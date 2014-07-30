@@ -43,10 +43,12 @@
 
 /*
  * Canonical C-language representation of a capability for compilers that
- * don't support capabilities directly.
+ * don't support capabilities directly.  We don't define internal fields by
+ * default as instructions, rather than memory access, should be preferred.
  */
 #define	CHERICAP_SIZE	32
 struct chericap {
+#ifdef CHERICAP_INTERNAL
 	uint32_t	c_reserved;
 #if BYTE_ORDER == BIG_ENDIAN
 	/* XXXRW: This definitely needs some testing. */
@@ -58,6 +60,9 @@ struct chericap {
 	uint64_t	c_otype;
 	uint64_t	c_base;
 	uint64_t	c_length;
+#else
+	uint8_t		c_data[CHERICAP_SIZE];
+#endif
 } __packed __aligned(CHERICAP_SIZE);
 #ifdef _KERNEL
 CTASSERT(sizeof(struct chericap) == CHERICAP_SIZE);
@@ -550,7 +555,7 @@ void	cheri_context_copy(struct pcb *dst, struct pcb *src);
 void	cheri_signal_copy(struct pcb *dst, struct pcb *src);
 void	cheri_stack_copy(struct pcb *dst, struct pcb *src);
 void	cheri_stack_init(struct pcb *pcb);
-int	cheri_stack_sandboxexception(struct thread *td, struct trapframe *tf,
+int	cheri_stack_unwind(struct thread *td, struct trapframe *tf,
 	    int signum);
 int	cheri_sysarch_getstack(struct thread *td, struct sysarch_args *uap);
 int	cheri_sysarch_setstack(struct thread *td, struct sysarch_args *uap);

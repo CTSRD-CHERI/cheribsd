@@ -131,8 +131,28 @@ void	cheritest_invoke_simple_op(int op);
 void	cheritest_invoke_syscall(void);
 void	cheritest_invoke_md5(void);
 void	cheritest_libcheri_userfn(void);
+void	cheritest_save_global(void);
+void	cheritest_save_ephemeral(void);
 int	cheritest_libcheri_setup(void);
 void	cheritest_libcheri_destroy(void);
+void	test_sandbox_cp2_bound_catch(void);
+void	test_sandbox_cp2_bound_nocatch(void);
+void	test_sandbox_cp2_perm_load_catch(void);
+void	test_sandbox_cp2_perm_load_nocatch(void);
+void	test_sandbox_cp2_perm_store_catch(void);
+void	test_sandbox_cp2_perm_store_nocatch(void);
+void	test_sandbox_cp2_tag_catch(void);
+void	test_sandbox_cp2_tag_nocatch(void);
+void	test_sandbox_cp2_seal_catch(void);
+void	test_sandbox_cp2_seal_nocatch(void);
+void	test_sandbox_divzero_catch(void);
+void	test_sandbox_divzero_nocatch(void);
+void	test_sandbox_vm_rfault_catch(void);
+void	test_sandbox_vm_rfault_nocatch(void);
+void	test_sandbox_vm_wfault_catch(void);
+void	test_sandbox_vm_wfault_nocatch(void);
+void	test_sandbox_vm_xfault_catch(void);
+void	test_sandbox_vm_xfault_nocatch(void);
 
 /* cheritest_stack.c */
 register_t	cheritest_libcheri_userfn_getstack(void);

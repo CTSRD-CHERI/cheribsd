@@ -625,7 +625,7 @@ trap(struct trapframe *trapframe)
 	/*
 	 * A trap can occur while DTrace executes a probe. Before
 	 * executing the probe, DTrace blocks re-scheduling and sets
-	 * a flag in it's per-cpu flags to indicate that it doesn't
+	 * a flag in its per-cpu flags to indicate that it doesn't
 	 * want to fault. On returning from the probe, the no-fault
 	 * flag is cleared and finally re-scheduling is enabled.
 	 *
@@ -638,7 +638,7 @@ trap(struct trapframe *trapframe)
 	 * XXXDTRACE: add pid probe handler here (if ever)
 	 */
 	if (!usermode) {
-		if (dtrace_trap_func != NULL && (*dtrace_trap_func)(trapframe, type))
+		if (dtrace_trap_func != NULL && (*dtrace_trap_func)(trapframe))
 			return (trapframe->pc);
 	}
 #endif
@@ -1192,24 +1192,7 @@ err:
 	ksi.ksi_code = ucode;
 	ksi.ksi_addr = (void *)addr;
 	ksi.ksi_trapno = type;
-#ifdef CPU_CHERI
-	/*
-	 * CHERI sandboxing may update register state and eat the signal, in
-	 * which case we fall out with a revised register file.
-	 *
-	 * NB: The definition of 'in a sandbox' used here is that the trusted
-	 * stack has a non-zero number of return frames.
-	 *
-	 * XXXRW: In the future, we'd like to instead remap the signal to
-	 * SIGSANDBOX delivered a userspace exception-handling capability
-	 * context.  Quite a bit of care will be required -- and some new
-	 * machinery to allow suitable contexts to be registered, rewrite the
-	 * trusted stack from userspace, etc.
-	 */
-	if (!cheri_stack_sandboxexception(td, trapframe, ksi.ksi_signo))
-
-#endif
-		trapsignal(td, &ksi);
+	trapsignal(td, &ksi);
 out:
 
 	/*

@@ -57,6 +57,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
+#include <sys/refcount.h>
 #include <sys/namei.h>
 #include <sys/proc.h>
 #include <sys/procdesc.h>
@@ -84,6 +85,14 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/jail.h>
 
+#ifdef CPU_CHERI
+/*
+ * XXXRW: We're not quite doing this in the right place, hence the header;
+ * need to work on that.
+ */
+#include <machine/cheri.h>
+#endif
+
 #include <machine/cpu.h>
 
 #include <security/audit/audit.h>
@@ -102,7 +111,6 @@ static int	coredump(struct thread *);
 static int	killpg1(struct thread *td, int sig, int pgid, int all,
 		    ksiginfo_t *ksi);
 static int	issignal(struct thread *td);
-static int	sigprop(int sig);
 static void	tdsigwakeup(struct thread *, int, sig_t, int);
 static void	sig_suspend_threads(struct thread *, struct proc *, int);
 static int	filt_sigattach(struct knote *kn);
@@ -136,8 +144,7 @@ SYSCTL_INT(_kern_sigqueue, OID_AUTO, max_pending_per_proc, CTLFLAG_RW,
     &max_pending_per_proc, 0, "Max pending signals per proc");
 
 static int	preallocate_siginfo = 1024;
-TUNABLE_INT("kern.sigqueue.preallocate", &preallocate_siginfo);
-SYSCTL_INT(_kern_sigqueue, OID_AUTO, preallocate, CTLFLAG_RD,
+SYSCTL_INT(_kern_sigqueue, OID_AUTO, preallocate, CTLFLAG_RDTUN,
     &preallocate_siginfo, 0, "Preallocated signal memory size");
 
 static int	signal_overflow = 0;
@@ -163,13 +170,11 @@ SYSINIT(signal, SI_SUB_P1003_1B, SI_ORDER_FIRST+3, sigqueue_start, NULL);
 	    (cr1)->cr_uid == (cr2)->cr_uid)
 
 static int	sugid_coredump;
-TUNABLE_INT("kern.sugid_coredump", &sugid_coredump);
-SYSCTL_INT(_kern, OID_AUTO, sugid_coredump, CTLFLAG_RW,
+SYSCTL_INT(_kern, OID_AUTO, sugid_coredump, CTLFLAG_RWTUN,
     &sugid_coredump, 0, "Allow setuid and setgid processes to dump core");
 
 static int	capmode_coredump;
-TUNABLE_INT("kern.capmode_coredump", &capmode_coredump);
-SYSCTL_INT(_kern, OID_AUTO, capmode_coredump, CTLFLAG_RW,
+SYSCTL_INT(_kern, OID_AUTO, capmode_coredump, CTLFLAG_RWTUN,
     &capmode_coredump, 0, "Allow processes in capability mode to dump core");
 
 static int	do_coredump = 1;
@@ -182,52 +187,43 @@ SYSCTL_INT(_kern, OID_AUTO, nodump_coredump, CTLFLAG_RW, &set_core_nodump_flag,
 
 /*
  * Signal properties and actions.
- * The array below categorizes the signals and their default actions
- * according to the following properties:
+ * The array below categorizes the signals and their default actions.
  */
-#define	SA_KILL		0x01		/* terminates process by default */
-#define	SA_CORE		0x02		/* ditto and coredumps */
-#define	SA_STOP		0x04		/* suspend process */
-#define	SA_TTYSTOP	0x08		/* ditto, from tty */
-#define	SA_IGNORE	0x10		/* ignore by default */
-#define	SA_CONT		0x20		/* continue if suspended */
-#define	SA_CANTMASK	0x40		/* non-maskable, catchable */
-
 static int sigproptbl[NSIG] = {
-	SA_KILL,			/* SIGHUP */
-	SA_KILL,			/* SIGINT */
-	SA_KILL|SA_CORE,		/* SIGQUIT */
-	SA_KILL|SA_CORE,		/* SIGILL */
-	SA_KILL|SA_CORE,		/* SIGTRAP */
-	SA_KILL|SA_CORE,		/* SIGABRT */
-	SA_KILL|SA_CORE,		/* SIGEMT */
-	SA_KILL|SA_CORE,		/* SIGFPE */
-	SA_KILL,			/* SIGKILL */
-	SA_KILL|SA_CORE,		/* SIGBUS */
-	SA_KILL|SA_CORE,		/* SIGSEGV */
-	SA_KILL|SA_CORE,		/* SIGSYS */
-	SA_KILL,			/* SIGPIPE */
-	SA_KILL,			/* SIGALRM */
-	SA_KILL,			/* SIGTERM */
-	SA_IGNORE,			/* SIGURG */
-	SA_STOP,			/* SIGSTOP */
-	SA_STOP|SA_TTYSTOP,		/* SIGTSTP */
-	SA_IGNORE|SA_CONT,		/* SIGCONT */
-	SA_IGNORE,			/* SIGCHLD */
-	SA_STOP|SA_TTYSTOP,		/* SIGTTIN */
-	SA_STOP|SA_TTYSTOP,		/* SIGTTOU */
-	SA_IGNORE,			/* SIGIO */
-	SA_KILL,			/* SIGXCPU */
-	SA_KILL,			/* SIGXFSZ */
-	SA_KILL,			/* SIGVTALRM */
-	SA_KILL,			/* SIGPROF */
-	SA_IGNORE,			/* SIGWINCH  */
-	SA_IGNORE,			/* SIGINFO */
-	SA_KILL,			/* SIGUSR1 */
-	SA_KILL,			/* SIGUSR2 */
-	SA_KILL,			/* SIGTHR */
-	SA_KILL,			/* SIGLIBRT */
-	SA_KILL|SA_CORE,		/* SIGPROT */
+	SIGPROP_KILL,					/* SIGHUP */
+	SIGPROP_KILL,					/* SIGINT */
+	SIGPROP_KILL|SIGPROP_CORE,			/* SIGQUIT */
+	SIGPROP_KILL|SIGPROP_CORE|SIGPROP_SBUNWIND,	/* SIGILL */
+	SIGPROP_KILL|SIGPROP_CORE,			/* SIGTRAP */
+	SIGPROP_KILL|SIGPROP_CORE,			/* SIGABRT */
+	SIGPROP_KILL|SIGPROP_CORE|SIGPROP_SBUNWIND,	/* SIGEMT */
+	SIGPROP_KILL|SIGPROP_CORE|SIGPROP_SBUNWIND,	/* SIGFPE */
+	SIGPROP_KILL,					/* SIGKILL */
+	SIGPROP_KILL|SIGPROP_CORE|SIGPROP_SBUNWIND,	/* SIGBUS */
+	SIGPROP_KILL|SIGPROP_CORE|SIGPROP_SBUNWIND,	/* SIGSEGV */
+	SIGPROP_KILL|SIGPROP_CORE,			/* SIGSYS */
+	SIGPROP_KILL,					/* SIGPIPE */
+	SIGPROP_KILL,					/* SIGALRM */
+	SIGPROP_KILL,					/* SIGTERM */
+	SIGPROP_IGNORE,					/* SIGURG */
+	SIGPROP_STOP,					/* SIGSTOP */
+	SIGPROP_STOP|SIGPROP_TTYSTOP,			/* SIGTSTP */
+	SIGPROP_IGNORE|SIGPROP_CONT,			/* SIGCONT */
+	SIGPROP_IGNORE,					/* SIGCHLD */
+	SIGPROP_STOP|SIGPROP_TTYSTOP,			/* SIGTTIN */
+	SIGPROP_STOP|SIGPROP_TTYSTOP,			/* SIGTTOU */
+	SIGPROP_IGNORE,					/* SIGIO */
+	SIGPROP_KILL,					/* SIGXCPU */
+	SIGPROP_KILL,					/* SIGXFSZ */
+	SIGPROP_KILL,					/* SIGVTALRM */
+	SIGPROP_KILL,					/* SIGPROF */
+	SIGPROP_IGNORE,					/* SIGWINCH  */
+	SIGPROP_IGNORE,					/* SIGINFO */
+	SIGPROP_KILL,					/* SIGUSR1 */
+	SIGPROP_KILL,					/* SIGUSR2 */
+	SIGPROP_KILL,					/* SIGTHR */
+	SIGPROP_KILL,					/* SIGLIBRT */
+	SIGPROP_KILL|SIGPROP_CORE|SIGPROP_SBUNWIND,	/* SIGPROT */
 };
 
 static void reschedule_signals(struct proc *p, sigset_t block, int flags);
@@ -606,7 +602,7 @@ sigonstack(size_t sp)
 	    : 0);
 }
 
-static __inline int
+int
 sigprop(int sig)
 {
 
@@ -738,7 +734,7 @@ kern_sigaction(td, sig, act, oact, flags)
 		 * have to restart the process.
 		 */
 		if (ps->ps_sigact[_SIG_IDX(sig)] == SIG_IGN ||
-		    (sigprop(sig) & SA_IGNORE &&
+		    (sigprop(sig) & SIGPROP_IGNORE &&
 		     ps->ps_sigact[_SIG_IDX(sig)] == SIG_DFL)) {
 			/* never to be seen again */
 			sigqueue_delete_proc(p, sig);
@@ -906,7 +902,7 @@ siginit(p)
 	ps = p->p_sigacts;
 	mtx_lock(&ps->ps_mtx);
 	for (i = 1; i <= NSIG; i++)
-		if (sigprop(i) & SA_IGNORE && i != SIGCONT)
+		if (sigprop(i) & SIGPROP_IGNORE && i != SIGCONT)
 			SIGADDSET(ps->ps_sigignore, i);
 	mtx_unlock(&ps->ps_mtx);
 	PROC_UNLOCK(p);
@@ -934,7 +930,7 @@ execsigs(struct proc *p)
 	while (SIGNOTEMPTY(ps->ps_sigcatch)) {
 		sig = sig_ffs(&ps->ps_sigcatch);
 		SIGDELSET(ps->ps_sigcatch, sig);
-		if (sigprop(sig) & SA_IGNORE) {
+		if (sigprop(sig) & SIGPROP_IGNORE) {
 			if (sig != SIGCONT)
 				SIGADDSET(ps->ps_sigignore, sig);
 			sigqueue_delete_proc(p, sig);
@@ -1878,6 +1874,24 @@ trapsignal(struct thread *td, ksiginfo_t *ksi)
 	PROC_LOCK(p);
 	ps = p->p_sigacts;
 	mtx_lock(&ps->ps_mtx);
+
+#ifdef CPU_CHERI
+	/*
+	 * If a signal triggered by a trap will not be caught by the process,
+	 * there's a sandbox frame to unwind, and the signal has the SBUNWIND
+	 * property, then the kernel will autounwind the trusted stack.
+	 *
+	 * XXXRW: It would be nice if this were in machine-dependent code ..
+	 * maybe?
+	 */
+	if ((p->p_flag & P_TRACED) == 0 && !SIGISMEMBER(ps->ps_sigcatch, sig)
+	    && (sigprop(sig) & SIGPROP_SBUNWIND) &&
+	    cheri_stack_unwind(td, td->td_frame, sig)) {
+		printf("Sandbox unwind on uncaught signal %d, pid %d, tid "
+		    "%d\n", sig, p->p_pid, td->td_tid);
+		mtx_unlock(&ps->ps_mtx);
+	} else
+#endif
 	if ((p->p_flag & P_TRACED) == 0 && SIGISMEMBER(ps->ps_sigcatch, sig) &&
 	    !SIGISMEMBER(td->td_sigmask, sig)) {
 		td->td_ru.ru_nsignals++;
@@ -1899,7 +1913,7 @@ trapsignal(struct thread *td, ksiginfo_t *ksi)
 			 */
 			SIGDELSET(ps->ps_sigcatch, sig);
 			if (sig != SIGCONT &&
-			    sigprop(sig) & SA_IGNORE)
+			    sigprop(sig) & SIGPROP_IGNORE)
 				SIGADDSET(ps->ps_sigignore, sig);
 			ps->ps_sigact[_SIG_IDX(sig)] = SIG_DFL;
 		}
@@ -2090,16 +2104,16 @@ tdsendsignal(struct proc *p, struct thread *td, int sig, ksiginfo_t *ksi)
 		intrval = ERESTART;
 	mtx_unlock(&ps->ps_mtx);
 
-	if (prop & SA_CONT)
+	if (prop & SIGPROP_CONT)
 		sigqueue_delete_stopmask_proc(p);
-	else if (prop & SA_STOP) {
+	else if (prop & SIGPROP_STOP) {
 		/*
 		 * If sending a tty stop signal to a member of an orphaned
 		 * process group, discard the signal here if the action
 		 * is default; don't stop the process below if sleeping,
 		 * and don't clear any pending SIGCONT.
 		 */
-		if ((prop & SA_TTYSTOP) &&
+		if ((prop & SIGPROP_TTYSTOP) &&
 		    (p->p_pgrp->pg_jobc == 0) &&
 		    (action == SIG_DFL)) {
 			if (ksi && (ksi->ksi_flags & KSI_INS))
@@ -2124,7 +2138,7 @@ tdsendsignal(struct proc *p, struct thread *td, int sig, ksiginfo_t *ksi)
 	 * except that stopped processes must be continued by SIGCONT.
 	 */
 	if (action == SIG_HOLD &&
-	    !((prop & SA_CONT) && (p->p_flag & P_STOPPED_SIG)))
+	    !((prop & SIGPROP_CONT) && (p->p_flag & P_STOPPED_SIG)))
 		return (ret);
 	/*
 	 * SIGKILL: Remove procfs STOPEVENTs.
@@ -2163,7 +2177,7 @@ tdsendsignal(struct proc *p, struct thread *td, int sig, ksiginfo_t *ksi)
 			goto runfast;
 		}
 
-		if (prop & SA_CONT) {
+		if (prop & SIGPROP_CONT) {
 			/*
 			 * If traced process is already stopped,
 			 * then no further action is necessary.
@@ -2213,7 +2227,7 @@ tdsendsignal(struct proc *p, struct thread *td, int sig, ksiginfo_t *ksi)
 			goto out;
 		}
 
-		if (prop & SA_STOP) {
+		if (prop & SIGPROP_STOP) {
 			/*
 			 * If traced process is already stopped,
 			 * then no further action is necessary.
@@ -2260,7 +2274,7 @@ tdsendsignal(struct proc *p, struct thread *td, int sig, ksiginfo_t *ksi)
 
 		MPASS(action == SIG_DFL);
 
-		if (prop & SA_STOP) {
+		if (prop & SIGPROP_STOP) {
 			if (p->p_flag & (P_PPWAIT|P_WEXIT))
 				goto out;
 			p->p_flag |= P_STOPPED_SIG;
@@ -2325,7 +2339,8 @@ tdsigwakeup(struct thread *td, int sig, sig_t action, int intrval)
 	 * Bring the priority of a thread up if we want it to get
 	 * killed in this lifetime.
 	 */
-	if (action == SIG_DFL && (prop & SA_KILL) && td->td_priority > PUSER)
+	if (action == SIG_DFL && (prop & SIGPROP_KILL) &&
+	    td->td_priority > PUSER)
 		sched_prio(td, PUSER);
 	if (TD_ON_SLEEPQ(td)) {
 		/*
@@ -2341,7 +2356,7 @@ tdsigwakeup(struct thread *td, int sig, sig_t action, int intrval)
 		 * asleep, we are finished; the process should not
 		 * be awakened.
 		 */
-		if ((prop & SA_CONT) && action == SIG_DFL) {
+		if ((prop & SIGPROP_CONT) && action == SIG_DFL) {
 			thread_unlock(td);
 			PROC_SUNLOCK(p);
 			sigqueue_delete(&p->p_sigqueue, sig);
@@ -2357,7 +2372,7 @@ tdsigwakeup(struct thread *td, int sig, sig_t action, int intrval)
 		 * Don't awaken a sleeping thread for SIGSTOP if the
 		 * STOP signal is deferred.
 		 */
-		if ((prop & SA_STOP) && (td->td_flags & TDF_SBDRY))
+		if ((prop & SIGPROP_STOP) && (td->td_flags & TDF_SBDRY))
 			goto out;
 
 		/*
@@ -2700,10 +2715,10 @@ issignal(struct thread *td)
 			 * if process is member of an orphaned
 			 * process group, ignore tty stop signals.
 			 */
-			if (prop & SA_STOP) {
+			if (prop & SIGPROP_STOP) {
 				if (p->p_flag & (P_TRACED|P_WEXIT) ||
 				    (p->p_pgrp->pg_jobc == 0 &&
-				     prop & SA_TTYSTOP))
+				     prop & SIGPROP_TTYSTOP))
 					break;	/* == ignore */
 				mtx_unlock(&ps->ps_mtx);
 				WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK,
@@ -2716,7 +2731,7 @@ issignal(struct thread *td)
 				PROC_SUNLOCK(p);
 				mtx_lock(&ps->ps_mtx);
 				break;
-			} else if (prop & SA_IGNORE) {
+			} else if (prop & SIGPROP_IGNORE) {
 				/*
 				 * Except for SIGCONT, shouldn't get here.
 				 * Default action is to ignore; drop it.
@@ -2732,7 +2747,7 @@ issignal(struct thread *td)
 			 * to take action on an ignored signal other
 			 * than SIGCONT, unless process is traced.
 			 */
-			if ((prop & SA_CONT) == 0 &&
+			if ((prop & SIGPROP_CONT) == 0 &&
 			    (p->p_flag & P_TRACED) == 0)
 				printf("issignal\n");
 			break;		/* == ignore */
@@ -2851,7 +2866,7 @@ postsig(sig)
 			 */
 			SIGDELSET(ps->ps_sigcatch, sig);
 			if (sig != SIGCONT &&
-			    sigprop(sig) & SA_IGNORE)
+			    sigprop(sig) & SIGPROP_IGNORE)
 				SIGADDSET(ps->ps_sigignore, sig);
 			ps->ps_sigact[_SIG_IDX(sig)] = SIG_DFL;
 		}
@@ -2909,7 +2924,8 @@ sigexit(td, sig)
 	 * XXX If another thread attempts to single-thread before us
 	 *     (e.g. via fork()), we won't get a dump at all.
 	 */
-	if ((sigprop(sig) & SA_CORE) && (thread_single(SINGLE_NO_EXIT) == 0)) {
+	if ((sigprop(sig) & SIGPROP_CORE) &&
+	    (thread_single(SINGLE_NO_EXIT) == 0)) {
 		p->p_sig = sig;
 		/*
 		 * Log signals which would cause core dumps
@@ -3055,8 +3071,7 @@ SYSCTL_INT(_kern, OID_AUTO, compress_user_cores_gzlevel, CTLFLAG_RW,
 #endif
 
 static char corefilename[MAXPATHLEN] = {"%N.core"};
-TUNABLE_STR("kern.corefile", corefilename, sizeof(corefilename));
-SYSCTL_STRING(_kern, OID_AUTO, corefile, CTLFLAG_RW, corefilename,
+SYSCTL_STRING(_kern, OID_AUTO, corefile, CTLFLAG_RWTUN, corefilename,
     sizeof(corefilename), "Process corefile name format string");
 
 /*
@@ -3429,21 +3444,17 @@ void
 sigacts_free(struct sigacts *ps)
 {
 
-	mtx_lock(&ps->ps_mtx);
-	ps->ps_refcnt--;
-	if (ps->ps_refcnt == 0) {
-		mtx_destroy(&ps->ps_mtx);
-		free(ps, M_SUBPROC);
-	} else
-		mtx_unlock(&ps->ps_mtx);
+	if (refcount_release(&ps->ps_refcnt) == 0)
+		return;
+	mtx_destroy(&ps->ps_mtx);
+	free(ps, M_SUBPROC);
 }
 
 struct sigacts *
 sigacts_hold(struct sigacts *ps)
 {
-	mtx_lock(&ps->ps_mtx);
-	ps->ps_refcnt++;
-	mtx_unlock(&ps->ps_mtx);
+
+	refcount_acquire(&ps->ps_refcnt);
 	return (ps);
 }
 
@@ -3460,10 +3471,6 @@ sigacts_copy(struct sigacts *dest, struct sigacts *src)
 int
 sigacts_shared(struct sigacts *ps)
 {
-	int shared;
 
-	mtx_lock(&ps->ps_mtx);
-	shared = ps->ps_refcnt > 1;
-	mtx_unlock(&ps->ps_mtx);
-	return (shared);
+	return (ps->ps_refcnt > 1);
 }

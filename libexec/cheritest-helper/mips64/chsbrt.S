@@ -28,9 +28,11 @@
 # SUCH DAMAGE.
 #
 
-.set mips64
+#include <machine/cherireg.h>
+
+#.set mips64
 .set noreorder
-.set nobopt
+#.set nobopt
 .set noat
 
 #
@@ -75,7 +77,13 @@ __ccall_enter:
 	# Set up in-sandbox stack; assume that suitable space for a stack has
 	# been made at the top of the sandbox address space described by IDC.
 	#
-	cmove	$c11, $c26
+	# XXXRW: We make the stack capability ephemeral, and disallow storing
+	# ephemeral capabilities via $c0 here, rather than in the TCB.  This
+	# is to ensure software is ready for proper stack handling.  We can
+	# remove these candperms once that is present.
+	#
+	dli	$t0, (~CHERI_PERM_NON_EPHEMERAL)
+	candperm	$c11, $c26, $t0
 	cgetlen	$sp, $c26
 	move	$fp, $sp
 
@@ -84,7 +92,8 @@ __ccall_enter:
 	# stores to memory inside the sandbox, and $c0-relative capability
 	# fetches and stores.
 	#
-	cmove	$c0, $c26
+	dli	$t0, (~CHERI_PERM_STORE_EPHEM_CAP)
+	candperm	$c0, $c26, $t0
 
 	#
 	# XXXRW: Defensively clear all general-purpose and capability
