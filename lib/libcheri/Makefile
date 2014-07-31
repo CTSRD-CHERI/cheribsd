@@ -11,10 +11,17 @@ SRCS=	cheri_invoke.S			\
 	sandbox_loader.c		\
 
 # Temporary stuff that should be in libc or similar
-SRCS+=	memcpy_c.s			\
+SRCS+=	\
+	memchr_c.c			\
+	memcmp_c.c			\
 	memcpy_c_tofrom.c		\
+	memcpy_c.s			\
 	strnlen_c.c			\
-	strncpy_c.c
+	strncpy_c.c			\
+	strchr_c.c			\
+	strcmp_c.c			\
+	strtol_c.c			\
+	strncmp_c.c
 
 INCS=	cheri_class.h			\
 	cheri_enter.h			\
@@ -44,6 +51,7 @@ CLEANFILES=	cheri_classes.o cheri_invoke.o
 NO_WERROR=
 
 .PATH: ${.CURDIR}/${MACHINE_ARCH}
+.PATH: ${.CURDIR}/../libc/stdlib
 .PATH: ${.CURDIR}/../libc/string
 .PATH: ${.CURDIR}/../libc/${MACHINE}/string
 
