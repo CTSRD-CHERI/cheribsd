@@ -38,6 +38,10 @@ LDADD+= -lcrypto
 CFLAGS+= -I${DESTDIR}/usr/include/openssl
 CFLAGS+= -DHAVE_LIBCRYPTO -DHAVE_OPENSSL_EVP_H
 .endif
+.if defined(CHERILIB)
+DPADD+=	${LIBCHERI}
+LDADD+=	-lcheri
+.endif
 
 version.c: ${TCPDUMP_DISTDIR}/VERSION
 	rm -f version.c ; \
