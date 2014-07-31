@@ -1829,6 +1829,7 @@ static void
 print_packet(u_char *user, const struct pcap_pkthdr *h, const u_char *sp)
 {
 	struct print_info *print_info;
+	packetbody_t p;
 
 	++packets_captured;
 
@@ -1836,15 +1837,16 @@ print_packet(u_char *user, const struct pcap_pkthdr *h, const u_char *sp)
 
 	print_info = (struct print_info *)user;
 
+	p = cheri_ptrperm((void *)sp, h->caplen,
+	    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP);
 	/*
 	 * Some printers want to check that they're not walking off the
 	 * end of the packet.
 	 * Rather than pass it all the way down, we set this global.
 	 */
-	snapend = cheri_ptrperm((void *)(sp + h->caplen), 0, 0);
+	snapend = p + h->caplen;
 
-	pretty_print_packet(print_info, h, cheri_ptrperm((void *)sp, h->caplen,
-	    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP));
+	pretty_print_packet(print_info, h, p);
 
 	putchar('\n');
 
