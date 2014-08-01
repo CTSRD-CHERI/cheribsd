@@ -20,6 +20,7 @@ SRCS+=	\
 	strncpy_c.c			\
 	strchr_c.c			\
 	strcmp_c.c			\
+	strcpy_c.c			\
 	strtol_c.c			\
 	strncmp_c.c
 
