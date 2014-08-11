@@ -234,6 +234,10 @@ struct cheri_stack {
 	__asm__ __volatile__ ("cgettype %0, $c%1" : "=r" (v) :		\
 	    "i" (cb));							\
 } while (0)
+#define	CHERI_CGETOFFSET(v, cb) do {					\
+	__asm__ __volatile__ ("cgetoffset %0, $c%1" : "=r" (v) :		\
+	    "i" (cb));							\
+} while (0)
 
 #define	CHERI_CGETCAUSE(v) do {						\
 	__asm__ __volatile__ ("cgetcause %0" : "=r" (v));		\
