@@ -190,6 +190,7 @@ const struct mips_opcode mips_builtin_opcodes[] =
 {"move",    "d,s",	0x00000025, 0xfc1f07ff,	WR_d|RD_s,		INSN2_ALIAS,	I1	},/* or */
 {"cgetperm", "t,+b",	    0x48000000, 0xffe007ff, 0, 0, I1},
 {"cgettype", "t,+b",	    0x48000001, 0xffe007ff, 0, 0, I1},
+{"cgetoffset", "t,+b",	    0x49a00002, 0xffe007ff, 0, 0, I1},
 {"cgetbase", "t,+b",	    0x48000002, 0xffe007ff, 0, 0, I1},
 {"cgetlen",  "t,+b",	    0x48000003, 0xffe007ff, 0, 0, I1},
 {"cgetcause", "t",          0x48000004, 0xffe0ffff, 0, 0, I1},
