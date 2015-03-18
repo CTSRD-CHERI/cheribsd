@@ -16,7 +16,7 @@ nocpu           CPU_HAVEFPU
 nooptions       SMP
 
 nooptions	HZ
-options 	HZ=100
+options 	HZ=2
 
 nooptions	INVARIANTS
 nooptions	INVARIANT_SUPPORT
