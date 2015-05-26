@@ -154,6 +154,7 @@ _LIBRARIES=	\
 		stdthreads \
 		supcplusplus \
 		svgtiny \
+		syscalls \
 		tacplus \
 		termcapw \
 		ufs \

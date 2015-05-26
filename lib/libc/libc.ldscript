@@ -1,2 +1,2 @@
 /* $FreeBSD$ */
-GROUP ( @@SHLIB@@ @@LIBDIR@@/libc_nonshared.a @@LIBDIR@@/libssp_nonshared.a )
+GROUP ( @@SHLIB@@ @@SHLIBDIR@@/libsyscalls.so.7 @@LIBDIR@@/libc_nonshared.a @@LIBDIR@@/libssp_nonshared.a )

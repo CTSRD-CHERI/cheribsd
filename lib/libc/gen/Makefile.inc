@@ -60,7 +60,6 @@ SRCS+=	__getosreldate.c \
 	getgrouplist.c \
 	gethostname.c \
 	getloadavg.c \
-	getlogin.c \
 	getmntinfo.c \
 	getnetgrent.c \
 	getosreldate.c \

@@ -119,6 +119,7 @@ LIBSSL?=	${DESTDIR}${LIBDIR}/libssl.a
 LIBSSP_NONSHARED?=	${DESTDIR}${LIBDIR}/libssp_nonshared.a
 LIBSTAND?=	${DESTDIR}${LIBDIR}/libstand.a
 LIBSTDCPLUSPLUS?= ${DESTDIR}${LIBDIR}/libstdc++.a
+LIBSYSCALLS?=	${DESTDIR}${LIBDIR}/libsyscalls.a
 LIBTACPLUS?=	${DESTDIR}${LIBDIR}/libtacplus.a
 LIBTERMCAP?=	${DESTDIR}${LIBDIR}/libtermcap.a
 LIBTERMCAPW?=	${DESTDIR}${LIBDIR}/libtermcapw.a
@@ -156,5 +157,8 @@ LDADD:=	${LDADD:N-lpthread} -lpthread
 .endif
 .if ${LDADD:M-lc}
 LDADD:=	${LDADD:N-lc} -lc
+.endif
+.if ${LDADD:M-lsyscalls}
+LDADD:=	${LDADD:N-lsyscalls} -lsyscalls
 .endif
 .endif

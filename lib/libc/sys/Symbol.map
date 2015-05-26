@@ -590,12 +590,14 @@ FBSDprivate_1.0 {
 	__sys_fork;
 	_fpathconf;
 	__sys_fpathconf;
+	freebsd7___semctl;
 	_fstat;
 	__sys_fstat;
 	_fstatfs;
 	__sys_fstatfs;
 	_fsync;
 	__sys_fsync;
+	__sys_futimens;
 	_futimes;
 	__sys_futimes;
 	_getaudit;
@@ -1033,6 +1035,7 @@ FBSDprivate_1.0 {
 	__sys_unmount;
 	_utimes;
 	__sys_utimes;
+	__sys_utimensat;
 	_utrace;
 	__sys_utrace;
 	_uuidgen;

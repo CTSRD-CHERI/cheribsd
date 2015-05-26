@@ -13,6 +13,7 @@ SUBDIR_ORDERED=	csu \
 	libc \
 	libc_nonshared \
 	libcompiler_rt \
+	libsyscalls \
 	${_libc_cheri} \
 	${_libcheri} \
 	${_libclang_rt} \

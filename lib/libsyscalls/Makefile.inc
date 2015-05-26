@@ -11,23 +11,18 @@
 # Include machine dependent definitions.
 #
 # MDASM names override the default syscall names in MIASM.
-# NOASM will prevent the default syscall code from being generated.
 #
-.sinclude "${LIBC_SRCTOP}/${LIBC_ARCH}/sys/Makefile.inc"
+#.sinclude "${LIBC_SRCTOP}/${LIBC_ARCH}/sys/Makefile.inc"
+.sinclude "${.CURDIR}/${LIBC_ARCH}/Makefile.inc"
 
-SRCS+= clock_gettime.c gettimeofday.c __vdso_gettimeofday.c
-
-# Sources common to both syscall interfaces:
-SRCS+=	\
-	stack_protector.c \
-	stack_protector_compat.c \
-	__error.c \
-	interposing_table.c
+PSEUDO+= _clock_gettime.o _gettimeofday.o
+SRCS+= futimens.c utimensat.c
+PSEUDO+= _futimens.o _utimensat.o
 
 # Don't generate default code for these syscalls:
-NOASM+=  break.o openbsd_poll.o sstk.o yield.o
+NOASM+= break.o openbsd_poll.o sstk.o yield.o
 
-PSEUDO+= _exit.o _getlogin.o
+PSEUDO+= _getlogin.o _exit.o
 
 INTERPOSED = \
 	accept \
@@ -65,15 +60,43 @@ INTERPOSED = \
 	write \
 	writev
 
-.if ${MACHINE_CPUARCH} == "sparc64"
-SRCS+=	sigaction.c
-.else
+.if ${MACHINE_CPUARCH} != "sparc64"
 INTERPOSED+= sigaction
 .endif
 
-SRCS+=	${INTERPOSED:S/$/.c/}
+PSEUDO+=	${INTERPOSED:C/^.*$/_&.o/}
+
+# Don't generate default assembly for PSEUDOs
+NOASM+=		${PSEUDO:S/^_//}
+
+# Add machine dependent asm sources:
+SRCS+=${MDASM}
+
+# Look though the complete list of syscalls (MIASM) for names that are
+# not defined with machine dependent implementations (MDASM) and are
+# not declared for generation of wrapped syscall code (PSEUDO).  Add each
+# syscall that satisfies these conditions to the ASM list.
+.for _asm in ${MIASM}
+.if (${MDASM:R:M${_asm:R}} == "")
+.if (${NOASM:R:M${_asm:R}} == "")
+ASM+=$(_asm)
+.endif
+.endif
+.endfor
+
+OBJS+=	${ASM} ${PSEUDO}
+
+SASM=	${ASM:S/.o/.S/}
+
+SPSEUDO= ${PSEUDO:S/.o/.S/}
+
+SRCS+=	${SASM} ${SPSEUDO}
 
 SYM_MAPS+=	${LIBC_SRCTOP}/sys/Symbol.map
+SYM_MAPS+=	${.CURDIR}/${LIBC_ARCH}/Symbol.map
+
+# Generated files
+CLEANFILES+=	${SASM} ${SPSEUDO}
 
 .if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386" || \
     ${MACHINE_CPUARCH} == "powerpc"
@@ -81,6 +104,17 @@ NOTE_GNU_STACK='\t.section .note.GNU-stack,"",%%progbits\n'
 .else
 NOTE_GNU_STACK=''
 .endif
+
+${SASM}:
+	printf '#include "compat.h"\n' > ${.TARGET}
+	printf '#include "SYS.h"\nRSYSCALL(${.PREFIX})\n' >> ${.TARGET}
+	printf  ${NOTE_GNU_STACK} >>${.TARGET}
+
+${SPSEUDO}:
+	printf '#include "compat.h"\n' > ${.TARGET}
+	printf '#include "SYS.h"\nPSEUDO(${.PREFIX:S/_//})\n' \
+	    >> ${.TARGET}
+	printf ${NOTE_GNU_STACK} >>${.TARGET}
 
 MAN+=	abort2.2 \
 	accept.2 \
