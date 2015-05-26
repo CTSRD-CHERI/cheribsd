@@ -316,9 +316,26 @@ realinstall: _libinstall
 .ORDER: beforeinstall _libinstall
 _libinstall:
 .if defined(LIB) && !empty(LIB) && ${MK_INSTALLLIB} != "no"
+.if defined(LIB_LDSCRIPT) && !empty(LIB_LDSCRIPT)
+.if !exists(${.CURDIR}/${LIB_LDSCRIPT})
+.error LIB_LDSCRIPT (${.CURDIR}/${LIB_LDSCRIPT}) is missing
+.endif
+	sed -e 's,@@LIB@@,${_LDSCRIPTROOT}${_LIBDIR}/lib${LIB}.a.real,g' \
+	    -e 's,@@LIBDIR@@,${_LDSCRIPTROOT}${_LIBDIR},g' \
+	    ${.CURDIR}/${LIB_LDSCRIPT} > ${DESTDIR}${_LIBDIR}/lib${LIB}.a.ld
+	${INSTALL} -S -C -o ${LIBOWN} -g ${LIBGRP} -m ${LIBMODE} \
+	    ${_INSTALLFLAGS} ${DESTDIR}${_LIBDIR}/lib${LIB}.a.ld \
+	    ${DESTDIR}${_LIBDIR}/lib${LIB}.a
+	rm -f ${DESTDIR}${_LIBDIR}/lib${LIB}.a.ld
+	${INSTALL} -C -o ${LIBOWN} -g ${LIBGRP} -m ${LIBMODE} \
+	    ${_INSTALLFLAGS} lib${LIB_PRIVATE}${LIB}${LIB_SUFFIX}.a \
+	    ${DESTDIR}${_LIBDIR}/lib${LIB_PRIVATE}${LIB}${LIB_SUFFIX}.a.real
+.else
 	${INSTALL} -C -o ${LIBOWN} -g ${LIBGRP} -m ${LIBMODE} \
 	    ${_INSTALLFLAGS} lib${LIB_PRIVATE}${LIB}${LIB_SUFFIX}.a \
 	    ${DESTDIR}${_LIBDIR}
+
+.endif
 .endif
 .if ${MK_PROFILE} != "no" && defined(LIB) && !empty(LIB)
 	${INSTALL} -C -o ${LIBOWN} -g ${LIBGRP} -m ${LIBMODE} \
@@ -358,6 +375,7 @@ _libinstall:
 .if defined(SHLIB_LDSCRIPT) && !empty(SHLIB_LDSCRIPT) && exists(${.CURDIR}/${SHLIB_LDSCRIPT})
 	sed -e 's,@@SHLIB@@,${_LDSCRIPTROOT}${_SHLIBDIR}/${SHLIB_NAME},g' \
 	    -e 's,@@LIBDIR@@,${_LDSCRIPTROOT}${_LIBDIR},g' \
+	    -e 's,@@SHLIBDIR@@,${_LDSCRIPTROOT}${_SHLIBDIR},g' \
 	    ${.CURDIR}/${SHLIB_LDSCRIPT} > ${DESTDIR}${_LIBDIR}/${SHLIB_LINK:R}.ld
 	${INSTALL} -S -C -o ${LIBOWN} -g ${LIBGRP} -m ${LIBMODE} \
 	    ${_INSTALLFLAGS} ${DESTDIR}${_LIBDIR}/${SHLIB_LINK:R}.ld \
