@@ -16,7 +16,8 @@ SRCS+=	cheritest_ccall.c						\
 	cheritest_syscall.c						\
 	cheritest_util.c						\
 	cheritest_var.c							\
-	cheritest_vm.c
+	cheritest_vm.c							\
+	cheritest_vm_swap.c
 .endif
 
 MAN=
