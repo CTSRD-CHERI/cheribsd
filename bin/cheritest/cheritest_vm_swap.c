@@ -98,7 +98,7 @@ caps2(const char *nam, __capability void *p)
 	    (size_t)cheri_getlen(p),
 	    (size_t)cheri_getoffset(p),
 	    (int)cheri_gettag(p),
-	    (int)__builtin_cheri_get_cap_sealed(p),
+	    (int)cheri_getsealed(p),
 	    (size_t)cheri_gettype(p),
 	    (size_t)cheri_getperm(p));
 
@@ -113,7 +113,7 @@ cne2(__capability void *p1, __capability void *p2)
 	    cheri_getbase(p1) != cheri_getbase(p2) ||
 	    cheri_getlen(p1) != cheri_getlen(p2) ||
 	    cheri_getoffset(p1) != cheri_getoffset(p2) ||
-	    __builtin_cheri_get_cap_sealed(p1) != __builtin_cheri_get_cap_sealed(p2) ||
+	    cheri_getsealed(p1) != cheri_getsealed(p2) ||
 	    cheri_gettype(p1) != cheri_gettype(p2) ||
 	    cheri_getperm(p1) != cheri_getperm(p2))
 		return (1);
