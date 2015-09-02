@@ -14,6 +14,8 @@ ident		CHERI_DE4_BENCHMARK
 
 include		CHERI_TEMPLATE
 
+options         MIPS_DISABLE_L1_CACHE
+
 #options       CPU_CHERI_CHERI0
 #options       CPU_CHERI_CHERI8
 #options       CPU_CHERI_CHERI16
