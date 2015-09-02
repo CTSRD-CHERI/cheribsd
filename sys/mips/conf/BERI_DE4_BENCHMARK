@@ -13,7 +13,7 @@ include		BERI_DE4_MDROOT
 ident		BERI_DE4_BENCHMARK
 
 nocpu           CPU_HAVEFPU
-nooptions       SMP
+#nooptions       SMP
 
 nooptions	HZ
 options 	HZ=2
