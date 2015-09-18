@@ -60,42 +60,15 @@
 #define CAP
 struct cheri_object cheri_bench;
 
-#define DEFINE_RDHWR_COUNTER_GETTER(name,regno)      \
-  static inline int32_t get_##name##_count (void) \
-  {					       \
-  int32_t ret;				       \
-  __asm __volatile("rdhwr %0, $"#regno : "=r" (ret)); \
-  return ret;						\
-  }
-
-
 #else
 
 #define __capability
 #define memcpy_c memcpy
 #define cheri_ptr(c,l) c
 
-// Manually assembled due to gcc/gas refusing to recognise custom rdhwr registers:
-// rdhwr $12, $rdhwrreg
-// move  $ret, $12
-// Move is needed because we can't get a raw register number for ret in the assembler
-// template without it being prefixed by $. Note that $12 == $t0.
-#define DEFINE_RDHWR_COUNTER_GETTER(name,regno)				\
-  static inline int32_t get_##name##_count (void)			\
-  {									\
-    int32_t ret;							\
-    __asm __volatile(".word (0x1f << 26) | (12 << 16) | (" #regno  " << 11) | 0x3b\n\tmove %0,$12" : "=r" (ret) :: "$12"); \
-    return ret;								\
-  }
-
 #endif
 
 static useconds_t console_usleep = 100000;
-
-DEFINE_RDHWR_COUNTER_GETTER(cycle,2)
-DEFINE_RDHWR_COUNTER_GETTER(inst,4)
-DEFINE_RDHWR_COUNTER_GETTER(tlb_inst,5)
-DEFINE_RDHWR_COUNTER_GETTER(tlb_data,6)
 
 typedef void memcpy_t(__capability char *, __capability char *, size_t, void *data);
 
@@ -106,17 +79,6 @@ struct semaphore_shared_data {
   __capability char * volatile dataout;
   volatile size_t len;
   int core;
-};
-
-struct counters {
-  // NB we use signed 32-bit because that is what rdhwr returns (annoyingly) and casting
-  // causes compiler to emit a lot of extra code which can be avoided if we just keep
-  // everything int32 then cast to uint32 just before displaying. Roll-over is fine
-  // so long as test is shorter than 2*32 cycles (42 seconds @ 100MHz).
-  int32_t insts;
-  int32_t cycles;
-  int32_t instTLB;
-  int32_t dataTLB;
 };
 
 /*
@@ -247,10 +209,10 @@ static void *semaphore_sandbox_func(void *arg)
     }
 }
 
-int benchmark(memcpy_t *memcpy_func, __capability char *dataout, __capability char *datain, size_t size, const char* name, uint reps, struct counters *samples, void *data) __attribute__((__noinline__));
-int benchmark(memcpy_t *memcpy_func, __capability char *dataout, __capability char *datain, size_t size, const char* name, uint reps, struct counters *samples, void *data)
+int benchmark(memcpy_t *memcpy_func, __capability char *dataout, __capability char *datain, size_t size, const char* name, uint reps, struct cheri_counters *samples, void *data) __attribute__((__noinline__));
+int benchmark(memcpy_t *memcpy_func, __capability char *dataout, __capability char *datain, size_t size, const char* name, uint reps, struct cheri_counters *samples, void *data)
 {
-      int32_t cycles, cycles2, insts, insts2, instTLB, instTLB2, dataTLB, dataTLB2;
+      struct cheri_counters start_counters, end_counters;
       // Initialise arrays
       for (uint i=0; i < size; i++) 
 	{
@@ -260,19 +222,13 @@ int benchmark(memcpy_t *memcpy_func, __capability char *dataout, __capability ch
 
       for (uint rep = 0; rep < reps; rep++) 
 	{
-	  cycles  = get_cycle_count();
-	  insts   = get_inst_count();
-	  instTLB = get_tlb_inst_count();
-	  dataTLB = get_tlb_data_count();
+	  cheri_get_all_counters(&start_counters);
+	  CHERI_START_TRACE;
 	  memcpy_func(dataout, datain, size, data);
-	  cycles2  = get_cycle_count();
-	  insts2   = get_inst_count();
-	  instTLB2 = get_tlb_inst_count();
-	  dataTLB2 = get_tlb_data_count();
-	  samples[rep].cycles = cycles2 - cycles;
-	  samples[rep].insts  = insts2 - insts;
-	  samples[rep].instTLB = instTLB2 - instTLB;
-	  samples[rep].dataTLB = dataTLB2 - dataTLB;
+	  CHERI_STOP_TRACE;
+	  cheri_get_all_counters(&end_counters);
+	  cheri_subtract_counters(&samples[rep], &end_counters, &start_counters);
+
 	  for (uint i=0; i < size; i+=8)
 	    {
 	      assert(dataout[i] == (char) i);
@@ -288,14 +244,17 @@ int benchmark(memcpy_t *memcpy_func, __capability char *dataout, __capability ch
 	printf("\n%zu,%s,"#metric, size, name);			\
 	for (uint rep = 0; rep < reps; rep++) {			\
 	  if ((rep & 0x7) == 0) flushit();			\
-	  printf(",%u", (uint32_t) samples[rep].metric);	\
+	  printf(",%ju", samples[rep].metric);	\
 	}							\
 	flushit();						\
       } while(0)
       dump_metric(cycles);
       dump_metric(insts);
-      dump_metric(instTLB);
-      dump_metric(dataTLB);
+      dump_metric(tlb_inst);
+      dump_metric(tlb_data);
+      dump_metric(inst_cache_misses);
+      dump_metric(data_cache_misses);
+      dump_metric(data_cache_accesses);
       return 0;
 }
 
@@ -329,7 +288,7 @@ main(int argc, char *argv[])
 	int ch;
 	int func = 0, invoke = 0, do_socket = 0, do_pipe=0, shared = 0, threads = 0, mutex = 0;
 	int inOffset = 0, outOffset = 0;
-	struct counters *samples;
+	struct cheri_counters *samples;
 	pthread_t sb_thread;
 	struct semaphore_shared_data *mutex_shared;
 	struct semaphore_shared_data *pthread_shared;
@@ -415,7 +374,7 @@ main(int argc, char *argv[])
 		printf("Invalid argument: %s\n", argv[arg]);
 	    max_size = size > max_size ? size : max_size;
 	  }
-	// parent always runs on core 0 (XXX rdhwr counters not enabled on APs)
+	// parent always runs on core 0
 	set_my_affinity(0); 
 	datain  = mmap(NULL, max_size + inOffset, PROT_READ | PROT_WRITE, MAP_ANON | MAP_SHARED, -1, 0);
 	dataout = mmap(NULL, max_size + outOffset, PROT_READ | PROT_WRITE, MAP_ANON | MAP_SHARED, -1, 0);
@@ -526,7 +485,7 @@ main(int argc, char *argv[])
 	  {
 	    printf(",r%d",rep);
 	  }
-	samples = malloc(sizeof(struct counters) * reps);
+	samples = malloc(sizeof(struct cheri_counters) * reps);
 	if (samples == NULL)
 	  err(1, "malloc samples");
 	for(arg = 0; arg < argc; arg++)
