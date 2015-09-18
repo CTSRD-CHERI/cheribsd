@@ -542,17 +542,87 @@ cheri_capability_store(u_int crn_from, struct chericap *cp)
 	CHERI_CGETLEN((c).c_length, (crn));				\
 } while (0)
 
+#define CHERI_START_TRACE do {asm volatile("li $0, 0xbeef");} while(0)
+#define CHERI_STOP_TRACE do {asm volatile("li $0, 0xdead");} while(0)
 
 /*
- * Routines for measuring time -- depends on a later MIPS userspace cycle
- * counter.
+ * Routines for measuring time and other things. Depends on a later
+ * MIPS rdhwr instruction.
  */
-static __inline uint32_t
-cheri_get_cyclecount(void)
+
+#if __has_feature(capabilities)
+#define DEFINE_RDHWR_COUNTER_GETTER(name,regno)      \
+  static inline uint64_t cheri_get_##name##_count (void) \
+  {					       \
+  uint64_t ret;				       \
+  __asm __volatile("rdhwr %0, $"#regno : "=r" (ret)); \
+  return ret;						\
+  }
+#else
+/* 
+ * Manually assembled due to gcc/gas refusing to recognise custom rdhwr registers:
+ * rdhwr $12, $rdhwrreg
+ * move  $ret, $12
+ * Move is needed because we can't get a raw register number for ret in the assembler
+ * template without it being prefixed by $. Note that $12 == $t0. 
+ */
+#define DEFINE_RDHWR_COUNTER_GETTER(name,regno)				\
+  static inline uint64_t cheri_get_##name##_count (void)			\
+  {									\
+    uint64_t ret;							\
+    __asm __volatile(".word (0x1f << 26) | (12 << 16) | (" #regno  " << 11) | 0x3b\n\tmove %0,$12" : "=r" (ret) :: "$12"); \
+    return ret;								\
+  }
+#endif
+
+/* cheri_get_cycle_count    The standard MIPS cycle counter via rdhwr */
+DEFINE_RDHWR_COUNTER_GETTER(cycle,2)
+/* cheri_get_inst_count     BERI specific committed instruction counter */
+DEFINE_RDHWR_COUNTER_GETTER(inst,4)
+/* cheri_get_tlb_inst_count BERI specific tlb instruction miss counter */
+DEFINE_RDHWR_COUNTER_GETTER(tlb_inst,5)
+/* cheri_get_tlb_data_count BERI specific tlb data miss counter */
+DEFINE_RDHWR_COUNTER_GETTER(tlb_data,6)
+DEFINE_RDHWR_COUNTER_GETTER(inst_cache_miss,7)
+DEFINE_RDHWR_COUNTER_GETTER(data_cache_miss,8)
+DEFINE_RDHWR_COUNTER_GETTER(data_cache_access,9)
+#undef DEFINE_RDHWR_COUNTER_GETTER
+
+struct cheri_counters {
+	uint64_t cycles;
+	uint64_t insts;
+	uint64_t tlb_inst;
+	uint64_t tlb_data;
+  	uint64_t inst_cache_misses;
+  	uint64_t data_cache_misses;
+  	uint64_t data_cache_accesses;
+};
+
+static inline void cheri_get_all_counters(struct cheri_counters *counters)
 {
-	uint64_t _time;
-	__asm __volatile("rdhwr %0, $2" : "=r" (_time));
-	return (_time & 0xffffffff);
+	counters->cycles   = cheri_get_cycle_count();
+	counters->insts    = cheri_get_inst_count();
+	counters->tlb_inst = cheri_get_tlb_inst_count();
+	counters->tlb_data = cheri_get_tlb_data_count();
+	counters->inst_cache_misses = cheri_get_inst_cache_miss_count();
+	counters->data_cache_misses = cheri_get_data_cache_miss_count();
+	counters->data_cache_accesses = cheri_get_data_cache_access_count();
+}
+
+static inline void cheri_subtract_counters(struct cheri_counters *dest, struct cheri_counters *sourceA, struct cheri_counters *sourceB)
+{
+#ifdef TEMP_SUB_COUNTER
+#error temporary macro already defined
+#endif
+#define TEMP_SUB_COUNTER(n) dest->n = sourceA->n - sourceB->n
+        TEMP_SUB_COUNTER(cycles);
+	TEMP_SUB_COUNTER(insts);
+	TEMP_SUB_COUNTER(tlb_inst);
+	TEMP_SUB_COUNTER(tlb_data);
+	TEMP_SUB_COUNTER(inst_cache_misses);
+	TEMP_SUB_COUNTER(data_cache_misses);
+	TEMP_SUB_COUNTER(data_cache_accesses);
+#undef TEMP_SUB_COUNTER
 }
 
 #ifdef _KERNEL

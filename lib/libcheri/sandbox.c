@@ -596,13 +596,13 @@ sandbox_object_cinvoke(struct sandbox_object *sbop, register_t methodnum,
 	else
 		SANDBOX_METHOD_INVOKE(sbcp->sbc_sandbox_method_nonamep);
 	SANDBOX_OBJECT_INVOKE(sbop->sbo_sandbox_object_statp);
-	start = cheri_get_cyclecount();
+	start = cheri_get_cycle_count();
 	v0 = cheri_invoke(sbop->sbo_cheri_object_invoke,
 	    CHERI_INVOKE_METHOD_LEGACY_INVOKE,
 	    methodnum,
 	    a1, a2, a3, a4, a5, a6, a7,
 	    c3, c4, c5, c6, c7, c8, c9, c10);
-	sample = cheri_get_cyclecount() - start;
+	sample = cheri_get_cycle_count() - start;
 	if (methodnum < SANDBOX_CLASS_METHOD_COUNT)
 		SANDBOX_METHOD_TIME_SAMPLE(
 		    sbcp->sbc_sandbox_methods[methodnum], sample);
