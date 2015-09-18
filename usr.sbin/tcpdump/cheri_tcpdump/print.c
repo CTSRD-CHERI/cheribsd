@@ -354,7 +354,7 @@ tcpdump_sandboxes_init(struct tcpdump_sandbox_list *list, int mode)
 		break;
 	case TDS_MODE_HASH_TCP:
 #ifdef TCPDUMP_BENCHMARKING
-		fprintf(stderr, "creating %d IP sandboxes\n", g_sandboxes);
+		fprintf(stderr, "%d,", g_sandboxes);
 #endif
 		for (i = 0; i < g_sandboxes; i++) {
 			sb = tcpdump_sandbox_new(hash_names[i],
