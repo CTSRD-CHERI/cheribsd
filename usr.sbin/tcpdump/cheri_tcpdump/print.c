@@ -148,7 +148,7 @@ static const char *hash_colors[] = {
 #define	MAX_SANDBOXES	129
 static char *hash_names[MAX_SANDBOXES];
 static char *proto_names[MAX_SANDBOXES];
-
+static struct tcpdump_sandbox *ip_sandboxes[MAX_SANDBOXES] = {0};
 static struct cheri_tcpdump_control _ctdc;
 static volatile struct cheri_tcpdump_control *ctdc;
 
@@ -277,6 +277,7 @@ tds_select_ipv4_fromlocal(int dlt, size_t len, __capability const u_char *data,
 	return (0);
 }
 
+
 static int
 tds_select_ipv4_hash(int dlt, size_t len, __capability const u_char *data,
     void *sd)
@@ -304,6 +305,12 @@ tcpdump_sandboxes_init(struct tcpdump_sandbox_list *list, int mode)
 	int i;
 	struct tcpdump_sandbox *sb;
 
+	for ( i = 0 ; i < MAX_SANDBOXES; i++) {
+	    if (ip_sandboxes[i] != NULL)
+		tcpdump_sandbox_destroy(ip_sandboxes[i]);
+	    ip_sandboxes[i] = NULL;
+	}
+	
 	while (!STAILQ_EMPTY(list)) {
 		sb = STAILQ_FIRST(list);
 		STAILQ_REMOVE_HEAD(list, tds_entry);
@@ -360,7 +367,7 @@ tcpdump_sandboxes_init(struct tcpdump_sandbox_list *list, int mode)
 			sb = tcpdump_sandbox_new(hash_names[i],
 			    hash_colors[i % N_HASH_COLORS],
 			    tds_select_ipv4_hash, (void *)(long)i);
-			STAILQ_INSERT_TAIL(list, sb, tds_entry);
+			ip_sandboxes[i] = sb;
 		}
 		sb = tcpdump_sandbox_new("catchall", SB_GREEN, tds_select_all,
 		    NULL);
@@ -381,7 +388,13 @@ static void
 tcpdump_sandboxes_reset_all(struct tcpdump_sandbox_list *list)
 {
 	struct tcpdump_sandbox *sb;
-
+	int i;
+	
+	for ( i=0 ; i<MAX_SANDBOXES ; i++) {
+	    if (ip_sandboxes[i] != NULL)
+		tcpdump_sandbox_reset(ip_sandboxes[i]);
+	}
+	
 	STAILQ_FOREACH(sb, list, tds_entry)
 		tcpdump_sandbox_reset(sb);
 }
@@ -391,7 +404,19 @@ tcpdump_sandbox_find(struct tcpdump_sandbox_list *list, int dlt, size_t len,
     __capability const u_char *data)
 {
 	struct tcpdump_sandbox *sb;
+	const u_char *ipaddr;
+	struct ip *iphdr;
+	int ip_box;
 
+	if (tds_select_ipv4(dlt, len, data, NULL)) {
+	    iphdr = (struct ip *)(data + sizeof(struct ether_header));
+	    ipaddr = (const u_char *)&(iphdr->ip_src);
+	    ip_box = (ipaddr[0] + ipaddr[1] + ipaddr[2] + ipaddr[3]) % g_sandboxes;
+	    sb = ip_sandboxes[ip_box];
+	    if (sb != NULL)
+		return (sb);
+	}
+	
 	STAILQ_FOREACH(sb, list, tds_entry)
 		if (sb->tds_selector(dlt, len, data, sb->tds_selector_data))
 			return (sb);
