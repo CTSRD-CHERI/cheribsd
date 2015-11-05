@@ -18,6 +18,8 @@ SUBDIR:=
 SUBDIR:=	${SUBDIR:Nlibgssapi_krb5:Nlibgssapi_ntlm:Nlibgssapi_spnego:Nlibhx509}
 # missing krb_err.h
 SUBDIR:=	${SUBDIR:Nlibkafs5}
+# clang bug #66
+SUBDIR:=	${SUBDIR:Nlibheimbase}
 .endif
 .endif
 .endif
