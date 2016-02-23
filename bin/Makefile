@@ -43,12 +43,14 @@ SUBDIR= cat \
 .if ${TARGET} == "mips"
 SUBDIR+=	shmem_bench
 SUBDIR+=	cheri_bench
+SUBDIR+=        dhry
 .endif
 
 .if ${MK_CHERI} != "no"
 SUBDIR+=	cheri_helloworld
 SUBDIR+=	cheritest
 SUBDIR+=	helloworld
+SUBDIR+=        dhry
 .endif
 
 .if ${MK_RCMDS} != "no"
