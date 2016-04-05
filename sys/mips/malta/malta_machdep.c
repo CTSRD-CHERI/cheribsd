@@ -277,6 +277,44 @@ malta_cpu_freq(void)
 	return (platform_counter_freq);
 }
 
+
+/* Parse cmd line args as env - copied from beri_machdep. */
+static void
+_parse_bootargs(char *cmdline)
+{
+	char *n, *v;
+
+	while ((v = strsep(&cmdline, " \n")) != NULL) {
+		if (*v == '\0')
+			continue;
+		if (*v == '-') {
+			while (*v != '\0') {
+				v++;
+				switch (*v) {
+				case 'a': boothowto |= RB_ASKNAME; break;
+				/* Someone should simulate that ;-) */
+				case 'C': boothowto |= RB_CDROM; break;
+				case 'd': boothowto |= RB_KDB; break;
+				case 'D': boothowto |= RB_MULTIPLE; break;
+				case 'm': boothowto |= RB_MUTE; break;
+				case 'g': boothowto |= RB_GDB; break;
+				case 'h': boothowto |= RB_SERIAL; break;
+				case 'p': boothowto |= RB_PAUSE; break;
+				case 'r': boothowto |= RB_DFLTROOT; break;
+				case 's': boothowto |= RB_SINGLE; break;
+				case 'v': boothowto |= RB_VERBOSE; break;
+				}
+			}
+		} else {
+			n = strsep(&v, "=");
+			if (v == NULL)
+				kern_setenv(n, "1");
+			else
+				kern_setenv(n, v);
+		}
+	}
+}
+
 void
 platform_start(__register_t a0, __register_t a1,  __register_t a2, 
     __register_t a3)
@@ -317,7 +355,16 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 			printf("%s ", (char*)(intptr_t)argv[i]);
 		printf("\n");
 	}
-
+	/*
+	 * parse the command line arguments passed e.g. by QEMUs -append option
+	 *
+	 * TODO: start parsing at index 1? QEMU passes -kernel option as
+	 * argv[0] so we currently call kern_setenv("/path/to/kernel", "1")
+	 * Or do other loaders/emulators pass arguments starting at index 0?
+	 */
+	for (int i = 0; i < argc; i++) {
+		_parse_bootargs((char*)(intptr_t)argv[i]);
+	}
 	if (bootverbose)
 		printf("envp:\n");
 
