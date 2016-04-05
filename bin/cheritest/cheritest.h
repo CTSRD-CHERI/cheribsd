@@ -138,6 +138,37 @@ void	cheritest_failure_errx(const char *msg, ...) __dead2  __printflike(1, 2);
 void	cheritest_success(void) __dead2;
 void	signal_handler_clear(int sig);
 
+/**
+ * Like CHERITEST_VERIFY but instead of printing condition details prints
+ * the provided printf-like message @p fmtargs
+ */
+#define CHERITEST_VERIFY2(cond, fmtargs...)		\
+	do { if (!(cond)) { 				\
+		cheritest_failure_errx(fmtargs);	\
+	} } while(0)
+
+/** If @p cond is false fail the test and print the failed condition */
+#define CHERITEST_VERIFY(cond) \
+	CHERITEST_VERIFY2(cond, "%s", "\'" #cond "\' is FALSE!")
+
+/**
+ * Like CHERITEST_CHECK_SYSCALL but instead of printing call details prints
+ * the provided printf-like message @p fmtargs
+ */
+#define CHERITEST_CHECK_SYSCALL2(call, fmtargs...) __extension__({	\
+		__typeof(call) __result = call;				\
+		if (__result == ((__typeof(__result))-1)) {		\
+			cheritest_failure_err(fmtargs);			\
+		}							\
+		__result;						\
+	})
+/**
+ * If result of @p call is equal to -1 fail the test and print the failed call
+ * followed by the string representation of @c errno
+ */
+#define CHERITEST_CHECK_SYSCALL(call) \
+	CHERITEST_CHECK_SYSCALL2(call, "Call \'" #call "\' failed")
+
 #ifdef LIST_ONLY
 #define DECLARE_CHERI_TEST_IMPL(name, args...) \
 	static inline void name(args) {}
