@@ -86,18 +86,15 @@ mmap_and_check_tag_stored(int fd, int protflags, int mapflags)
 	__capability void *cp_value;
 	int v;
 
-	cp = mmap(NULL, getpagesize(), protflags, mapflags, fd, 0);
-	if (cp == MAP_FAILED)
-		cheritest_failure_err("mmap");
+	cp = CHERITEST_CHECK_SYSCALL(mmap(NULL, getpagesize(), protflags,
+	     mapflags, fd, 0));
 	cp_value = cheri_ptr(&v, sizeof(v));
 	*cp = cp_value;
 	cp_value = *cp;
-	if (cheri_gettag(cp_value) == 0)
-		cheritest_failure_errx("tag lost");
-	if (munmap(__DEVOLATILE(void *, cp), getpagesize()) < 0)
-		cheritest_failure_err("munmap");
-	if (fd != -1 && close(fd) < 0)
-		cheritest_failure_err("close");
+	CHERITEST_VERIFY2(cheri_gettag(cp_value) != 0, "tag lost");
+	CHERITEST_CHECK_SYSCALL(munmap(__DEVOLATILE(void *, cp), getpagesize()));
+	if (fd != -1)
+		CHERITEST_CHECK_SYSCALL(close(fd));
 }
 
 void
@@ -110,11 +107,8 @@ cheritest_vm_tag_mmap_anon(const struct cheri_test *ctp __unused)
 void
 cheritest_vm_tag_shm_open_anon_shared(const struct cheri_test *ctp __unused)
 {
-	int fd = shm_open(SHM_ANON, O_RDWR, 0600);
-	if (fd < 0)
-		cheritest_failure_err("shm_open");
-	if (ftruncate(fd, getpagesize()) < 0)
-		cheritest_failure_err("ftruncate");
+	int fd = CHERITEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR, 0600));
+	CHERITEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
 	mmap_and_check_tag_stored(fd, PROT_READ | PROT_WRITE, MAP_SHARED);
 	cheritest_success();
 }
@@ -122,11 +116,8 @@ cheritest_vm_tag_shm_open_anon_shared(const struct cheri_test *ctp __unused)
 void
 cheritest_vm_tag_shm_open_anon_private(const struct cheri_test *ctp __unused)
 {
-	int fd = shm_open(SHM_ANON, O_RDWR, 0600);
-	if (fd < 0)
-		cheritest_failure_err("shm_open");
-	if (ftruncate(fd, getpagesize()) < 0)
-		cheritest_failure_err("ftruncate");
+	int fd = CHERITEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR, 0600));
+	CHERITEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
 	mmap_and_check_tag_stored(fd, PROT_READ | PROT_WRITE, MAP_PRIVATE);
 	cheritest_success();
 }
@@ -134,9 +125,7 @@ cheritest_vm_tag_shm_open_anon_private(const struct cheri_test *ctp __unused)
 void
 cheritest_vm_tag_dev_zero_shared(const struct cheri_test *ctp __unused)
 {
-	int fd = open("/dev/zero", O_RDWR);
-	if (fd < 0)
-		cheritest_failure_err("/dev/zero");
+	int fd = CHERITEST_CHECK_SYSCALL(open("/dev/zero", O_RDWR));
 	mmap_and_check_tag_stored(fd, PROT_READ | PROT_WRITE, MAP_SHARED);
 	cheritest_success();
 }
@@ -144,9 +133,7 @@ cheritest_vm_tag_dev_zero_shared(const struct cheri_test *ctp __unused)
 void
 cheritest_vm_tag_dev_zero_private(const struct cheri_test *ctp __unused)
 {
-	int fd = open("/dev/zero", O_RDWR);
-	if (fd < 0)
-		cheritest_failure_err("/dev/zero");
+	int fd = CHERITEST_CHECK_SYSCALL(open("/dev/zero", O_RDWR));
 	mmap_and_check_tag_stored(fd, PROT_READ | PROT_WRITE, MAP_PRIVATE);
 	cheritest_success();
 }
@@ -155,12 +142,10 @@ static int
 create_tempfile()
 {
 	char template[] = "/tmp/cheritest.XXXXXXXX";
-	int fd = mkstemp(template);
-	if (fd < 0)
-		cheritest_failure_err("mkstemp(%s)", template);
-	unlink(template);
-	if (ftruncate(fd, getpagesize()) < 0)
-		cheritest_failure_err("ftruncate");
+	int fd = CHERITEST_CHECK_SYSCALL2(mkstemp(template),
+	    "mkstemp %s", template);
+	CHERITEST_CHECK_SYSCALL(unlink(template));
+	CHERITEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
 	return fd;
 }
 
@@ -175,10 +160,8 @@ cheritest_vm_notag_tmpfile_shared(const struct cheri_test *ctp __unused)
 	int fd, v;
 
 	fd = create_tempfile();
-	cp = mmap(NULL, getpagesize(), PROT_READ | PROT_WRITE, MAP_SHARED,
-	    fd, 0);
-	if (cp == MAP_FAILED)
-		cheritest_failure_err("mmap");
+	cp = CHERITEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
+	    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
 	cp_value = cheri_ptr(&v, sizeof(v));
 	*cp = cp_value;
 	/* this test fails if /tmp is on tmpfs as it will silently strip the tag */
@@ -229,9 +212,7 @@ xfail_need_writable_non_tmpfs_tmp(const char *name)
 {
 	struct statfs info;
 
-	if (statfs("/tmp", &info) != 0) {
-		cheritest_failure_err("statfs /tmp");
-	}
+	CHERITEST_CHECK_SYSCALL(statfs("/tmp", &info));
 	if (strcmp(info.f_fstypename, "tmpfs") == 0) {
 		return ("cheritest_vm_notag_tmpfile_shared needs non-tmpfs /tmp");
 	}
@@ -263,23 +244,16 @@ cheritest_vm_cow_read(const struct cheri_test *ctp __unused)
 	/*
 	 * Create anonymous shared memory object.
 	 */
-	fd = shm_open(SHM_ANON, O_RDWR, 0600);
-	if (fd < 0)
-		cheritest_failure_err("shm_open");
-	if (ftruncate(fd, getpagesize()) < 0)
-		cheritest_failure_err("ftruncate");
+	fd = CHERITEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR, 0600));
+	CHERITEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
 
 	/*
 	 * Create 'real' and copy-on-write mappings.
 	 */
-	cp_real = mmap(NULL, getpagesize(), PROT_READ | PROT_WRITE,
-	    MAP_SHARED, fd, 0);
-	if (cp_real == MAP_FAILED)
-		cheritest_failure_err("mmap cp_real");
-	cp_copy = mmap(NULL, getpagesize(), PROT_READ | PROT_WRITE,
-	    MAP_PRIVATE, fd, 0);
-	if (cp_copy == MAP_FAILED)
-		cheritest_failure_err("mmap cp_copy");
+	cp_real = CHERITEST_CHECK_SYSCALL2(mmap(NULL, getpagesize(),
+	    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0), "mmap cp_real");
+	cp_copy = CHERITEST_CHECK_SYSCALL2(mmap(NULL, getpagesize(),
+	    PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0), "mmap cp_copy");
 
 	/*
 	 * Write out a tagged capability to 'real' mapping -- doesn't really
@@ -288,26 +262,23 @@ cheritest_vm_cow_read(const struct cheri_test *ctp __unused)
 	cp = cheri_ptr(&fd, sizeof(fd));
 	cp_real[0] = cp;
 	cp = cp_real[0];
-	if (cheri_gettag(cp) == 0)
-		cheritest_failure_errx("pretest: tag missing");
+	CHERITEST_VERIFY2(cheri_gettag(cp) != 0, "pretest: tag missing");
 
 	/*
 	 * Read in tagged capability via copy-on-write mapping.  Confirm it
 	 * has a tag.
 	 */
 	cp = cp_copy[0];
-	if (cheri_gettag(cp) == 0)
-		cheritest_failure_errx("tag missing, cp_real");
+	CHERITEST_VERIFY2(cheri_gettag(cp) != 0, "tag missing, cp_real");
 
 	/*
 	 * Clean up.
 	 */
-	if (munmap(__DEVOLATILE(void *, cp_real), getpagesize()) < 0)
-		cheritest_failure_err("munmap cp_real");
-	if (munmap(__DEVOLATILE(void *, cp_copy), getpagesize()) < 0)
-		cheritest_failure_err("munmap cp_copy");
-	if (close(fd) < 0)
-		cheritest_failure_err("close");
+	CHERITEST_CHECK_SYSCALL2(munmap(__DEVOLATILE(void *, cp_real),
+	    getpagesize()), "munmap cp_real");
+	CHERITEST_CHECK_SYSCALL2(munmap(__DEVOLATILE(void *, cp_copy),
+	    getpagesize()), "munmap cp_copy");
+	CHERITEST_CHECK_SYSCALL(close(fd));
 	cheritest_success();
 }
 
@@ -322,23 +293,16 @@ cheritest_vm_cow_write(const struct cheri_test *ctp __unused)
 	/*
 	 * Create anonymous shared memory object.
 	 */
-	fd = shm_open(SHM_ANON, O_RDWR, 0600);
-	if (fd < 0)
-		cheritest_failure_err("shm_open");
-	if (ftruncate(fd, getpagesize()) < 0)
-		cheritest_failure_err("ftruncate");
+	fd = CHERITEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR, 0600));
+	CHERITEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
 
 	/*
 	 * Create 'real' and copy-on-write mappings.
 	 */
-	cp_real = mmap(NULL, getpagesize(), PROT_READ | PROT_WRITE,
-	    MAP_SHARED, fd, 0);
-	if (cp_real == MAP_FAILED)
-		cheritest_failure_err("mmap cp_real");
-	cp_copy = mmap(NULL, getpagesize(), PROT_READ | PROT_WRITE,
-	    MAP_PRIVATE, fd, 0);
-	if (cp_copy == MAP_FAILED)
-		cheritest_failure_err("mmap cp_copy");
+	cp_real = CHERITEST_CHECK_SYSCALL2(mmap(NULL, getpagesize(),
+	    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0), "mmap cp_real");
+	cp_copy = CHERITEST_CHECK_SYSCALL2(mmap(NULL, getpagesize(),
+	    PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0), "mmap cp_copy");
 
 	/*
 	 * Write out a tagged capability to 'real' mapping -- doesn't really
@@ -347,16 +311,14 @@ cheritest_vm_cow_write(const struct cheri_test *ctp __unused)
 	cp = cheri_ptr(&fd, sizeof(fd));
 	cp_real[0] = cp;
 	cp = cp_real[0];
-	if (cheri_gettag(cp) == 0)
-		cheritest_failure_errx("pretest: tag missing");
+	CHERITEST_VERIFY2(cheri_gettag(cp) != 0, "pretest: tag missing");
 
 	/*
 	 * Read in tagged capability via copy-on-write mapping.  Confirm it
 	 * has a tag.
 	 */
 	cp = cp_copy[0];
-	if (cheri_gettag(cp) == 0)
-		cheritest_failure_errx("tag missing, cp_real");
+	CHERITEST_VERIFY2(cheri_gettag(cp) != 0, "tag missing, cp_real");
 
 	/*
 	 * Diverge from cheritest_vm_cow_read(): write via the second mapping
@@ -369,21 +331,18 @@ cheritest_vm_cow_write(const struct cheri_test *ctp __unused)
 	 * Confirm that the tag is still present on the 'real' page.
 	 */
 	cp = cp_real[0];
-	if (cheri_gettag(cp) == 0)
-		cheritest_failure_errx("tag missing after COW, cp_real");
+	CHERITEST_VERIFY2(cheri_gettag(cp) != 0, "tag missing after COW, cp_real");
 
 	cp = cp_copy[0];
-	if (cheri_gettag(cp) == 0)
-		cheritest_failure_errx("tag missing after COW, cp_copy");
+	CHERITEST_VERIFY2(cheri_gettag(cp) != 0, "tag missing after COW, cp_copy");
 
 	/*
 	 * Clean up.
 	 */
-	if (munmap(__DEVOLATILE(void *, cp_real), getpagesize()) < 0)
-		cheritest_failure_err("munmap cp_real");
-	if (munmap(__DEVOLATILE(void *, cp_copy), getpagesize()) < 0)
-		cheritest_failure_err("munmap cp_copy");
-	if (close(fd) < 0)
-		cheritest_failure_err("close");
+	CHERITEST_CHECK_SYSCALL2(munmap(__DEVOLATILE(void *, cp_real),
+	    getpagesize()), "munmap cp_real");
+	CHERITEST_CHECK_SYSCALL2(munmap(__DEVOLATILE(void *, cp_copy),
+	    getpagesize()), "munmap cp_copy");
+	CHERITEST_CHECK_SYSCALL(close(fd));
 	cheritest_success();
 }
