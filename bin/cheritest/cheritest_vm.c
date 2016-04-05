@@ -151,6 +151,19 @@ cheritest_vm_tag_dev_zero_private(const struct cheri_test *ctp __unused)
 	cheritest_success();
 }
 
+static int
+create_tempfile()
+{
+	char template[] = "/tmp/cheritest.XXXXXXXX";
+	int fd = mkstemp(template);
+	if (fd < 0)
+		cheritest_failure_err("mkstemp(%s)", template);
+	unlink(template);
+	if (ftruncate(fd, getpagesize()) < 0)
+		cheritest_failure_err("ftruncate");
+	return fd;
+}
+
 /*
  * This case should fault.
  */
@@ -159,15 +172,9 @@ cheritest_vm_notag_tmpfile_shared(const struct cheri_test *ctp __unused)
 {
 	void * __capability volatile *cp;
 	__capability void *cp_value;
-	char template[] = "/tmp/cheritest.XXXXXXXX";
 	int fd, v;
 
-	fd = mkstemp(template);
-	if (fd < 0)
-		cheritest_failure_err("%s", template);
-	unlink(template);
-	if (ftruncate(fd, getpagesize()) < 0)
-		cheritest_failure_err("ftruncate");
+	fd = create_tempfile();
 	cp = mmap(NULL, getpagesize(), PROT_READ | PROT_WRITE, MAP_SHARED,
 	    fd, 0);
 	if (cp == MAP_FAILED)
@@ -181,13 +188,7 @@ cheritest_vm_notag_tmpfile_shared(const struct cheri_test *ctp __unused)
 void
 cheritest_vm_tag_tmpfile_private(const struct cheri_test *ctp __unused)
 {
-	char template[] = "/tmp/cheritest.XXXXXXXX";
-	int fd = mkstemp(template);
-	if (fd < 0)
-		cheritest_failure_err("%s", template);
-	unlink(template);
-	if (ftruncate(fd, getpagesize()) < 0)
-		cheritest_failure_err("ftruncate");
+	int fd = create_tempfile();
 	mmap_and_check_tag_stored(fd, PROT_READ | PROT_WRITE, MAP_PRIVATE);
 	cheritest_success();
 }
@@ -195,13 +196,7 @@ cheritest_vm_tag_tmpfile_private(const struct cheri_test *ctp __unused)
 void
 cheritest_vm_tag_tmpfile_private_prefault(const struct cheri_test *ctp __unused)
 {
-	char template[] = "/tmp/cheritest.XXXXXXXX";
-	int fd = mkstemp(template);
-	if (fd < 0)
-		cheritest_failure_err("%s", template);
-	unlink(template);
-	if (ftruncate(fd, getpagesize()) < 0)
-		cheritest_failure_err("ftruncate");
+	int fd = create_tempfile();
 	mmap_and_check_tag_stored(fd, PROT_READ | PROT_WRITE,
 	    MAP_PRIVATE | MAP_PREFAULT_READ);
 	cheritest_success();
