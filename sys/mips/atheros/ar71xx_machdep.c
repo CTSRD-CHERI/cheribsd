@@ -44,6 +44,7 @@ __FBSDID("$FreeBSD$");
 
 #include <net/ethernet.h>
 
+#include <machine/bootinfo.h>
 #include <machine/clock.h>
 #include <machine/cpu.h>
 #include <machine/cpuregs.h>
@@ -65,39 +66,6 @@ extern char edata[], end[];
 /* 4KB static data aread to keep a copy of the bootload env until
    the dynamic kenv is setup */
 char boot1_env[4096];
-
-/*
- * We get a string in from Redboot with the all the arguments together,
- * "foo=bar bar=baz". Split them up and save in kenv.
- */
-static void
-parse_argv(char *str)
-{
-	char *n, *v;
-
-	while ((v = strsep(&str, " ")) != NULL) {
-		if (*v == '\0')
-			continue;
-		if (*v == '-') {
-			while (*v != '\0') {
-				v++;
-				switch (*v) {
-				case 'a': boothowto |= RB_ASKNAME; break;
-				case 'd': boothowto |= RB_KDB; break;
-				case 'g': boothowto |= RB_GDB; break;
-				case 's': boothowto |= RB_SINGLE; break;
-				case 'v': boothowto |= RB_VERBOSE; break;
-				}
-			}
-		} else {
-			n = strsep(&v, "=");
-			if (v == NULL)
-				kern_setenv(n, "1");
-			else
-				kern_setenv(n, v);
-		}
-	}
-}
 
 void
 platform_cpu_init()
@@ -425,10 +393,14 @@ platform_start(__register_t a0 __unused, __register_t a1 __unused,
 	 * XXX this code is very redboot specific.
 	 */
 	printf("Cmd line:");
+	/*
+	* We get a string in from Redboot with the all the arguments together,
+	* "foo=bar bar=baz". Split them up and save in kenv.
+	*/
 	if (MIPS_IS_VALID_PTR(argv)) {
 		for (i = 0; i < argc; i++) {
 			printf(" %s", argv[i]);
-			parse_argv(argv[i]);
+			mips_parse_bootargs(argv[i]);
 		}
 	}
 	else

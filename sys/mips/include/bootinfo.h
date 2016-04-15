@@ -80,6 +80,7 @@ struct bootinfo {
 
 #ifdef _KERNEL
 extern struct bootinfo	bootinfo;
+void	mips_parse_bootargs(char* cmdline);
 #endif
 
 #endif	/* !_MACHINE_BOOTINFO_H_ */
