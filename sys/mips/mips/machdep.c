@@ -691,7 +691,7 @@ mips_parse_bootargs(char *cmdline)
 {
 	char *n, *v;
 
-	while ((v = strsep(&cmdline, " \n")) != NULL) {
+	while ((v = strsep(&cmdline, " \n\t")) != NULL) {
 		if (*v == '\0')
 			continue;
 		if (*v == '-') {
