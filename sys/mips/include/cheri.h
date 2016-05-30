@@ -743,7 +743,6 @@ cheri_get_cyclecount(void)
 	DB_CHERI_CAP_PRINT(crn);					\
 } while (0)
 #endif /* !DDB */
-
 #endif /* !_KERNEL */
 
 #endif /* _MIPS_INCLUDE_CHERI_H_ */
