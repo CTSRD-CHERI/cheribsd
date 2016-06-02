@@ -55,6 +55,7 @@ struct thr_param {
     long	*parent_tid;		/* parent accesses the new TID here. */
     int		flags;			/* thread flags. */
     struct rtprio	*rtp;		/* Real-time scheduling priority */
+    /* XXXAR: should ddc always be here? It is only used by CHERIABI. */
 #ifdef __CHERI_PURE_CAPABILITY__
     void	*ddc;			/* Default data capability */
     void	*spare[2];		/* TODO: cpu affinity mask etc. */
