@@ -250,6 +250,9 @@ struct pthread_attr {
 #define pthread_attr_end_copy	cpuset
 	cpuset_t	*cpuset;
 	size_t	cpusetsize;
+#ifdef __CHERI_PURE_CAPABILITY__
+	void*	ddc;
+#endif
 };
 
 struct wake_addr {

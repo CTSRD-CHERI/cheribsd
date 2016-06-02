@@ -79,10 +79,17 @@ _pthread_create(pthread_t * thread, const pthread_attr_t * attr,
 
 	memset(&param, 0, sizeof(param));
 
-	if (attr == NULL || *attr == NULL)
+	if (attr == NULL || *attr == NULL) {
 		/* Use the default thread attributes: */
 		new_thread->attr = _pthread_attr_default;
-	else {
+#ifdef __CHERI_PURE_CAPABILITY__
+		/*
+		 * If the caller didn't provide thread attributes we use the
+		 * same $ddc for the new thread.
+		 */
+		new_thread->attr.ddc = cheri_getreg(0);
+#endif
+	} else {
 		new_thread->attr = *(*attr);
 		cpusetp = new_thread->attr.cpuset;
 		cpusetsize = new_thread->attr.cpusetsize;
@@ -157,6 +164,7 @@ _pthread_create(pthread_t * thread, const pthread_attr_t * attr,
 	param.stack_base = new_thread->attr.stackaddr_attr;
 	param.stack_size = new_thread->attr.stacksize_attr;
 #ifdef __CHERI_PURE_CAPABILITY__
+	param.ddc = new_thread->attr.ddc;
 	THR_ASSERT(cheri_gettag(param.stack_base) == 1,
 	    "stack_base must be a valid capability");
 	THR_ASSERT(cheri_getlen(param.stack_base) == param.stack_size,

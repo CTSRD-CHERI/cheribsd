@@ -375,7 +375,16 @@ _pthread_attr_init(pthread_attr_t *attr)
 	else {
 		/* Initialise the attribute object with the defaults: */
 		memcpy(pattr, &_pthread_attr_default, sizeof(struct pthread_attr));
-
+#ifdef __CHERI_PURE_CAPABILITY__
+		/*
+		 * A new thread will use the same $ddc as the calling thread
+		 * by default. This can be changed using the
+		 * pthread_attr_setcheriddc_np() API.
+		 *
+		 * XXXAR: should there be an alias CHERI_CR_DDC for CHERI_CR_C0?
+		 */
+		pattr->ddc = cheri_getreg(0);
+#endif
 		/* Return a pointer to the attribute object: */
 		*attr = pattr;
 		ret = 0;
@@ -625,7 +634,7 @@ _pthread_attr_setaffinity_np(pthread_attr_t *pattr, size_t cpusetsize,
 			return (0);
 		}
 		size_t kern_size = _get_kern_cpuset_size();
-		/* Kernel rejects small set, we check it here too. */ 
+		/* Kernel rejects small set, we check it here too. */
 		if (cpusetsize < kern_size)
 			return (ERANGE);
 		if (cpusetsize > kern_size) {
@@ -659,7 +668,7 @@ _pthread_attr_getaffinity_np(const pthread_attr_t *pattr, size_t cpusetsize,
 	if (pattr == NULL || (attr = (*pattr)) == NULL)
 		ret = EINVAL;
 	else {
-		/* Kernel rejects small set, we check it here too. */ 
+		/* Kernel rejects small set, we check it here too. */
 		size_t kern_size = _get_kern_cpuset_size();
 		if (cpusetsize < kern_size)
 			return (ERANGE);
@@ -669,8 +678,50 @@ _pthread_attr_getaffinity_np(const pthread_attr_t *pattr, size_t cpusetsize,
 		else
 			memset(cpusetp, -1, kern_size);
 		if (cpusetsize > kern_size)
-			memset(((char *)cpusetp) + kern_size, 0, 
+			memset(((char *)cpusetp) + kern_size, 0,
 				cpusetsize - kern_size);
 	}
 	return (ret);
 }
+
+__weak_reference(_pthread_attr_setcheriddc_np, pthread_attr_setcheriddc_np);
+int
+_pthread_attr_setcheriddc_np(pthread_attr_t *attr, void *ddc)
+{
+	int ret = ENOTSUP;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Check for invalid arguments: */
+	if (attr == NULL || *attr == NULL) {
+		ret = EINVAL;
+	} else if (ddc != NULL && cheri_gettag(ddc) == 0) {
+		/* ddc must be either NULL or a valid capability */
+		ret = EINVAL;
+	} else {
+		/* Save the thread's ddc: */
+		(*attr)->ddc = ddc;
+		ret = 0;
+	}
+#endif
+	return (ret);
+}
+
+__weak_reference(_pthread_attr_getcheriddc_np, pthread_attr_getcheriddc_np);
+int
+_pthread_attr_getcheriddc_np(const pthread_attr_t *attr, void **ddc)
+{
+	int ret = ENOTSUP;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Check for invalid arguments: */
+	if (attr == NULL || *attr == NULL || ddc == NULL) {
+		ret = EINVAL;
+	} else {
+		/* Return the thread's ddc: */
+		*ddc = (*attr)->ddc;
+		ret = 0;
+	}
+#endif
+	return (ret);
+}
+
