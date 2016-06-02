@@ -1346,18 +1346,14 @@ MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
 
 #ifdef CPU_CHERI
 	/*
-	 * XXXRW: This isn't really right, as it doesn't properly implement
-	 * CHERI bounds checking for $epcc.  On the other hand, unlike some
-	 * other pc loads in trap.c, it actually uses fuword()!
-	 */
-	/*
-	 * XXXRW: TODO: Implement offsetting instptr or instPC by the thread's
-	 * $pcc.  Unfortuntely, we don't have a pointer to that here, only
-	 * having been passed 'trapframe', not 'cheriframe'.  We use the saved
-	 * $epcc, but it's not clear if that's safe.
+	 * XXXRW: This needs careful review.  We extract a suitable offset
+	 * from the executing $pcc, add it to $pcc's base, and use that for a
+	 * $kdc-relative load via fuword().  Is this safe with respect to
+	 * alignment on $pcc, etc?
 	 */
 	register_t pcc_base;
-	CHERI_CGETBASE(pcc_base, CHERI_CR_EPCC);
+	CHERI_CLC(CHERI_CR_CTEMP0, CHERI_CR_KDC, &framePtr->pcc, 0);
+	CHERI_CGETBASE(pcc_base, CHERI_CR_CTEMP0);
 	if (instptr)
 		instptr += pcc_base;
 	instPC += pcc_base;
@@ -1374,6 +1370,9 @@ MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
 			inst = *(InstFmt *) instPC;
 	}
 
+	/*
+	 * XXXRW: CHERI branch instructions are not handled here.
+	 */
 	switch ((int)inst.JType.op) {
 	case OP_SPECIAL:
 		switch ((int)inst.RType.func) {
@@ -1827,6 +1826,7 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, re
 	int is_store = 0;
 	int sign_extend = 0;
 #ifdef CPU_CHERI
+	register_t pcc_base;
 
 	/*
 	 * XXXRW: This code isn't really post-CHERI ready.
@@ -1842,17 +1842,13 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, re
 	 * then substitute a different instruction...
 	 *
 	 * XXXRW: Should just use the CP0 'faulting instruction' register
-	 * available in CHERI.
-	 *
-	 * XXXRW: The below uses the saved $epcc for the user thread, but if
-	 * this is an emulated unaligned access for a kernel thread, then this
-	 * will not work.
+	 * available in CHERI (but not MIPS generally).
 	 */
 	CHERI_CLC(CHERI_CR_CTEMP0, CHERI_CR_KDC, &frame->pcc, 0);
-	CHERI_CLW(inst, 0, 0, CHERI_CR_CTEMP0);
-#else
-	inst = *((u_int32_t *)(intptr_t)pc);;
+	CHERI_CGETBASE(pcc_base, CHERI_CR_CTEMP0);
+	pc += pcc_base;
 #endif
+	inst = *((u_int32_t *)(intptr_t)pc);;
 	src_regno = MIPS_INST_RT(inst);
 
 	/*
