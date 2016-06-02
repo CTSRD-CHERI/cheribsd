@@ -114,10 +114,6 @@ struct cheri_signal {
  * from the public one.
  */
 struct cheri_stack_frame {
-	register_t	_csf_pad0;	/* Used to be MIPS program counter. */
-	register_t	_csf_pad1;
-	register_t	_csf_pad2;
-	register_t	_csf_pad3;
 #if !defined(_KERNEL) && __has_feature(capabilities)
 	__capability void	*csf_pcc;
 	__capability void	*csf_idc;
