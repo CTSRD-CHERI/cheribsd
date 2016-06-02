@@ -380,10 +380,8 @@ _pthread_attr_init(pthread_attr_t *attr)
 		 * A new thread will use the same $ddc as the calling thread
 		 * by default. This can be changed using the
 		 * pthread_attr_setcheriddc_np() API.
-		 *
-		 * XXXAR: should there be an alias CHERI_CR_DDC for CHERI_CR_C0?
 		 */
-		pattr->ddc = cheri_getreg(0);
+		pattr->ddc = cheri_getdefault();
 #endif
 		/* Return a pointer to the attribute object: */
 		*attr = pattr;

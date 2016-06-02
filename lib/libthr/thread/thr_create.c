@@ -87,7 +87,7 @@ _pthread_create(pthread_t * thread, const pthread_attr_t * attr,
 		 * If the caller didn't provide thread attributes we use the
 		 * same $ddc for the new thread.
 		 */
-		new_thread->attr.ddc = cheri_getreg(0);
+		new_thread->attr.ddc = cheri_getdefault();
 #endif
 	} else {
 		new_thread->attr = *(*attr);
