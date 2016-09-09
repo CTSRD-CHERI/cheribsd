@@ -172,7 +172,7 @@ SUBDIR.${MK_LDNS}+=	libldns
 _libclang_rt=	libclang_rt
 .endif
 
-.if ${MK_LIBCPLUSPLUS} != "no"
+.if ${MK_LIBCPLUSPLUS} != "no" || defined(LIBCHERI)
 _libcxxrt=	libcxxrt
 _libcplusplus=	libc++
 .endif
@@ -226,7 +226,7 @@ SUBDIR+=	libcheri_syscalls
 SUBDIR+=	libcheri_support
 SUBDIR_BOOTSTRAP:=	libgcc_s libgcc_eh ${SUBDIR_BOOTSTRAP}
 # No C++ support in cheri clang
-SUBDIR:=	${SUBDIR:Nlibc++:Nlibcxxrt:Nlibdevdctl}
+SUBDIR:=	${SUBDIR:Nlibdevdctl}
 # header issue in ioctl.c, probably needs more porting for CheriABI
 SUBDIR:=	${SUBDIR:Nlibsysdecode}
 .endif
