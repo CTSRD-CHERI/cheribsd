@@ -123,7 +123,7 @@
 			hard-interrupt-sources = <64>;
 			soft-interrupt-sources = <64>;
 		};
-
+/*
 		serial@7f002100 {
 			compatible = "ns16550";
 			reg = <0x7f002100 0x20>;
@@ -132,14 +132,14 @@
 			interrupts = <6>;
 			interrupt-parent = <&beripic0>;
 		};
-
+*/
 		serial@7f000000 {
 			compatible = "altera,jtag_uart-11_0";
 			reg = <0x7f000000 0x40>;
-			interrupts = <0>;
-			interrupt-parent = <&beripic0>;
+//			interrupts = <0>;
+//			interrupt-parent = <&beripic0>;
 		};
-
+/*
 		serial@7f001000 {
 			compatible = "altera,jtag_uart-11_0";
 			reg = <0x7f001000 0x40>;
@@ -149,7 +149,7 @@
 			compatible = "altera,jtag_uart-11_0";
 			reg = <0x7f002000 0x40>;
 		};
-
+*/
 		sdcard@7f008000 {
 			compatible = "altera,sdcard_11_2011";
 			reg = <0x7f008000 0x400>;
@@ -213,7 +213,7 @@
 			interrupts = <1 2>;
 			interrupt-parent = <&beripic0>;
 		};
-
+/*
 		ethernet@7f005000 {
 			compatible = "altera,atse";
 			// MAC, RX+RXC, TX+TXC.
@@ -241,7 +241,7 @@
 			       0x20000000 0x10000000
 			       0x7f006100 0x007f>;
 		};
-
+*/
 		usb@0x7f100000 {
 			compatible = "nxp,usb-isp1761";
 			reg = <0x7f100000 0x40000
