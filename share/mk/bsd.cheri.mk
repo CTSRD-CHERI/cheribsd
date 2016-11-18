@@ -57,6 +57,8 @@ _CHERI_CC=	${CHERI_CC} -g -integrated-as --target=cheri-unknown-freebsd \
 _CHERI_CC+=	--sysroot=${SYSROOT}
 .endif
 
+_CHERI_CC+= -Wno-deprecated-declarations
+
 .if ${WANT_CHERI} == "pure" || ${WANT_CHERI} == "sandbox"
 OBJCOPY:=	objcopy
 _CHERI_CC+=	-mabi=sandbox -mxgot
