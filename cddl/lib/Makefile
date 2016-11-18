@@ -38,4 +38,17 @@ SUBDIR_DEPEND_libzpool=	libavl libnvpair libumem
 
 SUBDIR_PARALLEL=
 
+.if defined(LIBCHERI)
+.if ${MK_LIBCHERI_ALL} == "no"
+SUBDIR:=
+.else
+.if ${MK_LIBCHERI_BROKEN} == "no"
+# dt_options.c stores pointers in ints (should store ints in pointers)
+SUBDIR:=	${SUBDIR:Nlibdtrace}
+# Fixed size, 64-bit fields containing pointers
+SUBDIR:=	${SUBDIR:Nlibzfs}
+.endif
+.endif
+.endif
+
 .include <bsd.subdir.mk>

@@ -1,5 +1,8 @@
 # $FreeBSD$
 
+# libzfs
+WANT_CHERI=none
+
 SRCS=		callout.cc		\
 		case_file.cc		\
 		zfsd_event.cc		\

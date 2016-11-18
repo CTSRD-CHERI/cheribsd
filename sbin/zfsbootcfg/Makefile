@@ -1,6 +1,9 @@
 #	@(#)Makefile	8.4 (Berkeley) 6/22/95
 # $FreeBSD$
 
+# linker error
+WANT_CHERI=none
+
 PROG=	zfsbootcfg
 WARNS?=	1
 MAN=	zfsbootcfg.8

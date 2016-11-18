@@ -1,6 +1,6 @@
 # $FreeBSD$
 
-# Linker error
+# libzfs
 WANT_CHERI=none
 
 .PATH: ${.CURDIR}/../../../cddl/contrib/opensolaris/cmd/zdb

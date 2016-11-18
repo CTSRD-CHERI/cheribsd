@@ -1,5 +1,8 @@
 # $FreeBSD$
 
+# libzfs
+WANT_CHERI=none
+
 .PATH: ${.CURDIR}/../../../cddl/contrib/opensolaris/cmd/zpool
 .PATH: ${.CURDIR}/../../../cddl/contrib/opensolaris/cmd/stat/common
 .PATH: ${.CURDIR}/../../../sys/cddl/contrib/opensolaris/common/zfs

@@ -1,5 +1,8 @@
 # $FreeBSD$
 
+# libzfs
+WANT_CHERI=none
+
 .include <src.opts.mk>
 
 PROG=	fstyp
