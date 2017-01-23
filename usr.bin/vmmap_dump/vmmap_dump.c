@@ -97,7 +97,7 @@ extract_vmap(pid_t pid)
 		err(EX_OSERR, "procstat_getvmmap");
 
 	for (i = 0; i < count; i++) {
-		fprintf(csv, "%u, %u, %u, ",
+		fprintf(csv, "%lu, %lu, %lu, ",
 			kve[i].kve_start,
 			kve[i].kve_end,
 			kve[i].kve_offset);

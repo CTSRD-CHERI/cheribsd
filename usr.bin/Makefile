@@ -202,7 +202,9 @@ SUBDIR.${MK_BSD_CPIO}+=	cpio
 SUBDIR.${MK_CALENDAR}+=	calendar
 SUBDIR.${MK_CHERI}+=	capsize \
 			libpng_sb_test \
-			qtrace
+			qtrace \
+			vmmap_dump \
+			cheri_stack_dump
 SUBDIR.${MK_CLANG}+=	clang
 SUBDIR.${MK_DIALOG}+=	dpv
 SUBDIR.${MK_EE}+=	ee
