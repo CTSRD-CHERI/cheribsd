@@ -134,7 +134,6 @@ extern u_int qemu_trace_perthread;
 static void
 stop_cheri_perthread_trace(struct thread *td)
 {
-	printf("Checking whether tracing should be disabled after exception...");
 	if (qemu_trace_perthread && (td->td_md.md_flags & MDTD_QTRACE)) {
 		/*
 		 * If we are currently tracing per-thread and the traced process
@@ -143,9 +142,6 @@ stop_cheri_perthread_trace(struct thread *td)
 		 */
 		CHERI_STOP_TRACE;
 		td->td_md.md_flags &= ~MDTD_QTRACE;
-		printf(" Turned off\n");
-	} else {
-		printf(" No change\n");
 	}
 }
 #endif
