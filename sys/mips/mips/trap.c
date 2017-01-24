@@ -142,6 +142,7 @@ stop_cheri_perthread_trace(struct thread *td)
 		 * turn on and off tracing in swtch.S will no be reached.
 		 */
 		CHERI_STOP_TRACE;
+		td->td_md.md_flags &= ~MDTD_QTRACE;
 		printf(" Turned off\n");
 	} else {
 		printf(" No change\n");
