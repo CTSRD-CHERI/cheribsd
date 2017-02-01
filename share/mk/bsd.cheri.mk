@@ -80,6 +80,8 @@ LDFLAGS+=	-Wl,-init=crt_init_globals
 .if defined(CHERI_LLD_BROKEN) || ${WANT_CHERI} == "sandbox"
 LDFLAGS+=	-fuse-ld=bfd
 .else
+CHERI_BINDIR!=	dirname	"${CHERI_CC}"
+LD=		${CHERI_BINDIR}/ld.lld
 LDFLAGS+=	-fuse-ld=lld
 .endif
 .endif
