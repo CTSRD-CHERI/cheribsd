@@ -148,6 +148,12 @@
 # undef OPENSSL_NO_DEPRECATED
 #endif
 
+/*
+ * Cheri tracing enable and disable macros
+ */
+#define CHERI_START_TRACE asm("lui $zero, 0xbeef")
+#define CHERI_STOP_TRACE asm("lui $zero, 0xdead")
+
 #include <assert.h>
 #include <ctype.h>
 #include <stdio.h>
@@ -2582,6 +2588,7 @@ static int sv_body(char *hostname, int s, int stype, unsigned char *context)
     if (buf != NULL) {
         OPENSSL_cleanse(buf, bufsize);
         OPENSSL_free(buf);
+	CHERI_STOP_TRACE;
     }
     if (ret >= 0)
         BIO_printf(bio_s_out, "ACCEPT\n");
@@ -3339,7 +3346,7 @@ static int rev_body(char *hostname, int s, int stype, unsigned char *context)
  end:
     /* make sure we re-use sessions */
     SSL_set_shutdown(con, SSL_SENT_SHUTDOWN | SSL_RECEIVED_SHUTDOWN);
-
+    CHERI_STOP_TRACE;
  err:
 
     if (buf != NULL)

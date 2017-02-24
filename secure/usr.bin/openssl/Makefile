@@ -19,6 +19,8 @@ SRCS+=	app_rand.c apps.c asn1pars.c ca.c ciphers.c cms.c crl.c crl2p7.c \
 	s_socket.c s_time.c sess_id.c smime.c speed.c spkac.c srp.c ts.c \
 	verify.c version.c x509.c
 
+NO_SHARED=yes
+LDFLAGS += "-fuse-ld=lld"
 .include <bsd.prog.mk>
 
 .PATH:	${LCRYPTO_SRC}/apps \
