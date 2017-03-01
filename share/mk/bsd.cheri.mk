@@ -75,6 +75,16 @@ _LIB_OBJTOP=	${ROOTOBJDIR}
 .ifdef LIBCHERI
 LDFLAGS+=	-Wl,-init=crt_init_globals
 .endif
+.if defined(CHERI_USE_LLD)
+# The sandbox.ld script doesn't work correctly yet
+.if defined(CHERI_LLD_BROKEN) || ${WANT_CHERI} == "sandbox"
+LDFLAGS+=	-fuse-ld=bfd
+.else
+CHERI_BINDIR!=	dirname	"${CHERI_CC}"
+LD=		${CHERI_BINDIR}/ld.lld
+LDFLAGS+=	-fuse-ld=lld
+.endif
+.endif
 .endif
 
 .if ${MK_CHERI128} == "yes"

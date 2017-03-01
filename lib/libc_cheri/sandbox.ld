@@ -63,7 +63,7 @@ SECTIONS
 	.text.invoke_vector : {
 		crt_invoke.o(.text .data .bss)
 	}
-	.= __code_body__;
+	. = __code_body__;
 	.init : {
 		KEEP (*(.init))
 	} = 0
@@ -117,7 +117,7 @@ SECTIONS
 	.data ALIGN(CAP_ALIGN): {
 		*(.data)
 	}
-	_gp = ALIGN(CAP_ALIGN) + 0x7fc0;
+	_gp = ABSOLUTE(ALIGN(CAP_ALIGN) + 0x7fc0);
 	.got : {
 		*(.got.plt)
 		*(.got)

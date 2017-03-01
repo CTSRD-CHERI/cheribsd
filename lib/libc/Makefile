@@ -32,6 +32,8 @@ LIBC_ARCH=${MACHINE_CPUARCH}
 LIB?=c
 SHLIB_MAJOR= 7
 .ifdef LIBCHERI
+# links fine but the created library doesn't work for some reason
+# CHERI_LLD_BROKEN=yes
 SHLIB_LDSCRIPT=libc-cheri.ldscript
 .else
 .if ${MK_SSP} != "no"
