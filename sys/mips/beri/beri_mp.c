@@ -231,9 +231,17 @@ platform_init_ap(int cpuid)
 #endif
 	mips_wr_status(status);
 
-	/* Enable HDWRD instruction in userspace. */
+	/* Enable HDWRD instruction in userspace. Also enables statcounters. */
 	hwrena = mips_rd_hwrena();
-	hwrena |= (MIPS_HWRENA_CC | MIPS_HWRENA_CCRES | MIPS_HWRENA_CPUNUM);
+	hwrena |= (MIPS_HWRENA_CC | MIPS_HWRENA_CCRES | MIPS_HWRENA_CPUNUM
+			| MIPS_BERI_HWRENA_RESET_STATCOUNTERS
+			| MIPS_BERI_HWRENA_ICACHE_STATCOUNTERS
+			| MIPS_BERI_HWRENA_DCACHE_STATCOUNTERS
+			| MIPS_BERI_HWRENA_L2CACHE_STATCOUNTERS
+			| MIPS_BERI_HWRENA_MEM_STATCOUNTERS
+			| MIPS_BERI_HWRENA_TAGCACHE_STATCOUNTERS
+			| MIPS_BERI_HWRENA_L2MASTER_STATCOUNTERS
+			| MIPS_BERI_HWRENA_TAGMASTER_STATCOUNTERS);
 	mips_wr_hwrena(hwrena);
 
 	/*
