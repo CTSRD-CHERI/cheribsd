@@ -728,14 +728,15 @@
 #define	MIPS_HWRENA_CCRES	(1<<3)	/* Cycle counter resolution */
 /* BERI specific statcounters */
 #if defined(CPU_BERI)
-#define	MIPS_BERI_HWRENA_RESET_STATCOUNTERS     (1<<7)	/* statcounters reseting */
-#define	MIPS_BERI_HWRENA_ICACHE_STATCOUNTERS    (1<<8)	/* ICACHE statcounters */
-#define	MIPS_BERI_HWRENA_DCACHE_STATCOUNTERS    (1<<9)	/* DCACHE statcounters */
-#define	MIPS_BERI_HWRENA_L2CACHE_STATCOUNTERS   (1<<10)	/* L2CACHE statcounters */
-#define	MIPS_BERI_HWRENA_MEM_STATCOUNTERS       (1<<11)	/* memory statcounters */
-#define	MIPS_BERI_HWRENA_TAGCACHE_STATCOUNTERS  (1<<12)	/* tag cache statcounters */
-#define	MIPS_BERI_HWRENA_L2MASTER_STATCOUNTERS  (1<<13)	/* L2 cache master statcounters */
-#define	MIPS_BERI_HWRENA_TAGMASTER_STATCOUNTERS (1<<14)	/* tag cache master statcounters */
+#define	MIPS_HWRENA_BERI_RESET_STATCOUNTERS     (1<<7)	  /* statcounters reseting */
+#define	MIPS_HWRENA_BERI_ICACHE_STATCOUNTERS    (1<<8)	  /* ICACHE statcounters */
+#define	MIPS_HWRENA_BERI_DCACHE_STATCOUNTERS    (1<<9)	  /* DCACHE statcounters */
+#define	MIPS_HWRENA_BERI_L2CACHE_STATCOUNTERS   (1<<10)	  /* L2CACHE statcounters */
+#define	MIPS_HWRENA_BERI_MEM_STATCOUNTERS       (1<<11)	  /* memory statcounters */
+#define	MIPS_HWRENA_BERI_TAGCACHE_STATCOUNTERS  (1<<12)	  /* tag cache statcounters */
+#define	MIPS_HWRENA_BERI_L2MASTER_STATCOUNTERS  (1<<13)	  /* L2 cache master statcounters */
+#define	MIPS_HWRENA_BERI_TAGMASTER_STATCOUNTERS (1<<14)	  /* tag cache master statcounters */
+#define	MIPS_HWRENA_BERI_STATCOUNTERS_MASK      (0xFF<<7) /* mask of all statcounters */
 #endif
 #define	MIPS_HWRENA_UL		(1<<29)	/* UserLocal Register */
 #define	MIPS_HWRENA_IMPL30	(1<<30)	/* Implementation-dependent 30 */
