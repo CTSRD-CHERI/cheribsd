@@ -219,6 +219,7 @@ morecore(int bucket)
 		buf += sz;
 		op = op->ov_next;
 	}
+	op->ov_next = NULL;
 }
 
 static union overhead *
