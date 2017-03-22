@@ -290,6 +290,7 @@ morecore(int bucket)
 		op->ov_next = (union overhead *)(void *)((caddr_t)op + sz);
 		op = (union overhead *)(void *)((caddr_t)op + sz);
   	}
+  	op->ov_next = NULL;
 }
 
 void
