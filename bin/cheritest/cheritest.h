@@ -371,6 +371,10 @@ void	test_sandbox_var_constructor(const struct cheri_test *ctp);
 /* cheritest_sealcap.c */
 void	test_sealcap_sysarch(const struct cheri_test *ctp);
 
+/* cheritest_signal.c */
+void	test_signal_handler_usr1(const struct cheri_test *ctp);
+void	test_signal_sigaction_usr1(const struct cheri_test *ctp);
+
 /* cheritest_string.c */
 void	test_string_memcpy(const struct cheri_test *ctp);
 void	test_string_memcpy_c(const struct cheri_test *ctp);

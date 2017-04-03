@@ -18,6 +18,7 @@ SRCS+=	cheritest_bounds_globals.c					\
 	cheritest_registers.c						\
 	cheritest_sandbox.S						\
 	cheritest_sealcap.c						\
+	cheritest_signal.c						\
 	cheritest_string.c						\
 	cheritest_syscall.c						\
 	cheritest_util.c						\

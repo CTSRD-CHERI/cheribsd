@@ -1229,6 +1229,18 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	/*
+	 * Tests ensuring that signal handlers work. Only really relevant when
+	 * using the pure-capability ABI, but might as well run them
+	 * unconditionally.
+	 */
+	{ .ct_name = "test_signal_handler_usr1",
+	  .ct_desc = "Install a signal handler (sa_handler) or SIGUSR1 and check it works",
+	  .ct_func = test_signal_handler_usr1 },
+	{ .ct_name = "test_signal_sigaction_usr1",
+	  .ct_desc = "Install a signal handler (sa_sigaction) for SIGUSR1 and check it works",
+	  .ct_func = test_signal_sigaction_usr1 },
+
+	/*
 	 * Standard library string tests.
 	 */
 	{ .ct_name = "test_string_memcpy",
