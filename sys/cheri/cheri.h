@@ -172,7 +172,7 @@ void	cheri_newthread_setregs(struct thread *td);
 int	cheri_syscall_authorize(struct thread *td, u_int code,
 	    int nargs, register_t *args);
 int	cheri_signal_sandboxed(struct thread *td);
-void	cheri_sendsig(struct thread *td);
+void	cheri_sendsig(struct thread *td, int change_stc);
 void	cheri_trapframe_from_cheriframe(struct trapframe *frame,
 	    struct cheri_frame *cfp);
 void	cheri_trapframe_to_cheriframe(struct trapframe *frame,

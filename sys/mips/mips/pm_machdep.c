@@ -108,6 +108,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 #endif
 	int sig;
 	int oonstack;
+	int change_stc;
 
 	td = curthread;
 	p = td->td_proc;
@@ -202,6 +203,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
 		sp = (vm_offset_t)((uintptr_t)td->td_sigstk.ss_sp +
 		    td->td_sigstk.ss_size);
+		change_stc = 1;
 	} else {
 #ifdef CPU_CHERI
 		/*
@@ -221,6 +223,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		}
 #endif
 		sp = (vm_offset_t)regs->sp;
+		change_stc = 0;
 	}
 #ifdef CPU_CHERI
 	cp2_len = sizeof(*cfp);
@@ -296,7 +299,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 * in.  As we don't install this in the CHERI frame on the user stack,
 	 * it will be (genrally) be removed automatically on sigreturn().
 	 */
-	cheri_sendsig(td);
+	cheri_sendsig(td, change_stc);
 #endif
 
 	regs->pc = (register_t)(intptr_t)catcher;

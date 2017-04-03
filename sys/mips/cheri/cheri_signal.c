@@ -66,7 +66,7 @@ cheri_signal_copy(struct pcb *dst, struct pcb *src)
  * state will be restored by default.
  */
 void
-cheri_sendsig(struct thread *td)
+cheri_sendsig(struct thread *td, int change_stc)
 {
 	struct trapframe *frame;
 	struct cheri_signal *csigp;
@@ -74,7 +74,8 @@ cheri_sendsig(struct thread *td)
 	frame = &td->td_pcb->pcb_regs;
 	csigp = &td->td_pcb->pcb_cherisignal;
 	cheri_capability_copy(&frame->ddc, &csigp->csig_ddc);
-	cheri_capability_copy(&frame->stc, &csigp->csig_stc);
+	if (change_stc)
+		cheri_capability_copy(&frame->stc, &csigp->csig_stc);
 	cheri_capability_copy(&frame->idc, &csigp->csig_idc);
 	cheri_capability_copy(&frame->pcc, &csigp->csig_pcc);
 }
