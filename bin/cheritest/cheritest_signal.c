@@ -77,12 +77,14 @@ test_signal_handler_usr1(const struct cheri_test *ctp __unused)
 }
 
 static int sigaction_signum;
+static int sigaction_info_si_signo;
 static int sigaction_info_si_code;
 
 static void
 sigaction_handler(int signum, siginfo_t *siginfo, void *context)
 {
 	sigaction_signum = signum;
+	sigaction_info_si_signo = siginfo->si_signo;
 	sigaction_info_si_code = siginfo->si_code;
 }
 
@@ -102,8 +104,10 @@ test_signal_sigaction_usr1(const struct cheri_test *ctp __unused)
 
 	if (sigaction_signum != SIGUSR1)
 		cheritest_failure_errx("sigaction_signum (%d) != SIGUSR1 (%d)", sigaction_signum, SIGUSR1);
-	if (sigaction_info_si_code != SIGUSR1)
-		cheritest_failure_errx("sigaction_info_si_code (%d) != SIGUSR1 (%d)", sigaction_info_si_code, SIGUSR1);
+	if (sigaction_info_si_signo != SIGUSR1)
+		cheritest_failure_errx("sigaction_info_si_signo (%d) != SIGUSR1 (%d)", sigaction_info_si_signo, SIGUSR1);
+	if (sigaction_info_si_code != SI_USER)
+		cheritest_failure_errx("sigaction_info_si_code (%d) != SI_USER (%d)", sigaction_info_si_code, SI_USER);
 
 	cheritest_success();
 }
