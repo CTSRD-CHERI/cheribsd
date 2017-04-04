@@ -371,9 +371,14 @@ void	test_sandbox_var_constructor(const struct cheri_test *ctp);
 /* cheritest_sealcap.c */
 void	test_sealcap_sysarch(const struct cheri_test *ctp);
 
+/* cheritest_setjmp.c */
+void	test_setjmp(const struct cheri_test *ctp);
+
 /* cheritest_signal.c */
 void	test_signal_handler_usr1(const struct cheri_test *ctp);
 void	test_signal_sigaction_usr1(const struct cheri_test *ctp);
+void	test_signal_sigaltstack(const struct cheri_test *ctp);
+void	test_signal_sigaltstack_disable(const struct cheri_test *ctp);
 
 /* cheritest_string.c */
 void	test_string_memcpy(const struct cheri_test *ctp);
@@ -393,6 +398,11 @@ void	test_initregs_idc(const struct cheri_test *ctp);
 void	test_initregs_pcc(const struct cheri_test *ctp);
 void	test_copyregs(const struct cheri_test *ctp);
 void	test_listregs(const struct cheri_test *ctp);
+
+/* cheritest_thread.c */
+void	test_thread_access_globals(const struct cheri_test *ctp);
+void	test_thread_arg_write(const struct cheri_test *ctp);
+void	test_thread_return_value(const struct cheri_test *ctp);
 
 /* cheritest_vm.c */
 void	cheritest_vm_tag_mmap_anon(const struct cheri_test *ctp __unused);

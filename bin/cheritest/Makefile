@@ -18,9 +18,11 @@ SRCS+=	cheritest_bounds_globals.c					\
 	cheritest_registers.c						\
 	cheritest_sandbox.S						\
 	cheritest_sealcap.c						\
+	cheritest_setjmp.c						\
 	cheritest_signal.c						\
 	cheritest_string.c						\
 	cheritest_syscall.c						\
+	cheritest_thread.c						\
 	cheritest_util.c						\
 	cheritest_vm.c							\
 	cheritest_vm_swap.c						\
@@ -68,7 +70,7 @@ WANT_DUMP=	yes
 LIBADD= 	cheri z
 .endif
 
-LIBADD+=	xo util
+LIBADD+=	xo util pthread
 
 NO_SHARED?=	YES
 

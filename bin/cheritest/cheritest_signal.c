@@ -68,10 +68,12 @@ test_signal_handler_usr1(const struct cheri_test *ctp __unused)
 
 	handler_signum = 0;
 	if (kill(getpid(), SIGUSR1) != 0)
-		cheritest_failure_errx("kill(getpid(), SIGUSR1) failed: %s", strerror(errno));
+		cheritest_failure_errx("kill(getpid(), SIGUSR1) failed: %s",
+		                       strerror(errno));
 
 	if (handler_signum != SIGUSR1)
-		cheritest_failure_errx("handler_signum (%d) != SIGUSR1 (%d)", handler_signum, SIGUSR1);
+		cheritest_failure_errx("handler_signum (%d) != SIGUSR1 (%d)",
+		                       handler_signum, SIGUSR1);
 
 	cheritest_success();
 }
@@ -100,14 +102,110 @@ test_signal_sigaction_usr1(const struct cheri_test *ctp __unused)
 
 	sigaction_signum = 0;
 	if (kill(getpid(), SIGUSR1) != 0)
-		cheritest_failure_errx("kill(getpid(), SIGUSR1) failed: %s", strerror(errno));
+		cheritest_failure_errx("kill(getpid(), SIGUSR1) failed: %s",
+		                       strerror(errno));
 
 	if (sigaction_signum != SIGUSR1)
-		cheritest_failure_errx("sigaction_signum (%d) != SIGUSR1 (%d)", sigaction_signum, SIGUSR1);
+		cheritest_failure_errx("sigaction_signum (%d) != SIGUSR1 (%d)",
+		                       sigaction_signum, SIGUSR1);
 	if (sigaction_info_si_signo != SIGUSR1)
-		cheritest_failure_errx("sigaction_info_si_signo (%d) != SIGUSR1 (%d)", sigaction_info_si_signo, SIGUSR1);
+		cheritest_failure_errx("sigaction_info_si_signo (%d) != SIGUSR1 (%d)",
+		                       sigaction_info_si_signo, SIGUSR1);
 	if (sigaction_info_si_code != SI_USER)
-		cheritest_failure_errx("sigaction_info_si_code (%d) != SI_USER (%d)", sigaction_info_si_code, SI_USER);
+		cheritest_failure_errx("sigaction_info_si_code (%d) != SI_USER (%d)",
+		                       sigaction_info_si_code, SI_USER);
+
+	cheritest_success();
+}
+
+static size_t sigaltstack_stack_local;
+
+static void
+sigaltstack_handler(int signum __unused)
+{
+	int x;
+	sigaltstack_stack_local = (size_t)&x;
+}
+
+void
+test_signal_sigaltstack(const struct cheri_test *ctp __unused)
+{
+	stack_t sigstk;
+	struct sigaction sa;
+
+	if ((sigstk.ss_sp = malloc(SIGSTKSZ)) == NULL)
+		cheritest_failure_errx("malloc(SIGSTKSZ) failed: %s", strerror(errno));
+	sigstk.ss_size = SIGSTKSZ;
+	sigstk.ss_flags = 0;
+	if (sigaltstack(&sigstk, NULL) != 0)
+		cheritest_failure_errx("sigaltstack failed: %s", strerror(errno));
+
+	sa.sa_sigaction = sigaltstack_handler;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = SA_ONSTACK;
+	if (sigaction(SIGUSR1, &sa, NULL) != 0)
+		cheritest_failure_errx("sigaction failed: %s", strerror(errno));
+
+	sigaltstack_stack_local = 0;
+	if (kill(getpid(), SIGUSR1) != 0)
+		cheritest_failure_errx("kill(getpid(), SIGUSR1) failed: %s",
+		                       strerror(errno));
+
+	if (sigaltstack_stack_local < (size_t)sigstk.ss_sp)
+		cheritest_failure_errx("stack local (0x%zx) < sigstk.ss_sp (0x%zx)",
+		                       sigaltstack_stack_local, (size_t)sigstk.ss_sp);
+
+	if (sigaltstack_stack_local >= (size_t)sigstk.ss_sp + SIGSTKSZ)
+		cheritest_failure_errx("stack local (0x%zx) >= sigstk.ss_sp+SIGSTKSZ (0x%zx)",
+		                       sigaltstack_stack_local,
+		                       (size_t)sigstk.ss_sp + SIGSTKSZ);
+
+	cheritest_success();
+}
+
+static size_t sigaltstack_disable_stack_local;
+
+static void
+sigaltstack_disable_handler(int signum __unused)
+{
+	int x;
+	sigaltstack_disable_stack_local = (size_t)&x;
+}
+
+void
+test_signal_sigaltstack_disable(const struct cheri_test *ctp __unused)
+{
+	stack_t sigstk;
+	struct sigaction sa;
+
+	if ((sigstk.ss_sp = malloc(SIGSTKSZ)) == NULL)
+		cheritest_failure_errx("malloc(SIGSTKSZ) failed: %s", strerror(errno));
+	sigstk.ss_size = SIGSTKSZ;
+	sigstk.ss_flags = 0;
+	if (sigaltstack(&sigstk, NULL) != 0)
+		cheritest_failure_errx("sigaltstack failed: %s", strerror(errno));
+	sigstk.ss_flags = SS_DISABLE;
+	if (sigaltstack(&sigstk, NULL) != 0)
+		cheritest_failure_errx("sigaltstack (disable) failed: %s",
+		                       strerror(errno));
+
+	sa.sa_sigaction = sigaltstack_disable_handler;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = SA_ONSTACK;
+	if (sigaction(SIGUSR1, &sa, NULL) != 0)
+		cheritest_failure_errx("sigaction failed: %s", strerror(errno));
+
+	sigaltstack_disable_stack_local = 0;
+	if (kill(getpid(), SIGUSR1) != 0)
+		cheritest_failure_errx("kill(getpid(), SIGUSR1) failed: %s",
+		                       strerror(errno));
+
+	if (sigaltstack_disable_stack_local >= (size_t)sigstk.ss_sp &&
+	    sigaltstack_disable_stack_local < (size_t)sigstk.ss_sp + SIGSTKSZ)
+		cheritest_failure_errx("stack local (0x%zx) in range of sigstk.ss_sp (0x%zx-0x%zx)",
+		                       sigaltstack_disable_stack_local,
+		                       (size_t)sigstk.ss_sp,
+		                       (size_t)sigstk.ss_sp+SIGSTKSZ);
 
 	cheritest_success();
 }

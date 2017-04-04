@@ -1229,16 +1229,29 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	/*
+	 * setjmp/longjmp tests.
+	 */
+	{ .ct_name = "test_setjmp",
+	  .ct_desc = "Check setjmp and multiple longjmp calls return the right values and restore state",
+	  .ct_func = test_setjmp },
+
+	/*
 	 * Tests ensuring that signal handlers work. Only really relevant when
 	 * using the pure-capability ABI, but might as well run them
 	 * unconditionally.
 	 */
 	{ .ct_name = "test_signal_handler_usr1",
-	  .ct_desc = "Install a signal handler (sa_handler) or SIGUSR1 and check it works",
+	  .ct_desc = "install a signal handler (sa_handler) or sigusr1 and check it works",
 	  .ct_func = test_signal_handler_usr1 },
 	{ .ct_name = "test_signal_sigaction_usr1",
 	  .ct_desc = "Install a signal handler (sa_sigaction) for SIGUSR1 and check it works",
 	  .ct_func = test_signal_sigaction_usr1 },
+	{ .ct_name = "test_signal_sigaltstack",
+	  .ct_desc = "Check signal handlers use the alternate stack when enabled",
+	  .ct_func = test_signal_sigaltstack },
+	{ .ct_name = "test_signal_sigaltstack_disable",
+	  .ct_desc = "Check signal handlers don't use a given alternate stack when re-disabled",
+	  .ct_func = test_signal_sigaltstack_disable },
 
 	/*
 	 * Standard library string tests.
@@ -1255,6 +1268,19 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_string_memmove_c",
 	  .ct_desc = "Test explicit capability memmove",
 	  .ct_func = test_string_memmove_c },
+
+	/*
+	 * Threading tests.
+	 */
+	{ .ct_name = "test_thread_access_globals",
+	  .ct_desc = "Check threads can access globals",
+	  .ct_func = test_thread_access_globals },
+	{ .ct_name = "test_thread_arg_write",
+	  .ct_desc = "Check threads can use their arguments",
+	  .ct_func = test_thread_arg_write },
+	{ .ct_name = "test_thread_return_value",
+	  .ct_desc = "Check thread return values can be retrieved by pthread_join",
+	  .ct_func = test_thread_return_value },
 
 	/*
 	 * zlib tests.
