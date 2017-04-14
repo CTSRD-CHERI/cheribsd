@@ -785,17 +785,17 @@ sed -e '
 			    syscallprefix, funcalias) > cheriabi_fill_uap
 			printf("    struct %s *uap)\n{\n",
 			    argalias) > cheriabi_fill_uap
-			printf("\tstruct chericap tmpcap;\n") > cheriabi_fill_uap
+			printf("\tstruct chericap tmpcap __unused;\n") > cheriabi_fill_uap
 			# Process all the integer arguments
+			intreg = -1;
 			for (i = 1; i <= argc; i++) {
 				if (isptrtype(argtype[i]))
 					continue
+				intreg++;
 				printf("\n\t/* [%d] %s %s */\n", i-1,
 				    argsaltype[i], argname[i]) > cheriabi_fill_uap
-				printf("\tcheriabi_fetch_syscall_arg(td, &tmpcap, %s%s, %d);\n",
-				    syscallprefix, funcalias, i-1) > cheriabi_fill_uap
-				printf("\tCHERI_CLC(CHERI_CR_CTEMP0, CHERI_CR_KDC, &tmpcap, 0);\n") > cheriabi_fill_uap
-				printf("\tCHERI_CTOINT(uap->%s, CHERI_CR_CTEMP0);\n", argname[i]) > cheriabi_fill_uap
+				printf("\tuap->%s = (__typeof__(uap->%s))td->td_frame->a%d;\n",
+				    argname[i], argname[i], intreg) > cheriabi_fill_uap
 			}
 			# Process pointer arguments that do not depend on
 			# dereferenced pointers.
