@@ -348,7 +348,7 @@ sed -e '
 			column = column + 8
 		}
 	}
-	function print_cheriabi_fill_uap_func(i, a_saltype, a_name, dep, pdep) {
+	function print_cheriabi_fill_uap_func(i, a_saltype, a_name, dep, pdep, capreg) {
 		annotation = a_saltype
 		gsub(/ .*/, "", annotation)
 		if (cheriabi_fill_uap != "/dev/null")
@@ -425,8 +425,7 @@ sed -e '
 		} else
 			reqspace = sprintf("sizeof(*uap->%s)", a_name)
 
-		printf("%s\t\tcheriabi_fetch_syscall_arg(td, &tmpcap, %s%s, %d);\n",
-		    pdeptab, syscallprefix, funcalias, i-1) > cheriabi_fill_uap
+		printf("%s\t\tcheri_capability_copy(&tmpcap, &td->td_frame->c%s);\n", pdeptab, capreg) > cheriabi_fill_uap
 		printf("%s\t\terror = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->%s),\n", pdeptab, a_name) > cheriabi_fill_uap
 		printf("%s\t\t    &tmpcap, %s, reqperms, %s);\n",
 		    pdeptab, reqspace, may_be_null) > cheriabi_fill_uap
@@ -799,9 +798,12 @@ sed -e '
 			}
 			# Process pointer arguments that do not depend on
 			# dereferenced pointers.
+			# Capabilities are being passed in cN registers starting from c3.
+			capreg = 2;
 			for (i = 1; i <= argc; i++) {
 				if (!isptrtype(argtype[i]))
 					continue
+				capreg++;
 				if (i in pdeps)
 					continue
 				if (argsaltype[i] ~ /_Pagerange_/)
@@ -811,13 +813,15 @@ sed -e '
 				else
 					print_cheriabi_fill_uap_func(i,
 					    argsaltype[i], argname[i],
-					    deps[i], "")
+					    deps[i], "", capreg)
 			}
 			# Process pointer arguments that DO depend on
 			# dereferenced pointers.
+			capreg = 2;
 			for (i = 1; i <= argc; i++) {
 				if (!isptrtype(argtype[i]))
 					continue
+				capreg++;
 				if (!(i in pdeps))
 					continue
 				if (argsaltype[i] ~ /_Pagerange_/)
@@ -827,7 +831,7 @@ sed -e '
 				else
 					print_cheriabi_fill_uap_func(i,
 					    argsaltype[i], argname[i], "",
-					    pdeps[i])
+					    pdeps[i], capreg)
 			}
 			printf("\n\treturn (0);\n") > cheriabi_fill_uap
 			printf("}\n\n") > cheriabi_fill_uap
