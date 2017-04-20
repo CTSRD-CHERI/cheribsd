@@ -7941,8 +7941,8 @@ CHERIABI_SYS_mknodat_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_openat_fill_uap(struct thread *td,
-    struct openat_args *uap)
+CHERIABI_SYS_cheriabi_openat_fill_uap(struct thread *td,
+    struct cheriabi_openat_args *uap)
 {
 	struct chericap tmpcap __unused;
 
