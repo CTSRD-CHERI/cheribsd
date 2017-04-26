@@ -279,9 +279,10 @@ typedef struct {
 #define	BOUND_PTR(ptr, size)	(ptr)
 #else
 void *malloc_area;
-#define	BOUND_PTR(ptr, size)	\
-    ((opt_cheri_setbounds && ptr != NULL) ? \
-    cheri_csetbounds((ptr), (size)) : (ptr))
+#define	BOUND_PTR(ptr, size)						\
+  (opt_cheri_setbounds ? cheri_csetbounds((ptr), (size)) :		\
+   cheri_setoffset(cheri_csetbounds(malloc_area, cheri_getlen(malloc_area)), \
+		   cheri_getoffset(UNBOUND_PTR(ptr))))
 #endif
 
 /******************************************************************************/
