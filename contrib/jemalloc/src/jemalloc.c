@@ -1379,6 +1379,10 @@ malloc_init_hard_a0_locked()
 	malloc_initializer = INITIALIZER;
 
 #ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * XXXAM: we should bound malloc area more,
+	 * where can I find the bounds of the underlying mmap?
+	 */
 	malloc_area = cheri_getdefault();
 #endif
 	if (config_prof)
