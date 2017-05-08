@@ -961,11 +961,11 @@ sed -e '
 					comma = ""
 				else
 					comma = ", "
-				if (isptrtype(argtype[i]) && !(argtype[i] ~ /caddr_t/)) {
+				if (isptrtype(argtype[i]) && !(argtype[i] ~ /caddr_t/) && !(argtype[i] ~ /intptr_t/)) {
 					a_type = argtype[i]
 					sub(/_c /, "", a_type)
 					sub(/_c_/, "_", a_type)
-					cast = "(" a_type ")"
+					cast = "(__cheri_cast " a_type ")"
 				} else
 					cast = ""
 				printf("%s%s%s", comma, cast,
