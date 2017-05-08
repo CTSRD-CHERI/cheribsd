@@ -551,7 +551,7 @@ sandbox_object_unload(struct sandbox_object *sbop)
 
 	sbmp = (void *)((char *)sbop->sbo_datamem +
 	    SANDBOX_METADATA_BASE);
-	free((void *)sbmp->sbm_vtable);
+	free((__cheri_cast vm_offset_t *)sbmp->sbm_vtable);
 
 	munmap(sbop->sbo_datamem, sbop->sbo_datalen);
 }

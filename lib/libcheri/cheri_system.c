@@ -122,7 +122,8 @@ cheri_system_calloc(size_t count, size_t size,
 {
 	__capability void *ptr;
 
-	if ((ptr = (__capability void *)calloc(count, size)) == NULL)
+	/* XXXAR: bounds? */
+	if ((ptr = (__cheri_cast __capability void *)calloc(count, size)) == NULL)
 		return (-1);
 	*ptrp = ptr;
 	return (0);
@@ -132,7 +133,7 @@ int
 cheri_system_free(__capability void *ptr)
 {
 
-	free((void *)ptr);
+	free((__cheri_cast void *)ptr);
 	return (0);
 }
 

@@ -749,7 +749,7 @@ sandbox_make_vtable(void *dataptr, const char *class,
 		}
 		return (cheri_andperm(vtable, CHERI_PERM_LOAD));
 	}
-	free((void *)vtable);
+	free((__cheri_cast vm_offset_t *)vtable);
 	return (NULL);
 }
 
