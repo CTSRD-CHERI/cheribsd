@@ -98,6 +98,7 @@ _CHERI_COMMON_FLAGS+=	--sysroot=${SYSROOT}
 .if ${MK_CHERI_EXACT_EQUALS} == "yes"
 _CHERI_COMMON_FLAGS+=	-mllvm -cheri-exact-equals
 .endif
+CHERI_USE_CAP_TABLE?=	pcrel
 
 # Turn off deprecated warnings
 _CHERI_COMMON_FLAGS+= -Wno-deprecated-declarations
@@ -114,9 +115,7 @@ LIBDIR_BASE:=	/usr/libcheri
 .endif
 ROOTOBJDIR=	${.OBJDIR:S,${.CURDIR},,}${SRCTOP}/worldcheri${SRCTOP}
 CFLAGS+=	-ftls-model=local-exec
-.if !empty(CHERI_USE_CAP_TABLE)
 CFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
-.endif
 
 .ifdef NO_WERROR
 # Implicit function declarations should always be an error in purecap mode as
