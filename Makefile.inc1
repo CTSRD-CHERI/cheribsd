@@ -93,7 +93,8 @@ OBJTREE=	${MAKEOBJDIRPREFIX}/${TARGET}.${TARGET_ARCH}
 
 # Pull in compiler metadata from buildworld/toolchain if possible to avoid
 # running CC from bsd.compiler.mk.
-.if make(installworld) || make(installsysroot) || make(install)
+.if make(installworld) || make(installsysroot) || make(install) || \
+    make(distributeworld) || make(stageworld)
 .-include "${OBJTREE}${.CURDIR}/compiler-metadata.mk"
 .endif
 
