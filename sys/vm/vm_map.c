@@ -2756,9 +2756,6 @@ done:
 	}
 	for (entry = first_entry; entry != &map->header && entry->start < end;
 	    entry = entry->next) {
-		if ((entry->eflags & MAP_ENTRY_WIRE_SKIPPED) != 0)
-			goto next_entry_done;
-
 		/*
 		 * If VM_MAP_WIRE_HOLESOK was specified, an empty
 		 * space in the unwired region could have been mapped
@@ -2766,7 +2763,7 @@ done:
 		 * pages or draining MAP_ENTRY_IN_TRANSITION.
 		 * Moreover, another thread could be simultaneously
 		 * wiring this new mapping entry.  Detect these cases
-		 * and skip any entries marked as in transition by us.
+		 * and skip any entries marked as in transition not by us.
 		 */
 		if ((entry->eflags & MAP_ENTRY_IN_TRANSITION) == 0 ||
 		    entry->wiring_thread != curthread) {
@@ -2774,6 +2771,9 @@ done:
 			    ("vm_map_wire: !HOLESOK and new/changed entry"));
 			continue;
 		}
+
+		if ((entry->eflags & MAP_ENTRY_WIRE_SKIPPED) != 0)
+			goto next_entry_done;
 
 		if (rv == KERN_SUCCESS) {
 			if (user_wire)
