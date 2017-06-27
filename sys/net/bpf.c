@@ -1312,7 +1312,7 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		CASE_IOC_BPF_DLTLIST(BIOCGDLTLIST):
 		CASE_IOC_IFREQ(BIOCGETIF):
 		case BIOCGRTIMEOUT:
-#if defined(COMPAT_FREEBSD32) && !defined(__mips__) && !defined(__powerpc__)
+#if defined(COMPAT_FREEBSD32) && defined(__amd64__)
 		case BIOCGRTIMEOUT32:
 #endif
 		case BIOCGSTATS:
@@ -1324,7 +1324,7 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		case FIONREAD:
 		case BIOCLOCK:
 		case BIOCSRTIMEOUT:
-#if defined(COMPAT_FREEBSD32) && !defined(__mips__) && !defined(__powerpc__)
+#if defined(COMPAT_FREEBSD32) && defined(__amd64__)
 		case BIOCSRTIMEOUT32:
 #endif
 		case BIOCIMMEDIATE:
@@ -1515,7 +1515,7 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	 * Set read timeout.
 	 */
 	case BIOCSRTIMEOUT:
-#if defined(COMPAT_FREEBSD32) && !defined(__mips__) && !defined(__powerpc__)
+#if defined(COMPAT_FREEBSD32) && defined(__amd64__)
 	case BIOCSRTIMEOUT32:
 #endif
 		{
@@ -1546,12 +1546,12 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	 * Get read timeout.
 	 */
 	case BIOCGRTIMEOUT:
-#if defined(COMPAT_FREEBSD32) && !defined(__mips__) && !defined(__powerpc__)
+#if defined(COMPAT_FREEBSD32) && defined(__amd64__)
 	case BIOCGRTIMEOUT32:
 #endif
 		{
 			struct timeval *tv;
-#if defined(COMPAT_FREEBSD32) && !defined(__mips__) && !defined(__powerpc__)
+#if defined(COMPAT_FREEBSD32) && defined(__amd64__)
 			struct timeval32 *tv32;
 			struct timeval tv64;
 
@@ -1563,7 +1563,7 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 			tv->tv_sec = d->bd_rtout / hz;
 			tv->tv_usec = (d->bd_rtout % hz) * tick;
-#if defined(COMPAT_FREEBSD32) && !defined(__mips__) && !defined(__powerpc__)
+#if defined(COMPAT_FREEBSD32) && defined(__amd64__)
 			if (cmd == BIOCGRTIMEOUT32) {
 				tv32 = (struct timeval32 *)addr;
 				tv32->tv_sec = tv->tv_sec;
