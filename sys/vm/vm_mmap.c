@@ -1666,10 +1666,11 @@ vm_mmap_object(vm_map_t map, vm_offset_t *addr, vm_offset_t max_addr,
     vm_prot_t maxprot, int flags, vm_object_t object, vm_ooffset_t foff,
     boolean_t writecounted, struct thread *td)
 {
-	boolean_t fitit;
+	boolean_t curmap, fitit;
 	int docow, error, findspace, rv;
 
-	if (map == &td->td_proc->p_vmspace->vm_map) {
+	curmap = map == &td->td_proc->p_vmspace->vm_map;
+	if (curmap) {
 		PROC_LOCK(td->td_proc);
 		if (map->size + size > lim_cur_proc(td->td_proc, RLIMIT_VMEM)) {
 			PROC_UNLOCK(td->td_proc);
@@ -1757,8 +1758,15 @@ vm_mmap_object(vm_map_t map, vm_offset_t *addr, vm_offset_t max_addr,
 			    MAP_ALIGNMENT_SHIFT);
 		else
 			findspace = VMFS_OPTIMAL_SPACE;
-		rv = vm_map_find(map, object, foff, addr, size,
-		    max_addr, findspace, prot, maxprot, docow);
+		if (curmap) {
+			rv = vm_map_find_min(map, object, foff, addr, size,
+			    round_page((vm_offset_t)td->td_proc->p_vmspace->
+			    vm_daddr + lim_max(td, RLIMIT_DATA)), max_addr,
+			    findspace, prot, maxprot, docow);
+		} else {
+			rv = vm_map_find(map, object, foff, addr, size,
+			    max_addr, findspace, prot, maxprot, docow);
+		}
 	} else {
 		if (max_addr != 0 && *addr + size > max_addr)
 			return (ENOMEM);
