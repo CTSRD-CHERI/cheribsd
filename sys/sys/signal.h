@@ -180,7 +180,7 @@ union sigval {
 	void    *sigval_ptr;
 };
 
-#else
+#else /* _KERNEL */
 union sigval_native {
 	int	sival_int;
 	void	*sival_ptr;
@@ -194,8 +194,17 @@ typedef union sigval_c		ksigval_union;
 #else
 typedef union sigval_native	ksigval_union;
 #endif
-#endif
+#endif /* _KERNEL */
 
+#if defined(_WANT_LWPINFO32) || (defined(_KERNEL) && defined(__LP64__))
+union sigval32 {
+	int	sival_int;
+	uint32_t sival_ptr;
+	/* 6.0 compatibility */
+	int	sigval_int;
+	uint32_t sigval_ptr;
+};
+#endif
 #endif
 
 #if __POSIX_VISIBLE >= 199309
@@ -394,6 +403,38 @@ typedef	struct siginfo_native	_siginfo_t;
 #define si_overrun	_reason._timer._overrun
 #define si_mqd		_reason._mesgq._mqd
 #define si_band		_reason._poll._band
+
+#if defined(_WANT_LWPINFO32) || (defined(_KERNEL) && defined(__LP64__))
+struct siginfo32 {
+	int	si_signo;		/* signal number */
+	int	si_errno;		/* errno association */
+	int	si_code;		/* signal code */
+	__pid_t	si_pid;			/* sending process */
+	__uid_t	si_uid;			/* sender's ruid */
+	int	si_status;		/* exit value */
+	uint32_t si_addr;		/* faulting instruction */
+	union sigval32 si_value;	/* signal value */
+	union	{
+		struct {
+			int	_trapno;/* machine specific trap code */
+		} _fault;
+		struct {
+			int	_timerid;
+			int	_overrun;
+		} _timer;
+		struct {
+			int	_mqd;
+		} _mesgq;
+		struct {
+			int32_t	_band;		/* band event for SIGPOLL */
+		} _poll;			/* was this ever used ? */
+		struct {
+			int32_t	__spare1__;
+			int	__spare2__[7];
+		} __spare__;
+	} _reason;
+};
+#endif
 
 /** si_code **/
 /* codes for SIGILL */
