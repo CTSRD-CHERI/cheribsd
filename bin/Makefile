@@ -67,8 +67,6 @@ SUBDIR.${MK_CHERI}+=	cheri_minimal_pie_exe
 
 .include <bsd.arch.inc.mk>
 
-SUBDIR:=	${SUBDIR:O}
-
 SUBDIR_PARALLEL=
 
 .include <bsd.subdir.mk>
