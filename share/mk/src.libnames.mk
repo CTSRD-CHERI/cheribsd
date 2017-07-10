@@ -103,6 +103,7 @@ _LIBRARIES=	\
 		devstat \
 		dialog \
 		dom \
+		dl \
 		dpv \
 		dtrace \
 		dwarf \
