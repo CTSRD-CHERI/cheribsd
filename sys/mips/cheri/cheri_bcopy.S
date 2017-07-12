@@ -83,7 +83,7 @@ return:
 	nop
 END(cheri_memcpy)
 
-LEAF(copystr_fc)
+LEAF(copystrcap)
 	move		t0, a1
 	li		t1, 1
 	beq		a1, zero, 4f
@@ -104,9 +104,9 @@ LEAF(copystr_fc)
 3:
 	j		ra			# v0 is 0 or ENAMETOOLONG
 	nop
-END(copystr_fc)
+END(copystrcap)
 
-NESTED(copyinstr_fc, CALLFRAME_SIZ, ra)
+NESTED(copyinstrcap, CALLFRAME_SIZ, ra)
 	PTR_SUBU	sp, sp, CALLFRAME_SIZ
 	.mask	0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ)
 	PTR_LA	v0, copyerr
@@ -115,7 +115,7 @@ NESTED(copyinstr_fc, CALLFRAME_SIZ, ra)
 	REG_S	ra, CALLFRAME_RA(sp)
 	GET_CPU_PCPU(v1)
 	PTR_L	v1, PC_CURPCB(v1)
-	PTR_LA	t9, _C_LABEL(copystr_fc)
+	PTR_LA	t9, _C_LABEL(copystrcap)
 	jalr	t9
 	PTR_S	v0, U_PCB_ONFAULT(v1)
 	REG_L	ra, CALLFRAME_RA(sp)
@@ -124,4 +124,4 @@ NESTED(copyinstr_fc, CALLFRAME_SIZ, ra)
 	PTR_S	zero, U_PCB_ONFAULT(v1)
 	j	ra
 	PTR_ADDU	sp, sp, CALLFRAME_SIZ
-END(copyinstr_fc)
+END(copyinstrcap)

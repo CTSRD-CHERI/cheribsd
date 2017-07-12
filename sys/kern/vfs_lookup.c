@@ -264,6 +264,8 @@ namei_handle_root(struct nameidata *ndp, struct vnode **dpp)
 	return (0);
 }
 
+#include <cheri/cheric.h>
+
 /*
  * Convert a pathname into a pointer to a locked vnode.
  *
@@ -330,6 +332,7 @@ namei(struct nameidata *ndp)
 	else
 		error = copyinstr_fc(ndp->ni_dirp, cnp->cn_pnbuf, MAXPATHLEN,
 		    &ndp->ni_pathlen);
+
 
 	/*
 	 * Don't allow empty pathnames.
