@@ -51,7 +51,8 @@ struct chericap {
 	uint8_t		c_data[CHERICAP_SIZE];
 } __packed __aligned(CHERICAP_SIZE);
 #ifdef _KERNEL
-CTASSERT(sizeof(struct chericap) == CHERICAP_SIZE);
+_Static_assert(sizeof(struct chericap) == CHERICAP_SIZE,
+    "compile-time assertion failed");
 #endif
 
 /*

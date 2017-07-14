@@ -1,0 +1,35 @@
+# CHERI_MALTA64 -- 64-bit kernel config for MALTA boards + 256-bit CHERI
+#
+# $FreeBSD$
+ 
+ident		CHERI_MALTA64
+
+include		"std.MALTA"
+ 
+hints		"CHERI_MALTA64.hints"  #Default places to look for devices.
+
+machine		mips mips64	# Malta supports both, so it isn't in std.malta
+ 
+makeoptions	ARCH_FLAGS="-march=mips64 -mabi=64"
+ 
+makeoptions 	KERNLOADADDR=0xffffffff80100000
+
+options 	KTRACE
+
+#
+# Features required for CHERI CPU and CheriBSD support.
+#
+options 	CPU_CHERI
+options 	COMPAT_CHERIABI
+options 	KSTACK_LARGE_PAGE
+options 	TMPFS
+options		KDTRACE_HOOKS
+options		KDTRACE_FRAME
+
+#
+# Qemu-CHERI tracing is permitted per thread, not just globally.
+#
+options 	CPU_QEMU_MALTA
+
+device		dtrace
+device		dtraceall

@@ -124,7 +124,8 @@ CTASSERT(sizeof(void * __capability) == CHERICAP_SIZE);
 CTASSERT(offsetof(struct cheri_frame, cf_c1) == sizeof(void * __capability));
 #endif
 /* 28 capability registers + capcause + padding. */
-CTASSERT(sizeof(struct cheri_frame) == (29 * CHERICAP_SIZE));
+_Static_assert(sizeof(struct cheri_frame) == (29 * CHERICAP_SIZE),
+    "compile-time assertion failed");
 #endif
 
 #ifdef _KERNEL
