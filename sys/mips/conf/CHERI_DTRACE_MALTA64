@@ -2,7 +2,7 @@
 #
 # $FreeBSD$
  
-ident		CHERI_MALTA64
+ident		CHERI_DTRACE_MALTA64
 
 include		"std.MALTA"
  
