@@ -743,7 +743,7 @@ typedef struct dof_ecbdesc {
 	dof_secidx_t dofe_pred;		/* link to DOF_SECT_DIFOHDR */
 	dof_secidx_t dofe_actions;	/* link to DOF_SECT_ACTDESC */
 	uint32_t dofe_pad;		/* reserved for future use */
-	uint64_t dofe_uarg;		/* user-supplied library argument */
+	uintptr_t dofe_uarg;		/* user-supplied library argument */
 } dof_ecbdesc_t;
 
 typedef struct dof_probedesc {
@@ -760,8 +760,8 @@ typedef struct dof_actdesc {
 	dof_secidx_t dofa_strtab;	/* link to DOF_SECT_STRTAB section */
 	uint32_t dofa_kind;		/* action kind (DTRACEACT_* constant) */
 	uint32_t dofa_ntuple;		/* number of subsequent tuple actions */
-	uint64_t dofa_arg;		/* kind-specific argument */
-	uint64_t dofa_uarg;		/* user-supplied argument */
+	uintptr_t dofa_arg;		/* kind-specific argument */
+	uintptr_t dofa_uarg;		/* user-supplied argument */
 } dof_actdesc_t;
 
 typedef struct dof_difohdr {
@@ -779,7 +779,7 @@ typedef struct dof_relodesc {
 	dof_stridx_t dofr_name;		/* string name of relocation symbol */
 	uint32_t dofr_type;		/* relo type (DOF_RELO_* constant) */
 	uint64_t dofr_offset;		/* byte offset for relocation */
-	uint64_t dofr_data;		/* additional type-specific data */
+	uintptr_t dofr_data;		/* additional type-specific data */
 } dof_relodesc_t;
 
 #define	DOF_RELO_NONE	0		/* empty relocation entry */
@@ -814,7 +814,7 @@ typedef struct dof_provider {
 } dof_provider_t;
 
 typedef struct dof_probe {
-	uint64_t dofpr_addr;		/* probe base address or offset */
+	uintptr_t dofpr_addr;		/* probe base address or offset */
 	dof_stridx_t dofpr_func;	/* probe function string */
 	dof_stridx_t dofpr_name;	/* probe name string */
 	dof_stridx_t dofpr_nargv;	/* native argument type strings */
@@ -930,8 +930,8 @@ typedef struct dtrace_actdesc {
 	struct dtrace_actdesc *dtad_next;	/* next action */
 	dtrace_actkind_t dtad_kind;		/* kind of action */
 	uint32_t dtad_ntuple;			/* number in tuple */
-	uint64_t dtad_arg;			/* action argument */
-	uint64_t dtad_uarg;			/* user argument */
+	uintptr_t dtad_arg;			/* action argument */
+	uintptr_t dtad_uarg;			/* user argument */
 	int dtad_refcnt;			/* reference count */
 } dtrace_actdesc_t;
 
@@ -939,7 +939,7 @@ typedef struct dtrace_ecbdesc {
 	dtrace_actdesc_t *dted_action;		/* action description(s) */
 	dtrace_preddesc_t dted_pred;		/* predicate description */
 	dtrace_probedesc_t dted_probe;		/* probe description */
-	uint64_t dted_uarg;			/* library argument */
+	uintptr_t dted_uarg;			/* library argument */
 	int dted_refcnt;			/* reference count */
 } dtrace_ecbdesc_t;
 
@@ -966,14 +966,14 @@ typedef struct dtrace_recdesc {
 	uint32_t dtrd_offset;			/* offset in ECB's data */
 	uint16_t dtrd_alignment;		/* required alignment */
 	uint16_t dtrd_format;			/* format, if any */
-	uint64_t dtrd_arg;			/* action argument */
-	uint64_t dtrd_uarg;			/* user argument */
+	uintptr_t dtrd_arg;			/* action argument */
+	uintptr_t dtrd_uarg;			/* user argument */
 } dtrace_recdesc_t;
 
 typedef struct dtrace_eprobedesc {
 	dtrace_epid_t dtepd_epid;		/* enabled probe ID */
 	dtrace_id_t dtepd_probeid;		/* probe ID */
-	uint64_t dtepd_uarg;			/* library argument */
+	uintptr_t dtepd_uarg;			/* library argument */
 	uint32_t dtepd_size;			/* total size */
 	int dtepd_nrecs;			/* number of records */
 	dtrace_recdesc_t dtepd_rec[1];		/* records themselves */
@@ -1417,8 +1417,8 @@ typedef struct {
 
 typedef struct dof_helper {
 	char dofhp_mod[DTRACE_MODNAMELEN];	/* executable or library name */
-	uint64_t dofhp_addr;			/* base address of object */
-	uint64_t dofhp_dof;			/* address of helper DOF */
+	uintptr_t dofhp_addr;			/* base address of object */
+	uintptr_t dofhp_dof;			/* address of helper DOF */
 #ifdef __FreeBSD__
 	pid_t dofhp_pid;			/* target process ID */
 	int dofhp_gen;
@@ -2283,7 +2283,7 @@ typedef struct dtrace_helper_probedesc {
 	char *dthpb_mod;			/* probe module */
 	char *dthpb_func; 			/* probe function */
 	char *dthpb_name; 			/* probe name */
-	uint64_t dthpb_base;			/* base address */
+	uintptr_t dthpb_base;			/* base address */
 	uint32_t *dthpb_offs;			/* offsets array */
 	uint32_t *dthpb_enoffs;			/* is-enabled offsets array */
 	uint32_t dthpb_noffs;			/* offsets count */
