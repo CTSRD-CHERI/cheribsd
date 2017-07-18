@@ -120,8 +120,10 @@ struct cheri_frame {
 
 #ifdef _KERNEL
 #if __has_feature(capabilities)
-CTASSERT(sizeof(void * __capability) == CHERICAP_SIZE);
-CTASSERT(offsetof(struct cheri_frame, cf_c1) == sizeof(void * __capability));
+_Static_assert(sizeof(void * __capability) == CHERICAP_SIZE,
+    "compile-time assertion failed");
+_Static_assert(offsetof(struct cheri_frame, cf_c1) == sizeof(void * __capability),
+    "compile-time assertion failed");
 #endif
 /* 28 capability registers + capcause + padding. */
 _Static_assert(sizeof(struct cheri_frame) == (29 * CHERICAP_SIZE),
