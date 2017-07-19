@@ -848,6 +848,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		return (rval);
 	}
 	default:
+		DTRACE_IOCTL_PRINTF("%s(%d): default: %0lx\n",__func__,__LINE__,cmd);
 		error = ENOTTY;
 	}
 	return (error);
