@@ -558,12 +558,12 @@ typedef struct dtrace_difv {
 
 #ifndef _LP64
 #if BYTE_ORDER == _BIG_ENDIAN
-#define	DTRACE_PTR(type, name)	uint32_t name##pad; type *name
+#define	DTRACE_PTR(type, name)	uint32_t name##pad; type * __capability name
 #else
-#define	DTRACE_PTR(type, name)	type *name; uint32_t name##pad
+#define	DTRACE_PTR(type, name)	type * __capability name; uint32_t name##pad
 #endif
 #else
-#define	DTRACE_PTR(type, name)	type *name
+#define	DTRACE_PTR(type, name)	type * __capability name
 #endif
 
 /*
@@ -1329,6 +1329,65 @@ typedef struct {
 							/* get DOF */
 #define	DTRACEIOC_REPLICATE	_IOW('x',18,dtrace_repldesc_t)	
 							/* replicate enab */
+typedef struct dtrace_bufdesc_c {
+	uint64_t dtbd_size;			/* size of buffer */
+	uint32_t dtbd_cpu;			/* CPU or DTRACE_CPUALL */
+	uint32_t dtbd_errors;			/* number of errors */
+	uint64_t dtbd_drops;			/* number of drops */
+	DTRACE_PTR(char, dtbd_data);		/* data */
+	uint64_t dtbd_oldest;			/* offset of oldest record */
+	uint64_t dtbd_timestamp;		/* hrtime of snapshot */
+} dtrace_bufdesc_c_t;
+
+typedef struct {
+	void * __capability dof;
+	int n_matched;
+} dtrace_enable_io_c_t;
+
+typedef struct dtrace_conf_c {
+	uint_t dtc_difversion;			/* supported DIF version */
+	uint_t dtc_difintregs;			/* # of DIF integer registers */
+	uint_t dtc_diftupregs;			/* # of DIF tuple registers */
+	uint_t dtc_ctfmodel;			/* CTF data model */
+	uint_t dtc_pad[8];			/* reserved for future use */
+} dtrace_conf_c_t;
+
+typedef struct dtrace_aggdesc_c {
+	DTRACE_PTR(char, dtagd_name);		/* not filled in by kernel */
+	dtrace_aggvarid_t dtagd_varid;		/* not filled in by kernel */
+	int dtagd_flags;			/* not filled in by kernel */
+	dtrace_aggid_t dtagd_id;		/* aggregation ID */
+	dtrace_epid_t dtagd_epid;		/* enabled probe ID */
+	uint32_t dtagd_size;			/* size in bytes */
+	int dtagd_nrecs;			/* number of records */
+	uint32_t dtagd_pad;			/* explicit padding */
+	dtrace_recdesc_t dtagd_rec[1];		/* record descriptions */
+} dtrace_aggdesc_c_t;
+
+typedef struct dtrace_fmtdesc_c {
+	DTRACE_PTR(char, dtfd_string);		/* format string */
+	int dtfd_length;			/* length of format string */
+	uint16_t dtfd_format;			/* format identifier */
+} dtrace_fmtdesc_c_t;
+
+#define	DTRACEIOC_PROVIDER_C	_IOC_NEWTYPE(DTRACEIOC_PROVIDER, dtrace_providerdesc_t)
+#define	DTRACEIOC_PROBES_C	_IOC_NEWTYPE(DTRACEIOC_PROBES, dtrace_probedesc_t)
+#define	DTRACEIOC_BUFSNAP_C	_IOC_NEWTYPE(DTRACEIOC_BUFSNAP, dtrace_bufdesc_c_t * __capability)
+#define	DTRACEIOC_PROBEMATCH_C	_IOC_NEWTYPE(DTRACEIOC_PROBEMATCH, dtrace_probedesc_c_t)
+#define	DTRACEIOC_ENABLE_C	_IOC_NEWTYPE(DTRACEIOC_ENABLE, dtrace_enable_io_c_t)
+#define	DTRACEIOC_AGGSNAP_C	_IOC_NEWTYPE(DTRACEIOC_AGGSNAP, dtrace_bufdesc_c_t * __capability)
+#define	DTRACEIOC_EPROBE_C	_IOC_NEWTYPE(DTRACEIOC_EPROBE, dtrace_eprobedesc_t)
+#define	DTRACEIOC_PROBEARG_C	_IOC_NEWTYPE(DTRACEIOC_PROBEARG, dtrace_argdesc_t)
+#define	DTRACEIOC_CONF_C	_IOC_NEWTYPE(DTRACEIOC_CONF, dtrace_conf_c_t)
+#define	DTRACEIOC_STATUS_C	_IOC_NEWTYPE(DTRACEIOC_STATUS, dtrace_status_t)
+#define	DTRACEIOC_GO_C		_IOC_NEWTYPE(DTRACEIOC_GO, processorid_t)
+#define	DTRACEIOC_STOP_C	_IOC_NEWTYPE(DTRACEIOC_STOP, processorid_t)
+#define	DTRACEIOC_AGGDESC_C	_IOC_NEWTYPE(DTRACEIOC_AGGDESC, dtrace_aggdesc_c_t * __capability)
+#define	DTRACEIOC_FORMAT_C	_IOC_NEWTYPE(DTRACEIOC_FORMAT, dtrace_fmtdesc_c_t)
+#define	DTRACEIOC_DOFGET_C	_IOC_NEWTYPE(DTRACEIOC_DOFGET, dof_hdr_t * __capability)
+#define	DTRACEIOC_REPLICATE_C	_IOC_NEWTYPE(DTRACEIOC_REPLICATE, dtrace_repldesc_t)
+
+#endif
 #endif
 
 /*
