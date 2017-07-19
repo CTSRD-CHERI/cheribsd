@@ -42,6 +42,9 @@
 #include <sys/rman.h>
 #include <sys/bus_dma.h>
 #include <sys/mdioctl.h>
+#ifdef CHERIABI_CDDL
+#include <sys/dtrace.h>
+#endif
 
 #include <net/if.h>
 #include <net/if_media.h>
@@ -383,6 +386,8 @@ struct ifmediareq_c {
 #define	SIOCGIFMEDIA_C		_IOC_NEWTYPE(SIOCGIFMEDIA, struct ifmediareq_c)
 #define	SIOCGIFXMEDIA_C		_IOC_NEWTYPE(SIOCGIFXMEDIA, struct ifmediareq_c)
 
+#ifdef CHERIABI_CDDL
+
 typedef struct dtrace_providerdesc_c {
 	char dtvd_name[DTRACE_PROVNAMELEN];	/* provider name */
 	dtrace_pattr_t dtvd_attr;		/* stability attributes */
@@ -514,5 +519,7 @@ typedef struct dtrace_repldesc_c {
 #define	DTRACEIOC_FORMAT_C	_IOC_NEWTYPE(DTRACEIOC_FORMAT, dtrace_fmtdesc_c_t)
 #define	DTRACEIOC_DOFGET_C	_IOC_NEWTYPE(DTRACEIOC_DOFGET, dof_hdr_c_t *)
 #define	DTRACEIOC_REPLICATE_C	_IOC_NEWTYPE(DTRACEIOC_REPLICATE, dtrace_repldesc_c_t)
+
+#endif
 
 #endif	/* _COMPAT_CHERIABI_IOCTL_H_ */
