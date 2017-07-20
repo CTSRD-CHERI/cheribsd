@@ -556,6 +556,8 @@ typedef struct dtrace_difv {
 #define	DTRACE_USTACK_ARG(x, y)		\
 	((((uint64_t)(y)) << 32) | ((x) & UINT32_MAX))
 
+#if __has_feature(capabilities)
+
 #ifndef _LP64
 #if BYTE_ORDER == _BIG_ENDIAN
 #define	DTRACE_PTR(type, name)	uint32_t name##pad; type * __capability name
@@ -564,6 +566,20 @@ typedef struct dtrace_difv {
 #endif
 #else
 #define	DTRACE_PTR(type, name)	type * __capability name
+#endif
+
+#else
+
+#ifndef _LP64
+#if BYTE_ORDER == _BIG_ENDIAN
+#define	DTRACE_PTR(type, name)	uint32_t name##pad; type *name
+#else
+#define	DTRACE_PTR(type, name)	type *name; uint32_t name##pad
+#endif
+#else
+#define	DTRACE_PTR(type, name)	type *name
+#endif
+
 #endif
 
 /*
@@ -1329,6 +1345,9 @@ typedef struct {
 							/* get DOF */
 #define	DTRACEIOC_REPLICATE	_IOW('x',18,dtrace_repldesc_t)	
 							/* replicate enab */
+
+#if __has_feature(capabilities)
+
 typedef struct dtrace_bufdesc_c {
 	uint64_t dtbd_size;			/* size of buffer */
 	uint32_t dtbd_cpu;			/* CPU or DTRACE_CPUALL */
@@ -1388,6 +1407,7 @@ typedef struct dtrace_fmtdesc_c {
 #define	DTRACEIOC_REPLICATE_C	_IOC_NEWTYPE(DTRACEIOC_REPLICATE, dtrace_repldesc_t)
 
 #endif
+
 #endif
 
 /*
