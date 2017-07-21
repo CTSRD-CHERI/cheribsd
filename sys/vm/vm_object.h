@@ -171,14 +171,14 @@ struct vm_object {
 #define	OBJ_FICTITIOUS	0x0001		/* (c) contains fictitious pages */
 #define	OBJ_UNMANAGED	0x0002		/* (c) contains unmanaged pages */
 #define	OBJ_POPULATE	0x0004		/* pager implements populate() */
-#define OBJ_DEAD	0x0008		/* dead objects (during rundown) */
+#define	OBJ_DEAD	0x0008		/* dead objects (during rundown) */
 #define	OBJ_NOSPLIT	0x0010		/* dont split this object */
 #define	OBJ_UMTXDEAD	0x0020		/* umtx pshared was terminated */
-#define OBJ_PIPWNT	0x0040		/* paging in progress wanted */
+#define	OBJ_PIPWNT	0x0040		/* paging in progress wanted */
 #ifdef CPU_CHERI
 #define	OBJ_NOLOADTAGS	0x0080		/* no tagged loads via pages */
 #endif
-#define OBJ_MIGHTBEDIRTY 0x0100		/* object might be dirty, only for vnode */
+#define	OBJ_MIGHTBEDIRTY 0x0100		/* object might be dirty, only for vnode */
 #define	OBJ_TMPFS_NODE	0x0200		/* object belongs to tmpfs VREG node */
 #define	OBJ_TMPFS_DIRTY	0x0400		/* dirty tmpfs obj */
 #ifdef CPU_CHERI
