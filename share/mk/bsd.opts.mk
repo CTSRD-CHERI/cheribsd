@@ -88,6 +88,7 @@ __DEFAULT_NO_OPTIONS+= \
 __DEFAULT_DEPENDENT_OPTIONS = \
     STAGING_MAN/STAGING \
     STAGING_PROG/STAGING \
+    STALE_STAGED/STAGING \
 
 .if defined(WITH_CHERI)
 .warning WITH_CHERI should not be set directly.
@@ -140,10 +141,6 @@ MK_CHERI_SHARED_PROG:=	no
 MK_${var}:=no
 .endif
 .endfor
-
-.if ${MK_STAGING} == "no"
-MK_STALE_STAGED= no
-.endif
 
 .include <bsd.cpu.mk>
 
