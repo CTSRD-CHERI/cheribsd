@@ -2564,7 +2564,7 @@ kern_readlinkat(struct thread *td, int fd, const char * __capability path,
 		return (error);
 	}
 #endif
-	if (vp->v_type != VLNK)
+	if (vp->v_type != VLNK && (vp->v_vflag & VV_READLINK) == 0)
 		error = EINVAL;
 	else {
 		IOVEC_INIT_C(&aiov, buf, count);
