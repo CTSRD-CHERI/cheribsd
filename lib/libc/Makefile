@@ -185,8 +185,8 @@ libkern.${LIBC_ARCH}:: ${KMSRCS}
 	${CP} ${.ALLSRC} ${DESTDIR}/sys/libkern/${LIBC_ARCH}
 .endif
 
-.if ${MK_TESTS} != "no" && !defined(NO_SYSCALLS)
-SUBDIR+=	tests
+.if !defined(NO_SYSCALLS)
+SUBDIR.${MK_TESTS}+= tests
 .endif
 
 .if defined(NO_SYSCALLS)

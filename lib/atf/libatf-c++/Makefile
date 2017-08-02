@@ -74,9 +74,7 @@ MLINKS+=	atf-c++.3 atf-c-api++.3  # Backwards compatibility.
 
 .if ${MACHINE_ARCH} != "mips64"
 # CheriABI C++ support broke this
-.if ${MK_TESTS} != "no"
-SUBDIR=		tests
-.endif
+SUBDIR.${MK_TESTS}+= tests
 .endif
 
 .include "../common.mk"

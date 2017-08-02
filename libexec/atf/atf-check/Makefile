@@ -40,9 +40,7 @@ CFLAGS+=	-DATF_SHELL='"/bin/sh"'
 
 LIBADD=		atf_cxx
 
-.if ${MK_TESTS} != "no"
-SUBDIR+=	tests
-.endif
+SUBDIR.${MK_TESTS}+= tests
 
 # Allow building atf as a static MIPS binary to speed up running tests
 # on QEMU (since QEMU it can only 'JIT' plain MIPS instructions)

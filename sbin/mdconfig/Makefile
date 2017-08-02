@@ -11,8 +11,6 @@ MAN=		mdconfig.8
 
 LIBADD=		util geom
 
-.if ${MK_TESTS} != "no"
-SUBDIR+=    tests
-.endif
+SUBDIR.${MK_TESTS}+= tests
 
 .include <bsd.prog.mk>
