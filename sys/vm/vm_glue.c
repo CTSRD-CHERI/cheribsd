@@ -439,14 +439,10 @@ vm_kstack_palloc(vm_object_t ksobj, vm_offset_t ks, int allocflags, int pages,
 
 	allocflags = (allocflags & ~VM_ALLOC_CLASS_MASK) | VM_ALLOC_NORMAL;
 
-	for (i = 0; i < pages; i++) {
-		/*
-		 * Get a kernel stack page.
-		 */
-		ma[i] = vm_page_grab(ksobj, i, allocflags);
-		if (allocflags & VM_ALLOC_NOBUSY)
-			ma[i]->valid = VM_PAGE_BITS_ALL;
-	}
+	vm_page_grab_pages(ksobj, 0, VM_ALLOC_NORMAL | VM_ALLOC_NOBUSY |
+	    VM_ALLOC_WIRED, ma, pages);
+	for (i = 0; i < pages; i++)
+		ma[i]->valid = VM_PAGE_BITS_ALL;
 
 	return (i);
 }
@@ -733,9 +729,8 @@ vm_thread_swapin(struct thread *td)
 	pages = td->td_kstack_pages;
 	ksobj = td->td_kstack_obj;
 	VM_OBJECT_WLOCK(ksobj);
-	for (int i = 0; i < pages; i++)
-		ma[i] = vm_page_grab(ksobj, i, VM_ALLOC_NORMAL |
-		    VM_ALLOC_WIRED);
+	vm_page_grab_pages(ksobj, 0, VM_ALLOC_NORMAL | VM_ALLOC_WIRED, ma,
+	    pages);
 	for (int i = 0; i < pages;) {
 		int j, a, count, rv;
 
