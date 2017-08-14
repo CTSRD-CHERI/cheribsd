@@ -184,7 +184,7 @@ SRCF+=		comparesf2
 .endif
 
 # FreeBSD-specific atomic intrinsics.
-.if ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "armv6"
+.if ${MACHINE_CPUARCH} == "arm"
 .PATH:		${SRCTOP}/sys/arm/arm
 
 SRCF+=		stdatomic
