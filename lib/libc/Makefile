@@ -186,6 +186,7 @@ libkern.${LIBC_ARCH}:: ${KMSRCS}
 .endif
 
 .if !defined(NO_SYSCALLS)
+HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
 .endif
 

@@ -40,6 +40,7 @@ CFLAGS+=	-DATF_SHELL='"/bin/sh"'
 
 LIBADD=		atf_cxx
 
+HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
 
 # Allow building atf as a static MIPS binary to speed up running tests
