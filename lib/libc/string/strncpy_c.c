@@ -51,5 +51,5 @@ strncpy_c_tocap(__CAP char *dst, const char *src, size_t n)
 
 	/* XXX: restrict perms */
 	/* XXX: Edge case: should truncate created cap to end of C0? */
-	return (strncpy_c(dst, cheri_ptr((char *)src, n), n));
+	return (strncpy_c(dst, cheri_ptr(src, n), n));
 }
