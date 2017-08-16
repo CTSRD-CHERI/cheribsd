@@ -246,7 +246,7 @@ CHERI_FLAGS+=	-DWITH_CHERI256
 .endif
 .endif
 
-_MAKE=	PATH=${PATH} MAKE_CMD=${MAKE} ${SUB_MAKE} -f Makefile.inc1 \
+_MAKE=	PATH=${PATH} MAKE_CMD="${MAKE}" ${SUB_MAKE} -f Makefile.inc1 \
 	${CHERI_FLAGS} \
 	TARGET=${_TARGET} TARGET_ARCH=${_TARGET_ARCH}
 
