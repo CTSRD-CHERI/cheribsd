@@ -180,9 +180,6 @@ SRCF+=		comparedf2
 SRCF+=		comparesf2
 .endif
 
-.if ${MACHINE_CPUARCH} != "mips"
-.endif
-
 # FreeBSD-specific atomic intrinsics.
 .if ${MACHINE_CPUARCH} == "arm"
 .PATH:		${SRCTOP}/sys/arm/arm
