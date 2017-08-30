@@ -133,10 +133,10 @@ static Elf64_Brandinfo freebsd_brand_info = {
 	.sysvec		= &elf64_freebsd_sysvec,
 	.interp_newpath	= NULL,
 	.brand_note	= &elf64_freebsd_brandnote,
-	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE,
 #ifdef CPU_CHERI
-	.header_supported = mips_elf_header_supported
+	.header_supported = mips_elf_header_supported,
 #endif
+	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE
 };
 
 SYSINIT(elf64, SI_SUB_EXEC, SI_ORDER_ANY,
