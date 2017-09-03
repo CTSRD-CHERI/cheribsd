@@ -31,23 +31,15 @@
 #include "opt_ddb.h"
 
 #include <sys/param.h>
-#include <sys/kernel.h>
-#include <sys/cheri_serial.h>
 #include <sys/proc.h>
-#include <sys/sysctl.h>
 #include <sys/sysent.h>
-
-#include <ddb/ddb.h>
-#include <sys/kdb.h>
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
-#include <machine/atomic.h>
 #include <machine/cherireg.h>
 #include <machine/pcb.h>
 #include <machine/proc.h>
-#include <machine/sysarch.h>
 
 static void	cheri_capability_set_user_ddc(void * __capability *);
 static void	cheri_capability_set_user_stc(void * __capability *);
