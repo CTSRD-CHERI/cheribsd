@@ -41,16 +41,14 @@
 #include <machine/pcb.h>
 #include <machine/proc.h>
 
-static void	cheri_capability_set_user_ddc(void * __capability *);
-static void	cheri_capability_set_user_stc(void * __capability *);
-static void	cheri_capability_set_user_pcc(void * __capability *);
-static void	cheri_capability_set_user_entry(void * __capability *,
+static void	hybridabi_capability_set_user_ddc(void * __capability *);
+static void	hybridabi_capability_set_user_stc(void * __capability *);
+static void	hybridabi_capability_set_user_pcc(void * __capability *);
+static void	hybridabi_capability_set_user_entry(void * __capability *,
 		    unsigned long);
-static void	cheri_capability_set_user_sigcode(void * __capability *,
-		   struct sysentvec *);
 
 static void
-cheri_capability_set_user_ddc(void * __capability *cp)
+hybridabi_capability_set_user_ddc(void * __capability *cp)
 {
 
 	cheri_capability_set(cp, CHERI_CAP_USER_DATA_PERMS,
@@ -59,7 +57,7 @@ cheri_capability_set_user_ddc(void * __capability *cp)
 }
 
 static void
-cheri_capability_set_user_stc(void * __capability *cp)
+hybridabi_capability_set_user_stc(void * __capability *cp)
 {
 
 	/*
@@ -67,21 +65,21 @@ cheri_capability_set_user_stc(void * __capability *cp)
 	 * In the future, we will may want to change this to be local
 	 * (non-global).
 	 */
-	cheri_capability_set_user_ddc(cp);
+	hybridabi_capability_set_user_ddc(cp);
 }
 
 static void
-cheri_capability_set_user_idc(void * __capability *cp)
+hybridabi_capability_set_user_idc(void * __capability *cp)
 {
 
 	/*
 	 * The default invoked data capability is also identical to $ddc.
 	 */
-	cheri_capability_set_user_ddc(cp);
+	hybridabi_capability_set_user_ddc(cp);
 }
 
 static void
-cheri_capability_set_user_pcc(void * __capability *cp)
+hybridabi_capability_set_user_pcc(void * __capability *cp)
 {
 
 	cheri_capability_set(cp, CHERI_CAP_USER_CODE_PERMS,
@@ -90,7 +88,7 @@ cheri_capability_set_user_pcc(void * __capability *cp)
 }
 
 static void
-cheri_capability_set_user_entry(void * __capability *cp,
+hybridabi_capability_set_user_entry(void * __capability *cp,
     unsigned long entry_addr)
 {
 
@@ -102,36 +100,6 @@ cheri_capability_set_user_entry(void * __capability *cp,
 	    CHERI_CAP_USER_CODE_BASE, CHERI_CAP_USER_CODE_LENGTH, entry_addr);
 }
 
-static void
-cheri_capability_set_user_sigcode(void * __capability *cp, struct sysentvec *se)
-{
-	uintptr_t base;
-	int szsigcode = *se->sv_szsigcode;
-
-	if (se->sv_sigcode_base != 0) {
-		base = se->sv_sigcode_base;
-	} else {
-		/*
-		 * XXX: true for mips64 and mip64-cheriabi without shared-page
-		 * support...
-		 */
-		base = (uintptr_t)se->sv_psstrings - szsigcode;
-		base = rounddown2(base, sizeof(struct chericap));
-	}
-
-	cheri_capability_set(cp, CHERI_CAP_USER_CODE_PERMS, base,
-	    szsigcode, 0);
-}
-
-static void
-cheri_capability_set_user_sealcap(void * __capability *cp)
-{
-
-	cheri_capability_set(cp, CHERI_SEALCAP_USERSPACE_PERMS,
-	    CHERI_SEALCAP_USERSPACE_BASE, CHERI_SEALCAP_USERSPACE_LENGTH,
-	    CHERI_SEALCAP_USERSPACE_OFFSET);
-}
-
 /*
  * Set per-thread CHERI register state for MIPS ABI processes.  In
  * particular, we need to set up the CHERI register state for MIPS ABI
@@ -140,7 +108,7 @@ cheri_capability_set_user_sealcap(void * __capability *cp)
  * XXX: I also wonder if we should be inheriting signal-handling state...?
  */
 void
-cheri_newthread_setregs(struct thread *td, unsigned long entry_addr)
+hybridabi_newthread_setregs(struct thread *td, unsigned long entry_addr)
 {
 	struct trapframe *frame;
 
@@ -162,11 +130,11 @@ cheri_newthread_setregs(struct thread *td, unsigned long entry_addr)
 	 * no rights at all.  The runtime linker/compiler/application can
 	 * propagate around rights as required.
 	 */
-	cheri_capability_set_user_ddc(&frame->ddc);
-	cheri_capability_set_user_stc(&frame->stc);
-	cheri_capability_set_user_idc(&frame->idc);
-	cheri_capability_set_user_entry(&frame->pcc, entry_addr);
-	cheri_capability_set_user_entry(&frame->c12, entry_addr);
+	hybridabi_capability_set_user_ddc(&frame->ddc);
+	hybridabi_capability_set_user_stc(&frame->stc);
+	hybridabi_capability_set_user_idc(&frame->idc);
+	hybridabi_capability_set_user_entry(&frame->pcc, entry_addr);
+	hybridabi_capability_set_user_entry(&frame->c12, entry_addr);
 }
 
 /*
@@ -175,11 +143,11 @@ cheri_newthread_setregs(struct thread *td, unsigned long entry_addr)
  * process' initial thread.
  */
 void
-cheri_exec_setregs(struct thread *td, unsigned long entry_addr)
+hybridabi_exec_setregs(struct thread *td, unsigned long entry_addr)
 {
 	struct cheri_signal *csigp;
 
-	cheri_newthread_setregs(td, entry_addr);
+	hybridabi_newthread_setregs(td, entry_addr);
 
 	/*
 	 * Initialise signal-handling state; this can't yet be modified
@@ -189,11 +157,11 @@ cheri_exec_setregs(struct thread *td, unsigned long entry_addr)
 	 */
 	csigp = &td->td_pcb->pcb_cherisignal;
 	bzero(csigp, sizeof(*csigp));
-	cheri_capability_set_user_ddc(&csigp->csig_ddc);
-	cheri_capability_set_user_stc(&csigp->csig_stc);
-	cheri_capability_set_user_stc(&csigp->csig_default_stack);
-	cheri_capability_set_user_idc(&csigp->csig_idc);
-	cheri_capability_set_user_pcc(&csigp->csig_pcc);
+	hybridabi_capability_set_user_ddc(&csigp->csig_ddc);
+	hybridabi_capability_set_user_stc(&csigp->csig_stc);
+	hybridabi_capability_set_user_stc(&csigp->csig_default_stack);
+	hybridabi_capability_set_user_idc(&csigp->csig_idc);
+	hybridabi_capability_set_user_pcc(&csigp->csig_pcc);
 	cheri_capability_set_user_sigcode(&csigp->csig_sigcode,
 	    td->td_proc->p_sysent);
 

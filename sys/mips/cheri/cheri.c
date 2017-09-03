@@ -169,6 +169,37 @@ cheri_capability_set_kern(void * __capability *cp)
 #endif
 
 void
+cheri_capability_set_user_sigcode(void * __capability *cp,
+    struct sysentvec *se)
+{
+	uintptr_t base;
+	int szsigcode = *se->sv_szsigcode;
+
+	if (se->sv_sigcode_base != 0) {
+		base = se->sv_sigcode_base;
+	} else {
+		/*
+		 * XXX: true for mips64 and mip64-cheriabi without shared-page
+		 * support...
+		 */
+		base = (uintptr_t)se->sv_psstrings - szsigcode;
+		base = rounddown2(base, sizeof(struct chericap));
+	}
+
+	cheri_capability_set(cp, CHERI_CAP_USER_CODE_PERMS, base,
+	    szsigcode, 0);
+}
+
+void
+cheri_capability_set_user_sealcap(void * __capability *cp)
+{
+
+	cheri_capability_set(cp, CHERI_SEALCAP_USERSPACE_PERMS,
+	    CHERI_SEALCAP_USERSPACE_BASE, CHERI_SEALCAP_USERSPACE_LENGTH,
+	    CHERI_SEALCAP_USERSPACE_OFFSET);
+}
+
+void
 cheri_serialize(struct cheri_serial *csp, void * __capability cap)
 {
 

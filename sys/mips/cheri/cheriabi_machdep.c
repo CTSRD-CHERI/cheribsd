@@ -739,7 +739,7 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	td->td_frame->sr = MIPS_SR_KSU_USER | MIPS_SR_EXL | MIPS_SR_INT_IE |
 	    (mips_rd_status() & MIPS_SR_INT_MASK) |
 	    MIPS_SR_PX | MIPS_SR_UX | MIPS_SR_KX | MIPS_SR_COP_2_BIT;
-	cheri_exec_setregs(td, imgp->entry_addr);
+	hybridabi_exec_setregs(td, imgp->entry_addr);
 	cheri_stack_init(td->td_pcb);
 
 	/*

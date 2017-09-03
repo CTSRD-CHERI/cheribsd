@@ -680,7 +680,15 @@ cheri_capability_setoffset(struct chericap *cp, register_t offset)
  * CHERI-MIPS-specific kernel utility functions.
  */
 #ifdef _KERNEL
+struct sysentvec;
+void	cheri_capability_set_user_sealcap(void *__capability *);
+void	cheri_capability_set_user_sigcode(void *__capability *,
+	    struct sysentvec *);
 int	cheri_capcause_to_sicode(register_t capcause);
+
+void	hybridabi_exec_setregs(struct thread *td, unsigned long entry_addr);
+void	hybridabi_newthread_setregs(struct thread *td,
+	    unsigned long entry_addr);
 #endif
 
 /*
