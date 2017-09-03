@@ -112,6 +112,11 @@
 #define	DELAYBRANCH(x)	((int)(x) < 0)
 #define	UCONTEXT_MAGIC	0xACEDBADE
 
+static void	cheriabi_capability_set_user_ddc(void * __capability *);
+static void	cheriabi_capability_set_user_stc(void * __capability *);
+static void	cheriabi_capability_set_user_pcc(void * __capability *);
+static void	cheriabi_capability_set_user_entry(void * __capability *,
+		    unsigned long);
 static int	cheriabi_fetch_syscall_args(struct thread *td);
 static void	cheriabi_set_syscall_retval(struct thread *td, int error);
 static void	cheriabi_sendsig(sig_t, ksiginfo_t *, sigset_t *);
@@ -721,9 +726,114 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 }
 
 static void
+cheriabi_capability_set_user_ddc(void * __capability *cp)
+{
+
+	cheri_capability_set(cp, CHERI_CAP_USER_DATA_PERMS,
+	    CHERI_CAP_USER_DATA_BASE, CHERI_CAP_USER_DATA_LENGTH,
+	    CHERI_CAP_USER_DATA_OFFSET);
+}
+
+static void
+cheriabi_capability_set_user_stc(void * __capability *cp)
+{
+
+	/*
+	 * For now, initialise stack as ambient with identical rights as $ddc.
+	 * In the future, we will may want to change this to be local
+	 * (non-global).
+	 */
+	cheriabi_capability_set_user_ddc(cp);
+}
+
+static void
+cheriabi_capability_set_user_idc(void * __capability *cp)
+{
+
+	/*
+	 * The default invoked data capability is also identical to $ddc.
+	 */
+	cheriabi_capability_set_user_ddc(cp);
+}
+
+static void
+cheriabi_capability_set_user_pcc(void * __capability *cp)
+{
+
+	cheri_capability_set(cp, CHERI_CAP_USER_CODE_PERMS,
+	    CHERI_CAP_USER_CODE_BASE, CHERI_CAP_USER_CODE_LENGTH,
+	    CHERI_CAP_USER_CODE_OFFSET);
+}
+
+static void
+cheriabi_capability_set_user_entry(void * __capability *cp,
+    unsigned long entry_addr)
+{
+
+	/*
+	 * Set the jump target regigster for the pure capability calling
+	 * convention.
+	 */
+	cheri_capability_set(cp, CHERI_CAP_USER_CODE_PERMS,
+	    CHERI_CAP_USER_CODE_BASE, CHERI_CAP_USER_CODE_LENGTH, entry_addr);
+}
+
+static void
+cheriabi_newthread_setregs(struct thread *td)
+{
+	struct cheri_signal *csigp;
+	struct trapframe *frame;
+
+	/*
+	 * We assume that the caller has initialised the trapframe to zeroes
+	 * -- but do a quick assertion or two to catch programmer error.  We
+	 * might want to check this with a more thorough set of assertions in
+	 * the future.
+	 */
+	frame = &td->td_pcb->pcb_regs;
+	KASSERT(*(uint64_t *)&frame->ddc == 0, ("%s: non-zero initial $ddc",
+	    __func__));
+	KASSERT(*(uint64_t *)&frame->pcc == 0, ("%s: non-zero initial $epcc",
+	    __func__));
+
+	/*
+	 * Initialise signal-handling state; this can't yet be modified
+	 * by userspace, but the principle is that signal handlers should run
+	 * with ambient authority unless given up by the userspace runtime
+	 * explicitly.
+	 *
+	 * XXXRW: In CheriABI, it could be that we should set more of these to
+	 * NULL capabilities rather than initialising to the full address
+	 * space.  Note that some fields are overwritten later in
+	 * cheriabi_exec_setregs() for the initial thread.
+	 */
+	csigp = &td->td_pcb->pcb_cherisignal;
+	bzero(csigp, sizeof(*csigp));
+	cheriabi_capability_set_user_ddc(&csigp->csig_ddc);
+	cheriabi_capability_set_user_stc(&csigp->csig_stc);
+	cheriabi_capability_set_user_stc(&csigp->csig_default_stack);
+	cheriabi_capability_set_user_idc(&csigp->csig_idc);
+	cheriabi_capability_set_user_pcc(&csigp->csig_pcc);
+	cheri_capability_set_user_sigcode(&csigp->csig_sigcode,
+	    td->td_proc->p_sysent);
+
+	/*
+	 * Set up root for the userspace object-type sealing capability tree.
+	 * This can be queried using sysarch(2).
+	 */
+	cheri_capability_set_user_sealcap(&td->td_proc->p_md.md_cheri_sealcap);
+
+	/*
+	 * Set up the thread's trusted stack.
+	 */
+	cheri_stack_init(td->td_pcb);
+}
+
+static void
 cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack)
 {
 	struct cheri_signal *csigp;
+	struct trapframe *frame;
 	u_long auxv, stackbase, stacklen;
 
 	bzero((caddr_t)td->td_frame, sizeof(struct trapframe));
@@ -739,8 +849,25 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	td->td_frame->sr = MIPS_SR_KSU_USER | MIPS_SR_EXL | MIPS_SR_INT_IE |
 	    (mips_rd_status() & MIPS_SR_INT_MASK) |
 	    MIPS_SR_PX | MIPS_SR_UX | MIPS_SR_KX | MIPS_SR_COP_2_BIT;
-	hybridabi_exec_setregs(td, imgp->entry_addr);
-	cheri_stack_init(td->td_pcb);
+
+	/*
+	 * Set up CHERI-related state: most register state, signal delivery,
+	 * sealing capabilities, trusted stack.
+	 */
+	cheriabi_newthread_setregs(td);
+
+	/*
+	 * XXXRW: Experimental CheriABI initialises $ddc with full user
+	 * privilege, and all other user-accessible capability registers with
+	 * no rights at all.  The runtime linker/compiler/application can
+	 * propagate around rights as required.
+	 */
+	frame = &td->td_pcb->pcb_regs;
+	cheriabi_capability_set_user_ddc(&frame->ddc);
+	cheriabi_capability_set_user_stc(&frame->stc);
+	cheriabi_capability_set_user_idc(&frame->idc);
+	cheriabi_capability_set_user_entry(&frame->pcc, imgp->entry_addr);
+	cheriabi_capability_set_user_entry(&frame->c12, imgp->entry_addr);
 
 	/*
 	 * Pass a pointer to the ELF auxiliary argument vector.
@@ -764,9 +891,10 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	cheri_capability_set(&td->td_frame->stc, CHERI_CAP_USER_DATA_PERMS,
 	    stackbase, stacklen, 0);
 	td->td_frame->sp = stacklen;
+
 	/*
 	 * Also update the signal stack.  The default set in
-	 * cheri_exec_setregs() covers the whole address space.
+	 * cheriabi_newthread_setregs() covers the whole address space.
 	 */
 	csigp = &td->td_pcb->pcb_cherisignal;
 	cheri_capability_set(&csigp->csig_stc, CHERI_CAP_USER_DATA_PERMS,
@@ -800,6 +928,12 @@ cheriabi_set_threadregs(struct thread *td, struct thr_param_c *param)
 	td->td_frame->sr = MIPS_SR_KSU_USER | MIPS_SR_EXL | MIPS_SR_INT_IE |
 	    (mips_rd_status() & MIPS_SR_INT_MASK) |
 	    MIPS_SR_PX | MIPS_SR_UX | MIPS_SR_KX | MIPS_SR_COP_2_BIT;
+
+	/*
+	 * Set up CHERI-related state: register state, signal delivery,
+	 * sealing capabilities, trusted stack.
+	 */
+	cheriabi_newthread_setregs(td);
 
 	/*
 	 * We don't perform validation on the new pcc or stack capabilities
