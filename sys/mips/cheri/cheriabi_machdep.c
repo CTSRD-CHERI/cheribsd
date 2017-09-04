@@ -460,8 +460,8 @@ cheriabi_set_mcontext(struct thread *td, mcontext_c_t *mcp)
  * The CheriABI version of sendsig(9) largely borrows from the MIPS version,
  * and it is important to keep them in sync.  It differs primarily in that it
  * must also be aware of user stack-handling ABIs, so is also sensitive to our
- * (fluctuating) design choices in how $stc and $sp interact.  The current
- * design uses ($stc + $sp) for stack-relative references, so early on we have
+ * (fluctuating) design choices in how $csp and $sp interact.  The current
+ * design uses ($csp + $sp) for stack-relative references, so early on we have
  * to calculate a 'relocated' version of $sp that we can then use for
  * MIPS-style access.
  *
@@ -495,17 +495,17 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	regs = td->td_frame;
 
 	/*
-	 * In CheriABI, $sp is $stc relative, so calculate a relocation base
+	 * In CheriABI, $sp is $csp relative, so calculate a relocation base
 	 * that must be combined with regs->sp from this point onwards.
 	 * Unfortunately, we won't retain bounds and permissions information
 	 * (as is the case elsewhere in CheriABI).  While 'stackbase'
-	 * suggests that $stc's offset isn't included, in practice it will be,
+	 * suggests that $csp's offset isn't included, in practice it will be,
 	 * although we may reasonably assume that it will be zero.
 	 *
 	 * If it turns out we will be delivering to the alternative signal
 	 * stack, we'll recalculate stackbase later.
 	 */
-	stackbase = (vaddr_t)td->td_pcb->pcb_regs.stc;
+	stackbase = (vaddr_t)td->td_pcb->pcb_regs.csp;
 	oonstack = sigonstack(stackbase + regs->sp);
 
 	/*
@@ -715,7 +715,7 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	cheri_sendsig(td);
 
 	/*
-	 * Note that $sp must be installed relative to $stc, so re-subtract
+	 * Note that $sp must be installed relative to $csp, so re-subtract
 	 * the stack base here.
 	 */
 	regs->pc = (register_t)(intptr_t)catcher;
@@ -880,7 +880,7 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	KASSERT(stack > stackbase,
 	    ("top of stack 0x%lx is below stack base 0x%lx", stack, stackbase));
 	stacklen = stack - stackbase;
-	cheri_capability_set(&td->td_frame->stc, CHERI_CAP_USER_DATA_PERMS,
+	cheri_capability_set(&td->td_frame->csp, CHERI_CAP_USER_DATA_PERMS,
 	    stackbase, stacklen, 0);
 	td->td_frame->sp = stacklen;
 
@@ -888,8 +888,8 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 * Update privileged signal-delivery environment for actual stack.
 	 */
 	csigp = &td->td_pcb->pcb_cherisignal;
-	csigp->csig_stc = td->td_frame->stc;
-	csigp->csig_default_stack = csigp->csig_stc;
+	csigp->csig_csp = td->td_frame->csp;
+	csigp->csig_default_stack = csigp->csig_csp;
 	/* XXX: set sp for signal stack! */
 
 	td->td_md.md_flags &= ~MDTD_FPUSED;
@@ -941,15 +941,15 @@ cheriabi_set_threadregs(struct thread *td, struct thr_param_c *param)
 	 * We don't perform validation on the new pcc or stack capabilities
 	 * and just let the caller fail on return if they are bogus.
 	 */
-	frame->stc = param->stack_base;
+	frame->csp = param->stack_base;
 	td->td_frame->sp = param->stack_size;
 
 	/*
 	 * Update privileged signal-delivery environment for actual stack.
 	 */
 	csigp = &td->td_pcb->pcb_cherisignal;
-	csigp->csig_stc = td->td_frame->stc;
-	csigp->csig_default_stack = csigp->csig_stc;
+	csigp->csig_csp = td->td_frame->csp;
+	csigp->csig_default_stack = csigp->csig_csp;
 	/* XXX: set sp for signal stack! */
 }
 
@@ -1017,7 +1017,7 @@ void
 cheriabi_get_signal_stack_capability(struct thread *td, void * __capability *csig)
 {
 
-	*csig = td->td_pcb->pcb_cherisignal.csig_stc;
+	*csig = td->td_pcb->pcb_cherisignal.csig_csp;
 }
 
 /*
@@ -1028,7 +1028,7 @@ void
 cheriabi_set_signal_stack_capability(struct thread *td, void * __capability *csig)
 {
 
-	td->td_pcb->pcb_cherisignal.csig_stc = csig != NULL ? *csig :
+	td->td_pcb->pcb_cherisignal.csig_csp = csig != NULL ? *csig :
 	    td->td_pcb->pcb_cherisignal.csig_default_stack;
 }
 

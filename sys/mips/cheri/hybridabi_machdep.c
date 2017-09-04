@@ -40,7 +40,7 @@
 #include <machine/proc.h>
 
 static void	hybridabi_capability_set_user_ddc(void * __capability *);
-static void	hybridabi_capability_set_user_stc(void * __capability *);
+static void	hybridabi_capability_set_user_csp(void * __capability *);
 static void	hybridabi_capability_set_user_pcc(void * __capability *);
 static void	hybridabi_capability_set_user_entry(void * __capability *,
 		    unsigned long);
@@ -56,7 +56,7 @@ hybridabi_capability_set_user_ddc(void * __capability *cp)
 }
 
 static void
-hybridabi_capability_set_user_stc(void * __capability *cp)
+hybridabi_capability_set_user_csp(void * __capability *cp)
 {
 
 	/*
@@ -128,7 +128,7 @@ hybridabi_thread_init(struct thread *td, unsigned long entry_addr)
 	 * propagate around rights as required.
 	 */
 	hybridabi_capability_set_user_ddc(&frame->ddc);
-	hybridabi_capability_set_user_stc(&frame->stc);
+	hybridabi_capability_set_user_csp(&frame->csp);
 	hybridabi_capability_set_user_idc(&frame->idc);
 	hybridabi_capability_set_user_entry(&frame->pcc, entry_addr);
 	hybridabi_capability_set_user_entry(&frame->c12, entry_addr);
@@ -142,8 +142,8 @@ hybridabi_thread_init(struct thread *td, unsigned long entry_addr)
 	csigp = &td->td_pcb->pcb_cherisignal;
 	bzero(csigp, sizeof(*csigp));
 	hybridabi_capability_set_user_ddc(&csigp->csig_ddc);
-	hybridabi_capability_set_user_stc(&csigp->csig_stc);
-	hybridabi_capability_set_user_stc(&csigp->csig_default_stack);
+	hybridabi_capability_set_user_csp(&csigp->csig_csp);
+	hybridabi_capability_set_user_csp(&csigp->csig_default_stack);
 	hybridabi_capability_set_user_idc(&csigp->csig_idc);
 	hybridabi_capability_set_user_pcc(&csigp->csig_pcc);
 	cheri_capability_set_user_sigcode(&csigp->csig_sigcode,
