@@ -113,7 +113,6 @@
 #define	UCONTEXT_MAGIC	0xACEDBADE
 
 static void	cheriabi_capability_set_user_ddc(void * __capability *);
-static void	cheriabi_capability_set_user_stc(void * __capability *);
 static void	cheriabi_capability_set_user_pcc(void * __capability *);
 static void	cheriabi_capability_set_user_entry(void * __capability *,
 		    unsigned long);
@@ -735,18 +734,6 @@ cheriabi_capability_set_user_ddc(void * __capability *cp)
 }
 
 static void
-cheriabi_capability_set_user_stc(void * __capability *cp)
-{
-
-	/*
-	 * For now, initialise stack as ambient with identical rights as $ddc.
-	 * In the future, we will may want to change this to be local
-	 * (non-global).
-	 */
-	cheriabi_capability_set_user_ddc(cp);
-}
-
-static void
 cheriabi_capability_set_user_idc(void * __capability *cp)
 {
 
@@ -800,7 +787,7 @@ cheriabi_newthread_setregs(struct thread *td)
 	 * Initialise signal-handling state; this can't yet be modified
 	 * by userspace, but the principle is that signal handlers should run
 	 * with ambient authority unless given up by the userspace runtime
-	 * explicitly.
+	 * explicitly.  The caller will initialise the stack fields.
 	 *
 	 * XXXRW: In CheriABI, it could be that we should set more of these to
 	 * NULL capabilities rather than initialising to the full address
@@ -810,8 +797,6 @@ cheriabi_newthread_setregs(struct thread *td)
 	csigp = &td->td_pcb->pcb_cherisignal;
 	bzero(csigp, sizeof(*csigp));
 	cheriabi_capability_set_user_ddc(&csigp->csig_ddc);
-	cheriabi_capability_set_user_stc(&csigp->csig_stc);
-	cheriabi_capability_set_user_stc(&csigp->csig_default_stack);
 	cheriabi_capability_set_user_idc(&csigp->csig_idc);
 	cheriabi_capability_set_user_pcc(&csigp->csig_pcc);
 	cheri_capability_set_user_sigcode(&csigp->csig_sigcode,
@@ -857,15 +842,18 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	cheriabi_newthread_setregs(td);
 
 	/*
-	 * XXXRW: Experimental CheriABI initialises $ddc with full user
-	 * privilege, and all other user-accessible capability registers with
-	 * no rights at all.  The runtime linker/compiler/application can
-	 * propagate around rights as required.
+	 * XXXRW: For now, initialise $ddc and $idc to the full address space,
+	 * but in the future these will be restricted (or not set at all).
 	 */
 	frame = &td->td_pcb->pcb_regs;
 	cheriabi_capability_set_user_ddc(&frame->ddc);
-	cheriabi_capability_set_user_stc(&frame->stc);
 	cheriabi_capability_set_user_idc(&frame->idc);
+
+	/*
+	 * XXXRW: Set $pcc and $c12 to the entry address -- for now, also with
+	 * broad bounds, but in the future, limited as appropriate to the
+	 * run-time linker or statically linked binary?
+	 */
 	cheriabi_capability_set_user_entry(&frame->pcc, imgp->entry_addr);
 	cheriabi_capability_set_user_entry(&frame->c12, imgp->entry_addr);
 
@@ -893,12 +881,11 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	td->td_frame->sp = stacklen;
 
 	/*
-	 * Also update the signal stack.  The default set in
-	 * cheriabi_newthread_setregs() covers the whole address space.
+	 * Update privileged signal-delivery environment for actual stack.
 	 */
 	csigp = &td->td_pcb->pcb_cherisignal;
-	cheri_capability_set(&csigp->csig_stc, CHERI_CAP_USER_DATA_PERMS,
-	    stackbase, stacklen, 0);
+	csigp->csig_stc = td->td_frame->stc;
+	csigp->csig_default_stack = csigp->csig_stc;
 	/* XXX: set sp for signal stack! */
 
 	td->td_md.md_flags &= ~MDTD_FPUSED;
@@ -915,6 +902,7 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 void
 cheriabi_set_threadregs(struct thread *td, struct thr_param_c *param)
 {
+	struct cheri_signal *csigp;
 	struct trapframe *frame;
 
 	frame = td->td_frame;
@@ -936,13 +924,6 @@ cheriabi_set_threadregs(struct thread *td, struct thr_param_c *param)
 	cheriabi_newthread_setregs(td);
 
 	/*
-	 * We don't perform validation on the new pcc or stack capabilities
-	 * and just let the caller fail on return if they are bogus.
-	 */
-	frame->stc = param->stack_base;
-	td->td_frame->sp = param->stack_size;
-
-	/*
 	 * XXX-BD: cpu_copy_thread() copies the cheri_signal struct.  Do we
 	 * want to point it at our stack instead?
 	 */
@@ -951,6 +932,21 @@ cheriabi_set_threadregs(struct thread *td, struct thr_param_c *param)
 	frame->pcc = param->start_func;
 	frame->c12 = param->start_func;
 	frame->c3 = param->arg;
+
+	/*
+	 * We don't perform validation on the new pcc or stack capabilities
+	 * and just let the caller fail on return if they are bogus.
+	 */
+	frame->stc = param->stack_base;
+	td->td_frame->sp = param->stack_size;
+
+	/*
+	 * Update privileged signal-delivery environment for actual stack.
+	 */
+	csigp = &td->td_pcb->pcb_cherisignal;
+	csigp->csig_stc = td->td_frame->stc;
+	csigp->csig_default_stack = csigp->csig_stc;
+	/* XXX: set sp for signal stack! */
 }
 
 /*
