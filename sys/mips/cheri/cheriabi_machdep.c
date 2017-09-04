@@ -765,8 +765,12 @@ cheriabi_capability_set_user_entry(void * __capability *cp,
 	    CHERI_CAP_USER_CODE_BASE, CHERI_CAP_USER_CODE_LENGTH, entry_addr);
 }
 
+/*
+ * Common per-thread CHERI state initialisation across execve(2) and
+ * additional thread creation.
+ */
 static void
-cheriabi_newthread_setregs(struct thread *td)
+cheriabi_newthread_init(struct thread *td)
 {
 	struct cheri_signal *csigp;
 	struct trapframe *frame;
@@ -839,7 +843,7 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 * Set up CHERI-related state: most register state, signal delivery,
 	 * sealing capabilities, trusted stack.
 	 */
-	cheriabi_newthread_setregs(td);
+	cheriabi_newthread_init(td);
 
 	/*
 	 * XXXRW: For now, initialise $ddc and $idc to the full address space,
@@ -921,7 +925,7 @@ cheriabi_set_threadregs(struct thread *td, struct thr_param_c *param)
 	 * Set up CHERI-related state: register state, signal delivery,
 	 * sealing capabilities, trusted stack.
 	 */
-	cheriabi_newthread_setregs(td);
+	cheriabi_newthread_init(td);
 
 	/*
 	 * XXX-BD: cpu_copy_thread() copies the cheri_signal struct.  Do we
