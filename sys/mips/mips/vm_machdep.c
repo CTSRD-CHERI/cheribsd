@@ -452,7 +452,6 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 #else
 	cheri_bcopy(td0->td_pcb, pcb2, sizeof(*pcb2));
 	cheri_signal_copy(pcb2, td0->td_pcb);
-	cheri_stack_init(pcb2);
 #endif
 
 	/*

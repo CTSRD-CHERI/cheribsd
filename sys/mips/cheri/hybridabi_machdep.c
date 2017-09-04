@@ -44,6 +44,7 @@ static void	hybridabi_capability_set_user_stc(void * __capability *);
 static void	hybridabi_capability_set_user_pcc(void * __capability *);
 static void	hybridabi_capability_set_user_entry(void * __capability *,
 		    unsigned long);
+static void	hybridabi_thread_init(struct thread *td, unsigned long);
 
 static void
 hybridabi_capability_set_user_ddc(void * __capability *cp)
@@ -99,15 +100,13 @@ hybridabi_capability_set_user_entry(void * __capability *cp,
 }
 
 /*
- * Set per-thread CHERI register state for MIPS ABI processes.  In
- * particular, we need to set up the CHERI register state for MIPS ABI
- * processes with suitable capabilities.
- *
- * XXX: I also wonder if we should be inheriting signal-handling state...?
+ * Common per-thread CHERI state initialisation across execve(2) and
+ * additional thread creation.
  */
-void
-hybridabi_newthread_setregs(struct thread *td, unsigned long entry_addr)
+static void
+hybridabi_thread_init(struct thread *td, unsigned long entry_addr)
 {
+	struct cheri_signal *csigp;
 	struct trapframe *frame;
 
 	/*
@@ -133,19 +132,6 @@ hybridabi_newthread_setregs(struct thread *td, unsigned long entry_addr)
 	hybridabi_capability_set_user_idc(&frame->idc);
 	hybridabi_capability_set_user_entry(&frame->pcc, entry_addr);
 	hybridabi_capability_set_user_entry(&frame->c12, entry_addr);
-}
-
-/*
- * Set per-process CHERI state for MIPS ABI processes after exec.
- * Initializes process-wide state as well as per-thread state for the
- * process' initial thread.
- */
-void
-hybridabi_exec_setregs(struct thread *td, unsigned long entry_addr)
-{
-	struct cheri_signal *csigp;
-
-	hybridabi_newthread_setregs(td, entry_addr);
 
 	/*
 	 * Initialise signal-handling state; this can't yet be modified
@@ -163,9 +149,40 @@ hybridabi_exec_setregs(struct thread *td, unsigned long entry_addr)
 	cheri_capability_set_user_sigcode(&csigp->csig_sigcode,
 	    td->td_proc->p_sysent);
 
-	/*
-	 * Set up root for the userspace object-type sealing capability tree.
-	 * This can be queried using sysarch(2).
-	 */
-	cheri_capability_set_user_sealcap(&td->td_proc->p_md.md_cheri_sealcap);
+        /*
+         * Set up root for the userspace object-type sealing capability tree.
+         * This can be queried using sysarch(2).
+         */
+        cheri_capability_set_user_sealcap(&td->td_proc->p_md.md_cheri_sealcap);
+
+        /*
+         * Set up the thread's trusted stack.
+         */
+        cheri_stack_init(td->td_pcb);
+}
+
+/*
+ * Set per-thread CHERI register state for MIPS ABI processes.  In
+ * particular, we need to set up the CHERI register state for MIPS ABI
+ * processes with suitable capabilities.
+ *
+ * XXX: I also wonder if we should be inheriting signal-handling state...?
+ */
+void
+hybridabi_newthread_setregs(struct thread *td, unsigned long entry_addr)
+{
+
+	hybridabi_thread_init(td, entry_addr);
+}
+
+/*
+ * Set per-process CHERI state for MIPS ABI processes after exec.
+ * Initializes process-wide state as well as per-thread state for the
+ * process' initial thread.
+ */
+void
+hybridabi_exec_setregs(struct thread *td, unsigned long entry_addr)
+{
+
+	hybridabi_thread_init(td, entry_addr);
 }
