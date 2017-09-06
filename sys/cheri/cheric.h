@@ -175,15 +175,15 @@ cheri_zerocap(void)
 #define cheri_ptr_to_bounded_cap(ptr)	__extension__({	\
 	typedef typeof(ptr) __ptr_type;			\
 	typedef __capability __ptr_type __cap_type;	\
-	(__cap_type)cheri_ptr(ptr, sizeof(*ptr));	\
+	(__cap_type)cheri_ptr((ptr), sizeof(*(ptr)));	\
 	})
 /*
  * XXXAR: Calling code should also check the capability bounds. Maybe we should
  * add a min_size parameter to this macro?
  */
-#define cheri_cap_to_ptr(cap)	__extension__({	\
-        typedef typeof(*cap) __underlying_type;	\
-        (__cheri_cast __underlying_type*)cap; })
+#define cheri_cap_to_ptr(cap)	__extension__({		\
+        typedef typeof(*(cap)) __underlying_type;	\
+        (__cheri_cast __underlying_type*)(cap); })
 
 #define CHERI_PRINT_PTR(ptr)						\
 	printf("%s: " #ptr " b:%016jx l:%016zx o:%jx\n", __func__,	\
