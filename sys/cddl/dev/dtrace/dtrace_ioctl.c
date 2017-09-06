@@ -40,6 +40,7 @@ dtrace_ioctl_helper(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	dhp = NULL;
 	dof = NULL;
 	rval = 0;
+
 	switch (cmd) {
 	case DTRACEHIOC_ADDDOF:
 		dhp = (dof_helper_t *)addr;

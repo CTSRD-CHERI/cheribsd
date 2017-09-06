@@ -70,6 +70,8 @@ typedef int model_t;
 #include <sys/stdint.h>
 #endif
 
+#include "dtrace_types.h"
+
 /*
  * DTrace Universal Constants and Typedefs
  */
@@ -90,14 +92,6 @@ typedef int model_t;
 #define	DTRACE_FULLNAMELEN	(DTRACE_PROVNAMELEN + DTRACE_MODNAMELEN + \
 				DTRACE_FUNCNAMELEN + DTRACE_NAMELEN + 4)
 #define	DTRACE_ARGTYPELEN	128
-
-typedef uint32_t dtrace_id_t;		/* probe identifier */
-typedef uint32_t dtrace_epid_t;		/* enabled probe identifier */
-typedef uint32_t dtrace_aggid_t;	/* aggregation identifier */
-typedef int64_t dtrace_aggvarid_t;	/* aggregation variable identifier */
-typedef uint16_t dtrace_actkind_t;	/* action kind */
-typedef int64_t dtrace_optval_t;	/* option value */
-typedef uint32_t dtrace_cacheid_t;	/* predicate cache identifier */
 
 typedef enum dtrace_probespec {
 	DTRACE_PROBESPEC_NONE = -1,
@@ -556,32 +550,6 @@ typedef struct dtrace_difv {
 #define	DTRACE_USTACK_ARG(x, y)		\
 	((((uint64_t)(y)) << 32) | ((x) & UINT32_MAX))
 
-#if __has_feature(capabilities)
-
-#ifndef _LP64
-#if BYTE_ORDER == _BIG_ENDIAN
-#define	DTRACE_PTR(type, name)	uint32_t name##pad; type * __capability name
-#else
-#define	DTRACE_PTR(type, name)	type * __capability name; uint32_t name##pad
-#endif
-#else
-#define	DTRACE_PTR(type, name)	type * __capability name
-#endif
-
-#else
-
-#ifndef _LP64
-#if BYTE_ORDER == _BIG_ENDIAN
-#define	DTRACE_PTR(type, name)	uint32_t name##pad; type *name
-#else
-#define	DTRACE_PTR(type, name)	type *name; uint32_t name##pad
-#endif
-#else
-#define	DTRACE_PTR(type, name)	type *name
-#endif
-
-#endif
-
 /*
  * DTrace Object Format (DOF)
  *
@@ -976,16 +944,6 @@ typedef struct dtrace_ecbdesc {
  * structure.  Note that all four of these structures must be bitness-neutral
  * to allow for a 32-bit DTrace consumer on a 64-bit kernel.
  */
-typedef struct dtrace_recdesc {
-	dtrace_actkind_t dtrd_action;		/* kind of action */
-	uint32_t dtrd_size;			/* size of record */
-	uint32_t dtrd_offset;			/* offset in ECB's data */
-	uint16_t dtrd_alignment;		/* required alignment */
-	uint16_t dtrd_format;			/* format, if any */
-	uintptr_t dtrd_arg;			/* action argument */
-	uintptr_t dtrd_uarg;			/* user argument */
-} dtrace_recdesc_t;
-
 typedef struct dtrace_eprobedesc {
 	dtrace_epid_t dtepd_epid;		/* enabled probe ID */
 	dtrace_id_t dtepd_probeid;		/* probe ID */
@@ -994,24 +952,6 @@ typedef struct dtrace_eprobedesc {
 	int dtepd_nrecs;			/* number of records */
 	dtrace_recdesc_t dtepd_rec[1];		/* records themselves */
 } dtrace_eprobedesc_t;
-
-typedef struct dtrace_aggdesc {
-	DTRACE_PTR(char, dtagd_name);		/* not filled in by kernel */
-	dtrace_aggvarid_t dtagd_varid;		/* not filled in by kernel */
-	int dtagd_flags;			/* not filled in by kernel */
-	dtrace_aggid_t dtagd_id;		/* aggregation ID */
-	dtrace_epid_t dtagd_epid;		/* enabled probe ID */
-	uint32_t dtagd_size;			/* size in bytes */
-	int dtagd_nrecs;			/* number of records */
-	uint32_t dtagd_pad;			/* explicit padding */
-	dtrace_recdesc_t dtagd_rec[1];		/* record descriptions */
-} dtrace_aggdesc_t;
-
-typedef struct dtrace_fmtdesc {
-	DTRACE_PTR(char, dtfd_string);		/* format string */
-	int dtfd_length;			/* length of format string */
-	uint16_t dtfd_format;			/* format identifier */
-} dtrace_fmtdesc_t;
 
 #define	DTRACE_SIZEOF_EPROBEDESC(desc)				\
 	(sizeof (dtrace_eprobedesc_t) + ((desc)->dtepd_nrecs ?	\
@@ -1077,43 +1017,6 @@ typedef struct dtrace_fmtdesc {
 #define	DTRACEOPT_BUFRESIZE_AUTO	0	/* automatic resizing */
 #define	DTRACEOPT_BUFRESIZE_MANUAL	1	/* manual resizing */
 
-/*
- * DTrace Buffer Interface
- *
- * In order to get a snapshot of the principal or aggregation buffer,
- * user-level passes a buffer description to the kernel with the dtrace_bufdesc
- * structure.  This describes which CPU user-level is interested in, and
- * where user-level wishes the kernel to snapshot the buffer to (the
- * dtbd_data field).  The kernel uses the same structure to pass back some
- * information regarding the buffer:  the size of data actually copied out, the
- * number of drops, the number of errors, the offset of the oldest record,
- * and the time of the snapshot.
- *
- * If the buffer policy is a "switch" policy, taking a snapshot of the
- * principal buffer has the additional effect of switching the active and
- * inactive buffers.  Taking a snapshot of the aggregation buffer _always_ has
- * the additional effect of switching the active and inactive buffers.
- */
-typedef struct dtrace_bufdesc {
-	uint64_t dtbd_size;			/* size of buffer */
-	uint32_t dtbd_cpu;			/* CPU or DTRACE_CPUALL */
-	uint32_t dtbd_errors;			/* number of errors */
-	uint64_t dtbd_drops;			/* number of drops */
-	DTRACE_PTR(char, dtbd_data);		/* data */
-	uint64_t dtbd_oldest;			/* offset of oldest record */
-	uint64_t dtbd_timestamp;		/* hrtime of snapshot */
-} dtrace_bufdesc_t;
-
-/*
- * Each record in the buffer (dtbd_data) begins with a header that includes
- * the epid and a timestamp.  The timestamp is split into two 4-byte parts
- * so that we do not require 8-byte alignment.
- */
-typedef struct dtrace_rechdr {
-	dtrace_epid_t dtrh_epid;		/* enabled probe id */
-	uint32_t dtrh_timestamp_hi;		/* high bits of hrtime_t */
-	uint32_t dtrh_timestamp_lo;		/* low bits of hrtime_t */
-} dtrace_rechdr_t;
 
 #define	DTRACE_RECORD_LOAD_TIMESTAMP(dtrh)			\
 	((dtrh)->dtrh_timestamp_lo +				\
@@ -1313,18 +1216,8 @@ typedef struct dtrace_providerdesc {
 							/* provider query */
 #define	DTRACEIOC_PROBES	_IOWR('x',2,dtrace_probedesc_t)
 							/* probe query */
-#define	DTRACEIOC_BUFSNAP	_IOW('x',4,dtrace_bufdesc_t *)	
-							/* snapshot buffer */
 #define	DTRACEIOC_PROBEMATCH	_IOWR('x',5,dtrace_probedesc_t)
 							/* match probes */
-typedef struct {
-	void	*dof;		/* DOF userland address written to driver. */
-	int	n_matched;	/* # matches returned by driver. */
-} dtrace_enable_io_t;
-#define	DTRACEIOC_ENABLE	_IOWR('x',6,dtrace_enable_io_t)
-							/* enable probes */
-#define	DTRACEIOC_AGGSNAP	_IOW('x',7,dtrace_bufdesc_t *)
-							/* snapshot agg. */
 #define	DTRACEIOC_EPROBE	_IOW('x',8,dtrace_eprobedesc_t)
 							/* get eprobe desc. */
 #define	DTRACEIOC_PROBEARG	_IOWR('x',9,dtrace_argdesc_t)
@@ -1337,76 +1230,9 @@ typedef struct {
 							/* start tracing */
 #define	DTRACEIOC_STOP		_IOWR('x',13,processorid_t)
 							/* stop tracing */
-#define	DTRACEIOC_AGGDESC	_IOW('x',15,dtrace_aggdesc_t *)	
-							/* get agg. desc. */
-#define	DTRACEIOC_FORMAT	_IOWR('x',16,dtrace_fmtdesc_t)	
-							/* get format str */
-#define	DTRACEIOC_DOFGET	_IOW('x',17,dof_hdr_t *)
-							/* get DOF */
 #define	DTRACEIOC_REPLICATE	_IOW('x',18,dtrace_repldesc_t)	
 							/* replicate enab */
 
-#if __has_feature(capabilities)
-
-typedef struct dtrace_bufdesc_c {
-	uint64_t dtbd_size;			/* size of buffer */
-	uint32_t dtbd_cpu;			/* CPU or DTRACE_CPUALL */
-	uint32_t dtbd_errors;			/* number of errors */
-	uint64_t dtbd_drops;			/* number of drops */
-	DTRACE_PTR(char, dtbd_data);		/* data */
-	uint64_t dtbd_oldest;			/* offset of oldest record */
-	uint64_t dtbd_timestamp;		/* hrtime of snapshot */
-} dtrace_bufdesc_c_t;
-
-typedef struct {
-	void * __capability dof;
-	int n_matched;
-} dtrace_enable_io_c_t;
-
-typedef struct dtrace_conf_c {
-	uint_t dtc_difversion;			/* supported DIF version */
-	uint_t dtc_difintregs;			/* # of DIF integer registers */
-	uint_t dtc_diftupregs;			/* # of DIF tuple registers */
-	uint_t dtc_ctfmodel;			/* CTF data model */
-	uint_t dtc_pad[8];			/* reserved for future use */
-} dtrace_conf_c_t;
-
-typedef struct dtrace_aggdesc_c {
-	DTRACE_PTR(char, dtagd_name);		/* not filled in by kernel */
-	dtrace_aggvarid_t dtagd_varid;		/* not filled in by kernel */
-	int dtagd_flags;			/* not filled in by kernel */
-	dtrace_aggid_t dtagd_id;		/* aggregation ID */
-	dtrace_epid_t dtagd_epid;		/* enabled probe ID */
-	uint32_t dtagd_size;			/* size in bytes */
-	int dtagd_nrecs;			/* number of records */
-	uint32_t dtagd_pad;			/* explicit padding */
-	dtrace_recdesc_t dtagd_rec[1];		/* record descriptions */
-} dtrace_aggdesc_c_t;
-
-typedef struct dtrace_fmtdesc_c {
-	DTRACE_PTR(char, dtfd_string);		/* format string */
-	int dtfd_length;			/* length of format string */
-	uint16_t dtfd_format;			/* format identifier */
-} dtrace_fmtdesc_c_t;
-
-#define	DTRACEIOC_PROVIDER_C	_IOC_NEWTYPE(DTRACEIOC_PROVIDER, dtrace_providerdesc_t)
-#define	DTRACEIOC_PROBES_C	_IOC_NEWTYPE(DTRACEIOC_PROBES, dtrace_probedesc_t)
-#define	DTRACEIOC_BUFSNAP_C	_IOC_NEWTYPE(DTRACEIOC_BUFSNAP, dtrace_bufdesc_c_t * __capability)
-#define	DTRACEIOC_PROBEMATCH_C	_IOC_NEWTYPE(DTRACEIOC_PROBEMATCH, dtrace_probedesc_c_t)
-#define	DTRACEIOC_ENABLE_C	_IOC_NEWTYPE(DTRACEIOC_ENABLE, dtrace_enable_io_c_t)
-#define	DTRACEIOC_AGGSNAP_C	_IOC_NEWTYPE(DTRACEIOC_AGGSNAP, dtrace_bufdesc_c_t * __capability)
-#define	DTRACEIOC_EPROBE_C	_IOC_NEWTYPE(DTRACEIOC_EPROBE, dtrace_eprobedesc_t)
-#define	DTRACEIOC_PROBEARG_C	_IOC_NEWTYPE(DTRACEIOC_PROBEARG, dtrace_argdesc_t)
-#define	DTRACEIOC_CONF_C	_IOC_NEWTYPE(DTRACEIOC_CONF, dtrace_conf_c_t)
-#define	DTRACEIOC_STATUS_C	_IOC_NEWTYPE(DTRACEIOC_STATUS, dtrace_status_t)
-#define	DTRACEIOC_GO_C		_IOC_NEWTYPE(DTRACEIOC_GO, processorid_t)
-#define	DTRACEIOC_STOP_C	_IOC_NEWTYPE(DTRACEIOC_STOP, processorid_t)
-#define	DTRACEIOC_AGGDESC_C	_IOC_NEWTYPE(DTRACEIOC_AGGDESC, dtrace_aggdesc_c_t * __capability)
-#define	DTRACEIOC_FORMAT_C	_IOC_NEWTYPE(DTRACEIOC_FORMAT, dtrace_fmtdesc_c_t)
-#define	DTRACEIOC_DOFGET_C	_IOC_NEWTYPE(DTRACEIOC_DOFGET, dof_hdr_t * __capability)
-#define	DTRACEIOC_REPLICATE_C	_IOC_NEWTYPE(DTRACEIOC_REPLICATE, dtrace_repldesc_t)
-
-#endif
 
 #endif
 

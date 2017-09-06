@@ -65,6 +65,7 @@ __FBSDID("$FreeBSD$");
 #include <compat/cheriabi/cheriabi_proto.h>
 /* Must come last due to massive header polution breaking cheriabi_proto.h */
 #include <compat/cheriabi/cheriabi_ioctl.h>
+#include <compat/cheriabi/cheriabi_dtrace.h>
 
 MALLOC_DECLARE(M_IOCTLOPS);
 
@@ -522,7 +523,8 @@ cheriabi_ioctl_translate_in(u_long com, void *data, u_long *t_comp,
 	}
 		
 	default:
-		return (EINVAL);
+		error = cheriabi_dtrace_in(com, data, t_comp, t_datap);
+		return (error);
 	}
 
 }
@@ -768,13 +770,15 @@ cheriabi_ioctl_translate_out(u_long com, void *data, void *t_data)
 	}
 
 	default:
-		printf("%s: unhandled command 0x%lx _IO%s('%c', %d, %d)\n",
-		    __func__, com,
-		    (IOC_VOID & com) ? (IOCPARM_LEN(com) == 0 ? "" : "INT") :
-		    ((IOC_OUT & com) ? ((IOC_IN & com) ? "WR" : "W") : "R"),
-		    (int)IOCGROUP(com), (int)(com & 0xFF),
-		    (int)IOCPARM_LEN(com));
-		error = EINVAL;
+		error = cheriabi_dtrace_out(com, data, t_data);
+		if (error)
+			printf("%s: unhandled command 0x%lx _IO%s('%c', %d, %d)\n",
+			    __func__, com,
+			    (IOC_VOID & com) ? (IOCPARM_LEN(com) == 0 ? "" : "INT") :
+			    ((IOC_OUT & com) ? ((IOC_IN & com) ? "WR" : "W") : "R"),
+			    (int)IOCGROUP(com), (int)(com & 0xFF),
+			    (int)IOCPARM_LEN(com));
+		return (error);
 	}
 
 	free(t_data, M_IOCTLOPS);
