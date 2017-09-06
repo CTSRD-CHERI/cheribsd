@@ -66,18 +66,18 @@ cheriabi_cap_to_ptr(caddr_t *ptrp, void * __capability cap, size_t reqlen,
 	if (!cheri_gettag(cap)) {
 		if (!may_be_null)
 			return (EFAULT);
-		*ptrp = (caddr_t)cap;
+		*ptrp = (__cheri_cast void *)cap;
 		if (*ptrp != NULL)
 			return (EFAULT);
 	} else {
 		if (cheri_getsealed(cap)) {
-			SYSERRCAUSE("cap %p is sealed", (void *)cap);
+			SYSERRCAUSE("cap %p is sealed", (void *)(vaddr_t)cap);
 			return (EPROT);
 		}
 
 		if ((cheri_getperm(cap) & reqperms) != reqperms) {
 			SYSERRCAUSE("cap %p has insufficent perms, missing %lx",
-			    (void *)cap, reqperms & ~cheri_getperm(cap));
+			    (void *)(vaddr_t)cap, reqperms & ~cheri_getperm(cap));
 			return (EPROT);
 		}
 
@@ -86,18 +86,18 @@ cheriabi_cap_to_ptr(caddr_t *ptrp, void * __capability cap, size_t reqlen,
 		if (offset >= length) {
 			SYSERRCAUSE(
 			    "cap %p out of bounds, offset %zu > length %zu",
-			    (void *)cap, offset, length);
+			    (void *)(vaddr_t)cap, offset, length);
 			return (EPROT);
 		}
 		length -= offset;
 		if (length < reqlen) {
 			SYSERRCAUSE("cap %p too short "
 			    "(length - offset) %zu < reqlen %zu",
-			    (void *)cap, length, reqlen);
+			    (void *)(vaddr_t)cap, length, reqlen);
 			return (EPROT);
 		}
 
-		*ptrp = (caddr_t)cap;
+		*ptrp = (__cheri_cast void *)cap;
 	}
 	return (0);
 }
