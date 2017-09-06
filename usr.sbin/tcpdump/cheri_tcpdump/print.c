@@ -207,7 +207,7 @@ tcpdump_sandbox_destroy(struct tcpdump_sandbox *sb)
 		for (i = 0; i < sb->tds_num_proto_sandboxes; i++)
 			tcpdump_sandbox_destroy(sb->tds_proto_sandboxes[i]);
 		free(sb->tds_proto_sandboxes);
-		free((void *)sb->tds_proto_sandbox_objects);
+		free(cheri_cap_to_ptr(sb->tds_proto_sandbox_objects));
 	}
 	sandbox_object_destroy(sb->tds_sandbox_object);
 	free(sb);
@@ -246,7 +246,8 @@ tds_select_ipv4(int dlt, size_t len, __capability const u_char *data,
 {
 	const struct ether_header *eh;
 
-	eh = (struct ether_header *)data;
+	/* XXXAR: check capability bounds? */
+	eh = (struct ether_header *)cheri_cap_to_ptr(data);
 
 	if (dlt != DLT_EN10MB ||
 	    len < sizeof(struct ether_header) + sizeof(struct ip))
@@ -267,7 +268,8 @@ tds_select_ipv4_fromlocal(int dlt, size_t len, __capability const u_char *data,
 	if (!tds_select_ipv4(dlt, len, data, sd))
 		return (0);
 
-	iphdr = (const struct ip *)(data +
+	/* XXXAR: check capability bounds? */
+	iphdr = (const struct ip *)cheri_cap_to_ptr(data +
 	    sizeof(struct ether_header));
 	if ((EXTRACT_32BITS(&iphdr->ip_src) & g_mask) == g_localnet)
 		return (1);
@@ -289,7 +291,9 @@ tds_select_ipv4_hash(int dlt, size_t len, __capability const u_char *data,
 
 	mod = (int)sd;
 
-	iphdr = (struct ip *)(data + sizeof(struct ether_header));
+	/* XXXAR: check capability bounds? */
+	iphdr = (struct ip *)cheri_cap_to_ptr(data +
+	    sizeof(struct ether_header));
 	ipaddr = (const u_char *)&(iphdr->ip_src);
 	if ((ipaddr[0] + ipaddr[1] + ipaddr[2] + ipaddr[3]) % g_sandboxes == mod)
 		return (1);
@@ -355,9 +359,10 @@ tcpdump_sandboxes_init(struct tcpdump_sandbox_list *list, int mode)
 		sb->tds_num_proto_sandboxes = g_sandboxes - 1;
 		sb->tds_proto_sandboxes = calloc(sb->tds_num_proto_sandboxes,
 		    sizeof(*sb->tds_proto_sandboxes));
-		sb->tds_proto_sandbox_objects =
-		    (__capability void *)calloc(sb->tds_num_proto_sandboxes,
-		    sizeof(*sb->tds_proto_sandbox_objects));
+		sb->tds_proto_sandbox_objects = cheri_ptr(
+		    calloc(sb->tds_num_proto_sandboxes,
+		     sizeof(*sb->tds_proto_sandbox_objects)),
+		     sizeof(*sb->tds_proto_sandbox_objects));
 		for (i = 0; i < sb->tds_num_proto_sandboxes; i++) {
 			sb->tds_proto_sandboxes[i] =
 			    tcpdump_sandbox_new(proto_names[i],
@@ -421,7 +426,9 @@ tcpdump_sandbox_find(struct tcpdump_sandbox_list *list, int dlt, size_t len,
 	int ip_box;
 
 	if (tds_select_ipv4(dlt, len, data, NULL)) {
-	    iphdr = (struct ip *)(data + sizeof(struct ether_header));
+	    /* XXXAR: bounds of capability? */
+	    iphdr = (struct ip *)cheri_cap_to_ptr(data +
+	        sizeof(struct ether_header));
 	    ipaddr = (const u_char *)&(iphdr->ip_src);
 	    ip_box = (ipaddr[0] + ipaddr[1] + ipaddr[2] + ipaddr[3]) % g_sandboxes;
 	    sb = ip_sandboxes[ip_box];
