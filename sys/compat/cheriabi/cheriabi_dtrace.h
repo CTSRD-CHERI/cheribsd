@@ -31,9 +31,7 @@
 #ifndef _CHERIABI_DTRACE_H_
 #define _CHERIABI_DTRACE_H_
 
-#include <compat/cheriabi/cheriabi_proto.h>
-
 int	cheriabi_dtrace_in(u_long, void *, u_long *, void **);
-int	cheriabi_dtrace_out(u_long, void *, void **);
+int	cheriabi_dtrace_out(u_long, void *, void *);
 
 #endif /* _CHERIABI_DTRACE_H_ */

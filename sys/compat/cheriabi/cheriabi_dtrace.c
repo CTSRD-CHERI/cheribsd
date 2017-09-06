@@ -66,6 +66,7 @@ __FBSDID("$FreeBSD$");
 #include <compat/cheriabi/cheriabi_dtrace.h>
 
 MALLOC_DECLARE(M_DTRACEIOC);
+MALLOC_DEFINE(M_DTRACEIOC, "dtraceioc", "DTrace CheriABI ioctl");
 
 typedef struct dtrace_bufdesc_c {
 	uint64_t dtbd_size;			/* size of buffer */
@@ -91,7 +92,7 @@ typedef struct dtrace_aggdesc_c {
 	uint32_t dtagd_size;			/* size in bytes */
 	int dtagd_nrecs;			/* number of records */
 	uint32_t dtagd_pad;			/* explicit padding */
-	dtrace_recdesc_t dtagd_rec[1];		/* record descriptions */
+	dtrace_recdesc_t *dtagd_rec;		/* record descriptions */
 } dtrace_aggdesc_c_t;
 
 typedef struct dtrace_fmtdesc_c {
@@ -211,7 +212,11 @@ cheriabi_dtrace_ioctl_translate_in(u_long com,
 		CP((**paggdesc_c), (**paggdesc), dtagd_size);
 		CP((**paggdesc_c), (**paggdesc), dtagd_nrecs);
 		CP((**paggdesc_c), (**paggdesc), dtagd_pad);
-		CP((**paggdesc_c), (**paggdesc), dtagd_rec);
+
+		/*
+		 * dtagd_rec[1] for a pointer, YAY.
+		 */
+		(*paggdesc)->dtagd_rec = (dtrace_recdesc_t *) (*paggdesc_c)->dtagd_rec;
 
 		/*
 		 * We need to somehow perserve the aggergation name capability.
@@ -236,21 +241,25 @@ cheriabi_dtrace_ioctl_translate_in(u_long com,
 	case DTRACEIOC_DOFGET_C: {
 		dof_hdr_t **hdr;
 		dof_hdr_t **hdr_c = (dof_hdr_t **) data;
+		int i;
+
+		hdr = malloc(sizeof(dof_hdr_t *), M_DTRACEIOC, M_WAITOK);
+		*hdr = malloc(sizeof(dof_hdr_t), M_DTRACEIOC, M_WAITOK);
 
 		for (i = 0; i < DOF_ID_SIZE; i++)
-			CP((*hdr_c), (*hdr), dofh_ident[i]);
+			CP((**hdr_c), (**hdr), dofh_ident[i]);
 
-		CP((*hdr_c), (*hdr), dofh_flags);
-		CP((*hdr_c), (*hdr), dofh_hdrsize);
-		CP((*hdr_c), (*hdr), dofh_secsize);
-		CP((*hdr_c), (*hdr), dofh_secnum);
-		CP((*hdr_c), (*hdr), dofh_secoff);
-		CP((*hdr_c), (*hdr), dofh_loadsz);
-		CP((*hdr_c), (*hdr), dofh_filesz);
-		CP((*hdr_c), (*hdr), dofh_pad);
+		CP((**hdr_c), (**hdr), dofh_flags);
+		CP((**hdr_c), (**hdr), dofh_hdrsize);
+		CP((**hdr_c), (**hdr), dofh_secsize);
+		CP((**hdr_c), (**hdr), dofh_secnum);
+		CP((**hdr_c), (**hdr), dofh_secoff);
+		CP((**hdr_c), (**hdr), dofh_loadsz);
+		CP((**hdr_c), (**hdr), dofh_filesz);
+		CP((**hdr_c), (**hdr), dofh_pad);
 	}
 	default:
-		error = EINVAL
+		error = EINVAL;
 	}
 
 	return (error);

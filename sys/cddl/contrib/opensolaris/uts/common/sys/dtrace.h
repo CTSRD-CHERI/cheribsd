@@ -603,20 +603,6 @@ typedef struct dtrace_difv {
  * DOF are always arbitrary-length and not bound to the current implementation.
  */
 
-#define	DOF_ID_SIZE	16	/* total size of dofh_ident[] in bytes */
-
-typedef struct dof_hdr {
-	uint8_t dofh_ident[DOF_ID_SIZE]; /* identification bytes (see below) */
-	uint32_t dofh_flags;		/* file attribute flags (if any) */
-	uint32_t dofh_hdrsize;		/* size of file header in bytes */
-	uint32_t dofh_secsize;		/* size of section header in bytes */
-	uint32_t dofh_secnum;		/* number of section headers */
-	uint64_t dofh_secoff;		/* file offset of section headers */
-	uint64_t dofh_loadsz;		/* file size of loadable portion */
-	uint64_t dofh_filesz;		/* file size of entire DOF file */
-	uint64_t dofh_pad;		/* reserved for future use */
-} dof_hdr_t;
-
 #define	DOF_ID_MAG0	0	/* first byte of magic number */
 #define	DOF_ID_MAG1	1	/* second byte of magic number */
 #define	DOF_ID_MAG2	2	/* third byte of magic number */

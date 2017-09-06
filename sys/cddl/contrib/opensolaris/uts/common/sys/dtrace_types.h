@@ -11,6 +11,7 @@
 #define	DTRACE_PTR(type, name)	type *name
 #endif
 
+#define	DOF_ID_SIZE	16	/* total size of dofh_ident[] in bytes */
 
 typedef uint32_t dtrace_id_t;		/* probe identifier */
 typedef uint32_t dtrace_epid_t;		/* enabled probe identifier */
@@ -19,6 +20,18 @@ typedef int64_t dtrace_aggvarid_t;	/* aggregation variable identifier */
 typedef uint16_t dtrace_actkind_t;	/* action kind */
 typedef int64_t dtrace_optval_t;	/* option value */
 typedef uint32_t dtrace_cacheid_t;	/* predicate cache identifier */
+
+typedef struct dof_hdr {
+	uint8_t dofh_ident[DOF_ID_SIZE]; /* identification bytes (see below) */
+	uint32_t dofh_flags;		/* file attribute flags (if any) */
+	uint32_t dofh_hdrsize;		/* size of file header in bytes */
+	uint32_t dofh_secsize;		/* size of section header in bytes */
+	uint32_t dofh_secnum;		/* number of section headers */
+	uint64_t dofh_secoff;		/* file offset of section headers */
+	uint64_t dofh_loadsz;		/* file size of loadable portion */
+	uint64_t dofh_filesz;		/* file size of entire DOF file */
+	uint64_t dofh_pad;		/* reserved for future use */
+} dof_hdr_t;
 
 
 /*
@@ -53,18 +66,6 @@ typedef struct {
 	int	n_matched;	/* # matches returned by driver. */
 } dtrace_enable_io_t;
 
-typedef struct dtrace_aggdesc {
-	DTRACE_PTR(char, dtagd_name);		/* not filled in by kernel */
-	dtrace_aggvarid_t dtagd_varid;		/* not filled in by kernel */
-	int dtagd_flags;			/* not filled in by kernel */
-	dtrace_aggid_t dtagd_id;		/* aggregation ID */
-	dtrace_epid_t dtagd_epid;		/* enabled probe ID */
-	uint32_t dtagd_size;			/* size in bytes */
-	int dtagd_nrecs;			/* number of records */
-	uint32_t dtagd_pad;			/* explicit padding */
-	dtrace_recdesc_t dtagd_rec[1];		/* record descriptions */
-} dtrace_aggdesc_t;
-
 typedef struct dtrace_recdesc {
 	dtrace_actkind_t dtrd_action;		/* kind of action */
 	uint32_t dtrd_size;			/* size of record */
@@ -74,6 +75,18 @@ typedef struct dtrace_recdesc {
 	uintptr_t dtrd_arg;			/* action argument */
 	uintptr_t dtrd_uarg;			/* user argument */
 } dtrace_recdesc_t;
+
+typedef struct dtrace_aggdesc {
+	DTRACE_PTR(char, dtagd_name);		/* not filled in by kernel */
+	dtrace_aggvarid_t dtagd_varid;		/* not filled in by kernel */
+	int dtagd_flags;			/* not filled in by kernel */
+	dtrace_aggid_t dtagd_id;		/* aggregation ID */
+	dtrace_epid_t dtagd_epid;		/* enabled probe ID */
+	uint32_t dtagd_size;			/* size in bytes */
+	int dtagd_nrecs;			/* number of records */
+	uint32_t dtagd_pad;			/* explicit padding */
+	dtrace_recdesc_t *dtagd_rec;		/* record descriptions */
+} dtrace_aggdesc_t;
 
 typedef struct dtrace_fmtdesc {
 	DTRACE_PTR(char, dtfd_string);		/* format string */
