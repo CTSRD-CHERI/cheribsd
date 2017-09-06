@@ -81,14 +81,14 @@ beri_elf64_exec(struct preloaded_file *fp)
 
 	md = file_findmetadata(fp, MODINFOMD_ELFHDR);
 	if (md == NULL) {
-		printf("%s: file_findmetadata failed\n");
+		printf("%s: file_findmetadata failed\n", __func__);
 		return (EFTYPE);
 	}
 	ehdr = (Elf_Ehdr *)md->md_data;
 
 	error = md_load64(fp->f_args, &mdp);
 	if (error) {
-		printf("%s: md_load64 failed\n");
+		printf("%s: md_load64 failed\n", __func__);
 		return (error);
 	}
 
@@ -126,7 +126,7 @@ beri_elf64_exec(struct preloaded_file *fp)
 	 * least bootinfop.
 	 */
 	(*entry)(boot2_argc, (register_t)boot2_argv, (register_t)boot2_envv,
-	    &bootinfo);
+	    (vaddr_t)&bootinfo);
 
 	panic("exec returned");
 }
