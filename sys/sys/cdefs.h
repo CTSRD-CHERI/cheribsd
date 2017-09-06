@@ -911,4 +911,9 @@
 #define	__CAPABILITY
 #endif
 
+#if !__has_feature(__cheri_cast)
+/* Support old compiler versions without __cheri_cast: */
+#define __cheri_cast
+#endif
+
 #endif /* !_SYS_CDEFS_H_ */

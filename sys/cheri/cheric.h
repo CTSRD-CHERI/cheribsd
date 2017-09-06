@@ -38,11 +38,6 @@
 
 #if __has_feature(capabilities)
 
-#if !__has_feature(__cheri_cast)
-/* XXXAR: Support old compiler versions without __cheri_cast: */
-#define __cheri_cast
-#endif
-
 /*
  * Programmer-friendly macros for CHERI-aware C code -- requires use of
  * CHERI-aware Clang/LLVM, and full capability context switching, so not yet
