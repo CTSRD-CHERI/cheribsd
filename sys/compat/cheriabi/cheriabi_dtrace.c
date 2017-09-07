@@ -57,8 +57,6 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/endian.h>
 
-#include <dtrace_types.h>
-
 #include <cheri/cheri.h>
 #include <compat/cheriabi/cheriabi.h>
 #include <compat/cheriabi/cheriabi_proto.h>
@@ -68,56 +66,6 @@ __FBSDID("$FreeBSD$");
 
 MALLOC_DECLARE(M_DTRACEIOC);
 MALLOC_DEFINE(M_DTRACEIOC, "dtraceioc", "DTrace CheriABI ioctl");
-
-typedef struct dtrace_bufdesc_c {
-	uint64_t dtbd_size;			/* size of buffer */
-	uint32_t dtbd_cpu;			/* CPU or DTRACE_CPUALL */
-	uint32_t dtbd_errors;			/* number of errors */
-	uint64_t dtbd_drops;			/* number of drops */
-	char * __capability dtbd_data;		/* data */
-	uint64_t dtbd_oldest;			/* offset of oldest record */
-	uint64_t dtbd_timestamp;		/* hrtime of snapshot */
-} dtrace_bufdesc_c_t;
-
-typedef struct {
-	void * __capability dof;
-	int n_matched;
-} dtrace_enable_io_c_t;
-
-typedef struct dtrace_aggdesc_c {
-	char * __capability dtagd_name;		/* not filled in by kernel */
-	dtrace_aggvarid_t dtagd_varid;		/* not filled in by kernel */
-	int dtagd_flags;			/* not filled in by kernel */
-	dtrace_aggid_t dtagd_id;		/* aggregation ID */
-	dtrace_epid_t dtagd_epid;		/* enabled probe ID */
-	uint32_t dtagd_size;			/* size in bytes */
-	int dtagd_nrecs;			/* number of records */
-	uint32_t dtagd_pad;			/* explicit padding */
-	dtrace_recdesc_t dtagd_rec[1];		/* record descriptions */
-} dtrace_aggdesc_c_t;
-
-typedef struct dtrace_fmtdesc_c {
-	char * __capability dtfd_string;	/* format string */
-	int dtfd_length;			/* length of format string */
-	uint16_t dtfd_format;			/* format identifier */
-} dtrace_fmtdesc_c_t;
-
-typedef struct dtrace_eprobedesc_c {
-	dtrace_epid_t dtepd_epid;		/* enabled probe ID */
-	dtrace_id_t dtepd_probeid;		/* probe ID */
-	__uintcap_t dtepd_uarg;			/* library argument */
-	uint32_t dtepd_size;			/* total size */
-	int dtepd_nrecs;			/* number of records */
-	dtrace_recdesc_t dtepd_rec[1];		/* records themselves */
-} dtrace_eprobedesc_c_t;
-
-#define	DTRACEIOC_BUFSNAP_C	_IOC_NEWTYPE(DTRACEIOC_BUFSNAP, dtrace_bufdesc_c_t * __capability)
-#define	DTRACEIOC_ENABLE_C	_IOC_NEWTYPE(DTRACEIOC_ENABLE, dtrace_enable_io_c_t)
-#define	DTRACEIOC_AGGSNAP_C	_IOC_NEWTYPE(DTRACEIOC_AGGSNAP, dtrace_bufdesc_c_t * __capability)
-#define	DTRACEIOC_AGGDESC_C	_IOC_NEWTYPE(DTRACEIOC_AGGDESC, dtrace_aggdesc_c_t * __capability)
-#define	DTRACEIOC_FORMAT_C	_IOC_NEWTYPE(DTRACEIOC_FORMAT, dtrace_fmtdesc_c_t)
-#define	DTRACEIOC_DOFGET_C	_IOC_NEWTYPE(DTRACEIOC_DOFGET, dof_hdr_t * __capability)
-#define	DTRACEIOC_EPROBE_C	_IOC_NEWTYPE(DTRACEIOC_EPROBE, dtrace_eprobedesc_c_t * __capability)
 
 static int
 cheriabi_dtrace_ioctl_translate_in(u_long com,
@@ -181,11 +129,9 @@ cheriabi_dtrace_ioctl_translate_in(u_long com,
 		/*
 		 * Check perms.
 		 */
-		printf("checkperm\n");
 		if ((cheri_getperm(p_c->dof) & CHERI_PERM_STORE) != CHERI_PERM_STORE)
 			return (EPROT);
 
-		printf("after\n");
 		/*
 		 * FIXME: No enforcement because we need information from the
 		 * header (which is user controlled...).
@@ -302,14 +248,9 @@ cheriabi_dtrace_ioctl_translate_in(u_long com,
 		break;
 	}
 	default:
-		printf("enable = %lu\n", DTRACEIOC_ENABLE_C);
-		printf("com = %lu\n", com);
 		error = EINVAL;
 	}
 
-	printf("enable_c = %lu\n", DTRACEIOC_ENABLE_C);
-	printf("enable = %lu\n", DTRACEIOC_ENABLE);
-	printf("com = %lu\n", com);
 	return (error);
 }
 

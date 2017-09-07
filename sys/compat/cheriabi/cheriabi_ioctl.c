@@ -898,7 +898,13 @@ ioctl_data_contains_pointers(u_long cmd)
 
 	case SIOCGIFMEDIA_C:
 	case SIOCGIFXMEDIA_C:
-
+	case DTRACEIOC_BUFSNAP_C:
+	case DTRACEIOC_ENABLE_C:
+	case DTRACEIOC_AGGSNAP_C:
+	case DTRACEIOC_EPROBE_C:
+	case DTRACEIOC_DOFGET_C:
+	case DTRACEIOC_FORMAT_C:
+	case DTRACEIOC_AGGDESC_C:
 		return (1);
 	default:
 		return (0);
