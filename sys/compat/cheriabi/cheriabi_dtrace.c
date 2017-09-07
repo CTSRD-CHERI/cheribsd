@@ -116,7 +116,7 @@ cheriabi_dtrace_ioctl_translate_in(u_long com,
 
 	error = 0;
 
-	switch(com) {
+	switch (com) {
 	case DTRACEIOC_AGGSNAP_C:
 	case DTRACEIOC_BUFSNAP_C: {
 		/*
@@ -145,6 +145,7 @@ cheriabi_dtrace_ioctl_translate_in(u_long com,
 		error = cheriabi_cap_to_ptr((caddr_t *)&((*pdesc)->dtbd_data),
 		    (*pdesc_c)->dtbd_data, (*pdesc_c)->dtbd_size,
 		    CHERI_PERM_STORE, 0);
+		break;
 	}
 	case DTRACEIOC_ENABLE_C: {
 		/*
@@ -177,6 +178,7 @@ cheriabi_dtrace_ioctl_translate_in(u_long com,
 		 * header (which is user controlled...).
 		 */
 		p->dof = (caddr_t) p_c->dof;
+		break;
 		
 	}
 	case DTRACEIOC_AGGDESC_C: {
@@ -220,7 +222,12 @@ cheriabi_dtrace_ioctl_translate_in(u_long com,
 
 		/*
 		 * We need to somehow perserve the aggergation name capability.
+		 * For now, just do a CGetOffset through a cast.
 		 */
+
+		error = cheriabi_strcap_to_ptr(&(*paggdesc)->dtagd_name,
+		    (*paggdesc_c)->dtagd_name, 1);
+		break;
 	}
 	case DTRACEIOC_FORMAT_C: {
 		dtrace_fmtdesc_t *fmt;
@@ -236,7 +243,8 @@ cheriabi_dtrace_ioctl_translate_in(u_long com,
 		CP((*fmt_c), (*fmt), dtfd_format);
 
 		error = cheriabi_cap_to_ptr((caddr_t *) &fmt->dtfd_string,
-		    fmt_c->dtfd_string, fmt_c->dtfd_length, CHERI_PERM_STORE, 0);
+		    fmt_c->dtfd_string, fmt_c->dtfd_length, CHERI_PERM_STORE, 1);
+		break;
 	}
 	case DTRACEIOC_DOFGET_C: {
 		dof_hdr_t **hdr;
@@ -257,6 +265,7 @@ cheriabi_dtrace_ioctl_translate_in(u_long com,
 		CP((**hdr_c), (**hdr), dofh_loadsz);
 		CP((**hdr_c), (**hdr), dofh_filesz);
 		CP((**hdr_c), (**hdr), dofh_pad);
+		break;
 	}
 	default:
 		error = EINVAL;
@@ -269,8 +278,82 @@ static int
 cheriabi_dtrace_ioctl_translate_out(u_long com,
     void *data, void *t_data)
 {
+	int error;
 
-	return (EINVAL);
+	switch (com) {
+	case DTRACEIOC_AGGSNAP_C:
+	case DTRACEIOC_BUFSNAP_C: {
+		size_t i;
+		dtrace_bufdesc_t **pdesc = t_data;
+		dtrace_bufdesc_c_t **pdesc_c = data;
+
+		error = 0;
+		CP((**pdesc), (**pdesc_c), dtbd_size);
+		CP((**pdesc), (**pdesc_c), dtbd_cpu);
+		CP((**pdesc), (**pdesc_c), dtbd_errors);
+		CP((**pdesc), (**pdesc_c), dtbd_drops);
+		CP((**pdesc), (**pdesc_c), dtbd_oldest);
+		CP((**pdesc), (**pdesc_c), dtbd_timestamp);
+
+		for (i = 0; i < (*pdesc_c)->dtbd_size; i++)
+			CP((**pdesc), (**pdesc_c), dtbd_data[i]);
+
+		free(*pdesc_c, M_DTRACEIOC);
+		break;
+	}
+	case DTRACEIOC_AGGDESC_C: {
+		dtrace_aggdesc_t **paggdesc = t_data;
+		dtrace_aggdesc_c_t **paggdesc_c = data;
+
+		error = 0;
+
+		CP((**paggdesc), (**paggdesc_c), dtagd_id);
+		CP((**paggdesc), (**paggdesc_c), dtagd_epid);
+		CP((**paggdesc), (**paggdesc_c), dtagd_size);
+		CP((**paggdesc), (**paggdesc_c), dtagd_nrecs);
+		CP((**paggdesc), (**paggdesc_c), dtagd_pad);
+		CP((**paggdesc), (**paggdesc_c), dtagd_rec);
+
+		free(*paggdesc_c, M_DTRACEIOC);
+	}
+	case DTRACEIOC_FORMAT_C: {
+		size_t i;
+		dtrace_fmtdesc_t *fmt = t_data;
+		dtrace_fmtdesc_c_t *fmt_c = data;
+
+		error = 0;
+
+		CP((*fmt), (*fmt_c), dtfd_length);
+		CP((*fmt), (*fmt_c), dtfd_format);
+
+		for (i = 0; i < fmt_c->dtfd_length; i++)
+			CP((*fmt), (*fmt_c), dtfd_string[i]);
+		break;
+	}
+	case DTRACEIOC_DOFGET_C: {
+		size_t i;
+		dof_hdr_t **hdr = t_data;
+		dof_hdr_t **hdr_c = data;
+
+		CP((**hdr), (**hdr_c), dofh_flags);
+		CP((**hdr), (**hdr_c), dofh_hdrsize);
+		CP((**hdr), (**hdr_c), dofh_secsize);
+		CP((**hdr), (**hdr_c), dofh_secnum);
+		CP((**hdr), (**hdr_c), dofh_secoff);
+		CP((**hdr), (**hdr_c), dofh_loadsz);
+		CP((**hdr), (**hdr_c), dofh_filesz);
+		CP((**hdr), (**hdr_c), dofh_pad);
+
+		for (i = 0; i < DOF_ID_SIZE; i++)
+			CP((**hdr), (**hdr_c), dofh_ident[i]);
+	}
+	default:
+		error = EINVAL;
+	}
+
+	error = 0;
+
+	return (error);
 }
 
 int
