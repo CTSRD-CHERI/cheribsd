@@ -93,7 +93,7 @@ typedef struct dtrace_aggdesc_c {
 	uint32_t dtagd_size;			/* size in bytes */
 	int dtagd_nrecs;			/* number of records */
 	uint32_t dtagd_pad;			/* explicit padding */
-	dtrace_recdesc_t *dtagd_rec;		/* record descriptions */
+	dtrace_recdesc_t dtagd_rec[1];		/* record descriptions */
 } dtrace_aggdesc_c_t;
 
 typedef struct dtrace_fmtdesc_c {
@@ -108,7 +108,7 @@ typedef struct dtrace_eprobedesc_c {
 	__uintcap_t dtepd_uarg;			/* library argument */
 	uint32_t dtepd_size;			/* total size */
 	int dtepd_nrecs;			/* number of records */
-	dtrace_recdesc_t *dtepd_rec;		/* records themselves */
+	dtrace_recdesc_t dtepd_rec[1];		/* records themselves */
 } dtrace_eprobedesc_c_t;
 
 #define	DTRACEIOC_BUFSNAP_C	_IOC_NEWTYPE(DTRACEIOC_BUFSNAP, dtrace_bufdesc_c_t * __capability)
@@ -181,14 +181,16 @@ cheriabi_dtrace_ioctl_translate_in(u_long com,
 		/*
 		 * Check perms.
 		 */
+		printf("checkperm\n");
 		if ((cheri_getperm(p_c->dof) & CHERI_PERM_STORE) != CHERI_PERM_STORE)
 			return (EPROT);
 
+		printf("after\n");
 		/*
 		 * FIXME: No enforcement because we need information from the
 		 * header (which is user controlled...).
 		 */
-		p->dof = (caddr_t) p_c->dof;
+		p->dof = (void *) p_c->dof;
 		break;
 		
 	}
@@ -202,13 +204,11 @@ cheriabi_dtrace_ioctl_translate_in(u_long com,
 		 * pointer in some way, but we also need to give the capability
 		 * back to userspace by preserving it's permissions, length,
 		 * offset and so on. This isn't a straightforward thing to do
-		 * without being invasing in DTrace itself (which we probably
+		 * without being invasive in DTrace itself (which we probably
 		 * don't want too much...).
 		 */
+		size_t i;
 		dtrace_aggdesc_t **paggdesc;
-		/*
-		 * We have to enforce __capability on the pointer itself here.
-		 */
 		dtrace_aggdesc_c_t **paggdesc_c = data;
 
 		error = 0;
@@ -226,10 +226,8 @@ cheriabi_dtrace_ioctl_translate_in(u_long com,
 		CP((**paggdesc_c), (**paggdesc), dtagd_nrecs);
 		CP((**paggdesc_c), (**paggdesc), dtagd_pad);
 
-		/*
-		 * dtagd_rec[1] for a pointer, YAY.
-		 */
-		(*paggdesc)->dtagd_rec = (dtrace_recdesc_t *) (*paggdesc_c)->dtagd_rec;
+		for (i = 0; i < (*paggdesc_c)->dtagd_nrecs; i++)
+			CP((**paggdesc_c), ((**paggdesc)), dtagd_rec[i]);
 
 		/*
 		 * We need to somehow perserve the aggergation name capability.
@@ -294,19 +292,24 @@ cheriabi_dtrace_ioctl_translate_in(u_long com,
 		*t_datap = epdesc;
 		*t_comp = _IOC_NEWTYPE(com, dtrace_eprobedesc_t *);
 
-		CP((**epdesc), (**epdesc_c), dtepd_epid);
-		CP((**epdesc), (**epdesc_c), dtepd_probeid);
-		CP((**epdesc), (**epdesc_c), dtepd_size);
-		CP((**epdesc), (**epdesc_c), dtepd_nrecs);
+		CP((**epdesc_c), (**epdesc), dtepd_epid);
+		CP((**epdesc_c), (**epdesc), dtepd_probeid);
+		CP((**epdesc_c), (**epdesc), dtepd_size);
+		CP((**epdesc_c), (**epdesc), dtepd_nrecs);
 
 		for (i = 0; i < (*epdesc)->dtepd_nrecs; i++)
-			CP((**epdesc), (**epdesc_c), dtepd_rec[i]);
+			CP((**epdesc_c), (**epdesc), dtepd_rec[i]);
 		break;
 	}
 	default:
+		printf("enable = %lu\n", DTRACEIOC_ENABLE_C);
+		printf("com = %lu\n", com);
 		error = EINVAL;
 	}
 
+	printf("enable_c = %lu\n", DTRACEIOC_ENABLE_C);
+	printf("enable = %lu\n", DTRACEIOC_ENABLE);
+	printf("com = %lu\n", com);
 	return (error);
 }
 

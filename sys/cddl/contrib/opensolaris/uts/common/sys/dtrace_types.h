@@ -85,7 +85,7 @@ typedef struct dtrace_aggdesc {
 	uint32_t dtagd_size;			/* size in bytes */
 	int dtagd_nrecs;			/* number of records */
 	uint32_t dtagd_pad;			/* explicit padding */
-	dtrace_recdesc_t *dtagd_rec;		/* record descriptions */
+	dtrace_recdesc_t dtagd_rec[1];		/* record descriptions */
 } dtrace_aggdesc_t;
 
 typedef struct dtrace_fmtdesc {
@@ -128,7 +128,7 @@ typedef struct dtrace_eprobedesc {
 	uintptr_t dtepd_uarg;			/* library argument */
 	uint32_t dtepd_size;			/* total size */
 	int dtepd_nrecs;			/* number of records */
-	dtrace_recdesc_t *dtepd_rec;		/* records themselves */
+	dtrace_recdesc_t dtepd_rec[1];		/* records themselves */
 } dtrace_eprobedesc_t;
 
 #define	DTRACEIOC_BUFSNAP	_IOW('x',4,dtrace_bufdesc_t *)	
