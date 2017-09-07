@@ -108,12 +108,12 @@ cheriabi_dtrace_ioctl_translate_in(u_long com,
 	}
 	case DTRACEIOC_ENABLE_C: {
 		/*
-		 * In order to enforce capabilities in this ioctl, we have to
-		 * know the information contained in the header. This is not
-		 * ideal in any way, shape, or form, as the userspace (which in
-		 * theory, is untrusted) is supplying us the information which
-		 * we will enforce with the capabilities. This interface likely
-		 * needs to be redesigned in a way that can be better enforced.
+		 * The problem with this is that we have the data in userspace
+		 * inside the DOF that corresponds to purecap. In the hybrid
+		 * ABI, we have an issue with the alignment being different, as
+		 * well as the size of various things in the DOF being
+		 * different. For DTrace, we really need to proivde a way to
+		 * convert this from purecap to non-CHERI.
 		 */
 		dtrace_enable_io_t *p;
 		dtrace_enable_io_c_t *p_c = data;
@@ -138,7 +138,6 @@ cheriabi_dtrace_ioctl_translate_in(u_long com,
 		 */
 		p->dof = (void *) p_c->dof;
 		break;
-		
 	}
 	case DTRACEIOC_AGGDESC_C: {
 		/*

@@ -649,9 +649,6 @@ typedef struct dtrace_difv {
 
 #define	DOF_FL_VALID	0	/* mask of all valid dofh_flags bits */
 
-typedef uint32_t dof_secidx_t;	/* section header table index type */
-typedef uint32_t dof_stridx_t;	/* string table index type */
-
 #define	DOF_SECIDX_NONE	(-1U)	/* null value for section indices */
 #define	DOF_STRIDX_NONE	(-1U)	/* null value for string indices */
 
@@ -724,15 +721,6 @@ typedef struct dof_probedesc {
 	dof_stridx_t dofp_name;		/* name string */
 	uint32_t dofp_id;		/* probe identifier (or zero) */
 } dof_probedesc_t;
-
-typedef struct dof_actdesc {
-	dof_secidx_t dofa_difo;		/* link to DOF_SECT_DIFOHDR */
-	dof_secidx_t dofa_strtab;	/* link to DOF_SECT_STRTAB section */
-	uint32_t dofa_kind;		/* action kind (DTRACEACT_* constant) */
-	uint32_t dofa_ntuple;		/* number of subsequent tuple actions */
-	uintptr_t dofa_arg;		/* kind-specific argument */
-	uintptr_t dofa_uarg;		/* user-supplied argument */
-} dof_actdesc_t;
 
 typedef struct dof_difohdr {
 	dtrace_diftype_t dofd_rtype;	/* return type for this fragment */

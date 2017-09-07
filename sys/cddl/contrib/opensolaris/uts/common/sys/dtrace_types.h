@@ -20,6 +20,18 @@ typedef int64_t dtrace_aggvarid_t;	/* aggregation variable identifier */
 typedef uint16_t dtrace_actkind_t;	/* action kind */
 typedef int64_t dtrace_optval_t;	/* option value */
 typedef uint32_t dtrace_cacheid_t;	/* predicate cache identifier */
+typedef uint32_t dof_secidx_t;	/* section header table index type */
+typedef uint32_t dof_stridx_t;	/* string table index type */
+
+
+typedef struct dof_actdesc {
+	dof_secidx_t dofa_difo;		/* link to DOF_SECT_DIFOHDR */
+	dof_secidx_t dofa_strtab;	/* link to DOF_SECT_STRTAB section */
+	uint32_t dofa_kind;		/* action kind (DTRACEACT_* constant) */
+	uint32_t dofa_ntuple;		/* number of subsequent tuple actions */
+	uintptr_t dofa_arg;		/* kind-specific argument */
+	uintptr_t dofa_uarg;		/* user-supplied argument */
+} dof_actdesc_t;
 
 typedef struct dof_hdr {
 	uint8_t dofh_ident[DOF_ID_SIZE]; /* identification bytes (see below) */
