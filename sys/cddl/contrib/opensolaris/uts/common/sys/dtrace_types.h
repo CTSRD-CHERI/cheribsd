@@ -105,6 +105,32 @@ typedef struct dtrace_rechdr {
 	uint32_t dtrh_timestamp_lo;		/* low bits of hrtime_t */
 } dtrace_rechdr_t;
 
+/*
+ * DTrace Metadata Description Structures
+ *
+ * DTrace separates the trace data stream from the metadata stream.  The only
+ * metadata tokens placed in the data stream are the dtrace_rechdr_t (EPID +
+ * timestamp) or (in the case of aggregations) aggregation identifiers.  To
+ * determine the structure of the data, DTrace consumers pass the token to the
+ * kernel, and receive in return a corresponding description of the enabled
+ * probe (via the dtrace_eprobedesc structure) or the aggregation (via the
+ * dtrace_aggdesc structure).  Both of these structures are expressed in terms
+ * of record descriptions (via the dtrace_recdesc structure) that describe the
+ * exact structure of the data.  Some record descriptions may also contain a
+ * format identifier; this additional bit of metadata can be retrieved from the
+ * kernel, for which a format description is returned via the dtrace_fmtdesc
+ * structure.  Note that all four of these structures must be bitness-neutral
+ * to allow for a 32-bit DTrace consumer on a 64-bit kernel.
+ */
+typedef struct dtrace_eprobedesc {
+	dtrace_epid_t dtepd_epid;		/* enabled probe ID */
+	dtrace_id_t dtepd_probeid;		/* probe ID */
+	uintptr_t dtepd_uarg;			/* library argument */
+	uint32_t dtepd_size;			/* total size */
+	int dtepd_nrecs;			/* number of records */
+	dtrace_recdesc_t *dtepd_rec;		/* records themselves */
+} dtrace_eprobedesc_t;
+
 #define	DTRACEIOC_BUFSNAP	_IOW('x',4,dtrace_bufdesc_t *)	
 							/* snapshot buffer */
 #define	DTRACEIOC_ENABLE	_IOWR('x',6,dtrace_enable_io_t)
@@ -117,4 +143,6 @@ typedef struct dtrace_rechdr {
 							/* get format str */
 #define	DTRACEIOC_DOFGET	_IOW('x',17,dof_hdr_t *)
 							/* get DOF */
+#define	DTRACEIOC_EPROBE	_IOW('x',8,dtrace_eprobedesc_t)
+							/* get eprobe desc. */
 #endif

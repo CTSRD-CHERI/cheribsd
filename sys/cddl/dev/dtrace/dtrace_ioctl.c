@@ -179,7 +179,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		dest = (uintptr_t)buf;
 
 		bcopy(&aggdesc, (void *)dest, sizeof (aggdesc));
-		dest += offsetof(dtrace_aggdesc_t, dtagd_rec[0]);
+		dest += offsetof(dtrace_aggdesc_t, dtagd_rec);
 
 		for (act = agg->dtag_first; ; act = act->dta_next) {
 			dtrace_recdesc_t rec = act->dta_rec;
@@ -511,7 +511,7 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		dest = (uintptr_t)buf;
 
 		bcopy(&epdesc, (void *)dest, sizeof (epdesc));
-		dest += offsetof(dtrace_eprobedesc_t, dtepd_rec[0]);
+		dest += offsetof(dtrace_eprobedesc_t, dtepd_rec);
 
 		for (act = ecb->dte_action; act != NULL; act = act->dta_next) {
 			if (DTRACEACT_ISAGG(act->dta_kind) || act->dta_intuple)

@@ -59,6 +59,7 @@ __FBSDID("$FreeBSD$");
 
 #include <dtrace_types.h>
 
+#include <cheri/cheri.h>
 #include <compat/cheriabi/cheriabi.h>
 #include <compat/cheriabi/cheriabi_proto.h>
 /* Must come last due to massive header polution breaking cheriabi_proto.h */
@@ -101,12 +102,22 @@ typedef struct dtrace_fmtdesc_c {
 	uint16_t dtfd_format;			/* format identifier */
 } dtrace_fmtdesc_c_t;
 
+typedef struct dtrace_eprobedesc_c {
+	dtrace_epid_t dtepd_epid;		/* enabled probe ID */
+	dtrace_id_t dtepd_probeid;		/* probe ID */
+	__uintcap_t dtepd_uarg;			/* library argument */
+	uint32_t dtepd_size;			/* total size */
+	int dtepd_nrecs;			/* number of records */
+	dtrace_recdesc_t *dtepd_rec;		/* records themselves */
+} dtrace_eprobedesc_c_t;
+
 #define	DTRACEIOC_BUFSNAP_C	_IOC_NEWTYPE(DTRACEIOC_BUFSNAP, dtrace_bufdesc_c_t * __capability)
 #define	DTRACEIOC_ENABLE_C	_IOC_NEWTYPE(DTRACEIOC_ENABLE, dtrace_enable_io_c_t)
 #define	DTRACEIOC_AGGSNAP_C	_IOC_NEWTYPE(DTRACEIOC_AGGSNAP, dtrace_bufdesc_c_t * __capability)
 #define	DTRACEIOC_AGGDESC_C	_IOC_NEWTYPE(DTRACEIOC_AGGDESC, dtrace_aggdesc_c_t * __capability)
 #define	DTRACEIOC_FORMAT_C	_IOC_NEWTYPE(DTRACEIOC_FORMAT, dtrace_fmtdesc_c_t)
 #define	DTRACEIOC_DOFGET_C	_IOC_NEWTYPE(DTRACEIOC_DOFGET, dof_hdr_t * __capability)
+#define	DTRACEIOC_EPROBE_C	_IOC_NEWTYPE(DTRACEIOC_EPROBE, dtrace_eprobedesc_c_t * __capability)
 
 static int
 cheriabi_dtrace_ioctl_translate_in(u_long com,
@@ -124,11 +135,11 @@ cheriabi_dtrace_ioctl_translate_in(u_long com,
 		 * path.
 		 */
 		dtrace_bufdesc_t **pdesc;
-		dtrace_bufdesc_c_t **pdesc_c = (dtrace_bufdesc_c_t **) data;
+		dtrace_bufdesc_c_t **pdesc_c = data;
 
 		error = 0;
 		pdesc = malloc(sizeof(dtrace_bufdesc_t *), M_DTRACEIOC, M_WAITOK);
-		*pdesc = malloc(sizeof(dtrace_bufdesc_t), M_DTRACEIOC, M_WAITOK);
+		*pdesc = malloc(sizeof(dtrace_bufdesc_t), M_DTRACEIOC, M_WAITOK | M_ZERO);
 
 		*t_datap = pdesc;
 		*t_comp = _IOC_NEWTYPE(com, dtrace_bufdesc_t *);
@@ -157,10 +168,10 @@ cheriabi_dtrace_ioctl_translate_in(u_long com,
 		 * needs to be redesigned in a way that can be better enforced.
 		 */
 		dtrace_enable_io_t *p;
-		dtrace_enable_io_c_t *p_c = (dtrace_enable_io_c_t *) data;
+		dtrace_enable_io_c_t *p_c = data;
 
 		error = 0;
-		p = malloc(sizeof(dtrace_enable_io_t), M_DTRACEIOC, M_WAITOK);
+		p = malloc(sizeof(dtrace_enable_io_t), M_DTRACEIOC, M_WAITOK | M_ZERO);
 
 		*t_datap = p;
 		*t_comp = _IOC_NEWTYPE(com, dtrace_enable_io_t);
@@ -198,11 +209,11 @@ cheriabi_dtrace_ioctl_translate_in(u_long com,
 		/*
 		 * We have to enforce __capability on the pointer itself here.
 		 */
-		dtrace_aggdesc_c_t **paggdesc_c = (dtrace_aggdesc_c_t **) data;
+		dtrace_aggdesc_c_t **paggdesc_c = data;
 
 		error = 0;
 		paggdesc = malloc(sizeof(dtrace_aggdesc_c_t *), M_DTRACEIOC, M_WAITOK);
-		*paggdesc = malloc(sizeof(dtrace_aggdesc_t), M_DTRACEIOC, M_WAITOK);
+		*paggdesc = malloc(sizeof(dtrace_aggdesc_t), M_DTRACEIOC, M_WAITOK | M_ZERO);
 
 		*t_datap = paggdesc;
 		*t_comp = _IOC_NEWTYPE(com, dtrace_aggdesc_t *);
@@ -231,10 +242,10 @@ cheriabi_dtrace_ioctl_translate_in(u_long com,
 	}
 	case DTRACEIOC_FORMAT_C: {
 		dtrace_fmtdesc_t *fmt;
-		dtrace_fmtdesc_c_t *fmt_c = (dtrace_fmtdesc_c_t *) data;
+		dtrace_fmtdesc_c_t *fmt_c = data;
 
 		error = 0;
-		fmt = malloc(sizeof(dtrace_fmtdesc_t), M_DTRACEIOC, M_WAITOK);
+		fmt = malloc(sizeof(dtrace_fmtdesc_t), M_DTRACEIOC, M_WAITOK | M_ZERO);
 
 		*t_datap = fmt;
 		*t_comp = _IOC_NEWTYPE(com, dtrace_fmtdesc_t);
@@ -248,11 +259,15 @@ cheriabi_dtrace_ioctl_translate_in(u_long com,
 	}
 	case DTRACEIOC_DOFGET_C: {
 		dof_hdr_t **hdr;
-		dof_hdr_t **hdr_c = (dof_hdr_t **) data;
+		dof_hdr_t **hdr_c = data;
 		int i;
 
+		error = 0;
 		hdr = malloc(sizeof(dof_hdr_t *), M_DTRACEIOC, M_WAITOK);
-		*hdr = malloc(sizeof(dof_hdr_t), M_DTRACEIOC, M_WAITOK);
+		*hdr = malloc(sizeof(dof_hdr_t), M_DTRACEIOC, M_WAITOK | M_ZERO);
+
+		*t_datap = hdr;
+		*t_comp = _IOC_NEWTYPE(com, dof_hdr_t *);
 
 		for (i = 0; i < DOF_ID_SIZE; i++)
 			CP((**hdr_c), (**hdr), dofh_ident[i]);
@@ -265,6 +280,27 @@ cheriabi_dtrace_ioctl_translate_in(u_long com,
 		CP((**hdr_c), (**hdr), dofh_loadsz);
 		CP((**hdr_c), (**hdr), dofh_filesz);
 		CP((**hdr_c), (**hdr), dofh_pad);
+		break;
+	}
+	case DTRACEIOC_EPROBE_C: {
+		size_t i;
+		dtrace_eprobedesc_t **epdesc;
+		dtrace_eprobedesc_c_t **epdesc_c = data;
+
+		error = 0;
+		epdesc = malloc(sizeof(dtrace_eprobedesc_t *), M_DTRACEIOC, M_WAITOK);
+		*epdesc = malloc(sizeof(dtrace_eprobedesc_t), M_DTRACEIOC, M_WAITOK | M_ZERO);
+
+		*t_datap = epdesc;
+		*t_comp = _IOC_NEWTYPE(com, dtrace_eprobedesc_t *);
+
+		CP((**epdesc), (**epdesc_c), dtepd_epid);
+		CP((**epdesc), (**epdesc_c), dtepd_probeid);
+		CP((**epdesc), (**epdesc_c), dtepd_size);
+		CP((**epdesc), (**epdesc_c), dtepd_nrecs);
+
+		for (i = 0; i < (*epdesc)->dtepd_nrecs; i++)
+			CP((**epdesc), (**epdesc_c), dtepd_rec[i]);
 		break;
 	}
 	default:
@@ -302,6 +338,7 @@ cheriabi_dtrace_ioctl_translate_out(u_long com,
 		break;
 	}
 	case DTRACEIOC_AGGDESC_C: {
+		size_t i;
 		dtrace_aggdesc_t **paggdesc = t_data;
 		dtrace_aggdesc_c_t **paggdesc_c = data;
 
@@ -312,9 +349,12 @@ cheriabi_dtrace_ioctl_translate_out(u_long com,
 		CP((**paggdesc), (**paggdesc_c), dtagd_size);
 		CP((**paggdesc), (**paggdesc_c), dtagd_nrecs);
 		CP((**paggdesc), (**paggdesc_c), dtagd_pad);
-		CP((**paggdesc), (**paggdesc_c), dtagd_rec);
+
+		for (i = 0; i < (*paggdesc)->dtagd_nrecs; i++)
+			CP((**paggdesc), (**paggdesc_c), dtagd_rec[i]);
 
 		free(*paggdesc_c, M_DTRACEIOC);
+		break;
 	}
 	case DTRACEIOC_FORMAT_C: {
 		size_t i;
@@ -346,6 +386,21 @@ cheriabi_dtrace_ioctl_translate_out(u_long com,
 
 		for (i = 0; i < DOF_ID_SIZE; i++)
 			CP((**hdr), (**hdr_c), dofh_ident[i]);
+		break;
+	}
+	case DTRACEIOC_EPROBE_C: {
+		size_t i;
+		dtrace_eprobedesc_t **epdesc = t_data;
+		dtrace_eprobedesc_c_t **epdesc_c = data;
+
+		CP((**epdesc), (**epdesc_c), dtepd_epid);
+		CP((**epdesc), (**epdesc_c), dtepd_probeid);
+		CP((**epdesc), (**epdesc_c), dtepd_size);
+		CP((**epdesc), (**epdesc_c), dtepd_nrecs);
+
+		for (i = 0; i < (*epdesc)->dtepd_nrecs; i++)
+			CP((**epdesc), (**epdesc_c), dtepd_rec[i]);
+		break;
 	}
 	default:
 		error = EINVAL;

@@ -42,9 +42,6 @@
 #include <sys/rman.h>
 #include <sys/bus_dma.h>
 #include <sys/mdioctl.h>
-#ifdef CHERIABI_CDDL
-#include <sys/dtrace.h>
-#endif
 
 #include <net/if.h>
 #include <net/if_media.h>

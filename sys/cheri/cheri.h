@@ -180,6 +180,7 @@ void	cheri_trapframe_to_cheriframe(struct trapframe *frame,
  */
 struct pcb;
 struct sysarch_args;
+struct proc;
 void	cheri_sealcap_copy(struct proc *dst, struct proc *src);
 void	cheri_signal_copy(struct pcb *dst, struct pcb *src);
 void	cheri_stack_copy(struct pcb *dst, struct pcb *src);
