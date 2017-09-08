@@ -11,6 +11,9 @@ INCS=	sysdecode.h
 CFLAGS+= -I${.OBJDIR}
 CFLAGS+= -I${SRCTOP}/sys
 CFLAGS+= -I${SRCTOP}/libexec/rtld-elf
+CFLAGS+= -I${SRCTOP}/sys/cddl/contrib/opensolaris/uts/common/sys
+
+WANT_CHERI=	yes
 
 MAN=	sysdecode.3 \
 	sysdecode_abi_to_freebsd_errno.3 \
@@ -117,6 +120,9 @@ CFLAGS.gcc+=	${CFLAGS.gcc.${.IMPSRC}}
 # Work around packed struct in cissio.h
 CFLAGS.ioctl.c+=	-Wno-error-cheri-capability-misuse
 .endif
+
+CFLAGS.ioctl.c+=	-I${SRCTOP}/sys/cddl/contrib/opensolaris/uts/common/sys
+CFLAGS.ioctl.c+=	--target=cheri-unknown-freebsd
 
 DEPENDOBJS+=	tables.h
 tables.h: mktables
