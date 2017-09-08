@@ -1,0 +1,34 @@
+# CHERI_PURECAP_MALTA64 -- 64-bit purecap ABI kernel config for MALTA boards + 256-bit CHERI
+#
+# $FreeBSD$
+ 
+ident		CHERI_PURECAP_MALTA64
+
+include		"std.MALTA"
+include		"std.CHERI"
+ 
+hints		"CHERI_MALTA64.hints"  #Default places to look for devices.
+
+machine		mips mips64	# Malta supports both, so it isn't in std.malta
+
+nomakeoptions 	ARCH_FLAGS
+makeoptions	ARCH_PIC_FLAGS="-fpic"
+makeoptions	ARCH_FLAGS="-target cheri-unknown-freebsd -march=mips64 -mabi=purecap"
+makeoptions 	KERNLOADADDR=0xffffffff80100000
+
+options 	KTRACE
+
+#
+# Features required for CHERI CPU and CheriBSD support.
+#
+options 	KSTACK_LARGE_PAGE
+options 	TMPFS
+
+#
+# Qemu-CHERI tracing is permitted per thread, not just globally.
+#
+options 	CPU_QEMU_MALTA
+
+# Qemu doesn't yet support these
+nooptions	CPU_CHERI_HW_CCALL_CHECKS
+nooptions	CPU_CHERI_HW_CCLEAR
