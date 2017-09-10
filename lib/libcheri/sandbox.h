@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012-2015 Robert N. M. Watson
+ * Copyright (c) 2012-2015, 2017 Robert N. M. Watson
  * Copyright (c) 2015 SRI International
  * All rights reserved.
  *
@@ -59,10 +59,10 @@ struct sandbox_metadata {
 	struct cheri_object	sbm_system_object;	/* Offset: 32 */
 #if __has_feature(capabilities)
 	__capability vm_offset_t	*sbm_vtable;	/* Cap-offset: 2 */
-	__capability void	*sbm_stackcap;		/* Cap-offset: 3 */
+	__capability void	*sbm_stackcsp;		/* Cap-offset: 3 */
 #else
 	struct chericap	sbm_vtable;
-	struct chericap	sbm_stackcap;
+	struct chericap sbm_stackcsp;
 #endif
 };
 

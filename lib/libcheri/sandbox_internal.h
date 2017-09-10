@@ -121,6 +121,7 @@ sandbox_object {
 	 * Stack capability that will also be installed in the object.
 	 */
 	__capability void	*sbo_stackcap;
+	__capability void	*sbo_stackcsp;
 
 	/*
 	 * Sandbox statistics.

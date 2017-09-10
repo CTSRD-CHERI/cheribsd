@@ -1,5 +1,5 @@
 #-
-# Copyright (c) 2012-2015 Robert N. M. Watson
+# Copyright (c) 2012-2017 Robert N. M. Watson
 # All rights reserved.
 #
 # This software was developed by SRI International and the University of
@@ -81,7 +81,7 @@ cheri_invoke:
 	# general-purpose and capability registers as possible.
 	#
 	# 2. Produce a value for $idc that bundles these up suitable to
-	# bootstrap trestoration.  This will save the original $idc, $csp,
+	# bootstrap trestoration.  This will save the original $idc, $c11,
 	# $sp, and $c0.
 	#
 	# Then after CReturn, reverse these steps by first unwrapping $idc,

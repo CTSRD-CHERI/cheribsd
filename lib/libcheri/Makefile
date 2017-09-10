@@ -11,16 +11,17 @@ SRCS=	cheri_enter.c			\
 	cheri_system.c			\
 	cheri_type.c			\
 	error.cc			\
-	libcheri_classes.S		\
 	sandbox.c			\
 	sandbox_elf.c			\
 	sandbox_loader.c		\
 	sandbox_methods.c		\
 
 .if defined(LIBCHERI)
-SRCS+=	cheri_invoke_cabi.S
+SRCS+=	cheri_invoke_cabi.S		\
+	libcheri_classes_cabi.S
 .else
-SRCS+=	cheri_invoke_hybrid.S
+SRCS+=	cheri_invoke_hybrid.S		\
+	libcheri_classes_hybrid.S
 .endif
 
 INCS=	cheri_class.h			\
@@ -53,7 +54,13 @@ MAN=	cheri_invoke.3			\
 NEED_CHERI=	hybrid
 .endif
 
-CLEANFILES=	cheri_classes.o cheri_invoke.o
+.if defined(LIBCHERI)
+CLEANFILES=	cheri_invoke_cabi.o		\
+		libcheri_classes_cabi.o
+.else
+CLEANFILES=	cheri_invoke_hybrid.o		\
+		libcheri_classes_hybrid.o
+.endif
 
 NO_WERROR=
 
