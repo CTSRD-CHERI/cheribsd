@@ -91,7 +91,8 @@ NESTED_NOPROFILE(__cerror, CALLFRAME_SIZ, ra)
 	clc		$c17, zero, CALLFRAME_CRA($csp)
 	clc		$csp, zero, CALLFRAME_CSP($csp)
 	clc		$cgp, zero, CALLFRAME_CGP($csp)
-	daddiu		t0, zero, -CALLFRAME_SIZ
+
+	daddiu		t0, zero, CALLFRAME_SIZ
 	cincoffset	$csp, $csp, t0
 
 	li		v0, -1
