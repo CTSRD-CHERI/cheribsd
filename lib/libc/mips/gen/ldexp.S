@@ -77,7 +77,11 @@ LEAF(ldexp)
 	ble	t1, zero, 4f		# underflow?
 	mtc1	v0, $f1			# save MSW of result
 	mtc1	t3, $f0			# save LSW of result
+#ifdef __CHERI_PURE_CAPABILITY__
+	cjr	$c17
+#else
 	j	ra
+#endif
 1:
 	sll	t2, v1, 32 - 20		# get x fraction
 	srl	t2, t2, 32 - 20
@@ -149,7 +153,11 @@ LEAF(ldexp)
 	or	t0, t0, t2
 	mtc1	t0, $f1			# save MSW of result
 	mtc1	t3, $f0			# save LSW of result
+#ifdef __CHERI_PURE_CAPABILITY__
+	cjr	$c17
+#else
 	j	ra
+#endif
 4:
 	li	v0, 0x80000000
 	ble	t1, -52, 7f		# is result too small for denorm?
@@ -177,7 +185,11 @@ LEAF(ldexp)
 	bge	v1, zero, 1f		# should result be negative?
 	neg.d	$f0, $f0		# negate result
 1:
+#ifdef __CHERI_PURE_CAPABILITY__
+	cjr	$c17
+#else
 	j	ra
+#endif
 2:
 	mtc1	zero, $f1		# exponent and upper fraction
 	addu	t1, t1, 20		# compute amount to shift right by
@@ -196,14 +208,22 @@ LEAF(ldexp)
 	bge	v1, zero, 1f		# is result negative?
 	neg.d	$f0, $f0		# negate result
 1:
+#ifdef __CHERI_PURE_CAPABILITY__
+	cjr	$c17
+#else
 	j	ra
+#endif
 7:
 	mtc1	zero, $f0		# result is zero
 	mtc1	zero, $f1
 	beq	t0, zero, 1f		# is result positive?
 	neg.d	$f0, $f0		# negate result
 1:
+#ifdef __CHERI_PURE_CAPABILITY__
+	cjr	$c17
+#else
 	j	ra
+#endif
 8:
 	li	t1, 0x7ff00000		# result is infinity (MSW)
 	mtc1	t1, $f1	
@@ -212,8 +232,16 @@ LEAF(ldexp)
 	neg.d	$f0, $f0		# result is negative infinity
 1:
 	add.d	$f0, $f0		# cause overflow faults if enabled
+#ifdef __CHERI_PURE_CAPABILITY__
+	cjr	$c17
+#else
 	j	ra
+#endif
 9:
 	mov.d	$f0, $f12		# yes, result is just x
+#ifdef __CHERI_PURE_CAPABILITY__
+	cjr	$c17
+#else
 	j	ra
+#endif
 END(ldexp)
