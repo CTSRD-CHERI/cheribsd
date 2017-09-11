@@ -76,21 +76,15 @@ NESTED_NOPROFILE(__cerror, CALLFRAME_SIZ, ra)
 	daddiu		t0, zero, -CALLFRAME_SIZ
 	cincoffset	$csp, $csp, t0
 
-	csc		$cgp, zero, CALLFRAME_CGP($csp)
-	csc		$csp, zero, CALLFRAME_CSP($csp)
 	csc		$c17, zero, CALLFRAME_CRA($csp)
 	csd		v0, zero, CALLFRAME_S0($csp)	# save errno ptr
-	cmove		$cfp, $csp
 
 	PIC_CALL(__error)	# locate address of errno
 
-	cmove		$csp, $cfp
 	cld		t0, zero, CALLFRAME_S0($csp)	# reload saved errno ptr
 	csw		t0, zero, 0($c3)		# save in errno
 
 	clc		$c17, zero, CALLFRAME_CRA($csp)
-	clc		$csp, zero, CALLFRAME_CSP($csp)
-	clc		$cgp, zero, CALLFRAME_CGP($csp)
 
 	daddiu		t0, zero, CALLFRAME_SIZ
 	cincoffset	$csp, $csp, t0

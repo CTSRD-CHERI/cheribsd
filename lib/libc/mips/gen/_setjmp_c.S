@@ -157,8 +157,6 @@ NESTED(_longjmp, LONGJMP_FRAME_SIZE, ra)
 	 * pointer, in the pure-capability ABI, unlike in the MIPS ABI where
 	 * they are in $a1 and $a0 respectively.
 	 */
-	csc		$cgp, zero, CALLFRAME_CGP($csp)
-	csc		$csp, zero, CALLFRAME_CSP($csp)
 	csc		$c17, zero, CALLFRAME_CRA($csp)
 	csd		a0, zero, CALLFRAME_S0($csp)	# save return value
 	csc		$c3, zero, CALLFRAME_SIZ($csp)

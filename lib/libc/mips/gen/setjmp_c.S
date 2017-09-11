@@ -72,11 +72,8 @@ NESTED(setjmp, SETJMP_FRAME_SIZE, ra)
 	dli		t0, -SETJMP_FRAME_SIZE	# allocate stack frame
 	cincoffset	$csp, $csp, t0
 
-	csc		$cgp, zero, CALLFRAME_CGP($csp)
-	csc		$csp, zero, CALLFRAME_CSP($csp)
 	csc		$c17, zero, CALLFRAME_CRA($csp)
 	csc		$c3, zero, CALLFRAME_SIZ($csp)	# store env
-	cmove		$cfp, $csp			# Save over sigprocmask
 
 	li		t0, (SZREG * 96)
 	csetbounds	$c3, $c3, t0
@@ -88,11 +85,8 @@ NESTED(setjmp, SETJMP_FRAME_SIZE, ra)
 	li		a0, 1				# SIG_SETBLOCK
 	PIC_CALL(__cheriabi_sigprocmask)			# get current signal mask
 
-	cmove		$csp, $cfp
-
 	clc		$c3, zero, CALLFRAME_SIZ($csp)	# restore env pointer
 	clc		$c17, zero, CALLFRAME_CRA($csp)	# restore return cap
-	clc		$cgp, zero, CALLFRAME_CGP($csp)
 
 	dli		t0, SETJMP_FRAME_SIZE		# pop stack frame
 	cincoffset	$csp, $csp, t0
@@ -184,13 +178,9 @@ NESTED(longjmp, LONGJMP_FRAME_SIZE, ra)
 	 * Prepare a proper stack frame so that we can call
 	 * __cheriabi_sigprocmask().
 	 */
-	csc		$cgp, zero, CALLFRAME_CGP($csp)
-	csc		$csp, zero, CALLFRAME_CSP($csp)
 	csc		$c17, zero, CALLFRAME_CRA($csp)
 	csd		a0, zero, CALLFRAME_S0($csp)
 	csc		$c3, zero, CALLFRAME_SIZ($csp)
-
-	cmove		$cfp, $csp
 
 	cld		v0, zero, (_JB_MAGIC  * SZREG)($c3)
 	REG_LI		t0, _JB_MAGIC_SETJMP
@@ -203,8 +193,6 @@ NESTED(longjmp, LONGJMP_FRAME_SIZE, ra)
 	cfromptr	$c4, $c3, zero			# oset == NULL
 	li		a0, 3				# SIG_SETMASK
 	PIC_CALL(__cheriabi_sigprocmask)		# set current signal mask
-
-	cmove		$csp, $cfp
 
 	clc		$c3, zero, CALLFRAME_SIZ($csp)
 	cld		a0, zero, CALLFRAME_S0($csp)	# restore return value

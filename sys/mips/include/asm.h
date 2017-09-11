@@ -322,11 +322,9 @@ _C_LABEL(x):
  *
  * XXX-BD: This is unstable and will certainly change.
  */
-#define	CALLFRAME_SIZ	(4*(_MIPS_SZCAP / 8))
-#define	CALLFRAME_CGP	(0*(_MIPS_SZCAP / 8))
-#define	CALLFRAME_CSP	(1*(_MIPS_SZCAP / 8))
-#define	CALLFRAME_CRA	(2*(_MIPS_SZCAP / 8))
-#define	CALLFRAME_S0	(3*(_MIPS_SZCAP / 8))
+#define	CALLFRAME_SIZ	(2*(_MIPS_SZCAP / 8))
+#define	CALLFRAME_CRA	(0*(_MIPS_SZCAP / 8))
+#define	CALLFRAME_S0	(1*(_MIPS_SZCAP / 8))
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
 
 /*
