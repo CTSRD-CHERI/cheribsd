@@ -48,7 +48,8 @@ local int gz_load(state, buf, len, have)
     *have = 0;
     do {
         /* XXX CHERI: Need cread() callgate in sandbox */
-        ret = read(state->fd, cheri_cap_to_ptr(buf) + *have, len - *have);
+        ret = read(state->fd, cheri_cap_to_ptr(buf, len - *have) + *have,
+                   len - *have);
         if (ret <= 0)
             break;
         *have += ret;
@@ -112,13 +113,13 @@ local int gz_look(state)
     /* allocate read buffers and inflate memory */
     if (state->size == 0) {
         /* allocate buffers */
-        state->in = cheri_ptr(malloc(state->want), state->want);
-        state->out = cheri_ptr(malloc(state->want << 1), state->want << 1);
+        state->in = malloc_c(state->want);
+        state->out = malloc_c(state->want << 1);
         if (state->in == NULL || state->out == NULL) {
             if (state->out != NULL)
-                free(cheri_cap_to_ptr(state->out));
+                free_c(state->out);
             if (state->in != NULL)
-                free(cheri_cap_to_ptr(state->in));
+                free_c(state->in);
             gz_error(state, Z_MEM_ERROR, "out of memory");
             return -1;
         }
@@ -131,8 +132,8 @@ local int gz_look(state)
         state->strm.avail_in = 0;
         state->strm.next_in = Z_NULL;
         if (inflateInit2(cheri_ptr_to_bounded_cap(&(state->strm)), 15 + 16) != Z_OK) {    /* gunzip */
-            free(cheri_cap_to_ptr(state->out));
-            free(cheri_cap_to_ptr(state->in));
+            free_c(state->out);
+            free_c(state->in);
             state->size = 0;
             gz_error(state, Z_MEM_ERROR, "out of memory");
             return -1;
@@ -605,8 +606,8 @@ int ZEXPORT gzclose_r(file)
     /* free memory and close file */
     if (state->size) {
         inflateEnd(cheri_ptr_to_bounded_cap(&(state->strm)));
-        free(cheri_cap_to_ptr(state->out));
-        free(cheri_cap_to_ptr(state->in));
+        free_c(state->out);
+        free_c(state->in);
     }
     err = state->err == Z_BUF_ERROR ? Z_BUF_ERROR : Z_OK;
     gz_error(state, Z_OK, NULL);

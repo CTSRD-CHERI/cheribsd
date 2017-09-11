@@ -169,7 +169,7 @@ int windowBits;
     if (windowBits && (windowBits < 8 || windowBits > 15))
         return Z_STREAM_ERROR;
     if (state->window != Z_NULL && state->wbits != (unsigned)windowBits) {
-        ZFREE(strm, cheri_cap_to_ptr(state->window));
+        ZFREE(strm, cheri_cap_to_ptr(state->window, 0));
         state->window = Z_NULL;
     }
 
@@ -1263,7 +1263,7 @@ z_streamp strm;
         return Z_STREAM_ERROR;
     state = (struct inflate_state FAR *)strm->state;
     if (state->window != Z_NULL)
-        ZFREE(strm, cheri_cap_to_ptr(state->window));
+        ZFREE(strm, cheri_cap_to_ptr(state->window, 0));
     ZFREE(strm, strm->state);
     strm->state = Z_NULL;
     Tracev((stderr, "inflate: end\n"));

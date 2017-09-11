@@ -207,7 +207,7 @@ tcpdump_sandbox_destroy(struct tcpdump_sandbox *sb)
 		for (i = 0; i < sb->tds_num_proto_sandboxes; i++)
 			tcpdump_sandbox_destroy(sb->tds_proto_sandboxes[i]);
 		free(sb->tds_proto_sandboxes);
-		free(cheri_cap_to_ptr(sb->tds_proto_sandbox_objects));
+		free_c(sb->tds_proto_sandbox_objects);
 	}
 	sandbox_object_destroy(sb->tds_sandbox_object);
 	free(sb);

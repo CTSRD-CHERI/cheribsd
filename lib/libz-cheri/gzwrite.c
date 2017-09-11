@@ -41,7 +41,7 @@ local int gz_init(state)
     z_streamp strm = cheri_ptr_to_bounded_cap(&(state->strm));
 
     /* allocate input buffer */
-    state->in = cheri_ptr(malloc(state->want), state->want);
+    state->in = malloc_c(state->want);
     if (state->in == NULL) {
         gz_error(state, Z_MEM_ERROR, "out of memory");
         return -1;
@@ -50,9 +50,9 @@ local int gz_init(state)
     /* only need output buffer and deflate state if compressing */
     if (!state->direct) {
         /* allocate output buffer */
-        state->out = cheri_ptr(malloc(state->want), state->want);
+        state->out = malloc_c(state->want);
         if (state->out == NULL) {
-            free(cheri_cap_to_ptr(state->in));
+            free_c(state->in);
             gz_error(state, Z_MEM_ERROR, "out of memory");
             return -1;
         }
@@ -64,8 +64,8 @@ local int gz_init(state)
         ret = deflateInit2(strm, state->level, Z_DEFLATED,
                            MAX_WBITS + 16, DEF_MEM_LEVEL, state->strategy);
         if (ret != Z_OK) {
-            free(cheri_cap_to_ptr(state->out));
-            free(cheri_cap_to_ptr(state->in));
+            free_c(state->out);
+            free_c(state->in);
             gz_error(state, Z_MEM_ERROR, "out of memory");
             return -1;
         }
@@ -374,10 +374,10 @@ int ZEXPORTVA gzvprintf(gzFile file, const char *format, va_list va)
 #  endif
 #else
 #  ifdef HAS_vsnprintf_void
-    (void)vsnprintf(cheri_cap_to_ptr(state->in), size, format, va);
-    len = strlen(cheri_cap_to_ptr(state->in));
+    (void)vsnprintf(cheri_cap_to_ptr(state->in, size), size, format, va);
+    len = strlen(cheri_cap_to_ptr(state->in, 0));
 #  else
-    len = vsnprintf(cheri_cap_to_ptr(state->in), size, format, va);
+    len = vsnprintf(cheri_cap_to_ptr(state->in, size), size, format, va);
 #  endif
 #endif
 
@@ -587,9 +587,9 @@ int ZEXPORT gzclose_w(file)
     if (state->size) {
         if (!state->direct) {
             (void)deflateEnd(cheri_ptr_to_bounded_cap(&(state->strm)));
-            free(cheri_cap_to_ptr(state->out));
+            free_c(state->out);
         }
-        free(cheri_cap_to_ptr(state->in));
+        free_c(state->in);
     }
     gz_error(state, Z_OK, NULL);
     free(state->path);

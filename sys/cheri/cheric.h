@@ -163,22 +163,33 @@ cheri_zerocap(void)
 	return (void * __capability)0;
 }
 
+static __inline uint64_t
+cheri_bytes_remaining(const void * __capability cap)
+{
+	if (cheri_getoffset(cap) >= cheri_getlen(cap))
+		return 0;
+	return cheri_getlen(cap) - cheri_getoffset(cap);
+}
+
 /*
  * Turn a pointer into a capability with the bounds set to
  * sizeof(*ptr)
  */
 #define cheri_ptr_to_bounded_cap(ptr)	__extension__({	\
-	typedef typeof(ptr) __ptr_type;			\
+	typedef __typeof__(ptr) __ptr_type;		\
 	typedef __capability __ptr_type __cap_type;	\
 	(__cap_type)cheri_ptr((ptr), sizeof(*(ptr)));	\
 	})
 /*
- * XXXAR: Calling code should also check the capability bounds. Maybe we should
- * add a min_size parameter to this macro?
+ * Convert a capability to a pointer. Returns NULL if there are less than
+ * min_size accessible bytes remiaing in cap.
  */
-#define cheri_cap_to_ptr(cap)	__extension__({		\
-        typedef typeof(*(cap)) __underlying_type;	\
-        (__cheri_cast __underlying_type*)(cap); })
+#define cheri_cap_to_ptr(cap, min_size)	__extension__({			\
+	typedef __typeof__(*(cap)) __underlying_type;			\
+	__underlying_type* __result = 0;				\
+	if (cheri_bytes_remaining(cap) >= (uint64_t)min_size) {			\
+		__result = (__cheri_cast __underlying_type*)(cap);	\
+	} __result; })
 
 #define CHERI_PRINT_PTR(ptr)						\
 	printf("%s: " #ptr " b:%016jx l:%016zx o:%jx\n", __func__,	\
