@@ -246,8 +246,7 @@ tds_select_ipv4(int dlt, size_t len, __capability const u_char *data,
 {
 	const struct ether_header *eh;
 
-	/* XXXAR: check capability bounds? */
-	eh = (struct ether_header *)cheri_cap_to_ptr(data);
+	eh = cheri_cap_to_typed_ptr(data, const struct ether_header);
 
 	if (dlt != DLT_EN10MB ||
 	    len < sizeof(struct ether_header) + sizeof(struct ip))
@@ -268,9 +267,8 @@ tds_select_ipv4_fromlocal(int dlt, size_t len, __capability const u_char *data,
 	if (!tds_select_ipv4(dlt, len, data, sd))
 		return (0);
 
-	/* XXXAR: check capability bounds? */
-	iphdr = (const struct ip *)cheri_cap_to_ptr(data +
-	    sizeof(struct ether_header));
+	iphdr = cheri_cap_to_typed_ptr(data + sizeof(struct ether_header),
+	     const struct ip);
 	if ((EXTRACT_32BITS(&iphdr->ip_src) & g_mask) == g_localnet)
 		return (1);
 
@@ -284,16 +282,15 @@ tds_select_ipv4_hash(int dlt, size_t len, __capability const u_char *data,
 {
 	int mod;
 	const u_char *ipaddr;
-	struct ip *iphdr;
+	const struct ip *iphdr;
 
 	if (!tds_select_ipv4(dlt, len, data, sd))
 		return (0);
 
 	mod = (int)sd;
 
-	/* XXXAR: check capability bounds? */
-	iphdr = (struct ip *)cheri_cap_to_ptr(data +
-	    sizeof(struct ether_header));
+	iphdr = cheri_cap_to_typed_ptr(data + sizeof(struct ether_header),
+	    const struct ip);
 	ipaddr = (const u_char *)&(iphdr->ip_src);
 	if ((ipaddr[0] + ipaddr[1] + ipaddr[2] + ipaddr[3]) % g_sandboxes == mod)
 		return (1);
@@ -422,13 +419,12 @@ tcpdump_sandbox_find(struct tcpdump_sandbox_list *list, int dlt, size_t len,
 {
 	struct tcpdump_sandbox *sb;
 	const u_char *ipaddr;
-	struct ip *iphdr;
+	const struct ip *iphdr;
 	int ip_box;
 
 	if (tds_select_ipv4(dlt, len, data, NULL)) {
-	    /* XXXAR: bounds of capability? */
-	    iphdr = (struct ip *)cheri_cap_to_ptr(data +
-	        sizeof(struct ether_header));
+	    iphdr = cheri_cap_to_typed_ptr(data + sizeof(struct ether_header),
+		const struct ip);
 	    ipaddr = (const u_char *)&(iphdr->ip_src);
 	    ip_box = (ipaddr[0] + ipaddr[1] + ipaddr[2] + ipaddr[3]) % g_sandboxes;
 	    sb = ip_sandboxes[ip_box];

@@ -95,7 +95,8 @@ libpng_sb_userfn_handler(struct cheri_object system_object __unused,
     __capability void *c5 __unused, __capability void *c6 __unused,
     __capability void *c7 __unused)
 {
-	struct sb_png_struct *psp = (struct sb_png_struct *)cheri_cap_to_ptr(void_cpsp, sizeof(*psp));
+	struct sb_png_struct *psp = cheri_cap_to_typed_ptr(void_cpsp,
+		    struct sb_png_struct);
 	void* c4_ptr = cheri_cap_to_ptr(c4, 0); /* XXXAR: what is min_size? */
 #if 0
 	printf("%s:  with method %ju\n", __func__, (intmax_t)methodnum);
