@@ -65,7 +65,6 @@
  *    Or for the pure-capability ABI:
  *
  *    $csp contains a pointer to the top of the stack; capability aligned
- *    $cfp contains a pointer to the top of the stack; capability aligned
  *
  *    $a0-$a7 contain user arguments
  *    $v0, $v1 contain user return values
@@ -116,7 +115,6 @@ __cheri_ ## class ## _entry:						\
 	 */								\
 	dla	$t0, __cheri_enter_stack_csp;				\
 	clc	$csp, $t0, 0($c12);					\
-	cmove	$cfp, $csp;						\
 									\
 	/*								\
 	 * Set up global pointer.					\

@@ -58,7 +58,6 @@
 #    $c0, $csp will be set up to match the class
 #    $csp will have have the global bit cleared, and point at an in-sandbox
 #    stack
-#    $cfp will point to the same place as $csp
 #
 # __invoke_vector will jump to the 'invoke' symbol and arrange a CReturn when
 # that function returns.  This code also implements 'abort' and '_exit'
@@ -115,7 +114,6 @@ __invoke_vector:
 	# XXXRW: Should this now be setting $cgp?
 	#
 	dla	$gp, _gp
-	cmove	$cfp, $csp # moved from above to avoid delay caused by slow cgetlen on 128-bit cheri
 
 	#
 	# Skip vtable dispatch if $v0 is -1

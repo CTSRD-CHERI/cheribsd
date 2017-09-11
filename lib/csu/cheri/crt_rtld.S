@@ -62,7 +62,6 @@ __rtld_vector:
 	# by the runtime.
 	#
 	clc	$csp, $t0, 32 + 3*CHERICAP_SIZE($c26)
-	cmove	$cfp, $csp
 
 	#
 	# Install $idc as $c0.  From here on out, we can do MIPS fetches and

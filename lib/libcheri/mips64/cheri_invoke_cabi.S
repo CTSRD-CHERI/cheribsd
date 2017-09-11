@@ -50,7 +50,7 @@
 # $c1, $c2	Invoked capabilities
 # $c3..$c10	Argument capabilities
 # $c11..$c16	Caller-save capabilities
-# $c17..$c24	Callee-save capabilities
+# $c17..$c25	Callee-save capabilities
 # $c26		IDC
 #
 # Calling conventions implemented around CCall:
@@ -59,7 +59,7 @@
 # $c2		Invoked data capability
 # $c3..$c10	Argument capabilities; $c3 as return capability
 # $c11..$c16	n/a
-# $c17..$c24	n/a
+# $c17..$c25	n/a
 # $c26		IDC
 #
 # XXXRW: Worries/TODO:
@@ -125,7 +125,7 @@ cheri_invoke_save_regs:
 	# should be doing this?
 	#
 cheri_invoke_save_caps:
-	dli	$t0, -8*CHERICAP_SIZE
+	dli	$t0, -9*CHERICAP_SIZE
 	cincoffset	$csp, $csp, $t0
 	csc	$c17, $zero, 0($csp)
 	csc	$c18, $zero, CHERICAP_SIZE($csp)
@@ -135,6 +135,7 @@ cheri_invoke_save_caps:
 	csc	$c22, $zero, 5*CHERICAP_SIZE($csp)
 	csc	$c23, $zero, 6*CHERICAP_SIZE($csp)
 	csc	$c24, $zero, 7*CHERICAP_SIZE($csp)
+	csc	$c25, $zero, 8*CHERICAP_SIZE($csp)
 
 	#
 	# Prepare $idc to be saved (and restored) by CCall; don't need to seal
@@ -193,8 +194,9 @@ cheri_invoke_restore_caps:
 	clc	$c22, $zero, 5*CHERICAP_SIZE($csp)
 	clc	$c23, $zero, 6*CHERICAP_SIZE($csp)
 	clc	$c24, $zero, 7*CHERICAP_SIZE($csp)
+	clc	$c25, $zero, 8*CHERICAP_SIZE($csp)
 	bnez	$a0, set_cheri_errno
-	dli	$t0, 8*CHERICAP_SIZE
+	dli	$t0, 9*CHERICAP_SIZE
 	cincoffset	$csp, $csp, $t0
 
 	#
