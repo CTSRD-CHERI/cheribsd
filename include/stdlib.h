@@ -333,6 +333,11 @@ long double
 #define	calloc_c(num, size) cheri_ptr(calloc(num, size), num * size)
 #define	realloc_c(cap, size) cheri_ptr(realloc(cheri_cap_to_ptr(cap, 0), size))
 #define	free_c(cap) free(cheri_cap_to_ptr(cap, 0))
+#else
+#define	malloc_c(size) malloc(size)
+#define	calloc_c(num, size) calloc(num, size)
+#define	realloc_c(cap, size) realloc(cap, size)
+#define	free_c(cap) free(cap)
 #endif
 #endif
 
