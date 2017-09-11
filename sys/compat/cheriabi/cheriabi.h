@@ -66,7 +66,8 @@ cheriabi_cap_to_ptr(caddr_t *ptrp, void * __capability cap, size_t reqlen,
 	if (!cheri_gettag(cap)) {
 		if (!may_be_null)
 			return (EFAULT);
-		*ptrp = (__cheri_cast void *)cap;
+		/* Have to cast through vaddr_t first: CTSRD-CHERI/clang#152 */
+		*ptrp = (caddr_t)(vaddr_t)cap;
 		if (*ptrp != NULL)
 			return (EFAULT);
 	} else {
@@ -96,8 +97,8 @@ cheriabi_cap_to_ptr(caddr_t *ptrp, void * __capability cap, size_t reqlen,
 			    (void *)(vaddr_t)cap, length, reqlen);
 			return (EPROT);
 		}
-
-		*ptrp = (__cheri_cast void *)cap;
+		/* Have to cast through vaddr_t first: CTSRD-CHERI/clang#152 */
+		*ptrp = (caddr_t)(vaddr_t)cap;
 	}
 	return (0);
 }
