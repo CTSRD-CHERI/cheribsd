@@ -49,7 +49,7 @@
 
 #define	CHERI_SYSTEM_OBJECT_FINI(x)					\
 	(x)->__cheri_system_object_field_c0 = NULL;			\
-	free((__cheri_cast intptr_t *)(x)->__cheri_system_object_vtable); \
+	free_c((x)->__cheri_system_object_vtable); 			\
 	(x)->__cheri_system_object_vtable = NULL
 
 /*
