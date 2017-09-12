@@ -254,6 +254,7 @@ MAN=	aac.4 \
 	led.4 \
 	lge.4 \
 	${_linux.4} \
+	liquidio.4 \
 	lm75.4 \
 	lmc.4 \
 	lo.4 \
