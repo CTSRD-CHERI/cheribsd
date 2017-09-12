@@ -73,6 +73,7 @@ static int	 opt_c;		/* Show connected sockets */
 static int	 opt_j;		/* Show specified jail */
 static int	 opt_L;		/* Don't show IPv4 or IPv6 loopback sockets */
 static int	 opt_l;		/* Show listening sockets */
+static int	 opt_S;		/* Show protocol stack if applicable */
 static int	 opt_s;		/* Show protocol state if applicable */
 static int	 opt_u;		/* Show Unix domain sockets */
 static int	 opt_v;		/* Verbose mode */
@@ -107,6 +108,7 @@ struct sock {
 	int proto;
 	int state;
 	const char *protoname;
+	char stack[TCP_FUNCTION_NAME_LEN_MAX];
 	struct addr *laddr;
 	struct addr *faddr;
 	struct sock *next;
@@ -699,8 +701,11 @@ gather_inet(int proto)
 		sock->laddr = laddr;
 		sock->faddr = faddr;
 		sock->vflag = xip->inp_vflag;
-		if (proto == IPPROTO_TCP)
+		if (proto == IPPROTO_TCP) {
 			sock->state = xtp->t_state;
+			memcpy(sock->stack, xtp->xt_stack,
+			    TCP_FUNCTION_NAME_LEN_MAX);
+		}
 		sock->protoname = protoname;
 		hash = (int)((uintptr_t)sock->socket % HASHSIZE);
 		sock->next = sockhash[hash];
@@ -1041,21 +1046,36 @@ displaysock(struct sock *s, int pos)
 		default:
 			abort();
 		}
-		if (first && opt_s &&
-		    (s->proto == IPPROTO_SCTP || s->proto == IPPROTO_TCP)) {
-			while (pos < 80)
-				pos += xprintf(" ");
-			switch (s->proto) {
-			case IPPROTO_SCTP:
-				pos += xprintf("%s", sctp_state(s->state));
-				break;
-			case IPPROTO_TCP:
-				if (s->state >= 0 && s->state < TCP_NSTATES)
-					pos +=
-					    xprintf("%s", tcpstates[s->state]);
-				else
-					pos += xprintf("?");
-				break;
+		if (first) {
+			if (opt_s &&
+			    (s->proto == IPPROTO_SCTP ||
+			     s->proto == IPPROTO_TCP)) {
+				while (pos < 80)
+					pos += xprintf(" ");
+				switch (s->proto) {
+				case IPPROTO_SCTP:
+					pos += xprintf("%s",
+					    sctp_state(s->state));
+					break;
+				case IPPROTO_TCP:
+					if (s->state >= 0 &&
+					    s->state < TCP_NSTATES)
+						pos +=
+						    xprintf("%s",
+						        tcpstates[s->state]);
+					else
+						pos += xprintf("?");
+					break;
+				}
+			}
+			if (opt_S && s->proto == IPPROTO_TCP) {
+				while (pos < 80)
+					pos += xprintf(" ");
+				if (opt_s)
+					while (pos < 93)
+						pos += xprintf(" ");
+				xprintf("%.*s", TCP_FUNCTION_NAME_LEN_MAX,
+				    s->stack);
 			}
 		}
 		if (laddr != NULL)
@@ -1084,6 +1104,8 @@ display(void)
 	    "LOCAL ADDRESS", "FOREIGN ADDRESS");
 	if (opt_s)
 		printf(" %-12s", "STATE");
+	if (opt_S)
+		printf(" %.*s", TCP_FUNCTION_NAME_LEN_MAX, "STACK");
 	printf("\n");
 	setpassent(1);
 	for (xf = xfiles, n = 0; n < nxfiles; ++n, ++xf) {
@@ -1154,7 +1176,7 @@ static void
 usage(void)
 {
 	fprintf(stderr,
-	    "usage: sockstat [-46cLlsu] [-j jid] [-p ports] [-P protocols]\n");
+	    "usage: sockstat [-46cLlSsu] [-j jid] [-p ports] [-P protocols]\n");
 	exit(1);
 }
 
@@ -1165,7 +1187,7 @@ main(int argc, char *argv[])
 	int o, i;
 
 	opt_j = -1;
-	while ((o = getopt(argc, argv, "46cj:Llp:P:suv")) != -1)
+	while ((o = getopt(argc, argv, "46cj:Llp:P:Ssuv")) != -1)
 		switch (o) {
 		case '4':
 			opt_4 = 1;
@@ -1190,6 +1212,9 @@ main(int argc, char *argv[])
 			break;
 		case 'P':
 			protos_defined = parse_protos(optarg);
+			break;
+		case 'S':
+			opt_S = 1;
 			break;
 		case 's':
 			opt_s = 1;
