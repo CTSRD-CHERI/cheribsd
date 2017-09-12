@@ -170,7 +170,7 @@ NESTED(_longjmp, LONGJMP_FRAME_SIZE, ra)
 	 * XXXRW: Should signal mask be restored here, as in MIPS?  That is
 	 * presumably the reason for saving/restoring $c3/$a0 around this gap.
 	 */
-	clc		$c3, sp, CALLFRAME_SIZ($csp)
+	clc		$c3, zero, CALLFRAME_SIZ($csp)
 	cld		a0, zero, CALLFRAME_S0($csp)	# restore return value
 
 	/*
