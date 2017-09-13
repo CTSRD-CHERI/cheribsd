@@ -196,7 +196,6 @@ typedef struct {
 #ifndef __CHERI_PURE_CAPABILITY__
 #define	BOUND_PTR(ptr, size)	(ptr)
 #else
-void *malloc_area;
 #define	BOUND_PTR(ptr, size)	\
     ((opt_cheri_setbounds && ptr != NULL) ? \
     cheri_csetbounds((ptr), (size)) : (ptr))
@@ -304,7 +303,7 @@ bootstrap_free(void *ptr) {
 		return;
 	}
 
-	a0idalloc(UNBOUND_PTR(ptr), false);
+	a0idalloc(ptr, false);
 }
 
 void
@@ -1246,9 +1245,6 @@ static bool
 malloc_init_hard_a0_locked() {
 	malloc_initializer = INITIALIZER;
 
-#ifdef __CHERI_PURE_CAPABILITY__
-	malloc_area = cheri_getdefault();
-#endif
 	if (config_prof) {
 		prof_boot0();
 	}
@@ -2225,9 +2221,6 @@ je_realloc(void *ptr, size_t size) {
 	size_t usize JEMALLOC_CC_SILENCE_INIT(0);
 	size_t old_usize = 0;
 
-	if (ptr != NULL)
-		ptr = UNBOUND_PTR(ptr);
-
 	if (unlikely(size == 0)) {
 		if (ptr != NULL) {
 			/* realloc(ptr, 0) is equivalent to free(ptr). */
@@ -2300,7 +2293,6 @@ JEMALLOC_EXPORT void JEMALLOC_NOTHROW
 je_free(void *ptr) {
 	UTRACE(ptr, 0, 0);
 	if (likely(ptr != NULL)) {
-		ptr = UNBOUND_PTR(ptr);
 		tsd_t *tsd = tsd_fetch();
 		check_entry_exit_locking(tsd_tsdn(tsd));
 

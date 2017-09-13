@@ -5,6 +5,29 @@
 #include "jemalloc/internal/sz.h"
 #include "jemalloc/internal/witness.h"
 
+JEMALLOC_ALWAYS_INLINE void *
+unbound_ptr(tsdn_t *tsdn, void *ptr) {
+	void *ubptr;
+
+#ifndef __CHERI_PURE_CAPABILITY__
+	ubptr = ptr;
+#else
+	rtree_ctx_t *rtree_ctx;
+	extent_t *extent;
+
+	rtree_ctx = tsd_rtree_ctx(tsdn_tsd(tsdn));
+	extent = rtree_extent_read(tsdn, &extents_rtree,
+	    rtree_ctx, (vaddr_t)ptr, true);
+	assert(extent != NULL);
+	ubptr = cheri_incoffset(extent->e_addr,
+	    (vaddr_t)ptr - (vaddr_t)extent->e_addr);
+	assert((vaddr_t)ptr == (vaddr_t)ubptr);
+	assert(cheri_getbase(ubptr) == cheri_getbase(extent->e_addr));
+	assert(cheri_getlen(ubptr) == cheri_getlen(extent->e_addr));
+#endif
+	return (ubptr);
+}
+
 JEMALLOC_ALWAYS_INLINE arena_t *
 iaalloc(tsdn_t *tsdn, const void *ptr) {
 	assert(ptr != NULL);
@@ -56,7 +79,7 @@ ipallocztm(tsdn_t *tsdn, size_t usize, size_t alignment, bool zero,
 	    WITNESS_RANK_CORE, 0);
 
 	ret = arena_palloc(tsdn, arena, usize, alignment, zero, tcache);
-	assert(ALIGNMENT_ADDR2BASE(ret, alignment) == ret);
+	assert(ALIGNMENT_ADDR2BASE(ret, alignment) == (vaddr_t)ret);
 	if (config_stats && is_internal && likely(ret != NULL)) {
 		arena_internal_add(iaalloc(tsdn, ret), isalloc(tsdn, ret));
 	}
@@ -94,7 +117,8 @@ idalloctm(tsdn_t *tsdn, void *ptr, tcache_t *tcache, alloc_ctx_t *alloc_ctx,
 	if (!is_internal && tsd_reentrancy_level_get(tsdn_tsd(tsdn)) != 0) {
 		assert(tcache == NULL);
 	}
-	arena_dalloc(tsdn, ptr, tcache, alloc_ctx, slow_path);
+	arena_dalloc(tsdn, unbound_ptr(tsdn, ptr), tcache, alloc_ctx,
+	    slow_path);
 }
 
 JEMALLOC_ALWAYS_INLINE void
