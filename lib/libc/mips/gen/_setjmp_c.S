@@ -235,6 +235,8 @@ NESTED(_longjmp, LONGJMP_FRAME_SIZE, ra)
 	clc		$c23, t1, (_JB_CHERI_C23 * _MIPS_SZCAP/8)($c3)
 	clc		$c24, t1, (_JB_CHERI_C24 * _MIPS_SZCAP/8)($c3)
 	clc		$c25, t1, (_JB_CHERI_C25 * _MIPS_SZCAP/8)($c3)
+	clc		$c4, t1, (_JB_CHERI_DDC * _MIPS_SZCAP/8)($c3)
+	csetdefault	$c4
 
 	/* Install $a0 as the return value from setjmp(). */
 	move		v0, a0
