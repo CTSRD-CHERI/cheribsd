@@ -2698,6 +2698,9 @@ dump_arch_dyn_val(struct readelf *re, GElf_Dyn *dyn)
 		case DT_MIPS_TIME_STAMP:
 			printf(" %s\n", timestamp(dyn->d_un.d_val));
 			break;
+		default:
+			printf("\n");
+			break;
 		}
 		break;
 	default:
