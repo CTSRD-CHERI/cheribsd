@@ -900,7 +900,7 @@ cryptodev_aead(
 	uio->uio_iov = &cse->iovec;
 	uio->uio_iovcnt = 1;
 	uio->uio_offset = 0;
-	uio->uio_resid = caead->len + caead->aadlen + cse->thash->hashsize;
+	uio->uio_resid = caead->aadlen + caead->len + cse->thash->hashsize;
 	uio->uio_segflg = UIO_SYSSPACE;
 	uio->uio_rw = UIO_WRITE;
 	uio->uio_td = td;
@@ -916,18 +916,17 @@ cryptodev_aead(
 	crda = crp->crp_desc;
 	crde = crda->crd_next;
 
-	if ((error = copyin_c(__USER_CAP(caead->src, caead->len),
-	    cse->uio.uio_iov[0].iov_base, caead->len)))
-		goto bail;
-
 	if ((error = copyin_c(__USER_CAP(caead->aad, caead->aadlen),
-	    (char * __capability)cse->uio.uio_iov[0].iov_base + caead->len,
-	    caead->aadlen)))
+	    cse->uio.uio_iov[0].iov_base, caead->aadlen)))
 		goto bail;
 
-	crda->crd_skip = caead->len;
+	if ((error = copyin_c(__USER_CAP(caead->src, caead->len),
+	    (char *)cse->uio.uio_iov[0].iov_base + caead->aadlen, caead->len)))
+		goto bail;
+
+	crda->crd_skip = 0;
 	crda->crd_len = caead->aadlen;
-	crda->crd_inject = caead->len + caead->aadlen;
+	crda->crd_inject = caead->aadlen + caead->len;
 
 	crda->crd_alg = cse->mac;
 	crda->crd_key = cse->mackey;
@@ -937,15 +936,15 @@ cryptodev_aead(
 		crde->crd_flags |= CRD_F_ENCRYPT;
 	else
 		crde->crd_flags &= ~CRD_F_ENCRYPT;
-	/* crde->crd_skip set below */
+	crde->crd_skip = caead->aadlen;
 	crde->crd_len = caead->len;
-	crde->crd_inject = 0;
+	crde->crd_inject = caead->aadlen;
 
 	crde->crd_alg = cse->cipher;
 	crde->crd_key = cse->key;
 	crde->crd_klen = cse->keylen * 8;
 
-	crp->crp_ilen = caead->len + caead->aadlen;
+	crp->crp_ilen = caead->aadlen + caead->len;
 	crp->crp_flags = CRYPTO_F_IOV | CRYPTO_F_CBIMM
 		       | (caead->flags & COP_F_BATCH);
 	crp->crp_buf = (caddr_t)&cse->uio.uio_iov;
@@ -963,10 +962,9 @@ cryptodev_aead(
 			goto bail;
 		bcopy(cse->tmp_iv, crde->crd_iv, caead->ivlen);
 		crde->crd_flags |= CRD_F_IV_EXPLICIT | CRD_F_IV_PRESENT;
-		crde->crd_skip = 0;
 	} else {
 		crde->crd_flags |= CRD_F_IV_PRESENT;
-		crde->crd_skip = cse->txform->blocksize;
+		crde->crd_skip += cse->txform->blocksize;
 		crde->crd_len -= cse->txform->blocksize;
 	}
 
@@ -1007,13 +1005,14 @@ again:
 		goto bail;
 	}
 
-	if (caead->dst && (error = copyout_c(cse->uio.uio_iov[0].iov_base,
-	    __USER_CAP(caead->dst, caead->len), caead->len)))
+	if (caead->dst && (error = copyout_c(
+	    (caddr_t)cse->uio.uio_iov[0].iov_base + caead->aadlen,
+	    __USER_CAP(caead->dst, cse->thash->hashsize), caead->len)))
 		goto bail;
 
-	if ((error = copyout_c(
-	    (char * __capability)cse->uio.uio_iov[0].iov_base + caead->len +
-	    caead->aadlen, __USER_CAP(caead->tag, cse->thash->hashsize),
+	if ((error = copyout_c((caddr_t)cse->uio.uio_iov[0].iov_base +
+	    caead->aadlen + caead->len,
+	    __USER_CAP(caead->tag, cse->thash->hashsize),
 	    cse->thash->hashsize)))
 		goto bail;
 
