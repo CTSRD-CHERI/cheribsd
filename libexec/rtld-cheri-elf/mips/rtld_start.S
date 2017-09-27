@@ -40,7 +40,15 @@
 .option pic0
 
 
-#define	PTR_SIZE	32
+/*
+ * NB: Use CHERICAP_SIZE to hold relocbase to retain stack alignment
+ */
+
+#define	SFRAME_SIZE		(4*CHERICAP_SIZE)
+#define	SFRAME_AUXARGS		(3*CHERICAP_SIZE)
+#define	SFRAME_OBJP		(2*CHERICAP_SIZE)
+#define	SFRAME_CLEANUP		(1*CHERICAP_SIZE)
+#define	SFRAME_RELOCBASE	(0*CHERICAP_SIZE)
 
 /*
  *      c3      auxargs pointer
@@ -49,22 +57,9 @@ LEAF(rtld_start)
 	/*
 	 * XXX: Assume the kernel aligned the stack correctly.
 	 */
-	/*
-	 * NB: Use 32 to retain stack alignment
-	 *
-	 * XXX-BD: this is all zeros...
-	 */
-	dli		sp, -(32 + 4*CHERICAP_SIZE)
+	dli		sp, -SFRAME_SIZE
 	cincoffset	$c11, $c11, sp
-	csd		gp, zero, 0($c11)
-	csd		s8, zero, 8($c11)
-	csd		ra, zero, 16($c11)
-			/* 24($c11) relocbase */
-
-			/* 32 + 0*CHERICAP_SIZE($c11) atexit */
-			/* 32 + 1*CHERICAP_SIZE($c11) obj_main */
-	csc		$c3, zero, 32 + 2*CHERICAP_SIZE($c11)
-	csc		$c17, zero, 32 + 3*CHERICAP_SIZE($c11)
+	csc		$c3, zero, SFRAME_AUXARGS($c11)
 
 	SETUP_GP64(s4, rtld_start)
 
@@ -74,7 +69,7 @@ LEAF(rtld_start)
 1:	cgetpcc		$c12
 	cgetoffset	a1, $c12
 	dsubu		a1, a1, a0
-	csd		a1, zero, 24($c11)
+	csd		a1, zero, SFRAME_RELOCBASE($c11)
 	cgetdefault	$c4
 	csetoffset	$c4, $c4, a1	/* relocbase */
 
@@ -88,16 +83,16 @@ LEAF(rtld_start)
 	cjalr		$c12, $c17
 	nop
 
-	clc		$c3, zero, 32 + 2*CHERICAP_SIZE($c11)	/* auxargs */
+	clc		$c3, zero, SFRAME_AUXARGS($c11)
 	/* XXX-BD: Should allocate cleanup and objp outside stack. */
 	dli		t1, CHERICAP_SIZE
-	dli		t0, 32 + 0*CHERICAP_SIZE
+	dli		t0, SFRAME_CLEANUP
 	cincoffset	$c4, $c11, t0			/* &cleanup */
 	csetbounds	$c4, $c4, t1
-	dli		t0, 32 + 1*CHERICAP_SIZE
+	dli		t0, SFRAME_OBJP
 	cincoffset	$c5, $c11, t0			/* &objp */
 	csetbounds	$c5, $c5, t1
-	cld		t0, zero, 24($c11)	/* relocbase */
+	cld		t0, zero, SFRAME_RELOCBASE($c11)
 	dla		t9, _C_LABEL(_rtld)
 	daddu		t0, t0, t9
 	cgetpcc		$c12
@@ -106,9 +101,9 @@ LEAF(rtld_start)
 	nop
 
 	cmove		$c12, $c3
-	clc		$c3, zero, 32 + 2*CHERICAP_SIZE($c11)	/* auxargs */
-	clc		$c4, zero, 32 + 0*CHERICAP_SIZE($c11)	/* cleanup */
-	clc		$c5, zero, 32 + 1*CHERICAP_SIZE($c11)	/* objp */
+	clc		$c3, zero, SFRAME_AUXARGS($c11)
+	clc		$c4, zero, SFRAME_CLEANUP($c11)
+	clc		$c5, zero, SFRAME_OBJP($c11)
 
 	cmove		$c17, $c12 /* return == PCC signals backtrace routine to stop */
 	cjr		$c12
