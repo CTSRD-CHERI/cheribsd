@@ -2080,8 +2080,7 @@ userland_sysctl(struct thread *td, int *name, u_int namelen,
 		}
 	}
 	req.validlen = req.oldlen;
-
-	req.oldptr= old;
+	req.oldptr = old;
 
 	if (new != NULL) {
 		req.newlen = newlen;
