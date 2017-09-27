@@ -1,10 +1,11 @@
 /*-
- * Copyright (c) 2017 Domagoj Stolfa <domagoj.stolfa@cl.cam.ac.uk>
+ * Copyright (c) 2017 Domagoj Stolfa
  * All rights reserved.
  *
- * This software was developed by SRI International and the University of
- * Cambridge Computer Laboratory under DARPA/AFRL contract FA8750-10-C-0237
- * ("CTSRD"), as part of the DARPA CRASH research programme.
+ * This software was developed by BAE Systems, the University of Cambridge
+ * Computer Laboratory, and Memorial University under DARPA/AFRL contract
+ * FA8650-15-C-7558 ("CADETS"), as part of the DARPA Transparent Computing
+ * (TC) research program.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,6 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -60,7 +62,6 @@ __FBSDID("$FreeBSD$");
 #include <cheri/cheri.h>
 #include <compat/cheriabi/cheriabi.h>
 #include <compat/cheriabi/cheriabi_proto.h>
-/* Must come last due to massive header polution breaking cheriabi_proto.h */
 #include <compat/cheriabi/cheriabi_ioctl.h>
 #include <compat/cheriabi/cheriabi_dtrace.h>
 
