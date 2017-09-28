@@ -833,13 +833,22 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	KASSERT(stack > stackbase,
 	    ("top of stack 0x%lx is below stack base 0x%lx", stack, stackbase));
 	stacklen = stack - stackbase;
+	/*
+	 * Round the stack down as required to make it representable.
+	 *
+	 * XXX: should we make the stack sealable?
+	 */
+	stacklen = rounddown2(stacklen, 1ULL << CHERI_ALIGN_SHIFT(stacklen));
+	KASSERT(stackbase ==
+	    rounddown2(stackbase, 1ULL << CHERI_ALIGN_SHIFT(stacklen)),
+	    ("stackbase 0x%lx is not representable at length 0x%lx",
+	    stackbase, stacklen));
 	cheri_capability_set(&td->td_frame->csp, CHERI_CAP_USER_DATA_PERMS,
 	    stackbase, stacklen, 0);
 	td->td_frame->sp = stacklen;
 
 	/* Using addr as length means ddc base must be 0. */
 	CTASSERT(CHERI_CAP_USER_DATA_BASE == 0);
-	text_end = stackbase;
 	if (imgp->end_addr != 0) {
 		text_end = roundup2(imgp->end_addr,
 		    1ULL << CHERI_SEAL_ALIGN_SHIFT(imgp->end_addr));
@@ -848,6 +857,9 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 		 * requires no other rounding.
 		 */
 		text_end = roundup2(text_end, PAGE_SIZE);
+	} else {
+		text_end = rounddown2(stackbase,
+		    1ULL << CHERI_SEAL_ALIGN_SHIFT(stackbase));
 	}
 	KASSERT(text_end <= stackbase,
 	    ("text_end 0x%zx > stackbase 0x%lx", text_end, stackbase));
@@ -857,6 +869,8 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	KASSERT(map_base < stackbase,
 	    ("map_base 0x%zx >= stackbase 0x%lx", map_base, stackbase));
 	map_length = stackbase - map_base;
+	map_length = rounddown2(map_length,
+	    1ULL << CHERI_ALIGN_SHIFT(map_length));
 	cheri_capability_set(&td->td_md.md_cheri_mmap_cap,
 	    CHERI_CAP_USER_MMAP_PERMS, map_base, map_length,
 	    CHERI_CAP_USER_MMAP_OFFSET);
@@ -872,8 +886,10 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 * all).
 	 */
 	frame = &td->td_pcb->pcb_regs;
-	cheriabi_capability_set_user_ddc(&frame->ddc, stackbase);
-	cheriabi_capability_set_user_idc(&frame->idc, stackbase);
+	cheriabi_capability_set_user_ddc(&frame->ddc,
+	   rounddown2(stackbase, 1ULL << CHERI_SEAL_ALIGN_SHIFT(stackbase)));
+	cheriabi_capability_set_user_idc(&frame->idc,
+	   rounddown2(stackbase, 1ULL << CHERI_SEAL_ALIGN_SHIFT(stackbase)));
 
 	/*
 	 * XXXRW: Set $pcc and $c12 to the entry address -- for now, also with
