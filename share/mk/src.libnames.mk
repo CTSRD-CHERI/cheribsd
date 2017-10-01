@@ -20,6 +20,7 @@ _PRIVATELIBS=	\
 		event \
 		heimipcc \
 		heimipcs \
+		ifconfig \
 		ldns \
 		sqlite3 \
 		ssh \
@@ -125,7 +126,6 @@ _LIBRARIES=	\
 		heimsqlite \
 		hubbub \
 		hx509 \
-		ifconfig \
 		ipsec \
 		jail \
 		jpeg \
