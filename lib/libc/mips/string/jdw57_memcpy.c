@@ -96,9 +96,9 @@ memmove
 void *
 cmemmove
 (void *dst0, const void *src0, size_t length)
-#elif defined(CMEMMOVE_C)
-void *
-cmemmove_c
+#elif defined(MEMMOVE_C)
+void * CAPABILITY
+memmove_c
 (void * CAPABILITY dst0, const void * CAPABILITY src0, size_t length)
 #elif defined(MEMCPY)
 void *
@@ -130,7 +130,7 @@ bcopy(const void *src0, void *dst0, size_t length)
 #endif
 	size_t t;
 	
-#if defined(MEMMOVE) || defined(BCOPY)
+#if defined(MEMMOVE) || defined(BCOPY) || defined(CMEMMOVE_C) || defined(CMEMMOVE)
 	const int handle_overlap = 1;
 #else
 	const int handle_overlap = 0;
