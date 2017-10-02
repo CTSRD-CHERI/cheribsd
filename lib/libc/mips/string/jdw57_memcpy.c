@@ -37,6 +37,9 @@ static char sccsid[] = "@(#)bcopy.c	8.1 (Berkeley) 6/4/93";
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 #include <sys/types.h>
+#include <stdint.h>
+#else
+typedef long vaddr_t;
 #endif
 /*
  * sizeof(word) MUST BE A POWER OF TWO
@@ -56,6 +59,8 @@ typedef	__uintcap_t ptr;
 typedef	uintptr_t ptr;
 #endif
 
+#define PWIDTH __POINTER_WIDTH__/8
+
 #define	psize	sizeof(ptr)
 #define	pmask	(psize - 1)
 #define bigptr	(psize>wsize)
@@ -65,7 +70,7 @@ typedef	uintptr_t ptr;
   index -= increment; \
 do { \
 asm (\
-  "addiu %[indexIn], %[indexIn], " #increment "\n" \
+  "daddiu %[indexIn], %[indexIn], " #increment "\n" \
   :[indexOut] "=r"(index) \
   :[indexIn] "r"(index) \
 );\
@@ -91,6 +96,10 @@ memmove
 void *
 cmemmove
 (void *dst0, const void *src0, size_t length)
+#elif defined(CMEMMOVE_C)
+void *
+cmemmove_c
+(void * CAPABILITY dst0, const void * CAPABILITY src0, size_t length)
 #elif defined(MEMCPY)
 void *
 memcpy
@@ -142,13 +151,13 @@ bcopy(const void *src0, void *dst0, size_t length)
 		/*
 		 * Copy forward.
 		 */
-		t = (int)src;	/* only need low bits */
-		if ((t | (int)dst) & wmask) { // XXX make sure we get virtual address from cast of dst
+		t = (vaddr_t)src;	/* only need low bits */
+		if ((t | (vaddr_t)dst) & wmask) { // XXX make sure we get virtual address from cast of dst
 			/*
 			 * Try to align operands.  This cannot be done
 			 * unless the low bits match.
 			 */
-			if ((t ^ (int)dst) & wmask || length < wsize)
+			if ((t ^ (vaddr_t)dst) & wmask || length < wsize)
 				t = length;
 			else
 				t = wsize - (t & wmask);
@@ -162,13 +171,13 @@ bcopy(const void *src0, void *dst0, size_t length)
 		 * If pointers are bigger than words, try to copy by words.
 		 */
 		if (bigptr) {
-			t = (int)src;	/* only need low bits */
-			if ((t | (int)dst) & pmask) { // XXX make sure dst cast gets virtual address
+			t = (vaddr_t)src;	/* only need low bits */
+			if ((t | (vaddr_t)dst) & pmask) { // XXX make sure dst cast gets virtual address
 				/*
 				 * Try to align operands.  This cannot be done
 				 * unless the low bits match.
 				 */
-				if ((t ^ (int)dst) & pmask || length < psize)
+				if ((t ^ (vaddr_t)dst) & pmask || length < psize)
 					t = length / wsize;
 				else
 					t = (psize - (t & pmask)) / wsize;
@@ -189,13 +198,14 @@ bcopy(const void *src0, void *dst0, size_t length)
 			src += t*psize;
 			dst += t*psize;
 			t = -(t*psize);
-#if !defined(_MIPS_SZCAP)
-			if (t) MIPSLOOP(t, -8, *((ptr * CAPABILITY)(dst+t)) = *((ptr * CAPABILITY)(src+t));, 8/*sizeof(ptr)*/);
-#elif _MIPS_SZCAP==128
-			if (t) MIPSLOOP(t, -16, *((ptr * CAPABILITY)(dst+t)) = *((ptr * CAPABILITY)(src+t));, 16/*sizeof(ptr)*/);
-#elif _MIPS_SZCAP==256
-			if (t) MIPSLOOP(t, -32, *((ptr * CAPABILITY)(dst+t)) = *((ptr * CAPABILITY)(src+t));, 32/*sizeof(ptr)*/);
-#endif
+			//if (t) MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) = *((ptr * CAPABILITY)(src+t));, PWIDTH);
+			#if !defined(_MIPS_SZCAP)
+		    MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) = *((ptr * CAPABILITY)(src+t));, 8);
+			#elif _MIPS_SZCAP==128
+				MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) = *((ptr * CAPABILITY)(src+t));, 16);
+			#elif _MIPS_SZCAP==256
+				MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) = *((ptr * CAPABILITY)(src+t));, 32);
+			#endif
 		}
 		t = length & pmask;
 		if (t) {
@@ -212,9 +222,9 @@ bcopy(const void *src0, void *dst0, size_t length)
 		 */
 		src += length;
 		dst += length;
-		t = (int)src;
-		if ((t | (int)dst) & wmask) {
-			if ((t ^ (int)dst) & wmask || length <= wsize)
+		t = (vaddr_t)src;
+		if ((t | (vaddr_t)dst) & wmask) {
+			if ((t ^ (vaddr_t)dst) & wmask || length <= wsize)
 				t = length;
 			else
 				t &= wmask;
@@ -225,9 +235,9 @@ bcopy(const void *src0, void *dst0, size_t length)
 			MIPSLOOP(t, 0, dst[t]=src[t];, -1);
 		}
 		if (bigptr) {
-			t = (int)src;	/* only need low bits */
-			if ((t | (int)dst) & pmask) {
-				if ((t ^ (int)dst) & pmask || length < psize)
+			t = (vaddr_t)src;	/* only need low bits */
+			if ((t | (vaddr_t)dst) & pmask) {
+				if ((t ^ (vaddr_t)dst) & pmask || length < psize)
 					t = length / wsize;
 				else
 					t = (psize - (t & pmask)) / wsize;
@@ -252,6 +262,7 @@ bcopy(const void *src0, void *dst0, size_t length)
 #elif _MIPS_SZCAP==256
 		  MIPSLOOP(t, 0, *((ptr * CAPABILITY)(dst+t)) = *((ptr * CAPABILITY)(src+t));, -32/*sizeof(ptr)*/);
 #endif
+			
 		}
 		t = length & pmask;
 		if (t) {
