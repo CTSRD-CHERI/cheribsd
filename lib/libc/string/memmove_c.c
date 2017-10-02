@@ -29,5 +29,5 @@
  */
 
 #define CAPABILITY_VERSION
-#define MEMMOVE
-#include "bcopy.c.orig"
+#define MEMMOVE_C
+#include "../mips/string/jdw57_memcpy.c"
