@@ -136,23 +136,12 @@ bcopy(const void *src0, void *dst0, size_t length)
 	const int handle_overlap = 0;
 #endif
 
-	/*
-	 * Macros: loop-t-times; and loop-t-times, t>0
-	 */
-#define	TLOOP(s) if (t) TLOOP1(s)
-#define	TLOOP1(s) do { s; } while (--t)
-
-  /*
-   * Comparing pointers is not good C practice, but this should use our CPtrCmp
-   * instruction.  XXX Is there a way to do the right thing type-wise and still
-   * get the efficient instruction?
-   */
 	if (dst < src || !handle_overlap) {
 		/*
 		 * Copy forward.
 		 */
 		t = (vaddr_t)src;	/* only need low bits */
-		if ((t | (vaddr_t)dst) & wmask) { // XXX make sure we get virtual address from cast of dst
+		if ((t | (vaddr_t)dst) & wmask) { 
 			/*
 			 * Try to align operands.  This cannot be done
 			 * unless the low bits match.
@@ -172,7 +161,7 @@ bcopy(const void *src0, void *dst0, size_t length)
 		 */
 		if (bigptr) {
 			t = (vaddr_t)src;	/* only need low bits */
-			if ((t | (vaddr_t)dst) & pmask) { // XXX make sure dst cast gets virtual address
+			if ((t | (vaddr_t)dst) & pmask) {
 				/*
 				 * Try to align operands.  This cannot be done
 				 * unless the low bits match.
@@ -198,14 +187,16 @@ bcopy(const void *src0, void *dst0, size_t length)
 			src += t*psize;
 			dst += t*psize;
 			t = -(t*psize);
-			//if (t) MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) = *((ptr * CAPABILITY)(src+t));, PWIDTH);
-			#if !defined(_MIPS_SZCAP)
-		    MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) = *((ptr * CAPABILITY)(src+t));, 8);
-			#elif _MIPS_SZCAP==128
-				MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) = *((ptr * CAPABILITY)(src+t));, 16);
-			#elif _MIPS_SZCAP==256
-				MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) = *((ptr * CAPABILITY)(src+t));, 32);
-			#endif
+#if !defined(_MIPS_SZCAP)
+			MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) = 
+				*((ptr * CAPABILITY)(src+t));, 8/*sizeof(ptr)*/);
+#elif _MIPS_SZCAP==128
+			MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) = 
+				*((ptr * CAPABILITY)(src+t));, 16/*sizeof(ptr)*/);
+#elif _MIPS_SZCAP==256
+			MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) = 
+				*((ptr * CAPABILITY)(src+t));, 32/*sizeof(ptr)*/);
+#endif
 		}
 		t = length & pmask;
 		if (t) {
@@ -214,7 +205,7 @@ bcopy(const void *src0, void *dst0, size_t length)
 			t = -t;
 			if (t) MIPSLOOP(t, -1, dst[t]=src[t];, 1);
 		}
-	}	else {
+	} else {
 		/*
 		 * Copy backwards.  Otherwise essentially the same.
 		 * Alignment works as before, except that it takes
@@ -246,7 +237,8 @@ bcopy(const void *src0, void *dst0, size_t length)
 					dst -= t*wsize;
 					src -= t*wsize;
 					t = ((t-1)*wsize);
-					MIPSLOOP(t, 0, *((word * CAPABILITY)(dst+t)) = *((word * CAPABILITY)(src+t));, -8/*wsize*/);
+					MIPSLOOP(t, 0, *((word * CAPABILITY)(dst+t)) = 
+						*((word * CAPABILITY)(src+t));, -8/*wsize*/);
 				}
 			}
 		}
@@ -256,11 +248,14 @@ bcopy(const void *src0, void *dst0, size_t length)
 			dst -= t*psize;
 			t = ((t-1)*psize);
 #if !defined(_MIPS_SZCAP)
-		  MIPSLOOP(t, 0, *((ptr * CAPABILITY)(dst+t)) = *((ptr * CAPABILITY)(src+t));, -8/*sizeof(ptr)*/);
+		MIPSLOOP(t, 0, *((ptr * CAPABILITY)(dst+t)) = 
+			*((ptr * CAPABILITY)(src+t));, -8/*sizeof(ptr)*/);
 #elif _MIPS_SZCAP==128
-		  MIPSLOOP(t, 0, *((ptr * CAPABILITY)(dst+t)) = *((ptr * CAPABILITY)(src+t));, -16/*sizeof(ptr)*/);
+		MIPSLOOP(t, 0, *((ptr * CAPABILITY)(dst+t)) = 
+			*((ptr * CAPABILITY)(src+t));, -16/*sizeof(ptr)*/);
 #elif _MIPS_SZCAP==256
-		  MIPSLOOP(t, 0, *((ptr * CAPABILITY)(dst+t)) = *((ptr * CAPABILITY)(src+t));, -32/*sizeof(ptr)*/);
+		MIPSLOOP(t, 0, *((ptr * CAPABILITY)(dst+t)) = 
+			*((ptr * CAPABILITY)(src+t));, -32/*sizeof(ptr)*/);
 #endif
 			
 		}
