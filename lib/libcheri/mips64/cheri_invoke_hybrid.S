@@ -168,7 +168,7 @@ cheri_invoke_bundle_idc:
 	# and IDC, so we don't need to.
 	#
 cheri_invoke_ccall:
-	ccall	$c1, $c2
+	ccall	$c1, $c2, 1
 
 	#
 	# Restore $idc-saved recovery state; $idc must be restored last.  The

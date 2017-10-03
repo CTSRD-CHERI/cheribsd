@@ -168,7 +168,6 @@ struct pcb
 	void *pcb_onfault;		/* for copyin/copyout faults */
 	register_t pcb_tpc;
 #ifdef CPU_CHERI
-	struct cheri_stack pcb_cheristack;	/* CCall/CReturn stack. */
 	struct cheri_signal pcb_cherisignal;	/* CHERI signal-related state. */
 	struct cheri_kframe pcb_cherikframe;	/* kernel caller-save state. */
 #endif

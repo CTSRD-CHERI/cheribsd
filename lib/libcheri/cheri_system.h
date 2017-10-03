@@ -36,6 +36,8 @@
 
 #include <stdarg.h>
 
+#include <cheri/cheri_system_md.h>
+
 /*
  * For now, expose the symbol for the system-object reference in each sandbox
  * as a public symbol.  At some point we will want to find a better way to do
@@ -62,6 +64,15 @@ extern struct cheri_object _cheri_system_object;
  * providing an open() method that returns file-descriptor objects.  We are
  * definitely not yet at that point.
  */
+
+/*
+ * Interface used to allocate system objects for specific sandboxes.
+ *
+ * XXXRW: This should probably be private to libcheri.
+ */
+struct sandbox_object;
+int	cheri_system_new(struct sandbox_object *sbop,
+	    struct sandbox_object **sbopp);
 
 /*
  * Methods themselves.

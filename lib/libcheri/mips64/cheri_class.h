@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012-2015 Robert N. M. Watson
+ * Copyright (c) 2012-2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -28,120 +28,44 @@
  * SUCH DAMAGE.
  */
 
-/* XXXRW: Needed temporarily for CHERI_ASM_CMOVE(). */
-#define	_CHERI_INTERNAL
-#define	zero	$zero
-#include <machine/cheriasm.h>
-#undef _CHERI_INTERNAL
+#ifndef _CHERI_CLASS_H_
+#define	_CHERI_CLASS_H_
 
 /*
- * Fields to insert at the front of data structures embedded in $idc for CHERI
- * system objects.  Currently, just an ambient $c0 to restore, since we can't
- * use the saved $idc for this.
+ * Fields to insert at the front of the 'sandbox_object' data structure that
+ * will be used during protection-domain switching to set up the target
+ * execution context.  These are used for both loaded classes and system
+ * classes.
+ *
+ * __sandbox_object_idc		IDC to install for both rtld and invocation
+ *				entry.  The entry vector code will also use
+ *				this capability, with offset set to zero, as
+ *				the installed DDC.
+ *
+ * __sandbox_object_rtld_pcc	PCC to install for rtld operations.
+ *
+ * __sandbox_object_invoke_pcc	PCC to install on invocation.
+ *
+ * __sandbox_vtable		VTable pointer used for CHERI system classes;
+ *				unused for loaded (confined) classes.
  */
-#define	CHERI_SYSTEM_OBJECT_FIELDS					\
-	__capability void	*__cheri_system_object_field_c0;	\
-	__capability intptr_t	*__cheri_system_object_vtable
+#define	LIBCHERI_SANDBOX_OBJECT_FIELDS					\
+	__capability void	*__sandbox_object_idc;			\
+	__capability void	*__sandbox_object_rtld_pcc;		\
+	__capability void	*__sandbox_object_invoke_pcc;		\
+	__capability intptr_t	*__sandbox_vtable
 
-#define	CHERI_SYSTEM_OBJECT_INIT(x, vtable)				\
-	(x)->__cheri_system_object_field_c0 = cheri_getdefault();	\
-	(x)->__cheri_system_object_vtable = (vtable)
+#define	LIBCHERI_SANDBOX_OBJECT_INIT(sbop, idc, rtld_pcc, invoke_pcc, vtable)\
+	(sbop)->__sandbox_object_idc = (idc);				\
+	(sbop)->__sandbox_object_rtld_pcc = (rtld_pcc);			\
+	(sbop)->__sandbox_object_invoke_pcc = (invoke_pcc);		\
+	(sbop)->__sandbox_vtable = (vtable)
 
-#define	CHERI_SYSTEM_OBJECT_FINI(x)					\
-	(x)->__cheri_system_object_field_c0 = NULL;			\
-	free((void *)(x)->__cheri_system_object_vtable);		\
-	(x)->__cheri_system_object_vtable = NULL
+#define	LIBCHERI_SANDBOX_OBJECT_FINI(sbop)				\
+	(sbop)->__sandbox_object_idc = NULL;				\
+	(sbop)->__sandbox_object_rtld_pcc = NULL;			\
+	(sbop)->__sandbox_object_invoke_pcc = NULL;			\
+	free((void *)(sbop)->__sandbox_vtable);				\
+	(sbop)->__sandbox_vtable = NULL
 
-/*
- * CHERI system class CCall landing pad code: catches CCalls inbound from
- * sandboxes seeking system services, and bootstraps C code.  A number of
- * differences from sandboxed code, including how $c0 is handled, and not
- * setting up the C heap.
- *
- * Temporary ABI conventions:
- *    $sp contains a pointer to the top of the stack; capability aligned
- *    $fp contains a pointer to the top of the stack; capability aligned
- *
- *    $a0-$a7 contain user arguments
- *    $v0, $v1 contain user return values
- *
- *    $c0, $pcc contain access to (100% overlapped) sandbox code and data
- *
- *    $c1, $c2 contain the invoked object capability
- *    $c3-$c10 contain user capability arguments
- *
- *    $c26 contains the invoked data capability installed by CCall; unlike
- *      sandboxed versions of this code, this points at actual data rather
- *      than being the value to install in $c0.  $c0 is copied from $pcc.
- *
- * Sandbox heap information is extracted from the sandbox metadata structure.
- * $c26 is assumed to have room for a stack at the top, although its length is
- * currently undefined.
- *
- * For now, assume:
- * (1) The caller has not set up the general-purpose register context, that's
- *     our job.
- * (2) That there is no concurrent sandbox use -- we have a single stack on
- *     the inbound path, which can't be the long-term solution.
- */
-
-#define	CHERI_CLASS_ASM(class)						\
-	.text;								\
-	.option pic0;							\
-	.global __cheri_ ## class ## _entry;				\
-	.type __cheri_ ## class ## _entry,@function;			\
-	.ent __cheri_ ## class ## _entry;				\
-__cheri_ ## class ## _entry:						\
-									\
-	/*								\
-	 * Normally in a CHERI sandbox, we would install $c26 ($idc)	\
-	 * into $c0 for MIPS load/store instructions.  For the system	\
-	 * class, a suitable capability is stored at the front of the	\
-	 * data structure referenced by $idc.				\
-	 */								\
-	clc	$c12, zero, 0($c26);					\
-	csetdefault	$c12;						\
-									\
-	/*								\
-	 * Install global invocation stack.  NB: this means we can't	\
-	 * support recursion or concurrency.  Further note: this is	\
-	 * shared by all classes outside of the sandbox.		\
-	 */								\
-	dla	$sp, __cheri_enter_stack_cap;				\
-	clc	$c11, $sp, 0($c12);					\
-	dla	$sp, __cheri_enter_stack_sp;				\
-	cld	$sp, $sp, 0($c12);					\
-	move	$fp, $sp;						\
-									\
-	/*								\
-	 * Set up global pointer.					\
-	 */								\
-	dla	$gp, _gp;						\
-									\
-	/*								\
-	 * The second entry of $idc is a method vtable.  If it is a	\
-	 * valid capability, then load the address at offset $v0	\
-	 * rather than using the "enter" functions.			\
-	 */								\
-	clc	$c12, zero, CHERICAP_SIZE($c26);			\
-	cld	$t9, $v0, 0($c12);					\
-	dla	$ra, 0f;						\
-	cgetpcc	$c12;							\
-	csetoffset	$c12, $c12, $t9;				\
-	cjalr	$c12, $c17;						\
-	nop;			/* Branch-delay slot */			\
-									\
-	/*								\
-	 * Return to caller.						\
-	 */								\
-0:									\
-	creturn;							\
-$__cheri_ ## class ## _entry_end:					\
-	.end __cheri_## class ## _entry;				\
-	.size __cheri_ ## class ## _entry,$__cheri_ ## class ## _entry_end - __cheri_ ## class ## _entry
-
-#define	CHERI_CLASS_DECL(class)						\
-	extern void (__cheri_## class ## _entry)(void);
-
-#define	CHERI_CLASS_ENTRY(class)					\
-	(__cheri_## class ## _entry)
+#endif /* _CHERI_CLASS_H_ */

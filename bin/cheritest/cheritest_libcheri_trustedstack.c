@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 Robert N. M. Watson
+ * Copyright (c) 2014-2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -39,12 +39,12 @@
 #include <sys/time.h>
 
 #include <machine/cpuregs.h>
-#include <machine/sysarch.h>
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 #include <cheri/cheri_enter.h>
 #include <cheri/cheri_fd.h>
+#include <cheri/cheri_stack.h>
 #include <cheri/sandbox.h>
 
 #include <cheritest-helper.h>
@@ -68,9 +68,9 @@ cheritest_libcheri_userfn_getstack(void)
 	u_int stack_depth;
 	int retval;
 
-	retval = sysarch(CHERI_GET_STACK, &cs);
+	retval = cheri_stack_get(&cs);
 	if (retval != 0)
-		cheritest_failure_err("sysarch(CHERI_GET_STACK) failed");
+		cheritest_failure_err("cheri_stack_get() failed");
 
 	/* Does stack layout look sensible enough to continue? */
 	if ((cs.cs_tsize % CHERI_FRAME_SIZE) != 0)
@@ -131,9 +131,9 @@ cheritest_libcheri_userfn_setstack(register_t arg)
 	int retval;
 
 	/* Validate stack as retrieved. */
-	retval = sysarch(CHERI_GET_STACK, &cs);
+	retval = cheri_stack_get(&cs);
 	if (retval != 0)
-		cheritest_failure_err("sysarch(CHERI_GET_STACK) failed");
+		cheritest_failure_err("cheri_stack_get() failed");
 
 	/* Does stack layout look sensible enough to continue? */
 	if ((cs.cs_tsize % CHERI_FRAME_SIZE) != 0)
@@ -173,9 +173,9 @@ cheritest_libcheri_userfn_setstack(register_t arg)
 	}
 
 	/* Update kernel view of trusted stack. */
-	retval = sysarch(CHERI_SET_STACK, &cs);
+	retval = cheri_stack_set(&cs);
 	if (retval != 0)
-		cheritest_failure_err("sysarch(CHERI_SET_STACK) failed");
+		cheritest_failure_err("cheri_stack_set() failed");
 
 	/* Leave behind a distinctive value we can test for. */
 	return (CHERITEST_SETSTACK_CONSTANT);

@@ -428,7 +428,6 @@ sandbox_object_new_flags(struct sandbox_class *sbcp, size_t heaplen,
 	sbop = calloc(1, sizeof(*sbop));
 	if (sbop == NULL)
 		return (-1);
-	CHERI_SYSTEM_OBJECT_INIT(sbop, cheri_system_vtable);
 	sbop->sbo_sandbox_classp = sbcp;
 	sbop->sbo_flags = flags;
 	sbop->sbo_heaplen = heaplen;
@@ -503,6 +502,51 @@ error:
 	return (-1);
 }
 
+#define	SANDBOX_OBJECT_FLAG_DEFAULT	(SANDBOX_OBJECT_FLAG_CONSOLE |	\
+	    SANDBOX_OBJECT_FLAG_ALLOCFREE | SANDBOX_OBJECT_FLAG_USERFN)
+int
+sandbox_object_new(struct sandbox_class *sbcp, size_t heaplen,
+    struct sandbox_object **sbopp)
+{
+
+	return (sandbox_object_new_flags(sbcp, heaplen,
+	    SANDBOX_OBJECT_FLAG_DEFAULT, sbopp));
+}
+
+/*
+ * libcheri system objects require a sandbox_object to be used with common
+ * invocation and rtld vectors, so provide a way to initialise those here.
+ *
+ * NB: System classes have NULL sbop->sbo_sandbox_classp pointers, which
+ * allows us to differentiate them during later object destruction.
+ *
+ * XXXRW: Should we instead require that system classes also register
+ * sandbox_class instances?  That would be more consistent...
+ */
+int
+sandbox_object_new_system_object(__capability void *idc,
+    __capability void *rtld_pcc, __capability void *invoke_pcc,
+    __capability intptr_t *vtable, struct sandbox_object **sbopp)
+{
+
+	/*
+	 * XXXRW: We skip the sanity check because system objects might be
+	 * created before we've loaded classes that the main program depends
+	 * on.  This is a bit backwards, but it's unclear what to do about it.
+	if (sandbox_program_sanity_check() < 0)
+		errx(1, "%s: sandbox_program_sanity_check", __func__);
+	 */
+
+	*sbopp = calloc(1, sizeof(**sbopp));
+	if (*sbopp == NULL)
+		return (-1);
+	(*sbopp)->sbo_idc = idc;
+	(*sbopp)->sbo_rtld_pcc = rtld_pcc;
+	(*sbopp)->sbo_invoke_pcc = invoke_pcc;
+	(*sbopp)->sbo_vtable = vtable;
+	return (0);
+}
+
 int
 sandbox_object_stack_reset(struct sandbox_object *sbop)
 {
@@ -553,17 +597,6 @@ sandbox_object_reset(struct sandbox_object *sbop)
 	    cheri_zerocap(), cheri_zerocap());
 
 	return (0);
-}
-
-#define	SANDBOX_OBJECT_FLAG_DEFAULT	(SANDBOX_OBJECT_FLAG_CONSOLE |	\
-	    SANDBOX_OBJECT_FLAG_ALLOCFREE | SANDBOX_OBJECT_FLAG_USERFN)
-int
-sandbox_object_new(struct sandbox_class *sbcp, size_t heaplen,
-    struct sandbox_object **sbopp)
-{
-
-	return (sandbox_object_new_flags(sbcp, heaplen,
-	    SANDBOX_OBJECT_FLAG_DEFAULT, sbopp));
 }
 
 register_t
@@ -633,10 +666,27 @@ sandbox_object_destroy(struct sandbox_object *sbop)
 {
 	struct sandbox_class *sbcp;
 
+	/*
+	 * NB: There is a minor bit of recursion here to free the dependent
+	 * system object.
+	 */
 	sbcp = sbop->sbo_sandbox_classp;
-	sandbox_object_unload(sbop);		/* Unmap memory. */
-	CHERI_SYSTEM_OBJECT_FINI(sbop);
-	(void)munmap(sbop->sbo_stackmem, sbop->sbo_stacklen);
+	if (sbcp != NULL) {
+		/* Explicitly loaded class. */
+		sandbox_object_unload(sbop);		/* Unmap memory. */
+		(void)munmap(sbop->sbo_stackmem, sbop->sbo_stacklen);
+		free((void *)sbop->sbo_vtable);
+
+		/* Ensure recursion is bounded. */
+		assert(sbop->sbo_sandbox_system_objectp->sbo_sandbox_classp ==
+		    NULL);
+		sandbox_object_destroy(sbop->sbo_sandbox_system_objectp);
+	} else {
+		/* System class. */
+		assert(sbop->sbo_stackmem == NULL);
+		assert(sbop->sbo_vtable == NULL);
+		assert(sbop->sbo_sandbox_system_objectp == NULL);
+	}
 	bzero(sbop, sizeof(*sbop));		/* Clears tags. */
 	free(sbop);
 }
@@ -652,8 +702,7 @@ __capability void *
 sandbox_object_getsandboxdata(struct sandbox_object *sbop)
 {
 
-	return (cheri_unseal(sbop->sbo_cheri_object_invoke.co_datacap,
-	    sbop->sbo_sandbox_classp->sbc_sealcap));
+	return (sbop->sbo_idc);
 }
 
 __capability void *

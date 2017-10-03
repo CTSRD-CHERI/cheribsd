@@ -812,10 +812,12 @@ cheriabi_newthread_init(struct thread *td)
 	 */
 	cheri_capability_set_user_sealcap(&td->td_proc->p_md.md_cheri_sealcap);
 
+#if 0
 	/*
 	 * Set up the thread's trusted stack.
 	 */
 	cheri_stack_init(td->td_pcb);
+#endif
 }
 
 static void

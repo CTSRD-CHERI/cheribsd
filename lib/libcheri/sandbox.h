@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012-2015 Robert N. M. Watson
+ * Copyright (c) 2012-2017 Robert N. M. Watson
  * Copyright (c) 2015 SRI International
  * All rights reserved.
  *
@@ -64,6 +64,7 @@ struct sandbox_metadata {
 	struct chericap	sbm_vtable;
 	struct chericap	sbm_stackcap;
 #endif
+	struct cheri_object	 sbm_creturn_object;	/* Cap-offset: 4, 5 */
 };
 
 /*
@@ -128,6 +129,12 @@ int	sandbox_object_new(struct sandbox_class *sbcp, size_t heaplen,
 	    struct sandbox_object **sbopp);
 int	sandbox_object_new_flags(struct sandbox_class *sbcp, size_t heaplen,
 	    uint flags, struct sandbox_object **sbopp);
+#if __has_feature(capabilities)
+int	sandbox_object_new_system_object(__capability void *idc,
+	    __capability void *rtld_pcc, __capability void *invoke_pcc,
+	    __capability intptr_t *vtable, struct sandbox_object **sbopp);
+#endif
+
 /**
  * Reset the stack of a sandbox.  This is a temporary API until libcheri
  * becomes responsible for managing a pool of stacks.

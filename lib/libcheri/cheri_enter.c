@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014, 2016 Robert N. M. Watson
+ * Copyright (c) 2014-2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -45,6 +45,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "cheri_ccall.h"
 #include "cheri_enter.h"
 #include "cheri_system.h"
 #include "sandbox.h"
@@ -65,6 +66,11 @@ extern register_t		 __cheri_enter_stack_sp;
 static void		*__cheri_enter_stack;
 __capability void	*__cheri_enter_stack_cap;
 register_t		 __cheri_enter_stack_sp;
+
+/*
+ * Return capability to use from system objects.
+ */
+struct cheri_object	 __cheri_object_creturn;
 
 __attribute__ ((constructor)) static void
 cheri_enter_init(void)
@@ -87,4 +93,5 @@ cheri_enter_init(void)
 	__cheri_enter_stack_sp = (register_t)((char *)__cheri_enter_stack +
 	    CHERI_ENTER_STACK_SIZE);
 #endif
+	__cheri_object_creturn = cheri_make_sealed_return_object();
 }

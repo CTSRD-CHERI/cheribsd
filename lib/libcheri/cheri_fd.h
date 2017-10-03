@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 Robert N. M. Watson
+ * Copyright (c) 2014-2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -51,9 +51,10 @@ extern struct cheri_object	cheri_fd;
  * Interfaces to create/revoke/destroy cheri_fd objects with ambient
  * authority.
  */
-int	cheri_fd_new(int fd, struct cheri_object *cop);
-void	cheri_fd_revoke(struct cheri_object co);
-void	cheri_fd_destroy(struct cheri_object co);
+struct sandbox_object;
+int	cheri_fd_new(int fd, struct sandbox_object **sbopp);
+void	cheri_fd_revoke(struct sandbox_object *sbop);
+void	cheri_fd_destroy(struct sandbox_object *sbop);
 
 /*
  * All methods return the following structure, which fits in register return

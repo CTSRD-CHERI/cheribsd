@@ -55,6 +55,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "cheri_ccall.h"
 #include "cheri_class.h"
 #include "cheri_invoke.h"
 #include "cheri_system.h"
@@ -69,8 +70,6 @@
 
 #define	GUARD_PAGE_SIZE	0x1000
 #define	METADATA_SIZE	0x1000
-
-CHERI_CLASS_DECL(libcheri_system);
 
 int
 sandbox_class_load(struct sandbox_class *sbcp)
@@ -134,13 +133,6 @@ sandbox_class_load(struct sandbox_class *sbcp)
 	}
 
 	/*
-	 * Construct various class-related capabilities, such as the sealing
-	 * capability, code capability for the run-time linker, and code
-	 * capability for object-capability invocation.
-	 */
-	sbcp->sbc_sealcap = cheri_type_alloc();
-
-	/*
 	 * Set bounds and mask permissions on code capabilities.
 	 *
 	 * XXXRW: In CheriABI, mmap(2) will return suitable bounds, so just
@@ -159,8 +151,8 @@ sandbox_class_load(struct sandbox_class *sbcp)
 	codecap = cheri_codeptrperm(sbcp->sbc_codemem, sbcp->sbc_codelen,
 	    CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_EXECUTE);
 #endif
-	codecap = cheri_setoffset(codecap, SANDBOX_RTLD_VECTOR);
-	sbcp->sbc_classcap_rtld = cheri_seal(codecap, sbcp->sbc_sealcap);
+	sbcp->sbc_classcap_rtld = cheri_setoffset(codecap,
+	    SANDBOX_RTLD_VECTOR);
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	codecap = cheri_andperm(sbcp->sbc_codemem,
@@ -169,8 +161,8 @@ sandbox_class_load(struct sandbox_class *sbcp)
 	codecap = cheri_codeptrperm(sbcp->sbc_codemem, sbcp->sbc_codelen,
 	    CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_EXECUTE);
 #endif
-	codecap = cheri_setoffset(codecap, SANDBOX_INVOKE_VECTOR);
-	sbcp->sbc_classcap_invoke = cheri_seal(codecap, sbcp->sbc_sealcap);
+	sbcp->sbc_classcap_invoke = cheri_setoffset(codecap,
+	    SANDBOX_INVOKE_VECTOR);
 
 	return (0);
 
@@ -188,58 +180,10 @@ sandbox_class_unload(struct sandbox_class *sbcp)
 	munmap(sbcp->sbc_codemem, sbcp->sbc_codelen);
 }
 
-static struct cheri_object
-cheri_system_object_for_instance(struct sandbox_object *sbop)
-{
-	struct cheri_object system_object;
-	__capability void *codecap, *datacap;
-
-	/*
-	 * Construct an object capability for the system-class instance that
-	 * will be passed into the sandbox.
-	 *
-	 * The code capability will simply be our $pcc.
-	 *
-	 * XXXRW: For now, we will populate $c0 with $pcc on invocation, so we
-	 * need to leave a full set of permissions on it.  Eventually, we
-	 * would prefer to limit this to LOAD and EXECUTE.
-	 *
-	 * XXXRW: We should do this once per class .. or even just once
-	 * globally, rather than on every object creation.
-	 *
-	 * XXXRW: Use cheri_codeptr() here in the future?
-	 */
-	codecap = cheri_getpcc();
-	codecap = cheri_setoffset(codecap,
-	    (register_t)CHERI_CLASS_ENTRY(libcheri_system));
-	system_object.co_codecap = cheri_seal(codecap, cheri_system_type);
-
-	/*
-	 * Construct a data capability describing the sandbox structure
-	 * itself, which allows the system class to identify the sandbox a
-	 * request is being issued from.  Embed saved $c0 as first field to
-	 * allow the ambient MIPS environment to be installed.
-	 */
-	datacap = cheri_ptrperm(sbop, sizeof(*sbop), CHERI_PERM_GLOBAL |
-	    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE |
-	    CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP);
-	assert(cheri_getoffset(datacap) == 0);
-	assert(cheri_getlen(datacap) == sizeof(*sbop));
-	system_object.co_datacap = cheri_seal(datacap, cheri_system_type);
-
-	/*
-	 * Return object capability.
-	 *
-	 * XXXRW: Possibly, this should be !CHERI_PERM_GLOBAL -- but we do not
-	 * currently support invoking non-global objects.
-	 */
-	return (system_object);
-}
-
 int
 sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 {
-	__capability void *datacap;
+	__capability void *idc, *rtld_pcc, *invoke_pcc;
 	struct sandbox_metadata *sbmp;
 	size_t length;
 	size_t heaplen;
@@ -409,52 +353,74 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	sbmp->sbm_stackcap = sbop->sbo_stackcap;
 
 	/*
-	 * Construct data capability for run-time linker vector.
+	 * Construct data capability suitable for use with both run-time
+	 * linking and invocation.
 	 */
-	datacap = cheri_ptrperm(sbop->sbo_datamem, sbop->sbo_datalen,
+	idc = cheri_ptrperm(sbop->sbo_datamem, sbop->sbo_datalen,
 	    CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |
 	    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP);
-	assert(cheri_getoffset(datacap) == 0);
-	assert(cheri_getlen(datacap) == sbop->sbo_datalen);
-	sbop->sbo_cheri_object_rtld.co_codecap = sbcp->sbc_classcap_rtld;
-	sbop->sbo_cheri_object_rtld.co_datacap = cheri_seal(datacap,
-	    sbcp->sbc_sealcap);
+	assert(cheri_getoffset(idc) == 0);
+	assert(cheri_getlen(idc) == sbop->sbo_datalen);
 
 	/*
-	 * Construct data capability for object-capability invocation vector.
+	 * Configure methods for object.
 	 */
-	datacap = cheri_ptrperm(sbop->sbo_datamem, sbop->sbo_datalen,
-	    CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |
-	    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP);
-	assert(cheri_getoffset(datacap) == 0);
-	assert(cheri_getlen(datacap) == sbop->sbo_datalen);
-	if (sandbox_set_required_method_variables(datacap,
-	    sbcp->sbc_required_methods)
-	    == -1) {
+	if (sandbox_set_required_method_variables(idc,
+	    sbcp->sbc_required_methods) == -1) {
 		saved_errno = EINVAL;
 		warnx("%s: sandbox_set_ccaller_method_variables", __func__);
 		goto error;
 	}
-	/*
-	 * XXXBD: Ideally we would render the .CHERI_CCALLEE and
-	 * .CHERI_CCALLER sections read-only at this point to avoid
-	 * control flow attacks.
-	 */
-	sbop->sbo_cheri_object_invoke.co_codecap = sbcp->sbc_classcap_invoke;
-	sbop->sbo_cheri_object_invoke.co_datacap = cheri_seal(datacap,
-	    sbcp->sbc_sealcap);
 
 	/*
+	 * Lift code capabilities suitable for run-time linking and invocation
+	 * from the sandbox class.
+	 */
+	rtld_pcc = sbcp->sbc_classcap_rtld;
+	invoke_pcc = sbcp->sbc_classcap_invoke;
+
+	/*
+	 * Configure IDC and vectors for use by the libcheri CCall trampoline.
+	 * vtable is set to NULL as this is not a system class.
+	 *
 	 * XXXRW: At this point, it would be good to check the properties of
 	 * all of the generated capabilities: seal bit, base, length,
 	 * permissions, etc, for what is expected, and fail if not.
+	 *
+	 * XXXBD: Ideally we would render the .CHERI_CCALLEE and
+	 * .CHERI_CCALLER sections read-only at this point to avoid
+	 * control-flow attacks.
+	 *
+	 * XXXRW: Where it the corresponding FINI?
 	 */
+	sbop->sbo_idc = idc;
+	sbop->sbo_rtld_pcc = rtld_pcc;
+	sbop->sbo_invoke_pcc = invoke_pcc;
+	sbop->sbo_vtable = NULL;
+
+	/*
+	 * Set up a CHERI system object to service the sandbox's requests to
+	 * the ambient environment.
+	 *
+	 * XXXRW: Should this occur earlier/later?
+	 */
+	if (cheri_system_new(sbop, &sbop->sbo_sandbox_system_objectp) == -1) {
+		saved_errno = errno;
+		warnx("%s: unable to allocate system object", __func__);
+		goto error;
+	}
 
 	/*
 	 * Install a reference to the system object in the class.
 	 */
 	sbmp->sbm_system_object = sbop->sbo_cheri_object_system =
-	    cheri_system_object_for_instance(sbop);
+	    cheri_sandbox_make_sealed_invoke_object(
+	    sbop->sbo_sandbox_system_objectp);
+
+	/*
+	 * Install CReturn capabilities in the class.
+	 */
+	sbmp->sbm_creturn_object = cheri_make_sealed_return_object();
 
 	/*
 	 * Protect metadata now that we've written all values.

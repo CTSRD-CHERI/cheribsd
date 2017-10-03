@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 Robert N. M. Watson
+ * Copyright (c) 2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -28,40 +28,18 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _CHERI_ENTER_H_
-#define	_CHERI_ENTER_H_
-
-typedef register_t (*cheri_system_user_fn_t)(struct cheri_object system_object,
-	    register_t methodnum,
-	    register_t a0, register_t a1, register_t a2, register_t a3,
-	    register_t a4, register_t a5, register_t a6, register_t a7,
-	    __capability void *c3, __capability void *c4,
-	    __capability void *c5, __capability void *c6,
-	    __capability void *c7)
-	    __attribute__((cheri_ccall)); /* XXXRW: Will be ccheri_ccallee. */
-
-void	cheri_system_user_register_fn(cheri_system_user_fn_t fn_ptr);
+#ifndef _CHERI_CCALL_H_
+#define	_CHERI_CCALL_H_
 
 /*
- * Location where libcheri system classes can find a suitable return
- * capability to use.
+ * Private interfaces to return sealed capabilities to call an object's rtld,
+ * invoke the object, or return (from any object).
  */
-extern struct cheri_object	__cheri_object_creturn;
+struct sandbox_object;
+struct cheri_object	cheri_sandbox_make_sealed_invoke_object(
+			    struct sandbox_object *sbop);
+struct cheri_object	cheri_sandbox_make_sealed_rtld_object(
+			    struct sandbox_object *sbop);
+struct cheri_object	cheri_make_sealed_return_object(void);
 
-/*
- * Method numbers used by the sandbox runtime itself.
- *
- * WARNING: These values must match those currently hard coded in the sandbox
- * C runtime (lib/csu/cheri/crt_sb.S).
- *
- * NB: In the future, these should be via a reserved entry point rather than
- * the primary object-capability 'invoke' entry point, so that they can be
- * called only by the runtime.
- */
-#define	SANDBOX_RUNTIME_CONSTRUCTORS	(-1)
-#define	SANDBOX_RUNTIME_DESTROCTORS	(-2)
-
-#define	CHERI_SYSTEM_USER_BASE		1000
-#define	CHERI_SYSTEM_USER_CEILING	2000
-
-#endif /* !_CHERI_ENTER_H_ */
+#endif /* _CHERI_CCALL_H_ */

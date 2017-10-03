@@ -311,9 +311,10 @@ void	test_sandbox_vm_xfault_nocatch(const struct cheri_test *ctp);
 #define	CHERITEST_FD_WRITE_STR	"write123"
 
 extern int			 zero_fd;
-extern struct cheri_object	 stdin_fd_object;
-extern struct cheri_object	 stdout_fd_object;
-extern struct cheri_object	 zero_fd_object;
+
+extern struct sandbox_object	*sbop_stdin;
+extern struct sandbox_object	*sbop_stdout;
+extern struct sandbox_object	*sbop_zero;
 
 void	test_sandbox_fd_fstat(const struct cheri_test *ctp);
 void	test_sandbox_fd_lseek(const struct cheri_test *ctp);

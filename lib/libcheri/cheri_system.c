@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 Robert N. M. Watson
+ * Copyright (c) 2014-2017 Robert N. M. Watson
  * Copyright (c) 2014 SRI International
  * All rights reserved.
  *
@@ -36,6 +36,7 @@
 
 #include <sys/syscall.h>
 
+#include <assert.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -51,18 +52,62 @@
 
 /*
  * This C file implements the CHERI system class.  Currently, pretty
- * minimalist.
+ * minimalist.  Sandbox object instances are created by sandbox_object_new()
+ * as required, one per loaded sandbox object.
  */
-__capability void		*cheri_system_type;
 __capability vm_offset_t	*cheri_system_vtable;
 
 static struct cheri_object null_object;
 
-static __attribute__ ((constructor)) void
-cheri_system_init(void)
-{
+CHERI_CLASS_DECL(libcheri_system);
 
-	cheri_system_type = cheri_system_type_alloc();
+/*
+ * Construct a new CHERI system object for use with a specific sandbox object.
+ */
+int
+cheri_system_new(struct sandbox_object *sbop, struct sandbox_object **sbopp)
+{
+	__capability void *idc, *invoke_pcc;
+
+	/*
+	 * Construct a data capability describing the sandbox structure
+	 * itself, which allows the system class to identify the sandbox a
+	 * request is being issued from.  Embed saved $c0 as first field to
+	 * allow the ambient MIPS environment to be installed.
+	 *
+	 * XXXRW: Is this up-to-date?
+	 */
+	idc = cheri_ptrperm(sbop, sizeof(*sbop), CHERI_PERM_GLOBAL |
+	    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE |
+	    CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP);
+	assert(cheri_getoffset(idc) == 0);
+	assert(cheri_getlen(idc) == sizeof(*sbop));
+
+	/*
+	 * Construct an object capability for the system-class instance that
+	 * will be passed into the sandbox.
+	 *
+	 * The code capability will simply be our $pcc.
+	 *
+	 * XXXRW: For now, we will populate $c0 with $pcc on invocation, so we
+	 * need to leave a full set of permissions on it.  Eventually, we
+	 * would prefer to limit this to LOAD and EXECUTE.
+	 *
+	 * XXXRW: We should do this once per class .. or even just once
+	 * globally, rather than on every object creation.
+	 *
+	 * XXXRW: Use cheri_codeptr() here in the future?
+	 *
+	 * XXXRW: Is this up-to-date?
+	 *
+	 * Set up vector pointer, remove sealing, point at tranpoline?
+	 */
+	invoke_pcc = cheri_getpcc();
+	invoke_pcc = cheri_setoffset(invoke_pcc,
+	    (register_t)CHERI_CLASS_ENTRY(libcheri_system));
+
+	return (sandbox_object_new_system_object(idc, NULL, invoke_pcc,
+	    cheri_system_vtable, sbopp));
 }
 
 /*

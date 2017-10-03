@@ -2017,6 +2017,7 @@ trapsignal(struct thread *td, ksiginfo_t *ksi)
 	ps = p->p_sigacts;
 	mtx_lock(&ps->ps_mtx);
 
+#if 0
 #ifdef CPU_CHERI
 	/*
 	 * If a signal triggered by a trap will not be caught by the process,
@@ -2034,6 +2035,7 @@ trapsignal(struct thread *td, ksiginfo_t *ksi)
 			    "tid %d\n", sig, p->p_pid, td->td_tid);
 		mtx_unlock(&ps->ps_mtx);
 	} else
+#endif
 #endif
 	if ((p->p_flag & P_TRACED) == 0 && SIGISMEMBER(ps->ps_sigcatch, sig) &&
 	    !SIGISMEMBER(td->td_sigmask, sig)) {

@@ -1,5 +1,5 @@
 #-
-# Copyright (c) 2012-2015 Robert N. M. Watson
+# Copyright (c) 2012-2017 Robert N. M. Watson
 # All rights reserved.
 #
 # This software was developed by SRI International and the University of
@@ -150,9 +150,16 @@ creturn_target:
 	#
 
 	#
-	# Return to caller.
+	# Return to caller -- load sbm_creturn_object.{co_code, co_data} into
+	# $c1 and $c2, and ccall into the creturn trampoline.
 	#
-	creturn
+	# XXXRW: Do we need to CGetDefault to load the right $c26 here?
+	#
+	cgetdefault	$c26
+	dli	$t0, 0x1000
+	clc	$c1, $t0, 32 + 4*CHERICAP_SIZE($c26)
+	clc	$c2, $t0, 32 + 5*CHERICAP_SIZE($c26)
+	ccall	$c1, $c2, 1
 	.end __invoke_vector
 
 	.global abort

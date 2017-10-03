@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012-2015, 2017 Robert N. M. Watson
+ * Copyright (c) 2012-2017 Robert N. M. Watson
  * Copyright (c) 2015 SRI International
  * All rights reserved.
  *
@@ -57,10 +57,9 @@ struct sandbox_class {
 	struct sandbox_map	*sbc_datamap;
 
 	/*
-	 * The class's code capability, in various incarnations required for
+	 * The class's code capabilities, in various incarnations required for
 	 * class creation.  These will be used for all objects in the class.
 	 */
-	__capability void	*sbc_sealcap;		/* Class type */
 	__capability void	*sbc_classcap_rtld;	/* Ctor/dtor */
 	__capability void	*sbc_classcap_invoke;	/* Object invoke */
 
@@ -95,8 +94,38 @@ struct
 __attribute__ ((aligned(4096)))
 #endif
 sandbox_object {
-	CHERI_SYSTEM_OBJECT_FIELDS;
+	/*
+	 * IMPORTANT: These fields must be at the top of the sandbox_object,
+	 * and in this specific order, as corresponding offsets to them are
+	 * included in assembly domain-transition code in
+	 * cheri_ccall_trampoline.S.
+	 *
+	 * sbo_idc         IDC to install for both rtld and invocation entry.
+	 *		   The entry vector code will also use this
+	 *		   capability, with offset set to zero, as the
+	 *		   installed DDC.
+	 *
+	 * sbo_rtld_pcc    PCC to install for rtld operations.
+	 *
+	 * sbo_invoke_pcc  PCC to install on invocation.
+	 *
+	 * sbo_vtable      VTable pointer used for CHERI system classes;
+	 *		   unused for loaded (confined) classes.
+	 *
+	 * XXXRW: It would be nice if the offsets to these fields were in
+	 * shared headers, allowing compile-time asserts to be used to check
+	 * binary compatibility has not been broken.
+	 */
+	__capability void	*sbo_idc;	/* Capability offset 1. */
+	__capability void	*sbo_rtld_pcc;	/* Capability offset 2. */
+	__capability void	*sbo_invoke_pcc;/* Capability offset 3. */
+	__capability void	*sbo_vtable;	/* Capability offset 4. */
+
+	/*
+	 * Further fields are unknown to the assembly domain-transition code.
+	 */
 	struct sandbox_class	*sbo_sandbox_classp;
+	struct sandbox_object	*sbo_sandbox_system_objectp;
 	void			*sbo_datamem;
 	void			*sbo_stackmem;
 
@@ -107,7 +136,9 @@ sandbox_object {
 	uint			 sbo_flags;	/* Sandbox flags. */
 
 	/*
-	 * The object's own code and data capabilities.
+	 * Sealed code and data capabilities suitable to access the object's
+	 * run-time linker methods and also general object-capability
+	 * invocation.
 	 */
 	struct cheri_object	 sbo_cheri_object_rtld;
 	struct cheri_object	 sbo_cheri_object_invoke;

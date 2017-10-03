@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 Robert N. M. Watson
+ * Copyright (c) 2014-2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -39,10 +39,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "cheri_ccall.h"
 #include "cheri_class.h"
 #define CHERI_FD_INTERNAL
 #include "cheri_fd.h"
-#include "cheri_type.h"
+#include "cheri_system.h"
+#include "sandbox.h"
 
 /*
  * This file implements the CHERI 'file descriptor' (fd) class.  Pretty
@@ -65,11 +67,13 @@
  * to complete.  Differentiate 'revoke' from 'destroy', the latter of which is
  * safe only once all references have drained.  We rely on the ambient code
  * knowing when it is safe (or perhaps never calling it).
+ *
+ * XXXRW: Userspace CCall: break out into two files, one for setup, the other
+ * for methods?
  */
 
 CHERI_CLASS_DECL(cheri_fd);
 
-static __capability void	*cheri_fd_type;
 __capability vm_offset_t	*cheri_fd_vtable;
 
 /*
@@ -80,26 +84,26 @@ struct
 __attribute__ ((aligned(4096)))
 #endif
 cheri_fd {
-	CHERI_SYSTEM_OBJECT_FIELDS;
-	int	cf_fd;	/* Underlying file descriptor. */
+	struct sandbox_object	*cd_sbop; /* Corresponding sandbox object. */
+	int			 cf_fd;	  /* Underlying file descriptor. */
 };
 
 #define	min(x, y)	((x) < (y) ? (x) : (y))
 
-static __attribute__ ((constructor)) void
-cheri_fd_init(void)
-{
-
-	cheri_fd_type = cheri_type_alloc();
-}
+/*
+ * XXXRW: CHERI system objects must have a corresponding sandbox_object to use
+ * during domain transition.  Define one here.
+ */
 
 /*
  * Allocate a new cheri_fd object for an already-open file descriptor.
+ *
+ * XXXRW: What to return in the userspace CCall world order?  The sandbox..?
  */
 int
-cheri_fd_new(int fd, struct cheri_object *cop)
+cheri_fd_new(int fd, struct sandbox_object **sbopp)
 {
-	__capability void *codecap, *datacap;
+	__capability void *idc, *invoke_pcc;
 	struct cheri_fd *cfp;
 
 	cfp = calloc(1, sizeof(*cfp));
@@ -107,8 +111,18 @@ cheri_fd_new(int fd, struct cheri_object *cop)
 		errno = ENOMEM;
 		return (-1);
 	}
-	CHERI_SYSTEM_OBJECT_INIT(cfp, cheri_fd_vtable);
 	cfp->cf_fd = fd;
+
+	/*
+	 * Construct a sealed data capability for the class.  This describes
+	 * the 'struct cheri_fd' for the specific file descriptor.  The $c0
+	 * to reinstall later is the first field in the structure.
+	 *
+	 * XXXRW: Should we also do an explicit cheri_setoffset()?
+	 */
+	idc = cheri_ptrperm(cfp, sizeof(*cfp), CHERI_PERM_GLOBAL |
+	    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE |
+	    CHERI_PERM_STORE_CAP);
 
 	/*
 	 * Construct a sealed code capability for the class.  This is just the
@@ -121,21 +135,18 @@ cheri_fd_new(int fd, struct cheri_object *cop)
 	 *
 	 * XXXRW: In the future, use cheri_codeptr() here?
 	 */
-	codecap = cheri_setoffset(cheri_getpcc(),
+	invoke_pcc = cheri_setoffset(cheri_getpcc(),
 	    (register_t)CHERI_CLASS_ENTRY(cheri_fd));
-	cop->co_codecap = cheri_seal(codecap, cheri_fd_type);
 
 	/*
-	 * Construct a sealed data capability for the class.  This describes
-	 * the 'struct cheri_fd' for the specific file descriptor.  The $c0
-	 * to reinstall later is the first field in the structure.
-	 *
-	 * XXXRW: Should we also do an explicit cheri_setoffset()?
+	 * Set up system object state for the sandbox.
 	 */
-	datacap = cheri_ptrperm(cfp, sizeof(*cfp), CHERI_PERM_GLOBAL |
-	    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE |
-	    CHERI_PERM_STORE_CAP);
-	cop->co_datacap = cheri_seal(datacap, cheri_fd_type);
+	if (sandbox_object_new_system_object(idc, NULL, invoke_pcc,
+	    cheri_fd_vtable, &cfp->cd_sbop) != 0) {
+		free(cfp);
+		return (-1);
+	}
+	*sbopp = cfp->cd_sbop;
 	return (0);
 }
 
@@ -144,11 +155,11 @@ cheri_fd_new(int fd, struct cheri_object *cop)
  * continue.  Note: does not close the fd or free memory.  The latter must
  */
 void
-cheri_fd_revoke(struct cheri_object co)
+cheri_fd_revoke(struct sandbox_object *sbop)
 {
 	__capability struct cheri_fd *cfp;
 
-	cfp = cheri_unseal(co.co_datacap, cheri_fd_type);
+	cfp = sandbox_object_getsandboxdata(sbop);
 	cfp->cf_fd = -1;
 }
 
@@ -157,12 +168,12 @@ cheri_fd_revoke(struct cheri_object co)
  * outstanding references in any sandboxes (etc).
  */
 void
-cheri_fd_destroy(struct cheri_object co)
+cheri_fd_destroy(struct sandbox_object *sbop)
 {
 	__capability struct cheri_fd *cfp;
 
-	cfp = cheri_unseal(co.co_datacap, cheri_fd_type);
-	CHERI_SYSTEM_OBJECT_FINI(cfp);
+	cfp = sandbox_object_getsandboxdata(sbop);
+	sandbox_object_destroy(sbop);
 	free((void *)cfp);
 }
 

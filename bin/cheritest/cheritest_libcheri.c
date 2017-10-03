@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012-2016 Robert N. M. Watson
+ * Copyright (c) 2012-2017 Robert N. M. Watson
  * Copyright (c) 2014 SRI International
  * All rights reserved.
  *
@@ -69,6 +69,9 @@ struct sandbox_object	*cheritest_objectp;
 
 struct cheri_object cheritest, cheritest2;
 
+static int	allow_syscall(int *retp __unused,
+		    __capability int *errno_val __unused);
+
 void
 test_sandbox_abort(const struct cheri_test *ctp __unused)
 {
@@ -94,7 +97,7 @@ test_sandbox_cs_calloc(const struct cheri_test *ctp __unused)
 }
 
 static int
-allow_syscall(int *retp __unused, __capability int *errno __unused)
+allow_syscall(int *retp __unused, __capability int *errno_val __unused)
 {
 
 	return (0);
@@ -395,14 +398,14 @@ cheritest_libcheri_setup(void)
 	/*
 	 * Prepare CHERI objects representing stdin, stdout, and /dev/zero.
 	 */
-	if (cheri_fd_new(STDIN_FILENO, &stdin_fd_object) < 0)
+	if (cheri_fd_new(STDIN_FILENO, &sbop_stdin) < 0)
 		err(EX_OSFILE, "cheri_fd_new: stdin");
-	if (cheri_fd_new(STDOUT_FILENO, &stdout_fd_object) < 0)
+	if (cheri_fd_new(STDOUT_FILENO, &sbop_stdout) < 0)
 		err(EX_OSFILE, "cheri_fd_new: stdout");
 	zero_fd = open("/dev/zero", O_RDWR);
 	if (zero_fd < 0)
 		err(EX_OSFILE, "open: /dev/zero");
-	if (cheri_fd_new(zero_fd, &zero_fd_object) < 0)
+	if (cheri_fd_new(zero_fd, &sbop_zero) < 0)
 		err(EX_OSFILE, "cheri_fd_new: /dev/zero");
 
 	if (sandbox_class_new("/usr/libexec/cheritest-helper",
@@ -424,6 +427,8 @@ cheritest_libcheri_destroy(void)
 
 	sandbox_object_destroy(cheritest_objectp);
 	sandbox_class_destroy(cheritest_classp);
-	cheri_fd_destroy(zero_fd_object);
+	cheri_fd_destroy(sbop_stdin);
+	cheri_fd_destroy(sbop_stdout);
+	cheri_fd_destroy(sbop_zero);
 	close(zero_fd);
 }

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 Robert N. M. Watson
+ * Copyright (c) 2014-2017 Robert N. M. Watson
  * Copyright (c) 2015 SRI International
  * All rights reserved.
  *
@@ -31,6 +31,54 @@
 
 #ifndef _CHERI_STACK_H_
 #define	_CHERI_STACK_H_
+
+#include <ucontext.h>	/* For ucontext_t argument to cheri_stack_unwind(). */
+
+/*
+ * Definitions for libcheri's "trusted stack": Each frame describes the state
+ * associated with a particular invocation of CCall, and contains the return
+ * $pcc and $idc values to restore once the invoked object returns.  Frames
+ * are pushed as invocations are made, and popped on safe return or if an
+ * exception leads to an unwind (or if the trusted stack is manipulated
+ * directly using privileged calls).
+ *
+ * Currently the same structures are used internally as are exposed via the
+ * library API; we might wish to change this for reasons of ABI robustness.
+ */
+struct cheri_stack_frame {
+#if __has_feature(capabilities)
+	void * __capability	csf_pcc;	/* Saved return $pcc */
+	void * __capability	csf_idc;	/* Saved IDC */
+#else
+	struct chericap	csf_pcc;
+	struct chericap	csf_idc;
+#endif
+};
+
+/*
+ * Currently, we have a maximum invocation depth that is low, and encoded in
+ * the ABI.  We might want to revisit these choices to hide any limit from the
+ * library consumer, to raise it, and perhaps to allow flexible per-thread
+ * limits.  A lot will depend on eventual common usage patterns.
+ */
+#define	CHERI_STACK_DEPTH	8	/* XXXRW: 8 is a nice round number. */
+struct cheri_stack {
+	register_t	cs_tsp;		/* Byte offset, not frame index. */
+	register_t	cs_tsize;	/* Stack size, in bytes. */
+	register_t	_cs_pad0;
+	register_t	_cs_pad1;
+	struct cheri_stack_frame	cs_frames[CHERI_STACK_DEPTH];
+} __aligned(CHERICAP_SIZE);
+
+#define	CHERI_FRAME_SIZE	sizeof(struct cheri_stack_frame)
+#define	CHERI_STACK_SIZE	(CHERI_STACK_DEPTH * CHERI_FRAME_SIZE)
+
+/*
+ * Public libcheri APIs to interact with the trusted stack.
+ */
+
+int	cheri_stack_get(struct cheri_stack *csp);	/* XXXRW: TODO */
+int	cheri_stack_set(struct cheri_stack *csp);	/* XXXRW: TODO */
 
 /*
  * Unwind operations.
