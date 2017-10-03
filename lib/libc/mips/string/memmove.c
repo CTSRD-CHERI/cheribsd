@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2015 SRI International
+ * Copyright (c) 2017 Robert Kovacsics
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
