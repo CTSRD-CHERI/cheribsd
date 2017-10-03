@@ -13,12 +13,6 @@ MDSRCS+= \
 	strrchr.S
 .endif
 
-.if ${MK_CHERI} == "no"
-MDSRCS+= \
-	bcopy.c \
-	memcpy.c \
-	memmove.c
-.else
 CHERI_MDSRCS=	\
 		memchr_c.c \
 		memcmp_c.c \
@@ -44,4 +38,3 @@ CC.${src}=	${_CHERI_CC}
 .endfor
 
 SYM_MAPS+=	${LIBC_SRCTOP}/mips/string/Symbol.map
-.endif
