@@ -188,8 +188,9 @@
 	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL)
 
 /*
- * XXX-BD: _DATA should not include _VMMAP, but malloc needs rework to
- * fix.
+ * _DATA includes _VMMAP to support MAP_CHERI_DDC.  This should be removed
+ * when all consumers are migrated.  Current consumers:
+ *  - TLS mini-allocator
  */
 #define	CHERI_PERMS_USERSPACE_DATA					\
 				(CHERI_PERMS_USERSPACE |		\

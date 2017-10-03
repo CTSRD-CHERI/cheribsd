@@ -257,6 +257,7 @@ void	test_fault_ccall_data_execute(const struct cheri_test *ctp);
 void	test_cheriabi_mmap_nospace(const struct cheri_test *ctp);
 void	test_cheriabi_mmap_perms(const struct cheri_test *ctp);
 void	test_cheriabi_mmap_unrepresentable(const struct cheri_test *ctp);
+void	test_cheriabi_mmap_ddc(const struct cheri_test *ctp);
 
 /* cheritest_cheriabi_open.c */
 void	test_cheriabi_open_ordinary(const struct cheri_test *ctp __unused);
