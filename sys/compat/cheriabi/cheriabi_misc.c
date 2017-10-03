@@ -1921,13 +1921,14 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 	}
 	cap_base = cheri_getbase(addr_cap);
 	cap_len = cheri_getlen(addr_cap);
-	if (usertag)
+	if (usertag) {
 		cap_offset = cheri_getoffset(addr_cap);
-	else
+	} else {
 		/*
 		 * Ignore offset of default cap, it's only used to set bounds.
 		 */
 		cap_offset = 0;
+	}
 	if (cap_offset >= cap_len) {
 		SYSERRCAUSE("capability has out of range offset");
 		return (EPROT);
