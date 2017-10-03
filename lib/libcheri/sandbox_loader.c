@@ -183,7 +183,7 @@ sandbox_class_unload(struct sandbox_class *sbcp)
 int
 sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 {
-	__capability void *idc, *rtld_pcc, *invoke_pcc;
+	__capability void *idc;
 	struct sandbox_metadata *sbmp;
 	size_t length;
 	size_t heaplen;
@@ -373,15 +373,10 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	}
 
 	/*
-	 * Lift code capabilities suitable for run-time linking and invocation
-	 * from the sandbox class.
-	 */
-	rtld_pcc = sbcp->sbc_classcap_rtld;
-	invoke_pcc = sbcp->sbc_classcap_invoke;
-
-	/*
-	 * Configure IDC and vectors for use by the libcheri CCall trampoline.
-	 * vtable is set to NULL as this is not a system class.
+	 * Set up the libcheri CCall trampoline environment.  Copy unsealed
+	 * code capabilities for rtld and invocation from the sandbox class.
+	 * As this is not a system class, set the vtable to NULL.  IDC is set
+	 * to the sandbox object itself (as above).
 	 *
 	 * XXXRW: At this point, it would be good to check the properties of
 	 * all of the generated capabilities: seal bit, base, length,
@@ -394,9 +389,19 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	 * XXXRW: Where it the corresponding FINI?
 	 */
 	sbop->sbo_idc = idc;
-	sbop->sbo_rtld_pcc = rtld_pcc;
-	sbop->sbo_invoke_pcc = invoke_pcc;
+	sbop->sbo_rtld_pcc = sbcp->sbc_classcap_rtld;
+	sbop->sbo_invoke_pcc = sbcp->sbc_classcap_invoke;
 	sbop->sbo_vtable = NULL;
+
+	/*
+	 * Construct sealed rtld and invocation capabilities for use with
+	 * cheri_invoke(), which will transition to the libcheri CCall
+	 * trampoline.
+	 */
+	sbop->sbo_cheri_object_rtld =
+	    cheri_sandbox_make_sealed_rtld_object(sbop);
+	sbop->sbo_cheri_object_invoke =
+	    cheri_sandbox_make_sealed_invoke_object(sbop);
 
 	/*
 	 * Set up a CHERI system object to service the sandbox's requests to
