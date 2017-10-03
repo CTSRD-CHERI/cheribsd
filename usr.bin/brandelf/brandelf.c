@@ -59,10 +59,6 @@ static struct ELFtypes elftypes[] = {
 	{ "SVR4",	ELFOSABI_SYSV }
 };
 
-#ifndef EM_MIPS_CHERI
-#define	EM_MIPS_CHERI	0xC256
-#endif
-
 int
 main(int argc, char **argv)
 {
@@ -71,27 +67,12 @@ main(int argc, char **argv)
 	int retval = 0;
 	int ch, change = 0, force = 0, listed = 0;
 	ssize_t writeout;
-	int cheri = 0;
 
-	while ((ch = getopt(argc, argv, "c:f:lt:v")) != -1)
+	while ((ch = getopt(argc, argv, "f:lt:v")) != -1)
 		switch (ch) {
-		case 'c':
-			if (force)
-				errx(1, "c option incompatible with f option");
-			if (change)
-				errx(1, "c option incompatible with t option");
-			cheri = atoi(optarg);
-			if (errno == ERANGE || (cheri != 128 && cheri != 256)) {
-				warnx("invalid argument to option c: %s",
-				    optarg);
-				usage();
-			}
-			break;
 		case 'f':
 			if (change)
 				errx(1, "f option incompatible with t option");
-			if (cheri)
-				errx(1, "f option incompatible with c option");
 			force = 1;
 			type = atoi(optarg);
 			if (errno == ERANGE || type < 0 || type > 255) {
@@ -108,8 +89,6 @@ main(int argc, char **argv)
 			/* does nothing */
 			break;
 		case 't':
-			if (cheri)
-				errx(1, "t option incompatible with c option");
 			if (force)
 				errx(1, "t option incompatible with f option");
 			change = 1;
@@ -129,21 +108,21 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (!force && !cheri && (type = elftype(strtype)) == -1) {
+	if (!force && (type = elftype(strtype)) == -1) {
 		warnx("invalid ELF type '%s'", strtype);
 		printelftypes();
 		usage();
 	}
 
 	while (argc) {
-		int e_data, e_machine, fd, target_e_machine;
+		int fd;
 		union {
 			unsigned char	ident[EI_NIDENT];
 			Elf32_Ehdr	ehdr32;
 			Elf64_Ehdr	ehdr64;
 		} buffer;
 
-		if ((fd = open(argv[0], change || cheri || force ? O_RDWR : O_RDONLY,
+		if ((fd = open(argv[0], change || force ? O_RDWR : O_RDONLY,
 		    0)) < 0) {
 			warn("error opening file %s", argv[0]);
 			retval = 1;
@@ -160,7 +139,7 @@ main(int argc, char **argv)
 			retval = 1;
 			goto fail;
 		}
-		if (!change && !cheri && !force) {
+		if (!change && !force) {
 			writeout = 0;
 			fprintf(stdout,
 				"File '%s' is of brand '%s' (%u).\n",
@@ -170,63 +149,6 @@ main(int argc, char **argv)
 				warnx("ELF ABI Brand '%u' is unknown",
 				      type);
 				printelftypes();
-			}
-		} else if (cheri) {
-			e_data = buffer.ident[EI_DATA];
-			if (e_data != 1 && e_data != 2) {
-				warnx("file '%s' has unknown endianness",
-				    argv[0]);
-				retval = 1;
-				goto fail;
-			}
-			switch (buffer.ident[EI_CLASS]) {
-			case ELFCLASS32:
-				writeout = sizeof(buffer.ehdr32);
-				if (pread(fd, &buffer, writeout, 0) <
-				    writeout) {
-					warnx("file '%s' too short", argv[0]);
-					retval = 1;
-					goto fail;
-				}
-				/* No CHERI on 32-bit architectures */
-				warnx("file '%s' not supported by cheri",
-				    argv[0]);
-				retval = 1;
-				goto fail;
-				break;
-
-			case ELFCLASS64:
-				writeout = sizeof(buffer.ehdr64);
-				if (pread(fd, &buffer, writeout, 0) <
-				    writeout) {
-					warnx("file '%s' too short", argv[0]);
-					retval = 1;
-					goto fail;
-				}
-				e_machine = e_data == 1 ?
-				    le16toh(buffer.ehdr64.e_machine) :
-				    be16toh(buffer.ehdr64.e_machine);
-				target_e_machine = EM_MIPS_CHERI;
-				if (e_machine == target_e_machine) {
-					break;
-				} else if (e_machine == EM_MIPS) {
-					buffer.ehdr64.e_machine =
-					    e_data == 1 ?
-					    htole16(target_e_machine) :
-					    htobe16(target_e_machine);
-				} else {
-					warnx("file '%s' not a CHERI platform",
-					    argv[0]);
-					retval = 1;
-					goto fail;
-				}
-				break;
-
-			default:
-				warnx("file '%s' is an unknown elf class %c",
-				   argv[0], buffer.ident[EI_CLASS]);
-				retval = 1;
-				goto fail;
 			}
 		} else {
 			writeout = EI_NIDENT;
