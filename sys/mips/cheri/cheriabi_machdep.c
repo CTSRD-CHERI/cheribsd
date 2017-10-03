@@ -160,23 +160,6 @@ struct sysentvec elf_freebsd_cheriabi_sysvec = {
 };
 INIT_SYSENTVEC(cheriabi_sysent, &elf_freebsd_cheriabi_sysvec);
 
-/* FIXME: remove legacy struct once everyone has upgraded to the new compiler */
-static Elf64_Brandinfo freebsd_cheriabi_brand_info_legacy = {
-	.brand		= ELFOSABI_FREEBSD,
-	.machine	= EM_MIPS_CHERI,
-	.compat_3_brand	= "FreeBSD",
-	.emul_path	= NULL,
-	.interp_path	= "/libexec/ld-cheri-elf.so.1",
-	.sysvec		= &elf_freebsd_cheriabi_sysvec,
-	.interp_newpath = NULL,
-	.flags		= 0,
-	.header_supported = cheriabi_elf_header_supported
-};
-
-SYSINIT(cheriabi_legacy, SI_SUB_EXEC, SI_ORDER_ANY,
-    (sysinit_cfunc_t) elf64_insert_brand_entry,
-    &freebsd_cheriabi_brand_info_legacy);
-
 static Elf64_Brandinfo freebsd_cheriabi_brand_info = {
 	.brand		= ELFOSABI_FREEBSD,
 	.machine	= EM_MIPS,
@@ -211,14 +194,6 @@ cheriabi_elf_header_supported(struct image_params *imgp)
 	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
 	const uint32_t machine = hdr->e_flags & EF_MIPS_MACH;
 
-	if (hdr->e_machine == EM_MIPS_CHERI) {
-#ifdef NOTYET
-		printf("warning: binary %s is using legacy EM_MIPS_CHERI "
-		    "machine type. Please update SDK and recompile.\n",
-		    imgp->execpath);
-#endif
-		return TRUE;
-	}
 	if ((hdr->e_flags & EF_MIPS_ABI) != EF_MIPS_ABI_CHERIABI)
 		return FALSE;
 
