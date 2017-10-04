@@ -103,7 +103,15 @@ struct syscall_args {
 };
 
 #ifdef __mips_n64
+#ifdef __CHERI_PURE_CAPABILITY__
+/**
+ * XXX KINFO_PROC32_SIZE is not defined for purecap
+ * because it is not clear how the 32bit compat layer would look like.
+ */
+#define KINFO_PROC_SIZE 1568
+#else /* ! __CHERI_PURE_CAPABILITY__ */
 #define	KINFO_PROC_SIZE 1088
+#endif /* ! __CHERI_PURE_CAPABILITY__ */
 #define	KINFO_PROC32_SIZE 816
 #else
 #define	KINFO_PROC_SIZE 816
