@@ -446,7 +446,8 @@ __elfN(map_partial)(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		if (sf == NULL)
 			return (KERN_FAILURE);
 		off = offset - trunc_page(offset);
-		error = copyout((caddr_t)sf_buf_kva(sf) + off, (caddr_t)start,
+		error = copyout((caddr_t)sf_buf_kva(sf) + off,
+		    (caddr_t)cheri_kern_ptr(start, end - start),
 		    end - start);
 		vm_imgact_unmap_page(sf);
 		if (error != 0)
@@ -503,7 +504,7 @@ __elfN(map_insert)(struct image_params *imgp, vm_map_t map, vm_object_t object,
 			if (sz > PAGE_SIZE - off)
 				sz = PAGE_SIZE - off;
 			error = copyout((caddr_t)sf_buf_kva(sf) + off,
-			    (caddr_t)start, sz);
+				(caddr_t)cheri_kern_ptr(start, sz), sz);
 			vm_imgact_unmap_page(sf);
 			if (error != 0)
 				return (KERN_FAILURE);
@@ -621,7 +622,7 @@ __elfN(load_section)(struct image_params *imgp, vm_ooffset_t offset,
 		off = trunc_page_ps(offset + filsz, pagesize) -
 		    trunc_page(offset + filsz);
 		error = copyout((caddr_t)sf_buf_kva(sf) + off,
-		    (caddr_t)map_addr, copy_len);
+		    (caddr_t)cheri_kern_ptr(map_addr, copy_len), copy_len);
 		vm_imgact_unmap_page(sf);
 		if (error != 0)
 			return (error);
