@@ -51,6 +51,8 @@ __FBSDID("$FreeBSD$");
 #include <cam/cam.h>
 #include <cam/cam_ccb.h>
 
+#include <cheri/cheri.h>
+
 /* prototypes */
 static int ata_generic_status(device_t dev);
 static int ata_wait(struct ata_channel *ch, int unit, u_int8_t);
@@ -845,7 +847,7 @@ ata_pio_read(struct ata_request *request, int length)
 				    bio->bio_ma[moff / PAGE_SIZE]);
 				moff %= PAGE_SIZE;
 				size = min(size, PAGE_SIZE - moff);
-				addr = (void *)(page + moff);
+				addr = (void *)cheri_kern_ptr((page + moff), size);
 			}
 		} else
 			panic("ata_pio_read: Unsupported CAM data type %x\n",
@@ -931,7 +933,7 @@ ata_pio_write(struct ata_request *request, int length)
 				    bio->bio_ma[moff / PAGE_SIZE]);
 				moff %= PAGE_SIZE;
 				size = min(size, PAGE_SIZE - moff);
-				addr = (void *)(page + moff);
+				addr = (void *)cheri_kern_ptr((page + moff), size);
 			}
 		} else
 			panic("ata_pio_write: Unsupported CAM data type %x\n",
