@@ -224,7 +224,7 @@
  */
 #define	CHERI_OTYPE_USER_MIN	(0)
 #define	CHERI_OTYPE_USER_MAX	((1 << 23) - 1)
-#define	CHERI_OTYPE_KERN_MIN	(1 << 24)
+#define	CHERI_OTYPE_KERN_MIN	(1 << 23)
 #define	CHERI_OTYPE_KERN_MAX	((1 << 24) - 1)
 
 #define	CHERI_OTYPE_KERN_FLAG	(1 << 23)
