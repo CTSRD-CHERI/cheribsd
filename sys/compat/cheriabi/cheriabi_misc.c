@@ -1559,6 +1559,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 {
 	int argc, envc;
 	void * __capability *vectp;
+	void * __capability *syscallp;
 	char *stringp;
 	uintptr_t destp;
 	void * __capability *stack_base;
@@ -1621,6 +1622,29 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	imgp->pagesizes = destp;
 	copyout(pagesizes, (void *)destp, szps);
 	imgp->pagesizeslen = szps;
+
+	/*
+	 * Populate the syscall token array.
+	 *
+	 * We should probably hang this off the sysvec for efficency.
+	 * We don't want to put it in the shared page because we'd like
+	 * to support knockouts. (Unless we limit access to the shared
+	 * page to rtld???)
+	 */
+	int nsyscalls = imgp->proc->p_sysent->sv_size;
+	destp -= nsyscalls * sizeof(void * __capability);
+	syscallp = (void * __capability *)destp;
+	imgp->systokens = destp;
+	imgp->systokens_count = nsyscalls;
+	for (int i = 0; i < nsyscalls; i++) {
+		void * __capability token =
+		    cheriabi_syscall2token(i, imgp->proc);
+		KASSERT(cheri_gettag(token),
+		    ("untagged token for syscall %d", i));
+		KASSERT(cheri_getsealed(token),
+		    ("unsealed token for syscall %d", i));
+		copyoutcap(&token, syscallp++, sizeof(token));
+	}
 
 	destp -= ARG_MAX - imgp->args->stringspace;
 	destp = rounddown2(destp, sizeof(void * __capability));
@@ -1802,6 +1826,12 @@ cheriabi_set_auxargs(void * __capability *pos, struct image_params *imgp)
 		AUXARGS_ENTRY_CAP(pos, AT_PAGESIZES, imgp->pagesizes, 0,
 		   imgp->pagesizeslen, CHERI_CAP_USER_DATA_PERMS);
 		AUXARGS_ENTRY(pos, AT_PAGESIZESLEN, imgp->pagesizeslen);
+	}
+	if (imgp->systokens != 0) {
+		AUXARGS_ENTRY_CAP(pos, AT_SYSTOKENS, imgp->systokens, 0,
+		    imgp->systokens_count * sizeof(void * __capability),
+		    CHERI_CAP_USER_DATA_PERMS);
+		AUXARGS_ENTRY(pos, AT_SYSTOK_COUNT, imgp->systokens_count);
 	}
 	if (imgp->sysent->sv_timekeep_base != 0) {
 		AUXARGS_ENTRY_CAP(pos, AT_TIMEKEEP,

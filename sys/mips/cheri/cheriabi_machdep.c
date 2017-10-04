@@ -280,14 +280,20 @@ cheriabi_fetch_syscall_args(struct thread *td)
 		locr0->pc = MipsEmulateBranch(locr0, sa->trapframe->pc, 0, 0);
 	else
 		locr0->pc += sizeof(int);
-	sa->code = locr0->v0;
+	/* XXXBD: support old binaries temporarily */
+	if (locr0->v0 == -1) {
+		sa->code = cheriabi_token2syscall(locr0->c12);
+		if (sa->code == -1)
+			return (EPROT);
+	} else
+		sa->code = locr0->v0;
 
 	se = td->td_proc->p_sysent;
 	if (se->sv_mask)
 		sa->code &= se->sv_mask;
 
 	if (sa->code >= se->sv_size)
-		sa->callp = &se->sv_table[0];
+		return (EINVAL);
 	else
 		sa->callp = &se->sv_table[sa->code];
 
@@ -305,12 +311,14 @@ static void
 cheriabi_set_syscall_retval(struct thread *td, int error)
 {
 	struct trapframe *locr0 = td->td_frame;
-	register_t a0;
 	unsigned int code;
 	struct sysentvec *se;
 
-	code = locr0->v0;
-	a0 = locr0->a0;
+	/* XXXBD: support old binaries temporarily */
+	if (locr0->v0 == -1)
+		code = cheri_getoffset(locr0->c12);
+	else
+		code = locr0->v0;
 
 	se = td->td_proc->p_sysent;
 	/*

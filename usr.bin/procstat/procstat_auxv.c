@@ -201,6 +201,19 @@ procstat_auxv(struct procstat *procstat, struct kinfo_proc *kipp)
 			    prefix, "AT_ENVV", auxv[i].a_un.a_ptr);
 			break;
 #endif
+#ifdef AT_SYSTOKENS
+		case AT_SYSTOKENS:
+			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_SYSTOKENS/%p}\n",
+			    prefix, "AT_SYSTOKENS", auxv[i].a_un.a_ptr);
+			break;
+#endif
+#ifdef AT_SYSTOK_COUNT
+		case AT_SYSTOK_COUNT:
+			xo_emit("{dw:/%s}{Lw:/%-16s/%s}"
+			    "{:AT_SYSTOK_COUNT/%ld}\n", prefix,
+			    "AT_SYSTOK_COUNT", (long)auxv[i].a_un.a_val);
+			break;
+#endif
 		default:
 			xo_emit("{dw:/%s}{Lw:/%16ld/%ld}{:UNKNOWN/%#lx}\n",
 			    prefix, auxv[i].a_type, auxv[i].a_un.a_val);

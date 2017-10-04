@@ -1,9 +1,9 @@
 /*-
- * Copyright (c) 2014 SRI International
+ * Copyright (c) 2017 SRI International
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
- * Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
+ * Cambridge Computer Laboratory under DARPA/AFRL contract FA8750-10-C-0237
  * ("CTSRD"), as part of the DARPA CRASH research programme.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,55 +28,63 @@
  * SUCH DAMAGE.
  */
 
-#include <errno.h>
-#include <setjmp.h>
-#include <signal.h>
-#include <stdlib.h>
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
-#include "libc_private.h"
+#include <sys/param.h>
+#include <sys/kernel.h>
+#include <sys/proc.h>
+#include <sys/sysent.h>
 
-void **__systokens;
-int __isthreaded = 0;
-void (*__cleanup)(void) __hidden;
+#include <machine/cherireg.h>
 
-void
-exit(int status __unused)
+#include <cheri/cheri.h>
+#include <cheri/cheric.h>
+
+#include "cheriabi_util.h"
+
+static otype_t systoken_type;
+void * __capability foo;
+
+static void
+cheriabi_systoken_init(void *dummy __unused)
 {
 
-	abort();
+	systoken_type = cheri_otype_alloc();
+}
+SYSINIT(cheriabi_systokens, SI_SUB_EXEC, SI_ORDER_FIRST,
+    cheriabi_systoken_init, NULL);
+
+CTASSERT(CHERI_SEAL_ALIGN_SHIFT(1) == 12);
+
+void * __capability
+cheriabi_syscall2token(int num, struct proc *p)
+{
+	int nsyscalls;
+	void * __capability token;
+
+	nsyscalls = p->p_sysent->sv_size;
+	if (num < 0 || num >= nsyscalls)
+		return (NULL);
+
+	cheri_capability_set(&token, 0, 0,
+	    roundup2(nsyscalls,
+		(size_t)(1ULL << CHERI_SEAL_ALIGN_SHIFT(nsyscalls))), num);
+	KASSERT(cheri_getbase(token) == 0, ("base of token is not 0"));
+	KASSERT(cheri_getoffset(token) == num,
+	    ("offset of token is not %d", num));
+	KASSERT(cheri_getlen(token) >= nsyscalls,
+	    ("length is too short %zu < %d", cheri_getlen(token), nsyscalls));
+	return (cheri_seal(token, systoken_type));
 }
 
 int
-setjmp(jmp_buf env __unused) {
-
-	return (0);
-}
-
-void
-longjmp(jmp_buf env __unused, int val __unused)
+cheriabi_token2syscall(void * __capability token)
 {
 
-	abort();
-}
+	if (cheri_gettype(token) !=
+	    cheri_getbase(systoken_type) + cheri_getoffset(systoken_type))
+		return (-1);
 
-int
-__libc_sigaction(int sig, const struct sigaction * restrict act,
-         struct sigaction * restrict oact);
-int
-__libc_sigaction(int sig, const struct sigaction * restrict act,
-         struct sigaction * restrict oact)
-{
-
-	return (EINVAL);
-}
-
-int
-__libc_sigprocmask(int how, const sigset_t * restrict set,
-         sigset_t * restrict oset);
-int
-__libc_sigprocmask(int how, const sigset_t * restrict set,
-         sigset_t * restrict oset)
-{
-
-	return (EINVAL);
+	return (cheri_getoffset(token));
 }

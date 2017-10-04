@@ -56,6 +56,13 @@ extern int	__isthreaded;
  */
 extern void	*__elf_aux_vector;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * System call tokens
+ */
+extern void **__systokens;
+#endif
+
 /*
  * libc should use libc_dlopen internally, which respects a global
  * flag where loading of new shared objects can be restricted.

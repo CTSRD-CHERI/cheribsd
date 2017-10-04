@@ -241,6 +241,7 @@ static int max_stack_flags;
  */
 char *__progname;
 char **environ;
+void **__systokens;
 
 /*
  * Used to pass argc, argv to init functions.
@@ -417,6 +418,7 @@ _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp)
     argc = aux_info[AT_ARGC]->a_un.a_val;
     argv = (char **)aux_info[AT_ARGV]->a_un.a_ptr;
     env = (char **)aux_info[AT_ENVV]->a_un.a_ptr;
+    __systokens = (void **)aux_info[AT_SYSTOKENS]->a_un.a_ptr;
 
     /* Initialize and relocate ourselves. */
     assert(aux_info[AT_BASE] != NULL);

@@ -133,7 +133,31 @@
 #endif
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
 
+#ifndef __CHERI_PURE_CAPABILITY__
 # define SYSTRAP(x)	li v0,SYS_ ## x; syscall;
+#else
+# if __SIZEOF_POINTER__ == 32
+#  define	PTR_SHIFT	5
+# elif __SIZEOF_POINTER__ == 16
+#  define	PTR_SHIFT	4
+# else
+#  error Unhandled pointer size
+# endif
+# define SYSTRAP(x)		\
+	cgetoffset t9, $c12;						\
+	lui	t0, %hi(%neg(%gp_rel(__sys_ ## x)));			\
+	daddu	t0, t0, t9;						\
+	daddiu	t0, t0, %lo(%neg(%gp_rel(__sys_ ## x)));		\
+	ld	t0, %got_disp(__systokens)(t0);				\
+	cgetdefault	$c12;						\
+	cfromptr	$c12, $c12, t0;					\
+	clc		$c12, zero, 0($c12);				\
+	/* Load the syscall token */					\
+	li v0, SYS_ ## x << PTR_SHIFT;					\
+	clc		$c12, v0, 0($c12);				\
+	li v0, -1;							\
+	syscall;
+#endif
 
 /*
  * Do a syscall that cannot fail (sync, get{p,u,g,eu,eg)id)

@@ -71,6 +71,8 @@ extern int etext;
 
 Elf_Auxinfo *__auxargs;
 
+void **__systokens;
+
 struct capreloc
 {
 	uint64_t capability_location;
@@ -152,6 +154,7 @@ __start(void *auxv,
 	argc = aux_info[AT_ARGC]->a_un.a_val;
 	argv = (char **)aux_info[AT_ARGV]->a_un.a_ptr;
 	env = (char **)aux_info[AT_ENVV]->a_un.a_ptr;
+	__systokens = (void **)aux_info[AT_SYSTOKENS]->a_un.a_ptr;
 
 	handle_argv(argc, argv, env);
 

@@ -119,6 +119,9 @@ int    cheriabi_syscall_module_handler(struct module *mod, int what, void *arg);
 int    cheriabi_syscall_helper_register(struct syscall_helper_data *sd, int flags);
 int    cheriabi_syscall_helper_unregister(struct syscall_helper_data *sd);
 
+void * __capability	cheriabi_syscall2token(int num, struct proc *p);
+int	cheriabi_token2syscall(void * __capability token);
+
 struct iovec_c;
 register_t *cheriabi_copyout_strings(struct image_params *imgp);
 int	cheriabi_copyiniov(struct iovec_c *iovp, u_int iovcnt,

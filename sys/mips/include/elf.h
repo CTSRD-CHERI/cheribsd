@@ -148,8 +148,10 @@ __ElfType(Auxinfo);
 #define	AT_ARGV		25	/* Argument vector */
 #define	AT_ENVC		26	/* Environment count */
 #define	AT_ENVV		27	/* Environment vector */
+#define	AT_SYSTOKENS	28	/* System call tokens */
+#define	AT_SYSTOK_COUNT	29	/* Number of system call tokens */
 
-#define	AT_COUNT	28	/* Count of defined aux entry types. */
+#define	AT_COUNT	30	/* Count of defined aux entry types. */
 
 #define	ET_DYN_LOAD_ADDR 0x0120000
 

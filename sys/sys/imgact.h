@@ -86,6 +86,8 @@ struct image_params {
 	int canarylen;
 	unsigned long pagesizes;
 	int pagesizeslen;
+	unsigned long systokens;
+	int systokens_count;
 	vm_prot_t stack_prot;
 	u_long stack_sz;
 	struct ucred *newcred;		/* new credentials if changing */
