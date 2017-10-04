@@ -66,9 +66,20 @@
 	struct	pcpu	*pc_self;		/* globally-uniqe self pointer */
 
 #ifdef	__mips_n64
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CPU_CHERI128)
+// struct pcpu aligns to 512 bytes boundary
+#define PCPU_MD_MIPS64_PAD (105 - (PCPU_NUM_EXC_CNTRS * 8))
+#elif defined(__CHERI_PURE_CAPABILITY__) && defined(CPU_CHERI)
+// struct pcpu aligns to 1024 bytes boundary
+#define PCPU_MD_MIPS64_PAD (352 - (PCPU_NUM_EXC_CNTRS * 8))
+#else
+// struct pcpu aligns to 512 bytes boundary
+#define PCPU_MD_MIPS64_PAD (245 - (PCPU_NUM_EXC_CNTRS * 8))
+#endif /* __CHERI_PURE_CAPABILITY__ */
 #define	PCPU_MD_MIPS64_FIELDS						\
 	PCPU_MD_COMMON_FIELDS						\
-	char		__pad[(245 - (PCPU_NUM_EXC_CNTRS * 8))]
+	char		__pad[PCPU_MD_MIPS64_PAD]
+
 #else
 #define	PCPU_MD_MIPS32_FIELDS						\
 	PCPU_MD_COMMON_FIELDS						\
