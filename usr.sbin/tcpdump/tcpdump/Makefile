@@ -36,7 +36,7 @@ LIBADD=	l pcap
 .if ${MK_CASPER} != "no"
 LIBADD+=	casper
 LIBADD+=	cap_dns
-CFLAGS+=-DWITH_CASPER
+CFLAGS+=-DHAVE_CASPER
 .endif
 .if ${MK_OPENSSL} != "no"
 LIBADD+=	crypto
