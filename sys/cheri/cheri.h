@@ -147,6 +147,17 @@ struct cheri_stack {
 void	cheri_capability_set(void * __capability *capp, uint32_t uperms,
 	    vaddr_t basep, size_t length, off_t off);
 
+#ifdef __CHERI_PURE_CAPABILITY__
+/**
+ * Make a pointer from the default kernel capability.
+ * XXXAM: this is used to materialise pointers in the kernel when there
+ * is no better provenance available.
+ */
+void * cheri_kern_ptr(vaddr_t addr, size_t len);
+#else
+#define cheri_kern_ptr(addr, len) (void *)(addr)
+#endif
+
 /*
  * CHERI capability utility functions.
  */
@@ -222,6 +233,7 @@ void	ktrcreturn_mdfill(struct pcb *pcb, struct ktr_creturn *kr);
 void	ktrcexception_mdfill(struct trapframe *frame,
 	    struct ktr_cexception *ke);
 #endif /* !_KERNEL */
+
 
 /*
  * Nested include of machine-dependent definitions, which likely depend on

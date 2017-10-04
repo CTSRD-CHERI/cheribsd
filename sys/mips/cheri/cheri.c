@@ -154,6 +154,18 @@ cheri_capability_set(void * __capability *cp, uint32_t perms, vaddr_t basep,
 #endif
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+/**
+ * This is used in the purecap kernel to temporarily generate
+ * pointers when no better provenance options are available.
+ */
+static __inline void *
+cheri_kern_ptr(vaddr_t addr, size_t len)
+{
+	return cheri_setbounds(cheri_incoffset(cheri_getkdc(), addr), len);
+}
+#endif
+
 /*
  * Functions to store a common set of capability values to in-memory
  * capabilities used in various aspects of user contexts.
