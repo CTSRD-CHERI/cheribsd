@@ -10,6 +10,7 @@ include		"std.CHERI128"
 machine		mips mips64	# Malta supports both, so it isn't in std.malta
 
 nomakeoptions	ARCH_FLAGS
+makeoptions	ARCH_PIC_FLAGS="-fpic"
 makeoptions	ARCH_FLAGS="-target cheri-unknown-freebsd -march=mips64 -mabi=purecap -mcpu=cheri128"
 makeoptions 	KERNLOADADDR=0xffffffff80100000
 

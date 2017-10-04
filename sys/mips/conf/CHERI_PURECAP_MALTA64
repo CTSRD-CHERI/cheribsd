@@ -14,9 +14,14 @@ machine		mips mips64	# Malta supports both, so it isn't in std.malta
 nomakeoptions 	ARCH_FLAGS
 makeoptions	ARCH_PIC_FLAGS="-fpic"
 makeoptions	ARCH_FLAGS="-target cheri-unknown-freebsd -march=mips64 -mabi=purecap"
+makeoptions	WERROR="-Wno-error"
 makeoptions 	KERNLOADADDR=0xffffffff80100000
 
 options 	KTRACE
+nooptions	KDB
+nooptions	DDB
+nooptions	MSDOSFS
+nooptions	NFSD, NFSCL
 
 #
 # Features required for CHERI CPU and CheriBSD support.
