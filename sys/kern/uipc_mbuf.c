@@ -158,6 +158,14 @@ CTASSERT(offsetof(struct mbuf, m_pktdat) % 8 == 0);
 CTASSERT(offsetof(struct mbuf, m_dat) == 32);
 CTASSERT(sizeof(struct pkthdr) == 56);
 CTASSERT(sizeof(struct m_ext) == 48);
+#elif defined(__CHERI_PURE_CAPABILITY__) && defined(CPU_CHERI128)
+CTASSERT(offsetof(struct mbuf, m_dat) == 64);
+CTASSERT(sizeof(struct pkthdr) == 96);
+CTASSERT(sizeof(struct m_ext) == 96);
+#elif defined(__CHERI_PURE_CAPABILITY__)
+CTASSERT(offsetof(struct mbuf, m_dat) == 128);
+CTASSERT(sizeof(struct pkthdr) == 160);
+CTASSERT(sizeof(struct m_ext) == 192);
 #else
 CTASSERT(offsetof(struct mbuf, m_dat) == 24);
 CTASSERT(sizeof(struct pkthdr) == 48);

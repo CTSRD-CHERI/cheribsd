@@ -141,6 +141,8 @@ struct m_snd_tag {
  * Record/packet header in first mbuf of chain; valid only if M_PKTHDR is set.
  * Size ILP32: 48
  *	 LP64: 56
+ *      CHERI256: 160
+ *      CHERI128: 96
  * Compile-time assertions in uipc_mbuf.c test these values to ensure that
  * they are correct.
  */
@@ -194,6 +196,10 @@ struct pkthdr {
  * set.
  * Size ILP32: 28
  *	 LP64: 48
+ *      CHERI256: 192
+ *      CHERI128: 96
+ * XXXAM: notice that we may be able to save space (padding) if we move the ext_size
+ * and ext_type/flags after ext_arg2.
  * Compile-time assertions in uipc_mbuf.c test these values to ensure that
  * they are correct.
  */
@@ -221,6 +227,8 @@ struct mbuf {
 	 * Header present at the beginning of every mbuf.
 	 * Size ILP32: 24
 	 *      LP64: 32
+	 *      CHERI256: 128
+	 *      CHERI128: 64
 	 * Compile-time assertions in uipc_mbuf.c test these values to ensure
 	 * that they are correct.
 	 */
@@ -238,7 +246,7 @@ struct mbuf {
 	int32_t		 m_len;		/* amount of data in this mbuf */
 	uint32_t	 m_type:8,	/* type of data in this mbuf */
 			 m_flags:24;	/* flags; see below */
-#if !defined(__LP64__)
+#if !defined(__LP64__) && !defined(__CHERI_PURE_CAPABILITY__)
 	uint32_t	 m_pad;		/* pad for 64bit alignment */
 #endif
 
