@@ -271,6 +271,9 @@ void	test_cheriabi_open_bad_tag(const struct cheri_test *ctp);
 void	test_cheriabi_open_bad_perm(const struct cheri_test *ctp);
 void	test_cheriabi_open_sealed(const struct cheri_test *ctp);
 
+/* cheritest_cheriabi_syscall.c */
+void	test_cheriabi_syscall_getpid(const struct cheri_test *ctp);
+
 /* cheritest_fault.c */
 void	test_fault_bounds(const struct cheri_test *ctp);
 void	test_fault_cgetcause(const struct cheri_test *ctp);

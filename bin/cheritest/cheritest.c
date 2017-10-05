@@ -1580,6 +1580,11 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_cheriabi_open_sealed",
 	  .ct_desc = "Sealed path",
 	  .ct_func = test_cheriabi_open_sealed, },
+
+	/* Verify system(2) implemenation */
+	{ .ct_name = "test_cheriabi_syscall_getpid",
+	  .ct_desc = "getpid via system()",
+	  .ct_func = test_cheriabi_syscall_getpid, },
 #endif
 #ifdef CHERI_C_TESTS
 #define	DECLARE_TEST(name, desc)			\
