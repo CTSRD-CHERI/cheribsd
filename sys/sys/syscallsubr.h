@@ -220,7 +220,7 @@ int	kern_renameat(struct thread *td, int oldfd, char *old, int newfd,
 	    char *new, enum uio_seg pathseg);
 int	kern_rmdirat(struct thread *td, int fd, const char *path,
 	    enum uio_seg pathseg);
-int	kern_rmdirat_c(struct thread *td, int fd, const char *path __CAPABILITY,
+int	kern_rmdirat_c(struct thread *td, int fd, const char * __CAPABILITY path,
 	    enum uio_seg pathseg);
 int	kern_sched_getparam(struct thread *td, struct thread *targettd,
 	    struct sched_param *param);
@@ -294,7 +294,7 @@ int	kern_truncate(struct thread *td, char *path, enum uio_seg pathseg,
 int	kern_unlinkat(struct thread *td, int fd, const char *path,
 	    enum uio_seg pathseg, ino_t oldinum);
 int	kern_unlinkat_c(struct thread *td, int fd,
-	    const char *path __CAPABILITY, enum uio_seg pathseg, ino_t oldinum);
+	    const char * __CAPABILITY path, enum uio_seg pathseg, ino_t oldinum);
 int	kern_utimesat(struct thread *td, int fd, char *path,
 	    enum uio_seg pathseg, struct timeval *tptr, enum uio_seg tptrseg);
 int	kern_utimensat(struct thread *td, int fd, char *path,
