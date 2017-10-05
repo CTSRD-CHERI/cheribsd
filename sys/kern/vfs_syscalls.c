@@ -156,8 +156,8 @@ struct quotactl_args {
 int
 sys_quotactl(struct thread *td, struct quotactl_args *uap)
 {
-	return (kern_quotactl(td, (const char * __CAPABILITY)uap->path,
-	    uap->cmd, uap->uid, (void * __CAPABILITY)uap->arg));
+	return (kern_quotactl(td, (__cheri_cast char * __CAPABILITY)uap->path,
+	    uap->cmd, uap->uid, (__cheri_cast char * __CAPABILITY)uap->arg));
 }
 
 int
@@ -880,7 +880,8 @@ int
 sys_chdir(struct thread *td, struct chdir_args *uap)
 {
 
-	return (kern_chdir(td, (char * __CAPABILITY)uap->path, UIO_USERSPACE));
+	return (kern_chdir(td, (__cheri_cast char * __CAPABILITY)uap->path,
+	    UIO_USERSPACE));
 }
 
 int
@@ -1520,8 +1521,9 @@ kern_linkat(struct thread *td, int fd1, int fd2, const char *path1, const char *
     enum uio_seg segflg, int follow)
 {
 
-	return (kern_linkat_c(td, fd1, fd2, (const char * __CAPABILITY)path1,
-	    (const char * __CAPABILITY)path2, segflg, follow));
+	return (kern_linkat_c(td, fd1, fd2,
+	    (__cheri_cast const char * __CAPABILITY)path1,
+	    (__cheri_cast const char * __CAPABILITY)path2, segflg, follow));
 }
 
 int
@@ -1799,8 +1801,8 @@ int
 kern_unlinkat(struct thread *td, int fd, const char *path, enum uio_seg pathseg,
     ino_t oldinum)
 {
-	return (kern_unlinkat_c(td, fd, (const char * __CAPABILITY)path,
-	    pathseg, oldinum));
+	return (kern_unlinkat_c(td, fd,
+	    (__cheri_cast const char * __CAPABILITY)path, pathseg, oldinum));
 }
 
 int
@@ -3711,8 +3713,8 @@ int
 kern_rmdirat(struct thread *td, int fd, const char *path, enum uio_seg pathseg)
 {
 
-	return (kern_rmdirat_c(td, fd, (const char * __CAPABILITY)path,
-	    pathseg));
+	return (kern_rmdirat_c(td, fd,
+	    (__cheri_cast const char * __CAPABILITY)path, pathseg));
 }
 
 int

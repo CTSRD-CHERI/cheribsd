@@ -89,8 +89,9 @@ int
 sys_kenv(struct thread *td, struct kenv_args *uap)
 {
 
-	return (kern_kenv(td, uap->what, (const char * __CAPABILITY)uap->name,
-	    (char * __CAPABILITY)uap->value, uap->len));
+	return (kern_kenv(td, uap->what,
+	    (__cheri_cast const char * __CAPABILITY)uap->name,
+	    (__cheri_cast char * __CAPABILITY)uap->value, uap->len));
 }
 
 int
@@ -133,8 +134,8 @@ kern_kenv(struct thread *td, int what, const char * __CAPABILITY namep,
 		}
 		mtx_unlock(&kenv_lock);
 		if (buffer != NULL) {
-			error = copyout_c((char * __CAPABILITY)buffer, val,
-			    done);
+			error = copyout_c((__cheri_cast char * __CAPABILITY)buffer,
+			    val, done);
 			free(buffer, M_TEMP);
 		}
 		td->td_retval[0] = ((done == needed) ? 0 : needed);
@@ -157,7 +158,7 @@ kern_kenv(struct thread *td, int what, const char * __CAPABILITY namep,
 
 	name = malloc(KENV_MNAMELEN + 1, M_TEMP, M_WAITOK);
 
-	error = copyinstr_c(namep, (char * __CAPABILITY)name,
+	error = copyinstr_c(namep, (__cheri_cast char * __CAPABILITY)name,
 	    KENV_MNAMELEN + 1, NULL);
 	if (error)
 		goto done;
@@ -177,7 +178,8 @@ kern_kenv(struct thread *td, int what, const char * __CAPABILITY namep,
 		len = strlen(value) + 1;
 		if (len > vallen)
 			len = vallen;
-		error = copyout_c((char * __CAPABILITY)value, val, len);
+		error = copyout_c((__cheri_cast char * __CAPABILITY)value, val,
+		    len);
 		freeenv(value);
 		if (error)
 			goto done;
@@ -192,7 +194,8 @@ kern_kenv(struct thread *td, int what, const char * __CAPABILITY namep,
 		if (len > KENV_MVALLEN + 1)
 			len = KENV_MVALLEN + 1;
 		value = malloc(len, M_TEMP, M_WAITOK);
-		error = copyinstr_c(val, (char * __CAPABILITY)value, len, NULL);
+		error = copyinstr_c(val, (__cheri_cast char * __CAPABILITY)value,
+		    len, NULL);
 		if (error) {
 			free(value, M_TEMP);
 			goto done;
