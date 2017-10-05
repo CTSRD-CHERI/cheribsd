@@ -66,7 +66,7 @@
 ; redistributions should be placed in the reserved range at the end
 ; of the current calls.
 
-0	AUE_NULL	STD	{ int cheriabi_syscall(int number); }
+0	AUE_NULL	UNIMPL	syscall
 1	AUE_EXIT	NOPROTO|NOSTUB	{ void sys_exit(int rval); } exit \
 				    sys_exit_args void
 2	AUE_FORK	NOPROTO	{ int fork(void); }

@@ -61,6 +61,11 @@ extern void	*__elf_aux_vector;
  * System call tokens
  */
 extern void **__systokens;
+int	__syscall_by_token(void *,
+	    __int64_t a0, __int64_t a1, __int64_t a2, __int64_t a3,
+	    __int64_t a4, __int64_t a5, __int64_t a6, __int64_t a7,
+	    __intptr_t p0, __intptr_t p1, __intptr_t p2, __intptr_t p3,
+	    __intptr_t p4, __intptr_t p5, __intptr_t p6, __intptr_t p7);
 #endif
 
 /*

@@ -9,19 +9,6 @@
 #define	_SYS_COMPAT_CHERIABI_FILL_UAP_H_
 
 static inline int
-CHERIABI_SYS_cheriabi_syscall_fill_uap(struct thread *td,
-    struct cheriabi_syscall_args *uap)
-{
-	void * __capability tmpcap;
-
-	/* [0] int number */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_syscall_PTRMASK);
-	uap->number = cheri_getoffset(tmpcap);
-
-	return (0);
-}
-
-static inline int
 CHERIABI_SYS_exit_fill_uap(struct thread *td,
     struct sys_exit_args *uap)
 {

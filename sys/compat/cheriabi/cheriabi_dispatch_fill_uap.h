@@ -18,7 +18,6 @@ nop_fill_uap(struct thread *td __unused, void *uap __unused)
 }
 
 static fill_uap_fp cheriabi_fill_uap_funcs[CHERIABI_SYS_MAXSYSCALL] = {
-	[CHERIABI_SYS_cheriabi_syscall] = (fill_uap_fp)CHERIABI_SYS_cheriabi_syscall_fill_uap,
 	[CHERIABI_SYS_exit] = (fill_uap_fp)CHERIABI_SYS_exit_fill_uap,
 	[CHERIABI_SYS_fork] = nop_fill_uap,
 	[CHERIABI_SYS_read] = (fill_uap_fp)CHERIABI_SYS_read_fill_uap,

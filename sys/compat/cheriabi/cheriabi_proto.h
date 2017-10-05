@@ -46,9 +46,6 @@ struct thread;
 #if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
 #define PAD64_REQUIRED
 #endif
-struct cheriabi_syscall_args {
-	char number_l_[PADL_(int)]; int number; char number_r_[PADR_(int)];
-};
 struct cheriabi_open_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
@@ -422,7 +419,6 @@ struct cheriabi_kevent_args {
 #if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
 #define PAD64_REQUIRED
 #endif
-int	cheriabi_syscall(struct thread *, struct cheriabi_syscall_args *);
 int	cheriabi_open(struct thread *, struct cheriabi_open_args *);
 int	cheriabi_link(struct thread *, struct cheriabi_link_args *);
 int	cheriabi_unlink(struct thread *, struct cheriabi_unlink_args *);
@@ -554,7 +550,6 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 
 #endif /* COMPAT_FREEBSD11 */
 
-#define	CHERIABI_SYS_AUE_cheriabi_syscall	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_open	AUE_OPEN_RWTC
 #define	CHERIABI_SYS_AUE_cheriabi_link	AUE_LINK
 #define	CHERIABI_SYS_AUE_cheriabi_unlink	AUE_UNLINK

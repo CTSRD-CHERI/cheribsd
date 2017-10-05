@@ -59,16 +59,6 @@ struct timezone;
 struct uuid;
 struct vm_domain_policy_entry;
 union semun;
-SYS_STUB(0, int, syscall,
-    /* _protoargs */ (int number),
-    /* _protoargs_chk */ (int *retp , __capability int *stub_errno, int number),
-    /* _protoargs_err */ (__capability int *stub_errno, int number),
-    /* _callargs */ (number),
-    /* _callargs_chk */ (&ret, stub_errno, number),
-    /* _callargs_err */ (&errno, number),
-    /* _localcheck */ {}
-)
-
 SYS_STUB(2, int, fork,
     /* _protoargs */ (void),
     /* _protoargs_chk */ (int *retp , __capability int *stub_errno),

@@ -8,7 +8,6 @@
 #ifndef _CHERIABI_SYSARGMAP_H_
 #define	_CHERIABI_SYSARGMAP_H_
 
-#define	CHERIABI_SYS_cheriabi_syscall_PTRMASK	(0x0)
 #define	CHERIABI_SYS_exit_PTRMASK	(0x0)
 #define	CHERIABI_SYS_read_PTRMASK	(0x0 | 0x2)
 #define	CHERIABI_SYS_write_PTRMASK	(0x0 | 0x2)
