@@ -271,14 +271,14 @@ cheriabi_fetch_syscall_arg(struct thread *td, void * __capability *argp,
 		}
 	} else {
 		switch (intreg_offset) {
-		case 0:	*argp = (void * __capability)locr0->a0;	break;
-		case 1:	*argp = (void * __capability)locr0->a1;	break;
-		case 2:	*argp = (void * __capability)locr0->a2;	break;
-		case 3:	*argp = (void * __capability)locr0->a3;	break;
-		case 4:	*argp = (void * __capability)locr0->a4;	break;
-		case 5:	*argp = (void * __capability)locr0->a5;	break;
-		case 6:	*argp = (void * __capability)locr0->a6;	break;
-		case 7:	*argp = (void * __capability)locr0->a7;	break;
+		case 0:	*argp = (void * __capability)(__intcap_t)locr0->a0; break;
+		case 1:	*argp = (void * __capability)(__intcap_t)locr0->a1; break;
+		case 2:	*argp = (void * __capability)(__intcap_t)locr0->a2; break;
+		case 3:	*argp = (void * __capability)(__intcap_t)locr0->a3; break;
+		case 4:	*argp = (void * __capability)(__intcap_t)locr0->a4; break;
+		case 5:	*argp = (void * __capability)(__intcap_t)locr0->a5; break;
+		case 6:	*argp = (void * __capability)(__intcap_t)locr0->a6; break;
+		case 7:	*argp = (void * __capability)(__intcap_t)locr0->a7; break;
 		default:
 			panic("%s: integer argument %d out of range",
 			    __func__, intreg_offset);
@@ -447,7 +447,7 @@ cheriabi_set_mcontext(struct thread *td, mcontext_c_t *mcp)
 	td->td_md.md_tls_cap =  mcp->mc_tls;
 	tag = cheri_gettag(mcp->mc_tls);
 	if (tag)
-		td->td_md.md_tls = (void *)mcp->mc_tls; // XXX: __capability?
+		td->td_md.md_tls = (__cheri_cast void *)mcp->mc_tls; // XXX: __capability?
 	else
 		td->td_md.md_tls = NULL;
 

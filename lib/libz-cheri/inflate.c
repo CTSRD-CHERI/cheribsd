@@ -169,7 +169,7 @@ int windowBits;
     if (windowBits && (windowBits < 8 || windowBits > 15))
         return Z_STREAM_ERROR;
     if (state->window != Z_NULL && state->wbits != (unsigned)windowBits) {
-        ZFREE(strm, state->window);
+        ZFREE(strm, cheri_cap_to_ptr(state->window, 0));
         state->window = Z_NULL;
     }
 
@@ -1262,7 +1262,8 @@ z_streamp strm;
     if (strm == Z_NULL || strm->state == Z_NULL || strm->zfree == (free_func)0)
         return Z_STREAM_ERROR;
     state = (struct inflate_state FAR *)strm->state;
-    if (state->window != Z_NULL) ZFREE(strm, state->window);
+    if (state->window != Z_NULL)
+        ZFREE(strm, cheri_cap_to_ptr(state->window, 0));
     ZFREE(strm, strm->state);
     strm->state = Z_NULL;
     Tracev((stderr, "inflate: end\n"));
@@ -1413,7 +1414,7 @@ z_streamp strm;
             state->bits -= 8;
         }
         state->have = 0;
-        syncsearch(&(state->have), (__capability unsigned char *)buf, len);
+        syncsearch(&(state->have), cheri_ptr(&buf[0], len), len);
     }
 
     /* search available input */
@@ -1471,7 +1472,7 @@ z_streamp source;
     window = Z_NULL;
     if (state->window != Z_NULL) {
         window = cheri_ptr(ZALLOC(source, 1U << state->wbits,
-			   sizeof(unsigned char)), 
+			   sizeof(unsigned char)),
 			   (1U << state->wbits) * sizeof(unsigned char));
         if (window == Z_NULL) {
             ZFREE(source, copy);
@@ -1480,7 +1481,7 @@ z_streamp source;
     }
 
     /* copy state */
-    zmemcpy((voidpf)dest, (voidpf)source, sizeof(z_stream));
+    zmemcpy_c((voidpf_c)dest, (voidpf_c)source, sizeof(z_stream));
     zmemcpy((voidpf)copy, (voidpf)state, sizeof(struct inflate_state));
     if (state->lencode >= state->codes &&
         state->lencode <= state->codes + ENOUGH - 1) {

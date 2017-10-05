@@ -327,6 +327,18 @@ long	 strtol_c(__capability const char * __restrict,
 long double
 	 strtold_c(__capability const char * __restrict,
 	    char * __capability * __restrict);
+
+#if !defined(__CHERI_PURE_CAPABILITY__)
+#define	malloc_c(size) cheri_ptr(malloc(size), size)
+#define	calloc_c(num, size) cheri_ptr(calloc(num, size), num * size)
+#define	realloc_c(cap, size) cheri_ptr(realloc(cheri_cap_to_ptr(cap, 0), size))
+#define	free_c(cap) free(cheri_cap_to_ptr(cap, 0))
+#else
+#define	malloc_c(size) malloc(size)
+#define	calloc_c(num, size) calloc(num, size)
+#define	realloc_c(cap, size) realloc(cap, size)
+#define	free_c(cap) free(cap)
+#endif
 #endif
 
 int timsort(void *base, size_t nel, size_t width,

@@ -40,7 +40,8 @@ memcpy(void *dst, const void *src, size_t len)
 	if (len == 0)
 		return (dst);
 #if _MIPS_SZCAP == 256
-	memcpy_c(cheri_ptr(dst, len), cheri_ptr((void *)src, len), len);
+	memcpy_c(cheri_ptr(dst, len), cheri_ptr(__DECONST(void *, src), len),
+	     len);
 #else
 	/*
 	 * XXX-BD: Setting more precise bounds would be good, but punt for

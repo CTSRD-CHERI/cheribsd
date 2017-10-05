@@ -28,32 +28,33 @@ int ZEXPORT uncompress (dest, destLen, source, sourceLen)
     uLong sourceLen;
 {
     z_stream stream;
+    z_streamp stream_cap = cheri_ptr_to_bounded_cap(&stream);
     int err;
 
-    stream.next_in = cheri_csetbounds((__capability void *)source, sourceLen);
+    stream.next_in = cheri_ptr(source, sourceLen);
     stream.avail_in = (uInt)sourceLen;
     /* Check for source > 64K on 16-bit machine: */
     if ((uLong)stream.avail_in != sourceLen) return Z_BUF_ERROR;
 
-    stream.next_out = cheri_csetbounds((__capability void *)dest, *destLen);
+    stream.next_out = cheri_ptr(dest, *destLen);
     stream.avail_out = (uInt)*destLen;
     if ((uLong)stream.avail_out != *destLen) return Z_BUF_ERROR;
 
     stream.zalloc = (alloc_func)0;
     stream.zfree = (free_func)0;
 
-    err = inflateInit((z_streamp)&stream);
+    err = inflateInit(stream_cap);
     if (err != Z_OK) return err;
 
-    err = inflate((z_streamp)&stream, Z_FINISH);
+    err = inflate(stream_cap, Z_FINISH);
     if (err != Z_STREAM_END) {
-        inflateEnd((z_streamp)&stream);
+        inflateEnd(stream_cap);
         if (err == Z_NEED_DICT || (err == Z_BUF_ERROR && stream.avail_in == 0))
             return Z_DATA_ERROR;
         return err;
     }
     *destLen = stream.total_out;
 
-    err = inflateEnd((z_streamp)&stream);
+    err = inflateEnd(stream_cap);
     return err;
 }

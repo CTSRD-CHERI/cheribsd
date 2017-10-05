@@ -461,8 +461,9 @@ cheriabi_kevent_copyin(void *arg, struct kevent *kevp, int count)
 		 * XXX-BD: this is quite awkward.  ident could be anything.
 		 * If it's a capabilty, we'll hang on to it in udata.
 		 */
-		if (cheri_gettag(ks_c[i].ident)) {
-			if (!(cheri_getperm(ks_c[i].ident) | CHERI_PERM_GLOBAL))
+		if (cheri_gettag((void * __capability)ks_c[i].ident)) {
+			if (!(cheri_getperm((void * __capability)ks_c[i].ident)
+			    | CHERI_PERM_GLOBAL))
 				return (EPROT);
 		}
 		kevp[i].ident = (uintptr_t)(__uintcap_t)ks_c[i].ident;
