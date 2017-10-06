@@ -93,6 +93,8 @@ __FBSDID("$FreeBSD$");
 #include <ddb/ddb.h>
 #include <ddb/db_sym.h>
 
+#include <cheri/cheri.h>
+
 void mi_startup(void);				/* Should be elsewhere */
 
 /* Components of the first process -- never freed. */
@@ -703,7 +705,8 @@ start_init(void *dummy)
 	if (vm_map_find(&p->p_vmspace->vm_map, NULL, 0, &addr, PAGE_SIZE, 0,
 	    VMFS_NO_SPACE, VM_PROT_ALL, VM_PROT_ALL, 0) != 0)
 		panic("init: couldn't allocate argument space");
-	p->p_vmspace->vm_maxsaddr = (caddr_t)addr;
+	/* XXXAM: vm_maxsaddr is not dereferenceable */
+	p->p_vmspace->vm_maxsaddr = (caddr_t)(uintptr_t)addr;
 	p->p_vmspace->vm_ssize = 1;
 
 	if ((var = kern_getenv("init_path")) != NULL) {
@@ -726,7 +729,11 @@ start_init(void *dummy)
 		 * Move out the boot flag argument.
 		 */
 		options = 0;
-		ucp = (char *)p->p_sysent->sv_usrstack;
+		/**
+		 * XXXAM: the ptr length is temporary, we should have a
+		 * better value for that.
+		 */
+		ucp = (char *)cheri_kern_ptr(p->p_sysent->sv_usrstack, PAGE_SIZE);
 		(void)subyte(--ucp, 0);		/* trailing zero */
 		if (boothowto & RB_SINGLE) {
 			(void)subyte(--ucp, 's');
@@ -759,6 +766,8 @@ start_init(void *dummy)
 
 		/*
 		 * Move out the arg pointers.
+		 * XXXAM: TODO this will not work, moving pointers with suword
+		 * fails horribly.
 		 */
 		uap = (char **)rounddown2((intptr_t)ucp, sizeof(intptr_t));
 		(void)suword((caddr_t)--uap, (long)0);	/* terminator */
