@@ -38,10 +38,10 @@ local int gz_init(state)
     gz_statep state;
 {
     int ret;
-    z_streamp strm = (z_streamp)&(state->strm);
+    z_streamp strm = cheri_ptr_to_bounded_cap(&(state->strm));
 
     /* allocate input buffer */
-    state->in = (__capability unsigned char *)malloc(state->want);
+    state->in = malloc_c(state->want);
     if (state->in == NULL) {
         gz_error(state, Z_MEM_ERROR, "out of memory");
         return -1;
@@ -50,9 +50,9 @@ local int gz_init(state)
     /* only need output buffer and deflate state if compressing */
     if (!state->direct) {
         /* allocate output buffer */
-        state->out = (__capability unsigned char *)malloc(state->want);
+        state->out = malloc_c(state->want);
         if (state->out == NULL) {
-            free((void *)state->in);
+            free_c(state->in);
             gz_error(state, Z_MEM_ERROR, "out of memory");
             return -1;
         }
@@ -64,8 +64,8 @@ local int gz_init(state)
         ret = deflateInit2(strm, state->level, Z_DEFLATED,
                            MAX_WBITS + 16, DEF_MEM_LEVEL, state->strategy);
         if (ret != Z_OK) {
-            free((void *)state->out);
-            free((void *)state->in);
+            free_c(state->out);
+            free_c(state->in);
             gz_error(state, Z_MEM_ERROR, "out of memory");
             return -1;
         }
@@ -95,7 +95,7 @@ local int gz_comp(state, flush)
 {
     int ret, got;
     unsigned have;
-    z_streamp strm = (z_streamp)&(state->strm);
+    z_streamp strm = cheri_ptr_to_bounded_cap(&(state->strm));
 
     /* allocate memory if this is the first time through */
     if (state->size == 0 && gz_init(state) == -1)
@@ -159,7 +159,7 @@ local int gz_zero(state, len)
 {
     int first;
     unsigned n;
-    z_streamp strm = (z_streamp)&(state->strm);
+    z_streamp strm = cheri_ptr_to_bounded_cap(&(state->strm));
 
     /* consume whatever's left in the input buffer */
     if (strm->avail_in && gz_comp(state, Z_NO_FLUSH) == -1)
@@ -198,7 +198,7 @@ int ZEXPORT gzwrite(file, buf, len)
     if (file == NULL)
         return 0;
     state = (gz_statep)file;
-    strm = (z_streamp)&(state->strm);
+    strm = cheri_ptr_to_bounded_cap(&(state->strm));
 
     /* check that we're writing and that there's no error */
     if (state->mode != GZ_WRITE || state->err != Z_OK)
@@ -278,7 +278,7 @@ int ZEXPORT gzputc(file, c)
     if (file == NULL)
         return -1;
     state = (gz_statep)file;
-    strm = (z_streamp)&(state->strm);
+    strm = cheri_ptr_to_bounded_cap(&(state->strm));
 
     /* check that we're writing and that there's no error */
     if (state->mode != GZ_WRITE || state->err != Z_OK)
@@ -340,7 +340,7 @@ int ZEXPORTVA gzvprintf(gzFile file, const char *format, va_list va)
     if (file == NULL)
         return -1;
     state = (gz_statep)file;
-    strm = (z_streamp)&(state->strm);
+    strm = cheri_ptr_to_bounded_cap(&(state->strm));
 
     /* check that we're writing and that there's no error */
     if (state->mode != GZ_WRITE || state->err != Z_OK)
@@ -374,10 +374,10 @@ int ZEXPORTVA gzvprintf(gzFile file, const char *format, va_list va)
 #  endif
 #else
 #  ifdef HAS_vsnprintf_void
-    (void)vsnprintf((char *)(state->in), size, format, va);
-    len = strlen((char *)(state->in));
+    (void)vsnprintf(cheri_cap_to_ptr(state->in, size), size, format, va);
+    len = strlen(cheri_cap_to_ptr(state->in, 0));
 #  else
-    len = vsnprintf((char *)(state->in), size, format, va);
+    len = vsnprintf(cheri_cap_to_ptr(state->in, size), size, format, va);
 #  endif
 #endif
 
@@ -529,7 +529,7 @@ int ZEXPORT gzsetparams(file, level, strategy)
     if (file == NULL)
         return Z_STREAM_ERROR;
     state = (gz_statep)file;
-    strm = (z_streamp)&(state->strm);
+    strm = cheri_ptr_to_bounded_cap(&(state->strm));
 
     /* check that we're writing and that there's no error */
     if (state->mode != GZ_WRITE || state->err != Z_OK)
@@ -586,10 +586,10 @@ int ZEXPORT gzclose_w(file)
         ret = state->err;
     if (state->size) {
         if (!state->direct) {
-            (void)deflateEnd((z_streamp)&(state->strm));
-            free((void *)state->out);
+            (void)deflateEnd(cheri_ptr_to_bounded_cap(&(state->strm)));
+            free_c(state->out);
         }
-        free((void *)state->in);
+        free_c(state->in);
     }
     gz_error(state, Z_OK, NULL);
     free(state->path);

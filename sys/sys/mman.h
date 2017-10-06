@@ -129,6 +129,7 @@
  * requested length or fails.  Passing an under-rounded length fails.
  */
 #define	MAP_CHERI_NOSETBOUNDS	0x0020		/* Don't alter addr */
+#define	MAP_CHERI_DDC		0x0040		/* map within DDC */
 #define	MAP_ALIGNED_CHERI	MAP_ALIGNED(2)	/* align for CHERI data */
 #define	MAP_ALIGNED_CHERI_SEAL	MAP_ALIGNED(3)	/* align for sealing on CHERI */
 #endif /* __BSD_VISIBLE */

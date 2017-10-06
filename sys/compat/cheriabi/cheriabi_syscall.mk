@@ -7,12 +7,12 @@ MIASM =  \
 	fork.o \
 	read.o \
 	write.o \
-	open.o \
+	cheriabi_open.o \
 	close.o \
 	wait4.o \
-	link.o \
-	unlink.o \
-	chdir.o \
+	cheriabi_link.o \
+	cheriabi_unlink.o \
+	cheriabi_chdir.o \
 	fchdir.o \
 	chmod.o \
 	chown.o \
@@ -41,7 +41,7 @@ MIASM =  \
 	ktrace.o \
 	getgid.o \
 	getlogin.o \
-	setlogin.o \
+	cheriabi_setlogin.o \
 	acct.o \
 	cheriabi_sigaltstack.o \
 	cheriabi_ioctl.o \
@@ -94,7 +94,7 @@ MIASM =  \
 	shutdown.o \
 	socketpair.o \
 	mkdir.o \
-	rmdir.o \
+	cheriabi_rmdir.o \
 	utimes.o \
 	adjtime.o \
 	setsid.o \
@@ -223,7 +223,7 @@ MIASM =  \
 	cheriabi___mac_get_file.o \
 	cheriabi___mac_set_fd.o \
 	cheriabi___mac_set_file.o \
-	kenv.o \
+	cheriabi_kenv.o \
 	lchflags.o \
 	uuidgen.o \
 	cheriabi_sendfile.o \
@@ -303,14 +303,14 @@ MIASM =  \
 	fchownat.o \
 	cheriabi_fexecve.o \
 	futimesat.o \
-	linkat.o \
+	cheriabi_linkat.o \
 	mkdirat.o \
 	mkfifoat.o \
 	cheriabi_openat.o \
 	readlinkat.o \
 	renameat.o \
 	symlinkat.o \
-	unlinkat.o \
+	cheriabi_unlinkat.o \
 	posix_openpt.o \
 	gssd_syscall.o \
 	cheriabi_jail_get.o \

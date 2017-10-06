@@ -1534,6 +1534,10 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Test CheriABI mmap() with unrepresentable lengths",
 	  .ct_func = test_cheriabi_mmap_unrepresentable },
 
+	{ .ct_name = "test_cheriabi_mmap_ddc",
+	  .ct_desc = "Test CheriABI MAP_CHERI_DDC flag",
+	  .ct_func = test_cheriabi_mmap_ddc },
+
 	/*
 	 * Tests for pathname handling in open(2).
 	 */

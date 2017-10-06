@@ -638,28 +638,29 @@
 #endif
 #endif
 
+/*
+ * XXXAR: For CHERI hybrid mode I removed the cast to the qualified type
+ * because we don't know whether the input type is a capability or a pointer
+ * and casting to the wrong one causes compiler warnings.
+ * The real solution would be an equivalent of const_cast<> for C
+ */
+
 #ifndef	__DECONST
-#if !__has_feature(capabilities)
 #define	__DECONST(type, var)	((type)(__uintptr_t)(const void *)(var))
-#else
-#define	__DECONST(type, var)	((type)(__intcap_t)(const void * __capability)(var))
-#endif
 #endif
 
 #ifndef	__DEVOLATILE
-#if !__has_feature(capabilities)
 #define	__DEVOLATILE(type, var)	((type)(__uintptr_t)(volatile void *)(var))
-#else
-#define	__DEVOLATILE(type, var)	((type)(__intcap_t)(volatile void * __capability)(var))
-#endif
 #endif
 
 #ifndef	__DEQUALIFY
-#if !__has_feature(capabilities)
 #define	__DEQUALIFY(type, var)	((type)(__uintptr_t)(const volatile void *)(var))
-#else
-#define	__DEQUALIFY(type, var)	((type)(__intcap_t)(const volatile void * __capability)(var))
 #endif
+
+#ifdef __CHERI__
+#define	__DECONST_CAP(type, var)	((type)(__uintcap_t)(const void * __capability)(var))
+#define	__DEVOLATILE_CAP(type, var)	((type)(__uintcap_t)(volatile void * __capability)(var))
+#define	__DEQUALIFY_CAP(type, var)	((type)(__uintcap_t)(const volatile void * __capability)(var))
 #endif
 
 /*-
@@ -908,6 +909,11 @@
 #define	__CAPABILITY	__capability
 #else
 #define	__CAPABILITY
+#endif
+
+#if !__has_feature(__cheri_cast)
+/* Support old compiler versions without __cheri_cast: */
+#define __cheri_cast
 #endif
 
 #endif /* !_SYS_CDEFS_H_ */

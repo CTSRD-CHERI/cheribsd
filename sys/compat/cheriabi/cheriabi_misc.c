@@ -173,14 +173,7 @@ cheriabi_syscall(struct thread *td, struct cheriabi_syscall_args *uap)
 	}
 }
 
-int
-cheriabi_openat(struct thread *td, struct cheriabi_openat_args *uap)
-{
-
-	return (kern_openat_c(td, uap->fd, uap->path, UIO_USERSPACE, uap->flag,
-	    uap->mode));
-}
-
+/* syscall #532 */
 int
 cheriabi_wait6(struct thread *td, struct cheriabi_wait6_args *uap)
 {
@@ -213,6 +206,7 @@ cheriabi_wait6(struct thread *td, struct cheriabi_wait6_args *uap)
 	return (error);
 }
 
+/* syscall #53 */
 int
 cheriabi_sigaltstack(struct thread *td,
     struct cheriabi_sigaltstack_args *uap)
@@ -467,8 +461,9 @@ cheriabi_kevent_copyin(void *arg, struct kevent *kevp, int count)
 		 * XXX-BD: this is quite awkward.  ident could be anything.
 		 * If it's a capabilty, we'll hang on to it in udata.
 		 */
-		if (cheri_gettag(ks_c[i].ident)) {
-			if (!(cheri_getperm(ks_c[i].ident) | CHERI_PERM_GLOBAL))
+		if (cheri_gettag((void * __capability)ks_c[i].ident)) {
+			if (!(cheri_getperm((void * __capability)ks_c[i].ident)
+			    | CHERI_PERM_GLOBAL))
 				return (EPROT);
 		}
 		kevp[i].ident = (uintptr_t)(__uintcap_t)ks_c[i].ident;
@@ -1903,20 +1898,37 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 			return (EINVAL);
 		}
 
-		/* User didn't provide a capability so get the thread one. */
-		addr_cap = td->td_md.md_cheri_mmap_cap;
-		KASSERT(cheri_gettag(addr_cap),
-		    ("td->td_md.md_cheri_mmap_cap is untagged!"));
+		/* User didn't provide a capability so get one. */
+		if (flags & MAP_CHERI_DDC) {
+			if ((cheri_getperm(td->td_pcb->pcb_regs.ddc) &
+			    CHERI_PERM_CHERIABI_VMMAP) == 0) {
+				SYSERRCAUSE("DDC lacks "
+				    "CHERI_PERM_CHERIABI_VMMAP");
+				return (EPROT);
+			}
+			addr_cap = td->td_pcb->pcb_regs.ddc;
+		} else {
+			/* Use the per-thread one */
+			addr_cap = td->td_md.md_cheri_mmap_cap;
+			KASSERT(cheri_gettag(addr_cap),
+			    ("td->td_md.md_cheri_mmap_cap is untagged!"));
+		}
+	} else {
+		if (flags & MAP_CHERI_DDC) {
+			SYSERRCAUSE("MAP_CHERI_DDC with non-NULL addr");
+			return (EINVAL);
+		}
 	}
 	cap_base = cheri_getbase(addr_cap);
 	cap_len = cheri_getlen(addr_cap);
-	if (usertag)
+	if (usertag) {
 		cap_offset = cheri_getoffset(addr_cap);
-	else
+	} else {
 		/*
 		 * Ignore offset of default cap, it's only used to set bounds.
 		 */
 		cap_offset = 0;
+	}
 	if (cap_offset >= cap_len) {
 		SYSERRCAUSE("capability has out of range offset");
 		return (EPROT);
@@ -2121,6 +2133,8 @@ cheriabi_mmap_set_retcap(struct thread *td, void * __capability *retcap,
 
 	if (flags & MAP_FIXED) {
 		addr = *addrp;
+	} else if (flags & MAP_CHERI_DDC) {
+		addr = td->td_pcb->pcb_regs.ddc;
 	} else {
 		addr = td->td_md.md_cheri_mmap_cap;
 	}
@@ -2183,13 +2197,6 @@ cheriabi_mount(struct thread *td, struct cheriabi_mount_args *uap)
 }
 
 int
-cheriabi_quotactl(struct thread *td, struct cheriabi_quotactl_args *uap)
-{
-
-	return (ENOSYS);
-}
-
-int
 cheriabi_mac_syscall(struct thread *td, struct cheriabi_mac_syscall_args *uap)
 {
 
@@ -2200,5 +2207,23 @@ int
 cheriabi_auditon(struct thread *td, struct cheriabi_auditon_args *uap)
 {
 
+#ifdef	AUDIT
+	return (kern_auditon(td, uap->cmd, uap->data, uap->length));
+#else
 	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_setlogin(struct thread *td, struct cheriabi_setlogin_args *uap)
+{
+
+	return (kern_setlogin(td, uap->namebuf));
+}
+
+int
+cheriabi_kenv(struct thread *td, struct cheriabi_kenv_args *uap)
+{
+
+	return (kern_kenv(td, uap->what, uap->name, uap->value, uap->len));
 }

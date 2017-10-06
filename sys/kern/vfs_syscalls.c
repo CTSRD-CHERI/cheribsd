@@ -156,16 +156,24 @@ struct quotactl_args {
 int
 sys_quotactl(struct thread *td, struct quotactl_args *uap)
 {
+	return (kern_quotactl(td, (__cheri_cast char * __CAPABILITY)uap->path,
+	    uap->cmd, uap->uid, (__cheri_cast char * __CAPABILITY)uap->arg));
+}
+
+int
+kern_quotactl(struct thread *td, const char * __CAPABILITY path, int cmd,
+    int uid, void * __CAPABILITY arg)
+{
 	struct mount *mp;
 	struct nameidata nd;
 	int error;
 
-	AUDIT_ARG_CMD(uap->cmd);
-	AUDIT_ARG_UID(uap->uid);
+	AUDIT_ARG_CMD(cmd);
+	AUDIT_ARG_UID(uid);
 	if (!prison_allow(td->td_ucred, PR_ALLOW_QUOTAS))
 		return (EPERM);
-	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF | AUDITVNODE1, UIO_USERSPACE,
-	    uap->path, td);
+	NDINIT_C(&nd, LOOKUP, FOLLOW | LOCKLEAF | AUDITVNODE1, UIO_USERSPACE,
+	    path, td);
 	if ((error = namei(&nd)) != 0)
 		return (error);
 	NDFREE(&nd, NDF_ONLY_PNBUF);
@@ -176,7 +184,7 @@ sys_quotactl(struct thread *td, struct quotactl_args *uap)
 	vfs_rel(mp);
 	if (error != 0)
 		return (error);
-	error = VFS_QUOTACTL(mp, uap->cmd, uap->uid, uap->arg);
+	error = VFS_QUOTACTL(mp, cmd, uid, arg);
 
 	/*
 	 * Since quota on operation typically needs to open quota
@@ -189,7 +197,7 @@ sys_quotactl(struct thread *td, struct quotactl_args *uap)
 	 * Require that Q_QUOTAON handles the vfs_busy() reference on
 	 * its own, always returning with ubusied mount point.
 	 */
-	if ((uap->cmd >> SUBCMDSHIFT) != Q_QUOTAON)
+	if ((cmd >> SUBCMDSHIFT) != Q_QUOTAON)
 		vfs_unbusy(mp);
 	return (error);
 }
@@ -872,16 +880,18 @@ int
 sys_chdir(struct thread *td, struct chdir_args *uap)
 {
 
-	return (kern_chdir(td, uap->path, UIO_USERSPACE));
+	return (kern_chdir(td, (__cheri_cast char * __CAPABILITY)uap->path,
+	    UIO_USERSPACE));
 }
 
 int
-kern_chdir(struct thread *td, char *path, enum uio_seg pathseg)
+kern_chdir(struct thread *td, const char * __CAPABILITY path,
+    enum uio_seg pathseg)
 {
 	struct nameidata nd;
 	int error;
 
-	NDINIT(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF | AUDITVNODE1,
+	NDINIT_C(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF | AUDITVNODE1,
 	    pathseg, path, td);
 	if ((error = namei(&nd)) != 0)
 		return (error);
@@ -1036,7 +1046,8 @@ kern_openat(struct thread *td, int fd, char *path, enum uio_seg pathseg,
     int flags, int mode)
 {
 
-	return (kern_openat_c(td, fd, (char * __CAPABILITY)path, pathseg, flags, mode));
+	return (kern_openat_c(td, fd, (__cheri_cast char * __CAPABILITY)path,
+	    pathseg, flags, mode));
 }
 
 int
@@ -1506,7 +1517,18 @@ can_hardlink(struct vnode *vp, struct ucred *cred)
 }
 
 int
-kern_linkat(struct thread *td, int fd1, int fd2, char *path1, char *path2,
+kern_linkat(struct thread *td, int fd1, int fd2, const char *path1, const char *path2,
+    enum uio_seg segflg, int follow)
+{
+
+	return (kern_linkat_c(td, fd1, fd2,
+	    (__cheri_cast const char * __CAPABILITY)path1,
+	    (__cheri_cast const char * __CAPABILITY)path2, segflg, follow));
+}
+
+int
+kern_linkat_c(struct thread *td, int fd1, int fd2,
+    const char * __CAPABILITY path1, const char * __CAPABILITY path2,
     enum uio_seg segflg, int follow)
 {
 	struct vnode *vp;
@@ -1517,7 +1539,7 @@ kern_linkat(struct thread *td, int fd1, int fd2, char *path1, char *path2,
 
 again:
 	bwillwrite();
-	NDINIT_ATRIGHTS(&nd, LOOKUP, follow | AUDITVNODE1, segflg, path1, fd1,
+	NDINIT_ATRIGHTS_C(&nd, LOOKUP, follow | AUDITVNODE1, segflg, path1, fd1,
 	    cap_rights_init(&rights, CAP_LINKAT_SOURCE), td);
 
 	if ((error = namei(&nd)) != 0)
@@ -1528,7 +1550,7 @@ again:
 		vrele(vp);
 		return (EPERM);		/* POSIX */
 	}
-	NDINIT_ATRIGHTS(&nd, CREATE,
+	NDINIT_ATRIGHTS_C(&nd, CREATE,
 	    LOCKPARENT | SAVENAME | AUDITVNODE2 | NOCACHE, segflg, path2, fd2,
 	    cap_rights_init(&rights, CAP_LINKAT_TARGET), td);
 	if ((error = namei(&nd)) == 0) {
@@ -1776,8 +1798,16 @@ sys_unlinkat(struct thread *td, struct unlinkat_args *uap)
 }
 
 int
-kern_unlinkat(struct thread *td, int fd, char *path, enum uio_seg pathseg,
+kern_unlinkat(struct thread *td, int fd, const char *path, enum uio_seg pathseg,
     ino_t oldinum)
+{
+	return (kern_unlinkat_c(td, fd,
+	    (__cheri_cast const char * __CAPABILITY)path, pathseg, oldinum));
+}
+
+int
+kern_unlinkat_c(struct thread *td, int fd, const char * __CAPABILITY path,
+    enum uio_seg pathseg, ino_t oldinum)
 {
 	struct mount *mp;
 	struct vnode *vp;
@@ -1788,7 +1818,7 @@ kern_unlinkat(struct thread *td, int fd, char *path, enum uio_seg pathseg,
 
 restart:
 	bwillwrite();
-	NDINIT_ATRIGHTS(&nd, DELETE, LOCKPARENT | LOCKLEAF | AUDITVNODE1,
+	NDINIT_ATRIGHTS_C(&nd, DELETE, LOCKPARENT | LOCKLEAF | AUDITVNODE1,
 	    pathseg, path, fd, cap_rights_init(&rights, CAP_UNLINKAT), td);
 	if ((error = namei(&nd)) != 0)
 		return (error == EINVAL ? EPERM : error);
@@ -3680,7 +3710,16 @@ sys_rmdir(struct thread *td, struct rmdir_args *uap)
 }
 
 int
-kern_rmdirat(struct thread *td, int fd, char *path, enum uio_seg pathseg)
+kern_rmdirat(struct thread *td, int fd, const char *path, enum uio_seg pathseg)
+{
+
+	return (kern_rmdirat_c(td, fd,
+	    (__cheri_cast const char * __CAPABILITY)path, pathseg));
+}
+
+int
+kern_rmdirat_c(struct thread *td, int fd, const char * __CAPABILITY path,
+    enum uio_seg pathseg)
 {
 	struct mount *mp;
 	struct vnode *vp;
@@ -3690,7 +3729,7 @@ kern_rmdirat(struct thread *td, int fd, char *path, enum uio_seg pathseg)
 
 restart:
 	bwillwrite();
-	NDINIT_ATRIGHTS(&nd, DELETE, LOCKPARENT | LOCKLEAF | AUDITVNODE1,
+	NDINIT_ATRIGHTS_C(&nd, DELETE, LOCKPARENT | LOCKLEAF | AUDITVNODE1,
 	    pathseg, path, fd, cap_rights_init(&rights, CAP_UNLINKAT), td);
 	if ((error = namei(&nd)) != 0)
 		return (error);

@@ -10,14 +10,14 @@
 #define	CHERIABI_SYS_fork	2
 #define	CHERIABI_SYS_read	3
 #define	CHERIABI_SYS_write	4
-#define	CHERIABI_SYS_open	5
+#define	CHERIABI_SYS_cheriabi_open	5
 #define	CHERIABI_SYS_close	6
 #define	CHERIABI_SYS_wait4	7
 				/* 8 is obsolete old creat */
-#define	CHERIABI_SYS_link	9
-#define	CHERIABI_SYS_unlink	10
+#define	CHERIABI_SYS_cheriabi_link	9
+#define	CHERIABI_SYS_cheriabi_unlink	10
 				/* 11 is obsolete execv */
-#define	CHERIABI_SYS_chdir	12
+#define	CHERIABI_SYS_cheriabi_chdir	12
 #define	CHERIABI_SYS_fchdir	13
 				/* 14 is obsolete fbsd11_mknod */
 #define	CHERIABI_SYS_chmod	15
@@ -55,7 +55,7 @@
 #define	CHERIABI_SYS_getgid	47
 				/* 48 is obsolete sigprocmask */
 #define	CHERIABI_SYS_getlogin	49
-#define	CHERIABI_SYS_setlogin	50
+#define	CHERIABI_SYS_cheriabi_setlogin	50
 #define	CHERIABI_SYS_acct	51
 				/* 52 is obsolete sigpending */
 #define	CHERIABI_SYS_cheriabi_sigaltstack	53
@@ -139,7 +139,7 @@
 #define	CHERIABI_SYS_shutdown	134
 #define	CHERIABI_SYS_socketpair	135
 #define	CHERIABI_SYS_mkdir	136
-#define	CHERIABI_SYS_rmdir	137
+#define	CHERIABI_SYS_cheriabi_rmdir	137
 #define	CHERIABI_SYS_utimes	138
 				/* 139 is obsolete sigreturn */
 #define	CHERIABI_SYS_adjtime	140
@@ -318,7 +318,7 @@
 #define	CHERIABI_SYS_cheriabi___mac_get_file	387
 #define	CHERIABI_SYS_cheriabi___mac_set_fd	388
 #define	CHERIABI_SYS_cheriabi___mac_set_file	389
-#define	CHERIABI_SYS_kenv	390
+#define	CHERIABI_SYS_cheriabi_kenv	390
 #define	CHERIABI_SYS_lchflags	391
 #define	CHERIABI_SYS_uuidgen	392
 #define	CHERIABI_SYS_cheriabi_sendfile	393
@@ -413,7 +413,7 @@
 #define	CHERIABI_SYS_cheriabi_fexecve	492
 				/* 493 is obsolete fbsd11_fstatat */
 #define	CHERIABI_SYS_futimesat	494
-#define	CHERIABI_SYS_linkat	495
+#define	CHERIABI_SYS_cheriabi_linkat	495
 #define	CHERIABI_SYS_mkdirat	496
 #define	CHERIABI_SYS_mkfifoat	497
 				/* 498 is obsolete fbsd11_mknodat */
@@ -421,7 +421,7 @@
 #define	CHERIABI_SYS_readlinkat	500
 #define	CHERIABI_SYS_renameat	501
 #define	CHERIABI_SYS_symlinkat	502
-#define	CHERIABI_SYS_unlinkat	503
+#define	CHERIABI_SYS_cheriabi_unlinkat	503
 #define	CHERIABI_SYS_posix_openpt	504
 #define	CHERIABI_SYS_gssd_syscall	505
 #define	CHERIABI_SYS_cheriabi_jail_get	506

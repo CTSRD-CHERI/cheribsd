@@ -652,7 +652,7 @@ sandbox_object_invoke(struct sandbox_object *sbop, register_t methodnum,
 	c7 = (c7p != NULL ? *(void * __capability *)c7p : NULL);
 	c8 = (c8p != NULL ? *(void * __capability *)c8p : NULL);
 	c9 = (c9p != NULL ? *(void * __capability *)c9p : NULL);
-	c10 = (c10p != NULL ? (__capability void *)c10p : NULL);
+	c10 = (c10p != NULL ? *(void * __capability *)c10p : NULL);
 
 	v0 = sandbox_object_cinvoke(sbop,
 	    methodnum,

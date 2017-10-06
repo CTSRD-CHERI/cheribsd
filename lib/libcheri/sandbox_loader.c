@@ -261,17 +261,9 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	/*
 	 * Assertions to make sure that we ended up with a well-aligned
 	 * memory allocation as required for a precise set of bounds in the
-	 * presence of compressed capabilities.  We don't check the
-	 * pointer, but instead its base + offset, so as to be tolerant of
-	 * both the MIPS ABI (where we are working from a $c0-based capability
-	 * derived from a kernel-returned pointer) and CheriABI (where we are
-	 * working from a capability directly returned by the kernel). All
-	 * that matters here is the underlying virtual address.
+	 * presence of compressed capabilities.
 	 */
-#if CHERICAP_SIZE == 16
-	assert(((cheri_getbase(base) + cheri_getoffset(base)) &
-	    CHERI_SEAL_ALIGN_MASK(length)) == 0);
-#endif
+	assert(((vaddr_t)base & CHERI_SEAL_ALIGN_MASK(length)) == 0);
 
 	/*
 	 * Map and (eventually) link the program.
@@ -360,7 +352,7 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	    CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |
 	    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP);
 	assert(cheri_getoffset(idc) == 0);
-	assert(cheri_getlen(idc) == sbop->sbo_datalen);
+	assert(cheri_getlen(idc) == (size_t)sbop->sbo_datalen);
 
 	/*
 	 * Configure methods for object.
@@ -522,7 +514,7 @@ sandbox_object_unload(struct sandbox_object *sbop)
 
 	sbmp = (void *)((char *)sbop->sbo_datamem +
 	    SANDBOX_METADATA_BASE);
-	free((void *)sbmp->sbm_vtable);
+	free_c(sbmp->sbm_vtable);
 
 	munmap(sbop->sbo_datamem, sbop->sbo_datalen);
 }

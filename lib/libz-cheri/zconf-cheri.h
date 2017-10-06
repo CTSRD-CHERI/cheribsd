@@ -390,6 +390,9 @@ typedef uLong FAR uLongf;
    typedef Byte FAR   *voidpf;
    typedef Byte       *voidp;
 #endif
+#if __has_feature(capabilities)
+typedef voidpf __capability voidpf_c;
+#endif
 
 #if !defined(Z_U4) && !defined(Z_SOLO) && defined(STDC)
 #  include <limits.h>

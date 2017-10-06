@@ -174,7 +174,7 @@ cheri_fd_destroy(struct sandbox_object *sbop)
 
 	cfp = sandbox_object_getsandboxdata(sbop);
 	sandbox_object_destroy(sbop);
-	free((void *)cfp);
+	free((__cheri_cast struct cheri_fd *)cfp);
 }
 
 /*
@@ -196,7 +196,7 @@ cheri_fd_fstat(__capability struct stat *sb_c)
 		ret.cfr_retval1 = EPROT;
 		return (ret);
 	}
-	sb = (void *)sb_c;
+	sb = cheri_cap_to_typed_ptr(sb_c, struct stat);
 
 	/* Check that the cheri_fd hasn't been revoked. */
 	cfp = cheri_getidc();
@@ -255,7 +255,7 @@ cheri_fd_read(__capability void *buf_c, size_t nbytes)
 		ret.cfr_retval1 = EPROT;
 		return (ret);
 	}
-	buf = (void *)buf_c;
+	buf = cheri_cap_to_ptr(buf_c, nbytes);
 
 	/* Check that the cheri_fd hasn't been revoked. */
 	cfp = cheri_getidc();
@@ -280,7 +280,7 @@ cheri_fd_write(__capability const void *buf_c, size_t nbytes)
 {
 	struct cheri_fd_ret ret;
 	__capability struct cheri_fd *cfp;
-	void *buf;
+	const void *buf;
 
 	/* XXXRW: Object-capability user permission check on idc. */
 
@@ -290,7 +290,7 @@ cheri_fd_write(__capability const void *buf_c, size_t nbytes)
 		ret.cfr_retval1 = EPROT;
 		return (ret);
 	}
-	buf = (void *)buf_c;
+	buf = cheri_cap_to_ptr(buf_c, nbytes);
 
 	/* Check that cheri_fd hasn't been revoked. */
 	cfp = cheri_getidc();

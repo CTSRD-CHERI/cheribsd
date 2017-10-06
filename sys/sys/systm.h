@@ -256,10 +256,18 @@ void	hexdump(const void *ptr, int length, const char *hdr, int flags);
 
 #define ovbcopy(f, t, l) bcopy((f), (t), (l))
 void	bcopy(const void * _Nonnull from, void * _Nonnull to, size_t len);
+#if __has_feature(capabilities)
+void	bcopynocap_c(const void * _Nonnull __capability from,
+	    void * _Nonnull __capability to, size_t len);
+#endif
 void	bzero(void * _Nonnull buf, size_t len);
 void	explicit_bzero(void * _Nonnull, size_t);
 
 void	*memcpy(void * _Nonnull to, const void * _Nonnull from, size_t len);
+#if __has_feature(capabilities)
+void	*memcpynocap_c(void * _Nonnull __capability to,
+	    const void * _Nonnull __capability from, size_t len);
+#endif
 void	*memmove(void * _Nonnull dest, const void * _Nonnull src, size_t n);
 
 struct copy_map {
@@ -275,13 +283,13 @@ int	copyinstr(const void * __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len,
 	    size_t * __restrict lencopied);
 #if __has_feature(capabilities)
-int	copyinstr_fc(const void * __CAPABILITY __restrict udaddr,
-	    void * _Nonnull __restrict kaddr, size_t len,
-	    size_t * __restrict lencopied);
+int	copyinstr_c(const void * _Nonnull __restrict __CAPABILITY udaddr,
+	    void * _Nonnull __restrict __CAPABILITY kaddr, size_t len,
+	    size_t * __restrict __CAPABILITY lencopied);
 #else
 static inline
 int
-copyinstr_fc(const void * __restrict udaddr,
+copyinstr_c(const void * __restrict udaddr,
     void * _Nonnull __restrict kaddr, size_t len,
     size_t * __restrict lencopied) {
 
@@ -290,6 +298,18 @@ copyinstr_fc(const void * __restrict udaddr,
 #endif
 int	copyin(const void * _Nonnull __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
+#if __has_feature(capabilities)
+int	copyin_c(const void * _Nonnull __restrict __capability udaddr,
+	    void * _Nonnull __restrict __capability kaddr, size_t len);
+#else
+static inline int
+copyin_c(const void * _Nonnull __restrict uaddr,
+    void * _Nonnull __restrict kaddr, size_t len)
+{
+
+	return(copyin(uaddr, kaddr, len));
+}
+#endif
 #ifdef CPU_CHERI
 int	copyincap(const void * _Nonnull __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
@@ -302,6 +322,18 @@ int	copyout_part(const void * _Nonnull __restrict kaddr,
 	     void * _Nonnull __restrict udaddr,
 	    struct copy_map * _Nonnull cmap, size_t cmap_ents);
 
+#if __has_feature(capabilities)
+int	copyout_c(const void * _Nonnull __restrict __capability kaddr,
+	    void * _Nonnull __restrict __capability udaddr, size_t len);
+#else
+static inline int
+copyout_c(const void * _Nonnull __restrict kaddr,
+    void * _Nonnull __restrict udaddr, size_t len)
+{
+
+	return (copyout(kaddr, udaddr, len));
+}
+#endif
 #ifdef CPU_CHERI
 int	copyoutcap(const void * _Nonnull __restrict kaddr,
 	    void * _Nonnull __restrict udaddr, size_t len);

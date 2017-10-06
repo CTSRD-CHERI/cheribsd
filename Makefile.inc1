@@ -2011,7 +2011,6 @@ bootstrap-tools: .PHONY
     ${_strfile} \
     ${_gperf} \
     ${_dtc} \
-    usr.bin/brandelf \
     ${_cat} \
     ${_kbdcontrol} \
     usr.bin/lorder \

@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2014-2015 Robert N. M. Watson
+ * Copyright (c) 2017 SRI International
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -83,45 +84,69 @@ return:
 	nop
 END(cheri_memcpy)
 
-LEAF(copystr_fc)
-	move		t0, a1
-	li		t1, 1
-	beq		a1, zero, 4f
-1:
-	clbu		v0, zero, 0($c3)
-	PTR_SUBU	a1, a1, 1
-	beq		v0, zero, 2f
-	sb		v0, 0(a0)		# each byte until NIL
-	cincoffset	$c3, $c3, t1
-	bne		a1, zero, 1b		# less than maxlen
-	PTR_ADDU	a0, a0, 1
-4:
-	li		v0, ENAMETOOLONG	# run out of space
-2:
-	beq		a2, zero, 3f		# return num. of copied bytes
-	PTR_SUBU	a1, t0, a1		# if the 4th arg was non-NULL
-	PTR_S		a1, 0(a2)
-3:
-	j		ra			# v0 is 0 or ENAMETOOLONG
+/*
+ * Implement memcpy() and bcopy() variants that take capability
+ * arguments, but DO NOT copy capabilities.  These are implemented in
+ * assembly to support copyin and copyout variants.
+ *
+ *  XXX: These routines are inefficent and copy one byte at a time.
+ *
+ * memcpynocap_c() accepts:
+ * c3 - destination ponter
+ * c4 - source pointer
+ * a0 - length
+ *
+ * bcopynocap_c() has inverted source/destination pointers.
+ */
+LEAF(bcopynocap_c)
+	cmove	$c5, $c3
+	cmove	$c3, $c4	/* $c3 now holds $dst for memcpynocap_c */
+	cmove	$c4, $c5
+XLEAF(memcpynocap_c)
+	beqz	a0, bcnc_return	/* Return immediately if zero-length. */
+	li	t0, 1		/* Bytes that will have been copied */
+bcnc_loop:
+	clbu	t1, t0, -1($c4)
+	csb	t1, t0, -1($c3)
+	bne	a0, t0, bcnc_loop /* Are we there yet?  If not, loop. */
+	daddiu	t0, t0, 1
+bcnc_return:
+	jr	ra
 	nop
-END(copystr_fc)
+END(bcopynocap_c)
 
-NESTED(copyinstr_fc, CALLFRAME_SIZ, ra)
-	PTR_SUBU	sp, sp, CALLFRAME_SIZ
-	.mask	0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ)
-	PTR_LA	v0, copyerr
-	# XXX
-	#blt	a0, zero, _C_LABEL(copyerr)  # make sure address is in user space
-	REG_S	ra, CALLFRAME_RA(sp)
-	GET_CPU_PCPU(v1)
-	PTR_L	v1, PC_CURPCB(v1)
-	PTR_LA	t9, _C_LABEL(copystr_fc)
-	jalr	t9
-	PTR_S	v0, U_PCB_ONFAULT(v1)
-	REG_L	ra, CALLFRAME_RA(sp)
-	GET_CPU_PCPU(v1)
-	PTR_L	v1, PC_CURPCB(v1)
-	PTR_S	zero, U_PCB_ONFAULT(v1)
-	j	ra
-	PTR_ADDU	sp, sp, CALLFRAME_SIZ
-END(copyinstr_fc)
+/*
+ * Copy a string from one capabilty to another up to a maximum length.
+ * Return the length by reference.
+ *
+ * copystr_c() accepts:
+ * c3 - source pointer
+ * c4 - destination pointer
+ * c5 - pointer length copied (size_t)
+ * a0 - maximum length
+ */
+
+LEAF(copystr_c)
+	li		v0, 0	/* Hopefully we succeed */
+	beqz		a0, cstr_return_toolong /* Return if zero-length. */	
+	li		t1, 1	/* Length we will have copied in loop */
+cstr_loop:
+	clbu		t0, t1, -1($c3)
+	beq		t0, zero, cstr_return_nul
+	csb		t0, t1, -1($c4)
+	bne		t1, a0, cstr_loop
+	daddiu		t1, t1, 1
+
+cstr_return_toolong:
+	li		v0, ENAMETOOLONG
+	daddiu		t1, t1, -1	/* Count is 1 too high */
+cstr_return_nul:	/* Store length read if c5 is non-NULL */
+	cgetdefault	$c3
+	ctoptr		t0, $c5, $c3
+	beq	 	t0, zero, cstr_return
+	nop
+	csd		t1, zero, 0($c5)	/* Store bytes copied */
+cstr_return:
+	jr	ra
+	nop
+END(copystr_c)
