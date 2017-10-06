@@ -29,8 +29,23 @@
 #ifndef _MACHINE_SF_BUF_H_
 #define _MACHINE_SF_BUF_H_
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <machine/param.h>
+#include <cheri/cheri.h>
+#endif
+
 #ifdef __mips_n64	/* In 64 bit the whole memory is directly mapped */
 
+#ifdef __CHERI_PURE_CAPABILITY__
+static inline void *
+sf_buf_kva(struct sf_buf *sf)
+{
+	vm_page_t	m;
+
+	m = (vm_page_t)sf;
+	return cheri_kern_ptr(MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m)), PAGE_SIZE);
+}
+#else /* ! __CHERI_PURE_CAPABILITY__ */
 static inline vm_offset_t
 sf_buf_kva(struct sf_buf *sf)
 {
@@ -39,6 +54,7 @@ sf_buf_kva(struct sf_buf *sf)
 	m = (vm_page_t)sf;
 	return (MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m)));
 }
+#endif /* ! __CHERI_PURE_CAPABILITY__ */
 
 static inline struct vm_page *
 sf_buf_page(struct sf_buf *sf)
