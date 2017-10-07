@@ -65,7 +65,7 @@
 	(sbop)->__sandbox_object_idc = NULL;				\
 	(sbop)->__sandbox_object_rtld_pcc = NULL;			\
 	(sbop)->__sandbox_object_invoke_pcc = NULL;			\
-	free((__cheri_cast intptr_t *)(sbop)->__sandbox_vtable);	\
+	free_c((sbop)->__sandbox_vtable);				\
 	(sbop)->__sandbox_vtable = NULL
 
 #endif /* _CHERI_CLASS_H_ */
