@@ -164,11 +164,22 @@ cheri_invoke_bundle_idc:
 	#
 
 	#
+	# Construct link-address PCC.
+	#
+	# XXXRW: Do we want a CCall variant like CJALR that automatically
+	# builds the desired capability?
+	#
+	dla	$t0, cheri_invoke_ccall_linkaddr
+	CGetPCC	$c17
+	CSetOffset	$c17, $c17, $t0
+
+	#
 	# Invoke object capability.  CCall/CReturn will save and restore $sp
 	# and IDC, so we don't need to.
 	#
 cheri_invoke_ccall:
 	ccall	$c1, $c2, 1
+cheri_invoke_ccall_linkaddr:
 
 	#
 	# Restore $idc-saved recovery state; $idc must be restored last.  The
