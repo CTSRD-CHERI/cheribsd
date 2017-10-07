@@ -137,7 +137,6 @@ ccall_push_stack:
 
 	/* Calculate $c14-relative offset to stack frame. */
 	daddiu	$t0, $t0, 32			# XXXRW: Hard-coded offset
-	cincoffset	$c14, $c14, $t0		# Adjust pointer to frame
 
 	/* NB: In this model, we don't need to increment the saved $pcc. */
 
@@ -230,7 +229,6 @@ creturn_pop_stack:
 
 	/* Calculate $c14-relative offset to stack frame. */
 	daddiu	$t0, $t0, 32			# XXXRW: Hard-coded offset
-	cincoffset	$c14, $c14, $t0		# Adjust pointer to frame
 
 	/* Pop caller return $pcc. */
 	clc	$c17, $t0, 0($c14)		# XXXRW: Hard-coded offset
