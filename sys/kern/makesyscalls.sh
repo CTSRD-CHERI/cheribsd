@@ -803,7 +803,7 @@ sed -e '
 				    argsaltype[i], argname[i]) > cheriabi_fill_uap
 				printf("\tcheriabi_fetch_syscall_arg(td, &tmpcap, %d, %s%s_PTRMASK);\n",
 				    i-1, syscallprefix, funcalias) > cheriabi_fill_uap
-				printf("\tuap->%s = (register_t)tmpcap;\n", argname[i]) > cheriabi_fill_uap
+				printf("\tuap->%s = cheri_getoffset(tmpcap);\n", argname[i]) > cheriabi_fill_uap
 			}
 			# Process capabilities we pass through
 			for (i = 1; i <= argc; i++) {
