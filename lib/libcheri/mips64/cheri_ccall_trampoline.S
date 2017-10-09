@@ -87,6 +87,16 @@
  * $c14		Earlier: trusted stack.  Later: trusted stack frame.
  * $c17		Earlier: return code capability.  Later: target $pcc.
  * $c26		IDC as provided by CCall -- pointer to object description.
+ *
+ * XXXRW: Quite a bit of work left to do here, as both register clearing and
+ * capability flow control are unimplemented.
+ *
+ * XXXRW: Some careful thinking about signal handlers and atomicity is still
+ * required here.  Machine-dependent trusted-stack unwind code may need to
+ * recognise when the interrupted $pcc falls during invocation or return, and
+ * "pick" one side or the other [accurately].  Fortunately, we have one
+ * particular store that "commits" the transition: the in-place update of the
+ * trusted stack pointer.
  */
 	.text
 	.global	libcheri_ccall_vector
@@ -153,8 +163,8 @@ ccall_extract_target:
 	 * Retrieve the target protection domain's PCC and IDC, which are
 	 * pointed to by our IDC.
 	 */
-	clc	$c12, $zero, 0($c26)		# XXXRW: Hard-coded offset
-	clc	$c26, $zero, CHERICAP_SIZE($c26)# XXXRW: Hard-coded offset
+	clc	$c12, $zero, (2*CHERICAP_SIZE)($c26) # XXXRW: Hard-coded offset
+	clc	$c26, $zero, (0*CHERICAP_SIZE)($c26) # XXXRW: Hard-coded offset
 
 ccall_clear_regs:
 	/* XXXRW: General-purpose registers. */
@@ -233,7 +243,7 @@ creturn_pop_stack:
 	/* Pop caller return $pcc. */
 	clc	$c17, $t0, 0($c14)		# XXXRW: Hard-coded offset
 
-	/* Pop caller return $csp. */
+	/* Pop caller return $c11. */
 	clc	$c11, $t0, CHERICAP_SIZE($c14)	# XXXRW: Hard-coded offset
 
 creturn_clear_regs:

@@ -116,10 +116,10 @@ sandbox_object {
 	 * shared headers, allowing compile-time asserts to be used to check
 	 * binary compatibility has not been broken.
 	 */
-	__capability void	*sbo_idc;	/* Capability offset 1. */
-	__capability void	*sbo_rtld_pcc;	/* Capability offset 2. */
-	__capability void	*sbo_invoke_pcc;/* Capability offset 3. */
-	__capability void	*sbo_vtable;	/* Capability offset 4. */
+	__capability void	*sbo_idc;	/* Capability offset 0. */
+	__capability void	*sbo_rtld_pcc;	/* Capability offset 1. */
+	__capability void	*sbo_invoke_pcc;/* Capability offset 2. */
+	__capability void	*sbo_vtable;	/* Capability offset 3. */
 
 	/*
 	 * Further fields are unknown to the assembly domain-transition code.

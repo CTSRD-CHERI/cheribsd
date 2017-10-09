@@ -1,5 +1,5 @@
 #-
-# Copyright (c) 2012-2015 Robert N. M. Watson
+# Copyright (c) 2012-2017 Robert N. M. Watson
 # All rights reserved.
 #
 # This software was developed by SRI International and the University of
@@ -46,21 +46,25 @@
 # Calling conventions into cheri_invoke:
 #
 # Registers	Description
-# $c0		MIPS address space
-# $c1, $c2	Invoked capabilities
-# $c3..$c10	Argument capabilities
-# $c11..$c16	Caller-save capabilities
-# $c17..$c24	Callee-save capabilities
-# $c26		IDC
+# $c0		MIPS address space - saved
+# $c1, $c2	Invoked capabilities - passed through
+# $c3..$c10	Argument capabilities - passed through
+# $c11		Stack capability - saved, cleared by CCall
+# $c12..$c16	Caller-save capabilities - cleared by CCall
+# $c17..$c25	Callee-save capabilities - saved, cleared by CCall
+# $c26		IDC - saved, overwritten by CCall
 #
-# Calling conventions implemented around CCall:
+# Calling conventions implemented by CCall:
 #
 # $c1		Invoked code capability
 # $c2		Invoked data capability
 # $c3..$c10	Argument capabilities; $c3 as return capability
-# $c11..$c16	n/a
-# $c17..$c24	n/a
-# $c26		IDC
+# $c11		Stack capability - saved by CCall
+# $c12..$c16	Cleared by CCall
+# $c17		Link register - restored as $pcc on return
+# $c18..$c26	Cleared by CCall
+#
+# Only $pcc and $c11 will be saved by the CCall implementation.
 #
 # XXXRW: Worries/TODO:
 #
@@ -128,7 +132,7 @@ cheri_invoke_save_regs:
 	# should be doing this?
 	#
 cheri_invoke_save_caps:
-	daddiu	$sp, -8*CHERICAP_SIZE
+	daddiu	$sp, -10*CHERICAP_SIZE
 	csc	$c17, $sp, 0($c11)
 	csc	$c18, $sp, CHERICAP_SIZE($c11)
 	csc	$c19, $sp, 2*CHERICAP_SIZE($c11)
@@ -137,25 +141,24 @@ cheri_invoke_save_caps:
 	csc	$c22, $sp, 5*CHERICAP_SIZE($c11)
 	csc	$c23, $sp, 6*CHERICAP_SIZE($c11)
 	csc	$c24, $sp, 7*CHERICAP_SIZE($c11)
+	csc	$c25, $sp, 8*CHERICAP_SIZE($c11)
+	csc	$c26, $sp, 9*CHERICAP_SIZE($c11)
 
 	#
-	# Prepare $idc to be saved (and restored) by CCall; don't need to seal
+	# Prepare $c11 to be saved (and restored) by CCall; don't need to seal
 	# as CCall will protect its integrity.  No more stack use after this
 	# point until $c11 and $sp are restored.  Move $c0 through $c12 to
 	# avoid direct use.
 	#
 cheri_invoke_bundle_idc:
-	daddiu		$sp, -4*CHERICAP_SIZE
-	csd		$sp, $sp, 3*CHERICAP_SIZE($c11)	# MIPS stack pointer
 	cgetdefault	$c12
-	csc		$c12, $sp, 2*CHERICAP_SIZE($c11)# Default capability
-	csc		$c11, $sp, CHERICAP_SIZE($c11)	# CHERI stack capability
-	csc		$c26, $sp, 0($c11)	# Save original $idc
-	cfromptr	$c26, $c11, $sp
-	dli		$t0, 4*CHERICAP_SIZE
-	# XXXRW: Soon:
-	#csetbounds	$c26, $c26, $t0
-	CSetBounds	$c26, $c26, $t0
+	daddiu		$sp, -3*CHERICAP_SIZE
+	csd		$sp, $sp, 2*CHERICAP_SIZE($c11)	  # MIPS stack pointer
+	csc		$c12, $sp, 1*CHERICAP_SIZE($c11)  # Default cap.
+	csc		$c11, $sp, 0*CHERICAP_SIZE($c11)  # CHERI stack cap.
+	cfromptr	$c11, $c11, $sp
+	dli		$t0, 3*CHERICAP_SIZE
+	CSetBounds	$c11, $c11, $t0
 
 	#
 	# The compiler is responsible for scrubbing unused argument registers
@@ -179,6 +182,7 @@ cheri_invoke_bundle_idc:
 	#
 cheri_invoke_ccall:
 	ccall	$c1, $c2, 1
+	nop
 cheri_invoke_ccall_linkaddr:
 
 	#
@@ -187,12 +191,11 @@ cheri_invoke_ccall_linkaddr:
 	# direct use.
 	#
 cheri_invoke_unbundle_idc:
-	cld		$sp, $zero, 3*CHERICAP_SIZE($c26)# MIPS stack pointer
-	clc		$c12, $zero, 2*CHERICAP_SIZE($c26)# Default capability
+	cld		$sp, $zero, 2*CHERICAP_SIZE($c11) # MIPS stack pointer
+	clc		$c12, $zero, 1*CHERICAP_SIZE($c11)# Default cap.
+	clc		$c11, $zero, 0*CHERICAP_SIZE($c11)# CHERI stack cap.
+	daddiu		$sp, 3*CHERICAP_SIZE
 	csetdefault	$c12
-	clc		$c11, $zero, CHERICAP_SIZE($c26) # CHERI stack capability
-	clc		$c26, $zero, 0($c26)	# Restore original $idc
-	daddiu		$sp, 4*CHERICAP_SIZE
 
 	#
 	# Restore capability registers from stack.
@@ -209,8 +212,10 @@ cheri_invoke_restore_caps:
 	clc	$c22, $sp, 5*CHERICAP_SIZE($c11)
 	clc	$c23, $sp, 6*CHERICAP_SIZE($c11)
 	clc	$c24, $sp, 7*CHERICAP_SIZE($c11)
+	clc	$c25, $sp, 8*CHERICAP_SIZE($c11)
+	clc	$c26, $sp, 9*CHERICAP_SIZE($c11)
 	bnez	$a0, set_cheri_errno
-	daddiu	$sp, 8*CHERICAP_SIZE
+	daddiu	$sp, 10*CHERICAP_SIZE
 
 	#
 	# CCall has conservatively cleared all non-return-value registers, and
