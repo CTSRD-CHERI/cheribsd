@@ -462,11 +462,21 @@ typedef struct if_rxsd {
 } *if_rxsd_t;
 
 /* multiple of word size */
-#ifdef __LP64__
+#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef CPU_CHERI128
+#define PKT_INFO_SIZE 8
+#define RXD_INFO_SIZE 8
+#define PKT_TYPE uint64_t
+#else /* CPU_CHERI256 */
+#define PKT_INFO_SIZE 12
+#define RXD_INFO_SIZE 16
+#define PKT_TYPE uint64_t
+#endif /* CPU_CHERI256 */
+#elif defined(__LP64__)
 #define PKT_INFO_SIZE	6
 #define RXD_INFO_SIZE	5
 #define PKT_TYPE uint64_t
-#else
+#else /* LP32 */
 #define PKT_INFO_SIZE	11
 #define RXD_INFO_SIZE	8
 #define PKT_TYPE uint32_t

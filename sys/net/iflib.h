@@ -73,6 +73,9 @@ typedef struct if_rxd_frag {
 	uint16_t irf_len;
 } *if_rxd_frag_t;
 
+/*
+ *  XXXAM: Struct layout may be refined for C128 and C256 alignment optimization.
+ */
 typedef struct if_rxd_info {
 	/* set by iflib */
 	uint16_t iri_qsidx;		/* qset index */
@@ -109,6 +112,9 @@ typedef struct if_rxd_update {
 #define IPI_TX_IPV4	0x2		/* ethertype IPv4 */
 #define IPI_TX_IPV6	0x4		/* ethertype IPv6 */
 
+/*
+ *  XXXAM: Struct layout may be refined for C128 and C256 alignment optimization.
+ */
 typedef struct if_pkt_info {
 	bus_dma_segment_t	*ipi_segs;	/* physical addresses */
 	uint32_t		ipi_len;	/* packet length */
