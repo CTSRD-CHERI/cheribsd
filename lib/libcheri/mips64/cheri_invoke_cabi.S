@@ -143,8 +143,7 @@ cheri_invoke_save_caps:
 	# here.)
 	#
 cheri_invoke_bundle_idc:
-	dli		$t0, -3*CHERICAP_SIZE
-	cincoffset	$csp, $csp, $t0
+	cincoffset	$csp, $csp, -3*CHERICAP_SIZE
 	cgetdefault	$c12
 	csc		$c12, $zero, 2*CHERICAP_SIZE($csp)# Default capability
 	csc		$csp, $zero, CHERICAP_SIZE($csp)# CHERI stack capability
