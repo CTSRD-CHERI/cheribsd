@@ -39,6 +39,7 @@
 #include <cheri/cheric.h>
 #endif
 
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include <elf.h>
@@ -70,10 +71,12 @@ void __libc_free_tls(void *tls, size_t tcbsize, size_t tcbalign);
 
 #if defined(__amd64__)
 #define TLS_TCB_ALIGN 16
+#elif __has_feature(capabilities)
+#define	TLS_TCB_ALIGN	sizeof(void * __capability)
 #elif defined(__aarch64__) || defined(__arm__) || defined(__i386__) || \
     defined(__mips__) || defined(__powerpc__) || defined(__riscv__) || \
     defined(__sparc64__)
-#define TLS_TCB_ALIGN sizeof(void *)
+#define	TLS_TCB_ALIGN	sizeof(void *)
 #else
 #error TLS_TCB_ALIGN undefined for target architecture
 #endif
@@ -90,6 +93,7 @@ void __libc_free_tls(void *tls, size_t tcbsize, size_t tcbalign);
 
 static size_t tls_static_space;
 static size_t tls_init_size;
+static size_t tls_init_align;
 static void *tls_init;
 #endif
 
@@ -118,37 +122,85 @@ __libc_tls_get_addr(void *ti __unused)
 
 #define	TLS_TCB_SIZE	(2 * sizeof(void *))
 
+static void *
+malloc_aligned(size_t size, size_t align)
+{
+	vaddr_t memshift;
+	void *mem, *res;
+	if (align < sizeof(void *))
+		align = sizeof(void *);
+
+	mem = __je_bootstrap_malloc(size + sizeof(void *) + align - 1);
+	memshift = roundup2((vaddr_t)mem + sizeof(void *), align) - (vaddr_t)mem;
+	res = (void *)((uintptr_t)mem + memshift);
+	*(void **)((uintptr_t)res - sizeof(void *)) = mem;
+	return (res);
+}
+
+static void
+free_aligned(void *ptr)
+{
+	void *mem;
+	uintptr_t x;
+
+	if (ptr == NULL)
+		return;
+
+	x = (uintptr_t)ptr;
+	x -= sizeof(void *);
+	mem = *(void **)x;
+	__je_bootstrap_free(mem);
+}
+
 /*
  * Free Static TLS using the Variant I method.
  */
 void
-__libc_free_tls(void *tcb, size_t tcbsize, size_t tcbalign __unused)
+__libc_free_tls(void *tcb, size_t tcbsize, size_t tcbalign)
 {
 	Elf_Addr *dtv;
 	Elf_Addr **tls;
+	size_t tcbextra, tcbshift;
 
-	tls = (Elf_Addr **)((char *)tcb + tcbsize - TLS_TCB_SIZE);
+	assert(tcbalign >= TLS_TCB_ALIGN);
+	assert(tcbsize >= TLS_TCB_SIZE);
+	tcbextra = tcbsize - TLS_TCB_SIZE;
+	tcbshift = roundup2(TLS_TCB_SIZE + tcbextra, tcbalign) -
+	    (TLS_TCB_SIZE + tcbextra);
+
+	tcb = (void *)((uintptr_t)tcb - tcbshift);
+	tls = (Elf_Addr **)((char *)tcb + tcbextra);
 	dtv = tls[0];
 	__je_bootstrap_free(dtv);
-	__je_bootstrap_free(tcb);
+	free_aligned(tcb);
 }
 
 /*
  * Allocate Static TLS using the Variant I method.
  */
 void *
-__libc_allocate_tls(void *oldtcb, size_t tcbsize, size_t tcbalign __unused)
+__libc_allocate_tls(void *oldtcb, size_t tcbsize, size_t tcbalign)
 {
 	Elf_Addr *dtv;
 	Elf_Addr **tls;
 	char *dtv2;
 	char *tcb;
+	size_t tcballocsize, tcbextra, tcbshift;
 
 	if (oldtcb != NULL && tcbsize == TLS_TCB_SIZE)
 		return (oldtcb);
 
-	tcb = __je_bootstrap_calloc(1, tls_static_space + tcbsize - TLS_TCB_SIZE);
-	tls = (Elf_Addr **)(tcb + tcbsize - TLS_TCB_SIZE);
+	assert(tcbalign >= TLS_TCB_ALIGN);
+	assert(tcbsize >= TLS_TCB_SIZE);
+	tcbextra = tcbsize - TLS_TCB_SIZE;
+	tcbshift = roundup2(TLS_TCB_SIZE + tcbextra, tcbalign) -
+	    (TLS_TCB_SIZE + tcbextra);
+	tcballocsize = tls_static_space + tcbextra + tcbshift;
+
+	tcb = malloc_aligned(tcballocsize, tcbalign);
+	memset(tcb, 0, tcballocsize);
+	tcb = (void *)((uintptr_t)tcb + tcbshift);
+	tls = (Elf_Addr **)(tcb + tcbextra);
 
 	if (oldtcb != NULL) {
 		memcpy(tls, oldtcb, tls_static_space);
@@ -322,6 +374,7 @@ _init_tls(void)
 			tls_static_space = roundup2(phdr[i].p_memsz,
 			    phdr[i].p_align);
 			tls_init_size = phdr[i].p_filesz;
+			tls_init_align = phdr[i].p_align;
 #ifndef __CHERI_PURE_CAPABILITY__
 			tls_init = (void*) phdr[i].p_vaddr;
 #else
@@ -329,6 +382,7 @@ _init_tls(void)
 			    cheri_getdefault(), phdr[i].p_vaddr),
 			    tls_init_size);
 #endif
+			break;
 		}
 	}
 
@@ -339,7 +393,8 @@ _init_tls(void)
 	tls_static_space += TLS_TCB_SIZE;
 #endif
 
-	tls = _rtld_allocate_tls(NULL, TLS_TCB_SIZE, TLS_TCB_ALIGN);
+	tls = _rtld_allocate_tls(NULL, TLS_TCB_SIZE,
+	    MAX(TLS_TCB_ALIGN, tls_init_align));
 
 	_set_tp(tls);
 #endif
