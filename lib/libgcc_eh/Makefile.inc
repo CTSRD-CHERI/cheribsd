@@ -8,9 +8,12 @@ WANT_CHERI?=	hybrid
 ALLOW_SHARED_TEXTREL=yes
 UNWINDINCDIR=   ${SRCTOP}/contrib/cheri-libunwind/include
 UNWINDSRCDIR=   ${SRCTOP}/contrib/cheri-libunwind/src
-.else
+.elif ${MACHINE_ARCH:Mmips*}
 UNWINDINCDIR=   ${SRCTOP}/contrib/cheri-libunwind/include
 UNWINDSRCDIR=   ${SRCTOP}/contrib/cheri-libunwind/src
+.else
+UNWINDINCDIR=   ${SRCTOP}/contrib/llvm/projects/libunwind/include
+UNWINDSRCDIR=   ${SRCTOP}/contrib/llvm/projects/libunwind/src
 .endif
 
 STATIC_CFLAGS+=${PICFLAG} -fvisibility=hidden -DVISIBILITY_HIDDEN
