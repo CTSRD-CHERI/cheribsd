@@ -160,6 +160,7 @@ creturn_target:
 	clc	$c1, $t0, 32 + 4*CHERICAP_SIZE($c26)
 	clc	$c2, $t0, 32 + 5*CHERICAP_SIZE($c26)
 	ccall	$c1, $c2, 1
+	nop
 	.end __invoke_vector
 
 	.global abort
