@@ -20,8 +20,10 @@ makeoptions 	KERNLOADADDR=0xffffffff80100000
 options 	KTRACE
 nooptions	KDB
 nooptions	DDB
+# NOTE we run without any root filesystem driver for now
 nooptions	MSDOSFS
 nooptions	NFSD, NFSCL
+nooptions	FFS
 
 #
 # Features required for CHERI CPU and CheriBSD support.
