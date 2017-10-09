@@ -103,8 +103,7 @@ cheri_invoke:
 	# should be doing this?
 	#
 cheri_invoke_save_regs:
-	dli	$t0, -96
-	cincoffset	$csp, $csp, $t0
+	cincoffset	$csp, $csp, -96
 	csd	$s0, $zero, 0($csp)
 	csd	$s1, $zero, 8($csp)
 	csd	$s2, $zero, 16($csp)
@@ -125,8 +124,7 @@ cheri_invoke_save_regs:
 	# should be doing this?
 	#
 cheri_invoke_save_caps:
-	dli	$t0, -9*CHERICAP_SIZE
-	cincoffset	$csp, $csp, $t0
+	cincoffset	$csp, $csp, -9*CHERICAP_SIZE
 	csc	$c17, $zero, 0($csp)
 	csc	$c18, $zero, CHERICAP_SIZE($csp)
 	csc	$c19, $zero, 2*CHERICAP_SIZE($csp)
@@ -176,8 +174,7 @@ cheri_invoke_unbundle_idc:
 	csetdefault	$c12
 	clc		$csp, $zero, CHERICAP_SIZE($c26) # CHERI stack capability
 	clc		$c26, $zero, 0($c26)	# Restore original $idc
-	dli		$t0, 3*CHERICAP_SIZE
-	cincoffset	$csp, $csp, $t0
+	cincoffset	$csp, $csp, 3*CHERICAP_SIZE
 
 	#
 	# Restore capability registers from stack.
@@ -196,8 +193,7 @@ cheri_invoke_restore_caps:
 	clc	$c24, $zero, 7*CHERICAP_SIZE($csp)
 	clc	$c25, $zero, 8*CHERICAP_SIZE($csp)
 	bnez	$a0, set_cheri_errno
-	dli	$t0, 9*CHERICAP_SIZE
-	cincoffset	$csp, $csp, $t0
+	cincoffset	$csp, $csp, 9*CHERICAP_SIZE
 
 	#
 	# CCall has conservatively cleared all non-return-value registers, and
@@ -221,8 +217,7 @@ cheri_invoke_restore_regs:
 	cld	$gp, $zero, 64($csp)
 	cld	$fp, $zero, 72($csp)
 	cld	$ra, $zero, 80($csp)
-	dli	$t0, 96
-	cincoffset	$csp, $csp, $t0
+	cincoffset	$csp, $csp, 96
 
 	#
 	# Return to C-language caller.
