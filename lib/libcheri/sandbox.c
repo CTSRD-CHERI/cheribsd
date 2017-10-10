@@ -675,7 +675,6 @@ sandbox_object_destroy(struct sandbox_object *sbop)
 		/* Explicitly loaded class. */
 		sandbox_object_unload(sbop);		/* Unmap memory. */
 		(void)munmap(sbop->sbo_stackmem, sbop->sbo_stacklen);
-		free_c(sbop->sbo_vtable);
 
 		/* Ensure recursion is bounded. */
 		assert(sbop->sbo_sandbox_system_objectp->sbo_sandbox_classp ==
@@ -684,9 +683,9 @@ sandbox_object_destroy(struct sandbox_object *sbop)
 	} else {
 		/* System class. */
 		assert(sbop->sbo_stackmem == NULL);
-		assert(sbop->sbo_vtable == NULL);
 		assert(sbop->sbo_sandbox_system_objectp == NULL);
 	}
+	free_c(sbop->sbo_vtable);
 	bzero(sbop, sizeof(*sbop));		/* Clears tags. */
 	free(sbop);
 }
