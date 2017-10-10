@@ -58,9 +58,6 @@ CFLAGS=		-ffreestanding			\
 		-msoft-float			\
 		-g
 
-# where to get libstand from
-CFLAGS+=	-I${SASRC}
-
 LDFLAGS=	-nostdlib			\
 		-static				\
 		-Wl,-N				\

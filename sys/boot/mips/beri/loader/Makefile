@@ -108,9 +108,6 @@ LDFLAGS=	-nostdlib				\
 		-L${.CURDIR}				\
 		-e __start
 
-# where to get libstand from
-CFLAGS+=	-I${SASRC}
-
 DPADD=		${LIBFICL} ${LIBSA}
 LDADD=		${LIBFICL} ${LIBSA}
 
