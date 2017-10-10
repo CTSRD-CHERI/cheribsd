@@ -21,6 +21,7 @@ SRCS+=	cheritest_bounds_globals.c					\
 	cheritest_sealcap.c						\
 	cheritest_string.c						\
 	cheritest_syscall.c						\
+	cheritest_tls.c							\
 	cheritest_util.c						\
 	cheritest_vm.c							\
 	cheritest_vm_swap.c						\

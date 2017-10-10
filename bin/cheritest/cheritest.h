@@ -404,6 +404,11 @@ void	test_initregs_pcc(const struct cheri_test *ctp);
 void	test_copyregs(const struct cheri_test *ctp);
 void	test_listregs(const struct cheri_test *ctp);
 
+/* cheritest_tls.c */
+void	test_tls_align_4k(const struct cheri_test *ctp __unused);
+void	test_tls_align_cap(const struct cheri_test *ctp __unused);
+void	test_tls_align_ptr(const struct cheri_test *ctp __unused);
+
 /* cheritest_vm.c */
 void	cheritest_vm_tag_mmap_anon(const struct cheri_test *ctp __unused);
 void	cheritest_vm_tag_shm_open_anon_shared(const struct cheri_test *ctp

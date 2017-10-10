@@ -1503,6 +1503,21 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_func = test_string_memmove_c },
 
 	/*
+	 * Thread-Local Storage (TLS) tests.
+	 */
+	{ .ct_name = "test_tls_align_ptr",
+	  .ct_desc = "Test alignment of TLS pointers",
+	  .ct_func = test_tls_align_ptr, },
+
+	{ .ct_name = "test_tls_align_cap",
+	  .ct_desc = "Test alignment of TLS capabilities",
+	  .ct_func = test_tls_align_ptr, },
+
+	{ .ct_name = "test_tls_align_4k",
+	  .ct_desc = "Test alignment of TLS 4K array",
+	  .ct_func = test_tls_align_4k, },
+
+	/*
 	 * zlib tests.
 	 */
 	{ .ct_name = "test_deflate_zeroes",
