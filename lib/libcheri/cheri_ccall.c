@@ -60,11 +60,12 @@
  */
 
 /*
- * External assembly for CCall and CReturn vectors.
- *
- * XXXRW: Should rtld have its own vector..?
+ * External assembly for CCall and CReturn vectors.  Ideally the rtld and
+ * general invocation vectors might be shared, but userspace CCall cannot
+ * currently reliable access the operand object type.
  */
-extern void	libcheri_ccall_vector;
+extern void	libcheri_ccall_rtld_vector;
+extern void	libcheri_ccall_invoke_vector;
 extern void	libcheri_creturn_vector;
 
 /*
@@ -112,7 +113,7 @@ cheri_ccall_constructor(void)
 	 * provide access to the trusted stack (etc).
 	 */
 	cap = cheri_getpcc();
-	cap = cheri_setoffset(cap, (vaddr_t)&libcheri_ccall_vector);
+	cap = cheri_setoffset(cap, (vaddr_t)&libcheri_ccall_invoke_vector);
 	cheri_ccall_invoke_sealed_code = cheri_seal(cap,
 	    cheri_ccall_invoke_type);
 
@@ -121,7 +122,7 @@ cheri_ccall_constructor(void)
 	 * access to the trusted stack (etc).
 	 */
 	cap = cheri_getpcc();
-	cap = cheri_setoffset(cap, (vaddr_t)&libcheri_ccall_vector);
+	cap = cheri_setoffset(cap, (vaddr_t)&libcheri_ccall_rtld_vector);
 	cheri_ccall_rtld_sealed_code = cheri_seal(cap, cheri_ccall_rtld_type);
 
 	/*

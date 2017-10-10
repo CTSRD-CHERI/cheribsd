@@ -64,7 +64,17 @@
  */
 
 /*
- * Implementation of CCall suitable for use within a sealed code capability.
+ * Implementations of CCall suitable for use within a sealed code capability.
+ *
+ * The first is used for rtld initialisation and destruction.  The second
+ * nearly identical vector is used for general invocation.  We would most
+ * ideally share an implementation, varying the target $pcc load based on
+ * sealed-capability object type -- but, unfortunately, the current userspace
+ * CCall instruction doesn't [yet] provide reliable access to the operand
+ * sealed capabilities.
+ *
+ * XXXRW: This would ideally be fixed.
+ *
  * The effective ABI from the caller is as follows:
  *
  * $c1 - Sealed code capability
@@ -99,14 +109,14 @@
  * trusted stack pointer.
  */
 	.text
-	.global	libcheri_ccall_vector
-	.ent	libcheri_ccall_vector
-libcheri_ccall_vector:
+	.global	libcheri_ccall_rtld_vector
+	.ent	libcheri_ccall_rtld_vector
+libcheri_ccall_rtld_vector:
 
-ccall_validate_args:
+libcheri_ccall_rtld_validate_args:
 	/* XXXRW: NOT YET */
 
-ccall_check_globals:
+libcheri_ccall_rtld_check_globals:
 	/* XXXRW: NOT YET */
 
 	/*
@@ -132,12 +142,12 @@ ccall_check_globals:
 	daddu	$at, $t0, $at
 	csetoffset	$c14, $c26, $at
 
-ccall_push_stack:
+libcheri_ccall_rtld_push_stack:
 	/* Retrieve current trusted stack pointer. */
 	cld	$t0, $zero, 0($c14)		# XXXRW: Hard-coded offset
 
 	/* If at the bottom (byte offset 0), then overflow. */
-	beqz	$t0, ccall_stack_overflow
+	beqz	$t0, libcheri_ccall_rtld_stack_overflow
 
 	/* Decrement trusted stack pointer. */
 	daddiu	$t0, $t0, -2*CHERICAP_SIZE
@@ -158,37 +168,142 @@ ccall_push_stack:
 
 	/* XXXRW: Tracing?  Could do utrace, potentially...  Or jump into C? */
 
-ccall_extract_target:
+libcheri_ccall_rtld_extract_target:
 	/*
 	 * Retrieve the target protection domain's PCC and IDC, which are
 	 * pointed to by our IDC.
+	 *
+	 * NB: Notice capability offset 1 for rtld initialisation.
 	 */
-	clc	$c12, $zero, (2*CHERICAP_SIZE)($c26) # XXXRW: Hard-coded offset
+	clc	$c12, $zero, (1*CHERICAP_SIZE)($c26) # XXXRW: Hard-coded offset
 	clc	$c26, $zero, (0*CHERICAP_SIZE)($c26) # XXXRW: Hard-coded offset
 
-ccall_clear_regs:
+libcheri_ccall_rtld_clear_regs:
 	/* XXXRW: General-purpose registers. */
 	mtlo	$zero
 	mthi	$zero
 
-ccall_clear_fpregs:
+libcheri_ccall_rtld_clear_fpregs:
 	/* XXXRW: Floating-point registers. */
 
-ccall_clear_caps:
+libcheri_ccall_rtld_clear_caps:
 	/* XXXRW: Capability registers. */
 
-ccall_return:
+libcheri_ccall_rtld_return:
 	cjr	$c12
 	nop					# Branch-delay slot
 
-ccall_local_argument:
-ccall_stack_overflow:
+libcheri_ccall_rtld_local_argument:
+libcheri_ccall_rtld_stack_overflow:
 	/* XXXRW: What do we want to do here?  Just trap for now. */
 	teq	$zero, $zero
-	.end	libcheri_ccall_vector
+	.end	libcheri_ccall_rtld_vector
 
 /*
- * Implementation of CCall suitable for use within a sealed code capability.
+ * Variation on CCall vector suitable for general invocation.
+ *
+ * XXXRW: This should be identical to the above other than the load offset for
+ * the target PCC, and the names of in-function symbols.
+ *
+ * XXXRW: Ideally, this would be the same code as above, dependent on the
+ * object type and a conditional move to load the right value, rather than a
+ * separate trampoline.
+ */
+
+	.text
+	.global	libcheri_ccall_invoke_vector
+	.ent	libcheri_ccall_invoke_vector
+libcheri_ccall_invoke_vector:
+
+libcheri_ccall_invoke_validate_args:
+	/* XXXRW: NOT YET */
+
+libcheri_ccall_invoke_check_globals:
+	/* XXXRW: NOT YET */
+
+	/*
+	 * We are now committed to performing a protection-domain switch.
+	 *
+	 * Use thread-local storage to retrieve the trusted stack for the
+	 * current pthread.  Load TLS data relative to IDC (referring to the
+	 * ambient portion of the process).  Prepare $c14 for use in pointing
+	 * at the trusted-stack container structure.
+	 *
+	 * XXXRW: Clang appears to generate roughly this code across multiple
+	 * ABIs and regardless of -fpic/-fno-pic, if -mno-abicalls is used.
+	 * So, go with this in all cases, but much testing definitely
+	 * required -- e.g., once we have dynamically linked pure-capability
+	 * binaries using.
+	 */
+	lui     $at, %tprel_hi(__cheri_stack_tls_storage)
+	.set	push
+	.set	mips32r2
+	rdhwr	$t0, $29
+	.set	pop
+	daddiu	$at, $at, %tprel_lo(__cheri_stack_tls_storage)
+	daddu	$at, $t0, $at
+	csetoffset	$c14, $c26, $at
+
+libcheri_ccall_invoke_push_stack:
+	/* Retrieve current trusted stack pointer. */
+	cld	$t0, $zero, 0($c14)		# XXXRW: Hard-coded offset
+
+	/* If at the bottom (byte offset 0), then overflow. */
+	beqz	$t0, libcheri_ccall_invoke_stack_overflow
+
+	/* Decrement trusted stack pointer. */
+	daddiu	$t0, $t0, -2*CHERICAP_SIZE
+
+	/* Write back trusted stack pointer. */
+	csd	$t0, $zero, 0($c14)		# XXXRW: Hard-coded offset
+
+	/* Calculate $c14-relative offset to stack frame. */
+	daddiu	$t0, $t0, 32			# XXXRW: Hard-coded offset
+
+	/* NB: In this model, we don't need to increment the saved $pcc. */
+
+	/* Save caller return $pcc. */
+	csc	$c17, $t0, 0($c14)		# XXXRW: Hard-coded offset
+
+	/* Save caller return $csp. */
+	csc	$c11, $t0, CHERICAP_SIZE($c14)	# XXXRW: Hard-coded offset
+
+	/* XXXRW: Tracing?  Could do utrace, potentially...  Or jump into C? */
+
+libcheri_ccall_invoke_extract_target:
+	/*
+	 * Retrieve the target protection domain's PCC and IDC, which are
+	 * pointed to by our IDC.
+	 *
+	 * NB: Notice capability offset 2 for general invocation.
+	 */
+	clc	$c12, $zero, (2*CHERICAP_SIZE)($c26) # XXXRW: Hard-coded offset
+	clc	$c26, $zero, (0*CHERICAP_SIZE)($c26) # XXXRW: Hard-coded offset
+
+libcheri_ccall_invoke_clear_regs:
+	/* XXXRW: General-purpose registers. */
+	mtlo	$zero
+	mthi	$zero
+
+libcheri_ccall_invoke_clear_fpregs:
+	/* XXXRW: Floating-point registers. */
+
+libcheri_ccall_invoke_clear_caps:
+	/* XXXRW: Capability registers. */
+
+libcheri_ccall_invoke_return:
+	cjr	$c12
+	nop					# Branch-delay slot
+
+libcheri_ccall_invoke_local_argument:
+libcheri_ccall_invoke_stack_overflow:
+	/* XXXRW: What do we want to do here?  Just trap for now. */
+	teq	$zero, $zero
+	.end	libcheri_ccall_invoke_vector
+
+/*
+ * Implementation of CCall suitable for use within a sealed code capability --
+ * used for CReturn.
  *
  * Local register use key:
  * $c14		Earlier: trusted stack.  Later: trusted stack frame.
