@@ -138,6 +138,7 @@ SRCS+=	__getosreldate.c \
 	times.c \
 	timezone.c \
 	tls.c \
+	tls_malloc.c \
 	ttyname.c \
 	ttyslot.c \
 	ualarm.c \

@@ -46,11 +46,6 @@
 
 #include "libc_private.h"
 
-/* Provided by jemalloc to avoid bootstrapping issues. */
-void	*__je_bootstrap_malloc(size_t size);
-void	*__je_bootstrap_calloc(size_t num, size_t size);
-void	__je_bootstrap_free(void *ptr);
-
 __weak_reference(__libc_allocate_tls, _rtld_allocate_tls);
 __weak_reference(__libc_free_tls, _rtld_free_tls);
 
@@ -122,36 +117,6 @@ __libc_tls_get_addr(void *ti __unused)
 
 #define	TLS_TCB_SIZE	(2 * sizeof(void *))
 
-static void *
-malloc_aligned(size_t size, size_t align)
-{
-	vaddr_t memshift;
-	void *mem, *res;
-	if (align < sizeof(void *))
-		align = sizeof(void *);
-
-	mem = __je_bootstrap_malloc(size + sizeof(void *) + align - 1);
-	memshift = roundup2((vaddr_t)mem + sizeof(void *), align) - (vaddr_t)mem;
-	res = (void *)((uintptr_t)mem + memshift);
-	*(void **)((uintptr_t)res - sizeof(void *)) = mem;
-	return (res);
-}
-
-static void
-free_aligned(void *ptr)
-{
-	void *mem;
-	uintptr_t x;
-
-	if (ptr == NULL)
-		return;
-
-	x = (uintptr_t)ptr;
-	x -= sizeof(void *);
-	mem = *(void **)x;
-	__je_bootstrap_free(mem);
-}
-
 /*
  * Free Static TLS using the Variant I method.
  */
@@ -171,8 +136,8 @@ __libc_free_tls(void *tcb, size_t tcbsize, size_t tcbalign)
 	tcb = (void *)((uintptr_t)tcb - tcbshift);
 	tls = (Elf_Addr **)((char *)tcb + tcbextra);
 	dtv = tls[0];
-	__je_bootstrap_free(dtv);
-	free_aligned(tcb);
+	tls_free(dtv);
+	tls_free_aligned(tcb);
 }
 
 /*
@@ -197,20 +162,20 @@ __libc_allocate_tls(void *oldtcb, size_t tcbsize, size_t tcbalign)
 	    (TLS_TCB_SIZE + tcbextra);
 	tcballocsize = tls_static_space + tcbextra + tcbshift;
 
-	tcb = malloc_aligned(tcballocsize, tcbalign);
+	tcb = tls_malloc_aligned(tcballocsize, tcbalign);
 	memset(tcb, 0, tcballocsize);
 	tcb = (void *)((uintptr_t)tcb + tcbshift);
 	tls = (Elf_Addr **)(tcb + tcbextra);
 
 	if (oldtcb != NULL) {
 		memcpy(tls, oldtcb, tls_static_space);
-		__je_bootstrap_free(oldtcb);
+		tls_free(oldtcb);
 
 		/* Adjust the DTV. */
 		dtv = tls[0];
 		dtv[2] = (Elf_Addr)tls + TLS_TCB_SIZE;
 	} else {
-		dtv = __je_bootstrap_malloc(3 * sizeof(Elf_Addr));
+		dtv = tls_malloc(3 * sizeof(Elf_Addr));
 		tls[0] = dtv;
 		dtv[0] = 1;
 		dtv[1] = 1;
@@ -249,8 +214,8 @@ __libc_free_tls(void *tcb, size_t tcbsize __unused, size_t tcbalign)
 	dtv = ((Elf_Addr**)tcb)[1];
 	tlsend = (Elf_Addr) tcb;
 	tlsstart = tlsend - size;
-	__je_bootstrap_free((void*) tlsstart);
-	__je_bootstrap_free(dtv);
+	tls_free((void*) tlsstart);
+	tls_free(dtv);
 }
 
 /*
@@ -268,8 +233,8 @@ __libc_allocate_tls(void *oldtls, size_t tcbsize, size_t tcbalign)
 
 	if (tcbsize < 2 * sizeof(Elf_Addr))
 		tcbsize = 2 * sizeof(Elf_Addr);
-	tls = __je_bootstrap_calloc(1, size + tcbsize);
-	dtv = __je_bootstrap_malloc(3 * sizeof(Elf_Addr));
+	tls = tls_calloc(1, size + tcbsize);
+	dtv = tls_malloc(3 * sizeof(Elf_Addr));
 
 	segbase = (Elf_Addr)(tls + size);
 	((Elf_Addr*)segbase)[0] = segbase;
