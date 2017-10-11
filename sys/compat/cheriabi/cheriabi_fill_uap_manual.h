@@ -38,18 +38,18 @@ CHERIABI_SYS_cheriabi_ioctl_fill_uap(struct thread *td,
 
 	/* [0] int fd */
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_ioctl_PTRMASK);
-	uap->fd = (register_t)tmpcap;
+	uap->fd = cheri_getoffset(tmpcap);
 
 	/* [1] u_long com */
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_ioctl_PTRMASK);
-	uap->com = (register_t)tmpcap;
+	uap->com = cheri_getoffset(tmpcap);
 
 	/* [2] _Inout_opt_ caddr_t data */
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_ioctl_PTRMASK);
 	if (uap->com & IOC_VOID) {
 		tag = cheri_gettag(tmpcap);
 		if (!tag)
-			uap->data = (void *)(cheri_getbase(tmpcap) + cheri_getoffset(tmpcap));
+			uap->data = (void *)cheri_getoffset(tmpcap);
 		else
 			return (EPROT);
 	} else {
@@ -90,7 +90,7 @@ CHERIABI_SYS_mincore_fill_uap(struct thread *td,
 
 	/* [1] size_t len */
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_mincore_PTRMASK);
-	uap->len = (register_t)tmpcap;
+	uap->len = cheri_getoffset(tmpcap);
 
 	/* [0] _Pagerange_opt_(len) const void * addr */
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_mincore_PTRMASK);
@@ -100,7 +100,7 @@ CHERIABI_SYS_mincore_fill_uap(struct thread *td,
 		 * Allow addr to be NULL, but don't let the caller examine
 		 * mappings they don't have access to.
 		 */
-		uap->addr = (void *)(cheri_getbase(tmpcap) + cheri_getoffset(tmpcap));
+		uap->addr = (void *)cheri_getoffset(tmpcap);
 		if (uap->addr != NULL)
 			return (EPROT);
 	} else {
@@ -123,7 +123,7 @@ CHERIABI_SYS_mincore_fill_uap(struct thread *td,
 		if (length < roundup2(uap->len + addr_adjust, PAGE_SIZE))
 			return (EPROT);
 
-		uap->addr = (void *)tmpcap;
+		uap->addr = (__cheri_cast void *)tmpcap;
 	}
 
 	/* [2] _Out_writes_bytes_(len/PAGE_SIZE) char * vec */
@@ -153,11 +153,11 @@ CHERIABI_SYS_fcntl_fill_uap(struct thread *td,
 
 	/* [0] int fd */
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_fcntl_PTRMASK);
-	uap->fd = (register_t)tmpcap;
+	uap->fd = cheri_getoffset(tmpcap);
 
 	/* [1] int cmd */
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_fcntl_PTRMASK);
-	uap->cmd = (register_t)tmpcap;
+	uap->cmd = cheri_getoffset(tmpcap);
 
 	/* [2] intptr_t arg */
 	/*
@@ -183,7 +183,7 @@ CHERIABI_SYS_fcntl_fill_uap(struct thread *td,
 	case F_READAHEAD:
 	case F_RDAHEAD:
 		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_fcntl_PTRMASK);
-		uap->arg = cheri_getbase(tmpcap) + cheri_getoffset(tmpcap);
+		uap->arg = cheri_getoffset(tmpcap);
 		break;
 
 	case F_GETLK:
@@ -211,7 +211,7 @@ CHERIABI_SYS_select_fill_uap(struct thread *td,
 
 	/* [0] int nd */
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_select_PTRMASK);
-	uap->nd = (register_t)tmpcap;
+	uap->nd = cheri_getoffset(tmpcap);
 
 	/*
 	 * If they are non-NULL, fd_sets need to provide access to an
@@ -279,7 +279,7 @@ CHERIABI_SYS_cheriabi_sysarch_fill_uap(struct thread *td,
 
 	/* [0] int op */
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_sysarch_PTRMASK);
-	uap->op = (register_t)tmpcap;
+	uap->op = cheri_getoffset(tmpcap);
 
 	/* [1] char * parms */
 	/*
@@ -307,7 +307,7 @@ CHERIABI_SYS__umtx_op_fill_uap(struct thread *td,
 
 	/* [1] int op */
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS__umtx_op_PTRMASK);
-	uap->op = (register_t)tmpcap;
+	uap->op = cheri_getoffset(tmpcap);
 
 	/* Short cut, blocking known unimplemted ops */
 	switch (uap->op) {
@@ -320,7 +320,7 @@ CHERIABI_SYS__umtx_op_fill_uap(struct thread *td,
 
 	/* [2] u_long val */
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS__umtx_op_PTRMASK);
-	uap->val = (register_t)tmpcap;
+	uap->val = cheri_getoffset(tmpcap);
 
 	/* [0] void * obj */
 	reqperms = 0;
@@ -430,7 +430,7 @@ CHERIABI_SYS__umtx_op_fill_uap(struct thread *td,
 			 * and assume we'll copy in a struct timespec if
 			 * the size is less than struct timespec.
 			 */
-			uap->uaddr1 = (void *)(cheri_getbase(tmpcap) + cheri_getoffset(tmpcap));
+			uap->uaddr1 = (void *)cheri_getoffset(tmpcap);
 			if ((size_t)uap->uaddr1 <= sizeof(struct timespec))
 				reqsize = sizeof(struct timespec);
 			else
@@ -542,12 +542,12 @@ CHERIABI_SYS_cheriabi_sigqueue_fill_uap(struct thread *td,
 	/* [0] pid_t pid */
 	cheriabi_fetch_syscall_arg(td, &tmpcap,
 	    0, CHERIABI_SYS_cheriabi_sigqueue_PTRMASK);
-	uap->pid = (register_t)tmpcap;
+	uap->pid = cheri_getoffset(tmpcap);
 
 	/* [1] int signum */
 	cheriabi_fetch_syscall_arg(td, &tmpcap,
 	    1, CHERIABI_SYS_cheriabi_sigqueue_PTRMASK);
-	uap->signum = (register_t)tmpcap;
+	uap->signum = cheri_getoffset(tmpcap);
 
 	/* [2] _In_opt_ union sigval_c value */
 	/*
@@ -566,23 +566,19 @@ CHERIABI_SYS_shm_open_fill_uap(struct thread *td,
 	void * __capability tmpcap;
 	register_t tag;
 	int error;
-	size_t base;
 
 	/* [1] int flags */
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_shm_open_PTRMASK);
-	uap->flags = (register_t)tmpcap;
+	uap->flags = cheri_getoffset(tmpcap);
 
 	/* [2] mode_t mode */
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_shm_open_PTRMASK);
-	uap->mode = (register_t)tmpcap;
+	uap->mode = cheri_getoffset(tmpcap);
 
 	/* [0] _In_z_ const char * path */
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_shm_open_PTRMASK);
 	tag = cheri_gettag(tmpcap);
 	if (!tag) {
-		base = cheri_getbase(tmpcap);
-		if (base != 0)
-			return (EPROT);
 		uap->path = (const char *)cheri_getoffset(tmpcap);
 		if (uap->path != SHM_ANON)
 			return (EPROT);
@@ -607,17 +603,17 @@ CHERIABI_SYS_cheriabi___semctl_fill_uap(struct thread *td,
 	/* [0] int semid */
 	cheriabi_fetch_syscall_arg(td, &tmpcap,
 	    0, CHERIABI_SYS_cheriabi___semctl_PTRMASK);
-	uap->semid = (register_t)tmpcap;
+	uap->semid = cheri_getoffset(tmpcap);
 
 	/* [1] int semnum */
 	cheriabi_fetch_syscall_arg(td, &tmpcap,
 	    1, CHERIABI_SYS_cheriabi___semctl_PTRMASK);
-	uap->semnum = (register_t)tmpcap;
+	uap->semnum = cheri_getoffset(tmpcap);
 
 	/* [2] int cmd */
 	cheriabi_fetch_syscall_arg(td, &tmpcap,
 	    2, CHERIABI_SYS_cheriabi___semctl_PTRMASK);
-	uap->cmd = (register_t)tmpcap;
+	uap->cmd = cheri_getoffset(tmpcap);
 
 	/* [3] _In_opt_ union semun_c * arg */
 	reqperms = CHERI_PERM_LOAD;
@@ -647,7 +643,7 @@ CHERIABI_SYS_pselect_fill_uap(struct thread *td,
 
 	/* [0] int nd */
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_pselect_PTRMASK);
-	uap->nd = (register_t)tmpcap;
+	uap->nd = cheri_getoffset(tmpcap);
 
 	/*
 	 * See comment in CHERIABI_SYS_select_fill_uap.
@@ -729,17 +725,17 @@ CHERIABI_SYS_cheriabi_procctl_fill_uap(struct thread *td,
 	/* [0] int idtype */
 	cheriabi_fetch_syscall_arg(td, &tmpcap,
 	    0, CHERIABI_SYS_cheriabi_procctl_PTRMASK);
-	uap->idtype = (register_t)tmpcap;
+	uap->idtype = cheri_getoffset(tmpcap);
 
 	/* [1] id_t id */
 	cheriabi_fetch_syscall_arg(td, &tmpcap,
 	    1, CHERIABI_SYS_cheriabi_procctl_PTRMASK);
-	uap->id = (register_t)tmpcap;
+	uap->id = cheri_getoffset(tmpcap);
 
 	/* [2] int com */
 	cheriabi_fetch_syscall_arg(td, &tmpcap,
 	    2, CHERIABI_SYS_cheriabi_procctl_PTRMASK);
-	uap->com = (register_t)tmpcap;
+	uap->com = cheri_getoffset(tmpcap);
 
 	/* [3] void * data */
 	/* May be _In_, _Inout_, _Out_, or NULL based on com */

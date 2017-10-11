@@ -201,14 +201,14 @@ static void socket_memcpy(__capability char *dataout, __capability char *datain,
   struct iovec iovs[2];
   iovs[0].iov_base = &len;
   iovs[0].iov_len  = sizeof(len);
-  iovs[1].iov_base = (void *) datain;
+  iovs[1].iov_base = (__cheri_cast char *) datain;
   iovs[1].iov_len  = len;
   
   io_len = writev(fd, iovs, 2);
   if(io_len != (ssize_t)(sizeof(len) + len))
     err(1, "socket parent write");
 
-  read_retry(fd, (char *) dataout, len);
+  read_retry(fd, (__cheri_cast char *) dataout, len);
 }
 
 static void socket_sandbox_func(int fd, size_t max_size)

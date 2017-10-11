@@ -387,5 +387,5 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 	realmem = btoc(ememsize);
 	mips_init(memsize, ememsize);
 
-	mips_timer_init_params(platform_counter_freq, 0);
+	mips_timer_init_params(platform_counter_freq, -1);
 }

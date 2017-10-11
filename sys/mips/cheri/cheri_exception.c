@@ -70,8 +70,8 @@ static const char *cheri_exccode_isa_array[] = {
      "permit store local capability violation", /* CHERI_EXCCODE_STORE_LOCAL */
 	"permit seal violation",		/* CHERI_EXCCODE_PERM_SEAL */
 	"access system registers violation",	/* CHERI_EXCCODE_SYSTEM_REGS */
-	"reserved",				/* 0x19 */
-	"reserved",				/* 0x1a */
+	"permit ccall violation",		/* CHERI_EXCCODE_PERM_CCALL */
+	"access ccall IDC violation",		/* CHERI_EXCCODE_CCALL_IDC */
 	"reserved",				/* 0x1b */
 	"reserved",				/* 0x1c */
 	"reserved",				/* 0x1d */

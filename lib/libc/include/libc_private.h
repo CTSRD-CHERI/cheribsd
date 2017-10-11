@@ -249,6 +249,16 @@ int _yp_check(char **);
 void _init_tls(void);
 
 /*
+ * Internal allocator for TLS
+ */
+void	*tls_malloc(__size_t size);
+void	*tls_calloc(__size_t number, __size_t size);
+void	 tls_free(void *ptr);
+void	*tls_calloc_aligned(__size_t number, __size_t size, __size_t align);
+void	*tls_malloc_aligned(__size_t size, __size_t align);
+void	 tls_free_aligned(void *ptr);
+
+/*
  * Provides pthread_once()-like functionality for both single-threaded
  * and multi-threaded applications.
  */

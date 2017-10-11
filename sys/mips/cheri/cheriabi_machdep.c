@@ -160,23 +160,6 @@ struct sysentvec elf_freebsd_cheriabi_sysvec = {
 };
 INIT_SYSENTVEC(cheriabi_sysent, &elf_freebsd_cheriabi_sysvec);
 
-/* FIXME: remove legacy struct once everyone has upgraded to the new compiler */
-static Elf64_Brandinfo freebsd_cheriabi_brand_info_legacy = {
-	.brand		= ELFOSABI_FREEBSD,
-	.machine	= EM_MIPS_CHERI,
-	.compat_3_brand	= "FreeBSD",
-	.emul_path	= NULL,
-	.interp_path	= "/libexec/ld-cheri-elf.so.1",
-	.sysvec		= &elf_freebsd_cheriabi_sysvec,
-	.interp_newpath = NULL,
-	.flags		= 0,
-	.header_supported = cheriabi_elf_header_supported
-};
-
-SYSINIT(cheriabi_legacy, SI_SUB_EXEC, SI_ORDER_ANY,
-    (sysinit_cfunc_t) elf64_insert_brand_entry,
-    &freebsd_cheriabi_brand_info_legacy);
-
 static Elf64_Brandinfo freebsd_cheriabi_brand_info = {
 	.brand		= ELFOSABI_FREEBSD,
 	.machine	= EM_MIPS,
@@ -211,14 +194,6 @@ cheriabi_elf_header_supported(struct image_params *imgp)
 	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
 	const uint32_t machine = hdr->e_flags & EF_MIPS_MACH;
 
-	if (hdr->e_machine == EM_MIPS_CHERI) {
-#ifdef NOTYET
-		printf("warning: binary %s is using legacy EM_MIPS_CHERI "
-		    "machine type. Please update SDK and recompile.\n",
-		    imgp->execpath);
-#endif
-		return TRUE;
-	}
 	if ((hdr->e_flags & EF_MIPS_ABI) != EF_MIPS_ABI_CHERIABI)
 		return FALSE;
 
@@ -271,14 +246,14 @@ cheriabi_fetch_syscall_arg(struct thread *td, void * __capability *argp,
 		}
 	} else {
 		switch (intreg_offset) {
-		case 0:	*argp = (void * __capability)locr0->a0;	break;
-		case 1:	*argp = (void * __capability)locr0->a1;	break;
-		case 2:	*argp = (void * __capability)locr0->a2;	break;
-		case 3:	*argp = (void * __capability)locr0->a3;	break;
-		case 4:	*argp = (void * __capability)locr0->a4;	break;
-		case 5:	*argp = (void * __capability)locr0->a5;	break;
-		case 6:	*argp = (void * __capability)locr0->a6;	break;
-		case 7:	*argp = (void * __capability)locr0->a7;	break;
+		case 0:	*argp = (void * __capability)(__intcap_t)locr0->a0; break;
+		case 1:	*argp = (void * __capability)(__intcap_t)locr0->a1; break;
+		case 2:	*argp = (void * __capability)(__intcap_t)locr0->a2; break;
+		case 3:	*argp = (void * __capability)(__intcap_t)locr0->a3; break;
+		case 4:	*argp = (void * __capability)(__intcap_t)locr0->a4; break;
+		case 5:	*argp = (void * __capability)(__intcap_t)locr0->a5; break;
+		case 6:	*argp = (void * __capability)(__intcap_t)locr0->a6; break;
+		case 7:	*argp = (void * __capability)(__intcap_t)locr0->a7; break;
 		default:
 			panic("%s: integer argument %d out of range",
 			    __func__, intreg_offset);
@@ -447,7 +422,7 @@ cheriabi_set_mcontext(struct thread *td, mcontext_c_t *mcp)
 	td->td_md.md_tls_cap =  mcp->mc_tls;
 	tag = cheri_gettag(mcp->mc_tls);
 	if (tag)
-		td->td_md.md_tls = (void *)mcp->mc_tls; // XXX: __capability?
+		td->td_md.md_tls = (__cheri_cast void *)mcp->mc_tls; // XXX: __capability?
 	else
 		td->td_md.md_tls = NULL;
 
@@ -833,13 +808,22 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	KASSERT(stack > stackbase,
 	    ("top of stack 0x%lx is below stack base 0x%lx", stack, stackbase));
 	stacklen = stack - stackbase;
+	/*
+	 * Round the stack down as required to make it representable.
+	 *
+	 * XXX: should we make the stack sealable?
+	 */
+	stacklen = rounddown2(stacklen, 1ULL << CHERI_ALIGN_SHIFT(stacklen));
+	KASSERT(stackbase ==
+	    rounddown2(stackbase, 1ULL << CHERI_ALIGN_SHIFT(stacklen)),
+	    ("stackbase 0x%lx is not representable at length 0x%lx",
+	    stackbase, stacklen));
 	cheri_capability_set(&td->td_frame->csp, CHERI_CAP_USER_DATA_PERMS,
 	    stackbase, stacklen, 0);
 	td->td_frame->sp = stacklen;
 
 	/* Using addr as length means ddc base must be 0. */
 	CTASSERT(CHERI_CAP_USER_DATA_BASE == 0);
-	text_end = stackbase;
 	if (imgp->end_addr != 0) {
 		text_end = roundup2(imgp->end_addr,
 		    1ULL << CHERI_SEAL_ALIGN_SHIFT(imgp->end_addr));
@@ -848,6 +832,9 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 		 * requires no other rounding.
 		 */
 		text_end = roundup2(text_end, PAGE_SIZE);
+	} else {
+		text_end = rounddown2(stackbase,
+		    1ULL << CHERI_SEAL_ALIGN_SHIFT(stackbase));
 	}
 	KASSERT(text_end <= stackbase,
 	    ("text_end 0x%zx > stackbase 0x%lx", text_end, stackbase));
@@ -857,6 +844,8 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	KASSERT(map_base < stackbase,
 	    ("map_base 0x%zx >= stackbase 0x%lx", map_base, stackbase));
 	map_length = stackbase - map_base;
+	map_length = rounddown2(map_length,
+	    1ULL << CHERI_ALIGN_SHIFT(map_length));
 	cheri_capability_set(&td->td_md.md_cheri_mmap_cap,
 	    CHERI_CAP_USER_MMAP_PERMS, map_base, map_length,
 	    CHERI_CAP_USER_MMAP_OFFSET);
@@ -872,8 +861,8 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 * all).
 	 */
 	frame = &td->td_pcb->pcb_regs;
-	cheriabi_capability_set_user_ddc(&frame->ddc, stackbase);
-	cheriabi_capability_set_user_idc(&frame->idc, stackbase);
+	cheriabi_capability_set_user_ddc(&frame->ddc, text_end);
+	cheriabi_capability_set_user_idc(&frame->idc, text_end);
 
 	/*
 	 * XXXRW: Set $pcc and $c12 to the entry address -- for now, also with

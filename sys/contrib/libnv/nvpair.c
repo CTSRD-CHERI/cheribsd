@@ -198,14 +198,13 @@ nvpair_remove_nvlist(nvpair_t *nvp)
 static void
 nvpair_remove_nvlist_array(nvpair_t *nvp)
 {
-	nvlist_t **nvlarray;
+	const nvlist_t * const *nvlarray;
 	size_t count, i;
 
-	/* XXX: DECONST is bad, mkay? */
-	nvlarray = __DECONST(nvlist_t **,
-	    nvpair_get_nvlist_array(nvp, &count));
+	nvlarray = nvpair_get_nvlist_array(nvp, &count);
 	for (i = 0; i < count; i++)
-		nvlist_set_array_next(nvlarray[i], NULL);
+		/* XXX: DECONST is bad, mkay? */
+		nvlist_set_array_next(__DECONST(nvlist_t*, nvlarray[i]), NULL);
 }
 
 void

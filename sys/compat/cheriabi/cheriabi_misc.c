@@ -461,8 +461,9 @@ cheriabi_kevent_copyin(void *arg, struct kevent *kevp, int count)
 		 * XXX-BD: this is quite awkward.  ident could be anything.
 		 * If it's a capabilty, we'll hang on to it in udata.
 		 */
-		if (cheri_gettag(ks_c[i].ident)) {
-			if (!(cheri_getperm(ks_c[i].ident) | CHERI_PERM_GLOBAL))
+		if (cheri_gettag((void * __capability)ks_c[i].ident)) {
+			if (!(cheri_getperm((void * __capability)ks_c[i].ident)
+			    | CHERI_PERM_GLOBAL))
 				return (EPROT);
 		}
 		kevp[i].ident = (uintptr_t)(__uintcap_t)ks_c[i].ident;
@@ -1897,20 +1898,37 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 			return (EINVAL);
 		}
 
-		/* User didn't provide a capability so get the thread one. */
-		addr_cap = td->td_md.md_cheri_mmap_cap;
-		KASSERT(cheri_gettag(addr_cap),
-		    ("td->td_md.md_cheri_mmap_cap is untagged!"));
+		/* User didn't provide a capability so get one. */
+		if (flags & MAP_CHERI_DDC) {
+			if ((cheri_getperm(td->td_pcb->pcb_regs.ddc) &
+			    CHERI_PERM_CHERIABI_VMMAP) == 0) {
+				SYSERRCAUSE("DDC lacks "
+				    "CHERI_PERM_CHERIABI_VMMAP");
+				return (EPROT);
+			}
+			addr_cap = td->td_pcb->pcb_regs.ddc;
+		} else {
+			/* Use the per-thread one */
+			addr_cap = td->td_md.md_cheri_mmap_cap;
+			KASSERT(cheri_gettag(addr_cap),
+			    ("td->td_md.md_cheri_mmap_cap is untagged!"));
+		}
+	} else {
+		if (flags & MAP_CHERI_DDC) {
+			SYSERRCAUSE("MAP_CHERI_DDC with non-NULL addr");
+			return (EINVAL);
+		}
 	}
 	cap_base = cheri_getbase(addr_cap);
 	cap_len = cheri_getlen(addr_cap);
-	if (usertag)
+	if (usertag) {
 		cap_offset = cheri_getoffset(addr_cap);
-	else
+	} else {
 		/*
 		 * Ignore offset of default cap, it's only used to set bounds.
 		 */
 		cap_offset = 0;
+	}
 	if (cap_offset >= cap_len) {
 		SYSERRCAUSE("capability has out of range offset");
 		return (EPROT);
@@ -2115,6 +2133,8 @@ cheriabi_mmap_set_retcap(struct thread *td, void * __capability *retcap,
 
 	if (flags & MAP_FIXED) {
 		addr = *addrp;
+	} else if (flags & MAP_CHERI_DDC) {
+		addr = td->td_pcb->pcb_regs.ddc;
 	} else {
 		addr = td->td_md.md_cheri_mmap_cap;
 	}

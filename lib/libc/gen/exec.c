@@ -53,7 +53,7 @@ int
 execl(const char *name, const char *arg, ...)
 {
 	va_list ap;
-	const char **argv;
+	char **argv;
 	int n;
 
 	va_start(ap, arg);
@@ -68,18 +68,18 @@ execl(const char *name, const char *arg, ...)
 	}
 	va_start(ap, arg);
 	n = 1;
-	argv[0] = arg;
+	argv[0] = __DECONST(char*, arg);
 	while ((argv[n] = va_arg(ap, char *)) != NULL)
 		n++;
 	va_end(ap);
-	return (_execve(name, __DECONST(char **, argv), environ));
+	return (_execve(name, argv, environ));
 }
 
 int
 execle(const char *name, const char *arg, ...)
 {
 	va_list ap;
-	const char **argv;
+	char **argv;
 	char **envp;
 	int n;
 
@@ -95,19 +95,19 @@ execle(const char *name, const char *arg, ...)
 	}
 	va_start(ap, arg);
 	n = 1;
-	argv[0] = arg;
+	argv[0] = __DECONST(char*, arg);
 	while ((argv[n] = va_arg(ap, char *)) != NULL)
 		n++;
 	envp = va_arg(ap, char **);
 	va_end(ap);
-	return (_execve(name, __DECONST(char **, argv), envp));
+	return (_execve(name, argv, envp));
 }
 
 int
 execlp(const char *name, const char *arg, ...)
 {
 	va_list ap;
-	const char **argv;
+	char **argv;
 	int n;
 
 	va_start(ap, arg);
@@ -122,11 +122,11 @@ execlp(const char *name, const char *arg, ...)
 	}
 	va_start(ap, arg);
 	n = 1;
-	argv[0] = arg;
+	argv[0] = __DECONST(char*, arg);
 	while ((argv[n] = va_arg(ap, char *)) != NULL)
 		n++;
 	va_end(ap);
-	return (execvp(name, __DECONST(char **, argv)));
+	return (execvp(name, argv));
 }
 
 int
@@ -146,7 +146,7 @@ static int
 execvPe(const char *name, const char *path, char * const *argv,
     char * const *envp)
 {
-	const char **memp;
+	char **memp;
 	size_t cnt, lp, ln;
 	int eacces, save_errno;
 	char *cur, buf[MAXPATHLEN];
@@ -221,10 +221,9 @@ retry:		(void)_execve(bp, argv, envp);
 				goto done;
 			}
 			memp[0] = "sh";
-			memp[1] = bp;
+			memp[1] = __DECONST(char*, bp);
 			bcopy(argv + 1, memp + 2, cnt * sizeof(char *));
- 			(void)_execve(_PATH_BSHELL,
-			    __DECONST(char **, memp), envp);
+ 			(void)_execve(_PATH_BSHELL, memp, envp);
 			goto done;
 		case ENOMEM:
 			goto done;

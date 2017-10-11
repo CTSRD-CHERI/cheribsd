@@ -41,7 +41,7 @@ int
 puts(const char *str)
 {
 
-	return (cheri_system_puts(cheri_ptr((void *)str, strlen(str) + 1)));
+	return (cheri_system_puts(cheri_ptr(str, strlen(str) + 1)));
 }
 
 int

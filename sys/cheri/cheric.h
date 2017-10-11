@@ -37,49 +37,33 @@
 #include <machine/cherireg.h>	/* Permission definitions. */
 
 #if __has_feature(capabilities)
+
 /*
  * Programmer-friendly macros for CHERI-aware C code -- requires use of
  * CHERI-aware Clang/LLVM, and full capability context switching, so not yet
  * usable in the kernel.
  */
-#define	cheri_getlen(x)		__builtin_mips_cheri_get_cap_length(		\
-				    __DECONST(void * __capability, (x)))
-#define	cheri_getbase(x)	__builtin_mips_cheri_get_cap_base(		\
-				    __DECONST(void * __capability, (x)))
-#define	cheri_getoffset(x)	__builtin_mips_cheri_cap_offset_get(		\
-				    __DECONST(void * __capability, (x)))
-#define	cheri_getperm(x)	__builtin_mips_cheri_get_cap_perms(		\
-				    __DECONST(void * __capability, (x)))
-#define	cheri_getsealed(x)	__builtin_mips_cheri_get_cap_sealed(		\
-				    __DECONST(void * __capability, (x)))
-#define	cheri_gettag(x)		__builtin_mips_cheri_get_cap_tag(		\
-				    __DECONST(void * __capability, (x)))
-#define	cheri_gettype(x)	__builtin_mips_cheri_get_cap_type(		\
-				    __DECONST(void * __capability, (x)))
+#define	cheri_getlen(x)		__builtin_mips_cheri_get_cap_length((x))
+#define	cheri_getbase(x)	__builtin_mips_cheri_get_cap_base((x))
+#define	cheri_getoffset(x)	__builtin_mips_cheri_cap_offset_get((x))
+#define	cheri_getperm(x)	__builtin_mips_cheri_get_cap_perms((x))
+#define	cheri_getsealed(x)	__builtin_mips_cheri_get_cap_sealed((x))
+#define	cheri_gettag(x)		__builtin_mips_cheri_get_cap_tag((x))
+#define	cheri_gettype(x)	__builtin_mips_cheri_get_cap_type((x))
 
-#define	cheri_andperm(x, y)	__builtin_mips_cheri_and_cap_perms(		\
-				    __DECONST(void * __capability, (x)), (y))
-#define	cheri_cleartag(x)	__builtin_mips_cheri_clear_cap_tag(		\
-				    __DECONST(void * __capability, (x)))
-#define	cheri_incoffset(x, y)	__builtin_mips_cheri_cap_offset_increment(	\
-				    __DECONST(void * __capability, (x)), (y))
-#define	cheri_setoffset(x, y)	__builtin_mips_cheri_cap_offset_set(		\
-				    __DECONST(void * __capability, (x)), (y))
+#define	cheri_andperm(x, y)	__builtin_mips_cheri_and_cap_perms((x), (y))
+#define	cheri_cleartag(x)	__builtin_mips_cheri_clear_cap_tag((x))
+#define	cheri_incoffset(x, y)	__builtin_mips_cheri_cap_offset_increment((x), (y))
+#define	cheri_setoffset(x, y)	__builtin_mips_cheri_cap_offset_set((x), (y))
 
-#define	cheri_seal(x, y)	__builtin_mips_cheri_seal_cap(		 \
-				    __DECONST(void * __capability, (x)), \
-				    __DECONST(void * __capability, (y)))
-#define	cheri_unseal(x, y)	__builtin_mips_cheri_unseal_cap(		 \
-				    __DECONST(void * __capability, (x)), \
-				    __DECONST(void * __capability, (y)))
+#define	cheri_seal(x, y)	__builtin_mips_cheri_seal_cap((x), (y))
+#define	cheri_unseal(x, y)	__builtin_mips_cheri_unseal_cap((x), (y))
 
 #define	cheri_getcause()	__builtin_mips_cheri_get_cause()
 #define	cheri_setcause(x)	__builtin_mips_cheri_set_cause(x)
 
-#define	cheri_ccheckperm(c, p)	__builtin_mips_cheri_check_perms(		\
-				    __DECONST(void * __capability, (c)), (p))
-#define	cheri_cchecktype(c, t)	__builtin_mips_cheri_check_type(		\
-				    __DECONST(void * __capability, (c)), (t))
+#define	cheri_ccheckperm(c, p)	__builtin_mips_cheri_check_perms((c), (p))
+#define	cheri_cchecktype(c, t)	__builtin_mips_cheri_check_type((c), (t))
 
 #define	cheri_getdefault()	__builtin_mips_cheri_get_global_data_cap()
 #define	cheri_getidc()		__builtin_mips_cheri_get_invoke_data_cap()
@@ -93,8 +77,7 @@
 
 #define	cheri_local(c)		cheri_andperm((c), ~CHERI_PERM_GLOBAL)
 
-#define	cheri_csetbounds(x, y)	__builtin_cheri_bounds_set(		\
-				    __DECONST(void * __capability, (x)), (y))
+#define	cheri_csetbounds(x, y)	__builtin_cheri_bounds_set((x), (y))
 
 /*
  * Two variations on cheri_ptr() based on whether we are looking for a code or
@@ -136,7 +119,7 @@ cheri_ptr(const void *ptr, size_t len)
 {
 
 	/* Assume CFromPtr without base set, availability of CSetBounds. */
-	return (cheri_csetbounds((const void * __capability)ptr, len));
+	return (cheri_csetbounds((__cheri_cast const void * __capability)ptr, len));
 }
 
 static __inline void * __capability
@@ -179,6 +162,47 @@ cheri_zerocap(void)
 {
 	return (void * __capability)0;
 }
+
+static __inline uint64_t
+cheri_bytes_remaining(const void * __capability cap)
+{
+	if (cheri_getoffset(cap) >= cheri_getlen(cap))
+		return 0;
+	return cheri_getlen(cap) - cheri_getoffset(cap);
+}
+
+/*
+ * Turn a pointer into a capability with the bounds set to
+ * sizeof(*ptr)
+ */
+/* XXX: work around CTSRD-CHERI/clang#157 */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define cheri_ptr_to_bounded_cap(ptr)	__extension__({	\
+	typedef __typeof__(ptr) __ptr_type;		\
+	(__ptr_type)cheri_ptr((ptr), sizeof(*(ptr)));	\
+	})
+#else
+#define	cheri_ptr_to_bounded_cap(ptr) cheri_ptr((ptr), sizeof(*(ptr)))
+#endif
+/*
+ * Convert a capability to a pointer. Returns NULL if there are less than
+ * min_size accessible bytes remiaing in cap.
+ */
+#define cheri_cap_to_ptr(cap, min_size)	__extension__({			\
+	typedef __typeof__(*(cap)) __underlying_type;			\
+	__underlying_type* __result = 0;				\
+	if (cheri_bytes_remaining(cap) >= (uint64_t)min_size) {		\
+		__result = (__cheri_cast __underlying_type*)(cap);	\
+	} __result; })
+
+/*
+ * Convert an untyped capability to a pointer of type \p type.
+ * This macro checks that there are at least sizeof(type) bytes accessible
+ * from \p cap.
+ */
+#define cheri_cap_to_typed_ptr(cap, type)				\
+	(type *)cheri_cap_to_ptr(cap, sizeof(type))
+
 
 #define CHERI_PRINT_PTR(ptr)						\
 	printf("%s: " #ptr " b:%016jx l:%016zx o:%jx\n", __func__,	\

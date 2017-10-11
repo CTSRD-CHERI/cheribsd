@@ -98,7 +98,7 @@ crt_call_constructors(void)
 	mips_function_ptr *func;
 
 	for (func = &__CTOR_LIST__[0];
-	    func != &__CTOR_END__;
+	    (vaddr_t)func != (vaddr_t)&__CTOR_END__;
 	    func++) {
 		if (*func != (mips_function_ptr)-1) {
 			cheri_function_ptr cheri_func =

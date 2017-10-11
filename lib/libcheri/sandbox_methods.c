@@ -710,8 +710,8 @@ sandbox_make_vtable(void *dataptr, const char *class,
 	if (provided_classes->spcs_nclasses == 0)
 		return (NULL);
 
-	if ((vtable = (__capability vm_offset_t *)calloc(
-	    provided_classes->spcs_nmethods, sizeof(*vtable))) == NULL) {
+	if ((vtable = calloc_c(provided_classes->spcs_nmethods,
+	    sizeof(*vtable))) == NULL) {
 		warnx("%s: calloc", __func__);
 		return (NULL);
 	}
@@ -749,7 +749,7 @@ sandbox_make_vtable(void *dataptr, const char *class,
 		}
 		return (cheri_andperm(vtable, CHERI_PERM_LOAD));
 	}
-	free((void *)vtable);
+	free_c(vtable);
 	return (NULL);
 }
 

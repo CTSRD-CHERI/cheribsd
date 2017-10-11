@@ -61,6 +61,7 @@ struct timecounter *platform_timecounter;
 
 static DPCPU_DEFINE(uint32_t, cycles_per_tick);
 static uint32_t cycles_per_usec;
+static unsigned int counter_ccres;
 
 static DPCPU_DEFINE(volatile uint32_t, counter_upper);
 static DPCPU_DEFINE(volatile uint32_t, counter_lower_last);
@@ -137,6 +138,20 @@ tick_ticker(void)
 	return (ret);
 }
 
+static unsigned int
+mips_get_ccres(void)
+{
+	uint64_t ccres;
+
+	__asm__ __volatile__ (
+	    ".set push\n"
+	    ".set noreorder\n"
+	    "rdhwr %0, $3\n"
+	   ".set pop\n"
+	    : "=r" (ccres));
+	return ((unsigned int)ccres);
+}
+
 void
 mips_timer_init_params(uint64_t platform_counter_freq, int double_count)
 {
@@ -151,8 +166,12 @@ mips_timer_init_params(uint64_t platform_counter_freq, int double_count)
 	 * pipeline cycles.
 	 * We know this because of status registers in CP0, make it automatic.
 	 */
-	if (double_count)
+	if (double_count == -1) {
+		counter_ccres = mips_get_ccres();
+		counter_freq /= counter_ccres;
+	} else if (double_count != 0) {
 		counter_freq /= 2;
+	}
 
 	cycles_per_usec = counter_freq / (1 * 1000 * 1000);
 	set_cputicker(tick_ticker, counter_freq, 1);
@@ -179,6 +198,9 @@ sysctl_machdep_counter_freq(SYSCTL_HANDLER_ARGS)
 SYSCTL_PROC(_machdep, OID_AUTO, counter_freq, CTLTYPE_U64 | CTLFLAG_RW,
     NULL, 0, sysctl_machdep_counter_freq, "QU",
     "Timecounter frequency in Hz");
+SYSCTL_UINT(_machdep, OID_AUTO, counter_ccres, CTLFLAG_RD,
+    &counter_ccres, 0,
+    "Number of clock cycles per cycle counter increment, 0 if unknown");
 
 static unsigned
 counter_get_timecount(struct timecounter *tc)

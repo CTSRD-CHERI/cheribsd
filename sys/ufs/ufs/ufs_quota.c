@@ -930,7 +930,8 @@ getquota32(struct thread *td, struct mount *mp, u_long id, int type,
 	if (error)
 		return (error);
 	dqb64_dqb32(&dqb64, &dqb32);
-	error = copyout_c((struct dqblk32 * __CAPABILITY)&dqb32, addr, sizeof(dqb32));
+	error = copyout_c((__cheri_cast struct dqblk32 * __CAPABILITY)&dqb32,
+	    addr, sizeof(dqb32));
 	return (error);
 }
 
@@ -942,7 +943,8 @@ setquota32(struct thread *td, struct mount *mp, u_long id, int type,
 	struct dqblk64 dqb64;
 	int error;
 
-	error = copyin_c(addr, (struct dqblk32 * __CAPABILITY)&dqb32, sizeof(dqb32));
+	error = copyin_c(addr, (__cheri_cast struct dqblk32 * __CAPABILITY)&dqb32,
+	    sizeof(dqb32));
 	if (error)
 		return (error);
 	dqb32_dqb64(&dqb32, &dqb64);
@@ -958,7 +960,7 @@ setuse32(struct thread *td, struct mount *mp, u_long id, int type,
 	struct dqblk64 dqb64;
 	int error;
 
-	error = copyin_c(addr, (struct dqblk32 * __CAPABILITY)&dqb32,
+	error = copyin_c(addr, (__cheri_cast struct dqblk32 * __CAPABILITY)&dqb32,
 	    sizeof(dqb32));
 	if (error)
 		return (error);
@@ -977,7 +979,7 @@ getquota(struct thread *td, struct mount *mp, u_long id, int type,
 	error = _getquota(td, mp, id, type, &dqb64);
 	if (error)
 		return (error);
-	error = copyout_c((struct dqblk64 * __CAPABILITY)&dqb64, addr,
+	error = copyout_c((__cheri_cast struct dqblk64 * __CAPABILITY)&dqb64, addr,
 	    sizeof(dqb64));
 	return (error);
 }
@@ -989,7 +991,7 @@ setquota(struct thread *td, struct mount *mp, u_long id, int type,
 	struct dqblk64 dqb64;
 	int error;
 
-	error = copyin_c(addr, (struct dqblk64 * __CAPABILITY)&dqb64,
+	error = copyin_c(addr, (__cheri_cast struct dqblk64 * __CAPABILITY)&dqb64,
 	    sizeof(dqb64));
 	if (error)
 		return (error);
@@ -1004,7 +1006,7 @@ setuse(struct thread *td, struct mount *mp, u_long id, int type,
 	struct dqblk64 dqb64;
 	int error;
 
-	error = copyin_c(addr, (struct dqblk64 * __CAPABILITY)&dqb64,
+	error = copyin_c(addr, (__cheri_cast struct dqblk64 * __CAPABILITY)&dqb64,
 	    sizeof(dqb64));
 	if (error)
 		return (error);
@@ -1033,7 +1035,8 @@ getquotasize(struct thread *td, struct mount *mp, u_long id, int type,
 	else
 		bitsize = 32;
 	UFS_UNLOCK(ump);
-	return (copyout_c((int * __CAPABILITY)&bitsize, sizep, sizeof(int)));
+	return (copyout_c((__cheri_cast int * __CAPABILITY)&bitsize, sizep,
+	    sizeof(int)));
 }
 
 /*

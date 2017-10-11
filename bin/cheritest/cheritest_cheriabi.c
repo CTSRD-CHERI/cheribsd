@@ -205,3 +205,29 @@ test_cheriabi_mmap_unrepresentable(const struct cheri_test *ctp __unused)
 
 	cheritest_success();
 }
+
+void
+test_cheriabi_mmap_ddc(const struct cheri_test *ctp __unused)
+{
+	void *cap, *ddc;
+	size_t length;
+
+	ddc = cheri_getdefault();
+	if ((cheri_getperm(ddc) & CHERI_PERM_CHERIABI_VMMAP) ==
+	    CHERI_PERM_CHERIABI_VMMAP) {
+		if ((cap = mmap(0, PAGE_SIZE, PROT_READ|PROT_WRITE,
+		    MAP_ANON|MAP_CHERI_DDC, -1, 0)) == MAP_FAILED)
+			cheritest_failure_err("mmap(MAP_CHERI_DDC) failed");
+
+		if (cheri_getbase(cap) < cheri_getbase(ddc) ||
+		    cheri_getbase(cap) > cheri_getbase(ddc) + cheri_getlen(ddc))
+			cheritest_failure_errx(
+			    "cap (%#p) base outside ddc (%#p)", cap, ddc);
+		if (cheri_getbase(cap) + cheri_getlen(cap) >
+		    cheri_getbase(ddc) + cheri_getlen(ddc))
+			cheritest_failure_errx(
+			    "cap (%#p) extends beyond ddc (%#p)", cap, ddc);
+	}
+
+	cheritest_success();
+}
