@@ -26,7 +26,7 @@ int ZEXPORT compress2 (dest, destLen, source, sourceLen, level)
     uLong sourceLen;
     int level;
 {
-    z_streamp stream;
+    z_stream stream;
     z_streamp stream_cap = cheri_ptr_to_bounded_cap(&stream);
     int err;
 
