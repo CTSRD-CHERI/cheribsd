@@ -609,6 +609,7 @@ struct unrhdr;
 struct unrhdr *new_unrhdr(int low, int high, struct mtx *mutex);
 void init_unrhdr(struct unrhdr *uh, int low, int high, struct mtx *mutex);
 void delete_unrhdr(struct unrhdr *uh);
+void clear_unrhdr(struct unrhdr *uh);
 void clean_unrhdr(struct unrhdr *uh);
 void clean_unrhdrl(struct unrhdr *uh);
 int alloc_unr(struct unrhdr *uh);
