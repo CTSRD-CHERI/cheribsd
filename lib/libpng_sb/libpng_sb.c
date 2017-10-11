@@ -68,7 +68,7 @@ struct sb_png_struct {
 };
 
 struct sb_info_struct {
-	__capability void *info_cap;
+	void * __capability info_cap;
 };
 
 #define DPRINTF printf
@@ -282,7 +282,7 @@ png_set_longjmp_fn(png_structp png_ptr,
 }
 
 png_infop
-png_create_info_struct(png_structp png_ptr __unused)
+png_create_info_struct(png_structp png_ptr)
 {
 	register_t v;
 	struct sb_png_struct *psp = (struct sb_png_struct *)png_ptr;
