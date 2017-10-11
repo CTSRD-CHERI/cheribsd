@@ -1355,7 +1355,7 @@ _bfd_elf_write_section_eh_frame (bfd *abfd,
 
 			val = read_value (abfd, buf, per_width,
 					  get_DW_EH_PE_signed (per_encoding));
-			val += ent->offset - ent->new_offset;
+			val += (bfd_vma)ent->offset - ent->new_offset;
 			val -= extra_string + extra_data;
 			write_value (abfd, buf, val, per_width);
 			action &= ~4;
@@ -1411,7 +1411,7 @@ _bfd_elf_write_section_eh_frame (bfd *abfd,
 		  }
 		  break;
 		case DW_EH_PE_pcrel:
-		  value += ent->offset - ent->new_offset;
+		  value += (bfd_vma)ent->offset - ent->new_offset;
 		  address += sec->output_section->vma + ent->offset + 8;
 		  break;
 		}
@@ -1439,7 +1439,7 @@ _bfd_elf_write_section_eh_frame (bfd *abfd,
 	      if (value)
 		{
 		  if ((ent->lsda_encoding & 0xf0) == DW_EH_PE_pcrel)
-		    value += ent->offset - ent->new_offset;
+		    value += (bfd_vma)ent->offset - ent->new_offset;
 		  else if (ent->cie_inf->need_lsda_relative)
 		    value -= (sec->output_section->vma + ent->new_offset + 8
 			      + ent->lsda_offset);
