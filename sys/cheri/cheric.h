@@ -175,11 +175,15 @@ cheri_bytes_remaining(const void * __capability cap)
  * Turn a pointer into a capability with the bounds set to
  * sizeof(*ptr)
  */
+/* XXX: work around CTSRD-CHERI/clang#157 */
+#ifdef __CHERI_PURE_CAPABILITY__
 #define cheri_ptr_to_bounded_cap(ptr)	__extension__({	\
 	typedef __typeof__(ptr) __ptr_type;		\
-	typedef __capability __ptr_type __cap_type;	\
-	(__cap_type)cheri_ptr((ptr), sizeof(*(ptr)));	\
+	(__ptr_type)cheri_ptr((ptr), sizeof(*(ptr)));	\
 	})
+#else
+#define	cheri_ptr_to_bounded_cap(ptr) cheri_ptr((ptr), sizeof(*(ptr)))
+#endif
 /*
  * Convert a capability to a pointer. Returns NULL if there are less than
  * min_size accessible bytes remiaing in cap.

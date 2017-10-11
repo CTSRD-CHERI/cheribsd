@@ -325,12 +325,24 @@ namei(struct nameidata *ndp)
 	if ((cnp->cn_flags & HASBUF) == 0)
 		cnp->cn_pnbuf = uma_zalloc(namei_zone, M_WAITOK);
 	if (ndp->ni_segflg == UIO_SYSSPACE)
-		error = copystr((__cheri_cast const char *)ndp->ni_dirp,
+/* XXX: work around CTSRD-CHERI/clang#157 */
+#if __has_feature(capabilities)
+		error = copystr((void *)(uintptr_t)cheri_getoffset(ndp->ni_dirp),
+#else
+		error = copystr(ndp->ni_dirp,
+#endif
 		    cnp->cn_pnbuf, MAXPATHLEN, &ndp->ni_pathlen);
 	else
+/* XXX: work around CTSRD-CHERI/clang#157 */
+#if __has_feature(capabilities)
+		error = copyinstr_c(ndp->ni_dirp,
+		    cheri_ptr(cnp->cn_pnbuf, MAXPATHLEN), MAXPATHLEN,
+		    cheri_ptr_to_bounded_cap(&ndp->ni_pathlen));
+#else
 		error = copyinstr_c(ndp->ni_dirp,
 		    (__cheri_cast char * __CAPABILITY)cnp->cn_pnbuf, MAXPATHLEN,
 		    (__cheri_cast size_t * __CAPABILITY)&ndp->ni_pathlen);
+#endif
 
 	/*
 	 * Don't allow empty pathnames.
