@@ -368,19 +368,7 @@ get_elf_header(int fd, const char *path, const struct stat *sbp)
 		_rtld_error("%s: unsupported file type", path);
 		goto error;
 	}
-	/* XXX: Remove once EM_MIPS_CHERI* are removed. */
-#ifdef _MIPS_ARCH_CHERI
-	if (hdr->e_machine != ELF_TARG_MACH &&
-	    hdr->e_machine != EM_MIPS_CHERI) {
-#elif defined(_MIPS_ARCH_CHERI128)
-#ifndef EM_MIPS_CHERI128
-#define EM_MIPS_CHERI128 0xC128
-#endif
-	if (hdr->e_machine != ELF_TARG_MACH &&
-	    hdr->e_machine != EM_MIPS_CHERI128) {
-#else
 	if (hdr->e_machine != ELF_TARG_MACH) {
-#endif
 		_rtld_error("%s: unsupported machine", path);
 		goto error;
 	}
