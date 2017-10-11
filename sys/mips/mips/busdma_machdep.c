@@ -126,7 +126,7 @@ struct bounce_zone {
 	int		total_bounced;
 	int		total_deferred;
 	int		map_count;
-	bus_size_t	alignment;
+	size_t		alignment;
 	bus_addr_t	lowaddr;
 	char		zoneid[8];
 	char		lowaddrid[20];
