@@ -45,6 +45,7 @@
 #    $c1, $c2 contain the sealed invoked code and data capability
 #    $pcc contains the unsealed invoked code capability
 #    $idc contains the unsealed invoked data capability
+#    $ddc contains a suitable unsealed Default Data Capability
 #
 # Expectations on the caller
 #    $v0 contains the method number (if any)
@@ -98,13 +99,6 @@ __invoke_vector:
 	clc	$c11, $t0, 32 + 3*CHERICAP_SIZE($c26)
 	cgetlen	$sp, $c11
 	#move	$fp, $sp # moved below to avoid delay due to slow cgetlen 128-bit cheri
-
-	#
-	# Install $idc as $c0.  From here on out, we can do MIPS fetches and
-	# stores to memory inside the sandbox, and $c0-relative capability
-	# fetches and stores.
-	#
-	csetdefault	$c26
 
 	#
 	# The compiler is responsible for scrubbing unused argument registers

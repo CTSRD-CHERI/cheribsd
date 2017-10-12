@@ -130,9 +130,9 @@ int	sandbox_object_new(struct sandbox_class *sbcp, size_t heaplen,
 int	sandbox_object_new_flags(struct sandbox_class *sbcp, size_t heaplen,
 	    uint flags, struct sandbox_object **sbopp);
 #if __has_feature(capabilities)
-int	sandbox_object_new_system_object(__capability void *idc,
-	    __capability void *rtld_pcc, __capability void *invoke_pcc,
-	    __capability intptr_t *vtable, struct sandbox_object **sbopp);
+int	sandbox_object_new_system_object(__capability void *private_data,
+	    __capability void *invoke_pcc, __capability intptr_t *vtable,
+	    struct sandbox_object **sbopp);
 #endif
 
 /**
@@ -193,5 +193,14 @@ sandbox_object_getsandboxstack(struct sandbox_object *sbop);
  */
 struct cheri_object	sandbox_object_getsystemobject(
 			    struct sandbox_object *sbop);
+
+/*
+ * API to get private data for system-class implementations.
+ */
+#if __has_feature(capabilities)
+__capability void	*sandbox_object_private_get(
+			    struct sandbox_object *sbop);
+__capability void	*sandbox_object_private_get_idc(void);
+#endif
 
 #endif /* !_SANDBOX_H_ */

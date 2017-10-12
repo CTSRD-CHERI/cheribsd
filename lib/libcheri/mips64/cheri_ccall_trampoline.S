@@ -170,11 +170,13 @@ libcheri_ccall_rtld_push_stack:
 
 libcheri_ccall_rtld_extract_target:
 	/*
-	 * Retrieve the target protection domain's PCC and IDC, which are
-	 * pointed to by our IDC.
+	 * Retrieve and install the target protection domain's DDC, PCC, and
+	 * IDC, which are pointed to by the trampoline's IDC.
 	 *
 	 * NB: Notice capability offset 1 for rtld initialisation.
 	 */
+	clc	$c12, $zero, (4*CHERICAP_SIZE)($c26) # XXXRW: Hard-coded offset
+	csetdefault	$c12
 	clc	$c12, $zero, (1*CHERICAP_SIZE)($c26) # XXXRW: Hard-coded offset
 	clc	$c26, $zero, (0*CHERICAP_SIZE)($c26) # XXXRW: Hard-coded offset
 
@@ -272,11 +274,13 @@ libcheri_ccall_invoke_push_stack:
 
 libcheri_ccall_invoke_extract_target:
 	/*
-	 * Retrieve the target protection domain's PCC and IDC, which are
-	 * pointed to by our IDC.
+	 * Retrieve and install the target protection domain's DDC, PCC, and
+	 * IDC, which are pointed to by the trampoline's IDC.
 	 *
 	 * NB: Notice capability offset 2 for general invocation.
 	 */
+	clc	$c12, $zero, (4*CHERICAP_SIZE)($c26) # XXXRW: Hard-coded offset
+	csetdefault	$c12
 	clc	$c12, $zero, (2*CHERICAP_SIZE)($c26) # XXXRW: Hard-coded offset
 	clc	$c26, $zero, (0*CHERICAP_SIZE)($c26) # XXXRW: Hard-coded offset
 

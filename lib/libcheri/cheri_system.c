@@ -67,25 +67,14 @@ CHERI_CLASS_DECL(libcheri_system);
 int
 cheri_system_new(struct sandbox_object *sbop, struct sandbox_object **sbopp)
 {
-	__capability void *idc, *invoke_pcc;
-
-	/*
-	 * Construct a data capability describing the sandbox structure
-	 * itself, which allows the system class to identify the sandbox a
-	 * request is being issued from.  Embed saved $c0 as first field to
-	 * allow the ambient MIPS environment to be installed.
-	 *
-	 * XXXRW: Is this up-to-date?
-	 */
-	idc = cheri_ptrperm(sbop, sizeof(*sbop), CHERI_PERM_GLOBAL |
-	    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE |
-	    CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP);
-	assert(cheri_getoffset(idc) == 0);
-	assert(cheri_getlen(idc) == sizeof(*sbop));
+	__capability void *invoke_pcc;
 
 	/*
 	 * Construct an object capability for the system-class instance that
 	 * will be passed into the sandbox.
+	 *
+	 * The private data pointer is to the sandbox object that this system
+	 * object serves.
 	 *
 	 * The code capability will simply be our $pcc.
 	 *
@@ -106,7 +95,8 @@ cheri_system_new(struct sandbox_object *sbop, struct sandbox_object **sbopp)
 	invoke_pcc = cheri_setoffset(invoke_pcc,
 	    (register_t)CHERI_CLASS_ENTRY(libcheri_system));
 
-	return (sandbox_object_new_system_object(idc, NULL, invoke_pcc,
+	return (sandbox_object_new_system_object(
+	    (__cheri_cast void * __capability)(void *)sbop, invoke_pcc,
 	    cheri_system_vtable, sbopp));
 }
 

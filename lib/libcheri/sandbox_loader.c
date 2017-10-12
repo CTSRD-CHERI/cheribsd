@@ -384,6 +384,7 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	sbop->sbo_rtld_pcc = sbcp->sbc_classcap_rtld;
 	sbop->sbo_invoke_pcc = sbcp->sbc_classcap_invoke;
 	sbop->sbo_vtable = NULL;
+	sbop->sbo_ddc = idc;
 
 	/*
 	 * Construct sealed rtld and invocation capabilities for use with

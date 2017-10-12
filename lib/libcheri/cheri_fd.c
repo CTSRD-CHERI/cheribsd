@@ -79,12 +79,8 @@ __capability vm_offset_t	*cheri_fd_vtable;
 /*
  * Data segment for a cheri_fd.
  */
-struct
-#if _MIPS_SZCAP == 128
-__attribute__ ((aligned(4096)))
-#endif
-cheri_fd {
-	struct sandbox_object	*cd_sbop; /* Corresponding sandbox object. */
+struct cheri_fd {
+	struct sandbox_object	*cf_sbop; /* Corresponding sandbox object. */
 	int			 cf_fd;	  /* Underlying file descriptor. */
 };
 
@@ -103,7 +99,7 @@ cheri_fd {
 int
 cheri_fd_new(int fd, struct sandbox_object **sbopp)
 {
-	__capability void *idc, *invoke_pcc;
+	__capability void *invoke_pcc;
 	struct cheri_fd *cfp;
 
 	cfp = calloc(1, sizeof(*cfp));
@@ -114,39 +110,26 @@ cheri_fd_new(int fd, struct sandbox_object **sbopp)
 	cfp->cf_fd = fd;
 
 	/*
-	 * Construct a sealed data capability for the class.  This describes
-	 * the 'struct cheri_fd' for the specific file descriptor.  The $c0
-	 * to reinstall later is the first field in the structure.
+	 * Construct a code capability for this class; for system classes,
+	 * this is just the ambient $pcc with the offset set to the entry
+	 * address.
 	 *
-	 * XXXRW: Should we also do an explicit cheri_setoffset()?
-	 */
-	idc = cheri_ptrperm(cfp, sizeof(*cfp), CHERI_PERM_GLOBAL |
-	    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE |
-	    CHERI_PERM_STORE_CAP);
-
-	/*
-	 * Construct a sealed code capability for the class.  This is just the
-	 * ambient $pcc with the offset set to the entry address.
-	 *
-	 * XXXRW: For now, when invoked, we install $pcc into $c0, so this
-	 * needs a full set of permissions rather than just LOAD/EXECUTE. In
-	 * the future, we will want to preserve a copy of cheri_getdefault()
-	 * in the struct cheri_fd to be reinstalled by the entry code.
-	 *
-	 * XXXRW: In the future, use cheri_codeptr() here?
+	 * XXXRW: Possibly, we should just pass cheri_fd to sandbox creation
+	 * rather than embedding this logic in each system class?
 	 */
 	invoke_pcc = cheri_setoffset(cheri_getpcc(),
 	    (register_t)CHERI_CLASS_ENTRY(cheri_fd));
 
 	/*
-	 * Set up system object state for the sandbox.
+	 * Set up system-object state for the sandbox.
 	 */
-	if (sandbox_object_new_system_object(idc, NULL, invoke_pcc,
-	    cheri_fd_vtable, &cfp->cd_sbop) != 0) {
+	if (sandbox_object_new_system_object(
+	    (__cheri_cast void * __capability)(void *)cfp, invoke_pcc,
+	    cheri_fd_vtable, &cfp->cf_sbop) != 0) {
 		free(cfp);
 		return (-1);
 	}
-	*sbopp = cfp->cd_sbop;
+	*sbopp = cfp->cf_sbop;
 	return (0);
 }
 
@@ -159,7 +142,7 @@ cheri_fd_revoke(struct sandbox_object *sbop)
 {
 	__capability struct cheri_fd *cfp;
 
-	cfp = sandbox_object_getsandboxdata(sbop);
+	cfp = sandbox_object_private_get(sbop);
 	cfp->cf_fd = -1;
 }
 
@@ -199,7 +182,7 @@ cheri_fd_fstat(__capability struct stat *sb_c)
 	sb = cheri_cap_to_typed_ptr(sb_c, struct stat);
 
 	/* Check that the cheri_fd hasn't been revoked. */
-	cfp = cheri_getidc();
+	cfp = sandbox_object_private_get_idc();
 	if (cfp->cf_fd == -1) {
 		ret.cfr_retval0 = -1;
 		ret.cfr_retval1 = EBADF;
@@ -224,7 +207,7 @@ cheri_fd_lseek(off_t offset, int whence)
 	/* XXXRW: Object-capability user permission check on idc. */
 
 	/* Check that the cheri_fd hasn't been revoked. */
-	cfp = cheri_getidc();
+	cfp = sandbox_object_private_get_idc();
 	if (cfp->cf_fd == -1) {
 		ret.cfr_retval0 = -1;
 		ret.cfr_retval1 = EBADF;
@@ -258,7 +241,7 @@ cheri_fd_read(__capability void *buf_c, size_t nbytes)
 	buf = cheri_cap_to_ptr(buf_c, nbytes);
 
 	/* Check that the cheri_fd hasn't been revoked. */
-	cfp = cheri_getidc();
+	cfp = sandbox_object_private_get_idc();
 	if (cfp->cf_fd == -1) {
 		ret.cfr_retval0 = -1;
 		ret.cfr_retval1 = EBADF;
@@ -293,7 +276,7 @@ cheri_fd_write(__capability const void *buf_c, size_t nbytes)
 	buf = cheri_cap_to_ptr(buf_c, nbytes);
 
 	/* Check that cheri_fd hasn't been revoked. */
-	cfp = cheri_getidc();
+	cfp = sandbox_object_private_get_idc();
 	if (cfp->cf_fd == -1) {
 		ret.cfr_retval0 = -1;
 		ret.cfr_retval1 = EBADF;

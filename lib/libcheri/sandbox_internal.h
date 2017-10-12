@@ -120,6 +120,7 @@ sandbox_object {
 	__capability void	*sbo_rtld_pcc;	/* Capability offset 1. */
 	__capability void	*sbo_invoke_pcc;/* Capability offset 2. */
 	__capability void	*sbo_vtable;	/* Capability offset 3. */
+	__capability void	*sbo_ddc;	/* Capability offset 4. */
 
 	/*
 	 * Further fields are unknown to the assembly domain-transition code.
@@ -157,6 +158,11 @@ sandbox_object {
 	 * Sandbox statistics.
 	 */
 	struct sandbox_object_stat	*sbo_sandbox_object_statp;
+
+	/*
+	 * Private data for system objects.
+	 */
+	__capability void	*sbo_private_data;
 };
 
 /*

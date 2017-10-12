@@ -524,9 +524,9 @@ sandbox_object_new(struct sandbox_class *sbcp, size_t heaplen,
  * sandbox_class instances?  That would be more consistent...
  */
 int
-sandbox_object_new_system_object(__capability void *idc,
-    __capability void *rtld_pcc, __capability void *invoke_pcc,
-    __capability intptr_t *vtable, struct sandbox_object **sbopp)
+sandbox_object_new_system_object(__capability void *private_data,
+    __capability void *invoke_pcc, __capability intptr_t *vtable,
+    struct sandbox_object **sbopp)
 {
 
 	/*
@@ -540,10 +540,14 @@ sandbox_object_new_system_object(__capability void *idc,
 	*sbopp = calloc(1, sizeof(**sbopp));
 	if (*sbopp == NULL)
 		return (-1);
-	(*sbopp)->sbo_idc = idc;
-	(*sbopp)->sbo_rtld_pcc = rtld_pcc;
+
+	(*sbopp)->sbo_idc =
+	    (__cheri_cast void * __capability)(void *)*sbopp;
+	(*sbopp)->sbo_rtld_pcc = NULL;
 	(*sbopp)->sbo_invoke_pcc = invoke_pcc;
 	(*sbopp)->sbo_vtable = vtable;
+	(*sbopp)->sbo_ddc = cheri_getdefault();
+	(*sbopp)->sbo_private_data = private_data;
 	return (0);
 }
 
@@ -711,10 +715,25 @@ sandbox_object_getsandboxstack(struct sandbox_object *sbop)
 	return (sbop->sbo_stackcap);
 }
 
-
 struct cheri_object
 sandbox_object_getsystemobject(struct sandbox_object *sbop)
 {
 
 	return (sbop->sbo_cheri_object_system);
+}
+
+void *
+sandbox_object_private_get(struct sandbox_object *sbop)
+{
+
+	return (sbop->sbo_private_data);
+}
+
+void *
+sandbox_object_private_get_idc(void)
+{
+	struct sandbox_object *sbop;
+
+	sbop = (struct sandbox_object *)(__cheri_cast void *)cheri_getidc();
+	return (sbop->sbo_private_data);
 }

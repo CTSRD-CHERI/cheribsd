@@ -56,12 +56,7 @@
  *    $c3-$c10 contain user capability arguments
  *
  *    $c26 contains the invoked data capability installed by CCall; unlike
- *      sandboxed versions of this code, this points at actual data rather
- *      than being the value to install in $c0.  $c0 is copied from $pcc.
- *
- * Sandbox heap information is extracted from the sandbox metadata structure.
- * $c26 is assumed to have room for a stack at the top, although its length is
- * currently undefined.
+ *      sandboxed versions of this code, this points at the sandbox_object.
  *
  * For now, assume:
  * (1) The caller has not set up the general-purpose register context, that's
@@ -79,12 +74,9 @@
 __cheri_ ## class ## _entry:						\
 									\
 	/*								\
-	 * Normally in a CHERI sandbox, we would install $c26 ($idc)	\
-	 * into $c0 for MIPS load/store instructions.  For the system	\
-	 * class, a suitable capability is stored at the front of the	\
-	 * data structure referenced by $idc.				\
+	 * Load sandbox object's DDC via IDC.				\
 	 */								\
-	clc	$c12, zero, 0($c26);					\
+	clc	$c12, zero, (4*CHERICAP_SIZE)($c26);			\
 	csetdefault	$c12;						\
 									\
 	/*								\
@@ -104,11 +96,11 @@ __cheri_ ## class ## _entry:						\
 	dla	$gp, _gp;						\
 									\
 	/*								\
-	 * The second entry of $idc is a method vtable.  If it is a	\
+	 * The fourth entry of $idc is a method vtable.  If it is a	\
 	 * valid capability, then load the address at offset $v0	\
 	 * rather than using the "enter" functions.			\
 	 */								\
-	clc	$c12, zero, CHERICAP_SIZE($c26);			\
+	clc	$c12, zero, (3*CHERICAP_SIZE)($c26);			\
 	cld	$t9, $v0, 0($c12);					\
 	dla	$ra, 0f;						\
 	cgetpcc	$c12;							\
