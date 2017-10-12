@@ -53,10 +53,10 @@ typedef	long word;		/* "word" used for medium copy speed */
 /* "pointer" used for optimal copy speed when pointers are large */
 #ifdef __CHERI__
 typedef	__uintcap_t ptr;
-#  define CAPABILITY __capability
+#define CAPABILITY __capability
 #else
-# define CAPABILITY
 typedef	uintptr_t ptr;
+#define CAPABILITY
 #endif
 
 #define PWIDTH __POINTER_WIDTH__/8
@@ -65,19 +65,18 @@ typedef	uintptr_t ptr;
 #define	pmask	(psize - 1)
 #define bigptr	(psize>wsize)
 
-#define MIPSLOOP(index, last, cStatements, increment) \
-{\
-  index -= increment; \
-do { \
-asm (\
-  "daddiu %[indexIn], %[indexIn], " #increment "\n" \
-  :[indexOut] "=r"(index) \
-  :[indexIn] "r"(index) \
-);\
-cStatements \
-} while (index!=last);\
+#define MIPSLOOP(index, last, cStatements, increment)			\
+{									\
+	index -= increment;						\
+	do {								\
+		asm (							\
+			"daddiu %[indexIn], %[indexIn], " #increment "\n" \
+			:[indexOut] "=r"(index)				\
+			:[indexIn] "r"(index)				\
+		);							\
+		cStatements						\
+	} while (index!=last);						\
 }
-    
 
 /*
  * Copy a block of memory, handling overlap.
@@ -86,7 +85,7 @@ cStatements \
  */
 
 #if defined(MEMCPY_C)
-void * CAPABILITY 
+void * CAPABILITY
 memcpy_c(void * CAPABILITY dst0, const void * CAPABILITY src0, size_t length)
 #elif defined(MEMMOVE)
 void *
@@ -105,7 +104,7 @@ void *
 memcpy
 (void *dst0, const void *src0, size_t length)
 #elif defined(CMEMCPY_C)
-void * CAPABILITY 
+void * CAPABILITY
 cmemcpy_c(void * CAPABILITY dst0, const void * CAPABILITY src0, size_t length)
 #elif defined(CMEMCPY)
 void *
@@ -120,17 +119,19 @@ bcopy(const void *src0, void *dst0, size_t length)
 {
 	if (length == 0 || src0 == dst0)		/* nothing to do */
 		goto done;
-		
+
 #ifdef __CHERI__
-	char * CAPABILITY dst = __builtin_cheri_bounds_set((char * CAPABILITY)dst0,length);
-	const char * CAPABILITY src = __builtin_cheri_bounds_set((const char * CAPABILITY)src0,length);
+	char * CAPABILITY dst =
+	    __builtin_cheri_bounds_set((__cheri_cast void * CAPABILITY)dst0,length);
+	const char * CAPABILITY src =
+	    __builtin_cheri_bounds_set((__cheri_cast const void * CAPABILITY)src0,length);
 #else
-	char * dst = (char * )dst0;
-	const char * src = (const char * )src0;
+	char *dst = dst0;
+	const char *src = src0;
 #endif
 	size_t t;
-	
-#if defined(MEMMOVE) || defined(BCOPY) || defined(CMEMMOVE_C) || defined(CMEMMOVE)
+
+#if defined(MEMMOVE) || defined(BCOPY) || defined(CMEMMOVE)
 	const int handle_overlap = 1;
 #else
 	const int handle_overlap = 0;
@@ -141,7 +142,7 @@ bcopy(const void *src0, void *dst0, size_t length)
 		 * Copy forward.
 		 */
 		t = (vaddr_t)src;	/* only need low bits */
-		if ((t | (vaddr_t)dst) & wmask) { 
+		if ((t | (vaddr_t)dst) & wmask) {
 			/*
 			 * Try to align operands.  This cannot be done
 			 * unless the low bits match.
@@ -175,7 +176,10 @@ bcopy(const void *src0, void *dst0, size_t length)
 					dst += t*wsize;
 					src += t*wsize;
 					t = -t*wsize;
-					MIPSLOOP(t, -8, *((word * CAPABILITY)(dst+t)) = *((word * CAPABILITY)(src+t));, 8/*wsize*/);
+					MIPSLOOP(t, -8,
+					    *((word * CAPABILITY)(dst+t)) =
+					    *((word * CAPABILITY)(src+t));,
+					    8/*wsize*/);
 				}
 			}
 		}
@@ -188,14 +192,14 @@ bcopy(const void *src0, void *dst0, size_t length)
 			dst += t*psize;
 			t = -(t*psize);
 #if !defined(_MIPS_SZCAP)
-			MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) = 
-				*((ptr * CAPABILITY)(src+t));, 8/*sizeof(ptr)*/);
+			MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) =
+			    *((ptr * CAPABILITY)(src+t));, 8/*sizeof(ptr)*/);
 #elif _MIPS_SZCAP==128
-			MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) = 
-				*((ptr * CAPABILITY)(src+t));, 16/*sizeof(ptr)*/);
+			MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) =
+			    *((ptr * CAPABILITY)(src+t));, 16/*sizeof(ptr)*/);
 #elif _MIPS_SZCAP==256
-			MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) = 
-				*((ptr * CAPABILITY)(src+t));, 32/*sizeof(ptr)*/);
+			MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) =
+			    *((ptr * CAPABILITY)(src+t));, 32/*sizeof(ptr)*/);
 #endif
 		}
 		t = length & pmask;
@@ -237,8 +241,10 @@ bcopy(const void *src0, void *dst0, size_t length)
 					dst -= t*wsize;
 					src -= t*wsize;
 					t = ((t-1)*wsize);
-					MIPSLOOP(t, 0, *((word * CAPABILITY)(dst+t)) = 
-						*((word * CAPABILITY)(src+t));, -8/*wsize*/);
+					MIPSLOOP(t, 0,
+					    *((word * CAPABILITY)(dst+t)) =
+					    *((word * CAPABILITY)(src+t));,
+					    -8/*wsize*/);
 				}
 			}
 		}
@@ -248,16 +254,16 @@ bcopy(const void *src0, void *dst0, size_t length)
 			dst -= t*psize;
 			t = ((t-1)*psize);
 #if !defined(_MIPS_SZCAP)
-		MIPSLOOP(t, 0, *((ptr * CAPABILITY)(dst+t)) = 
-			*((ptr * CAPABILITY)(src+t));, -8/*sizeof(ptr)*/);
+			MIPSLOOP(t, 0, *((ptr * CAPABILITY)(dst+t)) =
+			    *((ptr * CAPABILITY)(src+t));, -8/*sizeof(ptr)*/);
 #elif _MIPS_SZCAP==128
-		MIPSLOOP(t, 0, *((ptr * CAPABILITY)(dst+t)) = 
-			*((ptr * CAPABILITY)(src+t));, -16/*sizeof(ptr)*/);
+			MIPSLOOP(t, 0, *((ptr * CAPABILITY)(dst+t)) =
+			    *((ptr * CAPABILITY)(src+t));, -16/*sizeof(ptr)*/);
 #elif _MIPS_SZCAP==256
-		MIPSLOOP(t, 0, *((ptr * CAPABILITY)(dst+t)) = 
-			*((ptr * CAPABILITY)(src+t));, -32/*sizeof(ptr)*/);
+			MIPSLOOP(t, 0, *((ptr * CAPABILITY)(dst+t)) =
+			    *((ptr * CAPABILITY)(src+t));, -32/*sizeof(ptr)*/);
 #endif
-			
+
 		}
 		t = length & pmask;
 		if (t) {
