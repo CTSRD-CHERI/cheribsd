@@ -28,5 +28,5 @@
  * SUCH DAMAGE.
  */
 
-#define MEMCPY_C
-#include "../mips/string/jdw57_memcpy.c"
+#define CAPABILITY_VERSION
+#include "memcpy.c"

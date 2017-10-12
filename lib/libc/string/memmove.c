@@ -2,4 +2,4 @@
 __FBSDID("$FreeBSD$");
 
 #define	MEMMOVE
-#include "../mips/string/jdw57_memcpy.c"
+#include "bcopy.c"
