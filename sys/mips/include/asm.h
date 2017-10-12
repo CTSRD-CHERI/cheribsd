@@ -325,6 +325,7 @@ _C_LABEL(x):
 #define	CALLFRAME_SIZ	(2*(_MIPS_SZCAP / 8))
 #define	CALLFRAME_CRA	(0*(_MIPS_SZCAP / 8))
 #define	CALLFRAME_S0	(1*(_MIPS_SZCAP / 8))
+#define CALLFRAME_SP	0
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
 
 /*
