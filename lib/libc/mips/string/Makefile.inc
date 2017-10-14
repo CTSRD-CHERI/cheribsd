@@ -13,16 +13,11 @@ MDSRCS+= \
 	strrchr.S
 .endif
 
-.if ${MK_CHERI} == "no"
-MDSRCS+= \
-	bcopy.S \
-	memcpy.S \
-	memmove.S
-.else
+.if ${MK_CHERI} == "yes"
 CHERI_MDSRCS=	\
 		memchr_c.c \
 		memcmp_c.c \
-		memcpy_c.S \
+		memcpy_c.c \
 		memcpy_c_tofrom.c \
 		memmove_c.c \
 		memset_c.c \
