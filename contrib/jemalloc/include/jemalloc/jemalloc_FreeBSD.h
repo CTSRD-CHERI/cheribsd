@@ -56,10 +56,10 @@
 #ifdef __mips_n64
 #  define LG_VADDR		64
 #  define LG_SIZEOF_PTR		3
-#endif /* __CHERI_PURE_CAPABILITY__ */
 #else
 #  define LG_VADDR		32
 #  define LG_SIZEOF_PTR		2
+#endif
 #endif
 #ifdef __powerpc64__
 #  define LG_VADDR		64

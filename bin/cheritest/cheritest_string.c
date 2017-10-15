@@ -72,7 +72,7 @@ check(struct Test *t1, int start, int end)
 	for (i = start; i < 32; i++)
 		if (t1->pad0[i] != i)
 			cheritest_failure_errx("t1->pad0[%d] != %d", i, i);
-	if ((__cheri_cast void*)t1->y != t1)
+	if (t1->y != CAP(t1))
 		cheritest_failure_errx("t1->y != t1");
 	if (!cheri_gettag(t1->y))
 		cheritest_failure_errx("t1->y is untagged");

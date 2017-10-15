@@ -863,10 +863,8 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 * all).
 	 */
 	frame = &td->td_pcb->pcb_regs;
-	cheriabi_capability_set_user_ddc(&frame->ddc,
-	   rounddown2(stackbase, 1ULL << CHERI_SEAL_ALIGN_SHIFT(stackbase)));
-	cheriabi_capability_set_user_idc(&frame->idc,
-	   rounddown2(stackbase, 1ULL << CHERI_SEAL_ALIGN_SHIFT(stackbase)));
+	cheriabi_capability_set_user_ddc(&frame->ddc, text_end);
+	cheriabi_capability_set_user_idc(&frame->idc, text_end);
 
 	/*
 	 * XXXRW: Set $pcc and $c12 to the entry address -- for now, also with
