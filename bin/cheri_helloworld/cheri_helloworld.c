@@ -55,6 +55,8 @@ main(void)
 	int ret;
 	struct cheri_object stdout_fd;
 
+	libcheri_init();
+
 	if (cheri_fd_new(STDOUT_FILENO, &sbop) < 0)
 		err(EX_OSFILE, "cheri_fd_new: stdout");
 

@@ -48,6 +48,7 @@
 #include "cheri_ccall.h"
 #include "cheri_enter.h"
 #include "cheri_system.h"
+#include "libcheri_init.h"
 #include "sandbox.h"
 
 /*
@@ -72,7 +73,10 @@ register_t		 __cheri_enter_stack_sp;
  */
 struct cheri_object	 __cheri_object_creturn;
 
-__attribute__ ((constructor)) static void
+/*
+ * Initialise landing-pad environment for system-object invocation.
+ */
+void
 cheri_enter_init(void)
 {
 

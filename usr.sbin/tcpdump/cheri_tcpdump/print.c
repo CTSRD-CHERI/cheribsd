@@ -536,6 +536,8 @@ static int
 tcpdump_sandbox_object_setup()
 {
 
+	libcheri_init();
+
 	if (sandbox_class_new("/usr/libexec/tcpdump-helper",
 	    8*1024*1024, &tcpdump_classp) < 0) {
 		err(1, "failed to create sandbox class");

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2015 SRI International
+ * Copyright (c) 2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -28,39 +28,12 @@
  * SUCH DAMAGE.
  */
 
-#include <cheri/cheri.h>
-#include <cheri/sandbox.h>
+#ifndef _LIBCHERI_INIT_H_
+#define	_LIBCHERI_INIT_H_
 
-#include <err.h>
-#include <sysexits.h>
+void	cheri_ccall_init(void);
+void	cheri_stack_init(void);
+void	cheri_enter_init(void);
+void	sandbox_init(void);
 
-#include "helloworld.h"
-
-#define	COMPARTMENT_PATH	"/usr/libcheri/helloworld.co.0"
-
-struct cheri_object	 __helloworld;
-struct sandbox_class	*__helloworld_classp;
-static struct sandbox_object	*__helloworld_objectp;
-
-__attribute__ ((constructor)) static void
-cheri_helloworld_init(void)
-{
-
-	libcheri_init();
-	if (sandbox_class_new(COMPARTMENT_PATH, 0, &__helloworld_classp) < 0)
-		err(EX_OSFILE, "sandbox_class_new(%s)", COMPARTMENT_PATH);
-	if (sandbox_object_new(__helloworld_classp, 2*1024*1024,
-	    &__helloworld_objectp) < 0)
-		err(EX_OSFILE, "sandbox_object_new");
-	__helloworld = sandbox_object_getobject(__helloworld_objectp);
-}
-
-#if 0
-void
-cheri_helloworld_fini(void)
-{
-
-	sandbox_object_destroy(__helloworld_objectp);
-	sandbox_class_destroy(__helloworld_classp);
-}
-#endif
+#endif /* _LIBCHERI_INIT_H_ */

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2013, 2016 Robert N. M. Watson
+ * Copyright (c) 2013, 2016-2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -44,6 +44,7 @@
 #include <string.h>
 
 #include "cheri_invoke.h"
+#include "libcheri_init.h"
 #include "libcheri_stat.h"
 #include "sandbox.h"
 
@@ -127,7 +128,7 @@ static struct sandbox_method_stat
 static struct sandbox_object_stat
     sandbox_object_stats[SANDBOX_OBJECT_STAT_MAX];
 
-__attribute__ ((constructor)) static void
+void
 sandbox_stat_init(void)
 {
 	struct ps_strings *ps_strings;

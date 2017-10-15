@@ -138,6 +138,8 @@ static void
 init_sb_class()
 {
 
+	libcheri_init();
+
 	/* XXX: wrong error handling for library code */
 	if (sandbox_class_new("/usr/libexec/libpng_sb-helper",
 	    8*1024*1024, &classp) < 0)

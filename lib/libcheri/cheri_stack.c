@@ -38,8 +38,10 @@
 #include <errno.h>
 #include <string.h>
 #include <ucontext.h>
+
 #include "cheri_stack.h"
 #include "cheri_stack_internal.h"
+#include "libcheri_init.h"
 
 /*
  * Implementation of trusted stacks for the libcheri compartmentalisation
@@ -71,10 +73,22 @@
  * if interrupts taken during spl()s in the kernel, with the signal handler
  * "scheduling" the change to take place once the preempted code returns..?
  */
-__thread struct cheri_stack __cheri_stack_tls_storage = {
+__thread struct cheri_stack __cheri_stack_tls_storage
+    __attribute__((__aligned__(32))) = {
 	.cs_tsize = CHERI_STACK_SIZE,
 	.cs_tsp = CHERI_STACK_SIZE,
 };
+
+void
+cheri_stack_init(void)
+{
+
+	/*
+	 * Ensure thread-local storage for the first thread's trusted stack is
+	 * suitably aligned.
+	 */
+	assert(((vaddr_t)&__cheri_stack_tls_storage % CHERICAP_SIZE) == 0);
+}
 
 /*
  * APIs to get and set the trusted stack, which currently encode the internal

@@ -15,6 +15,7 @@ SRCS=	cheri_ccall.c			\
 	cheri_type.c			\
 	error.cc			\
 	libcheri_classes.S		\
+	libcheri_init.c			\
 	sandbox.c			\
 	sandbox_elf.c			\
 	sandbox_loader.c		\
@@ -36,6 +37,7 @@ INCS=	cheri_ccall.h			\
 	cheri_system.h			\
 	cheri_system_md.h		\
 	cheri_type.h			\
+	libcheri_init.h			\
 	sandbox.h			\
 	sandboxasm.h
 

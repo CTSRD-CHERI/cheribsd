@@ -37,6 +37,7 @@
 #include "cheri_ccall.h"
 #include "cheri_class.h"
 #include "cheri_type.h"
+#include "libcheri_init.h"
 #include "sandbox_internal.h"
 
 /*
@@ -95,8 +96,8 @@ void	*cheri_creturn_data;
  * capabilities for invocation, rtld, and creturn; and (2) Initialise sealed
  * capabilities where the values will be shared across many sandboxes.
  */
-__attribute__ ((constructor)) static void
-cheri_ccall_constructor(void)
+void
+cheri_ccall_init(void)
 {
 	__capability void *cap;
 

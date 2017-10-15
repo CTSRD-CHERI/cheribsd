@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 Robert N. M. Watson
+ * Copyright (c) 2014-2017 Robert N. M. Watson
  * Copyright (c) 2014 Robert M. Norton
  * All rights reserved.
  *
@@ -477,6 +477,7 @@ main(int argc, char *argv[])
 #ifdef CAP
 	if (invoke)
 	  {
+	    libcheri_init();
 	    if (sandbox_class_new("/usr/libexec/cheri_bench-helper",
 				  4*1024*1024, &classp) < 0)
 	      err(EX_OSFILE, "sandbox_class_new");

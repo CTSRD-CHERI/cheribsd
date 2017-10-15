@@ -2222,6 +2222,12 @@ main(int argc, char *argv[])
 	if (minherit(ccsp, getpagesize(), INHERIT_SHARE) < 0)
 		err(EX_OSERR, "minherit");
 
+	/*
+	 * Initialise the libcheri sandboxing library.
+	 */
+	if (!unsandboxed_tests_only)
+		libcheri_init();
+
 	cheri_failed_tests = sl_init();
 	cheri_xfailed_tests = sl_init();
 	/* Run the actual tests. */

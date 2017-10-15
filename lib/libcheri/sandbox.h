@@ -115,6 +115,8 @@ namespace cheri
 #undef LIBCHERI_OVERRIDE
 #endif
 
+void	libcheri_init(void);
+
 struct sandbox_class;
 int	sandbox_class_new(const char *path, size_t maxmapsize,
 	    struct sandbox_class **sbcpp);
