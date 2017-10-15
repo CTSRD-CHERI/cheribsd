@@ -68,13 +68,6 @@ __rtld_vector:
 	move	$fp, $sp
 
 	#
-	# Install $idc as $c0.  From here on out, we can do MIPS fetches and
-	# stores to memory inside the sandbox, and $c0-relative capability
-	# fetches and stores.
-	#
-	csetdefault	$c26
-
-	#
 	# The compiler is responsible for scrubbing unused argument registers
 	# (since only it has the information required to do so).  CCall is
 	# responsible for scrubbing all other registers.
