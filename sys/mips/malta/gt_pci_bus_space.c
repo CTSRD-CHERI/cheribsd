@@ -241,7 +241,7 @@ gt_pci_bs_r_4(void *t, bus_space_handle_t handle,
 
 void
 gt_pci_bs_rm_2(void *t, bus_space_handle_t bsh,
-    bus_size_t offset, uint16_t *addr, size_t count)
+    bus_size_t offset, uint16_t *addr, bus_size_t count)
 {
 	bus_addr_t baddr = bsh + offset;
 
@@ -251,7 +251,7 @@ gt_pci_bs_rm_2(void *t, bus_space_handle_t bsh,
 
 void
 gt_pci_bs_rm_4(void *t, bus_space_handle_t bsh,
-    bus_size_t offset, uint32_t *addr, size_t count)
+    bus_size_t offset, uint32_t *addr, bus_size_t count)
 {
 	bus_addr_t baddr = bsh + offset;
 
@@ -266,7 +266,7 @@ gt_pci_bs_rm_4(void *t, bus_space_handle_t bsh,
  */
 void
 gt_pci_bs_rr_2(void *t, bus_space_handle_t bsh,
-    bus_size_t offset, uint16_t *addr, size_t count)
+    bus_size_t offset, uint16_t *addr, bus_size_t count)
 {
 	bus_addr_t baddr = bsh + offset;
 
@@ -278,7 +278,7 @@ gt_pci_bs_rr_2(void *t, bus_space_handle_t bsh,
 
 void
 gt_pci_bs_rr_4(void *t, bus_space_handle_t bsh,
-    bus_size_t offset, uint32_t *addr, size_t count)
+    bus_size_t offset, uint32_t *addr, bus_size_t count)
 {
 	bus_addr_t baddr = bsh + offset;
 
@@ -314,7 +314,7 @@ gt_pci_bs_w_4(void *t, bus_space_handle_t bsh,
  */
 void
 gt_pci_bs_wm_2(void *t, bus_space_handle_t bsh,
-    bus_size_t offset, const uint16_t *addr, size_t count)
+    bus_size_t offset, const uint16_t *addr, bus_size_t count)
 {
 	bus_addr_t baddr = bsh + offset;
 
@@ -324,7 +324,7 @@ gt_pci_bs_wm_2(void *t, bus_space_handle_t bsh,
 
 void
 gt_pci_bs_wm_4(void *t, bus_space_handle_t bsh,
-    bus_size_t offset, const uint32_t *addr, size_t count)
+    bus_size_t offset, const uint32_t *addr, bus_size_t count)
 {
 	bus_addr_t baddr = bsh + offset;
 
@@ -338,7 +338,7 @@ gt_pci_bs_wm_4(void *t, bus_space_handle_t bsh,
  */
 void
 gt_pci_bs_wr_2(void *t, bus_space_handle_t bsh,
-    bus_size_t offset, const uint16_t *addr, size_t count)
+    bus_size_t offset, const uint16_t *addr, bus_size_t count)
 {
 	bus_addr_t baddr = bsh + offset;
 
@@ -350,7 +350,7 @@ gt_pci_bs_wr_2(void *t, bus_space_handle_t bsh,
 
 void
 gt_pci_bs_wr_4(void *t, bus_space_handle_t bsh,
-    bus_size_t offset, const uint32_t *addr, size_t count)
+    bus_size_t offset, const uint32_t *addr, bus_size_t count)
 {
 	bus_addr_t baddr = bsh + offset;
 
@@ -366,7 +366,7 @@ gt_pci_bs_wr_4(void *t, bus_space_handle_t bsh,
  */
 void
 gt_pci_bs_sm_2(void *t, bus_space_handle_t bsh,
-    bus_size_t offset, uint16_t value, size_t count)
+    bus_size_t offset, uint16_t value, bus_size_t count)
 {
 	bus_addr_t addr = bsh + offset;
 
@@ -376,7 +376,7 @@ gt_pci_bs_sm_2(void *t, bus_space_handle_t bsh,
 
 void
 gt_pci_bs_sm_4(void *t, bus_space_handle_t bsh,
-    bus_size_t offset, uint32_t value, size_t count)
+    bus_size_t offset, uint32_t value, bus_size_t count)
 {
 	bus_addr_t addr = bsh + offset;
 
@@ -390,7 +390,7 @@ gt_pci_bs_sm_4(void *t, bus_space_handle_t bsh,
  */
 void
 gt_pci_bs_sr_2(void *t, bus_space_handle_t bsh,
-		       bus_size_t offset, uint16_t value, size_t count)
+		       bus_size_t offset, uint16_t value, bus_size_t count)
 {
 	bus_addr_t addr = bsh + offset;
 
@@ -400,7 +400,7 @@ gt_pci_bs_sr_2(void *t, bus_space_handle_t bsh,
 
 void
 gt_pci_bs_sr_4(void *t, bus_space_handle_t bsh,
-    bus_size_t offset, uint32_t value, size_t count)
+    bus_size_t offset, uint32_t value, bus_size_t count)
 {
 	bus_addr_t addr = bsh + offset;
 
