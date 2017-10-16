@@ -144,8 +144,12 @@ cheri_test_sysctl_nulldereference(SYSCTL_HANDLER_ARGS)
 	error = sysctl_handle_int(oidp, &i, 0, req);
 	if (error != 0 || req->newptr == NULL)
 		return (error);
+#ifndef __CHERI_PURE_CAPABILITY__
 	CHERI_CLC(CHERI_CR_CTEMP0, CHERI_CR_KDC, &cheri_test_nullcap, 0);
 	CHERI_CSW(i, 0, 0, CHERI_CR_CTEMP0);
+#else
+	*(int *)cheri_test_nullcap = i;
+#endif
 	return (0);
 }
 
@@ -158,8 +162,12 @@ cheri_test_sysctl_fineload(SYSCTL_HANDLER_ARGS)
 	error = sysctl_handle_int(oidp, &i, 0, req);
 	if (error != 0 || req->newptr == NULL)
 		return (error);
+#ifndef __CHERI_PURE_CAPABILITY__
 	CHERI_CLC(CHERI_CR_CTEMP0, CHERI_CR_KDC, &cheri_test_finecap, 0);
 	CHERI_CLW(i, 0, 0, CHERI_CR_CTEMP0);
+#else
+	i = *(int *)cheri_test_finecap;
+#endif
 	return (0);
 }
 
@@ -172,8 +180,12 @@ cheri_test_sysctl_finestore(SYSCTL_HANDLER_ARGS)
 	error = sysctl_handle_int(oidp, &i, 0, req);
 	if (error != 0 || req->newptr == NULL)
 		return (error);
+#ifndef __CHERI_PURE_CAPABILITY__
 	CHERI_CLC(CHERI_CR_CTEMP0, CHERI_CR_KDC, &cheri_test_finecap, 0);
 	CHERI_CSW(i, 0, 0, CHERI_CR_CTEMP0);
+#else
+	*(int *)cheri_test_finecap = i;
+#endif
 	return (0);
 }
 
@@ -186,8 +198,12 @@ cheri_test_sysctl_tagviolation(SYSCTL_HANDLER_ARGS)
 	error = sysctl_handle_int(oidp, &i, 0, req);
 	if (error != 0 || req->newptr == NULL)
 		return (error);
+#ifndef __CHERI_PURE_CAPABILITY__
 	CHERI_CLC(CHERI_CR_CTEMP0, CHERI_CR_KDC, &cheri_test_untaggedcap, 0);
 	CHERI_CSW(i, 0, 0, CHERI_CR_CTEMP0);
+#else
+	*(int *)cheri_test_untaggedcap = i;
+#endif
 	return (0);
 }
 
@@ -200,8 +216,12 @@ cheri_test_sysctl_boundsviolation(SYSCTL_HANDLER_ARGS)
 	error = sysctl_handle_int(oidp, &i, 0, req);
 	if (error != 0 || req->newptr == NULL)
 		return (error);
+#ifndef __CHERI_PURE_CAPABILITY__
 	CHERI_CLC(CHERI_CR_CTEMP0, CHERI_CR_KDC, &cheri_test_nilboundscap, 0);
 	CHERI_CSW(i, 0, 0, CHERI_CR_CTEMP0);
+#else
+	*(int *)cheri_test_nilboundscap = i;
+#endif
 	return (0);
 }
 
@@ -214,7 +234,11 @@ cheri_test_sysctl_permsviolation(SYSCTL_HANDLER_ARGS)
 	error = sysctl_handle_int(oidp, &i, 0, req);
 	if (error != 0 || req->newptr == NULL)
 		return (error);
+#ifndef __CHERI_PURE_CAPABILITY__
 	CHERI_CLC(CHERI_CR_CTEMP0, CHERI_CR_KDC, &cheri_test_readonlycap, 0);
 	CHERI_CSW(i, 0, 0, CHERI_CR_CTEMP0);
+#else
+	*(int *)cheri_test_readonlycap = i;
+#endif
 	return (0);
 }
