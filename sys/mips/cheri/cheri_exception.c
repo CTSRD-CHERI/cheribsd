@@ -212,7 +212,10 @@ cheri_log_exception_registers(struct trapframe *frame)
 void
 cheri_log_cheri_frame(struct trapframe *frame)
 {
-
+	/* XXXAM:
+	 * Disable this until we have proper support for printf("%p", capability)
+	 */
+#ifndef __CHERI_PURE_CAPABILITY__
 	/* C0 */
 	CHERI_CLC(CHERI_CR_CTEMP0, CHERI_CR_KDC, &frame->ddc, 0);
 	CHERI_REG_PRINT(CHERI_CR_CTEMP0, 0);
@@ -320,6 +323,7 @@ cheri_log_cheri_frame(struct trapframe *frame)
 	/* C31 - saved $pcc */
 	CHERI_CLC(CHERI_CR_CTEMP0, CHERI_CR_KDC, &frame->pcc, 0);
 	CHERI_REG_PRINT(CHERI_CR_CTEMP0, 31);
+#endif /* __CHERI_PURE_CAPABILITY__ */
 }
 
 void
