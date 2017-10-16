@@ -64,7 +64,6 @@ typedef struct	__mcontext {
 	void		*mc_tls;	/* pointer to TLS area */
 	__register_t	cause;		/* cause register */
 
-#ifndef __CHERI_PURE_CAPABILITY__
         /*
          * Optional externally referenced storage for coprocessors.  Modeled
          * on the approach taken for extended FPU state on x86, which leaves
@@ -73,6 +72,7 @@ typedef struct	__mcontext {
         __register_t    mc_cp2state;    /* Pointer to external state. */
         __register_t    mc_cp2state_len;/* Length of external state. */
 
+#ifndef __CHERI_PURE_CAPABILITY__
         /*
          * XXXRW: Unfortunately, reserved space in the MIPS sigcontext was
          * made an 'int' rather than '__register_t', so embedding new pointers
