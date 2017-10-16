@@ -1330,13 +1330,21 @@ pmap_growkernel(vm_offset_t addr)
  ***************************************************/
 
 CTASSERT(sizeof(struct pv_chunk) == PAGE_SIZE);
-#ifdef __mips_n64
+#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef CPU_CHERI128
+CTASSERT(_NPCM == 2);
+CTASSERT(_NPCPV	== 83);
+#else /* CHERI256 */
+CTASSERT(_NPCM	== 1);
+CTASSERT(_NPCPV	== 40);
+#endif /* CHERI258 */
+#elif defined(__mips_n64)
 CTASSERT(_NPCM == 3);
 CTASSERT(_NPCPV == 168);
-#else
+#else /* n32 */
 CTASSERT(_NPCM == 11);
 CTASSERT(_NPCPV == 336);
-#endif
+#endif /* n32 */
 
 static __inline struct pv_chunk *
 pv_to_chunk(pv_entry_t pv)

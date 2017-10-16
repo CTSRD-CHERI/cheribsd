@@ -139,20 +139,28 @@ typedef struct pv_entry {
  * pv_entries are allocated in chunks per-process.  This avoids the
  * need to track per-pmap assignments.
  */
-#ifdef __mips_n64
+#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef CPU_CHERI128
+#define	_NPCM	2
+#define	_NPCPV	83
+#else /* CHERI256 */
+#define	_NPCM	1
+#define	_NPCPV	40
+#endif /* CHERI258 */
+#elif defined(__mips_n64)
 #define	_NPCM	3
 #define	_NPCPV	168
-#else
+#else /* n32 */
 #define	_NPCM	11
 #define	_NPCPV	336
-#endif
+#endif /* n32 */
 struct pv_chunk {
 	pmap_t			pc_pmap;
 	TAILQ_ENTRY(pv_chunk)	pc_list;
-	u_long			pc_map[_NPCM];	/* bitmap; 1 = free */
 	TAILQ_ENTRY(pv_chunk)	pc_lru;
+	u_long			pc_map[_NPCM];	/* bitmap; 1 = free */
 	struct pv_entry		pc_pventry[_NPCPV];
-};
+} __aligned(PAGE_SIZE);
 
 /*
  * physmem_desc[] is a superset of phys_avail[] and describes all the
