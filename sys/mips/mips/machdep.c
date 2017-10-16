@@ -182,7 +182,9 @@ struct bootinfo bootinfo;
  * But in some cases there might be additional data placed right after 
  * _end by loader or ELF trampoline.
  */
+#ifdef DDB
 vm_offset_t kernel_kseg0_end = (vm_offset_t)&end;
+#endif
 
 static void
 cpu_startup(void *dummy)
