@@ -405,6 +405,10 @@ int	 truncate(const char *, off_t);
 __END_DECLS
 #endif /* !_KERNEL */
 
+#if __has_feature(capabilities)
+typedef	void * __capability	otype_t;
+#endif
+
 #endif /* __BSD_VISIBLE */
 
 #endif /* !_SYS_TYPES_H_ */

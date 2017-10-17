@@ -190,6 +190,12 @@ int	cheri_sysarch_getstack(struct thread *td, struct sysarch_args *uap);
 int	cheri_sysarch_setstack(struct thread *td, struct sysarch_args *uap);
 
 /*
+ * Functions to manage object types.
+ */
+otype_t	cheri_otype_alloc(void);
+void	cheri_otype_free(otype_t);
+
+/*
  * Global sysctl definitions.
  */
 SYSCTL_DECL(_security_cheri);

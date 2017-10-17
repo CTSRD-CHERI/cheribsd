@@ -145,7 +145,7 @@ cheri_ptrpermoff(const void *ptr, size_t len, register_t perm, off_t off)
  * The caller may wish to assert various properties about the returned
  * capability, including that CHERI_PERM_SEAL is set.
  */
-static __inline void * __capability
+static __inline otype_t
 cheri_maketype(void * __capability root_type, register_t type)
 {
 	void * __capability c;
