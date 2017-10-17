@@ -12,6 +12,10 @@
 
 #undef JEMALLOC_BACKGROUND_THREAD
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#undef JEMALLOC_MAPS_COALESCE
+#endif
+
 /*
  * The following are architecture-dependent, so conditionally define them for
  * each supported architecture.
