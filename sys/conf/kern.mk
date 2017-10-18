@@ -184,9 +184,6 @@ CFLAGS.gcc+=	-mcall-aixdesc
 .if ${MACHINE_CPUARCH} == "mips"
 CFLAGS+=	-msoft-float
 INLINE_LIMIT?=	8000
-.if ${MACHINE_ARCH:Mmips*hf} != ""
-CFLAGS+= -DCPU_HAVEFPU
-.endif
 # XXX: Workaround for:
 #      /usr/home/en322/cheri/cheribsd/sys/mips/cheri/cheri_debug.c:103:2: error: Direct access to KR1C is deprecated. Use C(Get/Set)KR1C instead. [-Werror,-Winline-asm]
 CWARNEXTRA+=	-Wno-error=inline-asm
