@@ -2128,12 +2128,11 @@ userland_sysctl(struct thread *td, int *name, u_int namelen,
 	if (KTRPOINT(curthread, KTR_SYSCTL))
 		ktrsysctl(name, namelen);
 #endif
-
-	if (req.oldptr != NULL && req.oldlen > PAGE_SIZE) {
+	memlocked = 0;
+	if (req.oldptr != NULL && req.oldlen > 4 * PAGE_SIZE) {
 		memlocked = 1;
 		sx_xlock(&sysctlmemlock);
-	} else
-		memlocked = 0;
+	}
 	CURVNET_SET(TD_TO_VNET(td));
 
 	for (;;) {
