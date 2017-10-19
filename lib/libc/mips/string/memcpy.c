@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2017 Robert Kovacsics
+ * Copyright (c) 2015 SRI International
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -28,5 +28,18 @@
  * SUCH DAMAGE.
  */
 
-#define MEMCPY
-#include "jdw57_memcpy.c"
+#include <cheri/cheri.h>
+#include <cheri/cheric.h>
+
+#include <string.h>
+
+void *
+memcpy(void *dst, const void *src, size_t len)
+{
+
+	if (len == 0)
+		return (dst);
+	memcpy_c(cheri_ptr(dst, len), cheri_ptr(__DECONST(void *, src), len),
+	     len);
+	return (dst);
+}
