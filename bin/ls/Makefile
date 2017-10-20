@@ -8,6 +8,8 @@ PROG=	ls
 SRCS=	cmp.c ls.c print.c util.c
 LIBADD=	xo util
 
+CHERI_NO_SHARED=	fails: permit execute violation
+
 .if !defined(RELEASE_CRUNCH) && \
 	${MK_LS_COLORS} != no
 CFLAGS+= -DCOLORLS

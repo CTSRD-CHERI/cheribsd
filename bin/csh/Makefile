@@ -8,6 +8,8 @@
 
 .include <src.opts.mk>
 
+CHERI_NO_SHARED=	fails
+
 PACKAGE=runtime
 TCSHDIR= ${SRCTOP}/contrib/tcsh
 .PATH: ${TCSHDIR}

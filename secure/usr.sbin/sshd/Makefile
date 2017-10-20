@@ -19,6 +19,8 @@ SRCS=	sshd.c auth-rhosts.c auth-passwd.c \
 	sandbox-solaris.c
 PACKAGE=	ssh
 
+CHERI_NO_SHARED=	fails: Shared object "libgssapi_krb5.so.10" not found
+
 # gss-genr.c really belongs in libssh; see src/secure/lib/libssh/Makefile
 SRCS+=	gss-genr.c
 
