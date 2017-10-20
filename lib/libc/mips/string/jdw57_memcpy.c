@@ -235,7 +235,7 @@ bcopy(const void *src0, void *dst0, size_t length)
 				if ((t ^ (vaddr_t)dst) & pmask || length < psize)
 					t = length / wsize;
 				else
-					t = (psize - (t & pmask)) / wsize;
+					t = (t & pmask) / wsize;
 				if (t) {
 					length -= t*wsize;
 					dst -= t*wsize;
