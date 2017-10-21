@@ -37,9 +37,9 @@
  */
 struct sandbox_object;
 struct cheri_object	cheri_sandbox_make_sealed_invoke_object(
-			    struct sandbox_object *sbop);
+			    __capability struct sandbox_object *sbop);
 struct cheri_object	cheri_sandbox_make_sealed_rtld_object(
-			    struct sandbox_object *sbop);
+			    __capability struct sandbox_object *sbop);
 struct cheri_object	cheri_make_sealed_return_object(void);
 
 #endif /* _CHERI_CCALL_H_ */

@@ -112,6 +112,12 @@ sandbox_object {
 	 * sbo_vtable      VTable pointer used for CHERI system classes;
 	 *		   unused for loaded (confined) classes.
 	 *
+	 * These capabilities are used by libcheri itself when accessing data
+	 * from within the CCall trampoline, so that we don't have to assume
+	 * that the sandbox_object pointer is DDC-relative:
+	 *
+	 * sbo_libcheri_tls	Access TLS relative to this register.
+	 *
 	 * XXXRW: It would be nice if the offsets to these fields were in
 	 * shared headers, allowing compile-time asserts to be used to check
 	 * binary compatibility has not been broken.
@@ -121,6 +127,7 @@ sandbox_object {
 	__capability void	*sbo_invoke_pcc;/* Capability offset 2. */
 	__capability void	*sbo_vtable;	/* Capability offset 3. */
 	__capability void	*sbo_ddc;	/* Capability offset 4. */
+	__capability void	*sbo_libcheri_tls; /* Capability offset 5. */
 
 	/*
 	 * Further fields are unknown to the assembly domain-transition code.

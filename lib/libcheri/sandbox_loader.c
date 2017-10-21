@@ -386,15 +386,20 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	sbop->sbo_vtable = NULL;
 	sbop->sbo_ddc = idc;
 
+	/* XXXRW: Does this remain the right capability to use for TLS? */
+	sbop->sbo_libcheri_tls = cheri_getdefault();
+
 	/*
 	 * Construct sealed rtld and invocation capabilities for use with
 	 * cheri_invoke(), which will transition to the libcheri CCall
 	 * trampoline.
 	 */
 	sbop->sbo_cheri_object_rtld =
-	    cheri_sandbox_make_sealed_rtld_object(sbop);
+	    cheri_sandbox_make_sealed_rtld_object(
+	    (__cheri_cast __capability struct sandbox_object *)sbop);
 	sbop->sbo_cheri_object_invoke =
-	    cheri_sandbox_make_sealed_invoke_object(sbop);
+	    cheri_sandbox_make_sealed_invoke_object(
+	    (__cheri_cast __capability struct sandbox_object *)sbop);
 
 	/*
 	 * Set up a CHERI system object to service the sandbox's requests to
@@ -413,6 +418,7 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	 */
 	sbmp->sbm_system_object = sbop->sbo_cheri_object_system =
 	    cheri_sandbox_make_sealed_invoke_object(
+	    (__cheri_cast __capability struct sandbox_object *)
 	    sbop->sbo_sandbox_system_objectp);
 
 	/*

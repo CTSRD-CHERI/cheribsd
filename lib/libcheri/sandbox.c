@@ -551,13 +551,17 @@ sandbox_object_new_system_object(__capability void *private_data,
 	(*sbopp)->sbo_ddc = cheri_getdefault();
 	(*sbopp)->sbo_private_data = private_data;
 
+	/* XXXRW: Does this remain the right capability to use for TLS? */
+	(*sbopp)->sbo_libcheri_tls = cheri_getdefault();
+
 	/*
 	 * Construct sealed invocation capabilities for use with
 	 * cheri_invoke(), which will transition to the libcheri CCall
 	 * trampoline.  Leave rtld calabilities as NULL.
 	 */
         (*sbopp)->sbo_cheri_object_invoke =
-            cheri_sandbox_make_sealed_invoke_object(*sbopp);
+            cheri_sandbox_make_sealed_invoke_object(
+	    (__cheri_cast __capability struct sandbox_object *)*sbopp);
 	return (0);
 }
 
