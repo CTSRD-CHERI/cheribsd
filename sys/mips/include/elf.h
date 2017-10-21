@@ -146,12 +146,13 @@ __ElfType(Auxinfo);
 #define	AT_STACKPROT	23	/* Initial stack protection. */
 #define	AT_EHDRFLAGS	24	/* e_flags field from elf hdr */
 #define	AT_HWCAP	25	/* CPU feature flags. */
-#define	AT_ARGC		26	/* Argument count */
-#define	AT_ARGV		27	/* Argument vector */
-#define	AT_ENVC		28	/* Environment count */
-#define	AT_ENVV		29	/* Environment vector */
+#define	AT_HWCAP2	26	/* CPU feature flags 2. */
+#define	AT_ARGC		27	/* Argument count */
+#define	AT_ARGV		28	/* Argument vector */
+#define	AT_ENVC		29	/* Environment count */
+#define	AT_ENVV		30	/* Environment vector */
 
-#define	AT_COUNT	30	/* Count of defined aux entry types. */
+#define	AT_COUNT	31	/* Count of defined aux entry types. */
 
 #define	ET_DYN_LOAD_ADDR 0x0120000
 
