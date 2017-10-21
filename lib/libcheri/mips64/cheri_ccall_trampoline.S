@@ -31,6 +31,8 @@
 .set noreorder
 .set noat
 
+#define	_CHERI_INTERNAL
+#include <machine/cheriasm.h>
 #include <machine/cherireg.h>
 
 /*
@@ -120,12 +122,14 @@ libcheri_ccall_rtld_check_globals:
 	/* XXXRW: NOT YET */
 
 	/*
-	 * We are now committed to performing a protection-domain switch.
+	 * We are now committed to performing a protection-domain switch.  IDC
+	 * points at the sandbox_object, from which we must retrieve any
+	 * necessary capabilities to reach the trusted stack, etc.
 	 *
 	 * Use thread-local storage to retrieve the trusted stack for the
-	 * current pthread.  Load TLS data relative to IDC (referring to the
-	 * ambient portion of the process).  Prepare $c14 for use in pointing
-	 * at the trusted-stack container structure.
+	 * current pthread.  Load TLS data relative to sbo_libcheri_tls
+	 * (referring to the ambient portion of the process).  Prepare $c14
+	 * for use in pointing at the trusted-stack container structure.
 	 *
 	 * XXXRW: Clang appears to generate roughly this code across multiple
 	 * ABIs and regardless of -fpic/-fno-pic, if -mno-abicalls is used.
@@ -140,7 +144,8 @@ libcheri_ccall_rtld_check_globals:
 	.set	pop
 	daddiu	$at, $at, %tprel_lo(__cheri_stack_tls_storage)
 	daddu	$at, $t0, $at
-	csetoffset	$c14, $c26, $at
+	clc		$c14, $zero, (5*CHERICAP_SIZE)($c26)
+	csetoffset	$c14, $c14, $at
 
 libcheri_ccall_rtld_push_stack:
 	/* Retrieve current trusted stack pointer. */
@@ -181,7 +186,28 @@ libcheri_ccall_rtld_extract_target:
 	clc	$c26, $zero, (0*CHERICAP_SIZE)($c26) # XXXRW: Hard-coded offset
 
 libcheri_ccall_rtld_clear_regs:
-	/* XXXRW: General-purpose registers. */
+	CHERI_CLEAR_GPLO16( \
+		CHERI_CLEAR_GPLO_AT | \
+		CHERI_CLEAR_GPLO_V1 | \
+		CHERI_CLEAR_GPLO_T0 | \
+		CHERI_CLEAR_GPLO_T1 | \
+		CHERI_CLEAR_GPLO_T2 | \
+		CHERI_CLEAR_GPLO_T3 )
+	CHERI_CLEAR_GPHI16( \
+		CHERI_CLEAR_GPHI_S0 | \
+		CHERI_CLEAR_GPHI_S1 | \
+		CHERI_CLEAR_GPHI_S2 | \
+		CHERI_CLEAR_GPHI_S3 | \
+		CHERI_CLEAR_GPHI_S4 | \
+		CHERI_CLEAR_GPHI_S5 | \
+		CHERI_CLEAR_GPHI_S6 | \
+		CHERI_CLEAR_GPHI_S7 | \
+		CHERI_CLEAR_GPHI_T8 | \
+		CHERI_CLEAR_GPHI_T9 | \
+		CHERI_CLEAR_GPHI_GP | \
+		CHERI_CLEAR_GPHI_SP | \
+		CHERI_CLEAR_GPHI_S8 | \
+		CHERI_CLEAR_GPHI_RA )
 	mtlo	$zero
 	mthi	$zero
 
@@ -189,7 +215,23 @@ libcheri_ccall_rtld_clear_fpregs:
 	/* XXXRW: Floating-point registers. */
 
 libcheri_ccall_rtld_clear_caps:
-	/* XXXRW: Capability registers. */
+	CHERI_CLEAR_CAPLO16( \
+		CHERI_CLEAR_CAPLO_C11 | \
+		/* CHERI_CLEAR_CAPLO_C12 | */ \
+		CHERI_CLEAR_CAPLO_C13 | \
+		CHERI_CLEAR_CAPLO_C14 | \
+		CHERI_CLEAR_CAPLO_C15 )
+	CHERI_CLEAR_CAPHI16( \
+		CHERI_CLEAR_CAPHI_C16 | \
+		CHERI_CLEAR_CAPHI_C17 | \
+		CHERI_CLEAR_CAPHI_C18 | \
+		CHERI_CLEAR_CAPHI_C19 | \
+		CHERI_CLEAR_CAPHI_C20 | \
+		CHERI_CLEAR_CAPHI_C21 | \
+		CHERI_CLEAR_CAPHI_C22 | \
+		CHERI_CLEAR_CAPHI_C23 | \
+		CHERI_CLEAR_CAPHI_C24 | \
+		CHERI_CLEAR_CAPHI_C25)
 
 libcheri_ccall_rtld_return:
 	cjr	$c12
@@ -244,7 +286,8 @@ libcheri_ccall_invoke_check_globals:
 	.set	pop
 	daddiu	$at, $at, %tprel_lo(__cheri_stack_tls_storage)
 	daddu	$at, $t0, $at
-	csetoffset	$c14, $c26, $at
+	clc		$c14, $zero, (5*CHERICAP_SIZE)($c26)
+	csetoffset	$c14, $c14, $at
 
 libcheri_ccall_invoke_push_stack:
 	/* Retrieve current trusted stack pointer. */
@@ -285,7 +328,28 @@ libcheri_ccall_invoke_extract_target:
 	clc	$c26, $zero, (0*CHERICAP_SIZE)($c26) # XXXRW: Hard-coded offset
 
 libcheri_ccall_invoke_clear_regs:
-	/* XXXRW: General-purpose registers. */
+	CHERI_CLEAR_GPLO16( \
+		CHERI_CLEAR_GPLO_AT | \
+		CHERI_CLEAR_GPLO_V1 | \
+		CHERI_CLEAR_GPLO_T0 | \
+		CHERI_CLEAR_GPLO_T1 | \
+		CHERI_CLEAR_GPLO_T2 | \
+		CHERI_CLEAR_GPLO_T3 )
+	CHERI_CLEAR_GPHI16( \
+		CHERI_CLEAR_GPHI_S0 | \
+		CHERI_CLEAR_GPHI_S1 | \
+		CHERI_CLEAR_GPHI_S2 | \
+		CHERI_CLEAR_GPHI_S3 | \
+		CHERI_CLEAR_GPHI_S4 | \
+		CHERI_CLEAR_GPHI_S5 | \
+		CHERI_CLEAR_GPHI_S6 | \
+		CHERI_CLEAR_GPHI_S7 | \
+		CHERI_CLEAR_GPHI_T8 | \
+		CHERI_CLEAR_GPHI_T9 | \
+		CHERI_CLEAR_GPHI_GP | \
+		CHERI_CLEAR_GPHI_SP | \
+		CHERI_CLEAR_GPHI_S8 | \
+		CHERI_CLEAR_GPHI_RA )
 	mtlo	$zero
 	mthi	$zero
 
@@ -293,7 +357,23 @@ libcheri_ccall_invoke_clear_fpregs:
 	/* XXXRW: Floating-point registers. */
 
 libcheri_ccall_invoke_clear_caps:
-	/* XXXRW: Capability registers. */
+	CHERI_CLEAR_CAPLO16( \
+		CHERI_CLEAR_CAPLO_C11 | \
+		/* CHERI_CLEAR_CAPLO_C12 | */ \
+		CHERI_CLEAR_CAPLO_C13 | \
+		CHERI_CLEAR_CAPLO_C14 | \
+		CHERI_CLEAR_CAPLO_C15 )
+	CHERI_CLEAR_CAPHI16( \
+		CHERI_CLEAR_CAPHI_C16 | \
+		CHERI_CLEAR_CAPHI_C17 | \
+		CHERI_CLEAR_CAPHI_C18 | \
+		CHERI_CLEAR_CAPHI_C19 | \
+		CHERI_CLEAR_CAPHI_C20 | \
+		CHERI_CLEAR_CAPHI_C21 | \
+		CHERI_CLEAR_CAPHI_C22 | \
+		CHERI_CLEAR_CAPHI_C23 | \
+		CHERI_CLEAR_CAPHI_C24 | \
+		CHERI_CLEAR_CAPHI_C25)
 
 libcheri_ccall_invoke_return:
 	cjr	$c12
@@ -366,7 +446,35 @@ creturn_pop_stack:
 	clc	$c11, $t0, CHERICAP_SIZE($c14)	# XXXRW: Hard-coded offset
 
 creturn_clear_regs:
-	/* XXXRW: General-purpose registers. */
+	CHERI_CLEAR_GPLO16( \
+		CHERI_CLEAR_GPLO_AT | \
+		CHERI_CLEAR_GPLO_A0 | \
+		CHERI_CLEAR_GPLO_A1 | \
+		CHERI_CLEAR_GPLO_A2 | \
+		CHERI_CLEAR_GPLO_A3 | \
+		CHERI_CLEAR_GPLO_A4 | \
+		CHERI_CLEAR_GPLO_A5 | \
+		CHERI_CLEAR_GPLO_A6 | \
+		CHERI_CLEAR_GPLO_A7 | \
+		CHERI_CLEAR_GPLO_T0 | \
+		CHERI_CLEAR_GPLO_T1 | \
+		CHERI_CLEAR_GPLO_T2 | \
+		CHERI_CLEAR_GPLO_T3 )
+	CHERI_CLEAR_GPHI16( \
+		CHERI_CLEAR_GPHI_S0 | \
+		CHERI_CLEAR_GPHI_S1 | \
+		CHERI_CLEAR_GPHI_S2 | \
+		CHERI_CLEAR_GPHI_S3 | \
+		CHERI_CLEAR_GPHI_S4 | \
+		CHERI_CLEAR_GPHI_S5 | \
+		CHERI_CLEAR_GPHI_S6 | \
+		CHERI_CLEAR_GPHI_S7 | \
+		CHERI_CLEAR_GPHI_T8 | \
+		CHERI_CLEAR_GPHI_T9 | \
+		CHERI_CLEAR_GPHI_GP | \
+		CHERI_CLEAR_GPHI_SP | \
+		CHERI_CLEAR_GPHI_S8 | \
+		CHERI_CLEAR_GPHI_RA )
 	mtlo	$zero
 	mthi	$zero
 
@@ -374,7 +482,32 @@ creturn_clear_fpregs:
 	/* XXXRW: Floating-point registers. */
 
 creturn_clear_caps:
-	/* XXXRW: Capability registers. */
+	CHERI_CLEAR_CAPLO16( \
+		CHERI_CLEAR_CAPLO_C1  | \
+		CHERI_CLEAR_CAPLO_C2  | \
+		CHERI_CLEAR_CAPLO_C4  | \
+		CHERI_CLEAR_CAPLO_C5  | \
+		CHERI_CLEAR_CAPLO_C6  | \
+		CHERI_CLEAR_CAPLO_C7  | \
+		CHERI_CLEAR_CAPLO_C8  | \
+		CHERI_CLEAR_CAPLO_C9  | \
+		CHERI_CLEAR_CAPLO_C10 | \
+		/* CHERI_CLEAR_CAPLO_C11 | */ \
+		CHERI_CLEAR_CAPLO_C12 | \
+		CHERI_CLEAR_CAPLO_C13 | \
+		CHERI_CLEAR_CAPLO_C14 | \
+		CHERI_CLEAR_CAPLO_C15 )
+	CHERI_CLEAR_CAPHI16( \
+		CHERI_CLEAR_CAPHI_C16 | \
+		/* CHERI_CLEAR_CAPHI_C17 | */ \
+		CHERI_CLEAR_CAPHI_C18 | \
+		CHERI_CLEAR_CAPHI_C19 | \
+		CHERI_CLEAR_CAPHI_C20 | \
+		CHERI_CLEAR_CAPHI_C21 | \
+		CHERI_CLEAR_CAPHI_C22 | \
+		CHERI_CLEAR_CAPHI_C23 | \
+		CHERI_CLEAR_CAPHI_C24 | \
+		CHERI_CLEAR_CAPHI_C25)
 
 creturn_return:
 	cjr	$c17
