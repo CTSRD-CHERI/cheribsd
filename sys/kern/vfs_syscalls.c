@@ -1299,9 +1299,6 @@ kern_mknodat(struct thread *td, int fd, const char * __capability path,
 		if (error == 0 && dev == VNOVAL)
 			error = EINVAL;
 		break;
-	case S_IFMT:
-		error = priv_check(td, PRIV_VFS_MKNOD_BAD);
-		break;
 	case S_IFWHT:
 		error = priv_check(td, PRIV_VFS_MKNOD_WHT);
 		break;
@@ -1339,9 +1336,6 @@ restart:
 		whiteout = 0;
 
 		switch (mode & S_IFMT) {
-		case S_IFMT:	/* used by badsect to flag bad sectors */
-			vattr.va_type = VBAD;
-			break;
 		case S_IFCHR:
 			vattr.va_type = VCHR;
 			break;
