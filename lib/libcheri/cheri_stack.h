@@ -37,7 +37,7 @@
 /*
  * Definitions for libcheri's "trusted stack": Each frame describes the state
  * associated with a particular invocation of CCall, and contains the return
- * $pcc and $idc values to restore once the invoked object returns.  Frames
+ * $pcc and $csp values to restore once the invoked object returns.  Frames
  * are pushed as invocations are made, and popped on safe return or if an
  * exception leads to an unwind (or if the trusted stack is manipulated
  * directly using privileged calls).
@@ -48,10 +48,10 @@
 struct cheri_stack_frame {
 #if __has_feature(capabilities)
 	void * __capability	csf_pcc;	/* Saved return $pcc */
-	void * __capability	csf_idc;	/* Saved IDC */
+	void * __capability	csf_csp;	/* Saved return $csp */
 #else
 	struct chericap	csf_pcc;
-	struct chericap	csf_idc;
+	struct chericap	csf_csp;
 #endif
 };
 

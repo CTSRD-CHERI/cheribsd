@@ -77,10 +77,10 @@ cheri_stack_unwind_md(ucontext_t *uap, struct cheri_stack_frame *csfp,
 
 	/*
 	 * Zero the capability register file, explicitly restoring $pcc and
-	 * $idc from the last trusted-stack frame.
+	 * $csp from the last trusted-stack frame.
 	 */
 	memset(cfp, 0, sizeof(*cfp));
-	cfp->cf_idc =  csfp->csf_idc;
+	cfp->cf_csp =  csfp->csf_csp;
 	cfp->cf_pcc = csfp->csf_pcc;
 
 	/*
