@@ -94,11 +94,11 @@ static uint64_t jobseqno;
 #endif
 
 #ifndef MAX_AIO_QUEUE_PER_PROC
-#define MAX_AIO_QUEUE_PER_PROC	256 /* Bigger than AIO_LISTIO_MAX */
+#define MAX_AIO_QUEUE_PER_PROC	256
 #endif
 
 #ifndef MAX_AIO_QUEUE
-#define	MAX_AIO_QUEUE		1024 /* Bigger than AIO_LISTIO_MAX */
+#define MAX_AIO_QUEUE		1024 /* Bigger than MAX_AIO_QUEUE_PER_PROC */
 #endif
 
 #ifndef MAX_BUF_AIO
@@ -109,6 +109,7 @@ FEATURE(aio, "Asynchronous I/O");
 SYSCTL_DECL(_p1003_1b);
 
 static MALLOC_DEFINE(M_LIO, "lio", "listio aio control block list");
+static MALLOC_DEFINE(M_AIOS, "aios", "aio_suspend aio control block list");
 
 static SYSCTL_NODE(_vfs, OID_AUTO, aio, CTLFLAG_RW, 0,
     "Async IO management");
@@ -173,10 +174,14 @@ static int max_buf_aio = MAX_BUF_AIO;
 SYSCTL_INT(_vfs_aio, OID_AUTO, max_buf_aio, CTLFLAG_RW, &max_buf_aio, 0,
     "Maximum buf aio requests per process (stored in the process)");
 
-static int aio_listio_max = AIO_LISTIO_MAX;
+/* 
+ * Though redundant with vfs.aio.max_aio_queue_per_proc, POSIX requires
+ * sysconf(3) to support AIO_LISTIO_MAX, and we implement that with
+ * vfs.aio.aio_listio_max.
+ */
 SYSCTL_INT(_p1003_1b, CTL_P1003_1B_AIO_LISTIO_MAX, aio_listio_max,
-    CTLFLAG_RDTUN | CTLFLAG_CAPRD, &aio_listio_max, 0,
-    "Maximum aio requests for a single lio_listio call");
+    CTLFLAG_RD | CTLFLAG_CAPRD, &max_aio_queue_per_proc,
+    0, "Maximum aio requests for a single lio_listio call");
 
 #ifdef COMPAT_FREEBSD6
 typedef struct oaiocb {
@@ -345,10 +350,9 @@ static int	filt_lio(struct knote *kn, long hint);
  * 	kaio	Per process async io info
  *	aiop	async io process data
  *	aiocb	async io jobs
- *	aiol	list io job pointer - internal to aio_suspend XXX
  *	aiolio	list io jobs
  */
-static uma_zone_t kaio_zone, aiop_zone, aiocb_zone, aiol_zone, aiolio_zone;
+static uma_zone_t kaio_zone, aiop_zone, aiocb_zone, aiolio_zone;
 
 /* kqueue filters for aio */
 static struct filterops aio_filtops = {
@@ -405,11 +409,6 @@ static int
 aio_onceonly(void)
 {
 
-	if (aio_listio_max < AIO_LISTIO_MAX)
-		aio_listio_max = AIO_LISTIO_MAX;
-	if (aio_listio_max > MIN(MAX_AIO_QUEUE_PER_PROC, max_queue_count))
-		aio_listio_max = MIN(MAX_AIO_QUEUE_PER_PROC, max_queue_count);
-
 	exit_tag = EVENTHANDLER_REGISTER(process_exit, aio_proc_rundown, NULL,
 	    EVENTHANDLER_PRI_ANY);
 	exec_tag = EVENTHANDLER_REGISTER(process_exec, aio_proc_rundown_exec,
@@ -427,8 +426,6 @@ aio_onceonly(void)
 	    NULL, NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_NOFREE);
 	aiocb_zone = uma_zcreate("AIOCB", sizeof(struct kaiocb), NULL, NULL,
 	    NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_NOFREE);
-	aiol_zone = uma_zcreate("AIOL", aio_listio_max * sizeof(intptr_t),
-	    NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_NOFREE);
 	aiolio_zone = uma_zcreate("AIOLIO", sizeof(struct aioliojob), NULL,
 	    NULL, NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_NOFREE);
 	aiod_lifetime = AIOD_LIFETIME_DEFAULT;
@@ -2040,7 +2037,7 @@ sys_aio_suspend(struct thread *td, struct aio_suspend_args *uap)
 	kaiocb_t **ujoblist_native;
 	int error, i;
 
-	if (uap->nent < 0 || uap->nent > aio_listio_max)
+	if (uap->nent < 0 || uap->nent > max_aio_queue_per_proc)
 		return (EINVAL);
 
 	if (uap->timeout) {
@@ -2051,15 +2048,14 @@ sys_aio_suspend(struct thread *td, struct aio_suspend_args *uap)
 	} else
 		tsp = NULL;
 
-	ujoblist = uma_zalloc(aiol_zone, M_WAITOK);
+	ujoblist = malloc(uap->nent * sizeof(ujoblist[0]), M_AIOS, M_WAITOK);
 	ujoblist_native = (kaiocb_t **)ujoblist;
-	error = copyin(uap->aiocbp, ujoblist_native,
-	    uap->nent * sizeof(ujoblist[0]));
-	for (i = uap->nent - 1; i >= 0; i--)
-		ujoblist[i] = __USER_CAP_OBJ(ujoblist_native[i]);
+	error = copyin(uap->aiocbp, ujoblist, uap->nent * sizeof(ujoblist[0]));
 	if (error == 0)
 		error = kern_aio_suspend(td, uap->nent, ujoblist, tsp);
-	uma_zfree(aiol_zone, ujoblist);
+	for (i = uap->nent - 1; i >= 0; i--)
+		ujoblist[i] = __USER_CAP_OBJ(ujoblist_native[i]);
+	free(ujoblist, M_AIOS);
 	return (error);
 }
 
@@ -2278,7 +2274,7 @@ kern_lio_listio(struct thread *td, int mode, intcap_t uacb_list,
 	if ((mode != LIO_NOWAIT) && (mode != LIO_WAIT))
 		return (EINVAL);
 
-	if (nent < 0 || nent > aio_listio_max)
+	if (nent < 0 || nent > max_aio_queue_per_proc)
 		return (EINVAL);
 
 	if (p->p_aioinfo == NULL)
@@ -2410,7 +2406,7 @@ freebsd6_lio_listio(struct thread *td, struct freebsd6_lio_listio_args *uap)
 		return (EINVAL);
 
 	nent = uap->nent;
-	if (nent < 0 || nent > aio_listio_max)
+	if (nent < 0 || nent > max_aio_queue_per_proc)
 		return (EINVAL);
 
 	if (uap->sig && (uap->mode == LIO_NOWAIT)) {
@@ -2448,7 +2444,7 @@ sys_lio_listio(struct thread *td, struct lio_listio_args *uap)
 		return (EINVAL);
 
 	nent = uap->nent;
-	if (nent < 0 || nent > aio_listio_max)
+	if (nent < 0 || nent > max_aio_queue_per_proc)
 		return (EINVAL);
 
 	if (uap->sig && (uap->mode == LIO_NOWAIT)) {
@@ -2954,7 +2950,7 @@ freebsd32_aio_suspend(struct thread *td, struct freebsd32_aio_suspend_args *uap)
 	uint32_t *ujoblist32;
 	int error, i;
 
-	if (uap->nent < 0 || uap->nent > aio_listio_max)
+	if (uap->nent < 0 || uap->nent > max_aio_queue_per_proc)
 		return (EINVAL);
 
 	if (uap->timeout) {
@@ -2967,7 +2963,7 @@ freebsd32_aio_suspend(struct thread *td, struct freebsd32_aio_suspend_args *uap)
 	} else
 		tsp = NULL;
 
-	ujoblist = uma_zalloc(aiol_zone, M_WAITOK);
+	ujoblist = malloc(uap->nent * sizeof(ujoblist[0]), M_AIOS, M_WAITOK);
 	ujoblist32 = (uint32_t *)ujoblist;
 	error = copyin(uap->aiocbp, ujoblist32, uap->nent *
 	    sizeof(ujoblist32[0]));
@@ -2977,7 +2973,7 @@ freebsd32_aio_suspend(struct thread *td, struct freebsd32_aio_suspend_args *uap)
 
 		error = kern_aio_suspend(td, uap->nent, ujoblist, tsp);
 	}
-	uma_zfree(aiol_zone, ujoblist);
+	free(ujoblist, M_AIOS);
 	return (error);
 }
 
@@ -3093,7 +3089,7 @@ freebsd6_freebsd32_lio_listio(struct thread *td,
 		return (EINVAL);
 
 	nent = uap->nent;
-	if (nent < 0 || nent > aio_listio_max)
+	if (nent < 0 || nent > max_aio_queue_per_proc)
 		return (EINVAL);
 
 	if (uap->sig && (uap->mode == LIO_NOWAIT)) {
@@ -3139,7 +3135,7 @@ freebsd32_lio_listio(struct thread *td, struct freebsd32_lio_listio_args *uap)
 		return (EINVAL);
 
 	nent = uap->nent;
-	if (nent < 0 || nent > aio_listio_max)
+	if (nent < 0 || nent > max_aio_queue_per_proc)
 		return (EINVAL);
 
 	if (uap->sig && (uap->mode == LIO_NOWAIT)) {
@@ -3302,7 +3298,7 @@ cheriabi_aio_suspend(struct thread *td, struct cheriabi_aio_suspend_args *uap)
 	struct aiocb_c * __capability *ujoblist;
 	int error;
 
-	if (uap->nent < 0 || uap->nent > aio_listio_max)
+	if (uap->nent < 0 || uap->nent > max_aio_queue_per_proc)
 		return (EINVAL);
 
 	if (uap->timeout) {
@@ -3313,14 +3309,14 @@ cheriabi_aio_suspend(struct thread *td, struct cheriabi_aio_suspend_args *uap)
 	} else
 		tsp = NULL;
 
-	ujoblist = uma_zalloc(aiol_zone, M_WAITOK);
+	ujoblist = malloc(uap->nent * sizeof(ujoblist[0]), M_AIOS, M_WAITOK);
 	error = copyincap_c(uap->aiocbp,
 	    (__cheri_tocap struct aiocb_c * __capability * __capability)
 	    ujoblist, uap->nent * sizeof(*ujoblist));
 	if (error == 0)
 		error = kern_aio_suspend(td, uap->nent,
 		    (kaiocb_t * __capability *)ujoblist, tsp);
-	uma_zfree(aiol_zone, ujoblist);
+	free(ujoblist, M_AIOS);
 	return (error);
 }
 
@@ -3413,7 +3409,7 @@ cheriabi_lio_listio(struct thread *td, struct cheriabi_lio_listio_args *uap)
 		return (EINVAL);
 
 	nent = uap->nent;
-	if (nent < 0 || nent > aio_listio_max)
+	if (nent < 0 || nent > max_aio_queue_per_proc)
 		return (EINVAL);
 
 	if (uap->sig && (uap->mode == LIO_NOWAIT)) {
