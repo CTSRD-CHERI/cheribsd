@@ -131,7 +131,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 *     consider user state to be 'sandboxed' and therefore to require
 	 *     special delivery handling which includes a domain-switch to the
 	 *     thread's context-switch domain.  (This is done by
-	 *     cheri_sendsig()).
+	 *     hybridabi_sendsig()).
 	 *
 	 * (3) If an alternative signal stack is not defined, and we are in a
 	 *     'sandboxed' state, then we have two choices: (a) if the signal
@@ -297,7 +297,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 * in.  As we don't install this in the CHERI frame on the user stack,
 	 * it will be (genrally) be removed automatically on sigreturn().
 	 */
-	cheri_sendsig(td);
+	hybridabi_sendsig(td);
 #endif
 
 	regs->pc = (register_t)(intptr_t)catcher;

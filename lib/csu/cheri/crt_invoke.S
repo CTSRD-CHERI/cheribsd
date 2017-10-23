@@ -1,5 +1,5 @@
 #-
-# Copyright (c) 2012-2015 Robert N. M. Watson
+# Copyright (c) 2012-2017 Robert N. M. Watson
 # All rights reserved.
 #
 # This software was developed by SRI International and the University of
@@ -55,9 +55,9 @@
 #    $c0, $pcc contain access to (100% overlapped) sandbox code and data
 #
 # Things that will be set up for the callee C code
-#    $c0, $c11 will be set up to match the class
-#    $c11 will have have the global bit cleared
-#    $sp, $fp will point into an in-sandbox stack, relative to $c11
+#    $c0, $csp will be set up to match the class
+#    $csp will have have the global bit cleared, and point at an in-sandbox
+#    stack
 #
 # __invoke_vector will jump to the 'invoke' symbol and arrange a CReturn when
 # that function returns.  This code also implements 'abort' and '_exit'
@@ -91,13 +91,9 @@ __invoke_vector:
 
 	#
 	# Set up the in-sandbox stack: a stack capability has been left for us
-	# by the run-time.  For now, we assume that $sp is the length (i.e.,
-	# that $c11.offset == 0), but eventually we will presumably use only
-	# $c11 and can leave $sp alone.
+	# by the runtime.
 	#
-	clc	$c11, $t0, 32 + 3*CHERICAP_SIZE($c26)
-	cgetlen	$sp, $c11
-	#move	$fp, $sp # moved below to avoid delay due to slow cgetlen 128-bit cheri
+	clc	$csp, $t0, 32 + 3*CHERICAP_SIZE($c26)
 
 	#
 	# Install $idc as $c0.  From here on out, we can do MIPS fetches and
@@ -115,8 +111,9 @@ __invoke_vector:
 	#
 	# Set up global pointer.
 	#
+	# XXXRW: Should this now be setting $cgp?
+	#
 	dla	$gp, _gp
-	move	$fp, $sp # moved from above to avoid delay caused by slow cgetlen on 128-bit cheri
 
 	#
 	# Skip vtable dispatch if $v0 is -1

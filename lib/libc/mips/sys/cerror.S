@@ -72,31 +72,27 @@ NESTED_NOPROFILE(__cerror, CALLFRAME_SIZ, ra)
 
 	j		ra
 #else
-	/* CheriABI saves ra (for now) and fp */
-	.mask	0xc0000000, (CALLFRAME_RA - CALLFRAME_SIZ)
-	PTR_SUBU	sp, sp, CALLFRAME_SIZ
+	/* XXXRW: CFI annotations for debugger. */
+	daddiu		t0, zero, -CALLFRAME_SIZ
+	cincoffset	$csp, $csp, t0
 
-	csd		ra, sp, CALLFRAME_RA($c11)
-	csd		s8, sp, CALLFRAME_FP($c11)
-	csd		v0, sp, CALLFRAME_S0($c11)	# save errno value
-	csc		$c17, sp, CALLFRAME_C17($c11)
-	move		s8, sp
+	csc		$c17, zero, CALLFRAME_CRA($csp)
+	csd		v0, zero, CALLFRAME_S0($csp)	# save errno ptr
 
 	PIC_CALL(__error)	# locate address of errno
 
-	move		sp, s8
-	cld		t0, sp, CALLFRAME_S0($c11)
-	csw		t0, zero, 0($c3)
+	cld		t0, zero, CALLFRAME_S0($csp)	# reload saved errno ptr
+	csw		t0, zero, 0($c3)		# save in errno
 
-	clc		$c17, sp, CALLFRAME_C17($c11)
-	cld		s8, sp, CALLFRAME_FP($c11)
-	cld		ra, sp, CALLFRAME_RA($c11)
-	PTR_ADDU	sp, sp, CALLFRAME_SIZ
+	clc		$c17, zero, CALLFRAME_CRA($csp)
+
+	daddiu		t0, zero, CALLFRAME_SIZ
+	cincoffset	$csp, $csp, t0
 
 	li		v0, -1
 	li		v1, -1
-	cfromptr	$c3, $c0, zero
-	csetoffset	$c3, $c3, v0
+	cfromptr	$c3, $c0, zero			# return integer v0
+	csetoffset	$c3, $c3, v0			# via first return cap
 
 	cjr		$c17
 #endif

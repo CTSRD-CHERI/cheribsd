@@ -1,5 +1,5 @@
 #-
-# Copyright (c) 2012-2015 Robert N. M. Watson
+# Copyright (c) 2012-2017 Robert N. M. Watson
 # All rights reserved.
 #
 # This software was developed by SRI International and the University of
@@ -50,7 +50,7 @@
 # $c1, $c2	Invoked capabilities
 # $c3..$c10	Argument capabilities
 # $c11..$c16	Caller-save capabilities
-# $c17..$c24	Callee-save capabilities
+# $c17..$c25	Callee-save capabilities
 # $c26		IDC
 #
 # Calling conventions implemented around CCall:
@@ -59,7 +59,7 @@
 # $c2		Invoked data capability
 # $c3..$c10	Argument capabilities; $c3 as return capability
 # $c11..$c16	n/a
-# $c17..$c24	n/a
+# $c17..$c25	n/a
 # $c26		IDC
 #
 # XXXRW: Worries/TODO:
@@ -83,22 +83,18 @@ cheri_invoke:
 	#
 	# 2. Produce a value for $idc that bundles these up suitable to
 	# bootstrap trestoration.  This will save the original $idc, $csp,
-	# $sp, and $c0.
+	# and $c0.
 	#
 	# Then after CReturn, reverse these steps by first unwrapping $idc,
 	# and then performing a more normal function return.
 	#
 	# The caller $idc will describe a stack fragment, which gives us a bit
-	# of space to store useful things, such as $sp, that are otherwise
+	# of space to store useful things, such as $csp, that are otherwise
 	# quite hard to restore (for obvious reasons).
 	#
 	# Save callee-save general-purpose registers.
 	#
-	# Caller-save registers are: $s0..$s7, $gp, $sp, $s8 ($fp).
-	#
-	# Do also save $ra so that we can return properly.
-	#
-	# Don't save $sp as CCall will do that for us.
+	# Caller-save registers are: $s0..$s7, $gp, $s8 ($fp).
 	#
 	# NB: Use 96 rather than 88 for the stack to ensure 32-byte alignment
 	# for capabilities stored and loaded from it later.
@@ -107,18 +103,18 @@ cheri_invoke:
 	# should be doing this?
 	#
 cheri_invoke_save_regs:
-	daddiu	$sp, -96
-	csd	$s0, $sp, 0($c11)
-	csd	$s1, $sp, 8($c11)
-	csd	$s2, $sp, 16($c11)
-	csd	$s3, $sp, 24($c11)
-	csd	$s4, $sp, 32($c11)
-	csd	$s5, $sp, 40($c11)
-	csd	$s6, $sp, 48($c11)
-	csd	$s7, $sp, 56($c11)
-	csd	$gp, $sp, 64($c11)
-	csd	$fp, $sp, 72($c11)
-	csd	$ra, $sp, 80($c11)
+	cincoffset	$csp, $csp, -96
+	csd	$s0, $zero, 0($csp)
+	csd	$s1, $zero, 8($csp)
+	csd	$s2, $zero, 16($csp)
+	csd	$s3, $zero, 24($csp)
+	csd	$s4, $zero, 32($csp)
+	csd	$s5, $zero, 40($csp)
+	csd	$s6, $zero, 48($csp)
+	csd	$s7, $zero, 56($csp)
+	csd	$gp, $zero, 64($csp)
+	csd	$fp, $zero, 72($csp)
+	csd	$ra, $zero, 80($csp)
 
 	#
 	# Save capability registers we later need to restore (that won't be
@@ -128,34 +124,32 @@ cheri_invoke_save_regs:
 	# should be doing this?
 	#
 cheri_invoke_save_caps:
-	daddiu	$sp, -8*CHERICAP_SIZE
-	csc	$c17, $sp, 0($c11)
-	csc	$c18, $sp, CHERICAP_SIZE($c11)
-	csc	$c19, $sp, 2*CHERICAP_SIZE($c11)
-	csc	$c20, $sp, 3*CHERICAP_SIZE($c11)
-	csc	$c21, $sp, 4*CHERICAP_SIZE($c11)
-	csc	$c22, $sp, 5*CHERICAP_SIZE($c11)
-	csc	$c23, $sp, 6*CHERICAP_SIZE($c11)
-	csc	$c24, $sp, 7*CHERICAP_SIZE($c11)
+	cincoffset	$csp, $csp, -9*CHERICAP_SIZE
+	csc	$c17, $zero, 0($csp)
+	csc	$c18, $zero, CHERICAP_SIZE($csp)
+	csc	$c19, $zero, 2*CHERICAP_SIZE($csp)
+	csc	$c20, $zero, 3*CHERICAP_SIZE($csp)
+	csc	$c21, $zero, 4*CHERICAP_SIZE($csp)
+	csc	$c22, $zero, 5*CHERICAP_SIZE($csp)
+	csc	$c23, $zero, 6*CHERICAP_SIZE($csp)
+	csc	$c24, $zero, 7*CHERICAP_SIZE($csp)
+	csc	$c25, $zero, 8*CHERICAP_SIZE($csp)
 
 	#
 	# Prepare $idc to be saved (and restored) by CCall; don't need to seal
 	# as CCall will protect its integrity.  No more stack use after this
-	# point until $c11 and $sp are restored.  Move $c0 through $c12 to
-	# avoid direct use.
+	# point until $csp is restored.  Move $c0 through $c12 to avoid direct
+	# use.  (In contrast to the hybrid ABI, $sp is not saved/restored
+	# here.)
 	#
 cheri_invoke_bundle_idc:
-	daddiu		$sp, -4*CHERICAP_SIZE
-	csd		$sp, $sp, 3*CHERICAP_SIZE($c11)	# MIPS stack pointer
+	cincoffset	$csp, $csp, -3*CHERICAP_SIZE
 	cgetdefault	$c12
-	csc		$c12, $sp, 2*CHERICAP_SIZE($c11)# Default capability
-	csc		$c11, $sp, CHERICAP_SIZE($c11)	# CHERI stack capability
-	csc		$c26, $sp, 0($c11)	# Save original $idc
-	cfromptr	$c26, $c11, $sp
-	dli		$t0, 4*CHERICAP_SIZE
-	# XXXRW: Soon:
-	#csetbounds	$c26, $c26, $t0
-	CSetBounds	$c26, $c26, $t0
+	csc		$c12, $zero, 2*CHERICAP_SIZE($csp)# Default capability
+	csc		$csp, $zero, CHERICAP_SIZE($csp)# CHERI stack capability
+	csc		$c26, $zero, 0($csp)	# Save original $idc
+	dli		$t0, 3*CHERICAP_SIZE
+	csetbounds	$c26, $csp, $t0
 
 	#
 	# The compiler is responsible for scrubbing unused argument registers
@@ -164,8 +158,7 @@ cheri_invoke_bundle_idc:
 	#
 
 	#
-	# Invoke object capability.  CCall/CReturn will save and restore $sp
-	# and IDC, so we don't need to.
+	# Invoke object capability.  CCall/CReturn will save and restore IDC.
 	#
 cheri_invoke_ccall:
 	ccall	$c1, $c2
@@ -176,12 +169,11 @@ cheri_invoke_ccall:
 	# direct use.
 	#
 cheri_invoke_unbundle_idc:
-	cld		$sp, $zero, 3*CHERICAP_SIZE($c26)# MIPS stack pointer
 	clc		$c12, $zero, 2*CHERICAP_SIZE($c26)# Default capability
 	csetdefault	$c12
-	clc		$c11, $zero, CHERICAP_SIZE($c26) # CHERI stack capability
+	clc		$csp, $zero, CHERICAP_SIZE($c26) # CHERI stack capability
 	clc		$c26, $zero, 0($c26)	# Restore original $idc
-	daddiu		$sp, 4*CHERICAP_SIZE
+	cincoffset	$csp, $csp, 3*CHERICAP_SIZE
 
 	#
 	# Restore capability registers from stack.
@@ -190,16 +182,17 @@ cheri_invoke_unbundle_idc:
 	# should be doing this?
 	#
 cheri_invoke_restore_caps:
-	clc	$c17, $sp, 0($c11)
-	clc	$c18, $sp, CHERICAP_SIZE($c11)
-	clc	$c19, $sp, 2*CHERICAP_SIZE($c11)
-	clc	$c20, $sp, 3*CHERICAP_SIZE($c11)
-	clc	$c21, $sp, 4*CHERICAP_SIZE($c11)
-	clc	$c22, $sp, 5*CHERICAP_SIZE($c11)
-	clc	$c23, $sp, 6*CHERICAP_SIZE($c11)
-	clc	$c24, $sp, 7*CHERICAP_SIZE($c11)
+	clc	$c17, $zero, 0($csp)
+	clc	$c18, $zero, CHERICAP_SIZE($csp)
+	clc	$c19, $zero, 2*CHERICAP_SIZE($csp)
+	clc	$c20, $zero, 3*CHERICAP_SIZE($csp)
+	clc	$c21, $zero, 4*CHERICAP_SIZE($csp)
+	clc	$c22, $zero, 5*CHERICAP_SIZE($csp)
+	clc	$c23, $zero, 6*CHERICAP_SIZE($csp)
+	clc	$c24, $zero, 7*CHERICAP_SIZE($csp)
+	clc	$c25, $zero, 8*CHERICAP_SIZE($csp)
 	bnez	$a0, set_cheri_errno
-	daddiu	$sp, 8*CHERICAP_SIZE
+	cincoffset	$csp, $csp, 9*CHERICAP_SIZE
 
 	#
 	# CCall has conservatively cleared all non-return-value registers, and
@@ -212,18 +205,18 @@ cheri_invoke_restore_caps:
 	# should be doing this?
 	#
 cheri_invoke_restore_regs:
-	cld	$s0, $sp, 0($c11)
-	cld	$s1, $sp, 8($c11)
-	cld	$s2, $sp, 16($c11)
-	cld	$s3, $sp, 24($c11)
-	cld	$s4, $sp, 32($c11)
-	cld	$s5, $sp, 40($c11)
-	cld	$s6, $sp, 48($c11)
-	cld	$s7, $sp, 56($c11)
-	cld	$gp, $sp, 64($c11)
-	cld	$fp, $sp, 72($c11)
-	cld	$ra, $sp, 80($c11)
-	daddiu	$sp, 96
+	cld	$s0, $zero, 0($csp)
+	cld	$s1, $zero, 8($csp)
+	cld	$s2, $zero, 16($csp)
+	cld	$s3, $zero, 24($csp)
+	cld	$s4, $zero, 32($csp)
+	cld	$s5, $zero, 40($csp)
+	cld	$s6, $zero, 48($csp)
+	cld	$s7, $zero, 56($csp)
+	cld	$gp, $zero, 64($csp)
+	cld	$fp, $zero, 72($csp)
+	cld	$ra, $zero, 80($csp)
+	cincoffset	$csp, $csp, 96
 
 	#
 	# Return to C-language caller.

@@ -1,5 +1,5 @@
 #-
-# Copyright (c) 2012-2015 Robert N. M. Watson
+# Copyright (c) 2012-2015, 2017 Robert N. M. Watson
 # All rights reserved.
 #
 # This software was developed by SRI International and the University of
@@ -59,13 +59,9 @@ __rtld_vector:
 
 	#
 	# Set up the in-sandbox stack: a stack capability has been left for us
-	# by the run-time.  For now, we assume that $sp is the length (i.e.,
-	# that $c11.offset == 0), but eventually we will presumably use only
-	# $c11 and can leave $sp alone.
+	# by the runtime.
 	#
-	clc	$c11, $t0, 32 + 3*CHERICAP_SIZE($c26)
-	cgetlen	$sp, $c11
-	move	$fp, $sp
+	clc	$csp, $t0, 32 + 3*CHERICAP_SIZE($c26)
 
 	#
 	# Install $idc as $c0.  From here on out, we can do MIPS fetches and
@@ -82,6 +78,8 @@ __rtld_vector:
 
 	#
 	# Set up global pointer.
+	#
+	# XXXRW: Should this now be setting $cgp?
 	#
 	dla	$gp, _gp
 

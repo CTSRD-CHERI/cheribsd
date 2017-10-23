@@ -1,7 +1,8 @@
 /*-
- * Copyright (c) 2015 SRI International
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.
+ * Copyright (c) 2015 SRI International
+ * Copyright (c) 2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -57,18 +58,22 @@ __FBSDID("$FreeBSD$");
  * and a struct sigcontext, see <signal.h>
  */
 
+/* Stack space required to save original $c3. */
 #define SETJMP_FRAME_SIZE	(CALLFRAME_SIZ + _MIPS_SZCAP/8)
 
 NESTED(setjmp, SETJMP_FRAME_SIZE, ra)
 	.protected _C_LABEL(setjmp)
-	.mask	0xc0000000, (CALLFRAME_RA - CALLFRAME_SIZ)
-	PTR_SUBU sp, sp, SETJMP_FRAME_SIZE	# allocate stack frame
+	/* XXXRW: CFI annotations for debugger. */
 
-	csd		ra, sp, CALLFRAME_RA($c11)
-	csd		s8, sp, CALLFRAME_FP($c11)
-	csc		$c17, sp, CALLFRAME_C17($c11)
-	csc		$c3, sp, CALLFRAME_SIZ($c11)	# store env
-	move		s8, sp
+	/*
+	 * Prepare a proper stack frame so that we can call
+	 * __cheriabi_sigprocmask().
+	 */
+	dli		t0, -SETJMP_FRAME_SIZE	# allocate stack frame
+	cincoffset	$csp, $csp, t0
+
+	csc		$c17, zero, CALLFRAME_CRA($csp)
+	csc		$c3, zero, CALLFRAME_SIZ($csp)	# store env
 
 	li		t0, (SZREG * 96)
 	csetbounds	$c3, $c3, t0
@@ -80,23 +85,28 @@ NESTED(setjmp, SETJMP_FRAME_SIZE, ra)
 	li		a0, 1				# SIG_SETBLOCK
 	PIC_CALL(__cheriabi_sigprocmask)			# get current signal mask
 
-	move		sp, s8
+	clc		$c3, zero, CALLFRAME_SIZ($csp)	# restore env pointer
+	clc		$c17, zero, CALLFRAME_CRA($csp)	# restore return cap
 
-	clc		$c3, sp, CALLFRAME_SIZ($c11)	# restore env pointer
-	clc		$c17, sp, CALLFRAME_C17($c11)	# restore return cap
-	cld		s8, sp, CALLFRAME_FP($c11)
-	cld		ra, sp, CALLFRAME_RA($c11)	# restore RA
-	PTR_ADDU	sp, sp, SETJMP_FRAME_SIZE	# pop stack frame
+	dli		t0, SETJMP_FRAME_SIZE		# pop stack frame
+	cincoffset	$csp, $csp, t0
 
 	REG_LI		v0, _JB_MAGIC_SETJMP
 	csd		v0, zero, (_JB_MAGIC  * SZREG)($c3)
-	csd		ra, zero, (_JB_REG_RA * SZREG)($c3)
+
 	/*
 	 * From "MIPSpro N32 ABI Handbook", Table 2-1:
 	 * Registers s0..s7 are callee-saved.
 	 * The sp register is callee-saved.
 	 * The fp (or s8) register is callee-saved.
 	 * The gp register is callee-saved (for n32/n64).
+	 *
+	 * NB: The pure-capability ABI roughly retains the n32/n64 MIPS ABI in
+	 * terms of caller/callee-save registers, despite some registers
+	 * seeing different use.
+	 *
+	 * NB: In the pure-capability ABI, we need to neither save nore restore
+	 * $ra and $sp, which are caller-save and not used for control flow.
 	 */
 	csd		s0, zero, (_JB_REG_S0 * SZREG)($c3)
 	csd		s1, zero, (_JB_REG_S1 * SZREG)($c3)
@@ -106,7 +116,6 @@ NESTED(setjmp, SETJMP_FRAME_SIZE, ra)
 	csd		s5, zero, (_JB_REG_S5 * SZREG)($c3)
 	csd		s6, zero, (_JB_REG_S6 * SZREG)($c3)
 	csd		s7, zero, (_JB_REG_S7 * SZREG)($c3)
-	csd		sp, zero, (_JB_REG_SP * SZREG)($c3)
 	csd		s8, zero, (_JB_REG_S8 * SZREG)($c3)
 	csd		gp, zero, (_JB_REG_GP * SZREG)($c3)
 #ifndef __mips_soft_float
@@ -148,6 +157,7 @@ NESTED(setjmp, SETJMP_FRAME_SIZE, ra)
 	csc		$c22, t1, (_JB_CHERI_C22 * _MIPS_SZCAP/8)($c3)
 	csc		$c23, t1, (_JB_CHERI_C23 * _MIPS_SZCAP/8)($c3)
 	csc		$c24, t1, (_JB_CHERI_C24 * _MIPS_SZCAP/8)($c3)
+	csc		$c25, t1, (_JB_CHERI_C25 * _MIPS_SZCAP/8)($c3)
 	cgetdefault	$c4
 	csc		$c4, t1, (_JB_CHERI_DDC * _MIPS_SZCAP/8)($c3)
 
@@ -159,15 +169,18 @@ END(setjmp)
 
 NESTED(longjmp, LONGJMP_FRAME_SIZE, ra)
 	.protected _C_LABEL(longjmp)
-	.mask	0xc0000000, (CALLFRAME_RA - CALLFRAME_SIZ)
-	PTR_SUBU	sp, sp, LONGJMP_FRAME_SIZE	# allocate stack frame
+	/* XXXRW: CFI annotations for debugger. */
 
-	csd		ra, sp, CALLFRAME_RA($c11)
-	csd		s8, sp, CALLFRAME_FP($c11)
-	csd		a0, sp, CALLFRAME_S0($c11)	# save return value
-	csc		$c17, sp, CALLFRAME_C17($c11)
-	csc		$c3, sp, CALLFRAME_SIZ($c11)
-	move		s8, sp
+	dli		t0, -LONGJMP_FRAME_SIZE
+	cincoffset	$csp, $csp, t0
+
+	/*
+	 * Prepare a proper stack frame so that we can call
+	 * __cheriabi_sigprocmask().
+	 */
+	csc		$c17, zero, CALLFRAME_CRA($csp)
+	csd		a0, zero, CALLFRAME_S0($csp)
+	csc		$c3, zero, CALLFRAME_SIZ($csp)
 
 	cld		v0, zero, (_JB_MAGIC  * SZREG)($c3)
 	REG_LI		t0, _JB_MAGIC_SETJMP
@@ -181,18 +194,18 @@ NESTED(longjmp, LONGJMP_FRAME_SIZE, ra)
 	li		a0, 3				# SIG_SETMASK
 	PIC_CALL(__cheriabi_sigprocmask)		# set current signal mask
 
-	move		sp, s8
+	clc		$c3, zero, CALLFRAME_SIZ($csp)
+	cld		a0, zero, CALLFRAME_S0($csp)	# restore return value
 
-	clc		$c3, sp, CALLFRAME_SIZ($c11)
-	cld		a0, sp, CALLFRAME_S0($c11)	# restore return value
-
-	cld		ra, zero, (_JB_REG_RA * SZREG)($c3)
 	/*
 	 * From "MIPSpro N32 ABI Handbook", Table 2-1:
 	 * Registers s0..s7 are callee-saved.
 	 * The sp register is callee-saved.
 	 * The fp (or s8) register is callee-saved.
 	 * The gp register is callee-saved (for n32/n64).
+	 *
+	 * NB: In the pure-capability ABI, we need to neither save nore restore
+	 * $ra and $sp, which are caller-save and not used for control flow.
 	 */
 	cld		s0, zero, (_JB_REG_S0 * SZREG)($c3)
 	cld		s1, zero, (_JB_REG_S1 * SZREG)($c3)
@@ -202,7 +215,6 @@ NESTED(longjmp, LONGJMP_FRAME_SIZE, ra)
 	cld		s5, zero, (_JB_REG_S5 * SZREG)($c3)
 	cld		s6, zero, (_JB_REG_S6 * SZREG)($c3)
 	cld		s7, zero, (_JB_REG_S7 * SZREG)($c3)
-	cld		sp, zero, (_JB_REG_SP * SZREG)($c3)
 	cld		s8, zero, (_JB_REG_S8 * SZREG)($c3)
 	cld		gp, zero, (_JB_REG_GP * SZREG)($c3)
 #ifndef __mips_soft_float
@@ -246,7 +258,9 @@ NESTED(longjmp, LONGJMP_FRAME_SIZE, ra)
 	clc		$c22, t1, (_JB_CHERI_C22 * _MIPS_SZCAP/8)($c3)
 	clc		$c23, t1, (_JB_CHERI_C23 * _MIPS_SZCAP/8)($c3)
 	clc		$c24, t1, (_JB_CHERI_C24 * _MIPS_SZCAP/8)($c3)
+	clc		$c25, t1, (_JB_CHERI_C25 * _MIPS_SZCAP/8)($c3)
 
+	/* Install $a0 as the return value from setjmp(). */
 	move		v0, a0
 	cjr		$c17
 	nop
