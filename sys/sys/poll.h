@@ -32,6 +32,7 @@
 #define	_SYS_POLL_H_
 
 #include <sys/cdefs.h>
+#include <sys/_types.h>
 
 /*
  * This file is intended to be compatible with the traditional poll.h.
@@ -44,6 +45,17 @@ typedef	unsigned int	nfds_t;
  */
 struct pollfd {
 	int	fd;		/* which file descriptor to poll */
+	short	events;		/* events we are interested in */
+	short	revents;	/* events found on return */
+};
+
+#ifndef _FC_T_DECLARED
+typedef	__fc_t	fc_t;
+#define _FC_T_DECLARED
+#endif
+
+struct fc_pollfd {
+	fc_t	fc;		/* which file capability to poll */
 	short	events;		/* events we are interested in */
 	short	revents;	/* events found on return */
 };

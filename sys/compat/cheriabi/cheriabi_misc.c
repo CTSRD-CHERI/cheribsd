@@ -152,6 +152,8 @@ SYSCTL_INT(_compat_cheriabi_mmap, OID_AUTO, precise_bounds,
     CTLFLAG_RWTUN, &cheriabi_mmap_precise_bounds, 0,
     "Require that bounds on returned capabilities be precise.");
 
+static int cheriabi_do_mmap(struct thread *td, void *addr, size_t len, int prot,
+    int flags, int fd, off_t pos);
 static int cheriabi_kevent_copyout(void *arg, struct kevent *kevp, int count);
 static int cheriabi_kevent_copyin(void *arg, struct kevent *kevp, int count);
 static register_t cheriabi_mmap_prot2perms(int prot);
@@ -403,6 +405,26 @@ cheriabi_fexecve(struct thread *td, struct cheriabi_fexecve_args *uap)
 	return (error);
 }
 
+int
+cheriabi_fc_fexecve(struct thread *td, struct cheriabi_fc_fexecve_args *uap)
+{
+	struct image_args eargs;
+	struct vmspace *oldvmspace;
+	int error;
+
+	error = pre_execve(td, &oldvmspace);
+	if (error != 0)
+		return (error);
+	error = cheriabi_exec_copyin_args(&eargs, NULL, UIO_SYSSPACE,
+	    uap->argv, uap->envv);
+	if (error == 0) {
+		eargs.fd = fc2fd(uap->fc);
+		error = kern_execve(td, &eargs, NULL);
+	}
+	post_execve(td, error, oldvmspace);
+	return (error);
+}
+
 /*
  * Copy 'count' items into the destination list pointed to by uap->eventlist.
  */
@@ -518,6 +540,29 @@ cheriabi_kevent(struct thread *td, struct cheriabi_kevent_args *uap)
 	return (error);
 }
 
+int
+cheriabi_fc_kevent(struct thread *td, struct cheriabi_fc_kevent_args *uap)
+{
+	struct timespec ts, *tsp;
+	/* XXX-BD: probably need fc_t version as ident should be an fc_t */
+	struct kevent_copyops k_ops = { uap,
+					cheriabi_kevent_copyout,
+					cheriabi_kevent_copyin};
+	int error;
+
+
+	if (uap->timeout) {
+		error = copyin(uap->timeout, &ts, sizeof(ts));
+		if (error)
+			return (error);
+		tsp = &ts;
+	} else
+		tsp = NULL;
+	error = kern_kevent(td, fc2fd(uap->fc), uap->nchanges, uap->nevents,
+	    &k_ops, tsp);
+	return (error);
+}
+
 static int
 cheriabi_copyinuio(struct iovec_c *iovp, u_int iovcnt, struct uio **uiop)
 {
@@ -580,6 +625,20 @@ cheriabi_readv(struct thread *td, struct cheriabi_readv_args *uap)
 }
 
 int
+cheriabi_fc_readv(struct thread *td, struct cheriabi_fc_readv_args *uap)
+{
+	struct uio *auio;
+	int error;
+
+	error = cheriabi_copyinuio(uap->iovp, uap->iovcnt, &auio);
+	if (error)
+		return (error);
+	error = kern_readv(td, fc2fd(uap->fc), auio);
+	free(auio, M_IOV);
+	return (error);
+}
+
+int
 cheriabi_writev(struct thread *td, struct cheriabi_writev_args *uap)
 {
 	struct uio *auio;
@@ -589,6 +648,20 @@ cheriabi_writev(struct thread *td, struct cheriabi_writev_args *uap)
 	if (error)
 		return (error);
 	error = kern_writev(td, uap->fd, auio);
+	free(auio, M_IOV);
+	return (error);
+}
+
+int
+cheriabi_fc_writev(struct thread *td, struct cheriabi_fc_writev_args *uap)
+{
+	struct uio *auio;
+	int error;
+
+	error = cheriabi_copyinuio(uap->iovp, uap->iovcnt, &auio);
+	if (error)
+		return (error);
+	error = kern_writev(td, fc2fd(uap->fc), auio);
 	free(auio, M_IOV);
 	return (error);
 }
@@ -608,6 +681,20 @@ cheriabi_preadv(struct thread *td, struct cheriabi_preadv_args *uap)
 }
 
 int
+cheriabi_fc_preadv(struct thread *td, struct cheriabi_fc_preadv_args *uap)
+{
+	struct uio *auio;
+	int error;
+
+	error = cheriabi_copyinuio(uap->iovp, uap->iovcnt, &auio);
+	if (error)
+		return (error);
+	error = kern_preadv(td, fd2fc(uap->fc), auio, uap->offset);
+	free(auio, M_IOV);
+	return (error);
+}
+
+int
 cheriabi_pwritev(struct thread *td, struct cheriabi_pwritev_args *uap)
 {
 	struct uio *auio;
@@ -617,6 +704,20 @@ cheriabi_pwritev(struct thread *td, struct cheriabi_pwritev_args *uap)
 	if (error)
 		return (error);
 	error = kern_pwritev(td, uap->fd, auio, uap->offset);
+	free(auio, M_IOV);
+	return (error);
+}
+
+int
+cheriabi_fc_pwritev(struct thread *td, struct cheriabi_fc_pwritev_args *uap)
+{
+	struct uio *auio;
+	int error;
+
+	error = cheriabi_copyinuio(uap->iovp, uap->iovcnt, &auio);
+	if (error)
+		return (error);
+	error = kern_pwritev(td, fc2fd(uap->fc), auio, uap->offset);
 	free(auio, M_IOV);
 	return (error);
 }
@@ -810,27 +911,26 @@ out:
 }
 
 static int
-cheriabi_do_sendfile(struct thread *td,
-    struct cheriabi_sendfile_args *uap)
+cheriabi_do_sendfile(struct thread *td, int fd, int s, off_t offset,
+    size_t nbytes, struct sf_hdtr_c *hdtr, off_t *sbytesp, int flags)
 {
 	struct sf_hdtr_c hdtr_c;
 	struct iovec_c *headers, *trailers;
 	struct uio *hdr_uio, *trl_uio;
 	struct file *fp;
 	cap_rights_t rights;
-	off_t offset, sbytes;
+	off_t sbytes;
 	int error;
 	static register_t reqperms = CHERI_PERM_GLOBAL |
 	    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP;
 
-	offset = uap->offset;
 	if (offset < 0)
 		return (EINVAL);
 
 	hdr_uio = trl_uio = NULL;
 
-	if (uap->hdtr != NULL) {
-		error = copyincap(uap->hdtr, &hdtr_c, sizeof(hdtr_c));
+	if (hdtr != NULL) {
+		error = copyincap(hdtr, &hdtr_c, sizeof(hdtr_c));
 		if (error)
 			goto out;
 		error = cheriabi_cap_to_ptr((caddr_t *)&headers,
@@ -858,18 +958,18 @@ cheriabi_do_sendfile(struct thread *td,
 		}
 	}
 
-	AUDIT_ARG_FD(uap->fd);
+	AUDIT_ARG_FD(fd);
 
-	if ((error = fget_read(td, uap->fd,
+	if ((error = fget_read(td, fd,
 	    cap_rights_init(&rights, CAP_PREAD), &fp)) != 0)
 		goto out;
 
-	error = fo_sendfile(fp, uap->s, hdr_uio, trl_uio, offset,
-	    uap->nbytes, &sbytes, uap->flags, td);
+	error = fo_sendfile(fp, s, hdr_uio, trl_uio, offset,
+	    nbytes, &sbytes, flags, td);
 	fdrop(fp, td);
 
-	if (uap->sbytes != NULL)
-		copyout(&sbytes, uap->sbytes, sizeof(off_t));
+	if (sbytesp != NULL)
+		copyout(&sbytes, sbytesp, sizeof(off_t));
 
 out:
 	if (hdr_uio)
@@ -883,7 +983,16 @@ int
 cheriabi_sendfile(struct thread *td, struct cheriabi_sendfile_args *uap)
 {
 
-	return (cheriabi_do_sendfile(td, uap));
+	return (cheriabi_do_sendfile(td, uap->fd, uap->s, uap->offset,
+	    uap->nbytes, uap->hdtr, uap->sbytes, uap->flags));
+}
+
+int
+cheriabi_fc_sendfile(struct thread *td, struct cheriabi_fc_sendfile_args *uap)
+{
+
+	return (cheriabi_do_sendfile(td, fc2fd(uap->fc), fc2fd(uap->sc),
+	    uap->offset, uap->nbytes, uap->hdtr, uap->sbytes, uap->flags));
 }
 
 int
@@ -1869,9 +1978,23 @@ cheriabi_madvise(struct thread *td, struct cheriabi_madvise_args *uap)
 }
 
 int
-cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
+cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap) {
+
+	return(cheriabi_do_mmap(td, uap->addr, uap->len, uap->prot,
+	    uap->flags, uap->fd, uap->pos));
+}
+
+int
+cheriabi_fc_mmap(struct thread *td, struct cheriabi_fc_mmap_args *uap) {
+
+	return(cheriabi_do_mmap(td, uap->addr, uap->len, uap->prot,
+	    uap->flags, fc2fd(uap->fc), uap->pos));
+}
+
+static int
+cheriabi_do_mmap(struct thread *td, void *addr, size_t len, int prot,
+    int flags, int fd, off_t pos)
 {
-	int flags = uap->flags;
 	int usertag;
 	size_t cap_base, cap_len, cap_offset;
 	void * __capability addr_cap;
@@ -1937,7 +2060,7 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 	if (reqaddr == 0)
 		reqaddr = PAGE_SIZE;
 	perms = cheri_getperm(addr_cap);
-	reqperms = cheriabi_mmap_prot2perms(uap->prot);
+	reqperms = cheriabi_mmap_prot2perms(prot);
 	if ((perms & reqperms) != reqperms) {
 		SYSERRCAUSE("capability has insufficient perms (0x%lx)"
 		    "for request (0x%lx)", perms, reqperms);
@@ -1970,8 +2093,8 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 		 * In practice this is a no-op as super-pages are
 		 * precisely representable.
 		 */
-		if (uap->len < PDRSIZE &&
-		    CHERI_ALIGN_SHIFT(uap->len) > PAGE_SHIFT) {
+		if (len < PDRSIZE &&
+		    CHERI_ALIGN_SHIFT(len) > PAGE_SHIFT) {
 			flags &= ~MAP_ALIGNMENT_MASK;
 			flags |= MAP_ALIGNED_CHERI;
 		}
@@ -1997,7 +2120,7 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 		 * we'll catch the length later.
 		 */
 		if ((flags >> MAP_ALIGNMENT_SHIFT) <
-		    CHERI_ALIGN_SHIFT(uap->len)) {
+		    CHERI_ALIGN_SHIFT(len)) {
 			flags &= ~MAP_ALIGNMENT_MASK;
 			flags |= MAP_ALIGNED_CHERI;
 		}
@@ -2010,10 +2133,10 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 
 	if (flags & MAP_FIXED) {
 		if (cap_len - cap_offset <
-		    roundup2(uap->len, PAGE_SIZE)) {
+		    roundup2(len, PAGE_SIZE)) {
 			SYSERRCAUSE("MAP_FIXED and too little space in "
 			    "capablity (0x%zx < 0x%zx)", cap_len - cap_offset,
-			    roundup2(uap->len, PAGE_SIZE));
+			    roundup2(len, PAGE_SIZE));
 			return (EPROT);
 		}
 
@@ -2037,8 +2160,8 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 
 	}
 
-	return (kern_mmap(td, reqaddr, cap_base + cap_len, uap->len,
-	    uap->prot, flags, uap->fd, uap->pos));
+	return (kern_mmap(td, reqaddr, cap_base + cap_len, len,
+	    prot, flags, fd, pos));
 }
 
 

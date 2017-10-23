@@ -2214,7 +2214,7 @@ getmq_write(struct thread *td, int fd, struct file **fpp,
 	    fpp, ppn, pmq);
 }
 
-static int
+int
 kern_kmq_setattr(struct thread *td, int mqd, const struct mq_attr *attr,
     struct mq_attr *oattr)
 {
@@ -2248,17 +2248,32 @@ kern_kmq_setattr(struct thread *td, int mqd, const struct mq_attr *attr,
 int
 sys_kmq_setattr(struct thread *td, struct kmq_setattr_args *uap)
 {
+
+	return (kern_kmq_setattr(td, uap->mqd, uap->attr, uap->oattr));
+}
+
+int
+sys_fc_kmq_setattr(struct thread *td, struct fc_kmq_setattr_args *uap)
+{
+
+	return (kern_kmq_setattr(td, fc2fd(uap->mqc), uap->attr, uap->oattr));
+}
+
+int
+kern_kmq_setattr(struct thread *td, int mqd, const struct mq_attr *attrp,
+    struct mq_attr *oattrp)
+{
 	struct mq_attr attr, oattr;
 	int error;
 
-	if (uap->attr != NULL) {
-		error = copyin(uap->attr, &attr, sizeof(attr));
+	if (attrp != NULL) {
+		error = copyin(attrp, &attr, sizeof(attr));
 		if (error != 0)
 			return (error);
 	}
-	error = kern_kmq_setattr(td, uap->mqd, uap->attr != NULL ? &attr : NULL,
+	error = kern_kmq_setattr(td, mqd, attrp != NULL ? &attr : NULL,
 	    &oattr);
-	if (error == 0 && uap->oattr != NULL) {
+	if (error == 0 && oattrp != NULL) {
 		bzero(oattr.__reserved, sizeof(oattr.__reserved));
 		error = copyout(&oattr, uap->oattr, sizeof(oattr));
 	}
@@ -2268,26 +2283,43 @@ sys_kmq_setattr(struct thread *td, struct kmq_setattr_args *uap)
 int
 sys_kmq_timedreceive(struct thread *td, struct kmq_timedreceive_args *uap)
 {
+
+	return(kern_sys_kmq_setattr(td, uap->mqd, uap->msg_ptr, uap->msg_len,
+	    uap->msg_prio, uap->abs_timeout));
+}
+
+int
+sys_fc_kmq_timedreceive(struct thread *td, struct fc_kmq_timedreceive_args *uap)
+{
+
+	return(kern_sys_kmq_setattr(td, fc2fd(uap->mqc), uap->msg_ptr,
+	    uap->msg_len, uap->msg_prio, uap->abs_timeout));
+}
+
+int
+kern_kmq_timedreceive(int mqd, char *msg_ptr, size_t msg_len,
+    unsigned *msg_prio, const struct timespec *abs_timeout)
+{
 	struct mqueue *mq;
 	struct file *fp;
 	struct timespec *abs_timeout, ets;
 	int error;
 	int waitok;
 
-	AUDIT_ARG_FD(uap->mqd);
-	error = getmq_read(td, uap->mqd, &fp, NULL, &mq);
+	AUDIT_ARG_FD(mqd);
+	error = getmq_read(td, mqd, &fp, NULL, &mq);
 	if (error)
 		return (error);
-	if (uap->abs_timeout != NULL) {
-		error = copyin(uap->abs_timeout, &ets, sizeof(ets));
+	if (abs_timeout != NULL) {
+		error = copyin(abs_timeout, &ets, sizeof(ets));
 		if (error != 0)
 			return (error);
 		abs_timeout = &ets;
 	} else
 		abs_timeout = NULL;
 	waitok = !(fp->f_flag & O_NONBLOCK);
-	error = mqueue_receive(mq, uap->msg_ptr, uap->msg_len,
-		uap->msg_prio, waitok, abs_timeout);
+	error = mqueue_receive(mq, msg_ptr, msg_len, msg_prio, waitok,
+	    abs_timeout);
 	fdrop(fp, td);
 	return (error);
 }
@@ -2295,25 +2327,42 @@ sys_kmq_timedreceive(struct thread *td, struct kmq_timedreceive_args *uap)
 int
 sys_kmq_timedsend(struct thread *td, struct kmq_timedsend_args *uap)
 {
+
+	return(kern_kmq_timedsend(td, uap->mqd, uap->msg_ptr,
+	    uap->msg_len, uap->msg_prio, uap->abs_timeout));
+}
+
+int
+sys_fc_kmq_timedsend(struct thread *td, struct fc_kmq_timedsend_args *uap)
+{
+
+	return(kern_kmq_timedsend(td, fc2fd(uap->mqc), uap->msg_ptr,
+	    uap->msg_len, uap->msg_prio, uap->abs_timeout));
+}
+
+int
+kern_kmq_timedsend(struct thread *td, int mqd, const char *msg_ptr,
+    size_t msg_len, unsigned msg_prio, const struct timespec *abs_timeout)
+{
 	struct mqueue *mq;
 	struct file *fp;
 	struct timespec *abs_timeout, ets;
 	int error, waitok;
 
-	AUDIT_ARG_FD(uap->mqd);
-	error = getmq_write(td, uap->mqd, &fp, NULL, &mq);
+	AUDIT_ARG_FD(mqd);
+	error = getmq_write(td, mqd, &fp, NULL, &mq);
 	if (error)
 		return (error);
-	if (uap->abs_timeout != NULL) {
-		error = copyin(uap->abs_timeout, &ets, sizeof(ets));
+	if (abs_timeout != NULL) {
+		error = copyin(abs_timeout, &ets, sizeof(ets));
 		if (error != 0)
 			return (error);
 		abs_timeout = &ets;
 	} else
 		abs_timeout = NULL;
 	waitok = !(fp->f_flag & O_NONBLOCK);
-	error = mqueue_send(mq, uap->msg_ptr, uap->msg_len,
-		uap->msg_prio, waitok, abs_timeout);
+	error = mqueue_send(mq, msg_ptr, msg_len, msg_prio, waitok,
+	    abs_timeout);
 	fdrop(fp, td);
 	return (error);
 }
@@ -2440,6 +2489,23 @@ sys_kmq_notify(struct thread *td, struct kmq_notify_args *uap)
 		evp = &ev;
 	}
 	return (kern_kmq_notify(td, uap->mqd, evp));
+}
+
+int
+sys_fc_kmq_notify(struct thread *td, struct kmq_notify_args *uap)
+{
+	struct sigevent ev, *evp;
+	int error;
+
+	if (uap->sigev == NULL) {
+		evp = NULL;
+	} else {
+		error = copyin(uap->sigev, &ev, sizeof(ev));
+		if (error != 0)
+			return (error);
+		evp = &ev;
+	}
+	return (kern_kmq_notify(td, fc2fd(uap->mqc), evp));
 }
 
 static void

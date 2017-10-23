@@ -47,6 +47,11 @@
 #include <sys/cdefs.h>
 #include <sys/_types.h>
 
+#ifndef _FC_T_DECLARED
+typedef __fc_t  fc_t;
+#define	_FC_T_DECLARED
+#endif
+
 #ifndef _MODE_T_DECLARED
 typedef	__mode_t	mode_t;
 #define	_MODE_T_DECLARED
@@ -314,6 +319,7 @@ struct __oflock {
 #ifndef _KERNEL
 __BEGIN_DECLS
 int	open(const char *, int, ...);
+int	__fc_open(fc_t *newfc, const char *, int, ...);
 int	creat(const char *, mode_t);
 int	fcntl(int, int, ...);
 #if __BSD_VISIBLE
@@ -322,6 +328,7 @@ int	flock(int, int);
 #if __POSIX_VISIBLE >= 200809
 int	openat(int, const char *, int, ...);
 #endif
+int	__fc_openat(fc_t *newfc, const char *, int, ...);
 #if __POSIX_VISIBLE >= 200112
 int	posix_fadvise(int, off_t, off_t, int);
 int	posix_fallocate(int, off_t, off_t);

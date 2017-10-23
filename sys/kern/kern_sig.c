@@ -110,6 +110,7 @@ SDT_PROBE_DEFINE3(proc, , , signal__discard,
     "struct thread *", "struct proc *", "int");
 
 static int	coredump(struct thread *);
+static int	kern_pdkill(struct thread *td, int fd, int signum);
 static int	killpg1(struct thread *td, int sig, int pgid, int all,
 		    ksiginfo_t *ksi);
 static int	issignal(struct thread *td);
@@ -1823,23 +1824,37 @@ sys_kill(struct thread *td, struct kill_args *uap)
 int
 sys_pdkill(struct thread *td, struct pdkill_args *uap)
 {
+
+	return(kern_pdkill(td, uap->fd, uap->signum));
+}
+
+int
+sys_fc_pdkill(struct thread *td, struct fc_pdkill_args *uap)
+{
+
+	return(kern_pdkill(td, fd2fc(uap->fc), uap->signum));
+}
+
+static int
+kern_pdkill(struct thread *td, int fd, int signum)
+{
 	struct proc *p;
 	cap_rights_t rights;
 	int error;
 
-	AUDIT_ARG_SIGNUM(uap->signum);
-	AUDIT_ARG_FD(uap->fd);
-	if ((u_int)uap->signum > _SIG_MAXSIG)
+	AUDIT_ARG_SIGNUM(signum);
+	AUDIT_ARG_FD(fd);
+	if ((u_int)signum > _SIG_MAXSIG)
 		return (EINVAL);
 
-	error = procdesc_find(td, uap->fd,
+	error = procdesc_find(td, fd,
 	    cap_rights_init(&rights, CAP_PDKILL), &p);
 	if (error)
 		return (error);
 	AUDIT_ARG_PROCESS(p);
-	error = p_cansignal(td, p, uap->signum);
-	if (error == 0 && uap->signum)
-		kern_psignal(p, uap->signum);
+	error = p_cansignal(td, p, signum);
+	if (error == 0 && signum)
+		kern_psignal(p, signum);
 	PROC_UNLOCK(p);
 	return (error);
 }

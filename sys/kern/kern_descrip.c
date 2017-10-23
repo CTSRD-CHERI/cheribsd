@@ -109,6 +109,9 @@ static void	fdgrowtable_exp(struct filedesc *fdp, int nfd);
 static void	fdunused(struct filedesc *fdp, int fd);
 static void	fdused(struct filedesc *fdp, int fd);
 static int	getmaxfd(struct thread *td);
+static int	kern_closefrom(struct thread *td, int lowfd);
+static int	kern_fpathconf(struct thread *td, int fd, int name);
+static int	kern_flock(struct thread *td, int fd, int how);
 
 /*
  * Each process has:
@@ -374,6 +377,25 @@ sys_dup2(struct thread *td, struct dup2_args *uap)
 	return (kern_dup(td, FDDUP_FIXED, 0, (int)uap->from, (int)uap->to));
 }
 
+int
+sys___fc_dup2(struct thread *td, struct __fc_dup2_args *uap)
+{
+	int error, newfd;
+	fc_t newfc;
+
+	error = kern_dup(td, FDDUP_FIXED, 0, fc2fd(uap->from), uap->to);
+	if (error)
+		return (error);
+
+	newfd= td->td_retval[0];
+	td->td_retval[0] = 0;
+	newfc = fd2fc(newfd);
+	error = copyoutcap(&newfc, uap->newfc, sizeof(newfc));
+	if (error)
+		(void)kern_close(td, newfd);
+	return (error);
+}
+
 /*
  * Duplicate a file descriptor.
  */
@@ -388,6 +410,24 @@ sys_dup(struct thread *td, struct dup_args *uap)
 {
 
 	return (kern_dup(td, FDDUP_NORMAL, 0, (int)uap->fd, 0));
+}
+
+int sys___fc_dup(struct thread *td, struct __fc_dup_args *uap)
+{
+	int error, newfd;
+	fc_t newfc;
+
+	error = kern_dup(td, FDDUP_NORMAL, 0, fc2fd(uap->fc), 0);
+	if (error)
+		return (error);
+
+	newfd= td->td_retval[0];
+	td->td_retval[0] = 0;
+	newfc = fd2fc(newfd);
+	error = copyoutcap(&newfc, uap->newfc, sizeof(newfc));
+	if (error)
+		(void)kern_close(td, newfd);
+	return (error);
 }
 
 /*
@@ -406,6 +446,36 @@ sys_fcntl(struct thread *td, struct fcntl_args *uap)
 {
 
 	return (kern_fcntl_freebsd(td, uap->fd, uap->cmd, uap->arg));
+}
+
+int
+sys___fc_fcntl(struct thread *td, struct __fc_fcntl_args *uap)
+{
+	int error, newfd;
+	fc_t newfc;
+
+	error = kern_fcntl_freebsd(td, fc2fd(uap->fc), uap->cmd, uap->arg);
+	if (error != 0)
+		return (error);
+
+	switch (uap->cmd) {
+	case F_DUPFD:
+	case F_DUPFD_CLOEXEC:
+	case F_DUP2FD:
+	case F_DUP2FD_CLOEXEC:
+		newfd = td->td_retval[0];
+		td->td_retval[0] = 0;
+
+		newfc = fd2fc(newfd);
+		error = copyoutcap(&newfc, uap->newfc, sizeof(newfc));
+		if (error != 0)
+			(void)kern_close(td, newfd);
+		break;
+	default:
+		break;
+	}
+
+	return (error);
 }
 
 int
@@ -1221,6 +1291,13 @@ sys_close(struct thread *td, struct close_args *uap)
 }
 
 int
+sys_fc_close(struct thread *td, struct fc_close_args *uap)
+{
+
+	return (kern_close(td, fc2fd(uap->fc)));
+}
+
+int
 kern_close(struct thread *td, int fd)
 {
 	struct filedesc *fdp;
@@ -1253,20 +1330,34 @@ struct closefrom_args {
 int
 sys_closefrom(struct thread *td, struct closefrom_args *uap)
 {
+
+	return(kern_closefrom(td, uap->lowfd));
+}
+
+int
+sys_fc_closefrom(struct thread *td, struct fc_closefrom_args *uap)
+{
+
+	return(kern_closefrom(td, fc2fd(uap->lowfc)));
+}
+
+static int
+kern_closefrom(struct thread *td, int lowfd)
+{
 	struct filedesc *fdp;
 	int fd;
 
 	fdp = td->td_proc->p_fd;
-	AUDIT_ARG_FD(uap->lowfd);
+	AUDIT_ARG_FD(lowfd);
 
 	/*
 	 * Treat negative starting file descriptor values identical to
 	 * closefrom(0) which closes all files.
 	 */
-	if (uap->lowfd < 0)
-		uap->lowfd = 0;
+	if (lowfd < 0)
+		lowfd = 0;
 	FILEDESC_SLOCK(fdp);
-	for (fd = uap->lowfd; fd <= fdp->fd_lastfile; fd++) {
+	for (fd = lowfd; fd <= fdp->fd_lastfile; fd++) {
 		if (fdp->fd_ofiles[fd].fde_file != NULL) {
 			FILEDESC_SUNLOCK(fdp);
 			(void)kern_close(td, fd);
@@ -1345,6 +1436,18 @@ sys_fstat(struct thread *td, struct fstat_args *uap)
 }
 
 int
+sys_fc_fstat(struct thread *td, struct fc_fstat_args *uap)
+{
+	struct stat ub;
+	int error;
+
+	error = kern_fstat(td, fc2fd(uap->fc), &ub);
+	if (error == 0)
+		error = copyout(&ub, uap->sb, sizeof(ub));
+	return (error);
+}
+
+int
 kern_fstat(struct thread *td, int fd, struct stat *sbp)
 {
 	struct file *fp;
@@ -1416,26 +1519,40 @@ struct fpathconf_args {
 int
 sys_fpathconf(struct thread *td, struct fpathconf_args *uap)
 {
+
+	return (kern_fpathconf(td, uap->fd, uap->name));
+}
+
+int
+sys_fc_fpathconf(struct thread *td, struct fc_fpathconf_args *uap)
+{
+
+	return (kern_fpathconf(td, fc2fd(uap->fc), uap->name));
+}
+
+static int
+kern_fpathconf(struct thread *td, int fd, int name)
+{
 	struct file *fp;
 	struct vnode *vp;
 	cap_rights_t rights;
 	int error;
 
-	error = fget(td, uap->fd, cap_rights_init(&rights, CAP_FPATHCONF), &fp);
+	error = fget(td, fd, cap_rights_init(&rights, CAP_FPATHCONF), &fp);
 	if (error != 0)
 		return (error);
 
-	if (uap->name == _PC_ASYNC_IO) {
+	if (name == _PC_ASYNC_IO) {
 		td->td_retval[0] = _POSIX_ASYNCHRONOUS_IO;
 		goto out;
 	}
 	vp = fp->f_vnode;
 	if (vp != NULL) {
 		vn_lock(vp, LK_SHARED | LK_RETRY);
-		error = VOP_PATHCONF(vp, uap->name, td->td_retval);
+		error = VOP_PATHCONF(vp, name, td->td_retval);
 		VOP_UNLOCK(vp, 0);
 	} else if (fp->f_type == DTYPE_PIPE || fp->f_type == DTYPE_SOCKET) {
-		if (uap->name != _PC_PIPE_BUF) {
+		if (name != _PC_PIPE_BUF) {
 			error = EINVAL;
 		} else {
 			td->td_retval[0] = PIPE_BUF;
@@ -2901,13 +3018,27 @@ struct flock_args {
 int
 sys_flock(struct thread *td, struct flock_args *uap)
 {
+
+	return (kern_flock(td, uap->fd, uap->how));
+}
+
+int
+sys_fc_flock(struct thread *td, struct fc_flock_args *uap)
+{
+
+	return (kern_flock(td, fd2fc(uap->fc), uap->how));
+}
+
+static int
+kern_flock(struct thread *td, int fd, int how)
+{
 	struct file *fp;
 	struct vnode *vp;
 	struct flock lf;
 	cap_rights_t rights;
 	int error;
 
-	error = fget(td, uap->fd, cap_rights_init(&rights, CAP_FLOCK), &fp);
+	error = fget(td, fd, cap_rights_init(&rights, CAP_FLOCK), &fp);
 	if (error != 0)
 		return (error);
 	if (fp->f_type != DTYPE_VNODE) {
@@ -2919,15 +3050,15 @@ sys_flock(struct thread *td, struct flock_args *uap)
 	lf.l_whence = SEEK_SET;
 	lf.l_start = 0;
 	lf.l_len = 0;
-	if (uap->how & LOCK_UN) {
+	if (how & LOCK_UN) {
 		lf.l_type = F_UNLCK;
 		atomic_clear_int(&fp->f_flag, FHASLOCK);
 		error = VOP_ADVLOCK(vp, (caddr_t)fp, F_UNLCK, &lf, F_FLOCK);
 		goto done2;
 	}
-	if (uap->how & LOCK_EX)
+	if (how & LOCK_EX)
 		lf.l_type = F_WRLCK;
-	else if (uap->how & LOCK_SH)
+	else if (how & LOCK_SH)
 		lf.l_type = F_RDLCK;
 	else {
 		error = EBADF;
@@ -2935,7 +3066,7 @@ sys_flock(struct thread *td, struct flock_args *uap)
 	}
 	atomic_set_int(&fp->f_flag, FHASLOCK);
 	error = VOP_ADVLOCK(vp, (caddr_t)fp, F_SETLK, &lf,
-	    (uap->how & LOCK_NB) ? F_FLOCK : F_FLOCK | F_WAIT);
+	    (how & LOCK_NB) ? F_FLOCK : F_FLOCK | F_WAIT);
 done2:
 	fdrop(fp, td);
 	return (error);
@@ -3022,6 +3153,20 @@ dupfdopen(struct thread *td, struct filedesc *fdp, int dfd, int mode,
 	FILEDESC_XUNLOCK(fdp);
 	*indxp = indx;
 	return (0);
+}
+
+int
+fc2fd(fc_t fc)
+{
+
+	return ((int)fc);
+}
+
+fc_t
+fd2fc(int fd)
+{
+
+	return ((fc_t)fd);
 }
 
 /*

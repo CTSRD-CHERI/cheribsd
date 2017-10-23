@@ -141,6 +141,28 @@ sys_pdfork(struct thread *td, struct pdfork_args *uap)
 	return (error);
 }
 
+int
+sys_fc_pdfork(struct thread *td, struct fc_pdfork_args *uap)
+{
+	struct fork_req fr;
+	int error, fd, pid;
+	fc_t fc;
+
+	bzero(&fr, sizeof(fr));
+	fr.fr_flags = RFFDG | RFPROC | RFPROCDESC;
+	fr.fr_pidp = &pid;
+	fr.fr_pd_fd = &fd;
+	fr.fr_pd_flags = uap->flags;
+	error = fork1(td, &fr);
+	if (error == 0) {
+		td->td_retval[0] = pid;
+		td->td_retval[1] = 0;
+		fc = fc2fd(fd);
+		error = copyout(&fc, uap->fcp, sizeof(fc));
+	}
+	return (error);
+}
+
 /* ARGSUSED */
 int
 sys_vfork(struct thread *td, struct vfork_args *uap)

@@ -72,11 +72,18 @@ static int sendit(struct thread *td, int s, struct msghdr *mp, int flags);
 static int recvit(struct thread *td, int s, struct msghdr *mp, void *namelenp);
 
 static int accept1(struct thread *td, int s, struct sockaddr *uname,
-		   socklen_t *anamelen, int flags);
-static int getsockname1(struct thread *td, struct getsockname_args *uap,
-			int compat);
-static int getpeername1(struct thread *td, struct getpeername_args *uap,
-			int compat);
+    socklen_t *anamelen, int flags);
+static int getsockname1(struct thread *td, int s, struct sockaddr *name,
+    socklen_t *namelen, int compat);
+static int getpeername1(struct thread *td, int fdes, struct sockaddr *asa,
+    socklen_t *alen, int compat);
+static int kern_recvfrom(struct thread *td, int s, void *buf, size_t len,
+    int flags, struct sockaddr *from, socklen_t *fromlenaddr);
+static int kern_recvmsg(struct thread *td, int s, struct msghdr *mp, int flags);
+static int kern_sendmsg(struct thread *td, int s, const struct msghdr *msg,
+    int flags);
+static int kern_sendto(struct thread *td, int s, caddr_t buf, size_t len,
+    int flags, caddr_t to, int tolen);
 
 /*
  * Convert a user file descriptor to a kernel file entry and check if required
@@ -118,6 +125,26 @@ sys_socket(struct thread *td, struct socket_args *uap)
 {
 
 	return (kern_socket(td, uap->domain, uap->type, uap->protocol));
+}
+
+int
+sys___fc_socket(struct thread *td, struct __fc_socket_args *uap)
+{
+	int error, newfd;
+	fc_t newfc;
+
+	error = kern_socket(td, uap->domain, uap->type, uap->protocol);
+	if (error)
+		return (error);
+
+	newfd = td->td_retval[0];
+	td->td_retval[0] = 0;
+
+	newfc = fd2fc(newfd);
+	error = copyoutcap(&newfc, uap->newfc, sizeof(newfc));
+	if (error)
+		(void)kern_close(td, newfd);
+	return(error);
 }
 
 int
@@ -177,6 +204,20 @@ sys_bind(struct thread *td, struct bind_args *uap)
 }
 
 int
+sys_fc_bind(struct thread *td, struct fc_bind_args *uap)
+{
+	struct sockaddr *sa;
+	int error;
+
+	error = getsockaddr(&sa, __DECONST(caddr_t, uap->name), uap->namelen);
+	if (error == 0) {
+		error = kern_bindat(td, AT_FDCWD, fc2fd(uap->sc), sa);
+		free(sa, M_SONAME);
+	}
+	return (error);
+}
+
+int
 kern_bindat(struct thread *td, int dirfd, int fd, struct sockaddr *sa)
 {
 	struct socket *so;
@@ -225,10 +266,31 @@ sys_bindat(struct thread *td, struct bindat_args *uap)
 }
 
 int
+sys_fc_bindat(struct thread *td, struct fc_bindat_args *uap)
+{
+	struct sockaddr *sa;
+	int error;
+
+	error = getsockaddr(&sa, __DECONST(caddr_t, uap->name), uap->namelen);
+	if (error == 0) {
+		error = kern_bindat(td, fc2fd(uap->fc), fc2fd(uap->sc), sa);
+		free(sa, M_SONAME);
+	}
+	return (error);
+}
+
+int
 sys_listen(struct thread *td, struct listen_args *uap)
 {
 
 	return (kern_listen(td, uap->s, uap->backlog));
+}
+
+int
+sys_fc_listen(struct thread *td, struct fc_listen_args *uap)
+{
+
+	return (kern_listen(td, fc2fd(uap->sc), uap->backlog));
 }
 
 int
@@ -435,6 +497,27 @@ sys_accept(td, uap)
 }
 
 int
+sys___fc_accept(struct thread *td, struct __fc_accept_args *uap)
+{
+	int error, newfd;
+	fc_t newfc;
+
+	error = accept1(td, fc2fd(uap->sc), uap->name, uap->anamelen,
+	    ACCEPT4_INHERIT);
+	if (error)
+		return (error);
+
+	newfd = td->td_retval[0];
+	td->td_retval[0] = 0;
+
+	newfc = fd2fc(newfd);
+	error = copyoutcap(&newfc, uap->newfc, sizeof(newfc));
+	if (error)
+		(void)kern_close(td, newfd);
+	return(error);
+}
+
+int
 sys_accept4(td, uap)
 	struct thread *td;
 	struct accept4_args *uap;
@@ -444,6 +527,30 @@ sys_accept4(td, uap)
 		return (EINVAL);
 
 	return (accept1(td, uap->s, uap->name, uap->anamelen, uap->flags));
+}
+
+int
+sys___fc_accept4(struct thread *td, struct __fc_accept4_args *uap)
+{
+	int error, newfd;
+	fc_t newfc;
+
+	if (uap->flags & ~(SOCK_CLOEXEC | SOCK_NONBLOCK))
+		return (EINVAL);
+
+	error = accept1(td, fc2fd(uap->sc), uap->name, uap->anamelen,
+	    uap->flags);
+	if (error)
+		return (error);
+
+	newfd = td->td_retval[0];
+	td->td_retval[0] = 0;
+
+	newfc = fd2fc(newfd);
+	error = copyoutcap(&newfc, uap->newfc, sizeof(newfc));
+	if (error)
+		(void)kern_close(td, newfd);
+	return(error);
 }
 
 #ifdef COMPAT_OLDSOCK
@@ -467,6 +574,20 @@ sys_connect(struct thread *td, struct connect_args *uap)
 	error = getsockaddr(&sa, uap->name, uap->namelen);
 	if (error == 0) {
 		error = kern_connectat(td, AT_FDCWD, uap->s, sa);
+		free(sa, M_SONAME);
+	}
+	return (error);
+}
+
+int
+sys_fc_connect(struct thread *td, struct fc_connect_args *uap)
+{
+	struct sockaddr *sa;
+	int error;
+
+	error = getsockaddr(&sa, __DECONST(caddr_t, uap->name), uap->namelen);
+	if (error == 0) {
+		error = kern_connectat(td, AT_FDCWD, fc2fd(uap->sc), sa);
 		free(sa, M_SONAME);
 	}
 	return (error);
@@ -544,6 +665,20 @@ sys_connectat(struct thread *td, struct connectat_args *uap)
 	error = getsockaddr(&sa, uap->name, uap->namelen);
 	if (error == 0) {
 		error = kern_connectat(td, uap->fd, uap->s, sa);
+		free(sa, M_SONAME);
+	}
+	return (error);
+}
+
+int
+sys_fc_connectat(struct thread *td, struct fc_connectat_args *uap)
+{
+	struct sockaddr *sa;
+	int error;
+
+	error = getsockaddr(&sa, __DECONST(caddr_t, uap->name), uap->namelen);
+	if (error == 0) {
+		error = kern_connectat(td, fc2fd(uap->fc), fc2fd(uap->sc), sa);
 		free(sa, M_SONAME);
 	}
 	return (error);
@@ -640,6 +775,26 @@ sys_socketpair(struct thread *td, struct socketpair_args *uap)
 	if (error != 0)
 		return (error);
 	error = copyout(sv, uap->rsv, 2 * sizeof(int));
+	if (error != 0) {
+		(void)kern_close(td, sv[0]);
+		(void)kern_close(td, sv[1]);
+	}
+	return (error);
+}
+
+int
+sys_fc_socketpair(struct thread *td, struct fc_socketpair_args *uap)
+{
+	int error, sv[2];
+	fc_t scv[2];
+
+	error = kern_socketpair(td, uap->domain, uap->type,
+	    uap->protocol, sv);
+	if (error != 0)
+		return (error);
+	scv[0] = fd2fc(sv[0]);
+	scv[1] = fd2fc(sv[1]);
+	error = copyout(scv, uap->rsv, 2 * sizeof(fc_t));
 	if (error != 0) {
 		(void)kern_close(td, sv[0]);
 		(void)kern_close(td, sv[1]);
@@ -802,20 +957,37 @@ bad:
 int
 sys_sendto(struct thread *td, struct sendto_args *uap)
 {
+
+	return(kern_sendto(td, uap->s, uap->buf, uap->len, uap->flags,
+	    uap->to, uap->tolen));
+}
+
+int
+sys_fc_sendto(struct thread *td, struct fc_sendto_args *uap)
+{
+
+	return(kern_sendto(td, fc2fd(uap->sc), __DECONST(caddr_t, uap->buf),
+	    uap->len, uap->flags, __DECONST(caddr_t, uap->to), uap->tolen));
+}
+
+static int
+kern_sendto(struct thread *td, int s, caddr_t buf, size_t len, int flags,
+    caddr_t to, int tolen)
+{
 	struct msghdr msg;
 	struct iovec aiov;
 
-	msg.msg_name = uap->to;
-	msg.msg_namelen = uap->tolen;
+	msg.msg_name = to;
+	msg.msg_namelen = tolen;
 	msg.msg_iov = &aiov;
 	msg.msg_iovlen = 1;
 	msg.msg_control = 0;
 #ifdef COMPAT_OLDSOCK
 	msg.msg_flags = 0;
 #endif
-	aiov.iov_base = uap->buf;
-	aiov.iov_len = uap->len;
-	return (sendit(td, uap->s, &msg, uap->flags));
+	aiov.iov_base = buf;
+	aiov.iov_len = len;
+	return (sendit(td, s, &msg, flags));
 }
 
 #ifdef COMPAT_OLDSOCK
@@ -860,11 +1032,25 @@ osendmsg(struct thread *td, struct osendmsg_args *uap)
 int
 sys_sendmsg(struct thread *td, struct sendmsg_args *uap)
 {
+
+	return(kern_sendmsg(td, uap->s, uap->msg, uap->flags));
+}
+
+int
+sys_fc_sendmsg(struct thread *td, struct fc_sendmsg_args *uap)
+{
+
+	return(kern_sendmsg(td, fc2fd(uap->sc), uap->msg, uap->flags));
+}
+
+static int
+kern_sendmsg(struct thread *td, int s, const struct msghdr *mp, int flags)
+{
 	struct msghdr msg;
 	struct iovec *iov;
 	int error;
 
-	error = copyin(uap->msg, &msg, sizeof (msg));
+	error = copyin(mp, &msg, sizeof (msg));
 	if (error != 0)
 		return (error);
 	error = copyiniov(msg.msg_iov, msg.msg_iovlen, &iov, EMSGSIZE);
@@ -874,7 +1060,7 @@ sys_sendmsg(struct thread *td, struct sendmsg_args *uap)
 #ifdef COMPAT_OLDSOCK
 	msg.msg_flags = 0;
 #endif
-	error = sendit(td, uap->s, &msg, uap->flags);
+	error = sendit(td, s, &msg, flags);
 	free(iov, M_IOV);
 	return (error);
 }
@@ -1058,26 +1244,43 @@ recvit(struct thread *td, int s, struct msghdr *mp, void *namelenp)
 int
 sys_recvfrom(struct thread *td, struct recvfrom_args *uap)
 {
+
+	return(kern_recvfrom(td, uap->s, uap->buf, uap->len, uap->flags,
+	    uap->from, uap->fromlenaddr));
+}
+
+int
+sys_fc_recvfrom(struct thread *td, struct fc_recvfrom_args *uap)
+{
+
+	return(kern_recvfrom(td, fc2fd(uap->sc), uap->buf, uap->len, uap->flags,
+	    uap->from, uap->fromlenaddr));
+}
+
+static int
+kern_recvfrom(struct thread *td, int s, void *buf, size_t len, int flags,
+    struct sockaddr *from, socklen_t *fromlenaddr)
+{
 	struct msghdr msg;
 	struct iovec aiov;
 	int error;
 
-	if (uap->fromlenaddr) {
-		error = copyin(uap->fromlenaddr,
+	if (fromlenaddr) {
+		error = copyin(fromlenaddr,
 		    &msg.msg_namelen, sizeof (msg.msg_namelen));
 		if (error != 0)
 			goto done2;
 	} else {
 		msg.msg_namelen = 0;
 	}
-	msg.msg_name = uap->from;
+	msg.msg_name = from;
 	msg.msg_iov = &aiov;
 	msg.msg_iovlen = 1;
-	aiov.iov_base = uap->buf;
-	aiov.iov_len = uap->len;
+	aiov.iov_base = buf;
+	aiov.iov_len = len;
 	msg.msg_control = 0;
-	msg.msg_flags = uap->flags;
-	error = recvit(td, uap->s, &msg, uap->fromlenaddr);
+	msg.msg_flags = flags;
+	error = recvit(td, s, &msg, fromlenaddr);
 done2:
 	return (error);
 }
@@ -1142,26 +1345,40 @@ orecvmsg(struct thread *td, struct orecvmsg_args *uap)
 int
 sys_recvmsg(struct thread *td, struct recvmsg_args *uap)
 {
+
+	return(kern_recvmsg(td, uap->s, uap->msg, uap->flags));
+}
+
+int
+sys_fc_recvmsg(struct thread *td, struct fc_recvmsg_args *uap)
+{
+
+	return(kern_recvmsg(td, fc2fd(uap->sc), uap->msg, uap->flags));
+}
+
+static int
+kern_recvmsg(struct thread *td, int s, struct msghdr *mp, int flags)
+{
 	struct msghdr msg;
 	struct iovec *uiov, *iov;
 	int error;
 
-	error = copyin(uap->msg, &msg, sizeof (msg));
+	error = copyin(mp, &msg, sizeof (msg));
 	if (error != 0)
 		return (error);
 	error = copyiniov(msg.msg_iov, msg.msg_iovlen, &iov, EMSGSIZE);
 	if (error != 0)
 		return (error);
-	msg.msg_flags = uap->flags;
+	msg.msg_flags = flags;
 #ifdef COMPAT_OLDSOCK
 	msg.msg_flags &= ~MSG_COMPAT;
 #endif
 	uiov = msg.msg_iov;
 	msg.msg_iov = iov;
-	error = recvit(td, uap->s, &msg, NULL);
+	error = recvit(td, s, &msg, NULL);
 	if (error == 0) {
 		msg.msg_iov = uiov;
-		error = copyout(&msg, uap->msg, sizeof(msg));
+		error = copyout(&msg, mp, sizeof(msg));
 	}
 	free(iov, M_IOV);
 	return (error);
@@ -1172,6 +1389,13 @@ sys_shutdown(struct thread *td, struct shutdown_args *uap)
 {
 
 	return (kern_shutdown(td, uap->s, uap->how));
+}
+
+int
+sys_fc_shutdown(struct thread *td, struct fc_shutdown_args *uap)
+{
+
+	return (kern_shutdown(td, fc2fd(uap->sc), uap->how));
 }
 
 int
@@ -1211,7 +1435,15 @@ sys_setsockopt(struct thread *td, struct setsockopt_args *uap)
 }
 
 int
-kern_setsockopt(struct thread *td, int s, int level, int name, void *val,
+sys_fc_setsockopt(struct thread *td, struct fc_setsockopt_args *uap)
+{
+
+	return (kern_setsockopt(td, fc2fd(uap->sc), uap->level, uap->name,
+	    uap->val, UIO_USERSPACE, uap->valsize));
+}
+
+int
+kern_setsockopt(struct thread *td, int s, int level, int name, const void *val,
     enum uio_seg valseg, socklen_t valsize)
 {
 	struct socket *so;
@@ -1228,7 +1460,7 @@ kern_setsockopt(struct thread *td, int s, int level, int name, void *val,
 	sopt.sopt_dir = SOPT_SET;
 	sopt.sopt_level = level;
 	sopt.sopt_name = name;
-	sopt.sopt_val = val;
+	sopt.sopt_val = __DECONST(void *, val);
 	sopt.sopt_valsize = valsize;
 	switch (valseg) {
 	case UIO_USERSPACE:
@@ -1265,6 +1497,26 @@ sys_getsockopt(struct thread *td, struct getsockopt_args *uap)
 	}
 
 	error = kern_getsockopt(td, uap->s, uap->level, uap->name,
+	    uap->val, UIO_USERSPACE, &valsize);
+
+	if (error == 0)
+		error = copyout(&valsize, uap->avalsize, sizeof (valsize));
+	return (error);
+}
+
+int
+sys_fc_getsockopt(struct thread *td, struct fc_getsockopt_args *uap)
+{
+	socklen_t valsize;
+	int error;
+
+	if (uap->val) {
+		error = copyin(uap->avalsize, &valsize, sizeof (valsize));
+		if (error != 0)
+			return (error);
+	}
+
+	error = kern_getsockopt(td, fc2fd(uap->sc), uap->level, uap->name,
 	    uap->val, UIO_USERSPACE, &valsize);
 
 	if (error == 0)
@@ -1323,17 +1575,18 @@ kern_getsockopt(struct thread *td, int s, int level, int name, void *val,
  * getsockname1() - Get socket name.
  */
 static int
-getsockname1(struct thread *td, struct getsockname_args *uap, int compat)
+getsockname1(struct thread *td, int s, struct sockaddr *asa,
+    socklen_t *alen, int compat)
 {
 	struct sockaddr *sa;
 	socklen_t len;
 	int error;
 
-	error = copyin(uap->alen, &len, sizeof(len));
+	error = copyin(alen, &len, sizeof(len));
 	if (error != 0)
 		return (error);
 
-	error = kern_getsockname(td, uap->fdes, &sa, &len);
+	error = kern_getsockname(td, s, &sa, &len);
 	if (error != 0)
 		return (error);
 
@@ -1342,11 +1595,11 @@ getsockname1(struct thread *td, struct getsockname_args *uap, int compat)
 		if (compat)
 			((struct osockaddr *)sa)->sa_family = sa->sa_family;
 #endif
-		error = copyout(sa, uap->asa, (u_int)len);
+		error = copyout(sa, asa, (u_int)len);
 	}
 	free(sa, M_SONAME);
 	if (error == 0)
-		error = copyout(&len, uap->alen, sizeof(len));
+		error = copyout(&len, alen, sizeof(len));
 	return (error);
 }
 
@@ -1394,7 +1647,14 @@ int
 sys_getsockname(struct thread *td, struct getsockname_args *uap)
 {
 
-	return (getsockname1(td, uap, 0));
+	return (getsockname1(td, uap->fdes, uap->asa, uap->alen, 0));
+}
+
+int
+sys_fc_getsockname(struct thread *td, struct fc_getsockname_args *uap)
+{
+
+	return (getsockname1(td, fc2fd(uap->sc), uap->asa, uap->alen, 0));
 }
 
 #ifdef COMPAT_OLDSOCK
@@ -1402,7 +1662,7 @@ int
 ogetsockname(struct thread *td, struct getsockname_args *uap)
 {
 
-	return (getsockname1(td, uap, 1));
+	return (getsockname1(td, uap->fdes, uap->name, uap->namelen, 1));
 }
 #endif /* COMPAT_OLDSOCK */
 
@@ -1410,17 +1670,18 @@ ogetsockname(struct thread *td, struct getsockname_args *uap)
  * getpeername1() - Get name of peer for connected socket.
  */
 static int
-getpeername1(struct thread *td, struct getpeername_args *uap, int compat)
+getpeername1(struct thread *td, int fdes, struct sockaddr *asa,
+    socklen_t *alen, int compat)
 {
 	struct sockaddr *sa;
 	socklen_t len;
 	int error;
 
-	error = copyin(uap->alen, &len, sizeof (len));
+	error = copyin(alen, &len, sizeof (len));
 	if (error != 0)
 		return (error);
 
-	error = kern_getpeername(td, uap->fdes, &sa, &len);
+	error = kern_getpeername(td, fdes, &sa, &len);
 	if (error != 0)
 		return (error);
 
@@ -1429,11 +1690,11 @@ getpeername1(struct thread *td, struct getpeername_args *uap, int compat)
 		if (compat)
 			((struct osockaddr *)sa)->sa_family = sa->sa_family;
 #endif
-		error = copyout(sa, uap->asa, (u_int)len);
+		error = copyout(sa, asa, (u_int)len);
 	}
 	free(sa, M_SONAME);
 	if (error == 0)
-		error = copyout(&len, uap->alen, sizeof(len));
+		error = copyout(&len, alen, sizeof(len));
 	return (error);
 }
 
@@ -1486,7 +1747,14 @@ int
 sys_getpeername(struct thread *td, struct getpeername_args *uap)
 {
 
-	return (getpeername1(td, uap, 0));
+	return (getpeername1(td, uap->fdes, uap->asa, uap->alen, 0));
+}
+
+int
+sys_fc_getpeername(struct thread *td, struct fc_getpeername_args *uap)
+{
+
+	return (getpeername1(td, fc2fd(uap->sc), uap->asa, uap->alen, 0));
 }
 
 #ifdef COMPAT_OLDSOCK
@@ -1495,7 +1763,7 @@ ogetpeername(struct thread *td, struct ogetpeername_args *uap)
 {
 
 	/* XXX uap should have type `getpeername_args *' to begin with. */
-	return (getpeername1(td, (struct getpeername_args *)uap, 1));
+	return (getpeername1(td, uap->fdes, uap->asa, uap->alen, 1));
 }
 #endif /* COMPAT_OLDSOCK */
 

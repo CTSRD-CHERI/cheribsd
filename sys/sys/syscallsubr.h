@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 2002 Ian Dowse.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -65,7 +65,7 @@ int	kern_accept(struct thread *td, int s, struct sockaddr **name,
 	    socklen_t *namelen, struct file **fp);
 int	kern_accept4(struct thread *td, int s, struct sockaddr **name,
 	    socklen_t *namelen, int flags, struct file **fp);
-int	kern_accessat(struct thread *td, int fd, char *path,
+int	kern_accessat(struct thread *td, int fd, const char *path,
 	    enum uio_seg pathseg, int flags, int mode);
 int	kern_adjtime(struct thread *td, struct timeval *delta,
 	    struct timeval *olddelta);
@@ -104,9 +104,9 @@ int	kern_cpuset_setid(struct thread *td, cpuwhich_t which,
 int	kern_dup(struct thread *td, u_int mode, int flags, int old, int new);
 int	kern_execve(struct thread *td, struct image_args *args,
 	    struct mac *mac_p);
-int	kern_fchmodat(struct thread *td, int fd, char *path,
+int	kern_fchmodat(struct thread *td, int fd, const char *path,
 	    enum uio_seg pathseg, mode_t mode, int flag);
-int	kern_fchownat(struct thread *td, int fd, char *path,
+int	kern_fchownat(struct thread *td, int fd, const char *path,
 	    enum uio_seg pathseg, int uid, int gid, int flag);
 int	kern_fcntl(struct thread *td, int fd, int cmd, intptr_t arg);
 int	kern_fcntl_freebsd(struct thread *td, int fd, int cmd, long arg);
@@ -116,9 +116,9 @@ int	kern_fstat(struct thread *td, int fd, struct stat *sbp);
 int	kern_fstatfs(struct thread *td, int fd, struct statfs *buf);
 int	kern_fsync(struct thread *td, int fd, bool fullsync);
 int	kern_ftruncate(struct thread *td, int fd, off_t length);
-int	kern_futimes(struct thread *td, int fd, struct timeval *tptr,
+int	kern_futimes(struct thread *td, int fd, const struct timeval *tptr,
 	    enum uio_seg tptrseg);
-int	kern_futimens(struct thread *td, int fd, struct timespec *tptr,
+int	kern_futimens(struct thread *td, int fd, const struct timespec *tptr,
 	    enum uio_seg tptrseg);
 int	kern_getdirentries(struct thread *td, int fd, char *buf, size_t count,
 	    off_t *basep, ssize_t *residp, enum uio_seg bufseg);
@@ -161,11 +161,11 @@ int	kern_lutimes(struct thread *td, char *path, enum uio_seg pathseg,
 	    struct timeval *tptr, enum uio_seg tptrseg);
 int	kern_madvise(struct thread *td, uintptr_t addr, size_t len, int behav);
 int	kern_mincore(struct thread *td, uintptr_t addr, size_t len, char *vec);
-int	kern_mkdirat(struct thread *td, int fd, char *path,
+int	kern_mkdirat(struct thread *td, int fd, const char *path,
 	    enum uio_seg segflg, int mode);
-int	kern_mkfifoat(struct thread *td, int fd, char *path,
+int	kern_mkfifoat(struct thread *td, int fd, const char *path,
 	    enum uio_seg pathseg, int mode);
-int	kern_mknodat(struct thread *td, int fd, char *path,
+int	kern_mknodat(struct thread *td, int fd, const char *path,
 	    enum uio_seg pathseg, int mode, dev_t dev);
 int	kern_mlock(struct proc *proc, struct ucred *cred, uintptr_t addr,
 	    size_t len);
@@ -182,7 +182,7 @@ int     kern_nanosleep(struct thread *td, struct timespec *rqt,
 	    struct timespec *rmt);
 int	kern_ogetdirentries(struct thread *td, struct ogetdirentries_args *uap,
 	    long *ploff);
-int	kern_openat(struct thread *td, int fd, char *path,
+int	kern_openat(struct thread *td, int fd, const char *path,
 	    enum uio_seg pathseg, int flags, int mode);
 int	kern_openat_c(struct thread *td, int fd, char const * __CAPABILITY path,
 	    enum uio_seg pathseg, int flags, int mode);
@@ -211,13 +211,13 @@ int	kern_pwrite(struct thread *td, int fd, const void *buf, size_t nbyte,
 int	kern_pwritev(struct thread *td, int fd, struct uio *auio, off_t offset);
 int	kern_quotactl(struct thread *td, const char * __CAPABILITY path,
 	    int cmd, int uid, void * __CAPABILITY arg);
-int	kern_readlinkat(struct thread *td, int fd, char *path,
+int	kern_readlinkat(struct thread *td, int fd, const char *path,
 	    enum uio_seg pathseg, char *buf, enum uio_seg bufseg, size_t count);
 int	kern_readv(struct thread *td, int fd, struct uio *auio);
 int	kern_recvit(struct thread *td, int s, struct msghdr *mp,
 	    enum uio_seg fromseg, struct mbuf **controlp);
-int	kern_renameat(struct thread *td, int oldfd, char *old, int newfd,
-	    char *new, enum uio_seg pathseg);
+int	kern_renameat(struct thread *td, int oldfd, const char *old, int newfd,
+	    const char *new, enum uio_seg pathseg);
 int	kern_rmdirat(struct thread *td, int fd, const char *path,
 	    enum uio_seg pathseg);
 int	kern_rmdirat_c(struct thread *td, int fd, const char * __CAPABILITY path,
@@ -246,7 +246,7 @@ int	kern_setitimer(struct thread *, u_int, struct itimerval *,
 	    struct itimerval *);
 int	kern_setrlimit(struct thread *, u_int, struct rlimit *);
 int	kern_setsockopt(struct thread *td, int s, int level, int name,
-	    void *optval, enum uio_seg valseg, socklen_t valsize);
+	    const void *optval, enum uio_seg valseg, socklen_t valsize);
 int	kern_settimeofday(struct thread *td, struct timeval *tv,
 	    struct timezone *tzp);
 int	kern_shm_open(struct thread *td, const char *userpath, int flags,
@@ -270,13 +270,13 @@ int	kern_sigtimedwait(struct thread *td, sigset_t waitset,
 int	kern_sigqueue(struct thread *td, pid_t pid, int signum,
 	    union sigval *value, int flags);
 int	kern_socket(struct thread *td, int domain, int type, int protocol);
-int	kern_statat(struct thread *td, int flag, int fd, char *path,
+int	kern_statat(struct thread *td, int flag, int fd, const char *path,
 	    enum uio_seg pathseg, struct stat *sbp,
 	    void (*hook)(struct vnode *vp, struct stat *sbp));
 int	kern_statfs(struct thread *td, char *path, enum uio_seg pathseg,
 	    struct statfs *buf);
-int	kern_symlinkat(struct thread *td, char *path1, int fd, char *path2,
-	    enum uio_seg segflg);
+int	kern_symlinkat(struct thread *td, const char *path1, int fd,
+	    const char *path2, enum uio_seg segflg);
 int	kern_ktimer_create(struct thread *td, clockid_t clock_id,
 	    struct sigevent *evp, int *timerid, int preset_id);
 int	kern_ktimer_delete(struct thread *, int);
@@ -295,11 +295,12 @@ int	kern_unlinkat(struct thread *td, int fd, const char *path,
 	    enum uio_seg pathseg, ino_t oldinum);
 int	kern_unlinkat_c(struct thread *td, int fd,
 	    const char * __CAPABILITY path, enum uio_seg pathseg, ino_t oldinum);
-int	kern_utimesat(struct thread *td, int fd, char *path,
-	    enum uio_seg pathseg, struct timeval *tptr, enum uio_seg tptrseg);
-int	kern_utimensat(struct thread *td, int fd, char *path,
-	    enum uio_seg pathseg, struct timespec *tptr, enum uio_seg tptrseg,
-	    int follow);
+int	kern_utimesat(struct thread *td, int fd, const char *path,
+	    enum uio_seg pathseg, const struct timeval *tptr,
+	    enum uio_seg tptrseg);
+int	kern_utimensat(struct thread *td, int fd, const char *path,
+	    enum uio_seg pathseg, const struct timespec *tptr,
+	    enum uio_seg tptrseg, int follow);
 int	kern_wait(struct thread *td, pid_t pid, int *status, int options,
 	    struct rusage *rup);
 int	kern_wait6(struct thread *td, enum idtype idtype, id_t id, int *status,

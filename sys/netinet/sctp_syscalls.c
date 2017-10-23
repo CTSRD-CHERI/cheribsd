@@ -89,8 +89,25 @@ static struct syscall_helper_data sctp_syscalls[] = {
 	SYSCALL_INIT_HELPER(sctp_generic_sendmsg),
 	SYSCALL_INIT_HELPER(sctp_generic_sendmsg_iov),
 	SYSCALL_INIT_HELPER(sctp_generic_recvmsg),
+	SYSCALL_INIT_HELPER(fc_sctp_peeloff),
+	SYSCALL_INIT_HELPER(fc_sctp_generic_sendmsg),
+	SYSCALL_INIT_HELPER(fc_sctp_generic_sendmsg_iov),
+	SYSCALL_INIT_HELPER(fc_sctp_generic_recvmsg),
 	SYSCALL_INIT_LAST
 };
+
+static int	kern_sctp_peeloff(struct thread *td, int sd, uint32_t name);
+static int	kern_sctp_generic_recvmsg(struct thread *td, int sd,
+		    struct iovec *uiov, int iovlen, struct sockaddr *from,
+		    socklen_t *fromlenaddr, struct sctp_sndrcvinfo *sinfop,
+		    int *msg_flagsp);
+static int	kern_sctp_generic_sendmsg(struct thread *td, int sd,
+		    caddr_t msg, int mlen, caddr_t uto, socklen_t tolen,
+		    struct sctp_sndrcvinfo *usinfo, int flags);
+static int	kern_sctp_generic_sendmsg_iov(struct thread *td, int sd,
+		    struct iovec *uiov, int iovlen, caddr_t uto,
+		    socklen_t tolen, struct sctp_sndrcvinfo *sinfop,
+		    int flags);
 
 static void
 sctp_syscalls_init(void *unused __unused)
@@ -116,12 +133,21 @@ SYSINIT(sctp_syscalls, SI_SUB_SYSCALLS, SI_ORDER_ANY, sctp_syscalls_init, NULL);
  * XXX: We should make this loadable one day.
  */
 int
-sys_sctp_peeloff(td, uap)
-	struct thread *td;
-	struct sctp_peeloff_args /* {
-		int	sd;
-		caddr_t	name;
-	} */ *uap;
+sys_sctp_peeloff(struct thread *td, struct sctp_peeloff_args *uap)
+{
+
+	return (kern_sctp_peeloff(td, uap->sd, uap->name));
+}
+
+int
+sys_fc_sctp_peeloff(struct thread *td, struct fc_sctp_peeloff_args *uap)
+{
+
+	return (kern_sctp_peeloff(td, fc2fd(uap->sc), uap->name));
+}
+
+static int
+kern_sctp_peeloff(struct thread *td, int sd, uint32_t name)
 {
 #if (defined(INET) || defined(INET6)) && defined(SCTP)
 	struct file *headfp, *nfp = NULL;
@@ -130,8 +156,8 @@ sys_sctp_peeloff(td, uap)
 	u_int fflag;
 	int error, fd;
 
-	AUDIT_ARG_FD(uap->sd);
-	error = getsock_cap(td, uap->sd, cap_rights_init(&rights, CAP_PEELOFF),
+	AUDIT_ARG_FD(sd);
+	error = getsock_cap(td, sd, cap_rights_init(&rights, CAP_PEELOFF),
 	    &headfp, &fflag, NULL);
 	if (error != 0)
 		goto done2;
@@ -140,7 +166,7 @@ sys_sctp_peeloff(td, uap)
 		error = EOPNOTSUPP;
 		goto done;
 	}
-	error = sctp_can_peel_off(head, (sctp_assoc_t)uap->name);
+	error = sctp_can_peel_off(head, (sctp_assoc_t)name);
 	if (error != 0)
 		goto done;
 	/*
@@ -161,7 +187,7 @@ sys_sctp_peeloff(td, uap)
 		goto noconnection;
 	}
 	finit(nfp, fflag, DTYPE_SOCKET, so, &socketops);
-	error = sctp_do_peeloff(head, so, (sctp_assoc_t)uap->name);
+	error = sctp_do_peeloff(head, so, (sctp_assoc_t)name);
 	if (error != 0)
 		goto noconnection;
 	if (head->so_sigio != NULL)
@@ -191,17 +217,26 @@ done2:
 }
 
 int
-sys_sctp_generic_sendmsg (td, uap)
-	struct thread *td;
-	struct sctp_generic_sendmsg_args /* {
-		int sd,
-		caddr_t msg,
-		int mlen,
-		caddr_t to,
-		__socklen_t tolen,
-		struct sctp_sndrcvinfo *sinfo,
-		int flags
-	} */ *uap;
+sys_sctp_generic_sendmsg(struct thread *td,
+    struct sctp_generic_sendmsg_args *uap)
+{
+
+	return(kern_sctp_generic_sendmsg(td, uap->sd, uap->msg, uap->mlen,
+	    uap->to, uap->tolen, uap->sinfo, uap->flags));
+}
+
+int
+sys_fc_sctp_generic_sendmsg(struct thread *td,
+    struct fc_sctp_generic_sendmsg_args *uap)
+{
+
+	return(kern_sctp_generic_sendmsg(td, fc2fd(uap->sc), uap->msg,
+	    uap->mlen, (caddr_t)uap->to, uap->tolen, uap->sinfo, uap->flags));
+}
+
+static int
+kern_sctp_generic_sendmsg(struct thread *td, int sd, caddr_t msg, int mlen,
+    caddr_t uto, socklen_t tolen, struct sctp_sndrcvinfo *sinfop, int flags)
 {
 #if (defined(INET) || defined(INET6)) && defined(SCTP)
 	struct sctp_sndrcvinfo sinfo, *u_sinfo = NULL;
@@ -216,16 +251,16 @@ sys_sctp_generic_sendmsg (td, uap)
 	cap_rights_t rights;
 	int error = 0, len;
 
-	if (uap->sinfo != NULL) {
-		error = copyin(uap->sinfo, &sinfo, sizeof (sinfo));
+	if (sinfop != NULL) {
+		error = copyin(sinfop, &sinfo, sizeof (sinfo));
 		if (error != 0)
 			return (error);
 		u_sinfo = &sinfo;
 	}
 
 	cap_rights_init(&rights, CAP_SEND);
-	if (uap->tolen != 0) {
-		error = getsockaddr(&to, uap->to, uap->tolen);
+	if (tolen != 0) {
+		error = getsockaddr(&to, uto, tolen);
 		if (error != 0) {
 			to = NULL;
 			goto sctp_bad2;
@@ -233,8 +268,8 @@ sys_sctp_generic_sendmsg (td, uap)
 		cap_rights_set(&rights, CAP_CONNECT);
 	}
 
-	AUDIT_ARG_FD(uap->sd);
-	error = getsock_cap(td, uap->sd, &rights, &fp, NULL, NULL);
+	AUDIT_ARG_FD(sd);
+	error = getsock_cap(td, sd, &rights, &fp, NULL, NULL);
 	if (error != 0)
 		goto sctp_bad;
 #ifdef KTRACE
@@ -242,8 +277,8 @@ sys_sctp_generic_sendmsg (td, uap)
 		ktrsockaddr(to);
 #endif
 
-	iov[0].iov_base = uap->msg;
-	iov[0].iov_len = uap->mlen;
+	iov[0].iov_base = msg;
+	iov[0].iov_len = mlen;
 
 	so = (struct socket *)fp->f_data;
 	if (so->so_proto->pr_protocol != IPPROTO_SCTP) {
@@ -267,10 +302,10 @@ sys_sctp_generic_sendmsg (td, uap)
 	if (KTRPOINT(td, KTR_GENIO))
 		ktruio = cloneuio(&auio);
 #endif /* KTRACE */
-	len = auio.uio_resid = uap->mlen;
+	len = auio.uio_resid = mlen;
 	CURVNET_SET(so->so_vnet);
 	error = sctp_lower_sosend(so, to, &auio, (struct mbuf *)NULL,
-	    (struct mbuf *)NULL, uap->flags, u_sinfo, td);
+	    (struct mbuf *)NULL, flags, u_sinfo, td);
 	CURVNET_RESTORE();
 	if (error != 0) {
 		if (auio.uio_resid != len && (error == ERESTART ||
@@ -278,7 +313,7 @@ sys_sctp_generic_sendmsg (td, uap)
 			error = 0;
 		/* Generation of SIGPIPE can be controlled per socket. */
 		if (error == EPIPE && !(so->so_options & SO_NOSIGPIPE) &&
-		    !(uap->flags & MSG_NOSIGNAL)) {
+		    !(flags & MSG_NOSIGNAL)) {
 			PROC_LOCK(td->td_proc);
 			tdsignal(td, SIGPIPE);
 			PROC_UNLOCK(td->td_proc);
@@ -289,7 +324,7 @@ sys_sctp_generic_sendmsg (td, uap)
 #ifdef KTRACE
 	if (ktruio != NULL) {
 		ktruio->uio_resid = td->td_retval[0];
-		ktrgenio(uap->sd, UIO_WRITE, ktruio, error);
+		ktrgenio(sd, UIO_WRITE, ktruio, error);
 	}
 #endif /* KTRACE */
 sctp_bad:
@@ -304,17 +339,28 @@ sctp_bad2:
 }
 
 int
-sys_sctp_generic_sendmsg_iov(td, uap)
-	struct thread *td;
-	struct sctp_generic_sendmsg_iov_args /* {
-		int sd,
-		struct iovec *iov,
-		int iovlen,
-		caddr_t to,
-		__socklen_t tolen,
-		struct sctp_sndrcvinfo *sinfo,
-		int flags
-	} */ *uap;
+sys_sctp_generic_sendmsg_iov(struct thread *td,
+    struct sctp_generic_sendmsg_iov_args *uap)
+{
+
+	return(kern_sctp_generic_sendmsg_iov(td, uap->sd, uap->iov,
+	    uap->iovlen, uap->to, uap->tolen, uap->sinfo, uap->flags));
+}
+
+int
+sys_fc_sctp_generic_sendmsg_iov(struct thread *td,
+    struct fc_sctp_generic_sendmsg_iov_args *uap)
+{
+
+	return(kern_sctp_generic_sendmsg_iov(td, fc2fd(uap->sc), uap->iov,
+	    uap->iovlen, (caddr_t)uap->to, uap->tolen, uap->sinfo,
+	    uap->flags));
+}
+
+static int
+kern_sctp_generic_sendmsg_iov(struct thread *td, int sd, struct iovec *uiov,
+    int iovlen, caddr_t uto, socklen_t tolen, struct sctp_sndrcvinfo *sinfop,
+    int flags)
 {
 #if (defined(INET) || defined(INET6)) && defined(SCTP)
 	struct sctp_sndrcvinfo sinfo, *u_sinfo = NULL;
@@ -330,15 +376,15 @@ sys_sctp_generic_sendmsg_iov(td, uap)
 	ssize_t len;
 	int error, i;
 
-	if (uap->sinfo != NULL) {
-		error = copyin(uap->sinfo, &sinfo, sizeof (sinfo));
+	if (sinfop != NULL) {
+		error = copyin(sinfop, &sinfo, sizeof (sinfo));
 		if (error != 0)
 			return (error);
 		u_sinfo = &sinfo;
 	}
 	cap_rights_init(&rights, CAP_SEND);
-	if (uap->tolen != 0) {
-		error = getsockaddr(&to, uap->to, uap->tolen);
+	if (tolen != 0) {
+		error = getsockaddr(&to, uto, tolen);
 		if (error != 0) {
 			to = NULL;
 			goto sctp_bad2;
@@ -346,24 +392,24 @@ sys_sctp_generic_sendmsg_iov(td, uap)
 		cap_rights_set(&rights, CAP_CONNECT);
 	}
 
-	AUDIT_ARG_FD(uap->sd);
-	error = getsock_cap(td, uap->sd, &rights, &fp, NULL, NULL);
+	AUDIT_ARG_FD(sd);
+	error = getsock_cap(td, sd, &rights, &fp, NULL, NULL);
 	if (error != 0)
 		goto sctp_bad1;
 
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
-		error = freebsd32_copyiniov((struct iovec32 *)uap->iov,
-		    uap->iovlen, &iov, EMSGSIZE);
+		error = freebsd32_copyiniov((struct iovec32 *)uiov,
+		    iovlen, &iov, EMSGSIZE);
 	else
 #endif
 #ifdef COMPAT_CHERIABI
 	if (SV_CURPROC_FLAGS(SV_CHERI))
-		error = cheriabi_copyiniov((struct iovec_c *)uap->iov,
-		    uap->iovlen, &iov, EMSGSIZE);
+		error = cheriabi_copyiniov((struct iovec_c *)uiov,
+		    iovlen, &iov, EMSGSIZE);
 	else
 #endif
-		error = copyiniov(uap->iov, uap->iovlen, &iov, EMSGSIZE);
+		error = copyiniov(uiov, iovlen, &iov, EMSGSIZE);
 	if (error != 0)
 		goto sctp_bad1;
 #ifdef KTRACE
@@ -383,14 +429,14 @@ sys_sctp_generic_sendmsg_iov(td, uap)
 #endif /* MAC */
 
 	auio.uio_iov = iov;
-	auio.uio_iovcnt = uap->iovlen;
+	auio.uio_iovcnt = iovlen;
 	auio.uio_segflg = UIO_USERSPACE;
 	auio.uio_rw = UIO_WRITE;
 	auio.uio_td = td;
 	auio.uio_offset = 0;			/* XXX */
 	auio.uio_resid = 0;
 	tiov = iov;
-	for (i = 0; i <uap->iovlen; i++, tiov++) {
+	for (i = 0; i <iovlen; i++, tiov++) {
 		if ((auio.uio_resid += tiov->iov_len) < 0) {
 			error = EINVAL;
 			goto sctp_bad;
@@ -404,7 +450,7 @@ sys_sctp_generic_sendmsg_iov(td, uap)
 	CURVNET_SET(so->so_vnet);
 	error = sctp_lower_sosend(so, to, &auio,
 		    (struct mbuf *)NULL, (struct mbuf *)NULL,
-		    uap->flags, u_sinfo, td);
+		    flags, u_sinfo, td);
 	CURVNET_RESTORE();
 	if (error != 0) {
 		if (auio.uio_resid != len && (error == ERESTART ||
@@ -412,7 +458,7 @@ sys_sctp_generic_sendmsg_iov(td, uap)
 			error = 0;
 		/* Generation of SIGPIPE can be controlled per socket */
 		if (error == EPIPE && !(so->so_options & SO_NOSIGPIPE) &&
-		    !(uap->flags & MSG_NOSIGNAL)) {
+		    !(flags & MSG_NOSIGNAL)) {
 			PROC_LOCK(td->td_proc);
 			tdsignal(td, SIGPIPE);
 			PROC_UNLOCK(td->td_proc);
@@ -423,7 +469,7 @@ sys_sctp_generic_sendmsg_iov(td, uap)
 #ifdef KTRACE
 	if (ktruio != NULL) {
 		ktruio->uio_resid = td->td_retval[0];
-		ktrgenio(uap->sd, UIO_WRITE, ktruio, error);
+		ktrgenio(sd, UIO_WRITE, ktruio, error);
 	}
 #endif /* KTRACE */
 sctp_bad:
@@ -440,17 +486,28 @@ sctp_bad2:
 }
 
 int
-sys_sctp_generic_recvmsg(td, uap)
-	struct thread *td;
-	struct sctp_generic_recvmsg_args /* {
-		int sd,
-		struct iovec *iov,
-		int iovlen,
-		struct sockaddr *from,
-		__socklen_t *fromlenaddr,
-		struct sctp_sndrcvinfo *sinfo,
-		int *msg_flags
-	} */ *uap;
+sys_sctp_generic_recvmsg(struct thread *td,
+    struct sctp_generic_recvmsg_args *uap)
+{
+
+	return(kern_sctp_generic_recvmsg(td, uap->sd, uap->iov, uap->iovlen,
+	    uap->from, uap->fromlenaddr, uap->sinfo, uap->msg_flags));
+}
+
+int
+sys_fc_sctp_generic_recvmsg(struct thread *td,
+    struct fc_sctp_generic_recvmsg_args *uap)
+{
+
+	return(kern_sctp_generic_recvmsg(td, fc2fd(uap->sc), uap->iov,
+	    uap->iovlen, uap->from, uap->fromlenaddr, uap->sinfo,
+	    uap->msg_flags));
+}
+
+static int
+kern_sctp_generic_recvmsg(struct thread *td, int sd, struct iovec *uiov,
+    int iovlen, struct sockaddr *from, socklen_t *fromlenaddr,
+    struct sctp_sndrcvinfo *sinfop, int *msg_flagsp)
 {
 #if (defined(INET) || defined(INET6)) && defined(SCTP)
 	uint8_t sockbufstore[256];
@@ -467,24 +524,24 @@ sys_sctp_generic_recvmsg(td, uap)
 	ssize_t len;
 	int error, fromlen, i, msg_flags;
 
-	AUDIT_ARG_FD(uap->sd);
-	error = getsock_cap(td, uap->sd, cap_rights_init(&rights, CAP_RECV),
+	AUDIT_ARG_FD(sd);
+	error = getsock_cap(td, sd, cap_rights_init(&rights, CAP_RECV),
 	    &fp, NULL, NULL);
 	if (error != 0)
 		return (error);
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
-		error = freebsd32_copyiniov((struct iovec32 *)uap->iov,
-		    uap->iovlen, &iov, EMSGSIZE);
+		error = freebsd32_copyiniov((struct iovec32 *)uiov,
+		    iovlen, &iov, EMSGSIZE);
 	else
 #endif
 #ifdef COMPAT_CHERIABI
 	if (SV_CURPROC_FLAGS(SV_CHERI))
-		error = cheriabi_copyiniov((struct iovec_c *)uap->iov,
-		    uap->iovlen, &iov, EMSGSIZE);
+		error = cheriabi_copyiniov((struct iovec_c *)uiov,
+		    iovlen, &iov, EMSGSIZE);
 	else
 #endif
-		error = copyiniov(uap->iov, uap->iovlen, &iov, EMSGSIZE);
+		error = copyiniov(uiov, iovlen, &iov, EMSGSIZE);
 	if (error != 0)
 		goto out1;
 
@@ -499,29 +556,29 @@ sys_sctp_generic_recvmsg(td, uap)
 		goto out;
 #endif /* MAC */
 
-	if (uap->fromlenaddr != NULL) {
-		error = copyin(uap->fromlenaddr, &fromlen, sizeof (fromlen));
+	if (fromlenaddr != NULL) {
+		error = copyin(fromlenaddr, &fromlen, sizeof (fromlen));
 		if (error != 0)
 			goto out;
 	} else {
 		fromlen = 0;
 	}
-	if (uap->msg_flags) {
-		error = copyin(uap->msg_flags, &msg_flags, sizeof (int));
+	if (msg_flagsp) {
+		error = copyin(msg_flagsp, &msg_flags, sizeof (int));
 		if (error != 0)
 			goto out;
 	} else {
 		msg_flags = 0;
 	}
 	auio.uio_iov = iov;
-	auio.uio_iovcnt = uap->iovlen;
+	auio.uio_iovcnt = iovlen;
 	auio.uio_segflg = UIO_USERSPACE;
 	auio.uio_rw = UIO_READ;
 	auio.uio_td = td;
 	auio.uio_offset = 0;			/* XXX */
 	auio.uio_resid = 0;
 	tiov = iov;
-	for (i = 0; i <uap->iovlen; i++, tiov++) {
+	for (i = 0; i <iovlen; i++, tiov++) {
 		if ((auio.uio_resid += tiov->iov_len) < 0) {
 			error = EINVAL;
 			goto out;
@@ -545,30 +602,30 @@ sys_sctp_generic_recvmsg(td, uap)
 		    error == EINTR || error == EWOULDBLOCK))
 			error = 0;
 	} else {
-		if (uap->sinfo)
-			error = copyout(&sinfo, uap->sinfo, sizeof (sinfo));
+		if (sinfop)
+			error = copyout(&sinfo, sinfop, sizeof(sinfo));
 	}
 #ifdef KTRACE
 	if (ktruio != NULL) {
 		ktruio->uio_resid = len - auio.uio_resid;
-		ktrgenio(uap->sd, UIO_READ, ktruio, error);
+		ktrgenio(sd, UIO_READ, ktruio, error);
 	}
 #endif /* KTRACE */
 	if (error != 0)
 		goto out;
 	td->td_retval[0] = len - auio.uio_resid;
 
-	if (fromlen && uap->from) {
+	if (fromlen && from) {
 		len = fromlen;
 		if (len <= 0 || fromsa == NULL)
 			len = 0;
 		else {
 			len = MIN(len, fromsa->sa_len);
-			error = copyout(fromsa, uap->from, (size_t)len);
+			error = copyout(fromsa, from, (size_t)len);
 			if (error != 0)
 				goto out;
 		}
-		error = copyout(&len, uap->fromlenaddr, sizeof (socklen_t));
+		error = copyout(&len, fromlenaddr, sizeof (socklen_t));
 		if (error != 0)
 			goto out;
 	}
@@ -576,8 +633,8 @@ sys_sctp_generic_recvmsg(td, uap)
 	if (KTRPOINT(td, KTR_STRUCT))
 		ktrsockaddr(fromsa);
 #endif
-	if (uap->msg_flags) {
-		error = copyout(&msg_flags, uap->msg_flags, sizeof (int));
+	if (msg_flagsp) {
+		error = copyout(&msg_flags, msg_flagsp, sizeof (int));
 		if (error != 0)
 			goto out;
 	}

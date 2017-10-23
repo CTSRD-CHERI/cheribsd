@@ -207,6 +207,25 @@ sys_read(td, uap)
 	return(error);
 }
 
+int
+sys_fc_read(struct thread *td, struct fc_read_args *uap)
+{
+	struct uio auio;
+	struct iovec aiov;
+	int error;
+
+	if (uap->nbyte > IOSIZE_MAX)
+		return (EINVAL);
+	aiov.iov_base = uap->buf;
+	aiov.iov_len = uap->nbyte;
+	auio.uio_iov = &aiov;
+	auio.uio_iovcnt = 1;
+	auio.uio_resid = uap->nbyte;
+	auio.uio_segflg = UIO_USERSPACE;
+	error = kern_readv(td, fc2fd(uap->fc), &auio);
+	return(error);
+}
+
 /*
  * Positioned read system call
  */
@@ -224,6 +243,14 @@ sys_pread(struct thread *td, struct pread_args *uap)
 {
 
 	return (kern_pread(td, uap->fd, uap->buf, uap->nbyte, uap->offset));
+}
+
+int
+sys_fc_pread(struct thread *td, struct fc_pread_args *uap)
+{
+
+	return (kern_pread(td, fc2fd(uap->fc), uap->buf, uap->nbyte,
+	    uap->offset));
 }
 
 int
@@ -279,6 +306,20 @@ sys_readv(struct thread *td, struct readv_args *uap)
 }
 
 int
+sys_fc_readv(struct thread *td, struct fc_readv_args *uap)
+{
+	struct uio *auio;
+	int error;
+
+	error = copyinuio(uap->iovp, uap->iovcnt, &auio);
+	if (error)
+		return (error);
+	error = kern_readv(td, fc2fd(uap->fc), auio);
+	free(auio, M_IOV);
+	return (error);
+}
+
+int
 kern_readv(struct thread *td, int fd, struct uio *auio)
 {
 	struct file *fp;
@@ -314,6 +355,20 @@ sys_preadv(struct thread *td, struct preadv_args *uap)
 	if (error)
 		return (error);
 	error = kern_preadv(td, uap->fd, auio, uap->offset);
+	free(auio, M_IOV);
+	return (error);
+}
+
+int
+sys_fc_preadv(struct thread *td, struct fc_preadv_args *uap)
+{
+	struct uio *auio;
+	int error;
+
+	error = copyinuio(uap->iovp, uap->iovcnt, &auio);
+	if (error)
+		return (error);
+	error = kern_preadv(td, fc2fd(uap->fc), auio, uap->offset);
 	free(auio, M_IOV);
 	return (error);
 }
@@ -421,6 +476,25 @@ sys_write(td, uap)
 	return(error);
 }
 
+int
+sys_fc_write(struct thread *td, struct fc_write_args *uap)
+{
+	struct uio auio;
+	struct iovec aiov;
+	int error;
+
+	if (uap->nbyte > IOSIZE_MAX)
+		return (EINVAL);
+	aiov.iov_base = (void *)(uintptr_t)uap->buf;
+	aiov.iov_len = uap->nbyte;
+	auio.uio_iov = &aiov;
+	auio.uio_iovcnt = 1;
+	auio.uio_resid = uap->nbyte;
+	auio.uio_segflg = UIO_USERSPACE;
+	error = kern_writev(td, fc2fd(uap->fc), &auio);
+	return(error);
+}
+
 /*
  * Positioned write system call.
  */
@@ -438,6 +512,14 @@ sys_pwrite(struct thread *td, struct pwrite_args *uap)
 {
 
 	return (kern_pwrite(td, uap->fd, uap->buf, uap->nbyte, uap->offset));
+}
+
+int
+sys_fc_pwrite(struct thread *td, struct fc_pwrite_args *uap)
+{
+
+	return (kern_pwrite(td, fc2fd(uap->fc), uap->buf, uap->nbyte,
+	    uap->offset));
 }
 
 int
@@ -494,6 +576,20 @@ sys_writev(struct thread *td, struct writev_args *uap)
 }
 
 int
+sys_fc_writev(struct thread *td, struct fc_writev_args *uap)
+{
+	struct uio *auio;
+	int error;
+
+	error = copyinuio(uap->iovp, uap->iovcnt, &auio);
+	if (error)
+		return (error);
+	error = kern_writev(td, fc2fd(uap->fc), auio);
+	free(auio, M_IOV);
+	return (error);
+}
+
+int
 kern_writev(struct thread *td, int fd, struct uio *auio)
 {
 	struct file *fp;
@@ -529,6 +625,20 @@ sys_pwritev(struct thread *td, struct pwritev_args *uap)
 	if (error)
 		return (error);
 	error = kern_pwritev(td, uap->fd, auio, uap->offset);
+	free(auio, M_IOV);
+	return (error);
+}
+
+int
+sys_fc_pwritev(struct thread *td, struct fc_pwritev_args *uap)
+{
+	struct uio *auio;
+	int error;
+
+	error = copyinuio(uap->iovp, uap->iovcnt, &auio);
+	if (error)
+		return (error);
+	error = kern_pwritev(td, fc2fd(uap->fc), auio, uap->offset);
 	free(auio, M_IOV);
 	return (error);
 }
@@ -659,6 +769,13 @@ sys_ftruncate(td, uap)
 	return (kern_ftruncate(td, uap->fd, uap->length));
 }
 
+int
+sys_fc_ftruncate(struct thread *td, struct fc_ftruncate_args *uap)
+{
+
+	return (kern_ftruncate(td, fc2fd(uap->fc), uap->length));
+}
+
 #if defined(COMPAT_43)
 #ifndef _SYS_SYSPROTO_H_
 struct oftruncate_args {
@@ -743,6 +860,75 @@ sys_ioctl(struct thread *td, struct ioctl_args *uap)
 	}
 
 	error = kern_ioctl(td, uap->fd, com, data);
+
+	if (error == 0 && (com & IOC_OUT))
+		error = copyout(data, uap->data, (u_int)size);
+
+out:
+	if (size > SYS_IOCTL_SMALL_SIZE)
+		free(data, M_IOCTLOPS);
+	return (error);
+}
+
+int
+sys_fc_ioctl(struct thread *td, struct fc_ioctl_args *uap)
+{
+	u_char smalldata[SYS_IOCTL_SMALL_SIZE] __aligned(SYS_IOCTL_SMALL_ALIGN);
+	u_long com;
+	int arg, error;
+	u_int size;
+	caddr_t data;
+
+	if (uap->com > 0xffffffff) {
+		printf(
+		    "WARNING pid %d (%s): ioctl sign-extension ioctl %lx\n",
+		    td->td_proc->p_pid, td->td_name, uap->com);
+		uap->com &= 0xffffffff;
+	}
+	com = uap->com;
+
+	/*
+	 * Interpret high order word to find amount of data to be
+	 * copied to/from the user's address space.
+	 */
+	size = IOCPARM_LEN(com);
+	if ((size > IOCPARM_MAX) ||
+	    ((com & (IOC_VOID  | IOC_IN | IOC_OUT)) == 0) ||
+#if defined(COMPAT_FREEBSD5) || defined(COMPAT_FREEBSD4) || defined(COMPAT_43)
+	    ((com & IOC_OUT) && size == 0) ||
+#else
+	    ((com & (IOC_IN | IOC_OUT)) && size == 0) ||
+#endif
+	    ((com & IOC_VOID) && size > 0 && size != sizeof(int)))
+		return (ENOTTY);
+
+	if (size > 0) {
+		if (com & IOC_VOID) {
+			/* Integer argument. */
+			arg = (intptr_t)uap->data;
+			data = (void *)&arg;
+			size = 0;
+		} else {
+			if (size > SYS_IOCTL_SMALL_SIZE)
+				data = malloc((u_long)size, M_IOCTLOPS, M_WAITOK);
+			else
+				data = smalldata;
+		}
+	} else
+		data = (void *)&uap->data;
+	if (com & IOC_IN) {
+		error = copyin(uap->data, data, (u_int)size);
+		if (error != 0)
+			goto out;
+	} else if (com & IOC_OUT) {
+		/*
+		 * Zero the buffer so the user always
+		 * gets back something deterministic.
+		 */
+		bzero(data, size);
+	}
+
+	error = kern_ioctl(td, fc2fd(uap->fc), com, data);
 
 	if (error == 0 && (com & IOC_OUT))
 		error = copyout(data, uap->data, (u_int)size);
@@ -1345,6 +1531,28 @@ sys_poll(struct thread *td, struct poll_args *uap)
 }
 
 int
+sys_fc_poll(struct thread *td, struct fc_poll_args *uap)
+{
+#ifdef NOTYET
+	struct timespec ts, *tsp;
+
+	if (uap->timeout != INFTIM) {
+		if (uap->timeout < 0)
+			return (EINVAL);
+		ts.tv_sec = uap->timeout / 1000;
+		ts.tv_nsec = (uap->timeout % 1000) * 1000000;
+		tsp = &ts;
+	} else
+		tsp = NULL;
+
+	/* XXX: need to covert pollfd_c to pollfd */
+	return (kern_poll(td, uap->fds, uap->nfds, tsp, NULL));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
 kern_poll(struct thread *td, struct pollfd *fds, u_int nfds,
     struct timespec *tsp, sigset_t *uset)
 {
@@ -1467,6 +1675,13 @@ sys_ppoll(struct thread *td, struct ppoll_args *uap)
 	 */
 
 	return (kern_poll(td, uap->fds, uap->nfds, tsp, ssp));
+}
+
+int
+sys_fc_ppoll(struct thread *td, struct fc_ppoll_args *uap)
+{
+
+	return (ENOSYS);
 }
 
 static int

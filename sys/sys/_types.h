@@ -120,6 +120,12 @@ typedef union {
 
 typedef __uintmax_t     __rman_res_t;
 
+#if __has_feature(capabilities)
+typedef __intcap_t	__fc_t;
+#else
+typedef __int64_t	__fc_t;
+#endif
+
 /*
  * When the following macro is defined, the system uses 64-bit inode numbers.
  * Programs can use this to avoid including <sys/param.h>, with its associated

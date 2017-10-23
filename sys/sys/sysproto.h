@@ -1771,6 +1771,554 @@ struct kevent_args {
 	char nevents_l_[PADL_(int)]; int nevents; char nevents_r_[PADR_(int)];
 	char timeout_l_[PADL_(const struct timespec *)]; const struct timespec * timeout; char timeout_r_[PADR_(const struct timespec *)];
 };
+struct fc_read_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char buf_l_[PADL_(void *)]; void * buf; char buf_r_[PADR_(void *)];
+	char nbyte_l_[PADL_(size_t)]; size_t nbyte; char nbyte_r_[PADR_(size_t)];
+};
+struct fc_write_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char buf_l_[PADL_(const void *)]; const void * buf; char buf_r_[PADR_(const void *)];
+	char nbyte_l_[PADL_(size_t)]; size_t nbyte; char nbyte_r_[PADR_(size_t)];
+};
+struct __fc_open_args {
+	char newfc_l_[PADL_(fc_t *)]; fc_t * newfc; char newfc_r_[PADR_(fc_t *)];
+	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
+};
+struct fc_close_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+};
+struct fc_fchdir_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+};
+struct fc_recvmsg_args {
+	char sc_l_[PADL_(fc_t)]; fc_t sc; char sc_r_[PADR_(fc_t)];
+	char msg_l_[PADL_(struct msghdr *)]; struct msghdr * msg; char msg_r_[PADR_(struct msghdr *)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
+struct fc_sendmsg_args {
+	char sc_l_[PADL_(fc_t)]; fc_t sc; char sc_r_[PADR_(fc_t)];
+	char msg_l_[PADL_(const struct msghdr *)]; const struct msghdr * msg; char msg_r_[PADR_(const struct msghdr *)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
+struct fc_recvfrom_args {
+	char sc_l_[PADL_(fc_t)]; fc_t sc; char sc_r_[PADR_(fc_t)];
+	char buf_l_[PADL_(void *)]; void * buf; char buf_r_[PADR_(void *)];
+	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char from_l_[PADL_(struct sockaddr *)]; struct sockaddr * from; char from_r_[PADR_(struct sockaddr *)];
+	char fromlenaddr_l_[PADL_(__socklen_t *)]; __socklen_t * fromlenaddr; char fromlenaddr_r_[PADR_(__socklen_t *)];
+};
+struct __fc_accept_args {
+	char newfc_l_[PADL_(fc_t *)]; fc_t * newfc; char newfc_r_[PADR_(fc_t *)];
+	char sc_l_[PADL_(fc_t)]; fc_t sc; char sc_r_[PADR_(fc_t)];
+	char name_l_[PADL_(struct sockaddr *)]; struct sockaddr * name; char name_r_[PADR_(struct sockaddr *)];
+	char anamelen_l_[PADL_(__socklen_t *)]; __socklen_t * anamelen; char anamelen_r_[PADR_(__socklen_t *)];
+};
+struct fc_getpeername_args {
+	char sc_l_[PADL_(fc_t)]; fc_t sc; char sc_r_[PADR_(fc_t)];
+	char asa_l_[PADL_(struct sockaddr *)]; struct sockaddr * asa; char asa_r_[PADR_(struct sockaddr *)];
+	char alen_l_[PADL_(__socklen_t *)]; __socklen_t * alen; char alen_r_[PADR_(__socklen_t *)];
+};
+struct fc_getsockname_args {
+	char sc_l_[PADL_(fc_t)]; fc_t sc; char sc_r_[PADR_(fc_t)];
+	char asa_l_[PADL_(struct sockaddr *)]; struct sockaddr * asa; char asa_r_[PADR_(struct sockaddr *)];
+	char alen_l_[PADL_(__socklen_t *)]; __socklen_t * alen; char alen_r_[PADR_(__socklen_t *)];
+};
+struct fc_fchflags_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char flags_l_[PADL_(u_long)]; u_long flags; char flags_r_[PADR_(u_long)];
+};
+struct __fc_dup_args {
+	char newfc_l_[PADL_(fc_t *)]; fc_t * newfc; char newfc_r_[PADR_(fc_t *)];
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+};
+struct fc_ioctl_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char com_l_[PADL_(u_long)]; u_long com; char com_r_[PADR_(u_long)];
+	char data_l_[PADL_(void *)]; void * data; char data_r_[PADR_(void *)];
+};
+struct __fc_dup2_args {
+	char newfc_l_[PADL_(fc_t *)]; fc_t * newfc; char newfc_r_[PADR_(fc_t *)];
+	char from_l_[PADL_(fc_t)]; fc_t from; char from_r_[PADR_(fc_t)];
+	char to_l_[PADL_(u_int)]; u_int to; char to_r_[PADR_(u_int)];
+};
+struct __fc_fcntl_args {
+	char newfc_l_[PADL_(fc_t *)]; fc_t * newfc; char newfc_r_[PADR_(fc_t *)];
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
+	char arg_l_[PADL_(intptr_t)]; intptr_t arg; char arg_r_[PADR_(intptr_t)];
+};
+struct fc_fsync_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+};
+struct __fc_socket_args {
+	char newfc_l_[PADL_(fc_t *)]; fc_t * newfc; char newfc_r_[PADR_(fc_t *)];
+	char domain_l_[PADL_(int)]; int domain; char domain_r_[PADR_(int)];
+	char type_l_[PADL_(int)]; int type; char type_r_[PADR_(int)];
+	char protocol_l_[PADL_(int)]; int protocol; char protocol_r_[PADR_(int)];
+};
+struct fc_connect_args {
+	char sc_l_[PADL_(fc_t)]; fc_t sc; char sc_r_[PADR_(fc_t)];
+	char name_l_[PADL_(const struct sockaddr *)]; const struct sockaddr * name; char name_r_[PADR_(const struct sockaddr *)];
+	char namelen_l_[PADL_(__socklen_t)]; __socklen_t namelen; char namelen_r_[PADR_(__socklen_t)];
+};
+struct fc_bind_args {
+	char sc_l_[PADL_(fc_t)]; fc_t sc; char sc_r_[PADR_(fc_t)];
+	char name_l_[PADL_(const struct sockaddr *)]; const struct sockaddr * name; char name_r_[PADR_(const struct sockaddr *)];
+	char namelen_l_[PADL_(__socklen_t)]; __socklen_t namelen; char namelen_r_[PADR_(__socklen_t)];
+};
+struct fc_setsockopt_args {
+	char sc_l_[PADL_(fc_t)]; fc_t sc; char sc_r_[PADR_(fc_t)];
+	char level_l_[PADL_(int)]; int level; char level_r_[PADR_(int)];
+	char name_l_[PADL_(int)]; int name; char name_r_[PADR_(int)];
+	char val_l_[PADL_(const void *)]; const void * val; char val_r_[PADR_(const void *)];
+	char valsize_l_[PADL_(__socklen_t)]; __socklen_t valsize; char valsize_r_[PADR_(__socklen_t)];
+};
+struct fc_listen_args {
+	char sc_l_[PADL_(fc_t)]; fc_t sc; char sc_r_[PADR_(fc_t)];
+	char backlog_l_[PADL_(int)]; int backlog; char backlog_r_[PADR_(int)];
+};
+struct fc_getsockopt_args {
+	char sc_l_[PADL_(fc_t)]; fc_t sc; char sc_r_[PADR_(fc_t)];
+	char level_l_[PADL_(int)]; int level; char level_r_[PADR_(int)];
+	char name_l_[PADL_(int)]; int name; char name_r_[PADR_(int)];
+	char val_l_[PADL_(void *)]; void * val; char val_r_[PADR_(void *)];
+	char avalsize_l_[PADL_(__socklen_t *)]; __socklen_t * avalsize; char avalsize_r_[PADR_(__socklen_t *)];
+};
+struct fc_readv_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char iovp_l_[PADL_(struct iovec *)]; struct iovec * iovp; char iovp_r_[PADR_(struct iovec *)];
+	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
+};
+struct fc_writev_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char iovp_l_[PADL_(struct iovec *)]; struct iovec * iovp; char iovp_r_[PADR_(struct iovec *)];
+	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
+};
+struct fc_fchown_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char uid_l_[PADL_(int)]; int uid; char uid_r_[PADR_(int)];
+	char gid_l_[PADL_(int)]; int gid; char gid_r_[PADR_(int)];
+};
+struct fc_fchmod_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
+};
+struct fc_flock_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char how_l_[PADL_(int)]; int how; char how_r_[PADR_(int)];
+};
+struct fc_sendto_args {
+	char sc_l_[PADL_(fc_t)]; fc_t sc; char sc_r_[PADR_(fc_t)];
+	char buf_l_[PADL_(const void *)]; const void * buf; char buf_r_[PADR_(const void *)];
+	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char to_l_[PADL_(const struct sockaddr *)]; const struct sockaddr * to; char to_r_[PADR_(const struct sockaddr *)];
+	char tolen_l_[PADL_(__socklen_t)]; __socklen_t tolen; char tolen_r_[PADR_(__socklen_t)];
+};
+struct fc_shutdown_args {
+	char sc_l_[PADL_(fc_t)]; fc_t sc; char sc_r_[PADR_(fc_t)];
+	char how_l_[PADL_(int)]; int how; char how_r_[PADR_(int)];
+};
+struct fc_socketpair_args {
+	char domain_l_[PADL_(int)]; int domain; char domain_r_[PADR_(int)];
+	char type_l_[PADL_(int)]; int type; char type_r_[PADR_(int)];
+	char protocol_l_[PADL_(int)]; int protocol; char protocol_r_[PADR_(int)];
+	char rsv_l_[PADL_(fc_t *)]; fc_t * rsv; char rsv_r_[PADR_(fc_t *)];
+};
+struct fc_fpathconf_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char name_l_[PADL_(int)]; int name; char name_r_[PADR_(int)];
+};
+struct fc_futimes_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char tptr_l_[PADL_(const struct timeval *)]; const struct timeval * tptr; char tptr_r_[PADR_(const struct timeval *)];
+};
+struct fc_poll_args {
+	char fds_l_[PADL_(struct fc_pollfd *)]; struct fc_pollfd * fds; char fds_r_[PADR_(struct fc_pollfd *)];
+	char nfds_l_[PADL_(u_int)]; u_int nfds; char nfds_r_[PADR_(u_int)];
+	char timeout_l_[PADL_(int)]; int timeout; char timeout_r_[PADR_(int)];
+};
+struct fc_preadv_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char iovp_l_[PADL_(struct iovec *)]; struct iovec * iovp; char iovp_r_[PADR_(struct iovec *)];
+	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
+	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
+};
+struct fc_pwritev_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char iovp_l_[PADL_(struct iovec *)]; struct iovec * iovp; char iovp_r_[PADR_(struct iovec *)];
+	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
+	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
+};
+struct fc_aio_cancel_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char aiocbp_l_[PADL_(struct aiocb *)]; struct aiocb * aiocbp; char aiocbp_r_[PADR_(struct aiocb *)];
+};
+struct __fc_acl_get_fd_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
+	char aclp_l_[PADL_(struct acl *)]; struct acl * aclp; char aclp_r_[PADR_(struct acl *)];
+};
+struct __fc_acl_set_fd_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
+	char aclp_l_[PADL_(struct acl *)]; struct acl * aclp; char aclp_r_[PADR_(struct acl *)];
+};
+struct __fc_acl_delete_fd_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
+};
+struct __fc_acl_aclcheck_fd_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
+	char aclp_l_[PADL_(struct acl *)]; struct acl * aclp; char aclp_r_[PADR_(struct acl *)];
+};
+struct fc_extattr_set_fd_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
+	char attrname_l_[PADL_(const char *)]; const char * attrname; char attrname_r_[PADR_(const char *)];
+	char data_l_[PADL_(void *)]; void * data; char data_r_[PADR_(void *)];
+	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
+};
+struct fc_extattr_get_fd_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
+	char attrname_l_[PADL_(const char *)]; const char * attrname; char attrname_r_[PADR_(const char *)];
+	char data_l_[PADL_(void *)]; void * data; char data_r_[PADR_(void *)];
+	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
+};
+struct fc_extattr_delete_fd_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
+	char attrname_l_[PADL_(const char *)]; const char * attrname; char attrname_r_[PADR_(const char *)];
+};
+struct __fc_mac_get_fd_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char mac_p_l_[PADL_(struct mac_c *)]; struct mac_c * mac_p; char mac_p_r_[PADR_(struct mac_c *)];
+};
+struct __fc_mac_set_fd_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char mac_p_l_[PADL_(struct mac_c *)]; struct mac_c * mac_p; char mac_p_r_[PADR_(struct mac_c *)];
+};
+struct fc_sendfile_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char sc_l_[PADL_(fc_t)]; fc_t sc; char sc_r_[PADR_(fc_t)];
+	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
+	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
+	char hdtr_l_[PADL_(struct sf_hdtr *)]; struct sf_hdtr * hdtr; char hdtr_r_[PADR_(struct sf_hdtr *)];
+	char sbytes_l_[PADL_(off_t *)]; off_t * sbytes; char sbytes_r_[PADR_(off_t *)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
+struct fc_extattr_list_fd_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
+	char data_l_[PADL_(void *)]; void * data; char data_r_[PADR_(void *)];
+	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
+};
+struct __fc_kmq_open_args {
+	char newfc_l_[PADL_(fc_t *)]; fc_t * newfc; char newfc_r_[PADR_(fc_t *)];
+	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
+	char attr_l_[PADL_(const struct mq_attr *)]; const struct mq_attr * attr; char attr_r_[PADR_(const struct mq_attr *)];
+};
+struct fc_kmq_setattr_args {
+	char mqc_l_[PADL_(fc_t)]; fc_t mqc; char mqc_r_[PADR_(fc_t)];
+	char attr_l_[PADL_(const struct mq_attr *)]; const struct mq_attr * attr; char attr_r_[PADR_(const struct mq_attr *)];
+	char oattr_l_[PADL_(struct mq_attr *)]; struct mq_attr * oattr; char oattr_r_[PADR_(struct mq_attr *)];
+};
+struct fc_kmq_timedreceive_args {
+	char mqc_l_[PADL_(fc_t)]; fc_t mqc; char mqc_r_[PADR_(fc_t)];
+	char msg_ptr_l_[PADL_(char *)]; char * msg_ptr; char msg_ptr_r_[PADR_(char *)];
+	char msg_len_l_[PADL_(size_t)]; size_t msg_len; char msg_len_r_[PADR_(size_t)];
+	char msg_prio_l_[PADL_(unsigned *)]; unsigned * msg_prio; char msg_prio_r_[PADR_(unsigned *)];
+	char abs_timeout_l_[PADL_(const struct timespec *)]; const struct timespec * abs_timeout; char abs_timeout_r_[PADR_(const struct timespec *)];
+};
+struct fc_kmq_timedsend_args {
+	char mqc_l_[PADL_(fc_t)]; fc_t mqc; char mqc_r_[PADR_(fc_t)];
+	char msg_ptr_l_[PADL_(const char *)]; const char * msg_ptr; char msg_ptr_r_[PADR_(const char *)];
+	char msg_len_l_[PADL_(size_t)]; size_t msg_len; char msg_len_r_[PADR_(size_t)];
+	char msg_prio_l_[PADL_(unsigned)]; unsigned msg_prio; char msg_prio_r_[PADR_(unsigned)];
+	char abs_timeout_l_[PADL_(const struct timespec *)]; const struct timespec * abs_timeout; char abs_timeout_r_[PADR_(const struct timespec *)];
+};
+struct fc_kmq_notify_args {
+	char mqc_l_[PADL_(fc_t)]; fc_t mqc; char mqc_r_[PADR_(fc_t)];
+	char sigev_l_[PADL_(const struct sigevent *)]; const struct sigevent * sigev; char sigev_r_[PADR_(const struct sigevent *)];
+};
+struct fc_sctp_peeloff_args {
+	char sc_l_[PADL_(fc_t)]; fc_t sc; char sc_r_[PADR_(fc_t)];
+	char name_l_[PADL_(uint32_t)]; uint32_t name; char name_r_[PADR_(uint32_t)];
+};
+struct fc_sctp_generic_sendmsg_args {
+	char sc_l_[PADL_(fc_t)]; fc_t sc; char sc_r_[PADR_(fc_t)];
+	char msg_l_[PADL_(void *)]; void * msg; char msg_r_[PADR_(void *)];
+	char mlen_l_[PADL_(int)]; int mlen; char mlen_r_[PADR_(int)];
+	char to_l_[PADL_(struct sockaddr *)]; struct sockaddr * to; char to_r_[PADR_(struct sockaddr *)];
+	char tolen_l_[PADL_(__socklen_t)]; __socklen_t tolen; char tolen_r_[PADR_(__socklen_t)];
+	char sinfo_l_[PADL_(struct sctp_sndrcvinfo *)]; struct sctp_sndrcvinfo * sinfo; char sinfo_r_[PADR_(struct sctp_sndrcvinfo *)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
+struct fc_sctp_generic_sendmsg_iov_args {
+	char sc_l_[PADL_(fc_t)]; fc_t sc; char sc_r_[PADR_(fc_t)];
+	char iov_l_[PADL_(struct iovec *)]; struct iovec * iov; char iov_r_[PADR_(struct iovec *)];
+	char iovlen_l_[PADL_(int)]; int iovlen; char iovlen_r_[PADR_(int)];
+	char to_l_[PADL_(struct sockaddr *)]; struct sockaddr * to; char to_r_[PADR_(struct sockaddr *)];
+	char tolen_l_[PADL_(__socklen_t)]; __socklen_t tolen; char tolen_r_[PADR_(__socklen_t)];
+	char sinfo_l_[PADL_(struct sctp_sndrcvinfo *)]; struct sctp_sndrcvinfo * sinfo; char sinfo_r_[PADR_(struct sctp_sndrcvinfo *)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
+struct fc_sctp_generic_recvmsg_args {
+	char sc_l_[PADL_(fc_t)]; fc_t sc; char sc_r_[PADR_(fc_t)];
+	char iov_l_[PADL_(struct iovec *)]; struct iovec * iov; char iov_r_[PADR_(struct iovec *)];
+	char iovlen_l_[PADL_(int)]; int iovlen; char iovlen_r_[PADR_(int)];
+	char from_l_[PADL_(struct sockaddr *)]; struct sockaddr * from; char from_r_[PADR_(struct sockaddr *)];
+	char fromlenaddr_l_[PADL_(__socklen_t *)]; __socklen_t * fromlenaddr; char fromlenaddr_r_[PADR_(__socklen_t *)];
+	char sinfo_l_[PADL_(struct sctp_sndrcvinfo *)]; struct sctp_sndrcvinfo * sinfo; char sinfo_r_[PADR_(struct sctp_sndrcvinfo *)];
+	char msg_flags_l_[PADL_(int *)]; int * msg_flags; char msg_flags_r_[PADR_(int *)];
+};
+struct fc_pread_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char buf_l_[PADL_(void *)]; void * buf; char buf_r_[PADR_(void *)];
+	char nbyte_l_[PADL_(size_t)]; size_t nbyte; char nbyte_r_[PADR_(size_t)];
+	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
+};
+struct fc_pwrite_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char buf_l_[PADL_(const void *)]; const void * buf; char buf_r_[PADR_(const void *)];
+	char nbyte_l_[PADL_(size_t)]; size_t nbyte; char nbyte_r_[PADR_(size_t)];
+	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
+};
+struct fc_mmap_args {
+	char addr_l_[PADL_(void *)]; void * addr; char addr_r_[PADR_(void *)];
+	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
+	char prot_l_[PADL_(int)]; int prot; char prot_r_[PADR_(int)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char pos_l_[PADL_(off_t)]; off_t pos; char pos_r_[PADR_(off_t)];
+};
+struct fc_lseek_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
+	char whence_l_[PADL_(int)]; int whence; char whence_r_[PADR_(int)];
+};
+struct fc_ftruncate_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char length_l_[PADL_(off_t)]; off_t length; char length_r_[PADR_(off_t)];
+};
+struct fc_faccessat_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
+	char amode_l_[PADL_(int)]; int amode; char amode_r_[PADR_(int)];
+	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
+};
+struct fc_fchmodat_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
+	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
+	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
+};
+struct fc_fchownat_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
+	char uid_l_[PADL_(uid_t)]; uid_t uid; char uid_r_[PADR_(uid_t)];
+	char gid_l_[PADL_(gid_t)]; gid_t gid; char gid_r_[PADR_(gid_t)];
+	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
+};
+struct fc_fexecve_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char argv_l_[PADL_(void **)]; void ** argv; char argv_r_[PADR_(void **)];
+	char envv_l_[PADL_(void **)]; void ** envv; char envv_r_[PADR_(void **)];
+};
+struct fc_futimesat_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
+	char times_l_[PADL_(const struct timeval *)]; const struct timeval * times; char times_r_[PADR_(const struct timeval *)];
+};
+struct fc_linkat_args {
+	char fc1_l_[PADL_(fc_t)]; fc_t fc1; char fc1_r_[PADR_(fc_t)];
+	char path1_l_[PADL_(const char *)]; const char * path1; char path1_r_[PADR_(const char *)];
+	char fc2_l_[PADL_(fc_t)]; fc_t fc2; char fc2_r_[PADR_(fc_t)];
+	char path2_l_[PADL_(const char *)]; const char * path2; char path2_r_[PADR_(const char *)];
+	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
+};
+struct fc_mkdirat_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
+	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
+};
+struct fc_mkfifoat_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
+	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
+};
+struct __fc_openat_args {
+	char newfc_l_[PADL_(fc_t *)]; fc_t * newfc; char newfc_r_[PADR_(fc_t *)];
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
+	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
+	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
+};
+struct fc_readlinkat_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
+	char buf_l_[PADL_(char *)]; char * buf; char buf_r_[PADR_(char *)];
+	char bufsize_l_[PADL_(size_t)]; size_t bufsize; char bufsize_r_[PADR_(size_t)];
+};
+struct fc_renameat_args {
+	char oldfc_l_[PADL_(fc_t)]; fc_t oldfc; char oldfc_r_[PADR_(fc_t)];
+	char old_l_[PADL_(const char *)]; const char * old; char old_r_[PADR_(const char *)];
+	char newfc_l_[PADL_(fc_t)]; fc_t newfc; char newfc_r_[PADR_(fc_t)];
+	char new_l_[PADL_(const char *)]; const char * new; char new_r_[PADR_(const char *)];
+};
+struct fc_symlinkat_args {
+	char path1_l_[PADL_(const char *)]; const char * path1; char path1_r_[PADR_(const char *)];
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char path2_l_[PADL_(const char *)]; const char * path2; char path2_r_[PADR_(const char *)];
+};
+struct fc_unlinkat_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
+	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
+};
+struct fc_closefrom_args {
+	char lowfc_l_[PADL_(fc_t)]; fc_t lowfc; char lowfc_r_[PADR_(fc_t)];
+};
+struct __fc_cap_rights_get_args {
+	char version_l_[PADL_(int)]; int version; char version_r_[PADR_(int)];
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char rightsp_l_[PADL_(cap_rights_t *)]; cap_rights_t * rightsp; char rightsp_r_[PADR_(cap_rights_t *)];
+};
+struct fc_pdfork_args {
+	char fcp_l_[PADL_(fc_t *)]; fc_t * fcp; char fcp_r_[PADR_(fc_t *)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
+struct fc_pdkill_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char signum_l_[PADL_(int)]; int signum; char signum_r_[PADR_(int)];
+};
+struct fc_pdgetpid_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char pidp_l_[PADL_(pid_t *)]; pid_t * pidp; char pidp_r_[PADR_(pid_t *)];
+};
+struct fc_posix_fallocate_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
+	char len_l_[PADL_(off_t)]; off_t len; char len_r_[PADR_(off_t)];
+};
+struct fc_posix_fadvise_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
+	char len_l_[PADL_(off_t)]; off_t len; char len_r_[PADR_(off_t)];
+	char advice_l_[PADL_(int)]; int advice; char advice_r_[PADR_(int)];
+};
+struct fc_cap_rights_limit_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char rightsp_l_[PADL_(cap_rights_t *)]; cap_rights_t * rightsp; char rightsp_r_[PADR_(cap_rights_t *)];
+};
+struct fc_cap_ioctls_limit_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char cmds_l_[PADL_(const u_long *)]; const u_long * cmds; char cmds_r_[PADR_(const u_long *)];
+	char ncmds_l_[PADL_(size_t)]; size_t ncmds; char ncmds_r_[PADR_(size_t)];
+};
+struct fc_cap_ioctls_get_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char cmds_l_[PADL_(u_long *)]; u_long * cmds; char cmds_r_[PADR_(u_long *)];
+	char maxcmds_l_[PADL_(size_t)]; size_t maxcmds; char maxcmds_r_[PADR_(size_t)];
+};
+struct fc_cap_fcntls_limit_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char fcntlrights_l_[PADL_(uint32_t)]; uint32_t fcntlrights; char fcntlrights_r_[PADR_(uint32_t)];
+};
+struct fc_cap_fcntls_get_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char fcntlrightsp_l_[PADL_(uint32_t *)]; uint32_t * fcntlrightsp; char fcntlrightsp_r_[PADR_(uint32_t *)];
+};
+struct fc_bindat_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char sc_l_[PADL_(fc_t)]; fc_t sc; char sc_r_[PADR_(fc_t)];
+	char name_l_[PADL_(const struct sockaddr *)]; const struct sockaddr * name; char name_r_[PADR_(const struct sockaddr *)];
+	char namelen_l_[PADL_(__socklen_t)]; __socklen_t namelen; char namelen_r_[PADR_(__socklen_t)];
+};
+struct fc_connectat_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char sc_l_[PADL_(fc_t)]; fc_t sc; char sc_r_[PADR_(fc_t)];
+	char name_l_[PADL_(const struct sockaddr *)]; const struct sockaddr * name; char name_r_[PADR_(const struct sockaddr *)];
+	char namelen_l_[PADL_(__socklen_t)]; __socklen_t namelen; char namelen_r_[PADR_(__socklen_t)];
+};
+struct fc_chflagsat_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
+	char flags_l_[PADL_(u_long)]; u_long flags; char flags_r_[PADR_(u_long)];
+	char atflag_l_[PADL_(int)]; int atflag; char atflag_r_[PADR_(int)];
+};
+struct __fc_accept4_args {
+	char newfc_l_[PADL_(fc_t *)]; fc_t * newfc; char newfc_r_[PADR_(fc_t *)];
+	char sc_l_[PADL_(fc_t)]; fc_t sc; char sc_r_[PADR_(fc_t)];
+	char name_l_[PADL_(struct sockaddr *)]; struct sockaddr * name; char name_r_[PADR_(struct sockaddr *)];
+	char anamelen_l_[PADL_(__socklen_t *)]; __socklen_t * anamelen; char anamelen_r_[PADR_(__socklen_t *)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
+struct fc_pipe2_args {
+	char filecaps_l_[PADL_(fc_t *)]; fc_t * filecaps; char filecaps_r_[PADR_(fc_t *)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
+struct fc_ppoll_args {
+	char fds_l_[PADL_(struct fc_pollfd *)]; struct fc_pollfd * fds; char fds_r_[PADR_(struct fc_pollfd *)];
+	char nfds_l_[PADL_(u_int)]; u_int nfds; char nfds_r_[PADR_(u_int)];
+	char ts_l_[PADL_(const struct timespec *)]; const struct timespec * ts; char ts_r_[PADR_(const struct timespec *)];
+	char set_l_[PADL_(const sigset_t *)]; const sigset_t * set; char set_r_[PADR_(const sigset_t *)];
+};
+struct fc_futimens_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char times_l_[PADL_(const struct timespec *)]; const struct timespec * times; char times_r_[PADR_(const struct timespec *)];
+};
+struct fc_utimensat_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
+	char times_l_[PADL_(const struct timespec *)]; const struct timespec * times; char times_r_[PADR_(const struct timespec *)];
+	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
+};
+struct fc_fdatasync_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+};
+struct fc_fstat_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char sb_l_[PADL_(struct stat *)]; struct stat * sb; char sb_r_[PADR_(struct stat *)];
+};
+struct fc_fstatat_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
+	char buf_l_[PADL_(struct stat *)]; struct stat * buf; char buf_r_[PADR_(struct stat *)];
+	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
+};
+struct fc_getdirentries_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char buf_l_[PADL_(char *)]; char * buf; char buf_r_[PADR_(char *)];
+	char count_l_[PADL_(size_t)]; size_t count; char count_r_[PADR_(size_t)];
+	char basep_l_[PADL_(off_t *)]; off_t * basep; char basep_r_[PADR_(off_t *)];
+};
+struct fc_fstatfs_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char buf_l_[PADL_(struct statfs *)]; struct statfs * buf; char buf_r_[PADR_(struct statfs *)];
+};
+struct fc_mknodat_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
+	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
+	char dev_l_[PADL_(dev_t)]; dev_t dev; char dev_r_[PADR_(dev_t)];
+};
+struct fc_kevent_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char changelist_l_[PADL_(const struct kevent *)]; const struct kevent * changelist; char changelist_r_[PADR_(const struct kevent *)];
+	char nchanges_l_[PADL_(int)]; int nchanges; char nchanges_r_[PADR_(int)];
+	char eventlist_l_[PADL_(struct kevent *)]; struct kevent * eventlist; char eventlist_r_[PADR_(struct kevent *)];
+	char nevents_l_[PADL_(int)]; int nevents; char nevents_r_[PADR_(int)];
+	char timeout_l_[PADL_(const struct timespec *)]; const struct timespec * timeout; char timeout_r_[PADR_(const struct timespec *)];
+};
 int	nosys(struct thread *, struct nosys_args *);
 void	sys_sys_exit(struct thread *, struct sys_exit_args *);
 int	sys_fork(struct thread *, struct fork_args *);
@@ -2151,6 +2699,108 @@ int	sys_getfsstat(struct thread *, struct getfsstat_args *);
 int	sys_fhstatfs(struct thread *, struct fhstatfs_args *);
 int	sys_mknodat(struct thread *, struct mknodat_args *);
 int	sys_kevent(struct thread *, struct kevent_args *);
+int	sys_fc_read(struct thread *, struct fc_read_args *);
+int	sys_fc_write(struct thread *, struct fc_write_args *);
+int	sys___fc_open(struct thread *, struct __fc_open_args *);
+int	sys_fc_close(struct thread *, struct fc_close_args *);
+int	sys_fc_fchdir(struct thread *, struct fc_fchdir_args *);
+int	sys_fc_recvmsg(struct thread *, struct fc_recvmsg_args *);
+int	sys_fc_sendmsg(struct thread *, struct fc_sendmsg_args *);
+int	sys_fc_recvfrom(struct thread *, struct fc_recvfrom_args *);
+int	sys___fc_accept(struct thread *, struct __fc_accept_args *);
+int	sys_fc_getpeername(struct thread *, struct fc_getpeername_args *);
+int	sys_fc_getsockname(struct thread *, struct fc_getsockname_args *);
+int	sys_fc_fchflags(struct thread *, struct fc_fchflags_args *);
+int	sys___fc_dup(struct thread *, struct __fc_dup_args *);
+int	sys_fc_ioctl(struct thread *, struct fc_ioctl_args *);
+int	sys___fc_dup2(struct thread *, struct __fc_dup2_args *);
+int	sys___fc_fcntl(struct thread *, struct __fc_fcntl_args *);
+int	sys_fc_fsync(struct thread *, struct fc_fsync_args *);
+int	sys___fc_socket(struct thread *, struct __fc_socket_args *);
+int	sys_fc_connect(struct thread *, struct fc_connect_args *);
+int	sys_fc_bind(struct thread *, struct fc_bind_args *);
+int	sys_fc_setsockopt(struct thread *, struct fc_setsockopt_args *);
+int	sys_fc_listen(struct thread *, struct fc_listen_args *);
+int	sys_fc_getsockopt(struct thread *, struct fc_getsockopt_args *);
+int	sys_fc_readv(struct thread *, struct fc_readv_args *);
+int	sys_fc_writev(struct thread *, struct fc_writev_args *);
+int	sys_fc_fchown(struct thread *, struct fc_fchown_args *);
+int	sys_fc_fchmod(struct thread *, struct fc_fchmod_args *);
+int	sys_fc_flock(struct thread *, struct fc_flock_args *);
+int	sys_fc_sendto(struct thread *, struct fc_sendto_args *);
+int	sys_fc_shutdown(struct thread *, struct fc_shutdown_args *);
+int	sys_fc_socketpair(struct thread *, struct fc_socketpair_args *);
+int	sys_fc_fpathconf(struct thread *, struct fc_fpathconf_args *);
+int	sys_fc_futimes(struct thread *, struct fc_futimes_args *);
+int	sys_fc_poll(struct thread *, struct fc_poll_args *);
+int	sys_fc_preadv(struct thread *, struct fc_preadv_args *);
+int	sys_fc_pwritev(struct thread *, struct fc_pwritev_args *);
+int	sys_fc_aio_cancel(struct thread *, struct fc_aio_cancel_args *);
+int	sys___fc_acl_get_fd(struct thread *, struct __fc_acl_get_fd_args *);
+int	sys___fc_acl_set_fd(struct thread *, struct __fc_acl_set_fd_args *);
+int	sys___fc_acl_delete_fd(struct thread *, struct __fc_acl_delete_fd_args *);
+int	sys___fc_acl_aclcheck_fd(struct thread *, struct __fc_acl_aclcheck_fd_args *);
+int	sys_fc_extattr_set_fd(struct thread *, struct fc_extattr_set_fd_args *);
+int	sys_fc_extattr_get_fd(struct thread *, struct fc_extattr_get_fd_args *);
+int	sys_fc_extattr_delete_fd(struct thread *, struct fc_extattr_delete_fd_args *);
+int	sys___fc_mac_get_fd(struct thread *, struct __fc_mac_get_fd_args *);
+int	sys___fc_mac_set_fd(struct thread *, struct __fc_mac_set_fd_args *);
+int	sys_fc_sendfile(struct thread *, struct fc_sendfile_args *);
+int	sys_fc_extattr_list_fd(struct thread *, struct fc_extattr_list_fd_args *);
+int	sys___fc_kmq_open(struct thread *, struct __fc_kmq_open_args *);
+int	sys_fc_kmq_setattr(struct thread *, struct fc_kmq_setattr_args *);
+int	sys_fc_kmq_timedreceive(struct thread *, struct fc_kmq_timedreceive_args *);
+int	sys_fc_kmq_timedsend(struct thread *, struct fc_kmq_timedsend_args *);
+int	sys_fc_kmq_notify(struct thread *, struct fc_kmq_notify_args *);
+int	sys_fc_sctp_peeloff(struct thread *, struct fc_sctp_peeloff_args *);
+int	sys_fc_sctp_generic_sendmsg(struct thread *, struct fc_sctp_generic_sendmsg_args *);
+int	sys_fc_sctp_generic_sendmsg_iov(struct thread *, struct fc_sctp_generic_sendmsg_iov_args *);
+int	sys_fc_sctp_generic_recvmsg(struct thread *, struct fc_sctp_generic_recvmsg_args *);
+int	sys_fc_pread(struct thread *, struct fc_pread_args *);
+int	sys_fc_pwrite(struct thread *, struct fc_pwrite_args *);
+int	sys_fc_mmap(struct thread *, struct fc_mmap_args *);
+int	sys_fc_lseek(struct thread *, struct fc_lseek_args *);
+int	sys_fc_ftruncate(struct thread *, struct fc_ftruncate_args *);
+int	sys_fc_faccessat(struct thread *, struct fc_faccessat_args *);
+int	sys_fc_fchmodat(struct thread *, struct fc_fchmodat_args *);
+int	sys_fc_fchownat(struct thread *, struct fc_fchownat_args *);
+int	sys_fc_fexecve(struct thread *, struct fc_fexecve_args *);
+int	sys_fc_futimesat(struct thread *, struct fc_futimesat_args *);
+int	sys_fc_linkat(struct thread *, struct fc_linkat_args *);
+int	sys_fc_mkdirat(struct thread *, struct fc_mkdirat_args *);
+int	sys_fc_mkfifoat(struct thread *, struct fc_mkfifoat_args *);
+int	sys___fc_openat(struct thread *, struct __fc_openat_args *);
+int	sys_fc_readlinkat(struct thread *, struct fc_readlinkat_args *);
+int	sys_fc_renameat(struct thread *, struct fc_renameat_args *);
+int	sys_fc_symlinkat(struct thread *, struct fc_symlinkat_args *);
+int	sys_fc_unlinkat(struct thread *, struct fc_unlinkat_args *);
+int	sys_fc_closefrom(struct thread *, struct fc_closefrom_args *);
+int	sys___fc_cap_rights_get(struct thread *, struct __fc_cap_rights_get_args *);
+int	sys_fc_pdfork(struct thread *, struct fc_pdfork_args *);
+int	sys_fc_pdkill(struct thread *, struct fc_pdkill_args *);
+int	sys_fc_pdgetpid(struct thread *, struct fc_pdgetpid_args *);
+int	sys_fc_posix_fallocate(struct thread *, struct fc_posix_fallocate_args *);
+int	sys_fc_posix_fadvise(struct thread *, struct fc_posix_fadvise_args *);
+int	sys_fc_cap_rights_limit(struct thread *, struct fc_cap_rights_limit_args *);
+int	sys_fc_cap_ioctls_limit(struct thread *, struct fc_cap_ioctls_limit_args *);
+int	sys_fc_cap_ioctls_get(struct thread *, struct fc_cap_ioctls_get_args *);
+int	sys_fc_cap_fcntls_limit(struct thread *, struct fc_cap_fcntls_limit_args *);
+int	sys_fc_cap_fcntls_get(struct thread *, struct fc_cap_fcntls_get_args *);
+int	sys_fc_bindat(struct thread *, struct fc_bindat_args *);
+int	sys_fc_connectat(struct thread *, struct fc_connectat_args *);
+int	sys_fc_chflagsat(struct thread *, struct fc_chflagsat_args *);
+int	sys___fc_accept4(struct thread *, struct __fc_accept4_args *);
+int	sys_fc_pipe2(struct thread *, struct fc_pipe2_args *);
+int	sys_fc_ppoll(struct thread *, struct fc_ppoll_args *);
+int	sys_fc_futimens(struct thread *, struct fc_futimens_args *);
+int	sys_fc_utimensat(struct thread *, struct fc_utimensat_args *);
+int	sys_fc_fdatasync(struct thread *, struct fc_fdatasync_args *);
+int	sys_fc_fstat(struct thread *, struct fc_fstat_args *);
+int	sys_fc_fstatat(struct thread *, struct fc_fstatat_args *);
+int	sys_fc_getdirentries(struct thread *, struct fc_getdirentries_args *);
+int	sys_fc_fstatfs(struct thread *, struct fc_fstatfs_args *);
+int	sys_fc_mknodat(struct thread *, struct fc_mknodat_args *);
+int	sys_fc_kevent(struct thread *, struct fc_kevent_args *);
 
 #ifdef COMPAT_43
 
@@ -3043,6 +3693,108 @@ int	freebsd11_mknodat(struct thread *, struct freebsd11_mknodat_args *);
 #define	SYS_AUE_fhstatfs	AUE_FHSTATFS
 #define	SYS_AUE_mknodat	AUE_MKNODAT
 #define	SYS_AUE_kevent	AUE_KEVENT
+#define	SYS_AUE_fc_read	AUE_READ
+#define	SYS_AUE_fc_write	AUE_WRITE
+#define	SYS_AUE___fc_open	AUE_OPEN_RWTC
+#define	SYS_AUE_fc_close	AUE_CLOSE
+#define	SYS_AUE_fc_fchdir	AUE_FCHDIR
+#define	SYS_AUE_fc_recvmsg	AUE_RECVMSG
+#define	SYS_AUE_fc_sendmsg	AUE_SENDMSG
+#define	SYS_AUE_fc_recvfrom	AUE_RECVFROM
+#define	SYS_AUE___fc_accept	AUE_ACCEPT
+#define	SYS_AUE_fc_getpeername	AUE_GETPEERNAME
+#define	SYS_AUE_fc_getsockname	AUE_GETSOCKNAME
+#define	SYS_AUE_fc_fchflags	AUE_FCHFLAGS
+#define	SYS_AUE___fc_dup	AUE_DUP
+#define	SYS_AUE_fc_ioctl	AUE_NULL
+#define	SYS_AUE___fc_dup2	AUE_DUP2
+#define	SYS_AUE___fc_fcntl	AUE_FCNTL
+#define	SYS_AUE_fc_fsync	AUE_FSYNC
+#define	SYS_AUE___fc_socket	AUE_SOCKET
+#define	SYS_AUE_fc_connect	AUE_CONNECT
+#define	SYS_AUE_fc_bind	AUE_BIND
+#define	SYS_AUE_fc_setsockopt	AUE_SETSOCKOPT
+#define	SYS_AUE_fc_listen	AUE_LISTEN
+#define	SYS_AUE_fc_getsockopt	AUE_GETSOCKOPT
+#define	SYS_AUE_fc_readv	AUE_READV
+#define	SYS_AUE_fc_writev	AUE_WRITEV
+#define	SYS_AUE_fc_fchown	AUE_FCHOWN
+#define	SYS_AUE_fc_fchmod	AUE_FCHMOD
+#define	SYS_AUE_fc_flock	AUE_FLOCK
+#define	SYS_AUE_fc_sendto	AUE_SENDTO
+#define	SYS_AUE_fc_shutdown	AUE_SHUTDOWN
+#define	SYS_AUE_fc_socketpair	AUE_SOCKETPAIR
+#define	SYS_AUE_fc_fpathconf	AUE_FPATHCONF
+#define	SYS_AUE_fc_futimes	AUE_FUTIMES
+#define	SYS_AUE_fc_poll	AUE_POLL
+#define	SYS_AUE_fc_preadv	AUE_PREADV
+#define	SYS_AUE_fc_pwritev	AUE_PWRITEV
+#define	SYS_AUE_fc_aio_cancel	AUE_AIO_CANCEL
+#define	SYS_AUE___fc_acl_get_fd	AUE_ACL_GET_FD
+#define	SYS_AUE___fc_acl_set_fd	AUE_ACL_SET_FD
+#define	SYS_AUE___fc_acl_delete_fd	AUE_ACL_DELETE_FD
+#define	SYS_AUE___fc_acl_aclcheck_fd	AUE_ACL_CHECK_FD
+#define	SYS_AUE_fc_extattr_set_fd	AUE_EXTATTR_SET_FD
+#define	SYS_AUE_fc_extattr_get_fd	AUE_EXTATTR_GET_FD
+#define	SYS_AUE_fc_extattr_delete_fd	AUE_EXTATTR_DELETE_FD
+#define	SYS_AUE___fc_mac_get_fd	AUE_NULL
+#define	SYS_AUE___fc_mac_set_fd	AUE_NULL
+#define	SYS_AUE_fc_sendfile	AUE_SENDFILE
+#define	SYS_AUE_fc_extattr_list_fd	AUE_EXTATTR_LIST_FD
+#define	SYS_AUE___fc_kmq_open	AUE_MQ_OPEN
+#define	SYS_AUE_fc_kmq_setattr	AUE_MQ_SETATTR
+#define	SYS_AUE_fc_kmq_timedreceive	AUE_MQ_TIMEDRECEIVE
+#define	SYS_AUE_fc_kmq_timedsend	AUE_MQ_TIMEDSEND
+#define	SYS_AUE_fc_kmq_notify	AUE_MQ_NOTIFY
+#define	SYS_AUE_fc_sctp_peeloff	AUE_SCTP_PEELOFF
+#define	SYS_AUE_fc_sctp_generic_sendmsg	AUE_SCTP_GENERIC_SENDMSG
+#define	SYS_AUE_fc_sctp_generic_sendmsg_iov	AUE_SCTP_GENERIC_SENDMSG_IOV
+#define	SYS_AUE_fc_sctp_generic_recvmsg	AUE_SCTP_GENERIC_RECVMSG
+#define	SYS_AUE_fc_pread	AUE_PREAD
+#define	SYS_AUE_fc_pwrite	AUE_PWRITE
+#define	SYS_AUE_fc_mmap	AUE_MMAP
+#define	SYS_AUE_fc_lseek	AUE_LSEEK
+#define	SYS_AUE_fc_ftruncate	AUE_FTRUNCATE
+#define	SYS_AUE_fc_faccessat	AUE_FACCESSAT
+#define	SYS_AUE_fc_fchmodat	AUE_FCHMODAT
+#define	SYS_AUE_fc_fchownat	AUE_FCHOWNAT
+#define	SYS_AUE_fc_fexecve	AUE_FEXECVE
+#define	SYS_AUE_fc_futimesat	AUE_FUTIMESAT
+#define	SYS_AUE_fc_linkat	AUE_LINKAT
+#define	SYS_AUE_fc_mkdirat	AUE_MKDIRAT
+#define	SYS_AUE_fc_mkfifoat	AUE_MKFIFOAT
+#define	SYS_AUE___fc_openat	AUE_OPENAT_RWTC
+#define	SYS_AUE_fc_readlinkat	AUE_READLINKAT
+#define	SYS_AUE_fc_renameat	AUE_RENAMEAT
+#define	SYS_AUE_fc_symlinkat	AUE_SYMLINKAT
+#define	SYS_AUE_fc_unlinkat	AUE_UNLINKAT
+#define	SYS_AUE_fc_closefrom	AUE_CLOSEFROM
+#define	SYS_AUE___fc_cap_rights_get	AUE_CAP_RIGHTS_GET
+#define	SYS_AUE_fc_pdfork	AUE_PDFORK
+#define	SYS_AUE_fc_pdkill	AUE_PDKILL
+#define	SYS_AUE_fc_pdgetpid	AUE_PDGETPID
+#define	SYS_AUE_fc_posix_fallocate	AUE_POSIX_FALLOCATE
+#define	SYS_AUE_fc_posix_fadvise	AUE_POSIX_FADVISE
+#define	SYS_AUE_fc_cap_rights_limit	AUE_CAP_RIGHTS_LIMIT
+#define	SYS_AUE_fc_cap_ioctls_limit	AUE_CAP_IOCTLS_LIMIT
+#define	SYS_AUE_fc_cap_ioctls_get	AUE_CAP_IOCTLS_GET
+#define	SYS_AUE_fc_cap_fcntls_limit	AUE_CAP_FCNTLS_LIMIT
+#define	SYS_AUE_fc_cap_fcntls_get	AUE_CAP_FCNTLS_GET
+#define	SYS_AUE_fc_bindat	AUE_BINDAT
+#define	SYS_AUE_fc_connectat	AUE_CONNECTAT
+#define	SYS_AUE_fc_chflagsat	AUE_CHFLAGSAT
+#define	SYS_AUE___fc_accept4	AUE_ACCEPT
+#define	SYS_AUE_fc_pipe2	AUE_PIPE
+#define	SYS_AUE_fc_ppoll	AUE_POLL
+#define	SYS_AUE_fc_futimens	AUE_FUTIMES
+#define	SYS_AUE_fc_utimensat	AUE_FUTIMESAT
+#define	SYS_AUE_fc_fdatasync	AUE_FSYNC
+#define	SYS_AUE_fc_fstat	AUE_FSTAT
+#define	SYS_AUE_fc_fstatat	AUE_FSTATAT
+#define	SYS_AUE_fc_getdirentries	AUE_GETDIRENTRIES
+#define	SYS_AUE_fc_fstatfs	AUE_FSTATFS
+#define	SYS_AUE_fc_mknodat	AUE_MKNODAT
+#define	SYS_AUE_fc_kevent	AUE_KEVENT
 
 #undef PAD_
 #undef PADL_

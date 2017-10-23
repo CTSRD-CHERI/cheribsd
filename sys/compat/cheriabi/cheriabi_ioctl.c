@@ -45,6 +45,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/fcntl.h>
 #include <sys/filio.h>
 #include <sys/file.h>
+#include <sys/filedesc.h>
 #include <sys/ioccom.h>
 #include <sys/malloc.h>
 #include <sys/mdioctl.h>
@@ -67,6 +68,9 @@ __FBSDID("$FreeBSD$");
 #include <compat/cheriabi/cheriabi_ioctl.h>
 
 MALLOC_DECLARE(M_IOCTLOPS);
+
+static int	cheriabi_do_ioctl(struct thread *td, int fd, u_long com,
+		    caddr_t udata);
 
 #if 0
 /* Cannot get exact size in 64-bit due to alignment issue of entire struct. */
@@ -906,20 +910,33 @@ ioctl_data_contains_pointers(u_long cmd)
 int
 cheriabi_ioctl(struct thread *td, struct cheriabi_ioctl_args *uap)
 {
+
+	return (cheriabi_do_ioctl(td, uap->fd, uap->com, uap->data));
+}
+
+int
+cheriabi_fc_ioctl(struct thread *td, struct cheriabi_fc_ioctl_args *uap)
+{
+
+	return (cheriabi_do_ioctl(td, fc2fd(uap->fc), uap->com, uap->data));
+}
+
+static int
+cheriabi_do_ioctl(struct thread *td, int fd, u_long com, caddr_t udata)
+{
 	u_char smalldata[SYS_IOCTL_SMALL_SIZE] __aligned(SYS_IOCTL_SMALL_ALIGN);
-	u_long com, t_com, o_com;
+	u_long t_com, o_com;
 	int arg, error;
 	u_int size;
 	caddr_t data;
 	void *t_data;
 
-	if (uap->com > 0xffffffff) {
+	if (com > 0xffffffff) {
 		printf(
 		    "WARNING pid %d (%s): ioctl sign-extension ioctl %lx\n",
-		    td->td_proc->p_pid, td->td_name, uap->com);
-		uap->com &= 0xffffffff;
+		    td->td_proc->p_pid, td->td_name, com);
+		com &= 0xffffffff;
 	}
-	com = uap->com;
 
 	/*
 	 * Interpret high order word to find amount of data to be
@@ -939,7 +956,7 @@ cheriabi_ioctl(struct thread *td, struct cheriabi_ioctl_args *uap)
 	if (size > 0) {
 		if (com & IOC_VOID) {
 			/* Integer argument. */
-			arg = (intptr_t)uap->data;
+			arg = (intptr_t)udata;
 			data = (void *)&arg;
 			size = 0;
 		} else {
@@ -949,14 +966,14 @@ cheriabi_ioctl(struct thread *td, struct cheriabi_ioctl_args *uap)
 				data = smalldata;
 		}
 	} else
-		data = (void *)&uap->data;
+		data = (void *)&udata;
 	t_data = NULL;
 	if ((com & IOC_IN) && !ioctl_data_contains_pointers(com)) {
-		error = copyin(uap->data, data, size);
+		error = copyin(udata, data, size);
 		if (error != 0)
 			goto out;
 	} else if (com & IOC_IN) {
-		error = copyincap(uap->data, data, size);
+		error = copyincap(udata, data, size);
 		if (error != 0)
 			goto out;
 		error = cheriabi_ioctl_translate_in(com, data, &t_com, &t_data);
@@ -973,17 +990,17 @@ cheriabi_ioctl(struct thread *td, struct cheriabi_ioctl_args *uap)
 	}
 
 	if (t_data == NULL)
-		error = kern_ioctl(td, uap->fd, com, data);
+		error = kern_ioctl(td, fd, com, data);
 	else
-		error = kern_ioctl(td, uap->fd, com, t_data);
+		error = kern_ioctl(td, fd, com, t_data);
 
 	if (t_data && error == 0)
 		error = cheriabi_ioctl_translate_out(o_com, data, t_data);
 	if (error == 0 && (com & IOC_OUT)) {
 		if (t_data)
-			error = copyoutcap(data, uap->data, (u_int)size);
+			error = copyoutcap(data, udata, (u_int)size);
 		else
-			error = copyout(data, uap->data, (u_int)size);
+			error = copyout(data, udata, (u_int)size);
 	}
 
 out:

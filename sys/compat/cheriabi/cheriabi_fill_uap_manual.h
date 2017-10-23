@@ -774,3 +774,111 @@ CHERIABI_SYS_cheriabi_procctl_fill_uap(struct thread *td,
 
 	return (0);
 }
+
+static inline int
+CHERIABI_SYS_cheriabi_fc_ioctl_fill_uap(struct thread *td,
+    struct cheriabi_fc_ioctl_args *uap)
+{
+	void * __capability tmpcap;
+	register_t reqperms, tag;
+	int error;
+
+	/* [0] fc_t fc */
+	cheriabi_fetch_syscall_arg(td, (void * __capability *)&uap->fc, 0, CHERIABI_SYS_cheriabi_fc_ioctl_PTRMASK);
+
+	/* [1] u_long com */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_fc_ioctl_PTRMASK);
+	uap->com = cheri_getoffset(tmpcap);
+
+	/* [2] _Inout_opt_ caddr_t data */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_fc_ioctl_PTRMASK);
+	if (uap->com & IOC_VOID) {
+		tag = cheri_gettag(tmpcap);
+		if (!tag)
+			uap->data = (void *)cheri_getoffset(tmpcap);
+		else
+			return (EPROT);
+	} else {
+		reqperms = 0;
+		if (uap->com & IOC_IN)
+			reqperms |= CHERI_PERM_LOAD;
+		if (uap->com & IOC_OUT)
+			reqperms |= CHERI_PERM_STORE;
+		if (ioctl_data_contains_pointers(uap->com)) {
+			if (reqperms & CHERI_PERM_LOAD)
+				reqperms |= CHERI_PERM_LOAD_CAP;
+			if (reqperms & CHERI_PERM_STORE)
+				reqperms |= CHERI_PERM_STORE_CAP;
+		}
+
+		/*
+		 * XXX-BD: not sure about may_be_null=1 here, but lower
+		 * levels will fail cleanly is it is a problem.
+		 */
+		error = cheriabi_cap_to_ptr((caddr_t *)&uap->data,
+		    tmpcap, IOCPARM_LEN(uap->com), reqperms, 1);
+		if (error != 0)
+			return (error);
+	}
+
+	return (0);
+}
+
+static inline int
+CHERIABI_SYS___fc_fcntl_fill_uap(struct thread *td,
+    struct __fc_fcntl_args *uap)
+{
+	void * __capability tmpcap;
+	int error;
+
+
+
+	/* [1] int fd */
+	cheriabi_fetch_syscall_arg(td, (void * __capability *)&uap->fc, 1, CHERIABI_SYS___fc_fcntl_PTRMASK);
+
+	/* [2] int cmd */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS___fc_fcntl_PTRMASK);
+	uap->cmd = cheri_getoffset(tmpcap);
+
+	/* [3] intptr_t arg */
+	/*
+	 * There are three cases.  arg is ignored, arg is an int, and arg
+	 * is a pointer to struct flock.  We rely on userspace to have
+	 * promoted integers to intptr_t so we're only dealing with a
+	 * capability argument.
+	 */
+	switch (uap->cmd) {
+	case F_GETFD:
+	case F_GETFL:
+	case F_GETOWN:
+		uap->arg = (intptr_t)NULL;
+		break;
+
+	case F_DUPFD:
+	case F_DUPFD_CLOEXEC:
+	case F_DUP2FD:
+	case F_DUP2FD_CLOEXEC:
+	case F_SETFD:
+	case F_SETFL:
+	case F_SETOWN:
+	case F_READAHEAD:
+	case F_RDAHEAD:
+		cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS___fc_fcntl_PTRMASK);
+		uap->arg = cheri_getoffset(tmpcap);
+		break;
+
+	case F_GETLK:
+	case F_SETLK:
+	case F_SETLKW:
+		cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS___fc_fcntl_PTRMASK);
+		error = cheriabi_cap_to_ptr((caddr_t *)&uap->arg,
+		    tmpcap, sizeof(struct flock), CHERI_PERM_LOAD, 0);
+		if (error != 0)
+			return (error);
+		break;
+	default:
+		return (EINVAL);
+	}
+
+	return (0);
+}

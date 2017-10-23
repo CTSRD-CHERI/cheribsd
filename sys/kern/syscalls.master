@@ -1023,6 +1023,339 @@
 				    struct kevent *changelist, int nchanges, \
 				    struct kevent *eventlist, int nevents, \
 				    const struct timespec *timeout); }
+;
+; Capabilty file descriptor versions of the 101 functions that take a file
+; descriptor arguments.
+; XXX: Update syscall numbers with vim starting here and running:
+; :let i=561 | ,$g/^[1-9][0-9]*/s//\=''.i/ | let i=i+1
+561	AUE_READ	NOSTD	{ ssize_t fc_read(fc_t fc, \
+				    _Out_writes_bytes_(nbyte) \
+				    void * buf, \
+				    size_t nbyte); }
+562	AUE_WRITE	NOSTD	{ ssize_t fc_write(fc_t fc, \
+				    _In_reads_bytes_(nbyte) \
+				    const void * buf, \
+				    size_t nbyte); }
+563	AUE_OPEN_RWTC	NOSTD	{ int __fc_open( \
+				    _Out_ fc_t *newfc, \
+				    _In_z_ const char * path, \
+				    int flags, \
+				    mode_t mode); }
+564	AUE_CLOSE	NOSTD	{ int fc_close(fc_t fc); }
+565	AUE_FCHDIR	NOSTD	{ int fc_fchdir(fc_t fc); }
+566	AUE_RECVMSG	NOSTD	{ ssize_t fc_recvmsg(fc_t sc, \
+				    _In_ struct msghdr * msg, \
+				    int flags); }
+567	AUE_SENDMSG	NOSTD	{ ssize_t fc_sendmsg(fc_t sc, \
+				    _In_ const struct msghdr * msg, \
+				    int flags); }
+568	AUE_RECVFROM	NOSTD	{ ssize_t fc_recvfrom(fc_t sc, \
+				    _Out_writes_bytes_(len) \
+				    void * buf, \
+				    size_t len, int flags, \
+				    _Out_writes_bytes_opt_(*fromlenaddr) \
+				    struct sockaddr * __restrict \
+				    from, \
+				    _Inout_opt_ \
+				    __socklen_t * __restrict \
+				    fromlenaddr); }
+569	AUE_ACCEPT	NOSTD	{ int __fc_accept(_Out_ fc_t *newfc, fc_t sc, \
+				    _Out_writes_bytes_opt_(*anamelen) \
+				    struct sockaddr * __restrict \
+				    name, \
+				    _Inout_opt_ __socklen_t * \
+				    anamelen); }
+570	AUE_GETPEERNAME	NOSTD	{ int fc_getpeername(fc_t sc, \
+				    _Out_writes_bytes_(*alen) \
+				    struct sockaddr * __restrict \
+				    asa, \
+				    _Inout_opt_ __socklen_t * \
+				    alen); }
+571	AUE_GETSOCKNAME	NOSTD	{ int fc_getsockname(fc_t sc, \
+				    _Out_writes_bytes_(*alen) \
+				    struct sockaddr * __restrict asa, \
+				    _Inout_ __socklen_t * alen); }
+572	AUE_FCHFLAGS	NOSTD	{ int fc_fchflags(fc_t fc, u_long flags); }
+573	AUE_DUP		NOSTD	{ int __fc_dup(_Out_ fc_t *newfc, \
+				    fc_t fc); }
+574	AUE_NULL	NOSTD	{ int fc_ioctl( \
+				    fc_t fc, u_long com, \
+				    _Inout_opt_ void *data); }
+575	AUE_DUP2	NOSTD	{ int __fc_dup2(_Out_ fc_t *newfc, fc_t from, \
+				    u_int to); }
+576	AUE_FCNTL	NOSTD	{ int __fc_fcntl( \
+				    _Out_opt_ fc_t *newfc, fc_t fc, int cmd, \
+				    intptr_t arg); }
+577	AUE_FSYNC	NOSTD	{ int fc_fsync(fc_t fc); }
+578	AUE_SOCKET	NOSTD	{ int __fc_socket(_Out_ fc_t *newfc, int domain, \
+				    int type, int protocol); }
+579	AUE_CONNECT	NOSTD	{ int fc_connect(fc_t sc, \
+				    _In_reads_bytes_(namelen) \
+				    const struct sockaddr *name, \
+				    __socklen_t namelen); }
+580	AUE_BIND	NOSTD	{ int fc_bind(fc_t sc, \
+				    _In_reads_bytes_(namelen) \
+				    const struct sockaddr *name, \
+				    __socklen_t namelen); }
+581	AUE_SETSOCKOPT	NOSTD	{ int fc_setsockopt(fc_t sc, int level, \
+				    int name, \
+				    _In_reads_bytes_opt_(valsize) \
+				    const void *val, \
+				    __socklen_t valsize); }
+582	AUE_LISTEN	NOSTD	{ int fc_listen(fc_t sc, int backlog); }
+583	AUE_GETSOCKOPT	NOSTD	{ int fc_getsockopt(fc_t sc, int level, \
+				    int name, \
+				    _Out_writes_bytes_opt_(*avalsize) \
+				    void *val, _Inout_ __socklen_t *avalsize); }
+584	AUE_READV	NOSTD	{ int fc_readv(fc_t fc, \
+				    _Inout_updates_(iovcnt) \
+				    struct iovec *iovp, u_int iovcnt); }
+585	AUE_WRITEV	NOSTD	{ int fc_writev(fc_t fc, \
+				    _In_reads_opt_(iovcnt) \
+				    struct iovec *iovp, u_int iovcnt); }
+586	AUE_FCHOWN	NOSTD	{ int fc_fchown(fc_t fc, int uid, int gid); }
+587	AUE_FCHMOD	NOSTD	{ int fc_fchmod(fc_t fc, mode_t mode); }
+588	AUE_FLOCK	NOSTD	{ int fc_flock(fc_t fc, int how); }
+589	AUE_SENDTO	NOSTD	{ ssize_t fc_sendto(fc_t sc, \
+				    _In_reads_bytes_(len) const void *buf, \
+				    size_t len, int flags, \
+				    _In_reads_bytes_opt_(tolen) \
+				    const struct sockaddr *to, \
+				    __socklen_t tolen); }
+590	AUE_SHUTDOWN	NOSTD	{ int fc_shutdown(fc_t sc, int how); }
+591	AUE_SOCKETPAIR	NOSTD	{ int fc_socketpair(int domain, int type, \
+				    int protocol, _Out_writes_(2) fc_t *rsv); }
+592	AUE_FPATHCONF	NOSTD	{ int fc_fpathconf(fc_t fc, int name); }
+593	AUE_FUTIMES	NOSTD	{ int fc_futimes(fc_t fc, \
+				    _In_reads_(2) \
+				    const struct timeval *tptr); }
+594	AUE_POLL	NOSTD	{ int fc_poll( \
+				    _Inout_updates_(nfds) struct fc_pollfd *fds, \
+				    u_int nfds, int timeout); }
+595	AUE_PREADV	NOSTD	{ ssize_t fc_preadv(fc_t fc, \
+				    _In_reads_(iovcnt) \
+				    struct iovec *iovp, \
+				    u_int iovcnt, off_t offset); }
+596	AUE_PWRITEV	NOSTD	{ ssize_t fc_pwritev(fc_t fc, \
+				    _In_reads_(iovcnt) struct iovec *iovp, \
+				    u_int iovcnt, off_t offset); }
+597	AUE_AIO_CANCEL	NOSTD	{ int fc_aio_cancel(fc_t fc, \
+				    _In_opt_ struct aiocb *aiocbp); }
+598	AUE_ACL_GET_FD	NOSTD	{ int __fc_acl_get_fd(fc_t fc, \
+				    acl_type_t type, _Out_ struct acl *aclp); }
+599	AUE_ACL_SET_FD	NOSTD	{ int __fc_acl_set_fd(fc_t fc, \
+				    acl_type_t type, _In_ struct acl *aclp); }
+600	AUE_ACL_DELETE_FD	NOSTD	{ int __fc_acl_delete_fd(fc_t fc, \
+				    acl_type_t type); }
+601	AUE_ACL_CHECK_FD	NOSTD	{ int __fc_acl_aclcheck_fd(fc_t fc, \
+				    acl_type_t type, _In_ struct acl *aclp); }
+602	AUE_EXTATTR_SET_FD	NOSTD	{ ssize_t fc_extattr_set_fd(fc_t fc, \
+				    int attrnamespace, \
+				    _In_z_ const char *attrname, \
+				    _In_reads_bytes_(nbytes) void *data, \
+				    size_t nbytes); }
+603	AUE_EXTATTR_GET_FD	NOSTD	{ ssize_t fc_extattr_get_fd(fc_t fc, \
+				    int attrnamespace, \
+				    _In_z_ const char *attrname, \
+				    _Out_writes_bytes_(nbytes) void *data, \
+				    size_t nbytes); }
+604	AUE_EXTATTR_DELETE_FD	NOSTD	{ int fc_extattr_delete_fd(fc_t fc, \
+				    int attrnamespace, \
+				    _In_z_ const char *attrname); }
+605	AUE_NULL	NOSTD	{ int __fc_mac_get_fd(fc_t fc, \
+				    _Out_ struct mac_c *mac_p); }
+606	AUE_NULL	NOSTD	{ int __fc_mac_set_fd(fc_t fc, \
+				    _In_ struct mac_c *mac_p); }
+607	AUE_SENDFILE	NOSTD	{ int fc_sendfile(fc_t fc, fc_t sc, \
+				    off_t offset, \
+				    size_t nbytes, \
+				    _In_opt_ struct sf_hdtr *hdtr, \
+				    _Out_opt_ off_t *sbytes, int flags); }
+608	AUE_EXTATTR_LIST_FD	NOSTD	{ ssize_t fc_extattr_list_fd(fc_t fc, \
+				    int attrnamespace, \
+				    _Out_writes_bytes_opt_(nbytes) \
+				    void *data, \
+				    size_t nbytes); }
+609	AUE_MQ_OPEN	NOSTD	{ int __fc_kmq_open( _Out_ fc_t *newfc, \
+				    _In_z_ const char *path, int flags, \
+				    mode_t mode, \
+				    _In_opt_ const struct mq_attr *attr); }
+610	AUE_MQ_SETATTR	NOSTD	{ int fc_kmq_setattr(fc_t mqc, \
+				    _In_opt_ const struct mq_attr *attr, \
+				    _Out_opt_ struct mq_attr *oattr); }
+611	AUE_MQ_TIMEDRECEIVE	NOSTD	{ int fc_kmq_timedreceive( \
+				    fc_t mqc, \
+				    _Out_writes_bytes_(msg_len) char *msg_ptr, \
+				    size_t msg_len, \
+				    _Out_opt_ unsigned *msg_prio, \
+				    _In_opt_ \
+				    const struct timespec *abs_timeout); }
+612	AUE_MQ_TIMEDSEND	NOSTD	{ int fc_kmq_timedsend(fc_t mqc, \
+				    _In_reads_bytes_(msg_len) \
+				    const char *msg_ptr, size_t msg_len, \
+				    unsigned msg_prio, \
+				    _In_opt_ \
+				    const struct timespec *abs_timeout); }
+613	AUE_MQ_NOTIFY	NOSTD	{ int fc_kmq_notify(fc_t mqc,	\
+				    _In_opt_ const struct sigevent *sigev); }
+614	AUE_SCTP_PEELOFF	NOSTD	{ int fc_sctp_peeloff(fc_t sc, \
+				     uint32_t name); }
+615	AUE_SCTP_GENERIC_SENDMSG	NOSTD	{ int fc_sctp_generic_sendmsg( \
+				    fc_t sc, \
+				    _In_reads_bytes_(mlen) void *msg, \
+				    int mlen, \
+				    _In_reads_bytes_(tolen) \
+				    struct sockaddr *to, \
+				    __socklen_t tolen, \
+				    _In_opt_ struct sctp_sndrcvinfo *sinfo, \
+				    int flags); }
+616	AUE_SCTP_GENERIC_SENDMSG_IOV	NOSTD	{ int fc_sctp_generic_sendmsg_iov( \
+				    fc_t sc, \
+				    _In_reads_(iovlen) struct iovec *iov, \
+				    int iovlen, \
+				    _In_reads_bytes_(tolen) \
+				    struct sockaddr *to, \
+				    __socklen_t tolen, \
+				    _In_opt_ struct sctp_sndrcvinfo *sinfo, \
+				    int flags); }
+617	AUE_SCTP_GENERIC_RECVMSG	NOSTD	{ int fc_sctp_generic_recvmsg( \
+				    fc_t sc, \
+				    _In_reads_(iovlen) struct iovec *iov, \
+				    int iovlen, \
+				    _Out_writes_bytes_(*fromlenaddr) \
+				    struct sockaddr *from, \
+				    _Out_ __socklen_t *fromlenaddr, \
+				    _In_opt_ struct sctp_sndrcvinfo *sinfo, \
+				    _Out_opt_ int *msg_flags); }
+618	AUE_PREAD	NOSTD	{ ssize_t fc_pread(fc_t fc, \
+				    _Out_writes_bytes_(nbyte) void *buf, \
+				    size_t nbyte, off_t offset); }
+619	AUE_PWRITE	NOSTD	{ ssize_t fc_pwrite(fc_t fc, \
+				    _Out_writes_bytes_(nbyte) \
+				    const void *buf, size_t nbyte, \
+				    off_t offset); }
+620	AUE_MMAP	NOSTD { void *fc_mmap( \
+				    _Pagerange_vmmap_opt_(len) void *addr, \
+				    size_t len, int prot, int flags, fc_t fc, \
+				    off_t pos); }
+621	AUE_LSEEK	NOSTD	{ off_t fc_lseek(fc_t fc, off_t offset, \
+				    int whence); }
+622	AUE_FTRUNCATE	NOSTD	{ int fc_ftruncate(fc_t fc, off_t length); }
+623	AUE_FACCESSAT	NOSTD	{ int fc_faccessat(fc_t fc, \
+				    _In_z_ const char *path, int amode, \
+				    int flag); }
+624	AUE_FCHMODAT	NOSTD	{ int fc_fchmodat(fc_t fc, \
+				    _In_z_ const char *path, mode_t mode, \
+				    int flag); }
+625	AUE_FCHOWNAT	NOSTD	{ int fc_fchownat(fc_t fc, \
+				    _In_z_ const char *path, \
+				    uid_t uid, gid_t gid, int flag); }
+626	AUE_FEXECVE	NOSTD	{ int fc_fexecve(fc_t fc, \
+				    _In_ void * *argv, \
+				    _In_ void * *envv); }
+627	AUE_FUTIMESAT	NOSTD	{ int fc_futimesat(fc_t fc, \
+				    _In_z_ const char *path, \
+				    _In_reads_(2) const struct timeval *times); }
+628	AUE_LINKAT	NOSTD	{ int fc_linkat(fc_t fc1, \
+				    _In_z_ const char * path1, \
+				    fc_t fc2, \
+				    _In_z_ const char * path2, \
+				    int flag); }
+629	AUE_MKDIRAT	NOSTD	{ int fc_mkdirat(fc_t fc, _In_z_ const char *path, \
+				    mode_t mode); }
+630	AUE_MKFIFOAT	NOSTD	{ int fc_mkfifoat(fc_t fc, \
+				    _In_z_ const char *path, mode_t mode); }
+631	AUE_OPENAT_RWTC	NOSTD	{ int __fc_openat(fc_t *newfc, fc_t fc, \
+				    _In_z_ const char * path, \
+				    int flag, mode_t mode); }
+632	AUE_READLINKAT	NOSTD	{ int fc_readlinkat(fc_t fc, \
+				    _In_z_ const char *path, \
+				    _Out_writes_bytes_(bufsize) char *buf, \
+				    size_t bufsize); }
+633	AUE_RENAMEAT	NOSTD	{ int fc_renameat(fc_t oldfc, \
+				    _In_z_ const char *old, \
+				    fc_t newfc, _In_z_ const char *new); }
+634	AUE_SYMLINKAT	NOSTD	{ int fc_symlinkat(_In_z_ const char *path1, \
+				    fc_t fc, _In_z_ const char *path2); }
+635	AUE_UNLINKAT	NOSTD	{ int fc_unlinkat(fc_t fc, \
+				    _In_z_ const char * path, \
+				    int flag); }
+636	AUE_CLOSEFROM	NOSTD	{ int fc_closefrom(fc_t lowfc); }
+637	AUE_CAP_RIGHTS_GET	NOSTD	{ int __fc_cap_rights_get(int version, \
+				    fc_t fc, _Out_ cap_rights_t *rightsp); }
+638	AUE_PDFORK	NOSTD	{ int fc_pdfork(_Out_ fc_t *fcp, int flags); }
+639	AUE_PDKILL	NOSTD	{ int fc_pdkill(fc_t fc, int signum); }
+640	AUE_PDGETPID	NOSTD	{ int fc_pdgetpid(fc_t fc, _Out_ pid_t *pidp); }
+641	AUE_POSIX_FALLOCATE	NOSTD	{ int fc_posix_fallocate(fc_t fc,\
+				    off_t offset, off_t len); }
+642	AUE_POSIX_FADVISE	NOSTD	{ int fc_posix_fadvise(fc_t fc, \
+				    off_t offset, off_t len, int advice); }
+643	AUE_CAP_RIGHTS_LIMIT	NOSTD { int \
+				    fc_cap_rights_limit(fc_t fc, \
+				    _In_ cap_rights_t *rightsp); }
+644	AUE_CAP_IOCTLS_LIMIT	NOSTD { int \
+				    fc_cap_ioctls_limit(fc_t fc, \
+				    _In_reads_(ncmds) const u_long *cmds, \
+				    size_t ncmds); }
+645	AUE_CAP_IOCTLS_GET	NOSTD { ssize_t \
+				     fc_cap_ioctls_get(fc_t fc, \
+				    _Out_writes_(maxcmds) u_long *cmds, \
+				    size_t maxcmds); }
+646	AUE_CAP_FCNTLS_LIMIT	NOSTD	{ int fc_cap_fcntls_limit(fc_t fc, \
+				    uint32_t fcntlrights); }
+647	AUE_CAP_FCNTLS_GET	NOSTD	{ int fc_cap_fcntls_get(fc_t fc, \
+				    _Out_ uint32_t *fcntlrightsp); }
+648	AUE_BINDAT	NOSTD	{ int fc_bindat(fc_t fc, fc_t sc, \
+				    _In_reads_bytes_(namelen) \
+				    const struct sockaddr *name, \
+				    __socklen_t namelen); }
+649	AUE_CONNECTAT	NOSTD	{ int fc_connectat(fc_t fc, fc_t sc, \
+				    _In_reads_bytes_(namelen) \
+				    const struct sockaddr *name, \
+				    __socklen_t namelen); }
+650	AUE_CHFLAGSAT	NOSTD	{ int fc_chflagsat(fc_t fc, \
+				    _In_z_ const char *path, \
+				    u_long flags, int atflag); }
+651	AUE_ACCEPT	NOSTD 	{ int __fc_accept4(_Out_ fc_t *newfc, fc_t sc, \
+				    _Out_writes_bytes_opt_(*anamelen) \
+				    struct sockaddr * __restrict name, \
+				    _Inout_opt_ \
+				    __socklen_t * __restrict anamelen, \
+				    int flags); }
+652	AUE_PIPE	NOSTD	{ int fc_pipe2(_Out_writes_(2) fc_t *filecaps, \
+				    int flags); }
+653	AUE_POLL	NOSTD	{ int fc_ppoll( \
+				    _Inout_updates_(nfds) \
+				    struct fc_pollfd *fds, \
+				    u_int nfds, \
+				    _In_opt_ const struct timespec *ts, \
+				    _In_opt_ const sigset_t *set); }
+654	AUE_FUTIMES	NOSTD	{ int fc_futimens(fc_t fc, \
+				    _In_reads_(2) \
+				    const struct timespec *times); }
+655	AUE_FUTIMESAT	NOSTD	{ int fc_utimensat(fc_t fc, \
+				    _In_z_ const char *path, \
+				    _In_reads_(2) \
+				    const struct timespec *times, \
+				    int flag); }
+656	AUE_FSYNC	NOSTD	{ int fc_fdatasync(fc_t fc); }
+657	AUE_FSTAT	NOSTD	{ int fc_fstat(fc_t fc, _Out_ struct stat *sb); }
+658	AUE_FSTATAT	NOSTD	{ int fc_fstatat(fc_t fc, _In_z_ const char *path, \
+                                    _Out_ struct stat *buf, int flag); }
+659	AUE_GETDIRENTRIES NOSTD { ssize_t fc_getdirentries(fc_t fc, \
+				    _Out_writes_bytes_(count) char *buf, \
+                                    size_t count, _Out_ off_t *basep); }
+660	AUE_FSTATFS	NOSTD	{ int fc_fstatfs(fc_t fc, \
+				    _Out_ struct statfs *buf); }
+661	AUE_MKNODAT	NOSTD	{ int fc_mknodat(fc_t fc, _In_z_ const char *path, \
+				    mode_t mode, dev_t dev); }
+662	AUE_KEVENT	NOSTD	{ int fc_kevent(fc_t fc, \
+				    _In_reads_opt_(nchanges) \
+				    const struct kevent *changelist, \
+				    int nchanges, \
+				    _In_reads_opt_(nevents) \
+				    struct kevent *eventlist, int nevents, \
+				    _In_opt_ const struct timespec *timeout); }
 
 ; Please copy any additions and changes to the following compatability tables:
 ; sys/compat/freebsd32/syscalls.master

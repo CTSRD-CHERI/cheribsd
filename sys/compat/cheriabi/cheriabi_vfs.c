@@ -147,11 +147,53 @@ cheriabi_open(struct thread *td, struct cheriabi_open_args *uap)
 }
 
 int
+cheriabi___fc_open(struct thread *td, struct cheriabi___fc_open_args *uap)
+{
+	int error, newfd;
+	fc_t newfc;
+
+	error = kern_openat_c(td, AT_FDCWD, uap->path, UIO_USERSPACE,
+	    uap->flags, uap->mode);
+	if (error != 0)
+		return (error);
+
+	newfd = td->td_retval[0];
+	td->td_retval[0] = 0;
+
+	newfc = fd2fc(newfd);
+	error = copyoutcap(&newfc, uap->newfc, sizeof(newfc));
+	if (error != 0)
+		(void)kern_close(td, newfd);
+	return(error);
+}
+
+int
 cheriabi_openat(struct thread *td, struct cheriabi_openat_args *uap)
 {
 
 	return (kern_openat_c(td, uap->fd, uap->path, UIO_USERSPACE, uap->flag,
 	    uap->mode));
+}
+
+int
+cheriabi___fc_openat(struct thread *td, struct cheriabi___fc_openat_args *uap)
+{
+	int error, newfd;
+	fc_t newfc;
+
+	error = kern_openat_c(td, fd2fc(uap->fc), uap->path, UIO_USERSPACE,
+	    uap->flag, uap->mode);
+	if (error != 0)
+		return (error);
+
+	newfd = td->td_retval[0];
+	td->td_retval[0] = 0;
+
+	newfc = fd2fc(newfd);
+	error = copyoutcap(&newfc, uap->newfc, sizeof(newfc));
+	if (error != 0)
+		(void)kern_close(td, newfd);
+	return(error);
 }
 
 int
@@ -176,6 +218,20 @@ cheriabi_linkat(struct thread *td, struct cheriabi_linkat_args *uap)
 }
 
 int
+cheriabi_fc_linkat(struct thread *td, struct cheriabi_fc_linkat_args *uap)
+{
+	int flag;
+
+	flag = uap->flag;
+	if (flag & ~AT_SYMLINK_FOLLOW)
+		return (EINVAL);
+
+	return (kern_linkat_c(td, fc2fd(uap->fc1), fc2fd(uap->fc2), uap->path1,
+	    uap->path2, UIO_USERSPACE,
+	    (flag & AT_SYMLINK_FOLLOW) ? FOLLOW : NOFOLLOW));
+}
+
+int
 cheriabi_unlink(struct thread *td, struct cheriabi_unlink_args *uap)
 {
 
@@ -195,6 +251,22 @@ cheriabi_unlinkat(struct thread *td, struct cheriabi_unlinkat_args *uap)
 	else
 		return (kern_unlinkat_c(td, uap->fd, uap->path, UIO_USERSPACE,
 		    0));
+}
+
+int
+cheriabi_fc_unlinkat(struct thread *td, struct cheriabi_fc_unlinkat_args *uap)
+{
+	int flag = uap->flag;
+
+	if (flag & ~AT_REMOVEDIR)
+		return (EINVAL);
+
+	if (flag & AT_REMOVEDIR)
+		return (kern_rmdirat_c(td, fc2fd(uap->fc), uap->path,
+		    UIO_USERSPACE));
+	else
+		return (kern_unlinkat_c(td, fc2fd(uap->fc), uap->path,
+		    UIO_USERSPACE, 0));
 }
 
 int

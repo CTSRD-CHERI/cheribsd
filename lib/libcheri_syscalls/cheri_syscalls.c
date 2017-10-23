@@ -54,6 +54,7 @@ _sys _protoargs								\
 
 #define SYS_STUB_ARGHASPTRS(...)	SYS_STUB(__VA_ARGS__)
 
+#if 0
 /*
  * We need to perform what ever custom handling is required for the va_list
  * on the calling side since it might be the wrong type outside the sandbox.
@@ -63,6 +64,9 @@ _sys _protoargs								\
     _callargs, _callargs_chk, _callargs_err, _localcheck)		\
 _ret _sys _vprotoargs;							\
 __weak_reference(_sys, _##_sys);
+#else
+#define SYS_STUB_VA(...)
+#endif
 
 #include <compat/cheriabi/cheriabi_sysstubs.h>
 

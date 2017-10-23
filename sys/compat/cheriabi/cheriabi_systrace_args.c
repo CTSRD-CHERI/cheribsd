@@ -3099,6 +3099,962 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 6;
 		break;
 	}
+	/* fc_read */
+	case 561: {
+		struct fc_read_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->buf; /* void * */
+		uarg[2] = p->nbyte; /* size_t */
+		*n_args = 3;
+		break;
+	}
+	/* fc_write */
+	case 562: {
+		struct fc_write_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->buf; /* const void * */
+		uarg[2] = p->nbyte; /* size_t */
+		*n_args = 3;
+		break;
+	}
+	/* cheriabi___fc_open */
+	case 563: {
+		struct cheriabi___fc_open_args *p = params;
+		uarg[0] = (intptr_t) p->newfc; /* fc_t * */
+		uarg[1] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
+		iarg[2] = p->flags; /* int */
+		iarg[3] = p->mode; /* mode_t */
+		*n_args = 4;
+		break;
+	}
+	/* fc_close */
+	case 564: {
+		struct fc_close_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		*n_args = 1;
+		break;
+	}
+	/* fc_fchdir */
+	case 565: {
+		struct fc_fchdir_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		*n_args = 1;
+		break;
+	}
+	/* fc_recvmsg */
+	case 566: {
+		struct fc_recvmsg_args *p = params;
+		iarg[0] = p->sc; /* fc_t */
+		uarg[1] = (intptr_t) p->msg; /* struct msghdr_c * */
+		iarg[2] = p->flags; /* int */
+		*n_args = 3;
+		break;
+	}
+	/* fc_sendmsg */
+	case 567: {
+		struct fc_sendmsg_args *p = params;
+		iarg[0] = p->sc; /* fc_t */
+		uarg[1] = (intptr_t) p->msg; /* const struct msghdr_c * */
+		iarg[2] = p->flags; /* int */
+		*n_args = 3;
+		break;
+	}
+	/* fc_recvfrom */
+	case 568: {
+		struct fc_recvfrom_args *p = params;
+		iarg[0] = p->sc; /* fc_t */
+		uarg[1] = (intptr_t) p->buf; /* void * */
+		uarg[2] = p->len; /* size_t */
+		iarg[3] = p->flags; /* int */
+		uarg[4] = (intptr_t) p->from; /* struct sockaddr * */
+		uarg[5] = (intptr_t) p->fromlenaddr; /* __socklen_t * */
+		*n_args = 6;
+		break;
+	}
+	/* __fc_accept */
+	case 569: {
+		struct __fc_accept_args *p = params;
+		uarg[0] = (intptr_t) p->newfc; /* fc_t * */
+		iarg[1] = p->sc; /* fc_t */
+		uarg[2] = (intptr_t) p->name; /* struct sockaddr * */
+		uarg[3] = (intptr_t) p->anamelen; /* __socklen_t * */
+		*n_args = 4;
+		break;
+	}
+	/* fc_getpeername */
+	case 570: {
+		struct fc_getpeername_args *p = params;
+		iarg[0] = p->sc; /* fc_t */
+		uarg[1] = (intptr_t) p->asa; /* struct sockaddr * */
+		uarg[2] = (intptr_t) p->alen; /* __socklen_t * */
+		*n_args = 3;
+		break;
+	}
+	/* fc_getsockname */
+	case 571: {
+		struct fc_getsockname_args *p = params;
+		iarg[0] = p->sc; /* fc_t */
+		uarg[1] = (intptr_t) p->asa; /* struct sockaddr * */
+		uarg[2] = (intptr_t) p->alen; /* __socklen_t * */
+		*n_args = 3;
+		break;
+	}
+	/* fc_fchflags */
+	case 572: {
+		struct fc_fchflags_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = p->flags; /* u_long */
+		*n_args = 2;
+		break;
+	}
+	/* __fc_dup */
+	case 573: {
+		struct __fc_dup_args *p = params;
+		uarg[0] = (intptr_t) p->newfc; /* fc_t * */
+		iarg[1] = p->fc; /* fc_t */
+		*n_args = 2;
+		break;
+	}
+	/* cheriabi_fc_ioctl */
+	case 574: {
+		struct cheriabi_fc_ioctl_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = p->com; /* u_long */
+		uarg[2] = (intptr_t) p->data; /* void * */
+		*n_args = 3;
+		break;
+	}
+	/* __fc_dup2 */
+	case 575: {
+		struct __fc_dup2_args *p = params;
+		uarg[0] = (intptr_t) p->newfc; /* fc_t * */
+		iarg[1] = p->from; /* fc_t */
+		uarg[2] = p->to; /* u_int */
+		*n_args = 3;
+		break;
+	}
+	/* __fc_fcntl */
+	case 576: {
+		struct __fc_fcntl_args *p = params;
+		uarg[0] = (intptr_t) p->newfc; /* fc_t * */
+		iarg[1] = p->fc; /* fc_t */
+		iarg[2] = p->cmd; /* int */
+		uarg[3] = (intptr_t) p->arg; /* intptr_t */
+		*n_args = 4;
+		break;
+	}
+	/* fc_fsync */
+	case 577: {
+		struct fc_fsync_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		*n_args = 1;
+		break;
+	}
+	/* __fc_socket */
+	case 578: {
+		struct __fc_socket_args *p = params;
+		uarg[0] = (intptr_t) p->newfc; /* fc_t * */
+		iarg[1] = p->domain; /* int */
+		iarg[2] = p->type; /* int */
+		iarg[3] = p->protocol; /* int */
+		*n_args = 4;
+		break;
+	}
+	/* fc_connect */
+	case 579: {
+		struct fc_connect_args *p = params;
+		iarg[0] = p->sc; /* fc_t */
+		uarg[1] = (intptr_t) p->name; /* const struct sockaddr * */
+		iarg[2] = p->namelen; /* __socklen_t */
+		*n_args = 3;
+		break;
+	}
+	/* fc_bind */
+	case 580: {
+		struct fc_bind_args *p = params;
+		iarg[0] = p->sc; /* fc_t */
+		uarg[1] = (intptr_t) p->name; /* const struct sockaddr * */
+		iarg[2] = p->namelen; /* __socklen_t */
+		*n_args = 3;
+		break;
+	}
+	/* fc_setsockopt */
+	case 581: {
+		struct fc_setsockopt_args *p = params;
+		iarg[0] = p->sc; /* fc_t */
+		iarg[1] = p->level; /* int */
+		iarg[2] = p->name; /* int */
+		uarg[3] = (intptr_t) p->val; /* const void * */
+		iarg[4] = p->valsize; /* __socklen_t */
+		*n_args = 5;
+		break;
+	}
+	/* fc_listen */
+	case 582: {
+		struct fc_listen_args *p = params;
+		iarg[0] = p->sc; /* fc_t */
+		iarg[1] = p->backlog; /* int */
+		*n_args = 2;
+		break;
+	}
+	/* fc_getsockopt */
+	case 583: {
+		struct fc_getsockopt_args *p = params;
+		iarg[0] = p->sc; /* fc_t */
+		iarg[1] = p->level; /* int */
+		iarg[2] = p->name; /* int */
+		uarg[3] = (intptr_t) p->val; /* void * */
+		uarg[4] = (intptr_t) p->avalsize; /* __socklen_t * */
+		*n_args = 5;
+		break;
+	}
+	/* cheriabi_fc_readv */
+	case 584: {
+		struct cheriabi_fc_readv_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->iovp; /* struct iovec_c * */
+		uarg[2] = p->iovcnt; /* u_int */
+		*n_args = 3;
+		break;
+	}
+	/* cheriabi_fc_writev */
+	case 585: {
+		struct cheriabi_fc_writev_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->iovp; /* struct iovec_c * */
+		uarg[2] = p->iovcnt; /* u_int */
+		*n_args = 3;
+		break;
+	}
+	/* fc_fchown */
+	case 586: {
+		struct fc_fchown_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		iarg[1] = p->uid; /* int */
+		iarg[2] = p->gid; /* int */
+		*n_args = 3;
+		break;
+	}
+	/* fc_fchmod */
+	case 587: {
+		struct fc_fchmod_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		iarg[1] = p->mode; /* mode_t */
+		*n_args = 2;
+		break;
+	}
+	/* fc_flock */
+	case 588: {
+		struct fc_flock_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		iarg[1] = p->how; /* int */
+		*n_args = 2;
+		break;
+	}
+	/* fc_sendto */
+	case 589: {
+		struct fc_sendto_args *p = params;
+		iarg[0] = p->sc; /* fc_t */
+		uarg[1] = (intptr_t) p->buf; /* const void * */
+		uarg[2] = p->len; /* size_t */
+		iarg[3] = p->flags; /* int */
+		uarg[4] = (intptr_t) p->to; /* const struct sockaddr * */
+		iarg[5] = p->tolen; /* __socklen_t */
+		*n_args = 6;
+		break;
+	}
+	/* fc_shutdown */
+	case 590: {
+		struct fc_shutdown_args *p = params;
+		iarg[0] = p->sc; /* fc_t */
+		iarg[1] = p->how; /* int */
+		*n_args = 2;
+		break;
+	}
+	/* fc_socketpair */
+	case 591: {
+		struct fc_socketpair_args *p = params;
+		iarg[0] = p->domain; /* int */
+		iarg[1] = p->type; /* int */
+		iarg[2] = p->protocol; /* int */
+		uarg[3] = (intptr_t) p->rsv; /* fc_t * */
+		*n_args = 4;
+		break;
+	}
+	/* fc_fpathconf */
+	case 592: {
+		struct fc_fpathconf_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		iarg[1] = p->name; /* int */
+		*n_args = 2;
+		break;
+	}
+	/* fc_futimes */
+	case 593: {
+		struct fc_futimes_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->tptr; /* const struct timeval * */
+		*n_args = 2;
+		break;
+	}
+	/* fc_poll */
+	case 594: {
+		struct fc_poll_args *p = params;
+		uarg[0] = (intptr_t) p->fds; /* struct fc_pollfd * */
+		uarg[1] = p->nfds; /* u_int */
+		iarg[2] = p->timeout; /* int */
+		*n_args = 3;
+		break;
+	}
+	/* cheriabi_fc_preadv */
+	case 595: {
+		struct cheriabi_fc_preadv_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->iovp; /* struct iovec_c * */
+		uarg[2] = p->iovcnt; /* u_int */
+		iarg[3] = p->offset; /* off_t */
+		*n_args = 4;
+		break;
+	}
+	/* cheriabi_fc_pwritev */
+	case 596: {
+		struct cheriabi_fc_pwritev_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->iovp; /* struct iovec_c * */
+		uarg[2] = p->iovcnt; /* u_int */
+		iarg[3] = p->offset; /* off_t */
+		*n_args = 4;
+		break;
+	}
+	/* cheriabi_fc_aio_cancel */
+	case 597: {
+		struct cheriabi_fc_aio_cancel_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->aiocbp; /* struct aiocb_c * */
+		*n_args = 2;
+		break;
+	}
+	/* __fc_acl_get_fd */
+	case 598: {
+		struct __fc_acl_get_fd_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		iarg[1] = p->type; /* acl_type_t */
+		uarg[2] = (intptr_t) p->aclp; /* struct acl * */
+		*n_args = 3;
+		break;
+	}
+	/* __fc_acl_set_fd */
+	case 599: {
+		struct __fc_acl_set_fd_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		iarg[1] = p->type; /* acl_type_t */
+		uarg[2] = (intptr_t) p->aclp; /* struct acl * */
+		*n_args = 3;
+		break;
+	}
+	/* __fc_acl_delete_fd */
+	case 600: {
+		struct __fc_acl_delete_fd_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		iarg[1] = p->type; /* acl_type_t */
+		*n_args = 2;
+		break;
+	}
+	/* __fc_acl_aclcheck_fd */
+	case 601: {
+		struct __fc_acl_aclcheck_fd_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		iarg[1] = p->type; /* acl_type_t */
+		uarg[2] = (intptr_t) p->aclp; /* struct acl * */
+		*n_args = 3;
+		break;
+	}
+	/* fc_extattr_set_fd */
+	case 602: {
+		struct fc_extattr_set_fd_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		iarg[1] = p->attrnamespace; /* int */
+		uarg[2] = (intptr_t) p->attrname; /* const char * */
+		uarg[3] = (intptr_t) p->data; /* void * */
+		uarg[4] = p->nbytes; /* size_t */
+		*n_args = 5;
+		break;
+	}
+	/* fc_extattr_get_fd */
+	case 603: {
+		struct fc_extattr_get_fd_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		iarg[1] = p->attrnamespace; /* int */
+		uarg[2] = (intptr_t) p->attrname; /* const char * */
+		uarg[3] = (intptr_t) p->data; /* void * */
+		uarg[4] = p->nbytes; /* size_t */
+		*n_args = 5;
+		break;
+	}
+	/* fc_extattr_delete_fd */
+	case 604: {
+		struct fc_extattr_delete_fd_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		iarg[1] = p->attrnamespace; /* int */
+		uarg[2] = (intptr_t) p->attrname; /* const char * */
+		*n_args = 3;
+		break;
+	}
+	/* cheriabi___fc_mac_get_fd */
+	case 605: {
+		struct cheriabi___fc_mac_get_fd_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->mac_p; /* struct mac_c * */
+		*n_args = 2;
+		break;
+	}
+	/* cheriabi___fc_mac_set_fd */
+	case 606: {
+		struct cheriabi___fc_mac_set_fd_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->mac_p; /* struct mac_c * */
+		*n_args = 2;
+		break;
+	}
+	/* cheriabi_fc_sendfile */
+	case 607: {
+		struct cheriabi_fc_sendfile_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		iarg[1] = p->sc; /* fc_t */
+		iarg[2] = p->offset; /* off_t */
+		uarg[3] = p->nbytes; /* size_t */
+		uarg[4] = (intptr_t) p->hdtr; /* struct sf_hdtr_c * */
+		uarg[5] = (intptr_t) p->sbytes; /* off_t * */
+		iarg[6] = p->flags; /* int */
+		*n_args = 7;
+		break;
+	}
+	/* fc_extattr_list_fd */
+	case 608: {
+		struct fc_extattr_list_fd_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		iarg[1] = p->attrnamespace; /* int */
+		uarg[2] = (intptr_t) p->data; /* void * */
+		uarg[3] = p->nbytes; /* size_t */
+		*n_args = 4;
+		break;
+	}
+	/* __fc_kmq_open */
+	case 609: {
+		struct __fc_kmq_open_args *p = params;
+		uarg[0] = (intptr_t) p->newfc; /* fc_t * */
+		uarg[1] = (intptr_t) p->path; /* const char * */
+		iarg[2] = p->flags; /* int */
+		iarg[3] = p->mode; /* mode_t */
+		uarg[4] = (intptr_t) p->attr; /* const struct mq_attr * */
+		*n_args = 5;
+		break;
+	}
+	/* fc_kmq_setattr */
+	case 610: {
+		struct fc_kmq_setattr_args *p = params;
+		iarg[0] = p->mqc; /* fc_t */
+		uarg[1] = (intptr_t) p->attr; /* const struct mq_attr * */
+		uarg[2] = (intptr_t) p->oattr; /* struct mq_attr * */
+		*n_args = 3;
+		break;
+	}
+	/* fc_kmq_timedreceive */
+	case 611: {
+		struct fc_kmq_timedreceive_args *p = params;
+		iarg[0] = p->mqc; /* fc_t */
+		uarg[1] = (intptr_t) p->msg_ptr; /* char * */
+		uarg[2] = p->msg_len; /* size_t */
+		uarg[3] = (intptr_t) p->msg_prio; /* unsigned * */
+		uarg[4] = (intptr_t) p->abs_timeout; /* const struct timespec * */
+		*n_args = 5;
+		break;
+	}
+	/* fc_kmq_timedsend */
+	case 612: {
+		struct fc_kmq_timedsend_args *p = params;
+		iarg[0] = p->mqc; /* fc_t */
+		uarg[1] = (intptr_t) p->msg_ptr; /* const char * */
+		uarg[2] = p->msg_len; /* size_t */
+		uarg[3] = p->msg_prio; /* unsigned */
+		uarg[4] = (intptr_t) p->abs_timeout; /* const struct timespec * */
+		*n_args = 5;
+		break;
+	}
+	/* cheriabi_fc_kmq_notify */
+	case 613: {
+		struct cheriabi_fc_kmq_notify_args *p = params;
+		iarg[0] = p->mqc; /* fc_t */
+		uarg[1] = (intptr_t) p->sigev; /* const struct sigevent_c * */
+		*n_args = 2;
+		break;
+	}
+	/* fc_sctp_peeloff */
+	case 614: {
+		struct fc_sctp_peeloff_args *p = params;
+		iarg[0] = p->sc; /* fc_t */
+		uarg[1] = p->name; /* uint32_t */
+		*n_args = 2;
+		break;
+	}
+	/* fc_sctp_generic_sendmsg */
+	case 615: {
+		struct fc_sctp_generic_sendmsg_args *p = params;
+		iarg[0] = p->sc; /* fc_t */
+		uarg[1] = (intptr_t) p->msg; /* void * */
+		iarg[2] = p->mlen; /* int */
+		uarg[3] = (intptr_t) p->to; /* struct sockaddr * */
+		iarg[4] = p->tolen; /* __socklen_t */
+		uarg[5] = (intptr_t) p->sinfo; /* struct sctp_sndrcvinfo * */
+		iarg[6] = p->flags; /* int */
+		*n_args = 7;
+		break;
+	}
+	/* fc_sctp_generic_sendmsg_iov */
+	case 616: {
+		struct fc_sctp_generic_sendmsg_iov_args *p = params;
+		iarg[0] = p->sc; /* fc_t */
+		uarg[1] = (intptr_t) p->iov; /* struct iovec_c * */
+		iarg[2] = p->iovlen; /* int */
+		uarg[3] = (intptr_t) p->to; /* struct sockaddr * */
+		iarg[4] = p->tolen; /* __socklen_t */
+		uarg[5] = (intptr_t) p->sinfo; /* struct sctp_sndrcvinfo * */
+		iarg[6] = p->flags; /* int */
+		*n_args = 7;
+		break;
+	}
+	/* fc_sctp_generic_recvmsg */
+	case 617: {
+		struct fc_sctp_generic_recvmsg_args *p = params;
+		iarg[0] = p->sc; /* fc_t */
+		uarg[1] = (intptr_t) p->iov; /* struct iovec_c * */
+		iarg[2] = p->iovlen; /* int */
+		uarg[3] = (intptr_t) p->from; /* struct sockaddr * */
+		uarg[4] = (intptr_t) p->fromlenaddr; /* __socklen_t * */
+		uarg[5] = (intptr_t) p->sinfo; /* struct sctp_sndrcvinfo * */
+		uarg[6] = (intptr_t) p->msg_flags; /* int * */
+		*n_args = 7;
+		break;
+	}
+	/* fc_pread */
+	case 618: {
+		struct fc_pread_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->buf; /* void * */
+		uarg[2] = p->nbyte; /* size_t */
+		iarg[3] = p->offset; /* off_t */
+		*n_args = 4;
+		break;
+	}
+	/* fc_pwrite */
+	case 619: {
+		struct fc_pwrite_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->buf; /* const void * */
+		uarg[2] = p->nbyte; /* size_t */
+		iarg[3] = p->offset; /* off_t */
+		*n_args = 4;
+		break;
+	}
+	/* cheriabi_fc_mmap */
+	case 620: {
+		struct cheriabi_fc_mmap_args *p = params;
+		uarg[0] = (intptr_t) p->addr; /* void * */
+		uarg[1] = p->len; /* size_t */
+		iarg[2] = p->prot; /* int */
+		iarg[3] = p->flags; /* int */
+		iarg[4] = p->fc; /* fc_t */
+		iarg[5] = p->pos; /* off_t */
+		*n_args = 6;
+		break;
+	}
+	/* fc_lseek */
+	case 621: {
+		struct fc_lseek_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		iarg[1] = p->offset; /* off_t */
+		iarg[2] = p->whence; /* int */
+		*n_args = 3;
+		break;
+	}
+	/* fc_ftruncate */
+	case 622: {
+		struct fc_ftruncate_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		iarg[1] = p->length; /* off_t */
+		*n_args = 2;
+		break;
+	}
+	/* fc_faccessat */
+	case 623: {
+		struct fc_faccessat_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->path; /* const char * */
+		iarg[2] = p->amode; /* int */
+		iarg[3] = p->flag; /* int */
+		*n_args = 4;
+		break;
+	}
+	/* fc_fchmodat */
+	case 624: {
+		struct fc_fchmodat_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->path; /* const char * */
+		iarg[2] = p->mode; /* mode_t */
+		iarg[3] = p->flag; /* int */
+		*n_args = 4;
+		break;
+	}
+	/* fc_fchownat */
+	case 625: {
+		struct fc_fchownat_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->path; /* const char * */
+		uarg[2] = p->uid; /* uid_t */
+		iarg[3] = p->gid; /* gid_t */
+		iarg[4] = p->flag; /* int */
+		*n_args = 5;
+		break;
+	}
+	/* cheriabi_fc_fexecve */
+	case 626: {
+		struct cheriabi_fc_fexecve_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->argv; /* void *__capability * */
+		uarg[2] = (intptr_t) p->envv; /* void *__capability * */
+		*n_args = 3;
+		break;
+	}
+	/* fc_futimesat */
+	case 627: {
+		struct fc_futimesat_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->path; /* const char * */
+		uarg[2] = (intptr_t) p->times; /* const struct timeval * */
+		*n_args = 3;
+		break;
+	}
+	/* cheriabi_fc_linkat */
+	case 628: {
+		struct cheriabi_fc_linkat_args *p = params;
+		iarg[0] = p->fc1; /* fc_t */
+		uarg[1] = (cheri_getbase(p->path1) + cheri_getoffset(p->path1)); /* const char *__capability */
+		iarg[2] = p->fc2; /* fc_t */
+		uarg[3] = (cheri_getbase(p->path2) + cheri_getoffset(p->path2)); /* const char *__capability */
+		iarg[4] = p->flag; /* int */
+		*n_args = 5;
+		break;
+	}
+	/* fc_mkdirat */
+	case 629: {
+		struct fc_mkdirat_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->path; /* const char * */
+		iarg[2] = p->mode; /* mode_t */
+		*n_args = 3;
+		break;
+	}
+	/* fc_mkfifoat */
+	case 630: {
+		struct fc_mkfifoat_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->path; /* const char * */
+		iarg[2] = p->mode; /* mode_t */
+		*n_args = 3;
+		break;
+	}
+	/* cheriabi___fc_openat */
+	case 631: {
+		struct cheriabi___fc_openat_args *p = params;
+		uarg[0] = (intptr_t) p->newfc; /* fc_t * */
+		iarg[1] = p->fc; /* fc_t */
+		uarg[2] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
+		iarg[3] = p->flag; /* int */
+		iarg[4] = p->mode; /* mode_t */
+		*n_args = 5;
+		break;
+	}
+	/* fc_readlinkat */
+	case 632: {
+		struct fc_readlinkat_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->path; /* const char * */
+		uarg[2] = (intptr_t) p->buf; /* char * */
+		uarg[3] = p->bufsize; /* size_t */
+		*n_args = 4;
+		break;
+	}
+	/* fc_renameat */
+	case 633: {
+		struct fc_renameat_args *p = params;
+		iarg[0] = p->oldfc; /* fc_t */
+		uarg[1] = (intptr_t) p->old; /* const char * */
+		iarg[2] = p->newfc; /* fc_t */
+		uarg[3] = (intptr_t) p->new; /* const char * */
+		*n_args = 4;
+		break;
+	}
+	/* fc_symlinkat */
+	case 634: {
+		struct fc_symlinkat_args *p = params;
+		uarg[0] = (intptr_t) p->path1; /* const char * */
+		iarg[1] = p->fc; /* fc_t */
+		uarg[2] = (intptr_t) p->path2; /* const char * */
+		*n_args = 3;
+		break;
+	}
+	/* cheriabi_fc_unlinkat */
+	case 635: {
+		struct cheriabi_fc_unlinkat_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
+		iarg[2] = p->flag; /* int */
+		*n_args = 3;
+		break;
+	}
+	/* fc_closefrom */
+	case 636: {
+		struct fc_closefrom_args *p = params;
+		iarg[0] = p->lowfc; /* fc_t */
+		*n_args = 1;
+		break;
+	}
+	/* __fc_cap_rights_get */
+	case 637: {
+		struct __fc_cap_rights_get_args *p = params;
+		iarg[0] = p->version; /* int */
+		iarg[1] = p->fc; /* fc_t */
+		uarg[2] = (intptr_t) p->rightsp; /* cap_rights_t * */
+		*n_args = 3;
+		break;
+	}
+	/* fc_pdfork */
+	case 638: {
+		struct fc_pdfork_args *p = params;
+		uarg[0] = (intptr_t) p->fcp; /* fc_t * */
+		iarg[1] = p->flags; /* int */
+		*n_args = 2;
+		break;
+	}
+	/* fc_pdkill */
+	case 639: {
+		struct fc_pdkill_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		iarg[1] = p->signum; /* int */
+		*n_args = 2;
+		break;
+	}
+	/* fc_pdgetpid */
+	case 640: {
+		struct fc_pdgetpid_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->pidp; /* pid_t * */
+		*n_args = 2;
+		break;
+	}
+	/* fc_posix_fallocate */
+	case 641: {
+		struct fc_posix_fallocate_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		iarg[1] = p->offset; /* off_t */
+		iarg[2] = p->len; /* off_t */
+		*n_args = 3;
+		break;
+	}
+	/* fc_posix_fadvise */
+	case 642: {
+		struct fc_posix_fadvise_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		iarg[1] = p->offset; /* off_t */
+		iarg[2] = p->len; /* off_t */
+		iarg[3] = p->advice; /* int */
+		*n_args = 4;
+		break;
+	}
+	/* fc_cap_rights_limit */
+	case 643: {
+		struct fc_cap_rights_limit_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->rightsp; /* cap_rights_t * */
+		*n_args = 2;
+		break;
+	}
+	/* fc_cap_ioctls_limit */
+	case 644: {
+		struct fc_cap_ioctls_limit_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->cmds; /* const u_long * */
+		uarg[2] = p->ncmds; /* size_t */
+		*n_args = 3;
+		break;
+	}
+	/* fc_cap_ioctls_get */
+	case 645: {
+		struct fc_cap_ioctls_get_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->cmds; /* u_long * */
+		uarg[2] = p->maxcmds; /* size_t */
+		*n_args = 3;
+		break;
+	}
+	/* fc_cap_fcntls_limit */
+	case 646: {
+		struct fc_cap_fcntls_limit_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = p->fcntlrights; /* uint32_t */
+		*n_args = 2;
+		break;
+	}
+	/* fc_cap_fcntls_get */
+	case 647: {
+		struct fc_cap_fcntls_get_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->fcntlrightsp; /* uint32_t * */
+		*n_args = 2;
+		break;
+	}
+	/* fc_bindat */
+	case 648: {
+		struct fc_bindat_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		iarg[1] = p->sc; /* fc_t */
+		uarg[2] = (intptr_t) p->name; /* const struct sockaddr * */
+		iarg[3] = p->namelen; /* __socklen_t */
+		*n_args = 4;
+		break;
+	}
+	/* fc_connectat */
+	case 649: {
+		struct fc_connectat_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		iarg[1] = p->sc; /* fc_t */
+		uarg[2] = (intptr_t) p->name; /* const struct sockaddr * */
+		iarg[3] = p->namelen; /* __socklen_t */
+		*n_args = 4;
+		break;
+	}
+	/* fc_chflagsat */
+	case 650: {
+		struct fc_chflagsat_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->path; /* const char * */
+		uarg[2] = p->flags; /* u_long */
+		iarg[3] = p->atflag; /* int */
+		*n_args = 4;
+		break;
+	}
+	/* __fc_accept4 */
+	case 651: {
+		struct __fc_accept4_args *p = params;
+		uarg[0] = (intptr_t) p->newfc; /* fc_t * */
+		iarg[1] = p->sc; /* fc_t */
+		uarg[2] = (intptr_t) p->name; /* struct sockaddr * */
+		uarg[3] = (intptr_t) p->anamelen; /* __socklen_t * */
+		iarg[4] = p->flags; /* int */
+		*n_args = 5;
+		break;
+	}
+	/* fc_pipe2 */
+	case 652: {
+		struct fc_pipe2_args *p = params;
+		uarg[0] = (intptr_t) p->filecaps; /* fc_t * */
+		iarg[1] = p->flags; /* int */
+		*n_args = 2;
+		break;
+	}
+	/* fc_ppoll */
+	case 653: {
+		struct fc_ppoll_args *p = params;
+		uarg[0] = (intptr_t) p->fds; /* struct fc_pollfd * */
+		uarg[1] = p->nfds; /* u_int */
+		uarg[2] = (intptr_t) p->ts; /* const struct timespec * */
+		uarg[3] = (intptr_t) p->set; /* const sigset_t * */
+		*n_args = 4;
+		break;
+	}
+	/* fc_futimens */
+	case 654: {
+		struct fc_futimens_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->times; /* const struct timespec * */
+		*n_args = 2;
+		break;
+	}
+	/* fc_utimensat */
+	case 655: {
+		struct fc_utimensat_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->path; /* const char * */
+		uarg[2] = (intptr_t) p->times; /* const struct timespec * */
+		iarg[3] = p->flag; /* int */
+		*n_args = 4;
+		break;
+	}
+	/* fc_fdatasync */
+	case 656: {
+		struct fc_fdatasync_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		*n_args = 1;
+		break;
+	}
+	/* fc_fstat */
+	case 657: {
+		struct fc_fstat_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->sb; /* struct stat * */
+		*n_args = 2;
+		break;
+	}
+	/* fc_fstatat */
+	case 658: {
+		struct fc_fstatat_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->path; /* const char * */
+		uarg[2] = (intptr_t) p->buf; /* struct stat * */
+		iarg[3] = p->flag; /* int */
+		*n_args = 4;
+		break;
+	}
+	/* fc_getdirentries */
+	case 659: {
+		struct fc_getdirentries_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->buf; /* char * */
+		uarg[2] = p->count; /* size_t */
+		uarg[3] = (intptr_t) p->basep; /* off_t * */
+		*n_args = 4;
+		break;
+	}
+	/* fc_fstatfs */
+	case 660: {
+		struct fc_fstatfs_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->buf; /* struct statfs * */
+		*n_args = 2;
+		break;
+	}
+	/* fc_mknodat */
+	case 661: {
+		struct fc_mknodat_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->path; /* const char * */
+		iarg[2] = p->mode; /* mode_t */
+		iarg[3] = p->dev; /* dev_t */
+		*n_args = 4;
+		break;
+	}
+	/* cheriabi_fc_kevent */
+	case 662: {
+		struct cheriabi_fc_kevent_args *p = params;
+		iarg[0] = p->fc; /* fc_t */
+		uarg[1] = (intptr_t) p->changelist; /* const struct kevent_c * */
+		iarg[2] = p->nchanges; /* int */
+		uarg[3] = (intptr_t) p->eventlist; /* struct kevent_c * */
+		iarg[4] = p->nevents; /* int */
+		uarg[5] = (intptr_t) p->timeout; /* const struct timespec * */
+		*n_args = 6;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -8259,6 +9215,1752 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* fc_read */
+	case 561:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland void *";
+			break;
+		case 2:
+			p = "size_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_write */
+	case 562:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const void *";
+			break;
+		case 2:
+			p = "size_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi___fc_open */
+	case 563:
+		switch(ndx) {
+		case 0:
+			p = "userland fc_t *";
+			break;
+		case 1:
+			p = "userland const char *__capability";
+			break;
+		case 2:
+			p = "int";
+			break;
+		case 3:
+			p = "mode_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_close */
+	case 564:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_fchdir */
+	case 565:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_recvmsg */
+	case 566:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland struct msghdr_c *";
+			break;
+		case 2:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_sendmsg */
+	case 567:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const struct msghdr_c *";
+			break;
+		case 2:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_recvfrom */
+	case 568:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland void *";
+			break;
+		case 2:
+			p = "size_t";
+			break;
+		case 3:
+			p = "int";
+			break;
+		case 4:
+			p = "userland struct sockaddr *";
+			break;
+		case 5:
+			p = "userland __socklen_t *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* __fc_accept */
+	case 569:
+		switch(ndx) {
+		case 0:
+			p = "userland fc_t *";
+			break;
+		case 1:
+			p = "fc_t";
+			break;
+		case 2:
+			p = "userland struct sockaddr *";
+			break;
+		case 3:
+			p = "userland __socklen_t *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_getpeername */
+	case 570:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland struct sockaddr *";
+			break;
+		case 2:
+			p = "userland __socklen_t *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_getsockname */
+	case 571:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland struct sockaddr *";
+			break;
+		case 2:
+			p = "userland __socklen_t *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_fchflags */
+	case 572:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "u_long";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* __fc_dup */
+	case 573:
+		switch(ndx) {
+		case 0:
+			p = "userland fc_t *";
+			break;
+		case 1:
+			p = "fc_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_fc_ioctl */
+	case 574:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "u_long";
+			break;
+		case 2:
+			p = "userland void *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* __fc_dup2 */
+	case 575:
+		switch(ndx) {
+		case 0:
+			p = "userland fc_t *";
+			break;
+		case 1:
+			p = "fc_t";
+			break;
+		case 2:
+			p = "u_int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* __fc_fcntl */
+	case 576:
+		switch(ndx) {
+		case 0:
+			p = "userland fc_t *";
+			break;
+		case 1:
+			p = "fc_t";
+			break;
+		case 2:
+			p = "int";
+			break;
+		case 3:
+			p = "intptr_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_fsync */
+	case 577:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* __fc_socket */
+	case 578:
+		switch(ndx) {
+		case 0:
+			p = "userland fc_t *";
+			break;
+		case 1:
+			p = "int";
+			break;
+		case 2:
+			p = "int";
+			break;
+		case 3:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_connect */
+	case 579:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const struct sockaddr *";
+			break;
+		case 2:
+			p = "__socklen_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_bind */
+	case 580:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const struct sockaddr *";
+			break;
+		case 2:
+			p = "__socklen_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_setsockopt */
+	case 581:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "int";
+			break;
+		case 2:
+			p = "int";
+			break;
+		case 3:
+			p = "userland const void *";
+			break;
+		case 4:
+			p = "__socklen_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_listen */
+	case 582:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_getsockopt */
+	case 583:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "int";
+			break;
+		case 2:
+			p = "int";
+			break;
+		case 3:
+			p = "userland void *";
+			break;
+		case 4:
+			p = "userland __socklen_t *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_fc_readv */
+	case 584:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland struct iovec_c *";
+			break;
+		case 2:
+			p = "u_int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_fc_writev */
+	case 585:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland struct iovec_c *";
+			break;
+		case 2:
+			p = "u_int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_fchown */
+	case 586:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "int";
+			break;
+		case 2:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_fchmod */
+	case 587:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "mode_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_flock */
+	case 588:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_sendto */
+	case 589:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const void *";
+			break;
+		case 2:
+			p = "size_t";
+			break;
+		case 3:
+			p = "int";
+			break;
+		case 4:
+			p = "userland const struct sockaddr *";
+			break;
+		case 5:
+			p = "__socklen_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_shutdown */
+	case 590:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_socketpair */
+	case 591:
+		switch(ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "int";
+			break;
+		case 2:
+			p = "int";
+			break;
+		case 3:
+			p = "userland fc_t *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_fpathconf */
+	case 592:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_futimes */
+	case 593:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const struct timeval *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_poll */
+	case 594:
+		switch(ndx) {
+		case 0:
+			p = "userland struct fc_pollfd *";
+			break;
+		case 1:
+			p = "u_int";
+			break;
+		case 2:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_fc_preadv */
+	case 595:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland struct iovec_c *";
+			break;
+		case 2:
+			p = "u_int";
+			break;
+		case 3:
+			p = "off_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_fc_pwritev */
+	case 596:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland struct iovec_c *";
+			break;
+		case 2:
+			p = "u_int";
+			break;
+		case 3:
+			p = "off_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_fc_aio_cancel */
+	case 597:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland struct aiocb_c *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* __fc_acl_get_fd */
+	case 598:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "acl_type_t";
+			break;
+		case 2:
+			p = "userland struct acl *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* __fc_acl_set_fd */
+	case 599:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "acl_type_t";
+			break;
+		case 2:
+			p = "userland struct acl *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* __fc_acl_delete_fd */
+	case 600:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "acl_type_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* __fc_acl_aclcheck_fd */
+	case 601:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "acl_type_t";
+			break;
+		case 2:
+			p = "userland struct acl *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_extattr_set_fd */
+	case 602:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "int";
+			break;
+		case 2:
+			p = "userland const char *";
+			break;
+		case 3:
+			p = "userland void *";
+			break;
+		case 4:
+			p = "size_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_extattr_get_fd */
+	case 603:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "int";
+			break;
+		case 2:
+			p = "userland const char *";
+			break;
+		case 3:
+			p = "userland void *";
+			break;
+		case 4:
+			p = "size_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_extattr_delete_fd */
+	case 604:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "int";
+			break;
+		case 2:
+			p = "userland const char *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi___fc_mac_get_fd */
+	case 605:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland struct mac_c *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi___fc_mac_set_fd */
+	case 606:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland struct mac_c *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_fc_sendfile */
+	case 607:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "fc_t";
+			break;
+		case 2:
+			p = "off_t";
+			break;
+		case 3:
+			p = "size_t";
+			break;
+		case 4:
+			p = "userland struct sf_hdtr_c *";
+			break;
+		case 5:
+			p = "userland off_t *";
+			break;
+		case 6:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_extattr_list_fd */
+	case 608:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "int";
+			break;
+		case 2:
+			p = "userland void *";
+			break;
+		case 3:
+			p = "size_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* __fc_kmq_open */
+	case 609:
+		switch(ndx) {
+		case 0:
+			p = "userland fc_t *";
+			break;
+		case 1:
+			p = "userland const char *";
+			break;
+		case 2:
+			p = "int";
+			break;
+		case 3:
+			p = "mode_t";
+			break;
+		case 4:
+			p = "userland const struct mq_attr *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_kmq_setattr */
+	case 610:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const struct mq_attr *";
+			break;
+		case 2:
+			p = "userland struct mq_attr *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_kmq_timedreceive */
+	case 611:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland char *";
+			break;
+		case 2:
+			p = "size_t";
+			break;
+		case 3:
+			p = "userland unsigned *";
+			break;
+		case 4:
+			p = "userland const struct timespec *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_kmq_timedsend */
+	case 612:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const char *";
+			break;
+		case 2:
+			p = "size_t";
+			break;
+		case 3:
+			p = "unsigned";
+			break;
+		case 4:
+			p = "userland const struct timespec *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_fc_kmq_notify */
+	case 613:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const struct sigevent_c *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_sctp_peeloff */
+	case 614:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "uint32_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_sctp_generic_sendmsg */
+	case 615:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland void *";
+			break;
+		case 2:
+			p = "int";
+			break;
+		case 3:
+			p = "userland struct sockaddr *";
+			break;
+		case 4:
+			p = "__socklen_t";
+			break;
+		case 5:
+			p = "userland struct sctp_sndrcvinfo *";
+			break;
+		case 6:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_sctp_generic_sendmsg_iov */
+	case 616:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland struct iovec_c *";
+			break;
+		case 2:
+			p = "int";
+			break;
+		case 3:
+			p = "userland struct sockaddr *";
+			break;
+		case 4:
+			p = "__socklen_t";
+			break;
+		case 5:
+			p = "userland struct sctp_sndrcvinfo *";
+			break;
+		case 6:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_sctp_generic_recvmsg */
+	case 617:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland struct iovec_c *";
+			break;
+		case 2:
+			p = "int";
+			break;
+		case 3:
+			p = "userland struct sockaddr *";
+			break;
+		case 4:
+			p = "userland __socklen_t *";
+			break;
+		case 5:
+			p = "userland struct sctp_sndrcvinfo *";
+			break;
+		case 6:
+			p = "userland int *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_pread */
+	case 618:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland void *";
+			break;
+		case 2:
+			p = "size_t";
+			break;
+		case 3:
+			p = "off_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_pwrite */
+	case 619:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const void *";
+			break;
+		case 2:
+			p = "size_t";
+			break;
+		case 3:
+			p = "off_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_fc_mmap */
+	case 620:
+		switch(ndx) {
+		case 0:
+			p = "userland void *";
+			break;
+		case 1:
+			p = "size_t";
+			break;
+		case 2:
+			p = "int";
+			break;
+		case 3:
+			p = "int";
+			break;
+		case 4:
+			p = "fc_t";
+			break;
+		case 5:
+			p = "off_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_lseek */
+	case 621:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "off_t";
+			break;
+		case 2:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_ftruncate */
+	case 622:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "off_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_faccessat */
+	case 623:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const char *";
+			break;
+		case 2:
+			p = "int";
+			break;
+		case 3:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_fchmodat */
+	case 624:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const char *";
+			break;
+		case 2:
+			p = "mode_t";
+			break;
+		case 3:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_fchownat */
+	case 625:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const char *";
+			break;
+		case 2:
+			p = "uid_t";
+			break;
+		case 3:
+			p = "gid_t";
+			break;
+		case 4:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_fc_fexecve */
+	case 626:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland void *__capability *";
+			break;
+		case 2:
+			p = "userland void *__capability *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_futimesat */
+	case 627:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const char *";
+			break;
+		case 2:
+			p = "userland const struct timeval *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_fc_linkat */
+	case 628:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const char *__capability";
+			break;
+		case 2:
+			p = "fc_t";
+			break;
+		case 3:
+			p = "userland const char *__capability";
+			break;
+		case 4:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_mkdirat */
+	case 629:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const char *";
+			break;
+		case 2:
+			p = "mode_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_mkfifoat */
+	case 630:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const char *";
+			break;
+		case 2:
+			p = "mode_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi___fc_openat */
+	case 631:
+		switch(ndx) {
+		case 0:
+			p = "userland fc_t *";
+			break;
+		case 1:
+			p = "fc_t";
+			break;
+		case 2:
+			p = "userland const char *__capability";
+			break;
+		case 3:
+			p = "int";
+			break;
+		case 4:
+			p = "mode_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_readlinkat */
+	case 632:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const char *";
+			break;
+		case 2:
+			p = "userland char *";
+			break;
+		case 3:
+			p = "size_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_renameat */
+	case 633:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const char *";
+			break;
+		case 2:
+			p = "fc_t";
+			break;
+		case 3:
+			p = "userland const char *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_symlinkat */
+	case 634:
+		switch(ndx) {
+		case 0:
+			p = "userland const char *";
+			break;
+		case 1:
+			p = "fc_t";
+			break;
+		case 2:
+			p = "userland const char *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_fc_unlinkat */
+	case 635:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const char *__capability";
+			break;
+		case 2:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_closefrom */
+	case 636:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* __fc_cap_rights_get */
+	case 637:
+		switch(ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "fc_t";
+			break;
+		case 2:
+			p = "userland cap_rights_t *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_pdfork */
+	case 638:
+		switch(ndx) {
+		case 0:
+			p = "userland fc_t *";
+			break;
+		case 1:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_pdkill */
+	case 639:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_pdgetpid */
+	case 640:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland pid_t *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_posix_fallocate */
+	case 641:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "off_t";
+			break;
+		case 2:
+			p = "off_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_posix_fadvise */
+	case 642:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "off_t";
+			break;
+		case 2:
+			p = "off_t";
+			break;
+		case 3:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_cap_rights_limit */
+	case 643:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland cap_rights_t *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_cap_ioctls_limit */
+	case 644:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const u_long *";
+			break;
+		case 2:
+			p = "size_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_cap_ioctls_get */
+	case 645:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland u_long *";
+			break;
+		case 2:
+			p = "size_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_cap_fcntls_limit */
+	case 646:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "uint32_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_cap_fcntls_get */
+	case 647:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland uint32_t *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_bindat */
+	case 648:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "fc_t";
+			break;
+		case 2:
+			p = "userland const struct sockaddr *";
+			break;
+		case 3:
+			p = "__socklen_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_connectat */
+	case 649:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "fc_t";
+			break;
+		case 2:
+			p = "userland const struct sockaddr *";
+			break;
+		case 3:
+			p = "__socklen_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_chflagsat */
+	case 650:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const char *";
+			break;
+		case 2:
+			p = "u_long";
+			break;
+		case 3:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* __fc_accept4 */
+	case 651:
+		switch(ndx) {
+		case 0:
+			p = "userland fc_t *";
+			break;
+		case 1:
+			p = "fc_t";
+			break;
+		case 2:
+			p = "userland struct sockaddr *";
+			break;
+		case 3:
+			p = "userland __socklen_t *";
+			break;
+		case 4:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_pipe2 */
+	case 652:
+		switch(ndx) {
+		case 0:
+			p = "userland fc_t *";
+			break;
+		case 1:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_ppoll */
+	case 653:
+		switch(ndx) {
+		case 0:
+			p = "userland struct fc_pollfd *";
+			break;
+		case 1:
+			p = "u_int";
+			break;
+		case 2:
+			p = "userland const struct timespec *";
+			break;
+		case 3:
+			p = "userland const sigset_t *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_futimens */
+	case 654:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const struct timespec *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_utimensat */
+	case 655:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const char *";
+			break;
+		case 2:
+			p = "userland const struct timespec *";
+			break;
+		case 3:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_fdatasync */
+	case 656:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_fstat */
+	case 657:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland struct stat *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_fstatat */
+	case 658:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const char *";
+			break;
+		case 2:
+			p = "userland struct stat *";
+			break;
+		case 3:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_getdirentries */
+	case 659:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland char *";
+			break;
+		case 2:
+			p = "size_t";
+			break;
+		case 3:
+			p = "userland off_t *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_fstatfs */
+	case 660:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland struct statfs *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fc_mknodat */
+	case 661:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const char *";
+			break;
+		case 2:
+			p = "mode_t";
+			break;
+		case 3:
+			p = "dev_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_fc_kevent */
+	case 662:
+		switch(ndx) {
+		case 0:
+			p = "fc_t";
+			break;
+		case 1:
+			p = "userland const struct kevent_c *";
+			break;
+		case 2:
+			p = "int";
+			break;
+		case 3:
+			p = "userland struct kevent_c *";
+			break;
+		case 4:
+			p = "int";
+			break;
+		case 5:
+			p = "userland const struct timespec *";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -10044,6 +12746,516 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* cheriabi_kevent */
 	case 560:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_read */
+	case 561:
+		if (ndx == 0 || ndx == 1)
+			p = "ssize_t";
+		break;
+	/* fc_write */
+	case 562:
+		if (ndx == 0 || ndx == 1)
+			p = "ssize_t";
+		break;
+	/* cheriabi___fc_open */
+	case 563:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_close */
+	case 564:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_fchdir */
+	case 565:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_recvmsg */
+	case 566:
+		if (ndx == 0 || ndx == 1)
+			p = "ssize_t";
+		break;
+	/* fc_sendmsg */
+	case 567:
+		if (ndx == 0 || ndx == 1)
+			p = "ssize_t";
+		break;
+	/* fc_recvfrom */
+	case 568:
+		if (ndx == 0 || ndx == 1)
+			p = "ssize_t";
+		break;
+	/* __fc_accept */
+	case 569:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_getpeername */
+	case 570:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_getsockname */
+	case 571:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_fchflags */
+	case 572:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* __fc_dup */
+	case 573:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_fc_ioctl */
+	case 574:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* __fc_dup2 */
+	case 575:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* __fc_fcntl */
+	case 576:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_fsync */
+	case 577:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* __fc_socket */
+	case 578:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_connect */
+	case 579:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_bind */
+	case 580:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_setsockopt */
+	case 581:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_listen */
+	case 582:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_getsockopt */
+	case 583:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_fc_readv */
+	case 584:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_fc_writev */
+	case 585:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_fchown */
+	case 586:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_fchmod */
+	case 587:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_flock */
+	case 588:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_sendto */
+	case 589:
+		if (ndx == 0 || ndx == 1)
+			p = "ssize_t";
+		break;
+	/* fc_shutdown */
+	case 590:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_socketpair */
+	case 591:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_fpathconf */
+	case 592:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_futimes */
+	case 593:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_poll */
+	case 594:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_fc_preadv */
+	case 595:
+		if (ndx == 0 || ndx == 1)
+			p = "ssize_t";
+		break;
+	/* cheriabi_fc_pwritev */
+	case 596:
+		if (ndx == 0 || ndx == 1)
+			p = "ssize_t";
+		break;
+	/* cheriabi_fc_aio_cancel */
+	case 597:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* __fc_acl_get_fd */
+	case 598:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* __fc_acl_set_fd */
+	case 599:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* __fc_acl_delete_fd */
+	case 600:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* __fc_acl_aclcheck_fd */
+	case 601:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_extattr_set_fd */
+	case 602:
+		if (ndx == 0 || ndx == 1)
+			p = "ssize_t";
+		break;
+	/* fc_extattr_get_fd */
+	case 603:
+		if (ndx == 0 || ndx == 1)
+			p = "ssize_t";
+		break;
+	/* fc_extattr_delete_fd */
+	case 604:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi___fc_mac_get_fd */
+	case 605:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi___fc_mac_set_fd */
+	case 606:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_fc_sendfile */
+	case 607:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_extattr_list_fd */
+	case 608:
+		if (ndx == 0 || ndx == 1)
+			p = "ssize_t";
+		break;
+	/* __fc_kmq_open */
+	case 609:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_kmq_setattr */
+	case 610:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_kmq_timedreceive */
+	case 611:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_kmq_timedsend */
+	case 612:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_fc_kmq_notify */
+	case 613:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_sctp_peeloff */
+	case 614:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_sctp_generic_sendmsg */
+	case 615:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_sctp_generic_sendmsg_iov */
+	case 616:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_sctp_generic_recvmsg */
+	case 617:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_pread */
+	case 618:
+		if (ndx == 0 || ndx == 1)
+			p = "ssize_t";
+		break;
+	/* fc_pwrite */
+	case 619:
+		if (ndx == 0 || ndx == 1)
+			p = "ssize_t";
+		break;
+	/* cheriabi_fc_mmap */
+	case 620:
+		if (ndx == 0 || ndx == 1)
+			p = "*";
+		break;
+	/* fc_lseek */
+	case 621:
+		if (ndx == 0 || ndx == 1)
+			p = "off_t";
+		break;
+	/* fc_ftruncate */
+	case 622:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_faccessat */
+	case 623:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_fchmodat */
+	case 624:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_fchownat */
+	case 625:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_fc_fexecve */
+	case 626:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_futimesat */
+	case 627:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_fc_linkat */
+	case 628:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_mkdirat */
+	case 629:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_mkfifoat */
+	case 630:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi___fc_openat */
+	case 631:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_readlinkat */
+	case 632:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_renameat */
+	case 633:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_symlinkat */
+	case 634:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_fc_unlinkat */
+	case 635:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_closefrom */
+	case 636:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* __fc_cap_rights_get */
+	case 637:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_pdfork */
+	case 638:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_pdkill */
+	case 639:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_pdgetpid */
+	case 640:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_posix_fallocate */
+	case 641:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_posix_fadvise */
+	case 642:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_cap_rights_limit */
+	case 643:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_cap_ioctls_limit */
+	case 644:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_cap_ioctls_get */
+	case 645:
+		if (ndx == 0 || ndx == 1)
+			p = "ssize_t";
+		break;
+	/* fc_cap_fcntls_limit */
+	case 646:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_cap_fcntls_get */
+	case 647:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_bindat */
+	case 648:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_connectat */
+	case 649:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_chflagsat */
+	case 650:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* __fc_accept4 */
+	case 651:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_pipe2 */
+	case 652:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_ppoll */
+	case 653:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_futimens */
+	case 654:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_utimensat */
+	case 655:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_fdatasync */
+	case 656:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_fstat */
+	case 657:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_fstatat */
+	case 658:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_getdirentries */
+	case 659:
+		if (ndx == 0 || ndx == 1)
+			p = "ssize_t";
+		break;
+	/* fc_fstatfs */
+	case 660:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fc_mknodat */
+	case 661:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_fc_kevent */
+	case 662:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

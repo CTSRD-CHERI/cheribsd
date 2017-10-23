@@ -219,6 +219,23 @@ sys_pdgetpid(struct thread *td, struct pdgetpid_args *uap)
 	return (error);
 }
 
+int
+sys_fc_pdgetpid(struct thread *td, struct fc_pdgetpid_args *uap)
+{
+	cap_rights_t rights;
+	pid_t pid;
+	int error;
+	int fd;
+
+	fd = fc2fd(uap->fc);
+	AUDIT_ARG_FD(fd);
+	error = kern_pdgetpid(td, fd,
+	    cap_rights_init(&rights, CAP_PDGETPID), &pid);
+	if (error == 0)
+		error = copyout(&pid, uap->pidp, sizeof(pid));
+	return (error);
+}
+
 /*
  * When a new process is forked by pdfork(), a file descriptor is allocated
  * by the fork code first, then the process is forked, and then we get a

@@ -401,6 +401,104 @@ struct cheriabi_kevent_args {
 	char nevents_l_[PADL_(int)]; int nevents; char nevents_r_[PADR_(int)];
 	char timeout_l_[PADL_(const struct timespec *)]; const struct timespec * timeout; char timeout_r_[PADR_(const struct timespec *)];
 };
+struct cheriabi___fc_open_args {
+	char newfc_l_[PADL_(fc_t *)]; fc_t * newfc; char newfc_r_[PADR_(fc_t *)];
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
+};
+struct cheriabi_fc_ioctl_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char com_l_[PADL_(u_long)]; u_long com; char com_r_[PADR_(u_long)];
+	char data_l_[PADL_(void *)]; void * data; char data_r_[PADR_(void *)];
+};
+struct cheriabi_fc_readv_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char iovp_l_[PADL_(struct iovec_c *)]; struct iovec_c * iovp; char iovp_r_[PADR_(struct iovec_c *)];
+	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
+};
+struct cheriabi_fc_writev_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char iovp_l_[PADL_(struct iovec_c *)]; struct iovec_c * iovp; char iovp_r_[PADR_(struct iovec_c *)];
+	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
+};
+struct cheriabi_fc_preadv_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char iovp_l_[PADL_(struct iovec_c *)]; struct iovec_c * iovp; char iovp_r_[PADR_(struct iovec_c *)];
+	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
+	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
+};
+struct cheriabi_fc_pwritev_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char iovp_l_[PADL_(struct iovec_c *)]; struct iovec_c * iovp; char iovp_r_[PADR_(struct iovec_c *)];
+	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
+	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
+};
+struct cheriabi_fc_aio_cancel_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char aiocbp_l_[PADL_(struct aiocb_c *)]; struct aiocb_c * aiocbp; char aiocbp_r_[PADR_(struct aiocb_c *)];
+};
+struct cheriabi___fc_mac_get_fd_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char mac_p_l_[PADL_(struct mac_c *)]; struct mac_c * mac_p; char mac_p_r_[PADR_(struct mac_c *)];
+};
+struct cheriabi___fc_mac_set_fd_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char mac_p_l_[PADL_(struct mac_c *)]; struct mac_c * mac_p; char mac_p_r_[PADR_(struct mac_c *)];
+};
+struct cheriabi_fc_sendfile_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char sc_l_[PADL_(fc_t)]; fc_t sc; char sc_r_[PADR_(fc_t)];
+	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
+	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
+	char hdtr_l_[PADL_(struct sf_hdtr_c *)]; struct sf_hdtr_c * hdtr; char hdtr_r_[PADR_(struct sf_hdtr_c *)];
+	char sbytes_l_[PADL_(off_t *)]; off_t * sbytes; char sbytes_r_[PADR_(off_t *)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
+struct cheriabi_fc_kmq_notify_args {
+	char mqc_l_[PADL_(fc_t)]; fc_t mqc; char mqc_r_[PADR_(fc_t)];
+	char sigev_l_[PADL_(const struct sigevent_c *)]; const struct sigevent_c * sigev; char sigev_r_[PADR_(const struct sigevent_c *)];
+};
+struct cheriabi_fc_mmap_args {
+	char addr_l_[PADL_(void *)]; void * addr; char addr_r_[PADR_(void *)];
+	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
+	char prot_l_[PADL_(int)]; int prot; char prot_r_[PADR_(int)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char pos_l_[PADL_(off_t)]; off_t pos; char pos_r_[PADR_(off_t)];
+};
+struct cheriabi_fc_fexecve_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char argv_l_[PADL_(void *__capability *)]; void *__capability * argv; char argv_r_[PADR_(void *__capability *)];
+	char envv_l_[PADL_(void *__capability *)]; void *__capability * envv; char envv_r_[PADR_(void *__capability *)];
+};
+struct cheriabi_fc_linkat_args {
+	char fc1_l_[PADL_(fc_t)]; fc_t fc1; char fc1_r_[PADR_(fc_t)];
+	char path1_l_[PADL_(const char *__capability)]; const char *__capability path1; char path1_r_[PADR_(const char *__capability)];
+	char fc2_l_[PADL_(fc_t)]; fc_t fc2; char fc2_r_[PADR_(fc_t)];
+	char path2_l_[PADL_(const char *__capability)]; const char *__capability path2; char path2_r_[PADR_(const char *__capability)];
+	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
+};
+struct cheriabi___fc_openat_args {
+	char newfc_l_[PADL_(fc_t *)]; fc_t * newfc; char newfc_r_[PADR_(fc_t *)];
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
+	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
+};
+struct cheriabi_fc_unlinkat_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
+};
+struct cheriabi_fc_kevent_args {
+	char fc_l_[PADL_(fc_t)]; fc_t fc; char fc_r_[PADR_(fc_t)];
+	char changelist_l_[PADL_(const struct kevent_c *)]; const struct kevent_c * changelist; char changelist_r_[PADR_(const struct kevent_c *)];
+	char nchanges_l_[PADL_(int)]; int nchanges; char nchanges_r_[PADR_(int)];
+	char eventlist_l_[PADL_(struct kevent_c *)]; struct kevent_c * eventlist; char eventlist_r_[PADR_(struct kevent_c *)];
+	char nevents_l_[PADL_(int)]; int nevents; char nevents_r_[PADR_(int)];
+	char timeout_l_[PADL_(const struct timespec *)]; const struct timespec * timeout; char timeout_r_[PADR_(const struct timespec *)];
+};
 #if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
 #define PAD64_REQUIRED
 #endif
@@ -480,6 +578,23 @@ int	cheriabi_wait6(struct thread *, struct cheriabi_wait6_args *);
 int	cheriabi_aio_mlock(struct thread *, struct cheriabi_aio_mlock_args *);
 int	cheriabi_procctl(struct thread *, struct cheriabi_procctl_args *);
 int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
+int	cheriabi___fc_open(struct thread *, struct cheriabi___fc_open_args *);
+int	cheriabi_fc_ioctl(struct thread *, struct cheriabi_fc_ioctl_args *);
+int	cheriabi_fc_readv(struct thread *, struct cheriabi_fc_readv_args *);
+int	cheriabi_fc_writev(struct thread *, struct cheriabi_fc_writev_args *);
+int	cheriabi_fc_preadv(struct thread *, struct cheriabi_fc_preadv_args *);
+int	cheriabi_fc_pwritev(struct thread *, struct cheriabi_fc_pwritev_args *);
+int	cheriabi_fc_aio_cancel(struct thread *, struct cheriabi_fc_aio_cancel_args *);
+int	cheriabi___fc_mac_get_fd(struct thread *, struct cheriabi___fc_mac_get_fd_args *);
+int	cheriabi___fc_mac_set_fd(struct thread *, struct cheriabi___fc_mac_set_fd_args *);
+int	cheriabi_fc_sendfile(struct thread *, struct cheriabi_fc_sendfile_args *);
+int	cheriabi_fc_kmq_notify(struct thread *, struct cheriabi_fc_kmq_notify_args *);
+int	cheriabi_fc_mmap(struct thread *, struct cheriabi_fc_mmap_args *);
+int	cheriabi_fc_fexecve(struct thread *, struct cheriabi_fc_fexecve_args *);
+int	cheriabi_fc_linkat(struct thread *, struct cheriabi_fc_linkat_args *);
+int	cheriabi___fc_openat(struct thread *, struct cheriabi___fc_openat_args *);
+int	cheriabi_fc_unlinkat(struct thread *, struct cheriabi_fc_unlinkat_args *);
+int	cheriabi_fc_kevent(struct thread *, struct cheriabi_fc_kevent_args *);
 
 #ifdef COMPAT_43
 
@@ -610,6 +725,23 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_aio_mlock	AUE_AIO_MLOCK
 #define	CHERIABI_SYS_AUE_cheriabi_procctl	AUE_PROCCTL
 #define	CHERIABI_SYS_AUE_cheriabi_kevent	AUE_KEVENT
+#define	CHERIABI_SYS_AUE_cheriabi___fc_open	AUE_OPEN_RWTC
+#define	CHERIABI_SYS_AUE_cheriabi_fc_ioctl	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_fc_readv	AUE_READV
+#define	CHERIABI_SYS_AUE_cheriabi_fc_writev	AUE_WRITEV
+#define	CHERIABI_SYS_AUE_cheriabi_fc_preadv	AUE_PREADV
+#define	CHERIABI_SYS_AUE_cheriabi_fc_pwritev	AUE_PWRITEV
+#define	CHERIABI_SYS_AUE_cheriabi_fc_aio_cancel	AUE_AIO_CANCEL
+#define	CHERIABI_SYS_AUE_cheriabi___fc_mac_get_fd	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi___fc_mac_set_fd	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_fc_sendfile	AUE_SENDFILE
+#define	CHERIABI_SYS_AUE_cheriabi_fc_kmq_notify	AUE_MQ_NOTIFY
+#define	CHERIABI_SYS_AUE_cheriabi_fc_mmap	AUE_MMAP
+#define	CHERIABI_SYS_AUE_cheriabi_fc_fexecve	AUE_FEXECVE
+#define	CHERIABI_SYS_AUE_cheriabi_fc_linkat	AUE_LINKAT
+#define	CHERIABI_SYS_AUE_cheriabi___fc_openat	AUE_OPENAT_RWTC
+#define	CHERIABI_SYS_AUE_cheriabi_fc_unlinkat	AUE_UNLINKAT
+#define	CHERIABI_SYS_AUE_cheriabi_fc_kevent	AUE_KEVENT
 
 #undef PAD_
 #undef PADL_

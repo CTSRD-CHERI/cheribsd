@@ -324,6 +324,7 @@ unsigned int	 alarm(unsigned int);
 int	 chdir(const char *);
 int	 chown(const char *, uid_t, gid_t);
 int	 close(int);
+int	 fc_close(fc_t);
 void	 closefrom(int);
 int	 dup(int);
 int	 dup2(int, int);

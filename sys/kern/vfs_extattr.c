@@ -47,6 +47,16 @@ __FBSDID("$FreeBSD$");
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
 
+static int	kern_extattr_delete_fd(struct thread *td, int fd,
+		    int attrnamespace, const char *attrname);
+static int	kern_extattr_get_fd(struct thread *td, int fd,
+		    int attrnamespace, const char *attrname, void *data,
+		    size_t nbytes);
+static int	kern_extattr_list_fd(struct thread *td, int fd,
+		    int attrnamespace, void *data, size_t nbytes);
+static int	kern_extattr_set_fd(struct thread *td, int fd,
+		    int attrnamespace, const char *attrname, void *data,
+		    size_t nbytes);
 /*
  * Syscall to push extended attribute configuration information into the VFS.
  * Accepts a path, which it converts to a mountpoint, as well as a command
@@ -204,35 +214,45 @@ done:
 }
 
 int
-sys_extattr_set_fd(td, uap)
-	struct thread *td;
-	struct extattr_set_fd_args /* {
-		int fd;
-		int attrnamespace;
-		const char *attrname;
-		void *data;
-		size_t nbytes;
-	} */ *uap;
+sys_extattr_set_fd(struct thread *td, struct extattr_set_fd_args *uap)
+{
+
+	return(kern_extattr_set_fd(td, uap->fd, uap->attrnamespace,
+	    uap->attrname, uap->data, uap->nbytes));
+}
+
+int
+sys_fc_extattr_set_fd(struct thread *td, struct fc_extattr_set_fd_args *uap)
+{
+
+	return(kern_extattr_set_fd(td, fc2fd(uap->fc), uap->attrnamespace,
+	    uap->attrname, uap->data, uap->nbytes));
+}
+
+static int
+kern_extattr_set_fd(struct thread *td, int fd, int attrnamespace,
+    const char *uattrname, void *data, size_t nbytes)
 {
 	struct file *fp;
 	char attrname[EXTATTR_MAXNAMELEN];
 	cap_rights_t rights;
 	int error;
 
-	AUDIT_ARG_FD(uap->fd);
-	AUDIT_ARG_VALUE(uap->attrnamespace);
-	error = copyinstr(uap->attrname, attrname, EXTATTR_MAXNAMELEN, NULL);
+	AUDIT_ARG_FD(fd);
+	AUDIT_ARG_VALUE(attrnamespace);
+	error = copyinstr(attrname, __DECONST(void *, uattrname),
+	    EXTATTR_MAXNAMELEN, NULL);
 	if (error)
 		return (error);
 	AUDIT_ARG_TEXT(attrname);
 
-	error = getvnode(td, uap->fd,
+	error = getvnode(td, fd,
 	    cap_rights_init(&rights, CAP_EXTATTR_SET), &fp);
 	if (error)
 		return (error);
 
-	error = extattr_set_vp(fp->f_vnode, uap->attrnamespace,
-	    attrname, uap->data, uap->nbytes, td);
+	error = extattr_set_vp(fp->f_vnode, attrnamespace,
+	    attrname, data, nbytes, td);
 	fdrop(fp, td);
 
 	return (error);
@@ -379,35 +399,45 @@ done:
 }
 
 int
-sys_extattr_get_fd(td, uap)
-	struct thread *td;
-	struct extattr_get_fd_args /* {
-		int fd;
-		int attrnamespace;
-		const char *attrname;
-		void *data;
-		size_t nbytes;
-	} */ *uap;
+sys_extattr_get_fd(struct thread *td, struct extattr_get_fd_args *uap)
+{
+
+	return(kern_extattr_get_fd(td, uap->fd, uap->attrnamespace,
+	    uap->attrname, uap->data, uap->nbytes));
+}
+
+int
+sys_fc_extattr_get_fd(struct thread *td, struct fc_extattr_get_fd_args *uap)
+{
+
+	return(kern_extattr_get_fd(td, fc2fd(uap->fc), uap->attrnamespace,
+	    uap->attrname, uap->data, uap->nbytes));
+}
+
+static int
+kern_extattr_get_fd(struct thread *td, int fd, int attrnamespace,
+    const char *uattrname, void *data, size_t nbytes)
 {
 	struct file *fp;
 	char attrname[EXTATTR_MAXNAMELEN];
 	cap_rights_t rights;
 	int error;
 
-	AUDIT_ARG_FD(uap->fd);
-	AUDIT_ARG_VALUE(uap->attrnamespace);
-	error = copyinstr(uap->attrname, attrname, EXTATTR_MAXNAMELEN, NULL);
+	AUDIT_ARG_FD(fd);
+	AUDIT_ARG_VALUE(attrnamespace);
+	error = copyinstr(attrname, __DECONST(void *, uattrname),
+	    EXTATTR_MAXNAMELEN, NULL);
 	if (error)
 		return (error);
 	AUDIT_ARG_TEXT(attrname);
 
-	error = getvnode(td, uap->fd,
+	error = getvnode(td, fd,
 	    cap_rights_init(&rights, CAP_EXTATTR_GET), &fp);
 	if (error)
 		return (error);
 
-	error = extattr_get_vp(fp->f_vnode, uap->attrnamespace,
-	    attrname, uap->data, uap->nbytes, td);
+	error = extattr_get_vp(fp->f_vnode, attrnamespace,
+	    attrname, data, nbytes, td);
 
 	fdrop(fp, td);
 	return (error);
@@ -525,32 +555,45 @@ done:
 }
 
 int
-sys_extattr_delete_fd(td, uap)
-	struct thread *td;
-	struct extattr_delete_fd_args /* {
-		int fd;
-		int attrnamespace;
-		const char *attrname;
-	} */ *uap;
+sys_extattr_delete_fd(struct thread *td, struct extattr_delete_fd_args *uap)
+{
+
+	return(kern_extattr_delete_fd(td, uap->fd, uap->attrnamespace,
+	    uap->attrname));
+}
+
+int
+sys_fc_extattr_delete_fd(struct thread *td,
+    struct fc_extattr_delete_fd_args *uap)
+{
+
+	return(kern_extattr_delete_fd(td, fc2fd(uap->fc), uap->attrnamespace,
+	    uap->attrname));
+}
+
+static int
+kern_extattr_delete_fd(struct thread *td, int fd, int attrnamespace,
+    const char *uattrname)
 {
 	struct file *fp;
 	char attrname[EXTATTR_MAXNAMELEN];
 	cap_rights_t rights;
 	int error;
 
-	AUDIT_ARG_FD(uap->fd);
-	AUDIT_ARG_VALUE(uap->attrnamespace);
-	error = copyinstr(uap->attrname, attrname, EXTATTR_MAXNAMELEN, NULL);
+	AUDIT_ARG_FD(fd);
+	AUDIT_ARG_VALUE(attrnamespace);
+	error = copyinstr(attrname, __DECONST(void *, uattrname),
+	    EXTATTR_MAXNAMELEN, NULL);
 	if (error)
 		return (error);
 	AUDIT_ARG_TEXT(attrname);
 
-	error = getvnode(td, uap->fd,
+	error = getvnode(td, fd,
 	    cap_rights_init(&rights, CAP_EXTATTR_DELETE), &fp);
 	if (error)
 		return (error);
 
-	error = extattr_delete_vp(fp->f_vnode, uap->attrnamespace,
+	error = extattr_delete_vp(fp->f_vnode, attrnamespace,
 	    attrname, td);
 	fdrop(fp, td);
 	return (error);
@@ -682,28 +725,37 @@ done:
 
 
 int
-sys_extattr_list_fd(td, uap)
-	struct thread *td;
-	struct extattr_list_fd_args /* {
-		int fd;
-		int attrnamespace;
-		void *data;
-		size_t nbytes;
-	} */ *uap;
+sys_extattr_list_fd(struct thread *td, struct extattr_list_fd_args *uap)
+{
+
+	return(kern_extattr_list_fd(td, uap->fd, uap->attrnamespace,
+	    uap->data, uap->nbytes));
+}
+
+int
+sys_fc_extattr_list_fd(struct thread *td, struct fc_extattr_list_fd_args *uap)
+{
+
+	return(kern_extattr_list_fd(td, fc2fd(uap->fc), uap->attrnamespace,
+	    uap->data, uap->nbytes));
+}
+
+static int
+kern_extattr_list_fd(struct thread *td, int fd, int attrnamespace, void *data,
+    size_t nbytes)
 {
 	struct file *fp;
 	cap_rights_t rights;
 	int error;
 
-	AUDIT_ARG_FD(uap->fd);
-	AUDIT_ARG_VALUE(uap->attrnamespace);
-	error = getvnode(td, uap->fd,
+	AUDIT_ARG_FD(fd);
+	AUDIT_ARG_VALUE(attrnamespace);
+	error = getvnode(td, fd,
 	    cap_rights_init(&rights, CAP_EXTATTR_LIST), &fp);
 	if (error)
 		return (error);
 
-	error = extattr_list_vp(fp->f_vnode, uap->attrnamespace, uap->data,
-	    uap->nbytes, td);
+	error = extattr_list_vp(fp->f_vnode, attrnamespace, data, nbytes, td);
 
 	fdrop(fp, td);
 	return (error);

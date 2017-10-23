@@ -199,6 +199,9 @@ int	fget_cap(struct thread *td, int fd, cap_rights_t *needrightsp,
 int	fget_unlocked(struct filedesc *fdp, int fd, cap_rights_t *needrightsp,
 	    struct file **fpp, seq_t *seqp);
 
+int	fc2fd(fc_t fc);
+fc_t	fd2fc(int fd);
+
 /* Requires a FILEDESC_{S,X}LOCK held and returns without a ref. */
 static __inline struct file *
 fget_locked(struct filedesc *fdp, int fd)

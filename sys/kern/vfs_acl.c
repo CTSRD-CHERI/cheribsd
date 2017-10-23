@@ -65,6 +65,14 @@ CTASSERT(ACL_MAX_ENTRIES >= OLDACL_MAX_ENTRIES);
 
 MALLOC_DEFINE(M_ACL, "acl", "Access Control Lists");
 
+static int	kern___acl_aclcheck_fd(struct thread *td, int filedes,
+		    acl_type_t type, struct acl *aclp);
+static int	kern___acl_delete_fd(struct thread *td, int filedes,
+		    acl_type_t type);
+static int	kern___acl_get_fd(struct thread *td, int filedes,
+		    acl_type_t type, struct acl *aclp);
+static int	kern___acl_set_fd(struct thread *td, int filedes,
+		    acl_type_t type, struct acl *aclp);
 static int	vacl_set_acl(struct thread *td, struct vnode *vp,
 		    acl_type_t type, struct acl *aclp);
 static int	vacl_get_acl(struct thread *td, struct vnode *vp,
@@ -420,15 +428,30 @@ sys___acl_set_link(struct thread *td, struct __acl_set_link_args *uap)
 int
 sys___acl_get_fd(struct thread *td, struct __acl_get_fd_args *uap)
 {
+
+	return(kern___acl_get_fd(td, uap->filedes, uap->type, uap->aclp));
+}
+
+int
+sys___fc_acl_get_fd(struct thread *td, struct __fc_acl_get_fd_args *uap)
+{
+
+	return(kern___acl_get_fd(td, fc2fd(uap->fc), uap->type, uap->aclp));
+}
+
+static int
+kern___acl_get_fd(struct thread *td, int filedes, acl_type_t type,
+    struct acl *aclp)
+{
 	struct file *fp;
 	cap_rights_t rights;
 	int error;
 
-	AUDIT_ARG_FD(uap->filedes);
-	error = getvnode(td, uap->filedes,
+	AUDIT_ARG_FD(filedes);
+	error = getvnode(td, filedes,
 	    cap_rights_init(&rights, CAP_ACL_GET), &fp);
 	if (error == 0) {
-		error = vacl_get_acl(td, fp->f_vnode, uap->type, uap->aclp);
+		error = vacl_get_acl(td, fp->f_vnode, type, aclp);
 		fdrop(fp, td);
 	}
 	return (error);
@@ -440,15 +463,30 @@ sys___acl_get_fd(struct thread *td, struct __acl_get_fd_args *uap)
 int
 sys___acl_set_fd(struct thread *td, struct __acl_set_fd_args *uap)
 {
+
+	return(kern___acl_set_fd(td, uap->filedes, uap->type, uap->aclp));
+}
+
+int
+sys___fc_acl_set_fd(struct thread *td, struct __fc_acl_set_fd_args *uap)
+{
+
+	return(kern___acl_set_fd(td, fc2fd(uap->fc), uap->type, uap->aclp));
+}
+
+static int
+kern___acl_set_fd(struct thread *td, int filedes, acl_type_t type,
+    struct acl *aclp)
+{
 	struct file *fp;
 	cap_rights_t rights;
 	int error;
 
-	AUDIT_ARG_FD(uap->filedes);
-	error = getvnode(td, uap->filedes,
+	AUDIT_ARG_FD(filedes);
+	error = getvnode(td, filedes,
 	    cap_rights_init(&rights, CAP_ACL_SET), &fp);
 	if (error == 0) {
-		error = vacl_set_acl(td, fp->f_vnode, uap->type, uap->aclp);
+		error = vacl_set_acl(td, fp->f_vnode, type, aclp);
 		fdrop(fp, td);
 	}
 	return (error);
@@ -496,15 +534,29 @@ sys___acl_delete_link(struct thread *td, struct __acl_delete_link_args *uap)
 int
 sys___acl_delete_fd(struct thread *td, struct __acl_delete_fd_args *uap)
 {
+
+	return(kern___acl_delete_fd(td, uap->filedes, uap->type));
+}
+
+int
+sys___fc_acl_delete_fd(struct thread *td, struct __fc_acl_delete_fd_args *uap)
+{
+
+	return(kern___acl_delete_fd(td, fc2fd(uap->fc), uap->type));
+}
+
+static int
+kern___acl_delete_fd(struct thread *td, int filedes, acl_type_t type)
+{
 	struct file *fp;
 	cap_rights_t rights;
 	int error;
 
-	AUDIT_ARG_FD(uap->filedes);
-	error = getvnode(td, uap->filedes,
+	AUDIT_ARG_FD(filedes);
+	error = getvnode(td, filedes,
 	    cap_rights_init(&rights, CAP_ACL_DELETE), &fp);
 	if (error == 0) {
-		error = vacl_delete(td, fp->f_vnode, uap->type);
+		error = vacl_delete(td, fp->f_vnode, type);
 		fdrop(fp, td);
 	}
 	return (error);
@@ -552,15 +604,31 @@ sys___acl_aclcheck_link(struct thread *td, struct __acl_aclcheck_link_args *uap)
 int
 sys___acl_aclcheck_fd(struct thread *td, struct __acl_aclcheck_fd_args *uap)
 {
+
+	return(kern___acl_aclcheck_fd(td, uap->filedes, uap->type, uap->aclp));
+}
+
+int
+sys___fc_acl_aclcheck_fd(struct thread *td,
+    struct __fc_acl_aclcheck_fd_args *uap)
+{
+
+	return(kern___acl_aclcheck_fd(td, fc2fd(uap->fc), uap->type, uap->aclp));
+}
+
+static int
+kern___acl_aclcheck_fd(struct thread *td, int filedes, acl_type_t type,
+    struct acl *aclp)
+{
 	struct file *fp;
 	cap_rights_t rights;
 	int error;
 
-	AUDIT_ARG_FD(uap->filedes);
-	error = getvnode(td, uap->filedes,
+	AUDIT_ARG_FD(filedes);
+	error = getvnode(td, filedes,
 	    cap_rights_init(&rights, CAP_ACL_CHECK), &fp);
 	if (error == 0) {
-		error = vacl_aclcheck(td, fp->f_vnode, uap->type, uap->aclp);
+		error = vacl_aclcheck(td, fp->f_vnode, type, aclp);
 		fdrop(fp, td);
 	}
 	return (error);

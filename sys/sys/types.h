@@ -263,6 +263,11 @@ typedef __intcap_t	syscallarg_t;
 typedef register_t	syscallarg_t;
 #endif
 
+#ifndef _FC_T_DECLARED
+typedef	__fc_t	fc_t;
+#define	_FC_T_DECLARED
+#endif
+
 #ifdef _KERNEL
 typedef	int		boolean_t;
 typedef	struct device	*device_t;

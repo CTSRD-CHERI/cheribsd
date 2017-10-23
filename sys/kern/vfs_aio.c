@@ -322,6 +322,8 @@ static int	filt_aio(struct knote *kn, long hint);
 static int	filt_lioattach(struct knote *kn);
 static void	filt_liodetach(struct knote *kn);
 static int	filt_lio(struct knote *kn, long hint);
+static int	kern_aio_cancel(struct thread *td, int fd,
+		    struct aiocb *aiocbp);
 
 /*
  * Zones for:
@@ -1967,6 +1969,20 @@ sys_aio_suspend(struct thread *td, struct aio_suspend_args *uap)
 int
 sys_aio_cancel(struct thread *td, struct aio_cancel_args *uap)
 {
+
+	return (kern_aio_cancel(td, uap->fd, uap->aiocbp));
+}
+
+int
+sys_fc_aio_cancel(struct thread *td, struct fc_aio_cancel_args *uap)
+{
+
+	return (kern_aio_cancel(td, fc2fd(uap->fc), uap->aiocbp));
+}
+
+static int
+kern_aio_cancel(struct thread *td, int fd, struct aiocb *aiocbp)
+{
 	struct proc *p = td->td_proc;
 	struct kaioinfo *ki;
 	struct kaiocb *job, *jobn;
@@ -1978,7 +1994,7 @@ sys_aio_cancel(struct thread *td, struct aio_cancel_args *uap)
 	struct vnode *vp;
 
 	/* Lookup file object. */
-	error = fget(td, uap->fd, cap_rights_init(&rights), &fp);
+	error = fget(td, fd, cap_rights_init(&rights), &fp);
 	if (error)
 		return (error);
 
@@ -1997,15 +2013,15 @@ sys_aio_cancel(struct thread *td, struct aio_cancel_args *uap)
 
 	AIO_LOCK(ki);
 	TAILQ_FOREACH_SAFE(job, &ki->kaio_jobqueue, plist, jobn) {
-		if ((uap->fd == job->uaiocb.aio_fildes) &&
-		    ((uap->aiocbp == NULL) ||
-		     (uap->aiocbp == job->ujob))) {
+		if ((fd == job->uaiocb.aio_fildes) &&
+		    ((aiocbp == NULL) ||
+		     (aiocbp == job->ujob))) {
 			if (aio_cancel_job(p, ki, job)) {
 				cancelled++;
 			} else {
 				notcancelled++;
 			}
-			if (uap->aiocbp != NULL)
+			if (aiocbp != NULL)
 				break;
 		}
 	}
@@ -2014,7 +2030,7 @@ sys_aio_cancel(struct thread *td, struct aio_cancel_args *uap)
 done:
 	fdrop(fp, td);
 
-	if (uap->aiocbp != NULL) {
+	if (aiocbp != NULL) {
 		if (cancelled) {
 			td->td_retval[0] = AIO_CANCELED;
 			return (0);

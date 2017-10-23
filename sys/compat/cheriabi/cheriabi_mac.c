@@ -62,6 +62,13 @@ cheriabi___mac_get_fd(struct thread *td, struct cheriabi___mac_get_fd_args *uap)
 }
 
 int
+cheriabi___fc_mac_get_fd(struct thread *td, struct cheriabi___fc_mac_get_fd_args *uap)
+{
+
+	return(ENOSYS);
+}
+
+int
 cheriabi___mac_get_file(struct thread *td, struct cheriabi___mac_get_file_args *uap)
 {
 
@@ -70,6 +77,13 @@ cheriabi___mac_get_file(struct thread *td, struct cheriabi___mac_get_file_args *
 
 int
 cheriabi___mac_set_fd(struct thread *td, struct cheriabi___mac_set_fd_args *uap)
+{
+
+	return(ENOSYS);
+}
+
+int
+cheriabi___fc_mac_set_fd(struct thread *td, struct cheriabi___fc_mac_set_fd_args *uap)
 {
 
 	return(ENOSYS);
