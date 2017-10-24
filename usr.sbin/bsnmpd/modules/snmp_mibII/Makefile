@@ -21,3 +21,8 @@ INCS=	snmp_${MOD}.h
 BMIBS=	BEGEMOT-IP-MIB.txt BEGEMOT-MIB2-MIB.txt
 
 .include <bsd.snmpmod.mk>
+
+.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} > 040000
+CFLAGS+=-Wno-tautological-constant-compare
+.endif
+

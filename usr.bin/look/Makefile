@@ -4,3 +4,7 @@
 PROG=	look
 
 .include <bsd.prog.mk>
+
+.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} > 040000
+CFLAGS+=-Wno-tautological-constant-compare
+.endif
