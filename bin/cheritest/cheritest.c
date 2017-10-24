@@ -1381,17 +1381,17 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_getstack",
-	  .ct_desc = "Exercise CHERI_GET_STACK sysarch()",
+	  .ct_desc = "Exercise cheri_stack_get()",
 	  .ct_func = test_sandbox_getstack,
 	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_setstack_nop",
-	  .ct_desc = "Exercise CHERI_SET_STACK sysarch() for nop rewrite",
+	  .ct_desc = "Exercise cheri_stack_set() for nop rewrite",
 	  .ct_func = test_sandbox_setstack_nop,
 	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_setstack",
-	  .ct_desc = "Exercise CHERI_SET_STACK sysarch() to change stack",
+	  .ct_desc = "Exercise cheri_stack_set() to change stack",
 	  .ct_func = test_sandbox_setstack,
 	  .ct_flags = CT_FLAG_SANDBOX, },
 
