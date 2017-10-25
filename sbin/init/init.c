@@ -324,12 +324,12 @@ invalid:
 #endif
 	    0);
 	handle(transition_handler, SIGHUP, SIGINT, SIGEMT, SIGTERM, SIGTSTP,
-	    SIGUSR1, SIGUSR2, 0);
+	    SIGUSR1, SIGUSR2, SIGWINCH, 0);
 	handle(alrm_handler, SIGALRM, 0);
 	sigfillset(&mask);
 	delset(&mask, SIGABRT, SIGFPE, SIGILL, SIGSEGV, SIGBUS, SIGSYS,
 	    SIGXCPU, SIGXFSZ, SIGHUP, SIGINT, SIGEMT, SIGTERM, SIGTSTP,
-	    SIGALRM, SIGUSR1, SIGUSR2,
+	    SIGALRM, SIGUSR1, SIGUSR2, SIGWINCH,
 #ifdef SIGPROT
 	    SIGPROT, /* Don't mask CHERI exceptions */
 #endif
@@ -1556,8 +1556,9 @@ transition_handler(int sig)
 		    current_state == clean_ttys || current_state == catatonia)
 			requested_transition = clean_ttys;
 		break;
+	case SIGWINCH:
 	case SIGUSR2:
-		howto = RB_POWEROFF;
+		howto = sig == SIGUSR2 ? RB_POWEROFF : RB_POWERCYCLE;
 	case SIGUSR1:
 		howto |= RB_HALT;
 	case SIGINT:
