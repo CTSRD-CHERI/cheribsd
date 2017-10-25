@@ -20,7 +20,8 @@ makeoptions 	KERNLOADADDR=0xffffffff80100000
 
 include		"../beri/std.beri"
 
-makeoptions	DEBUG=-g		#Build kernel with gdb(1) debug symbols
+# HACK: work around https://bugs.llvm.org/show_bug.cgi?id=35071
+# makeoptions	DEBUG=-g		#Build kernel with gdb(1) debug symbols
 
 makeoptions	MODULES_OVERRIDE=""
 
