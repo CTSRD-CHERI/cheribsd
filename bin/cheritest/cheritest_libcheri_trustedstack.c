@@ -46,6 +46,7 @@
 #include <cheri/cheri_fd.h>
 #include <cheri/cheri_stack.h>
 #include <cheri/sandbox.h>
+#include <cheri/sandbox_internal.h>
 
 #include <cheritest-helper.h>
 #include <err.h>
@@ -92,16 +93,22 @@ cheritest_libcheri_userfn_getstack(void)
 
 	/* Validate that the first is a saved ambient context. */
 	csfp = &cs.cs_frames[stack_depth - 1];
-	if (cheri_getbase(csfp->csf_pcc) != cheri_getbase(cheri_getpcc()) ||
-	    cheri_getlen(csfp->csf_pcc) != cheri_getlen(cheri_getpcc()))
+	if (cheri_getbase(csfp->csf_caller_pcc) !=
+	    cheri_getbase(cheri_getpcc()) ||
+	    cheri_getlen(csfp->csf_caller_pcc) !=
+	    cheri_getlen(cheri_getpcc()))
 		cheritest_failure_errx("frame 0: not global code cap");
+
+	/* ... and that the callee sandbox is right. */
+	if (csfp->csf_callee_sbop != cheritest_objectp)
+		cheritest_failure_errx("frame 1: incorrect callee sandbox");
 
 	/* Validate that the second is cheritest_objectp. */
 	csfp = &cs.cs_frames[stack_depth - 2];
-	if ((cheri_getbase(csfp->csf_pcc) != cheri_getbase(
-	    sandbox_object_getobject(cheritest_objectp).co_codecap)) ||
-	    cheri_getlen(csfp->csf_pcc) != cheri_getlen(
-	    sandbox_object_getobject(cheritest_objectp).co_codecap))
+	if ((cheri_getbase(csfp->csf_caller_pcc) != cheri_getbase(
+	    cheritest_objectp->sbo_invoke_pcc)) ||
+	    (cheri_getlen(csfp->csf_caller_pcc) != cheri_getlen(
+	    cheritest_objectp->sbo_invoke_pcc)))
 		cheritest_failure_errx("frame 1: not sandbox code cap");
 	return (0);
 }
@@ -155,16 +162,22 @@ cheritest_libcheri_userfn_setstack(register_t arg)
 
 	/* Validate that the first is a saved ambient context. */
 	csfp = &cs.cs_frames[stack_depth - 1];
-	if (cheri_getbase(csfp->csf_pcc) != cheri_getbase(cheri_getpcc()) ||
-	    cheri_getlen(csfp->csf_pcc) != cheri_getlen(cheri_getpcc()))
+	if (cheri_getbase(csfp->csf_caller_pcc) !=
+	    cheri_getbase(cheri_getpcc()) ||
+	    cheri_getlen(csfp->csf_caller_pcc) !=
+	    cheri_getlen(cheri_getpcc()))
 		cheritest_failure_errx("frame 0: not global code cap");
+
+	/* ... and that the callee sandbox is right. */
+	if (csfp->csf_callee_sbop != cheritest_objectp)
+		cheritest_failure_errx("frame 1: incorrect callee sandbox");
 
 	/* Validate that the second is cheritest_objectp. */
 	csfp = &cs.cs_frames[stack_depth - 2];
-	if ((cheri_getbase(csfp->csf_pcc) != cheri_getbase(
-	    sandbox_object_getobject(cheritest_objectp).co_codecap)) ||
-	    cheri_getlen(csfp->csf_pcc) != cheri_getlen(
-	    sandbox_object_getobject(cheritest_objectp).co_codecap))
+	if ((cheri_getbase(csfp->csf_caller_pcc) != cheri_getbase(
+	    cheritest_objectp->sbo_invoke_pcc)) ||
+	    (cheri_getlen(csfp->csf_caller_pcc) != cheri_getlen(
+	    cheritest_objectp->sbo_invoke_pcc)))
 		cheritest_failure_errx("frame 1: not sandbox code cap");
 
 	if (arg) {

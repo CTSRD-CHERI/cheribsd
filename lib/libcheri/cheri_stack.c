@@ -127,11 +127,15 @@ int
 cheri_stack_set(struct cheri_stack *csp)
 {
 
-	if (csp->cs_tsize != __cheri_stack_tls_storage.cs_tsize)
-		return (EINVAL);
+	if (csp->cs_tsize != __cheri_stack_tls_storage.cs_tsize) {
+		errno = EINVAL;
+		return (-1);
+	}
 	if (csp->cs_tsp < 0 || csp->cs_tsp > CHERI_STACK_SIZE ||
-	    (csp->cs_tsp & CHERI_FRAME_SIZE) != 0)
-		return (EINVAL);
+	    (csp->cs_tsp % CHERI_FRAME_SIZE) != 0) {
+		errno = EINVAL;
+		return (-1);
+	}
 	memcpy(&__cheri_stack_tls_storage, csp,
 	    sizeof(__cheri_stack_tls_storage));
 	return (0);
@@ -192,8 +196,10 @@ cheri_stack_unwind(ucontext_t *uap, register_t ret, u_int op,
 	csfp = &cs.cs_frames[stack_size - (stack_frames - num_frames) - 1];
 #if 0
 	/* Make sure we will be returning to ambient authority. */
-	if (cheri_getbase(csfp->csf_pcc) != cheri_getbase(cheri_getpcc()) ||
-	    cheri_getlen(csfp->csf_pcc) != cheri_getlen(cheri_getpcc()))
+	if (cheri_getbase(csfp->csf_caller_pcc) !=
+	    cheri_getbase(cheri_getpcc()) ||
+	    cheri_getlen(csfp->csf_caller_pcc) !=
+	    cheri_getlen(cheri_getpcc()))
 		return (-1);
 #endif
 

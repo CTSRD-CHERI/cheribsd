@@ -47,11 +47,13 @@
  */
 struct cheri_stack_frame {
 #if __has_feature(capabilities)
-	void * __capability	csf_pcc;	/* Saved return $pcc */
-	void * __capability	csf_csp;	/* Saved return $csp */
+	void * __capability	csf_caller_pcc;	/* Caller return $pcc */
+	void * __capability	csf_caller_csp;	/* Callee return $csp */
+	void * __capability	csf_callee_sbop;/* Callee sandbox object */
 #else
-	struct chericap	csf_pcc;
-	struct chericap	csf_csp;
+	struct chericap	csf_caller_pcc;
+	struct chericap	csf_caller_csp;
+	struct chericap csf_callee_sbop;
 #endif
 };
 
@@ -63,7 +65,8 @@ struct cheri_stack_frame {
  */
 #define	CHERI_STACK_DEPTH	8	/* XXXRW: 8 is a nice round number. */
 struct cheri_stack {
-	register_t	cs_tsp;		/* Byte offset, not frame index. */
+	register_t	cs_tsp;		/* Byte offset into cs_frames,
+					 * not frame index. */
 	register_t	cs_tsize;	/* Stack size, in bytes. */
 	register_t	_cs_pad0;
 	register_t	_cs_pad1;

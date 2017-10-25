@@ -155,9 +155,9 @@ libcheri_ccall_rtld_push_stack:
 	beqz	$t0, libcheri_ccall_rtld_stack_overflow
 
 	/* Decrement trusted stack pointer. */
-	daddiu	$t0, $t0, -2*CHERICAP_SIZE
+	daddiu	$t0, $t0, -3*CHERICAP_SIZE
 
-	/* Write back trusted stack pointer. */
+	/* Write back trusted stack pointer - cs_tsp. */
 	csd	$t0, $zero, 0($c14)		# XXXRW: Hard-coded offset
 
 	/* Calculate $c14-relative offset to stack frame. */
@@ -170,6 +170,9 @@ libcheri_ccall_rtld_push_stack:
 
 	/* Save caller return $csp. */
 	csc	$c11, $t0, CHERICAP_SIZE($c14)	# XXXRW: Hard-coded offset
+
+	/* Save callee sandbox pointer. */
+	csc	$c26, $t0, (2*CHERICAP_SIZE)($c14)# XXXRW: Hard-coded offset
 
 	/* XXXRW: Tracing?  Could do utrace, potentially...  Or jump into C? */
 
@@ -290,14 +293,14 @@ libcheri_ccall_invoke_check_globals:
 	csetoffset	$c14, $c14, $at
 
 libcheri_ccall_invoke_push_stack:
-	/* Retrieve current trusted stack pointer. */
+	/* Retrieve current trusted stack pointer - cs_tsp. */
 	cld	$t0, $zero, 0($c14)		# XXXRW: Hard-coded offset
 
 	/* If at the bottom (byte offset 0), then overflow. */
 	beqz	$t0, libcheri_ccall_invoke_stack_overflow
 
 	/* Decrement trusted stack pointer. */
-	daddiu	$t0, $t0, -2*CHERICAP_SIZE
+	daddiu	$t0, $t0, -3*CHERICAP_SIZE
 
 	/* Write back trusted stack pointer. */
 	csd	$t0, $zero, 0($c14)		# XXXRW: Hard-coded offset
@@ -312,6 +315,9 @@ libcheri_ccall_invoke_push_stack:
 
 	/* Save caller return $csp. */
 	csc	$c11, $t0, CHERICAP_SIZE($c14)	# XXXRW: Hard-coded offset
+
+	/* Save callee sandbox pointer. */
+	csc	$c26, $t0, (2*CHERICAP_SIZE)($c14)# XXXRW: Hard-coded offset
 
 	/* XXXRW: Tracing?  Could do utrace, potentially...  Or jump into C? */
 
@@ -430,8 +436,8 @@ creturn_pop_stack:
 	beq	$t0, $t1, creturn_stack_underflow
 	nop
 
-	/* Increment (copy of) trusted stack pointer. */
-	daddiu	$t1, $t0, 2*CHERICAP_SIZE
+	/* Increment (copy of) trusted stack pointer - cs_tsp. */
+	daddiu	$t1, $t0, 3*CHERICAP_SIZE
 
 	/* Write back incremented trusted stack pointer. */
 	csd	$t1, $zero, 0($c14)		# XXXRW: Hard-coded offset

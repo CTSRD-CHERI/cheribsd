@@ -80,8 +80,8 @@ cheri_stack_unwind_md(ucontext_t *uap, struct cheri_stack_frame *csfp,
 	 * $csp from the last trusted-stack frame.
 	 */
 	memset(cfp, 0, sizeof(*cfp));
-	cfp->cf_csp =  csfp->csf_csp;
-	cfp->cf_pcc = csfp->csf_pcc;
+	cfp->cf_csp =  csfp->csf_caller_csp;
+	cfp->cf_pcc = csfp->csf_caller_pcc;
 
 	/*
 	 * Zero the general-purpose register file.  restore not only $pc, but
