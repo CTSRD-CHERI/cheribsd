@@ -52,6 +52,6 @@ INCSAPIDIR= $(INCLUDEDIR)/netnatm/api
 INCSAPI= api/atmapi.h api/ccatm.h api/unisap.h
 
 .include <bsd.lib.mk>
-.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} > 040000
+.if defined(LIBCHERI) || (${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 060000)
 CFLAGS+=-Wno-tautological-constant-compare
 .endif

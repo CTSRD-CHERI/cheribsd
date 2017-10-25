@@ -22,7 +22,7 @@ BMIBS=	BEGEMOT-IP-MIB.txt BEGEMOT-MIB2-MIB.txt
 
 .include <bsd.snmpmod.mk>
 
-.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} > 040000
+.if defined(LIBCHERI) || (${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 060000)
 CFLAGS+=-Wno-tautological-constant-compare
 .endif
 
