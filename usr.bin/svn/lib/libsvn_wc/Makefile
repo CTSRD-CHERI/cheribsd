@@ -26,3 +26,5 @@ CFLAGS+=	-I${SVNDIR}/include -I${SVNDIR} -I${.CURDIR}/../.. \
 		-I${APRU}/include
 
 .include <bsd.lib.mk>
+# HACK: Work around https://bugs.llvm.org/show_bug.cgi?id=35071
+CFLAGS+=-g0
