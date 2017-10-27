@@ -72,6 +72,7 @@
  * true of other FreeBSD exception handlers.
  */
 
+	.option pic0
 	.set noreorder	/* Preserve nops, allow instructions in b-d slots. */
 
 /*
