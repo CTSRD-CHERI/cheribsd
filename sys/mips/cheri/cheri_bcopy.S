@@ -150,3 +150,17 @@ cstr_return:
 	jr	ra
 	nop
 END(copystr_c)
+
+/*
+ * Variant of memcpy with capability arguments that preserve tags
+ *
+ * memcpy_c() accepts:
+ * c3 - source pointer
+ * c4 - destination pointer
+ * a0 - length
+ */
+LEAF(memcpy_c)
+	jr	ra
+	nop
+END(memcpy_c)	
+	

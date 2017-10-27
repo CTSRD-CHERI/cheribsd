@@ -1032,6 +1032,29 @@ atomic_thread_fence_seq_cst(void)
 #define	atomic_load_acq_ptr	atomic_load_acq_long
 #define	atomic_store_rel_ptr	atomic_store_rel_long
 #define	atomic_readandclear_ptr	atomic_readandclear_long
-#endif
+#else /* __CHERI_PURE_CAPABILITY__ */
+// XXXAM TODO pointer atomics
+#define	atomic_set_ptr		atomic_set_long
+#define	atomic_set_acq_ptr	atomic_set_acq_long
+#define	atomic_set_rel_ptr	atomic_set_rel_long
+#define	atomic_clear_ptr	atomic_clear_long
+#define	atomic_clear_acq_ptr	atomic_clear_acq_long
+#define	atomic_clear_rel_ptr	atomic_clear_rel_long
+#define	atomic_add_ptr		atomic_add_long
+#define	atomic_add_acq_ptr	atomic_add_acq_long
+#define	atomic_add_rel_ptr	atomic_add_rel_long
+#define	atomic_subtract_ptr	atomic_subtract_long
+#define	atomic_subtract_acq_ptr	atomic_subtract_acq_long
+#define	atomic_subtract_rel_ptr	atomic_subtract_rel_long
+#define	atomic_cmpset_ptr	atomic_cmpset_long
+#define	atomic_cmpset_acq_ptr	atomic_cmpset_acq_long
+#define	atomic_cmpset_rel_ptr	atomic_cmpset_rel_long
+#define	atomic_fcmpset_ptr	atomic_fcmpset_long
+#define	atomic_fcmpset_acq_ptr	atomic_fcmpset_acq_long
+#define	atomic_fcmpset_rel_ptr	atomic_fcmpset_rel_long
+#define	atomic_load_acq_ptr	atomic_load_acq_long
+#define	atomic_store_rel_ptr	atomic_store_rel_long
+#define	atomic_readandclear_ptr	atomic_readandclear_long
+#endif /* __CHERI_PURE_CAPABILITY__ */
 
 #endif /* ! _MACHINE_ATOMIC_H_ */
