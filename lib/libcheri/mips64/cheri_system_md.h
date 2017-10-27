@@ -118,6 +118,7 @@ __cheri_ ## class ## _entry:						\
 	clc	$c1, $t0, 0($c2);					\
 	clc	$c2, $t0, CHERICAP_SIZE($c2);				\
 	ccall	$c1, $c2, 1;						\
+	nop;								\
 									\
 $__cheri_ ## class ## _entry_end:					\
 	.end __cheri_## class ## _entry;				\
