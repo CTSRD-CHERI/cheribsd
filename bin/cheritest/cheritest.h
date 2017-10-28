@@ -292,6 +292,8 @@ void	test_nofault_ccheck_user_pass(const struct cheri_test *ctp);
 
 void	test_sandbox_cp2_bound_catch(const struct cheri_test *ctp);
 void	test_sandbox_cp2_bound_nocatch(const struct cheri_test *ctp);
+void	test_sandbox_cp2_bound_nocatch_noaltstack(
+	    const struct cheri_test *ctp);
 void	test_sandbox_cp2_perm_load_catch(const struct cheri_test *ctp);
 void	test_sandbox_cp2_perm_load_nocatch(const struct cheri_test *ctp);
 void	test_sandbox_cp2_perm_store_catch(const struct cheri_test *ctp);

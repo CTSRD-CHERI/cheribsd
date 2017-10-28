@@ -1123,6 +1123,13 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
 	  .ct_signum = SIGPROT },
 
+	{ .ct_name = "test_sandbox_cp2_bound_nocatch_noaltstack",
+	  .ct_desc = "Exercise sandboxed CP2 bounds-check failure; uncaught, "
+		"no alt stack",
+	  .ct_func = test_sandbox_cp2_bound_nocatch_noaltstack,
+	  .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+	  .ct_signum = SIGILL },
+
 	{ .ct_name = "test_sandbox_cp2_perm_load_catch",
 	  .ct_desc = "Exercise sandboxed CP2 load-perm-check failure; caught",
 	  .ct_func = test_sandbox_cp2_perm_load_catch,

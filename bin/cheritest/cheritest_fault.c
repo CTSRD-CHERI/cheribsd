@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012-2016 Robert N. M. Watson
+ * Copyright (c) 2012-2017 Robert N. M. Watson
  * Copyright (c) 2014 SRI International
  * All rights reserved.
  *
@@ -230,6 +230,20 @@ test_sandbox_cp2_bound_nocatch(const struct cheri_test *ctp __unused)
 		cheritest_failure_errx("invoke returned %ld (expected %d)", v,
 		    -1);
 	cheritest_success();
+}
+
+void
+test_sandbox_cp2_bound_nocatch_noaltstack(
+    const struct cheri_test *ctp __unused)
+{
+	stack_t ss;
+
+	bzero(&ss, sizeof(ss));
+	ss.ss_flags = SS_DISABLE;
+	if (sigaltstack(&ss, NULL) < 0)
+		cheritest_failure_err("sigaltstack");
+	invoke_cap_fault(CHERITEST_HELPER_CAP_FAULT_CP2_BOUND);
+	cheritest_failure_errx("invoke returned");
 }
 
 void
