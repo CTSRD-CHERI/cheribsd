@@ -106,6 +106,8 @@ extern struct cheritest_child_state *ccsp;
 #define	CT_FLAG_SANDBOX		0x00000100  /* Test requires that a libcheri
 					     * sandbox be created. */
 #define	CT_FLAG_SI_CODE		0x00000200  /* Check signal si_code. */
+#define	CT_FLAG_SIGEXIT		0x00000400  /* Exits with uncaught signal;
+					       checks status signum. */
 
 #define	CHERITEST_SANDBOX_UNWOUND	0x123456789ULL
 
