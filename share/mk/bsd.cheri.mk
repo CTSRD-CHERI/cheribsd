@@ -146,7 +146,7 @@ _CHERI_CFLAGS+=	-Qunused-arguments
 .endif
 
 .if ${WANT_CHERI} != "variables"
-.if ${MK_CHERI_SHARED} == "no"
+.if ${MK_CHERI_SHARED} == "no" || defined(CHERI_NO_SHARED)
 NO_SHARED=	yes
 .elif defined(__BSD_PROG_MK) && ${MK_CHERI_SHARED_PROG} == "no"
 NO_SHARED=	yes

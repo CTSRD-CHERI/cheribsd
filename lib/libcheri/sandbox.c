@@ -459,6 +459,9 @@ sandbox_object_new_flags(struct sandbox_class *sbcp, size_t heaplen,
 	    sbop->sbo_stacklen, CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |
 	    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
 	    CHERI_PERM_STORE_LOCAL_CAP));
+	sbop->sbo_stackcsp =
+	    (__capability void *)((uintptr_t)sbop->sbo_stackcap +
+	    sbop->sbo_stacklen);
 
 	/*
 	 * Set up the sandbox's code/data segments, sealed capabilities.
@@ -736,14 +739,14 @@ sandbox_object_getsystemobject(struct sandbox_object *sbop)
 	return (sbop->sbo_cheri_object_system);
 }
 
-void *
+__capability void *
 sandbox_object_private_get(struct sandbox_object *sbop)
 {
 
 	return (sbop->sbo_private_data);
 }
 
-void *
+__capability void *
 sandbox_object_private_get_idc(void)
 {
 	struct sandbox_object *sbop;

@@ -14,7 +14,6 @@ SRCS=	cheri_ccall.c			\
 	cheri_system.c			\
 	cheri_type.c			\
 	error.cc			\
-	libcheri_classes.S		\
 	libcheri_init.c			\
 	sandbox.c			\
 	sandbox_elf.c			\
@@ -22,9 +21,11 @@ SRCS=	cheri_ccall.c			\
 	sandbox_methods.c		\
 
 .if defined(LIBCHERI)
-SRCS+=	cheri_invoke_cabi.S
+SRCS+=	cheri_invoke_cabi.S		\
+	libcheri_classes_cabi.S
 .else
-SRCS+=	cheri_invoke_hybrid.S
+SRCS+=	cheri_invoke_hybrid.S		\
+	libcheri_classes_hybrid.S
 .endif
 
 INCS=	cheri_ccall.h			\
@@ -61,10 +62,14 @@ MAN=	cheri_invoke.3			\
 NEED_CHERI=	hybrid
 .endif
 
-CLEANFILES=	cheri_ccall_trampoline.o	\
-		cheri_invoke_cabi.o		\
-		cheri_invoke_hybrid.o		\
-		libcheri_classes.o
+CLEANFILES=	cheri_ccall_trampoline.o
+.if defined(LIBCHERI)
+CLEANFILES+=	cheri_invoke_cabi.o		\
+		libcheri_classes_cabi.o
+.else
+CLEANFILES+=	cheri_invoke_hybrid.o		\
+		libcheri_classes_hybrid.o
+.endif
 
 NO_WERROR=
 

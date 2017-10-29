@@ -1983,7 +1983,7 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, re
 static struct timeval unaligned_lasterr;
 static int unaligned_curerr;
 
-static int unaligned_pps_log_limit = 4;
+static int unaligned_pps_log_limit = 0;
 
 SYSCTL_INT(_machdep, OID_AUTO, unaligned_log_pps_limit, CTLFLAG_RWTUN,
     &unaligned_pps_log_limit, 0,

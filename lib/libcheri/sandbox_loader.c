@@ -342,7 +342,9 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	sbmp->sbm_heaplen = heaplen;
 	sbmp->sbm_vtable = sandbox_make_vtable(sbop->sbo_datamem, NULL,
 	    sbcp->sbc_provided_classes);
-	sbmp->sbm_stackcap = sbop->sbo_stackcap;
+	sbmp->sbm_stackcsp =
+	    (__capability void *)((uintptr_t)sbop->sbo_stackcap +
+	    cheri_getlen(sbop->sbo_stackcap));
 
 	/*
 	 * Construct data capability suitable for use with both run-time

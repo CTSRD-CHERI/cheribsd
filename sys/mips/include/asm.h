@@ -314,22 +314,17 @@ _C_LABEL(x):
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
 /*
  *  cheriabi callframe {
- *	uint64_t	cf_ra;
- *	uint64_t	cf_fp;
- *	uint64_t	cf_gp;
- *	uint64_t	cf_s0;
- *	intcap_t	cf_c17;
- *	intcap_t	cf_something;	XXX-BD: What should go here?
+ *	intcap_t	cf_cgp;		global pointer
+ *	intcap_t	cf_csp;		frame pointer
+ *	intcap_t	cf_cra;		return address
+ *	int32_t		cf_s0;		misc.
  *  };
  *
  * XXX-BD: This is unstable and will certainly change.
  */
-#define CALLFRAME_SIZ	(SZREG * 4 + (_MIPS_SZCAP / 8) * 2)
-#define CALLFRAME_RA	(CALLFRAME_SIZ - 1 * SZREG)
-#define CALLFRAME_FP	(CALLFRAME_SIZ - 2 * SZREG)
-#define CALLFRAME_GP	(CALLFRAME_SIZ - 3 * SZREG)
-#define	CALLFRAME_S0	(CALLFRAME_SIZ - 4 * SZREG)
-#define	CALLFRAME_C17	(CALLFRAME_SIZ - 4 * SZREG - _MIPS_SZCAP / 8)
+#define	CALLFRAME_SIZ	(2*(_MIPS_SZCAP / 8))
+#define	CALLFRAME_CRA	(0*(_MIPS_SZCAP / 8))
+#define	CALLFRAME_S0	(1*(_MIPS_SZCAP / 8))
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
 
 /*
@@ -773,8 +768,9 @@ _C_LABEL(x):
 #define	_JB_CHERI_C22	11
 #define	_JB_CHERI_C23	12
 #define	_JB_CHERI_C24	13
+#define	_JB_CHERI_C25	14
 #ifdef __CHERI_PURE_CAPABILITY__
-#define	_JB_CHERI_DDC	14
+#define	_JB_CHERI_DDC	15
 #endif
 #endif
 

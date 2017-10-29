@@ -113,17 +113,17 @@ Summary:
 #ifdef __cplusplus
 extern "C" {
 #endif
-
+/* XXXAR: This is undefined behaviour and what does the comment mean anyway? */
 /* We use subtraction of (char *) 0 instead of casting to int
    because on word-addressable machines a simple cast to int
    may ignore the byte-within-word field of the pointer.  */
 
 #ifndef __PTR_TO_INT
-# define __PTR_TO_INT(P) ((P) - (char *) 0)
+# define __PTR_TO_INT(P) ((intptr_t)(P))
 #endif
 
 #ifndef __INT_TO_PTR
-# define __INT_TO_PTR(P) ((P) + (char *) 0)
+# define __INT_TO_PTR(P) ((void*)(intptr_t)(P))
 #endif
 
 /* We need the type of the resulting object.  If __PTRDIFF_TYPE__ is
@@ -427,7 +427,7 @@ __extension__								\
      __o1->maybe_empty_object = 1;					\
    __o1->next_free							\
      = __INT_TO_PTR ((__PTR_TO_INT (__o1->next_free)+__o1->alignment_mask)\
-		     & ~ (__o1->alignment_mask));			\
+		     & ~(intptr_t)(__o1->alignment_mask));			\
    if (__o1->next_free - (char *)__o1->chunk				\
        > __o1->chunk_limit - (char *)__o1->chunk)			\
      __o1->next_free = __o1->chunk_limit;				\

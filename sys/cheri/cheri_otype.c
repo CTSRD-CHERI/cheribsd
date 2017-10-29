@@ -1,9 +1,9 @@
 /*-
- * Copyright (c) 2011-2017 Robert N. M. Watson
+ * Copyright (c) 2017 SRI International
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
- * Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
+ * Cambridge Computer Laboratory under DARPA/AFRL contract FA8750-10-C-0237
  * ("CTSRD"), as part of the DARPA CRASH research programme.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,53 +28,59 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
 #include <sys/param.h>
 #include <sys/kernel.h>
-#include <sys/proc.h>
-#include <sys/syscall.h>
-#include <sys/sysctl.h>
-
-#include <ddb/ddb.h>
-#include <sys/kdb.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
+#include <sys/systm.h>
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
-#include <machine/atomic.h>
-#include <machine/pcb.h>
-#include <machine/sysarch.h>
+#include <machine/cherireg.h>
 
-/*
- * When new threads are forked, by default simply replicate the parent
- * thread's CHERI-related signal-handling state.
- *
- * XXXRW: Is this, in fact, the right thing?
- */
-void
-cheri_signal_copy(struct pcb *dst, struct pcb *src)
+static struct mtx cheri_otype_lock;
+static struct unrhdr *cheri_otypes;
+static void * __capability kernel_sealcap;
+
+static void
+cheri_otype_init(void *dummy __unused)
 {
 
-	cheri_memcpy(&dst->pcb_cherisignal, &src->pcb_cherisignal,
-	    sizeof(dst->pcb_cherisignal));
+	mtx_init(&cheri_otype_lock, "CHERI object type lock", NULL, MTX_DEF);
+	cheri_otypes = new_unrhdr(CHERI_OTYPE_KERN_MIN,
+	    CHERI_OTYPE_KERN_MAX, &cheri_otype_lock);
+	cheri_capability_set(&kernel_sealcap, CHERI_SEALCAP_KERNEL_PERMS,
+	    CHERI_SEALCAP_KERNEL_BASE, CHERI_SEALCAP_KERNEL_LENGTH,
+	    CHERI_SEALCAP_KERNEL_BASE);
+}
+SYSINIT(cheri_otype_init, SI_SUB_LOCK, SI_ORDER_FIRST, cheri_otype_init, NULL);
+
+otype_t
+cheri_otype_alloc(void)
+{
+	u_int type;
+
+	type = alloc_unr(cheri_otypes);
+	if (type == -1)
+		return (NULL);
+	return (cheri_maketype(kernel_sealcap,
+	    type - CHERI_SEALCAP_KERNEL_BASE));
 }
 
 /*
- * As with system calls, handling signal delivery connotes special authority
- * in the runtime environment.  In the signal delivery code, we need to
- * determine whether to trust the executing thread to have valid stack state,
- * and use this function to query whether the execution environment is
- * suitable for direct handler execution, or if (in effect) a security-domain
- * transition is required first.
+ * Return a type to the pool.  Ideally we would ensure that no
+ * capablities of this type remain in memory, but that would be VERY
+ * expensive.  In practice, most consumers will never free a type.
  */
-int
-cheri_signal_sandboxed(struct thread *td)
+void
+cheri_otype_free(otype_t cap)
 {
-	uintmax_t c_perms;
+	u_int type;
 
-	c_perms = cheri_getperm(td->td_pcb->pcb_regs.pcc);
-	if ((c_perms & CHERI_PERM_SYSCALL) == 0) {
-		atomic_add_int(&security_cheri_sandboxed_signals, 1);
-		return (ECAPMODE);
-	}
-	return (0);
+	type = cheri_getbase(cap);
+	free_unr(cheri_otypes, type);
 }

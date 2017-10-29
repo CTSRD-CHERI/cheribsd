@@ -370,7 +370,7 @@ cheriabi_get_mcontext(struct thread *td, mcontext_c_t *mcp, int flags)
 
 	tp = td->td_frame;
 	PROC_LOCK(curthread->td_proc);
-	mcp->mc_onstack = sigonstack(tp->sp);
+	mcp->mc_onstack = sigonstack((vaddr_t)tp->csp);
 	PROC_UNLOCK(curthread->td_proc);
 	bcopy((void *)&td->td_frame->zero, (void *)&mcp->mc_regs,
 	    sizeof(mcp->mc_regs));
@@ -435,10 +435,11 @@ cheriabi_set_mcontext(struct thread *td, mcontext_c_t *mcp)
  * The CheriABI version of sendsig(9) largely borrows from the MIPS version,
  * and it is important to keep them in sync.  It differs primarily in that it
  * must also be aware of user stack-handling ABIs, so is also sensitive to our
- * (fluctuating) design choices in how $csp and $sp interact.  The current
- * design uses ($csp + $sp) for stack-relative references, so early on we have
- * to calculate a 'relocated' version of $sp that we can then use for
- * MIPS-style access.
+ * (fluctuating) design choices in how $csp and $sp interact.  In the current
+ * model, $csp encapsulates the bounds and stack pointer itself, and the
+ * historic $sp register is simply a general-puprose register.  As such, there
+ * should be no mention of $sp (in its role as a stack pointer) in CheriABI
+ * code.
  *
  * This code, as with the CHERI-aware MIPS code, makes a privilege
  * determination in order to decide whether to trust the stack exposed by the
@@ -454,8 +455,8 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	struct trapframe *regs;
 	struct sigacts *psp;
 	struct sigframe_c sf, *sfp;
-	uintptr_t stackbase;
-	vm_offset_t sp;
+	struct cheri_signal *csigp;
+	intptr_t csp; /* XXXAR: shouldn't this be intcap_t */
 	int cheri_is_sandboxed;
 	int sig;
 	int oonstack;
@@ -466,22 +467,16 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	sig = ksi->ksi_signo;
 	psp = p->p_sigacts;
 	mtx_assert(&psp->ps_mtx, MA_OWNED);
-
-	regs = td->td_frame;
+	csigp = &td->td_pcb->pcb_cherisignal;
 
 	/*
-	 * In CheriABI, $sp is $csp relative, so calculate a relocation base
-	 * that must be combined with regs->sp from this point onwards.
-	 * Unfortunately, we won't retain bounds and permissions information
-	 * (as is the case elsewhere in CheriABI).  While 'stackbase'
-	 * suggests that $csp's offset isn't included, in practice it will be,
-	 * although we may reasonably assume that it will be zero.
-	 *
-	 * If it turns out we will be delivering to the alternative signal
-	 * stack, we'll recalculate stackbase later.
+	 * XXXRW: We make an on-stack determination using the virtual address
+	 * associated with the stack pointer, rather than using the full
+	 * capability.  Should we compare the entire capability...?  Just
+	 * pointer and bounds...?
 	 */
-	stackbase = (vaddr_t)td->td_pcb->pcb_regs.csp;
-	oonstack = sigonstack(stackbase + regs->sp);
+	regs = td->td_frame;
+	oonstack = sigonstack((vaddr_t)regs->csp);
 
 	/*
 	 * CHERI affects signal delivery in the following ways:
@@ -519,7 +514,7 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 #endif
 
 	/*
-	 * If a thread is running sandboxed, we can't rely on $sp which may
+	 * If a thread is running sandboxed, we can't rely on $csp which may
 	 * not point at a valid stack in the ambient context, or even be
 	 * maliciously manipulated.  We must therefore always use the
 	 * alternative stack.  We are also therefore unable to tell whether we
@@ -564,15 +559,11 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 #endif
 	/* XXXRW: sf.sf_uc.uc_mcontext.sr seems never to be set? */
 	sf.sf_uc.uc_mcontext.cause = regs->cause;
-	cheri_trapframe_to_cheriframe(&td->td_pcb->pcb_regs,
+	cheri_trapframe_to_cheriframe(regs,
 	    &sf.sf_uc.uc_mcontext.mc_cheriframe);
 
 	/*
-	 * Allocate and validate space for the signal handler context.  For
-	 * CheriABI purposes, 'sp' from this point forward is relocated
-	 * relative to any pertinent stack capability.  For an alternative
-	 * signal context, we need to recalculate stackbase for later use in
-	 * calculating a new $sp for the signal-handling context.
+	 * Allocate and validate space for the signal handler context.
 	 *
 	 * XXXRW: It seems like it would be nice to both the regular and
 	 * alternative stack calculations in the same place.  However, we need
@@ -580,8 +571,7 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !oonstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		stackbase = (vm_offset_t)td->td_sigstk.ss_sp;
-		sp = (vm_offset_t)(stackbase + td->td_sigstk.ss_size);
+		csp = (intptr_t)csigp->csig_csp;
 	} else {
 		/*
 		 * Signals delivered when a CHERI sandbox is present must be
@@ -598,12 +588,12 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 			sigexit(td, SIGILL);
 			/* NOTREACHED */
 		}
-		sp = (vm_offset_t)(stackbase + regs->sp);
+		csp = (intptr_t)regs->csp;
 	}
-	sp -= sizeof(struct sigframe_c);
+	csp -= sizeof(struct sigframe_c);
 	/* For CHERI, keep the stack pointer capability aligned. */
-	sp &= ~(CHERICAP_SIZE - 1);
-	sfp = (void *)sp;
+	csp &= ~(CHERICAP_SIZE - 1);
+	sfp = (void *)csp;
 
 	/* Build the argument list for the signal handler. */
 	regs->a0 = sig;
@@ -660,8 +650,11 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 	/*
 	 * Copy the sigframe out to the user's stack.
+	 *
+	 * XXXRW: Should copy out using the user capability, so as to receive
+	 * permission/bounds faults.
 	 */
-	if (copyoutcap(&sf, (void *)sfp, sizeof(sf)) != 0) {
+	if (copyoutcap(&sf, (void *)(vaddr_t)sfp, sizeof(sf)) != 0) {
 		/*
 		 * Something is wrong with the stack pointer.
 		 * ...Kill the process.
@@ -685,18 +678,17 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 * Install CHERI signal-delivery register state for handler to run
 	 * in.  As we don't install this in the CHERI frame on the user stack,
 	 * it will be (generally) be removed automatically on sigreturn().
-	 */
-	/* XXX-BD: this isn't quite right */
-	cheri_sendsig(td);
-
-	/*
-	 * Note that $sp must be installed relative to $csp, so re-subtract
-	 * the stack base here.
+	 *
+	 * XXXRW: Seems awkward to set both $pc and $pcc here .. and to
+	 * different things.
 	 */
 	regs->pc = (register_t)(intptr_t)catcher;
-	regs->sp = (register_t)((intptr_t)sfp - stackbase);
+	regs->csp = (__cheri_cast void * __capability)(void*)sfp;
 	regs->c12 = psp->ps_sigcap[_SIG_IDX(sig)];
 	regs->c17 = td->td_pcb->pcb_cherisignal.csig_sigcode;
+	regs->ddc = csigp->csig_ddc;
+	regs->idc = csigp->csig_idc;
+	regs->pcc = csigp->csig_pcc;
 }
 
 static void
@@ -858,9 +850,8 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	    MIPS_SR_PX | MIPS_SR_UX | MIPS_SR_KX | MIPS_SR_COP_2_BIT;
 
 	/*
-	 * XXXRW: For now, initialise $ddc and $idc to almost the full address
-	 * space, but in the future these will be restricted (or not set at
-	 * all).
+	 * XXXRW: For now, initialise $ddc and $idc to the full address space,
+	 * but in the future these will be restricted (or not set at all).
 	 */
 	frame = &td->td_pcb->pcb_regs;
 	cheriabi_capability_set_user_ddc(&frame->ddc, text_end);
@@ -890,12 +881,29 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	    auxv, imgp->auxarg_size * 2 * sizeof(void * __capability), 0);
 
 	/*
+	 * Restrict the stack capability to the maximum region allowed for
+	 * this process and adjust sp accordingly.
+	 *
+	 * XXXBD: 8MB should be the process stack limit.
+	 */
+	CTASSERT(CHERI_CAP_USER_DATA_BASE == 0);
+	stackbase = USRSTACK - (1024 * 1024 * 8);
+	KASSERT(stack > stackbase,
+	    ("top of stack 0x%lx is below stack base 0x%lx", stack, stackbase));
+	stacklen = stack - stackbase;
+	cheri_capability_set(&td->td_frame->csp, CHERI_CAP_USER_DATA_PERMS,
+	    stackbase, stacklen, stacklen);
+
+	/*
 	 * Update privileged signal-delivery environment for actual stack.
+	 *
+	 * XXXRW: Not entirely clear whether we want an offset of 'stacklen'
+	 * for csig_csp here.  Maybe we don't want to use csig_csp at all?
+	 * Possibly csig_csp should default to NULL...?
 	 */
 	csigp = &td->td_pcb->pcb_cherisignal;
 	csigp->csig_csp = td->td_frame->csp;
 	csigp->csig_default_stack = csigp->csig_csp;
-	/* XXX: set sp for signal stack! */
 
 	td->td_md.md_flags &= ~MDTD_FPUSED;
 	if (PCPU_GET(fpcurthread) == td)
@@ -946,16 +954,18 @@ cheriabi_set_threadregs(struct thread *td, struct thr_param_c *param)
 	 * We don't perform validation on the new pcc or stack capabilities
 	 * and just let the caller fail on return if they are bogus.
 	 */
-	frame->csp = param->stack_base;
-	td->td_frame->sp = param->stack_size;
+	frame->csp = param->stack_base + param->stack_size;
 
 	/*
 	 * Update privileged signal-delivery environment for actual stack.
+	 *
+	 * XXXRW: Not entirely clear whether we want an offset of 'stacklen'
+	 * for csig_csp here.  Maybe we don't want to use csig_csp at all?
+	 * Possibly csig_csp should default to NULL...?
 	 */
 	csigp = &td->td_pcb->pcb_cherisignal;
 	csigp->csig_csp = td->td_frame->csp;
 	csigp->csig_default_stack = csigp->csig_csp;
-	/* XXX: set sp for signal stack! */
 }
 
 /*

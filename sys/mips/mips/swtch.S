@@ -809,9 +809,9 @@ szsigcode32:
 #ifdef COMPAT_CHERIABI
 	.globl	_C_LABEL(cheri_sigcode)
 _C_LABEL(cheri_sigcode):
-	PTR_ADDU	a0, sp, SIGF_C_UC	# address of ucontext
-	csetoffset	$c3, $c11, a0
-	li		v0, SYS_sigreturn
+	dli		t0, SIGF_C_UC
+	cincoffset	$c3, $c11, t0		# In the hybrid ABI named $c11,
+	li		v0, SYS_sigreturn	# but we really mean $csp.
 # sigreturn (ucp)
 	syscall
 	break	0				# just in case sigreturn fails

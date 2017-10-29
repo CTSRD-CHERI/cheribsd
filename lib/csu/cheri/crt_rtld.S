@@ -59,13 +59,9 @@ __rtld_vector:
 
 	#
 	# Set up the in-sandbox stack: a stack capability has been left for us
-	# by the run-time.  For now, we assume that $sp is the length (i.e.,
-	# that $c11.offset == 0), but eventually we will presumably use only
-	# $c11 and can leave $sp alone.
+	# by the runtime.
 	#
-	clc	$c11, $t0, 32 + 3*CHERICAP_SIZE($c26)
-	cgetlen	$sp, $c11
-	move	$fp, $sp
+	clc	$csp, $t0, 32 + 3*CHERICAP_SIZE($c26)
 
 	#
 	# The compiler is responsible for scrubbing unused argument registers
@@ -75,6 +71,8 @@ __rtld_vector:
 
 	#
 	# Set up global pointer.
+	#
+	# XXXRW: Should this now be setting $cgp?
 	#
 	dla	$gp, _gp
 

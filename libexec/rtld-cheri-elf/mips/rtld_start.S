@@ -40,7 +40,15 @@
 .option pic0
 
 
-#define	PTR_SIZE	32
+/*
+ * NB: Use CHERICAP_SIZE to hold relocbase to retain stack alignment
+ */
+
+#define	SFRAME_SIZE		(4*CHERICAP_SIZE)
+#define	SFRAME_AUXARGS		(3*CHERICAP_SIZE)
+#define	SFRAME_OBJP		(2*CHERICAP_SIZE)
+#define	SFRAME_CLEANUP		(1*CHERICAP_SIZE)
+#define	SFRAME_RELOCBASE	(0*CHERICAP_SIZE)
 
 /*
  *      c3      auxargs pointer
@@ -49,32 +57,19 @@ LEAF(rtld_start)
 	/*
 	 * XXX: Assume the kernel aligned the stack correctly.
 	 */
-	/*
-	 * NB: Use 32 to retain stack alignment
-	 *
-	 * XXX-BD: this is all zeros...
-	 */
-	daddiu		sp, sp, -32
-	csd		gp, sp, 0($c11)
-	csd		s8, sp, 8($c11)
-	csd		ra, sp, 16($c11)
-			/* 24($c11) relocbase */
-
-	daddiu		sp, sp, -4*CHERICAP_SIZE
-			/* 0*CHERICAP_SIZE($c11) atexit */
-			/* 1*CHERICAP_SIZE($c11) obj_main */
-	csc		$c3, sp, 2*CHERICAP_SIZE($c11)
-	csc		$c17, sp, 3*CHERICAP_SIZE($c11)
+	dli		sp, -SFRAME_SIZE
+	cincoffset	$c11, $c11, sp
+	csc		$c3, zero, SFRAME_AUXARGS($c11)
 
 	SETUP_GP64(s4, rtld_start)
 
-	move		s8, sp
+	cmove		$c24, $c11
 
 	dla		a0, 1f
 1:	cgetpcc		$c12
 	cgetoffset	a1, $c12
 	dsubu		a1, a1, a0
-	csd		a1, sp, 24($c11)
+	csd		a1, zero, SFRAME_RELOCBASE($c11)
 	cgetdefault	$c4
 	csetoffset	$c4, $c4, a1	/* relocbase */
 
@@ -88,16 +83,16 @@ LEAF(rtld_start)
 	cjalr		$c12, $c17
 	nop
 
-	clc		$c3, sp, 2*CHERICAP_SIZE($c11)	/* auxargs */
+	clc		$c3, zero, SFRAME_AUXARGS($c11)
 	/* XXX-BD: Should allocate cleanup and objp outside stack. */
-	dla		t1, CHERICAP_SIZE
-	daddi		t0, sp, 0*CHERICAP_SIZE
-	csetoffset	$c4, $c11, t0			/* &cleanup */
+	dli		t1, CHERICAP_SIZE
+	dli		t0, SFRAME_CLEANUP
+	cincoffset	$c4, $c11, t0			/* &cleanup */
 	csetbounds	$c4, $c4, t1
-	daddi		t0, sp, 1*CHERICAP_SIZE
-	csetoffset	$c5, $c11, t0			/* &objp */
+	dli		t0, SFRAME_OBJP
+	cincoffset	$c5, $c11, t0			/* &objp */
 	csetbounds	$c5, $c5, t1
-	cld		t0, sp, 24($c11)	/* relocbase */
+	cld		t0, zero, SFRAME_RELOCBASE($c11)
 	dla		t9, _C_LABEL(_rtld)
 	daddu		t0, t0, t9
 	cgetpcc		$c12
@@ -106,9 +101,9 @@ LEAF(rtld_start)
 	nop
 
 	cmove		$c12, $c3
-	clc		$c3, sp, 2*CHERICAP_SIZE($c11)	/* auxargs */
-	clc		$c4, sp, 0*CHERICAP_SIZE($c11)	/* cleanup */
-	clc		$c5, sp, 1*CHERICAP_SIZE($c11)	/* objp */
+	clc		$c3, zero, SFRAME_AUXARGS($c11)
+	clc		$c4, zero, SFRAME_CLEANUP($c11)
+	clc		$c5, zero, SFRAME_OBJP($c11)
 
 	cmove		$c17, $c12 /* return == PCC signals backtrace routine to stop */
 	cjr		$c12
@@ -143,30 +138,31 @@ END(rtld_start)
 _rtld_bind_start:
 	.frame	sp, XCALLFRAME_SIZ, $15
 	move	v1, gp			/* save old GP */
-	PTR_SUBU sp, XCALLFRAME_SIZ	/* save arguments and sp value in stack */
+	dli	sp, -XCALLFRAME_SIZ
+	cincoffset $c11, $c11, sp	/* save arguments and sp value in stack */
 	//SETUP_GP64(XCALLFRAME_GP, _rtld_bind_start)
-	csd	gp,  sp, XCALLFRAME_GP($c11)
-	csd	a0,  sp, XCALLFRAME_A0($c11)
-	csd	a1,  sp, XCALLFRAME_A1($c11)
-	csd	a2,  sp, XCALLFRAME_A2($c11)
-	csd	a3,  sp, XCALLFRAME_A3($c11)
-	csd	a4,  sp, XCALLFRAME_A4($c11)
-	csd	a5,  sp, XCALLFRAME_A5($c11)
-	csd	a6,  sp, XCALLFRAME_A6($c11)
-	csd	a7,  sp, XCALLFRAME_A7($c11)
-	csd	$15, sp, XCALLFRAME_RA($c11)	/* ra is in t7/t3 */
-	csd	s0,  sp, XCALLFRAME_S0($c11)
+	csd	gp,  zero, XCALLFRAME_GP($c11)
+	csd	a0,  zero, XCALLFRAME_A0($c11)
+	csd	a1,  zero, XCALLFRAME_A1($c11)
+	csd	a2,  zero, XCALLFRAME_A2($c11)
+	csd	a3,  zero, XCALLFRAME_A3($c11)
+	csd	a4,  zero, XCALLFRAME_A4($c11)
+	csd	a5,  zero, XCALLFRAME_A5($c11)
+	csd	a6,  zero, XCALLFRAME_A6($c11)
+	csd	a7,  zero, XCALLFRAME_A7($c11)
+	csd	$15, zero, XCALLFRAME_RA($c11)	/* ra is in t7/t3 */
+	csd	s0,  zero, XCALLFRAME_S0($c11)
 	/* XXX-BD: What about ccall functions?  Do we need v0, c1, c2? */
-	csc	$c3, sp, XCALLFRAME_C3($c11)
-	csc	$c4, sp, XCALLFRAME_C4($c11)
-	csc	$c5, sp, XCALLFRAME_C5($c11)
-	csc	$c6, sp, XCALLFRAME_C6($c11)
-	csc	$c7, sp, XCALLFRAME_C7($c11)
-	csc	$c8, sp, XCALLFRAME_C8($c11)
-	csc	$c9, sp, XCALLFRAME_C9($c11)
-	csc	$c10, sp, XCALLFRAME_C10($c11)
-	csc	$c17, sp, XCALLFRAME_C17($c11)
-	move	s0, sp
+	csc	$c3, zero, XCALLFRAME_C3($c11)
+	csc	$c4, zero, XCALLFRAME_C4($c11)
+	csc	$c5, zero, XCALLFRAME_C5($c11)
+	csc	$c6, zero, XCALLFRAME_C6($c11)
+	csc	$c7, zero, XCALLFRAME_C7($c11)
+	csc	$c8, zero, XCALLFRAME_C8($c11)
+	csc	$c9, zero, XCALLFRAME_C9($c11)
+	csc	$c10, zero, XCALLFRAME_C10($c11)
+	csc	$c17, zero, XCALLFRAME_C17($c11)
+	cmove	$c24, $c11
 
 	move	a0, v1			/* old GP */
 	PTR_SUBU	a0, a0, 0x7ff0	/* The offset of $gp from the	*/
@@ -193,29 +189,29 @@ _rtld_bind_start:
 	nop
 	cgetpccsetoffset $c12, v0
 
-	move	sp, s0
-	clc	$c17, sp, XCALLFRAME_C17($c11)
-	clc	$c10, sp, XCALLFRAME_C10($c11)
-	clc	$c9, sp, XCALLFRAME_C9($c11)
-	clc	$c8, sp, XCALLFRAME_C8($c11)
-	clc	$c7, sp, XCALLFRAME_C7($c11)
-	clc	$c6, sp, XCALLFRAME_C6($c11)
-	clc	$c5, sp, XCALLFRAME_C5($c11)
-	clc	$c4, sp, XCALLFRAME_C4($c11)
-	clc	$c3, sp, XCALLFRAME_C3($c11)
-	cld	ra, sp, XCALLFRAME_RA($c11)
-	cld	s0, sp, XCALLFRAME_S0($c11)
-	cld	a0, sp, XCALLFRAME_A0($c11)
-	cld	a1, sp, XCALLFRAME_A1($c11)
-	cld	a2, sp, XCALLFRAME_A2($c11)
-	cld	a3, sp, XCALLFRAME_A3($c11)
-	cld	a4, sp, XCALLFRAME_A4($c11)
-	cld	a5, sp, XCALLFRAME_A5($c11)
-	cld	a6, sp, XCALLFRAME_A6($c11)
-	cld	a7, sp, XCALLFRAME_A7($c11)
-	cld	gp, sp, XCALLFRAME_GP($c11)
+	cmove	$c11, $c24
+	clc	$c17, zero, XCALLFRAME_C17($c11)
+	clc	$c10, zero, XCALLFRAME_C10($c11)
+	clc	$c9, zero, XCALLFRAME_C9($c11)
+	clc	$c8, zero, XCALLFRAME_C8($c11)
+	clc	$c7, zero, XCALLFRAME_C7($c11)
+	clc	$c6, zero, XCALLFRAME_C6($c11)
+	clc	$c5, zero, XCALLFRAME_C5($c11)
+	clc	$c4, zero, XCALLFRAME_C4($c11)
+	clc	$c3, zero, XCALLFRAME_C3($c11)
+	cld	ra, zero, XCALLFRAME_RA($c11)
+	cld	s0, zero, XCALLFRAME_S0($c11)
+	cld	a0, zero, XCALLFRAME_A0($c11)
+	cld	a1, zero, XCALLFRAME_A1($c11)
+	cld	a2, zero, XCALLFRAME_A2($c11)
+	cld	a3, zero, XCALLFRAME_A3($c11)
+	cld	a4, zero, XCALLFRAME_A4($c11)
+	cld	a5, zero, XCALLFRAME_A5($c11)
+	cld	a6, zero, XCALLFRAME_A6($c11)
+	cld	a7, zero, XCALLFRAME_A7($c11)
+	cld	gp, zero, XCALLFRAME_GP($c11)
 	//RESTORE_GP64
-	PTR_ADDU sp, XCALLFRAME_SIZ
+	dli	sp, XCALLFRAME_SIZ
 	cjr	$c12
-	nop
+	cincoffset $c11, $c11, sp
 END(_rtld_bind_start)

@@ -214,6 +214,9 @@
 	(CHERI_PERMS_KERNEL | CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |	\
 	CHERI_PERM_STORE_LOCAL_CAP)
 
+#define	CHERI_PERMS_KERNEL_SEALCAP					\
+	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL)
+
 /*
  * The CHERI object-type space is split between userspace and kernel,
  * permitting kernel object references to be delegated to userspace (if
@@ -285,6 +288,15 @@
 #define	CHERI_SEALCAP_USERSPACE_LENGTH	\
     (CHERI_OTYPE_USER_MAX - CHERI_OTYPE_USER_MIN + 1)
 #define	CHERI_SEALCAP_USERSPACE_OFFSET	0x0
+
+/*
+ * Root sealing capability for kernel managed objects.
+ */
+#define	CHERI_SEALCAP_KERNEL_PERMS	CHERI_PERMS_KERNEL_SEALCAP
+#define CHERI_SEALCAP_KERNEL_BASE	CHERI_OTYPE_KERN_MIN
+#define	CHERI_SEALCAP_KERNEL_LENGTH	\
+    (CHERI_OTYPE_KERN_MAX - CHERI_OTYPE_KERN_MIN + 1)
+#define	CHERI_SEALCAP_KERNEL_OFFSET	0x0
 
 /*
  * A blend of hardware and software allocation of capability registers.

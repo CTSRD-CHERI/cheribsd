@@ -4,6 +4,8 @@
 PACKAGE=runtime
 PROG=	md5
 
+CHERI_NO_SHARED=	fails
+
 LINKS=	${BINDIR}/md5 ${BINDIR}/rmd160 \
 	${BINDIR}/md5 ${BINDIR}/sha1 \
 	${BINDIR}/md5 ${BINDIR}/sha256 \

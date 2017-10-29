@@ -128,11 +128,11 @@ void	cheri_newthread_setregs(struct thread *td, u_long entry_addr);
 int	cheri_syscall_authorize(struct thread *td, u_int code,
 	    int nargs, syscallarg_t *args);
 int	cheri_signal_sandboxed(struct thread *td);
-void	cheri_sendsig(struct thread *td);
 void	cheri_trapframe_from_cheriframe(struct trapframe *frame,
 	    struct cheri_frame *cfp);
 void	cheri_trapframe_to_cheriframe(struct trapframe *frame,
 	    struct cheri_frame *cfp);
+void	hybridabi_sendsig(struct thread *td);
 
 /*
  * Functions to set up and manipulate CHERI contexts and stacks.
@@ -148,6 +148,12 @@ int	cheri_stack_unwind(struct thread *td, struct trapframe *tf,
 int	cheri_sysarch_getsealcap(struct thread *td, struct sysarch_args *uap);
 int	cheri_sysarch_getstack(struct thread *td, struct sysarch_args *uap);
 int	cheri_sysarch_setstack(struct thread *td, struct sysarch_args *uap);
+
+/*
+ * Functions to manage object types.
+ */
+otype_t	cheri_otype_alloc(void);
+void	cheri_otype_free(otype_t);
 
 /*
  * Global sysctl definitions.

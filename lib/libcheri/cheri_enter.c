@@ -54,19 +54,31 @@
 /*
  * This file implements a stack landing pad for CHERI system classes provided
  * by libcheri.  The single stack is statically allocated -- meaning no
- * concurrent invocation from sandboxes.  Currently, that is ensured by virtue
- * of applications not themselves invoking sandboxes concurrently.
+ * concurrent invocation from sandboxes in multiple threads (or reentrantly).
+ * Currently, that is ensured by virtue of applications not themselves
+ * invoking sandboxes concurrently.
  */
 
 /*
- * Stack for use on entering from sandbox.
+ * Stack for use on entering from sandbox, supporting both hybrid ABI (in
+ * which the stack capability is combined with $sp) and pure-capability ABI
+ * (in which only the stack capability is used).
  */
-extern __capability void	*__cheri_enter_stack_cap;
-extern register_t		 __cheri_enter_stack_sp;
+#ifdef __CHERI_PURE_CAPABILITY__
+extern __capability void	*__cheri_enter_stack_csp; /* Pure cap. */
+#else
+extern __capability void	*__cheri_enter_stack_cap; /* Hybrid cap. */
+extern register_t		 __cheri_enter_stack_sp;  /* Hybrid cap. */
+#endif
+
 #define	CHERI_ENTER_STACK_SIZE	(PAGE_SIZE * 16)
-static void		*__cheri_enter_stack;
-__capability void	*__cheri_enter_stack_cap;
-register_t		 __cheri_enter_stack_sp;
+static void		*__cheri_enter_stack;		/* Stack itself. */
+#ifdef __CHERI_PURE_CAPABILITY__
+__capability void	*__cheri_enter_stack_csp;	/* Pure cap. */
+#else
+__capability void	*__cheri_enter_stack_cap;	/* Hybrid cap. */
+register_t		 __cheri_enter_stack_sp;	/* Hubrid cap. */
+#endif
 
 /*
  * Return capability to use from system objects.
@@ -87,11 +99,11 @@ cheri_enter_init(void)
 
 	/*
 	 * In CheriABI, we use the capability returned by mmap(2), which $sp
-	 * will be relative to.  Otherwise, use $c0 and assume a global $sp.
+	 * will be relative to, and implement solely $csp.  Otherwise, assume
+	 * a global $sp and use $c0.
 	 */
 #ifdef __CHERI_PURE_CAPABILITY__
-	__cheri_enter_stack_cap = __cheri_enter_stack;
-	__cheri_enter_stack_sp = CHERI_ENTER_STACK_SIZE;
+	__cheri_enter_stack_csp = __cheri_enter_stack + CHERI_ENTER_STACK_SIZE;
 #else
 	__cheri_enter_stack_cap = cheri_getdefault();
 	__cheri_enter_stack_sp = (register_t)((char *)__cheri_enter_stack +

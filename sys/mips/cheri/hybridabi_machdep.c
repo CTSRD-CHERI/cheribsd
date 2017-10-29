@@ -189,3 +189,25 @@ hybridabi_exec_setregs(struct thread *td, unsigned long entry_addr)
 
 	hybridabi_thread_init(td, entry_addr);
 }
+
+/*
+ * Configure CHERI register state for a thread about to resume in a signal
+ * handler.  Eventually, csigp should contain configurable values, but for
+ * now, this ensures handlers run with ambient authority in a useful way.
+ * Note that this doesn't touch the already copied-out CHERI register frame
+ * (see sendsig()), and hence when sigreturn() is called, the previous CHERI
+ * state will be restored by default.
+ */
+void
+hybridabi_sendsig(struct thread *td)
+{
+	struct trapframe *frame;
+	struct cheri_signal *csigp;
+
+	frame = &td->td_pcb->pcb_regs;
+	csigp = &td->td_pcb->pcb_cherisignal;
+	frame->ddc = csigp->csig_ddc;
+	frame->csp = csigp->csig_csp;
+	frame->idc = csigp->csig_idc;
+	frame->pcc = csigp->csig_pcc;
+}

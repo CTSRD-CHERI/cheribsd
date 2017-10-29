@@ -43,9 +43,13 @@
  * differences from sandboxed code, including how $c0 is handled, and not
  * setting up the C heap.
  *
- * Temporary ABI conventions:
+ * Temporary ABI conventions for the hybrid ABI:
  *    $sp contains a pointer to the top of the stack; capability aligned
  *    $fp contains a pointer to the top of the stack; capability aligned
+ *
+ *    Or for the pure-capability ABI:
+ *
+ *    $csp contains a pointer to the top of the stack; capability aligned
  *
  *    $a0-$a7 contain user arguments
  *    $v0, $v1 contain user return values
@@ -56,7 +60,8 @@
  *    $c3-$c10 contain user capability arguments
  *
  *    $c26 contains the invoked data capability installed by CCall; unlike
- *      sandboxed versions of this code, this points at the sandbox_object.
+ *      sandboxed versions of this code, this points at the sandbox_object,
+ *      which a suitable $ddc can be loaded from.
  *
  * For now, assume:
  * (1) The caller has not set up the general-purpose register context, that's
@@ -64,6 +69,66 @@
  * (2) That there is no concurrent sandbox use -- we have a single stack on
  *     the inbound path, which can't be the long-term solution.
  */
+
+#ifdef __CHERI_PURE_CAPABILITY__
+
+#define	CHERI_CLASS_ASM(class)						\
+	.text;								\
+	.option pic0;							\
+	.global __cheri_ ## class ## _entry;				\
+	.type __cheri_ ## class ## _entry,@function;			\
+	.ent __cheri_ ## class ## _entry;				\
+__cheri_ ## class ## _entry:						\
+									\
+	/*								\
+	 * Load sandbox object's DDC via IDC.				\
+	 */								\
+	clc	$c12, zero, (4*CHERICAP_SIZE)($c26);			\
+	csetdefault	$c12;						\
+									\
+	/*								\
+	 * Install global invocation stack.  NB: this means we can't	\
+	 * support recursion or concurrency.  Further note: this is	\
+	 * shared by all classes outside of the sandbox.		\
+	 */								\
+	dla	$t0, __cheri_enter_stack_csp;				\
+	clc	$csp, $t0, 0($c12);					\
+									\
+	/*								\
+	 * Set up global pointer.					\
+	 */								\
+	dla	$gp, _gp;						\
+									\
+	/*								\
+	 * The fourth entry of $idc is a method vtable.  If it is a	\
+	 * valid capability, then load the address at offset $v0	\
+	 * rather than using the "enter" functions.			\
+	 */								\
+	clc	$c12, zero, (3*CHERICAP_SIZE)($c26);			\
+	cld	$t9, $v0, 0($c12);					\
+	dla	$ra, 0f;						\
+	cgetpcc	$c12;							\
+	csetoffset	$c12, $c12, $t9;				\
+	cjalr	$c12, $c17;						\
+	nop;			/* Branch-delay slot */			\
+									\
+0:									\
+	/*								\
+	 * Return to caller - load creturn capability from		\
+	 * __cheri_object_creturn into $c1, $c2, and then ccall.	\
+	 */								\
+	dla	$t0, __cheri_object_creturn;				\
+	cgetdefault	$c2;						\
+	clc	$c1, $t0, 0($c2);					\
+	clc	$c2, $t0, CHERICAP_SIZE($c2);				\
+	ccall	$c1, $c2, 1;						\
+	nop;								\
+									\
+$__cheri_ ## class ## _entry_end:					\
+	.end __cheri_## class ## _entry;				\
+	.size __cheri_ ## class ## _entry,$__cheri_ ## class ## _entry_end - __cheri_ ## class ## _entry
+
+#else /* !__CHERI_PURE_CAPABILITY__ */
 
 #define	CHERI_CLASS_ASM(class)						\
 	.text;								\
@@ -123,6 +188,8 @@ __cheri_ ## class ## _entry:						\
 $__cheri_ ## class ## _entry_end:					\
 	.end __cheri_## class ## _entry;				\
 	.size __cheri_ ## class ## _entry,$__cheri_ ## class ## _entry_end - __cheri_ ## class ## _entry
+
+#endif /* !__CHERI_PURE_CAPABILITY__ */
 
 #define	CHERI_CLASS_DECL(class)						\
 	extern void (__cheri_## class ## _entry)(void);

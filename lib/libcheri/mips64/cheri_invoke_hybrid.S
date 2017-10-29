@@ -46,25 +46,20 @@
 # Calling conventions into cheri_invoke:
 #
 # Registers	Description
-# $c0		MIPS address space - saved
-# $c1, $c2	Invoked capabilities - passed through
-# $c3..$c10	Argument capabilities - passed through
-# $c11		Stack capability - saved, cleared by CCall
-# $c12..$c16	Caller-save capabilities - cleared by CCall
-# $c17..$c25	Callee-save capabilities - saved, cleared by CCall
-# $c26		IDC - saved, overwritten by CCall
+# $c0		MIPS address space
+# $c1, $c2	Invoked capabilities
+# $c3..$c10	Argument capabilities
+# $c11..$c16	Caller-save capabilities
+# $c17..$c26	Callee-save capabilities
 #
 # Calling conventions implemented by CCall:
 #
 # $c1		Invoked code capability
 # $c2		Invoked data capability
 # $c3..$c10	Argument capabilities; $c3 as return capability
-# $c11		Stack capability - saved by CCall
-# $c12..$c16	Cleared by CCall
-# $c17		Link register - restored as $pcc on return
-# $c18..$c26	Cleared by CCall
-#
-# Only $pcc and $c11 will be saved by the CCall implementation.
+# $c11..$c16	n/a
+# $c17..$c25	n/a
+# $c26		IDC
 #
 # XXXRW: Worries/TODO:
 #
@@ -84,24 +79,25 @@ cheri_invoke:
 	# 1. First, use the conventional stack to save as many caller-save
 	# general-purpose and capability registers as possible.
 	#
-	# 2. Produce a value for $idc that bundles these up suitable to
-	# bootstrap trestoration.  This will save the original $idc, $csp,
-	# $sp, and $c0.
+	# 2. Produce a value for $csp that bundles these up suitable to
+	# bootstrap restoration.  This will save the original $idc, $csp,
+	# $sp, and $ddc.
 	#
 	# Then after CReturn, reverse these steps by first unwrapping $idc,
 	# and then performing a more normal function return.
 	#
-	# The caller $idc will describe a stack fragment, which gives us a bit
+	# The caller $csp will describe a stack fragment, which gives us a bit
 	# of space to store useful things, such as $sp, that are otherwise
 	# quite hard to restore (for obvious reasons).
+	#
+	# NB: This is still required for the hybrid ABI, unlike the
+	# pure-capability ABI, because we need to save and restore $sp.
 	#
 	# Save callee-save general-purpose registers.
 	#
 	# Caller-save registers are: $s0..$s7, $gp, $sp, $s8 ($fp).
 	#
 	# Do also save $ra so that we can return properly.
-	#
-	# Don't save $sp as CCall will do that for us.
 	#
 	# NB: Use 96 rather than 88 for the stack to ensure 32-byte alignment
 	# for capabilities stored and loaded from it later.
@@ -157,8 +153,7 @@ cheri_invoke_bundle_idc:
 	csc		$c12, $sp, 1*CHERICAP_SIZE($c11)  # Default cap.
 	csc		$c11, $sp, 0*CHERICAP_SIZE($c11)  # CHERI stack cap.
 	cfromptr	$c11, $c11, $sp
-	dli		$t0, 3*CHERICAP_SIZE
-	CSetBounds	$c11, $c11, $t0
+	csetbounds	$c11, $c11, 3*CHERICAP_SIZE
 
 	#
 	# The compiler is responsible for scrubbing unused argument registers
@@ -172,13 +167,12 @@ cheri_invoke_bundle_idc:
 	# XXXRW: Do we want a CCall variant like CJALR that automatically
 	# builds the desired capability?
 	#
-	dla	$t0, cheri_invoke_ccall_linkaddr
-	CGetPCC	$c17
-	CSetOffset	$c17, $c17, $t0
+	dla		$t0, cheri_invoke_ccall_linkaddr
+	cgetpcc		$c17
+	csetoffset	$c17, $c17, $t0
 
 	#
-	# Invoke object capability.  CCall/CReturn will save and restore $sp
-	# and IDC, so we don't need to.
+	# Invoke object capability.  CCall/CReturn will save and restore $csp.
 	#
 cheri_invoke_ccall:
 	ccall	$c1, $c2, 1
@@ -298,5 +292,3 @@ set_cheri_errno:
 cherierrno:
 	.4byte	0                       # 0x0
 	.size	cherierrno, 4
-
-

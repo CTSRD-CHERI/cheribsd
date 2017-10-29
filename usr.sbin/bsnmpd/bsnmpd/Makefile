@@ -155,3 +155,7 @@ NO_WCAST_ALIGN=	yes
 WARNS?=		6
 
 .include <bsd.prog.mk>
+
+.if defined(LIBCHERI) || (${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 060000)
+CFLAGS+=-Wno-tautological-constant-compare
+.endif

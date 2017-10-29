@@ -131,7 +131,7 @@ bcopy(const void *src0, void *dst0, size_t length)
 #endif
 	size_t t;
 
-#if defined(MEMMOVE) || defined(BCOPY) || defined(CMEMMOVE)
+#if defined(MEMMOVE) || defined(BCOPY) || defined(CMEMMOVE) || defined(MEMMOVE_C)
 	const int handle_overlap = 1;
 #else
 	const int handle_overlap = 0;
@@ -235,7 +235,7 @@ bcopy(const void *src0, void *dst0, size_t length)
 				if ((t ^ (vaddr_t)dst) & pmask || length < psize)
 					t = length / wsize;
 				else
-					t = (psize - (t & pmask)) / wsize;
+					t = (t & pmask) / wsize;
 				if (t) {
 					length -= t*wsize;
 					dst -= t*wsize;

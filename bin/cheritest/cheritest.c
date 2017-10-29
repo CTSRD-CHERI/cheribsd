@@ -39,6 +39,7 @@
 
 #include <sys/param.h>
 #include <sys/mman.h>
+#include <sys/resource.h>
 #include <sys/sysctl.h>
 #include <sys/time.h>
 #include <sys/ucontext.h>
@@ -1640,6 +1641,7 @@ static int qtrace;
 static int sleep_after_test;
 static int unsandboxed_tests_only;
 static int verbose;
+static int coredump_enabled;
 
 static void
 usage(void)
@@ -1657,6 +1659,7 @@ usage(void)
 "options:\n"
 "    -f  -- Only include \"fast\" tests\n"
 #ifndef LIST_ONLY
+"    -c  -- Enable core dumps\n"
 "    -s  -- Sleep one second after each test\n"
 "    -q  -- Enable qemu tracing in test process\n"
 #endif
@@ -2148,6 +2151,7 @@ cheritest_run_test_name(const char *name)
 int
 main(int argc, char *argv[])
 {
+	struct rlimit rl;
 	int opt;
 	int glob = 0;
 #ifndef LIST_ONLY
@@ -2161,10 +2165,13 @@ main(int argc, char *argv[])
 	argc = xo_parse_args(argc, argv);
 	if (argc < 0)
 		errx(1, "xo_parse_args failed\n");
-	while ((opt = getopt(argc, argv, "afglqsuv")) != -1) {
+	while ((opt = getopt(argc, argv, "acfglqsuv")) != -1) {
 		switch (opt) {
 		case 'a':
 			run_all = 1;
+			break;
+		case 'c':
+			coredump_enabled = 1;
 			break;
 		case 'f':
 			fast_tests_only = 1;
@@ -2260,6 +2267,15 @@ main(int argc, char *argv[])
 		err(EX_OSERR, "mmap");
 	if (minherit(ccsp, getpagesize(), INHERIT_SHARE) < 0)
 		err(EX_OSERR, "minherit");
+
+	/*
+	 * Disable core dumps unless specifically enabled.
+	 */
+	if (!coredump_enabled) {
+		bzero(&rl, sizeof(rl));
+		if (setrlimit(RLIMIT_CORE, &rl) < 0)
+			err(EX_OSERR, "setrlimit");
+	}
 
 	/*
 	 * Initialise the libcheri sandboxing library.

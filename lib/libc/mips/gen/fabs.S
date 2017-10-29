@@ -53,6 +53,10 @@ __FBSDID("$FreeBSD$");
  * Return absolute value of x.
  */
 LEAF(fabs)
+#ifdef __CHERI_PURE_CAPABILITY__
+	cjr	$c17
+#else
 	j	ra
+#endif
 	abs.d	$f0, $f12		# compute absolute value of x
 END(fabs)
