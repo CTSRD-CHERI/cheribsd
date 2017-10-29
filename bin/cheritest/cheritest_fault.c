@@ -222,14 +222,10 @@ test_sandbox_cp2_bound_catch(const struct cheri_test *ctp __unused)
 void
 test_sandbox_cp2_bound_nocatch(const struct cheri_test *ctp __unused)
 {
-	register_t v;
 
 	signal_handler_clear(SIGPROT);
-	v = invoke_cap_fault(CHERITEST_HELPER_CAP_FAULT_CP2_BOUND);
-	if (v != -1)
-		cheritest_failure_errx("invoke returned %ld (expected %d)", v,
-		    -1);
-	cheritest_success();
+	invoke_cap_fault(CHERITEST_HELPER_CAP_FAULT_CP2_BOUND);
+	cheritest_failure_errx("invoke returned");
 }
 
 void
@@ -257,14 +253,10 @@ test_sandbox_cp2_perm_load_catch(const struct cheri_test *ctp __unused)
 void
 test_sandbox_cp2_perm_load_nocatch(const struct cheri_test *ctp __unused)
 {
-	register_t v;
 
 	signal_handler_clear(SIGPROT);
-	v = invoke_cap_fault(CHERITEST_HELPER_CAP_FAULT_CP2_PERM_LOAD);
-	if (v != -1)
-		cheritest_failure_errx("invoke returned %ld (expected %d)", v,
-		    -1);
-	cheritest_success();
+	invoke_cap_fault(CHERITEST_HELPER_CAP_FAULT_CP2_PERM_LOAD);
+	cheritest_failure_errx("invoke returned");
 }
 
 void
@@ -278,14 +270,10 @@ test_sandbox_cp2_perm_store_catch(const struct cheri_test *ctp __unused)
 void
 test_sandbox_cp2_perm_store_nocatch(const struct cheri_test *ctp __unused)
 {
-	register_t v;
 
 	signal_handler_clear(SIGPROT);
-	v = invoke_cap_fault(CHERITEST_HELPER_CAP_FAULT_CP2_PERM_STORE);
-	if (v != -1)
-		cheritest_failure_errx("invoke returned %ld (expected %d)", v,
-		    -1);
-	cheritest_success();
+	invoke_cap_fault(CHERITEST_HELPER_CAP_FAULT_CP2_PERM_STORE);
+	cheritest_failure_errx("invoke returned");
 }
 
 void
@@ -307,6 +295,7 @@ test_sandbox_cp2_tag_nocatch(const struct cheri_test *ctp __unused)
 		cheritest_failure_errx("invoke returned %ld (expected %d)", v,
 		    -1);
 	cheritest_success();
+	cheritest_failure_errx("invoke returned");
 }
 
 void
@@ -320,14 +309,10 @@ test_sandbox_cp2_seal_catch(const struct cheri_test *ctp __unused)
 void
 test_sandbox_cp2_seal_nocatch(const struct cheri_test *ctp __unused)
 {
-	register_t v;
 
 	signal_handler_clear(SIGPROT);
-	v = invoke_cap_fault(CHERITEST_HELPER_CAP_FAULT_CP2_SEAL);
-	if (v != -1)
-		cheritest_failure_errx("invoke returned %ld (expected %d)", v,
-		    -1);
-	cheritest_success();
+	invoke_cap_fault(CHERITEST_HELPER_CAP_FAULT_CP2_SEAL);
+	cheritest_failure_errx("invoke returned");
 }
 
 void
@@ -341,14 +326,10 @@ test_sandbox_divzero_catch(const struct cheri_test *ctp __unused)
 void
 test_sandbox_divzero_nocatch(const struct cheri_test *ctp __unused)
 {
-	register_t v;
 
 	signal_handler_clear(SIGEMT);
-	v = invoke_divzero();
-	if (v != -1)
-		cheritest_failure_errx("invoke returned %ld (expected %d)", v,
-		    -1);
-	cheritest_success();
+	invoke_divzero();
+	cheritest_failure_errx("invoke returned");
 }
 
 void
@@ -362,14 +343,10 @@ test_sandbox_vm_rfault_catch(const struct cheri_test *ctp __unused)
 void
 test_sandbox_vm_rfault_nocatch(const struct cheri_test *ctp __unused)
 {
-	register_t v;
 
 	signal_handler_clear(SIGSEGV);
-	v = invoke_vm_fault(CHERITEST_HELPER_VM_FAULT_RFAULT);
-	if (v != -1)
-		cheritest_failure_errx("invoke returned %ld (expected %d)", v,
-		    -1);
-	cheritest_success();
+	invoke_vm_fault(CHERITEST_HELPER_VM_FAULT_RFAULT);
+	cheritest_failure_errx("invoke returned");
 }
 
 void
@@ -383,14 +360,10 @@ test_sandbox_vm_wfault_catch(const struct cheri_test *ctp __unused)
 void
 test_sandbox_vm_wfault_nocatch(const struct cheri_test *ctp __unused)
 {
-	register_t v;
 
 	signal_handler_clear(SIGSEGV);
-	v = invoke_vm_fault(CHERITEST_HELPER_VM_FAULT_WFAULT);
-	if (v != -1)
-		cheritest_failure_errx("invoke returned %ld (expected %d)", v,
-		    -1);
-	cheritest_success();
+	invoke_vm_fault(CHERITEST_HELPER_VM_FAULT_WFAULT);
+	cheritest_failure_errx("invoke returned");
 }
 
 void
@@ -404,12 +377,8 @@ test_sandbox_vm_xfault_catch(const struct cheri_test *ctp __unused)
 void
 test_sandbox_vm_xfault_nocatch(const struct cheri_test *ctp __unused)
 {
-	register_t v;
 
 	signal_handler_clear(SIGSEGV);
-	v = invoke_vm_fault(CHERITEST_HELPER_VM_FAULT_XFAULT);
-	if (v != -1)
-		cheritest_failure_errx("invoke returned %ld (expected %d)", v,
-		    -1);
-	cheritest_success();
+	invoke_vm_fault(CHERITEST_HELPER_VM_FAULT_XFAULT);
+	cheritest_failure_errx("invoke returned");
 }
