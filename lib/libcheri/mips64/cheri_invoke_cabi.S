@@ -120,11 +120,9 @@ cheri_invoke_save_regs:
 	# Save capability registers we later need to restore (that won't be
 	# handled by CCall for us).
 	#
-	# XXXRW: Possibly with the __ccall calling convention, the compiler
-	# should be doing this?
-	#
 cheri_invoke_save_caps:
-	cincoffset	$csp, $csp, -10*CHERICAP_SIZE
+	cgetdefault	$c12
+	cincoffset	$csp, $csp, -11*CHERICAP_SIZE
 	csc	$c17, $zero, 0($csp)
 	csc	$c18, $zero, CHERICAP_SIZE($csp)
 	csc	$c19, $zero, 2*CHERICAP_SIZE($csp)
@@ -135,20 +133,7 @@ cheri_invoke_save_caps:
 	csc	$c24, $zero, 7*CHERICAP_SIZE($csp)
 	csc	$c25, $zero, 8*CHERICAP_SIZE($csp)
 	csc	$c26, $zero, 9*CHERICAP_SIZE($csp)
-
-	#
-	# Prepare $c11 to be saved (and restored) by CCall; don't need to seal
-	# as CCall will protect its integrity.  No more stack use after this
-	# point until $csp is restored.  Move $c0 through $c12 to avoid direct
-	# use.  (In contrast to the hybrid ABI, $sp is not saved/restored
-	# here.)
-	#
-cheri_invoke_bundle_idc:
-	cgetdefault	$c12
-	cincoffset	$csp, $csp, -2*CHERICAP_SIZE
-	csc		$c12, $zero, 1*CHERICAP_SIZE($csp)  # Default cap.
-	csc		$csp, $zero, 0*CHERICAP_SIZE($csp)  # CHERI stack cap.
-	csetbounds	$csp, $csp, 2*CHERICAP_SIZE
+	csc	$c12, $zero, 10*CHERICAP_SIZE($csp)
 
 	#
 	# The compiler is responsible for scrubbing unused argument registers
@@ -175,21 +160,7 @@ cheri_invoke_ccall:
 cheri_invoke_ccall_linkaddr:
 
 	#
-	# Restore $idc-saved recovery state; $idc must be restored last.  The
-	# stack is usable again after this.  Move $c0 through $c12 to avoid
-	# direct use.
-	#
-cheri_invoke_unbundle_idc:
-	clc		$c12, $zero, 1*CHERICAP_SIZE($csp)  # Default cap.
-	clc		$csp, $zero, 0*CHERICAP_SIZE($csp)  # CHERI stack cap.
-	cincoffset	$csp, $csp, 2*CHERICAP_SIZE
-	csetdefault	$c12
-
-	#
 	# Restore capability registers from stack.
-	#
-	# XXXRW: Possibly with the __ccall calling convention, the compiler
-	# should be doing this?
 	#
 cheri_invoke_restore_caps:
 	clc	$c17, $zero, 0($csp)
@@ -202,8 +173,12 @@ cheri_invoke_restore_caps:
 	clc	$c24, $zero, 7*CHERICAP_SIZE($csp)
 	clc	$c25, $zero, 8*CHERICAP_SIZE($csp)
 	clc	$c26, $zero, 9*CHERICAP_SIZE($csp)
+	clc	$c12, $zero, 10*CHERICAP_SIZE($csp)
+	csetdefault	$c12
+
+cheri_invoke_set_errno:
 	bnez	$a0, set_cheri_errno
-	cincoffset	$csp, $csp, 10*CHERICAP_SIZE
+	cincoffset	$csp, $csp, 11*CHERICAP_SIZE	# Branch-delay slot
 
 	#
 	# CCall has conservatively cleared all non-return-value registers, and

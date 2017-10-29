@@ -124,13 +124,11 @@ cheri_invoke_save_regs:
 	# Save capability registers we later need to restore (that won't be
 	# handled by CCall for us).
 	#
-	# XXXRW: Possibly with the __ccall calling convention, the compiler
-	# should be doing this?
-	#
 cheri_invoke_save_caps:
+	cgetdefault	$c11
 	daddiu	$sp, -10*CHERICAP_SIZE
 	csc	$c17, $sp, 0($c11)
-	csc	$c18, $sp, CHERICAP_SIZE($c11)
+	csc	$c18, $sp, 1*CHERICAP_SIZE($c11)
 	csc	$c19, $sp, 2*CHERICAP_SIZE($c11)
 	csc	$c20, $sp, 3*CHERICAP_SIZE($c11)
 	csc	$c21, $sp, 4*CHERICAP_SIZE($c11)
@@ -141,19 +139,10 @@ cheri_invoke_save_caps:
 	csc	$c26, $sp, 9*CHERICAP_SIZE($c11)
 
 	#
-	# Prepare $c11 to be saved (and restored) by CCall; don't need to seal
-	# as CCall will protect its integrity.  No more stack use after this
-	# point until $c11 and $sp are restored.  Move $c0 through $c12 to
-	# avoid direct use.
+	# Stash $sp in the offset of $c11 so that it will be saved and
+	# restored by CCall.
 	#
-cheri_invoke_bundle_idc:
-	cgetdefault	$c12
-	daddiu		$sp, -3*CHERICAP_SIZE
-	csd		$sp, $sp, 2*CHERICAP_SIZE($c11)	  # MIPS stack pointer
-	csc		$c12, $sp, 1*CHERICAP_SIZE($c11)  # Default cap.
-	csc		$c11, $sp, 0*CHERICAP_SIZE($c11)  # CHERI stack cap.
-	cfromptr	$c11, $c11, $sp
-	csetbounds	$c11, $c11, 3*CHERICAP_SIZE
+	csetoffset	$c11, $c11, $sp
 
 	#
 	# The compiler is responsible for scrubbing unused argument registers
@@ -180,26 +169,19 @@ cheri_invoke_ccall:
 cheri_invoke_ccall_linkaddr:
 
 	#
-	# Restore $idc-saved recovery state; $idc must be restored last.  The
-	# stack is usable again after this.  Move $c0 through $c12 to avoid
-	# direct use.
+	# Unstash $sp from offset of $c11; restore $c11 offset to zero and
+	# install as DDC.
 	#
-cheri_invoke_unbundle_idc:
-	cld		$sp, $zero, 2*CHERICAP_SIZE($c11) # MIPS stack pointer
-	clc		$c12, $zero, 1*CHERICAP_SIZE($c11)# Default cap.
-	clc		$c11, $zero, 0*CHERICAP_SIZE($c11)# CHERI stack cap.
-	daddiu		$sp, 3*CHERICAP_SIZE
-	csetdefault	$c12
+	cgetoffset	$sp, $c11
+	csetoffset	$c11, $c11, $zero
+	csetdefault	$c11
 
 	#
 	# Restore capability registers from stack.
 	#
-	# XXXRW: Possibly with the __ccall calling convention, the compiler
-	# should be doing this?
-	#
 cheri_invoke_restore_caps:
 	clc	$c17, $sp, 0($c11)
-	clc	$c18, $sp, CHERICAP_SIZE($c11)
+	clc	$c18, $sp, 1*CHERICAP_SIZE($c11)
 	clc	$c19, $sp, 2*CHERICAP_SIZE($c11)
 	clc	$c20, $sp, 3*CHERICAP_SIZE($c11)
 	clc	$c21, $sp, 4*CHERICAP_SIZE($c11)
@@ -208,8 +190,10 @@ cheri_invoke_restore_caps:
 	clc	$c24, $sp, 7*CHERICAP_SIZE($c11)
 	clc	$c25, $sp, 8*CHERICAP_SIZE($c11)
 	clc	$c26, $sp, 9*CHERICAP_SIZE($c11)
+
+cheri_invoke_set_errno:
 	bnez	$a0, set_cheri_errno
-	daddiu	$sp, 10*CHERICAP_SIZE
+	daddiu	$sp, 10*CHERICAP_SIZE		# Branch-delay slot
 
 	#
 	# CCall has conservatively cleared all non-return-value registers, and
@@ -217,9 +201,6 @@ cheri_invoke_restore_caps:
 
 	#
 	# Restore general-purpose registers from the stack.
-	#
-	# XXXRW: Possibly with the __ccall calling convention, the compiler
-	# should be doing this?
 	#
 cheri_invoke_restore_regs:
 	ld	$s0, 0($sp)
