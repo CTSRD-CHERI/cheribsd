@@ -42,6 +42,7 @@
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
+#include <cheri/cheri_ccall.h>
 #include <cheri/cheri_enter.h>
 #include <cheri/cheri_fd.h>
 #include <cheri/cheri_stack.h>
@@ -230,4 +231,23 @@ test_sandbox_setstack_nop(const struct cheri_test *ctp __unused)
 	if (v != CHERITEST_SETSTACK_CONSTANT)
 		cheritest_failure_errx("unexpected return value (%ld)", v);
 	cheritest_success();
+}
+
+/*
+ * Perform a return without a corresponding invocation, to underflow the
+ * trusted stack.
+ */
+void
+test_sandbox_trustedstack_underflow(const struct cheri_test *ctp __unused)
+{
+	struct cheri_object returncap;
+	__capability void *codecap asm ("$c1");
+	__capability void *datacap asm ("$c2");
+
+	returncap = cheri_make_sealed_return_object();
+	codecap = returncap.co_codecap;
+	datacap = returncap.co_datacap;
+	__asm__ __volatile__ ("ccall $c1, $c2, 1;" "nop" : : "C"(codecap),
+	    "C"(datacap));
+	cheritest_failure_errx("continued after attempted CReturn");
 }

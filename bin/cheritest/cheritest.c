@@ -1411,6 +1411,13 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_func = test_sandbox_setstack,
 	  .ct_flags = CT_FLAG_SANDBOX, },
 
+	{ .ct_name = "test_sandbox_trustedstack_underflow",
+	  .ct_desc = "Underflow trusted stack",
+	  .ct_func = test_sandbox_trustedstack_underflow,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE,
+	  .ct_signum = SIGEMT,
+	  .ct_mips_exccode = T_TRAP },
+
 	/*
 	 * Check various properties to do with global vs. local capabilities
 	 * passed into (and out of) sandboxes.

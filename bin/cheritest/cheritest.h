@@ -378,6 +378,7 @@ register_t	cheritest_libcheri_userfn_setstack(register_t arg);
 void	test_sandbox_getstack(const struct cheri_test *ctp);
 void	test_sandbox_setstack(const struct cheri_test *ctp);
 void	test_sandbox_setstack_nop(const struct cheri_test *ctp);
+void	test_sandbox_trustedstack_underflow(const struct cheri_test *ctp);
 
 /* cheritest_libcheri_var.c */
 void	test_sandbox_var_bss(const struct cheri_test *ctp);
