@@ -387,6 +387,10 @@ void	test_sandbox_var_data_getset(const struct cheri_test *ctp);
 void	test_2sandbox_var_data_getset(const struct cheri_test *ctp);
 void	test_sandbox_var_constructor(const struct cheri_test *ctp);
 
+/* cheritest_longjmp.c */
+void	cheritest_setjmp(const struct cheri_test *ctp);
+void	cheritest_setjmp_longjmp(const struct cheri_test *ctp);
+
 /* cheritest_sealcap.c */
 void	test_sealcap_sysarch(const struct cheri_test *ctp);
 

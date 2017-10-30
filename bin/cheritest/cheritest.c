@@ -1512,6 +1512,17 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	/*
+	 * Tests relating to setjmp(3) and longjmp(3).
+	 */
+	{ .ct_name = "cheritest_setjmp",
+	  .ct_desc = "Exercise setjmp without longjmp",
+	  .ct_func = cheritest_setjmp, },
+
+	{ .ct_name = "cheritest_setjmp_longjmp",
+	  .ct_desc = "Exercise setjmp with longjmp",
+	  .ct_func = cheritest_setjmp_longjmp, },
+
+	/*
 	 * Standard library string tests.
 	 */
 	{ .ct_name = "test_string_memcpy",

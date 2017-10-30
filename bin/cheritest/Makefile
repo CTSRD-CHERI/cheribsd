@@ -16,6 +16,7 @@ SRCS+=	cheritest_bounds_globals.c					\
 	cheritest_libcheri_local.c					\
 	cheritest_libcheri_trustedstack.c				\
 	cheritest_libcheri_var.c					\
+	cheritest_longjmp.c						\
 	cheritest_registers.c						\
 	cheritest_sandbox.S						\
 	cheritest_sealcap.c						\
