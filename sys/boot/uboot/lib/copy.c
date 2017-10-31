@@ -30,7 +30,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 
 #include <stand.h>
-#include <stdint.h>
+#include <sys/stdint.h>
 
 #include "api_public.h"
 #include "glue.h"
