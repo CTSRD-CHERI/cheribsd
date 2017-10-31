@@ -40,11 +40,12 @@ CXXFLAGS+=	-std=c++11
 .endif
 CXXFLAGS+=	-fno-rtti
 STATIC_CXXFLAGS+= -fvisibility=hidden -fPIC
+# Probably need to just move this earlier or use CXXFLAGS
 .if ${MK_DIRDEPS_BUILD} == "yes"
 # Avoid dependency on lib/libc++
 .if ${MK_CHERI} != "no"
-CFLAGS+=	-I${SRCTOP}/contrib/cheri-libc++/include
+CFLAGS+=	-isystem ${SRCTOP}/contrib/cheri-libc++/include -nostdinc++
 .else
-CFLAGS+=	-I${SRCTOP}/contrib/cheri-libc++/include
+CFLAGS+=	-isystem ${SRCTOP}/contrib/cheri-libc++/include -nostdinc++
 .endif
 .endif
