@@ -1245,7 +1245,7 @@ libcheribuildenv:
 
 TOOLCHAIN_TGTS=	${WMAKE_TGTS:Neverything:Nbuild${libcompat}:Nbuildcheri}
 toolchain: ${TOOLCHAIN_TGTS} .PHONY
-kernel-toolchain: ${TOOLCHAIN_TGTS:N_includes:N_libraries} .PHONY
+kernel-toolchain: ${TOOLCHAIN_TGTS:N_obj:N_cleanobj:N_includes:N_libraries} .PHONY
 
 BUILDSYSROOT_TGTS=	${WMAKE_TGTS:Neverything}
 
@@ -2250,6 +2250,12 @@ _rescue=rescue/rescue
 _tcsh=bin/csh
 .endif
 
+# kernel-toolchain skips _cleanobj, so handle cleaning up previous
+# build-tools directories if needed.
+.if !defined(NO_CLEAN) && make(kernel-toolchain)
+_bt_clean=	${CLEANDIR}
+.endif
+
 .for _tool in \
     ${_tcsh} \
     bin/sh \
@@ -2265,8 +2271,9 @@ _tcsh=bin/csh
     usr.bin/vi/catalog \
     ${_gcc_tools}
 build-tools_${_tool}: .PHONY
-	${_+_}@${ECHODIR} "===> ${_tool} (obj,build-tools)"; \
+	${_+_}@${ECHODIR} "===> ${_tool} (${_bt_clean:D${_bt_clean},}obj,build-tools)"; \
 		cd ${.CURDIR}/${_tool}; \
+		if [ -n "${_bt_clean}" ]; then ${MAKE} DIRPRFX=${_tool}/ ${_bt_clean}; fi; \
 		if [ -z "${NO_OBJ}" ]; then ${MAKE} DIRPRFX=${_tool}/ obj; fi; \
 		${MAKE} DIRPRFX=${_tool}/ build-tools
 build-tools: build-tools_${_tool}
