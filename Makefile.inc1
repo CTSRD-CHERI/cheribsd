@@ -910,6 +910,7 @@ _worldtmp: .PHONY
 	@echo "--------------------------------------------------------------"
 .if !defined(NO_CLEAN)
 	rm -rf ${WORLDTMP}
+	@mkdir -p ${WORLDTMP}
 .else
 .if exists(${WORLDTMP})
 	@echo ">>> Deleting stale files in build tree..."
@@ -926,6 +927,7 @@ _worldtmp: .PHONY
 .endfor
 .endif	# ${USING_SYSTEM_COMPILER} == "yes"
 .endif	# !defined(NO_CLEAN)
+	@touch ${WORLDTMP}/${.TARGET}
 
 .for _dir in \
     bin lib lib/casper usr legacy/bin legacy/usr
