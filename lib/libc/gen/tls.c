@@ -54,8 +54,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <elf.h>
+#include <unistd.h>
 
 #include "libc_private.h"
+
+#define	tls_assert(cond)	((cond) ? (void) 0 :			\
+    (tls_msg(#cond ": assert failed: " __FILE__ ":"			\
+      __XSTRING(__LINE__) "\n"), abort()))
+#define	tls_msg(s)		write(STDOUT_FILENO, s, strlen(s))
 
 __weak_reference(__libc_allocate_tls, _rtld_allocate_tls);
 __weak_reference(__libc_free_tls, _rtld_free_tls);
@@ -132,7 +138,7 @@ __libc_tls_get_addr(void *ti __unused)
  * Free Static TLS using the Variant I method.
  */
 void
-__libc_free_tls(void *tcb, size_t tcbsize, size_t tcbalign)
+__libc_free_tls(void *tcb, size_t tcbsize __unused, size_t tcbalign __unused)
 {
 	Elf_Addr *dtv;
 	Elf_Addr **tls;
@@ -144,11 +150,11 @@ __libc_free_tls(void *tcb, size_t tcbsize, size_t tcbalign)
 	tcbshift = roundup2(TLS_TCB_SIZE + tcbextra, tcbalign) -
 	    (TLS_TCB_SIZE + tcbextra);
 
-	tcb = (void *)((uintptr_t)tcb - tcbshift);
-	tls = (Elf_Addr **)((char *)tcb + tcbextra);
+	tls_free_aligned(tcb);
+	tls = (Elf_Addr **)tcb;
 	dtv = tls[0];
 	tls_free(dtv);
-	tls_free_aligned(tcb);
+	tls_free_aligned(tls);
 }
 
 /*
@@ -157,47 +163,48 @@ __libc_free_tls(void *tcb, size_t tcbsize, size_t tcbalign)
 void *
 __libc_allocate_tls(void *oldtcb, size_t tcbsize, size_t tcbalign)
 {
+	char *dtv2;
 	Elf_Addr *dtv;
 	Elf_Addr **tls;
-	char *dtv2;
-	char *tcb;
-	size_t tcballocsize, tcbextra, tcbshift;
 
 	if (oldtcb != NULL && tcbsize == TLS_TCB_SIZE)
 		return (oldtcb);
 
-	assert(tcbalign >= TLS_TCB_ALIGN);
-	assert(tcbsize >= TLS_TCB_SIZE);
-	tcbextra = tcbsize - TLS_TCB_SIZE;
-	tcbshift = roundup2(TLS_TCB_SIZE + tcbextra, tcbalign) -
-	    (TLS_TCB_SIZE + tcbextra);
-	tcballocsize = tls_static_space + tcbextra + tcbshift;
+	tls_assert(tcbalign >= TLS_TCB_ALIGN);
+	tls_assert(tcbsize == TLS_TCB_SIZE);
 
-	tcb = tls_malloc_aligned(tcballocsize, tcbalign);
-	memset(tcb, 0, tcballocsize);
-	tcb = (void *)((uintptr_t)tcb + tcbshift);
-	tls = (Elf_Addr **)(tcb + tcbextra);
+	tcbsize = roundup2(tcbsize, tcbalign);
+	tls = tls_malloc_aligned(tcbsize + tls_static_space, tcbalign);
+	if (tls == NULL) {
+		tls_msg("__libc_allocate_tls: Out of memory.\n");
+		abort();
+	}
+	memset(tls, 0, tcbsize + tls_static_space);
 
 	if (oldtcb != NULL) {
-		memcpy(tls, oldtcb, tls_static_space);
+		memcpy(tls, oldtcb, tcbsize + tls_static_space);
 		tls_free(oldtcb);
 
 		/* Adjust the DTV. */
 		dtv = tls[0];
-		dtv[2] = (Elf_Addr)tls + TLS_TCB_SIZE;
+		dtv[2] = (Elf_Addr)tls + tcbsize;
 	} else {
 		dtv = tls_malloc(3 * sizeof(Elf_Addr));
+		if (dtv == NULL) {
+			tls_msg("__libc_allocate_tls: Out of memory.\n");
+			abort();
+		}
 		tls[0] = dtv;
-		dtv[0] = 1;
-		dtv[1] = 1;
-		dtv2 = (char *)((intptr_t)tls + TLS_TCB_SIZE);
+		dtv[0] = 1;		/* Generation. */
+		dtv[1] = 1;		/* Segments count. */
+		dtv2 = (char *)tls + tcbsize;
 		dtv[2] = (Elf_Addr)dtv2;
 
 		if (tls_init_size > 0)
 			memcpy(dtv2, tls_init, tls_init_size);
 	}
 
-	return(tcb); 
+	return (tls);
 }
 
 #endif
@@ -225,7 +232,7 @@ __libc_free_tls(void *tcb, size_t tcbsize __unused, size_t tcbalign)
 	dtv = ((Elf_Addr**)tcb)[1];
 	tlsend = (Elf_Addr) tcb;
 	tlsstart = tlsend - size;
-	tls_free((void*) tlsstart);
+	tls_free_aligned((void*)tlsstart);
 	tls_free(dtv);
 }
 
@@ -245,7 +252,15 @@ __libc_allocate_tls(void *oldtls, size_t tcbsize, size_t tcbalign)
 	if (tcbsize < 2 * sizeof(Elf_Addr))
 		tcbsize = 2 * sizeof(Elf_Addr);
 	tls = tls_calloc(1, size + tcbsize);
+	if (tls == NULL) {
+		tls_msg("__libc_allocate_tls: Out of memory.\n");
+		abort();
+	}
 	dtv = tls_malloc(3 * sizeof(Elf_Addr));
+	if (dtv == NULL) {
+		tls_msg("__libc_allocate_tls: Out of memory.\n");
+		abort();
+	}
 
 	segbase = (Elf_Addr)(tls + size);
 	((Elf_Addr*)segbase)[0] = segbase;
@@ -361,13 +376,6 @@ _init_tls(void)
 			break;
 		}
 	}
-
-#ifdef TLS_VARIANT_I
-	/*
-	 * tls_static_space should include space for TLS structure
-	 */
-	tls_static_space += TLS_TCB_SIZE;
-#endif
 
 	tls = _rtld_allocate_tls(NULL, TLS_TCB_SIZE,
 	    MAX(TLS_TCB_ALIGN, tls_init_align));
