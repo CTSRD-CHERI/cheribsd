@@ -35,6 +35,8 @@
 #include <machine/cheriasm.h>
 #include <machine/cherireg.h>
 
+#include <cheri/cheri_errno.h>
+
 /*
  * Userspace implementation of libcheri invocation and return semantics.
  * These vectors are intended to run on the inside of sealed call and return
@@ -116,11 +118,119 @@
 libcheri_ccall_rtld_vector:
 
 libcheri_ccall_rtld_validate_args:
-	/* XXXRW: NOT YET */
+	/*
+	 * XXXRW: Although the CCall instruction validates many aspects of
+	 * arguments, it doesn't check that the ABI is conformed to.  We need
+	 * to check that $c1 and $c2 were used as operands, here, if we want
+	 * to later rely on having access to sealed capabilities -- and, in		 * particular, the corresponding object-type information.  Right now,
+	 * this can't be done in CHERI-MIPS without entering a privileged ring
+	 * to access the CP0 register.  So another solution is needed -- e.g.,
+	 * CCall placing the sealed versions in known registers (or special
+	 * registers), or using an unprivileged opcode-preservation mechanism.
+	 */
 
 libcheri_ccall_rtld_check_globals:
-	/* XXXRW: NOT YET */
+	/*
+	 * Enforce the capability flow-control policy that prevents valid
+	 * argument capabilities without the global bit from being passed		 * between compartments.
+	 *
+	 * XXXRW: We leave the offending register number in $t3 should we find
+	 * one.  We don't yet merge this into $a0 for return to the caller
+	 * context.
+	 *
+	 * XXXRW: This is currently quite inefficient architecturally, but
+	 * would be easy to optimise with a conditional move instruction
+	 * based on permissions as input (or similar).
+	 */
+	move		$t3, $zero		/* Reset before we start. */
 
+	/* No need to check $c0: we will overwrite that. */
+
+	cgettag		$t0, $c1		/* $t0 = tagged. */
+	cgetperm	$t1, $c1		/* $t1 = permissions. */
+	andi		$t1, CHERI_PERM_GLOBAL	/* $t1 = global. */
+	not		$t1, $t1		/* $t1 = !global. */
+	and		$t0, $t0, $t1		/* $t0 = tagged && !global */
+	dli		$t2, 1			/* $c1 */
+	movn		$t3, $t2, $t0		/* Clear if true. */
+
+	cgettag		$t0, $c2		/* $t0 = tagged. */
+	cgetperm	$t1, $c2		/* $t1 = permissions. */
+	andi		$t1, CHERI_PERM_GLOBAL	/* $t1 = global. */
+	not		$t1, $t1		/* $t1 = !global. */
+	and		$t0, $t0, $t1		/* $t0 = tagged && !global */
+	dli		$t2, 2			/* $c2 */
+	movn		$t3, $t2, $t0		/* Clear if true. */
+
+	cgettag		$t0, $c3		/* $t0 = tagged. */
+	cgetperm	$t1, $c3		/* $t1 = permissions. */
+	andi		$t1, CHERI_PERM_GLOBAL	/* $t1 = global. */
+	not		$t1, $t1		/* $t1 = !global. */
+	and		$t0, $t0, $t1		/* $t0 = tagged && !global */
+	dli		$t2, 3			/* $c3 */
+	movn		$t3, $t2, $t0		/* Clear if true. */
+
+	cgettag		$t0, $c4		/* $t0 = tagged. */
+	cgetperm	$t1, $c4		/* $t1 = permissions. */
+	andi		$t1, CHERI_PERM_GLOBAL	/* $t1 = global. */
+	not		$t1, $t1		/* $t1 = !global. */
+	and		$t0, $t0, $t1		/* $t0 = tagged && !global */
+	dli		$t2, 4			/* $c4 */
+	movn		$t3, $t2, $t0		/* Clear if true. */
+
+	cgettag		$t0, $c5		/* $t0 = tagged. */
+	cgetperm	$t1, $c5		/* $t1 = permissions. */
+	andi		$t1, CHERI_PERM_GLOBAL	/* $t1 = global. */
+	not		$t1, $t1		/* $t1 = !global. */
+	and		$t0, $t0, $t1		/* $t0 = tagged && !global */
+	dli		$t2, 5			/* $c5 */
+	movn		$t3, $t2, $t0		/* Clear if true. */
+
+	cgettag		$t0, $c6		/* $t0 = tagged. */
+	cgetperm	$t1, $c6		/* $t1 = permissions. */
+	andi		$t1, CHERI_PERM_GLOBAL	/* $t1 = global. */
+	not		$t1, $t1		/* $t1 = !global. */
+	and		$t0, $t0, $t1		/* $t0 = tagged && !global */
+	dli		$t2, 6			/* $c6 */
+	movn		$t3, $t2, $t0		/* Clear if true. */
+
+	cgettag		$t0, $c7		/* $t0 = tagged. */
+	cgetperm	$t1, $c7		/* $t1 = permissions. */
+	andi		$t1, CHERI_PERM_GLOBAL	/* $t1 = global. */
+	not		$t1, $t1		/* $t1 = !global. */
+	and		$t0, $t0, $t1		/* $t0 = tagged && !global */
+	dli		$t2, 7			/* $c7 */
+	movn		$t3, $t2, $t0		/* Clear if true. */
+
+	cgettag		$t0, $c8		/* $t0 = tagged. */
+	cgetperm	$t1, $c8		/* $t1 = permissions. */
+	andi		$t1, CHERI_PERM_GLOBAL	/* $t1 = global. */
+	not		$t1, $t1		/* $t1 = !global. */
+	and		$t0, $t0, $t1		/* $t0 = tagged && !global */
+	dli		$t2, 8			/* $c8 */
+	movn		$t3, $t2, $t0		/* Clear if true. */
+
+	cgettag		$t0, $c9		/* $t0 = tagged. */
+	cgetperm	$t1, $c9		/* $t1 = permissions. */
+	andi		$t1, CHERI_PERM_GLOBAL	/* $t1 = global. */
+	not		$t1, $t1		/* $t1 = !global. */
+	and		$t0, $t0, $t1		/* $t0 = tagged && !global */
+	dli		$t2, 9			/* $c9 */
+	movn		$t3, $t2, $t0		/* Clear if true. */
+
+	cgettag		$t0, $c10		/* $t0 = tagged. */
+	cgetperm	$t1, $c10		/* $t1 = permissions. */
+	andi		$t1, CHERI_PERM_GLOBAL	/* $t1 = global. */
+	not		$t1, $t1		/* $t1 = !global. */
+	and		$t0, $t0, $t1		/* $t0 = tagged && !global */
+	dli		$t2, 10			/* $c10 */
+	movn		$t3, $t2, $t0		/* Clear if true. */
+
+	/* One branch to rule them all. */
+	bnez		$t3, libcheri_ccall_rtld_local_argument
+	nop
+
+libcheri_ccall_rtld_fetch_stack:
 	/*
 	 * We are now committed to performing a protection-domain switch.  IDC
 	 * points at the sandbox_object, from which we must retrieve any
@@ -137,7 +247,7 @@ libcheri_ccall_rtld_check_globals:
 	 * required -- e.g., once we have dynamically linked pure-capability
 	 * binaries using.
 	 */
-	lui     $at, %tprel_hi(__cheri_stack_tls_storage)
+	lui	$at, %tprel_hi(__cheri_stack_tls_storage)
 	.set	push
 	.set	mips32r2
 	rdhwr	$t0, $29
@@ -207,6 +317,8 @@ libcheri_ccall_rtld_clear_regs:
 		CHERI_CLEAR_GPHI_S7 | \
 		CHERI_CLEAR_GPHI_T8 | \
 		CHERI_CLEAR_GPHI_T9 | \
+		CHERI_CLEAR_GPHI_K0 | \
+		CHERI_CLEAR_GPHI_K1 | \
 		CHERI_CLEAR_GPHI_GP | \
 		CHERI_CLEAR_GPHI_SP | \
 		CHERI_CLEAR_GPHI_S8 | \
@@ -241,12 +353,12 @@ libcheri_ccall_rtld_return:
 	nop					# Branch-delay slot
 
 libcheri_ccall_rtld_local_argument:
-	dli	$a0, -1				# XXX
+	dli	$a0, CHERI_ERRNO_INVOKE_LOCAL_ARG
 	b	libcheri_ccall_rtld_error_return
 	nop
 
 libcheri_ccall_rtld_stack_overflow:
-	dli	$a0, -2				# XXX
+	dli	$a0, CHERI_ERRNO_INVOKE_OVERFLOW
 	b	libcheri_ccall_rtld_error_return
 	nop
 
@@ -278,6 +390,8 @@ libcheri_ccall_rtld_error_clear_regs:
 		CHERI_CLEAR_GPHI_S7 | \
 		CHERI_CLEAR_GPHI_T8 | \
 		CHERI_CLEAR_GPHI_T9 | \
+		CHERI_CLEAR_GPHI_K0 | \
+		CHERI_CLEAR_GPHI_K1 | \
 		CHERI_CLEAR_GPHI_GP | \
 		CHERI_CLEAR_GPHI_SP | \
 		CHERI_CLEAR_GPHI_S8 | \
@@ -342,11 +456,120 @@ libcheri_ccall_rtld_error_jump:
 libcheri_ccall_invoke_vector:
 
 libcheri_ccall_invoke_validate_args:
-	/* XXXRW: NOT YET */
+	/*
+	 * XXXRW: Although the CCall instruction validates many aspects of
+	 * arguments, it doesn't check that the ABI is conformed to.  We need
+	 * to check that $c1 and $c2 were used as operands, here, if we want
+	 * to later rely on having access to sealed capabilities -- and, in		 * particular, the corresponding object-type information.  Right now,
+	 * this can't be done in CHERI-MIPS without entering a privileged ring
+	 * to access the CP0 register.  So another solution is needed -- e.g.,
+	 * CCall placing the sealed versions in known registers (or special
+	 * registers), or using an unprivileged opcode-preservation mechanism.
+	 */
 
 libcheri_ccall_invoke_check_globals:
-	/* XXXRW: NOT YET */
+	/*
+	 * Enforce the capability flow-control policy that prevents valid
+	 * argument capabilities without the global bit from being passed		 * between compartments.
+	 *
+	 * XXXRW: We leave the offending register number in $t3 should we find
+	 * one.  We don't yet merge this into $a0 for return to the caller
+	 * context.
+	 *
+	 * XXXRW: This is currently quite inefficient architecturally, but
+	 * XXXRW: This is currently quite inefficient architecturally, but
+	 * would be easy to optimise with a conditional move instruction
+	 * based on permissions as input (or similar).
+	 */
+	move		$t3, $zero		/* Reset before we start. */
 
+	/* No need to check $c0: we will overwrite that. */
+
+	cgettag		$t0, $c1		/* $t0 = tagged. */
+	cgetperm	$t1, $c1		/* $t1 = permissions. */
+	andi		$t1, CHERI_PERM_GLOBAL	/* $t1 = global. */
+	not		$t1, $t1		/* $t1 = !global. */
+	and		$t0, $t0, $t1		/* $t0 = tagged && !global */
+	dli		$t2, 1			/* $c1 */
+	movn		$t3, $t2, $t0		/* Clear if true. */
+
+	cgettag		$t0, $c2		/* $t0 = tagged. */
+	cgetperm	$t1, $c2		/* $t1 = permissions. */
+	andi		$t1, CHERI_PERM_GLOBAL	/* $t1 = global. */
+	not		$t1, $t1		/* $t1 = !global. */
+	and		$t0, $t0, $t1		/* $t0 = tagged && !global */
+	dli		$t2, 2			/* $c2 */
+	movn		$t3, $t2, $t0		/* Clear if true. */
+
+	cgettag		$t0, $c3		/* $t0 = tagged. */
+	cgetperm	$t1, $c3		/* $t1 = permissions. */
+	andi		$t1, CHERI_PERM_GLOBAL	/* $t1 = global. */
+	not		$t1, $t1		/* $t1 = !global. */
+	and		$t0, $t0, $t1		/* $t0 = tagged && !global */
+	dli		$t2, 3			/* $c3 */
+	movn		$t3, $t2, $t0		/* Clear if true. */
+
+	cgettag		$t0, $c4		/* $t0 = tagged. */
+	cgetperm	$t1, $c4		/* $t1 = permissions. */
+	andi		$t1, CHERI_PERM_GLOBAL	/* $t1 = global. */
+	not		$t1, $t1		/* $t1 = !global. */
+	and		$t0, $t0, $t1		/* $t0 = tagged && !global */
+	dli		$t2, 4			/* $c4 */
+	movn		$t3, $t2, $t0		/* Clear if true. */
+
+	cgettag		$t0, $c5		/* $t0 = tagged. */
+	cgetperm	$t1, $c5		/* $t1 = permissions. */
+	andi		$t1, CHERI_PERM_GLOBAL	/* $t1 = global. */
+	not		$t1, $t1		/* $t1 = !global. */
+	and		$t0, $t0, $t1		/* $t0 = tagged && !global */
+	dli		$t2, 5			/* $c5 */
+	movn		$t3, $t2, $t0		/* Clear if true. */
+
+	cgettag		$t0, $c6		/* $t0 = tagged. */
+	cgetperm	$t1, $c6		/* $t1 = permissions. */
+	andi		$t1, CHERI_PERM_GLOBAL	/* $t1 = global. */
+	not		$t1, $t1		/* $t1 = !global. */
+	and		$t0, $t0, $t1		/* $t0 = tagged && !global */
+	dli		$t2, 6			/* $c6 */
+	movn		$t3, $t2, $t0		/* Clear if true. */
+
+	cgettag		$t0, $c7		/* $t0 = tagged. */
+	cgetperm	$t1, $c7		/* $t1 = permissions. */
+	andi		$t1, CHERI_PERM_GLOBAL	/* $t1 = global. */
+	not		$t1, $t1		/* $t1 = !global. */
+	and		$t0, $t0, $t1		/* $t0 = tagged && !global */
+	dli		$t2, 7			/* $c7 */
+	movn		$t3, $t2, $t0		/* Clear if true. */
+
+	cgettag		$t0, $c8		/* $t0 = tagged. */
+	cgetperm	$t1, $c8		/* $t1 = permissions. */
+	andi		$t1, CHERI_PERM_GLOBAL	/* $t1 = global. */
+	not		$t1, $t1		/* $t1 = !global. */
+	and		$t0, $t0, $t1		/* $t0 = tagged && !global */
+	dli		$t2, 8			/* $c8 */
+	movn		$t3, $t2, $t0		/* Clear if true. */
+
+	cgettag		$t0, $c9		/* $t0 = tagged. */
+	cgetperm	$t1, $c9		/* $t1 = permissions. */
+	andi		$t1, CHERI_PERM_GLOBAL	/* $t1 = global. */
+	not		$t1, $t1		/* $t1 = !global. */
+	and		$t0, $t0, $t1		/* $t0 = tagged && !global */
+	dli		$t2, 9			/* $c9 */
+	movn		$t3, $t2, $t0		/* Clear if true. */
+
+	cgettag		$t0, $c10		/* $t0 = tagged. */
+	cgetperm	$t1, $c10		/* $t1 = permissions. */
+	andi		$t1, CHERI_PERM_GLOBAL	/* $t1 = global. */
+	not		$t1, $t1		/* $t1 = !global. */
+	and		$t0, $t0, $t1		/* $t0 = tagged && !global */
+	dli		$t2, 10			/* $c10 */
+	movn		$t3, $t2, $t0		/* Clear if true. */
+
+	/* One branch to rule them all. */
+	bnez		$t3, libcheri_ccall_invoke_local_argument
+	nop
+
+libcheri_ccall_invoke_fetch_stack:
 	/*
 	 * We are now committed to performing a protection-domain switch.
 	 *
@@ -361,7 +584,7 @@ libcheri_ccall_invoke_check_globals:
 	 * required -- e.g., once we have dynamically linked pure-capability
 	 * binaries using.
 	 */
-	lui     $at, %tprel_hi(__cheri_stack_tls_storage)
+	lui	$at, %tprel_hi(__cheri_stack_tls_storage)
 	.set	push
 	.set	mips32r2
 	rdhwr	$t0, $29
@@ -431,6 +654,8 @@ libcheri_ccall_invoke_clear_regs:
 		CHERI_CLEAR_GPHI_S7 | \
 		CHERI_CLEAR_GPHI_T8 | \
 		CHERI_CLEAR_GPHI_T9 | \
+		CHERI_CLEAR_GPHI_K0 | \
+		CHERI_CLEAR_GPHI_K1 | \
 		CHERI_CLEAR_GPHI_GP | \
 		CHERI_CLEAR_GPHI_SP | \
 		CHERI_CLEAR_GPHI_S8 | \
@@ -465,12 +690,12 @@ libcheri_ccall_invoke_return:
 	nop					# Branch-delay slot
 
 libcheri_ccall_invoke_local_argument:
-	dli	$a0, -1				# XXX
+	dli	$a0, CHERI_ERRNO_INVOKE_LOCAL_ARG
 	b	libcheri_ccall_invoke_error_return
 	nop
 
 libcheri_ccall_invoke_stack_overflow:
-	dli	$a0, -2				# XXX
+	dli	$a0, CHERI_ERRNO_INVOKE_OVERFLOW
 	b	libcheri_ccall_invoke_error_return
 	nop
 
@@ -502,6 +727,8 @@ libcheri_ccall_invoke_error_clear_regs:
 		CHERI_CLEAR_GPHI_S7 | \
 		CHERI_CLEAR_GPHI_T8 | \
 		CHERI_CLEAR_GPHI_T9 | \
+		CHERI_CLEAR_GPHI_K0 | \
+		CHERI_CLEAR_GPHI_K1 | \
 		CHERI_CLEAR_GPHI_GP | \
 		CHERI_CLEAR_GPHI_SP | \
 		CHERI_CLEAR_GPHI_S8 | \
@@ -562,10 +789,13 @@ libcheri_ccall_invoke_error_jump:
 	.ent	libcheri_creturn_vector
 libcheri_creturn_vector:
 
-creturn_check_global:
-	/* XXXRW: NOT YET */
-
+libcheri_creturn_fetch_stack:
 	/*
+	 * Unlike with invocation, we will attempt to complete a return even
+	 * if constraints (e.g., relating to local capabilities) fail, as the
+	 * error will be returned to the caller (target) rather than the
+	 * callee (source).
+	 *
 	 * We are now committed to performing a protection-domain switch.
 	 *
 	 * Use thread-local storage to retrieve the trusted stack for the
@@ -575,7 +805,7 @@ creturn_check_global:
 	 *
 	 * XXXRW: Read note above on TLS and testing.
 	 */
-	lui     $at, %tprel_hi(__cheri_stack_tls_storage)
+	lui	$at, %tprel_hi(__cheri_stack_tls_storage)
 	.set	push
 	.set	mips32r2
 	rdhwr	$t0, $29
@@ -584,14 +814,14 @@ creturn_check_global:
 	daddu	$at, $t0, $at
 	csetoffset	$c14, $c26, $at
 
-creturn_pop_stack:
+libcheri_creturn_pop_stack:
 	/* Retrieve current trusted stack pointer. */
 	cld	$t0, $zero, 0($c14)		# XXXRW: Hard-coded offset
 
 	/* Retrieve size of trusted stack. */
 	cld	$t1, $zero, 8($c14)		# XXXRW: Hard-coded offset
 
-	beq	$t0, $t1, creturn_stack_underflow
+	beq	$t0, $t1, libcheri_creturn_stack_underflow
 	nop
 
 	/* Increment (copy of) trusted stack pointer - cs_tsp. */
@@ -609,9 +839,25 @@ creturn_pop_stack:
 	/* Pop caller return $c11. */
 	clc	$c11, $t0, CHERICAP_SIZE($c14)	# XXXRW: Hard-coded offset
 
-creturn_clear_regs:
+libcheri_creturn_check_global:
+	/*
+	 * Enforce the capability flow-control policy that prevents valid
+	 * return-value capabilities without the global bit from being passed
+	 * between compartments.
+	 */
+	cgettag		$t0, $c3		/* $t0 = tagged. */
+	cgetperm	$t1, $c3		/* $t1 = permissions. */
+	andi		$t1, CHERI_PERM_GLOBAL	/* $t1 = global. */
+	not		$t1, $t1		/* $t1 = !global. */
+	and		$t0, $t0, $t1		/* $t0 = tagged && !global */
+	bnez		$t0, libcheri_creturn_local_retval
+	nop
+
+libcheri_creturn_clear_regs:
 	CHERI_CLEAR_GPLO16( \
 		CHERI_CLEAR_GPLO_AT | \
+		/* CHERI_CLEAR_GPLO_V0 | */ \
+		/* CHERI_CLEAR_GPLO_V1 | */ \
 		CHERI_CLEAR_GPLO_A0 | \
 		CHERI_CLEAR_GPLO_A1 | \
 		CHERI_CLEAR_GPLO_A2 | \
@@ -635,6 +881,8 @@ creturn_clear_regs:
 		CHERI_CLEAR_GPHI_S7 | \
 		CHERI_CLEAR_GPHI_T8 | \
 		CHERI_CLEAR_GPHI_T9 | \
+		CHERI_CLEAR_GPHI_K0 | \
+		CHERI_CLEAR_GPHI_K1 | \
 		CHERI_CLEAR_GPHI_GP | \
 		CHERI_CLEAR_GPHI_SP | \
 		CHERI_CLEAR_GPHI_S8 | \
@@ -642,13 +890,14 @@ creturn_clear_regs:
 	mtlo	$zero
 	mthi	$zero
 
-creturn_clear_fpregs:
+libcheri_creturn_clear_fpregs:
 	/* XXXRW: Floating-point registers. */
 
-creturn_clear_caps:
+libcheri_creturn_clear_caps:
 	CHERI_CLEAR_CAPLO16( \
 		CHERI_CLEAR_CAPLO_C1  | \
 		CHERI_CLEAR_CAPLO_C2  | \
+		/* CHERI_CLEAR_CAPLO_C3  | */ \
 		CHERI_CLEAR_CAPLO_C4  | \
 		CHERI_CLEAR_CAPLO_C5  | \
 		CHERI_CLEAR_CAPLO_C6  | \
@@ -671,14 +920,95 @@ creturn_clear_caps:
 		CHERI_CLEAR_CAPHI_C22 | \
 		CHERI_CLEAR_CAPHI_C23 | \
 		CHERI_CLEAR_CAPHI_C24 | \
-		CHERI_CLEAR_CAPHI_C25)
+		CHERI_CLEAR_CAPHI_C25 | \
+		CHERI_CLEAR_CAPHI_IDC )
 
-creturn_return:
+libcheri_creturn_jump:
 	cjr	$c17
 	nop					# Branch-delay slot
 
-creturn_local_retval:
-creturn_stack_underflow:
+libcheri_creturn_local_retval:
+	dli	$a0, CHERI_ERRNO_RETURN_LOCAL_RETVAL
+	b	libcheri_creturn_error_return
+	nop					# Branch-delay slot
+
+libcheri_creturn_stack_underflow:
 	/* XXXRW: What do we want to do here?  Just trap for now. */
+	dli	$a0, CHERI_ERRNO_RETURN_UNDERFLOW
 	teq	$zero, $zero
+
+libcheri_creturn_error_return:
+libcheri_creturn_error_clear_regs:
+	CHERI_CLEAR_GPLO16( \
+		CHERI_CLEAR_GPLO_AT | \
+		CHERI_CLEAR_GPLO_V0 | \
+		CHERI_CLEAR_GPLO_V1 | \
+		/* CHERI_CLEAR_GPLO_A0 | */ \
+		CHERI_CLEAR_GPLO_A1 | \
+		CHERI_CLEAR_GPLO_A2 | \
+		CHERI_CLEAR_GPLO_A3 | \
+		CHERI_CLEAR_GPLO_A4 | \
+		CHERI_CLEAR_GPLO_A5 | \
+		CHERI_CLEAR_GPLO_A6 | \
+		CHERI_CLEAR_GPLO_A7 | \
+		CHERI_CLEAR_GPLO_T0 | \
+		CHERI_CLEAR_GPLO_T1 | \
+		CHERI_CLEAR_GPLO_T2 | \
+		CHERI_CLEAR_GPLO_T3 )
+	CHERI_CLEAR_GPHI16( \
+		CHERI_CLEAR_GPHI_S0 | \
+		CHERI_CLEAR_GPHI_S1 | \
+		CHERI_CLEAR_GPHI_S2 | \
+		CHERI_CLEAR_GPHI_S3 | \
+		CHERI_CLEAR_GPHI_S4 | \
+		CHERI_CLEAR_GPHI_S5 | \
+		CHERI_CLEAR_GPHI_S6 | \
+		CHERI_CLEAR_GPHI_S7 | \
+		CHERI_CLEAR_GPHI_T8 | \
+		CHERI_CLEAR_GPHI_T9 | \
+		CHERI_CLEAR_GPHI_K0 | \
+		CHERI_CLEAR_GPHI_K1 | \
+		CHERI_CLEAR_GPHI_GP | \
+		CHERI_CLEAR_GPHI_SP | \
+		CHERI_CLEAR_GPHI_S8 | \
+		CHERI_CLEAR_GPHI_RA )
+	mtlo	$zero
+	mthi	$zero
+
+libcheri_creturn_error_clear_fpregs:
+	/* XXXRW: Floating-point registers. */
+
+libcheri_creturn_error_clear_caps:
+	CHERI_CLEAR_CAPLO16( \
+		CHERI_CLEAR_CAPLO_C1  | \
+		CHERI_CLEAR_CAPLO_C2  | \
+		CHERI_CLEAR_CAPLO_C3  | \
+		CHERI_CLEAR_CAPLO_C4  | \
+		CHERI_CLEAR_CAPLO_C5  | \
+		CHERI_CLEAR_CAPLO_C6  | \
+		CHERI_CLEAR_CAPLO_C7  | \
+		CHERI_CLEAR_CAPLO_C8  | \
+		CHERI_CLEAR_CAPLO_C9  | \
+		CHERI_CLEAR_CAPLO_C10 | \
+		/* CHERI_CLEAR_CAPLO_C11 | */ \
+		CHERI_CLEAR_CAPLO_C12 | \
+		CHERI_CLEAR_CAPLO_C13 | \
+		CHERI_CLEAR_CAPLO_C14 | \
+		CHERI_CLEAR_CAPLO_C15 )
+	CHERI_CLEAR_CAPHI16( \
+		CHERI_CLEAR_CAPHI_C16 | \
+		/* CHERI_CLEAR_CAPHI_C17 | */ \
+		CHERI_CLEAR_CAPHI_C18 | \
+		CHERI_CLEAR_CAPHI_C19 | \
+		CHERI_CLEAR_CAPHI_C20 | \
+		CHERI_CLEAR_CAPHI_C21 | \
+		CHERI_CLEAR_CAPHI_C22 | \
+		CHERI_CLEAR_CAPHI_C23 | \
+		CHERI_CLEAR_CAPHI_C24 | \
+		CHERI_CLEAR_CAPHI_C25 | \
+		CHERI_CLEAR_CAPHI_IDC )
+
+libcheri_creturn_error_jump:
+	cjr	$c17
+	nop					# Branch-delay slot
 	.end	libcheri_creturn_vector

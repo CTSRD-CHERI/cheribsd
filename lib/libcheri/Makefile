@@ -31,6 +31,7 @@ SRCS+=	cheri_invoke_hybrid.S		\
 INCS=	cheri_ccall.h			\
 	cheri_class.h			\
 	cheri_enter.h			\
+	cheri_errno.h			\
 	cheri_fd.h			\
 	cheri_invoke.h			\
 	cheri_memcpy.h			\
@@ -47,6 +48,7 @@ CFLAGS+=	-I${.CURDIR}
 CFLAGS+=	-I${.CURDIR}/${MACHINE_ARCH}
 CFLAGS.cheri_invoke_hybrid.S+= -fno-pic -mabicalls
 CFLAGS+=  -mllvm -mxmxgot
+CFLAGS+=	-DHAVE_WORKING_TLS
 
 INCSDIR=	${INCLUDEDIR}/cheri
 

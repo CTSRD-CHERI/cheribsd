@@ -1438,7 +1438,7 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_STORE_LOCALCAP },
 
-	{ .ct_name = "test_sandbox_store_local_capability_in_bss",
+	{ .ct_name = "test_sandbox_store_local_capability_in_bss_nocatch",
 	  .ct_desc = "Try to store local capability to sandbox bss; uncaught",
 	  .ct_func = test_sandbox_store_local_capability_in_bss_nocatch,
 	  .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
@@ -1459,33 +1459,15 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_func = test_sandbox_return_global_capability,
 	  .ct_flags = CT_FLAG_SANDBOX, },
 
-	{ .ct_name = "test_sandbox_return_local_capability_catch",
-	  .ct_desc = "Try to return a local capability from a sandbox; caught",
-	  .ct_func = test_sandbox_return_local_capability_catch,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE |
-		    CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
-	  .ct_signum = SIGPROT,
-	  .ct_si_code = PROT_CHERI_LOCALRET,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_SW_LOCALRET },
-
-	{ .ct_name = "test_sandbox_return_local_capability_nocatch",
-	  .ct_desc = "Try to return a local capability from a sandbox; uncaught",
-	  .ct_func = test_sandbox_return_local_capability_nocatch,
-	  .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
-	  .ct_signum = SIGPROT },
+	{ .ct_name = "test_sandbox_return_local_capability",
+	  .ct_desc = "Try to return a local capability from a sandbox",
+	  .ct_func = test_sandbox_return_local_capability,
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_pass_local_capability_arg",
 	  .ct_desc = "Try to pass a local capability to a sandbox",
 	  .ct_func = test_sandbox_pass_local_capability_arg,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE |
-		    CT_FLAG_SANDBOX,
-	  .ct_signum = SIGPROT,
-	  .ct_si_code = PROT_CHERI_LOCALARG,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_SW_LOCALARG },
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	/*
 	 * Tests relating to initialisation of, and permissions on, global

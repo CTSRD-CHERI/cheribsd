@@ -366,10 +366,7 @@ void	test_sandbox_store_global_capability_in_stack(
 void	test_sandbox_store_local_capability_in_stack(
 	    const struct cheri_test *ctp);
 void	test_sandbox_return_global_capability(const struct cheri_test *ctp);
-void	test_sandbox_return_local_capability_catch(
-	    const struct cheri_test *ctp);
-void	test_sandbox_return_local_capability_nocatch(
-	    const struct cheri_test *ctp);
+void	test_sandbox_return_local_capability(const struct cheri_test *ctp);
 void	test_sandbox_pass_local_capability_arg(const struct cheri_test *ctp);
 
 /* cheritest_libcheri_trustedstack.c */
