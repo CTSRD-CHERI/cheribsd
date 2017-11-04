@@ -155,13 +155,6 @@ hybridabi_thread_init(struct thread *td, unsigned long entry_addr)
          * This can be queried using sysarch(2).
          */
         cheri_capability_set_user_sealcap(&td->td_proc->p_md.md_cheri_sealcap);
-
-#if 0
-        /*
-         * Set up the thread's trusted stack.
-         */
-        cheri_stack_init(td->td_pcb);
-#endif
 }
 
 /*

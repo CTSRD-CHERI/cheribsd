@@ -141,12 +141,6 @@ SYSCTL_INT(_kern, OID_AUTO, forcesigexit, CTLFLAG_RW,
 static SYSCTL_NODE(_kern, OID_AUTO, sigqueue, CTLFLAG_RW, 0,
     "POSIX real time signal");
 
-#ifdef CPU_CHERI
-static int	log_cheri_unwind = 1;
-SYSCTL_INT(_kern, OID_AUTO, log_cheri_unwind, CTLFLAG_RW,
-    &log_cheri_unwind, 1, "Log CHERI sandbox unwind on uncaught signal");
-#endif
-
 static int	max_pending_per_proc = 128;
 SYSCTL_INT(_kern_sigqueue, OID_AUTO, max_pending_per_proc, CTLFLAG_RW,
     &max_pending_per_proc, 0, "Max pending signals per proc");
@@ -2017,26 +2011,6 @@ trapsignal(struct thread *td, ksiginfo_t *ksi)
 	ps = p->p_sigacts;
 	mtx_lock(&ps->ps_mtx);
 
-#if 0
-#ifdef CPU_CHERI
-	/*
-	 * If a signal triggered by a trap will not be caught by the process,
-	 * there's a sandbox frame to unwind, and the signal has the SBUNWIND
-	 * property, then the kernel will autounwind the trusted stack.
-	 *
-	 * XXXRW: It would be nice if this were in machine-dependent code ..
-	 * maybe?
-	 */
-	if ((p->p_flag & P_TRACED) == 0 && !SIGISMEMBER(ps->ps_sigcatch, sig)
-	    && (sigprop(sig) & SIGPROP_SBUNWIND) &&
-	    cheri_stack_unwind(td, td->td_frame, sig)) {
-		if (log_cheri_unwind)
-			printf("Sandbox unwind on uncaught signal %d, pid %d, "
-			    "tid %d\n", sig, p->p_pid, td->td_tid);
-		mtx_unlock(&ps->ps_mtx);
-	} else
-#endif
-#endif
 	if ((p->p_flag & P_TRACED) == 0 && SIGISMEMBER(ps->ps_sigcatch, sig) &&
 	    !SIGISMEMBER(td->td_sigmask, sig)) {
 #ifdef KTRACE
