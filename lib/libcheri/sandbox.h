@@ -74,14 +74,6 @@ struct sandbox_metadata {
 
 extern int sb_verbose;
 
-/**
- * The CHERI error number variable.  If the stack is forcibly unwound as the
- * result of signal delivery during a ccall invocation, this will be set to
- * the signal number of the signal inside the sandbox.  If a ccall invocation
- * returns normally then this value is unmodified.
- */
-extern _Thread_local int cherierrno;
-
 #ifdef __cplusplus
 #if __cplusplus >= 201103
 #define LIBCHERI_OVERRIDE override
@@ -104,7 +96,7 @@ namespace cheri
 		sandbox_invoke_failure(int e) : errno(e) {}
 
 		/**
-		 * Returns the error code, which should be the `cherierrno`
+		 * Returns the error code, which should be the `cher_ierrno`
 		 * value from a failed ccall.
 		 */
 		int error_code() { return errno; }

@@ -35,6 +35,7 @@
 #include <machine/cheriasm.h>
 #include <machine/cherireg.h>
 
+#define	CHERI_ERRNO_ASM
 #include <cheri/cheri_errno.h>
 
 /*

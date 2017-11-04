@@ -225,12 +225,12 @@ cheri_invoke_return:
 
 set_cheri_errno:
 #ifndef __PIC__
-	lui     $at, %tprel_hi(cherierrno)
+	lui     $at, %tprel_hi(cheri_errno)
 	.set    push
 	.set    mips32r2
 	rdhwr   $t0, $29
 	.set    pop
-	daddiu  $at, $at, %tprel_lo(cherierrno)
+	daddiu  $at, $at, %tprel_lo(cheri_errno)
 	daddu   $at, $t0, $at
 	sw      $a0, 0($at)
 #else
@@ -243,22 +243,22 @@ set_cheri_errno:
 	daddu	$at, $at, $t9
 	daddiu	$gp, $at, %lo(%neg(%gp_rel(cheri_invoke)))
 	#
-	# Get the address of the thread-local cherierrno variable.
+	# Get the address of the thread-local cheri_errno variable.
 	#
 	lui	$at, %call_hi(__tls_get_addr)
 	daddu	$at, $at, $gp
 	ld	$t9, %call_lo(__tls_get_addr)($at)
 	jalr	$t9
-	daddiu	$a0, $gp, %tlsgd(cherierrno)
+	daddiu	$a0, $gp, %tlsgd(cheri_errno)
 	#
-	# Store the signal value in cherierrno.
+	# Store the signal value in cheri_errno.
 	#
 	ld	$a0, 88($sp)
 	sw	$a0, 0($v0)
 #endif // __PIC__
 	#
 	# Store the values in v0 / v1 that code that doesn't know about
-	# cherierrno might be expecting.
+	# cheri_errno might be expecting.
 	#
 	daddiu	$v0, $zero, -1
 	b	cheri_invoke_restore_regs
@@ -266,10 +266,10 @@ set_cheri_errno:
 
 	.end	cheri_invoke
 
-	.type	cherierrno,@object      # @cherierrno
+	.type	cheri_errno,@object      # @cheri_errno
 	.section	.tbss,"awT",@nobits
-	.globl	cherierrno
+	.globl	cheri_errno
 	.align	2
-cherierrno:
+cheri_errno:
 	.4byte	0                       # 0x0
-	.size	cherierrno, 4
+	.size	cheri_errno, 4

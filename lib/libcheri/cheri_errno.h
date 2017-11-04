@@ -31,12 +31,21 @@
 #ifndef _CHERI_ERRNO_H_
 #define	_CHERI_ERRNO_H_
 
+#ifndef CHERI_ERRNO_ASM
 /*
- * Constants and definitions shard by C amd assembly parts of the invocation
- * and return trampolines.
+ * The CHERI error number variable.  If an error occurs during rtld entry,
+ * invocation, or return, then this will be set to indicate the error.  On
+ * success, then invocation/return leave this value unmodified.
  *
+ * NB: C-language definitions are masked when including cheri_errno.h in the
+ * domain-transition trampoline assembly.
+ */
+extern _Thread_local int	cheri_errno;
+#endif
+
+/*
  * These values may be returned from the rtld, invocation, and return
- * trampolines via cherierrno.
+ * trampolines via cheri_errno.
  */
 #define	CHERI_ERRNO_INVOKE_LOCAL_ARG	1
 #define	CHERI_ERRNO_INVOKE_OVERFLOW	2

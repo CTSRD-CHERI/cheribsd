@@ -133,16 +133,16 @@ test_sandbox_cs_clock_gettime_default(const struct cheri_test *ctp __unused)
 	register_t v;
 
 #ifdef CHERIERRNO_LINKS
-	cherierrno = 0;
+	cheri_errno = 0;
 #endif
 	v = invoke_clock_gettime();
 	if (v != -1)
 		cheritest_failure_errx("Sandbox returned %jd", (intmax_t)v);
 #ifdef CHERIERRNO_LINKS
-	else if (cherierrno != 0)
+	else if (cheri_errno != 0)
 		cheritest_failure_errx(
-		    "Sandbox returned -1, but set cherierrno to %d",
-		    cherierrno);
+		    "Sandbox returned -1, but set cheri_errno to %d",
+		    cheri_errno);
 #endif
 	else
 		cheritest_success();
@@ -156,16 +156,16 @@ test_sandbox_cs_clock_gettime_deny(const struct cheri_test *ctp __unused)
 	syscall_checks[SYS_clock_gettime] = (syscall_check_t)deny_syscall;
 
 #ifdef CHERIERRNO_LINKS
-	cherierrno = 0;
+	cheri_errno = 0;
 #endif
 	v = invoke_clock_gettime();
 	if (v != -1)
 		cheritest_failure_errx("Sandbox returned %jd", (intmax_t)v);
 #ifdef CHERIERRNO_LINKS
-	else if (cherierrno != 0)
+	else if (cheri_errno != 0)
 		cheritest_failure_errx(
-		    "Sandbox returned -1, but set cherierrno to %d",
-		    cherierrno);
+		    "Sandbox returned -1, but set cheri_errno to %d",
+		    cheri_errno);
 #endif
 	else
 		cheritest_success();
