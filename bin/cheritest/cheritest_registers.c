@@ -147,11 +147,11 @@ check_initreg_code(__capability void *c)
 		cheritest_failure_errx("offset %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_CAP_USER_CODE_OFFSET);
 
-	/* Type -- should be zero for an unsealed capability. */
+	/* Type -- should be (-1) for an unsealed capability. */
 	v = cheri_gettype(c);
-	if (v != 0)
+	if (v != 0xffffffffffffffff)
 		cheritest_failure_errx("otype %jx (expected %jx)", v,
-		    (uintmax_t)0);
+		    (uintmax_t)0xffffffffffffffff);
 
 	/* Permissions. */
 	v = cheri_getperm(c);
@@ -237,11 +237,11 @@ check_initreg_data(__capability void *c)
 		cheritest_failure_errx("offset %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_CAP_USER_DATA_OFFSET);
 
-	/* Type -- should be zero for an unsealed capability. */
+	/* Type -- should be (-1) for an unsealed capability. */
 	v = cheri_gettype(c);
-	if (v != 0)
+	if (v != 0xffffffffffffffff)
 		cheritest_failure_errx("otype %jx (expected %jx)", v,
-		    (uintmax_t)0);
+		    (uintmax_t)0xffffffffffffffff);
 
 	/* Permissions. */
 	v = cheri_getperm(c);
