@@ -43,7 +43,8 @@
 
 /*
  * Per-sandbox meta-data structure mapped read-only within the sandbox at a
- * fixed address to allow sandboxed code to find its stack, heap, etc.
+ * fixed address to allow sandboxed code to find its vtable, heap, return
+ * capabilities, etc.
  *
  * NB: This data structure (and its base address) are part of the ABI between
  * libcheri and programs running in sandboxes.  Only ever append to this,
@@ -59,10 +60,10 @@ struct sandbox_metadata {
 	struct cheri_object	sbm_system_object;	/* Offset: 32 */
 #if __has_feature(capabilities)
 	__capability vm_offset_t	*sbm_vtable;	/* Cap-offset: 2 */
-	__capability void	*sbm_stackcsp;		/* Cap-offset: 3 */
+	__capability void		*_sbm_reserved2;/* Cap-offset: 3 */
 #else
 	struct chericap	sbm_vtable;
-	struct chericap sbm_stackcsp;
+	struct chericap	_sbm_reserved2;
 #endif
 	struct cheri_object	 sbm_creturn_object;	/* Cap-offset: 4, 5 */
 };

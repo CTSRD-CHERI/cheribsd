@@ -459,8 +459,7 @@ sandbox_object_new_flags(struct sandbox_class *sbcp, size_t heaplen,
 	    sbop->sbo_stacklen, CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |
 	    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
 	    CHERI_PERM_STORE_LOCAL_CAP));
-	sbop->sbo_stackcsp =
-	    (__capability void *)((uintptr_t)sbop->sbo_stackcap +
+	sbop->sbo_csp = (__capability void *)((uintptr_t)sbop->sbo_stackcap +
 	    sbop->sbo_stacklen);
 
 	/*

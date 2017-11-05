@@ -39,7 +39,7 @@
 #
 # CHERI sandbox run-time linker entry point, used for constructors and
 # destructors.  Identical calling convention to that described in
-# crt_invoke.S.
+# crt_invoke.S -- please see the comments there.
 #
 # Most code borrowed from crt_invoke.S; notice that exit/abort symbols here
 # are not global, and that there is no path to invoke().
@@ -56,12 +56,6 @@ __rtld_vector:
 	# Load $idc-relative offset of the Sandbox Metadata (SBM) area
 	#
 	dli	$t0, 0x1000
-
-	#
-	# Set up the in-sandbox stack: a stack capability has been left for us
-	# by the runtime.
-	#
-	clc	$csp, $t0, 32 + 3*CHERICAP_SIZE($c26)
 
 	#
 	# The compiler is responsible for scrubbing unused argument registers

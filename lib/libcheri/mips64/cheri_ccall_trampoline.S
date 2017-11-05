@@ -294,6 +294,7 @@ libcheri_ccall_rtld_extract_target:
 	 *
 	 * NB: Notice capability offset 1 for rtld initialisation.
 	 */
+	clc	$c11, $zero, (6*CHERICAP_SIZE)($c26) # XXXRW: Hard-coded offset
 	clc	$c12, $zero, (4*CHERICAP_SIZE)($c26) # XXXRW: Hard-coded offset
 	csetdefault	$c12
 	clc	$c12, $zero, (1*CHERICAP_SIZE)($c26) # XXXRW: Hard-coded offset
@@ -332,7 +333,7 @@ libcheri_ccall_rtld_clear_fpregs:
 
 libcheri_ccall_rtld_clear_caps:
 	CHERI_CLEAR_CAPLO16( \
-		CHERI_CLEAR_CAPLO_C11 | \
+		/* CHERI_CLEAR_CAPLO_C11 | */ \
 		/* CHERI_CLEAR_CAPLO_C12 | */ \
 		CHERI_CLEAR_CAPLO_C13 | \
 		CHERI_CLEAR_CAPLO_C14 | \
@@ -631,6 +632,7 @@ libcheri_ccall_invoke_extract_target:
 	 *
 	 * NB: Notice capability offset 2 for general invocation.
 	 */
+	clc	$c11, $zero, (6*CHERICAP_SIZE)($c26) # XXXRW: Hard-coded offset
 	clc	$c12, $zero, (4*CHERICAP_SIZE)($c26) # XXXRW: Hard-coded offset
 	csetdefault	$c12
 	clc	$c12, $zero, (2*CHERICAP_SIZE)($c26) # XXXRW: Hard-coded offset
@@ -669,7 +671,7 @@ libcheri_ccall_invoke_clear_fpregs:
 
 libcheri_ccall_invoke_clear_caps:
 	CHERI_CLEAR_CAPLO16( \
-		CHERI_CLEAR_CAPLO_C11 | \
+		/* CHERI_CLEAR_CAPLO_C11 | */ \
 		/* CHERI_CLEAR_CAPLO_C12 | */ \
 		CHERI_CLEAR_CAPLO_C13 | \
 		CHERI_CLEAR_CAPLO_C14 | \

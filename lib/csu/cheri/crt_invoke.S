@@ -46,6 +46,11 @@
 #    $pcc contains the unsealed invoked code capability
 #    $idc contains the unsealed invoked data capability
 #    $ddc contains a suitable unsealed Default Data Capability
+#    $csp will contain a suitable unsealed stack capability
+#
+# If we want to support executing hybrid-ABI binaries in sandboxes again, we
+# will either need the invocation trampoline to install $c11/$sp instead of
+# $csp, or we will need the landing vectors for the two ABIs to differ.
 #
 # Expectations on the caller
 #    $v0 contains the method number (if any)
@@ -53,12 +58,8 @@
 #    $c3-$c10 will contain capability arguments
 #
 # Expectations on the class code and instance setup:
-#    $c0, $pcc contain access to (100% overlapped) sandbox code and data
-#
-# Things that will be set up for the callee C code
-#    $c0, $csp will be set up to match the class
-#    $csp will have have the global bit cleared, and point at an in-sandbox
-#    stack
+#    $ddc, $pcc contain access to (100% overlapped) sandbox code and data
+#    $csp will be set up to point at a suitable stack
 #
 # __invoke_vector will jump to the 'invoke' symbol and arrange a CReturn when
 # that function returns.  This code also implements 'abort' and '_exit'
@@ -69,8 +70,6 @@
 #    $c3 will contain a capability return value
 #
 # Sandbox heap information is extracted from the sandbox metadata structure.
-# $c26 is assumed to have room for a stack at the top, although its length is
-# currently undefined.
 #
 # For now, assume:
 # (1) The caller has not set up the general-purpose register context, that's
@@ -89,12 +88,6 @@ __invoke_vector:
 	# Load $idc-relative offset of the Sandbox Metadata (SBM) area.
 	#
 	dli	$t0, 0x1000
-
-	#
-	# Set up the in-sandbox stack: a stack capability has been left for us
-	# by the runtime.
-	#
-	clc	$csp, $t0, 32 + 3*CHERICAP_SIZE($c26)
 
 	#
 	# The compiler is responsible for scrubbing unused argument registers
