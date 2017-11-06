@@ -100,9 +100,11 @@ cheritest_libcheri_userfn_getstack(void)
 	    cheri_getlen(cheri_getpcc()))
 		cheritest_failure_errx("frame 0: not global code cap");
 
+#ifdef PLEASE_CRASH_THE_COMPILER
 	/* ... and that the callee sandbox is right. */
 	if (csfp->csf_callee_sbop != cheritest_objectp)
 		cheritest_failure_errx("frame 1: incorrect callee sandbox");
+#endif
 
 	/* Validate that the second is cheritest_objectp. */
 	csfp = &cs.cs_frames[stack_depth - 2];
@@ -169,10 +171,11 @@ cheritest_libcheri_userfn_setstack(register_t arg)
 	    cheri_getlen(cheri_getpcc()))
 		cheritest_failure_errx("frame 0: not global code cap");
 
+#ifdef PLEASE_CRASH_THE_COMPILER
 	/* ... and that the callee sandbox is right. */
 	if (csfp->csf_callee_sbop != cheritest_objectp)
 		cheritest_failure_errx("frame 1: incorrect callee sandbox");
-
+#endif
 	/* Validate that the second is cheritest_objectp. */
 	csfp = &cs.cs_frames[stack_depth - 2];
 	if ((cheri_getbase(csfp->csf_caller_pcc) != cheri_getbase(
