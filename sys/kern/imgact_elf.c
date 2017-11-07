@@ -145,6 +145,11 @@ SYSCTL_INT(_kern_elf32, OID_AUTO, read_exec, CTLFLAG_RW, &i386_read_exec, 0,
     "enable execution from readable segments");
 #endif
 #endif
+static unsigned long __elfN(et_dyn_load_addr) = ET_DYN_LOAD_ADDR;
+
+SYSCTL_ULONG(__CONCAT(_kern_elf, __ELF_WORD_SIZE), OID_AUTO,
+    dyn_load_addr, CTLFLAG_RW, &__elfN(et_dyn_load_addr), 0,
+    __XSTRING(__CONCAT(ELF, __ELF_WORD_SIZE)) ": default load address for PIE executables");
 
 static Elf_Brandinfo *elf_brand_list[MAX_BRANDS];
 
@@ -910,7 +915,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		 * non-zero for some reason.
 		 */
 		if (baddr == 0)
-			et_dyn_addr = ET_DYN_LOAD_ADDR;
+			et_dyn_addr = __elfN(et_dyn_load_addr);
 	}
 	sv = brand_info->sysvec;
 	if (interp != NULL && brand_info->interp_newpath != NULL)
