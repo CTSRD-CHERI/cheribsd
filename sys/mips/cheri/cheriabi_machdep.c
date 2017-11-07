@@ -210,7 +210,7 @@ cheriabi_fetch_syscall_arg(struct thread *td, void * __capability *argp,
     int argnum, int ptrmask)
 {
 	struct trapframe *locr0 = td->td_frame;	 /* aka td->td_pcb->pcv_regs */
-	struct sysentvec *se;
+	const struct sysentvec *se;
 	int i, intreg_offset, ptrreg_offset, is_ptr_arg;
 
 	se = td->td_proc->p_sysent;
@@ -265,7 +265,7 @@ static int
 cheriabi_fetch_syscall_args(struct thread *td)
 {
 	struct trapframe *locr0 = td->td_frame;	 /* aka td->td_pcb->pcv_regs */
-	struct sysentvec *se;
+	const struct sysentvec *se;
 	struct syscall_args *sa;
 	int error;
 
@@ -307,7 +307,7 @@ cheriabi_set_syscall_retval(struct thread *td, int error)
 	struct trapframe *locr0 = td->td_frame;
 	register_t a0;
 	unsigned int code;
-	struct sysentvec *se;
+	const struct sysentvec *se;
 
 	code = locr0->v0;
 	a0 = locr0->a0;

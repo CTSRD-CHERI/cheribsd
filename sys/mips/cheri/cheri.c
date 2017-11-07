@@ -187,7 +187,7 @@ cheri_capability_set_kern(void * __capability *cp)
 
 void
 cheri_capability_set_user_sigcode(void * __capability *cp,
-    struct sysentvec *se)
+    const struct sysentvec *se)
 {
 	uintptr_t base;
 	int szsigcode = *se->sv_szsigcode;

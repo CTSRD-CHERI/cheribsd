@@ -408,7 +408,7 @@ int
 cpu_fetch_syscall_args(struct thread *td)
 {
 	struct trapframe *locr0;
-	struct sysentvec *se;
+	const struct sysentvec *se;
 	struct syscall_args *sa;
 	int error, nsaved;
 

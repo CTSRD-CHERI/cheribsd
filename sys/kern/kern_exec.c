@@ -1059,7 +1059,7 @@ exec_unmap_first_page(struct image_params *imgp)
  *	automatically in trap.c.
  */
 int
-exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
+exec_new_vmspace(struct image_params *imgp, const struct sysentvec *sv)
 {
 	int error;
 	struct proc *p = imgp->proc;

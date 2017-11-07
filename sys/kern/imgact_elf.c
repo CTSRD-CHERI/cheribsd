@@ -799,7 +799,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	const char *err_str, *newinterp;
 	char *interp, *interp_buf, *path;
 	Elf_Brandinfo *brand_info;
-	struct sysentvec *sv;
+	const struct sysentvec *sv;
 	vm_prot_t prot;
 	u_long text_size, data_size, total_size, text_addr, data_addr;
 	u_long seg_size, seg_addr, addr, baddr, et_dyn_addr, entry, proghdr;

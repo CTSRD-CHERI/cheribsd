@@ -683,7 +683,7 @@ cheri_capability_setoffset(struct chericap *cp, register_t offset)
 struct sysentvec;
 void	cheri_capability_set_user_sealcap(void *__capability *);
 void	cheri_capability_set_user_sigcode(void *__capability *,
-	    struct sysentvec *);
+	    const struct sysentvec *);
 int	cheri_capcause_to_sicode(register_t capcause);
 
 void	hybridabi_exec_setregs(struct thread *td, unsigned long entry_addr);

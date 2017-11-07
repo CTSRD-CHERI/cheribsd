@@ -621,7 +621,7 @@ struct proc {
 	int		p_osrel;	/* (x) osreldate for the
 					       binary (from ELF note, if any) */
 	char		p_comm[MAXCOMLEN + 1];	/* (x) Process name. */
-	struct sysentvec *p_sysent;	/* (b) Syscall dispatch info. */
+	const struct sysentvec *p_sysent;	/* (b) Syscall dispatch info. */
 	struct pargs	*p_args;	/* (c) Process arguments. */
 	rlim_t		p_cpulimit;	/* (c) Current CPU limit in seconds. */
 	signed char	p_nice;		/* (c) Process "nice" value. */
