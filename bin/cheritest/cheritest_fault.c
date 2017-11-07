@@ -294,7 +294,6 @@ test_sandbox_cp2_tag_nocatch(const struct cheri_test *ctp __unused)
 	if (v != -1)
 		cheritest_failure_errx("invoke returned %ld (expected %d)", v,
 		    -1);
-	cheritest_success();
 	cheritest_failure_errx("invoke returned");
 }
 
