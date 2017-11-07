@@ -270,6 +270,10 @@ Invocation has failed because a tagged, local capability value has been passed
 as an argument.
 .It Er CHERI_ERRNO_INVOKE_OVERFLOW
 Invocation has failed because a trusted-stack overflow would occur.
+.It Er CHERI_ERRNO_INVOKE_BUSY
+Invocation has failed because the target object has exceeded maximum
+concurrency, or because the target object has experienced an unrecoverable
+fault.
 .It Er CHERI_ERRNO_RETURN_LOCAL_RETVAL
 Return has succeeded, but the tagged, local capability return value has been
 cleared.

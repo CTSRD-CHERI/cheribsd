@@ -47,10 +47,11 @@ extern _Thread_local int	cheri_errno;
  * These values may be returned from the rtld, invocation, and return
  * trampolines via cheri_errno.
  */
-#define	CHERI_ERRNO_INVOKE_LOCAL_ARG	1
-#define	CHERI_ERRNO_INVOKE_OVERFLOW	2
+#define	CHERI_ERRNO_INVOKE_LOCAL_ARG	1	/* Local capability passed. */
+#define	CHERI_ERRNO_INVOKE_OVERFLOW	2	/* Trusted-stack overflow. */
+#define	CHERI_ERRNO_INVOKE_BUSY		3	/* Sandbox object is in use. */
 
-#define	CHERI_ERRNO_RETURN_LOCAL_RETVAL	80
-#define	CHERI_ERRNO_RETURN_UNDERFLOW	81
+#define	CHERI_ERRNO_RETURN_LOCAL_RETVAL	80	/* Local capability returned. */
+#define	CHERI_ERRNO_RETURN_UNDERFLOW	81	/* Trusted-stack underflow. */
 
 #endif /* _CHERI_ERRNO_H_ */

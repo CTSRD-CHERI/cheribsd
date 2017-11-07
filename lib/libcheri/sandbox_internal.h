@@ -133,6 +133,10 @@ sandbox_object {
 	__capability void	*sbo_ddc;	/* Capability offset 4. */
 	__capability void	*sbo_libcheri_tls; /* Capability offset 5. */
 	__capability void	*sbo_csp;	/* Capability offset 6. */
+	union {
+		int		 sbo_busy;	/* Capability offset 7. */
+		__capability void *_sbo_reserved; /* Pad to capability size. */
+	};
 
 	/*
 	 * Further fields are unknown to the assembly domain-transition code.
