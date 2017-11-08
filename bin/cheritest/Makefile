@@ -63,7 +63,11 @@ MAN=
 .ifndef BOOTSTRAPPING
 .if ${PROG} == cheritest
 NEED_CHERI=	hybrid
+.elif ${PROG} == cheritest-mt
+NEED_CHERI=	hybrid
 .elif ${PROG} == cheriabitest
+WANT_CHERI=	pure
+.elif ${PROG} == cheriabitest-mt
 WANT_CHERI=	pure
 .endif
 WANT_DUMP=	yes
