@@ -3276,6 +3276,16 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 6;
 		break;
 	}
+	/* coexecve */
+	case 561: {
+		struct coexecve_args *p = params;
+		iarg[0] = p->pid; /* pid_t */
+		uarg[1] = (intptr_t) p->fname; /* char * */
+		uarg[2] = (intptr_t) p->argv; /* char ** */
+		uarg[3] = (intptr_t) p->envv; /* char ** */
+		*n_args = 4;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -8728,6 +8738,25 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* coexecve */
+	case 561:
+		switch(ndx) {
+		case 0:
+			p = "pid_t";
+			break;
+		case 1:
+			p = "userland char *";
+			break;
+		case 2:
+			p = "userland char **";
+			break;
+		case 3:
+			p = "userland char **";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -10611,6 +10640,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* kevent */
 	case 560:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* coexecve */
+	case 561:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

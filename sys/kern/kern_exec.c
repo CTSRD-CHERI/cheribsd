@@ -198,6 +198,26 @@ sysctl_kern_stackprot(SYSCTL_HANDLER_ARGS)
  */
 static const struct execsw **execsw;
 
+int
+sys_coexecve(struct thread *td, struct coexecve_args *uap)
+{
+	struct image_args args;
+	struct vmspace *oldvmspace;
+	int error;
+
+	printf("PING\n");
+
+	error = pre_execve(td, &oldvmspace);
+	if (error != 0)
+		return (error);
+	error = exec_copyin_args(&args, uap->fname, UIO_USERSPACE,
+	    uap->argv, uap->envv);
+	if (error == 0)
+		error = kern_execve(td, &args, NULL);
+	post_execve(td, error, oldvmspace);
+	return (error);
+}
+
 #ifndef _SYS_SYSPROTO_H_
 struct execve_args {
 	char    *fname; 

@@ -332,6 +332,7 @@ int	 execle(const char *, const char *, ...);
 int	 execlp(const char *, const char *, ...) __null_sentinel;
 int	 execv(const char *, char * const *);
 int	 execve(const char *, char * const *, char * const *);
+int	 coexecve(pid_t, const char *, char * const *, char * const *);
 int	 execvp(const char *, char * const *);
 pid_t	 fork(void);
 long	 fpathconf(int, int);

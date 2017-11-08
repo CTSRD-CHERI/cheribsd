@@ -405,4 +405,5 @@ MIASM =  \
 	getfsstat.o \
 	fhstatfs.o \
 	mknodat.o \
-	kevent.o
+	kevent.o \
+	coexecve.o

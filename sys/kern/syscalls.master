@@ -1023,6 +1023,8 @@
 				    struct kevent *changelist, int nchanges, \
 				    struct kevent *eventlist, int nevents, \
 				    const struct timespec *timeout); }
+561	AUE_NULL	STD	{ int coexecve(pid_t pid, char *fname, char **argv, \
+				    char **envv); }
 
 ; Please copy any additions and changes to the following compatability tables:
 ; sys/compat/freebsd32/syscalls.master

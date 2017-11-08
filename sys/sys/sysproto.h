@@ -1771,6 +1771,12 @@ struct kevent_args {
 	char nevents_l_[PADL_(int)]; int nevents; char nevents_r_[PADR_(int)];
 	char timeout_l_[PADL_(const struct timespec *)]; const struct timespec * timeout; char timeout_r_[PADR_(const struct timespec *)];
 };
+struct coexecve_args {
+	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
+	char fname_l_[PADL_(char *)]; char * fname; char fname_r_[PADR_(char *)];
+	char argv_l_[PADL_(char **)]; char ** argv; char argv_r_[PADR_(char **)];
+	char envv_l_[PADL_(char **)]; char ** envv; char envv_r_[PADR_(char **)];
+};
 int	nosys(struct thread *, struct nosys_args *);
 void	sys_sys_exit(struct thread *, struct sys_exit_args *);
 int	sys_fork(struct thread *, struct fork_args *);
@@ -2151,6 +2157,7 @@ int	sys_getfsstat(struct thread *, struct getfsstat_args *);
 int	sys_fhstatfs(struct thread *, struct fhstatfs_args *);
 int	sys_mknodat(struct thread *, struct mknodat_args *);
 int	sys_kevent(struct thread *, struct kevent_args *);
+int	sys_coexecve(struct thread *, struct coexecve_args *);
 
 #ifdef COMPAT_43
 
@@ -3043,6 +3050,7 @@ int	freebsd11_mknodat(struct thread *, struct freebsd11_mknodat_args *);
 #define	SYS_AUE_fhstatfs	AUE_FHSTATFS
 #define	SYS_AUE_mknodat	AUE_MKNODAT
 #define	SYS_AUE_kevent	AUE_KEVENT
+#define	SYS_AUE_coexecve	AUE_NULL
 
 #undef PAD_
 #undef PADL_

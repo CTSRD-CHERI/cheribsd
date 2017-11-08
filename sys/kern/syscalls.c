@@ -567,4 +567,5 @@ const char *syscallnames[] = {
 	"fhstatfs",			/* 558 = fhstatfs */
 	"mknodat",			/* 559 = mknodat */
 	"kevent",			/* 560 = kevent */
+	"coexecve",			/* 561 = coexecve */
 };

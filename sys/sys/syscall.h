@@ -478,4 +478,5 @@
 #define	SYS_fhstatfs	558
 #define	SYS_mknodat	559
 #define	SYS_kevent	560
-#define	SYS_MAXSYSCALL	561
+#define	SYS_coexecve	561
+#define	SYS_MAXSYSCALL	562
