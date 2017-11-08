@@ -24,6 +24,7 @@ SUBDIR=	alias \
 	chpass \
 	cksum \
 	cmp \
+	coexec \
 	col \
 	colldef \
 	colrm \
