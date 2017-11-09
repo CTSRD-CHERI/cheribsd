@@ -102,6 +102,8 @@ int	kern_cpuset_getid(struct thread *td, cpulevel_t level,
 int	kern_cpuset_setid(struct thread *td, cpuwhich_t which,
 	    id_t id, cpusetid_t setid);
 int	kern_dup(struct thread *td, u_int mode, int flags, int old, int new);
+int	kern_coexecve(struct thread *td, struct image_args *args,
+	    struct mac *mac_p, struct proc *cop);
 int	kern_execve(struct thread *td, struct image_args *args,
 	    struct mac *mac_p);
 int	kern_fchmodat(struct thread *td, int fd, char *path,

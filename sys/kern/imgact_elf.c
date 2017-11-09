@@ -934,6 +934,9 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	 */
 	VOP_UNLOCK(imgp->vp, 0);
 
+	if (imgp->cop != NULL)
+		printf("%s: cop %p\n", __func__, imgp->cop);
+
 	error = exec_new_vmspace(imgp, sv);
 	imgp->proc->p_sysent = sv;
 

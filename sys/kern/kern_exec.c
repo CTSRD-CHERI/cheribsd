@@ -118,7 +118,7 @@ static int sysctl_kern_ps_strings(SYSCTL_HANDLER_ARGS);
 static int sysctl_kern_usrstack(SYSCTL_HANDLER_ARGS);
 static int sysctl_kern_stackprot(SYSCTL_HANDLER_ARGS);
 static int do_execve(struct thread *td, struct image_args *args,
-    struct mac *mac_p);
+    struct mac *mac_p, struct proc *cop);
 
 /* XXX This should be vm_size_t. */
 SYSCTL_PROC(_kern, KERN_PS_STRINGS, ps_strings, CTLTYPE_ULONG|CTLFLAG_RD|
@@ -203,18 +203,25 @@ sys_coexecve(struct thread *td, struct coexecve_args *uap)
 {
 	struct image_args args;
 	struct vmspace *oldvmspace;
+	struct proc *p;
 	int error;
 
-	printf("PING\n");
-
-	error = pre_execve(td, &oldvmspace);
+	// XXX: Revisit the flags.
+	error = pget(uap->pid, PGET_HOLD | PGET_CANDEBUG, &p);
 	if (error != 0)
 		return (error);
+	error = pre_execve(td, &oldvmspace);
+	if (error != 0) {
+		PRELE(p);
+		return (error);
+	}
 	error = exec_copyin_args(&args, uap->fname, UIO_USERSPACE,
 	    uap->argv, uap->envv);
 	if (error == 0)
-		error = kern_execve(td, &args, NULL);
+		error = kern_coexecve(td, &args, NULL, p);
 	post_execve(td, error, oldvmspace);
+	PRELE(p);
+
 	return (error);
 }
 
@@ -358,14 +365,22 @@ post_execve(struct thread *td, int error, struct vmspace *oldvmspace)
  * memory).
  */
 int
-kern_execve(struct thread *td, struct image_args *args, struct mac *mac_p)
+kern_coexecve(struct thread *td, struct image_args *args, struct mac *mac_p,
+    struct proc *cop)
 {
 
 	AUDIT_ARG_ARGV(args->begin_argv, args->argc,
 	    args->begin_envv - args->begin_argv);
 	AUDIT_ARG_ENVV(args->begin_envv, args->envc,
 	    args->endp - args->begin_envv);
-	return (do_execve(td, args, mac_p));
+	return (do_execve(td, args, mac_p, cop));
+}
+
+int
+kern_execve(struct thread *td, struct image_args *args, struct mac *mac_p)
+{
+
+	return (kern_coexecve(td, args, mac_p, NULL));
 }
 
 /*
@@ -373,7 +388,8 @@ kern_execve(struct thread *td, struct image_args *args, struct mac *mac_p)
  * userspace pointers from the passed thread.
  */
 static int
-do_execve(struct thread *td, struct image_args *args, struct mac *mac_p)
+do_execve(struct thread *td, struct image_args *args, struct mac *mac_p,
+    struct proc *cop)
 {
 	struct proc *p = td->td_proc;
 	struct nameidata nd;
@@ -425,6 +441,7 @@ do_execve(struct thread *td, struct image_args *args, struct mac *mac_p)
 	imgp->proc = p;
 	imgp->attr = &attr;
 	imgp->args = args;
+	imgp->cop = cop;
 	oldcred = p->p_ucred;
 
 #ifdef MAC
@@ -974,6 +991,8 @@ exec_fail:
 
 	if (error && imgp->vmspace_destroyed) {
 		/* sorry, no more process anymore. exit gracefully */
+		if (cop != NULL)
+			PRELE(cop);
 		exit1(td, 0, SIGABRT);
 		/* NOT REACHED */
 	}
