@@ -42,6 +42,8 @@
 
 #include <machine/asm.h>
 
+	.cfi_sections .debug_frame
+
 .globl _C_LABEL(_rtld_relocate_nonplt_self)
 .globl _C_LABEL(_rtld)
 
@@ -131,6 +133,7 @@ END(rtld_start)
 _rtld_bind_start:
 	.frame	sp, XCALLFRAME_SIZ, $15
 	.cfi_startproc simple
+	.cfi_def_cfa sp, 0
 	.cfi_register ra, $15
 	move	v1, gp			/* save old GP */
 #if defined(__mips_o32) || defined(__mips_o64)
@@ -138,7 +141,7 @@ _rtld_bind_start:
 #endif
 	SETUP_GP
 	PTR_SUBU sp, XCALLFRAME_SIZ	/* save arguments and sp value in stack */
-	.cfi_def_cfa sp, XCALLFRAME_SIZ
+	.cfi_def_cfa_offset XCALLFRAME_SIZ
 	SETUP_GP64(XCALLFRAME_GP, _rtld_bind_start)
 	SAVE_GP(XCALLFRAME_GP)
 #if defined(__mips_n32) || defined(__mips_n64)
@@ -224,6 +227,7 @@ END(_rtld_bind_start)
 _rtld_pltbind_start:
 	.frame	sp, XCALLFRAME_SIZ, $15
 	.cfi_startproc simple
+	.cfi_def_cfa sp, 0
 	.cfi_register ra, $15
 #if defined(__mips_o32)
 	move	v1, gp			/* save pointer to .got.plt */
@@ -235,7 +239,7 @@ _rtld_pltbind_start:
 #endif
 	SETUP_GP
 	PTR_SUBU sp, XCALLFRAME_SIZ	/* save arguments and sp value in stack */
-	.cfi_def_cfa sp, XCALLFRAME_SIZ
+	.cfi_def_cfa_offset XCALLFRAME_SIZ
 	SETUP_GP64(XCALLFRAME_GP, _rtld_pltbind_start)
 	SAVE_GP(XCALLFRAME_GP)
 #if defined(__mips_n32) || defined(__mips_n64)
