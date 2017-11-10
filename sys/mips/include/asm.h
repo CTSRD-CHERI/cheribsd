@@ -478,6 +478,7 @@ _C_LABEL(x):
 #define	INT_SUBI	dsubi
 #define	INT_SUBU	dsubu
 #define	INT_SUBIU	dsubu
+/* FIXME: this seems wrong */
 #define	INT_L		ld
 #define	INT_LA		dla
 #define	INT_S		sd

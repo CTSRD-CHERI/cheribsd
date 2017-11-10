@@ -314,7 +314,7 @@ mips_sw1:
 	 * with emulator state.
 	 */
 	PTR_LA	t2, _C_LABEL(qemu_trace_perthread)	# Load address of var
-	PTR_L	t2, 0(t2)				# Load var value
+	lw	t2, 0(t2)				# Load var value
 	beqz	t2, done_qemu_tracing			# Skip if value is 0
 	nop
 
