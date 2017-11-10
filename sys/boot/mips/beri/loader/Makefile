@@ -68,6 +68,8 @@ SRCS+=		altera_jtag_uart.c				\
 # Since we don't have a backward compatibility issue, default to this on BERI.
 CFLAGS+=	-DBOOT_PROMPT_123
 
+HELP_FILES+=	help.mips
+
 # Always add MI sources
 .include	"${BOOTSRC}/loader.mk"
 
@@ -77,8 +79,6 @@ CFLAGS+=	-I${BOOTSRC}/mips/beri/common
 
 # Loader-specific MD headers
 CFLAGS+=	-I${.CURDIR}
-
-CLEANFILES+=	loader.help
 
 # Generate code appropriate for the loader environment
 CFLAGS+=	-G0					\
@@ -95,15 +95,6 @@ LDFLAGS=	-nostdlib				\
 
 DPADD=		${LIBFICL} ${LIBSA}
 LDADD=		${LIBFICL} ${LIBSA}
-
-loader.help: help.common help.mips
-	cat ${.ALLSRC} | \
-	    awk -f ${LDRSRC}/merge_help.awk > ${.TARGET}
-
-.PATH: ${BOOTSRC}/forth
-.include	"${BOOTSRC}/forth/Makefile.inc"
-
-FILES+= loader.rc menu.rc
 
 .if defined(LOADER_USB_SUPPORT)
 # Do garbage collection
