@@ -7,7 +7,6 @@ PROG=	cheriabitest-mt
 
 CHERIABI_TESTS=	yes
 CHERI_C_TESTS=	yes
-
-LIBADD+=	pthread
+CHERITHREAD_TESTS=	yes
 
 .include	<${SRCDIR}/Makefile>

@@ -1493,6 +1493,22 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_func = test_sandbox_var_constructor,
 	  .ct_flags = CT_FLAG_SANDBOX, },
 
+#ifdef CHERITHREAD_TESTS
+	/*
+	 * Tests of pthread interactions with libcheri.
+	 */
+	{ .ct_name = "test_sandbox_pthread_abort",
+	  .ct_desc = "Test sandbox abort from a second thread",
+	  .ct_func = test_sandbox_pthread_abort,
+	  .ct_flags = CT_FLAG_SANDBOX, },
+
+	{ .ct_name = "test_sandbox_pthread_cs_helloworld",
+	  .ct_desc = "Test sandbox hello world from a second thread",
+	  .ct_func = test_sandbox_pthread_cs_helloworld,
+	  .ct_flags = CT_FLAG_STDOUT_STRING | CT_FLAG_SANDBOX,
+	  .ct_stdout_string = "hello world\n" },
+#endif
+
 	/*
 	 * Tests relating to setjmp(3) and longjmp(3).
 	 */

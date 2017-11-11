@@ -58,6 +58,10 @@ SRCS+=	test_runtime.c	\
 .endif
 .endif
 
+.ifdef CHERITHREAD_TESTS
+CFLAGS+=	-DCHERITHREAD_TESTS
+.endif
+
 MAN=
 
 .ifndef BOOTSTRAPPING
@@ -79,6 +83,11 @@ LIBADD+=	xo util
 NO_SHARED?=	YES
 
 NO_WERROR=	YES
+
+.ifdef CHERITHREAD_TESTS
+LIBADD+=	pthread
+SRCS+=		cheritest_libcheri_pthreads.c
+.endif
 
 .ifdef BOOTSTRAPPING
 CFLAGS+=	-DLIST_ONLY \

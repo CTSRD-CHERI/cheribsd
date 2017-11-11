@@ -5,6 +5,6 @@ SRCDIR=	${.CURDIR}/../cheritest
 
 PROG=	cheritest-mt
 
-LIBADD+=	pthread
+CHERITHREAD_TESTS=	yes
 
 .include	<${SRCDIR}/Makefile>

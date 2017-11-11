@@ -369,6 +369,10 @@ void	test_sandbox_return_global_capability(const struct cheri_test *ctp);
 void	test_sandbox_return_local_capability(const struct cheri_test *ctp);
 void	test_sandbox_pass_local_capability_arg(const struct cheri_test *ctp);
 
+/* cheritest_libcheri_pthreads.c */
+void	test_sandbox_pthread_abort(const struct cheri_test *ctp);
+void	test_sandbox_pthread_cs_helloworld(const struct cheri_test *ctp);
+
 /* cheritest_libcheri_trustedstack.c */
 register_t	cheritest_libcheri_userfn_getstack(void);
 register_t	cheritest_libcheri_userfn_setstack(register_t arg);
