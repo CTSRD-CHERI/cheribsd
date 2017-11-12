@@ -90,6 +90,7 @@ _LIBRARIES=	\
 		cap_pwd \
 		cap_random \
 		cap_sysctl \
+		cap_syslog \
 		com_err \
 		compiler_rt \
 		crypt \
@@ -267,6 +268,7 @@ _DP_cap_grp=	nv
 _DP_cap_pwd=	nv
 _DP_cap_random=	nv
 _DP_cap_sysctl=	nv
+_DP_cap_syslog=	nv
 _DP_pjdlog=	util
 _DP_png=	z
 _DP_opie=	md
@@ -582,6 +584,7 @@ LIBCAP_GRPDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_grp
 LIBCAP_PWDDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_pwd
 LIBCAP_RANDOMDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_random
 LIBCAP_SYSCTLDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_sysctl
+LIBCAP_SYSLOGDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_syslog
 LIBBSDXMLDIR=	${_LIB_OBJTOP}/lib/libexpat
 LIBKVMDIR=	${_LIB_OBJTOP}/lib/libkvm
 LIBPTHREADDIR=	${_LIB_OBJTOP}/lib/libthr
