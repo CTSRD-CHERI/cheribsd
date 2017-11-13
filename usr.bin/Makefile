@@ -119,6 +119,7 @@ SUBDIR=	alias \
 	patch \
 	pathchk \
 	perror \
+	pie \
 	pr \
 	printenv \
 	printf \
