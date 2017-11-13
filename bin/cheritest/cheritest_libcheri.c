@@ -47,6 +47,7 @@
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 #include <cheri/cheri_enter.h>
+#include <cheri/cheri_errno.h>
 #include <cheri/cheri_system.h>
 #include <cheri/cheri_fd.h>
 #include <cheri/sandbox.h>
@@ -132,18 +133,14 @@ test_sandbox_cs_clock_gettime_default(const struct cheri_test *ctp __unused)
 {
 	register_t v;
 
-#ifdef CHERIERRNO_LINKS
 	cheri_errno = 0;
-#endif
 	v = invoke_clock_gettime();
 	if (v != -1)
 		cheritest_failure_errx("Sandbox returned %jd", (intmax_t)v);
-#ifdef CHERIERRNO_LINKS
 	else if (cheri_errno != 0)
 		cheritest_failure_errx(
 		    "Sandbox returned -1, but set cheri_errno to %d",
 		    cheri_errno);
-#endif
 	else
 		cheritest_success();
 }
@@ -155,18 +152,14 @@ test_sandbox_cs_clock_gettime_deny(const struct cheri_test *ctp __unused)
 
 	syscall_checks[SYS_clock_gettime] = (syscall_check_t)deny_syscall;
 
-#ifdef CHERIERRNO_LINKS
 	cheri_errno = 0;
-#endif
 	v = invoke_clock_gettime();
 	if (v != -1)
 		cheritest_failure_errx("Sandbox returned %jd", (intmax_t)v);
-#ifdef CHERIERRNO_LINKS
 	else if (cheri_errno != 0)
 		cheritest_failure_errx(
 		    "Sandbox returned -1, but set cheri_errno to %d",
 		    cheri_errno);
-#endif
 	else
 		cheritest_success();
 }
