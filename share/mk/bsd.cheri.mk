@@ -142,11 +142,13 @@ STATIC_CFLAGS+= -ftls-model=local-exec # MIPS/hybrid case
 .endif
 
 .if ${MK_CHERI128} == "yes"
-_CHERI_COMMON_FLAGS+=	-mllvm -cheri128
-# XXX: Needed as Clang rejects -mllvm -cheri128 when using $CC to link.
-_CHERI_CFLAGS+=	-Qunused-arguments
+_CHERI_COMMON_FLAGS+=	-cheri=128
+.else
+_CHERI_COMMON_FLAGS+=	-cheri=256
 .endif
-
+# XXX: Needed as Clang rejects -mllvm -cheri128 when using $CC to link:
+# warning: argument unused during compilation: '-cheri=128'
+_CHERI_CFLAGS+=	-Qunused-arguments
 .if ${WANT_CHERI} != "variables"
 .if ${MK_CHERI_SHARED} == "no" || defined(CHERI_NO_SHARED)
 NO_SHARED=	yes
