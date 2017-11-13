@@ -745,7 +745,7 @@ _C_LABEL(x):
 #define _JB_FPREG_F31		26
 #define _JB_FPREG_FCSR		27
 
-#if defined(_MIPS_ARCH_CHERI) || defined(_MIPS_ARCH_CHERI128)
+#if defined(__CHERI__)
 /*
  * CHERI capabilities start here, but must be aligned so are may start up
  * to two slots later.

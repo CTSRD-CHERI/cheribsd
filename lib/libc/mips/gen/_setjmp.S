@@ -114,7 +114,7 @@ LEAF(_setjmp)
 #endif
 	INT_S	v0, (_JB_FPREG_FCSR * SZREG)(a0)
 #endif /* ! __mips_soft_float */
-#if defined(_MIPS_ARCH_CHERI)
+#if defined(__CHERI__)
 	/* jmp_buf is 64-bit aligned, so we need to round it up. */
 	cgetbase	t0, $c3
 	cgetoffset	t1, $c3
@@ -207,7 +207,7 @@ LEAF(_longjmp)
 	FP_L	$f31, (_JB_FPREG_F31 * SZREG)(a0)
 #endif
 #endif	/* ! __mips_soft_float */
-#if defined(_MIPS_ARCH_CHERI)
+#if defined(__CHERI__)
 	/* jmp_buf is 64-bit aligned, so we need to round it up. */
 	cgetbase	t0, $c3
 	cgetoffset	t1, $c3
