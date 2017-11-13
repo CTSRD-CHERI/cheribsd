@@ -31,11 +31,9 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include <err.h>
-#include <limits.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 
 extern char **environ;
@@ -44,18 +42,41 @@ static void
 usage(void)
 {
 
-	fprintf(stderr, "usage: pie\n");
+	fprintf(stderr, "usage: pie [-s | -v]\n");
 	exit(1);
 }
 
 int
 main(int argc, char **argv __unused)
 {
+	bool sflag = false, vflag = false;
+	int ch;
 
-	if (argc != 1)
+	while ((ch = getopt(argc, argv, "sv")) != -1) {
+		switch (ch) {
+		case 's':
+			sflag = true;
+			break;
+		case 'v':
+			vflag = true;
+			break;
+		case '?':
+		default:
+			usage();
+		}
+	}
+
+	argc -= optind;
+	if (argc != 0)
 		usage();
 
-	printf("pie\n");
+	if (vflag)
+		printf("pie\n");
+
+	if (sflag) {
+		while (sleep(1) == 0)
+			continue;
+	}
 	
 	return (0);
 }
