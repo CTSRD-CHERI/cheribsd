@@ -77,6 +77,6 @@ main(int argc, char **argv __unused)
 		while (sleep(1) == 0)
 			continue;
 	}
-	
+
 	return (0);
 }
