@@ -4098,6 +4098,23 @@ vmspace_exec(struct proc *p, vm_offset_t minuser, vm_offset_t maxuser)
 	return (0);
 }
 
+int
+vmspace_coexec(struct proc *p, struct proc *cop, vm_offset_t minuser, vm_offset_t maxuser)
+{
+	struct vmspace *newvmspace;
+
+	KASSERT((curthread->td_pflags & TDP_EXECVMSPC) == 0,
+	    ("vmspace_exec recursed"));
+	newvmspace = vmspace_acquire_ref(cop);
+	PROC_VMSPACE_LOCK(p);
+	p->p_vmspace = newvmspace;
+	PROC_VMSPACE_UNLOCK(p);
+	if (p == curthread->td_proc)
+		pmap_activate(curthread);
+	curthread->td_pflags |= TDP_EXECVMSPC;
+	return (0);
+}
+
 /*
  * Unshare the specified VM space for forcing COW.  This
  * is called by rfork, for the (RFMEM|RFPROC) == 0 case.

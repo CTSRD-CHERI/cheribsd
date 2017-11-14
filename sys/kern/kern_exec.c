@@ -1126,10 +1126,16 @@ exec_new_vmspace(struct image_params *imgp, const struct sysentvec *sv)
 	else
 		sv_minuser = MAX(sv->sv_minuser, PAGE_SIZE);
 	if (vmspace->vm_refcnt == 1 && vm_map_min(map) == sv_minuser &&
-	    vm_map_max(map) == sv->sv_maxuser) {
+	    vm_map_max(map) == sv->sv_maxuser && imgp->cop == NULL) {
 		shmexit(vmspace);
 		pmap_remove_pages(vmspace_pmap(vmspace));
 		vm_map_remove(map, vm_map_min(map), vm_map_max(map));
+	} else if (imgp->cop != NULL) {
+		error = vmspace_coexec(p, imgp->cop, sv_minuser, sv->sv_maxuser);
+		if (error)
+			return (error);
+		vmspace = p->p_vmspace;
+		map = &vmspace->vm_map;
 	} else {
 		error = vmspace_exec(p, sv_minuser, sv->sv_maxuser);
 		if (error)
@@ -1150,7 +1156,7 @@ exec_new_vmspace(struct image_params *imgp, const struct sysentvec *sv)
 
 	/* Map a shared page */
 	obj = sv->sv_shared_page_obj;
-	if (obj != NULL) {
+	if (obj != NULL && imgp->cop == NULL) {
 		vm_object_reference(obj);
 		error = vm_map_fixed(map, obj, 0,
 		    sv->sv_shared_page_base, sv->sv_shared_page_len,
@@ -1162,6 +1168,9 @@ exec_new_vmspace(struct image_params *imgp, const struct sysentvec *sv)
 			return (error);
 		}
 	}
+
+	if (imgp->cop != NULL)
+		return (0);
 
 	/* Allocate a new stack */
 	if (imgp->stack_sz != 0) {

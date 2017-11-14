@@ -102,6 +102,7 @@ typedef int (*pmap_pinit_t)(struct pmap *pmap);
 struct vmspace *vmspace_alloc(vm_offset_t, vm_offset_t, pmap_pinit_t);
 struct vmspace *vmspace_fork(struct vmspace *, vm_ooffset_t *);
 int vmspace_exec(struct proc *, vm_offset_t, vm_offset_t);
+int vmspace_coexec(struct proc *, struct proc *, vm_offset_t, vm_offset_t);
 int vmspace_unshare(struct proc *);
 void vmspace_exit(struct thread *);
 struct vmspace *vmspace_acquire_ref(struct proc *);

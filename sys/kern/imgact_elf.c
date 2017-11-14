@@ -916,6 +916,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		 */
 		if (baddr == 0)
 			et_dyn_addr = __elfN(et_dyn_load_addr);
+		// XXX: Change the address to avoid collision with existing mappings.
 	}
 	sv = brand_info->sysvec;
 	if (interp != NULL && brand_info->interp_newpath != NULL)
