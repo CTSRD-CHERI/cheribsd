@@ -128,6 +128,12 @@ struct kaiocb {
 	struct	file *fd_file;		/* (*) pointer to file structure */
 	struct	aioliojob *lio;		/* (*) optional lio job */
 	struct	aiocb *ujob;		/* (*) pointer in userspace of aiocb */
+#if __has_feature(capabilities)
+	__intcap_t	ujobptr;
+#else
+	intptr_t	ujobptr;
+#endif
+	size_t		ujobptr_size;
 	struct	knlist klist;		/* (a) list of knotes */
 	struct	aiocb uaiocb;		/* (*) copy of user I/O control block */
 	ksiginfo_t ksi;			/* (a) realtime signal info */

@@ -536,14 +536,15 @@
 253	AUE_ISSETUGID	NOPROTO	{ int issetugid(void); }
 254	AUE_LCHOWN	NOPROTO	{ int lchown(_In_z_ const char *path, int uid, \
 				    int gid); }
-; XXX-BD: aio functions impractical to check
-255	AUE_AIO_READ	NOSTD	{ int cheriabi_aio_read( \
-				    _Inout_ struct aiocb_c *aiocbp); }
-256	AUE_AIO_WRITE	NOSTD	{ int cheriabi_aio_write( \
-				    _Inout_ struct aiocb_c *aiocbp); }
-257	AUE_LIO_LISTIO	NOSTD	{ int cheriabi_lio_listio(int mode, \
+255	AUE_AIO_READ	STD	{ int cheriabi_aio_read( \
+				    _Inout_ struct aiocb_c * __capability \
+				    aiocbp); }
+256	AUE_AIO_WRITE	STD	{ int cheriabi_aio_write( \
+				    _Inout_ struct aiocb_c * __capability \
+				    aiocbp); }
+257	AUE_LIO_LISTIO	STD	{ int cheriabi_lio_listio(int mode, \
 				    _Inout_updates_(nent) \
-				    struct aiocb_c * const *acb_list, \
+				    struct aiocb_c * const __capability *acb_list, \
 				    int nent, \
 				    _In_opt_ struct sigevent_c *sig); }
 258	AUE_NULL	UNIMPL	nosys
@@ -622,16 +623,17 @@
 312	AUE_SETRESGID	NOPROTO	{ int setresgid(gid_t rgid, gid_t egid, \
 				    gid_t sgid); }
 313	AUE_NULL	OBSOL	signanosleep
-314	AUE_AIO_RETURN	NOSTD	{ int cheriabi_aio_return( \
-				    _Inout_ struct aiocb_c *aiocbp); }
-; XXX-BD: aiobp more likely void * __capability *
-315	AUE_AIO_SUSPEND	NOSTD	{ int cheriabi_aio_suspend( \
+314	AUE_AIO_RETURN	STD	{ int cheriabi_aio_return( \
+				    _Inout_ struct aiocb_c * __capability \
+				    aiocbp); }
+315	AUE_AIO_SUSPEND	STD	{ int cheriabi_aio_suspend( \
 				    _Inout_updates_(nent) \
-				    struct aiocb_c * const * aiocbp, int nent, \
+				    struct aiocb_c * const __capability * aiocbp, int nent, \
 				    _In_opt_ const struct timespec *timeout); }
-316	AUE_AIO_CANCEL	NOSTD	{ int cheriabi_aio_cancel(int fd, \
+; XXX-BD: Requiring load is technically excessive
+316	AUE_AIO_CANCEL	STD	{ int cheriabi_aio_cancel(int fd, \
 				    _In_opt_ struct aiocb_c *aiocbp); }
-317	AUE_AIO_ERROR	NOSTD	{ int cheriabi_aio_error( \
+317	AUE_AIO_ERROR	STD	{ int cheriabi_aio_error( \
 				    _In_ struct aiocb_c *aiocbp); }
 318	AUE_AIO_READ	OBSOL	oaio_read
 319	AUE_AIO_WRITE	OBSOL	oaio_write
@@ -725,9 +727,9 @@
 				    _In_z_ const char *path, \
 				    int attrnamespace, \
 				    _In_z_ const char *attrname); }
-359	AUE_AIO_WAITCOMPLETE	NOSTD	{ int cheriabi_aio_waitcomplete( \
+359	AUE_AIO_WAITCOMPLETE	STD	{ int cheriabi_aio_waitcomplete( \
 				    _Outptr_result_maybenull_ \
-				    struct aiocb_c **aiocbp, \
+				    struct aiocb_c * __capability *aiocbp, \
 				    _In_opt_ struct timespec *timeout); }
 360	AUE_GETRESUID	NOPROTO	{ int getresuid(_Out_opt_ uid_t *ruid, \
 				    _Out_opt_ uid_t *euid, \
@@ -970,8 +972,9 @@
 				    _In_reads_(nargs) void * __capability *args); }
 464	AUE_NULL 	NOPROTO	{ int thr_set_name(long id, \
 				    _In_z_ const char *name); }
-465	AUE_AIO_FSYNC	NOSTD	{ int cheriabi_aio_fsync(int op, \
-				    _In_ struct aiocb_c *aiocbp); }
+465	AUE_AIO_FSYNC	STD	{ int cheriabi_aio_fsync(int op, \
+				    _Inout_ struct aiocb_c * __capability \
+				    aiocbp); }
 ; XXX-BD: _In_ if RTP_SET, _Out_ if RTP_LOOKUP
 466	AUE_RTPRIO	NOPROTO	{ int rtprio_thread(int function, \
 				    lwpid_t lwpid, \
@@ -1199,8 +1202,9 @@
 				    int flags); }
 542	AUE_PIPE	NOPROTO	{ int pipe2(_Out_writes_(2) int *fildes, \
 				    int flags); }
-543	AUE_AIO_MLOCK	NOSTD	{ int cheriabi_aio_mlock( \
-				    _In_ struct aiocb_c *aiocbp); }
+543	AUE_AIO_MLOCK	STD	{ int cheriabi_aio_mlock( \
+				    _Inout_ struct aiocb_c * __capability \
+				    aiocbp); }
 544	AUE_PROCCTL	STD|NOPARSE	{ int cheriabi_procctl(int idtype, \
 				    id_t id, int com, void *data); }
 545	AUE_POLL	NOPROTO	{ int ppoll( \

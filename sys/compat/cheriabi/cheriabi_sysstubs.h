@@ -1502,32 +1502,32 @@ SYS_STUB(254, int, lchown,
 )
 
 SYS_STUB_ARGHASPTRS(255, int, aio_read,
-    /* _protoargs */ (struct aiocb* aiocbp),
-    /* _protoargs_chk */ (int *retp , __capability int *stub_errno, struct aiocb* __capability  aiocbp),
-    /* _protoargs_err */ (__capability int *stub_errno, struct aiocb* __capability  aiocbp),
-    /* _callargs */ ((__cheri_cast struct aiocb*)aiocbp),
+    /* _protoargs */ (struct aiocb*__capability aiocbp),
+    /* _protoargs_chk */ (int *retp , __capability int *stub_errno, struct aiocb* __capability __capability aiocbp),
+    /* _protoargs_err */ (__capability int *stub_errno, struct aiocb* __capability __capability aiocbp),
+    /* _callargs */ ((__cheri_cast struct aiocb*__capability)aiocbp),
     /* _callargs_chk */ (&ret, stub_errno, aiocbp),
-    /* _callargs_err */ (&errno, (struct aiocb*)aiocbp),
+    /* _callargs_err */ (&errno, (struct aiocb*__capability)aiocbp),
     /* _localcheck */ {if (!(cheri_getperm(aiocbp) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
 SYS_STUB_ARGHASPTRS(256, int, aio_write,
-    /* _protoargs */ (struct aiocb* aiocbp),
-    /* _protoargs_chk */ (int *retp , __capability int *stub_errno, struct aiocb* __capability  aiocbp),
-    /* _protoargs_err */ (__capability int *stub_errno, struct aiocb* __capability  aiocbp),
-    /* _callargs */ ((__cheri_cast struct aiocb*)aiocbp),
+    /* _protoargs */ (struct aiocb*__capability aiocbp),
+    /* _protoargs_chk */ (int *retp , __capability int *stub_errno, struct aiocb* __capability __capability aiocbp),
+    /* _protoargs_err */ (__capability int *stub_errno, struct aiocb* __capability __capability aiocbp),
+    /* _callargs */ ((__cheri_cast struct aiocb*__capability)aiocbp),
     /* _callargs_chk */ (&ret, stub_errno, aiocbp),
-    /* _callargs_err */ (&errno, (struct aiocb*)aiocbp),
+    /* _callargs_err */ (&errno, (struct aiocb*__capability)aiocbp),
     /* _localcheck */ {if (!(cheri_getperm(aiocbp) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
 SYS_STUB_ARGHASPTRS(257, int, lio_listio,
-    /* _protoargs */ (int mode, struct aiocb*const * acb_list, int nent, struct sigevent* sig),
-    /* _protoargs_chk */ (int *retp , __capability int *stub_errno, int mode, struct aiocb* __capability const * __capability  acb_list, int nent, struct sigevent* __capability  sig),
-    /* _protoargs_err */ (__capability int *stub_errno, int mode, struct aiocb* __capability const * __capability  acb_list, int nent, struct sigevent* __capability  sig),
-    /* _callargs */ (mode, (__cheri_cast struct aiocb*const *)acb_list, nent, (__cheri_cast struct sigevent*)sig),
+    /* _protoargs */ (int mode, struct aiocb*const __capability * acb_list, int nent, struct sigevent* sig),
+    /* _protoargs_chk */ (int *retp , __capability int *stub_errno, int mode, struct aiocb* __capability const __capability * __capability  acb_list, int nent, struct sigevent* __capability  sig),
+    /* _protoargs_err */ (__capability int *stub_errno, int mode, struct aiocb* __capability const __capability * __capability  acb_list, int nent, struct sigevent* __capability  sig),
+    /* _callargs */ (mode, (__cheri_cast struct aiocb*const __capability *)acb_list, nent, (__cheri_cast struct sigevent*)sig),
     /* _callargs_chk */ (&ret, stub_errno, mode, acb_list, nent, sig),
-    /* _callargs_err */ (&errno, mode, (struct aiocb*const *)acb_list, nent, (struct sigevent*)sig),
+    /* _callargs_err */ (&errno, mode, (struct aiocb*const __capability *)acb_list, nent, (struct sigevent*)sig),
     /* _localcheck */ {if (!(cheri_getperm(acb_list) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(sig) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
@@ -1712,22 +1712,22 @@ SYS_STUB(312, int, setresgid,
 )
 
 SYS_STUB_ARGHASPTRS(314, int, aio_return,
-    /* _protoargs */ (struct aiocb* aiocbp),
-    /* _protoargs_chk */ (int *retp , __capability int *stub_errno, struct aiocb* __capability  aiocbp),
-    /* _protoargs_err */ (__capability int *stub_errno, struct aiocb* __capability  aiocbp),
-    /* _callargs */ ((__cheri_cast struct aiocb*)aiocbp),
+    /* _protoargs */ (struct aiocb*__capability aiocbp),
+    /* _protoargs_chk */ (int *retp , __capability int *stub_errno, struct aiocb* __capability __capability aiocbp),
+    /* _protoargs_err */ (__capability int *stub_errno, struct aiocb* __capability __capability aiocbp),
+    /* _callargs */ ((__cheri_cast struct aiocb*__capability)aiocbp),
     /* _callargs_chk */ (&ret, stub_errno, aiocbp),
-    /* _callargs_err */ (&errno, (struct aiocb*)aiocbp),
+    /* _callargs_err */ (&errno, (struct aiocb*__capability)aiocbp),
     /* _localcheck */ {if (!(cheri_getperm(aiocbp) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
 SYS_STUB_ARGHASPTRS(315, int, aio_suspend,
-    /* _protoargs */ (struct aiocb*const * aiocbp, int nent, const struct timespec * timeout),
-    /* _protoargs_chk */ (int *retp , __capability int *stub_errno, struct aiocb* __capability const * __capability  aiocbp, int nent, const struct timespec * __capability  timeout),
-    /* _protoargs_err */ (__capability int *stub_errno, struct aiocb* __capability const * __capability  aiocbp, int nent, const struct timespec * __capability  timeout),
-    /* _callargs */ ((__cheri_cast struct aiocb*const *)aiocbp, nent, (__cheri_cast const struct timespec *)timeout),
+    /* _protoargs */ (struct aiocb*const __capability * aiocbp, int nent, const struct timespec * timeout),
+    /* _protoargs_chk */ (int *retp , __capability int *stub_errno, struct aiocb* __capability const __capability * __capability  aiocbp, int nent, const struct timespec * __capability  timeout),
+    /* _protoargs_err */ (__capability int *stub_errno, struct aiocb* __capability const __capability * __capability  aiocbp, int nent, const struct timespec * __capability  timeout),
+    /* _callargs */ ((__cheri_cast struct aiocb*const __capability *)aiocbp, nent, (__cheri_cast const struct timespec *)timeout),
     /* _callargs_chk */ (&ret, stub_errno, aiocbp, nent, timeout),
-    /* _callargs_err */ (&errno, (struct aiocb*const *)aiocbp, nent, (const struct timespec *)timeout),
+    /* _callargs_err */ (&errno, (struct aiocb*const __capability *)aiocbp, nent, (const struct timespec *)timeout),
     /* _localcheck */ {if (!(cheri_getperm(aiocbp) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(timeout) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
@@ -2062,12 +2062,12 @@ SYS_STUB(358, int, extattr_delete_file,
 )
 
 SYS_STUB_ARGHASPTRS(359, int, aio_waitcomplete,
-    /* _protoargs */ (struct aiocb** aiocbp, struct timespec * timeout),
-    /* _protoargs_chk */ (int *retp , __capability int *stub_errno, struct aiocb* __capability * __capability  aiocbp, struct timespec * __capability  timeout),
-    /* _protoargs_err */ (__capability int *stub_errno, struct aiocb* __capability * __capability  aiocbp, struct timespec * __capability  timeout),
-    /* _callargs */ ((__cheri_cast struct aiocb**)aiocbp, (__cheri_cast struct timespec *)timeout),
+    /* _protoargs */ (struct aiocb*__capability * aiocbp, struct timespec * timeout),
+    /* _protoargs_chk */ (int *retp , __capability int *stub_errno, struct aiocb* __capability __capability * __capability  aiocbp, struct timespec * __capability  timeout),
+    /* _protoargs_err */ (__capability int *stub_errno, struct aiocb* __capability __capability * __capability  aiocbp, struct timespec * __capability  timeout),
+    /* _callargs */ ((__cheri_cast struct aiocb*__capability *)aiocbp, (__cheri_cast struct timespec *)timeout),
     /* _callargs_chk */ (&ret, stub_errno, aiocbp, timeout),
-    /* _callargs_err */ (&errno, (struct aiocb**)aiocbp, (struct timespec *)timeout),
+    /* _callargs_err */ (&errno, (struct aiocb*__capability *)aiocbp, (struct timespec *)timeout),
     /* _localcheck */ {if (!(cheri_getperm(aiocbp) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(timeout) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
@@ -2752,12 +2752,12 @@ SYS_STUB(464, int, thr_set_name,
 )
 
 SYS_STUB_ARGHASPTRS(465, int, aio_fsync,
-    /* _protoargs */ (int op, struct aiocb* aiocbp),
-    /* _protoargs_chk */ (int *retp , __capability int *stub_errno, int op, struct aiocb* __capability  aiocbp),
-    /* _protoargs_err */ (__capability int *stub_errno, int op, struct aiocb* __capability  aiocbp),
-    /* _callargs */ (op, (__cheri_cast struct aiocb*)aiocbp),
+    /* _protoargs */ (int op, struct aiocb*__capability aiocbp),
+    /* _protoargs_chk */ (int *retp , __capability int *stub_errno, int op, struct aiocb* __capability __capability aiocbp),
+    /* _protoargs_err */ (__capability int *stub_errno, int op, struct aiocb* __capability __capability aiocbp),
+    /* _callargs */ (op, (__cheri_cast struct aiocb*__capability)aiocbp),
     /* _callargs_chk */ (&ret, stub_errno, op, aiocbp),
-    /* _callargs_err */ (&errno, op, (struct aiocb*)aiocbp),
+    /* _callargs_err */ (&errno, op, (struct aiocb*__capability)aiocbp),
     /* _localcheck */ {if (!(cheri_getperm(aiocbp) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
@@ -3423,12 +3423,12 @@ SYS_STUB(542, int, pipe2,
 )
 
 SYS_STUB_ARGHASPTRS(543, int, aio_mlock,
-    /* _protoargs */ (struct aiocb* aiocbp),
-    /* _protoargs_chk */ (int *retp , __capability int *stub_errno, struct aiocb* __capability  aiocbp),
-    /* _protoargs_err */ (__capability int *stub_errno, struct aiocb* __capability  aiocbp),
-    /* _callargs */ ((__cheri_cast struct aiocb*)aiocbp),
+    /* _protoargs */ (struct aiocb*__capability aiocbp),
+    /* _protoargs_chk */ (int *retp , __capability int *stub_errno, struct aiocb* __capability __capability aiocbp),
+    /* _protoargs_err */ (__capability int *stub_errno, struct aiocb* __capability __capability aiocbp),
+    /* _callargs */ ((__cheri_cast struct aiocb*__capability)aiocbp),
     /* _callargs_chk */ (&ret, stub_errno, aiocbp),
-    /* _callargs_err */ (&errno, (struct aiocb*)aiocbp),
+    /* _callargs_err */ (&errno, (struct aiocb*__capability)aiocbp),
     /* _localcheck */ {if (!(cheri_getperm(aiocbp) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
