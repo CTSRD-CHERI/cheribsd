@@ -54,7 +54,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_open */
 	case 5: {
 		struct cheriabi_open_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char *__capability */
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->flags; /* int */
 		iarg[2] = p->mode; /* mode_t */
 		*n_args = 3;
@@ -80,22 +80,22 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_link */
 	case 9: {
 		struct cheriabi_link_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char *__capability */
-		uarg[1] = (intptr_t) p->to; /* const char *__capability */
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
+		uarg[1] = (cheri_getbase(p->to) + cheri_getoffset(p->to)); /* const char *__capability */
 		*n_args = 2;
 		break;
 	}
 	/* cheriabi_unlink */
 	case 10: {
 		struct cheriabi_unlink_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char *__capability */
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		*n_args = 1;
 		break;
 	}
 	/* cheriabi_chdir */
 	case 12: {
 		struct cheriabi_chdir_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char *__capability */
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -131,10 +131,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_mount */
 	case 21: {
 		struct cheriabi_mount_args *p = params;
-		uarg[0] = (intptr_t) p->type; /* const char *__capability */
-		uarg[1] = (intptr_t) p->path; /* const char *__capability */
+		uarg[0] = (cheri_getbase(p->type) + cheri_getoffset(p->type)); /* const char *__capability */
+		uarg[1] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[2] = p->flags; /* int */
-		uarg[3] = (intptr_t) p->data; /* void *__capability */
+		uarg[3] = (cheri_getbase(p->data) + cheri_getoffset(p->data)); /* void *__capability */
 		*n_args = 4;
 		break;
 	}
@@ -320,7 +320,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_setlogin */
 	case 50: {
 		struct cheriabi_setlogin_args *p = params;
-		uarg[0] = (intptr_t) p->namebuf; /* const char *__capability */
+		uarg[0] = (cheri_getbase(p->namebuf) + cheri_getoffset(p->namebuf)); /* const char *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -758,7 +758,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_rmdir */
 	case 137: {
 		struct cheriabi_rmdir_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char *__capability */
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -786,10 +786,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_quotactl */
 	case 148: {
 		struct cheriabi_quotactl_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char *__capability */
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->cmd; /* int */
 		iarg[2] = p->uid; /* int */
-		uarg[3] = (intptr_t) p->arg; /* void *__capability */
+		uarg[3] = (cheri_getbase(p->arg) + cheri_getoffset(p->arg)); /* void *__capability */
 		*n_args = 4;
 		break;
 	}
@@ -807,7 +807,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 155: {
 		struct cheriabi_nfssvc_args *p = params;
 		iarg[0] = p->flag; /* int */
-		uarg[1] = (intptr_t) p->argp; /* void *__capability */
+		uarg[1] = (cheri_getbase(p->argp) + cheri_getoffset(p->argp)); /* void *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -1829,8 +1829,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 390: {
 		struct cheriabi_kenv_args *p = params;
 		iarg[0] = p->what; /* int */
-		uarg[1] = (intptr_t) p->name; /* const char *__capability */
-		uarg[2] = (intptr_t) p->value; /* char *__capability */
+		uarg[1] = (cheri_getbase(p->name) + cheri_getoffset(p->name)); /* const char *__capability */
+		uarg[2] = (cheri_getbase(p->value) + cheri_getoffset(p->value)); /* char *__capability */
 		iarg[3] = p->len; /* int */
 		*n_args = 4;
 		break;
@@ -1867,9 +1867,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_mac_syscall */
 	case 394: {
 		struct cheriabi_mac_syscall_args *p = params;
-		uarg[0] = (intptr_t) p->policy; /* const char *__capability */
+		uarg[0] = (cheri_getbase(p->policy) + cheri_getoffset(p->policy)); /* const char *__capability */
 		iarg[1] = p->call; /* int */
-		uarg[2] = (intptr_t) p->arg; /* void *__capability */
+		uarg[2] = (cheri_getbase(p->arg) + cheri_getoffset(p->arg)); /* void *__capability */
 		*n_args = 3;
 		break;
 	}
@@ -2136,7 +2136,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 446: {
 		struct cheriabi_auditon_args *p = params;
 		iarg[0] = p->cmd; /* int */
-		uarg[1] = (intptr_t) p->data; /* void *__capability */
+		uarg[1] = (cheri_getbase(p->data) + cheri_getoffset(p->data)); /* void *__capability */
 		uarg[2] = p->length; /* u_int */
 		*n_args = 3;
 		break;
@@ -2540,9 +2540,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 495: {
 		struct cheriabi_linkat_args *p = params;
 		iarg[0] = p->fd1; /* int */
-		uarg[1] = (intptr_t) p->path1; /* const char *__capability */
+		uarg[1] = (cheri_getbase(p->path1) + cheri_getoffset(p->path1)); /* const char *__capability */
 		iarg[2] = p->fd2; /* int */
-		uarg[3] = (intptr_t) p->path2; /* const char *__capability */
+		uarg[3] = (cheri_getbase(p->path2) + cheri_getoffset(p->path2)); /* const char *__capability */
 		iarg[4] = p->flag; /* int */
 		*n_args = 5;
 		break;
@@ -2569,7 +2569,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 499: {
 		struct cheriabi_openat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->path; /* const char *__capability */
+		uarg[1] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[2] = p->flag; /* int */
 		iarg[3] = p->mode; /* mode_t */
 		*n_args = 4;
@@ -2608,7 +2608,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 503: {
 		struct cheriabi_unlinkat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->path; /* const char *__capability */
+		uarg[1] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[2] = p->flag; /* int */
 		*n_args = 3;
 		break;

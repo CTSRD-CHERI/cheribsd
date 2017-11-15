@@ -693,7 +693,11 @@ sed -e '
 					printf("\t\tcase %d:\n\t\t\tp = \"userland %s\";\n\t\t\tbreak;\n", i - 1, arg) > systracetmp
 				else
 					printf("\t\tcase %d:\n\t\t\tp = \"%s\";\n\t\t\tbreak;\n", i - 1, arg) > systracetmp
-				if (isptrtype(arg))
+				if (iscaptype(arg))
+					printf("\t\tuarg[%d] = (cheri_getbase(p->%s) + cheri_getoffset(p->%s)); /* %s */\n", \
+					     i - 1, \
+					     argname[i], argname[i], arg) > systrace
+				else if (isptrtype(arg))
 					printf("\t\tuarg[%d] = (intptr_t) p->%s; /* %s */\n", \
 					     i - 1, \
 					     argname[i], arg) > systrace
