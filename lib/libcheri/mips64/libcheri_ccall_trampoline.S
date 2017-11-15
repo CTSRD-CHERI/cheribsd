@@ -36,7 +36,7 @@
 #include <machine/cherireg.h>
 
 #define	CHERI_ERRNO_ASM
-#include <cheri/cheri_errno.h>
+#include <cheri/libcheri_errno.h>
 
 /*
  * Userspace implementation of libcheri invocation and return semantics.

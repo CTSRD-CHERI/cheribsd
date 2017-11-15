@@ -36,7 +36,7 @@
 
 #include <stdarg.h>
 
-#include <cheri/cheri_system_md.h>
+#include <cheri/libcheri_system_md.h>
 
 /*
  * For now, expose the symbol for the system-object reference in each sandbox

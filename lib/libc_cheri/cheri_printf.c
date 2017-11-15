@@ -42,7 +42,7 @@
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-#include <cheri/cheri_system.h>
+#include <cheri/libcheri_system.h>
 
 #include <inttypes.h>
 #include <stdarg.h>

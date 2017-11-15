@@ -34,7 +34,7 @@
 
 #include <sys/stat.h>
 
-#include "cheri_class.h"
+#include "libcheri_class.h"
 
 extern int	sb_verbose;
 

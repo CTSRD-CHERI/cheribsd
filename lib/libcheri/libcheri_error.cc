@@ -1,7 +1,7 @@
 #include <sys/types.h>
 #include <cheri/cheri.h>
 
-#include "sandbox.h"
+#include "libcheri_sandbox.h"
 
 cheri::sandbox_invoke_failure::~sandbox_invoke_failure() throw() {}
 const char *cheri::sandbox_invoke_failure::what() const throw()

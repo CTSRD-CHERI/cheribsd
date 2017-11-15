@@ -39,8 +39,8 @@
 #include <string.h>
 #include <ucontext.h>
 
-#include "cheri_stack.h"
-#include "cheri_stack_internal.h"
+#include "libcheri_stack.h"
+#include "libcheri_stack_internal.h"
 #include "libcheri_init.h"
 
 /*

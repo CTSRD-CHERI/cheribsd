@@ -47,9 +47,9 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "sandbox_methods.h"
-#include "sandbox.h"
-#include "sandbox_internal.h"
+#include "libcheri_sandbox_methods.h"
+#include "libcheri_sandbox.h"
+#include "libcheri_sandbox_internal.h"
 
 /*
  * Description of a method provided by a sandbox to be called via ccall.

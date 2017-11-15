@@ -30,50 +30,9 @@
  */
 
 #include <sys/types.h>
-#include <sys/errno.h>
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-#include <cheri/cheri_system.h>
-
-#include <assert.h>
-#include <errno.h>
+#include <libcheri_system.h>
 
 struct cheri_object _cheri_system_object;
-
-/* XXX-BD: should be in crt. */
-extern char **environ;
-char **environ;
-extern const char *__progname;
-const char *__progname = "";
-extern register_t _sb_heapbase;
-extern size_t             _sb_heaplen;
-register_t        _sb_heapbase;
-size_t            _sb_heaplen;
-
-static char *heapcap;
-
-void *sbrk(int incr);
-void *
-sbrk(int incr)
-{
-
-	if (heapcap == NULL) {
-		if (_sb_heapbase == 0 || _sb_heaplen == 0)
-			return (NULL);
-		heapcap = cheri_csetbounds(cheri_setoffset(cheri_getdefault(),
-		    _sb_heapbase), _sb_heaplen);
-		assert(heapcap != NULL);
-	}
-
-	if (incr < 0) {
-		if (-incr > (ssize_t)cheri_getoffset(heapcap)) {
-			errno = EINVAL;
-			return (void *)-1;
-		}
-	} else if (incr > (ssize_t)(cheri_getlen(heapcap) - cheri_getoffset(heapcap))) {
-		errno = ENOMEM;
-		return (void *)-1;
-	}
-	return (heapcap += incr);
-}

@@ -42,13 +42,13 @@
 #include <stdio.h>
 #include <time.h>
 
-#include "cheri_enter.h"
+#include "libcheri_enter.h"
 #define CHERI_SYSTEM_INTERNAL
-#include "cheri_system.h"
-#include "cheri_type.h"
+#include "libcheri_system.h"
+#include "libcheri_type.h"
 
-#include "sandbox.h"
-#include "sandbox_internal.h"
+#include "libcheri_sandbox.h"
+#include "libcheri_sandbox_internal.h"
 
 /*
  * This C file implements the CHERI system class.  Currently, pretty

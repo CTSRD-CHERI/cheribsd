@@ -51,8 +51,8 @@
 #include <inttypes.h>
 #include <string.h>
 
-#include "cheri_stack.h"
-#include "cheri_stack_internal.h"
+#include "libcheri_stack.h"
+#include "libcheri_stack_internal.h"
 
 /*
  * Unwind the trusted stack by the specified number of frames (or all) --

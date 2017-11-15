@@ -13,13 +13,13 @@
 # libcheri
 LIB=		c_cheri
 SRCS=		\
-		cheri_invoke_cabi.S	\
 		cheri_printf.c		\
 		cheri_put.c		\
 		cheri_raise.c		\
 		cheri_stdio.c		\
 		cheri_stub.c		\
 		heap.c			\
+		libcheri_invoke_cabi.S	\
 		malloc.c
 
 CFLAGS.malloc.c=	-Wno-cast-align
@@ -246,8 +246,8 @@ SRCS+=	gedf2.c				\
 CFLAGS.subr_scanf.c=	-Wno-sign-compare
 SRCS+=		subr_scanf.c
 
-# CHERI system classes
-SRCS+=		cheri_system_stub.c
+# libcheri system classes
+SRCS+=		libcheri_system_stub.c
 
 # Pull in ../Makefile.inc to define SHLIB_MAJOR so we can undef it.
 .include <bsd.init.mk>

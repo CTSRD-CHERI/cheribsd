@@ -44,7 +44,7 @@ __REQUIRE_CAPABILITIES
 #include <stdatomic.h>
 #include <stdio.h>
 
-#include "cheri_type.h"
+#include "libcheri_type.h"
 
 /* The root sealing capability of the types provenance tree. */
 static __capability void *cheri_sealing_root;

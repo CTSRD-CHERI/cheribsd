@@ -43,10 +43,10 @@
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-#include <cheri/cheri_fd.h>
-#include <cheri/cheri_invoke.h>
-#include <cheri/cheri_type.h>
-#include <cheri/sandbox.h>
+#include <cheri/libcheri_fd.h>
+#include <cheri/libcheri_invoke.h>
+#include <cheri/libcheri_type.h>
+#include <cheri/libcheri_sandbox.h>
 
 #include <cheritest-helper.h>
 #include <err.h>

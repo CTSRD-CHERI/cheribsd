@@ -38,9 +38,9 @@
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-#include <cheri/cheri_fd.h>
+#include <cheri/libcheri_fd.h>
+#include <cheri/libcheri_sandbox.h>
 #include <cheri/helloworld.h>
-#include <cheri/sandbox.h>
 
 #include <assert.h>
 #include <err.h>

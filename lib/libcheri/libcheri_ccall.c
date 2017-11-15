@@ -34,11 +34,11 @@
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
-#include "cheri_ccall.h"
-#include "cheri_class.h"
-#include "cheri_type.h"
+#include "libcheri_ccall.h"
+#include "libcheri_class.h"
+#include "libcheri_type.h"
 #include "libcheri_init.h"
-#include "sandbox_internal.h"
+#include "libcheri_sandbox_internal.h"
 
 /*
  * This call provides the C implementation of the userspace CCall trampoline

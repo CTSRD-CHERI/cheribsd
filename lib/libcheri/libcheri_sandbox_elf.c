@@ -45,7 +45,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "sandbox_elf.h"
+#include "libcheri_sandbox_elf.h"
 
 STAILQ_HEAD(sandbox_map_head, sandbox_map_entry);
 

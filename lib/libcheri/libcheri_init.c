@@ -31,9 +31,9 @@
 #include <sys/types.h>
 
 #include <cheri/cheri.h>
-#include <cheri/sandbox.h>
 
 #include "libcheri_init.h"
+#include "libcheri_sandbox.h"
 
 static int	libcheri_initialised;
 

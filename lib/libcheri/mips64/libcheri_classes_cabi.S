@@ -35,8 +35,8 @@
 
 #include <machine/cherireg.h>
 
-#include "cheri_class.h"
-#include "cheri_system_md.h"
+#include "libcheri_class.h"
+#include "libcheri_system_md.h"
 
 CHERI_CLASS_ASM(libcheri_system);
 CHERI_CLASS_ASM(cheri_fd);

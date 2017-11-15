@@ -39,7 +39,7 @@
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-#include <cheri/sandbox.h>
+#include <cheri/libcheri_sandbox.h>
 
 #include <errno.h>
 #include <fcntl.h>

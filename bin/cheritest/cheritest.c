@@ -54,9 +54,9 @@
 #include <machine/frame.h>
 #include <machine/trap.h>
 
-#include <cheri/cheri_fd.h>
-#include <cheri/cheri_stack.h>
-#include <cheri/sandbox.h>
+#include <cheri/libcheri_fd.h>
+#include <cheri/libcheri_stack.h>
+#include <cheri/libcheri_sandbox.h>
 
 #include <machine/sysarch.h>
 #endif

@@ -32,9 +32,9 @@
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-#include <cheri/cheri_enter.h>
-#include <cheri/cheri_fd.h>
-#include <cheri/sandbox.h>
+#include <cheri/libcheri_enter.h>
+#include <cheri/libcheri_fd.h>
+#include <cheri/libcheri_sandbox.h>
 
 #include <assert.h>
 #include <err.h>

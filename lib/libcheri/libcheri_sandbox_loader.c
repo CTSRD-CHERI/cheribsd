@@ -55,16 +55,16 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "cheri_ccall.h"
-#include "cheri_class.h"
-#include "cheri_invoke.h"
-#include "cheri_system.h"
-#include "cheri_type.h"
-#include "sandbox.h"
-#include "sandbox_elf.h"
-#include "sandbox_internal.h"
-#include "sandbox_methods.h"
-#include "sandboxasm.h"
+#include "libcheri_ccall.h"
+#include "libcheri_class.h"
+#include "libcheri_invoke.h"
+#include "libcheri_system.h"
+#include "libcheri_type.h"
+#include "libcheri_sandbox.h"
+#include "libcheri_sandbox_elf.h"
+#include "libcheri_sandbox_internal.h"
+#include "libcheri_sandbox_methods.h"
+#include "libcheri_sandboxasm.h"
 
 #define	roundup2(x, y)	(((x)+((y)-1))&(~((y)-1))) /* if y is powers of two */
 

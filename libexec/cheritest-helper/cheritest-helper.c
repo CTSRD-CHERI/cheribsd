@@ -34,11 +34,11 @@
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-#include <cheri/cheri_enter.h>
-#include <cheri/cheri_fd.h>
-#include <cheri/cheri_invoke.h>
-#include <cheri/cheri_memcpy.h>
-#include <cheri/cheri_system.h>
+#include <cheri/libcheri_enter.h>
+#include <cheri/libcheri_fd.h>
+#include <cheri/libcheri_invoke.h>
+#include <cheri/libcheri_memcpy.h>
+#include <cheri/libcheri_system.h>
 
 #include <inttypes.h>
 #include <md5.h>

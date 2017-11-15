@@ -56,18 +56,18 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "cheri_ccall.h"
-#include "cheri_class.h"
-#include "cheri_enter.h"
-#include "cheri_fd.h"
-#include "cheri_invoke.h"
-#include "cheri_system.h"
+#include "libcheri_ccall.h"
+#include "libcheri_class.h"
+#include "libcheri_enter.h"
+#include "libcheri_fd.h"
+#include "libcheri_invoke.h"
+#include "libcheri_system.h"
 #include "libcheri_init.h"
-#include "sandbox.h"
-#include "sandbox_elf.h"
-#include "sandbox_internal.h"
-#include "sandbox_methods.h"
-#include "sandboxasm.h"
+#include "libcheri_sandbox.h"
+#include "libcheri_sandbox_elf.h"
+#include "libcheri_sandbox_internal.h"
+#include "libcheri_sandbox_methods.h"
+#include "libcheri_sandboxasm.h"
 
 static size_t			num_sandbox_classes;
 static size_t			max_sandbox_classes;

@@ -43,10 +43,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "cheri_invoke.h"
+#include "libcheri_invoke.h"
 #include "libcheri_init.h"
 #include "libcheri_stat.h"
-#include "sandbox.h"
+#include "libcheri_sandbox.h"
 
 /*
  * The sandbox statistic mechanism tracks active sandbox classes, methods, and

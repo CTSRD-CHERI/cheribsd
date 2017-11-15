@@ -39,12 +39,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "cheri_ccall.h"
-#include "cheri_class.h"
+#include "libcheri_ccall.h"
+#include "libcheri_class.h"
 #define CHERI_FD_INTERNAL
-#include "cheri_fd.h"
-#include "cheri_system.h"
-#include "sandbox.h"
+#include "libcheri_fd.h"
+#include "libcheri_system.h"
+#include "libcheri_sandbox.h"
 
 /*
  * This file implements the CHERI 'file descriptor' (fd) class.  Pretty

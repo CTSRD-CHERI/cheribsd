@@ -45,11 +45,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "cheri_ccall.h"
-#include "cheri_enter.h"
-#include "cheri_system.h"
+#include "libcheri_ccall.h"
+#include "libcheri_enter.h"
+#include "libcheri_system.h"
 #include "libcheri_init.h"
-#include "sandbox.h"
+#include "libcheri_sandbox.h"
 
 /*
  * This file implements a stack landing pad for CHERI system classes provided
