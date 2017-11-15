@@ -107,6 +107,10 @@ _CHERI_COMMON_FLAGS+= -Wno-deprecated-declarations
 .if ${WANT_CHERI} == "sandbox"
 MK_DEBUG_FILES:=no
 STRIP:=
+# The libcheri sandbox loader assumes that there is exactly one code and one
+# data segment. If we don't pass this flag only parts of each segment will
+# be mapped and any sandbox will crash on startup
+LDFLAGS+=-Wl,--no-rosegment -Wl,-z,norelro
 .endif
 
 .if ${WANT_CHERI} == "pure" || ${WANT_CHERI} == "sandbox"
