@@ -916,7 +916,39 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		 */
 		if (baddr == 0)
 			et_dyn_addr = __elfN(et_dyn_load_addr);
-		// XXX: Change the address to avoid collision with existing mappings.
+
+		/*
+		 * For coexecve(2), adjust the load address to be above
+		 * the existing mappings.
+		 *
+		 * XXX: This doesn't really work the way I want - it should
+		 * 	put the address above all the mappings, not between
+		 * 	the other process' binary and its rtld.  Oh well.
+		 */
+		if (imgp->cop != NULL) {
+			struct vmspace *covmspace;
+			vm_size_t len;
+
+			// XXX: What protects p_vmspace?
+			covmspace = imgp->cop->p_vmspace;
+			len = 0;
+			for (i = 0; i < hdr->e_phnum; i++) {
+				if (phdr[i].p_type != PT_LOAD)
+					continue;
+				if (phdr[i].p_vaddr + phdr[i].p_memsz > len) {
+					//printf("%s: adjusting size from %lu to %lu\n", __func__, len, phdr[i].p_vaddr + phdr[i].p_memsz);
+					len = round_page(phdr[i].p_vaddr + phdr[i].p_memsz);
+				}
+			}
+
+			// XXX: Use vm_map_lock() to avoid race with concurrent mmap(2).
+			error = vm_map_findspace(&covmspace->vm_map, (vm_offset_t)covmspace->vm_daddr + covmspace->vm_dsize, len, &et_dyn_addr);
+			if (error != 0) {
+				printf("%s: vm_map_findspace() failed with error %d\n", __func__, error);
+				goto ret;
+			}
+			//printf("%s: et_dyn_addr adjusted to %lx, end at %lx, len %lu\n", __func__, et_dyn_addr, et_dyn_addr + len, len);
+		}
 	}
 	sv = brand_info->sysvec;
 	if (interp != NULL && brand_info->interp_newpath != NULL)
@@ -934,9 +966,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	 * the vnode is unlocked.
 	 */
 	VOP_UNLOCK(imgp->vp, 0);
-
-	if (imgp->cop != NULL)
-		printf("%s: cop %p\n", __func__, imgp->cop);
 
 	error = exec_new_vmspace(imgp, sv);
 	imgp->proc->p_sysent = sv;
@@ -1071,6 +1100,26 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	 */
 	addr = round_page((vm_offset_t)vmspace->vm_daddr + lim_max(td,
 	    RLIMIT_DATA));
+
+	/*
+	 * ... unless we need to colocate with another process.  In that
+	 * case, just try to find some free space above that.
+	 */
+	if (imgp->cop != NULL) {
+		struct vmspace *covmspace;
+
+		// XXX: What protects p_vmspace?
+		covmspace = imgp->cop->p_vmspace;
+
+		// XXX: Hardcoded size, meh.
+		error = vm_map_findspace(&covmspace->vm_map, addr, 1024 * 1024, &addr);
+		if (error != 0) {
+			printf("%s: vm_map_findspace() failed with error %d\n", __func__, error);
+			goto ret;
+		}
+		//printf("%s: rtld addr adjusted to %lx\n", __func__, addr);
+	}
+
 	/* Round up so signficant bits of rtld addresses aren't touched */
 	if (imgp->proc->p_sysent->sv_flags & SV_CHERI)
 		addr = roundup2(addr, 0x1000000);
