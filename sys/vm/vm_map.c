@@ -1362,6 +1362,7 @@ charged:
 	new_entry->wiring_thread = NULL;
 	new_entry->read_ahead = VM_FAULT_READ_AHEAD_INIT;
 	new_entry->next_read = start;
+	new_entry->owner = curproc->p_pid;
 
 	KASSERT(cred == NULL || !ENTRY_CHARGED(new_entry),
 	    ("overcommit: vm_map_insert leaks vm_map %p", new_entry));
