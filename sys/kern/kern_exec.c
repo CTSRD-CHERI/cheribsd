@@ -1187,8 +1187,16 @@ exec_new_vmspace(struct image_params *imgp, const struct sysentvec *sv)
 		ssiz = maxssiz;
 	}
 	if (imgp->cop != NULL) {
-		// XXX: More than one coprocess?
-		stack_addr = sv->sv_usrstack - ssiz - MAXSSIZ;
+		vm_offset_t dummy;
+
+		/*
+		 * XXX: Using linear search here is rather silly.
+		 */
+		do {
+			imgp->usrstack_delta += MAXSSIZ;
+			stack_addr = sv->sv_usrstack - ssiz - imgp->usrstack_delta;
+			error = vm_map_findspace(map, stack_addr, ssiz, &dummy);
+		} while (error != 0);
 	} else {
 		stack_addr = sv->sv_usrstack - ssiz;
 	}
@@ -1547,7 +1555,7 @@ exec_copyout_strings(struct image_params *imgp)
 	}
 
 	if (imgp->cop != NULL) {
-		arginfo = (struct ps_strings *)(((char *)arginfo) - MAXSSIZ);
+		arginfo = (struct ps_strings *)(((char *)arginfo) - imgp->usrstack_delta);
 		//printf("%s: arginfo is %p\n", __func__, arginfo);
 	}
 
