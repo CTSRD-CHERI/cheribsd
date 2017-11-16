@@ -71,7 +71,7 @@ main(int argc, char **argv __unused)
 		usage();
 
 	if (vflag)
-		printf("pie\n");
+		printf("pid %d, &argv %p\n", getpid(), &argv);
 
 	if (sflag) {
 		while (sleep(1) == 0)
