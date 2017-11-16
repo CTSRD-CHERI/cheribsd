@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 Robert N. M. Watson
+ * Copyright (c) 2014-2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -28,8 +28,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _CHERI_ENTER_H_
-#define	_CHERI_ENTER_H_
+#ifndef _LIBCHERI_ENTER_H_
+#define	_LIBCHERI_ENTER_H_
 
 typedef register_t (*cheri_system_user_fn_t)(struct cheri_object system_object,
 	    register_t methodnum,
@@ -64,4 +64,4 @@ extern struct cheri_object	__cheri_object_creturn;
 #define	CHERI_SYSTEM_USER_BASE		1000
 #define	CHERI_SYSTEM_USER_CEILING	2000
 
-#endif /* !_CHERI_ENTER_H_ */
+#endif /* !_LIBCHERI_ENTER_H_ */

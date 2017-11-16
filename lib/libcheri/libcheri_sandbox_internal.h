@@ -29,8 +29,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _SANDBOX_INTERNAL_H_
-#define	_SANDBOX_INTERNAL_H_
+#ifndef _LIBCHERI_SANDBOX_INTERNAL_H_
+#define	_LIBCHERI_SANDBOX_INTERNAL_H_
 
 #include <sys/stat.h>
 
@@ -203,4 +203,4 @@ int	sandbox_object_protect(struct sandbox_class *sbcp,
 int	sandbox_object_reload(struct sandbox_object *sbop);
 void	sandbox_object_unload(struct sandbox_object *sbop);
 
-#endif /* !_SANDBOX_INTERNAL_H_ */
+#endif /* !_LIBCHERI_SANDBOX_INTERNAL_H_ */

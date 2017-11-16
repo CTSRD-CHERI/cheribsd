@@ -29,8 +29,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _SANDBOX_H_
-#define	_SANDBOX_H_
+#ifndef _LIBCHERI_SANDBOX_H_
+#define	_LIBCHERI_SANDBOX_H_
 
 #ifdef __cplusplus
 #include <exception>
@@ -198,4 +198,4 @@ __capability void	*sandbox_object_private_get(
 __capability void	*sandbox_object_private_get_idc(void);
 #endif
 
-#endif /* !_SANDBOX_H_ */
+#endif /* !_LIBCHERI_SANDBOX_H_ */

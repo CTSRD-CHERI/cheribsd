@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2013-2015 Robert N. M. Watson
+ * Copyright (c) 2013-2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -28,8 +28,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _CHERI_INVOKE_H_
-#define	_CHERI_INVOKE_H_
+#ifndef _LIBCHERI_INVOKE_H_
+#define	_LIBCHERI_INVOKE_H_
 
 #define CHERI_INVOKE_METHOD_LEGACY_INVOKE	-1
 
@@ -44,4 +44,4 @@ register_t	cheri_invoke(struct cheri_object co, register_t v0,
 		    __capability void *c10) __attribute__((cheri_ccall));
 #endif
 
-#endif /* !_CHERI_INVOKE_H_ */
+#endif /* !_LIBCHERI_INVOKE_H_ */

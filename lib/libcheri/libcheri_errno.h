@@ -28,8 +28,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _CHERI_ERRNO_H_
-#define	_CHERI_ERRNO_H_
+#ifndef _LIBCHERI_ERRNO_H_
+#define	_LIBCHERI_ERRNO_H_
 
 #ifndef CHERI_ERRNO_ASM
 /*
@@ -54,4 +54,4 @@ extern _Thread_local int	cheri_errno;
 #define	CHERI_ERRNO_RETURN_LOCAL_RETVAL	80	/* Local capability returned. */
 #define	CHERI_ERRNO_RETURN_UNDERFLOW	81	/* Trusted-stack underflow. */
 
-#endif /* _CHERI_ERRNO_H_ */
+#endif /* _LIBCHERI_ERRNO_H_ */

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014 Robert N. M. Watson
+ * Copyright (c) 2014, 2017 Robert N. M. Watson
  * Copyright (c) 2014 SRI International
  * All rights reserved.
  *
@@ -29,8 +29,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _CHERI_SYSTEM_H_
-#define	_CHERI_SYSTEM_H_
+#ifndef _LIBCHERI_SYSTEM_H_
+#define	_LIBCHERI_SYSTEM_H_
 
 #include <sys/syscall.h>
 
@@ -130,4 +130,4 @@ extern __capability vm_offset_t	*cheri_system_vtable;
 #undef SYS_STUB_ARGHASPTRS
 #undef SYS_STUB_VA
 
-#endif /* !_CHERI_SYSTEM_H_ */
+#endif /* !_LIBCHERI_SYSTEM_H_ */

@@ -29,8 +29,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _CHERI_STACK_H_
-#define	_CHERI_STACK_H_
+#ifndef _LIBCHERI_STACK_H_
+#define	_LIBCHERI_STACK_H_
 
 #include <ucontext.h>	/* For ucontext_t argument to cheri_stack_unwind(). */
 
@@ -93,4 +93,4 @@ int	cheri_stack_numframes(int *numframesp);
 int	cheri_stack_unwind(ucontext_t *uap, register_t ret, u_int op,
 	    u_int num_frames);
 
-#endif /* !_CHERI_STACK_H_ */
+#endif /* !_LIBCHERI_STACK_H_ */

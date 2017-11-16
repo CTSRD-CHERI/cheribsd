@@ -28,8 +28,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _CHERI_CCALL_H_
-#define	_CHERI_CCALL_H_
+#ifndef _LIBCHERI_CCALL_H_
+#define	_LIBCHERI_CCALL_H_
 
 /*
  * Private interfaces to return sealed capabilities to call an object's rtld,
@@ -42,4 +42,4 @@ struct cheri_object	cheri_sandbox_make_sealed_rtld_object(
 			    __capability struct sandbox_object *sbop);
 struct cheri_object	cheri_make_sealed_return_object(void);
 
-#endif /* _CHERI_CCALL_H_ */
+#endif /* _LIBCHERI_CCALL_H_ */

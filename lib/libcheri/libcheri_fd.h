@@ -28,8 +28,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _CHERI_FD_H_
-#define	_CHERI_FD_H_
+#ifndef _LIBCHERI_FD_H_
+#define	_LIBCHERI_FD_H_
 
 extern __capability vm_offset_t *cheri_fd_vtable;
 
@@ -84,4 +84,4 @@ CHERI_FD_CCALL
 struct cheri_fd_ret	cheri_fd_write(__capability const void *buf_c,
 			     size_t nbytes);
 
-#endif /* !_CHERI_FD_H_ */
+#endif /* !_LIBCHERI_FD_H_ */

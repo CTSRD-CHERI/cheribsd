@@ -28,8 +28,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _CHERI_SYSTEM_MD_H_
-#define	_CHERI_SYSTEM_MD_H_
+#ifndef _LIBCHERI_SYSTEM_MD_H_
+#define	_LIBCHERI_SYSTEM_MD_H_
 
 /* XXXRW: Needed temporarily for CHERI_ASM_CMOVE(). */
 #define	_CHERI_INTERNAL
@@ -197,4 +197,4 @@ $__cheri_ ## class ## _entry_end:					\
 #define	CHERI_CLASS_ENTRY(class)					\
 	(__cheri_## class ## _entry)
 
-#endif /* _CHERI_SYSTEM_MD_H_ */
+#endif /* _LIBCHERI_SYSTEM_MD_H_ */

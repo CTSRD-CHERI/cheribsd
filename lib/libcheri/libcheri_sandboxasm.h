@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2013 Robert N. M. Watson
+ * Copyright (c) 2013, 2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -28,8 +28,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _SANDBOXASM_H_
-#define	_SANDBOXASM_H_
+#ifndef _LIBCHERI_SANDBOXASM_H_
+#define	_LIBCHERI_SANDBOXASM_H_
 
 /*
  * Per-sandbox meta-data structure mapped read-only within the sandbox at a
@@ -57,4 +57,4 @@
 #define	SANDBOX_RTLD_VECTOR	(SANDBOX_BINARY_BASE + SANDBOX_VECTOR_SIZE * 0)
 #define	SANDBOX_INVOKE_VECTOR	(SANDBOX_BINARY_BASE + SANDBOX_VECTOR_SIZE * 1)
 
-#endif /* !_SANDBOXASM_H_ */
+#endif /* !_LIBCHERI_SANDBOXASM_H_ */

@@ -1,6 +1,6 @@
 /*-
  * Copyright (c) 2014-2015 SRI International
- * Copyright (c) 2015 Robert N. M. Watson
+ * Copyright (c) 2015-2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -29,8 +29,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef __SANDBOX_METHODS_H__
-#define __SANDBOX_METHODS_H__
+#ifndef __LIBCHERI_SANDBOX_METHODS_H__
+#define __LIBCHERI_SANDBOX_METHODS_H__
 
 struct sandbox_provided_classes;
 struct sandbox_required_methods;
@@ -55,4 +55,4 @@ __capability vm_offset_t *sandbox_make_vtable(void *datacap, const char *class,
 int	sandbox_set_required_method_variables(__capability void *datacap,
 	    struct sandbox_required_methods *required_methods);
 
-#endif /* __SANDBOX_METHODS_H__ */
+#endif /* __LIBCHERI_SANDBOX_METHODS_H__ */

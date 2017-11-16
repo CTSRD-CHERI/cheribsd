@@ -1,6 +1,6 @@
 /*-
  * Copyright (c) 2014-2015 SRI International
- * Copyright (c) 2015 Robert N. M. Watson
+ * Copyright (c) 2015-2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -29,8 +29,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef __SANDBOX_ELF_H__
-#define __SANDBOX_ELF_H__
+#ifndef __LIBCHERI_SANDBOX_ELF_H__
+#define __LIBCHERI_SANDBOX_ELF_H__
 
 struct sandbox_map;
 
@@ -46,4 +46,4 @@ void			 sandbox_map_free(struct sandbox_map *sm);
 size_t			 sandbox_map_maxoffset(struct sandbox_map *sm);
 size_t			 sandbox_map_minoffset(struct sandbox_map *sm);
 
-#endif /* __SANDBOX_ELF_H__ */
+#endif /* __LIBCHERI_SANDBOX_ELF_H__ */
