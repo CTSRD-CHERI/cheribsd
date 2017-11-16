@@ -1169,9 +1169,6 @@ exec_new_vmspace(struct image_params *imgp, const struct sysentvec *sv)
 		}
 	}
 
-	if (imgp->cop != NULL)
-		return (0);
-
 	/* Allocate a new stack */
 	if (imgp->stack_sz != 0) {
 		ssiz = trunc_page(imgp->stack_sz);
@@ -1189,7 +1186,12 @@ exec_new_vmspace(struct image_params *imgp, const struct sysentvec *sv)
 	} else {
 		ssiz = maxssiz;
 	}
-	stack_addr = sv->sv_usrstack - ssiz;
+	if (imgp->cop != NULL) {
+		// XXX: More than one coprocess?
+		stack_addr = sv->sv_usrstack - ssiz - MAXSSIZ;
+	} else {
+		stack_addr = sv->sv_usrstack - ssiz;
+	}
 	error = vm_map_stack(map, stack_addr, (vm_size_t)ssiz,
 	    obj != NULL && imgp->stack_prot != 0 ? imgp->stack_prot :
 		sv->sv_stackprot,
@@ -1197,12 +1199,14 @@ exec_new_vmspace(struct image_params *imgp, const struct sysentvec *sv)
 	if (error)
 		return (error);
 
-	/*
-	 * vm_ssize and vm_maxsaddr are somewhat antiquated concepts, but they
-	 * are still used to enforce the stack rlimit on the process stack.
-	 */
-	vmspace->vm_ssize = sgrowsiz >> PAGE_SHIFT;
-	vmspace->vm_maxsaddr = (char *)stack_addr;
+	if (imgp->cop == NULL) {
+		/*
+		 * vm_ssize and vm_maxsaddr are somewhat antiquated concepts, but they
+		 * are still used to enforce the stack rlimit on the process stack.
+		 */
+		vmspace->vm_ssize = sgrowsiz >> PAGE_SHIFT;
+		vmspace->vm_maxsaddr = (char *)stack_addr;
+	}
 
 	return (0);
 }
@@ -1541,6 +1545,12 @@ exec_copyout_strings(struct image_params *imgp)
 		if (p->p_sysent->sv_szsigcode != NULL)
 			szsigcode = *(p->p_sysent->sv_szsigcode);
 	}
+
+	if (imgp->cop != NULL) {
+		arginfo = (struct ps_strings *)(((char *)arginfo) - MAXSSIZ);
+		//printf("%s: arginfo is %p\n", __func__, arginfo);
+	}
+
 	destp =	(uintptr_t)arginfo;
 
 	/*

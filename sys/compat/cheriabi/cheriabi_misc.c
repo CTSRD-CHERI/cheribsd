@@ -1583,6 +1583,11 @@ cheriabi_copyout_strings(struct image_params *imgp)
 		szsigcode = *(imgp->proc->p_sysent->sv_szsigcode);
 	else
 		szsigcode = 0;
+
+	if (imgp->cop != NULL) {
+		printf("%s: XXX: needs to adjust arginfo, like exec_copyout_strings() does\n", __func__);
+	}
+
 	destp =	(uintptr_t)arginfo;
 
 	/*
