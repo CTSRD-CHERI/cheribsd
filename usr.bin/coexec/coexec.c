@@ -56,7 +56,7 @@ parse_pid(const char *str)
 
 	pid = strtoul(str, &end, 10);
 	if ((size_t)(end - str) != strlen(str))
-		err(1, "invalid number \"%s\"", str);
+		err(1, "invalid PID \"%s\"", str);
 
 	return (pid);
 }
