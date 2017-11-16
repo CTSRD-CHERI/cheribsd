@@ -18,6 +18,7 @@ LDIRS=	BSD_daemon \
 	IPv6 \
 	bootforth \
 	csh \
+	coexec \
 	diskless \
 	drivers \
 	etc \
@@ -58,6 +59,7 @@ XFILES=	BSD_daemon/FreeBSD.pfa \
 	bootforth/menuconf.4th \
 	bootforth/screen.4th \
 	csh/dot.cshrc \
+	coexec/coexec.sh \
 	diskless/ME \
 	diskless/README.BOOTP \
 	diskless/README.TEMPLATING \
