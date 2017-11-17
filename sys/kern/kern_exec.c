@@ -144,6 +144,11 @@ static int map_at_zero = 0;
 SYSCTL_INT(_security_bsd, OID_AUTO, map_at_zero, CTLFLAG_RWTUN, &map_at_zero, 0,
     "Permit processes to map an object at virtual address 0.");
 
+static int opportunistic_colocation;
+SYSCTL_INT(_kern, OID_AUTO, opportunistic_colocation, CTLFLAG_RW,
+    &opportunistic_colocation, 0,
+    "Try to colocate binaries on execve(2)");
+
 static int
 sysctl_kern_ps_strings(SYSCTL_HANDLER_ARGS)
 {
@@ -379,6 +384,38 @@ kern_coexecve(struct thread *td, struct image_args *args, struct mac *mac_p,
 int
 kern_execve(struct thread *td, struct image_args *args, struct mac *mac_p)
 {
+	struct proc *cop;
+	int error;
+
+	if (opportunistic_colocation != 0) {
+		sx_slock(&proctree_lock);
+		cop = proc_realparent(td->td_proc);
+		PHOLD(cop);
+		sx_sunlock(&proctree_lock);
+		error = kern_coexecve(td, args, mac_p, cop);
+#ifdef notyet
+		/*
+		 * XXX: No idea why this happens; do_execve() does the same without coexec.
+		 */
+		KASSERT(error != 0, ("%s: kern_coexecve returned 0", __func__));
+#else
+		if (error == 0)
+			return (0);
+#endif
+		PRELE(cop);
+
+		switch (error) {
+		case ENOTDIR:
+		case ENAMETOOLONG:
+		case ENOEXEC:
+		case ENOENT:
+		case ELOOP:
+			return (error);
+			break;
+		default:
+			break;
+		}
+	}
 
 	return (kern_coexecve(td, args, mac_p, NULL));
 }

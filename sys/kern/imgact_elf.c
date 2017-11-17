@@ -949,6 +949,15 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 			}
 			//printf("%s: et_dyn_addr adjusted to %lx, end at %lx, len %lu\n", __func__, et_dyn_addr, et_dyn_addr + len, len);
 		}
+	} else if (imgp->cop != NULL) {
+#if 0
+		/*
+		 * Enabling this looks weird with kern.opportunistic_colocation=1.
+		 */
+		uprintf("Cannot coexecute an object that's not shared\n");
+#endif
+		error = EINVAL;
+		goto ret;
 	}
 	sv = brand_info->sysvec;
 	if (interp != NULL && brand_info->interp_newpath != NULL)
