@@ -43,8 +43,8 @@
 __vector_base__ = 0x8000;
 __vector_size__ = 0x200;
 
-__rtld_vector__ = __vector_base__ + __vector_size__ * 0;
-__invoke_vector__ = __vector_base__ + __vector_size__ * 1;
+__rtld_vector_addr__ = __vector_base__ + __vector_size__ * 0;
+__invoke_vector_addr__ = __vector_base__ + __vector_size__ * 1;
 __reserved0_vector__ = __vector_base__ + __vector_size__ * 2;
 __reserved1_vector__ = __vector_base__ + __vector_size__ * 3;
 
@@ -55,12 +55,24 @@ PAGE_ALIGN = 0x1000;
 
 SECTIONS
 {
-	. = __rtld_vector__;
-	.text.rtld_vector : {
+	. = __rtld_vector_addr__;
+	/* XXXAR: we can't call these sections .text.rtld_vector anymore
+	 * because LLD will merge any sections starting with .text., .data., etc.
+	 * I believe this is a bug in LLD but for now work around it by using
+	 * a different name for the section. Using a valid C identifier has the
+	 * added benefit that we get a __start_sec and __stop_sec symbol from
+	 * the linker that we can use to verify that the output was correct/
+	 */
+	/*
+	 * Adding the . after the section name forces the output section
+	 * to be placed at the address of the current location counter:
+	 * https://sourceware.org/binutils/docs/ld/Output-Section-Address.html
+	 */
+	__rtld_vector . : {
 		crt_rtld.o(.text .data .bss)
 	}
-	. = __invoke_vector__;
-	.text.invoke_vector : {
+	. = __invoke_vector_addr__;
+	__invoke_vector . : {
 		crt_invoke.o(.text .data .bss)
 	}
 	. = __code_body__;
