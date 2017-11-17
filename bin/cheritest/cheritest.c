@@ -1781,7 +1781,7 @@ signal_handler(int signum, siginfo_t *info, void *vuap)
 		 * sandbox.
 		 */
 		ret = libcheri_stack_unwind(uap, CHERITEST_SANDBOX_UNWOUND,
-		    CHERI_STACK_UNWIND_OP_ALL, 0);
+		    LIBCHERI_STACK_UNWIND_OP_ALL, 0);
 		if (ret < 0) {
 			ccsp->ccs_signum = -1;
 			fprintf(stderr, "%s: libcheri_stack_unwind failed\n",

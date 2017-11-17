@@ -73,10 +73,10 @@
  * if interrupts taken during spl()s in the kernel, with the signal handler
  * "scheduling" the change to take place once the preempted code returns..?
  */
-__thread struct cheri_stack __libcheri_stack_tls_storage
+__thread struct libcheri_stack __libcheri_stack_tls_storage
     __attribute__((__aligned__(32))) = {
-	.cs_tsize = CHERI_STACK_SIZE,
-	.cs_tsp = CHERI_STACK_SIZE,
+	.lcs_tsize = LIBCHERI_STACK_SIZE,
+	.lcs_tsp = LIBCHERI_STACK_SIZE,
 };
 
 void
@@ -99,10 +99,10 @@ libcheri_stack_init(void)
  * present if libcheri hasn't been used from a thread previously.
  */
 int
-libcheri_stack_get(struct cheri_stack *csp)
+libcheri_stack_get(struct libcheri_stack *lcsp)
 {
 
-	memcpy(csp, &__libcheri_stack_tls_storage, sizeof(*csp));
+	memcpy(lcsp, &__libcheri_stack_tls_storage, sizeof(*lcsp));
 	return (0);
 }
 
@@ -115,8 +115,8 @@ int
 libcheri_stack_numframes(int *numframesp)
 {
 
-	*numframesp = (__libcheri_stack_tls_storage.cs_tsize -
-	    __libcheri_stack_tls_storage.cs_tsp) / CHERI_FRAME_SIZE;
+	*numframesp = (__libcheri_stack_tls_storage.lcs_tsize -
+	    __libcheri_stack_tls_storage.lcs_tsp) / LIBCHERI_STACKFRAME_SIZE;
 	return (0);
 }
 
@@ -124,19 +124,19 @@ libcheri_stack_numframes(int *numframesp)
  * Allow the trusted stack to be set, subject to various safety constraints.
  */
 int
-libcheri_stack_set(struct cheri_stack *csp)
+libcheri_stack_set(struct libcheri_stack *lcsp)
 {
 
-	if (csp->cs_tsize != __libcheri_stack_tls_storage.cs_tsize) {
+	if (lcsp->lcs_tsize != __libcheri_stack_tls_storage.lcs_tsize) {
 		errno = EINVAL;
 		return (-1);
 	}
-	if (csp->cs_tsp < 0 || csp->cs_tsp > CHERI_STACK_SIZE ||
-	    (csp->cs_tsp % CHERI_FRAME_SIZE) != 0) {
+	if (lcsp->lcs_tsp < 0 || lcsp->lcs_tsp > LIBCHERI_STACK_SIZE ||
+	    (lcsp->lcs_tsp % LIBCHERI_STACKFRAME_SIZE) != 0) {
 		errno = EINVAL;
 		return (-1);
 	}
-	memcpy(&__libcheri_stack_tls_storage, csp,
+	memcpy(&__libcheri_stack_tls_storage, lcsp,
 	    sizeof(__libcheri_stack_tls_storage));
 	return (0);
 }
@@ -149,12 +149,12 @@ int
 libcheri_stack_unwind(ucontext_t *uap, register_t ret, u_int op,
     u_int num_frames)
 {
-	struct cheri_stack cs;
-	struct cheri_stack_frame *csfp;
+	struct libcheri_stack lcs;
+	struct libcheri_stack_frame *lcsfp;
 	u_int stack_size, stack_frames;
 
-	if (op != CHERI_STACK_UNWIND_OP_N &&
-	    op != CHERI_STACK_UNWIND_OP_ALL) {
+	if (op != LIBCHERI_STACK_UNWIND_OP_N &&
+	    op != LIBCHERI_STACK_UNWIND_OP_ALL) {
 		errno = EINVAL;
 		return (-1);
 	}
@@ -163,17 +163,17 @@ libcheri_stack_unwind(ucontext_t *uap, register_t ret, u_int op,
 	 * Request to unwind zero frames is a no-op: no state transformation
 	 * is needed.
 	 */
-	if ((op == CHERI_STACK_UNWIND_OP_N) && (num_frames == 0))
+	if ((op == LIBCHERI_STACK_UNWIND_OP_N) && (num_frames == 0))
 		return (0);
 
 	/*
 	 * Retrieve trusted stack and validate before attempting to unwind.
 	 */
-	if (libcheri_stack_get(&cs) != 0)
+	if (libcheri_stack_get(&lcs) != 0)
 		return (-1);
-	if ((cs.cs_tsize % CHERI_FRAME_SIZE) != 0 ||
-	    (cs.cs_tsp > cs.cs_tsize) ||
-	    (cs.cs_tsp % CHERI_FRAME_SIZE) != 0) {
+	if ((lcs.lcs_tsize % LIBCHERI_STACKFRAME_SIZE) != 0 ||
+	    (lcs.lcs_tsp > lcs.lcs_tsize) ||
+	    (lcs.lcs_tsp % LIBCHERI_STACKFRAME_SIZE) != 0) {
 		errno = ERANGE;
 		return (-1);
 	}
@@ -181,9 +181,10 @@ libcheri_stack_unwind(ucontext_t *uap, register_t ret, u_int op,
 	/*
 	 * See if there is room on the stack for that much unwinding.
 	 */
-	stack_size = cs.cs_tsize / CHERI_FRAME_SIZE;
-	stack_frames = (cs.cs_tsize - cs.cs_tsp) / CHERI_FRAME_SIZE;
-	if (op == CHERI_STACK_UNWIND_OP_ALL)
+	stack_size = lcs.lcs_tsize / LIBCHERI_STACKFRAME_SIZE;
+	stack_frames = (lcs.lcs_tsize - lcs.lcs_tsp) /
+	    LIBCHERI_STACKFRAME_SIZE;
+	if (op == LIBCHERI_STACK_UNWIND_OP_ALL)
 		num_frames = stack_frames;
 	if ((num_frames < 0) || (stack_frames < num_frames)) {
 		errno = ERANGE;
@@ -193,12 +194,12 @@ libcheri_stack_unwind(ucontext_t *uap, register_t ret, u_int op,
 	/*
 	 * Restore state from the last frame being unwound.
 	 */
-	csfp = &cs.cs_frames[stack_size - (stack_frames - num_frames) - 1];
+	lcsfp = &lcs.lcs_frames[stack_size - (stack_frames - num_frames) - 1];
 #if 0
 	/* Make sure we will be returning to ambient authority. */
-	if (cheri_getbase(csfp->csf_caller_pcc) !=
+	if (cheri_getbase(lcsfp->csf_caller_pcc) !=
 	    cheri_getbase(cheri_getpcc()) ||
-	    cheri_getlen(csfp->csf_caller_pcc) !=
+	    cheri_getlen(lcsfp->csf_caller_pcc) !=
 	    cheri_getlen(cheri_getpcc()))
 		return (-1);
 #endif
@@ -206,12 +207,12 @@ libcheri_stack_unwind(ucontext_t *uap, register_t ret, u_int op,
 	/*
 	 * Pop stack desired number of frames.
 	 */
-	cs.cs_tsp += num_frames * CHERI_FRAME_SIZE;
-	assert(cs.cs_tsp <= cs.cs_tsize);
+	lcs.lcs_tsp += num_frames * LIBCHERI_STACKFRAME_SIZE;
+	assert(lcs.lcs_tsp <= lcs.lcs_tsize);
 
-	if (libcheri_stack_unwind_md(uap, csfp, ret) < 0)
+	if (libcheri_stack_unwind_md(uap, lcsfp, ret) < 0)
 		return (-1);
-	if (libcheri_stack_set(&cs) < 0)
+	if (libcheri_stack_set(&lcs) < 0)
 		return (-1);
 	return (0);
 }
