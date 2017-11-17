@@ -80,5 +80,5 @@ call_libcheri_fd_write_c(struct cheri_object fd_object)
 	hello_world_buf_c = cheri_ptrperm(&hello_world_str_nl, len_buf_c,
 	    CHERI_PERM_LOAD); /* Just the text. */
 	return (libcheri_fd_write_c(fd_object,
-	    hello_world_buf_c, len_buf_c).cfr_retval0);
+	    hello_world_buf_c, len_buf_c).lcfr_retval0);
 }
