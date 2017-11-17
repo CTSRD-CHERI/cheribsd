@@ -31,7 +31,8 @@
 #ifndef _LIBCHERI_ENTER_H_
 #define	_LIBCHERI_ENTER_H_
 
-typedef register_t (*cheri_system_user_fn_t)(struct cheri_object system_object,
+typedef register_t (*libcheri_system_user_fn_t)(
+	    struct cheri_object system_object,
 	    register_t methodnum,
 	    register_t a0, register_t a1, register_t a2, register_t a3,
 	    register_t a4, register_t a5, register_t a6, register_t a7,
@@ -40,19 +41,19 @@ typedef register_t (*cheri_system_user_fn_t)(struct cheri_object system_object,
 	    __capability void *c7)
 	    __attribute__((cheri_ccall)); /* XXXRW: Will be ccheri_ccallee. */
 
-void	cheri_system_user_register_fn(cheri_system_user_fn_t fn_ptr);
+void	libcheri_system_user_register_fn(libcheri_system_user_fn_t fn_ptr);
 
 /*
  * Location where libcheri system classes can find a suitable return
  * capability to use.
  */
-extern struct cheri_object	__cheri_object_creturn;
+extern struct cheri_object	__libcheri_object_creturn;
 
 /*
  * Method numbers used by the sandbox runtime itself.
  *
  * WARNING: These values must match those currently hard coded in the sandbox
- * C runtime (lib/csu/cheri/crt_sb.S).
+ * C runtime (lib/csu/cheri/crt_invoke.S and crt_rtld.S).
  *
  * NB: In the future, these should be via a reserved entry point rather than
  * the primary object-capability 'invoke' entry point, so that they can be

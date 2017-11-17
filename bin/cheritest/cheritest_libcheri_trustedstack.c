@@ -70,9 +70,9 @@ cheritest_libcheri_userfn_getstack(void)
 	u_int stack_depth;
 	int retval;
 
-	retval = cheri_stack_get(&cs);
+	retval = libcheri_stack_get(&cs);
 	if (retval != 0)
-		cheritest_failure_err("cheri_stack_get() failed");
+		cheritest_failure_err("libcheri_stack_get() failed");
 
 	/* Does stack layout look sensible enough to continue? */
 	if ((cs.cs_tsize % CHERI_FRAME_SIZE) != 0)
@@ -141,9 +141,9 @@ cheritest_libcheri_userfn_setstack(register_t arg)
 	int retval;
 
 	/* Validate stack as retrieved. */
-	retval = cheri_stack_get(&cs);
+	retval = libcheri_stack_get(&cs);
 	if (retval != 0)
-		cheritest_failure_err("cheri_stack_get() failed");
+		cheritest_failure_err("libcheri_stack_get() failed");
 
 	/* Does stack layout look sensible enough to continue? */
 	if ((cs.cs_tsize % CHERI_FRAME_SIZE) != 0)
@@ -190,9 +190,9 @@ cheritest_libcheri_userfn_setstack(register_t arg)
 	}
 
 	/* Update kernel view of trusted stack. */
-	retval = cheri_stack_set(&cs);
+	retval = libcheri_stack_set(&cs);
 	if (retval != 0)
-		cheritest_failure_err("cheri_stack_set() failed");
+		cheritest_failure_err("libcheri_stack_set() failed");
 
 	/* Leave behind a distinctive value we can test for. */
 	return (CHERITEST_SETSTACK_CONSTANT);
@@ -247,7 +247,7 @@ test_sandbox_trustedstack_underflow(const struct cheri_test *ctp __unused)
 	__capability void *codecap asm ("$c1");
 	__capability void *datacap asm ("$c2");
 
-	returncap = cheri_make_sealed_return_object();
+	returncap = libcheri_make_sealed_return_object();
 	codecap = returncap.co_codecap;
 	datacap = returncap.co_datacap;
 	__asm__ __volatile__ ("ccall $c1, $c2, 1;" "nop" : : "C"(codecap),

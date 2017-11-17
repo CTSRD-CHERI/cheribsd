@@ -36,10 +36,10 @@
  * invoke the object, or return (from any object).
  */
 struct sandbox_object;
-struct cheri_object	cheri_sandbox_make_sealed_invoke_object(
+struct cheri_object	libcheri_sandbox_make_sealed_invoke_object(
 			    __capability struct sandbox_object *sbop);
-struct cheri_object	cheri_sandbox_make_sealed_rtld_object(
+struct cheri_object	libcheri_sandbox_make_sealed_rtld_object(
 			    __capability struct sandbox_object *sbop);
-struct cheri_object	cheri_make_sealed_return_object(void);
+struct cheri_object	libcheri_make_sealed_return_object(void);
 
 #endif /* _LIBCHERI_CCALL_H_ */

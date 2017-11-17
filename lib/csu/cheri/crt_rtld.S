@@ -127,12 +127,12 @@ constructors:
 
 	# Code capability
 	clc	$c12, $t0, 32($c26)
-	dla	$t2, _cheri_system_object;
+	dla	$t2, _libcheri_system_object;
 	csc	$c12, $t2, 0($c26)
 
 	# Data capability
 	clc	$c12, $t0, 32+CHERICAP_SIZE($c26)
-	dla	$t2, _cheri_system_object;
+	dla	$t2, _libcheri_system_object;
 	csc	$c12, $t2, CHERICAP_SIZE($c26)
 
 	#

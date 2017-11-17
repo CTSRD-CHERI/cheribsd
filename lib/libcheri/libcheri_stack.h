@@ -80,8 +80,8 @@ struct cheri_stack {
  * Public libcheri APIs to interact with the trusted stack.
  */
 
-int	cheri_stack_get(struct cheri_stack *csp);	/* XXXRW: TODO */
-int	cheri_stack_set(struct cheri_stack *csp);	/* XXXRW: TODO */
+int	libcheri_stack_get(struct cheri_stack *csp);	/* XXXRW: TODO */
+int	libcheri_stack_set(struct cheri_stack *csp);	/* XXXRW: TODO */
 
 /*
  * Unwind operations.
@@ -89,8 +89,8 @@ int	cheri_stack_set(struct cheri_stack *csp);	/* XXXRW: TODO */
 #define	CHERI_STACK_UNWIND_OP_N		1	/* Unwind (n) frames. */
 #define	CHERI_STACK_UNWIND_OP_ALL	2	/* Unwind all frames. */
 
-int	cheri_stack_numframes(int *numframesp);
-int	cheri_stack_unwind(ucontext_t *uap, register_t ret, u_int op,
+int	libcheri_stack_numframes(int *numframesp);
+int	libcheri_stack_unwind(ucontext_t *uap, register_t ret, u_int op,
 	    u_int num_frames);
 
 #endif /* !_LIBCHERI_STACK_H_ */

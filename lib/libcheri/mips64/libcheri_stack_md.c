@@ -59,7 +59,7 @@
  * machine-dependent portion.
  */
 int
-cheri_stack_unwind_md(ucontext_t *uap, struct cheri_stack_frame *csfp,
+libcheri_stack_unwind_md(ucontext_t *uap, struct cheri_stack_frame *csfp,
     register_t ret)
 {
 	struct cheri_frame *cfp;

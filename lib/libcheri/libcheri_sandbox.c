@@ -132,9 +132,9 @@ sandbox_program_init(void)
 		return (-1);
 	}
 	/* XXXBD: cheri_system needs to do this. */
-	cheri_system_vtable = sandbox_make_vtable(NULL, "_cheri_system_object",
-	    main_provided_classes);
-	cheri_fd_vtable = sandbox_make_vtable(NULL, "cheri_fd",
+	libcheri_system_vtable = sandbox_make_vtable(NULL,
+	    "_libcheri_system_object", main_provided_classes);
+	libcheri_fd_vtable = sandbox_make_vtable(NULL, "libcheri_fd",
 	    main_provided_classes);
 	close(fd);
 	return (0);
@@ -477,7 +477,7 @@ sandbox_object_new_flags(struct sandbox_class *sbcp, size_t heaplen,
 	 * will need to change in the future.  We also need to think more
 	 * carefully about the mechanism here.
 	 */
-	if (cheri_invoke(sbop->sbo_cheri_object_rtld,
+	if (libcheri_invoke(sbop->sbo_cheri_object_rtld,
 	    SANDBOX_RUNTIME_CONSTRUCTORS,
 	    0, 0, 0, 0, 0, 0, 0, 0,
 	    cheri_zerocap(), cheri_zerocap(), cheri_zerocap(),
@@ -558,11 +558,11 @@ sandbox_object_new_system_object(__capability void *private_data,
 
 	/*
 	 * Construct sealed invocation capabilities for use with
-	 * cheri_invoke(), which will transition to the libcheri CCall
+	 * libcheri_invoke(), which will transition to the libcheri CCall
 	 * trampoline.  Leave rtld calabilities as NULL.
 	 */
         (*sbopp)->sbo_cheri_object_invoke =
-            cheri_sandbox_make_sealed_invoke_object(
+            libcheri_sandbox_make_sealed_invoke_object(
 	    (__cheri_cast __capability struct sandbox_object *)*sbopp);
 	return (0);
 }
@@ -609,7 +609,7 @@ sandbox_object_reset(struct sandbox_object *sbop)
 	 * this will need to change in the future.  We also need to think more
 	 * carefully about the mechanism here.
 	 */
-	(void)cheri_invoke(sbop->sbo_cheri_object_rtld,
+	(void)libcheri_invoke(sbop->sbo_cheri_object_rtld,
 	    SANDBOX_RUNTIME_CONSTRUCTORS,
 	    0, 0, 0, 0, 0, 0, 0, 0,
 	    cheri_zerocap(), cheri_zerocap(), cheri_zerocap(),
@@ -639,7 +639,7 @@ sandbox_object_cinvoke(struct sandbox_object *sbop, register_t methodnum,
 	 */
 	sbcp = sbop->sbo_sandbox_classp;
 	start = cheri_get_cyclecount();
-	v0 = cheri_invoke(sbop->sbo_cheri_object_invoke,
+	v0 = libcheri_invoke(sbop->sbo_cheri_object_invoke,
 	    CHERI_INVOKE_METHOD_LEGACY_INVOKE,
 	    methodnum,
 	    a1, a2, a3, a4, a5, a6, a7,

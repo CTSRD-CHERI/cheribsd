@@ -31,7 +31,7 @@
 #ifndef _LIBCHERI_TYPE_H_
 #define	_LIBCHERI_TYPE_H_
 
-__capability void	*cheri_type_alloc(void);
-__capability void	*cheri_system_type_alloc(void);
+__capability void	*libcheri_type_alloc(void);
+__capability void	*libcheri_system_type_alloc(void);
 
 #endif /* !_LIBCHERI_TYPE_H_ */

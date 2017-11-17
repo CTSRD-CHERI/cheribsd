@@ -390,14 +390,14 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 
 	/*
 	 * Construct sealed rtld and invocation capabilities for use with
-	 * cheri_invoke(), which will transition to the libcheri CCall
+	 * libcheri_invoke(), which will transition to the libcheri CCall
 	 * trampoline.
 	 */
 	sbop->sbo_cheri_object_rtld =
-	    cheri_sandbox_make_sealed_rtld_object(
+	    libcheri_sandbox_make_sealed_rtld_object(
 	    (__cheri_cast __capability struct sandbox_object *)sbop);
 	sbop->sbo_cheri_object_invoke =
-	    cheri_sandbox_make_sealed_invoke_object(
+	    libcheri_sandbox_make_sealed_invoke_object(
 	    (__cheri_cast __capability struct sandbox_object *)sbop);
 
 	/*
@@ -406,7 +406,8 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	 *
 	 * XXXRW: Should this occur earlier/later?
 	 */
-	if (cheri_system_new(sbop, &sbop->sbo_sandbox_system_objectp) == -1) {
+	if (libcheri_system_new(sbop, &sbop->sbo_sandbox_system_objectp) ==
+	    -1) {
 		saved_errno = errno;
 		warnx("%s: unable to allocate system object", __func__);
 		goto error;
@@ -416,14 +417,14 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	 * Install a reference to the system object in the class.
 	 */
 	sbmp->sbm_system_object = sbop->sbo_cheri_object_system =
-	    cheri_sandbox_make_sealed_invoke_object(
+	    libcheri_sandbox_make_sealed_invoke_object(
 	    (__cheri_cast __capability struct sandbox_object *)
 	    sbop->sbo_sandbox_system_objectp);
 
 	/*
 	 * Install CReturn capabilities in the class.
 	 */
-	sbmp->sbm_creturn_object = cheri_make_sealed_return_object();
+	sbmp->sbm_creturn_object = libcheri_make_sealed_return_object();
 
 	/*
 	 * Protect metadata now that we've written all values.

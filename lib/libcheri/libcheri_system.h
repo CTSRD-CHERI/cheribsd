@@ -43,26 +43,26 @@
  * as a public symbol.  At some point we will want to find a better way to do
  * this.
  */
-extern struct cheri_object _cheri_system_object;
+extern struct cheri_object _libcheri_system_object;
 
-#ifdef CHERI_SYSTEM_INTERNAL
-#define CHERI_SYSTEM_CCALL					\
+#ifdef LIBCHERI_SYSTEM_INTERNAL
+#define LIBCHERI_SYSTEM_CCALL					\
     __attribute__((cheri_ccallee))				\
-    __attribute__((cheri_method_class(_cheri_system_object)))
+    __attribute__((cheri_method_class(_libcheri_system_object)))
 #else
-#define CHERI_SYSTEM_CCALL					\
+#define LIBCHERI_SYSTEM_CCALL					\
     __attribute__((cheri_ccall))				\
     __attribute__((cheri_method_suffix("_cap")))		\
-    __attribute__((cheri_method_class(_cheri_system_object)))
+    __attribute__((cheri_method_class(_libcheri_system_object)))
 #endif
 
 /*
- * This header defines the interface for the CHERI system class.  Currently,
- * it is a bit catch-all, and provides a few key service that make it easy to
- * implement (and debug) sandboxed code.  In the future, we anticipate the
- * system class being an entry point to a number of other classes -- e.g.,
- * providing an open() method that returns file-descriptor objects.  We are
- * definitely not yet at that point.
+ * This header defines the interface for the libcheri system class.
+ * Currently, it is a bit catch-all, and provides a few key service that make
+ * it easy to implement (and debug) sandboxed code.  In the future, we
+ * anticipate the system class being an entry point to a number of other
+ * classes -- e.g., providing an open() method that returns file-descriptor
+ * objects.  We are definitely not yet at that point.
  */
 
 /*
@@ -71,28 +71,28 @@ extern struct cheri_object _cheri_system_object;
  * XXXRW: This should probably be private to libcheri.
  */
 struct sandbox_object;
-int	cheri_system_new(struct sandbox_object *sbop,
+int	libcheri_system_new(struct sandbox_object *sbop,
 	    struct sandbox_object **sbopp);
 
 /*
  * Methods themselves.
  */
-CHERI_SYSTEM_CCALL
-int	cheri_system_helloworld(void);
-CHERI_SYSTEM_CCALL
-int	cheri_system_puts(__capability const char *str);
-CHERI_SYSTEM_CCALL
-int	cheri_system_putchar(int c);
-CHERI_SYSTEM_CCALL
-int	cheri_system_clock_gettime(clockid_t clock_id,
+LIBCHERI_SYSTEM_CCALL
+int	libcheri_system_helloworld(void);
+LIBCHERI_SYSTEM_CCALL
+int	libcheri_system_puts(__capability const char *str);
+LIBCHERI_SYSTEM_CCALL
+int	libcheri_system_putchar(int c);
+LIBCHERI_SYSTEM_CCALL
+int	libcheri_system_clock_gettime(clockid_t clock_id,
 	    __capability struct timespec *tp);
-CHERI_SYSTEM_CCALL
-int	cheri_system_calloc(size_t number, size_t size,
+LIBCHERI_SYSTEM_CCALL
+int	libcheri_system_calloc(size_t number, size_t size,
 	    void * __capability * __capability ptrp);
-CHERI_SYSTEM_CCALL
-int	cheri_system_free(__capability void *ptr);
-CHERI_SYSTEM_CCALL
-register_t	cheri_system_user_call_fn(register_t methodnum,
+LIBCHERI_SYSTEM_CCALL
+int	libcheri_system_free(__capability void *ptr);
+LIBCHERI_SYSTEM_CCALL
+register_t	libcheri_system_user_call_fn(register_t methodnum,
 		    register_t a0, register_t a1, register_t a2,
 		    register_t a3, register_t a4, register_t a5,
 		    register_t a6,
@@ -104,25 +104,25 @@ register_t	cheri_system_user_call_fn(register_t methodnum,
  * XXXRW: Probably should be library-private: the CHERI type of the system
  * library.
  */
-extern __capability void	*cheri_system_type;
+extern __capability void	*libcheri_system_type;
 
-typedef int(*syscall_check_t)(int *ret, __capability int *stub_errno);
-extern syscall_check_t syscall_checks[SYS_MAXSYSCALL];
+typedef int(*libcheri_syscall_check_t)(int *ret, __capability int *stub_errno);
+extern libcheri_syscall_check_t libcheri_syscall_checks[SYS_MAXSYSCALL];
 
 /*
  * Vtable for cheri_system methods.
  */
-extern __capability vm_offset_t	*cheri_system_vtable;
+extern __capability vm_offset_t	*libcheri_system_vtable;
 
 #define SYS_STUB(_num, _ret, _sys,					\
     _protoargs, _protoargs_chk, _protoargs_err,				\
     _callargs, _callargs_chk, _callargs_err, _localcheck)		\
-    CHERI_SYSTEM_CCALL _ret __cheri_system_sys_##_sys _protoargs_err;
+    LIBCHERI_SYSTEM_CCALL _ret __libcheri_system_sys_##_sys _protoargs_err;
 #define SYS_STUB_ARGHASPTRS	SYS_STUB
 #define SYS_STUB_VA(_num, _ret, _sys, _lastarg,				\
     _protoargs, _vprotoargs, _protoargs_chk, _protoargs_err,		\
     _callargs, _callargs_chk, _callargs_err, _localcheck)		\
-    CHERI_SYSTEM_CCALL _ret __cheri_system_sys_##_sys _protoargs_err;
+    LIBCHERI_SYSTEM_CCALL _ret __libcheri_system_sys_##_sys _protoargs_err;
 
 #include <compat/cheriabi/cheriabi_sysstubs.h>
 

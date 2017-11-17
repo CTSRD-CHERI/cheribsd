@@ -43,7 +43,7 @@
 #include <time.h>
 
 #include "libcheri_enter.h"
-#define CHERI_SYSTEM_INTERNAL
+#define LIBCHERI_SYSTEM_INTERNAL
 #include "libcheri_system.h"
 #include "libcheri_type.h"
 
@@ -55,17 +55,18 @@
  * minimalist.  Sandbox object instances are created by sandbox_object_new()
  * as required, one per loaded sandbox object.
  */
-__capability vm_offset_t	*cheri_system_vtable;
+__capability vm_offset_t	*libcheri_system_vtable;
 
 static struct cheri_object null_object;
 
-CHERI_CLASS_DECL(libcheri_system);
+LIBCHERI_CLASS_DECL(libcheri_system);
 
 /*
  * Construct a new CHERI system object for use with a specific sandbox object.
  */
 int
-cheri_system_new(struct sandbox_object *sbop, struct sandbox_object **sbopp)
+libcheri_system_new(struct sandbox_object *sbop,
+    struct sandbox_object **sbopp)
 {
 	__capability void *invoke_pcc;
 
@@ -93,18 +94,18 @@ cheri_system_new(struct sandbox_object *sbop, struct sandbox_object **sbopp)
 	 */
 	invoke_pcc = cheri_getpcc();
 	invoke_pcc = cheri_setoffset(invoke_pcc,
-	    (register_t)CHERI_CLASS_ENTRY(libcheri_system));
+	    (register_t)LIBCHERI_CLASS_ENTRY(libcheri_system));
 
 	return (sandbox_object_new_system_object(
 	    (__cheri_cast void * __capability)(void *)sbop, invoke_pcc,
-	    cheri_system_vtable, sbopp));
+	    libcheri_system_vtable, sbopp));
 }
 
 /*
  * Just a test function.
  */
 int
-cheri_system_helloworld(void)
+libcheri_system_helloworld(void)
 {
 
 	printf("hello world\n");
@@ -117,7 +118,7 @@ cheri_system_helloworld(void)
  * capability being passed in.
  */
 int
-cheri_system_puts(__capability const char *str)
+libcheri_system_puts(__capability const char *str)
 {
 
 	for (; *str != '\0'; str++) {
@@ -129,14 +130,15 @@ cheri_system_puts(__capability const char *str)
 }
 
 int
-cheri_system_putchar(int c)
+libcheri_system_putchar(int c)
 {
 
 	return (putchar(c));
 }
 
 int
-cheri_system_clock_gettime(clockid_t clock_id, __capability struct timespec *tp)
+libcheri_system_clock_gettime(clockid_t clock_id,
+    __capability struct timespec *tp)
 {
 	int ret;
 	struct timespec ts;
@@ -152,7 +154,7 @@ cheri_system_clock_gettime(clockid_t clock_id, __capability struct timespec *tp)
 }
 
 int
-cheri_system_calloc(size_t count, size_t size,
+libcheri_system_calloc(size_t count, size_t size,
     void * __capability * __capability ptrp)
 {
 	__capability void *ptr;
@@ -164,30 +166,30 @@ cheri_system_calloc(size_t count, size_t size,
 }
 
 int
-cheri_system_free(__capability void *ptr)
+libcheri_system_free(__capability void *ptr)
 {
 
 	free_c(ptr);
 	return (0);
 }
 
-static cheri_system_user_fn_t	cheri_system_user_fn_ptr;
+static libcheri_system_user_fn_t	libcheri_system_user_fn_ptr;
 
 /*
  * Allow the application to register its own methods.
  */
 void
-cheri_system_user_register_fn(cheri_system_user_fn_t fn_ptr)
+libcheri_system_user_register_fn(libcheri_system_user_fn_t fn_ptr)
 {
 
-	cheri_system_user_fn_ptr = fn_ptr;
+	libcheri_system_user_fn_ptr = fn_ptr;
 }
 
 /*
  * Call a legacy user function.
  */
 register_t
-cheri_system_user_call_fn(register_t methodnum,
+libcheri_system_user_call_fn(register_t methodnum,
     register_t a0, register_t a1, register_t a2, register_t a3,
     register_t a4, register_t a5, register_t a6,
     __capability void *c3, __capability void *c4, __capability void *c5,
@@ -196,8 +198,8 @@ cheri_system_user_call_fn(register_t methodnum,
 
 	if (methodnum >= CHERI_SYSTEM_USER_BASE &&
 	    methodnum < CHERI_SYSTEM_USER_CEILING &&
-	    cheri_system_user_fn_ptr != NULL)
-		return (cheri_system_user_fn_ptr(null_object,
+	    libcheri_system_user_fn_ptr != NULL)
+		return (libcheri_system_user_fn_ptr(null_object,
 		    methodnum,
 		    a0, a1, a2, a3, a4, a5, a6, 0,
 		    c3, c4, c5, c6, c7));
@@ -205,14 +207,14 @@ cheri_system_user_call_fn(register_t methodnum,
 }
 
 static int
-syscall_allow(void)
+libcheri_syscall_allow(void)
 {
 
 	return (1);
 }
 
-syscall_check_t syscall_checks[SYS_MAXSYSCALL] = {
-	[SYS_issetugid] = (syscall_check_t)syscall_allow,
+libcheri_syscall_check_t libcheri_syscall_checks[SYS_MAXSYSCALL] = {
+	[SYS_issetugid] = (libcheri_syscall_check_t)libcheri_syscall_allow,
 };
 
 /*
@@ -223,12 +225,12 @@ syscall_check_t syscall_checks[SYS_MAXSYSCALL] = {
     _callargs, _callargs_chk, _callargs_err, _localcheck)		\
 _ret _sys _protoargs;							\
 _ret									\
-__cheri_system_sys_##_sys _protoargs_err				\
+__libcheri_system_sys_##_sys _protoargs_err				\
 {									\
 	_ret ret;							\
 	int(*checkfunc)_protoargs_chk;					\
 									\
-	checkfunc = (int(*)_protoargs_chk)syscall_checks[_num];		\
+	checkfunc = (int(*)_protoargs_chk)libcheri_syscall_checks[_num];\
 	if (checkfunc == NULL) {					\
 		*stub_errno = ENOSYS;					\
 		return ((_ret)-1);					\
@@ -252,7 +254,7 @@ __cheri_system_sys_##_sys _protoargs_err				\
    _callargs, _callargs_chk, _callargs_err, _localcheck)		\
 _ret _sys _protoargs;							\
 _ret									\
-__cheri_system_sys_##_sys _protoargs_err				\
+__libcheri_system_sys_##_sys _protoargs_err				\
 {									\
 									\
 	*stub_errno = ENOSYS;						\
@@ -269,12 +271,12 @@ __cheri_system_sys_##_sys _protoargs_err				\
     _callargs, _callargs_chk, _callargs_err, _localcheck)		\
 _ret __sys_##_sys _protoargs;						\
 _ret									\
-__cheri_system_sys_##_sys _protoargs_err				\
+__libcheri_system_sys_##_sys _protoargs_err				\
 {									\
 	_ret ret;							\
 	int(*checkfunc)_protoargs_chk;					\
 									\
-	checkfunc = (int(*)_protoargs_chk)syscall_checks[_num];		\
+	checkfunc = (int(*)_protoargs_chk)libcheri_syscall_checks[_num];\
 	if (checkfunc == NULL) {					\
 		*stub_errno = ENOSYS;					\
 		return ((_ret)-1);					\

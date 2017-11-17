@@ -39,7 +39,7 @@
 #include <assert.h>
 #include <errno.h>
 
-struct cheri_object _cheri_system_object;
+struct cheri_object _libcheri_system_object;
 
 /* XXX-BD: should be in crt. */
 extern char **environ;

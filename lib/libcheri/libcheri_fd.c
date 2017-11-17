@@ -41,13 +41,13 @@
 
 #include "libcheri_ccall.h"
 #include "libcheri_class.h"
-#define CHERI_FD_INTERNAL
+#define LIBCHERI_FD_INTERNAL
 #include "libcheri_fd.h"
 #include "libcheri_system.h"
 #include "libcheri_sandbox.h"
 
 /*
- * This file implements the CHERI 'file descriptor' (fd) class.  Pretty
+ * This file implements the libcheri 'file descriptor' (fd) class.  Pretty
  * minimalist.
  *
  * XXXRW: This is a slightly risky business, as we're taking capabilities as
@@ -72,9 +72,9 @@
  * for methods?
  */
 
-CHERI_CLASS_DECL(cheri_fd);
+LIBCHERI_CLASS_DECL(libcheri_fd);
 
-__capability vm_offset_t	*cheri_fd_vtable;
+__capability vm_offset_t	*libcheri_fd_vtable;
 
 /*
  * Data segment for a cheri_fd.
@@ -92,12 +92,12 @@ struct cheri_fd {
  */
 
 /*
- * Allocate a new cheri_fd object for an already-open file descriptor.
+ * Allocate a new libcheri_fd object for an already-open file descriptor.
  *
  * XXXRW: What to return in the userspace CCall world order?  The sandbox..?
  */
 int
-cheri_fd_new(int fd, struct sandbox_object **sbopp)
+libcheri_fd_new(int fd, struct sandbox_object **sbopp)
 {
 	__capability void *invoke_pcc;
 	struct cheri_fd *cfp;
@@ -118,14 +118,14 @@ cheri_fd_new(int fd, struct sandbox_object **sbopp)
 	 * rather than embedding this logic in each system class?
 	 */
 	invoke_pcc = cheri_setoffset(cheri_getpcc(),
-	    (register_t)CHERI_CLASS_ENTRY(cheri_fd));
+	    (register_t)LIBCHERI_CLASS_ENTRY(libcheri_fd));
 
 	/*
 	 * Set up system-object state for the sandbox.
 	 */
 	if (sandbox_object_new_system_object(
 	    (__cheri_cast void * __capability)(void *)cfp, invoke_pcc,
-	    cheri_fd_vtable, &cfp->cf_sbop) != 0) {
+	    libcheri_fd_vtable, &cfp->cf_sbop) != 0) {
 		free(cfp);
 		return (-1);
 	}
@@ -138,7 +138,7 @@ cheri_fd_new(int fd, struct sandbox_object **sbopp)
  * continue.  Note: does not close the fd or free memory.  The latter must
  */
 void
-cheri_fd_revoke(struct sandbox_object *sbop)
+libcheri_fd_revoke(struct sandbox_object *sbop)
 {
 	__capability struct cheri_fd *cfp;
 
@@ -147,11 +147,11 @@ cheri_fd_revoke(struct sandbox_object *sbop)
 }
 
 /*
- * Actually free a cheri_fd.  This can only be done if there are no
+ * Actually free a libcheri_fd.  This can only be done if there are no
  * outstanding references in any sandboxes (etc).
  */
 void
-cheri_fd_destroy(struct sandbox_object *sbop)
+libcheri_fd_destroy(struct sandbox_object *sbop)
 {
 	__capability struct cheri_fd *cfp;
 
@@ -164,7 +164,7 @@ cheri_fd_destroy(struct sandbox_object *sbop)
  * Forward fstat() on a cheri_fd to the underlying file descriptor.
  */
 struct cheri_fd_ret
-cheri_fd_fstat(__capability struct stat *sb_c)
+libcheri_fd_fstat(__capability struct stat *sb_c)
 {
 	struct cheri_fd_ret ret;
 	__capability struct cheri_fd *cfp;
@@ -199,7 +199,7 @@ cheri_fd_fstat(__capability struct stat *sb_c)
  * Forward lseek() on a cheri_fd to the underlying file descriptor.
  */
 struct cheri_fd_ret
-cheri_fd_lseek(off_t offset, int whence)
+libcheri_fd_lseek(off_t offset, int whence)
 {
 	struct cheri_fd_ret ret;
 	__capability struct cheri_fd *cfp;
@@ -224,7 +224,7 @@ cheri_fd_lseek(off_t offset, int whence)
  * Forward read() on a cheri_fd to the underlying file descriptor.
  */
 struct cheri_fd_ret
-cheri_fd_read(__capability void *buf_c, size_t nbytes)
+libcheri_fd_read(__capability void *buf_c, size_t nbytes)
 {
 	struct cheri_fd_ret ret;
 	__capability struct cheri_fd *cfp;
@@ -259,7 +259,7 @@ cheri_fd_read(__capability void *buf_c, size_t nbytes)
  * Forward write_c() on a cheri_fd to the underlying file descriptor.
  */
 struct cheri_fd_ret
-cheri_fd_write(__capability const void *buf_c, size_t nbytes)
+libcheri_fd_write(__capability const void *buf_c, size_t nbytes)
 {
 	struct cheri_fd_ret ret;
 	__capability struct cheri_fd *cfp;
@@ -275,7 +275,7 @@ cheri_fd_write(__capability const void *buf_c, size_t nbytes)
 	}
 	buf = cheri_cap_to_ptr(buf_c, nbytes);
 
-	/* Check that cheri_fd hasn't been revoked. */
+	/* Check that libcheri_fd hasn't been revoked. */
 	cfp = sandbox_object_private_get_idc();
 	if (cfp->cf_fd == -1) {
 		ret.cfr_retval0 = -1;

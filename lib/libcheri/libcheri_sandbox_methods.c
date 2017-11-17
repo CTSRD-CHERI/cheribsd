@@ -1,6 +1,6 @@
 /*-
  * Copyright (c) 2014-2015 SRI International
- * Copyright (c) 2015-2016 Robert N. M. Watson
+ * Copyright (c) 2015-2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -113,8 +113,8 @@ struct sandbox_required_methods {
 static void	sandbox_free_provided_methods(
 		    struct sandbox_provided_methods *provided_methods);
 
-#define	CHERI_CALLEE_SYM_PREFIX	"__cheri_callee_method."
-#define	CHERI_CALLER_SYM_PREFIX	"__cheri_method."
+#define	LIBCHERI_CALLEE_SYM_PREFIX	"__cheri_callee_method."
+#define	LIBCHERI_CALLER_SYM_PREFIX	"__cheri_method."
 
 extern int sb_verbose;
 
@@ -376,13 +376,13 @@ sandbox_parse_ccall_methods(int fd,
 		if (cheri_callee_idx != 0 &&
 		    symtab[i].st_shndx == cheri_callee_idx) {
 			/* Check that the prefix is right */
-			if (strncmp(sname, CHERI_CALLEE_SYM_PREFIX,
-			    strlen(CHERI_CALLEE_SYM_PREFIX)) != 0) {
+			if (strncmp(sname, LIBCHERI_CALLEE_SYM_PREFIX,
+			    strlen(LIBCHERI_CALLEE_SYM_PREFIX)) != 0) {
 				warnx("%s: malformed .CHERI_CALLEE symbol '%s'",
 				    __func__, sname);
 				goto bad;
 			}
-			sname += strlen(CHERI_CALLEE_SYM_PREFIX);
+			sname += strlen(LIBCHERI_CALLEE_SYM_PREFIX);
 
 			/* Extract the class name */
 			class_name_len = strcspn(sname, ".");
@@ -457,13 +457,13 @@ sandbox_parse_ccall_methods(int fd,
 			}
 
 			/* Check that the prefix is right */
-			if (strncmp(sname, CHERI_CALLER_SYM_PREFIX,
-			    strlen(CHERI_CALLER_SYM_PREFIX)) != 0) {
+			if (strncmp(sname, LIBCHERI_CALLER_SYM_PREFIX,
+			    strlen(LIBCHERI_CALLER_SYM_PREFIX)) != 0) {
 				warnx("%s: malformed .CHERI_CALLER symbol '%s'",
 				    __func__, sname);
 				goto bad;
 			}
-			sname += strlen(CHERI_CALLER_SYM_PREFIX);
+			sname += strlen(LIBCHERI_CALLER_SYM_PREFIX);
 
 			required_class_name_len = strcspn(sname, ".");
 			if (*(sname + required_class_name_len) != '.' ||

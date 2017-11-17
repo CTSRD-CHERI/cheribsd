@@ -52,9 +52,9 @@ libcheri_init(void)
 	 * Must initialise sealing capabilities before other aspects of
 	 * libcheri.
 	 */
-	cheri_ccall_init();
-	cheri_stack_init();
-	cheri_enter_init();
+	libcheri_ccall_init();
+	libcheri_stack_init();
+	libcheri_enter_init();
 	sandbox_init();
 	libcheri_initialised = 1;
 }

@@ -3,14 +3,14 @@
 
 #include "libcheri_sandbox.h"
 
-cheri::sandbox_invoke_failure::~sandbox_invoke_failure() throw() {}
-const char *cheri::sandbox_invoke_failure::what() const throw()
+libcheri::sandbox_invoke_failure::~sandbox_invoke_failure() throw() {}
+const char *libcheri::sandbox_invoke_failure::what() const throw()
 {
-	return "CHERI sandbox invocation error.";
+	return "libcheri sandbox invocation error.";
 }
 
-extern "C" void __cxa_cheri_sandbox_invoke_failure(int e)
+extern "C" void __cxa_libcheri_sandbox_invoke_failure(int e)
 {
-	cheri::sandbox_invoke_failure ex(e);
+	libcheri::sandbox_invoke_failure ex(e);
 	throw ex;
 }

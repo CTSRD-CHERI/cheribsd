@@ -124,7 +124,7 @@ test_sandbox_fd_read_revoke(const struct cheri_test *ctp __unused)
 	 * Essentially the same test as test_sandbox_fd_read() except that we
 	 * expect not to receive input.
 	 */
-	cheri_fd_revoke(sbop_stdin);
+	libcheri_fd_revoke(sbop_stdin);
 	len = sizeof(read_string);
 	stringc = cheri_ptrperm(read_string, len, CHERI_PERM_STORE);
 	v = invoke_fd_read_c(sandbox_object_getobject(sbop_stdin), stringc,
@@ -163,7 +163,7 @@ test_sandbox_fd_write_revoke(const struct cheri_test *ctp __unused)
 	 * Essentially the same test as test_sandbox_fd_write() except that we
 	 * expect to see no output.
 	 */
-	cheri_fd_revoke(sbop_stdout);
+	libcheri_fd_revoke(sbop_stdout);
 	len = strlen(ctp->ct_stdout_string);
 	stringc = cheri_ptrperm(ctp->ct_stdout_string, len, CHERI_PERM_LOAD);
 	v = invoke_fd_write_c(sandbox_object_getobject(sbop_stdout), stringc,

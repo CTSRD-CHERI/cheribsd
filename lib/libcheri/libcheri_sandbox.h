@@ -81,7 +81,7 @@ extern int sb_verbose;
 #else
 #define LIBCHERI_OVERRIDE
 #endif
-namespace cheri
+namespace libcheri
 {
 	/**
 	 * Sandbox exception class.  In C++ mode, error returns from

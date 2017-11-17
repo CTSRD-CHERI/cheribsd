@@ -200,7 +200,7 @@ init_sb_class()
 	    LIBPNG_SB_HELPER_OP_GET_INTERLACE_TYPE,
 	    "png_get_interlace_type");
 
-	cheri_system_user_register_fn(&libpng_sb_userfn_handler);
+	libcheri_system_user_register_fn(&libpng_sb_userfn_handler);
 
 	DPRINTF("sandbox class created\n");
 }

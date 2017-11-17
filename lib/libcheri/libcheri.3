@@ -49,7 +49,7 @@
 .In cheri/cheri.h
 .In cheri/cheric.h
 .In cheri/libcheri_sandbox.h
-.Vt extern _Thread_local int  cheri_errno ;
+.Vt extern _Thread_local int  libcheri_errno ;
 .Ft void
 .Fo libcheri_init
 .Fa "void"
@@ -225,7 +225,7 @@ method number via
 .Fa methodnum ,
 and general-purpose and capability register arguments.
 These functions are implemented as wrappers around
-.Xr cheri_invoke 3 .
+.Xr libcheri_invoke 3 .
 .Ss Object monitoring
 .Pp
 Objects within a
@@ -256,11 +256,11 @@ use of negative return values for method return values is discouraged.
 If domain transition experiences a problem - e.g., a trusted-stack overflow
 or violation of the local-global capability flow-control policy - then it
 will be reported via
-.Vt cheri_errno .
+.Vt libcheri_errno .
 This variable can be set to zero before performing an invocation, and then
 checked following invocation to detect an error.
 If no error occurs,
-.Vt cheri_errno
+.Vt libcheri_errno
 will not be modified by
 .Nm .
 Possible values include:
@@ -282,7 +282,7 @@ The trusted stack has underflowed (not used, as an attempted return will
 instead trap).
 .El
 .Sh SEE ALSO
-.Xr cheri_invoke 3 ,
+.Xr libcheri_invoke 3 ,
 .Xr libprocstat 3 ,
 .Xr procstat 1
 .Sh AUTHORS

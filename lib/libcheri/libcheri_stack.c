@@ -55,9 +55,9 @@
 /*
  * Use linker/compiler-provided thread-local storage for the stack, to avoid
  * the need for explicit pthreads-based initialisation and management that
- * would otherwise need to incur inline in cheri_invoke() -- although we might
- * want to change this functional simplification for performance reasons in
- * the future.
+ * would otherwise need to incur inline in libcheri_invoke() -- although we
+ * might want to change this functional simplification for performance reasons
+ * in the future.
  *
  * XXX: Today we access this field lock-free, since it won't be accessed by
  * other threads (at least currently).  However, there is a question about
@@ -73,21 +73,21 @@
  * if interrupts taken during spl()s in the kernel, with the signal handler
  * "scheduling" the change to take place once the preempted code returns..?
  */
-__thread struct cheri_stack __cheri_stack_tls_storage
+__thread struct cheri_stack __libcheri_stack_tls_storage
     __attribute__((__aligned__(32))) = {
 	.cs_tsize = CHERI_STACK_SIZE,
 	.cs_tsp = CHERI_STACK_SIZE,
 };
 
 void
-cheri_stack_init(void)
+libcheri_stack_init(void)
 {
 
 	/*
 	 * Ensure thread-local storage for the first thread's trusted stack is
 	 * suitably aligned.
 	 */
-	assert(((vaddr_t)&__cheri_stack_tls_storage % CHERICAP_SIZE) == 0);
+	assert(((vaddr_t)&__libcheri_stack_tls_storage % CHERICAP_SIZE) == 0);
 }
 
 /*
@@ -99,10 +99,10 @@ cheri_stack_init(void)
  * present if libcheri hasn't been used from a thread previously.
  */
 int
-cheri_stack_get(struct cheri_stack *csp)
+libcheri_stack_get(struct cheri_stack *csp)
 {
 
-	memcpy(csp, &__cheri_stack_tls_storage, sizeof(*csp));
+	memcpy(csp, &__libcheri_stack_tls_storage, sizeof(*csp));
 	return (0);
 }
 
@@ -112,11 +112,11 @@ cheri_stack_get(struct cheri_stack *csp)
  * trusted stack being allocated.
  */
 int
-cheri_stack_numframes(int *numframesp)
+libcheri_stack_numframes(int *numframesp)
 {
 
-	*numframesp = (__cheri_stack_tls_storage.cs_tsize -
-	    __cheri_stack_tls_storage.cs_tsp) / CHERI_FRAME_SIZE;
+	*numframesp = (__libcheri_stack_tls_storage.cs_tsize -
+	    __libcheri_stack_tls_storage.cs_tsp) / CHERI_FRAME_SIZE;
 	return (0);
 }
 
@@ -124,10 +124,10 @@ cheri_stack_numframes(int *numframesp)
  * Allow the trusted stack to be set, subject to various safety constraints.
  */
 int
-cheri_stack_set(struct cheri_stack *csp)
+libcheri_stack_set(struct cheri_stack *csp)
 {
 
-	if (csp->cs_tsize != __cheri_stack_tls_storage.cs_tsize) {
+	if (csp->cs_tsize != __libcheri_stack_tls_storage.cs_tsize) {
 		errno = EINVAL;
 		return (-1);
 	}
@@ -136,8 +136,8 @@ cheri_stack_set(struct cheri_stack *csp)
 		errno = EINVAL;
 		return (-1);
 	}
-	memcpy(&__cheri_stack_tls_storage, csp,
-	    sizeof(__cheri_stack_tls_storage));
+	memcpy(&__libcheri_stack_tls_storage, csp,
+	    sizeof(__libcheri_stack_tls_storage));
 	return (0);
 }
 
@@ -146,7 +146,7 @@ cheri_stack_set(struct cheri_stack *csp)
  * machine-independent portion.
  */
 int
-cheri_stack_unwind(ucontext_t *uap, register_t ret, u_int op,
+libcheri_stack_unwind(ucontext_t *uap, register_t ret, u_int op,
     u_int num_frames)
 {
 	struct cheri_stack cs;
@@ -169,7 +169,7 @@ cheri_stack_unwind(ucontext_t *uap, register_t ret, u_int op,
 	/*
 	 * Retrieve trusted stack and validate before attempting to unwind.
 	 */
-	if (cheri_stack_get(&cs) != 0)
+	if (libcheri_stack_get(&cs) != 0)
 		return (-1);
 	if ((cs.cs_tsize % CHERI_FRAME_SIZE) != 0 ||
 	    (cs.cs_tsp > cs.cs_tsize) ||
@@ -209,9 +209,9 @@ cheri_stack_unwind(ucontext_t *uap, register_t ret, u_int op,
 	cs.cs_tsp += num_frames * CHERI_FRAME_SIZE;
 	assert(cs.cs_tsp <= cs.cs_tsize);
 
-	if (cheri_stack_unwind_md(uap, csfp, ret) < 0)
+	if (libcheri_stack_unwind_md(uap, csfp, ret) < 0)
 		return (-1);
-	if (cheri_stack_set(&cs) < 0)
+	if (libcheri_stack_set(&cs) < 0)
 		return (-1);
 	return (0);
 }

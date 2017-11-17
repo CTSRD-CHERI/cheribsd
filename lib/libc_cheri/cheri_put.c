@@ -41,12 +41,12 @@ int
 puts(const char *str)
 {
 
-	return (cheri_system_puts(cheri_ptr(str, strlen(str) + 1)));
+	return (libcheri_system_puts(cheri_ptr(str, strlen(str) + 1)));
 }
 
 int
 putchar(int c)
 {
 
-	return(cheri_system_putchar(c));
+	return(libcheri_system_putchar(c));
 }

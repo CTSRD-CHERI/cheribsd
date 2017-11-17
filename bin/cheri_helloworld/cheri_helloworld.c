@@ -57,20 +57,20 @@ main(void)
 
 	libcheri_init();
 
-	if (cheri_fd_new(STDOUT_FILENO, &sbop) < 0)
-		err(EX_OSFILE, "cheri_fd_new: stdout");
+	if (libcheri_fd_new(STDOUT_FILENO, &sbop) < 0)
+		err(EX_OSFILE, "libcheri_fd_new: stdout");
 
-	ret = call_cheri_system_helloworld();
+	ret = call_libcheri_system_helloworld();
 	assert(ret == 123456);
 
-	ret = call_cheri_system_puts();
+	ret = call_libcheri_system_puts();
 	assert(ret >= 0);
 
 	stdout_fd = sandbox_object_getobject(sbop);
-	ret = call_cheri_fd_write_c(stdout_fd);
+	ret = call_libcheri_fd_write_c(stdout_fd);
 	assert(ret == 12);
 
-	cheri_fd_destroy(sbop);
+	libcheri_fd_destroy(sbop);
 
 	return (0);
 }

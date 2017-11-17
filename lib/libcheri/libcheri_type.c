@@ -47,25 +47,25 @@ __REQUIRE_CAPABILITIES
 #include "libcheri_type.h"
 
 /* The root sealing capability of the types provenance tree. */
-static __capability void *cheri_sealing_root;
+static __capability void *libcheri_sealing_root;
 
 /* The number of bits in the type field of a capability. */
-static const int cap_type_bits = 24;
+static const int libcheri_cap_type_bits = 24;
 
 /* The next non-system type number to allocate. */
-static _Atomic(uint64_t) cheri_type_next = 1;
+static _Atomic(uint64_t) libcheri_type_next = 1;
 
 /* The maximum non-system type number to allocate (plus one). */
-static const int cheri_type_max = 1<<(cap_type_bits-2);
+static const int libcheri_type_max = 1<<(libcheri_cap_type_bits-2);
 
 /* The next system type number to allocate. */
-static _Atomic(uint64_t) cheri_system_type_next = cheri_type_max;
+static _Atomic(uint64_t) libcheri_system_type_next = libcheri_type_max;
 
 /* The maximum system type number to allocate (plus one). */
-static const int cheri_system_type_max = 1<<(cap_type_bits-1);
+static const int libcheri_system_type_max = 1<<(libcheri_cap_type_bits-1);
 
 static void
-cheri_type_init(void)
+libcheri_type_init(void)
 {
 
 	/*
@@ -75,10 +75,10 @@ cheri_type_init(void)
 	 * properties of the capability later, should compartmentalisation
 	 * actually be used by the application.
 	 */
-	if (sysarch(CHERI_GET_SEALCAP, &cheri_sealing_root) < 0)
-		cheri_sealing_root = NULL;
-	assert((cheri_getperm(cheri_sealing_root) & CHERI_PERM_SEAL) != 0);
-	assert(cheri_getlen(cheri_sealing_root) != 0);
+	if (sysarch(CHERI_GET_SEALCAP, &libcheri_sealing_root) < 0)
+		libcheri_sealing_root = NULL;
+	assert((cheri_getperm(libcheri_sealing_root) & CHERI_PERM_SEAL) != 0);
+	assert(cheri_getlen(libcheri_sealing_root) != 0);
 }
 
 /**
@@ -88,7 +88,7 @@ cheri_type_init(void)
  * specifies value that the returned type must be less than.
  */
 static inline __capability void *
-alloc_type_capability(_Atomic(uint64_t) *source, uint64_t max)
+libcheri_alloc_type_capability(_Atomic(uint64_t) *source, uint64_t max)
 {
 	__capability void *new_type_cap;
 	uint64_t next;
@@ -112,9 +112,9 @@ alloc_type_capability(_Atomic(uint64_t) *source, uint64_t max)
 	 * On first use, query the root object-type capability from the
 	 * kernel.
 	 */
-	if ((cheri_getperm(cheri_sealing_root) & CHERI_PERM_SEAL) == 0)
-		cheri_type_init();
-	new_type_cap = cheri_maketype(cheri_sealing_root, next);
+	if ((cheri_getperm(libcheri_sealing_root) & CHERI_PERM_SEAL) == 0)
+		libcheri_type_init();
+	new_type_cap = cheri_maketype(libcheri_sealing_root, next);
 	return (new_type_cap);
 }
 
@@ -122,16 +122,17 @@ alloc_type_capability(_Atomic(uint64_t) *source, uint64_t max)
  * A [very] simple CHERI type allocator.
  */
 __capability void *
-cheri_type_alloc(void)
+libcheri_type_alloc(void)
 {
 
-	return (alloc_type_capability(&cheri_type_next, cheri_type_max));
+	return (libcheri_alloc_type_capability(&libcheri_type_next,
+	    libcheri_type_max));
 }
 
 __capability void *
-cheri_system_type_alloc(void)
+libcheri_system_type_alloc(void)
 {
 
-	return (alloc_type_capability(&cheri_system_type_next,
-	    cheri_system_type_max));
+	return (libcheri_alloc_type_capability(&libcheri_system_type_next,
+	    libcheri_system_type_max));
 }

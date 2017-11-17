@@ -31,9 +31,9 @@
 #ifndef _LIBCHERI_INIT_H_
 #define	_LIBCHERI_INIT_H_
 
-void	cheri_ccall_init(void);
-void	cheri_stack_init(void);
-void	cheri_enter_init(void);
+void	libcheri_ccall_init(void);
+void	libcheri_stack_init(void);
+void	libcheri_enter_init(void);
 void	sandbox_init(void);
 
 #endif /* _LIBCHERI_INIT_H_ */
