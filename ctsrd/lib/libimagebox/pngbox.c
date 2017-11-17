@@ -39,7 +39,7 @@
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-#include <cheri/sandbox.h>
+#include <cheri/libcheri_sandbox.h>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -246,10 +246,12 @@ cheri_png_read_start(char *pngbuffer, size_t pnglen,
 	if (ibox_verbose)
 		sb_verbose = ibox_verbose;
 
-	if (sandbox_class == NULL)
+	if (sandbox_class == NULL) {
+		libcheri_init();
 		if (sandbox_class_new("/usr/libexec/readpng-cheri-helper",
 		    8*1024*1024, &sandbox_class) < 0)
 			goto error;
+	}
 	if (sandbox_object == NULL)
 		if (sandbox_object_new(sandbox_class, 4*1024*1024,
 		    &sandbox_object) < 0)

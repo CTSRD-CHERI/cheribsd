@@ -376,9 +376,11 @@ mips_vector_init(void)
 	bcopy(MipsCache, (void *)MIPS_CACHE_ERR_EXC_VEC,
 	      MipsCacheEnd - MipsCache);
 
+#if 0
 #ifdef CPU_CHERI
 	bcopy(CHERICCallVector, (void *)CHERI_CCALL_EXC_VEC,
 	      CHERICCallVectorEnd - CHERICCallVector);
+#endif
 #endif
 
 	/*

@@ -39,6 +39,7 @@
 
 #include <sys/param.h>
 #include <sys/mman.h>
+#include <sys/resource.h>
 #include <sys/sysctl.h>
 #include <sys/time.h>
 #include <sys/ucontext.h>
@@ -53,9 +54,9 @@
 #include <machine/frame.h>
 #include <machine/trap.h>
 
-#include <cheri/cheri_fd.h>
-#include <cheri/cheri_stack.h>
-#include <cheri/sandbox.h>
+#include <cheri/libcheri_fd.h>
+#include <cheri/libcheri_stack.h>
+#include <cheri/libcheri_sandbox.h>
 
 #include <machine/sysarch.h>
 #endif
@@ -1120,7 +1121,15 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_sandbox_cp2_bound_nocatch",
 	  .ct_desc = "Exercise sandboxed CP2 bounds-check failure; uncaught",
 	  .ct_func = test_sandbox_cp2_bound_nocatch,
-	  .ct_flags = CT_FLAG_SANDBOX, },
+	  .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+	  .ct_signum = SIGPROT },
+
+	{ .ct_name = "test_sandbox_cp2_bound_nocatch_noaltstack",
+	  .ct_desc = "Exercise sandboxed CP2 bounds-check failure; uncaught, "
+		"no alt stack",
+	  .ct_func = test_sandbox_cp2_bound_nocatch_noaltstack,
+	  .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+	  .ct_signum = SIGILL },
 
 	{ .ct_name = "test_sandbox_cp2_perm_load_catch",
 	  .ct_desc = "Exercise sandboxed CP2 load-perm-check failure; caught",
@@ -1136,7 +1145,8 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_sandbox_cp2_perm_load_nocatch",
 	  .ct_desc = "Exercise sandboxed CP2 load-perm-check failure; uncaught",
 	  .ct_func = test_sandbox_cp2_perm_load_nocatch,
-	  .ct_flags = CT_FLAG_SANDBOX, },
+	  .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+	  .ct_signum = SIGPROT },
 
 	{ .ct_name = "test_sandbox_cp2_perm_store_catch",
 	  .ct_desc = "Exercise sandboxed CP2 store-perm-check failure; caught",
@@ -1152,7 +1162,8 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_sandbox_cp2_perm_store_nocatch",
 	  .ct_desc = "Exercise sandboxed CP2 store-perm-check failure; uncaught",
 	  .ct_func = test_sandbox_cp2_perm_store_nocatch,
-	  .ct_flags = CT_FLAG_SANDBOX, },
+	  .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+	  .ct_signum = SIGPROT },
 
 	{ .ct_name = "test_sandbox_cp2_tag_catch",
 	  .ct_desc = "Exercise sandboxed CP2 tag-check failure; caught",
@@ -1168,7 +1179,8 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_sandbox_cp2_tag_nocatch",
 	  .ct_desc = "Exercise sandboxed CP2 tag-check failure; uncaught",
 	  .ct_func = test_sandbox_cp2_tag_nocatch,
-	  .ct_flags = CT_FLAG_SANDBOX, },
+	  .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+	  .ct_signum = SIGPROT },
 
 	{ .ct_name = "test_sandbox_cp2_seal_catch",
 	  .ct_desc = "Exercise sandboxed CP2 seal failure; caught",
@@ -1184,7 +1196,8 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_sandbox_cp2_seal_nocatch",
 	  .ct_desc = "Exercise sandboxed CP2 seal failure; uncaught",
 	  .ct_func = test_sandbox_cp2_seal_nocatch,
-	  .ct_flags = CT_FLAG_SANDBOX, },
+	  .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+	  .ct_signum = SIGPROT },
 
 	{ .ct_name = "test_sandbox_divzero_catch",
 	  .ct_desc = "Exercise sandboxed divide-by-zero exception; caught",
@@ -1217,7 +1230,8 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_sandbox_vm_rfault_nocatch",
 	  .ct_desc = "Exercise sandboxed VM read fault; uncaught",
 	  .ct_func = test_sandbox_vm_rfault_nocatch,
-	  .ct_flags = CT_FLAG_SANDBOX, },
+	  .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+	  .ct_signum = SIGSEGV },
 
 	{ .ct_name = "test_sandbox_vm_wfault_catch",
 	  .ct_desc = "Exercise sandboxed VM write fault; caught",
@@ -1230,7 +1244,8 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_sandbox_vm_wfault_nocatch",
 	  .ct_desc = "Exercise sandboxed VM write fault; uncaught",
 	  .ct_func = test_sandbox_vm_wfault_nocatch,
-	  .ct_flags = CT_FLAG_SANDBOX, },
+	  .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+	  .ct_signum = SIGSEGV },
 
 	{ .ct_name = "test_sandbox_vm_xfault_catch",
 	  .ct_desc = "Exercise sandboxed VM exec fault; caught",
@@ -1243,7 +1258,8 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_sandbox_vm_xfault_nocatch",
 	  .ct_desc = "Exercise sandboxed VM exec fault; uncaught",
 	  .ct_func = test_sandbox_vm_xfault_nocatch,
-	  .ct_flags = CT_FLAG_SANDBOX, },
+	  .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+	  .ct_signum = SIGSEGV },
 
 	{ .ct_name = "test_sandbox_helloworld",
 	  .ct_desc = "Print 'hello world' in a libcheri sandbox",
@@ -1381,19 +1397,26 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_getstack",
-	  .ct_desc = "Exercise CHERI_GET_STACK sysarch()",
+	  .ct_desc = "Exercise libcheri_stack_get()",
 	  .ct_func = test_sandbox_getstack,
 	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_setstack_nop",
-	  .ct_desc = "Exercise CHERI_SET_STACK sysarch() for nop rewrite",
+	  .ct_desc = "Exercise libcheri_stack_set() for nop rewrite",
 	  .ct_func = test_sandbox_setstack_nop,
 	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_setstack",
-	  .ct_desc = "Exercise CHERI_SET_STACK sysarch() to change stack",
+	  .ct_desc = "Exercise libcheri_stack_set() to change stack",
 	  .ct_func = test_sandbox_setstack,
 	  .ct_flags = CT_FLAG_SANDBOX, },
+
+	{ .ct_name = "test_sandbox_trustedstack_underflow",
+	  .ct_desc = "Underflow trusted stack",
+	  .ct_func = test_sandbox_trustedstack_underflow,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE,
+	  .ct_signum = SIGEMT,
+	  .ct_mips_exccode = T_TRAP },
 
 	/*
 	 * Check various properties to do with global vs. local capabilities
@@ -1415,10 +1438,11 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_STORE_LOCALCAP },
 
-	{ .ct_name = "test_sandbox_store_local_capability_in_bss",
+	{ .ct_name = "test_sandbox_store_local_capability_in_bss_nocatch",
 	  .ct_desc = "Try to store local capability to sandbox bss; uncaught",
 	  .ct_func = test_sandbox_store_local_capability_in_bss_nocatch,
-	  .ct_flags = CT_FLAG_SANDBOX, },
+	  .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+	  .ct_signum = SIGPROT },
 
 	{ .ct_name = "test_sandbox_store_global_capability_in_stack",
 	  .ct_desc = "Try to store global capability to sandbox stack",
@@ -1435,32 +1459,15 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_func = test_sandbox_return_global_capability,
 	  .ct_flags = CT_FLAG_SANDBOX, },
 
-	{ .ct_name = "test_sandbox_return_local_capability_catch",
-	  .ct_desc = "Try to return a local capability from a sandbox; caught",
-	  .ct_func = test_sandbox_return_local_capability_catch,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE |
-		    CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
-	  .ct_signum = SIGPROT,
-	  .ct_si_code = PROT_CHERI_LOCALRET,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_SW_LOCALRET },
-
-	{ .ct_name = "test_sandbox_return_local_capability_nocatch",
-	  .ct_desc = "Try to return a local capability from a sandbox; uncaught",
-	  .ct_func = test_sandbox_return_local_capability_nocatch,
-		.ct_flags = CT_FLAG_SANDBOX, },
+	{ .ct_name = "test_sandbox_return_local_capability",
+	  .ct_desc = "Try to return a local capability from a sandbox",
+	  .ct_func = test_sandbox_return_local_capability,
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_pass_local_capability_arg",
 	  .ct_desc = "Try to pass a local capability to a sandbox",
 	  .ct_func = test_sandbox_pass_local_capability_arg,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
-		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE |
-		    CT_FLAG_SANDBOX,
-	  .ct_signum = SIGPROT,
-	  .ct_si_code = PROT_CHERI_LOCALARG,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_SW_LOCALARG },
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	/*
 	 * Tests relating to initialisation of, and permissions on, global
@@ -1486,6 +1493,33 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_func = test_sandbox_var_constructor,
 	  .ct_flags = CT_FLAG_SANDBOX, },
 
+#ifdef CHERITHREAD_TESTS
+	/*
+	 * Tests of pthread interactions with libcheri.
+	 */
+	{ .ct_name = "test_sandbox_pthread_abort",
+	  .ct_desc = "Test sandbox abort from a second thread",
+	  .ct_func = test_sandbox_pthread_abort,
+	  .ct_flags = CT_FLAG_SANDBOX, },
+
+	{ .ct_name = "test_sandbox_pthread_cs_helloworld",
+	  .ct_desc = "Test sandbox hello world from a second thread",
+	  .ct_func = test_sandbox_pthread_cs_helloworld,
+	  .ct_flags = CT_FLAG_STDOUT_STRING | CT_FLAG_SANDBOX,
+	  .ct_stdout_string = "hello world\n" },
+#endif
+
+	/*
+	 * Tests relating to setjmp(3) and longjmp(3).
+	 */
+	{ .ct_name = "cheritest_setjmp",
+	  .ct_desc = "Exercise setjmp without longjmp",
+	  .ct_func = cheritest_setjmp, },
+
+	{ .ct_name = "cheritest_setjmp_longjmp",
+	  .ct_desc = "Exercise setjmp with longjmp",
+	  .ct_func = cheritest_setjmp_longjmp, },
+
 	/*
 	 * Standard library string tests.
 	 */
@@ -1501,6 +1535,21 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_string_memmove_c",
 	  .ct_desc = "Test explicit capability memmove",
 	  .ct_func = test_string_memmove_c },
+
+	/*
+	 * Thread-Local Storage (TLS) tests.
+	 */
+	{ .ct_name = "test_tls_align_ptr",
+	  .ct_desc = "Test alignment of TLS pointers",
+	  .ct_func = test_tls_align_ptr, },
+
+	{ .ct_name = "test_tls_align_cap",
+	  .ct_desc = "Test alignment of TLS capabilities",
+	  .ct_func = test_tls_align_ptr, },
+
+	{ .ct_name = "test_tls_align_4k",
+	  .ct_desc = "Test alignment of TLS 4K array",
+	  .ct_func = test_tls_align_4k, },
 
 	/*
 	 * zlib tests.
@@ -1608,6 +1657,7 @@ static int qtrace;
 static int sleep_after_test;
 static int unsandboxed_tests_only;
 static int verbose;
+static int coredump_enabled;
 
 static void
 usage(void)
@@ -1625,6 +1675,7 @@ usage(void)
 "options:\n"
 "    -f  -- Only include \"fast\" tests\n"
 #ifndef LIST_ONLY
+"    -c  -- Enable core dumps\n"
 "    -s  -- Sleep one second after each test\n"
 "    -q  -- Enable qemu tracing in test process\n"
 #endif
@@ -1716,10 +1767,10 @@ signal_handler(int signum, siginfo_t *info, void *vuap)
 	 * CHERITEST_SANDBOX_UNWOUND, or if we are not executing in a sandbox,
 	 * terminate the test, returning signal information to the parent.
 	 */
-	ret = cheri_stack_numframes(&numframes);
+	ret = libcheri_stack_numframes(&numframes);
 	if (ret < 0) {
 		ccsp->ccs_signum = -1;
-		fprintf(stderr, "%s: cheri_stack_numframes failed\n",
+		fprintf(stderr, "%s: libcheri_stack_numframes failed\n",
 		    __func__);
 		_exit(EX_SOFTWARE);
 	}
@@ -1729,11 +1780,11 @@ signal_handler(int signum, siginfo_t *info, void *vuap)
 		 * Sandboxed code is executing, even if we're not in a
 		 * sandbox.
 		 */
-		ret = cheri_stack_unwind(uap, CHERITEST_SANDBOX_UNWOUND,
+		ret = libcheri_stack_unwind(uap, CHERITEST_SANDBOX_UNWOUND,
 		    CHERI_STACK_UNWIND_OP_ALL, 0);
 		if (ret < 0) {
 			ccsp->ccs_signum = -1;
-			fprintf(stderr, "%s: cheri_stack_unwind failed\n",
+			fprintf(stderr, "%s: libcheri_stack_unwind failed\n",
 			    __func__);
 			_exit(EX_SOFTWARE);
 		}
@@ -1892,10 +1943,31 @@ cheritest_run_test(const struct cheri_test *ctp)
 
 	/*
 	 * First, check for errors from the test framework: successful process
-	 * termination, signal disposition/exception codes/etc.
-	 *
-	 * Analyse child's signal state returned via shared memory.
+	 * termination, signal disposition/exception codes/etc.  Handle the
+	 * special case in which the kernel terminates a process with prejudice
+	 * if an alternate signal stack is not present when a sandbox receives
+	 * a signal.  Analyse child's signal state returned via shared memory.
 	 */
+	if (ctp->ct_flags & CT_FLAG_SIGEXIT) {
+		if (!WIFSIGNALED(status)) {
+			snprintf(reason, sizeof(reason),
+			    "Expected child termination with signal %d",
+			    ctp->ct_signum);
+			goto fail;
+		}
+		if (WTERMSIG(status) != ctp->ct_signum) {
+			snprintf(reason, sizeof(reason),
+			    "Expected child termination with signal %d; got %d",
+			    ctp->ct_signum, WTERMSIG(status));
+			goto fail;
+		}
+
+		/*
+		 * Skip remaining checks as process has terminated as
+		 * expected.
+		 */
+		goto pass;
+	}
 	if (!WIFEXITED(status)) {
 		snprintf(reason, sizeof(reason), "Child exited abnormally");
 		goto fail;
@@ -2036,6 +2108,7 @@ cheritest_run_test(const struct cheri_test *ctp)
 		}
 	}
 
+pass:
 	if (xfail_reason == NULL)
 		xo_emit("{:status/%s}: {d:name/%s}\n", "PASS", ctp->ct_name);
 	else {
@@ -2094,6 +2167,7 @@ cheritest_run_test_name(const char *name)
 int
 main(int argc, char *argv[])
 {
+	struct rlimit rl;
 	int opt;
 	int glob = 0;
 #ifndef LIST_ONLY
@@ -2107,10 +2181,13 @@ main(int argc, char *argv[])
 	argc = xo_parse_args(argc, argv);
 	if (argc < 0)
 		errx(1, "xo_parse_args failed\n");
-	while ((opt = getopt(argc, argv, "afglqsuv")) != -1) {
+	while ((opt = getopt(argc, argv, "acfglqsuv")) != -1) {
 		switch (opt) {
 		case 'a':
 			run_all = 1;
+			break;
+		case 'c':
+			coredump_enabled = 1;
 			break;
 		case 'f':
 			fast_tests_only = 1;
@@ -2206,6 +2283,21 @@ main(int argc, char *argv[])
 		err(EX_OSERR, "mmap");
 	if (minherit(ccsp, getpagesize(), INHERIT_SHARE) < 0)
 		err(EX_OSERR, "minherit");
+
+	/*
+	 * Disable core dumps unless specifically enabled.
+	 */
+	if (!coredump_enabled) {
+		bzero(&rl, sizeof(rl));
+		if (setrlimit(RLIMIT_CORE, &rl) < 0)
+			err(EX_OSERR, "setrlimit");
+	}
+
+	/*
+	 * Initialise the libcheri sandboxing library.
+	 */
+	if (!unsandboxed_tests_only)
+		libcheri_init();
 
 	cheri_failed_tests = sl_init();
 	cheri_xfailed_tests = sl_init();

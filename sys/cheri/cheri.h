@@ -100,46 +100,6 @@ struct cheri_signal {
 };
 
 /*
- * Per-thread CHERI CCall/CReturn stack, which preserves the calling PC/PCC/
- * IDC across CCall so that CReturn can restore them.
- *
- * XXXRW: This is a very early experiment -- it's not clear if this idea will
- * persist in its current form, or at all.  For more complex userspace
- * language, there's a reasonable expectation that it, rather than the kernel,
- * will want to manage the idea of a "trusted stack".
- *
- * XXXRW: This is currently part of the kernel-user ABI due to the
- * CHERI_GET_STACK and CHERI_SET_STACK sysarch() calls.  In due course we need
- * to revise those APIs and differentiate the kernel-internal representation
- * from the public one.
- */
-struct cheri_stack_frame {
-	register_t	_csf_pad0;	/* Used to be MIPS program counter. */
-	register_t	_csf_pad1;
-	register_t	_csf_pad2;
-	register_t	_csf_pad3;
-#if __has_feature(capabilities)
-	void * __capability	csf_pcc;
-	void * __capability	csf_idc;
-#else
-	struct chericap	csf_pcc;
-	struct chericap	csf_idc;
-#endif
-};
-
-#define	CHERI_STACK_DEPTH	8	/* XXXRW: 8 is a nice round number. */
-struct cheri_stack {
-	register_t	cs_tsp;		/* Byte offset, not frame index. */
-	register_t	cs_tsize;	/* Stack size, in bytes. */
-	register_t	_cs_pad0;
-	register_t	_cs_pad1;
-	struct cheri_stack_frame	cs_frames[CHERI_STACK_DEPTH];
-} __aligned(CHERICAP_SIZE);
-
-#define	CHERI_FRAME_SIZE	sizeof(struct cheri_stack_frame)
-#define	CHERI_STACK_SIZE	(CHERI_STACK_DEPTH * CHERI_FRAME_SIZE)
-
-/*
  * APIs that act on C language representations of capabilities -- but not
  * capabilities themselves.
  */
@@ -161,8 +121,8 @@ void * cheri_kern_ptr(vaddr_t addr, size_t len);
 /*
  * CHERI capability utility functions.
  */
-void	 cheri_bcopy(void *src, void *dst, size_t len);
-void	*cheri_memcpy(void *dst, void *src, size_t len);
+void	 cheri_bcopy(const void *src, void *dst, size_t len);
+void	*cheri_memcpy(void *dst, const void *src, size_t len);
 
 /*
  * CHERI context management functions.
@@ -192,10 +152,6 @@ struct pcb;
 struct sysarch_args;
 void	cheri_sealcap_copy(struct proc *dst, struct proc *src);
 void	cheri_signal_copy(struct pcb *dst, struct pcb *src);
-void	cheri_stack_copy(struct pcb *dst, struct pcb *src);
-void	cheri_stack_init(struct pcb *pcb);
-int	cheri_stack_unwind(struct thread *td, struct trapframe *tf,
-	    int signum);
 int	cheri_sysarch_getsealcap(struct thread *td, struct sysarch_args *uap);
 int	cheri_sysarch_getstack(struct thread *td, struct sysarch_args *uap);
 int	cheri_sysarch_setstack(struct thread *td, struct sysarch_args *uap);

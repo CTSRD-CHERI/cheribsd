@@ -79,6 +79,23 @@ CTASSERT(offsetof(struct mdthread, md_tls_cap) % CHERICAP_SIZE == 0);
 CTASSERT(offsetof(struct mdthread, md_cheri_mmap_cap) % CHERICAP_SIZE == 0);
 
 /*
+ * Ensure that the compiler being used to build the kernel agrees with the
+ * kernel configuration on the size of a capability, and that we are compiling
+ * for the hybrid ABI.
+ */
+#ifdef CPU_CHERI128
+CTASSERT(sizeof(void *) == 8);
+CTASSERT(sizeof(void *__capability) == 16);
+CTASSERT(sizeof(struct chericap) == 16);
+CTASSERT(sizeof(struct cheri_object) == 32);
+#else
+CTASSERT(sizeof(void *) == 8);
+CTASSERT(sizeof(void *__capability) == 32);
+CTASSERT(sizeof(struct chericap) == 32);
+CTASSERT(sizeof(struct cheri_object) == 64);
+#endif
+
+/*
  * For now, all we do is declare what we support, as most initialisation took
  * place in the MIPS machine-dependent assembly.  CHERI doesn't need a lot of
  * actual boot-time initialisation.

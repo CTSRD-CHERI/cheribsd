@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012-2016 Robert N. M. Watson
+ * Copyright (c) 2012-2017 Robert N. M. Watson
  * Copyright (c) 2014 SRI International
  * All rights reserved.
  *
@@ -45,9 +45,9 @@
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-#include <cheri/cheri_enter.h>
-#include <cheri/cheri_fd.h>
-#include <cheri/sandbox.h>
+#include <cheri/libcheri_enter.h>
+#include <cheri/libcheri_fd.h>
+#include <cheri/libcheri_sandbox.h>
 
 #include <cheritest-helper.h>
 #include <err.h>
@@ -62,8 +62,11 @@
 
 #include "cheritest.h"
 
+/*
+ * XXXRW: Where are these initialised?
+ */
 int zero_fd = -1;
-struct cheri_object stdin_fd_object, stdout_fd_object, zero_fd_object;
+struct sandbox_object *sbop_stdin, *sbop_stdout, *sbop_zero;
 
 static char read_string[128];
 
@@ -72,7 +75,7 @@ test_sandbox_fd_fstat(const struct cheri_test *ctp __unused)
 {
 	register_t v;
 
-	v = invoke_fd_fstat_c(zero_fd_object);
+	v = invoke_fd_fstat_c(sandbox_object_getobject(sbop_zero));
 	if (v != 0)
 		cheritest_failure_errx("invoke returned %ld (expected 0)", v);
 	cheritest_success();
@@ -83,7 +86,7 @@ test_sandbox_fd_lseek(const struct cheri_test *ctp __unused)
 {
 	register_t v;
 
-	v = invoke_fd_lseek_c(zero_fd_object);
+	v = invoke_fd_lseek_c(sandbox_object_getobject(sbop_zero));
 	if (v != 0)
 		cheritest_failure_errx("invoke returned %ld (expected 0)", v);
 	cheritest_success();
@@ -98,7 +101,8 @@ test_sandbox_fd_read(const struct cheri_test *ctp)
 
 	len = sizeof(read_string);
 	stringc = cheri_ptrperm(read_string, len, CHERI_PERM_STORE);
-	v = invoke_fd_read_c(stdin_fd_object, stringc, len);
+	v = invoke_fd_read_c(sandbox_object_getobject(sbop_stdin), stringc,
+	    len);
 	if (v != (register_t)strlen(ctp->ct_stdin_string))
 		cheritest_failure_errx("invoke returned %ld (expected %ld)",
 		    v, strlen(ctp->ct_stdin_string));
@@ -120,10 +124,11 @@ test_sandbox_fd_read_revoke(const struct cheri_test *ctp __unused)
 	 * Essentially the same test as test_sandbox_fd_read() except that we
 	 * expect not to receive input.
 	 */
-	cheri_fd_revoke(stdin_fd_object);
+	libcheri_fd_revoke(sbop_stdin);
 	len = sizeof(read_string);
 	stringc = cheri_ptrperm(read_string, len, CHERI_PERM_STORE);
-	v = invoke_fd_read_c(stdin_fd_object, stringc, len);
+	v = invoke_fd_read_c(sandbox_object_getobject(sbop_stdin), stringc,
+	    len);
 	if (v != -1)
 		cheritest_failure_errx("invoke returned %lu; expected %d\n",
 		    v, -1);
@@ -139,7 +144,8 @@ test_sandbox_fd_write(const struct cheri_test *ctp __unused)
 
 	len = strlen(ctp->ct_stdout_string);
 	stringc = cheri_ptrperm(ctp->ct_stdout_string, len, CHERI_PERM_LOAD);
-	v = invoke_fd_write_c(stdout_fd_object, stringc, len);
+	v = invoke_fd_write_c(sandbox_object_getobject(sbop_stdout), stringc,
+	    len);
 	if (v != (ssize_t)len)
 		cheritest_failure_errx("invoke returned %lu; expected %zd\n",
 		    v, strlen(ctp->ct_stdout_string));
@@ -157,10 +163,11 @@ test_sandbox_fd_write_revoke(const struct cheri_test *ctp __unused)
 	 * Essentially the same test as test_sandbox_fd_write() except that we
 	 * expect to see no output.
 	 */
-	cheri_fd_revoke(stdout_fd_object);
+	libcheri_fd_revoke(sbop_stdout);
 	len = strlen(ctp->ct_stdout_string);
 	stringc = cheri_ptrperm(ctp->ct_stdout_string, len, CHERI_PERM_LOAD);
-	v = invoke_fd_write_c(stdout_fd_object, stringc, len);
+	v = invoke_fd_write_c(sandbox_object_getobject(sbop_stdout), stringc,
+	    len);
 	if (v != -1)
 		cheritest_failure_errx("invoke returned %lu; expected %d\n",
 		    v, -1);

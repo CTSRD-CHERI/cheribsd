@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 Robert N. M. Watson
+ * Copyright (c) 2014-2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -38,9 +38,9 @@
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-#include <cheri/cheri_fd.h>
+#include <cheri/libcheri_fd.h>
+#include <cheri/libcheri_sandbox.h>
 #include <cheri/helloworld.h>
-#include <cheri/sandbox.h>
 
 #include <assert.h>
 #include <err.h>
@@ -51,20 +51,26 @@
 int
 main(void)
 {
+	struct sandbox_object *sbop;
 	int ret;
 	struct cheri_object stdout_fd;
 
-	if (cheri_fd_new(STDOUT_FILENO, &stdout_fd) < 0)
-		err(EX_OSFILE, "cheri_fd_new: stdout");
+	libcheri_init();
 
-	ret = call_cheri_system_helloworld();
+	if (libcheri_fd_new(STDOUT_FILENO, &sbop) < 0)
+		err(EX_OSFILE, "libcheri_fd_new: stdout");
+
+	ret = call_libcheri_system_helloworld();
 	assert(ret == 123456);
-	ret = call_cheri_system_puts();
+
+	ret = call_libcheri_system_puts();
 	assert(ret >= 0);
-	ret = call_cheri_fd_write_c(stdout_fd);
+
+	stdout_fd = sandbox_object_getobject(sbop);
+	ret = call_libcheri_fd_write_c(stdout_fd);
 	assert(ret == 12);
 
-	cheri_fd_destroy(stdout_fd);
+	libcheri_fd_destroy(sbop);
 
 	return (0);
 }

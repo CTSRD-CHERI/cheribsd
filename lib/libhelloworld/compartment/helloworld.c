@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 Robert N. M. Watson
+ * Copyright (c) 2014-2017 Robert N. M. Watson
  * Copyright (c) 2015 SRI International
  * All rights reserved.
  *
@@ -34,10 +34,10 @@
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-#include <cheri/cheri_enter.h>
-#include <cheri/cheri_fd.h>
-#include <cheri/cheri_invoke.h>
-#include <cheri/cheri_system.h>
+#include <cheri/libcheri_enter.h>
+#include <cheri/libcheri_fd.h>
+#include <cheri/libcheri_invoke.h>
+#include <cheri/libcheri_system.h>
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -53,25 +53,25 @@ static char hello_world_str[] = "hello world";
 static char hello_world_str_nl[] = "hello world\n";
 
 int
-call_cheri_system_helloworld(void)
+call_libcheri_system_helloworld(void)
 {
 
-	return (cheri_system_helloworld());
+	return (libcheri_system_helloworld());
 }
 
 int
-call_cheri_system_puts(void)
+call_libcheri_system_puts(void)
 {
 	__capability char *hello_world_str_c;
 
 	hello_world_str_c = cheri_ptrperm(&hello_world_str,
 	    sizeof(hello_world_str), CHERI_PERM_LOAD); /* Nul-terminated. */
 
-	return (cheri_system_puts(hello_world_str_c));
+	return (libcheri_system_puts(hello_world_str_c));
 }
 
 int
-call_cheri_fd_write_c(struct cheri_object fd_object)
+call_libcheri_fd_write_c(struct cheri_object fd_object)
 {
 	__capability char *hello_world_buf_c;
 	size_t len_buf_c;
@@ -79,6 +79,6 @@ call_cheri_fd_write_c(struct cheri_object fd_object)
 	len_buf_c = strlen(hello_world_str_nl);
 	hello_world_buf_c = cheri_ptrperm(&hello_world_str_nl, len_buf_c,
 	    CHERI_PERM_LOAD); /* Just the text. */
-	return (cheri_fd_write_c(fd_object,
+	return (libcheri_fd_write_c(fd_object,
 	    hello_world_buf_c, len_buf_c).cfr_retval0);
 }

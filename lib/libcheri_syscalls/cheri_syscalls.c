@@ -33,7 +33,7 @@
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-#include <cheri/cheri_system.h>
+#include <cheri/libcheri_system.h>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -49,7 +49,7 @@ _sys _protoargs								\
 {									\
 									\
 	_localcheck							\
-	return (__cheri_system_sys_##_sys _callargs_err);		\
+	return (__libcheri_system_sys_##_sys _callargs_err);		\
 }
 
 #define SYS_STUB_ARGHASPTRS(...)	SYS_STUB(__VA_ARGS__)
@@ -82,7 +82,7 @@ open(const char * path, int flags, ...)
 		mode = 0;
 	va_end(ap);
 
-	return (__cheri_system_sys_open(&errno, path, flags, mode));
+	return (__libcheri_system_sys_open(&errno, path, flags, mode));
 }
 
 int
@@ -98,7 +98,7 @@ openat(int fd, const char * path, int flags, ...)
 		mode = 0;
 	va_end(ap);
 
-	return (__cheri_system_sys_openat(&errno, fd, path, flags, mode));
+	return (__libcheri_system_sys_openat(&errno, fd, path, flags, mode));
 }
 
 int
@@ -127,7 +127,7 @@ fcntl(int fd, int cmd, ...)
 	}
 	va_end(ap);
 
-	return (__cheri_system_sys_fcntl(&errno, fd, cmd, arg));
+	return (__libcheri_system_sys_fcntl(&errno, fd, cmd, arg));
 }
 
 int	ioctl(int fd __unused, unsigned long request __unused, ...);

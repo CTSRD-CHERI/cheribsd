@@ -237,7 +237,9 @@ LDFLAGS		+=	-Wl,--no-warn-mismatch
 _LDFLAGS	=	${LDFLAGS:S/-Wl,//g:N-mabi=*:N-fuse-ld=*}
 
 LINT		?=	lint
-LINTFLAGS	?=	-cghapbx
+# Lint doesn't understand clang's stddef.h so let's define __STDDEF_H to skip it
+# It also doesn't understand __builtin_va_list so let's define it to __va_list
+LINTFLAGS	?=	-cghapbxF -D__STDDEF_H=1 -D__builtin_va_list=__va_list
 LINTKERNFLAGS	?=	${LINTFLAGS}
 LINTOBJFLAGS	?=	-cghapbxu -i
 LINTOBJKERNFLAGS?=	${LINTOBJFLAGS}

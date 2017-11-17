@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2016 Robert N. M. Watson
+ * Copyright (c) 2016-2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -44,9 +44,10 @@
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-#include <cheri/cheri_enter.h>
-#include <cheri/cheri_fd.h>
-#include <cheri/sandbox.h>
+#include <cheri/libcheri_enter.h>
+#include <cheri/libcheri_errno.h>
+#include <cheri/libcheri_fd.h>
+#include <cheri/libcheri_sandbox.h>
 
 #include <cheritest-helper.h>
 #include <err.h>
@@ -183,50 +184,29 @@ test_sandbox_return_global_capability(const struct cheri_test *ctp __unused)
 
 /*
  * Test that if we pass in a global capability, and the sandbox recasts it to
- * be a local capability to return it, that it is not returned.  Rely on the
- * signal handler to unwind the stack.
+ * be a local capability to return it, that it is not returned.
  */
 void
-test_sandbox_return_local_capability_catch(
-    const struct cheri_test *ctp __unused)
+test_sandbox_return_local_capability(const struct cheri_test *ctp __unused)
 {
 	__capability void *carg, *cret = NULL;
 	register_t v;
 
 	carg = (__capability void *)&v;
+	libcheri_errno = 0;
 	cret = invoke_return_local_capability(carg);
 	if (cret == carg)
 		cheritest_failure_errx("local capability returned");
-	cheritest_success();
-}
-
-/*
- * Test that if we pass in a global capability, and the sandbox recasts it to
- * be a local capability to return it, that it is not returned.  Disable the
- * signal handler.
- */
-void
-test_sandbox_return_local_capability_nocatch(
-    const struct cheri_test *ctp __unused)
-{
-	__capability void *carg, *cret = NULL;
-	register_t v;
-
-	signal_handler_clear(SIGPROT);
-	carg = (__capability void *)&v;
-	cret = invoke_return_local_capability(carg);
-	if (cret == carg)
-		cheritest_failure_errx("local capability returned");
+	if (libcheri_errno != CHERI_ERRNO_RETURN_LOCAL_RETVAL)
+		cheritest_failure_errx(
+		  "returned local capability with unexpected libcheri_errno %d",
+		    libcheri_errno);
 	cheritest_success();
 }
 
 /*
  * Test that if we pass a local capability to a sandbox, CCall rejects the
- * attempt.  Rely on the signal handler to terminate the test.  We don't have
- * a _nocatch variant as that aspect of the test suite only works for signals
- * delivered in sandboxes, and this signal is actually delivered before
- * entering the sandbox (i.e., before there are frames on the trusted stack
- * that permit unwinding).
+ * attempt.
  */
 void
 test_sandbox_pass_local_capability_arg(const struct cheri_test *ctp __unused)
@@ -236,6 +216,11 @@ test_sandbox_pass_local_capability_arg(const struct cheri_test *ctp __unused)
 
 	carg = (__capability void *)&v;
 	carg = cheri_local(carg);
+	libcheri_errno = 0;
 	v = invoke_store_capability_in_stack(carg);
-	cheritest_failure_errx("passing local capability argument succeeded");
+	if (libcheri_errno != CHERI_ERRNO_INVOKE_LOCAL_ARG)
+		cheritest_failure_errx(
+		    "passed local capability with unexpected libcheri_errno %d",
+		    libcheri_errno);
+	cheritest_success();
 }

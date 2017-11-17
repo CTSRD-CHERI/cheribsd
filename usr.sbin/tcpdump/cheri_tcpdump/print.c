@@ -44,9 +44,9 @@
 #include <net/ethernet.h>
 #include <netinet/in.h>
 
-#include <cheri/cheri_enter.h>
-#include <cheri/cheri_stack.h>
-#include <cheri/sandbox.h>
+#include <cheri/libcheri_enter.h>
+#include <cheri/libcheri_stack.h>
+#include <cheri/libcheri_sandbox.h>
 
 #include <assert.h>
 #include <ctype.h>
@@ -535,6 +535,8 @@ tcpdump_sandbox_invoke(struct tcpdump_sandbox *sb, netdissect_options *ndo,
 static int
 tcpdump_sandbox_object_setup()
 {
+
+	libcheri_init();
 
 	if (sandbox_class_new("/usr/libexec/tcpdump-helper",
 	    8*1024*1024, &tcpdump_classp) < 0) {

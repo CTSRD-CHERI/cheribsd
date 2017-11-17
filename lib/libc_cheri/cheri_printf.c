@@ -2,7 +2,7 @@
  * Copyright (c) 1986, 1988, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
- * Copyright (c) 2011, 2014, 2016 Robert N. M. Watson
+ * Copyright (c) 2011, 2014, 2016-2017 Robert N. M. Watson
  *
  * All or some portions of this file are derived from material licensed
  * to the University of California by American Telephone and Telegraph
@@ -42,7 +42,7 @@
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-#include <cheri/cheri_system.h>
+#include <cheri/libcheri_system.h>
 
 #include <inttypes.h>
 #include <stdarg.h>
@@ -524,17 +524,17 @@ number:
  * but this is the smallest diff against the lifted printf() code.
  */
 static void
-cheri_printf_putchar(int c, void *arg)
+libcheri_printf_putchar(int c, void *arg)
 {
 
-	(void)cheri_system_putchar(c);
+	(void)libcheri_system_putchar(c);
 }
 
 int
 vprintf(const char *fmt, va_list ap)
 {
 
-	return (kvprintf(fmt, cheri_printf_putchar, NULL, 10, ap));
+	return (kvprintf(fmt, libcheri_printf_putchar, NULL, 10, ap));
 }
 
 int

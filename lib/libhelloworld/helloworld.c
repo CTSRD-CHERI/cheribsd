@@ -29,7 +29,7 @@
  */
 
 #include <cheri/cheri.h>
-#include <cheri/sandbox.h>
+#include <cheri/libcheri_sandbox.h>
 
 #include <err.h>
 #include <sysexits.h>
@@ -45,7 +45,8 @@ static struct sandbox_object	*__helloworld_objectp;
 __attribute__ ((constructor)) static void
 cheri_helloworld_init(void)
 {
-	
+
+	libcheri_init();
 	if (sandbox_class_new(COMPARTMENT_PATH, 0, &__helloworld_classp) < 0)
 		err(EX_OSFILE, "sandbox_class_new(%s)", COMPARTMENT_PATH);
 	if (sandbox_object_new(__helloworld_classp, 2*1024*1024,

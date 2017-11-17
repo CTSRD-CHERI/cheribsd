@@ -109,11 +109,13 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 #endif
 
 #ifdef CPU_CHERI
+#if 0
 	case CHERI_GET_STACK:
 		return (cheri_sysarch_getstack(td, uap));
 
 	case CHERI_SET_STACK:
 		return (cheri_sysarch_setstack(td, uap));
+#endif
 
 	case CHERI_GET_SEALCAP:
 		return (cheri_sysarch_getsealcap(td, uap));

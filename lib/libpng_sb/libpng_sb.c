@@ -32,9 +32,9 @@
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-#include <cheri/cheri_enter.h>
-#include <cheri/cheri_fd.h>
-#include <cheri/sandbox.h>
+#include <cheri/libcheri_enter.h>
+#include <cheri/libcheri_fd.h>
+#include <cheri/libcheri_sandbox.h>
 
 #include <assert.h>
 #include <err.h>
@@ -138,6 +138,8 @@ static void
 init_sb_class()
 {
 
+	libcheri_init();
+
 	/* XXX: wrong error handling for library code */
 	if (sandbox_class_new("/usr/libexec/libpng_sb-helper",
 	    8*1024*1024, &classp) < 0)
@@ -198,7 +200,7 @@ init_sb_class()
 	    LIBPNG_SB_HELPER_OP_GET_INTERLACE_TYPE,
 	    "png_get_interlace_type");
 
-	cheri_system_user_register_fn(&libpng_sb_userfn_handler);
+	libcheri_system_user_register_fn(&libpng_sb_userfn_handler);
 
 	DPRINTF("sandbox class created\n");
 }

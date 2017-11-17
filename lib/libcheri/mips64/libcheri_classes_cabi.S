@@ -1,5 +1,5 @@
 #-
-# Copyright (c) 2012-2014 Robert N. M. Watson
+# Copyright (c) 2012-2014, 2017 Robert N. M. Watson
 # All rights reserved.
 #
 # This software was developed by SRI International and the University of
@@ -35,7 +35,8 @@
 
 #include <machine/cherireg.h>
 
-#include <cheri_class.h>
+#include "libcheri_class.h"
+#include "libcheri_system_md.h"
 
-CHERI_CLASS_ASM(libcheri_system);
-CHERI_CLASS_ASM(cheri_fd);
+LIBCHERI_CLASS_ASM(libcheri_system);
+LIBCHERI_CLASS_ASM(libcheri_fd);

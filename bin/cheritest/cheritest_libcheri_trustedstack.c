@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 Robert N. M. Watson
+ * Copyright (c) 2014-2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -39,13 +39,15 @@
 #include <sys/time.h>
 
 #include <machine/cpuregs.h>
-#include <machine/sysarch.h>
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-#include <cheri/cheri_enter.h>
-#include <cheri/cheri_fd.h>
-#include <cheri/sandbox.h>
+#include <cheri/libcheri_ccall.h>
+#include <cheri/libcheri_enter.h>
+#include <cheri/libcheri_fd.h>
+#include <cheri/libcheri_stack.h>
+#include <cheri/libcheri_sandbox.h>
+#include <cheri/libcheri_sandbox_internal.h>
 
 #include <cheritest-helper.h>
 #include <err.h>
@@ -68,9 +70,9 @@ cheritest_libcheri_userfn_getstack(void)
 	u_int stack_depth;
 	int retval;
 
-	retval = sysarch(CHERI_GET_STACK, &cs);
+	retval = libcheri_stack_get(&cs);
 	if (retval != 0)
-		cheritest_failure_err("sysarch(CHERI_GET_STACK) failed");
+		cheritest_failure_err("libcheri_stack_get() failed");
 
 	/* Does stack layout look sensible enough to continue? */
 	if ((cs.cs_tsize % CHERI_FRAME_SIZE) != 0)
@@ -92,16 +94,24 @@ cheritest_libcheri_userfn_getstack(void)
 
 	/* Validate that the first is a saved ambient context. */
 	csfp = &cs.cs_frames[stack_depth - 1];
-	if (cheri_getbase(csfp->csf_pcc) != cheri_getbase(cheri_getpcc()) ||
-	    cheri_getlen(csfp->csf_pcc) != cheri_getlen(cheri_getpcc()))
+	if (cheri_getbase(csfp->csf_caller_pcc) !=
+	    cheri_getbase(cheri_getpcc()) ||
+	    cheri_getlen(csfp->csf_caller_pcc) !=
+	    cheri_getlen(cheri_getpcc()))
 		cheritest_failure_errx("frame 0: not global code cap");
+
+#ifdef PLEASE_CRASH_THE_COMPILER
+	/* ... and that the callee sandbox is right. */
+	if (csfp->csf_callee_sbop != cheritest_objectp)
+		cheritest_failure_errx("frame 1: incorrect callee sandbox");
+#endif
 
 	/* Validate that the second is cheritest_objectp. */
 	csfp = &cs.cs_frames[stack_depth - 2];
-	if ((cheri_getbase(csfp->csf_pcc) != cheri_getbase(
-	    sandbox_object_getobject(cheritest_objectp).co_codecap)) ||
-	    cheri_getlen(csfp->csf_pcc) != cheri_getlen(
-	    sandbox_object_getobject(cheritest_objectp).co_codecap))
+	if ((cheri_getbase(csfp->csf_caller_pcc) != cheri_getbase(
+	    cheritest_objectp->sbo_invoke_pcc)) ||
+	    (cheri_getlen(csfp->csf_caller_pcc) != cheri_getlen(
+	    cheritest_objectp->sbo_invoke_pcc)))
 		cheritest_failure_errx("frame 1: not sandbox code cap");
 	return (0);
 }
@@ -131,9 +141,9 @@ cheritest_libcheri_userfn_setstack(register_t arg)
 	int retval;
 
 	/* Validate stack as retrieved. */
-	retval = sysarch(CHERI_GET_STACK, &cs);
+	retval = libcheri_stack_get(&cs);
 	if (retval != 0)
-		cheritest_failure_err("sysarch(CHERI_GET_STACK) failed");
+		cheritest_failure_err("libcheri_stack_get() failed");
 
 	/* Does stack layout look sensible enough to continue? */
 	if ((cs.cs_tsize % CHERI_FRAME_SIZE) != 0)
@@ -155,16 +165,23 @@ cheritest_libcheri_userfn_setstack(register_t arg)
 
 	/* Validate that the first is a saved ambient context. */
 	csfp = &cs.cs_frames[stack_depth - 1];
-	if (cheri_getbase(csfp->csf_pcc) != cheri_getbase(cheri_getpcc()) ||
-	    cheri_getlen(csfp->csf_pcc) != cheri_getlen(cheri_getpcc()))
+	if (cheri_getbase(csfp->csf_caller_pcc) !=
+	    cheri_getbase(cheri_getpcc()) ||
+	    cheri_getlen(csfp->csf_caller_pcc) !=
+	    cheri_getlen(cheri_getpcc()))
 		cheritest_failure_errx("frame 0: not global code cap");
 
+#ifdef PLEASE_CRASH_THE_COMPILER
+	/* ... and that the callee sandbox is right. */
+	if (csfp->csf_callee_sbop != cheritest_objectp)
+		cheritest_failure_errx("frame 1: incorrect callee sandbox");
+#endif
 	/* Validate that the second is cheritest_objectp. */
 	csfp = &cs.cs_frames[stack_depth - 2];
-	if ((cheri_getbase(csfp->csf_pcc) != cheri_getbase(
-	    sandbox_object_getobject(cheritest_objectp).co_codecap)) ||
-	    cheri_getlen(csfp->csf_pcc) != cheri_getlen(
-	    sandbox_object_getobject(cheritest_objectp).co_codecap))
+	if ((cheri_getbase(csfp->csf_caller_pcc) != cheri_getbase(
+	    cheritest_objectp->sbo_invoke_pcc)) ||
+	    (cheri_getlen(csfp->csf_caller_pcc) != cheri_getlen(
+	    cheritest_objectp->sbo_invoke_pcc)))
 		cheritest_failure_errx("frame 1: not sandbox code cap");
 
 	if (arg) {
@@ -173,9 +190,9 @@ cheritest_libcheri_userfn_setstack(register_t arg)
 	}
 
 	/* Update kernel view of trusted stack. */
-	retval = sysarch(CHERI_SET_STACK, &cs);
+	retval = libcheri_stack_set(&cs);
 	if (retval != 0)
-		cheritest_failure_err("sysarch(CHERI_SET_STACK) failed");
+		cheritest_failure_err("libcheri_stack_set() failed");
 
 	/* Leave behind a distinctive value we can test for. */
 	return (CHERITEST_SETSTACK_CONSTANT);
@@ -217,4 +234,23 @@ test_sandbox_setstack_nop(const struct cheri_test *ctp __unused)
 	if (v != CHERITEST_SETSTACK_CONSTANT)
 		cheritest_failure_errx("unexpected return value (%ld)", v);
 	cheritest_success();
+}
+
+/*
+ * Perform a return without a corresponding invocation, to underflow the
+ * trusted stack.
+ */
+void
+test_sandbox_trustedstack_underflow(const struct cheri_test *ctp __unused)
+{
+	struct cheri_object returncap;
+	__capability void *codecap asm ("$c1");
+	__capability void *datacap asm ("$c2");
+
+	returncap = libcheri_make_sealed_return_object();
+	codecap = returncap.co_codecap;
+	datacap = returncap.co_datacap;
+	__asm__ __volatile__ ("ccall $c1, $c2, 1;" "nop" : : "C"(codecap),
+	    "C"(datacap));
+	cheritest_failure_errx("continued after attempted CReturn");
 }

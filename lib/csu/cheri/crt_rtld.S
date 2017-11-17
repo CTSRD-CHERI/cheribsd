@@ -1,5 +1,5 @@
 #-
-# Copyright (c) 2012-2015, 2017 Robert N. M. Watson
+# Copyright (c) 2012-2017 Robert N. M. Watson
 # All rights reserved.
 #
 # This software was developed by SRI International and the University of
@@ -39,7 +39,7 @@
 #
 # CHERI sandbox run-time linker entry point, used for constructors and
 # destructors.  Identical calling convention to that described in
-# crt_invoke.S.
+# crt_invoke.S -- please see the comments there.
 #
 # Most code borrowed from crt_invoke.S; notice that exit/abort symbols here
 # are not global, and that there is no path to invoke().
@@ -56,19 +56,6 @@ __rtld_vector:
 	# Load $idc-relative offset of the Sandbox Metadata (SBM) area
 	#
 	dli	$t0, 0x1000
-
-	#
-	# Set up the in-sandbox stack: a stack capability has been left for us
-	# by the runtime.
-	#
-	clc	$csp, $t0, 32 + 3*CHERICAP_SIZE($c26)
-
-	#
-	# Install $idc as $c0.  From here on out, we can do MIPS fetches and
-	# stores to memory inside the sandbox, and $c0-relative capability
-	# fetches and stores.
-	#
-	csetdefault	$c26
 
 	#
 	# The compiler is responsible for scrubbing unused argument registers
@@ -109,9 +96,17 @@ creturn_target:
 	#
 
 	#
-	# Return to caller.
+	# Return to caller -- load sbm_creturn_object.{co_code, co_data} into
+	# $c1 and $c2, and ccall into the creturn trampoline.
 	#
-	creturn
+	# XXXRW: Do we need to CGetDefault to load the right $c26 here?
+	#
+	cgetdefault	$c26
+	dli	$t0, 0x1000
+	clc	$c1, $t0, 32 + 4*CHERICAP_SIZE($c26)
+	clc	$c2, $t0, 32 + 5*CHERICAP_SIZE($c26)
+	ccall	$c1, $c2, 1
+	nop
 
 constructors:
 	#
@@ -132,12 +127,12 @@ constructors:
 
 	# Code capability
 	clc	$c12, $t0, 32($c26)
-	dla	$t2, _cheri_system_object;
+	dla	$t2, _libcheri_system_object;
 	csc	$c12, $t2, 0($c26)
 
 	# Data capability
 	clc	$c12, $t0, 32+CHERICAP_SIZE($c26)
-	dla	$t2, _cheri_system_object;
+	dla	$t2, _libcheri_system_object;
 	csc	$c12, $t2, CHERICAP_SIZE($c26)
 
 	#

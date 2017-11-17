@@ -16,11 +16,13 @@ SRCS+=	cheritest_bounds_globals.c					\
 	cheritest_libcheri_local.c					\
 	cheritest_libcheri_trustedstack.c				\
 	cheritest_libcheri_var.c					\
+	cheritest_longjmp.c						\
 	cheritest_registers.c						\
 	cheritest_sandbox.S						\
 	cheritest_sealcap.c						\
 	cheritest_string.c						\
 	cheritest_syscall.c						\
+	cheritest_tls.c							\
 	cheritest_util.c						\
 	cheritest_vm.c							\
 	cheritest_vm_swap.c						\
@@ -56,12 +58,20 @@ SRCS+=	test_runtime.c	\
 .endif
 .endif
 
+.ifdef CHERITHREAD_TESTS
+CFLAGS+=	-DCHERITHREAD_TESTS
+.endif
+
 MAN=
 
 .ifndef BOOTSTRAPPING
 .if ${PROG} == cheritest
 NEED_CHERI=	hybrid
+.elif ${PROG} == cheritest-mt
+NEED_CHERI=	hybrid
 .elif ${PROG} == cheriabitest
+WANT_CHERI=	pure
+.elif ${PROG} == cheriabitest-mt
 WANT_CHERI=	pure
 .endif
 WANT_DUMP=	yes
@@ -73,6 +83,11 @@ LIBADD+=	xo util
 NO_SHARED?=	YES
 
 NO_WERROR=	YES
+
+.ifdef CHERITHREAD_TESTS
+LIBADD+=	pthread
+SRCS+=		cheritest_libcheri_pthreads.c
+.endif
 
 .ifdef BOOTSTRAPPING
 CFLAGS+=	-DLIST_ONLY \

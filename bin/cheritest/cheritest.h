@@ -106,6 +106,8 @@ extern struct cheritest_child_state *ccsp;
 #define	CT_FLAG_SANDBOX		0x00000100  /* Test requires that a libcheri
 					     * sandbox be created. */
 #define	CT_FLAG_SI_CODE		0x00000200  /* Check signal si_code. */
+#define	CT_FLAG_SIGEXIT		0x00000400  /* Exits with uncaught signal;
+					       checks status signum. */
 
 #define	CHERITEST_SANDBOX_UNWOUND	0x123456789ULL
 
@@ -290,6 +292,8 @@ void	test_nofault_ccheck_user_pass(const struct cheri_test *ctp);
 
 void	test_sandbox_cp2_bound_catch(const struct cheri_test *ctp);
 void	test_sandbox_cp2_bound_nocatch(const struct cheri_test *ctp);
+void	test_sandbox_cp2_bound_nocatch_noaltstack(
+	    const struct cheri_test *ctp);
 void	test_sandbox_cp2_perm_load_catch(const struct cheri_test *ctp);
 void	test_sandbox_cp2_perm_load_nocatch(const struct cheri_test *ctp);
 void	test_sandbox_cp2_perm_store_catch(const struct cheri_test *ctp);
@@ -312,9 +316,10 @@ void	test_sandbox_vm_xfault_nocatch(const struct cheri_test *ctp);
 #define	CHERITEST_FD_WRITE_STR	"write123"
 
 extern int			 zero_fd;
-extern struct cheri_object	 stdin_fd_object;
-extern struct cheri_object	 stdout_fd_object;
-extern struct cheri_object	 zero_fd_object;
+
+extern struct sandbox_object	*sbop_stdin;
+extern struct sandbox_object	*sbop_stdout;
+extern struct sandbox_object	*sbop_zero;
 
 void	test_sandbox_fd_fstat(const struct cheri_test *ctp);
 void	test_sandbox_fd_lseek(const struct cheri_test *ctp);
@@ -361,11 +366,12 @@ void	test_sandbox_store_global_capability_in_stack(
 void	test_sandbox_store_local_capability_in_stack(
 	    const struct cheri_test *ctp);
 void	test_sandbox_return_global_capability(const struct cheri_test *ctp);
-void	test_sandbox_return_local_capability_catch(
-	    const struct cheri_test *ctp);
-void	test_sandbox_return_local_capability_nocatch(
-	    const struct cheri_test *ctp);
+void	test_sandbox_return_local_capability(const struct cheri_test *ctp);
 void	test_sandbox_pass_local_capability_arg(const struct cheri_test *ctp);
+
+/* cheritest_libcheri_pthreads.c */
+void	test_sandbox_pthread_abort(const struct cheri_test *ctp);
+void	test_sandbox_pthread_cs_helloworld(const struct cheri_test *ctp);
 
 /* cheritest_libcheri_trustedstack.c */
 register_t	cheritest_libcheri_userfn_getstack(void);
@@ -373,6 +379,7 @@ register_t	cheritest_libcheri_userfn_setstack(register_t arg);
 void	test_sandbox_getstack(const struct cheri_test *ctp);
 void	test_sandbox_setstack(const struct cheri_test *ctp);
 void	test_sandbox_setstack_nop(const struct cheri_test *ctp);
+void	test_sandbox_trustedstack_underflow(const struct cheri_test *ctp);
 
 /* cheritest_libcheri_var.c */
 void	test_sandbox_var_bss(const struct cheri_test *ctp);
@@ -380,6 +387,10 @@ void	test_sandbox_var_data(const struct cheri_test *ctp);
 void	test_sandbox_var_data_getset(const struct cheri_test *ctp);
 void	test_2sandbox_var_data_getset(const struct cheri_test *ctp);
 void	test_sandbox_var_constructor(const struct cheri_test *ctp);
+
+/* cheritest_longjmp.c */
+void	cheritest_setjmp(const struct cheri_test *ctp);
+void	cheritest_setjmp_longjmp(const struct cheri_test *ctp);
 
 /* cheritest_sealcap.c */
 void	test_sealcap_sysarch(const struct cheri_test *ctp);
@@ -402,6 +413,11 @@ void	test_initregs_idc(const struct cheri_test *ctp);
 void	test_initregs_pcc(const struct cheri_test *ctp);
 void	test_copyregs(const struct cheri_test *ctp);
 void	test_listregs(const struct cheri_test *ctp);
+
+/* cheritest_tls.c */
+void	test_tls_align_4k(const struct cheri_test *ctp __unused);
+void	test_tls_align_cap(const struct cheri_test *ctp __unused);
+void	test_tls_align_ptr(const struct cheri_test *ctp __unused);
 
 /* cheritest_vm.c */
 void	cheritest_vm_tag_mmap_anon(const struct cheri_test *ctp __unused);

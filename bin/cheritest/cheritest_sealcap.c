@@ -75,11 +75,11 @@ test_sealcap_sysarch(const struct cheri_test *ctp __unused)
 		cheritest_failure_errx("offset %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_SEALCAP_USERSPACE_OFFSET);
 
-	/* Type -- should be zero for an unsealed capability. */
+	/* Type -- should be (-1) for an unsealed capability. */
 	v = cheri_gettype(sealcap);
-	if (v != 0)
+	if (v != 0xffffffffffffffff)
 		cheritest_failure_errx("otype %jx (expected %jx)", v,
-		    (uintmax_t)0);
+		    (uintmax_t)0xffffffffffffffff);
 
 	/* Permissions. */
 	v = cheri_getperm(sealcap);
