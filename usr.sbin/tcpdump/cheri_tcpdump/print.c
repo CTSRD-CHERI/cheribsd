@@ -164,8 +164,8 @@ handle_alarm(int sig, siginfo_t *info __unused, void *vuap)
 
 	assert(sig == SIGALRM);
 
-	cheri_stack_unwind(vuap, SANDBOX_STACK_UNWOUND, SANDBOX_STACK_UNWOUND,
-	    0);
+	libcheri_stack_unwind(vuap, SANDBOX_STACK_UNWOUND,
+	    SANDBOX_STACK_UNWOUND, 0);
 }
 
 static void
