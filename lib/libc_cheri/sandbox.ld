@@ -43,15 +43,28 @@
 __vector_base__ = 0x8000;
 __vector_size__ = 0x200;
 
-__rtld_vector_addr__ = __vector_base__ + __vector_size__ * 0;
-__invoke_vector_addr__ = __vector_base__ + __vector_size__ * 1;
-__reserved0_vector__ = __vector_base__ + __vector_size__ * 2;
-__reserved1_vector__ = __vector_base__ + __vector_size__ * 3;
+HIDDEN(__rtld_vector_addr__ = __vector_base__ + __vector_size__ * 0);
+HIDDEN(__invoke_vector_addr__ = __vector_base__ + __vector_size__ * 1);
+HIDDEN(__reserved0_vector__ = __vector_base__ + __vector_size__ * 2);
+HIDDEN(__reserved1_vector__ = __vector_base__ + __vector_size__ * 3);
 
-__code_body__ = __vector_base__ + __vector_size__ * 4;
+HIDDEN(__code_body__ = __vector_base__ + __vector_size__ * 4);
 
 CAP_ALIGN = 0x20;
 PAGE_ALIGN = 0x1000;
+
+/*
+ * Unlike BFD, LLD doesn't implicitly add any name referenced by an input
+ * section description as an input file: When we were linkingi with bfd the
+ * crt_rtld.o and crt_invoke.o files were implicitly pulled in because they
+ * are mentioned in the following output section descriptions. With LLD we need
+ * to explicitly use INPUT()
+ */
+INPUT(crt_rtld.o crt_invoke.o)
+INPUT(crtbeginC.o crtendC.o)
+
+ENTRY(__rtld_vector)
+/* Not supported by LLD: STARTUP(crt_rtld.o) */
 
 SECTIONS
 {
@@ -68,15 +81,18 @@ SECTIONS
 	 * to be placed at the address of the current location counter:
 	 * https://sourceware.org/binutils/docs/ld/Output-Section-Address.html
 	 */
-	__rtld_vector . : {
-		crt_rtld.o(.text .data .bss)
+	rtld_vector_text . : AT(__rtld_vector_addr__) {
+		__rtld_vector_addr = .;
+		KEEP(crt_rtld.o(*))
 	}
 	. = __invoke_vector_addr__;
-	__invoke_vector . : {
-		crt_invoke.o(.text .data .bss)
+	invoke_vector_text . : AT(__invoke_vector_addr__) {
+		__invoke_vector_addr = .;
+		KEEP(crt_invoke.o(*))
 	}
 	. = __code_body__;
-	.init : {
+	.init . : {
+		__code_body_addr = .;
 		KEEP (*(.init))
 	} = 0
 	.text ALIGN(CAP_ALIGN): {
