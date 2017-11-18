@@ -70,8 +70,10 @@
 	.text
 	.option pic0
 	.global libcheri_invoke
+	.global cheri_invoke
 	.ent	libcheri_invoke
 libcheri_invoke:
+cheri_invoke:
 
 	#
 	# Wrap up all caller-save state suitable to be preseved by CCall and
