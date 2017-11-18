@@ -31,10 +31,6 @@
 
 #include <sys/cdefs.h>
 
-#if !__has_feature(capabilities)
-#error "This code requires a CHERI-aware compiler"
-#endif
-
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/ucontext.h>

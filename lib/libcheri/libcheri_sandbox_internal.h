@@ -36,6 +36,10 @@
 
 #include "libcheri_class.h"
 
+#if !__has_feature(capabilities)
+#error "This code requires a CHERI-aware compiler"
+#endif
+
 extern int	sb_verbose;
 
 /*

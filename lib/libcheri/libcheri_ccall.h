@@ -31,6 +31,10 @@
 #ifndef _LIBCHERI_CCALL_H_
 #define	_LIBCHERI_CCALL_H_
 
+#if !__has_feature(capabilities)
+#error "This code requires a CHERI-aware compiler"
+#endif
+
 /*
  * Private interfaces to return sealed capabilities to call an object's rtld,
  * invoke the object, or return (from any object).

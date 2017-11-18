@@ -31,6 +31,10 @@
 #ifndef _LIBCHERI_FD_H_
 #define	_LIBCHERI_FD_H_
 
+#if !__has_feature(capabilities)
+#error "This code requires a CHERI-aware compiler"
+#endif
+
 extern __capability vm_offset_t *libcheri_fd_vtable;
 
 extern struct cheri_object	libcheri_fd;

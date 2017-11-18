@@ -34,6 +34,10 @@
 
 #include <ucontext.h>  /* For ucontext_t argument to libcheri_stack_unwind(). */
 
+#if !__has_feature(capabilities)
+#error "This code requires a CHERI-aware compiler"
+#endif
+
 /*
  * Definitions for libcheri's "trusted stack": Each frame describes the state
  * associated with a particular invocation of CCall, and contains the return
@@ -46,15 +50,9 @@
  * library API; we might wish to change this for reasons of ABI robustness.
  */
 struct libcheri_stack_frame {
-#if __has_feature(capabilities)
 	void * __capability	lcsf_caller_pcc;   /* Caller return $pcc */
 	void * __capability	lcsf_caller_csp;   /* Callee return $csp */
 	void * __capability	lcsf_callee_sbop;  /* Callee sandbox object */
-#else
-	struct chericap	lcsf_caller_pcc;
-	struct chericap	lcsf_caller_csp;
-	struct chericap lcsf_callee_sbop;
-#endif
 };
 
 /*

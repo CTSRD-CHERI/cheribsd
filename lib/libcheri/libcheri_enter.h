@@ -31,6 +31,10 @@
 #ifndef _LIBCHERI_ENTER_H_
 #define	_LIBCHERI_ENTER_H_
 
+#if !__has_feature(capabilities)
+#error "This code requires a CHERI-aware compiler"
+#endif
+
 typedef register_t (*libcheri_system_user_fn_t)(
 	    struct cheri_object system_object,
 	    register_t methodnum,

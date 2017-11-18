@@ -38,6 +38,10 @@
 
 #include <cheri/libcheri_system_md.h>
 
+#if !__has_feature(capabilities)
+#error "This code requires a CHERI-aware compiler"
+#endif
+
 /*
  * For now, expose the symbol for the system-object reference in each sandbox
  * as a public symbol.  At some point we will want to find a better way to do

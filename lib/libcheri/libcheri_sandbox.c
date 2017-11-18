@@ -31,10 +31,6 @@
 
 #include <sys/cdefs.h>
 
-#if !__has_feature(capabilities)
-#error "This code requires a CHERI-aware compiler"
-#endif
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/mman.h>
@@ -480,9 +476,7 @@ sandbox_object_new_flags(struct sandbox_class *sbcp, size_t heaplen,
 	if (libcheri_invoke(sbop->sbo_cheri_object_rtld,
 	    SANDBOX_RUNTIME_CONSTRUCTORS,
 	    0, 0, 0, 0, 0, 0, 0, 0,
-	    cheri_zerocap(), cheri_zerocap(), cheri_zerocap(),
-	    cheri_zerocap(), cheri_zerocap(), cheri_zerocap(),
-	    cheri_zerocap(), cheri_zerocap()) != 0) {
+	    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL) != 0) {
 		sandbox_object_unload(sbop);
 		saved_errno = EPROT;
 		goto error;
@@ -620,7 +614,7 @@ sandbox_object_reset(struct sandbox_object *sbop)
 }
 
 register_t
-sandbox_object_cinvoke(struct sandbox_object *sbop, register_t methodnum,
+sandbox_object_invoke(struct sandbox_object *sbop, register_t methodnum,
     register_t a1, register_t a2, register_t a3,
     register_t a4, register_t a5, register_t a6, register_t a7,
     __capability void *c3, __capability void *c4, __capability void *c5,
@@ -645,39 +639,6 @@ sandbox_object_cinvoke(struct sandbox_object *sbop, register_t methodnum,
 	    a1, a2, a3, a4, a5, a6, a7,
 	    c3, c4, c5, c6, c7, c8, c9, c10);
 	sample = cheri_get_cyclecount() - start;
-	return (v0);
-}
-
-/*
- * This version of invoke() is intended for callers not implementing CHERI
- * compiler support -- but internally, it can be implemented either way.
- */
-register_t
-sandbox_object_invoke(struct sandbox_object *sbop, register_t methodnum,
-    register_t a1, register_t a2, register_t a3,
-    register_t a4, register_t a5, register_t a6, register_t a7,
-    struct chericap *c3p, struct chericap *c4p, struct chericap *c5p,
-    struct chericap *c6p, struct chericap *c7p, struct chericap *c8p,
-    struct chericap *c9p, struct chericap *c10p)
-{
-	struct sandbox_class *sbcp;
-	__capability void *c3, *c4, *c5, *c6, *c7, *c8, *c9, *c10;
-	register_t v0;
-
-	sbcp = sbop->sbo_sandbox_classp;
-	c3 = (c3p != NULL ? *(void * __capability *)c3p : NULL);
-	c4 = (c4p != NULL ? *(void * __capability *)c4p : NULL);
-	c5 = (c5p != NULL ? *(void * __capability *)c5p : NULL);
-	c6 = (c6p != NULL ? *(void * __capability *)c6p : NULL);
-	c7 = (c7p != NULL ? *(void * __capability *)c7p : NULL);
-	c8 = (c8p != NULL ? *(void * __capability *)c8p : NULL);
-	c9 = (c9p != NULL ? *(void * __capability *)c9p : NULL);
-	c10 = (c10p != NULL ? *(void * __capability *)c10p : NULL);
-
-	v0 = sandbox_object_cinvoke(sbop,
-	    methodnum,
-	    a1, a2, a3, a4, a5, a6, a7,
-	    c3, c4, c5, c6, c7, c8, c9, c10);
 	return (v0);
 }
 

@@ -31,6 +31,10 @@
 #ifndef _LIBCHERI_TYPE_H_
 #define	_LIBCHERI_TYPE_H_
 
+#if !__has_feature(capabilities)
+#error "This code requires a CHERI-aware compiler"
+#endif
+
 __capability void	*libcheri_type_alloc(void);
 __capability void	*libcheri_system_type_alloc(void);
 
