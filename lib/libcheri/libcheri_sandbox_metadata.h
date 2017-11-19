@@ -1,5 +1,6 @@
 /*-
- * Copyright (c) 2013, 2017 Robert N. M. Watson
+ * Copyright (c) 2012-2017 Robert N. M. Watson
+ * Copyright (c) 2015 SRI International
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -28,34 +29,38 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _LIBCHERI_SANDBOXASM_H_
-#define	_LIBCHERI_SANDBOXASM_H_
+#ifndef _LIBCHERI_SANDBOX_METADATA_H_
+#define	_LIBCHERI_SANDBOX_METADATA_H_
+
+#if !__has_feature(capabilities)
+#error "This code requires a CHERI-aware compiler"
+#endif
+
+/*
+ * This section defines the interface between 'inside' and 'outside' the
+ * sandbox model.
+ */
 
 /*
  * Per-sandbox meta-data structure mapped read-only within the sandbox at a
- * fixed address to allow sandboxed code to find its stack, heap, etc.
+ * fixed address to allow sandboxed code to find its vtable, heap, return
+ * capabilities, etc.
  *
- * The base address must match libcheri's libcheri_sandbox.c as well as the
- * linker scripts used to statically link sandboxed code.  The offsets must
- * match struct sandbox_metadata in libcheri_sandbox_metadata.h.  See the
- * comment there for good reasons not to change these definitions if you can
- * avoid it.
- *
- * XXXRW: For reasons I don't understand, and should learn about, I can't get
- * this to usefully include in .S files.  But that is the actual goal -- they
- * should use these definitions rather than hard-coded values.
+ * NB: This data structure (and its base address) are part of the ABI between
+ * libcheri and programs running in sandboxes.  Only ever append to this,
+ * don't modify the order, lengths, or interpretations of existing fields.  If
+ * this reaches a page in size, then allocation code in sandbox.c will need
+ * updating.  See also sandbox.c and sandboxasm.h.
  */
-#define	SANDBOX_METADATA_BASE			0x1000
-#define	SANDBOX_METADATA_OFFSET_HEAPBASE	0
-#define	SANDBOX_METADATA_OFFSET_HEAPLEN		8
+struct sandbox_metadata {
+	register_t	sbm_heapbase;			/* Offset: 0 */
+	register_t	sbm_heaplen;			/* Offset: 8 */
+	uint64_t	_sbm_reserved0;			/* Offset: 16 */
+	uint64_t	_sbm_reserved1;			/* Offset: 24 */
+	struct cheri_object	sbm_system_object;	/* Offset: 32 */
+	__capability vm_offset_t	*sbm_vtable;	/* Cap-offset: 2 */
+	__capability void	*_sbm_reserved2;	/* Cap-offset: 3 */
+	struct cheri_object	 sbm_creturn_object;	/* Cap-offset: 4, 5 */
+};
 
-#define	SANDBOX_BINARY_BASE	0x8000
-#define	SANDBOX_VECTOR_SIZE	0x200
-
-/*
- * These are the (defined) entry vectors for sandbox
- */
-#define	SANDBOX_RTLD_VECTOR	(SANDBOX_BINARY_BASE + SANDBOX_VECTOR_SIZE * 0)
-#define	SANDBOX_INVOKE_VECTOR	(SANDBOX_BINARY_BASE + SANDBOX_VECTOR_SIZE * 1)
-
-#endif /* !_LIBCHERI_SANDBOXASM_H_ */
+#endif /* !_LIBCHERI_SANDBOX_METADATA_H_ */

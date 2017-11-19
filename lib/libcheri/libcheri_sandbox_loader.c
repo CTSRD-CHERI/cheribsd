@@ -59,6 +59,7 @@
 #include "libcheri_sandbox.h"
 #include "libcheri_sandbox_elf.h"
 #include "libcheri_sandbox_internal.h"
+#include "libcheri_sandbox_metadata.h"
 #include "libcheri_sandbox_methods.h"
 #include "libcheri_sandboxasm.h"
 
