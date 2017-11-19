@@ -57,7 +57,7 @@ extern struct cheri_object	__libcheri_object_creturn;
  * Method numbers used by the sandbox runtime itself.
  *
  * WARNING: These values must match those currently hard coded in the sandbox
- * C runtime (lib/csu/cheri/crt_invoke.S and crt_rtld.S).
+ * C runtime (lib/csu/libcheri/crt_invoke.S and crt_rtld.S).
  *
  * NB: In the future, these should be via a reserved entry point rather than
  * the primary object-capability 'invoke' entry point, so that they can be
