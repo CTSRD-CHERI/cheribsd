@@ -67,6 +67,25 @@ LDFLAGS+= -static
 CFLAGS+= -ftls-model=initial-exec
 .endif
 
+.if defined(MK_PIE)
+# Ports will not have MK_PIE defined and the following logic requires
+# it be defined.
+
+.if ${LDFLAGS:M-static}
+NOPIE=yes
+.endif
+
+.if !defined(NOPIE)
+.if ${MK_PIE} != "no"
+
+CFLAGS+= -fPIC -fPIE
+CXXFLAGS+= -fPIC -fPIE
+LDFLAGS+= -pie
+
+.endif # ${MK_PIE} != no
+.endif # !defined(NOPIE)
+.endif # defined(MK_PIE)
+
 .if ${MK_DEBUG_FILES} != "no"
 PROG_FULL=${PROG}.full
 # Use ${DEBUGDIR} for base system debug files, else .debug subdirectory
