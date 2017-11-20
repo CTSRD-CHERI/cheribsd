@@ -50,7 +50,7 @@ static int in_completion = 0;
 static char *tk_text;
 static char *tk_original;
 static char *tk_ipoint;
-static char *tk_trial;
+static char *tk_trial = NULL;
 static struct textlist tk_tlist;
 #endif
 
@@ -437,8 +437,9 @@ cmd_right()
 cmd_left()
 {
 	char *ncp;
-	int width, bswidth;
-	
+	int width = 0;
+	int bswidth = 0;
+
 	if (cp <= cmdbuf)
 	{
 		/* Already at the beginning of the line */
@@ -1233,6 +1234,13 @@ cmd_char(c)
 			*cmd_mbc_buf = c;
 			if (IS_ASCII_OCTET(c))
 				cmd_mbc_buf_len = 1;
+#if MSDOS_COMPILER || OS2
+			else if (c == (unsigned char) '\340' && IS_ASCII_OCTET(peekcc()))
+			{
+				/* Assume a special key. */
+				cmd_mbc_buf_len = 1;
+			}
+#endif
 			else if (IS_UTF8_LEAD(c))
 			{
 				cmd_mbc_buf_len = utf_len(c);
