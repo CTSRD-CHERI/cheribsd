@@ -48,8 +48,7 @@ MAN=
 
 AFLAGS=		-G0
 
-CFLAGS=		-ffreestanding			\
-		-I${.CURDIR}			\
+CFLAGS+=	-I${.CURDIR}			\
 		-I${SASRC}			\
 		-I${LDRSRC}			\
 		-I${SYSDIR}/contrib/libfdt	\
@@ -57,7 +56,6 @@ CFLAGS=		-ffreestanding			\
 		-Wall				\
 		-G0 				\
 		-fno-pic -mno-abicalls		\
-		-msoft-float			\
 		-g
 
 LDFLAGS=	-nostdlib			\

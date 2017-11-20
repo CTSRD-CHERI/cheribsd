@@ -84,7 +84,6 @@ CFLAGS+=	-I${.CURDIR}
 CFLAGS+=	-G0					\
 		-fno-pic				\
 		-mno-abicalls				\
-		-msoft-float				\
 		-g
 
 LDFLAGS=	-nostdlib				\
