@@ -2,6 +2,8 @@
 /*	$OpenBSD: pcb.h,v 1.3 1998/09/15 10:50:12 pefo Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause AND BSD-2-Clause
+ *
  * Copyright (c) 2017 Robert N. M. Watson
  * All rights reserved.
  *
