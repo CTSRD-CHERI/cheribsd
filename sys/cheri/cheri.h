@@ -107,7 +107,7 @@ struct cheri_signal {
 void	cheri_capability_set(void * __capability *capp, uint32_t uperms,
 	    vaddr_t basep, size_t length, off_t off);
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef CHERI_KERNEL
 /**
  * Make a pointer from the default kernel capability.
  * XXXAM: this is used to materialise pointers in the kernel when there
@@ -116,7 +116,7 @@ void	cheri_capability_set(void * __capability *capp, uint32_t uperms,
 void * cheri_kern_ptr(vaddr_t addr, size_t len);
 #else
 #define cheri_kern_ptr(addr, len) (void *)(addr)
-#endif
+#endif /* CHERI_KERNEL */
 
 /*
  * CHERI capability utility functions.

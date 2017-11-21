@@ -84,12 +84,20 @@ CTASSERT(offsetof(struct mdthread, md_cheri_mmap_cap) % CHERICAP_SIZE == 0);
  * for the hybrid ABI.
  */
 #ifdef CPU_CHERI128
+#ifndef CHERI_KERNEL
 CTASSERT(sizeof(void *) == 8);
+#else
+CTASSERT(sizeof(void *) == 16);
+#endif
 CTASSERT(sizeof(void *__capability) == 16);
 CTASSERT(sizeof(struct chericap) == 16);
 CTASSERT(sizeof(struct cheri_object) == 32);
 #else
+#ifndef CHERI_KERNEL
 CTASSERT(sizeof(void *) == 8);
+#else
+CTASSERT(sizeof(void *) == 32);
+#endif
 CTASSERT(sizeof(void *__capability) == 32);
 CTASSERT(sizeof(struct chericap) == 32);
 CTASSERT(sizeof(struct cheri_object) == 64);
