@@ -123,9 +123,14 @@ FDT_DTB_STATIC_ONLY		opt_platform.h
 CPU_CHERI	opt_global.h
 
 #
-# Experimental support for 128-bit capabilities.
+# Enable CHERI MIPS with 128-bit capabilities.
 #
 CPU_CHERI128			opt_global.h
+
+#
+# Experimental support for pure capability kernel
+#
+CHERI_KERNEL		opt_global.h
 
 #
 # Variations on hardware optimisation of CCall/CReturn.

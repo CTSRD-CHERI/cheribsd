@@ -17,6 +17,7 @@ makeoptions	ARCH_FLAGS="-target cheri-unknown-freebsd -march=mips64 -mabi=pureca
 makeoptions	WERROR="-Wno-error"
 makeoptions 	KERNLOADADDR=0xffffffff80100000
 
+options		CHERI_KERNEL
 options 	KTRACE
 nooptions	KDB
 nooptions	DDB

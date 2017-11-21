@@ -61,8 +61,7 @@
  */
 
 /*
- *	Contains code that is the first executed at boot time plus
- *	assembly language support routines.
+ *	Contains code that is the first executed at boot time on a CHERI CPU
  */
 
 #include <machine/asm.h>
@@ -70,11 +69,16 @@
 #include <machine/cpuregs.h>
 #include <machine/regnum.h>
 
-#if defined(CPU_CHERI)
 #include <machine/cheriasm.h>
-#endif
 
 #include "assym.s"
+
+/*
+ * Check that we are compiling with the expected flags
+ */
+#if !defined(CHERI_KERNEL) || !defined(CPU_CHERI) || !defined(__CHERI_PURE_CAPABILITY__)
+#error CHERI kernel requires CPU_CHERI and CHERI_KERNEL
+#endif	
 
 	.data
 #ifdef YAMON
@@ -93,24 +97,6 @@ VECTOR(_locore, unknown)
 	/* UNSAFE TO USE a0..a3, need to preserve the args from boot loader */
 	mtc0	zero, MIPS_COP_0_CAUSE	# Clear soft interrupts
 	
-#if defined(CPU_CNMIPS)
-	/*
-	 * t1: Bits to set explicitly:
-	 *	Enable FPU
-	 */
-
-	/* Set these bits */
-        li	t1, (MIPS_SR_COP_0_BIT | MIPS_SR_PX | MIPS_SR_KX | MIPS_SR_UX | MIPS_SR_SX | MIPS_SR_BEV)
-
-	/* Reset these bits */
-        li	t0, ~(MIPS_SR_DE | MIPS_SR_SR | MIPS_SR_ERL | MIPS_SR_EXL | MIPS_SR_INT_IE | MIPS_SR_COP_2_BIT)
-#elif defined (CPU_RMI) || defined (CPU_NLM) 
-	/* Set these bits */
-        li	t1, (MIPS_SR_COP_2_BIT | MIPS_SR_COP_0_BIT | MIPS_SR_KX | MIPS_SR_UX)
-
-	/* Reset these bits */
-        li	t0, ~(MIPS_SR_BEV | MIPS_SR_SR | MIPS_SR_INT_IE)
-#else
 	/*
 	 * t0: Bits to preserve if set:
 	 * 	Soft reset
@@ -121,15 +107,8 @@ VECTOR(_locore, unknown)
 	 * t1: Bits to set explicitly:
 	 *	Enable FPU
 	 */
-#if defined(CPU_CHERI)
 	li	t1, MIPS_SR_COP_1_BIT | MIPS_SR_COP_2_BIT
-#else
-	li	t1, MIPS_SR_COP_1_BIT
-#endif
-#ifdef __mips_n64
 	or	t1, MIPS_SR_KX | MIPS_SR_SX | MIPS_SR_UX | MIPS_SR_FR
-#endif
-#endif
 	/*
 	 * Read coprocessor 0 status register, clear bits not
 	 * preserved (namely, clearing interrupt bits), and set
@@ -146,7 +125,6 @@ VECTOR(_locore, unknown)
 	mtc0	t0, MIPS_COP_0_CONFIG
 	COP0_SYNC
 
-#if defined(CPU_CHERI)
 	/*
 	 * On CHERI MIPS, preserve the kernel's data segment context for use
 	 * in exception handlers.
@@ -154,11 +132,8 @@ VECTOR(_locore, unknown)
 	 * XXXRW: Do we want to rely on default initialisation of all CP2
 	 * registers here?
 	 */
-	CHERI_ASM_CMOVE(CHERI_REG_KDC, $c0)	# Preserve $kdc
-	CHERI_ASM_CMOVE(CHERI_REG_KCC, $c0)	# Preserve $kcc
-	/* cgetdefault	CHERI_REG_KCC	# Preserve $kcc */
-	/* cgetdefault	CHERI_REG_KDC	# Preserve $kdc */
-#endif
+	cgetdefault	CHERI_REG_KCC	# Preserve $kcc
+	cgetdefault	CHERI_REG_KDC	# Preserve $kdc
 
 #if defined(CPU_BERI)
 	/*
@@ -172,28 +147,13 @@ VECTOR(_locore, unknown)
 	MTC0	t0, MIPS_COP_0_HWRENA
 #endif
 
-	/*xxximp
-	 * now that we pass a0...a3 to the platform_init routine, do we need
-	 * to stash this stuff here?
-	 */
 #ifdef YAMON
 	/* Save YAMON boot environment pointer */
 	sw	a2, _C_LABEL(fenvp)
 #endif
 
-#if defined(CPU_CNMIPS) && defined(SMP)
-	.set push
-	.set mips32r2
-	rdhwr	t2, $0
-	beqz	t2, 1f
-	nop
-	j	octeon_ap_wait
-	nop
-	.set pop
-1:
-#endif
-
 #if defined(CPU_MALTA) && defined(SMP)
+	/* XXX-AM: TODO adjust SMP initialization */
 	.set push
 	.set mips32r2
 	jal	malta_cpu_configure
@@ -211,50 +171,50 @@ VECTOR(_locore, unknown)
 	/*
 	 * Initialize stack and call machine startup.
 	 */
-#ifdef __CHERI_PURE_CAPABILITY__
 	PTR_LA		t0, _C_LABEL(pcpu_space)
-	csetoffset	$c11, $c11, t0
-	cincoffset	$c11, $c11, PCPU_SIZE	# Top of pcpu space is struct pcpu
+	csetoffset	CHERI_REG_STC, CHERI_REG_STC, t0
+	REG_LI		t0, PCPU_SIZE
+	cincoffset	CHERI_REG_STC, CHERI_REG_STC, t0
 	REG_LI		t0, (PAGE_SIZE * 2) - PCPU_SIZE
-	csetbounds	$c11, $c11, t0		# Boot stack capability
-	REG_SUBIU	t0, t0, CALLFRAME_SIZ
-	cincoffset	$c11, $c11, t0		# Make room for initial callframe
+	csetbounds	CHERI_REG_STC, CHERI_REG_STC, t0	# Boot stack capability
+	PTR_SUBU	t0, t0, CALLFRAME_SIZ
+	cincoffset	CHERI_REG_STC, CHERI_REG_STC, t0	# Make room for initial callframe
 
-	PTR_LA	gp, _C_LABEL(_gp)	# where is gp in cheri???
+	/* Zero out old callframe fields for debugger */
+	cfromptr	$c1, $c1, zero
+	csc		$c1, zero, CALLFRAME_CGP(CHERI_REG_STC)
+	csc		$c1, zero, CALLFRAME_CSP(CHERI_REG_STC)
+	csc		$c1, zero, CALLFRAME_CRA(CHERI_REG_STC)
 
-	/* Call the platform-specific startup code. */
-	PTR_LA	t0, _C_LABEL(platform_start)
-	cgetdefault	$c12
-	csetoffset	$c12, $c12, t0
-	cjalr	$c12, $c17
-	nop
-
-	PANIC("Startup failed!")
-	
-#else
-	PTR_LA		sp, _C_LABEL(pcpu_space)
-	PTR_ADDU	sp, (PAGE_SIZE * 2) - CALLFRAME_SIZ
-
-	REG_S	zero, CALLFRAME_RA(sp)	# Zero out old ra for debugger
-	REG_S	zero, CALLFRAME_SP(sp)	# Zero out old fp for debugger
-
+	/* XXX-AM: can use a R_MIPS_GPREL_HI and _LO */
 	PTR_LA	gp, _C_LABEL(_gp)
 
 	/* Call the platform-specific startup code. */
-	PTR_LA	t9, _C_LABEL(platform_start)
-	jalr	t9
+	cfromptr	$c3, CHERI_REG_KDC, a1
+	dsll		t0, a0, 3
+	csetbounds	$c3, $c3, t0
+	/* do not bound envp because we do not have
+	 * reliable length information */
+	cfromptr	$c4, CHERI_REG_KDC, a2
+	PTR_LA	t0, _C_LABEL(platform_start)
+	cgetpccsetoffset $c12, t0
+	cjalr	$c12, $c17
 	nop
-#endif	
 
+	/* XXX-AM what is this thing doing?
+	* probably relies on some special positioning of struct pcb
+	* for thread0
+	*/
 	PTR_LA	sp, _C_LABEL(thread0_st)
 	PTR_L	a0, TD_PCB(sp)
 	REG_LI	t0, ~7
 	and	a0, a0, t0
 	PTR_SUBU	sp, a0, CALLFRAME_SIZ
-
-	PTR_LA	t9, _C_LABEL(mi_startup)
-	jalr	t9				# mi_startup(frame)
-	sw	zero, (CALLFRAME_SIZ - 8)(sp)	# Zero out old fp for debugger
+	
+	PTR_LA	t0, _C_LABEL(mi_startup)
+	cgetpccsetoffset $c12, t0
+	cjalr	$c12, $c17
+	nop
 
 	PANIC("Startup failed!")
 

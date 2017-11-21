@@ -130,6 +130,7 @@ ASSYM(MIPS_KSEG2_START, (vaddr_t)(void *)MIPS_KSEG2_START);
 ASSYM(MIPS_XKSEG_START, (vaddr_t)(void *)MIPS_XKSEG_START);
 
 #ifdef	CPU_CHERI
+ASSYM(PCPU_SIZE, sizeof(struct pcpu));
 ASSYM(U_PCB_CHERIKFRAME, offsetof(struct pcb, pcb_cherikframe));
 #endif
 

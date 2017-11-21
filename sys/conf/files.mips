@@ -11,7 +11,7 @@ mips/mips/busdma_machdep.c		standard
 mips/mips/cache.c			standard
 mips/mips/cache_mipsNN.c		standard
 mips/mips/cpu.c				standard
-mips/mips/db_disasm.c			optional	ddb
+omips/mips/db_disasm.c			optional	ddb
 mips/mips/db_interface.c		optional	ddb
 mips/mips/db_trace.c			optional	ddb
 mips/mips/dump_machdep.c		standard
@@ -22,7 +22,7 @@ mips/mips/freebsd32_machdep.c		optional	compat_freebsd32
 mips/mips/gdb_machdep.c			standard
 mips/mips/in_cksum.c			optional	inet
 mips/mips/libkern_machdep.c		standard
-mips/mips/locore.S			standard	no-obj
+mips/mips/locore.S			optional	no-obj !cheri_kernel
 mips/mips/machdep.c			standard
 mips/mips/mem.c				optional	mem
 mips/mips/minidump_machdep.c		standard
@@ -47,6 +47,9 @@ mips/mips/trap.c			standard
 mips/mips/uio_machdep.c			standard
 mips/mips/uma_machdep.c			standard
 mips/mips/vm_machdep.c			standard
+
+# cheri arch files
+mips/cheri/locore.S			optional	no-obj cheri_kernel
 
 # misc opt-in bits
 kern/kern_clocksource.c			standard
