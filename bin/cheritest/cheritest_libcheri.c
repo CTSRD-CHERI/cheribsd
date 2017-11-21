@@ -46,10 +46,11 @@
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-#include <cheri/cheri_enter.h>
-#include <cheri/cheri_system.h>
-#include <cheri/cheri_fd.h>
-#include <cheri/sandbox.h>
+#include <cheri/libcheri_enter.h>
+#include <cheri/libcheri_errno.h>
+#include <cheri/libcheri_system.h>
+#include <cheri/libcheri_fd.h>
+#include <cheri/libcheri_sandbox.h>
 
 #include <cheritest-helper.h>
 #include <err.h>
@@ -118,7 +119,8 @@ test_sandbox_cs_clock_gettime(const struct cheri_test *ctp __unused)
 {
 	register_t v;
 
-	syscall_checks[SYS_clock_gettime] = (syscall_check_t)allow_syscall;
+	libcheri_syscall_checks[SYS_clock_gettime] =
+	    (libcheri_syscall_check_t)allow_syscall;
 
 	v = invoke_clock_gettime();
 	if (v < 0)
@@ -132,18 +134,14 @@ test_sandbox_cs_clock_gettime_default(const struct cheri_test *ctp __unused)
 {
 	register_t v;
 
-#ifdef CHERIERRNO_LINKS
-	cheri_errno = 0;
-#endif
+	libcheri_errno = 0;
 	v = invoke_clock_gettime();
 	if (v != -1)
 		cheritest_failure_errx("Sandbox returned %jd", (intmax_t)v);
-#ifdef CHERIERRNO_LINKS
-	else if (cheri_errno != 0)
+	else if (libcheri_errno != 0)
 		cheritest_failure_errx(
-		    "Sandbox returned -1, but set cheri_errno to %d",
-		    cheri_errno);
-#endif
+		    "Sandbox returned -1, but set libcheri_errno to %d",
+		    libcheri_errno);
 	else
 		cheritest_success();
 }
@@ -153,20 +151,17 @@ test_sandbox_cs_clock_gettime_deny(const struct cheri_test *ctp __unused)
 {
 	register_t v;
 
-	syscall_checks[SYS_clock_gettime] = (syscall_check_t)deny_syscall;
+	libcheri_syscall_checks[SYS_clock_gettime] =
+	    (libcheri_syscall_check_t)deny_syscall;
 
-#ifdef CHERIERRNO_LINKS
-	cheri_errno = 0;
-#endif
+	libcheri_errno = 0;
 	v = invoke_clock_gettime();
 	if (v != -1)
 		cheritest_failure_errx("Sandbox returned %jd", (intmax_t)v);
-#ifdef CHERIERRNO_LINKS
-	else if (cheri_errno != 0)
+	else if (libcheri_errno != 0)
 		cheritest_failure_errx(
-		    "Sandbox returned -1, but set cheri_errno to %d",
-		    cheri_errno);
-#endif
+		    "Sandbox returned -1, but set libcheri_errno to %d",
+		    libcheri_errno);
 	else
 		cheritest_success();
 }
@@ -398,15 +393,15 @@ cheritest_libcheri_setup(void)
 	/*
 	 * Prepare CHERI objects representing stdin, stdout, and /dev/zero.
 	 */
-	if (cheri_fd_new(STDIN_FILENO, &sbop_stdin) < 0)
-		err(EX_OSFILE, "cheri_fd_new: stdin");
-	if (cheri_fd_new(STDOUT_FILENO, &sbop_stdout) < 0)
-		err(EX_OSFILE, "cheri_fd_new: stdout");
+	if (libcheri_fd_new(STDIN_FILENO, &sbop_stdin) < 0)
+		err(EX_OSFILE, "libcheri_fd_new: stdin");
+	if (libcheri_fd_new(STDOUT_FILENO, &sbop_stdout) < 0)
+		err(EX_OSFILE, "clibheri_fd_new: stdout");
 	zero_fd = open("/dev/zero", O_RDWR);
 	if (zero_fd < 0)
 		err(EX_OSFILE, "open: /dev/zero");
-	if (cheri_fd_new(zero_fd, &sbop_zero) < 0)
-		err(EX_OSFILE, "cheri_fd_new: /dev/zero");
+	if (libcheri_fd_new(zero_fd, &sbop_zero) < 0)
+		err(EX_OSFILE, "libcheri_fd_new: /dev/zero");
 
 	if (sandbox_class_new("/usr/libexec/cheritest-helper",
 	    4*1024*1024, &cheritest_classp) < 0)
@@ -416,7 +411,7 @@ cheritest_libcheri_setup(void)
 	cheritest = sandbox_object_getobject(cheritest_objectp);
 	cheritest2 = sandbox_object_getobject(cheritest_objectp);
 
-	cheri_system_user_register_fn(&cheritest_libcheri_userfn_handler);
+	libcheri_system_user_register_fn(&cheritest_libcheri_userfn_handler);
 
 	return (0);
 }
@@ -427,8 +422,8 @@ cheritest_libcheri_destroy(void)
 
 	sandbox_object_destroy(cheritest_objectp);
 	sandbox_class_destroy(cheritest_classp);
-	cheri_fd_destroy(sbop_stdin);
-	cheri_fd_destroy(sbop_stdout);
-	cheri_fd_destroy(sbop_zero);
+	libcheri_fd_destroy(sbop_stdin);
+	libcheri_fd_destroy(sbop_stdout);
+	libcheri_fd_destroy(sbop_zero);
 	close(zero_fd);
 }

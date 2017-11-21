@@ -54,9 +54,9 @@
 #include <machine/frame.h>
 #include <machine/trap.h>
 
-#include <cheri/cheri_fd.h>
-#include <cheri/cheri_stack.h>
-#include <cheri/sandbox.h>
+#include <cheri/libcheri_fd.h>
+#include <cheri/libcheri_stack.h>
+#include <cheri/libcheri_sandbox.h>
 
 #include <machine/sysarch.h>
 #endif
@@ -1397,17 +1397,17 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_getstack",
-	  .ct_desc = "Exercise cheri_stack_get()",
+	  .ct_desc = "Exercise libcheri_stack_get()",
 	  .ct_func = test_sandbox_getstack,
 	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_setstack_nop",
-	  .ct_desc = "Exercise cheri_stack_set() for nop rewrite",
+	  .ct_desc = "Exercise libcheri_stack_set() for nop rewrite",
 	  .ct_func = test_sandbox_setstack_nop,
 	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_setstack",
-	  .ct_desc = "Exercise cheri_stack_set() to change stack",
+	  .ct_desc = "Exercise libcheri_stack_set() to change stack",
 	  .ct_func = test_sandbox_setstack,
 	  .ct_flags = CT_FLAG_SANDBOX, },
 
@@ -1492,6 +1492,22 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Check initial value of constructor-initalised variable",
 	  .ct_func = test_sandbox_var_constructor,
 	  .ct_flags = CT_FLAG_SANDBOX, },
+
+#ifdef CHERITHREAD_TESTS
+	/*
+	 * Tests of pthread interactions with libcheri.
+	 */
+	{ .ct_name = "test_sandbox_pthread_abort",
+	  .ct_desc = "Test sandbox abort from a second thread",
+	  .ct_func = test_sandbox_pthread_abort,
+	  .ct_flags = CT_FLAG_SANDBOX, },
+
+	{ .ct_name = "test_sandbox_pthread_cs_helloworld",
+	  .ct_desc = "Test sandbox hello world from a second thread",
+	  .ct_func = test_sandbox_pthread_cs_helloworld,
+	  .ct_flags = CT_FLAG_STDOUT_STRING | CT_FLAG_SANDBOX,
+	  .ct_stdout_string = "hello world\n" },
+#endif
 
 	/*
 	 * Tests relating to setjmp(3) and longjmp(3).
@@ -1751,10 +1767,10 @@ signal_handler(int signum, siginfo_t *info, void *vuap)
 	 * CHERITEST_SANDBOX_UNWOUND, or if we are not executing in a sandbox,
 	 * terminate the test, returning signal information to the parent.
 	 */
-	ret = cheri_stack_numframes(&numframes);
+	ret = libcheri_stack_numframes(&numframes);
 	if (ret < 0) {
 		ccsp->ccs_signum = -1;
-		fprintf(stderr, "%s: cheri_stack_numframes failed\n",
+		fprintf(stderr, "%s: libcheri_stack_numframes failed\n",
 		    __func__);
 		_exit(EX_SOFTWARE);
 	}
@@ -1764,11 +1780,11 @@ signal_handler(int signum, siginfo_t *info, void *vuap)
 		 * Sandboxed code is executing, even if we're not in a
 		 * sandbox.
 		 */
-		ret = cheri_stack_unwind(uap, CHERITEST_SANDBOX_UNWOUND,
-		    CHERI_STACK_UNWIND_OP_ALL, 0);
+		ret = libcheri_stack_unwind(uap, CHERITEST_SANDBOX_UNWOUND,
+		    LIBCHERI_STACK_UNWIND_OP_ALL, 0);
 		if (ret < 0) {
 			ccsp->ccs_signum = -1;
-			fprintf(stderr, "%s: cheri_stack_unwind failed\n",
+			fprintf(stderr, "%s: libcheri_stack_unwind failed\n",
 			    __func__);
 			_exit(EX_SOFTWARE);
 		}

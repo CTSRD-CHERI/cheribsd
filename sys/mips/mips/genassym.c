@@ -93,10 +93,6 @@ ASSYM(PC_CPUID, offsetof(struct pcpu, pc_cpuid));
 ASSYM(PC_TLB_MISS_CNT, offsetof(struct pcpu, pc_tlb_miss_cnt));
 ASSYM(PC_TLB_INVALID_CNT, offsetof(struct pcpu, pc_tlb_invalid_cnt));
 ASSYM(PC_TLB_MOD_CNT, offsetof(struct pcpu, pc_tlb_mod_cnt));
-#ifdef CPU_CHERI
-ASSYM(PC_CHERI_CCALL_CNT, offsetof(struct pcpu, pc_cheri_ccall_cnt));
-ASSYM(PC_CHERI_CRETURN_CNT, offsetof(struct pcpu, pc_cheri_creturn_cnt));
-#endif /* CPU_CHERI */
 #endif /* defined(MIPS_EXC_CNTRS) */
 
 ASSYM(VM_MAX_KERNEL_ADDRESS, VM_MAX_KERNEL_ADDRESS);

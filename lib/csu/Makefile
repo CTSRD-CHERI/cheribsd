@@ -13,6 +13,7 @@ SUBDIR+= ${MACHINE_CPUARCH}
 # XXXRW: And arguable also mips64-dependent
 .if ${MK_CHERI} != "no"
 SUBDIR+=	cheri
+SUBDIR+=	libcheri
 .endif
 
 .include <bsd.subdir.mk>

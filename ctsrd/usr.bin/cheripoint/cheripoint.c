@@ -34,9 +34,6 @@
 #include <sys/sysctl.h>
 #include <sys/wait.h>
 
-#include <cheri/cheri.h>
-#include <cheri/sandbox.h>
-
 #include <terasic_mtl.h>
 #ifdef INPUT_DEBUG
 #include <ctype.h>

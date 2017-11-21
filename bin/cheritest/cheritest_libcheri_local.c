@@ -44,10 +44,10 @@
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-#include <cheri/cheri_enter.h>
-#include <cheri/cheri_errno.h>
-#include <cheri/cheri_fd.h>
-#include <cheri/sandbox.h>
+#include <cheri/libcheri_enter.h>
+#include <cheri/libcheri_errno.h>
+#include <cheri/libcheri_fd.h>
+#include <cheri/libcheri_sandbox.h>
 
 #include <cheritest-helper.h>
 #include <err.h>
@@ -193,14 +193,14 @@ test_sandbox_return_local_capability(const struct cheri_test *ctp __unused)
 	register_t v;
 
 	carg = (__capability void *)&v;
-	cheri_errno = 0;
+	libcheri_errno = 0;
 	cret = invoke_return_local_capability(carg);
 	if (cret == carg)
 		cheritest_failure_errx("local capability returned");
-	if (cheri_errno != CHERI_ERRNO_RETURN_LOCAL_RETVAL)
+	if (libcheri_errno != LIBCHERI_ERRNO_RETURN_LOCAL_RETVAL)
 		cheritest_failure_errx(
-		    "returned local capability with unexpected cheri_errno %d",
-		    cheri_errno);
+		  "returned local capability with unexpected libcheri_errno %d",
+		    libcheri_errno);
 	cheritest_success();
 }
 
@@ -216,11 +216,11 @@ test_sandbox_pass_local_capability_arg(const struct cheri_test *ctp __unused)
 
 	carg = (__capability void *)&v;
 	carg = cheri_local(carg);
-	cheri_errno = 0;
+	libcheri_errno = 0;
 	v = invoke_store_capability_in_stack(carg);
-	if (cheri_errno != CHERI_ERRNO_INVOKE_LOCAL_ARG)
+	if (libcheri_errno != LIBCHERI_ERRNO_INVOKE_LOCAL_ARG)
 		cheritest_failure_errx(
-		    "passed local capability with unexpected cheri_errno %d",
-		    cheri_errno);
+		    "passed local capability with unexpected libcheri_errno %d",
+		    libcheri_errno);
 	cheritest_success();
 }

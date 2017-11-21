@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2013 Robert N. M. Watson
+ * Copyright (c) 2013, 2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -28,8 +28,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _SANDBOX_STAT_H_
-#define	_SANDBOX_STAT_H_
+#ifndef _LIBCHERI_SANDBOX_STAT_H_
+#define	_LIBCHERI_SANDBOX_STAT_H_
 
 /*
  * Interfaces to register/deregister classes and methods.
@@ -44,4 +44,4 @@ int	sandbox_stat_object_register(struct sandbox_object_stat **sospp,
 	    struct sandbox_class_stat *scsp, uint64_t type, uint64_t name);
 void	sandbox_stat_object_deregister(struct sandbox_object_stat *sosp);
 
-#endif /* !_SANDBOX_STAT_H_ */
+#endif /* !_LIBCHERI_SANDBOX_STAT_H_ */

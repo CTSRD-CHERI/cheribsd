@@ -52,9 +52,9 @@
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-#include <cheri/cheri_fd.h>
-#include <cheri/sandbox.h>
-#include <cheri/cheri_invoke.h>
+#include <cheri/libcheri_fd.h>
+#include <cheri/libcheri_sandbox.h>
+#include <cheri/libcheri_invoke.h>
 #include <cheri_bench-helper.h>
 
 #define CAP

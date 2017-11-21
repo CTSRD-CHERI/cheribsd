@@ -47,12 +47,12 @@ extern struct sandbox_class	*__helloworld_classp;
 #endif
 
 CHERI_HELLOWORLD_CCALL
-int call_cheri_system_helloworld(void);
+int call_libcheri_system_helloworld(void);
 
 CHERI_HELLOWORLD_CCALL
-int call_cheri_system_puts(void);
+int call_libcheri_system_puts(void);
 
 CHERI_HELLOWORLD_CCALL
-int call_cheri_fd_write_c(struct cheri_object fd_object);
+int call_libcheri_fd_write_c(struct cheri_object fd_object);
 
 #endif /* !_CHERI_HELLOWORLD_H_ */

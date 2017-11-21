@@ -29,7 +29,7 @@
  */
 
 #include <cheri/cheri.h>
-#include <cheri/sandbox.h>
+#include <cheri/libcheri_sandbox.h>
 
 #include <err.h>
 #include <sysexits.h>

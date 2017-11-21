@@ -58,12 +58,20 @@ SRCS+=	test_runtime.c	\
 .endif
 .endif
 
+.ifdef CHERITHREAD_TESTS
+CFLAGS+=	-DCHERITHREAD_TESTS
+.endif
+
 MAN=
 
 .ifndef BOOTSTRAPPING
 .if ${PROG} == cheritest
 NEED_CHERI=	hybrid
+.elif ${PROG} == cheritest-mt
+NEED_CHERI=	hybrid
 .elif ${PROG} == cheriabitest
+WANT_CHERI=	pure
+.elif ${PROG} == cheriabitest-mt
 WANT_CHERI=	pure
 .endif
 WANT_DUMP=	yes
@@ -75,6 +83,11 @@ LIBADD+=	xo util
 NO_SHARED?=	YES
 
 NO_WERROR=	YES
+
+.ifdef CHERITHREAD_TESTS
+LIBADD+=	pthread
+SRCS+=		cheritest_libcheri_pthreads.c
+.endif
 
 .ifdef BOOTSTRAPPING
 CFLAGS+=	-DLIST_ONLY \
