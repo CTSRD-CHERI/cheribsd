@@ -320,13 +320,41 @@ _C_LABEL(x):
  *	int32_t		cf_s0;		misc.
  *  };
  *
+ *  cheriabi callframe {
+ *	intcap_t	cf_s0;  misc
+ *	intcap_t	cf_cra; return address
+ *	intcap_t	cf_csp; frame pointer
+ *	int64_t		cf_pad[N]; N=1 cheri128, N=3 cheri256
+ *	int64_t		cf_cgp;  global pointer (Not yet a capability)
+ *  };
+ *
  * XXX-BD: This is unstable and will certainly change.
  */
-#define	CALLFRAME_SIZ	(2*(_MIPS_SZCAP / 8))
-#define	CALLFRAME_CRA	(0*(_MIPS_SZCAP / 8))
-#define	CALLFRAME_S0	(1*(_MIPS_SZCAP / 8))
-#define CALLFRAME_SP	0
+/* #define	CALLFRAME_SIZ	(2*(_MIPS_SZCAP / 8)) */
+/* #define	CALLFRAME_CRA	(0*(_MIPS_SZCAP / 8)) */
+/* #define	CALLFRAME_S0	(1*(_MIPS_SZCAP / 8)) */
+/* #define CALLFRAME_SP	0 */
+/* #define CALLFRAME_RA    CALLFRAME_CRA */
+
+/*
+ * XXX-AM: The purecap kernel is PIC, so we have GP. Ideally it should go
+ * away once we have proper non-pic purecap support.
+ */
+#define	CALLFRAME_SIZ	(4*(_MIPS_SZCAP / 8))
+
+#define	CALLFRAME_S0	(0*(_MIPS_SZCAP / 8))
+#define	CALLFRAME_CRA	(1*(_MIPS_SZCAP / 8))
+#define CALLFRAME_CSP	(2*(_MIPS_SZCAP / 8))
+#define CALLFRAME_CGP   (3*(_MIPS_SZCAP / 8))
+
+/* XXX-AM: these should never be used in purecap */
 #define CALLFRAME_RA    CALLFRAME_CRA
+#define CALLFRAME_SP    CALLFRAME_CSP
+#ifdef CPU_CHERI128
+#define CALLFRAME_GP    CALLFRAME_CGP + 8
+#else /* CPU_CHERI256 */
+#define CALLFRAME_GP    CALLFRAME_CGP + 24
+#endif
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
 
 /*
