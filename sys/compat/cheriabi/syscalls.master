@@ -994,7 +994,7 @@
 				    __socklen_t tolen, \
 				    _In_opt_ struct sctp_sndrcvinfo *sinfo, \
 				    int flags); }
-473	AUE_SCTP_GENERIC_SENDMSG_IOV	NOSTD|NOSTUB	{ int cheriabi_sctp_generic_sendmsg_iov( \
+473	AUE_SCTP_GENERIC_SENDMSG_IOV	NOPROTO|NOSTD|NOSTUB	{ int sctp_generic_sendmsg_iov( \
 				    int sd, \
 				    _In_reads_(iovlen) struct iovec_c *iov, \
 				    int iovlen, \
@@ -1003,8 +1003,7 @@
 				    __socklen_t tolen, \
 				    _In_opt_ struct sctp_sndrcvinfo *sinfo, \
 				    int flags); }
-; XXX-BD: dependent variables
-474	AUE_SCTP_GENERIC_RECVMSG	NOSTD|NOSTUB	{ int cheriabi_sctp_generic_recvmsg( \
+474	AUE_SCTP_GENERIC_RECVMSG	NOPROTO|NOSTD|NOSTUB	{ int sctp_generic_recvmsg( \
 				    int sd, \
 				    _In_reads_(iovlen) struct iovec_c *iov, \
 				    int iovlen, \
