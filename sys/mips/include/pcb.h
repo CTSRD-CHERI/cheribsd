@@ -101,7 +101,7 @@
 	xor	t0, a0, t0                          ;\
 	mtc0	t0, MIPS_COP_0_STATUS               ;\
 	COP0_SYNC                                   ;\
-	GET_CPU_PCPU(s1)                            ;\
+	GET_CPU_PCPU_NOCAP(s1)                      ;\
 	PTR_L	s3, PC_CURPCB(s1)                   ;\
 	PTR_L	s1, PC_CURTHREAD(s1)                ;\
 	lw	s2, TD_FLAGS(s1)                    ;\

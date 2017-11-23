@@ -691,8 +691,16 @@ _C_LABEL(x):
 #define	USE_ALT_CP(a)		.cplocal a
 #endif	/* __mips_n32 || __mips_n64 */
 
+/* #ifdef CHERI_KERNEL */
 #define	GET_CPU_PCPU(reg)		\
+	PTR_LA	AT, _C_LABEL(pcpup);	\
+	cfromptr	reg, $c30, AT;	\
+	csetbounds	reg, reg, _MIPS_SZCAP;	\
+	clc	reg, zero, 0(reg)
+/* #else */
+#define	GET_CPU_PCPU_NOCAP(reg)		\
 	PTR_L	reg, _C_LABEL(pcpup);
+/* #endif */
 
 #if defined(MIPS_EXC_CNTRS)
 

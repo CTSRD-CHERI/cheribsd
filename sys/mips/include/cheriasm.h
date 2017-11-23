@@ -100,6 +100,11 @@
 #define	CHERI_REG_CCALLDATA	$c2
 
 /*
+ * Macro to abstract the creation of a NULL capability
+ */
+#define CHERI_NULL(reg) cfromptr reg, $c30, zero
+
+/*
  * Macro to abstract use of cmove in kernel assembly, used as a temporary
  * workaround for cmove generating CIncBase instructions on 128-bit CHERI.
  * This will be removed once all live bitfiles and toolchain have been

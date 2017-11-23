@@ -18,7 +18,6 @@ mips/malta/malta_mp.c			optional smp
 # Additions for MALTA CHERI support
 mips/cheri/cheri.c			optional cpu_cheri
 mips/cheri/cheri_bcopy.S		optional cpu_cheri
-mips/cheri/cheri_support.S		optional cpu_cheri
 mips/cheri/cheri_debug.c		optional cpu_cheri
 mips/cheri/cheri_exception.c		optional cpu_cheri
 mips/cheri/cheri_ktrace.c		optional cpu_cheri ktrace

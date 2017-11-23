@@ -38,7 +38,7 @@ mips/mips/sc_machdep.c			standard
 mips/mips/stack_machdep.c		optional	ddb | stack
 mips/mips/stdatomic.c			standard \
 	compile-with "${NORMAL_C:N-Wmissing-prototypes}"
-mips/mips/support.S			standard
+mips/mips/support.S			optional	!cheri_kernel
 mips/mips/bcopy.S			standard
 mips/mips/swtch.S			standard
 mips/mips/sys_machdep.c			standard
@@ -50,6 +50,7 @@ mips/mips/vm_machdep.c			standard
 
 # cheri arch files
 mips/cheri/locore.S			optional	no-obj cheri_kernel
+mips/cheri/support.S			optional	cheri_kernel
 
 # misc opt-in bits
 kern/kern_clocksource.c			standard

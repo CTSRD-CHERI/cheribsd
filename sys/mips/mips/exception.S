@@ -201,7 +201,7 @@ MipsDoTLBMiss:
 	bltz		k0, 1f				#02: k0<0 -> 1f (kernel fault)
 	PTR_SRL		k0, k0, SEGSHIFT - PTRSHIFT	#03: k0=seg offset (almost)
 
-	GET_CPU_PCPU(k1)
+	GET_CPU_PCPU_NOCAP(k1)
 	PTR_L		k1, PC_SEGBASE(k1)
 	beqz		k1, 2f				#05: make sure segbase is not null
 	andi		k0, k0, PDEPTRMASK		#06: k0=seg offset
@@ -690,7 +690,7 @@ END(MipsKernGenException)
 NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	.set	noat
 	.mask	0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ)
-	GET_CPU_PCPU(k1)
+	GET_CPU_PCPU_NOCAP(k1)
 	PTR_L	k1, PC_CURPCB(k1)
 	SAVE_REGS_TO_PCB(k1)
 #ifdef CPU_CHERI
@@ -734,7 +734,7 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
  * after interrupts are disabled.  Otherwise it will get overwritten
  * by the interrupt code.
  */
-	GET_CPU_PCPU(k1)
+	GET_CPU_PCPU_NOCAP(k1)
 	PTR_L	k1, PC_CURPCB(k1)
 
 	/*
@@ -912,7 +912,7 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
  * Save the relevant user registers into the u.u_pcb struct.
  * We don't need to save s0 - s8 because the compiler does it for us.
  */
-	GET_CPU_PCPU(k1)
+	GET_CPU_PCPU_NOCAP(k1)
 	PTR_L	k1, PC_CURPCB(k1)
 	SAVE_U_PCB_REG(AT, AST, k1)
 	.set	at
@@ -1011,7 +1011,7 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
  */
  	CLEAR_STATUS
 
-	GET_CPU_PCPU(k1)
+	GET_CPU_PCPU_NOCAP(k1)
 	PTR_L	k1, PC_CURPCB(k1)
 
 	/*
@@ -1113,7 +1113,7 @@ LEAF_NOPROFILE(MipsTLBInvalidException)
 	PTR_L		k1, %lo(kernel_segmap)(k1)	# k1=segment tab base
 
 1:	/* User address.  */
-	GET_CPU_PCPU(k1)
+	GET_CPU_PCPU_NOCAP(k1)
 	PTR_L		k1, PC_SEGBASE(k1)
 
 2:	/* Validate page directory pointer.  */
@@ -1262,7 +1262,7 @@ tlb_insert_random:
 	/*
 	 * Check for kernel stack overflow.
 	 */
-	GET_CPU_PCPU(k1)
+	GET_CPU_PCPU_NOCAP(k1)
 	PTR_L	k0, PC_CURTHREAD(k1)
 	PTR_L	k0, TD_KSTACK(k0)
 	sltu	k0, k0, sp
@@ -1275,7 +1275,7 @@ tlb_insert_random:
 	 * Move to a valid stack before we call panic. We use the boot stack
 	 * for this purpose.
 	 */
-	GET_CPU_PCPU(k1)
+	GET_CPU_PCPU_NOCAP(k1)
 	lw	k1, PC_CPUID(k1)
 	sll	k1, k1, PAGE_SHIFT + 1
 
@@ -1317,7 +1317,7 @@ tlb_insert_random:
 	/*
 	 * Squelch any more overflow checks by setting the stack base to 0.
 	 */
-	GET_CPU_PCPU(k1)
+	GET_CPU_PCPU_NOCAP(k1)
 	PTR_L	k0, PC_CURTHREAD(k1)
 	PTR_S	zero, TD_KSTACK(k0)
 
@@ -1493,7 +1493,7 @@ NESTED(MipsFPTrap, CALLFRAME_SIZ, ra)
  * be emulated to get the resulting PC.
  */
 	PTR_S	a2, (CALLFRAME_SIZ + 8)(sp)
-	GET_CPU_PCPU(a0)
+	GET_CPU_PCPU_NOCAP(a0)
 #mips64 unsafe?
 	PTR_L	a0, PC_CURPCB(a0)
 	PTR_ADDU a0, a0, U_PCB_REGS		# first arg is ptr to CPU registers
@@ -1518,7 +1518,7 @@ NESTED(MipsFPTrap, CALLFRAME_SIZ, ra)
 #xxx mips64 unsafe?
 	PTR_ADDU	v0, a2, 4			# v0 = next pc
 2:
-	GET_CPU_PCPU(t2)
+	GET_CPU_PCPU_NOCAP(t2)
 	PTR_L	t2, PC_CURPCB(t2)
 	SAVE_U_PCB_REG(v0, PC, t2)		# save new pc
 /*
@@ -1532,7 +1532,7 @@ NESTED(MipsFPTrap, CALLFRAME_SIZ, ra)
  * Send a floating point exception signal to the current process.
  */
 3:
-	GET_CPU_PCPU(a0)
+	GET_CPU_PCPU_NOCAP(a0)
 	PTR_L	a0, PC_CURTHREAD(a0)		# get current thread
 	cfc1	a2, MIPS_FPU_CSR		# code = FP execptions
 	ctc1	zero, MIPS_FPU_CSR		# Clear exceptions
