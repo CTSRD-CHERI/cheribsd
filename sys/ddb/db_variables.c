@@ -76,8 +76,7 @@ db_find_variable(struct db_variable **varp)
 			}
 		}
 	}
-	db_printf("Unknown variable\n");
-	db_flush_lex();
+	db_error("Unknown variable\n");
 	return (0);
 }
 
@@ -136,13 +135,11 @@ db_set_cmd(db_expr_t dummy1, bool dummy2, db_expr_t dummy3, char *dummy4)
 
 	t = db_read_token();
 	if (t != tDOLLAR) {
-		db_printf("Unknown variable\n");
-		db_flush_lex();
+		db_error("Unknown variable\n");
 		return;
 	}
 	if (!db_find_variable(&vp)) {
-		db_printf("Unknown variable\n");
-		db_flush_lex();
+		db_error("Unknown variable\n");
 		return;
 	}
 
@@ -151,15 +148,11 @@ db_set_cmd(db_expr_t dummy1, bool dummy2, db_expr_t dummy3, char *dummy4)
 		db_unread_token(t);
 
 	if (!db_expression(&value)) {
-		db_printf("No value\n");
-		db_flush_lex();
+		db_error("No value\n");
 		return;
 	}
-	if (db_read_token() != tEOL) {
-		db_printf("?\n");
-		db_flush_lex();
-		return;
-	}
+	if (db_read_token() != tEOL)
+		db_error("?\n");
 
 	db_write_variable(vp, value);
 }
