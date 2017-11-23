@@ -556,6 +556,7 @@ db_error(const char *s)
 	if (s)
 	    db_printf("%s", s);
 	db_flush_lex();
+	kdb_reenter_silent = 1;
 	kdb_reenter();
 }
 
