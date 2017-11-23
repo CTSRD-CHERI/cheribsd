@@ -86,6 +86,8 @@ static void	db_puts(const char *str);
 static void	db_putchar(int c, void *arg);
 static void	db_pager(void);
 
+#define	CTRL(c)		((c) & 0x1f)
+
 /*
  * Force pending whitespace.
  */
@@ -286,6 +288,7 @@ db_pager(void)
 		case 'Q':
 		case 'x':
 		case 'X':
+		case CTRL('c'):
 			/* Quit */
 			db_maxlines = 0;
 			quit = 1;
