@@ -115,6 +115,7 @@ bcnc_return:
 	nop
 END(bcopynocap_c)
 
+#ifndef CHERI_KERNEL
 /*
  * Copy a string from one capabilty to another up to a maximum length.
  * Return the length by reference.
@@ -150,17 +151,5 @@ cstr_return:
 	jr	ra
 	nop
 END(copystr_c)
-
-/*
- * Variant of memcpy with capability arguments that preserve tags
- *
- * memcpy_c() accepts:
- * c3 - source pointer
- * c4 - destination pointer
- * a0 - length
- */
-LEAF(memcpy_c)
-	jr	ra
-	nop
-END(memcpy_c)	
+#endif
 	
