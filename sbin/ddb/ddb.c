@@ -45,6 +45,7 @@ usage(void)
 
 	fprintf(stderr, "usage: ddb capture [-M core] [-N system] print\n");
 	fprintf(stderr, "       ddb capture [-M core] [-N system] status\n");
+	fprintf(stderr, "       ddb enter\n");
 	fprintf(stderr, "       ddb script scriptname\n");
 	fprintf(stderr, "       ddb script scriptname=script\n");
 	fprintf(stderr, "       ddb scripts\n");
@@ -108,6 +109,8 @@ ddb_main(int argc, char *argv[])
 
 	if (strcmp(argv[0], "capture") == 0)
 		ddb_capture(argc, argv);
+	else if (strcmp(argv[0], "enter") == 0)
+		ddb_enter(argc, argv);
 	else if (strcmp(argv[0], "script") == 0)
 		ddb_script(argc, argv);
 	else if (strcmp(argv[0], "scripts") == 0)

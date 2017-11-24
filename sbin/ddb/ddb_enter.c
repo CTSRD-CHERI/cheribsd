@@ -1,6 +1,10 @@
 /*-
- * Copyright (c) 2007 Robert N. M. Watson
+ * Copyright (c) 2017 Edward Tomasz Napierala <trasz@FreeBSD.org>
  * All rights reserved.
+ *
+ * This software was developed by SRI International and the University of
+ * Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
+ * ("CTSRD"), as part of the DARPA CRASH research programme.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -22,18 +26,35 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
-#ifndef DDB_H
-#define	DDB_H
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
-void	ddb_capture(int argc, char *argv[]);
-void	ddb_enter(int argc, char *argv[]);
-void	ddb_script(int argc, char *argv[]);
-void	ddb_scripts(int argc, char *argv[]);
-void	ddb_unscript(int argc, char *argv[]);
-void	usage(void);
+#include <sys/types.h>
+#include <sys/sysctl.h>
 
-#endif /* DDB_H */
+#include <err.h>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sysexits.h>
+
+#include "ddb.h"
+
+#define	SYSCTL_ENTER	"debug.kdb.enter"
+
+void
+ddb_enter(int argc, char *argv[])
+{
+	int one;
+
+	if (argc != 1)
+		usage();
+
+	one = 1;
+	if (sysctlbyname(SYSCTL_ENTER, NULL, NULL, &one, sizeof(one)) < 0)
+		err(EX_OSERR, "sysctl: %s", SYSCTL_ENTER);
+
+}
