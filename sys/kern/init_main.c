@@ -776,9 +776,9 @@ start_init(void *dummy)
 		 * to user mode as init!
 		 */
 		error = kern_execve(td, &args, NULL);
-		if (error == 0) {
-			free(free_init_path, M_TEMP);
+		if (error == EJUSTRETURN) {
 			mtx_unlock(&Giant);
+			free(free_init_path, M_TEMP);
 			return;
 		}
 		if (error != ENOENT)
