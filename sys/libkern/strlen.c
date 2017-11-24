@@ -30,6 +30,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/libkern.h>
 #include <sys/limits.h>
 
+#ifdef CHERI_KERNEL
+#include <cheri/cheric.h>
+#endif
+
 /*
  * Portable strlen() for 32-bit and 64-bit systems.
  *
@@ -55,6 +59,7 @@ __FBSDID("$FreeBSD$");
  * Henry S. Warren, Jr.
  */
 
+#ifndef CHERI_KERNEL
 /* Magic numbers for the algorithm */
 #if LONG_BIT == 32
 static const unsigned long mask01 = 0x01010101;
@@ -77,11 +82,13 @@ static const unsigned long mask80 = 0x8080808080808080;
 		if (p[x] == '\0')		\
 		    return (p - str + x);	\
 	} while (0)
+#endif /* !CHERI_KERNEL */
 
 size_t
 strlen(const char *str)
 {
 	const char *p;
+#ifndef CHERI_KERNEL
 	const unsigned long *lp;
 	long va, vb;
 
@@ -123,6 +130,19 @@ strlen(const char *str)
 #endif
 		}
 	}
+#else /* CHERI_KERNEL */
+	/*
+	 * The purecap variant of strlen can not rely on access to
+	 * word-aligned memory since some bytes may be beyond the
+	 * pointer bounds.
+	 * A more efficient implementation for long strings may be
+	 * possible.
+	 */
+	p = str;
+	while (*p != '\0')
+		p++;
+	return (p - str - 1);
+#endif /* CHERI_KERNEL */
 
 	/* NOTREACHED */
 	return (0);
