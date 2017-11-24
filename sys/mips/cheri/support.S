@@ -704,35 +704,49 @@ memsetsmallclr:
 END(memset)
 
 /*
- * bzero(s1, n)
+ * bzero(<c3>s1, <a0>n)
  */
 LEAF(bzero)
 XLEAF(blkclr)
-	blt	a1, 12, smallclr	# small amount to clear?
-	PTR_SUBU	a3, zero, a0		# compute # bytes to word align address
+	blt	a0, 12, smallclr	# small amount to clear?
+	nop
+
+	/* XXX-AM: can we ignore the base? */
+	cgetbase	t0, $c3
+	cgetoffset	a3, $c3
+	PTR_ADDU	a3, a3, t0
+	PTR_SUBU	a3, zero, a0	# compute # bytes to word align address
 	and	a3, a3, 3
 	beq	a3, zero, 1f		# skip if word aligned
-	PTR_SUBU	a1, a1, a3		# subtract from remaining count
-	SWHI	zero, 0(a0)		# clear 1, 2, or 3 bytes to align
-	PTR_ADDU	a0, a0, a3
+	PTR_SUBU	a0, a0, a3	# subtract from remaining count
+
+	REG_LI	t3, 0			# clear 1, 2, or 3 bytes to align
+	cincoffset	$c2, $c3, a3
+3:
+	cincoffset	$c3, $c3, 1
+	ceq	t0, $c3, $c2
+	beq	t0, zero, 3b
+	csb	zero, zero, -1($c1)
 1:
-	and	v0, a1, 3		# compute number of words left
-	PTR_SUBU	a3, a1, v0
-	move	a1, v0
-	PTR_ADDU	a3, a3, a0		# compute ending address
+	and	v0, a0, 3		# compute number of words left
+	PTR_SUBU	a3, a0, v0
+	move	a0, v0
+	cincoffset	$c2, $c3, a3	# compute ending address
 2:
-	PTR_ADDU	a0, a0, 4		# clear words
-	bne	a0, a3, 2b		#  unrolling loop does not help
-	sw	zero, -4(a0)		#  since we are limited by memory speed
+	cincoffset	$c3, $c3, 4	# clear words
+	ceq	t0, $c3, $c2		#  unrolling loop does not help
+	beq	t0, zero, 2b		#  since we are limited by memory speed
+	csw	zero, zero, -4($c3)
 smallclr:
-	ble	a1, zero, 2f
-	PTR_ADDU	a3, a1, a0		# compute ending address
+	ble	a0, zero, 2f
+	cincoffset	$c2, $c3, a0	# compute ending address
 1:
-	PTR_ADDU	a0, a0, 1		# clear bytes
-	bne	a0, a3, 1b
-	sb	zero, -1(a0)
+	cincoffset	$c3, $c3, 1	# clear bytes
+	ceq	t0, $c3, $c2
+	beq	t0, zero, 1b
+	csb	zero, zero, -1($c3)
 2:
-	j	ra
+	cjr	$c17
 	nop
 END(bzero)
 
