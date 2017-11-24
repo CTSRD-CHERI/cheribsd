@@ -123,6 +123,9 @@ db_putchar(int c, void *arg)
 {
 	struct dbputchar_arg *dap = arg;
 
+	if (db_pager_quit)
+		return;
+
 	if (dap->da_pbufr == NULL) {
 
 		 /* No bufferized output is provided. */
@@ -331,9 +334,6 @@ db_printf(const char *fmt, ...)
 	struct dbputchar_arg dca;
 	va_list	listp;
 	int retval;
-
-	if (db_pager_quit)
-		return (0);
 
 #ifdef DDB_BUFR_SIZE
 	dca.da_pbufr = bufr;
