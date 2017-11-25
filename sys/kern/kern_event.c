@@ -33,6 +33,10 @@ __FBSDID("$FreeBSD$");
 #include "opt_ktrace.h"
 #include "opt_kqueue.h"
 
+#ifdef COMPAT_FREEBSD11
+#define	_WANT_FREEBSD11_KEVENT
+#endif
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/capsicum.h>
@@ -116,7 +120,7 @@ static void	kqueue_fo_release(int filt);
 struct g_kevent_args;
 static int	kern_kevent_generic(struct thread *td,
 		    struct g_kevent_args *uap,
-		    struct kevent_copyops *k_ops);
+		    struct kevent_copyops *k_ops, const char *struct_name);
 
 static fo_ioctl_t	kqueue_ioctl;
 static fo_poll_t	kqueue_poll;
@@ -907,17 +911,6 @@ kern_kqueue(struct thread *td, int flags, struct filecaps *fcaps)
 	return (0);
 }
 
-#ifdef KTRACE
-static size_t
-kev_iovlen(int n, u_int kgio, size_t kevent_size)
-{
-
-	if (n < 0 || n >= kgio / kevent_size)
-		return (kgio);
-	return (n * kevent_size);
-}
-#endif
-
 struct g_kevent_args {
 	int	fd;
 	void	*changelist;
@@ -945,22 +938,18 @@ sys_kevent(struct thread *td, struct kevent_args *uap)
 		.timeout = uap->timeout,
 	};
 
-	return (kern_kevent_generic(td, &gk_args, &k_ops));
+	return (kern_kevent_generic(td, &gk_args, &k_ops, "kevent"));
 }
 
 static int
 kern_kevent_generic(struct thread *td, struct g_kevent_args *uap,
-    struct kevent_copyops *k_ops)
+    struct kevent_copyops *k_ops, const char *struct_name)
 {
 	struct timespec ts, *tsp;
-	int error;
 #ifdef KTRACE
-	struct uio ktruio;
-	kiovec_t ktriov;
-	struct uio *ktruioin = NULL;
-	struct uio *ktruioout = NULL;
-	u_int kgio;
+	struct kevent *eventlist = uap->eventlist;
 #endif
+	int error;
 
 	if (uap->timeout != NULL) {
 		error = copyin(uap->timeout, &ts, sizeof(ts));
@@ -971,33 +960,18 @@ kern_kevent_generic(struct thread *td, struct g_kevent_args *uap,
 		tsp = NULL;
 
 #ifdef KTRACE
-	if (KTRPOINT(td, KTR_GENIO)) {
-		kgio = ktr_geniosize;
-		IOVEC_INIT(&ktriov, uap->changelist,
-		    kev_iovlen(uap->nchanges, kgio, k_ops->kevent_size));
-		ktruio = (struct uio){ .uio_iov = &ktriov, .uio_iovcnt = 1,
-		    .uio_segflg = UIO_USERSPACE, .uio_rw = UIO_READ,
-		    .uio_td = td };
-		ktruioin = cloneuio(&ktruio);
-		IOVEC_INIT(&ktriov, uap->eventlist,
-		    kev_iovlen(uap->nevents, kgio, k_ops->kevent_size));
-		ktriov.iov_len = uap->nevents * k_ops->kevent_size;
-		ktruioout = cloneuio(&ktruio);
-	}
+	if (KTRPOINT(td, KTR_STRUCT_ARRAY))
+		ktrstructarray(struct_name, UIO_USERSPACE, uap->changelist,
+		    uap->nchanges, k_ops->kevent_size);
 #endif
 
 	error = kern_kevent(td, uap->fd, uap->nchanges, uap->nevents,
 	    k_ops, tsp);
 
 #ifdef KTRACE
-	if (ktruioin != NULL) {
-		ktruioin->uio_resid = kev_iovlen(uap->nchanges, kgio,
-		    k_ops->kevent_size);
-		ktrgenio(uap->fd, UIO_WRITE, ktruioin, 0);
-		ktruioout->uio_resid = kev_iovlen(td->td_retval[0], kgio,
-		    k_ops->kevent_size);
-		ktrgenio(uap->fd, UIO_READ, ktruioout, error);
-	}
+	if (error == 0 && KTRPOINT(td, KTR_STRUCT_ARRAY))
+		ktrstructarray(struct_name, UIO_USERSPACE, eventlist,
+		    td->td_retval[0], k_ops->kevent_size);
 #endif
 
 	return (error);
@@ -1078,15 +1052,6 @@ kevent_copyin(void *arg, kkevent_t *kevp, int count)
 }
 
 #ifdef COMPAT_FREEBSD11
-struct kevent_freebsd11 {
-	__uintptr_t	ident;		/* identifier for this event */
-	short		filter;		/* filter for event */
-	unsigned short	flags;
-	unsigned int	fflags;
-	__intptr_t	data;
-	void		*udata;		/* opaque user data identifier */
-};
-
 static int
 kevent11_copyout(void *arg, kkevent_t *kevp, int count)
 {
@@ -1161,7 +1126,7 @@ freebsd11_kevent(struct thread *td, struct freebsd11_kevent_args *uap)
 		.timeout = uap->timeout,
 	};
 
-	return (kern_kevent_generic(td, &gk_args, &k_ops));
+	return (kern_kevent_generic(td, &gk_args, &k_ops, "kevent_freebsd11"));
 }
 #endif
 
