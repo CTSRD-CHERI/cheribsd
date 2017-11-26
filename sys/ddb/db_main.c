@@ -226,6 +226,8 @@ db_trap(int type, int code)
 	if (cnunavailable())
 		return (0);
 
+	db_disable_pager();
+
 	if (db_stop_at_pc(type, code, &bkpt, &watchpt)) {
 		if (db_inst_count) {
 			db_printf("After %d instructions (%d loads, %d stores),\n",

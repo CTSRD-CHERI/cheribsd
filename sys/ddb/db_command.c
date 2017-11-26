@@ -547,6 +547,7 @@ db_command_script(const char *command)
 void
 db_error(const char *s)
 {
+	db_disable_pager();
 	if (s)
 	    db_printf("%s", s);
 	db_flush_lex();
