@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright 2013 Philip Withnall
  * Copyright 1996-1998 John D. Polstra.
  * All rights reserved.
