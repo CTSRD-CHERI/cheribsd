@@ -36,7 +36,7 @@ struct timecounter;
  * Hooks downward into platform functionality.
  */
 void platform_reset(void);
-void platform_start(__register_t, __register_t,  __register_t, __register_t);
+void platform_start(__register_t, __intptr_t,  __intptr_t, __register_t);
 
 /* For clocks and ticks and such */
 void platform_initclocks(void);

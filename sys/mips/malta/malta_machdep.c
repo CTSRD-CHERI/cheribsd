@@ -75,6 +75,10 @@ __FBSDID("$FreeBSD$");
 
 #include <mips/malta/maltareg.h>
 
+#ifdef CHERI_KERNEL
+#include <cheri/cheric.h>
+#endif
+
 extern int	*edata;
 extern int	*end;
 
@@ -311,10 +315,9 @@ malta_cpu_freq(void)
 }
 
 void
-platform_start(__register_t a0, __register_t a1,  __register_t a2, 
+platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
     __register_t a3)
 {
-	vm_offset_t kernend;
 	uint64_t platform_counter_freq;
 	int argc = a0;
 	int32_t *argv = (int32_t*)a1;
@@ -324,8 +327,19 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 	int i;
 
 	/* clear the BSS and SBSS segments */
+#ifdef CHERI_KERNEL
+	/* we need to hand-craft a capability for edata because it is defined
+	 * by the linker script and have no size info.
+	 */
+	void *edata_start;
+	size_t edata_siz = (size_t)(&end) - (size_t)(&edata);
+	cheri_capability_set(&edata_start, CHERI_PERM_STORE, (vm_offset_t)(&edata), edata_siz, 0);
+	memset(edata_start, 0, edata_siz);
+#else
+	vm_offset_t kernend;
 	kernend = (vm_offset_t)&end;
 	memset(&edata, 0, kernend - (vm_offset_t)(&edata));
+#endif
 
 	mips_postboot_fixup();
 
