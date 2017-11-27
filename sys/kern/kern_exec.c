@@ -355,8 +355,13 @@ post_execve(struct thread *td, int error, struct vmspace *oldvmspace)
 		PROC_UNLOCK(p);
 	}
 	if ((td->td_pflags & TDP_EXECVMSPC) != 0) {
+#ifdef notanymore
+		/*
+		 * XXX: This assertion is not valid for coexecve(2).
+		 */
 		KASSERT(p->p_vmspace != oldvmspace,
 		    ("oldvmspace still used"));
+#endif
 		vmspace_free(oldvmspace);
 		td->td_pflags &= ~TDP_EXECVMSPC;
 	}
@@ -393,6 +398,7 @@ kern_execve(struct thread *td, struct image_args *args, struct mac *mac_p)
 		PHOLD(cop);
 		sx_sunlock(&proctree_lock);
 		error = kern_coexecve(td, args, mac_p, cop);
+		PRELE(cop);
 #ifdef notyet
 		/*
 		 * XXX: No idea why this happens; do_execve() does the same without coexec.
@@ -402,7 +408,6 @@ kern_execve(struct thread *td, struct image_args *args, struct mac *mac_p)
 		if (error == 0)
 			return (0);
 #endif
-		PRELE(cop);
 
 		switch (error) {
 		case ENOTDIR:
