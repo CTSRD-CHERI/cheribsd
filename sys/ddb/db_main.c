@@ -44,6 +44,7 @@ __FBSDID("$FreeBSD$");
 
 #include <ddb/ddb.h>
 #include <ddb/db_command.h>
+#include <ddb/db_output.h>
 #include <ddb/db_sym.h>
 
 SYSCTL_NODE(_debug, OID_AUTO, ddb, CTLFLAG_RW, 0, "DDB settings");
