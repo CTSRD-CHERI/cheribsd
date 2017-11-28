@@ -34,6 +34,7 @@ CHERITEST_DIR:=	${.PARSEDIR}
 .ifdef CHERIABI_TESTS
 .ifndef BOOTSTRAPPING
 SRCS+=	cheritest_cheriabi.c
+SRCS+=	cheritest_cheriabi_fc_open.c
 SRCS+=	cheritest_cheriabi_open.c
 .endif
 CFLAGS+=	-DCHERIABI_TESTS
