@@ -406,6 +406,8 @@ vmspace_exit(struct thread *td)
 	int refcnt;
 	struct vmspace *vm;
 	struct proc *p;
+	vm_map_t map;
+	vm_map_entry_t entry;
 
 	/*
 	 * Release user portion of address space.
@@ -447,6 +449,15 @@ vmspace_exit(struct thread *td)
 		PROC_VMSPACE_UNLOCK(p);
 		pmap_activate(td);
 		vmspace_dofree(vm);
+	} else {
+		map = &vm->vm_map;
+		vm_map_lock(map);
+		for (entry = map->header.next; entry != &map->header;
+		    entry = entry->next) {
+			if (entry->owner == p->p_pid)
+				entry->owner = 0;
+		}
+		vm_map_unlock(map);
 	}
 #ifdef RACCT
 	if (racct_enable)
