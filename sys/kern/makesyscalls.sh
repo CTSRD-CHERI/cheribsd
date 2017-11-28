@@ -969,7 +969,7 @@ sed -e '
 					a_type = argtype[i]
 					sub(/_c /, "", a_type)
 					sub(/_c_/, "_", a_type)
-					cast = "(__cheri_cast " a_type ")"
+					cast = "(__cheri_fromcap " a_type ")"
 				} else
 					cast = ""
 				printf("%s%s%s", comma, cast,
