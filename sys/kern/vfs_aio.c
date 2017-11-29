@@ -286,6 +286,7 @@ struct aiocb_ops {
 	int	(*copyin)(struct aiocb *ujob, struct aiocb *kjob);
 	long	(*fetch_status)(struct aiocb *ujob);
 	long	(*fetch_error)(struct aiocb *ujob);
+	void	(*free_kaiocb)(struct kaiocb *kjob);
 	int	(*store_status)(struct aiocb *ujob, long status);
 	int	(*store_error)(struct aiocb *ujob, long error);
 	int	(*store_kernelinfo)(struct aiocb *ujob, long jobref);
@@ -560,6 +561,10 @@ aio_free_entry(struct kaiocb *job)
 	if (job->fd_file)
 		fdrop(job->fd_file, curthread);
 	crfree(job->cred);
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		cheriabi_free_sival(&job->uaiocb.aio_sigevent.sigev_value);
+#endif
 	uma_zfree(aiocb_zone, job);
 	AIO_LOCK(ki);
 
@@ -1390,6 +1395,13 @@ aiocb_fetch_error(struct aiocb *ujob)
 	return (fuword(&ujob->_aiocb_private.error));
 }
 
+static void
+aiocb_free_kaiocb(struct kaiocb *kjob)
+{
+
+	uma_zfree(aiocb_zone, kjob);
+}
+
 static int
 aiocb_store_status(struct aiocb *ujob, long status)
 {
@@ -1438,6 +1450,7 @@ static struct aiocb_ops aiocb_ops = {
 	.copyin = aiocb_copyin,
 	.fetch_status = aiocb_fetch_status,
 	.fetch_error = aiocb_fetch_error,
+	.free_kaiocb = aiocb_free_kaiocb,
 	.store_status = aiocb_store_status,
 	.store_error = aiocb_store_error,
 	.store_kernelinfo = aiocb_store_kernelinfo,
@@ -1450,6 +1463,7 @@ static struct aiocb_ops aiocb_ops_osigevent = {
 	.copyin = aiocb_copyin_old_sigevent,
 	.fetch_status = aiocb_fetch_status,
 	.fetch_error = aiocb_fetch_error,
+	.free_kaiocb = aiocb_free_kaiocb,
 	.store_status = aiocb_store_status,
 	.store_error = aiocb_store_error,
 	.store_kernelinfo = aiocb_store_kernelinfo,
@@ -1499,12 +1513,12 @@ aio_aqueue(struct thread *td, struct aiocb *ujob, void *ujobptrp,
 	error = ops->copyin(ujob, &job->uaiocb);
 	if (error) {
 		ops->store_error(ujob, error);
-		uma_zfree(aiocb_zone, job);
+		ops->free_kaiocb(job);
 		return (error);
 	}
 
 	if (job->uaiocb.aio_nbytes > IOSIZE_MAX) {
-		uma_zfree(aiocb_zone, job);
+		ops->free_kaiocb(job);
 		return (EINVAL);
 	}
 
@@ -1513,14 +1527,14 @@ aio_aqueue(struct thread *td, struct aiocb *ujob, void *ujobptrp,
 	    job->uaiocb.aio_sigevent.sigev_notify != SIGEV_THREAD_ID &&
 	    job->uaiocb.aio_sigevent.sigev_notify != SIGEV_NONE) {
 		ops->store_error(ujob, EINVAL);
-		uma_zfree(aiocb_zone, job);
+		ops->free_kaiocb(job);
 		return (EINVAL);
 	}
 
 	if ((job->uaiocb.aio_sigevent.sigev_notify == SIGEV_SIGNAL ||
 	     job->uaiocb.aio_sigevent.sigev_notify == SIGEV_THREAD_ID) &&
 		!_SIG_VALID(job->uaiocb.aio_sigevent.sigev_signo)) {
-		uma_zfree(aiocb_zone, job);
+		ops->free_kaiocb(job);
 		return (EINVAL);
 	}
 
@@ -1567,7 +1581,7 @@ aio_aqueue(struct thread *td, struct aiocb *ujob, void *ujobptrp,
 		error = EINVAL;
 	}
 	if (error) {
-		uma_zfree(aiocb_zone, job);
+		ops->free_kaiocb(job);
 		ops->store_error(ujob, error);
 		return (error);
 	}
@@ -1597,7 +1611,7 @@ aio_aqueue(struct thread *td, struct aiocb *ujob, void *ujobptrp,
 
 	if (opcode == LIO_NOP) {
 		fdrop(fp, td);
-		uma_zfree(aiocb_zone, job);
+		ops->free_kaiocb(job);
 		return (0);
 	}
 
@@ -1672,7 +1686,7 @@ aqueue_fail:
 	knlist_delete(&job->klist, curthread, 0);
 	if (fp)
 		fdrop(fp, td);
-	uma_zfree(aiocb_zone, job);
+	ops->free_kaiocb(job);
 	ops->store_error(ujob, error);
 	return (error);
 }
@@ -2776,6 +2790,13 @@ aiocb32_fetch_error(struct aiocb *ujob)
 	return (fuword32(&ujob32->_aiocb_private.error));
 }
 
+static void
+aiocb32_free_kaiocb(struct kaiocb *kjob)
+{
+
+	uma_zfree(aiocb_zone, kjob);
+}
+
 static int
 aiocb32_store_status(struct aiocb *ujob, long status)
 {
@@ -2830,6 +2851,7 @@ static struct aiocb_ops aiocb32_ops = {
 	.copyin = aiocb32_copyin,
 	.fetch_status = aiocb32_fetch_status,
 	.fetch_error = aiocb32_fetch_error,
+	.free_kaiocb = aiocb32_free_kaiocb,
 	.store_status = aiocb32_store_status,
 	.store_error = aiocb32_store_error,
 	.store_kernelinfo = aiocb32_store_kernelinfo,
@@ -2842,6 +2864,7 @@ static struct aiocb_ops aiocb32_ops_osigevent = {
 	.copyin = aiocb32_copyin_old_sigevent,
 	.fetch_status = aiocb32_fetch_status,
 	.fetch_error = aiocb32_fetch_error,
+	.free_kaiocb = aiocb32_free_kaiocb,
 	.store_status = aiocb32_store_status,
 	.store_error = aiocb32_store_error,
 	.store_kernelinfo = aiocb32_store_kernelinfo,
@@ -3150,6 +3173,14 @@ aiocb_c_fetch_error(struct aiocb *ujob)
 	return (fuword(&ujob_c->_aiocb_private.error));
 }
 
+static void
+aiocb_c_free_kaiocb(struct kaiocb *kjob)
+{
+
+	cheriabi_free_sival(&kjob->uaiocb.aio_sigevent.sigev_value);
+	uma_zfree(aiocb_zone, kjob);
+}
+
 static int
 aiocb_c_store_status(struct aiocb *ujob, long status)
 {
@@ -3203,6 +3234,7 @@ static struct aiocb_ops aiocb_c_ops = {
 	.copyin = aiocb_c_copyin,
 	.fetch_status = aiocb_c_fetch_status,
 	.fetch_error = aiocb_c_fetch_error,
+	.free_kaiocb = aiocb_c_free_kaiocb,
 	.store_status = aiocb_c_store_status,
 	.store_error = aiocb_c_store_error,
 	.store_kernelinfo = aiocb_c_store_kernelinfo,
