@@ -133,7 +133,6 @@ struct kaiocb {
 #else
 	intptr_t	ujobptr;
 #endif
-	size_t		ujobptr_size;
 	struct	knlist klist;		/* (a) list of knotes */
 	struct	aiocb uaiocb;		/* (*) copy of user I/O control block */
 	ksiginfo_t ksi;			/* (a) realtime signal info */
