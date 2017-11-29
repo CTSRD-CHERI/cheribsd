@@ -615,9 +615,8 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		sf.sf_si.si_signo = sig;
 		sf.sf_si.si_code = ksi->ksi_code;
 		if (ksi->ksi_flags & KSI_CHERI)
-			cheri_memcpy(&sf.sf_si.si_value,
-			    ksi->ksi_info.si_value.sival_ptr,
-			    sizeof(sf.sf_si.si_value));
+			sf.sf_si.si_value.sival_ptr =
+			    cheriabi_extract_sival(&ksi->ksi_info.si_value);
 		else
 			sf.sf_si.si_value.sival_int =
 			    ksi->ksi_info.si_value.sival_int;
