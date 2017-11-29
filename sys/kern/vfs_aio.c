@@ -1619,16 +1619,10 @@ aio_aqueue(struct thread *td, struct aiocb *ujob, void *ujobptrp,
 		 * In a CheriABI process, we use sidecar storage for
 		 * both kqueue and sigevent pointers.  The two merge
 		 * here!
-		 *
-		 * XXXBD: There has got to be a better way to do this...
 		 */
-		void * __capability * udata;
-		udata = malloc(2*sizeof(void * __capability), M_KQUEUE,
-		    M_WAITOK);
-		kev.udata = udata;
-		udata[0] = (void * __capability)(__intcap_t)kev.ident;
-		udata[1] = *(void * __capability *)
-		    job->uaiocb.aio_sigevent.sigev_value.sival_ptr;
+		kev.udata = cheriabi_build_kevent_udata((__intcap_t)kev.ident,
+		    cheriabi_extract_sival(
+		    &job->uaiocb.aio_sigevent.sigev_value));
 	} else
 #endif
 		kev.udata = job->uaiocb.aio_sigevent.sigev_value.sival_ptr;
@@ -2235,14 +2229,10 @@ kern_lio_listio(struct thread *td, int mode, struct aiocb * const *uacb_list,
 #ifdef COMPAT_CHERIABI
 			if (SV_CURPROC_FLAG(SV_CHERI)) {
 				/* See comment in aio_aqueue() */
-				void * __capability * udata;
-				udata = malloc(2*sizeof(void * __capability),
-				    M_KQUEUE, M_WAITOK);
-				kev.udata = udata;
-				udata[0] = (void * __capability)(__intcap_t)
-				    kev.ident;
-				udata[1] = *(void * __capability *)
-				    lj->lioj_signal.sigev_value.sival_ptr;
+				kev.udata = cheriabi_build_kevent_udata(
+				    (__intcap_t)kev.ident,
+				    cheriabi_extract_sival(
+				    &lj->lioj_signal.sigev_value));
 			} else
 #endif
 				kev.udata =
@@ -3372,6 +3362,7 @@ cheriabi_lio_listio(struct thread *td, struct cheriabi_lio_listio_args *uap)
 	acb_list_c = malloc(sizeof(*acb_list_c) * nent, M_LIO, M_WAITOK);
 	error = copyincap(uap->acb_list, acb_list_c, nent * sizeof(*acb_list_c));
 	if (error) {
+		cheriabi_free_sival(&sig.sigev_value);
 		free(acb_list_c, M_LIO);
 		return (error);
 	}
@@ -3381,6 +3372,7 @@ cheriabi_lio_listio(struct thread *td, struct cheriabi_lio_listio_args *uap)
 		    acb_list_c[i], sizeof(struct aiocb_c),
 		    CHERI_PERM_GLOBAL|CHERI_PERM_LOAD|CHERI_PERM_STORE, 1);
 		if (error) {
+			cheriabi_free_sival(&sig.sigev_value);
 			free(acb_list_c, M_LIO);
 			free(acb_list, M_LIO);
 			return (error);
@@ -3391,6 +3383,7 @@ cheriabi_lio_listio(struct thread *td, struct cheriabi_lio_listio_args *uap)
 	error = kern_lio_listio(td, uap->mode,
 	    (struct aiocb * const *)uap->acb_list, acb_list, nent, sigp,
 	    &aiocb_c_ops);
+	cheriabi_free_sival(&sig.sigev_value);
 	free(acb_list, M_LIO);
 	return (error);
 }
