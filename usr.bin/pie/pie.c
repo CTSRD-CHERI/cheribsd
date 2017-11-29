@@ -31,6 +31,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,18 +44,22 @@ static void
 usage(void)
 {
 
-	fprintf(stderr, "usage: pie [-s | -v]\n");
+	fprintf(stderr, "usage: pie [-f | -s | -v]\n");
 	exit(1);
 }
 
 int
 main(int argc, char **argv __unused)
 {
-	bool sflag = false, vflag = false;
-	int ch;
+	pid_t pid;
+	bool fflag = false, sflag = false, vflag = false;
+	int ch, status;
 
-	while ((ch = getopt(argc, argv, "sv")) != -1) {
+	while ((ch = getopt(argc, argv, "fsv")) != -1) {
 		switch (ch) {
+		case 'f':
+			fflag = true;
+			break;
 		case 's':
 			sflag = true;
 			break;
@@ -69,6 +75,15 @@ main(int argc, char **argv __unused)
 	argc -= optind;
 	if (argc != 0)
 		usage();
+
+	if (fflag) {
+		pid = fork();
+		if (pid < 0)
+			perror("fork");
+
+		if (pid != 0)
+			wait(&status);
+	}
 
 	if (vflag)
 		printf("pid %d, &argv %p\n", getpid(), &argv);
