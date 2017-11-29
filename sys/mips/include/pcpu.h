@@ -34,23 +34,12 @@
 #include <machine/cpufunc.h>
 #include <machine/pte.h>
 
-#ifdef CPU_CHERI
-#define	PCPU_CHERI_COUNTERS						\
-	register_t	pc_cheri_ccall_cnt;	/* Cheri ccall count */ \
-	register_t	pc_cheri_creturn_cnt;	/* Cheri creturn count */ \
-#define	PCPU_NUM_CHERI_COUNTERS	2
-#else
-#define	PCPU_CHERI_COUNTERS
-#define	PCPU_NUM_CHERI_COUNTERS	0
-#endif
-
 #if defined(MIPS_EXC_CNTRS)
 #define	PCPU_MIPS_COUNTERS						\
 	register_t	pc_tlb_miss_cnt;	/* TLB miss count */    \
 	register_t	pc_tlb_invalid_cnt;	/* TLB invalid count */ \
 	register_t	pc_tlb_mod_cnt;		/* TLB modification count */ \
-	PCPU_CHERI_COUNTERS
-#define	PCPU_NUM_EXC_CNTRS	3 + PCPU_NUM_CHERI_COUNTERS
+#define	PCPU_NUM_EXC_CNTRS	3
 #else
 #define PCPU_MIPS_COUNTERS
 #define	PCPU_NUM_EXC_CNTRS	0

@@ -170,9 +170,6 @@ extern char MipsCache[], MipsCacheEnd[];
 /* MIPS wait skip region */
 extern char MipsWaitStart[], MipsWaitEnd[];
 
-/* CHERI CCall/CReturn software path */
-extern char CHERICCallVector[], CHERICCallVectorEnd[];
-
 extern char edata[], end[];
 
 u_int32_t bootdev;
@@ -376,11 +373,14 @@ mips_vector_init(void)
 	bcopy(MipsCache, (void *)MIPS_CACHE_ERR_EXC_VEC,
 	      MipsCacheEnd - MipsCache);
 
-#if 0
 #ifdef CPU_CHERI
-	bcopy(CHERICCallVector, (void *)CHERI_CCALL_EXC_VEC,
-	      CHERICCallVectorEnd - CHERICCallVector);
-#endif
+	/*
+	 * XXXRW: Install ordinary MIPS exception vector in the CCall
+	 * exception vector, as we don't currently have another.  But it could
+	 * be that we do want a specialised vector here at some point.
+	 */
+	bcopy(MipsException, (void *)CHERI_CCALL_EXC_VEC,
+	      MipsCacheEnd - MipsCache);
 #endif
 
 	/*
@@ -504,10 +504,6 @@ cpu_pcpu_init(struct pcpu *pcpu, int cpuid, size_t size)
 	pcpu->pc_tlb_miss_cnt = 0;
 	pcpu->pc_tlb_invalid_cnt = 0;
 	pcpu->pc_tlb_mod_cnt = 0;
-#ifdef CPU_CHERI
-	pcpu->pc_cheri_ccall_cnt = 0;
-	pcpu->pc_cheri_creturn_cnt = 0;
-#endif /* CPU_CHERI */
 #endif /* defined(MIPS_EXC_CNTRS) */
 
 #ifdef SMP
@@ -685,14 +681,6 @@ mips_exc_cntrs_sysctl_register(void *arg)
 		SYSCTL_ADD_CNTR(&pcpupg->pc_tlb_mod_cnt, cpu,
 			"tlb_mod_cnt",
 			"TLB modification exception count for cpu N");
-#ifdef CPU_CHERI
-		SYSCTL_ADD_CNTR(&pcpupg->pc_cheri_ccall_cnt, cpu,
-			"cheri_ccall_cnt",
-			"Cheri ccall exception count for cpu N");
-		SYSCTL_ADD_CNTR(&pcpupg->pc_cheri_creturn_cnt, cpu,
-			"cheri_creturn_cnt",
-			"Cheri creturn exception count for cpu N");
-#endif /* CPU_CHERI */
 	}
 }
 

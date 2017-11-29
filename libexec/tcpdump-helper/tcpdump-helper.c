@@ -60,8 +60,8 @@
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-#include <cheri/cheri_system.h>
-#include <cheri/cheri_invoke.h>
+#include <cheri/libcheri_system.h>
+#include <cheri/libcheri_invoke.h>
 
 #include <stdlib.h>
 #include <string.h>

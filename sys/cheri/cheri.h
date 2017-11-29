@@ -110,8 +110,8 @@ void	cheri_capability_set(void * __capability *capp, uint32_t uperms,
 /*
  * CHERI capability utility functions.
  */
-void	 cheri_bcopy(void *src, void *dst, size_t len);
-void	*cheri_memcpy(void *dst, void *src, size_t len);
+void	 cheri_bcopy(const void *src, void *dst, size_t len);
+void	*cheri_memcpy(void *dst, const void *src, size_t len);
 
 /*
  * CHERI context management functions.

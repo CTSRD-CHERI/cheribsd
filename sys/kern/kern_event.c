@@ -950,7 +950,19 @@ sys_kevent(struct thread *td, struct kevent_args *uap)
 		.kevent_size = sizeof(struct kevent),
 	};
 
+#ifdef CPU_CHERI
+	struct g_kevent_args args;
+
+	args.fd = uap->fd;
+	args.changelist = uap->changelist;
+	args.nchanges = uap->nchanges;
+	args.eventlist = uap->eventlist;
+	args.nevents = uap->nevents;
+	args.timeout = uap->timeout;
+	return (kern_kevent_generic(td, &args, &k_ops));
+#else
 	return (kern_kevent_generic(td, (struct g_kevent_args *)uap, &k_ops));
+#endif
 }
 
 static int
@@ -1122,7 +1134,19 @@ freebsd11_kevent(struct thread *td, struct freebsd11_kevent_args *uap)
 		.kevent_size = sizeof(struct kevent_freebsd11),
 	};
 
+#ifdef CPU_CHERI
+	struct g_kevent_args args;
+
+	args.fd = uap->fd;
+	args.changelist = uap->changelist;
+	args.nchanges = uap->nchanges;
+	args.eventlist = uap->eventlist;
+	args.nevents = uap->nevents;
+	args.timeout = uap->timeout;
+	return (kern_kevent_generic(td, &args, &k_ops));
+#else
 	return (kern_kevent_generic(td, (struct g_kevent_args *)uap, &k_ops));
+#endif
 }
 #endif
 

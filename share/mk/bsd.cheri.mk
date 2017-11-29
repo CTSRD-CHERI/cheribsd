@@ -104,15 +104,6 @@ _CHERI_COMMON_FLAGS+=	-mllvm -cheri-exact-equals
 # Turn off deprecated warnings
 _CHERI_COMMON_FLAGS+= -Wno-deprecated-declarations
 
-.if ${WANT_CHERI} == "sandbox"
-MK_DEBUG_FILES:=no
-STRIP:=
-# The libcheri sandbox loader assumes that there is exactly one code and one
-# data segment. If we don't pass this flag only parts of each segment will
-# be mapped and any sandbox will crash on startup
-LDFLAGS+=-Wl,--no-rosegment -Wl,-z,norelro
-.endif
-
 .if ${WANT_CHERI} == "pure" || ${WANT_CHERI} == "sandbox"
 OBJCOPY:=	objcopy
 MIPS_ABI=	purecap
@@ -135,6 +126,9 @@ _LIB_OBJTOP=	${ROOTOBJDIR}
 .endif
 .ifdef LIBCHERI
 LDFLAGS+=	-Wl,-init=crt_init_globals
+.endif
+.if ${WANT_CHERI} == "sandbox"
+CHERI_LLD_BROKEN=	yes
 .endif
 # remove any conflicting -fuse-ld= flags
 LDFLAGS:=${LDFLAGS:N-fuse-ld=*}

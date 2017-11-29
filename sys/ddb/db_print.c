@@ -59,6 +59,7 @@ db_show_regs(db_expr_t _1, bool _2, db_expr_t _3, char *_4)
 			continue;
 		db_printf("%-12s%#*lr", regp->name,
 		    (int)(sizeof(unsigned long) * 2 + 2), (unsigned long)value);
+#ifdef __mips__
 		if (value >= VM_MAXUSER_ADDRESS) {
 #if __has_feature(capabilities)
 			if ((value % sizeof(void * __capability)) == 0)
@@ -74,6 +75,7 @@ db_show_regs(db_expr_t _1, bool _2, db_expr_t _3, char *_4)
 			else
 				db_printf("\t(unaligned)");
 		}
+#endif
 		db_find_xtrn_sym_and_offset((db_addr_t)value, &name, &offset);
 		if (name != NULL && offset <= (unsigned long)db_maxoff &&
 		    offset != value) {

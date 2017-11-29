@@ -44,9 +44,9 @@
 #include <net/ethernet.h>
 #include <netinet/in.h>
 
-#include <cheri/cheri_enter.h>
-#include <cheri/cheri_stack.h>
-#include <cheri/sandbox.h>
+#include <cheri/libcheri_enter.h>
+#include <cheri/libcheri_stack.h>
+#include <cheri/libcheri_sandbox.h>
 
 #include <assert.h>
 #include <ctype.h>
@@ -164,8 +164,8 @@ handle_alarm(int sig, siginfo_t *info __unused, void *vuap)
 
 	assert(sig == SIGALRM);
 
-	cheri_stack_unwind(vuap, SANDBOX_STACK_UNWOUND, SANDBOX_STACK_UNWOUND,
-	    0);
+	libcheri_stack_unwind(vuap, SANDBOX_STACK_UNWOUND,
+	    SANDBOX_STACK_UNWOUND, 0);
 }
 
 static void
