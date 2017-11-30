@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014 Robert N. M. Watson
+ * Copyright (c) 2014, 2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -28,10 +28,14 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _CHERI_TYPE_H_
-#define	_CHERI_TYPE_H_
+#ifndef _LIBCHERI_TYPE_H_
+#define	_LIBCHERI_TYPE_H_
 
-__capability void	*cheri_type_alloc(void);
-__capability void	*cheri_system_type_alloc(void);
+#if !__has_feature(capabilities)
+#error "This code requires a CHERI-aware compiler"
+#endif
 
-#endif /* !_CHERI_TYPE_H_ */
+__capability void	*libcheri_type_alloc(void);
+__capability void	*libcheri_system_type_alloc(void);
+
+#endif /* !_LIBCHERI_TYPE_H_ */

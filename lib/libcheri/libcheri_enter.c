@@ -30,10 +30,6 @@
 
 #include <sys/cdefs.h>
 
-#if !__has_feature(capabilities)
-#error "This code requires a CHERI-aware compiler"
-#endif
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/mman.h>
@@ -52,8 +48,8 @@
 #include "libcheri_sandbox.h"
 
 /*
- * This file implements a stack landing pad for CHERI system classes provided
- * by libcheri.  The single stack is statically allocated -- meaning no
+ * This file implements a stack landing pad for system classes provided by
+ * libcheri.  The single stack is statically allocated -- meaning no
  * concurrent invocation from sandboxes in multiple threads (or reentrantly).
  * Currently, that is ensured by virtue of applications not themselves
  * invoking sandboxes concurrently.
@@ -65,37 +61,37 @@
  * (in which only the stack capability is used).
  */
 #ifdef __CHERI_PURE_CAPABILITY__
-extern __capability void	*__cheri_enter_stack_csp; /* Pure cap. */
+extern __capability void	*__libcheri_enter_stack_csp; /* Pure cap. */
 #else
-extern __capability void	*__cheri_enter_stack_cap; /* Hybrid cap. */
-extern register_t		 __cheri_enter_stack_sp;  /* Hybrid cap. */
+extern __capability void	*__libcheri_enter_stack_cap; /* Hybrid cap. */
+extern register_t		 __libcheri_enter_stack_sp;  /* Hybrid cap. */
 #endif
 
-#define	CHERI_ENTER_STACK_SIZE	(PAGE_SIZE * 16)
-static void		*__cheri_enter_stack;		/* Stack itself. */
+#define	LIBCHERI_ENTER_STACK_SIZE	(PAGE_SIZE * 16)
+static void		*__libcheri_enter_stack;	/* Stack itself. */
 #ifdef __CHERI_PURE_CAPABILITY__
-__capability void	*__cheri_enter_stack_csp;	/* Pure cap. */
+__capability void	*__libcheri_enter_stack_csp;	/* Pure cap. */
 #else
-__capability void	*__cheri_enter_stack_cap;	/* Hybrid cap. */
-register_t		 __cheri_enter_stack_sp;	/* Hubrid cap. */
+__capability void	*__libcheri_enter_stack_cap;	/* Hybrid cap. */
+register_t		 __libcheri_enter_stack_sp;	/* Hybrid cap. */
 #endif
 
 /*
  * Return capability to use from system objects.
  */
-struct cheri_object	 __cheri_object_creturn;
+struct cheri_object	 __libcheri_object_creturn;
 
 /*
  * Initialise landing-pad environment for system-object invocation.
  */
 void
-cheri_enter_init(void)
+libcheri_enter_init(void)
 {
 
 	/* XXX: Should be MAP_STACK, but that is broken. */
-	__cheri_enter_stack = mmap(NULL, CHERI_ENTER_STACK_SIZE,
+	__libcheri_enter_stack = mmap(NULL, LIBCHERI_ENTER_STACK_SIZE,
 	    PROT_READ | PROT_WRITE, MAP_ANON, -1, 0);
-	assert(__cheri_enter_stack != MAP_FAILED);
+	assert(__libcheri_enter_stack != MAP_FAILED);
 
 	/*
 	 * In CheriABI, we use the capability returned by mmap(2), which $sp
@@ -103,11 +99,13 @@ cheri_enter_init(void)
 	 * a global $sp and use $c0.
 	 */
 #ifdef __CHERI_PURE_CAPABILITY__
-	__cheri_enter_stack_csp = __cheri_enter_stack + CHERI_ENTER_STACK_SIZE;
+	__libcheri_enter_stack_csp = __libcheri_enter_stack +
+	    LIBCHERI_ENTER_STACK_SIZE;
 #else
-	__cheri_enter_stack_cap = cheri_getdefault();
-	__cheri_enter_stack_sp = (register_t)((char *)__cheri_enter_stack +
-	    CHERI_ENTER_STACK_SIZE);
+	__libcheri_enter_stack_cap = cheri_getdefault();
+	__libcheri_enter_stack_sp =
+	    (register_t)((char *)__libcheri_enter_stack +
+	    LIBCHERI_ENTER_STACK_SIZE);
 #endif
-	__cheri_object_creturn = cheri_make_sealed_return_object();
+	__libcheri_object_creturn = libcheri_make_sealed_return_object();
 }

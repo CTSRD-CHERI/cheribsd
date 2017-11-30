@@ -911,9 +911,12 @@
 #define	__CAPABILITY
 #endif
 
-#if !__has_feature(__cheri_cast)
-/* Support old compiler versions without __cheri_cast: */
-#define __cheri_cast
+#if !__has_feature(cheri_casts)
+/* Support old compiler versions without CHERI casts: */
+#define __cheri_tocap
+#define __cheri_fromcap
+#define __cheri_offset
+#define __cheri_addr
 #endif
 
 #endif /* !_SYS_CDEFS_H_ */

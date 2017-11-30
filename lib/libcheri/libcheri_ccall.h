@@ -28,18 +28,22 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _CHERI_CCALL_H_
-#define	_CHERI_CCALL_H_
+#ifndef _LIBCHERI_CCALL_H_
+#define	_LIBCHERI_CCALL_H_
+
+#if !__has_feature(capabilities)
+#error "This code requires a CHERI-aware compiler"
+#endif
 
 /*
  * Private interfaces to return sealed capabilities to call an object's rtld,
  * invoke the object, or return (from any object).
  */
 struct sandbox_object;
-struct cheri_object	cheri_sandbox_make_sealed_invoke_object(
+struct cheri_object	libcheri_sandbox_make_sealed_invoke_object(
 			    __capability struct sandbox_object *sbop);
-struct cheri_object	cheri_sandbox_make_sealed_rtld_object(
+struct cheri_object	libcheri_sandbox_make_sealed_rtld_object(
 			    __capability struct sandbox_object *sbop);
-struct cheri_object	cheri_make_sealed_return_object(void);
+struct cheri_object	libcheri_make_sealed_return_object(void);
 
-#endif /* _CHERI_CCALL_H_ */
+#endif /* _LIBCHERI_CCALL_H_ */

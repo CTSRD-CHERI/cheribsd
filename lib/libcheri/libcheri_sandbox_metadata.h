@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 2014-2016 Robert N. M. Watson
- * Copyright (c) 2014 SRI International
+ * Copyright (c) 2012-2017 Robert N. M. Watson
+ * Copyright (c) 2015 SRI International
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -29,51 +29,38 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/types.h>
-#include <sys/errno.h>
+#ifndef _LIBCHERI_SANDBOX_METADATA_H_
+#define	_LIBCHERI_SANDBOX_METADATA_H_
 
-#include <cheri/cheri.h>
-#include <cheri/cheric.h>
-#include <cheri/libcheri_system.h>
+#if !__has_feature(capabilities)
+#error "This code requires a CHERI-aware compiler"
+#endif
 
-#include <assert.h>
-#include <errno.h>
+/*
+ * This section defines the interface between 'inside' and 'outside' the
+ * sandbox model.
+ */
 
-struct cheri_object _libcheri_system_object;
+/*
+ * Per-sandbox meta-data structure mapped read-only within the sandbox at a
+ * fixed address to allow sandboxed code to find its vtable, heap, return
+ * capabilities, etc.
+ *
+ * NB: This data structure (and its base address) are part of the ABI between
+ * libcheri and programs running in sandboxes.  Only ever append to this,
+ * don't modify the order, lengths, or interpretations of existing fields.  If
+ * this reaches a page in size, then allocation code in sandbox.c will need
+ * updating.  See also sandbox.c and sandboxasm.h.
+ */
+struct sandbox_metadata {
+	register_t	sbm_heapbase;			/* Offset: 0 */
+	register_t	sbm_heaplen;			/* Offset: 8 */
+	uint64_t	_sbm_reserved0;			/* Offset: 16 */
+	uint64_t	_sbm_reserved1;			/* Offset: 24 */
+	struct cheri_object	sbm_system_object;	/* Offset: 32 */
+	__capability vm_offset_t	*sbm_vtable;	/* Cap-offset: 2 */
+	__capability void	*_sbm_reserved2;	/* Cap-offset: 3 */
+	struct cheri_object	 sbm_creturn_object;	/* Cap-offset: 4, 5 */
+};
 
-/* XXX-BD: should be in crt. */
-extern char **environ;
-char **environ;
-extern const char *__progname;
-const char *__progname = "";
-extern register_t _sb_heapbase;
-extern size_t             _sb_heaplen;
-register_t        _sb_heapbase;
-size_t            _sb_heaplen;
-
-static char *heapcap;
-
-void *sbrk(int incr);
-void *
-sbrk(int incr)
-{
-
-	if (heapcap == NULL) {
-		if (_sb_heapbase == 0 || _sb_heaplen == 0)
-			return (NULL);
-		heapcap = cheri_csetbounds(cheri_setoffset(cheri_getdefault(),
-		    _sb_heapbase), _sb_heaplen);
-		assert(heapcap != NULL);
-	}
-
-	if (incr < 0) {
-		if (-incr > (ssize_t)cheri_getoffset(heapcap)) {
-			errno = EINVAL;
-			return (void *)-1;
-		}
-	} else if (incr > (ssize_t)(cheri_getlen(heapcap) - cheri_getoffset(heapcap))) {
-		errno = ENOMEM;
-		return (void *)-1;
-	}
-	return (heapcap += incr);
-}
+#endif /* !_LIBCHERI_SANDBOX_METADATA_H_ */

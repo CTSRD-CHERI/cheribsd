@@ -43,7 +43,7 @@
 # unwrapping it again.  We rely on the compiler and CCall to sort out clearing
 # of registers that require it, since they have the information to do so.
 #
-# Calling conventions into cheri_invoke:
+# Calling conventions into libcheri_invoke:
 #
 # Registers	Description
 # $c0		MIPS address space
@@ -69,8 +69,10 @@
 
 	.text
 	.option pic0
+	.global libcheri_invoke
 	.global cheri_invoke
-	.ent	cheri_invoke
+	.ent	libcheri_invoke
+libcheri_invoke:
 cheri_invoke:
 
 	#
@@ -102,7 +104,7 @@ cheri_invoke:
 	# XXXRW: Possibly with the __ccall calling convention, the compiler
 	# should be doing this?
 	#
-cheri_invoke_save_regs:
+libcheri_invoke_save_regs:
 	cincoffset	$csp, $csp, -96
 	csd	$s0, $zero, 0($csp)
 	csd	$s1, $zero, 8($csp)
@@ -120,7 +122,7 @@ cheri_invoke_save_regs:
 	# Save capability registers we later need to restore (that won't be
 	# handled by CCall for us).
 	#
-cheri_invoke_save_caps:
+libcheri_invoke_save_caps:
 	cgetdefault	$c12
 	cincoffset	$csp, $csp, -11*CHERICAP_SIZE
 	csc	$c17, $zero, 0($csp)
@@ -147,22 +149,22 @@ cheri_invoke_save_caps:
 	# XXXRW: Do we want a CCall variant like CJALR that automatically
 	# builds the desired capability?
 	#
-	dla		$t0, cheri_invoke_ccall_linkaddr
+	dla		$t0, libcheri_invoke_ccall_linkaddr
 	cgetpcc		$c17
 	csetoffset	$c17, $c17, $t0
 
 	#
 	# Invoke object capability.  CCall/CReturn will save and restore $csp.
 	#
-cheri_invoke_ccall:
+libcheri_invoke_ccall:
 	ccall	$c1, $c2, 1
 	nop
-cheri_invoke_ccall_linkaddr:
+libcheri_invoke_ccall_linkaddr:
 
 	#
 	# Restore capability registers from stack.
 	#
-cheri_invoke_restore_caps:
+libcheri_invoke_restore_caps:
 	clc	$c17, $zero, 0($csp)
 	clc	$c18, $zero, CHERICAP_SIZE($csp)
 	clc	$c19, $zero, 2*CHERICAP_SIZE($csp)
@@ -176,8 +178,8 @@ cheri_invoke_restore_caps:
 	clc	$c12, $zero, 10*CHERICAP_SIZE($csp)
 	csetdefault	$c12
 
-cheri_invoke_set_errno:
-	bnez	$a0, set_cheri_errno
+libcheri_invoke_set_errno:
+	bnez	$a0, libcheri_set_errno
 	cincoffset	$csp, $csp, 11*CHERICAP_SIZE	# Branch-delay slot
 
 	#
@@ -190,7 +192,7 @@ cheri_invoke_set_errno:
 	# XXXRW: Possibly with the __ccall calling convention, the compiler
 	# should be doing this?
 	#
-cheri_invoke_restore_regs:
+libcheri_invoke_restore_regs:
 	cld	$s0, $zero, 0($csp)
 	cld	$s1, $zero, 8($csp)
 	cld	$s2, $zero, 16($csp)
@@ -207,43 +209,43 @@ cheri_invoke_restore_regs:
 	#
 	# Return to C-language caller.
 	#
-cheri_invoke_return:
+libcheri_invoke_return:
 	cjr	$c17
 	nop				# Branch-delay slot
 
-set_cheri_errno:
+libcheri_set_errno:
 	#
-	# Get the address of the thread-local cheri_errno variable.
+	# Get the address of the thread-local libcheri_errno variable.
 	#
 #ifdef HAVE_WORKING_TLS
-	lui	$at, %tprel_hi(cheri_errno)
+	lui	$at, %tprel_hi(libcheri_errno)
 	.set	push
 	.set	mips32r2
 	rdhwr	$t0, $29
 	.set	pop
-	daddiu	$at, $at, %tprel_lo(cheri_errno)
+	daddiu	$at, $at, %tprel_lo(libcheri_errno)
 	daddu	$at, $t0, $at
-	b	cheri_invoke_restore_regs
+	b	libcheri_invoke_restore_regs
 	sw	$a0, 0($at)
 
-	.end	cheri_invoke
+	.end	libcheri_invoke
 
 #else
 	#
 	# We currently don't have working TLS inside sandboxes, so set a global.
 	#
-	dla	$a2, cheri_errno
-	b	cheri_invoke_restore_regs
+	dla	$a2, libcheri_errno
+	b	libcheri_invoke_restore_regs
 	csw	$a0, $a2, 0($c0)
-	.end	cheri_invoke
+	.end	libcheri_invoke
 #endif
 
-	.type	cheri_errno,@object      # @cheri_errno
+	.type	libcheri_errno,@object      # @libcheri_errno
 #ifdef HAVE_WORKING_TLS
 	.section	.tbss,"awT",@nobits
 #endif
-	.globl	cheri_errno
+	.globl	libcheri_errno
 	.align	2
-cheri_errno:
+libcheri_errno:
 	.4byte	0
-	.size	cheri_errno, 4
+	.size	libcheri_errno, 4

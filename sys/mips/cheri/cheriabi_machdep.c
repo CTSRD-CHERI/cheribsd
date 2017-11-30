@@ -422,7 +422,7 @@ cheriabi_set_mcontext(struct thread *td, mcontext_c_t *mcp)
 	td->td_md.md_tls_cap =  mcp->mc_tls;
 	tag = cheri_gettag(mcp->mc_tls);
 	if (tag)
-		td->td_md.md_tls = (__cheri_cast void *)mcp->mc_tls; // XXX: __capability?
+		td->td_md.md_tls = (__cheri_fromcap void *)mcp->mc_tls; // XXX: __capability?
 	else
 		td->td_md.md_tls = NULL;
 
@@ -682,7 +682,7 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 * different things.
 	 */
 	regs->pc = (register_t)(intptr_t)catcher;
-	regs->csp = (__cheri_cast void * __capability)(void*)sfp;
+	regs->csp = (__cheri_tocap void * __capability)(void*)sfp;
 	regs->c12 = psp->ps_sigcap[_SIG_IDX(sig)];
 	regs->c17 = td->td_pcb->pcb_cherisignal.csig_sigcode;
 	regs->ddc = csigp->csig_ddc;

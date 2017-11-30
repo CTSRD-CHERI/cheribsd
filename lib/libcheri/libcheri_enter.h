@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 Robert N. M. Watson
+ * Copyright (c) 2014-2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -28,10 +28,15 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _CHERI_ENTER_H_
-#define	_CHERI_ENTER_H_
+#ifndef _LIBCHERI_ENTER_H_
+#define	_LIBCHERI_ENTER_H_
 
-typedef register_t (*cheri_system_user_fn_t)(struct cheri_object system_object,
+#if !__has_feature(capabilities)
+#error "This code requires a CHERI-aware compiler"
+#endif
+
+typedef register_t (*libcheri_system_user_fn_t)(
+	    struct cheri_object system_object,
 	    register_t methodnum,
 	    register_t a0, register_t a1, register_t a2, register_t a3,
 	    register_t a4, register_t a5, register_t a6, register_t a7,
@@ -40,19 +45,19 @@ typedef register_t (*cheri_system_user_fn_t)(struct cheri_object system_object,
 	    __capability void *c7)
 	    __attribute__((cheri_ccall)); /* XXXRW: Will be ccheri_ccallee. */
 
-void	cheri_system_user_register_fn(cheri_system_user_fn_t fn_ptr);
+void	libcheri_system_user_register_fn(libcheri_system_user_fn_t fn_ptr);
 
 /*
  * Location where libcheri system classes can find a suitable return
  * capability to use.
  */
-extern struct cheri_object	__cheri_object_creturn;
+extern struct cheri_object	__libcheri_object_creturn;
 
 /*
  * Method numbers used by the sandbox runtime itself.
  *
  * WARNING: These values must match those currently hard coded in the sandbox
- * C runtime (lib/csu/cheri/crt_sb.S).
+ * C runtime (lib/csu/libcheri/crt_invoke.S and crt_rtld.S).
  *
  * NB: In the future, these should be via a reserved entry point rather than
  * the primary object-capability 'invoke' entry point, so that they can be
@@ -64,4 +69,4 @@ extern struct cheri_object	__cheri_object_creturn;
 #define	CHERI_SYSTEM_USER_BASE		1000
 #define	CHERI_SYSTEM_USER_CEILING	2000
 
-#endif /* !_CHERI_ENTER_H_ */
+#endif /* !_LIBCHERI_ENTER_H_ */

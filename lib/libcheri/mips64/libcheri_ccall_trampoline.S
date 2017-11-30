@@ -35,7 +35,7 @@
 #include <machine/cheriasm.h>
 #include <machine/cherireg.h>
 
-#define	CHERI_ERRNO_ASM
+#define	LIBCHERI_ERRNO_ASM
 #include <cheri/libcheri_errno.h>
 
 /*
@@ -248,12 +248,12 @@ libcheri_ccall_rtld_fetch_stack:
 	 * required -- e.g., once we have dynamically linked pure-capability
 	 * binaries using.
 	 */
-	lui	$at, %tprel_hi(__cheri_stack_tls_storage)
+	lui	$at, %tprel_hi(__libcheri_stack_tls_storage)
 	.set	push
 	.set	mips32r2
 	rdhwr	$t0, $29
 	.set	pop
-	daddiu	$at, $at, %tprel_lo(__cheri_stack_tls_storage)
+	daddiu	$at, $at, %tprel_lo(__libcheri_stack_tls_storage)
 	daddu	$at, $t0, $at
 	clc		$c14, $zero, (5*CHERICAP_SIZE)($c26)
 	csetoffset	$c14, $c14, $at
@@ -394,17 +394,17 @@ libcheri_ccall_rtld_return:
 	nop					# Branch-delay slot
 
 libcheri_ccall_rtld_local_argument:
-	dli	$a0, CHERI_ERRNO_INVOKE_LOCAL_ARG
+	dli	$a0, LIBCHERI_ERRNO_INVOKE_LOCAL_ARG
 	b	libcheri_ccall_rtld_error_return
 	nop
 
 libcheri_ccall_rtld_stack_overflow:
-	dli	$a0, CHERI_ERRNO_INVOKE_OVERFLOW
+	dli	$a0, LIBCHERI_ERRNO_INVOKE_OVERFLOW
 	b	libcheri_ccall_rtld_error_return
 	nop
 
 libcheri_ccall_rtld_sandbox_busy:
-	dli	$a0, CHERI_ERRNO_INVOKE_BUSY
+	dli	$a0, LIBCHERI_ERRNO_INVOKE_BUSY
 	b	libcheri_ccall_rtld_error_return
 	nop
 
@@ -628,12 +628,12 @@ libcheri_ccall_invoke_fetch_stack:
 	 * required -- e.g., once we have dynamically linked pure-capability
 	 * binaries using.
 	 */
-	lui	$at, %tprel_hi(__cheri_stack_tls_storage)
+	lui	$at, %tprel_hi(__libcheri_stack_tls_storage)
 	.set	push
 	.set	mips32r2
 	rdhwr	$t0, $29
 	.set	pop
-	daddiu	$at, $at, %tprel_lo(__cheri_stack_tls_storage)
+	daddiu	$at, $at, %tprel_lo(__libcheri_stack_tls_storage)
 	daddu	$at, $t0, $at
 	clc		$c14, $zero, (5*CHERICAP_SIZE)($c26)
 	csetoffset	$c14, $c14, $at
@@ -774,17 +774,17 @@ libcheri_ccall_invoke_return:
 	nop					# Branch-delay slot
 
 libcheri_ccall_invoke_local_argument:
-	dli	$a0, CHERI_ERRNO_INVOKE_LOCAL_ARG
+	dli	$a0, LIBCHERI_ERRNO_INVOKE_LOCAL_ARG
 	b	libcheri_ccall_invoke_error_return
 	nop
 
 libcheri_ccall_invoke_stack_overflow:
-	dli	$a0, CHERI_ERRNO_INVOKE_OVERFLOW
+	dli	$a0, LIBCHERI_ERRNO_INVOKE_OVERFLOW
 	b	libcheri_ccall_invoke_error_return
 	nop
 
 libcheri_ccall_invoke_sandbox_busy:
-	dli	$a0, CHERI_ERRNO_INVOKE_BUSY
+	dli	$a0, LIBCHERI_ERRNO_INVOKE_BUSY
 	b	libcheri_ccall_invoke_error_return
 	nop
 
@@ -894,12 +894,12 @@ libcheri_creturn_fetch_stack:
 	 *
 	 * XXXRW: Read note above on TLS and testing.
 	 */
-	lui	$at, %tprel_hi(__cheri_stack_tls_storage)
+	lui	$at, %tprel_hi(__libcheri_stack_tls_storage)
 	.set	push
 	.set	mips32r2
 	rdhwr	$t0, $29
 	.set	pop
-	daddiu	$at, $at, %tprel_lo(__cheri_stack_tls_storage)
+	daddiu	$at, $at, %tprel_lo(__libcheri_stack_tls_storage)
 	daddu	$at, $t0, $at
 	csetoffset	$c14, $c26, $at
 
@@ -1029,13 +1029,13 @@ libcheri_creturn_jump:
 	nop					# Branch-delay slot
 
 libcheri_creturn_local_retval:
-	dli	$a0, CHERI_ERRNO_RETURN_LOCAL_RETVAL
+	dli	$a0, LIBCHERI_ERRNO_RETURN_LOCAL_RETVAL
 	b	libcheri_creturn_error_return
 	nop					# Branch-delay slot
 
 libcheri_creturn_stack_underflow:
 	/* XXXRW: What do we want to do here?  Just trap for now. */
-	dli	$a0, CHERI_ERRNO_RETURN_UNDERFLOW
+	dli	$a0, LIBCHERI_ERRNO_RETURN_UNDERFLOW
 	teq	$zero, $zero
 
 libcheri_creturn_error_return:

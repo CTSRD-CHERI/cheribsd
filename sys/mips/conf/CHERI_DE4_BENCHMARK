@@ -13,10 +13,3 @@ include		BERI_DE4_BENCHMARK
 ident		CHERI_DE4_BENCHMARK
 
 include		"std.CHERI"
-
-#options       CPU_CHERI_CHERI0
-#options       CPU_CHERI_CHERI8
-#options       CPU_CHERI_CHERI16
-#options       CPU_CHERI_HW_CCALL_CHECKS
-#options       CPU_CHERI_HW_RCLEAR
-#options       CPU_CHERI_HW_CCLEAR

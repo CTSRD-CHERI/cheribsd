@@ -65,52 +65,53 @@
 register_t
 cheritest_libcheri_userfn_getstack(void)
 {
-	struct cheri_stack cs;
-	struct cheri_stack_frame *csfp;
+	struct libcheri_stack lcs;
+	struct libcheri_stack_frame *lcsfp;
 	u_int stack_depth;
 	int retval;
 
-	retval = cheri_stack_get(&cs);
+	retval = libcheri_stack_get(&lcs);
 	if (retval != 0)
-		cheritest_failure_err("cheri_stack_get() failed");
+		cheritest_failure_err("libcheri_stack_get() failed");
 
 	/* Does stack layout look sensible enough to continue? */
-	if ((cs.cs_tsize % CHERI_FRAME_SIZE) != 0)
+	if ((lcs.lcs_tsize % LIBCHERI_STACKFRAME_SIZE) != 0)
 		cheritest_failure_errx(
 		    "stack size (%ld) not a multiple of frame size",
-		    cs.cs_tsize);
-	stack_depth = cs.cs_tsize / CHERI_FRAME_SIZE;
+		    lcs.lcs_tsize);
+	stack_depth = lcs.lcs_tsize / LIBCHERI_STACKFRAME_SIZE;
 
-	if ((cs.cs_tsp % CHERI_FRAME_SIZE) != 0)
+	if ((lcs.lcs_tsp % LIBCHERI_STACKFRAME_SIZE) != 0)
 		cheritest_failure_errx(
 		    "stack pointer (%ld) not a multiple of frame size",
-		    cs.cs_tsp);
+		    lcs.lcs_tsp);
 
 	/* Validate that two stack frames are found. */
-	if (cs.cs_tsp != cs.cs_tsize - (register_t)(2 * CHERI_FRAME_SIZE))
+	if (lcs.lcs_tsp != lcs.lcs_tsize -
+	    (register_t)(2 * LIBCHERI_STACKFRAME_SIZE))
 		cheritest_failure_errx("stack contains %ld frames; expected "
-		    "2", (cs.cs_tsize - (2 * CHERI_FRAME_SIZE)) /
-		    CHERI_FRAME_SIZE);
+		    "2", (lcs.lcs_tsize - (2 * LIBCHERI_STACKFRAME_SIZE)) /
+		    LIBCHERI_STACKFRAME_SIZE);
 
 	/* Validate that the first is a saved ambient context. */
-	csfp = &cs.cs_frames[stack_depth - 1];
-	if (cheri_getbase(csfp->csf_caller_pcc) !=
+	lcsfp = &lcs.lcs_frames[stack_depth - 1];
+	if (cheri_getbase(lcsfp->lcsf_caller_pcc) !=
 	    cheri_getbase(cheri_getpcc()) ||
-	    cheri_getlen(csfp->csf_caller_pcc) !=
+	    cheri_getlen(lcsfp->lcsf_caller_pcc) !=
 	    cheri_getlen(cheri_getpcc()))
 		cheritest_failure_errx("frame 0: not global code cap");
 
 #ifdef PLEASE_CRASH_THE_COMPILER
 	/* ... and that the callee sandbox is right. */
-	if (csfp->csf_callee_sbop != cheritest_objectp)
+	if (lcsfp->lcsf_callee_sbop != cheritest_objectp)
 		cheritest_failure_errx("frame 1: incorrect callee sandbox");
 #endif
 
 	/* Validate that the second is cheritest_objectp. */
-	csfp = &cs.cs_frames[stack_depth - 2];
-	if ((cheri_getbase(csfp->csf_caller_pcc) != cheri_getbase(
+	lcsfp = &lcs.lcs_frames[stack_depth - 2];
+	if ((cheri_getbase(lcsfp->lcsf_caller_pcc) != cheri_getbase(
 	    cheritest_objectp->sbo_invoke_pcc)) ||
-	    (cheri_getlen(csfp->csf_caller_pcc) != cheri_getlen(
+	    (cheri_getlen(lcsfp->lcsf_caller_pcc) != cheri_getlen(
 	    cheritest_objectp->sbo_invoke_pcc)))
 		cheritest_failure_errx("frame 1: not sandbox code cap");
 	return (0);
@@ -135,64 +136,65 @@ test_sandbox_getstack(const struct cheri_test *ctp __unused)
 register_t
 cheritest_libcheri_userfn_setstack(register_t arg)
 {
-	struct cheri_stack cs;
-	struct cheri_stack_frame *csfp;
+	struct libcheri_stack lcs;
+	struct libcheri_stack_frame *lcsfp;
 	u_int stack_depth;
 	int retval;
 
 	/* Validate stack as retrieved. */
-	retval = cheri_stack_get(&cs);
+	retval = libcheri_stack_get(&lcs);
 	if (retval != 0)
-		cheritest_failure_err("cheri_stack_get() failed");
+		cheritest_failure_err("libcheri_stack_get() failed");
 
 	/* Does stack layout look sensible enough to continue? */
-	if ((cs.cs_tsize % CHERI_FRAME_SIZE) != 0)
+	if ((lcs.lcs_tsize % LIBCHERI_STACKFRAME_SIZE) != 0)
 		cheritest_failure_errx(
 		    "stack size (%ld) not a multiple of frame size",
-		    cs.cs_tsize);
-	stack_depth = cs.cs_tsize / CHERI_FRAME_SIZE;
+		    lcs.lcs_tsize);
+	stack_depth = lcs.lcs_tsize / LIBCHERI_STACKFRAME_SIZE;
 
-	if ((cs.cs_tsp % CHERI_FRAME_SIZE) != 0)
+	if ((lcs.lcs_tsp % LIBCHERI_STACKFRAME_SIZE) != 0)
 		cheritest_failure_errx(
 		    "stack pointer (%ld) not a multiple of frame size",
-		    cs.cs_tsp);
+		    lcs.lcs_tsp);
 
 	/* Validate that two stack frames are found. */
-	if (cs.cs_tsp != cs.cs_tsize - (register_t)(2 * CHERI_FRAME_SIZE))
+	if (lcs.lcs_tsp != lcs.lcs_tsize -
+	    (register_t)(2 * LIBCHERI_STACKFRAME_SIZE))
 		cheritest_failure_errx("stack contains %ld frames; expected "
-		    "2", (cs.cs_tsize - (2 * CHERI_FRAME_SIZE)) /
-		    CHERI_FRAME_SIZE);
+		    "2", (lcs.lcs_tsize - (2 * LIBCHERI_STACKFRAME_SIZE)) /
+		    LIBCHERI_STACKFRAME_SIZE);
 
 	/* Validate that the first is a saved ambient context. */
-	csfp = &cs.cs_frames[stack_depth - 1];
-	if (cheri_getbase(csfp->csf_caller_pcc) !=
+	lcsfp = &lcs.lcs_frames[stack_depth - 1];
+	if (cheri_getbase(lcsfp->lcsf_caller_pcc) !=
 	    cheri_getbase(cheri_getpcc()) ||
-	    cheri_getlen(csfp->csf_caller_pcc) !=
+	    cheri_getlen(lcsfp->lcsf_caller_pcc) !=
 	    cheri_getlen(cheri_getpcc()))
 		cheritest_failure_errx("frame 0: not global code cap");
 
 #ifdef PLEASE_CRASH_THE_COMPILER
 	/* ... and that the callee sandbox is right. */
-	if (csfp->csf_callee_sbop != cheritest_objectp)
+	if (lcsfp->lcsf_callee_sbop != cheritest_objectp)
 		cheritest_failure_errx("frame 1: incorrect callee sandbox");
 #endif
 	/* Validate that the second is cheritest_objectp. */
-	csfp = &cs.cs_frames[stack_depth - 2];
-	if ((cheri_getbase(csfp->csf_caller_pcc) != cheri_getbase(
+	lcsfp = &lcs.lcs_frames[stack_depth - 2];
+	if ((cheri_getbase(lcsfp->lcsf_caller_pcc) != cheri_getbase(
 	    cheritest_objectp->sbo_invoke_pcc)) ||
-	    (cheri_getlen(csfp->csf_caller_pcc) != cheri_getlen(
+	    (cheri_getlen(lcsfp->lcsf_caller_pcc) != cheri_getlen(
 	    cheritest_objectp->sbo_invoke_pcc)))
 		cheritest_failure_errx("frame 1: not sandbox code cap");
 
 	if (arg) {
 		/* Rewrite to remove sandbox frame. */
-		cs.cs_tsp += CHERI_FRAME_SIZE;
+		lcs.lcs_tsp += LIBCHERI_STACKFRAME_SIZE;
 	}
 
 	/* Update kernel view of trusted stack. */
-	retval = cheri_stack_set(&cs);
+	retval = libcheri_stack_set(&lcs);
 	if (retval != 0)
-		cheritest_failure_err("cheri_stack_set() failed");
+		cheritest_failure_err("libcheri_stack_set() failed");
 
 	/* Leave behind a distinctive value we can test for. */
 	return (CHERITEST_SETSTACK_CONSTANT);
@@ -247,7 +249,7 @@ test_sandbox_trustedstack_underflow(const struct cheri_test *ctp __unused)
 	__capability void *codecap asm ("$c1");
 	__capability void *datacap asm ("$c2");
 
-	returncap = cheri_make_sealed_return_object();
+	returncap = libcheri_make_sealed_return_object();
 	codecap = returncap.co_codecap;
 	datacap = returncap.co_datacap;
 	__asm__ __volatile__ ("ccall $c1, $c2, 1;" "nop" : : "C"(codecap),

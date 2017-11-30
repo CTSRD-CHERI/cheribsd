@@ -28,8 +28,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _CHERI_CLASS_H_
-#define	_CHERI_CLASS_H_
+#ifndef _LIBCHERI_CLASS_H_
+#define	_LIBCHERI_CLASS_H_
 
 /*
  * Fields to insert at the front of the 'sandbox_object' data structure that
@@ -68,4 +68,4 @@
 	free_c((sbop)->__sandbox_vtable);				\
 	(sbop)->__sandbox_vtable = NULL
 
-#endif /* _CHERI_CLASS_H_ */
+#endif /* _LIBCHERI_CLASS_H_ */

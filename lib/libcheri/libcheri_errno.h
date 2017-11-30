@@ -28,30 +28,30 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _CHERI_ERRNO_H_
-#define	_CHERI_ERRNO_H_
+#ifndef _LIBCHERI_ERRNO_H_
+#define	_LIBCHERI_ERRNO_H_
 
-#ifndef CHERI_ERRNO_ASM
+#ifndef LIBCHERI_ERRNO_ASM
 /*
- * The CHERI error number variable.  If an error occurs during rtld entry,
+ * The libcheri error number variable.  If an error occurs during rtld entry,
  * invocation, or return, then this will be set to indicate the error.  On
  * success, then invocation/return leave this value unmodified.
  *
- * NB: C-language definitions are masked when including cheri_errno.h in the
- * domain-transition trampoline assembly.
+ * NB: C-language definitions are masked when including libcheri_errno.h in
+ * the domain-transition trampoline assembly.
  */
-extern _Thread_local int	cheri_errno;
+extern _Thread_local int	libcheri_errno;
 #endif
 
 /*
  * These values may be returned from the rtld, invocation, and return
- * trampolines via cheri_errno.
+ * trampolines via libcheri_errno.
  */
-#define	CHERI_ERRNO_INVOKE_LOCAL_ARG	1	/* Local capability passed. */
-#define	CHERI_ERRNO_INVOKE_OVERFLOW	2	/* Trusted-stack overflow. */
-#define	CHERI_ERRNO_INVOKE_BUSY		3	/* Sandbox object is in use. */
+#define	LIBCHERI_ERRNO_INVOKE_LOCAL_ARG	1	/* Local capability passed. */
+#define	LIBCHERI_ERRNO_INVOKE_OVERFLOW	2	/* Trusted-stack overflow. */
+#define	LIBCHERI_ERRNO_INVOKE_BUSY	3	/* Sandbox object is in use. */
 
-#define	CHERI_ERRNO_RETURN_LOCAL_RETVAL	80	/* Local capability returned. */
-#define	CHERI_ERRNO_RETURN_UNDERFLOW	81	/* Trusted-stack underflow. */
+#define	LIBCHERI_ERRNO_RETURN_LOCAL_RETVAL	80 /* Local capability returned. */
+#define	LIBCHERI_ERRNO_RETURN_UNDERFLOW	81	/* Trusted-stack underflow. */
 
-#endif /* _CHERI_ERRNO_H_ */
+#endif /* _LIBCHERI_ERRNO_H_ */

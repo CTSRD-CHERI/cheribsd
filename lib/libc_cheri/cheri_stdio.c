@@ -51,7 +51,7 @@ __swbuf(int c, FILE *stream)
 	if (stream != stdout)
 		return(EOF);
 
-	return(cheri_system_putchar(c));
+	return(libcheri_system_putchar(c));
 }
 
 int
@@ -63,7 +63,7 @@ fputs(const char *str, FILE *stream)
 		return (EOF);
 	}
 
-	return (cheri_system_puts(cheri_ptr(str, strlen(str) + 1)));
+	return (libcheri_system_puts(cheri_ptr(str, strlen(str) + 1)));
 }
 
 size_t
@@ -76,7 +76,7 @@ fwrite(const void * restrict ptr, size_t size,
 		return (0);
 
 	for (i = 0; i < size * nitems; i++)
-		(void)cheri_system_putchar(((const char *)ptr)[i]);
+		(void)libcheri_system_putchar(((const char *)ptr)[i]);
 
 	return (nitems);
 }
@@ -86,7 +86,7 @@ fputc(int c, FILE *stream)
 {
 
 	if (stream == stdout)
-		return(cheri_system_putchar(c));
+		return(libcheri_system_putchar(c));
 	else
 		return (EOF);
 }
@@ -186,7 +186,7 @@ putc(int c, FILE *stream)
 {
 
 	if (stream == stdout)
-		return(cheri_system_putchar(c));
+		return(libcheri_system_putchar(c));
 	else
 		return (EOF);
 }

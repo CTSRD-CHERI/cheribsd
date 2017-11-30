@@ -45,7 +45,11 @@
 # are not global, and that there is no path to invoke().
 #
 
-	.text
+# XXXAR: LLD linker script output section assignment appears to be broken
+# right now. It just assigns the input section name to the output section.
+# To work around this we just give it the name of the output section that we want
+# 	.text
+	.section rtld_vector_text,"ax",@progbits
 	.option pic0
 	.global __rtld_vector
 	.type __rtld_vector,@function
@@ -127,12 +131,12 @@ constructors:
 
 	# Code capability
 	clc	$c12, $t0, 32($c26)
-	dla	$t2, _cheri_system_object;
+	dla	$t2, _libcheri_system_object;
 	csc	$c12, $t2, 0($c26)
 
 	# Data capability
 	clc	$c12, $t0, 32+CHERICAP_SIZE($c26)
-	dla	$t2, _cheri_system_object;
+	dla	$t2, _libcheri_system_object;
 	csc	$c12, $t2, CHERICAP_SIZE($c26)
 
 	#

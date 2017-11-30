@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2013 Robert N. M. Watson
+ * Copyright (c) 2013, 2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -28,17 +28,18 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _SANDBOXASM_H_
-#define	_SANDBOXASM_H_
+#ifndef _LIBCHERI_SANDBOXASM_H_
+#define	_LIBCHERI_SANDBOXASM_H_
 
 /*
  * Per-sandbox meta-data structure mapped read-only within the sandbox at a
  * fixed address to allow sandboxed code to find its stack, heap, etc.
  *
- * The base address must match libcheri's sandbox.c as well as the linker
- * scripts used to statically link sandboxed code.  The offsets must match
- * struct sandbox_metadata in sandbox.h.  See the comment there for good
- * reasons not to change these definitions if you can avoid it.
+ * The base address must match libcheri's libcheri_sandbox.c as well as the
+ * linker scripts used to statically link sandboxed code.  The offsets must
+ * match struct sandbox_metadata in libcheri_sandbox_metadata.h.  See the
+ * comment there for good reasons not to change these definitions if you can
+ * avoid it.
  *
  * XXXRW: For reasons I don't understand, and should learn about, I can't get
  * this to usefully include in .S files.  But that is the actual goal -- they
@@ -57,4 +58,4 @@
 #define	SANDBOX_RTLD_VECTOR	(SANDBOX_BINARY_BASE + SANDBOX_VECTOR_SIZE * 0)
 #define	SANDBOX_INVOKE_VECTOR	(SANDBOX_BINARY_BASE + SANDBOX_VECTOR_SIZE * 1)
 
-#endif /* !_SANDBOXASM_H_ */
+#endif /* !_LIBCHERI_SANDBOXASM_H_ */

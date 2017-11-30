@@ -111,14 +111,14 @@ test_string_memcpy_c(const struct cheri_test *ctp __unused)
 	/* Simple case: aligned start and end */
 	invalidate(&t2);
 	cpy = memcpy_c(CAP(&t2), CAP(&t1), sizeof(t1));
-	if ((__cheri_cast void *)cpy != &t2)
+	if ((__cheri_fromcap void *)cpy != &t2)
 		cheritest_failure_errx("memcpy_c did not return dst (&t2)");
 	check(&t2, 0, 32);
 
 	/* Test that it still works with an unaligned start... */
 	invalidate(&t2);
 	cpy = memcpy_c(CAP(&t2.pad0[3]), CAP(&t1.pad0[3]), sizeof(t1) - 3);
-	if ((__cheri_cast void*)cpy != &t2.pad0[3])
+	if ((__cheri_fromcap void*)cpy != &t2.pad0[3])
 		cheritest_failure_errx("memcpy_c did not return dst "
 		    "(&t2.pad0[3])");
 	check(&t2, 3, 32);
@@ -126,14 +126,14 @@ test_string_memcpy_c(const struct cheri_test *ctp __unused)
 	/* ...or and unaligned end... */
 	invalidate(&t2);
 	cpy = memcpy_c(CAP(&t2), CAP(&t1), sizeof(t1) - 3);
-	if ((__cheri_cast void *)cpy != &t2)
+	if ((__cheri_fromcap void *)cpy != &t2)
 		cheritest_failure_errx("memcpy_c did not return dst (&t2)");
 	check(&t2, 0, 29);
 
 	/* ...or both... */
 	invalidate(&t2);
 	cpy = memcpy_c(CAP(&t2.pad0[3]), CAP(&t1.pad0[3]), sizeof(t1) - 6);
-	if ((__cheri_cast void*)cpy != &t2.pad0[3])
+	if ((__cheri_fromcap void*)cpy != &t2.pad0[3])
 		cheritest_failure_errx("memcpy_c did not return dst "
 		    "(&t2.pad0[3])");
 	check(&t2, 3, 29);
@@ -141,7 +141,7 @@ test_string_memcpy_c(const struct cheri_test *ctp __unused)
 	/* ...and case where the alignment is different for both... */
 	invalidate(&t2);
 	cpy = memcpy_c(CAP(&t2), CAP(&t1.pad0[1]), sizeof(t1) - 1);
-	if ((__cheri_cast void*)cpy != &t2)
+	if ((__cheri_fromcap void*)cpy != &t2)
 		cheritest_failure_errx("memcpy_c did not return dst (&t2)");
 	/* This should have invalidated the capability */
 	if (cheri_gettag(t2.y) != 0)
@@ -165,7 +165,7 @@ test_string_memcpy_c(const struct cheri_test *ctp __unused)
 	    __builtin_mips_cheri_cap_offset_increment(CAP(&t2), 3),
 	    __builtin_mips_cheri_cap_offset_increment(CAP(&t1), 3),
 	    sizeof(t1)-6);
-	if ((__cheri_cast void*)cpy != &t2.pad0[3])
+	if ((__cheri_fromcap void*)cpy != &t2.pad0[3])
 		cheritest_failure_errx("memcpy_c did not return dst "
 		    "(&t2.pad0[3])");
 	check(&t2, 3, 29);
@@ -179,7 +179,7 @@ test_string_memcpy_c(const struct cheri_test *ctp __unused)
 	    __builtin_mips_cheri_cap_offset_increment(CAP(t2.pad0-1), 1),
 	    __builtin_mips_cheri_cap_offset_increment(CAP(t1.pad0-1), 1),
 	    sizeof(t1));
-	if ((__cheri_cast void*)cpy != &t2.pad0)
+	if ((__cheri_fromcap void*)cpy != &t2.pad0)
 		cheritest_failure_errx("(void*)cpy != &t2.pad0");
 	check(&t2, 0, 32);
 
@@ -189,7 +189,7 @@ test_string_memcpy_c(const struct cheri_test *ctp __unused)
 	    __builtin_mips_cheri_cap_offset_increment(CAP(t2.pad0-1), 32),
 	    __builtin_mips_cheri_cap_offset_increment(CAP(t1.pad0-1), 32),
 	    sizeof(t1) - 31);
-	if ((__cheri_cast void*)cpy != t2.pad0+31)
+	if ((__cheri_fromcap void*)cpy != t2.pad0+31)
 		cheritest_failure_errx("(void*)cpy != t2.pad0+31");
 	check(&t2, 31, 32);
 
@@ -274,14 +274,14 @@ test_string_memmove_c(const struct cheri_test *ctp __unused)
 	/* Simple case: aligned start and end */
 	invalidate(&t2);
 	cpy = memmove_c(CAP(&t2), CAP(&t1), sizeof(t1));
-	if ((__cheri_cast void *)cpy != &t2)
+	if ((__cheri_fromcap void *)cpy != &t2)
 		cheritest_failure_errx("memmove_c did not return dst (&t2)");
 	check(&t2, 0, 32);
 
 	/* Test that it still works with an unaligned start... */
 	invalidate(&t2);
 	cpy = memmove_c(CAP(&t2.pad0[3]), CAP(&t1.pad0[3]), sizeof(t1) - 3);
-	if ((__cheri_cast void*)cpy != &t2.pad0[3])
+	if ((__cheri_fromcap void*)cpy != &t2.pad0[3])
 		cheritest_failure_errx("memmove_c did not return dst "
 		    "(&t2.pad0[3])");
 	check(&t2, 3, 32);
@@ -289,14 +289,14 @@ test_string_memmove_c(const struct cheri_test *ctp __unused)
 	/* ...or and unaligned end... */
 	invalidate(&t2);
 	cpy = memmove_c(CAP(&t2), CAP(&t1), sizeof(t1) - 3);
-	if ((__cheri_cast void *)cpy != &t2)
+	if ((__cheri_fromcap void *)cpy != &t2)
 		cheritest_failure_errx("memmove_c did not return dst (&t2)");
 	check(&t2, 0, 29);
 
 	/* ...or both... */
 	invalidate(&t2);
 	cpy = memmove_c(CAP(&t2.pad0[3]), CAP(&t1.pad0[3]), sizeof(t1) - 6);
-	if ((__cheri_cast void*)cpy != &t2.pad0[3])
+	if ((__cheri_fromcap void*)cpy != &t2.pad0[3])
 		cheritest_failure_errx("memmove_c did not return dst "
 		    "(&t2.pad0[3])");
 	check(&t2, 3, 29);
@@ -304,7 +304,7 @@ test_string_memmove_c(const struct cheri_test *ctp __unused)
 	/* ...and case where the alignment is different for both... */
 	invalidate(&t2);
 	cpy = memmove_c(CAP(&t2), CAP(&t1.pad0[1]), sizeof(t1) - 1);
-	if ((__cheri_cast void*)cpy != &t2)
+	if ((__cheri_fromcap void*)cpy != &t2)
 		cheritest_failure_errx("memmove_c did not return dst (&t2)");
 	/* This should have invalidated the capability */
 	if (cheri_gettag(t2.y) != 0)
@@ -328,7 +328,7 @@ test_string_memmove_c(const struct cheri_test *ctp __unused)
 	    __builtin_mips_cheri_cap_offset_increment(CAP(&t2), 3),
 	    __builtin_mips_cheri_cap_offset_increment(CAP(&t1), 3),
 	    sizeof(t1)-6);
-	if ((__cheri_cast void*)cpy != &t2.pad0[3])
+	if ((__cheri_fromcap void*)cpy != &t2.pad0[3])
 		cheritest_failure_errx("memmove_c did not return dst "
 		    "(&t2.pad0[3])");
 	check(&t2, 3, 29);
@@ -339,7 +339,7 @@ test_string_memmove_c(const struct cheri_test *ctp __unused)
 	    __builtin_mips_cheri_cap_offset_increment(CAP(t2.pad0-1), 1),
 	    __builtin_mips_cheri_cap_offset_increment(CAP(t1.pad0-1), 1),
 	    sizeof(t1));
-	if ((__cheri_cast void*)cpy != &t2.pad0)
+	if ((__cheri_fromcap void*)cpy != &t2.pad0)
 		cheritest_failure_errx("(void*)cpy != &t2.pad0");
 	check(&t2, 0, 32);
 
@@ -349,7 +349,7 @@ test_string_memmove_c(const struct cheri_test *ctp __unused)
 	    __builtin_mips_cheri_cap_offset_increment(CAP(t2.pad0-1), 32),
 	    __builtin_mips_cheri_cap_offset_increment(CAP(t1.pad0-1), 32),
 	    sizeof(t1) - 31);
-	if ((__cheri_cast void*)cpy != t2.pad0+31)
+	if ((__cheri_fromcap void*)cpy != t2.pad0+31)
 		cheritest_failure_errx("(void*)cpy != t2.pad0+31");
 	check(&t2, 31, 32);
 

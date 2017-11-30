@@ -261,7 +261,7 @@ WARNS?= 2
 
 NO_WERROR=	yes
 
-CLEANFILES=	cheri_invoke.o
+CLEANFILES=	libcheri_invoke.o
 
 LIBC_DIR=${.CURDIR}/../libc
 LIBCHERI_DIR=${.CURDIR}/../libcheri

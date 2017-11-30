@@ -28,8 +28,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _CHERI_SYSTEM_MD_H_
-#define	_CHERI_SYSTEM_MD_H_
+#ifndef _LIBCHERI_SYSTEM_MD_H_
+#define	_LIBCHERI_SYSTEM_MD_H_
 
 /* XXXRW: Needed temporarily for CHERI_ASM_CMOVE(). */
 #define	_CHERI_INTERNAL
@@ -72,13 +72,13 @@
 
 #ifdef __CHERI_PURE_CAPABILITY__
 
-#define	CHERI_CLASS_ASM(class)						\
+#define	LIBCHERI_CLASS_ASM(class)					\
 	.text;								\
 	.option pic0;							\
-	.global __cheri_ ## class ## _entry;				\
-	.type __cheri_ ## class ## _entry,@function;			\
-	.ent __cheri_ ## class ## _entry;				\
-__cheri_ ## class ## _entry:						\
+	.global __libcheri_ ## class ## _entry;				\
+	.type __libcheri_ ## class ## _entry,@function;			\
+	.ent __libcheri_ ## class ## _entry;				\
+__libcheri_ ## class ## _entry:						\
 									\
 	/*								\
 	 * Load sandbox object's DDC via IDC.				\
@@ -91,7 +91,7 @@ __cheri_ ## class ## _entry:						\
 	 * support recursion or concurrency.  Further note: this is	\
 	 * shared by all classes outside of the sandbox.		\
 	 */								\
-	dla	$t0, __cheri_enter_stack_csp;				\
+	dla	$t0, __libcheri_enter_stack_csp;			\
 	clc	$csp, $t0, 0($c12);					\
 									\
 	/*								\
@@ -115,28 +115,28 @@ __cheri_ ## class ## _entry:						\
 0:									\
 	/*								\
 	 * Return to caller - load creturn capability from		\
-	 * __cheri_object_creturn into $c1, $c2, and then ccall.	\
+	 * __libcheri_object_creturn into $c1, $c2, and then ccall.	\
 	 */								\
-	dla	$t0, __cheri_object_creturn;				\
+	dla	$t0, __libcheri_object_creturn;				\
 	cgetdefault	$c2;						\
 	clc	$c1, $t0, 0($c2);					\
 	clc	$c2, $t0, CHERICAP_SIZE($c2);				\
 	ccall	$c1, $c2, 1;						\
 	nop;								\
 									\
-$__cheri_ ## class ## _entry_end:					\
-	.end __cheri_## class ## _entry;				\
-	.size __cheri_ ## class ## _entry,$__cheri_ ## class ## _entry_end - __cheri_ ## class ## _entry
+$__libcheri_ ## class ## _entry_end:					\
+	.end __libcheri_## class ## _entry;				\
+	.size __libcheri_ ## class ## _entry,$__libcheri_ ## class ## _entry_end - __libcheri_ ## class ## _entry
 
 #else /* !__CHERI_PURE_CAPABILITY__ */
 
-#define	CHERI_CLASS_ASM(class)						\
+#define	LIBCHERI_CLASS_ASM(class)					\
 	.text;								\
 	.option pic0;							\
-	.global __cheri_ ## class ## _entry;				\
-	.type __cheri_ ## class ## _entry,@function;			\
-	.ent __cheri_ ## class ## _entry;				\
-__cheri_ ## class ## _entry:						\
+	.global __libcheri_ ## class ## _entry;				\
+	.type __libcheri_ ## class ## _entry,@function;			\
+	.ent __libcheri_ ## class ## _entry;				\
+__libcheri_ ## class ## _entry:						\
 									\
 	/*								\
 	 * Load sandbox object's DDC via IDC.				\
@@ -149,9 +149,9 @@ __cheri_ ## class ## _entry:						\
 	 * support recursion or concurrency.  Further note: this is	\
 	 * shared by all classes outside of the sandbox.		\
 	 */								\
-	dla	$sp, __cheri_enter_stack_cap;				\
+	dla	$sp, __libcheri_enter_stack_cap;				\
 	clc	$c11, $sp, 0($c12);					\
-	dla	$sp, __cheri_enter_stack_sp;				\
+	dla	$sp, __libcheri_enter_stack_sp;				\
 	cld	$sp, $sp, 0($c12);					\
 	move	$fp, $sp;						\
 									\
@@ -178,23 +178,23 @@ __cheri_ ## class ## _entry:						\
 	 * Return to caller - load creturn capability from		\
 	 * __cheri_object_creturn into $c1, $c2, and then ccall.	\
 	 */								\
-	dla	$t0, __cheri_object_creturn;				\
+	dla	$t0, __libcheri_object_creturn;				\
 	cgetdefault	$c2;						\
 	clc	$c1, $t0, 0($c2);					\
 	clc	$c2, $t0, CHERICAP_SIZE($c2);				\
 	ccall	$c1, $c2, 1;						\
 	nop;								\
 									\
-$__cheri_ ## class ## _entry_end:					\
-	.end __cheri_## class ## _entry;				\
-	.size __cheri_ ## class ## _entry,$__cheri_ ## class ## _entry_end - __cheri_ ## class ## _entry
+$__libcheri_ ## class ## _entry_end:					\
+	.end __libcheri_## class ## _entry;				\
+	.size __libcheri_ ## class ## _entry,$__libcheri_ ## class ## _entry_end - __libcheri_ ## class ## _entry
 
 #endif /* !__CHERI_PURE_CAPABILITY__ */
 
-#define	CHERI_CLASS_DECL(class)						\
-	extern void (__cheri_## class ## _entry)(void);
+#define	LIBCHERI_CLASS_DECL(class)					\
+	extern void (__libcheri_## class ## _entry)(void);
 
-#define	CHERI_CLASS_ENTRY(class)					\
-	(__cheri_## class ## _entry)
+#define	LIBCHERI_CLASS_ENTRY(class)					\
+	(__libcheri_## class ## _entry)
 
-#endif /* _CHERI_SYSTEM_MD_H_ */
+#endif /* _LIBCHERI_SYSTEM_MD_H_ */

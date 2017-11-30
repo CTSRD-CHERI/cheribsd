@@ -119,7 +119,7 @@ cheri_ptr(const void *ptr, size_t len)
 {
 
 	/* Assume CFromPtr without base set, availability of CSetBounds. */
-	return (cheri_csetbounds((__cheri_cast const void * __capability)ptr, len));
+	return (cheri_csetbounds((__cheri_tocap const void * __capability)ptr, len));
 }
 
 static __inline void * __capability
@@ -192,7 +192,7 @@ cheri_bytes_remaining(const void * __capability cap)
 	typedef __typeof__(*(cap)) __underlying_type;			\
 	__underlying_type* __result = 0;				\
 	if (cheri_bytes_remaining(cap) >= (uint64_t)min_size) {		\
-		__result = (__cheri_cast __underlying_type*)(cap);	\
+		__result = (__cheri_fromcap __underlying_type*)(cap);	\
 	} __result; })
 
 /*

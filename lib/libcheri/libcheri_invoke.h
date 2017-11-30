@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2013-2015 Robert N. M. Watson
+ * Copyright (c) 2013-2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -28,13 +28,16 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _CHERI_INVOKE_H_
-#define	_CHERI_INVOKE_H_
+#ifndef _LIBCHERI_INVOKE_H_
+#define	_LIBCHERI_INVOKE_H_
+
+#if !__has_feature(capabilities)
+#error "This code requires a CHERI-aware compiler"
+#endif
 
 #define CHERI_INVOKE_METHOD_LEGACY_INVOKE	-1
 
-#if __has_feature(capabilities)
-register_t	cheri_invoke(struct cheri_object co, register_t v0,
+register_t	libcheri_invoke(struct cheri_object co, register_t v0,
 		    register_t a0, register_t a1, register_t a2,
 		    register_t a3, register_t a4, register_t a5,
 		    register_t a6, register_t a7, __capability void *c3,
@@ -42,6 +45,5 @@ register_t	cheri_invoke(struct cheri_object co, register_t v0,
 		    __capability void *c6, __capability void *c7,
 		    __capability void *c8, __capability void *c9,
 		    __capability void *c10) __attribute__((cheri_ccall));
-#endif
 
-#endif /* !_CHERI_INVOKE_H_ */
+#endif /* !_LIBCHERI_INVOKE_H_ */

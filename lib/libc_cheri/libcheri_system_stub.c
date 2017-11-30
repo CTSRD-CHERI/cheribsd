@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 Robert N. M. Watson
+ * Copyright (c) 2014-2017 Robert N. M. Watson
  * Copyright (c) 2014 SRI International
  * All rights reserved.
  *
@@ -35,4 +35,4 @@
 #include <cheri/cheric.h>
 #include <libcheri_system.h>
 
-struct cheri_object _cheri_system_object;
+struct cheri_object _libcheri_system_object;

@@ -28,33 +28,37 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _CHERI_FD_H_
-#define	_CHERI_FD_H_
+#ifndef _LIBCHERI_FD_H_
+#define	_LIBCHERI_FD_H_
 
-extern __capability vm_offset_t *cheri_fd_vtable;
+#if !__has_feature(capabilities)
+#error "This code requires a CHERI-aware compiler"
+#endif
 
-extern struct cheri_object	cheri_fd;
-#ifdef CHERI_FD_INTERNAL
-#define CHERI_FD_CCALL					\
+extern __capability vm_offset_t *libcheri_fd_vtable;
+
+extern struct cheri_object	libcheri_fd;
+#ifdef LIBCHERI_FD_INTERNAL
+#define LIBCHERI_FD_CCALL				\
     __attribute__((cheri_ccallee))			\
     __attribute__((cheri_method_suffix("_c")))		\
-    __attribute__((cheri_method_class(cheri_fd)))
+    __attribute__((cheri_method_class(libcheri_fd)))
 #else
-#define CHERI_FD_CCALL					\
+#define LIBCHERI_FD_CCALL				\
     __attribute__((cheri_ccall))			\
     __attribute__((cheri_method_suffix("_c")))		\
-    __attribute__((cheri_method_class(cheri_fd)))
+    __attribute__((cheri_method_class(libcheri_fd)))
 #endif
 
 
 /*
- * Interfaces to create/revoke/destroy cheri_fd objects with ambient
+ * Interfaces to create/revoke/destroy libcheri_fd objects with ambient
  * authority.
  */
 struct sandbox_object;
-int	cheri_fd_new(int fd, struct sandbox_object **sbopp);
-void	cheri_fd_revoke(struct sandbox_object *sbop);
-void	cheri_fd_destroy(struct sandbox_object *sbop);
+int	libcheri_fd_new(int fd, struct sandbox_object **sbopp);
+void	libcheri_fd_revoke(struct sandbox_object *sbop);
+void	libcheri_fd_destroy(struct sandbox_object *sbop);
 
 /*
  * All methods return the following structure, which fits in register return
@@ -63,25 +67,25 @@ void	cheri_fd_destroy(struct sandbox_object *sbop);
  * if retval0 == -1.  This is near-identical to the semantics of the kernel's
  * td_retval[0,1].
  */
-struct cheri_fd_ret {
-	register_t	cfr_retval0;	/* Actual return value. */
-	register_t	cfr_retval1;	/* errno if cfr_retval0 == -1. */
+struct libcheri_fd_ret {
+	register_t	lcfr_retval0;	/* Actual return value. */
+	register_t	lcfr_retval1;	/* errno if lcfr_retval0 == -1. */
 };
 
 /*
- * Methods that can be invoked on cheri_fd objects regardless of ambient
+ * Methods that can be invoked on libcheri_fd objects regardless of ambient
  * authority.
  */
 struct stat;
-CHERI_FD_CCALL
-struct cheri_fd_ret	cheri_fd_fstat(__capability struct stat *sb_c);
-CHERI_FD_CCALL
-struct cheri_fd_ret	cheri_fd_lseek(off_t offset, int whence);
-CHERI_FD_CCALL
-struct cheri_fd_ret	cheri_fd_read(__capability void *buf_c,
+LIBCHERI_FD_CCALL
+struct libcheri_fd_ret	libcheri_fd_fstat(__capability struct stat *sb_c);
+LIBCHERI_FD_CCALL
+struct libcheri_fd_ret	libcheri_fd_lseek(off_t offset, int whence);
+LIBCHERI_FD_CCALL
+struct libcheri_fd_ret	libcheri_fd_read(__capability void *buf_c,
 			     size_t nbytes);
-CHERI_FD_CCALL
-struct cheri_fd_ret	cheri_fd_write(__capability const void *buf_c,
+LIBCHERI_FD_CCALL
+struct libcheri_fd_ret	libcheri_fd_write(__capability const void *buf_c,
 			     size_t nbytes);
 
-#endif /* !_CHERI_FD_H_ */
+#endif /* !_LIBCHERI_FD_H_ */

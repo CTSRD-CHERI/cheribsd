@@ -73,23 +73,23 @@ extern void	libcheri_creturn_vector;
  * Sealing capabilities used to seal invocation, rtld, and creturn
  * capabilities.
  */
-static __capability void	*cheri_ccall_invoke_type;
-static __capability void	*cheri_ccall_rtld_type;
-static __capability void	*cheri_creturn_type;
+static __capability void	*libcheri_ccall_invoke_type;
+static __capability void	*libcheri_ccall_rtld_type;
+static __capability void	*libcheri_creturn_type;
 
 /*
  * Sealed capabilities shared across all sandbox objects: code for invocation
  * and rtld; code and data for creturn.
  */
-static __capability void	*cheri_ccall_invoke_sealed_code;
-static __capability void	*cheri_ccall_rtld_sealed_code;
-static struct cheri_object	 cheri_creturn_object;
+static __capability void	*libcheri_ccall_invoke_sealed_code;
+static __capability void	*libcheri_ccall_rtld_sealed_code;
+static struct cheri_object	 libcheri_creturn_object;
 
 static
 #if _MIPS_SZCAP == 128
 __attribute__ ((aligned(4096)))
 #endif
-__capability void	*cheri_creturn_data;
+__capability void	*libcheri_creturn_data;
 
 /*
  * One-time initialisation of libcheri on startup: (1) Initialise sealing
@@ -97,7 +97,7 @@ __capability void	*cheri_creturn_data;
  * capabilities where the values will be shared across many sandboxes.
  */
 void
-cheri_ccall_init(void)
+libcheri_ccall_init(void)
 {
 	__capability void *cap;
 
@@ -105,24 +105,25 @@ cheri_ccall_init(void)
 	 * Initialise sealing capabilities for invocation, rtld, and creturn,
 	 *
 	 */
-	cheri_ccall_invoke_type = cheri_type_alloc();
-	cheri_ccall_rtld_type = cheri_type_alloc();
-	cheri_creturn_type = cheri_type_alloc();
+	libcheri_ccall_invoke_type = libcheri_type_alloc();
+	libcheri_ccall_rtld_type = libcheri_type_alloc();
+	libcheri_creturn_type = libcheri_type_alloc();
 
 	/*
 	 * Pointer to the invocation vector.
 	 */
 	cap = cheri_getpcc();
 	cap = cheri_setoffset(cap, (vaddr_t)&libcheri_ccall_invoke_vector);
-	cheri_ccall_invoke_sealed_code = cheri_seal(cap,
-	    cheri_ccall_invoke_type);
+	libcheri_ccall_invoke_sealed_code = cheri_seal(cap,
+	    libcheri_ccall_invoke_type);
 
 	/*
 	 * Pointer to the rtld vector.
 	 */
 	cap = cheri_getpcc();
 	cap = cheri_setoffset(cap, (vaddr_t)&libcheri_ccall_rtld_vector);
-	cheri_ccall_rtld_sealed_code = cheri_seal(cap, cheri_ccall_rtld_type);
+	libcheri_ccall_rtld_sealed_code =
+	    cheri_seal(cap, libcheri_ccall_rtld_type);
 
 	/*
 	 * Pointer to the creturn vector, with global bounds in order to
@@ -133,51 +134,53 @@ cheri_ccall_init(void)
 	 */
 	cap = cheri_getpcc();
 	cap = cheri_setoffset(cap, (vaddr_t)&libcheri_creturn_vector);
-	cheri_creturn_object.co_codecap = cheri_seal(cap, cheri_creturn_type);
+	libcheri_creturn_object.co_codecap =
+	    cheri_seal(cap, libcheri_creturn_type);
 
 	cap = cheri_getdefault();
-	cap = cheri_setoffset(cap, (vaddr_t)&cheri_creturn_data);
-	cheri_creturn_object.co_datacap = cheri_seal(cap, cheri_creturn_type);
+	cap = cheri_setoffset(cap, (vaddr_t)&libcheri_creturn_data);
+	libcheri_creturn_object.co_datacap =
+	    cheri_seal(cap, libcheri_creturn_type);
 }
 
 /*
  * Return various sealed capabilities for a sandbox object instance.
  */
 struct cheri_object
-cheri_sandbox_make_sealed_invoke_object(
+libcheri_sandbox_make_sealed_invoke_object(
     __capability struct sandbox_object *sbop)
 {
 	struct cheri_object co;
 
-	co.co_codecap = cheri_ccall_invoke_sealed_code;
+	co.co_codecap = libcheri_ccall_invoke_sealed_code;
 
 	/*
 	 * Pointer to sandbox description; struct sandbox_object must itself
 	 * provide indirect access to a suitable DDC (etc) for the trampoline.
 	 */
-	co.co_datacap = cheri_seal(sbop, cheri_ccall_invoke_type);
+	co.co_datacap = cheri_seal(sbop, libcheri_ccall_invoke_type);
 	return (co);
 }
 
 struct cheri_object
-cheri_sandbox_make_sealed_rtld_object(
+libcheri_sandbox_make_sealed_rtld_object(
     __capability struct sandbox_object *sbop)
 {
 	struct cheri_object co;
 
-	co.co_codecap = cheri_ccall_rtld_sealed_code;
+	co.co_codecap = libcheri_ccall_rtld_sealed_code;
 
 	/*
 	 * Pointer to sandbox description; struct sandbox_object must itself
 	 * provide indirect access to a suitable DDC (etc) for the trampoline.
 	 */
-	co.co_datacap = cheri_seal(sbop, cheri_ccall_rtld_type);
+	co.co_datacap = cheri_seal(sbop, libcheri_ccall_rtld_type);
 	return (co);
 }
 
 struct cheri_object
-cheri_make_sealed_return_object(void)
+libcheri_make_sealed_return_object(void)
 {
 
-	return (cheri_creturn_object);
+	return (libcheri_creturn_object);
 }
