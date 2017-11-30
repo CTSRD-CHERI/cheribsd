@@ -1414,7 +1414,7 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_sandbox_trustedstack_underflow",
 	  .ct_desc = "Underflow trusted stack",
 	  .ct_func = test_sandbox_trustedstack_underflow,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE | CT_FLAG_SANDBOX,
 	  .ct_signum = SIGEMT,
 	  .ct_mips_exccode = T_TRAP },
 
