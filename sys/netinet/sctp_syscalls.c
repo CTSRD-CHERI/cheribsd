@@ -72,6 +72,9 @@ __FBSDID("$FreeBSD$");
 #ifdef COMPAT_FREEBSD32
 #include <compat/freebsd32/freebsd32_util.h>
 #endif
+#ifdef COMPAT_CHERIABI
+#include <compat/cheriabi/cheriabi_util.h>
+#endif
 
 #include <net/vnet.h>
 
@@ -354,6 +357,12 @@ sys_sctp_generic_sendmsg_iov(td, uap)
 		    uap->iovlen, &iov, EMSGSIZE);
 	else
 #endif
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAGS(SV_CHERI))
+		error = cheriabi_copyiniov((struct iovec_c *)uap->iov,
+		    uap->iovlen, &iov, EMSGSIZE);
+	else
+#endif
 		error = copyiniov(uap->iov, uap->iovlen, &iov, EMSGSIZE);
 	if (error != 0)
 		goto sctp_bad1;
@@ -466,6 +475,12 @@ sys_sctp_generic_recvmsg(td, uap)
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		error = freebsd32_copyiniov((struct iovec32 *)uap->iov,
+		    uap->iovlen, &iov, EMSGSIZE);
+	else
+#endif
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAGS(SV_CHERI))
+		error = cheriabi_copyiniov((struct iovec_c *)uap->iov,
 		    uap->iovlen, &iov, EMSGSIZE);
 	else
 #endif

@@ -174,7 +174,7 @@ invoke_syscall(void)
 int
 invoke_fd_fstat_c(struct cheri_object fd_object)
 {
-	struct cheri_fd_ret ret;
+	struct libcheri_fd_ret ret;
 	struct stat *sbp;
 
 	sbp = malloc(sizeof(*sbp));
@@ -182,32 +182,32 @@ invoke_fd_fstat_c(struct cheri_object fd_object)
 		return (-1);
 	ret = libcheri_fd_fstat_c(fd_object, sbp);
 	free(sbp);
-	return (ret.cfr_retval0);
+	return (ret.lcfr_retval0);
 }
 
 int
 invoke_fd_lseek_c(struct cheri_object fd_object)
 {
-	struct cheri_fd_ret ret;
+	struct libcheri_fd_ret ret;
 
 	ret = libcheri_fd_lseek_c(fd_object, 0, SEEK_SET);
-	return (ret.cfr_retval0);
+	return (ret.lcfr_retval0);
 }
 
 int
 invoke_fd_read_c(struct cheri_object fd_object, void *buf, size_t nbytes)
 {
-	struct cheri_fd_ret ret;
+	struct libcheri_fd_ret ret;
 
 	ret = libcheri_fd_read_c(fd_object, buf, nbytes);
-	return (ret.cfr_retval0);
+	return (ret.lcfr_retval0);
 }
 
 int
 invoke_fd_write_c(struct cheri_object fd_object, char *arg, size_t nbytes)
 {
 
-	return (libcheri_fd_write_c(fd_object, arg, nbytes).cfr_retval0);
+	return (libcheri_fd_write_c(fd_object, arg, nbytes).lcfr_retval0);
 }
 
 int

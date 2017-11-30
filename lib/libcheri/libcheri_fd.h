@@ -31,6 +31,10 @@
 #ifndef _LIBCHERI_FD_H_
 #define	_LIBCHERI_FD_H_
 
+#if !__has_feature(capabilities)
+#error "This code requires a CHERI-aware compiler"
+#endif
+
 extern __capability vm_offset_t *libcheri_fd_vtable;
 
 extern struct cheri_object	libcheri_fd;
@@ -63,9 +67,9 @@ void	libcheri_fd_destroy(struct sandbox_object *sbop);
  * if retval0 == -1.  This is near-identical to the semantics of the kernel's
  * td_retval[0,1].
  */
-struct cheri_fd_ret {
-	register_t	cfr_retval0;	/* Actual return value. */
-	register_t	cfr_retval1;	/* errno if cfr_retval0 == -1. */
+struct libcheri_fd_ret {
+	register_t	lcfr_retval0;	/* Actual return value. */
+	register_t	lcfr_retval1;	/* errno if lcfr_retval0 == -1. */
 };
 
 /*
@@ -74,14 +78,14 @@ struct cheri_fd_ret {
  */
 struct stat;
 LIBCHERI_FD_CCALL
-struct cheri_fd_ret	libcheri_fd_fstat(__capability struct stat *sb_c);
+struct libcheri_fd_ret	libcheri_fd_fstat(__capability struct stat *sb_c);
 LIBCHERI_FD_CCALL
-struct cheri_fd_ret	libcheri_fd_lseek(off_t offset, int whence);
+struct libcheri_fd_ret	libcheri_fd_lseek(off_t offset, int whence);
 LIBCHERI_FD_CCALL
-struct cheri_fd_ret	libcheri_fd_read(__capability void *buf_c,
+struct libcheri_fd_ret	libcheri_fd_read(__capability void *buf_c,
 			     size_t nbytes);
 LIBCHERI_FD_CCALL
-struct cheri_fd_ret	libcheri_fd_write(__capability const void *buf_c,
+struct libcheri_fd_ret	libcheri_fd_write(__capability const void *buf_c,
 			     size_t nbytes);
 
 #endif /* !_LIBCHERI_FD_H_ */

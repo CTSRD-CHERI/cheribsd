@@ -42,6 +42,7 @@ INCS=	libcheri_ccall.h		\
 	libcheri_init.h			\
 	libcheri_sandbox.h		\
 	libcheri_sandbox_internal.h	\
+	libcheri_sandbox_metadata.h	\
 	libcheri_sandboxasm.h
 
 CFLAGS+=	-I${.CURDIR}

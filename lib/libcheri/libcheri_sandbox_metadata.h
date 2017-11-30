@@ -1,5 +1,6 @@
 /*-
- * Copyright (c) 2013-2017 Robert N. M. Watson
+ * Copyright (c) 2012-2017 Robert N. M. Watson
+ * Copyright (c) 2015 SRI International
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -28,22 +29,38 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _LIBCHERI_INVOKE_H_
-#define	_LIBCHERI_INVOKE_H_
+#ifndef _LIBCHERI_SANDBOX_METADATA_H_
+#define	_LIBCHERI_SANDBOX_METADATA_H_
 
 #if !__has_feature(capabilities)
 #error "This code requires a CHERI-aware compiler"
 #endif
 
-#define CHERI_INVOKE_METHOD_LEGACY_INVOKE	-1
+/*
+ * This section defines the interface between 'inside' and 'outside' the
+ * sandbox model.
+ */
 
-register_t	libcheri_invoke(struct cheri_object co, register_t v0,
-		    register_t a0, register_t a1, register_t a2,
-		    register_t a3, register_t a4, register_t a5,
-		    register_t a6, register_t a7, __capability void *c3,
-		    __capability void *c4, __capability void *c5,
-		    __capability void *c6, __capability void *c7,
-		    __capability void *c8, __capability void *c9,
-		    __capability void *c10) __attribute__((cheri_ccall));
+/*
+ * Per-sandbox meta-data structure mapped read-only within the sandbox at a
+ * fixed address to allow sandboxed code to find its vtable, heap, return
+ * capabilities, etc.
+ *
+ * NB: This data structure (and its base address) are part of the ABI between
+ * libcheri and programs running in sandboxes.  Only ever append to this,
+ * don't modify the order, lengths, or interpretations of existing fields.  If
+ * this reaches a page in size, then allocation code in sandbox.c will need
+ * updating.  See also sandbox.c and sandboxasm.h.
+ */
+struct sandbox_metadata {
+	register_t	sbm_heapbase;			/* Offset: 0 */
+	register_t	sbm_heaplen;			/* Offset: 8 */
+	uint64_t	_sbm_reserved0;			/* Offset: 16 */
+	uint64_t	_sbm_reserved1;			/* Offset: 24 */
+	struct cheri_object	sbm_system_object;	/* Offset: 32 */
+	__capability vm_offset_t	*sbm_vtable;	/* Cap-offset: 2 */
+	__capability void	*_sbm_reserved2;	/* Cap-offset: 3 */
+	struct cheri_object	 sbm_creturn_object;	/* Cap-offset: 4, 5 */
+};
 
-#endif /* !_LIBCHERI_INVOKE_H_ */
+#endif /* !_LIBCHERI_SANDBOX_METADATA_H_ */

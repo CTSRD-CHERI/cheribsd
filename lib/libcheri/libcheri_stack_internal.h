@@ -31,9 +31,9 @@
 #ifndef _LIBCHERI_STACK_INTERNAL_H_
 #define	_LIBCHERI_STACK_INTERNAL_H_
 
-extern __thread struct cheri_stack	__libcheri_stack_tls_storage;
+extern __thread struct libcheri_stack	__libcheri_stack_tls_storage;
 
 int	libcheri_stack_unwind_md(ucontext_t *uap,
-	    struct cheri_stack_frame *csfp, register_t ret);
+	    struct libcheri_stack_frame *lcsfp, register_t ret);
 
 #endif /* !_LIBCHERI_STACK_INTERNAL_H_ */

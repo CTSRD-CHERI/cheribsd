@@ -36,37 +36,9 @@
 #include <exception>
 #endif
 
-/*
- * This section defines the interface between 'inside' and 'outside' the
- * sandbox model.
- */
-
-/*
- * Per-sandbox meta-data structure mapped read-only within the sandbox at a
- * fixed address to allow sandboxed code to find its vtable, heap, return
- * capabilities, etc.
- *
- * NB: This data structure (and its base address) are part of the ABI between
- * libcheri and programs running in sandboxes.  Only ever append to this,
- * don't modify the order, lengths, or interpretations of existing fields.  If
- * this reaches a page in size, then allocation code in sandbox.c will need
- * updating.  See also sandbox.c and sandboxasm.h.
- */
-struct sandbox_metadata {
-	register_t	sbm_heapbase;			/* Offset: 0 */
-	register_t	sbm_heaplen;			/* Offset: 8 */
-	uint64_t	_sbm_reserved0;			/* Offset: 16 */
-	uint64_t	_sbm_reserved1;			/* Offset: 24 */
-	struct cheri_object	sbm_system_object;	/* Offset: 32 */
-#if __has_feature(capabilities)
-	__capability vm_offset_t	*sbm_vtable;	/* Cap-offset: 2 */
-	__capability void		*_sbm_reserved2;/* Cap-offset: 3 */
-#else
-	struct chericap	sbm_vtable;
-	struct chericap	_sbm_reserved2;
+#if !__has_feature(capabilities)
+#error "This code requires a CHERI-aware compiler"
 #endif
-	struct cheri_object	 sbm_creturn_object;	/* Cap-offset: 4, 5 */
-};
 
 /*
  * This section defines interfaces for setting up, invoking, resetting, and
@@ -124,11 +96,9 @@ int	sandbox_object_new(struct sandbox_class *sbcp, size_t heaplen,
 	    struct sandbox_object **sbopp);
 int	sandbox_object_new_flags(struct sandbox_class *sbcp, size_t heaplen,
 	    uint flags, struct sandbox_object **sbopp);
-#if __has_feature(capabilities)
 int	sandbox_object_new_system_object(__capability void *private_data,
 	    __capability void *invoke_pcc, __capability intptr_t *vtable,
 	    struct sandbox_object **sbopp);
-#endif
 
 /**
  * Reset the stack of a sandbox.  This is a temporary API until libcheri
@@ -136,8 +106,7 @@ int	sandbox_object_new_system_object(__capability void *private_data,
  */
 int	sandbox_object_stack_reset(struct sandbox_object *sbop);
 int	sandbox_object_reset(struct sandbox_object *sbop);
-#if __has_feature(capabilities)
-register_t	sandbox_object_cinvoke(struct sandbox_object *sbop,
+register_t	sandbox_object_invoke(struct sandbox_object *sbop,
 		    register_t methodnum, register_t a1,
 		    register_t a2, register_t a3, register_t a4,
 		    register_t a5, register_t a6, register_t a7,
@@ -145,15 +114,6 @@ register_t	sandbox_object_cinvoke(struct sandbox_object *sbop,
 		    __capability void *c5, __capability void *c6,
 		    __capability void *c7, __capability void *c8,
 		    __capability void *c9, __capability void *c10);
-#endif
-register_t	sandbox_object_invoke(struct sandbox_object *sbop,
-		    register_t methodnum, register_t a1,
-		    register_t a2, register_t a3, register_t a4,
-		    register_t a5, register_t a6, register_t a7,
-		    struct chericap *c3p, struct chericap *c4p,
-		    struct chericap *c5p, struct chericap *c6p,
-		    struct chericap *c7p, struct chericap *c8p,
-		    struct chericap *c9p, struct chericap *c10p);
 void	sandbox_object_destroy(struct sandbox_object *sbop);
 
 /*
@@ -168,7 +128,6 @@ void	sandbox_object_destroy(struct sandbox_object *sbop);
  */
 struct cheri_object	sandbox_object_getobject(struct sandbox_object *sbop);
 
-#if __has_feature(capabilities)
 /**
  * Get the sandbox's global data capability.
  */
@@ -181,7 +140,6 @@ sandbox_object_getsandboxdata(struct sandbox_object *sbop);
  */
 __capability void *
 sandbox_object_getsandboxstack(struct sandbox_object *sbop);
-#endif
 
 /*
  * API to query system capabilities for use by sandboxes.
@@ -192,10 +150,8 @@ struct cheri_object	sandbox_object_getsystemobject(
 /*
  * API to get private data for system-class implementations.
  */
-#if __has_feature(capabilities)
 __capability void	*sandbox_object_private_get(
 			    struct sandbox_object *sbop);
 __capability void	*sandbox_object_private_get_idc(void);
-#endif
 
 #endif /* !_LIBCHERI_SANDBOX_H_ */

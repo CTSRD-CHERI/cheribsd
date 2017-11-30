@@ -1,13 +1,9 @@
 #
 # $FreeBSD$
 #
-SRCS=	crt_invoke.S				\
-	crt_rtld.S				\
-	crtbeginC.c				\
+SRCS=	crtbeginC.c				\
 	crtendC.c
-FILES=	crt_invoke.o				\
-	crt_rtld.o				\
-	crtbeginC.o				\
+FILES=	crtbeginC.o				\
 	crtendC.o
 FILESOWN=       ${LIBOWN}
 FILESGRP=       ${LIBGRP}

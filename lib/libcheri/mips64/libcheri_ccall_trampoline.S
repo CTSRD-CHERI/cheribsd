@@ -394,17 +394,17 @@ libcheri_ccall_rtld_return:
 	nop					# Branch-delay slot
 
 libcheri_ccall_rtld_local_argument:
-	dli	$a0, CHERI_ERRNO_INVOKE_LOCAL_ARG
+	dli	$a0, LIBCHERI_ERRNO_INVOKE_LOCAL_ARG
 	b	libcheri_ccall_rtld_error_return
 	nop
 
 libcheri_ccall_rtld_stack_overflow:
-	dli	$a0, CHERI_ERRNO_INVOKE_OVERFLOW
+	dli	$a0, LIBCHERI_ERRNO_INVOKE_OVERFLOW
 	b	libcheri_ccall_rtld_error_return
 	nop
 
 libcheri_ccall_rtld_sandbox_busy:
-	dli	$a0, CHERI_ERRNO_INVOKE_BUSY
+	dli	$a0, LIBCHERI_ERRNO_INVOKE_BUSY
 	b	libcheri_ccall_rtld_error_return
 	nop
 
@@ -774,17 +774,17 @@ libcheri_ccall_invoke_return:
 	nop					# Branch-delay slot
 
 libcheri_ccall_invoke_local_argument:
-	dli	$a0, CHERI_ERRNO_INVOKE_LOCAL_ARG
+	dli	$a0, LIBCHERI_ERRNO_INVOKE_LOCAL_ARG
 	b	libcheri_ccall_invoke_error_return
 	nop
 
 libcheri_ccall_invoke_stack_overflow:
-	dli	$a0, CHERI_ERRNO_INVOKE_OVERFLOW
+	dli	$a0, LIBCHERI_ERRNO_INVOKE_OVERFLOW
 	b	libcheri_ccall_invoke_error_return
 	nop
 
 libcheri_ccall_invoke_sandbox_busy:
-	dli	$a0, CHERI_ERRNO_INVOKE_BUSY
+	dli	$a0, LIBCHERI_ERRNO_INVOKE_BUSY
 	b	libcheri_ccall_invoke_error_return
 	nop
 
@@ -1029,13 +1029,13 @@ libcheri_creturn_jump:
 	nop					# Branch-delay slot
 
 libcheri_creturn_local_retval:
-	dli	$a0, CHERI_ERRNO_RETURN_LOCAL_RETVAL
+	dli	$a0, LIBCHERI_ERRNO_RETURN_LOCAL_RETVAL
 	b	libcheri_creturn_error_return
 	nop					# Branch-delay slot
 
 libcheri_creturn_stack_underflow:
 	/* XXXRW: What do we want to do here?  Just trap for now. */
-	dli	$a0, CHERI_ERRNO_RETURN_UNDERFLOW
+	dli	$a0, LIBCHERI_ERRNO_RETURN_UNDERFLOW
 	teq	$zero, $zero
 
 libcheri_creturn_error_return:

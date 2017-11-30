@@ -32,6 +32,10 @@
 #ifndef __LIBCHERI_SANDBOX_METHODS_H__
 #define __LIBCHERI_SANDBOX_METHODS_H__
 
+#if !__has_feature(capabilities)
+#error "This code requires a CHERI-aware compiler"
+#endif
+
 struct sandbox_provided_classes;
 struct sandbox_required_methods;
 

@@ -123,7 +123,7 @@ CHERIABI_SYS_mincore_fill_uap(struct thread *td,
 		if (length < roundup2(uap->len + addr_adjust, PAGE_SIZE))
 			return (EPROT);
 
-		uap->addr = (__cheri_cast void *)tmpcap;
+		uap->addr = (__cheri_fromcap void *)tmpcap;
 	}
 
 	/* [2] _Out_writes_bytes_(len/PAGE_SIZE) char * vec */

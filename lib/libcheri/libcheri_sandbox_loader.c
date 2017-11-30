@@ -31,10 +31,6 @@
 
 #include <sys/cdefs.h>
 
-#if !__has_feature(capabilities)
-#error "This code requires a CHERI-aware compiler"
-#endif
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/mman.h>
@@ -63,6 +59,7 @@
 #include "libcheri_sandbox.h"
 #include "libcheri_sandbox_elf.h"
 #include "libcheri_sandbox_internal.h"
+#include "libcheri_sandbox_metadata.h"
 #include "libcheri_sandbox_methods.h"
 #include "libcheri_sandboxasm.h"
 
@@ -395,10 +392,10 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	 */
 	sbop->sbo_cheri_object_rtld =
 	    libcheri_sandbox_make_sealed_rtld_object(
-	    (__cheri_cast __capability struct sandbox_object *)sbop);
+	    (__cheri_tocap __capability struct sandbox_object *)sbop);
 	sbop->sbo_cheri_object_invoke =
 	    libcheri_sandbox_make_sealed_invoke_object(
-	    (__cheri_cast __capability struct sandbox_object *)sbop);
+	    (__cheri_tocap __capability struct sandbox_object *)sbop);
 
 	/*
 	 * Set up a CHERI system object to service the sandbox's requests to
@@ -418,7 +415,7 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	 */
 	sbmp->sbm_system_object = sbop->sbo_cheri_object_system =
 	    libcheri_sandbox_make_sealed_invoke_object(
-	    (__cheri_cast __capability struct sandbox_object *)
+	    (__cheri_tocap __capability struct sandbox_object *)
 	    sbop->sbo_sandbox_system_objectp);
 
 	/*

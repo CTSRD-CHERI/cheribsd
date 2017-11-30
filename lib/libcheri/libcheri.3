@@ -40,7 +40,6 @@
 .Nm sandbox_object_getsystemobject ,
 .Nm sandbox_object_reset ,
 .Nm sandbox_object_destroy ,
-.Nm sandbox_object_cinvoke ,
 .Nm sandbox_object_invoke
 .Nd Library interface for CHERI compartmentalization
 .Sh LIBRARY
@@ -93,10 +92,8 @@
 .Fa "struct sandbox_object *sbop"
 .Fc
 .Pp
-#if __has_feature(capabilities)
-.Pp
 .Ft register_t
-.Fo sandbox_object_cinvoke
+.Fo sandbox_object_invoke
 .Fa "struct sandbox_object *sbop"
 .Fa "u_int methodnum"
 .Fa "register_t a1"
@@ -115,31 +112,6 @@
 .Fa "__capability void *c9"
 .Fa "__capability void *c10"
 .Fc
-.Pp
-#else
-.Pp
-.Ft register_t
-.Fo sandbox_object_invoke
-.Fa "struct sandbox_object *sbop"
-.Fa "u_int methodnum"
-.Fa "register_t a1"
-.Fa "register_t a2"
-.Fa "register_t a3"
-.Fa "register_t a4"
-.Fa "register_t a5"
-.Fa "register_t a6"
-.Fa "register_t a7"
-.Fa "struct chericap *c3p"
-.Fa "struct chericap *c4p"
-.Fa "struct chericap *c5p"
-.Fa "struct chericap *c6p"
-.Fa "struct chericap *c7p"
-.Fa "struct chericap *c8p"
-.Fa "struct chericap *c9p"
-.Fa "struct chericap *c10p"
-.Fc
-.Pp
-#endif
 .Pp
 .Sh DESCRIPTION
 .Nm
@@ -211,20 +183,15 @@ object's underlying CHERI object (sealed code and data capabilities).
 returns the CHERI system-class instance suitable for delegating to the object.
 .Ss Object invocation
 Methods may be invoked using
-.Fn sandbox_object_cinvoke
-if CHERI compiler support is present (allowing use of
-.Em __capability ) ,
-or
-.Fn sandbox_object_invoke
-(which can be used without compiler support).
-Both interfaces accept a
+.Fn sandbox_object_invoke ,
+which accepts a
 .Nm
 object pointer,
 .Fa sbop ,
 method number via
 .Fa methodnum ,
 and general-purpose and capability register arguments.
-These functions are implemented as wrappers around
+This function is implemented as a wrapper around
 .Xr libcheri_invoke 3 .
 .Ss Object monitoring
 .Pp
@@ -245,10 +212,8 @@ and
 .Fn sandbox_object_destroy
 do not have return values as they cannot fail.
 .Pp
-.Fn sandbox_object_cinvoke
-and
 .Fn sandbox_object_invoke
-return the value returned by the invoked object method unless a fault occurs,
+returns the value returned by the invoked object method unless a fault occurs,
 in which case -1 will be returned.
 As a method returning -1 cannot be distinguished from a fault in the caller,
 use of negative return values for method return values is discouraged.
@@ -265,19 +230,19 @@ will not be modified by
 .Nm .
 Possible values include:
 .Bl -hang -width Ds
-.It Er CHERI_ERRNO_INVOKE_LOCAL_ARG
+.It Er LIBCHERI_ERRNO_INVOKE_LOCAL_ARG
 Invocation has failed because a tagged, local capability value has been passed
 as an argument.
-.It Er CHERI_ERRNO_INVOKE_OVERFLOW
+.It Er LIBCHERI_ERRNO_INVOKE_OVERFLOW
 Invocation has failed because a trusted-stack overflow would occur.
-.It Er CHERI_ERRNO_INVOKE_BUSY
+.It Er LIBCHERI_ERRNO_INVOKE_BUSY
 Invocation has failed because the target object has exceeded maximum
 concurrency, or because the target object has experienced an unrecoverable
 fault.
-.It Er CHERI_ERRNO_RETURN_LOCAL_RETVAL
+.It Er LIBCHERI_ERRNO_RETURN_LOCAL_RETVAL
 Return has succeeded, but the tagged, local capability return value has been
 cleared.
-.It Er CHERI_ERRNO_RETURN_UNDERFLOW
+.It Er LIBCHERI_ERRNO_RETURN_UNDERFLOW
 The trusted stack has underflowed (not used, as an attempted return will
 instead trap).
 .El
@@ -295,10 +260,8 @@ Laboratory under DARPA/AFRL contract
 as part of the DARPA CRASH research programme.
 .Sh BUGS
 The
-.Fn sandbox_object_cinvoke
-and
 .Fn sandbox_object_invoke
-APIs cannot distinguish the invoked object returning a negative value and a
+API cannot distinguish the invoked object returning a negative value and a
 fault causing a negative value to be returned.
 .Pp
 It is not clear how programmers should select a suitable
