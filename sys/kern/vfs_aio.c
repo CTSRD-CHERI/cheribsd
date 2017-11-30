@@ -2790,13 +2790,6 @@ aiocb32_fetch_error(struct aiocb *ujob)
 	return (fuword32(&ujob32->_aiocb_private.error));
 }
 
-static void
-aiocb32_free_kaiocb(struct kaiocb *kjob)
-{
-
-	uma_zfree(aiocb_zone, kjob);
-}
-
 static int
 aiocb32_store_status(struct aiocb *ujob, long status)
 {
@@ -2851,7 +2844,7 @@ static struct aiocb_ops aiocb32_ops = {
 	.copyin = aiocb32_copyin,
 	.fetch_status = aiocb32_fetch_status,
 	.fetch_error = aiocb32_fetch_error,
-	.free_kaiocb = aiocb32_free_kaiocb,
+	.free_kaiocb = aiocb_free_kaiocb,	/* Identical to 64-bit */
 	.store_status = aiocb32_store_status,
 	.store_error = aiocb32_store_error,
 	.store_kernelinfo = aiocb32_store_kernelinfo,
@@ -2864,7 +2857,7 @@ static struct aiocb_ops aiocb32_ops_osigevent = {
 	.copyin = aiocb32_copyin_old_sigevent,
 	.fetch_status = aiocb32_fetch_status,
 	.fetch_error = aiocb32_fetch_error,
-	.free_kaiocb = aiocb32_free_kaiocb,
+	.free_kaiocb = aiocb_free_kaiocb,	/* Identical to 64-bit */
 	.store_status = aiocb32_store_status,
 	.store_error = aiocb32_store_error,
 	.store_kernelinfo = aiocb32_store_kernelinfo,
