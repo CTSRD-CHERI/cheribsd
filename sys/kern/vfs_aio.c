@@ -3246,7 +3246,7 @@ int
 cheriabi_aio_return(struct thread *td, struct cheriabi_aio_return_args *uap)
 {
 
-	return (kern_aio_return(td, (__cheri_cast struct aiocb *)
+	return (kern_aio_return(td, (__cheri_fromcap struct aiocb *)
 	    (struct aiocb * __capability)uap->aiocbp, &aiocb_c_ops));
 }
 
@@ -3312,7 +3312,7 @@ int
 cheriabi_aio_read(struct thread *td, struct cheriabi_aio_read_args *uap)
 {
 
-	return (aio_aqueue(td, (__cheri_cast struct aiocb *)
+	return (aio_aqueue(td, (__cheri_fromcap struct aiocb *)
 	    (struct aiocb * __capability)uap->aiocbp, &uap->aiocbp, NULL,
 	    LIO_READ, &aiocb_c_ops));
 }
@@ -3321,7 +3321,7 @@ int
 cheriabi_aio_write(struct thread *td, struct cheriabi_aio_write_args *uap)
 {
 
-	return (aio_aqueue(td, (__cheri_cast struct aiocb *)
+	return (aio_aqueue(td, (__cheri_fromcap struct aiocb *)
 	    (struct aiocb * __capability)uap->aiocbp, &uap->aiocbp, NULL,
 	    LIO_WRITE, &aiocb_c_ops));
 }
@@ -3330,7 +3330,7 @@ int
 cheriabi_aio_mlock(struct thread *td, struct cheriabi_aio_mlock_args *uap)
 {
 
-	return (aio_aqueue(td, (__cheri_cast struct aiocb *)
+	return (aio_aqueue(td, (__cheri_fromcap struct aiocb *)
 	    (struct aiocb * __capability)uap->aiocbp, &uap->aiocbp, NULL,
 	    LIO_MLOCK, &aiocb_c_ops));
 }
@@ -3360,7 +3360,8 @@ cheriabi_aio_fsync(struct thread *td, struct cheriabi_aio_fsync_args *uap)
 {
 
 	return (kern_aio_fsync(td, uap->op,
-	    (__cheri_cast struct aiocb *)(struct aiocb * __capability)uap->aiocbp,
+	    (__cheri_fromcap struct aiocb *)
+	    (struct aiocb * __capability)uap->aiocbp,
 	    &uap->aiocbp, &aiocb_c_ops));
 }
 
