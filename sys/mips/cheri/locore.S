@@ -186,6 +186,35 @@ VECTOR(_locore, unknown)
 	csc		$c1, zero, CALLFRAME_CSP(CHERI_REG_STC)
 	csc		$c1, zero, CALLFRAME_CRA(CHERI_REG_STC)
 
+#if 0
+	/* Restrict kernel PCC */
+	/*
+	 * XXX-AM: Currently disabled because I have to understand
+	 * how it plays out with relocations
+	 */
+	cgetpcc $c12
+	PTR_LI t1, 0xffffffff80000000	# Exception vector start
+	csetoffset $c12, $c12, t1
+	PTR_LA t0, _C_LABEL(etext)	# Kernel .text end
+	PTR_SUBU t0, t0, t1
+	csetbounds $c12, $c12, t0
+	PTR_LA t0, restrict_pcc
+	PTR_SUBU t0, t0, t1
+	csetoffset $c12, $c12, t0
+	cjr $c12
+	nop
+	/* Split kdc in system-kdc and user-kdc
+	 * system-kdc continues to live in REG_KDC
+	 * user-kdc is stored in kernel_userspace_capability
+	 */
+	// TODO
+	/* Clear all capability registers
+	 * except STC, KCC, KDC, PCC.
+	 */
+	// TODO
+restrict_pcc:
+#endif
+
 	/* XXX-AM: can use a R_MIPS_GPREL_HI and _LO */
 	PTR_LA	gp, _C_LABEL(_gp)
 
