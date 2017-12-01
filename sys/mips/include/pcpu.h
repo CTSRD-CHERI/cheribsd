@@ -34,6 +34,10 @@
 #include <machine/cpufunc.h>
 #include <machine/pte.h>
 
+#ifdef CHERI_KERNEL
+#include <cheri/cheric.h>
+#endif
+
 #if defined(MIPS_EXC_CNTRS)
 #define	PCPU_MIPS_COUNTERS						\
 	register_t	pc_tlb_miss_cnt;	/* TLB miss count */    \
@@ -55,10 +59,10 @@
 	struct	pcpu	*pc_self;		/* globally-uniqe self pointer */
 
 #ifdef	__mips_n64
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(CPU_CHERI128)
+#if defined(CHERI_KERNEL) && defined(CPU_CHERI128)
 // struct pcpu aligns to 512 bytes boundary
 #define PCPU_MD_MIPS64_PAD (105 - (PCPU_NUM_EXC_CNTRS * 8))
-#elif defined(__CHERI_PURE_CAPABILITY__) && defined(CPU_CHERI)
+#elif defined(CHERI_KERNEL) && defined(CPU_CHERI)
 // struct pcpu aligns to 1024 bytes boundary
 #define PCPU_MD_MIPS64_PAD (352 - (PCPU_NUM_EXC_CNTRS * 8))
 #else
@@ -84,7 +88,11 @@
 #ifdef _KERNEL
 
 extern char pcpu_space[MAXCPU][PAGE_SIZE * 2];
+#ifndef CHERI_KERNEL
 #define	PCPU_ADDR(cpu)		(struct pcpu *)(pcpu_space[(cpu)])
+#else /* CHERI_KERNEL */
+#define PCPU_ADDR(cpu)		cheri_csetbounds((struct pcpu *)(pcpu_space[(cpu)]), sizeof(struct pcpu))
+#endif /* CHERI_KERNEL*/
 
 extern struct pcpu *pcpup;
 #define	PCPUP	pcpup
