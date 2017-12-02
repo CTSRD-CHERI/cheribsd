@@ -49,7 +49,6 @@ MAN=
 AFLAGS=		-G0
 
 CFLAGS+=	-I${.CURDIR}			\
-		-I${SASRC}			\
 		-I${LDRSRC}			\
 		-I${SYSDIR}/contrib/libfdt	\
 		-D_KERNEL			\
