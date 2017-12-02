@@ -85,6 +85,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpu.h>
 #endif
 
+#ifdef CPU_CHERI
+#include <machine/cherireg.h>
+#endif
+
 #include <ddb/ddb.h>
 
 #ifdef KDTRACE_HOOKS
@@ -649,7 +653,14 @@ realloc(void *addr, unsigned long size, struct malloc_type *mtp, int flags)
 		return (NULL);
 
 	/* Copy over original contents */
-	bcopy(addr, newaddr, min(size, alloc));
+#ifdef CPU_CHERI
+	if (size >= CHERICAP_SIZE && alloc >= CHERICAP_SIZE &&
+	    ((uintptr_t)addr & (CHERICAP_SIZE-1)) == 0 &&
+	    ((uintptr_t)newaddr & (CHERICAP_SIZE-1)) == 0)
+		cheri_bcopy(addr, newaddr, min(size, alloc));
+	else
+#endif
+		bcopy(addr, newaddr, min(size, alloc));
 	free(addr, mtp);
 	return (newaddr);
 }
