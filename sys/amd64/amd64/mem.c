@@ -77,7 +77,7 @@ MALLOC_DEFINE(M_MEMDESC, "memdesc", "memory range descriptors");
 int
 memrw(struct cdev *dev, struct uio *uio, int flags)
 {
-	struct iovec *iov;
+	kiovec_t *iov;
 	void *p;
 	ssize_t orig_resid;
 	u_long v, vd;

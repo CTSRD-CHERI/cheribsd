@@ -173,7 +173,7 @@ extattr_set_vp(struct vnode *vp, int attrnamespace, const char *attrname,
 {
 	struct mount *mp;
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	ssize_t cnt;
 	int error;
 
@@ -326,7 +326,7 @@ extattr_get_vp(struct vnode *vp, int attrnamespace, const char *attrname,
     void *data, size_t nbytes, struct thread *td)
 {
 	struct uio auio, *auiop;
-	struct iovec aiov;
+	kiovec_t aiov;
 	ssize_t cnt;
 	size_t size, *sizep;
 	int error;
@@ -621,7 +621,7 @@ extattr_list_vp(struct vnode *vp, int attrnamespace, void *data,
 {
 	struct uio auio, *auiop;
 	size_t size, *sizep;
-	struct iovec aiov;
+	kiovec_t aiov;
 	ssize_t cnt;
 	int error;
 

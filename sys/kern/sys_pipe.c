@@ -898,7 +898,7 @@ pipe_clone_write_buffer(wpipe)
 	struct pipe *wpipe;
 {
 	struct uio uio;
-	struct iovec iov;
+	kiovec_t iov;
 	int size;
 	int pos;
 

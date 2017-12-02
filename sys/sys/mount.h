@@ -612,7 +612,6 @@ struct vfsquery {
 	} while (0)
 #endif
 
-struct iovec;
 struct uio;
 
 #ifdef _KERNEL
@@ -964,6 +963,7 @@ void	syncer_resume(void);
 
 #include <sys/cdefs.h>
 
+struct iovec;
 struct stat;
 
 __BEGIN_DECLS

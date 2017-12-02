@@ -816,7 +816,7 @@ cuse_proc2proc_copy(struct proc *proc_s, vm_offset_t data_s,
 	proc_cur = td->td_proc;
 
 	if (proc_cur == proc_d) {
-		struct iovec iov;
+		kiovec_t iov;
 		IOVEC_INIT(&iov, (void *)data_d, len);
 		struct uio uio = {
 			.uio_iov = &iov,
@@ -833,7 +833,7 @@ cuse_proc2proc_copy(struct proc *proc_s, vm_offset_t data_s,
 		PRELE(proc_s);
 
 	} else if (proc_cur == proc_s) {
-		struct iovec iov;
+		kiovec_t iov;
 		IOVEC_INIT(&iov, (void *)data_s, len);
 		struct uio uio = {
 			.uio_iov = &iov,

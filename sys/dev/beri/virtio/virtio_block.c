@@ -108,7 +108,7 @@ static struct resource_spec beri_spec[] = {
 };
 
 static int
-vtblk_rdwr(struct beri_vtblk_softc *sc, struct iovec *iov,
+vtblk_rdwr(struct beri_vtblk_softc *sc, kiovec_t *iov,
 	int cnt, int offset, int operation, int iolen)
 {
 	struct vnode *vp;
@@ -148,10 +148,10 @@ vtblk_rdwr(struct beri_vtblk_softc *sc, struct iovec *iov,
 static void
 vtblk_proc(struct beri_vtblk_softc *sc, struct vqueue_info *vq)
 {
-	struct iovec iov[VTBLK_MAXSEGS + 2];
+	kiovec_t iov[VTBLK_MAXSEGS + 2];
 	uint16_t flags[VTBLK_MAXSEGS + 2];
 	struct virtio_blk_outhdr *vbh;
-	struct iovec *tiov;
+	kiovec_t *tiov;
 	uint8_t *status;
 	off_t offset;
 	int iolen;

@@ -842,8 +842,8 @@ mdstart_vnode(struct md_s *sc, struct bio *bp)
 {
 	int error;
 	struct uio auio;
-	struct iovec aiov;
-	struct iovec *piov;
+	kiovec_t aiov;
+	kiovec_t *piov;
 	struct mount *mp;
 	struct vnode *vp;
 	struct buf *pb;
@@ -1355,7 +1355,7 @@ mdsetcred(struct md_s *sc, struct ucred *cred)
 
 	if (sc->vnode) {
 		struct uio auio;
-		struct iovec aiov;
+		kiovec_t aiov;
 
 		tmpbuf = malloc(sc->sectorsize, M_TEMP, M_WAITOK);
 		bzero(&auio, sizeof(auio));

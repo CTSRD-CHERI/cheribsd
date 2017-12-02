@@ -301,9 +301,11 @@ vfs_buildopts(struct uio *auio, struct vfsoptlist **options)
 		TAILQ_INSERT_TAIL(opts, opt, link);
 
 		if (auio->uio_segflg == UIO_SYSSPACE) {
-			bcopy(auio->uio_iov[i].iov_base, opt->name, namelen);
+			bcopy((__cheri_fromcap void *)auio->uio_iov[i].iov_base,
+			    opt->name, namelen);
 		} else {
-			error = copyin(auio->uio_iov[i].iov_base, opt->name,
+			error = copyin_c(auio->uio_iov[i].iov_base,
+			    (__cheri_tocap char * __capability)opt->name,
 			    namelen);
 			if (error)
 				goto bad;
@@ -317,10 +319,12 @@ vfs_buildopts(struct uio *auio, struct vfsoptlist **options)
 			opt->len = optlen;
 			opt->value = malloc(optlen, M_MOUNT, M_WAITOK);
 			if (auio->uio_segflg == UIO_SYSSPACE) {
-				bcopy(auio->uio_iov[i + 1].iov_base, opt->value,
+				bcopy((__cheri_fromcap void *)
+				    auio->uio_iov[i + 1].iov_base, opt->value,
 				    optlen);
 			} else {
-				error = copyin(auio->uio_iov[i + 1].iov_base,
+				error = copyin_c(auio->uio_iov[i + 1].iov_base,
+				    (__cheri_tocap void * __capability)
 				    opt->value, optlen);
 				if (error)
 					goto bad;
@@ -368,7 +372,7 @@ vfs_mergeopts(struct vfsoptlist *toopts, struct vfsoptlist *oldopts)
  */
 #ifndef _SYS_SYSPROTO_H_
 struct nmount_args {
-	struct iovec *iovp;
+	struct iovec_native *iovp;
 	unsigned int iovcnt;
 	int flags;
 };
@@ -680,10 +684,11 @@ bail:
 	    && errmsg_len > 0 && errmsg != NULL) {
 		if (fsoptions->uio_segflg == UIO_SYSSPACE) {
 			bcopy(errmsg,
+			    (__cheri_fromcap void *)
 			    fsoptions->uio_iov[2 * errmsg_pos + 1].iov_base,
 			    fsoptions->uio_iov[2 * errmsg_pos + 1].iov_len);
 		} else {
-			copyout(errmsg,
+			copyout_c((__cheri_tocap char * __capability)errmsg,
 			    fsoptions->uio_iov[2 * errmsg_pos + 1].iov_base,
 			    fsoptions->uio_iov[2 * errmsg_pos + 1].iov_len);
 		}
@@ -1807,7 +1812,7 @@ struct mntaarg {
 
 /* The header for the mount arguments */
 struct mntarg {
-	struct iovec *v;
+	kiovec_t *v;
 	int len;
 	int error;
 	SLIST_HEAD(, mntaarg)	list;

@@ -215,7 +215,7 @@ sys_sctp_generic_sendmsg(struct thread *td,
 	struct uio *ktruio = NULL;
 #endif
 	struct uio auio;
-	struct iovec iov[1];
+	kiovec_t iov[1];
 	cap_rights_t rights;
 	int error = 0, len;
 
@@ -308,7 +308,7 @@ sctp_bad2:
 #ifndef _SYS_SYSPROTO_H_
 struct sctp_generic_sendmsg_iov_args {
 	int sd;
-	struct iovec *iov;
+	struct iovec_native *iov;
 	int iovlen;
 	struct sockaddr *to;
 	__socklen_t tolen;
@@ -329,7 +329,7 @@ sys_sctp_generic_sendmsg_iov(struct thread *td,
 	struct uio *ktruio = NULL;
 #endif
 	struct uio auio;
-	struct iovec *iov, *tiov;
+	kiovec_t *iov, *tiov;
 	cap_rights_t rights;
 	ssize_t len;
 	int error, i;
@@ -446,7 +446,7 @@ sctp_bad2:
 #ifndef _SYS_SYSPROTO_H_
 struct sctp_generic_recvmsg_args {
 	int sd;
-	struct iovec *iov;
+	struct iovec_native *iov;
 	int iovlen;
 	struct sockaddr *from;
 	__socklen_t *fromlenaddr;
@@ -461,7 +461,7 @@ sys_sctp_generic_recvmsg(struct thread *td,
 #if (defined(INET) || defined(INET6)) && defined(SCTP)
 	uint8_t sockbufstore[256];
 	struct uio auio;
-	struct iovec *iov, *tiov;
+	kiovec_t *iov, *tiov;
 	struct sctp_sndrcvinfo sinfo;
 	struct socket *so;
 	struct file *fp = NULL;

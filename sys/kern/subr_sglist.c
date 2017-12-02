@@ -463,7 +463,7 @@ sglist_append_sglist(struct sglist *sg, struct sglist *source, size_t offset,
 int
 sglist_append_uio(struct sglist *sg, struct uio *uio)
 {
-	struct iovec *iov;
+	kiovec_t *iov;
 	struct sgsave save;
 	size_t resid, minlen;
 	pmap_t pmap;
@@ -491,7 +491,8 @@ sglist_append_uio(struct sglist *sg, struct uio *uio)
 		 */
 		minlen = MIN(resid, iov[i].iov_len);
 		if (minlen > 0) {
-			error = _sglist_append_buf(sg, iov[i].iov_base, minlen,
+			error = _sglist_append_buf(sg,
+			    (__cheri_fromcap void *)iov[i].iov_base, minlen,
 			    pmap, NULL);
 			if (error) {
 				SGLIST_RESTORE(sg, save);
@@ -511,7 +512,7 @@ sglist_append_uio(struct sglist *sg, struct uio *uio)
 int
 sglist_consume_uio(struct sglist *sg, struct uio *uio, size_t resid)
 {
-	struct iovec *iov;
+	kiovec_t *iov;
 	size_t done;
 	pmap_t pmap;
 	int error, len;
@@ -542,7 +543,8 @@ sglist_consume_uio(struct sglist *sg, struct uio *uio, size_t resid)
 		 * Try to append this iovec.  If we run out of room,
 		 * then break out of the loop.
 		 */
-		error = _sglist_append_buf(sg, iov->iov_base, len, pmap, &done);
+		error = _sglist_append_buf(sg,
+		    (__cheri_fromcap void *)iov->iov_base, len, pmap, &done);
 		IOVEC_ADVANCE(iov, done);
 		uio->uio_resid -= done;
 		uio->uio_offset += done;

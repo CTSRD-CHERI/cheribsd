@@ -196,7 +196,7 @@ static struct ctl_be_block_softc backend_block_softc;
 struct ctl_be_block_io {
 	union ctl_io			*io;
 	struct ctl_sg_entry		sg_segs[CTLBLK_MAX_SEGS];
-	struct iovec			xiovecs[CTLBLK_MAX_SEGS];
+	kiovec_t			xiovecs[CTLBLK_MAX_SEGS];
 	int				bio_cmd;
 	int				num_segs;
 	int				num_bios_sent;
@@ -624,7 +624,7 @@ ctl_be_block_dispatch_file(struct ctl_be_block_lun *be_lun,
 	struct ctl_be_block_filedata *file_data;
 	union ctl_io *io;
 	struct uio xuio;
-	struct iovec *xiovec;
+	kiovec_t *xiovec;
 	size_t s;
 	int error, flags, i;
 
@@ -855,7 +855,7 @@ ctl_be_block_dispatch_zvol(struct ctl_be_block_lun *be_lun,
 	struct cdevsw *csw;
 	struct cdev *dev;
 	struct uio xuio;
-	struct iovec *xiovec;
+	kiovec_t *xiovec;
 	int error, flags, i, ref;
 
 	DPRINTF("entered\n");

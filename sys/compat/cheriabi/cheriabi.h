@@ -125,21 +125,6 @@ struct kevent_c {
 	__uint64_t		ext[4];
 };
 
-struct iovec_c {
-	void * __capability	iov_base;
-	size_t			iov_len;
-};
-
-struct msghdr_c {
-	void * __capability		msg_name;
-	socklen_t			msg_namelen;
-	struct iovec_c * __capability	msg_iov;
-	int				msg_iovlen;
-	void * __capability		msg_control;
-	socklen_t			msg_controllen;
-	int				msg_flags;
-};
-
 struct jail_c {
 	uint32_t			version;
 	char * __capability		path;
@@ -288,13 +273,6 @@ struct kld_sym_lookup_c {
 	char * __capability symname; /* Symbol name we are looking up */
 	u_long		symvalue;
 	size_t		symsize;
-};
-
-struct sf_hdtr_c {
-	struct iovec_c * __capability	headers;
-	int				hdr_cnt;
-	struct iovec_c * __capability	trailers;
-	int				trl_cnt;
 };
 
 struct procctl_reaper_pids_c {

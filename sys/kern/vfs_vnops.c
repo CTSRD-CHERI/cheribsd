@@ -521,7 +521,7 @@ vn_rdwr(enum uio_rw rw, struct vnode *vp, void *base, int len, off_t offset,
     struct ucred *file_cred, ssize_t *aresid, struct thread *td)
 {
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	struct mount *mp;
 	struct ucred *cred;
 	void *rl_cookie;
@@ -973,12 +973,13 @@ vn_io_fault_doio(struct vn_io_fault_args *args, struct uio *uio,
 }
 
 static int
-vn_io_fault_touch(char *base, const struct uio *uio)
+vn_io_fault_touch(char * __capability base, const struct uio *uio)
 {
 	int r;
 
-	r = fubyte(base);
-	if (r == -1 || (uio->uio_rw == UIO_READ && subyte(base, r) == -1))
+	r = fubyte((__cheri_fromcap void *)base);
+	if (r == -1 || (uio->uio_rw == UIO_READ &&
+	    subyte((__cheri_fromcap void *)base, r) == -1))
 		return (EFAULT);
 	return (0);
 }
@@ -986,8 +987,8 @@ vn_io_fault_touch(char *base, const struct uio *uio)
 static int
 vn_io_fault_prefault_user(const struct uio *uio)
 {
-	char *base;
-	const struct iovec *iov;
+	char * __capability base;
+	kiovec_t *iov;
 	size_t len;
 	ssize_t resid;
 	int error, i;
@@ -1038,7 +1039,7 @@ vn_io_fault1(struct vnode *vp, struct uio *uio, struct vn_io_fault_args *args,
 {
 	vm_page_t ma[io_hold_cnt + 2];
 	struct uio *uio_clone, short_uio;
-	struct iovec short_iovec[1];
+	kiovec_t short_iovec[1];
 	vm_page_t *prev_td_ma;
 	vm_prot_t prot;
 	vm_offset_t addr, end;
@@ -1095,7 +1096,7 @@ vn_io_fault1(struct vnode *vp, struct uio *uio, struct vn_io_fault_args *args,
 		}
 		if (len > io_hold_cnt * PAGE_SIZE)
 			len = io_hold_cnt * PAGE_SIZE;
-		addr = (uintptr_t)uio_clone->uio_iov->iov_base;
+		addr = (vaddr_t)uio_clone->uio_iov->iov_base;
 		end = round_page(addr + len);
 		if (end < addr) {
 			error = EFAULT;
@@ -1114,7 +1115,8 @@ vn_io_fault1(struct vnode *vp, struct uio *uio, struct vn_io_fault_args *args,
 			break;
 		}
 		short_uio.uio_iov = &short_iovec[0];
-		IOVEC_INIT(&short_iovec[0], (void *)addr, len);
+		IOVEC_INIT_C(&short_iovec[0], uio_clone->uio_iov->iov_base,
+		    len);
 		short_uio.uio_iovcnt = 1;
 		short_uio.uio_resid = len;
 		short_uio.uio_offset = uio_clone->uio_offset;
@@ -1199,7 +1201,7 @@ int
 vn_io_fault_uiomove(char *data, int xfersize, struct uio *uio)
 {
 	struct uio transp_uio;
-	struct iovec transp_iov[1];
+	kiovec_t transp_iov[1];
 	struct thread *td;
 	size_t adv;
 	int error, pgadv;
@@ -1234,12 +1236,12 @@ vn_io_fault_uiomove(char *data, int xfersize, struct uio *uio)
 	}
 	transp_uio.uio_td = uio->uio_td;
 	error = uiomove_fromphys(td->td_ma,
-	    ((vm_offset_t)uio->uio_iov->iov_base) & PAGE_MASK,
+	    ((vm_offset_t)(__cheri_fromcap void *)uio->uio_iov->iov_base) & PAGE_MASK,
 	    xfersize, &transp_uio);
 	adv = xfersize - transp_uio.uio_resid;
 	pgadv =
-	    (((vm_offset_t)uio->uio_iov->iov_base + adv) >> PAGE_SHIFT) -
-	    (((vm_offset_t)uio->uio_iov->iov_base) >> PAGE_SHIFT);
+	    (((vm_offset_t)(__cheri_fromcap void *)uio->uio_iov->iov_base + adv) >> PAGE_SHIFT) -
+	    (((vm_offset_t)(__cheri_fromcap void *)uio->uio_iov->iov_base) >> PAGE_SHIFT);
 	td->td_ma += pgadv;
 	KASSERT(td->td_ma_cnt >= pgadv, ("consumed pages %d %d", td->td_ma_cnt,
 	    pgadv));
@@ -1265,7 +1267,7 @@ vn_io_fault_pgmove(vm_page_t ma[], vm_offset_t offset, int xfersize,
 
 	KASSERT(uio->uio_iovcnt == 1, ("uio_iovcnt %d", uio->uio_iovcnt));
 	cnt = xfersize > uio->uio_resid ? uio->uio_resid : xfersize;
-	iov_base = (vm_offset_t)uio->uio_iov->iov_base;
+	iov_base = (vm_offset_t)(__cheri_fromcap void *)uio->uio_iov->iov_base;
 	switch (uio->uio_rw) {
 	case UIO_WRITE:
 		pmap_copy_pages(td->td_ma, iov_base & PAGE_MASK, ma,
@@ -1924,7 +1926,7 @@ vn_extattr_get(struct vnode *vp, int ioflg, int attrnamespace,
     const char *attrname, int *buflen, char *buf, struct thread *td)
 {
 	struct uio	auio;
-	struct iovec	iov;
+	kiovec_t	iov;
 	int	error;
 
 	IOVEC_INIT(&iov, buf, *buflen);
@@ -1964,7 +1966,7 @@ vn_extattr_set(struct vnode *vp, int ioflg, int attrnamespace,
     const char *attrname, int buflen, char *buf, struct thread *td)
 {
 	struct uio	auio;
-	struct iovec	iov;
+	kiovec_t	iov;
 	struct mount	*mp;
 	int	error;
 

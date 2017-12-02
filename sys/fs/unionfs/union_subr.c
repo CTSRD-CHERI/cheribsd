@@ -972,7 +972,7 @@ unionfs_copyfile_core(struct vnode *lvp, struct vnode *uvp,
 	int		bufoffset;
 	char           *buf;
 	struct uio	uio;
-	struct iovec	iov;
+	kiovec_t	iov;
 
 	error = 0;
 	memset(&uio, 0, sizeof(uio));
@@ -1115,7 +1115,7 @@ unionfs_check_rmdir(struct vnode *vp, struct ucred *cred, struct thread *td)
 	struct dirent  *dp;
 	struct dirent  *edp;
 	struct uio	uio;
-	struct iovec	iov;
+	kiovec_t	iov;
 
 	ASSERT_VOP_ELOCKED(vp, "unionfs_check_rmdir");
 

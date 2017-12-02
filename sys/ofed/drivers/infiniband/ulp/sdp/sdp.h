@@ -707,13 +707,13 @@ void sdp_rx_comp_full(struct sdp_sock *ssk);
 
 /* sdp_zcopy.c */
 struct kiocb;
-int sdp_sendmsg_zcopy(struct kiocb *iocb, struct socket *sk, struct iovec *iov);
+int sdp_sendmsg_zcopy(struct kiocb *iocb, struct socket *sk, kiovec_t *iov);
 int sdp_handle_srcavail(struct sdp_sock *ssk, struct sdp_srcah *srcah);
 void sdp_handle_sendsm(struct sdp_sock *ssk, u32 mseq_ack);
 void sdp_handle_rdma_read_compl(struct sdp_sock *ssk, u32 mseq_ack,
 		u32 bytes_completed);
 int sdp_handle_rdma_read_cqe(struct sdp_sock *ssk);
-int sdp_rdma_to_iovec(struct socket *sk, struct iovec *iov, struct mbuf *mb,
+int sdp_rdma_to_iovec(struct socket *sk, kivec_t *iov, struct mbuf *mb,
 		unsigned long *used);
 int sdp_post_rdma_rd_compl(struct sdp_sock *ssk,
 		struct rx_srcavail_state *rx_sa);

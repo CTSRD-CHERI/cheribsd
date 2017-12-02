@@ -208,7 +208,7 @@ cd9660_getattr(ap)
 	vap->va_size	= (u_quad_t) ip->i_size;
 	if (ip->i_size == 0 && (vap->va_mode & S_IFMT) == S_IFLNK) {
 		struct vop_readlink_args rdlnk;
-		struct iovec aiov;
+		kiovec_t aiov;
 		struct uio auio;
 		char *cp;
 
@@ -708,7 +708,7 @@ cd9660_readlink(ap)
 	 * Abuse a namei buffer for now.
 	 */
 	if (uio->uio_segflg == UIO_SYSSPACE)
-		symname = uio->uio_iov->iov_base;
+		symname = (__cheri_fromcap void *)uio->uio_iov->iov_base;
 	else
 		symname = uma_zalloc(namei_zone, M_WAITOK);
 

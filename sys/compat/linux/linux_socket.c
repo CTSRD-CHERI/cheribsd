@@ -659,7 +659,7 @@ linux_sendto_hdrincl(struct thread *td, struct linux_sendto_args *linux_args)
 
 	struct ip *packet;
 	struct msghdr msg;
-	struct iovec aiov[1];
+	kiovec_t aiov[1];
 	int error;
 
 	/* Check that the packet isn't too big or too small. */
@@ -1017,7 +1017,7 @@ int
 linux_sendto(struct thread *td, struct linux_sendto_args *args)
 {
 	struct msghdr msg;
-	struct iovec aiov;
+	kiovec_t aiov;
 
 	if (linux_check_hdrincl(td, args->s) == 0)
 		/* IP_HDRINCL set, tweak the packet before sending */
@@ -1038,7 +1038,7 @@ int
 linux_recvfrom(struct thread *td, struct linux_recvfrom_args *args)
 {
 	struct msghdr msg;
-	struct iovec aiov;
+	kiovec_t aiov;
 	int error, fromlen;
 
 	if (PTRIN(args->fromlen) != NULL) {
@@ -1091,7 +1091,7 @@ linux_sendmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 	struct l_cmsghdr linux_cmsg;
 	struct l_cmsghdr *ptr_cmsg;
 	struct l_msghdr linux_msg;
-	struct iovec *iov;
+	kiovec_t *iov;
 	socklen_t datalen;
 	struct sockaddr *sa;
 	sa_family_t sa_family;
@@ -1265,7 +1265,7 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 	struct l_ucred linux_ucred;
 	socklen_t datalen, outlen;
 	struct l_msghdr linux_msg;
-	struct iovec *iov, *uiov;
+	kiovec_t *iov, *uiov;
 	struct mbuf *control = NULL;
 	struct mbuf **controlp;
 	struct timeval *ftmvl;

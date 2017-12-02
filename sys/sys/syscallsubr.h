@@ -46,7 +46,6 @@ struct kevent_copyops;
 struct kld_file_stat;
 struct ksiginfo;
 struct mbuf;
-struct msghdr;
 struct msqid_ds;
 struct pollfd;
 struct ogetdirentries_args;
@@ -214,7 +213,7 @@ int	kern_quotactl(struct thread *td, const char * __CAPABILITY path,
 int	kern_readlinkat(struct thread *td, int fd, char *path,
 	    enum uio_seg pathseg, char *buf, enum uio_seg bufseg, size_t count);
 int	kern_readv(struct thread *td, int fd, struct uio *auio);
-int	kern_recvit(struct thread *td, int s, struct msghdr *mp,
+int	kern_recvit(struct thread *td, int s, kmsghdr_t *mp,
 	    enum uio_seg fromseg, struct mbuf **controlp);
 int	kern_renameat(struct thread *td, int oldfd, char *old, int newfd,
 	    char *new, enum uio_seg pathseg);
@@ -239,7 +238,7 @@ int	kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 int	kern_setlogin(struct thread *td, const char * __CAPABILITY namebuf);
 int	kern_select(struct thread *td, int nd, fd_set *fd_in, fd_set *fd_ou,
 	    fd_set *fd_ex, struct timeval *tvp, int abi_nfdbits);
-int	kern_sendit(struct thread *td, int s, struct msghdr *mp, int flags,
+int	kern_sendit(struct thread *td, int s, kmsghdr_t *mp, int flags,
 	    struct mbuf *control, enum uio_seg segflg);
 int	kern_setgroups(struct thread *td, u_int ngrp, gid_t *groups);
 int	kern_setitimer(struct thread *, u_int, struct itimerval *,

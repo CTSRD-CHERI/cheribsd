@@ -213,7 +213,7 @@ struct mpr_command {
 	u_int				cm_length;
 	u_int				cm_out_len;
 	struct uio			cm_uio;
-	struct iovec			cm_iovec[MPR_IOVEC_COUNT];
+	kiovec_t			cm_iovec[MPR_IOVEC_COUNT];
 	u_int				cm_max_segs;
 	u_int				cm_sglsize;
 	void				*cm_sge;

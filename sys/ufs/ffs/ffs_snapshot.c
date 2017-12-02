@@ -220,7 +220,7 @@ ffs_snapshot(mp, snapfile)
 	struct vattr vat;
 	struct vnode *vp, *xvp, *mvp, *devvp;
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	struct snapdata *sn;
 	struct ufsmount *ump;
 
@@ -1959,7 +1959,7 @@ ffs_snapshot_mount(mp)
 	struct vnode *lastvp;
 	struct inode *ip;
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	void *snapblklist;
 	char *reason;
 	daddr_t snaplistsize;

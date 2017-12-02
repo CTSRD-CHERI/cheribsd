@@ -192,7 +192,7 @@ sys_read(td, uap)
 	struct read_args *uap;
 {
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	int error;
 
 	if (uap->nbyte > IOSIZE_MAX)
@@ -229,7 +229,7 @@ int
 kern_pread(struct thread *td, int fd, void *buf, size_t nbyte, off_t offset)
 {
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	int error;
 
 	if (nbyte > IOSIZE_MAX)
@@ -258,7 +258,7 @@ freebsd6_pread(struct thread *td, struct freebsd6_pread_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct readv_args {
 	int	fd;
-	struct	iovec *iovp;
+	struct	iovec_native *iovp;
 	u_int	iovcnt;
 };
 #endif
@@ -297,7 +297,7 @@ kern_readv(struct thread *td, int fd, struct uio *auio)
 #ifndef _SYS_SYSPROTO_H_
 struct preadv_args {
 	int	fd;
-	struct	iovec *iovp;
+	struct	iovec_native *iovp;
 	u_int	iovcnt;
 	off_t	offset;
 };
@@ -404,7 +404,7 @@ sys_write(td, uap)
 	struct write_args *uap;
 {
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	int error;
 
 	if (uap->nbyte > IOSIZE_MAX)
@@ -442,7 +442,7 @@ kern_pwrite(struct thread *td, int fd, const void *buf, size_t nbyte,
     off_t offset)
 {
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	int error;
 
 	if (nbyte > IOSIZE_MAX)
@@ -471,7 +471,7 @@ freebsd6_pwrite(struct thread *td, struct freebsd6_pwrite_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct writev_args {
 	int	fd;
-	struct	iovec *iovp;
+	struct	iovec_native *iovp;
 	u_int	iovcnt;
 };
 #endif
@@ -510,7 +510,7 @@ kern_writev(struct thread *td, int fd, struct uio *auio)
 #ifndef _SYS_SYSPROTO_H_
 struct pwritev_args {
 	int	fd;
-	struct	iovec *iovp;
+	struct	iovec_native *iovp;
 	u_int	iovcnt;
 	off_t	offset;
 };

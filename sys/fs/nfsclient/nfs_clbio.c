@@ -117,7 +117,7 @@ ncl_getpages(struct vop_getpages_args *ap)
 {
 	int i, error, nextoff, size, toff, count, npages;
 	struct uio uio;
-	struct iovec iov;
+	kiovec_t iov;
 	vm_offset_t kva;
 	struct buf *bp;
 	struct vnode *vp;
@@ -264,7 +264,7 @@ int
 ncl_putpages(struct vop_putpages_args *ap)
 {
 	struct uio uio;
-	struct iovec iov;
+	kiovec_t iov;
 	int i, error, npages, count;
 	off_t offset;
 	int *rtvals;
@@ -747,12 +747,12 @@ nfs_directio_write(vp, uiop, cred, ioflag)
 	if (ioflag & IO_SYNC) {
 		int iomode, must_commit;
 		struct uio uio;
-		struct iovec iov;
+		kiovec_t iov;
 do_sync:
 		while (uiop->uio_resid > 0) {
 			size = MIN(uiop->uio_resid, wsize);
 			size = MIN(uiop->uio_iov->iov_len, size);
-			IOVEC_INIT(&iov, uiop->uio_iov->iov_base, size);
+			IOVEC_INIT_C(&iov, uiop->uio_iov->iov_base, size);
 			uio.uio_iov = &iov;
 			uio.uio_iovcnt = 1;
 			uio.uio_offset = uiop->uio_offset;
@@ -778,7 +778,7 @@ do_sync:
 		}
 	} else {
 		struct uio *t_uio;
-		struct iovec *t_iov;
+		kiovec_t *t_iov;
 		struct buf *bp;
 
 		/*
@@ -800,7 +800,7 @@ do_sync:
 			size = MIN(uiop->uio_iov->iov_len, size);
 			bp = getpbuf(&ncl_pbuf_freecnt);
 			t_uio = malloc(sizeof(struct uio), M_NFSDIRECTIO, M_WAITOK);
-			t_iov = malloc(sizeof(struct iovec), M_NFSDIRECTIO, M_WAITOK);
+			t_iov = malloc(sizeof(kiovec_t), M_NFSDIRECTIO, M_WAITOK);
 			IOVEC_INIT(t_iov, malloc(size, M_NFSDIRECTIO, M_WAITOK),
 			    size);
 			t_uio->uio_iov = t_iov;
@@ -814,7 +814,7 @@ do_sync:
 			    uiop->uio_segflg == UIO_SYSSPACE,
 			    ("nfs_directio_write: Bad uio_segflg"));
 			if (uiop->uio_segflg == UIO_USERSPACE) {
-				error = copyin(uiop->uio_iov->iov_base,
+				error = copyin_c(uiop->uio_iov->iov_base,
 				    t_iov->iov_base, size);
 				if (error != 0)
 					goto err_free;
@@ -823,8 +823,8 @@ do_sync:
 				 * UIO_SYSSPACE may never happen, but handle
 				 * it just in case it does.
 				 */
-				bcopy(uiop->uio_iov->iov_base, t_iov->iov_base,
-				    size);
+				bcopy((__cheri_fromcap void *)uiop->uio_iov->iov_base,
+				    (__cheri_fromcap void *)t_iov->iov_base, size);
 			bp->b_flags |= B_DIRECT;
 			bp->b_iocmd = BIO_WRITE;
 			if (cred != NOCRED) {
@@ -837,7 +837,7 @@ do_sync:
 			error = ncl_asyncio(nmp, bp, NOCRED, td);
 err_free:
 			if (error) {
-				free(t_iov->iov_base, M_NFSDIRECTIO);
+				free_c(t_iov->iov_base, M_NFSDIRECTIO);
 				free(t_iov, M_NFSDIRECTIO);
 				free(t_uio, M_NFSDIRECTIO);
 				bp->b_vp = NULL;
@@ -1556,13 +1556,13 @@ ncl_doio_directwrite(struct buf *bp)
 {
 	int iomode, must_commit;
 	struct uio *uiop = (struct uio *)bp->b_caller1;
-	char *iov_base = uiop->uio_iov->iov_base;
+	char * __capability iov_base = uiop->uio_iov->iov_base;
 
 	iomode = NFSWRITE_FILESYNC;
 	uiop->uio_td = NULL; /* NULL since we're in nfsiod */
 	ncl_writerpc(bp->b_vp, uiop, bp->b_wcred, &iomode, &must_commit, 0);
 	KASSERT((must_commit == 0), ("ncl_doio_directwrite: Did not commit write"));
-	free(iov_base, M_NFSDIRECTIO);
+	free_c(iov_base, M_NFSDIRECTIO);
 	free(uiop->uio_iov, M_NFSDIRECTIO);
 	free(uiop, M_NFSDIRECTIO);
 	if ((bp->b_flags & B_DIRECT) && bp->b_iocmd == BIO_WRITE) {
@@ -1602,7 +1602,7 @@ ncl_doio(struct vnode *vp, struct buf *bp, struct ucred *cr, struct thread *td,
 	struct nfsmount *nmp;
 	int error = 0, iomode, must_commit = 0;
 	struct uio uio;
-	struct iovec io;
+	kiovec_t io;
 	struct proc *p = td ? td->td_proc : NULL;
 	uint8_t	iocmd;
 

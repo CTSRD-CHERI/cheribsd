@@ -52,7 +52,7 @@ static int
 write_bytes(struct diffarg *da)
 {
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 
 	IOVEC_INIT_OBJ(&aiov, da->da_ddr);
 	auio.uio_iov = &aiov;

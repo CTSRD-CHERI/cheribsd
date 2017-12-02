@@ -136,7 +136,8 @@ physio(struct cdev *dev, struct uio *uio, int ioflag)
 				curthread->td_ru.ru_oublock++;
 			}
 			bp->bio_offset = uio->uio_offset;
-			bp->bio_data = uio->uio_iov[i].iov_base;
+			bp->bio_data =
+			    (__cheri_fromcap void *)uio->uio_iov[i].iov_base;
 			bp->bio_length = uio->uio_iov[i].iov_len;
 			if (bp->bio_length > dev->si_iosize_max)
 				bp->bio_length = dev->si_iosize_max;

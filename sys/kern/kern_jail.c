@@ -303,7 +303,7 @@ sys_jail(struct thread *td, struct jail_args *uap)
 int
 kern_jail(struct thread *td, struct jail *j)
 {
-	struct iovec optiov[2 * (4 + nitems(pr_allow_names)
+	kiovec_t optiov[2 * (4 + nitems(pr_allow_names)
 #ifdef INET
 			    + 1
 #endif
@@ -431,7 +431,7 @@ kern_jail(struct thread *td, struct jail *j)
 #endif
 #ifdef INET6
 	optstr = "ip6.addr";
-	IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
+	IOVEC_INIT(&optiov[opt.uio_iovcnt], optstr, strlen(optstr) + 1);
 	opt.uio_iovcnt++;
 	IOVEC_INIT(&optiov[opt.uio_iovcnt], u_ip6,
 	    j->ip6s * sizeof(struct in6_addr));
@@ -452,7 +452,7 @@ kern_jail(struct thread *td, struct jail *j)
 
 /*
  * struct jail_set_args {
- *	struct iovec *iovp;
+ *	kiovec_t *iovp;
  *	unsigned int iovcnt;
  *	int flags;
  * };
@@ -1879,11 +1879,12 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 		    &errmsg_len) == 0 && errmsg_len > 0) {
 			errmsg_pos = 2 * vfs_getopt_pos(opts, "errmsg") + 1;
 			if (optuio->uio_segflg == UIO_SYSSPACE)
-				bcopy(errmsg,
+				bcopy(errmsg, (__cheri_fromcap void *)
 				    optuio->uio_iov[errmsg_pos].iov_base,
 				    errmsg_len);
 			else
-				copyout(errmsg,
+				copyout_c(
+				    (__cheri_tocap char * __capability)errmsg,
 				    optuio->uio_iov[errmsg_pos].iov_base,
 				    errmsg_len);
 		}
@@ -1904,7 +1905,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 
 /*
  * struct jail_get_args {
- *	struct iovec *iovp;
+ *	kiovec_t *iovp;
  *	unsigned int iovcnt;
  *	int flags;
  * };
@@ -1924,8 +1925,7 @@ sys_jail_get(struct thread *td, struct jail_get_args *uap)
 		return (error);
 	error = kern_jail_get(td, auio, uap->flags);
 	if (error == 0)
-		error = copyout(auio->uio_iov, uap->iovp,
-		    uap->iovcnt * sizeof (struct iovec));
+		error = updateiov(auio, uap->iovp);
 	free(auio, M_IOV);
 	return (error);
 }
@@ -2172,10 +2172,12 @@ kern_jail_get(struct thread *td, struct uio *optuio, int flags)
 			if (opt->value != NULL) {
 				if (optuio->uio_segflg == UIO_SYSSPACE) {
 					bcopy(opt->value,
+					    (__cheri_fromcap void *)
 					    optuio->uio_iov[pos].iov_base,
 					    opt->len);
 				} else {
-					error = copyout(opt->value,
+					error = copyout_c(
+					    (__cheri_tocap void * __capability)opt->value,
 					    optuio->uio_iov[pos].iov_base,
 					    opt->len);
 					if (error)
@@ -2198,11 +2200,12 @@ kern_jail_get(struct thread *td, struct uio *optuio, int flags)
 		errmsg_pos = 2 * errmsg_pos + 1;
 		if (errmsg_len > 0) {
 			if (optuio->uio_segflg == UIO_SYSSPACE)
-				bcopy(errmsg,
+				bcopy(errmsg, (__cheri_fromcap void *)
 				    optuio->uio_iov[errmsg_pos].iov_base,
 				    errmsg_len);
 			else
-				copyout(errmsg,
+				copyout_c((__cheri_tocap char * __capability)
+				    errmsg,
 				    optuio->uio_iov[errmsg_pos].iov_base,
 				    errmsg_len);
 		}

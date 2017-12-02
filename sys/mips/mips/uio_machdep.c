@@ -67,7 +67,7 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 {
 	struct sf_buf *sf;
 	struct thread *td = curthread;
-	struct iovec *iov;
+	kiovec_t *iov;
 	void *cp;
 	vm_offset_t page_offset;
 	vm_paddr_t pa;
@@ -113,9 +113,12 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 		case UIO_USERSPACE:
 			maybe_yield();
 			if (uio->uio_rw == UIO_READ)
-				error = copyout(cp, iov->iov_base, cnt);
+				error = copyout_c(
+				    (__cheri_tocap void * __capability)cp,
+				    iov->iov_base, cnt);
 			else
-				error = copyin(iov->iov_base, cp, cnt);
+				error = copyin_c(iov->iov_base,
+				    (__cheri_tocap void * __capability)cp, cnt);
 			if (error) {
 				if (sf != NULL)
 					sf_buf_free(sf);
@@ -128,15 +131,19 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 			    CAP_ALIGNED((uintptr_t)iov->iov_base) &&
 			    CAP_ALIGNED(cnt)) {
 				if (uio->uio_rw == UIO_READ)
-					cheri_bcopy(cp, iov->iov_base, cnt);
+					cheri_bcopy(cp, (__cheri_fromcap void *)
+					    iov->iov_base, cnt);
 				else
-					cheri_bcopy(iov->iov_base, cp, cnt);
+					cheri_bcopy((__cheri_fromcap void *)
+					    iov->iov_base, cp, cnt);
 			} else
 #endif
 			if (uio->uio_rw == UIO_READ)
-				bcopy(cp, iov->iov_base, cnt);
+				bcopy(cp, (__cheri_fromcap void *)iov->iov_base,
+				    cnt);
 			else
-				bcopy(iov->iov_base, cp, cnt);
+				bcopy((__cheri_fromcap void *)iov->iov_base,
+				    cp, cnt);
 			break;
 		case UIO_NOCOPY:
 			break;

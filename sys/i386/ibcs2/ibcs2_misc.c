@@ -319,7 +319,7 @@ ibcs2_getdents(struct thread *td, struct ibcs2_getdents_args *uap)
 	cap_rights_t rights;
 	struct file *fp;
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	struct ibcs2_dirent idb;
 	off_t off;			/* true file offset */
 	int buflen, error, eofflag;
@@ -470,7 +470,7 @@ ibcs2_read(struct thread *td, struct ibcs2_read_args *uap)
 	cap_rights_t rights;
 	struct file *fp;
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	struct ibcs2_direct {
 		ibcs2_ino_t ino;
 		char name[14];

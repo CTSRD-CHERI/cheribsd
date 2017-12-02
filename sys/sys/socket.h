@@ -423,6 +423,7 @@ struct sockproto {
  * Message header for recvmsg and sendmsg calls.
  * Used value-result for recvmsg, value only for sendmsg.
  */
+#ifndef _KERNEL
 struct msghdr {
 	void		*msg_name;		/* optional address */
 	socklen_t	 msg_namelen;		/* size of address */
@@ -432,6 +433,32 @@ struct msghdr {
 	socklen_t	 msg_controllen;	/* ancillary data buffer len */
 	int		 msg_flags;		/* flags on received message */
 };
+#else /* _KERNEL */
+struct msghdr_c {
+	void		* __capability msg_name;		/* optional address */
+	socklen_t	 msg_namelen;		/* size of address */
+	struct iovec_c	* __capability msg_iov;		/* scatter/gather array */
+	int		 msg_iovlen;		/* # elements in msg_iov */
+	void		* __capability msg_control;		/* ancillary data, see below */
+	socklen_t	 msg_controllen;	/* ancillary data buffer len */
+	int		 msg_flags;		/* flags on received message */
+};
+struct msghdr_native {
+	void		*msg_name;		/* optional address */
+	socklen_t	 msg_namelen;		/* size of address */
+	struct iovec_native	*msg_iov;	/* scatter/gather array */
+	int		 msg_iovlen;		/* # elements in msg_iov */
+	void		*msg_control;		/* ancillary data, see below */
+	socklen_t	 msg_controllen;	/* ancillary data buffer len */
+	int		 msg_flags;		/* flags on received message */
+}; /* _KERNEL */
+#if __has_feature(capabilities)
+typedef	struct msghdr_c		kmsghdr_t;
+#else
+typedef	struct msghdr_native	kmsghdr_t;
+#endif
+typedef	struct msghdr_native	umsghdr_t;
+#endif
 
 #define	MSG_OOB		 0x00000001	/* process out-of-band data */
 #define	MSG_PEEK	 0x00000002	/* peek at incoming message */
@@ -542,7 +569,7 @@ struct sockcred {
 	    ((char *)(cmsg) + \
 	    _CMSG_ALIGN(((struct cmsghdr *)(cmsg))->cmsg_len) + \
 	    _CMSG_ALIGN(sizeof(struct cmsghdr)) > \
-	    (char *)(mhdr)->msg_control + (mhdr)->msg_controllen) ? \
+	    (__cheri_fromcap char *)(mhdr)->msg_control + (mhdr)->msg_controllen) ? \
 	    (struct cmsghdr *)0 : \
 	    (struct cmsghdr *)(void *)((char *)(cmsg) + \
 	    _CMSG_ALIGN(((struct cmsghdr *)(cmsg))->cmsg_len)))
@@ -553,7 +580,7 @@ struct sockcred {
  */
 #define	CMSG_FIRSTHDR(mhdr) \
 	((mhdr)->msg_controllen >= sizeof(struct cmsghdr) ? \
-	 (struct cmsghdr *)(mhdr)->msg_control : \
+	 (__cheri_fromcap struct cmsghdr *)(mhdr)->msg_control : \
 	 (struct cmsghdr *)0)
 
 #if __BSD_VISIBLE
@@ -584,14 +611,16 @@ struct osockaddr {
 	unsigned short sa_family;	/* address family */
 	char	sa_data[14];		/* up to 14 bytes of direct address */
 };
+#endif
 
+#ifdef _KERNEL
 /*
  * 4.3-compat message header (move to compat file later).
  */
 struct omsghdr {
 	char	*msg_name;		/* optional address */
 	int	msg_namelen;		/* size of address */
-	struct	iovec *msg_iov;		/* scatter/gather array */
+	struct	iovec_native *msg_iov;		/* scatter/gather array */
 	int	msg_iovlen;		/* # elements in msg_iov */
 	char	*msg_accrights;		/* access rights sent/received */
 	int	msg_accrightslen;
@@ -618,12 +647,29 @@ struct omsghdr {
 /*
  * sendfile(2) header/trailer struct
  */
+#ifndef _KERNEL
 struct sf_hdtr {
 	struct iovec *headers;	/* pointer to an array of header struct iovec's */
 	int hdr_cnt;		/* number of header iovec's */
 	struct iovec *trailers;	/* pointer to an array of trailer struct iovec's */
 	int trl_cnt;		/* number of trailer iovec's */
 };
+#else /* _KERNEL */
+struct sf_hdtr_c {
+	struct iovec_c * __capability headers;	/* pointer to an array of header struct iovec's */
+	int hdr_cnt;		/* number of header iovec's */
+	struct iovec_c * __capability trailers;	/* pointer to an array of trailer struct iovec's */
+	int trl_cnt;		/* number of trailer iovec's */
+};
+struct sf_hdtr_native {
+	struct iovec_native *headers;	/* pointer to an array of header struct iovec's */
+	int hdr_cnt;		/* number of header iovec's */
+	struct iovec_native *trailers;	/* pointer to an array of trailer struct iovec's */
+	int trl_cnt;		/* number of trailer iovec's */
+};
+typedef	struct sf_hdtr_c	ksf_hdtr_t;
+typedef	struct sf_hdtr_native	usf_hdtr_t;
+#endif /* _KERNEL */
 
 /*
  * Sendfile-specific flag(s)
@@ -642,10 +688,24 @@ struct sf_hdtr {
 /*
  * Sendmmsg/recvmmsg specific structure(s)
  */
+
+#ifndef _KERNEL
 struct mmsghdr {
 	struct msghdr	msg_hdr;		/* message header */
 	ssize_t		msg_len;		/* message length */
 };
+#else /* _KERNEL */
+struct mmsghdr_c {
+	struct msghdr_c	msg_hdr;		/* message header */
+	ssize_t		msg_len;		/* message length */
+};
+struct mmsghdr_native {
+	struct msghdr_native	msg_hdr;		/* message header */
+	ssize_t		msg_len;		/* message length */
+};
+typedef	struct mmsghdr_c	kmmsghdr_t;
+typedef	struct mmsghdr_native	ummsghdr_t;
+#endif /* _KERNEL */
 #endif /* __BSD_VISIBLE */
 
 #ifndef	_KERNEL

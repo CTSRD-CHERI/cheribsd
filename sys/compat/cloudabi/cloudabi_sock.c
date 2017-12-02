@@ -247,16 +247,16 @@ cloudabi_sys_sock_stat_get(struct thread *td,
 }
 
 int
-cloudabi_sock_recv(struct thread *td, cloudabi_fd_t fd, struct iovec *data,
+cloudabi_sock_recv(struct thread *td, cloudabi_fd_t fd, kiovec_t *data,
     size_t datalen, cloudabi_fd_t *fds, size_t fdslen,
     cloudabi_msgflags_t flags, size_t *rdatalen, size_t *rfdslen,
     cloudabi_sockaddr_t *peername, cloudabi_msgflags_t *rflags)
 {
 	struct sockaddr_storage ss;
-	struct msghdr hdr = {
+	kmsghdr_t hdr = {
 		.msg_name = &ss,
 		.msg_namelen = sizeof(ss),
-		.msg_iov = data,
+		.msg_iov = (__cheri_tocap kiovec_t * __capability)data,
 		.msg_iovlen = datalen,
 	};
 	struct mbuf *control;
@@ -290,7 +290,8 @@ cloudabi_sock_recv(struct thread *td, cloudabi_fd_t fd, struct iovec *data,
 	if (control != NULL) {
 		struct cmsghdr *chdr;
 
-		hdr.msg_control = mtod(control, void *);
+		hdr.msg_control =
+		    (__cheri_tocap void * __capability)mtod(control, void *);
 		hdr.msg_controllen = control->m_len;
 		for (chdr = CMSG_FIRSTHDR(&hdr); chdr != NULL;
 		    chdr = CMSG_NXTHDR(&hdr, chdr)) {
@@ -322,12 +323,12 @@ cloudabi_sock_recv(struct thread *td, cloudabi_fd_t fd, struct iovec *data,
 }
 
 int
-cloudabi_sock_send(struct thread *td, cloudabi_fd_t fd, struct iovec *data,
+cloudabi_sock_send(struct thread *td, cloudabi_fd_t fd, kiovec_t *data,
     size_t datalen, const cloudabi_fd_t *fds, size_t fdslen,
     cloudabi_msgflags_t flags, size_t *rdatalen)
 {
-	struct msghdr hdr = {
-		.msg_iov = data,
+	kmsghdr_t hdr = {
+		.msg_iov = (__cheri_tocap struct iovec_c * __capability)data,
 		.msg_iovlen = datalen,
 	};
 	struct mbuf *control;

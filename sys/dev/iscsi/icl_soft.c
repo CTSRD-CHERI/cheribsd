@@ -172,7 +172,7 @@ icl_conn_receive(struct icl_conn *ic, size_t len)
 static int
 icl_conn_receive_buf(struct icl_conn *ic, void *buf, size_t len)
 {
-	struct iovec iov[1];
+	kiovec_t iov[1];
 	struct uio uio;
 	struct socket *so;
 	int error, flags;

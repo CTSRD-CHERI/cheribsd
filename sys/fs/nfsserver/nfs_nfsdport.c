@@ -342,7 +342,7 @@ nfsvno_namei(struct nfsrv_descript *nd, struct nameidata *ndp,
 {
 	struct componentname *cnp = &ndp->ni_cnd;
 	int i;
-	struct iovec aiov;
+	kiovec_t aiov;
 	struct uio auio;
 	int lockleaf = (cnp->cn_flags & LOCKLEAF) != 0, linklen;
 	int error = 0, crossmnt;
@@ -567,8 +567,8 @@ int
 nfsvno_readlink(struct vnode *vp, struct ucred *cred, struct thread *p,
     struct mbuf **mpp, struct mbuf **mpendp, int *lenp)
 {
-	struct iovec iv[(NFS_MAXPATHLEN+MLEN-1)/MLEN];
-	struct iovec *ivp = iv;
+	kiovec_t iv[(NFS_MAXPATHLEN+MLEN-1)/MLEN];
+	kiovec_t *ivp = iv;
 	struct uio io, *uiop = &io;
 	struct mbuf *mp, *mp2 = NULL, *mp3 = NULL;
 	int i, len, tlen, error = 0;
@@ -631,8 +631,8 @@ nfsvno_read(struct vnode *vp, off_t off, int cnt, struct ucred *cred,
 {
 	struct mbuf *m;
 	int i;
-	struct iovec *iv;
-	struct iovec *iv2;
+	kiovec_t *iv;
+	kiovec_t *iv2;
 	int error = 0, len, left, siz, tlen, ioflag = 0;
 	struct mbuf *m2 = NULL, *m3;
 	struct uio io, *uiop = &io;
@@ -657,7 +657,7 @@ nfsvno_read(struct vnode *vp, off_t off, int cnt, struct ucred *cred,
 			m3 = m;
 		m2 = m;
 	}
-	MALLOC(iv, struct iovec *, i * sizeof (struct iovec),
+	MALLOC(iv, kiovec_t *, i * sizeof (kiovec_t),
 	    M_TEMP, M_WAITOK);
 	uiop->uio_iov = iv2 = iv;
 	m = m3;
@@ -717,14 +717,14 @@ int
 nfsvno_write(struct vnode *vp, off_t off, int retlen, int cnt, int stable,
     struct mbuf *mp, char *cp, struct ucred *cred, struct thread *p)
 {
-	struct iovec *ivp;
+	kiovec_t *ivp;
 	int i, len;
-	struct iovec *iv;
+	kiovec_t *iv;
 	int ioflags, error;
 	struct uio io, *uiop = &io;
 	struct nfsheur *nh;
 
-	MALLOC(ivp, struct iovec *, cnt * sizeof (struct iovec), M_TEMP,
+	MALLOC(ivp, kiovec_t *, cnt * sizeof (kiovec_t), M_TEMP,
 	    M_WAITOK);
 	uiop->uio_iov = iv = ivp;
 	uiop->uio_iovcnt = cnt;
@@ -1573,7 +1573,7 @@ nfsrvd_readdir(struct nfsrv_descript *nd, int isdgram,
 	u_int64_t off, toff, verf;
 	u_long *cookies = NULL, *cookiep;
 	struct uio io;
-	struct iovec iv;
+	kiovec_t iv;
 	int is_ufs;
 
 	if (nd->nd_repstat) {
@@ -1822,7 +1822,7 @@ nfsrvd_readdirplus(struct nfsrv_descript *nd, int isdgram,
 	u_long *cookies = NULL, *cookiep;
 	nfsattrbit_t attrbits, rderrbits, savbits;
 	struct uio io;
-	struct iovec iv;
+	kiovec_t iv;
 	struct componentname cn;
 	int at_root, is_ufs, is_zfs, needs_unbusy, supports_nfsv4acls;
 	struct mount *mp, *new_mp;

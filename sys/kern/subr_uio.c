@@ -125,7 +125,7 @@ int
 physcopyin(void *src, vm_paddr_t dst, size_t len)
 {
 	vm_page_t m[PHYS_PAGE_COUNT(len)];
-	struct iovec iov[1];
+	kiovec_t iov[1];
 	struct uio uio;
 	int i;
 
@@ -145,7 +145,7 @@ int
 physcopyout(vm_paddr_t src, void *dst, size_t len)
 {
 	vm_page_t m[PHYS_PAGE_COUNT(len)];
-	struct iovec iov[1];
+	kiovec_t iov[1];
 	struct uio uio;
 	int i;
 
@@ -233,7 +233,7 @@ static int
 uiomove_faultflag(void *cp, int n, struct uio *uio, int nofault)
 {
 	struct thread *td;
-	struct iovec *iov;
+	kiovec_t *iov;
 	size_t cnt;
 	int error, newflags, save;
 
@@ -274,18 +274,23 @@ uiomove_faultflag(void *cp, int n, struct uio *uio, int nofault)
 		case UIO_USERSPACE:
 			maybe_yield();
 			if (uio->uio_rw == UIO_READ)
-				error = copyout(cp, iov->iov_base, cnt);
+				error = copyout_c(
+				    (__cheri_tocap void * __capability)cp,
+				    iov->iov_base, cnt);
 			else
-				error = copyin(iov->iov_base, cp, cnt);
+				error = copyin_c(iov->iov_base,
+				    (__cheri_tocap void * __capability)cp, cnt);
 			if (error)
 				goto out;
 			break;
 
 		case UIO_SYSSPACE:
 			if (uio->uio_rw == UIO_READ)
-				bcopy(cp, iov->iov_base, cnt);
+				bcopy(cp, (__cheri_fromcap void *)iov->iov_base,
+				    cnt);
 			else
-				bcopy(iov->iov_base, cp, cnt);
+				bcopy((__cheri_fromcap void *)iov->iov_base, cp,
+				    cnt);
 			break;
 		case UIO_NOCOPY:
 			break;
@@ -329,8 +334,8 @@ uiomove_frombuf(void *buf, int buflen, struct uio *uio)
 int
 ureadc(int c, struct uio *uio)
 {
-	struct iovec *iov;
-	char *iov_base;
+	kiovec_t *iov;
+	char * __capability iov_base;
 
 	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
 	    "Calling ureadc()");
@@ -347,7 +352,7 @@ again:
 	switch (uio->uio_segflg) {
 
 	case UIO_USERSPACE:
-		if (subyte(iov->iov_base, c) < 0)
+		if (subyte_c(iov->iov_base, c) < 0)
 			return (EFAULT);
 		break;
 
@@ -404,41 +409,52 @@ copyinstrfrom(const void * __restrict src, void * __restrict dst, size_t len,
 }
 
 int
-copyiniov(const struct iovec *iovp, u_int iovcnt, struct iovec **iov, int error)
+copyiniov(const uiovec_t *iovp, u_int iovcnt, kiovec_t **iov, int error)
 {
-	u_int iovlen;
+	uiovec_t useriov;
+	kiovec_t *iovs;
+	size_t iovlen;
+	int i;
 
 	*iov = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (error);
-	iovlen = iovcnt * sizeof (struct iovec);
-	*iov = malloc(iovlen, M_IOV, M_WAITOK);
-	error = copyin(iovp, *iov, iovlen);
-	if (error) {
-		free(*iov, M_IOV);
-		*iov = NULL;
+	iovlen = iovcnt * sizeof (kiovec_t);
+	iovs = malloc(iovlen, M_IOV, M_WAITOK);
+	/* XXXBD: needlessly slow when uiovec_t and kiovec_t are the same */
+	for (i = 0; i < iovcnt; i++) {
+		error = copyin(iovp, *iov, iovlen);
+		if (error) {
+			free(*iov, M_IOV);
+		}
+		IOVEC_INIT(iovs + i, useriov.iov_base, useriov.iov_len);
 	}
+	*iov = iovs;
 	return (error);
 }
 
 int
-copyinuio(const struct iovec *iovp, u_int iovcnt, struct uio **uiop)
+copyinuio(const uiovec_t *iovp, u_int iovcnt, struct uio **uiop)
 {
-	struct iovec *iov;
+	uiovec_t u_iov;
+	kiovec_t *iov;
 	struct uio *uio;
-	u_int iovlen;
+	size_t iovlen;
 	int error, i;
 
 	*uiop = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (EINVAL);
-	iovlen = iovcnt * sizeof (struct iovec);
+	iovlen = iovcnt * sizeof (kiovec_t);
 	uio = malloc(iovlen + sizeof *uio, M_IOV, M_WAITOK);
-	iov = (struct iovec *)(uio + 1);
-	error = copyin(iovp, iov, iovlen);
-	if (error) {
-		free(uio, M_IOV);
-		return (error);
+	iov = (kiovec_t *)(uio + 1);
+	for (i = 0; i < iovcnt; i++) {
+		error = copyin(&iovp[i], &u_iov, sizeof(u_iov));
+		if (error) {
+			free(uio, M_IOV);
+			return (error);
+		}
+		IOVEC_INIT(&iov[i], u_iov.iov_base, u_iov.iov_len);
 	}
 	uio->uio_iov = iov;
 	uio->uio_iovcnt = iovcnt;
@@ -457,17 +473,34 @@ copyinuio(const struct iovec *iovp, u_int iovcnt, struct uio **uiop)
 	return (0);
 }
 
+/*
+ * Update the lengths in a userspace iovec to match those in a struct uio's
+ * iovec.
+ */
+int
+updateiov(const struct uio *uiop, uiovec_t *iovp)
+{
+	int i, error;
+
+	for (i = 0; i < uiop->uio_iovcnt; i++) {
+		error = suword(&iovp[i].iov_len, uiop->uio_iov[i].iov_len);
+		if (error != 0)
+			return (error);
+	}
+	return (0);
+}
+
 struct uio *
 cloneuio(struct uio *uiop)
 {
 	struct uio *uio;
 	int iovlen;
 
-	iovlen = uiop->uio_iovcnt * sizeof (struct iovec);
+	iovlen = uiop->uio_iovcnt * sizeof (kiovec_t);
 	uio = malloc(iovlen + sizeof *uio, M_IOV, M_WAITOK);
 	*uio = *uiop;
-	uio->uio_iov = (struct iovec *)(uio + 1);
-	bcopy(uiop->uio_iov, uio->uio_iov, iovlen);
+	uio->uio_iov = (kiovec_t *)(uio + 1);
+	cheri_bcopy(uiop->uio_iov, uio->uio_iov, iovlen);
 	return (uio);
 }
 

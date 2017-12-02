@@ -761,7 +761,7 @@ aio_process_rw(struct kaiocb *job)
 	struct aiocb *cb;
 	struct file *fp;
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	ssize_t cnt;
 	long msgsnd_st, msgsnd_end;
 	long msgrcv_st, msgrcv_end;

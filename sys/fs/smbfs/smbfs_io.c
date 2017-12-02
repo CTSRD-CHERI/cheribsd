@@ -309,7 +309,7 @@ smbfs_doio(struct vnode *vp, struct buf *bp, struct ucred *cr, struct thread *td
 	struct smbmount *smp = VFSTOSMBFS(vp->v_mount);
 	struct smbnode *np = VTOSMB(vp);
 	struct uio *uiop;
-	struct iovec io;
+	kiovec_t io;
 	struct smb_cred *scred;
 	int error = 0;
 
@@ -426,7 +426,7 @@ smbfs_getpages(ap)
 #else
 	int i, error, nextoff, size, toff, npages, count;
 	struct uio uio;
-	struct iovec iov;
+	kiovec_t iov;
 	vm_offset_t kva;
 	struct buf *bp;
 	struct vnode *vp;
@@ -566,7 +566,7 @@ smbfs_putpages(ap)
 	return error;
 #else
 	struct uio uio;
-	struct iovec iov;
+	kiovec_t iov;
 	vm_offset_t kva;
 	struct buf *bp;
 	int i, npages, count;

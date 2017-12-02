@@ -306,7 +306,7 @@ nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thre
 	    case SMBIOC_READ: case SMBIOC_WRITE: {
 		struct smbioc_rw *rwrq = (struct smbioc_rw*)data;
 		struct uio auio;
-		struct iovec iov;
+		kiovec_t iov;
 	
 		if ((ssp = sdp->sd_share) == NULL) {
 			error = ENOTCONN;

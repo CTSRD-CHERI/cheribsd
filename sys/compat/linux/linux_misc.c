@@ -2515,7 +2515,7 @@ int
 linux_getrandom(struct thread *td, struct linux_getrandom_args *args)
 {
 	struct uio uio;
-	struct iovec iov;
+	kiobec_t iov;
 	int error;
 
 	if (args->flags & ~(LINUX_GRND_NONBLOCK|LINUX_GRND_RANDOM))

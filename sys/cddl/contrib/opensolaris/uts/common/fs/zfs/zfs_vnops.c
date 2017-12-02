@@ -5730,7 +5730,7 @@ vop_listextattr {
 	char attrprefix[16];
 	u_char dirbuf[sizeof(struct dirent)];
 	struct dirent *dp;
-	struct iovec aiov;
+	kiovec_t aiov;
 	struct uio auio, *uio = ap->a_uio;
 	size_t *sizep = ap->a_size;
 	size_t plen;

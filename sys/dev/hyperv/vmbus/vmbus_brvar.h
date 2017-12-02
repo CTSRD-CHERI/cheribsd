@@ -125,6 +125,6 @@ void		vmbus_txbr_init(struct vmbus_txbr *tbr);
 void		vmbus_txbr_deinit(struct vmbus_txbr *tbr);
 void		vmbus_txbr_setup(struct vmbus_txbr *tbr, void *buf, int blen);
 int		vmbus_txbr_write(struct vmbus_txbr *tbr,
-		    const struct iovec iov[], int iovlen, boolean_t *need_sig);
+		    const kiovec_t iov[], int iovlen, boolean_t *need_sig);
 
 #endif  /* _VMBUS_BRVAR_H_ */

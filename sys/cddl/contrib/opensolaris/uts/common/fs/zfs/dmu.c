@@ -1104,7 +1104,7 @@ dmu_xuio_fini(xuio_t *xuio)
 int
 dmu_xuio_add(xuio_t *xuio, arc_buf_t *abuf, offset_t off, size_t n)
 {
-	struct iovec *iov;
+	kiovec_t *iov;
 	uio_t *uio = &xuio->xu_uio;
 	dmu_xuio_t *priv = XUIO_XUZC_PRIV(xuio);
 	int i = priv->next++;

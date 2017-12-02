@@ -866,7 +866,7 @@ static int
 freebsd32_copyinuio(struct iovec32 *iovp, u_int iovcnt, struct uio **uiop)
 {
 	struct iovec32 iov32;
-	struct iovec *iov;
+	kiovec_t *iov;
 	struct uio *uio;
 	u_int iovlen;
 	int error, i;
@@ -874,9 +874,9 @@ freebsd32_copyinuio(struct iovec32 *iovp, u_int iovcnt, struct uio **uiop)
 	*uiop = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (EINVAL);
-	iovlen = iovcnt * sizeof(struct iovec);
+	iovlen = iovcnt * sizeof(kiovec_t);
 	uio = malloc(iovlen + sizeof *uio, M_IOV, M_WAITOK);
-	iov = (struct iovec *)(uio + 1);
+	iov = (kiovec_t *)(uio + 1);
 	for (i = 0; i < iovcnt; i++) {
 		error = copyin(&iovp[i], &iov32, sizeof(struct iovec32));
 		if (error) {
@@ -963,14 +963,14 @@ freebsd32_copyiniov(struct iovec32 *iovp32, u_int iovcnt, struct iovec **iovp,
     int error)
 {
 	struct iovec32 iov32;
-	struct iovec *iov;
+	kiovec_t *iov;
 	u_int iovlen;
 	int i;
 
 	*iovp = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (error);
-	iovlen = iovcnt * sizeof(struct iovec);
+	iovlen = iovcnt * sizeof(kiovec_t);
 	iov = malloc(iovlen, M_IOV, M_WAITOK);
 	for (i = 0; i < iovcnt; i++) {
 		error = copyin(&iovp32[i], &iov32, sizeof(struct iovec32));
@@ -985,7 +985,7 @@ freebsd32_copyiniov(struct iovec32 *iovp32, u_int iovcnt, struct iovec **iovp,
 }
 
 static int
-freebsd32_copyinmsghdr(struct msghdr32 *msg32, struct msghdr *msg)
+freebsd32_copyinmsghdr(struct msghdr32 *msg32, kmsghdr_t *msg)
 {
 	struct msghdr32 m32;
 	int error;
@@ -1004,7 +1004,7 @@ freebsd32_copyinmsghdr(struct msghdr32 *msg32, struct msghdr *msg)
 }
 
 static int
-freebsd32_copyoutmsghdr(struct msghdr *msg, struct msghdr32 *msg32)
+freebsd32_copyoutmsghdr(kmsghdr_t *msg, struct msghdr32 *msg32)
 {
 	struct msghdr32 m32;
 	int error;
@@ -1033,7 +1033,7 @@ freebsd32_copyoutmsghdr(struct msghdr *msg, struct msghdr32 *msg32)
 #define	FREEBSD32_CMSG_DATA(cmsg)	((unsigned char *)(cmsg) + \
 				 FREEBSD32_ALIGN(sizeof(struct cmsghdr)))
 static int
-freebsd32_copy_msg_out(struct msghdr *msg, struct mbuf *control)
+freebsd32_copy_msg_out(kmsghdr_t *msg, struct mbuf *control)
 {
 	struct cmsghdr *cm;
 	void *data;
@@ -1130,9 +1130,9 @@ freebsd32_recvmsg(td, uap)
 		int	flags;
 	} */ *uap;
 {
-	struct msghdr msg;
+	kmsghdr_t msg;
 	struct msghdr32 m32;
-	struct iovec *uiov, *iov;
+	kiovec_t *uiov, *iov;
 	struct mbuf *control = NULL;
 	struct mbuf **controlp;
 
@@ -1261,9 +1261,9 @@ int
 freebsd32_sendmsg(struct thread *td,
 		  struct freebsd32_sendmsg_args *uap)
 {
-	struct msghdr msg;
+	kmsghdr_t msg;
 	struct msghdr32 m32;
-	struct iovec *iov;
+	kiovec_t *iov;
 	struct mbuf *control = NULL;
 	struct sockaddr *to = NULL;
 	int error;
@@ -1317,8 +1317,8 @@ int
 freebsd32_recvfrom(struct thread *td,
 		   struct freebsd32_recvfrom_args *uap)
 {
-	struct msghdr msg;
-	struct iovec aiov;
+	kmsghdr_t msg;
+	kiovec_t aiov;
 	int error;
 
 	if (uap->fromlenaddr) {
@@ -1777,7 +1777,7 @@ freebsd32_do_sendfile(struct thread *td,
     struct freebsd32_sendfile_args *uap, int compat)
 {
 	struct sf_hdtr32 hdtr32;
-	struct sf_hdtr hdtr;
+	ksf_hdtr_t hdtr;
 	struct uio *hdr_uio, *trl_uio;
 	struct file *fp;
 	cap_rights_t rights;
@@ -2930,7 +2930,7 @@ freebsd32_cpuset_setaffinity(struct thread *td,
 int
 freebsd32_nmount(struct thread *td,
     struct freebsd32_nmount_args /* {
-    	struct iovec *iovp;
+	struct iovec32 *iovp;
     	unsigned int iovcnt;
     	int flags;
     } */ *uap)

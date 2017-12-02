@@ -2500,7 +2500,7 @@ kern_readlinkat(struct thread *td, int fd, char *path, enum uio_seg pathseg,
     char *buf, enum uio_seg bufseg, size_t count)
 {
 	struct vnode *vp;
-	struct iovec aiov;
+	kiovec_t aiov;
 	struct uio auio;
 	struct nameidata nd;
 	int error;
@@ -3981,7 +3981,7 @@ kern_getdirentries(struct thread *td, int fd, char *buf, size_t count,
 	struct vnode *vp;
 	struct file *fp;
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	cap_rights_t rights;
 	off_t loff;
 	int error, eofflag;

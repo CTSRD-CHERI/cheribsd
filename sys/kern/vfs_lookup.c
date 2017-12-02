@@ -290,7 +290,7 @@ namei(struct nameidata *ndp)
 	struct filedesc *fdp;	/* pointer to file descriptor state */
 	char *cp;		/* pointer into pathname argument */
 	struct vnode *dp;	/* the directory we are searching */
-	struct iovec aiov;		/* uio for reading symbolic links */
+	kiovec_t aiov;		/* uio for reading symbolic links */
 	struct componentname *cnp;
 	struct thread *td;
 	struct proc *p;

@@ -45,7 +45,6 @@
 
 struct module;
 struct kiocb;
-struct iovec;
 struct dentry;
 struct page;
 struct file_lock;

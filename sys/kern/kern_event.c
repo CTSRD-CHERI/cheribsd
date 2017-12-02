@@ -973,7 +973,7 @@ kern_kevent_generic(struct thread *td, struct g_kevent_args *uap,
 	int error;
 #ifdef KTRACE
 	struct uio ktruio;
-	struct iovec ktriov;
+	kiovec_t ktriov;
 	struct uio *ktruioin = NULL;
 	struct uio *ktruioout = NULL;
 	u_int kgio;

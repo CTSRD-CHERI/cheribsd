@@ -529,8 +529,7 @@ cheriabi_kevent(struct thread *td, struct cheriabi_kevent_args *uap)
 static int
 cheriabi_copyinuio(struct iovec_c *iovp, u_int iovcnt, struct uio **uiop)
 {
-	struct iovec_c iov_c;
-	struct iovec *iov;
+	kiovec_t *iov;
 	struct uio *uio;
 	u_int iovlen;
 	int error, i;
@@ -538,23 +537,13 @@ cheriabi_copyinuio(struct iovec_c *iovp, u_int iovcnt, struct uio **uiop)
 	*uiop = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (EINVAL);
-	iovlen = iovcnt * sizeof(struct iovec);
+	iovlen = iovcnt * sizeof(kiovec_t);
 	uio = malloc(iovlen + sizeof(*uio), M_IOV, M_WAITOK);
-	iov = (struct iovec *)(uio + 1);
-	for (i = 0; i < iovcnt; i++) {
-		error = copyincap(&iovp[i], &iov_c, sizeof(struct iovec_c));
-		if (error) {
-			free(uio, M_IOV);
-			return (error);
-		}
-		iov[i].iov_len = iov_c.iov_len;
-		error = cheriabi_cap_to_ptr((caddr_t *)&iov[i].iov_base,
-		    iov_c.iov_base, iov[i].iov_len,
-		    CHERI_PERM_GLOBAL | CHERI_PERM_LOAD, 1);
-		if (error) {
-			free(uio, M_IOV);
-			return (error);
-		}
+	iov = (kiovec_t *)(uio + 1);
+	error = copyincap(iovp, iov, iovlen);
+	if (error) {
+		free(uio, M_IOV);
+		return (error);
 	}
 	uio->uio_iov = iov;
 	uio->uio_iovcnt = iovcnt;
@@ -630,89 +619,39 @@ cheriabi_pwritev(struct thread *td, struct cheriabi_pwritev_args *uap)
 }
 
 int
-cheriabi_copyiniov(struct iovec_c *iovp_c, u_int iovcnt, struct iovec **iovp,
-    int error)
+cheriabi_copyiniov(struct iovec_c * __capability iovp_c, u_int iovcnt,
+    kiovec_t * __capability *iovp, int error)
 {
-	struct iovec_c iov_c;
-	struct iovec *iov;
+	kiovec_t * __capability iov;
 	u_int iovlen;
-	int i;
 
 	*iovp = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (error);
-	iovlen = iovcnt * sizeof(struct iovec);
-	iov = malloc(iovlen, M_IOV, M_WAITOK);
-	for (i = 0; i < iovcnt; i++) {
-		error = copyincap(&iovp_c[i], &iov_c, sizeof(struct iovec_c));
-		if (error) {
-			free(iov, M_IOV);
-			return (error);
-		}
-		iov[i].iov_len = iov_c.iov_len;
-		error = cheriabi_cap_to_ptr((caddr_t *)&iov[i].iov_base,
-		    iov_c.iov_base, iov[i].iov_len,
-		    CHERI_PERM_GLOBAL | CHERI_PERM_LOAD, 0);
-		if (error) {
-			free(iov, M_IOV);
-			return (error);
-		}
+	iovlen = iovcnt * sizeof(kiovec_t);
+	iov = malloc_c(iovlen, M_IOV, M_WAITOK);
+	error = copyincap_c(iovp_c, iov, iovlen);
+	if (error) {
+		free_c(iov, M_IOV);
+		return (error);
 	}
 	*iovp = iov;
 	return (0);
 }
 
 static int
-cheriabi_copyinmsghdr(const struct msghdr_c *msg_cp, struct msghdr *msg,
+cheriabi_copyinmsghdr(const struct msghdr_c *msg_cp, kmsghdr_t *msg,
     int out)
 {
-	struct msghdr_c msg_c;
-	int error;
 
-	error = copyincap(msg_cp, &msg_c, sizeof(msg_c));
-	if (error)
-		return (error);
-	error = cheriabi_cap_to_ptr((caddr_t *)&msg->msg_name, msg_c.msg_name,
-	    msg_c.msg_namelen, CHERI_PERM_GLOBAL | CHERI_PERM_LOAD, 1);
-	if (error)
-		return (error);
-	msg->msg_namelen = msg_c.msg_namelen;
-	error = cheriabi_cap_to_ptr((caddr_t *)&msg->msg_iov, msg_c.msg_iov,
-	    sizeof(struct iovec_c) * msg_c.msg_iovlen,
-	    CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP, 0);
-	if (error)
-		return (error);
-	msg->msg_iovlen = msg_c.msg_iovlen;
-	error = cheriabi_cap_to_ptr((caddr_t *)&msg->msg_control,
-	    msg_c.msg_control, msg_c.msg_controllen,
-	    CHERI_PERM_GLOBAL | (out ? CHERI_PERM_STORE : CHERI_PERM_LOAD), 1);
-	if (error)
-		return (error);
-	msg->msg_controllen = msg_c.msg_controllen;
-	msg->msg_flags = msg_c.msg_flags;
-	return (0);
+	return (copyincap(msg_cp, msg, sizeof(*msg_cp)));
 }
 
 static int
-cheriabi_copyoutmsghdr(struct msghdr *msg, struct msghdr_c *msg_c)
+cheriabi_copyoutmsghdr(kmsghdr_t *msg, struct msghdr_c *msg_cp)
 {
-	struct copy_map cm[3];
-	int error;
 
-	cm[0].koffset = offsetof(struct msghdr, msg_namelen);
-	cm[0].uoffset = offsetof(struct msghdr_c, msg_namelen);
-	cm[0].len = sizeof(msg_c->msg_namelen);
-	cm[1].koffset = offsetof(struct msghdr, msg_iovlen);
-	cm[1].uoffset = offsetof(struct msghdr_c, msg_iovlen);
-	cm[1].len = sizeof(msg_c->msg_iovlen);
-	/* Copy out msg_controllen and msg_flags */
-	cm[2].koffset = offsetof(struct msghdr, msg_controllen);
-	cm[2].uoffset = offsetof(struct msghdr_c, msg_controllen);
-	cm[2].len = sizeof(struct msghdr_c) -
-	    offsetof(struct msghdr_c, msg_controllen);
-
-	error = copyout_part(msg, msg_c, cm, 3);
-	return (error);
+	return (copyoutcap(msg, msg_cp, sizeof(msg_cp)));
 }
 
 int
@@ -723,25 +662,25 @@ cheriabi_recvmsg(struct thread *td,
 		int	flags;
 	} */ *uap)
 {
-	struct msghdr msg;
-	struct iovec *uiov, *iov;
+	kmsghdr_t msg;
+	struct iovec_c *__capability uiov;
+	kiovec_t * __capability iov;
 
 	int error;
 
 	error = cheriabi_copyinmsghdr(uap->msg, &msg, 1);
 	if (error)
 		return (error);
-	error = cheriabi_copyiniov((struct iovec_c *)msg.msg_iov, msg.msg_iovlen,
-	    &iov, EMSGSIZE);
+	uiov = (struct iovec_c * __capability)msg.msg_iov;
+	error = cheriabi_copyiniov(uiov, msg.msg_iovlen, &iov, EMSGSIZE);
 	if (error)
 		return (error);
 	msg.msg_flags = uap->flags;
-	uiov = msg.msg_iov;
 	msg.msg_iov = iov;
 
 	error = kern_recvit(td, uap->s, &msg, UIO_USERSPACE, NULL);
 	if (error == 0) {
-		msg.msg_iov = uiov;
+		msg.msg_iov = (kiovec_t * __capability)uiov;
 
 		/*
 		 * Message contents have already been copied out, update
@@ -749,7 +688,7 @@ cheriabi_recvmsg(struct thread *td,
 		 */
 		error = cheriabi_copyoutmsghdr(&msg, uap->msg);
 	}
-	free(iov, M_IOV);
+	free_c(iov, M_IOV);
 
 	return (error);
 }
@@ -758,8 +697,8 @@ int
 cheriabi_sendmsg(struct thread *td,
 		  struct cheriabi_sendmsg_args *uap)
 {
-	struct msghdr msg;
-	struct iovec *iov;
+	kmsghdr_t msg;
+	kiovec_t * __capability iov;
 	struct mbuf *control = NULL;
 	struct sockaddr *to = NULL;
 	int error;
@@ -767,18 +706,18 @@ cheriabi_sendmsg(struct thread *td,
 	error = cheriabi_copyinmsghdr(uap->msg, &msg, 0);
 	if (error)
 		return (error);
-	error = cheriabi_copyiniov((struct iovec_c *)msg.msg_iov, msg.msg_iovlen,
-	    &iov, EMSGSIZE);
+	error = cheriabi_copyiniov(msg.msg_iov, msg.msg_iovlen, &iov, EMSGSIZE);
 	if (error)
 		return (error);
 	msg.msg_iov = iov;
 	if (msg.msg_name != NULL) {
-		error = getsockaddr(&to, msg.msg_name, msg.msg_namelen);
+		error = getsockaddr(&to, (__cheri_fromcap char *)msg.msg_name,
+		    msg.msg_namelen);
 		if (error) {
 			to = NULL;
 			goto out;
 		}
-		msg.msg_name = to;
+		msg.msg_name = (__cheri_tocap void * __capability)to;
 	}
 
 	if (msg.msg_control) {
@@ -797,21 +736,18 @@ cheriabi_sendmsg(struct thread *td,
 		 * alignment of mbufs is sufficent as well.
 		 */
 		/* XXX: No support for COMPAT_OLDSOCK path */
-		error = sockargs(&control, msg.msg_control, msg.msg_controllen,
+		error = sockargs(&control,
+		    (__cheri_fromcap void *)msg.msg_control, msg.msg_controllen,
 		    MT_CONTROL);
 		if (error)
 			goto out;
-
-		/* XXXBD: sys_sendmsg doesn't do this */
-		msg.msg_control = NULL;
-		msg.msg_controllen = 0;
 	}
 
 	error = kern_sendit(td, uap->s, &msg, uap->flags, control,
 	    UIO_USERSPACE);
 
 out:
-	free(iov, M_IOV);
+	free_c(iov, M_IOV);
 	if (to)
 		free(to, M_SONAME);
 	return (error);

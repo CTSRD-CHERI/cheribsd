@@ -606,7 +606,7 @@ fuse_io_strategy(struct vnode *vp, struct buf *bp)
 	struct ucred *cred;
 	struct uio *uiop;
 	struct uio uio;
-	struct iovec io;
+	kiovec_t io;
 	int error = 0;
 
 	const int biosize = fuse_iosize(vp);

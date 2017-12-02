@@ -360,7 +360,7 @@ iicioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags, struct thread *t
 	device_t parent, iicdev;
 	struct iiccmd *s;
 	struct uio ubuf;
-	struct iovec uvec;
+	kiovec_t uvec;
 	struct iic_cdevpriv *priv;
 	int error;
 

@@ -442,12 +442,13 @@ nfs_access(struct vop_access_args *ap)
 		mtx_lock(&np->n_mtx);
 		if (ap->a_cred->cr_uid == 0 && (ap->a_accmode & VREAD)
 		    && VTONFS(vp)->n_size > 0) {
-			struct iovec aiov;
+			kiovec_t aiov;
 			struct uio auio;
 			char buf[1];
 
 			mtx_unlock(&np->n_mtx);
-			IOVEC_INIT(&aiov, buf, 1);
+			/* XXXBD: CTSRD-CHERI/clang#179 */
+			IOVEC_INIT(&aiov, &buf[0], 1);
 			auio.uio_iov = &aiov;
 			auio.uio_iovcnt = 1;
 			auio.uio_offset = 0;

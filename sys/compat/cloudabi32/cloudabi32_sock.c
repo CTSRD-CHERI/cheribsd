@@ -48,7 +48,7 @@ cloudabi32_sys_sock_recv(struct thread *td,
 	cloudabi32_recv_in_t ri;
 	cloudabi32_recv_out_t ro = {};
 	cloudabi32_iovec_t iovobj;
-	struct iovec *iov;
+	kiovec_t *iov;
 	const cloudabi32_iovec_t *user_iov;
 	size_t i, rdatalen, rfdslen;
 	int error;
@@ -60,7 +60,7 @@ cloudabi32_sys_sock_recv(struct thread *td,
 	/* Convert iovecs to native format. */
 	if (ri.ri_data_len > UIO_MAXIOV)
 		return (EINVAL);
-	iov = malloc(ri.ri_data_len * sizeof(struct iovec),
+	iov = malloc(ri.ri_data_len * sizeof(kiovec_t),
 	    M_SOCKET, M_WAITOK);
 	user_iov = TO_PTR(ri.ri_data);
 	for (i = 0; i < ri.ri_data_len; i++) {
@@ -91,7 +91,7 @@ cloudabi32_sys_sock_send(struct thread *td,
 	cloudabi32_send_in_t si;
 	cloudabi32_send_out_t so = {};
 	cloudabi32_ciovec_t iovobj;
-	struct iovec *iov;
+	kiovec_t iovec *iov;
 	const cloudabi32_ciovec_t *user_iov;
 	size_t datalen, i;
 	int error;
@@ -103,7 +103,7 @@ cloudabi32_sys_sock_send(struct thread *td,
 	/* Convert iovecs to native format. */
 	if (si.si_data_len > UIO_MAXIOV)
 		return (EINVAL);
-	iov = malloc(si.si_data_len * sizeof(struct iovec),
+	iov = malloc(si.si_data_len * sizeof(kiovec_t),
 	    M_SOCKET, M_WAITOK);
 	user_iov = TO_PTR(si.si_data);
 	for (i = 0; i < si.si_data_len; i++) {

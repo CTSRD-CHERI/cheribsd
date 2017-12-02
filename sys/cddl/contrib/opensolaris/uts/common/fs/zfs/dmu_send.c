@@ -106,7 +106,7 @@ dump_bytes(dmu_sendarg_t *dsp, void *buf, int len)
 {
 	dsl_dataset_t *ds = dmu_objset_ds(dsp->dsa_os);
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 
 	/*
 	 * The code does not rely on this (len being a multiple of 8).  We keep

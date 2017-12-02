@@ -212,7 +212,7 @@ nfsm_mbufuio(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 			goto out;
 		}
 		left = uiop->uio_iov->iov_len;
-		uiocp = uiop->uio_iov->iov_base;
+		uiocp = (__cheri_fromcap void *)uiop->uio_iov->iov_base;
 		if (left > siz)
 			left = siz;
 		uiosiz = left;

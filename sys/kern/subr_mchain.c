@@ -287,7 +287,8 @@ mb_put_uio(struct mbchain *mbp, struct uio *uiop, int size)
 		}
 		if (left > size)
 			left = size;
-		error = mb_put_mem(mbp, uiop->uio_iov->iov_base, left, mtype);
+		error = mb_put_mem(mbp,
+		    __DECAP_CHECK(uiop->uio_iov->iov_base, left), left, mtype);
 		if (error)
 			return (error);
 		uiop->uio_offset += left;
@@ -536,7 +537,7 @@ md_get_uio(struct mdchain *mdp, struct uio *uiop, int size)
 			uiop->uio_iovcnt--;
 			continue;
 		}
-		uiocp = uiop->uio_iov->iov_base;
+		uiocp = __DECAP_CHECK(uiop->uio_iov->iov_base, left);
 		if (left > size)
 			left = size;
 		error = md_get_mem(mdp, uiocp, left, mtype);

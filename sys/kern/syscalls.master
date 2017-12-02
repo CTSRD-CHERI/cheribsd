@@ -99,10 +99,10 @@
 25	AUE_GETEUID	STD	{ uid_t geteuid(void); }
 26	AUE_PTRACE	STD	{ int ptrace(int req, pid_t pid, \
 				    caddr_t addr, int data); }
-27	AUE_RECVMSG	STD	{ int recvmsg(int s, struct msghdr *msg, \
-				    int flags); }
-28	AUE_SENDMSG	STD	{ int sendmsg(int s, struct msghdr *msg, \
-				    int flags); }
+27	AUE_RECVMSG	STD	{ int recvmsg(int s, \
+				    struct msghdr_native *msg, int flags); }
+28	AUE_SENDMSG	STD	{ int sendmsg(int s, \
+				    struct msghdr_native *msg, int flags); }
 29	AUE_RECVFROM	STD	{ int recvfrom(int s, caddr_t buf, \
 				    size_t len, int flags, \
 				    struct sockaddr * __restrict from, \
@@ -254,9 +254,9 @@
 118	AUE_GETSOCKOPT	STD	{ int getsockopt(int s, int level, int name, \
 				    caddr_t val, int *avalsize); }
 119	AUE_NULL	UNIMPL	resuba (BSD/OS 2.x)
-120	AUE_READV	STD	{ int readv(int fd, struct iovec *iovp, \
+120	AUE_READV	STD	{ int readv(int fd, struct iovec_native *iovp, \
 				    u_int iovcnt); }
-121	AUE_WRITEV	STD	{ int writev(int fd, struct iovec *iovp, \
+121	AUE_WRITEV	STD	{ int writev(int fd, struct iovec_native *iovp, \
 				    u_int iovcnt); }
 122	AUE_SETTIMEOFDAY	STD	{ int settimeofday(struct timeval *tv, \
 				    struct timezone *tzp); }
@@ -524,9 +524,9 @@
 287	AUE_NULL	UNIMPL	nosys
 288	AUE_NULL	UNIMPL	nosys
 ; 289 and 290 from NetBSD (OpenBSD: 267 and 268)
-289	AUE_PREADV	STD	{ ssize_t preadv(int fd, struct iovec *iovp, \
+289	AUE_PREADV	STD	{ ssize_t preadv(int fd, struct iovec_native *iovp, \
 					u_int iovcnt, off_t offset); }
-290	AUE_PWRITEV	STD	{ ssize_t pwritev(int fd, struct iovec *iovp, \
+290	AUE_PWRITEV	STD	{ ssize_t pwritev(int fd, struct iovec_native *iovp, \
 					u_int iovcnt, off_t offset); }
 291	AUE_NULL	UNIMPL	nosys
 292	AUE_NULL	UNIMPL	nosys
@@ -598,7 +598,7 @@
 335	AUE_NULL	STD	{ int utrace(const void *addr, size_t len); }
 336	AUE_SENDFILE	COMPAT4	{ int sendfile(int fd, int s, \
 				    off_t offset, size_t nbytes, \
-				    struct sf_hdtr *hdtr, off_t *sbytes, \
+				    struct sf_hdtr_native *hdtr, off_t *sbytes, \
 				    int flags); }
 337	AUE_NULL	STD	{ int kldsym(int fileid, int cmd, \
 				    void *data); }
@@ -686,7 +686,7 @@
 377	AUE_NULL	NOSTD|NOTSTATIC	{ int afs3_syscall(long syscall, \
 				    long parm1, long parm2, long parm3, \
 				    long parm4, long parm5, long parm6); }
-378	AUE_NMOUNT	STD	{ int nmount(struct iovec *iovp, \
+378	AUE_NMOUNT	STD	{ int nmount(struct iovec_native *iovp, \
 				    unsigned int iovcnt, int flags); }
 379	AUE_NULL	UNIMPL	kse_exit
 380	AUE_NULL	UNIMPL	kse_wakeup
@@ -710,7 +710,7 @@
 392	AUE_NULL	STD	{ int uuidgen(struct uuid *store, \
 				    int count); }
 393	AUE_SENDFILE	STD	{ int sendfile(int fd, int s, off_t offset, \
-				    size_t nbytes, struct sf_hdtr *hdtr, \
+				    size_t nbytes, struct sf_hdtr_native *hdtr, \
 				    off_t *sbytes, int flags); }
 394	AUE_NULL	STD	{ int mac_syscall(const char *policy, \
 				    int call, void *arg); }
@@ -851,10 +851,10 @@
 472	AUE_SCTP_GENERIC_SENDMSG	NOSTD	{ int sctp_generic_sendmsg(int sd, caddr_t msg, int mlen, \
 				    caddr_t to, __socklen_t tolen, \
 				    struct sctp_sndrcvinfo *sinfo, int flags); }
-473	AUE_SCTP_GENERIC_SENDMSG_IOV	NOSTD	{ int sctp_generic_sendmsg_iov(int sd, struct iovec *iov, int iovlen, \
+473	AUE_SCTP_GENERIC_SENDMSG_IOV	NOSTD	{ int sctp_generic_sendmsg_iov(int sd, struct iovec_native *iov, int iovlen, \
 				    caddr_t to, __socklen_t tolen, \
 				    struct sctp_sndrcvinfo *sinfo, int flags); }
-474	AUE_SCTP_GENERIC_RECVMSG	NOSTD	{ int sctp_generic_recvmsg(int sd, struct iovec *iov, int iovlen, \
+474	AUE_SCTP_GENERIC_RECVMSG	NOSTD	{ int sctp_generic_recvmsg(int sd, struct iovec_native *iov, int iovlen, \
 				    struct sockaddr * from, __socklen_t *fromlenaddr, \
 				    struct sctp_sndrcvinfo *sinfo, int *msg_flags); }
 475	AUE_PREAD	STD	{ ssize_t pread(int fd, void *buf, \
@@ -914,9 +914,9 @@
 504	AUE_POSIX_OPENPT	STD	{ int posix_openpt(int flags); }
 ; 505 is initialised by the kgssapi code, if present.
 505	AUE_NULL	NOSTD	{ int gssd_syscall(char *path); }
-506	AUE_JAIL_GET	STD	{ int jail_get(struct iovec *iovp, \
+506	AUE_JAIL_GET	STD	{ int jail_get(struct iovec_native *iovp, \
 				    unsigned int iovcnt, int flags); }
-507	AUE_JAIL_SET	STD	{ int jail_set(struct iovec *iovp, \
+507	AUE_JAIL_SET	STD	{ int jail_set(struct iovec_native *iovp, \
 				    unsigned int iovcnt, int flags); }
 508	AUE_JAIL_REMOVE	STD	{ int jail_remove(int jid); }
 509	AUE_CLOSEFROM	STD	{ int closefrom(int lowfd); }

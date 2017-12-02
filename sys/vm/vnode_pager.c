@@ -609,7 +609,7 @@ static int
 vnode_pager_input_old(vm_object_t object, vm_page_t m)
 {
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	int error;
 	int size;
 	struct sf_buf *sf;
@@ -1196,7 +1196,7 @@ vnode_pager_generic_putpages(struct vnode *vp, vm_page_t *ma, int bytecount,
 	vm_page_t m;
 	vm_ooffset_t poffset;
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	int count, error, i, maxsize, ncount, pgoff, ppscheck;
 	static struct timeval lastfail;
 	static int curfail;

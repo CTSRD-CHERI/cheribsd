@@ -283,7 +283,7 @@ struct csession {
 	caddr_t		mackey;
 	int		mackeylen;
 
-	struct iovec	iovec;
+	kiovec_t	iovec;
 	struct uio	uio;
 	int		error;
 };
@@ -744,8 +744,8 @@ cryptodev_op(
 		}
 	}
 
-	if ((error = copyin(cop->src, cse->uio.uio_iov[0].iov_base,
-	    cop->len))) {
+	if ((error = copyin_c(__USER_CAP(cop->src, cop->len),
+	    cse->uio.uio_iov[0].iov_base, cop->len))) {
 		SDT_PROBE1(opencrypto, dev, ioctl, error, __LINE__);
 		goto bail;
 	}
@@ -852,15 +852,17 @@ again:
 	}
 
 	if (cop->dst &&
-	    (error = copyout(cse->uio.uio_iov[0].iov_base, cop->dst,
-	    cop->len))) {
+	    (error = copyout_c(cse->uio.uio_iov[0].iov_base,
+	    __USER_CAP(cop->dst, cop->len), cop->len))) {
 		SDT_PROBE1(opencrypto, dev, ioctl, error, __LINE__);
 		goto bail;
 	}
 
 	if (cop->mac &&
-	    (error = copyout((caddr_t)cse->uio.uio_iov[0].iov_base + cop->len,
-	    cop->mac, cse->thash->hashsize))) {
+	    (error = copyout_c(
+	    (char * __capability)cse->uio.uio_iov[0].iov_base + cop->len,
+	    __USER_CAP(cop->mac, cse->thash->hashsize),
+	    cse->thash->hashsize))) {
 		SDT_PROBE1(opencrypto, dev, ioctl, error, __LINE__);
 		goto bail;
 	}
@@ -869,7 +871,7 @@ bail:
 	if (crp)
 		crypto_freereq(crp);
 	if (cse->uio.uio_iov[0].iov_base)
-		free(cse->uio.uio_iov[0].iov_base, M_XDATA);
+		free_c(cse->uio.uio_iov[0].iov_base, M_XDATA);
 
 	return (error);
 }
@@ -913,12 +915,13 @@ cryptodev_aead(
 	crda = crp->crp_desc;
 	crde = crda->crd_next;
 
-	if ((error = copyin(caead->src, cse->uio.uio_iov[0].iov_base,
-	    caead->len)))
+	if ((error = copyin_c(__USER_CAP(caead->src, caead->len),
+	    cse->uio.uio_iov[0].iov_base, caead->len)))
 		goto bail;
 
-	if ((error = copyin(caead->aad, (char *)cse->uio.uio_iov[0].iov_base +
-	    caead->len, caead->aadlen)))
+	if ((error = copyin_c(__USER_CAP(caead->aad, caead->aadlen),
+	    (char * __capability)cse->uio.uio_iov[0].iov_base + caead->len,
+	    caead->aadlen)))
 		goto bail;
 
 	crda->crd_skip = caead->len;
@@ -966,7 +969,8 @@ cryptodev_aead(
 		crde->crd_len -= cse->txform->blocksize;
 	}
 
-	if ((error = copyin(caead->tag, (caddr_t)cse->uio.uio_iov[0].iov_base +
+	if ((error = copyin_c(__USER_CAP(caead->tag, cse->thash->hashsize),
+	    (char * __capability)cse->uio.uio_iov[0].iov_base +
 	    caead->len + caead->aadlen, cse->thash->hashsize)))
 		goto bail;
 again:
@@ -1002,17 +1006,19 @@ again:
 		goto bail;
 	}
 
-	if (caead->dst && (error = copyout(cse->uio.uio_iov[0].iov_base,
-	    caead->dst, caead->len)))
+	if (caead->dst && (error = copyout_c(cse->uio.uio_iov[0].iov_base,
+	    __USER_CAP(caead->dst, caead->len), caead->len)))
 		goto bail;
 
-	if ((error = copyout((caddr_t)cse->uio.uio_iov[0].iov_base +
-	    caead->len + caead->aadlen, caead->tag, cse->thash->hashsize)))
+	if ((error = copyout_c(
+	    (char * __capability)cse->uio.uio_iov[0].iov_base + caead->len +
+	    caead->aadlen, __USER_CAP(caead->tag, cse->thash->hashsize),
+	    cse->thash->hashsize)))
 		goto bail;
 
 bail:
 	crypto_freereq(crp);
-	free(cse->uio.uio_iov[0].iov_base, M_XDATA);
+	free_c(cse->uio.uio_iov[0].iov_base, M_XDATA);
 
 	return (error);
 }

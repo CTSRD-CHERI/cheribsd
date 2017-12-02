@@ -179,7 +179,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 27: {
 		struct recvmsg_args *p = params;
 		iarg[0] = p->s; /* int */
-		uarg[1] = (intptr_t) p->msg; /* struct msghdr * */
+		uarg[1] = (intptr_t) p->msg; /* struct msghdr_native * */
 		iarg[2] = p->flags; /* int */
 		*n_args = 3;
 		break;
@@ -188,7 +188,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 28: {
 		struct sendmsg_args *p = params;
 		iarg[0] = p->s; /* int */
-		uarg[1] = (intptr_t) p->msg; /* struct msghdr * */
+		uarg[1] = (intptr_t) p->msg; /* struct msghdr_native * */
 		iarg[2] = p->flags; /* int */
 		*n_args = 3;
 		break;
@@ -661,7 +661,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 120: {
 		struct readv_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->iovp; /* struct iovec * */
+		uarg[1] = (intptr_t) p->iovp; /* struct iovec_native * */
 		uarg[2] = p->iovcnt; /* u_int */
 		*n_args = 3;
 		break;
@@ -670,7 +670,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 121: {
 		struct writev_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->iovp; /* struct iovec * */
+		uarg[1] = (intptr_t) p->iovp; /* struct iovec_native * */
 		uarg[2] = p->iovcnt; /* u_int */
 		*n_args = 3;
 		break;
@@ -1375,7 +1375,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 289: {
 		struct preadv_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->iovp; /* struct iovec * */
+		uarg[1] = (intptr_t) p->iovp; /* struct iovec_native * */
 		uarg[2] = p->iovcnt; /* u_int */
 		iarg[3] = p->offset; /* off_t */
 		*n_args = 4;
@@ -1385,7 +1385,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 290: {
 		struct pwritev_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->iovp; /* struct iovec * */
+		uarg[1] = (intptr_t) p->iovp; /* struct iovec_native * */
 		uarg[2] = p->iovcnt; /* u_int */
 		iarg[3] = p->offset; /* off_t */
 		*n_args = 4;
@@ -1891,7 +1891,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* nmount */
 	case 378: {
 		struct nmount_args *p = params;
-		uarg[0] = (intptr_t) p->iovp; /* struct iovec * */
+		uarg[0] = (intptr_t) p->iovp; /* struct iovec_native * */
 		uarg[1] = p->iovcnt; /* unsigned int */
 		iarg[2] = p->flags; /* int */
 		*n_args = 3;
@@ -1976,7 +1976,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		iarg[1] = p->s; /* int */
 		iarg[2] = p->offset; /* off_t */
 		uarg[3] = p->nbytes; /* size_t */
-		uarg[4] = (intptr_t) p->hdtr; /* struct sf_hdtr * */
+		uarg[4] = (intptr_t) p->hdtr; /* struct sf_hdtr_native * */
 		uarg[5] = (intptr_t) p->sbytes; /* off_t * */
 		iarg[6] = p->flags; /* int */
 		*n_args = 7;
@@ -2522,7 +2522,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 473: {
 		struct sctp_generic_sendmsg_iov_args *p = params;
 		iarg[0] = p->sd; /* int */
-		uarg[1] = (intptr_t) p->iov; /* struct iovec * */
+		uarg[1] = (intptr_t) p->iov; /* struct iovec_native * */
 		iarg[2] = p->iovlen; /* int */
 		uarg[3] = (intptr_t) p->to; /* caddr_t */
 		iarg[4] = p->tolen; /* __socklen_t */
@@ -2535,7 +2535,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 474: {
 		struct sctp_generic_recvmsg_args *p = params;
 		iarg[0] = p->sd; /* int */
-		uarg[1] = (intptr_t) p->iov; /* struct iovec * */
+		uarg[1] = (intptr_t) p->iov; /* struct iovec_native * */
 		iarg[2] = p->iovlen; /* int */
 		uarg[3] = (intptr_t) p->from; /* struct sockaddr * */
 		uarg[4] = (intptr_t) p->fromlenaddr; /* __socklen_t * */
@@ -2817,7 +2817,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* jail_get */
 	case 506: {
 		struct jail_get_args *p = params;
-		uarg[0] = (intptr_t) p->iovp; /* struct iovec * */
+		uarg[0] = (intptr_t) p->iovp; /* struct iovec_native * */
 		uarg[1] = p->iovcnt; /* unsigned int */
 		iarg[2] = p->flags; /* int */
 		*n_args = 3;
@@ -2826,7 +2826,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* jail_set */
 	case 507: {
 		struct jail_set_args *p = params;
-		uarg[0] = (intptr_t) p->iovp; /* struct iovec * */
+		uarg[0] = (intptr_t) p->iovp; /* struct iovec_native * */
 		uarg[1] = p->iovcnt; /* unsigned int */
 		iarg[2] = p->flags; /* int */
 		*n_args = 3;
@@ -3548,7 +3548,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct msghdr *";
+			p = "userland struct msghdr_native *";
 			break;
 		case 2:
 			p = "int";
@@ -3564,7 +3564,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct msghdr *";
+			p = "userland struct msghdr_native *";
 			break;
 		case 2:
 			p = "int";
@@ -4327,7 +4327,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct iovec *";
+			p = "userland struct iovec_native *";
 			break;
 		case 2:
 			p = "u_int";
@@ -4343,7 +4343,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct iovec *";
+			p = "userland struct iovec_native *";
 			break;
 		case 2:
 			p = "u_int";
@@ -5466,7 +5466,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct iovec *";
+			p = "userland struct iovec_native *";
 			break;
 		case 2:
 			p = "u_int";
@@ -5485,7 +5485,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct iovec *";
+			p = "userland struct iovec_native *";
 			break;
 		case 2:
 			p = "u_int";
@@ -6317,7 +6317,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 378:
 		switch(ndx) {
 		case 0:
-			p = "userland struct iovec *";
+			p = "userland struct iovec_native *";
 			break;
 		case 1:
 			p = "unsigned int";
@@ -6462,7 +6462,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "size_t";
 			break;
 		case 4:
-			p = "userland struct sf_hdtr *";
+			p = "userland struct sf_hdtr_native *";
 			break;
 		case 5:
 			p = "userland off_t *";
@@ -7385,7 +7385,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct iovec *";
+			p = "userland struct iovec_native *";
 			break;
 		case 2:
 			p = "int";
@@ -7413,7 +7413,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct iovec *";
+			p = "userland struct iovec_native *";
 			break;
 		case 2:
 			p = "int";
@@ -7929,7 +7929,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 506:
 		switch(ndx) {
 		case 0:
-			p = "userland struct iovec *";
+			p = "userland struct iovec_native *";
 			break;
 		case 1:
 			p = "unsigned int";
@@ -7945,7 +7945,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 507:
 		switch(ndx) {
 		case 0:
-			p = "userland struct iovec *";
+			p = "userland struct iovec_native *";
 			break;
 		case 1:
 			p = "unsigned int";

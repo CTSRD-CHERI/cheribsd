@@ -60,12 +60,12 @@ typedef struct mbuf *		mbuf_t;
 #define	uio_uio_resid(p)	((p)->uio_resid)
 #define	uio_uio_resid_add(p, v)	((p)->uio_resid += (v))
 #define	uio_uio_resid_set(p, v)	((p)->uio_resid = (v))
-#define	uio_iov_base(p)		((p)->uio_iov->iov_base)
+#define	uio_iov_base(p)		((__cheri_fromcap void *)(p)->uio_iov->iov_base)
 #define	uio_iov_base_add(p, v)	do {					\
-	char *pp;							\
-	pp = (char *)(p)->uio_iov->iov_base;				\
+	char * __capability pp;							\
+	pp = (char * __capability)(p)->uio_iov->iov_base;		\
 	pp += (v);							\
-	(p)->uio_iov->iov_base = (void *)pp;				\
+	(p)->uio_iov->iov_base = (void * __capability)pp;		\
     } while (0)
 #define	uio_iov_len(p)		((p)->uio_iov->iov_len)
 #define	uio_iov_len_add(p, v)	((p)->uio_iov->iov_len += (v))
