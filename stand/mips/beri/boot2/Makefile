@@ -48,10 +48,8 @@ MAN=
 
 AFLAGS=		-G0
 
-CFLAGS+=	-I${.CURDIR}			\
-		-I${LDRSRC}			\
+CFLAGS+=	-I${LDRSRC}			\
 		-I${SYSDIR}/contrib/libfdt	\
-		-D_KERNEL			\
 		-Wall				\
 		-G0 				\
 		-fno-pic -mno-abicalls		\
