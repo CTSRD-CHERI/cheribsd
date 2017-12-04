@@ -764,7 +764,6 @@ vm_forkproc(td, p2, td2, vm2, flags)
 	int error;
 
 	if ((flags & RFMEM) == 0 && (flags & RFPROC) != 0) {
-		printf("%s: go\n", __func__);
 		map2 = &vm2->vm_map;
 		vm_map_lock(map2);
 		for (entry = map2->header.next; entry != &map2->header;
