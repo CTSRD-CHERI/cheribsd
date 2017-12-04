@@ -3644,6 +3644,16 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 
 			break;
 		}
+
+		// XXX: OBJT_PHYS is to avoid touching the shared page.
+		// XXX: We should just skip (not duplicate) mappings that
+		// 	are not owned by us.  This, however, breaks certain
+		// 	things, for reasons yet unknown.
+		if (old_entry->owner != curproc->p_pid &&
+		    (old_entry->object.vm_object == NULL || old_entry->object.vm_object->type != OBJT_PHYS)) {
+			new_entry->owner = 0;
+		}
+
 		old_entry = old_entry->next;
 	}
 	/*
