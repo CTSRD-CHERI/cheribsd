@@ -33,6 +33,36 @@ __FBSDID("$FreeBSD$");
 
 #include <mips/malta/yamon.h>
 
+#ifdef CHERI_KERNEL
+#include <cheri/cheric.h>
+
+/* Wrappers to call into non-purecap ABI YAMON routines */
+
+inline int
+_yamon_syscon_read(t_yamon_syscon_id id, void *param, uint32_t size)
+{
+	int32_t *yamon_func_table = cheri_setoffset(
+		cheri_getkdc(), YAMON_FUNC_OFFSET(YAMON_SYSCON_READ_OFS));
+	long yamon_syscon_read = (long)*yamon_func_table;
+	int value;
+	__asm__ __volatile__ (
+		".set push\n"
+		".set noreorder\n"
+		"move $a0, %1\n"
+		"cgetbase $a1, %2\n"
+		"cgetoffset $t0, %2\n"
+		"daddu $a1, $a1, $t0\n"
+		"jalr %4\n"
+		"move $a2, %3\n"
+		"move %0, $v0\n"
+		".set pop\n"
+		: "=r" (value)
+		: "r" (id), "r" (param), "r" (size), "r" (yamon_syscon_read)
+		: "memory");
+	return value;
+}
+#endif
+
 char *
 yamon_getenv(char *name)
 {
