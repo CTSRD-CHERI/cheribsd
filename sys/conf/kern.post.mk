@@ -223,7 +223,6 @@ DEPEND_MP?=	-MP
 ${DEPENDOBJS}:	.NOMETA
 .depend:	.NOMETA
 # Unset these to avoid looping/statting on them later.
-.undef DEPENDSRCS
 .undef DEPENDOBJS
 .undef DEPENDFILES
 .endif	# defined(_SKIP_DEPEND)
