@@ -215,8 +215,13 @@ VECTOR(_locore, unknown)
 restrict_pcc:
 #endif
 
-	/* XXX-AM: can use a R_MIPS_GPREL_HI and _LO */
 	PTR_LA	gp, _C_LABEL(_gp)
+
+	/* Process cap relocations */
+	PTR_LA	t0, _C_LABEL(process_kernel_cap_relocs)
+	cgetpccsetoffset $c12, t0
+	cjalr	$c12, $c17
+	nop
 
 	/* Call the platform-specific startup code. */
 	cfromptr	$c3, CHERI_REG_KDC, a1

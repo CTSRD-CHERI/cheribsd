@@ -264,4 +264,17 @@ typedef struct {
 	Elf64_Xword	ch_addralign;
 } Elf64_Chdr;
 
+#ifdef CHERI_KERNEL
+/* CHERI capability relocation format */
+typedef struct {
+	Elf64_Addr	location;
+	Elf64_Addr	object;
+	Elf64_Off	offset;
+	Elf64_Xword	size;
+	Elf64_Xword	permissions;
+} Elf64_Capreloc;
+
+#define ELF64_CAPRELOC_FUNCTION (1UL << 63)
+#endif
+
 #endif /* !_SYS_ELF64_H_ */

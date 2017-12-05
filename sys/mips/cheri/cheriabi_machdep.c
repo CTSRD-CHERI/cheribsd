@@ -79,6 +79,9 @@
 #include <sys/timeffc.h>
 #include <sys/timex.h>
 #include <sys/uuid.h>
+#ifdef CHERI_KERNEL
+#include <sys/elf.h>
+#endif
 #include <netinet/sctp.h>
 
 #include <cheri/cheri.h>
@@ -123,6 +126,13 @@ static void	cheriabi_exec_setregs(struct thread *, struct image_params *,
 		    u_long);
 static __inline boolean_t cheriabi_check_cpu_compatible(uint32_t, const char *);
 static boolean_t cheriabi_elf_header_supported(struct image_params *);
+
+#ifdef CHERI_KERNEL
+__attribute__((weak))
+extern Elf64_Capreloc __start___cap_relocs;
+__attribute__((weak))
+extern Elf64_Capreloc __stop___cap_relocs;
+#endif
 
 extern const char *cheriabi_syscallnames[];
 
@@ -1216,3 +1226,34 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 		return (sysarch(td, (struct sysarch_args*)uap));
 	}
 }
+
+#ifdef CHERI_KERNEL
+void
+process_kernel_cap_relocs()
+{
+	void *pcc = cheri_getpcc();
+	void *gdc = cheri_getdefault();
+
+	for (Elf64_Capreloc *reloc = &__start___cap_relocs;
+	     reloc < &__stop___cap_relocs; reloc++)
+	{
+		void *cap;
+		void **dst = cheri_setoffset(gdc, reloc->location);
+
+		/* XXX-AM: at some point we should be able to switch to
+		 * the cbuildcap instruction to reconstruct the capability.
+		 */
+		if ((reloc->permissions & ELF64_CAPRELOC_FUNCTION) ==
+		    ELF64_CAPRELOC_FUNCTION) {
+			cap = cheri_setoffset(pcc, reloc->object);
+		}
+		else {
+			cap = cheri_setoffset(gdc, reloc->object);
+			if (reloc->size != 0)
+				cap = cheri_csetbounds(cap, reloc->size);
+		}
+		cap = cheri_incoffset(cap, reloc->offset);
+		*dst = cap;
+	}
+}
+#endif /* CHERI_KERNEL */
