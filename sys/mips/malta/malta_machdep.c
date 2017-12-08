@@ -335,6 +335,8 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 	size_t edata_siz = (size_t)(&end) - (size_t)(&edata);
 	cheri_capability_set(&edata_start, CHERI_PERM_STORE, (vm_offset_t)(&edata), edata_siz, 0);
 	memset(edata_start, 0, edata_siz);
+	/* early capability-related initialization */
+	cheri_init_capabilities();
 #else
 	vm_offset_t kernend;
 	kernend = (vm_offset_t)&end;

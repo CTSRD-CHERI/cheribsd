@@ -87,10 +87,29 @@
 #define	MIPS_KSEG3_END			((intptr_t)(int32_t)0xffffffff)
 #define MIPS_KSEG2_START		MIPS_KSSEG_START
 #define MIPS_KSEG2_END			MIPS_KSSEG_END
-#endif
+#endif /* !LOCORE */
 
+#ifdef CHERI_KERNEL
+/* 
+ * Global capabilities for various address-space segments.
+ */
+extern void *cheri_xuseg_capability;
+extern void *cheri_xkphys_capability;
+extern void *cheri_xkseg_capability;
+extern void *cheri_kseg0_capability;
+extern void *cheri_kseg1_capability;
+extern void *cheri_kseg2_capability;
+extern void *cheri_kseg3_capability;
+
+#define	MIPS_PHYS_TO_KSEG0(x)						\
+  ((vm_offset_t)(cheri_kseg0_capability + ((uintptr_t)(x) & ~MIPS_KSEG0_START)))
+#define	MIPS_PHYS_TO_KSEG1(x)						\
+  ((vm_offset_t)(cheri_kseg1_capability + ((uintptr_t)(x) & ~MIPS_KSEG1_START)))
+#else /* !CHERI_KERNEL */
 #define	MIPS_PHYS_TO_KSEG0(x)		((uintptr_t)(x) | MIPS_KSEG0_START)
 #define	MIPS_PHYS_TO_KSEG1(x)		((uintptr_t)(x) | MIPS_KSEG1_START)
+#endif /* !CHERI_KERNEL */
+
 #define	MIPS_KSEG0_TO_PHYS(x)		((uintptr_t)(x) & MIPS_KSEG0_PHYS_MASK)
 #define	MIPS_KSEG1_TO_PHYS(x)		((uintptr_t)(x) & MIPS_KSEG0_PHYS_MASK)
 
@@ -208,8 +227,10 @@
 #define	MIPS_XUSEG_END			0x0000010000000000
 #define	MIPS_XKSEG_START		0xc000000000000000
 #define	MIPS_XKSEG_END			0xc00000ff80000000
+
 #define	MIPS_XKSEG_COMPAT32_START	0xffffffff80000000
 #define	MIPS_XKSEG_COMPAT32_END		0xffffffffffffffff
+
 #define	MIPS_XKSEG_TO_COMPAT32(va)	((va) & 0xffffffff)
 
 #ifdef __mips_n64

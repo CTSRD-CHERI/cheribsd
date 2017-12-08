@@ -132,6 +132,18 @@ __attribute__((weak))
 extern Elf64_Capreloc __start___cap_relocs;
 __attribute__((weak))
 extern Elf64_Capreloc __stop___cap_relocs;
+
+/* 
+ * Global capabilities for various address-space segments.
+ */
+void *cheri_xuseg_capability;
+void *cheri_xkphys_capability;
+void *cheri_xkseg_capability;
+void *cheri_kseg0_capability;
+void *cheri_kseg1_capability;
+void *cheri_kseg2_capability;
+void *cheri_kseg3_capability;
+
 #endif
 
 extern const char *cheriabi_syscallnames[];
@@ -1228,7 +1240,7 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 }
 
 #ifdef CHERI_KERNEL
-void
+static void
 process_kernel_cap_relocs()
 {
 	void *pcc = cheri_getpcc();
@@ -1256,4 +1268,48 @@ process_kernel_cap_relocs()
 		*dst = cap;
 	}
 }
+
+/*
+ * Early capability initialization.
+ * Process capability relocations and initialize
+ * kernel segment capabilities.
+ *
+ * Note this must be called before accessing any global
+ * pointer. And after clearing .bss and .sbss because
+ * it stores data in those sections.
+ */
+void
+cheri_init_capabilities()
+{
+	void *kdc = cheri_getkdc();
+
+	process_kernel_cap_relocs();
+	/*
+	 * Split kdc and generate a capability for each memory segment.
+	 * XXX-AM: we should also have a separate capability for
+	 * KCC that covers only kernel .text and exception vectors
+	 * KDC that covers only kernel .data/.rodata/.bss etc.
+	 * Those should fall both into kseg0.
+	 */
+	cheri_xuseg_capability = cheri_csetbounds(
+		cheri_setoffset(kdc, MIPS_XUSEG_START),
+		MIPS_XUSEG_END - MIPS_XUSEG_START);
+	cheri_xkphys_capability = cheri_andperm(
+		cheri_csetbounds(cheri_setoffset(kdc, MIPS_XKPHYS_START),
+				 MIPS_XKPHYS_END - MIPS_XKPHYS_START),
+		~(CHERI_PERM_EXECUTE | CHERI_PERM_CCALL));
+	cheri_xkseg_capability = cheri_csetbounds(
+		cheri_setoffset(kdc, MIPS_XKSEG_START),
+		MIPS_XKSEG_END - MIPS_XKSEG_START);
+	cheri_kseg0_capability = cheri_csetbounds(
+		cheri_setoffset(kdc, MIPS_KSEG0_START),
+		MIPS_KSEG0_END - MIPS_KSEG0_START);
+	cheri_kseg1_capability = cheri_csetbounds(
+		cheri_setoffset(kdc, MIPS_KSEG1_START),
+		MIPS_KSEG1_END - MIPS_KSEG1_START);
+	cheri_kseg2_capability = cheri_csetbounds(
+		cheri_setoffset(kdc, MIPS_KSEG2_START),
+		MIPS_KSEG2_END - MIPS_KSEG2_START);
+}
+
 #endif /* CHERI_KERNEL */

@@ -46,11 +46,6 @@ unsigned platform_get_timecount(struct timecounter *);
 /* For hardware specific CPU initialization */
 void platform_cpu_init(void);
 
-#ifdef CHERI_KERNEL
-/* Initialization of capabilities for global pointers */
-void process_kernel_cap_relocs(void);
-#endif
-
 #ifdef SMP
 
 /*

@@ -186,14 +186,17 @@ VECTOR(_locore, unknown)
 	csc		$c1, zero, CALLFRAME_CSP(CHERI_REG_STC)
 	csc		$c1, zero, CALLFRAME_CRA(CHERI_REG_STC)
 
+	/* Clear all remaining capabilities */
+	cclearlo	0xf7fe 	# keep c0, c11
+	cclearhi	0x9fff	# keep c29, c30
 #if 0
-	/* Restrict kernel PCC */
+	/* Restrict kernel KCC and KDC */
 	/*
 	 * XXX-AM: Currently disabled because I have to understand
 	 * how it plays out with relocations
 	 */
 	cgetpcc $c12
-	PTR_LI t1, 0xffffffff80000000	# Exception vector start
+	PTR_LA t1, MIPS_XKSEG_COMPAT32_START # Exception vector start
 	csetoffset $c12, $c12, t1
 	PTR_LA t0, _C_LABEL(etext)	# Kernel .text end
 	PTR_SUBU t0, t0, t1
@@ -203,25 +206,10 @@ VECTOR(_locore, unknown)
 	csetoffset $c12, $c12, t0
 	cjr $c12
 	nop
-	/* Split kdc in system-kdc and user-kdc
-	 * system-kdc continues to live in REG_KDC
-	 * user-kdc is stored in kernel_userspace_capability
-	 */
-	// TODO
-	/* Clear all capability registers
-	 * except STC, KCC, KDC, PCC.
-	 */
-	// TODO
 restrict_pcc:
 #endif
 
 	PTR_LA	gp, _C_LABEL(_gp)
-
-	/* Process cap relocations */
-	PTR_LA	t0, _C_LABEL(process_kernel_cap_relocs)
-	cgetpccsetoffset $c12, t0
-	cjalr	$c12, $c17
-	nop
 
 	/* Call the platform-specific startup code. */
 	cfromptr	$c3, CHERI_REG_KDC, a1
