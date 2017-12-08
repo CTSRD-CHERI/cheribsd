@@ -80,7 +80,7 @@ typedef int (*t_yamon_syscon_read)(t_yamon_syscon_id id, void *param,
 #else /* CHERI_KERNEL */
 /* Can not call YAMON functions with purecap ABI so wrap the calls */
 
-#define YAMON_FUNC_OFFSET(ofs)		(MIPS_PHYS_TO_KSEG0(ofs))
+#define YAMON_FUNC_OFFSET(ofs)		((vm_offset_t)MIPS_PHYS_TO_KSEG0(ofs))
 
 inline int _yamon_syscon_read(t_yamon_syscon_id id, void *param, uint32_t size);
 #define YAMON_SYSCON_READ(id, param, size) _yamon_syscon_read(id, param, size)

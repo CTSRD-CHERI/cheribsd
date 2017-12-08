@@ -44,6 +44,8 @@ _yamon_syscon_read(t_yamon_syscon_id id, void *param, uint32_t size)
 	int32_t *yamon_func_table = cheri_setoffset(
 		cheri_getkdc(), YAMON_FUNC_OFFSET(YAMON_SYSCON_READ_OFS));
 	long yamon_syscon_read = (long)*yamon_func_table;
+	/* XXX-AM: ideally YAMON_FUNC_OFFSET should return a capability from kseg0_cap */
+	/* long yamon_syscon_read = (long)*((int32_t *)YAMON_FUNC_OFFSET(YAMON_SYSCON_READ_OFS)); */
 	int value;
 	__asm__ __volatile__ (
 		".set push\n"
