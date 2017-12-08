@@ -87,7 +87,6 @@
 #define	MIPS_KSEG3_END			((intptr_t)(int32_t)0xffffffff)
 #define MIPS_KSEG2_START		MIPS_KSSEG_START
 #define MIPS_KSEG2_END			MIPS_KSSEG_END
-#endif /* !LOCORE */
 
 #ifdef CHERI_KERNEL
 /* 
@@ -102,9 +101,9 @@ extern void *cheri_kseg2_capability;
 extern void *cheri_kseg3_capability;
 
 #define	MIPS_PHYS_TO_KSEG0(x)						\
-  ((vm_offset_t)(cheri_kseg0_capability + ((uintptr_t)(x) & ~MIPS_KSEG0_START)))
+  (cheri_kseg0_capability + ((uintptr_t)(x) & ~MIPS_KSEG0_START))
 #define	MIPS_PHYS_TO_KSEG1(x)						\
-  ((vm_offset_t)(cheri_kseg1_capability + ((uintptr_t)(x) & ~MIPS_KSEG1_START)))
+  (cheri_kseg1_capability + ((uintptr_t)(x) & ~MIPS_KSEG1_START))
 #else /* !CHERI_KERNEL */
 #define	MIPS_PHYS_TO_KSEG0(x)		((uintptr_t)(x) | MIPS_KSEG0_START)
 #define	MIPS_PHYS_TO_KSEG1(x)		((uintptr_t)(x) | MIPS_KSEG1_START)
@@ -121,6 +120,7 @@ extern void *cheri_kseg3_capability;
 	    ((vm_offset_t)(x) <= MIPS_KSEG1_END))
 #define	MIPS_IS_VALID_PTR(x)		(MIPS_IS_KSEG0_ADDR(x) || \
 					    MIPS_IS_KSEG1_ADDR(x))
+#endif /* !LOCORE */
 
 /*
  * Cache Coherency Attributes:
