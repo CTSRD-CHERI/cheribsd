@@ -128,9 +128,11 @@ idalloctm(tsdn_t *tsdn, void *ptr, tcache_t *tcache, alloc_ctx_t *alloc_ctx,
 	if (config_stats && is_internal) {
 		arena_internal_sub(iaalloc(tsdn, ptr), isalloc(tsdn, ptr));
 	}
+#if 0
 	if (!is_internal && tsd_reentrancy_level_get(tsdn_tsd(tsdn)) != 0) {
 		assert(tcache == NULL);
 	}
+#endif
 	arena_dalloc(tsdn, unbound_ptr(tsdn, ptr), tcache, alloc_ctx,
 	    slow_path);
 }
