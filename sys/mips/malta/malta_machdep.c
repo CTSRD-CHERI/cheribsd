@@ -333,7 +333,8 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 	 */
 	void *edata_start;
 	size_t edata_siz = (size_t)(&end) - (size_t)(&edata);
-	cheri_capability_set(&edata_start, CHERI_PERM_STORE, (vm_offset_t)(&edata), edata_siz, 0);
+	cheri_capability_set(&edata_start, CHERI_PERM_STORE, (vm_offset_t)(&edata),
+			     edata_siz, 0);
 	memset(edata_start, 0, edata_siz);
 	/* early capability-related initialization */
 	cheri_init_capabilities();
@@ -362,8 +363,19 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 
 	if (bootverbose) {
 		printf("cmd line: ");
-		for (i = 0; i < argc; i++)
-			printf("%s ", (char*)(intptr_t)argv[i]);
+		for (i = 0; i < argc; i++) {
+			const char *arg;
+#ifdef CHERI_KERNEL
+			/* trust that YAMON initialized the strings correctly and
+			 * do not try to get the precise string length.
+			 */
+			cheri_capability_set(&arg, CHERI_PERM_LOAD, (intptr_t)argv[i],
+					     4096, 0);
+#else
+			arg = (char*)(intptr_t)argv[i];
+#endif
+			printf("%s ", arg);
+		}
 		printf("\n");
 	}
 
@@ -375,10 +387,18 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 	 */
 	for (i = 0; envp[i]; i += 2) {
 		const char *a, *v;
-
+#ifdef CHERI_KERNEL
+		/* trust that YAMON initialized the strings correctly and
+		 * do not try to get the precise string length.
+		 */
+		cheri_capability_set(&a, CHERI_PERM_LOAD, (intptr_t)envp[i],
+				     4096, 0);
+		cheri_capability_set(&v, CHERI_PERM_LOAD, (intptr_t)envp[i+1],
+				     4096, 0);
+#else
 		a = (char *)(intptr_t)envp[i];
 		v = (char *)(intptr_t)envp[i+1];
-
+#endif
 		if (bootverbose)
 			printf("\t%s = %s\n", a, v);
 
