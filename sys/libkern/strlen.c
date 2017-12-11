@@ -141,7 +141,7 @@ strlen(const char *str)
 	p = str;
 	while (*p != '\0')
 		p++;
-	return (p - str - 1);
+	return (p - str);
 #endif /* CHERI_KERNEL */
 
 	/* NOTREACHED */
