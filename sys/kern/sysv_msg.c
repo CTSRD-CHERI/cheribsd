@@ -82,6 +82,14 @@ __FBSDID("$FreeBSD$");
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
 
+#ifdef COMPAT_CHERIABI
+#include <compat/cheriabi/cheriabi_ipc_msg.h>
+#endif
+
+#if defined(COMPAT_CHERIABI) || defined(COMPAT_FREEBSD32)
+#define CP(src,dst,fld) do { (dst).fld = (src).fld; } while (0)
+#endif
+
 FEATURE(sysv_msg, "System V message queues support");
 
 static MALLOC_DEFINE(M_MSG, "msg", "SVID compatible message queues");
@@ -227,7 +235,7 @@ msginit()
 	msgmaps = malloc(sizeof(struct msgmap) * msginfo.msgseg, M_MSG, M_WAITOK);
 	msghdrs = malloc(sizeof(struct msg) * msginfo.msgtql, M_MSG, M_WAITOK);
 	msqids = malloc(sizeof(struct msqid_kernel) * msginfo.msgmni, M_MSG,
-	    M_WAITOK);
+	    M_WAITOK|M_ZERO);
 
 	/*
 	 * msginfo.msgssz should be a power of two for efficiency reasons.
@@ -1416,7 +1424,15 @@ static int
 sysctl_msqids(SYSCTL_HANDLER_ARGS)
 {
 	struct msqid_kernel tmsqk;
+#ifdef COMPAT_FREEBSD32
+	struct msqid_kernel32 tmsqk32;
+#endif
+#ifdef COMPAT_CHERIABI
+	struct msqid_kernel_c tmsqk_c;
+#endif
 	struct prison *pr, *rpr;
+	void *outaddr;
+	size_t outsize;
 	int error, i;
 
 	pr = req->td->td_ucred->cr_prison;
@@ -1433,7 +1449,58 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 				tmsqk.u.msg_perm.key = IPC_PRIVATE;
 		}
 		mtx_unlock(&msq_mtx);
-		error = SYSCTL_OUT(req, &tmsqk, sizeof(tmsqk));
+#ifdef COMPAT_FREEBSD32
+		if (SV_CURPROC_FLAG(SV_ILP32)) {
+			bzero(&tmsqk32, sizeof(tmsqk32));
+			freebsd32_ipcperm_out(&tmsqk.u.msg_perm,
+			    &tmsqk32.u.msg_perm);
+			/* Don't copy u.msg_first or u.msg_last */
+			CP(tmsqk, tmsqk32, u.msg_cbytes);
+			CP(tmsqk, tmsqk32, u.msg_qnum);
+			CP(tmsqk, tmsqk32, u.msg_qbytes);
+			CP(tmsqk, tmsqk32, u.msg_lspid);
+			CP(tmsqk, tmsqk32, u.msg_lrpid);
+			CP(tmsqk, tmsqk32, u.msg_stime);
+			CP(tmsqk, tmsqk32, u.msg_rtime);
+			CP(tmsqk, tmsqk32, u.msg_ctime);
+			/* Don't copy label or cred */
+			outaddr = &tmsqk32;
+			outsize = sizeof(tmsqk32);
+		} else
+#endif
+#ifdef COMPAT_CHERIABI
+		if (SV_CURPROC_FLAG(SV_CHERI)) {
+			bzero(&tmsqk_c, sizeof(tmsqk_c));
+			CP(tmsqk, tmsqk_c, u.msg_perm);
+			/* Don't copy u.msg_first or u.msg_last */
+			CP(tmsqk, tmsqk_c, u.msg_cbytes);
+			CP(tmsqk, tmsqk_c, u.msg_qnum);
+			CP(tmsqk, tmsqk_c, u.msg_qbytes);
+			CP(tmsqk, tmsqk_c, u.msg_lspid);
+			CP(tmsqk, tmsqk_c, u.msg_lrpid);
+			CP(tmsqk, tmsqk_c, u.msg_stime);
+			CP(tmsqk, tmsqk_c, u.msg_rtime);
+			CP(tmsqk, tmsqk_c, u.msg_ctime);
+			/* Don't copy label or cred */
+			outaddr = &tmsqk_c;
+			outsize = sizeof(tmsqk_c);
+		} else
+#endif
+		{
+			/* Don't leak kernel pointers */
+			tmsqk.u.msg_first = NULL;
+			tmsqk.u.msg_last = NULL;
+			tmsqk.label = NULL;
+			tmsqk.cred = NULL;
+			/*
+			 * XXX: some padding also exists, but we take care to
+			 * allocate our pool of msqid_kernel structs with
+			 * zeroed memory so this should be OK.
+			 */
+			outaddr = &tmsqk;
+			outsize = sizeof(tmsqk);
+		}
+		error = SYSCTL_OUT(req, outaddr, outsize);
 		if (error != 0)
 			break;
 	}
