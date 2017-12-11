@@ -90,7 +90,75 @@ cstr_return:
 	nop
 END(copystr_c)
 
+/*
+ * pure capability ABI-only versions of the support routines
+ */
 #ifdef CHERI_KERNEL
+
+/*
+ * Implement CHERI memcpy() and bcopy() variants in assembly; C works fine in
+ * the kernel most of the time, but copyincap() and copyoutcap() require that
+ * no callee-save registers be trampled over due to fault-based error
+ * handling.
+ *
+ * This version handles both aligned and unaligned access at _MIPS_SZ_CAP, 8, 4, 2, 1 bytes.
+ * This version also handles overlapping copies.
+ * This version does not preserve memory tags.
+ *
+ * bcopy() accepts:
+ * c3 - source pointer
+ * c4 - destination pointer
+ * a0 - length
+ *
+ * memcpy() has inverted source/destination pointers.
+ */
+LEAF(memcpy)
+XLEAF(memcpy_c)
+XLEAF(memcpynocap_c)
+	cmove	$c3, $c4
+
+XLEAF(bcopy)
+XLEAF(bcopy_c)
+XLEAF(bcopynocap_c)
+
+END(memcpy)
+
+/*
+ * See memcpy() bcopy()
+ * This version preserves memory tags, however it requres
+ * the input and output pointers to be capability-aligned.
+ */
+LEAF(cheri_memcpy)
+	cmove	$c1, $c3
+	cmove	$c3, $c4
+	cmove	$c4, $c1
+XLEAF(cheri_bcopy)
+	beqz	a0, 2f /* Return immediately if zero-length. */
+	li	v0, -CHERICAP_SIZE	/* Handle under-aligned lengths by... */
+	and	a0, a0, v0	/* .. truncating the length to capsize bytes. */
+	cltu	v0, $c4, $c3	/* forward or backward copy? */
+	beqz	v0, 3f 	/* Backward */
+	cincoffset	$c2, $c4, a0	/* end pointer in c2 */
+	/* Copy forward */
+	li	v1, CHERICAP_SIZE	/* forward loop increment */
+1:	/* Common copy loop */
+	clc	CHERI_REG_CTEMP0, zero, 0($c3)
+	csc	CHERI_REG_CTEMP0, zero, 0($c4)
+	cincoffset	$c4, $c4, v1	/* Increment destination pointer. */
+	ceq	v0, $c2, $c4	/* Are we there yet?  If not, loop. */
+	beqz	v0, 1b # loop
+	cincoffset	$c3, $c3, v1	/* Branch delay: increment src ptr. */
+2:	/* Return */
+	cjr	$c17
+	cmove	$c3, $c1	/* need to return original c3 for memcpy */
+3:	/* Copy backwards */
+	cmove	CHERI_REG_CTEMP0, $c2	/* swap destination start and end pointers */
+	cmove	$c2, $c4
+	cmove	$c4, CHERI_REG_CTEMP0
+	cincoffset	$c3, $c3, a0	/* set the source pointer at the end of the buffer */
+	b	1b	/* copy loop */
+	li	v1, -CHERICAP_SIZE	/* backward loop increment */
+END(cheri_memcpy)
 
 #if 0
 /* XXX-AM: is this even ever used? */

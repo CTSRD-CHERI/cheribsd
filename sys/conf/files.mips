@@ -39,7 +39,7 @@ mips/mips/stack_machdep.c		optional	ddb | stack
 mips/mips/stdatomic.c			standard \
 	compile-with "${NORMAL_C:N-Wmissing-prototypes}"
 mips/mips/support.S			optional	!cheri_kernel
-mips/mips/bcopy.S			standard
+mips/mips/bcopy.S			optional	!cheri_kernel
 mips/mips/swtch.S			standard
 mips/mips/sys_machdep.c			standard
 mips/mips/tlb.c				standard
