@@ -152,7 +152,7 @@ main(int argc, char *argv[], char *envv[], struct bootinfo *bootinfop)
 	printf("bootpath=\"%s\"\n", bootpath);
 #endif
 
-	interact();
+	interact(NULL);
 	return (0);
 }
 
