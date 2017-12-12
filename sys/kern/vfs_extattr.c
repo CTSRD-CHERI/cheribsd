@@ -181,6 +181,9 @@ extattr_set_vp(struct vnode *vp, int attrnamespace, const char *attrname,
 	ssize_t cnt;
 	int error;
 
+	if (nbytes > IOSIZE_MAX)
+		return (EINVAL);
+
 	error = vn_start_write(vp, &mp, V_WAIT | PCATCH);
 	if (error)
 		return (error);
@@ -190,10 +193,6 @@ extattr_set_vp(struct vnode *vp, int attrnamespace, const char *attrname,
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_offset = 0;
-	if (nbytes > IOSIZE_MAX) {
-		error = EINVAL;
-		goto done;
-	}
 	auio.uio_resid = nbytes;
 	auio.uio_rw = UIO_WRITE;
 	auio.uio_segflg = UIO_USERSPACE;
@@ -352,6 +351,9 @@ extattr_get_vp(struct vnode *vp, int attrnamespace, const char *attrname,
 	size_t size, *sizep;
 	int error;
 
+	if (nbytes > IOSIZE_MAX)
+		return (EINVAL);
+
 	vn_lock(vp, LK_SHARED | LK_RETRY);
 
 	/*
@@ -367,10 +369,6 @@ extattr_get_vp(struct vnode *vp, int attrnamespace, const char *attrname,
 		auio.uio_iov = &aiov;
 		auio.uio_iovcnt = 1;
 		auio.uio_offset = 0;
-		if (nbytes > IOSIZE_MAX) {
-			error = EINVAL;
-			goto done;
-		}
 		auio.uio_resid = nbytes;
 		auio.uio_rw = UIO_READ;
 		auio.uio_segflg = UIO_USERSPACE;
@@ -669,6 +667,9 @@ extattr_list_vp(struct vnode *vp, int attrnamespace, void * __capability data,
 	ssize_t cnt;
 	int error;
 
+	if (nbytes > IOSIZE_MAX)
+		return (EINVAL);
+
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 
 	auiop = NULL;
@@ -679,10 +680,6 @@ extattr_list_vp(struct vnode *vp, int attrnamespace, void * __capability data,
 		auio.uio_iov = &aiov;
 		auio.uio_iovcnt = 1;
 		auio.uio_offset = 0;
-		if (nbytes > IOSIZE_MAX) {
-			error = EINVAL;
-			goto done;
-		}
 		auio.uio_resid = nbytes;
 		auio.uio_rw = UIO_READ;
 		auio.uio_segflg = UIO_USERSPACE;
