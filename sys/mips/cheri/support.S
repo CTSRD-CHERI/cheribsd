@@ -101,9 +101,10 @@ END(copystr_c)
  * no callee-save registers be trampled over due to fault-based error
  * handling.
  *
- * This version handles both aligned and unaligned access at _MIPS_SZ_CAP, 8, 4, 2, 1 bytes.
+ * This version handles both aligned and unaligned access.
  * This version also handles overlapping copies.
  * This version does not preserve memory tags.
+ *
  *
  * bcopy() accepts:
  * c3 - source pointer
@@ -115,43 +116,141 @@ END(copystr_c)
 LEAF(memcpy)
 XLEAF(memcpy_c)
 XLEAF(memcpynocap_c)
+	cmove	$c1, $c3
 	cmove	$c3, $c4
-
+	cmove	$c3, $c1
 XLEAF(bcopy)
 XLEAF(bcopy_c)
 XLEAF(bcopynocap_c)
+	beqz	a0, 5f	/* return immediately if zero-length */
+	cltu	t0, $c4, $c3	/* forward or backward copy? */
+	bnez	t0, 9f	/* forward */
+	/* backward copy */
+	cmove	$c2, $c4	/* end pointer in c2 */
+	cincoffset	$c3, $c3, a0
+	cincoffset	$c4, $c4, a0
+	b 8f	/* do_copy */
+	li	v0, -1	/* byte copy increment */
+9:	/* forward: */
+	li	v0, 1	/* byte copy increment */
+	cincoffset	$c2, $c4, a0	/* end pointer in c2 */
+8:	/* do_copy: */
+	cgetbase	t2, $c3
+	cgetoffset	t1, $c3
+	daddu	t2, t2, t1	/* src cursor in t2 */
+	cgetbase	t3, $c4
+	cgetoffset	t1, $c4
+	daddu	t3, t3, t1	/* dest cursor in t3 */
+	/* check dest alignment */
+	andi	t1, t3, (CHERICAP_SIZE - 1)
+	beqz	t1, 7f	/* cap_copy */
+	andi	t1, t3, (SZREG - 1)
+	bnez	t1, 6f	/* byte_copy */
+	nop
+	/* fall through */
 
+	/* word_copy: */
+	andi	t1, t2, (SZREG - 1)	/* check src alignment */
+	bnez	t1, 6f	/* byte_copy */
+	li	v1, -SZREG	/* delay slot: backward loop increment */
+	bltz	v0, 1f	/* word_copy_back */
+	and	a0, a0, v1	/* delay slot: aligned copy length */
+	/* forward copy */
+	li	v1, SZREG	/* forward loop increment */
+	li	t3, 0	/* forward loop offset in t3 */
+	b	2f	/* word_loop */
+	cincoffset	$c13, $c4, a0
+1:	/* word_copy_back: */
+	/* backward copy */
+	dsub	a0, zero, a0	/* negate copy length becase c4 points at the end */
+	li	t3, -SZREG	/* backward loop offset in t3 */
+	cincoffset	$c13, $c4, a0
+2:	/* word_loop: */
+	cld	t0, $t3, 0($c3)
+	csd	t0, $t3, 0($c4)
+	cincoffset	$c4, $c4, v1
+	ceq	t0, $c13, $c4	/* did we reach the aligned end? */
+	beqz	t0, 2b	/* word_loop */
+	cincoffset	$c3, $c3, v1
+	b	6f	/* byte_copy */
+	nop
+
+7:	/* cap_copy: */
+	andi	t1, t2, (CHERICAP_SIZE - 1)	/* check src alignment */
+	bnez	t1, 6f	/* byte_copy */
+	li	v1, -CHERICAP_SIZE	/* delay slot: backward loop increment */
+	bltz	v0, 1f	/* cap_copy_back */
+	and	a0, a0, v1	/* delay slot: aligned copy length */
+	/* forward copy  */
+	li	v1, CHERICAP_SIZE	/* forward loop increment */
+	li	t3, 0	/* forward loop offset in t3 */
+	b	2f	/* cap_loop */
+	cincoffset	$c13, $c4, a0
+1:	/* cap_copy_back: */
+	/* backward copy  */
+	dsub	a0, zero, a0	/* negate copy length becase c4 points at the end */
+	li	t3, -CHERICAP_SIZE	/* backward loop offset in t3 */
+	cincoffset	$c13, $c4, a0
+2:	/* cap_loop: */
+	clc	$c14, zero, 0($c3)
+	ccleartag	$c14, $c14
+	csc	$c14, zero, 0($c4)
+	cincoffset	$c4, $c4, v1
+	ceq	t0, $c13, $c4	/* did we reach the aligned end? */
+	beqz	t0, 2b	/* cap_loop */
+	cincoffset	$c3, $c3, v1
+	/* fall through */
+
+6:	/* byte_copy: */
+	ceq	t0, $c2, $c4	/* did we reach the actual end? */
+	bnez	t0, 5f	/* return */
+	li	t3, 0	/* delay slot: forward loop offset */
+	bgtz	v0, 1f	/* if forward copy, skip to byte_loop */
+	nop
+	li	t3, -1	/* backward loop offset */
+1:	/* byte_loop: */
+	clb	t0, t3, 0($c3)
+	csb	t0, t3, 0($c4)
+	cincoffset	$c4, $c4, v0
+	ceq	t0, $c2, $c4	/* did we reach the end? */
+	beqz	t0, 1b	/* byte_loop */
+	cincoffset	$c3, $c3, v0
+
+5:	/* return: */
+	cjr	$c17
+	cmove	$c3, $c1	/* need to return original c3 for memcpy */
 END(memcpy)
 
 /*
  * See memcpy() bcopy()
  * This version preserves memory tags, however it requres
  * the input and output pointers to be capability-aligned.
+ * XXX-AM: should we also copy the remaining unaligned bytes?
  */
 LEAF(cheri_memcpy)
 	cmove	$c1, $c3
 	cmove	$c3, $c4
 	cmove	$c4, $c1
 XLEAF(cheri_bcopy)
-	beqz	a0, 2f /* Return immediately if zero-length. */
+	beqz	a0, 2f /* return immediately if zero-length. */
 	li	v0, -CHERICAP_SIZE	/* Handle under-aligned lengths by... */
 	and	a0, a0, v0	/* .. truncating the length to capsize bytes. */
 	cltu	v0, $c4, $c3	/* forward or backward copy? */
-	beqz	v0, 3f 	/* Backward */
+	beqz	v0, 3f 	/* backward */
 	cincoffset	$c2, $c4, a0	/* end pointer in c2 */
-	/* Copy forward */
+	/* copy forward */
 	li	v1, CHERICAP_SIZE	/* forward loop increment */
-1:	/* Common copy loop */
+1:	/* common copy loop */
 	clc	CHERI_REG_CTEMP0, zero, 0($c3)
 	csc	CHERI_REG_CTEMP0, zero, 0($c4)
-	cincoffset	$c4, $c4, v1	/* Increment destination pointer. */
+	cincoffset	$c4, $c4, v1	/* increment destination pointer. */
 	ceq	v0, $c2, $c4	/* Are we there yet?  If not, loop. */
 	beqz	v0, 1b # loop
-	cincoffset	$c3, $c3, v1	/* Branch delay: increment src ptr. */
-2:	/* Return */
+	cincoffset	$c3, $c3, v1	/* branch delay: increment src ptr. */
+2:	/* return */
 	cjr	$c17
 	cmove	$c3, $c1	/* need to return original c3 for memcpy */
-3:	/* Copy backwards */
+3:	/* copy backwards */
 	cmove	CHERI_REG_CTEMP0, $c2	/* swap destination start and end pointers */
 	cmove	$c2, $c4
 	cmove	$c4, CHERI_REG_CTEMP0
