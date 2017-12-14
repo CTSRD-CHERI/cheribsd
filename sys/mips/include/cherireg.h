@@ -418,7 +418,7 @@
 /*
  * Location of the CHERI CCall/CReturn software-path exception vector.
  */
-#define	CHERI_CCALL_EXC_VEC	((intptr_t)(int32_t)0x80000280)
+#define	CHERI_CCALL_EXC_VEC	MIPS_KSEG0((intptr_t)(int32_t)0x80000280)
 
 #if CHERICAP_SIZE == 32
 #define	CHERI_ALIGN_SHIFT(l)	0ULL

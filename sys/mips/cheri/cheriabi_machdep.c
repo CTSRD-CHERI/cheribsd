@@ -133,6 +133,9 @@ extern Elf64_Capreloc __start___cap_relocs;
 __attribute__((weak))
 extern Elf64_Capreloc __stop___cap_relocs;
 
+/* Defined in linker script, mark the end of .text and kernel image */
+extern char etext[], end[];
+
 /* 
  * Global capabilities for various address-space segments.
  */
@@ -142,7 +145,9 @@ void *cheri_xkseg_capability;
 void *cheri_kseg0_capability;
 void *cheri_kseg1_capability;
 void *cheri_kseg2_capability;
-void *cheri_kseg3_capability;
+void *cheri_kcode_capability;
+void *cheri_kdata_capability;
+void *cheri_kall_capability;
 
 #endif
 
@@ -1310,6 +1315,15 @@ cheri_init_capabilities()
 	cheri_kseg2_capability = cheri_csetbounds(
 		cheri_setoffset(kdc, MIPS_KSEG2_START),
 		MIPS_KSEG2_END - MIPS_KSEG2_START);
+	cheri_kcode_capability = cheri_andperm(
+		cheri_csetbounds(cheri_setoffset(kdc, MIPS_KSEG0_START),
+				 (vm_offset_t)&etext - MIPS_KSEG0_START),
+		(CHERI_PERM_EXECUTE | CHERI_PERM_LOAD | CHERI_PERM_CCALL | CHERI_PERM_SYSTEM_REGS));
+	cheri_kdata_capability = cheri_andperm(
+		cheri_csetbounds(cheri_setoffset(kdc, (vm_offset_t)&etext),
+				 (vm_offset_t)&end - (vm_offset_t)&etext),
+		~(CHERI_PERM_EXECUTE | CHERI_PERM_CCALL | CHERI_PERM_SEAL | CHERI_PERM_SYSTEM_REGS));
+	cheri_kall_capability = kdc;
 }
 
 #endif /* CHERI_KERNEL */
