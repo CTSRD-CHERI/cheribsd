@@ -166,8 +166,8 @@ XLEAF(bcopynocap_c)
 	li	t3, -SZREG	/* backward loop offset in t3 */
 	cincoffset	$c13, $c4, a0
 2:	/* word_loop: */
-	cld	t0, $t3, 0($c3)
-	csd	t0, $t3, 0($c4)
+	cld	t0, t3, 0($c3)
+	csd	t0, t3, 0($c4)
 	cincoffset	$c4, $c4, v1
 	ceq	t0, $c13, $c4	/* did we reach the aligned end? */
 	beqz	t0, 2b	/* word_loop */
