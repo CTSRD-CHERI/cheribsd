@@ -41,11 +41,7 @@ __FBSDID("$FreeBSD$");
 inline int
 _yamon_syscon_read(t_yamon_syscon_id id, void *param, uint32_t size)
 {
-	int32_t *yamon_func_table = cheri_setoffset(
-		cheri_getkdc(), YAMON_FUNC_OFFSET(YAMON_SYSCON_READ_OFS));
-	long yamon_syscon_read = (long)*yamon_func_table;
-	/* XXX-AM: ideally YAMON_FUNC_OFFSET should return a capability from kseg0_cap */
-	/* long yamon_syscon_read = (long)*((int32_t *)YAMON_FUNC_OFFSET(YAMON_SYSCON_READ_OFS)); */
+	long yamon_syscon_read = (long)*((int32_t *)YAMON_FUNC_OFFSET(YAMON_SYSCON_READ_OFS));
 	int value;
 	__asm__ __volatile__ (
 		".set push\n"
@@ -57,6 +53,8 @@ _yamon_syscon_read(t_yamon_syscon_id id, void *param, uint32_t size)
 		"jalr %4\n"
 		"move $a2, %3\n"
 		"move %0, $v0\n"
+		/* XXX-AM keep ra zeroed so we can catch anything that returns improperly */
+		"move $ra, $zero\n"
 		".set pop\n"
 		: "=r" (value)
 		: "r" (id), "r" (param), "r" (size), "r" (yamon_syscon_read)

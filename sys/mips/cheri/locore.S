@@ -210,6 +210,8 @@ restrict_pcc:
 #endif
 
 	PTR_LA	gp, _C_LABEL(_gp)
+	/* XXX-AM: zero out ra so we catch anything that returns improperly */
+	PTR_LA	ra, 0
 
 	/* Call the platform-specific startup code. */
 	cfromptr	$c3, CHERI_REG_KDC, a1
