@@ -218,6 +218,7 @@ restrict_pcc:
 	/* do not bound envp because we do not have
 	 * reliable length information */
 	cfromptr	$c4, CHERI_REG_KDC, a2
+	move	a1, a3
 	PTR_LA	t0, _C_LABEL(platform_start)
 	cgetpccsetoffset $c12, t0
 	cjalr	$c12, $c17
