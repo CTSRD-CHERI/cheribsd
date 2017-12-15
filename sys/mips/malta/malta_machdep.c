@@ -364,13 +364,13 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 	if (bootverbose) {
 		printf("cmd line: ");
 		for (i = 0; i < argc; i++) {
-			const char *arg;
+			char *arg;
 #ifdef CHERI_KERNEL
 			/* trust that YAMON initialized the strings correctly and
 			 * do not try to get the precise string length.
 			 */
-			cheri_capability_set(&arg, CHERI_PERM_LOAD, (intptr_t)argv[i],
-					     4096, 0);
+			cheri_capability_set((void **)&arg, CHERI_PERM_LOAD,
+					     (intptr_t)argv[i], 4096, 0);
 #else
 			arg = (char*)(intptr_t)argv[i];
 #endif
@@ -386,15 +386,15 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 	 * Parse the environment for things like ememsize.
 	 */
 	for (i = 0; envp[i]; i += 2) {
-		const char *a, *v;
+		char *a, *v;
 #ifdef CHERI_KERNEL
 		/* trust that YAMON initialized the strings correctly and
 		 * do not try to get the precise string length.
 		 */
-		cheri_capability_set(&a, CHERI_PERM_LOAD, (intptr_t)envp[i],
-				     4096, 0);
-		cheri_capability_set(&v, CHERI_PERM_LOAD, (intptr_t)envp[i+1],
-				     4096, 0);
+		cheri_capability_set((void **)&a, CHERI_PERM_LOAD,
+				     (intptr_t)envp[i], 4096, 0);
+		cheri_capability_set((void **)&v, CHERI_PERM_LOAD,
+				     (intptr_t)envp[i+1], 4096, 0);
 #else
 		a = (char *)(intptr_t)envp[i];
 		v = (char *)(intptr_t)envp[i+1];
