@@ -181,6 +181,7 @@ int	kern_fhopen(struct thread *td,
 	    const struct fhandle * __capability u_fhp, int flags);
 int	kern_fhstat(struct thread *td, fhandle_t fh, struct stat *buf);
 int	kern_fhstatfs(struct thread *td, fhandle_t fh, struct statfs *buf);
+int	kern_fpathconf(struct thread *td, int fd, int name);
 int	kern_fstat(struct thread *td, int fd, struct stat *sbp);
 int	kern_fstatfs(struct thread *td, int fd, struct statfs *buf);
 int	kern_fsync(struct thread *td, int fd, bool fullsync);
