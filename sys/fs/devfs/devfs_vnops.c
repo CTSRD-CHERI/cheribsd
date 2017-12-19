@@ -1234,6 +1234,12 @@ devfs_pathconf(struct vop_pathconf_args *ap)
 {
 
 	switch (ap->a_name) {
+	case _PC_NAME_MAX:
+		*ap->a_retval = NAME_MAX;
+		return (0);
+	case _PC_LINK_MAX:
+		*ap->a_retval = LINK_MAX;
+		return (0);
 	case _PC_MAX_CANON:
 		if (ap->a_vp->v_vflag & VV_ISTTY) {
 			*ap->a_retval = MAX_CANON;
@@ -1262,6 +1268,9 @@ devfs_pathconf(struct vop_pathconf_args *ap)
 #else
 		*ap->a_retval = 0;
 #endif
+		return (0);
+	case _PC_CHOWN_RESTRICTED:
+		*ap->a_retval = 1;
 		return (0);
 	default:
 		return (vop_stdpathconf(ap));
