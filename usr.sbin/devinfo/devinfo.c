@@ -137,6 +137,22 @@ skip:
 	return(0);
 }
 
+static void
+print_dev(struct devinfo_dev *dev)
+{
+
+	printf("%s", dev->dd_name[0] ? dev->dd_name : "unknown");
+	if (vflag && *dev->dd_pnpinfo)
+		printf(" pnpinfo %s", dev->dd_pnpinfo);
+	if (vflag && *dev->dd_location)
+		printf(" at %s", dev->dd_location);
+	if (!(dev->dd_flags & DF_ENABLED))
+		printf(" (disabled)");
+	else if (dev->dd_flags & DF_SUSPENDED)
+		printf(" (suspended)");
+}
+
+
 /*
  * Print information about a device and its children.
  */
@@ -150,15 +166,7 @@ print_device(struct devinfo_dev *dev, void *arg)
 		indent = (int)(intptr_t)arg;
 		for (i = 0; i < indent; i++)
 			printf(" ");
-		printf("%s", dev->dd_name[0] ? dev->dd_name : "unknown");
-		if (vflag && *dev->dd_pnpinfo)
-			printf(" pnpinfo %s", dev->dd_pnpinfo);
-		if (vflag && *dev->dd_location)
-			printf(" at %s", dev->dd_location);
-		if (!(dev->dd_flags & DF_ENABLED))
-			printf(" (disabled)");
-		else if (dev->dd_flags & DF_SUSPENDED)
-			printf(" (suspended)");
+		print_dev(dev);
 		printf("\n");
 		if (iflag || rflag) {
 			ia.indent = indent + 4;
@@ -207,17 +215,6 @@ print_rman(struct devinfo_rman *rman, void *arg __unused)
 	return(0);
 }
 
-static void __dead2
-usage(void)
-{
-	fprintf(stderr, "%s\n%s\n%s\n",
-	    "usage: devinfo [-rv]",
-	    "       devinfo -u",
-	    "       devifno -p dev");
-	exit(1);
-}
-
-
 static int
 print_path(struct devinfo_dev *dev, void *xname)
 {
@@ -225,14 +222,30 @@ print_path(struct devinfo_dev *dev, void *xname)
 	int rv;
 
 	if (strcmp(dev->dd_name, name) == 0) {
-		printf("%s", dev->dd_name);
+		print_dev(dev);
+		if (vflag)
+			printf("\n");
 		return (1);
 	}
 
 	rv = devinfo_foreach_device_child(dev, print_path, xname);
-	if (rv == 1)
-		printf(" %s", dev->dd_name[0] ? dev->dd_name : "unknown");
+	if (rv == 1) {
+		printf(" ");
+		print_dev(dev);
+		if (vflag)
+			printf("\n");
+	}
 	return (rv);
+}
+
+static void __dead2
+usage(void)
+{
+	fprintf(stderr, "%s\n%s\n%s\n",
+	    "usage: devinfo [-rv]",
+	    "       devinfo -u",
+	    "       devifno -p dev [-v]");
+	exit(1);
 }
 
 int
@@ -240,7 +253,7 @@ main(int argc, char *argv[])
 {
 	struct devinfo_dev	*root;
 	int			c, uflag;
-	char			*path;
+	char			*path = NULL;
 
 	uflag = 0;
 	while ((c = getopt(argc, argv, "ip:ruv")) != -1) {
@@ -277,7 +290,8 @@ main(int argc, char *argv[])
 	if (path) {
 		if (devinfo_foreach_device_child(root, print_path, (void *)path) == 0)
 			errx(1, "%s: Not found", path);
-		printf("\n");
+		if (!vflag)
+			printf("\n");
 	} else if (uflag) {
 		/* print resource usage? */
 		devinfo_foreach_rman(print_rman, NULL);
