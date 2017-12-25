@@ -974,7 +974,6 @@ aio_schedule_fsync(void *context, int pending)
 bool
 aio_cancel_cleared(struct kaiocb *job)
 {
-	struct kaioinfo *ki;
 
 	/*
 	 * The caller should hold the same queue lock held when
@@ -982,7 +981,6 @@ aio_cancel_cleared(struct kaiocb *job)
 	 * ensuring this check sees an up-to-date value.  However,
 	 * there is no way to assert that.
 	 */
-	ki = job->userproc->p_aioinfo;
 	return ((job->jobflags & KAIOCB_CLEARED) != 0);
 }
 
@@ -1774,7 +1772,6 @@ aio_cancel_sync(struct kaiocb *job)
 int
 aio_queue_file(struct file *fp, struct kaiocb *job)
 {
-	struct aioliojob *lj;
 	struct kaioinfo *ki;
 	struct kaiocb *job2;
 	struct vnode *vp;
@@ -1782,7 +1779,6 @@ aio_queue_file(struct file *fp, struct kaiocb *job)
 	int error, opcode;
 	bool safe;
 
-	lj = job->lio;
 	ki = job->userproc->p_aioinfo;
 	opcode = job->uaiocb.aio_lio_opcode;
 	if (opcode == LIO_SYNC)
