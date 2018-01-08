@@ -59,144 +59,6 @@
 #define	_MIPS_CPUREGS_H_
 
 /*
- * Address space.
- * 32-bit mips CPUS partition their 32-bit address space into four segments:
- *
- * kuseg   0x00000000 - 0x7fffffff  User virtual mem,  mapped
- * kseg0   0x80000000 - 0x9fffffff  Physical memory, cached, unmapped
- * kseg1   0xa0000000 - 0xbfffffff  Physical memory, uncached, unmapped
- * kseg2   0xc0000000 - 0xffffffff  kernel-virtual,  mapped
- *
- * Caching of mapped addresses is controlled by bits in the TLB entry.
- */
-
-#define	MIPS_KSEG0_LARGEST_PHYS		(0x20000000)
-#define	MIPS_KSEG0_PHYS_MASK		(0x1fffffff)
-#define	MIPS_XKPHYS_LARGEST_PHYS	(0x10000000000)  /* 40 bit PA */
-#define	MIPS_XKPHYS_PHYS_MASK		(0x0ffffffffff)
-
-#define	MIPS_XKPHYS_START		0x8000000000000000
-#define	MIPS_XKPHYS_END			0xbfffffffffffffff
-#define	MIPS_XUSEG_START		0x0000000000000000
-#define	MIPS_XUSEG_END			0x0000010000000000
-#define	MIPS_XKSEG_START		0xc000000000000000
-#define	MIPS_XKSEG_END			0xc00000ff80000000
-
-#define	MIPS_XKSEG_COMPAT32_START	0xffffffff80000000
-#define	MIPS_XKSEG_COMPAT32_END		0xffffffffffffffff
-
-#ifndef LOCORE
-#define	MIPS_KUSEG_START		0x00000000
-#define	MIPS_KSEG0_START		((intptr_t)(int32_t)0x80000000)
-#define	MIPS_KSEG0_END			((intptr_t)(int32_t)0x9fffffff)
-#define	MIPS_KSEG1_START		((intptr_t)(int32_t)0xa0000000)
-#define	MIPS_KSEG1_END			((intptr_t)(int32_t)0xbfffffff)
-#define	MIPS_KSSEG_START		((intptr_t)(int32_t)0xc0000000)
-#define	MIPS_KSSEG_END			((intptr_t)(int32_t)0xdfffffff)
-#define	MIPS_KSEG3_START		((intptr_t)(int32_t)0xe0000000)
-#define	MIPS_KSEG3_END			((intptr_t)(int32_t)0xffffffff)
-#define MIPS_KSEG2_START		MIPS_KSSEG_START
-#define MIPS_KSEG2_END			MIPS_KSSEG_END
-
-#ifdef CHERI_KERNEL
-/* 
- * Global capabilities for various address-space segments.
- */
-extern void *cheri_xuseg_capability;
-extern void *cheri_xkphys_capability;
-extern void *cheri_xkseg_capability;
-extern void *cheri_kseg0_capability;
-extern void *cheri_kseg1_capability;
-extern void *cheri_kseg2_capability;
-/* 
- * Global capabilities for specific kernel address space regions
- */
-/*
- * Kernel global code capability
- * has PERM_LOAD PERM_EXECUTE PERM_CCALL PERM_SYSTEM_REGS
- * This spans the kernel .text section and exception vectors.
- */
-extern void *cheri_kcode_capability;
-/*
- * Kernel global data capability
- * has PERM_LOAD PERM_STORE PERM_LOAD_CAP PERM_STORE_CAP PERM_STORE_LOCAL_CAP
- * This spans the kernel data sections, excluding debug sections
- */
-extern void *cheri_kdata_capability;
-/*
- * Kernel root capability
- * has all permissions
- * This spans the whole address-space
- */
-extern void *cheri_kall_capability;
-
-/*
- * Macros used to create a pointer for each address space segment
- */
-#define MIPS_XKPHYS(x) (cheri_xkphys_capability + (x - MIPS_XKPHYS_START))
-#define MIPS_XKSEG(x) (cheri_xkseg_capability + (x - MIPS_XKSEG_START))
-#define MIPS_XUSEG(x) (cheri_xuseg_capability + (x - MIPS_XUSEG_START))
-#define MIPS_KSEG0(x) (cheri_kseg0_capability + (x - MIPS_KSEG0_START))
-#define MIPS_KSEG1(x) (cheri_kseg1_capability + (x - MIPS_KSEG1_START))
-#define MIPS_KSEG2(x) (cheri_kseg2_capability + (x - MIPS_KSEG2_START))
-/* Special macros used to create pointers in specific kernel address space regions */
-#define MIPS_KCODE(x) (cheri_kcode_capability + (x - MIPS_KSEG0_START))
-#define MIPS_KDATA(x) (cheri_kdata_capability +				\
-		       (x - __builtin_mips_cheri_get_cap_base(cheri_kdata_capability)))
-#define MIPS_KALL(x) (cheri_kall_capability + x)
-#else /* ! CHERI_KERNEL */
-#define MIPS_XKPHYS(x) (x)
-#define MIPS_XKSEG(x) (x)
-#define MIPS_XUSEG(x) (x)
-#define MIPS_KSEG0(x) (x)
-#define MIPS_KSEG1(x) (x)
-#define MIPS_KSEG2(x) (x)
-#define MIPS_KCODE(x) (x)
-#define MIPS_KDATA(x) (x)
-#define MIPS_KALL(x) (x)
-#endif /* ! CHERI_KERNEL */
-
-#define	MIPS_PHYS_TO_KSEG0(x)	MIPS_KSEG0((uintptr_t)(x) | MIPS_KSEG0_START)
-#define	MIPS_PHYS_TO_KSEG1(x)	MIPS_KSEG1((uintptr_t)(x) | MIPS_KSEG1_START)
-
-#define	MIPS_KSEG0_TO_PHYS(x)		((uintptr_t)(x) & MIPS_KSEG0_PHYS_MASK)
-#define	MIPS_KSEG1_TO_PHYS(x)		((uintptr_t)(x) & MIPS_KSEG0_PHYS_MASK)
-
-#define	MIPS_IS_KSEG0_ADDR(x)					\
-	(((vm_offset_t)(x) >= MIPS_KSEG0_START) &&		\
-	    ((vm_offset_t)(x) <= MIPS_KSEG0_END))
-#define	MIPS_IS_KSEG1_ADDR(x)					\
-	(((vm_offset_t)(x) >= MIPS_KSEG1_START) &&		\
-	    ((vm_offset_t)(x) <= MIPS_KSEG1_END))
-#define	MIPS_IS_VALID_PTR(x)		(MIPS_IS_KSEG0_ADDR(x) || \
-					    MIPS_IS_KSEG1_ADDR(x))
-
-#define	MIPS_PHYS_TO_XKPHYS(cca,x) \
-	((0x2ULL << 62) | ((unsigned long long)(cca) << 59) | (x))
-#define	MIPS_PHYS_TO_XKPHYS_CACHED(x) \
-	((0x2ULL << 62) | ((unsigned long long)(MIPS_CCA_CACHED) << 59) | (x))
-#define	MIPS_PHYS_TO_XKPHYS_UNCACHED(x) \
-	((0x2ULL << 62) | ((unsigned long long)(MIPS_CCA_UNCACHED) << 59) | (x))
-
-#define	MIPS_XKPHYS_TO_PHYS(x)		((uintptr_t)(x) & MIPS_XKPHYS_PHYS_MASK)
-
-#define	MIPS_XKSEG_TO_COMPAT32(va)	((va) & 0xffffffff)
-
-#ifdef __mips_n64
-#define	MIPS_DIRECT_MAPPABLE(pa)	1
-#define	MIPS_PHYS_TO_DIRECT(pa)		MIPS_PHYS_TO_XKPHYS_CACHED(pa)
-#define	MIPS_PHYS_TO_DIRECT_UNCACHED(pa)	MIPS_PHYS_TO_XKPHYS_UNCACHED(pa)
-#define	MIPS_DIRECT_TO_PHYS(va)		MIPS_XKPHYS_TO_PHYS(va)
-#else
-#define	MIPS_DIRECT_MAPPABLE(pa)	((pa) < MIPS_KSEG0_LARGEST_PHYS)
-#define	MIPS_PHYS_TO_DIRECT(pa)		MIPS_PHYS_TO_KSEG0(pa)
-#define	MIPS_PHYS_TO_DIRECT_UNCACHED(pa)	MIPS_PHYS_TO_KSEG1(pa)
-#define	MIPS_DIRECT_TO_PHYS(va)		MIPS_KSEG0_TO_PHYS(va)
-#endif
-
-#endif /* !LOCORE */
-
-/*
  * Cache Coherency Attributes:
  *	UC:	Uncached.
  *	UA:	Uncached accelerated.
@@ -285,6 +147,144 @@ extern void *cheri_kall_capability;
 #define	MIPS_CCA_CACHED	MIPS_CCA_C
 #endif
 #endif
+
+/*
+ * Address space.
+ * 32-bit mips CPUS partition their 32-bit address space into four segments:
+ *
+ * kuseg   0x00000000 - 0x7fffffff  User virtual mem,  mapped
+ * kseg0   0x80000000 - 0x9fffffff  Physical memory, cached, unmapped
+ * kseg1   0xa0000000 - 0xbfffffff  Physical memory, uncached, unmapped
+ * kseg2   0xc0000000 - 0xffffffff  kernel-virtual,  mapped
+ *
+ * Caching of mapped addresses is controlled by bits in the TLB entry.
+ */
+
+#define	MIPS_KSEG0_LARGEST_PHYS		(0x20000000)
+#define	MIPS_KSEG0_PHYS_MASK		(0x1fffffff)
+#define	MIPS_XKPHYS_LARGEST_PHYS	(0x10000000000)  /* 40 bit PA */
+#define	MIPS_XKPHYS_PHYS_MASK		(0x0ffffffffff)
+
+#define	MIPS_XKPHYS_START		0x8000000000000000
+#define	MIPS_XKPHYS_END			0xbfffffffffffffff
+#define	MIPS_XUSEG_START		0x0000000000000000
+#define	MIPS_XUSEG_END			0x0000010000000000
+#define	MIPS_XKSEG_START		0xc000000000000000
+#define	MIPS_XKSEG_END			0xc00000ff80000000
+
+#define	MIPS_XKSEG_COMPAT32_START	0xffffffff80000000
+#define	MIPS_XKSEG_COMPAT32_END		0xffffffffffffffff
+
+#ifndef LOCORE
+#define	MIPS_KUSEG_START		0x00000000
+#define	MIPS_KSEG0_START		((intptr_t)(int32_t)0x80000000)
+#define	MIPS_KSEG0_END			((intptr_t)(int32_t)0x9fffffff)
+#define	MIPS_KSEG1_START		((intptr_t)(int32_t)0xa0000000)
+#define	MIPS_KSEG1_END			((intptr_t)(int32_t)0xbfffffff)
+#define	MIPS_KSSEG_START		((intptr_t)(int32_t)0xc0000000)
+#define	MIPS_KSSEG_END			((intptr_t)(int32_t)0xdfffffff)
+#define	MIPS_KSEG3_START		((intptr_t)(int32_t)0xe0000000)
+#define	MIPS_KSEG3_END			((intptr_t)(int32_t)0xffffffff)
+#define MIPS_KSEG2_START		MIPS_KSSEG_START
+#define MIPS_KSEG2_END			MIPS_KSSEG_END
+
+#ifdef CHERI_KERNEL
+/* 
+ * Global capabilities for various address-space segments.
+ */
+extern void *cheri_xuseg_capability;
+extern void *cheri_xkphys_capability;
+extern void *cheri_xkseg_capability;
+extern void *cheri_kseg0_capability;
+extern void *cheri_kseg1_capability;
+extern void *cheri_kseg2_capability;
+/* 
+ * Global capabilities for specific kernel address space regions
+ */
+/*
+ * Kernel global code capability
+ * has PERM_LOAD PERM_EXECUTE PERM_CCALL PERM_SYSTEM_REGS
+ * This spans the kernel .text section and exception vectors.
+ */
+extern void *cheri_kcode_capability;
+/*
+ * Kernel global data capability
+ * has PERM_LOAD PERM_STORE PERM_LOAD_CAP PERM_STORE_CAP PERM_STORE_LOCAL_CAP
+ * This spans the kernel data sections, excluding debug sections
+ */
+extern void *cheri_kdata_capability;
+/*
+ * Kernel root capability
+ * has all permissions
+ * This spans the whole address-space
+ */
+extern void *cheri_kall_capability;
+
+/*
+ * Macros used to create a pointer for each address space segment
+ */
+#define MIPS_XKPHYS(x) (cheri_xkphys_capability + ((x) - MIPS_XKPHYS_START))
+#define MIPS_XKSEG(x) (cheri_xkseg_capability + ((x) - MIPS_XKSEG_START))
+#define MIPS_XUSEG(x) (cheri_xuseg_capability + ((x) - MIPS_XUSEG_START))
+#define MIPS_KSEG0(x) (cheri_kseg0_capability + ((x) - MIPS_KSEG0_START))
+#define MIPS_KSEG1(x) (cheri_kseg1_capability + ((x) - MIPS_KSEG1_START))
+#define MIPS_KSEG2(x) (cheri_kseg2_capability + ((x) - MIPS_KSEG2_START))
+/* Special macros used to create pointers in specific kernel address space regions */
+#define MIPS_KCODE(x) (cheri_kcode_capability + ((x) - MIPS_KSEG0_START))
+#define MIPS_KDATA(x) (cheri_kdata_capability +				\
+		       ((x) - __builtin_mips_cheri_get_cap_base(cheri_kdata_capability)))
+#define MIPS_KALL(x) (cheri_kall_capability + (x))
+#else /* ! CHERI_KERNEL */
+#define MIPS_XKPHYS(x) (x)
+#define MIPS_XKSEG(x) (x)
+#define MIPS_XUSEG(x) (x)
+#define MIPS_KSEG0(x) (x)
+#define MIPS_KSEG1(x) (x)
+#define MIPS_KSEG2(x) (x)
+#define MIPS_KCODE(x) (x)
+#define MIPS_KDATA(x) (x)
+#define MIPS_KALL(x) (x)
+#endif /* ! CHERI_KERNEL */
+
+#define	MIPS_PHYS_TO_KSEG0(x)	MIPS_KSEG0((uintptr_t)(x) | MIPS_KSEG0_START)
+#define	MIPS_PHYS_TO_KSEG1(x)	MIPS_KSEG1((uintptr_t)(x) | MIPS_KSEG1_START)
+
+#define	MIPS_KSEG0_TO_PHYS(x)		((uintptr_t)(x) & MIPS_KSEG0_PHYS_MASK)
+#define	MIPS_KSEG1_TO_PHYS(x)		((uintptr_t)(x) & MIPS_KSEG0_PHYS_MASK)
+
+#define	MIPS_IS_KSEG0_ADDR(x)					\
+	(((vm_offset_t)(x) >= MIPS_KSEG0_START) &&		\
+	    ((vm_offset_t)(x) <= MIPS_KSEG0_END))
+#define	MIPS_IS_KSEG1_ADDR(x)					\
+	(((vm_offset_t)(x) >= MIPS_KSEG1_START) &&		\
+	    ((vm_offset_t)(x) <= MIPS_KSEG1_END))
+#define	MIPS_IS_VALID_PTR(x)		(MIPS_IS_KSEG0_ADDR(x) || \
+					    MIPS_IS_KSEG1_ADDR(x))
+
+#define	MIPS_PHYS_TO_XKPHYS(cca,x) \
+	MIPS_XKPHYS((0x2ULL << 62) | ((unsigned long long)(cca) << 59) | (x))
+#define	MIPS_PHYS_TO_XKPHYS_CACHED(x) \
+	MIPS_PHYS_TO_XKPHYS(MIPS_CCA_CACHED, (x))
+#define	MIPS_PHYS_TO_XKPHYS_UNCACHED(x) \
+	MIPS_PHYS_TO_XKPHYS(MIPS_CCA_UNCACHED, (x))
+
+#define	MIPS_XKPHYS_TO_PHYS(x)		((uintptr_t)(x) & MIPS_XKPHYS_PHYS_MASK)
+
+#define	MIPS_XKSEG_TO_COMPAT32(va)	((va) & 0xffffffff)
+
+#ifdef __mips_n64
+#define	MIPS_DIRECT_MAPPABLE(pa)	1
+#define	MIPS_PHYS_TO_DIRECT(pa)		MIPS_PHYS_TO_XKPHYS_CACHED(pa)
+#define	MIPS_PHYS_TO_DIRECT_UNCACHED(pa)	MIPS_PHYS_TO_XKPHYS_UNCACHED(pa)
+#define	MIPS_DIRECT_TO_PHYS(va)		MIPS_XKPHYS_TO_PHYS(va)
+#else
+#define	MIPS_DIRECT_MAPPABLE(pa)	((pa) < MIPS_KSEG0_LARGEST_PHYS)
+#define	MIPS_PHYS_TO_DIRECT(pa)		MIPS_PHYS_TO_KSEG0(pa)
+#define	MIPS_PHYS_TO_DIRECT_UNCACHED(pa)	MIPS_PHYS_TO_KSEG1(pa)
+#define	MIPS_DIRECT_TO_PHYS(va)		MIPS_KSEG0_TO_PHYS(va)
+#endif
+
+#endif /* !LOCORE */
 
 /* CPU dependent mtc0 hazard hook */
 #if defined(CPU_CNMIPS) || defined(CPU_RMI) || defined(CPU_BERI)
