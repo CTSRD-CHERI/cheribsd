@@ -192,12 +192,12 @@
 /* 
  * Global capabilities for various address-space segments.
  */
-extern void *cheri_xuseg_capability;
-extern void *cheri_xkphys_capability;
-extern void *cheri_xkseg_capability;
-extern void *cheri_kseg0_capability;
-extern void *cheri_kseg1_capability;
-extern void *cheri_kseg2_capability;
+extern caddr_t cheri_xuseg_capability;
+extern caddr_t cheri_xkphys_capability;
+extern caddr_t cheri_xkseg_capability;
+extern caddr_t cheri_kseg0_capability;
+extern caddr_t cheri_kseg1_capability;
+extern caddr_t cheri_kseg2_capability;
 /* 
  * Global capabilities for specific kernel address space regions
  */
@@ -206,19 +206,19 @@ extern void *cheri_kseg2_capability;
  * has PERM_LOAD PERM_EXECUTE PERM_CCALL PERM_SYSTEM_REGS
  * This spans the kernel .text section and exception vectors.
  */
-extern void *cheri_kcode_capability;
+extern caddr_t cheri_kcode_capability;
 /*
  * Kernel global data capability
  * has PERM_LOAD PERM_STORE PERM_LOAD_CAP PERM_STORE_CAP PERM_STORE_LOCAL_CAP
  * This spans the kernel data sections, excluding debug sections
  */
-extern void *cheri_kdata_capability;
+extern caddr_t cheri_kdata_capability;
 /*
  * Kernel root capability
  * has all permissions
  * This spans the whole address-space
  */
-extern void *cheri_kall_capability;
+extern caddr_t cheri_kall_capability;
 
 /*
  * Macros used to create a pointer for each address space segment

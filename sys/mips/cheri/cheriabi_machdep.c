@@ -139,15 +139,15 @@ extern char etext[], end[];
 /* 
  * Global capabilities for various address-space segments.
  */
-void *cheri_xuseg_capability;
-void *cheri_xkphys_capability;
-void *cheri_xkseg_capability;
-void *cheri_kseg0_capability;
-void *cheri_kseg1_capability;
-void *cheri_kseg2_capability;
-void *cheri_kcode_capability;
-void *cheri_kdata_capability;
-void *cheri_kall_capability;
+caddr_t cheri_xuseg_capability;
+caddr_t cheri_xkphys_capability;
+caddr_t cheri_xkseg_capability;
+caddr_t cheri_kseg0_capability;
+caddr_t cheri_kseg1_capability;
+caddr_t cheri_kseg2_capability;
+caddr_t cheri_kcode_capability;
+caddr_t cheri_kdata_capability;
+caddr_t cheri_kall_capability;
 
 #endif
 
