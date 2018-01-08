@@ -99,8 +99,6 @@ struct sysentvec;
 struct thread;
 struct vmspace;
 
-#define IMGACT_CORE_COMPRESS	0x01
-
 int	exec_alloc_args(struct image_args *);
 int	exec_args_add_arg_str(struct image_args *args, char *argp,
 	    enum uio_seg segflg);
