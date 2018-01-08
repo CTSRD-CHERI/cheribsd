@@ -1302,7 +1302,8 @@ cheri_init_capabilities()
 	cheri_xkphys_capability = cheri_andperm(
 		cheri_csetbounds(cheri_setoffset(kdc, MIPS_XKPHYS_START),
 				 MIPS_XKPHYS_END - MIPS_XKPHYS_START),
-		~(CHERI_PERM_EXECUTE | CHERI_PERM_CCALL));
+		(CHERI_PERM_LOAD | CHERI_PERM_STORE | CHERI_PERM_LOAD_CAP |
+		 CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP));
 	cheri_xkseg_capability = cheri_csetbounds(
 		cheri_setoffset(kdc, MIPS_XKSEG_START),
 		MIPS_XKSEG_END - MIPS_XKSEG_START);
@@ -1322,7 +1323,8 @@ cheri_init_capabilities()
 	cheri_kdata_capability = cheri_andperm(
 		cheri_csetbounds(cheri_setoffset(kdc, (vm_offset_t)&etext),
 				 (vm_offset_t)&end - (vm_offset_t)&etext),
-		~(CHERI_PERM_EXECUTE | CHERI_PERM_CCALL | CHERI_PERM_SEAL | CHERI_PERM_SYSTEM_REGS));
+		~(CHERI_PERM_EXECUTE | CHERI_PERM_CCALL | CHERI_PERM_SEAL |
+		  CHERI_PERM_SYSTEM_REGS));
 	cheri_kall_capability = kdc;
 }
 
