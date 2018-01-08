@@ -97,6 +97,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/md_var.h>
 #include <machine/tlb.h>
 
+#ifdef CHERI_KERNEL
+#include <cheri/cheric.h>
+#endif
+
 #undef PMAP_DEBUG
 
 #if !defined(DIAGNOSTIC)
@@ -394,11 +398,11 @@ pmap_pte(pmap_t pmap, vm_offset_t va)
 	return (pmap_pde_to_pte(pde, va));
 }
 
-vm_offset_t
+vm_ptr_t
 pmap_steal_memory(vm_size_t size)
 {
 	vm_paddr_t bank_size, pa;
-	vm_offset_t va;
+	vm_ptr_t va;
 
 	size = round_page(size);
 	bank_size = phys_avail[1] - phys_avail[0];
@@ -421,6 +425,9 @@ pmap_steal_memory(vm_size_t size)
 	if (MIPS_DIRECT_MAPPABLE(pa) == 0)
 		panic("Out of memory below 512Meg?");
 	va = MIPS_PHYS_TO_DIRECT(pa);
+#ifdef CHERI_KERNEL
+	va = cheri_csetbounds(va, size);
+#endif
 	bzero((caddr_t)va, size);
 	return (va);
 }
@@ -433,11 +440,11 @@ static void
 pmap_create_kernel_pagetable(void)
 {
 	int i, j;
-	vm_offset_t ptaddr;
+	vm_ptr_t ptaddr;
 	pt_entry_t *pte;
 #ifdef __mips_n64
 	pd_entry_t *pde;
-	vm_offset_t pdaddr;
+	vm_ptr_t pdaddr;
 	int npt, npde;
 #endif
 
@@ -900,10 +907,11 @@ pmap_kremove(vm_offset_t va)
 vm_offset_t
 pmap_map(vm_offset_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
 {
-	vm_offset_t va, sva;
+	vm_offset_t va;
+	vm_ptr_t sva;
 
 	if (MIPS_DIRECT_MAPPABLE(end - 1))
-		return (MIPS_PHYS_TO_DIRECT(start));
+		return ((vm_offset_t)MIPS_PHYS_TO_DIRECT(start));
 
 	va = sva = *virt;
 	while (start < end) {
@@ -1093,7 +1101,7 @@ pmap_alloc_direct_page(unsigned int index, int req)
 int
 pmap_pinit(pmap_t pmap)
 {
-	vm_offset_t ptdva;
+	vm_ptr_t ptdva;
 	vm_page_t ptdpg;
 	int i, req_class;
 
@@ -1125,7 +1133,7 @@ pmap_pinit(pmap_t pmap)
 static vm_page_t
 _pmap_allocpte(pmap_t pmap, unsigned ptepindex, u_int flags)
 {
-	vm_offset_t pageva;
+	vm_ptr_t pageva;
 	vm_page_t m;
 	int req_class;
 
@@ -2359,7 +2367,7 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 void *
 pmap_kenter_temporary(vm_paddr_t pa, int i)
 {
-	vm_offset_t va;
+	vm_ptr_t va;
 
 	if (i != 0)
 		printf("%s: ERROR!!! More than one page of virtual address mapping not supported\n",
@@ -2546,7 +2554,7 @@ pmap_copy(pmap_t dst_pmap, pmap_t src_pmap, vm_offset_t dst_addr,
 void
 pmap_zero_page(vm_page_t m)
 {
-	vm_offset_t va;
+	vm_ptr_t va;
 	vm_paddr_t phys = VM_PAGE_TO_PHYS(m);
 
 	if (MIPS_DIRECT_MAPPABLE(phys)) {
@@ -2570,7 +2578,7 @@ pmap_zero_page(vm_page_t m)
 void
 pmap_zero_page_area(vm_page_t m, int off, int size)
 {
-	vm_offset_t va;
+	vm_ptr_t va;
 	vm_paddr_t phys = VM_PAGE_TO_PHYS(m);
 
 	if (MIPS_DIRECT_MAPPABLE(phys)) {
@@ -2597,7 +2605,7 @@ pmap_zero_page_area(vm_page_t m, int off, int size)
 static void
 pmap_copy_page_internal(vm_page_t src, vm_page_t dst, int flags)
 {
-	vm_offset_t va_src, va_dst;
+	vm_ptr_t va_src, va_dst;
 	vm_paddr_t phys_src = VM_PAGE_TO_PHYS(src);
 	vm_paddr_t phys_dst = VM_PAGE_TO_PHYS(dst);
 
@@ -2609,7 +2617,7 @@ pmap_copy_page_internal(vm_page_t src, vm_page_t dst, int flags)
 		 */
 		pmap_flush_pvcache(src);
 		mips_dcache_wbinv_range_index(
-		    MIPS_PHYS_TO_DIRECT(phys_dst), PAGE_SIZE);
+		    (vm_offset_t)MIPS_PHYS_TO_DIRECT(phys_dst), PAGE_SIZE);
 		va_src = MIPS_PHYS_TO_DIRECT(phys_src);
 		va_dst = MIPS_PHYS_TO_DIRECT(phys_dst);
 #ifdef CPU_CHERI
@@ -2678,7 +2686,8 @@ pmap_copy_pages_internal(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
 		    MIPS_DIRECT_MAPPABLE(b_phys)) {
 			pmap_flush_pvcache(a_m);
 			mips_dcache_wbinv_range_index(
-			    MIPS_PHYS_TO_DIRECT(b_phys), PAGE_SIZE);
+			    (vm_offset_t)MIPS_PHYS_TO_DIRECT(b_phys),
+			    PAGE_SIZE);
 			a_cp = (char *)MIPS_PHYS_TO_DIRECT(a_phys) +
 			    a_pg_offset;
 			b_cp = (char *)MIPS_PHYS_TO_DIRECT(b_phys) +
@@ -2735,7 +2744,7 @@ pmap_copy_pages_tags(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
 }
 #endif
 
-vm_offset_t
+vm_ptr_t
 pmap_quick_enter_page(vm_page_t m)
 {
 #if defined(__mips_n64)

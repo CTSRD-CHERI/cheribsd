@@ -823,7 +823,7 @@ ata_pio_read(struct ata_request *request, int length)
 	struct ata_channel *ch = device_get_softc(request->parent);
 	struct bio *bio;
 	uint8_t *addr;
-	vm_offset_t page;
+	vm_ptr_t page;
 	int todo, done, off, moff, resid, size, i;
 	uint8_t buf[2] __aligned(2);
 
@@ -847,7 +847,11 @@ ata_pio_read(struct ata_request *request, int length)
 				    bio->bio_ma[moff / PAGE_SIZE]);
 				moff %= PAGE_SIZE;
 				size = min(size, PAGE_SIZE - moff);
-				addr = (void *)cheri_kern_ptr((page + moff), size);
+#ifdef CHERI_KERNEL
+				addr = cheri_csetbounds((page + moff), size);
+#else
+				addr = page + moff;
+#endif
 			}
 		} else
 			panic("ata_pio_read: Unsupported CAM data type %x\n",
@@ -909,7 +913,7 @@ ata_pio_write(struct ata_request *request, int length)
 	struct ata_channel *ch = device_get_softc(request->parent);
 	struct bio *bio;
 	uint8_t *addr;
-	vm_offset_t page;
+	vm_ptr_t page;
 	int todo, done, off, moff, resid, size, i;
 	uint8_t buf[2] __aligned(2);
 
@@ -933,7 +937,11 @@ ata_pio_write(struct ata_request *request, int length)
 				    bio->bio_ma[moff / PAGE_SIZE]);
 				moff %= PAGE_SIZE;
 				size = min(size, PAGE_SIZE - moff);
-				addr = (void *)cheri_kern_ptr((page + moff), size);
+#ifdef CHERI_KERNEL
+				addr = cheri_csetbounds((page + moff), size);
+#else
+				addr = page + moff;
+#endif
 			}
 		} else
 			panic("ata_pio_write: Unsupported CAM data type %x\n",

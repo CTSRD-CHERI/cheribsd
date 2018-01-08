@@ -190,7 +190,7 @@ void *pmap_mapdev(vm_paddr_t, vm_size_t);
 boolean_t pmap_page_is_mapped(vm_page_t m);
 void *pmap_mapdev_attr(vm_paddr_t, vm_size_t, vm_memattr_t);
 void pmap_unmapdev(vm_offset_t, vm_size_t);
-vm_offset_t pmap_steal_memory(vm_size_t size);
+vm_ptr_t pmap_steal_memory(vm_size_t size);
 void pmap_kenter(vm_offset_t va, vm_paddr_t pa);
 void pmap_kenter_attr(vm_offset_t va, vm_paddr_t pa, vm_memattr_t attr);
 void pmap_kremove(vm_offset_t va);
