@@ -673,7 +673,11 @@ LEAF(MipsFPID)
 	cfc1	v0, MIPS_FPU_ID
 	mtc0	t1, MIPS_COP_0_STATUS		# Restore the status register.
 	ITLBNOPFIX
+#ifdef CHERI_KERNEL
+	cjr	$c17
+#else
 	j	ra
+#endif
 	nop
 	.set pop
 END(MipsFPID)
