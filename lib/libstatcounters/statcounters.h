@@ -89,7 +89,11 @@ void dump_statcounters (
     const statcounters_bank_t * const b,
     const char * const fname,
     const char * const fmt) DEPRECATED("use statcounters_dump instead -- arguments changed");
-int statcounters_dump (
+int statcounters_dump (const statcounters_bank_t * const b);
+int statcounters_dump_with_pname (
+    const statcounters_bank_t * const b,
+    const char * const progname);
+int statcounters_dump_with_args (
     const statcounters_bank_t * const b,
     const char * const progname,
     const char * const archname,

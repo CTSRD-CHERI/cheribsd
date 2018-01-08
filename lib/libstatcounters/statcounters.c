@@ -372,19 +372,76 @@ void dump_statcounters (
         const char * aname = getenv("STATCOUNTERS_ARCHNAME");
         if (!aname || aname[0] == '\0')
             aname = getarchname();
-        statcounters_dump(b,pname,aname,fp,flg);
+        statcounters_dump_with_args(b,pname,aname,fp,flg);
         fclose(fp);
     } else {
         warn("Failed to open statcounters output %s", fname);
     } 
 }
-int statcounters_dump (
+int statcounters_dump (const statcounters_bank_t * const b)
+{
+    return statcounters_dump_with_args(b,NULL,NULL,NULL,HUMAN_READABLE);
+}
+int statcounters_dump_with_pname (
+    const statcounters_bank_t * const b,
+    const char * const progname)
+{
+    return statcounters_dump_with_args(b,progname,NULL,NULL,HUMAN_READABLE);
+}
+int statcounters_dump_with_args (
     const statcounters_bank_t * const b,
     const char * const progname,
     const char * const archname,
-    FILE * const fp,
-    const statcounters_fmt_flag_t fmt_flg)
+    FILE * const fileptr,
+    const statcounters_fmt_flag_t format_flag)
 {
+    // preparing default values for NULL arguments
+    // displayed progname
+    const char * pname;
+    if (!progname) {
+        pname = getenv("STATCOUNTERS_PROGNAME");
+        if (!pname || pname[0] == '\0')
+            pname = getprogname();
+    } else {
+        pname = progname;
+    }
+    // displayed archname
+    const char * aname;
+    if (!archname) {
+        aname = getenv("STATCOUNTERS_ARCHNAME");
+        if (!aname || aname[0] == '\0')
+            aname = getarchname();
+    } else {
+        aname = archname;
+    }
+    // dump file pointer
+    bool display_header = true;
+    bool use_stdout = false;
+    FILE * fp = fileptr;
+    if (!fp) {
+        const char * const fname = getenv("STATCOUNTERS_OUTPUT");
+        if (access(fname, F_OK) != -1)
+            display_header = false;
+        fp = fopen(fname, "a");
+        if (!fp) {
+            warn("Failed to open statcounters output %s", fname);
+            use_stdout = true;
+        }
+    } else {
+        use_stdout = true;
+    }
+    if (use_stdout)
+        fp = stdout;
+    // output format
+    const char * const fmt = getenv("STATCOUNTERS_FORMAT");
+    statcounters_fmt_flag_t fmt_flg = format_flag;
+    if (fmt && (strcmp(fmt,"csv") == 0)) {
+       if (display_header)
+           fmt_flg = CSV_HEADER;
+       else
+           fmt_flg = CSV_NOHEADER;
+    }
+
     if (b == NULL || fp == NULL)
         return -1;
     switch (fmt_flg)
@@ -446,8 +503,8 @@ int statcounters_dump (
             fprintf(fp, "tagcachemaster_write_rsp");
             fprintf(fp, "\n");
         case CSV_NOHEADER:
-            fprintf(fp, "%s,",progname);
-            fprintf(fp, "%s,",archname);
+            fprintf(fp, "%s,",pname);
+            fprintf(fp, "%s,",aname);
             fprintf(fp, "%lu,",b->cycle);
             fprintf(fp, "%lu,",b->inst);
             fprintf(fp, "%lu,",b->itlb_miss);
@@ -504,7 +561,7 @@ int statcounters_dump (
             break;
         case HUMAN_READABLE:
         default:
-            fprintf(fp, "===== %s -- %s =====\n",progname, archname);
+            fprintf(fp, "===== %s -- %s =====\n",pname, aname);
             fprintf(fp, "cycles:                       \t%lu\n",b->cycle);
             fprintf(fp, "instructions:                 \t%lu\n",b->inst);
             fprintf(fp, "itlb_miss:                    \t%lu\n",b->itlb_miss);
@@ -567,6 +624,8 @@ int statcounters_dump (
             fprintf(fp, "\n");
             break;
     }
+    if (!use_stdout)
+        fclose(fp);
     return 0;
 }
 
@@ -595,33 +654,6 @@ static void end_sample (void)
     statcounters_sample(&end_cnt); // TODO change the order of sampling to keep cycle sampled early
     // compute difference between samples
     statcounters_diff(&diff_cnt, &end_cnt, &start_cnt);
-    // preparing call to dumping function
-    FILE * fp = NULL;
-    const char * pname = getenv("STATCOUNTERS_PROGNAME");
-    if (!pname || pname[0] == '\0')
-        pname = getprogname();
-    const char * aname = getenv("STATCOUNTERS_ARCHNAME");
-    if (!aname || aname[0] == '\0')
-        aname = getarchname();
-    const char * const fname = getenv("STATCOUNTERS_OUTPUT");
-    const char * const fmt = getenv("STATCOUNTERS_FORMAT");
-    bool display_header = true;
-    statcounters_fmt_flag_t fmt_flg = HUMAN_READABLE;
-    if (!fname)
-        return;
-    if (access(fname, F_OK) != -1)
-        display_header = false;
-    fp = fopen(fname, "a");
-    if (!fp) {
-        warn("Failed to open statcounters output %s", fname);
-        return;
-    }
-    if (fmt && (strcmp(fmt,"csv") == 0)) {
-       if (display_header)
-           fmt_flg = CSV_HEADER;
-       else
-           fmt_flg = CSV_NOHEADER;
-    }
-    statcounters_dump(&diff_cnt,pname,aname,fp,fmt_flg);
-    fclose(fp);
+    // dump the counters
+    statcounters_dump(&diff_cnt);
 }
