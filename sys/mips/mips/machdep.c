@@ -120,7 +120,7 @@ SYSCTL_INT(_hw, OID_AUTO, clockrate, CTLFLAG_RD,
     &cpu_clock, 0, "CPU instruction clock rate");
 int clocks_running = 0;
 
-vm_offset_t kstack0;
+vm_ptr_t kstack0;
 
 /*
  * Each entry in the pcpu_space[] array is laid out in the following manner:
