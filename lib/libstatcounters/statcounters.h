@@ -40,6 +40,9 @@
 #define DEPRECATED(x) __attribute__((deprecated))
 #endif
 
+#include <stdio.h>
+#include <stdint.h>
+
 // counters bank
 #define STATCOUNTERS_MAX_MOD_CNT 12
 typedef struct statcounters_bank
