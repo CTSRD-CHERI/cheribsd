@@ -114,7 +114,7 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
  */
 #define	ASSERT_ATOMIC_LOAD_PTR(var, msg)				\
 	KASSERT(sizeof(var) == sizeof(void *) &&			\
-	    ((uintptr_t)&(var) & (sizeof(void *) - 1)) == 0, msg)
+	    ((vm_offset_t)&(var) & (sizeof(void *) - 1)) == 0, msg)
 
 /*
  * Assert that a thread is in critical(9) section.
