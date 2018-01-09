@@ -38,7 +38,11 @@ typedef	uint64_t pt_entry_t;
 typedef	uint32_t pt_entry_t;
 #endif
 
-#if defined(_KERNEL) && !defined(__CHERI_PURE_CAPABILITY__)
+#if defined(_KERNEL) && (defined(CHERI_KERNEL) || !defined(__CHERI_PURE_CAPABILITY__))
+/*
+ * XXX-AM: The pointer to the second-level page table entry can (and should) be a capability
+ * in the purecap kernel.
+ */
 typedef	pt_entry_t *pd_entry_t;
 #else
 /*
