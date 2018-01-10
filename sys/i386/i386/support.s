@@ -776,7 +776,8 @@ ENTRY(longjmp)
 END(longjmp)
 
 /*
- * Support for reading MSRs in the safe manner.
+ * Support for reading MSRs in the safe manner.  (Instead of panic on #gp,
+ * return an error.)
  */
 ENTRY(rdmsr_safe)
 /* int rdmsr_safe(u_int msr, uint64_t *data) */
@@ -796,7 +797,8 @@ ENTRY(rdmsr_safe)
 	ret
 
 /*
- * Support for writing MSRs in the safe manner.
+ * Support for writing MSRs in the safe manner.  (Instead of panic on #gp,
+ * return an error.)
  */
 ENTRY(wrmsr_safe)
 /* int wrmsr_safe(u_int msr, uint64_t data) */
