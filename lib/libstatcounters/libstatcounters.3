@@ -140,16 +140,16 @@ and all other arguments are set to
 .Nm NULL .
 .Pp
 .Ft int
-.Fn statcounters_dump_with_pname "const statcounters_bank_t * const b" "const char * const progname"
+.Fn statcounters_dump_with_phase "const statcounters_bank_t * const b" "const char * const phase"
 .sp
-.Fn statcounters_dump_with_pname
+.Fn statcounters_dump_with_phase
 is a wrapper around
 .Fn statcounters_dump_with_args .
 The
 .Fa b
 and
-.Fa progname
-argument are passed unchanged, the
+.Fa phase
+arguments are passed unchanged, the
 .Fa fmt_flg
 argument is set to
 .Nm HUMAN_READABLE
@@ -157,7 +157,7 @@ and all other arguments are set to
 .Nm NULL .
 .Pp
 .Ft int
-.Fn statcounters_dump_with_args "const statcounters_bank_t * const b" "const char * const progname" "const char * const archname" "const FILE * const fp" "const statcounters_fmt_flag_t fmt_flg)"
+.Fn statcounters_dump_with_args "const statcounters_bank_t * const b" "const char * const progname" "const char * const phase" "const char * const archname" "const FILE * const fp" "const statcounters_fmt_flag_t fmt_flg)"
 .sp
 .Fn statcounters_dump_with_args
 dumps the statcounters_bank_t
@@ -167,7 +167,11 @@ content in file described by the file descriptor
 according to the format flag
 .Fa fmt_flg along with
 .Fa progname
-and
+(and
+.Fa phase
+as a suffix if it is not
+.Nm NULL
+) and
 .Fa archname
 (usefull for csv output). The currently supported value for the
 .Fa fmt_flg

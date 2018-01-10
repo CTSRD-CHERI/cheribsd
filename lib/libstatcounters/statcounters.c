@@ -372,7 +372,7 @@ void dump_statcounters (
         const char * aname = getenv("STATCOUNTERS_ARCHNAME");
         if (!aname || aname[0] == '\0')
             aname = getarchname();
-        statcounters_dump_with_args(b,pname,aname,fp,flg);
+        statcounters_dump_with_args(b,pname,NULL,aname,fp,flg);
         fclose(fp);
     } else {
         warn("Failed to open statcounters output %s", fname);
@@ -380,30 +380,42 @@ void dump_statcounters (
 }
 int statcounters_dump (const statcounters_bank_t * const b)
 {
-    return statcounters_dump_with_args(b,NULL,NULL,NULL,HUMAN_READABLE);
+    return statcounters_dump_with_args(b,NULL,NULL,NULL,NULL,HUMAN_READABLE);
 }
-int statcounters_dump_with_pname (
+int statcounters_dump_with_phase (
     const statcounters_bank_t * const b,
-    const char * const progname)
+    const char * const phase)
 {
-    return statcounters_dump_with_args(b,progname,NULL,NULL,HUMAN_READABLE);
+    return statcounters_dump_with_args(b,NULL,phase,NULL,NULL,HUMAN_READABLE);
 }
 int statcounters_dump_with_args (
     const statcounters_bank_t * const b,
     const char * const progname,
+    const char * const phase,
     const char * const archname,
     FILE * const fileptr,
     const statcounters_fmt_flag_t format_flag)
 {
     // preparing default values for NULL arguments
     // displayed progname
-    const char * pname;
+#define MAX_NAME_SIZE 512
+    char * pname;
+    size_t pname_s  = strnlen(progname,MAX_NAME_SIZE);
+    if (phase) {
+        pname_s += strnlen(phase,MAX_NAME_SIZE);
+    }
+    pname = malloc(sizeof(char) * pname_s);
     if (!progname) {
-        pname = getenv("STATCOUNTERS_PROGNAME");
-        if (!pname || pname[0] == '\0')
-            pname = getprogname();
+        const char * env_pname = getenv("STATCOUNTERS_PROGNAME");
+        if (!env_pname || env_pname[0] == '\0')
+            strncpy(pname, getprogname(), MAX_NAME_SIZE);
+	else
+            strncpy(pname, env_pname, MAX_NAME_SIZE);
     } else {
-        pname = progname;
+        strncpy(pname, progname, MAX_NAME_SIZE);
+    }
+    if (phase) {
+        strncat(pname, phase, MAX_NAME_SIZE);
     }
     // displayed archname
     const char * aname;
@@ -624,6 +636,7 @@ int statcounters_dump_with_args (
             fprintf(fp, "\n");
             break;
     }
+    free(pname);
     if (!use_stdout)
         fclose(fp);
     return 0;
