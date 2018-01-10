@@ -95,12 +95,12 @@ void dump_statcounters (
 int statcounters_dump (const statcounters_bank_t * const b);
 int statcounters_dump_with_phase (
     const statcounters_bank_t * const b,
-    const char * const phase);
+    const char * phase);
 int statcounters_dump_with_args (
     const statcounters_bank_t * const b,
-    const char * const progname,
-    const char * const phase,
-    const char * const archname,
+    const char * progname,
+    const char * phase,
+    const char * archname,
     FILE * const fp,
     const statcounters_fmt_flag_t fmt_flg);
 

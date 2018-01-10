@@ -384,36 +384,32 @@ int statcounters_dump (const statcounters_bank_t * const b)
 }
 int statcounters_dump_with_phase (
     const statcounters_bank_t * const b,
-    const char * const phase)
+    const char * phase)
 {
     return statcounters_dump_with_args(b,NULL,phase,NULL,NULL,HUMAN_READABLE);
 }
 int statcounters_dump_with_args (
     const statcounters_bank_t * const b,
-    const char * const progname,
-    const char * const phase,
-    const char * const archname,
+    const char * progname,
+    const char * phase,
+    const char * archname,
     FILE * const fileptr,
     const statcounters_fmt_flag_t format_flag)
 {
     // preparing default values for NULL arguments
     // displayed progname
 #define MAX_NAME_SIZE 512
-    char * pname;
-    size_t pname_s  = strnlen(progname,MAX_NAME_SIZE);
+    if (!progname) {
+        progname = getenv("STATCOUNTERS_PROGNAME");
+        if (!progname || progname[0] == '\0')
+	    progname = getprogname();
+    }
+    size_t pname_s = strnlen(progname,MAX_NAME_SIZE);
     if (phase) {
         pname_s += strnlen(phase,MAX_NAME_SIZE);
     }
-    pname = malloc(sizeof(char) * pname_s);
-    if (!progname) {
-        const char * env_pname = getenv("STATCOUNTERS_PROGNAME");
-        if (!env_pname || env_pname[0] == '\0')
-            strncpy(pname, getprogname(), MAX_NAME_SIZE);
-	else
-            strncpy(pname, env_pname, MAX_NAME_SIZE);
-    } else {
-        strncpy(pname, progname, MAX_NAME_SIZE);
-    }
+    char * pname = malloc(sizeof(char) * pname_s);
+    strncpy(pname, progname, MAX_NAME_SIZE);
     if (phase) {
         strncat(pname, phase, MAX_NAME_SIZE);
     }
