@@ -408,7 +408,7 @@ int statcounters_dump_with_args (
     if (phase) {
         pname_s += strnlen(phase,MAX_NAME_SIZE);
     }
-    char * pname = malloc(sizeof(char) * pname_s);
+    char * pname = malloc((sizeof(char) * pname_s) + 1);
     strncpy(pname, progname, MAX_NAME_SIZE);
     if (phase) {
         strncat(pname, phase, MAX_NAME_SIZE);
