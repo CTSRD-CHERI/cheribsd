@@ -49,7 +49,7 @@ usage(void)
 }
 
 int
-main(int argc, char **argv __unused)
+main(int argc, char **argv)
 {
 	pid_t pid;
 	bool fflag = false, sflag = false, vflag = false;
