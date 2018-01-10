@@ -405,13 +405,14 @@ int statcounters_dump_with_args (
 	    progname = getprogname();
     }
     size_t pname_s = strnlen(progname,MAX_NAME_SIZE);
+    size_t phase_s = 0;
     if (phase) {
-        pname_s += strnlen(phase,MAX_NAME_SIZE);
+        phase_s = strnlen(phase,MAX_NAME_SIZE);
     }
-    char * pname = malloc((sizeof(char) * pname_s) + 1);
-    strncpy(pname, progname, MAX_NAME_SIZE);
+    char * pname = malloc((sizeof(char) * (pname_s + phase_s)) + 1);
+    strncpy(pname, progname, pname_s);
     if (phase) {
-        strncat(pname, phase, MAX_NAME_SIZE);
+        strncat(pname, phase, phase_s);
     }
     // displayed archname
     const char * aname;
