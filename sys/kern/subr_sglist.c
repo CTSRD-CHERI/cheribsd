@@ -492,7 +492,7 @@ sglist_append_uio(struct sglist *sg, struct uio *uio)
 		minlen = MIN(resid, iov[i].iov_len);
 		if (minlen > 0) {
 			error = _sglist_append_buf(sg,
-			    (__cheri_fromcap void *)iov[i].iov_base, minlen,
+			    __DECAP_CHECK(iov[i].iov_base, minlen), minlen,
 			    pmap, NULL);
 			if (error) {
 				SGLIST_RESTORE(sg, save);
@@ -544,7 +544,7 @@ sglist_consume_uio(struct sglist *sg, struct uio *uio, size_t resid)
 		 * then break out of the loop.
 		 */
 		error = _sglist_append_buf(sg,
-		    (__cheri_fromcap void *)iov->iov_base, len, pmap, &done);
+		    __DECAP_CHECK(iov->iov_base, len), len, pmap, &done);
 		IOVEC_ADVANCE(iov, done);
 		uio->uio_resid -= done;
 		uio->uio_offset += done;

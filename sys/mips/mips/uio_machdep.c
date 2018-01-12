@@ -131,15 +131,18 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 			    CAP_ALIGNED((uintptr_t)iov->iov_base) &&
 			    CAP_ALIGNED(cnt)) {
 				if (uio->uio_rw == UIO_READ)
-					cheri_bcopy(cp, (__cheri_fromcap void *)
+					cheri_bcopy(cp,
+					    (__cheri_fromcap void *)
 					    iov->iov_base, cnt);
 				else
-					cheri_bcopy((__cheri_fromcap void *)
+					cheri_bcopy(
+					    (__cheri_fromcap void *)
 					    iov->iov_base, cp, cnt);
 			} else
 #endif
 			if (uio->uio_rw == UIO_READ)
-				bcopy(cp, (__cheri_fromcap void *)iov->iov_base,
+				bcopy(cp,
+				    (__cheri_fromcap void *)iov->iov_base,
 				    cnt);
 			else
 				bcopy((__cheri_fromcap void *)iov->iov_base,

@@ -660,7 +660,9 @@ sendit(struct thread *td, int s, kmsghdr_t *mp, int flags)
 #endif
 
 	if (mp->msg_name != NULL) {
-		error = getsockaddr(&to, (__cheri_fromcap void *)mp->msg_name, mp->msg_namelen);
+		error = getsockaddr(&to,
+		    __DECAP_CHECK(mp->msg_name, mp->msg_namelen),
+		    mp->msg_namelen);
 		if (error != 0) {
 			to = NULL;
 			goto bad;
@@ -679,8 +681,9 @@ sendit(struct thread *td, int s, kmsghdr_t *mp, int flags)
 			error = EINVAL;
 			goto bad;
 		}
-		error = sockargs(&control, (__cheri_fromcap void *)mp->msg_control,
-		    mp->msg_controllen, MT_CONTROL);
+		error = sockargs(&control,
+		   __DECAP_CHECK(mp->msg_control, mp->msg_controllen),
+		   mp->msg_controllen, MT_CONTROL);
 		if (error != 0)
 			goto bad;
 #ifdef COMPAT_OLDSOCK
@@ -742,7 +745,7 @@ kern_sendit(struct thread *td, int s, kmsghdr_t *mp, int flags,
 #ifdef MAC
 	if (mp->msg_name != NULL) {
 		error = mac_socket_check_connect(td->td_ucred, so,
-		    (__cheri_fromcap void *)mp->msg_name);
+		    __DECAP_CHECK(mp->msg_name, mp->msg_namelen));
 		if (error != 0) {
 			m_freem(control);
 			goto bad;
@@ -775,7 +778,8 @@ kern_sendit(struct thread *td, int s, kmsghdr_t *mp, int flags,
 		ktruio = cloneuio(&auio);
 #endif
 	len = auio.uio_resid;
-	error = sosend(so, (__cheri_fromcap struct sockaddr *)mp->msg_name, &auio, 0, control, flags, td);
+	error = sosend(so, (__cheri_fromcap struct sockaddr *)mp->msg_name,
+	    &auio, 0, control, flags, td);
 	if (error != 0) {
 		if (auio.uio_resid != len && (error == ERESTART ||
 		    error == EINTR || error == EWOULDBLOCK))
@@ -986,7 +990,9 @@ kern_recvit(struct thread *td, int s, kmsghdr_t *mp, enum uio_seg fromseg,
 				if (error != 0)
 					goto out;
 			} else
-				bcopy(fromsa, (__cheri_fromcap void *)mp->msg_name, len);
+				bcopy(fromsa,
+				    (__cheri_fromcap void *)mp->msg_name,
+				    len);
 		}
 		mp->msg_namelen = len;
 	}

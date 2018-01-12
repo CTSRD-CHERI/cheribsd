@@ -2177,7 +2177,8 @@ kern_jail_get(struct thread *td, struct uio *optuio, int flags)
 					    opt->len);
 				} else {
 					error = copyout_c(
-					    (__cheri_tocap void * __capability)opt->value,
+					    (__cheri_tocap void * __capability)
+					    opt->value,
 					    optuio->uio_iov[pos].iov_base,
 					    opt->len);
 					if (error)

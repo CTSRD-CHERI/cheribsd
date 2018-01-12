@@ -823,8 +823,10 @@ do_sync:
 				 * UIO_SYSSPACE may never happen, but handle
 				 * it just in case it does.
 				 */
-				bcopy((__cheri_fromcap void *)uiop->uio_iov->iov_base,
-				    (__cheri_fromcap void *)t_iov->iov_base, size);
+				bcopy((__cheri_fromcap void *)
+				    uiop->uio_iov->iov_base,
+				    (__cheri_fromcap void *)t_iov->iov_base,
+				    size);
 			bp->b_flags |= B_DIRECT;
 			bp->b_iocmd = BIO_WRITE;
 			if (cred != NOCRED) {

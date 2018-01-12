@@ -711,7 +711,8 @@ cheriabi_sendmsg(struct thread *td,
 		return (error);
 	msg.msg_iov = iov;
 	if (msg.msg_name != NULL) {
-		error = getsockaddr(&to, (__cheri_fromcap char *)msg.msg_name,
+		error = getsockaddr(&to,
+		    __DECAP_CHECK(msg.msg_name, msg.msg_namelen),
 		    msg.msg_namelen);
 		if (error) {
 			to = NULL;
@@ -737,8 +738,8 @@ cheriabi_sendmsg(struct thread *td,
 		 */
 		/* XXX: No support for COMPAT_OLDSOCK path */
 		error = sockargs(&control,
-		    (__cheri_fromcap void *)msg.msg_control, msg.msg_controllen,
-		    MT_CONTROL);
+		    __DECAP_CHECK(msg.msg_control, msg.msg_controllen),
+		    msg.msg_controllen, MT_CONTROL);
 		if (error)
 			goto out;
 	}

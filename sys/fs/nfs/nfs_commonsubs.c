@@ -212,7 +212,8 @@ nfsm_mbufuio(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 			goto out;
 		}
 		left = uiop->uio_iov->iov_len;
-		uiocp = (__cheri_fromcap void *)uiop->uio_iov->iov_base;
+		uiocp = __DECAP_CHECK(uiop->uio_iov->iov_base,
+		    uiop->uio_iov->iov_len);
 		if (left > siz)
 			left = siz;
 		uiosiz = left;

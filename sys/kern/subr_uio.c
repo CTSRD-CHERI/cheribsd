@@ -286,11 +286,12 @@ uiomove_faultflag(void *cp, int n, struct uio *uio, int nofault)
 
 		case UIO_SYSSPACE:
 			if (uio->uio_rw == UIO_READ)
-				bcopy(cp, (__cheri_fromcap void *)iov->iov_base,
+				bcopy(cp,
+				    (__cheri_fromcap void *)iov->iov_base,
 				    cnt);
 			else
-				bcopy((__cheri_fromcap void *)iov->iov_base, cp,
-				    cnt);
+				bcopy((__cheri_fromcap void *)iov->iov_base,
+				    cp, cnt);
 			break;
 		case UIO_NOCOPY:
 			break;

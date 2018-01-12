@@ -977,9 +977,9 @@ vn_io_fault_touch(char * __capability base, const struct uio *uio)
 {
 	int r;
 
-	r = fubyte((__cheri_fromcap void *)base);
+	r = fubyte_c(base);
 	if (r == -1 || (uio->uio_rw == UIO_READ &&
-	    subyte((__cheri_fromcap void *)base, r) == -1))
+	    subyte_c(base, r) == -1))
 		return (EFAULT);
 	return (0);
 }
