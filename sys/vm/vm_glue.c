@@ -117,9 +117,7 @@ __FBSDID("$FreeBSD$");
  * space.
  */
 int
-kernacc(addr, len, rw)
-	void *addr;
-	int len, rw;
+kernacc(void *addr, int len, int rw)
 {
 	boolean_t rv;
 	vm_offset_t saddr, eaddr;
@@ -690,12 +688,8 @@ intr_prof_stack_use(struct thread *td, struct trapframe *frame)
  * to user mode to avoid stack copying and relocation problems.
  */
 int
-vm_forkproc(td, p2, td2, vm2, flags)
-	struct thread *td;
-	struct proc *p2;
-	struct thread *td2;
-	struct vmspace *vm2;
-	int flags;
+vm_forkproc(struct thread *td, struct proc *p2, struct thread *td2,
+    struct vmspace *vm2, int flags)
 {
 	struct proc *p1 = td->td_proc;
 	int error;
