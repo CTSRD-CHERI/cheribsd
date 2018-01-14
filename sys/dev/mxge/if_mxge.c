@@ -4531,7 +4531,6 @@ abort_with_fw:
 static int
 mxge_add_msix_irqs(mxge_softc_t *sc)
 {
-	size_t bytes;
 	int count, err, i, rid;
 
 	rid = PCIR_BAR(2);
