@@ -53,7 +53,7 @@ extern	int	szcheri_sigcode;
 extern	uint32_t *vm_page_dump;
 extern	int vm_page_dump_size;
 
-extern vm_offset_t kstack0;
+extern vm_ptr_t kstack0;
 extern vm_offset_t kernel_kseg0_end;
 
 uint32_t MipsFPID(void);
