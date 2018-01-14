@@ -96,6 +96,7 @@ __FBSDID("$FreeBSD$");
 
 #ifdef CPU_CHERI
 #include <cheri/cheri.h>
+#include <cheri/cheric.h>
 #endif
 
 #include <sys/random.h>
@@ -287,9 +288,10 @@ mips_proc0_init(void)
 #endif
 	proc_linkup0(&proc0, &thread0);
 
-	KASSERT((kstack0 & ((KSTACK_PAGE_SIZE * 2) - 1)) == 0,
+	KASSERT(((vm_offset_t)kstack0 & ((KSTACK_PAGE_SIZE * 2) - 1)) == 0,
 		("kstack0 is not aligned on a page (0x%0lx) boundary: 0x%0lx",
 		(long)(KSTACK_PAGE_SIZE * 2), (long)kstack0));
+
 #ifdef KSTACK_LARGE_PAGE
 	/*
 	 * For 16K page size the stack uses the odd page
@@ -301,13 +303,22 @@ mips_proc0_init(void)
 	thread0.td_kstack = kstack0;
 #endif
 	thread0.td_kstack_pages = KSTACK_PAGES;
-	/* 
-	 * Do not use cpu_thread_alloc to initialize these fields 
-	 * thread0 is the only thread that has kstack located in KSEG0 
+	/*
+	 * Do not use cpu_thread_alloc to initialize these fields
+	 * thread0 is the only thread that has kstack located in KSEG0
 	 * while cpu_thread_alloc handles kstack allocated in KSEG2.
 	 */
+#ifndef CHERI_KERNEL
 	thread0.td_pcb = (struct pcb *)(thread0.td_kstack +
 	    thread0.td_kstack_pages * PAGE_SIZE) - 1;
+#else /* CHERI_KERNEL */
+	/* Adjust the bounds of the thread0 kernel stack and pcb. */
+	thread0.td_pcb = cheri_csetbounds((struct pcb *)(thread0.td_kstack +
+		thread0.td_kstack_pages * PAGE_SIZE) - 1,
+		sizeof(struct pcb));
+	thread0.td_kstack = cheri_csetbounds(thread0.td_kstack,
+		thread0.td_kstack_pages * PAGE_SIZE - sizeof(struct pcb));
+#endif /* CHERI_KERNEL */
 	thread0.td_frame = &thread0.td_pcb->pcb_regs;
 
 	/* Steal memory for the dynamic per-cpu area. */
@@ -316,7 +327,7 @@ mips_proc0_init(void)
 	PCPU_SET(curpcb, thread0.td_pcb);
 	/*
 	 * There is no need to initialize md_upte array for thread0 as it's
-	 * located in .bss section and should be explicitly zeroed during 
+	 * located in .bss section and should be explicitly zeroed during
 	 * kernel initialization.
 	 */
 }
