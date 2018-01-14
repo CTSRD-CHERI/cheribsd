@@ -104,13 +104,17 @@ _CHERI_COMMON_FLAGS+=	-mllvm -cheri-exact-equals
 # Turn off deprecated warnings
 _CHERI_COMMON_FLAGS+= -Wno-deprecated-declarations
 
+.if ${WANT_CHERI} != "none"
+CFLAGS+=	${CHERI_OPTIMIZATION_FLAGS:U-O2}
+.endif
+
 .if ${WANT_CHERI} == "pure" || ${WANT_CHERI} == "sandbox"
 OBJCOPY:=	objcopy
 MIPS_ABI=	purecap
 _CHERI_COMMON_FLAGS+=	-fpic
 LIBDIR:=	/usr/libcheri
 ROOTOBJDIR=	${.OBJDIR:S,${.CURDIR},,}${SRCTOP}/worldcheri${SRCTOP}
-CFLAGS+=	${CHERI_OPTIMIZATION_FLAGS:U-O2} -ftls-model=local-exec
+CFLAGS+=	-ftls-model=local-exec
 .ifdef NO_WERROR
 # Implicit function declarations should always be an error in purecap mode as
 # we will probably generate wrong code for calling them
