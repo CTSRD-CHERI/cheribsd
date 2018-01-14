@@ -745,15 +745,15 @@ struct __less<_T1, const _T1>
 };
 
 template <class _Predicate>
-class __negate
+class __invert // invert the sense of a comparison
 {
 private:
     _Predicate __p_;
 public:
-    _LIBCPP_INLINE_VISIBILITY __negate() {}
+    _LIBCPP_INLINE_VISIBILITY __invert() {}
 
     _LIBCPP_INLINE_VISIBILITY
-    explicit __negate(_Predicate __p) : __p_(__p) {}
+    explicit __invert(_Predicate __p) : __p_(__p) {}
 
     template <class _T1>
     _LIBCPP_INLINE_VISIBILITY
@@ -761,7 +761,7 @@ public:
 
     template <class _T1, class _T2>
     _LIBCPP_INLINE_VISIBILITY
-    bool operator()(const _T1& __x, const _T2& __y) {return !__p_(__x, __y);}
+    bool operator()(const _T1& __x, const _T2& __y) {return __p_(__y, __x);}
 };
 
 #ifdef _LIBCPP_DEBUG
@@ -808,7 +808,7 @@ unsigned __ctz(unsigned __x) {
   unsigned long where;
   // Search from LSB to MSB for first set bit.
   // Returns zero if no set bit is found.
-  if (_BitScanForward(&where, mask))
+  if (_BitScanForward(&where, __x))
     return where;
   return 32;
 #endif
@@ -834,15 +834,15 @@ unsigned long long __ctz(unsigned long long __x) {
 // Returns zero if no set bit is found.
 #if defined(_LIBCPP_HAS_BITSCAN64)
     (defined(_M_AMD64) || defined(__x86_64__))
-  if (_BitScanForward64(&where, mask))
+  if (_BitScanForward64(&where, __x))
     return static_cast<int>(where);
 #else
   // Win32 doesn't have _BitScanForward64 so emulate it with two 32 bit calls.
   // Scan the Low Word.
-  if (_BitScanForward(&where, static_cast<unsigned long>(mask)))
+  if (_BitScanForward(&where, static_cast<unsigned long>(__x)))
     return where;
   // Scan the High Word.
-  if (_BitScanForward(&where, static_cast<unsigned long>(mask >> 32)))
+  if (_BitScanForward(&where, static_cast<unsigned long>(__x >> 32)))
     return where + 32; // Create a bit offset from the LSB.
 #endif
   return 64;
@@ -860,7 +860,7 @@ unsigned __clz(unsigned __x) {
   unsigned long where;
   // Search from LSB to MSB for first set bit.
   // Returns zero if no set bit is found.
-  if (_BitScanReverse(&where, mask))
+  if (_BitScanReverse(&where, __x))
     return 31 - where;
   return 32; // Undefined Behavior.
 #endif
@@ -885,14 +885,14 @@ unsigned long long __clz(unsigned long long __x) {
 // BitScanReverse scans from MSB to LSB for first set bit.
 // Returns 0 if no set bit is found.
 #if defined(_LIBCPP_HAS_BITSCAN64)
-  if (_BitScanReverse64(&where, mask))
+  if (_BitScanReverse64(&where, __x))
     return static_cast<int>(63 - where);
 #else
   // Scan the high 32 bits.
-  if (_BitScanReverse(&where, static_cast<unsigned long>(mask >> 32)))
+  if (_BitScanReverse(&where, static_cast<unsigned long>(__x >> 32)))
     return 63 - (where + 32); // Create a bit offset from the MSB.
   // Scan the low 32 bits.
-  if (_BitScanReverse(&where, static_cast<unsigned long>(mask)))
+  if (_BitScanReverse(&where, static_cast<unsigned long>(__x)))
     return 63 - where;
 #endif
   return 64; // Undefined Behavior.
@@ -4579,7 +4579,7 @@ __buffered_inplace_merge(_BidirectionalIterator __first, _BidirectionalIterator 
         typedef reverse_iterator<value_type*> _Rv;
         __half_inplace_merge(_Rv(__p), _Rv(__buff),
                              _RBi(__middle), _RBi(__first),
-                             _RBi(__last), __negate<_Compare>(__comp));
+                             _RBi(__last), __invert<_Compare>(__comp));
     }
 }
 
@@ -5558,9 +5558,9 @@ __set_union(_InputIterator1 __first1, _InputIterator1 __last1,
         }
         else
         {
-            *__result = *__first1;
             if (!__comp(*__first1, *__first2))
                 ++__first2;
+            *__result = *__first1;
             ++__first1;
         }
     }

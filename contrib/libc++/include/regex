@@ -784,6 +784,8 @@ _LIBCPP_PUSH_MACROS
 #include <__undef_macros>
 
 
+#define _LIBCPP_REGEX_COMPLEXITY_FACTOR 4096
+
 _LIBCPP_BEGIN_NAMESPACE_STD
 
 namespace regex_constants
@@ -2418,17 +2420,28 @@ __bracket_expression<_CharT, _Traits>::__exec(__state& __s) const
                 goto __exit;
             }
         }
-        if (!__neg_chars_.empty())
+        // set of "__found" chars =
+        //   union(complement(union(__neg_chars_, __neg_mask_)),
+        //         other cases...)
+        //
+        // __neg_chars_ and __neg_mask_'d better be handled together, as there
+        // are no short circuit opportunities.
+        //
+        // In addition, when __neg_mask_/__neg_chars_ is empty, they should be
+        // treated as all ones/all chars.
         {
-            for (size_t __i = 0; __i < __neg_chars_.size(); ++__i)
-            {
-                if (__ch == __neg_chars_[__i])
-                    goto __is_neg_char;
-            }
+          const bool __in_neg_mask = (__neg_mask_ == 0) ||
+              __traits_.isctype(__ch, __neg_mask_);
+          const bool __in_neg_chars =
+              __neg_chars_.empty() ||
+              std::find(__neg_chars_.begin(), __neg_chars_.end(), __ch) !=
+              __neg_chars_.end();
+          if (!(__in_neg_mask || __in_neg_chars))
+          {
             __found = true;
             goto __exit;
+          }
         }
-__is_neg_char:
         if (!__ranges_.empty())
         {
             string_type __s2 = __collate_ ?
@@ -2456,11 +2469,6 @@ __is_neg_char:
             }
         }
         if (__traits_.isctype(__ch, __mask_))
-        {
-            __found = true;
-            goto __exit;
-        }
-        if (__neg_mask_ && !__traits_.isctype(__ch, __neg_mask_))
         {
             __found = true;
             goto __exit;
@@ -4067,6 +4075,8 @@ basic_regex<_CharT, _Traits>::__parse_DUP_COUNT(_ForwardIterator __first,
                  __first != __last && ( __val = __traits_.value(*__first, 10)) != -1;
                  ++__first)
             {
+                if (__c >= std::numeric_limits<int>::max() / 10)
+                    __throw_regex_error<regex_constants::error_badbrace>();
                 __c *= 10;
                 __c += __val;
             }
@@ -4328,8 +4338,12 @@ basic_regex<_CharT, _Traits>::__parse_decimal_escape(_ForwardIterator __first,
             unsigned __v = *__first - '0';
             for (++__first;
                     __first != __last && '0' <= *__first && *__first <= '9'; ++__first)
+                {
+                if (__v >= std::numeric_limits<unsigned>::max() / 10)
+                    __throw_regex_error<regex_constants::error_backref>();
                 __v = 10 * __v + *__first - '0';
-            if (__v > mark_count())
+                }
+            if (__v == 0 || __v > mark_count())
                 __throw_regex_error<regex_constants::error_backref>();
             __push_back_ref(__v);
         }
@@ -5237,11 +5251,11 @@ public:
 
     // size:
     _LIBCPP_INLINE_VISIBILITY
-    size_type size() const {return __matches_.size();}
+    size_type size() const _NOEXCEPT {return __matches_.size();}
     _LIBCPP_INLINE_VISIBILITY
-    size_type max_size() const {return __matches_.max_size();}
-    _LIBCPP_INLINE_VISIBILITY
-    bool empty() const {return size() == 0;}
+    size_type max_size() const _NOEXCEPT {return __matches_.max_size();}
+    _LIBCPP_NODISCARD_AFTER_CXX17 _LIBCPP_INLINE_VISIBILITY
+    bool empty() const _NOEXCEPT {return size() == 0;}
 
     // element access:
     _LIBCPP_INLINE_VISIBILITY
@@ -5456,15 +5470,17 @@ match_results<_BidirectionalIterator, _Allocator>::format(_OutputIter __output_i
                     if ('0' <= __fmt_first[1] && __fmt_first[1] <= '9')
                     {
                         ++__fmt_first;
-                        size_t __i = *__fmt_first - '0';
+                        size_t __idx = *__fmt_first - '0';
                         if (__fmt_first + 1 != __fmt_last &&
                             '0' <= __fmt_first[1] && __fmt_first[1] <= '9')
                         {
                             ++__fmt_first;
-                            __i = 10 * __i + *__fmt_first - '0';
+                            if (__idx >= std::numeric_limits<size_t>::max() / 10)
+                                __throw_regex_error<regex_constants::error_escape>();
+                            __idx = 10 * __idx + *__fmt_first - '0';
                         }
-                        __output_iter = _VSTD::copy((*this)[__i].first,
-                                            (*this)[__i].second, __output_iter);
+                        __output_iter = _VSTD::copy((*this)[__idx].first,
+                                            (*this)[__idx].second, __output_iter);
                     }
                     else
                     {
@@ -5563,8 +5579,14 @@ basic_regex<_CharT, _Traits>::__match_at_start_ecma(
         __states.back().__node_ = __st;
         __states.back().__flags_ = __flags;
         __states.back().__at_first_ = __at_first;
+        int __counter = 0;
+        int __length = __last - __first;
         do
         {
+            ++__counter;
+            if (__counter % _LIBCPP_REGEX_COMPLEXITY_FACTOR == 0 &&
+                __counter / _LIBCPP_REGEX_COMPLEXITY_FACTOR >= __length)
+              __throw_regex_error<regex_constants::error_complexity>();
             __state& __s = __states.back();
             if (__s.__node_)
                 __s.__node_->__exec(__s);
@@ -5638,8 +5660,14 @@ basic_regex<_CharT, _Traits>::__match_at_start_posix_nosubs(
         __states.back().__flags_ = __flags;
         __states.back().__at_first_ = __at_first;
         bool __matched = false;
+        int __counter = 0;
+        int __length = __last - __first;
         do
         {
+            ++__counter;
+            if (__counter % _LIBCPP_REGEX_COMPLEXITY_FACTOR == 0 &&
+                __counter / _LIBCPP_REGEX_COMPLEXITY_FACTOR >= __length)
+              __throw_regex_error<regex_constants::error_complexity>();
             __state& __s = __states.back();
             if (__s.__node_)
                 __s.__node_->__exec(__s);
@@ -5735,8 +5763,14 @@ basic_regex<_CharT, _Traits>::__match_at_start_posix_subs(
         __states.back().__at_first_ = __at_first;
         const _CharT* __current = __first;
         bool __matched = false;
+        int __counter = 0;
+        int __length = __last - __first;
         do
         {
+            ++__counter;
+            if (__counter % _LIBCPP_REGEX_COMPLEXITY_FACTOR == 0 &&
+                __counter / _LIBCPP_REGEX_COMPLEXITY_FACTOR >= __length)
+              __throw_regex_error<regex_constants::error_complexity>();
             __state& __s = __states.back();
             if (__s.__node_)
                 __s.__node_->__exec(__s);
