@@ -1245,14 +1245,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_aio_read */
 	case 255: {
 		struct cheriabi_aio_read_args *p = params;
-		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb_c * */
+		uarg[0] = (cheri_getbase(p->aiocbp) + cheri_getoffset(p->aiocbp)); /* struct aiocb_c *__capability */
 		*n_args = 1;
 		break;
 	}
 	/* cheriabi_aio_write */
 	case 256: {
 		struct cheriabi_aio_write_args *p = params;
-		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb_c * */
+		uarg[0] = (cheri_getbase(p->aiocbp) + cheri_getoffset(p->aiocbp)); /* struct aiocb_c *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -1260,7 +1260,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 257: {
 		struct cheriabi_lio_listio_args *p = params;
 		iarg[0] = p->mode; /* int */
-		uarg[1] = (intptr_t) p->acb_list; /* struct aiocb_c *const * */
+		uarg[1] = (intptr_t) p->acb_list; /* struct aiocb_c *const __capability * */
 		iarg[2] = p->nent; /* int */
 		uarg[3] = (intptr_t) p->sig; /* struct sigevent_c * */
 		*n_args = 4;
@@ -1410,14 +1410,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_aio_return */
 	case 314: {
 		struct cheriabi_aio_return_args *p = params;
-		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb_c * */
+		uarg[0] = (cheri_getbase(p->aiocbp) + cheri_getoffset(p->aiocbp)); /* struct aiocb_c *__capability */
 		*n_args = 1;
 		break;
 	}
 	/* cheriabi_aio_suspend */
 	case 315: {
 		struct cheriabi_aio_suspend_args *p = params;
-		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb_c *const * */
+		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb_c *const __capability * */
 		iarg[1] = p->nent; /* int */
 		uarg[2] = (intptr_t) p->timeout; /* const struct timespec * */
 		*n_args = 3;
@@ -1696,7 +1696,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_aio_waitcomplete */
 	case 359: {
 		struct cheriabi_aio_waitcomplete_args *p = params;
-		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb_c ** */
+		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb_c *__capability * */
 		uarg[1] = (intptr_t) p->timeout; /* struct timespec * */
 		*n_args = 2;
 		break;
@@ -2297,7 +2297,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 465: {
 		struct cheriabi_aio_fsync_args *p = params;
 		iarg[0] = p->op; /* int */
-		uarg[1] = (intptr_t) p->aiocbp; /* struct aiocb_c * */
+		uarg[1] = (cheri_getbase(p->aiocbp) + cheri_getoffset(p->aiocbp)); /* struct aiocb_c *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -2331,9 +2331,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 7;
 		break;
 	}
-	/* cheriabi_sctp_generic_sendmsg_iov */
+	/* sctp_generic_sendmsg_iov */
 	case 473: {
-		struct cheriabi_sctp_generic_sendmsg_iov_args *p = params;
+		struct sctp_generic_sendmsg_iov_args *p = params;
 		iarg[0] = p->sd; /* int */
 		uarg[1] = (intptr_t) p->iov; /* struct iovec_c * */
 		iarg[2] = p->iovlen; /* int */
@@ -2344,9 +2344,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 7;
 		break;
 	}
-	/* cheriabi_sctp_generic_recvmsg */
+	/* sctp_generic_recvmsg */
 	case 474: {
-		struct cheriabi_sctp_generic_recvmsg_args *p = params;
+		struct sctp_generic_recvmsg_args *p = params;
 		iarg[0] = p->sd; /* int */
 		uarg[1] = (intptr_t) p->iov; /* struct iovec_c * */
 		iarg[2] = p->iovlen; /* int */
@@ -2941,7 +2941,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_aio_mlock */
 	case 543: {
 		struct cheriabi_aio_mlock_args *p = params;
-		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb_c * */
+		uarg[0] = (cheri_getbase(p->aiocbp) + cheri_getoffset(p->aiocbp)); /* struct aiocb_c *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -5061,7 +5061,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 255:
 		switch(ndx) {
 		case 0:
-			p = "userland struct aiocb_c *";
+			p = "userland struct aiocb_c *__capability";
 			break;
 		default:
 			break;
@@ -5071,7 +5071,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 256:
 		switch(ndx) {
 		case 0:
-			p = "userland struct aiocb_c *";
+			p = "userland struct aiocb_c *__capability";
 			break;
 		default:
 			break;
@@ -5084,7 +5084,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct aiocb_c *const *";
+			p = "userland struct aiocb_c *const __capability *";
 			break;
 		case 2:
 			p = "int";
@@ -5325,7 +5325,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 314:
 		switch(ndx) {
 		case 0:
-			p = "userland struct aiocb_c *";
+			p = "userland struct aiocb_c *__capability";
 			break;
 		default:
 			break;
@@ -5335,7 +5335,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 315:
 		switch(ndx) {
 		case 0:
-			p = "userland struct aiocb_c *const *";
+			p = "userland struct aiocb_c *const __capability *";
 			break;
 		case 1:
 			p = "int";
@@ -5796,7 +5796,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 359:
 		switch(ndx) {
 		case 0:
-			p = "userland struct aiocb_c **";
+			p = "userland struct aiocb_c *__capability *";
 			break;
 		case 1:
 			p = "userland struct timespec *";
@@ -6817,7 +6817,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct aiocb_c *";
+			p = "userland struct aiocb_c *__capability";
 			break;
 		default:
 			break;
@@ -6880,7 +6880,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* cheriabi_sctp_generic_sendmsg_iov */
+	/* sctp_generic_sendmsg_iov */
 	case 473:
 		switch(ndx) {
 		case 0:
@@ -6908,7 +6908,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* cheriabi_sctp_generic_recvmsg */
+	/* sctp_generic_recvmsg */
 	case 474:
 		switch(ndx) {
 		case 0:
@@ -7978,7 +7978,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 543:
 		switch(ndx) {
 		case 0:
-			p = "userland struct aiocb_c *";
+			p = "userland struct aiocb_c *__capability";
 			break;
 		default:
 			break;
@@ -9630,12 +9630,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cheriabi_sctp_generic_sendmsg_iov */
+	/* sctp_generic_sendmsg_iov */
 	case 473:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cheriabi_sctp_generic_recvmsg */
+	/* sctp_generic_recvmsg */
 	case 474:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

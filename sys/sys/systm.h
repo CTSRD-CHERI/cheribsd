@@ -325,6 +325,8 @@ int	copyout_part(const void * _Nonnull __restrict kaddr,
 #if __has_feature(capabilities)
 int	copyout_c(const void * _Nonnull __restrict __capability kaddr,
 	    void * _Nonnull __restrict __capability udaddr, size_t len);
+int	copyoutcap(const void * _Nonnull __restrict kaddr,
+	    void * _Nonnull __restrict udaddr, size_t len);
 #else
 static inline int
 copyout_c(const void * _Nonnull __restrict kaddr,
@@ -333,10 +335,13 @@ copyout_c(const void * _Nonnull __restrict kaddr,
 
 	return (copyout(kaddr, udaddr, len));
 }
-#endif
-#ifdef CPU_CHERI
-int	copyoutcap(const void * _Nonnull __restrict kaddr,
-	    void * _Nonnull __restrict udaddr, size_t len);
+static inline int
+copyoutcap(const void * _Nonnull __restrict kaddr,
+    void * _Nonnull __restrict udaddr, size_t len)
+{
+
+	return (copyout(kaddr, udaddr, len));
+}
 #endif
 int	copyout_nofault(const void * _Nonnull __restrict kaddr,
 	    void * _Nonnull __restrict udaddr, size_t len);

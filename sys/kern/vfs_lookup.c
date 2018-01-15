@@ -340,8 +340,8 @@ namei(struct nameidata *ndp)
 		    cheri_ptr_to_bounded_cap(&ndp->ni_pathlen));
 #else
 		error = copyinstr_c(ndp->ni_dirp,
-		    (__cheri_cast char * __CAPABILITY)cnp->cn_pnbuf, MAXPATHLEN,
-		    (__cheri_cast size_t * __CAPABILITY)&ndp->ni_pathlen);
+		    (__cheri_tocap char * __CAPABILITY)cnp->cn_pnbuf, MAXPATHLEN,
+		    (__cheri_tocap size_t * __CAPABILITY)&ndp->ni_pathlen);
 #endif
 
 	/*
@@ -1271,7 +1271,7 @@ NDINIT_ALL(struct nameidata *ndp, u_long op, u_long flags, enum uio_seg segflg,
 {
 
 	NDINIT_ALL_C(ndp, op, flags, segflg,
-	    (__cheri_cast const char * __CAPABILITY)namep,
+	    (__cheri_tocap const char * __CAPABILITY)namep,
 	    dirfd, startdir, rightsp, td);
 }
 

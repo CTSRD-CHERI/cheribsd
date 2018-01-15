@@ -1,0 +1,333 @@
+;
+; Capabilty file descriptor versions of the 101 functions that take a file
+; descriptor arguments.
+; XXX: Update syscall numbers with vim starting here and running:
+; :let i=561 | ,$g/^[1-9][0-9]*/s//\=''.i/ | let i=i+1
+561	AUE_READ	STD	{ ssize_t c_read(fd_t fd, \
+				    _Out_writes_bytes_(nbyte) \
+				    void * buf, \
+				    size_t nbyte); }
+562	AUE_WRITE	STD	{ ssize_t c_write(fd_t fd, \
+				    _In_reads_bytes_(nbyte) \
+				    const void * buf, \
+				    size_t nbyte); }
+563	AUE_OPEN_RWTC	STD|VARARG	{ int cheriabi___c_open( \
+				    _Out_ fd_t *newfd, \
+				    _In_z_ const char * __capability path, \
+				    int flags, \
+				    mode_t mode); }
+564	AUE_CLOSE	STD	{ int c_close(fd_t fd); }
+565	AUE_FCHDIR	STD	{ int c_fchdir(fd_t fd); }
+566	AUE_RECVMSG	STD	{ ssize_t c_recvmsg(fd_t s, \
+				    _In_ struct msghdr_c * msg, \
+				    int flags); }
+567	AUE_SENDMSG	STD	{ ssize_t c_sendmsg(fd_t s, \
+				    _In_ const struct msghdr_c * \
+				    msg, \
+				    int flags); }
+568	AUE_RECVFROM	STD	{ ssize_t c_recvfrom(fd_t s, \
+				    _Out_writes_bytes_(len) \
+				    void * buf, \
+				    size_t len, int flags, \
+				    _Out_writes_bytes_opt_(*fromlenaddr) \
+				    struct sockaddr * __restrict \
+				    from, \
+				    _Inout_opt_ \
+				    __socklen_t * __restrict \
+				    fromlenaddr); }
+569	AUE_ACCEPT	STD	{ int __c_accept(_Out_ fd_t *newfd, fd_t s, \
+				    _Out_writes_bytes_opt_(*anamelen) \
+				    struct sockaddr * __restrict \
+				    name, \
+				    _Inout_opt_ __socklen_t * \
+				    anamelen); }
+570	AUE_GETPEERNAME	STD	{ int c_getpeername(fd_t fdes, \
+				    _Out_writes_bytes_(*alen) \
+				    struct sockaddr * __restrict \
+				    asa, \
+				    _Inout_opt_ __socklen_t * \
+				    alen); }
+571	AUE_GETSOCKNAME	STD	{ int c_getsockname(fd_t fdes, \
+				    _Out_writes_bytes_(*alen) \
+				    struct sockaddr * __restrict asa, \
+				    _Inout_ __socklen_t * alen); }
+572	AUE_FCHFLAGS	STD	{ int c_fchflags(fd_t fd, u_long flags); }
+573	AUE_DUP		STD	{ int __c_dup(_Out_ fd_t *newfs, \
+				    fd_t fd); }
+574	AUE_NULL	STD|NOPARSE|VARARG|NOSTUB	{ int cheriabi_c_ioctl( \
+				    fd_t fd, u_long com, \
+				    _Inout_opt_ void *data); }
+575	AUE_DUP2	STD	{ int __c_dup2(_Out_ fd_t *newfd, fd_t from, \
+				    u_int to); }
+576	AUE_FCNTL	STD|NOPARSE|VARARG	{ int __c_fcntl( \
+				    _Out_opt_ fd_t *newfd, fd_t fd, int cmd, \
+				    intptr_t arg); }
+577	AUE_FSYNC	STD	{ int c_fsync(fd_t fd); }
+578	AUE_SOCKET	STD	{ int __c_socket(_Out_ fd_t *newfd, int domain, \
+				    int type, int protocol); }
+579	AUE_CONNECT	STD	{ int c_connect(fd_t s, \
+				    _In_reads_bytes_(namelen) \
+				    const struct sockaddr *name, \
+				    __socklen_t namelen); }
+580	AUE_BIND	STD	{ int c_bind(fd_t s, \
+				    _In_reads_bytes_(namelen) \
+				    const struct sockaddr *name, \
+				    __socklen_t namelen); }
+581	AUE_SETSOCKOPT	STD	{ int c_setsockopt(fd_t s, int level, \
+				    int name, \
+				    _In_reads_bytes_opt_(valsize) \
+				    const void *val, \
+				    __socklen_t valsize); }
+582	AUE_LISTEN	STD	{ int c_listen(fd_t s, int backlog); }
+583	AUE_GETSOCKOPT	STD	{ int c_getsockopt(fd_t s, int level, \
+				    int name, \
+				    _Out_writes_bytes_opt_(*avalsize) \
+				    void *val, _Inout_ __socklen_t *avalsize); }
+584	AUE_READV	STD	{ int cheriabi_c_readv(fd_t fd, \
+				    _Inout_updates_(iovcnt) \
+				    struct iovec_c *iovp, u_int iovcnt); }
+585	AUE_WRITEV	STD	{ int cheriabi_c_writev(fd_t fd, \
+				    _In_reads_opt_(iovcnt) \
+				    struct iovec_c *iovp, u_int iovcnt); }
+586	AUE_FCHOWN	STD	{ int c_fchown(fd_t fd, int uid, int gid); }
+587	AUE_FCHMOD	STD	{ int c_fchmod(fd_t fd, mode_t mode); }
+588	AUE_FLOCK	STD	{ int c_flock(fd_t fd, int how); }
+589	AUE_SENDTO	STD	{ ssize_t c_sendto(fd_t s, \
+				    _In_reads_bytes_(len) const void *buf, \
+				    size_t len, int flags, \
+				    _In_reads_bytes_opt_(tolen) \
+				    const struct sockaddr *to, \
+				    __socklen_t tolen); }
+590	AUE_SHUTDOWN	STD	{ int c_shutdown(fd_t s, int how); }
+591	AUE_SOCKETPAIR	STD	{ int c_socketpair(int domain, int type, \
+				    int protocol, _Out_writes_(2) fd_t *rsv); }
+592	AUE_FPATHCONF	STD	{ int c_fpathconf(fd_t fd, int name); }
+593	AUE_FUTIMES	STD	{ int c_futimes(fd_t fd, \
+				    _In_reads_(2) \
+				    const struct timeval *tptr); }
+594	AUE_POLL	STD	{ int c_poll( \
+				    _Inout_updates_(nfds) struct c_pollfd *fds, \
+				    u_int nfds, int timeout); }
+595	AUE_PREADV	STD	{ ssize_t cheriabi_c_preadv(fd_t fd, \
+				    _In_reads_(iovcnt) \
+				    struct iovec_c *iovp, \
+				    u_int iovcnt, off_t offset); }
+596	AUE_PWRITEV	STD	{ ssize_t cheriabi_c_pwritev(fd_t fd, \
+				    _In_reads_(iovcnt) struct iovec_c *iovp, \
+				    u_int iovcnt, off_t offset); }
+597	AUE_AIO_CANCEL	STD	{ int cheriabi_c_aio_cancel(fd_t fd, \
+				    _In_opt_ struct aiocb_c *aiocbp); }
+598	AUE_ACL_GET_FD	STD	{ int __c_acl_get_fd(fd_t c_filedes, \
+				    acl_type_t type, _Out_ struct acl *aclp); }
+599	AUE_ACL_SET_FD	STD	{ int __c_acl_set_fd(fd_t c_filedes, \
+				    acl_type_t type, _In_ struct acl *aclp); }
+600	AUE_ACL_DELETE_FD	STD	{ int __c_acl_delete_fd(fd_t filedes, \
+				    acl_type_t type); }
+601	AUE_ACL_CHECK_FD	STD	{ int __c_acl_aclcheck_fd(fd_t filedes, \
+				    acl_type_t type, _In_ struct acl *aclp); }
+602	AUE_EXTATTR_SET_FD	STD	{ ssize_t c_extattr_set_fd(fd_t fd, \
+				    int attrnamespace, \
+				    _In_z_ const char *attrname, \
+				    _In_reads_bytes_(nbytes) void *data, \
+				    size_t nbytes); }
+603	AUE_EXTATTR_GET_FD	STD	{ ssize_t c_extattr_get_fd(fd_t fd, \
+				    int attrnamespace, \
+				    _In_z_ const char *attrname, \
+				    _Out_writes_bytes_(nbytes) void *data, \
+				    size_t nbytes); }
+604	AUE_EXTATTR_DELETE_FD	STD	{ int c_extattr_delete_fd(fd_t fd, \
+				    int attrnamespace, \
+				    _In_z_ const char *attrname); }
+605	AUE_NULL	STD	{ int cheriabi___c_mac_set_fd(fd_t fd, \
+				    _In_ struct mac_c *mac_p); }
+606	AUE_SENDFILE	STD	{ int cheriabi_c_sendfile(fd_t fd, fd_t s, \
+				    off_t offset, \
+				    size_t nbytes, \
+				    _In_opt_ struct sf_hdtr_c *hdtr, \
+				    _Out_opt_ off_t *sbytes, int flags); }
+607	AUE_EXTATTR_LIST_FD	STD	{ ssize_t c_extattr_list_fd(fd_t fd, \
+				    int attrnamespace, \
+				    _Out_writes_bytes_opt_(nbytes) \
+				    void *data, \
+				    size_t nbytes); }
+608	AUE_MQ_OPEN	NOSTD	{ int __c_kmq_open( _Out_ fd_t *newfd, \
+				    _In_z_ const char *path, int flags, \
+				    mode_t mode, \
+				    _In_opt_ const struct mq_attr *attr); }
+609	AUE_MQ_SETATTR	NOSTD	{ int c_kmq_setattr(fd_t mqd, \
+				    _In_opt_ const struct mq_attr *attr, \
+				    _Out_opt_ struct mq_attr *oattr); }
+610	AUE_MQ_TIMEDRECEIVE	NOSTD	{ int c_kmq_timedreceive( \
+				    fd_t mqd, \
+				    _Out_writes_bytes_(msg_len) char *msg_ptr, \
+				    size_t msg_len, \
+				    _Out_opt_ unsigned *msg_prio, \
+				    _In_opt_ \
+				    const struct timespec *abs_timeout); }
+611	AUE_MQ_TIMEDSEND	NOSTD	{ int c_kmq_timedsend(fd_t mqd, \
+				    _In_reads_bytes_(msg_len) \
+				    const char *msg_ptr, size_t msg_len, \
+				    unsigned msg_prio, \
+				    _In_opt_ \
+				    const struct timespec *abs_timeout); }
+612	AUE_MQ_NOTIFY	NOSTD	{ int cheriabi_c_kmq_notify(fd_t mqd,	\
+				    _In_opt_ const struct sigevent_c *sigev); }
+613	AUE_SCTP_PEELOFF	STD	{ int c_sctp_peeloff(fd_t sd, \
+				     uint32_t name); }
+614	AUE_SCTP_GENERIC_SENDMSG	STD	{ int c_sctp_generic_sendmsg( \
+				    fd_t sd, \
+				    _In_reads_bytes_(mlen) void *msg, \
+				    int mlen, \
+				    _In_reads_bytes_(tolen) \
+				    struct sockaddr *to, \
+				    __socklen_t tolen, \
+				    _In_opt_ struct sctp_sndrcvinfo *sinfo, \
+				    int flags); }
+615	AUE_SCTP_GENERIC_SENDMSG_IOV	NOSTD	{ int cheriabi_c_sctp_generic_sendmsg_iov( \
+				    fd_t sd, \
+				    _In_reads_(iovlen) struct iovec_c *iov, \
+				    int iovlen, \
+				    _In_reads_bytes_(tolen) \
+				    struct sockaddr *to, \
+				    __socklen_t tolen, \
+				    _In_opt_ struct sctp_sndrcvinfo *sinfo, \
+				    int flags); }
+616	AUE_SCTP_GENERIC_RECVMSG	NOSTD	{ int cheriabi_c_sctp_generic_recvmsg( \
+				    fd_t sd, \
+				    _In_reads_(iovlen) struct iovec_c *iov, \
+				    int iovlen, \
+				    _Out_writes_bytes_(*fromlenaddr) \
+				    struct sockaddr *from, \
+				    _Out_ __socklen_t *fromlenaddr, \
+				    _In_opt_ struct sctp_sndrcvinfo *sinfo, \
+				    _Out_opt_ int *msg_flags); }
+617	AUE_PREAD	STD	{ ssize_t c_pread(fd_t fd, \
+				    _Out_writes_bytes_(nbyte) void *buf, \
+				    size_t nbyte, off_t offset); }
+618	AUE_PWRITE	STD	{ ssize_t c_pwrite(fd_t fd, \
+				    _Out_writes_bytes_(nbyte) \
+				    const void *buf, size_t nbyte, \
+				    off_t offset); }
+619	AUE_MMAP	STD { void *cheriabi_c_mmap( \
+				    _Pagerange_vmmap_opt_(len) void *addr, \
+				    size_t len, int prot, int flags, fd_t fd, \
+				    off_t pos); }
+620	AUE_LSEEK	STD	{ off_t c_lseek(fd_t fd, off_t offset, \
+				    int whence); }
+621	AUE_FTRUNCATE	STD	{ int c_ftruncate(fd_t fd, off_t length); }
+622	AUE_FACCESSAT	STD	{ int c_faccessat(fd_t fd, \
+				    _In_z_ const char *path, int amode, \
+				    int flag); }
+623	AUE_FCHMODAT	STD	{ int c_fchmodat(fd_t fd, \
+				    _In_z_ const char *path, mode_t mode, \
+				    int flag); }
+624	AUE_FCHOWNAT	STD	{ int c_fchownat(fd_t fd, \
+				    _In_z_ const char *path, \
+				    uid_t uid, gid_t gid, int flag); }
+625	AUE_FEXECVE	STD	{ int cheriabi_c_fexecve(fd_t fd, \
+				    _In_ void * __capability *argv, \
+				    _In_ void * __capability *envv); }
+626	AUE_FUTIMESAT	STD	{ int c_futimesat(fd_t fd, \
+				    _In_z_ const char *path, \
+				    _In_reads_(2) const struct timeval *times); }
+627	AUE_LINKAT	STD	{ int cheriabi_c_linkat(fd_t fd1, \
+				    _In_z_ const char * __capability path1, \
+				    fd_t fd2, \
+				    _In_z_ const char * __capability path2, \
+				    int flag); }
+628	AUE_MKDIRAT	STD	{ int c_mkdirat(fd_t fd, _In_z_ const char *path, \
+				    mode_t mode); }
+629	AUE_MKFIFOAT	STD	{ int c_mkfifoat(fd_t fd, \
+				    _In_z_ const char *path, mode_t mode); }
+630	AUE_OPENAT_RWTC	STD|VARARG	{ int cheriabi_c_openat(fd_t fd, \
+				    _In_z_ const char * __capability path, \
+				    int flag, mode_t mode); }
+631	AUE_READLINKAT	STD	{ int c_readlinkat(fd_t fd, \
+				    _In_z_ const char *path, \
+				    _Out_writes_bytes_(bufsize) char *buf, \
+				    size_t bufsize); }
+632	AUE_RENAMEAT	STD	{ int c_renameat(fd_t oldfd, \
+				    _In_z_ const char *old, \
+				    fd_t newfd, _In_z_ const char *new); }
+633	AUE_SYMLINKAT	STD	{ int c_symlinkat(_In_z_ const char *path1, \
+				    fd_t fd, _In_z_ const char *path2); }
+634	AUE_UNLINKAT	STD	{ int cheriabi_c_unlinkat(fd_t fd, \
+				    _In_z_ const char * __capability path, \
+				    int flag); }
+635	AUE_CLOSEFROM	STD	{ int c_closefrom(fd_t lowfd); }
+636	AUE_CAP_RIGHTS_GET	STD	{ int __c_cap_rights_get(int version, \
+				    fd_t fd, _Out_ cap_rights_t *rightsp); }
+637	AUE_PDFORK	STD	{ int c_pdfork(_Out_ fd_t *fdp, int flags); }
+638	AUE_PDKILL	STD	{ int c_pdkill(fd_t fd, int signum); }
+639	AUE_PDGETPID	STD	{ int c_pdgetpid(fd_t fd, _Out_ pid_t *pidp); }
+640	AUE_POSIX_FALLOCATE	STD	{ int c_posix_fallocate(fd_t fd,\
+				    off_t offset, off_t len); }
+641	AUE_POSIX_FADVISE	STD	{ int c_posix_fadvise(fd_t fd, \
+				    off_t offset, off_t len, int advice); }
+642	AUE_CAP_RIGHTS_LIMIT	STD { int \
+				    c_cap_rights_limit(fd_t fd, \
+				    _In_ cap_rights_t *rightsp); }
+643	AUE_CAP_IOCTLS_LIMIT	STD { int \
+				    c_cap_ioctls_limit(fd_t fd, \
+				    _In_reads_(ncmds) const u_long *cmds, \
+				    size_t ncmds); }
+644	AUE_CAP_IOCTLS_GET	STD { ssize_t \
+				     c_cap_ioctls_get(fd_t fd, \
+				    _Out_writes_(maxcmds) u_long *cmds, \
+				    size_t maxcmds); }
+645	AUE_CAP_FCNTLS_LIMIT	STD	{ int c_cap_fcntls_limit(fd_t fd, \
+				    uint32_t fcntlrights); }
+646	AUE_CAP_FCNTLS_GET	STD	{ int c_cap_fcntls_get(fd_t fd, \
+				    _Out_ uint32_t *fcntlrightsp); }
+647	AUE_BINDAT	STD	{ int c_bindat(fd_t fd, fd_t s, \
+				    _In_reads_bytes_(namelen) \
+				    const struct sockaddr *name, \
+				    __socklen_t namelen); }
+648	AUE_CONNECTAT	STD	{ int c_connectat(fd_t fd, fd_t s, \
+				    _In_reads_bytes_(namelen) \
+				    const struct sockaddr *name, \
+				    __socklen_t namelen); }
+649	AUE_CHFLAGSAT	STD	{ int c_chflagsat(fd_t fd, \
+				    _In_z_ const char *path, \
+				    u_long flags, int atflag); }
+650	AUE_ACCEPT	STD 	{ int c_accept4(_Out_ fd_t *newfd, fd_t s, \
+				    _Out_writes_bytes_opt_(*anamelen) \
+				    struct sockaddr * __restrict name, \
+				    _Inout_opt_ \
+				    __socklen_t * __restrict anamelen, \
+				    int flags); }
+651	AUE_PIPE	STD	{ int c_pipe2(_Out_writes_(2) fd_t *fildes, \
+				    int flags); }
+; XXX-BD need to handle pollfd's
+652	AUE_POLL	STD	{ int c_ppoll( \
+				    _Inout_updates_(nfds) \
+				    struct c_pollfd *fds, \
+				    u_int nfds, \
+				    _In_opt_ const struct timespec *ts, \
+				    _In_opt_ const sigset_t *set); }
+653	AUE_FUTIMES	STD	{ int c_futimens(fd_t fd, \
+				    _In_reads_(2) \
+				    const struct timespec *times); }
+654	AUE_FUTIMESAT	STD	{ int c_utimensat(fd_t fd, \
+				    _In_z_ const char *path, \
+				    _In_reads_(2) \
+				    const struct timespec *times, \
+				    int flag); }
+655	AUE_FSYNC	STD	{ int c_fdatasync(fd_t fd); }
+656	AUE_FSTAT	STD	{ int c_fstat(fd_t fd, _Out_ struct stat *sb); }
+657	AUE_FSTATAT	STD	{ int c_fstatat(fd_t fd, _In_z_ const char *path, \
+                                    _Out_ struct stat *buf, int flag); }
+658	AUE_GETDIRENTRIES STD { ssize_t c_getdirentries(fd_t fd, \
+				    _Out_writes_bytes_(count) char *buf, \
+                                    size_t count, _Out_ off_t *basep); }
+659	AUE_FSTATFS	STD	{ int c_fstatfs(fd_t fd, \
+				    _Out_ struct statfs *buf); }
+660	AUE_MKNODAT	STD	{ int c_mknodat(fd_t fd, _In_z_ const char *path, \
+				    mode_t mode, dev_t dev); }
+661	AUE_KEVENT	STD	{ int cheriabi_c_kevent(fd_t fd, \
+				    _In_reads_opt_(nchanges) \
+				    const struct kevent_c *changelist, \
+				    int nchanges, \
+				    _In_reads_opt_(nevents) \
+				    struct kevent_c *eventlist, int nevents, \
+				    _In_opt_ const struct timespec *timeout); }

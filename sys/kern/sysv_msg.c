@@ -82,6 +82,14 @@ __FBSDID("$FreeBSD$");
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
 
+#ifdef COMPAT_CHERIABI
+#include <compat/cheriabi/cheriabi_ipc_msg.h>
+#endif
+
+#if defined(COMPAT_CHERIABI) || defined(COMPAT_FREEBSD32)
+#define CP(src,dst,fld) do { (dst).fld = (src).fld; } while (0)
+#endif
+
 FEATURE(sysv_msg, "System V message queues support");
 
 static MALLOC_DEFINE(M_MSG, "msg", "SVID compatible message queues");
@@ -209,6 +217,20 @@ static struct syscall_helper_data msg32_syscalls[] = {
 };
 #endif
 
+#ifdef COMPAT_CHERIABI
+#include <compat/cheriabi/cheriabi_proto.h>
+#include <compat/cheriabi/cheriabi_syscall.h>
+#include <compat/cheriabi/cheriabi_util.h>
+
+static struct syscall_helper_data cheriabi_msg_syscalls[] = {
+	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_msgctl),
+	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(msgget),
+	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(msgsnd),
+	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(msgrcv),
+	SYSCALL_INIT_LAST
+};
+#endif /* COMPAT_CHERIABI */
+
 static int
 msginit()
 {
@@ -227,7 +249,7 @@ msginit()
 	msgmaps = malloc(sizeof(struct msgmap) * msginfo.msgseg, M_MSG, M_WAITOK);
 	msghdrs = malloc(sizeof(struct msg) * msginfo.msgtql, M_MSG, M_WAITOK);
 	msqids = malloc(sizeof(struct msqid_kernel) * msginfo.msgmni, M_MSG,
-	    M_WAITOK);
+	    M_WAITOK|M_ZERO);
 
 	/*
 	 * msginfo.msgssz should be a power of two for efficiency reasons.
@@ -306,6 +328,12 @@ msginit()
 		return (error);
 #ifdef COMPAT_FREEBSD32
 	error = syscall32_helper_register(msg32_syscalls, SY_THR_STATIC_KLD);
+	if (error != 0)
+		return (error);
+#endif
+#ifdef COMPAT_CHERIABI
+	error = cheriabi_syscall_helper_register(cheriabi_msg_syscalls,
+	    SY_THR_STATIC_KLD);
 	if (error != 0)
 		return (error);
 #endif
@@ -1416,7 +1444,15 @@ static int
 sysctl_msqids(SYSCTL_HANDLER_ARGS)
 {
 	struct msqid_kernel tmsqk;
+#ifdef COMPAT_FREEBSD32
+	struct msqid_kernel32 tmsqk32;
+#endif
+#ifdef COMPAT_CHERIABI
+	struct msqid_kernel_c tmsqk_c;
+#endif
 	struct prison *pr, *rpr;
+	void *outaddr;
+	size_t outsize;
 	int error, i;
 
 	pr = req->td->td_ucred->cr_prison;
@@ -1433,7 +1469,58 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 				tmsqk.u.msg_perm.key = IPC_PRIVATE;
 		}
 		mtx_unlock(&msq_mtx);
-		error = SYSCTL_OUT(req, &tmsqk, sizeof(tmsqk));
+#ifdef COMPAT_FREEBSD32
+		if (SV_CURPROC_FLAG(SV_ILP32)) {
+			bzero(&tmsqk32, sizeof(tmsqk32));
+			freebsd32_ipcperm_out(&tmsqk.u.msg_perm,
+			    &tmsqk32.u.msg_perm);
+			/* Don't copy u.msg_first or u.msg_last */
+			CP(tmsqk, tmsqk32, u.msg_cbytes);
+			CP(tmsqk, tmsqk32, u.msg_qnum);
+			CP(tmsqk, tmsqk32, u.msg_qbytes);
+			CP(tmsqk, tmsqk32, u.msg_lspid);
+			CP(tmsqk, tmsqk32, u.msg_lrpid);
+			CP(tmsqk, tmsqk32, u.msg_stime);
+			CP(tmsqk, tmsqk32, u.msg_rtime);
+			CP(tmsqk, tmsqk32, u.msg_ctime);
+			/* Don't copy label or cred */
+			outaddr = &tmsqk32;
+			outsize = sizeof(tmsqk32);
+		} else
+#endif
+#ifdef COMPAT_CHERIABI
+		if (SV_CURPROC_FLAG(SV_CHERI)) {
+			bzero(&tmsqk_c, sizeof(tmsqk_c));
+			CP(tmsqk, tmsqk_c, u.msg_perm);
+			/* Don't copy u.msg_first or u.msg_last */
+			CP(tmsqk, tmsqk_c, u.msg_cbytes);
+			CP(tmsqk, tmsqk_c, u.msg_qnum);
+			CP(tmsqk, tmsqk_c, u.msg_qbytes);
+			CP(tmsqk, tmsqk_c, u.msg_lspid);
+			CP(tmsqk, tmsqk_c, u.msg_lrpid);
+			CP(tmsqk, tmsqk_c, u.msg_stime);
+			CP(tmsqk, tmsqk_c, u.msg_rtime);
+			CP(tmsqk, tmsqk_c, u.msg_ctime);
+			/* Don't copy label or cred */
+			outaddr = &tmsqk_c;
+			outsize = sizeof(tmsqk_c);
+		} else
+#endif
+		{
+			/* Don't leak kernel pointers */
+			tmsqk.u.msg_first = NULL;
+			tmsqk.u.msg_last = NULL;
+			tmsqk.label = NULL;
+			tmsqk.cred = NULL;
+			/*
+			 * XXX: some padding also exists, but we take care to
+			 * allocate our pool of msqid_kernel structs with
+			 * zeroed memory so this should be OK.
+			 */
+			outaddr = &tmsqk;
+			outsize = sizeof(tmsqk);
+		}
+		error = SYSCTL_OUT(req, outaddr, outsize);
 		if (error != 0)
 			break;
 	}
@@ -1782,6 +1869,51 @@ freebsd32_msgrcv(struct thread *td, struct freebsd32_msgrcv_args *uap)
 	return (copyout(&mtype32, msgp, sizeof(mtype32)));
 }
 #endif
+
+#ifdef COMPAT_CHERIABI
+int
+cheriabi_msgctl(struct thread *td, struct cheriabi_msgctl_args *uap)
+{
+	struct msqid_ds msqbuf;
+	struct msqid_ds_c msqbuf_c;
+	int error;
+
+	if (uap->cmd == IPC_SET) {
+		error = copyin(uap->buf, &msqbuf_c, sizeof(msqbuf_c));
+		if (error)
+			return (error);
+		CP(msqbuf_c, msqbuf, msg_perm);
+		msqbuf.msg_first = NULL;	/* Ignored */
+		msqbuf.msg_last = NULL;		/* Ignored */
+		CP(msqbuf_c, msqbuf, msg_cbytes);
+		CP(msqbuf_c, msqbuf, msg_qnum);
+		CP(msqbuf_c, msqbuf, msg_qbytes);
+		CP(msqbuf_c, msqbuf, msg_lspid);
+		CP(msqbuf_c, msqbuf, msg_lrpid);
+		CP(msqbuf_c, msqbuf, msg_stime);
+		CP(msqbuf_c, msqbuf, msg_rtime);
+		CP(msqbuf_c, msqbuf, msg_ctime);
+	}
+	error = kern_msgctl(td, uap->msqid, uap->cmd, &msqbuf);
+	if (error)
+		return (error);
+	if (uap->cmd == IPC_STAT) {
+		CP(msqbuf, msqbuf_c, msg_perm);
+		msqbuf_c.kmsg_first = NULL;	/* Don't leak kernel ptr */
+		msqbuf_c.kmsg_last = NULL;	/* Don't leak kernel ptr */
+		CP(msqbuf, msqbuf_c, msg_cbytes);
+		CP(msqbuf, msqbuf_c, msg_qnum);
+		CP(msqbuf, msqbuf_c, msg_qbytes);
+		CP(msqbuf, msqbuf_c, msg_lspid);
+		CP(msqbuf, msqbuf_c, msg_lrpid);
+		CP(msqbuf, msqbuf_c, msg_stime);
+		CP(msqbuf, msqbuf_c, msg_rtime);
+		CP(msqbuf, msqbuf_c, msg_ctime);
+		error = copyout(&msqbuf_c, uap->buf, sizeof(struct msqid_ds_c));
+	}
+	return (error);
+}
+#endif /* COMPAT_CHERIABI */
 
 #if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
     defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)

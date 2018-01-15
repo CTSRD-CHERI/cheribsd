@@ -146,4 +146,7 @@ int	cheriabi_set_mcontext(struct thread *td, mcontext_c_t *mcp);
 void	cheriabi_set_threadregs(struct thread *td, struct thr_param_c *param);
 int	cheriabi_set_user_tls(struct thread *td, void * __capability tls_base);
 
+void	*cheriabi_build_kevent_udata(__intcap_t ident,
+	    void * __capability udata);
+
 #endif /* !_COMPAT_CHERIABI_CHERIABI_UTIL_H_ */

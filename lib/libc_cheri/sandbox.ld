@@ -43,28 +43,56 @@
 __vector_base__ = 0x8000;
 __vector_size__ = 0x200;
 
-__rtld_vector__ = __vector_base__ + __vector_size__ * 0;
-__invoke_vector__ = __vector_base__ + __vector_size__ * 1;
-__reserved0_vector__ = __vector_base__ + __vector_size__ * 2;
-__reserved1_vector__ = __vector_base__ + __vector_size__ * 3;
+__rtld_vector_addr__ = __vector_base__ + __vector_size__ * 0;
+__invoke_vector_addr__ = __vector_base__ + __vector_size__ * 1;
+PROVIDE_HIDDEN(__reserved0_vector__ = __vector_base__ + __vector_size__ * 2);
+PROVIDE_HIDDEN(__reserved1_vector__ = __vector_base__ + __vector_size__ * 3);
 
 __code_body__ = __vector_base__ + __vector_size__ * 4;
 
 CAP_ALIGN = 0x20;
 PAGE_ALIGN = 0x1000;
 
+/*
+ * Unlike BFD, LLD doesn't implicitly add any name referenced by an input
+ * section description as an input file: When we were linkingi with bfd the
+ * crt_rtld.o and crt_invoke.o files were implicitly pulled in because they
+ * are mentioned in the following output section descriptions. With LLD we need
+ * to explicitly use INPUT()
+ */
+INPUT(crt_rtld.o crt_invoke.o)
+INPUT(crtbeginC.o crtendC.o)
+
+ENTRY(__rtld_vector)
+/* Not supported by LLD: STARTUP(crt_rtld.o) */
+
 SECTIONS
 {
-	. = __rtld_vector__;
-	.text.rtld_vector : {
-		crt_rtld.o(.text .data .bss)
+	. = __rtld_vector_addr__;
+	/* XXXAR: we can't call these sections .text.rtld_vector anymore
+	 * because LLD will merge any sections starting with .text., .data., etc.
+	 * I believe this is a bug in LLD but for now work around it by using
+	 * a different name for the section. Using a valid C identifier has the
+	 * added benefit that we get a __start_sec and __stop_sec symbol from
+	 * the linker that we can use to verify that the output was correct/
+	 */
+	/*
+	 * Adding the . after the section name forces the output section
+	 * to be placed at the address of the current location counter:
+	 * https://sourceware.org/binutils/docs/ld/Output-Section-Address.html
+	 */
+	rtld_vector_text . : {
+		__rtld_vector_addr = .;
+		KEEP(*crt_rtld.o(.text *vector_text))
 	}
-	. = __invoke_vector__;
-	.text.invoke_vector : {
-		crt_invoke.o(.text .data .bss)
+	. = __invoke_vector_addr__;
+	invoke_vector_text . : {
+		__invoke_vector_addr = .;
+		KEEP(*crt_invoke.o(.text *vector_text))
 	}
 	. = __code_body__;
-	.init : {
+	.init . : {
+		__code_body_addr = .;
 		KEEP (*(.init))
 	} = 0
 	.text ALIGN(CAP_ALIGN): {

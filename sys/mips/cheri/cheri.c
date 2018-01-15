@@ -157,14 +157,14 @@ cheri_capability_set(void * __capability *cp, uint32_t perms, vaddr_t basep,
 #ifdef INVARIANTS
 	KASSERT(cheri_gettag(*cp) != 0, ("%s: capability untagged", __func__));
 	KASSERT(cheri_getperm(*cp) == (register_t)perms,
-	    ("%s: permissions 0x%x rather than 0x%x", __func__,
-	    (unsigned int)cheri_getperm(*cp), perms));
+	    ("%s: permissions 0x%lx rather than 0x%x", __func__,
+	    (unsigned long)cheri_getperm(*cp), perms));
 	KASSERT(cheri_getbase(*cp) == (register_t)basep,
 	    ("%s: base %p rather than %lx", __func__,
 	     (void *)cheri_getbase(*cp), basep));
 	KASSERT(cheri_getlen(*cp) == (register_t)length,
-	    ("%s: length 0x%x rather than %p", __func__,
-	    (unsigned int)cheri_getlen(*cp), (void *)length));
+	    ("%s: length 0x%lx rather than %p", __func__,
+	    (unsigned long)cheri_getlen(*cp), (void *)length));
 	KASSERT(cheri_getoffset(*cp) == (register_t)off,
 	    ("%s: offset %p rather than %p", __func__,
 	    (void *)cheri_getoffset(*cp), (void *)off));

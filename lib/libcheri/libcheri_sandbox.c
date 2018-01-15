@@ -540,7 +540,7 @@ sandbox_object_new_system_object(__capability void *private_data,
 		return (-1);
 
 	(*sbopp)->sbo_idc =
-	    (__cheri_cast void * __capability)(void *)*sbopp;
+	    (__cheri_tocap void * __capability)(void *)*sbopp;
 	(*sbopp)->sbo_rtld_pcc = NULL;
 	(*sbopp)->sbo_invoke_pcc = invoke_pcc;
 	(*sbopp)->sbo_vtable = vtable;
@@ -557,7 +557,7 @@ sandbox_object_new_system_object(__capability void *private_data,
 	 */
         (*sbopp)->sbo_cheri_object_invoke =
             libcheri_sandbox_make_sealed_invoke_object(
-	    (__cheri_cast __capability struct sandbox_object *)*sbopp);
+	    (__cheri_tocap __capability struct sandbox_object *)*sbopp);
 	return (0);
 }
 
@@ -711,6 +711,6 @@ sandbox_object_private_get_idc(void)
 {
 	struct sandbox_object *sbop;
 
-	sbop = (struct sandbox_object *)(__cheri_cast void *)cheri_getidc();
+	sbop = (struct sandbox_object *)(__cheri_fromcap void *)cheri_getidc();
 	return (sbop->sbo_private_data);
 }

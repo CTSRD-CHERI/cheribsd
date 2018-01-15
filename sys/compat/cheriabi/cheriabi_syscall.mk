@@ -282,8 +282,8 @@ MIASM =  \
 	rtprio_thread.o \
 	sctp_peeloff.o \
 	sctp_generic_sendmsg.o \
-	cheriabi_sctp_generic_sendmsg_iov.o \
-	cheriabi_sctp_generic_recvmsg.o \
+	sctp_generic_sendmsg_iov.o \
+	sctp_generic_recvmsg.o \
 	pread.o \
 	pwrite.o \
 	cheriabi_mmap.o \

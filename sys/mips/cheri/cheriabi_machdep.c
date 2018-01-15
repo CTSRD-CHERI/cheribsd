@@ -422,7 +422,7 @@ cheriabi_set_mcontext(struct thread *td, mcontext_c_t *mcp)
 	td->td_md.md_tls_cap =  mcp->mc_tls;
 	tag = cheri_gettag(mcp->mc_tls);
 	if (tag)
-		td->td_md.md_tls = (__cheri_cast void *)mcp->mc_tls; // XXX: __capability?
+		td->td_md.md_tls = (__cheri_fromcap void *)mcp->mc_tls; // XXX: __capability?
 	else
 		td->td_md.md_tls = NULL;
 
@@ -615,9 +615,8 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		sf.sf_si.si_signo = sig;
 		sf.sf_si.si_code = ksi->ksi_code;
 		if (ksi->ksi_flags & KSI_CHERI)
-			cheri_memcpy(&sf.sf_si.si_value,
-			    ksi->ksi_info.si_value.sival_ptr,
-			    sizeof(sf.sf_si.si_value));
+			sf.sf_si.si_value.sival_ptr =
+			    cheriabi_extract_sival(&ksi->ksi_info.si_value);
 		else
 			sf.sf_si.si_value.sival_int =
 			    ksi->ksi_info.si_value.sival_int;
@@ -683,7 +682,7 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 * different things.
 	 */
 	regs->pc = (register_t)(intptr_t)catcher;
-	regs->csp = (__cheri_cast void * __capability)(void*)sfp;
+	regs->csp = (__cheri_tocap void * __capability)(void*)sfp;
 	regs->c12 = psp->ps_sigcap[_SIG_IDX(sig)];
 	regs->c17 = td->td_pcb->pcb_cherisignal.csig_sigcode;
 	regs->ddc = csigp->csig_ddc;

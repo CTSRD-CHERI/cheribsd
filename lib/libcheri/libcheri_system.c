@@ -97,7 +97,7 @@ libcheri_system_new(struct sandbox_object *sbop,
 	    (register_t)LIBCHERI_CLASS_ENTRY(libcheri_system));
 
 	return (sandbox_object_new_system_object(
-	    (__cheri_cast void * __capability)(void *)sbop, invoke_pcc,
+	    (__cheri_tocap void * __capability)(void *)sbop, invoke_pcc,
 	    libcheri_system_vtable, sbopp));
 }
 

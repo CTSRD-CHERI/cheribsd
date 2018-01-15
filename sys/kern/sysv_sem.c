@@ -71,6 +71,7 @@ __FBSDID("$FreeBSD$");
 
 #ifdef COMPAT_CHERIABI
 #include <sys/user.h>
+#include <compat/cheriabi/cheriabi_ipc_sem.h>
 #include <compat/cheriabi/cheriabi_syscall.h>
 #include <compat/cheriabi/cheriabi_util.h>
 #endif
@@ -103,17 +104,6 @@ static int sem_prison_set(void *, void *);
 static int sem_prison_get(void *, void *);
 static int sem_prison_remove(void *, void *);
 static void sem_prison_cleanup(struct prison *);
-
-struct cheriabi___semctl_args;
-int sys_cheriabi___semctl(struct thread *td, struct __semctl_args *uap);
-#ifndef _SYS_SYSPROTO_H_
-struct __semctl_args;
-int __semctl(struct thread *td, struct __semctl_args *uap);
-struct semget_args;
-int semget(struct thread *td, struct semget_args *uap);
-struct semop_args;
-int semop(struct thread *td, struct semop_args *uap);
-#endif
 
 static struct sem_undo *semu_alloc(struct thread *td);
 static int semundo_adjust(struct thread *td, struct sem_undo **supptr,
@@ -277,7 +267,7 @@ static struct syscall_helper_data sem32_syscalls[] = {
 #include <compat/cheriabi/cheriabi_proto.h>
 
 static struct syscall_helper_data cheriabi_sem_syscalls[] = {
-	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(cheriabi___semctl),
+	CHERIABI_SYSCALL_INIT_HELPER(cheriabi___semctl),
 	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(semget),
 	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(semop),
 	SYSCALL_INIT_LAST
@@ -299,7 +289,7 @@ seminit(void)
 
 	sem = malloc(sizeof(struct sem) * seminfo.semmns, M_SEM, M_WAITOK);
 	sema = malloc(sizeof(struct semid_kernel) * seminfo.semmni, M_SEM,
-	    M_WAITOK);
+	    M_WAITOK|M_ZERO);
 	sema_mtx = malloc(sizeof(struct mtx) * seminfo.semmni, M_SEM,
 	    M_WAITOK | M_ZERO);
 	semu = malloc(seminfo.semmnu * seminfo.semusz, M_SEM, M_WAITOK);
@@ -709,17 +699,101 @@ sys___semctl(struct thread *td, struct __semctl_args *uap)
 	return (error);
 }
 
-/*
- * XXX: There's something wrong with either the function naming,
- *      or my understanding of what's the convention here. It works,
- *      but looks ugly.
- */
+#ifdef COMPAT_CHERIABI
 int
-sys_cheriabi___semctl(struct thread *td, struct __semctl_args *uap)
+cheriabi___semctl(struct thread *td, struct cheriabi___semctl_args *uap)
 {
+	struct semid_ds dsbuf;
+	struct semid_ds_c dsbuf_c;
+	union semun_c arg;
+	union semun semun;
+	register_t rval;
+	int error, semidx;
+	int64_t reqperms;
 
-	return (sys___semctl(td, uap));
+	switch (uap->cmd) {
+	case SEM_STAT:
+	case IPC_SET:
+	case IPC_STAT:
+	case GETALL:
+	case SETVAL:
+	case SETALL:
+		error = copyincap(uap->arg, &arg, sizeof(arg));
+		if (error)
+			return (error);
+		break;
+	}
+
+	switch (uap->cmd) {
+	case SEM_STAT:
+	case IPC_STAT:
+		semun.buf = &dsbuf;
+		break;
+	case IPC_SET:
+		error = copyin_c(arg.buf,
+		    (__cheri_tocap struct semid_ds_c * __capability)&dsbuf_c,
+		    sizeof(dsbuf_c));
+		if (error)
+			return (error);
+		memset(&dsbuf, 0, sizeof(dsbuf));
+		CP(dsbuf_c, dsbuf, sem_perm);
+		/* only sem_perm is used so don't copy the rest */
+		semun.buf = &dsbuf;
+		break;
+	case GETALL:
+	case SETALL:
+		semidx = IPCID_TO_IX(uap->semid);
+		if (semidx < 0 || semidx >= seminfo.semmni)
+			return (EINVAL);
+
+		reqperms = CHERI_PERM_GLOBAL;
+		if (uap->cmd == GETALL)
+			reqperms |= CHERI_PERM_LOAD;
+		else
+			reqperms |= CHERI_PERM_STORE;
+		/*
+		 * NOTE: a time-of-check vs time-of-use bug exists here.
+		 * The semid "uniqueness" code partially mitigates this
+		 * as documented in the GETALL case of kern_semctl().
+		 *
+		 * Performing the check here vs at the copyin somewhat
+		 * widens the race, but this is less disruptive for now.
+		 */
+		error = cheriabi_cap_to_ptr((caddr_t *)&semun.array, arg.array,
+		    sema[semidx].u.sem_nsems * sizeof(*arg.array), reqperms, 0);
+		if (error)
+			return (error);
+		break;
+	case SETVAL:
+		semun.val = arg.val;
+		break;
+	}
+
+	error = kern_semctl(td, uap->semid, uap->semnum, uap->cmd, &semun,
+	    &rval);
+	if (error)
+		return (error);
+
+	switch (uap->cmd) {
+	case SEM_STAT:
+	case IPC_STAT:
+		memset(&dsbuf_c, 0, sizeof(dsbuf));
+		CP(dsbuf, dsbuf_c, sem_perm);
+		/* Don't copy sem_base */
+		CP(dsbuf, dsbuf_c, sem_nsems);
+		CP(dsbuf, dsbuf_c, sem_otime);
+		CP(dsbuf, dsbuf_c, sem_ctime);
+		error = copyout_c(
+		    (__cheri_tocap struct semid_ds_c * __capability)&dsbuf_c,
+		    arg.buf, sizeof(dsbuf_c));
+		break;
+	}
+
+	if (error == 0)
+		td->td_retval[0] = rval;
+	return (error);
 }
+#endif /* COMPAT_CHERIABI */
 
 int
 kern_semctl(struct thread *td, int semid, int semnum, int cmd,
@@ -1524,6 +1598,14 @@ sysctl_sema(SYSCTL_HANDLER_ARGS)
 {
 	struct prison *pr, *rpr;
 	struct semid_kernel tsemak;
+#ifdef COMPAT_FREEBSD32
+	struct semid_kernel32 tsemak32;
+#endif
+#ifdef COMPAT_CHERIABI
+	struct semid_kernel_c tsemak_c;
+#endif
+	void *outaddr;
+	size_t outsize;
 	int error, i;
 
 	pr = req->td->td_ucred->cr_prison;
@@ -1540,7 +1622,40 @@ sysctl_sema(SYSCTL_HANDLER_ARGS)
 				tsemak.u.sem_perm.key = IPC_PRIVATE;
 		}
 		mtx_unlock(&sema_mtx[i]);
-		error = SYSCTL_OUT(req, &tsemak, sizeof(tsemak));
+#ifdef COMPAT_FREEBSD32
+		if (SV_CURPROC_FLAG(SV_ILP32)) {
+			bzero(&tsemak32, sizeof(tsemak32));
+			freebsd32_ipcperm_out(&tsemak.u.sem_perm, &tsemak32.u.sem_perm);
+			/* Don't copy u.sem_base */
+			CP(tsemak, tsemak32, u.sem_nsems);
+			CP(tsemak, tsemak32, u.sem_otime);
+			CP(tsemak, tsemak32, u.sem_ctime);
+			/* Don't copy label or cred */
+			outaddr = &tsemak32;
+			outsize = sizeof(tsemak32);
+		} else
+#endif
+#ifdef COMPAT_CHERIABI
+		if (SV_CURPROC_FLAG(SV_CHERI)) {
+			bzero(&tsemak_c, sizeof(tsemak_c));
+			CP(tsemak, tsemak_c, u.sem_perm);
+			/* Don't copy u.sem_base */
+			CP(tsemak, tsemak_c, u.sem_nsems);
+			CP(tsemak, tsemak_c, u.sem_otime);
+			CP(tsemak, tsemak_c, u.sem_ctime);
+			/* Don't copy label or cred */
+			outaddr = &tsemak_c;
+			outsize = sizeof(tsemak_c);
+		} else
+#endif
+		{
+			tsemak.u.sem_base = NULL;
+			tsemak.label = NULL;
+			tsemak.cred = NULL;
+			outaddr = &tsemak;
+			outsize = sizeof(tsemak);
+		}
+		error = SYSCTL_OUT(req, outaddr, outsize);
 		if (error != 0)
 			break;
 	}

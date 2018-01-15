@@ -1167,8 +1167,12 @@ libcheribuildenvvars:
 .endif
 .endif
 libcheribuildenv:
-	@echo Entering world for ${TARGET_ARCH}:${TARGET}
-	@cd ${.CURDIR} && env ${LIBCHERIWMAKEENV} ${BUILDENV_SHELL} || true
+	@echo "Entering world (CHERI${CHERI}) for ${TARGET_ARCH}:${TARGET}"
+.if ${BUILDENV_SHELL:M*zsh*}
+	@echo For ZSH you must run: export CPUTYPE=${TARGET_CPUTYPE}
+.endif
+	@cd ${BUILDENV_DIR} && env ${LIBCHERIWMAKEENV} BUILDENV=1 \
+	    ${BUILDENV_SHELL} || true
 .endif
 
 TOOLCHAIN_TGTS=	${WMAKE_TGTS:Neverything:Nbuild${libcompat}:Nbuildcheri}

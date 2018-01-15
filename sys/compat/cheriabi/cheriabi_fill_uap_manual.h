@@ -123,7 +123,7 @@ CHERIABI_SYS_mincore_fill_uap(struct thread *td,
 		if (length < roundup2(uap->len + addr_adjust, PAGE_SIZE))
 			return (EPROT);
 
-		uap->addr = (__cheri_cast void *)tmpcap;
+		uap->addr = (__cheri_fromcap void *)tmpcap;
 	}
 
 	/* [2] _Out_writes_bytes_(len/PAGE_SIZE) char * vec */
@@ -598,7 +598,6 @@ CHERIABI_SYS_cheriabi___semctl_fill_uap(struct thread *td,
 {
 	void * __capability tmpcap;
 	int error;
-	register_t reqperms;
 
 	/* [0] int semid */
 	cheriabi_fetch_syscall_arg(td, &tmpcap,
@@ -616,18 +615,21 @@ CHERIABI_SYS_cheriabi___semctl_fill_uap(struct thread *td,
 	uap->cmd = cheri_getoffset(tmpcap);
 
 	/* [3] _In_opt_ union semun_c * arg */
-	reqperms = CHERI_PERM_LOAD;
 	switch (uap->cmd) {
-	case IPC_STAT:
-	case IPC_SET:
-	case GETALL:
-	case SETALL:
-		reqperms |= CHERI_PERM_LOAD_CAP;
+	case GETNCNT:
+	case GETPID:
+	case GETVAL:
+	case GETZCNT:
+	case IPC_RMID:
+		/* no arg */
+		uap->arg = NULL;
+		return (0);
 	}
 	cheriabi_fetch_syscall_arg(td, &tmpcap,
 	    3, CHERIABI_SYS_cheriabi___semctl_PTRMASK);
 	error = cheriabi_cap_to_ptr((caddr_t *)&uap->arg, tmpcap,
-	    sizeof(*uap->arg), reqperms, 1);
+	    sizeof(*uap->arg),
+	    CHERI_PERM_GLOBAL|CHERI_PERM_LOAD|CHERI_PERM_LOAD_CAP, 0);
 	if (error != 0)
 		return (error);
 

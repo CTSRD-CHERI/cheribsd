@@ -78,7 +78,12 @@
 #     run only native MIPS64 code, or hand-crafted CHERI assembler.  Thus
 #     must change before we can run Clang-compiled CHERI code.
 #
-	.text
+
+# XXXAR: LLD linker script output section assignment appears to be broken
+# right now. It just assigns the input section name to the output section.
+# To work around this we just give it the name of the output section that we want
+#       .text
+        .section invoke_vector_text,"ax",@progbits
 	.option pic0
 	.global __invoke_vector
 	.ent __invoke_vector

@@ -307,10 +307,9 @@ struct procctl_reaper_pids_c {
 };
 
 union semun_c {
-	int val;
-	/* struct semid_ds *buf; */
-	/* unsigned short  *array; */
-	void * __capability ptr;
+	int				val;
+	struct semid_ds * __capability	buf;
+	unsigned short  * __capability	array;
 };
 
 #include <sys/ipc.h>

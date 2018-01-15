@@ -97,5 +97,7 @@ typedef struct {
 struct sigevent;
 int convert_sigevent_c(struct sigevent_c *sig_c, struct sigevent *sig);
 void siginfo_to_siginfo_c(const siginfo_t *src, struct siginfo_c *dst);
+void * __capability cheriabi_extract_sival(union sigval *sival);
+void cheriabi_free_sival(union sigval *sival);
 
 #endif /* _COMPAT_CHERIABI_CHERIABI_SIGNAL_H_ */

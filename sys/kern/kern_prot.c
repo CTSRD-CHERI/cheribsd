@@ -2120,7 +2120,7 @@ int
 sys_setlogin(struct thread *td, struct setlogin_args *uap)
 {
 
-	return (kern_setlogin(td, (__cheri_cast char * __CAPABILITY)uap->namebuf));
+	return (kern_setlogin(td, (__cheri_tocap char * __CAPABILITY)uap->namebuf));
 }
 
 int
@@ -2135,7 +2135,7 @@ kern_setlogin(struct thread *td, const char * __CAPABILITY namebuf)
 	error = priv_check(td, PRIV_PROC_SETLOGIN);
 	if (error)
 		return (error);
-	error = copyinstr_c(namebuf, (__cheri_cast char * __CAPABILITY)&logintmp[0],
+	error = copyinstr_c(namebuf, (__cheri_tocap char * __CAPABILITY)&logintmp[0],
 	    sizeof(logintmp), NULL);
 	if (error != 0) {
 		if (error == ENAMETOOLONG)

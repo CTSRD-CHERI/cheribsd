@@ -124,7 +124,7 @@ libcheri_fd_new(int fd, struct sandbox_object **sbopp)
 	 * Set up system-object state for the sandbox.
 	 */
 	if (sandbox_object_new_system_object(
-	    (__cheri_cast void * __capability)(void *)lcfp, invoke_pcc,
+	    (__cheri_tocap void * __capability)(void *)lcfp, invoke_pcc,
 	    libcheri_fd_vtable, &lcfp->lcf_sbop) != 0) {
 		free(lcfp);
 		return (-1);
@@ -157,7 +157,7 @@ libcheri_fd_destroy(struct sandbox_object *sbop)
 
 	lcfp = sandbox_object_getsandboxdata(sbop);
 	sandbox_object_destroy(sbop);
-	free((__cheri_cast struct libcheri_fd *)lcfp);
+	free((__cheri_fromcap struct libcheri_fd *)lcfp);
 }
 
 /*

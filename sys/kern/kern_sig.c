@@ -265,7 +265,7 @@ ksiginfo_free(ksiginfo_t *ksi)
 {
 #ifdef COMPAT_CHERIABI
 	if (ksi->ksi_flags & KSI_CHERI)
-		free(ksi->ksi_info.si_value.sival_ptr, M_TEMP);
+		cheriabi_free_sival(&ksi->ksi_info.si_value);
 #endif
 	uma_zfree(ksiginfo_zone, ksi);
 }
@@ -276,7 +276,7 @@ ksiginfo_tryfree(ksiginfo_t *ksi)
 	if (!(ksi->ksi_flags & KSI_EXT)) {
 #ifdef COMPAT_CHERIABI
 		if (ksi->ksi_flags & KSI_CHERI)
-			free(ksi->ksi_info.si_value.sival_ptr, M_TEMP);
+			cheriabi_free_sival(&ksi->ksi_info.si_value);
 #endif
 		uma_zfree(ksiginfo_zone, ksi);
 		return (1);

@@ -45,7 +45,11 @@
 # are not global, and that there is no path to invoke().
 #
 
-	.text
+# XXXAR: LLD linker script output section assignment appears to be broken
+# right now. It just assigns the input section name to the output section.
+# To work around this we just give it the name of the output section that we want
+# 	.text
+	.section rtld_vector_text,"ax",@progbits
 	.option pic0
 	.global __rtld_vector
 	.type __rtld_vector,@function
