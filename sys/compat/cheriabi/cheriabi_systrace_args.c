@@ -638,7 +638,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 120: {
 		struct cheriabi_readv_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->iovp; /* struct iovec_c * */
+		uarg[1] = (cheri_getbase(p->iovp) + cheri_getoffset(p->iovp)); /* struct iovec_c *__capability */
 		uarg[2] = p->iovcnt; /* u_int */
 		*n_args = 3;
 		break;
@@ -647,7 +647,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 121: {
 		struct cheriabi_writev_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->iovp; /* struct iovec_c * */
+		uarg[1] = (cheri_getbase(p->iovp) + cheri_getoffset(p->iovp)); /* struct iovec_c *__capability */
 		uarg[2] = p->iovcnt; /* u_int */
 		*n_args = 3;
 		break;
@@ -1296,7 +1296,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 289: {
 		struct cheriabi_preadv_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->iovp; /* struct iovec_c * */
+		uarg[1] = (cheri_getbase(p->iovp) + cheri_getoffset(p->iovp)); /* struct iovec_c *__capability */
 		uarg[2] = p->iovcnt; /* u_int */
 		iarg[3] = p->offset; /* off_t */
 		*n_args = 4;
@@ -1306,7 +1306,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 290: {
 		struct cheriabi_pwritev_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->iovp; /* struct iovec_c * */
+		uarg[1] = (cheri_getbase(p->iovp) + cheri_getoffset(p->iovp)); /* struct iovec_c *__capability */
 		uarg[2] = p->iovcnt; /* u_int */
 		iarg[3] = p->offset; /* off_t */
 		*n_args = 4;
@@ -1783,7 +1783,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_nmount */
 	case 378: {
 		struct cheriabi_nmount_args *p = params;
-		uarg[0] = (intptr_t) p->iovp; /* struct iovec_c * */
+		uarg[0] = (cheri_getbase(p->iovp) + cheri_getoffset(p->iovp)); /* struct iovec_c *__capability */
 		uarg[1] = p->iovcnt; /* unsigned int */
 		iarg[2] = p->flags; /* int */
 		*n_args = 3;
@@ -2640,7 +2640,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_jail_get */
 	case 506: {
 		struct cheriabi_jail_get_args *p = params;
-		uarg[0] = (intptr_t) p->iovp; /* struct iovec_c * */
+		uarg[0] = (cheri_getbase(p->iovp) + cheri_getoffset(p->iovp)); /* struct iovec_c *__capability */
 		uarg[1] = p->iovcnt; /* unsigned int */
 		iarg[2] = p->flags; /* int */
 		*n_args = 3;
@@ -2649,7 +2649,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_jail_set */
 	case 507: {
 		struct cheriabi_jail_set_args *p = params;
-		uarg[0] = (intptr_t) p->iovp; /* struct iovec_c * */
+		uarg[0] = (cheri_getbase(p->iovp) + cheri_getoffset(p->iovp)); /* struct iovec_c *__capability */
 		uarg[1] = p->iovcnt; /* unsigned int */
 		iarg[2] = p->flags; /* int */
 		*n_args = 3;
@@ -4120,7 +4120,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct iovec_c *";
+			p = "userland struct iovec_c *__capability";
 			break;
 		case 2:
 			p = "u_int";
@@ -4136,7 +4136,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct iovec_c *";
+			p = "userland struct iovec_c *__capability";
 			break;
 		case 2:
 			p = "u_int";
@@ -5158,7 +5158,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct iovec_c *";
+			p = "userland struct iovec_c *__capability";
 			break;
 		case 2:
 			p = "u_int";
@@ -5177,7 +5177,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct iovec_c *";
+			p = "userland struct iovec_c *__capability";
 			break;
 		case 2:
 			p = "u_int";
@@ -5956,7 +5956,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 378:
 		switch(ndx) {
 		case 0:
-			p = "userland struct iovec_c *";
+			p = "userland struct iovec_c *__capability";
 			break;
 		case 1:
 			p = "unsigned int";
@@ -7460,7 +7460,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 506:
 		switch(ndx) {
 		case 0:
-			p = "userland struct iovec_c *";
+			p = "userland struct iovec_c *__capability";
 			break;
 		case 1:
 			p = "unsigned int";
@@ -7476,7 +7476,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 507:
 		switch(ndx) {
 		case 0:
-			p = "userland struct iovec_c *";
+			p = "userland struct iovec_c *__capability";
 			break;
 		case 1:
 			p = "unsigned int";

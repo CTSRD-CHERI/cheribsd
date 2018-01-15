@@ -527,11 +527,12 @@ cheriabi_kevent(struct thread *td, struct cheriabi_kevent_args *uap)
 }
 
 static int
-cheriabi_copyinuio(struct iovec_c *iovp, u_int iovcnt, struct uio **uiop)
+cheriabi_copyinuio(struct iovec_c * __capability iovp, u_int iovcnt,
+    struct uio **uiop)
 {
-	kiovec_t *iov;
+	kiovec_t * __capability iov;
 	struct uio *uio;
-	u_int iovlen;
+	size_t iovlen;
 	int error, i;
 
 	*uiop = NULL;
@@ -539,24 +540,23 @@ cheriabi_copyinuio(struct iovec_c *iovp, u_int iovcnt, struct uio **uiop)
 		return (EINVAL);
 	iovlen = iovcnt * sizeof(kiovec_t);
 	uio = malloc(iovlen + sizeof(*uio), M_IOV, M_WAITOK);
-	iov = (kiovec_t *)(uio + 1);
-	error = copyincap(iovp, iov, iovlen);
+	iov = (__cheri_tocap kiovec_t * __capability)(kiovec_t *)(uio + 1);
+	error = copyincap_c(iovp, iov, iovlen);
 	if (error) {
 		free(uio, M_IOV);
 		return (error);
 	}
-	uio->uio_iov = iov;
+	uio->uio_iov = (__cheri_fromcap kiovec_t *)iov;
 	uio->uio_iovcnt = iovcnt;
 	uio->uio_segflg = UIO_USERSPACE;
 	uio->uio_offset = -1;
 	uio->uio_resid = 0;
 	for (i = 0; i < iovcnt; i++) {
-		if (iov->iov_len > INT_MAX - uio->uio_resid) {
+		if (iov[i].iov_len > SIZE_MAX - uio->uio_resid) {
 			free(uio, M_IOV);
 			return (EINVAL);
 		}
-		uio->uio_resid += iov->iov_len;
-		iov++;
+		uio->uio_resid += iov[i].iov_len;
 	}
 	*uiop = uio;
 	return (0);
@@ -759,14 +759,11 @@ cheriabi_do_sendfile(struct thread *td,
     struct cheriabi_sendfile_args *uap)
 {
 	struct sf_hdtr_c hdtr_c;
-	struct iovec_c *headers, *trailers;
 	struct uio *hdr_uio, *trl_uio;
 	struct file *fp;
 	cap_rights_t rights;
 	off_t offset, sbytes;
 	int error;
-	static register_t reqperms = CHERI_PERM_GLOBAL |
-	    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP;
 
 	offset = uap->offset;
 	if (offset < 0)
@@ -778,26 +775,16 @@ cheriabi_do_sendfile(struct thread *td,
 		error = copyincap(uap->hdtr, &hdtr_c, sizeof(hdtr_c));
 		if (error)
 			goto out;
-		error = cheriabi_cap_to_ptr((caddr_t *)&headers,
-		    hdtr_c.headers, sizeof(struct iovec_c) * hdtr_c.hdr_cnt,
-		    reqperms, 1);
-		if (error)
-			goto out;
-		error = cheriabi_cap_to_ptr((caddr_t *)&trailers,
-		    hdtr_c.trailers, sizeof(struct iovec_c) * hdtr_c.trl_cnt,
-		    reqperms, 1);
-		if (error)
-			goto out;
 
-		if (headers != NULL) {
-			error = cheriabi_copyinuio(headers, hdtr_c.hdr_cnt,
-			    &hdr_uio);
+		if (hdtr_c.headers != NULL) {
+			error = cheriabi_copyinuio(hdtr_c.headers,
+			    hdtr_c.hdr_cnt, &hdr_uio);
 			if (error)
 				goto out;
 		}
-		if (trailers != NULL) {
-			error = cheriabi_copyinuio(trailers, hdtr_c.trl_cnt,
-			    &trl_uio);
+		if (hdtr_c.trailers != NULL) {
+			error = cheriabi_copyinuio(hdtr_c.trailers,
+			    hdtr_c.trl_cnt, &trl_uio);
 			if (error)
 				goto out;
 		}
@@ -1314,9 +1301,9 @@ cheriabi_sigwaitinfo(struct thread *td, struct cheriabi_sigwaitinfo_args *uap)
 int
 cheriabi_nmount(struct thread *td,
     struct cheriabi_nmount_args /* {
-    	struct iovec_c *iovp;
-    	unsigned int iovcnt;
-    	int flags;
+	struct iovec_c * __capability iovp;
+	unsigned int iovcnt;
+	int flags;
     } */ *uap)
 {
 	struct uio *auio;

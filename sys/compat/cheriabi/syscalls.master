@@ -297,10 +297,12 @@
 119	AUE_NULL	UNIMPL	resuba (BSD/OS 2.x)
 120	AUE_READV	STD	{ int cheriabi_readv(int fd, \
 				    _Inout_updates_(iovcnt) \
-				    struct iovec_c *iovp, u_int iovcnt); }
+				    struct iovec_c * __capability iovp, \
+				    u_int iovcnt); }
 121	AUE_WRITEV	STD	{ int cheriabi_writev(int fd, \
 				    _In_reads_opt_(iovcnt) \
-				    struct iovec_c *iovp, u_int iovcnt); }
+				    struct iovec_c * __capability iovp, \
+				    u_int iovcnt); }
 122	AUE_SETTIMEOFDAY	NOPROTO	{ int settimeofday( \
 				    _In_ const struct timeval *tv, \
 				    _In_opt_ const struct timezone *tzp); }
@@ -594,10 +596,11 @@
 ; 289 and 290 from NetBSD (OpenBSD: 267 and 268)
 289	AUE_PREADV	STD	{ ssize_t cheriabi_preadv(int fd, \
 				    _In_reads_(iovcnt) \
-				    struct iovec_c *iovp, \
+				    struct iovec_c * __capability iovp, \
 				    u_int iovcnt, off_t offset); }
 290	AUE_PWRITEV	STD	{ ssize_t cheriabi_pwritev(int fd, \
-				    _In_reads_(iovcnt) struct iovec_c *iovp, \
+				    _In_reads_(iovcnt) \
+				    struct iovec_c * __capability iovp, \
 				    u_int iovcnt, off_t offset); }
 291	AUE_NULL	UNIMPL	nosys
 292	AUE_NULL	UNIMPL	nosys
@@ -770,7 +773,8 @@
 376	AUE_EACCESS	NOPROTO	{ int eaccess(_In_z_ char *path, int amode); }
 377	AUE_NULL	UNIMPL	afs3_syscall
 378	AUE_NMOUNT	STD	{ int cheriabi_nmount( \
-				    _In_reads_(iovcnt) struct iovec_c *iovp, \
+				    _In_reads_(iovcnt) \
+				    struct iovec_c * __capability iovp, \
 				    unsigned int iovcnt, int flags); }
 379	AUE_NULL	OBSOL	kse_exit
 380	AUE_NULL	OBSOL	kse_wakeup
@@ -1102,11 +1106,11 @@
 ; 505 is initialised by the kgssapi code, if present.
 505	AUE_NULL	NOSTD|NOPROTO	{ int gssd_syscall( \
 				    _In_z_ const char *path); }
-506	AUE_JAIL_GET	STD	{ int cheriabi_jail_get( \
-				    _In_reads_(iovcnt) struct iovec_c *iovp, \
+506	AUE_JAIL_GET	STD	{ int cheriabi_jail_get(_In_reads_(iovcnt) \
+				    struct iovec_c * __capability iovp, \
 				    unsigned int iovcnt, int flags); }
-507	AUE_JAIL_SET	STD	{ int cheriabi_jail_set( \
-				    _In_reads_(iovcnt) struct iovec_c *iovp, \
+507	AUE_JAIL_SET	STD	{ int cheriabi_jail_set(_In_reads_(iovcnt) \
+				    struct iovec_c * __capability iovp, \
 				    unsigned int iovcnt, int flags); }
 508	AUE_JAIL_REMOVE	NOPROTO	{ int jail_remove(int jid); }
 509	AUE_CLOSEFROM	NOPROTO	{ int closefrom(int lowfd); }

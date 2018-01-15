@@ -1706,17 +1706,10 @@ CHERIABI_SYS_cheriabi_readv_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_readv_PTRMASK);
 	uap->iovcnt = cheri_getoffset(tmpcap);
 
-	/* [1] _Inout_updates_(iovcnt) struct iovec_c * iovp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD|CHERI_PERM_LOAD_CAP|CHERI_PERM_STORE|CHERI_PERM_STORE_CAP);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_readv_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->iovp),
-		    tmpcap, (sizeof(*uap->iovp) * uap->iovcnt), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [1] _Inout_updates_(iovcnt) struct iovec_c *__capability iovp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->iovp),
+	    1, CHERIABI_SYS_cheriabi_readv_PTRMASK);
 
 	return (0);
 }
@@ -1735,17 +1728,10 @@ CHERIABI_SYS_cheriabi_writev_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_writev_PTRMASK);
 	uap->iovcnt = cheri_getoffset(tmpcap);
 
-	/* [1] _In_reads_opt_(iovcnt) struct iovec_c * iovp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD|CHERI_PERM_LOAD_CAP);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_writev_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->iovp),
-		    tmpcap, (sizeof(*uap->iovp) * uap->iovcnt), reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
+	/* [1] _In_reads_opt_(iovcnt) struct iovec_c *__capability iovp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->iovp),
+	    1, CHERIABI_SYS_cheriabi_writev_PTRMASK);
 
 	return (0);
 }
@@ -3529,17 +3515,10 @@ CHERIABI_SYS_cheriabi_preadv_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_preadv_PTRMASK);
 	uap->offset = cheri_getoffset(tmpcap);
 
-	/* [1] _In_reads_(iovcnt) struct iovec_c * iovp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD|CHERI_PERM_LOAD_CAP);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_preadv_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->iovp),
-		    tmpcap, (sizeof(*uap->iovp) * uap->iovcnt), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [1] _In_reads_(iovcnt) struct iovec_c *__capability iovp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->iovp),
+	    1, CHERIABI_SYS_cheriabi_preadv_PTRMASK);
 
 	return (0);
 }
@@ -3562,17 +3541,10 @@ CHERIABI_SYS_cheriabi_pwritev_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_pwritev_PTRMASK);
 	uap->offset = cheri_getoffset(tmpcap);
 
-	/* [1] _In_reads_(iovcnt) struct iovec_c * iovp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD|CHERI_PERM_LOAD_CAP);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_pwritev_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->iovp),
-		    tmpcap, (sizeof(*uap->iovp) * uap->iovcnt), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [1] _In_reads_(iovcnt) struct iovec_c *__capability iovp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->iovp),
+	    1, CHERIABI_SYS_cheriabi_pwritev_PTRMASK);
 
 	return (0);
 }
@@ -5074,17 +5046,10 @@ CHERIABI_SYS_cheriabi_nmount_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_nmount_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [0] _In_reads_(iovcnt) struct iovec_c * iovp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD|CHERI_PERM_LOAD_CAP);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_nmount_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->iovp),
-		    tmpcap, (sizeof(*uap->iovp) * uap->iovcnt), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _In_reads_(iovcnt) struct iovec_c *__capability iovp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->iovp),
+	    0, CHERIABI_SYS_cheriabi_nmount_PTRMASK);
 
 	return (0);
 }
@@ -7954,17 +7919,10 @@ CHERIABI_SYS_cheriabi_jail_get_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_jail_get_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [0] _In_reads_(iovcnt) struct iovec_c * iovp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD|CHERI_PERM_LOAD_CAP);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_jail_get_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->iovp),
-		    tmpcap, (sizeof(*uap->iovp) * uap->iovcnt), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _In_reads_(iovcnt) struct iovec_c *__capability iovp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->iovp),
+	    0, CHERIABI_SYS_cheriabi_jail_get_PTRMASK);
 
 	return (0);
 }
@@ -7983,17 +7941,10 @@ CHERIABI_SYS_cheriabi_jail_set_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_jail_set_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [0] _In_reads_(iovcnt) struct iovec_c * iovp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD|CHERI_PERM_LOAD_CAP);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_jail_set_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->iovp),
-		    tmpcap, (sizeof(*uap->iovp) * uap->iovcnt), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _In_reads_(iovcnt) struct iovec_c *__capability iovp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->iovp),
+	    0, CHERIABI_SYS_cheriabi_jail_set_PTRMASK);
 
 	return (0);
 }
