@@ -33,20 +33,20 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 0;
 		break;
 	}
-	/* read */
+	/* cheriabi_read */
 	case 3: {
-		struct read_args *p = params;
+		struct cheriabi_read_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->buf; /* void * */
+		uarg[1] = (cheri_getbase(p->buf) + cheri_getoffset(p->buf)); /* void *__capability */
 		uarg[2] = p->nbyte; /* size_t */
 		*n_args = 3;
 		break;
 	}
-	/* write */
+	/* cheriabi_write */
 	case 4: {
-		struct write_args *p = params;
+		struct cheriabi_write_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->buf; /* const void * */
+		uarg[1] = (cheri_getbase(p->buf) + cheri_getoffset(p->buf)); /* const void *__capability */
 		uarg[2] = p->nbyte; /* size_t */
 		*n_args = 3;
 		break;
@@ -2367,21 +2367,21 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 7;
 		break;
 	}
-	/* pread */
+	/* cheriabi_pread */
 	case 475: {
-		struct pread_args *p = params;
+		struct cheriabi_pread_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->buf; /* void * */
+		uarg[1] = (cheri_getbase(p->buf) + cheri_getoffset(p->buf)); /* void *__capability */
 		uarg[2] = p->nbyte; /* size_t */
 		iarg[3] = p->offset; /* off_t */
 		*n_args = 4;
 		break;
 	}
-	/* pwrite */
+	/* cheriabi_pwrite */
 	case 476: {
-		struct pwrite_args *p = params;
+		struct cheriabi_pwrite_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->buf; /* const void * */
+		uarg[1] = (cheri_getbase(p->buf) + cheri_getoffset(p->buf)); /* const void *__capability */
 		uarg[2] = p->nbyte; /* size_t */
 		iarg[3] = p->offset; /* off_t */
 		*n_args = 4;
@@ -3145,14 +3145,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* fork */
 	case 2:
 		break;
-	/* read */
+	/* cheriabi_read */
 	case 3:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 2:
 			p = "size_t";
@@ -3161,14 +3161,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* write */
+	/* cheriabi_write */
 	case 4:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland const void *";
+			p = "userland const void *__capability";
 			break;
 		case 2:
 			p = "size_t";
@@ -6965,14 +6965,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* pread */
+	/* cheriabi_pread */
 	case 475:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 2:
 			p = "size_t";
@@ -6984,14 +6984,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* pwrite */
+	/* cheriabi_pwrite */
 	case 476:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland const void *";
+			p = "userland const void *__capability";
 			break;
 		case 2:
 			p = "size_t";
@@ -8314,12 +8314,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* fork */
 	case 2:
-	/* read */
+	/* cheriabi_read */
 	case 3:
 		if (ndx == 0 || ndx == 1)
 			p = "ssize_t";
 		break;
-	/* write */
+	/* cheriabi_write */
 	case 4:
 		if (ndx == 0 || ndx == 1)
 			p = "ssize_t";
@@ -9674,12 +9674,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* pread */
+	/* cheriabi_pread */
 	case 475:
 		if (ndx == 0 || ndx == 1)
 			p = "ssize_t";
 		break;
-	/* pwrite */
+	/* cheriabi_pwrite */
 	case 476:
 		if (ndx == 0 || ndx == 1)
 			p = "ssize_t";

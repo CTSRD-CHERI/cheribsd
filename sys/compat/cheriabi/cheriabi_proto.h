@@ -49,6 +49,16 @@ struct thread;
 struct cheriabi_syscall_args {
 	char number_l_[PADL_(int)]; int number; char number_r_[PADR_(int)];
 };
+struct cheriabi_read_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char buf_l_[PADL_(void *__capability)]; void *__capability buf; char buf_r_[PADR_(void *__capability)];
+	char nbyte_l_[PADL_(size_t)]; size_t nbyte; char nbyte_r_[PADR_(size_t)];
+};
+struct cheriabi_write_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char buf_l_[PADL_(const void *__capability)]; const void *__capability buf; char buf_r_[PADR_(const void *__capability)];
+	char nbyte_l_[PADL_(size_t)]; size_t nbyte; char nbyte_r_[PADR_(size_t)];
+};
 struct cheriabi_open_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
@@ -330,6 +340,18 @@ struct cheriabi_aio_fsync_args {
 	char op_l_[PADL_(int)]; int op; char op_r_[PADR_(int)];
 	char aiocbp_l_[PADL_(struct aiocb_c *__capability)]; struct aiocb_c *__capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c *__capability)];
 };
+struct cheriabi_pread_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char buf_l_[PADL_(void *__capability)]; void *__capability buf; char buf_r_[PADR_(void *__capability)];
+	char nbyte_l_[PADL_(size_t)]; size_t nbyte; char nbyte_r_[PADR_(size_t)];
+	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
+};
+struct cheriabi_pwrite_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char buf_l_[PADL_(const void *__capability)]; const void *__capability buf; char buf_r_[PADR_(const void *__capability)];
+	char nbyte_l_[PADL_(size_t)]; size_t nbyte; char nbyte_r_[PADR_(size_t)];
+	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
+};
 struct cheriabi_mmap_args {
 	char addr_l_[PADL_(void *)]; void * addr; char addr_r_[PADR_(void *)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
@@ -411,6 +433,8 @@ struct cheriabi_kevent_args {
 #define PAD64_REQUIRED
 #endif
 int	cheriabi_syscall(struct thread *, struct cheriabi_syscall_args *);
+int	cheriabi_read(struct thread *, struct cheriabi_read_args *);
+int	cheriabi_write(struct thread *, struct cheriabi_write_args *);
 int	cheriabi_open(struct thread *, struct cheriabi_open_args *);
 int	cheriabi_link(struct thread *, struct cheriabi_link_args *);
 int	cheriabi_unlink(struct thread *, struct cheriabi_unlink_args *);
@@ -474,6 +498,8 @@ int	cheriabi_sigqueue(struct thread *, struct cheriabi_sigqueue_args *);
 int	cheriabi_kmq_notify(struct thread *, struct cheriabi_kmq_notify_args *);
 int	cheriabi_abort2(struct thread *, struct cheriabi_abort2_args *);
 int	cheriabi_aio_fsync(struct thread *, struct cheriabi_aio_fsync_args *);
+int	cheriabi_pread(struct thread *, struct cheriabi_pread_args *);
+int	cheriabi_pwrite(struct thread *, struct cheriabi_pwrite_args *);
 int	cheriabi_mmap(struct thread *, struct cheriabi_mmap_args *);
 int	cheriabi_fexecve(struct thread *, struct cheriabi_fexecve_args *);
 int	cheriabi_linkat(struct thread *, struct cheriabi_linkat_args *);
@@ -542,6 +568,8 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #endif /* COMPAT_FREEBSD11 */
 
 #define	CHERIABI_SYS_AUE_cheriabi_syscall	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_read	AUE_READ
+#define	CHERIABI_SYS_AUE_cheriabi_write	AUE_WRITE
 #define	CHERIABI_SYS_AUE_cheriabi_open	AUE_OPEN_RWTC
 #define	CHERIABI_SYS_AUE_cheriabi_link	AUE_LINK
 #define	CHERIABI_SYS_AUE_cheriabi_unlink	AUE_UNLINK
@@ -605,6 +633,8 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_kmq_notify	AUE_MQ_NOTIFY
 #define	CHERIABI_SYS_AUE_cheriabi_abort2	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_aio_fsync	AUE_AIO_FSYNC
+#define	CHERIABI_SYS_AUE_cheriabi_pread	AUE_PREAD
+#define	CHERIABI_SYS_AUE_cheriabi_pwrite	AUE_PWRITE
 #define	CHERIABI_SYS_AUE_cheriabi_mmap	AUE_MMAP
 #define	CHERIABI_SYS_AUE_cheriabi_fexecve	AUE_FEXECVE
 #define	CHERIABI_SYS_AUE_cheriabi_linkat	AUE_LINKAT

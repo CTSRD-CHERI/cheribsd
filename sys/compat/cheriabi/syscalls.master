@@ -70,11 +70,13 @@
 1	AUE_EXIT	NOPROTO|NOSTUB	{ void sys_exit(int rval); } exit \
 				    sys_exit_args void
 2	AUE_FORK	NOPROTO	{ int fork(void); }
-3	AUE_READ	NOPROTO	{ ssize_t read(int fd, \
-				    _Out_writes_bytes_(nbyte) void *buf, \
+3	AUE_READ	STD	{ ssize_t cheriabi_read(int fd, \
+				    _Out_writes_bytes_(nbyte) \
+				    void * __capability buf, \
 				    size_t nbyte); }
-4	AUE_WRITE	NOPROTO	{ ssize_t write(int fd, \
-				    _In_reads_bytes_(nbyte) const void *buf, \
+4	AUE_WRITE	STD	{ ssize_t cheriabi_write(int fd, \
+				    _In_reads_bytes_(nbyte) \
+				    const void * __capability buf, \
 				    size_t nbyte); }
 5	AUE_OPEN_RWTC	STD|VARARG	{ int cheriabi_open( \
 				    _In_z_ const char * __capability path, \
@@ -1024,13 +1026,14 @@
 				    _Out_ __socklen_t *fromlenaddr, \
 				    _In_opt_ struct sctp_sndrcvinfo *sinfo, \
 				    _Out_opt_ int *msg_flags); }
-475	AUE_PREAD	NOPROTO	{ ssize_t pread(int fd, \
-				    _Out_writes_bytes_(nbyte) void *buf, \
-				    size_t nbyte, off_t offset); }
-476	AUE_PWRITE	NOPROTO	{ ssize_t pwrite(int fd, \
+475	AUE_PREAD	STD	{ ssize_t cheriabi_pread(int fd, \
 				    _Out_writes_bytes_(nbyte) \
-				    const void *buf, size_t nbyte, \
-				    off_t offset); }
+				    void * __capability buf, \
+				    size_t nbyte, off_t offset); }
+476	AUE_PWRITE	STD	{ ssize_t cheriabi_pwrite(int fd, \
+				    _Out_writes_bytes_(nbyte) \
+				    const void * __capability buf, \
+				    size_t nbyte, off_t offset); }
 ; XXX: A more complex set of checks on addr is required.  We do that in
 ; cheriabi_mmap().
 477	AUE_MMAP	STD { void *cheriabi_mmap( \

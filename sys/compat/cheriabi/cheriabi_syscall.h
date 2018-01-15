@@ -8,8 +8,8 @@
 #define	CHERIABI_SYS_cheriabi_syscall	0
 #define	CHERIABI_SYS_exit	1
 #define	CHERIABI_SYS_fork	2
-#define	CHERIABI_SYS_read	3
-#define	CHERIABI_SYS_write	4
+#define	CHERIABI_SYS_cheriabi_read	3
+#define	CHERIABI_SYS_cheriabi_write	4
 #define	CHERIABI_SYS_cheriabi_open	5
 #define	CHERIABI_SYS_close	6
 #define	CHERIABI_SYS_wait4	7
@@ -394,8 +394,8 @@
 #define	CHERIABI_SYS_sctp_generic_sendmsg	472
 #define	CHERIABI_SYS_sctp_generic_sendmsg_iov	473
 #define	CHERIABI_SYS_sctp_generic_recvmsg	474
-#define	CHERIABI_SYS_pread	475
-#define	CHERIABI_SYS_pwrite	476
+#define	CHERIABI_SYS_cheriabi_pread	475
+#define	CHERIABI_SYS_cheriabi_pwrite	476
 #define	CHERIABI_SYS_cheriabi_mmap	477
 #define	CHERIABI_SYS_lseek	478
 #define	CHERIABI_SYS_truncate	479

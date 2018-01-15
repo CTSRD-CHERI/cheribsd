@@ -5,8 +5,8 @@ MIASM =  \
 	cheriabi_syscall.o \
 	exit.o \
 	fork.o \
-	read.o \
-	write.o \
+	cheriabi_read.o \
+	cheriabi_write.o \
 	cheriabi_open.o \
 	close.o \
 	wait4.o \
@@ -285,8 +285,8 @@ MIASM =  \
 	sctp_generic_sendmsg.o \
 	sctp_generic_sendmsg_iov.o \
 	sctp_generic_recvmsg.o \
-	pread.o \
-	pwrite.o \
+	cheriabi_pread.o \
+	cheriabi_pwrite.o \
 	cheriabi_mmap.o \
 	lseek.o \
 	truncate.o \
