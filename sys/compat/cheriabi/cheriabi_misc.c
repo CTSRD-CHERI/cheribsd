@@ -887,11 +887,27 @@ cheriabi_jail_set(struct thread *td, struct cheriabi_jail_set_args *uap)
 	return (error);
 }
 
+static int
+cheriabi_updateiov(const struct uio * uiop, struct iovec_c * __capability iovp)
+{
+	int i, error;
+
+	for (i = 0; i < uiop->uio_iovcnt; i++) {
+		error = copyout_c(
+		    (__cheri_tocap size_t * __capability)
+		    &uiop->uio_iov[i].iov_len, &iovp[i].iov_len,
+		    sizeof(uiop->uio_iov[i].iov_len));
+		if (error != 0)
+			return (error);
+	}
+	return (0);
+}
+
 int
 cheriabi_jail_get(struct thread *td, struct cheriabi_jail_get_args *uap)
 {
 	struct uio *auio;
-	int error, i;
+	int error;
 
 	/* Check that we have an even number of iovecs. */
 	if (uap->iovcnt & 1)
@@ -902,21 +918,7 @@ cheriabi_jail_get(struct thread *td, struct cheriabi_jail_get_args *uap)
 		return (error);
 	error = kern_jail_get(td, auio, uap->flags);
 	if (error == 0)
-		for (i = 0; i < uap->iovcnt; i++) {
-			/*
-			 * Copyout the length of data previously copied
-			 * to userspace by kern_jail_get.  Do not touch the
-			 * capabilities as we have no way to reconstruct
-			 * the correct values short of pulling them from
-			 * userspace again.
-			 */
-			error = copyout(&auio->uio_iov[i].iov_len,
-			    ((char *)uap->iovp + i) +
-			     offsetof(struct iovec_c, iov_len),
-			    sizeof(auio->uio_iov[i].iov_len));
-			if (error != 0)
-				break;
-		}
+		error = cheriabi_updateiov(auio, uap->iovp);
 	free(auio, M_IOV);
 	return (error);
 }
