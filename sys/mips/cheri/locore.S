@@ -226,15 +226,18 @@ restrict_pcc:
 	cjalr	$c12, $c17
 	nop
 
-	/* XXX-AM what is this thing doing?
-	* probably relies on some special positioning of struct pcb
-	* for thread0
+	/*
+	 * thread0 set thread0 kstack to the bottom of the stack
+	 * page, realign thread0 kstack and start using it.
 	*/
+	cgetdefault	CHERI_REG_KDC
 	PTR_LA	sp, _C_LABEL(thread0_st)
-	PTR_L	a0, TD_PCB(sp)
+	clc	CHERI_REG_STC, sp, TD_KSTACK(CHERI_REG_KDC)
+	cgetlen	a0, CHERI_REG_STC
 	REG_LI	t0, ~7
 	and	a0, a0, t0
-	PTR_SUBU	sp, a0, CALLFRAME_SIZ
+	PTR_SUBU	a0, a0, CALLFRAME_SIZ
+	csetoffset	CHERI_REG_STC, CHERI_REG_STC, a0
 	
 	PTR_LA	t0, _C_LABEL(mi_startup)
 	cgetpccsetoffset $c12, t0
