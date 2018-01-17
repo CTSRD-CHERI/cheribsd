@@ -429,7 +429,7 @@ vm_page_domain_init(struct vm_domain *vmd)
 vm_offset_t
 vm_page_startup(vm_offset_t vaddr)
 {
-	vm_offset_t mapped;
+	vm_ptr_t mapped;
 	vm_paddr_t high_avail, low_avail, page_range, size;
 	vm_paddr_t new_end;
 	int i;

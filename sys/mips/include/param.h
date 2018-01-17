@@ -145,7 +145,11 @@
 #endif
 
 #ifdef __mips_n64
+#ifndef CHERI_KERNEL
 #define	NPDEPGSHIFT		9               /* LOG2(NPTEPG) */
+#else /* CHERI_KERNEL */
+#define NPDEPGSHIFT		7		/* LOG2(NPDEPG) */
+#endif
 #define	SEGSHIFT		(PAGE_SHIFT + NPTEPGSHIFT + NPDEPGSHIFT)
 #define	NBSEG			(1ul << SEGSHIFT)
 #define	PDRSHIFT		(PAGE_SHIFT + NPTEPGSHIFT)

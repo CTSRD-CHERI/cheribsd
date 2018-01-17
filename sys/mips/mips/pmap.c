@@ -903,15 +903,39 @@ pmap_kremove(vm_offset_t va)
  *	region.
  *
  *	Use XKPHYS for 64 bit, and KSEG0 where possible for 32 bit.
+ *
+ * XXX-AM: It is a good idea to expand prot to be more precise in the type of
+ * permissions the memory mapping should have to make full use of the granularity
+ * of permissions in CHERI.
+ * If kernel pointers are marked as LOCAL, a VM_PROT_KERN for kernel-only mappings may be useful.
+ * VM_PROT_READ/WRITE_PTR for capability access restrictions may also be useful.
+ * Being able to have a different CCALL and EXECUTE permissions may also be useful.
  */
-vm_offset_t
+vm_ptr_t
 pmap_map(vm_offset_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
 {
 	vm_offset_t va;
 	vm_ptr_t sva;
 
-	if (MIPS_DIRECT_MAPPABLE(end - 1))
-		return ((vm_offset_t)MIPS_PHYS_TO_DIRECT(start));
+	if (MIPS_DIRECT_MAPPABLE(end - 1)) {
+#ifndef CHERI_KERNEL
+		return (MIPS_PHYS_TO_DIRECT(start));
+#else /* CHERI_KERNEL */
+		sva = MIPS_PHYS_TO_DIRECT(start);
+		sva = cheri_csetbounds(sva, end - start);
+		if (!(prot & VM_PROT_READ))
+		  sva = cheri_andperm(sva,
+			 ~(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP));
+		if (!(prot & VM_PROT_WRITE))
+		  sva = cheri_andperm(sva,
+			~(CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
+			  CHERI_PERM_STORE_LOCAL_CAP));
+		if (!(prot & VM_PROT_EXECUTE))
+		  sva = cheri_andperm(sva,
+			~(CHERI_PERM_EXECUTE | CHERI_PERM_CCALL));
+		return sva;
+#endif
+	}
 
 	va = sva = *virt;
 	while (start < end) {
