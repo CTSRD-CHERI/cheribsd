@@ -1,7 +1,10 @@
-/*	$NetBSD: fabs.c,v 1.2 2002/05/26 11:48:01 wiz Exp $	*/
-
-/*
- * Copyright (c) 1996 Mark Brinicombe
+/*-
+ * Copyright (c) 2017 SRI International
+ * All rights reserved.
+ *
+ * This software was developed by SRI International and the University of
+ * Cambridge Computer Laboratory under DARPA/AFRL contract FA8750-10-C-0237
+ * ("CTSRD"), as part of the DARPA CRASH research programme.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -11,12 +14,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Mark Brinicombe
- * 4. Neither the name of the University nor the names of its contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -31,15 +28,30 @@
  * SUCH DAMAGE.
  */
 
-/*
- * fabs(x) returns the absolute value of x.
- */
+#ifndef _COMPAT_CHERIABI_IPC_SEM_H_
+#define	_COMPAT_CHERIABI_IPC_SEM_H_
+
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
+#include <sys/_types.h>
+#include <sys/ipc.h>
 
-double
-fabs(double x)
-{
+struct semid_ds_c {
+	struct ipc_perm	 		sem_perm;
+	struct sem * __capability	sem_base;
+	unsigned short			sem_nsems;
+	time_t				sem_otime;
+	time_t				sem_ctime;
+};
 
-	return (__builtin_fabs(x));
-}
+#ifdef _KERNEL
+struct semid_kernel_c {
+	/* Data structure exposed to user space. */
+	struct semid_ds_c		 u;
+
+	/* Kernel-private components of the semaphore. */
+	struct label * __capability	label;
+	struct ucred * __capability	cred;
+};
+#endif /* _KERNEL */
+
+#endif /* _COMPAT_CHERIABI_IPC_SEM_H_ */

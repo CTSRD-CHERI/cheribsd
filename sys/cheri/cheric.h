@@ -205,7 +205,8 @@ cheri_bytes_remaining(const void * __capability cap)
 
 
 #define CHERI_PRINT_PTR(ptr)						\
-	printf("%s: " #ptr " b:%016jx l:%016zx o:%jx\n", __func__,	\
+	printf("%s: " #ptr " v:%lu b:%016jx l:%016zx o:%jx\n", __func__, \
+	    cheri_gettag((const void * __capability)(ptr)),	        \
 	   cheri_getbase((const void * __capability)(ptr)),		\
 	   cheri_getlen((const void * __capability)(ptr)),		\
 	   cheri_getoffset((const void * __capability)(ptr)))

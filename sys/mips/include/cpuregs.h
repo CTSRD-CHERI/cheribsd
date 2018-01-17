@@ -790,6 +790,14 @@ extern caddr_t cheri_kall_capability;
 #define	MIPS_HWRENA_CCRES	(1<<3)	/* Cycle counter resolution */
 /* BERI specific statcounters */
 #if defined(CPU_BERI)
+/*
+ * XXXAR: the first three don't use the selector field so waste opcode space.
+ * We should probably move them further back and use the selector. This would
+ * also simplify the QEMU implementation since MIPSR6 uses rdhwr 4 and 5
+ */
+#define	MIPS_HWRENA_BERI_ICOUNT_STATCOUNTERS	(1<<4)	/* instruction count */
+#define	MIPS_HWRENA_BERI_ITLB_MISS_STATCOUNTERS	(1<<5)	/* itlb misses */
+#define	MIPS_HWRENA_BERI_DTLB_MISS_STATCOUNTERS	(1<<6)	/* dtlb misses */
 #define	MIPS_HWRENA_BERI_RESET_STATCOUNTERS	(1<<7)	/* counters reseting */
 #define	MIPS_HWRENA_BERI_ICACHE_STATCOUNTERS	(1<<8)	/* ICACHE counters */
 #define	MIPS_HWRENA_BERI_DCACHE_STATCOUNTERS	(1<<9)	/* DCACHE counters */
@@ -800,7 +808,10 @@ extern caddr_t cheri_kall_capability;
 #define	MIPS_HWRENA_BERI_TAGMASTER_STATCOUNTERS	(1<<14)	/* tag cache counters */
 /* mask of all statcounters */
 #define	MIPS_HWRENA_BERI_STATCOUNTERS_MASK		\
-	(MIPS_HWRENA_BERI_RESET_STATCOUNTERS |		\
+	(MIPS_HWRENA_BERI_ICOUNT_STATCOUNTERS |		\
+	 MIPS_HWRENA_BERI_ITLB_MISS_STATCOUNTERS |	\
+	 MIPS_HWRENA_BERI_DTLB_MISS_STATCOUNTERS |	\
+	 MIPS_HWRENA_BERI_RESET_STATCOUNTERS |		\
 	 MIPS_HWRENA_BERI_ICACHE_STATCOUNTERS |		\
 	 MIPS_HWRENA_BERI_DCACHE_STATCOUNTERS |		\
 	 MIPS_HWRENA_BERI_L2CACHE_STATCOUNTERS |	\

@@ -151,6 +151,22 @@ static void	*get_args(struct procstat_core *core, vm_offset_t psstrings,
     enum psc_type type, void *buf, size_t *lenp);
 static void	*get_auxv(struct procstat_core *core, void *buf, size_t *lenp);
 
+static bool
+core_is_cheri128(struct procstat_core *core)
+{
+
+	return ((core->pc_ehdr.e_flags & (EF_MIPS_ABI | EF_MIPS_MACH)) ==
+	    (EF_MIPS_ABI_CHERIABI | EF_MIPS_MACH_CHERI128));
+}
+
+static bool
+core_is_cheri256(struct procstat_core *core)
+{
+
+	return ((core->pc_ehdr.e_flags & (EF_MIPS_ABI | EF_MIPS_MACH)) ==
+	    (EF_MIPS_ABI_CHERIABI | EF_MIPS_MACH_CHERI256));
+}
+
 struct procstat_core *
 procstat_core_open(const char *filename)
 {
@@ -416,51 +432,39 @@ core_read_ps_strings(struct procstat_core *core, vm_offset_t psstrings,
 
 	assert(type == PSC_TYPE_ARGV || type == PSC_TYPE_ENVV);
 
-	switch(core->pc_ehdr.e_machine) {
-	case EM_MIPS_CHERI128:
-		{
-			cap128_ps_strings_t pss;
+	if (core_is_cheri128(core)) {
+		cap128_ps_strings_t pss;
 
-			if (core_read_mem(core, &pss, sizeof(pss), psstrings,
-			    true) == -1)
-				return ((vm_offset_t)0);
-			nargstr = pss.ps_nargvstr;
-			nenvstr = pss.ps_nenvstr;
-			argaddr = (vm_offset_t)pss.ps_argvstr.cursor;
-			envaddr = (vm_offset_t)pss.ps_envstr.cursor;
-			*size = sizeof(cap128_t);
-		}
-		break;
+		if (core_read_mem(core, &pss, sizeof(pss), psstrings, true) ==
+		    -1)
+			return ((vm_offset_t)0);
+		nargstr = pss.ps_nargvstr;
+		nenvstr = pss.ps_nenvstr;
+		argaddr = (vm_offset_t)pss.ps_argvstr.cursor;
+		envaddr = (vm_offset_t)pss.ps_envstr.cursor;
+		*size = sizeof(cap128_t);
+	} else if (core_is_cheri256(core)) {
+		cap256_ps_strings_t pss;
 
-	case EM_MIPS_CHERI:
-		{
-			cap256_ps_strings_t pss;
+		if (core_read_mem(core, &pss, sizeof(pss), psstrings, true) ==
+		    -1)
+			return ((vm_offset_t)0);
+		nargstr = pss.ps_nargvstr;
+		nenvstr = pss.ps_nenvstr;
+		argaddr = (vm_offset_t)pss.ps_argvstr.cursor;
+		envaddr = (vm_offset_t)pss.ps_envstr.cursor;
+		*size = sizeof(cap256_t);
+	} else {
+		struct ps_strings pss;
 
-			if (core_read_mem(core, &pss, sizeof(pss), psstrings,
-			    true) == -1)
-				return ((vm_offset_t)0);
-			nargstr = pss.ps_nargvstr;
-			nenvstr = pss.ps_nenvstr;
-			argaddr = (vm_offset_t)pss.ps_argvstr.cursor;
-			envaddr = (vm_offset_t)pss.ps_envstr.cursor;
-			*size = sizeof(cap256_t);
-		}
-		break;
-
-	default:
-		{
-			struct ps_strings pss;
-
-			if (core_read_mem(core, &pss, sizeof(pss), psstrings,
-			    true) == -1)
-				return ((vm_offset_t)0);
-			nargstr = pss.ps_nargvstr;
-			nenvstr = pss.ps_nenvstr;
-			argaddr = (vm_offset_t)pss.ps_argvstr;
-			envaddr = (vm_offset_t)pss.ps_envstr;
-			*size = sizeof(char *);
-		}
-		break;
+		if (core_read_mem(core, &pss, sizeof(pss), psstrings, true) ==
+		    -1)
+			return ((vm_offset_t)0);
+		nargstr = pss.ps_nargvstr;
+		nenvstr = pss.ps_nenvstr;
+		argaddr = (vm_offset_t)pss.ps_argvstr;
+		envaddr = (vm_offset_t)pss.ps_envstr;
+		*size = sizeof(char *);
 	}
 
 	if (type == PSC_TYPE_ARGV) {
@@ -476,24 +480,16 @@ static inline vm_offset_t
 core_image_off(struct procstat_core *core, char **ptr, int i)
 {
 
-	switch(core->pc_ehdr.e_machine) {
-	case EM_MIPS_CHERI128:
-		{
-			cap128_t *cap = (cap128_t *)(ptr + (i * sizeof(cap128_t) / 8));
+	if (core_is_cheri128(core)) {
+		cap128_t *cap = (cap128_t *)(ptr + (i * sizeof(cap128_t) / 8));
 
-			return (cap->cursor);
-		}
+		return (cap->cursor);
+	} else if (core_is_cheri256(core)) {
+		cap256_t *cap = (cap256_t *)(ptr + (i * sizeof(cap256_t) / 8));
 
-	case EM_MIPS_CHERI:
-		{
-			cap256_t *cap = (cap256_t *)(ptr + (i * sizeof(cap256_t) / 8));
-
-			return (cap->cursor);
-		}
-
-	default:
+		return (cap->cursor);
+	} else
 		return ((vm_offset_t)ptr[i]);
-	}
 }
 
 #define ARGS_CHUNK_SZ	256	/* Chunk size (bytes) for get_args operations. */
@@ -596,60 +592,49 @@ get_auxv(struct procstat_core *core, void *auxv, size_t *lenp)
 	Elf_Auxinfo *buf;
 	unsigned count, i;
 
-	switch(core->pc_ehdr.e_machine) {
-	case EM_MIPS_CHERI128:
-		{
-			ElfCheriABI128_Auxinfo *auxv_cheri =
-			    (ElfCheriABI128_Auxinfo *)auxv;
+	if (core_is_cheri128(core)) {
+		ElfCheriABI128_Auxinfo *auxv_cheri = auxv;
 
-			count = *lenp / sizeof(ElfCheriABI128_Auxinfo);
-			*lenp = count * sizeof(Elf_Auxinfo);
-			buf = (Elf_Auxinfo *)malloc(*lenp);
-			if (buf == NULL) {
-				free(auxv);
-				*lenp = 0;
-				return (NULL);
-			}
-			for (i = 0; i < count; i++) {
-				buf[i].a_type = auxv_cheri[i].a_type;
-				if (is_auxv_ptr(auxv_cheri[i].a_type))
-					buf[i].a_un.a_ptr = (void *)(uintptr_t)
-					    auxv_cheri[i].a_un.a_ptr.cursor;
-				else
-					buf[i].a_un.a_val =
-					    auxv_cheri[i].a_un.a_val;
-			}
+		count = *lenp / sizeof(ElfCheriABI128_Auxinfo);
+		*lenp = count * sizeof(Elf_Auxinfo);
+		buf = (Elf_Auxinfo *)malloc(*lenp);
+		if (buf == NULL) {
 			free(auxv);
-			return ((void *)buf);
+			*lenp = 0;
+			return (NULL);
 		}
+		for (i = 0; i < count; i++) {
+			buf[i].a_type = auxv_cheri[i].a_type;
+			if (is_auxv_ptr(auxv_cheri[i].a_type))
+				buf[i].a_un.a_ptr = (void *)(uintptr_t)
+				    auxv_cheri[i].a_un.a_ptr.cursor;
+			else
+				buf[i].a_un.a_val = auxv_cheri[i].a_un.a_val;
+		}
+		free(auxv);
+		return ((void *)buf);
+	} else if (core_is_cheri256(core)) {
+		ElfCheriABI256_Auxinfo *auxv_cheri = auxv;
 
-	case EM_MIPS_CHERI:
-		{
-			ElfCheriABI256_Auxinfo *auxv_cheri =
-			    (ElfCheriABI256_Auxinfo *)auxv;
-
-			count = *lenp / sizeof(ElfCheriABI256_Auxinfo);
-			*lenp = count * sizeof(Elf_Auxinfo);
-			buf = (Elf_Auxinfo *)malloc(*lenp);
-			if (buf == NULL) {
-				free(auxv);
-				*lenp = 0;
-				return (NULL);
-			}
-			for (i = 0; i < count; i++) {
-				buf[i].a_type = auxv_cheri[i].a_type;
-				if (is_auxv_ptr(auxv_cheri[i].a_type))
-					buf[i].a_un.a_ptr = (void *)(uintptr_t)
-					    auxv_cheri[i].a_un.a_ptr.cursor;
-				else
-					buf[i].a_un.a_val =
-					    auxv_cheri[i].a_un.a_val;
-			}
+		count = *lenp / sizeof(ElfCheriABI256_Auxinfo);
+		*lenp = count * sizeof(Elf_Auxinfo);
+		buf = (Elf_Auxinfo *)malloc(*lenp);
+		if (buf == NULL) {
 			free(auxv);
-			return ((void *)buf);
+			*lenp = 0;
+			return (NULL);
 		}
-
-	default:
+		for (i = 0; i < count; i++) {
+			buf[i].a_type = auxv_cheri[i].a_type;
+			if (is_auxv_ptr(auxv_cheri[i].a_type))
+				buf[i].a_un.a_ptr = (void *)(uintptr_t)
+				    auxv_cheri[i].a_un.a_ptr.cursor;
+			else
+				buf[i].a_un.a_val = auxv_cheri[i].a_un.a_val;
+		}
+		free(auxv);
+		return ((void *)buf);
+	} else {
 		/* Nothing needs to be done so just pass the buffer back. */
 		return (auxv);
 	}

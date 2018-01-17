@@ -438,6 +438,18 @@ cheriabi_kevent_copyout(void *arg, struct kevent *kevp, int count)
 	return (error);
 }
 
+void *
+cheriabi_build_kevent_udata(__intcap_t ident, void * __capability udata)
+{
+	void * __capability * newudata;
+
+	newudata = malloc(2*sizeof(void * __capability), M_KQUEUE, M_WAITOK);
+	newudata[0] = (void * __capability)ident;
+	newudata[1] = udata;
+
+	return (newudata);
+}
+
 /*
  * Copy 'count' items from the list pointed to by uap->changelist.
  */
@@ -485,12 +497,8 @@ cheriabi_kevent_copyin(void *arg, struct kevent *kevp, int count)
 		 * We stash the real ident and udata capabilities in
 		 * a malloced array in udata.
 		 */
-		void * __capability * udata;
-		udata = malloc(2*sizeof(void * __capability), M_KQUEUE,
-		    M_WAITOK);
-		kevp[i].udata = udata;
-		udata[0] = (void * __capability)ks_c[i].ident;
-		udata[1] = ks_c[i].udata;
+		kevp[i].udata = cheriabi_build_kevent_udata(ks_c[i].ident,
+		    ks_c[i].udata);
 	}
 done:
 	return (error);
@@ -1154,11 +1162,13 @@ int cheriabi_ktimer_create(struct thread *td,
 			return (error);
 	}
 	error = kern_ktimer_create(td, uap->clock_id, evp, &id, -1);
-	if (error == 0) {
-		error = copyout(&id, uap->timerid, sizeof(int));
-		if (error != 0)
-			kern_ktimer_delete(td, id);
+	if (error != 0 && evp != NULL) {
+		cheriabi_free_sival(&evp->sigev_value);
+		return (error);
 	}
+	error = copyout(&id, uap->timerid, sizeof(int));
+	if (error != 0)
+		kern_ktimer_delete(td, id);
 	return (error);
 }
 
@@ -1733,6 +1743,20 @@ convert_sigevent_c(struct sigevent_c *sig_c, struct sigevent *sig)
 		return (EINVAL);
 	}
 	return (0);
+}
+
+void * __capability
+cheriabi_extract_sival(union sigval *sival)
+{
+
+	return (*((void * __capability *)sival->sival_ptr));
+}
+
+void
+cheriabi_free_sival(union sigval *sival)
+{
+
+	free(sival->sival_ptr, M_TEMP);
 }
 
 #define	AUXARGS_ENTRY_CAP(pos, id, base, offset, len, perm)		\
