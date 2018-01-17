@@ -1532,6 +1532,7 @@ print_cmsgs(FILE *fp, pid_t pid, bool receive, struct msghdr *msghdr)
 			break;
 		}
 		fputs("}", fp);
+		first = false;
 	}
 	fputs("}", fp);
 	free(cmsgbuf);
