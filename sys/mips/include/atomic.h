@@ -1009,7 +1009,7 @@ atomic_thread_fence_seq_cst(void)
 
 #endif /* __mips_n64 */
 
-#ifndef __CHERI_PURE_CAPABILITY__
+#ifndef CHERI_KERNEL
 /* Operations on pointers. */
 #define	atomic_set_ptr		atomic_set_long
 #define	atomic_set_acq_ptr	atomic_set_acq_long
@@ -1032,8 +1032,7 @@ atomic_thread_fence_seq_cst(void)
 #define	atomic_load_acq_ptr	atomic_load_acq_long
 #define	atomic_store_rel_ptr	atomic_store_rel_long
 #define	atomic_readandclear_ptr	atomic_readandclear_long
-#else /* __CHERI_PURE_CAPABILITY__ */
-// XXXAM TODO pointer atomics
+#else /* CHERI_KERNEL */
 #define	atomic_set_ptr		atomic_set_long
 #define	atomic_set_acq_ptr	atomic_set_acq_long
 #define	atomic_set_rel_ptr	atomic_set_rel_long
@@ -1055,6 +1054,6 @@ atomic_thread_fence_seq_cst(void)
 #define	atomic_load_acq_ptr	atomic_load_acq_long
 #define	atomic_store_rel_ptr	atomic_store_rel_long
 #define	atomic_readandclear_ptr	atomic_readandclear_long
-#endif /* __CHERI_PURE_CAPABILITY__ */
+#endif /* CHERI_KERNEL */
 
 #endif /* ! _MACHINE_ATOMIC_H_ */
