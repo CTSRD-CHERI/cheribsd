@@ -33,7 +33,52 @@
 #ifndef _SYS_CDEFS_H_
 #error this file needs sys/cdefs.h as a prerequisite
 #endif
-#include <stdatomic.h>
+//#include <stdatomic.h>
+
+/* XXX-AM: defines similar to what stdatomic provides */
+#define atomic_thread_fence(order) __c11_atomic_thread_fence(order)
+#define atomic_store(object, desired)			\
+  __c11_atomic_store(object, desired, __ATOMIC_SEQ_CST)
+#define atomic_store_explicit __c11_atomic_store
+
+#define atomic_load(object) __c11_atomic_load(object, __ATOMIC_SEQ_CST)
+#define atomic_load_explicit __c11_atomic_load
+
+#define atomic_exchange(object, desired)			\
+	__c11_atomic_exchange(object, desired, __ATOMIC_SEQ_CST)
+#define atomic_exchange_explicit __c11_atomic_exchange
+
+#define atomic_compare_exchange_strong(object, expected, desired)	\
+  __c11_atomic_compare_exchange_strong(object, expected, desired,	\
+				       __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
+#define atomic_compare_exchange_strong_explicit \
+  __c11_atomic_compare_exchange_strong
+
+#define atomic_compare_exchange_weak(object, expected, desired)		\
+  __c11_atomic_compare_exchange_weak(object, expected, desired,		\
+				     __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
+#define atomic_compare_exchange_weak_explicit	\
+  __c11_atomic_compare_exchange_weak
+
+#define atomic_fetch_add(object, operand)			\
+  __c11_atomic_fetch_add(object, operand, __ATOMIC_SEQ_CST)
+#define atomic_fetch_add_explicit __c11_atomic_fetch_add
+
+#define atomic_fetch_sub(object, operand)			\
+  __c11_atomic_fetch_sub(object, operand, __ATOMIC_SEQ_CST)
+#define atomic_fetch_sub_explicit __c11_atomic_fetch_sub
+
+#define atomic_fetch_or(object, operand)			\
+  __c11_atomic_fetch_or(object, operand, __ATOMIC_SEQ_CST)
+#define atomic_fetch_or_explicit __c11_atomic_fetch_or
+
+#define atomic_fetch_xor(object, operand)			\
+  __c11_atomic_fetch_xor(object, operand, __ATOMIC_SEQ_CST)
+#define atomic_fetch_xor_explicit __c11_atomic_fetch_xor
+
+#define atomic_fetch_and(object, operand)			\
+  __c11_atomic_fetch_and(object, operand, __ATOMIC_SEQ_CST)
+#define atomic_fetch_and_explicit __c11_atomic_fetch_and
 
 /*
  * Note: All the 64-bit atomic operations are only atomic when running
@@ -68,141 +113,109 @@ mips_sync(void)
  * of interrupts and SMP safe.
  */
 
-void atomic_set_8(__volatile uint8_t *, uint8_t);
-void atomic_clear_8(__volatile uint8_t *, uint8_t);
-void atomic_add_8(__volatile uint8_t *, uint8_t);
-void atomic_subtract_8(__volatile uint8_t *, uint8_t);
-
-void atomic_set_16(__volatile uint16_t *, uint16_t);
-void atomic_clear_16(__volatile uint16_t *, uint16_t);
-void atomic_add_16(__volatile uint16_t *, uint16_t);
-void atomic_subtract_16(__volatile uint16_t *, uint16_t);
-
-/* Work around https://github.com/CTSRD-CHERI/qemu/issues/4 */
-#define QEMU_TLB_WORKAROUND32(register) \
-	"clw $zero, $zero, 0(" register ")\n\t"
-#define QEMU_TLB_WORKAROUND64(register) \
-	"cld $zero, $zero, 0(" register ")\n\t"
-
-
-static __inline void
-atomic_set_32(__volatile uint32_t *p, uint32_t v)
-{
-	_Atomic(uint32_t) *ptr = (_Atomic(uint32_t)*)p;
-	uint32_t expected = atomic_load(ptr), desired;
-	do {
-		desired = expected | v;
-	} while (!(atomic_compare_exchange_weak(ptr, &expected, desired)));
+#define ATOMIC_SET(WIDTH, TYPE)						\
+static __inline  void							\
+atomic_set_##WIDTH(__volatile TYPE *p, TYPE v)				\
+{									\
+	__volatile _Atomic(TYPE) *ptr = (__volatile _Atomic(TYPE)*)p;	\
+	TYPE expected = atomic_load(ptr), desired;			\
+	do {								\
+		desired = expected | v;					\
+	} while (!(atomic_compare_exchange_weak(ptr, &expected, desired))); \
 }
 
-static __inline void
-atomic_clear_32(__volatile uint32_t *p, uint32_t v)
-{
-	_Atomic(uint32_t) *ptr = (_Atomic(uint32_t)*)p;
-	uint32_t expected = atomic_load(ptr), desired;
-
-	do {
-		desired = expected & ~v;
-	} while (!atomic_compare_exchange_weak(ptr, &expected, desired));
+#define ATOMIC_CLEAR(WIDTH, TYPE)					\
+static __inline void							\
+atomic_clear_##WIDTH(__volatile TYPE *p, TYPE v)			\
+{									\
+	__volatile _Atomic(TYPE) *ptr = (__volatile _Atomic(TYPE)*)p;	\
+	TYPE expected = atomic_load(ptr), desired;			\
+	do {								\
+		desired = expected & ~v;				\
+	} while (!atomic_compare_exchange_weak(ptr, &expected, desired)); \
 }
 
-static __inline void
-atomic_add_32(__volatile uint32_t *p, uint32_t v)
-{
-	atomic_fetch_add((_Atomic(uint32_t)*)p, v);
+#define ATOMIC_ADD(WIDTH, TYPE)						\
+static __inline void							\
+atomic_add_##WIDTH(__volatile TYPE *p, TYPE v)				\
+{									\
+	atomic_fetch_add((__volatile _Atomic(TYPE)*)p, v);		\
 }
 
-static __inline void
-atomic_subtract_32(__volatile uint32_t *p, uint32_t v)
-{
-	atomic_fetch_sub((_Atomic(uint32_t)*)p, v);
+#define ATOMIC_SUB(WIDTH, TYPE)						\
+static __inline void							\
+atomic_subtract_##WIDTH(__volatile TYPE *p, TYPE v)			\
+{									\
+		atomic_fetch_sub((__volatile _Atomic(TYPE)*)p, v);	\
 }
 
-static __inline uint32_t
-atomic_readandclear_32(__volatile uint32_t *addr)
-{
-	_Atomic(uint32_t) *ptr = (_Atomic(uint32_t)*)addr;
-	uint32_t expected = atomic_load(ptr);
-
-	do {
-	} while (!atomic_compare_exchange_weak(ptr, &expected, 0));
-	return (expected);
+#define ATOMIC_READANDCLEAR(WIDTH, TYPE)				\
+static __inline TYPE							\
+atomic_readandclear_##WIDTH(__volatile TYPE *addr)			\
+{									\
+	__volatile _Atomic(TYPE) *ptr = (__volatile _Atomic(TYPE)*)addr; \
+	TYPE expected = atomic_load(ptr);				\
+									\
+	do {								\
+	} while (!atomic_compare_exchange_weak(ptr, &expected, 0));	\
+	return (expected);						\
 }
 
-static __inline uint32_t
-atomic_readandset_32(__volatile uint32_t *addr, uint32_t value)
-{
-	_Atomic(uint32_t) *ptr = (_Atomic(uint32_t)*)addr;
-	uint32_t result = atomic_load(ptr), desired;
-
-	do {
-		desired = result | value;
-	} while (!atomic_compare_exchange_weak(ptr, &result, desired));
-
-	return result;
+#define ATOMIC_READANDSET(WIDTH, TYPE)					\
+static __inline TYPE							\
+atomic_readandset_##WIDTH(__volatile TYPE *addr, TYPE value)		\
+{									\
+	__volatile _Atomic(TYPE) *ptr = (__volatile _Atomic(TYPE)*)addr; \
+	TYPE result = atomic_load(ptr), desired;			\
+									\
+	do {								\
+		desired = result | value;				\
+	} while (!atomic_compare_exchange_weak(ptr, &result, desired));	\
+									\
+	return result;							\
 }
+
+ATOMIC_SET(8, uint8_t)
+ATOMIC_SET(16, uint16_t)
+ATOMIC_SET(32, uint32_t)
+
+ATOMIC_CLEAR(8, uint8_t)
+ATOMIC_CLEAR(16, uint16_t)
+ATOMIC_CLEAR(32, uint32_t)
+
+ATOMIC_ADD(8, uint8_t)
+ATOMIC_ADD(16, uint16_t)
+ATOMIC_ADD(32, uint32_t)
+
+ATOMIC_SUB(8, uint8_t)
+ATOMIC_SUB(16, uint16_t)
+ATOMIC_SUB(32, uint32_t)
+
+ATOMIC_READANDCLEAR(32, uint32_t)
+ATOMIC_READANDSET(32, uint32_t)
 
 #if defined(__mips_n64) || defined(__mips_n32)
-static __inline void
-atomic_set_64(__volatile uint64_t *p, uint64_t v)
-{
-	_Atomic(uint64_t) *ptr = (_Atomic(uint64_t)*)p;
-	uint64_t expected = atomic_load(ptr), desired;
+ATOMIC_SET(64, uint64_t)
+ATOMIC_CLEAR(64, uint64_t)
+ATOMIC_ADD(64, uint64_t)
+ATOMIC_SUB(64, uint64_t)
+ATOMIC_READANDCLEAR(64, uint64_t)
+ATOMIC_READANDSET(64, uint64_t)
 
-	do {
-		desired = expected | v;
-	} while (!atomic_compare_exchange_weak(ptr, &expected, desired));
-}
+#ifdef __CHERI_PURE_CAPABILITY__
+ATOMIC_SET(cap, uintptr_t)
+ATOMIC_CLEAR(cap, uintptr_t)
+ATOMIC_ADD(cap, uintptr_t)
+ATOMIC_SUB(cap, uintptr_t)
+ATOMIC_READANDCLEAR(cap, uintptr_t)
+ATOMIC_READANDSET(cap, uintptr_t)
+#endif /* __CHERI_PURE_CAPABILITY__ */
+#endif /* __mips_n64 || __mips_n32 */
 
-static __inline void
-atomic_clear_64(__volatile uint64_t *p, uint64_t v)
-{
-	_Atomic(uint64_t) *ptr = (_Atomic(uint64_t)*)p;
-	uint64_t expected = atomic_load(ptr), desired;
-
-	do {
-		desired = expected & ~v;
-	} while (!atomic_compare_exchange_weak(ptr, &expected, desired));
-}
-
-static __inline void
-atomic_add_64(__volatile uint64_t *p, uint64_t v)
-{
-	atomic_fetch_add((_Atomic(uint64_t)*)p, v);
-}
-
-static __inline void
-atomic_subtract_64(__volatile uint64_t *p, uint64_t v)
-{
-	atomic_fetch_sub((_Atomic(uint64_t)*)p, v);
-}
-
-static __inline uint64_t
-atomic_readandclear_64(__volatile uint64_t *addr)
-{
-	_Atomic(uint64_t) *ptr = (_Atomic(uint64_t)*)addr;
-	uint64_t expected = _atomic_load(ptr);
-
-	do {
-	} while (!atomic_compare_exchange_weak(ptr, &expected, 0));
-
-	return (expected);
-}
-
-static __inline uint64_t
-atomic_readandset_64(__volatile uint64_t *addr, uint64_t value)
-{
-	_Atomic(uint64_t) *ptr = (_Atomic(uint64_t)*)addr;
-	uint64_t expected = atomic_load(ptr), desired;
-
-	do {
-		desired = expected | value;
-	} while (!atomic_compare_exchange_weak(ptr, &expected, desired));
-
-	return (expected);
-}
-#endif
-
+/*
+ * Variants of simple arithmetic with memory barriers.
+ * XXX-AM: TODO port in C by using __ATOMIC_ACQUIRE/__ATOMIC_RELEASE in explicits
+ */
 #define	ATOMIC_ACQ_REL(NAME, WIDTH)					\
 static __inline  void							\
 atomic_##NAME##_acq_##WIDTH(__volatile uint##WIDTH##_t *p, uint##WIDTH##_t v)\
@@ -218,8 +231,6 @@ atomic_##NAME##_rel_##WIDTH(__volatile uint##WIDTH##_t *p, uint##WIDTH##_t v)\
 	atomic_##NAME##_##WIDTH(p, v);					\
 }
 
-
-/* Variants of simple arithmetic with memory barriers. */
 ATOMIC_ACQ_REL(set, 8)
 ATOMIC_ACQ_REL(clear, 8)
 ATOMIC_ACQ_REL(add, 8)
@@ -237,33 +248,38 @@ ATOMIC_ACQ_REL(set, 64)
 ATOMIC_ACQ_REL(clear, 64)
 ATOMIC_ACQ_REL(add, 64)
 ATOMIC_ACQ_REL(subtract, 64)
-#endif
+#ifdef __CHERI_PURE_CAPABILITY__
+#endif /* __CHERI_PURE_CAPABILITY__ */
+#endif /* __mips_n64 || __mips_n32 */
 
 #undef ATOMIC_ACQ_REL
 
 /*
- * We assume that a = b will do atomic loads and stores.
+ * Atomic load and store with memory barriers
  */
-#define	ATOMIC_STORE_LOAD(WIDTH)			\
-static __inline  uint##WIDTH##_t			\
-atomic_load_acq_##WIDTH(__volatile uint##WIDTH##_t *p)	\
+#define	ATOMIC_STORE_LOAD(WIDTH, TYPE)			\
+static __inline TYPE					\
+atomic_load_acq_##WIDTH(__volatile TYPE *p)		\
 {							\
-	uint##WIDTH##_t v;				\
-							\
-	v = *p;						\
-	mips_sync();					\
-	return (v);					\
+	return (atomic_load_explicit(			\
+			(__volatile _Atomic(TYPE)*)p,	\
+			__ATOMIC_ACQUIRE));		\
 }							\
 							\
 static __inline  void					\
-atomic_store_rel_##WIDTH(__volatile uint##WIDTH##_t *p, uint##WIDTH##_t v)\
+atomic_store_rel_##WIDTH(__volatile TYPE *p, TYPE v)	\
 {							\
-	mips_sync();					\
-	*p = v;						\
+	atomic_store_explicit(				\
+		(__volatile _Atomic(TYPE)*)p, v,	\
+		__ATOMIC_RELEASE);			\
 }
 
-ATOMIC_STORE_LOAD(32)
-ATOMIC_STORE_LOAD(64)
+ATOMIC_STORE_LOAD(32, uint32_t)
+ATOMIC_STORE_LOAD(64, uint64_t)
+#ifdef __CHERI_PURE_CAPABILITY__
+ATOMIC_STORE_LOAD(cap, uintptr_t)
+#endif /* __CHERI_PURE_CAPABILITY__ */
+
 #if !defined(__mips_n64) && !defined(__mips_n32)
 void atomic_store_64(__volatile uint64_t *, uint64_t *);
 void atomic_load_64(__volatile uint64_t *, uint64_t *);
@@ -284,241 +300,116 @@ atomic_load_64(__volatile uint64_t *p, uint64_t *v)
 #undef ATOMIC_STORE_LOAD
 
 /*
- * Atomically compare the value stored at *p with cmpval and if the
- * two values are equal, update the value of *p with newval. Returns
- * zero if the compare failed, nonzero otherwise.
+ * Atomic compare and fetch operations
  */
-static __inline uint32_t
-atomic_cmpset_32(__volatile uint32_t *p, uint32_t cmpval, uint32_t newval)
-{
-	return (atomic_compare_exchange_weak((_Atomic(uint32_t)*)p, &cmpval,
-		newval));
-}
 
 /*
  * Atomically compare the value stored at *p with cmpval and if the
  * two values are equal, update the value of *p with newval. Returns
  * zero if the compare failed, nonzero otherwise.
  */
-static __inline uint32_t
-atomic_cmpset_acq_32(__volatile uint32_t *p, uint32_t cmpval, uint32_t newval)
-{
+#define ATOMIC_CMPSET(WIDTH, TYPE)					\
+static __inline TYPE							\
+atomic_cmpset_##WIDTH(__volatile TYPE *p, TYPE cmpval, TYPE newval)	\
+{									\
+	return (atomic_compare_exchange_weak((__volatile _Atomic(TYPE)*)p, \
+					     &cmpval, newval));		\
+}									\
+									\
+static __inline TYPE							\
+atomic_cmpset_acq_##WIDTH(__volatile TYPE *p, TYPE cmpval, TYPE newval)	\
+{									\
+	return (atomic_compare_exchange_weak_explicit(			\
+			(__volatile _Atomic(TYPE)*)p, &cmpval, newval,	\
+			__ATOMIC_ACQUIRE, __ATOMIC_ACQUIRE));		\
+}									\
+									\
+static __inline TYPE							\
+atomic_cmpset_rel_##WIDTH(__volatile TYPE *p, TYPE cmpval, TYPE newval)	\
+{									\
+	return (atomic_compare_exchange_weak_explicit(			\
+			(__volatile _Atomic(TYPE)*)p, &cmpval, newval,	\
+			__ATOMIC_RELEASE, __ATOMIC_RELEASE));		\
+}									\
 
-	return (atomic_compare_exchange_weak_explicit((_Atomic(uint32_t)*)p,
-		&cmpval, newval, __ATOMIC_ACQUIRE, __ATOMIC_ACQUIRE));
-}
 
-static __inline uint32_t
-atomic_cmpset_rel_32(__volatile uint32_t *p, uint32_t cmpval, uint32_t newval)
-{
-
-	return (atomic_compare_exchange_weak_explicit((_Atomic(uint32_t)*)p,
-		&cmpval, newval, __ATOMIC_RELEASE, __ATOMIC_RELEASE));
-}
-
-static __inline uint32_t
-atomic_fcmpset_32(__volatile uint32_t *p, uint32_t *cmpval, uint32_t newval)
-{
-	uint32_t ret;
-
-#ifndef __CHERI_PURE_CAPABILITY__
-	__asm __volatile (
-		"1:\n\t"
-		"ll	%0, %1\n\t"		/* load old value */
-		"bne	%0, %4, 2f\n\t"		/* compare */
-		"move	%0, %3\n\t"		/* value to store */
-		"sc	%0, %1\n\t"		/* attempt to store */
-		"beqz	%0, 1b\n\t"		/* if it failed, spin */
-		"j	3f\n\t"
-		"2:\n\t"
-		"sw	%0, %2\n\t"		/* save old value */
-		"li	%0, 0\n\t"
-		"3:\n"
-		: "=&r" (ret), "+m" (*p), "=m" (*cmpval)
-		: "r" (newval), "r" (*cmpval)
-		: "memory");
-#else
-	uint32_t tmp;
-	uint32_t expected = *cmpval;
-
-	__asm __volatile (
-		"1:\n\t"
-		"cllw	%[tmp], %[ptr]\n\t"		/* load old value */
-		"bne	%[tmp], %[expected], 2f\n\t"	/* compare */
-		"cscw	%[ret], %[newval], %[ptr]\n\t"	/* attempt to store */
-		"beqz	%[ret], 1b\n\t"			/* if it failed, spin */
-		"j	3f\n\t"
-		"2:\n\t"
-		"csw	%[tmp], $0, 0(%[cmpval])\n\t"	/* store loaded value */
-		"li	%[ret], 0\n\t"
-		"3:\n"
-		: [ret] "=&r" (ret), [tmp] "=&r" (tmp), [ptr]"+C" (p),
-		    [cmpval]"+C" (cmpval)
-		: [newval] "r" (newval), [expected] "r" (expected)
-		: "memory");
-#endif
-	return ret;
-}
-
-static __inline uint32_t
-atomic_fcmpset_acq_32(__volatile uint32_t *p, uint32_t *cmpval, uint32_t newval)
-{
-	int retval;
-
-	retval = atomic_fcmpset_32(p, cmpval, newval);
-	mips_sync();
-	return (retval);
-}
-
-static __inline uint32_t
-atomic_fcmpset_rel_32(__volatile uint32_t *p, uint32_t *cmpval, uint32_t newval)
-{
-	mips_sync();
-	return (atomic_fcmpset_32(p, cmpval, newval));
+/*
+ * Atomically compare the value stored at *p with cmpval and if the
+ * two values are equal, update the value of *p with newval,
+ * otherwise update the value of cmpval with the value loaded from *p.
+ * Returns zero if the compare failed, nonzero otherwise.
+ */
+#define ATOMIC_FCMPSET(WIDTH, TYPE)					\
+static __inline TYPE							\
+atomic_fcmpset_##WIDTH(__volatile TYPE *p, TYPE *cmpval, TYPE newval)	\
+{									\
+	return (atomic_compare_exchange_weak((__volatile _Atomic(TYPE)*)p, \
+					     cmpval, newval));		\
+}									\
+									\
+static __inline TYPE							\
+atomic_fcmpset_acq_##WIDTH(__volatile TYPE *p, TYPE *cmpval, TYPE newval) \
+{									\
+	return (atomic_compare_exchange_weak_explicit(			\
+			(__volatile _Atomic(TYPE)*)p, cmpval, newval,	\
+			__ATOMIC_ACQUIRE, __ATOMIC_ACQUIRE));		\
+}									\
+									\
+static __inline TYPE							\
+atomic_fcmpset_rel_##WIDTH(__volatile TYPE *p, TYPE *cmpval, TYPE newval) \
+{									\
+	return (atomic_compare_exchange_weak_explicit(			\
+			(__volatile _Atomic(TYPE)*)p, cmpval, newval,	\
+			__ATOMIC_RELEASE, __ATOMIC_RELEASE));		\
 }
 
 /*
  * Atomically add the value of v to the integer pointed to by p and return
  * the previous value of *p.
  */
-static __inline uint32_t
-atomic_fetchadd_32(__volatile uint32_t *p, uint32_t v)
-{
-	return (atomic_fetch_add((_Atomic(uint32_t)*)p, v));
+#define ATOMIC_FETCHADD(WIDTH, TYPE)					\
+static __inline TYPE							\
+atomic_fetchadd_##WIDTH(__volatile TYPE *p, TYPE v)			\
+{									\
+	return (atomic_fetch_add((__volatile _Atomic(TYPE)*)p, v));	\
 }
 
+ATOMIC_CMPSET(32, uint32_t)
+ATOMIC_FCMPSET(32, uint32_t)
+ATOMIC_FETCHADD(32, uint32_t)
 #if defined(__mips_n64) || defined(__mips_n32)
-/*
- * Atomically compare the value stored at *p with cmpval and if the
- * two values are equal, update the value of *p with newval. Returns
- * zero if the compare failed, nonzero otherwise.
- */
-static __inline uint64_t
-atomic_cmpset_64(__volatile uint64_t *p, uint64_t cmpval, uint64_t newval)
-{
-	return (atomic_compare_exchange_weak((_Atomic(uint64_t)*)p, &cmpval,
-		newval));
-}
-
-/*
- * Atomically compare the value stored at *p with cmpval and if the
- * two values are equal, update the value of *p with newval. Returns
- * zero if the compare failed, nonzero otherwise.
- */
-static __inline uint64_t
-atomic_cmpset_acq_64(__volatile uint64_t *p, uint64_t cmpval, uint64_t newval)
-{
-
-	return (atomic_compare_exchange_weak_explicit((_Atomic(uint64_t)*)p,
-		&cmpval, newval, __ATOMIC_ACQUIRE, __ATOMIC_ACQUIRE));
-}
-
-static __inline uint64_t
-atomic_cmpset_rel_64(__volatile uint64_t *p, uint64_t cmpval, uint64_t newval)
-{
-
-	return (atomic_compare_exchange_weak_explicit((_Atomic(uint64_t)*)p,
-		&cmpval, newval, __ATOMIC_RELEASE, __ATOMIC_RELEASE));
-}
-
-static __inline uint32_t
-atomic_fcmpset_64(__volatile uint64_t *p, uint64_t *cmpval, uint64_t newval)
-{
-        uint32_t ret;
-
-#ifndef __CHERI_PURE_CAPABILITY__
-        __asm __volatile (
-                "1:\n\t"
-		"lld	%0, %1\n\t"		/* load old value */
-                "bne	%0, %4, 2f\n\t"		/* compare */
-                "move	%0, %3\n\t"		/* value to store */
-                "scd	%0, %1\n\t"		/* attempt to store */
-                "beqz	%0, 1b\n\t"		/* if it failed, spin */
-                "j	3f\n\t"
-                "2:\n\t"
-                "sd	%0, %2\n\t"		/* save old value */
-                "li	%0, 0\n\t"
-                "3:\n"
-                : "=&r" (ret), "+m" (*p), "=m" (*cmpval)
-                : "r" (newval), "r" (*cmpval)
-                : "memory");
-#else
-	uint64_t tmp;
-	uint64_t expected = *cmpval;
-
-	__asm __volatile (
-		"1:\n\t"
-		"clld	%[tmp], %[ptr]\n\t"		/* load old value */
-		"bne	%[tmp], %[expected], 2f\n\t"	/* compare */
-		"cscd	%[ret], %[newval], %[ptr]\n\t"	/* attempt to store */
-		"beqz	%[ret], 1b\n\t"			/* if it failed, spin */
-		"j	3f\n\t"
-		"2:\n\t"
-		"csd	%[tmp], $0, 0(%[cmpval])\n\t"	/* store loaded value */
-		"li	%[ret], 0\n\t"
-		"3:\n"
-		: [ret] "=&r" (ret), [tmp] "=&r" (tmp), [ptr]"+C" (p),
-		    [cmpval]"+C" (cmpval)
-		: [newval] "r" (newval), [expected] "r" (expected)
-		: "memory");
-#endif
-	return ret;
-}
-
-static __inline uint64_t
-atomic_fcmpset_acq_64(__volatile uint64_t *p, uint64_t *cmpval, uint64_t newval)
-{
-	int retval;
-
-	retval = atomic_fcmpset_64(p, cmpval, newval);
-	mips_sync();
-	return (retval);
-}
-
-static __inline uint64_t
-atomic_fcmpset_rel_64(__volatile uint64_t *p, uint64_t *cmpval, uint64_t newval)
-{
-	mips_sync();
-	return (atomic_fcmpset_64(p, cmpval, newval));
-}
-
-/*
- * Atomically add the value of v to the integer pointed to by p and return
- * the previous value of *p.
- */
-static __inline uint64_t
-atomic_fetchadd_64(__volatile uint64_t *p, uint64_t v)
-{
-	return (atomic_fetch_add((_Atomic(uint64_t)*)p, v));
-}
-#endif
+ATOMIC_CMPSET(64, uint64_t)
+ATOMIC_FCMPSET(64, uint64_t)
+ATOMIC_FETCHADD(64, uint64_t)
+#ifdef __CHERI_PURE_CAPABILITY__
+ATOMIC_CMPSET(cap, uintptr_t)
+ATOMIC_FCMPSET(cap, uintptr_t)
+ATOMIC_FETCHADD(cap, uintptr_t)
+#endif /* __CHERI_PURE_CAPABILITY__ */
+#endif /* __mips_n64 || __mips_n32 */
 
 static __inline void
 atomic_thread_fence_acq(void)
 {
-
-	mips_sync();
+	atomic_thread_fence(__ATOMIC_ACQUIRE);
 }
 
 static __inline void
 atomic_thread_fence_rel(void)
 {
-
-	mips_sync();
+	atomic_thread_fence(__ATOMIC_RELEASE);
 }
 
 static __inline void
 atomic_thread_fence_acq_rel(void)
 {
-
-	mips_sync();
+	atomic_thread_fence(__ATOMIC_ACQ_REL);
 }
 
 static __inline void
 atomic_thread_fence_seq_cst(void)
 {
-
-	mips_sync();
+	atomic_thread_fence(__ATOMIC_SEQ_CST);
 }
 
 /* Operations on chars. */
@@ -685,27 +576,27 @@ atomic_thread_fence_seq_cst(void)
 #define	atomic_store_rel_ptr	atomic_store_rel_long
 #define	atomic_readandclear_ptr	atomic_readandclear_long
 #else /* CHERI_KERNEL */
-#define	atomic_set_ptr		atomic_set_long
-#define	atomic_set_acq_ptr	atomic_set_acq_long
-#define	atomic_set_rel_ptr	atomic_set_rel_long
-#define	atomic_clear_ptr	atomic_clear_long
-#define	atomic_clear_acq_ptr	atomic_clear_acq_long
-#define	atomic_clear_rel_ptr	atomic_clear_rel_long
-#define	atomic_add_ptr		atomic_add_long
-#define	atomic_add_acq_ptr	atomic_add_acq_long
-#define	atomic_add_rel_ptr	atomic_add_rel_long
-#define	atomic_subtract_ptr	atomic_subtract_long
-#define	atomic_subtract_acq_ptr	atomic_subtract_acq_long
-#define	atomic_subtract_rel_ptr	atomic_subtract_rel_long
-#define	atomic_cmpset_ptr	atomic_cmpset_long
-#define	atomic_cmpset_acq_ptr	atomic_cmpset_acq_long
-#define	atomic_cmpset_rel_ptr	atomic_cmpset_rel_long
-#define	atomic_fcmpset_ptr	atomic_fcmpset_long
-#define	atomic_fcmpset_acq_ptr	atomic_fcmpset_acq_long
-#define	atomic_fcmpset_rel_ptr	atomic_fcmpset_rel_long
-#define	atomic_load_acq_ptr	atomic_load_acq_long
-#define	atomic_store_rel_ptr	atomic_store_rel_long
-#define	atomic_readandclear_ptr	atomic_readandclear_long
+#define	atomic_set_ptr		atomic_set_cap
+#define	atomic_set_acq_ptr	atomic_set_acq_cap
+#define	atomic_set_rel_ptr	atomic_set_rel_cap
+#define	atomic_clear_ptr	atomic_clear_cap
+#define	atomic_clear_acq_ptr	atomic_clear_acq_cap
+#define	atomic_clear_rel_ptr	atomic_clear_rel_cap
+#define	atomic_add_ptr		atomic_add_cap
+#define	atomic_add_acq_ptr	atomic_add_acq_cap
+#define	atomic_add_rel_ptr	atomic_add_rel_cap
+#define	atomic_subtract_ptr	atomic_subtract_cap
+#define	atomic_subtract_acq_ptr	atomic_subtract_acq_cap
+#define	atomic_subtract_rel_ptr	atomic_subtract_rel_cap
+#define	atomic_cmpset_ptr	atomic_cmpset_cap
+#define	atomic_cmpset_acq_ptr	atomic_cmpset_acq_cap
+#define	atomic_cmpset_rel_ptr	atomic_cmpset_rel_cap
+#define	atomic_fcmpset_ptr	atomic_fcmpset_cap
+#define	atomic_fcmpset_acq_ptr	atomic_fcmpset_acq_cap
+#define	atomic_fcmpset_rel_ptr	atomic_fcmpset_rel_cap
+#define	atomic_load_acq_ptr	atomic_load_acq_cap
+#define	atomic_store_rel_ptr	atomic_store_rel_cap
+#define	atomic_readandclear_ptr	atomic_readandclear_cap
 #endif /* CHERI_KERNEL */
 
 #endif /* ! _MACHINE_ATOMIC_H_ */
