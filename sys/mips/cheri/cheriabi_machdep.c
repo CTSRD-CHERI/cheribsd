@@ -180,11 +180,16 @@ SYSINIT(cheriabi, SI_SUB_EXEC, SI_ORDER_ANY,
 static __inline boolean_t
 cheriabi_check_cpu_compatible(uint32_t bits, const char *execpath)
 {
+	static struct timeval lastfail;
+	static int curfail;
 	const uint32_t expected = CHERICAP_SIZE * 8;
+
 	if (bits == expected)
 		return TRUE;
-	printf("warning: attempting to execute %d-bit CheriABI binary '%s' on "
-	    "a %d-bit kernel\n", bits, execpath, expected);
+	if (ppsratecheck(&lastfail, &curfail, 1))
+		printf("warning: attempting to execute %d-bit CheriABI "
+		    "binary '%s' on a %d-bit kernel\n", bits, execpath,
+		    expected);
 	return FALSE;
 }
 

@@ -98,11 +98,15 @@ INIT_SYSENTVEC(elf64_sysvec, &elf64_freebsd_sysvec);
 static __inline boolean_t
 mips_hybrid_check_cap_size(uint32_t bits, const char *execpath)
 {
+	static struct timeval lastfail;
+	static int curfail;
 	const uint32_t expected = CHERICAP_SIZE * 8;
+
 	if (bits == expected)
 		return TRUE;
-	printf("warning: attempting to execute %d-bit hybrid binary '%s' on "
-	    "a %d-bit kernel\n", bits, execpath, expected);
+	if (ppsratecheck(&lastfail, &curfail, 1))
+		printf("warning: attempting to execute %d-bit hybrid binary "
+		    "'%s' on a %d-bit kernel\n", bits, execpath, expected);
 	return FALSE;
 }
 
