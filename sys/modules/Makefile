@@ -584,7 +584,6 @@ _bxe=		bxe
 .endif
 _cardbus=	cardbus
 _cbb=		cbb
-_ccp=		ccp
 _cpuctl=	cpuctl
 _cpufreq=	cpufreq
 _cs=		cs
@@ -714,6 +713,7 @@ _x86bios=	x86bios
 .endif
 
 .if ${MACHINE_CPUARCH} == "amd64"
+_ccp=		ccp
 _efirt=		efirt
 _ioat=		ioat
 _ixl=		ixl
