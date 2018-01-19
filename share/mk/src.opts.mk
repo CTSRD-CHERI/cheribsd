@@ -292,6 +292,11 @@ __DEFAULT_YES_OPTIONS+=CXGBETOOL
 .else
 __DEFAULT_NO_OPTIONS+=CXGBETOOL
 .endif
+.if ${__T:Mmips*}
+__DEFAULT_YES_OPTIONS+=PIE
+.else
+__DEFAULT_NO_OPTIONS+=PIE
+.endif
 
 .include <bsd.mkopt.mk>
 
