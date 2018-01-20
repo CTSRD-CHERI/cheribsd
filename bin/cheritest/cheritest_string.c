@@ -44,7 +44,7 @@
 
 #include "cheritest.h"
 
-#define	CAP(x)	((__capability void*)(x))
+#define	CAP(x)	((__cheri_tocap __capability void*)(x))
 
 /*
  * Test structure which will be memcpy'd.  Contains data and a capability in
