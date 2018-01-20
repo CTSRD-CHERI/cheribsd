@@ -59,6 +59,8 @@ struct Test
 	char pad1[32];
 };
 
+static void * __capability expected_y;
+
 /*
  * Check that the copy has the data that we expect it to contain.  The start
  * and end parameters describe the range in the padding to check.  For partial
@@ -72,7 +74,7 @@ check(struct Test *t1, int start, int end)
 	for (i = start; i < 32; i++)
 		if (t1->pad0[i] != i)
 			cheritest_failure_errx("t1->pad0[%d] != %d", i, i);
-	if (t1->y != CAP(t1))
+	if (t1->y != expected_y)
 		cheritest_failure_errx("t1->y != t1");
 	if (!cheri_gettag(t1->y))
 		cheritest_failure_errx("t1->y is untagged");
@@ -106,7 +108,7 @@ test_string_memcpy_c(const struct cheri_test *ctp __unused)
 		t1.pad0[i] = i;
 		t1.pad1[i] = i;
 	}
-	t1.y = CAP(&t2);
+	expected_y = t1.y = CAP(&t2);
 
 	/* Simple case: aligned start and end */
 	invalidate(&t2);
@@ -208,7 +210,7 @@ test_string_memcpy(const struct cheri_test *ctp __unused)
 		t1.pad0[i] = i;
 		t1.pad1[i] = i;
 	}
-	t1.y = CAP(&t2);
+	expected_y = t1.y = CAP(&t2);
 
 	/* Simple case: aligned start and end */
 	invalidate(&t2);
@@ -269,7 +271,7 @@ test_string_memmove_c(const struct cheri_test *ctp __unused)
 		t1.pad0[i] = i;
 		t1.pad1[i] = i;
 	}
-	t1.y = CAP(&t2);
+	expected_y = t1.y = CAP(&t2);
 
 	/* Simple case: aligned start and end */
 	invalidate(&t2);
@@ -370,7 +372,7 @@ test_string_memmove(const struct cheri_test *ctp __unused)
 		t1.pad0[i] = i;
 		t1.pad1[i] = i;
 	}
-	t1.y = CAP(&t2);
+	expected_y = t1.y = CAP(&t2);
 
 	/* Simple case: aligned start and end */
 	invalidate(&t2);
