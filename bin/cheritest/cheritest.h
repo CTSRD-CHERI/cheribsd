@@ -396,6 +396,8 @@ void	cheritest_setjmp_longjmp(const struct cheri_test *ctp);
 void	test_sealcap_sysarch(const struct cheri_test *ctp);
 
 /* cheritest_string.c */
+void	test_string_kern_memcpy_c(const struct cheri_test *ctp);
+void	test_string_kern_memmove_c(const struct cheri_test *ctp);
 void	test_string_memcpy(const struct cheri_test *ctp);
 void	test_string_memcpy_c(const struct cheri_test *ctp);
 void	test_string_memmove(const struct cheri_test *ctp);

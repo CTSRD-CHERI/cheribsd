@@ -1523,6 +1523,12 @@ static const struct cheri_test cheri_tests[] = {
 	/*
 	 * Standard library string tests.
 	 */
+	{ .ct_name = "test_string_kern_memcpy_c",
+	  .ct_desc = "Test explicit capability memcpy (kernel version)",
+	  .ct_func = test_string_kern_memcpy_c },
+	{ .ct_name = "test_string_kern_memmove_c",
+	  .ct_desc = "Test explicit capability memmove (kernel version)",
+	  .ct_func = test_string_kern_memmove_c },
 	{ .ct_name = "test_string_memcpy",
 	  .ct_desc = "Test implicit capability memcpy",
 	  .ct_func = test_string_memcpy },

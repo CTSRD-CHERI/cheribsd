@@ -39,6 +39,10 @@ SRCS+=	cheritest_cheriabi_open.c
 CFLAGS+=	-DCHERIABI_TESTS
 .endif
 
+.PATH: ${SRCTOP}/sys/mips/cheri
+SRCS+=	cheri_memcpy_c.S
+CFLAGS.cheri_memcpy_c.S=-D__KERN_FUNC_PREFIX -D_KERNEL
+
 .ifdef CHERI_C_TESTS
 CHERI_C_TESTS_DIR=	${SRCTOP}/contrib/cheri-c-tests
 .if exists(${CHERI_C_TESTS_DIR}/Makefile)
