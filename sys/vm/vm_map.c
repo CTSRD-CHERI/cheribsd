@@ -1622,7 +1622,8 @@ vm_map_simplify_entry(vm_map_t map, vm_map_entry_t entry)
 		     (prev->max_protection == entry->max_protection) &&
 		     (prev->inheritance == entry->inheritance) &&
 		     (prev->wired_count == entry->wired_count) &&
-		     (prev->cred == entry->cred)) {
+		     (prev->cred == entry->cred) &&
+		     (prev->owner == entry->owner)) {
 			vm_map_log("remove", prev);
 			vm_map_entry_unlink(map, prev);
 			entry->start = prev->start;
@@ -1665,7 +1666,8 @@ vm_map_simplify_entry(vm_map_t map, vm_map_entry_t entry)
 		    (next->max_protection == entry->max_protection) &&
 		    (next->inheritance == entry->inheritance) &&
 		    (next->wired_count == entry->wired_count) &&
-		    (next->cred == entry->cred)) {
+		    (next->cred == entry->cred) &&
+		    (next->owner == entry->owner)) {
 			vm_map_log("remove", next);
 			vm_map_entry_unlink(map, next);
 			entry->end = next->end;
