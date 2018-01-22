@@ -144,6 +144,9 @@ static int vm_map_stack_locked(vm_map_t map, vm_offset_t addrbos,
     int cow);
 static void vm_map_wire_entry_failure(vm_map_t map, vm_map_entry_t entry,
     vm_offset_t failed_addr);
+static vm_map_entry_t vm_map_entry_create(vm_map_t map);
+static void vm_map_entry_link(vm_map_t map, vm_map_entry_t after_where,
+    vm_map_entry_t entry);
 
 #define	ENTRY_CHARGED(e) ((e)->cred != NULL || \
     ((e)->object.vm_object != NULL && (e)->object.vm_object->cred != NULL && \
@@ -400,6 +403,27 @@ vmspace_exitfree(struct proc *p)
 	vmspace_free(vm);
 }
 
+static void
+vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
+{
+	vm_map_entry_t entry;
+	vm_offset_t start, end;
+	boolean_t found;
+	int rv;
+
+	start = old_entry->start;
+	end = old_entry->end;
+	vm_map_delete(map, old_entry->start, old_entry->end);
+	rv = vm_map_insert(map, NULL, 0, start, end,
+	    PROT_NONE, PROT_NONE, MAP_DISABLE_SYNCER | MAP_DISABLE_COREDUMP);
+	KASSERT(rv == KERN_SUCCESS,
+	    ("%s: vm_map_insert() failed with error %d\n", __func__, rv));
+	found = vm_map_lookup_entry(map, start, &entry);
+	KASSERT(found == TRUE,
+	    ("%s: vm_map_insert() returned false\n", __func__));
+	entry->owner = 0;
+}
+
 void
 vmspace_exit(struct thread *td)
 {
@@ -452,10 +476,13 @@ vmspace_exit(struct thread *td)
 	} else {
 		map = &vm->vm_map;
 		vm_map_lock(map);
+again:
 		for (entry = map->header.next; entry != &map->header;
 		    entry = entry->next) {
-			if (entry->owner == p->p_pid)
-				entry->owner = 0;
+			if (entry->owner == p->p_pid) {
+				vm_map_entry_abandon(map, entry);
+				goto again;
+			}
 		}
 		vm_map_unlock(map);
 	}
