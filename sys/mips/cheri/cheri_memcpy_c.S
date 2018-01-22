@@ -252,7 +252,7 @@ b_dword_copy:
 	 */
 	andi		t2, t0, (CHERICAP_SIZE - 1)
 	andi		t3, t1, (CHERICAP_SIZE - 1)
-	and		a1, a0, -SZREG	// a1: amount we could copy
+	and		a1, a0, -SZREG	// a1: mask off header
 	bne		t2, t3, b_cannot_be_cap_aligned
 	nop
 b_can_be_cap_aligned:
