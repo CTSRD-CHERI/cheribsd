@@ -406,21 +406,44 @@ vmspace_exitfree(struct proc *p)
 static void
 vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 {
-	vm_map_entry_t entry;
+	vm_map_entry_t entry, prev, next;
 	vm_offset_t start, end;
 	boolean_t found;
 	int rv;
 
+	prev = old_entry->prev;
+	next = old_entry->next;
 	start = old_entry->start;
 	end = old_entry->end;
 	vm_map_delete(map, old_entry->start, old_entry->end);
+
+	/*
+	 * Try to cover the "holes" between abandoned entries.
+	 */
+	if (prev != &map->header && prev->object.vm_object == NULL &&
+	    prev->protection == PROT_NONE && prev->owner == 0 &&
+	    start > prev->end && start - prev->end <= 0x10000) {
+		start = prev->end;
+	}
+
+	/*
+	 * Also do that for abandoned stacks.
+	 */
+	if (next != &map->header && next->object.vm_object == NULL &&
+	    next->protection == PROT_NONE && next->owner == 0 &&
+	    end < next->start && next->start - end <= MAXSSIZ) {
+		end = next->start;
+	}
+
 	rv = vm_map_insert(map, NULL, 0, start, end,
 	    PROT_NONE, PROT_NONE, MAP_DISABLE_SYNCER | MAP_DISABLE_COREDUMP);
 	KASSERT(rv == KERN_SUCCESS,
 	    ("%s: vm_map_insert() failed with error %d\n", __func__, rv));
+
 	found = vm_map_lookup_entry(map, start, &entry);
 	KASSERT(found == TRUE,
 	    ("%s: vm_map_insert() returned false\n", __func__));
+
 	entry->owner = 0;
 }
 
