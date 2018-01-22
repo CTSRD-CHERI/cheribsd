@@ -172,6 +172,7 @@ _LIBRARIES=	\
 		pthread \
 		radius \
 		readline \
+		regex \
 		roken \
 		rosprite \
 		rpcsec_gss \
