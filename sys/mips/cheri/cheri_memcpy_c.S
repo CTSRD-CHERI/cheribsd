@@ -185,7 +185,7 @@ b_cannot_be_dword_aligned:
 	li		a3, -1		// a3: increment
 b_byte_loop:
 	clb		t9, a2, 0($c3)
-	csb		t9, a2, 0($c3)
+	csb		t9, a2, 0($c4)
 	bne		a1, a2, b_byte_loop
 	daddu		a2, a2, a3
 
@@ -219,7 +219,7 @@ b_cannot_be_cap_aligned:
 	li		a3, -SZREG	// a3: increment
 b_dword_loop:
 	cld		t9, a2, 0($c3)
-	csd		t9, a2, 0($c3)
+	csd		t9, a2, 0($c4)
 	bne		a1, a2, b_dword_loop
 	daddu		a2, a2, a3
 
