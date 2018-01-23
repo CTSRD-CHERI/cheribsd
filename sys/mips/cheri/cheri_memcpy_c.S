@@ -72,10 +72,12 @@ f_byte_copy:
 	bne		t2, t3, f_cannot_be_word_aligned
 	move		a1, a0		// a1: how much to copy
 f_can_be_word_aligned:
-	andi		a1, t0, (SZREG-1)
+	andi		t8, t0, (SZREG-1)
 	li		t9, SZREG
-	beqz		a1, f_dword_copy	// already aligned (common)
-	dsub		a1, t9, a1
+	beqz		t8, f_dword_copy	// already aligned (common)
+	dsub		t8, t9, t8
+	slt		t9, t8, a1		// Make sure we have this much
+	movn		a1, t8, t9
 f_cannot_be_word_aligned:
 	li		a2, 1		// a2: how much we will have copied
 f_byte_loop:
@@ -105,10 +107,12 @@ f_dword_copy:
 	bne		t2, t3, f_cannot_be_cap_aligned
 	nop
 f_can_be_cap_aligned:
-	andi		a1, t0, (CHERICAP_SIZE - 1)	// just to capability
+	andi		t8, t0, (CHERICAP_SIZE - 1)	// just to capability
 	li		t9, CHERICAP_SIZE
-	beqz		a1, f_cap_copy	// already aligned (common)
-	dsub		a1, t9, a1
+	beqz		t8, f_cap_copy	// already aligned (common)
+	dsub		t8, t9, t8
+	slt		t9, t8, a1
+	movn		a1, t8, t9
 f_cannot_be_cap_aligned:
 	li		a2, SZREG	// a2: how much we will have copied
 f_dword_loop:
@@ -177,8 +181,10 @@ b_byte_copy:
 	bne		t2, t3, b_cannot_be_dword_aligned
 	move		a1, a0		// a1: how much to copy
 b_can_be_dword_aligned:
-	andi		a1, t0, (SZREG-1)	// a1: just to align
-	beqz		a1, b_dword_copy	// tail is dword aligned
+	andi		t8, t0, (SZREG-1)	// a1: just to align
+	beqz		t8, b_dword_copy	// tail is dword aligned
+	slt		t9, t8, a1		// is there space?
+	movn		a1, t8, t9
 b_cannot_be_dword_aligned:
 	dsub		a1, zero, a1	// End (negative) offset
 	li		a2, -1		// a2: offset we will have copy
@@ -211,8 +217,10 @@ b_dword_copy:
 	bne		t2, t3, b_cannot_be_cap_aligned
 	nop
 b_can_be_cap_aligned:
-	andi		a1, t0, (CHERICAP_SIZE - 1)	// just to capability
-	beqz		a1, b_cap_copy	// already aligned (common)
+	andi		t8, t0, (CHERICAP_SIZE - 1)	// just to capability
+	beqz		t8, b_cap_copy	// already aligned (common)
+	slt		t9, t8, a1		// is there space?
+	movn		a1, t8, t9
 b_cannot_be_cap_aligned:
 	dsub		a1, zero, a1	// End (negative) offset
 	li		a2, -SZREG	// a2: offset we will copy
