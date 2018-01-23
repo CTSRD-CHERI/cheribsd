@@ -184,12 +184,12 @@ sysctl_kern_usrstack(SYSCTL_HANDLER_ARGS)
 #ifdef SCTL_MASK32
 	if (req->flags & SCTL_MASK32) {
 		unsigned int val;
-		val = (unsigned int)p->p_sysent->sv_usrstack;
+		val = (unsigned int)p->p_usrstack;
 		error = SYSCTL_OUT(req, &val, sizeof(val));
 	} else
 #endif
-		error = SYSCTL_OUT(req, &p->p_sysent->sv_usrstack,
-		    sizeof(p->p_sysent->sv_usrstack));
+		error = SYSCTL_OUT(req, &p->p_usrstack,
+		    sizeof(p->p_usrstack));
 	return error;
 }
 
@@ -1156,7 +1156,8 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	imgp->eff_stack_sz = lim_cur(curthread, RLIMIT_STACK);
 	if (ssiz < imgp->eff_stack_sz)
 		imgp->eff_stack_sz = ssiz;
-	stack_addr = sv->sv_usrstack - ssiz;
+	p->p_usrstack = sv->sv_usrstack;
+	stack_addr =  p->p_usrstack - ssiz;
 	error = vm_map_stack(map, stack_addr, (vm_size_t)ssiz,
 	    obj != NULL && imgp->stack_prot != 0 ? imgp->stack_prot :
 	    sv->sv_stackprot, VM_PROT_ALL, MAP_STACK_GROWS_DOWN);
@@ -1654,7 +1655,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 * bounds.
 	 */
 	stack_vaddr = (vaddr_t)p->p_vmspace->vm_maxsaddr;
-	ssiz = p->p_sysent->sv_usrstack - stack_vaddr;
+	ssiz = p->p_usrstack - stack_vaddr;
 	stack_offset = 0;
 	do {
 		rounded_stack_vaddr = CHERI_REPRESENTABLE_BASE(stack_vaddr,

@@ -643,7 +643,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 * to userspace.
 	 */
 	stack_vaddr = (vm_offset_t)p->p_vmspace->vm_maxsaddr;
-	ssiz = p->p_sysent->sv_usrstack - stack_vaddr;
+	ssiz = p->p_usrstack - stack_vaddr;
 	stack_offset = 0;
 	do {
 		rounded_stack_vaddr = CHERI_REPRESENTABLE_BASE(stack_vaddr,
