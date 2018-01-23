@@ -39,9 +39,13 @@ SRCS+=	cheritest_cheriabi_open.c
 CFLAGS+=	-DCHERIABI_TESTS
 .endif
 
+.ifndef BOOTSTRAPPING
 .PATH: ${SRCTOP}/sys/mips/cheri
 SRCS+=	cheri_memcpy_c.S
 CFLAGS.cheri_memcpy_c.S=-D__KERN_FUNC_PREFIX -D_KERNEL
+CFLAGS+=	-DKERNEL_MEMCPY_TESTS
+.else
+.endif
 
 .ifdef CHERI_C_TESTS
 CHERI_C_TESTS_DIR=	${SRCTOP}/contrib/cheri-c-tests

@@ -44,11 +44,12 @@
 
 #include "cheritest.h"
 
-
+#ifdef KERNEL_MEMCPY_TESTS
 void * __capability
     kern_memcpy_c(void * __capability, const void * __capability, size_t);
 void * __capability
     kern_memmove_c(void * __capability, const void * __capability, size_t);
+#endif
 
 #define	CAP(x)	((__cheri_tocap __capability void*)(x))
 
@@ -429,6 +430,7 @@ test_string_memmove(const struct cheri_test *ctp __unused)
 	cheritest_success();
 }
 
+#ifdef KERNEL_MEMCPY_TESTS
 void
 test_string_kern_memcpy_c(const struct cheri_test *ctp __unused)
 {
@@ -632,3 +634,4 @@ test_string_kern_memmove_c(const struct cheri_test *ctp __unused)
 
 	cheritest_success();
 }
+#endif
