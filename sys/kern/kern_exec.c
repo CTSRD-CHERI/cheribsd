@@ -178,12 +178,12 @@ sysctl_kern_usrstack(SYSCTL_HANDLER_ARGS)
 #ifdef SCTL_MASK32
 	if (req->flags & SCTL_MASK32) {
 		unsigned int val;
-		val = (unsigned int)p->p_sysent->sv_usrstack;
+		val = (unsigned int)p->p_usrstack;
 		error = SYSCTL_OUT(req, &val, sizeof(val));
 	} else
 #endif
-		error = SYSCTL_OUT(req, &p->p_sysent->sv_usrstack,
-		    sizeof(p->p_sysent->sv_usrstack));
+		error = SYSCTL_OUT(req, &p->p_usrstack,
+		    sizeof(p->p_usrstack));
 	return error;
 }
 
@@ -1228,6 +1228,7 @@ exec_new_vmspace(struct image_params *imgp, const struct sysentvec *sv)
 	} else {
 		ssiz = maxssiz;
 	}
+	p->p_usrstack = sv->sv_usrstack;
 	if (imgp->cop != NULL) {
 		vm_offset_t dummy;
 
@@ -1235,12 +1236,12 @@ exec_new_vmspace(struct image_params *imgp, const struct sysentvec *sv)
 		 * XXX: Using linear search here is rather silly.
 		 */
 		do {
-			imgp->usrstack_delta += MAXSSIZ;
-			stack_addr = sv->sv_usrstack - ssiz - imgp->usrstack_delta;
+			p->p_usrstack -= MAXSSIZ;
+			stack_addr = p->p_usrstack - ssiz;
 			error = vm_map_findspace(map, stack_addr, ssiz, &dummy);
 		} while (error != 0);
 	} else {
-		stack_addr = sv->sv_usrstack - ssiz;
+		stack_addr = p->p_usrstack - ssiz;
 	}
 	error = vm_map_stack(map, stack_addr, (vm_size_t)ssiz,
 	    obj != NULL && imgp->stack_prot != 0 ? imgp->stack_prot :
@@ -1597,7 +1598,7 @@ exec_copyout_strings(struct image_params *imgp)
 	}
 
 	if (imgp->cop != NULL) {
-		arginfo = (struct ps_strings *)(((char *)arginfo) - imgp->usrstack_delta);
+		arginfo = (struct ps_strings *)(((char *)arginfo) - (p->p_sysent->sv_usrstack - p->p_usrstack));
 		//printf("%s: arginfo is %p\n", __func__, arginfo);
 	}
 

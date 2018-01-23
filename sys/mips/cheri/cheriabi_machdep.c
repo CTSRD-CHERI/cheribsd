@@ -790,7 +790,7 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	PROC_LOCK(td->td_proc);
 	lim_rlimit_proc(td->td_proc, RLIMIT_STACK, &rlim_stack);
 	PROC_UNLOCK(td->td_proc);
-	stackbase = td->td_proc->p_sysent->sv_usrstack - rlim_stack.rlim_max;
+	stackbase = td->td_proc->p_usrstack - rlim_stack.rlim_max;
 	KASSERT(stack > stackbase,
 	    ("top of stack 0x%lx is below stack base 0x%lx", stack, stackbase));
 	stacklen = stack - stackbase;
