@@ -403,40 +403,62 @@ vmspace_exitfree(struct proc *p)
 	vmspace_free(vm);
 }
 
+static int coexecve_cleanup_on_exit = 1;
+SYSCTL_INT(_debug, OID_AUTO, coexecve_cleanup_on_exit, CTLFLAG_RWTUN,
+    &coexecve_cleanup_on_exit, 0,
+    "Clean up abandoned vm entries after colocated process exits");
+static int coexecve_cleanup_margin_up = 0x10000;
+SYSCTL_INT(_debug, OID_AUTO, coexecve_cleanup_margin_up, CTLFLAG_RWTUN,
+    &coexecve_cleanup_margin_up, 0,
+    "Maximum hole size for segments growing up when cleaning up after colocated process exits");
+static int coexecve_cleanup_margin_down = MAXSSIZ;
+SYSCTL_INT(_debug, OID_AUTO, coexecve_cleanup_margin_down, CTLFLAG_RWTUN,
+    &coexecve_cleanup_margin_down, 0,
+    "Maximum hole size for segments growing down when cleaning up after colocated process exits");
+
 static void
 vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 {
 	vm_map_entry_t entry, prev, next;
 	vm_offset_t start, end;
-	boolean_t found;
+	boolean_t found, grown_down;
 	int rv;
+
+	if (coexecve_cleanup_on_exit == 0) {
+		old_entry->owner = 0;
+		return;
+	}
 
 	prev = old_entry->prev;
 	next = old_entry->next;
 	start = old_entry->start;
 	end = old_entry->end;
+	grown_down = old_entry->eflags & MAP_ENTRY_GROWS_DOWN;
 	vm_map_delete(map, old_entry->start, old_entry->end);
 
 	/*
-	 * Try to cover the "holes" between abandoned entries.
+	 * Try to cover the "holes" between abandoned entries, so that
+	 * vm_map_simplify_entry() can coalesce them.  Use much larger
+	 * threshold for stacks.
 	 */
 	if (prev != &map->header && prev->object.vm_object == NULL &&
 	    prev->protection == PROT_NONE && prev->owner == 0 &&
-	    start > prev->end && start - prev->end <= 0x10000) {
+	    start > prev->end && start - prev->end <=
+	    ((grown_down != 0) ?
+	    coexecve_cleanup_margin_down : coexecve_cleanup_margin_up)) {
 		start = prev->end;
 	}
 
-	/*
-	 * Also do that for abandoned stacks.
-	 */
 	if (next != &map->header && next->object.vm_object == NULL &&
 	    next->protection == PROT_NONE && next->owner == 0 &&
-	    end < next->start && next->start - end <= MAXSSIZ) {
+	    end < next->start && next->start - end <=
+	    (((next->eflags & MAP_ENTRY_GROWS_DOWN) != 0) ?
+	    coexecve_cleanup_margin_down : coexecve_cleanup_margin_up)) {
 		end = next->start;
 	}
 
 	rv = vm_map_insert(map, NULL, 0, start, end,
-	    PROT_NONE, PROT_NONE, MAP_DISABLE_SYNCER | MAP_DISABLE_COREDUMP);
+	    PROT_NONE, PROT_NONE, MAP_NOFAULT | MAP_DISABLE_SYNCER | MAP_DISABLE_COREDUMP);
 	KASSERT(rv == KERN_SUCCESS,
 	    ("%s: vm_map_insert() failed with error %d\n", __func__, rv));
 
@@ -444,7 +466,29 @@ vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 	KASSERT(found == TRUE,
 	    ("%s: vm_map_insert() returned false\n", __func__));
 
+	KASSERT(entry->protection == PROT_NONE,
+	    ("%s: protection %d\n", __func__, entry->protection));
+	KASSERT(entry->max_protection == PROT_NONE,
+	    ("%s: max_protection %d\n", __func__, entry->max_protection));
+	KASSERT(entry->inheritance == VM_INHERIT_DEFAULT,
+	    ("%s: inheritance %d\n", __func__, entry->inheritance));
+	KASSERT(entry->wired_count == 0,
+	    ("%s: wired_count %d\n", __func__, entry->wired_count));
+	KASSERT(entry->cred == NULL,
+	    ("%s: cred %p\n", __func__, entry->cred));
+
+	/*
+	 * Preserve this particular flag for the purpose of future coalescing
+	 * by another vm_map_entry_abandon() run.
+	 */
+	if (grown_down)
+		entry->eflags |= MAP_ENTRY_GROWS_DOWN;
 	entry->owner = 0;
+
+	/*
+	 * We need to call it again after setting the owner to 0.
+	 */
+	vm_map_simplify_entry(map, entry);
 }
 
 void
@@ -1656,8 +1700,14 @@ vm_map_simplify_entry(vm_map_t map, vm_map_entry_t entry)
 	vm_map_entry_t next, prev;
 	vm_size_t prevsize, esize;
 
-	if ((entry->eflags & (MAP_ENTRY_GROWS_DOWN | MAP_ENTRY_GROWS_UP |
+	if ((entry->eflags & (MAP_ENTRY_GROWS_UP |
 	    MAP_ENTRY_IN_TRANSITION | MAP_ENTRY_IS_SUB_MAP)) != 0)
+		return;
+
+	if ((entry->eflags & MAP_ENTRY_GROWS_DOWN) != 0 &&
+           (entry->object.vm_object != NULL ||
+	    entry->protection != PROT_NONE ||
+	    entry->owner != 0))
 		return;
 
 	prev = entry->prev;
