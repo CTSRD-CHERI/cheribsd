@@ -453,35 +453,21 @@ test_string_kern_memcpy_c(const struct cheri_test *ctp __unused)
 	expected_y = t1.y = CAP(&t2);
 	check(&t1, 0, 32);
 
-	/* Simple case: aligned start and end */
-	invalidate(&t2);
-	cpy = kern_memcpy_c(CAP(&t2), CAP(&t1), sizeof(t1));
-	if ((__cheri_fromcap void *)cpy != &t2)
-		cheritest_failure_errx("kern_memcpy_c did not return dst (&t2)");
-	check(&t2, 0, 32);
-
-	/* Test that it still works with an unaligned start... */
-	invalidate(&t2);
-	cpy = kern_memcpy_c(CAP(&t2.pad0[3]), CAP(&t1.pad0[3]), sizeof(t1) - 3);
-	if ((__cheri_fromcap void*)cpy != &t2.pad0[3])
-		cheritest_failure_errx("kern_memcpy_c did not return dst "
-		    "(&t2.pad0[3])");
-	check(&t2, 3, 32);
-
-	/* ...or and unaligned end... */
-	invalidate(&t2);
-	cpy = kern_memcpy_c(CAP(&t2), CAP(&t1), sizeof(t1) - 3);
-	if ((__cheri_fromcap void *)cpy != &t2)
-		cheritest_failure_errx("kern_memcpy_c did not return dst (&t2)");
-	check(&t2, 0, 29);
-
-	/* ...or both... */
-	invalidate(&t2);
-	cpy = kern_memcpy_c(CAP(&t2.pad0[3]), CAP(&t1.pad0[3]), sizeof(t1) - 6);
-	if ((__cheri_fromcap void*)cpy != &t2.pad0[3])
-		cheritest_failure_errx("kern_memcpy_c did not return dst "
-		    "(&t2.pad0[3])");
-	check(&t2, 3, 29);
+	/* Check all combinations of start and end alignments */
+	for (size_t head = 0; head < sizeof(t2.pad0); head++) {
+		for (size_t tail = 0; tail < sizeof(t2.pad1); tail++) {
+			int len = sizeof(t2) - head - (sizeof(t2.pad1) - tail);
+			invalidate(&t2);
+			cpy = kern_memcpy_c(CAP(&t2.pad0[head]),
+			    CAP(&t1.pad0[head]),
+			    len);
+			if ((__cheri_fromcap void*)cpy != &t2.pad0[head])
+				cheritest_failure_errx(
+				    "kern_memcpy_c did not return dst "
+				    "(&t2.pad0[%zu])", head);
+			check(&t2, head, tail);
+		}
+	}
 
 	/* ...and case where the alignment is different for both... */
 	invalidate(&t2);
@@ -555,35 +541,21 @@ test_string_kern_memmove_c(const struct cheri_test *ctp __unused)
 	}
 	expected_y = t1.y = CAP(&t2);
 
-	/* Simple case: aligned start and end */
-	invalidate(&t2);
-	cpy = kern_memmove_c(CAP(&t2), CAP(&t1), sizeof(t1));
-	if ((__cheri_fromcap void *)cpy != &t2)
-		cheritest_failure_errx("kern_memmove_c did not return dst (&t2)");
-	check(&t2, 0, 32);
-
-	/* Test that it still works with an unaligned start... */
-	invalidate(&t2);
-	cpy = kern_memmove_c(CAP(&t2.pad0[3]), CAP(&t1.pad0[3]), sizeof(t1) - 3);
-	if ((__cheri_fromcap void*)cpy != &t2.pad0[3])
-		cheritest_failure_errx("kern_memmove_c did not return dst "
-		    "(&t2.pad0[3])");
-	check(&t2, 3, 32);
-
-	/* ...or and unaligned end... */
-	invalidate(&t2);
-	cpy = kern_memmove_c(CAP(&t2), CAP(&t1), sizeof(t1) - 3);
-	if ((__cheri_fromcap void *)cpy != &t2)
-		cheritest_failure_errx("kern_memmove_c did not return dst (&t2)");
-	check(&t2, 0, 29);
-
-	/* ...or both... */
-	invalidate(&t2);
-	cpy = kern_memmove_c(CAP(&t2.pad0[3]), CAP(&t1.pad0[3]), sizeof(t1) - 6);
-	if ((__cheri_fromcap void*)cpy != &t2.pad0[3])
-		cheritest_failure_errx("kern_memmove_c did not return dst "
-		    "(&t2.pad0[3])");
-	check(&t2, 3, 29);
+	/* Check all combinations of start and end alignments */
+	for (size_t head = 0; head < sizeof(t2.pad0); head++) {
+		for (size_t tail = 0; tail < sizeof(t2.pad0); tail++) {
+			int len = sizeof(t2) - head - (sizeof(t2.pad1) - tail);
+			invalidate(&t2);
+			cpy = kern_memmove_c(CAP(&t2.pad0[head]),
+			    CAP(&t1.pad0[head]),
+			    len);
+			if ((__cheri_fromcap void*)cpy != &t2.pad0[head])
+				cheritest_failure_errx(
+				    "kern_memcpy_c did not return dst "
+				    "(&t2.pad0[%zu])", head);
+			check(&t2, head, tail);
+		}
+	}
 
 	/* ...and case where the alignment is different for both... */
 	invalidate(&t2);
