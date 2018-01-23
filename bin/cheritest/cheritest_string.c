@@ -81,14 +81,20 @@ check(struct Test *t1, int start, int end)
 
 	for (i = start; i < 32; i++)
 		if (t1->pad0[i] != i)
-			cheritest_failure_errx("t1->pad0[%d] != %d", i, i);
+			cheritest_failure_errx(
+			    "(start = %d, end %d) t1->pad0[%d] != %d", start,
+			    end, i, i);
 	if (t1->y != expected_y)
-		cheritest_failure_errx("t1->y != t1");
+		cheritest_failure_errx("(start = %d, end %d) t1->y != t1",
+		    start, end);
 	if (!cheri_gettag(t1->y))
-		cheritest_failure_errx("t1->y is untagged");
+		cheritest_failure_errx("(start = %d, end %d) t1->y is untagged",
+		     start, end);
 	for (i = 0 ; i < end ; i++)
 		if (t1->pad1[i] != i)
-			cheritest_failure_errx("t1->pad1[%d] != %d", i, i);
+			cheritest_failure_errx(
+			    "(start = %d, end %d) t1->pad1[%d] != %d",
+			    start, end, i, i);
 }
 
 /*
