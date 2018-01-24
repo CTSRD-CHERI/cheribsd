@@ -407,14 +407,18 @@ static int coexecve_cleanup_on_exit = 1;
 SYSCTL_INT(_debug, OID_AUTO, coexecve_cleanup_on_exit, CTLFLAG_RWTUN,
     &coexecve_cleanup_on_exit, 0,
     "Clean up abandoned vm entries after colocated process exits");
+static int coexecve_cleanup_on_fork = 0;
+SYSCTL_INT(_debug, OID_AUTO, coexecve_cleanup_on_fork, CTLFLAG_RWTUN,
+    &coexecve_cleanup_on_fork, 0,
+    "Clean up abandoned vm entries after colocated process forks");
 static int coexecve_cleanup_margin_up = 0x10000;
 SYSCTL_INT(_debug, OID_AUTO, coexecve_cleanup_margin_up, CTLFLAG_RWTUN,
     &coexecve_cleanup_margin_up, 0,
-    "Maximum hole size for segments growing up when cleaning up after colocated process exits");
+    "Maximum hole size for segments growing up when cleaning up after colocated processes");
 static int coexecve_cleanup_margin_down = MAXSSIZ;
 SYSCTL_INT(_debug, OID_AUTO, coexecve_cleanup_margin_down, CTLFLAG_RWTUN,
     &coexecve_cleanup_margin_down, 0,
-    "Maximum hole size for segments growing down when cleaning up after colocated process exits");
+    "Maximum hole size for segments growing down when cleaning up after colocated processes");
 
 static void
 vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
@@ -423,11 +427,6 @@ vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 	vm_offset_t start, end;
 	boolean_t found, grown_down;
 	int rv;
-
-	if (coexecve_cleanup_on_exit == 0) {
-		old_entry->owner = 0;
-		return;
-	}
 
 	prev = old_entry->prev;
 	next = old_entry->next;
@@ -547,8 +546,17 @@ again:
 		for (entry = map->header.next; entry != &map->header;
 		    entry = entry->next) {
 			if (entry->owner == p->p_pid) {
-				vm_map_entry_abandon(map, entry);
-				goto again;
+				if (coexecve_cleanup_on_exit != 0) {
+					vm_map_entry_abandon(map, entry);
+					/*
+					 * vm_map_entry_abandon() frees
+					 * the entry, and possibly also
+					 * the next one, due to coalescing.
+					 */
+					goto again;
+				} else {
+					entry->owner = 0;
+				}
 			}
 		}
 		vm_map_unlock(map);
@@ -3595,6 +3603,8 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 		if (old_entry->eflags & MAP_ENTRY_IS_SUB_MAP)
 			panic("vm_map_fork: encountered a submap");
 
+		new_entry = NULL;
+
 		switch (old_entry->inheritance) {
 		case VM_INHERIT_NONE:
 			break;
@@ -3751,9 +3761,14 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 		// XXX: We should just skip (not duplicate) mappings that
 		// 	are not owned by us.  This, however, breaks certain
 		// 	things, for reasons yet unknown.
-		if (old_entry->owner != curproc->p_pid &&
-		    (old_entry->object.vm_object == NULL || old_entry->object.vm_object->type != OBJT_PHYS)) {
-			new_entry->owner = 0;
+		if (new_entry != NULL && old_entry->owner != curproc->p_pid &&
+		    (old_entry->object.vm_object == NULL ||
+		     old_entry->object.vm_object->type != OBJT_PHYS)) {
+			if (coexecve_cleanup_on_fork != 0) {
+				vm_map_entry_abandon(new_map, new_entry);
+			} else {
+				new_entry->owner = 0;
+			}
 		}
 
 		old_entry = old_entry->next;
