@@ -43,7 +43,7 @@ CFLAGS+=	-DCHERIABI_TESTS
 .ifndef BOOTSTRAPPING
 .PATH: ${SRCTOP}/sys/mips/cheri
 SRCS+=	cheri_memcpy_c.S
-CFLAGS.cheri_memcpy_c.S=-D__KERN_FUNC_PREFIX -D_KERNEL
+CFLAGS.cheri_memcpy_c.S=-D__KERN_FUNC_PREFIX -D_KERNEL -DINVARIANTS
 CFLAGS+=	-DKERNEL_MEMCPY_TESTS
 .else
 .endif

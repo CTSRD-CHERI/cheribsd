@@ -78,9 +78,17 @@ XLEAF(FUNC_PREFIX(bcopynocap_c))
 	li	t0, ~CHERI_PERM_LOAD_CAP
 	candperm	$c3, $c3, t0	/* strip LOAD_CAP from dst */
 XLEAF(FUNC_PREFIX(bcopy_c))
-	beqz	a0, return	/* return immediately if zero-length */
-	cltu	t0, $c3, $c4	/* forward or backward copy? */
-	bnez	t0, backward
+	beqz		a0, return	/* return immediately if zero-length */
+	cltu		t0, $c3, $c4	/* forward or backward copy? */
+#ifdef INVARIANTS
+	csetbounds	$c3, $c3, a0
+	csetbounds	$c4, $c4, a0
+	li		t8, ~(CHERI_PERM_STORE_CAP|CHERI_PERM_STORE)
+	candperm	$c3, $c3, t8
+	li		t8, ~(CHERI_PERM_LOAD_CAP|CHERI_PERM_LOAD)
+	candperm	$c4, $c4,t8
+#endif
+	bnez		t0, backward
 
 forward:
 	cgetbase	t0, $c3
