@@ -66,35 +66,12 @@
 
 #define	RW_OWNER(x)		((x) & ~RW_LOCK_FLAGMASK)
 #define	RW_READERS_SHIFT	5
+#define	RW_READERS(x)		(ptr_get_flag(x, ~RW_LOCK_FLAGMASK) >> RW_READERS_SHIFT)
 #define	RW_READERS_LOCK(x)	((x) << RW_READERS_SHIFT | RW_LOCK_READ)
 #define	RW_ONE_READER		(1 << RW_READERS_SHIFT)
 
 #define	RW_UNLOCKED		RW_READERS_LOCK(0)
 #define	RW_DESTROYED		(RW_LOCK_READ_WAITERS | RW_LOCK_WRITE_WAITERS)
-
-/*
- * Macros to check the value of flags embedded in pointers
- * XXX-AM: it may turn out that these can be generalized
- * CheriABI pointer values are compared to integers
- * derived from the canonical NULL capability. This breaks
- * comparison of flags embedded in pointers because
- * the comparison doesn't take into account only the offset.
- * We cast the pointer value to a integer address for the
- * purposes of comparison.
- */
-#ifndef CHERI_KERNEL
-#define	RW_READERS(x)		(RW_OWNER((x)) >> RW_READERS_SHIFT)
-#define RW_GET_FLAG(x, f)	((x) & (f))
-#else /* CHERI_KERNEL */
-#define	RW_READERS(x)		((vm_offset_t)RW_OWNER((x)) >> RW_READERS_SHIFT)
-#define RW_GET_FLAG(x, f)	((vm_offset_t)(x) & (f))
-#endif /* CHERI_KERNEL */
-#define RW_GET_READ(x)		RW_GET_FLAG(x, RW_LOCK_READ)
-#define RW_GET_READ_WAITERS(x)	RW_GET_FLAG(x, RW_LOCK_READ_WAITERS)
-#define RW_GET_WRITE_WAITERS(x)	RW_GET_FLAG(x, RW_LOCK_WRITE_WAITERS)
-#define RW_GET_WAITERS(x)	RW_GET_FLAG(x, RW_LOCK_WAITERS)
-#define RW_GET_WRITE_SPINNER(x)	RW_GET_FLAG(x, RW_LOCK_WRITE_SPINNER)
-#define RW_GET_WRITER_RECURSED(x) RW_GET_FLAG(x, RW_LOCK_WRITER_RECURSED)
 
 #ifdef _KERNEL
 

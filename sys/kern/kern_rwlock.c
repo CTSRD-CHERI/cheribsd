@@ -116,7 +116,7 @@ LOCK_DELAY_SYSINIT_DEFAULT(rw_delay);
  */
 
 #define	lv_rw_wowner(v)							\
-	(RW_GET_READ(v) ? NULL :		\
+	(ptr_get_flag(v, RW_LOCK_READ) ? NULL :				\
 	 (struct thread *)RW_OWNER((v)))
 
 #define	rw_wowner(rw)	lv_rw_wowner(RW_READ_VALUE(rw))
@@ -169,7 +169,7 @@ unlock_rw(struct lock_object *lock)
 
 	rw = (struct rwlock *)lock;
 	rw_assert(rw, RA_LOCKED | LA_NOTRECURSED);
-	if (RW_GET_READ(rw->rw_lock)) {
+	if (ptr_get_flag(rw->rw_lock, RW_LOCK_READ)) {
 		rw_runlock(rw);
 		return (1);
 	} else {
@@ -186,7 +186,7 @@ owner_rw(const struct lock_object *lock, struct thread **owner)
 	uintptr_t x = rw->rw_lock;
 
 	*owner = rw_wowner(rw);
-	return (RW_GET_READ(x) != 0 ? (RW_READERS(x) != 0) :
+	return (ptr_get_flag(x, RW_LOCK_READ) != 0 ? (RW_READERS(x) != 0) :
 	    (*owner != NULL));
 }
 #endif
@@ -371,8 +371,8 @@ _rw_wunlock_cookie(volatile uintptr_t *c, const char *file, int line)
  * prioritizes writers before readers.
  */
 #define	RW_CAN_READ(td, _rw)						\
-	(((td)->td_rw_rlocks && RW_GET_READ(_rw)) ||			\
-	 RW_GET_FLAG(_rw, RW_LOCK_READ | RW_LOCK_WRITE_WAITERS |	\
+	(((td)->td_rw_rlocks && ptr_get_flag(_rw, RW_LOCK_READ)) ||	\
+	 ptr_get_flag(_rw, RW_LOCK_READ | RW_LOCK_WRITE_WAITERS |	\
 		     RW_LOCK_WRITE_SPINNER)				\
 	 == RW_LOCK_READ)
 
@@ -465,7 +465,7 @@ __rw_rlock_hard(volatile uintptr_t *c, struct thread *td, uintptr_t v,
 		 * the owner stops running or the state of the lock
 		 * changes.
 		 */
-		if (RW_GET_READ(v) == 0) {
+		if (ptr_get_flag(v, RW_LOCK_READ) == 0) {
 			owner = (struct thread *)RW_OWNER(v);
 			if (TD_IS_RUNNING(owner)) {
 				if (LOCK_LOG_TEST(&rw->lock_object, 0))
@@ -491,7 +491,8 @@ __rw_rlock_hard(volatile uintptr_t *c, struct thread *td, uintptr_t v,
 			    rw->lock_object.lo_name);
 			for (i = 0; i < rowner_loops; i++) {
 				v = RW_READ_VALUE(rw);
-				if (RW_GET_READ(v) == 0 || RW_CAN_READ(td, v))
+				if (ptr_get_flag(v, RW_LOCK_READ) == 0 ||
+				    RW_CAN_READ(td, v))
 					break;
 				cpu_spinwait();
 			}
@@ -532,7 +533,7 @@ __rw_rlock_hard(volatile uintptr_t *c, struct thread *td, uintptr_t v,
 		 * chain lock.  If so, drop the turnstile lock and try
 		 * again.
 		 */
-		if (RW_GET_READ(v) == 0) {
+		if (ptr_get_flag(v, RW_LOCK_READ) == 0) {
 			owner = (struct thread *)RW_OWNER(v);
 			if (TD_IS_RUNNING(owner)) {
 				turnstile_cancel(ts);
@@ -552,9 +553,9 @@ __rw_rlock_hard(volatile uintptr_t *c, struct thread *td, uintptr_t v,
 		 * to set it.  If we fail to set it drop the turnstile
 		 * lock and restart the loop.
 		 */
-		if (!RW_GET_READ_WAITERS(v)) {
+		if (!ptr_get_flag(v, RW_LOCK_READ_WAITERS)) {
 			if (!atomic_cmpset_ptr(&rw->rw_lock, v,
-			    v | RW_LOCK_READ_WAITERS)) {
+			    ptr_put_flag(v, RW_LOCK_READ_WAITERS))) {
 				turnstile_cancel(ts);
 				v = RW_READ_VALUE(rw);
 				continue;
@@ -588,14 +589,14 @@ __rw_rlock_hard(volatile uintptr_t *c, struct thread *td, uintptr_t v,
 	all_time += lockstat_nsecs(&rw->lock_object);
 	if (sleep_time)
 		LOCKSTAT_RECORD4(rw__block, rw, sleep_time,
-		    LOCKSTAT_READER, RW_GET_READ(state) == 0,
-		    RW_GET_READ(state) == 0 ? 0 : RW_READERS(state));
+		     LOCKSTAT_READER, ptr_get_flag(state, RW_LOCK_READ) == 0,
+		     ptr_get_flag(state, RW_LOCK_READ) == 0 ? 0 : RW_READERS(state));
 
 	/* Record only the loops spinning and not sleeping. */
 	if (lda.spin_cnt > sleep_cnt)
 		LOCKSTAT_RECORD4(rw__spin, rw, all_time - sleep_time,
-		    LOCKSTAT_READER, RW_GET_READ(state) == 0,
-		    RW_GET_READ(state) == 0 ? 0 : RW_READERS(state));
+		    LOCKSTAT_READER, ptr_get_flag(state, RW_LOCK_READ) == 0,
+		    ptr_get_flag(state, RW_LOCK_READ) == 0 ? 0 : RW_READERS(state));
 #endif
 	/*
 	 * TODO: acquire "owner of record" here.  Here be turnstile dragons
@@ -655,7 +656,7 @@ __rw_try_rlock(volatile uintptr_t *c, const char *file, int line)
 	for (;;) {
 		KASSERT(rw->rw_lock != RW_DESTROYED,
 		    ("rw_try_rlock() of destroyed rwlock @ %s:%d", file, line));
-		if (!RW_GET_READ(x))
+		if (!ptr_get_flag(x, RW_LOCK_READ))
 			break;
 		if (atomic_fcmpset_acq_ptr(&rw->rw_lock, &x, x + RW_ONE_READER)) {
 			LOCK_LOG_TRY("RLOCK", &rw->lock_object, 0, 1, file,
@@ -699,8 +700,8 @@ __rw_runlock_try(struct rwlock *rw, struct thread *td, uintptr_t *vp)
 		 * If there aren't any waiters for a write lock, then try
 		 * to drop it quickly.
 		 */
-		if (!RW_GET_WAITERS(*vp)) {
-			MPASS(RW_GET_FLAG(*vp, ~RW_LOCK_WRITE_SPINNER) ==
+		if (!ptr_get_flag(*vp, RW_LOCK_WAITERS)) {
+			MPASS(ptr_get_flag(*vp, ~RW_LOCK_WRITE_SPINNER) ==
 			    RW_READERS_LOCK(1));
 			if (atomic_fcmpset_rel_ptr(&rw->rw_lock, vp,
 			    RW_UNLOCKED)) {
@@ -739,8 +740,9 @@ __rw_runlock_hard(volatile uintptr_t *c, struct thread *td, uintptr_t v,
 		 * last reader, so grab the turnstile lock.
 		 */
 		turnstile_chain_lock(&rw->lock_object);
-		v = rw->rw_lock & (RW_LOCK_WAITERS | RW_LOCK_WRITE_SPINNER);
-		MPASS(RW_GET_WAITERS(v));
+		v = ptr_get_flag(rw->rw_lock,
+				 (RW_LOCK_WAITERS | RW_LOCK_WRITE_SPINNER));
+		MPASS(v & RW_LOCK_WAITERS);
 
 		/*
 		 * Try to drop our lock leaving the lock in a unlocked
@@ -759,7 +761,7 @@ __rw_runlock_hard(volatile uintptr_t *c, struct thread *td, uintptr_t v,
 		 * restart.
 		 */
 		x = RW_UNLOCKED;
-		if (RW_GET_WRITE_WAITERS(v)) {
+		if (v & RW_LOCK_WRITE_WAITERS) {
 			queue = TS_EXCLUSIVE_QUEUE;
 			x |= (v & RW_LOCK_READ_WAITERS);
 		} else
@@ -901,7 +903,7 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v, uintptr_t tid,
 		 * running or the state of the lock changes.
 		 */
 		owner = lv_rw_wowner(v);
-		if (!(RW_GET_READ(v) && TD_IS_RUNNING(owner)) {
+		if (!(ptr_get_flag(v, RW_LOCK_READ) && TD_IS_RUNNING(owner)) {
 			if (LOCK_LOG_TEST(&rw->lock_object, 0))
 				CTR3(KTR_LOCK, "%s: spinning on %p held by %p",
 				    __func__, rw, owner);
@@ -917,11 +919,11 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v, uintptr_t tid,
 			    "running");
 			continue;
 		}
-		if ((RW_GET_READ(v) && RW_READERS(v) &&
+		if ((ptr_get_flag(v, RW_LOCK_READ) && RW_READERS(v) &&
 		    spintries < rowner_retries) {
-			if (!RW_GET_WRITE_SPINNER(v)) {
+			if (!ptr_get_flag(v, RW_LOCK_WRITE_SPINNER)) {
 				if (!atomic_cmpset_ptr(&rw->rw_lock, v,
-				    v | RW_LOCK_WRITE_SPINNER)) {
+				    ptr_put_flag(v, RW_LOCK_WRITE_SPINNER))) {
 					v = RW_READ_VALUE(rw);
 					continue;
 				}
@@ -931,7 +933,7 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v, uintptr_t tid,
 			    "spinning", "lockname:\"%s\"",
 			    rw->lock_object.lo_name);
 			for (i = 0; i < rowner_loops; i++) {
-				if (RW_GET_WRITE_SPINNER(rw->rw_lock) == 0)
+				if (ptr_get_flag(rw->rw_lock, RW_LOCK_WRITE_SPINNER) == 0)
 					break;
 				cpu_spinwait();
 			}
@@ -956,7 +958,7 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v, uintptr_t tid,
 		 * chain lock.  If so, drop the turnstile lock and try
 		 * again.
 		 */
-		if (!RW_GET_READ(v)) {
+		if (!ptr_get_flag(v, RW_LOCK_READ)) {
 			owner = (struct thread *)RW_OWNER(v);
 			if (TD_IS_RUNNING(owner)) {
 				turnstile_cancel(ts);
@@ -971,10 +973,11 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v, uintptr_t tid,
 		 * If a pending waiters queue is present, claim the lock
 		 * ownership and maintain the pending queue.
 		 */
-		x = RW_GET_FLAG(v, RW_LOCK_WAITERS | RW_LOCK_WRITE_SPINNER);
-		if (RW_GET_FLAG(v, ~x) == RW_UNLOCKED) {
+		x = ptr_get_flag(v, RW_LOCK_WAITERS | RW_LOCK_WRITE_SPINNER);
+		if (ptr_get_flag(v, ~x) == RW_UNLOCKED) {
 			x &= ~RW_LOCK_WRITE_SPINNER;
-			if (atomic_cmpset_acq_ptr(&rw->rw_lock, v, tid | x)) {
+			if (atomic_cmpset_acq_ptr(&rw->rw_lock, v,
+			    ptr_put_flag(tid, x))) {
 				if (x)
 					turnstile_claim(ts);
 				else
@@ -990,9 +993,9 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v, uintptr_t tid,
 		 * set it.  If we fail to set it, then loop back and try
 		 * again.
 		 */
-		if (!RW_GET_WRITE_WAITERS(v)) {
+		if (!ptr_get_flag(v, RW_LOCK_WRITE_WAITERS)) {
 			if (!atomic_cmpset_ptr(&rw->rw_lock, v,
-			    v | RW_LOCK_WRITE_WAITERS)) {
+			    ptr_put_flag(v, RW_LOCK_WRITE_WAITERS))) {
 				turnstile_cancel(ts);
 				v = RW_READ_VALUE(rw);
 				continue;
@@ -1028,14 +1031,14 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v, uintptr_t tid,
 	all_time += lockstat_nsecs(&rw->lock_object);
 	if (sleep_time)
 		LOCKSTAT_RECORD4(rw__block, rw, sleep_time,
-		    LOCKSTAT_WRITER, RW_GET_READ(state) == 0,
-		    RW_GET_READ(state) == 0 ? 0 : RW_READERS(state));
+		    LOCKSTAT_WRITER, ptr_get_flag(state, RW_LOCK_READ) == 0,
+		    ptr_get_flag(state, RW_LOCK_READ) == 0 ? 0 : RW_READERS(state));
 
 	/* Record only the loops spinning and not sleeping. */
 	if (lda.spin_cnt > sleep_cnt)
 		LOCKSTAT_RECORD4(rw__spin, rw, all_time - sleep_time,
-		    LOCKSTAT_WRITER, RW_GET_READ(state) == 0,
-		    RW_GET_READ(state) == 0 ? 0 : RW_READERS(state));
+		    LOCKSTAT_WRITER, ptr_get_flag(state, RW_LOCK_READ) == 0,
+		    ptr_get_flag(state, RW_LOCK_READ) == 0 ? 0 : RW_READERS(state));
 #endif
 	LOCKSTAT_PROFILE_OBTAIN_RWLOCK_SUCCESS(rw__acquire, rw, contested,
 	    waittime, file, line, LOCKSTAT_WRITER);
@@ -1061,7 +1064,7 @@ __rw_wunlock_hard(volatile uintptr_t *c, uintptr_t tid, const char *file,
 
 	rw = rwlock2rw(c);
 	v = RW_READ_VALUE(rw);
-	if (RW_GET_WRITER_RECURSED(v)) {
+	if (ptr_get_flag(v, RW_LOCK_WRITER_RECURSED)) {
 		if (--(rw->rw_recurse) == 0)
 			atomic_clear_ptr(&rw->rw_lock, RW_LOCK_WRITER_RECURSED);
 		if (LOCK_LOG_TEST(&rw->lock_object, 0))
@@ -1073,7 +1076,8 @@ __rw_wunlock_hard(volatile uintptr_t *c, uintptr_t tid, const char *file,
 	if (v == tid && _rw_write_unlock(rw, tid))
 		return;
 
-	KASSERT(rw->rw_lock & (RW_LOCK_READ_WAITERS | RW_LOCK_WRITE_WAITERS),
+	KASSERT(ptr_get_flag(rw->rw_lock, (RW_LOCK_READ_WAITERS |
+	    RW_LOCK_WRITE_WAITERS)),
 	    ("%s: neither of the waiter flags are set", __func__));
 
 	if (LOCK_LOG_TEST(&rw->lock_object, 0))
@@ -1100,9 +1104,9 @@ __rw_wunlock_hard(volatile uintptr_t *c, uintptr_t tid, const char *file,
 	 * of waiters or doing some complicated lock handoff gymnastics.
 	 */
 	v = RW_UNLOCKED;
-	if (RW_GET_WRITE_WAITERS(rw->rw_lock)) {
+	if (ptr_get_flag(rw->rw_lock, RW_LOCK_WRITE_WAITERS)) {
 		queue = TS_EXCLUSIVE_QUEUE;
-		v |= (rw->rw_lock & RW_LOCK_READ_WAITERS);
+		v |= ptr_get_flag(rw->rw_lock, RW_LOCK_READ_WAITERS);
 	} else
 		queue = TS_SHARED_QUEUE;
 
@@ -1151,7 +1155,7 @@ __rw_try_upgrade(volatile uintptr_t *c, const char *file, int line)
 		v = rw->rw_lock;
 		if (RW_READERS(v) > 1)
 			break;
-		if (!RW_GET_WAITERS(v)) {
+		if (!ptr_get_flag(v, RW_LOCK_WAITERS)) {
 			success = atomic_cmpset_acq_ptr(&rw->rw_lock, v, tid);
 			if (!success)
 				continue;
@@ -1173,8 +1177,8 @@ __rw_try_upgrade(volatile uintptr_t *c, const char *file, int line)
 		 * If we obtain the lock with the flags set, then claim
 		 * ownership of the turnstile.
 		 */
-		x = rw->rw_lock & RW_LOCK_WAITERS;
-		success = atomic_cmpset_ptr(&rw->rw_lock, v, tid | x);
+		x = ptr_get_flag(rw->rw_lock, RW_LOCK_WAITERS);
+		success = atomic_cmpset_ptr(&rw->rw_lock, v, ptr_put_flag(tid, x));
 		if (success) {
 			if (x)
 				turnstile_claim(ts);
@@ -1234,7 +1238,7 @@ __rw_downgrade(volatile uintptr_t *c, const char *file, int line)
 	 * read the waiter flags without any races.
 	 */
 	turnstile_chain_lock(&rw->lock_object);
-	v = rw->rw_lock & RW_LOCK_WAITERS;
+	v = ptr_get_flag(rw->rw_lock, RW_LOCK_WAITERS);
 	rwait = v & RW_LOCK_READ_WAITERS;
 	wwait = v & RW_LOCK_WRITE_WAITERS;
 	MPASS(rwait | wwait);
@@ -1300,13 +1304,14 @@ __rw_assert(const volatile uintptr_t *c, int what, const char *file, int line)
 		 * has a lock at all, fail.
 		 */
 		if (rw->rw_lock == RW_UNLOCKED ||
-		    (!RW_GET_READ(rw->rw_lock) && (what & RA_RLOCKED ||
-		    rw_wowner(rw) != curthread)))
+		    (!ptr_get_flag(rw->rw_lock, RW_LOCK_READ) &&
+		     (what & RA_RLOCKED || rw_wowner(rw) != curthread)))
 			panic("Lock %s not %slocked @ %s:%d\n",
 			    rw->lock_object.lo_name, (what & RA_RLOCKED) ?
 			    "read " : "", file, line);
 
-		if (!RW_GET_READ(rw->rw_lock) && !(what & RA_RLOCKED)) {
+		if (!ptr_get_flag(rw->rw_lock, RW_LOCK_READ) &&
+		    !(what & RA_RLOCKED)) {
 			if (rw_recursed(rw)) {
 				if (what & RA_NOTRECURSED)
 					panic("Lock %s recursed @ %s:%d\n",
@@ -1367,7 +1372,7 @@ db_show_rwlock(const struct lock_object *lock)
 	else if (rw->rw_lock == RW_DESTROYED) {
 		db_printf("DESTROYED\n");
 		return;
-	} else if (RW_GET_READ(rw->rw_lock))
+	} else if (ptr_get_flag(rw->rw_lock, RW_LOCK_READ))
 		db_printf("RLOCK: %ju locks\n",
 		    (uintmax_t)(RW_READERS(rw->rw_lock)));
 	else {
@@ -1378,7 +1383,7 @@ db_show_rwlock(const struct lock_object *lock)
 			db_printf(" recursed: %u\n", rw->rw_recurse);
 	}
 	db_printf(" waiters: ");
-	switch (RW_GET_WAITERS(rw->rw_lock)) {
+	switch (ptr_get_flag(rw->rw_lock, RW_LOCK_WAITERS)) {
 	case RW_LOCK_READ_WAITERS:
 		db_printf("readers\n");
 		break;
