@@ -1230,6 +1230,7 @@ static __inline void
 atomic_clear_cap(__volatile uintptr_t *p, uintptr_t v)
 {
 	uintptr_t temp;
+	v = ~v;
 
 	__asm __volatile (
 		"1:\n\t"
