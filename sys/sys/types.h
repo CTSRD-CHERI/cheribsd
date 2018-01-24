@@ -298,6 +298,23 @@ typedef	_Bool	bool;
 
 #define offsetof(type, field) __offsetof(type, field)
 
+/*
+ * Macros that provide correct handling of flags embedded
+ * in pointer bits.
+ *
+ * This is mostly used by mutex and rwlock.
+ */
+#ifndef __ptr_put_flag
+/* if there are no machine-dependant defines, use this default */
+#define __ptr_put_flag(p, f) ((uintptr_t)(p) | (f))
+#endif
+#ifndef __ptr_get_flag
+/* if there are no machine-dependant defines, use this default */
+#define __ptr_get_flag(p, f) ((uintptr_t)(p) & (f))
+#endif
+#define ptr_put_flag(p, f) __ptr_put_flag(p, f)
+#define ptr_get_flag(p, f) __ptr_get_flag(p, f)
+
 #endif /* !_KERNEL */
 
 /*

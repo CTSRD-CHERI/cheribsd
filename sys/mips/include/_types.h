@@ -159,6 +159,17 @@ typedef	int		___wchar_t;
 #define	__WCHAR_MIN	__INT_MIN	/* min value for a wchar_t */
 #define	__WCHAR_MAX	__INT_MAX	/* max value for a wchar_t */
 
+#if defined(_KERNEL) && defined(__CHERI_PURE_CAPABILITY__)
+/*
+ * CHERI-specific pointer flags embedding macros
+ *
+ * Make sure that the flag is extracted from a pointer as an integer
+ * so that integer comparison will be properly used.
+ */
+#define __ptr_get_flag(p, f) ((__vm_offset_t)(p) & (f))
+#endif
+
+
 /*
  * Unusual type definitions.
  */
