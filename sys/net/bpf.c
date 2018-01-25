@@ -63,6 +63,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysent.h>
 #include <sys/ttycom.h>
 #include <sys/uio.h>
+#include <sys/sysent.h>
 
 #include <sys/event.h>
 #include <sys/file.h>
@@ -1343,10 +1344,18 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	 * If we're called from a 32-bit process, mark the stream as 32-bit
 	 * so that it will get 32-bit packet headers.
 	 */
-	if (SV_CURPROC_FLAG(SV_ILP32)) {
-		BPFD_LOCK(d);
-		d->bd_compat32 = 1;
-		BPFD_UNLOCK(d);
+	switch (cmd) {
+	case BIOCSETF32:
+	case BIOCSETFNR32:
+	case BIOCSETWF32:
+	case BIOCGDLTLIST32:
+	case BIOCGRTIMEOUT32:
+	case BIOCSRTIMEOUT32:
+		if (SV_PROC_FLAG(td->td_proc, SV_ILP32)) {
+			BPFD_LOCK(d);
+			d->bd_compat32 = 1;
+			BPFD_UNLOCK(d);
+		}
 	}
 #endif
 
