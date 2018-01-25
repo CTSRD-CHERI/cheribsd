@@ -3762,8 +3762,9 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 		// 	are not owned by us.  This, however, breaks certain
 		// 	things, for reasons yet unknown.
 		if (new_entry != NULL && old_entry->owner != curproc->p_pid &&
+		    old_entry->owner != 0 &&
 		    (old_entry->object.vm_object == NULL ||
-		     old_entry->object.vm_object->type != OBJT_PHYS)) {
+		    old_entry->object.vm_object->type != OBJT_PHYS)) {
 			if (coexecve_cleanup_on_fork != 0) {
 				vm_map_entry_abandon(new_map, new_entry);
 			} else {
