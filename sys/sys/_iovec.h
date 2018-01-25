@@ -45,4 +45,14 @@ struct iovec {
 	size_t	 iov_len;	/* Length. */
 };
 
+#define	IOVEC_INIT(iovp, base, len)					\
+do {									\
+	(iovp)->iov_base = (base);					\
+	(iovp)->iov_len = (len);					\
+} while(0)
+#define	IOVEC_INIT_STR(iovp, str)					\
+	IOVEC_INIT(iovp, str, strlen(str) + 1)
+#define	IOVEC_INIT_OBJ(iovp, objp)					\
+	IOVEC_INIT(iovp, objp, sizeof(*(objp)))
+
 #endif /* !_SYS__IOVEC_H_ */

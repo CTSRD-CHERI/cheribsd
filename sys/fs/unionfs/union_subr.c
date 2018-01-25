@@ -988,8 +988,7 @@ unionfs_copyfile_core(struct vnode *lvp, struct vnode *uvp,
 
 		uio.uio_iov = &iov;
 		uio.uio_iovcnt = 1;
-		iov.iov_base = buf;
-		iov.iov_len = MAXBSIZE;
+		IOVEC_INIT(&iov, buf, MAXBSIZE);
 		uio.uio_resid = iov.iov_len;
 		uio.uio_rw = UIO_READ;
 
@@ -1002,8 +1001,7 @@ unionfs_copyfile_core(struct vnode *lvp, struct vnode *uvp,
 		while (bufoffset < count) {
 			uio.uio_iov = &iov;
 			uio.uio_iovcnt = 1;
-			iov.iov_base = buf + bufoffset;
-			iov.iov_len = count - bufoffset;
+			IOVEC_INIT(&iov, buf + bufoffset, count - bufoffset);
 			uio.uio_offset = offset + bufoffset;
 			uio.uio_resid = iov.iov_len;
 			uio.uio_rw = UIO_WRITE;
@@ -1150,8 +1148,7 @@ unionfs_check_rmdir(struct vnode *vp, struct ucred *cred, struct thread *td)
 	error = mac_vnode_check_readdir(td->td_ucred, lvp);
 #endif
 	while (!error && !eofflag) {
-		iov.iov_base = buf;
-		iov.iov_len = sizeof(buf);
+		IOVEC_INIT_OBJ(&iov, buf);
 		uio.uio_iov = &iov;
 		uio.uio_iovcnt = 1;
 		uio.uio_resid = iov.iov_len;

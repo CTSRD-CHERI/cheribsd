@@ -165,8 +165,7 @@ linux32_copyinuio(struct l_iovec32 *iovp, l_ulong iovcnt, struct uio **uiop)
 			free(uio, M_IOV);
 			return (error);
 		}
-		iov[i].iov_base = PTRIN(iov32.iov_base);
-		iov[i].iov_len = iov32.iov_len;
+		IOVEC_INIT(&iov[i], PTRIN(iov32.iov_base), iov32.iov_len);
 	}
 	uio->uio_iov = iov;
 	uio->uio_iovcnt = iovcnt;
@@ -205,8 +204,7 @@ linux32_copyiniov(struct l_iovec32 *iovp32, l_ulong iovcnt, struct iovec **iovp,
 			free(iov, M_IOV);
 			return (error);
 		}
-		iov[i].iov_base = PTRIN(iov32.iov_base);
-		iov[i].iov_len = iov32.iov_len;
+		IOVEC_INIT(&iov[i], PTRIN(iov32.iov_base), iov32.iov_len);
 	}
 	*iovp = iov;
 	return(0);

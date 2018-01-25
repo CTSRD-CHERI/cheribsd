@@ -101,8 +101,7 @@ physcopyin(void *src, vm_paddr_t dst, size_t len)
 	struct uio uio;
 	int i;
 
-	iov[0].iov_base = src;
-	iov[0].iov_len = len;
+	IOVEC_INIT(&iov[0], src, len);
 	uio.uio_iov = iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = 0;
@@ -122,8 +121,7 @@ physcopyout(vm_paddr_t src, void *dst, size_t len)
 	struct uio uio;
 	int i;
 
-	iov[0].iov_base = dst;
-	iov[0].iov_len = len;
+	IOVEC_INIT(&iov[0], dst, len);
 	uio.uio_iov = iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = 0;

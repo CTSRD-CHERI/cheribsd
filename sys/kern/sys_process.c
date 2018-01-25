@@ -368,8 +368,7 @@ proc_iop(struct thread *td, struct proc *p, vm_offset_t va, void *buf,
 	MPASS(len < SSIZE_MAX);
 	slen = (ssize_t)len;
 
-	iov.iov_base = (caddr_t)buf;
-	iov.iov_len = len;
+	IOVEC_INIT(&iov, buf, len);
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = va;
@@ -1261,16 +1260,15 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 #ifdef COMPAT_FREEBSD32
 		if (wrap32) {
 			piod32 = addr;
-			iov.iov_base = (void *)(uintptr_t)piod32->piod_addr;
-			iov.iov_len = piod32->piod_len;
+			IOVEC_INIT(&iov, (void *)(uintptr_t)piod32->piod_addr,
+			    piod32->piod_len);
 			uio.uio_offset = (off_t)(uintptr_t)piod32->piod_offs;
 			uio.uio_resid = piod32->piod_len;
 		} else
 #endif
 		{
 			piod = addr;
-			iov.iov_base = piod->piod_addr;
-			iov.iov_len = piod->piod_len;
+			IOVEC_INIT(&iov, piod->piod_addr, piod->piod_len);
 			uio.uio_offset = (off_t)(uintptr_t)piod->piod_offs;
 			uio.uio_resid = piod->piod_len;
 		}

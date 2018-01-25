@@ -1856,8 +1856,8 @@ process_mpa_request(struct c4iw_ep *ep)
 	if (state != MPA_REQ_WAIT)
 		return 0;
 
-	iov.iov_base = &ep->mpa_pkt[ep->mpa_pkt_len];
-	iov.iov_len = sizeof(ep->mpa_pkt) - ep->mpa_pkt_len;
+	IOVEC_INIT(&iov, &ep->mpa_pkt[ep->mpa_pkt_len],
+	    sizeof(ep->mpa_pkt) - ep->mpa_pkt_len);
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = 0;

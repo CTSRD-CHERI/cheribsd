@@ -400,8 +400,7 @@ ext2_htree_append_block(struct vnode *vp, char *data,
 
 	auio.uio_offset = cursize;
 	auio.uio_resid = blksize;
-	aiov.iov_len = blksize;
-	aiov.iov_base = data;
+	IOVEC_INIT(&aiov, data, blksize);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_rw = UIO_WRITE;

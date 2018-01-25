@@ -156,8 +156,7 @@ swcr_encdec(struct cryptodesc *crd, struct swcr_data *sw, caddr_t buf,
 	} else if ((flags & CRYPTO_F_IOV) != 0)
 		uio = (struct uio *)buf;
 	else {
-		iov[0].iov_base = buf;
-		iov[0].iov_len = crd->crd_skip + crd->crd_len;
+		IOVEC_INIT(&iov[0], buf, crd->crd_skip + crd->crd_len);
 		uio->uio_iov = iov;
 		uio->uio_iovcnt = 1;
 	}

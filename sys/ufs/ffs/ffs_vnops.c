@@ -1151,8 +1151,7 @@ ffs_rdextattr(u_char **p, struct vnode *vp, struct thread *td, int extra)
 
 	eae = malloc(easize + extra, M_TEMP, M_WAITOK);
 
-	liovec.iov_base = eae;
-	liovec.iov_len = easize;
+	IOVEC_INIT(&liovec, eae, easize);
 	luio.uio_iov = &liovec;
 	luio.uio_iovcnt = 1;
 	luio.uio_offset = 0;
@@ -1252,8 +1251,7 @@ ffs_close_ea(struct vnode *vp, int commit, struct ucred *cred, struct thread *td
 		ASSERT_VOP_ELOCKED(vp, "ffs_close_ea commit");
 		if (cred == NOCRED)
 			cred =  vp->v_mount->mnt_cred;
-		liovec.iov_base = ip->i_ea_area;
-		liovec.iov_len = ip->i_ea_len;
+		IOVEC_INIT(&liovec, ip->i_ea_area, ip->i_ea_len);
 		luio.uio_iov = &liovec;
 		luio.uio_iovcnt = 1;
 		luio.uio_offset = 0;

@@ -494,8 +494,7 @@ namei(struct nameidata *ndp)
 			cp = uma_zalloc(namei_zone, M_WAITOK);
 		else
 			cp = cnp->cn_pnbuf;
-		aiov.iov_base = cp;
-		aiov.iov_len = MAXPATHLEN;
+		IOVEC_INIT(&aiov, cp, MAXPATHLEN);
 		auio.uio_iov = &aiov;
 		auio.uio_iovcnt = 1;
 		auio.uio_offset = 0;

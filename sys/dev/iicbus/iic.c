@@ -434,8 +434,7 @@ iicioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags, struct thread *t
 			error = EINVAL;
 			break;
 		}
-		uvec.iov_base = s->buf;
-		uvec.iov_len = s->count;
+		IOVEC_INIT(&uvec, s->buf, s->count);
 		ubuf.uio_iov = &uvec;
 		ubuf.uio_iovcnt = 1;
 		ubuf.uio_segflg = UIO_USERSPACE;
@@ -451,8 +450,7 @@ iicioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags, struct thread *t
 			error = EINVAL;
 			break;
 		}
-		uvec.iov_base = s->buf;
-		uvec.iov_len = s->count;
+		IOVEC_INIT(&uvec, s->buf, s->count);
 		ubuf.uio_iov = &uvec;
 		ubuf.uio_iovcnt = 1;
 		ubuf.uio_segflg = UIO_USERSPACE;

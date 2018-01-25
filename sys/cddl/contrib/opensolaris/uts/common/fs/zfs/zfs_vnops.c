@@ -5787,8 +5787,7 @@ vop_listextattr {
 	do {
 		u_char nlen;
 
-		aiov.iov_base = (void *)dirbuf;
-		aiov.iov_len = sizeof(dirbuf);
+		IOVEC_INIT_OBJ(&aiov, (void *)dirbuf);
 		auio.uio_resid = sizeof(dirbuf);
 		error = VOP_READDIR(vp, &auio, ap->a_cred, &eof, NULL, NULL);
 		done = sizeof(dirbuf) - auio.uio_resid;

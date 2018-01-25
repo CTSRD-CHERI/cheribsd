@@ -780,8 +780,7 @@ aio_process_rw(struct kaiocb *job)
 	cb = &job->uaiocb;
 	fp = job->fd_file;
 
-	aiov.iov_base = (void *)(uintptr_t)cb->aio_buf;
-	aiov.iov_len = cb->aio_nbytes;
+	IOVEC_INIT(&aiov, __DEVOLATILE(void *, cb->aio_buf), cb->aio_nbytes);
 
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;

@@ -348,8 +348,7 @@ ibcs2_getdents(struct thread *td, struct ibcs2_getdents_args *uap)
 	buf = malloc(buflen, M_TEMP, M_WAITOK);
 	vn_lock(vp, LK_SHARED | LK_RETRY);
 again:
-	aiov.iov_base = buf;
-	aiov.iov_len = buflen;
+	IOVEC_INIT(&aiov, buf, buflen);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_rw = UIO_READ;
@@ -507,8 +506,7 @@ ibcs2_read(struct thread *td, struct ibcs2_read_args *uap)
 	buf = malloc(buflen, M_TEMP, M_WAITOK);
 	vn_lock(vp, LK_SHARED | LK_RETRY);
 again:
-	aiov.iov_base = buf;
-	aiov.iov_len = buflen;
+	IOVEC_INIT(&aiov, buf, buflen);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_rw = UIO_READ;

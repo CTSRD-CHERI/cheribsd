@@ -918,8 +918,7 @@ ext2_direnter(struct inode *ip, struct vnode *dvp, struct componentname *cnp)
 		auio.uio_offset = dp->i_offset;
 		newdir.e2d_reclen = DIRBLKSIZ;
 		auio.uio_resid = newentrysize;
-		aiov.iov_len = newentrysize;
-		aiov.iov_base = (caddr_t)&newdir;
+		IOVEC_INIT(&aiov, &newdir, newentrysize);
 		auio.uio_iov = &aiov;
 		auio.uio_iovcnt = 1;
 		auio.uio_rw = UIO_WRITE;

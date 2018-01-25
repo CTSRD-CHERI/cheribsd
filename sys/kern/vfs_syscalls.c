@@ -2525,8 +2525,7 @@ kern_readlinkat(struct thread *td, int fd, char *path, enum uio_seg pathseg,
 	if (vp->v_type != VLNK)
 		error = EINVAL;
 	else {
-		aiov.iov_base = buf;
-		aiov.iov_len = count;
+		IOVEC_INIT(&aiov, buf, count);
 		auio.uio_iov = &aiov;
 		auio.uio_iovcnt = 1;
 		auio.uio_offset = 0;
@@ -4006,8 +4005,7 @@ unionread:
 		error = EINVAL;
 		goto fail;
 	}
-	aiov.iov_base = buf;
-	aiov.iov_len = count;
+	IOVEC_INIT(&aiov, buf, count);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_rw = UIO_READ;

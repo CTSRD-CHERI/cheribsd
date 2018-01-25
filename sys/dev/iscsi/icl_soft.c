@@ -180,8 +180,7 @@ icl_conn_receive_buf(struct icl_conn *ic, void *buf, size_t len)
 	so = ic->ic_socket;
 
 	memset(&uio, 0, sizeof(uio));
-	iov[0].iov_base = buf;
-	iov[0].iov_len = len;
+	IOVEC_INIT(&iov[0], buf, len);
 	uio.uio_iov = iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = 0;

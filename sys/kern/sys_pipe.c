@@ -913,8 +913,7 @@ pipe_clone_write_buffer(wpipe)
 	wpipe->pipe_state &= ~PIPE_DIRECTW;
 
 	PIPE_UNLOCK(wpipe);
-	iov.iov_base = wpipe->pipe_buffer.buffer;
-	iov.iov_len = size;
+	IOVEC_INIT(&iov, wpipe->pipe_buffer.buffer, size);
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = 0;

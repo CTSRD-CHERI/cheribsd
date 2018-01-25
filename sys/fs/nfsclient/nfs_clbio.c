@@ -188,8 +188,7 @@ ncl_getpages(struct vop_getpages_args *ap)
 	VM_CNT_ADD(v_vnodepgsin, npages);
 
 	count = npages << PAGE_SHIFT;
-	iov.iov_base = (caddr_t) kva;
-	iov.iov_len = count;
+	IOVEC_INIT(&iov, bp->b_data, count);
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = IDX_TO_OFF(pages[0]->pindex);
@@ -323,8 +322,7 @@ ncl_putpages(struct vop_putpages_args *ap)
 	VM_CNT_INC(v_vnodeout);
 	VM_CNT_ADD(v_vnodepgsout, count);
 
-	iov.iov_base = unmapped_buf;
-	iov.iov_len = count;
+	IOVEC_INIT(&iov, unmapped_buf, count);
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = offset;
@@ -754,8 +752,7 @@ do_sync:
 		while (uiop->uio_resid > 0) {
 			size = MIN(uiop->uio_resid, wsize);
 			size = MIN(uiop->uio_iov->iov_len, size);
-			iov.iov_base = uiop->uio_iov->iov_base;
-			iov.iov_len = size;
+			IOVEC_INIT(&iov, uiop->uio_iov->iov_base, size);
 			uio.uio_iov = &iov;
 			uio.uio_iovcnt = 1;
 			uio.uio_offset = uiop->uio_offset;
@@ -806,8 +803,8 @@ do_sync:
 			bp = getpbuf(&ncl_pbuf_freecnt);
 			t_uio = malloc(sizeof(struct uio), M_NFSDIRECTIO, M_WAITOK);
 			t_iov = malloc(sizeof(struct iovec), M_NFSDIRECTIO, M_WAITOK);
-			t_iov->iov_base = malloc(size, M_NFSDIRECTIO, M_WAITOK);
-			t_iov->iov_len = size;
+			IOVEC_INIT(t_iov, malloc(size, M_NFSDIRECTIO, M_WAITOK),
+			    size);
 			t_uio->uio_iov = t_iov;
 			t_uio->uio_iovcnt = 1;
 			t_uio->uio_offset = uiop->uio_offset;
@@ -1632,8 +1629,8 @@ ncl_doio(struct vnode *vp, struct buf *bp, struct ucred *cr, struct thread *td,
 	KASSERT(!(bp->b_flags & B_DONE), ("ncl_doio: bp %p already marked done", bp));
 	iocmd = bp->b_iocmd;
 	if (iocmd == BIO_READ) {
-	    io.iov_len = uiop->uio_resid = bp->b_bcount;
-	    io.iov_base = bp->b_data;
+	    uiop->uio_resid = bp->b_bcount;
+	    IOVEC_INIT(&io, bp->b_data, bp->b_bcount);
 	    uiop->uio_rw = UIO_READ;
 
 	    switch (vp->v_type) {
@@ -1734,11 +1731,12 @@ ncl_doio(struct vnode *vp, struct buf *bp, struct ucred *cr, struct thread *td,
 	    mtx_unlock(&np->n_mtx);
 
 	    if (bp->b_dirtyend > bp->b_dirtyoff) {
-		io.iov_len = uiop->uio_resid = bp->b_dirtyend
+		uiop->uio_resid = bp->b_dirtyend
 		    - bp->b_dirtyoff;
 		uiop->uio_offset = (off_t)bp->b_blkno * DEV_BSIZE
 		    + bp->b_dirtyoff;
-		io.iov_base = (char *)bp->b_data + bp->b_dirtyoff;
+		IOVEC_INIT(&io, (char *)bp->b_data + bp->b_dirtyoff,
+		    uiop->uio_resid);
 		uiop->uio_rw = UIO_WRITE;
 		NFSINCRGLOBAL(nfsstatsv1.write_bios);
 
