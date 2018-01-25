@@ -543,8 +543,7 @@ sglist_consume_uio(struct sglist *sg, struct uio *uio, size_t resid)
 		 * then break out of the loop.
 		 */
 		error = _sglist_append_buf(sg, iov->iov_base, len, pmap, &done);
-		iov->iov_base = (char *)iov->iov_base + done;
-		iov->iov_len -= done;
+		IOVEC_ADVANCE(iov, done);
 		uio->uio_resid -= done;
 		uio->uio_offset += done;
 		resid -= done;

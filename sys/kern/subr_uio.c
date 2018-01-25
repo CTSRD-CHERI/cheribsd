@@ -262,8 +262,7 @@ uiomove_faultflag(void *cp, int n, struct uio *uio, int nofault)
 		case UIO_NOCOPY:
 			break;
 		}
-		iov->iov_base = (char *)iov->iov_base + cnt;
-		iov->iov_len -= cnt;
+		IOVEC_ADVANCE(iov, cnt);
 		uio->uio_resid -= cnt;
 		uio->uio_offset += cnt;
 		cp = (char *)cp + cnt;
@@ -332,8 +331,7 @@ again:
 	case UIO_NOCOPY:
 		break;
 	}
-	iov->iov_base = (char *)iov->iov_base + 1;
-	iov->iov_len--;
+	IOVEC_ADVANCE(iov, 1);
 	uio->uio_resid--;
 	uio->uio_offset++;
 	return (0);

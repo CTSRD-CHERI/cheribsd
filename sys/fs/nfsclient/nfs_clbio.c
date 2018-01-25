@@ -773,9 +773,7 @@ do_sync:
 				uiop->uio_iovcnt--;
 				uiop->uio_iov++;
 			} else {
-				uiop->uio_iov->iov_base =
-					(char *)uiop->uio_iov->iov_base + size;
-				uiop->uio_iov->iov_len -= size;
+				IOVEC_ADVANCE(uiop->uio_iov, size);
 			}
 		}
 	} else {
@@ -854,9 +852,7 @@ err_free:
 				uiop->uio_iovcnt--;
 				uiop->uio_iov++;
 			} else {
-				uiop->uio_iov->iov_base =
-					(char *)uiop->uio_iov->iov_base + size;
-				uiop->uio_iov->iov_len -= size;
+				IOVEC_ADVANCE(uiop->uio_iov, size);
 			}
 		}
 	}

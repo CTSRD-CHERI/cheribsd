@@ -735,8 +735,7 @@ cd9660_readlink(ap)
 		return (error);
 	}
 	uio->uio_resid -= symlen;
-	uio->uio_iov->iov_base = (char *)uio->uio_iov->iov_base + symlen;
-	uio->uio_iov->iov_len -= symlen;
+	IOVEC_ADVANCE(uio->uio_iov, symlen);
 	return (0);
 }
 

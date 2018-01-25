@@ -260,10 +260,7 @@ isc_sendPDU(isc_session_t *sp, pduq_t *pq)
 	  len -= uio->uio_resid;
 	  while(uio->uio_iovcnt > 0) {
 	       if(iv->iov_len > len) {
-		    caddr_t bp = (caddr_t)iv->iov_base;
-
-		    iv->iov_len -= len;
-		    iv->iov_base = (void *)&bp[len];
+		    IOVEC_ADVANCE(iv, len);
 		    break;
 	       }
 	       len -= iv->iov_len;
