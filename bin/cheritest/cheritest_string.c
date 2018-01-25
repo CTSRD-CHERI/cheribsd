@@ -51,7 +51,8 @@ void * __capability
     kern_memmove_c(void * __capability, const void * __capability, size_t);
 #endif
 
-#define	CAP(x)	((__cheri_tocap __capability void*)(x))
+/* XXXAR: extra cast to void* to work around CTSRD-CHERI/clang#178 */
+#define	CAP(x)	((__cheri_tocap __capability void*)(void*)(x))
 
 /*
  * Test structure which will be memcpy'd.  Contains data and a capability in
