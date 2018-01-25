@@ -1588,7 +1588,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 		execpath_len = strlen(imgp->execpath) + 1;
 	else
 		execpath_len = 0;
-	arginfo = (struct cheriabi_ps_strings *)curproc->p_sysent->sv_psstrings;
+	arginfo = (struct cheriabi_ps_strings *)curproc->p_psstrings;
 	if (imgp->proc->p_sysent->sv_sigcode_base == 0)
 		szsigcode = *(imgp->proc->p_sysent->sv_szsigcode);
 	else

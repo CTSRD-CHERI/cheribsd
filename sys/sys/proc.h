@@ -631,6 +631,8 @@ struct proc {
 					       our subtree. */
 	uint16_t	p_elf_machine;	/* (x) ELF machine type */
 	uint64_t	p_elf_flags;	/* (x) ELF flags */
+	vm_offset_t	p_usrstack;
+	vm_offset_t	p_psstrings;
 /* End area that is copied on creation. */
 #define	p_endcopy	p_xexit
 
@@ -664,7 +666,6 @@ struct proc {
 	 */
 	LIST_ENTRY(proc) p_orphan;	/* (e) List of orphan processes. */
 	LIST_HEAD(, proc) p_orphans;	/* (e) Pointer to list of orphans. */
-	vm_offset_t	p_usrstack;
 };
 
 #define	p_session	p_pgrp->pg_session

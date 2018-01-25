@@ -159,12 +159,12 @@ sysctl_kern_ps_strings(SYSCTL_HANDLER_ARGS)
 #ifdef SCTL_MASK32
 	if (req->flags & SCTL_MASK32) {
 		unsigned int val;
-		val = (unsigned int)p->p_sysent->sv_psstrings;
+		val = (unsigned int)p->p_psstrings;
 		error = SYSCTL_OUT(req, &val, sizeof(val));
 	} else
 #endif
-		error = SYSCTL_OUT(req, &p->p_sysent->sv_psstrings,
-		   sizeof(p->p_sysent->sv_psstrings));
+		error = SYSCTL_OUT(req, &p->p_psstrings,
+		   sizeof(p->p_psstrings));
 	return error;
 }
 
@@ -1591,15 +1591,15 @@ exec_copyout_strings(struct image_params *imgp)
 		execpath_len = 0;
 	p = imgp->proc;
 	szsigcode = 0;
-	arginfo = (struct ps_strings *)p->p_sysent->sv_psstrings;
+
+	p->p_psstrings = p->p_sysent->sv_psstrings;
+	if (imgp->cop != NULL)
+		p->p_psstrings -= p->p_sysent->sv_usrstack - p->p_usrstack;
+
+	arginfo = (struct ps_strings *)p->p_psstrings;
 	if (p->p_sysent->sv_sigcode_base == 0) {
 		if (p->p_sysent->sv_szsigcode != NULL)
 			szsigcode = *(p->p_sysent->sv_szsigcode);
-	}
-
-	if (imgp->cop != NULL) {
-		arginfo = (struct ps_strings *)(((char *)arginfo) - (p->p_sysent->sv_usrstack - p->p_usrstack));
-		//printf("%s: arginfo is %p\n", __func__, arginfo);
 	}
 
 	destp =	(uintptr_t)arginfo;

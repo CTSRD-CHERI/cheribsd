@@ -1774,7 +1774,7 @@ get_proc_vector32(struct thread *td, struct proc *p, char ***proc_vectorp,
 	int i, error;
 
 	error = 0;
-	if (proc_readmem(td, p, (vm_offset_t)p->p_sysent->sv_psstrings, &pss,
+	if (proc_readmem(td, p, (vm_offset_t)p->p_psstrings, &pss,
 	    sizeof(pss)) != sizeof(pss))
 		return (ENOMEM);
 	switch (type) {
@@ -1847,7 +1847,7 @@ get_proc_vector_cheriabi(struct thread *td, struct proc *p,
 	size_t vsize, size;
 	int i;
 
-	if (proc_readmem(td, p, (vm_offset_t)p->p_sysent->sv_psstrings, &pss,
+	if (proc_readmem(td, p, (vm_offset_t)p->p_psstrings, &pss,
 	    sizeof(pss)) != sizeof(pss))
 		return (ENOMEM);
 	switch (type) {
@@ -1940,7 +1940,7 @@ get_proc_vector(struct thread *td, struct proc *p, char ***proc_vectorp,
 		return (get_proc_vector_cheriabi(td, p, proc_vectorp, vsizep,
 			type));
 #endif
-	if (proc_readmem(td, p, (vm_offset_t)p->p_sysent->sv_psstrings, &pss,
+	if (proc_readmem(td, p, (vm_offset_t)p->p_psstrings, &pss,
 	    sizeof(pss)) != sizeof(pss))
 		return (ENOMEM);
 	switch (type) {
@@ -2972,13 +2972,13 @@ sysctl_kern_proc_ps_strings(SYSCTL_HANDLER_ARGS)
 		 * process.
 		 */
 		ps_strings32 = SV_PROC_FLAG(p, SV_ILP32) != 0 ?
-		    PTROUT(p->p_sysent->sv_psstrings) : 0;
+		    PTROUT(p->p_psstrings) : 0;
 		PROC_UNLOCK(p);
 		error = SYSCTL_OUT(req, &ps_strings32, sizeof(ps_strings32));
 		return (error);
 	}
 #endif
-	ps_strings = p->p_sysent->sv_psstrings;
+	ps_strings = p->p_psstrings;
 	PROC_UNLOCK(p);
 	error = SYSCTL_OUT(req, &ps_strings, sizeof(ps_strings));
 	return (error);
@@ -3086,9 +3086,9 @@ sysctl_kern_proc_sigtramp(SYSCTL_HANDLER_ARGS)
 				kst32.ksigtramp_end = sv->sv_sigcode_base +
 				    *sv->sv_szsigcode;
 			} else {
-				kst32.ksigtramp_start = sv->sv_psstrings -
+				kst32.ksigtramp_start = p->p_psstrings -
 				    *sv->sv_szsigcode;
-				kst32.ksigtramp_end = sv->sv_psstrings;
+				kst32.ksigtramp_end = p->p_psstrings;
 			}
 		}
 		PROC_UNLOCK(p);
@@ -3102,9 +3102,9 @@ sysctl_kern_proc_sigtramp(SYSCTL_HANDLER_ARGS)
 		kst.ksigtramp_end = (char *)sv->sv_sigcode_base +
 		    *sv->sv_szsigcode;
 	} else {
-		kst.ksigtramp_start = (char *)sv->sv_psstrings -
+		kst.ksigtramp_start = (char *)p->p_psstrings -
 		    *sv->sv_szsigcode;
-		kst.ksigtramp_end = (char *)sv->sv_psstrings;
+		kst.ksigtramp_end = (char *)p->p_psstrings;
 	}
 	PROC_UNLOCK(p);
 	error = SYSCTL_OUT(req, &kst, sizeof(kst));
@@ -3147,7 +3147,7 @@ proc_get_sbmetadata_ptrlen(struct thread *td, struct proc *p,
 #ifdef COMPAT_FREEBSD32
 	if (SV_PROC_FLAG(p, SV_ILP32) != 0) {
 		if (proc_readmem(td, p,
-		    (vm_offset_t)p->p_sysent->sv_psstrings, &pss32,
+		    (vm_offset_t)p->p_psstrings, &pss32,
 		    sizeof(pss32)) != sizeof(pss32));
 			return (ENOMEM);
 
@@ -3163,7 +3163,7 @@ proc_get_sbmetadata_ptrlen(struct thread *td, struct proc *p,
 	 } else {
 #endif
 		if (proc_readmem(td, p,
-		    (vm_offset_t)(p->p_sysent->sv_psstrings), &pss,
+		    (vm_offset_t)(p->p_psstrings), &pss,
 		    sizeof(pss)) != sizeof(pss))
 			return (ENOMEM);
 #ifdef COMPAT_FREEBSD32
