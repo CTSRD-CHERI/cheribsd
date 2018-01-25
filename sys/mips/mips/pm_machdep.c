@@ -332,7 +332,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	} else {
 		/* Signal trampoline code is at base of user stack. */
 		/* XXX: GC this code path once shared page is stable */
-		regs->ra = (register_t)(intptr_t)PS_STRINGS -
+		regs->ra = (register_t)p->p_psstrings -
 		    *(p->p_sysent->sv_szsigcode);
 	}
 #endif

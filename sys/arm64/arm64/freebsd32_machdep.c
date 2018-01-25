@@ -394,7 +394,7 @@ freebsd32_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	if (sysent->sv_sigcode_base != 0)
 		tf->tf_x[14] = (register_t)sysent->sv_sigcode_base;
 	else
-		tf->tf_x[14] = (register_t)(sysent->sv_psstrings -
+		tf->tf_x[14] = (register_t)(p->p_psstrings -
 		    *(sysent->sv_szsigcode));
 	/* Set the mode to enter in the signal handler */
 	if ((register_t)catcher & 1)

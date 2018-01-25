@@ -165,12 +165,12 @@ sysctl_kern_ps_strings(SYSCTL_HANDLER_ARGS)
 #ifdef SCTL_MASK32
 	if (req->flags & SCTL_MASK32) {
 		unsigned int val;
-		val = (unsigned int)p->p_sysent->sv_psstrings;
+		val = (unsigned int)p->p_psstrings;
 		error = SYSCTL_OUT(req, &val, sizeof(val));
 	} else
 #endif
-		error = SYSCTL_OUT(req, &p->p_sysent->sv_psstrings,
-		   sizeof(p->p_sysent->sv_psstrings));
+		error = SYSCTL_OUT(req, &p->p_psstrings,
+		   sizeof(p->p_psstrings));
 	return error;
 }
 
@@ -1647,6 +1647,8 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	p = imgp->proc;
 	szsigcode = 0;
 
+	p->p_psstrings = p->p_sysent->sv_psstrings;
+
 #if __has_feature(capabilities)
 	/*
 	 * destp must cover all of the smaller buffers copied out
@@ -1666,12 +1668,12 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	destp = (uintcap_t)cheri_capability_build_user_data(
 	    CHERI_CAP_USER_DATA_PERMS, rounded_stack_vaddr,
 	    CHERI_REPRESENTABLE_LENGTH(ssiz + stack_offset), stack_offset);
-	destp = cheri_setaddress(destp, p->p_sysent->sv_psstrings);
+	destp = cheri_setaddress(destp, p->p_psstrings);
 	arginfo = (struct ps_strings * __capability)cheri_setboundsexact(destp,
 	    sizeof(*arginfo));
 #else
-	arginfo = (struct ps_strings *)p->p_sysent->sv_psstrings;
-	destp = (uintptr_t)arginfo;
+	destp = (uintptr_t)p->p_psstrings;
+	arginfo = (struct ps_strings *)destp;
 #endif
 	imgp->ps_strings = arginfo;
 	if (p->p_sysent->sv_sigcode_base == 0) {
