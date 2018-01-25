@@ -637,6 +637,8 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	p = imgp->proc;
 	szsigcode = 0;
 
+	p->p_psstrings = p->p_sysent->sv_psstrings;
+
 	/*
 	 * Here we do not care about the representability of the
 	 * resulting stack as the capability will not be handed out
@@ -654,7 +656,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	destp = (uintcap_t)cheri_capability_build_user_data(
 	    CHERI_CAP_USER_DATA_PERMS, rounded_stack_vaddr,
 	    CHERI_REPRESENTABLE_LENGTH(ssiz + stack_offset), stack_offset);
-	destp = cheri_setaddress(destp, p->p_sysent->sv_psstrings);
+	destp = cheri_setaddress(destp, p->p_psstrings);
 	arginfo = (struct freebsd64_ps_strings * __capability)
 	    cheri_setboundsexact(destp, sizeof(*arginfo));
 	imgp->ps_strings = arginfo;

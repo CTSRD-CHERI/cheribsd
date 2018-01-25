@@ -924,7 +924,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	if (sysent->sv_sigcode_base != 0)
 		tf->tf_lr = (register_t)sysent->sv_sigcode_base;
 	else
-		tf->tf_lr = (register_t)(sysent->sv_psstrings -
+		tf->tf_lr = (register_t)(p->p_psstrings -
 		    *(sysent->sv_szsigcode));
 
 	CTR3(KTR_SIG, "sendsig: return td=%p pc=%#x sp=%#x", td, tf->tf_elr,

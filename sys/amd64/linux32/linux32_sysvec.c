@@ -739,6 +739,7 @@ linux_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	char *stringp;
 	uintptr_t destp, ustringp;
 	struct linux32_ps_strings *arginfo;
+	struct proc *p;
 	char canary[LINUX_AT_RANDOM_LEN];
 	size_t execpath_len;
 
@@ -747,8 +748,9 @@ linux_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 		execpath_len = strlen(imgp->execpath) + 1;
 	else
 		execpath_len = 0;
+	p = imgp->proc;
 
-	arginfo = (struct linux32_ps_strings *)LINUX32_PS_STRINGS;
+	arginfo = (struct linux32_ps_strings *)p->p_psstrings;
 	destp = (uintptr_t)arginfo;
 
 	if (execpath_len != 0) {

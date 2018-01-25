@@ -940,7 +940,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	if (sysent->sv_sigcode_base != 0)
 		tf->tf_ra = (register_t)sysent->sv_sigcode_base;
 	else
-		tf->tf_ra = (register_t)(sysent->sv_psstrings -
+		tf->tf_ra = (register_t)(p->p_psstrings -
 		    *(sysent->sv_szsigcode));
 #endif
 

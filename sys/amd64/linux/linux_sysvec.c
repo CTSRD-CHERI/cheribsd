@@ -334,7 +334,7 @@ linux_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 		execpath_len = 0;
 
 	p = imgp->proc;
-	arginfo = (struct ps_strings *)p->p_sysent->sv_psstrings;
+	arginfo = (struct ps_strings *)p->p_psstrings;
 	destp = (uintptr_t)arginfo;
 
 	if (execpath_len != 0) {
