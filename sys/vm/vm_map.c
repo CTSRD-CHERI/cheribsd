@@ -407,7 +407,7 @@ static int coexecve_cleanup_on_exit = 1;
 SYSCTL_INT(_debug, OID_AUTO, coexecve_cleanup_on_exit, CTLFLAG_RWTUN,
     &coexecve_cleanup_on_exit, 0,
     "Clean up abandoned vm entries after colocated process exits");
-static int coexecve_cleanup_on_fork = 0;
+static int coexecve_cleanup_on_fork = 1
 SYSCTL_INT(_debug, OID_AUTO, coexecve_cleanup_on_fork, CTLFLAG_RWTUN,
     &coexecve_cleanup_on_fork, 0,
     "Clean up abandoned vm entries after colocated process forks");
