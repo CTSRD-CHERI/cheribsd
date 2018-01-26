@@ -814,10 +814,23 @@ _vm_map_assert_locked(vm_map_t map, const char *file, int line)
 		sx_assert_(&map->lock, SA_XLOCKED, file, line);
 }
 
+static void
+_vm_map_assert_rlocked(vm_map_t map, const char *file, int line)
+{
+
+	if (map->system_map)
+		mtx_assert_(&map->system_mtx, MA_OWNED, file, line);
+	else
+		sx_assert_(&map->lock, SA_LOCKED, file, line);
+}
+
 #define	VM_MAP_ASSERT_LOCKED(map) \
     _vm_map_assert_locked(map, LOCK_FILE, LOCK_LINE)
+#define	VM_MAP_ASSERT_RLOCKED(map) \
+    _vm_map_assert_rlocked(map, LOCK_FILE, LOCK_LINE)
 #else
 #define	VM_MAP_ASSERT_LOCKED(map)
+#define	VM_MAP_ASSERT_RLOCKED(map)
 #endif
 
 /*
@@ -2121,7 +2134,7 @@ vm_map_check_owner(vm_map_t map, vm_offset_t start, vm_offset_t end)
 {
 	vm_map_entry_t entry;
 
-	VM_MAP_ASSERT_LOCKED(map);
+	VM_MAP_ASSERT_RLOCKED(map);
 
 	VM_MAP_RANGE_CHECK(map, start, end);
 
