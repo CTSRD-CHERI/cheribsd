@@ -2321,7 +2321,7 @@ vm_map_madvise(
 	int behav)
 {
 	vm_map_entry_t current, entry;
-	int modify_map = 0;
+	int modify_map = 0, result;
 
 	/*
 	 * Some madvise calls directly modify the vm_map_entry, in which case
@@ -2351,6 +2351,17 @@ vm_map_madvise(
 		break;
 	default:
 		return (KERN_INVALID_ARGUMENT);
+	}
+
+	result = vm_map_check_owner(map, start, end);
+	if (result != KERN_SUCCESS) {
+		printf("%s: vm_map_check_owner returned %d\n",
+		    __func__, result);
+		if (modify_map)
+			vm_map_unlock(map);
+		else
+			vm_map_unlock_read(map);
+		return (result);
 	}
 
 	/*
@@ -2499,6 +2510,7 @@ vm_map_inherit(vm_map_t map, vm_offset_t start, vm_offset_t end,
 {
 	vm_map_entry_t entry;
 	vm_map_entry_t temp_entry;
+	int result;
 
 	switch (new_inheritance) {
 	case VM_INHERIT_NONE:
@@ -2512,6 +2524,13 @@ vm_map_inherit(vm_map_t map, vm_offset_t start, vm_offset_t end,
 	if (start == end)
 		return (KERN_SUCCESS);
 	vm_map_lock(map);
+	result = vm_map_check_owner(map, start, end);
+	if (result != KERN_SUCCESS) {
+		printf("%s: vm_map_check_owner returned %d\n",
+		    __func__, result);
+		vm_map_unlock(map);
+		return (result);
+	}
 	VM_MAP_RANGE_CHECK(map, start, end);
 	if (vm_map_lookup_entry(map, start, &temp_entry)) {
 		entry = temp_entry;
@@ -3096,8 +3115,16 @@ vm_map_sync(vm_map_t map, vm_offset_t start, vm_offset_t end,
 	vm_ooffset_t offset;
 	unsigned int last_timestamp;
 	boolean_t failed;
+	int result;
 
 	vm_map_lock_read(map);
+	result = vm_map_check_owner(map, start, end);
+	if (result != KERN_SUCCESS) {
+		printf("%s: vm_map_check_owner returned %d\n",
+		    __func__, result);
+		vm_map_unlock(map);
+		return (result);
+	}
 	VM_MAP_RANGE_CHECK(map, start, end);
 	if (!vm_map_lookup_entry(map, start, &entry)) {
 		vm_map_unlock_read(map);
