@@ -2147,8 +2147,9 @@ vm_map_check_owner(vm_map_t map, vm_offset_t start, vm_offset_t end)
 	for (; entry != &map->header && entry->start < end;
 	    entry = entry->next) {
 		if (entry->owner != curproc->p_pid) {
-			printf("%s: entry owner %d != %d\n",
-			    __func__, entry->owner, curproc->p_pid);
+			printf("%s: entry owner %d != %d (%s)\n",
+			    __func__, entry->owner, curproc->p_pid,
+			    curproc->p_comm);
 			return (KERN_PROTECTION_FAILURE);
 		}
 	}
