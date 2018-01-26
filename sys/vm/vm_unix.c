@@ -205,6 +205,13 @@ sys_obreak(td, uap)
 			do_map_wirefuture = TRUE;
 		}
 	} else if (new < old) {
+		rv = vm_map_check_owner(map, new, old);
+		if (rv != KERN_SUCCESS) {
+			printf("%s: vm_map_check_owner returned %d\n",
+			    __func__, rv);
+			error = ENOMEM;
+			goto done;
+		}
 		rv = vm_map_delete(map, new, old);
 		if (rv != KERN_SUCCESS) {
 			error = ENOMEM;

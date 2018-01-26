@@ -716,6 +716,7 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 	vm_offset_t addr;
 	vm_size_t pageoff;
 	vm_map_t map;
+	int result;
 
 	if (size == 0)
 		return (EINVAL);
@@ -735,6 +736,15 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 	if (addr < vm_map_min(map) || addr + size > vm_map_max(map))
 		return (EINVAL);
 	vm_map_lock(map);
+
+	result = vm_map_check_owner(map, addr, addr + size);
+	if (result != KERN_SUCCESS) {
+		printf("%s: vm_map_check_owner returned %d\n",
+		    __func__, result);
+		vm_map_unlock(map);
+		return (result);
+	}
+
 #ifdef HWPMC_HOOKS
 	pmc_handled = false;
 	if (PMC_HOOK_INSTALLED(PMC_FN_MUNMAP)) {
