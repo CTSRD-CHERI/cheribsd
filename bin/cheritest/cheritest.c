@@ -1085,6 +1085,13 @@ static const struct cheri_test cheri_tests[] = {
 #endif
 
 	/*
+	 * Test copyin/out(_c) via kbounce(2) syscall.
+	 */
+	{ .ct_name = "test_kbounce",
+	  .ct_desc = "Exercise copyin/out via kbounce(2) syscall",
+	  .ct_func = test_kbounce, },
+
+	/*
 	 * Test libcheri sandboxing -- and kernel sandbox unwind.
 	 */
 	{ .ct_name = "test_sandbox_abort",
