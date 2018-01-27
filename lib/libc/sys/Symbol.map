@@ -392,6 +392,7 @@ FBSD_1.5 {
 	getdents;
 	getdirentries;
 	getfsstat;
+	kbounce;
 	kevent;
 	lstat;
 	mknod;

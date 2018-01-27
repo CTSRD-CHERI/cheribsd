@@ -1531,6 +1531,16 @@ SYS_STUB_ARGHASPTRS(257, int, lio_listio,
     /* _localcheck */ {if (!(cheri_getperm(acb_list) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(sig) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
+SYS_STUB(258, int, kbounce,
+    /* _protoargs */ (const void *__capability src, void *__capability dst, size_t len, int flags),
+    /* _protoargs_chk */ (int *retp , __capability int *stub_errno, const void * __capability __capability src, void * __capability __capability dst, size_t len, int flags),
+    /* _protoargs_err */ (__capability int *stub_errno, const void * __capability __capability src, void * __capability __capability dst, size_t len, int flags),
+    /* _callargs */ ((__cheri_fromcap const void *__capability)src, (__cheri_fromcap void *__capability)dst, len, flags),
+    /* _callargs_chk */ (&ret, stub_errno, src, dst, len, flags),
+    /* _callargs_err */ (&errno, (const void *__capability)src, (void *__capability)dst, len, flags),
+    /* _localcheck */ {if (!(cheri_getperm(src) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(dst) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
+)
+
 SYS_STUB(274, int, lchmod,
     /* _protoargs */ (const char * path, mode_t mode),
     /* _protoargs_chk */ (int *retp , __capability int *stub_errno, const char * __capability  path, mode_t mode),

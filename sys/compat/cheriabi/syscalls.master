@@ -548,7 +548,12 @@
 				    struct aiocb_c * const __capability *acb_list, \
 				    int nent, \
 				    _In_opt_ struct sigevent_c *sig); }
-258	AUE_NULL	UNIMPL	nosys
+258	AUE_NULL	STD	{ int cheriabi_kbounce( \
+				    _In_reads_bytes_(len) \
+				    const void * __capability src, \
+				    _Out_writes_bytes_(len) \
+				    void * __capability dst, \
+				    size_t len, int flags); }
 259	AUE_NULL	UNIMPL	nosys
 260	AUE_NULL	UNIMPL	nosys
 261	AUE_NULL	UNIMPL	nosys
