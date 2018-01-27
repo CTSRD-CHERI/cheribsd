@@ -111,6 +111,7 @@ next:			c = *fmt++;
 			case 'p':
 				isptr = 1;
 				islong = 1;
+				/* FALLTHROUGH */
 			case 'd':
 			case 'u':
 			case 'x':
