@@ -64,6 +64,12 @@ struct cheriabi_open_args {
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 };
+struct cheriabi_wait4_args {
+	char pid_l_[PADL_(int)]; int pid; char pid_r_[PADR_(int)];
+	char status_l_[PADL_(int *__capability)]; int *__capability status; char status_r_[PADR_(int *__capability)];
+	char options_l_[PADL_(int)]; int options; char options_r_[PADR_(int)];
+	char rusage_l_[PADL_(struct rusage *__capability)]; struct rusage *__capability rusage; char rusage_r_[PADR_(struct rusage *__capability)];
+};
 struct cheriabi_link_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 	char to_l_[PADL_(const char *__capability)]; const char *__capability to; char to_r_[PADR_(const char *__capability)];
@@ -412,10 +418,10 @@ struct cheriabi_msgctl_args {
 struct cheriabi_wait6_args {
 	char idtype_l_[PADL_(int)]; int idtype; char idtype_r_[PADR_(int)];
 	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
-	char status_l_[PADL_(int *)]; int * status; char status_r_[PADR_(int *)];
+	char status_l_[PADL_(int *__capability)]; int *__capability status; char status_r_[PADR_(int *__capability)];
 	char options_l_[PADL_(int)]; int options; char options_r_[PADR_(int)];
-	char wrusage_l_[PADL_(struct __wrusage *)]; struct __wrusage * wrusage; char wrusage_r_[PADR_(struct __wrusage *)];
-	char info_l_[PADL_(struct siginfo_c *)]; struct siginfo_c * info; char info_r_[PADR_(struct siginfo_c *)];
+	char wrusage_l_[PADL_(struct __wrusage *__capability)]; struct __wrusage *__capability wrusage; char wrusage_r_[PADR_(struct __wrusage *__capability)];
+	char info_l_[PADL_(struct siginfo_c *__capability)]; struct siginfo_c *__capability info; char info_r_[PADR_(struct siginfo_c *__capability)];
 };
 struct cheriabi_aio_mlock_args {
 	char aiocbp_l_[PADL_(struct aiocb_c *__capability)]; struct aiocb_c *__capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c *__capability)];
@@ -447,6 +453,7 @@ int	cheriabi_syscall(struct thread *, struct cheriabi_syscall_args *);
 int	cheriabi_read(struct thread *, struct cheriabi_read_args *);
 int	cheriabi_write(struct thread *, struct cheriabi_write_args *);
 int	cheriabi_open(struct thread *, struct cheriabi_open_args *);
+int	cheriabi_wait4(struct thread *, struct cheriabi_wait4_args *);
 int	cheriabi_link(struct thread *, struct cheriabi_link_args *);
 int	cheriabi_unlink(struct thread *, struct cheriabi_unlink_args *);
 int	cheriabi_chdir(struct thread *, struct cheriabi_chdir_args *);
@@ -584,6 +591,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_read	AUE_READ
 #define	CHERIABI_SYS_AUE_cheriabi_write	AUE_WRITE
 #define	CHERIABI_SYS_AUE_cheriabi_open	AUE_OPEN_RWTC
+#define	CHERIABI_SYS_AUE_cheriabi_wait4	AUE_WAIT4
 #define	CHERIABI_SYS_AUE_cheriabi_link	AUE_LINK
 #define	CHERIABI_SYS_AUE_cheriabi_unlink	AUE_UNLINK
 #define	CHERIABI_SYS_AUE_cheriabi_chdir	AUE_CHDIR

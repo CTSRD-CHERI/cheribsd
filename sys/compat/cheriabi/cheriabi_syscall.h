@@ -12,7 +12,7 @@
 #define	CHERIABI_SYS_cheriabi_write	4
 #define	CHERIABI_SYS_cheriabi_open	5
 #define	CHERIABI_SYS_close	6
-#define	CHERIABI_SYS_wait4	7
+#define	CHERIABI_SYS_cheriabi_wait4	7
 				/* 8 is obsolete old creat */
 #define	CHERIABI_SYS_cheriabi_link	9
 #define	CHERIABI_SYS_cheriabi_unlink	10

@@ -9,7 +9,7 @@ MIASM =  \
 	cheriabi_write.o \
 	cheriabi_open.o \
 	close.o \
-	wait4.o \
+	cheriabi_wait4.o \
 	cheriabi_link.o \
 	cheriabi_unlink.o \
 	cheriabi_chdir.o \

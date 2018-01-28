@@ -740,18 +740,27 @@ owait(struct thread *td, struct owait_args *uap __unused)
 int
 sys_wait4(struct thread *td, struct wait4_args *uap)
 {
+
+	return (kern_wait4(td, uap->pid, __USER_CAP_OBJ(uap->status),
+	    uap->options, __USER_CAP_OBJ(uap->rusage)));
+}
+
+int
+kern_wait4(struct thread *td, int pid, int * __capability statusp, int options,
+    struct rusage * __capability rusage)
+{
 	struct rusage ru, *rup;
 	int error, status;
 
-	if (uap->rusage != NULL)
+	if (rusage != NULL)
 		rup = &ru;
 	else
 		rup = NULL;
-	error = kern_wait(td, uap->pid, &status, uap->options, rup);
-	if (uap->status != NULL && error == 0 && td->td_retval[0] != 0)
-		error = copyout(&status, uap->status, sizeof(status));
-	if (uap->rusage != NULL && error == 0 && td->td_retval[0] != 0)
-		error = copyout(&ru, uap->rusage, sizeof(struct rusage));
+	error = kern_wait(td, pid, &status, options, rup);
+	if (statusp != NULL && error == 0 && td->td_retval[0] != 0)
+		error = copyout_c(&status, statusp, sizeof(status));
+	if (rusage != NULL && error == 0 && td->td_retval[0] != 0)
+		error = copyout_c(&ru, rusage, sizeof(struct rusage));
 	return (error);
 }
 

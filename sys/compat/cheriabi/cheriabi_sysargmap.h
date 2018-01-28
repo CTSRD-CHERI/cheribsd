@@ -14,7 +14,7 @@
 #define	CHERIABI_SYS_cheriabi_write_PTRMASK	(0x0 | 0x2)
 #define	CHERIABI_SYS_cheriabi_open_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_close_PTRMASK	(0x0)
-#define	CHERIABI_SYS_wait4_PTRMASK	(0x0 | 0x2 | 0x8)
+#define	CHERIABI_SYS_cheriabi_wait4_PTRMASK	(0x0 | 0x2 | 0x8)
 #define	CHERIABI_SYS_cheriabi_link_PTRMASK	(0x0 | 0x1 | 0x2)
 #define	CHERIABI_SYS_cheriabi_unlink_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_chdir_PTRMASK	(0x0 | 0x1)

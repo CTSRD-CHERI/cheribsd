@@ -173,7 +173,14 @@ cheriabi_syscall(struct thread *td, struct cheriabi_syscall_args *uap)
 	}
 }
 
-/* syscall #532 */
+int
+cheriabi_wait4(struct thread *td, struct cheriabi_wait4_args *uap)
+{
+
+	return (kern_wait4(td, uap->pid, uap->status, uap->options,
+	    uap->rusage));
+}
+
 int
 cheriabi_wait6(struct thread *td, struct cheriabi_wait6_args *uap)
 {
@@ -196,12 +203,12 @@ cheriabi_wait6(struct thread *td, struct cheriabi_wait6_args *uap)
 	if (error != 0)
 		return (error);
 	if (uap->status != NULL)
-		error = copyout(&status, uap->status, sizeof(status));
+		error = copyout_c(&status, uap->status, sizeof(status));
 	if (uap->wrusage != NULL && error == 0)
-		error = copyout(&wru, uap->wrusage, sizeof(wru));
+		error = copyout_c(&wru, uap->wrusage, sizeof(wru));
 	if (uap->info != NULL && error == 0) {
 		siginfo_to_siginfo_c (&si, &si_c);
-		error = copyout(&si_c, uap->info, sizeof(si_c));
+		error = copyout_c(&si_c, uap->info, sizeof(si_c));
 	}
 	return (error);
 }

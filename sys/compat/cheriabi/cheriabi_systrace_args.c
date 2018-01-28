@@ -67,13 +67,13 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* wait4 */
+	/* cheriabi_wait4 */
 	case 7: {
-		struct wait4_args *p = params;
+		struct cheriabi_wait4_args *p = params;
 		iarg[0] = p->pid; /* int */
-		uarg[1] = (intptr_t) p->status; /* int * */
+		uarg[1] = (cheri_getbase(p->status) + cheri_getoffset(p->status)); /* int *__capability */
 		iarg[2] = p->options; /* int */
-		uarg[3] = (intptr_t) p->rusage; /* struct rusage * */
+		uarg[3] = (cheri_getbase(p->rusage) + cheri_getoffset(p->rusage)); /* struct rusage *__capability */
 		*n_args = 4;
 		break;
 	}
@@ -2851,10 +2851,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct cheriabi_wait6_args *p = params;
 		iarg[0] = p->idtype; /* int */
 		iarg[1] = p->id; /* id_t */
-		uarg[2] = (intptr_t) p->status; /* int * */
+		uarg[2] = (cheri_getbase(p->status) + cheri_getoffset(p->status)); /* int *__capability */
 		iarg[3] = p->options; /* int */
-		uarg[4] = (intptr_t) p->wrusage; /* struct __wrusage * */
-		uarg[5] = (intptr_t) p->info; /* struct siginfo_c * */
+		uarg[4] = (cheri_getbase(p->wrusage) + cheri_getoffset(p->wrusage)); /* struct __wrusage *__capability */
+		uarg[5] = (cheri_getbase(p->info) + cheri_getoffset(p->info)); /* struct siginfo_c *__capability */
 		*n_args = 6;
 		break;
 	}
@@ -3203,20 +3203,20 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* wait4 */
+	/* cheriabi_wait4 */
 	case 7:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland int *";
+			p = "userland int *__capability";
 			break;
 		case 2:
 			p = "int";
 			break;
 		case 3:
-			p = "userland struct rusage *";
+			p = "userland struct rusage *__capability";
 			break;
 		default:
 			break;
@@ -7828,16 +7828,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "id_t";
 			break;
 		case 2:
-			p = "userland int *";
+			p = "userland int *__capability";
 			break;
 		case 3:
 			p = "int";
 			break;
 		case 4:
-			p = "userland struct __wrusage *";
+			p = "userland struct __wrusage *__capability";
 			break;
 		case 5:
-			p = "userland struct siginfo_c *";
+			p = "userland struct siginfo_c *__capability";
 			break;
 		default:
 			break;
@@ -8334,7 +8334,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* wait4 */
+	/* cheriabi_wait4 */
 	case 7:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

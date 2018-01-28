@@ -83,9 +83,11 @@
 				    int flags, \
 				    mode_t mode); }
 6	AUE_CLOSE	NOPROTO	{ int close(int fd); }
-7	AUE_WAIT4	NOPROTO	{ int wait4(int pid, _Out_opt_ int *status, \
+7	AUE_WAIT4	STD	{ int cheriabi_wait4(int pid, \
+				    _Out_opt_ int * __capability status, \
 				    int options, \
-				    _Out_opt_ struct rusage *rusage); }
+				    _Out_opt_ \
+				    struct rusage * __capability rusage); }
 8	AUE_CREAT	OBSOL	old creat
 9	AUE_LINK	STD	{ int cheriabi_link( \
 				    _In_z_ const char * __capability path, \
@@ -1178,9 +1180,12 @@
 531	AUE_POSIX_FADVISE	NOPROTO	{ int posix_fadvise(int fd, \
 				    off_t offset, off_t len, int advice); }
 532	AUE_WAIT6	STD	{ int cheriabi_wait6(int idtype, id_t id, \
-				    _Out_opt_ int *status, int options, \
-				    _Out_opt_ struct __wrusage *wrusage, \
-				    _Out_opt_ struct siginfo_c *info); }
+				    _Out_opt_ int * __capability status, \
+				    int options, \
+				    _Out_opt_ \
+				    struct __wrusage * __capability wrusage, \
+				    _Out_opt_ \
+				    struct siginfo_c * __capability info); }
 533	AUE_CAP_RIGHTS_LIMIT	NOPROTO	{ \
 				    int cap_rights_limit(int fd, \
 				    _In_ cap_rights_t *rightsp); }
