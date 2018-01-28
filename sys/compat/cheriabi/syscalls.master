@@ -449,8 +449,9 @@
 				    const struct timeval *tptr); }
 207	AUE_GETPGID	NOPROTO	{ int getpgid(pid_t pid); }
 208	AUE_NULL	UNIMPL	newreboot (NetBSD)
-209	AUE_POLL	NOPROTO	{ int poll( \
-				    _Inout_updates_(nfds) struct pollfd *fds, \
+209	AUE_POLL	STD	{ int cheriabi_poll( \
+				    _Inout_updates_(nfds) \
+				    struct pollfd * __capability fds, \
 				    u_int nfds, int timeout); }
 
 ;
@@ -1219,11 +1220,13 @@
 				    aiocbp); }
 544	AUE_PROCCTL	STD|NOPARSE	{ int cheriabi_procctl(int idtype, \
 				    id_t id, int com, void *data); }
-545	AUE_POLL	NOPROTO	{ int ppoll( \
-				    _Inout_updates_(nfds) struct pollfd *fds, \
+545	AUE_POLL	STD	{ int cheriabi_ppoll( \
+				    _Inout_updates_(nfds) \
+				    struct pollfd * __capability fds, \
 				    u_int nfds, \
-				    _In_opt_ const struct timespec *ts, \
-				    _In_opt_ const sigset_t *set); }
+				    _In_opt_ \
+				    const struct timespec * __capability ts, \
+				    _In_opt_ const sigset_t * __capability set); }
 546	AUE_FUTIMES	NOPROTO	{ int futimens(int fd, \
 				    _In_reads_(2) \
 				    const struct timespec *times); }

@@ -36,7 +36,9 @@ __FBSDID("$FreeBSD$");
 #include "opt_ktrace.h"
 
 #include <sys/param.h>
+#include <sys/poll.h>
 #include <sys/syscallsubr.h>
+
 #include <compat/cheriabi/cheriabi_proto.h>
 
 int
@@ -111,4 +113,57 @@ cheriabi_pwrite(struct thread *td, struct cheriabi_pwrite_args *uap)
 	auio.uio_segflg = UIO_USERSPACE;
 	error = kern_pwritev(td, uap->fd, &auio, uap->offset);
 	return(error);
+}
+
+#ifdef NOTYET
+cheriabi_pselect
+
+cheriabi_select
+#endif
+
+int
+cheriabi_poll(struct thread *td, struct cheriabi_poll_args *uap)
+{
+
+	struct timespec ts, *tsp;
+
+	if (uap->timeout != INFTIM) {
+		if (uap->timeout < 0)
+			return (EINVAL);
+		ts.tv_sec = uap->timeout / 1000;
+		ts.tv_nsec = (uap->timeout % 1000) * 1000000;
+		tsp = &ts;
+	} else
+		tsp = NULL;
+
+	return (kern_poll(td, uap->fds, uap->nfds, tsp, NULL));
+}
+
+int
+cheriabi_ppoll(struct thread *td, struct cheriabi_ppoll_args *uap)
+{
+	struct timespec ts, *tsp;
+	sigset_t set, *ssp;
+	int error;
+
+	if (uap->ts != NULL) {
+		error = copyin_c(uap->ts, &ts, sizeof(ts));
+		if (error)
+			return (error);
+		tsp = &ts;
+	} else
+		tsp = NULL;
+	if (uap->set != NULL) {
+		error = copyin_c(uap->set, &set, sizeof(set));
+		if (error)
+			return (error);
+		ssp = &set;
+	} else
+		ssp = NULL;
+		/*
+		 * fds is still a pointer to user space. kern_poll() will
+		 * perfrom the copyin.
+		 */
+
+	return (kern_poll(td, uap->fds, uap->nfds, tsp, ssp));
 }

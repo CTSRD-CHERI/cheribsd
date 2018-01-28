@@ -109,13 +109,13 @@ MALLOC_DEFINE(M_IOCTLOPS, "ioctlops", "ioctl data buffer");
 static MALLOC_DEFINE(M_SELECT, "select", "select() buffer");
 MALLOC_DEFINE(M_IOV, "iov", "large iov's");
 
-static int	pollout(struct thread *, struct pollfd *, struct pollfd *,
-		    u_int);
-static int	pollscan(struct thread *, struct pollfd *, u_int);
+static int	pollout(struct thread *, struct pollfd * __capability,
+		    struct pollfd * __capability, u_int);
+static int	pollscan(struct thread *, struct pollfd * __capability , u_int);
 static int	pollrescan(struct thread *);
 static int	selscan(struct thread *, fd_mask **, fd_mask **, int);
 static int	selrescan(struct thread *, fd_mask **, fd_mask **);
-static void	selfdalloc(struct thread *, void *);
+static void	selfdalloc(struct thread *, void * __capability);
 static void	selfdfree(struct seltd *, struct selfd *);
 static int	dofileread(struct thread *, int, struct file *, struct uio *,
 		    off_t, int);
@@ -154,7 +154,7 @@ struct selfd {
 	struct selinfo		*sf_si;		/* (f) selinfo when linked. */
 	struct mtx		*sf_mtx;	/* Pointer to selinfo mtx. */
 	struct seltd		*sf_td;		/* (k) owning seltd. */
-	void			*sf_cookie;	/* (k) fd or pollfd. */
+	void * __capability	sf_cookie;	/* (k) fd or pollfd. */
 	u_int			sf_refs;
 };
 
@@ -1261,7 +1261,7 @@ selrescan(struct thread *td, fd_mask **ibits, fd_mask **obits)
 	stp = td->td_sel;
 	n = 0;
 	STAILQ_FOREACH_SAFE(sfp, &stp->st_selq, sf_link, sfn) {
-		fd = (int)(uintptr_t)sfp->sf_cookie;
+		fd = (int)(uintcap_t)sfp->sf_cookie;
 		si = sfp->sf_si;
 		selfdfree(stp, sfp);
 		/* If the selinfo wasn't cleared the event didn't fire. */
@@ -1311,7 +1311,7 @@ selscan(td, ibits, obits, nfd)
 			error = getselfd_cap(fdp, fd, &fp);
 			if (error)
 				return (error);
-			selfdalloc(td, (void *)(uintptr_t)fd);
+			selfdalloc(td, (void * __capability)(uintcap_t)fd);
 			ev = fo_poll(fp, flags, td->td_ucred, td);
 			fdrop(fp, td);
 			if (ev != 0)
@@ -1337,14 +1337,15 @@ sys_poll(struct thread *td, struct poll_args *uap)
 	} else
 		tsp = NULL;
 
-	return (kern_poll(td, uap->fds, uap->nfds, tsp, NULL));
+	return (kern_poll(td, __USER_CAP_ARRAY(uap->fds, uap->nfds), uap->nfds,
+	    tsp, NULL));
 }
 
 int
-kern_poll(struct thread *td, struct pollfd *fds, u_int nfds,
+kern_poll(struct thread *td, struct pollfd * __capability fds, u_int nfds,
     struct timespec *tsp, sigset_t *uset)
 {
-	struct pollfd *bits;
+	struct pollfd * __capability bits;
 	struct pollfd smallbits[32];
 	sbintime_t sbt, precision, tmp;
 	time_t over;
@@ -1381,10 +1382,10 @@ kern_poll(struct thread *td, struct pollfd *fds, u_int nfds,
 		return (EINVAL);
 	ni = nfds * sizeof(struct pollfd);
 	if (ni > sizeof(smallbits))
-		bits = malloc(ni, M_TEMP, M_WAITOK);
+		bits = malloc_c(ni, M_TEMP, M_WAITOK);
 	else
-		bits = smallbits;
-	error = copyin(fds, bits, ni);
+		bits = &smallbits[0];
+	error = copyin_c(fds, bits, ni);
 	if (error)
 		goto done;
 
@@ -1432,7 +1433,7 @@ done:
 	}
 out:
 	if (ni > sizeof(smallbits))
-		free(bits, M_TEMP);
+		free_c(bits, M_TEMP);
 	return (error);
 }
 
@@ -1462,7 +1463,8 @@ sys_ppoll(struct thread *td, struct ppoll_args *uap)
 	 * take care of copyin that array to the kernel space.
 	 */
 
-	return (kern_poll(td, uap->fds, uap->nfds, tsp, ssp));
+	return (kern_poll(td,
+	     __USER_CAP_ARRAY(uap->fds, uap->nfds), uap->nfds, tsp, ssp));
 }
 
 static int
@@ -1474,7 +1476,7 @@ pollrescan(struct thread *td)
 	struct selinfo *si;
 	struct filedesc *fdp;
 	struct file *fp;
-	struct pollfd *fd;
+	struct pollfd * __capability fd;
 #ifdef CAPABILITIES
 	cap_rights_t rights;
 #endif
@@ -1485,7 +1487,7 @@ pollrescan(struct thread *td)
 	stp = td->td_sel;
 	FILEDESC_SLOCK(fdp);
 	STAILQ_FOREACH_SAFE(sfp, &stp->st_selq, sf_link, sfn) {
-		fd = (struct pollfd *)sfp->sf_cookie;
+		fd = sfp->sf_cookie;
 		si = sfp->sf_si;
 		selfdfree(stp, sfp);
 		/* If the selinfo wasn't cleared the event didn't fire. */
@@ -1521,18 +1523,16 @@ pollrescan(struct thread *td)
 
 
 static int
-pollout(td, fds, ufds, nfd)
-	struct thread *td;
-	struct pollfd *fds;
-	struct pollfd *ufds;
-	u_int nfd;
+pollout(struct thread *td, struct pollfd * __capability fds,
+    struct pollfd * __capability ufds, u_int nfd)
 {
 	int error = 0;
 	u_int i = 0;
 	u_int n = 0;
 
 	for (i = 0; i < nfd; i++) {
-		error = copyout(&fds->revents, &ufds->revents,
+		/* XXX-BD: CTSRD-CHERI/clang#180 */
+		error = copyout_c(&fds->revents, &ufds->revents,
 		    sizeof(ufds->revents));
 		if (error)
 			return (error);
@@ -1546,10 +1546,7 @@ pollout(td, fds, ufds, nfd)
 }
 
 static int
-pollscan(td, fds, nfd)
-	struct thread *td;
-	struct pollfd *fds;
-	u_int nfd;
+pollscan(struct thread *td, struct pollfd * __capability fds, u_int nfd)
 {
 	struct filedesc *fdp = td->td_proc->p_fd;
 	struct file *fp;
@@ -1663,7 +1660,7 @@ selsocket(struct socket *so, int events, struct timeval *tvp, struct thread *td)
  * have two select sets, one for read and another for write.
  */
 static void
-selfdalloc(struct thread *td, void *cookie)
+selfdalloc(struct thread *td, void * __capability cookie)
 {
 	struct seltd *stp;
 

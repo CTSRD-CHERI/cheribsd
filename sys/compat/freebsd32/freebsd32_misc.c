@@ -3470,5 +3470,6 @@ freebsd32_ppoll(struct thread *td, struct freebsd32_ppoll_args *uap)
 	} else
 		ssp = NULL;
 
-	return (kern_poll(td, uap->fds, uap->nfds, tsp, ssp));
+	return (kern_poll(td, __USER_CAP_ARRAY(uap->fds, uap->nfds), uap->nfds,
+	    tsp, ssp));
 }

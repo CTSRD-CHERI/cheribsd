@@ -961,10 +961,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* poll */
+	/* cheriabi_poll */
 	case 209: {
-		struct poll_args *p = params;
-		uarg[0] = (intptr_t) p->fds; /* struct pollfd * */
+		struct cheriabi_poll_args *p = params;
+		uarg[0] = (cheri_getbase(p->fds) + cheri_getoffset(p->fds)); /* struct pollfd *__capability */
 		uarg[1] = p->nfds; /* u_int */
 		iarg[2] = p->timeout; /* int */
 		*n_args = 3;
@@ -2965,13 +2965,13 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
-	/* ppoll */
+	/* cheriabi_ppoll */
 	case 545: {
-		struct ppoll_args *p = params;
-		uarg[0] = (intptr_t) p->fds; /* struct pollfd * */
+		struct cheriabi_ppoll_args *p = params;
+		uarg[0] = (cheri_getbase(p->fds) + cheri_getoffset(p->fds)); /* struct pollfd *__capability */
 		uarg[1] = p->nfds; /* u_int */
-		uarg[2] = (intptr_t) p->ts; /* const struct timespec * */
-		uarg[3] = (intptr_t) p->set; /* const sigset_t * */
+		uarg[2] = (cheri_getbase(p->ts) + cheri_getoffset(p->ts)); /* const struct timespec *__capability */
+		uarg[3] = (cheri_getbase(p->set) + cheri_getoffset(p->set)); /* const sigset_t *__capability */
 		*n_args = 4;
 		break;
 	}
@@ -4653,11 +4653,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* poll */
+	/* cheriabi_poll */
 	case 209:
 		switch(ndx) {
 		case 0:
-			p = "userland struct pollfd *";
+			p = "userland struct pollfd *__capability";
 			break;
 		case 1:
 			p = "u_int";
@@ -8032,20 +8032,20 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* ppoll */
+	/* cheriabi_ppoll */
 	case 545:
 		switch(ndx) {
 		case 0:
-			p = "userland struct pollfd *";
+			p = "userland struct pollfd *__capability";
 			break;
 		case 1:
 			p = "u_int";
 			break;
 		case 2:
-			p = "userland const struct timespec *";
+			p = "userland const struct timespec *__capability";
 			break;
 		case 3:
-			p = "userland const sigset_t *";
+			p = "userland const sigset_t *__capability";
 			break;
 		default:
 			break;
@@ -8856,7 +8856,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* poll */
+	/* cheriabi_poll */
 	case 209:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -10001,7 +10001,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* ppoll */
+	/* cheriabi_ppoll */
 	case 545:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

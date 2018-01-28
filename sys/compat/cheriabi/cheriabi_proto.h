@@ -150,6 +150,11 @@ struct cheriabi_sysarch_args {
 	char op_l_[PADL_(int)]; int op; char op_r_[PADR_(int)];
 	char parms_l_[PADL_(char *)]; char * parms; char parms_r_[PADR_(char *)];
 };
+struct cheriabi_poll_args {
+	char fds_l_[PADL_(struct pollfd *__capability)]; struct pollfd *__capability fds; char fds_r_[PADR_(struct pollfd *__capability)];
+	char nfds_l_[PADL_(u_int)]; u_int nfds; char nfds_r_[PADR_(u_int)];
+	char timeout_l_[PADL_(int)]; int timeout; char timeout_r_[PADR_(int)];
+};
 struct cheriabi_ktimer_create_args {
 	char clock_id_l_[PADL_(clockid_t)]; clockid_t clock_id; char clock_id_r_[PADR_(clockid_t)];
 	char evp_l_[PADL_(struct sigevent_c *)]; struct sigevent_c * evp; char evp_r_[PADR_(struct sigevent_c *)];
@@ -421,6 +426,12 @@ struct cheriabi_procctl_args {
 	char com_l_[PADL_(int)]; int com; char com_r_[PADR_(int)];
 	char data_l_[PADL_(void *)]; void * data; char data_r_[PADR_(void *)];
 };
+struct cheriabi_ppoll_args {
+	char fds_l_[PADL_(struct pollfd *__capability)]; struct pollfd *__capability fds; char fds_r_[PADR_(struct pollfd *__capability)];
+	char nfds_l_[PADL_(u_int)]; u_int nfds; char nfds_r_[PADR_(u_int)];
+	char ts_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability ts; char ts_r_[PADR_(const struct timespec *__capability)];
+	char set_l_[PADL_(const sigset_t *__capability)]; const sigset_t *__capability set; char set_r_[PADR_(const sigset_t *__capability)];
+};
 struct cheriabi_kevent_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char changelist_l_[PADL_(const struct kevent_c *)]; const struct kevent_c * changelist; char changelist_r_[PADR_(const struct kevent_c *)];
@@ -455,6 +466,7 @@ int	cheriabi_quotactl(struct thread *, struct cheriabi_quotactl_args *);
 int	cheriabi_nlm_syscall(struct thread *, struct cheriabi_nlm_syscall_args *);
 int	cheriabi_nfssvc(struct thread *, struct cheriabi_nfssvc_args *);
 int	cheriabi_sysarch(struct thread *, struct cheriabi_sysarch_args *);
+int	cheriabi_poll(struct thread *, struct cheriabi_poll_args *);
 int	cheriabi_ktimer_create(struct thread *, struct cheriabi_ktimer_create_args *);
 int	cheriabi_aio_read(struct thread *, struct cheriabi_aio_read_args *);
 int	cheriabi_aio_write(struct thread *, struct cheriabi_aio_write_args *);
@@ -512,6 +524,7 @@ int	cheriabi_msgctl(struct thread *, struct cheriabi_msgctl_args *);
 int	cheriabi_wait6(struct thread *, struct cheriabi_wait6_args *);
 int	cheriabi_aio_mlock(struct thread *, struct cheriabi_aio_mlock_args *);
 int	cheriabi_procctl(struct thread *, struct cheriabi_procctl_args *);
+int	cheriabi_ppoll(struct thread *, struct cheriabi_ppoll_args *);
 int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 
 #ifdef COMPAT_43
@@ -590,6 +603,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_nlm_syscall	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_nfssvc	AUE_NFS_SVC
 #define	CHERIABI_SYS_AUE_cheriabi_sysarch	AUE_SYSARCH
+#define	CHERIABI_SYS_AUE_cheriabi_poll	AUE_POLL
 #define	CHERIABI_SYS_AUE_cheriabi_ktimer_create	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_aio_read	AUE_AIO_READ
 #define	CHERIABI_SYS_AUE_cheriabi_aio_write	AUE_AIO_WRITE
@@ -647,6 +661,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_wait6	AUE_WAIT6
 #define	CHERIABI_SYS_AUE_cheriabi_aio_mlock	AUE_AIO_MLOCK
 #define	CHERIABI_SYS_AUE_cheriabi_procctl	AUE_PROCCTL
+#define	CHERIABI_SYS_AUE_cheriabi_ppoll	AUE_POLL
 #define	CHERIABI_SYS_AUE_cheriabi_kevent	AUE_KEVENT
 
 #undef PAD_

@@ -2334,7 +2334,9 @@ linux_ppoll(struct thread *td, struct linux_ppoll_args *args)
 	} else
 		tsp = NULL;
 
-	error = kern_poll(td, args->fds, args->nfds, tsp, ssp);
+	error = kern_poll(td,
+	    (__cheri_tocap struct pollfd * __capability)args->fds, args->nfds,
+	    tsp, ssp);
 
 	if (error == 0 && args->tsp != NULL) {
 		if (td->td_retval[0]) {

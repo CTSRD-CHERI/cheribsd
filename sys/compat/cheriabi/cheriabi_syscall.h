@@ -194,7 +194,7 @@
 #define	CHERIABI_SYS_undelete	205
 #define	CHERIABI_SYS_futimes	206
 #define	CHERIABI_SYS_getpgid	207
-#define	CHERIABI_SYS_poll	209
+#define	CHERIABI_SYS_cheriabi_poll	209
 				/* 220 is obsolete __semctl */
 #define	CHERIABI_SYS_semget	221
 #define	CHERIABI_SYS_semop	222
@@ -463,7 +463,7 @@
 #define	CHERIABI_SYS_pipe2	542
 #define	CHERIABI_SYS_cheriabi_aio_mlock	543
 #define	CHERIABI_SYS_cheriabi_procctl	544
-#define	CHERIABI_SYS_ppoll	545
+#define	CHERIABI_SYS_cheriabi_ppoll	545
 #define	CHERIABI_SYS_futimens	546
 #define	CHERIABI_SYS_utimensat	547
 #define	CHERIABI_SYS_numa_getaffinity	548

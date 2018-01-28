@@ -120,7 +120,7 @@ MIASM =  \
 	undelete.o \
 	futimes.o \
 	getpgid.o \
-	poll.o \
+	cheriabi_poll.o \
 	semget.o \
 	semop.o \
 	msgget.o \
@@ -351,7 +351,7 @@ MIASM =  \
 	pipe2.o \
 	cheriabi_aio_mlock.o \
 	cheriabi_procctl.o \
-	ppoll.o \
+	cheriabi_ppoll.o \
 	futimens.o \
 	utimensat.o \
 	numa_getaffinity.o \
