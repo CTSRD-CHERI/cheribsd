@@ -86,6 +86,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_pageout.h>
 #include <vm/vm_extern.h>
 #include <vm/uma.h>
+#include <vm/cheri.h>
 
 vm_map_t kernel_map;
 vm_map_t exec_map;
@@ -202,6 +203,7 @@ retry:
 		    VM_PROT_ALL | PMAP_ENTER_WIRED, 0);
 	}
 	VM_OBJECT_WUNLOCK(object);
+	CHERI_VM_ASSERT_VALID(addr);
 	return (addr);
 }
 
@@ -259,6 +261,7 @@ retry:
 		tmp += PAGE_SIZE;
 	}
 	VM_OBJECT_WUNLOCK(object);
+	CHERI_VM_ASSERT_VALID(addr);
 	return (addr);
 }
 
@@ -320,6 +323,7 @@ kmem_malloc(struct vmem *vmem, vm_size_t size, int flags)
 		vmem_free(vmem, addr, size);
 		return (0);
 	}
+	CHERI_VM_ASSERT_VALID(addr);
 	return (addr);
 }
 
@@ -458,6 +462,7 @@ kmap_alloc_wait(map, size)
 	vm_map_insert(map, NULL, 0, addr, addr + size, VM_PROT_ALL,
 	    VM_PROT_ALL, MAP_ACC_CHARGED);
 	vm_map_unlock(map);
+	CHERI_VM_ASSERT_VALID(addr);
 	return (addr);
 }
 

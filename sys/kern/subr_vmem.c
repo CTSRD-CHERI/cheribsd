@@ -69,6 +69,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_extern.h>
 #include <vm/vm_param.h>
 #include <vm/vm_pageout.h>
+#include <vm/cheri.h>
 
 #define	VMEM_OPTORDER		5
 #define	VMEM_OPTVALUE		(1 << VMEM_OPTORDER)
@@ -855,6 +856,7 @@ vmem_import(vmem_t *vm, vmem_size_t size, vmem_size_t align, int flags)
 	vm->vm_nfreetags += BT_MAXALLOC;
 	if (error)
 		return ENOMEM;
+	CHERI_VM_ASSERT_VALID(addr);
 
 	vmem_add1(vm, addr, size, BT_TYPE_SPAN);
 
@@ -1089,6 +1091,7 @@ vmem_alloc(vmem_t *vm, vmem_size_t size, int flags, vmem_addr_t *addrp)
 		*addrp = (vmem_addr_t)uma_zalloc(qc->qc_cache, flags);
 		if (*addrp == 0)
 			return (ENOMEM);
+		CHERI_VM_ASSERT_VALID(*addrp);
 		return (0);
 	}
 
@@ -1212,6 +1215,7 @@ out:
 	VMEM_UNLOCK(vm);
 	if (error != 0 && (flags & M_NOWAIT) == 0)
 		panic("failed to allocate waiting allocation\n");
+	CHERI_VM_ASSERT_VALID(*addrp);
 
 	return (error);
 }
