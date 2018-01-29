@@ -32,97 +32,13 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
-#include "opt_inet.h"
-#include "opt_inet6.h"
-#include "opt_ktrace.h"
-
 #include <sys/param.h>
-#include <sys/bus.h>
-#include <sys/capsicum.h>
-#include <sys/clock.h>
-#include <sys/exec.h>
 #include <sys/fcntl.h>
-#include <sys/filedesc.h>
-#include <sys/imgact.h>
-#include <sys/imgact_elf.h>
-#include <sys/jail.h>
-#include <sys/kernel.h>
-#include <sys/limits.h>
-#include <sys/linker.h>
-#include <sys/lock.h>
-#include <sys/malloc.h>
-#include <sys/file.h>		/* Must come after sys/malloc.h */
-#include <sys/imgact.h>
-#include <sys/mbuf.h>
-#include <sys/mman.h>
-#include <sys/module.h>
-#include <sys/mount.h>
-#include <sys/mutex.h>
 #include <sys/namei.h>
-#include <sys/proc.h>
-#include <sys/procctl.h>
-#include <sys/reboot.h>
-#include <sys/resource.h>
-#include <sys/resourcevar.h>
-#include <sys/selinfo.h>
-#include <sys/eventvar.h>	/* Must come after sys/selinfo.h */
-#include <sys/pipe.h>		/* Must come after sys/selinfo.h */
 #include <sys/signal.h>
-#include <sys/ktrace.h>		/* Must come after sys/signal.h */
-#include <sys/signalvar.h>
-#include <sys/smp.h>
-#include <sys/socket.h>
-#include <sys/socketvar.h>
-#include <sys/stat.h>
-#include <sys/syscall.h>
 #include <sys/syscallsubr.h>
-#include <sys/sysctl.h>
-#include <sys/sysent.h>
-#include <sys/sysproto.h>
-#include <sys/systm.h>
-#include <sys/thr.h>
-#include <sys/unistd.h>
-#include <sys/ucontext.h>
-#include <sys/user.h>
-#include <sys/vnode.h>
-#include <sys/vdso.h>
-#include <sys/wait.h>
-#include <sys/ipc.h>
-#include <sys/msg.h>
-#include <sys/sem.h>
-#include <sys/shm.h>
 
-#ifdef INET
-#include <netinet/in.h>
-#endif
-
-#include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/pmap.h>
-#include <vm/vm_map.h>
-#include <vm/vm_object.h>
-#include <vm/vm_extern.h>
-
-#include <machine/cpu.h>
-#include <machine/elf.h>
-
-#include <security/audit/audit.h>
-
-#include <cheri/cheri.h>
-
-#include <compat/cheriabi/cheriabi.h>
-#include <compat/cheriabi/cheriabi_util.h>
-#if 0
-#include <compat/cheriabi/cheriabi_ipc.h>
-#include <compat/cheriabi/cheriabi_misc.h>
-#endif
-#include <compat/cheriabi/cheriabi_signal.h>
 #include <compat/cheriabi/cheriabi_proto.h>
-#include <compat/cheriabi/cheriabi_syscall.h>
-#include <compat/cheriabi/cheriabi_sysargmap.h>
-
-#include <sys/cheriabi.h>
 
 int
 cheriabi_quotactl(struct thread *td, struct cheriabi_quotactl_args *uap)
