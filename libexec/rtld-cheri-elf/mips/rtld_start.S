@@ -52,6 +52,7 @@
 
 /*
  *      c3      auxargs pointer
+ *      c4      relocabase capability
  */
 LEAF(rtld_start)
 	/*
@@ -69,9 +70,8 @@ LEAF(rtld_start)
 1:	cgetpcc		$c12
 	cgetoffset	a1, $c12
 	dsubu		a1, a1, a0
-	csd		a1, zero, SFRAME_RELOCBASE($c11)
-	cgetdefault	$c4
-	csetoffset	$c4, $c4, a1	/* relocbase */
+
+	csc		$c4, zero, SFRAME_RELOCBASE($c11) /* relocbase */
 
 	dla		a0, _DYNAMIC
 	cincoffset	$c3, $c4, a0	/* dynp */
@@ -92,7 +92,10 @@ LEAF(rtld_start)
 	dli		t0, SFRAME_OBJP
 	cincoffset	$c5, $c11, t0			/* &objp */
 	csetbounds	$c5, $c5, t1
-	cld		t0, zero, SFRAME_RELOCBASE($c11)
+	clc		$c12, zero, SFRAME_RELOCBASE($c11)
+	cgetoffset	t0, $c12
+	cgetbase	t1, $c12
+	daddu		t0, t0, t1
 	dla		t9, _C_LABEL(_rtld)
 	daddu		t0, t0, t9
 	cgetpcc		$c12
