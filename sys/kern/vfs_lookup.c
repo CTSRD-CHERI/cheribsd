@@ -325,8 +325,10 @@ namei(struct nameidata *ndp)
 	if ((cnp->cn_flags & HASBUF) == 0)
 		cnp->cn_pnbuf = uma_zalloc(namei_zone, M_WAITOK);
 	if (ndp->ni_segflg == UIO_SYSSPACE)
-		error = copystr((__cheri_fromcap const char *)ndp->ni_dirp,
-		    cnp->cn_pnbuf, MAXPATHLEN, &ndp->ni_pathlen);
+		error = copystr_c(ndp->ni_dirp,
+		    (__cheri_tocap char * __capability)cnp->cn_pnbuf,
+		    MAXPATHLEN,
+		    (__cheri_tocap size_t * __capability)&ndp->ni_pathlen);
 	else
 		error = copyinstr_c(ndp->ni_dirp,
 		    (__cheri_tocap char * __capability)cnp->cn_pnbuf,
@@ -1259,13 +1261,13 @@ NDINIT_ALL(struct nameidata *ndp, u_long op, u_long flags, enum uio_seg segflg,
 {
 
 	NDINIT_ALL_C(ndp, op, flags, segflg,
-	    (__cheri_tocap const char * __CAPABILITY)namep,
+	    (__cheri_tocap const char * __capability)namep,
 	    dirfd, startdir, rightsp, td);
 }
 
 void
 NDINIT_ALL_C(struct nameidata *ndp, u_long op, u_long flags, enum uio_seg segflg,
-    const char * __CAPABILITY namep, int dirfd, struct vnode *startdir, cap_rights_t *rightsp,
+    const char * __capability namep, int dirfd, struct vnode *startdir, cap_rights_t *rightsp,
     struct thread *td)
 {
 
