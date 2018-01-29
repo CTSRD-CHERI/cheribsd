@@ -148,8 +148,12 @@
 #ifndef CHERI_KERNEL
 #define	NPDEPGSHIFT		9               /* LOG2(NPTEPG) */
 #else /* CHERI_KERNEL */
+#ifdef CPU_CHERI128
+#define NPDEPGSHIFT		8		/* LOG2(NPDEPG) */
+#else /* CHERI256 */
 #define NPDEPGSHIFT		7		/* LOG2(NPDEPG) */
-#endif
+#endif /* CHERI256*/
+#endif /* CHERI_KERNEL */
 #define	SEGSHIFT		(PAGE_SHIFT + NPTEPGSHIFT + NPDEPGSHIFT)
 #define	NBSEG			(1ul << SEGSHIFT)
 #define	PDRSHIFT		(PAGE_SHIFT + NPTEPGSHIFT)
