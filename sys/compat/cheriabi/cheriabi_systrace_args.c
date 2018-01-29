@@ -324,10 +324,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* acct */
+	/* cheriabi_acct */
 	case 51: {
-		struct acct_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_acct_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -3604,11 +3604,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* acct */
+	/* cheriabi_acct */
 	case 51:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		default:
 			break;
@@ -8478,7 +8478,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* acct */
+	/* cheriabi_acct */
 	case 51:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

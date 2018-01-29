@@ -2211,6 +2211,18 @@ error:
 }
 
 /*
+ * kern_acct.c
+ */
+
+int
+cheriabi_acct(struct thread *td, struct cheriabi_acct_args *uap)
+{
+
+	return (kern_acct(td, uap->path));
+}
+
+
+/*
  * kern_ktrace.c
  */
 

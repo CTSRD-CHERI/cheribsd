@@ -42,7 +42,7 @@ MIASM =  \
 	getgid.o \
 	cheriabi_getlogin.o \
 	cheriabi_setlogin.o \
-	acct.o \
+	cheriabi_acct.o \
 	cheriabi_sigaltstack.o \
 	cheriabi_ioctl.o \
 	reboot.o \

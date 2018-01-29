@@ -56,7 +56,7 @@
 				/* 48 is obsolete sigprocmask */
 #define	CHERIABI_SYS_cheriabi_getlogin	49
 #define	CHERIABI_SYS_cheriabi_setlogin	50
-#define	CHERIABI_SYS_acct	51
+#define	CHERIABI_SYS_cheriabi_acct	51
 				/* 52 is obsolete sigpending */
 #define	CHERIABI_SYS_cheriabi_sigaltstack	53
 #define	CHERIABI_SYS_cheriabi_ioctl	54

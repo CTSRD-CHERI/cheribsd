@@ -179,7 +179,8 @@
 				    u_int namelen); }
 50	AUE_SETLOGIN	STD	{ int cheriabi_setlogin( \
 				    _In_z_ const char * __capability namebuf); }
-51	AUE_ACCT	NOPROTO	{ int acct(_In_z_ const char *path); }
+51	AUE_ACCT	STD	{ int cheriabi_acct( \
+				    _In_z_ const char * __capability path); }
 52	AUE_SIGPENDING	OBSOL	sigpending
 53	AUE_SIGALTSTACK	STD	{ int cheriabi_sigaltstack( \
 				    _In_opt_ const cheriabi_stack_t *ss, \

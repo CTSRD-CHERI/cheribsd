@@ -66,6 +66,7 @@ int	kern_accept4(struct thread *td, int s, struct sockaddr **name,
 	    socklen_t *namelen, int flags, struct file **fp);
 int	kern_accessat(struct thread *td, int fd, const char * __capability path,
 	    enum uio_seg pathseg, int flags, int mode);
+int	kern_acct(struct thread *td, const char * __capability path);
 int	kern_adjtime(struct thread *td, struct timeval *delta,
 	    struct timeval *olddelta);
 int	kern_alternate_path(struct thread *td, const char *prefix, const char *path,

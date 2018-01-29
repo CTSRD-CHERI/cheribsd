@@ -136,6 +136,9 @@ struct cheriabi_getlogin_args {
 struct cheriabi_setlogin_args {
 	char namebuf_l_[PADL_(const char *__capability)]; const char *__capability namebuf; char namebuf_r_[PADR_(const char *__capability)];
 };
+struct cheriabi_acct_args {
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+};
 struct cheriabi_sigaltstack_args {
 	char ss_l_[PADL_(const cheriabi_stack_t *)]; const cheriabi_stack_t * ss; char ss_r_[PADR_(const cheriabi_stack_t *)];
 	char oss_l_[PADL_(cheriabi_stack_t *)]; cheriabi_stack_t * oss; char oss_r_[PADR_(cheriabi_stack_t *)];
@@ -663,6 +666,7 @@ int	cheriabi_profil(struct thread *, struct cheriabi_profil_args *);
 int	cheriabi_ktrace(struct thread *, struct cheriabi_ktrace_args *);
 int	cheriabi_getlogin(struct thread *, struct cheriabi_getlogin_args *);
 int	cheriabi_setlogin(struct thread *, struct cheriabi_setlogin_args *);
+int	cheriabi_acct(struct thread *, struct cheriabi_acct_args *);
 int	cheriabi_sigaltstack(struct thread *, struct cheriabi_sigaltstack_args *);
 int	cheriabi_ioctl(struct thread *, struct cheriabi_ioctl_args *);
 int	cheriabi_revoke(struct thread *, struct cheriabi_revoke_args *);
@@ -843,6 +847,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_ktrace	AUE_KTRACE
 #define	CHERIABI_SYS_AUE_cheriabi_getlogin	AUE_GETLOGIN
 #define	CHERIABI_SYS_AUE_cheriabi_setlogin	AUE_SETLOGIN
+#define	CHERIABI_SYS_AUE_cheriabi_acct	AUE_ACCT
 #define	CHERIABI_SYS_AUE_cheriabi_sigaltstack	AUE_SIGALTSTACK
 #define	CHERIABI_SYS_AUE_cheriabi_ioctl	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_revoke	AUE_REVOKE
