@@ -31,7 +31,7 @@ CFLAGS+=	-I${.CURDIR}/${RTLD_ARCH} -I${.CURDIR}
 # If we try to link RTLD with LLD it will complain about non-PIC relocations
 # Additionally, it will use RELA relocations which are not handled by rtld yet.
 CHERI_LLD_BROKEN=yes
-LDFLAGS+=	-nostdlib -e .rtld_start
+LDFLAGS+=	-nostdlib -e rtld_start
 WARNS?=		2
 INSTALLFLAGS=	-C -b
 PRECIOUSPROG=
