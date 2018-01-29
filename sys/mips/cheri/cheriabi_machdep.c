@@ -779,7 +779,8 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	struct cheri_signal *csigp;
 	struct trapframe *frame;
 	u_long auxv, stackbase, stacklen;
-	size_t map_base, map_length, text_end;
+	bool is_dynamic_binary;
+	size_t map_base, map_length, text_end, data_length, code_length;
 	struct rlimit rlim_stack;
 
 	bzero((caddr_t)td->td_frame, sizeof(struct trapframe));
@@ -847,12 +848,17 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	    MIPS_SR_PX | MIPS_SR_UX | MIPS_SR_KX | MIPS_SR_COP_2_BIT;
 
 	/*
-	 * XXXRW: For now, initialise $ddc and $idc to the full address space,
-	 * but in the future these will be restricted (or not set at all).
+	 * XXXAR: For now, initialise $ddc and $idc to the full address space
+	 * for dynamically linked executables. In the future these will be
+	 * restricted (or not set at all).
 	 */
+	/* XXXAR: is there a better way to check for dynamic binaries? */
+	is_dynamic_binary = imgp->end_addr == 0 && imgp->reloc_base != 0;
+	data_length = is_dynamic_binary ? CHERI_CAP_USER_DATA_LENGTH : text_end;
+	code_length = is_dynamic_binary ? CHERI_CAP_USER_CODE_LENGTH : text_end;
 	frame = &td->td_pcb->pcb_regs;
-	cheriabi_capability_set_user_ddc(&frame->ddc, text_end);
-	cheriabi_capability_set_user_idc(&frame->idc, text_end);
+	cheriabi_capability_set_user_ddc(&frame->ddc, data_length);
+	cheriabi_capability_set_user_idc(&frame->idc, data_length);
 
 	/*
 	 * XXXRW: Set $pcc and $c12 to the entry address -- for now, also with
@@ -860,7 +866,7 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 * run-time linker or statically linked binary?
 	 */
 	cheriabi_capability_set_user_entry(&frame->pcc, imgp->entry_addr,
-	    text_end);
+	    code_length);
 	frame->c12 = frame->pcc;
 
 	/*
