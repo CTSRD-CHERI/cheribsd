@@ -177,8 +177,8 @@ struct pv_chunk {
 extern vm_paddr_t phys_avail[PHYS_AVAIL_ENTRIES + 2];
 extern vm_paddr_t physmem_desc[PHYS_AVAIL_ENTRIES + 2];
 
-extern vm_offset_t virtual_avail;
-extern vm_offset_t virtual_end;
+extern vm_ptr_t virtual_avail;
+extern vm_ptr_t virtual_end;
 
 extern vm_paddr_t dump_avail[PHYS_AVAIL_ENTRIES + 2];
 

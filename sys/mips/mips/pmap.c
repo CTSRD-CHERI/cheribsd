@@ -136,8 +136,8 @@ __FBSDID("$FreeBSD$");
 struct pmap kernel_pmap_store;
 pd_entry_t *kernel_segmap;
 
-vm_offset_t virtual_avail;	/* VA of first avail page (after kernel bss) */
-vm_offset_t virtual_end;	/* VA of last avail page (end of kernel AS) */
+vm_ptr_t virtual_avail;	/* VA of first avail page (after kernel bss) */
+vm_ptr_t virtual_end;	/* VA of last avail page (end of kernel AS) */
 
 static int nkpt;
 unsigned pmap_max_asid;		/* max ASID supported by the system */
@@ -580,10 +580,16 @@ again:
 #endif
 	kstack0 = roundup2(kstack0, (KSTACK_PAGE_SIZE * 2));
 
-
-
-	virtual_avail = VM_MIN_KERNEL_ADDRESS;
-	virtual_end = VM_MAX_KERNEL_ADDRESS;
+	/*
+	 * The kernel virtual address space lies within the XKSEG segment,
+	 * the base capability for XKSEG is used to generate a valid
+	 * kernel-space capability for the kernel VM initialization.
+	 * The max kernel address bound is not set because the kernel page
+	 * table is allowed to grow.
+	 * XXX-AM: Assume CHERI is always on top of mips64
+	 */
+	virtual_avail = (vm_ptr_t)MIPS_XKSEG(VM_MIN_KERNEL_ADDRESS);
+	virtual_end = (vm_ptr_t)MIPS_XKSEG(VM_MAX_KERNEL_ADDRESS);
 
 #ifdef SMP
 	/*
