@@ -133,9 +133,6 @@ LDFLAGS+=	-Wl,-init=crt_init_globals
 .endif
 # remove any conflicting -fuse-ld= flags
 LDFLAGS:=${LDFLAGS:N-fuse-ld=*}
-.ifdef CHERI_LLD_BROKEN
-LDFLAGS+=	-fuse-ld=bfd
-.else
 LDFLAGS+=	-fuse-ld=lld -Wl,-z,norelro
 .ifdef CHERI_LLD_INTEGRATED_CAPSIZEFIX
 LDFLAGS+=      -no-capsizefix -Wl,--process-cap-relocs -Wl,-color-diagnostics
@@ -149,7 +146,6 @@ ALLOW_SHARED_TEXTREL=yes
 .ifdef ALLOW_SHARED_TEXTREL
 # By default text relocations are an error instead of a warning with LLD
 LDFLAGS+=	-Wl,-z,notext
-.endif
 .endif
 .else
 STATIC_CFLAGS+= -ftls-model=local-exec # MIPS/hybrid case
