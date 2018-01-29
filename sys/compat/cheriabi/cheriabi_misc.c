@@ -2216,3 +2216,21 @@ error:
 	free((__cheri_fromcap void *)bounce, M_TEMP);
 	return (error);
 }
+
+/*
+ * kern_ktrace.c
+ */
+
+int
+cheriabi_ktrace(struct thread *td, struct cheriabi_ktrace_args *uap)
+{
+
+	return (kern_ktrace(td, uap->fname, uap->ops, uap->facs, uap->pid));
+}
+
+int
+cheriabi_utrace(struct thread *td, struct cheriabi_utrace_args *uap)
+{
+
+	return (kern_utrace(td, uap->addr, uap->len));
+}

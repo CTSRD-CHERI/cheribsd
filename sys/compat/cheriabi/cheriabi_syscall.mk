@@ -38,7 +38,7 @@ MIASM =  \
 	dup.o \
 	getegid.o \
 	profil.o \
-	ktrace.o \
+	cheriabi_ktrace.o \
 	getgid.o \
 	getlogin.o \
 	cheriabi_setlogin.o \
@@ -188,7 +188,7 @@ MIASM =  \
 	sched_get_priority_max.o \
 	sched_get_priority_min.o \
 	sched_rr_get_interval.o \
-	utrace.o \
+	cheriabi_utrace.o \
 	cheriabi_kldsym.o \
 	cheriabi_jail.o \
 	sigprocmask.o \

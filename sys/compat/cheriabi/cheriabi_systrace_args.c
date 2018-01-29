@@ -294,10 +294,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
-	/* ktrace */
+	/* cheriabi_ktrace */
 	case 45: {
-		struct ktrace_args *p = params;
-		uarg[0] = (intptr_t) p->fname; /* const char * */
+		struct cheriabi_ktrace_args *p = params;
+		uarg[0] = (cheri_getbase(p->fname) + cheri_getoffset(p->fname)); /* const char *__capability */
 		iarg[1] = p->ops; /* int */
 		iarg[2] = p->facs; /* int */
 		iarg[3] = p->pid; /* int */
@@ -1527,10 +1527,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* utrace */
+	/* cheriabi_utrace */
 	case 335: {
-		struct utrace_args *p = params;
-		uarg[0] = (intptr_t) p->addr; /* const void * */
+		struct cheriabi_utrace_args *p = params;
+		uarg[0] = (cheri_getbase(p->addr) + cheri_getoffset(p->addr)); /* const void *__capability */
 		uarg[1] = p->len; /* size_t */
 		*n_args = 2;
 		break;
@@ -3559,11 +3559,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* ktrace */
+	/* cheriabi_ktrace */
 	case 45:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "int";
@@ -5513,11 +5513,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* utrace */
+	/* cheriabi_utrace */
 	case 335:
 		switch(ndx) {
 		case 0:
-			p = "userland const void *";
+			p = "userland const void *__capability";
 			break;
 		case 1:
 			p = "size_t";
@@ -8461,7 +8461,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* ktrace */
+	/* cheriabi_ktrace */
 	case 45:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9192,7 +9192,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* utrace */
+	/* cheriabi_utrace */
 	case 335:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

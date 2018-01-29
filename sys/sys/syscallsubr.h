@@ -155,6 +155,8 @@ int	kern_kqueue(struct thread *td, int flags, struct filecaps *fcaps);
 int	kern_kldload(struct thread *td, const char *file, int *fileid);
 int	kern_kldstat(struct thread *td, int fileid, struct kld_file_stat *stat);
 int	kern_kldunload(struct thread *td, int fileid, int flags);
+int	kern_ktrace(struct thread *td, const char * __capability fname,
+	    int uops, int ufacs, int pid);
 int	kern_linkat(struct thread *td, int fd1, int fd2, const char *path1,
 	    const char *path2, enum uio_seg segflg, int follow);
 int	kern_linkat_c(struct thread *td, int fd1, int fd2,
@@ -315,6 +317,8 @@ int	kern_utimesat(struct thread *td, int fd, const char * __capability path,
 int	kern_utimensat(struct thread *td, int fd, const char * __capability path,
 	    enum uio_seg pathseg, const struct timespec * __capability tptr,
 	    enum uio_seg tptrseg, int follow);
+int	kern_utrace(struct thread *td, const void * __capability addr,
+	    size_t len);
 int	kern_wait(struct thread *td, pid_t pid, int *status, int options,
 	    struct rusage *rup);
 int	kern_wait4(struct thread *td, int pid, int * __capability status,

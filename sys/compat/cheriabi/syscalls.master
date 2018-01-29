@@ -166,7 +166,8 @@
 44	AUE_PROFILE	NOPROTO	{ int profil( \
 				    _Out_writes_bytes_(size) void *samples, \
 				    size_t size, size_t offset, u_int scale); }
-45	AUE_KTRACE	NOPROTO	{ int ktrace(_In_z_ const char *fname, \
+45	AUE_KTRACE	STD	{ int cheriabi_ktrace( \
+				    _In_z_ const char * __capability fname, \
 				    int ops, int facs, int pid); }
 46	AUE_SIGACTION	OBSOL	sigaction
 47	AUE_GETGID	NOPROTO	{ gid_t getgid(void); }
@@ -697,8 +698,9 @@
 333	AUE_NULL	NOPROTO	{ int sched_get_priority_min (int policy); }
 334	AUE_NULL	NOPROTO	{ int sched_rr_get_interval (pid_t pid, \
 				    _Out_ struct timespec *interval); }
-335	AUE_NULL	NOPROTO	{ int utrace( \
-				    _In_reads_bytes_(len) const void *addr, \
+335	AUE_NULL	STD	{ int cheriabi_utrace( \
+				    _In_reads_bytes_(len) \
+				    const void * __capability addr, \
 				    size_t len); }
 336	AUE_SENDFILE	OBSOL	sendfile
 337	AUE_NULL	STD	{ int cheriabi_kldsym(int fileid, int cmd, \

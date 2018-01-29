@@ -50,7 +50,7 @@
 				/* 42 is obsolete pipe */
 #define	CHERIABI_SYS_getegid	43
 #define	CHERIABI_SYS_profil	44
-#define	CHERIABI_SYS_ktrace	45
+#define	CHERIABI_SYS_cheriabi_ktrace	45
 				/* 46 is obsolete sigaction */
 #define	CHERIABI_SYS_getgid	47
 				/* 48 is obsolete sigprocmask */
@@ -275,7 +275,7 @@
 #define	CHERIABI_SYS_sched_get_priority_max	332
 #define	CHERIABI_SYS_sched_get_priority_min	333
 #define	CHERIABI_SYS_sched_rr_get_interval	334
-#define	CHERIABI_SYS_utrace	335
+#define	CHERIABI_SYS_cheriabi_utrace	335
 				/* 336 is obsolete sendfile */
 #define	CHERIABI_SYS_cheriabi_kldsym	337
 #define	CHERIABI_SYS_cheriabi_jail	338

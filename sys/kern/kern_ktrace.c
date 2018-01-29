@@ -57,6 +57,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/unistd.h>
 #include <sys/vnode.h>
 #include <sys/socket.h>
+#include <sys/syscallsubr.h>
 #include <sys/stat.h>
 #include <sys/ktrace.h>
 #include <sys/sx.h>
@@ -947,18 +948,26 @@ struct ktrace_args {
 int
 sys_ktrace(struct thread *td, struct ktrace_args *uap)
 {
+
+	return (kern_ktrace(td, __USER_CAP_STR(uap->fname), uap->ops,
+	    uap->facs, uap->pid));
+}
+
+int
+kern_ktrace(struct thread *td, const char * __capability fname, int uops,
+    int ufacs, int pid)
+{
 #ifdef KTRACE
 	struct vnode *vp = NULL;
 	struct proc *p;
 	struct pgrp *pg;
-	int facs = uap->facs & ~KTRFAC_ROOT;
-	int ops = KTROP(uap->ops);
-	int descend = uap->ops & KTRFLAG_DESCEND;
+	int facs = ufacs & ~KTRFAC_ROOT;
+	int ops = KTROP(uops);
+	int descend = uops & KTRFLAG_DESCEND;
 	int nfound, ret = 0;
 	int flags, error = 0;
 	struct nameidata nd;
 	struct ucred *cred;
-
 	/*
 	 * Need something to (un)trace.
 	 */
@@ -970,7 +979,7 @@ sys_ktrace(struct thread *td, struct ktrace_args *uap)
 		/*
 		 * an operation which requires a file argument.
 		 */
-		NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_USERSPACE, uap->fname, td);
+		NDINIT_C(&nd, LOOKUP, NOFOLLOW, UIO_USERSPACE, fname, td);
 		flags = FREAD | FWRITE | O_NOFOLLOW;
 		error = vn_open(&nd, &flags, 0, NULL);
 		if (error) {
@@ -1019,11 +1028,11 @@ sys_ktrace(struct thread *td, struct ktrace_args *uap)
 	 * do it
 	 */
 	sx_slock(&proctree_lock);
-	if (uap->pid < 0) {
+	if (pid < 0) {
 		/*
 		 * by process group
 		 */
-		pg = pgfind(-uap->pid);
+		pg = pgfind(-pid);
 		if (pg == NULL) {
 			sx_sunlock(&proctree_lock);
 			error = ESRCH;
@@ -1057,7 +1066,7 @@ sys_ktrace(struct thread *td, struct ktrace_args *uap)
 		/*
 		 * by pid
 		 */
-		p = pfind(uap->pid);
+		p = pfind(pid);
 		if (p == NULL)
 			error = ESRCH;
 		else
@@ -1091,28 +1100,35 @@ int
 sys_utrace(struct thread *td, struct utrace_args *uap)
 {
 
+	return (kern_utrace(td, __USER_CAP(uap->addr, uap->len),
+	    uap->len));
+}
+
+int
+kern_utrace(struct thread *td, const void * __capability addr, size_t len)
+{
 #ifdef KTRACE
 	struct ktr_request *req;
-	void *cp;
+	void * __capability cp;
 	int error;
 
 	if (!KTRPOINT(td, KTR_USER))
 		return (0);
-	if (uap->len > KTR_USER_MAXLEN)
+	if (len > KTR_USER_MAXLEN)
 		return (EINVAL);
-	cp = malloc(uap->len, M_KTRACE, M_WAITOK);
-	error = copyin(uap->addr, cp, uap->len);
+	cp = malloc_c(len, M_KTRACE, M_WAITOK);
+	error = copyin_c(addr, cp, len);
 	if (error) {
-		free(cp, M_KTRACE);
+		free_c(cp, M_KTRACE);
 		return (error);
 	}
 	req = ktr_getrequest(KTR_USER);
 	if (req == NULL) {
-		free(cp, M_KTRACE);
+		free_c(cp, M_KTRACE);
 		return (ENOMEM);
 	}
-	req->ktr_buffer = cp;
-	req->ktr_header.ktr_len = uap->len;
+	req->ktr_buffer = (__cheri_fromcap void *)cp;
+	req->ktr_header.ktr_len = len;
 	ktr_submitrequest(td, req);
 	return (0);
 #else /* !KTRACE */
