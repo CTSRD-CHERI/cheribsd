@@ -2172,13 +2172,6 @@ cheriabi_auditon(struct thread *td, struct cheriabi_auditon_args *uap)
 }
 
 int
-cheriabi_setlogin(struct thread *td, struct cheriabi_setlogin_args *uap)
-{
-
-	return (kern_setlogin(td, uap->namebuf));
-}
-
-int
 cheriabi_kenv(struct thread *td, struct cheriabi_kenv_args *uap)
 {
 
@@ -2233,6 +2226,73 @@ cheriabi_utrace(struct thread *td, struct cheriabi_utrace_args *uap)
 {
 
 	return (kern_utrace(td, uap->addr, uap->len));
+}
+
+/*
+ * kern_prot.c
+ */
+int
+cheriabi_getgroups(struct thread *td, struct cheriabi_getgroups_args *uap)
+{
+
+	return (kern_getgroups(td, uap->gidsetsize, uap->gidset));
+}
+
+int
+cheriabi_setgroups(struct thread *td, struct cheriabi_setgroups_args *uap)
+{
+	gid_t smallgroups[XU_NGROUPS];
+	gid_t *groups;
+	u_int gidsetsize;
+	int error;
+
+	gidsetsize = uap->gidsetsize;
+	if (gidsetsize > ngroups_max + 1)
+		return (EINVAL);
+
+	if (gidsetsize > XU_NGROUPS)
+		groups = malloc(gidsetsize * sizeof(gid_t), M_TEMP, M_WAITOK);
+	else
+		/* XXX: CTSRD-CHERI/clang#179 */
+		groups = &smallgroups[0];
+
+	error = copyin_c(uap->gidset,
+	    (__cheri_tocap gid_t * __capability)groups,
+	    gidsetsize * sizeof(gid_t));
+	if (error == 0)
+		error = kern_setgroups(td, gidsetsize, groups);
+
+	if (gidsetsize > XU_NGROUPS)
+		free(groups, M_TEMP);
+	return (error);
+}
+
+int
+cheriabi_getresuid(struct thread *td, struct cheriabi_getresuid_args *uap)
+{
+
+	return (kern_getresuid(td, uap->ruid, uap->euid, uap->suid));
+}
+
+int
+cheriabi_getresgid(struct thread *td, struct cheriabi_getresgid_args *uap)
+{
+
+	return (kern_getresgid(td, uap->rgid, uap->egid, uap->sgid));
+}
+
+int
+cheriabi_getlogin(struct thread *td, struct cheriabi_getlogin_args *uap)
+{
+
+	return (kern_getlogin(td, uap->namebuf, uap->namelen));
+}
+
+int
+cheriabi_setlogin(struct thread *td, struct cheriabi_setlogin_args *uap)
+{
+
+	return (kern_setlogin(td, uap->namebuf));
 }
 
 /*

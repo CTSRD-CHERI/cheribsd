@@ -129,6 +129,10 @@ struct cheriabi_ktrace_args {
 	char facs_l_[PADL_(int)]; int facs; char facs_r_[PADR_(int)];
 	char pid_l_[PADL_(int)]; int pid; char pid_r_[PADR_(int)];
 };
+struct cheriabi_getlogin_args {
+	char namebuf_l_[PADL_(char *__capability)]; char *__capability namebuf; char namebuf_r_[PADR_(char *__capability)];
+	char namelen_l_[PADL_(u_int)]; u_int namelen; char namelen_r_[PADR_(u_int)];
+};
 struct cheriabi_setlogin_args {
 	char namebuf_l_[PADL_(const char *__capability)]; const char *__capability namebuf; char namebuf_r_[PADR_(const char *__capability)];
 };
@@ -170,6 +174,14 @@ struct cheriabi_madvise_args {
 	char addr_l_[PADL_(void *)]; void * addr; char addr_r_[PADR_(void *)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char behav_l_[PADL_(int)]; int behav; char behav_r_[PADR_(int)];
+};
+struct cheriabi_getgroups_args {
+	char gidsetsize_l_[PADL_(u_int)]; u_int gidsetsize; char gidsetsize_r_[PADR_(u_int)];
+	char gidset_l_[PADL_(gid_t *__capability)]; gid_t *__capability gidset; char gidset_r_[PADR_(gid_t *__capability)];
+};
+struct cheriabi_setgroups_args {
+	char gidsetsize_l_[PADL_(u_int)]; u_int gidsetsize; char gidsetsize_r_[PADR_(u_int)];
+	char gidset_l_[PADL_(const gid_t *__capability)]; const gid_t *__capability gidset; char gidset_r_[PADR_(const gid_t *__capability)];
 };
 struct cheriabi_readv_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
@@ -322,6 +334,16 @@ struct cheriabi_sigwaitinfo_args {
 struct cheriabi_aio_waitcomplete_args {
 	char aiocbp_l_[PADL_(struct aiocb_c *__capability *)]; struct aiocb_c *__capability * aiocbp; char aiocbp_r_[PADR_(struct aiocb_c *__capability *)];
 	char timeout_l_[PADL_(struct timespec *)]; struct timespec * timeout; char timeout_r_[PADR_(struct timespec *)];
+};
+struct cheriabi_getresuid_args {
+	char ruid_l_[PADL_(uid_t *__capability)]; uid_t *__capability ruid; char ruid_r_[PADR_(uid_t *__capability)];
+	char euid_l_[PADL_(uid_t *__capability)]; uid_t *__capability euid; char euid_r_[PADR_(uid_t *__capability)];
+	char suid_l_[PADL_(uid_t *__capability)]; uid_t *__capability suid; char suid_r_[PADR_(uid_t *__capability)];
+};
+struct cheriabi_getresgid_args {
+	char rgid_l_[PADL_(gid_t *__capability)]; gid_t *__capability rgid; char rgid_r_[PADR_(gid_t *__capability)];
+	char egid_l_[PADL_(gid_t *__capability)]; gid_t *__capability egid; char egid_r_[PADR_(gid_t *__capability)];
+	char sgid_l_[PADL_(gid_t *__capability)]; gid_t *__capability sgid; char sgid_r_[PADR_(gid_t *__capability)];
 };
 struct cheriabi_nmount_args {
 	char iovp_l_[PADL_(struct iovec_c *__capability)]; struct iovec_c *__capability iovp; char iovp_r_[PADR_(struct iovec_c *__capability)];
@@ -639,6 +661,7 @@ int	cheriabi_access(struct thread *, struct cheriabi_access_args *);
 int	cheriabi_chflags(struct thread *, struct cheriabi_chflags_args *);
 int	cheriabi_profil(struct thread *, struct cheriabi_profil_args *);
 int	cheriabi_ktrace(struct thread *, struct cheriabi_ktrace_args *);
+int	cheriabi_getlogin(struct thread *, struct cheriabi_getlogin_args *);
 int	cheriabi_setlogin(struct thread *, struct cheriabi_setlogin_args *);
 int	cheriabi_sigaltstack(struct thread *, struct cheriabi_sigaltstack_args *);
 int	cheriabi_ioctl(struct thread *, struct cheriabi_ioctl_args *);
@@ -649,6 +672,8 @@ int	cheriabi_execve(struct thread *, struct cheriabi_execve_args *);
 int	cheriabi_chroot(struct thread *, struct cheriabi_chroot_args *);
 int	cheriabi_mprotect(struct thread *, struct cheriabi_mprotect_args *);
 int	cheriabi_madvise(struct thread *, struct cheriabi_madvise_args *);
+int	cheriabi_getgroups(struct thread *, struct cheriabi_getgroups_args *);
+int	cheriabi_setgroups(struct thread *, struct cheriabi_setgroups_args *);
 int	cheriabi_readv(struct thread *, struct cheriabi_readv_args *);
 int	cheriabi_writev(struct thread *, struct cheriabi_writev_args *);
 int	cheriabi_rename(struct thread *, struct cheriabi_rename_args *);
@@ -684,6 +709,8 @@ int	cheriabi_jail(struct thread *, struct cheriabi_jail_args *);
 int	cheriabi_sigtimedwait(struct thread *, struct cheriabi_sigtimedwait_args *);
 int	cheriabi_sigwaitinfo(struct thread *, struct cheriabi_sigwaitinfo_args *);
 int	cheriabi_aio_waitcomplete(struct thread *, struct cheriabi_aio_waitcomplete_args *);
+int	cheriabi_getresuid(struct thread *, struct cheriabi_getresuid_args *);
+int	cheriabi_getresgid(struct thread *, struct cheriabi_getresgid_args *);
 int	cheriabi_nmount(struct thread *, struct cheriabi_nmount_args *);
 int	cheriabi___mac_get_proc(struct thread *, struct cheriabi___mac_get_proc_args *);
 int	cheriabi___mac_set_proc(struct thread *, struct cheriabi___mac_set_proc_args *);
@@ -814,6 +841,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_chflags	AUE_CHFLAGS
 #define	CHERIABI_SYS_AUE_cheriabi_profil	AUE_PROFILE
 #define	CHERIABI_SYS_AUE_cheriabi_ktrace	AUE_KTRACE
+#define	CHERIABI_SYS_AUE_cheriabi_getlogin	AUE_GETLOGIN
 #define	CHERIABI_SYS_AUE_cheriabi_setlogin	AUE_SETLOGIN
 #define	CHERIABI_SYS_AUE_cheriabi_sigaltstack	AUE_SIGALTSTACK
 #define	CHERIABI_SYS_AUE_cheriabi_ioctl	AUE_NULL
@@ -824,6 +852,8 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_chroot	AUE_CHROOT
 #define	CHERIABI_SYS_AUE_cheriabi_mprotect	AUE_MPROTECT
 #define	CHERIABI_SYS_AUE_cheriabi_madvise	AUE_MADVISE
+#define	CHERIABI_SYS_AUE_cheriabi_getgroups	AUE_GETGROUPS
+#define	CHERIABI_SYS_AUE_cheriabi_setgroups	AUE_SETGROUPS
 #define	CHERIABI_SYS_AUE_cheriabi_readv	AUE_READV
 #define	CHERIABI_SYS_AUE_cheriabi_writev	AUE_WRITEV
 #define	CHERIABI_SYS_AUE_cheriabi_rename	AUE_RENAME
@@ -859,6 +889,8 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_sigtimedwait	AUE_SIGWAIT
 #define	CHERIABI_SYS_AUE_cheriabi_sigwaitinfo	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_aio_waitcomplete	AUE_AIO_WAITCOMPLETE
+#define	CHERIABI_SYS_AUE_cheriabi_getresuid	AUE_GETRESUID
+#define	CHERIABI_SYS_AUE_cheriabi_getresgid	AUE_GETRESGID
 #define	CHERIABI_SYS_AUE_cheriabi_nmount	AUE_NMOUNT
 #define	CHERIABI_SYS_AUE_cheriabi___mac_get_proc	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi___mac_set_proc	AUE_NULL

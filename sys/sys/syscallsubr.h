@@ -129,10 +129,18 @@ int	kern_getfh(struct thread *td, const char * __capability path,
 	    fhandle_t * __capability fhp, int follow);
 int	kern_getfsstat(struct thread *td, struct statfs **buf, size_t bufsize,
 	    size_t *countp, enum uio_seg bufseg, int mode);
+int	kern_getgroups(struct thread *td, u_int gidsetsize,
+	    gid_t * __capability gidset);
 int	kern_getitimer(struct thread *, u_int, struct itimerval *);
+int	kern_getlogin(struct thread *td, char * __capability namebuf,
+	    u_int namelen);
 int	kern_getppid(struct thread *);
 int	kern_getpeername(struct thread *td, int fd, struct sockaddr **sa,
 	    socklen_t *alen);
+int	kern_getresgid(struct thread *td, gid_t * __capability rgid,
+	    gid_t * __capability egid, gid_t * __capability sgid);
+int	kern_getresuid(struct thread *td, uid_t * __capability ruid,
+	    uid_t * __capability euid, uid_t * __capability suid);
 int	kern_getrusage(struct thread *td, int who, struct rusage *rup);
 int	kern_getsockname(struct thread *td, int fd, struct sockaddr **sa,
 	    socklen_t *alen);
@@ -255,7 +263,8 @@ int	kern_select(struct thread *td, int nd, fd_set *fd_in, fd_set *fd_ou,
 	    fd_set *fd_ex, struct timeval *tvp, int abi_nfdbits);
 int	kern_sendit(struct thread *td, int s, kmsghdr_t *mp, int flags,
 	    struct mbuf *control, enum uio_seg segflg);
-int	kern_setgroups(struct thread *td, u_int ngrp, gid_t *groups);
+int	kern_setgroups(struct thread *td, u_int ngrp,
+	    gid_t *groups);
 int	kern_setitimer(struct thread *, u_int, struct itimerval *,
 	    struct itimerval *);
 int	kern_setrlimit(struct thread *, u_int, struct rlimit *);

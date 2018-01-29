@@ -601,12 +601,12 @@ SYS_STUB(79, int, getgroups,
 )
 
 SYS_STUB(80, int, setgroups,
-    /* _protoargs */ (u_int gidsetsize, gid_t * gidset),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, u_int gidsetsize, gid_t * __capability  gidset),
-    /* _protoargs_err */ (__capability int *stub_errno, u_int gidsetsize, gid_t * __capability  gidset),
-    /* _callargs */ (gidsetsize, (__cheri_fromcap gid_t *)gidset),
+    /* _protoargs */ (u_int gidsetsize, const gid_t * gidset),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, u_int gidsetsize, const gid_t * __capability  gidset),
+    /* _protoargs_err */ (__capability int *stub_errno, u_int gidsetsize, const gid_t * __capability  gidset),
+    /* _callargs */ (gidsetsize, (__cheri_fromcap const gid_t *)gidset),
     /* _callargs_chk */ (&ret, stub_errno, gidsetsize, gidset),
-    /* _callargs_err */ (&errno, gidsetsize, (gid_t *)gidset),
+    /* _callargs_err */ (&errno, gidsetsize, (const gid_t *)gidset),
     /* _localcheck */ {if (!(cheri_getperm(gidset) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 

@@ -309,10 +309,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 0;
 		break;
 	}
-	/* getlogin */
+	/* cheriabi_getlogin */
 	case 49: {
-		struct getlogin_args *p = params;
-		uarg[0] = (intptr_t) p->namebuf; /* char * */
+		struct cheriabi_getlogin_args *p = params;
+		uarg[0] = (cheri_getbase(p->namebuf) + cheri_getoffset(p->namebuf)); /* char *__capability */
 		uarg[1] = p->namelen; /* u_int */
 		*n_args = 2;
 		break;
@@ -451,19 +451,19 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* getgroups */
+	/* cheriabi_getgroups */
 	case 79: {
-		struct getgroups_args *p = params;
+		struct cheriabi_getgroups_args *p = params;
 		uarg[0] = p->gidsetsize; /* u_int */
-		uarg[1] = (intptr_t) p->gidset; /* gid_t * */
+		uarg[1] = (cheri_getbase(p->gidset) + cheri_getoffset(p->gidset)); /* gid_t *__capability */
 		*n_args = 2;
 		break;
 	}
-	/* setgroups */
+	/* cheriabi_setgroups */
 	case 80: {
-		struct setgroups_args *p = params;
+		struct cheriabi_setgroups_args *p = params;
 		uarg[0] = p->gidsetsize; /* u_int */
-		uarg[1] = (intptr_t) p->gidset; /* gid_t * */
+		uarg[1] = (cheri_getbase(p->gidset) + cheri_getoffset(p->gidset)); /* const gid_t *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -1711,21 +1711,21 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* getresuid */
+	/* cheriabi_getresuid */
 	case 360: {
-		struct getresuid_args *p = params;
-		uarg[0] = (intptr_t) p->ruid; /* uid_t * */
-		uarg[1] = (intptr_t) p->euid; /* uid_t * */
-		uarg[2] = (intptr_t) p->suid; /* uid_t * */
+		struct cheriabi_getresuid_args *p = params;
+		uarg[0] = (cheri_getbase(p->ruid) + cheri_getoffset(p->ruid)); /* uid_t *__capability */
+		uarg[1] = (cheri_getbase(p->euid) + cheri_getoffset(p->euid)); /* uid_t *__capability */
+		uarg[2] = (cheri_getbase(p->suid) + cheri_getoffset(p->suid)); /* uid_t *__capability */
 		*n_args = 3;
 		break;
 	}
-	/* getresgid */
+	/* cheriabi_getresgid */
 	case 361: {
-		struct getresgid_args *p = params;
-		uarg[0] = (intptr_t) p->rgid; /* gid_t * */
-		uarg[1] = (intptr_t) p->egid; /* gid_t * */
-		uarg[2] = (intptr_t) p->sgid; /* gid_t * */
+		struct cheriabi_getresgid_args *p = params;
+		uarg[0] = (cheri_getbase(p->rgid) + cheri_getoffset(p->rgid)); /* gid_t *__capability */
+		uarg[1] = (cheri_getbase(p->egid) + cheri_getoffset(p->egid)); /* gid_t *__capability */
+		uarg[2] = (cheri_getbase(p->sgid) + cheri_getoffset(p->sgid)); /* gid_t *__capability */
 		*n_args = 3;
 		break;
 	}
@@ -3581,11 +3581,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* getgid */
 	case 47:
 		break;
-	/* getlogin */
+	/* cheriabi_getlogin */
 	case 49:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland char *__capability";
 			break;
 		case 1:
 			p = "u_int";
@@ -3808,27 +3808,27 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* getgroups */
+	/* cheriabi_getgroups */
 	case 79:
 		switch(ndx) {
 		case 0:
 			p = "u_int";
 			break;
 		case 1:
-			p = "userland gid_t *";
+			p = "userland gid_t *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* setgroups */
+	/* cheriabi_setgroups */
 	case 80:
 		switch(ndx) {
 		case 0:
 			p = "u_int";
 			break;
 		case 1:
-			p = "userland gid_t *";
+			p = "userland const gid_t *__capability";
 			break;
 		default:
 			break;
@@ -5834,33 +5834,33 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* getresuid */
+	/* cheriabi_getresuid */
 	case 360:
 		switch(ndx) {
 		case 0:
-			p = "userland uid_t *";
+			p = "userland uid_t *__capability";
 			break;
 		case 1:
-			p = "userland uid_t *";
+			p = "userland uid_t *__capability";
 			break;
 		case 2:
-			p = "userland uid_t *";
+			p = "userland uid_t *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* getresgid */
+	/* cheriabi_getresgid */
 	case 361:
 		switch(ndx) {
 		case 0:
-			p = "userland gid_t *";
+			p = "userland gid_t *__capability";
 			break;
 		case 1:
-			p = "userland gid_t *";
+			p = "userland gid_t *__capability";
 			break;
 		case 2:
-			p = "userland gid_t *";
+			p = "userland gid_t *__capability";
 			break;
 		default:
 			break;
@@ -8468,7 +8468,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* getgid */
 	case 47:
-	/* getlogin */
+	/* cheriabi_getlogin */
 	case 49:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -8555,12 +8555,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* getgroups */
+	/* cheriabi_getgroups */
 	case 79:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* setgroups */
+	/* cheriabi_setgroups */
 	case 80:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9297,12 +9297,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* getresuid */
+	/* cheriabi_getresuid */
 	case 360:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* getresgid */
+	/* cheriabi_getresgid */
 	case 361:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

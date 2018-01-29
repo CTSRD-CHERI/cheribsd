@@ -751,26 +751,19 @@ CHERIABI_SYS_cheriabi_ktrace_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_getlogin_fill_uap(struct thread *td,
-    struct getlogin_args *uap)
+CHERIABI_SYS_cheriabi_getlogin_fill_uap(struct thread *td,
+    struct cheriabi_getlogin_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [1] u_int namelen */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_getlogin_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_getlogin_PTRMASK);
 	uap->namelen = cheri_getoffset(tmpcap);
 
-	/* [0] _Out_writes_z_(namelen) char * namebuf */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_getlogin_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->namebuf),
-		    tmpcap, (sizeof(*uap->namebuf) * uap->namelen), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _Out_writes_z_(namelen) char *__capability namebuf */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->namebuf),
+	    0, CHERIABI_SYS_cheriabi_getlogin_PTRMASK);
 
 	return (0);
 }
@@ -1096,51 +1089,37 @@ static inline int	CHERIABI_SYS_mincore_fill_uap(struct thread *td,
     struct mincore_args *uap);
 
 static inline int
-CHERIABI_SYS_getgroups_fill_uap(struct thread *td,
-    struct getgroups_args *uap)
+CHERIABI_SYS_cheriabi_getgroups_fill_uap(struct thread *td,
+    struct cheriabi_getgroups_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] u_int gidsetsize */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_getgroups_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_getgroups_PTRMASK);
 	uap->gidsetsize = cheri_getoffset(tmpcap);
 
-	/* [1] _Out_writes_opt_(gidsetsize) gid_t * gidset */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_getgroups_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->gidset),
-		    tmpcap, (sizeof(*uap->gidset) * uap->gidsetsize), reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
+	/* [1] _Out_writes_opt_(gidsetsize) gid_t *__capability gidset */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->gidset),
+	    1, CHERIABI_SYS_cheriabi_getgroups_PTRMASK);
 
 	return (0);
 }
 
 static inline int
-CHERIABI_SYS_setgroups_fill_uap(struct thread *td,
-    struct setgroups_args *uap)
+CHERIABI_SYS_cheriabi_setgroups_fill_uap(struct thread *td,
+    struct cheriabi_setgroups_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] u_int gidsetsize */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_setgroups_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_setgroups_PTRMASK);
 	uap->gidsetsize = cheri_getoffset(tmpcap);
 
-	/* [1] _In_reads_(gidsetsize) gid_t * gidset */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_setgroups_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->gidset),
-		    tmpcap, (sizeof(*uap->gidset) * uap->gidsetsize), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [1] _In_reads_(gidsetsize) const gid_t *__capability gidset */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->gidset),
+	    1, CHERIABI_SYS_cheriabi_setgroups_PTRMASK);
 
 	return (0);
 }
@@ -4546,91 +4525,47 @@ CHERIABI_SYS_cheriabi_aio_waitcomplete_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_getresuid_fill_uap(struct thread *td,
-    struct getresuid_args *uap)
+CHERIABI_SYS_cheriabi_getresuid_fill_uap(struct thread *td,
+    struct cheriabi_getresuid_args *uap)
 {
-	void * __capability tmpcap;
 
-	/* [0] _Out_opt_ uid_t * ruid */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
+	/* [0] _Out_opt_ uid_t *__capability ruid */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->ruid),
+	    0, CHERIABI_SYS_cheriabi_getresuid_PTRMASK);
 
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_getresuid_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->ruid),
-		    tmpcap, sizeof(*uap->ruid), reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
+	/* [1] _Out_opt_ uid_t *__capability euid */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->euid),
+	    1, CHERIABI_SYS_cheriabi_getresuid_PTRMASK);
 
-	/* [1] _Out_opt_ uid_t * euid */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_getresuid_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->euid),
-		    tmpcap, sizeof(*uap->euid), reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
-
-	/* [2] _Out_opt_ uid_t * suid */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_getresuid_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->suid),
-		    tmpcap, sizeof(*uap->suid), reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
+	/* [2] _Out_opt_ uid_t *__capability suid */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->suid),
+	    2, CHERIABI_SYS_cheriabi_getresuid_PTRMASK);
 
 	return (0);
 }
 
 static inline int
-CHERIABI_SYS_getresgid_fill_uap(struct thread *td,
-    struct getresgid_args *uap)
+CHERIABI_SYS_cheriabi_getresgid_fill_uap(struct thread *td,
+    struct cheriabi_getresgid_args *uap)
 {
-	void * __capability tmpcap;
 
-	/* [0] _Out_opt_ gid_t * rgid */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
+	/* [0] _Out_opt_ gid_t *__capability rgid */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->rgid),
+	    0, CHERIABI_SYS_cheriabi_getresgid_PTRMASK);
 
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_getresgid_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->rgid),
-		    tmpcap, sizeof(*uap->rgid), reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
+	/* [1] _Out_opt_ gid_t *__capability egid */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->egid),
+	    1, CHERIABI_SYS_cheriabi_getresgid_PTRMASK);
 
-	/* [1] _Out_opt_ gid_t * egid */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_getresgid_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->egid),
-		    tmpcap, sizeof(*uap->egid), reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
-
-	/* [2] _Out_opt_ gid_t * sgid */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_getresgid_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->sgid),
-		    tmpcap, sizeof(*uap->sgid), reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
+	/* [2] _Out_opt_ gid_t *__capability sgid */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->sgid),
+	    2, CHERIABI_SYS_cheriabi_getresgid_PTRMASK);
 
 	return (0);
 }

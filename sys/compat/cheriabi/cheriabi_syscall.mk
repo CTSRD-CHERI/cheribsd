@@ -40,7 +40,7 @@ MIASM =  \
 	cheriabi_profil.o \
 	cheriabi_ktrace.o \
 	getgid.o \
-	getlogin.o \
+	cheriabi_getlogin.o \
 	cheriabi_setlogin.o \
 	acct.o \
 	cheriabi_sigaltstack.o \
@@ -58,8 +58,8 @@ MIASM =  \
 	cheriabi_mprotect.o \
 	cheriabi_madvise.o \
 	mincore.o \
-	getgroups.o \
-	setgroups.o \
+	cheriabi_getgroups.o \
+	cheriabi_setgroups.o \
 	getpgrp.o \
 	setpgid.o \
 	setitimer.o \
@@ -209,8 +209,8 @@ MIASM =  \
 	extattr_get_file.o \
 	extattr_delete_file.o \
 	cheriabi_aio_waitcomplete.o \
-	getresuid.o \
-	getresgid.o \
+	cheriabi_getresuid.o \
+	cheriabi_getresgid.o \
 	kqueue.o \
 	extattr_set_fd.o \
 	extattr_get_fd.o \

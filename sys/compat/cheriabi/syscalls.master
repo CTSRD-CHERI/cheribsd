@@ -173,8 +173,9 @@
 46	AUE_SIGACTION	OBSOL	sigaction
 47	AUE_GETGID	NOPROTO	{ gid_t getgid(void); }
 48	AUE_SIGPROCMASK	OBSOL	sigprocmask
-49	AUE_GETLOGIN	NOPROTO	{ int getlogin( \
-				    _Out_writes_z_(namelen) char *namebuf, \
+49	AUE_GETLOGIN	STD	{ int cheriabi_getlogin( \
+				    _Out_writes_z_(namelen) \
+				    char * __capability namebuf, \
 				    u_int namelen); }
 50	AUE_SETLOGIN	STD	{ int cheriabi_setlogin( \
 				    _In_z_ const char * __capability namebuf); }
@@ -239,11 +240,12 @@
 				    size_t len, \
 				    _Out_writes_bytes_(len/PAGE_SIZE) \
 				    char *vec); }
-79	AUE_GETGROUPS	NOPROTO	{ int getgroups(u_int gidsetsize, \
+79	AUE_GETGROUPS	STD	{ int cheriabi_getgroups(u_int gidsetsize, \
 				    _Out_writes_opt_(gidsetsize) \
-				    gid_t *gidset); }
-80	AUE_SETGROUPS	NOPROTO	{ int setgroups(u_int gidsetsize, \
-				    _In_reads_(gidsetsize) gid_t *gidset); }
+				    gid_t * __capability gidset); }
+80	AUE_SETGROUPS	STD	{ int cheriabi_setgroups(u_int gidsetsize, \
+				    _In_reads_(gidsetsize) \
+				    const gid_t * __capability gidset); }
 81	AUE_GETPGRP	NOPROTO	{ int getpgrp(void); }
 82	AUE_SETPGRP	NOPROTO	{ int setpgid(int pid, int pgid); }
 83	AUE_SETITIMER	NOPROTO	{ int setitimer(int which, \
@@ -768,12 +770,14 @@
 				    _Outptr_result_maybenull_ \
 				    struct aiocb_c * __capability *aiocbp, \
 				    _In_opt_ struct timespec *timeout); }
-360	AUE_GETRESUID	NOPROTO	{ int getresuid(_Out_opt_ uid_t *ruid, \
-				    _Out_opt_ uid_t *euid, \
-				    _Out_opt_ uid_t *suid); }
-361	AUE_GETRESGID	NOPROTO	{ int getresgid(_Out_opt_ gid_t *rgid, \
-				    _Out_opt_ gid_t *egid, \
-				    _Out_opt_ gid_t *sgid); }
+360	AUE_GETRESUID	STD	{ int cheriabi_getresuid( \
+				    _Out_opt_ uid_t * __capability ruid, \
+				    _Out_opt_ uid_t * __capability euid, \
+				    _Out_opt_ uid_t * __capability suid); }
+361	AUE_GETRESGID	STD	{ int cheriabi_getresgid( \
+				    _Out_opt_ gid_t * __capability rgid, \
+				    _Out_opt_ gid_t * __capability egid, \
+				    _Out_opt_ gid_t * __capability sgid); }
 362	AUE_KQUEUE	NOPROTO	{ int kqueue(void); }
 363	AUE_NULL	UNIMPL	kevent11
 364	AUE_NULL	UNIMPL	__cap_get_proc

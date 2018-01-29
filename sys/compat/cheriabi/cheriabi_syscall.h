@@ -54,7 +54,7 @@
 				/* 46 is obsolete sigaction */
 #define	CHERIABI_SYS_getgid	47
 				/* 48 is obsolete sigprocmask */
-#define	CHERIABI_SYS_getlogin	49
+#define	CHERIABI_SYS_cheriabi_getlogin	49
 #define	CHERIABI_SYS_cheriabi_setlogin	50
 #define	CHERIABI_SYS_acct	51
 				/* 52 is obsolete sigpending */
@@ -84,8 +84,8 @@
 				/* 76 is obsolete vhangup */
 				/* 77 is obsolete vlimit */
 #define	CHERIABI_SYS_mincore	78
-#define	CHERIABI_SYS_getgroups	79
-#define	CHERIABI_SYS_setgroups	80
+#define	CHERIABI_SYS_cheriabi_getgroups	79
+#define	CHERIABI_SYS_cheriabi_setgroups	80
 #define	CHERIABI_SYS_getpgrp	81
 #define	CHERIABI_SYS_setpgid	82
 #define	CHERIABI_SYS_setitimer	83
@@ -299,8 +299,8 @@
 #define	CHERIABI_SYS_extattr_get_file	357
 #define	CHERIABI_SYS_extattr_delete_file	358
 #define	CHERIABI_SYS_cheriabi_aio_waitcomplete	359
-#define	CHERIABI_SYS_getresuid	360
-#define	CHERIABI_SYS_getresgid	361
+#define	CHERIABI_SYS_cheriabi_getresuid	360
+#define	CHERIABI_SYS_cheriabi_getresgid	361
 #define	CHERIABI_SYS_kqueue	362
 #define	CHERIABI_SYS_extattr_set_fd	371
 #define	CHERIABI_SYS_extattr_get_fd	372
