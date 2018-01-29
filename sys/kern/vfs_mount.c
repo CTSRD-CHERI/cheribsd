@@ -1136,12 +1136,19 @@ struct unmount_args {
 int
 sys_unmount(struct thread *td, struct unmount_args *uap)
 {
+
+	return (kern_unmount(td, __USER_CAP_STR(uap->path), uap->flags));
+}
+
+int
+kern_unmount(struct thread *td, const char * __capability path, int flags)
+{
 	struct nameidata nd;
 	struct mount *mp;
 	char *pathbuf;
 	int error, id0, id1;
 
-	AUDIT_ARG_VALUE(uap->flags);
+	AUDIT_ARG_VALUE(flags);
 	if (jailed(td->td_ucred) || usermount == 0) {
 		error = priv_check(td, PRIV_VFS_UNMOUNT);
 		if (error)
@@ -1149,12 +1156,13 @@ sys_unmount(struct thread *td, struct unmount_args *uap)
 	}
 
 	pathbuf = malloc(MNAMELEN, M_TEMP, M_WAITOK);
-	error = copyinstr(uap->path, pathbuf, MNAMELEN, NULL);
+	error = copyinstr_c(path, (__cheri_tocap char * __capability)pathbuf,
+	    MNAMELEN, NULL);
 	if (error) {
 		free(pathbuf, M_TEMP);
 		return (error);
 	}
-	if (uap->flags & MNT_BYFSID) {
+	if (flags & MNT_BYFSID) {
 		AUDIT_ARG_TEXT(pathbuf);
 		/* Decode the filesystem ID. */
 		if (sscanf(pathbuf, "FSID:%d:%d", &id0, &id1) != 2) {
@@ -1201,7 +1209,7 @@ sys_unmount(struct thread *td, struct unmount_args *uap)
 		 * now, so in the !MNT_BYFSID case return the more likely
 		 * EINVAL for compatibility.
 		 */
-		return ((uap->flags & MNT_BYFSID) ? ENOENT : EINVAL);
+		return ((flags & MNT_BYFSID) ? ENOENT : EINVAL);
 	}
 
 	/*
@@ -1211,7 +1219,7 @@ sys_unmount(struct thread *td, struct unmount_args *uap)
 		vfs_rel(mp);
 		return (EINVAL);
 	}
-	error = dounmount(mp, uap->flags, td);
+	error = dounmount(mp, flags, td);
 	return (error);
 }
 

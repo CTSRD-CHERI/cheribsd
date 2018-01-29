@@ -99,10 +99,12 @@
 				    _In_z_ const char * __capability path); }
 13	AUE_FCHDIR	NOPROTO	{ int fchdir(int fd); }
 14	AUE_MKNOD	OBSOL	fbsd11_mknod
-15	AUE_CHMOD	NOPROTO	{ int chmod(_In_z_ const char *path, \
+15	AUE_CHMOD	STD	{ int cheriabi_chmod( \
+				    _In_z_ const char * __capability path, \
 				    mode_t mode); }
-16	AUE_CHOWN	NOPROTO	{ int chown(_In_z_ const char *path, int uid, \
-				    int gid); }
+16	AUE_CHOWN	STD	{ int cheriabi_chown( \
+				    _In_z_ const char * __capability path, \
+				    int uid, int gid); }
 17	AUE_NULL	OBSOL	obreak
 18	AUE_GETFSSTAT	OBSOL	getstatfs
 19	AUE_LSEEK	OBSOL	lseek
@@ -113,7 +115,8 @@
 				    _In_z_ const char * __capability path, \
 				    int flags, \
 				    _In_opt_ void * __capability data); }
-22	AUE_UMOUNT	NOPROTO	{ int unmount(_In_z_ const char *path, \
+22	AUE_UMOUNT	STD	{ int cheriabi_unmount( \
+				    _In_z_ const char * __capability path, \
 				    int flags); }
 23	AUE_SETUID	NOPROTO	{ int setuid(uid_t uid); }
 24	AUE_GETUID	NOPROTO	{ uid_t getuid(void); }
@@ -145,9 +148,11 @@
 				    _Out_writes_bytes_(*alen) \
 				    struct sockaddr * __restrict asa, \
 				    _Inout_ __socklen_t *alen); }
-33	AUE_ACCESS	NOPROTO	{ int access(_In_z_ const char *path, \
+33	AUE_ACCESS	STD	{ int cheriabi_access( \
+				    _In_z_ const char * __capability path, \
 				    int amode); }
-34	AUE_CHFLAGS	NOPROTO	{ int chflags(_In_z_ const char *path, \
+34	AUE_CHFLAGS	STD	{ int cheriabi_chflags( \
+				    _In_z_ const char * __capability path, \
 				    u_long flags); }
 35	AUE_FCHFLAGS	NOPROTO	{ int fchflags(int fd, u_long flags); }
 36	AUE_SYNC	NOPROTO	{ int sync(void); }
@@ -180,11 +185,15 @@
 				    int fd, u_long com, \
 				    _Inout_opt_ void *data); }
 55	AUE_REBOOT	NOPROTO	{ int reboot(int opt); }
-56	AUE_REVOKE	NOPROTO	{ int revoke(_In_z_ const char *path); }
-57	AUE_SYMLINK	NOPROTO	{ int symlink(_In_z_ const char *path, \
-				    _In_z_ const char *link); }
-58	AUE_READLINK	NOPROTO	{ ssize_t readlink(_In_z_ const char *path, \
-				    _Out_writes_z_(count) char *buf, \
+56	AUE_REVOKE	STD	{ int cheriabi_revoke( \
+				    _In_z_ const char * __capability path); }
+57	AUE_SYMLINK	STD	{ int cheriabi_symlink( \
+				    _In_z_ const char * __capability path, \
+				    _In_z_ const char * __capability link); }
+58	AUE_READLINK	STD	{ ssize_t cheriabi_readlink( \
+				    _In_z_ const char * __capability path, \
+				    _Out_writes_z_(count) \
+				    char * __capability buf, \
 				    size_t count); }
 ; XXX-BD: Arguably argv and envv are _In_z_, but the SAL documentation is
 ; inconsistant about NUL terminated string, vs NULL terminted array so
@@ -194,7 +203,8 @@
 				    _In_ void * __capability *argv, \
 				    _In_ void * __capability *envv); }
 60	AUE_UMASK	NOPROTO	{ mode_t umask(mode_t newmask); }
-61	AUE_CHROOT	NOPROTO	{ int chroot(_In_z_ const char *path); }
+61	AUE_CHROOT	STD	{ int cheriabi_chroot( \
+				    _In_z_ const char * __capability path); }
 62	AUE_FSTAT	OBSOL	fstat
 63	AUE_NULL	OBSOL	ogetkerninfo
 64	AUE_NULL	OBSOL	getpagesize
@@ -315,8 +325,9 @@
 125	AUE_RECVFROM	OBSOL	orecvfrom
 126	AUE_SETREUID	NOPROTO	{ int setreuid(int ruid, int euid); }
 127	AUE_SETREGID	NOPROTO	{ int setregid(int rgid, int egid); }
-128	AUE_RENAME	NOPROTO	{ int rename(_In_z_ const char *from, \
-				    _In_z_ const char *to); }
+128	AUE_RENAME	STD	{ int cheriabi_rename( \
+				    _In_z_ const char * __capability from, \
+				    _In_z_ const char * __capability to); }
 129	AUE_TRUNCATE	OBSOL	truncate
 130	AUE_FTRUNCATE	OBSOL	ftruncate
 131	AUE_FLOCK	NOPROTO	{ int flock(int fd, int how); }
@@ -331,12 +342,15 @@
 134	AUE_SHUTDOWN	NOPROTO	{ int shutdown(int s, int how); }
 135	AUE_SOCKETPAIR	NOPROTO	{ int socketpair(int domain, int type, \
 				    int protocol, _Out_writes_(2) int *rsv); }
-136	AUE_MKDIR	NOPROTO	{ int mkdir(_In_z_ const char *path, \
+136	AUE_MKDIR	STD	{ int cheriabi_mkdir( \
+				    _In_z_ const char * __capability path, \
 				    mode_t mode); }
 137	AUE_RMDIR	STD	{ int cheriabi_rmdir( \
 				    _In_z_ const char * __capability path); }
-138	AUE_UTIMES	NOPROTO	{ int utimes(_In_z_ const char *path, \
-				    _In_ const struct timeval *tptr); }
+138	AUE_UTIMES	STD	{ int cheriabi_utimes( \
+				    _In_z_ const char * __capability path, \
+				    _In_ \
+				    const struct timeval * __capability tptr); }
 139	AUE_NULL	OBSOL	sigreturn
 140	AUE_ADJTIME	NOPROTO	{ int adjtime( \
 				    _In_ const struct timeval *delta, \
@@ -374,10 +388,12 @@
 157	AUE_STATFS	OBSOL	statfs
 158	AUE_FSTATFS	OBSOL	fstatfs
 159	AUE_NULL	UNIMPL	nosys
-160	AUE_LGETFH	NOPROTO { int lgetfh(_In_z_ const char *fname, \
-				    _Out_ struct fhandle *fhp); }
-161	AUE_NFS_GETFH	NOPROTO	{ int getfh(_In_z_ const char *fname, \
-				    _Out_ struct fhandle *fhp); }
+160	AUE_LGETFH	STD	{ int cheriabi_lgetfh( \
+				    _In_z_ const char * __capability fname, \
+				    _Out_ struct fhandle * __capability fhp); }
+161	AUE_NFS_GETFH	STD	{ int cheriabi_getfh( \
+				    _In_z_ const char * __capability fname, \
+				    _Out_ struct fhandle * __capability fhp); }
 162	AUE_NULL	OBSOL	getdomainname
 163	AUE_NULL	OBSOL	setdomainname
 164	AUE_NULL	OBSOL	uname
@@ -413,7 +429,8 @@
 188	AUE_STAT	OBSOL	fbsd11_stat
 189	AUE_FSTAT	OBSOL	fbsd11_fstat
 190	AUE_LSTAT	OBSOL	fbsd11_lstat
-191	AUE_PATHCONF	NOPROTO	{ int pathconf(_In_z_ const char *path, \
+191	AUE_PATHCONF	STD	{ int cheriabi_pathconf( \
+				    _In_z_ const char * __capability path, \
 				    int name); }
 192	AUE_FPATHCONF	NOPROTO	{ int fpathconf(int fd, int name); }
 193	AUE_NULL	UNIMPL	nosys
@@ -445,7 +462,8 @@
 204	AUE_MUNLOCK	NOPROTO	{ int munlock( \
 				    _Pagerange_(len) const void *addr, \
 				    size_t len); }
-205	AUE_UNDELETE	NOPROTO	{ int undelete(_In_z_ const char *path); }
+205	AUE_UNDELETE	STD	{ int cheriabi_undelete( \
+				    _In_z_ const char * __capability path); }
 206	AUE_FUTIMES	NOPROTO	{ int futimes(int fd, \
 				    _In_reads_(2) \
 				    const struct timeval *tptr); }
@@ -576,11 +594,13 @@
 271	AUE_NULL	UNIMPL	nosys
 272	AUE_O_GETDENTS	OBSOL	fbsd11_getdents
 273	AUE_NULL	UNIMPL	nosys
-274	AUE_LCHMOD	NOPROTO	{ int lchmod(_In_z_ const char *path, \
+274	AUE_LCHMOD	STD	{ int cheriabi_lchmod( \
+				    _In_z_ const char * __capability path, \
 				    mode_t mode); }
 275	AUE_LCHOWN	UNIMPL	netbsd_lchown
-276	AUE_LUTIMES	NOPROTO	{ int lutimes(_In_z_ const char *path, \
-				    _In_ const struct timeval *tptr); }
+276	AUE_LUTIMES	STD	{ int cheriabi_lutimes( \
+				    _In_z_ const char * __capability path, \
+				    _In_ const struct timeval * __capability tptr); }
 277	AUE_MSYNC	UNIMPL	netbsd_msync
 278	AUE_STAT	COMPAT11|NOPROTO { int nstat( \
 				    _In_z_ const char *path, \
@@ -806,7 +826,8 @@
 				    _In_z_opt_ const char * __capability name, \
 				    _Inout_updates_opt_(len) \
 				    char * __capability value, int len); }
-391	AUE_LCHFLAGS	NOPROTO	{ int lchflags(_In_z_ const char *path, \
+391	AUE_LCHFLAGS	STD	{ int cheriabi_lchflags( \
+				    _In_z_ const char * __capability path, \
 				    u_long flags); }
 392	AUE_NULL	NOPROTO	{ int uuidgen( \
 				    _Out_writes_(count) struct uuid *store, \
@@ -1045,7 +1066,8 @@
 				    off_t pos); }
 478	AUE_LSEEK	NOPROTO	{ off_t lseek(int fd, off_t offset, \
 				    int whence); }
-479	AUE_TRUNCATE	NOPROTO	{ int truncate(_In_z_ const char *path, \
+479	AUE_TRUNCATE	STD	{ int cheriabi_truncate( \
+				    _In_z_ const char * __capability path, \
 				    off_t length); }
 480	AUE_FTRUNCATE	NOPROTO	{ int ftruncate(int fd, off_t length); }
 481	AUE_THR_KILL2	NOPROTO	{ int thr_kill2(pid_t pid, long id, int sig); }
@@ -1068,43 +1090,51 @@
 				    cpulevel_t level, cpuwhich_t which, \
 				    id_t id, size_t cpusetsize, \
 				    _Out_ const cpuset_t *mask); }
-489	AUE_FACCESSAT	NOPROTO	{ int faccessat(int fd, \
-				    _In_z_ const char *path, int amode, \
-				    int flag); }
-490	AUE_FCHMODAT	NOPROTO	{ int fchmodat(int fd, \
-				    _In_z_ const char *path, mode_t mode, \
-				    int flag); }
-491	AUE_FCHOWNAT	NOPROTO	{ int fchownat(int fd, _In_z_ const char *path, \
+489	AUE_FACCESSAT	STD	{ int cheriabi_faccessat(int fd, \
+				    _In_z_ const char * __capability path, \
+				    int amode, int flag); }
+490	AUE_FCHMODAT	STD	{ int cheriabi_fchmodat(int fd, \
+				    _In_z_ const char * __capability path, \
+				    mode_t mode, int flag); }
+491	AUE_FCHOWNAT	STD	{ int cheriabi_fchownat(int fd, \
+				    _In_z_ const char * __capability path, \
 				    uid_t uid, gid_t gid, int flag); }
 492	AUE_FEXECVE	STD|NOSTUB	{ int cheriabi_fexecve(int fd, \
 				    _In_ void * __capability *argv, \
 				    _In_ void * __capability *envv); }
 493	AUE_FSTATAT	OBSOL	fbsd11_fstatat
-494	AUE_FUTIMESAT	NOPROTO	{ int futimesat(int fd, \
-				    _In_z_ const char *path, \
-				    _In_reads_(2) const struct timeval *times); }
+494	AUE_FUTIMESAT	STD	{ int cheriabi_futimesat(int fd, \
+				    _In_z_ const char * __capability path, \
+				    _In_reads_(2) \
+				    const struct timeval * __capability times); }
 495	AUE_LINKAT	STD	{ int cheriabi_linkat(int fd1, \
 				    _In_z_ const char * __capability path1, \
 				    int fd2, \
 				    _In_z_ const char * __capability path2, \
 				    int flag); }
-496	AUE_MKDIRAT	NOPROTO	{ int mkdirat(int fd, _In_z_ const char *path, \
+496	AUE_MKDIRAT	STD	{ int cheriabi_mkdirat(int fd, \
+				    _In_z_ const char * __capability path, \
 				    mode_t mode); }
-497	AUE_MKFIFOAT	NOPROTO	{ int mkfifoat(int fd, \
-				    _In_z_ const char *path, mode_t mode); }
+497	AUE_MKFIFOAT	STD	{ int cheriabi_mkfifoat(int fd, \
+				    _In_z_ const char * __capability path, \
+				    mode_t mode); }
 498	AUE_MKNODAT	OBSOL	fbsd11_mknodat
 499	AUE_OPENAT_RWTC	STD|VARARG	{ int cheriabi_openat(int fd, \
 				    _In_z_ const char * __capability path, \
 				    int flag, mode_t mode); }
-500	AUE_READLINKAT	NOPROTO	{ int readlinkat(int fd, \
-				    _In_z_ const char *path, \
-				    _Out_writes_bytes_(bufsize) char *buf, \
+500	AUE_READLINKAT	STD	{ int cheriabi_readlinkat(int fd, \
+				    _In_z_ const char * __capability path, \
+				    _Out_writes_bytes_(bufsize) \
+				    char * __capability buf, \
 				    size_t bufsize); }
-501	AUE_RENAMEAT	NOPROTO	{ int renameat(int oldfd, \
-				    _In_z_ const char *old, \
-				    int newfd, _In_z_ const char *new); }
-502	AUE_SYMLINKAT	NOPROTO	{ int symlinkat(_In_z_ const char *path1, \
-				    int fd, _In_z_ const char *path2); }
+501	AUE_RENAMEAT	STD	{ int cheriabi_renameat(int oldfd, \
+				    _In_z_ const char * __capability old, \
+				    int newfd, \
+				    _In_z_ const char * __capability new); }
+502	AUE_SYMLINKAT	STD	{ int cheriabi_symlinkat( \
+				    _In_z_ const char * __capability path1, \
+				    int fd, \
+				    _In_z_ const char * __capability path2); }
 503	AUE_UNLINKAT	STD	{ int cheriabi_unlinkat(int fd, \
 				    _In_z_ const char * __capability path, \
 				    int flag); }
@@ -1128,7 +1158,8 @@
 ; XXX: technically buf is sometimes _In_ and sometimes _Out_
 512	AUE_SHMCTL	NOSTD|NOPROTO	{ int shmctl(int shmid, int cmd, \
 				    _Inout_opt_ struct shmid_ds *buf); }
-513	AUE_LPATHCONF	NOPROTO	{ int lpathconf(_In_z_ const char *path, \
+513	AUE_LPATHCONF	STD	{ int cheriabi_lpathconf( \
+				    _In_z_ const char * __capability path, \
 				    int name); }
 514	AUE_NULL	OBSOL	cap_new
 515	AUE_CAP_RIGHTS_GET	NOPROTO	{ int __cap_rights_get(int version, \
@@ -1209,8 +1240,8 @@
 				    _In_reads_bytes_(namelen) \
 				    const struct sockaddr *name, \
 				    __socklen_t namelen); }
-540	AUE_CHFLAGSAT	NOPROTO	{ int chflagsat(int fd, \
-				    _In_z_ const char *path, \
+540	AUE_CHFLAGSAT	STD	{ int cheriabi_chflagsat(int fd, \
+				    _In_z_ const char * __capability path, \
 				    u_long flags, int atflag); }
 541	AUE_ACCEPT	NOPROTO	{ int accept4(int s, \
 				    _Out_writes_bytes_opt_(*anamelen) \
@@ -1232,13 +1263,14 @@
 				    _In_opt_ \
 				    const struct timespec * __capability ts, \
 				    _In_opt_ const sigset_t * __capability set); }
-546	AUE_FUTIMES	NOPROTO	{ int futimens(int fd, \
+546	AUE_FUTIMES	STD	{ int cheriabi_futimens(int fd, \
 				    _In_reads_(2) \
-				    const struct timespec *times); }
-547	AUE_FUTIMESAT	NOPROTO	{ int utimensat(int fd, \
-				    _In_z_ const char *path, \
+				    const struct timespec * __capability \
+				    times); }
+547	AUE_FUTIMESAT	STD	{ int cheriabi_utimensat(int fd, \
+				    _In_z_ const char * __capability path, \
 				    _In_reads_(2) \
-				    const struct timespec *times, \
+				    const struct timespec * __capability times, \
 				    int flag); }
 548	AUE_NULL	NOPROTO	{ int numa_getaffinity(cpuwhich_t which, \
 				    id_t id, \
@@ -1268,7 +1300,8 @@
 558	AUE_FHSTATFS	NOPROTO	{ int fhstatfs( \
 				    _In_ const struct fhandle *u_fhp, \
                                     _Out_ struct statfs *buf); }
-559	AUE_MKNODAT	NOPROTO	{ int mknodat(int fd, _In_z_ const char *path, \
+559	AUE_MKNODAT	STD	{ int cheriabi_mknodat(int fd, \
+				    _In_z_ const char * __capability path, \
 				    mode_t mode, dev_t dev); }
 560	AUE_KEVENT	STD	{ int cheriabi_kevent(int fd, \
 				    _In_reads_opt_(nchanges) \

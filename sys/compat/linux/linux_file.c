@@ -653,7 +653,7 @@ linux_chmod(struct thread *td, struct linux_chmod_args *args)
 	if (ldebug(chmod))
 		printf(ARGS(chmod, "%s, %d"), path, args->mode);
 #endif
-	error = kern_fchmodat(td, AT_FDCWD, path, UIO_SYSSPACE,
+	error = kern_fchmodat(td, AT_FDCWD, UADDR2PTR(path), UIO_SYSSPACE,
 	    args->mode, 0);
 	LFREEPATH(path);
 	return (error);
@@ -673,7 +673,8 @@ linux_fchmodat(struct thread *td, struct linux_fchmodat_args *args)
 		printf(ARGS(fchmodat, "%s, %d"), path, args->mode);
 #endif
 
-	error = kern_fchmodat(td, dfd, path, UIO_SYSSPACE, args->mode, 0);
+	error = kern_fchmodat(td, dfd, UADDR2PTR(path), UIO_SYSSPACE,
+	    args->mode, 0);
 	LFREEPATH(path);
 	return (error);
 }
@@ -1475,8 +1476,9 @@ linux_chown(struct thread *td, struct linux_chown_args *args)
 	if (ldebug(chown))
 		printf(ARGS(chown, "%s, %d, %d"), path, args->uid, args->gid);
 #endif
-	error = kern_fchownat(td, AT_FDCWD, path, UIO_SYSSPACE, args->uid,
-	    args->gid, 0);
+	error = kern_fchownat(td, AT_FDCWD,
+	    (__cheri_tocap const char * __capability)path,
+	    UIO_SYSSPACE, args->uid, args->gid, 0);
 	LFREEPATH(path);
 	return (error);
 }
@@ -1500,8 +1502,9 @@ linux_fchownat(struct thread *td, struct linux_fchownat_args *args)
 
 	flag = (args->flag & LINUX_AT_SYMLINK_NOFOLLOW) == 0 ? 0 :
 	    AT_SYMLINK_NOFOLLOW;
-	error = kern_fchownat(td, dfd, path, UIO_SYSSPACE, args->uid, args->gid,
-	    flag);
+	error = kern_fchownat(td, dfd,
+	    (__cheri_tocap const char * __capability)path,
+	    UIO_SYSSPACE, args->uid, args->gid, flag);
 	LFREEPATH(path);
 	return (error);
 }
@@ -1518,8 +1521,9 @@ linux_lchown(struct thread *td, struct linux_lchown_args *args)
 	if (ldebug(lchown))
 		printf(ARGS(lchown, "%s, %d, %d"), path, args->uid, args->gid);
 #endif
-	error = kern_fchownat(td, AT_FDCWD, path, UIO_SYSSPACE, args->uid,
-	    args->gid, AT_SYMLINK_NOFOLLOW);
+	error = kern_fchownat(td, AT_FDCWD,
+	    (__cheri_tocap const char * __capability)path,
+	    UIO_SYSSPACE, args->uid, args->gid, AT_SYMLINK_NOFOLLOW);
 	LFREEPATH(path);
 	return (error);
 }

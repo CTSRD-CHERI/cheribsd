@@ -1,6 +1,5 @@
 /*-
- * Copyright (c) 2002 Doug Rabson
- * Copyright (c) 2015-2017 SRI International
+ * Copyright (c) 2015-2018 SRI International
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -55,6 +54,13 @@ cheriabi_chdir(struct thread *td, struct cheriabi_chdir_args *uap)
 }
 
 int
+cheriabi_chroot(struct thread *td, struct cheriabi_chroot_args *uap)
+{
+
+	return (kern_chroot(td, uap->path));
+}
+
+int
 cheriabi_open(struct thread *td, struct cheriabi_open_args *uap)
 {
 
@@ -67,6 +73,23 @@ cheriabi_openat(struct thread *td, struct cheriabi_openat_args *uap)
 {
 
 	return (kern_openat_c(td, uap->fd, uap->path, UIO_USERSPACE, uap->flag,
+	    uap->mode));
+}
+
+
+int
+cheriabi_mknodat(struct thread *td, struct cheriabi_mknodat_args *uap)
+{
+
+	return (kern_mknodat(td, uap->fd, uap->path, UIO_USERSPACE, uap->mode,
+	    uap->dev));
+}
+
+int
+cheriabi_mkfifoat(struct thread *td, struct cheriabi_mkfifoat_args *uap)
+{
+
+	return (kern_mkfifoat(td, AT_FDCWD, uap->path, UIO_USERSPACE,
 	    uap->mode));
 }
 
@@ -92,6 +115,29 @@ cheriabi_linkat(struct thread *td, struct cheriabi_linkat_args *uap)
 }
 
 int
+cheriabi_symlink(struct thread *td, struct cheriabi_symlink_args *uap)
+{
+
+	return (kern_symlinkat(td, uap->path, AT_FDCWD, uap->link,
+	    UIO_USERSPACE));
+}
+
+int
+cheriabi_symlinkat(struct thread *td, struct cheriabi_symlinkat_args *uap)
+{
+
+	return (kern_symlinkat(td, uap->path1, uap->fd, uap->path2,
+	    UIO_USERSPACE));
+}
+
+int
+cheriabi_undelete(struct thread *td, struct cheriabi_undelete_args *uap)
+{
+
+	return (kern_undelete(td, uap->path, UIO_USERSPACE));
+}
+
+int
 cheriabi_unlink(struct thread *td, struct cheriabi_unlink_args *uap)
 {
 
@@ -114,8 +160,229 @@ cheriabi_unlinkat(struct thread *td, struct cheriabi_unlinkat_args *uap)
 }
 
 int
+cheriabi_access(struct thread *td, struct cheriabi_access_args *uap)
+{
+
+	return (kern_accessat(td, AT_FDCWD, uap->path, UIO_USERSPACE,
+	    0, uap->amode));
+}
+
+int
+cheriabi_faccessat(struct thread *td, struct cheriabi_faccessat_args *uap)
+{
+
+	return (kern_accessat(td, uap->fd, uap->path, UIO_USERSPACE,
+	    uap->flag, uap->amode));
+}
+
+int
+cheriabi_pathconf(struct thread *td, struct cheriabi_pathconf_args *uap)
+{
+
+	return (kern_pathconf(td, uap->path, UIO_USERSPACE, uap->name,
+	    FOLLOW));
+}
+
+int
+cheriabi_lpathconf(struct thread *td, struct cheriabi_lpathconf_args *uap)
+{
+
+	return (kern_pathconf(td, uap->path, UIO_USERSPACE, uap->name,
+	    NOFOLLOW));
+}
+
+int
+cheriabi_readlink(struct thread *td, struct cheriabi_readlink_args *uap)
+{
+
+	return (kern_readlinkat(td, AT_FDCWD, uap->path, UIO_USERSPACE,
+	    uap->buf, UIO_USERSPACE, uap->count));
+}
+
+int
+cheriabi_readlinkat(struct thread *td, struct cheriabi_readlinkat_args *uap)
+{
+
+	return (kern_readlinkat(td, uap->fd, uap->path, UIO_USERSPACE,
+	    uap->buf, UIO_USERSPACE, uap->bufsize));
+}
+
+int
+cheriabi_chflags(struct thread *td, struct cheriabi_chflags_args *uap)
+{
+
+	return (kern_chflagsat(td, AT_FDCWD, uap->path, UIO_USERSPACE,
+	    uap->flags, 0));
+}
+
+int
+cheriabi_chflagsat(struct thread *td, struct cheriabi_chflagsat_args *uap)
+{
+
+	if (uap->atflag & ~AT_SYMLINK_NOFOLLOW)
+		return (EINVAL);
+
+	return (kern_chflagsat(td, uap->fd, uap->path, UIO_USERSPACE,
+	    uap->flags, uap->atflag));
+}
+
+int
+cheriabi_lchflags(struct thread *td, struct cheriabi_lchflags_args *uap)
+{
+
+	return (kern_chflagsat(td, AT_FDCWD, uap->path, UIO_USERSPACE,
+	    uap->flags, AT_SYMLINK_NOFOLLOW));
+}
+
+int
+cheriabi_chmod(struct thread *td, struct cheriabi_chmod_args *uap)
+{
+
+	return (kern_fchmodat(td, AT_FDCWD, uap->path, UIO_USERSPACE,
+	    uap->mode, 0));
+}
+
+int
+cheriabi_fchmodat(struct thread *td, struct cheriabi_fchmodat_args *uap)
+{
+
+	if (uap->flag & ~AT_SYMLINK_NOFOLLOW)
+		return (EINVAL);
+
+	return (kern_fchmodat(td, uap->fd, uap->path, UIO_USERSPACE,
+	    uap->mode, uap->flag));
+}
+
+int
+cheriabi_lchmod(struct thread *td, struct cheriabi_lchmod_args *uap)
+{
+
+	return (kern_fchmodat(td, AT_FDCWD, uap->path, UIO_USERSPACE,
+	    uap->mode, AT_SYMLINK_NOFOLLOW));
+}
+
+int
+cheriabi_chown(struct thread *td, struct cheriabi_chown_args *uap)
+{
+
+	return (kern_fchownat(td, AT_FDCWD, uap->path, UIO_USERSPACE, uap->uid,
+	    uap->gid, 0));
+}
+
+int
+cheriabi_fchownat(struct thread *td, struct cheriabi_fchownat_args *uap)
+{
+
+	return (kern_fchownat(td, AT_FDCWD, uap->path, UIO_USERSPACE,
+	    uap->uid, uap->gid, 0));
+}
+
+int
+cheriabi_utimes(struct thread *td, struct cheriabi_utimes_args *uap)
+{
+
+	return (kern_utimesat(td, AT_FDCWD, uap->path, UIO_USERSPACE,
+	    uap->tptr, UIO_USERSPACE));
+}
+
+int
+cheriabi_futimesat(struct thread *td, struct cheriabi_futimesat_args *uap)
+{
+
+	return (kern_utimesat(td, uap->fd, uap->path, UIO_USERSPACE,
+	    uap->times, UIO_USERSPACE));
+}
+
+int
+cheriabi_lutimes(struct thread *td, struct cheriabi_lutimes_args *uap)
+{
+	return (kern_lutimes(td, uap->path, UIO_USERSPACE, uap->tptr,
+	    UIO_USERSPACE));
+}
+
+int
+cheriabi_futimens(struct thread *td, struct cheriabi_futimens_args *uap)
+{
+	return (kern_futimens(td, uap->fd, uap->times, UIO_USERSPACE));
+}
+
+int
+cheriabi_utimensat(struct thread *td, struct cheriabi_utimensat_args *uap)
+{
+
+	return (kern_utimensat(td, uap->fd, uap->path, UIO_USERSPACE,
+	    uap->times, UIO_USERSPACE, uap->flag));
+}
+
+int
+cheriabi_truncate(struct thread *td, struct cheriabi_truncate_args *uap)
+{
+
+	return (kern_truncate(td, uap->path, UIO_USERSPACE, uap->length));
+}
+
+int
+cheriabi_rename(struct thread *td, struct cheriabi_rename_args *uap)
+{
+
+	return (kern_renameat(td, AT_FDCWD, uap->from, AT_FDCWD,
+	    uap->to, UIO_USERSPACE));
+}
+
+int
+cheriabi_renameat(struct thread *td, struct cheriabi_renameat_args *uap)
+{
+
+	return (kern_renameat(td, uap->oldfd, uap->old, uap->newfd,
+	    uap->new, UIO_USERSPACE));
+}
+
+int
+cheriabi_mkdir(struct thread *td, struct cheriabi_mkdir_args *uap)
+{
+
+	return (kern_mkdirat(td, AT_FDCWD, uap->path, UIO_USERSPACE,
+	    uap->mode));
+}
+
+int
+cheriabi_mkdirat(struct thread *td, struct cheriabi_mkdirat_args *uap)
+{
+
+	return (kern_mkdirat(td, uap->fd, uap->path, UIO_USERSPACE, uap->mode));
+}
+
+int
 cheriabi_rmdir(struct thread *td, struct cheriabi_rmdir_args *uap)
 {
 
 	return (kern_rmdirat_c(td, AT_FDCWD, uap->path, UIO_USERSPACE));
+}
+
+int
+cheriabi_unmount(struct thread *td, struct cheriabi_unmount_args *uap)
+{
+
+	return (kern_unmount(td, uap->path, uap->flags));
+}
+
+int
+cheriabi_revoke(struct thread *td, struct cheriabi_revoke_args *uap)
+{
+
+	return (kern_revoke(td, uap->path, UIO_USERSPACE));
+}
+
+int
+cheriabi_lgetfh(struct thread *td, struct cheriabi_lgetfh_args *uap)
+{
+
+	return (kern_getfh(td, uap->fname, uap->fhp, NOFOLLOW));
+}
+
+int
+cheriabi_getfh(struct thread *td, struct cheriabi_getfh_args *uap)
+{
+
+	return (kern_getfh(td, uap->fname, uap->fhp, FOLLOW));
 }

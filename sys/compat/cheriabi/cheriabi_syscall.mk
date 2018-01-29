@@ -14,11 +14,11 @@ MIASM =  \
 	cheriabi_unlink.o \
 	cheriabi_chdir.o \
 	fchdir.o \
-	chmod.o \
-	chown.o \
+	cheriabi_chmod.o \
+	cheriabi_chown.o \
 	getpid.o \
 	cheriabi_mount.o \
-	unmount.o \
+	cheriabi_unmount.o \
 	setuid.o \
 	getuid.o \
 	geteuid.o \
@@ -29,8 +29,8 @@ MIASM =  \
 	accept.o \
 	getpeername.o \
 	getsockname.o \
-	access.o \
-	chflags.o \
+	cheriabi_access.o \
+	cheriabi_chflags.o \
 	fchflags.o \
 	sync.o \
 	kill.o \
@@ -46,12 +46,12 @@ MIASM =  \
 	cheriabi_sigaltstack.o \
 	cheriabi_ioctl.o \
 	reboot.o \
-	revoke.o \
-	symlink.o \
-	readlink.o \
+	cheriabi_revoke.o \
+	cheriabi_symlink.o \
+	cheriabi_readlink.o \
 	cheriabi_execve.o \
 	umask.o \
-	chroot.o \
+	cheriabi_chroot.o \
 	msync.o \
 	vfork.o \
 	munmap.o \
@@ -87,22 +87,22 @@ MIASM =  \
 	fchmod.o \
 	setreuid.o \
 	setregid.o \
-	rename.o \
+	cheriabi_rename.o \
 	flock.o \
 	mkfifo.o \
 	sendto.o \
 	shutdown.o \
 	socketpair.o \
-	mkdir.o \
+	cheriabi_mkdir.o \
 	cheriabi_rmdir.o \
-	utimes.o \
+	cheriabi_utimes.o \
 	adjtime.o \
 	setsid.o \
 	cheriabi_quotactl.o \
 	cheriabi_nlm_syscall.o \
 	cheriabi_nfssvc.o \
-	lgetfh.o \
-	getfh.o \
+	cheriabi_lgetfh.o \
+	cheriabi_getfh.o \
 	cheriabi_sysarch.o \
 	rtprio.o \
 	setfib.o \
@@ -110,14 +110,14 @@ MIASM =  \
 	setgid.o \
 	setegid.o \
 	seteuid.o \
-	pathconf.o \
+	cheriabi_pathconf.o \
 	fpathconf.o \
 	getrlimit.o \
 	setrlimit.o \
 	__sysctl.o \
 	mlock.o \
 	munlock.o \
-	undelete.o \
+	cheriabi_undelete.o \
 	futimes.o \
 	getpgid.o \
 	cheriabi_poll.o \
@@ -152,8 +152,8 @@ MIASM =  \
 	cheriabi_aio_write.o \
 	cheriabi_lio_listio.o \
 	cheriabi_kbounce.o \
-	lchmod.o \
-	lutimes.o \
+	cheriabi_lchmod.o \
+	cheriabi_lutimes.o \
 	freebsd11_nstat.o \
 	freebsd11_nfstat.o \
 	freebsd11_nlstat.o \
@@ -225,7 +225,7 @@ MIASM =  \
 	cheriabi___mac_set_fd.o \
 	cheriabi___mac_set_file.o \
 	cheriabi_kenv.o \
-	lchflags.o \
+	cheriabi_lchflags.o \
 	uuidgen.o \
 	cheriabi_sendfile.o \
 	cheriabi_mac_syscall.o \
@@ -289,7 +289,7 @@ MIASM =  \
 	cheriabi_pwrite.o \
 	cheriabi_mmap.o \
 	lseek.o \
-	truncate.o \
+	cheriabi_truncate.o \
 	ftruncate.o \
 	thr_kill2.o \
 	shm_open.o \
@@ -299,18 +299,18 @@ MIASM =  \
 	cpuset_getid.o \
 	cpuset_getaffinity.o \
 	cpuset_setaffinity.o \
-	faccessat.o \
-	fchmodat.o \
-	fchownat.o \
+	cheriabi_faccessat.o \
+	cheriabi_fchmodat.o \
+	cheriabi_fchownat.o \
 	cheriabi_fexecve.o \
-	futimesat.o \
+	cheriabi_futimesat.o \
 	cheriabi_linkat.o \
-	mkdirat.o \
-	mkfifoat.o \
+	cheriabi_mkdirat.o \
+	cheriabi_mkfifoat.o \
 	cheriabi_openat.o \
-	readlinkat.o \
-	renameat.o \
-	symlinkat.o \
+	cheriabi_readlinkat.o \
+	cheriabi_renameat.o \
+	cheriabi_symlinkat.o \
 	cheriabi_unlinkat.o \
 	posix_openpt.o \
 	gssd_syscall.o \
@@ -321,7 +321,7 @@ MIASM =  \
 	cheriabi___semctl.o \
 	cheriabi_msgctl.o \
 	shmctl.o \
-	lpathconf.o \
+	cheriabi_lpathconf.o \
 	__cap_rights_get.o \
 	cap_enter.o \
 	cap_getmode.o \
@@ -346,14 +346,14 @@ MIASM =  \
 	cap_fcntls_get.o \
 	bindat.o \
 	connectat.o \
-	chflagsat.o \
+	cheriabi_chflagsat.o \
 	accept4.o \
 	pipe2.o \
 	cheriabi_aio_mlock.o \
 	cheriabi_procctl.o \
 	cheriabi_ppoll.o \
-	futimens.o \
-	utimensat.o \
+	cheriabi_futimens.o \
+	cheriabi_utimensat.o \
 	numa_getaffinity.o \
 	numa_setaffinity.o \
 	fdatasync.o \
@@ -365,5 +365,5 @@ MIASM =  \
 	fstatfs.o \
 	getfsstat.o \
 	fhstatfs.o \
-	mknodat.o \
+	cheriabi_mknodat.o \
 	cheriabi_kevent.o

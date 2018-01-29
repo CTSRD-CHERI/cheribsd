@@ -106,18 +106,18 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* chmod */
+	/* cheriabi_chmod */
 	case 15: {
-		struct chmod_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_chmod_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->mode; /* mode_t */
 		*n_args = 2;
 		break;
 	}
-	/* chown */
+	/* cheriabi_chown */
 	case 16: {
-		struct chown_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_chown_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->uid; /* int */
 		iarg[2] = p->gid; /* int */
 		*n_args = 3;
@@ -138,10 +138,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
-	/* unmount */
+	/* cheriabi_unmount */
 	case 22: {
-		struct unmount_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_unmount_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->flags; /* int */
 		*n_args = 2;
 		break;
@@ -230,18 +230,18 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* access */
+	/* cheriabi_access */
 	case 33: {
-		struct access_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_access_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->amode; /* int */
 		*n_args = 2;
 		break;
 	}
-	/* chflags */
+	/* cheriabi_chflags */
 	case 34: {
-		struct chflags_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_chflags_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		uarg[1] = p->flags; /* u_long */
 		*n_args = 2;
 		break;
@@ -355,26 +355,26 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* revoke */
+	/* cheriabi_revoke */
 	case 56: {
-		struct revoke_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_revoke_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		*n_args = 1;
 		break;
 	}
-	/* symlink */
+	/* cheriabi_symlink */
 	case 57: {
-		struct symlink_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
-		uarg[1] = (intptr_t) p->link; /* const char * */
+		struct cheriabi_symlink_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
+		uarg[1] = (cheri_getbase(p->link) + cheri_getoffset(p->link)); /* const char *__capability */
 		*n_args = 2;
 		break;
 	}
-	/* readlink */
+	/* cheriabi_readlink */
 	case 58: {
-		struct readlink_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
-		uarg[1] = (intptr_t) p->buf; /* char * */
+		struct cheriabi_readlink_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
+		uarg[1] = (cheri_getbase(p->buf) + cheri_getoffset(p->buf)); /* char *__capability */
 		uarg[2] = p->count; /* size_t */
 		*n_args = 3;
 		break;
@@ -395,10 +395,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* chroot */
+	/* cheriabi_chroot */
 	case 61: {
-		struct chroot_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_chroot_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -693,11 +693,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* rename */
+	/* cheriabi_rename */
 	case 128: {
-		struct rename_args *p = params;
-		uarg[0] = (intptr_t) p->from; /* const char * */
-		uarg[1] = (intptr_t) p->to; /* const char * */
+		struct cheriabi_rename_args *p = params;
+		uarg[0] = (cheri_getbase(p->from) + cheri_getoffset(p->from)); /* const char *__capability */
+		uarg[1] = (cheri_getbase(p->to) + cheri_getoffset(p->to)); /* const char *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -747,10 +747,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
-	/* mkdir */
+	/* cheriabi_mkdir */
 	case 136: {
-		struct mkdir_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_mkdir_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->mode; /* mode_t */
 		*n_args = 2;
 		break;
@@ -762,11 +762,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* utimes */
+	/* cheriabi_utimes */
 	case 138: {
-		struct utimes_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
-		uarg[1] = (intptr_t) p->tptr; /* const struct timeval * */
+		struct cheriabi_utimes_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
+		uarg[1] = (cheri_getbase(p->tptr) + cheri_getoffset(p->tptr)); /* const struct timeval *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -811,19 +811,19 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* lgetfh */
+	/* cheriabi_lgetfh */
 	case 160: {
-		struct lgetfh_args *p = params;
-		uarg[0] = (intptr_t) p->fname; /* const char * */
-		uarg[1] = (intptr_t) p->fhp; /* struct fhandle * */
+		struct cheriabi_lgetfh_args *p = params;
+		uarg[0] = (cheri_getbase(p->fname) + cheri_getoffset(p->fname)); /* const char *__capability */
+		uarg[1] = (cheri_getbase(p->fhp) + cheri_getoffset(p->fhp)); /* struct fhandle *__capability */
 		*n_args = 2;
 		break;
 	}
-	/* getfh */
+	/* cheriabi_getfh */
 	case 161: {
-		struct getfh_args *p = params;
-		uarg[0] = (intptr_t) p->fname; /* const char * */
-		uarg[1] = (intptr_t) p->fhp; /* struct fhandle * */
+		struct cheriabi_getfh_args *p = params;
+		uarg[0] = (cheri_getbase(p->fname) + cheri_getoffset(p->fname)); /* const char *__capability */
+		uarg[1] = (cheri_getbase(p->fhp) + cheri_getoffset(p->fhp)); /* struct fhandle *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -879,10 +879,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* pathconf */
+	/* cheriabi_pathconf */
 	case 191: {
-		struct pathconf_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_pathconf_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->name; /* int */
 		*n_args = 2;
 		break;
@@ -939,10 +939,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* undelete */
+	/* cheriabi_undelete */
 	case 205: {
-		struct undelete_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_undelete_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -1276,19 +1276,19 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
-	/* lchmod */
+	/* cheriabi_lchmod */
 	case 274: {
-		struct lchmod_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_lchmod_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->mode; /* mode_t */
 		*n_args = 2;
 		break;
 	}
-	/* lutimes */
+	/* cheriabi_lutimes */
 	case 276: {
-		struct lutimes_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
-		uarg[1] = (intptr_t) p->tptr; /* const struct timeval * */
+		struct cheriabi_lutimes_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
+		uarg[1] = (cheri_getbase(p->tptr) + cheri_getoffset(p->tptr)); /* const struct timeval *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -1845,10 +1845,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
-	/* lchflags */
+	/* cheriabi_lchflags */
 	case 391: {
-		struct lchflags_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_lchflags_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		uarg[1] = p->flags; /* u_long */
 		*n_args = 2;
 		break;
@@ -2408,10 +2408,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* truncate */
+	/* cheriabi_truncate */
 	case 479: {
-		struct truncate_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_truncate_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->length; /* off_t */
 		*n_args = 2;
 		break;
@@ -2497,31 +2497,31 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 5;
 		break;
 	}
-	/* faccessat */
+	/* cheriabi_faccessat */
 	case 489: {
-		struct faccessat_args *p = params;
+		struct cheriabi_faccessat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->path; /* const char * */
+		uarg[1] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[2] = p->amode; /* int */
 		iarg[3] = p->flag; /* int */
 		*n_args = 4;
 		break;
 	}
-	/* fchmodat */
+	/* cheriabi_fchmodat */
 	case 490: {
-		struct fchmodat_args *p = params;
+		struct cheriabi_fchmodat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->path; /* const char * */
+		uarg[1] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[2] = p->mode; /* mode_t */
 		iarg[3] = p->flag; /* int */
 		*n_args = 4;
 		break;
 	}
-	/* fchownat */
+	/* cheriabi_fchownat */
 	case 491: {
-		struct fchownat_args *p = params;
+		struct cheriabi_fchownat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->path; /* const char * */
+		uarg[1] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		uarg[2] = p->uid; /* uid_t */
 		iarg[3] = p->gid; /* gid_t */
 		iarg[4] = p->flag; /* int */
@@ -2537,12 +2537,12 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* futimesat */
+	/* cheriabi_futimesat */
 	case 494: {
-		struct futimesat_args *p = params;
+		struct cheriabi_futimesat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->path; /* const char * */
-		uarg[2] = (intptr_t) p->times; /* const struct timeval * */
+		uarg[1] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
+		uarg[2] = (cheri_getbase(p->times) + cheri_getoffset(p->times)); /* const struct timeval *__capability */
 		*n_args = 3;
 		break;
 	}
@@ -2557,20 +2557,20 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 5;
 		break;
 	}
-	/* mkdirat */
+	/* cheriabi_mkdirat */
 	case 496: {
-		struct mkdirat_args *p = params;
+		struct cheriabi_mkdirat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->path; /* const char * */
+		uarg[1] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[2] = p->mode; /* mode_t */
 		*n_args = 3;
 		break;
 	}
-	/* mkfifoat */
+	/* cheriabi_mkfifoat */
 	case 497: {
-		struct mkfifoat_args *p = params;
+		struct cheriabi_mkfifoat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->path; /* const char * */
+		uarg[1] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[2] = p->mode; /* mode_t */
 		*n_args = 3;
 		break;
@@ -2585,32 +2585,32 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
-	/* readlinkat */
+	/* cheriabi_readlinkat */
 	case 500: {
-		struct readlinkat_args *p = params;
+		struct cheriabi_readlinkat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->path; /* const char * */
-		uarg[2] = (intptr_t) p->buf; /* char * */
+		uarg[1] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
+		uarg[2] = (cheri_getbase(p->buf) + cheri_getoffset(p->buf)); /* char *__capability */
 		uarg[3] = p->bufsize; /* size_t */
 		*n_args = 4;
 		break;
 	}
-	/* renameat */
+	/* cheriabi_renameat */
 	case 501: {
-		struct renameat_args *p = params;
+		struct cheriabi_renameat_args *p = params;
 		iarg[0] = p->oldfd; /* int */
-		uarg[1] = (intptr_t) p->old; /* const char * */
+		uarg[1] = (cheri_getbase(p->old) + cheri_getoffset(p->old)); /* const char *__capability */
 		iarg[2] = p->newfd; /* int */
-		uarg[3] = (intptr_t) p->new; /* const char * */
+		uarg[3] = (cheri_getbase(p->new) + cheri_getoffset(p->new)); /* const char *__capability */
 		*n_args = 4;
 		break;
 	}
-	/* symlinkat */
+	/* cheriabi_symlinkat */
 	case 502: {
-		struct symlinkat_args *p = params;
-		uarg[0] = (intptr_t) p->path1; /* const char * */
+		struct cheriabi_symlinkat_args *p = params;
+		uarg[0] = (cheri_getbase(p->path1) + cheri_getoffset(p->path1)); /* const char *__capability */
 		iarg[1] = p->fd; /* int */
-		uarg[2] = (intptr_t) p->path2; /* const char * */
+		uarg[2] = (cheri_getbase(p->path2) + cheri_getoffset(p->path2)); /* const char *__capability */
 		*n_args = 3;
 		break;
 	}
@@ -2697,10 +2697,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* lpathconf */
+	/* cheriabi_lpathconf */
 	case 513: {
-		struct lpathconf_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_lpathconf_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->name; /* int */
 		*n_args = 2;
 		break;
@@ -2920,11 +2920,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
-	/* chflagsat */
+	/* cheriabi_chflagsat */
 	case 540: {
-		struct chflagsat_args *p = params;
+		struct cheriabi_chflagsat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->path; /* const char * */
+		uarg[1] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		uarg[2] = p->flags; /* u_long */
 		iarg[3] = p->atflag; /* int */
 		*n_args = 4;
@@ -2975,20 +2975,20 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
-	/* futimens */
+	/* cheriabi_futimens */
 	case 546: {
-		struct futimens_args *p = params;
+		struct cheriabi_futimens_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->times; /* const struct timespec * */
+		uarg[1] = (cheri_getbase(p->times) + cheri_getoffset(p->times)); /* const struct timespec *__capability */
 		*n_args = 2;
 		break;
 	}
-	/* utimensat */
+	/* cheriabi_utimensat */
 	case 547: {
-		struct utimensat_args *p = params;
+		struct cheriabi_utimensat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->path; /* const char * */
-		uarg[2] = (intptr_t) p->times; /* const struct timespec * */
+		uarg[1] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
+		uarg[2] = (cheri_getbase(p->times) + cheri_getoffset(p->times)); /* const struct timespec *__capability */
 		iarg[3] = p->flag; /* int */
 		*n_args = 4;
 		break;
@@ -3087,11 +3087,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* mknodat */
+	/* cheriabi_mknodat */
 	case 559: {
-		struct mknodat_args *p = params;
+		struct cheriabi_mknodat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->path; /* const char * */
+		uarg[1] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[2] = p->mode; /* mode_t */
 		iarg[3] = p->dev; /* dev_t */
 		*n_args = 4;
@@ -3265,11 +3265,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* chmod */
+	/* cheriabi_chmod */
 	case 15:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "mode_t";
@@ -3278,11 +3278,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* chown */
+	/* cheriabi_chown */
 	case 16:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "int";
@@ -3316,11 +3316,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* unmount */
+	/* cheriabi_unmount */
 	case 22:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "int";
@@ -3469,11 +3469,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* access */
+	/* cheriabi_access */
 	case 33:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "int";
@@ -3482,11 +3482,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* chflags */
+	/* cheriabi_chflags */
 	case 34:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "u_long";
@@ -3653,37 +3653,37 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* revoke */
+	/* cheriabi_revoke */
 	case 56:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* symlink */
+	/* cheriabi_symlink */
 	case 57:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* readlink */
+	/* cheriabi_readlink */
 	case 58:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
-			p = "userland char *";
+			p = "userland char *__capability";
 			break;
 		case 2:
 			p = "size_t";
@@ -3718,11 +3718,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* chroot */
+	/* cheriabi_chroot */
 	case 61:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		default:
 			break;
@@ -4213,14 +4213,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* rename */
+	/* cheriabi_rename */
 	case 128:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		default:
 			break;
@@ -4309,11 +4309,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* mkdir */
+	/* cheriabi_mkdir */
 	case 136:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "mode_t";
@@ -4332,14 +4332,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* utimes */
+	/* cheriabi_utimes */
 	case 138:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
-			p = "userland const struct timeval *";
+			p = "userland const struct timeval *__capability";
 			break;
 		default:
 			break;
@@ -4412,27 +4412,27 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* lgetfh */
+	/* cheriabi_lgetfh */
 	case 160:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
-			p = "userland struct fhandle *";
+			p = "userland struct fhandle *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* getfh */
+	/* cheriabi_getfh */
 	case 161:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
-			p = "userland struct fhandle *";
+			p = "userland struct fhandle *__capability";
 			break;
 		default:
 			break;
@@ -4517,11 +4517,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* pathconf */
+	/* cheriabi_pathconf */
 	case 191:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "int";
@@ -4620,11 +4620,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* undelete */
+	/* cheriabi_undelete */
 	case 205:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		default:
 			break;
@@ -5125,11 +5125,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* lchmod */
+	/* cheriabi_lchmod */
 	case 274:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "mode_t";
@@ -5138,14 +5138,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* lutimes */
+	/* cheriabi_lutimes */
 	case 276:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
-			p = "userland const struct timeval *";
+			p = "userland const struct timeval *__capability";
 			break;
 		default:
 			break;
@@ -6059,11 +6059,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* lchflags */
+	/* cheriabi_lchflags */
 	case 391:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "u_long";
@@ -7044,11 +7044,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* truncate */
+	/* cheriabi_truncate */
 	case 479:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "off_t";
@@ -7201,14 +7201,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* faccessat */
+	/* cheriabi_faccessat */
 	case 489:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 2:
 			p = "int";
@@ -7220,14 +7220,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* fchmodat */
+	/* cheriabi_fchmodat */
 	case 490:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 2:
 			p = "mode_t";
@@ -7239,14 +7239,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* fchownat */
+	/* cheriabi_fchownat */
 	case 491:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 2:
 			p = "uid_t";
@@ -7277,17 +7277,17 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* futimesat */
+	/* cheriabi_futimesat */
 	case 494:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 2:
-			p = "userland const struct timeval *";
+			p = "userland const struct timeval *__capability";
 			break;
 		default:
 			break;
@@ -7315,14 +7315,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* mkdirat */
+	/* cheriabi_mkdirat */
 	case 496:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 2:
 			p = "mode_t";
@@ -7331,14 +7331,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* mkfifoat */
+	/* cheriabi_mkfifoat */
 	case 497:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 2:
 			p = "mode_t";
@@ -7366,17 +7366,17 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* readlinkat */
+	/* cheriabi_readlinkat */
 	case 500:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 2:
-			p = "userland char *";
+			p = "userland char *__capability";
 			break;
 		case 3:
 			p = "size_t";
@@ -7385,36 +7385,36 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* renameat */
+	/* cheriabi_renameat */
 	case 501:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 2:
 			p = "int";
 			break;
 		case 3:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* symlinkat */
+	/* cheriabi_symlinkat */
 	case 502:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		default:
 			break;
@@ -7559,11 +7559,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* lpathconf */
+	/* cheriabi_lpathconf */
 	case 513:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "int";
@@ -7952,14 +7952,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* chflagsat */
+	/* cheriabi_chflagsat */
 	case 540:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 2:
 			p = "u_long";
@@ -8051,30 +8051,30 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* futimens */
+	/* cheriabi_futimens */
 	case 546:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct timespec *";
+			p = "userland const struct timespec *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* utimensat */
+	/* cheriabi_utimensat */
 	case 547:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 2:
-			p = "userland const struct timespec *";
+			p = "userland const struct timespec *__capability";
 			break;
 		case 3:
 			p = "int";
@@ -8244,14 +8244,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* mknodat */
+	/* cheriabi_mknodat */
 	case 559:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 2:
 			p = "mode_t";
@@ -8359,12 +8359,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* chmod */
+	/* cheriabi_chmod */
 	case 15:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* chown */
+	/* cheriabi_chown */
 	case 16:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -8376,7 +8376,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* unmount */
+	/* cheriabi_unmount */
 	case 22:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -8425,12 +8425,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* access */
+	/* cheriabi_access */
 	case 33:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* chflags */
+	/* cheriabi_chflags */
 	case 34:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -8498,17 +8498,17 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* revoke */
+	/* cheriabi_revoke */
 	case 56:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* symlink */
+	/* cheriabi_symlink */
 	case 57:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* readlink */
+	/* cheriabi_readlink */
 	case 58:
 		if (ndx == 0 || ndx == 1)
 			p = "ssize_t";
@@ -8523,7 +8523,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "mode_t";
 		break;
-	/* chroot */
+	/* cheriabi_chroot */
 	case 61:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -8694,7 +8694,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* rename */
+	/* cheriabi_rename */
 	case 128:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -8724,7 +8724,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* mkdir */
+	/* cheriabi_mkdir */
 	case 136:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -8734,7 +8734,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* utimes */
+	/* cheriabi_utimes */
 	case 138:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -8761,12 +8761,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* lgetfh */
+	/* cheriabi_lgetfh */
 	case 160:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* getfh */
+	/* cheriabi_getfh */
 	case 161:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -8806,7 +8806,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* pathconf */
+	/* cheriabi_pathconf */
 	case 191:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -8841,7 +8841,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* undelete */
+	/* cheriabi_undelete */
 	case 205:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9033,12 +9033,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* lchmod */
+	/* cheriabi_lchmod */
 	case 274:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* lutimes */
+	/* cheriabi_lutimes */
 	case 276:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9374,7 +9374,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* lchflags */
+	/* cheriabi_lchflags */
 	case 391:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9694,7 +9694,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "off_t";
 		break;
-	/* truncate */
+	/* cheriabi_truncate */
 	case 479:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9744,17 +9744,17 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* faccessat */
+	/* cheriabi_faccessat */
 	case 489:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* fchmodat */
+	/* cheriabi_fchmodat */
 	case 490:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* fchownat */
+	/* cheriabi_fchownat */
 	case 491:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9764,7 +9764,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* futimesat */
+	/* cheriabi_futimesat */
 	case 494:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9774,12 +9774,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* mkdirat */
+	/* cheriabi_mkdirat */
 	case 496:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* mkfifoat */
+	/* cheriabi_mkfifoat */
 	case 497:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9789,17 +9789,17 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* readlinkat */
+	/* cheriabi_readlinkat */
 	case 500:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* renameat */
+	/* cheriabi_renameat */
 	case 501:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* symlinkat */
+	/* cheriabi_symlinkat */
 	case 502:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9854,7 +9854,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* lpathconf */
+	/* cheriabi_lpathconf */
 	case 513:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9976,7 +9976,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* chflagsat */
+	/* cheriabi_chflagsat */
 	case 540:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -10006,12 +10006,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* futimens */
+	/* cheriabi_futimens */
 	case 546:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* utimensat */
+	/* cheriabi_utimensat */
 	case 547:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -10071,7 +10071,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* mknodat */
+	/* cheriabi_mknodat */
 	case 559:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
