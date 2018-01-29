@@ -402,7 +402,7 @@ vm_ptr_t
 pmap_steal_memory(vm_size_t size)
 {
 	vm_paddr_t bank_size, pa;
-	vm_ptr_t va;
+	caddr_t va;
 
 	size = round_page(size);
 	bank_size = phys_avail[1] - phys_avail[0];
@@ -424,12 +424,12 @@ pmap_steal_memory(vm_size_t size)
 	phys_avail[0] += size;
 	if (MIPS_DIRECT_MAPPABLE(pa) == 0)
 		panic("Out of memory below 512Meg?");
-	va = MIPS_PHYS_TO_DIRECT(pa);
+	va = (caddr_t)MIPS_PHYS_TO_DIRECT(pa);
 #ifdef CHERI_KERNEL
 	va = cheri_csetbounds(va, size);
 #endif
-	bzero((caddr_t)va, size);
-	return (va);
+	bzero(va, size);
+	return ((vm_ptr_t)va);
 }
 
 /*
@@ -912,28 +912,29 @@ pmap_kremove(vm_offset_t va)
  * Being able to have a different CCALL and EXECUTE permissions may also be useful.
  */
 vm_ptr_t
-pmap_map(vm_offset_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
+pmap_map(vm_ptr_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
 {
-	vm_offset_t va;
-	vm_ptr_t sva;
+	vm_ptr_t sva, va;
 
 	if (MIPS_DIRECT_MAPPABLE(end - 1)) {
 #ifndef CHERI_KERNEL
 		return (MIPS_PHYS_TO_DIRECT(start));
 #else /* CHERI_KERNEL */
-		sva = MIPS_PHYS_TO_DIRECT(start);
-		sva = cheri_csetbounds(sva, end - start);
+		caddr_t map_addr;
+
+		map_addr = MIPS_PHYS_TO_DIRECT(start);
+		map_addr = cheri_csetbounds(map_addr, end - start);
 		if (!(prot & VM_PROT_READ))
-		  sva = cheri_andperm(sva,
+		  map_addr = cheri_andperm(map_addr,
 			 ~(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP));
 		if (!(prot & VM_PROT_WRITE))
-		  sva = cheri_andperm(sva,
+		  map_addr = cheri_andperm(map_addr,
 			~(CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
 			  CHERI_PERM_STORE_LOCAL_CAP));
 		if (!(prot & VM_PROT_EXECUTE))
-		  sva = cheri_andperm(sva,
+		  map_addr = cheri_andperm(map_addr,
 			~(CHERI_PERM_EXECUTE | CHERI_PERM_CCALL));
-		return sva;
+		return (vm_ptr_t)map_addr;
 #endif
 	}
 
@@ -3286,7 +3287,7 @@ pmap_is_referenced(vm_page_t m)
 void *
 pmap_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t ma)
 {
-        vm_offset_t va, tmpva, offset;
+        vm_ptr_t va, tmpva, offset;
 
 	/*
 	 * KSEG1 maps only first 512M of phys address space. For
