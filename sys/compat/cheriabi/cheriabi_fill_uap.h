@@ -1171,22 +1171,14 @@ CHERIABI_SYS_setitimer_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_swapon_fill_uap(struct thread *td,
-    struct swapon_args *uap)
+CHERIABI_SYS_cheriabi_swapon_fill_uap(struct thread *td,
+    struct cheriabi_swapon_args *uap)
 {
-	void * __capability tmpcap;
 
-	/* [0] _In_z_ const char * name */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_swapon_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->name),
-		    tmpcap, sizeof(*uap->name), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _In_z_ const char *__capability name */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->name),
+	    0, CHERIABI_SYS_cheriabi_swapon_PTRMASK);
 
 	return (0);
 }
@@ -5470,22 +5462,14 @@ CHERIABI_SYS_cheriabi_swapcontext_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_swapoff_fill_uap(struct thread *td,
-    struct swapoff_args *uap)
+CHERIABI_SYS_cheriabi_swapoff_fill_uap(struct thread *td,
+    struct cheriabi_swapoff_args *uap)
 {
-	void * __capability tmpcap;
 
-	/* [0] _In_z_ const char * name */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_swapoff_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->name),
-		    tmpcap, sizeof(*uap->name), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _In_z_ const char *__capability name */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->name),
+	    0, CHERIABI_SYS_cheriabi_swapoff_PTRMASK);
 
 	return (0);
 }

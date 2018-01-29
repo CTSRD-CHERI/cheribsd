@@ -489,10 +489,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* swapon */
+	/* cheriabi_swapon */
 	case 85: {
-		struct swapon_args *p = params;
-		uarg[0] = (intptr_t) p->name; /* const char * */
+		struct cheriabi_swapon_args *p = params;
+		uarg[0] = (cheri_getbase(p->name) + cheri_getoffset(p->name)); /* const char *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -1986,10 +1986,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* swapoff */
+	/* cheriabi_swapoff */
 	case 424: {
-		struct swapoff_args *p = params;
-		uarg[0] = (intptr_t) p->name; /* const char * */
+		struct cheriabi_swapoff_args *p = params;
+		uarg[0] = (cheri_getbase(p->name) + cheri_getoffset(p->name)); /* const char *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -3866,11 +3866,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* swapon */
+	/* cheriabi_swapon */
 	case 85:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		default:
 			break;
@@ -6306,11 +6306,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* swapoff */
+	/* cheriabi_swapoff */
 	case 424:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		default:
 			break;
@@ -8577,7 +8577,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* swapon */
+	/* cheriabi_swapon */
 	case 85:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9454,7 +9454,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* swapoff */
+	/* cheriabi_swapoff */
 	case 424:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

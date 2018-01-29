@@ -299,6 +299,8 @@ int	kern_statat(struct thread *td, int flag, int fd, char *path,
 	    void (*hook)(struct vnode *vp, struct stat *sbp));
 int	kern_statfs(struct thread *td, char *path, enum uio_seg pathseg,
 	    struct statfs *buf);
+int	kern_swapoff(struct thread *td, const char * __capability name);
+int	kern_swapon(struct thread *td, const char * __capability name);
 int	kern_symlinkat(struct thread *td, const char *__capability path1,
 	    int fd, const char * __capability path2, enum uio_seg segflg);
 int	kern_ktimer_create(struct thread *td, clockid_t clock_id,

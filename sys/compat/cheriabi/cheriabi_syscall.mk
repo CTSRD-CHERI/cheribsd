@@ -63,7 +63,7 @@ MIASM =  \
 	getpgrp.o \
 	setpgid.o \
 	setitimer.o \
-	swapon.o \
+	cheriabi_swapon.o \
 	getitimer.o \
 	getdtablesize.o \
 	dup2.o \
@@ -241,7 +241,7 @@ MIASM =  \
 	cheriabi_getcontext.o \
 	cheriabi_setcontext.o \
 	cheriabi_swapcontext.o \
-	swapoff.o \
+	cheriabi_swapoff.o \
 	__acl_get_link.o \
 	__acl_set_link.o \
 	__acl_delete_link.o \

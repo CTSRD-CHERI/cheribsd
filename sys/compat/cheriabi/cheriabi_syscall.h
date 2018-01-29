@@ -90,7 +90,7 @@
 #define	CHERIABI_SYS_setpgid	82
 #define	CHERIABI_SYS_setitimer	83
 				/* 84 is obsolete owait */
-#define	CHERIABI_SYS_swapon	85
+#define	CHERIABI_SYS_cheriabi_swapon	85
 #define	CHERIABI_SYS_getitimer	86
 				/* 87 is obsolete ogethostname */
 				/* 88 is obsolete osethostname */
@@ -349,7 +349,7 @@
 #define	CHERIABI_SYS_cheriabi_getcontext	421
 #define	CHERIABI_SYS_cheriabi_setcontext	422
 #define	CHERIABI_SYS_cheriabi_swapcontext	423
-#define	CHERIABI_SYS_swapoff	424
+#define	CHERIABI_SYS_cheriabi_swapoff	424
 #define	CHERIABI_SYS___acl_get_link	425
 #define	CHERIABI_SYS___acl_set_link	426
 #define	CHERIABI_SYS___acl_delete_link	427

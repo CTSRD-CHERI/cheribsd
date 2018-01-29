@@ -2318,3 +2318,21 @@ cheriabi_profil(struct thread *td, struct cheriabi_profil_args *uap)
 	return (kern_profil(td, uap->samples, uap->size, uap->offset,
 	    uap->scale));
 }
+
+/*
+ * vm/swap_pager.c
+ */
+
+int
+cheriabi_swapon(struct thread *td, struct cheriabi_swapon_args *uap)
+{
+
+	return (kern_swapon(td, uap->name));
+}
+
+int
+cheriabi_swapoff(struct thread *td, struct cheriabi_swapoff_args *uap)
+{
+
+	return (kern_swapoff(td, uap->name));
+}

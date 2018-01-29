@@ -186,6 +186,9 @@ struct cheriabi_setgroups_args {
 	char gidsetsize_l_[PADL_(u_int)]; u_int gidsetsize; char gidsetsize_r_[PADR_(u_int)];
 	char gidset_l_[PADL_(const gid_t *__capability)]; const gid_t *__capability gidset; char gidset_r_[PADR_(const gid_t *__capability)];
 };
+struct cheriabi_swapon_args {
+	char name_l_[PADL_(const char *__capability)]; const char *__capability name; char name_r_[PADR_(const char *__capability)];
+};
 struct cheriabi_readv_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char iovp_l_[PADL_(struct iovec_c *__capability)]; struct iovec_c *__capability iovp; char iovp_r_[PADR_(struct iovec_c *__capability)];
@@ -435,6 +438,9 @@ struct cheriabi_swapcontext_args {
 	char oucp_l_[PADL_(ucontext_c_t *)]; ucontext_c_t * oucp; char oucp_r_[PADR_(ucontext_c_t *)];
 	char ucp_l_[PADL_(const ucontext_c_t *)]; const ucontext_c_t * ucp; char ucp_r_[PADR_(const ucontext_c_t *)];
 };
+struct cheriabi_swapoff_args {
+	char name_l_[PADL_(const char *__capability)]; const char *__capability name; char name_r_[PADR_(const char *__capability)];
+};
 struct cheriabi_thr_create_args {
 	char ctx_l_[PADL_(ucontext_c_t *)]; ucontext_c_t * ctx; char ctx_r_[PADR_(ucontext_c_t *)];
 	char id_l_[PADL_(long *)]; long * id; char id_r_[PADR_(long *)];
@@ -678,6 +684,7 @@ int	cheriabi_mprotect(struct thread *, struct cheriabi_mprotect_args *);
 int	cheriabi_madvise(struct thread *, struct cheriabi_madvise_args *);
 int	cheriabi_getgroups(struct thread *, struct cheriabi_getgroups_args *);
 int	cheriabi_setgroups(struct thread *, struct cheriabi_setgroups_args *);
+int	cheriabi_swapon(struct thread *, struct cheriabi_swapon_args *);
 int	cheriabi_readv(struct thread *, struct cheriabi_readv_args *);
 int	cheriabi_writev(struct thread *, struct cheriabi_writev_args *);
 int	cheriabi_rename(struct thread *, struct cheriabi_rename_args *);
@@ -735,6 +742,7 @@ int	cheriabi_sigreturn(struct thread *, struct cheriabi_sigreturn_args *);
 int	cheriabi_getcontext(struct thread *, struct cheriabi_getcontext_args *);
 int	cheriabi_setcontext(struct thread *, struct cheriabi_setcontext_args *);
 int	cheriabi_swapcontext(struct thread *, struct cheriabi_swapcontext_args *);
+int	cheriabi_swapoff(struct thread *, struct cheriabi_swapoff_args *);
 int	cheriabi_thr_create(struct thread *, struct cheriabi_thr_create_args *);
 int	cheriabi_auditon(struct thread *, struct cheriabi_auditon_args *);
 int	cheriabi_thr_new(struct thread *, struct cheriabi_thr_new_args *);
@@ -859,6 +867,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_madvise	AUE_MADVISE
 #define	CHERIABI_SYS_AUE_cheriabi_getgroups	AUE_GETGROUPS
 #define	CHERIABI_SYS_AUE_cheriabi_setgroups	AUE_SETGROUPS
+#define	CHERIABI_SYS_AUE_cheriabi_swapon	AUE_SWAPON
 #define	CHERIABI_SYS_AUE_cheriabi_readv	AUE_READV
 #define	CHERIABI_SYS_AUE_cheriabi_writev	AUE_WRITEV
 #define	CHERIABI_SYS_AUE_cheriabi_rename	AUE_RENAME
@@ -916,6 +925,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_getcontext	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_setcontext	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_swapcontext	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_swapoff	AUE_SWAPOFF
 #define	CHERIABI_SYS_AUE_cheriabi_thr_create	AUE_THR_CREATE
 #define	CHERIABI_SYS_AUE_cheriabi_auditon	AUE_AUDITON
 #define	CHERIABI_SYS_AUE_cheriabi_thr_new	AUE_THR_NEW

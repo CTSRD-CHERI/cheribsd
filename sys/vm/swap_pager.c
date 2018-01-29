@@ -91,6 +91,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/resource.h>
 #include <sys/resourcevar.h>
 #include <sys/rwlock.h>
+#include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
 #include <sys/sysproto.h>
 #include <sys/blist.h>
@@ -2215,6 +2216,13 @@ struct swapon_args {
 int
 sys_swapon(struct thread *td, struct swapon_args *uap)
 {
+
+	return (kern_swapon(td, __USER_CAP_STR(uap->name)));
+}
+
+int
+kern_swapon(struct thread *td, const char * __capability name)
+{
 	struct vattr attr;
 	struct vnode *vp;
 	struct nameidata nd;
@@ -2235,8 +2243,8 @@ sys_swapon(struct thread *td, struct swapon_args *uap)
 		goto done;
 	}
 
-	NDINIT(&nd, LOOKUP, ISOPEN | FOLLOW | AUDITVNODE1, UIO_USERSPACE,
-	    uap->name, td);
+	NDINIT_C(&nd, LOOKUP, ISOPEN | FOLLOW | AUDITVNODE1, UIO_USERSPACE,
+	    name, td);
 	error = namei(&nd);
 	if (error)
 		goto done;
@@ -2381,6 +2389,13 @@ struct swapoff_args {
 int
 sys_swapoff(struct thread *td, struct swapoff_args *uap)
 {
+
+	return (kern_swapoff(td, __USER_CAP_STR(uap->name)));
+}
+
+int
+kern_swapoff(struct thread *td, const char * __capability name)
+{
 	struct vnode *vp;
 	struct nameidata nd;
 	struct swdevt *sp;
@@ -2392,8 +2407,7 @@ sys_swapoff(struct thread *td, struct swapoff_args *uap)
 
 	sx_xlock(&swdev_syscall_lock);
 
-	NDINIT(&nd, LOOKUP, FOLLOW | AUDITVNODE1, UIO_USERSPACE, uap->name,
-	    td);
+	NDINIT_C(&nd, LOOKUP, FOLLOW | AUDITVNODE1, UIO_USERSPACE, name, td);
 	error = namei(&nd);
 	if (error)
 		goto done;
