@@ -186,8 +186,21 @@ struct cheriabi_setgroups_args {
 	char gidsetsize_l_[PADL_(u_int)]; u_int gidsetsize; char gidsetsize_r_[PADR_(u_int)];
 	char gidset_l_[PADL_(const gid_t *__capability)]; const gid_t *__capability gidset; char gidset_r_[PADR_(const gid_t *__capability)];
 };
+struct cheriabi_setitimer_args {
+	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
+	char itv_l_[PADL_(const struct itimerval *__capability)]; const struct itimerval *__capability itv; char itv_r_[PADR_(const struct itimerval *__capability)];
+	char oitv_l_[PADL_(struct itimerval *__capability)]; struct itimerval *__capability oitv; char oitv_r_[PADR_(struct itimerval *__capability)];
+};
 struct cheriabi_swapon_args {
 	char name_l_[PADL_(const char *__capability)]; const char *__capability name; char name_r_[PADR_(const char *__capability)];
+};
+struct cheriabi_getitimer_args {
+	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
+	char itv_l_[PADL_(struct itimerval *__capability)]; struct itimerval *__capability itv; char itv_r_[PADR_(struct itimerval *__capability)];
+};
+struct cheriabi_gettimeofday_args {
+	char tp_l_[PADL_(struct timeval *__capability)]; struct timeval *__capability tp; char tp_r_[PADR_(struct timeval *__capability)];
+	char tzp_l_[PADL_(struct timezone *__capability)]; struct timezone *__capability tzp; char tzp_r_[PADR_(struct timezone *__capability)];
 };
 struct cheriabi_readv_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
@@ -198,6 +211,10 @@ struct cheriabi_writev_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char iovp_l_[PADL_(struct iovec_c *__capability)]; struct iovec_c *__capability iovp; char iovp_r_[PADR_(struct iovec_c *__capability)];
 	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
+};
+struct cheriabi_settimeofday_args {
+	char tv_l_[PADL_(const struct timeval *__capability)]; const struct timeval *__capability tv; char tv_r_[PADR_(const struct timeval *__capability)];
+	char tzp_l_[PADL_(const struct timezone *__capability)]; const struct timezone *__capability tzp; char tzp_r_[PADR_(const struct timezone *__capability)];
 };
 struct cheriabi_rename_args {
 	char from_l_[PADL_(const char *__capability)]; const char *__capability from; char from_r_[PADR_(const char *__capability)];
@@ -254,10 +271,47 @@ struct cheriabi_poll_args {
 	char nfds_l_[PADL_(u_int)]; u_int nfds; char nfds_r_[PADR_(u_int)];
 	char timeout_l_[PADL_(int)]; int timeout; char timeout_r_[PADR_(int)];
 };
+struct cheriabi_clock_gettime_args {
+	char clock_id_l_[PADL_(clockid_t)]; clockid_t clock_id; char clock_id_r_[PADR_(clockid_t)];
+	char tp_l_[PADL_(struct timespec *__capability)]; struct timespec *__capability tp; char tp_r_[PADR_(struct timespec *__capability)];
+};
+struct cheriabi_clock_settime_args {
+	char clock_id_l_[PADL_(clockid_t)]; clockid_t clock_id; char clock_id_r_[PADR_(clockid_t)];
+	char tp_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability tp; char tp_r_[PADR_(const struct timespec *__capability)];
+};
+struct cheriabi_clock_getres_args {
+	char clock_id_l_[PADL_(clockid_t)]; clockid_t clock_id; char clock_id_r_[PADR_(clockid_t)];
+	char tp_l_[PADL_(struct timespec *__capability)]; struct timespec *__capability tp; char tp_r_[PADR_(struct timespec *__capability)];
+};
 struct cheriabi_ktimer_create_args {
 	char clock_id_l_[PADL_(clockid_t)]; clockid_t clock_id; char clock_id_r_[PADR_(clockid_t)];
-	char evp_l_[PADL_(struct sigevent_c *)]; struct sigevent_c * evp; char evp_r_[PADR_(struct sigevent_c *)];
-	char timerid_l_[PADL_(int *)]; int * timerid; char timerid_r_[PADR_(int *)];
+	char evp_l_[PADL_(struct sigevent_c *__capability)]; struct sigevent_c *__capability evp; char evp_r_[PADR_(struct sigevent_c *__capability)];
+	char timerid_l_[PADL_(int *__capability)]; int *__capability timerid; char timerid_r_[PADR_(int *__capability)];
+};
+struct cheriabi_ktimer_settime_args {
+	char timerid_l_[PADL_(int)]; int timerid; char timerid_r_[PADR_(int)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char value_l_[PADL_(const struct itimerspec *__capability)]; const struct itimerspec *__capability value; char value_r_[PADR_(const struct itimerspec *__capability)];
+	char ovalue_l_[PADL_(struct itimerspec *__capability)]; struct itimerspec *__capability ovalue; char ovalue_r_[PADR_(struct itimerspec *__capability)];
+};
+struct cheriabi_ktimer_gettime_args {
+	char timerid_l_[PADL_(int)]; int timerid; char timerid_r_[PADR_(int)];
+	char value_l_[PADL_(struct itimerspec *__capability)]; struct itimerspec *__capability value; char value_r_[PADR_(struct itimerspec *__capability)];
+};
+struct cheriabi_nanosleep_args {
+	char rqtp_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability rqtp; char rqtp_r_[PADR_(const struct timespec *__capability)];
+	char rmtp_l_[PADL_(struct timespec *__capability)]; struct timespec *__capability rmtp; char rmtp_r_[PADR_(struct timespec *__capability)];
+};
+struct cheriabi_clock_nanosleep_args {
+	char clock_id_l_[PADL_(clockid_t)]; clockid_t clock_id; char clock_id_r_[PADR_(clockid_t)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char rqtp_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability rqtp; char rqtp_r_[PADR_(const struct timespec *__capability)];
+	char rmtp_l_[PADL_(struct timespec *__capability)]; struct timespec *__capability rmtp; char rmtp_r_[PADR_(struct timespec *__capability)];
+};
+struct cheriabi_clock_getcpuclockid2_args {
+	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
+	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
+	char clock_id_l_[PADL_(clockid_t *__capability)]; clockid_t *__capability clock_id; char clock_id_r_[PADR_(clockid_t *__capability)];
 };
 struct cheriabi_aio_read_args {
 	char aiocbp_l_[PADL_(struct aiocb_c *__capability)]; struct aiocb_c *__capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c *__capability)];
@@ -684,9 +738,13 @@ int	cheriabi_mprotect(struct thread *, struct cheriabi_mprotect_args *);
 int	cheriabi_madvise(struct thread *, struct cheriabi_madvise_args *);
 int	cheriabi_getgroups(struct thread *, struct cheriabi_getgroups_args *);
 int	cheriabi_setgroups(struct thread *, struct cheriabi_setgroups_args *);
+int	cheriabi_setitimer(struct thread *, struct cheriabi_setitimer_args *);
 int	cheriabi_swapon(struct thread *, struct cheriabi_swapon_args *);
+int	cheriabi_getitimer(struct thread *, struct cheriabi_getitimer_args *);
+int	cheriabi_gettimeofday(struct thread *, struct cheriabi_gettimeofday_args *);
 int	cheriabi_readv(struct thread *, struct cheriabi_readv_args *);
 int	cheriabi_writev(struct thread *, struct cheriabi_writev_args *);
+int	cheriabi_settimeofday(struct thread *, struct cheriabi_settimeofday_args *);
 int	cheriabi_rename(struct thread *, struct cheriabi_rename_args *);
 int	cheriabi_mkdir(struct thread *, struct cheriabi_mkdir_args *);
 int	cheriabi_rmdir(struct thread *, struct cheriabi_rmdir_args *);
@@ -700,7 +758,15 @@ int	cheriabi_sysarch(struct thread *, struct cheriabi_sysarch_args *);
 int	cheriabi_pathconf(struct thread *, struct cheriabi_pathconf_args *);
 int	cheriabi_undelete(struct thread *, struct cheriabi_undelete_args *);
 int	cheriabi_poll(struct thread *, struct cheriabi_poll_args *);
+int	cheriabi_clock_gettime(struct thread *, struct cheriabi_clock_gettime_args *);
+int	cheriabi_clock_settime(struct thread *, struct cheriabi_clock_settime_args *);
+int	cheriabi_clock_getres(struct thread *, struct cheriabi_clock_getres_args *);
 int	cheriabi_ktimer_create(struct thread *, struct cheriabi_ktimer_create_args *);
+int	cheriabi_ktimer_settime(struct thread *, struct cheriabi_ktimer_settime_args *);
+int	cheriabi_ktimer_gettime(struct thread *, struct cheriabi_ktimer_gettime_args *);
+int	cheriabi_nanosleep(struct thread *, struct cheriabi_nanosleep_args *);
+int	cheriabi_clock_nanosleep(struct thread *, struct cheriabi_clock_nanosleep_args *);
+int	cheriabi_clock_getcpuclockid2(struct thread *, struct cheriabi_clock_getcpuclockid2_args *);
 int	cheriabi_aio_read(struct thread *, struct cheriabi_aio_read_args *);
 int	cheriabi_aio_write(struct thread *, struct cheriabi_aio_write_args *);
 int	cheriabi_lio_listio(struct thread *, struct cheriabi_lio_listio_args *);
@@ -867,9 +933,13 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_madvise	AUE_MADVISE
 #define	CHERIABI_SYS_AUE_cheriabi_getgroups	AUE_GETGROUPS
 #define	CHERIABI_SYS_AUE_cheriabi_setgroups	AUE_SETGROUPS
+#define	CHERIABI_SYS_AUE_cheriabi_setitimer	AUE_SETITIMER
 #define	CHERIABI_SYS_AUE_cheriabi_swapon	AUE_SWAPON
+#define	CHERIABI_SYS_AUE_cheriabi_getitimer	AUE_GETITIMER
+#define	CHERIABI_SYS_AUE_cheriabi_gettimeofday	AUE_GETTIMEOFDAY
 #define	CHERIABI_SYS_AUE_cheriabi_readv	AUE_READV
 #define	CHERIABI_SYS_AUE_cheriabi_writev	AUE_WRITEV
+#define	CHERIABI_SYS_AUE_cheriabi_settimeofday	AUE_SETTIMEOFDAY
 #define	CHERIABI_SYS_AUE_cheriabi_rename	AUE_RENAME
 #define	CHERIABI_SYS_AUE_cheriabi_mkdir	AUE_MKDIR
 #define	CHERIABI_SYS_AUE_cheriabi_rmdir	AUE_RMDIR
@@ -883,7 +953,15 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_pathconf	AUE_PATHCONF
 #define	CHERIABI_SYS_AUE_cheriabi_undelete	AUE_UNDELETE
 #define	CHERIABI_SYS_AUE_cheriabi_poll	AUE_POLL
+#define	CHERIABI_SYS_AUE_cheriabi_clock_gettime	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_clock_settime	AUE_CLOCK_SETTIME
+#define	CHERIABI_SYS_AUE_cheriabi_clock_getres	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_ktimer_create	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_ktimer_settime	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_ktimer_gettime	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_nanosleep	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_clock_nanosleep	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_clock_getcpuclockid2	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_aio_read	AUE_AIO_READ
 #define	CHERIABI_SYS_AUE_cheriabi_aio_write	AUE_AIO_WRITE
 #define	CHERIABI_SYS_AUE_cheriabi_lio_listio	AUE_LIO_LISTIO

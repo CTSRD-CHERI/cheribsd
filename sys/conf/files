@@ -274,6 +274,7 @@ compat/cheriabi/cheriabi_mac.c		optional compat_cheriabi
 compat/cheriabi/cheriabi_misc.c		optional compat_cheriabi
 compat/cheriabi/cheriabi_syscalls.c	optional compat_cheriabi
 compat/cheriabi/cheriabi_sysent.c	optional compat_cheriabi
+compat/cheriabi/cheriabi_time.c		optional compat_cheriabi
 compat/cheriabi/cheriabi_vfs.c		optional compat_cheriabi
 
 # dtrace specific

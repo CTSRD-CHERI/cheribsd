@@ -88,10 +88,10 @@
 #define	CHERIABI_SYS_cheriabi_setgroups	80
 #define	CHERIABI_SYS_getpgrp	81
 #define	CHERIABI_SYS_setpgid	82
-#define	CHERIABI_SYS_setitimer	83
+#define	CHERIABI_SYS_cheriabi_setitimer	83
 				/* 84 is obsolete owait */
 #define	CHERIABI_SYS_cheriabi_swapon	85
-#define	CHERIABI_SYS_getitimer	86
+#define	CHERIABI_SYS_cheriabi_getitimer	86
 				/* 87 is obsolete ogethostname */
 				/* 88 is obsolete osethostname */
 #define	CHERIABI_SYS_getdtablesize	89
@@ -119,12 +119,12 @@
 				/* 113 is obsolete orecvmsg */
 				/* 114 is obsolete osendmsg */
 				/* 115 is obsolete vtrace */
-#define	CHERIABI_SYS_gettimeofday	116
+#define	CHERIABI_SYS_cheriabi_gettimeofday	116
 #define	CHERIABI_SYS_getrusage	117
 #define	CHERIABI_SYS_getsockopt	118
 #define	CHERIABI_SYS_cheriabi_readv	120
 #define	CHERIABI_SYS_cheriabi_writev	121
-#define	CHERIABI_SYS_settimeofday	122
+#define	CHERIABI_SYS_cheriabi_settimeofday	122
 #define	CHERIABI_SYS_fchown	123
 #define	CHERIABI_SYS_fchmod	124
 				/* 125 is obsolete orecvfrom */
@@ -206,20 +206,20 @@
 				/* 229 is obsolete shmctl */
 #define	CHERIABI_SYS_shmdt	230
 #define	CHERIABI_SYS_shmget	231
-#define	CHERIABI_SYS_clock_gettime	232
-#define	CHERIABI_SYS_clock_settime	233
-#define	CHERIABI_SYS_clock_getres	234
+#define	CHERIABI_SYS_cheriabi_clock_gettime	232
+#define	CHERIABI_SYS_cheriabi_clock_settime	233
+#define	CHERIABI_SYS_cheriabi_clock_getres	234
 #define	CHERIABI_SYS_cheriabi_ktimer_create	235
 #define	CHERIABI_SYS_ktimer_delete	236
-#define	CHERIABI_SYS_ktimer_settime	237
-#define	CHERIABI_SYS_ktimer_gettime	238
+#define	CHERIABI_SYS_cheriabi_ktimer_settime	237
+#define	CHERIABI_SYS_cheriabi_ktimer_gettime	238
 #define	CHERIABI_SYS_ktimer_getoverrun	239
-#define	CHERIABI_SYS_nanosleep	240
+#define	CHERIABI_SYS_cheriabi_nanosleep	240
 #define	CHERIABI_SYS_ffclock_getcounter	241
 #define	CHERIABI_SYS_ffclock_setestimate	242
 #define	CHERIABI_SYS_ffclock_getestimate	243
-#define	CHERIABI_SYS_clock_nanosleep	244
-#define	CHERIABI_SYS_clock_getcpuclockid2	247
+#define	CHERIABI_SYS_cheriabi_clock_nanosleep	244
+#define	CHERIABI_SYS_cheriabi_clock_getcpuclockid2	247
 #define	CHERIABI_SYS_ntp_gettime	248
 #define	CHERIABI_SYS_minherit	250
 #define	CHERIABI_SYS_rfork	251

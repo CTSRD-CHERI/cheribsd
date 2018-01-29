@@ -1134,38 +1134,24 @@ CHERIABI_SYS_setpgid_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_setitimer_fill_uap(struct thread *td,
-    struct setitimer_args *uap)
+CHERIABI_SYS_cheriabi_setitimer_fill_uap(struct thread *td,
+    struct cheriabi_setitimer_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] int which */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_setitimer_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_setitimer_PTRMASK);
 	uap->which = cheri_getoffset(tmpcap);
 
-	/* [1] _In_ const struct itimerval * itv */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
+	/* [1] _In_ const struct itimerval *__capability itv */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->itv),
+	    1, CHERIABI_SYS_cheriabi_setitimer_PTRMASK);
 
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_setitimer_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->itv),
-		    tmpcap, sizeof(*uap->itv), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
-
-	/* [2] _Out_opt_ struct itimerval * oitv */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_setitimer_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->oitv),
-		    tmpcap, sizeof(*uap->oitv), reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
+	/* [2] _Out_opt_ struct itimerval *__capability oitv */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->oitv),
+	    2, CHERIABI_SYS_cheriabi_setitimer_PTRMASK);
 
 	return (0);
 }
@@ -1184,26 +1170,19 @@ CHERIABI_SYS_cheriabi_swapon_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_getitimer_fill_uap(struct thread *td,
-    struct getitimer_args *uap)
+CHERIABI_SYS_cheriabi_getitimer_fill_uap(struct thread *td,
+    struct cheriabi_getitimer_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] int which */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_getitimer_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_getitimer_PTRMASK);
 	uap->which = cheri_getoffset(tmpcap);
 
-	/* [1] _Out_ struct itimerval * itv */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_getitimer_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->itv),
-		    tmpcap, sizeof(*uap->itv), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [1] _Out_ struct itimerval *__capability itv */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->itv),
+	    1, CHERIABI_SYS_cheriabi_getitimer_PTRMASK);
 
 	return (0);
 }
@@ -1416,34 +1395,19 @@ CHERIABI_SYS_listen_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_gettimeofday_fill_uap(struct thread *td,
-    struct gettimeofday_args *uap)
+CHERIABI_SYS_cheriabi_gettimeofday_fill_uap(struct thread *td,
+    struct cheriabi_gettimeofday_args *uap)
 {
-	void * __capability tmpcap;
 
-	/* [0] _Out_ struct timeval * tp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
+	/* [0] _Out_ struct timeval *__capability tp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->tp),
+	    0, CHERIABI_SYS_cheriabi_gettimeofday_PTRMASK);
 
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_gettimeofday_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->tp),
-		    tmpcap, sizeof(*uap->tp), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
-
-	/* [1] _Out_opt_ struct timezone * tzp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_gettimeofday_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->tzp),
-		    tmpcap, sizeof(*uap->tzp), reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
+	/* [1] _Out_opt_ struct timezone *__capability tzp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->tzp),
+	    1, CHERIABI_SYS_cheriabi_gettimeofday_PTRMASK);
 
 	return (0);
 }
@@ -1578,34 +1542,19 @@ CHERIABI_SYS_cheriabi_writev_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_settimeofday_fill_uap(struct thread *td,
-    struct settimeofday_args *uap)
+CHERIABI_SYS_cheriabi_settimeofday_fill_uap(struct thread *td,
+    struct cheriabi_settimeofday_args *uap)
 {
-	void * __capability tmpcap;
 
-	/* [0] _In_ const struct timeval * tv */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
+	/* [0] _In_ const struct timeval *__capability tv */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->tv),
+	    0, CHERIABI_SYS_cheriabi_settimeofday_PTRMASK);
 
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_settimeofday_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->tv),
-		    tmpcap, sizeof(*uap->tv), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
-
-	/* [1] _In_opt_ const struct timezone * tzp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_settimeofday_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->tzp),
-		    tmpcap, sizeof(*uap->tzp), reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
+	/* [1] _In_opt_ const struct timezone *__capability tzp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->tzp),
+	    1, CHERIABI_SYS_cheriabi_settimeofday_PTRMASK);
 
 	return (0);
 }
@@ -2637,76 +2586,55 @@ CHERIABI_SYS_shmget_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_clock_gettime_fill_uap(struct thread *td,
-    struct clock_gettime_args *uap)
+CHERIABI_SYS_cheriabi_clock_gettime_fill_uap(struct thread *td,
+    struct cheriabi_clock_gettime_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] clockid_t clock_id */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_clock_gettime_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_clock_gettime_PTRMASK);
 	uap->clock_id = cheri_getoffset(tmpcap);
 
-	/* [1] _Out_ struct timespec * tp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_clock_gettime_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->tp),
-		    tmpcap, sizeof(*uap->tp), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [1] _Out_ struct timespec *__capability tp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->tp),
+	    1, CHERIABI_SYS_cheriabi_clock_gettime_PTRMASK);
 
 	return (0);
 }
 
 static inline int
-CHERIABI_SYS_clock_settime_fill_uap(struct thread *td,
-    struct clock_settime_args *uap)
+CHERIABI_SYS_cheriabi_clock_settime_fill_uap(struct thread *td,
+    struct cheriabi_clock_settime_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] clockid_t clock_id */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_clock_settime_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_clock_settime_PTRMASK);
 	uap->clock_id = cheri_getoffset(tmpcap);
 
-	/* [1] _In_ const struct timespec * tp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_clock_settime_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->tp),
-		    tmpcap, sizeof(*uap->tp), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [1] _In_ const struct timespec *__capability tp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->tp),
+	    1, CHERIABI_SYS_cheriabi_clock_settime_PTRMASK);
 
 	return (0);
 }
 
 static inline int
-CHERIABI_SYS_clock_getres_fill_uap(struct thread *td,
-    struct clock_getres_args *uap)
+CHERIABI_SYS_cheriabi_clock_getres_fill_uap(struct thread *td,
+    struct cheriabi_clock_getres_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] clockid_t clock_id */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_clock_getres_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_clock_getres_PTRMASK);
 	uap->clock_id = cheri_getoffset(tmpcap);
 
-	/* [1] _Out_ struct timespec * tp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_clock_getres_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->tp),
-		    tmpcap, sizeof(*uap->tp), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [1] _Out_ struct timespec *__capability tp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->tp),
+	    1, CHERIABI_SYS_cheriabi_clock_getres_PTRMASK);
 
 	return (0);
 }
@@ -2721,29 +2649,15 @@ CHERIABI_SYS_cheriabi_ktimer_create_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_ktimer_create_PTRMASK);
 	uap->clock_id = cheri_getoffset(tmpcap);
 
-	/* [1] _In_ struct sigevent_c * evp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD|CHERI_PERM_LOAD_CAP);
+	/* [1] _In_ struct sigevent_c *__capability evp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->evp),
+	    1, CHERIABI_SYS_cheriabi_ktimer_create_PTRMASK);
 
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_ktimer_create_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->evp),
-		    tmpcap, sizeof(*uap->evp), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
-
-	/* [2] _Out_ int * timerid */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_ktimer_create_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->timerid),
-		    tmpcap, sizeof(*uap->timerid), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [2] _Out_ int *__capability timerid */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->timerid),
+	    2, CHERIABI_SYS_cheriabi_ktimer_create_PTRMASK);
 
 	return (0);
 }
@@ -2762,67 +2676,46 @@ CHERIABI_SYS_ktimer_delete_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_ktimer_settime_fill_uap(struct thread *td,
-    struct ktimer_settime_args *uap)
+CHERIABI_SYS_cheriabi_ktimer_settime_fill_uap(struct thread *td,
+    struct cheriabi_ktimer_settime_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] int timerid */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_ktimer_settime_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_ktimer_settime_PTRMASK);
 	uap->timerid = cheri_getoffset(tmpcap);
 
 	/* [1] int flags */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_ktimer_settime_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_ktimer_settime_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [2] _In_ const struct itimerspec * value */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
+	/* [2] _In_ const struct itimerspec *__capability value */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->value),
+	    2, CHERIABI_SYS_cheriabi_ktimer_settime_PTRMASK);
 
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_ktimer_settime_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->value),
-		    tmpcap, sizeof(*uap->value), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
-
-	/* [3] _Out_opt_ struct itimerspec * ovalue */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_ktimer_settime_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->ovalue),
-		    tmpcap, sizeof(*uap->ovalue), reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
+	/* [3] _Out_opt_ struct itimerspec *__capability ovalue */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->ovalue),
+	    3, CHERIABI_SYS_cheriabi_ktimer_settime_PTRMASK);
 
 	return (0);
 }
 
 static inline int
-CHERIABI_SYS_ktimer_gettime_fill_uap(struct thread *td,
-    struct ktimer_gettime_args *uap)
+CHERIABI_SYS_cheriabi_ktimer_gettime_fill_uap(struct thread *td,
+    struct cheriabi_ktimer_gettime_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] int timerid */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_ktimer_gettime_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_ktimer_gettime_PTRMASK);
 	uap->timerid = cheri_getoffset(tmpcap);
 
-	/* [1] _Out_ struct itimerspec * value */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_ktimer_gettime_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->value),
-		    tmpcap, sizeof(*uap->value), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [1] _Out_ struct itimerspec *__capability value */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->value),
+	    1, CHERIABI_SYS_cheriabi_ktimer_gettime_PTRMASK);
 
 	return (0);
 }
@@ -2841,34 +2734,19 @@ CHERIABI_SYS_ktimer_getoverrun_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_nanosleep_fill_uap(struct thread *td,
-    struct nanosleep_args *uap)
+CHERIABI_SYS_cheriabi_nanosleep_fill_uap(struct thread *td,
+    struct cheriabi_nanosleep_args *uap)
 {
-	void * __capability tmpcap;
 
-	/* [0] _In_ const struct timespec * rqtp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
+	/* [0] _In_ const struct timespec *__capability rqtp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->rqtp),
+	    0, CHERIABI_SYS_cheriabi_nanosleep_PTRMASK);
 
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_nanosleep_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->rqtp),
-		    tmpcap, sizeof(*uap->rqtp), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
-
-	/* [1] _Out_opt_ struct timespec * rmtp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_nanosleep_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->rmtp),
-		    tmpcap, sizeof(*uap->rmtp), reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
+	/* [1] _Out_opt_ struct timespec *__capability rmtp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->rmtp),
+	    1, CHERIABI_SYS_cheriabi_nanosleep_PTRMASK);
 
 	return (0);
 }
@@ -2937,71 +2815,50 @@ CHERIABI_SYS_ffclock_getestimate_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_clock_nanosleep_fill_uap(struct thread *td,
-    struct clock_nanosleep_args *uap)
+CHERIABI_SYS_cheriabi_clock_nanosleep_fill_uap(struct thread *td,
+    struct cheriabi_clock_nanosleep_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] clockid_t clock_id */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_clock_nanosleep_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_clock_nanosleep_PTRMASK);
 	uap->clock_id = cheri_getoffset(tmpcap);
 
 	/* [1] int flags */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_clock_nanosleep_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_clock_nanosleep_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [2] _In_ const struct timespec * rqtp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
+	/* [2] _In_ const struct timespec *__capability rqtp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->rqtp),
+	    2, CHERIABI_SYS_cheriabi_clock_nanosleep_PTRMASK);
 
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_clock_nanosleep_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->rqtp),
-		    tmpcap, sizeof(*uap->rqtp), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
-
-	/* [3] _Out_opt_ struct timespec * rmtp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_clock_nanosleep_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->rmtp),
-		    tmpcap, sizeof(*uap->rmtp), reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
+	/* [3] _Out_opt_ struct timespec *__capability rmtp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->rmtp),
+	    3, CHERIABI_SYS_cheriabi_clock_nanosleep_PTRMASK);
 
 	return (0);
 }
 
 static inline int
-CHERIABI_SYS_clock_getcpuclockid2_fill_uap(struct thread *td,
-    struct clock_getcpuclockid2_args *uap)
+CHERIABI_SYS_cheriabi_clock_getcpuclockid2_fill_uap(struct thread *td,
+    struct cheriabi_clock_getcpuclockid2_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] id_t id */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_clock_getcpuclockid2_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_clock_getcpuclockid2_PTRMASK);
 	uap->id = cheri_getoffset(tmpcap);
 
 	/* [1] int which */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_clock_getcpuclockid2_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_clock_getcpuclockid2_PTRMASK);
 	uap->which = cheri_getoffset(tmpcap);
 
-	/* [2] _Out_ clockid_t * clock_id */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_clock_getcpuclockid2_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->clock_id),
-		    tmpcap, sizeof(*uap->clock_id), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [2] _Out_ clockid_t *__capability clock_id */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->clock_id),
+	    2, CHERIABI_SYS_cheriabi_clock_getcpuclockid2_PTRMASK);
 
 	return (0);
 }

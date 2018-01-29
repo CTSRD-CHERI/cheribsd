@@ -1065,46 +1065,6 @@ cheriabi_swapcontext(struct thread *td, struct cheriabi_swapcontext_args *uap)
 	return (EJUSTRETURN);
 }
 
-struct sigvec_c {
-	void * __capability	sv_handler;
-	int		sv_mask;
-	int		sv_flags;
-};
-
-struct sigstack32 {
-	u_int32_t	ss_sp;
-	int		ss_onstack;
-};
-
-int cheriabi_ktimer_create(struct thread *td,
-    struct cheriabi_ktimer_create_args *uap)
-{
-	struct sigevent_c ev_c;
-	struct sigevent ev, *evp;
-	int error, id;
-
-	if (uap->evp == NULL) {
-		evp = NULL;
-	} else {
-		evp = &ev;
-		error = copyincap(uap->evp, &ev_c, sizeof(ev_c));
-		if (error != 0)
-			return (error);
-		error = convert_sigevent_c(&ev_c, &ev);
-		if (error != 0)
-			return (error);
-	}
-	error = kern_ktimer_create(td, uap->clock_id, evp, &id, -1);
-	if (error != 0 && evp != NULL) {
-		cheriabi_free_sival(&evp->sigev_value);
-		return (error);
-	}
-	error = copyout(&id, uap->timerid, sizeof(int));
-	if (error != 0)
-		kern_ktimer_delete(td, id);
-	return (error);
-}
-
 int
 cheriabi_thr_create(struct thread *td, struct cheriabi_thr_create_args *uap)
 {

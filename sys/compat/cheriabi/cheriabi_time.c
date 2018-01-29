@@ -1,0 +1,226 @@
+/*-
+ * Copyright (c) 2018 SRI International
+ * All rights reserved.
+ *
+ * This software was developed by SRI International and the University of
+ * Cambridge Computer Laboratory under DARPA/AFRL contract FA8750-10-C-0237
+ * ("CTSRD"), as part of the DARPA CRASH research programme.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <sys/param.h>
+#include <sys/syscallsubr.h>
+
+#include <compat/cheriabi/cheriabi_proto.h>
+
+int
+cheriabi_clock_getcpuclockid2(struct thread *td,
+    struct cheriabi_clock_getcpuclockid2_args *uap)
+{
+	clockid_t clk_id;
+	int error;
+
+	error = kern_clock_getcpuclockid2(td, uap->id, uap->which, &clk_id);
+	if (error == 0)
+		error = copyout_c(&clk_id, uap->clock_id, sizeof(clockid_t));
+
+	return (error);
+}
+
+int
+cheriabi_clock_gettime(struct thread *td,
+    struct cheriabi_clock_gettime_args *uap)
+{
+	struct timespec ats;
+	int error;
+
+	error = kern_clock_gettime(td, uap->clock_id, &ats);
+	if (error == 0)
+		error = copyout_c(&ats, uap->tp, sizeof(ats));
+
+	return (error);
+}
+
+int
+cheriabi_clock_settime(struct thread *td,
+    struct cheriabi_clock_settime_args *uap)
+{
+	struct timespec ats;
+	int error;
+
+	error = copyin_c(uap->tp, &ats, sizeof(ats));
+	if (error != 0)
+		return (error);
+
+	return (kern_clock_settime(td, uap->clock_id, &ats));
+}
+
+int
+cheriabi_clock_getres(struct thread *td,
+    struct cheriabi_clock_getres_args *uap)
+{
+	struct timespec ats;
+	int error;
+
+	if (uap->tp == NULL)
+		return (0);
+
+	error = kern_clock_getres(td, uap->clock_id, &ats);
+	if (error == 0)
+		error = copyout_c(&ats, uap->tp, sizeof(ats));
+	
+	return (error);
+}
+
+int
+cheriabi_nanosleep(struct thread *td, struct cheriabi_nanosleep_args *uap)
+{
+
+	return (user_clock_nanosleep(td, CLOCK_REALTIME, TIMER_RELTIME,
+	    uap->rqtp, uap->rmtp));
+}
+
+int
+cheriabi_clock_nanosleep(struct thread *td,
+    struct cheriabi_clock_nanosleep_args *uap)
+{
+	int error;
+
+	error = user_clock_nanosleep(td, uap->clock_id, uap->flags, uap->rqtp,
+	    uap->rmtp);
+	return (kern_posix_error(td, error));
+}
+
+int
+cheriabi_gettimeofday(struct thread *td, struct cheriabi_gettimeofday_args *uap)
+{
+
+	return (kern_gettimeofday(td, uap->tp, uap->tzp));
+}
+
+int
+cheriabi_settimeofday(struct thread *td,
+    struct cheriabi_settimeofday_args *uap)
+{
+
+	return (user_settimeofday(td, uap->tv, uap->tzp));
+}
+
+int
+cheriabi_getitimer(struct thread *td, struct cheriabi_getitimer_args *uap)
+{
+	struct itimerval aitv;
+	int error;
+
+	error = kern_getitimer(td, uap->which, &aitv);
+	if (error != 0)
+		return (error);
+	return (copyout_c(&aitv, uap->itv, sizeof (struct itimerval)));
+}
+
+int
+cheriabi_setitimer(struct thread *td, struct cheriabi_setitimer_args *uap)
+{
+	struct itimerval aitv, oitv;
+	int error;
+
+	if (uap->itv == NULL) {
+		error = kern_getitimer(td, uap->which, &aitv);
+		if (error != 0)
+			return (error);
+		return (copyout_c(&aitv, uap->oitv, sizeof (struct itimerval)));
+	}
+
+	error = copyin_c(uap->itv, &aitv, sizeof(struct itimerval));
+	if (error != 0)
+		return (error);
+	error = kern_setitimer(td, uap->which, &aitv, &oitv);
+	if (error != 0 || uap->oitv == NULL)
+		return (error);
+	return (copyout_c(&oitv, uap->oitv, sizeof(struct itimerval)));
+}
+
+int
+cheriabi_ktimer_create(struct thread *td,
+    struct cheriabi_ktimer_create_args *uap)
+{
+	struct sigevent_c ev_c;
+	struct sigevent ev, *evp;
+	int error, id;
+
+	if (uap->evp == NULL) {
+		evp = NULL;
+	} else {
+		evp = &ev;
+		error = copyincap_c(uap->evp, &ev_c, sizeof(ev_c));
+		if (error != 0)
+			return (error);
+		error = convert_sigevent_c(&ev_c, &ev);
+		if (error != 0)
+			return (error);
+	}
+	error = kern_ktimer_create(td, uap->clock_id, evp, &id, -1);
+	if (error != 0 && evp != NULL) {
+		cheriabi_free_sival(&evp->sigev_value);
+		return (error);
+	}
+	error = copyout_c(&id, uap->timerid, sizeof(int));
+	if (error != 0)
+		kern_ktimer_delete(td, id);
+	return (error);
+}
+
+int
+cheriabi_ktimer_settime(struct thread *td,
+    struct cheriabi_ktimer_settime_args *uap)
+{
+	struct itimerspec val, oval, *ovalp;
+	int error;
+
+	error = copyin_c(uap->value, &val, sizeof(val));
+	if (error != 0)
+		return (error);
+	ovalp = uap->ovalue != NULL ? &oval : NULL;
+	error = kern_ktimer_settime(td, uap->timerid, uap->flags, &val, ovalp);
+	if (error == 0 && uap->ovalue != NULL)
+		error = copyout_c(
+		    (__cheri_tocap struct itimerspec * __capability)ovalp,
+		    uap->ovalue, sizeof(*ovalp));
+	return (error);
+}
+
+int
+cheriabi_ktimer_gettime(struct thread *td,
+    struct cheriabi_ktimer_gettime_args *uap)
+{
+	struct itimerspec val;
+	int error;
+
+	error = kern_ktimer_gettime(td, uap->timerid, &val);
+	if (error == 0)
+		error = copyout_c(&val, uap->value, sizeof(val));
+	return (error);
+}

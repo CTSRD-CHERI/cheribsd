@@ -62,9 +62,9 @@ MIASM =  \
 	cheriabi_setgroups.o \
 	getpgrp.o \
 	setpgid.o \
-	setitimer.o \
+	cheriabi_setitimer.o \
 	cheriabi_swapon.o \
-	getitimer.o \
+	cheriabi_getitimer.o \
 	getdtablesize.o \
 	dup2.o \
 	fcntl.o \
@@ -77,12 +77,12 @@ MIASM =  \
 	bind.o \
 	setsockopt.o \
 	listen.o \
-	gettimeofday.o \
+	cheriabi_gettimeofday.o \
 	getrusage.o \
 	getsockopt.o \
 	cheriabi_readv.o \
 	cheriabi_writev.o \
-	settimeofday.o \
+	cheriabi_settimeofday.o \
 	fchown.o \
 	fchmod.o \
 	setreuid.o \
@@ -129,20 +129,20 @@ MIASM =  \
 	shmat.o \
 	shmdt.o \
 	shmget.o \
-	clock_gettime.o \
-	clock_settime.o \
-	clock_getres.o \
+	cheriabi_clock_gettime.o \
+	cheriabi_clock_settime.o \
+	cheriabi_clock_getres.o \
 	cheriabi_ktimer_create.o \
 	ktimer_delete.o \
-	ktimer_settime.o \
-	ktimer_gettime.o \
+	cheriabi_ktimer_settime.o \
+	cheriabi_ktimer_gettime.o \
 	ktimer_getoverrun.o \
-	nanosleep.o \
+	cheriabi_nanosleep.o \
 	ffclock_getcounter.o \
 	ffclock_setestimate.o \
 	ffclock_getestimate.o \
-	clock_nanosleep.o \
-	clock_getcpuclockid2.o \
+	cheriabi_clock_nanosleep.o \
+	cheriabi_clock_getcpuclockid2.o \
 	ntp_gettime.o \
 	minherit.o \
 	rfork.o \

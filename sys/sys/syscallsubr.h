@@ -147,6 +147,9 @@ int	kern_getsockname(struct thread *td, int fd, struct sockaddr **sa,
 	    socklen_t *alen);
 int	kern_getsockopt(struct thread *td, int s, int level, int name,
 	    void *optval, enum uio_seg valseg, socklen_t *valsize);
+int	kern_gettimeofday(struct thread *td,
+	    struct timeval * __capability tp,
+	    struct timezone * __capability tzp);
 int	kern_ioctl(struct thread *td, int fd, u_long com, caddr_t data);
 int	kern_jail(struct thread *td, struct jail *j);
 int	kern_jail_get(struct thread *td, struct uio *options, int flags);
@@ -342,6 +345,13 @@ int	kern_wait6(struct thread *td, enum idtype idtype, id_t id, int *status,
 int	kern_writev(struct thread *td, int fd, struct uio *auio);
 int	kern_socketpair(struct thread *td, int domain, int type, int protocol,
 	    int *rsv);
+
+int	user_clock_nanosleep(struct thread *td, clockid_t clock_id,
+	    int flags, const struct timespec * __capability ua_rqtp,
+	    struct timespec * __capability ua_rmtp);
+int	user_settimeofday(struct thread *td,
+	    const struct timeval * __capability tp,
+	    const struct timezone * __capability tz);
 
 /* flags for kern_sigaction */
 #define	KSA_OSIGSET	0x0001	/* uses osigact_t */

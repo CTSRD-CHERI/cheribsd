@@ -87,9 +87,6 @@ static uma_zone_t	itimer_zone = NULL;
 
 static int	settime(struct thread *, struct timeval *);
 static void	timevalfix(struct timeval *);
-static int	user_clock_nanosleep(struct thread *td, clockid_t clock_id,
-		    int flags, const struct timespec *ua_rqtp,
-		    struct timespec *ua_rmtp);
 
 static void	itimer_start(void);
 static int	itimer_init(void *, int, int);
@@ -581,8 +578,8 @@ kern_clock_nanosleep(struct thread *td, clockid_t clock_id, int flags,
 
 #ifndef _SYS_SYSPROTO_H_
 struct nanosleep_args {
-	struct	timespec *rqtp;
-	struct	timespec *rmtp;
+	const struct	timespec *rqtp;
+	struct		timespec *rmtp;
 };
 #endif
 /* ARGSUSED */
@@ -591,14 +588,14 @@ sys_nanosleep(struct thread *td, struct nanosleep_args *uap)
 {
 
 	return (user_clock_nanosleep(td, CLOCK_REALTIME, TIMER_RELTIME,
-	    uap->rqtp, uap->rmtp));
+	    __USER_CAP_OBJ(uap->rqtp), __USER_CAP_OBJ(uap->rmtp)));
 }
 
 #ifndef _SYS_SYSPROTO_H_
 struct clock_nanosleep_args {
 	clockid_t clock_id;
 	int 	  flags;
-	struct	timespec *rqtp;
+	const struct	timespec *rqtp;
 	struct	timespec *rmtp;
 };
 #endif
@@ -608,29 +605,31 @@ sys_clock_nanosleep(struct thread *td, struct clock_nanosleep_args *uap)
 {
 	int error;
 
-	error = user_clock_nanosleep(td, uap->clock_id, uap->flags, uap->rqtp,
-	    uap->rmtp);
+	error = user_clock_nanosleep(td, uap->clock_id, uap->flags,
+	    __USER_CAP_OBJ(uap->rqtp), __USER_CAP_OBJ(uap->rmtp));
 	return (kern_posix_error(td, error));
 }
 
-static int
+int
 user_clock_nanosleep(struct thread *td, clockid_t clock_id, int flags,
-    const struct timespec *ua_rqtp, struct timespec *ua_rmtp)
+    const struct timespec * __capability ua_rqtp,
+    struct timespec * __capability ua_rmtp)
 {
 	struct timespec rmt, rqt;
 	int error;
 
-	error = copyin(ua_rqtp, &rqt, sizeof(rqt));
+	error = copyin_c(ua_rqtp, &rqt, sizeof(rqt));
 	if (error)
 		return (error);
 	if (ua_rmtp != NULL && (flags & TIMER_ABSTIME) == 0 &&
-	    !useracc(ua_rmtp, sizeof(rmt), VM_PROT_WRITE))
+	    !useracc(__DECAP_CHECK(ua_rmtp, sizeof(rmt)), sizeof(rmt),
+	    VM_PROT_WRITE))
 		return (EFAULT);
 	error = kern_clock_nanosleep(td, clock_id, flags, &rqt, &rmt);
 	if (error == EINTR && ua_rmtp != NULL && (flags & TIMER_ABSTIME) == 0) {
 		int error2;
 
-		error2 = copyout(&rmt, ua_rmtp, sizeof(rmt));
+		error2 = copyout_c(&rmt, ua_rmtp, sizeof(rmt));
 		if (error2)
 			error = error2;
 	}
@@ -647,18 +646,27 @@ struct gettimeofday_args {
 int
 sys_gettimeofday(struct thread *td, struct gettimeofday_args *uap)
 {
+
+	return (kern_gettimeofday(td, __USER_CAP_OBJ(uap->tp),
+	    __USER_CAP_OBJ(uap->tzp)));
+}
+
+int
+kern_gettimeofday(struct thread *td, struct timeval * __capability tp,
+    struct timezone * __capability tzp)
+{
 	struct timeval atv;
 	struct timezone rtz;
 	int error = 0;
 
-	if (uap->tp) {
+	if (tp) {
 		microtime(&atv);
-		error = copyout(&atv, uap->tp, sizeof (atv));
+		error = copyout_c(&atv, tp, sizeof (atv));
 	}
-	if (error == 0 && uap->tzp != NULL) {
+	if (error == 0 && tzp != NULL) {
 		rtz.tz_minuteswest = tz_minuteswest;
 		rtz.tz_dsttime = tz_dsttime;
-		error = copyout(&rtz, uap->tzp, sizeof (rtz));
+		error = copyout_c(&rtz, tzp, sizeof (rtz));
 	}
 	return (error);
 }
@@ -673,19 +681,28 @@ struct settimeofday_args {
 int
 sys_settimeofday(struct thread *td, struct settimeofday_args *uap)
 {
+
+	return (user_settimeofday(td, __USER_CAP_OBJ(uap->tv),
+	    __USER_CAP_OBJ(uap->tzp)));
+}
+
+int
+user_settimeofday(struct thread *td, const struct timeval * __capability tv,
+    const struct timezone * __capability tz)
+{
 	struct timeval atv, *tvp;
 	struct timezone atz, *tzp;
 	int error;
 
-	if (uap->tv) {
-		error = copyin(uap->tv, &atv, sizeof(atv));
+	if (tv) {
+		error = copyin_c(tv, &atv, sizeof(atv));
 		if (error)
 			return (error);
 		tvp = &atv;
 	} else
 		tvp = NULL;
-	if (uap->tzp) {
-		error = copyin(uap->tzp, &atz, sizeof(atz));
+	if (tz) {
+		error = copyin_c(tz, &atz, sizeof(atz));
 		if (error)
 			return (error);
 		tzp = &atz;

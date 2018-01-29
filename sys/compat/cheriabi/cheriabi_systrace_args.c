@@ -480,12 +480,12 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* setitimer */
+	/* cheriabi_setitimer */
 	case 83: {
-		struct setitimer_args *p = params;
+		struct cheriabi_setitimer_args *p = params;
 		iarg[0] = p->which; /* int */
-		uarg[1] = (intptr_t) p->itv; /* const struct itimerval * */
-		uarg[2] = (intptr_t) p->oitv; /* struct itimerval * */
+		uarg[1] = (cheri_getbase(p->itv) + cheri_getoffset(p->itv)); /* const struct itimerval *__capability */
+		uarg[2] = (cheri_getbase(p->oitv) + cheri_getoffset(p->oitv)); /* struct itimerval *__capability */
 		*n_args = 3;
 		break;
 	}
@@ -496,11 +496,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* getitimer */
+	/* cheriabi_getitimer */
 	case 86: {
-		struct getitimer_args *p = params;
+		struct cheriabi_getitimer_args *p = params;
 		iarg[0] = p->which; /* int */
-		uarg[1] = (intptr_t) p->itv; /* struct itimerval * */
+		uarg[1] = (cheri_getbase(p->itv) + cheri_getoffset(p->itv)); /* struct itimerval *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -607,11 +607,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* gettimeofday */
+	/* cheriabi_gettimeofday */
 	case 116: {
-		struct gettimeofday_args *p = params;
-		uarg[0] = (intptr_t) p->tp; /* struct timeval * */
-		uarg[1] = (intptr_t) p->tzp; /* struct timezone * */
+		struct cheriabi_gettimeofday_args *p = params;
+		uarg[0] = (cheri_getbase(p->tp) + cheri_getoffset(p->tp)); /* struct timeval *__capability */
+		uarg[1] = (cheri_getbase(p->tzp) + cheri_getoffset(p->tzp)); /* struct timezone *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -652,11 +652,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* settimeofday */
+	/* cheriabi_settimeofday */
 	case 122: {
-		struct settimeofday_args *p = params;
-		uarg[0] = (intptr_t) p->tv; /* const struct timeval * */
-		uarg[1] = (intptr_t) p->tzp; /* const struct timezone * */
+		struct cheriabi_settimeofday_args *p = params;
+		uarg[0] = (cheri_getbase(p->tv) + cheri_getoffset(p->tv)); /* const struct timeval *__capability */
+		uarg[1] = (cheri_getbase(p->tzp) + cheri_getoffset(p->tzp)); /* const struct timezone *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -1092,27 +1092,27 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* clock_gettime */
+	/* cheriabi_clock_gettime */
 	case 232: {
-		struct clock_gettime_args *p = params;
+		struct cheriabi_clock_gettime_args *p = params;
 		iarg[0] = p->clock_id; /* clockid_t */
-		uarg[1] = (intptr_t) p->tp; /* struct timespec * */
+		uarg[1] = (cheri_getbase(p->tp) + cheri_getoffset(p->tp)); /* struct timespec *__capability */
 		*n_args = 2;
 		break;
 	}
-	/* clock_settime */
+	/* cheriabi_clock_settime */
 	case 233: {
-		struct clock_settime_args *p = params;
+		struct cheriabi_clock_settime_args *p = params;
 		iarg[0] = p->clock_id; /* clockid_t */
-		uarg[1] = (intptr_t) p->tp; /* const struct timespec * */
+		uarg[1] = (cheri_getbase(p->tp) + cheri_getoffset(p->tp)); /* const struct timespec *__capability */
 		*n_args = 2;
 		break;
 	}
-	/* clock_getres */
+	/* cheriabi_clock_getres */
 	case 234: {
-		struct clock_getres_args *p = params;
+		struct cheriabi_clock_getres_args *p = params;
 		iarg[0] = p->clock_id; /* clockid_t */
-		uarg[1] = (intptr_t) p->tp; /* struct timespec * */
+		uarg[1] = (cheri_getbase(p->tp) + cheri_getoffset(p->tp)); /* struct timespec *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -1120,8 +1120,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 235: {
 		struct cheriabi_ktimer_create_args *p = params;
 		iarg[0] = p->clock_id; /* clockid_t */
-		uarg[1] = (intptr_t) p->evp; /* struct sigevent_c * */
-		uarg[2] = (intptr_t) p->timerid; /* int * */
+		uarg[1] = (cheri_getbase(p->evp) + cheri_getoffset(p->evp)); /* struct sigevent_c *__capability */
+		uarg[2] = (cheri_getbase(p->timerid) + cheri_getoffset(p->timerid)); /* int *__capability */
 		*n_args = 3;
 		break;
 	}
@@ -1132,21 +1132,21 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* ktimer_settime */
+	/* cheriabi_ktimer_settime */
 	case 237: {
-		struct ktimer_settime_args *p = params;
+		struct cheriabi_ktimer_settime_args *p = params;
 		iarg[0] = p->timerid; /* int */
 		iarg[1] = p->flags; /* int */
-		uarg[2] = (intptr_t) p->value; /* const struct itimerspec * */
-		uarg[3] = (intptr_t) p->ovalue; /* struct itimerspec * */
+		uarg[2] = (cheri_getbase(p->value) + cheri_getoffset(p->value)); /* const struct itimerspec *__capability */
+		uarg[3] = (cheri_getbase(p->ovalue) + cheri_getoffset(p->ovalue)); /* struct itimerspec *__capability */
 		*n_args = 4;
 		break;
 	}
-	/* ktimer_gettime */
+	/* cheriabi_ktimer_gettime */
 	case 238: {
-		struct ktimer_gettime_args *p = params;
+		struct cheriabi_ktimer_gettime_args *p = params;
 		iarg[0] = p->timerid; /* int */
-		uarg[1] = (intptr_t) p->value; /* struct itimerspec * */
+		uarg[1] = (cheri_getbase(p->value) + cheri_getoffset(p->value)); /* struct itimerspec *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -1157,11 +1157,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* nanosleep */
+	/* cheriabi_nanosleep */
 	case 240: {
-		struct nanosleep_args *p = params;
-		uarg[0] = (intptr_t) p->rqtp; /* const struct timespec * */
-		uarg[1] = (intptr_t) p->rmtp; /* struct timespec * */
+		struct cheriabi_nanosleep_args *p = params;
+		uarg[0] = (cheri_getbase(p->rqtp) + cheri_getoffset(p->rqtp)); /* const struct timespec *__capability */
+		uarg[1] = (cheri_getbase(p->rmtp) + cheri_getoffset(p->rmtp)); /* struct timespec *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -1186,22 +1186,22 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* clock_nanosleep */
+	/* cheriabi_clock_nanosleep */
 	case 244: {
-		struct clock_nanosleep_args *p = params;
+		struct cheriabi_clock_nanosleep_args *p = params;
 		iarg[0] = p->clock_id; /* clockid_t */
 		iarg[1] = p->flags; /* int */
-		uarg[2] = (intptr_t) p->rqtp; /* const struct timespec * */
-		uarg[3] = (intptr_t) p->rmtp; /* struct timespec * */
+		uarg[2] = (cheri_getbase(p->rqtp) + cheri_getoffset(p->rqtp)); /* const struct timespec *__capability */
+		uarg[3] = (cheri_getbase(p->rmtp) + cheri_getoffset(p->rmtp)); /* struct timespec *__capability */
 		*n_args = 4;
 		break;
 	}
-	/* clock_getcpuclockid2 */
+	/* cheriabi_clock_getcpuclockid2 */
 	case 247: {
-		struct clock_getcpuclockid2_args *p = params;
+		struct cheriabi_clock_getcpuclockid2_args *p = params;
 		iarg[0] = p->id; /* id_t */
 		iarg[1] = p->which; /* int */
-		uarg[2] = (intptr_t) p->clock_id; /* clockid_t * */
+		uarg[2] = (cheri_getbase(p->clock_id) + cheri_getoffset(p->clock_id)); /* clockid_t *__capability */
 		*n_args = 3;
 		break;
 	}
@@ -3850,17 +3850,17 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* setitimer */
+	/* cheriabi_setitimer */
 	case 83:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct itimerval *";
+			p = "userland const struct itimerval *__capability";
 			break;
 		case 2:
-			p = "userland struct itimerval *";
+			p = "userland struct itimerval *__capability";
 			break;
 		default:
 			break;
@@ -3876,14 +3876,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* getitimer */
+	/* cheriabi_getitimer */
 	case 86:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct itimerval *";
+			p = "userland struct itimerval *__capability";
 			break;
 		default:
 			break;
@@ -4065,14 +4065,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* gettimeofday */
+	/* cheriabi_gettimeofday */
 	case 116:
 		switch(ndx) {
 		case 0:
-			p = "userland struct timeval *";
+			p = "userland struct timeval *__capability";
 			break;
 		case 1:
-			p = "userland struct timezone *";
+			p = "userland struct timezone *__capability";
 			break;
 		default:
 			break;
@@ -4145,14 +4145,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* settimeofday */
+	/* cheriabi_settimeofday */
 	case 122:
 		switch(ndx) {
 		case 0:
-			p = "userland const struct timeval *";
+			p = "userland const struct timeval *__capability";
 			break;
 		case 1:
-			p = "userland const struct timezone *";
+			p = "userland const struct timezone *__capability";
 			break;
 		default:
 			break;
@@ -4827,40 +4827,40 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* clock_gettime */
+	/* cheriabi_clock_gettime */
 	case 232:
 		switch(ndx) {
 		case 0:
 			p = "clockid_t";
 			break;
 		case 1:
-			p = "userland struct timespec *";
+			p = "userland struct timespec *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* clock_settime */
+	/* cheriabi_clock_settime */
 	case 233:
 		switch(ndx) {
 		case 0:
 			p = "clockid_t";
 			break;
 		case 1:
-			p = "userland const struct timespec *";
+			p = "userland const struct timespec *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* clock_getres */
+	/* cheriabi_clock_getres */
 	case 234:
 		switch(ndx) {
 		case 0:
 			p = "clockid_t";
 			break;
 		case 1:
-			p = "userland struct timespec *";
+			p = "userland struct timespec *__capability";
 			break;
 		default:
 			break;
@@ -4873,10 +4873,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "clockid_t";
 			break;
 		case 1:
-			p = "userland struct sigevent_c *";
+			p = "userland struct sigevent_c *__capability";
 			break;
 		case 2:
-			p = "userland int *";
+			p = "userland int *__capability";
 			break;
 		default:
 			break;
@@ -4892,7 +4892,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* ktimer_settime */
+	/* cheriabi_ktimer_settime */
 	case 237:
 		switch(ndx) {
 		case 0:
@@ -4902,23 +4902,23 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland const struct itimerspec *";
+			p = "userland const struct itimerspec *__capability";
 			break;
 		case 3:
-			p = "userland struct itimerspec *";
+			p = "userland struct itimerspec *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* ktimer_gettime */
+	/* cheriabi_ktimer_gettime */
 	case 238:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct itimerspec *";
+			p = "userland struct itimerspec *__capability";
 			break;
 		default:
 			break;
@@ -4934,14 +4934,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* nanosleep */
+	/* cheriabi_nanosleep */
 	case 240:
 		switch(ndx) {
 		case 0:
-			p = "userland const struct timespec *";
+			p = "userland const struct timespec *__capability";
 			break;
 		case 1:
-			p = "userland struct timespec *";
+			p = "userland struct timespec *__capability";
 			break;
 		default:
 			break;
@@ -4977,7 +4977,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* clock_nanosleep */
+	/* cheriabi_clock_nanosleep */
 	case 244:
 		switch(ndx) {
 		case 0:
@@ -4987,16 +4987,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland const struct timespec *";
+			p = "userland const struct timespec *__capability";
 			break;
 		case 3:
-			p = "userland struct timespec *";
+			p = "userland struct timespec *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* clock_getcpuclockid2 */
+	/* cheriabi_clock_getcpuclockid2 */
 	case 247:
 		switch(ndx) {
 		case 0:
@@ -5006,7 +5006,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland clockid_t *";
+			p = "userland clockid_t *__capability";
 			break;
 		default:
 			break;
@@ -8572,7 +8572,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* setitimer */
+	/* cheriabi_setitimer */
 	case 83:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -8582,7 +8582,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* getitimer */
+	/* cheriabi_getitimer */
 	case 86:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -8644,7 +8644,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* gettimeofday */
+	/* cheriabi_gettimeofday */
 	case 116:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -8669,7 +8669,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* settimeofday */
+	/* cheriabi_settimeofday */
 	case 122:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -8921,17 +8921,17 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* clock_gettime */
+	/* cheriabi_clock_gettime */
 	case 232:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* clock_settime */
+	/* cheriabi_clock_settime */
 	case 233:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* clock_getres */
+	/* cheriabi_clock_getres */
 	case 234:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -8946,12 +8946,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* ktimer_settime */
+	/* cheriabi_ktimer_settime */
 	case 237:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* ktimer_gettime */
+	/* cheriabi_ktimer_gettime */
 	case 238:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -8961,7 +8961,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* nanosleep */
+	/* cheriabi_nanosleep */
 	case 240:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -8981,12 +8981,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* clock_nanosleep */
+	/* cheriabi_clock_nanosleep */
 	case 244:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* clock_getcpuclockid2 */
+	/* cheriabi_clock_getcpuclockid2 */
 	case 247:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

@@ -249,14 +249,17 @@
 				    const gid_t * __capability gidset); }
 81	AUE_GETPGRP	NOPROTO	{ int getpgrp(void); }
 82	AUE_SETPGRP	NOPROTO	{ int setpgid(int pid, int pgid); }
-83	AUE_SETITIMER	NOPROTO	{ int setitimer(int which, \
-				    _In_ const struct itimerval *itv, \
-				    _Out_opt_ struct itimerval *oitv); }
+83	AUE_SETITIMER	STD	{ int cheriabi_setitimer(int which, \
+				    _In_ \
+				    const struct itimerval * __capability itv, \
+				    _Out_opt_ \
+				    struct itimerval * __capability oitv); }
 84	AUE_NULL	OBSOL	owait
 85	AUE_SWAPON	STD	{ int cheriabi_swapon( \
 				    _In_z_ const char * __capability name); }
-86	AUE_GETITIMER	NOPROTO	{ int getitimer(int which, \
-				    _Out_ struct itimerval *itv); }
+86	AUE_GETITIMER	STD	{ int cheriabi_getitimer(int which, \
+				    _Out_ \
+				    struct itimerval * __capability itv); }
 87	AUE_O_GETHOSTNAME	OBSOL	ogethostname
 88	AUE_O_SETHOSTNAME	OBSOL	osethostname
 89	AUE_GETDTABLESIZE	NOPROTO	{ int getdtablesize(void); }
@@ -304,9 +307,10 @@
 113	AUE_NULL	OBSOL	orecvmsg
 114	AUE_NULL	OBSOL	osendmsg
 115	AUE_NULL	OBSOL	vtrace
-116	AUE_GETTIMEOFDAY	NOPROTO	{ int gettimeofday( \
-				    _Out_ struct timeval *tp, \
-				    _Out_opt_ struct timezone *tzp); }
+116	AUE_GETTIMEOFDAY	STD	{ int cheriabi_gettimeofday( \
+				    _Out_ struct timeval * __capability tp, \
+				    _Out_opt_ \
+				    struct timezone * __capability tzp); }
 117	AUE_GETRUSAGE	NOPROTO	{ int getrusage(int who, \
 				    _Out_ struct rusage *rusage); }
 118	AUE_GETSOCKOPT	NOPROTO	{ int getsockopt(int s, int level, \
@@ -322,9 +326,11 @@
 				    _In_reads_opt_(iovcnt) \
 				    struct iovec_c * __capability iovp, \
 				    u_int iovcnt); }
-122	AUE_SETTIMEOFDAY	NOPROTO	{ int settimeofday( \
-				    _In_ const struct timeval *tv, \
-				    _In_opt_ const struct timezone *tzp); }
+122	AUE_SETTIMEOFDAY	STD	{ int cheriabi_settimeofday( \
+				    _In_ \
+				    const struct timeval * __capability tv, \
+				    _In_opt_ \
+				    const struct timezone * __capability tzp); }
 123	AUE_FCHOWN	NOPROTO	{ int fchown(int fd, int uid, int gid); }
 124	AUE_FCHMOD	NOPROTO	{ int fchmod(int fd, mode_t mode); }
 125	AUE_RECVFROM	OBSOL	orecvfrom
@@ -520,41 +526,52 @@
 				    _Pagerange_vmmap_opt_(1) void *shmaddr); }
 231	AUE_SHMGET	NOSTD|NOPROTO	{ int shmget(key_t key, int size, \
 				    int shmflg); }
-232	AUE_NULL	NOPROTO	{ int clock_gettime(clockid_t clock_id, \
-				    _Out_ struct timespec *tp); }
-233	AUE_CLOCK_SETTIME	NOPROTO	{ int clock_settime(clockid_t clock_id, \
-				    _In_ const struct timespec *tp); }
-234	AUE_NULL	NOPROTO	{ int clock_getres(clockid_t clock_id, \
-				    _Out_ struct timespec *tp); }
+232	AUE_NULL	STD	{ int cheriabi_clock_gettime( \
+				    clockid_t clock_id, \
+				    _Out_ struct timespec * __capability tp); }
+233	AUE_CLOCK_SETTIME	STD	{ int cheriabi_clock_settime( \
+				    clockid_t clock_id, \
+				    _In_ \
+				    const struct timespec * __capability tp); }
+234	AUE_NULL	STD	{ int cheriabi_clock_getres(clockid_t clock_id, \
+				    _Out_ struct timespec * __capability tp); }
 235	AUE_NULL	STD	{ int cheriabi_ktimer_create(\
 				    clockid_t clock_id, \
-				    _In_ struct sigevent_c *evp, \
-				    _Out_ int *timerid); }
+				    _In_ struct sigevent_c * __capability evp, \
+				    _Out_ int * __capability timerid); }
 236	AUE_NULL	NOPROTO	{ int ktimer_delete(int timerid); }
-237	AUE_NULL	NOPROTO	{ int ktimer_settime(int timerid,\
+237	AUE_NULL	STD	{ int cheriabi_ktimer_settime(int timerid,\
 				    int flags, \
-				    _In_ const struct itimerspec *value, \
-				    _Out_opt_ struct itimerspec *ovalue); }
-238	AUE_NULL	NOPROTO	{ int ktimer_gettime(int timerid,\
-				    _Out_ struct itimerspec *value); }
+				    _In_ const \
+				    struct itimerspec * __capability value, \
+				    _Out_opt_ \
+				    struct itimerspec * __capability ovalue); }
+238	AUE_NULL	STD	{ int cheriabi_ktimer_gettime(int timerid, \
+				    _Out_ \
+				    struct itimerspec * __capability value); }
 239	AUE_NULL	NOPROTO	{ int ktimer_getoverrun(int timerid); }
-240	AUE_NULL	NOPROTO	{ int nanosleep( \
-				    _In_ const struct timespec *rqtp, \
-				    _Out_opt_ struct timespec *rmtp); }
+240	AUE_NULL	STD	{ int cheriabi_nanosleep( \
+				    _In_ \
+				    const struct timespec * __capability rqtp, \
+				    _Out_opt_ \
+				    struct timespec * __capability rmtp); }
 241	AUE_NULL	NOPROTO	{ int ffclock_getcounter( \
 				    _Out_ ffcounter *ffcount); }
 242	AUE_NULL	NOPROTO	{ int ffclock_setestimate( \
 				    _In_ struct ffclock_estimate *cest); }
 243	AUE_NULL	NOPROTO	{ int ffclock_getestimate( \
 				    _Out_ struct ffclock_estimate *cest); }
-244	AUE_NULL	NOPROTO	{ int clock_nanosleep(clockid_t clock_id, \
-				    int flags, \
-				    _In_ const struct timespec *rqtp, \
-				    _Out_opt_ struct timespec *rmtp); }
+244	AUE_NULL	STD	{ int cheriabi_clock_nanosleep( \
+				    clockid_t clock_id, int flags, \
+				    _In_ \
+				    const struct timespec * __capability rqtp, \
+				    _Out_opt_ \
+				    struct timespec * __capability rmtp); }
 245	AUE_NULL	UNIMPL	nosys
 246	AUE_NULL	UNIMPL	nosys
-247	AUE_NULL	NOPROTO	{ int clock_getcpuclockid2(id_t id,\
-				    int which, _Out_ clockid_t *clock_id); }
+247	AUE_NULL	STD	{ int cheriabi_clock_getcpuclockid2(id_t id, \
+				    int which, \
+				    _Out_ clockid_t * __capability clock_id); }
 248	AUE_NULL	NOPROTO	{ int ntp_gettime(\
 				    _Out_ struct ntptimeval *ntvp); }
 249	AUE_NULL	UNIMPL	nosys
