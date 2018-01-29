@@ -49,7 +49,7 @@
 #define	CHERIABI_SYS_dup	41
 				/* 42 is obsolete pipe */
 #define	CHERIABI_SYS_getegid	43
-#define	CHERIABI_SYS_profil	44
+#define	CHERIABI_SYS_cheriabi_profil	44
 #define	CHERIABI_SYS_cheriabi_ktrace	45
 				/* 46 is obsolete sigaction */
 #define	CHERIABI_SYS_getgid	47

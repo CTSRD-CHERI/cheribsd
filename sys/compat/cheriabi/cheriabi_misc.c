@@ -2234,3 +2234,15 @@ cheriabi_utrace(struct thread *td, struct cheriabi_utrace_args *uap)
 
 	return (kern_utrace(td, uap->addr, uap->len));
 }
+
+/*
+ * subr_profil.c
+ */
+
+int
+cheriabi_profil(struct thread *td, struct cheriabi_profil_args *uap)
+{
+
+	return (kern_profil(td, uap->samples, uap->size, uap->offset,
+	    uap->scale));
+}

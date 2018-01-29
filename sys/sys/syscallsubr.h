@@ -207,6 +207,8 @@ int	kern_posix_fallocate(struct thread *td, int fd, off_t offset,
 	    off_t len);
 int	kern_procctl(struct thread *td, enum idtype idtype, id_t id, int com,
 	    void *data);
+int	kern_profil(struct thread *td, char * __capability samples, size_t size,
+	    size_t offset, u_int scale);
 int	kern_pread(struct thread *td, int fd, void *buf, size_t nbyte,
 	    off_t offset);
 int	kern_preadv(struct thread *td, int fd, struct uio *auio, off_t offset);

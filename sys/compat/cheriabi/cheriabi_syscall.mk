@@ -37,7 +37,7 @@ MIASM =  \
 	getppid.o \
 	dup.o \
 	getegid.o \
-	profil.o \
+	cheriabi_profil.o \
 	cheriabi_ktrace.o \
 	getgid.o \
 	getlogin.o \

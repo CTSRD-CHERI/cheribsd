@@ -36,7 +36,7 @@
 #define	CHERIABI_SYS_fchflags_PTRMASK	(0x0)
 #define	CHERIABI_SYS_kill_PTRMASK	(0x0)
 #define	CHERIABI_SYS_dup_PTRMASK	(0x0)
-#define	CHERIABI_SYS_profil_PTRMASK	(0x0 | 0x1)
+#define	CHERIABI_SYS_cheriabi_profil_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_ktrace_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_getlogin_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_setlogin_PTRMASK	(0x0 | 0x1)

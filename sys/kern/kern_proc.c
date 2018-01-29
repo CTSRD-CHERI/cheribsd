@@ -1165,7 +1165,7 @@ pstats_fork(struct pstats *src, struct pstats *dst)
 
 	bzero(&dst->pstat_startzero,
 	    __rangeof(struct pstats, pstat_startzero, pstat_endzero));
-	bcopy(&src->pstat_startcopy, &dst->pstat_startcopy,
+	cheri_bcopy(&src->pstat_startcopy, &dst->pstat_startcopy,
 	    __rangeof(struct pstats, pstat_startcopy, pstat_endcopy));
 }
 

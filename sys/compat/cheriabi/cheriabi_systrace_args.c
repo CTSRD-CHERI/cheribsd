@@ -284,10 +284,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 0;
 		break;
 	}
-	/* profil */
+	/* cheriabi_profil */
 	case 44: {
-		struct profil_args *p = params;
-		uarg[0] = (intptr_t) p->samples; /* void * */
+		struct cheriabi_profil_args *p = params;
+		uarg[0] = (cheri_getbase(p->samples) + cheri_getoffset(p->samples)); /* void *__capability */
 		uarg[1] = p->size; /* size_t */
 		uarg[2] = p->offset; /* size_t */
 		uarg[3] = p->scale; /* u_int */
@@ -3540,11 +3540,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* getegid */
 	case 43:
 		break;
-	/* profil */
+	/* cheriabi_profil */
 	case 44:
 		switch(ndx) {
 		case 0:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 1:
 			p = "size_t";
@@ -8456,7 +8456,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* getegid */
 	case 43:
-	/* profil */
+	/* cheriabi_profil */
 	case 44:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

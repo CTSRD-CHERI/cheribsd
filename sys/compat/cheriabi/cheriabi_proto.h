@@ -117,6 +117,12 @@ struct cheriabi_chflags_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 	char flags_l_[PADL_(u_long)]; u_long flags; char flags_r_[PADR_(u_long)];
 };
+struct cheriabi_profil_args {
+	char samples_l_[PADL_(void *__capability)]; void *__capability samples; char samples_r_[PADR_(void *__capability)];
+	char size_l_[PADL_(size_t)]; size_t size; char size_r_[PADR_(size_t)];
+	char offset_l_[PADL_(size_t)]; size_t offset; char offset_r_[PADR_(size_t)];
+	char scale_l_[PADL_(u_int)]; u_int scale; char scale_r_[PADR_(u_int)];
+};
 struct cheriabi_ktrace_args {
 	char fname_l_[PADL_(const char *__capability)]; const char *__capability fname; char fname_r_[PADR_(const char *__capability)];
 	char ops_l_[PADL_(int)]; int ops; char ops_r_[PADR_(int)];
@@ -631,6 +637,7 @@ int	cheriabi_recvmsg(struct thread *, struct cheriabi_recvmsg_args *);
 int	cheriabi_sendmsg(struct thread *, struct cheriabi_sendmsg_args *);
 int	cheriabi_access(struct thread *, struct cheriabi_access_args *);
 int	cheriabi_chflags(struct thread *, struct cheriabi_chflags_args *);
+int	cheriabi_profil(struct thread *, struct cheriabi_profil_args *);
 int	cheriabi_ktrace(struct thread *, struct cheriabi_ktrace_args *);
 int	cheriabi_setlogin(struct thread *, struct cheriabi_setlogin_args *);
 int	cheriabi_sigaltstack(struct thread *, struct cheriabi_sigaltstack_args *);
@@ -805,6 +812,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_sendmsg	AUE_SENDMSG
 #define	CHERIABI_SYS_AUE_cheriabi_access	AUE_ACCESS
 #define	CHERIABI_SYS_AUE_cheriabi_chflags	AUE_CHFLAGS
+#define	CHERIABI_SYS_AUE_cheriabi_profil	AUE_PROFILE
 #define	CHERIABI_SYS_AUE_cheriabi_ktrace	AUE_KTRACE
 #define	CHERIABI_SYS_AUE_cheriabi_setlogin	AUE_SETLOGIN
 #define	CHERIABI_SYS_AUE_cheriabi_sigaltstack	AUE_SIGALTSTACK
