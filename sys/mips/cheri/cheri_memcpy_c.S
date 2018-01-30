@@ -297,7 +297,7 @@ b_head_loop:
 	clb		t9, a2, 0($c3)
 	csb		t9, a2, 0($c4)
 	bne		a1, a2, b_head_loop
-	daddi		a2, 1
+	dadd		a2, a2, a3
 
 return:
 	jr	ra
