@@ -232,9 +232,6 @@
 				/* 272 is obsolete fbsd11_getdents */
 #define	CHERIABI_SYS_cheriabi_lchmod	274
 #define	CHERIABI_SYS_cheriabi_lutimes	276
-#define	CHERIABI_SYS_freebsd11_nstat	278
-#define	CHERIABI_SYS_freebsd11_nfstat	279
-#define	CHERIABI_SYS_freebsd11_nlstat	280
 #define	CHERIABI_SYS_cheriabi_preadv	289
 #define	CHERIABI_SYS_cheriabi_pwritev	290
 				/* 297 is obsolete fhstatfs */

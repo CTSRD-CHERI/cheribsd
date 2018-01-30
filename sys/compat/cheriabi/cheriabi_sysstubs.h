@@ -34,7 +34,6 @@ struct module_stat;
 struct mq_attr;
 struct msghdr;
 struct msqid_ds;
-struct nstat;
 struct ntptimeval;
 struct pollfd;
 struct rlimit;

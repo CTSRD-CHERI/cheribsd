@@ -154,9 +154,6 @@ MIASM =  \
 	cheriabi_kbounce.o \
 	cheriabi_lchmod.o \
 	cheriabi_lutimes.o \
-	freebsd11_nstat.o \
-	freebsd11_nfstat.o \
-	freebsd11_nlstat.o \
 	cheriabi_preadv.o \
 	cheriabi_pwritev.o \
 	fhopen.o \

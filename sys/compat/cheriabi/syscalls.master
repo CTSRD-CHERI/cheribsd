@@ -634,14 +634,9 @@
 				    _In_z_ const char * __capability path, \
 				    _In_ const struct timeval * __capability tptr); }
 277	AUE_MSYNC	UNIMPL	netbsd_msync
-278	AUE_STAT	COMPAT11|NOPROTO { int nstat( \
-				    _In_z_ const char *path, \
-				    _Out_ struct nstat *ub); }
-279	AUE_FSTAT	COMPAT11|NOPROTO { int nfstat(int fd, \
-				    _Out_ struct nstat *sb); }
-280	AUE_LSTAT	COMPAT11|NOPROTO { int nlstat(\
-				    _In_z_ const char *path, \
-				    _Out_ struct nstat *ub); }
+278	AUE_STAT	UNIMPL	freebsd11_nstat
+279	AUE_FSTAT	UNIMPL	freebsd11_nfstat
+280	AUE_LSTAT	UNIMPL	freebsd11_nlstat
 281	AUE_NULL	UNIMPL	nosys
 282	AUE_NULL	UNIMPL	nosys
 283	AUE_NULL	UNIMPL	nosys

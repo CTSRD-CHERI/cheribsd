@@ -18,12 +18,6 @@
 
 #define AS(name) (sizeof(struct name) / sizeof(syscallarg_t))
 
-#ifdef COMPAT_FREEBSD11
-#define compat11(n, name) n, (sy_call_t *)__CONCAT(freebsd11_,name)
-#else
-#define compat11(n, name) 0, (sy_call_t *)nosys
-#endif
-
 /* The casts are bogus but will do for now. */
 struct sysent cheriabi_sysent[] = {
 #if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
@@ -307,9 +301,9 @@ struct sysent cheriabi_sysent[] = {
 	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 275 = netbsd_lchown */
 	{ AS(cheriabi_lutimes_args), (sy_call_t *)cheriabi_lutimes, AUE_LUTIMES, NULL, 0, 0, 0, SY_THR_STATIC },	/* 276 = cheriabi_lutimes */
 	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 277 = netbsd_msync */
-	{ compat11(AS(freebsd11_nstat_args),nstat), AUE_STAT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 278 = freebsd11 nstat */
-	{ compat11(AS(freebsd11_nfstat_args),nfstat), AUE_FSTAT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 279 = freebsd11 nfstat */
-	{ compat11(AS(freebsd11_nlstat_args),nlstat), AUE_LSTAT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 280 = freebsd11 nlstat */
+	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 278 = freebsd11_nstat */
+	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 279 = freebsd11_nfstat */
+	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 280 = freebsd11_nlstat */
 	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 281 = nosys */
 	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 282 = nosys */
 	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 283 = nosys */
