@@ -287,36 +287,45 @@ struct rtprio_thread_args {
 int
 sys_rtprio_thread(struct thread *td, struct rtprio_thread_args *uap)
 {
+
+	return (kern_rtprio_thread(td, uap->function, uap->lwpid,
+	    __USER_CAP_OBJ(uap->rtp)));
+}
+
+int
+kern_rtprio_thread(struct thread *td, int function, lwpid_t lwpid,
+    struct rtprio * __capability urtp)
+{
 	struct proc *p;
 	struct rtprio rtp;
 	struct thread *td1;
 	int cierror, error;
 
 	/* Perform copyin before acquiring locks if needed. */
-	if (uap->function == RTP_SET)
-		cierror = copyin(uap->rtp, &rtp, sizeof(struct rtprio));
+	if (function == RTP_SET)
+		cierror = copyin_c(urtp, &rtp, sizeof(struct rtprio));
 	else
 		cierror = 0;
 
-	if (uap->lwpid == 0 || uap->lwpid == td->td_tid) {
+	if (lwpid == 0 || lwpid == td->td_tid) {
 		p = td->td_proc;
 		td1 = td;
 		PROC_LOCK(p);
 	} else {
 		/* Only look up thread in current process */
-		td1 = tdfind(uap->lwpid, curproc->p_pid);
+		td1 = tdfind(lwpid, curproc->p_pid);
 		if (td1 == NULL)
 			return (ESRCH);
 		p = td1->td_proc;
 	}
 
-	switch (uap->function) {
+	switch (function) {
 	case RTP_LOOKUP:
 		if ((error = p_cansee(td, p)))
 			break;
 		pri_to_rtp(td1, &rtp);
 		PROC_UNLOCK(p);
-		return (copyout(&rtp, uap->rtp, sizeof(struct rtprio)));
+		return (copyout_c(&rtp, urtp, sizeof(struct rtprio)));
 	case RTP_SET:
 		if ((error = p_cansched(td, p)) || (error = cierror))
 			break;
@@ -369,27 +378,36 @@ struct rtprio_args {
 int
 sys_rtprio(struct thread *td, struct rtprio_args *uap)
 {
+
+	return (kern_rtprio(td, uap->function, uap->pid,
+	    __USER_CAP_OBJ(uap->rtp)));
+}
+
+int
+kern_rtprio(struct thread *td, int function, pid_t pid,
+    struct rtprio * __capability urtp)
+{
 	struct proc *p;
 	struct thread *tdp;
 	struct rtprio rtp;
 	int cierror, error;
 
 	/* Perform copyin before acquiring locks if needed. */
-	if (uap->function == RTP_SET)
-		cierror = copyin(uap->rtp, &rtp, sizeof(struct rtprio));
+	if (function == RTP_SET)
+		cierror = copyin_c(urtp, &rtp, sizeof(struct rtprio));
 	else
 		cierror = 0;
 
-	if (uap->pid == 0) {
+	if (pid == 0) {
 		p = td->td_proc;
 		PROC_LOCK(p);
 	} else {
-		p = pfind(uap->pid);
+		p = pfind(pid);
 		if (p == NULL)
 			return (ESRCH);
 	}
 
-	switch (uap->function) {
+	switch (function) {
 	case RTP_LOOKUP:
 		if ((error = p_cansee(td, p)))
 			break;
@@ -401,7 +419,7 @@ sys_rtprio(struct thread *td, struct rtprio_args *uap)
 		 * Note: specifying our own pid is not the same
 		 * as leaving it zero.
 		 */
-		if (uap->pid == 0) {
+		if (pid == 0) {
 			pri_to_rtp(td, &rtp);
 		} else {
 			struct rtprio rtp2;
@@ -419,7 +437,7 @@ sys_rtprio(struct thread *td, struct rtprio_args *uap)
 			}
 		}
 		PROC_UNLOCK(p);
-		return (copyout(&rtp, uap->rtp, sizeof(struct rtprio)));
+		return (copyout_c(&rtp, urtp, sizeof(struct rtprio)));
 	case RTP_SET:
 		if ((error = p_cansched(td, p)) || (error = cierror))
 			break;
@@ -443,7 +461,7 @@ sys_rtprio(struct thread *td, struct rtprio_args *uap)
 		 * do all the threads on that process. If we
 		 * specify our own pid we do the latter.
 		 */
-		if (uap->pid == 0) {
+		if (pid == 0) {
 			error = rtp_to_pri(&rtp, td);
 		} else {
 			FOREACH_THREAD_IN_PROC(p, td) {

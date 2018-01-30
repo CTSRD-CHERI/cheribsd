@@ -120,7 +120,7 @@
 				/* 114 is obsolete osendmsg */
 				/* 115 is obsolete vtrace */
 #define	CHERIABI_SYS_cheriabi_gettimeofday	116
-#define	CHERIABI_SYS_getrusage	117
+#define	CHERIABI_SYS_cheriabi_getrusage	117
 #define	CHERIABI_SYS_getsockopt	118
 #define	CHERIABI_SYS_cheriabi_readv	120
 #define	CHERIABI_SYS_cheriabi_writev	121
@@ -164,7 +164,7 @@
 				/* 163 is obsolete setdomainname */
 				/* 164 is obsolete uname */
 #define	CHERIABI_SYS_cheriabi_sysarch	165
-#define	CHERIABI_SYS_rtprio	166
+#define	CHERIABI_SYS_cheriabi_rtprio	166
 				/* 169 is obsolete semsys */
 				/* 170 is obsolete msgsys */
 				/* 171 is obsolete shmsys */
@@ -180,8 +180,8 @@
 				/* 190 is obsolete fbsd11_lstat */
 #define	CHERIABI_SYS_cheriabi_pathconf	191
 #define	CHERIABI_SYS_fpathconf	192
-#define	CHERIABI_SYS_getrlimit	194
-#define	CHERIABI_SYS_setrlimit	195
+#define	CHERIABI_SYS_cheriabi_getrlimit	194
+#define	CHERIABI_SYS_cheriabi_setrlimit	195
 				/* 196 is obsolete fbsd11_getdirentries */
 				/* 197 is obsolete mmap */
 				/* 198 is obsolete __syscall */
@@ -389,7 +389,7 @@
 #define	CHERIABI_SYS_cheriabi_abort2	463
 #define	CHERIABI_SYS_thr_set_name	464
 #define	CHERIABI_SYS_cheriabi_aio_fsync	465
-#define	CHERIABI_SYS_rtprio_thread	466
+#define	CHERIABI_SYS_cheriabi_rtprio_thread	466
 #define	CHERIABI_SYS_sctp_peeloff	471
 #define	CHERIABI_SYS_sctp_generic_sendmsg	472
 #define	CHERIABI_SYS_sctp_generic_sendmsg_iov	473

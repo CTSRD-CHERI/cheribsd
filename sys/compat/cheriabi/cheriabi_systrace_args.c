@@ -615,11 +615,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* getrusage */
+	/* cheriabi_getrusage */
 	case 117: {
-		struct getrusage_args *p = params;
+		struct cheriabi_getrusage_args *p = params;
 		iarg[0] = p->who; /* int */
-		uarg[1] = (intptr_t) p->rusage; /* struct rusage * */
+		uarg[1] = (cheri_getbase(p->rusage) + cheri_getoffset(p->rusage)); /* struct rusage *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -835,12 +835,12 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* rtprio */
+	/* cheriabi_rtprio */
 	case 166: {
-		struct rtprio_args *p = params;
+		struct cheriabi_rtprio_args *p = params;
 		iarg[0] = p->function; /* int */
 		iarg[1] = p->pid; /* pid_t */
-		uarg[2] = (intptr_t) p->rtp; /* struct rtprio * */
+		uarg[2] = (cheri_getbase(p->rtp) + cheri_getoffset(p->rtp)); /* struct rtprio *__capability */
 		*n_args = 3;
 		break;
 	}
@@ -895,19 +895,19 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* getrlimit */
+	/* cheriabi_getrlimit */
 	case 194: {
-		struct __getrlimit_args *p = params;
+		struct cheriabi_getrlimit_args *p = params;
 		uarg[0] = p->which; /* u_int */
-		uarg[1] = (intptr_t) p->rlp; /* struct rlimit * */
+		uarg[1] = (cheri_getbase(p->rlp) + cheri_getoffset(p->rlp)); /* struct rlimit *__capability */
 		*n_args = 2;
 		break;
 	}
-	/* setrlimit */
+	/* cheriabi_setrlimit */
 	case 195: {
-		struct __setrlimit_args *p = params;
+		struct cheriabi_setrlimit_args *p = params;
 		uarg[0] = p->which; /* u_int */
-		uarg[1] = (intptr_t) p->rlp; /* struct rlimit * */
+		uarg[1] = (cheri_getbase(p->rlp) + cheri_getoffset(p->rlp)); /* struct rlimit *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -2311,12 +2311,12 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* rtprio_thread */
+	/* cheriabi_rtprio_thread */
 	case 466: {
-		struct rtprio_thread_args *p = params;
+		struct cheriabi_rtprio_thread_args *p = params;
 		iarg[0] = p->function; /* int */
 		iarg[1] = p->lwpid; /* lwpid_t */
-		uarg[2] = (intptr_t) p->rtp; /* struct rtprio * */
+		uarg[2] = (cheri_getbase(p->rtp) + cheri_getoffset(p->rtp)); /* struct rtprio *__capability */
 		*n_args = 3;
 		break;
 	}
@@ -4078,14 +4078,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* getrusage */
+	/* cheriabi_getrusage */
 	case 117:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct rusage *";
+			p = "userland struct rusage *__capability";
 			break;
 		default:
 			break;
@@ -4451,7 +4451,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* rtprio */
+	/* cheriabi_rtprio */
 	case 166:
 		switch(ndx) {
 		case 0:
@@ -4461,7 +4461,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "pid_t";
 			break;
 		case 2:
-			p = "userland struct rtprio *";
+			p = "userland struct rtprio *__capability";
 			break;
 		default:
 			break;
@@ -4543,27 +4543,27 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* getrlimit */
+	/* cheriabi_getrlimit */
 	case 194:
 		switch(ndx) {
 		case 0:
 			p = "u_int";
 			break;
 		case 1:
-			p = "userland struct rlimit *";
+			p = "userland struct rlimit *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* setrlimit */
+	/* cheriabi_setrlimit */
 	case 195:
 		switch(ndx) {
 		case 0:
 			p = "u_int";
 			break;
 		case 1:
-			p = "userland struct rlimit *";
+			p = "userland struct rlimit *__capability";
 			break;
 		default:
 			break;
@@ -6852,7 +6852,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* rtprio_thread */
+	/* cheriabi_rtprio_thread */
 	case 466:
 		switch(ndx) {
 		case 0:
@@ -6862,7 +6862,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "lwpid_t";
 			break;
 		case 2:
-			p = "userland struct rtprio *";
+			p = "userland struct rtprio *__capability";
 			break;
 		default:
 			break;
@@ -8649,7 +8649,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* getrusage */
+	/* cheriabi_getrusage */
 	case 117:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -8776,7 +8776,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* rtprio */
+	/* cheriabi_rtprio */
 	case 166:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -8816,12 +8816,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* getrlimit */
+	/* cheriabi_getrlimit */
 	case 194:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* setrlimit */
+	/* cheriabi_setrlimit */
 	case 195:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9649,7 +9649,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* rtprio_thread */
+	/* cheriabi_rtprio_thread */
 	case 466:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

@@ -51,6 +51,7 @@ struct pollfd;
 struct ogetdirentries_args;
 struct rlimit;
 struct rusage;
+struct rtprio;
 union semun;
 struct sockaddr;
 struct stat;
@@ -248,6 +249,10 @@ int	kern_rmdirat(struct thread *td, int fd, const char *path,
 	    enum uio_seg pathseg);
 int	kern_rmdirat_c(struct thread *td, int fd, const char * __CAPABILITY path,
 	    enum uio_seg pathseg);
+int	kern_rtprio(struct thread *td, int function, pid_t pid,
+	    struct rtprio * __capability urtp);
+int	kern_rtprio_thread(struct thread *td, int function, lwpid_t lwpid,
+	    struct rtprio * __capability urtp);
 int	kern_sched_getparam(struct thread *td, struct thread *targettd,
 	    struct sched_param *param);
 int	kern_sched_getscheduler(struct thread *td, struct thread *targettd,

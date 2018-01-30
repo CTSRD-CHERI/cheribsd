@@ -78,7 +78,7 @@ MIASM =  \
 	setsockopt.o \
 	listen.o \
 	cheriabi_gettimeofday.o \
-	getrusage.o \
+	cheriabi_getrusage.o \
 	getsockopt.o \
 	cheriabi_readv.o \
 	cheriabi_writev.o \
@@ -104,7 +104,7 @@ MIASM =  \
 	cheriabi_lgetfh.o \
 	cheriabi_getfh.o \
 	cheriabi_sysarch.o \
-	rtprio.o \
+	cheriabi_rtprio.o \
 	setfib.o \
 	ntp_adjtime.o \
 	setgid.o \
@@ -112,8 +112,8 @@ MIASM =  \
 	seteuid.o \
 	cheriabi_pathconf.o \
 	fpathconf.o \
-	getrlimit.o \
-	setrlimit.o \
+	cheriabi_getrlimit.o \
+	cheriabi_setrlimit.o \
 	__sysctl.o \
 	mlock.o \
 	munlock.o \
@@ -280,7 +280,7 @@ MIASM =  \
 	cheriabi_abort2.o \
 	thr_set_name.o \
 	cheriabi_aio_fsync.o \
-	rtprio_thread.o \
+	cheriabi_rtprio_thread.o \
 	sctp_peeloff.o \
 	sctp_generic_sendmsg.o \
 	sctp_generic_sendmsg_iov.o \

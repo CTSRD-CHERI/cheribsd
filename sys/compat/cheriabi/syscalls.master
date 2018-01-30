@@ -311,8 +311,8 @@
 				    _Out_ struct timeval * __capability tp, \
 				    _Out_opt_ \
 				    struct timezone * __capability tzp); }
-117	AUE_GETRUSAGE	NOPROTO	{ int getrusage(int who, \
-				    _Out_ struct rusage *rusage); }
+117	AUE_GETRUSAGE	STD	{ int cheriabi_getrusage(int who, \
+				    _Out_ struct rusage * __capability rusage); }
 118	AUE_GETSOCKOPT	NOPROTO	{ int getsockopt(int s, int level, \
 				    int name, \
 				    _Out_writes_bytes_opt_(*avalsize) \
@@ -412,8 +412,8 @@
 165	AUE_SYSARCH	STD|NOPARSE	{ int cheriabi_sysarch(int op, \
 				    char *parms); }
 ; XXX-BD rtp is _In_ or _Out_ depending on function
-166	AUE_RTPRIO	NOPROTO	{ int rtprio(int function, pid_t pid, \
-				    _Inout_ struct rtprio *rtp); }
+166	AUE_RTPRIO	STD	{ int cheriabi_rtprio(int function, pid_t pid, \
+				    _Inout_ struct rtprio * __capability rtp); }
 167	AUE_NULL	UNIMPL	nosys
 168	AUE_NULL	UNIMPL	nosys
 169	AUE_SEMSYS	OBSOL	semsys
@@ -445,12 +445,10 @@
 				    int name); }
 192	AUE_FPATHCONF	NOPROTO	{ int fpathconf(int fd, int name); }
 193	AUE_NULL	UNIMPL	nosys
-194	AUE_GETRLIMIT	NOPROTO	{ int getrlimit(u_int which, \
-				    _Out_ struct rlimit *rlp); } getrlimit \
-				    __getrlimit_args int
-195	AUE_SETRLIMIT	NOPROTO	{ int setrlimit(u_int which, \
-				    _In_ struct rlimit *rlp); } setrlimit \
-				    __setrlimit_args int
+194	AUE_GETRLIMIT	STD	{ int cheriabi_getrlimit(u_int which, \
+				    _Out_ struct rlimit * __capability rlp); }
+195	AUE_SETRLIMIT	STD	{ int cheriabi_setrlimit(u_int which, \
+				    _In_ struct rlimit * __capability rlp); }
 196	AUE_GETDIRENTRIES	OBSOL	fbsd11_getdirentries
 197	AUE_MMAP	OBSOL	mmap
 198	AUE_NULL	OBSOL	__syscall
@@ -1038,9 +1036,9 @@
 				    _Inout_ struct aiocb_c * __capability \
 				    aiocbp); }
 ; XXX-BD: _In_ if RTP_SET, _Out_ if RTP_LOOKUP
-466	AUE_RTPRIO	NOPROTO	{ int rtprio_thread(int function, \
+466	AUE_RTPRIO	STD	{ int cheriabi_rtprio_thread(int function, \
 				    lwpid_t lwpid, \
-				    _Inout_ struct rtprio *rtp); }
+				    _Inout_ struct rtprio * __capability rtp); }
 467	AUE_NULL	UNIMPL	nosys
 468	AUE_NULL	UNIMPL	nosys
 469	AUE_NULL	UNIMPL	__getpath_fromfd

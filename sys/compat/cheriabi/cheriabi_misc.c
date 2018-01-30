@@ -2268,6 +2268,62 @@ cheriabi_setlogin(struct thread *td, struct cheriabi_setlogin_args *uap)
 }
 
 /*
+ * kern_resource.h
+ */
+int
+cheriabi_rtprio_thread(struct thread *td,
+    struct cheriabi_rtprio_thread_args *uap)
+{
+
+	return (kern_rtprio_thread(td, uap->function, uap->lwpid,
+	    uap->rtp));
+}
+
+int
+cheriabi_rtprio(struct thread *td, struct cheriabi_rtprio_args *uap)
+{
+
+	return (kern_rtprio(td, uap->function, uap->pid, uap->rtp));
+}
+
+int
+cheriabi_setrlimit(struct thread *td, struct cheriabi_setrlimit_args *uap)
+{
+	struct rlimit alim;
+	int error;
+
+	error = copyin_c(uap->rlp, &alim, sizeof(struct rlimit));
+	if (error != 0)
+		return (error);
+	return (kern_setrlimit(td, uap->which, &alim));
+}
+
+int
+cheriabi_getrlimit(struct thread *td, struct cheriabi_getrlimit_args *uap)
+{
+	struct rlimit rlim;
+	int error;
+
+	if (uap->which >= RLIM_NLIMITS)
+		return (EINVAL);
+	lim_rlimit(td, uap->which, &rlim);
+	error = copyout_c(&rlim, uap->rlp, sizeof(struct rlimit));
+	return (error);
+}
+
+int
+cheriabi_getrusage(struct thread *td, struct cheriabi_getrusage_args *uap)
+{
+	struct rusage ru;
+	int error;
+
+	error = kern_getrusage(td, uap->who, &ru);
+	if (error == 0)
+		error = copyout_c(&ru, uap->rusage, sizeof(struct rusage));
+	return (error);
+}
+
+/*
  * subr_profil.c
  */
 
