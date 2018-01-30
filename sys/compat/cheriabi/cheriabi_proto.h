@@ -315,6 +315,19 @@ struct cheriabi_semop_args {
 	char sops_l_[PADL_(struct sembuf *__capability)]; struct sembuf *__capability sops; char sops_r_[PADR_(struct sembuf *__capability)];
 	char nsops_l_[PADL_(u_int)]; u_int nsops; char nsops_r_[PADR_(u_int)];
 };
+struct cheriabi_msgsnd_args {
+	char msqid_l_[PADL_(int)]; int msqid; char msqid_r_[PADR_(int)];
+	char msgp_l_[PADL_(void *__capability)]; void *__capability msgp; char msgp_r_[PADR_(void *__capability)];
+	char msgsz_l_[PADL_(size_t)]; size_t msgsz; char msgsz_r_[PADR_(size_t)];
+	char msgflg_l_[PADL_(int)]; int msgflg; char msgflg_r_[PADR_(int)];
+};
+struct cheriabi_msgrcv_args {
+	char msqid_l_[PADL_(int)]; int msqid; char msqid_r_[PADR_(int)];
+	char msgp_l_[PADL_(void *__capability)]; void *__capability msgp; char msgp_r_[PADR_(void *__capability)];
+	char msgsz_l_[PADL_(size_t)]; size_t msgsz; char msgsz_r_[PADR_(size_t)];
+	char msgtyp_l_[PADL_(long)]; long msgtyp; char msgtyp_r_[PADR_(long)];
+	char msgflg_l_[PADL_(int)]; int msgflg; char msgflg_r_[PADR_(int)];
+};
 struct cheriabi_clock_gettime_args {
 	char clock_id_l_[PADL_(clockid_t)]; clockid_t clock_id; char clock_id_r_[PADR_(clockid_t)];
 	char tp_l_[PADL_(struct timespec *__capability)]; struct timespec *__capability tp; char tp_r_[PADR_(struct timespec *__capability)];
@@ -828,6 +841,8 @@ int	cheriabi_undelete(struct thread *, struct cheriabi_undelete_args *);
 int	cheriabi_futimes(struct thread *, struct cheriabi_futimes_args *);
 int	cheriabi_poll(struct thread *, struct cheriabi_poll_args *);
 int	cheriabi_semop(struct thread *, struct cheriabi_semop_args *);
+int	cheriabi_msgsnd(struct thread *, struct cheriabi_msgsnd_args *);
+int	cheriabi_msgrcv(struct thread *, struct cheriabi_msgrcv_args *);
 int	cheriabi_clock_gettime(struct thread *, struct cheriabi_clock_gettime_args *);
 int	cheriabi_clock_settime(struct thread *, struct cheriabi_clock_settime_args *);
 int	cheriabi_clock_getres(struct thread *, struct cheriabi_clock_getres_args *);
@@ -1036,6 +1051,8 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_futimes	AUE_FUTIMES
 #define	CHERIABI_SYS_AUE_cheriabi_poll	AUE_POLL
 #define	CHERIABI_SYS_AUE_cheriabi_semop	AUE_SEMOP
+#define	CHERIABI_SYS_AUE_cheriabi_msgsnd	AUE_MSGSND
+#define	CHERIABI_SYS_AUE_cheriabi_msgrcv	AUE_MSGRCV
 #define	CHERIABI_SYS_AUE_cheriabi_clock_gettime	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_clock_settime	AUE_CLOCK_SETTIME
 #define	CHERIABI_SYS_AUE_cheriabi_clock_getres	AUE_NULL

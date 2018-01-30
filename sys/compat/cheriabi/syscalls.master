@@ -517,11 +517,13 @@
 223	AUE_NULL	UNIMPL	semconfig
 224	AUE_MSGCTL	OBSOL	msgctl
 225	AUE_MSGGET	NOSTD|NOPROTO	{ int msgget(key_t key, int msgflg); }
-226	AUE_MSGSND	NOSTD|NOPROTO	{ int msgsnd(int msqid, \
-				    _In_reads_bytes_(msgsz) void *msgp, \
+226	AUE_MSGSND	NOSTD	{ int cheriabi_msgsnd(int msqid, \
+				    _In_reads_bytes_(msgsz) \
+				    void * __capability msgp, \
 				    size_t msgsz, int msgflg); }
-227	AUE_MSGRCV	NOSTD|NOPROTO	{ int msgrcv(int msqid, \
-				    _Out_writes_bytes_(msgsz) void *msgp, \
+227	AUE_MSGRCV	NOSTD	{ int cheriabi_msgrcv(int msqid, \
+				    _Out_writes_bytes_(msgsz) \
+				    void * __capability msgp, \
 				    size_t msgsz, long msgtyp, int msgflg); }
 228	AUE_SHMAT	NOSTD|NOPROTO	{ void *shmat( int shmid, \
 				    _Pagerange_vmmap_opt_(1)void *shmaddr, \

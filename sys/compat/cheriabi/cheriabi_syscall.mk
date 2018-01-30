@@ -124,8 +124,8 @@ MIASM =  \
 	semget.o \
 	cheriabi_semop.o \
 	msgget.o \
-	msgsnd.o \
-	msgrcv.o \
+	cheriabi_msgsnd.o \
+	cheriabi_msgrcv.o \
 	shmat.o \
 	shmdt.o \
 	shmget.o \

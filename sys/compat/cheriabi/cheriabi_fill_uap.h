@@ -2403,71 +2403,57 @@ CHERIABI_SYS_msgget_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_msgsnd_fill_uap(struct thread *td,
-    struct msgsnd_args *uap)
+CHERIABI_SYS_cheriabi_msgsnd_fill_uap(struct thread *td,
+    struct cheriabi_msgsnd_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] int msqid */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_msgsnd_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_msgsnd_PTRMASK);
 	uap->msqid = cheri_getoffset(tmpcap);
 
 	/* [2] size_t msgsz */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_msgsnd_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_msgsnd_PTRMASK);
 	uap->msgsz = cheri_getoffset(tmpcap);
 
 	/* [3] int msgflg */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_msgsnd_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_msgsnd_PTRMASK);
 	uap->msgflg = cheri_getoffset(tmpcap);
 
-	/* [1] _In_reads_bytes_(msgsz) void * msgp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_msgsnd_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->msgp),
-		    tmpcap, 1 * uap->msgsz, reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [1] _In_reads_bytes_(msgsz) void *__capability msgp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->msgp),
+	    1, CHERIABI_SYS_cheriabi_msgsnd_PTRMASK);
 
 	return (0);
 }
 
 static inline int
-CHERIABI_SYS_msgrcv_fill_uap(struct thread *td,
-    struct msgrcv_args *uap)
+CHERIABI_SYS_cheriabi_msgrcv_fill_uap(struct thread *td,
+    struct cheriabi_msgrcv_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] int msqid */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_msgrcv_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_msgrcv_PTRMASK);
 	uap->msqid = cheri_getoffset(tmpcap);
 
 	/* [2] size_t msgsz */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_msgrcv_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_msgrcv_PTRMASK);
 	uap->msgsz = cheri_getoffset(tmpcap);
 
 	/* [3] long msgtyp */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_msgrcv_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_msgrcv_PTRMASK);
 	uap->msgtyp = cheri_getoffset(tmpcap);
 
 	/* [4] int msgflg */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 4, CHERIABI_SYS_msgrcv_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 4, CHERIABI_SYS_cheriabi_msgrcv_PTRMASK);
 	uap->msgflg = cheri_getoffset(tmpcap);
 
-	/* [1] _Out_writes_bytes_(msgsz) void * msgp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_msgrcv_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->msgp),
-		    tmpcap, 1 * uap->msgsz, reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [1] _Out_writes_bytes_(msgsz) void *__capability msgp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->msgp),
+	    1, CHERIABI_SYS_cheriabi_msgrcv_PTRMASK);
 
 	return (0);
 }

@@ -1046,21 +1046,21 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* msgsnd */
+	/* cheriabi_msgsnd */
 	case 226: {
-		struct msgsnd_args *p = params;
+		struct cheriabi_msgsnd_args *p = params;
 		iarg[0] = p->msqid; /* int */
-		uarg[1] = (intptr_t) p->msgp; /* void * */
+		uarg[1] = (cheri_getbase(p->msgp) + cheri_getoffset(p->msgp)); /* void *__capability */
 		uarg[2] = p->msgsz; /* size_t */
 		iarg[3] = p->msgflg; /* int */
 		*n_args = 4;
 		break;
 	}
-	/* msgrcv */
+	/* cheriabi_msgrcv */
 	case 227: {
-		struct msgrcv_args *p = params;
+		struct cheriabi_msgrcv_args *p = params;
 		iarg[0] = p->msqid; /* int */
-		uarg[1] = (intptr_t) p->msgp; /* void * */
+		uarg[1] = (cheri_getbase(p->msgp) + cheri_getoffset(p->msgp)); /* void *__capability */
 		uarg[2] = p->msgsz; /* size_t */
 		iarg[3] = p->msgtyp; /* long */
 		iarg[4] = p->msgflg; /* int */
@@ -4744,14 +4744,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* msgsnd */
+	/* cheriabi_msgsnd */
 	case 226:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 2:
 			p = "size_t";
@@ -4763,14 +4763,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* msgrcv */
+	/* cheriabi_msgrcv */
 	case 227:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 2:
 			p = "size_t";
@@ -8896,12 +8896,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* msgsnd */
+	/* cheriabi_msgsnd */
 	case 226:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* msgrcv */
+	/* cheriabi_msgrcv */
 	case 227:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

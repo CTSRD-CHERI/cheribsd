@@ -200,8 +200,8 @@
 #define	CHERIABI_SYS_cheriabi_semop	222
 				/* 224 is obsolete msgctl */
 #define	CHERIABI_SYS_msgget	225
-#define	CHERIABI_SYS_msgsnd	226
-#define	CHERIABI_SYS_msgrcv	227
+#define	CHERIABI_SYS_cheriabi_msgsnd	226
+#define	CHERIABI_SYS_cheriabi_msgrcv	227
 #define	CHERIABI_SYS_shmat	228
 				/* 229 is obsolete shmctl */
 #define	CHERIABI_SYS_shmdt	230

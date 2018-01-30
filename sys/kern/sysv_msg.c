@@ -225,8 +225,8 @@ static struct syscall_helper_data msg32_syscalls[] = {
 static struct syscall_helper_data cheriabi_msg_syscalls[] = {
 	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_msgctl),
 	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(msgget),
-	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(msgsnd),
-	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(msgrcv),
+	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_msgsnd),
+	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_msgrcv),
 	SYSCALL_INIT_LAST
 };
 #endif /* COMPAT_CHERIABI */
@@ -785,16 +785,8 @@ done2:
 	return (error);
 }
 
-#ifndef _SYS_SYSPROTO_H_
-struct msgsnd_args {
-	int	msqid;
-	const void	*msgp;	/* XXX msgp is actually mtext. */
-	size_t	msgsz;
-	int	msgflg;
-};
-#endif
 int
-kern_msgsnd(struct thread *td, int msqid, const void *msgp,
+kern_msgsnd(struct thread *td, int msqid, const void * __capability msgp,
     size_t msgsz, int msgflg, long mtype)
 {
 	int msqix, segs_needed, error = 0;
@@ -1047,7 +1039,7 @@ kern_msgsnd(struct thread *td, int msqid, const void *msgp,
 		if (next >= msginfo.msgseg)
 			panic("next out of range #2");
 		mtx_unlock(&msq_mtx);
-		if ((error = copyin(msgp, &msgpool[next * msginfo.msgssz],
+		if ((error = copyin_c(msgp, &msgpool[next * msginfo.msgssz],
 		    tlen)) != 0) {
 			mtx_lock(&msq_mtx);
 			DPRINTF(("error %d copying in message segment\n",
@@ -1059,7 +1051,7 @@ kern_msgsnd(struct thread *td, int msqid, const void *msgp,
 		}
 		mtx_lock(&msq_mtx);
 		msgsz -= tlen;
-		msgp = (const char *)msgp + tlen;
+		msgp = (const char * __capability)msgp + tlen;
 		next = msgmaps[next].next;
 	}
 	if (next != -1)
@@ -1135,6 +1127,14 @@ done2:
 	return (error);
 }
 
+#ifndef _SYS_SYSPROTO_H_
+struct msgsnd_args {
+	int	msqid;
+	const void	*msgp;	/* XXX msgp is actually mtext. */
+	size_t	msgsz;
+	int	msgflg;
+};
+#endif
 int
 sys_msgsnd(struct thread *td, struct msgsnd_args *uap)
 {
@@ -1149,23 +1149,14 @@ sys_msgsnd(struct thread *td, struct msgsnd_args *uap)
 		return (error);
 	}
 	return (kern_msgsnd(td, uap->msqid,
-	    (const char *)uap->msgp + sizeof(mtype),
-	    uap->msgsz, uap->msgflg, mtype));
+	    (const char * __capability)__USER_CAP(uap->msgp, uap->msgsz) +
+	    sizeof(mtype), uap->msgsz, uap->msgflg, mtype));
 }
 
-#ifndef _SYS_SYSPROTO_H_
-struct msgrcv_args {
-	int	msqid;
-	void	*msgp;
-	size_t	msgsz;
-	long	msgtyp;
-	int	msgflg;
-};
-#endif
 /* XXX msgp is actually mtext. */
 int
-kern_msgrcv(struct thread *td, int msqid, void *msgp, size_t msgsz, long msgtyp,
-    int msgflg, long *mtype)
+kern_msgrcv(struct thread *td, int msqid, void * __capability msgp,
+    size_t msgsz, long msgtyp, int msgflg, long *mtype)
 {
 	size_t len;
 	struct msqid_kernel *msqkptr;
@@ -1397,7 +1388,7 @@ kern_msgrcv(struct thread *td, int msqid, void *msgp, size_t msgsz, long msgtyp,
 		if (next >= msginfo.msgseg)
 			panic("next out of range #3");
 		mtx_unlock(&msq_mtx);
-		error = copyout(&msgpool[next * msginfo.msgssz], msgp, tlen);
+		error = copyout_c(&msgpool[next * msginfo.msgssz], msgp, tlen);
 		mtx_lock(&msq_mtx);
 		if (error != 0) {
 			DPRINTF(("error (%d) copying out message segment\n",
@@ -1406,7 +1397,7 @@ kern_msgrcv(struct thread *td, int msqid, void *msgp, size_t msgsz, long msgtyp,
 			wakeup(msqkptr);
 			goto done2;
 		}
-		msgp = (char *)msgp + tlen;
+		msgp = (char * __capability)msgp + tlen;
 		next = msgmaps[next].next;
 	}
 
@@ -1422,6 +1413,15 @@ done2:
 	return (error);
 }
 
+#ifndef _SYS_SYSPROTO_H_
+struct msgrcv_args {
+	int	msqid;
+	void	*msgp;
+	size_t	msgsz;
+	long	msgtyp;
+	int	msgflg;
+};
+#endif
 int
 sys_msgrcv(struct thread *td, struct msgrcv_args *uap)
 {
@@ -1432,8 +1432,8 @@ sys_msgrcv(struct thread *td, struct msgrcv_args *uap)
 	    uap->msgp, uap->msgsz, uap->msgtyp, uap->msgflg));
 
 	if ((error = kern_msgrcv(td, uap->msqid,
-	    (char *)uap->msgp + sizeof(mtype), uap->msgsz,
-	    uap->msgtyp, uap->msgflg, &mtype)) != 0)
+	    (char * __capability)__USER_CAP(uap->msgp, uap->msgsz) +
+	    sizeof(mtype), uap->msgsz, uap->msgtyp, uap->msgflg, &mtype)) != 0)
 		return (error);
 	if ((error = copyout(&mtype, uap->msgp, sizeof(mtype))) != 0)
 		DPRINTF(("error %d copying the message type\n", error));
@@ -1848,8 +1848,8 @@ freebsd32_msgsnd(struct thread *td, struct freebsd32_msgsnd_args *uap)
 		return (error);
 	mtype = mtype32;
 	return (kern_msgsnd(td, uap->msqid,
-	    (const char *)msgp + sizeof(mtype32),
-	    uap->msgsz, uap->msgflg, mtype));
+	    (const char * __capability)__USER_CAP(msgp, uap->msgsz) +
+	    sizeof(mtype32), uap->msgsz, uap->msgflg, mtype));
 }
 
 int
@@ -1862,8 +1862,8 @@ freebsd32_msgrcv(struct thread *td, struct freebsd32_msgrcv_args *uap)
 
 	msgp = PTRIN(uap->msgp);
 	if ((error = kern_msgrcv(td, uap->msqid,
-	    (char *)msgp + sizeof(mtype32), uap->msgsz,
-	    uap->msgtyp, uap->msgflg, &mtype)) != 0)
+	    (char * __capability)__USER_CAP(msgp, uap->msgsz) + sizeof(mtype32),
+	    uap->msgsz, uap->msgtyp, uap->msgflg, &mtype)) != 0)
 		return (error);
 	mtype32 = (int32_t)mtype;
 	return (copyout(&mtype32, msgp, sizeof(mtype32)));
@@ -1912,6 +1912,42 @@ cheriabi_msgctl(struct thread *td, struct cheriabi_msgctl_args *uap)
 		error = copyout(&msqbuf_c, uap->buf, sizeof(struct msqid_ds_c));
 	}
 	return (error);
+}
+
+int
+cheriabi_msgrcv(struct thread *td, struct cheriabi_msgrcv_args *uap)
+{
+	int error;
+	long mtype;
+
+	DPRINTF(("call to msgrcv(%d, %p, %zu, %ld, %d)\n", uap->msqid,
+	    uap->msgp, uap->msgsz, uap->msgtyp, uap->msgflg));
+
+	if ((error = kern_msgrcv(td, uap->msqid,
+	    (char * __capability)uap->msgp + sizeof(mtype),
+	    uap->msgsz, uap->msgtyp, uap->msgflg, &mtype)) != 0)
+		return (error);
+	if ((error = copyout_c(&mtype, uap->msgp, sizeof(mtype))) != 0)
+		DPRINTF(("error %d copying the message type\n", error));
+	return (error);
+}
+
+int
+cheriabi_msgsnd(struct thread *td, struct cheriabi_msgsnd_args *uap)
+{
+	int error;
+	long mtype;
+
+	DPRINTF(("call to msgsnd(%d, %p, %zu, %d)\n", uap->msqid, uap->msgp,
+	    uap->msgsz, uap->msgflg));
+
+	if ((error = copyin_c(uap->msgp, &mtype, sizeof(mtype))) != 0) {
+		DPRINTF(("error %d copying the message type\n", error));
+		return (error);
+	}
+	return (kern_msgsnd(td, uap->msqid,
+	    (const char * __capability)uap->msgp + sizeof(mtype),
+	    uap->msgsz, uap->msgflg, mtype));
 }
 #endif /* COMPAT_CHERIABI */
 
