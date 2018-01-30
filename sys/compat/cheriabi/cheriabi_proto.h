@@ -198,6 +198,13 @@ struct cheriabi_getitimer_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
 	char itv_l_[PADL_(struct itimerval *__capability)]; struct itimerval *__capability itv; char itv_r_[PADR_(struct itimerval *__capability)];
 };
+struct cheriabi_select_args {
+	char nd_l_[PADL_(int)]; int nd; char nd_r_[PADR_(int)];
+	char in_l_[PADL_(fd_set *__capability)]; fd_set *__capability in; char in_r_[PADR_(fd_set *__capability)];
+	char ou_l_[PADL_(fd_set *__capability)]; fd_set *__capability ou; char ou_r_[PADR_(fd_set *__capability)];
+	char ex_l_[PADL_(fd_set *__capability)]; fd_set *__capability ex; char ex_r_[PADR_(fd_set *__capability)];
+	char tv_l_[PADL_(struct timeval *__capability)]; struct timeval *__capability tv; char tv_r_[PADR_(struct timeval *__capability)];
+};
 struct cheriabi_gettimeofday_args {
 	char tp_l_[PADL_(struct timeval *__capability)]; struct timeval *__capability tp; char tp_r_[PADR_(struct timeval *__capability)];
 	char tzp_l_[PADL_(struct timezone *__capability)]; struct timezone *__capability tzp; char tzp_r_[PADR_(struct timezone *__capability)];
@@ -686,6 +693,14 @@ struct cheriabi_lpathconf_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 	char name_l_[PADL_(int)]; int name; char name_r_[PADR_(int)];
 };
+struct cheriabi_pselect_args {
+	char nd_l_[PADL_(int)]; int nd; char nd_r_[PADR_(int)];
+	char in_l_[PADL_(fd_set *__capability)]; fd_set *__capability in; char in_r_[PADR_(fd_set *__capability)];
+	char ou_l_[PADL_(fd_set *__capability)]; fd_set *__capability ou; char ou_r_[PADR_(fd_set *__capability)];
+	char ex_l_[PADL_(fd_set *__capability)]; fd_set *__capability ex; char ex_r_[PADR_(fd_set *__capability)];
+	char ts_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability ts; char ts_r_[PADR_(const struct timespec *__capability)];
+	char sm_l_[PADL_(const sigset_t *__capability)]; const sigset_t *__capability sm; char sm_r_[PADR_(const sigset_t *__capability)];
+};
 struct cheriabi_wait6_args {
 	char idtype_l_[PADL_(int)]; int idtype; char idtype_r_[PADR_(int)];
 	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
@@ -777,6 +792,7 @@ int	cheriabi_setgroups(struct thread *, struct cheriabi_setgroups_args *);
 int	cheriabi_setitimer(struct thread *, struct cheriabi_setitimer_args *);
 int	cheriabi_swapon(struct thread *, struct cheriabi_swapon_args *);
 int	cheriabi_getitimer(struct thread *, struct cheriabi_getitimer_args *);
+int	cheriabi_select(struct thread *, struct cheriabi_select_args *);
 int	cheriabi_gettimeofday(struct thread *, struct cheriabi_gettimeofday_args *);
 int	cheriabi_getrusage(struct thread *, struct cheriabi_getrusage_args *);
 int	cheriabi_readv(struct thread *, struct cheriabi_readv_args *);
@@ -883,6 +899,7 @@ int	cheriabi_jail_set(struct thread *, struct cheriabi_jail_set_args *);
 int	cheriabi___semctl(struct thread *, struct cheriabi___semctl_args *);
 int	cheriabi_msgctl(struct thread *, struct cheriabi_msgctl_args *);
 int	cheriabi_lpathconf(struct thread *, struct cheriabi_lpathconf_args *);
+int	cheriabi_pselect(struct thread *, struct cheriabi_pselect_args *);
 int	cheriabi_wait6(struct thread *, struct cheriabi_wait6_args *);
 int	cheriabi_chflagsat(struct thread *, struct cheriabi_chflagsat_args *);
 int	cheriabi_aio_mlock(struct thread *, struct cheriabi_aio_mlock_args *);
@@ -981,6 +998,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_setitimer	AUE_SETITIMER
 #define	CHERIABI_SYS_AUE_cheriabi_swapon	AUE_SWAPON
 #define	CHERIABI_SYS_AUE_cheriabi_getitimer	AUE_GETITIMER
+#define	CHERIABI_SYS_AUE_cheriabi_select	AUE_SELECT
 #define	CHERIABI_SYS_AUE_cheriabi_gettimeofday	AUE_GETTIMEOFDAY
 #define	CHERIABI_SYS_AUE_cheriabi_getrusage	AUE_GETRUSAGE
 #define	CHERIABI_SYS_AUE_cheriabi_readv	AUE_READV
@@ -1087,6 +1105,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi___semctl	AUE_SEMCTL
 #define	CHERIABI_SYS_AUE_cheriabi_msgctl	AUE_MSGCTL
 #define	CHERIABI_SYS_AUE_cheriabi_lpathconf	AUE_LPATHCONF
+#define	CHERIABI_SYS_AUE_cheriabi_pselect	AUE_SELECT
 #define	CHERIABI_SYS_AUE_cheriabi_wait6	AUE_WAIT6
 #define	CHERIABI_SYS_AUE_cheriabi_chflagsat	AUE_CHFLAGSAT
 #define	CHERIABI_SYS_AUE_cheriabi_aio_mlock	AUE_AIO_MLOCK

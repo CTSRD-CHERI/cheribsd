@@ -97,7 +97,7 @@
 #define	CHERIABI_SYS_getdtablesize	89
 #define	CHERIABI_SYS_dup2	90
 #define	CHERIABI_SYS_fcntl	92
-#define	CHERIABI_SYS_select	93
+#define	CHERIABI_SYS_cheriabi_select	93
 #define	CHERIABI_SYS_fsync	95
 #define	CHERIABI_SYS_setpriority	96
 #define	CHERIABI_SYS_socket	97
@@ -440,7 +440,7 @@
 #define	CHERIABI_SYS_pdfork	518
 #define	CHERIABI_SYS_pdkill	519
 #define	CHERIABI_SYS_pdgetpid	520
-#define	CHERIABI_SYS_pselect	522
+#define	CHERIABI_SYS_cheriabi_pselect	522
 #define	CHERIABI_SYS_getloginclass	523
 #define	CHERIABI_SYS_setloginclass	524
 #define	CHERIABI_SYS_rctl_get_racct	525

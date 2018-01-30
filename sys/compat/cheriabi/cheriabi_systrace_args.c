@@ -526,14 +526,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* select */
+	/* cheriabi_select */
 	case 93: {
-		struct select_args *p = params;
+		struct cheriabi_select_args *p = params;
 		iarg[0] = p->nd; /* int */
-		uarg[1] = (intptr_t) p->in; /* fd_set * */
-		uarg[2] = (intptr_t) p->ou; /* fd_set * */
-		uarg[3] = (intptr_t) p->ex; /* fd_set * */
-		uarg[4] = (intptr_t) p->tv; /* struct timeval * */
+		uarg[1] = (cheri_getbase(p->in) + cheri_getoffset(p->in)); /* fd_set *__capability */
+		uarg[2] = (cheri_getbase(p->ou) + cheri_getoffset(p->ou)); /* fd_set *__capability */
+		uarg[3] = (cheri_getbase(p->ex) + cheri_getoffset(p->ex)); /* fd_set *__capability */
+		uarg[4] = (cheri_getbase(p->tv) + cheri_getoffset(p->tv)); /* struct timeval *__capability */
 		*n_args = 5;
 		break;
 	}
@@ -2750,15 +2750,15 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* pselect */
+	/* cheriabi_pselect */
 	case 522: {
-		struct pselect_args *p = params;
+		struct cheriabi_pselect_args *p = params;
 		iarg[0] = p->nd; /* int */
-		uarg[1] = (intptr_t) p->in; /* fd_set * */
-		uarg[2] = (intptr_t) p->ou; /* fd_set * */
-		uarg[3] = (intptr_t) p->ex; /* fd_set * */
-		uarg[4] = (intptr_t) p->ts; /* const struct timespec * */
-		uarg[5] = (intptr_t) p->sm; /* const sigset_t * */
+		uarg[1] = (cheri_getbase(p->in) + cheri_getoffset(p->in)); /* fd_set *__capability */
+		uarg[2] = (cheri_getbase(p->ou) + cheri_getoffset(p->ou)); /* fd_set *__capability */
+		uarg[3] = (cheri_getbase(p->ex) + cheri_getoffset(p->ex)); /* fd_set *__capability */
+		uarg[4] = (cheri_getbase(p->ts) + cheri_getoffset(p->ts)); /* const struct timespec *__capability */
+		uarg[5] = (cheri_getbase(p->sm) + cheri_getoffset(p->sm)); /* const sigset_t *__capability */
 		*n_args = 6;
 		break;
 	}
@@ -3921,23 +3921,23 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* select */
+	/* cheriabi_select */
 	case 93:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland fd_set *";
+			p = "userland fd_set *__capability";
 			break;
 		case 2:
-			p = "userland fd_set *";
+			p = "userland fd_set *__capability";
 			break;
 		case 3:
-			p = "userland fd_set *";
+			p = "userland fd_set *__capability";
 			break;
 		case 4:
-			p = "userland struct timeval *";
+			p = "userland struct timeval *__capability";
 			break;
 		default:
 			break;
@@ -7640,26 +7640,26 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* pselect */
+	/* cheriabi_pselect */
 	case 522:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland fd_set *";
+			p = "userland fd_set *__capability";
 			break;
 		case 2:
-			p = "userland fd_set *";
+			p = "userland fd_set *__capability";
 			break;
 		case 3:
-			p = "userland fd_set *";
+			p = "userland fd_set *__capability";
 			break;
 		case 4:
-			p = "userland const struct timespec *";
+			p = "userland const struct timespec *__capability";
 			break;
 		case 5:
-			p = "userland const sigset_t *";
+			p = "userland const sigset_t *__capability";
 			break;
 		default:
 			break;
@@ -8599,7 +8599,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* select */
+	/* cheriabi_select */
 	case 93:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9886,7 +9886,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* pselect */
+	/* cheriabi_pselect */
 	case 522:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

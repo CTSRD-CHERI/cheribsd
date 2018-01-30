@@ -577,7 +577,8 @@ freebsd32_select(struct thread *td, struct freebsd32_select_args *uap)
 	/*
 	 * XXX Do pointers need PTRIN()?
 	 */
-	return (kern_select(td, uap->nd, uap->in, uap->ou, uap->ex, tvp,
+	return (kern_select(td, uap->nd, __USER_CAP_UNBOUND(uap->in),
+	    __USER_CAP_UNBOUND(uap->ou), __USER_CAP_UNBOUND(uap->ex), tvp,
 	    sizeof(int32_t) * 8));
 }
 
@@ -610,7 +611,8 @@ freebsd32_pselect(struct thread *td, struct freebsd32_pselect_args *uap)
 	/*
 	 * XXX Do pointers need PTRIN()?
 	 */
-	error = kern_pselect(td, uap->nd, uap->in, uap->ou, uap->ex, tvp,
+	error = kern_pselect(td, uap->nd, __USER_CAP_UNBOUND(uap->in),
+	    __USER_CAP_UNBOUND(uap->ou), __USER_CAP_UNBOUND(uap->ex), tvp,
 	    uset, sizeof(int32_t) * 8);
 	return (error);
 }

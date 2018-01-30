@@ -230,8 +230,9 @@ int	kern_profil(struct thread *td, char * __capability samples, size_t size,
 int	kern_pread(struct thread *td, int fd, void *buf, size_t nbyte,
 	    off_t offset);
 int	kern_preadv(struct thread *td, int fd, struct uio *auio, off_t offset);
-int	kern_pselect(struct thread *td, int nd, fd_set *in, fd_set *ou,
-	    fd_set *ex, struct timeval *tvp, sigset_t *uset, int abi_nfdbits);
+int	kern_pselect(struct thread *td, int nd, fd_set * __capability in,
+	    fd_set * __capability ou, fd_set * __capability ex,
+	    struct timeval *tvp, sigset_t *uset, int abi_nfdbits);
 int	kern_ptrace(struct thread *td, int req, pid_t pid, void *addr,
 	    int data);
 int	kern_pwrite(struct thread *td, int fd, const void *buf, size_t nbyte,
@@ -273,8 +274,9 @@ int	kern_sched_rr_get_interval_td(struct thread *td, struct thread *targettd,
 int	kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 	    union semun *arg, register_t *rval);
 int	kern_setlogin(struct thread *td, const char * __CAPABILITY namebuf);
-int	kern_select(struct thread *td, int nd, fd_set *fd_in, fd_set *fd_ou,
-	    fd_set *fd_ex, struct timeval *tvp, int abi_nfdbits);
+int	kern_select(struct thread *td, int nd, fd_set * __capability fd_in,
+	    fd_set * __capability fd_ou, fd_set * __capability fd_ex,
+	    struct timeval *tvp, int abi_nfdbits);
 int	kern_sendit(struct thread *td, int s, kmsghdr_t *mp, int flags,
 	    struct mbuf *control, enum uio_seg segflg);
 int	kern_setgroups(struct thread *td, u_int ngrp,

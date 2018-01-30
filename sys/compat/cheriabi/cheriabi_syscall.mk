@@ -68,7 +68,7 @@ MIASM =  \
 	getdtablesize.o \
 	dup2.o \
 	fcntl.o \
-	select.o \
+	cheriabi_select.o \
 	fsync.o \
 	setpriority.o \
 	socket.o \
@@ -328,7 +328,7 @@ MIASM =  \
 	pdfork.o \
 	pdkill.o \
 	pdgetpid.o \
-	pselect.o \
+	cheriabi_pselect.o \
 	getloginclass.o \
 	setloginclass.o \
 	rctl_get_racct.o \

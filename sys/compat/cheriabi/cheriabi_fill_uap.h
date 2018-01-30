@@ -1207,8 +1207,38 @@ CHERIABI_SYS_dup2_fill_uap(struct thread *td,
 static inline int	CHERIABI_SYS_fcntl_fill_uap(struct thread *td,
     struct fcntl_args *uap);
 
-static inline int	CHERIABI_SYS_select_fill_uap(struct thread *td,
-    struct select_args *uap);
+static inline int
+CHERIABI_SYS_cheriabi_select_fill_uap(struct thread *td,
+    struct cheriabi_select_args *uap)
+{
+	void * __capability tmpcap;
+
+	/* [0] int nd */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_select_PTRMASK);
+	uap->nd = cheri_getoffset(tmpcap);
+
+	/* [1] _Inout_opt_ fd_set *__capability in */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->in),
+	    1, CHERIABI_SYS_cheriabi_select_PTRMASK);
+
+	/* [2] _Inout_opt_ fd_set *__capability ou */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->ou),
+	    2, CHERIABI_SYS_cheriabi_select_PTRMASK);
+
+	/* [3] _Inout_opt_ fd_set *__capability ex */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->ex),
+	    3, CHERIABI_SYS_cheriabi_select_PTRMASK);
+
+	/* [4] _In_opt_ struct timeval *__capability tv */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->tv),
+	    4, CHERIABI_SYS_cheriabi_select_PTRMASK);
+
+	return (0);
+}
 
 static inline int
 CHERIABI_SYS_fsync_fill_uap(struct thread *td,
@@ -7507,8 +7537,43 @@ CHERIABI_SYS_pdgetpid_fill_uap(struct thread *td,
 	return (0);
 }
 
-static inline int	CHERIABI_SYS_pselect_fill_uap(struct thread *td,
-    struct pselect_args *uap);
+static inline int
+CHERIABI_SYS_cheriabi_pselect_fill_uap(struct thread *td,
+    struct cheriabi_pselect_args *uap)
+{
+	void * __capability tmpcap;
+
+	/* [0] int nd */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_pselect_PTRMASK);
+	uap->nd = cheri_getoffset(tmpcap);
+
+	/* [1] _Inout_opt_ fd_set *__capability in */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->in),
+	    1, CHERIABI_SYS_cheriabi_pselect_PTRMASK);
+
+	/* [2] _Inout_opt_ fd_set *__capability ou */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->ou),
+	    2, CHERIABI_SYS_cheriabi_pselect_PTRMASK);
+
+	/* [3] _Inout_opt_ fd_set *__capability ex */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->ex),
+	    3, CHERIABI_SYS_cheriabi_pselect_PTRMASK);
+
+	/* [4] _In_opt_ const struct timespec *__capability ts */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->ts),
+	    4, CHERIABI_SYS_cheriabi_pselect_PTRMASK);
+
+	/* [5] _In_opt_ const sigset_t *__capability sm */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->sm),
+	    5, CHERIABI_SYS_cheriabi_pselect_PTRMASK);
+
+	return (0);
+}
 
 static inline int
 CHERIABI_SYS_getloginclass_fill_uap(struct thread *td,

@@ -268,11 +268,12 @@
 ; XXX-BD: no practical way to check arg
 92	AUE_FCNTL	NOPROTO|NOPARSE|VARARG	{ int fcntl(int fd, int cmd, \
 				    intptr_t arg); }
-93	AUE_SELECT	NOPROTO|NOPARSE	{ int select(int nd, \
-				    _Inout_opt_ fd_set *in, \
-				    _Inout_opt_ fd_set *ou, \
-				    _Inout_opt_ fd_set *ex, \
-				    _In_opt_ struct timeval *tv); }
+93	AUE_SELECT	STD	{ int cheriabi_select(int nd, \
+				    _Inout_opt_ fd_set * __capability in, \
+				    _Inout_opt_ fd_set * __capability ou, \
+				    _Inout_opt_ fd_set * __capability ex, \
+				    _In_opt_ \
+				    struct timeval * __capability tv); }
 94	AUE_NULL	UNIMPL	setdopt
 95	AUE_FSYNC	NOPROTO	{ int fsync(int fd); }
 96	AUE_SETPRIORITY	NOPROTO	{ int setpriority(int which, int who, \
@@ -1200,12 +1201,14 @@
 519	AUE_PDKILL	NOPROTO	{ int pdkill(int fd, int signum); }
 520	AUE_PDGETPID	NOPROTO	{ int pdgetpid(int fd, _Out_ pid_t *pidp); }
 521	AUE_PDWAIT	UNIMPL	pdwait4
-522	AUE_SELECT	NOPROTO|NOPARSE	{ int pselect(int nd, \
-				    _Inout_opt_ fd_set *in, \
-				    _Inout_opt_ fd_set *ou, \
-				    _Inout_opt_ fd_set *ex, \
-				    _In_opt_ const struct timespec *ts, \
-				    _In_opt_ const sigset_t *sm); }
+522	AUE_SELECT	STD	{ int cheriabi_pselect(int nd, \
+				    _Inout_opt_ fd_set * __capability in, \
+				    _Inout_opt_ fd_set * __capability ou, \
+				    _Inout_opt_ fd_set * __capability ex, \
+				    _In_opt_ \
+				    const struct timespec * __capability ts, \
+				    _In_opt_ \
+				    const sigset_t * __capability sm); }
 523	AUE_GETLOGINCLASS	NOPROTO	{ int getloginclass( \
 				    _Out_writes_z_(namelen) char *namebuf, \
 				    size_t namelen); }

@@ -115,11 +115,50 @@ cheriabi_pwrite(struct thread *td, struct cheriabi_pwrite_args *uap)
 	return(error);
 }
 
-#ifdef NOTYET
-cheriabi_pselect
+int
+cheriabi_pselect(struct thread *td, struct cheriabi_pselect_args *uap)
+{
+	struct timespec ts;
+	struct timeval tv, *tvp;
+	sigset_t set, *uset;
+	int error;
 
-cheriabi_select
-#endif
+	if (uap->ts != NULL) {
+		error = copyin_c(uap->ts, &ts, sizeof(ts));
+		if (error != 0)
+		    return (error);
+		TIMESPEC_TO_TIMEVAL(&tv, &ts);
+		tvp = &tv;
+	} else
+		tvp = NULL;
+	if (uap->sm != NULL) {
+		error = copyin_c(uap->sm, &set, sizeof(set));
+		if (error != 0)
+			return (error);
+		uset = &set;
+	} else
+		uset = NULL;
+	return (kern_pselect(td, uap->nd, uap->in, uap->ou, uap->ex, tvp,
+	    uset, NFDBITS));
+}
+
+int
+cheriabi_select(struct thread *td, struct cheriabi_select_args *uap)
+{
+	struct timeval tv, *tvp;
+	int error;
+
+	if (uap->tv != NULL) {
+		error = copyin_c(uap->tv, &tv, sizeof(tv));
+		if (error)
+			return (error);
+		tvp = &tv;
+	} else
+		tvp = NULL;
+
+	return (kern_select(td, uap->nd, uap->in, uap->ou, uap->ex, tvp,
+	    NFDBITS));
+}
 
 int
 cheriabi_poll(struct thread *td, struct cheriabi_poll_args *uap)

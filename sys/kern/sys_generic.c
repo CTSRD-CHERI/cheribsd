@@ -113,8 +113,10 @@ static int	pollout(struct thread *, struct pollfd * __capability,
 		    struct pollfd * __capability, u_int);
 static int	pollscan(struct thread *, struct pollfd * __capability , u_int);
 static int	pollrescan(struct thread *);
-static int	selscan(struct thread *, fd_mask **, fd_mask **, int);
-static int	selrescan(struct thread *, fd_mask **, fd_mask **);
+static int	selscan(struct thread *, fd_mask * __capability *,
+		    fd_mask * __capability *, int);
+static int	selrescan(struct thread *, fd_mask * __capability *,
+		    fd_mask * __capability *);
 static void	selfdalloc(struct thread *, void * __capability);
 static void	selfdfree(struct seltd *, struct selfd *);
 static int	dofileread(struct thread *, int, struct file *, struct uio *,
@@ -888,12 +890,14 @@ sys_pselect(struct thread *td, struct pselect_args *uap)
 		uset = &set;
 	} else
 		uset = NULL;
-	return (kern_pselect(td, uap->nd, uap->in, uap->ou, uap->ex, tvp,
-	    uset, NFDBITS));
+	return (kern_pselect(td, uap->nd, __USER_CAP_UNBOUND(uap->in),
+	    __USER_CAP_UNBOUND(uap->ou), __USER_CAP_UNBOUND(uap->ex),
+	    tvp, uset, NFDBITS));
 }
 
 int
-kern_pselect(struct thread *td, int nd, fd_set *in, fd_set *ou, fd_set *ex,
+kern_pselect(struct thread *td, int nd, fd_set * __capability in,
+    fd_set * __capability ou, fd_set * __capability ex,
     struct timeval *tvp, sigset_t *uset, int abi_nfdbits)
 {
 	int error;
@@ -938,8 +942,9 @@ sys_select(struct thread *td, struct select_args *uap)
 	} else
 		tvp = NULL;
 
-	return (kern_select(td, uap->nd, uap->in, uap->ou, uap->ex, tvp,
-	    NFDBITS));
+	return (kern_select(td, uap->nd, __USER_CAP_UNBOUND(uap->in),
+	    __USER_CAP_UNBOUND(uap->ou), __USER_CAP_UNBOUND(uap->ex),
+	    tvp, NFDBITS));
 }
 
 /*
@@ -952,7 +957,8 @@ sys_select(struct thread *td, struct select_args *uap)
  * nd is fd_lastfile + 1.
  */
 static int
-select_check_badfd(fd_set *fd_in, int nd, int ndu, int abi_nfdbits)
+select_check_badfd(fd_set * __capability fd_in, int nd, int ndu,
+    int abi_nfdbits)
 {
 	char *addr, *oaddr;
 	int b, i, res;
@@ -966,9 +972,10 @@ select_check_badfd(fd_set *fd_in, int nd, int ndu, int abi_nfdbits)
 	for (i = nd; i < ndu; i++) {
 		b = i / NBBY;
 #if BYTE_ORDER == LITTLE_ENDIAN
-		addr = (char *)fd_in + b;
+		addr =
+		    (char *)__DECAP_CHECK(fd_in, roundup(ndu, NBBY) / NBBY) + b;
 #else
-		addr = (char *)fd_in;
+		addr = (char *)__DECAP_CHECK(fd_in, roundup(ndu, NBBY) / NBBY);
 		if (abi_nfdbits == NFDBITS) {
 			addr += rounddown(b, sizeof(fd_mask)) +
 			    sizeof(fd_mask) - 1 - b % sizeof(fd_mask);
@@ -991,8 +998,9 @@ select_check_badfd(fd_set *fd_in, int nd, int ndu, int abi_nfdbits)
 }
 
 int
-kern_select(struct thread *td, int nd, fd_set *fd_in, fd_set *fd_ou,
-    fd_set *fd_ex, struct timeval *tvp, int abi_nfdbits)
+kern_select(struct thread *td, int nd, fd_set * __capability fd_in,
+    fd_set * __capability fd_ou, fd_set * __capability fd_ex,
+    struct timeval *tvp, int abi_nfdbits)
 {
 	struct filedesc *fdp;
 	/*
@@ -1002,7 +1010,10 @@ kern_select(struct thread *td, int nd, fd_set *fd_in, fd_set *fd_ou,
 	 * of 256.
 	 */
 	fd_mask s_selbits[howmany(2048, NFDBITS)];
-	fd_mask *ibits[3], *obits[3], *selbits, *sbp;
+	fd_mask * __capability ibits[3];
+	fd_mask * __capability obits[3];
+	fd_mask * __capability selbits;
+	fd_mask * __capability sbp;
 	struct timeval rtv;
 	sbintime_t asbt, precision, rsbt;
 	u_int nbufbytes, ncpbytes, ncpubytes, nfdbits;
@@ -1043,7 +1054,7 @@ kern_select(struct thread *td, int nd, fd_set *fd_in, fd_set *fd_ou,
 	if (nbufbytes <= sizeof s_selbits)
 		selbits = &s_selbits[0];
 	else
-		selbits = malloc(nbufbytes, M_SELECT, M_WAITOK);
+		selbits = malloc_c(nbufbytes, M_SELECT, M_WAITOK);
 
 	/*
 	 * Assign pointers into the bit buffers and fetch the input bits.
@@ -1060,10 +1071,11 @@ kern_select(struct thread *td, int nd, fd_set *fd_in, fd_set *fd_ou,
 			ibits[x] = sbp + nbufbytes / 2 / sizeof *sbp;	\
 			obits[x] = sbp;					\
 			sbp += ncpbytes / sizeof *sbp;			\
-			error = copyin(name, ibits[x], ncpubytes);	\
+			error = copyin_c(name, ibits[x], ncpubytes);	\
 			if (error != 0)					\
 				goto done;				\
-			bzero((char *)ibits[x] + ncpubytes,		\
+			bzero((__cheri_fromcap char *)			\
+			    (char * __capability) ibits[x] + ncpubytes,	\
 			    ncpbytes - ncpubytes);			\
 		}							\
 	} while (0)
@@ -1094,7 +1106,7 @@ kern_select(struct thread *td, int nd, fd_set *fd_in, fd_set *fd_ou,
 	swizzle_fdset(ibits[2]);
 	
 	if (nbufbytes != 0)
-		bzero(selbits, nbufbytes / 2);
+		bzero(__DECAP_CHECK(selbits, nbufbytes / 2), nbufbytes / 2);
 
 	precision = 0;
 	if (tvp != NULL) {
@@ -1149,7 +1161,7 @@ done:
 #undef swizzle_fdset
 
 #define	putbits(name, x) \
-	if (name && (error2 = copyout(obits[x], name, ncpubytes))) \
+	if (name && (error2 = copyout_c(obits[x], name, ncpubytes))) \
 		error = error2;
 	if (error == 0) {
 		int error2;
@@ -1159,8 +1171,8 @@ done:
 		putbits(fd_ex, 2);
 #undef putbits
 	}
-	if (selbits != &s_selbits[0])
-		free(selbits, M_SELECT);
+	if (selbits != (__cheri_tocap fd_mask * __capability)&s_selbits[0])
+		free_c(selbits, M_SELECT);
 
 	return (error);
 }
@@ -1181,7 +1193,7 @@ static int select_flags[3] = {
  * bit position in the fd_mask array.
  */
 static __inline int
-selflags(fd_mask **ibits, int idx, fd_mask bit)
+selflags(fd_mask * __capability *ibits, int idx, fd_mask bit)
 {
 	int flags;
 	int msk;
@@ -1202,7 +1214,8 @@ selflags(fd_mask **ibits, int idx, fd_mask bit)
  * input bits originally requested.
  */
 static __inline int
-selsetbits(fd_mask **ibits, fd_mask **obits, int idx, fd_mask bit, int events)
+selsetbits(fd_mask * __capability *ibits, fd_mask * __capability *obits,
+    int idx, fd_mask bit, int events)
 {
 	int msk;
 	int n;
@@ -1245,7 +1258,8 @@ getselfd_cap(struct filedesc *fdp, int fd, struct file **fpp)
  * completion.
  */
 static int
-selrescan(struct thread *td, fd_mask **ibits, fd_mask **obits)
+selrescan(struct thread *td, fd_mask * __capability *ibits,
+    fd_mask * __capability *obits)
 {
 	struct filedesc *fdp;
 	struct selinfo *si;
@@ -1287,10 +1301,8 @@ selrescan(struct thread *td, fd_mask **ibits, fd_mask **obits)
  * each selinfo.
  */
 static int
-selscan(td, ibits, obits, nfd)
-	struct thread *td;
-	fd_mask **ibits, **obits;
-	int nfd;
+selscan(struct thread *td, fd_mask * __capability *ibits,
+    fd_mask * __capability *obits, int nfd)
 {
 	struct filedesc *fdp;
 	struct file *fp;
