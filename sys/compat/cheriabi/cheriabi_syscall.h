@@ -192,7 +192,7 @@
 #define	CHERIABI_SYS_mlock	203
 #define	CHERIABI_SYS_munlock	204
 #define	CHERIABI_SYS_cheriabi_undelete	205
-#define	CHERIABI_SYS_futimes	206
+#define	CHERIABI_SYS_cheriabi_futimes	206
 #define	CHERIABI_SYS_getpgid	207
 #define	CHERIABI_SYS_cheriabi_poll	209
 				/* 220 is obsolete __semctl */

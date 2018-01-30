@@ -301,6 +301,10 @@ struct cheriabi_setrlimit_args {
 struct cheriabi_undelete_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 };
+struct cheriabi_futimes_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char tptr_l_[PADL_(const struct timeval *__capability)]; const struct timeval *__capability tptr; char tptr_r_[PADR_(const struct timeval *__capability)];
+};
 struct cheriabi_poll_args {
 	char fds_l_[PADL_(struct pollfd *__capability)]; struct pollfd *__capability fds; char fds_r_[PADR_(struct pollfd *__capability)];
 	char nfds_l_[PADL_(u_int)]; u_int nfds; char nfds_r_[PADR_(u_int)];
@@ -816,6 +820,7 @@ int	cheriabi_pathconf(struct thread *, struct cheriabi_pathconf_args *);
 int	cheriabi_getrlimit(struct thread *, struct cheriabi_getrlimit_args *);
 int	cheriabi_setrlimit(struct thread *, struct cheriabi_setrlimit_args *);
 int	cheriabi_undelete(struct thread *, struct cheriabi_undelete_args *);
+int	cheriabi_futimes(struct thread *, struct cheriabi_futimes_args *);
 int	cheriabi_poll(struct thread *, struct cheriabi_poll_args *);
 int	cheriabi_clock_gettime(struct thread *, struct cheriabi_clock_gettime_args *);
 int	cheriabi_clock_settime(struct thread *, struct cheriabi_clock_settime_args *);
@@ -1022,6 +1027,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_getrlimit	AUE_GETRLIMIT
 #define	CHERIABI_SYS_AUE_cheriabi_setrlimit	AUE_SETRLIMIT
 #define	CHERIABI_SYS_AUE_cheriabi_undelete	AUE_UNDELETE
+#define	CHERIABI_SYS_AUE_cheriabi_futimes	AUE_FUTIMES
 #define	CHERIABI_SYS_AUE_cheriabi_poll	AUE_POLL
 #define	CHERIABI_SYS_AUE_cheriabi_clock_gettime	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_clock_settime	AUE_CLOCK_SETTIME

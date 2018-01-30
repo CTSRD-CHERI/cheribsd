@@ -2290,26 +2290,19 @@ CHERIABI_SYS_cheriabi_undelete_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_futimes_fill_uap(struct thread *td,
-    struct futimes_args *uap)
+CHERIABI_SYS_cheriabi_futimes_fill_uap(struct thread *td,
+    struct cheriabi_futimes_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] int fd */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_futimes_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_futimes_PTRMASK);
 	uap->fd = cheri_getoffset(tmpcap);
 
-	/* [1] _In_reads_(2) const struct timeval * tptr */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_futimes_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->tptr),
-		    tmpcap, (sizeof(*uap->tptr) * 2), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [1] _In_reads_(2) const struct timeval *__capability tptr */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->tptr),
+	    1, CHERIABI_SYS_cheriabi_futimes_PTRMASK);
 
 	return (0);
 }

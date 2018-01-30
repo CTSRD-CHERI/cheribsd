@@ -302,6 +302,14 @@ cheriabi_futimesat(struct thread *td, struct cheriabi_futimesat_args *uap)
 }
 
 int
+cheriabi_futimes(struct thread *td, struct cheriabi_futimes_args *uap)
+{
+
+	return (kern_futimes(td, uap->fd, uap->tptr, UIO_USERSPACE));
+}
+
+
+int
 cheriabi_lutimes(struct thread *td, struct cheriabi_lutimes_args *uap)
 {
 	return (kern_lutimes(td, uap->path, UIO_USERSPACE, uap->tptr,

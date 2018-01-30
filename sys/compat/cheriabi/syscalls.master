@@ -479,9 +479,9 @@
 				    size_t len); }
 205	AUE_UNDELETE	STD	{ int cheriabi_undelete( \
 				    _In_z_ const char * __capability path); }
-206	AUE_FUTIMES	NOPROTO	{ int futimes(int fd, \
+206	AUE_FUTIMES	STD	{ int cheriabi_futimes(int fd, \
 				    _In_reads_(2) \
-				    const struct timeval *tptr); }
+				    const struct timeval * __capability tptr); }
 207	AUE_GETPGID	NOPROTO	{ int getpgid(pid_t pid); }
 208	AUE_NULL	UNIMPL	newreboot (NetBSD)
 209	AUE_POLL	STD	{ int cheriabi_poll( \

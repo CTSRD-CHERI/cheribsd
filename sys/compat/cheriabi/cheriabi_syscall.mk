@@ -118,7 +118,7 @@ MIASM =  \
 	mlock.o \
 	munlock.o \
 	cheriabi_undelete.o \
-	futimes.o \
+	cheriabi_futimes.o \
 	getpgid.o \
 	cheriabi_poll.o \
 	semget.o \

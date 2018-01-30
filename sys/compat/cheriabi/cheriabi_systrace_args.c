@@ -946,11 +946,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* futimes */
+	/* cheriabi_futimes */
 	case 206: {
-		struct futimes_args *p = params;
+		struct cheriabi_futimes_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->tptr; /* const struct timeval * */
+		uarg[1] = (cheri_getbase(p->tptr) + cheri_getoffset(p->tptr)); /* const struct timeval *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -4630,14 +4630,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* futimes */
+	/* cheriabi_futimes */
 	case 206:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct timeval *";
+			p = "userland const struct timeval *__capability";
 			break;
 		default:
 			break;
@@ -8846,7 +8846,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* futimes */
+	/* cheriabi_futimes */
 	case 206:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

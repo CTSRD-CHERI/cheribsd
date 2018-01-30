@@ -112,7 +112,7 @@
 #define	CHERIABI_SYS_mlock_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_munlock_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_undelete_PTRMASK	(0x0 | 0x1)
-#define	CHERIABI_SYS_futimes_PTRMASK	(0x0 | 0x2)
+#define	CHERIABI_SYS_cheriabi_futimes_PTRMASK	(0x0 | 0x2)
 #define	CHERIABI_SYS_getpgid_PTRMASK	(0x0)
 #define	CHERIABI_SYS_cheriabi_poll_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_semget_PTRMASK	(0x0)
