@@ -197,7 +197,7 @@
 #define	CHERIABI_SYS_cheriabi_poll	209
 				/* 220 is obsolete __semctl */
 #define	CHERIABI_SYS_semget	221
-#define	CHERIABI_SYS_semop	222
+#define	CHERIABI_SYS_cheriabi_semop	222
 				/* 224 is obsolete msgctl */
 #define	CHERIABI_SYS_msgget	225
 #define	CHERIABI_SYS_msgsnd	226

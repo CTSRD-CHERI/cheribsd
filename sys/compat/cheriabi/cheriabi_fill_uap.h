@@ -2364,30 +2364,23 @@ CHERIABI_SYS_semget_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_semop_fill_uap(struct thread *td,
-    struct semop_args *uap)
+CHERIABI_SYS_cheriabi_semop_fill_uap(struct thread *td,
+    struct cheriabi_semop_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] int semid */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_semop_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_semop_PTRMASK);
 	uap->semid = cheri_getoffset(tmpcap);
 
 	/* [2] u_int nsops */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_semop_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_semop_PTRMASK);
 	uap->nsops = cheri_getoffset(tmpcap);
 
-	/* [1] _In_reads_(nsops) struct sembuf * sops */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_semop_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->sops),
-		    tmpcap, (sizeof(*uap->sops) * uap->nsops), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [1] _In_reads_(nsops) struct sembuf *__capability sops */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->sops),
+	    1, CHERIABI_SYS_cheriabi_semop_PTRMASK);
 
 	return (0);
 }

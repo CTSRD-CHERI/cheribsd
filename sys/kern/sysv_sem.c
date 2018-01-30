@@ -89,6 +89,8 @@ static MALLOC_DEFINE(M_SEM, "sem", "SVID compatible semaphores");
 #define DPRINTF(a)
 #endif
 
+static int kern_semop(struct thread *td, int semid,
+    struct sembuf * __capability usops, size_t nsops);
 static int seminit(void);
 static int sysvsem_modload(struct module *, int, void *);
 static int semunload(void);
@@ -269,7 +271,7 @@ static struct syscall_helper_data sem32_syscalls[] = {
 static struct syscall_helper_data cheriabi_sem_syscalls[] = {
 	CHERIABI_SYSCALL_INIT_HELPER(cheriabi___semctl),
 	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(semget),
-	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(semop),
+	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_semop),
 	SYSCALL_INIT_LAST
 };
 #endif /* COMPAT_CHERIABI */
@@ -789,6 +791,14 @@ cheriabi___semctl(struct thread *td, struct cheriabi___semctl_args *uap)
 		td->td_retval[0] = rval;
 	return (error);
 }
+
+int
+cheriabi_semop(struct thread *td, struct cheriabi_semop_args *uap)
+{
+
+	return (kern_semop(td, uap->semid, uap->sops, uap->nsops));
+}
+
 #endif /* COMPAT_CHERIABI */
 
 int
@@ -1193,10 +1203,17 @@ struct semop_args {
 int
 sys_semop(struct thread *td, struct semop_args *uap)
 {
+
+	return (kern_semop(td, uap->semid,
+	    __USER_CAP_ARRAY(uap->sops, uap->nsops), uap->nsops));
+}
+
+static int
+kern_semop(struct thread *td, int semid, struct sembuf * __capability usops,
+    size_t nsops)
+{
 #define SMALL_SOPS	8
 	struct sembuf small_sops[SMALL_SOPS];
-	int semid = uap->semid;
-	size_t nsops = uap->nsops;
 	struct prison *rpr;
 	struct sembuf *sops;
 	struct semid_kernel *semakptr;
@@ -1247,9 +1264,12 @@ sys_semop(struct thread *td, struct semop_args *uap)
 
 		sops = malloc(nsops * sizeof(*sops), M_TEMP, M_WAITOK);
 	}
-	if ((error = copyin(uap->sops, sops, nsops * sizeof(sops[0]))) != 0) {
+	if ((error = copyin_c(usops,
+	    (__cheri_tocap struct sembuf * __capability)sops,
+	    nsops * sizeof(sops[0]))) != 0) {
 		DPRINTF(("error = %d from copyin(%p, %p, %d)\n", error,
-		    uap->sops, sops, nsops * sizeof(sops[0])));
+		    (__cheri_fromcap struct sembuf *)usops, sops,
+		    nsops * sizeof(sops[0])));
 		if (sops != small_sops)
 			free(sops, M_SEM);
 		return (error);
@@ -1263,7 +1283,7 @@ sys_semop(struct thread *td, struct semop_args *uap)
 		goto done2;
 	}
 	seq = semakptr->u.sem_perm.seq;
-	if (seq != IPCID_TO_SEQ(uap->semid)) {
+	if (seq != IPCID_TO_SEQ(semid)) {
 		error = EINVAL;
 		goto done2;
 	}
@@ -1391,7 +1411,7 @@ sys_semop(struct thread *td, struct semop_args *uap)
 		 */
 		seq = semakptr->u.sem_perm.seq;
 		if ((semakptr->u.sem_perm.mode & SEM_ALLOC) == 0 ||
-		    seq != IPCID_TO_SEQ(uap->semid)) {
+		    seq != IPCID_TO_SEQ(semid)) {
 			error = EIDRM;
 			goto done2;
 		}

@@ -1029,11 +1029,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* semop */
+	/* cheriabi_semop */
 	case 222: {
-		struct semop_args *p = params;
+		struct cheriabi_semop_args *p = params;
 		iarg[0] = p->semid; /* int */
-		uarg[1] = (intptr_t) p->sops; /* struct sembuf * */
+		uarg[1] = (cheri_getbase(p->sops) + cheri_getoffset(p->sops)); /* struct sembuf *__capability */
 		uarg[2] = p->nsops; /* u_int */
 		*n_args = 3;
 		break;
@@ -4715,14 +4715,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* semop */
+	/* cheriabi_semop */
 	case 222:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct sembuf *";
+			p = "userland struct sembuf *__capability";
 			break;
 		case 2:
 			p = "u_int";
@@ -8886,7 +8886,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* semop */
+	/* cheriabi_semop */
 	case 222:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

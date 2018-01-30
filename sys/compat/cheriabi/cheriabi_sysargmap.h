@@ -116,7 +116,7 @@
 #define	CHERIABI_SYS_getpgid_PTRMASK	(0x0)
 #define	CHERIABI_SYS_cheriabi_poll_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_semget_PTRMASK	(0x0)
-#define	CHERIABI_SYS_semop_PTRMASK	(0x0 | 0x2)
+#define	CHERIABI_SYS_cheriabi_semop_PTRMASK	(0x0 | 0x2)
 #define	CHERIABI_SYS_msgget_PTRMASK	(0x0)
 #define	CHERIABI_SYS_msgsnd_PTRMASK	(0x0 | 0x2)
 #define	CHERIABI_SYS_msgrcv_PTRMASK	(0x0 | 0x2)

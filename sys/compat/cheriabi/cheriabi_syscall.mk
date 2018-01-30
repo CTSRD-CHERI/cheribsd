@@ -122,7 +122,7 @@ MIASM =  \
 	getpgid.o \
 	cheriabi_poll.o \
 	semget.o \
-	semop.o \
+	cheriabi_semop.o \
 	msgget.o \
 	msgsnd.o \
 	msgrcv.o \
