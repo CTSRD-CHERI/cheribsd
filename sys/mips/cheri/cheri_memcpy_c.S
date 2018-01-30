@@ -274,7 +274,7 @@ b_cap_copy:
 	 */
 	li		a2, -CHERICAP_SIZE	// a2: offset we will copy
 	and		a1, a0, a2		// a1: amount we could copy
-	slt		t9, a0, a2
+	slt		t9, a0, CHERICAP_SIZE
 	bnez		t9, b_copy_head
 	li		a3, -CHERICAP_SIZE	// a3: incremnt
 	dsub		a1, zero, a1	// a1: end offset (negative)
