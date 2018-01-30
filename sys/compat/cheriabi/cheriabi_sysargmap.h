@@ -140,7 +140,7 @@
 #define	CHERIABI_SYS_cheriabi_ntp_gettime_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_minherit_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_rfork_PTRMASK	(0x0)
-#define	CHERIABI_SYS_lchown_PTRMASK	(0x0 | 0x1)
+#define	CHERIABI_SYS_cheriabi_lchown_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_aio_read_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_aio_write_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_lio_listio_PTRMASK	(0x0 | 0x2 | 0x8)

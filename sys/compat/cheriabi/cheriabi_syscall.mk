@@ -147,7 +147,7 @@ MIASM =  \
 	minherit.o \
 	rfork.o \
 	issetugid.o \
-	lchown.o \
+	cheriabi_lchown.o \
 	cheriabi_aio_read.o \
 	cheriabi_aio_write.o \
 	cheriabi_lio_listio.o \

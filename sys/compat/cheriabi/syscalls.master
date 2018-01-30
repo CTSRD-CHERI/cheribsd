@@ -591,8 +591,9 @@
 251	AUE_RFORK	NOPROTO	{ int rfork(int flags); }
 252	AUE_POLL	UNIMPL	openbsd_poll
 253	AUE_ISSETUGID	NOPROTO	{ int issetugid(void); }
-254	AUE_LCHOWN	NOPROTO	{ int lchown(_In_z_ const char *path, int uid, \
-				    int gid); }
+254	AUE_LCHOWN	STD	{ int cheriabi_lchown( \
+				    _In_z_ const char * __capability path, \
+				    int uid, int gid); }
 255	AUE_AIO_READ	STD	{ int cheriabi_aio_read( \
 				    _Inout_ struct aiocb_c * __capability \
 				    aiocbp); }

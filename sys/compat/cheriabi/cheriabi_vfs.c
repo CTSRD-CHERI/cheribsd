@@ -286,6 +286,14 @@ cheriabi_fchownat(struct thread *td, struct cheriabi_fchownat_args *uap)
 }
 
 int
+cheriabi_lchown(struct thread *td, struct cheriabi_lchown_args *uap)
+{
+
+	return (kern_fchownat(td, AT_FDCWD, uap->path, UIO_USERSPACE,
+	    uap->uid, uap->gid, AT_SYMLINK_NOFOLLOW));
+}
+
+int
 cheriabi_utimes(struct thread *td, struct cheriabi_utimes_args *uap)
 {
 

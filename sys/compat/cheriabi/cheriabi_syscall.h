@@ -224,7 +224,7 @@
 #define	CHERIABI_SYS_minherit	250
 #define	CHERIABI_SYS_rfork	251
 #define	CHERIABI_SYS_issetugid	253
-#define	CHERIABI_SYS_lchown	254
+#define	CHERIABI_SYS_cheriabi_lchown	254
 #define	CHERIABI_SYS_cheriabi_aio_read	255
 #define	CHERIABI_SYS_cheriabi_aio_write	256
 #define	CHERIABI_SYS_cheriabi_lio_listio	257
