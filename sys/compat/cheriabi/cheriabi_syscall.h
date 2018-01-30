@@ -215,9 +215,9 @@
 #define	CHERIABI_SYS_cheriabi_ktimer_gettime	238
 #define	CHERIABI_SYS_ktimer_getoverrun	239
 #define	CHERIABI_SYS_cheriabi_nanosleep	240
-#define	CHERIABI_SYS_ffclock_getcounter	241
-#define	CHERIABI_SYS_ffclock_setestimate	242
-#define	CHERIABI_SYS_ffclock_getestimate	243
+#define	CHERIABI_SYS_cheriabi_ffclock_getcounter	241
+#define	CHERIABI_SYS_cheriabi_ffclock_setestimate	242
+#define	CHERIABI_SYS_cheriabi_ffclock_getestimate	243
 #define	CHERIABI_SYS_cheriabi_clock_nanosleep	244
 #define	CHERIABI_SYS_cheriabi_clock_getcpuclockid2	247
 #define	CHERIABI_SYS_cheriabi_ntp_gettime	248

@@ -1165,24 +1165,24 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* ffclock_getcounter */
+	/* cheriabi_ffclock_getcounter */
 	case 241: {
-		struct ffclock_getcounter_args *p = params;
-		uarg[0] = (intptr_t) p->ffcount; /* ffcounter * */
+		struct cheriabi_ffclock_getcounter_args *p = params;
+		uarg[0] = (cheri_getbase(p->ffcount) + cheri_getoffset(p->ffcount)); /* ffcounter *__capability */
 		*n_args = 1;
 		break;
 	}
-	/* ffclock_setestimate */
+	/* cheriabi_ffclock_setestimate */
 	case 242: {
-		struct ffclock_setestimate_args *p = params;
-		uarg[0] = (intptr_t) p->cest; /* struct ffclock_estimate * */
+		struct cheriabi_ffclock_setestimate_args *p = params;
+		uarg[0] = (cheri_getbase(p->cest) + cheri_getoffset(p->cest)); /* struct ffclock_estimate *__capability */
 		*n_args = 1;
 		break;
 	}
-	/* ffclock_getestimate */
+	/* cheriabi_ffclock_getestimate */
 	case 243: {
-		struct ffclock_getestimate_args *p = params;
-		uarg[0] = (intptr_t) p->cest; /* struct ffclock_estimate * */
+		struct cheriabi_ffclock_getestimate_args *p = params;
+		uarg[0] = (cheri_getbase(p->cest) + cheri_getoffset(p->cest)); /* struct ffclock_estimate *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -4947,31 +4947,31 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* ffclock_getcounter */
+	/* cheriabi_ffclock_getcounter */
 	case 241:
 		switch(ndx) {
 		case 0:
-			p = "userland ffcounter *";
+			p = "userland ffcounter *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* ffclock_setestimate */
+	/* cheriabi_ffclock_setestimate */
 	case 242:
 		switch(ndx) {
 		case 0:
-			p = "userland struct ffclock_estimate *";
+			p = "userland struct ffclock_estimate *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* ffclock_getestimate */
+	/* cheriabi_ffclock_getestimate */
 	case 243:
 		switch(ndx) {
 		case 0:
-			p = "userland struct ffclock_estimate *";
+			p = "userland struct ffclock_estimate *__capability";
 			break;
 		default:
 			break;
@@ -8966,17 +8966,17 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* ffclock_getcounter */
+	/* cheriabi_ffclock_getcounter */
 	case 241:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* ffclock_setestimate */
+	/* cheriabi_ffclock_setestimate */
 	case 242:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* ffclock_getestimate */
+	/* cheriabi_ffclock_getestimate */
 	case 243:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

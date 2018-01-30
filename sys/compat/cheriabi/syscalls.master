@@ -562,12 +562,13 @@
 				    const struct timespec * __capability rqtp, \
 				    _Out_opt_ \
 				    struct timespec * __capability rmtp); }
-241	AUE_NULL	NOPROTO	{ int ffclock_getcounter( \
-				    _Out_ ffcounter *ffcount); }
-242	AUE_NULL	NOPROTO	{ int ffclock_setestimate( \
-				    _In_ struct ffclock_estimate *cest); }
-243	AUE_NULL	NOPROTO	{ int ffclock_getestimate( \
-				    _Out_ struct ffclock_estimate *cest); }
+241	AUE_NULL	STD	{ int cheriabi_ffclock_getcounter( \
+				    _Out_ \
+				    ffcounter * __capability ffcount); }
+242	AUE_NULL	STD	{ int cheriabi_ffclock_setestimate( \
+				    _In_ struct ffclock_estimate * __capability cest); }
+243	AUE_NULL	STD	{ int cheriabi_ffclock_getestimate( \
+				    _Out_ struct ffclock_estimate * __capability cest); }
 244	AUE_NULL	STD	{ int cheriabi_clock_nanosleep( \
 				    clockid_t clock_id, int flags, \
 				    _In_ \

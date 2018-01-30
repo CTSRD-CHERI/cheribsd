@@ -359,6 +359,15 @@ struct cheriabi_nanosleep_args {
 	char rqtp_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability rqtp; char rqtp_r_[PADR_(const struct timespec *__capability)];
 	char rmtp_l_[PADL_(struct timespec *__capability)]; struct timespec *__capability rmtp; char rmtp_r_[PADR_(struct timespec *__capability)];
 };
+struct cheriabi_ffclock_getcounter_args {
+	char ffcount_l_[PADL_(ffcounter *__capability)]; ffcounter *__capability ffcount; char ffcount_r_[PADR_(ffcounter *__capability)];
+};
+struct cheriabi_ffclock_setestimate_args {
+	char cest_l_[PADL_(struct ffclock_estimate *__capability)]; struct ffclock_estimate *__capability cest; char cest_r_[PADR_(struct ffclock_estimate *__capability)];
+};
+struct cheriabi_ffclock_getestimate_args {
+	char cest_l_[PADL_(struct ffclock_estimate *__capability)]; struct ffclock_estimate *__capability cest; char cest_r_[PADR_(struct ffclock_estimate *__capability)];
+};
 struct cheriabi_clock_nanosleep_args {
 	char clock_id_l_[PADL_(clockid_t)]; clockid_t clock_id; char clock_id_r_[PADR_(clockid_t)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
@@ -850,6 +859,9 @@ int	cheriabi_ktimer_create(struct thread *, struct cheriabi_ktimer_create_args *
 int	cheriabi_ktimer_settime(struct thread *, struct cheriabi_ktimer_settime_args *);
 int	cheriabi_ktimer_gettime(struct thread *, struct cheriabi_ktimer_gettime_args *);
 int	cheriabi_nanosleep(struct thread *, struct cheriabi_nanosleep_args *);
+int	cheriabi_ffclock_getcounter(struct thread *, struct cheriabi_ffclock_getcounter_args *);
+int	cheriabi_ffclock_setestimate(struct thread *, struct cheriabi_ffclock_setestimate_args *);
+int	cheriabi_ffclock_getestimate(struct thread *, struct cheriabi_ffclock_getestimate_args *);
 int	cheriabi_clock_nanosleep(struct thread *, struct cheriabi_clock_nanosleep_args *);
 int	cheriabi_clock_getcpuclockid2(struct thread *, struct cheriabi_clock_getcpuclockid2_args *);
 int	cheriabi_ntp_gettime(struct thread *, struct cheriabi_ntp_gettime_args *);
@@ -1060,6 +1072,9 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_ktimer_settime	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_ktimer_gettime	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_nanosleep	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_ffclock_getcounter	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_ffclock_setestimate	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_ffclock_getestimate	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_clock_nanosleep	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_clock_getcpuclockid2	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_ntp_gettime	AUE_NULL

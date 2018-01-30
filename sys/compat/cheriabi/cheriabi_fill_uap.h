@@ -2696,64 +2696,40 @@ CHERIABI_SYS_cheriabi_nanosleep_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_ffclock_getcounter_fill_uap(struct thread *td,
-    struct ffclock_getcounter_args *uap)
+CHERIABI_SYS_cheriabi_ffclock_getcounter_fill_uap(struct thread *td,
+    struct cheriabi_ffclock_getcounter_args *uap)
 {
-	void * __capability tmpcap;
 
-	/* [0] _Out_ ffcounter * ffcount */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_ffclock_getcounter_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->ffcount),
-		    tmpcap, sizeof(*uap->ffcount), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _Out_ ffcounter *__capability ffcount */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->ffcount),
+	    0, CHERIABI_SYS_cheriabi_ffclock_getcounter_PTRMASK);
 
 	return (0);
 }
 
 static inline int
-CHERIABI_SYS_ffclock_setestimate_fill_uap(struct thread *td,
-    struct ffclock_setestimate_args *uap)
+CHERIABI_SYS_cheriabi_ffclock_setestimate_fill_uap(struct thread *td,
+    struct cheriabi_ffclock_setestimate_args *uap)
 {
-	void * __capability tmpcap;
 
-	/* [0] _In_ struct ffclock_estimate * cest */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_ffclock_setestimate_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->cest),
-		    tmpcap, sizeof(*uap->cest), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _In_ struct ffclock_estimate *__capability cest */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->cest),
+	    0, CHERIABI_SYS_cheriabi_ffclock_setestimate_PTRMASK);
 
 	return (0);
 }
 
 static inline int
-CHERIABI_SYS_ffclock_getestimate_fill_uap(struct thread *td,
-    struct ffclock_getestimate_args *uap)
+CHERIABI_SYS_cheriabi_ffclock_getestimate_fill_uap(struct thread *td,
+    struct cheriabi_ffclock_getestimate_args *uap)
 {
-	void * __capability tmpcap;
 
-	/* [0] _Out_ struct ffclock_estimate * cest */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_ffclock_getestimate_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->cest),
-		    tmpcap, sizeof(*uap->cest), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _Out_ struct ffclock_estimate *__capability cest */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->cest),
+	    0, CHERIABI_SYS_cheriabi_ffclock_getestimate_PTRMASK);
 
 	return (0);
 }

@@ -138,9 +138,9 @@ MIASM =  \
 	cheriabi_ktimer_gettime.o \
 	ktimer_getoverrun.o \
 	cheriabi_nanosleep.o \
-	ffclock_getcounter.o \
-	ffclock_setestimate.o \
-	ffclock_getestimate.o \
+	cheriabi_ffclock_getcounter.o \
+	cheriabi_ffclock_setestimate.o \
+	cheriabi_ffclock_getestimate.o \
 	cheriabi_clock_nanosleep.o \
 	cheriabi_clock_getcpuclockid2.o \
 	cheriabi_ntp_gettime.o \

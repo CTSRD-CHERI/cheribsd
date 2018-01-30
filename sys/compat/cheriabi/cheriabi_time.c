@@ -31,12 +31,59 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include "opt_ffclock.h"
+
 #include <sys/param.h>
+#include <sys/timeffc.h>
 #include <sys/proc.h>
 #include <sys/syscallsubr.h>
 #include <sys/timex.h>
 
 #include <compat/cheriabi/cheriabi_proto.h>
+
+/*
+ * kern_ffclock.c
+ */
+int
+cheriabi_ffclock_getcounter(struct thread *td,
+    struct cheriabi_ffclock_getcounter_args *uap)
+{
+#ifdef	FFCLOCK
+	ffcounter ffcount;
+
+	ffcount = 0;
+	ffclock_read_counter(&ffcount);
+	if (ffcount == 0)
+		return (EAGAIN);
+	return (copyout_c(&ffcount, uap->ffcount, sizeof(ffcounter)));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_ffclock_setestimate(struct thread *td,
+    struct cheriabi_ffclock_setestimate_args *uap)
+{
+
+#ifdef	FFCLOCK
+	return (kern_ffclock_setestimate(td, uap->cest));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_ffclock_getestimate(struct thread *td,
+    struct cheriabi_ffclock_getestimate_args *uap)
+{
+
+#ifdef	FFCLOCK
+	return (kern_ffclock_getestimate(td, uap->cest));
+#else
+	return (ENOSYS);
+#endif
+}
 
 /*
  * kern_ntptime.c
