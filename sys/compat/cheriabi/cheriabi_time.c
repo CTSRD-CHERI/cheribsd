@@ -32,9 +32,62 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
+#include <sys/proc.h>
 #include <sys/syscallsubr.h>
+#include <sys/timex.h>
 
 #include <compat/cheriabi/cheriabi_proto.h>
+
+/*
+ * kern_ntptime.c
+ */
+int
+cheriabi_ntp_gettime(struct thread *td, struct cheriabi_ntp_gettime_args *uap)
+{
+
+	return (kern_ntp_gettime(td, uap->ntvp));
+}
+
+int
+cheriabi_ntp_adjtime(struct thread *td, struct cheriabi_ntp_adjtime_args *uap)
+{
+	struct timex ntv;
+	int error, retval;
+
+	error = copyin_c(uap->tp, &ntv, sizeof(ntv));
+	if (error != 0)
+		return (error);
+	error = kern_ntp_adjtime(td, &ntv, &retval);
+	if (error != 0)
+		return (error);
+	error = copyout_c(&ntv, uap->tp, sizeof(ntv));
+	if (error == 0)
+		td->td_retval[0] = retval;
+	return (error);
+}
+
+int
+cheriabi_adjtime(struct thread *td, struct cheriabi_adjtime_args *uap)
+{
+	struct timeval delta, olddelta, *deltap;
+	int error;
+
+	if (uap->delta) {
+		error = copyin_c(uap->delta, &delta, sizeof(delta));
+		if (error != 0)
+			return (error);
+		deltap = &delta;
+	} else
+		deltap = NULL;
+	error = kern_adjtime(td, deltap, &olddelta);
+	if (uap->olddelta && error == 0)
+		error = copyout_c(&olddelta, uap->olddelta, sizeof(olddelta));
+	return (error);
+}
+
+/*
+ * kern_time.c
+ */
 
 int
 cheriabi_clock_getcpuclockid2(struct thread *td,

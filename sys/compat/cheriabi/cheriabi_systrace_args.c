@@ -770,11 +770,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* adjtime */
+	/* cheriabi_adjtime */
 	case 140: {
-		struct adjtime_args *p = params;
-		uarg[0] = (intptr_t) p->delta; /* const struct timeval * */
-		uarg[1] = (intptr_t) p->olddelta; /* struct timeval * */
+		struct cheriabi_adjtime_args *p = params;
+		uarg[0] = (cheri_getbase(p->delta) + cheri_getoffset(p->delta)); /* const struct timeval *__capability */
+		uarg[1] = (cheri_getbase(p->olddelta) + cheri_getoffset(p->olddelta)); /* struct timeval *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -851,10 +851,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* ntp_adjtime */
+	/* cheriabi_ntp_adjtime */
 	case 176: {
-		struct ntp_adjtime_args *p = params;
-		uarg[0] = (intptr_t) p->tp; /* struct timex * */
+		struct cheriabi_ntp_adjtime_args *p = params;
+		uarg[0] = (cheri_getbase(p->tp) + cheri_getoffset(p->tp)); /* struct timex *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -1205,10 +1205,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* ntp_gettime */
+	/* cheriabi_ntp_gettime */
 	case 248: {
-		struct ntp_gettime_args *p = params;
-		uarg[0] = (intptr_t) p->ntvp; /* struct ntptimeval * */
+		struct cheriabi_ntp_gettime_args *p = params;
+		uarg[0] = (cheri_getbase(p->ntvp) + cheri_getoffset(p->ntvp)); /* struct ntptimeval *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -4345,14 +4345,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* adjtime */
+	/* cheriabi_adjtime */
 	case 140:
 		switch(ndx) {
 		case 0:
-			p = "userland const struct timeval *";
+			p = "userland const struct timeval *__capability";
 			break;
 		case 1:
-			p = "userland struct timeval *";
+			p = "userland struct timeval *__capability";
 			break;
 		default:
 			break;
@@ -4477,11 +4477,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* ntp_adjtime */
+	/* cheriabi_ntp_adjtime */
 	case 176:
 		switch(ndx) {
 		case 0:
-			p = "userland struct timex *";
+			p = "userland struct timex *__capability";
 			break;
 		default:
 			break;
@@ -5012,11 +5012,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* ntp_gettime */
+	/* cheriabi_ntp_gettime */
 	case 248:
 		switch(ndx) {
 		case 0:
-			p = "userland struct ntptimeval *";
+			p = "userland struct ntptimeval *__capability";
 			break;
 		default:
 			break;
@@ -8739,7 +8739,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* adjtime */
+	/* cheriabi_adjtime */
 	case 140:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -8786,7 +8786,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* ntp_adjtime */
+	/* cheriabi_ntp_adjtime */
 	case 176:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -8991,7 +8991,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* ntp_gettime */
+	/* cheriabi_ntp_gettime */
 	case 248:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

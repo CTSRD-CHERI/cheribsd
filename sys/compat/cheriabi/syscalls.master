@@ -352,8 +352,9 @@
 				    const struct sockaddr *to, \
 				    __socklen_t tolen); }
 134	AUE_SHUTDOWN	NOPROTO	{ int shutdown(int s, int how); }
-135	AUE_SOCKETPAIR	NOPROTO	{ int socketpair(int domain, int type, \
-				    int protocol, _Out_writes_(2) int *rsv); }
+135	AUE_SOCKETPAIR	NOPROTO	{ int socketpair(int domain, \
+				    int type, int protocol, \
+				    _Out_writes_(2) int *rsv); }
 136	AUE_MKDIR	STD	{ int cheriabi_mkdir( \
 				    _In_z_ const char * __capability path, \
 				    mode_t mode); }
@@ -364,9 +365,11 @@
 				    _In_ \
 				    const struct timeval * __capability tptr); }
 139	AUE_NULL	OBSOL	sigreturn
-140	AUE_ADJTIME	NOPROTO	{ int adjtime( \
-				    _In_ const struct timeval *delta, \
-				    _Out_opt_ struct timeval *olddelta); }
+140	AUE_ADJTIME	STD	{ int cheriabi_adjtime( \
+				    _In_ \
+				    const struct timeval * __capability delta, \
+				    _Out_opt_ \
+				    struct timeval * __capability olddelta); }
 141	AUE_GETPEERNAME	OBSOL	ogetpeername
 142	AUE_SYSCTL	OBSOL	ogethostid
 143	AUE_SYSCTL	OBSOL	sethostid
@@ -424,7 +427,8 @@
 173	AUE_PREAD	OBSOL	pread
 174	AUE_PWRITE	OBSOL	pwrite
 175	AUE_SETFIB	NOPROTO	{ int setfib(int fibnum); }
-176	AUE_NTP_ADJTIME	NOPROTO	{ int ntp_adjtime(_Inout_ struct timex *tp); }
+176	AUE_NTP_ADJTIME	STD	{ int cheriabi_ntp_adjtime( \
+				    _Inout_ struct timex * __capability tp); }
 177	AUE_NULL	UNIMPL	sfork (BSD/OS 2.x)
 178	AUE_NULL	UNIMPL	getdescriptor (BSD/OS 2.x)
 179	AUE_NULL	UNIMPL	setdescriptor (BSD/OS 2.x)
@@ -571,8 +575,9 @@
 247	AUE_NULL	STD	{ int cheriabi_clock_getcpuclockid2(id_t id, \
 				    int which, \
 				    _Out_ clockid_t * __capability clock_id); }
-248	AUE_NULL	NOPROTO	{ int ntp_gettime(\
-				    _Out_ struct ntptimeval *ntvp); }
+248	AUE_NULL	STD	{ int cheriabi_ntp_gettime(\
+				    _Out_ \
+				    struct ntptimeval * __capability ntvp); }
 249	AUE_NULL	UNIMPL	nosys
 ; syscall numbers initially used in OpenBSD
 250	AUE_MINHERIT	NOPROTO	{ int minherit( \

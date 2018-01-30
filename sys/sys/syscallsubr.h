@@ -47,6 +47,7 @@ struct kld_file_stat;
 struct ksiginfo;
 struct mbuf;
 struct msqid_ds;
+struct ntptimeval;
 struct pollfd;
 struct ogetdirentries_args;
 struct rlimit;
@@ -56,6 +57,7 @@ union semun;
 struct sockaddr;
 struct stat;
 struct thr_param;
+struct timex;
 struct sched_param;
 struct __wrusage;
 
@@ -201,6 +203,9 @@ int	kern_munlock(struct thread *td, uintptr_t addr, size_t size);
 int	kern_munmap(struct thread *td, uintptr_t addr, size_t size);
 int     kern_nanosleep(struct thread *td, struct timespec *rqt,
 	    struct timespec *rmt);
+int	kern_ntp_adjtime(struct thread *td, struct timex *tp, int *retval);
+int	kern_ntp_gettime(struct thread *td,
+	    struct ntptimeval * __capability ntvp);
 int	kern_ogetdirentries(struct thread *td, struct ogetdirentries_args *uap,
 	    long *ploff);
 int	kern_openat(struct thread *td, int fd, char *path,

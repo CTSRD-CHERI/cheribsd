@@ -142,7 +142,7 @@
 #define	CHERIABI_SYS_cheriabi_rmdir	137
 #define	CHERIABI_SYS_cheriabi_utimes	138
 				/* 139 is obsolete sigreturn */
-#define	CHERIABI_SYS_adjtime	140
+#define	CHERIABI_SYS_cheriabi_adjtime	140
 				/* 141 is obsolete ogetpeername */
 				/* 142 is obsolete ogethostid */
 				/* 143 is obsolete sethostid */
@@ -171,7 +171,7 @@
 				/* 173 is obsolete pread */
 				/* 174 is obsolete pwrite */
 #define	CHERIABI_SYS_setfib	175
-#define	CHERIABI_SYS_ntp_adjtime	176
+#define	CHERIABI_SYS_cheriabi_ntp_adjtime	176
 #define	CHERIABI_SYS_setgid	181
 #define	CHERIABI_SYS_setegid	182
 #define	CHERIABI_SYS_seteuid	183
@@ -220,7 +220,7 @@
 #define	CHERIABI_SYS_ffclock_getestimate	243
 #define	CHERIABI_SYS_cheriabi_clock_nanosleep	244
 #define	CHERIABI_SYS_cheriabi_clock_getcpuclockid2	247
-#define	CHERIABI_SYS_ntp_gettime	248
+#define	CHERIABI_SYS_cheriabi_ntp_gettime	248
 #define	CHERIABI_SYS_minherit	250
 #define	CHERIABI_SYS_rfork	251
 #define	CHERIABI_SYS_issetugid	253

@@ -239,6 +239,10 @@ struct cheriabi_utimes_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 	char tptr_l_[PADL_(const struct timeval *__capability)]; const struct timeval *__capability tptr; char tptr_r_[PADR_(const struct timeval *__capability)];
 };
+struct cheriabi_adjtime_args {
+	char delta_l_[PADL_(const struct timeval *__capability)]; const struct timeval *__capability delta; char delta_r_[PADR_(const struct timeval *__capability)];
+	char olddelta_l_[PADL_(struct timeval *__capability)]; struct timeval *__capability olddelta; char olddelta_r_[PADR_(struct timeval *__capability)];
+};
 struct cheriabi_quotactl_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
@@ -271,6 +275,9 @@ struct cheriabi_rtprio_args {
 	char function_l_[PADL_(int)]; int function; char function_r_[PADR_(int)];
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
 	char rtp_l_[PADL_(struct rtprio *__capability)]; struct rtprio *__capability rtp; char rtp_r_[PADR_(struct rtprio *__capability)];
+};
+struct cheriabi_ntp_adjtime_args {
+	char tp_l_[PADL_(struct timex *__capability)]; struct timex *__capability tp; char tp_r_[PADR_(struct timex *__capability)];
 };
 struct cheriabi_pathconf_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
@@ -333,6 +340,9 @@ struct cheriabi_clock_getcpuclockid2_args {
 	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
 	char clock_id_l_[PADL_(clockid_t *__capability)]; clockid_t *__capability clock_id; char clock_id_r_[PADR_(clockid_t *__capability)];
+};
+struct cheriabi_ntp_gettime_args {
+	char ntvp_l_[PADL_(struct ntptimeval *__capability)]; struct ntptimeval *__capability ntvp; char ntvp_r_[PADR_(struct ntptimeval *__capability)];
 };
 struct cheriabi_aio_read_args {
 	char aiocbp_l_[PADL_(struct aiocb_c *__capability)]; struct aiocb_c *__capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c *__capability)];
@@ -777,6 +787,7 @@ int	cheriabi_mkfifo(struct thread *, struct cheriabi_mkfifo_args *);
 int	cheriabi_mkdir(struct thread *, struct cheriabi_mkdir_args *);
 int	cheriabi_rmdir(struct thread *, struct cheriabi_rmdir_args *);
 int	cheriabi_utimes(struct thread *, struct cheriabi_utimes_args *);
+int	cheriabi_adjtime(struct thread *, struct cheriabi_adjtime_args *);
 int	cheriabi_quotactl(struct thread *, struct cheriabi_quotactl_args *);
 int	cheriabi_nlm_syscall(struct thread *, struct cheriabi_nlm_syscall_args *);
 int	cheriabi_nfssvc(struct thread *, struct cheriabi_nfssvc_args *);
@@ -784,6 +795,7 @@ int	cheriabi_lgetfh(struct thread *, struct cheriabi_lgetfh_args *);
 int	cheriabi_getfh(struct thread *, struct cheriabi_getfh_args *);
 int	cheriabi_sysarch(struct thread *, struct cheriabi_sysarch_args *);
 int	cheriabi_rtprio(struct thread *, struct cheriabi_rtprio_args *);
+int	cheriabi_ntp_adjtime(struct thread *, struct cheriabi_ntp_adjtime_args *);
 int	cheriabi_pathconf(struct thread *, struct cheriabi_pathconf_args *);
 int	cheriabi_getrlimit(struct thread *, struct cheriabi_getrlimit_args *);
 int	cheriabi_setrlimit(struct thread *, struct cheriabi_setrlimit_args *);
@@ -798,6 +810,7 @@ int	cheriabi_ktimer_gettime(struct thread *, struct cheriabi_ktimer_gettime_args
 int	cheriabi_nanosleep(struct thread *, struct cheriabi_nanosleep_args *);
 int	cheriabi_clock_nanosleep(struct thread *, struct cheriabi_clock_nanosleep_args *);
 int	cheriabi_clock_getcpuclockid2(struct thread *, struct cheriabi_clock_getcpuclockid2_args *);
+int	cheriabi_ntp_gettime(struct thread *, struct cheriabi_ntp_gettime_args *);
 int	cheriabi_aio_read(struct thread *, struct cheriabi_aio_read_args *);
 int	cheriabi_aio_write(struct thread *, struct cheriabi_aio_write_args *);
 int	cheriabi_lio_listio(struct thread *, struct cheriabi_lio_listio_args *);
@@ -978,6 +991,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_mkdir	AUE_MKDIR
 #define	CHERIABI_SYS_AUE_cheriabi_rmdir	AUE_RMDIR
 #define	CHERIABI_SYS_AUE_cheriabi_utimes	AUE_UTIMES
+#define	CHERIABI_SYS_AUE_cheriabi_adjtime	AUE_ADJTIME
 #define	CHERIABI_SYS_AUE_cheriabi_quotactl	AUE_QUOTACTL
 #define	CHERIABI_SYS_AUE_cheriabi_nlm_syscall	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_nfssvc	AUE_NFS_SVC
@@ -985,6 +999,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_getfh	AUE_NFS_GETFH
 #define	CHERIABI_SYS_AUE_cheriabi_sysarch	AUE_SYSARCH
 #define	CHERIABI_SYS_AUE_cheriabi_rtprio	AUE_RTPRIO
+#define	CHERIABI_SYS_AUE_cheriabi_ntp_adjtime	AUE_NTP_ADJTIME
 #define	CHERIABI_SYS_AUE_cheriabi_pathconf	AUE_PATHCONF
 #define	CHERIABI_SYS_AUE_cheriabi_getrlimit	AUE_GETRLIMIT
 #define	CHERIABI_SYS_AUE_cheriabi_setrlimit	AUE_SETRLIMIT
@@ -999,6 +1014,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_nanosleep	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_clock_nanosleep	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_clock_getcpuclockid2	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_ntp_gettime	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_aio_read	AUE_AIO_READ
 #define	CHERIABI_SYS_AUE_cheriabi_aio_write	AUE_AIO_WRITE
 #define	CHERIABI_SYS_AUE_cheriabi_lio_listio	AUE_LIO_LISTIO

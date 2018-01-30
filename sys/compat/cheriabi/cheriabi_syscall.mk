@@ -96,7 +96,7 @@ MIASM =  \
 	cheriabi_mkdir.o \
 	cheriabi_rmdir.o \
 	cheriabi_utimes.o \
-	adjtime.o \
+	cheriabi_adjtime.o \
 	setsid.o \
 	cheriabi_quotactl.o \
 	cheriabi_nlm_syscall.o \
@@ -106,7 +106,7 @@ MIASM =  \
 	cheriabi_sysarch.o \
 	cheriabi_rtprio.o \
 	setfib.o \
-	ntp_adjtime.o \
+	cheriabi_ntp_adjtime.o \
 	setgid.o \
 	setegid.o \
 	seteuid.o \
@@ -143,7 +143,7 @@ MIASM =  \
 	ffclock_getestimate.o \
 	cheriabi_clock_nanosleep.o \
 	cheriabi_clock_getcpuclockid2.o \
-	ntp_gettime.o \
+	cheriabi_ntp_gettime.o \
 	minherit.o \
 	rfork.o \
 	issetugid.o \
