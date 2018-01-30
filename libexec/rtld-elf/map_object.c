@@ -219,7 +219,7 @@ map_object(int fd, const char *path, const struct stat *sb)
 	data_flags = convert_flags(segs[i]->p_flags) | MAP_FIXED;
 	if (mmap(data_addr, data_vlimit - data_vaddr, data_prot,
 	  data_flags | MAP_PREFAULT_READ, fd, data_offset) == (caddr_t) -1) {
-	    _rtld_error("%s: mmap of data failed: %s", path,
+	    _rtld_error("%s: mmap of data at %p, size %zd failed (base_addr %p, mapbase %p, mapsize %zd: %s", path, data_addr, data_vlimit - data_vaddr, base_addr, mapbase, mapsize,
 		rtld_strerror(errno));
 	    goto error1;
 	}
