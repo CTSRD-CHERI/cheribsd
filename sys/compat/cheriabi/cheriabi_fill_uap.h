@@ -1660,26 +1660,19 @@ CHERIABI_SYS_flock_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_mkfifo_fill_uap(struct thread *td,
-    struct mkfifo_args *uap)
+CHERIABI_SYS_cheriabi_mkfifo_fill_uap(struct thread *td,
+    struct cheriabi_mkfifo_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [1] mode_t mode */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_mkfifo_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_mkfifo_PTRMASK);
 	uap->mode = cheri_getoffset(tmpcap);
 
-	/* [0] _In_z_ const char * path */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_mkfifo_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->path),
-		    tmpcap, sizeof(*uap->path), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _In_z_ const char *__capability path */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->path),
+	    0, CHERIABI_SYS_cheriabi_mkfifo_PTRMASK);
 
 	return (0);
 }

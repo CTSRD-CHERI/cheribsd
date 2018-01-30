@@ -342,7 +342,8 @@
 129	AUE_TRUNCATE	OBSOL	truncate
 130	AUE_FTRUNCATE	OBSOL	ftruncate
 131	AUE_FLOCK	NOPROTO	{ int flock(int fd, int how); }
-132	AUE_MKFIFO	NOPROTO	{ int mkfifo(_In_z_ const char *path, \
+132	AUE_MKFIFO	STD	{ int cheriabi_mkfifo( \
+				    _In_z_ const char * __capability path, \
 				    mode_t mode); }
 133	AUE_SENDTO	NOPROTO	{ ssize_t sendto(int s, \
 				    _In_reads_bytes_(len) const void *buf, \

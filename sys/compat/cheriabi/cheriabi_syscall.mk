@@ -89,7 +89,7 @@ MIASM =  \
 	setregid.o \
 	cheriabi_rename.o \
 	flock.o \
-	mkfifo.o \
+	cheriabi_mkfifo.o \
 	sendto.o \
 	shutdown.o \
 	socketpair.o \

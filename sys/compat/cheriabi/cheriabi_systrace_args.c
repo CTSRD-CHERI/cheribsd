@@ -709,10 +709,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* mkfifo */
+	/* cheriabi_mkfifo */
 	case 132: {
-		struct mkfifo_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_mkfifo_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->mode; /* mode_t */
 		*n_args = 2;
 		break;
@@ -4239,11 +4239,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* mkfifo */
+	/* cheriabi_mkfifo */
 	case 132:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "mode_t";
@@ -8704,7 +8704,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* mkfifo */
+	/* cheriabi_mkfifo */
 	case 132:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

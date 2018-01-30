@@ -86,6 +86,14 @@ cheriabi_mknodat(struct thread *td, struct cheriabi_mknodat_args *uap)
 }
 
 int
+cheriabi_mkfifo(struct thread *td, struct cheriabi_mkfifo_args *uap)
+{
+
+	return (kern_mkfifoat(td, AT_FDCWD, uap->path, UIO_USERSPACE,
+	    uap->mode));
+}
+
+int
 cheriabi_mkfifoat(struct thread *td, struct cheriabi_mkfifoat_args *uap)
 {
 

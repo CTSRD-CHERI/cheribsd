@@ -224,6 +224,10 @@ struct cheriabi_rename_args {
 	char from_l_[PADL_(const char *__capability)]; const char *__capability from; char from_r_[PADR_(const char *__capability)];
 	char to_l_[PADL_(const char *__capability)]; const char *__capability to; char to_r_[PADR_(const char *__capability)];
 };
+struct cheriabi_mkfifo_args {
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
+};
 struct cheriabi_mkdir_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
@@ -769,6 +773,7 @@ int	cheriabi_readv(struct thread *, struct cheriabi_readv_args *);
 int	cheriabi_writev(struct thread *, struct cheriabi_writev_args *);
 int	cheriabi_settimeofday(struct thread *, struct cheriabi_settimeofday_args *);
 int	cheriabi_rename(struct thread *, struct cheriabi_rename_args *);
+int	cheriabi_mkfifo(struct thread *, struct cheriabi_mkfifo_args *);
 int	cheriabi_mkdir(struct thread *, struct cheriabi_mkdir_args *);
 int	cheriabi_rmdir(struct thread *, struct cheriabi_rmdir_args *);
 int	cheriabi_utimes(struct thread *, struct cheriabi_utimes_args *);
@@ -969,6 +974,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_writev	AUE_WRITEV
 #define	CHERIABI_SYS_AUE_cheriabi_settimeofday	AUE_SETTIMEOFDAY
 #define	CHERIABI_SYS_AUE_cheriabi_rename	AUE_RENAME
+#define	CHERIABI_SYS_AUE_cheriabi_mkfifo	AUE_MKFIFO
 #define	CHERIABI_SYS_AUE_cheriabi_mkdir	AUE_MKDIR
 #define	CHERIABI_SYS_AUE_cheriabi_rmdir	AUE_RMDIR
 #define	CHERIABI_SYS_AUE_cheriabi_utimes	AUE_UTIMES
