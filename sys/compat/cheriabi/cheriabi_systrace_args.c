@@ -1468,28 +1468,28 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* sched_setparam */
+	/* cheriabi_sched_setparam */
 	case 327: {
-		struct sched_setparam_args *p = params;
+		struct cheriabi_sched_setparam_args *p = params;
 		iarg[0] = p->pid; /* pid_t */
-		uarg[1] = (intptr_t) p->param; /* const struct sched_param * */
+		uarg[1] = (cheri_getbase(p->param) + cheri_getoffset(p->param)); /* const struct sched_param *__capability */
 		*n_args = 2;
 		break;
 	}
-	/* sched_getparam */
+	/* cheriabi_sched_getparam */
 	case 328: {
-		struct sched_getparam_args *p = params;
+		struct cheriabi_sched_getparam_args *p = params;
 		iarg[0] = p->pid; /* pid_t */
-		uarg[1] = (intptr_t) p->param; /* struct sched_param * */
+		uarg[1] = (cheri_getbase(p->param) + cheri_getoffset(p->param)); /* struct sched_param *__capability */
 		*n_args = 2;
 		break;
 	}
-	/* sched_setscheduler */
+	/* cheriabi_sched_setscheduler */
 	case 329: {
-		struct sched_setscheduler_args *p = params;
+		struct cheriabi_sched_setscheduler_args *p = params;
 		iarg[0] = p->pid; /* pid_t */
 		iarg[1] = p->policy; /* int */
-		uarg[2] = (intptr_t) p->param; /* const struct sched_param * */
+		uarg[2] = (cheri_getbase(p->param) + cheri_getoffset(p->param)); /* const struct sched_param *__capability */
 		*n_args = 3;
 		break;
 	}
@@ -1519,11 +1519,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* sched_rr_get_interval */
+	/* cheriabi_sched_rr_get_interval */
 	case 334: {
-		struct sched_rr_get_interval_args *p = params;
+		struct cheriabi_sched_rr_get_interval_args *p = params;
 		iarg[0] = p->pid; /* pid_t */
-		uarg[1] = (intptr_t) p->interval; /* struct timespec * */
+		uarg[1] = (cheri_getbase(p->interval) + cheri_getoffset(p->interval)); /* struct timespec *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -5425,33 +5425,33 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* sched_setparam */
+	/* cheriabi_sched_setparam */
 	case 327:
 		switch(ndx) {
 		case 0:
 			p = "pid_t";
 			break;
 		case 1:
-			p = "userland const struct sched_param *";
+			p = "userland const struct sched_param *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* sched_getparam */
+	/* cheriabi_sched_getparam */
 	case 328:
 		switch(ndx) {
 		case 0:
 			p = "pid_t";
 			break;
 		case 1:
-			p = "userland struct sched_param *";
+			p = "userland struct sched_param *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* sched_setscheduler */
+	/* cheriabi_sched_setscheduler */
 	case 329:
 		switch(ndx) {
 		case 0:
@@ -5461,7 +5461,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland const struct sched_param *";
+			p = "userland const struct sched_param *__capability";
 			break;
 		default:
 			break;
@@ -5500,14 +5500,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* sched_rr_get_interval */
+	/* cheriabi_sched_rr_get_interval */
 	case 334:
 		switch(ndx) {
 		case 0:
 			p = "pid_t";
 			break;
 		case 1:
-			p = "userland struct timespec *";
+			p = "userland struct timespec *__capability";
 			break;
 		default:
 			break;
@@ -9155,17 +9155,17 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* sched_setparam */
+	/* cheriabi_sched_setparam */
 	case 327:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* sched_getparam */
+	/* cheriabi_sched_getparam */
 	case 328:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* sched_setscheduler */
+	/* cheriabi_sched_setscheduler */
 	case 329:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9187,7 +9187,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* sched_rr_get_interval */
+	/* cheriabi_sched_rr_get_interval */
 	case 334:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

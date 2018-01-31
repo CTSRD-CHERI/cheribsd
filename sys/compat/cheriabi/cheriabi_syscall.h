@@ -264,14 +264,14 @@
 #define	CHERIABI_SYS_mlockall	324
 #define	CHERIABI_SYS_munlockall	325
 #define	CHERIABI_SYS_cheriabi___getcwd	326
-#define	CHERIABI_SYS_sched_setparam	327
-#define	CHERIABI_SYS_sched_getparam	328
-#define	CHERIABI_SYS_sched_setscheduler	329
+#define	CHERIABI_SYS_cheriabi_sched_setparam	327
+#define	CHERIABI_SYS_cheriabi_sched_getparam	328
+#define	CHERIABI_SYS_cheriabi_sched_setscheduler	329
 #define	CHERIABI_SYS_sched_getscheduler	330
 #define	CHERIABI_SYS_sched_yield	331
 #define	CHERIABI_SYS_sched_get_priority_max	332
 #define	CHERIABI_SYS_sched_get_priority_min	333
-#define	CHERIABI_SYS_sched_rr_get_interval	334
+#define	CHERIABI_SYS_cheriabi_sched_rr_get_interval	334
 #define	CHERIABI_SYS_cheriabi_utrace	335
 				/* 336 is obsolete sendfile */
 #define	CHERIABI_SYS_cheriabi_kldsym	337

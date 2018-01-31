@@ -36,6 +36,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ktrace.h"
+#include "opt_posix.h"
 
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -62,6 +63,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/namei.h>
 #include <sys/proc.h>
 #include <sys/procctl.h>
+#include <sys/posix4.h>
 #include <sys/reboot.h>
 #include <sys/resource.h>
 #include <sys/resourcevar.h>
@@ -2322,6 +2324,55 @@ cheriabi_getrusage(struct thread *td, struct cheriabi_getrusage_args *uap)
 		error = copyout_c(&ru, uap->rusage, sizeof(struct rusage));
 	return (error);
 }
+
+#ifdef _KPOSIX_PRIORITY_SCHEDULING
+/*
+ * p1003_1b.c
+ */
+int
+cheriabi_sched_setparam(struct thread *td,
+    struct cheriabi_sched_setparam_args * uap)
+{
+
+	return (user_sched_setparam(td, uap->pid, uap->param));
+}
+
+int
+cheriabi_sched_getparam(struct thread *td,
+    struct cheriabi_sched_getparam_args *uap)
+{
+
+	return (user_sched_getparam(td, uap->pid, uap->param));
+}
+
+int
+cheriabi_sched_setscheduler(struct thread *td,
+    struct cheriabi_sched_setscheduler_args *uap)
+{
+
+	return (user_sched_setscheduler(td, uap->pid, uap->policy, uap->param));
+}
+
+int
+cheriabi_sched_rr_get_interval(struct thread *td,
+    struct cheriabi_sched_rr_get_interval_args *uap)
+{
+
+	return (user_sched_rr_get_interval(td, uap->pid, uap->interval));
+}
+
+#else /* !_KPOSIX_PRIORITY_SCHEDULING */
+#define CHERIABI_SYSCALL_NOT_PRESENT_GEN(SC) \
+int cheriabi_ ## SC (struct thread *td, struct cheriabi_##SC##_args *uap) \
+{ \
+	return syscall_not_present(td, #SC , (struct nosys_args *)uap); \
+}
+
+CHERIABI_SYSCALL_NOT_PRESENT_GEN(sched_setparam)
+CHERIABI_SYSCALL_NOT_PRESENT_GEN(sched_getparam)
+CHERIABI_SYSCALL_NOT_PRESENT_GEN(sched_setscheduler)
+CHERIABI_SYSCALL_NOT_PRESENT_GEN(sched_rr_get_interval)
+#endif /* !_KPOSIX_PRIORITY_SCHEDULING */
 
 /*
  * subr_profil.c

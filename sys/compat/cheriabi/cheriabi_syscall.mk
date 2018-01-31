@@ -177,14 +177,14 @@ MIASM =  \
 	mlockall.o \
 	munlockall.o \
 	cheriabi___getcwd.o \
-	sched_setparam.o \
-	sched_getparam.o \
-	sched_setscheduler.o \
+	cheriabi_sched_setparam.o \
+	cheriabi_sched_getparam.o \
+	cheriabi_sched_setscheduler.o \
 	sched_getscheduler.o \
 	sched_yield.o \
 	sched_get_priority_max.o \
 	sched_get_priority_min.o \
-	sched_rr_get_interval.o \
+	cheriabi_sched_rr_get_interval.o \
 	cheriabi_utrace.o \
 	cheriabi_kldsym.o \
 	cheriabi_jail.o \

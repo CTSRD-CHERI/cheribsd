@@ -368,6 +368,14 @@ int	kern_socketpair(struct thread *td, int domain, int type, int protocol,
 int	user_clock_nanosleep(struct thread *td, clockid_t clock_id,
 	    int flags, const struct timespec * __capability ua_rqtp,
 	    struct timespec * __capability ua_rmtp);
+int	user_sched_getparam(struct thread *td, pid_t,
+	    struct sched_param * __capability param);
+int	user_sched_rr_get_interval(struct thread *td, pid_t pid,
+	    struct timespec * __capability interval);
+int	user_sched_setparam(struct thread *td, pid_t pid,
+	    const struct sched_param * __capability param);
+int	user_sched_setscheduler(struct thread *td, pid_t pid, int policy,
+	    const struct sched_param * __capability param);
 int	user_settimeofday(struct thread *td,
 	    const struct timeval * __capability tp,
 	    const struct timezone * __capability tz);

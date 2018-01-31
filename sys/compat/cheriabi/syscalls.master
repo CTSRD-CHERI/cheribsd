@@ -709,21 +709,21 @@
 				    _Out_writes_z_(buflen) \
 				    char * __capability buf, \
 				    size_t buflen); }
-327	AUE_NULL	NOPROTO	{ int sched_setparam (pid_t pid, \
-				    _In_ const struct sched_param *param); }
-328	AUE_NULL	NOPROTO	{ int sched_getparam (pid_t pid, \
-				    _Out_ struct sched_param *param); }
+327	AUE_NULL	STD	{ int cheriabi_sched_setparam (pid_t pid, \
+				    _In_ const struct sched_param * __capability param); }
+328	AUE_NULL	STD	{ int cheriabi_sched_getparam (pid_t pid, \
+				    _Out_ struct sched_param * __capability param); }
 
-329	AUE_NULL	NOPROTO	{ int sched_setscheduler (pid_t pid, \
+329	AUE_NULL	STD	{ int cheriabi_sched_setscheduler (pid_t pid, \
 				    int policy, \
-				    _In_ const struct sched_param *param); }
+				    _In_ const struct sched_param * __capability param); }
 330	AUE_NULL	NOPROTO	{ int sched_getscheduler (pid_t pid); }
 
 331	AUE_NULL	NOPROTO	{ int sched_yield (void); }
 332	AUE_NULL	NOPROTO	{ int sched_get_priority_max (int policy); }
 333	AUE_NULL	NOPROTO	{ int sched_get_priority_min (int policy); }
-334	AUE_NULL	NOPROTO	{ int sched_rr_get_interval (pid_t pid, \
-				    _Out_ struct timespec *interval); }
+334	AUE_NULL	STD	{ int cheriabi_sched_rr_get_interval (pid_t pid, \
+				    _Out_ struct timespec * __capability interval); }
 335	AUE_NULL	STD	{ int cheriabi_utrace( \
 				    _In_reads_bytes_(len) \
 				    const void * __capability addr, \
