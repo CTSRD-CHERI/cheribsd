@@ -465,32 +465,6 @@ CHERIABI_SYS__umtx_op_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_cheriabi_sigqueue_fill_uap(struct thread *td,
-    struct cheriabi_sigqueue_args *uap)
-{
-	void * __capability tmpcap;
-
-	/* [0] pid_t pid */
-	cheriabi_fetch_syscall_arg(td, &tmpcap,
-	    0, CHERIABI_SYS_cheriabi_sigqueue_PTRMASK);
-	uap->pid = cheri_getoffset(tmpcap);
-
-	/* [1] int signum */
-	cheriabi_fetch_syscall_arg(td, &tmpcap,
-	    1, CHERIABI_SYS_cheriabi_sigqueue_PTRMASK);
-	uap->signum = cheri_getoffset(tmpcap);
-
-	/* [2] _In_opt_ union sigval_c value */
-	/*
-	 * This requires special handling which we'll do in
-	 * cheriabi_sys_sigqueue().  We don't use the uap argument at all.
-	 */
-	uap->value = NULL;
-
-	return (0);
-}
-
-static inline int
 CHERIABI_SYS_shm_open_fill_uap(struct thread *td,
     struct shm_open_args *uap)
 {

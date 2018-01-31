@@ -5743,8 +5743,27 @@ CHERIABI_SYS_cheriabi_thr_new_fill_uap(struct thread *td,
 	return (0);
 }
 
-static inline int	CHERIABI_SYS_cheriabi_sigqueue_fill_uap(struct thread *td,
-    struct cheriabi_sigqueue_args *uap);
+static inline int
+CHERIABI_SYS_cheriabi_sigqueue_fill_uap(struct thread *td,
+    struct cheriabi_sigqueue_args *uap)
+{
+	void * __capability tmpcap;
+
+	/* [0] pid_t pid */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_sigqueue_PTRMASK);
+	uap->pid = cheri_getoffset(tmpcap);
+
+	/* [1] int signum */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_sigqueue_PTRMASK);
+	uap->signum = cheri_getoffset(tmpcap);
+
+	/* [2] void *__capability value */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->value),
+	    2, CHERIABI_SYS_cheriabi_sigqueue_PTRMASK);
+
+	return (0);
+}
 
 static inline int
 CHERIABI_SYS_kmq_open_fill_uap(struct thread *td,

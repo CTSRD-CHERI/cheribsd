@@ -1011,8 +1011,8 @@
 455	AUE_THR_NEW	STD	{ int cheriabi_thr_new(	\
 				    _In_ struct thr_param_c *param, \
 				    int param_size); }
-456	AUE_NULL	STD|NOPARSE	{ int cheriabi_sigqueue(pid_t pid, \
-				    int signum, void *value); }
+456	AUE_NULL	STD	{ int cheriabi_sigqueue(pid_t pid, \
+				    int signum, void * __capability value); }
 457	AUE_MQ_OPEN	NOSTD|NOPROTO	{ int kmq_open( \
 				    _In_z_ const char *path, int flags, \
 				    mode_t mode, \

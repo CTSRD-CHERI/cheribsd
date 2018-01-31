@@ -297,3 +297,32 @@ cheriabi_sigaltstack(struct thread *td,
 	}
 	return (error);
 }
+
+int
+cheriabi_sigqueue(struct thread *td, struct cheriabi_sigqueue_args *uap)
+{
+	union sigval_c	value_union;
+	union sigval	sv;
+	int		flags = 0, tag;
+
+	value_union.sival_ptr = uap->value;
+	if (uap->pid == td->td_proc->p_pid) {
+		sv.sival_ptr = malloc(sizeof(value_union), M_TEMP, M_WAITOK);
+		*((void * __capability *)sv.sival_ptr) = value_union.sival_ptr;
+		flags = KSI_CHERI;
+	} else {
+		/*
+		 * Cowardly refuse to send capabilities to other
+		 * processes.
+		 *
+		 * XXX-BD: allow untagged capablities between
+		 * CheriABI processess? (Would have to happen in
+		 * delivery code to avoid a race).
+		 */
+		tag = cheri_gettag(value_union.sival_ptr);
+		if (tag)
+			return (EPROT);
+		sv.sival_int = value_union.sival_int;
+	}
+	return (kern_sigqueue(td, uap->pid, uap->signum, &sv, flags));
+}

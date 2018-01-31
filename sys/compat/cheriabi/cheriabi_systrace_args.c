@@ -2226,7 +2226,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct cheriabi_sigqueue_args *p = params;
 		iarg[0] = p->pid; /* pid_t */
 		iarg[1] = p->signum; /* int */
-		uarg[2] = (intptr_t) p->value; /* void * */
+		uarg[2] = (cheri_getbase(p->value) + cheri_getoffset(p->value)); /* void *__capability */
 		*n_args = 3;
 		break;
 	}
@@ -6702,7 +6702,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		default:
 			break;

@@ -1050,43 +1050,6 @@ siginfo_to_siginfo_c(const siginfo_t *src, struct siginfo_c *dst)
 	dst->si_overrun = src->si_overrun;
 }
 
-#ifndef _SYS_SYSPROTO_H_
-struct cheriabi_sigqueue_args {
-	pid_t pid;
-	int signum;
-	/* union sigval_c */ void *value;
-};
-#endif
-int
-cheriabi_sigqueue(struct thread *td, struct cheriabi_sigqueue_args *uap)
-{
-	union sigval_c	value_union;
-	union sigval	sv;
-	int		flags = 0, tag;
-
-	cheriabi_fetch_syscall_arg(td, &value_union.sival_ptr,
-	    2, CHERIABI_SYS_cheriabi_sigqueue_PTRMASK);
-	if (uap->pid == td->td_proc->p_pid) {
-		sv.sival_ptr = malloc(sizeof(value_union), M_TEMP, M_WAITOK);
-		*((void * __capability *)sv.sival_ptr) = value_union.sival_ptr;
-		flags = KSI_CHERI;
-	} else {
-		/*
-		 * Cowardly refuse to send capabilities to other
-		 * processes.
-		 *
-		 * XXX-BD: allow untagged capablities between
-		 * CheriABI processess? (Would have to happen in
-		 * delivery code to avoid a race).
-		 */
-		tag = cheri_gettag(value_union.sival_ptr);
-		if (tag)
-			return (EPROT);
-		sv.sival_int = value_union.sival_int;
-	}
-	return (kern_sigqueue(td, uap->pid, uap->signum, &sv, flags));
-}
-
 int
 cheriabi_nmount(struct thread *td,
     struct cheriabi_nmount_args /* {

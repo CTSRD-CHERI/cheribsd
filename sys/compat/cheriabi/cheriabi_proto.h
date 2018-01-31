@@ -628,7 +628,7 @@ struct cheriabi_thr_new_args {
 struct cheriabi_sigqueue_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
 	char signum_l_[PADL_(int)]; int signum; char signum_r_[PADR_(int)];
-	char value_l_[PADL_(void *)]; void * value; char value_r_[PADR_(void *)];
+	char value_l_[PADL_(void *__capability)]; void *__capability value; char value_r_[PADR_(void *__capability)];
 };
 struct cheriabi_kmq_notify_args {
 	char mqd_l_[PADL_(int)]; int mqd; char mqd_r_[PADR_(int)];
