@@ -276,10 +276,10 @@
 				/* 336 is obsolete sendfile */
 #define	CHERIABI_SYS_cheriabi_kldsym	337
 #define	CHERIABI_SYS_cheriabi_jail	338
-#define	CHERIABI_SYS_sigprocmask	340
-#define	CHERIABI_SYS_sigsuspend	341
+#define	CHERIABI_SYS_cheriabi_sigprocmask	340
+#define	CHERIABI_SYS_cheriabi_sigsuspend	341
 				/* 342 is obsolete sigaction */
-#define	CHERIABI_SYS_sigpending	343
+#define	CHERIABI_SYS_cheriabi_sigpending	343
 				/* 344 is obsolete sigreturn */
 #define	CHERIABI_SYS_cheriabi_sigtimedwait	345
 #define	CHERIABI_SYS_cheriabi_sigwaitinfo	346
@@ -351,7 +351,7 @@
 #define	CHERIABI_SYS___acl_set_link	426
 #define	CHERIABI_SYS___acl_delete_link	427
 #define	CHERIABI_SYS___acl_aclcheck_link	428
-#define	CHERIABI_SYS_sigwait	429
+#define	CHERIABI_SYS_cheriabi_sigwait	429
 #define	CHERIABI_SYS_cheriabi_thr_create	430
 #define	CHERIABI_SYS_thr_exit	431
 #define	CHERIABI_SYS_thr_self	432

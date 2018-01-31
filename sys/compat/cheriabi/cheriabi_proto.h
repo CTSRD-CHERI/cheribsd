@@ -140,8 +140,8 @@ struct cheriabi_acct_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 };
 struct cheriabi_sigaltstack_args {
-	char ss_l_[PADL_(const cheriabi_stack_t *)]; const cheriabi_stack_t * ss; char ss_r_[PADR_(const cheriabi_stack_t *)];
-	char oss_l_[PADL_(cheriabi_stack_t *)]; cheriabi_stack_t * oss; char oss_r_[PADR_(cheriabi_stack_t *)];
+	char ss_l_[PADL_(const cheriabi_stack_t *__capability)]; const cheriabi_stack_t *__capability ss; char ss_r_[PADR_(const cheriabi_stack_t *__capability)];
+	char oss_l_[PADL_(cheriabi_stack_t *__capability)]; cheriabi_stack_t *__capability oss; char oss_r_[PADR_(cheriabi_stack_t *__capability)];
 };
 struct cheriabi_ioctl_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
@@ -483,14 +483,25 @@ struct cheriabi_kldsym_args {
 struct cheriabi_jail_args {
 	char jailp_l_[PADL_(struct jail_c *__capability)]; struct jail_c *__capability jailp; char jailp_r_[PADR_(struct jail_c *__capability)];
 };
+struct cheriabi_sigprocmask_args {
+	char how_l_[PADL_(int)]; int how; char how_r_[PADR_(int)];
+	char set_l_[PADL_(const sigset_t *__capability)]; const sigset_t *__capability set; char set_r_[PADR_(const sigset_t *__capability)];
+	char oset_l_[PADL_(sigset_t *__capability)]; sigset_t *__capability oset; char oset_r_[PADR_(sigset_t *__capability)];
+};
+struct cheriabi_sigsuspend_args {
+	char sigmask_l_[PADL_(const sigset_t *__capability)]; const sigset_t *__capability sigmask; char sigmask_r_[PADR_(const sigset_t *__capability)];
+};
+struct cheriabi_sigpending_args {
+	char set_l_[PADL_(sigset_t *__capability)]; sigset_t *__capability set; char set_r_[PADR_(sigset_t *__capability)];
+};
 struct cheriabi_sigtimedwait_args {
-	char set_l_[PADL_(const sigset_t *)]; const sigset_t * set; char set_r_[PADR_(const sigset_t *)];
-	char info_l_[PADL_(struct siginfo_c *)]; struct siginfo_c * info; char info_r_[PADR_(struct siginfo_c *)];
-	char timeout_l_[PADL_(const struct timespec *)]; const struct timespec * timeout; char timeout_r_[PADR_(const struct timespec *)];
+	char set_l_[PADL_(const sigset_t *__capability)]; const sigset_t *__capability set; char set_r_[PADR_(const sigset_t *__capability)];
+	char info_l_[PADL_(struct siginfo_c *__capability)]; struct siginfo_c *__capability info; char info_r_[PADR_(struct siginfo_c *__capability)];
+	char timeout_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability timeout; char timeout_r_[PADR_(const struct timespec *__capability)];
 };
 struct cheriabi_sigwaitinfo_args {
-	char set_l_[PADL_(const sigset_t *)]; const sigset_t * set; char set_r_[PADR_(const sigset_t *)];
-	char info_l_[PADL_(struct siginfo_c *)]; struct siginfo_c * info; char info_r_[PADR_(struct siginfo_c *)];
+	char set_l_[PADL_(const sigset_t *__capability)]; const sigset_t *__capability set; char set_r_[PADR_(const sigset_t *__capability)];
+	char info_l_[PADL_(struct siginfo_c *__capability)]; struct siginfo_c *__capability info; char info_r_[PADR_(struct siginfo_c *__capability)];
 };
 struct cheriabi_aio_waitcomplete_args {
 	char aiocbp_l_[PADL_(struct aiocb_c *__capability *)]; struct aiocb_c *__capability * aiocbp; char aiocbp_r_[PADR_(struct aiocb_c *__capability *)];
@@ -577,11 +588,11 @@ struct cheriabi___mac_execve_args {
 };
 struct cheriabi_sigaction_args {
 	char sig_l_[PADL_(int)]; int sig; char sig_r_[PADR_(int)];
-	char act_l_[PADL_(struct sigaction_c *)]; struct sigaction_c * act; char act_r_[PADR_(struct sigaction_c *)];
-	char oact_l_[PADL_(struct sigaction_c *)]; struct sigaction_c * oact; char oact_r_[PADR_(struct sigaction_c *)];
+	char act_l_[PADL_(struct sigaction_c *__capability)]; struct sigaction_c *__capability act; char act_r_[PADR_(struct sigaction_c *__capability)];
+	char oact_l_[PADL_(struct sigaction_c *__capability)]; struct sigaction_c *__capability oact; char oact_r_[PADR_(struct sigaction_c *__capability)];
 };
 struct cheriabi_sigreturn_args {
-	char sigcntxp_l_[PADL_(const ucontext_c_t *)]; const ucontext_c_t * sigcntxp; char sigcntxp_r_[PADR_(const ucontext_c_t *)];
+	char sigcntxp_l_[PADL_(const ucontext_c_t *__capability)]; const ucontext_c_t *__capability sigcntxp; char sigcntxp_r_[PADR_(const ucontext_c_t *__capability)];
 };
 struct cheriabi_getcontext_args {
 	char ucp_l_[PADL_(ucontext_c_t *)]; ucontext_c_t * ucp; char ucp_r_[PADR_(ucontext_c_t *)];
@@ -595,6 +606,10 @@ struct cheriabi_swapcontext_args {
 };
 struct cheriabi_swapoff_args {
 	char name_l_[PADL_(const char *__capability)]; const char *__capability name; char name_r_[PADR_(const char *__capability)];
+};
+struct cheriabi_sigwait_args {
+	char set_l_[PADL_(const sigset_t *__capability)]; const sigset_t *__capability set; char set_r_[PADR_(const sigset_t *__capability)];
+	char sig_l_[PADL_(int *__capability)]; int *__capability sig; char sig_r_[PADR_(int *__capability)];
 };
 struct cheriabi_thr_create_args {
 	char ctx_l_[PADL_(ucontext_c_t *)]; ucontext_c_t * ctx; char ctx_r_[PADR_(ucontext_c_t *)];
@@ -921,6 +936,9 @@ int	cheriabi_sched_rr_get_interval(struct thread *, struct cheriabi_sched_rr_get
 int	cheriabi_utrace(struct thread *, struct cheriabi_utrace_args *);
 int	cheriabi_kldsym(struct thread *, struct cheriabi_kldsym_args *);
 int	cheriabi_jail(struct thread *, struct cheriabi_jail_args *);
+int	cheriabi_sigprocmask(struct thread *, struct cheriabi_sigprocmask_args *);
+int	cheriabi_sigsuspend(struct thread *, struct cheriabi_sigsuspend_args *);
+int	cheriabi_sigpending(struct thread *, struct cheriabi_sigpending_args *);
 int	cheriabi_sigtimedwait(struct thread *, struct cheriabi_sigtimedwait_args *);
 int	cheriabi_sigwaitinfo(struct thread *, struct cheriabi_sigwaitinfo_args *);
 int	cheriabi_aio_waitcomplete(struct thread *, struct cheriabi_aio_waitcomplete_args *);
@@ -947,6 +965,7 @@ int	cheriabi_getcontext(struct thread *, struct cheriabi_getcontext_args *);
 int	cheriabi_setcontext(struct thread *, struct cheriabi_setcontext_args *);
 int	cheriabi_swapcontext(struct thread *, struct cheriabi_swapcontext_args *);
 int	cheriabi_swapoff(struct thread *, struct cheriabi_swapoff_args *);
+int	cheriabi_sigwait(struct thread *, struct cheriabi_sigwait_args *);
 int	cheriabi_thr_create(struct thread *, struct cheriabi_thr_create_args *);
 int	cheriabi_auditon(struct thread *, struct cheriabi_auditon_args *);
 int	cheriabi_thr_new(struct thread *, struct cheriabi_thr_new_args *);
@@ -1142,6 +1161,9 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_utrace	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_kldsym	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_jail	AUE_JAIL
+#define	CHERIABI_SYS_AUE_cheriabi_sigprocmask	AUE_SIGPROCMASK
+#define	CHERIABI_SYS_AUE_cheriabi_sigsuspend	AUE_SIGSUSPEND
+#define	CHERIABI_SYS_AUE_cheriabi_sigpending	AUE_SIGPENDING
 #define	CHERIABI_SYS_AUE_cheriabi_sigtimedwait	AUE_SIGWAIT
 #define	CHERIABI_SYS_AUE_cheriabi_sigwaitinfo	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_aio_waitcomplete	AUE_AIO_WAITCOMPLETE
@@ -1168,6 +1190,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_setcontext	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_swapcontext	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_swapoff	AUE_SWAPOFF
+#define	CHERIABI_SYS_AUE_cheriabi_sigwait	AUE_SIGWAIT
 #define	CHERIABI_SYS_AUE_cheriabi_thr_create	AUE_THR_CREATE
 #define	CHERIABI_SYS_AUE_cheriabi_auditon	AUE_AUDITON
 #define	CHERIABI_SYS_AUE_cheriabi_thr_new	AUE_THR_NEW

@@ -188,9 +188,9 @@ MIASM =  \
 	cheriabi_utrace.o \
 	cheriabi_kldsym.o \
 	cheriabi_jail.o \
-	sigprocmask.o \
-	sigsuspend.o \
-	sigpending.o \
+	cheriabi_sigprocmask.o \
+	cheriabi_sigsuspend.o \
+	cheriabi_sigpending.o \
 	cheriabi_sigtimedwait.o \
 	cheriabi_sigwaitinfo.o \
 	__acl_get_file.o \
@@ -243,7 +243,7 @@ MIASM =  \
 	__acl_set_link.o \
 	__acl_delete_link.o \
 	__acl_aclcheck_link.o \
-	sigwait.o \
+	cheriabi_sigwait.o \
 	cheriabi_thr_create.o \
 	thr_exit.o \
 	thr_self.o \

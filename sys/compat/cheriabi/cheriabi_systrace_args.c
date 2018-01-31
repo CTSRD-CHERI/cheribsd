@@ -334,8 +334,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_sigaltstack */
 	case 53: {
 		struct cheriabi_sigaltstack_args *p = params;
-		uarg[0] = (intptr_t) p->ss; /* const cheriabi_stack_t * */
-		uarg[1] = (intptr_t) p->oss; /* cheriabi_stack_t * */
+		uarg[0] = (cheri_getbase(p->ss) + cheri_getoffset(p->ss)); /* const cheriabi_stack_t *__capability */
+		uarg[1] = (cheri_getbase(p->oss) + cheri_getoffset(p->oss)); /* cheriabi_stack_t *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -1551,43 +1551,43 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* sigprocmask */
+	/* cheriabi_sigprocmask */
 	case 340: {
-		struct sigprocmask_args *p = params;
+		struct cheriabi_sigprocmask_args *p = params;
 		iarg[0] = p->how; /* int */
-		uarg[1] = (intptr_t) p->set; /* const sigset_t * */
-		uarg[2] = (intptr_t) p->oset; /* sigset_t * */
+		uarg[1] = (cheri_getbase(p->set) + cheri_getoffset(p->set)); /* const sigset_t *__capability */
+		uarg[2] = (cheri_getbase(p->oset) + cheri_getoffset(p->oset)); /* sigset_t *__capability */
 		*n_args = 3;
 		break;
 	}
-	/* sigsuspend */
+	/* cheriabi_sigsuspend */
 	case 341: {
-		struct sigsuspend_args *p = params;
-		uarg[0] = (intptr_t) p->sigmask; /* const sigset_t * */
+		struct cheriabi_sigsuspend_args *p = params;
+		uarg[0] = (cheri_getbase(p->sigmask) + cheri_getoffset(p->sigmask)); /* const sigset_t *__capability */
 		*n_args = 1;
 		break;
 	}
-	/* sigpending */
+	/* cheriabi_sigpending */
 	case 343: {
-		struct sigpending_args *p = params;
-		uarg[0] = (intptr_t) p->set; /* sigset_t * */
+		struct cheriabi_sigpending_args *p = params;
+		uarg[0] = (cheri_getbase(p->set) + cheri_getoffset(p->set)); /* sigset_t *__capability */
 		*n_args = 1;
 		break;
 	}
 	/* cheriabi_sigtimedwait */
 	case 345: {
 		struct cheriabi_sigtimedwait_args *p = params;
-		uarg[0] = (intptr_t) p->set; /* const sigset_t * */
-		uarg[1] = (intptr_t) p->info; /* struct siginfo_c * */
-		uarg[2] = (intptr_t) p->timeout; /* const struct timespec * */
+		uarg[0] = (cheri_getbase(p->set) + cheri_getoffset(p->set)); /* const sigset_t *__capability */
+		uarg[1] = (cheri_getbase(p->info) + cheri_getoffset(p->info)); /* struct siginfo_c *__capability */
+		uarg[2] = (cheri_getbase(p->timeout) + cheri_getoffset(p->timeout)); /* const struct timespec *__capability */
 		*n_args = 3;
 		break;
 	}
 	/* cheriabi_sigwaitinfo */
 	case 346: {
 		struct cheriabi_sigwaitinfo_args *p = params;
-		uarg[0] = (intptr_t) p->set; /* const sigset_t * */
-		uarg[1] = (intptr_t) p->info; /* struct siginfo_c * */
+		uarg[0] = (cheri_getbase(p->set) + cheri_getoffset(p->set)); /* const sigset_t *__capability */
+		uarg[1] = (cheri_getbase(p->info) + cheri_getoffset(p->info)); /* struct siginfo_c *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -1952,15 +1952,15 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 416: {
 		struct cheriabi_sigaction_args *p = params;
 		iarg[0] = p->sig; /* int */
-		uarg[1] = (intptr_t) p->act; /* struct sigaction_c * */
-		uarg[2] = (intptr_t) p->oact; /* struct sigaction_c * */
+		uarg[1] = (cheri_getbase(p->act) + cheri_getoffset(p->act)); /* struct sigaction_c *__capability */
+		uarg[2] = (cheri_getbase(p->oact) + cheri_getoffset(p->oact)); /* struct sigaction_c *__capability */
 		*n_args = 3;
 		break;
 	}
 	/* cheriabi_sigreturn */
 	case 417: {
 		struct cheriabi_sigreturn_args *p = params;
-		uarg[0] = (intptr_t) p->sigcntxp; /* const ucontext_c_t * */
+		uarg[0] = (cheri_getbase(p->sigcntxp) + cheri_getoffset(p->sigcntxp)); /* const ucontext_c_t *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -2028,11 +2028,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* sigwait */
+	/* cheriabi_sigwait */
 	case 429: {
-		struct sigwait_args *p = params;
-		uarg[0] = (intptr_t) p->set; /* const sigset_t * */
-		uarg[1] = (intptr_t) p->sig; /* int * */
+		struct cheriabi_sigwait_args *p = params;
+		uarg[0] = (cheri_getbase(p->set) + cheri_getoffset(p->set)); /* const sigset_t *__capability */
+		uarg[1] = (cheri_getbase(p->sig) + cheri_getoffset(p->sig)); /* int *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -3618,10 +3618,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 53:
 		switch(ndx) {
 		case 0:
-			p = "userland const cheriabi_stack_t *";
+			p = "userland const cheriabi_stack_t *__capability";
 			break;
 		case 1:
-			p = "userland cheriabi_stack_t *";
+			p = "userland cheriabi_stack_t *__capability";
 			break;
 		default:
 			break;
@@ -5552,37 +5552,37 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* sigprocmask */
+	/* cheriabi_sigprocmask */
 	case 340:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland const sigset_t *";
+			p = "userland const sigset_t *__capability";
 			break;
 		case 2:
-			p = "userland sigset_t *";
+			p = "userland sigset_t *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* sigsuspend */
+	/* cheriabi_sigsuspend */
 	case 341:
 		switch(ndx) {
 		case 0:
-			p = "userland const sigset_t *";
+			p = "userland const sigset_t *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* sigpending */
+	/* cheriabi_sigpending */
 	case 343:
 		switch(ndx) {
 		case 0:
-			p = "userland sigset_t *";
+			p = "userland sigset_t *__capability";
 			break;
 		default:
 			break;
@@ -5592,13 +5592,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 345:
 		switch(ndx) {
 		case 0:
-			p = "userland const sigset_t *";
+			p = "userland const sigset_t *__capability";
 			break;
 		case 1:
-			p = "userland struct siginfo_c *";
+			p = "userland struct siginfo_c *__capability";
 			break;
 		case 2:
-			p = "userland const struct timespec *";
+			p = "userland const struct timespec *__capability";
 			break;
 		default:
 			break;
@@ -5608,10 +5608,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 346:
 		switch(ndx) {
 		case 0:
-			p = "userland const sigset_t *";
+			p = "userland const sigset_t *__capability";
 			break;
 		case 1:
-			p = "userland struct siginfo_c *";
+			p = "userland struct siginfo_c *__capability";
 			break;
 		default:
 			break;
@@ -6254,10 +6254,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct sigaction_c *";
+			p = "userland struct sigaction_c *__capability";
 			break;
 		case 2:
-			p = "userland struct sigaction_c *";
+			p = "userland struct sigaction_c *__capability";
 			break;
 		default:
 			break;
@@ -6267,7 +6267,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 417:
 		switch(ndx) {
 		case 0:
-			p = "userland const ucontext_c_t *";
+			p = "userland const ucontext_c_t *__capability";
 			break;
 		default:
 			break;
@@ -6377,14 +6377,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* sigwait */
+	/* cheriabi_sigwait */
 	case 429:
 		switch(ndx) {
 		case 0:
-			p = "userland const sigset_t *";
+			p = "userland const sigset_t *__capability";
 			break;
 		case 1:
-			p = "userland int *";
+			p = "userland int *__capability";
 			break;
 		default:
 			break;
@@ -9207,17 +9207,17 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* sigprocmask */
+	/* cheriabi_sigprocmask */
 	case 340:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* sigsuspend */
+	/* cheriabi_sigsuspend */
 	case 341:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* sigpending */
+	/* cheriabi_sigpending */
 	case 343:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9479,7 +9479,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* sigwait */
+	/* cheriabi_sigwait */
 	case 429:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

@@ -874,7 +874,7 @@ cheriabi_sigreturn(struct thread *td, struct cheriabi_sigreturn_args *uap)
 	ucontext_c_t uc;
 	int error;
 
-	error = copyincap(uap->sigcntxp, &uc, sizeof(uc));
+	error = copyincap_c(uap->sigcntxp, &uc, sizeof(uc));
 	if (error != 0)
 		return (error);
 
