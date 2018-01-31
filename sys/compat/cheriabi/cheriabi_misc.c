@@ -830,11 +830,10 @@ cheriabi_sendfile(struct thread *td, struct cheriabi_sendfile_args *uap)
 int
 cheriabi_jail(struct thread *td, struct cheriabi_jail_args *uap)
 {
-	uint32_t version;
+	unsigned int version;
 	int error;
-	struct jail j;
 
-	error = copyin(uap->jailp, &version, sizeof(uint32_t));
+	error = copyin_c(&uap->jailp->version, &version, sizeof(version));
 	if (error)
 		return (error);
 
@@ -846,36 +845,20 @@ cheriabi_jail(struct thread *td, struct cheriabi_jail_args *uap)
 
 	case 2:	/* JAIL_API_VERSION */
 	{
+		struct jail_c j;
 		/* FreeBSD multi-IPv4/IPv6,noIP jails. */
-		struct jail_c j_c;
 
-		error = copyincap(uap->jailp, &j_c, sizeof(j_c));
-		if (error)
+		error = copyincap_c(uap->jailp, &j, sizeof(j));
+		if (error != 0)
 			return (error);
-		CP(j_c, j, version);
-		cheriabi_strcap_to_ptr(&j.path, j_c.path, 1);
-		cheriabi_strcap_to_ptr(&j.hostname, j_c.hostname, 1);
-		cheriabi_strcap_to_ptr(&j.jailname, j_c.jailname, 1);
-		CP(j_c, j, ip4s);
-		CP(j_c, j, ip6s);
-		error = cheriabi_cap_to_ptr((caddr_t *)&j.ip4, j_c.ip4,
-		    sizeof(*j.ip4) * j.ip4s,
-		    CHERI_PERM_GLOBAL | CHERI_PERM_LOAD, 1);
-		if (error)
-			return (error);
-		error = cheriabi_cap_to_ptr((caddr_t *)&j.ip6, j_c.ip6,
-		    sizeof(*j.ip6) * j.ip6s,
-		    CHERI_PERM_GLOBAL | CHERI_PERM_LOAD, 1);
-		if (error)
-			return (error);
-		break;
+		return (kern_jail(td, j.path, j.hostname, j.jailname,
+		    j.ip4, j.ip4s, j.ip6, j.ip6s, UIO_USERSPACE));
 	}
 
 	default:
 		/* Sci-Fi jails are not supported, sorry. */
 		return (EINVAL);
 	}
-	return (kern_jail(td, &j));
 }
 
 int

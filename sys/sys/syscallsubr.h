@@ -41,6 +41,8 @@ struct filecaps;
 enum idtype;
 struct itimerval;
 struct image_args;
+struct in_addr;
+struct in6_addr;
 struct jail;
 struct kevent;
 struct kevent_copyops;
@@ -159,7 +161,12 @@ int	kern_gettimeofday(struct thread *td,
 	    struct timeval * __capability tp,
 	    struct timezone * __capability tzp);
 int	kern_ioctl(struct thread *td, int fd, u_long com, caddr_t data);
-int	kern_jail(struct thread *td, struct jail *j);
+int	kern_jail(struct thread *td, const char * __capability path,
+	    const char * __capability hostname,
+	    const char * __capability jailname,
+	    struct in_addr * __capability ip4, size_t ip4s,
+	    struct in6_addr * __capability ip6, size_t ip6s,
+	    enum uio_seg ipseg);
 int	kern_jail_get(struct thread *td, struct uio *options, int flags);
 int	kern_jail_set(struct thread *td, struct uio *options, int flags);
 int	kern_kenv(struct thread *td, int what, const char * __CAPABILITY namep,

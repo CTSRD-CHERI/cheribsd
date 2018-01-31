@@ -1547,7 +1547,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_jail */
 	case 338: {
 		struct cheriabi_jail_args *p = params;
-		uarg[0] = (intptr_t) p->jailp; /* struct jail_c * */
+		uarg[0] = (cheri_getbase(p->jailp) + cheri_getoffset(p->jailp)); /* struct jail_c *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -5546,7 +5546,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 338:
 		switch(ndx) {
 		case 0:
-			p = "userland struct jail_c *";
+			p = "userland struct jail_c *__capability";
 			break;
 		default:
 			break;

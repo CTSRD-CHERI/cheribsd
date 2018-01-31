@@ -3562,19 +3562,11 @@ static inline int
 CHERIABI_SYS_cheriabi_jail_fill_uap(struct thread *td,
     struct cheriabi_jail_args *uap)
 {
-	void * __capability tmpcap;
 
-	/* [0] _In_ struct jail_c * jailp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD|CHERI_PERM_LOAD_CAP);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_jail_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->jailp),
-		    tmpcap, sizeof(*uap->jailp), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _In_ struct jail_c *__capability jailp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->jailp),
+	    0, CHERIABI_SYS_cheriabi_jail_PTRMASK);
 
 	return (0);
 }
