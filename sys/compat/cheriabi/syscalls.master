@@ -671,12 +671,14 @@
 				    _Out_ struct module_stat* stat); }
 302	AUE_NULL	NOPROTO	{ int modfnext(int modid); }
 303	AUE_NULL	NOPROTO	{ int modfind(_In_z_ const char *name); }
-304	AUE_MODLOAD	NOPROTO	{ int kldload(_In_z_ const char *file); }
+304	AUE_MODLOAD	STD	{ int cheriabi_kldload( \
+				    _In_z_ const char * __capability file); }
 305	AUE_MODUNLOAD	NOPROTO	{ int kldunload(int fileid); }
-306	AUE_NULL	NOPROTO	{ int kldfind(_In_z_ const char *file); }
+306	AUE_NULL	STD	{ int cheriabi_kldfind( \
+				    _In_z_ const char * __capability file); }
 307	AUE_NULL	NOPROTO	{ int kldnext(int fileid); }
 308	AUE_NULL	STD	{ int cheriabi_kldstat(int fileid, \
-				    _Out_ struct kld_file_stat_c *stat); }
+				    _Out_ struct kld_file_stat_c * __capability stat); }
 309	AUE_NULL	NOPROTO	{ int kldfirstmod(int fileid); }
 310	AUE_GETSID	NOPROTO	{ int getsid(pid_t pid); }
 311	AUE_SETRESUID	NOPROTO	{ int setresuid(uid_t ruid, uid_t euid, \
@@ -730,7 +732,7 @@
 				    size_t len); }
 336	AUE_SENDFILE	OBSOL	sendfile
 337	AUE_NULL	STD	{ int cheriabi_kldsym(int fileid, int cmd, \
-				    _In_ struct kld_sym_lookup_c *data); }
+				    _In_ struct kld_sym_lookup_c * __capability data); }
 338	AUE_JAIL	STD	{ int cheriabi_jail( \
 				    _In_ struct jail_c *jailp); }
 339	AUE_NULL	UNIMPL	nnpfs_syscall

@@ -425,9 +425,15 @@ struct cheriabi_pwritev_args {
 	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
 	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
 };
+struct cheriabi_kldload_args {
+	char file_l_[PADL_(const char *__capability)]; const char *__capability file; char file_r_[PADR_(const char *__capability)];
+};
+struct cheriabi_kldfind_args {
+	char file_l_[PADL_(const char *__capability)]; const char *__capability file; char file_r_[PADR_(const char *__capability)];
+};
 struct cheriabi_kldstat_args {
 	char fileid_l_[PADL_(int)]; int fileid; char fileid_r_[PADR_(int)];
-	char stat_l_[PADL_(struct kld_file_stat_c *)]; struct kld_file_stat_c * stat; char stat_r_[PADR_(struct kld_file_stat_c *)];
+	char stat_l_[PADL_(struct kld_file_stat_c *__capability)]; struct kld_file_stat_c *__capability stat; char stat_r_[PADR_(struct kld_file_stat_c *__capability)];
 };
 struct cheriabi_aio_return_args {
 	char aiocbp_l_[PADL_(struct aiocb_c *__capability)]; struct aiocb_c *__capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c *__capability)];
@@ -472,7 +478,7 @@ struct cheriabi_utrace_args {
 struct cheriabi_kldsym_args {
 	char fileid_l_[PADL_(int)]; int fileid; char fileid_r_[PADR_(int)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char data_l_[PADL_(struct kld_sym_lookup_c *)]; struct kld_sym_lookup_c * data; char data_r_[PADR_(struct kld_sym_lookup_c *)];
+	char data_l_[PADL_(struct kld_sym_lookup_c *__capability)]; struct kld_sym_lookup_c *__capability data; char data_r_[PADR_(struct kld_sym_lookup_c *__capability)];
 };
 struct cheriabi_jail_args {
 	char jailp_l_[PADL_(struct jail_c *)]; struct jail_c * jailp; char jailp_r_[PADR_(struct jail_c *)];
@@ -900,6 +906,8 @@ int	cheriabi_lchmod(struct thread *, struct cheriabi_lchmod_args *);
 int	cheriabi_lutimes(struct thread *, struct cheriabi_lutimes_args *);
 int	cheriabi_preadv(struct thread *, struct cheriabi_preadv_args *);
 int	cheriabi_pwritev(struct thread *, struct cheriabi_pwritev_args *);
+int	cheriabi_kldload(struct thread *, struct cheriabi_kldload_args *);
+int	cheriabi_kldfind(struct thread *, struct cheriabi_kldfind_args *);
 int	cheriabi_kldstat(struct thread *, struct cheriabi_kldstat_args *);
 int	cheriabi_aio_return(struct thread *, struct cheriabi_aio_return_args *);
 int	cheriabi_aio_suspend(struct thread *, struct cheriabi_aio_suspend_args *);
@@ -1119,6 +1127,8 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_lutimes	AUE_LUTIMES
 #define	CHERIABI_SYS_AUE_cheriabi_preadv	AUE_PREADV
 #define	CHERIABI_SYS_AUE_cheriabi_pwritev	AUE_PWRITEV
+#define	CHERIABI_SYS_AUE_cheriabi_kldload	AUE_MODLOAD
+#define	CHERIABI_SYS_AUE_cheriabi_kldfind	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_kldstat	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_aio_return	AUE_AIO_RETURN
 #define	CHERIABI_SYS_AUE_cheriabi_aio_suspend	AUE_AIO_SUSPEND

@@ -241,9 +241,9 @@
 #define	CHERIABI_SYS_modstat	301
 #define	CHERIABI_SYS_modfnext	302
 #define	CHERIABI_SYS_modfind	303
-#define	CHERIABI_SYS_kldload	304
+#define	CHERIABI_SYS_cheriabi_kldload	304
 #define	CHERIABI_SYS_kldunload	305
-#define	CHERIABI_SYS_kldfind	306
+#define	CHERIABI_SYS_cheriabi_kldfind	306
 #define	CHERIABI_SYS_kldnext	307
 #define	CHERIABI_SYS_cheriabi_kldstat	308
 #define	CHERIABI_SYS_kldfirstmod	309

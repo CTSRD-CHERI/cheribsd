@@ -1349,10 +1349,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* kldload */
+	/* cheriabi_kldload */
 	case 304: {
-		struct kldload_args *p = params;
-		uarg[0] = (intptr_t) p->file; /* const char * */
+		struct cheriabi_kldload_args *p = params;
+		uarg[0] = (cheri_getbase(p->file) + cheri_getoffset(p->file)); /* const char *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -1363,10 +1363,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* kldfind */
+	/* cheriabi_kldfind */
 	case 306: {
-		struct kldfind_args *p = params;
-		uarg[0] = (intptr_t) p->file; /* const char * */
+		struct cheriabi_kldfind_args *p = params;
+		uarg[0] = (cheri_getbase(p->file) + cheri_getoffset(p->file)); /* const char *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -1381,7 +1381,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 308: {
 		struct cheriabi_kldstat_args *p = params;
 		iarg[0] = p->fileid; /* int */
-		uarg[1] = (intptr_t) p->stat; /* struct kld_file_stat_c * */
+		uarg[1] = (cheri_getbase(p->stat) + cheri_getoffset(p->stat)); /* struct kld_file_stat_c *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -1540,7 +1540,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct cheriabi_kldsym_args *p = params;
 		iarg[0] = p->fileid; /* int */
 		iarg[1] = p->cmd; /* int */
-		uarg[2] = (intptr_t) p->data; /* struct kld_sym_lookup_c * */
+		uarg[2] = (cheri_getbase(p->data) + cheri_getoffset(p->data)); /* struct kld_sym_lookup_c *__capability */
 		*n_args = 3;
 		break;
 	}
@@ -5245,11 +5245,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* kldload */
+	/* cheriabi_kldload */
 	case 304:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		default:
 			break;
@@ -5265,11 +5265,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* kldfind */
+	/* cheriabi_kldfind */
 	case 306:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		default:
 			break;
@@ -5292,7 +5292,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct kld_file_stat_c *";
+			p = "userland struct kld_file_stat_c *__capability";
 			break;
 		default:
 			break;
@@ -5536,7 +5536,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland struct kld_sym_lookup_c *";
+			p = "userland struct kld_sym_lookup_c *__capability";
 			break;
 		default:
 			break;
@@ -9078,7 +9078,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* kldload */
+	/* cheriabi_kldload */
 	case 304:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9088,7 +9088,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* kldfind */
+	/* cheriabi_kldfind */
 	case 306:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

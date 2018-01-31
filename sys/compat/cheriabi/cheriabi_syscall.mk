@@ -161,9 +161,9 @@ MIASM =  \
 	modstat.o \
 	modfnext.o \
 	modfind.o \
-	kldload.o \
+	cheriabi_kldload.o \
 	kldunload.o \
-	kldfind.o \
+	cheriabi_kldfind.o \
 	kldnext.o \
 	cheriabi_kldstat.o \
 	kldfirstmod.o \

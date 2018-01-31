@@ -1315,49 +1315,6 @@ cheriabi_nmount(struct thread *td,
 	return (error);
 }
 
-/*
- * Convert pointers to NULL capabilities with the offset of the
- * virtual address to avoid leaking kernel capbilities.  One
- * alternative to consider is sealed capabilities, but would seem
- * to complicate attempts to impose hardware enforced flow control.
- */
-#define PTREXPAND_CP(src,dst,fld) \
-	do { (dst).fld = (void * __capability)(__intcap_t)(src).fld; } while (0)
-
-int
-cheriabi_kldstat(struct thread *td, struct cheriabi_kldstat_args *uap)
-{
-        struct kld_file_stat stat;
-        struct kld_file_stat_c stat_c;
-        int error, version;
-
-        if ((error = copyin(&uap->stat->version, &version, sizeof(version)))
-            != 0)
-                return (error);
-        if (version != sizeof(struct kld_file_stat_c))
-                return (EINVAL);
-
-        error = kern_kldstat(td, uap->fileid, &stat);
-        if (error != 0)
-                return (error);
-
-        bcopy(&stat.name[0], &stat_c.name[0], sizeof(stat.name));
-        CP(stat, stat_c, refs);
-        CP(stat, stat_c, id);
-        PTREXPAND_CP(stat, stat_c, address);
-        CP(stat, stat_c, size);
-        bcopy(&stat.pathname[0], &stat_c.pathname[0], sizeof(stat.pathname));
-        return (copyout(&stat_c, uap->stat, version));
-}
-
-int
-cheriabi_kldsym(struct thread *td, struct cheriabi_kldsym_args *uap)
-{
-
-	/* XXX-BD: split sys_kldsym into kern_kldsym */
-	return (ENOSYS);
-}
-
 int
 cheriabi_abort2(struct thread *td, struct cheriabi_abort2_args *uap)
 {
@@ -2183,7 +2140,6 @@ cheriabi_acct(struct thread *td, struct cheriabi_acct_args *uap)
 	return (kern_acct(td, uap->path));
 }
 
-
 /*
  * kern_ktrace.c
  */
@@ -2200,6 +2156,92 @@ cheriabi_utrace(struct thread *td, struct cheriabi_utrace_args *uap)
 {
 
 	return (kern_utrace(td, uap->addr, uap->len));
+}
+
+/*
+ * kern_linker.c
+ */
+
+int
+cheriabi_kldload(struct thread *td, struct cheriabi_kldload_args *uap)
+{
+	char *pathname = NULL;
+	int error, fileid;
+
+	td->td_retval[0] = -1;
+
+	pathname = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
+	error = copyinstr_c(uap->file, &pathname[0], MAXPATHLEN, NULL);
+	if (error != 0)
+		goto error;
+	error = kern_kldload(td, pathname, &fileid);
+	if (error == 0)
+		td->td_retval[0] = fileid;
+error:
+	free(pathname, M_TEMP);
+	return (error);
+}
+
+int
+cheriabi_kldfind(struct thread *td, struct cheriabi_kldfind_args *uap)
+{
+
+	return (kern_kldfind(td, uap->file));
+}
+
+int
+cheriabi_kldstat(struct thread *td, struct cheriabi_kldstat_args *uap)
+{
+        struct kld_file_stat stat;
+        struct kld_file_stat_c stat_c;
+        int error, version;
+
+        error = copyin_c(&uap->stat->version, &version, sizeof(version));
+	if (error != 0)
+                return (error);
+        if (version != sizeof(struct kld_file_stat_c))
+                return (EINVAL);
+
+        error = kern_kldstat(td, uap->fileid, &stat);
+        if (error != 0)
+                return (error);
+
+        bcopy(&stat.name[0], &stat_c.name[0], sizeof(stat.name));
+        CP(stat, stat_c, refs);
+        CP(stat, stat_c, id);
+	stat_c.address = (void * __capability)(intcap_t)stat.address;
+        CP(stat, stat_c, size);
+        bcopy(&stat.pathname[0], &stat_c.pathname[0], sizeof(stat.pathname));
+        return (copyout_c(&stat_c, uap->stat, version));
+}
+
+int
+cheriabi_kldsym(struct thread *td, struct cheriabi_kldsym_args *uap)
+{
+	struct kld_sym_lookup_c lookup;
+	char *symstr;
+	int error;
+
+	error = copyincap_c(uap->data, &lookup, sizeof(lookup));
+	if (error != 0)
+		return (error);
+	if (lookup.version != sizeof(lookup) ||
+	    uap->cmd != KLDSYM_LOOKUP)
+		return (EINVAL);
+	symstr = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
+	error = copyinstr_c(lookup.symname,
+	    (__cheri_tocap char * __capability)symstr, MAXPATHLEN, NULL);
+	if (error != 0)
+		goto done;
+	error = kern_kldsym(td, uap->fileid, uap->cmd, symstr,
+	    &lookup.symvalue, &lookup.symsize);
+	if (error != 0)
+		goto done;
+	error = copyoutcap_c(&lookup, uap->data, sizeof(lookup));
+
+done:
+	free(symstr, M_TEMP);
+	return (error);
 }
 
 /*

@@ -1132,6 +1132,13 @@ sys_kldunloadf(struct thread *td, struct kldunloadf_args *uap)
 int
 sys_kldfind(struct thread *td, struct kldfind_args *uap)
 {
+
+	return (kern_kldfind(td, __USER_CAP_STR(uap->file)));
+}
+
+int
+kern_kldfind(struct thread *td, const char * __capability file)
+{
 	char *pathname;
 	const char *filename;
 	linker_file_t lf;
@@ -1146,7 +1153,9 @@ sys_kldfind(struct thread *td, struct kldfind_args *uap)
 	td->td_retval[0] = -1;
 
 	pathname = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	if ((error = copyinstr(uap->file, pathname, MAXPATHLEN, NULL)) != 0)
+	if ((error = copyinstr_c(file,
+	    (__cheri_tocap char * __capability)pathname, MAXPATHLEN,
+	    NULL)) != 0)
 		goto out;
 
 	filename = linker_basename(pathname);
@@ -1310,12 +1319,39 @@ sys_kldfirstmod(struct thread *td, struct kldfirstmod_args *uap)
 int
 sys_kldsym(struct thread *td, struct kldsym_args *uap)
 {
-	char *symstr = NULL;
+
+	struct kld_sym_lookup lookup;
+	char *symstr;
+	int error;
+
+	error = copyin(uap->data, &lookup, sizeof(lookup));
+	if (error != 0)
+		return (error);
+	if (lookup.version != sizeof(lookup) ||
+	    uap->cmd != KLDSYM_LOOKUP)
+		return (EINVAL);
+	symstr = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
+	error = copyinstr(lookup.symname, symstr, MAXPATHLEN, NULL);
+	if (error != 0)
+		goto done;
+	error = kern_kldsym(td, uap->fileid, uap->cmd, symstr,
+	    &lookup.symvalue, &lookup.symsize);
+	if (error != 0)
+		goto done;
+	error = copyout(&lookup, uap->data, sizeof(lookup));
+done:
+	free(symstr, M_TEMP);
+	return (error);
+}
+
+int
+kern_kldsym(struct thread *td, int fileid, int cmd, const char *symstr,
+    u_long *symvalue, size_t *symsize)
+{
 	c_linker_sym_t sym;
 	linker_symval_t symval;
 	linker_file_t lf;
-	struct kld_sym_lookup lookup;
-	int error = 0;
+	int error;
 
 #ifdef MAC
 	error = mac_kld_check_stat(td->td_ucred);
@@ -1323,34 +1359,25 @@ sys_kldsym(struct thread *td, struct kldsym_args *uap)
 		return (error);
 #endif
 
-	if ((error = copyin(uap->data, &lookup, sizeof(lookup))) != 0)
-		return (error);
-	if (lookup.version != sizeof(lookup) ||
-	    uap->cmd != KLDSYM_LOOKUP)
-		return (EINVAL);
-	symstr = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	if ((error = copyinstr(lookup.symname, symstr, MAXPATHLEN, NULL)) != 0)
-		goto out;
 	sx_xlock(&kld_sx);
-	if (uap->fileid != 0) {
-		lf = linker_find_file_by_id(uap->fileid);
+	if (fileid != 0) {
+		lf = linker_find_file_by_id(fileid);
 		if (lf == NULL)
 			error = ENOENT;
 		else if (LINKER_LOOKUP_SYMBOL(lf, symstr, &sym) == 0 &&
 		    LINKER_SYMBOL_VALUES(lf, sym, &symval) == 0) {
-			lookup.symvalue = (uintptr_t) symval.value;
-			lookup.symsize = symval.size;
-			error = copyout(&lookup, uap->data, sizeof(lookup));
+			*symvalue = (uintptr_t) symval.value;
+			*symsize = symval.size;
+			error = 0;
 		} else
 			error = ENOENT;
 	} else {
 		TAILQ_FOREACH(lf, &linker_files, link) {
 			if (LINKER_LOOKUP_SYMBOL(lf, symstr, &sym) == 0 &&
 			    LINKER_SYMBOL_VALUES(lf, sym, &symval) == 0) {
-				lookup.symvalue = (uintptr_t)symval.value;
-				lookup.symsize = symval.size;
-				error = copyout(&lookup, uap->data,
-				    sizeof(lookup));
+				*symvalue = (uintptr_t)symval.value;
+				*symsize = symval.size;
+				error = 0;
 				break;
 			}
 		}
@@ -1358,8 +1385,6 @@ sys_kldsym(struct thread *td, struct kldsym_args *uap)
 			error = ENOENT;
 	}
 	sx_xunlock(&kld_sx);
-out:
-	free(symstr, M_TEMP);
 	return (error);
 }
 
