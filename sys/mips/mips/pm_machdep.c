@@ -63,6 +63,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_extern.h>
 #include <sys/user.h>
 #include <sys/uio.h>
+#include <machine/abi.h>
 #include <machine/cpuinfo.h>
 #include <machine/reg.h>
 #include <machine/md_var.h>
@@ -234,12 +235,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	sf.sf_uc.uc_mcontext.mc_cp2state_len = cp2_len;
 #endif
 	sp -= sizeof(struct sigframe);
-#ifdef CPU_CHERI
-	/* For CHERI, keep the stack pointer capability aligned. */
-	sp &= ~(CHERICAP_SIZE - 1);
-#else
-	sp &= ~(sizeof(__int64_t) - 1);
-#endif
+	sp &= ~(STACK_ALIGN - 1);
 	sfp = (struct sigframe *)sp;
 
 	/* Build the argument list for the signal handler. */
@@ -610,12 +606,7 @@ exec_setregs(struct thread *td, struct image_params *imgp, u_long stack)
 
 	bzero((caddr_t)td->td_frame, sizeof(struct trapframe));
 
-	/*
-	 * The stack pointer has to be aligned to accommodate the largest
-	 * datatype at minimum.  This probably means it should be 16-byte
-	 * aligned, but for now we're 8-byte aligning it.
-	 */
-	td->td_frame->sp = ((register_t) stack) & ~(sizeof(__int64_t) - 1);
+	td->td_frame->sp = ((register_t)stack) & ~(STACK_ALIGN - 1);
 
 	/*
 	 * If we're running o32 or n32 programs but have 64-bit registers,
