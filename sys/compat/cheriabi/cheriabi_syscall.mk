@@ -176,7 +176,7 @@ MIASM =  \
 	cheriabi_aio_error.o \
 	mlockall.o \
 	munlockall.o \
-	__getcwd.o \
+	cheriabi___getcwd.o \
 	sched_setparam.o \
 	sched_getparam.o \
 	sched_setscheduler.o \

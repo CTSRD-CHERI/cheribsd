@@ -1460,10 +1460,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 0;
 		break;
 	}
-	/* __getcwd */
+	/* cheriabi___getcwd */
 	case 326: {
-		struct __getcwd_args *p = params;
-		uarg[0] = (intptr_t) p->buf; /* char * */
+		struct cheriabi___getcwd_args *p = params;
+		uarg[0] = (cheri_getbase(p->buf) + cheri_getoffset(p->buf)); /* char *__capability */
 		uarg[1] = p->buflen; /* size_t */
 		*n_args = 2;
 		break;
@@ -5412,11 +5412,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* munlockall */
 	case 325:
 		break;
-	/* __getcwd */
+	/* cheriabi___getcwd */
 	case 326:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland char *__capability";
 			break;
 		case 1:
 			p = "size_t";
@@ -9150,7 +9150,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* munlockall */
 	case 325:
-	/* __getcwd */
+	/* cheriabi___getcwd */
 	case 326:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

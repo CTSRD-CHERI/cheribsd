@@ -5,8 +5,6 @@
  * $FreeBSD$
  */
 
-#include "opt_compat.h"
-
 #include <sys/param.h>
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
@@ -349,7 +347,7 @@ struct sysent cheriabi_sysent[] = {
 	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 323 = obsolete thr_wakeup */
 	{ AS(mlockall_args), (sy_call_t *)sys_mlockall, AUE_MLOCKALL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 324 = mlockall */
 	{ 0, (sy_call_t *)sys_munlockall, AUE_MUNLOCKALL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 325 = munlockall */
-	{ AS(__getcwd_args), (sy_call_t *)sys___getcwd, AUE_GETCWD, NULL, 0, 0, 0, SY_THR_STATIC },	/* 326 = __getcwd */
+	{ AS(cheriabi___getcwd_args), (sy_call_t *)cheriabi___getcwd, AUE_GETCWD, NULL, 0, 0, 0, SY_THR_STATIC },	/* 326 = cheriabi___getcwd */
 	{ AS(sched_setparam_args), (sy_call_t *)sys_sched_setparam, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 327 = sched_setparam */
 	{ AS(sched_getparam_args), (sy_call_t *)sys_sched_getparam, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 328 = sched_getparam */
 	{ AS(sched_setscheduler_args), (sy_call_t *)sys_sched_setscheduler, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 329 = sched_setscheduler */

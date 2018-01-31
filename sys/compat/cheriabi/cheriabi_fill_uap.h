@@ -3409,26 +3409,19 @@ CHERIABI_SYS_mlockall_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS___getcwd_fill_uap(struct thread *td,
-    struct __getcwd_args *uap)
+CHERIABI_SYS_cheriabi___getcwd_fill_uap(struct thread *td,
+    struct cheriabi___getcwd_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [1] size_t buflen */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS___getcwd_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___getcwd_PTRMASK);
 	uap->buflen = cheri_getoffset(tmpcap);
 
-	/* [0] _Out_writes_z_(buflen) char * buf */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS___getcwd_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->buf),
-		    tmpcap, (sizeof(*uap->buf) * uap->buflen), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _Out_writes_z_(buflen) char *__capability buf */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->buf),
+	    0, CHERIABI_SYS_cheriabi___getcwd_PTRMASK);
 
 	return (0);
 }

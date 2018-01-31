@@ -2037,13 +2037,13 @@ int
 sys___getcwd(struct thread *td, struct __getcwd_args *uap)
 {
 
-	return (kern___getcwd(td, uap->buf, UIO_USERSPACE, uap->buflen,
-	    MAXPATHLEN));
+	return (kern___getcwd(td, __USER_CAP(uap->buf, uap->buflen),
+	    UIO_USERSPACE, uap->buflen, MAXPATHLEN));
 }
 
 int
-kern___getcwd(struct thread *td, char *buf, enum uio_seg bufseg, size_t buflen,
-    size_t path_max)
+kern___getcwd(struct thread *td, char * __capability buf, enum uio_seg bufseg,
+    size_t buflen, size_t path_max)
 {
 	char *bp, *tmpbuf;
 	struct filedesc *fdp;
@@ -2071,9 +2071,11 @@ kern___getcwd(struct thread *td, char *buf, enum uio_seg bufseg, size_t buflen,
 
 	if (!error) {
 		if (bufseg == UIO_SYSSPACE)
-			bcopy(bp, buf, strlen(bp) + 1);
+			bcopy_c((__cheri_tocap char * __capability)bp,
+			    buf, strlen(bp) + 1);
 		else
-			error = copyout(bp, buf, strlen(bp) + 1);
+			error = copyout_c((__cheri_tocap char * __capability)bp,
+			    buf, strlen(bp) + 1);
 #ifdef KTRACE
 	if (KTRPOINT(curthread, KTR_NAMEI))
 		ktrnamei(bp);

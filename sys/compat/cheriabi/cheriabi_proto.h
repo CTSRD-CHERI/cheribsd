@@ -444,6 +444,10 @@ struct cheriabi_aio_cancel_args {
 struct cheriabi_aio_error_args {
 	char aiocbp_l_[PADL_(struct aiocb_c *)]; struct aiocb_c * aiocbp; char aiocbp_r_[PADR_(struct aiocb_c *)];
 };
+struct cheriabi___getcwd_args {
+	char buf_l_[PADL_(char *__capability)]; char *__capability buf; char buf_r_[PADR_(char *__capability)];
+	char buflen_l_[PADL_(size_t)]; size_t buflen; char buflen_r_[PADR_(size_t)];
+};
 struct cheriabi_utrace_args {
 	char addr_l_[PADL_(const void *__capability)]; const void *__capability addr; char addr_r_[PADR_(const void *__capability)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
@@ -884,6 +888,7 @@ int	cheriabi_aio_return(struct thread *, struct cheriabi_aio_return_args *);
 int	cheriabi_aio_suspend(struct thread *, struct cheriabi_aio_suspend_args *);
 int	cheriabi_aio_cancel(struct thread *, struct cheriabi_aio_cancel_args *);
 int	cheriabi_aio_error(struct thread *, struct cheriabi_aio_error_args *);
+int	cheriabi___getcwd(struct thread *, struct cheriabi___getcwd_args *);
 int	cheriabi_utrace(struct thread *, struct cheriabi_utrace_args *);
 int	cheriabi_kldsym(struct thread *, struct cheriabi_kldsym_args *);
 int	cheriabi_jail(struct thread *, struct cheriabi_jail_args *);
@@ -1098,6 +1103,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_aio_suspend	AUE_AIO_SUSPEND
 #define	CHERIABI_SYS_AUE_cheriabi_aio_cancel	AUE_AIO_CANCEL
 #define	CHERIABI_SYS_AUE_cheriabi_aio_error	AUE_AIO_ERROR
+#define	CHERIABI_SYS_AUE_cheriabi___getcwd	AUE_GETCWD
 #define	CHERIABI_SYS_AUE_cheriabi_utrace	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_kldsym	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_jail	AUE_JAIL

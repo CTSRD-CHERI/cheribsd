@@ -39,6 +39,20 @@ __FBSDID("$FreeBSD$");
 
 #include <compat/cheriabi/cheriabi_proto.h>
 
+/*
+ * vfs_cache.c
+ */
+int
+cheriabi___getcwd(struct thread *td, struct cheriabi___getcwd_args *uap)
+{
+
+	return (kern___getcwd(td, uap->buf, UIO_USERSPACE, uap->buflen,
+	    MAXPATHLEN));
+}
+
+/*
+ * vfs_syscalls.c
+ */
 int
 cheriabi_quotactl(struct thread *td, struct cheriabi_quotactl_args *uap)
 {

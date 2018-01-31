@@ -168,7 +168,7 @@
 #define	CHERIABI_SYS_cheriabi_aio_cancel_PTRMASK	(0x0 | 0x2)
 #define	CHERIABI_SYS_cheriabi_aio_error_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_mlockall_PTRMASK	(0x0)
-#define	CHERIABI_SYS___getcwd_PTRMASK	(0x0 | 0x1)
+#define	CHERIABI_SYS_cheriabi___getcwd_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_sched_setparam_PTRMASK	(0x0 | 0x2)
 #define	CHERIABI_SYS_sched_getparam_PTRMASK	(0x0 | 0x2)
 #define	CHERIABI_SYS_sched_setscheduler_PTRMASK	(0x0 | 0x4)

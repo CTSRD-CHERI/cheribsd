@@ -263,7 +263,7 @@
 				/* 323 is obsolete thr_wakeup */
 #define	CHERIABI_SYS_mlockall	324
 #define	CHERIABI_SYS_munlockall	325
-#define	CHERIABI_SYS___getcwd	326
+#define	CHERIABI_SYS_cheriabi___getcwd	326
 #define	CHERIABI_SYS_sched_setparam	327
 #define	CHERIABI_SYS_sched_getparam	328
 #define	CHERIABI_SYS_sched_setscheduler	329
