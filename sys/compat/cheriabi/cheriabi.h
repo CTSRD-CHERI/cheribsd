@@ -136,12 +136,6 @@ struct jail_c {
 	struct in6_addr * __capability	ip6;
 };
 
-struct sigaction_c {
-	void * __capability	sa_u;
-	int		sa_flags;
-	sigset_t	sa_mask;
-};
-
 struct thr_param_c {
 	void * __capability		start_func;
 	void * __capability		arg;

@@ -37,6 +37,12 @@ struct sigaltstack_c {
 	int		ss_flags;	/* SS_DISABLE and/or SS_ONSTACK */
 };
 
+struct sigaction_c {
+	void * __capability	sa_u;
+	int			sa_flags;
+	sigset_t		sa_mask;
+};
+
 union sigval_c {
 	int			sival_int;
 	void * __capability	sival_ptr;
