@@ -753,27 +753,32 @@
 346	AUE_NULL	STD	{ int cheriabi_sigwaitinfo( \
 				    _In_ const sigset_t * __capability set, \
 				    _Out_opt_ struct siginfo_c * __capability info); }
-347	AUE_ACL_GET_FILE	NOPROTO	{ int __acl_get_file( \
-				    _In_z_ const char *path, \
+347	AUE_ACL_GET_FILE	STD	{ int cheriabi___acl_get_file( \
+				    _In_z_ const char * __capability path, \
 				    acl_type_t type, \
-				    _Out_ struct acl *aclp); }
-348	AUE_ACL_SET_FILE	NOPROTO	{ int __acl_set_file( \
-				    _In_z_ const char *path, \
-				    acl_type_t type, _In_ struct acl *aclp); }
-349	AUE_ACL_GET_FD	NOPROTO	{ int __acl_get_fd(int filedes, \
-				    acl_type_t type, _Out_ struct acl *aclp); }
-350	AUE_ACL_SET_FD	NOPROTO	{ int __acl_set_fd(int filedes, \
-				    acl_type_t type, _In_ struct acl *aclp); }
-351	AUE_ACL_DELETE_FILE	NOPROTO	{ int __acl_delete_file( \
-				    _In_z_ const char *path, \
+				    _Out_ struct acl * __capability aclp); }
+348	AUE_ACL_SET_FILE	STD	{ int cheriabi___acl_set_file( \
+				    _In_z_ const char * __capability path, \
+				    acl_type_t type, \
+				    _In_ struct acl * __capability aclp); }
+349	AUE_ACL_GET_FD	STD	{ int cheriabi___acl_get_fd(int filedes, \
+				    acl_type_t type, \
+				    _Out_ struct acl * __capability aclp); }
+350	AUE_ACL_SET_FD	STD	{ int cheriabi___acl_set_fd(int filedes, \
+				    acl_type_t type, \
+				    _In_ struct acl * __capability aclp); }
+351	AUE_ACL_DELETE_FILE	STD	{ int cheriabi___acl_delete_file( \
+				    _In_z_ const char * __capability path, \
 				    acl_type_t type); }
-352	AUE_ACL_DELETE_FD	NOPROTO	{ int __acl_delete_fd(int filedes, \
-				    acl_type_t type); }
-353	AUE_ACL_CHECK_FILE	NOPROTO	{ int __acl_aclcheck_file( \
-				    _In_z_ const char *path, \
-				    acl_type_t type, _In_ struct acl *aclp); }
-354	AUE_ACL_CHECK_FD	NOPROTO	{ int __acl_aclcheck_fd(int filedes, \
-				    acl_type_t type, _In_ struct acl *aclp); }
+352	AUE_ACL_DELETE_FD	NOPROTO	{ int __acl_delete_fd( \
+				    int filedes, acl_type_t type); }
+353	AUE_ACL_CHECK_FILE	STD	{ int cheriabi___acl_aclcheck_file( \
+				    _In_z_ const char *__capability path, \
+				    acl_type_t type, \
+				    _In_ struct acl * __capability aclp); }
+354	AUE_ACL_CHECK_FD	STD	{ int cheriabi___acl_aclcheck_fd( \
+				    int filedes, acl_type_t type, \
+				    _In_ struct acl * __capability aclp); }
 355	AUE_EXTATTRCTL	NOPROTO	{ int extattrctl(_In_z_ const char *path, \
 				    int cmd, _In_z_opt_ const char *filename, \
 				    int attrnamespace, \
@@ -936,16 +941,21 @@
 				    _In_ const ucontext_c_t *ucp); }
 424	AUE_SWAPOFF	STD	{ int cheriabi_swapoff( \
 				    _In_z_ const char * __capability name); }
-425	AUE_ACL_GET_LINK	NOPROTO	{ int __acl_get_link(_In_z_ const char *path, \
-				    acl_type_t type, _Out_ struct acl *aclp); }
-426	AUE_ACL_SET_LINK	NOPROTO	{ int __acl_set_link(_In_z_ const char *path, \
-				    acl_type_t type, _In_ struct acl *aclp); }
-427	AUE_ACL_DELETE_LINK	NOPROTO	{ int __acl_delete_link( \
-				    _In_z_ const char *path, \
+425	AUE_ACL_GET_LINK	STD	{ int cheriabi___acl_get_link( \
+				    _In_z_ const char * __capability path, \
+				    acl_type_t type, \
+				    _Out_ struct acl * __capability aclp); }
+426	AUE_ACL_SET_LINK	STD	{ int cheriabi___acl_set_link( \
+				    _In_z_ const char * __capability path, \
+				    acl_type_t type, \
+				    _In_ struct acl * __capability aclp); }
+427	AUE_ACL_DELETE_LINK	STD	{ int cheriabi___acl_delete_link( \
+				    _In_z_ const char * __capability path, \
 				    acl_type_t type); }
-428	AUE_ACL_CHECK_LINK	NOPROTO	{ int __acl_aclcheck_link( \
-				    _In_z_ const char *path, \
-				    acl_type_t type, _In_ struct acl *aclp); }
+428	AUE_ACL_CHECK_LINK	STD	{ int cheriabi___acl_aclcheck_link( \
+				    _In_z_ const char * __capability path, \
+				    acl_type_t type, \
+				    _In_ struct acl * __capability aclp); }
 429	AUE_SIGWAIT	STD	{ int cheriabi_sigwait( \
 				    _In_ const sigset_t * __capability set, \
 				    _Out_ int * __capability sig); }

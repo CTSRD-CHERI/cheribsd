@@ -193,14 +193,14 @@ MIASM =  \
 	cheriabi_sigpending.o \
 	cheriabi_sigtimedwait.o \
 	cheriabi_sigwaitinfo.o \
-	__acl_get_file.o \
-	__acl_set_file.o \
-	__acl_get_fd.o \
-	__acl_set_fd.o \
-	__acl_delete_file.o \
+	cheriabi___acl_get_file.o \
+	cheriabi___acl_set_file.o \
+	cheriabi___acl_get_fd.o \
+	cheriabi___acl_set_fd.o \
+	cheriabi___acl_delete_file.o \
 	__acl_delete_fd.o \
-	__acl_aclcheck_file.o \
-	__acl_aclcheck_fd.o \
+	cheriabi___acl_aclcheck_file.o \
+	cheriabi___acl_aclcheck_fd.o \
 	extattrctl.o \
 	extattr_set_file.o \
 	extattr_get_file.o \
@@ -239,10 +239,10 @@ MIASM =  \
 	cheriabi_setcontext.o \
 	cheriabi_swapcontext.o \
 	cheriabi_swapoff.o \
-	__acl_get_link.o \
-	__acl_set_link.o \
-	__acl_delete_link.o \
-	__acl_aclcheck_link.o \
+	cheriabi___acl_get_link.o \
+	cheriabi___acl_set_link.o \
+	cheriabi___acl_delete_link.o \
+	cheriabi___acl_aclcheck_link.o \
 	cheriabi_sigwait.o \
 	cheriabi_thr_create.o \
 	thr_exit.o \

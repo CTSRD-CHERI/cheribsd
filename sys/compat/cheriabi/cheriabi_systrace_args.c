@@ -1591,46 +1591,46 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* __acl_get_file */
+	/* cheriabi___acl_get_file */
 	case 347: {
-		struct __acl_get_file_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi___acl_get_file_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->type; /* acl_type_t */
-		uarg[2] = (intptr_t) p->aclp; /* struct acl * */
+		uarg[2] = (cheri_getbase(p->aclp) + cheri_getoffset(p->aclp)); /* struct acl *__capability */
 		*n_args = 3;
 		break;
 	}
-	/* __acl_set_file */
+	/* cheriabi___acl_set_file */
 	case 348: {
-		struct __acl_set_file_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi___acl_set_file_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->type; /* acl_type_t */
-		uarg[2] = (intptr_t) p->aclp; /* struct acl * */
+		uarg[2] = (cheri_getbase(p->aclp) + cheri_getoffset(p->aclp)); /* struct acl *__capability */
 		*n_args = 3;
 		break;
 	}
-	/* __acl_get_fd */
+	/* cheriabi___acl_get_fd */
 	case 349: {
-		struct __acl_get_fd_args *p = params;
+		struct cheriabi___acl_get_fd_args *p = params;
 		iarg[0] = p->filedes; /* int */
 		iarg[1] = p->type; /* acl_type_t */
-		uarg[2] = (intptr_t) p->aclp; /* struct acl * */
+		uarg[2] = (cheri_getbase(p->aclp) + cheri_getoffset(p->aclp)); /* struct acl *__capability */
 		*n_args = 3;
 		break;
 	}
-	/* __acl_set_fd */
+	/* cheriabi___acl_set_fd */
 	case 350: {
-		struct __acl_set_fd_args *p = params;
+		struct cheriabi___acl_set_fd_args *p = params;
 		iarg[0] = p->filedes; /* int */
 		iarg[1] = p->type; /* acl_type_t */
-		uarg[2] = (intptr_t) p->aclp; /* struct acl * */
+		uarg[2] = (cheri_getbase(p->aclp) + cheri_getoffset(p->aclp)); /* struct acl *__capability */
 		*n_args = 3;
 		break;
 	}
-	/* __acl_delete_file */
+	/* cheriabi___acl_delete_file */
 	case 351: {
-		struct __acl_delete_file_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi___acl_delete_file_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->type; /* acl_type_t */
 		*n_args = 2;
 		break;
@@ -1643,21 +1643,21 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* __acl_aclcheck_file */
+	/* cheriabi___acl_aclcheck_file */
 	case 353: {
-		struct __acl_aclcheck_file_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi___acl_aclcheck_file_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->type; /* acl_type_t */
-		uarg[2] = (intptr_t) p->aclp; /* struct acl * */
+		uarg[2] = (cheri_getbase(p->aclp) + cheri_getoffset(p->aclp)); /* struct acl *__capability */
 		*n_args = 3;
 		break;
 	}
-	/* __acl_aclcheck_fd */
+	/* cheriabi___acl_aclcheck_fd */
 	case 354: {
-		struct __acl_aclcheck_fd_args *p = params;
+		struct cheriabi___acl_aclcheck_fd_args *p = params;
 		iarg[0] = p->filedes; /* int */
 		iarg[1] = p->type; /* acl_type_t */
-		uarg[2] = (intptr_t) p->aclp; /* struct acl * */
+		uarg[2] = (cheri_getbase(p->aclp) + cheri_getoffset(p->aclp)); /* struct acl *__capability */
 		*n_args = 3;
 		break;
 	}
@@ -1993,38 +1993,38 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* __acl_get_link */
+	/* cheriabi___acl_get_link */
 	case 425: {
-		struct __acl_get_link_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi___acl_get_link_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->type; /* acl_type_t */
-		uarg[2] = (intptr_t) p->aclp; /* struct acl * */
+		uarg[2] = (cheri_getbase(p->aclp) + cheri_getoffset(p->aclp)); /* struct acl *__capability */
 		*n_args = 3;
 		break;
 	}
-	/* __acl_set_link */
+	/* cheriabi___acl_set_link */
 	case 426: {
-		struct __acl_set_link_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi___acl_set_link_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->type; /* acl_type_t */
-		uarg[2] = (intptr_t) p->aclp; /* struct acl * */
+		uarg[2] = (cheri_getbase(p->aclp) + cheri_getoffset(p->aclp)); /* struct acl *__capability */
 		*n_args = 3;
 		break;
 	}
-	/* __acl_delete_link */
+	/* cheriabi___acl_delete_link */
 	case 427: {
-		struct __acl_delete_link_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi___acl_delete_link_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->type; /* acl_type_t */
 		*n_args = 2;
 		break;
 	}
-	/* __acl_aclcheck_link */
+	/* cheriabi___acl_aclcheck_link */
 	case 428: {
-		struct __acl_aclcheck_link_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi___acl_aclcheck_link_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->type; /* acl_type_t */
-		uarg[2] = (intptr_t) p->aclp; /* struct acl * */
+		uarg[2] = (cheri_getbase(p->aclp) + cheri_getoffset(p->aclp)); /* struct acl *__capability */
 		*n_args = 3;
 		break;
 	}
@@ -5617,39 +5617,39 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* __acl_get_file */
+	/* cheriabi___acl_get_file */
 	case 347:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "acl_type_t";
 			break;
 		case 2:
-			p = "userland struct acl *";
+			p = "userland struct acl *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* __acl_set_file */
+	/* cheriabi___acl_set_file */
 	case 348:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "acl_type_t";
 			break;
 		case 2:
-			p = "userland struct acl *";
+			p = "userland struct acl *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* __acl_get_fd */
+	/* cheriabi___acl_get_fd */
 	case 349:
 		switch(ndx) {
 		case 0:
@@ -5659,13 +5659,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "acl_type_t";
 			break;
 		case 2:
-			p = "userland struct acl *";
+			p = "userland struct acl *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* __acl_set_fd */
+	/* cheriabi___acl_set_fd */
 	case 350:
 		switch(ndx) {
 		case 0:
@@ -5675,17 +5675,17 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "acl_type_t";
 			break;
 		case 2:
-			p = "userland struct acl *";
+			p = "userland struct acl *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* __acl_delete_file */
+	/* cheriabi___acl_delete_file */
 	case 351:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "acl_type_t";
@@ -5707,23 +5707,23 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* __acl_aclcheck_file */
+	/* cheriabi___acl_aclcheck_file */
 	case 353:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "acl_type_t";
 			break;
 		case 2:
-			p = "userland struct acl *";
+			p = "userland struct acl *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* __acl_aclcheck_fd */
+	/* cheriabi___acl_aclcheck_fd */
 	case 354:
 		switch(ndx) {
 		case 0:
@@ -5733,7 +5733,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "acl_type_t";
 			break;
 		case 2:
-			p = "userland struct acl *";
+			p = "userland struct acl *__capability";
 			break;
 		default:
 			break;
@@ -6316,43 +6316,43 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* __acl_get_link */
+	/* cheriabi___acl_get_link */
 	case 425:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "acl_type_t";
 			break;
 		case 2:
-			p = "userland struct acl *";
+			p = "userland struct acl *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* __acl_set_link */
+	/* cheriabi___acl_set_link */
 	case 426:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "acl_type_t";
 			break;
 		case 2:
-			p = "userland struct acl *";
+			p = "userland struct acl *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* __acl_delete_link */
+	/* cheriabi___acl_delete_link */
 	case 427:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "acl_type_t";
@@ -6361,17 +6361,17 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* __acl_aclcheck_link */
+	/* cheriabi___acl_aclcheck_link */
 	case 428:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "acl_type_t";
 			break;
 		case 2:
-			p = "userland struct acl *";
+			p = "userland struct acl *__capability";
 			break;
 		default:
 			break;
@@ -9232,27 +9232,27 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* __acl_get_file */
+	/* cheriabi___acl_get_file */
 	case 347:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* __acl_set_file */
+	/* cheriabi___acl_set_file */
 	case 348:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* __acl_get_fd */
+	/* cheriabi___acl_get_fd */
 	case 349:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* __acl_set_fd */
+	/* cheriabi___acl_set_fd */
 	case 350:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* __acl_delete_file */
+	/* cheriabi___acl_delete_file */
 	case 351:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9262,12 +9262,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* __acl_aclcheck_file */
+	/* cheriabi___acl_aclcheck_file */
 	case 353:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* __acl_aclcheck_fd */
+	/* cheriabi___acl_aclcheck_fd */
 	case 354:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9459,22 +9459,22 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* __acl_get_link */
+	/* cheriabi___acl_get_link */
 	case 425:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* __acl_set_link */
+	/* cheriabi___acl_set_link */
 	case 426:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* __acl_delete_link */
+	/* cheriabi___acl_delete_link */
 	case 427:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* __acl_aclcheck_link */
+	/* cheriabi___acl_aclcheck_link */
 	case 428:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

@@ -3647,158 +3647,109 @@ CHERIABI_SYS_cheriabi_sigwaitinfo_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS___acl_get_file_fill_uap(struct thread *td,
-    struct __acl_get_file_args *uap)
+CHERIABI_SYS_cheriabi___acl_get_file_fill_uap(struct thread *td,
+    struct cheriabi___acl_get_file_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [1] acl_type_t type */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS___acl_get_file_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___acl_get_file_PTRMASK);
 	uap->type = cheri_getoffset(tmpcap);
 
-	/* [0] _In_z_ const char * path */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
+	/* [0] _In_z_ const char *__capability path */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->path),
+	    0, CHERIABI_SYS_cheriabi___acl_get_file_PTRMASK);
 
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS___acl_get_file_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->path),
-		    tmpcap, sizeof(*uap->path), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
-
-	/* [2] _Out_ struct acl * aclp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS___acl_get_file_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->aclp),
-		    tmpcap, sizeof(*uap->aclp), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [2] _Out_ struct acl *__capability aclp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->aclp),
+	    2, CHERIABI_SYS_cheriabi___acl_get_file_PTRMASK);
 
 	return (0);
 }
 
 static inline int
-CHERIABI_SYS___acl_set_file_fill_uap(struct thread *td,
-    struct __acl_set_file_args *uap)
+CHERIABI_SYS_cheriabi___acl_set_file_fill_uap(struct thread *td,
+    struct cheriabi___acl_set_file_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [1] acl_type_t type */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS___acl_set_file_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___acl_set_file_PTRMASK);
 	uap->type = cheri_getoffset(tmpcap);
 
-	/* [0] _In_z_ const char * path */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
+	/* [0] _In_z_ const char *__capability path */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->path),
+	    0, CHERIABI_SYS_cheriabi___acl_set_file_PTRMASK);
 
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS___acl_set_file_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->path),
-		    tmpcap, sizeof(*uap->path), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
-
-	/* [2] _In_ struct acl * aclp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS___acl_set_file_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->aclp),
-		    tmpcap, sizeof(*uap->aclp), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [2] _In_ struct acl *__capability aclp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->aclp),
+	    2, CHERIABI_SYS_cheriabi___acl_set_file_PTRMASK);
 
 	return (0);
 }
 
 static inline int
-CHERIABI_SYS___acl_get_fd_fill_uap(struct thread *td,
-    struct __acl_get_fd_args *uap)
+CHERIABI_SYS_cheriabi___acl_get_fd_fill_uap(struct thread *td,
+    struct cheriabi___acl_get_fd_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] int filedes */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS___acl_get_fd_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi___acl_get_fd_PTRMASK);
 	uap->filedes = cheri_getoffset(tmpcap);
 
 	/* [1] acl_type_t type */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS___acl_get_fd_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___acl_get_fd_PTRMASK);
 	uap->type = cheri_getoffset(tmpcap);
 
-	/* [2] _Out_ struct acl * aclp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS___acl_get_fd_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->aclp),
-		    tmpcap, sizeof(*uap->aclp), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [2] _Out_ struct acl *__capability aclp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->aclp),
+	    2, CHERIABI_SYS_cheriabi___acl_get_fd_PTRMASK);
 
 	return (0);
 }
 
 static inline int
-CHERIABI_SYS___acl_set_fd_fill_uap(struct thread *td,
-    struct __acl_set_fd_args *uap)
+CHERIABI_SYS_cheriabi___acl_set_fd_fill_uap(struct thread *td,
+    struct cheriabi___acl_set_fd_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] int filedes */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS___acl_set_fd_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi___acl_set_fd_PTRMASK);
 	uap->filedes = cheri_getoffset(tmpcap);
 
 	/* [1] acl_type_t type */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS___acl_set_fd_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___acl_set_fd_PTRMASK);
 	uap->type = cheri_getoffset(tmpcap);
 
-	/* [2] _In_ struct acl * aclp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS___acl_set_fd_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->aclp),
-		    tmpcap, sizeof(*uap->aclp), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [2] _In_ struct acl *__capability aclp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->aclp),
+	    2, CHERIABI_SYS_cheriabi___acl_set_fd_PTRMASK);
 
 	return (0);
 }
 
 static inline int
-CHERIABI_SYS___acl_delete_file_fill_uap(struct thread *td,
-    struct __acl_delete_file_args *uap)
+CHERIABI_SYS_cheriabi___acl_delete_file_fill_uap(struct thread *td,
+    struct cheriabi___acl_delete_file_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [1] acl_type_t type */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS___acl_delete_file_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___acl_delete_file_PTRMASK);
 	uap->type = cheri_getoffset(tmpcap);
 
-	/* [0] _In_z_ const char * path */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS___acl_delete_file_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->path),
-		    tmpcap, sizeof(*uap->path), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _In_z_ const char *__capability path */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->path),
+	    0, CHERIABI_SYS_cheriabi___acl_delete_file_PTRMASK);
 
 	return (0);
 }
@@ -3821,67 +3772,46 @@ CHERIABI_SYS___acl_delete_fd_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS___acl_aclcheck_file_fill_uap(struct thread *td,
-    struct __acl_aclcheck_file_args *uap)
+CHERIABI_SYS_cheriabi___acl_aclcheck_file_fill_uap(struct thread *td,
+    struct cheriabi___acl_aclcheck_file_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [1] acl_type_t type */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS___acl_aclcheck_file_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___acl_aclcheck_file_PTRMASK);
 	uap->type = cheri_getoffset(tmpcap);
 
-	/* [0] _In_z_ const char * path */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
+	/* [0] _In_z_ const char *__capability path */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->path),
+	    0, CHERIABI_SYS_cheriabi___acl_aclcheck_file_PTRMASK);
 
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS___acl_aclcheck_file_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->path),
-		    tmpcap, sizeof(*uap->path), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
-
-	/* [2] _In_ struct acl * aclp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS___acl_aclcheck_file_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->aclp),
-		    tmpcap, sizeof(*uap->aclp), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [2] _In_ struct acl *__capability aclp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->aclp),
+	    2, CHERIABI_SYS_cheriabi___acl_aclcheck_file_PTRMASK);
 
 	return (0);
 }
 
 static inline int
-CHERIABI_SYS___acl_aclcheck_fd_fill_uap(struct thread *td,
-    struct __acl_aclcheck_fd_args *uap)
+CHERIABI_SYS_cheriabi___acl_aclcheck_fd_fill_uap(struct thread *td,
+    struct cheriabi___acl_aclcheck_fd_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] int filedes */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS___acl_aclcheck_fd_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi___acl_aclcheck_fd_PTRMASK);
 	uap->filedes = cheri_getoffset(tmpcap);
 
 	/* [1] acl_type_t type */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS___acl_aclcheck_fd_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___acl_aclcheck_fd_PTRMASK);
 	uap->type = cheri_getoffset(tmpcap);
 
-	/* [2] _In_ struct acl * aclp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS___acl_aclcheck_fd_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->aclp),
-		    tmpcap, sizeof(*uap->aclp), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [2] _In_ struct acl *__capability aclp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->aclp),
+	    2, CHERIABI_SYS_cheriabi___acl_aclcheck_fd_PTRMASK);
 
 	return (0);
 }
@@ -5060,137 +4990,88 @@ CHERIABI_SYS_cheriabi_swapoff_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS___acl_get_link_fill_uap(struct thread *td,
-    struct __acl_get_link_args *uap)
+CHERIABI_SYS_cheriabi___acl_get_link_fill_uap(struct thread *td,
+    struct cheriabi___acl_get_link_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [1] acl_type_t type */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS___acl_get_link_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___acl_get_link_PTRMASK);
 	uap->type = cheri_getoffset(tmpcap);
 
-	/* [0] _In_z_ const char * path */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
+	/* [0] _In_z_ const char *__capability path */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->path),
+	    0, CHERIABI_SYS_cheriabi___acl_get_link_PTRMASK);
 
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS___acl_get_link_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->path),
-		    tmpcap, sizeof(*uap->path), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
-
-	/* [2] _Out_ struct acl * aclp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS___acl_get_link_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->aclp),
-		    tmpcap, sizeof(*uap->aclp), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [2] _Out_ struct acl *__capability aclp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->aclp),
+	    2, CHERIABI_SYS_cheriabi___acl_get_link_PTRMASK);
 
 	return (0);
 }
 
 static inline int
-CHERIABI_SYS___acl_set_link_fill_uap(struct thread *td,
-    struct __acl_set_link_args *uap)
+CHERIABI_SYS_cheriabi___acl_set_link_fill_uap(struct thread *td,
+    struct cheriabi___acl_set_link_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [1] acl_type_t type */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS___acl_set_link_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___acl_set_link_PTRMASK);
 	uap->type = cheri_getoffset(tmpcap);
 
-	/* [0] _In_z_ const char * path */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
+	/* [0] _In_z_ const char *__capability path */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->path),
+	    0, CHERIABI_SYS_cheriabi___acl_set_link_PTRMASK);
 
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS___acl_set_link_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->path),
-		    tmpcap, sizeof(*uap->path), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
-
-	/* [2] _In_ struct acl * aclp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS___acl_set_link_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->aclp),
-		    tmpcap, sizeof(*uap->aclp), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [2] _In_ struct acl *__capability aclp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->aclp),
+	    2, CHERIABI_SYS_cheriabi___acl_set_link_PTRMASK);
 
 	return (0);
 }
 
 static inline int
-CHERIABI_SYS___acl_delete_link_fill_uap(struct thread *td,
-    struct __acl_delete_link_args *uap)
+CHERIABI_SYS_cheriabi___acl_delete_link_fill_uap(struct thread *td,
+    struct cheriabi___acl_delete_link_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [1] acl_type_t type */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS___acl_delete_link_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___acl_delete_link_PTRMASK);
 	uap->type = cheri_getoffset(tmpcap);
 
-	/* [0] _In_z_ const char * path */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS___acl_delete_link_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->path),
-		    tmpcap, sizeof(*uap->path), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _In_z_ const char *__capability path */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->path),
+	    0, CHERIABI_SYS_cheriabi___acl_delete_link_PTRMASK);
 
 	return (0);
 }
 
 static inline int
-CHERIABI_SYS___acl_aclcheck_link_fill_uap(struct thread *td,
-    struct __acl_aclcheck_link_args *uap)
+CHERIABI_SYS_cheriabi___acl_aclcheck_link_fill_uap(struct thread *td,
+    struct cheriabi___acl_aclcheck_link_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [1] acl_type_t type */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS___acl_aclcheck_link_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___acl_aclcheck_link_PTRMASK);
 	uap->type = cheri_getoffset(tmpcap);
 
-	/* [0] _In_z_ const char * path */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
+	/* [0] _In_z_ const char *__capability path */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->path),
+	    0, CHERIABI_SYS_cheriabi___acl_aclcheck_link_PTRMASK);
 
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS___acl_aclcheck_link_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->path),
-		    tmpcap, sizeof(*uap->path), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
-
-	/* [2] _In_ struct acl * aclp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS___acl_aclcheck_link_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->aclp),
-		    tmpcap, sizeof(*uap->aclp), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [2] _In_ struct acl *__capability aclp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->aclp),
+	    2, CHERIABI_SYS_cheriabi___acl_aclcheck_link_PTRMASK);
 
 	return (0);
 }

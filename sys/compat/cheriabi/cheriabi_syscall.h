@@ -283,14 +283,14 @@
 				/* 344 is obsolete sigreturn */
 #define	CHERIABI_SYS_cheriabi_sigtimedwait	345
 #define	CHERIABI_SYS_cheriabi_sigwaitinfo	346
-#define	CHERIABI_SYS___acl_get_file	347
-#define	CHERIABI_SYS___acl_set_file	348
-#define	CHERIABI_SYS___acl_get_fd	349
-#define	CHERIABI_SYS___acl_set_fd	350
-#define	CHERIABI_SYS___acl_delete_file	351
+#define	CHERIABI_SYS_cheriabi___acl_get_file	347
+#define	CHERIABI_SYS_cheriabi___acl_set_file	348
+#define	CHERIABI_SYS_cheriabi___acl_get_fd	349
+#define	CHERIABI_SYS_cheriabi___acl_set_fd	350
+#define	CHERIABI_SYS_cheriabi___acl_delete_file	351
 #define	CHERIABI_SYS___acl_delete_fd	352
-#define	CHERIABI_SYS___acl_aclcheck_file	353
-#define	CHERIABI_SYS___acl_aclcheck_fd	354
+#define	CHERIABI_SYS_cheriabi___acl_aclcheck_file	353
+#define	CHERIABI_SYS_cheriabi___acl_aclcheck_fd	354
 #define	CHERIABI_SYS_extattrctl	355
 #define	CHERIABI_SYS_extattr_set_file	356
 #define	CHERIABI_SYS_extattr_get_file	357
@@ -347,10 +347,10 @@
 #define	CHERIABI_SYS_cheriabi_setcontext	422
 #define	CHERIABI_SYS_cheriabi_swapcontext	423
 #define	CHERIABI_SYS_cheriabi_swapoff	424
-#define	CHERIABI_SYS___acl_get_link	425
-#define	CHERIABI_SYS___acl_set_link	426
-#define	CHERIABI_SYS___acl_delete_link	427
-#define	CHERIABI_SYS___acl_aclcheck_link	428
+#define	CHERIABI_SYS_cheriabi___acl_get_link	425
+#define	CHERIABI_SYS_cheriabi___acl_set_link	426
+#define	CHERIABI_SYS_cheriabi___acl_delete_link	427
+#define	CHERIABI_SYS_cheriabi___acl_aclcheck_link	428
 #define	CHERIABI_SYS_cheriabi_sigwait	429
 #define	CHERIABI_SYS_cheriabi_thr_create	430
 #define	CHERIABI_SYS_thr_exit	431

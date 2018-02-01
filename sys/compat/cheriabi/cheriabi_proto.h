@@ -503,6 +503,40 @@ struct cheriabi_sigwaitinfo_args {
 	char set_l_[PADL_(const sigset_t *__capability)]; const sigset_t *__capability set; char set_r_[PADR_(const sigset_t *__capability)];
 	char info_l_[PADL_(struct siginfo_c *__capability)]; struct siginfo_c *__capability info; char info_r_[PADR_(struct siginfo_c *__capability)];
 };
+struct cheriabi___acl_get_file_args {
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
+	char aclp_l_[PADL_(struct acl *__capability)]; struct acl *__capability aclp; char aclp_r_[PADR_(struct acl *__capability)];
+};
+struct cheriabi___acl_set_file_args {
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
+	char aclp_l_[PADL_(struct acl *__capability)]; struct acl *__capability aclp; char aclp_r_[PADR_(struct acl *__capability)];
+};
+struct cheriabi___acl_get_fd_args {
+	char filedes_l_[PADL_(int)]; int filedes; char filedes_r_[PADR_(int)];
+	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
+	char aclp_l_[PADL_(struct acl *__capability)]; struct acl *__capability aclp; char aclp_r_[PADR_(struct acl *__capability)];
+};
+struct cheriabi___acl_set_fd_args {
+	char filedes_l_[PADL_(int)]; int filedes; char filedes_r_[PADR_(int)];
+	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
+	char aclp_l_[PADL_(struct acl *__capability)]; struct acl *__capability aclp; char aclp_r_[PADR_(struct acl *__capability)];
+};
+struct cheriabi___acl_delete_file_args {
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
+};
+struct cheriabi___acl_aclcheck_file_args {
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
+	char aclp_l_[PADL_(struct acl *__capability)]; struct acl *__capability aclp; char aclp_r_[PADR_(struct acl *__capability)];
+};
+struct cheriabi___acl_aclcheck_fd_args {
+	char filedes_l_[PADL_(int)]; int filedes; char filedes_r_[PADR_(int)];
+	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
+	char aclp_l_[PADL_(struct acl *__capability)]; struct acl *__capability aclp; char aclp_r_[PADR_(struct acl *__capability)];
+};
 struct cheriabi_aio_waitcomplete_args {
 	char aiocbp_l_[PADL_(struct aiocb_c *__capability *)]; struct aiocb_c *__capability * aiocbp; char aiocbp_r_[PADR_(struct aiocb_c *__capability *)];
 	char timeout_l_[PADL_(struct timespec *)]; struct timespec * timeout; char timeout_r_[PADR_(struct timespec *)];
@@ -606,6 +640,25 @@ struct cheriabi_swapcontext_args {
 };
 struct cheriabi_swapoff_args {
 	char name_l_[PADL_(const char *__capability)]; const char *__capability name; char name_r_[PADR_(const char *__capability)];
+};
+struct cheriabi___acl_get_link_args {
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
+	char aclp_l_[PADL_(struct acl *__capability)]; struct acl *__capability aclp; char aclp_r_[PADR_(struct acl *__capability)];
+};
+struct cheriabi___acl_set_link_args {
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
+	char aclp_l_[PADL_(struct acl *__capability)]; struct acl *__capability aclp; char aclp_r_[PADR_(struct acl *__capability)];
+};
+struct cheriabi___acl_delete_link_args {
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
+};
+struct cheriabi___acl_aclcheck_link_args {
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
+	char aclp_l_[PADL_(struct acl *__capability)]; struct acl *__capability aclp; char aclp_r_[PADR_(struct acl *__capability)];
 };
 struct cheriabi_sigwait_args {
 	char set_l_[PADL_(const sigset_t *__capability)]; const sigset_t *__capability set; char set_r_[PADR_(const sigset_t *__capability)];
@@ -941,6 +994,13 @@ int	cheriabi_sigsuspend(struct thread *, struct cheriabi_sigsuspend_args *);
 int	cheriabi_sigpending(struct thread *, struct cheriabi_sigpending_args *);
 int	cheriabi_sigtimedwait(struct thread *, struct cheriabi_sigtimedwait_args *);
 int	cheriabi_sigwaitinfo(struct thread *, struct cheriabi_sigwaitinfo_args *);
+int	cheriabi___acl_get_file(struct thread *, struct cheriabi___acl_get_file_args *);
+int	cheriabi___acl_set_file(struct thread *, struct cheriabi___acl_set_file_args *);
+int	cheriabi___acl_get_fd(struct thread *, struct cheriabi___acl_get_fd_args *);
+int	cheriabi___acl_set_fd(struct thread *, struct cheriabi___acl_set_fd_args *);
+int	cheriabi___acl_delete_file(struct thread *, struct cheriabi___acl_delete_file_args *);
+int	cheriabi___acl_aclcheck_file(struct thread *, struct cheriabi___acl_aclcheck_file_args *);
+int	cheriabi___acl_aclcheck_fd(struct thread *, struct cheriabi___acl_aclcheck_fd_args *);
 int	cheriabi_aio_waitcomplete(struct thread *, struct cheriabi_aio_waitcomplete_args *);
 int	cheriabi_getresuid(struct thread *, struct cheriabi_getresuid_args *);
 int	cheriabi_getresgid(struct thread *, struct cheriabi_getresgid_args *);
@@ -965,6 +1025,10 @@ int	cheriabi_getcontext(struct thread *, struct cheriabi_getcontext_args *);
 int	cheriabi_setcontext(struct thread *, struct cheriabi_setcontext_args *);
 int	cheriabi_swapcontext(struct thread *, struct cheriabi_swapcontext_args *);
 int	cheriabi_swapoff(struct thread *, struct cheriabi_swapoff_args *);
+int	cheriabi___acl_get_link(struct thread *, struct cheriabi___acl_get_link_args *);
+int	cheriabi___acl_set_link(struct thread *, struct cheriabi___acl_set_link_args *);
+int	cheriabi___acl_delete_link(struct thread *, struct cheriabi___acl_delete_link_args *);
+int	cheriabi___acl_aclcheck_link(struct thread *, struct cheriabi___acl_aclcheck_link_args *);
 int	cheriabi_sigwait(struct thread *, struct cheriabi_sigwait_args *);
 int	cheriabi_thr_create(struct thread *, struct cheriabi_thr_create_args *);
 int	cheriabi_auditon(struct thread *, struct cheriabi_auditon_args *);
@@ -1166,6 +1230,13 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_sigpending	AUE_SIGPENDING
 #define	CHERIABI_SYS_AUE_cheriabi_sigtimedwait	AUE_SIGWAIT
 #define	CHERIABI_SYS_AUE_cheriabi_sigwaitinfo	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi___acl_get_file	AUE_ACL_GET_FILE
+#define	CHERIABI_SYS_AUE_cheriabi___acl_set_file	AUE_ACL_SET_FILE
+#define	CHERIABI_SYS_AUE_cheriabi___acl_get_fd	AUE_ACL_GET_FD
+#define	CHERIABI_SYS_AUE_cheriabi___acl_set_fd	AUE_ACL_SET_FD
+#define	CHERIABI_SYS_AUE_cheriabi___acl_delete_file	AUE_ACL_DELETE_FILE
+#define	CHERIABI_SYS_AUE_cheriabi___acl_aclcheck_file	AUE_ACL_CHECK_FILE
+#define	CHERIABI_SYS_AUE_cheriabi___acl_aclcheck_fd	AUE_ACL_CHECK_FD
 #define	CHERIABI_SYS_AUE_cheriabi_aio_waitcomplete	AUE_AIO_WAITCOMPLETE
 #define	CHERIABI_SYS_AUE_cheriabi_getresuid	AUE_GETRESUID
 #define	CHERIABI_SYS_AUE_cheriabi_getresgid	AUE_GETRESGID
@@ -1190,6 +1261,10 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_setcontext	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_swapcontext	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_swapoff	AUE_SWAPOFF
+#define	CHERIABI_SYS_AUE_cheriabi___acl_get_link	AUE_ACL_GET_LINK
+#define	CHERIABI_SYS_AUE_cheriabi___acl_set_link	AUE_ACL_SET_LINK
+#define	CHERIABI_SYS_AUE_cheriabi___acl_delete_link	AUE_ACL_DELETE_LINK
+#define	CHERIABI_SYS_AUE_cheriabi___acl_aclcheck_link	AUE_ACL_CHECK_LINK
 #define	CHERIABI_SYS_AUE_cheriabi_sigwait	AUE_SIGWAIT
 #define	CHERIABI_SYS_AUE_cheriabi_thr_create	AUE_THR_CREATE
 #define	CHERIABI_SYS_AUE_cheriabi_auditon	AUE_AUDITON

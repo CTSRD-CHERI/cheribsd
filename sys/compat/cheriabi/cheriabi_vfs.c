@@ -40,6 +40,104 @@ __FBSDID("$FreeBSD$");
 #include <compat/cheriabi/cheriabi_proto.h>
 
 /*
+ * vfs_acl.c
+ */
+int
+cheriabi___acl_get_file(struct thread *td,
+    struct cheriabi___acl_get_file_args *uap)
+{
+
+	return (kern___acl_get_path(td, uap->path, uap->type, uap->aclp,
+	    FOLLOW));
+}
+
+int
+cheriabi___acl_get_link(struct thread *td,
+    struct cheriabi___acl_get_link_args *uap)
+{
+
+	return (kern___acl_get_path(td, uap->path, uap->type, uap->aclp,
+	    NOFOLLOW));
+}
+
+int
+cheriabi___acl_set_file(struct thread *td,
+    struct cheriabi___acl_set_file_args *uap)
+{
+
+	return(kern___acl_set_path(td, uap->path, uap->type, uap->aclp,
+	    FOLLOW));
+}
+
+int
+cheriabi___acl_set_link(struct thread *td,
+    struct cheriabi___acl_set_link_args *uap)
+{
+
+	return(kern___acl_set_path(td, uap->path, uap->type, uap->aclp,
+	    NOFOLLOW));
+}
+
+int
+cheriabi___acl_get_fd(struct thread *td,
+    struct cheriabi___acl_get_fd_args *uap)
+{
+
+	return (kern___acl_get_fd(td, uap->filedes, uap->type, uap->aclp));
+}
+
+int
+cheriabi___acl_set_fd(struct thread *td,
+    struct cheriabi___acl_set_fd_args *uap)
+{
+
+	return (kern___acl_set_fd(td, uap->filedes, uap->type, uap->aclp));
+}
+
+int
+cheriabi___acl_delete_file(struct thread *td,
+    struct cheriabi___acl_delete_file_args *uap)
+{
+
+	return (kern___acl_delete_path(td, uap->path, uap->type, FOLLOW));
+}
+
+int
+cheriabi___acl_delete_link(struct thread *td,
+    struct cheriabi___acl_delete_link_args *uap)
+{
+
+	return (kern___acl_delete_path(td, uap->path, uap->type, NOFOLLOW));
+}
+
+int
+cheriabi___acl_aclcheck_file(struct thread *td,
+    struct cheriabi___acl_aclcheck_file_args *uap)
+{
+
+	return (kern___acl_aclcheck_path(td, uap->path, uap->type, uap->aclp,
+	    FOLLOW));
+}
+
+int
+cheriabi___acl_aclcheck_link(struct thread *td,
+    struct cheriabi___acl_aclcheck_link_args *uap)
+{
+
+	return (kern___acl_aclcheck_path(td, uap->path, uap->type, uap->aclp,
+	    NOFOLLOW));
+}
+
+int
+cheriabi___acl_aclcheck_fd(struct thread *td,
+    struct cheriabi___acl_aclcheck_fd_args *uap)
+{
+
+	return (kern___acl_aclcheck_fd(td, uap->filedes, uap->type,
+	    uap->aclp));
+}
+
+/*
  * vfs_cache.c
  */
 int
