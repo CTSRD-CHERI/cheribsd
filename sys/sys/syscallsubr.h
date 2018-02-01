@@ -28,6 +28,7 @@
 #ifndef _SYS_SYSCALLSUBR_H_
 #define _SYS_SYSCALLSUBR_H_
 
+#include <sys/acl.h>
 #include <sys/signal.h>
 #include <sys/uio.h>
 #include <sys/socket.h>
@@ -64,6 +65,21 @@ struct timex;
 struct sched_param;
 struct __wrusage;
 
+int	kern___acl_aclcheck_fd(struct thread *td, int filedes, acl_type_t type,
+	    const struct acl * __capability aclp);
+int	kern___acl_aclcheck_path(struct thread *td,
+	    const char * __capability path, acl_type_t type,
+	    struct acl * __capability aclp, int follow);
+int	kern___acl_delete_path(struct thread *td,
+	    const char * __capability path, acl_type_t type, int follow);
+int	kern___acl_get_fd(struct thread *td, int filedes, acl_type_t type,
+	    struct acl * __capability aclp);
+int	kern___acl_get_path(struct thread *td, const char * __capability path,
+	    acl_type_t type, struct acl * __capability aclp, int follow);
+int	kern___acl_set_fd(struct thread *td, int filedes, acl_type_t type,
+	    const struct acl * __capability aclp);
+int	kern___acl_set_path(struct thread *td, const char *__capability path,
+	    acl_type_t type, const struct acl * __capability aclp, int follow);
 int	kern___getcwd(struct thread *td, char * __capability buf,
 	    enum uio_seg bufseg, size_t buflen, size_t path_max);
 int	kern_accept(struct thread *td, int s, struct sockaddr **name,
