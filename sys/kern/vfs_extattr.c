@@ -54,16 +54,17 @@ __FBSDID("$FreeBSD$");
  *
  * Currently this is used only by UFS1 extended attributes.
  */
+#ifndef _SYS_SYSPROTO_H_
+struct extattrctl_args {
+	const char *path;
+	int cmd;
+	const char *filename;
+	int attrnamespace;
+	const char *attrname;
+};
+#endif
 int
-sys_extattrctl(td, uap)
-	struct thread *td;
-	struct extattrctl_args /* {
-		const char *path;
-		int cmd;
-		const char *filename;
-		int attrnamespace;
-		const char *attrname;
-	} */ *uap;
+sys_extattrctl(struct thread *td, struct extattrctl_args *uap)
 {
 	struct vnode *filename_vp;
 	struct nameidata nd;
@@ -202,16 +203,17 @@ done:
 	return (error);
 }
 
+#ifndef _SYS_SYSPROTO_H_
+struct extattr_set_fd_args {
+	int fd;
+	int attrnamespace;
+	const char *attrname;
+	void *data;
+	size_t nbytes;
+};
+#endif
 int
-sys_extattr_set_fd(td, uap)
-	struct thread *td;
-	struct extattr_set_fd_args /* {
-		int fd;
-		int attrnamespace;
-		const char *attrname;
-		void *data;
-		size_t nbytes;
-	} */ *uap;
+sys_extattr_set_fd(struct thread *td, struct extattr_set_fd_args *uap)
 {
 	struct file *fp;
 	char attrname[EXTATTR_MAXNAMELEN];
@@ -237,16 +239,17 @@ sys_extattr_set_fd(td, uap)
 	return (error);
 }
 
+#ifndef _SYS_SYSPROTO_H_
+struct extattr_set_file_args {
+	const char *path;
+	int attrnamespace;
+	const char *attrname;
+	void *data;
+	size_t nbytes;
+};
+#endif
 int
-sys_extattr_set_file(td, uap)
-	struct thread *td;
-	struct extattr_set_file_args /* {
-		const char *path;
-		int attrnamespace;
-		const char *attrname;
-		void *data;
-		size_t nbytes;
-	} */ *uap;
+sys_extattr_set_file(struct thread *td, struct extattr_set_file_args *uap)
 {
 	struct nameidata nd;
 	char attrname[EXTATTR_MAXNAMELEN];
@@ -272,16 +275,17 @@ sys_extattr_set_file(td, uap)
 	return (error);
 }
 
+#ifndef _SYS_SYSPROTO_H_
+struct extattr_set_link_args {
+	const char *path;
+	int attrnamespace;
+	const char *attrname;
+	void *data;
+	size_t nbytes;
+};
+#endif
 int
-sys_extattr_set_link(td, uap)
-	struct thread *td;
-	struct extattr_set_link_args /* {
-		const char *path;
-		int attrnamespace;
-		const char *attrname;
-		void *data;
-		size_t nbytes;
-	} */ *uap;
+sys_extattr_set_link(struct thread *td, struct extattr_set_link_args *uap)
 {
 	struct nameidata nd;
 	char attrname[EXTATTR_MAXNAMELEN];
@@ -376,16 +380,17 @@ done:
 	return (error);
 }
 
+#ifndef _SYS_SYSPROTO_H_
+struct extattr_get_fd_args {
+	int fd;
+	int attrnamespace;
+	const char *attrname;
+	void *data;
+	size_t nbytes;
+};
+#endif
 int
-sys_extattr_get_fd(td, uap)
-	struct thread *td;
-	struct extattr_get_fd_args /* {
-		int fd;
-		int attrnamespace;
-		const char *attrname;
-		void *data;
-		size_t nbytes;
-	} */ *uap;
+sys_extattr_get_fd(struct thread *td, struct extattr_get_fd_args *uap)
 {
 	struct file *fp;
 	char attrname[EXTATTR_MAXNAMELEN];
@@ -411,16 +416,17 @@ sys_extattr_get_fd(td, uap)
 	return (error);
 }
 
+#ifndef _SYS_SYSPROTO_H_
+struct extattr_get_file_args {
+	const char *path;
+	int attrnamespace;
+	const char *attrname;
+	void *data;
+	size_t nbytes;
+};
+#endif
 int
-sys_extattr_get_file(td, uap)
-	struct thread *td;
-	struct extattr_get_file_args /* {
-		const char *path;
-		int attrnamespace;
-		const char *attrname;
-		void *data;
-		size_t nbytes;
-	} */ *uap;
+sys_extattr_get_file(struct thread *td, struct extattr_get_file_args *uap)
 {
 	struct nameidata nd;
 	char attrname[EXTATTR_MAXNAMELEN];
@@ -445,16 +451,17 @@ sys_extattr_get_file(td, uap)
 	return (error);
 }
 
+#ifndef _SYS_SYSPROTO_H_
+struct extattr_get_link_args {
+	const char *path;
+	int attrnamespace;
+	const char *attrname;
+	void *data;
+	size_t nbytes;
+};
+#endif
 int
-sys_extattr_get_link(td, uap)
-	struct thread *td;
-	struct extattr_get_link_args /* {
-		const char *path;
-		int attrnamespace;
-		const char *attrname;
-		void *data;
-		size_t nbytes;
-	} */ *uap;
+sys_extattr_get_link(struct thread *td, struct extattr_get_link_args *uap)
 {
 	struct nameidata nd;
 	char attrname[EXTATTR_MAXNAMELEN];
@@ -522,14 +529,15 @@ done:
 	return (error);
 }
 
+#ifndef _SYS_SYSPROTO_H_
+struct extattr_delete_fd_args {
+	int fd;
+	int attrnamespace;
+	const char *attrname;
+};
+#endif
 int
-sys_extattr_delete_fd(td, uap)
-	struct thread *td;
-	struct extattr_delete_fd_args /* {
-		int fd;
-		int attrnamespace;
-		const char *attrname;
-	} */ *uap;
+sys_extattr_delete_fd(struct thread *td, struct extattr_delete_fd_args *uap)
 {
 	struct file *fp;
 	char attrname[EXTATTR_MAXNAMELEN];
@@ -554,14 +562,15 @@ sys_extattr_delete_fd(td, uap)
 	return (error);
 }
 
+#ifndef _SYS_SYSPROTO_H_
+struct extattr_delete_file_args {
+	const char *path;
+	int attrnamespace;
+	const char *attrname;
+};
+#endif
 int
-sys_extattr_delete_file(td, uap)
-	struct thread *td;
-	struct extattr_delete_file_args /* {
-		const char *path;
-		int attrnamespace;
-		const char *attrname;
-	} */ *uap;
+sys_extattr_delete_file(struct thread *td, struct extattr_delete_file_args *uap)
 {
 	struct nameidata nd;
 	char attrname[EXTATTR_MAXNAMELEN];
@@ -584,14 +593,15 @@ sys_extattr_delete_file(td, uap)
 	return(error);
 }
 
+#ifndef _SYS_SYSPROTO_H_
+struct extattr_delete_link_args {
+	const char *path;
+	int attrnamespace;
+	const char *attrname;
+};
+#endif
 int
-sys_extattr_delete_link(td, uap)
-	struct thread *td;
-	struct extattr_delete_link_args /* {
-		const char *path;
-		int attrnamespace;
-		const char *attrname;
-	} */ *uap;
+sys_extattr_delete_link(struct thread *td, struct extattr_delete_link_args *uap)
 {
 	struct nameidata nd;
 	char attrname[EXTATTR_MAXNAMELEN];
@@ -678,15 +688,16 @@ done:
 }
 
 
+#ifndef _SYS_SYSPROTO_H_
+struct extattr_list_fd_args {
+	int fd;
+	int attrnamespace;
+	void *data;
+	size_t nbytes;
+};
+#endif
 int
-sys_extattr_list_fd(td, uap)
-	struct thread *td;
-	struct extattr_list_fd_args /* {
-		int fd;
-		int attrnamespace;
-		void *data;
-		size_t nbytes;
-	} */ *uap;
+sys_extattr_list_fd(struct thread *td, struct extattr_list_fd_args *uap)
 {
 	struct file *fp;
 	cap_rights_t rights;
@@ -706,15 +717,16 @@ sys_extattr_list_fd(td, uap)
 	return (error);
 }
 
+#ifndef _SYS_SYSPROTO_H_
+struct extattr_list_file_args {
+	const char *path;
+	int attrnamespace;
+	void *data;
+	size_t nbytes;
+}
+#endif
 int
-sys_extattr_list_file(td, uap)
-	struct thread*td;
-	struct extattr_list_file_args /* {
-		const char *path;
-		int attrnamespace;
-		void *data;
-		size_t nbytes;
-	} */ *uap;
+sys_extattr_list_file(struct thread *td, struct extattr_list_file_args *uap)
 {
 	struct nameidata nd;
 	int error;
@@ -733,15 +745,16 @@ sys_extattr_list_file(td, uap)
 	return (error);
 }
 
+#ifndef _SYS_SYSPROTO_H_
+struct extattr_list_link_args {
+	const char *path;
+	int attrnamespace;
+	void *data;
+	size_t nbytes;
+};
+#endif
 int
-sys_extattr_list_link(td, uap)
-	struct thread*td;
-	struct extattr_list_link_args /* {
-		const char *path;
-		int attrnamespace;
-		void *data;
-		size_t nbytes;
-	} */ *uap;
+sys_extattr_list_link(struct thread *td, struct extattr_list_link_args *uap)
 {
 	struct nameidata nd;
 	int error;
