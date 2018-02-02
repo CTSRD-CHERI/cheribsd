@@ -251,7 +251,7 @@ msginit()
 	msgmaps = malloc(sizeof(struct msgmap) * msginfo.msgseg, M_MSG, M_WAITOK);
 	msghdrs = malloc(sizeof(struct msg) * msginfo.msgtql, M_MSG, M_WAITOK);
 	msqids = malloc(sizeof(struct msqid_kernel) * msginfo.msgmni, M_MSG,
-	    M_WAITOK|M_ZERO);
+	    M_WAITOK | M_ZERO);
 
 	/*
 	 * msginfo.msgssz should be a power of two for efficiency reasons.

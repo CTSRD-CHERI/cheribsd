@@ -293,7 +293,7 @@ seminit(void)
 
 	sem = malloc(sizeof(struct sem) * seminfo.semmns, M_SEM, M_WAITOK);
 	sema = malloc(sizeof(struct semid_kernel) * seminfo.semmni, M_SEM,
-	    M_WAITOK|M_ZERO);
+	    M_WAITOK | M_ZERO);
 	sema_mtx = malloc(sizeof(struct mtx) * seminfo.semmni, M_SEM,
 	    M_WAITOK | M_ZERO);
 	semu = malloc(seminfo.semmnu * seminfo.semusz, M_SEM, M_WAITOK);
@@ -1627,7 +1627,8 @@ sysctl_sema(SYSCTL_HANDLER_ARGS)
 #ifdef COMPAT_FREEBSD32
 		if (SV_CURPROC_FLAG(SV_ILP32)) {
 			bzero(&tsemak32, sizeof(tsemak32));
-			freebsd32_ipcperm_out(&tsemak.u.sem_perm, &tsemak32.u.sem_perm);
+			freebsd32_ipcperm_out(&tsemak.u.sem_perm,
+			    &tsemak32.u.sem_perm);
 			/* Don't copy u.sem_base */
 			CP(tsemak, tsemak32, u.sem_nsems);
 			CP(tsemak, tsemak32, u.sem_otime);
