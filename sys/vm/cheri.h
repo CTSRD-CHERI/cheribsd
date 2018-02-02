@@ -41,10 +41,12 @@
 #include <sys/systm.h>
 #include <cheri/cheric.h>
 
+/* Check that a capability is dereferenceable */
 #define CHERI_VM_ASSERT_VALID(ptr)					\
 	KASSERT(cheri_gettag((void *)(ptr)),				\
-		("VM created invalid capability %s %s:%d", __func__,	\
+		("VM expect valid capability %s %s:%d", __func__,	\
 		 __FILE__, __LINE__))
+
 #else /* ! CHERI_KERNEL */
 #define CHERI_VM_ASSERT_VALID(ptr) do{		\
 	} while (0)
