@@ -42,9 +42,10 @@ __FBSDID("$FreeBSD$");
 #include <stdlib.h>
 #include <unistd.h>
 
-extern int	cocall(int (* __capability)(void), void * __capability);
+extern int	cocreate(void * __capability *, void * __capability *);
+extern int	cocall(void * __capability, void * __capability);
 
-int (* __capability switcher_code)(void);
+void * __capability switcher_code;
 void * __capability switcher_data;
 
 #if 0
@@ -118,13 +119,9 @@ call(void)
 {
 	int error;
 
-	error = sysarch(CHERI_GET_SWITCHER_CODE, &switcher_code);
+	error = cocreate(&switcher_code, &switcher_data);
 	if (error < 0)
-		err(1, "CHERI_GET_SWITCHER_CODE");
-
-	error = sysarch(CHERI_GET_SWITCHER_DATA, &switcher_data);
-	if (error < 0)
-		err(1, "CHERI_GET_SWITCHER_DATA");
+		err(1, "cocreate");
 
 	fprintf(stderr, "cocall to code capability %p, data capability %p...\n", (__cheri_fromcap void *)switcher_code, (__cheri_fromcap void *)switcher_data);
 	error = cocall(switcher_code, switcher_data);

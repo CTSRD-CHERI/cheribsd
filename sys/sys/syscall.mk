@@ -406,4 +406,5 @@ MIASM =  \
 	fhstatfs.o \
 	mknodat.o \
 	kevent.o \
-	coexecve.o
+	coexecve.o \
+	cocreate.o

@@ -1025,6 +1025,8 @@
 				    const struct timespec *timeout); }
 561	AUE_NULL	STD	{ int coexecve(pid_t pid, char *fname, char **argv, \
 				    char **envv); }
+562	AUE_NULL	STD	{ int cocreate(void * __capability *code, \
+				    void * __capability *data); }
 
 ; Please copy any additions and changes to the following compatability tables:
 ; sys/compat/freebsd32/syscalls.master

@@ -3286,6 +3286,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
+	/* cocreate */
+	case 562: {
+		struct cocreate_args *p = params;
+		uarg[0] = (intptr_t) p->code; /* void *__capability * */
+		uarg[1] = (intptr_t) p->data; /* void *__capability * */
+		*n_args = 2;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -8757,6 +8765,19 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* cocreate */
+	case 562:
+		switch(ndx) {
+		case 0:
+			p = "userland void *__capability *";
+			break;
+		case 1:
+			p = "userland void *__capability *";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -10645,6 +10666,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* coexecve */
 	case 561:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cocreate */
+	case 562:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

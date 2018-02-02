@@ -33,9 +33,12 @@
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/cheri_serial.h>
+#include <sys/mman.h>
 #include <sys/proc.h>
+#include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
 #include <sys/sysent.h>
+#include <sys/sysproto.h>
 
 #include <ddb/ddb.h>
 #include <sys/kdb.h>
@@ -48,6 +51,14 @@
 #include <machine/pcb.h>
 #include <machine/proc.h>
 #include <machine/sysarch.h>
+#include <machine/md_var.h>
+
+#include <vm/vm.h>
+#include <vm/vm_param.h>
+#include <vm/vm_extern.h>
+#include <vm/vm_page.h>
+#include <vm/vm_pageout.h>
+#include <vm/vm_map.h>
 
 /*
  * Beginnings of a programming interface for explicitly managing capability
@@ -246,4 +257,49 @@ cheri_serialize(struct cheri_serial *csp, void * __capability cap)
 		csp->cs_offset = __builtin_cheri_offset_get(cap);
 	} else
 		memcpy(&csp->cs_data, &cap, CHERICAP_SIZE);
+}
+
+#define	SWITCHER_VADDR	0x7ffffff800
+
+int
+sys_cocreate(struct thread *td, struct cocreate_args *uap)
+{
+	vm_map_t map;
+	vm_map_entry_t entry;
+	void * __capability codecap;
+	void * __capability datacap;
+	vaddr_t addr;
+	boolean_t found;
+	int error;
+
+	/*
+	 * XXX: Race between this and setting the owner.
+	 */
+	error = kern_mmap(td, 0, 0, PAGE_SIZE, VM_PROT_READ | VM_PROT_WRITE, MAP_ANON, -1, 0);
+	if (error != 0) {
+		printf("%s: meh\n", __func__);
+		return (error);
+	}
+
+	addr = td->td_retval[0];
+
+	map = &td->td_proc->p_vmspace->vm_map;
+	vm_map_lock(map);
+	found = vm_map_lookup_entry(map, addr, &entry);
+	KASSERT(found == TRUE, ("%s: vm_map_lookup_entry returned false\n", __func__));
+
+	entry->owner = 0;
+	vm_map_unlock(map);
+
+	cheri_capability_set(&codecap, CHERI_CAP_USER_CODE_PERMS, SWITCHER_VADDR,
+	    szswitcher, 0);
+	codecap = cheri_seal(codecap, curproc->p_md.md_cheri_sealcap);
+	error = copyoutcap(&codecap, uap->code, sizeof(codecap));
+	if (error != 0)
+		return (error);
+
+	cheri_capability_set(&datacap, CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 0);
+	datacap = cheri_seal(datacap, curproc->p_md.md_cheri_sealcap);
+	error = copyoutcap(&datacap, uap->data, sizeof(datacap));
+	return (error);
 }
