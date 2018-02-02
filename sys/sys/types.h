@@ -249,7 +249,11 @@ struct cap_rights;
 typedef	struct cap_rights	cap_rights_t;
 #endif
 
-typedef __uintptr_t    	vm_ptr_t;
+#ifdef CHERI_KERNEL
+typedef __uintptr_t	vm_ptr_t;
+#else
+typedef __vm_offset_t	vm_ptr_t;
+#endif
 typedef	__vm_offset_t	vm_offset_t;
 typedef	__int64_t	vm_ooffset_t;
 typedef	__vm_paddr_t	vm_paddr_t;
@@ -302,7 +306,7 @@ typedef	_Bool	bool;
  * Macros that provide correct handling of flags embedded
  * in pointer bits.
  *
- * This is mostly used by mutex and rwlock.
+ * This is mostly used by locks.
  */
 #ifndef __ptr_put_flag
 /* if there are no machine-dependant defines, use this default */
@@ -314,6 +318,8 @@ typedef	_Bool	bool;
 #endif
 #define ptr_put_flag(p, f) __ptr_put_flag(p, f)
 #define ptr_get_flag(p, f) __ptr_get_flag(p, f)
+
+#define ptr_to_va(p) ((vm_offset_t)(void *)(p))
 
 #endif /* !_KERNEL */
 
