@@ -121,16 +121,16 @@ SYSCTL_ULONG(_vm, OID_AUTO, max_kernel_address, CTLFLAG_RD,
  *	its use, typically with pmap_qenter().  Any attempt to create
  *	a mapping on demand through vm_fault() will result in a panic. 
  */
-vm_offset_t
+vm_ptr_t
 kva_alloc(size)
 	vm_size_t size;
 {
-	vm_offset_t addr;
+	vmem_addr_t addr;
 
 	size = round_page(size);
 	if (vmem_alloc(kernel_arena, size, M_BESTFIT | M_NOWAIT, &addr))
 		return (0);
-
+	CHERI_VM_ASSERT_VALID(addr);
 	return (addr);
 }
 
@@ -491,7 +491,8 @@ kmap_free_wakeup(map, addr, size)
 void
 kmem_init_zero_region(void)
 {
-	vm_offset_t addr, i;
+	vm_ptr_t addr;
+	vm_offset_t i;
 	vm_page_t m;
 
 	/*
@@ -521,11 +522,22 @@ kmem_init_zero_region(void)
  */
 void
 kmem_init(start, end)
-	vm_offset_t start, end;
+	vm_ptr_t start, end;
 {
 	vm_map_t m;
+	vm_ptr_t kern_map_start;
 
-	m = vm_map_create(kernel_pmap, VM_MIN_KERNEL_ADDRESS, end);
+	CHERI_VM_ASSERT_VALID(start);
+	CHERI_VM_ASSERT_VALID(end);
+#ifndef CHERI_KERNEL
+	kern_map_start = VM_MIN_KERNEL_ADDRESS;
+#else
+	kern_map_start = (vm_ptr_t)cheri_setoffset(
+		(void *)start,
+		VM_MIN_KERNEL_ADDRESS - cheri_getbase((void *)start));
+#endif
+
+	m = vm_map_create(kernel_pmap, kern_map_start, end);
 	m->system_map = 1;
 	vm_map_lock(m);
 	/* N.B.: cannot use kgdb to debug, starting with this assignment ... */
@@ -534,9 +546,9 @@ kmem_init(start, end)
 #ifdef __amd64__
 	    KERNBASE,
 #else		     
-	    VM_MIN_KERNEL_ADDRESS,
+	    ptr_to_va(kern_map_start),
 #endif
-	    start, VM_PROT_ALL, VM_PROT_ALL, MAP_NOFAULT);
+	    ptr_to_va(start), VM_PROT_ALL, VM_PROT_ALL, MAP_NOFAULT);
 	/* ... and ending with the completion of the above `insert' */
 	vm_map_unlock(m);
 }

@@ -95,6 +95,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vnode_pager.h>
 #include <vm/swap_pager.h>
 #include <vm/uma.h>
+#include <vm/cheri.h>
 
 /*
  *	Virtual memory maps provide for the mapping, protection,
@@ -128,8 +129,8 @@ static uma_zone_t mapzone;
 static uma_zone_t vmspace_zone;
 static int vmspace_zinit(void *mem, int size, int flags);
 static int vm_map_zinit(void *mem, int ize, int flags);
-static void _vm_map_init(vm_map_t map, pmap_t pmap, vm_offset_t min,
-    vm_offset_t max);
+static void _vm_map_init(vm_map_t map, pmap_t pmap, vm_ptr_t min,
+    vm_ptr_t max);
 static void vm_map_entry_deallocate(vm_map_entry_t entry, boolean_t system_map);
 static void vm_map_entry_dispose(vm_map_t map, vm_map_entry_t entry);
 static void vm_map_entry_unwire(vm_map_t map, vm_map_entry_t entry);
@@ -204,6 +205,45 @@ vm_map_log(const char *prefix, vm_map_entry_t entry)
 #else
 #define	vm_map_log(prefix, entry)
 #endif
+
+#ifdef CHERI_KERNEL
+/*
+ * Convert VM protection flags to CHERI pointer permission bits.
+ */
+static int
+vm_prot_to_cheri(vm_prot_t prot)
+{
+	int perms = CHERI_PERM_GLOBAL;
+
+	if (prot & (VM_PROT_READ | VM_PROT_COPY))
+		perms |= (CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP);
+	if (prot & VM_PROT_WRITE)
+		perms |= (CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
+			  CHERI_PERM_STORE_LOCAL_CAP | CHERI_PERM_SEAL);
+	if (prot & VM_PROT_EXECUTE)
+		perms |= (CHERI_PERM_EXECUTE | CHERI_PERM_CCALL | CHERI_PERM_SEAL);
+	return perms;
+}
+
+/*
+ * Create a valid pointer for the given region in a map.
+ */
+static vm_ptr_t
+vm_map_make_ptr(vm_map_t map, vm_offset_t addr, vm_size_t size, vm_prot_t prot)
+{
+	void *mapped;
+
+	addr = addr - cheri_getbase(map->map_capability);
+	mapped = cheri_csetbounds(
+		cheri_setoffset(map->map_capability, addr),
+		size);
+	mapped = cheri_andperm(mapped, vm_prot_to_cheri(prot));
+
+	return ((vm_ptr_t)mapped);
+}
+#else /* ! CHERI_KERNEL */
+#define vm_map_make_ptr(map, addr, size, prot) (addr)
+#endif /* ! CHERI_KERNEL */
 
 /*
  *	vm_map_startup:
@@ -304,7 +344,7 @@ vm_map_zdtor(void *mem, int size, void *arg)
  * If 'pinit' is NULL then the embedded pmap is initialized via pmap_pinit().
  */
 struct vmspace *
-vmspace_alloc(vm_offset_t min, vm_offset_t max, pmap_pinit_t pinit)
+vmspace_alloc(vm_ptr_t min, vm_ptr_t max, pmap_pinit_t pinit)
 {
 	struct vmspace *vm;
 
@@ -803,7 +843,7 @@ vmspace_resident_count(struct vmspace *vmspace)
  *	the given lower and upper address bounds.
  */
 vm_map_t
-vm_map_create(pmap_t pmap, vm_offset_t min, vm_offset_t max)
+vm_map_create(pmap_t pmap, vm_ptr_t min, vm_ptr_t max)
 {
 	vm_map_t result;
 
@@ -818,23 +858,29 @@ vm_map_create(pmap_t pmap, vm_offset_t min, vm_offset_t max)
  * such as that in the vmspace structure.
  */
 static void
-_vm_map_init(vm_map_t map, pmap_t pmap, vm_offset_t min, vm_offset_t max)
+_vm_map_init(vm_map_t map, pmap_t pmap, vm_ptr_t min, vm_ptr_t max)
 {
+	CHERI_VM_ASSERT_VALID(min);
+	CHERI_VM_ASSERT_VALID(max);
 
 	map->header.next = map->header.prev = &map->header;
 	map->needs_wakeup = FALSE;
 	map->system_map = 0;
 	map->pmap = pmap;
-	map->min_offset = min;
-	map->max_offset = max;
+	map->min_offset = (vm_offset_t)(void *)min;
+	map->max_offset = (vm_offset_t)(void *)max;
 	map->flags = 0;
 	map->root = NULL;
 	map->timestamp = 0;
 	map->busy = 0;
+#ifdef CHERI_KERNEL
+	map->map_capability = cheri_csetbounds(
+		(void *)min, ((caddr_t)max - (caddr_t)min));
+#endif
 }
 
 void
-vm_map_init(vm_map_t map, pmap_t pmap, vm_offset_t min, vm_offset_t max)
+vm_map_init(vm_map_t map, pmap_t pmap, vm_ptr_t min, vm_ptr_t max)
 {
 
 	_vm_map_init(map, pmap, min, max);
@@ -1509,14 +1555,17 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
  *
  *	If object is non-NULL, ref count must be bumped by caller
  *	prior to making call to account for the new entry.
+ *
+ *	XXX-AM: vm_map_find returns a capability for the newly allocated
+ *	region.
  */
 int
 vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
-	    vm_offset_t *addr,	/* IN/OUT */
+	    vm_ptr_t *addr,	/* IN/OUT */
 	    vm_size_t length, vm_offset_t max_addr, int find_space,
 	    vm_prot_t prot, vm_prot_t max, int cow)
 {
-	vm_offset_t alignment, initial_addr, start;
+	vm_offset_t alignment, initial_addr, start, space;
 	int result;
 
 	KASSERT((cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) == 0 ||
@@ -1530,14 +1579,14 @@ vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		alignment = (vm_offset_t)1 << (find_space >> 8);
 	} else
 		alignment = 0;
-	initial_addr = *addr;
+	initial_addr = ptr_to_va(*addr);
 again:
 	start = initial_addr;
 	vm_map_lock(map);
 	do {
 		if (find_space != VMFS_NO_SPACE) {
-			if (vm_map_findspace(map, start, length, addr) ||
-			    (max_addr != 0 && *addr + length > max_addr)) {
+			if (vm_map_findspace(map, start, length, &space) ||
+			    (max_addr != 0 && space + length > max_addr)) {
 				vm_map_unlock(map);
 				if (find_space == VMFS_OPTIMAL_SPACE) {
 					find_space = VMFS_ANY_SPACE;
@@ -1548,20 +1597,20 @@ again:
 			switch (find_space) {
 			case VMFS_SUPER_SPACE:
 			case VMFS_OPTIMAL_SPACE:
-				pmap_align_superpage(object, offset, addr,
+				pmap_align_superpage(object, offset, &space,
 				    length);
 				break;
 			case VMFS_ANY_SPACE:
 				break;
 			default:
-				if ((*addr & (alignment - 1)) != 0) {
-					*addr &= ~(alignment - 1);
-					*addr += alignment;
+				if ((space & (alignment - 1)) != 0) {
+					space &= ~(alignment - 1);
+					space += alignment;
 				}
 				break;
 			}
 
-			start = *addr;
+			start = space;
 		}
 		if ((cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) != 0) {
 			result = vm_map_stack_locked(map, start, length,
@@ -1573,6 +1622,10 @@ again:
 	} while (result == KERN_NO_SPACE && find_space != VMFS_NO_SPACE &&
 	    find_space != VMFS_ANY_SPACE);
 	vm_map_unlock(map);
+	if (result == KERN_SUCCESS) {
+		*addr = vm_map_make_ptr(map, space, length, prot);
+		CHERI_VM_ASSERT_VALID(*addr);
+	}
 	return (result);
 }
 

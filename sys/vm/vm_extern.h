@@ -44,7 +44,7 @@ struct cdev;
 struct cdevsw;
 
 /* These operate on kernel virtual addresses only. */
-vm_offset_t kva_alloc(vm_size_t);
+vm_ptr_t kva_alloc(vm_size_t);
 void kva_free(vm_offset_t, vm_size_t);
 
 /* These operate on pageable virtual addresses. */
@@ -67,7 +67,7 @@ void kmem_unback(vm_object_t, vm_offset_t, vm_size_t);
 /* Bootstrapping. */
 vm_map_t kmem_suballoc(vm_map_t, vm_offset_t *, vm_offset_t *, vm_size_t,
     boolean_t);
-void kmem_init(vm_offset_t, vm_offset_t);
+void kmem_init(vm_ptr_t, vm_ptr_t);
 void kmem_init_zero_region(void);
 void kmeminit(void);
 
@@ -99,7 +99,7 @@ int vm_mmap_vnode(struct thread *, vm_size_t, vm_prot_t, vm_prot_t *, int *,
 void vm_set_page_size(void);
 void vm_sync_icache(vm_map_t, vm_offset_t, vm_size_t);
 typedef int (*pmap_pinit_t)(struct pmap *pmap);
-struct vmspace *vmspace_alloc(vm_offset_t, vm_offset_t, pmap_pinit_t);
+struct vmspace *vmspace_alloc(vm_ptr_t, vm_ptr_t, pmap_pinit_t);
 struct vmspace *vmspace_fork(struct vmspace *, vm_ooffset_t *);
 int vmspace_exec(struct proc *, vm_offset_t, vm_offset_t);
 int vmspace_unshare(struct proc *);

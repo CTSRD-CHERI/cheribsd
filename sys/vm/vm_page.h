@@ -486,7 +486,7 @@ vm_page_t vm_page_scan_contig(u_long npages, vm_page_t m_start,
     vm_page_t m_end, u_long alignment, vm_paddr_t boundary, int options);
 void vm_page_set_valid_range(vm_page_t m, int base, int size);
 int vm_page_sleep_if_busy(vm_page_t m, const char *msg);
-vm_offset_t vm_page_startup(vm_offset_t vaddr);
+vm_ptr_t vm_page_startup(vm_ptr_t vaddr);
 void vm_page_sunbusy(vm_page_t m);
 int vm_page_trysbusy(vm_page_t m);
 void vm_page_unhold_pages(vm_page_t *ma, int count);
@@ -597,7 +597,7 @@ vm_page_aflag_clear(vm_page_t m, uint8_t bits)
 	 * within this word are handled properly by the atomic update.
 	 */
 	addr = (void *)&m->aflags;
-	KASSERT(((uintptr_t)addr & (sizeof(uint32_t) - 1)) == 0,
+	KASSERT((ptr_to_va(addr) & (sizeof(uint32_t) - 1)) == 0,
 	    ("vm_page_aflag_clear: aflags is misaligned"));
 	val = bits;
 #if BYTE_ORDER == BIG_ENDIAN
@@ -622,7 +622,7 @@ vm_page_aflag_set(vm_page_t m, uint8_t bits)
 	 * within this word are handled properly by the atomic update.
 	 */
 	addr = (void *)&m->aflags;
-	KASSERT(((uintptr_t)addr & (sizeof(uint32_t) - 1)) == 0,
+	KASSERT((ptr_to_va(addr) & (sizeof(uint32_t) - 1)) == 0,
 	    ("vm_page_aflag_set: aflags is misaligned"));
 	val = bits;
 #if BYTE_ORDER == BIG_ENDIAN

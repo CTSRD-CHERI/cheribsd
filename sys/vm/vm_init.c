@@ -103,7 +103,7 @@ SYSINIT(vm_mem, SI_SUB_VM, SI_ORDER_FIRST, vm_mem_init, NULL);
 static int
 kva_import(void *unused, vmem_size_t size, int flags, vmem_addr_t *addrp)
 {
-	vm_offset_t addr;
+	vm_ptr_t addr;
 	int result;
  
 	addr = vm_map_min(kernel_map);
@@ -143,7 +143,8 @@ vm_mem_init(dummy)
 	vm_object_init();
 	vm_map_startup();
 	kmem_init(virtual_avail, virtual_end);
-
+	/* XXX-AM: in principle we could now destroy the virtual_avail/end capabilities */
+\
 	/*
 	 * Initialize the kernel_arena.  This can grow on demand.
 	 */

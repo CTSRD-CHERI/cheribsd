@@ -199,10 +199,17 @@ static LIST_HEAD(, vmem) vmem_list = LIST_HEAD_INITIALIZER(vmem_list);
 #define	VMEM_LOCK_DESTROY(vm)	mtx_destroy(&vm->vm_lock)
 #define	VMEM_ASSERT_LOCKED(vm)	mtx_assert(&vm->vm_lock, MA_OWNED);
 
+#ifndef CHERI_KERNEL
 #define	VMEM_ALIGNUP(addr, align)	(-(-(addr) & -(align)))
 
 #define	VMEM_CROSS_P(addr1, addr2, boundary) \
 	((((addr1) ^ (addr2)) & -(boundary)) != 0)
+#else /* CHERI_KERNEL */
+#define	VMEM_ALIGNUP(addr, align)	__builtin_align_up(addr, align)
+
+#define	VMEM_CROSS_P(addr1, addr2, boundary)			\
+	(((ptr_to_va(addr1) ^ ptr_to_va(addr2)) & -(boundary)) != 0)
+#endif
 
 #define	ORDER2SIZE(order)	((order) < VMEM_OPTVALUE ? ((order) + 1) : \
     (vmem_size_t)1 << ((order) - (VMEM_OPTVALUE - VMEM_OPTORDER - 1)))
@@ -883,15 +890,27 @@ vmem_fit(const bt_t *bt, vmem_size_t size, vmem_size_t align,
 	/*
 	 * XXX assumption: vmem_addr_t and vmem_size_t are
 	 * unsigned integer of the same size.
+	 * XXX-AM: CHERI breaks the assumption!
 	 */
+	CHERI_VM_ASSERT_VALID(bt->bt_start);
 
 	start = bt->bt_start;
-	if (start < minaddr) {
+	if (ptr_to_va(start) < ptr_to_va(minaddr)) {
 		start = minaddr;
 	}
 	end = BT_END(bt);
-	if (end > maxaddr)
+	if (ptr_to_va(end) > ptr_to_va(maxaddr))
 		end = maxaddr;
+
+	/*
+	 * XXX-AM: Do not require that minaddr and maxaddr are valid
+	 * capabilities because in some cases we allow the fit
+	 * to be anywhere in the address space, so we do not
+	 * want to force the caller to hold a capability for
+	 * the whole address space.
+	 */
+	CHERI_VM_ASSERT_VALID(start);
+	CHERI_VM_ASSERT_VALID(end);
 	if (start > end) 
 		return (ENOMEM);
 
@@ -903,10 +922,10 @@ vmem_fit(const bt_t *bt, vmem_size_t size, vmem_size_t align,
 		start = VMEM_ALIGNUP(start - phase, nocross) + phase;
 	}
 	if (start <= end && end - start >= size - 1) {
-		MPASS((start & (align - 1)) == phase);
+		MPASS((ptr_to_va(start) & (align - 1)) == phase);
 		MPASS(!VMEM_CROSS_P(start, start + size - 1, nocross));
-		MPASS(minaddr <= start);
-		MPASS(maxaddr == 0 || start + size - 1 <= maxaddr);
+		MPASS(minaddr <= ptr_to_va(start));
+		MPASS(maxaddr == 0 || ptr_to_va(start) + size - 1 <= maxaddr);
 		MPASS(bt->bt_start <= start);
 		MPASS(BT_END(bt) - start >= size - 1);
 		*addrp = start;
@@ -936,6 +955,12 @@ vmem_clip(vmem_t *vm, bt_t *bt, vmem_addr_t start, vmem_size_t size)
 		btprev->bt_size = start - bt->bt_start;
 		bt->bt_start = start;
 		bt->bt_size -= btprev->bt_size;
+#ifdef CHERI_KERNEL
+		btprev->bt_start = (vmem_addr_t)cheri_csetbounds(
+			(void *)btprev->bt_start, btprev->bt_size);
+		bt->bt_start = (vmem_addr_t)cheri_csetbounds(
+			(void *)bt->bt_start, bt->bt_size);
+#endif
 		bt_insfree(vm, btprev);
 		bt_insseg(vm, btprev,
 		    TAILQ_PREV(bt, vmem_seglist, bt_seglist));
@@ -949,6 +974,12 @@ vmem_clip(vmem_t *vm, bt_t *bt, vmem_addr_t start, vmem_size_t size)
 		btnew->bt_size = size;
 		bt->bt_start = bt->bt_start + size;
 		bt->bt_size -= size;
+#ifdef CHERI_KERNEL
+		btnew->bt_start = (vmem_addr_t)cheri_csetbounds(
+			(void *)btnew->bt_start, btnew->bt_size);
+		bt->bt_start = (vmem_addr_t)cheri_csetbounds(
+			(void *)bt->bt_start, bt->bt_size);
+#endif
 		bt_insfree(vm, bt);
 		bt_insseg(vm, btnew,
 		    TAILQ_PREV(bt, vmem_seglist, bt_seglist));
