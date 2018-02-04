@@ -596,6 +596,10 @@ struct cheriabi_extattr_delete_fd_args {
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
 	char attrname_l_[PADL_(const char *__capability)]; const char *__capability attrname; char attrname_r_[PADR_(const char *__capability)];
 };
+struct cheriabi_eaccess_args {
+	char path_l_[PADL_(char *__capability)]; char *__capability path; char path_r_[PADR_(char *__capability)];
+	char amode_l_[PADL_(int)]; int amode; char amode_r_[PADR_(int)];
+};
 struct cheriabi_nmount_args {
 	char iovp_l_[PADL_(struct iovec_c *__capability)]; struct iovec_c *__capability iovp; char iovp_r_[PADR_(struct iovec_c *__capability)];
 	char iovcnt_l_[PADL_(unsigned int)]; unsigned int iovcnt; char iovcnt_r_[PADR_(unsigned int)];
@@ -1093,6 +1097,7 @@ int	cheriabi_getresgid(struct thread *, struct cheriabi_getresgid_args *);
 int	cheriabi_extattr_set_fd(struct thread *, struct cheriabi_extattr_set_fd_args *);
 int	cheriabi_extattr_get_fd(struct thread *, struct cheriabi_extattr_get_fd_args *);
 int	cheriabi_extattr_delete_fd(struct thread *, struct cheriabi_extattr_delete_fd_args *);
+int	cheriabi_eaccess(struct thread *, struct cheriabi_eaccess_args *);
 int	cheriabi_nmount(struct thread *, struct cheriabi_nmount_args *);
 int	cheriabi___mac_get_proc(struct thread *, struct cheriabi___mac_get_proc_args *);
 int	cheriabi___mac_set_proc(struct thread *, struct cheriabi___mac_set_proc_args *);
@@ -1342,6 +1347,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_extattr_set_fd	AUE_EXTATTR_SET_FD
 #define	CHERIABI_SYS_AUE_cheriabi_extattr_get_fd	AUE_EXTATTR_GET_FD
 #define	CHERIABI_SYS_AUE_cheriabi_extattr_delete_fd	AUE_EXTATTR_DELETE_FD
+#define	CHERIABI_SYS_AUE_cheriabi_eaccess	AUE_EACCESS
 #define	CHERIABI_SYS_AUE_cheriabi_nmount	AUE_NMOUNT
 #define	CHERIABI_SYS_AUE_cheriabi___mac_get_proc	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi___mac_set_proc	AUE_NULL

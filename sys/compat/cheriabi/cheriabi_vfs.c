@@ -415,6 +415,14 @@ cheriabi_faccessat(struct thread *td, struct cheriabi_faccessat_args *uap)
 }
 
 int
+cheriabi_eaccess(struct thread *td, struct cheriabi_eaccess_args *uap)
+{
+
+	return (kern_accessat(td, AT_FDCWD, uap->path, UIO_USERSPACE,
+	    AT_EACCESS, uap->amode));
+}
+
+int
 cheriabi_pathconf(struct thread *td, struct cheriabi_pathconf_args *uap)
 {
 

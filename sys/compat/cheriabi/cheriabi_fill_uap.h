@@ -4112,26 +4112,19 @@ CHERIABI_SYS___setugid_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_eaccess_fill_uap(struct thread *td,
-    struct eaccess_args *uap)
+CHERIABI_SYS_cheriabi_eaccess_fill_uap(struct thread *td,
+    struct cheriabi_eaccess_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [1] int amode */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_eaccess_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_eaccess_PTRMASK);
 	uap->amode = cheri_getoffset(tmpcap);
 
-	/* [0] _In_z_ char * path */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_eaccess_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->path),
-		    tmpcap, sizeof(*uap->path), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _In_z_ char *__capability path */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->path),
+	    0, CHERIABI_SYS_cheriabi_eaccess_PTRMASK);
 
 	return (0);
 }

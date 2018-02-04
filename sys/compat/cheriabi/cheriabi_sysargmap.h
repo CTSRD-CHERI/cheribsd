@@ -203,7 +203,7 @@
 #define	CHERIABI_SYS_cheriabi_extattr_get_fd_PTRMASK	(0x0 | 0x4 | 0x8)
 #define	CHERIABI_SYS_cheriabi_extattr_delete_fd_PTRMASK	(0x0 | 0x4)
 #define	CHERIABI_SYS___setugid_PTRMASK	(0x0)
-#define	CHERIABI_SYS_eaccess_PTRMASK	(0x0 | 0x1)
+#define	CHERIABI_SYS_cheriabi_eaccess_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_nmount_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi___mac_get_proc_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi___mac_set_proc_PTRMASK	(0x0 | 0x1)

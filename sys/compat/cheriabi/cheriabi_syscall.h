@@ -303,7 +303,7 @@
 #define	CHERIABI_SYS_cheriabi_extattr_get_fd	372
 #define	CHERIABI_SYS_cheriabi_extattr_delete_fd	373
 #define	CHERIABI_SYS___setugid	374
-#define	CHERIABI_SYS_eaccess	376
+#define	CHERIABI_SYS_cheriabi_eaccess	376
 #define	CHERIABI_SYS_cheriabi_nmount	378
 				/* 379 is obsolete kse_exit */
 				/* 380 is obsolete kse_wakeup */

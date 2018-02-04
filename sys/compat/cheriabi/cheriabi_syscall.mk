@@ -213,7 +213,7 @@ MIASM =  \
 	cheriabi_extattr_get_fd.o \
 	cheriabi_extattr_delete_fd.o \
 	__setugid.o \
-	eaccess.o \
+	cheriabi_eaccess.o \
 	cheriabi_nmount.o \
 	cheriabi___mac_get_proc.o \
 	cheriabi___mac_set_proc.o \

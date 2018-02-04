@@ -842,7 +842,9 @@
 				    _In_z_ const char * __capability attrname); }
 374	AUE_SETUGID	NOPROTO	{ int __setugid(int flag); }
 375	AUE_NULL	UNIMPL	nfsclnt
-376	AUE_EACCESS	NOPROTO	{ int eaccess(_In_z_ char *path, int amode); }
+376	AUE_EACCESS	STD	{ int cheriabi_eaccess( \
+				    _In_z_ char * __capability path, \
+				    int amode); }
 377	AUE_NULL	UNIMPL	afs3_syscall
 378	AUE_NMOUNT	STD	{ int cheriabi_nmount( \
 				    _In_reads_(iovcnt) \
