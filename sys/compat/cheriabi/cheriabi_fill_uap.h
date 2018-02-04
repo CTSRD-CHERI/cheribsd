@@ -4355,26 +4355,19 @@ CHERIABI_SYS_cheriabi_lchflags_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_uuidgen_fill_uap(struct thread *td,
-    struct uuidgen_args *uap)
+CHERIABI_SYS_cheriabi_uuidgen_fill_uap(struct thread *td,
+    struct cheriabi_uuidgen_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [1] int count */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_uuidgen_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_uuidgen_PTRMASK);
 	uap->count = cheri_getoffset(tmpcap);
 
-	/* [0] _Out_writes_(count) struct uuid * store */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_uuidgen_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->store),
-		    tmpcap, (sizeof(*uap->store) * uap->count), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _Out_writes_(count) struct uuid *__capability store */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->store),
+	    0, CHERIABI_SYS_cheriabi_uuidgen_PTRMASK);
 
 	return (0);
 }

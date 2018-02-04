@@ -878,8 +878,9 @@
 391	AUE_LCHFLAGS	STD	{ int cheriabi_lchflags( \
 				    _In_z_ const char * __capability path, \
 				    u_long flags); }
-392	AUE_NULL	NOPROTO	{ int uuidgen( \
-				    _Out_writes_(count) struct uuid *store, \
+392	AUE_NULL	STD	{ int cheriabi_uuidgen( \
+				    _Out_writes_(count) \
+				    struct uuid * __capability store, \
 				    int count); }
 393	AUE_SENDFILE	STD	{ int cheriabi_sendfile(int fd, int s, \
 				    off_t offset, \

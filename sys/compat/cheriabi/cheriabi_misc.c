@@ -1,6 +1,7 @@
 /*-
  * Copyright (c) 2002 Doug Rabson
- * Copyright (c) 2015-2016 SRI International
+ * Copyright (c) 2002 Marcel Moolenaar
+ * Copyright (c) 2015-2018 SRI International
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -87,6 +88,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/unistd.h>
 #include <sys/ucontext.h>
 #include <sys/user.h>
+#include <sys/uuid.h>
 #include <sys/vnode.h>
 #include <sys/vdso.h>
 #include <sys/wait.h>
@@ -2024,6 +2026,32 @@ done:
 	free(symstr, M_TEMP);
 	return (error);
 }
+
+int
+cheriabi_uuidgen(struct thread *td, struct cheriabi_uuidgen_args *uap)
+{
+	struct uuid *store;
+	size_t count;
+	int error;
+
+	/*
+	 * Limit the number of UUIDs that can be created at the same time
+	 * to some arbitrary number. This isn't really necessary, but I
+	 * like to have some sort of upper-bound that's less than 2G :-)
+	 * XXX probably needs to be tunable.
+	 */
+	if (uap->count < 1 || uap->count > 2048)
+		return (EINVAL);
+
+	count = uap->count;
+	store = malloc(count * sizeof(struct uuid), M_TEMP, M_WAITOK);
+	kern_uuidgen(store, count);
+	error = copyout_c((__cheri_tocap struct uuid * __capability)store,
+	    uap->store, count * sizeof(struct uuid));
+	free(store, M_TEMP);
+	return (error);
+}
+
 
 /*
  * kern_prot.c

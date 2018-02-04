@@ -637,6 +637,10 @@ struct cheriabi_lchflags_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 	char flags_l_[PADL_(u_long)]; u_long flags; char flags_r_[PADR_(u_long)];
 };
+struct cheriabi_uuidgen_args {
+	char store_l_[PADL_(struct uuid *__capability)]; struct uuid *__capability store; char store_r_[PADR_(struct uuid *__capability)];
+	char count_l_[PADL_(int)]; int count; char count_r_[PADR_(int)];
+};
 struct cheriabi_sendfile_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
@@ -1107,6 +1111,7 @@ int	cheriabi___mac_set_fd(struct thread *, struct cheriabi___mac_set_fd_args *);
 int	cheriabi___mac_set_file(struct thread *, struct cheriabi___mac_set_file_args *);
 int	cheriabi_kenv(struct thread *, struct cheriabi_kenv_args *);
 int	cheriabi_lchflags(struct thread *, struct cheriabi_lchflags_args *);
+int	cheriabi_uuidgen(struct thread *, struct cheriabi_uuidgen_args *);
 int	cheriabi_sendfile(struct thread *, struct cheriabi_sendfile_args *);
 int	cheriabi_mac_syscall(struct thread *, struct cheriabi_mac_syscall_args *);
 int	cheriabi___mac_get_pid(struct thread *, struct cheriabi___mac_get_pid_args *);
@@ -1357,6 +1362,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi___mac_set_file	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_kenv	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_lchflags	AUE_LCHFLAGS
+#define	CHERIABI_SYS_AUE_cheriabi_uuidgen	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_sendfile	AUE_SENDFILE
 #define	CHERIABI_SYS_AUE_cheriabi_mac_syscall	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi___mac_get_pid	AUE_NULL

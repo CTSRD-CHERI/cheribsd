@@ -318,7 +318,7 @@
 #define	CHERIABI_SYS_cheriabi___mac_set_file	389
 #define	CHERIABI_SYS_cheriabi_kenv	390
 #define	CHERIABI_SYS_cheriabi_lchflags	391
-#define	CHERIABI_SYS_uuidgen	392
+#define	CHERIABI_SYS_cheriabi_uuidgen	392
 #define	CHERIABI_SYS_cheriabi_sendfile	393
 #define	CHERIABI_SYS_cheriabi_mac_syscall	394
 				/* 395 is obsolete fbsd11_getfsstat */

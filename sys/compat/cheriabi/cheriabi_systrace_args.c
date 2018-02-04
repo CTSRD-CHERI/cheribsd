@@ -1853,10 +1853,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* uuidgen */
+	/* cheriabi_uuidgen */
 	case 392: {
-		struct uuidgen_args *p = params;
-		uarg[0] = (intptr_t) p->store; /* struct uuid * */
+		struct cheriabi_uuidgen_args *p = params;
+		uarg[0] = (cheri_getbase(p->store) + cheri_getoffset(p->store)); /* struct uuid *__capability */
 		iarg[1] = p->count; /* int */
 		*n_args = 2;
 		break;
@@ -6072,11 +6072,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* uuidgen */
+	/* cheriabi_uuidgen */
 	case 392:
 		switch(ndx) {
 		case 0:
-			p = "userland struct uuid *";
+			p = "userland struct uuid *__capability";
 			break;
 		case 1:
 			p = "int";
@@ -9379,7 +9379,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* uuidgen */
+	/* cheriabi_uuidgen */
 	case 392:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
