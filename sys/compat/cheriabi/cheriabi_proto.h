@@ -537,6 +537,32 @@ struct cheriabi___acl_aclcheck_fd_args {
 	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
 	char aclp_l_[PADL_(struct acl *__capability)]; struct acl *__capability aclp; char aclp_r_[PADR_(struct acl *__capability)];
 };
+struct cheriabi_extattrctl_args {
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
+	char filename_l_[PADL_(const char *__capability)]; const char *__capability filename; char filename_r_[PADR_(const char *__capability)];
+	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
+	char attrname_l_[PADL_(const char *__capability)]; const char *__capability attrname; char attrname_r_[PADR_(const char *__capability)];
+};
+struct cheriabi_extattr_set_file_args {
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
+	char attrname_l_[PADL_(const char *__capability)]; const char *__capability attrname; char attrname_r_[PADR_(const char *__capability)];
+	char data_l_[PADL_(void *__capability)]; void *__capability data; char data_r_[PADR_(void *__capability)];
+	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
+};
+struct cheriabi_extattr_get_file_args {
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
+	char attrname_l_[PADL_(const char *__capability)]; const char *__capability attrname; char attrname_r_[PADR_(const char *__capability)];
+	char data_l_[PADL_(void *__capability)]; void *__capability data; char data_r_[PADR_(void *__capability)];
+	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
+};
+struct cheriabi_extattr_delete_file_args {
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
+	char attrname_l_[PADL_(const char *__capability)]; const char *__capability attrname; char attrname_r_[PADR_(const char *__capability)];
+};
 struct cheriabi_aio_waitcomplete_args {
 	char aiocbp_l_[PADL_(struct aiocb_c *__capability *)]; struct aiocb_c *__capability * aiocbp; char aiocbp_r_[PADR_(struct aiocb_c *__capability *)];
 	char timeout_l_[PADL_(struct timespec *)]; struct timespec * timeout; char timeout_r_[PADR_(struct timespec *)];
@@ -550,6 +576,25 @@ struct cheriabi_getresgid_args {
 	char rgid_l_[PADL_(gid_t *__capability)]; gid_t *__capability rgid; char rgid_r_[PADR_(gid_t *__capability)];
 	char egid_l_[PADL_(gid_t *__capability)]; gid_t *__capability egid; char egid_r_[PADR_(gid_t *__capability)];
 	char sgid_l_[PADL_(gid_t *__capability)]; gid_t *__capability sgid; char sgid_r_[PADR_(gid_t *__capability)];
+};
+struct cheriabi_extattr_set_fd_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
+	char attrname_l_[PADL_(const char *__capability)]; const char *__capability attrname; char attrname_r_[PADR_(const char *__capability)];
+	char data_l_[PADL_(void *__capability)]; void *__capability data; char data_r_[PADR_(void *__capability)];
+	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
+};
+struct cheriabi_extattr_get_fd_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
+	char attrname_l_[PADL_(const char *__capability)]; const char *__capability attrname; char attrname_r_[PADR_(const char *__capability)];
+	char data_l_[PADL_(void *__capability)]; void *__capability data; char data_r_[PADR_(void *__capability)];
+	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
+};
+struct cheriabi_extattr_delete_fd_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
+	char attrname_l_[PADL_(const char *__capability)]; const char *__capability attrname; char attrname_r_[PADR_(const char *__capability)];
 };
 struct cheriabi_nmount_args {
 	char iovp_l_[PADL_(struct iovec_c *__capability)]; struct iovec_c *__capability iovp; char iovp_r_[PADR_(struct iovec_c *__capability)];
@@ -614,6 +659,25 @@ struct cheriabi___mac_set_link_args {
 	char path_p_l_[PADL_(const char *)]; const char * path_p; char path_p_r_[PADR_(const char *)];
 	char mac_p_l_[PADL_(struct mac_c *)]; struct mac_c * mac_p; char mac_p_r_[PADR_(struct mac_c *)];
 };
+struct cheriabi_extattr_set_link_args {
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
+	char attrname_l_[PADL_(const char *__capability)]; const char *__capability attrname; char attrname_r_[PADR_(const char *__capability)];
+	char data_l_[PADL_(void *__capability)]; void *__capability data; char data_r_[PADR_(void *__capability)];
+	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
+};
+struct cheriabi_extattr_get_link_args {
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
+	char attrname_l_[PADL_(const char *__capability)]; const char *__capability attrname; char attrname_r_[PADR_(const char *__capability)];
+	char data_l_[PADL_(void *__capability)]; void *__capability data; char data_r_[PADR_(void *__capability)];
+	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
+};
+struct cheriabi_extattr_delete_link_args {
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
+	char attrname_l_[PADL_(const char *__capability)]; const char *__capability attrname; char attrname_r_[PADR_(const char *__capability)];
+};
 struct cheriabi___mac_execve_args {
 	char fname_l_[PADL_(char *)]; char * fname; char fname_r_[PADR_(char *)];
 	char argv_l_[PADL_(void *__capability *)]; void *__capability * argv; char argv_r_[PADR_(void *__capability *)];
@@ -668,6 +732,24 @@ struct cheriabi_thr_create_args {
 	char ctx_l_[PADL_(ucontext_c_t *)]; ucontext_c_t * ctx; char ctx_r_[PADR_(ucontext_c_t *)];
 	char id_l_[PADL_(long *)]; long * id; char id_r_[PADR_(long *)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
+struct cheriabi_extattr_list_fd_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
+	char data_l_[PADL_(void *__capability)]; void *__capability data; char data_r_[PADR_(void *__capability)];
+	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
+};
+struct cheriabi_extattr_list_file_args {
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
+	char data_l_[PADL_(void *__capability)]; void *__capability data; char data_r_[PADR_(void *__capability)];
+	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
+};
+struct cheriabi_extattr_list_link_args {
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
+	char data_l_[PADL_(void *__capability)]; void *__capability data; char data_r_[PADR_(void *__capability)];
+	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
 };
 struct cheriabi_auditon_args {
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
@@ -1001,9 +1083,16 @@ int	cheriabi___acl_set_fd(struct thread *, struct cheriabi___acl_set_fd_args *);
 int	cheriabi___acl_delete_file(struct thread *, struct cheriabi___acl_delete_file_args *);
 int	cheriabi___acl_aclcheck_file(struct thread *, struct cheriabi___acl_aclcheck_file_args *);
 int	cheriabi___acl_aclcheck_fd(struct thread *, struct cheriabi___acl_aclcheck_fd_args *);
+int	cheriabi_extattrctl(struct thread *, struct cheriabi_extattrctl_args *);
+int	cheriabi_extattr_set_file(struct thread *, struct cheriabi_extattr_set_file_args *);
+int	cheriabi_extattr_get_file(struct thread *, struct cheriabi_extattr_get_file_args *);
+int	cheriabi_extattr_delete_file(struct thread *, struct cheriabi_extattr_delete_file_args *);
 int	cheriabi_aio_waitcomplete(struct thread *, struct cheriabi_aio_waitcomplete_args *);
 int	cheriabi_getresuid(struct thread *, struct cheriabi_getresuid_args *);
 int	cheriabi_getresgid(struct thread *, struct cheriabi_getresgid_args *);
+int	cheriabi_extattr_set_fd(struct thread *, struct cheriabi_extattr_set_fd_args *);
+int	cheriabi_extattr_get_fd(struct thread *, struct cheriabi_extattr_get_fd_args *);
+int	cheriabi_extattr_delete_fd(struct thread *, struct cheriabi_extattr_delete_fd_args *);
 int	cheriabi_nmount(struct thread *, struct cheriabi_nmount_args *);
 int	cheriabi___mac_get_proc(struct thread *, struct cheriabi___mac_get_proc_args *);
 int	cheriabi___mac_set_proc(struct thread *, struct cheriabi___mac_set_proc_args *);
@@ -1018,6 +1107,9 @@ int	cheriabi_mac_syscall(struct thread *, struct cheriabi_mac_syscall_args *);
 int	cheriabi___mac_get_pid(struct thread *, struct cheriabi___mac_get_pid_args *);
 int	cheriabi___mac_get_link(struct thread *, struct cheriabi___mac_get_link_args *);
 int	cheriabi___mac_set_link(struct thread *, struct cheriabi___mac_set_link_args *);
+int	cheriabi_extattr_set_link(struct thread *, struct cheriabi_extattr_set_link_args *);
+int	cheriabi_extattr_get_link(struct thread *, struct cheriabi_extattr_get_link_args *);
+int	cheriabi_extattr_delete_link(struct thread *, struct cheriabi_extattr_delete_link_args *);
 int	cheriabi___mac_execve(struct thread *, struct cheriabi___mac_execve_args *);
 int	cheriabi_sigaction(struct thread *, struct cheriabi_sigaction_args *);
 int	cheriabi_sigreturn(struct thread *, struct cheriabi_sigreturn_args *);
@@ -1031,6 +1123,9 @@ int	cheriabi___acl_delete_link(struct thread *, struct cheriabi___acl_delete_lin
 int	cheriabi___acl_aclcheck_link(struct thread *, struct cheriabi___acl_aclcheck_link_args *);
 int	cheriabi_sigwait(struct thread *, struct cheriabi_sigwait_args *);
 int	cheriabi_thr_create(struct thread *, struct cheriabi_thr_create_args *);
+int	cheriabi_extattr_list_fd(struct thread *, struct cheriabi_extattr_list_fd_args *);
+int	cheriabi_extattr_list_file(struct thread *, struct cheriabi_extattr_list_file_args *);
+int	cheriabi_extattr_list_link(struct thread *, struct cheriabi_extattr_list_link_args *);
 int	cheriabi_auditon(struct thread *, struct cheriabi_auditon_args *);
 int	cheriabi_thr_new(struct thread *, struct cheriabi_thr_new_args *);
 int	cheriabi_sigqueue(struct thread *, struct cheriabi_sigqueue_args *);
@@ -1237,9 +1332,16 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi___acl_delete_file	AUE_ACL_DELETE_FILE
 #define	CHERIABI_SYS_AUE_cheriabi___acl_aclcheck_file	AUE_ACL_CHECK_FILE
 #define	CHERIABI_SYS_AUE_cheriabi___acl_aclcheck_fd	AUE_ACL_CHECK_FD
+#define	CHERIABI_SYS_AUE_cheriabi_extattrctl	AUE_EXTATTRCTL
+#define	CHERIABI_SYS_AUE_cheriabi_extattr_set_file	AUE_EXTATTR_SET_FILE
+#define	CHERIABI_SYS_AUE_cheriabi_extattr_get_file	AUE_EXTATTR_GET_FILE
+#define	CHERIABI_SYS_AUE_cheriabi_extattr_delete_file	AUE_EXTATTR_DELETE_FILE
 #define	CHERIABI_SYS_AUE_cheriabi_aio_waitcomplete	AUE_AIO_WAITCOMPLETE
 #define	CHERIABI_SYS_AUE_cheriabi_getresuid	AUE_GETRESUID
 #define	CHERIABI_SYS_AUE_cheriabi_getresgid	AUE_GETRESGID
+#define	CHERIABI_SYS_AUE_cheriabi_extattr_set_fd	AUE_EXTATTR_SET_FD
+#define	CHERIABI_SYS_AUE_cheriabi_extattr_get_fd	AUE_EXTATTR_GET_FD
+#define	CHERIABI_SYS_AUE_cheriabi_extattr_delete_fd	AUE_EXTATTR_DELETE_FD
 #define	CHERIABI_SYS_AUE_cheriabi_nmount	AUE_NMOUNT
 #define	CHERIABI_SYS_AUE_cheriabi___mac_get_proc	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi___mac_set_proc	AUE_NULL
@@ -1254,6 +1356,9 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi___mac_get_pid	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi___mac_get_link	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi___mac_set_link	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_extattr_set_link	AUE_EXTATTR_SET_LINK
+#define	CHERIABI_SYS_AUE_cheriabi_extattr_get_link	AUE_EXTATTR_GET_LINK
+#define	CHERIABI_SYS_AUE_cheriabi_extattr_delete_link	AUE_EXTATTR_DELETE_LINK
 #define	CHERIABI_SYS_AUE_cheriabi___mac_execve	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_sigaction	AUE_SIGACTION
 #define	CHERIABI_SYS_AUE_cheriabi_sigreturn	AUE_SIGRETURN
@@ -1267,6 +1372,9 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi___acl_aclcheck_link	AUE_ACL_CHECK_LINK
 #define	CHERIABI_SYS_AUE_cheriabi_sigwait	AUE_SIGWAIT
 #define	CHERIABI_SYS_AUE_cheriabi_thr_create	AUE_THR_CREATE
+#define	CHERIABI_SYS_AUE_cheriabi_extattr_list_fd	AUE_EXTATTR_LIST_FD
+#define	CHERIABI_SYS_AUE_cheriabi_extattr_list_file	AUE_EXTATTR_LIST_FILE
+#define	CHERIABI_SYS_AUE_cheriabi_extattr_list_link	AUE_EXTATTR_LIST_LINK
 #define	CHERIABI_SYS_AUE_cheriabi_auditon	AUE_AUDITON
 #define	CHERIABI_SYS_AUE_cheriabi_thr_new	AUE_THR_NEW
 #define	CHERIABI_SYS_AUE_cheriabi_sigqueue	AUE_NULL

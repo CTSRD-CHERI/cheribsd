@@ -201,17 +201,17 @@ MIASM =  \
 	__acl_delete_fd.o \
 	cheriabi___acl_aclcheck_file.o \
 	cheriabi___acl_aclcheck_fd.o \
-	extattrctl.o \
-	extattr_set_file.o \
-	extattr_get_file.o \
-	extattr_delete_file.o \
+	cheriabi_extattrctl.o \
+	cheriabi_extattr_set_file.o \
+	cheriabi_extattr_get_file.o \
+	cheriabi_extattr_delete_file.o \
 	cheriabi_aio_waitcomplete.o \
 	cheriabi_getresuid.o \
 	cheriabi_getresgid.o \
 	kqueue.o \
-	extattr_set_fd.o \
-	extattr_get_fd.o \
-	extattr_delete_fd.o \
+	cheriabi_extattr_set_fd.o \
+	cheriabi_extattr_get_fd.o \
+	cheriabi_extattr_delete_fd.o \
 	__setugid.o \
 	eaccess.o \
 	cheriabi_nmount.o \
@@ -229,9 +229,9 @@ MIASM =  \
 	cheriabi___mac_get_pid.o \
 	cheriabi___mac_get_link.o \
 	cheriabi___mac_set_link.o \
-	extattr_set_link.o \
-	extattr_get_link.o \
-	extattr_delete_link.o \
+	cheriabi_extattr_set_link.o \
+	cheriabi_extattr_get_link.o \
+	cheriabi_extattr_delete_link.o \
 	cheriabi___mac_execve.o \
 	cheriabi_sigaction.o \
 	cheriabi_sigreturn.o \
@@ -249,9 +249,9 @@ MIASM =  \
 	thr_self.o \
 	thr_kill.o \
 	jail_attach.o \
-	extattr_list_fd.o \
-	extattr_list_file.o \
-	extattr_list_link.o \
+	cheriabi_extattr_list_fd.o \
+	cheriabi_extattr_list_file.o \
+	cheriabi_extattr_list_link.o \
 	ksem_timedwait.o \
 	thr_suspend.o \
 	thr_wake.o \

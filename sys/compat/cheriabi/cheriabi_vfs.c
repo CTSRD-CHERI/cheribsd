@@ -149,6 +149,125 @@ cheriabi___getcwd(struct thread *td, struct cheriabi___getcwd_args *uap)
 }
 
 /*
+ * vfs_extattr.c
+ */
+int
+cheriabi_extattrctl(struct thread *td, struct cheriabi_extattrctl_args *uap)
+{
+
+	return (kern_extattrctl(td, uap->path, uap->cmd, uap->filename,
+	    uap->attrnamespace, uap->attrname));
+}
+
+int
+cheriabi_extattr_set_fd(struct thread *td,
+    struct cheriabi_extattr_set_fd_args *uap)
+{
+
+	return (kern_extattr_set_fd(td, uap->fd, uap->attrnamespace,
+	    uap->attrname, uap->data, uap->nbytes));
+}
+
+int
+cheriabi_extattr_set_file(struct thread *td,
+    struct cheriabi_extattr_set_file_args *uap)
+{
+
+	return (kern_extattr_set_path(td, uap->path, uap->attrnamespace,
+	    uap->attrname, uap->data, uap->nbytes, FOLLOW));
+}
+
+int
+cheriabi_extattr_set_link(struct thread *td,
+    struct cheriabi_extattr_set_link_args *uap)
+{
+
+	return (kern_extattr_set_path(td, uap->path, uap->attrnamespace,
+	    uap->attrname, uap->data, uap->nbytes, NOFOLLOW));
+}
+
+int
+cheriabi_extattr_get_fd(struct thread *td,
+    struct cheriabi_extattr_get_fd_args *uap)
+{
+
+	return (kern_extattr_get_fd(td, uap->fd, uap->attrnamespace,
+	    uap->attrname, uap->data, uap->nbytes));
+}
+
+int
+cheriabi_extattr_get_file(struct thread *td,
+    struct cheriabi_extattr_get_file_args *uap)
+{
+
+	return (kern_extattr_get_path(td, uap->path, uap->attrnamespace,
+	    uap->attrname, uap->data, uap->nbytes, FOLLOW));
+}
+
+int
+cheriabi_extattr_get_link(struct thread *td,
+    struct cheriabi_extattr_get_link_args *uap)
+{
+
+	return (kern_extattr_get_path(td, uap->path, uap->attrnamespace,
+	    uap->attrname, uap->data, uap->nbytes, NOFOLLOW));
+}
+
+int
+cheriabi_extattr_delete_fd(struct thread *td,
+    struct cheriabi_extattr_delete_fd_args *uap)
+{
+
+	return (kern_extattr_delete_fd(td, uap->fd, uap->attrnamespace,
+	    uap->attrname));
+}
+
+int
+cheriabi_extattr_delete_file(struct thread *td,
+    struct cheriabi_extattr_delete_file_args *uap)
+{
+
+	return (kern_extattr_delete_path(td, uap->path, uap->attrnamespace,
+	    uap->attrname, FOLLOW));
+}
+
+int
+cheriabi_extattr_delete_link(struct thread *td,
+    struct cheriabi_extattr_delete_link_args *uap)
+{
+
+	return (kern_extattr_delete_path(td, uap->path, uap->attrnamespace,
+	    uap->attrname, NOFOLLOW));
+}
+
+int
+cheriabi_extattr_list_fd(struct thread *td,
+    struct cheriabi_extattr_list_fd_args *uap)
+{
+
+	return (kern_extattr_list_fd(td, uap->fd, uap->attrnamespace,
+	    uap->data, uap->nbytes));
+}
+
+int
+cheriabi_extattr_list_file(struct thread *td,
+    struct cheriabi_extattr_list_file_args *uap)
+{
+
+	return (kern_extattr_list_path(td, uap->path, uap->attrnamespace,
+	    uap->data, uap->nbytes, FOLLOW));
+}
+
+int
+cheriabi_extattr_list_link(struct thread *td,
+    struct cheriabi_extattr_list_link_args *uap)
+{
+
+	return (kern_extattr_list_path(td, uap->path, uap->attrnamespace,
+	    uap->data, uap->nbytes, NOFOLLOW));
+}
+
+/*
  * vfs_syscalls.c
  */
 int

@@ -129,6 +129,31 @@ int	kern_cpuset_setid(struct thread *td, cpuwhich_t which,
 int	kern_dup(struct thread *td, u_int mode, int flags, int old, int new);
 int	kern_execve(struct thread *td, struct image_args *args,
 	    struct mac *mac_p);
+int	kern_extattrctl(struct thread *td, const char * __capability path,
+	    int cmd, const char * __capability filename, int attrnamespace,
+	    const char * __capability uattrname);
+int	kern_extattr_delete_fd(struct thread *td, int fd, int attrnamespace,
+	    const char * __capability uattrname);
+int	kern_extattr_delete_path(struct thread *td,
+	     const char * __capability path, int attrnamespace,
+	     const char * __capability attrname, int follow);
+int	kern_extattr_get_fd(struct thread *td, int fd, int attrnamespace,
+	    const char * __capability attrname, void * __capability data,
+	    size_t nbytes);
+int	kern_extattr_get_path(struct thread *td, const char * __capability path,
+	     int attrnamespace, const char * __capability attrname,
+	     void * __capability data, size_t nbytes, int follow);
+int	kern_extattr_list_fd(struct thread *td, int fd, int attrnamespace,
+	    void * __capability data, size_t nbytes);
+int	kern_extattr_list_path(struct thread *td,
+	    const char * __capability path, int attrnamespace,
+	    void * __capability data, size_t nbytes, int follow);
+int	kern_extattr_set_fd(struct thread *td, int fd, int attrnamespace,
+	    const char * __capability uattrname, void * __capability data,
+	    size_t nbytes);
+int	kern_extattr_set_path(struct thread *td, const char * __capability path,
+	    int attrnamespace, const char * __capability attrname,
+	    void * __capability data, size_t nbytes, int follow);
 int	kern_fchmodat(struct thread *td, int fd, const char * __capability path,
 	    enum uio_seg pathseg, mode_t mode, int flag);
 int	kern_fchownat(struct thread *td, int fd, const char * __capability path,

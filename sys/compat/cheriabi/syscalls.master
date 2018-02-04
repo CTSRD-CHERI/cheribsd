@@ -779,26 +779,31 @@
 354	AUE_ACL_CHECK_FD	STD	{ int cheriabi___acl_aclcheck_fd( \
 				    int filedes, acl_type_t type, \
 				    _In_ struct acl * __capability aclp); }
-355	AUE_EXTATTRCTL	NOPROTO	{ int extattrctl(_In_z_ const char *path, \
-				    int cmd, _In_z_opt_ const char *filename, \
+355	AUE_EXTATTRCTL	STD	{ int cheriabi_extattrctl( \
+				    _In_z_ const char * __capability path, \
+				    int cmd, \
+				    _In_z_opt_ \
+				    const char * __capability filename, \
 				    int attrnamespace, \
-				    _In_z_ const char *attrname); }
-356	AUE_EXTATTR_SET_FILE	NOPROTO	{ ssize_t extattr_set_file( \
-				    _In_z_ const char *path, \
+				    _In_z_ const char * __capability attrname); }
+356	AUE_EXTATTR_SET_FILE	STD	{ ssize_t cheriabi_extattr_set_file( \
+				    _In_z_ const char * __capability path, \
 				    int attrnamespace, \
-				    _In_z_ const char *attrname, \
-				    _In_reads_bytes_(nbytes) void *data, \
+				    _In_z_ const char * __capability attrname, \
+				    _In_reads_bytes_(nbytes) \
+				    void * __capability data, \
 				    size_t nbytes); }
-357	AUE_EXTATTR_GET_FILE	NOPROTO	{ ssize_t extattr_get_file( \
-				    _In_z_ const char *path, \
+357	AUE_EXTATTR_GET_FILE	STD	{ ssize_t cheriabi_extattr_get_file( \
+				    _In_z_ const char * __capability path, \
 				    int attrnamespace, \
-				    _In_z_ const char *attrname, \
-				    _Out_writes_bytes_(nbytes) void *data, \
+				    _In_z_ const char * __capability attrname, \
+				    _Out_writes_bytes_(nbytes) \
+				    void * __capability data, \
 				    size_t nbytes); }
-358	AUE_EXTATTR_DELETE_FILE	NOPROTO	{ int extattr_delete_file( \
-				    _In_z_ const char *path, \
+358	AUE_EXTATTR_DELETE_FILE	STD	{ int cheriabi_extattr_delete_file( \
+				    _In_z_ const char * __capability path, \
 				    int attrnamespace, \
-				    _In_z_ const char *attrname); }
+				    _In_z_ const char * __capability attrname); }
 359	AUE_AIO_WAITCOMPLETE	STD	{ int cheriabi_aio_waitcomplete( \
 				    _Outptr_result_maybenull_ \
 				    struct aiocb_c * __capability *aiocbp, \
@@ -820,19 +825,21 @@
 368	AUE_NULL	UNIMPL	__cap_set_fd
 369	AUE_NULL	UNIMPL	__cap_set_file
 370	AUE_NULL	UNIMPL	nosys
-371	AUE_EXTATTR_SET_FD	NOPROTO	{ ssize_t extattr_set_fd(int fd, \
-				    int attrnamespace, \
-				    _In_z_ const char *attrname, \
-				    _In_reads_bytes_(nbytes) void *data, \
+371	AUE_EXTATTR_SET_FD	STD	{ ssize_t cheriabi_extattr_set_fd(\
+				    int fd, int attrnamespace, \
+				    _In_z_ const char * __capability attrname, \
+				    _In_reads_bytes_(nbytes) \
+				    void * __capability data, \
 				    size_t nbytes); }
-372	AUE_EXTATTR_GET_FD	NOPROTO	{ ssize_t extattr_get_fd(int fd, \
-				    int attrnamespace, \
-				    _In_z_ const char *attrname, \
-				    _Out_writes_bytes_(nbytes) void *data, \
+372	AUE_EXTATTR_GET_FD	STD	{ ssize_t cheriabi_extattr_get_fd(\
+				    int fd, int attrnamespace, \
+				    _In_z_ const char * __capability attrname, \
+				    _Out_writes_bytes_(nbytes) \
+				    void * __capability data, \
 				    size_t nbytes); }
-373	AUE_EXTATTR_DELETE_FD	NOPROTO	{ int extattr_delete_fd(int fd, \
-				    int attrnamespace, \
-				    _In_z_ const char *attrname); }
+373	AUE_EXTATTR_DELETE_FD	STD	{ int cheriabi_extattr_delete_fd(\
+				    int fd, int attrnamespace, \
+				    _In_z_ const char * __capability attrname); }
 374	AUE_SETUGID	NOPROTO	{ int __setugid(int flag); }
 375	AUE_NULL	UNIMPL	nfsclnt
 376	AUE_EACCESS	NOPROTO	{ int eaccess(_In_z_ char *path, int amode); }
@@ -903,22 +910,24 @@
 411	AUE_NULL	STD	{ int cheriabi___mac_set_link( \
 				    _In_z_ const char *path_p, \
 				    _In_ struct mac_c *mac_p); }
-412	AUE_EXTATTR_SET_LINK	NOPROTO	{ ssize_t extattr_set_link( \
-				    _In_z_ const char *path, \
+412	AUE_EXTATTR_SET_LINK	STD	{ ssize_t cheriabi_extattr_set_link( \
+				    _In_z_ const char * __capability path, \
 				    int attrnamespace, \
-				    _In_z_ const char *attrname, \
-				    _In_reads_bytes_(nbytes) void *data, \
+				    _In_z_ const char * __capability attrname, \
+				    _In_reads_bytes_(nbytes) \
+				    void * __capability data, \
 				    size_t nbytes); }
-413	AUE_EXTATTR_GET_LINK	NOPROTO	{ ssize_t extattr_get_link( \
-				    _In_z_ const char *path, \
+413	AUE_EXTATTR_GET_LINK	STD	{ ssize_t cheriabi_extattr_get_link( \
+				    _In_z_ const char * __capability path, \
 				    int attrnamespace, \
-				    _In_z_ const char *attrname, \
-				    _Out_writes_bytes_(nbytes) void *data, \
+				    _In_z_ const char * __capability attrname, \
+				    _Out_writes_bytes_(nbytes) \
+				    void * __capability data, \
 				    size_t nbytes); }
-414	AUE_EXTATTR_DELETE_LINK	NOPROTO	{ int extattr_delete_link( \
-				    _In_z_ const char *path, \
+414	AUE_EXTATTR_DELETE_LINK	STD	{ int cheriabi_extattr_delete_link( \
+				    _In_z_ const char * __capability path, \
 				    int attrnamespace, \
-				    _In_z_ const char *attrname); }
+				    _In_z_ const char * __capability attrname); }
 415	AUE_NULL	STD|NOSTUB	{ int cheriabi___mac_execve( \
 				    _In_z_ char *fname, \
 				    _In_ void * __capability *argv, \
@@ -968,21 +977,21 @@
 434	AUE_NULL	UNIMPL	nosys
 435	AUE_NULL	UNIMPL	nosys
 436	AUE_JAIL_ATTACH	NOPROTO	{ int jail_attach(int jid); }
-437	AUE_EXTATTR_LIST_FD	NOPROTO	{ ssize_t extattr_list_fd(int fd, \
-				    int attrnamespace, \
+437	AUE_EXTATTR_LIST_FD	STD	{ ssize_t cheriabi_extattr_list_fd(\
+				    int fd, int attrnamespace, \
 				    _Out_writes_bytes_opt_(nbytes) \
-				    void *data, \
+				    void * __capability data, \
 				    size_t nbytes); }
-438	AUE_EXTATTR_LIST_FILE	NOPROTO	{ ssize_t extattr_list_file( \
-				    _In_z_ const char *path, \
+438	AUE_EXTATTR_LIST_FILE	STD	{ ssize_t cheriabi_extattr_list_file( \
+				    _In_z_ const char * __capability path, \
 				    int attrnamespace, \
 				    _Out_writes_bytes_opt_(nbytes) \
-				    void *data, size_t nbytes); }
-439	AUE_EXTATTR_LIST_LINK	NOPROTO	{ ssize_t extattr_list_link( \
-				    _In_z_ const char *path, \
+				    void * __capability data, size_t nbytes); }
+439	AUE_EXTATTR_LIST_LINK	STD	{ ssize_t cheriabi_extattr_list_link( \
+				    _In_z_ const char * __capability path, \
 				    int attrnamespace, \
 				    _Out_writes_bytes_opt_(nbytes) \
-				    void *data, size_t nbytes); }
+				    void * __capability data, size_t nbytes); }
 440	AUE_NULL	OBSOL	kse_switchin
 441	AUE_SEMWAIT	NOSTD|NOPROTO	{ int ksem_timedwait(semid_t id, \
 				    _In_opt_ \

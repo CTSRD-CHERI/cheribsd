@@ -1661,45 +1661,45 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* extattrctl */
+	/* cheriabi_extattrctl */
 	case 355: {
-		struct extattrctl_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_extattrctl_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->cmd; /* int */
-		uarg[2] = (intptr_t) p->filename; /* const char * */
+		uarg[2] = (cheri_getbase(p->filename) + cheri_getoffset(p->filename)); /* const char *__capability */
 		iarg[3] = p->attrnamespace; /* int */
-		uarg[4] = (intptr_t) p->attrname; /* const char * */
+		uarg[4] = (cheri_getbase(p->attrname) + cheri_getoffset(p->attrname)); /* const char *__capability */
 		*n_args = 5;
 		break;
 	}
-	/* extattr_set_file */
+	/* cheriabi_extattr_set_file */
 	case 356: {
-		struct extattr_set_file_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_extattr_set_file_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->attrnamespace; /* int */
-		uarg[2] = (intptr_t) p->attrname; /* const char * */
-		uarg[3] = (intptr_t) p->data; /* void * */
+		uarg[2] = (cheri_getbase(p->attrname) + cheri_getoffset(p->attrname)); /* const char *__capability */
+		uarg[3] = (cheri_getbase(p->data) + cheri_getoffset(p->data)); /* void *__capability */
 		uarg[4] = p->nbytes; /* size_t */
 		*n_args = 5;
 		break;
 	}
-	/* extattr_get_file */
+	/* cheriabi_extattr_get_file */
 	case 357: {
-		struct extattr_get_file_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_extattr_get_file_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->attrnamespace; /* int */
-		uarg[2] = (intptr_t) p->attrname; /* const char * */
-		uarg[3] = (intptr_t) p->data; /* void * */
+		uarg[2] = (cheri_getbase(p->attrname) + cheri_getoffset(p->attrname)); /* const char *__capability */
+		uarg[3] = (cheri_getbase(p->data) + cheri_getoffset(p->data)); /* void *__capability */
 		uarg[4] = p->nbytes; /* size_t */
 		*n_args = 5;
 		break;
 	}
-	/* extattr_delete_file */
+	/* cheriabi_extattr_delete_file */
 	case 358: {
-		struct extattr_delete_file_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_extattr_delete_file_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->attrnamespace; /* int */
-		uarg[2] = (intptr_t) p->attrname; /* const char * */
+		uarg[2] = (cheri_getbase(p->attrname) + cheri_getoffset(p->attrname)); /* const char *__capability */
 		*n_args = 3;
 		break;
 	}
@@ -1734,34 +1734,34 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 0;
 		break;
 	}
-	/* extattr_set_fd */
+	/* cheriabi_extattr_set_fd */
 	case 371: {
-		struct extattr_set_fd_args *p = params;
+		struct cheriabi_extattr_set_fd_args *p = params;
 		iarg[0] = p->fd; /* int */
 		iarg[1] = p->attrnamespace; /* int */
-		uarg[2] = (intptr_t) p->attrname; /* const char * */
-		uarg[3] = (intptr_t) p->data; /* void * */
+		uarg[2] = (cheri_getbase(p->attrname) + cheri_getoffset(p->attrname)); /* const char *__capability */
+		uarg[3] = (cheri_getbase(p->data) + cheri_getoffset(p->data)); /* void *__capability */
 		uarg[4] = p->nbytes; /* size_t */
 		*n_args = 5;
 		break;
 	}
-	/* extattr_get_fd */
+	/* cheriabi_extattr_get_fd */
 	case 372: {
-		struct extattr_get_fd_args *p = params;
+		struct cheriabi_extattr_get_fd_args *p = params;
 		iarg[0] = p->fd; /* int */
 		iarg[1] = p->attrnamespace; /* int */
-		uarg[2] = (intptr_t) p->attrname; /* const char * */
-		uarg[3] = (intptr_t) p->data; /* void * */
+		uarg[2] = (cheri_getbase(p->attrname) + cheri_getoffset(p->attrname)); /* const char *__capability */
+		uarg[3] = (cheri_getbase(p->data) + cheri_getoffset(p->data)); /* void *__capability */
 		uarg[4] = p->nbytes; /* size_t */
 		*n_args = 5;
 		break;
 	}
-	/* extattr_delete_fd */
+	/* cheriabi_extattr_delete_fd */
 	case 373: {
-		struct extattr_delete_fd_args *p = params;
+		struct cheriabi_extattr_delete_fd_args *p = params;
 		iarg[0] = p->fd; /* int */
 		iarg[1] = p->attrnamespace; /* int */
-		uarg[2] = (intptr_t) p->attrname; /* const char * */
+		uarg[2] = (cheri_getbase(p->attrname) + cheri_getoffset(p->attrname)); /* const char *__capability */
 		*n_args = 3;
 		break;
 	}
@@ -1907,34 +1907,34 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* extattr_set_link */
+	/* cheriabi_extattr_set_link */
 	case 412: {
-		struct extattr_set_link_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_extattr_set_link_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->attrnamespace; /* int */
-		uarg[2] = (intptr_t) p->attrname; /* const char * */
-		uarg[3] = (intptr_t) p->data; /* void * */
+		uarg[2] = (cheri_getbase(p->attrname) + cheri_getoffset(p->attrname)); /* const char *__capability */
+		uarg[3] = (cheri_getbase(p->data) + cheri_getoffset(p->data)); /* void *__capability */
 		uarg[4] = p->nbytes; /* size_t */
 		*n_args = 5;
 		break;
 	}
-	/* extattr_get_link */
+	/* cheriabi_extattr_get_link */
 	case 413: {
-		struct extattr_get_link_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_extattr_get_link_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->attrnamespace; /* int */
-		uarg[2] = (intptr_t) p->attrname; /* const char * */
-		uarg[3] = (intptr_t) p->data; /* void * */
+		uarg[2] = (cheri_getbase(p->attrname) + cheri_getoffset(p->attrname)); /* const char *__capability */
+		uarg[3] = (cheri_getbase(p->data) + cheri_getoffset(p->data)); /* void *__capability */
 		uarg[4] = p->nbytes; /* size_t */
 		*n_args = 5;
 		break;
 	}
-	/* extattr_delete_link */
+	/* cheriabi_extattr_delete_link */
 	case 414: {
-		struct extattr_delete_link_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_extattr_delete_link_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->attrnamespace; /* int */
-		uarg[2] = (intptr_t) p->attrname; /* const char * */
+		uarg[2] = (cheri_getbase(p->attrname) + cheri_getoffset(p->attrname)); /* const char *__capability */
 		*n_args = 3;
 		break;
 	}
@@ -2074,32 +2074,32 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* extattr_list_fd */
+	/* cheriabi_extattr_list_fd */
 	case 437: {
-		struct extattr_list_fd_args *p = params;
+		struct cheriabi_extattr_list_fd_args *p = params;
 		iarg[0] = p->fd; /* int */
 		iarg[1] = p->attrnamespace; /* int */
-		uarg[2] = (intptr_t) p->data; /* void * */
+		uarg[2] = (cheri_getbase(p->data) + cheri_getoffset(p->data)); /* void *__capability */
 		uarg[3] = p->nbytes; /* size_t */
 		*n_args = 4;
 		break;
 	}
-	/* extattr_list_file */
+	/* cheriabi_extattr_list_file */
 	case 438: {
-		struct extattr_list_file_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_extattr_list_file_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->attrnamespace; /* int */
-		uarg[2] = (intptr_t) p->data; /* void * */
+		uarg[2] = (cheri_getbase(p->data) + cheri_getoffset(p->data)); /* void *__capability */
 		uarg[3] = p->nbytes; /* size_t */
 		*n_args = 4;
 		break;
 	}
-	/* extattr_list_link */
+	/* cheriabi_extattr_list_link */
 	case 439: {
-		struct extattr_list_link_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_extattr_list_link_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->attrnamespace; /* int */
-		uarg[2] = (intptr_t) p->data; /* void * */
+		uarg[2] = (cheri_getbase(p->data) + cheri_getoffset(p->data)); /* void *__capability */
 		uarg[3] = p->nbytes; /* size_t */
 		*n_args = 4;
 		break;
@@ -5739,42 +5739,42 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* extattrctl */
+	/* cheriabi_extattrctl */
 	case 355:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 3:
 			p = "int";
 			break;
 		case 4:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* extattr_set_file */
+	/* cheriabi_extattr_set_file */
 	case 356:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 3:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 4:
 			p = "size_t";
@@ -5783,20 +5783,20 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* extattr_get_file */
+	/* cheriabi_extattr_get_file */
 	case 357:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 3:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 4:
 			p = "size_t";
@@ -5805,17 +5805,17 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* extattr_delete_file */
+	/* cheriabi_extattr_delete_file */
 	case 358:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		default:
 			break;
@@ -5869,7 +5869,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* kqueue */
 	case 362:
 		break;
-	/* extattr_set_fd */
+	/* cheriabi_extattr_set_fd */
 	case 371:
 		switch(ndx) {
 		case 0:
@@ -5879,10 +5879,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 3:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 4:
 			p = "size_t";
@@ -5891,7 +5891,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* extattr_get_fd */
+	/* cheriabi_extattr_get_fd */
 	case 372:
 		switch(ndx) {
 		case 0:
@@ -5901,10 +5901,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 3:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 4:
 			p = "size_t";
@@ -5913,7 +5913,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* extattr_delete_fd */
+	/* cheriabi_extattr_delete_fd */
 	case 373:
 		switch(ndx) {
 		case 0:
@@ -5923,7 +5923,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		default:
 			break;
@@ -6168,20 +6168,20 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* extattr_set_link */
+	/* cheriabi_extattr_set_link */
 	case 412:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 3:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 4:
 			p = "size_t";
@@ -6190,20 +6190,20 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* extattr_get_link */
+	/* cheriabi_extattr_get_link */
 	case 413:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 3:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 4:
 			p = "size_t";
@@ -6212,17 +6212,17 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* extattr_delete_link */
+	/* cheriabi_extattr_delete_link */
 	case 414:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		default:
 			break;
@@ -6449,7 +6449,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* extattr_list_fd */
+	/* cheriabi_extattr_list_fd */
 	case 437:
 		switch(ndx) {
 		case 0:
@@ -6459,7 +6459,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 3:
 			p = "size_t";
@@ -6468,17 +6468,17 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* extattr_list_file */
+	/* cheriabi_extattr_list_file */
 	case 438:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 3:
 			p = "size_t";
@@ -6487,17 +6487,17 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* extattr_list_link */
+	/* cheriabi_extattr_list_link */
 	case 439:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 3:
 			p = "size_t";
@@ -9272,22 +9272,22 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* extattrctl */
+	/* cheriabi_extattrctl */
 	case 355:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* extattr_set_file */
+	/* cheriabi_extattr_set_file */
 	case 356:
 		if (ndx == 0 || ndx == 1)
 			p = "ssize_t";
 		break;
-	/* extattr_get_file */
+	/* cheriabi_extattr_get_file */
 	case 357:
 		if (ndx == 0 || ndx == 1)
 			p = "ssize_t";
 		break;
-	/* extattr_delete_file */
+	/* cheriabi_extattr_delete_file */
 	case 358:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9309,17 +9309,17 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* kqueue */
 	case 362:
-	/* extattr_set_fd */
+	/* cheriabi_extattr_set_fd */
 	case 371:
 		if (ndx == 0 || ndx == 1)
 			p = "ssize_t";
 		break;
-	/* extattr_get_fd */
+	/* cheriabi_extattr_get_fd */
 	case 372:
 		if (ndx == 0 || ndx == 1)
 			p = "ssize_t";
 		break;
-	/* extattr_delete_fd */
+	/* cheriabi_extattr_delete_fd */
 	case 373:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9409,17 +9409,17 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* extattr_set_link */
+	/* cheriabi_extattr_set_link */
 	case 412:
 		if (ndx == 0 || ndx == 1)
 			p = "ssize_t";
 		break;
-	/* extattr_get_link */
+	/* cheriabi_extattr_get_link */
 	case 413:
 		if (ndx == 0 || ndx == 1)
 			p = "ssize_t";
 		break;
-	/* extattr_delete_link */
+	/* cheriabi_extattr_delete_link */
 	case 414:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9509,17 +9509,17 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* extattr_list_fd */
+	/* cheriabi_extattr_list_fd */
 	case 437:
 		if (ndx == 0 || ndx == 1)
 			p = "ssize_t";
 		break;
-	/* extattr_list_file */
+	/* cheriabi_extattr_list_file */
 	case 438:
 		if (ndx == 0 || ndx == 1)
 			p = "ssize_t";
 		break;
-	/* extattr_list_link */
+	/* cheriabi_extattr_list_link */
 	case 439:
 		if (ndx == 0 || ndx == 1)
 			p = "ssize_t";
