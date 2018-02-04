@@ -1099,22 +1099,6 @@ cheriabi_nmount(struct thread *td,
 }
 
 int
-cheriabi_abort2(struct thread *td, struct cheriabi_abort2_args *uap)
-{
-	struct abort2_args a2args;
-
-	a2args.why = uap->why;
-	/*
-	 * XXX-BD: need to duplication much of the abort2 logic or
-	 * refactor to support passing array of args in kernelspace.
-	 */
-	a2args.nargs = 0;
-	a2args.args = NULL;
-
-	return (sys_abort2(td, &a2args));
-}
-
-int
 cheriabi_syscall_register(int *offset, struct sysent *new_sysent,
     struct sysent *old_sysent, int flags)
 {

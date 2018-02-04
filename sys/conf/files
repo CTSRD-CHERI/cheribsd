@@ -268,6 +268,7 @@ cddl/contrib/opensolaris/uts/common/zmod/zutil.c			optional zfs compile-with "${
 # CHERI and CHERI-compat related files
 cheri/cheri_sysctl.c			optional cpu_cheri
 cheri/cheri_otype.c			optional cpu_cheri
+compat/cheriabi/cheriabi_abort2.c	optional compat_cheriabi
 compat/cheriabi/cheriabi_generic.c	optional compat_cheriabi
 compat/cheriabi/cheriabi_ioctl.c	optional compat_cheriabi
 compat/cheriabi/cheriabi_mac.c		optional compat_cheriabi

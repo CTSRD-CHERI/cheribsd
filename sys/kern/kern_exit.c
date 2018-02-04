@@ -686,7 +686,7 @@ sys_abort2(struct thread *td, struct abort2_args *uap)
 	 * maximal number of arguments was chosen to be logged.
 	 */
 	if (uap->why != NULL) {
-		error = sbuf_copyin(sb, uap->why, 128);
+		error = sbuf_copyin(sb, __USER_CAP_STR(uap->why), 128);
 		if (error < 0)
 			goto out;
 	} else {

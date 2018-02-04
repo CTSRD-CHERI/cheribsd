@@ -509,7 +509,7 @@ sbuf_cat(struct sbuf *s, const char *str)
  * Append a string from userland to an sbuf.
  */
 int
-sbuf_copyin(struct sbuf *s, const void *uaddr, size_t len)
+sbuf_copyin(struct sbuf *s, const void * __capability uaddr, size_t len)
 {
 	size_t done;
 
@@ -528,7 +528,9 @@ sbuf_copyin(struct sbuf *s, const void *uaddr, size_t len)
 		if (SBUF_FREESPACE(s) < len)
 			len = SBUF_FREESPACE(s);
 	}
-	switch (copyinstr(uaddr, s->s_buf + s->s_len, len + 1, &done)) {
+	switch (copyinstr_c(uaddr,
+	    (__cheri_tocap char * __capability)s->s_buf + s->s_len, len + 1,
+	    &done)) {
 	case ENAMETOOLONG:
 		s->s_error = ENOMEM;
 		/* fall through */

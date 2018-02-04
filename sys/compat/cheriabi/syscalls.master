@@ -1059,12 +1059,11 @@
 				    _In_opt_ const struct sigevent_c *sigev); }
 462	AUE_MQ_UNLINK	NOPROTO|NOSTD	{ int kmq_unlink( \
 				    _In_z_ const char *path); }
-; XXX-BD: defensive argument usage probably makes sense, but
-; we have to kill the process even if we're passed garbage so we can't
-; generate an argument handler.
-463	AUE_NULL	STD|NOSTUB	{ void cheriabi_abort2(_In_z_ const char *why, \
+463	AUE_NULL	STD|NOSTUB	{ void cheriabi_abort2( \
+				    _In_z_ const char * __capability why, \
 				    int nargs, \
-				    _In_reads_(nargs) void * __capability *args); }
+				    _In_reads_(nargs) void * __capability * \
+				    __capability args); }
 464	AUE_NULL 	NOPROTO	{ int thr_set_name(long id, \
 				    _In_z_ const char *name); }
 465	AUE_AIO_FSYNC	STD	{ int cheriabi_aio_fsync(int op, \

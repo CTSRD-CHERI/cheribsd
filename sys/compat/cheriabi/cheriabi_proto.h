@@ -778,9 +778,9 @@ struct cheriabi_kmq_notify_args {
 	char sigev_l_[PADL_(const struct sigevent_c *)]; const struct sigevent_c * sigev; char sigev_r_[PADR_(const struct sigevent_c *)];
 };
 struct cheriabi_abort2_args {
-	char why_l_[PADL_(const char *)]; const char * why; char why_r_[PADR_(const char *)];
+	char why_l_[PADL_(const char *__capability)]; const char *__capability why; char why_r_[PADR_(const char *__capability)];
 	char nargs_l_[PADL_(int)]; int nargs; char nargs_r_[PADR_(int)];
-	char args_l_[PADL_(void *__capability *)]; void *__capability * args; char args_r_[PADR_(void *__capability *)];
+	char args_l_[PADL_(void *__capability *__capability)]; void *__capability *__capability args; char args_r_[PADR_(void *__capability *__capability)];
 };
 struct cheriabi_aio_fsync_args {
 	char op_l_[PADL_(int)]; int op; char op_r_[PADR_(int)];

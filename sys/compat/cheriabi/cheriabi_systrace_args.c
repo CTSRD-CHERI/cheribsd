@@ -2289,9 +2289,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_abort2 */
 	case 463: {
 		struct cheriabi_abort2_args *p = params;
-		uarg[0] = (intptr_t) p->why; /* const char * */
+		uarg[0] = (cheri_getbase(p->why) + cheri_getoffset(p->why)); /* const char *__capability */
 		iarg[1] = p->nargs; /* int */
-		uarg[2] = (intptr_t) p->args; /* void *__capability * */
+		uarg[2] = (cheri_getbase(p->args) + cheri_getoffset(p->args)); /* void *__capability *__capability */
 		*n_args = 3;
 		break;
 	}
@@ -6814,13 +6814,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 463:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland void *__capability *";
+			p = "userland void *__capability *__capability";
 			break;
 		default:
 			break;
