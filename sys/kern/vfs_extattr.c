@@ -304,15 +304,6 @@ sys_extattr_set_link(struct thread *td, struct extattr_set_link_args *uap)
 	    NOFOLLOW));
 }
 
-#ifndef _SYS_SYSPROTO_H_
-struct extattr_set_link_args {
-	const char *path;
-	int attrnamespace;
-	const char *attrname;
-	void *data;
-	size_t nbytes;
-};
-#endif
 int
 kern_extattr_set_path(struct thread *td,
     const char * __capability path, int attrnamespace,
@@ -492,15 +483,6 @@ sys_extattr_get_link(struct thread *td, struct extattr_get_link_args *uap)
 	    __USER_CAP(uap->data, uap->nbytes), uap->nbytes, NOFOLLOW));
 }
 
-#ifndef _SYS_SYSPROTO_H_
-struct extattr_get_link_args {
-	const char *path;
-	int attrnamespace;
-	const char *attrname;
-	void *data;
-	size_t nbytes;
-};
-#endif
 int
 kern_extattr_get_path(struct thread *td, const char * __capability path,
     int attrnamespace, const char * __capability uattrname,
@@ -643,13 +625,6 @@ sys_extattr_delete_link(struct thread *td, struct extattr_delete_link_args *uap)
 	    uap->attrnamespace, __USER_CAP_STR(uap->attrname), NOFOLLOW));
 }
 
-#ifndef _SYS_SYSPROTO_H_
-struct extattr_delete_link_args {
-	const char *path;
-	int attrnamespace;
-	const char *attrname;
-};
-#endif
 int
 kern_extattr_delete_path(struct thread *td, const char * __capability path,
     int attrnamespace, const char * __capability uattrname, int follow)
@@ -810,14 +785,6 @@ sys_extattr_list_link(struct thread *td, struct extattr_list_link_args *uap)
 	    uap->nbytes, NOFOLLOW));
 }
 
-#ifndef _SYS_SYSPROTO_H_
-struct extattr_list_link_args {
-	const char *path;
-	int attrnamespace;
-	void *data;
-	size_t nbytes;
-};
-#endif
 int
 kern_extattr_list_path(struct thread *td, const char * __capability path,
     int attrnamespace, void * __capability data, size_t nbytes, int follow)
