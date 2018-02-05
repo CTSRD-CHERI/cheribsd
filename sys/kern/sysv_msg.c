@@ -353,6 +353,9 @@ msgunload()
 #ifdef COMPAT_FREEBSD32
 	syscall32_helper_unregister(msg32_syscalls);
 #endif
+#ifdef COMPAT_CHERIABI
+	cheriabi_syscall_helper_unregister(cheriabi_msg_syscalls);
+#endif
 
 	for (msqid = 0; msqid < msginfo.msgmni; msqid++) {
 		msqkptr = &msqids[msqid];
