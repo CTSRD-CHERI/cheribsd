@@ -320,7 +320,7 @@ typedef	_Bool	bool;
 #define ptr_get_flag(p, f) __ptr_get_flag(p, f)
 
 #ifdef CHERI_KERNEL
-#define ptr_to_va(p) ((__cheri_addr vm_offset_t)(p))
+#define ptr_to_va(p) ((__cheri_addr vm_offset_t)(void *)(p))
 #else
 #define ptr_to_va(p) ((vm_offset_t)(p))
 #endif
