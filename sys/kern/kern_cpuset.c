@@ -949,6 +949,13 @@ struct cpuset_args {
 int
 sys_cpuset(struct thread *td, struct cpuset_args *uap)
 {
+
+	return (kern_cpuset(td, uap->setid));
+}
+
+int
+kern_cpuset(struct thread *td, cpusetid_t *setid)
+{
 	struct cpuset *root;
 	struct cpuset *set;
 	int error;
@@ -960,7 +967,7 @@ sys_cpuset(struct thread *td, struct cpuset_args *uap)
 	cpuset_rel(root);
 	if (error)
 		return (error);
-	error = copyout(&set->cs_id, uap->setid, sizeof(set->cs_id));
+	error = copyout(&set->cs_id, setid, sizeof(set->cs_id));
 	if (error == 0)
 		error = cpuset_setproc(-1, set, NULL);
 	cpuset_rel(set);
