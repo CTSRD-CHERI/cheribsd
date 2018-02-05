@@ -510,16 +510,6 @@ SYS_STUB(58, ssize_t, readlink,
     /* _localcheck */ {if (!(cheri_getperm(path) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((ssize_t)-1);} if (!(cheri_getperm(buf) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((ssize_t)-1);} }
 )
 
-SYS_STUB(59, int, execve,
-    /* _protoargs */ (const char * fname, void * * argv, void * * envv),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, const char * __capability  fname, void * __capability  * __capability  argv, void * __capability  * __capability  envv),
-    /* _protoargs_err */ (__capability int *stub_errno, const char * __capability  fname, void * __capability  * __capability  argv, void * __capability  * __capability  envv),
-    /* _callargs */ ((__cheri_fromcap const char *)fname, (__cheri_fromcap void * *)argv, (__cheri_fromcap void * *)envv),
-    /* _callargs_chk */ (&ret, stub_errno, fname, argv, envv),
-    /* _callargs_err */ (&errno, (const char *)fname, (void * *)argv, (void * *)envv),
-    /* _localcheck */ {if (!(cheri_getperm(fname) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(argv) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(envv) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
-)
-
 SYS_STUB(60, mode_t, umask,
     /* _protoargs */ (mode_t newmask),
     /* _protoargs_chk */ (mode_t *retp , int * __capability stub_errno, mode_t newmask),
@@ -1009,16 +999,6 @@ SYS_STUB(148, int, quotactl,
     /* _callargs_chk */ (&ret, stub_errno, path, cmd, uid, arg),
     /* _callargs_err */ (&errno, (const char *)path, cmd, uid, (void *)arg),
     /* _localcheck */ {if (!(cheri_getperm(path) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(arg) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
-)
-
-SYS_STUB(154, int, nlm_syscall,
-    /* _protoargs */ (int debug_level, int grace_period, int addr_count, void * * addrs),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, int debug_level, int grace_period, int addr_count, void * __capability  * __capability  addrs),
-    /* _protoargs_err */ (__capability int *stub_errno, int debug_level, int grace_period, int addr_count, void * __capability  * __capability  addrs),
-    /* _callargs */ (debug_level, grace_period, addr_count, (__cheri_fromcap void * *)addrs),
-    /* _callargs_chk */ (&ret, stub_errno, debug_level, grace_period, addr_count, addrs),
-    /* _callargs_err */ (&errno, debug_level, grace_period, addr_count, (void * *)addrs),
-    /* _localcheck */ {if (!(cheri_getperm(addrs) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
 SYS_STUB(155, int, nfssvc,
@@ -2341,16 +2321,6 @@ SYS_STUB(414, int, extattr_delete_link,
     /* _localcheck */ {if (!(cheri_getperm(path) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(attrname) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
-SYS_STUB_ARGHASPTRS(415, int, __mac_execve,
-    /* _protoargs */ (char * fname, void * * argv, void * * envv, struct mac* mac_p),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, char * __capability  fname, void * __capability  * __capability  argv, void * __capability  * __capability  envv, struct mac* __capability  mac_p),
-    /* _protoargs_err */ (__capability int *stub_errno, char * __capability  fname, void * __capability  * __capability  argv, void * __capability  * __capability  envv, struct mac* __capability  mac_p),
-    /* _callargs */ ((__cheri_fromcap char *)fname, (__cheri_fromcap void * *)argv, (__cheri_fromcap void * *)envv, (__cheri_fromcap struct mac*)mac_p),
-    /* _callargs_chk */ (&ret, stub_errno, fname, argv, envv, mac_p),
-    /* _callargs_err */ (&errno, (char *)fname, (void * *)argv, (void * *)envv, (struct mac*)mac_p),
-    /* _localcheck */ {if (!(cheri_getperm(fname) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(argv) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(envv) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(mac_p) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
-)
-
 SYS_STUB_ARGHASPTRS(416, int, sigaction,
     /* _protoargs */ (int sig, struct sigaction* act, struct sigaction* oact),
     /* _protoargs_chk */ (int *retp , int * __capability stub_errno, int sig, struct sigaction* __capability  act, struct sigaction* __capability  oact),
@@ -2959,16 +2929,6 @@ SYS_STUB(491, int, fchownat,
     /* _callargs_chk */ (&ret, stub_errno, fd, path, uid, gid, flag),
     /* _callargs_err */ (&errno, fd, (const char *)path, uid, gid, flag),
     /* _localcheck */ {if (!(cheri_getperm(path) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
-)
-
-SYS_STUB(492, int, fexecve,
-    /* _protoargs */ (int fd, void * * argv, void * * envv),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, int fd, void * __capability  * __capability  argv, void * __capability  * __capability  envv),
-    /* _protoargs_err */ (__capability int *stub_errno, int fd, void * __capability  * __capability  argv, void * __capability  * __capability  envv),
-    /* _callargs */ (fd, (__cheri_fromcap void * *)argv, (__cheri_fromcap void * *)envv),
-    /* _callargs_chk */ (&ret, stub_errno, fd, argv, envv),
-    /* _callargs_err */ (&errno, fd, (void * *)argv, (void * *)envv),
-    /* _localcheck */ {if (!(cheri_getperm(argv) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(envv) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
 SYS_STUB(494, int, futimesat,
