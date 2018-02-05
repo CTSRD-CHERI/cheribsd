@@ -36,7 +36,9 @@ __FBSDID("$FreeBSD$");
 #endif
 #include <dlfcn.h>
 #include <link.h>
+#include <stdarg.h>
 #include <stddef.h>
+#include <stdio.h>
 #include "namespace.h"
 #include <pthread.h>
 #include "un-namespace.h"
@@ -62,6 +64,11 @@ void _rtld_atfork_post(int *);
 void
 _rtld_error(const char *fmt, ...)
 {
+	va_list ap;
+
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
 }
 
 #pragma weak dladdr

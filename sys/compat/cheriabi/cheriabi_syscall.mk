@@ -151,6 +151,7 @@ MIASM =  \
 	cheriabi_aio_read.o \
 	cheriabi_aio_write.o \
 	cheriabi_lio_listio.o \
+	cheriabi_kbounce.o \
 	lchmod.o \
 	lutimes.o \
 	freebsd11_nstat.o \

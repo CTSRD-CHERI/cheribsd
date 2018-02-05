@@ -104,13 +104,17 @@ _CHERI_COMMON_FLAGS+=	-mllvm -cheri-exact-equals
 # Turn off deprecated warnings
 _CHERI_COMMON_FLAGS+= -Wno-deprecated-declarations
 
+.if ${WANT_CHERI} != "none"
+CFLAGS+=	${CHERI_OPTIMIZATION_FLAGS:U-O2}
+.endif
+
 .if ${WANT_CHERI} == "pure" || ${WANT_CHERI} == "sandbox"
 OBJCOPY:=	objcopy
 MIPS_ABI=	purecap
 _CHERI_COMMON_FLAGS+=	-fpic
 LIBDIR:=	/usr/libcheri
 ROOTOBJDIR=	${.OBJDIR:S,${.CURDIR},,}${SRCTOP}/worldcheri${SRCTOP}
-CFLAGS+=	${CHERI_OPTIMIZATION_FLAGS:U-O2} -ftls-model=local-exec
+CFLAGS+=	-ftls-model=local-exec
 .ifdef NO_WERROR
 # Implicit function declarations should always be an error in purecap mode as
 # we will probably generate wrong code for calling them
@@ -127,14 +131,8 @@ _LIB_OBJTOP=	${ROOTOBJDIR}
 .ifdef LIBCHERI
 LDFLAGS+=	-Wl,-init=crt_init_globals
 .endif
-.if ${WANT_CHERI} == "sandbox"
-CHERI_LLD_BROKEN=	yes
-.endif
 # remove any conflicting -fuse-ld= flags
 LDFLAGS:=${LDFLAGS:N-fuse-ld=*}
-.ifdef CHERI_LLD_BROKEN
-LDFLAGS+=	-fuse-ld=bfd
-.else
 LDFLAGS+=	-fuse-ld=lld -Wl,-z,norelro
 .ifdef CHERI_LLD_INTEGRATED_CAPSIZEFIX
 LDFLAGS+=      -no-capsizefix -Wl,--process-cap-relocs -Wl,-color-diagnostics
@@ -148,7 +146,6 @@ ALLOW_SHARED_TEXTREL=yes
 .ifdef ALLOW_SHARED_TEXTREL
 # By default text relocations are an error instead of a warning with LLD
 LDFLAGS+=	-Wl,-z,notext
-.endif
 .endif
 .else
 STATIC_CFLAGS+= -ftls-model=local-exec # MIPS/hybrid case

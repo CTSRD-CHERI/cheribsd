@@ -270,6 +270,7 @@
 #define	MIPS_CR_COP_ERR		0x30000000
 #define	MIPS_CR_EXC_CODE	0x0000007C	/* five bits */
 #define	MIPS_CR_IP		0x0000FF00
+#define	MIPS_CR_DC		(1 << 27)	/* Count register disable */
 #define	MIPS_CR_EXC_CODE_SHIFT	2
 #define	MIPS_CR_COP_ERR_SHIFT	28
 

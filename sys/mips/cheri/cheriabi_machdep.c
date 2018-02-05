@@ -180,11 +180,16 @@ SYSINIT(cheriabi, SI_SUB_EXEC, SI_ORDER_ANY,
 static __inline boolean_t
 cheriabi_check_cpu_compatible(uint32_t bits, const char *execpath)
 {
+	static struct timeval lastfail;
+	static int curfail;
 	const uint32_t expected = CHERICAP_SIZE * 8;
+
 	if (bits == expected)
 		return TRUE;
-	printf("warning: attempting to execute %d-bit CheriABI binary '%s' on "
-	    "a %d-bit kernel\n", bits, execpath, expected);
+	if (ppsratecheck(&lastfail, &curfail, 1))
+		printf("warning: attempting to execute %d-bit CheriABI "
+		    "binary '%s' on a %d-bit kernel\n", bits, execpath,
+		    expected);
 	return FALSE;
 }
 
@@ -774,7 +779,8 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	struct cheri_signal *csigp;
 	struct trapframe *frame;
 	u_long auxv, stackbase, stacklen;
-	size_t map_base, map_length, text_end;
+	bool is_dynamic_binary;
+	size_t map_base, map_length, text_end, data_length, code_length;
 	struct rlimit rlim_stack;
 
 	bzero((caddr_t)td->td_frame, sizeof(struct trapframe));
@@ -842,12 +848,17 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	    MIPS_SR_PX | MIPS_SR_UX | MIPS_SR_KX | MIPS_SR_COP_2_BIT;
 
 	/*
-	 * XXXRW: For now, initialise $ddc and $idc to the full address space,
-	 * but in the future these will be restricted (or not set at all).
+	 * XXXAR: For now, initialise $ddc and $idc to the full address space
+	 * for dynamically linked executables. In the future these will be
+	 * restricted (or not set at all).
 	 */
+	/* XXXAR: is there a better way to check for dynamic binaries? */
+	is_dynamic_binary = imgp->end_addr == 0 && imgp->reloc_base != 0;
+	data_length = is_dynamic_binary ? CHERI_CAP_USER_DATA_LENGTH : text_end;
+	code_length = is_dynamic_binary ? CHERI_CAP_USER_CODE_LENGTH : text_end;
 	frame = &td->td_pcb->pcb_regs;
-	cheriabi_capability_set_user_ddc(&frame->ddc, text_end);
-	cheriabi_capability_set_user_idc(&frame->idc, text_end);
+	cheriabi_capability_set_user_ddc(&frame->ddc, data_length);
+	cheriabi_capability_set_user_idc(&frame->idc, data_length);
 
 	/*
 	 * XXXRW: Set $pcc and $c12 to the entry address -- for now, also with
@@ -855,7 +866,7 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 * run-time linker or statically linked binary?
 	 */
 	cheriabi_capability_set_user_entry(&frame->pcc, imgp->entry_addr,
-	    text_end);
+	    code_length);
 	frame->c12 = frame->pcc;
 
 	/*
@@ -871,7 +882,13 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	    (imgp->args->argc + imgp->args->envc + 2) * sizeof(void * __capability);
 	cheri_capability_set(&td->td_frame->c3, CHERI_CAP_USER_DATA_PERMS,
 	    auxv, imgp->auxarg_size * 2 * sizeof(void * __capability), 0);
-
+	/*
+	 * Load relocbase into $c4 so that rtld has a capability with the
+	 * correct bounds available on startup
+	 */
+	if (imgp->reloc_base)
+		cheri_capability_set(&td->td_frame->c4,
+		   CHERI_CAP_USER_DATA_PERMS, imgp->reloc_base, data_length, 0);
 	/*
 	 * Restrict the stack capability to the maximum region allowed for
 	 * this process and adjust sp accordingly.

@@ -257,6 +257,8 @@ void	hexdump(const void *ptr, int length, const char *hdr, int flags);
 #define ovbcopy(f, t, l) bcopy((f), (t), (l))
 void	bcopy(const void * _Nonnull from, void * _Nonnull to, size_t len);
 #if __has_feature(capabilities)
+void	bcopy_c(const void * _Nonnull __capability from,
+	    void * _Nonnull __capability to, size_t len);
 void	bcopynocap_c(const void * _Nonnull __capability from,
 	    void * _Nonnull __capability to, size_t len);
 #endif
@@ -265,10 +267,18 @@ void	explicit_bzero(void * _Nonnull, size_t);
 
 void	*memcpy(void * _Nonnull to, const void * _Nonnull from, size_t len);
 #if __has_feature(capabilities)
+void	*memcpy_c(void * _Nonnull __capability to,
+	    const void * _Nonnull __capability from, size_t len);
 void	*memcpynocap_c(void * _Nonnull __capability to,
 	    const void * _Nonnull __capability from, size_t len);
 #endif
 void	*memmove(void * _Nonnull dest, const void * _Nonnull src, size_t n);
+#if __has_feature(capabilities)
+void	*memmove_c(void * _Nonnull __capability dest,
+	    const void * _Nonnull __capability src, size_t n);
+void	*memmovenocap_c(void * _Nonnull __capability dest,
+	    const void * _Nonnull __capability src, size_t n);
+#endif
 
 struct copy_map {
 	size_t	len;

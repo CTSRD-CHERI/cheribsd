@@ -144,6 +144,7 @@
 #define	CHERIABI_SYS_cheriabi_aio_read_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_aio_write_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_lio_listio_PTRMASK	(0x0 | 0x2 | 0x8)
+#define	CHERIABI_SYS_cheriabi_kbounce_PTRMASK	(0x0 | 0x1 | 0x2)
 #define	CHERIABI_SYS_lchmod_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_lutimes_PTRMASK	(0x0 | 0x1 | 0x2)
 #define	CHERIABI_SYS_cheriabi_preadv_PTRMASK	(0x0 | 0x2)

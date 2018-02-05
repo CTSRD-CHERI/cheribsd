@@ -95,11 +95,31 @@ struct sysentvec elf64_freebsd_sysvec = {
 INIT_SYSENTVEC(elf64_sysvec, &elf64_freebsd_sysvec);
 
 #ifdef CPU_CHERI
-static boolean_t mips_elf_header_supported(struct image_params * imgp)
+static __inline boolean_t
+mips_hybrid_check_cap_size(uint32_t bits, const char *execpath)
+{
+	static struct timeval lastfail;
+	static int curfail;
+	const uint32_t expected = CHERICAP_SIZE * 8;
+
+	if (bits == expected)
+		return TRUE;
+	if (ppsratecheck(&lastfail, &curfail, 1))
+		printf("warning: attempting to execute %d-bit hybrid binary "
+		    "'%s' on a %d-bit kernel\n", bits, execpath, expected);
+	return FALSE;
+}
+
+static boolean_t
+mips_elf_header_supported(struct image_params * imgp)
 {
 	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
 	if ((hdr->e_flags & EF_MIPS_ABI) == EF_MIPS_ABI_CHERIABI)
 		return FALSE;
+	if ((hdr->e_flags & EF_MIPS_MACH) == EF_MIPS_MACH_CHERI128)
+		return mips_hybrid_check_cap_size(128, imgp->execpath);
+	if ((hdr->e_flags & EF_MIPS_MACH) == EF_MIPS_MACH_CHERI256)
+		return mips_hybrid_check_cap_size(256, imgp->execpath);
 	return TRUE;
 }
 #endif
