@@ -319,7 +319,11 @@ typedef	_Bool	bool;
 #define ptr_put_flag(p, f) __ptr_put_flag(p, f)
 #define ptr_get_flag(p, f) __ptr_get_flag(p, f)
 
-#define ptr_to_va(p) ((vm_offset_t)(void *)(p))
+#ifdef CHERI_KERNEL
+#define ptr_to_va(p) ((__cheri_addr vm_offset_t)(p))
+#else
+#define ptr_to_va(p) ((vm_offset_t)(p))
+#endif
 
 #endif /* !_KERNEL */
 
