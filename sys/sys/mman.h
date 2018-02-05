@@ -190,7 +190,11 @@
 /*
  * Anonymous object constant for shm_open().
  */
+#ifndef _KERNEL
 #define	SHM_ANON		((char *)1)
+#else
+#define	SHM_ANON		((char * __capability)(intcap_t)1)
+#endif
 #endif /* __BSD_VISIBLE */
 
 /*

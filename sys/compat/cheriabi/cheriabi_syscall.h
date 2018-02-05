@@ -398,8 +398,8 @@
 #define	CHERIABI_SYS_cheriabi_truncate	479
 #define	CHERIABI_SYS_ftruncate	480
 #define	CHERIABI_SYS_thr_kill2	481
-#define	CHERIABI_SYS_shm_open	482
-#define	CHERIABI_SYS_shm_unlink	483
+#define	CHERIABI_SYS_cheriabi_shm_open	482
+#define	CHERIABI_SYS_cheriabi_shm_unlink	483
 #define	CHERIABI_SYS_cpuset	484
 #define	CHERIABI_SYS_cpuset_setid	485
 #define	CHERIABI_SYS_cpuset_getid	486

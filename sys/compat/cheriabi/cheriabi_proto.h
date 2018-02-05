@@ -815,6 +815,14 @@ struct cheriabi_truncate_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 	char length_l_[PADL_(off_t)]; off_t length; char length_r_[PADR_(off_t)];
 };
+struct cheriabi_shm_open_args {
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
+};
+struct cheriabi_shm_unlink_args {
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+};
 struct cheriabi_faccessat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
@@ -1147,6 +1155,8 @@ int	cheriabi_pread(struct thread *, struct cheriabi_pread_args *);
 int	cheriabi_pwrite(struct thread *, struct cheriabi_pwrite_args *);
 int	cheriabi_mmap(struct thread *, struct cheriabi_mmap_args *);
 int	cheriabi_truncate(struct thread *, struct cheriabi_truncate_args *);
+int	cheriabi_shm_open(struct thread *, struct cheriabi_shm_open_args *);
+int	cheriabi_shm_unlink(struct thread *, struct cheriabi_shm_unlink_args *);
 int	cheriabi_faccessat(struct thread *, struct cheriabi_faccessat_args *);
 int	cheriabi_fchmodat(struct thread *, struct cheriabi_fchmodat_args *);
 int	cheriabi_fchownat(struct thread *, struct cheriabi_fchownat_args *);
@@ -1398,6 +1408,8 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_pwrite	AUE_PWRITE
 #define	CHERIABI_SYS_AUE_cheriabi_mmap	AUE_MMAP
 #define	CHERIABI_SYS_AUE_cheriabi_truncate	AUE_TRUNCATE
+#define	CHERIABI_SYS_AUE_cheriabi_shm_open	AUE_SHMOPEN
+#define	CHERIABI_SYS_AUE_cheriabi_shm_unlink	AUE_SHMUNLINK
 #define	CHERIABI_SYS_AUE_cheriabi_faccessat	AUE_FACCESSAT
 #define	CHERIABI_SYS_AUE_cheriabi_fchmodat	AUE_FCHMODAT
 #define	CHERIABI_SYS_AUE_cheriabi_fchownat	AUE_FCHOWNAT

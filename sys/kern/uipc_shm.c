@@ -694,8 +694,8 @@ shm_remove(char *path, Fnv32_t fnv, struct ucred *ucred)
 }
 
 int
-kern_shm_open(struct thread *td, const char *userpath, int flags, mode_t mode,
-    struct filecaps *fcaps)
+kern_shm_open(struct thread *td, const char * __capability userpath, int flags,
+    mode_t mode, struct filecaps *fcaps)
 {
 	struct filedesc *fdp;
 	struct shmfd *shmfd;
@@ -747,7 +747,8 @@ kern_shm_open(struct thread *td, const char *userpath, int flags, mode_t mode,
 		/* Construct a full pathname for jailed callers. */
 		pr_pathlen = strcmp(pr_path, "/") == 0 ? 0
 		    : strlcpy(path, pr_path, MAXPATHLEN);
-		error = copyinstr(userpath, path + pr_pathlen,
+		error = copyinstr_c(userpath,
+		    (__cheri_tocap char * __capability)path + pr_pathlen,
 		    MAXPATHLEN - pr_pathlen, NULL);
 #ifdef KTRACE
 		if (error == 0 && KTRPOINT(curthread, KTR_NAMEI))
@@ -842,11 +843,19 @@ int
 sys_shm_open(struct thread *td, struct shm_open_args *uap)
 {
 
-	return (kern_shm_open(td, uap->path, uap->flags, uap->mode, NULL));
+	return (kern_shm_open(td, __USER_CAP_STR(uap->path), uap->flags,
+	    uap->mode, NULL));
 }
 
 int
 sys_shm_unlink(struct thread *td, struct shm_unlink_args *uap)
+{
+
+	return (kern_shm_unlink(td, __USER_CAP_STR(uap->path)));
+}
+
+int
+kern_shm_unlink(struct thread *td, const char * __capability userpath)
 {
 	char *path;
 	const char *pr_path;
@@ -858,8 +867,9 @@ sys_shm_unlink(struct thread *td, struct shm_unlink_args *uap)
 	pr_path = td->td_ucred->cr_prison->pr_path;
 	pr_pathlen = strcmp(pr_path, "/") == 0 ? 0
 	    : strlcpy(path, pr_path, MAXPATHLEN);
-	error = copyinstr(uap->path, path + pr_pathlen, MAXPATHLEN - pr_pathlen,
-	    NULL);
+	error = copyinstr_c(userpath,
+	    (__cheri_tocap char * __capability)path + pr_pathlen,
+	    MAXPATHLEN - pr_pathlen, NULL);
 	if (error) {
 		free(path, M_TEMP);
 		return (error);

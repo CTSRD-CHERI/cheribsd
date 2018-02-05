@@ -289,8 +289,8 @@ MIASM =  \
 	cheriabi_truncate.o \
 	ftruncate.o \
 	thr_kill2.o \
-	shm_open.o \
-	shm_unlink.o \
+	cheriabi_shm_open.o \
+	cheriabi_shm_unlink.o \
 	cpuset.o \
 	cpuset_setid.o \
 	cpuset_getid.o \

@@ -277,6 +277,7 @@ compat/cheriabi/cheriabi_signal.c	optional compat_cheriabi
 compat/cheriabi/cheriabi_syscalls.c	optional compat_cheriabi
 compat/cheriabi/cheriabi_sysent.c	optional compat_cheriabi
 compat/cheriabi/cheriabi_time.c		optional compat_cheriabi
+compat/cheriabi/cheriabi_uipc.c		optional compat_cheriabi
 compat/cheriabi/cheriabi_vfs.c		optional compat_cheriabi
 
 # dtrace specific
