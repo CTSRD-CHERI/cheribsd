@@ -1926,6 +1926,43 @@ cheriabi_utrace(struct thread *td, struct cheriabi_utrace_args *uap)
 }
 
 /*
+ * kern_cpuset.c
+ */
+int
+cheriabi_cpuset(struct thread *td, struct cheriabi_cpuset_args *uap)
+{
+
+	return (kern_cpuset(td, uap->setid));
+}
+
+int
+cheriabi_cpuset_getid(struct thread *td,
+    struct cheriabi_cpuset_getid_args *uap)
+{
+
+	return (kern_cpuset_getid(td, uap->level, uap->which, uap->id,
+	    uap->setid));
+}
+
+int
+cheriabi_cpuset_getaffinity(struct thread *td,
+    struct cheriabi_cpuset_getaffinity_args *uap)
+{
+
+	return (kern_cpuset_getaffinity(td, uap->level, uap->which,
+	    uap->id, uap->cpusetsize, uap->mask));
+}
+
+int
+cheriabi_cpuset_setaffinity(struct thread *td,
+    struct cheriabi_cpuset_setaffinity_args *uap)
+{
+
+	return (kern_cpuset_setaffinity(td, uap->level, uap->which, uap->id,
+	    uap->cpusetsize, uap->mask));
+}
+
+/*
  * kern_linker.c
  */
 

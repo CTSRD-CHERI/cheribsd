@@ -950,11 +950,11 @@ int
 sys_cpuset(struct thread *td, struct cpuset_args *uap)
 {
 
-	return (kern_cpuset(td, uap->setid));
+	return (kern_cpuset(td, __USER_CAP_OBJ(uap->setid)));
 }
 
 int
-kern_cpuset(struct thread *td, cpusetid_t *setid)
+kern_cpuset(struct thread *td, cpusetid_t * __capability setid)
 {
 	struct cpuset *root;
 	struct cpuset *set;
@@ -967,7 +967,8 @@ kern_cpuset(struct thread *td, cpusetid_t *setid)
 	cpuset_rel(root);
 	if (error)
 		return (error);
-	error = copyout(&set->cs_id, setid, sizeof(set->cs_id));
+	error = copyout_c((__cheri_tocap cpusetid_t * __capability)&set->cs_id,
+	    setid, sizeof(set->cs_id));
 	if (error == 0)
 		error = cpuset_setproc(-1, set, NULL);
 	cpuset_rel(set);
@@ -1021,12 +1022,12 @@ sys_cpuset_getid(struct thread *td, struct cpuset_getid_args *uap)
 {
 
 	return (kern_cpuset_getid(td, uap->level, uap->which, uap->id,
-	    uap->setid));
+	    __USER_CAP_OBJ(uap->setid)));
 }
 
 int
 kern_cpuset_getid(struct thread *td, cpulevel_t level, cpuwhich_t which,
-    id_t id, cpusetid_t *setid)
+    id_t id, cpusetid_t * __capability setid)
 {
 	struct cpuset *nset;
 	struct cpuset *set;
@@ -1069,7 +1070,7 @@ kern_cpuset_getid(struct thread *td, cpulevel_t level, cpuwhich_t which,
 	tmpid = set->cs_id;
 	cpuset_rel(set);
 	if (error == 0)
-		error = copyout(&tmpid, setid, sizeof(id));
+		error = copyout_c(&tmpid, setid, sizeof(id));
 
 	return (error);
 }
@@ -1088,12 +1089,12 @@ sys_cpuset_getaffinity(struct thread *td, struct cpuset_getaffinity_args *uap)
 {
 
 	return (kern_cpuset_getaffinity(td, uap->level, uap->which,
-	    uap->id, uap->cpusetsize, uap->mask));
+	    uap->id, uap->cpusetsize, __USER_CAP(uap->mask, uap->cpusetsize)));
 }
 
 int
 kern_cpuset_getaffinity(struct thread *td, cpulevel_t level, cpuwhich_t which,
-    id_t id, size_t cpusetsize, cpuset_t *maskp)
+    id_t id, size_t cpusetsize, cpuset_t * __capability maskp)
 {
 	struct thread *ttd;
 	struct cpuset *nset;
@@ -1186,7 +1187,8 @@ kern_cpuset_getaffinity(struct thread *td, cpulevel_t level, cpuwhich_t which,
 	if (p)
 		PROC_UNLOCK(p);
 	if (error == 0)
-		error = copyout(mask, maskp, size);
+		error = copyout_c((__cheri_tocap cpuset_t * __capability)mask,
+		    maskp, size);
 out:
 	free(mask, M_TEMP);
 	return (error);
@@ -1206,12 +1208,12 @@ sys_cpuset_setaffinity(struct thread *td, struct cpuset_setaffinity_args *uap)
 {
 
 	return (kern_cpuset_setaffinity(td, uap->level, uap->which,
-	    uap->id, uap->cpusetsize, uap->mask));
+	    uap->id, uap->cpusetsize, __USER_CAP(uap->mask, uap->cpusetsize)));
 }
 
 int
 kern_cpuset_setaffinity(struct thread *td, cpulevel_t level, cpuwhich_t which,
-    id_t id, size_t cpusetsize, const cpuset_t *maskp)
+    id_t id, size_t cpusetsize, const cpuset_t * __capability maskp)
 {
 	struct cpuset *nset;
 	struct cpuset *set;
@@ -1232,7 +1234,8 @@ kern_cpuset_setaffinity(struct thread *td, cpulevel_t level, cpuwhich_t which,
 		return (ECAPMODE);
 	}
 	mask = malloc(cpusetsize, M_TEMP, M_WAITOK | M_ZERO);
-	error = copyin(maskp, mask, cpusetsize);
+	error = copyin_c(maskp, (__cheri_tocap cpuset_t * __capability)mask,
+	    cpusetsize);
 	if (error)
 		goto out;
 	/*

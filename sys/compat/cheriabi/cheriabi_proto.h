@@ -823,6 +823,29 @@ struct cheriabi_shm_open_args {
 struct cheriabi_shm_unlink_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 };
+struct cheriabi_cpuset_args {
+	char setid_l_[PADL_(cpusetid_t *__capability)]; cpusetid_t *__capability setid; char setid_r_[PADR_(cpusetid_t *__capability)];
+};
+struct cheriabi_cpuset_getid_args {
+	char level_l_[PADL_(cpulevel_t)]; cpulevel_t level; char level_r_[PADR_(cpulevel_t)];
+	char which_l_[PADL_(cpuwhich_t)]; cpuwhich_t which; char which_r_[PADR_(cpuwhich_t)];
+	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
+	char setid_l_[PADL_(cpusetid_t *__capability)]; cpusetid_t *__capability setid; char setid_r_[PADR_(cpusetid_t *__capability)];
+};
+struct cheriabi_cpuset_getaffinity_args {
+	char level_l_[PADL_(cpulevel_t)]; cpulevel_t level; char level_r_[PADR_(cpulevel_t)];
+	char which_l_[PADL_(cpuwhich_t)]; cpuwhich_t which; char which_r_[PADR_(cpuwhich_t)];
+	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
+	char cpusetsize_l_[PADL_(size_t)]; size_t cpusetsize; char cpusetsize_r_[PADR_(size_t)];
+	char mask_l_[PADL_(cpuset_t *__capability)]; cpuset_t *__capability mask; char mask_r_[PADR_(cpuset_t *__capability)];
+};
+struct cheriabi_cpuset_setaffinity_args {
+	char level_l_[PADL_(cpulevel_t)]; cpulevel_t level; char level_r_[PADR_(cpulevel_t)];
+	char which_l_[PADL_(cpuwhich_t)]; cpuwhich_t which; char which_r_[PADR_(cpuwhich_t)];
+	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
+	char cpusetsize_l_[PADL_(size_t)]; size_t cpusetsize; char cpusetsize_r_[PADR_(size_t)];
+	char mask_l_[PADL_(const cpuset_t *__capability)]; const cpuset_t *__capability mask; char mask_r_[PADR_(const cpuset_t *__capability)];
+};
 struct cheriabi_faccessat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
@@ -1157,6 +1180,10 @@ int	cheriabi_mmap(struct thread *, struct cheriabi_mmap_args *);
 int	cheriabi_truncate(struct thread *, struct cheriabi_truncate_args *);
 int	cheriabi_shm_open(struct thread *, struct cheriabi_shm_open_args *);
 int	cheriabi_shm_unlink(struct thread *, struct cheriabi_shm_unlink_args *);
+int	cheriabi_cpuset(struct thread *, struct cheriabi_cpuset_args *);
+int	cheriabi_cpuset_getid(struct thread *, struct cheriabi_cpuset_getid_args *);
+int	cheriabi_cpuset_getaffinity(struct thread *, struct cheriabi_cpuset_getaffinity_args *);
+int	cheriabi_cpuset_setaffinity(struct thread *, struct cheriabi_cpuset_setaffinity_args *);
 int	cheriabi_faccessat(struct thread *, struct cheriabi_faccessat_args *);
 int	cheriabi_fchmodat(struct thread *, struct cheriabi_fchmodat_args *);
 int	cheriabi_fchownat(struct thread *, struct cheriabi_fchownat_args *);
@@ -1410,6 +1437,10 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_truncate	AUE_TRUNCATE
 #define	CHERIABI_SYS_AUE_cheriabi_shm_open	AUE_SHMOPEN
 #define	CHERIABI_SYS_AUE_cheriabi_shm_unlink	AUE_SHMUNLINK
+#define	CHERIABI_SYS_AUE_cheriabi_cpuset	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_cpuset_getid	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_cpuset_getaffinity	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_cpuset_setaffinity	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_faccessat	AUE_FACCESSAT
 #define	CHERIABI_SYS_AUE_cheriabi_fchmodat	AUE_FCHMODAT
 #define	CHERIABI_SYS_AUE_cheriabi_fchownat	AUE_FCHOWNAT

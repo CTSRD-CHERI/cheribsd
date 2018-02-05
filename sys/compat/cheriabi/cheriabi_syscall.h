@@ -400,11 +400,11 @@
 #define	CHERIABI_SYS_thr_kill2	481
 #define	CHERIABI_SYS_cheriabi_shm_open	482
 #define	CHERIABI_SYS_cheriabi_shm_unlink	483
-#define	CHERIABI_SYS_cpuset	484
+#define	CHERIABI_SYS_cheriabi_cpuset	484
 #define	CHERIABI_SYS_cpuset_setid	485
-#define	CHERIABI_SYS_cpuset_getid	486
-#define	CHERIABI_SYS_cpuset_getaffinity	487
-#define	CHERIABI_SYS_cpuset_setaffinity	488
+#define	CHERIABI_SYS_cheriabi_cpuset_getid	486
+#define	CHERIABI_SYS_cheriabi_cpuset_getaffinity	487
+#define	CHERIABI_SYS_cheriabi_cpuset_setaffinity	488
 #define	CHERIABI_SYS_cheriabi_faccessat	489
 #define	CHERIABI_SYS_cheriabi_fchmodat	490
 #define	CHERIABI_SYS_cheriabi_fchownat	491

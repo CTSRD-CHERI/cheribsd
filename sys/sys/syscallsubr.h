@@ -117,14 +117,15 @@ int	kern_clock_settime(struct thread *td, clockid_t clock_id,
 int	kern_close(struct thread *td, int fd);
 int	kern_connectat(struct thread *td, int dirfd, int fd,
 	    struct sockaddr *sa);
-int	kern_cpuset(struct thread *td, cpusetid_t *setid);
+int	kern_cpuset(struct thread *td, cpusetid_t * __capability setid);
 int	kern_cpuset_getaffinity(struct thread *td, cpulevel_t level,
-	    cpuwhich_t which, id_t id, size_t cpusetsize, cpuset_t *maskp);
+	    cpuwhich_t which, id_t id, size_t cpusetsize,
+	    cpuset_t * __capability maskp);
 int	kern_cpuset_setaffinity(struct thread *td, cpulevel_t level,
 	    cpuwhich_t which, id_t id, size_t cpusetsize,
-	    const cpuset_t *maskp);
+	    const cpuset_t * __capability maskp);
 int	kern_cpuset_getid(struct thread *td, cpulevel_t level,
-	    cpuwhich_t which, id_t id, cpusetid_t *setid);
+	    cpuwhich_t which, id_t id, cpusetid_t * __capability setid);
 int	kern_cpuset_setid(struct thread *td, cpuwhich_t which,
 	    id_t id, cpusetid_t setid);
 int	kern_dup(struct thread *td, u_int mode, int flags, int old, int new);

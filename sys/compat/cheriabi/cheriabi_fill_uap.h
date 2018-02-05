@@ -6176,22 +6176,14 @@ CHERIABI_SYS_cheriabi_shm_unlink_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_cpuset_fill_uap(struct thread *td,
-    struct cpuset_args *uap)
+CHERIABI_SYS_cheriabi_cpuset_fill_uap(struct thread *td,
+    struct cheriabi_cpuset_args *uap)
 {
-	void * __capability tmpcap;
 
-	/* [0] _Out_ cpusetid_t * setid */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cpuset_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->setid),
-		    tmpcap, sizeof(*uap->setid), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _Out_ cpusetid_t *__capability setid */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->setid),
+	    0, CHERIABI_SYS_cheriabi_cpuset_PTRMASK);
 
 	return (0);
 }
@@ -6218,108 +6210,87 @@ CHERIABI_SYS_cpuset_setid_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_cpuset_getid_fill_uap(struct thread *td,
-    struct cpuset_getid_args *uap)
+CHERIABI_SYS_cheriabi_cpuset_getid_fill_uap(struct thread *td,
+    struct cheriabi_cpuset_getid_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] cpulevel_t level */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cpuset_getid_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_cpuset_getid_PTRMASK);
 	uap->level = cheri_getoffset(tmpcap);
 
 	/* [1] cpuwhich_t which */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cpuset_getid_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_cpuset_getid_PTRMASK);
 	uap->which = cheri_getoffset(tmpcap);
 
 	/* [2] id_t id */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cpuset_getid_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_cpuset_getid_PTRMASK);
 	uap->id = cheri_getoffset(tmpcap);
 
-	/* [3] _Out_ cpusetid_t * setid */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cpuset_getid_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->setid),
-		    tmpcap, sizeof(*uap->setid), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [3] _Out_ cpusetid_t *__capability setid */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->setid),
+	    3, CHERIABI_SYS_cheriabi_cpuset_getid_PTRMASK);
 
 	return (0);
 }
 
 static inline int
-CHERIABI_SYS_cpuset_getaffinity_fill_uap(struct thread *td,
-    struct cpuset_getaffinity_args *uap)
+CHERIABI_SYS_cheriabi_cpuset_getaffinity_fill_uap(struct thread *td,
+    struct cheriabi_cpuset_getaffinity_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] cpulevel_t level */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cpuset_getaffinity_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_cpuset_getaffinity_PTRMASK);
 	uap->level = cheri_getoffset(tmpcap);
 
 	/* [1] cpuwhich_t which */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cpuset_getaffinity_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_cpuset_getaffinity_PTRMASK);
 	uap->which = cheri_getoffset(tmpcap);
 
 	/* [2] id_t id */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cpuset_getaffinity_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_cpuset_getaffinity_PTRMASK);
 	uap->id = cheri_getoffset(tmpcap);
 
 	/* [3] size_t cpusetsize */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cpuset_getaffinity_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_cpuset_getaffinity_PTRMASK);
 	uap->cpusetsize = cheri_getoffset(tmpcap);
 
-	/* [4] _Out_ cpuset_t * mask */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 4, CHERIABI_SYS_cpuset_getaffinity_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->mask),
-		    tmpcap, sizeof(*uap->mask), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [4] _Out_ cpuset_t *__capability mask */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->mask),
+	    4, CHERIABI_SYS_cheriabi_cpuset_getaffinity_PTRMASK);
 
 	return (0);
 }
 
 static inline int
-CHERIABI_SYS_cpuset_setaffinity_fill_uap(struct thread *td,
-    struct cpuset_setaffinity_args *uap)
+CHERIABI_SYS_cheriabi_cpuset_setaffinity_fill_uap(struct thread *td,
+    struct cheriabi_cpuset_setaffinity_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] cpulevel_t level */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cpuset_setaffinity_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_cpuset_setaffinity_PTRMASK);
 	uap->level = cheri_getoffset(tmpcap);
 
 	/* [1] cpuwhich_t which */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cpuset_setaffinity_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_cpuset_setaffinity_PTRMASK);
 	uap->which = cheri_getoffset(tmpcap);
 
 	/* [2] id_t id */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cpuset_setaffinity_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_cpuset_setaffinity_PTRMASK);
 	uap->id = cheri_getoffset(tmpcap);
 
 	/* [3] size_t cpusetsize */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cpuset_setaffinity_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_cpuset_setaffinity_PTRMASK);
 	uap->cpusetsize = cheri_getoffset(tmpcap);
 
-	/* [4] _Out_ const cpuset_t * mask */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 4, CHERIABI_SYS_cpuset_setaffinity_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->mask),
-		    tmpcap, sizeof(*uap->mask), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [4] _Out_ const cpuset_t *__capability mask */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->mask),
+	    4, CHERIABI_SYS_cheriabi_cpuset_setaffinity_PTRMASK);
 
 	return (0);
 }

@@ -1134,20 +1134,21 @@
 				    int flags, mode_t mode); }
 483	AUE_SHMUNLINK	STD	{ int cheriabi_shm_unlink( \
 				    _In_z_ const char * __capability path); }
-484	AUE_NULL	NOPROTO	{ int cpuset(_Out_ cpusetid_t *setid); }
+484	AUE_NULL	STD	{ int cheriabi_cpuset( \
+				    _Out_ cpusetid_t * __capability setid); }
 485	AUE_NULL	NOPROTO	{ int cpuset_setid(cpuwhich_t which, \
 				    id_t id, cpusetid_t setid); }
-486	AUE_NULL	NOPROTO	{ int cpuset_getid(cpulevel_t level, \
+486	AUE_NULL	STD	{ int cheriabi_cpuset_getid(cpulevel_t level, \
 				    cpuwhich_t which, id_t id, \
-				    _Out_ cpusetid_t *setid); }
-487	AUE_NULL	NOPROTO	{ int cpuset_getaffinity( \
+				    _Out_ cpusetid_t * __capability setid); }
+487	AUE_NULL	STD	{ int cheriabi_cpuset_getaffinity( \
 				    cpulevel_t level, cpuwhich_t which, \
 				    id_t id, size_t cpusetsize, \
-				    _Out_ cpuset_t *mask); }
-488	AUE_NULL	NOPROTO	{ int cpuset_setaffinity( \
+				    _Out_ cpuset_t * __capability mask); }
+488	AUE_NULL	STD	{ int cheriabi_cpuset_setaffinity( \
 				    cpulevel_t level, cpuwhich_t which, \
 				    id_t id, size_t cpusetsize, \
-				    _Out_ const cpuset_t *mask); }
+				    _Out_ const cpuset_t * __capability mask); }
 489	AUE_FACCESSAT	STD	{ int cheriabi_faccessat(int fd, \
 				    _In_z_ const char * __capability path, \
 				    int amode, int flag); }

@@ -2449,10 +2449,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* cpuset */
+	/* cheriabi_cpuset */
 	case 484: {
-		struct cpuset_args *p = params;
-		uarg[0] = (intptr_t) p->setid; /* cpusetid_t * */
+		struct cheriabi_cpuset_args *p = params;
+		uarg[0] = (cheri_getbase(p->setid) + cheri_getoffset(p->setid)); /* cpusetid_t *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -2465,35 +2465,35 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* cpuset_getid */
+	/* cheriabi_cpuset_getid */
 	case 486: {
-		struct cpuset_getid_args *p = params;
+		struct cheriabi_cpuset_getid_args *p = params;
 		iarg[0] = p->level; /* cpulevel_t */
 		iarg[1] = p->which; /* cpuwhich_t */
 		iarg[2] = p->id; /* id_t */
-		uarg[3] = (intptr_t) p->setid; /* cpusetid_t * */
+		uarg[3] = (cheri_getbase(p->setid) + cheri_getoffset(p->setid)); /* cpusetid_t *__capability */
 		*n_args = 4;
 		break;
 	}
-	/* cpuset_getaffinity */
+	/* cheriabi_cpuset_getaffinity */
 	case 487: {
-		struct cpuset_getaffinity_args *p = params;
+		struct cheriabi_cpuset_getaffinity_args *p = params;
 		iarg[0] = p->level; /* cpulevel_t */
 		iarg[1] = p->which; /* cpuwhich_t */
 		iarg[2] = p->id; /* id_t */
 		uarg[3] = p->cpusetsize; /* size_t */
-		uarg[4] = (intptr_t) p->mask; /* cpuset_t * */
+		uarg[4] = (cheri_getbase(p->mask) + cheri_getoffset(p->mask)); /* cpuset_t *__capability */
 		*n_args = 5;
 		break;
 	}
-	/* cpuset_setaffinity */
+	/* cheriabi_cpuset_setaffinity */
 	case 488: {
-		struct cpuset_setaffinity_args *p = params;
+		struct cheriabi_cpuset_setaffinity_args *p = params;
 		iarg[0] = p->level; /* cpulevel_t */
 		iarg[1] = p->which; /* cpuwhich_t */
 		iarg[2] = p->id; /* id_t */
 		uarg[3] = p->cpusetsize; /* size_t */
-		uarg[4] = (intptr_t) p->mask; /* const cpuset_t * */
+		uarg[4] = (cheri_getbase(p->mask) + cheri_getoffset(p->mask)); /* const cpuset_t *__capability */
 		*n_args = 5;
 		break;
 	}
@@ -7112,11 +7112,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* cpuset */
+	/* cheriabi_cpuset */
 	case 484:
 		switch(ndx) {
 		case 0:
-			p = "userland cpusetid_t *";
+			p = "userland cpusetid_t *__capability";
 			break;
 		default:
 			break;
@@ -7138,7 +7138,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* cpuset_getid */
+	/* cheriabi_cpuset_getid */
 	case 486:
 		switch(ndx) {
 		case 0:
@@ -7151,13 +7151,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "id_t";
 			break;
 		case 3:
-			p = "userland cpusetid_t *";
+			p = "userland cpusetid_t *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* cpuset_getaffinity */
+	/* cheriabi_cpuset_getaffinity */
 	case 487:
 		switch(ndx) {
 		case 0:
@@ -7173,13 +7173,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "size_t";
 			break;
 		case 4:
-			p = "userland cpuset_t *";
+			p = "userland cpuset_t *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* cpuset_setaffinity */
+	/* cheriabi_cpuset_setaffinity */
 	case 488:
 		switch(ndx) {
 		case 0:
@@ -7195,7 +7195,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "size_t";
 			break;
 		case 4:
-			p = "userland const cpuset_t *";
+			p = "userland const cpuset_t *__capability";
 			break;
 		default:
 			break;
@@ -9719,7 +9719,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cpuset */
+	/* cheriabi_cpuset */
 	case 484:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9729,17 +9729,17 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cpuset_getid */
+	/* cheriabi_cpuset_getid */
 	case 486:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cpuset_getaffinity */
+	/* cheriabi_cpuset_getaffinity */
 	case 487:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cpuset_setaffinity */
+	/* cheriabi_cpuset_setaffinity */
 	case 488:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

@@ -291,11 +291,11 @@ MIASM =  \
 	thr_kill2.o \
 	cheriabi_shm_open.o \
 	cheriabi_shm_unlink.o \
-	cpuset.o \
+	cheriabi_cpuset.o \
 	cpuset_setid.o \
-	cpuset_getid.o \
-	cpuset_getaffinity.o \
-	cpuset_setaffinity.o \
+	cheriabi_cpuset_getid.o \
+	cheriabi_cpuset_getaffinity.o \
+	cheriabi_cpuset_setaffinity.o \
 	cheriabi_faccessat.o \
 	cheriabi_fchmodat.o \
 	cheriabi_fchownat.o \
