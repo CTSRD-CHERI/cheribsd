@@ -569,4 +569,6 @@ const char *syscallnames[] = {
 	"kevent",			/* 560 = kevent */
 	"coexecve",			/* 561 = coexecve */
 	"cocreate",			/* 562 = cocreate */
+	"coregister",			/* 563 = coregister */
+	"colookup",			/* 564 = colookup */
 };
