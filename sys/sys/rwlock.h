@@ -66,7 +66,8 @@
 
 #define	RW_OWNER(x)		((x) & ~RW_LOCK_FLAGMASK)
 #define	RW_READERS_SHIFT	5
-#define	RW_READERS(x)		(ptr_get_flag(x, ~RW_LOCK_FLAGMASK) >> RW_READERS_SHIFT)
+#define	RW_READERS(x)							\
+	(ptr_get_flag(x, ~RW_LOCK_FLAGMASK) >> RW_READERS_SHIFT)
 #define	RW_READERS_LOCK(x)	((x) << RW_READERS_SHIFT | RW_LOCK_READ)
 #define	RW_ONE_READER		(1 << RW_READERS_SHIFT)
 

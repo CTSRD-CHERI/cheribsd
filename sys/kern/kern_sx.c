@@ -203,7 +203,7 @@ owner_sx(const struct lock_object *lock, struct thread **owner)
 	sx = (const struct sx *)lock;
 	x = sx->sx_lock;
 	*owner = NULL;
-	return ((x & SX_LOCK_SHARED) != 0 ? (SX_SHARERS(x) != 0) :
+	return (ptr_get_flag(x, SX_LOCK_SHARED) != 0 ? (SX_SHARERS(x) != 0) :
 	    ((*owner = (struct thread *)SX_OWNER(x)) != NULL));
 }
 #endif
@@ -273,7 +273,7 @@ sx_try_slock_(struct sx *sx, const char *file, int line)
 	for (;;) {
 		KASSERT(x != SX_LOCK_DESTROYED,
 		    ("sx_try_slock() of destroyed sx @ %s:%d", file, line));
-		if (!(x & SX_LOCK_SHARED))
+		if (!ptr_get_flag(x, SX_LOCK_SHARED))
 			break;
 		if (atomic_fcmpset_acq_ptr(&sx->sx_lock, &x, x + SX_ONE_SHARER)) {
 			LOCK_LOG_TRY("SLOCK", &sx->lock_object, 0, 1, file, line);
@@ -409,9 +409,9 @@ sx_try_upgrade_(struct sx *sx, const char *file, int line)
 	 * to maintain the SX_LOCK_EXCLUSIVE_WAITERS flag if set so that
 	 * we will wake up the exclusive waiters when we drop the lock.
 	 */
-	x = sx->sx_lock & SX_LOCK_EXCLUSIVE_WAITERS;
+	x = ptr_get_flag(sx->sx_lock, SX_LOCK_EXCLUSIVE_WAITERS);
 	success = atomic_cmpset_acq_ptr(&sx->sx_lock, SX_SHARERS_LOCK(1) | x,
-	    (uintptr_t)curthread | x);
+	    ptr_put_flag((uintptr_t)curthread, x));
 	LOCK_LOG_TRY("XUPGRADE", &sx->lock_object, 0, success, file, line);
 	if (success) {
 		WITNESS_UPGRADE(&sx->lock_object, LOP_EXCLUSIVE | LOP_TRYLOCK,
@@ -455,9 +455,9 @@ sx_downgrade_(struct sx *sx, const char *file, int line)
 	 * so we can wake them up.
 	 */
 	x = sx->sx_lock;
-	if (!(x & SX_LOCK_SHARED_WAITERS) &&
+	if (!ptr_get_flag(x, SX_LOCK_SHARED_WAITERS) &&
 	    atomic_cmpset_rel_ptr(&sx->sx_lock, x, SX_SHARERS_LOCK(1) |
-	    (x & SX_LOCK_EXCLUSIVE_WAITERS))) {
+	    ptr_get_flag(x, SX_LOCK_EXCLUSIVE_WAITERS))) {
 		LOCK_LOG_LOCK("XDOWNGRADE", &sx->lock_object, 0, 0, file, line);
 		return;
 	}
@@ -475,8 +475,8 @@ sx_downgrade_(struct sx *sx, const char *file, int line)
 	wakeup_swapper = 0;
 	x = sx->sx_lock;
 	atomic_store_rel_ptr(&sx->sx_lock, SX_SHARERS_LOCK(1) |
-	    (x & SX_LOCK_EXCLUSIVE_WAITERS));
-	if (x & SX_LOCK_SHARED_WAITERS)
+	    ptr_get_flag(x, SX_LOCK_EXCLUSIVE_WAITERS));
+	if (ptr_get_flag(x, SX_LOCK_SHARED_WAITERS))
 		wakeup_swapper = sleepq_broadcast(&sx->lock_object, SLEEPQ_SX,
 		    0, SQ_SHARED_QUEUE);
 	sleepq_release(&sx->lock_object);
@@ -571,7 +571,7 @@ _sx_xlock_hard(struct sx *sx, uintptr_t x, uintptr_t tid, int opts,
 		 * running or the state of the lock changes.
 		 */
 		if ((sx->lock_object.lo_flags & SX_NOADAPTIVE) == 0) {
-			if ((x & SX_LOCK_SHARED) == 0) {
+			if (ptr_get_flag(x, SX_LOCK_SHARED) == 0) {
 				owner = lv_sx_owner(x);
 				if (TD_IS_RUNNING(owner)) {
 					if (LOCK_LOG_TEST(&sx->lock_object, 0))
@@ -605,7 +605,7 @@ _sx_xlock_hard(struct sx *sx, uintptr_t x, uintptr_t tid, int opts,
 				    "%s: shared spinning on %p with %u and %u",
 						    __func__, sx, spintries, i);
 					x = sx->sx_lock;
-					if ((x & SX_LOCK_SHARED) == 0 ||
+					if (ptr_get_flag(x, SX_LOCK_SHARED) == 0 ||
 					    SX_SHARERS(x) == 0)
 						break;
 					cpu_spinwait();
@@ -642,7 +642,7 @@ _sx_xlock_hard(struct sx *sx, uintptr_t x, uintptr_t tid, int opts,
 		 * chain lock.  If so, drop the sleep queue lock and try
 		 * again.
 		 */
-		if (!(x & SX_LOCK_SHARED) &&
+		if (!ptr_get_flag(x, SX_LOCK_SHARED) &&
 		    (sx->lock_object.lo_flags & SX_NOADAPTIVE) == 0) {
 			owner = (struct thread *)SX_OWNER(x);
 			if (TD_IS_RUNNING(owner)) {
@@ -665,7 +665,7 @@ _sx_xlock_hard(struct sx *sx, uintptr_t x, uintptr_t tid, int opts,
 		if (x == (SX_LOCK_UNLOCKED | SX_LOCK_EXCLUSIVE_WAITERS)) {
 			if (atomic_cmpset_acq_ptr(&sx->sx_lock,
 			    SX_LOCK_UNLOCKED | SX_LOCK_EXCLUSIVE_WAITERS,
-			    tid | SX_LOCK_EXCLUSIVE_WAITERS)) {
+			    ptr_put_flag(tid, SX_LOCK_EXCLUSIVE_WAITERS))) {
 				sleepq_release(&sx->lock_object);
 				CTR2(KTR_LOCK, "%s: %p claimed by new writer",
 				    __func__, sx);
@@ -680,9 +680,9 @@ _sx_xlock_hard(struct sx *sx, uintptr_t x, uintptr_t tid, int opts,
 		 * Try to set the SX_LOCK_EXCLUSIVE_WAITERS.  If we fail,
 		 * than loop back and retry.
 		 */
-		if (!(x & SX_LOCK_EXCLUSIVE_WAITERS)) {
+		if (!ptr_get_flag(x, SX_LOCK_EXCLUSIVE_WAITERS)) {
 			if (!atomic_cmpset_ptr(&sx->sx_lock, x,
-			    x | SX_LOCK_EXCLUSIVE_WAITERS)) {
+			    ptr_put_flag(x, SX_LOCK_EXCLUSIVE_WAITERS))) {
 				sleepq_release(&sx->lock_object);
 				x = SX_READ_VALUE(sx);
 				continue;
@@ -732,12 +732,14 @@ _sx_xlock_hard(struct sx *sx, uintptr_t x, uintptr_t tid, int opts,
 	all_time += lockstat_nsecs(&sx->lock_object);
 	if (sleep_time)
 		LOCKSTAT_RECORD4(sx__block, sx, sleep_time,
-		    LOCKSTAT_WRITER, (state & SX_LOCK_SHARED) == 0,
-		    (state & SX_LOCK_SHARED) == 0 ? 0 : SX_SHARERS(state));
+		    LOCKSTAT_WRITER, ptr_get_flag(state, SX_LOCK_SHARED) == 0,
+		    ptr_get_flag(state, SX_LOCK_SHARED) == 0 ?
+				 0 : SX_SHARERS(state));
 	if (lda.spin_cnt > sleep_cnt)
 		LOCKSTAT_RECORD4(sx__spin, sx, all_time - sleep_time,
-		    LOCKSTAT_WRITER, (state & SX_LOCK_SHARED) == 0,
-		    (state & SX_LOCK_SHARED) == 0 ? 0 : SX_SHARERS(state));
+		    LOCKSTAT_WRITER, ptr_get_flag(state, SX_LOCK_SHARED) == 0,
+		    ptr_get_flag(state, SX_LOCK_SHARED) == 0 ?
+				 0 : SX_SHARERS(state));
 #endif
 	if (!error)
 		LOCKSTAT_PROFILE_OBTAIN_RWLOCK_SUCCESS(sx__acquire, sx,
@@ -761,10 +763,10 @@ _sx_xunlock_hard(struct sx *sx, uintptr_t tid, const char *file, int line)
 	if (SCHEDULER_STOPPED())
 		return;
 
-	MPASS(!(sx->sx_lock & SX_LOCK_SHARED));
+	MPASS(!ptr_get_flag(sx->sx_lock, SX_LOCK_SHARED));
 
 	x = SX_READ_VALUE(sx);
-	if (x & SX_LOCK_RECURSED) {
+	if (ptr_get_flag(x, SX_LOCK_RECURSED)) {
 		/* The lock is recursed, unrecurse one level. */
 		if ((--sx->sx_recurse) == 0)
 			atomic_clear_ptr(&sx->sx_lock, SX_LOCK_RECURSED);
@@ -778,8 +780,8 @@ _sx_xunlock_hard(struct sx *sx, uintptr_t tid, const char *file, int line)
 	    atomic_cmpset_rel_ptr(&sx->sx_lock, tid, SX_LOCK_UNLOCKED))
 		return;
 
-	MPASS(sx->sx_lock & (SX_LOCK_SHARED_WAITERS |
-	    SX_LOCK_EXCLUSIVE_WAITERS));
+	MPASS(ptr_get_flag(sx->sx_lock, (SX_LOCK_SHARED_WAITERS |
+	    SX_LOCK_EXCLUSIVE_WAITERS)));
 	if (LOCK_LOG_TEST(&sx->lock_object, 0))
 		CTR2(KTR_LOCK, "%s: %p contested", __func__, sx);
 
@@ -795,10 +797,10 @@ _sx_xunlock_hard(struct sx *sx, uintptr_t tid, const char *file, int line)
 	 * starvation for the threads sleeping on the exclusive queue by giving
 	 * them precedence and cleaning up the shared waiters bit anyway.
 	 */
-	if ((sx->sx_lock & SX_LOCK_SHARED_WAITERS) != 0 &&
+	if (ptr_get_flag(sx->sx_lock, SX_LOCK_SHARED_WAITERS) != 0 &&
 	    sleepq_sleepcnt(&sx->lock_object, SQ_SHARED_QUEUE) != 0) {
 		queue = SQ_SHARED_QUEUE;
-		x |= (sx->sx_lock & SX_LOCK_EXCLUSIVE_WAITERS);
+		x |= ptr_get_flag(sx->sx_lock, SX_LOCK_EXCLUSIVE_WAITERS);
 	} else
 		queue = SQ_EXCLUSIVE_QUEUE;
 
@@ -825,8 +827,8 @@ __sx_slock_try(struct sx *sx, uintptr_t *xp, const char *file, int line)
 	 * of SX_LOCK_EXCLUSIVE_WAITERS, if we fail to acquire the
 	 * shared lock loop back and retry.
 	 */
-	while (*xp & SX_LOCK_SHARED) {
-		MPASS(!(*xp & SX_LOCK_SHARED_WAITERS));
+	while (ptr_get_flag(*xp, SX_LOCK_SHARED)) {
+		MPASS(!ptr_get_flag(*xp, SX_LOCK_SHARED_WAITERS));
 		if (atomic_fcmpset_acq_ptr(&sx->sx_lock, xp,
 		    *xp + SX_ONE_SHARER)) {
 			if (LOCK_LOG_TEST(&sx->lock_object, 0))
@@ -931,7 +933,7 @@ _sx_slock_hard(struct sx *sx, int opts, const char *file, int line, uintptr_t x)
 		 * The lock could have been released while we spun.
 		 * In this case loop back and retry.
 		 */
-		if (x & SX_LOCK_SHARED) {
+		if (ptr_get_flag(x, SX_LOCK_SHARED)) {
 			sleepq_release(&sx->lock_object);
 			continue;
 		}
@@ -942,7 +944,7 @@ _sx_slock_hard(struct sx *sx, int opts, const char *file, int line, uintptr_t x)
 		 * the owner stops running or the state of the lock
 		 * changes.
 		 */
-		if (!(x & SX_LOCK_SHARED) &&
+		if (!ptr_get_flag(x, SX_LOCK_SHARED) &&
 		    (sx->lock_object.lo_flags & SX_NOADAPTIVE) == 0) {
 			owner = (struct thread *)SX_OWNER(x);
 			if (TD_IS_RUNNING(owner)) {
@@ -958,9 +960,9 @@ _sx_slock_hard(struct sx *sx, int opts, const char *file, int line, uintptr_t x)
 		 * fail to set it drop the sleep queue lock and loop
 		 * back.
 		 */
-		if (!(x & SX_LOCK_SHARED_WAITERS)) {
+		if (!ptr_get_flag(x, SX_LOCK_SHARED_WAITERS)) {
 			if (!atomic_cmpset_ptr(&sx->sx_lock, x,
-			    x | SX_LOCK_SHARED_WAITERS)) {
+			    ptr_put_flag(x, SX_LOCK_SHARED_WAITERS))) {
 				sleepq_release(&sx->lock_object);
 				x = SX_READ_VALUE(sx);
 				continue;
@@ -1009,12 +1011,14 @@ _sx_slock_hard(struct sx *sx, int opts, const char *file, int line, uintptr_t x)
 	all_time += lockstat_nsecs(&sx->lock_object);
 	if (sleep_time)
 		LOCKSTAT_RECORD4(sx__block, sx, sleep_time,
-		    LOCKSTAT_READER, (state & SX_LOCK_SHARED) == 0,
-		    (state & SX_LOCK_SHARED) == 0 ? 0 : SX_SHARERS(state));
+		    LOCKSTAT_READER, ptr_get_flag(state, SX_LOCK_SHARED) == 0,
+		    ptr_get_flag(state, SX_LOCK_SHARED) == 0 ?
+				 0 : SX_SHARERS(state));
 	if (lda.spin_cnt > sleep_cnt)
 		LOCKSTAT_RECORD4(sx__spin, sx, all_time - sleep_time,
-		    LOCKSTAT_READER, (state & SX_LOCK_SHARED) == 0,
-		    (state & SX_LOCK_SHARED) == 0 ? 0 : SX_SHARERS(state));
+		    LOCKSTAT_READER, ptr_get_flag(state, SX_LOCK_SHARED) == 0,
+		    ptr_get_flag(state, SX_LOCK_SHARED) == 0 ?
+				 0 : SX_SHARERS(state));
 #endif
 	if (error == 0) {
 		LOCKSTAT_PROFILE_OBTAIN_RWLOCK_SUCCESS(sx__acquire, sx,
@@ -1059,7 +1063,7 @@ _sx_sunlock_try(struct sx *sx, uintptr_t *xp)
 		 * We should never have sharers while at least one thread
 		 * holds a shared lock.
 		 */
-		KASSERT(!(*xp & SX_LOCK_SHARED_WAITERS),
+		KASSERT(!ptr_get_flag(*xp, SX_LOCK_SHARED_WAITERS),
 		    ("%s: waiting sharers", __func__));
 
 		/*
@@ -1083,7 +1087,7 @@ _sx_sunlock_try(struct sx *sx, uintptr_t *xp)
 		 * If there aren't any waiters for an exclusive lock,
 		 * then try to drop it quickly.
 		 */
-		if (!(*xp & SX_LOCK_EXCLUSIVE_WAITERS)) {
+		if (!ptr_get_flag(*xp, SX_LOCK_EXCLUSIVE_WAITERS)) {
 			MPASS(*xp == SX_SHARERS_LOCK(1));
 			*xp = SX_SHARERS_LOCK(1);
 			if (atomic_fcmpset_rel_ptr(&sx->sx_lock,
@@ -1205,13 +1209,13 @@ _sx_assert(const struct sx *sx, int what, const char *file, int line)
 		 * Also, if no one has a lock at all, fail.
 		 */
 		if (sx->sx_lock == SX_LOCK_UNLOCKED ||
-		    (!(sx->sx_lock & SX_LOCK_SHARED) && (slocked ||
+		    (!(ptr_get_flag(sx->sx_lock, SX_LOCK_SHARED)) && (slocked ||
 		    sx_xholder(sx) != curthread)))
 			panic("Lock %s not %slocked @ %s:%d\n",
 			    sx->lock_object.lo_name, slocked ? "share " : "",
 			    file, line);
 
-		if (!(sx->sx_lock & SX_LOCK_SHARED)) {
+		if (!ptr_get_flag(sx->sx_lock, SX_LOCK_SHARED)) {
 			if (sx_recursed(sx)) {
 				if (what & SA_NOTRECURSED)
 					panic("Lock %s recursed @ %s:%d\n",
@@ -1273,7 +1277,7 @@ db_show_sx(const struct lock_object *lock)
 	else if (sx->sx_lock == SX_LOCK_DESTROYED) {
 		db_printf("DESTROYED\n");
 		return;
-	} else if (sx->sx_lock & SX_LOCK_SHARED)
+	} else if (ptr_get_flag(sx->sx_lock, SX_LOCK_SHARED))
 		db_printf("SLOCK: %ju\n", (uintmax_t)SX_SHARERS(sx->sx_lock));
 	else {
 		td = sx_xholder(sx);
@@ -1284,8 +1288,8 @@ db_show_sx(const struct lock_object *lock)
 	}
 
 	db_printf(" waiters: ");
-	switch(sx->sx_lock &
-	    (SX_LOCK_SHARED_WAITERS | SX_LOCK_EXCLUSIVE_WAITERS)) {
+	switch(ptr_get_flag(sx->sx_lock,
+	    (SX_LOCK_SHARED_WAITERS | SX_LOCK_EXCLUSIVE_WAITERS))) {
 	case SX_LOCK_SHARED_WAITERS:
 		db_printf("shared\n");
 		break;
@@ -1323,7 +1327,7 @@ sx_chain(struct thread *td, struct thread **ownerp)
 	/* We think we have an sx lock, so output some details. */
 	db_printf("blocked on sx \"%s\" ", td->td_wmesg);
 	*ownerp = sx_xholder(sx);
-	if (sx->sx_lock & SX_LOCK_SHARED)
+	if (ptr_get_flag(sx->sx_lock, SX_LOCK_SHARED))
 		db_printf("SLOCK (count %ju)\n",
 		    (uintmax_t)SX_SHARERS(sx->sx_lock));
 	else
