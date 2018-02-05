@@ -3304,6 +3304,22 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
+	/* coregister */
+	case 563: {
+		struct coregister_args *p = params;
+		uarg[0] = (intptr_t) p->name; /* const char * */
+		uarg[1] = (intptr_t) p->cap; /* void *__capability * */
+		*n_args = 2;
+		break;
+	}
+	/* colookup */
+	case 564: {
+		struct colookup_args *p = params;
+		uarg[0] = (intptr_t) p->name; /* const char * */
+		uarg[1] = (intptr_t) p->cap; /* void *__capability * */
+		*n_args = 2;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -8807,6 +8823,32 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* coregister */
+	case 563:
+		switch(ndx) {
+		case 0:
+			p = "userland const char *";
+			break;
+		case 1:
+			p = "userland void *__capability *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* colookup */
+	case 564:
+		switch(ndx) {
+		case 0:
+			p = "userland const char *";
+			break;
+		case 1:
+			p = "userland void *__capability *";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -10705,6 +10747,16 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* cocreate */
 	case 562:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* coregister */
+	case 563:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* colookup */
+	case 564:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

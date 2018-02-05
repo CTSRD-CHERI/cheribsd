@@ -1028,6 +1028,8 @@
 				    char **envv); }
 562	AUE_NULL	STD	{ int cocreate(void * __capability *code, \
 				    void * __capability *data); }
+563	AUE_NULL	STD	{ int coregister(const char *name, void * __capability *cap); }
+564	AUE_NULL	STD	{ int colookup(const char *name, void * __capability *cap); }
 
 ; Please copy any additions and changes to the following compatability tables:
 ; sys/compat/freebsd32/syscalls.master

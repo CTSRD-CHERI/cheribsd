@@ -1787,6 +1787,14 @@ struct cocreate_args {
 	char code_l_[PADL_(void *__capability *)]; void *__capability * code; char code_r_[PADR_(void *__capability *)];
 	char data_l_[PADL_(void *__capability *)]; void *__capability * data; char data_r_[PADR_(void *__capability *)];
 };
+struct coregister_args {
+	char name_l_[PADL_(const char *)]; const char * name; char name_r_[PADR_(const char *)];
+	char cap_l_[PADL_(void *__capability *)]; void *__capability * cap; char cap_r_[PADR_(void *__capability *)];
+};
+struct colookup_args {
+	char name_l_[PADL_(const char *)]; const char * name; char name_r_[PADR_(const char *)];
+	char cap_l_[PADL_(void *__capability *)]; void *__capability * cap; char cap_r_[PADR_(void *__capability *)];
+};
 int	nosys(struct thread *, struct nosys_args *);
 void	sys_sys_exit(struct thread *, struct sys_exit_args *);
 int	sys_fork(struct thread *, struct fork_args *);
@@ -2170,6 +2178,8 @@ int	sys_mknodat(struct thread *, struct mknodat_args *);
 int	sys_kevent(struct thread *, struct kevent_args *);
 int	sys_coexecve(struct thread *, struct coexecve_args *);
 int	sys_cocreate(struct thread *, struct cocreate_args *);
+int	sys_coregister(struct thread *, struct coregister_args *);
+int	sys_colookup(struct thread *, struct colookup_args *);
 
 #ifdef COMPAT_43
 
@@ -3065,6 +3075,8 @@ int	freebsd11_mknodat(struct thread *, struct freebsd11_mknodat_args *);
 #define	SYS_AUE_kevent	AUE_KEVENT
 #define	SYS_AUE_coexecve	AUE_NULL
 #define	SYS_AUE_cocreate	AUE_NULL
+#define	SYS_AUE_coregister	AUE_NULL
+#define	SYS_AUE_colookup	AUE_NULL
 
 #undef PAD_
 #undef PADL_

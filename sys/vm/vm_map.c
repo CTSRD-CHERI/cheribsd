@@ -324,6 +324,7 @@ vmspace_alloc(vm_offset_t min, vm_offset_t max, pmap_pinit_t pinit)
 	}
 	CTR1(KTR_VM, "vmspace_alloc: %p", vm);
 	_vm_map_init(&vm->vm_map, vmspace_pmap(vm), min, max);
+	LIST_INIT(&vm->vm_conames);
 	vm->vm_refcnt = 1;
 	vm->vm_shm = NULL;
 	vm->vm_swrss = 0;
@@ -354,6 +355,7 @@ vmspace_container_reset(struct proc *p)
 static inline void
 vmspace_dofree(struct vmspace *vm)
 {
+	struct coname *con, *next;
 
 	CTR1(KTR_VM, "vmspace_free: %p", vm);
 
@@ -370,6 +372,11 @@ vmspace_dofree(struct vmspace *vm)
 	 */
 	(void)vm_map_remove(&vm->vm_map, vm->vm_map.min_offset,
 	    vm->vm_map.max_offset);
+
+	LIST_FOREACH_SAFE(con, &vm->vm_conames, c_next, next) {
+		free(con->c_name, M_TEMP);
+		free(con, M_TEMP);
+	}
 
 	pmap_release(vmspace_pmap(vm));
 	vm->vm_map.pmap = NULL;

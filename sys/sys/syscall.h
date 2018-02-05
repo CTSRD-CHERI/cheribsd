@@ -481,4 +481,6 @@
 #define	SYS_kevent	560
 #define	SYS_coexecve	561
 #define	SYS_cocreate	562
-#define	SYS_MAXSYSCALL	563
+#define	SYS_coregister	563
+#define	SYS_colookup	564
+#define	SYS_MAXSYSCALL	565

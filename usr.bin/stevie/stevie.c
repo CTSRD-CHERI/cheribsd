@@ -44,6 +44,8 @@ __FBSDID("$FreeBSD$");
 
 extern int	cocreate(void * __capability *, void * __capability *);
 extern int	cocall(void * __capability, void * __capability);
+extern int	coregister(const char *, void * __capability *);
+extern int	colookup(const char *, void * __capability *);
 
 void * __capability switcher_code;
 void * __capability switcher_data;
@@ -117,11 +119,22 @@ show_chunk(void *ptr, off_t off, int len)
 static void
 call(void)
 {
+	void * __capability registered;
+	void * __capability lookedup;
 	int error;
 
 	error = cocreate(&switcher_code, &switcher_data);
-	if (error < 0)
+	if (error != 0)
 		err(1, "cocreate");
+
+	error = coregister("kopytko", &registered);
+	if (error != 0)
+		err(1, "coregister");
+
+	error = colookup("kopytko", &lookedup);
+	if (error != 0)
+		err(1, "colookup");
+	fprintf(stderr, "registered %p, found %p...\n", (__cheri_fromcap void *)registered, (__cheri_fromcap void *)lookedup);
 
 	fprintf(stderr, "cocall to code capability %p, data capability %p...\n", (__cheri_fromcap void *)switcher_code, (__cheri_fromcap void *)switcher_data);
 	error = cocall(switcher_code, switcher_data);

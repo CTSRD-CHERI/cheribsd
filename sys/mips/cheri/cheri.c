@@ -282,6 +282,7 @@ sys_cocreate(struct thread *td, struct cocreate_args *uap)
 	}
 
 	addr = td->td_retval[0];
+	td->td_retval[0] = 0;
 
 	map = &td->td_proc->p_vmspace->vm_map;
 	vm_map_lock(map);
@@ -301,5 +302,81 @@ sys_cocreate(struct thread *td, struct cocreate_args *uap)
 	cheri_capability_set(&datacap, CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 0);
 	datacap = cheri_seal(datacap, curproc->p_md.md_cheri_sealcap);
 	error = copyoutcap(&datacap, uap->data, sizeof(datacap));
+	return (error);
+}
+
+int
+sys_coregister(struct thread *td, struct coregister_args *uap)
+{
+	struct vmspace *vmspace;
+	struct coname *con;
+	char name[PATH_MAX];
+	void * __capability cap;
+	int error;
+
+	vmspace = td->td_proc->p_vmspace;
+
+	error = copyinstr(uap->name, name, sizeof(name), NULL);
+	if (error != 0)
+		return (error);
+
+	if (strlen(name) == 0)
+		return (EINVAL);
+
+	if (strlen(name) >= PATH_MAX)
+		return (ENAMETOOLONG);
+
+	vm_map_lock(&vmspace->vm_map);
+	LIST_FOREACH(con, &vmspace->vm_conames, c_next) {
+		if (strcmp(name, con->c_name) == 0) {
+			vm_map_unlock(&vmspace->vm_map);
+			return (EEXIST);
+		}
+	}
+
+	cheri_capability_set(&cap, CHERI_CAP_USER_DATA_PERMS, 42 /* XXX */, PAGE_SIZE, 0);
+	cap = cheri_seal(cap, curproc->p_md.md_cheri_sealcap);
+	error = copyoutcap(&cap, uap->cap, sizeof(cap));
+	if (error != 0) {
+		vm_map_unlock(&vmspace->vm_map);
+		return (error);
+	}
+
+	con = malloc(sizeof(struct coname), M_TEMP, M_WAITOK);
+	con->c_name = strdup(name, M_TEMP);
+	con->c_value = cap;
+	LIST_INSERT_HEAD(&vmspace->vm_conames, con, c_next);
+	vm_map_unlock(&vmspace->vm_map);
+
+	return (0);
+}
+
+int
+sys_colookup(struct thread *td, struct colookup_args *uap)
+{
+	struct vmspace *vmspace;
+	const struct coname *con;
+	char name[PATH_MAX];
+	int error;
+
+	vmspace = td->td_proc->p_vmspace;
+
+	error = copyinstr(uap->name, name, sizeof(name), NULL);
+	if (error != 0)
+		return (error);
+
+	vm_map_lock(&vmspace->vm_map);
+	LIST_FOREACH(con, &vmspace->vm_conames, c_next) {
+		if (strcmp(name, con->c_name) == 0)
+			break;
+	}
+
+	if (con == NULL) {
+		vm_map_unlock(&vmspace->vm_map);
+		return (ESRCH);
+	}
+
+	error = copyoutcap(&con->c_value, uap->cap, sizeof(con->c_value));
+	vm_map_unlock(&vmspace->vm_map);
 	return (error);
 }

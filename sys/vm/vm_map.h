@@ -224,7 +224,15 @@ vm_map_modflags(vm_map_t map, vm_flags_t set, vm_flags_t clear)
 {
 	map->flags = (map->flags | set) & ~clear;
 }
+
+struct coname {
+	LIST_ENTRY(coname)	c_next;
+	char			*c_name;
+	void * __capability	c_value;
+};
 #endif	/* _KERNEL */
+
+struct coname;
 
 /*
  * Shareable process virtual address space.
@@ -235,6 +243,7 @@ vm_map_modflags(vm_map_t map, vm_flags_t set, vm_flags_t clear)
 struct vmspace {
 	struct vm_map vm_map;	/* VM address map */
 	struct shmmap_state *vm_shm;	/* SYS5 shared memory private data XXX */
+	LIST_HEAD(, coname) vm_conames;
 	segsz_t vm_swrss;	/* resident set size before last swap */
 	segsz_t vm_tsize;	/* text size (pages) XXX */
 	segsz_t vm_dsize;	/* data size (pages) XXX */
