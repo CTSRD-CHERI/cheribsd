@@ -889,6 +889,7 @@ sed -e '
 					a_type = argtype[i]
 					sub(/_c /, "", a_type)
 					sub(/_c_/, "_", a_type)
+					sub(/__capability/, "", a_type);
 					printf("%s%s %s", comma, a_type,
 					    argname[i]) > sysstubstubs
 				}
@@ -908,6 +909,7 @@ sed -e '
 						a_type = argtype[i]
 						sub(/_c /, "", a_type)
 						sub(/_c_/, "_", a_type)
+						sub(/__capability/, "", a_type);
 						if (i == argc)
 							printf(", ...") > sysstubstubs
 						else
@@ -918,12 +920,13 @@ sed -e '
 			}
 
 			# _protoargs_chk
-			printf ("),\n    /* _protoargs_chk */ (%s *retp , __capability int *stub_errno",
+			printf ("),\n    /* _protoargs_chk */ (%s *retp , int * __capability stub_errno",
 			    userrettype) > sysstubstubs
 			for (i = 1; i <= argc; i++) {
 				a_type = argtype[i]
 				sub(/_c /, "", a_type)
 				sub(/_c_/, "_", a_type)
+				sub(/__capability/, "", a_type);
 				if (isptrtype(a_type)) {
 					if (a_type ~ /intptr_t/) {
 						sub(/uintptr_t/, "__uintcap_t",
@@ -944,6 +947,7 @@ sed -e '
 				a_type = argtype[i]
 				sub(/_c /, "", a_type)
 				sub(/_c_/, "_", a_type)
+				sub(/__capability/, "", a_type);
 				if (isptrtype(a_type)) {
 					if (a_type ~ /intptr_t/) {
 						sub(/uintptr_t/, "__uintcap_t",
@@ -969,6 +973,7 @@ sed -e '
 					a_type = argtype[i]
 					sub(/_c /, "", a_type)
 					sub(/_c_/, "_", a_type)
+					sub(/__capability/, "", a_type);
 					cast = "(__cheri_fromcap " a_type ")"
 				} else
 					cast = ""
@@ -990,6 +995,7 @@ sed -e '
 					a_type = argtype[i]
 					sub(/_c /, "", a_type)
 					sub(/_c_/, "_", a_type)
+					sub(/__capability/, "", a_type);
 					cast = "(" a_type ")"
 				} else
 					cast = ""

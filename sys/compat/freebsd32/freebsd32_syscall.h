@@ -224,6 +224,7 @@
 #define	FREEBSD32_SYS_freebsd32_aio_read	255
 #define	FREEBSD32_SYS_freebsd32_aio_write	256
 #define	FREEBSD32_SYS_freebsd32_lio_listio	257
+#define	FREEBSD32_SYS_kbounce	258
 #define	FREEBSD32_SYS_freebsd11_freebsd32_getdents	272
 #define	FREEBSD32_SYS_lchmod	274
 #define	FREEBSD32_SYS_netbsd_lchown	275

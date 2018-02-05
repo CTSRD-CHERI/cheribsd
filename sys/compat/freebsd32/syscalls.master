@@ -489,7 +489,8 @@
 257	AUE_LIO_LISTIO	STD	{ int freebsd32_lio_listio(int mode, \
 				    struct aiocb32 * const *acb_list, \
 				    int nent, struct sigevent32 *sig); }
-258	AUE_NULL	UNIMPL	nosys
+258	AUE_NULL	NOPROTO	{ int kbounce(void *src, void *dst, \
+				    size_t len, int flags); }
 259	AUE_NULL	UNIMPL	nosys
 260	AUE_NULL	UNIMPL	nosys
 261	AUE_NULL	UNIMPL	nosys

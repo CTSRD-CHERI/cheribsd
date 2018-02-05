@@ -157,6 +157,12 @@ struct cheriabi_lio_listio_args {
 	char nent_l_[PADL_(int)]; int nent; char nent_r_[PADR_(int)];
 	char sig_l_[PADL_(struct sigevent_c *)]; struct sigevent_c * sig; char sig_r_[PADR_(struct sigevent_c *)];
 };
+struct cheriabi_kbounce_args {
+	char src_l_[PADL_(const void *__capability)]; const void *__capability src; char src_r_[PADR_(const void *__capability)];
+	char dst_l_[PADL_(void *__capability)]; void *__capability dst; char dst_r_[PADR_(void *__capability)];
+	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
 struct cheriabi_preadv_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char iovp_l_[PADL_(struct iovec_c *)]; struct iovec_c * iovp; char iovp_r_[PADR_(struct iovec_c *)];
@@ -429,6 +435,7 @@ int	cheriabi_ktimer_create(struct thread *, struct cheriabi_ktimer_create_args *
 int	cheriabi_aio_read(struct thread *, struct cheriabi_aio_read_args *);
 int	cheriabi_aio_write(struct thread *, struct cheriabi_aio_write_args *);
 int	cheriabi_lio_listio(struct thread *, struct cheriabi_lio_listio_args *);
+int	cheriabi_kbounce(struct thread *, struct cheriabi_kbounce_args *);
 int	cheriabi_preadv(struct thread *, struct cheriabi_preadv_args *);
 int	cheriabi_pwritev(struct thread *, struct cheriabi_pwritev_args *);
 int	cheriabi_kldstat(struct thread *, struct cheriabi_kldstat_args *);
@@ -559,6 +566,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_aio_read	AUE_AIO_READ
 #define	CHERIABI_SYS_AUE_cheriabi_aio_write	AUE_AIO_WRITE
 #define	CHERIABI_SYS_AUE_cheriabi_lio_listio	AUE_LIO_LISTIO
+#define	CHERIABI_SYS_AUE_cheriabi_kbounce	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_preadv	AUE_PREADV
 #define	CHERIABI_SYS_AUE_cheriabi_pwritev	AUE_PWRITEV
 #define	CHERIABI_SYS_AUE_cheriabi_kldstat	AUE_NULL

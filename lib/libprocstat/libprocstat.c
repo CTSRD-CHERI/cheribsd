@@ -318,6 +318,8 @@ procstat_getprocs(struct procstat *procstat, int what, int arg,
 	} else if (procstat->type == PROCSTAT_CORE) {
 		p = procstat_core_get(procstat->core, PSC_TYPE_PROC, NULL,
 		    &len);
+		if (p == NULL)
+			goto fail;
 		if ((len % sizeof(*p)) != 0 || p->ki_structsize != sizeof(*p)) {
 			warnx("kinfo_proc structure size mismatch");
 			goto fail;

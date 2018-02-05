@@ -459,13 +459,6 @@ negotiate:
 		/* If SIM disagree - renegotiate. */
 		if (mode != wantmode)
 			goto negotiate;
-
-		/* XXXAR: without the printf the following load of
-		 *  path->device_inq_flags causes a TLB miss when compiled
-		 *  with the latest clang. Possibly there is some strict
-		 * aliasing error? */
-		printf("ata_xpt crash workaround: path=%p, path->device=%p\n",
-		    path, path->device);
 		/* Remember what transport thinks about DMA. */
 		if (mode < ATA_DMA)
 			path->device->inq_flags &= ~SID_DMA;

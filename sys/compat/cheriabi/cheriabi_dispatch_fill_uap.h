@@ -167,6 +167,7 @@ static fill_uap_fp cheriabi_fill_uap_funcs[CHERIABI_SYS_MAXSYSCALL] = {
 	[CHERIABI_SYS_cheriabi_aio_read] = (fill_uap_fp)CHERIABI_SYS_cheriabi_aio_read_fill_uap,
 	[CHERIABI_SYS_cheriabi_aio_write] = (fill_uap_fp)CHERIABI_SYS_cheriabi_aio_write_fill_uap,
 	[CHERIABI_SYS_cheriabi_lio_listio] = (fill_uap_fp)CHERIABI_SYS_cheriabi_lio_listio_fill_uap,
+	[CHERIABI_SYS_cheriabi_kbounce] = (fill_uap_fp)CHERIABI_SYS_cheriabi_kbounce_fill_uap,
 	[CHERIABI_SYS_lchmod] = (fill_uap_fp)CHERIABI_SYS_lchmod_fill_uap,
 	[CHERIABI_SYS_lutimes] = (fill_uap_fp)CHERIABI_SYS_lutimes_fill_uap,
 	[CHERIABI_SYS_cheriabi_preadv] = (fill_uap_fp)CHERIABI_SYS_cheriabi_preadv_fill_uap,
