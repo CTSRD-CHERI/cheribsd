@@ -920,6 +920,9 @@ struct cheriabi_unlinkat_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 };
+struct cheriabi_gssd_syscall_args {
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+};
 struct cheriabi_jail_get_args {
 	char iovp_l_[PADL_(struct iovec_c *__capability)]; struct iovec_c *__capability iovp; char iovp_r_[PADR_(struct iovec_c *__capability)];
 	char iovcnt_l_[PADL_(unsigned int)]; unsigned int iovcnt; char iovcnt_r_[PADR_(unsigned int)];
@@ -1197,6 +1200,7 @@ int	cheriabi_readlinkat(struct thread *, struct cheriabi_readlinkat_args *);
 int	cheriabi_renameat(struct thread *, struct cheriabi_renameat_args *);
 int	cheriabi_symlinkat(struct thread *, struct cheriabi_symlinkat_args *);
 int	cheriabi_unlinkat(struct thread *, struct cheriabi_unlinkat_args *);
+int	cheriabi_gssd_syscall(struct thread *, struct cheriabi_gssd_syscall_args *);
 int	cheriabi_jail_get(struct thread *, struct cheriabi_jail_get_args *);
 int	cheriabi_jail_set(struct thread *, struct cheriabi_jail_set_args *);
 int	cheriabi___semctl(struct thread *, struct cheriabi___semctl_args *);
@@ -1454,6 +1458,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_renameat	AUE_RENAMEAT
 #define	CHERIABI_SYS_AUE_cheriabi_symlinkat	AUE_SYMLINKAT
 #define	CHERIABI_SYS_AUE_cheriabi_unlinkat	AUE_UNLINKAT
+#define	CHERIABI_SYS_AUE_cheriabi_gssd_syscall	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_jail_get	AUE_JAIL_GET
 #define	CHERIABI_SYS_AUE_cheriabi_jail_set	AUE_JAIL_SET
 #define	CHERIABI_SYS_AUE_cheriabi___semctl	AUE_SEMCTL

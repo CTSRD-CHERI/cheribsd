@@ -300,7 +300,7 @@
 #define	CHERIABI_SYS_cheriabi_symlinkat_PTRMASK	(0x0 | 0x1 | 0x4)
 #define	CHERIABI_SYS_cheriabi_unlinkat_PTRMASK	(0x0 | 0x2)
 #define	CHERIABI_SYS_posix_openpt_PTRMASK	(0x0)
-#define	CHERIABI_SYS_gssd_syscall_PTRMASK	(0x0 | 0x1)
+#define	CHERIABI_SYS_cheriabi_gssd_syscall_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_jail_get_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_jail_set_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_jail_remove_PTRMASK	(0x0)

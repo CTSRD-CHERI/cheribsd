@@ -1199,8 +1199,8 @@
 				    int flag); }
 504	AUE_POSIX_OPENPT	NOPROTO	{ int posix_openpt(int flags); }
 ; 505 is initialised by the kgssapi code, if present.
-505	AUE_NULL	NOSTD|NOPROTO	{ int gssd_syscall( \
-				    _In_z_ const char *path); }
+505	AUE_NULL	NOSTD	{ int cheriabi_gssd_syscall( \
+				    _In_z_ const char * __capability path); }
 506	AUE_JAIL_GET	STD	{ int cheriabi_jail_get(_In_reads_(iovcnt) \
 				    struct iovec_c * __capability iovp, \
 				    unsigned int iovcnt, int flags); }

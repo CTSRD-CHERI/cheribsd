@@ -421,7 +421,7 @@
 #define	CHERIABI_SYS_cheriabi_symlinkat	502
 #define	CHERIABI_SYS_cheriabi_unlinkat	503
 #define	CHERIABI_SYS_posix_openpt	504
-#define	CHERIABI_SYS_gssd_syscall	505
+#define	CHERIABI_SYS_cheriabi_gssd_syscall	505
 #define	CHERIABI_SYS_cheriabi_jail_get	506
 #define	CHERIABI_SYS_cheriabi_jail_set	507
 #define	CHERIABI_SYS_jail_remove	508

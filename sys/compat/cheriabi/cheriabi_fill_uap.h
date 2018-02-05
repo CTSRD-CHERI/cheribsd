@@ -6651,22 +6651,14 @@ CHERIABI_SYS_posix_openpt_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_gssd_syscall_fill_uap(struct thread *td,
-    struct gssd_syscall_args *uap)
+CHERIABI_SYS_cheriabi_gssd_syscall_fill_uap(struct thread *td,
+    struct cheriabi_gssd_syscall_args *uap)
 {
-	void * __capability tmpcap;
 
-	/* [0] _In_z_ const char * path */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_gssd_syscall_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->path),
-		    tmpcap, sizeof(*uap->path), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _In_z_ const char *__capability path */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->path),
+	    0, CHERIABI_SYS_cheriabi_gssd_syscall_PTRMASK);
 
 	return (0);
 }

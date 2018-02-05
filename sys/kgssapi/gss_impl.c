@@ -70,9 +70,24 @@ static struct syscall_helper_data gssd32_syscalls[] = {
 };
 #endif
 
+#ifdef COMPAT_CHERIABI
+#include <compat/cheriabi/cheriabi_proto.h>
+#include <compat/cheriabi/cheriabi_syscall.h>
+#include <compat/cheriabi/cheriabi_util.h>
+
+static struct syscall_helper_data cheriabi_gssd_syscalls[] = {
+
+	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_gssd_syscall),
+	SYSCALL_INIT_LAST
+};
+#endif
+
 struct kgss_mech_list kgss_mechs;
 CLIENT *kgss_gssd_handle;
 struct mtx kgss_gssd_lock;
+
+static int	kern_gssd_syscall(struct thread *td,
+		    const char * __capability upath);
 
 static int
 kgss_load(void)
@@ -88,6 +103,12 @@ kgss_load(void)
 	if (error != 0)
 		return (error);
 #endif
+#ifdef COMPAT_CHERIABI
+	error = cheriabi_syscall_helper_register(cheriabi_gssd_syscalls,
+	    SY_THR_STATIC_KLD);
+	if (error != 0)
+		return (error);
+#endif
 
 	return (0);
 }
@@ -100,10 +121,30 @@ kgss_unload(void)
 #ifdef COMPAT_FREEBSD32
 	syscall32_helper_unregister(gssd_syscalls);
 #endif
+#ifdef COMPAT_CHERIABI
+	cheriabi_syscall_helper_unregister(cheriabi_gssd_syscalls);
+#endif
 }
 
 int
 sys_gssd_syscall(struct thread *td, struct gssd_syscall_args *uap)
+{
+
+	return (kern_gssd_syscall(td, __USER_CAP_STR(uap->path)));
+}
+
+#ifdef COMPAT_CHERIABI
+int
+cheriabi_gssd_syscall(struct thread *td,
+    struct cheriabi_gssd_syscall_args *uap)
+{
+
+	return (kern_gssd_syscall(td, __USER_CAP_STR(uap->path)));
+}
+#endif
+
+static int
+kern_gssd_syscall(struct thread *td, const char * __capability upath)
 {
         struct sockaddr_un sun;
         struct netconfig *nconf;
@@ -115,7 +156,7 @@ sys_gssd_syscall(struct thread *td, struct gssd_syscall_args *uap)
 	if (error)
 		return (error);
 
-	error = copyinstr(uap->path, path, sizeof(path), NULL);
+	error = copyinstr_c(upath, &path[0], sizeof(path), NULL);
 	if (error)
 		return (error);
 	if (strlen(path) + 1 > sizeof(sun.sun_path))

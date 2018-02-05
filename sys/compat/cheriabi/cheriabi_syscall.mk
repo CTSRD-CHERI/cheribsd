@@ -310,7 +310,7 @@ MIASM =  \
 	cheriabi_symlinkat.o \
 	cheriabi_unlinkat.o \
 	posix_openpt.o \
-	gssd_syscall.o \
+	cheriabi_gssd_syscall.o \
 	cheriabi_jail_get.o \
 	cheriabi_jail_set.o \
 	jail_remove.o \
