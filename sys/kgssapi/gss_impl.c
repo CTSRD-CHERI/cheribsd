@@ -28,6 +28,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include "opt_compat.h"
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/kobj.h>
@@ -59,6 +61,15 @@ static struct syscall_helper_data gssd_syscalls[] = {
 	SYSCALL_INIT_LAST
 };
 
+#ifdef COMPAT_FREEBSD32
+#include <compat/freebsd32/freebsd32_util.h>
+
+static struct syscall_helper_data gssd32_syscalls[] = {
+	SYSCALL32_INIT_HELPER_COMPAT(gssd_syscall),
+	SYSCALL_INIT_LAST
+};
+#endif
+
 struct kgss_mech_list kgss_mechs;
 CLIENT *kgss_gssd_handle;
 struct mtx kgss_gssd_lock;
@@ -72,6 +83,12 @@ kgss_load(void)
 	error = syscall_helper_register(gssd_syscalls, SY_THR_STATIC_KLD);
 	if (error != 0)
 		return (error);
+#ifdef COMPAT_FREEBSD32
+	error = syscall32_helper_register(gssd32_syscalls, SY_THR_STATIC_KLD);
+	if (error != 0)
+		return (error);
+#endif
+
 	return (0);
 }
 
@@ -80,6 +97,9 @@ kgss_unload(void)
 {
 
 	syscall_helper_unregister(gssd_syscalls);
+#ifdef COMPAT_FREEBSD32
+	syscall32_helper_unregister(gssd_syscalls);
+#endif
 }
 
 int
