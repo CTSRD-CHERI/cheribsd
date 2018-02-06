@@ -442,12 +442,12 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* mincore */
+	/* cheriabi_mincore */
 	case 78: {
-		struct mincore_args *p = params;
-		uarg[0] = (intptr_t) p->addr; /* const void * */
+		struct cheriabi_mincore_args *p = params;
+		uarg[0] = (cheri_getbase(p->addr) + cheri_getoffset(p->addr)); /* const void *__capability */
 		uarg[1] = p->len; /* size_t */
-		uarg[2] = (intptr_t) p->vec; /* char * */
+		uarg[2] = (cheri_getbase(p->vec) + cheri_getoffset(p->vec)); /* char *__capability */
 		*n_args = 3;
 		break;
 	}
@@ -3792,17 +3792,17 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* mincore */
+	/* cheriabi_mincore */
 	case 78:
 		switch(ndx) {
 		case 0:
-			p = "userland const void *";
+			p = "userland const void *__capability";
 			break;
 		case 1:
 			p = "size_t";
 			break;
 		case 2:
-			p = "userland char *";
+			p = "userland char *__capability";
 			break;
 		default:
 			break;
@@ -8550,7 +8550,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* mincore */
+	/* cheriabi_mincore */
 	case 78:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

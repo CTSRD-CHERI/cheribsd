@@ -1062,8 +1062,28 @@ CHERIABI_SYS_cheriabi_madvise_fill_uap(struct thread *td,
 	return (0);
 }
 
-static inline int	CHERIABI_SYS_mincore_fill_uap(struct thread *td,
-    struct mincore_args *uap);
+static inline int
+CHERIABI_SYS_cheriabi_mincore_fill_uap(struct thread *td,
+    struct cheriabi_mincore_args *uap)
+{
+	void * __capability tmpcap;
+
+	/* [1] size_t len */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_mincore_PTRMASK);
+	uap->len = cheri_getoffset(tmpcap);
+
+	/* [0] _Pagerange_opt_(len) const void *__capability addr */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->addr),
+	    0, CHERIABI_SYS_cheriabi_mincore_PTRMASK);
+
+	/* [2] _Out_writes_bytes_(len/PAGE_SIZE) char *__capability vec */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->vec),
+	    2, CHERIABI_SYS_cheriabi_mincore_PTRMASK);
+
+	return (0);
+}
 
 static inline int
 CHERIABI_SYS_cheriabi_getgroups_fill_uap(struct thread *td,

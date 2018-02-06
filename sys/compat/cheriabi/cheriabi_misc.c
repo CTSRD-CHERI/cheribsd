@@ -2296,3 +2296,15 @@ cheriabi_pdgetpid(struct thread *td, struct cheriabi_pdgetpid_args *uap)
 
 	return (user_pdgetpid(td, uap->fd, uap->pidp));
 }
+
+/*
+ * vm_mmap.c
+ */
+int
+cheriabi_mincore(struct thread *td, struct cheriabi_mincore_args *uap)
+{
+
+	/* XXX: check range of cap */
+	return (kern_mincore(td, (__cheri_addr uintptr_t)uap->addr, uap->len,
+	    uap->vec));
+}

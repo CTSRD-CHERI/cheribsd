@@ -57,7 +57,7 @@ MIASM =  \
 	munmap.o \
 	cheriabi_mprotect.o \
 	cheriabi_madvise.o \
-	mincore.o \
+	cheriabi_mincore.o \
 	cheriabi_getgroups.o \
 	cheriabi_setgroups.o \
 	getpgrp.o \

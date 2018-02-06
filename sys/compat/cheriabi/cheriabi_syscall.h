@@ -83,7 +83,7 @@
 #define	CHERIABI_SYS_cheriabi_madvise	75
 				/* 76 is obsolete vhangup */
 				/* 77 is obsolete vlimit */
-#define	CHERIABI_SYS_mincore	78
+#define	CHERIABI_SYS_cheriabi_mincore	78
 #define	CHERIABI_SYS_cheriabi_getgroups	79
 #define	CHERIABI_SYS_cheriabi_setgroups	80
 #define	CHERIABI_SYS_getpgrp	81

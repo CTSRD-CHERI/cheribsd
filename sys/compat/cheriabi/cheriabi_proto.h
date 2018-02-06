@@ -178,6 +178,11 @@ struct cheriabi_madvise_args {
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char behav_l_[PADL_(int)]; int behav; char behav_r_[PADR_(int)];
 };
+struct cheriabi_mincore_args {
+	char addr_l_[PADL_(const void *__capability)]; const void *__capability addr; char addr_r_[PADR_(const void *__capability)];
+	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
+	char vec_l_[PADL_(char *__capability)]; char *__capability vec; char vec_r_[PADR_(char *__capability)];
+};
 struct cheriabi_getgroups_args {
 	char gidsetsize_l_[PADL_(u_int)]; u_int gidsetsize; char gidsetsize_r_[PADR_(u_int)];
 	char gidset_l_[PADL_(gid_t *__capability)]; gid_t *__capability gidset; char gidset_r_[PADR_(gid_t *__capability)];
@@ -1055,6 +1060,7 @@ int	cheriabi_execve(struct thread *, struct cheriabi_execve_args *);
 int	cheriabi_chroot(struct thread *, struct cheriabi_chroot_args *);
 int	cheriabi_mprotect(struct thread *, struct cheriabi_mprotect_args *);
 int	cheriabi_madvise(struct thread *, struct cheriabi_madvise_args *);
+int	cheriabi_mincore(struct thread *, struct cheriabi_mincore_args *);
 int	cheriabi_getgroups(struct thread *, struct cheriabi_getgroups_args *);
 int	cheriabi_setgroups(struct thread *, struct cheriabi_setgroups_args *);
 int	cheriabi_setitimer(struct thread *, struct cheriabi_setitimer_args *);
@@ -1316,6 +1322,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_chroot	AUE_CHROOT
 #define	CHERIABI_SYS_AUE_cheriabi_mprotect	AUE_MPROTECT
 #define	CHERIABI_SYS_AUE_cheriabi_madvise	AUE_MADVISE
+#define	CHERIABI_SYS_AUE_cheriabi_mincore	AUE_MINCORE
 #define	CHERIABI_SYS_AUE_cheriabi_getgroups	AUE_GETGROUPS
 #define	CHERIABI_SYS_AUE_cheriabi_setgroups	AUE_SETGROUPS
 #define	CHERIABI_SYS_AUE_cheriabi_setitimer	AUE_SETITIMER

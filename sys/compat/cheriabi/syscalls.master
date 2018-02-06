@@ -236,11 +236,12 @@
 76	AUE_NULL	OBSOL	vhangup
 77	AUE_NULL	OBSOL	vlimit
 ; XXX-BD: missing round up of len for misaligned addr
-78	AUE_MINCORE	NOPROTO|NOPARSE	{ int mincore( \
-				    _Pagerange_opt_(len) const void *addr, \
+78	AUE_MINCORE	STD	{ int cheriabi_mincore( \
+				    _Pagerange_opt_(len) \
+				    const void * __capability addr, \
 				    size_t len, \
 				    _Out_writes_bytes_(len/PAGE_SIZE) \
-				    char *vec); }
+				    char * __capability vec); }
 79	AUE_GETGROUPS	STD	{ int cheriabi_getgroups(u_int gidsetsize, \
 				    _Out_writes_opt_(gidsetsize) \
 				    gid_t * __capability gidset); }

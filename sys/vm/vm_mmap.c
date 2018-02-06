@@ -928,11 +928,13 @@ int
 sys_mincore(struct thread *td, struct mincore_args *uap)
 {
 
-	return (kern_mincore(td, (uintptr_t)uap->addr, uap->len, uap->vec));
+	return (kern_mincore(td, (uintptr_t)uap->addr, uap->len,
+	    __USER_CAP(uap->vec, uap->len)));
 }
 
 int
-kern_mincore(struct thread *td, uintptr_t addr0, size_t len, char *vec)
+kern_mincore(struct thread *td, uintptr_t addr0, size_t len,
+    char * __capability vec)
 {
 	vm_offset_t addr, first_addr;
 	vm_offset_t end, cend;
@@ -1110,7 +1112,8 @@ RestartScan:
 			 */
 			while ((lastvecindex + 1) < vecindex) {
 				++lastvecindex;
-				error = subyte(vec + lastvecindex, 0);
+				error = subyte(
+				    __DECAP_CHECK(vec + lastvecindex, 1), 0);
 				if (error) {
 					error = EFAULT;
 					goto done2;
@@ -1120,7 +1123,8 @@ RestartScan:
 			/*
 			 * Pass the page information to the user
 			 */
-			error = subyte(vec + vecindex, mincoreinfo);
+			error = subyte(__DECAP_CHECK(vec + vecindex, 1),
+			    mincoreinfo);
 			if (error) {
 				error = EFAULT;
 				goto done2;
@@ -1151,7 +1155,7 @@ RestartScan:
 	vecindex = atop(end - first_addr);
 	while ((lastvecindex + 1) < vecindex) {
 		++lastvecindex;
-		error = subyte(vec + lastvecindex, 0);
+		error = subyte(__DECAP_CHECK(vec + lastvecindex, 1), 0);
 		if (error) {
 			error = EFAULT;
 			goto done2;

@@ -241,7 +241,8 @@ int	kern_lutimes(struct thread *td,
 	    const char * __capability path, enum uio_seg pathseg,
 	    const struct timeval * __capability tptr, enum uio_seg tptrseg);
 int	kern_madvise(struct thread *td, uintptr_t addr, size_t len, int behav);
-int	kern_mincore(struct thread *td, uintptr_t addr, size_t len, char *vec);
+int	kern_mincore(struct thread *td, uintptr_t addr, size_t len,
+	    char * __capability vec);
 int	kern_mkdirat(struct thread *td, int fd, const char * __capability path,
 	    enum uio_seg segflg, int mode);
 int	kern_mkfifoat(struct thread *td, int fd, const char * __capability path,

@@ -2553,5 +2553,6 @@ linux_mincore(struct thread *td, struct linux_mincore_args *args)
 	/* Needs to be page-aligned */
 	if (args->start & PAGE_MASK)
 		return (EINVAL);
-	return (kern_mincore(td, args->start, args->len, args->vec));
+	return (kern_mincore(td, args->start, args->len,
+	    __USER_CAP(args->vec, args->len)));
 }
