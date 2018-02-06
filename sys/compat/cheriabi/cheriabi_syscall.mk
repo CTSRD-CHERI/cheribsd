@@ -322,9 +322,9 @@ MIASM =  \
 	__cap_rights_get.o \
 	cap_enter.o \
 	cap_getmode.o \
-	pdfork.o \
+	cheriabi_pdfork.o \
 	pdkill.o \
-	pdgetpid.o \
+	cheriabi_pdgetpid.o \
 	cheriabi_pselect.o \
 	getloginclass.o \
 	setloginclass.o \

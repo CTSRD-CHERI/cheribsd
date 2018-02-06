@@ -434,9 +434,9 @@
 #define	CHERIABI_SYS___cap_rights_get	515
 #define	CHERIABI_SYS_cap_enter	516
 #define	CHERIABI_SYS_cap_getmode	517
-#define	CHERIABI_SYS_pdfork	518
+#define	CHERIABI_SYS_cheriabi_pdfork	518
 #define	CHERIABI_SYS_pdkill	519
-#define	CHERIABI_SYS_pdgetpid	520
+#define	CHERIABI_SYS_cheriabi_pdgetpid	520
 #define	CHERIABI_SYS_cheriabi_pselect	522
 #define	CHERIABI_SYS_getloginclass	523
 #define	CHERIABI_SYS_setloginclass	524

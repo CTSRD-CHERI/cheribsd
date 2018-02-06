@@ -2726,10 +2726,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* pdfork */
+	/* cheriabi_pdfork */
 	case 518: {
-		struct pdfork_args *p = params;
-		uarg[0] = (intptr_t) p->fdp; /* int * */
+		struct cheriabi_pdfork_args *p = params;
+		uarg[0] = (cheri_getbase(p->fdp) + cheri_getoffset(p->fdp)); /* int *__capability */
 		iarg[1] = p->flags; /* int */
 		*n_args = 2;
 		break;
@@ -2742,11 +2742,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* pdgetpid */
+	/* cheriabi_pdgetpid */
 	case 520: {
-		struct pdgetpid_args *p = params;
+		struct cheriabi_pdgetpid_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->pidp; /* pid_t * */
+		uarg[1] = (cheri_getbase(p->pidp) + cheri_getoffset(p->pidp)); /* pid_t *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -7601,11 +7601,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* pdfork */
+	/* cheriabi_pdfork */
 	case 518:
 		switch(ndx) {
 		case 0:
-			p = "userland int *";
+			p = "userland int *__capability";
 			break;
 		case 1:
 			p = "int";
@@ -7627,14 +7627,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* pdgetpid */
+	/* cheriabi_pdgetpid */
 	case 520:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland pid_t *";
+			p = "userland pid_t *__capability";
 			break;
 		default:
 			break;
@@ -9871,7 +9871,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* pdfork */
+	/* cheriabi_pdfork */
 	case 518:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9881,7 +9881,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* pdgetpid */
+	/* cheriabi_pdgetpid */
 	case 520:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

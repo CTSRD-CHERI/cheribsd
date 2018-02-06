@@ -1908,6 +1908,16 @@ cheriabi_acct(struct thread *td, struct cheriabi_acct_args *uap)
 }
 
 /*
+ * kern_fork.c
+ */
+int
+cheriabi_pdfork(struct thread *td, struct cheriabi_pdfork_args *uap)
+{
+
+	return (kern_pdfork(td, uap->fdp, uap->flags));
+}
+
+/*
  * kern_ktrace.c
  */
 
@@ -2274,4 +2284,15 @@ cheriabi_swapoff(struct thread *td, struct cheriabi_swapoff_args *uap)
 {
 
 	return (kern_swapoff(td, uap->name));
+}
+
+/*
+ * sys_procdesc.c
+ */
+
+int
+cheriabi_pdgetpid(struct thread *td, struct cheriabi_pdgetpid_args *uap)
+{
+
+	return (user_pdgetpid(td, uap->fd, uap->pidp));
 }

@@ -1228,9 +1228,11 @@
 				    int fd, _Out_ cap_rights_t *rightsp); }
 516	AUE_CAP_ENTER	NOPROTO	{ int cap_enter(void); }
 517	AUE_CAP_GETMODE	NOPROTO	{ int cap_getmode(_Out_ u_int *modep); }
-518	AUE_PDFORK	NOPROTO	{ int pdfork(_Out_ int *fdp, int flags); }
+518	AUE_PDFORK	STD	{ int cheriabi_pdfork( \
+				    _Out_ int * __capability fdp, int flags); }
 519	AUE_PDKILL	NOPROTO	{ int pdkill(int fd, int signum); }
-520	AUE_PDGETPID	NOPROTO	{ int pdgetpid(int fd, _Out_ pid_t *pidp); }
+520	AUE_PDGETPID	STD	{ int cheriabi_pdgetpid(int fd, \
+				    _Out_ pid_t * __capability pidp); }
 521	AUE_PDWAIT	UNIMPL	pdwait4
 522	AUE_SELECT	STD	{ int cheriabi_pselect(int nd, \
 				    _Inout_opt_ fd_set * __capability in, \

@@ -6872,26 +6872,19 @@ CHERIABI_SYS_cap_getmode_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_pdfork_fill_uap(struct thread *td,
-    struct pdfork_args *uap)
+CHERIABI_SYS_cheriabi_pdfork_fill_uap(struct thread *td,
+    struct cheriabi_pdfork_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [1] int flags */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_pdfork_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_pdfork_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [0] _Out_ int * fdp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_pdfork_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->fdp),
-		    tmpcap, sizeof(*uap->fdp), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _Out_ int *__capability fdp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->fdp),
+	    0, CHERIABI_SYS_cheriabi_pdfork_PTRMASK);
 
 	return (0);
 }
@@ -6914,26 +6907,19 @@ CHERIABI_SYS_pdkill_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_pdgetpid_fill_uap(struct thread *td,
-    struct pdgetpid_args *uap)
+CHERIABI_SYS_cheriabi_pdgetpid_fill_uap(struct thread *td,
+    struct cheriabi_pdgetpid_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] int fd */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_pdgetpid_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_pdgetpid_PTRMASK);
 	uap->fd = cheri_getoffset(tmpcap);
 
-	/* [1] _Out_ pid_t * pidp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_pdgetpid_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->pidp),
-		    tmpcap, sizeof(*uap->pidp), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [1] _Out_ pid_t *__capability pidp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->pidp),
+	    1, CHERIABI_SYS_cheriabi_pdgetpid_PTRMASK);
 
 	return (0);
 }

@@ -953,6 +953,14 @@ struct cheriabi_lpathconf_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 	char name_l_[PADL_(int)]; int name; char name_r_[PADR_(int)];
 };
+struct cheriabi_pdfork_args {
+	char fdp_l_[PADL_(int *__capability)]; int *__capability fdp; char fdp_r_[PADR_(int *__capability)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
+struct cheriabi_pdgetpid_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char pidp_l_[PADL_(pid_t *__capability)]; pid_t *__capability pidp; char pidp_r_[PADR_(pid_t *__capability)];
+};
 struct cheriabi_pselect_args {
 	char nd_l_[PADL_(int)]; int nd; char nd_r_[PADR_(int)];
 	char in_l_[PADL_(fd_set *__capability)]; fd_set *__capability in; char in_r_[PADR_(fd_set *__capability)];
@@ -1212,6 +1220,8 @@ int	cheriabi___semctl(struct thread *, struct cheriabi___semctl_args *);
 int	cheriabi_msgctl(struct thread *, struct cheriabi_msgctl_args *);
 int	cheriabi_shmctl(struct thread *, struct cheriabi_shmctl_args *);
 int	cheriabi_lpathconf(struct thread *, struct cheriabi_lpathconf_args *);
+int	cheriabi_pdfork(struct thread *, struct cheriabi_pdfork_args *);
+int	cheriabi_pdgetpid(struct thread *, struct cheriabi_pdgetpid_args *);
 int	cheriabi_pselect(struct thread *, struct cheriabi_pselect_args *);
 int	cheriabi_wait6(struct thread *, struct cheriabi_wait6_args *);
 int	cheriabi_chflagsat(struct thread *, struct cheriabi_chflagsat_args *);
@@ -1471,6 +1481,8 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_msgctl	AUE_MSGCTL
 #define	CHERIABI_SYS_AUE_cheriabi_shmctl	AUE_SHMCTL
 #define	CHERIABI_SYS_AUE_cheriabi_lpathconf	AUE_LPATHCONF
+#define	CHERIABI_SYS_AUE_cheriabi_pdfork	AUE_PDFORK
+#define	CHERIABI_SYS_AUE_cheriabi_pdgetpid	AUE_PDGETPID
 #define	CHERIABI_SYS_AUE_cheriabi_pselect	AUE_SELECT
 #define	CHERIABI_SYS_AUE_cheriabi_wait6	AUE_WAIT6
 #define	CHERIABI_SYS_AUE_cheriabi_chflagsat	AUE_CHFLAGSAT

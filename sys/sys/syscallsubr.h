@@ -274,6 +274,7 @@ int	kern_openat_c(struct thread *td, int fd, char const * __CAPABILITY path,
 	    enum uio_seg pathseg, int flags, int mode);
 int	kern_pathconf(struct thread *td, const char * __capability path,
 	    enum uio_seg pathseg, int name, u_long flags);
+int	kern_pdfork(struct thread *td, int * __capability fdp, int flags);
 int	kern_pipe(struct thread *td, int fildes[2], int flags,
 	    struct filecaps *fcaps1, struct filecaps *fcaps2);
 int	kern_poll(struct thread *td, struct pollfd * __capability fds,
@@ -422,6 +423,7 @@ int	kern_socketpair(struct thread *td, int domain, int type, int protocol,
 int	user_clock_nanosleep(struct thread *td, clockid_t clock_id,
 	    int flags, const struct timespec * __capability ua_rqtp,
 	    struct timespec * __capability ua_rmtp);
+int	user_pdgetpid(struct thread *td, int fd, pid_t * __capability pidp);
 int	user_sched_getparam(struct thread *td, pid_t,
 	    struct sched_param * __capability param);
 int	user_sched_rr_get_interval(struct thread *td, pid_t pid,
