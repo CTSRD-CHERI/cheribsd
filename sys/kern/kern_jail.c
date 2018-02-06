@@ -394,21 +394,22 @@ kern_jail(struct thread *td, struct jail *j)
 	IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
 	opt.uio_iovcnt++;
 	error = copyinstr(j->hostname, u_hostname, MAXHOSTNAMELEN, &tmplen);
-	IOVEC_INIT(&optiov[opt.uio_iovcnt], u_hostname, tmplen);
 	if (error) {
 		free(u_path, M_TEMP);
 		return (error);
 	}
+	IOVEC_INIT(&optiov[opt.uio_iovcnt], u_hostname, tmplen);
 	opt.uio_iovcnt++;
 	if (j->jailname != NULL) {
 		optstr = "name";
 		IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
 		opt.uio_iovcnt++;
-		IOVEC_INIT(&optiov[opt.uio_iovcnt], u_name, tmplen);
+		error = copyinstr(j->jailname, u_name, MAXHOSTNAMELEN, &tmplen);
 		if (error) {
 			free(u_path, M_TEMP);
 			return (error);
 		}
+		IOVEC_INIT(&optiov[opt.uio_iovcnt], u_name, tmplen);
 		opt.uio_iovcnt++;
 	}
 #ifdef INET
