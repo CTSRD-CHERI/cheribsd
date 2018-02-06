@@ -118,7 +118,7 @@ XLEAF(memcpy_c)
 XLEAF(memcpynocap_c)
 	cmove	$c1, $c3
 	cmove	$c3, $c4
-	cmove	$c3, $c1
+	cmove	$c4, $c1
 XLEAF(bcopy)
 XLEAF(bcopy_c)
 XLEAF(bcopynocap_c)
