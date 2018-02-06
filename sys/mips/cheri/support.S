@@ -141,9 +141,16 @@ XLEAF(bcopynocap_c)
 	cgetbase	t3, $c4
 	cgetoffset	t1, $c4
 	daddu	t3, t3, t1	/* dest cursor in t3 */
+	/* enough bytes to copy for an aligned copy? */
+	slti	t1, a0, CHERICAP_SIZE
+	bnez	t1, 3f /* check_word_align */
 	/* check dest alignment */
 	andi	t1, t3, (CHERICAP_SIZE - 1)
 	beqz	t1, 7f	/* cap_copy */
+3:	/* check_word_align: */
+	/* enough bytes to copy for an aligned copy? */
+	slti	t1, a0, SZREG
+	bnez	t1, 6f /* byte_copy */
 	andi	t1, t3, (SZREG - 1)
 	bnez	t1, 6f	/* byte_copy */
 	nop
