@@ -438,8 +438,8 @@
 #define	CHERIABI_SYS_pdkill	519
 #define	CHERIABI_SYS_cheriabi_pdgetpid	520
 #define	CHERIABI_SYS_cheriabi_pselect	522
-#define	CHERIABI_SYS_getloginclass	523
-#define	CHERIABI_SYS_setloginclass	524
+#define	CHERIABI_SYS_cheriabi_getloginclass	523
+#define	CHERIABI_SYS_cheriabi_setloginclass	524
 #define	CHERIABI_SYS_rctl_get_racct	525
 #define	CHERIABI_SYS_rctl_get_rules	526
 #define	CHERIABI_SYS_rctl_get_limits	527

@@ -974,6 +974,13 @@ struct cheriabi_pselect_args {
 	char ts_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability ts; char ts_r_[PADR_(const struct timespec *__capability)];
 	char sm_l_[PADL_(const sigset_t *__capability)]; const sigset_t *__capability sm; char sm_r_[PADR_(const sigset_t *__capability)];
 };
+struct cheriabi_getloginclass_args {
+	char namebuf_l_[PADL_(char *__capability)]; char *__capability namebuf; char namebuf_r_[PADR_(char *__capability)];
+	char namelen_l_[PADL_(size_t)]; size_t namelen; char namelen_r_[PADR_(size_t)];
+};
+struct cheriabi_setloginclass_args {
+	char namebuf_l_[PADL_(const char *__capability)]; const char *__capability namebuf; char namebuf_r_[PADR_(const char *__capability)];
+};
 struct cheriabi_wait6_args {
 	char idtype_l_[PADL_(int)]; int idtype; char idtype_r_[PADR_(int)];
 	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
@@ -1229,6 +1236,8 @@ int	cheriabi_lpathconf(struct thread *, struct cheriabi_lpathconf_args *);
 int	cheriabi_pdfork(struct thread *, struct cheriabi_pdfork_args *);
 int	cheriabi_pdgetpid(struct thread *, struct cheriabi_pdgetpid_args *);
 int	cheriabi_pselect(struct thread *, struct cheriabi_pselect_args *);
+int	cheriabi_getloginclass(struct thread *, struct cheriabi_getloginclass_args *);
+int	cheriabi_setloginclass(struct thread *, struct cheriabi_setloginclass_args *);
 int	cheriabi_wait6(struct thread *, struct cheriabi_wait6_args *);
 int	cheriabi_chflagsat(struct thread *, struct cheriabi_chflagsat_args *);
 int	cheriabi_aio_mlock(struct thread *, struct cheriabi_aio_mlock_args *);
@@ -1491,6 +1500,8 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_pdfork	AUE_PDFORK
 #define	CHERIABI_SYS_AUE_cheriabi_pdgetpid	AUE_PDGETPID
 #define	CHERIABI_SYS_AUE_cheriabi_pselect	AUE_SELECT
+#define	CHERIABI_SYS_AUE_cheriabi_getloginclass	AUE_GETLOGINCLASS
+#define	CHERIABI_SYS_AUE_cheriabi_setloginclass	AUE_SETLOGINCLASS
 #define	CHERIABI_SYS_AUE_cheriabi_wait6	AUE_WAIT6
 #define	CHERIABI_SYS_AUE_cheriabi_chflagsat	AUE_CHFLAGSAT
 #define	CHERIABI_SYS_AUE_cheriabi_aio_mlock	AUE_AIO_MLOCK

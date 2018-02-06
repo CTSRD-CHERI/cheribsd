@@ -1243,11 +1243,12 @@
 				    const struct timespec * __capability ts, \
 				    _In_opt_ \
 				    const sigset_t * __capability sm); }
-523	AUE_GETLOGINCLASS	NOPROTO	{ int getloginclass( \
-				    _Out_writes_z_(namelen) char *namebuf, \
+523	AUE_GETLOGINCLASS	STD	{ int cheriabi_getloginclass( \
+				    _Out_writes_z_(namelen) \
+				    char * __capability namebuf, \
 				    size_t namelen); }
-524	AUE_SETLOGINCLASS	NOPROTO	{ int setloginclass( \
-				    _In_z_ const char *namebuf); }
+524	AUE_SETLOGINCLASS	STD	{ int cheriabi_setloginclass( \
+				    _In_z_ const char * __capability namebuf); }
 525	AUE_NULL	NOPROTO	{ int rctl_get_racct( \
 				    _In_reads_bytes_(inbuflen) \
 				    const void *inbufp, size_t inbuflen, \

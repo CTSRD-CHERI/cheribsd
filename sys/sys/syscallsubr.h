@@ -188,6 +188,8 @@ int	kern_getgroups(struct thread *td, u_int gidsetsize,
 int	kern_getitimer(struct thread *, u_int, struct itimerval *);
 int	kern_getlogin(struct thread *td, char * __capability namebuf,
 	    u_int namelen);
+int	kern_getloginclass(struct thread *td, char * __capability namebuf,
+	    size_t namelen);
 int	kern_getppid(struct thread *);
 int	kern_getpeername(struct thread *td, int fd, struct sockaddr **sa,
 	    socklen_t *alen);
@@ -336,6 +338,8 @@ int	kern_sched_rr_get_interval_td(struct thread *td, struct thread *targettd,
 int	kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 	    ksemun_t *arg, register_t *rval);
 int	kern_setlogin(struct thread *td, const char * __CAPABILITY namebuf);
+int	kern_setloginclass(struct thread *td,
+	    const char * __capability namebuf);
 int	kern_select(struct thread *td, int nd, fd_set * __capability fd_in,
 	    fd_set * __capability fd_ou, fd_set * __capability fd_ex,
 	    struct timeval *tvp, int abi_nfdbits);

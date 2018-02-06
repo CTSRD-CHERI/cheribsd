@@ -2058,6 +2058,25 @@ done:
 	return (error);
 }
 
+/*
+ * kern_loginclass.c
+ */
+int
+cheriabi_getloginclass(struct thread *td,
+    struct cheriabi_getloginclass_args *uap)
+{
+
+	return (kern_getloginclass(td, uap->namebuf, uap->namelen));
+}
+
+int
+cheriabi_setloginclass(struct thread *td,
+    struct cheriabi_setloginclass_args *uap)
+{
+
+	return (kern_setloginclass(td, uap->namebuf));
+}
+
 int
 cheriabi_uuidgen(struct thread *td, struct cheriabi_uuidgen_args *uap)
 {

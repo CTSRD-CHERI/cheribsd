@@ -6983,47 +6983,32 @@ CHERIABI_SYS_cheriabi_pselect_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_getloginclass_fill_uap(struct thread *td,
-    struct getloginclass_args *uap)
+CHERIABI_SYS_cheriabi_getloginclass_fill_uap(struct thread *td,
+    struct cheriabi_getloginclass_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [1] size_t namelen */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_getloginclass_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_getloginclass_PTRMASK);
 	uap->namelen = cheri_getoffset(tmpcap);
 
-	/* [0] _Out_writes_z_(namelen) char * namebuf */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_getloginclass_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->namebuf),
-		    tmpcap, (sizeof(*uap->namebuf) * uap->namelen), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _Out_writes_z_(namelen) char *__capability namebuf */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->namebuf),
+	    0, CHERIABI_SYS_cheriabi_getloginclass_PTRMASK);
 
 	return (0);
 }
 
 static inline int
-CHERIABI_SYS_setloginclass_fill_uap(struct thread *td,
-    struct setloginclass_args *uap)
+CHERIABI_SYS_cheriabi_setloginclass_fill_uap(struct thread *td,
+    struct cheriabi_setloginclass_args *uap)
 {
-	void * __capability tmpcap;
 
-	/* [0] _In_z_ const char * namebuf */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_setloginclass_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->namebuf),
-		    tmpcap, sizeof(*uap->namebuf), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _In_z_ const char *__capability namebuf */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->namebuf),
+	    0, CHERIABI_SYS_cheriabi_setloginclass_PTRMASK);
 
 	return (0);
 }

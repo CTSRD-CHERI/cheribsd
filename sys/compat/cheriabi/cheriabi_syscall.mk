@@ -326,8 +326,8 @@ MIASM =  \
 	pdkill.o \
 	cheriabi_pdgetpid.o \
 	cheriabi_pselect.o \
-	getloginclass.o \
-	setloginclass.o \
+	cheriabi_getloginclass.o \
+	cheriabi_setloginclass.o \
 	rctl_get_racct.o \
 	rctl_get_rules.o \
 	rctl_get_limits.o \

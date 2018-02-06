@@ -2762,18 +2762,18 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 6;
 		break;
 	}
-	/* getloginclass */
+	/* cheriabi_getloginclass */
 	case 523: {
-		struct getloginclass_args *p = params;
-		uarg[0] = (intptr_t) p->namebuf; /* char * */
+		struct cheriabi_getloginclass_args *p = params;
+		uarg[0] = (cheri_getbase(p->namebuf) + cheri_getoffset(p->namebuf)); /* char *__capability */
 		uarg[1] = p->namelen; /* size_t */
 		*n_args = 2;
 		break;
 	}
-	/* setloginclass */
+	/* cheriabi_setloginclass */
 	case 524: {
-		struct setloginclass_args *p = params;
-		uarg[0] = (intptr_t) p->namebuf; /* const char * */
+		struct cheriabi_setloginclass_args *p = params;
+		uarg[0] = (cheri_getbase(p->namebuf) + cheri_getoffset(p->namebuf)); /* const char *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -7665,11 +7665,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* getloginclass */
+	/* cheriabi_getloginclass */
 	case 523:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland char *__capability";
 			break;
 		case 1:
 			p = "size_t";
@@ -7678,11 +7678,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* setloginclass */
+	/* cheriabi_setloginclass */
 	case 524:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		default:
 			break;
@@ -9891,12 +9891,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* getloginclass */
+	/* cheriabi_getloginclass */
 	case 523:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* setloginclass */
+	/* cheriabi_setloginclass */
 	case 524:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
