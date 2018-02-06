@@ -457,7 +457,7 @@
 #define	CHERIABI_SYS_connectat	539
 #define	CHERIABI_SYS_cheriabi_chflagsat	540
 #define	CHERIABI_SYS_accept4	541
-#define	CHERIABI_SYS_pipe2	542
+#define	CHERIABI_SYS_cheriabi_pipe2	542
 #define	CHERIABI_SYS_cheriabi_aio_mlock	543
 #define	CHERIABI_SYS_cheriabi_procctl	544
 #define	CHERIABI_SYS_cheriabi_ppoll	545

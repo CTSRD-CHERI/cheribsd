@@ -7574,26 +7574,19 @@ CHERIABI_SYS_accept4_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_pipe2_fill_uap(struct thread *td,
-    struct pipe2_args *uap)
+CHERIABI_SYS_cheriabi_pipe2_fill_uap(struct thread *td,
+    struct cheriabi_pipe2_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [1] int flags */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_pipe2_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_pipe2_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [0] _Out_writes_(2) int * fildes */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_pipe2_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->fildes),
-		    tmpcap, (sizeof(*uap->fildes) * 2), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _Out_writes_(2) int *__capability fildes */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->fildes),
+	    0, CHERIABI_SYS_cheriabi_pipe2_PTRMASK);
 
 	return (0);
 }

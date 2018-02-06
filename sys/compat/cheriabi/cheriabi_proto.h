@@ -995,6 +995,10 @@ struct cheriabi_chflagsat_args {
 	char flags_l_[PADL_(u_long)]; u_long flags; char flags_r_[PADR_(u_long)];
 	char atflag_l_[PADL_(int)]; int atflag; char atflag_r_[PADR_(int)];
 };
+struct cheriabi_pipe2_args {
+	char fildes_l_[PADL_(int *__capability)]; int *__capability fildes; char fildes_r_[PADR_(int *__capability)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
 struct cheriabi_aio_mlock_args {
 	char aiocbp_l_[PADL_(struct aiocb_c *__capability)]; struct aiocb_c *__capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c *__capability)];
 };
@@ -1240,6 +1244,7 @@ int	cheriabi_getloginclass(struct thread *, struct cheriabi_getloginclass_args *
 int	cheriabi_setloginclass(struct thread *, struct cheriabi_setloginclass_args *);
 int	cheriabi_wait6(struct thread *, struct cheriabi_wait6_args *);
 int	cheriabi_chflagsat(struct thread *, struct cheriabi_chflagsat_args *);
+int	cheriabi_pipe2(struct thread *, struct cheriabi_pipe2_args *);
 int	cheriabi_aio_mlock(struct thread *, struct cheriabi_aio_mlock_args *);
 int	cheriabi_procctl(struct thread *, struct cheriabi_procctl_args *);
 int	cheriabi_ppoll(struct thread *, struct cheriabi_ppoll_args *);
@@ -1504,6 +1509,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_setloginclass	AUE_SETLOGINCLASS
 #define	CHERIABI_SYS_AUE_cheriabi_wait6	AUE_WAIT6
 #define	CHERIABI_SYS_AUE_cheriabi_chflagsat	AUE_CHFLAGSAT
+#define	CHERIABI_SYS_AUE_cheriabi_pipe2	AUE_PIPE
 #define	CHERIABI_SYS_AUE_cheriabi_aio_mlock	AUE_AIO_MLOCK
 #define	CHERIABI_SYS_AUE_cheriabi_procctl	AUE_PROCCTL
 #define	CHERIABI_SYS_AUE_cheriabi_ppoll	AUE_POLL

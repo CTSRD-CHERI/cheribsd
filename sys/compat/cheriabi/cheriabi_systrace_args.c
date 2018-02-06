@@ -2940,10 +2940,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
-	/* pipe2 */
+	/* cheriabi_pipe2 */
 	case 542: {
-		struct pipe2_args *p = params;
-		uarg[0] = (intptr_t) p->fildes; /* int * */
+		struct cheriabi_pipe2_args *p = params;
+		uarg[0] = (cheri_getbase(p->fildes) + cheri_getoffset(p->fildes)); /* int *__capability */
 		iarg[1] = p->flags; /* int */
 		*n_args = 2;
 		break;
@@ -7990,11 +7990,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* pipe2 */
+	/* cheriabi_pipe2 */
 	case 542:
 		switch(ndx) {
 		case 0:
-			p = "userland int *";
+			p = "userland int *__capability";
 			break;
 		case 1:
 			p = "int";
@@ -9986,7 +9986,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* pipe2 */
+	/* cheriabi_pipe2 */
 	case 542:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

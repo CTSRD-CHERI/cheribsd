@@ -2306,6 +2306,16 @@ cheriabi_swapoff(struct thread *td, struct cheriabi_swapoff_args *uap)
 }
 
 /*
+ * sys_pipe.c
+ */
+int
+cheriabi_pipe2(struct thread *td, struct cheriabi_pipe2_args *uap)
+{
+
+	return (kern_pipe2(td, uap->fildes, uap->flags));
+}
+
+/*
  * sys_procdesc.c
  */
 

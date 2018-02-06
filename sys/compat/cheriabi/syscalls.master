@@ -1317,7 +1317,8 @@
 				    _Inout_opt_ \
 				    __socklen_t * __restrict anamelen, \
 				    int flags); }
-542	AUE_PIPE	NOPROTO	{ int pipe2(_Out_writes_(2) int *fildes, \
+542	AUE_PIPE	STD	{ int cheriabi_pipe2( \
+				    _Out_writes_(2) int * __capability fildes, \
 				    int flags); }
 543	AUE_AIO_MLOCK	STD	{ int cheriabi_aio_mlock( \
 				    _Inout_ struct aiocb_c * __capability \

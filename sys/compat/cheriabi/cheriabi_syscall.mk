@@ -345,7 +345,7 @@ MIASM =  \
 	connectat.o \
 	cheriabi_chflagsat.o \
 	accept4.o \
-	pipe2.o \
+	cheriabi_pipe2.o \
 	cheriabi_aio_mlock.o \
 	cheriabi_procctl.o \
 	cheriabi_ppoll.o \

@@ -334,7 +334,7 @@
 #define	CHERIABI_SYS_connectat_PTRMASK	(0x0 | 0x4)
 #define	CHERIABI_SYS_cheriabi_chflagsat_PTRMASK	(0x0 | 0x2)
 #define	CHERIABI_SYS_accept4_PTRMASK	(0x0 | 0x2 | 0x4)
-#define	CHERIABI_SYS_pipe2_PTRMASK	(0x0 | 0x1)
+#define	CHERIABI_SYS_cheriabi_pipe2_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_aio_mlock_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_procctl_PTRMASK	(0x0 | 0x8)
 #define	CHERIABI_SYS_cheriabi_ppoll_PTRMASK	(0x0 | 0x1 | 0x4 | 0x8)
