@@ -465,50 +465,6 @@ CHERIABI_SYS__umtx_op_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_cheriabi___semctl_fill_uap(struct thread *td,
-    struct cheriabi___semctl_args *uap)
-{
-	void * __capability tmpcap;
-	int error;
-
-	/* [0] int semid */
-	cheriabi_fetch_syscall_arg(td, &tmpcap,
-	    0, CHERIABI_SYS_cheriabi___semctl_PTRMASK);
-	uap->semid = cheri_getoffset(tmpcap);
-
-	/* [1] int semnum */
-	cheriabi_fetch_syscall_arg(td, &tmpcap,
-	    1, CHERIABI_SYS_cheriabi___semctl_PTRMASK);
-	uap->semnum = cheri_getoffset(tmpcap);
-
-	/* [2] int cmd */
-	cheriabi_fetch_syscall_arg(td, &tmpcap,
-	    2, CHERIABI_SYS_cheriabi___semctl_PTRMASK);
-	uap->cmd = cheri_getoffset(tmpcap);
-
-	/* [3] _In_opt_ union semun_c * arg */
-	switch (uap->cmd) {
-	case GETNCNT:
-	case GETPID:
-	case GETVAL:
-	case GETZCNT:
-	case IPC_RMID:
-		/* no arg */
-		uap->arg = NULL;
-		return (0);
-	}
-	cheriabi_fetch_syscall_arg(td, &tmpcap,
-	    3, CHERIABI_SYS_cheriabi___semctl_PTRMASK);
-	error = cheriabi_cap_to_ptr((caddr_t *)&uap->arg, tmpcap,
-	    sizeof(*uap->arg),
-	    CHERI_PERM_GLOBAL|CHERI_PERM_LOAD|CHERI_PERM_LOAD_CAP, 0);
-	if (error != 0)
-		return (error);
-
-	return (0);
-}
-
-static inline int
 CHERIABI_SYS_cheriabi_procctl_fill_uap(struct thread *td,
     struct cheriabi_procctl_args *uap)
 {

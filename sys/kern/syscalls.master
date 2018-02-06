@@ -921,7 +921,7 @@
 508	AUE_JAIL_REMOVE	STD	{ int jail_remove(int jid); }
 509	AUE_CLOSEFROM	STD	{ int closefrom(int lowfd); }
 510	AUE_SEMCTL	NOSTD	{ int __semctl(int semid, int semnum, \
-				    int cmd, union semun *arg); }
+				    int cmd, union semun_native *arg); }
 511	AUE_MSGCTL	NOSTD	{ int msgctl(int msqid, int cmd, \
 				    struct msqid_ds *buf); }
 512	AUE_SHMCTL	NOSTD	{ int shmctl(int shmid, int cmd, \

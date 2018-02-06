@@ -1209,8 +1209,9 @@
 				    unsigned int iovcnt, int flags); }
 508	AUE_JAIL_REMOVE	NOPROTO	{ int jail_remove(int jid); }
 509	AUE_CLOSEFROM	NOPROTO	{ int closefrom(int lowfd); }
-510	AUE_SEMCTL	NOSTD|NOPARSE { int cheriabi___semctl(int semid, int semnum, \
-				    int cmd, union semun_c *arg); }
+510	AUE_SEMCTL	NOSTD { int cheriabi___semctl(int semid, int semnum, \
+				    int cmd, \
+				    union semun_c * __capability arg); }
 ; XXX-BD: technically IPC_SET doesn't require _Out_ permissions
 511	AUE_MSGCTL	NOSTD { int cheriabi_msgctl(int msqid, int cmd, \
 				    _Inout_opt_ struct msqid_ds_c *buf); }

@@ -6733,8 +6733,31 @@ CHERIABI_SYS_closefrom_fill_uap(struct thread *td,
 	return (0);
 }
 
-static inline int	CHERIABI_SYS_cheriabi___semctl_fill_uap(struct thread *td,
-    struct cheriabi___semctl_args *uap);
+static inline int
+CHERIABI_SYS_cheriabi___semctl_fill_uap(struct thread *td,
+    struct cheriabi___semctl_args *uap)
+{
+	void * __capability tmpcap;
+
+	/* [0] int semid */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi___semctl_PTRMASK);
+	uap->semid = cheri_getoffset(tmpcap);
+
+	/* [1] int semnum */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___semctl_PTRMASK);
+	uap->semnum = cheri_getoffset(tmpcap);
+
+	/* [2] int cmd */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi___semctl_PTRMASK);
+	uap->cmd = cheri_getoffset(tmpcap);
+
+	/* [3] union semun_c *__capability arg */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->arg),
+	    3, CHERIABI_SYS_cheriabi___semctl_PTRMASK);
+
+	return (0);
+}
 
 static inline int
 CHERIABI_SYS_cheriabi_msgctl_fill_uap(struct thread *td,

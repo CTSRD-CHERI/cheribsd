@@ -30,6 +30,7 @@
 
 #include <sys/acl.h>
 #include <sys/signal.h>
+#include <sys/sem.h>
 #include <sys/uio.h>
 #include <sys/socket.h>
 #include <sys/mac.h>
@@ -57,7 +58,6 @@ struct ogetdirentries_args;
 struct rlimit;
 struct rusage;
 struct rtprio;
-union semun;
 struct sockaddr;
 struct stat;
 struct thr_param;
@@ -332,7 +332,7 @@ int	kern_sched_rr_get_interval(struct thread *td, pid_t pid,
 int	kern_sched_rr_get_interval_td(struct thread *td, struct thread *targettd,
 	    struct timespec *ts);
 int	kern_semctl(struct thread *td, int semid, int semnum, int cmd,
-	    union semun *arg, register_t *rval);
+	    ksemun_t *arg, register_t *rval);
 int	kern_setlogin(struct thread *td, const char * __CAPABILITY namebuf);
 int	kern_select(struct thread *td, int nd, fd_set * __capability fd_in,
 	    fd_set * __capability fd_ou, fd_set * __capability fd_ex,

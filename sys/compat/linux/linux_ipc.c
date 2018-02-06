@@ -544,7 +544,7 @@ linux_semctl(struct thread *td, struct linux_semctl_args *args)
 	struct l_semid64_ds linux_semid64;
 	struct l_seminfo linux_seminfo;
 	struct semid_ds semid;
-	union semun semun;
+	ksemun_t semun;
 	register_t rval;
 	int cmd, error;
 
@@ -629,11 +629,11 @@ linux_semctl(struct thread *td, struct linux_semctl_args *args)
 		return (0);
 	case LINUX_GETALL:
 		cmd = GETALL;
-		semun.array = PTRIN(args->arg.array);
+		semun.array = __USER_CAP_UNBOUND(PTRIN(args->arg.array));
 		break;
 	case LINUX_SETALL:
 		cmd = SETALL;
-		semun.array = PTRIN(args->arg.array);
+		semun.array = __USER_CAP_UNBOUND(PTRIN(args->arg.array));
 		break;
 	default:
 		linux_msg(td, "ipc type %d is not implemented",
