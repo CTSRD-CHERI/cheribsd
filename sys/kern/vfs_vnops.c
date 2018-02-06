@@ -1211,11 +1211,11 @@ vn_io_fault_uiomove(char *data, int xfersize, struct uio *uio)
 
 	KASSERT(uio->uio_iovcnt == 1, ("uio_iovcnt %d", uio->uio_iovcnt));
 	transp_uio.uio_iov = &transp_iov[0];
-	IOVEC_INIT(&transp_iov[0], data, xfersize);
 	transp_uio.uio_iovcnt = 1;
 	if (xfersize > uio->uio_resid)
 		xfersize = uio->uio_resid;
-	transp_uio.uio_resid = transp_iov[0].iov_len;
+	IOVEC_INIT(&transp_iov[0], data, xfersize);
+	transp_uio.uio_resid = xfersize;
 	transp_uio.uio_offset = 0;
 	transp_uio.uio_segflg = UIO_SYSSPACE;
 	/*
