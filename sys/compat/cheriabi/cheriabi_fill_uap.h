@@ -6773,46 +6773,32 @@ CHERIABI_SYS_cheriabi_msgctl_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_msgctl_PTRMASK);
 	uap->cmd = cheri_getoffset(tmpcap);
 
-	/* [2] _Inout_opt_ struct msqid_ds_c * buf */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD|CHERI_PERM_LOAD_CAP|CHERI_PERM_STORE|CHERI_PERM_STORE_CAP);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_msgctl_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->buf),
-		    tmpcap, sizeof(*uap->buf), reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
+	/* [2] _Inout_opt_ struct msqid_ds_c *__capability buf */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->buf),
+	    2, CHERIABI_SYS_cheriabi_msgctl_PTRMASK);
 
 	return (0);
 }
 
 static inline int
-CHERIABI_SYS_shmctl_fill_uap(struct thread *td,
-    struct shmctl_args *uap)
+CHERIABI_SYS_cheriabi_shmctl_fill_uap(struct thread *td,
+    struct cheriabi_shmctl_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] int shmid */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_shmctl_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_shmctl_PTRMASK);
 	uap->shmid = cheri_getoffset(tmpcap);
 
 	/* [1] int cmd */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_shmctl_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_shmctl_PTRMASK);
 	uap->cmd = cheri_getoffset(tmpcap);
 
-	/* [2] _Inout_opt_ struct shmid_ds * buf */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD|CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_shmctl_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->buf),
-		    tmpcap, sizeof(*uap->buf), reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
+	/* [2] _Inout_opt_ struct shmid_ds *__capability buf */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->buf),
+	    2, CHERIABI_SYS_cheriabi_shmctl_PTRMASK);
 
 	return (0);
 }

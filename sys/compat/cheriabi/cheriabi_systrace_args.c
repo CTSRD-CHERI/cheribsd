@@ -2684,16 +2684,16 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct cheriabi_msgctl_args *p = params;
 		iarg[0] = p->msqid; /* int */
 		iarg[1] = p->cmd; /* int */
-		uarg[2] = (intptr_t) p->buf; /* struct msqid_ds_c * */
+		uarg[2] = (cheri_getbase(p->buf) + cheri_getoffset(p->buf)); /* struct msqid_ds_c *__capability */
 		*n_args = 3;
 		break;
 	}
-	/* shmctl */
+	/* cheriabi_shmctl */
 	case 512: {
-		struct shmctl_args *p = params;
+		struct cheriabi_shmctl_args *p = params;
 		iarg[0] = p->shmid; /* int */
 		iarg[1] = p->cmd; /* int */
-		uarg[2] = (intptr_t) p->buf; /* struct shmid_ds * */
+		uarg[2] = (cheri_getbase(p->buf) + cheri_getoffset(p->buf)); /* struct shmid_ds *__capability */
 		*n_args = 3;
 		break;
 	}
@@ -7537,13 +7537,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland struct msqid_ds_c *";
+			p = "userland struct msqid_ds_c *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* shmctl */
+	/* cheriabi_shmctl */
 	case 512:
 		switch(ndx) {
 		case 0:
@@ -7553,7 +7553,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland struct shmid_ds *";
+			p = "userland struct shmid_ds *__capability";
 			break;
 		default:
 			break;
@@ -9849,7 +9849,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* shmctl */
+	/* cheriabi_shmctl */
 	case 512:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

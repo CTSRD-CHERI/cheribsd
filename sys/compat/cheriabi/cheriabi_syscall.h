@@ -428,7 +428,7 @@
 #define	CHERIABI_SYS_closefrom	509
 #define	CHERIABI_SYS_cheriabi___semctl	510
 #define	CHERIABI_SYS_cheriabi_msgctl	511
-#define	CHERIABI_SYS_shmctl	512
+#define	CHERIABI_SYS_cheriabi_shmctl	512
 #define	CHERIABI_SYS_cheriabi_lpathconf	513
 				/* 514 is obsolete cap_new */
 #define	CHERIABI_SYS___cap_rights_get	515

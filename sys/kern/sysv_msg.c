@@ -1882,7 +1882,7 @@ cheriabi_msgctl(struct thread *td, struct cheriabi_msgctl_args *uap)
 	int error;
 
 	if (uap->cmd == IPC_SET) {
-		error = copyin(uap->buf, &msqbuf_c, sizeof(msqbuf_c));
+		error = copyin_c(uap->buf, &msqbuf_c, sizeof(msqbuf_c));
 		if (error)
 			return (error);
 		CP(msqbuf_c, msqbuf, msg_perm);
@@ -1912,7 +1912,8 @@ cheriabi_msgctl(struct thread *td, struct cheriabi_msgctl_args *uap)
 		CP(msqbuf, msqbuf_c, msg_stime);
 		CP(msqbuf, msqbuf_c, msg_rtime);
 		CP(msqbuf, msqbuf_c, msg_ctime);
-		error = copyout(&msqbuf_c, uap->buf, sizeof(struct msqid_ds_c));
+		error = copyout_c(&msqbuf_c, uap->buf,
+		    sizeof(struct msqid_ds_c));
 	}
 	return (error);
 }

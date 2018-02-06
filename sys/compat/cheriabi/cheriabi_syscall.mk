@@ -317,7 +317,7 @@ MIASM =  \
 	closefrom.o \
 	cheriabi___semctl.o \
 	cheriabi_msgctl.o \
-	shmctl.o \
+	cheriabi_shmctl.o \
 	cheriabi_lpathconf.o \
 	__cap_rights_get.o \
 	cap_enter.o \

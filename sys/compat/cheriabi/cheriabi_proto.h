@@ -942,7 +942,12 @@ struct cheriabi___semctl_args {
 struct cheriabi_msgctl_args {
 	char msqid_l_[PADL_(int)]; int msqid; char msqid_r_[PADR_(int)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char buf_l_[PADL_(struct msqid_ds_c *)]; struct msqid_ds_c * buf; char buf_r_[PADR_(struct msqid_ds_c *)];
+	char buf_l_[PADL_(struct msqid_ds_c *__capability)]; struct msqid_ds_c *__capability buf; char buf_r_[PADR_(struct msqid_ds_c *__capability)];
+};
+struct cheriabi_shmctl_args {
+	char shmid_l_[PADL_(int)]; int shmid; char shmid_r_[PADR_(int)];
+	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
+	char buf_l_[PADL_(struct shmid_ds *__capability)]; struct shmid_ds *__capability buf; char buf_r_[PADR_(struct shmid_ds *__capability)];
 };
 struct cheriabi_lpathconf_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
@@ -1205,6 +1210,7 @@ int	cheriabi_jail_get(struct thread *, struct cheriabi_jail_get_args *);
 int	cheriabi_jail_set(struct thread *, struct cheriabi_jail_set_args *);
 int	cheriabi___semctl(struct thread *, struct cheriabi___semctl_args *);
 int	cheriabi_msgctl(struct thread *, struct cheriabi_msgctl_args *);
+int	cheriabi_shmctl(struct thread *, struct cheriabi_shmctl_args *);
 int	cheriabi_lpathconf(struct thread *, struct cheriabi_lpathconf_args *);
 int	cheriabi_pselect(struct thread *, struct cheriabi_pselect_args *);
 int	cheriabi_wait6(struct thread *, struct cheriabi_wait6_args *);
@@ -1463,6 +1469,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_jail_set	AUE_JAIL_SET
 #define	CHERIABI_SYS_AUE_cheriabi___semctl	AUE_SEMCTL
 #define	CHERIABI_SYS_AUE_cheriabi_msgctl	AUE_MSGCTL
+#define	CHERIABI_SYS_AUE_cheriabi_shmctl	AUE_SHMCTL
 #define	CHERIABI_SYS_AUE_cheriabi_lpathconf	AUE_LPATHCONF
 #define	CHERIABI_SYS_AUE_cheriabi_pselect	AUE_SELECT
 #define	CHERIABI_SYS_AUE_cheriabi_wait6	AUE_WAIT6

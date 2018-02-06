@@ -1214,10 +1214,12 @@
 				    union semun_c * __capability arg); }
 ; XXX-BD: technically IPC_SET doesn't require _Out_ permissions
 511	AUE_MSGCTL	NOSTD { int cheriabi_msgctl(int msqid, int cmd, \
-				    _Inout_opt_ struct msqid_ds_c *buf); }
+				    _Inout_opt_ \
+				    struct msqid_ds_c * __capability buf); }
 ; XXX: technically buf is sometimes _In_ and sometimes _Out_
-512	AUE_SHMCTL	NOSTD|NOPROTO	{ int shmctl(int shmid, int cmd, \
-				    _Inout_opt_ struct shmid_ds *buf); }
+512	AUE_SHMCTL	NOSTD	{ int cheriabi_shmctl(int shmid, int cmd, \
+				    _Inout_opt_ \
+				    struct shmid_ds * __capability buf); }
 513	AUE_LPATHCONF	STD	{ int cheriabi_lpathconf( \
 				    _In_z_ const char * __capability path, \
 				    int name); }

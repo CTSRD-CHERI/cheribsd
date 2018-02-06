@@ -307,7 +307,7 @@
 #define	CHERIABI_SYS_closefrom_PTRMASK	(0x0)
 #define	CHERIABI_SYS_cheriabi___semctl_PTRMASK	(0x0 | 0x8)
 #define	CHERIABI_SYS_cheriabi_msgctl_PTRMASK	(0x0 | 0x4)
-#define	CHERIABI_SYS_shmctl_PTRMASK	(0x0 | 0x4)
+#define	CHERIABI_SYS_cheriabi_shmctl_PTRMASK	(0x0 | 0x4)
 #define	CHERIABI_SYS_cheriabi_lpathconf_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS___cap_rights_get_PTRMASK	(0x0 | 0x4)
 #define	CHERIABI_SYS_cap_getmode_PTRMASK	(0x0 | 0x1)

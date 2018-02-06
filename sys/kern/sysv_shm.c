@@ -97,6 +97,7 @@ __FBSDID("$FreeBSD$");
 #include <cheri/cheric.h>
 #include <sys/user.h>
 #include <compat/cheriabi/cheriabi_ipc_shm.h>
+#include <compat/cheriabi/cheriabi_proto.h>
 #include <compat/cheriabi/cheriabi_syscall.h>
 #include <compat/cheriabi/cheriabi_util.h>
 #include <compat/cheriabi/cheriabi_sysargmap.h>
@@ -121,6 +122,8 @@ static int shmget_allocate_segment(struct thread *td,
     struct shmget_args *uap, int mode);
 static int shmget_existing(struct thread *td, struct shmget_args *uap,
     int mode, int segnum);
+static int user_shmctl(struct thread *td, int shmid, int cmd,
+    struct shmid_ds * __capability ubuf);
 
 #define	SHMSEG_FREE     	0x0200
 #define	SHMSEG_REMOVED  	0x0400
@@ -733,6 +736,24 @@ struct shmctl_args {
 int
 sys_shmctl(struct thread *td, struct shmctl_args *uap)
 {
+
+	return (user_shmctl(td, uap->shmid, uap->cmd,
+	    __USER_CAP_OBJ(uap->buf)));
+}
+
+#ifdef COMPAT_CHERIABI
+int
+cheriabi_shmctl(struct thread *td, struct cheriabi_shmctl_args *uap)
+{
+
+	return (user_shmctl(td, uap->shmid, uap->cmd, uap->buf));
+}
+#endif
+
+static int
+user_shmctl(struct thread *td, int shmid, int cmd,
+    struct shmid_ds * __capability ubuf)
+{
 	int error;
 	struct shmid_ds buf;
 	size_t bufsz;
@@ -742,24 +763,23 @@ sys_shmctl(struct thread *td, struct shmctl_args *uap)
 	 * Linux binaries.  If we see the call come through the FreeBSD ABI,
 	 * return an error back to the user since we do not to support this.
 	 */
-	if (uap->cmd == IPC_INFO || uap->cmd == SHM_INFO ||
-	    uap->cmd == SHM_STAT)
+	if (cmd == IPC_INFO || cmd == SHM_INFO || cmd == SHM_STAT)
 		return (EINVAL);
 
 	/* IPC_SET needs to copyin the buffer before calling kern_shmctl */
-	if (uap->cmd == IPC_SET) {
-		if ((error = copyin(uap->buf, &buf, sizeof(struct shmid_ds))))
+	if (cmd == IPC_SET) {
+		if ((error = copyin_c(ubuf, &buf, sizeof(struct shmid_ds))))
 			goto done;
 	}
 
-	error = kern_shmctl(td, uap->shmid, uap->cmd, (void *)&buf, &bufsz);
+	error = kern_shmctl(td, shmid, cmd, &buf, &bufsz);
 	if (error)
 		goto done;
 
 	/* Cases in which we need to copyout */
-	switch (uap->cmd) {
+	switch (cmd) {
 	case IPC_STAT:
-		error = copyout(&buf, uap->buf, bufsz);
+		error = copyout_c(&buf, ubuf, bufsz);
 		break;
 	}
 
@@ -1038,12 +1058,14 @@ static struct syscall_helper_data shm32_syscalls[] = {
 
 #ifdef COMPAT_CHERIABI
 #include <compat/cheriabi/cheriabi.h>
+#include <compat/cheriabi/cheriabi_proto.h>
+#include <compat/cheriabi/cheriabi_syscall.h>
 
 static struct syscall_helper_data cheriabi_shm_syscalls[] = {
 	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(shmat),
 	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(shmdt),
 	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(shmget),
-	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(shmctl),
+	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_shmctl),
 	SYSCALL_INIT_LAST
 };
 #endif /* COMPAT_CHERIABI */
