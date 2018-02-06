@@ -410,7 +410,7 @@ mips_postboot_fixup(void)
 	 * We store u_long sized objects into the reload area, so the array
 	 * must be so aligned. The standard allows any alignment for char data.
 	 */
-	_Alignas(_Alignof(u_long)) static char fake_preload[256];
+	static char fake_preload[256] _Alignas(_Alignof(u_long));
 	caddr_t preload_ptr = (caddr_t)&fake_preload[0];
 	size_t size = 0;
 
