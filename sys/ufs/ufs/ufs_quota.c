@@ -1219,7 +1219,7 @@ dqopen(struct vnode *vp, struct ufsmount *ump, int type)
 	ASSERT_VOP_LOCKED(vp, "dqopen");
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
-	IOVEC_INIT_OBJ(&aiov, &dqh);
+	IOVEC_INIT_OBJ(&aiov, dqh);
 	auio.uio_resid = sizeof(dqh);
 	auio.uio_offset = 0;
 	auio.uio_segflg = UIO_SYSSPACE;

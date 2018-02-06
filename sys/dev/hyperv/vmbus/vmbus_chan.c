@@ -1068,7 +1068,7 @@ vmbus_chan_send_sglist(struct vmbus_channel *chan,
 	pkt.cp_rsvd = 0;
 	pkt.cp_gpa_cnt = sglen;
 
-	IOVEC_INIT_OBJ(&iov[0], &pkt);
+	IOVEC_INIT_OBJ(&iov[0], pkt);
 	IOVEC_INIT(&iov[1], sg, sizeof(struct vmbus_gpa) * sglen);
 	IOVEC_INIT(&iov[2], data, dlen);
 	IOVEC_INIT(&iov[3], &pad, pad_pktlen - pktlen);
@@ -1105,7 +1105,7 @@ vmbus_chan_send_prplist(struct vmbus_channel *chan,
 	pkt.cp_rsvd = 0;
 	pkt.cp_range_cnt = 1;
 
-	IOVEC_INIT_OBJ(&iov[0], &pkt);
+	IOVEC_INIT_OBJ(&iov[0], pkt);
 	IOVEC_INIT(&iov[1], prp,
 	    __offsetof(struct vmbus_gpa_range, gpa_page[prp_cnt]));
 	IOVEC_INIT(&iov[2], data, dlen);

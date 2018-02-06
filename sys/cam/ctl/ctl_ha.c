@@ -294,7 +294,7 @@ ctl_ha_rx_thread(void *arg)
 		SOCKBUF_UNLOCK(&so->so_rcv);
 
 		if (wire_hdr.length == 0) {
-			IOVEC_INIT_OBJ(&iov, &wire_hdr);
+			IOVEC_INIT_OBJ(&iov, wire_hdr);
 			uio.uio_iov = &iov;
 			uio.uio_iovcnt = 1;
 			uio.uio_rw = UIO_READ;

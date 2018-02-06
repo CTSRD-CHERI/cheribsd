@@ -198,7 +198,7 @@ isc_sendPDU(isc_session_t *sp, pduq_t *pq)
      uio->uio_td = sp->td;
      uio->uio_iov = iv = pq->iov;
 
-     IOVEC_INIT_OBJ(iv, &pp->ipdu);
+     IOVEC_INIT_OBJ(iv, pp->ipdu);
      uio->uio_resid = iv->iov_len;
      iv++;
      if(ISOK2DIG(sp->hdrDigest, pp))

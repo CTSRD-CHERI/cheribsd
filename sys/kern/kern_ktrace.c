@@ -1253,7 +1253,7 @@ ktr_writerequest(struct thread *td, struct ktr_request *req)
 	auio.uio_offset = 0;
 	auio.uio_segflg = UIO_SYSSPACE;
 	auio.uio_rw = UIO_WRITE;
-	IOVEC_INIT_OBJ(&aiov[0], kth);
+	IOVEC_INIT(&aiov[0], kth, sizeof(struct ktr_header));
 	auio.uio_resid = sizeof(struct ktr_header);
 	auio.uio_iovcnt = 1;
 	auio.uio_td = td;

@@ -725,7 +725,7 @@ bootpc_call(struct bootpc_globalcontext *gctx, struct thread *td)
 				ifctx->sentmsg = 1;
 			}
 
-			IOVEC_INIT_OBJ(&aio, &ifctx->call);
+			IOVEC_INIT_OBJ(&aio, ifctx->call);
 
 			auio.uio_iov = &aio;
 			auio.uio_iovcnt = 1;

@@ -295,7 +295,7 @@ nbssn_recvhdr(struct nbpcb *nbp, int *lenp,
 	u_int32_t len;
 	int error;
 
-	IOVEC_INIT_OBJ(&aio, &len);
+	IOVEC_INIT_OBJ(&aio, len);
 	auio.uio_iov = &aio;
 	auio.uio_iovcnt = 1;
 	auio.uio_segflg = UIO_SYSSPACE;

@@ -345,7 +345,7 @@ kern_jail(struct thread *td, struct jail *j)
 		IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
 		opt.uio_iovcnt++;
 		enforce_statfs = jail_default_enforce_statfs;
-		IOVEC_INIT_OBJ(&optiov[opt.uio_iovcnt], &enforce_statfs);
+		IOVEC_INIT_OBJ(&optiov[opt.uio_iovcnt], enforce_statfs);
 		opt.uio_iovcnt++;
 	}
 

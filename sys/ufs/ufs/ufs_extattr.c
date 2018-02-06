@@ -619,7 +619,7 @@ ufs_extattr_enable(struct ufsmount *ump, int attrnamespace,
 
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
-	IOVEC_INIT_OBJ(&aiov, &attribute->uele_fileheader);
+	IOVEC_INIT_OBJ(&aiov, attribute->uele_fileheader);
 	auio.uio_resid = sizeof(struct ufs_extattr_fileheader);
 	auio.uio_offset = (off_t) 0;
 	auio.uio_segflg = UIO_SYSSPACE;
