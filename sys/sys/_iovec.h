@@ -45,18 +45,16 @@ struct iovec {
 	size_t	 iov_len;	/* Length. */
 };
 
-#define	IOVEC_INIT(iovp, base, len)					\
-do {									\
+#define	IOVEC_INIT(iovp, base, len)	do {				\
 	(iovp)->iov_base = (base);					\
 	(iovp)->iov_len = (len);					\
 } while(0)
 #define	IOVEC_INIT_STR(iovp, str)					\
 	IOVEC_INIT(iovp, str, strlen(str) + 1)
-#define	IOVEC_INIT_OBJ(iovp, objp)					\
-	IOVEC_INIT(iovp, objp, sizeof(*(objp)))
+#define	IOVEC_INIT_OBJ(iovp, obj)					\
+	IOVEC_INIT(iovp, &(obj), sizeof(obj))
 
-#define	IOVEC_ADVANCE(iovp, amt)					\
-do {									\
+#define	IOVEC_ADVANCE(iovp, amt)	do {				\
 	size_t amount = (amt);						\
 	KASSERT(amount <= (iovp)->iov_len, ("%s: amount %zu > iov_len	\
 	    %zu", __func__, amount, (iovp)->iov_len));			\
