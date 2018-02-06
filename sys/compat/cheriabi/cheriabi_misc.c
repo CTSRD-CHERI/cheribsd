@@ -1918,24 +1918,6 @@ cheriabi_pdfork(struct thread *td, struct cheriabi_pdfork_args *uap)
 }
 
 /*
- * kern_ktrace.c
- */
-
-int
-cheriabi_ktrace(struct thread *td, struct cheriabi_ktrace_args *uap)
-{
-
-	return (kern_ktrace(td, uap->fname, uap->ops, uap->facs, uap->pid));
-}
-
-int
-cheriabi_utrace(struct thread *td, struct cheriabi_utrace_args *uap)
-{
-
-	return (kern_utrace(td, uap->addr, uap->len));
-}
-
-/*
  * kern_cpuset.c
  */
 int
@@ -1970,6 +1952,24 @@ cheriabi_cpuset_setaffinity(struct thread *td,
 
 	return (kern_cpuset_setaffinity(td, uap->level, uap->which, uap->id,
 	    uap->cpusetsize, uap->mask));
+}
+
+/*
+ * kern_ktrace.c
+ */
+
+int
+cheriabi_ktrace(struct thread *td, struct cheriabi_ktrace_args *uap)
+{
+
+	return (kern_ktrace(td, uap->fname, uap->ops, uap->facs, uap->pid));
+}
+
+int
+cheriabi_utrace(struct thread *td, struct cheriabi_utrace_args *uap)
+{
+
+	return (kern_utrace(td, uap->addr, uap->len));
 }
 
 /*
