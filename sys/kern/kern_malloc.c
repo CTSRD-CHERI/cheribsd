@@ -802,12 +802,7 @@ mallocinit(void *dummy)
 		kmem_zmax = KMEM_ZMAX;
 
 	mt_zone = uma_zcreate("mt_zone", sizeof(struct malloc_type_internal),
-#ifdef INVARIANTS
-	    mtrash_ctor, mtrash_dtor, mtrash_init, mtrash_fini,
-#else
-	    NULL, NULL, NULL, NULL,
-#endif
-	    UMA_ALIGN_PTR, UMA_ZONE_MALLOC);
+	    NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_MALLOC);
 	for (i = 0, indx = 0; kmemzones[indx].kz_size != 0; indx++) {
 		int size = kmemzones[indx].kz_size;
 		char *name = kmemzones[indx].kz_name;
