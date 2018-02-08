@@ -66,7 +66,7 @@ static BOOL	same_os_sema(const sem_ref obj, void * osobj);
 
 #else
 
-# define thread_exit(c)	pthread_exit((void*)(size_t)(c))
+# define thread_exit(c)	pthread_exit((void*)(uintptr_t)(c))
 # define tickle_sem	sem_post
 void *		blocking_thread(void *);
 static	void	block_thread_signals(sigset_t *);
