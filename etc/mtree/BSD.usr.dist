@@ -8,8 +8,6 @@
     bin
     ..
     include
-	curl
-	..
         private
             bsdstat
             ..
