@@ -23,4 +23,10 @@ CFLAGS+= -I${SRCTOP}/sys/cddl/contrib/opensolaris/uts/common
 CFLAGS+= -I${SRCTOP}/cddl/compat/opensolaris/include
 CFLAGS+= -I${SRCTOP}/cddl/contrib/opensolaris/head
 
+# The aok vairable used by assert() is defined in
+# sys/cddl/contrib/opensolaris/common/nvpair/opensolaris_nvpair.c so we need
+# to link against nvpair in order to get size information for that file
+# (at least for libcheri)
+LIBADD=	nvpair
+
 .include <bsd.lib.mk>

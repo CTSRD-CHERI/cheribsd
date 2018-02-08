@@ -1266,6 +1266,16 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
+	/* cheriabi_kbounce */
+	case 258: {
+		struct cheriabi_kbounce_args *p = params;
+		uarg[0] = (cheri_getbase(p->src) + cheri_getoffset(p->src)); /* const void *__capability */
+		uarg[1] = (cheri_getbase(p->dst) + cheri_getoffset(p->dst)); /* void *__capability */
+		uarg[2] = p->len; /* size_t */
+		iarg[3] = p->flags; /* int */
+		*n_args = 4;
+		break;
+	}
 	/* lchmod */
 	case 274: {
 		struct lchmod_args *p = params;
@@ -5091,6 +5101,25 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 3:
 			p = "userland struct sigevent_c *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_kbounce */
+	case 258:
+		switch(ndx) {
+		case 0:
+			p = "userland const void *__capability";
+			break;
+		case 1:
+			p = "userland void *__capability";
+			break;
+		case 2:
+			p = "size_t";
+			break;
+		case 3:
+			p = "int";
 			break;
 		default:
 			break;
@@ -8996,6 +9025,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* cheriabi_lio_listio */
 	case 257:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_kbounce */
+	case 258:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

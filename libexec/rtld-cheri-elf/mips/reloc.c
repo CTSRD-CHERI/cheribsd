@@ -184,13 +184,13 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 	/* Relocate the local GOT entries */
 	got += i;
 	for (; i < local_gotno; i++) {
-		*got++ += (uintptr_t)relocbase;
+		*got++ += (vaddr_t)relocbase;
 	}
 
 	sym = symtab + gotsym;
 	/* Now do the global GOT entries */
 	for (i = gotsym; i < symtabno; i++) {
-		*got = sym->st_value + (uintptr_t)relocbase;
+		*got = sym->st_value + (vaddr_t)relocbase;
 		++sym;
 		++got;
 	}
@@ -219,7 +219,7 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 			assert(r_symndx < gotsym);
 			sym = symtab + r_symndx;
 			assert(ELF_ST_BIND(sym->st_info) == STB_LOCAL);
-			val += (uintptr_t)relocbase;
+			val += (vaddr_t)relocbase;
 #ifdef DEBUG_VERBOSE
 			dbg("REL32/L(%p) %p -> %p in <self>",
 			    where, (void *)(uintptr_t)old,

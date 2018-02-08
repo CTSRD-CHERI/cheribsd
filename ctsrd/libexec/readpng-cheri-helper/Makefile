@@ -8,9 +8,6 @@ SRCS=	readpng-cheri.c				\
 NEED_CHERI=	sandbox
 WANT_DUMP=	yes
 
-# don't know how to handle processor specific section `.preinit_array'
-CHERI_LLD_BROKEN=yes
-
 .PATH: ${SRCTOP}/ctsrd/lib/libimagebox
 SRCS+=	decode_png.c
 

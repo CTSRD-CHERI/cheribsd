@@ -117,7 +117,7 @@
 26	AUE_PTRACE	NOPROTO	{ int ptrace(int req, pid_t pid, \
 				    _Inout_opt_ caddr_t addr, int data); }
 27	AUE_RECVMSG	STD	{ ssize_t cheriabi_recvmsg(int s, \
-				    _In_ struct msghdr_c *msg, \
+				    _Inout_ struct msghdr_c *msg, \
 				    int flags); }
 28	AUE_SENDMSG	STD	{ ssize_t cheriabi_sendmsg(int s, \
 				    _In_ const struct msghdr_c *msg, \
@@ -185,7 +185,7 @@
 ; XXX-BD: Arguably argv and envv are _In_z_, but the SAL documentation is
 ; inconsistant about NUL terminated string, vs NULL terminted array so
 ; _In_ for now.
-59	AUE_EXECVE	STD	{ int cheriabi_execve( \
+59	AUE_EXECVE	STD|NOSTUB	{ int cheriabi_execve( \
 				    _In_z_ const char *fname, \
 				    _In_ void * __capability *argv, \
 				    _In_ void * __capability *envv); }
@@ -357,7 +357,7 @@
 152	AUE_NULL	UNIMPL	sem_wakeup (BSD/OS 2.x)
 153	AUE_NULL	UNIMPL	asyncdaemon (BSD/OS 2.x)
 ; 154 is initialised by the NLM code, if present.
-154	AUE_NULL	NOSTD	{ int cheriabi_nlm_syscall(int debug_level, \
+154	AUE_NULL	NOSTD|NOSTUB	{ int cheriabi_nlm_syscall(int debug_level, \
 				    int grace_period , int addr_count, \
 				    _In_reads_(addr_count) \
 				    void * __capability *addrs); }
@@ -548,7 +548,12 @@
 				    struct aiocb_c * const __capability *acb_list, \
 				    int nent, \
 				    _In_opt_ struct sigevent_c *sig); }
-258	AUE_NULL	UNIMPL	nosys
+258	AUE_NULL	STD	{ int cheriabi_kbounce( \
+				    _In_reads_bytes_(len) \
+				    const void * __capability src, \
+				    _Out_writes_bytes_(len) \
+				    void * __capability dst, \
+				    size_t len, int flags); }
 259	AUE_NULL	UNIMPL	nosys
 260	AUE_NULL	UNIMPL	nosys
 261	AUE_NULL	UNIMPL	nosys
@@ -844,7 +849,7 @@
 				    _In_z_ const char *path, \
 				    int attrnamespace, \
 				    _In_z_ const char *attrname); }
-415	AUE_NULL	STD	{ int cheriabi___mac_execve( \
+415	AUE_NULL	STD|NOSTUB	{ int cheriabi___mac_execve( \
 				    _In_z_ char *fname, \
 				    _In_ void * __capability *argv, \
 				    _In_ void * __capability *envv, \
@@ -1061,7 +1066,7 @@
 				    int flag); }
 491	AUE_FCHOWNAT	NOPROTO	{ int fchownat(int fd, _In_z_ const char *path, \
 				    uid_t uid, gid_t gid, int flag); }
-492	AUE_FEXECVE	STD	{ int cheriabi_fexecve(int fd, \
+492	AUE_FEXECVE	STD|NOSTUB	{ int cheriabi_fexecve(int fd, \
 				    _In_ void * __capability *argv, \
 				    _In_ void * __capability *envv); }
 493	AUE_FSTATAT	OBSOL	fbsd11_fstatat

@@ -11,6 +11,7 @@ SRCS+=	cheritest_bounds_globals.c					\
 	cheritest_ccall.c						\
 	cheritest_fault.c						\
 	cheritest_fd.c							\
+	cheritest_kbounce.c						\
 	cheritest_libcheri.c						\
 	cheritest_libcheri_cxx.cc					\
 	cheritest_libcheri_local.c					\
@@ -37,6 +38,14 @@ SRCS+=	cheritest_cheriabi.c
 SRCS+=	cheritest_cheriabi_open.c
 .endif
 CFLAGS+=	-DCHERIABI_TESTS
+.endif
+
+.ifndef BOOTSTRAPPING
+.PATH: ${SRCTOP}/sys/mips/cheri
+SRCS+=	cheri_memcpy_c.S
+CFLAGS.cheri_memcpy_c.S=-D__KERN_FUNC_PREFIX -D_KERNEL -DINVARIANTS
+CFLAGS+=	-DKERNEL_MEMCPY_TESTS
+.else
 .endif
 
 .ifdef CHERI_C_TESTS
