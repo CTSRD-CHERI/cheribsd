@@ -816,7 +816,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 			base = 16;
 			sharpflag = (width == 0);
 			sign = 0;
-			num = (uintptr_t)va_arg(ap, void *);
+			num = ptr_to_va((uintptr_t)va_arg(ap, void *));
 			goto number;
 		case 'q':
 			qflag = 1;
