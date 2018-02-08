@@ -73,6 +73,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/uma.h>
 #include <vm/uma_int.h>
 #include <vm/uma_dbg.h>
+#include <vm/cheri.h>
 
 #ifdef DEBUG_MEMGUARD
 #include <vm/memguard.h>
@@ -412,6 +413,7 @@ contigmalloc(unsigned long size, struct malloc_type *type, int flags,
 	    alignment, boundary, VM_MEMATTR_DEFAULT);
 	if (ret != NULL)
 		malloc_type_allocated(type, round_page(size));
+	CHERI_VM_ASSERT_VALID(ret);
 	return (ret);
 }
 
@@ -425,7 +427,7 @@ contigmalloc(unsigned long size, struct malloc_type *type, int flags,
 void
 contigfree(void *addr, unsigned long size, struct malloc_type *type)
 {
-
+	CHERI_VM_ASSERT_VALID(addr);
 	kmem_free(kernel_arena, (vm_offset_t)addr, size);
 	malloc_type_freed(type, round_page(size));
 }
@@ -530,6 +532,7 @@ malloc(unsigned long size, struct malloc_type *mtp, int flags)
 	if (va != NULL)
 		va = redzone_setup(va, osize);
 #endif
+	CHERI_VM_ASSERT_VALID(va);
 	return ((void *) va);
 }
 
@@ -553,6 +556,7 @@ free(void *addr, struct malloc_type *mtp)
 	/* free(NULL, ...) does nothing */
 	if (addr == NULL)
 		return;
+	CHERI_VM_ASSERT_VALID(addr);
 
 #ifdef DEBUG_MEMGUARD
 	if (is_memguard_addr(addr)) {
@@ -633,6 +637,7 @@ realloc(void *addr, unsigned long size, struct malloc_type *mtp, int flags)
 	/* realloc(NULL, ...) is equivalent to malloc(...) */
 	if (addr == NULL)
 		return (malloc(size, mtp, flags));
+	CHERI_VM_ASSERT_VALID(addr);
 
 	/*
 	 * XXX: Should report free of old memory and alloc of new memory to
