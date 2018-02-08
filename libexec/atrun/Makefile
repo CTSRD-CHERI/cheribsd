@@ -1,5 +1,8 @@
 # $FreeBSD$
 
+# linker crash
+WANT_CHERI=none
+
 PACKAGE=at
 MAINSRC=${SRCTOP}/usr.bin/at
 
