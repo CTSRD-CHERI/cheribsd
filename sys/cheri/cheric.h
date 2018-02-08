@@ -79,6 +79,15 @@
 
 #define	cheri_csetbounds(x, y)	__builtin_cheri_bounds_set((x), (y))
 
+/* Capability alignment helpers.
+ * Assume x is a capability and y is a power of two
+ * XXX-AM: These are temporary, until we have a working generic __builtin_align_up/down
+ */
+#define rounddown2_cap(x, y) cheri_setoffset(				\
+	x, rounddown2(cheri_getbase(x) + cheri_getoffset(x), y) - cheri_getbase(x))
+#define roundup2_cap(x, y) cheri_setoffset(				\
+	x, roundup2(cheri_getbase(x) + cheri_getoffset(x), y) - cheri_getbase(x))
+
 /*
  * Two variations on cheri_ptr() based on whether we are looking for a code or
  * data capability.  The compiler's use of CFromPtr will be with respect to
