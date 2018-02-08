@@ -87,6 +87,9 @@ __FBSDID("$FreeBSD$");
 
 #ifdef CPU_CHERI
 #include <machine/cherireg.h>
+#ifdef CHERI_KERNEL
+#include <cheri/cheric.h>
+#endif
 #endif
 
 #include <ddb/ddb.h>
@@ -583,11 +586,26 @@ free(void *addr, struct malloc_type *mtp)
 		 * This code assumes that size is a multiple of 8 bytes for
 		 * 64 bit machines
 		 */
-		mtpp = (struct malloc_type **)
-		    ((unsigned long)mtpp & ~UMA_ALIGN_PTR);
-		mtpp += (size - sizeof(struct malloc_type *)) /
-		    sizeof(struct malloc_type *);
-		*mtpp = mtp;
+#if defined(CHERI_KERNEL) && CHERICAP_SIZE > 16
+		/* CHERI-256 pointers do not fit in the smallest kmemzone */
+		if (size >= sizeof(struct malloc_type *))
+#endif
+		{
+#ifdef CHERI_KERNEL
+			/*
+			 * XXX-AM: this is temporary, we should have a generic
+			 * rounddown2 that works
+			 */
+			mtpp = (struct malloc_type **)
+			    rounddown2_cap(mtpp, UMA_ALIGN_PTR);
+#else
+			mtpp = (struct malloc_type **)
+			    ((unsigned long)mtpp & ~UMA_ALIGN_PTR);
+#endif
+			mtpp += (size - sizeof(struct malloc_type *)) /
+			    sizeof(struct malloc_type *);
+			*mtpp = mtp;
+		}
 #endif
 		uma_zfree_arg(LIST_FIRST(&slab->us_keg->uk_zones), addr, slab);
 	} else {

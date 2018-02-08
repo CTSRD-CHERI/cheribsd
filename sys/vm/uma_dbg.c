@@ -147,7 +147,13 @@ mtrash_ctor(void *mem, int size, void *arg, int flags)
 	if (is_memguard_addr(mem))
 		return (0);
 #endif
-
+	/*
+	 * XXX-AM: in CHERI256 we may find sizes smaller
+	 * than the pointer size, in this case fall back to
+	 * trash_ctor.
+	 */
+	if (size < sizeof(struct malloc_type *))
+		return trash_ctor(mem, size, arg, flags);
 	size -= sizeof(struct malloc_type *);
 	ksp = (struct malloc_type **)mem;
 	ksp += size / sizeof(struct malloc_type *);
@@ -179,6 +185,13 @@ mtrash_dtor(void *mem, int size, void *arg)
 	if (is_memguard_addr(mem))
 		return;
 #endif
+	/*
+	 * XXX-AM: in CHERI256 we may find sizes smaller
+	 * than the pointer size, in this case fall back to
+	 * trash_dtor.
+	 */
+	if (size < sizeof(struct malloc_type *))
+		return trash_dtor(mem, size, arg);
 
 	size -= sizeof(struct malloc_type *);
 	cnt = size / sizeof(uma_junk);
@@ -205,9 +218,16 @@ mtrash_init(void *mem, int size, int flags)
 
 	mtrash_dtor(mem, size, NULL);
 
-	ksp = (struct malloc_type **)mem;
-	ksp += (size / sizeof(struct malloc_type *)) - 1;
-	*ksp = NULL;
+	/*
+	 * XXX-AM: in CHERI256 we may find sizes smaller
+	 * than the pointer size, in this case fall back to
+	 * trash_init behaviour.
+	 */
+	if (size >= sizeof(struct malloc_type *)) {
+		ksp = (struct malloc_type **)mem;
+		ksp += (size / sizeof(struct malloc_type *)) - 1;
+		*ksp = NULL;
+	}
 	return (0);
 }
 
