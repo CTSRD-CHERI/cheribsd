@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD$");
 #include <link.h>
 #include <stdarg.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include "namespace.h"
 #include <pthread.h>
@@ -68,14 +69,19 @@ _rtld_error(const char *fmt, ...)
 
 	va_start(ap, fmt);
 	vfprintf(stderr, fmt, ap);
+	fputc('\n', stderr);
 	va_end(ap);
 }
+
+#define PRINT_FUNCTION_NOT_AVAILABLE()	\
+	_rtld_error("%s: %s is not available when statically linked.", \
+	    getprogname(), __func__)
 
 #pragma weak dladdr
 int
 dladdr(const void *addr, Dl_info *dlip)
 {
-	_rtld_error(sorry);
+	PRINT_FUNCTION_NOT_AVAILABLE();
 	return 0;
 }
 
@@ -83,7 +89,7 @@ dladdr(const void *addr, Dl_info *dlip)
 int
 dlclose(void *handle)
 {
-	_rtld_error(sorry);
+	PRINT_FUNCTION_NOT_AVAILABLE();
 	return -1;
 }
 
@@ -112,7 +118,7 @@ dllockinit(void *context,
 void *
 dlopen(const char *name, int mode)
 {
-	_rtld_error(sorry);
+	PRINT_FUNCTION_NOT_AVAILABLE();
 	return NULL;
 }
 
@@ -120,7 +126,7 @@ dlopen(const char *name, int mode)
 void *
 dlsym(void * __restrict handle, const char * __restrict name)
 {
-	_rtld_error(sorry);
+	PRINT_FUNCTION_NOT_AVAILABLE();
 	return NULL;
 }
 
@@ -128,7 +134,7 @@ dlsym(void * __restrict handle, const char * __restrict name)
 dlfunc_t
 dlfunc(void * __restrict handle, const char * __restrict name)
 {
-	_rtld_error(sorry);
+	PRINT_FUNCTION_NOT_AVAILABLE();
 	return NULL;
 }
 
@@ -137,7 +143,7 @@ void *
 dlvsym(void * __restrict handle, const char * __restrict name,
     const char * __restrict version)
 {
-	_rtld_error(sorry);
+	PRINT_FUNCTION_NOT_AVAILABLE();
 	return NULL;
 }
 
@@ -145,7 +151,7 @@ dlvsym(void * __restrict handle, const char * __restrict name,
 int
 dlinfo(void * __restrict handle, int request, void * __restrict p)
 {
-	_rtld_error(sorry);
+	PRINT_FUNCTION_NOT_AVAILABLE();
 	return 0;
 }
 
@@ -153,7 +159,7 @@ dlinfo(void * __restrict handle, int request, void * __restrict p)
 void
 _rtld_thread_init(void * li)
 {
-	_rtld_error(sorry);
+	PRINT_FUNCTION_NOT_AVAILABLE();
 }
 
 static pthread_once_t dl_phdr_info_once = PTHREAD_ONCE_INIT;
@@ -217,7 +223,7 @@ void *
 fdlopen(int fd, int mode)
 {
 
-	_rtld_error(sorry);
+	PRINT_FUNCTION_NOT_AVAILABLE();
 	return NULL;
 }
 
