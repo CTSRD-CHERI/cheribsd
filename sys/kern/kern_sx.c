@@ -411,7 +411,7 @@ sx_try_upgrade_(struct sx *sx, const char *file, int line)
 	 */
 	x = ptr_get_flag(sx->sx_lock, SX_LOCK_EXCLUSIVE_WAITERS);
 	success = atomic_cmpset_acq_ptr(&sx->sx_lock, SX_SHARERS_LOCK(1) | x,
-	    ptr_put_flag((uintptr_t)curthread, x));
+	    ptr_set_flag(curthread, x));
 	LOCK_LOG_TRY("XUPGRADE", &sx->lock_object, 0, success, file, line);
 	if (success) {
 		WITNESS_UPGRADE(&sx->lock_object, LOP_EXCLUSIVE | LOP_TRYLOCK,
@@ -665,7 +665,7 @@ _sx_xlock_hard(struct sx *sx, uintptr_t x, uintptr_t tid, int opts,
 		if (x == (SX_LOCK_UNLOCKED | SX_LOCK_EXCLUSIVE_WAITERS)) {
 			if (atomic_cmpset_acq_ptr(&sx->sx_lock,
 			    SX_LOCK_UNLOCKED | SX_LOCK_EXCLUSIVE_WAITERS,
-			    ptr_put_flag(tid, SX_LOCK_EXCLUSIVE_WAITERS))) {
+			    ptr_set_flag(tid, SX_LOCK_EXCLUSIVE_WAITERS))) {
 				sleepq_release(&sx->lock_object);
 				CTR2(KTR_LOCK, "%s: %p claimed by new writer",
 				    __func__, sx);
@@ -682,7 +682,7 @@ _sx_xlock_hard(struct sx *sx, uintptr_t x, uintptr_t tid, int opts,
 		 */
 		if (!ptr_get_flag(x, SX_LOCK_EXCLUSIVE_WAITERS)) {
 			if (!atomic_cmpset_ptr(&sx->sx_lock, x,
-			    ptr_put_flag(x, SX_LOCK_EXCLUSIVE_WAITERS))) {
+			    ptr_set_flag(x, SX_LOCK_EXCLUSIVE_WAITERS))) {
 				sleepq_release(&sx->lock_object);
 				x = SX_READ_VALUE(sx);
 				continue;
@@ -962,7 +962,7 @@ _sx_slock_hard(struct sx *sx, int opts, const char *file, int line, uintptr_t x)
 		 */
 		if (!ptr_get_flag(x, SX_LOCK_SHARED_WAITERS)) {
 			if (!atomic_cmpset_ptr(&sx->sx_lock, x,
-			    ptr_put_flag(x, SX_LOCK_SHARED_WAITERS))) {
+			    ptr_set_flag(x, SX_LOCK_SHARED_WAITERS))) {
 				sleepq_release(&sx->lock_object);
 				x = SX_READ_VALUE(sx);
 				continue;

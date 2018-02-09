@@ -308,15 +308,15 @@ typedef	_Bool	bool;
  *
  * This is mostly used by locks.
  */
-#ifndef __ptr_put_flag
+#ifndef __ptr_set_flag
 /* if there are no machine-dependant defines, use this default */
-#define __ptr_put_flag(p, f) ((uintptr_t)(p) | (f))
+#define __ptr_set_flag(p, f) ((uintptr_t)(p) | (f))
 #endif
 #ifndef __ptr_get_flag
 /* if there are no machine-dependant defines, use this default */
 #define __ptr_get_flag(p, f) ((uintptr_t)(p) & (f))
 #endif
-#define ptr_put_flag(p, f) __ptr_put_flag(p, f)
+#define ptr_set_flag(p, f) __ptr_set_flag(p, f)
 #define ptr_get_flag(p, f) __ptr_get_flag(p, f)
 
 #ifdef CHERI_KERNEL

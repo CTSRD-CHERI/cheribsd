@@ -555,7 +555,7 @@ __rw_rlock_hard(volatile uintptr_t *c, struct thread *td, uintptr_t v,
 		 */
 		if (!ptr_get_flag(v, RW_LOCK_READ_WAITERS)) {
 			if (!atomic_cmpset_ptr(&rw->rw_lock, v,
-			    ptr_put_flag(v, RW_LOCK_READ_WAITERS))) {
+			    ptr_set_flag(v, RW_LOCK_READ_WAITERS))) {
 				turnstile_cancel(ts);
 				v = RW_READ_VALUE(rw);
 				continue;
@@ -923,7 +923,7 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v, uintptr_t tid,
 		    spintries < rowner_retries) {
 			if (!ptr_get_flag(v, RW_LOCK_WRITE_SPINNER)) {
 				if (!atomic_cmpset_ptr(&rw->rw_lock, v,
-				    ptr_put_flag(v, RW_LOCK_WRITE_SPINNER))) {
+				    ptr_set_flag(v, RW_LOCK_WRITE_SPINNER))) {
 					v = RW_READ_VALUE(rw);
 					continue;
 				}
@@ -977,7 +977,7 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v, uintptr_t tid,
 		if (ptr_get_flag(v, ~x) == RW_UNLOCKED) {
 			x &= ~RW_LOCK_WRITE_SPINNER;
 			if (atomic_cmpset_acq_ptr(&rw->rw_lock, v,
-			    ptr_put_flag(tid, x))) {
+			    ptr_set_flag(tid, x))) {
 				if (x)
 					turnstile_claim(ts);
 				else
@@ -995,7 +995,7 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v, uintptr_t tid,
 		 */
 		if (!ptr_get_flag(v, RW_LOCK_WRITE_WAITERS)) {
 			if (!atomic_cmpset_ptr(&rw->rw_lock, v,
-			    ptr_put_flag(v, RW_LOCK_WRITE_WAITERS))) {
+			    ptr_set_flag(v, RW_LOCK_WRITE_WAITERS))) {
 				turnstile_cancel(ts);
 				v = RW_READ_VALUE(rw);
 				continue;
@@ -1178,7 +1178,7 @@ __rw_try_upgrade(volatile uintptr_t *c, const char *file, int line)
 		 * ownership of the turnstile.
 		 */
 		x = ptr_get_flag(rw->rw_lock, RW_LOCK_WAITERS);
-		success = atomic_cmpset_ptr(&rw->rw_lock, v, ptr_put_flag(tid, x));
+		success = atomic_cmpset_ptr(&rw->rw_lock, v, ptr_set_flag(tid, x));
 		if (success) {
 			if (x)
 				turnstile_claim(ts);

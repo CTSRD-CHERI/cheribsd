@@ -590,7 +590,7 @@ __mtx_lock_sleep(volatile uintptr_t *c, uintptr_t v, uintptr_t tid)
 		 */
 		if (ptr_get_flag(v, MTX_CONTESTED) == 0 &&
 		    !atomic_cmpset_ptr(&m->mtx_lock, v,
-				       ptr_put_flag(v, MTX_CONTESTED))) {
+				       ptr_set_flag(v, MTX_CONTESTED))) {
 			turnstile_cancel(ts);
 			v = MTX_READ_VALUE(m);
 			continue;
