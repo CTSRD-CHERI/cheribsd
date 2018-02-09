@@ -51,7 +51,6 @@ entry2acl(acl_entry_t entry)
 {
 	acl_t aclp;
 
-	/* XXXCHERI: Had to replace (long) with (intptr_t). */
 	aclp = (acl_t)(((intptr_t)entry >> _ACL_T_ALIGNMENT_BITS) << _ACL_T_ALIGNMENT_BITS);
 
 	return (aclp);
