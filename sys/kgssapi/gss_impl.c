@@ -349,11 +349,8 @@ kgssapi_modevent(module_t mod, int type, void *data)
 
 	switch (type) {
 	case MOD_LOAD:
-		error = kgss_load();
-		if (error != 0) {
-			kgss_unload();
+		if (error != 0)
 			return (error);
-		}
 		rpc_gss_entries.rpc_gss_refresh_auth = rpc_gss_refresh_auth;
 		rpc_gss_entries.rpc_gss_secfind = rpc_gss_secfind;
 		rpc_gss_entries.rpc_gss_secpurge = rpc_gss_secpurge;
@@ -378,8 +375,11 @@ kgssapi_modevent(module_t mod, int type, void *data)
 		rpc_gss_entries.rpc_gss_svc_max_data_length =
 		    rpc_gss_svc_max_data_length;
 		mtx_init(&kgss_gssd_lock, "kgss_gssd_lock", NULL, MTX_DEF);
+		error = kgss_load();
 		break;
 	case MOD_UNLOAD:
+		kgss_unload();
+		mtx_destroy(&kgss_gssd_lock);
 		/*
 		 * Unloading of the kgssapi module is not currently supported.
 		 * If somebody wants this, we would need to keep track of
