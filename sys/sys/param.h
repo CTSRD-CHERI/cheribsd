@@ -294,14 +294,14 @@
 #define	rounddown(x, y)	(((x)/(y))*(y))
 #define	roundup(x, y)	((((x)+((y)-1))/(y))*(y))  /* to any y */
 #define powerof2(x)	((((x)-1)&(x))==0)
-#ifndef CHERI_KERNEL
-#define	rounddown2(x, y) ((x)&(~((y)-1)))          /* if y is power of two */
-#define	roundup2(x, y)	(((x)+((y)-1))&(~((y)-1))) /* if y is powers of two */
-#else /* CHERI_KERNEL */
+#if defined(CHERI_KERNEL) && defined(NOTYET)
 /* compiler provides alignment builtins, these are not upstreamed yet */
 #define	rounddown2(x, y) __builtin_align_down(x, y)
 #define	roundup2(x, y)	__builtin_align_up(x, y)
-#endif /* CHERI_KERNEL */
+#else /* ! CHERI_KERNEL */
+#define	rounddown2(x, y) ((x)&(~((y)-1)))          /* if y is power of two */
+#define	roundup2(x, y)	(((x)+((y)-1))&(~((y)-1))) /* if y is powers of two */
+#endif /* ! CHERI_KERNEL */
 
 /* Macros for min/max. */
 #define	MIN(a,b) (((a)<(b))?(a):(b))
