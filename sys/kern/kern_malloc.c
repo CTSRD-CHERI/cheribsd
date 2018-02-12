@@ -601,7 +601,7 @@ free(void *addr, struct malloc_type *mtp)
 			 * rounddown2 that works
 			 */
 			mtpp = (struct malloc_type **)
-			    rounddown2_cap(mtpp, UMA_ALIGN_PTR);
+			    rounddown2_cap(mtpp, sizeof(struct malloc_type *));
 #else
 			mtpp = (struct malloc_type **)
 			    ((unsigned long)mtpp & ~UMA_ALIGN_PTR);
