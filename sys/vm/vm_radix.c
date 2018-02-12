@@ -180,7 +180,7 @@ static __inline boolean_t
 vm_radix_isleaf(struct vm_radix_node *rnode)
 {
 
-	return (((uintptr_t)rnode & VM_RADIX_ISLEAF) != 0);
+	return (ptr_get_flag(rnode, VM_RADIX_ISLEAF) != 0);
 }
 
 /*
@@ -203,7 +203,7 @@ vm_radix_addpage(struct vm_radix_node *rnode, vm_pindex_t index, uint16_t clev,
 	int slot;
 
 	slot = vm_radix_slot(index, clev);
-	rnode->rn_child[slot] = (void *)((uintptr_t)page | VM_RADIX_ISLEAF);
+	rnode->rn_child[slot] = (void *)(ptr_set_flag(page, VM_RADIX_ISLEAF));
 }
 
 /*
@@ -345,7 +345,7 @@ vm_radix_insert(struct vm_radix *rtree, vm_page_t page)
 	 */
 	rnode = vm_radix_getroot(rtree);
 	if (rnode == NULL) {
-		rtree->rt_root = (uintptr_t)page | VM_RADIX_ISLEAF;
+		rtree->rt_root = ptr_set_flag(page, VM_RADIX_ISLEAF);
 		return (0);
 	}
 	parentp = (void **)&rtree->rt_root;
@@ -753,7 +753,7 @@ vm_radix_replace(struct vm_radix *rtree, vm_page_t newpage)
 		if (m->pindex != index)
 			panic("%s: original replacing root key not found",
 			    __func__);
-		rtree->rt_root = (uintptr_t)newpage | VM_RADIX_ISLEAF;
+		rtree->rt_root = ptr_set_flag(newpage, VM_RADIX_ISLEAF);
 		return (m);
 	}
 	for (;;) {
@@ -762,8 +762,8 @@ vm_radix_replace(struct vm_radix *rtree, vm_page_t newpage)
 			m = vm_radix_topage(rnode->rn_child[slot]);
 			if (m->pindex == index) {
 				rnode->rn_child[slot] =
-				    (void *)((uintptr_t)newpage |
-				    VM_RADIX_ISLEAF);
+				    (void *)(ptr_set_flag(newpage,
+				    VM_RADIX_ISLEAF));
 				return (m);
 			} else
 				break;

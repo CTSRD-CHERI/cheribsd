@@ -47,6 +47,20 @@
 		("VM expect valid capability %s %s:%d", __func__,	\
 		 __FILE__, __LINE__))
 
+/* Check that the given pointer can fit a capability
+ * This is useful to detect when someone is passing a vm_offset_t* when
+ * we want a uintptr_t*
+ */
+#define CHERI_VM_ASSERT_FIT_PTR(ptr) do {				\
+		CHERI_VM_ASSERT_VALID(ptr);				\
+		KASSERT(cheri_getlen((void *)ptr) >= sizeof(void *),	\
+			("Cheri can not store a pointer here %p, "	\
+			 "not enugh_space(%d) %s %s:%d", ptr,		\
+			 cheri_getlen((void *)ptr), __func__, __FILE__,	\
+			 __LINE__));					\
+	} while (0)
+
+
 #else /* ! CHERI_KERNEL */
 #define CHERI_VM_ASSERT_VALID(ptr) do{		\
 	} while (0)
