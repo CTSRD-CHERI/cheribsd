@@ -132,10 +132,6 @@ LDFLAGS+=	-Wl,-init=crt_init_globals
 # remove any conflicting -fuse-ld= flags
 LDFLAGS:=${LDFLAGS:N-fuse-ld=*}
 LDFLAGS+=	-fuse-ld=lld -Wl,-z,norelro
-.ifdef CHERI_LLD_INTEGRATED_CAPSIZEFIX
-LDFLAGS+=      -no-capsizefix -Wl,--process-cap-relocs -Wl,-color-diagnostics
-LD_FATAL_WARNINGS:=no
-.endif
 .else
 STATIC_CFLAGS+= -ftls-model=local-exec # MIPS/hybrid case
 .endif
