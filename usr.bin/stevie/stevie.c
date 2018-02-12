@@ -37,15 +37,15 @@ __FBSDID("$FreeBSD$");
 #include <sys/wait.h>
 #include <ctype.h>
 #include <err.h>
+#include <pthread.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
-extern int	cocall(void * __capability, void * __capability);
+pthread_t	service_thread;
 
-void * __capability switcher_code;
-void * __capability switcher_data;
+extern int	cocall(void * __capability, void * __capability);
 
 #if 0
 #define SHARED_PAGE	0x7ffffff000
@@ -116,37 +116,66 @@ show_chunk(void *ptr, off_t off, int len)
 static void
 call(void)
 {
-	void * __capability registered;
+	void * __capability switcher_code;
+	void * __capability switcher_data;
 	void * __capability lookedup;
 	int error;
 
+	fprintf(stderr, "%s: cocreating...\n", __func__);
 	error = cocreate(&switcher_code, &switcher_data);
 	if (error != 0)
 		err(1, "cocreate");
 
-	error = coregister("kopytko", &registered);
-	if (error != 0)
-		err(1, "coregister");
-
+	fprintf(stderr, "%s: colookingup...\n", __func__);
 	error = colookup("kopytko", &lookedup);
 	if (error != 0)
 		err(1, "colookup");
-	fprintf(stderr, "registered %p, found %p...\n", (__cheri_fromcap void *)registered, (__cheri_fromcap void *)lookedup);
 
 	fprintf(stderr, "cocall to code capability %p, data capability %p...\n", (__cheri_fromcap void *)switcher_code, (__cheri_fromcap void *)switcher_data);
 	error = cocall(switcher_code, switcher_data);
 	fprintf(stderr, "done, cocall returned %d\n", error);
 }
 
+static void *
+service_proc(void *dummy __unused)
+{
+	void * __capability switcher_code;
+	void * __capability switcher_data;
+	void * __capability registered;
+	int error;
+
+	fprintf(stderr, "%s: cocreating...\n", __func__);
+	error = cocreate(&switcher_code, &switcher_data);
+	if (error != 0)
+		err(1, "cocreate");
+
+	fprintf(stderr, "%s: coregistering...\n", __func__);
+	error = coregister("kopytko", &registered);
+	if (error != 0)
+		err(1, "coregister");
+
+	fprintf(stderr, "%s: serving...\n", __func__);
+	for (;;) {
+		fprintf(stderr, ".");
+		sleep(1);
+	}
+}
+
 int
 main(int argc __unused, char **argv __unused)
 {
+	int error;
 
 #if 0
 	fprintf(stderr, "memory at %p:\n", (void *)SHARED_PAGE);
 	show_chunk((void *)SHARED_PAGE, SHARED_PAGE, PAGE_SIZE);
 #endif
 
+	error = pthread_create(&service_thread, NULL, service_proc, NULL);
+	if (error != 0)
+		err(1, "pthread_create");
+
+	sleep(1);
 	call();
 
 	return (0);
