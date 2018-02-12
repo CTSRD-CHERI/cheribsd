@@ -161,19 +161,20 @@ kva_free(addr, size)
  *	necessarily physically contiguous.  If M_ZERO is specified through the
  *	given flags, then the pages are zeroed before they are mapped.
  */
-vm_offset_t
+vm_ptr_t
 kmem_alloc_attr(vmem_t *vmem, vm_size_t size, int flags, vm_paddr_t low,
     vm_paddr_t high, vm_memattr_t memattr)
 {
 	vm_object_t object = vmem == kmem_arena ? kmem_object : kernel_object;
-	vm_offset_t addr, i, offset;
+	vm_ptr_t addr;
+	vm_offset_t i, offset;
 	vm_page_t m;
 	int pflags, tries;
 
 	size = round_page(size);
 	if (vmem_alloc(vmem, size, M_BESTFIT | flags, &addr))
 		return (0);
-	offset = addr - VM_MIN_KERNEL_ADDRESS;
+	offset = ptr_to_va(addr) - VM_MIN_KERNEL_ADDRESS;
 	pflags = malloc2vm_flags(flags) | VM_ALLOC_NOBUSY | VM_ALLOC_WIRED;
 	VM_OBJECT_WLOCK(object);
 	for (i = 0; i < size; i += PAGE_SIZE) {
@@ -192,14 +193,14 @@ retry:
 				tries++;
 				goto retry;
 			}
-			kmem_unback(object, addr, i);
+			kmem_unback(object, ptr_to_va(addr), i);
 			vmem_free(vmem, addr, size);
 			return (0);
 		}
 		if ((flags & M_ZERO) && (m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
 		m->valid = VM_PAGE_BITS_ALL;
-		pmap_enter(kernel_pmap, addr + i, m, VM_PROT_ALL,
+		pmap_enter(kernel_pmap, ptr_to_va(addr) + i, m, VM_PROT_ALL,
 		    VM_PROT_ALL | PMAP_ENTER_WIRED, 0);
 	}
 	VM_OBJECT_WUNLOCK(object);
@@ -307,10 +308,10 @@ kmem_suballoc(vm_map_t parent, vm_offset_t *min, vm_offset_t *max,
  *
  *	Allocate wired-down pages in the kernel's address space.
  */
-vm_offset_t
+vm_ptr_t
 kmem_malloc(struct vmem *vmem, vm_size_t size, int flags)
 {
-	vm_offset_t addr;
+	vm_ptr_t addr;
 	int rv;
 
 	size = round_page(size);
@@ -331,9 +332,13 @@ kmem_malloc(struct vmem *vmem, vm_size_t size, int flags)
  *	kmem_back:
  *
  *	Allocate physical pages for the specified virtual address range.
+ *	XXX-AM:
+ *	We should prevent physical pages allocation if whoever asks for it
+ *	does not have a valid capability for the virtual address range
+ *	of the specified size.
  */
 int
-kmem_back(vm_object_t object, vm_offset_t addr, vm_size_t size, int flags)
+kmem_back(vm_object_t object, vm_ptr_t addr, vm_size_t size, int flags)
 {
 	vm_offset_t offset, i;
 	vm_page_t m;
@@ -341,8 +346,9 @@ kmem_back(vm_object_t object, vm_offset_t addr, vm_size_t size, int flags)
 
 	KASSERT(object == kmem_object || object == kernel_object,
 	    ("kmem_back: only supports kernel objects."));
+	CHERI_VM_ASSERT_VALID(addr);
 
-	offset = addr - VM_MIN_KERNEL_ADDRESS;
+	offset = ptr_to_va(addr) - VM_MIN_KERNEL_ADDRESS;
 	pflags = malloc2vm_flags(flags) | VM_ALLOC_NOBUSY | VM_ALLOC_WIRED;
 
 	VM_OBJECT_WLOCK(object);
@@ -370,7 +376,7 @@ retry:
 		KASSERT((m->oflags & VPO_UNMANAGED) != 0,
 		    ("kmem_malloc: page %p is managed", m));
 		m->valid = VM_PAGE_BITS_ALL;
-		pmap_enter(kernel_pmap, addr + i, m, VM_PROT_ALL,
+		pmap_enter(kernel_pmap, ptr_to_va(addr) + i, m, VM_PROT_ALL,
 		    VM_PROT_ALL | PMAP_ENTER_WIRED, 0);
 	}
 	VM_OBJECT_WUNLOCK(object);
