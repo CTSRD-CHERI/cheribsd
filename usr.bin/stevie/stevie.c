@@ -42,10 +42,7 @@ __FBSDID("$FreeBSD$");
 #include <stdlib.h>
 #include <unistd.h>
 
-extern int	cocreate(void * __capability *, void * __capability *);
 extern int	cocall(void * __capability, void * __capability);
-extern int	coregister(const char *, void * __capability *);
-extern int	colookup(const char *, void * __capability *);
 
 void * __capability switcher_code;
 void * __capability switcher_data;
