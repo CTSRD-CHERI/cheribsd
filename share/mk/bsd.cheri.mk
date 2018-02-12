@@ -104,6 +104,9 @@ _CHERI_COMMON_FLAGS+= -Wno-deprecated-declarations
 
 .if ${WANT_CHERI} != "none"
 CFLAGS+=	${CHERI_OPTIMIZATION_FLAGS:U-O2}
+# We now need LLD to link any code that uses capabilities:
+LDFLAGS:=${LDFLAGS:N-fuse-ld=*}
+LDFLAGS+=	-fuse-ld=lld
 .endif
 
 .if ${WANT_CHERI} == "pure" || ${WANT_CHERI} == "sandbox"
@@ -129,9 +132,6 @@ _LIB_OBJTOP=	${ROOTOBJDIR}
 .ifdef LIBCHERI
 LDFLAGS+=	-Wl,-init=crt_init_globals
 .endif
-# remove any conflicting -fuse-ld= flags
-LDFLAGS:=${LDFLAGS:N-fuse-ld=*}
-LDFLAGS+=	-fuse-ld=lld
 .else
 STATIC_CFLAGS+= -ftls-model=local-exec # MIPS/hybrid case
 .endif
