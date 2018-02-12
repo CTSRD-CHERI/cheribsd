@@ -1162,6 +1162,7 @@ vmem_xalloc(vmem_t *vm, const vmem_size_t size0, vmem_size_t align,
 	MPASS(nocross == 0 || nocross >= size);
 	MPASS(minaddr <= maxaddr);
 	MPASS(!VMEM_CROSS_P(phase, phase + size - 1, nocross));
+	CHERI_VM_ASSERT_FIT_PTR(addrp);
 
 	if (align == 0)
 		align = vm->vm_quantum_mask + 1;
