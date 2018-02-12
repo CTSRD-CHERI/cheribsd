@@ -102,16 +102,9 @@ _CHERI_COMMON_FLAGS+=	-mllvm -cheri-exact-equals
 # Turn off deprecated warnings
 _CHERI_COMMON_FLAGS+= -Wno-deprecated-declarations
 
-.if ${WANT_CHERI} != "none"
-CFLAGS+=	${CHERI_OPTIMIZATION_FLAGS:U-O2}
-# We now need LLD to link any code that uses capabilities:
-LDFLAGS:=${LDFLAGS:N-fuse-ld=*}
-LDFLAGS+=	-fuse-ld=lld
-.endif
-
 .if ${WANT_CHERI} == "pure" || ${WANT_CHERI} == "sandbox"
 OBJCOPY:=	objcopy
-MIPS_ABI=	purecap
+MIPS_ABI:=	purecap
 _CHERI_COMMON_FLAGS+=	-fpic
 LIBDIR:=	/usr/libcheri
 ROOTOBJDIR=	${.OBJDIR:S,${.CURDIR},,}${SRCTOP}/worldcheri${SRCTOP}
@@ -141,6 +134,13 @@ _CHERI_COMMON_FLAGS+=	-cheri=128
 .else
 _CHERI_COMMON_FLAGS+=	-cheri=256
 .endif
+
+CFLAGS+=	${CHERI_OPTIMIZATION_FLAGS:U-O2}
+# We now need LLD to link any code that uses capabilities:
+# We are expanding $LDFLAGS here so this must come after MIPS_ABI has been set!
+LDFLAGS:=${LDFLAGS:N-fuse-ld=*}
+LDFLAGS+=	-fuse-ld=lld
+
 # XXX: Needed as Clang rejects -mllvm -cheri128 when using $CC to link:
 # warning: argument unused during compilation: '-cheri=128'
 _CHERI_CFLAGS+=	-Qunused-arguments
