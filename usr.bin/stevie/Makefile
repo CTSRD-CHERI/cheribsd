@@ -6,8 +6,8 @@ PROG=		stevie
 SRCS=		stevie.c cocall.S
 MAN=
 
-#CFLAGS=		-fPIE -pie -Wno-error=deprecated-declarations
-CFLAGS=		-Wno-error=deprecated-declarations
+#CFLAGS+=	-fPIE -pie -Wno-error=deprecated-declarations -fuse-ld=lld
+CFLAGS+=	-Wno-error=deprecated-declarations
 NEED_CHERI=	hybrid
 
 WARNS?=	5
