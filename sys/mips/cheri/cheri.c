@@ -259,8 +259,6 @@ cheri_serialize(struct cheri_serial *csp, void * __capability cap)
 		memcpy(&csp->cs_data, &cap, CHERICAP_SIZE);
 }
 
-#define	SWITCHER_VADDR	0x7ffffff800
-
 int
 sys_cocreate(struct thread *td, struct cocreate_args *uap)
 {
@@ -292,8 +290,9 @@ sys_cocreate(struct thread *td, struct cocreate_args *uap)
 	entry->owner = 0;
 	vm_map_unlock(map);
 
-	cheri_capability_set(&codecap, CHERI_CAP_USER_CODE_PERMS, SWITCHER_VADDR,
-	    szswitcher, 0);
+	cheri_capability_set(&codecap, CHERI_CAP_USER_CODE_PERMS,
+	    td->td_proc->p_sysent->sv_switcher_base,
+	    td->td_proc->p_sysent->sv_switcher_len, 0);
 	codecap = cheri_seal(codecap, curproc->p_md.md_cheri_sealcap);
 	error = copyoutcap(&codecap, uap->code, sizeof(codecap));
 	if (error != 0)

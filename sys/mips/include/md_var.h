@@ -50,6 +50,8 @@ extern	int	szsigcode32;
 extern	char	cheri_sigcode[];
 extern	int	szcheri_sigcode;
 #endif
+extern	char	switcher[];
+extern	int	szswitcher;
 extern	uint32_t *vm_page_dump;
 extern	int vm_page_dump_size;
 

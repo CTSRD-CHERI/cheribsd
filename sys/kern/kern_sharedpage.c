@@ -54,6 +54,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_page.h>
 #include <vm/vm_pager.h>
 
+#include <machine/md_var.h>
+
 static struct sx shared_page_alloc_sx;
 static vm_object_t shared_page_obj;
 static int shared_page_free;
@@ -265,6 +267,9 @@ exec_sysvec_init(void *param)
 	sv->sv_shared_page_obj = shared_page_obj;
 	sv->sv_sigcode_base = sv->sv_shared_page_base +
 	    shared_page_fill(*(sv->sv_szsigcode), 16, sv->sv_sigcode);
+	sv->sv_switcher_base = sv->sv_shared_page_base +
+	    shared_page_fill(szswitcher, 16, switcher);
+	sv->sv_switcher_len = szswitcher;
 	if ((sv->sv_flags & SV_ABI_MASK) != SV_ABI_FREEBSD)
 		return;
 	if ((sv->sv_flags & SV_TIMEKEEP) != 0) {
