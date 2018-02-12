@@ -46,8 +46,6 @@ WANT_CHERI?=	hybrid
 # XXXAR: leave this for a while until everyone has updated clang to
 # a version that defaults to libc++
 LDFLAGS+=	-stdlib=libc++
-# exceptions currently require text relocations on MIPS
-ALLOW_SHARED_TEXTREL=yes
 .endif
 .endif
 
@@ -137,15 +135,6 @@ LDFLAGS+=	-fuse-ld=lld -Wl,-z,norelro
 .ifdef CHERI_LLD_INTEGRATED_CAPSIZEFIX
 LDFLAGS+=      -no-capsizefix -Wl,--process-cap-relocs -Wl,-color-diagnostics
 LD_FATAL_WARNINGS:=no
-.endif
-.if ${CFLAGS:M-fexceptions} != ""
-# any code built with -fexceptions currently needs text relocations
-# See https://reviews.llvm.org/D33670
-ALLOW_SHARED_TEXTREL=yes
-.endif
-.ifdef ALLOW_SHARED_TEXTREL
-# By default text relocations are an error instead of a warning with LLD
-LDFLAGS+=	-Wl,-z,notext
 .endif
 .else
 STATIC_CFLAGS+= -ftls-model=local-exec # MIPS/hybrid case
