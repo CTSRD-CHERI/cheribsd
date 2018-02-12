@@ -131,7 +131,7 @@ LDFLAGS+=	-Wl,-init=crt_init_globals
 .endif
 # remove any conflicting -fuse-ld= flags
 LDFLAGS:=${LDFLAGS:N-fuse-ld=*}
-LDFLAGS+=	-fuse-ld=lld -Wl,-z,norelro
+LDFLAGS+=	-fuse-ld=lld
 .else
 STATIC_CFLAGS+= -ftls-model=local-exec # MIPS/hybrid case
 .endif
