@@ -1020,6 +1020,8 @@ LEAF(ffs)
 	nop
 END(ffs)
 
+#if 0 /* XXX-AM these seems not being used */
+
 /**
  * void
  * atomic_set_16(u_int16_t *a, u_int16_t b)
@@ -1247,6 +1249,7 @@ LEAF(atomic_load_64)
 	nop
 END(atomic_load_64)
 #endif
+#endif /* XXX-AM seemingly not used */
 
 #if defined(DDB) || defined(DEBUG)
 
