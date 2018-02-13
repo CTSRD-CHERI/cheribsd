@@ -1377,7 +1377,6 @@ xs_write(struct xs_transaction t, const char *dir, const char *node,
 
 	IOVEC_INIT(&iovec[0], __DECONST(void *, sbuf_data(path)),
 	    sbuf_len(path) + 1);
-	/* XXX-BD: no space for NUL? */
 	IOVEC_INIT(&iovec[1], __DECONST(void *, string), strlen(string));
 
 	error = xs_talkv(t, XS_WRITE, iovec, 2, NULL, NULL);
