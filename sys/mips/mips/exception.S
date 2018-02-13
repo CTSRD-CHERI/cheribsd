@@ -99,6 +99,7 @@
 
 #include "assym.s"
 
+	.option pic0
 	.set	noreorder		# Noreorder is default style!
 
 #ifdef KDTRACE_HOOKS
@@ -106,7 +107,7 @@
 	.globl	dtrace_invop_calltrap_addr
 	.align	4
 	.type	dtrace_invop_calltrap_addr, @object
-        .size	dtrace_invop_calltrap_addr, 8
+	.size	dtrace_invop_calltrap_addr, 8
 dtrace_invop_calltrap_addr:
 	.word	0
 	.word	0
@@ -200,8 +201,8 @@ VECTOR_END(MipsTLBMiss)
 MipsDoTLBMiss:
 	bltz		k0, 1f				#02: k0<0 -> 1f (kernel fault)
 	PTR_SRL		k0, k0, SEGSHIFT - PTRSHIFT	#03: k0=seg offset (almost)
-
-	GET_CPU_PCPU_NOCAP(k1)
+#ifndef CHERI_KERNEL
+	GET_CPU_PCPU(k1)
 	PTR_L		k1, PC_SEGBASE(k1)
 	beqz		k1, 2f				#05: make sure segbase is not null
 	andi		k0, k0, PDEPTRMASK		#06: k0=seg offset
@@ -294,6 +295,43 @@ not_superpage:
 	COP0_SYNC
 	tlbwr						#1a: write to tlb
 	HAZARD_DELAY
+
+#else	/* CHERI_KERNEL - assumes __mips64 and ! MIPS64_NEW_PMAP */
+	GET_CPU_PCPU(CHERI_REG_KR1C)
+	clc		CHERI_REG_KR1C, zero, PC_SEGBASE(CHERI_REG_KR1C)
+	cbez		CHERI_REG_KR1C, 2f			# == NULL no segbase
+	andi		k0, k0, PDEPTRMASK			# k0 = seg offset
+	cincoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, k0	# kr1c = seg entry ptr
+
+	clc		CHERI_REG_KR1C, zero, 0(CHERI_REG_KR1C) # kr1c = seg entry
+	MFC0		k0, MIPS_COP_0_BAD_VADDR		# XXX we may use k1 and avoid to reload badVaddr
+	cbez		CHERI_REG_KR1C, 2f			# == NULL no page table
+	PTR_SRL		k0, PDRSHIFT - PTRSHIFT			# k0 = shift to first level page directory
+	andi		k0, k0, PDEPTRMASK			# k0 = pde offset
+	clc		CHERI_REG_KR1C, k0, 0(CHERI_REG_KR1C)	# kr1c = pde entry
+	cbez		CHERI_REG_KR1C, 2f			# == NULL no page table
+	nop
+
+	MFC0		k0, MIPS_COP_0_BAD_VADDR	# k0=bad address (again)
+	PTR_SRL		k0, PAGE_SHIFT - PTESHIFT	#0b: k0=VPN (second level page table entry)
+	andi		k0, k0, PTE2MASK		#0c: k0=page tab offset
+	cincoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, k0 # lo0 pte address
+	cld		k0, zero, 0(CHERI_REG_KR1C)	# k0 = lo0 pte
+
+	CLEAR_PTE_SWBITS(k0)
+	PTE_MTC0	k0, MIPS_COP_0_TLB_LO0		#12: lo0 is loaded
+	COP0_SYNC
+
+	cld		k0, zero, PTESIZE(CHERI_REG_KR1C) # k1 = lo1 pte
+
+	CLEAR_PTE_SWBITS(k0)
+	PTE_MTC0	k0, MIPS_COP_0_TLB_LO1		#15: lo1 is loaded
+	COP0_SYNC
+	tlbwr						#1a: write to tlb
+	HAZARD_DELAY
+
+#endif /* CHERI_KERNEL */
+
 #ifdef CPU_CHERI
 	CHERI_EXCEPTION_RETURN(k0)
 #endif
@@ -336,6 +374,7 @@ VECTOR(MipsException, unknown)
 	PTR_SLL	k1, k1, 1			# shift to get 8-byte offset
 #endif
 1:
+#ifndef CHERI_KERNEL
 	PTR_LA	k0, _C_LABEL(machExceptionTable)  # get base of the jump table
 	PTR_ADDU k0, k0, k1			# Get the address of the
 						#  function entry.  Note that
@@ -346,6 +385,19 @@ VECTOR(MipsException, unknown)
 	nop
 	j	k0				# Jump to the function.
 	nop
+#else /* CHERI_KERNEL */
+	PTR_LA		k0, _C_LABEL(machExceptionTable)
+	cgetkdc		CHERI_REG_KR1C
+	csetoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, k0
+	/* XXX-AM: For some reason the compiler does not generate the size symbol */
+	/* PTR_LA		k0, _C_LABEL(.size.machExcEptiontable) */
+	REG_LI		k0, 64 * CHERICAP_SIZE		# hardcoded exceptionTable size
+	csetbounds	CHERI_REG_KR1C, CHERI_REG_KR1C, k0
+	PTR_SLL		k1, CHERICAP_SHIFT - 3		# cause is already shifted by 3
+	clc		CHERI_REG_KR1C, k1, 0(CHERI_REG_KR1C) # get function address
+	cjr		CHERI_REG_KR1C			# Jump to the function
+	nop
+#endif /* CHERI_KERNEL */
 	.set	at
 VECTOR_END(MipsException)
 
@@ -420,44 +472,61 @@ SlowFault:
  * Save CHERI registers on the stack to construct the kernel trap frame.
  * Suitable alignment should already have been arranged by the caller.
  */
-#define	SAVE_CREG(creg, regoffs, offs, cregbase)	\
-	csc	creg, regoffs, (CALLFRAME_SIZ + (SZREG * offs))(cregbase)
+#ifndef CHERI_KERNEL
+#define	SAVE_CREG(creg, offs)						\
+	csc	creg, sp, (CALLFRAME_SIZ + (SZREG * offs))(CHERI_REG_KDC)
 
-#define	SAVE_CAPCAUSE(reg, treg, regoffs, offs, cregbase)		\
-	daddiu	treg, regoffs, (CALLFRAME_SIZ + (SZREG * offs));	\
-	csd	reg, treg, 0(cregbase)
+#define	SAVE_CAPCAUSE(reg, treg, offs)					\
+	daddiu	treg, sp, (CALLFRAME_SIZ + (SZREG * offs));		\
+	csd	reg, treg, 0(CHERI_REG_KDC)
 
-#define	SAVE_CHERI(treg0, treg1)				\
-	SAVE_CREG(CHERI_REG_DDC, sp, DDC, CHERI_REG_KDC);	\
-	SAVE_CREG(CHERI_REG_C1, sp, C1, CHERI_REG_KDC);		\
-	SAVE_CREG(CHERI_REG_C2, sp, C2, CHERI_REG_KDC);		\
-	SAVE_CREG(CHERI_REG_C3, sp, C3, CHERI_REG_KDC);		\
-	SAVE_CREG(CHERI_REG_C4, sp, C4, CHERI_REG_KDC);		\
-	SAVE_CREG(CHERI_REG_C5, sp, C5, CHERI_REG_KDC);		\
-	SAVE_CREG(CHERI_REG_C6, sp, C6, CHERI_REG_KDC);		\
-	SAVE_CREG(CHERI_REG_C7, sp, C7, CHERI_REG_KDC);		\
-	SAVE_CREG(CHERI_REG_C8, sp, C8, CHERI_REG_KDC);		\
-	SAVE_CREG(CHERI_REG_C9, sp, C9, CHERI_REG_KDC);		\
-	SAVE_CREG(CHERI_REG_C10, sp, C10, CHERI_REG_KDC);	\
-	SAVE_CREG(CHERI_REG_STC, sp, STC, CHERI_REG_KDC);	\
-	SAVE_CREG(CHERI_REG_C12, sp, C12, CHERI_REG_KDC);	\
-	SAVE_CREG(CHERI_REG_C13, sp, C13, CHERI_REG_KDC);	\
-	SAVE_CREG(CHERI_REG_C14, sp, C14, CHERI_REG_KDC);	\
-	SAVE_CREG(CHERI_REG_C15, sp, C15, CHERI_REG_KDC);	\
-	SAVE_CREG(CHERI_REG_C16, sp, C16, CHERI_REG_KDC);	\
-	SAVE_CREG(CHERI_REG_C17, sp, C17, CHERI_REG_KDC);	\
-	SAVE_CREG(CHERI_REG_C18, sp, C18, CHERI_REG_KDC);	\
-	SAVE_CREG(CHERI_REG_C19, sp, C19, CHERI_REG_KDC);	\
-	SAVE_CREG(CHERI_REG_C20, sp, C20, CHERI_REG_KDC);	\
-	SAVE_CREG(CHERI_REG_C21, sp, C21, CHERI_REG_KDC);	\
-	SAVE_CREG(CHERI_REG_C22, sp, C22, CHERI_REG_KDC);	\
-	SAVE_CREG(CHERI_REG_C23, sp, C23, CHERI_REG_KDC);	\
-	SAVE_CREG(CHERI_REG_C24, sp, C24, CHERI_REG_KDC);	\
-	SAVE_CREG(CHERI_REG_C25, sp, C25, CHERI_REG_KDC);	\
-	SAVE_CREG(CHERI_REG_C26, sp, IDC, CHERI_REG_KDC);	\
-	SAVE_CREG(CHERI_REG_EPCC, sp, PCC, CHERI_REG_KDC);	\
-	cgetcause	treg0;					\
-	SAVE_CAPCAUSE(treg0, treg1, sp, CAPCAUSE, CHERI_REG_KDC)
+/* Register to save in the trap frame cheri STC register offset */
+#define CHERI_EXC_STC_REG	CHERI_REG_STC
+#else /* CHERI_KERNEL */
+#define	SAVE_CREG(creg, offs)						\
+	csc	creg, zero, (CALLFRAME_SIZ + (SZREG * offs))(CHERI_REG_STC)
+
+#define	SAVE_CAPCAUSE(reg, treg, offs) 					\
+	REG_LI	treg, (CALLFRAME_SIZ + (SZREG * offs)); 		\
+	csd	reg, treg, 0(CHERI_REG_STC)
+
+/* Register to save in the trap frame cheri STC register offset.
+ * In this case KR1C holds the exception stack pointer.
+ */
+#define CHERI_EXC_STC_REG	CHERI_REG_KR1C
+#endif /* CHERI_KERNEL */
+
+#define	SAVE_CHERI(treg0, treg1)			\
+	SAVE_CREG(CHERI_REG_DDC, DDC);		\
+	SAVE_CREG(CHERI_REG_C1, C1);		\
+	SAVE_CREG(CHERI_REG_C2, C2);		\
+	SAVE_CREG(CHERI_REG_C3, C3);		\
+	SAVE_CREG(CHERI_REG_C4, C4);		\
+	SAVE_CREG(CHERI_REG_C5, C5);		\
+	SAVE_CREG(CHERI_REG_C6, C6);		\
+	SAVE_CREG(CHERI_REG_C7, C7);		\
+	SAVE_CREG(CHERI_REG_C8, C8);		\
+	SAVE_CREG(CHERI_REG_C9, C9);		\
+	SAVE_CREG(CHERI_REG_C10, C10);		\
+	SAVE_CREG(CHERI_EXC_STC_REG, STC);	\
+	SAVE_CREG(CHERI_REG_C12, C12);		\
+	SAVE_CREG(CHERI_REG_C13, C13);		\
+	SAVE_CREG(CHERI_REG_C14, C14);		\
+	SAVE_CREG(CHERI_REG_C15, C15);		\
+	SAVE_CREG(CHERI_REG_C16, C16);		\
+	SAVE_CREG(CHERI_REG_C17, C17);		\
+	SAVE_CREG(CHERI_REG_C18, C18);		\
+	SAVE_CREG(CHERI_REG_C19, C19);		\
+	SAVE_CREG(CHERI_REG_C20, C20);		\
+	SAVE_CREG(CHERI_REG_C21, C21);		\
+	SAVE_CREG(CHERI_REG_C22, C22);		\
+	SAVE_CREG(CHERI_REG_C23, C23);		\
+	SAVE_CREG(CHERI_REG_C24, C24);		\
+	SAVE_CREG(CHERI_REG_C25, C25);		\
+	SAVE_CREG(CHERI_REG_C26, IDC);		\
+	SAVE_CREG(CHERI_REG_EPCC, PCC);		\
+	cgetcause	treg0;			\
+	SAVE_CAPCAUSE(treg0, treg1, CAPCAUSE)
 #else
 #define	SAVE_CHERI(treg0, treg1)
 #endif
@@ -481,98 +550,127 @@ SlowFault:
  *
  * sp and k1 may differ if we've had to re-align the stack for CHERI.
  */
-#define	SAVE_REG(reg, offs, base) \
-	REG_S	reg, (CALLFRAME_SIZ + (SZREG * offs)) (base)
+
+#ifndef CHERI_KERNEL
+#define	SAVE_REG(reg, offs)		\
+	REG_S	reg, (CALLFRAME_SIZ + (SZREG * offs)) (sp)
+
+/* Register to save in the trap frame SP register offset */
+#define CHERI_EXC_SP_REG	k1
+
+/* Make trap frame pointer in a0 (first argument of a function) */
+#define TRAP_FRAME_POINTER		\
+	PTR_ADDU a0, sp, CALLFRAME_SIZ
+#else /* CHERI_KERNEL */
+#define	SAVE_REG(reg, offs)		\
+	csd	reg, zero, (CALLFRAME_SIZ + (SZREG * offs))(CHERI_REG_STC)
+
+/* Register to save in the trap frame SP register offset, in this
+ * case sp is a normal register and the exception stack is pointed by the
+ * stack capability.
+ */
+#define CHERI_EXC_SP_REG	sp
+
+/* Make trap frame pointer in c3 (first argument of a function) */
+#define TRAP_FRAME_POINTER				\
+	cincoffset	$c3, CHERI_REG_STC, CALLFRAME_SIZ
+#endif /* CHERI_KERNEL*/
 
 #define	SAVE_CPU \
-	SAVE_REG(AT, AST, sp)		;\
-	.set	at		        ;\
-	SAVE_REG(v0, V0, sp)		;\
-	SAVE_REG(v1, V1, sp)		;\
-	SAVE_REG(a0, A0, sp)		;\
-	SAVE_REG(a1, A1, sp)		;\
-	SAVE_REG(a2, A2, sp)		;\
-	SAVE_REG(a3, A3, sp)		;\
-	SAVE_REG(t0, T0, sp)		;\
-	SAVE_REG(t1, T1, sp)		;\
-	SAVE_REG(t2, T2, sp)		;\
-	SAVE_REG(t3, T3, sp)		;\
-	SAVE_REG(ta0, TA0, sp)		;\
-	SAVE_REG(ta1, TA1, sp)		;\
-	SAVE_REG(ta2, TA2, sp)		;\
-	SAVE_REG(ta3, TA3, sp)		;\
-	SAVE_REG(t8, T8, sp)		;\
-	SAVE_REG(t9, T9, sp)		;\
-	SAVE_REG(gp, GP, sp)		;\
-	SAVE_REG(s0, S0, sp)		;\
-	SAVE_REG(s1, S1, sp)		;\
-	SAVE_REG(s2, S2, sp)		;\
-	SAVE_REG(s3, S3, sp)		;\
-	SAVE_REG(s4, S4, sp)		;\
-	SAVE_REG(s5, S5, sp)		;\
-	SAVE_REG(s6, S6, sp)		;\
-	SAVE_REG(s7, S7, sp)		;\
-	SAVE_REG(s8, S8, sp)	        ;\
+	SAVE_REG(AT, AST)		;\
+	.set	at			;\
+	SAVE_REG(v0, V0)		;\
+	SAVE_REG(v1, V1)		;\
+	SAVE_REG(a0, A0)		;\
+	SAVE_REG(a1, A1)		;\
+	SAVE_REG(a2, A2)		;\
+	SAVE_REG(a3, A3)		;\
+	SAVE_REG(t0, T0)		;\
+	SAVE_REG(t1, T1)		;\
+	SAVE_REG(t2, T2)		;\
+	SAVE_REG(t3, T3)		;\
+	SAVE_REG(ta0, TA0)		;\
+	SAVE_REG(ta1, TA1)		;\
+	SAVE_REG(ta2, TA2)		;\
+	SAVE_REG(ta3, TA3)		;\
+	SAVE_REG(t8, T8)		;\
+	SAVE_REG(t9, T9)		;\
+	SAVE_REG(gp, GP)		;\
+	SAVE_REG(s0, S0)		;\
+	SAVE_REG(s1, S1)		;\
+	SAVE_REG(s2, S2)		;\
+	SAVE_REG(s3, S3)		;\
+	SAVE_REG(s4, S4)		;\
+	SAVE_REG(s5, S5)		;\
+	SAVE_REG(s6, S6)		;\
+	SAVE_REG(s7, S7)		;\
+	SAVE_REG(s8, S8)		;\
 	mflo	v0			;\
 	mfhi	v1			;\
 	mfc0	a0, MIPS_COP_0_STATUS	;\
 	mfc0	a1, MIPS_COP_0_CAUSE	;\
 	MFC0	a2, MIPS_COP_0_BAD_VADDR;\
 	MFC0	a3, MIPS_COP_0_EXC_PC	;\
-	SAVE_REG(v0, MULLO, sp)		;\
-	SAVE_REG(v1, MULHI, sp)		;\
-	SAVE_REG(a0, SR, sp)		;\
-	SAVE_REG(a1, CAUSE, sp)		;\
-	SAVE_REG(a2, BADVADDR, sp)	;\
+	SAVE_REG(v0, MULLO)		;\
+	SAVE_REG(v1, MULHI)		;\
+	SAVE_REG(a0, SR)		;\
+	SAVE_REG(a1, CAUSE)		;\
+	SAVE_REG(a2, BADVADDR)		;\
 	SAVE_CHERI(t0, t1)		;\
 	move	t0, ra			;\
 	move	ra, a3			;\
-	SAVE_REG(ra, PC, sp)		;\
+	SAVE_REG(ra, PC)		;\
 	move	ra, t0			;\
-	SAVE_REG(ra, RA, sp)		;\
-	SAVE_REG(k1, SP, sp)		/* Notice: k1 stored for sp. */	;\
+	SAVE_REG(ra, RA)		;\
+	SAVE_REG(CHERI_EXC_SP_REG, SP)	/* Notice: k1/sp stored for sp. */;\
 	CLEAR_STATUS			;\
-	PTR_ADDU a0, sp, CALLFRAME_SIZ	/* Make trap frame pointer. */	;\
+	TRAP_FRAME_POINTER		/* Notice: trap frame ptr in a0 or c3 */;\
 	ITLBNOPFIX
 
 #ifdef CPU_CHERI
-#define	RESTORE_CREG(creg, regoffs, offs, cregbase)	\
-	clc	creg, regoffs, (CALLFRAME_SIZ + (SZREG * offs))(cregbase)
+
+#ifndef CHERI_KERNEL
+#define	RESTORE_CREG(creg, offs)	\
+	clc	creg, sp, (CALLFRAME_SIZ + (SZREG * offs))(CHERI_REG_KDC)
+#else /* CHERI_KERNEL */
+#define RESTORE_CREG(creg, offs)	\
+	clc	creg, zero, (CALLFRAME_SIZ + (SZREG * offs))(CHERI_REG_STC)
+#endif /* CHERI_KERNEL */
 
 /*
  * Restore CHERI registers from the on-stack kernel trap frame.
  *
  * Notice: the capability cause register is saved, but not restored.
- */
-#define	RESTORE_CHERI						\
-	RESTORE_CREG(CHERI_REG_DDC, sp, DDC, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_C1, sp, C1, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_C2, sp, C2, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_C3, sp, C3, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_C4, sp, C4, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_C5, sp, C5, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_C6, sp, C6, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_C7, sp, C7, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_C8, sp, C8, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_C9, sp, C9, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_C10, sp, C10, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_STC, sp, STC, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_C12, sp, C12, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_C13, sp, C13, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_C14, sp, C14, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_C15, sp, C15, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_C16, sp, C16, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_C17, sp, C17, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_C18, sp, C18, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_C19, sp, C19, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_C20, sp, C20, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_C21, sp, C21, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_C22, sp, C22, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_C23, sp, C23, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_C24, sp, C24, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_C25, sp, C25, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_C26, sp, IDC, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_EPCC, sp, PCC, CHERI_REG_KDC)
+*/
+#define	RESTORE_CHERI				\
+	RESTORE_CREG(CHERI_REG_DDC, DDC);	\
+	RESTORE_CREG(CHERI_REG_C1, C1);	\
+	RESTORE_CREG(CHERI_REG_C2, C2);	\
+	RESTORE_CREG(CHERI_REG_C3, C3);	\
+	RESTORE_CREG(CHERI_REG_C4, C4);	\
+	RESTORE_CREG(CHERI_REG_C5, C5);	\
+	RESTORE_CREG(CHERI_REG_C6, C6);	\
+	RESTORE_CREG(CHERI_REG_C7, C7);	\
+	RESTORE_CREG(CHERI_REG_C8, C8);	\
+	RESTORE_CREG(CHERI_REG_C9, C9);	\
+	RESTORE_CREG(CHERI_REG_C10, C10);	\
+	RESTORE_CREG(CHERI_REG_STC, STC);	\
+	RESTORE_CREG(CHERI_REG_C12, C12);	\
+	RESTORE_CREG(CHERI_REG_C13, C13);	\
+	RESTORE_CREG(CHERI_REG_C14, C14);	\
+	RESTORE_CREG(CHERI_REG_C15, C15);	\
+	RESTORE_CREG(CHERI_REG_C16, C16);	\
+	RESTORE_CREG(CHERI_REG_C17, C17);	\
+	RESTORE_CREG(CHERI_REG_C18, C18);	\
+	RESTORE_CREG(CHERI_REG_C19, C19);	\
+	RESTORE_CREG(CHERI_REG_C20, C20);	\
+	RESTORE_CREG(CHERI_REG_C21, C21);	\
+	RESTORE_CREG(CHERI_REG_C22, C22);	\
+	RESTORE_CREG(CHERI_REG_C23, C23);	\
+	RESTORE_CREG(CHERI_REG_C24, C24);	\
+	RESTORE_CREG(CHERI_REG_C25, C25);	\
+	RESTORE_CREG(CHERI_REG_C26, IDC);	\
+	RESTORE_CREG(CHERI_REG_EPCC, PCC)
 #else
 #define	RESTORE_CHERI
 #endif
@@ -581,53 +679,59 @@ SlowFault:
  * Restore preempted kernel state following a kernel exception.  The caller
  * will restore the original sp from k1 after RESTORE_CPU has ended.
  */
-#define	RESTORE_REG(reg, offs, base) \
-	REG_L	reg, (CALLFRAME_SIZ + (SZREG * offs)) (base)
+#ifndef CHERI_KERNEL
+#define	RESTORE_REG(reg, offs) \
+	REG_L	reg, (CALLFRAME_SIZ + (SZREG * offs)) (sp)
+#else /* CHERI_KERNEL */
+#define	RESTORE_REG(reg, offs) \
+	cld	reg, zero, (CALLFRAME_SIZ + (SZREG * offs)) (CHERI_REG_STC)
+#endif /* CHERI_KERNEL */
 
 #define	RESTORE_CPU \
 	CLEAR_STATUS			;\
 	RESTORE_CHERI			;\
-	RESTORE_REG(k0, SR, sp)		;\
-	RESTORE_REG(t0, MULLO, sp)	;\
-	RESTORE_REG(t1, MULHI, sp)	;\
+	RESTORE_REG(k0, SR)		;\
+	RESTORE_REG(t0, MULLO)	;\
+	RESTORE_REG(t1, MULHI)	;\
 	mtlo	t0			;\
 	mthi	t1			;\
 	MTC0	v0, MIPS_COP_0_EXC_PC	;\
-	.set noat		        ;\
-	RESTORE_REG(AT, AST, sp)	;\
-	RESTORE_REG(v0, V0, sp)		;\
-	RESTORE_REG(v1, V1, sp)		;\
-	RESTORE_REG(a0, A0, sp)		;\
-	RESTORE_REG(a1, A1, sp)		;\
-	RESTORE_REG(a2, A2, sp)		;\
-	RESTORE_REG(a3, A3, sp)		;\
-	RESTORE_REG(t0, T0, sp)		;\
-	RESTORE_REG(t1, T1, sp)		;\
-	RESTORE_REG(t2, T2, sp)		;\
-	RESTORE_REG(t3, T3, sp)		;\
-	RESTORE_REG(ta0, TA0, sp)	;\
-	RESTORE_REG(ta1, TA1, sp)	;\
-	RESTORE_REG(ta2, TA2, sp)	;\
-	RESTORE_REG(ta3, TA3, sp)	;\
-	RESTORE_REG(t8, T8, sp)		;\
-	RESTORE_REG(t9, T9, sp)		;\
-	RESTORE_REG(s0, S0, sp)		;\
-	RESTORE_REG(s1, S1, sp)		;\
-	RESTORE_REG(s2, S2, sp)		;\
-	RESTORE_REG(s3, S3, sp)		;\
-	RESTORE_REG(s4, S4, sp)		;\
-	RESTORE_REG(s5, S5, sp)		;\
-	RESTORE_REG(s6, S6, sp)		;\
-	RESTORE_REG(s7, S7, sp)		;\
-	RESTORE_REG(s8, S8, sp)	        ;\
-	RESTORE_REG(gp, GP, sp)		;\
-	RESTORE_REG(ra, RA, sp)		;\
-	RESTORE_REG(k1, SP, sp)		/* Notice: restored sp in k1. */ ;\
+	.set noat			;\
+	RESTORE_REG(AT, AST)	;\
+	RESTORE_REG(v0, V0)		;\
+	RESTORE_REG(v1, V1)		;\
+	RESTORE_REG(a0, A0)		;\
+	RESTORE_REG(a1, A1)		;\
+	RESTORE_REG(a2, A2)		;\
+	RESTORE_REG(a3, A3)		;\
+	RESTORE_REG(t0, T0)		;\
+	RESTORE_REG(t1, T1)		;\
+	RESTORE_REG(t2, T2)		;\
+	RESTORE_REG(t3, T3)		;\
+	RESTORE_REG(ta0, TA0)	;\
+	RESTORE_REG(ta1, TA1)	;\
+	RESTORE_REG(ta2, TA2)	;\
+	RESTORE_REG(ta3, TA3)	;\
+	RESTORE_REG(t8, T8)		;\
+	RESTORE_REG(t9, T9)		;\
+	RESTORE_REG(s0, S0)		;\
+	RESTORE_REG(s1, S1)		;\
+	RESTORE_REG(s2, S2)		;\
+	RESTORE_REG(s3, S3)		;\
+	RESTORE_REG(s4, S4)		;\
+	RESTORE_REG(s5, S5)		;\
+	RESTORE_REG(s6, S6)		;\
+	RESTORE_REG(s7, S7)		;\
+	RESTORE_REG(s8, S8)		;\
+	RESTORE_REG(gp, GP)		;\
+	RESTORE_REG(ra, RA)		;\
+	RESTORE_REG(k1, SP)		/* Notice: restored sp in k1. */ ;\
 	mtc0	k0, MIPS_COP_0_STATUS
 
 NESTED_NOPROFILE(MipsKernGenException, KERN_EXC_FRAME_SIZE, ra)
 	.set	noat
 
+#ifndef CHERI_KERNEL
 	/* Save exception sp in k1 to put on the stack later. */
 	move	k1, sp
 	PTR_SUBU	sp, sp, KERN_EXC_FRAME_SIZE
@@ -646,6 +750,29 @@ NESTED_NOPROFILE(MipsKernGenException, KERN_EXC_FRAME_SIZE, ra)
 	PTR_LA	t9, _C_LABEL(trap)
 	jalr	t9
 	REG_S	a3, (CALLFRAME_RA + KERN_REG_SIZE)(sp)		# for debugging
+#else /* CHERI_KERNEL */
+	/* Save exception stc in kr1c to put on the stack later */
+	cmove	CHERI_REG_KR1C, CHERI_REG_STC
+	PTR_SUBU	k0, zero, KERN_EXC_FRAME_SIZE
+	cincoffset	CHERI_REG_STC, CHERI_REG_STC, k0
+	/* No stack alignment adjustment needed */
+	/* XXX-AM: Can we use .mask/.frame in cheriabi? */
+	.mask	0x80000000, (CALLFRAME_RA - KERN_EXC_FRAME_SIZE)
+/*
+ * For CHERI_KERNEL, CHERI_REG_STC holds the location of the trap frame,
+ * KR1C holds the value of STC to save in the trap frame.
+ */
+	SAVE_CPU
+/*
+ * Call the exception handler.  SAVE_CPU has left c3 pointing at the saved frame.
+ */
+	PTR_LA	gp, _C_LABEL(_gp)
+	PTR_LA	t9, _C_LABEL(trap)
+	cgetpccsetoffset $c12, t9
+	cjalr	$c12, $c17
+	/* XXX-AM: a3 this holds the exception PC from SAVE_CPU */
+	REG_S	a3, (CALLFRAME_RA + KERN_REG_SIZE)(sp)		# for debugging
+#endif /* CHERI_KERNEL */
 
 	/*
 	 * Update interrupt and CPU mask in saved status register
@@ -655,14 +782,19 @@ NESTED_NOPROFILE(MipsKernGenException, KERN_EXC_FRAME_SIZE, ra)
 	 */
 	mfc0	a0, MIPS_COP_0_STATUS
 	and	a0, a0, (MIPS_SR_INT_MASK|MIPS_SR_COP_USABILITY)
-	RESTORE_REG(a1, SR, sp)
+	RESTORE_REG(a1, SR)
 	and	a1, a1, ~(MIPS_SR_INT_MASK|MIPS_SR_COP_USABILITY)
 	or	a1, a1, a0
-	SAVE_REG(a1, SR, sp)
+	SAVE_REG(a1, SR)
 	RESTORE_CPU			# v0 contains the return address.
 
+#ifndef CHERI_KERNEL
 	/* Restore preempted sp from k1 now we are done with the stack. */
 	move	sp, k1
+#else /* CHERI_KERNEL */
+	/* Restore preempted stc from kr1c now we are done with the stack. */
+	cmove	CHERI_REG_STC, CHERI_REG_KR1C
+#endif
 	sync
 
 #ifdef CPU_CHERI
@@ -708,7 +840,7 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	or      t0, t0, (MIPS_SR_KX | MIPS_SR_SX | MIPS_SR_UX | MIPS_SR_PX)
 #elif defined(CPU_RMI)	|| defined(CPU_NLM)
 	or      t0, t0, (MIPS_SR_KX | MIPS_SR_UX | MIPS_SR_COP_2_BIT)
-#endif	
+#endif
 	mtc0	t0, MIPS_COP_0_STATUS
 
 	PTR_ADDU a0, k1, U_PCB_REGS
@@ -869,10 +1001,10 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
 	 */
 	mfc0	a0, MIPS_COP_0_STATUS
 	and	a0, a0, (MIPS_SR_INT_MASK|MIPS_SR_COP_USABILITY)
-	RESTORE_REG(a1, SR, sp)
+	RESTORE_REG(a1, SR)
 	and	a1, a1, ~(MIPS_SR_INT_MASK|MIPS_SR_COP_USABILITY)
 	or	a1, a1, a0
-	SAVE_REG(a1, SR, sp)
+	SAVE_REG(a1, SR)
 	REG_L	v0, (CALLFRAME_RA + KERN_REG_SIZE)(sp)
 	RESTORE_CPU			# v0 contains the return address.
 
@@ -974,7 +1106,7 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 	or      t0, t0, (MIPS_SR_KX | MIPS_SR_SX | MIPS_SR_UX | MIPS_SR_PX)
 #elif defined(CPU_RMI)	|| defined(CPU_NLM)
 	or      t0, t0, (MIPS_SR_KX | MIPS_SR_UX | MIPS_SR_COP_2_BIT)
-#endif	
+#endif
 	mtc0	t0, MIPS_COP_0_STATUS
 	ITLBNOPFIX
 	PTR_ADDU a0, k1, U_PCB_REGS
@@ -1005,11 +1137,11 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
  * DO_AST enabled interrupts
  */
 	DO_AST
-	
+
 /*
- * Restore user registers and return. 
+ * Restore user registers and return.
  */
- 	CLEAR_STATUS
+	CLEAR_STATUS
 
 	GET_CPU_PCPU_NOCAP(k1)
 	PTR_L	k1, PC_CURPCB(k1)
@@ -1070,7 +1202,7 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 	.set	noat
 	RESTORE_U_PCB_REG(AT, AST, k1)
 
-	mtc0	k0, MIPS_COP_0_STATUS	# SR with EXL set. 
+	mtc0	k0, MIPS_COP_0_STATUS	# SR with EXL set.
 	ITLBNOPFIX
 	sync
 #ifdef CPU_CHERI
@@ -1312,7 +1444,7 @@ tlb_insert_random:
 	 * Now restore the value of 'sp' at the time of the tlb exception in
 	 * the trapframe.
 	 */
-	SAVE_REG(k1, SP, sp)
+	SAVE_REG(k1, SP)
 
 	/*
 	 * Squelch any more overflow checks by setting the stack base to 0.
@@ -1354,6 +1486,7 @@ END(MipsTLBInvalidException)
  */
 LEAF_NOPROFILE(MipsTLBMissException)
 	.set	noat
+#ifndef CHERI_KERNEL
 	MFC0		k0, MIPS_COP_0_BAD_VADDR	# k0=bad address
 	PTR_LI		k1, VM_MAX_KERNEL_ADDRESS	# check fault address against
 	sltu		k1, k1, k0			# upper bound of kernel_segmap
@@ -1434,6 +1567,55 @@ not_kspg:
 	COP0_SYNC
 	tlbwr					# write to tlb
 	HAZARD_DELAY
+#else /* CHERI_KERNEL -- assumes __mips64 and ! MIPS64_NEW_PMAP */
+	MFC0		k0, MIPS_COP_0_BAD_VADDR	# k0=bad address
+	/**
+	 * XXX-AM: It would be nice if we could stop using VM_MAX/MIN_KERNEL_ADDRESS
+	 * in LOCORE and perform the check against the xkseg capability so we can
+	 * the KERNEL_ADDRESS with MIPS_XKSEG() to automatically have it
+	 * derived as a capability everywhere. The implications are not obvious
+	 * to me so I'll leave it for now.
+	 * PTR_LA		k1, _C_LABEL(cheri_xkseg_capability)
+	*/
+	cgetkdc		CHERI_REG_KR1C			# grab kdc
+	PTR_LI		k1, VM_MAX_KERNEL_ADDRESS	# check fault address against
+	sltu		k1, k1, k0			# upper bound of kernel_segmap
+	bnez		k1, MipsKernGenException	# out of bound
+	PTR_LA		k1, _C_LABEL(kernel_segmap)	# k1 = segbase ptr (should not use $at)	
+	PTR_SRL		k0, SEGSHIFT - PTRSHIFT		# k0 = seg offset (almost)
+	/* XXX-AM: MUST set bounds on kernel_segmap, also readonly */
+	clc		CHERI_REG_KR1C, k1, 0(CHERI_REG_KR1C) # kr1c = segbase
+	cbez		CHERI_REG_KR1C, MipsKernGenException  # == NULL -- no seg tab
+	andi		k0, k0, PDEPTRMASK		# k0 = seg offset
+	clc		CHERI_REG_KR1C, k0, 0(CHERI_REG_KR1C) # kr1c = seg entry
+	MFC0		k0, MIPS_COP_0_BAD_VADDR	# k0 = bad address (again)
+	cbez		CHERI_REG_KR1C, MipsKernGenException  # === NULL -- no page table
+
+	PTR_SRL		k0, PDRSHIFT - PTRSHIFT		# k0 = VPN
+	andi		k0, k0, PDEPTRMASK		# k0=pde offset
+	clc		CHERI_REG_KR1C, k0, 0(CHERI_REG_KR1C) # kr1c = pde entry
+	MFC0		k0, MIPS_COP_0_BAD_VADDR	# k0 = bad address (again)
+	cbez		CHERI_REG_KR1C, MipsKernGenException # == NULL -- no page table
+
+	PTR_SRL		k0, PAGE_SHIFT - PTESHIFT	# k0=VPN
+	andi		k0, k0, PTE2MASK		# k0=page tab offset
+	cincoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, k0 # kr1c = lo0 pte address
+	cld		k0, zero, 0(CHERI_REG_KR1C)	# k0 = lo0 pte
+	# XXX Reference bit emulation
+
+	CLEAR_PTE_SWBITS(k0)
+	PTE_MTC0	k0, MIPS_COP_0_TLB_LO0		# lo0 is loaded
+	COP0_SYNC
+
+	cld		k0, zero, PTESIZE(CHERI_REG_KR1C) # k0 = lo1 pte
+
+	CLEAR_PTE_SWBITS(k0)
+	PTE_MTC0	k0, MIPS_COP_0_TLB_LO1		# lo1 is loaded
+	COP0_SYNC
+	tlbwr					# write to tlb
+	HAZARD_DELAY
+#endif /* CHERI_KERNEL */
+
 #ifdef CPU_CHERI
 	CHERI_EXCEPTION_RETURN(k0)
 #endif

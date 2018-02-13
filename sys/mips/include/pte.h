@@ -610,7 +610,7 @@ not_valid ## unique ## :
 
 #endif /* ! MIPS64_NEW_PMAP */
 
-#else /* ! LOCORE */
+#else /* ! defined(__mips_n64) || defined(__mips_n32) */
 #define	PTESHIFT		2
 #define	PTE2MASK		0xff8	/* for the 2-page lo0/lo1 */
 #define	PTEMASK			0xffc
@@ -623,8 +623,12 @@ not_valid ## unique ## :
 #define	IS_PTE_VALID(r0, r1, offset, label)
 #define	SET_REF_BIT(r0, r1, offset)
 
-#endif /* defined(__mips_n64) || defined(__mips_n32) */
+#endif /* ! defined(__mips_n64) || defined(__mips_n32) */
 
+#if defined(CPU_CHERI) && defined(CHERI_KERNEL)
+#define PTRSHIFT		CHERICAP_SHIFT
+#define PDEPTRMASK		(0xfff & (CHERICAP_SIZE - 1))
+#else /* ! (CPU_HERI && CHERI_KERNEL) */
 #if defined(__mips_n64)
 #define	PTRSHIFT		3
 #define	PDEPTRMASK		0xff8
@@ -632,6 +636,7 @@ not_valid ## unique ## :
 #define	PTRSHIFT		2
 #define	PDEPTRMASK		0xffc
 #endif
+#endif /* ! (CPU_CHERI && CHERI_KERNEL) */
 
 #endif /* LOCORE */
 
