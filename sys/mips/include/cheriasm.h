@@ -131,10 +131,8 @@
 	beq	reg, $0, 64f;						\
 	nop;								\
 	/* Save user $ddc; install kernel $ddc. */			\
-	CHERI_ASM_CMOVE(CHERI_REG_SEC0, CHERI_REG_C0);			\
-	CHERI_ASM_CMOVE(CHERI_REG_C0, CHERI_REG_KDC);			\
-	/* cgetdefault	CHERI_REG_SEC0; */				\
-	/* csetdefault	CHERI_REG_KDC; */				\
+	cgetdefault	CHERI_REG_SEC0;					\
+	csetdefault	CHERI_REG_KDC;					\
 64:
 
 /*
@@ -157,8 +155,7 @@
 	nop;								\
 	b	66f;							\
 	/* If returning to userspace, restore saved user $ddc. */	\
-	CHERI_ASM_CMOVE(CHERI_REG_C0, CHERI_REG_SEC0); /* Branch-delay. */ \
-	/* csetdefault	CHERI_REG_SEC0; */	/* Branch-delay. */	\
+	csetdefault	CHERI_REG_SEC0;	/* Branch-delay. */		\
 65:									\
 	/* If returning to kernelspace, reinstall kernel code $pcc. */	\
 	/*								\
