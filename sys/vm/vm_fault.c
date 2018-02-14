@@ -1237,6 +1237,12 @@ readrest:
 			 * write-enabled after all.
 			 */
 			prot &= retry_prot;
+			fault_type &= retry_prot;
+			if (prot == 0) {
+				release_page(&fs);
+				unlock_and_deallocate(&fs);
+				goto RetryFault;
+			}
 		}
 	}
 
