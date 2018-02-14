@@ -56,7 +56,6 @@ struct timeval;
 struct timex;
 struct timezone;
 struct uuid;
-struct vm_domain_policy_entry;
 union semun;
 SYS_STUB(0, int, syscall,
     /* _protoargs */ (int number),
@@ -3439,26 +3438,6 @@ SYS_STUB(547, int, utimensat,
     /* _callargs_chk */ (&ret, stub_errno, fd, path, times, flag),
     /* _callargs_err */ (&errno, fd, (const char *)path, (const struct timespec *)times, flag),
     /* _localcheck */ {if (!(cheri_getperm(path) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(times) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
-)
-
-SYS_STUB(548, int, numa_getaffinity,
-    /* _protoargs */ (cpuwhich_t which, id_t id, struct vm_domain_policy_entry * policy),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, cpuwhich_t which, id_t id, struct vm_domain_policy_entry * __capability  policy),
-    /* _protoargs_err */ (__capability int *stub_errno, cpuwhich_t which, id_t id, struct vm_domain_policy_entry * __capability  policy),
-    /* _callargs */ (which, id, (__cheri_fromcap struct vm_domain_policy_entry *)policy),
-    /* _callargs_chk */ (&ret, stub_errno, which, id, policy),
-    /* _callargs_err */ (&errno, which, id, (struct vm_domain_policy_entry *)policy),
-    /* _localcheck */ {if (!(cheri_getperm(policy) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
-)
-
-SYS_STUB(549, int, numa_setaffinity,
-    /* _protoargs */ (cpuwhich_t which, id_t id, const struct vm_domain_policy_entry * policy),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, cpuwhich_t which, id_t id, const struct vm_domain_policy_entry * __capability  policy),
-    /* _protoargs_err */ (__capability int *stub_errno, cpuwhich_t which, id_t id, const struct vm_domain_policy_entry * __capability  policy),
-    /* _callargs */ (which, id, (__cheri_fromcap const struct vm_domain_policy_entry *)policy),
-    /* _callargs_chk */ (&ret, stub_errno, which, id, policy),
-    /* _callargs_err */ (&errno, which, id, (const struct vm_domain_policy_entry *)policy),
-    /* _localcheck */ {if (!(cheri_getperm(policy) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
 SYS_STUB(550, int, fdatasync,

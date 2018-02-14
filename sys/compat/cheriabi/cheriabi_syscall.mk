@@ -351,8 +351,6 @@ MIASM =  \
 	cheriabi_ppoll.o \
 	cheriabi_futimens.o \
 	cheriabi_utimensat.o \
-	numa_getaffinity.o \
-	numa_setaffinity.o \
 	fdatasync.o \
 	fstat.o \
 	fstatat.o \

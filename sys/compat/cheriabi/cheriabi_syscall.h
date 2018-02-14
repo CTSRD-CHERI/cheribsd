@@ -463,8 +463,6 @@
 #define	CHERIABI_SYS_cheriabi_ppoll	545
 #define	CHERIABI_SYS_cheriabi_futimens	546
 #define	CHERIABI_SYS_cheriabi_utimensat	547
-#define	CHERIABI_SYS_numa_getaffinity	548
-#define	CHERIABI_SYS_numa_setaffinity	549
 #define	CHERIABI_SYS_fdatasync	550
 #define	CHERIABI_SYS_fstat	551
 #define	CHERIABI_SYS_fstatat	552

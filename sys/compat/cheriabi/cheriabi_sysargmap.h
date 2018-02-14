@@ -340,8 +340,6 @@
 #define	CHERIABI_SYS_cheriabi_ppoll_PTRMASK	(0x0 | 0x1 | 0x4 | 0x8)
 #define	CHERIABI_SYS_cheriabi_futimens_PTRMASK	(0x0 | 0x2)
 #define	CHERIABI_SYS_cheriabi_utimensat_PTRMASK	(0x0 | 0x2 | 0x4)
-#define	CHERIABI_SYS_numa_getaffinity_PTRMASK	(0x0 | 0x4)
-#define	CHERIABI_SYS_numa_setaffinity_PTRMASK	(0x0 | 0x4)
 #define	CHERIABI_SYS_fdatasync_PTRMASK	(0x0)
 #define	CHERIABI_SYS_fstat_PTRMASK	(0x0 | 0x2)
 #define	CHERIABI_SYS_fstatat_PTRMASK	(0x0 | 0x2 | 0x4)

@@ -1342,14 +1342,8 @@
 				    _In_reads_(2) \
 				    const struct timespec * __capability times, \
 				    int flag); }
-548	AUE_NULL	NOPROTO	{ int numa_getaffinity(cpuwhich_t which, \
-				    id_t id, \
-				    _Out_ \
-				    struct vm_domain_policy_entry *policy); }
-549	AUE_NULL	NOPROTO	{ int numa_setaffinity(cpuwhich_t which, \
-				    id_t id, \
-				    _In_ \
-				    const struct vm_domain_policy_entry *policy); }
+548	AUE_NULL	UNIMPL	freebsd11_numa_getaffinity
+549	AUE_NULL	UNIMPL	freebsd11_numa_setaffinity
 550	AUE_FSYNC	NOPROTO	{ int fdatasync(int fd); }
 551	AUE_FSTAT	NOPROTO	{ int fstat(int fd, _Out_ struct stat *sb); }
 552	AUE_FSTATAT	NOPROTO	{ int fstatat(int fd, _In_z_ const char *path, \

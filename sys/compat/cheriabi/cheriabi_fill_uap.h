@@ -7704,64 +7704,6 @@ CHERIABI_SYS_cheriabi_utimensat_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_numa_getaffinity_fill_uap(struct thread *td,
-    struct numa_getaffinity_args *uap)
-{
-	void * __capability tmpcap;
-
-	/* [0] cpuwhich_t which */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_numa_getaffinity_PTRMASK);
-	uap->which = cheri_getoffset(tmpcap);
-
-	/* [1] id_t id */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_numa_getaffinity_PTRMASK);
-	uap->id = cheri_getoffset(tmpcap);
-
-	/* [2] _Out_ struct vm_domain_policy_entry * policy */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_numa_getaffinity_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->policy),
-		    tmpcap, sizeof(*uap->policy), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
-
-	return (0);
-}
-
-static inline int
-CHERIABI_SYS_numa_setaffinity_fill_uap(struct thread *td,
-    struct numa_setaffinity_args *uap)
-{
-	void * __capability tmpcap;
-
-	/* [0] cpuwhich_t which */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_numa_setaffinity_PTRMASK);
-	uap->which = cheri_getoffset(tmpcap);
-
-	/* [1] id_t id */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_numa_setaffinity_PTRMASK);
-	uap->id = cheri_getoffset(tmpcap);
-
-	/* [2] _In_ const struct vm_domain_policy_entry * policy */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_numa_setaffinity_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->policy),
-		    tmpcap, sizeof(*uap->policy), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
-
-	return (0);
-}
-
-static inline int
 CHERIABI_SYS_fdatasync_fill_uap(struct thread *td,
     struct fdatasync_args *uap)
 {
