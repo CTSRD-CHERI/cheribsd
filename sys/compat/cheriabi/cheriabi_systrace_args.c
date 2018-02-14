@@ -2961,7 +2961,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		iarg[0] = p->idtype; /* int */
 		iarg[1] = p->id; /* id_t */
 		iarg[2] = p->com; /* int */
-		uarg[3] = (intptr_t) p->data; /* void * */
+		uarg[3] = (cheri_getbase(p->data) + cheri_getoffset(p->data)); /* void *__capability */
 		*n_args = 4;
 		break;
 	}
@@ -8026,7 +8026,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		default:
 			break;

@@ -1022,15 +1022,7 @@ int
 cheriabi_procctl(struct thread *td, struct cheriabi_procctl_args *uap)
 {
 
-	switch (uap->com) {
-	case PROC_REAP_GETPIDS:
-		/*
-		 * XXX-BD: implement struct procctl_reaper_pids_c
-		 * support in reap_getpids()
-		 */
-		return (EOPNOTSUPP);
-	}
-	return (sys_procctl(td, (struct procctl_args *)uap));
+	return (user_procctl(td, uap->idtype, uap->id, uap->com, uap->data));
 }
 
 void

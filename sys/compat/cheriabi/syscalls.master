@@ -1323,8 +1323,9 @@
 543	AUE_AIO_MLOCK	STD	{ int cheriabi_aio_mlock( \
 				    _Inout_ struct aiocb_c * __capability \
 				    aiocbp); }
-544	AUE_PROCCTL	STD|NOPARSE	{ int cheriabi_procctl(int idtype, \
-				    id_t id, int com, void *data); }
+544	AUE_PROCCTL	STD	{ int cheriabi_procctl(int idtype, \
+				    id_t id, int com, \
+				    void * __capability data); }
 545	AUE_POLL	STD	{ int cheriabi_ppoll( \
 				    _Inout_updates_(nfds) \
 				    struct pollfd * __capability fds, \

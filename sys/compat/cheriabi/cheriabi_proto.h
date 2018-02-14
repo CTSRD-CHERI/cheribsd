@@ -1006,7 +1006,7 @@ struct cheriabi_procctl_args {
 	char idtype_l_[PADL_(int)]; int idtype; char idtype_r_[PADR_(int)];
 	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
 	char com_l_[PADL_(int)]; int com; char com_r_[PADR_(int)];
-	char data_l_[PADL_(void *)]; void * data; char data_r_[PADR_(void *)];
+	char data_l_[PADL_(void *__capability)]; void *__capability data; char data_r_[PADR_(void *__capability)];
 };
 struct cheriabi_ppoll_args {
 	char fds_l_[PADL_(struct pollfd *__capability)]; struct pollfd *__capability fds; char fds_r_[PADR_(struct pollfd *__capability)];

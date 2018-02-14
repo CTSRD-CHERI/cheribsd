@@ -7604,8 +7604,31 @@ CHERIABI_SYS_cheriabi_aio_mlock_fill_uap(struct thread *td,
 	return (0);
 }
 
-static inline int	CHERIABI_SYS_cheriabi_procctl_fill_uap(struct thread *td,
-    struct cheriabi_procctl_args *uap);
+static inline int
+CHERIABI_SYS_cheriabi_procctl_fill_uap(struct thread *td,
+    struct cheriabi_procctl_args *uap)
+{
+	void * __capability tmpcap;
+
+	/* [0] int idtype */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_procctl_PTRMASK);
+	uap->idtype = cheri_getoffset(tmpcap);
+
+	/* [1] id_t id */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_procctl_PTRMASK);
+	uap->id = cheri_getoffset(tmpcap);
+
+	/* [2] int com */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_procctl_PTRMASK);
+	uap->com = cheri_getoffset(tmpcap);
+
+	/* [3] void *__capability data */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->data),
+	    3, CHERIABI_SYS_cheriabi_procctl_PTRMASK);
+
+	return (0);
+}
 
 static inline int
 CHERIABI_SYS_cheriabi_ppoll_fill_uap(struct thread *td,

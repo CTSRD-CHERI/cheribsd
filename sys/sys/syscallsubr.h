@@ -430,6 +430,8 @@ int	user_clock_nanosleep(struct thread *td, clockid_t clock_id,
 	    int flags, const struct timespec * __capability ua_rqtp,
 	    struct timespec * __capability ua_rmtp);
 int	user_pdgetpid(struct thread *td, int fd, pid_t * __capability pidp);
+int	user_procctl(struct thread *td, enum idtype idtype, id_t id, int com,
+	    void * __capability data);
 int	user_sched_getparam(struct thread *td, pid_t,
 	    struct sched_param * __capability param);
 int	user_sched_rr_get_interval(struct thread *td, pid_t pid,
