@@ -303,22 +303,19 @@ pte_test(pt_entry_t *pte, pt_entry_t bit)
 static __inline void
 pde_clear(pd_entry_t *pde, pt_entry_t bit)
 {
-
-	*(pt_entry_t *)pde &= (~bit);
+	ptr_set_flag(*(pt_entry_t *)pde, (~bit));
 }
 
 static __inline void
 pde_set(pd_entry_t *pde, pt_entry_t bit)
 {
-
-	*(pt_entry_t *)pde |= bit;
+	ptr_set_flag(*(pt_entry_t *)pde, bit);
 }
 
 static __inline int
 pde_test(pd_entry_t *pde, pt_entry_t bit)
 {
-
-	return ((*(pt_entry_t *)pde & bit) == bit);
+	return (ptr_get_flag(*(pt_entry_t *)pde, bit) == bit);
 }
 
 static __inline pt_entry_t
@@ -627,7 +624,7 @@ not_valid ## unique ## :
 
 #if defined(CPU_CHERI) && defined(CHERI_KERNEL)
 #define PTRSHIFT		CHERICAP_SHIFT
-#define PDEPTRMASK		(0xfff & (CHERICAP_SIZE - 1))
+#define PDEPTRMASK		(0xfff & ~(CHERICAP_SIZE - 1))
 #else /* ! (CPU_HERI && CHERI_KERNEL) */
 #if defined(__mips_n64)
 #define	PTRSHIFT		3
