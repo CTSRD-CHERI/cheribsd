@@ -39,6 +39,8 @@ CFLAGS+=	-fpic
 CFLAGS+=	-DPIC $(DEBUG)
 CFLAGS.reloc.c+=-fno-jump-tables
 LDFLAGS+=	-shared -Wl,-Bsymbolic -Wl,-z,defs
+# avoid accidentally depending on non-existent symbols
+LDFLAGS+=	-Wl,-no-undefined
 LIBADD=		c_pic
 
 # For floating-point functions used by gdtoa.
