@@ -7,6 +7,7 @@
  * Co. or Unix System Laboratories, Inc. and are reproduced herein with
  * the permission of UNIX System Laboratories, Inc.
  * Copyright (c) 2011 Konstantin Belousov <kib@FreeBSD.org>
+ * Copyright (c) 2018 Alex Richardson <arichardson@FreeBSD.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -41,7 +42,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <unistd.h>
-#include "rtld_printf.h"
+#include "simple_printf.h"
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
@@ -50,6 +51,16 @@
 
 #define	PRINT_METHOD_SNPRINTF	1
 #define	PRINT_METHOD_WRITE	2
+
+static size_t	 simple_strlen(const char *) __pure;
+
+/* We need to define strlen to avoid dependencies on libc */
+static inline size_t simple_strlen(const char* s) {
+	size_t result = 0;
+	while (*s++)
+		result++;
+	return result;
+}
 
 struct snprintf_arg {
 	int	method;
@@ -66,7 +77,7 @@ printf_out(struct snprintf_arg *info)
 
 	if (info->remain == info->buf_total)
 		return;
-	__rtld_write(info->fd, info->buf, info->buf_total - info->remain);
+	SIMPLE_PRINTF_FN(write)(info->fd, info->buf, info->buf_total - info->remain);
 	info->str = info->buf;
 	info->remain = info->buf_total;
 }
@@ -361,7 +372,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 			if (p == NULL)
 				p = "(null)";
 			if (!dot)
-				n = strlen (p);
+				n = simple_strlen(p);
 			else
 				for (n = 0; n < dwidth && p[n]; n++)
 					continue;
@@ -492,19 +503,19 @@ number:
 }
 
 int
-rtld_snprintf(char *buf, size_t bufsize, const char *fmt, ...)
+SIMPLE_PRINTF_FN(snprintf)(char *buf, size_t bufsize, const char *fmt, ...)
 {
 	va_list ap;
 	int retval;
 
 	va_start(ap, fmt);
-	retval = rtld_vsnprintf(buf, bufsize, fmt, ap);
+	retval = SIMPLE_PRINTF_FN(vsnprintf)(buf, bufsize, fmt, ap);
 	va_end(ap);
 	return (retval);
 }
 
 int
-rtld_vsnprintf(char *buf, size_t bufsize, const char *fmt, va_list ap)
+SIMPLE_PRINTF_FN(vsnprintf)(char *buf, size_t bufsize, const char *fmt, va_list ap)
 {
 	struct snprintf_arg info;
 	int retval;
@@ -520,7 +531,7 @@ rtld_vsnprintf(char *buf, size_t bufsize, const char *fmt, va_list ap)
 }
 
 int
-rtld_vfdprintf(int fd, const char *fmt, va_list ap)
+SIMPLE_PRINTF_FN(vfdprintf)(int fd, const char *fmt, va_list ap)
 {
 	char buf[512];
 	struct snprintf_arg info;
@@ -536,29 +547,55 @@ rtld_vfdprintf(int fd, const char *fmt, va_list ap)
 }
 
 int
-rtld_fdprintf(int fd, const char *fmt, ...)
+SIMPLE_PRINTF_FN(fdprintf)(int fd, const char *fmt, ...)
 {
 	va_list ap;
 	int retval;
 
 	va_start(ap, fmt);
-	retval = rtld_vfdprintf(fd, fmt, ap);
+	retval = SIMPLE_PRINTF_FN(vfdprintf)(fd, fmt, ap);
 	va_end(ap);
 	return (retval);
 }
 
+int
+SIMPLE_PRINTF_FN(printf)(const char *fmt, ...)
+{
+	va_list ap;
+	int retval;
+
+	va_start(ap, fmt);
+	retval = SIMPLE_PRINTF_FN(vfdprintf)(STDOUT_FILENO, fmt, ap);
+	va_end(ap);
+	return (retval);
+}
+
+
 void
-rtld_fdputstr(int fd, const char *str)
+SIMPLE_PRINTF_FN(fdputstr)(int fd, const char *str)
 {
 
-	write(fd, str, strlen(str));
+	SIMPLE_PRINTF_FN(write)(fd, str, simple_strlen(str));
 }
 
 void
-rtld_fdputchar(int fd, int c)
+SIMPLE_PRINTF_FN(putstr)(const char *str)
 {
-	char c1;
 
-	c1 = c;
-	write(fd, &c1, 1);
+	SIMPLE_PRINTF_FN(fdputstr(STDOUT_FILENO, str));
+}
+
+void
+SIMPLE_PRINTF_FN(fdputchar)(int fd, int c)
+{
+	char c1 = c;
+
+	SIMPLE_PRINTF_FN(write)(fd, &c1, 1);
+}
+
+void
+SIMPLE_PRINTF_FN(putchar)(int c)
+{
+
+	SIMPLE_PRINTF_FN(fdputchar(STDOUT_FILENO, c));
 }

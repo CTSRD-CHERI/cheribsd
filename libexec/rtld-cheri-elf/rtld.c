@@ -61,7 +61,7 @@
 #include "libmap.h"
 #include "paths.h"
 #include "rtld_tls.h"
-#include "rtld_printf.h"
+#include "simple_printf.h"
 #include "rtld_utrace.h"
 #include "notes.h"
 

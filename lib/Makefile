@@ -96,6 +96,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	liby \
 	libz \
 	libzstd \
+	libsimple_printf \
 	ncurses
 
 # Inter-library dependencies.  When the makefile for a library contains LDADD

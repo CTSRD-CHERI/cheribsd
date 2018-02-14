@@ -12,8 +12,8 @@ MK_CHERI_SHARED_PROG:=yes
 
 PROG?=		ld-cheri-elf.so.1
 SRCS=		rtld_start.S \
-		reloc.c rtld.c rtld_lock.c rtld_printf.c map_object.c \
-		heap.c malloc.c xmalloc.c debug.c libmap.c write.S
+		reloc.c rtld.c rtld_lock.c map_object.c \
+		heap.c malloc.c xmalloc.c debug.c libmap.c
 MAN=
 NEED_CHERI=	pure
 WANT_DUMP=yes
@@ -43,6 +43,10 @@ LIBADD=		c_pic
 
 # For floating-point functions used by gdtoa.
 LIBADD+=	compiler_rt
+
+# for the rtld_printf functions:
+SIMPLE_PRINTF_PREFIX=rtld
+.include "${SRCTOP}/lib/libsimple_printf/Makefile.inc"
 
 .if defined(NOT_YET)
 .if ${MK_SYMVER} == "yes"
