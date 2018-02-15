@@ -1536,7 +1536,7 @@ freebsd4_freebsd32_statfs(struct thread *td, struct freebsd4_freebsd32_statfs_ar
 	int error;
 
 	sp = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
-	error = kern_statfs(td, uap->path, UIO_USERSPACE, sp);
+	error = kern_statfs(td, __USER_CAP_STR(uap->path), UIO_USERSPACE, sp);
 	if (error == 0) {
 		copy_statfs(sp, &s32);
 		error = copyout(&s32, uap->buf, sizeof(s32));
@@ -1674,8 +1674,8 @@ freebsd11_freebsd32_getdirentries(struct thread *td,
 	int32_t base32;
 	int error;
 
-	error = freebsd11_kern_getdirentries(td, uap->fd, uap->buf, uap->count,
-	    &base, NULL);
+	error = freebsd11_kern_getdirentries(td, uap->fd,
+	    __USER_CAP(uap->buf, uap->count), uap->count, &base, NULL);
 	if (error)
 		return (error);
 	if (uap->basep != NULL) {
@@ -1707,7 +1707,8 @@ freebsd32_getdirentries(struct thread *td,
 	int32_t base32;
 	int error;
 
-	error = kern_getdirentries(td, uap->fd, uap->buf, uap->count, &base,
+	error = kern_getdirentries(td, uap->fd,
+	    __USER_CAP(uap->buf, uap->count), uap->count, &base,
 	    NULL, UIO_USERSPACE);
 	if (error)
 		return (error);
@@ -1931,8 +1932,8 @@ ofreebsd32_stat(struct thread *td, struct ofreebsd32_stat_args *uap)
 	struct ostat32 sb32;
 	int error;
 
-	error = kern_statat(td, 0, AT_FDCWD, uap->path, UIO_USERSPACE,
-	    &sb, NULL);
+	error = kern_statat(td, 0, AT_FDCWD, __USER_CAP_STR(uap->path),
+	    UIO_USERSPACE, &sb, NULL);
 	if (error)
 		return (error);
 	copy_ostat(&sb, &sb32);
@@ -1980,8 +1981,8 @@ freebsd32_fstatat(struct thread *td, struct freebsd32_fstatat_args *uap)
 	struct stat32 ub32;
 	int error;
 
-	error = kern_statat(td, uap->flag, uap->fd, uap->path, UIO_USERSPACE,
-	    &ub, NULL);
+	error = kern_statat(td, uap->flag, uap->fd, __USER_CAP_STR(uap->path),
+	    UIO_USERSPACE, &ub, NULL);
 	if (error)
 		return (error);
 	copy_stat(&ub, &ub32);
@@ -1997,8 +1998,8 @@ ofreebsd32_lstat(struct thread *td, struct ofreebsd32_lstat_args *uap)
 	struct ostat32 sb32;
 	int error;
 
-	error = kern_statat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD, uap->path,
-	    UIO_USERSPACE, &sb, NULL);
+	error = kern_statat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD,
+	    __USER_CAP_STR(uap->path), UIO_USERSPACE, &sb, NULL);
 	if (error)
 		return (error);
 	copy_ostat(&sb, &sb32);
@@ -2088,8 +2089,8 @@ freebsd11_freebsd32_stat(struct thread *td,
 	struct freebsd11_stat32 sb32;
 	int error;
 
-	error = kern_statat(td, 0, AT_FDCWD, uap->path, UIO_USERSPACE,
-	    &sb, NULL);
+	error = kern_statat(td, 0, AT_FDCWD, __USER_CAP_STR(uap->path),
+	    UIO_USERSPACE, &sb, NULL);
 	if (error != 0)
 		return (error);
 	error = freebsd11_cvtstat32(&sb, &sb32);
@@ -2123,8 +2124,8 @@ freebsd11_freebsd32_fstatat(struct thread *td,
 	struct freebsd11_stat32 sb32;
 	int error;
 
-	error = kern_statat(td, uap->flag, uap->fd, uap->path, UIO_USERSPACE,
-	    &sb, NULL);
+	error = kern_statat(td, uap->flag, uap->fd, __USER_CAP_STR(uap->path),
+	    UIO_USERSPACE, &sb, NULL);
 	if (error != 0)
 		return (error);
 	error = freebsd11_cvtstat32(&sb, &sb32);
@@ -2141,8 +2142,8 @@ freebsd11_freebsd32_lstat(struct thread *td,
 	struct freebsd11_stat32 sb32;
 	int error;
 
-	error = kern_statat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD, uap->path,
-	    UIO_USERSPACE, &sb, NULL);
+	error = kern_statat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD,
+	    __USER_CAP_STR(uap->path), UIO_USERSPACE, &sb, NULL);
 	if (error != 0)
 		return (error);
 	error = freebsd11_cvtstat32(&sb, &sb32);

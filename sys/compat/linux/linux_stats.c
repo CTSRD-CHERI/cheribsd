@@ -77,7 +77,8 @@ linux_kern_statat(struct thread *td, int flag, int fd, char *path,
     struct stat *sbp)
 {
 
-	return (kern_statat(td, flag, fd, path, UIO_SYSSPACE, sbp,
+	return (kern_statat(td, flag, fd,
+	    (__cheri_tocap char * __capability)path, UIO_SYSSPACE, sbp,
 	    translate_vnhook_major_minor));
 }
 

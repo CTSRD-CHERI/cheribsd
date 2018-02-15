@@ -430,6 +430,10 @@ struct cheriabi_pwritev_args {
 	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
 	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
 };
+struct cheriabi_fhopen_args {
+	char u_fhp_l_[PADL_(const struct fhandle *__capability)]; const struct fhandle *__capability u_fhp; char u_fhp_r_[PADR_(const struct fhandle *__capability)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
 struct cheriabi_kldload_args {
 	char file_l_[PADL_(const char *__capability)]; const char *__capability file; char file_r_[PADR_(const char *__capability)];
 };
@@ -1024,6 +1028,38 @@ struct cheriabi_utimensat_args {
 	char times_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability times; char times_r_[PADR_(const struct timespec *__capability)];
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 };
+struct cheriabi_fstat_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char sb_l_[PADL_(struct stat *__capability)]; struct stat *__capability sb; char sb_r_[PADR_(struct stat *__capability)];
+};
+struct cheriabi_fstatat_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char buf_l_[PADL_(struct stat *__capability)]; struct stat *__capability buf; char buf_r_[PADR_(struct stat *__capability)];
+	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
+};
+struct cheriabi_fhstat_args {
+	char u_fhp_l_[PADL_(const struct fhandle *__capability)]; const struct fhandle *__capability u_fhp; char u_fhp_r_[PADR_(const struct fhandle *__capability)];
+	char sb_l_[PADL_(struct stat *__capability)]; struct stat *__capability sb; char sb_r_[PADR_(struct stat *__capability)];
+};
+struct cheriabi_getdirentries_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char buf_l_[PADL_(char *__capability)]; char *__capability buf; char buf_r_[PADR_(char *__capability)];
+	char count_l_[PADL_(size_t)]; size_t count; char count_r_[PADR_(size_t)];
+	char basep_l_[PADL_(off_t *__capability)]; off_t *__capability basep; char basep_r_[PADR_(off_t *__capability)];
+};
+struct cheriabi_statfs_args {
+	char path_l_[PADL_(char *__capability)]; char *__capability path; char path_r_[PADR_(char *__capability)];
+	char buf_l_[PADL_(struct statfs *__capability)]; struct statfs *__capability buf; char buf_r_[PADR_(struct statfs *__capability)];
+};
+struct cheriabi_fstatfs_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char buf_l_[PADL_(struct statfs *__capability)]; struct statfs *__capability buf; char buf_r_[PADR_(struct statfs *__capability)];
+};
+struct cheriabi_fhstatfs_args {
+	char u_fhp_l_[PADL_(const struct fhandle *__capability)]; const struct fhandle *__capability u_fhp; char u_fhp_r_[PADR_(const struct fhandle *__capability)];
+	char buf_l_[PADL_(struct statfs *__capability)]; struct statfs *__capability buf; char buf_r_[PADR_(struct statfs *__capability)];
+};
 struct cheriabi_mknodat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
@@ -1128,6 +1164,7 @@ int	cheriabi_lchmod(struct thread *, struct cheriabi_lchmod_args *);
 int	cheriabi_lutimes(struct thread *, struct cheriabi_lutimes_args *);
 int	cheriabi_preadv(struct thread *, struct cheriabi_preadv_args *);
 int	cheriabi_pwritev(struct thread *, struct cheriabi_pwritev_args *);
+int	cheriabi_fhopen(struct thread *, struct cheriabi_fhopen_args *);
 int	cheriabi_kldload(struct thread *, struct cheriabi_kldload_args *);
 int	cheriabi_kldfind(struct thread *, struct cheriabi_kldfind_args *);
 int	cheriabi_kldstat(struct thread *, struct cheriabi_kldstat_args *);
@@ -1250,6 +1287,13 @@ int	cheriabi_procctl(struct thread *, struct cheriabi_procctl_args *);
 int	cheriabi_ppoll(struct thread *, struct cheriabi_ppoll_args *);
 int	cheriabi_futimens(struct thread *, struct cheriabi_futimens_args *);
 int	cheriabi_utimensat(struct thread *, struct cheriabi_utimensat_args *);
+int	cheriabi_fstat(struct thread *, struct cheriabi_fstat_args *);
+int	cheriabi_fstatat(struct thread *, struct cheriabi_fstatat_args *);
+int	cheriabi_fhstat(struct thread *, struct cheriabi_fhstat_args *);
+int	cheriabi_getdirentries(struct thread *, struct cheriabi_getdirentries_args *);
+int	cheriabi_statfs(struct thread *, struct cheriabi_statfs_args *);
+int	cheriabi_fstatfs(struct thread *, struct cheriabi_fstatfs_args *);
+int	cheriabi_fhstatfs(struct thread *, struct cheriabi_fhstatfs_args *);
 int	cheriabi_mknodat(struct thread *, struct cheriabi_mknodat_args *);
 int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 
@@ -1393,6 +1437,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_lutimes	AUE_LUTIMES
 #define	CHERIABI_SYS_AUE_cheriabi_preadv	AUE_PREADV
 #define	CHERIABI_SYS_AUE_cheriabi_pwritev	AUE_PWRITEV
+#define	CHERIABI_SYS_AUE_cheriabi_fhopen	AUE_FHOPEN
 #define	CHERIABI_SYS_AUE_cheriabi_kldload	AUE_MODLOAD
 #define	CHERIABI_SYS_AUE_cheriabi_kldfind	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_kldstat	AUE_NULL
@@ -1515,6 +1560,13 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_ppoll	AUE_POLL
 #define	CHERIABI_SYS_AUE_cheriabi_futimens	AUE_FUTIMES
 #define	CHERIABI_SYS_AUE_cheriabi_utimensat	AUE_FUTIMESAT
+#define	CHERIABI_SYS_AUE_cheriabi_fstat	AUE_FSTAT
+#define	CHERIABI_SYS_AUE_cheriabi_fstatat	AUE_FSTATAT
+#define	CHERIABI_SYS_AUE_cheriabi_fhstat	AUE_FHSTAT
+#define	CHERIABI_SYS_AUE_cheriabi_getdirentries	AUE_GETDIRENTRIES
+#define	CHERIABI_SYS_AUE_cheriabi_statfs	AUE_STATFS
+#define	CHERIABI_SYS_AUE_cheriabi_fstatfs	AUE_FSTATFS
+#define	CHERIABI_SYS_AUE_cheriabi_fhstatfs	AUE_FHSTATFS
 #define	CHERIABI_SYS_AUE_cheriabi_mknodat	AUE_MKNODAT
 #define	CHERIABI_SYS_AUE_cheriabi_kevent	AUE_KEVENT
 

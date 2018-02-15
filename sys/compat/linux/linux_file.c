@@ -328,7 +328,8 @@ linux_getdents(struct thread *td, struct linux_getdents_args *args)
 	buflen = min(args->count, MAXBSIZE);
 	buf = malloc(buflen, M_TEMP, M_WAITOK);
 
-	error = kern_getdirentries(td, args->fd, buf, buflen,
+	error = kern_getdirentries(td, args->fd,
+	    (__cheri_tocap char * __capability)buf, buflen,
 	    &base, NULL, UIO_SYSSPACE);
 	if (error != 0) {
 		error = linux_getdents_error(td, args->fd, error);
@@ -408,7 +409,8 @@ linux_getdents64(struct thread *td, struct linux_getdents64_args *args)
 	buflen = min(args->count, MAXBSIZE);
 	buf = malloc(buflen, M_TEMP, M_WAITOK);
 
-	error = kern_getdirentries(td, args->fd, buf, buflen,
+	error = kern_getdirentries(td, args->fd,
+	    (__cheri_tocap char * __capability)buf, buflen,
 	    &base, NULL, UIO_SYSSPACE);
 	if (error != 0) {
 		error = linux_getdents_error(td, args->fd, error);
@@ -483,7 +485,8 @@ linux_readdir(struct thread *td, struct linux_readdir_args *args)
 	buflen = LINUX_RECLEN(LINUX_NAME_MAX);
 	buf = malloc(buflen, M_TEMP, M_WAITOK);
 
-	error = kern_getdirentries(td, args->fd, buf, buflen,
+	error = kern_getdirentries(td, args->fd,
+	    (__cheri_tocap char * __capability)buf, buflen,
 	    &base, NULL, UIO_SYSSPACE);
 	if (error != 0) {
 		error = linux_getdents_error(td, args->fd, error);
@@ -583,7 +586,8 @@ linux_unlink(struct thread *td, struct linux_unlink_args *args)
 	error = kern_unlinkat(td, AT_FDCWD, path, UIO_SYSSPACE, 0);
 	if (error == EPERM) {
 		/* Introduce POSIX noncompliant behaviour of Linux */
-		if (kern_statat(td, 0, AT_FDCWD, path, UIO_SYSSPACE, &st,
+		if (kern_statat(td, 0, AT_FDCWD,
+		    (__cheri_tocap char * __capability)path, UIO_SYSSPACE, &st,
 		    NULL) == 0) {
 			if (S_ISDIR(st.st_mode))
 				error = EISDIR;
@@ -617,7 +621,8 @@ linux_unlinkat(struct thread *td, struct linux_unlinkat_args *args)
 		error = kern_unlinkat(td, dfd, path, UIO_SYSSPACE, 0);
 	if (error == EPERM && !(args->flag & LINUX_AT_REMOVEDIR)) {
 		/* Introduce POSIX noncompliant behaviour of Linux */
-		if (kern_statat(td, AT_SYMLINK_NOFOLLOW, dfd, path,
+		if (kern_statat(td, AT_SYMLINK_NOFOLLOW, dfd,
+		    (__cheri_tocap char * __capability)path,
 		    UIO_SYSSPACE, &st, NULL) == 0 && S_ISDIR(st.st_mode))
 			error = EISDIR;
 	}

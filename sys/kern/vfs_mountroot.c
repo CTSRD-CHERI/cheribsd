@@ -558,7 +558,8 @@ parse_dir_md(char **conf)
 	free(tok, M_TEMP);
 
 	/* Get file status. */
-	error = kern_statat(td, 0, AT_FDCWD, path, UIO_SYSSPACE, &sb, NULL);
+	error = kern_statat(td, 0, AT_FDCWD,
+	    (__cheri_tocap char * __capability)path, UIO_SYSSPACE, &sb, NULL);
 	if (error)
 		goto out;
 

@@ -663,7 +663,8 @@
 296	AUE_NULL	UNIMPL	nosys
 ; XXX 297 is 300 in NetBSD 
 297	AUE_FHSTATFS	OBSOL	fhstatfs
-298	AUE_FHOPEN	NOPROTO	{ int fhopen(_In_ const struct fhandle *u_fhp, \
+298	AUE_FHOPEN	STD	{ int cheriabi_fhopen( \
+				    _In_ const struct fhandle * __capability u_fhp, \
 			 	    int flags); }
 299	AUE_FHSTAT	OBSOL	fbsd11_fhstat
 ; syscall numbers for FreeBSD
@@ -1345,25 +1346,32 @@
 548	AUE_NULL	UNIMPL	freebsd11_numa_getaffinity
 549	AUE_NULL	UNIMPL	freebsd11_numa_setaffinity
 550	AUE_FSYNC	NOPROTO	{ int fdatasync(int fd); }
-551	AUE_FSTAT	NOPROTO	{ int fstat(int fd, _Out_ struct stat *sb); }
-552	AUE_FSTATAT	NOPROTO	{ int fstatat(int fd, _In_z_ const char *path, \
-                                    _Out_ struct stat *buf, int flag); }
-553	AUE_FHSTAT	NOPROTO	{ int fhstat(_In_ const struct fhandle *u_fhp, \
-                                    _Out_ struct stat *sb); }
-554	AUE_GETDIRENTRIES NOPROTO { ssize_t getdirentries(int fd, \
-				    _Out_writes_bytes_(count) char *buf, \
-                                    size_t count, _Out_ off_t *basep); }
-555	AUE_STATFS	NOPROTO	{ int statfs(_In_z_ char *path, \
-				    _Out_ struct statfs *buf); }
-556	AUE_FSTATFS	NOPROTO	{ int fstatfs(int fd, \
-				    _Out_ struct statfs *buf); }
+551	AUE_FSTAT	STD	{ int cheriabi_fstat(int fd, \
+				    _Out_ struct stat * __capability sb); }
+552	AUE_FSTATAT	STD	{ int cheriabi_fstatat(int fd, \
+				    _In_z_ const char * __capability path, \
+                                    _Out_ struct stat * __capability buf, \
+				    int flag); }
+553	AUE_FHSTAT	STD	{ int cheriabi_fhstat( \
+				    _In_ const struct fhandle * __capability u_fhp, \
+                                    _Out_ struct stat * __capability sb); }
+554	AUE_GETDIRENTRIES STD { ssize_t cheriabi_getdirentries(int fd, \
+				    _Out_writes_bytes_(count) \
+				    char * __capability buf, \
+                                    size_t count, \
+				    _Out_ off_t * __capability basep); }
+555	AUE_STATFS	STD	{ int cheriabi_statfs( \
+				    _In_z_ char * __capability path, \
+				    _Out_ struct statfs * __capability buf); }
+556	AUE_FSTATFS	STD	{ int cheriabi_fstatfs(int fd, \
+				    _Out_ struct statfs * __capability buf); }
 557	AUE_GETFSSTAT	NOPROTO	{ int getfsstat( \
 				    _Out_writes_bytes_opt_(bufsize) \
-				    struct statfs *buf, \
+				    struct statfs * buf, \
                                     long bufsize, int mode); }
-558	AUE_FHSTATFS	NOPROTO	{ int fhstatfs( \
-				    _In_ const struct fhandle *u_fhp, \
-                                    _Out_ struct statfs *buf); }
+558	AUE_FHSTATFS	STD	{ int cheriabi_fhstatfs( \
+				    _In_ const struct fhandle * __capability u_fhp, \
+                                    _Out_ struct statfs * __capability buf); }
 559	AUE_MKNODAT	STD	{ int cheriabi_mknodat(int fd, \
 				    _In_z_ const char * __capability path, \
 				    mode_t mode, dev_t dev); }

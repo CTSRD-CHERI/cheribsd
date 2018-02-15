@@ -115,7 +115,8 @@ ibcs2_statfs(td, uap)
 
 	CHECKALTEXIST(td, uap->path, &path);
 	sf = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
-	error = kern_statfs(td, path, UIO_SYSSPACE, sf);
+	error = kern_statfs(td, (__cheri_tocap char * __capability)path,
+	    UIO_SYSSPACE, sf);
 	free(path, M_TEMP);
 	if (error == 0)
 		error = cvt_statfs(sf, (caddr_t)uap->buf, uap->len);
@@ -151,7 +152,8 @@ ibcs2_stat(td, uap)
 
 	CHECKALTEXIST(td, uap->path, &path);
 
-	error = kern_statat(td, 0, AT_FDCWD, path, UIO_SYSSPACE, &st, NULL);
+	error = kern_statat(td, 0, AT_FDCWD,
+	    (__cheri_tocap char * __capability)path, UIO_SYSSPACE, &st, NULL);
 	free(path, M_TEMP);
 	if (error)
 		return (error);
@@ -172,8 +174,8 @@ ibcs2_lstat(td, uap)
 
 	CHECKALTEXIST(td, uap->path, &path);
 
-	error = kern_statat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD, path,
-	    UIO_SYSSPACE, &st, NULL);
+	error = kern_statat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD,
+	    (__cheri_tocap char * __capability)path, UIO_SYSSPACE, &st, NULL);
 	free(path, M_TEMP);
 	if (error)
 		return (error);

@@ -1947,6 +1947,16 @@ cheriabi_cpuset_setaffinity(struct thread *td,
 }
 
 /*
+ * kern_descrip.c
+ */
+int
+cheriabi_fstat(struct thread *td, struct cheriabi_fstat_args *uap)
+{
+
+	return (user_fstat(td, uap->fd, uap->sb));
+}
+
+/*
  * kern_ktrace.c
  */
 

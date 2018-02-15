@@ -156,7 +156,7 @@ MIASM =  \
 	cheriabi_lutimes.o \
 	cheriabi_preadv.o \
 	cheriabi_pwritev.o \
-	fhopen.o \
+	cheriabi_fhopen.o \
 	modnext.o \
 	modstat.o \
 	modfnext.o \
@@ -352,13 +352,13 @@ MIASM =  \
 	cheriabi_futimens.o \
 	cheriabi_utimensat.o \
 	fdatasync.o \
-	fstat.o \
-	fstatat.o \
-	fhstat.o \
-	getdirentries.o \
-	statfs.o \
-	fstatfs.o \
+	cheriabi_fstat.o \
+	cheriabi_fstatat.o \
+	cheriabi_fhstat.o \
+	cheriabi_getdirentries.o \
+	cheriabi_statfs.o \
+	cheriabi_fstatfs.o \
 	getfsstat.o \
-	fhstatfs.o \
+	cheriabi_fhstatfs.o \
 	cheriabi_mknodat.o \
 	cheriabi_kevent.o

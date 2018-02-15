@@ -278,6 +278,20 @@ cheriabi_quotactl(struct thread *td, struct cheriabi_quotactl_args *uap)
 }
 
 int
+cheriabi_statfs(struct thread *td, struct cheriabi_statfs_args *uap)
+{
+
+	return (user_statfs(td, uap->path, uap->buf));
+}
+
+int
+cheriabi_fstatfs(struct thread *td, struct cheriabi_fstatfs_args *uap)
+{
+
+	return (user_fstatfs(td, uap->fd, uap->buf));
+}
+
+int
 cheriabi_chdir(struct thread *td, struct cheriabi_chdir_args *uap)
 {
 
@@ -420,6 +434,13 @@ cheriabi_eaccess(struct thread *td, struct cheriabi_eaccess_args *uap)
 
 	return (kern_accessat(td, AT_FDCWD, uap->path, UIO_USERSPACE,
 	    AT_EACCESS, uap->amode));
+}
+
+int
+cheriabi_fstatat(struct thread *td, struct cheriabi_fstatat_args *uap)
+{
+
+	return (user_fstatat(td, uap->fd, uap->path, uap->buf, uap->flag));
 }
 
 int
@@ -623,6 +644,15 @@ cheriabi_rmdir(struct thread *td, struct cheriabi_rmdir_args *uap)
 }
 
 int
+cheriabi_getdirentries(struct thread *td,
+    struct cheriabi_getdirentries_args *uap)
+{
+
+	return (user_getdirentries(td, uap->fd, uap->buf, uap->count,
+	    uap->basep));
+}
+
+int
 cheriabi_unmount(struct thread *td, struct cheriabi_unmount_args *uap)
 {
 
@@ -648,4 +678,25 @@ cheriabi_getfh(struct thread *td, struct cheriabi_getfh_args *uap)
 {
 
 	return (kern_getfh(td, uap->fname, uap->fhp, FOLLOW));
+}
+
+int
+cheriabi_fhopen(struct thread *td, struct cheriabi_fhopen_args *uap)
+{
+
+	return (kern_fhopen(td, uap->u_fhp, uap->flags));
+}
+
+int
+cheriabi_fhstat(struct thread *td, struct cheriabi_fhstat_args *uap)
+{
+
+	return (user_fhstat(td, uap->u_fhp, uap->sb));
+}
+
+int
+cheriabi_fhstatfs(struct thread *td, struct cheriabi_fhstatfs_args *uap)
+{
+
+	return (user_fhstatfs(td, uap->u_fhp, uap->buf));
 }

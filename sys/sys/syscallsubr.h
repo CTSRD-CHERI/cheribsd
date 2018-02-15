@@ -166,6 +166,8 @@ int	kern_ffclock_getestimate(struct thread *td,
 	    struct ffclock_estimate * __capability cest);
 int	kern_ffclock_setestimate(struct thread *td,
 	    const struct ffclock_estimate * __capability ucest);
+int	kern_fhopen(struct thread *td,
+	    const struct fhandle * __capability u_fhp, int flags);
 int	kern_fhstat(struct thread *td, fhandle_t fh, struct stat *buf);
 int	kern_fhstatfs(struct thread *td, fhandle_t fh, struct statfs *buf);
 int	kern_fstat(struct thread *td, int fd, struct stat *sbp);
@@ -177,8 +179,8 @@ int	kern_futimes(struct thread *td, int fd,
 	    enum uio_seg tptrseg);
 int	kern_futimens(struct thread *td, int fd,
 	    const struct timespec * __capability tptr, enum uio_seg tptrseg);
-int	kern_getdirentries(struct thread *td, int fd, char *buf, size_t count,
-	    off_t *basep, ssize_t *residp, enum uio_seg bufseg);
+int	kern_getdirentries(struct thread *td, int fd, char * __capability buf,
+	    size_t count, off_t *basep, ssize_t *residp, enum uio_seg bufseg);
 int	kern_getfh(struct thread *td, const char * __capability path,
 	    fhandle_t * __capability fhp, int follow);
 int	kern_getfsstat(struct thread *td, struct statfs **buf, size_t bufsize,
@@ -377,11 +379,12 @@ int	kern_sigtimedwait(struct thread *td, sigset_t waitset,
 int	kern_sigqueue(struct thread *td, pid_t pid, int signum,
 	    union sigval *value, int flags);
 int	kern_socket(struct thread *td, int domain, int type, int protocol);
-int	kern_statat(struct thread *td, int flag, int fd, char *path,
+int	kern_statat(struct thread *td, int flag, int fd,
+	    const char * __capability path,
 	    enum uio_seg pathseg, struct stat *sbp,
 	    void (*hook)(struct vnode *vp, struct stat *sbp));
-int	kern_statfs(struct thread *td, char *path, enum uio_seg pathseg,
-	    struct statfs *buf);
+int	kern_statfs(struct thread *td, const char * __capability path,
+	    enum uio_seg pathseg, struct statfs *buf);
 int	kern_swapoff(struct thread *td, const char * __capability name);
 int	kern_swapon(struct thread *td, const char * __capability name);
 int	kern_symlinkat(struct thread *td, const char *__capability path1,
@@ -429,6 +432,19 @@ int	kern_socketpair(struct thread *td, int domain, int type, int protocol,
 int	user_clock_nanosleep(struct thread *td, clockid_t clock_id,
 	    int flags, const struct timespec * __capability ua_rqtp,
 	    struct timespec * __capability ua_rmtp);
+int	user_fhstat(struct thread *td,
+	    const struct fhandle * __capability u_fhp,
+	    struct stat * __capability sb);
+int	user_fhstatfs(struct thread *td,
+	    const struct fhandle * __capability u_fhp,
+	    struct statfs * __capability buf);
+int	user_fstat(struct thread *td, int fd, struct stat * __capability sb);
+int	user_fstatat(struct thread *td, int fd, const char * __capability path,
+	    struct stat * __capability buf, int flag);
+int	user_fstatfs(struct thread *td, int fd,
+	    struct statfs * __capability buf);
+int	user_getdirentries(struct thread *td, int fd, char * __capability buf,
+	    size_t count, off_t * __capability basep);
 int	user_pdgetpid(struct thread *td, int fd, pid_t * __capability pidp);
 int	user_procctl(struct thread *td, enum idtype idtype, id_t id, int com,
 	    void * __capability data);
@@ -443,6 +459,8 @@ int	user_sched_setscheduler(struct thread *td, pid_t pid, int policy,
 int	user_settimeofday(struct thread *td,
 	    const struct timeval * __capability tp,
 	    const struct timezone * __capability tz);
+int	user_statfs(struct thread *td, const char * __capability path,
+	    struct statfs * __capability buf);
 
 /* flags for kern_sigaction */
 #define	KSA_OSIGSET	0x0001	/* uses osigact_t */

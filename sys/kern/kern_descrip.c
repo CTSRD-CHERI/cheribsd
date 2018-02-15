@@ -1335,12 +1335,19 @@ struct fstat_args {
 int
 sys_fstat(struct thread *td, struct fstat_args *uap)
 {
+
+	return (user_fstat(td, uap->fd, __USER_CAP_OBJ(uap->sb)));
+}
+
+int
+user_fstat(struct thread *td, int fd, struct stat * __capability sb)
+{
 	struct stat ub;
 	int error;
 
-	error = kern_fstat(td, uap->fd, &ub);
+	error = kern_fstat(td, fd, &ub);
 	if (error == 0)
-		error = copyout(&ub, uap->sb, sizeof(ub));
+		error = copyout_c(&ub, sb, sizeof(ub));
 	return (error);
 }
 
