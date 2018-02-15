@@ -1768,26 +1768,6 @@ freebsd11_freebsd32_getdents(struct thread *td,
 }
 #endif /* COMPAT_FREEBSD11 */
 
-int
-freebsd32_getdirentries(struct thread *td,
-    struct freebsd32_getdirentries_args *uap)
-{
-	long base;
-	int32_t base32;
-	int error;
-
-	error = kern_getdirentries(td, uap->fd,
-	    __USER_CAP(uap->buf, uap->count), uap->count, &base,
-	    NULL, UIO_USERSPACE);
-	if (error)
-		return (error);
-	if (uap->basep != NULL) {
-		base32 = base;
-		error = copyout(&base32, uap->basep, sizeof(int32_t));
-	}
-	return (error);
-}
-
 #ifdef COMPAT_FREEBSD6
 /* versions with the 'int pad' argument */
 int
