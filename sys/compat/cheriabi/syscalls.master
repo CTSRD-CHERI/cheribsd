@@ -124,10 +124,10 @@
 26	AUE_PTRACE	NOPROTO	{ int ptrace(int req, pid_t pid, \
 				    _Inout_opt_ caddr_t addr, int data); }
 27	AUE_RECVMSG	STD	{ ssize_t cheriabi_recvmsg(int s, \
-				    _Inout_ struct msghdr_c *msg, \
+				    _Inout_ struct msghdr_c * __capability msg, \
 				    int flags); }
 28	AUE_SENDMSG	STD	{ ssize_t cheriabi_sendmsg(int s, \
-				    _In_ const struct msghdr_c *msg, \
+				    _In_ const struct msghdr_c * __capability msg, \
 				    int flags); }
 29	AUE_RECVFROM	NOPROTO	{ ssize_t recvfrom(int s, \
 				    _Out_writes_bytes_(len) void *buf, \

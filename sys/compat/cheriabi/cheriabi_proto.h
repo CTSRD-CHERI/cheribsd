@@ -101,12 +101,12 @@ struct cheriabi_unmount_args {
 };
 struct cheriabi_recvmsg_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char msg_l_[PADL_(struct msghdr_c *)]; struct msghdr_c * msg; char msg_r_[PADR_(struct msghdr_c *)];
+	char msg_l_[PADL_(struct msghdr_c *__capability)]; struct msghdr_c *__capability msg; char msg_r_[PADR_(struct msghdr_c *__capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct cheriabi_sendmsg_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char msg_l_[PADL_(const struct msghdr_c *)]; const struct msghdr_c * msg; char msg_r_[PADR_(const struct msghdr_c *)];
+	char msg_l_[PADL_(const struct msghdr_c *__capability)]; const struct msghdr_c *__capability msg; char msg_r_[PADR_(const struct msghdr_c *__capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct cheriabi_access_args {

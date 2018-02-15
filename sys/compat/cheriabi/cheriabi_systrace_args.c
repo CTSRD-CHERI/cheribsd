@@ -177,7 +177,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 27: {
 		struct cheriabi_recvmsg_args *p = params;
 		iarg[0] = p->s; /* int */
-		uarg[1] = (intptr_t) p->msg; /* struct msghdr_c * */
+		uarg[1] = (cheri_getbase(p->msg) + cheri_getoffset(p->msg)); /* struct msghdr_c *__capability */
 		iarg[2] = p->flags; /* int */
 		*n_args = 3;
 		break;
@@ -186,7 +186,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 28: {
 		struct cheriabi_sendmsg_args *p = params;
 		iarg[0] = p->s; /* int */
-		uarg[1] = (intptr_t) p->msg; /* const struct msghdr_c * */
+		uarg[1] = (cheri_getbase(p->msg) + cheri_getoffset(p->msg)); /* const struct msghdr_c *__capability */
 		iarg[2] = p->flags; /* int */
 		*n_args = 3;
 		break;
@@ -3353,7 +3353,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct msghdr_c *";
+			p = "userland struct msghdr_c *__capability";
 			break;
 		case 2:
 			p = "int";
@@ -3369,7 +3369,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct msghdr_c *";
+			p = "userland const struct msghdr_c *__capability";
 			break;
 		case 2:
 			p = "int";

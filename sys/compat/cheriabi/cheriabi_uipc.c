@@ -52,7 +52,7 @@ cheriabi_recvmsg(struct thread *td, struct cheriabi_recvmsg_args *uap)
 
 	int error;
 
-	error = copyincap(uap->msg, &msg, 1);
+	error = copyincap_c(uap->msg, &msg, sizeof(msg));
 	if (error)
 		return (error);
 	uiov = (struct iovec_c * __capability)msg.msg_iov;
@@ -70,7 +70,7 @@ cheriabi_recvmsg(struct thread *td, struct cheriabi_recvmsg_args *uap)
 		 * Message contents have already been copied out, update
 		 * lengths.
 		 */
-		error = copyoutcap(&msg, uap->msg, sizeof(msg));
+		error = copyoutcap_c(&msg, uap->msg, sizeof(msg));
 	}
 	free_c(iov, M_IOV);
 
@@ -87,7 +87,7 @@ cheriabi_sendmsg(struct thread *td,
 	struct sockaddr *to = NULL;
 	int error;
 
-	error = copyincap(uap->msg, &msg, 0);
+	error = copyincap_c(uap->msg, &msg, sizeof(msg));
 	if (error)
 		return (error);
 	error = cheriabi_copyiniov(msg.msg_iov, msg.msg_iovlen, &iov, EMSGSIZE);
