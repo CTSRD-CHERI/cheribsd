@@ -3083,11 +3083,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 560: {
 		struct cheriabi_kevent_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->changelist; /* const struct kevent_c * */
+		uarg[1] = (cheri_getbase(p->changelist) + cheri_getoffset(p->changelist)); /* const struct kevent_c *__capability */
 		iarg[2] = p->nchanges; /* int */
-		uarg[3] = (intptr_t) p->eventlist; /* struct kevent_c * */
+		uarg[3] = (cheri_getbase(p->eventlist) + cheri_getoffset(p->eventlist)); /* struct kevent_c *__capability */
 		iarg[4] = p->nevents; /* int */
-		uarg[5] = (intptr_t) p->timeout; /* const struct timespec * */
+		uarg[5] = (cheri_getbase(p->timeout) + cheri_getoffset(p->timeout)); /* const struct timespec *__capability */
 		*n_args = 6;
 		break;
 	}
@@ -8220,19 +8220,19 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct kevent_c *";
+			p = "userland const struct kevent_c *__capability";
 			break;
 		case 2:
 			p = "int";
 			break;
 		case 3:
-			p = "userland struct kevent_c *";
+			p = "userland struct kevent_c *__capability";
 			break;
 		case 4:
 			p = "int";
 			break;
 		case 5:
-			p = "userland const struct timespec *";
+			p = "userland const struct timespec *__capability";
 			break;
 		default:
 			break;

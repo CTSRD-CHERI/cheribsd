@@ -7919,41 +7919,20 @@ CHERIABI_SYS_cheriabi_kevent_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 4, CHERIABI_SYS_cheriabi_kevent_PTRMASK);
 	uap->nevents = cheri_getoffset(tmpcap);
 
-	/* [1] _In_reads_opt_(nchanges) const struct kevent_c * changelist */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD|CHERI_PERM_LOAD_CAP);
+	/* [1] _In_reads_opt_(nchanges) const struct kevent_c *__capability changelist */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->changelist),
+	    1, CHERIABI_SYS_cheriabi_kevent_PTRMASK);
 
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_kevent_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->changelist),
-		    tmpcap, (sizeof(*uap->changelist) * uap->nchanges), reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
+	/* [3] _In_reads_opt_(nevents) struct kevent_c *__capability eventlist */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->eventlist),
+	    3, CHERIABI_SYS_cheriabi_kevent_PTRMASK);
 
-	/* [3] _In_reads_opt_(nevents) struct kevent_c * eventlist */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD|CHERI_PERM_LOAD_CAP);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_kevent_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->eventlist),
-		    tmpcap, (sizeof(*uap->eventlist) * uap->nevents), reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
-
-	/* [5] _In_opt_ const struct timespec * timeout */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 5, CHERIABI_SYS_cheriabi_kevent_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->timeout),
-		    tmpcap, sizeof(*uap->timeout), reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
+	/* [5] _In_opt_ const struct timespec *__capability timeout */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->timeout),
+	    5, CHERIABI_SYS_cheriabi_kevent_PTRMASK);
 
 	return (0);
 }

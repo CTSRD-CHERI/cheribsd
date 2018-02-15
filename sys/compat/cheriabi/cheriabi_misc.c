@@ -396,7 +396,7 @@ cheriabi_kevent_copyout(void *arg, struct kevent *kevp, int count)
 		ks_c[i].ident = (__intcap_t)udata[0];
 		ks_c[i].udata = udata[1];
 	}
-	error = copyoutcap(ks_c, uap->eventlist, count * sizeof(*ks_c));
+	error = copyoutcap_c(&ks_c[0], uap->eventlist, count * sizeof(*ks_c));
 	if (error == 0)
 		uap->eventlist += count;
 	return (error);
@@ -427,7 +427,7 @@ cheriabi_kevent_copyin(void *arg, struct kevent *kevp, int count)
 	KASSERT(count <= KQ_NEVENTS, ("count (%d) > KQ_NEVENTS", count));
 	uap = (struct cheriabi_kevent_args *)arg;
 
-	error = copyincap(uap->changelist, ks_c, count * sizeof *ks_c);
+	error = copyincap_c(uap->changelist, &ks_c[0], count * sizeof(*ks_c));
 	if (error)
 		goto done;
 	uap->changelist += count;
@@ -479,7 +479,7 @@ cheriabi_kevent(struct thread *td, struct cheriabi_kevent_args *uap)
 
 
 	if (uap->timeout) {
-		error = copyin(uap->timeout, &ts, sizeof(ts));
+		error = copyin_c(uap->timeout, &ts, sizeof(ts));
 		if (error)
 			return (error);
 		tsp = &ts;

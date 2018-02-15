@@ -1377,8 +1377,9 @@
 				    mode_t mode, dev_t dev); }
 560	AUE_KEVENT	STD	{ int cheriabi_kevent(int fd, \
 				    _In_reads_opt_(nchanges) \
-				    const struct kevent_c *changelist, \
+				    const struct kevent_c * __capability changelist, \
 				    int nchanges, \
 				    _In_reads_opt_(nevents) \
-				    struct kevent_c *eventlist, int nevents, \
-				    _In_opt_ const struct timespec *timeout); }
+				    struct kevent_c * __capability eventlist, \
+				    int nevents, \
+				    _In_opt_ const struct timespec * __capability timeout); }

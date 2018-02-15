@@ -1073,11 +1073,11 @@ struct cheriabi_mknodat_args {
 };
 struct cheriabi_kevent_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char changelist_l_[PADL_(const struct kevent_c *)]; const struct kevent_c * changelist; char changelist_r_[PADR_(const struct kevent_c *)];
+	char changelist_l_[PADL_(const struct kevent_c *__capability)]; const struct kevent_c *__capability changelist; char changelist_r_[PADR_(const struct kevent_c *__capability)];
 	char nchanges_l_[PADL_(int)]; int nchanges; char nchanges_r_[PADR_(int)];
-	char eventlist_l_[PADL_(struct kevent_c *)]; struct kevent_c * eventlist; char eventlist_r_[PADR_(struct kevent_c *)];
+	char eventlist_l_[PADL_(struct kevent_c *__capability)]; struct kevent_c *__capability eventlist; char eventlist_r_[PADR_(struct kevent_c *__capability)];
 	char nevents_l_[PADL_(int)]; int nevents; char nevents_r_[PADR_(int)];
-	char timeout_l_[PADL_(const struct timespec *)]; const struct timespec * timeout; char timeout_r_[PADR_(const struct timespec *)];
+	char timeout_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability timeout; char timeout_r_[PADR_(const struct timespec *__capability)];
 };
 #if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
 #define PAD64_REQUIRED
