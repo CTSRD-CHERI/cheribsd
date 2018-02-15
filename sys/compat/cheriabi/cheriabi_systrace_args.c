@@ -562,11 +562,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* connect */
+	/* cheriabi_connect */
 	case 98: {
-		struct connect_args *p = params;
+		struct cheriabi_connect_args *p = params;
 		iarg[0] = p->s; /* int */
-		uarg[1] = (intptr_t) p->name; /* const struct sockaddr * */
+		uarg[1] = (cheri_getbase(p->name) + cheri_getoffset(p->name)); /* const struct sockaddr *__capability */
 		iarg[2] = p->namelen; /* __socklen_t */
 		*n_args = 3;
 		break;
@@ -579,11 +579,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* bind */
+	/* cheriabi_bind */
 	case 104: {
-		struct bind_args *p = params;
+		struct cheriabi_bind_args *p = params;
 		iarg[0] = p->s; /* int */
-		uarg[1] = (intptr_t) p->name; /* const struct sockaddr * */
+		uarg[1] = (cheri_getbase(p->name) + cheri_getoffset(p->name)); /* const struct sockaddr *__capability */
 		iarg[2] = p->namelen; /* __socklen_t */
 		*n_args = 3;
 		break;
@@ -2900,22 +2900,22 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* bindat */
+	/* cheriabi_bindat */
 	case 538: {
-		struct bindat_args *p = params;
+		struct cheriabi_bindat_args *p = params;
 		iarg[0] = p->fd; /* int */
 		iarg[1] = p->s; /* int */
-		uarg[2] = (intptr_t) p->name; /* const struct sockaddr * */
+		uarg[2] = (cheri_getbase(p->name) + cheri_getoffset(p->name)); /* const struct sockaddr *__capability */
 		iarg[3] = p->namelen; /* __socklen_t */
 		*n_args = 4;
 		break;
 	}
-	/* connectat */
+	/* cheriabi_connectat */
 	case 539: {
-		struct connectat_args *p = params;
+		struct cheriabi_connectat_args *p = params;
 		iarg[0] = p->fd; /* int */
 		iarg[1] = p->s; /* int */
-		uarg[2] = (intptr_t) p->name; /* const struct sockaddr * */
+		uarg[2] = (cheri_getbase(p->name) + cheri_getoffset(p->name)); /* const struct sockaddr *__capability */
 		iarg[3] = p->namelen; /* __socklen_t */
 		*n_args = 4;
 		break;
@@ -3967,14 +3967,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* connect */
+	/* cheriabi_connect */
 	case 98:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct sockaddr *";
+			p = "userland const struct sockaddr *__capability";
 			break;
 		case 2:
 			p = "__socklen_t";
@@ -3996,14 +3996,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* bind */
+	/* cheriabi_bind */
 	case 104:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct sockaddr *";
+			p = "userland const struct sockaddr *__capability";
 			break;
 		case 2:
 			p = "__socklen_t";
@@ -7896,7 +7896,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* bindat */
+	/* cheriabi_bindat */
 	case 538:
 		switch(ndx) {
 		case 0:
@@ -7906,7 +7906,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland const struct sockaddr *";
+			p = "userland const struct sockaddr *__capability";
 			break;
 		case 3:
 			p = "__socklen_t";
@@ -7915,7 +7915,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* connectat */
+	/* cheriabi_connectat */
 	case 539:
 		switch(ndx) {
 		case 0:
@@ -7925,7 +7925,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland const struct sockaddr *";
+			p = "userland const struct sockaddr *__capability";
 			break;
 		case 3:
 			p = "__socklen_t";
@@ -8569,7 +8569,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* connect */
+	/* cheriabi_connect */
 	case 98:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -8579,7 +8579,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* bind */
+	/* cheriabi_bind */
 	case 104:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9916,12 +9916,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* bindat */
+	/* cheriabi_bindat */
 	case 538:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* connectat */
+	/* cheriabi_connectat */
 	case 539:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

@@ -1287,30 +1287,23 @@ CHERIABI_SYS_socket_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_connect_fill_uap(struct thread *td,
-    struct connect_args *uap)
+CHERIABI_SYS_cheriabi_connect_fill_uap(struct thread *td,
+    struct cheriabi_connect_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] int s */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_connect_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_connect_PTRMASK);
 	uap->s = cheri_getoffset(tmpcap);
 
 	/* [2] __socklen_t namelen */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_connect_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_connect_PTRMASK);
 	uap->namelen = cheri_getoffset(tmpcap);
 
-	/* [1] _In_reads_bytes_(namelen) const struct sockaddr * name */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_connect_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->name),
-		    tmpcap, 1 * uap->namelen, reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [1] _In_reads_bytes_(namelen) const struct sockaddr *__capability name */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->name),
+	    1, CHERIABI_SYS_cheriabi_connect_PTRMASK);
 
 	return (0);
 }
@@ -1333,30 +1326,23 @@ CHERIABI_SYS_getpriority_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_bind_fill_uap(struct thread *td,
-    struct bind_args *uap)
+CHERIABI_SYS_cheriabi_bind_fill_uap(struct thread *td,
+    struct cheriabi_bind_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] int s */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_bind_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_bind_PTRMASK);
 	uap->s = cheri_getoffset(tmpcap);
 
 	/* [2] __socklen_t namelen */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_bind_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_bind_PTRMASK);
 	uap->namelen = cheri_getoffset(tmpcap);
 
-	/* [1] _In_reads_bytes_(namelen) const struct sockaddr * name */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_bind_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->name),
-		    tmpcap, 1 * uap->namelen, reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [1] _In_reads_bytes_(namelen) const struct sockaddr *__capability name */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->name),
+	    1, CHERIABI_SYS_cheriabi_bind_PTRMASK);
 
 	return (0);
 }
@@ -7405,67 +7391,53 @@ CHERIABI_SYS_cap_fcntls_get_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_bindat_fill_uap(struct thread *td,
-    struct bindat_args *uap)
+CHERIABI_SYS_cheriabi_bindat_fill_uap(struct thread *td,
+    struct cheriabi_bindat_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] int fd */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_bindat_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_bindat_PTRMASK);
 	uap->fd = cheri_getoffset(tmpcap);
 
 	/* [1] int s */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_bindat_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_bindat_PTRMASK);
 	uap->s = cheri_getoffset(tmpcap);
 
 	/* [3] __socklen_t namelen */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_bindat_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_bindat_PTRMASK);
 	uap->namelen = cheri_getoffset(tmpcap);
 
-	/* [2] _In_reads_bytes_(namelen) const struct sockaddr * name */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_bindat_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->name),
-		    tmpcap, 1 * uap->namelen, reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [2] _In_reads_bytes_(namelen) const struct sockaddr *__capability name */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->name),
+	    2, CHERIABI_SYS_cheriabi_bindat_PTRMASK);
 
 	return (0);
 }
 
 static inline int
-CHERIABI_SYS_connectat_fill_uap(struct thread *td,
-    struct connectat_args *uap)
+CHERIABI_SYS_cheriabi_connectat_fill_uap(struct thread *td,
+    struct cheriabi_connectat_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] int fd */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_connectat_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_connectat_PTRMASK);
 	uap->fd = cheri_getoffset(tmpcap);
 
 	/* [1] int s */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_connectat_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_connectat_PTRMASK);
 	uap->s = cheri_getoffset(tmpcap);
 
 	/* [3] __socklen_t namelen */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_connectat_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_connectat_PTRMASK);
 	uap->namelen = cheri_getoffset(tmpcap);
 
-	/* [2] _In_reads_bytes_(namelen) const struct sockaddr * name */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_connectat_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->name),
-		    tmpcap, 1 * uap->namelen, reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [2] _In_reads_bytes_(namelen) const struct sockaddr *__capability name */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->name),
+	    2, CHERIABI_SYS_cheriabi_connectat_PTRMASK);
 
 	return (0);
 }

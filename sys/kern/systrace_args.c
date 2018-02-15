@@ -589,7 +589,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 98: {
 		struct connect_args *p = params;
 		iarg[0] = p->s; /* int */
-		uarg[1] = (intptr_t) p->name; /* caddr_t */
+		uarg[1] = (intptr_t) p->name; /* const struct sockaddr * */
 		iarg[2] = p->namelen; /* int */
 		*n_args = 3;
 		break;
@@ -606,7 +606,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 104: {
 		struct bind_args *p = params;
 		iarg[0] = p->s; /* int */
-		uarg[1] = (intptr_t) p->name; /* caddr_t */
+		uarg[1] = (intptr_t) p->name; /* const struct sockaddr * */
 		iarg[2] = p->namelen; /* int */
 		*n_args = 3;
 		break;
@@ -2511,7 +2511,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		iarg[0] = p->sd; /* int */
 		uarg[1] = (intptr_t) p->msg; /* caddr_t */
 		iarg[2] = p->mlen; /* int */
-		uarg[3] = (intptr_t) p->to; /* caddr_t */
+		uarg[3] = (intptr_t) p->to; /* const struct sockaddr * */
 		iarg[4] = p->tolen; /* __socklen_t */
 		uarg[5] = (intptr_t) p->sinfo; /* struct sctp_sndrcvinfo * */
 		iarg[6] = p->flags; /* int */
@@ -2524,7 +2524,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		iarg[0] = p->sd; /* int */
 		uarg[1] = (intptr_t) p->iov; /* struct iovec_native * */
 		iarg[2] = p->iovlen; /* int */
-		uarg[3] = (intptr_t) p->to; /* caddr_t */
+		uarg[3] = (intptr_t) p->to; /* const struct sockaddr * */
 		iarg[4] = p->tolen; /* __socklen_t */
 		uarg[5] = (intptr_t) p->sinfo; /* struct sctp_sndrcvinfo * */
 		iarg[6] = p->flags; /* int */
@@ -3082,7 +3082,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct bindat_args *p = params;
 		iarg[0] = p->fd; /* int */
 		iarg[1] = p->s; /* int */
-		uarg[2] = (intptr_t) p->name; /* caddr_t */
+		uarg[2] = (intptr_t) p->name; /* const struct sockaddr * */
 		iarg[3] = p->namelen; /* int */
 		*n_args = 4;
 		break;
@@ -3092,7 +3092,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct connectat_args *p = params;
 		iarg[0] = p->fd; /* int */
 		iarg[1] = p->s; /* int */
-		uarg[2] = (intptr_t) p->name; /* caddr_t */
+		uarg[2] = (intptr_t) p->name; /* const struct sockaddr * */
 		iarg[3] = p->namelen; /* int */
 		*n_args = 4;
 		break;
@@ -4199,7 +4199,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "caddr_t";
+			p = "userland const struct sockaddr *";
 			break;
 		case 2:
 			p = "int";
@@ -4228,7 +4228,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "caddr_t";
+			p = "userland const struct sockaddr *";
 			break;
 		case 2:
 			p = "int";
@@ -7363,7 +7363,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "caddr_t";
+			p = "userland const struct sockaddr *";
 			break;
 		case 4:
 			p = "__socklen_t";
@@ -7391,7 +7391,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "caddr_t";
+			p = "userland const struct sockaddr *";
 			break;
 		case 4:
 			p = "__socklen_t";
@@ -8393,7 +8393,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "caddr_t";
+			p = "userland const struct sockaddr *";
 			break;
 		case 3:
 			p = "int";
@@ -8412,7 +8412,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "caddr_t";
+			p = "userland const struct sockaddr *";
 			break;
 		case 3:
 			p = "int";

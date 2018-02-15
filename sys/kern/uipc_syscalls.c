@@ -165,12 +165,21 @@ kern_socket(struct thread *td, int domain, int type, int protocol)
 int
 sys_bind(struct thread *td, struct bind_args *uap)
 {
+
+	return (user_bind(td, uap->s, __USER_CAP(uap->name, uap->namelen),
+	    uap->namelen));
+}
+
+int
+user_bind(struct thread *td, int s, const struct sockaddr * __capability name,
+    socklen_t namelen)
+{
 	struct sockaddr *sa;
 	int error;
 
-	error = getsockaddr(&sa, uap->name, uap->namelen);
+	error = getsockaddr(&sa, name, namelen);
 	if (error == 0) {
-		error = kern_bindat(td, AT_FDCWD, uap->s, sa);
+		error = kern_bindat(td, AT_FDCWD, s, sa);
 		free(sa, M_SONAME);
 	}
 	return (error);
@@ -213,12 +222,21 @@ kern_bindat(struct thread *td, int dirfd, int fd, struct sockaddr *sa)
 int
 sys_bindat(struct thread *td, struct bindat_args *uap)
 {
+
+	return(user_bindat(td, uap->fd, uap->s,
+	    __USER_CAP(uap->name, uap->namelen), uap->namelen));
+}
+
+int
+user_bindat(struct thread *td, int fd, int s,
+    const struct sockaddr * __capability name, socklen_t namelen)
+{
 	struct sockaddr *sa;
 	int error;
 
-	error = getsockaddr(&sa, uap->name, uap->namelen);
+	error = getsockaddr(&sa, name, namelen);
 	if (error == 0) {
-		error = kern_bindat(td, uap->fd, uap->s, sa);
+		error = kern_bindat(td, fd, s, sa);
 		free(sa, M_SONAME);
 	}
 	return (error);
@@ -461,12 +479,21 @@ oaccept(td, uap)
 int
 sys_connect(struct thread *td, struct connect_args *uap)
 {
+
+	return (user_connectat(td, AT_FDCWD, uap->s,
+	    __USER_CAP(uap->name, uap->namelen), uap->namelen));
+}
+
+int
+user_connectat(struct thread *td, int fd, int s,
+    const struct sockaddr * __capability name, socklen_t namelen)
+{
 	struct sockaddr *sa;
 	int error;
 
-	error = getsockaddr(&sa, uap->name, uap->namelen);
+	error = getsockaddr(&sa, name, namelen);
 	if (error == 0) {
-		error = kern_connectat(td, AT_FDCWD, uap->s, sa);
+		error = kern_connectat(td, AT_FDCWD, s, sa);
 		free(sa, M_SONAME);
 	}
 	return (error);
@@ -538,15 +565,9 @@ done1:
 int
 sys_connectat(struct thread *td, struct connectat_args *uap)
 {
-	struct sockaddr *sa;
-	int error;
 
-	error = getsockaddr(&sa, uap->name, uap->namelen);
-	if (error == 0) {
-		error = kern_connectat(td, uap->fd, uap->s, sa);
-		free(sa, M_SONAME);
-	}
-	return (error);
+	return (user_connectat(td, uap->fd, uap->s,
+	    __USER_CAP(uap->name, uap->namelen), uap->namelen));
 }
 
 int
@@ -660,9 +681,7 @@ sendit(struct thread *td, int s, kmsghdr_t *mp, int flags)
 #endif
 
 	if (mp->msg_name != NULL) {
-		error = getsockaddr(&to,
-		    __DECAP_CHECK(mp->msg_name, mp->msg_namelen),
-		    mp->msg_namelen);
+		error = getsockaddr(&to, mp->msg_name, mp->msg_namelen);
 		if (error != 0) {
 			to = NULL;
 			goto bad;
@@ -1574,7 +1593,8 @@ sockargs(struct mbuf **mp, char *buf, socklen_t buflen, int type)
 }
 
 int
-getsockaddr(struct sockaddr **namp, caddr_t uaddr, size_t len)
+getsockaddr(struct sockaddr **namp, const struct sockaddr * __capability uaddr,
+    size_t len)
 {
 	struct sockaddr *sa;
 	int error;
@@ -1584,7 +1604,8 @@ getsockaddr(struct sockaddr **namp, caddr_t uaddr, size_t len)
 	if (len < offsetof(struct sockaddr, sa_data[0]))
 		return (EINVAL);
 	sa = malloc(len, M_SONAME, M_WAITOK);
-	error = copyin(uaddr, sa, len);
+	error = copyin_c(uaddr,
+	    (__cheri_tocap struct sockaddr * __capability)sa, len);
 	if (error != 0) {
 		free(sa, M_SONAME);
 	} else {

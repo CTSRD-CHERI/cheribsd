@@ -214,7 +214,8 @@
 				    int prio); }
 97	AUE_SOCKET	NOPROTO	{ int socket(int domain, int type, \
 				    int protocol); }
-98	AUE_CONNECT	NOPROTO	{ int connect(int s, caddr_t name, \
+98	AUE_CONNECT	NOPROTO	{ int connect(int s, \
+				    const struct sockaddr name, \
 				    int namelen); }
 99	AUE_NULL	OBSOL	oaccept
 100	AUE_GETPRIORITY	NOPROTO	{ int getpriority(int which, int who); }
@@ -222,7 +223,7 @@
 102	AUE_NULL	OBSOL	orecv
 103	AUE_SIGRETURN	COMPAT	{ int freebsd32_sigreturn( \
 				    struct ia32_sigcontext3 *sigcntxp); }
-104	AUE_BIND	NOPROTO	{ int bind(int s, caddr_t name, \
+104	AUE_BIND	NOPROTO	{ int bind(int s, const struct sockaddr *name, \
 				    int namelen); }
 105	AUE_SETSOCKOPT	NOPROTO	{ int setsockopt(int s, int level, \
 				    int name, caddr_t val, int valsize); }
@@ -1057,9 +1058,11 @@
 				    uint32_t fcntlrights); }
 537	AUE_CAP_FCNTLS_GET	NOPROTO	{ int cap_fcntls_get(int fd, \
 				    uint32_t *fcntlrightsp); }
-538	AUE_BINDAT	NOPROTO	{ int bindat(int fd, int s, caddr_t name, \
+538	AUE_BINDAT	NOPROTO	{ int bindat(int fd, int s, \
+				    const struct sockaddr *name, \
 				    int namelen); }
-539	AUE_CONNECTAT	NOPROTO	{ int connectat(int fd, int s, caddr_t name, \
+539	AUE_CONNECTAT	NOPROTO	{ int connectat(int fd, int s, \
+				    const struct sockaddr name, \
 				    int namelen); }
 540	AUE_CHFLAGSAT	NOPROTO	{ int chflagsat(int fd, const char *path, \
 				    u_long flags, int atflag); }

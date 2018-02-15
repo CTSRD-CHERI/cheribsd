@@ -101,13 +101,13 @@
 #define	CHERIABI_SYS_fsync	95
 #define	CHERIABI_SYS_setpriority	96
 #define	CHERIABI_SYS_socket	97
-#define	CHERIABI_SYS_connect	98
+#define	CHERIABI_SYS_cheriabi_connect	98
 				/* 99 is obsolete oaccept */
 #define	CHERIABI_SYS_getpriority	100
 				/* 101 is obsolete osend */
 				/* 102 is obsolete orecv */
 				/* 103 is obsolete sigreturn */
-#define	CHERIABI_SYS_bind	104
+#define	CHERIABI_SYS_cheriabi_bind	104
 #define	CHERIABI_SYS_setsockopt	105
 #define	CHERIABI_SYS_listen	106
 				/* 107 is obsolete vtimes */
@@ -453,8 +453,8 @@
 #define	CHERIABI_SYS_cap_ioctls_get	535
 #define	CHERIABI_SYS_cap_fcntls_limit	536
 #define	CHERIABI_SYS_cap_fcntls_get	537
-#define	CHERIABI_SYS_bindat	538
-#define	CHERIABI_SYS_connectat	539
+#define	CHERIABI_SYS_cheriabi_bindat	538
+#define	CHERIABI_SYS_cheriabi_connectat	539
 #define	CHERIABI_SYS_cheriabi_chflagsat	540
 #define	CHERIABI_SYS_accept4	541
 #define	CHERIABI_SYS_cheriabi_pipe2	542

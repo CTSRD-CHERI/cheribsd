@@ -281,18 +281,18 @@
 				    int prio); }
 97	AUE_SOCKET	NOPROTO	{ int socket(int domain, int type, \
 				    int protocol); }
-98	AUE_CONNECT	NOPROTO	{ int connect(int s, \
+98	AUE_CONNECT	STD	{ int cheriabi_connect(int s, \
 				    _In_reads_bytes_(namelen) \
-				    const struct sockaddr *name, \
+				    const struct sockaddr * __capability name, \
 				    __socklen_t namelen); }
 99	AUE_NULL	OBSOL	oaccept
 100	AUE_GETPRIORITY	NOPROTO	{ int getpriority(int which, int who); }
 101	AUE_NULL	OBSOL	osend
 102	AUE_NULL	OBSOL	orecv
 103	AUE_NULL	OBSOL	sigreturn
-104	AUE_BIND	NOPROTO	{ int bind(int s, \
+104	AUE_BIND	STD	{ int cheriabi_bind(int s, \
 				    _In_reads_bytes_(namelen) \
-				    const struct sockaddr *name, \
+				    const struct sockaddr * __capability name, \
 				    __socklen_t namelen); }
 105	AUE_SETSOCKOPT	NOPROTO	{ int setsockopt(int s, int level, \
 				    int name, \
@@ -1301,13 +1301,13 @@
 				    uint32_t fcntlrights); }
 537	AUE_CAP_FCNTLS_GET	NOPROTO	{ int cap_fcntls_get(int fd, \
 				    _Out_ uint32_t *fcntlrightsp); }
-538	AUE_BINDAT	NOPROTO	{ int bindat(int fd, int s, \
+538	AUE_BINDAT	STD	{ int cheriabi_bindat(int fd, int s, \
 				    _In_reads_bytes_(namelen) \
-				    const struct sockaddr *name, \
+				    const struct sockaddr * __capability name, \
 				    __socklen_t namelen); }
-539	AUE_CONNECTAT	NOPROTO	{ int connectat(int fd, int s, \
+539	AUE_CONNECTAT	STD	{ int cheriabi_connectat(int fd, int s, \
 				    _In_reads_bytes_(namelen) \
-				    const struct sockaddr *name, \
+				    const struct sockaddr * __capability name, \
 				    __socklen_t namelen); }
 540	AUE_CHFLAGSAT	STD	{ int cheriabi_chflagsat(int fd, \
 				    _In_z_ const char * __capability path, \

@@ -429,9 +429,19 @@ int	kern_writev(struct thread *td, int fd, struct uio *auio);
 int	kern_socketpair(struct thread *td, int domain, int type, int protocol,
 	    int *rsv);
 
+int	user_bind(struct thread *td, int s,
+	    const struct sockaddr * __capability name, socklen_t namelen);
+int	user_bindat(struct thread *td, int fd, int s,
+	    const struct sockaddr * __capability name, socklen_t namelen);
+int	user_cap_ioctls_limit(struct thread *td, int fd,
+	    const u_long * __capability ucmds, size_t ncmds);
+int	user_cap_rights_limit(struct thread *td, int fd,
+	    cap_rights_t * __capability rightsp);
 int	user_clock_nanosleep(struct thread *td, clockid_t clock_id,
 	    int flags, const struct timespec * __capability ua_rqtp,
 	    struct timespec * __capability ua_rmtp);
+int	user_connectat(struct thread *td, int fd, int s,
+		const struct sockaddr * __capability name, socklen_t namelen);
 int	user_fhstat(struct thread *td,
 	    const struct fhandle * __capability u_fhp,
 	    struct stat * __capability sb);

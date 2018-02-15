@@ -210,6 +210,16 @@ struct cheriabi_select_args {
 	char ex_l_[PADL_(fd_set *__capability)]; fd_set *__capability ex; char ex_r_[PADR_(fd_set *__capability)];
 	char tv_l_[PADL_(struct timeval *__capability)]; struct timeval *__capability tv; char tv_r_[PADR_(struct timeval *__capability)];
 };
+struct cheriabi_connect_args {
+	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
+	char name_l_[PADL_(const struct sockaddr *__capability)]; const struct sockaddr *__capability name; char name_r_[PADR_(const struct sockaddr *__capability)];
+	char namelen_l_[PADL_(__socklen_t)]; __socklen_t namelen; char namelen_r_[PADR_(__socklen_t)];
+};
+struct cheriabi_bind_args {
+	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
+	char name_l_[PADL_(const struct sockaddr *__capability)]; const struct sockaddr *__capability name; char name_r_[PADR_(const struct sockaddr *__capability)];
+	char namelen_l_[PADL_(__socklen_t)]; __socklen_t namelen; char namelen_r_[PADR_(__socklen_t)];
+};
 struct cheriabi_gettimeofday_args {
 	char tp_l_[PADL_(struct timeval *__capability)]; struct timeval *__capability tp; char tp_r_[PADR_(struct timeval *__capability)];
 	char tzp_l_[PADL_(struct timezone *__capability)]; struct timezone *__capability tzp; char tzp_r_[PADR_(struct timezone *__capability)];
@@ -993,6 +1003,18 @@ struct cheriabi_wait6_args {
 	char wrusage_l_[PADL_(struct __wrusage *__capability)]; struct __wrusage *__capability wrusage; char wrusage_r_[PADR_(struct __wrusage *__capability)];
 	char info_l_[PADL_(struct siginfo_c *__capability)]; struct siginfo_c *__capability info; char info_r_[PADR_(struct siginfo_c *__capability)];
 };
+struct cheriabi_bindat_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
+	char name_l_[PADL_(const struct sockaddr *__capability)]; const struct sockaddr *__capability name; char name_r_[PADR_(const struct sockaddr *__capability)];
+	char namelen_l_[PADL_(__socklen_t)]; __socklen_t namelen; char namelen_r_[PADR_(__socklen_t)];
+};
+struct cheriabi_connectat_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
+	char name_l_[PADL_(const struct sockaddr *__capability)]; const struct sockaddr *__capability name; char name_r_[PADR_(const struct sockaddr *__capability)];
+	char namelen_l_[PADL_(__socklen_t)]; __socklen_t namelen; char namelen_r_[PADR_(__socklen_t)];
+};
 struct cheriabi_chflagsat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
@@ -1119,6 +1141,8 @@ int	cheriabi_setitimer(struct thread *, struct cheriabi_setitimer_args *);
 int	cheriabi_swapon(struct thread *, struct cheriabi_swapon_args *);
 int	cheriabi_getitimer(struct thread *, struct cheriabi_getitimer_args *);
 int	cheriabi_select(struct thread *, struct cheriabi_select_args *);
+int	cheriabi_connect(struct thread *, struct cheriabi_connect_args *);
+int	cheriabi_bind(struct thread *, struct cheriabi_bind_args *);
 int	cheriabi_gettimeofday(struct thread *, struct cheriabi_gettimeofday_args *);
 int	cheriabi_getrusage(struct thread *, struct cheriabi_getrusage_args *);
 int	cheriabi_readv(struct thread *, struct cheriabi_readv_args *);
@@ -1285,6 +1309,8 @@ int	cheriabi_pselect(struct thread *, struct cheriabi_pselect_args *);
 int	cheriabi_getloginclass(struct thread *, struct cheriabi_getloginclass_args *);
 int	cheriabi_setloginclass(struct thread *, struct cheriabi_setloginclass_args *);
 int	cheriabi_wait6(struct thread *, struct cheriabi_wait6_args *);
+int	cheriabi_bindat(struct thread *, struct cheriabi_bindat_args *);
+int	cheriabi_connectat(struct thread *, struct cheriabi_connectat_args *);
 int	cheriabi_chflagsat(struct thread *, struct cheriabi_chflagsat_args *);
 int	cheriabi_pipe2(struct thread *, struct cheriabi_pipe2_args *);
 int	cheriabi_aio_mlock(struct thread *, struct cheriabi_aio_mlock_args *);
@@ -1393,6 +1419,8 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_swapon	AUE_SWAPON
 #define	CHERIABI_SYS_AUE_cheriabi_getitimer	AUE_GETITIMER
 #define	CHERIABI_SYS_AUE_cheriabi_select	AUE_SELECT
+#define	CHERIABI_SYS_AUE_cheriabi_connect	AUE_CONNECT
+#define	CHERIABI_SYS_AUE_cheriabi_bind	AUE_BIND
 #define	CHERIABI_SYS_AUE_cheriabi_gettimeofday	AUE_GETTIMEOFDAY
 #define	CHERIABI_SYS_AUE_cheriabi_getrusage	AUE_GETRUSAGE
 #define	CHERIABI_SYS_AUE_cheriabi_readv	AUE_READV
@@ -1559,6 +1587,8 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_getloginclass	AUE_GETLOGINCLASS
 #define	CHERIABI_SYS_AUE_cheriabi_setloginclass	AUE_SETLOGINCLASS
 #define	CHERIABI_SYS_AUE_cheriabi_wait6	AUE_WAIT6
+#define	CHERIABI_SYS_AUE_cheriabi_bindat	AUE_BINDAT
+#define	CHERIABI_SYS_AUE_cheriabi_connectat	AUE_CONNECTAT
 #define	CHERIABI_SYS_AUE_cheriabi_chflagsat	AUE_CHFLAGSAT
 #define	CHERIABI_SYS_AUE_cheriabi_pipe2	AUE_PIPE
 #define	CHERIABI_SYS_AUE_cheriabi_aio_mlock	AUE_AIO_MLOCK

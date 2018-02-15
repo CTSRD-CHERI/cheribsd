@@ -1576,7 +1576,8 @@ iscsi_ioctl_daemon_connect(struct iscsi_softc *sc,
 	sx_sunlock(&sc->sc_lock);
 
 	if (idc->idc_from_addrlen > 0) {
-		error = getsockaddr(&from_sa, (void *)idc->idc_from_addr, idc->idc_from_addrlen);
+		error = getsockaddr(&from_sa, __USER_CAP(idc->idc_from_addr,
+		    idc->idc_from_addrlen), idc->idc_from_addrlen);
 		if (error != 0) {
 			ISCSI_SESSION_WARN(is,
 			    "getsockaddr failed with error %d", error);
@@ -1585,7 +1586,8 @@ iscsi_ioctl_daemon_connect(struct iscsi_softc *sc,
 	} else {
 		from_sa = NULL;
 	}
-	error = getsockaddr(&to_sa, (void *)idc->idc_to_addr, idc->idc_to_addrlen);
+	error = getsockaddr(&to_sa, __USER_CAP(idc->idc_to_addr,
+	    idc->idc_to_addrlen), idc->idc_to_add rlen);
 	if (error != 0) {
 		ISCSI_SESSION_WARN(is, "getsockaddr failed with error %d",
 		    error);

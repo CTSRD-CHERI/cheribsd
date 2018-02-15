@@ -32,6 +32,7 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
+#include <sys/fcntl.h>
 #include <sys/mbuf.h>
 #include <sys/socketvar.h>
 #include <sys/syscallsubr.h>
@@ -42,6 +43,37 @@ __FBSDID("$FreeBSD$");
 /*
  * kern_uipc.c
  */
+
+int
+cheriabi_bind(struct thread *td, struct cheriabi_bind_args *uap)
+{
+
+	return (user_bind(td, uap->s, uap->name, uap->namelen));
+}
+
+int
+cheriabi_bindat(struct thread *td, struct cheriabi_bindat_args *uap)
+{
+
+	return (user_bindat(td, uap->fd, uap->s, uap->name, uap->namelen));
+}
+
+// accept
+// accept4
+
+int
+cheriabi_connect(struct thread *td, struct cheriabi_connect_args *uap)
+{
+
+	return (user_connectat(td, AT_FDCWD, uap->s, uap->name, uap->namelen));
+}
+
+int
+cheriabi_connectat(struct thread *td, struct cheriabi_connectat_args *uap)
+{
+
+	return (user_connectat(td, uap->fd, uap->s, uap->name, uap->namelen));
+}
 
 int
 cheriabi_recvmsg(struct thread *td, struct cheriabi_recvmsg_args *uap)
@@ -95,9 +127,7 @@ cheriabi_sendmsg(struct thread *td,
 		return (error);
 	msg.msg_iov = iov;
 	if (msg.msg_name != NULL) {
-		error = getsockaddr(&to,
-		    __DECAP_CHECK(msg.msg_name, msg.msg_namelen),
-		    msg.msg_namelen);
+		error = getsockaddr(&to, msg.msg_name, msg.msg_namelen);
 		if (error) {
 			to = NULL;
 			goto out;

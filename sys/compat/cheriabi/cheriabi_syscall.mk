@@ -72,9 +72,9 @@ MIASM =  \
 	fsync.o \
 	setpriority.o \
 	socket.o \
-	connect.o \
+	cheriabi_connect.o \
 	getpriority.o \
-	bind.o \
+	cheriabi_bind.o \
 	setsockopt.o \
 	listen.o \
 	cheriabi_gettimeofday.o \
@@ -341,8 +341,8 @@ MIASM =  \
 	cap_ioctls_get.o \
 	cap_fcntls_limit.o \
 	cap_fcntls_get.o \
-	bindat.o \
-	connectat.o \
+	cheriabi_bindat.o \
+	cheriabi_connectat.o \
 	cheriabi_chflagsat.o \
 	accept4.o \
 	cheriabi_pipe2.o \

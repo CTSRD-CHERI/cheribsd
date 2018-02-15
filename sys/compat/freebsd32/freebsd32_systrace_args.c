@@ -592,7 +592,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 98: {
 		struct connect_args *p = params;
 		iarg[0] = p->s; /* int */
-		uarg[1] = (intptr_t) p->name; /* caddr_t */
+		iarg[1] = p->name; /* const struct sockaddr */
 		iarg[2] = p->namelen; /* int */
 		*n_args = 3;
 		break;
@@ -609,7 +609,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 104: {
 		struct bind_args *p = params;
 		iarg[0] = p->s; /* int */
-		uarg[1] = (intptr_t) p->name; /* caddr_t */
+		uarg[1] = (intptr_t) p->name; /* const struct sockaddr * */
 		iarg[2] = p->namelen; /* int */
 		*n_args = 3;
 		break;
@@ -3056,7 +3056,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct bindat_args *p = params;
 		iarg[0] = p->fd; /* int */
 		iarg[1] = p->s; /* int */
-		uarg[2] = (intptr_t) p->name; /* caddr_t */
+		uarg[2] = (intptr_t) p->name; /* const struct sockaddr * */
 		iarg[3] = p->namelen; /* int */
 		*n_args = 4;
 		break;
@@ -3066,7 +3066,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct connectat_args *p = params;
 		iarg[0] = p->fd; /* int */
 		iarg[1] = p->s; /* int */
-		uarg[2] = (intptr_t) p->name; /* caddr_t */
+		iarg[2] = p->name; /* const struct sockaddr */
 		iarg[3] = p->namelen; /* int */
 		*n_args = 4;
 		break;
@@ -4192,7 +4192,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "caddr_t";
+			p = "const struct sockaddr";
 			break;
 		case 2:
 			p = "int";
@@ -4221,7 +4221,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "caddr_t";
+			p = "userland const struct sockaddr *";
 			break;
 		case 2:
 			p = "int";
@@ -8402,7 +8402,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "caddr_t";
+			p = "userland const struct sockaddr *";
 			break;
 		case 3:
 			p = "int";
@@ -8421,7 +8421,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "caddr_t";
+			p = "const struct sockaddr";
 			break;
 		case 3:
 			p = "int";

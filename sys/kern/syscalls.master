@@ -216,8 +216,8 @@
 				    int prio); }
 97	AUE_SOCKET	STD	{ int socket(int domain, int type, \
 				    int protocol); }
-98	AUE_CONNECT	STD	{ int connect(int s, caddr_t name, \
-				    int namelen); }
+98	AUE_CONNECT	STD	{ int connect(int s, \
+				    const struct sockaddr *name, int namelen); }
 99	AUE_ACCEPT	COMPAT|NOARGS { int accept(int s, caddr_t name, \
 				    int *anamelen); } accept accept_args int
 100	AUE_GETPRIORITY	STD	{ int getpriority(int which, int who); }
@@ -227,7 +227,7 @@
 				    int flags); }
 103	AUE_SIGRETURN	COMPAT	{ int sigreturn( \
 				    struct osigcontext *sigcntxp); }
-104	AUE_BIND	STD	{ int bind(int s, caddr_t name, \
+104	AUE_BIND	STD	{ int bind(int s, const struct sockaddr *name, \
 				    int namelen); }
 105	AUE_SETSOCKOPT	STD	{ int setsockopt(int s, int level, int name, \
 				    caddr_t val, int valsize); }
@@ -849,10 +849,10 @@
 470	AUE_NULL	UNIMPL	__getpath_fromaddr
 471	AUE_SCTP_PEELOFF	NOSTD	{ int sctp_peeloff(int sd, uint32_t name); }
 472	AUE_SCTP_GENERIC_SENDMSG	NOSTD	{ int sctp_generic_sendmsg(int sd, caddr_t msg, int mlen, \
-				    caddr_t to, __socklen_t tolen, \
+				    const struct sockaddr *to, __socklen_t tolen, \
 				    struct sctp_sndrcvinfo *sinfo, int flags); }
 473	AUE_SCTP_GENERIC_SENDMSG_IOV	NOSTD	{ int sctp_generic_sendmsg_iov(int sd, struct iovec_native *iov, int iovlen, \
-				    caddr_t to, __socklen_t tolen, \
+				    const struct sockaddr *to, __socklen_t tolen, \
 				    struct sctp_sndrcvinfo *sinfo, int flags); }
 474	AUE_SCTP_GENERIC_RECVMSG	NOSTD	{ int sctp_generic_recvmsg(int sd, struct iovec_native *iov, int iovlen, \
 				    struct sockaddr * from, __socklen_t *fromlenaddr, \
@@ -976,10 +976,10 @@
 					    uint32_t fcntlrights); }
 537	AUE_CAP_FCNTLS_GET	STD	{ int cap_fcntls_get(int fd, \
 					    uint32_t *fcntlrightsp); }
-538	AUE_BINDAT	STD	{ int bindat(int fd, int s, caddr_t name, \
-				    int namelen); }
-539	AUE_CONNECTAT	STD	{ int connectat(int fd, int s, caddr_t name, \
-				    int namelen); }
+538	AUE_BINDAT	STD	{ int bindat(int fd, int s, \
+				    const struct sockaddr *name, int namelen); }
+539	AUE_CONNECTAT	STD	{ int connectat(int fd, int s, \
+				    const struct sockaddr *name, int namelen); }
 540	AUE_CHFLAGSAT	STD	{ int chflagsat(int fd, const char *path, \
 				    u_long flags, int atflag); }
 541	AUE_ACCEPT	STD	{ int accept4(int s, \

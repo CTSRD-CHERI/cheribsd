@@ -1283,7 +1283,8 @@ freebsd32_sendmsg(struct thread *td,
 		return (error);
 	msg.msg_iov = iov;
 	if (msg.msg_name != NULL) {
-		error = getsockaddr(&to, msg.msg_name, msg.msg_namelen);
+		error = getsockaddr(&to,
+		    __USER_CAP(msg.msg_name, msg.msg_namelen), msg.msg_namelen);
 		if (error) {
 			to = NULL;
 			goto out;
