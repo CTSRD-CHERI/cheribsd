@@ -250,6 +250,12 @@ struct cheriabi_mkfifo_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 };
+struct cheriabi_socketpair_args {
+	char domain_l_[PADL_(int)]; int domain; char domain_r_[PADR_(int)];
+	char type_l_[PADL_(int)]; int type; char type_r_[PADR_(int)];
+	char protocol_l_[PADL_(int)]; int protocol; char protocol_r_[PADR_(int)];
+	char rsv_l_[PADL_(int *__capability)]; int *__capability rsv; char rsv_r_[PADR_(int *__capability)];
+};
 struct cheriabi_mkdir_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
@@ -1150,6 +1156,7 @@ int	cheriabi_writev(struct thread *, struct cheriabi_writev_args *);
 int	cheriabi_settimeofday(struct thread *, struct cheriabi_settimeofday_args *);
 int	cheriabi_rename(struct thread *, struct cheriabi_rename_args *);
 int	cheriabi_mkfifo(struct thread *, struct cheriabi_mkfifo_args *);
+int	cheriabi_socketpair(struct thread *, struct cheriabi_socketpair_args *);
 int	cheriabi_mkdir(struct thread *, struct cheriabi_mkdir_args *);
 int	cheriabi_rmdir(struct thread *, struct cheriabi_rmdir_args *);
 int	cheriabi_utimes(struct thread *, struct cheriabi_utimes_args *);
@@ -1428,6 +1435,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_settimeofday	AUE_SETTIMEOFDAY
 #define	CHERIABI_SYS_AUE_cheriabi_rename	AUE_RENAME
 #define	CHERIABI_SYS_AUE_cheriabi_mkfifo	AUE_MKFIFO
+#define	CHERIABI_SYS_AUE_cheriabi_socketpair	AUE_SOCKETPAIR
 #define	CHERIABI_SYS_AUE_cheriabi_mkdir	AUE_MKDIR
 #define	CHERIABI_SYS_AUE_cheriabi_rmdir	AUE_RMDIR
 #define	CHERIABI_SYS_AUE_cheriabi_utimes	AUE_UTIMES

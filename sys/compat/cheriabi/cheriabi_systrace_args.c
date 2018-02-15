@@ -737,13 +737,13 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* socketpair */
+	/* cheriabi_socketpair */
 	case 135: {
-		struct socketpair_args *p = params;
+		struct cheriabi_socketpair_args *p = params;
 		iarg[0] = p->domain; /* int */
 		iarg[1] = p->type; /* int */
 		iarg[2] = p->protocol; /* int */
-		uarg[3] = (intptr_t) p->rsv; /* int * */
+		uarg[3] = (cheri_getbase(p->rsv) + cheri_getoffset(p->rsv)); /* int *__capability */
 		*n_args = 4;
 		break;
 	}
@@ -4272,7 +4272,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* socketpair */
+	/* cheriabi_socketpair */
 	case 135:
 		switch(ndx) {
 		case 0:
@@ -4285,7 +4285,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "userland int *";
+			p = "userland int *__capability";
 			break;
 		default:
 			break;
@@ -8669,7 +8669,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* socketpair */
+	/* cheriabi_socketpair */
 	case 135:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

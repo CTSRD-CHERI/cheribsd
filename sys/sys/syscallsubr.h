@@ -471,6 +471,8 @@ int	user_sched_setscheduler(struct thread *td, pid_t pid, int policy,
 int	user_settimeofday(struct thread *td,
 	    const struct timeval * __capability tp,
 	    const struct timezone * __capability tz);
+int	user_socketpair(struct thread *td, int domain, int type, int protocol,
+	    int * __capability rsv);
 int	user_statfs(struct thread *td, const char * __capability path,
 	    struct statfs * __capability buf);
 

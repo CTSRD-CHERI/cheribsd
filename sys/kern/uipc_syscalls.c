@@ -654,13 +654,21 @@ free1:
 int
 sys_socketpair(struct thread *td, struct socketpair_args *uap)
 {
+
+	return (user_socketpair(td, uap->domain, uap->type, uap->protocol,
+	    __USER_CAP(uap->rsv, 2 * sizeof(int))));
+}
+
+int
+user_socketpair(struct thread *td, int domain, int type, int protocol,
+    int * __capability rsv)
+{
 	int error, sv[2];
 
-	error = kern_socketpair(td, uap->domain, uap->type,
-	    uap->protocol, sv);
+	error = kern_socketpair(td, domain, type, protocol, sv);
 	if (error != 0)
 		return (error);
-	error = copyout(sv, uap->rsv, 2 * sizeof(int));
+	error = copyout_c(&sv[0], rsv, 2 * sizeof(int));
 	if (error != 0) {
 		(void)kern_close(td, sv[0]);
 		(void)kern_close(td, sv[1]);

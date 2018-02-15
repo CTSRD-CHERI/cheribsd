@@ -92,7 +92,7 @@ MIASM =  \
 	cheriabi_mkfifo.o \
 	sendto.o \
 	shutdown.o \
-	socketpair.o \
+	cheriabi_socketpair.o \
 	cheriabi_mkdir.o \
 	cheriabi_rmdir.o \
 	cheriabi_utimes.o \

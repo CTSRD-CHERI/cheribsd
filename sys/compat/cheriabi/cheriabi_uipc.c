@@ -76,6 +76,14 @@ cheriabi_connectat(struct thread *td, struct cheriabi_connectat_args *uap)
 }
 
 int
+cheriabi_socketpair(struct thread *td, struct cheriabi_socketpair_args *uap)
+{
+
+	return (user_socketpair(td, uap->domain, uap->type, uap->protocol,
+	    uap->rsv));
+}
+
+int
 cheriabi_recvmsg(struct thread *td, struct cheriabi_recvmsg_args *uap)
 {
 	kmsghdr_t msg;

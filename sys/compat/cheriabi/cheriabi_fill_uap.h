@@ -1751,34 +1751,27 @@ CHERIABI_SYS_shutdown_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_socketpair_fill_uap(struct thread *td,
-    struct socketpair_args *uap)
+CHERIABI_SYS_cheriabi_socketpair_fill_uap(struct thread *td,
+    struct cheriabi_socketpair_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] int domain */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_socketpair_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_socketpair_PTRMASK);
 	uap->domain = cheri_getoffset(tmpcap);
 
 	/* [1] int type */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_socketpair_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_socketpair_PTRMASK);
 	uap->type = cheri_getoffset(tmpcap);
 
 	/* [2] int protocol */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_socketpair_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_socketpair_PTRMASK);
 	uap->protocol = cheri_getoffset(tmpcap);
 
-	/* [3] _Out_writes_(2) int * rsv */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_socketpair_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->rsv),
-		    tmpcap, (sizeof(*uap->rsv) * 2), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [3] _Out_writes_(2) int *__capability rsv */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->rsv),
+	    3, CHERIABI_SYS_cheriabi_socketpair_PTRMASK);
 
 	return (0);
 }

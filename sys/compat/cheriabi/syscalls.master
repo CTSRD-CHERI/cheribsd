@@ -354,9 +354,9 @@
 				    const struct sockaddr *to, \
 				    __socklen_t tolen); }
 134	AUE_SHUTDOWN	NOPROTO	{ int shutdown(int s, int how); }
-135	AUE_SOCKETPAIR	NOPROTO	{ int socketpair(int domain, \
+135	AUE_SOCKETPAIR	STD	{ int cheriabi_socketpair(int domain, \
 				    int type, int protocol, \
-				    _Out_writes_(2) int *rsv); }
+				    _Out_writes_(2) int * __capability rsv); }
 136	AUE_MKDIR	STD	{ int cheriabi_mkdir( \
 				    _In_z_ const char * __capability path, \
 				    mode_t mode); }

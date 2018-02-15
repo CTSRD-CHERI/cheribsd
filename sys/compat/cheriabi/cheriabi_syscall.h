@@ -137,7 +137,7 @@
 #define	CHERIABI_SYS_cheriabi_mkfifo	132
 #define	CHERIABI_SYS_sendto	133
 #define	CHERIABI_SYS_shutdown	134
-#define	CHERIABI_SYS_socketpair	135
+#define	CHERIABI_SYS_cheriabi_socketpair	135
 #define	CHERIABI_SYS_cheriabi_mkdir	136
 #define	CHERIABI_SYS_cheriabi_rmdir	137
 #define	CHERIABI_SYS_cheriabi_utimes	138
