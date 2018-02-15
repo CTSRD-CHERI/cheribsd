@@ -85,7 +85,7 @@
 #define	CHERIABI_SYS_cheriabi_rename_PTRMASK	(0x0 | 0x1 | 0x2)
 #define	CHERIABI_SYS_flock_PTRMASK	(0x0)
 #define	CHERIABI_SYS_cheriabi_mkfifo_PTRMASK	(0x0 | 0x1)
-#define	CHERIABI_SYS_sendto_PTRMASK	(0x0 | 0x2 | 0x10)
+#define	CHERIABI_SYS_cheriabi_sendto_PTRMASK	(0x0 | 0x2 | 0x10)
 #define	CHERIABI_SYS_shutdown_PTRMASK	(0x0)
 #define	CHERIABI_SYS_cheriabi_socketpair_PTRMASK	(0x0 | 0x8)
 #define	CHERIABI_SYS_cheriabi_mkdir_PTRMASK	(0x0 | 0x1)

@@ -468,6 +468,9 @@ int	user_sched_setparam(struct thread *td, pid_t pid,
 	    const struct sched_param * __capability param);
 int	user_sched_setscheduler(struct thread *td, pid_t pid, int policy,
 	    const struct sched_param * __capability param);
+int	user_sendto(struct thread *td, int s, const char * __capability buf,
+	    size_t len, int flags, const struct sockaddr * __capability to,
+	    socklen_t tolen);
 int	user_settimeofday(struct thread *td,
 	    const struct timeval * __capability tp,
 	    const struct timezone * __capability tz);

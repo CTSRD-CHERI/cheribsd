@@ -135,7 +135,7 @@
 				/* 130 is obsolete ftruncate */
 #define	CHERIABI_SYS_flock	131
 #define	CHERIABI_SYS_cheriabi_mkfifo	132
-#define	CHERIABI_SYS_sendto	133
+#define	CHERIABI_SYS_cheriabi_sendto	133
 #define	CHERIABI_SYS_shutdown	134
 #define	CHERIABI_SYS_cheriabi_socketpair	135
 #define	CHERIABI_SYS_cheriabi_mkdir	136

@@ -84,6 +84,14 @@ cheriabi_socketpair(struct thread *td, struct cheriabi_socketpair_args *uap)
 }
 
 int
+cheriabi_sendto(struct thread *td, struct cheriabi_sendto_args *uap)
+{
+
+	return (user_sendto(td, uap->s, uap->buf, uap->len, uap->flags,
+	    uap->to, uap->tolen));
+}
+
+int
 cheriabi_recvmsg(struct thread *td, struct cheriabi_recvmsg_args *uap)
 {
 	kmsghdr_t msg;
@@ -118,8 +126,7 @@ cheriabi_recvmsg(struct thread *td, struct cheriabi_recvmsg_args *uap)
 }
 
 int
-cheriabi_sendmsg(struct thread *td,
-		  struct cheriabi_sendmsg_args *uap)
+cheriabi_sendmsg(struct thread *td, struct cheriabi_sendmsg_args *uap)
 {
 	kmsghdr_t msg;
 	kiovec_t * __capability iov;

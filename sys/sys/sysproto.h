@@ -445,7 +445,7 @@ struct sendto_args {
 	char buf_l_[PADL_(caddr_t)]; caddr_t buf; char buf_r_[PADR_(caddr_t)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
-	char to_l_[PADL_(caddr_t)]; caddr_t to; char to_r_[PADR_(caddr_t)];
+	char to_l_[PADL_(const struct sockaddr *)]; const struct sockaddr * to; char to_r_[PADR_(const struct sockaddr *)];
 	char tolen_l_[PADL_(int)]; int tolen; char tolen_r_[PADR_(int)];
 };
 struct shutdown_args {

@@ -747,7 +747,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		uarg[1] = (intptr_t) p->buf; /* caddr_t */
 		uarg[2] = p->len; /* size_t */
 		iarg[3] = p->flags; /* int */
-		uarg[4] = (intptr_t) p->to; /* caddr_t */
+		uarg[4] = (intptr_t) p->to; /* const struct sockaddr * */
 		iarg[5] = p->tolen; /* int */
 		*n_args = 6;
 		break;
@@ -4475,7 +4475,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 4:
-			p = "caddr_t";
+			p = "userland const struct sockaddr *";
 			break;
 		case 5:
 			p = "int";

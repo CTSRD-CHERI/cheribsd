@@ -268,8 +268,8 @@
 131	AUE_FLOCK	NOPROTO	{ int flock(int fd, int how); }
 132	AUE_MKFIFO	NOPROTO	{ int mkfifo(char *path, int mode); }
 133	AUE_SENDTO	NOPROTO	{ int sendto(int s, caddr_t buf, \
-				    size_t len, int flags, caddr_t to, \
-				    int tolen); }
+				    size_t len, int flags, \
+				    struct sockaddr *to, int tolen); }
 134	AUE_SHUTDOWN	NOPROTO	{ int shutdown(int s, int how); }
 135	AUE_SOCKETPAIR	NOPROTO	{ int socketpair(int domain, int type, \
 				    int protocol, int *rsv); }

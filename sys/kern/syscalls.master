@@ -274,7 +274,8 @@
 131	AUE_FLOCK	STD	{ int flock(int fd, int how); }
 132	AUE_MKFIFO	STD	{ int mkfifo(char *path, int mode); }
 133	AUE_SENDTO	STD	{ int sendto(int s, caddr_t buf, size_t len, \
-				    int flags, caddr_t to, int tolen); }
+				    int flags, const struct sockaddr *to, \
+				    int tolen); }
 134	AUE_SHUTDOWN	STD	{ int shutdown(int s, int how); }
 135	AUE_SOCKETPAIR	STD	{ int socketpair(int domain, int type, \
 				    int protocol, int *rsv); }

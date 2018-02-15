@@ -1685,50 +1685,36 @@ CHERIABI_SYS_cheriabi_mkfifo_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_sendto_fill_uap(struct thread *td,
-    struct sendto_args *uap)
+CHERIABI_SYS_cheriabi_sendto_fill_uap(struct thread *td,
+    struct cheriabi_sendto_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] int s */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_sendto_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_sendto_PTRMASK);
 	uap->s = cheri_getoffset(tmpcap);
 
 	/* [2] size_t len */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_sendto_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_sendto_PTRMASK);
 	uap->len = cheri_getoffset(tmpcap);
 
 	/* [3] int flags */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_sendto_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_sendto_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
 	/* [5] __socklen_t tolen */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 5, CHERIABI_SYS_sendto_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 5, CHERIABI_SYS_cheriabi_sendto_PTRMASK);
 	uap->tolen = cheri_getoffset(tmpcap);
 
-	/* [1] _In_reads_bytes_(len) const void * buf */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
+	/* [1] _In_reads_bytes_(len) const void *__capability buf */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->buf),
+	    1, CHERIABI_SYS_cheriabi_sendto_PTRMASK);
 
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_sendto_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->buf),
-		    tmpcap, 1 * uap->len, reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
-
-	/* [4] _In_reads_bytes_opt_(tolen) const struct sockaddr * to */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 4, CHERIABI_SYS_sendto_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->to),
-		    tmpcap, 1 * uap->tolen, reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
+	/* [4] _In_reads_bytes_opt_(tolen) const struct sockaddr *__capability to */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->to),
+	    4, CHERIABI_SYS_cheriabi_sendto_PTRMASK);
 
 	return (0);
 }

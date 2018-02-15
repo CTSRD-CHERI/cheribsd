@@ -835,19 +835,29 @@ bad:
 int
 sys_sendto(struct thread *td, struct sendto_args *uap)
 {
+
+	return (user_sendto(td, uap->s, __USER_CAP(uap->buf, uap->len),
+	    uap->len, uap->flags, __USER_CAP(uap->to, uap->tolen), uap->tolen));
+}
+
+int
+user_sendto(struct thread *td, int s, const char * __capability buf,
+    size_t len, int flags, const struct sockaddr * __capability to,
+    socklen_t tolen)
+{
 	kmsghdr_t msg;
 	kiovec_t aiov;
 
-	msg.msg_name = __USER_CAP(uap->to, uap->tolen);
-	msg.msg_namelen = uap->tolen;
+	msg.msg_name = __DECONST_CAP(void * __capability, to);
+	msg.msg_namelen = tolen;
 	msg.msg_iov = &aiov;
 	msg.msg_iovlen = 1;
 	msg.msg_control = 0;
 #ifdef COMPAT_OLDSOCK
 	msg.msg_flags = 0;
 #endif
-	IOVEC_INIT(&aiov, uap->buf, uap->len);
-	return (sendit(td, uap->s, &msg, uap->flags));
+	IOVEC_INIT_C(&aiov, __DECONST_CAP(void * __capability, buf), len);
+	return (sendit(td, s, &msg, flags));
 }
 
 #ifdef COMPAT_OLDSOCK

@@ -250,6 +250,14 @@ struct cheriabi_mkfifo_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 };
+struct cheriabi_sendto_args {
+	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
+	char buf_l_[PADL_(const void *__capability)]; const void *__capability buf; char buf_r_[PADR_(const void *__capability)];
+	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char to_l_[PADL_(const struct sockaddr *__capability)]; const struct sockaddr *__capability to; char to_r_[PADR_(const struct sockaddr *__capability)];
+	char tolen_l_[PADL_(__socklen_t)]; __socklen_t tolen; char tolen_r_[PADR_(__socklen_t)];
+};
 struct cheriabi_socketpair_args {
 	char domain_l_[PADL_(int)]; int domain; char domain_r_[PADR_(int)];
 	char type_l_[PADL_(int)]; int type; char type_r_[PADR_(int)];
@@ -1156,6 +1164,7 @@ int	cheriabi_writev(struct thread *, struct cheriabi_writev_args *);
 int	cheriabi_settimeofday(struct thread *, struct cheriabi_settimeofday_args *);
 int	cheriabi_rename(struct thread *, struct cheriabi_rename_args *);
 int	cheriabi_mkfifo(struct thread *, struct cheriabi_mkfifo_args *);
+int	cheriabi_sendto(struct thread *, struct cheriabi_sendto_args *);
 int	cheriabi_socketpair(struct thread *, struct cheriabi_socketpair_args *);
 int	cheriabi_mkdir(struct thread *, struct cheriabi_mkdir_args *);
 int	cheriabi_rmdir(struct thread *, struct cheriabi_rmdir_args *);
@@ -1435,6 +1444,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_settimeofday	AUE_SETTIMEOFDAY
 #define	CHERIABI_SYS_AUE_cheriabi_rename	AUE_RENAME
 #define	CHERIABI_SYS_AUE_cheriabi_mkfifo	AUE_MKFIFO
+#define	CHERIABI_SYS_AUE_cheriabi_sendto	AUE_SENDTO
 #define	CHERIABI_SYS_AUE_cheriabi_socketpair	AUE_SOCKETPAIR
 #define	CHERIABI_SYS_AUE_cheriabi_mkdir	AUE_MKDIR
 #define	CHERIABI_SYS_AUE_cheriabi_rmdir	AUE_RMDIR

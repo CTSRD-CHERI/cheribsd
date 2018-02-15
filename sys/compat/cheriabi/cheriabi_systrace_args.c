@@ -717,14 +717,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* sendto */
+	/* cheriabi_sendto */
 	case 133: {
-		struct sendto_args *p = params;
+		struct cheriabi_sendto_args *p = params;
 		iarg[0] = p->s; /* int */
-		uarg[1] = (intptr_t) p->buf; /* const void * */
+		uarg[1] = (cheri_getbase(p->buf) + cheri_getoffset(p->buf)); /* const void *__capability */
 		uarg[2] = p->len; /* size_t */
 		iarg[3] = p->flags; /* int */
-		uarg[4] = (intptr_t) p->to; /* const struct sockaddr * */
+		uarg[4] = (cheri_getbase(p->to) + cheri_getoffset(p->to)); /* const struct sockaddr *__capability */
 		iarg[5] = p->tolen; /* __socklen_t */
 		*n_args = 6;
 		break;
@@ -4234,14 +4234,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* sendto */
+	/* cheriabi_sendto */
 	case 133:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland const void *";
+			p = "userland const void *__capability";
 			break;
 		case 2:
 			p = "size_t";
@@ -4250,7 +4250,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 4:
-			p = "userland const struct sockaddr *";
+			p = "userland const struct sockaddr *__capability";
 			break;
 		case 5:
 			p = "__socklen_t";
@@ -8659,7 +8659,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* sendto */
+	/* cheriabi_sendto */
 	case 133:
 		if (ndx == 0 || ndx == 1)
 			p = "ssize_t";
