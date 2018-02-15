@@ -292,6 +292,13 @@ cheriabi_fstatfs(struct thread *td, struct cheriabi_fstatfs_args *uap)
 }
 
 int
+cheriabi_getfsstat(struct thread *td, struct cheriabi_getfsstat_args *uap)
+{
+
+	return (user_getfsstat(td, uap->buf, uap->bufsize, uap->mode));
+}
+
+int
 cheriabi_chdir(struct thread *td, struct cheriabi_chdir_args *uap)
 {
 

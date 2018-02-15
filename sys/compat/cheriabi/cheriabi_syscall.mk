@@ -358,7 +358,7 @@ MIASM =  \
 	cheriabi_getdirentries.o \
 	cheriabi_statfs.o \
 	cheriabi_fstatfs.o \
-	getfsstat.o \
+	cheriabi_getfsstat.o \
 	cheriabi_fhstatfs.o \
 	cheriabi_mknodat.o \
 	cheriabi_kevent.o

@@ -328,7 +328,8 @@ linprocfs_domtab(PFS_FILL_ARGS)
 	char *dlep, *flep, *mntto, *mntfrom, *fstype;
 	size_t lep_len;
 	int error;
-	struct statfs *buf, *sp;
+	struct statfs * __capability buf
+	struct statfs *sp;
 	size_t count;
 
 	/* resolve symlinks etc. in the emulation tree prefix */
@@ -347,12 +348,13 @@ linprocfs_domtab(PFS_FILL_ARGS)
 	error = kern_getfsstat(td, &buf, SIZE_T_MAX, &count,
 	    UIO_SYSSPACE, MNT_WAIT);
 	if (error != 0) {
-		free(buf, M_TEMP);
+		free_c(buf, M_TEMP);
 		free(flep, M_TEMP);
 		return (error);
 	}
 
-	for (sp = buf; count > 0; sp++, count--) {
+	for (sp = (__cheri_fromcap struct statfs *)buf; count > 0;
+	    sp++, count--) {
 		/* determine device name */
 		mntfrom = sp->f_mntfromname;
 
@@ -393,7 +395,7 @@ linprocfs_domtab(PFS_FILL_ARGS)
 		sbuf_printf(sb, " 0 0\n");
 	}
 
-	free(buf, M_TEMP);
+	free_c(buf, M_TEMP);
 	free(flep, M_TEMP);
 	return (error);
 }

@@ -1365,9 +1365,9 @@
 				    _Out_ struct statfs * __capability buf); }
 556	AUE_FSTATFS	STD	{ int cheriabi_fstatfs(int fd, \
 				    _Out_ struct statfs * __capability buf); }
-557	AUE_GETFSSTAT	NOPROTO	{ int getfsstat( \
+557	AUE_GETFSSTAT	STD	{ int cheriabi_getfsstat( \
 				    _Out_writes_bytes_opt_(bufsize) \
-				    struct statfs * buf, \
+				    struct statfs * __capability buf, \
                                     long bufsize, int mode); }
 558	AUE_FHSTATFS	STD	{ int cheriabi_fhstatfs( \
 				    _In_ const struct fhandle * __capability u_fhp, \

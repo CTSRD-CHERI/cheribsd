@@ -470,7 +470,7 @@
 #define	CHERIABI_SYS_cheriabi_getdirentries	554
 #define	CHERIABI_SYS_cheriabi_statfs	555
 #define	CHERIABI_SYS_cheriabi_fstatfs	556
-#define	CHERIABI_SYS_getfsstat	557
+#define	CHERIABI_SYS_cheriabi_getfsstat	557
 #define	CHERIABI_SYS_cheriabi_fhstatfs	558
 #define	CHERIABI_SYS_cheriabi_mknodat	559
 #define	CHERIABI_SYS_cheriabi_kevent	560

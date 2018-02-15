@@ -347,7 +347,7 @@
 #define	CHERIABI_SYS_cheriabi_getdirentries_PTRMASK	(0x0 | 0x2 | 0x8)
 #define	CHERIABI_SYS_cheriabi_statfs_PTRMASK	(0x0 | 0x1 | 0x2)
 #define	CHERIABI_SYS_cheriabi_fstatfs_PTRMASK	(0x0 | 0x2)
-#define	CHERIABI_SYS_getfsstat_PTRMASK	(0x0 | 0x1)
+#define	CHERIABI_SYS_cheriabi_getfsstat_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_fhstatfs_PTRMASK	(0x0 | 0x1 | 0x2)
 #define	CHERIABI_SYS_cheriabi_mknodat_PTRMASK	(0x0 | 0x2)
 #define	CHERIABI_SYS_cheriabi_kevent_PTRMASK	(0x0 | 0x2 | 0x8 | 0x20)

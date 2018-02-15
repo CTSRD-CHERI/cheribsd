@@ -3052,10 +3052,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* getfsstat */
+	/* cheriabi_getfsstat */
 	case 557: {
-		struct getfsstat_args *p = params;
-		uarg[0] = (intptr_t) p->buf; /* struct statfs * */
+		struct cheriabi_getfsstat_args *p = params;
+		uarg[0] = (cheri_getbase(p->buf) + cheri_getoffset(p->buf)); /* struct statfs *__capability */
 		iarg[1] = p->bufsize; /* long */
 		iarg[2] = p->mode; /* int */
 		*n_args = 3;
@@ -8165,11 +8165,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* getfsstat */
+	/* cheriabi_getfsstat */
 	case 557:
 		switch(ndx) {
 		case 0:
-			p = "userland struct statfs *";
+			p = "userland struct statfs *__capability";
 			break;
 		case 1:
 			p = "long";
@@ -10001,7 +10001,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* getfsstat */
+	/* cheriabi_getfsstat */
 	case 557:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

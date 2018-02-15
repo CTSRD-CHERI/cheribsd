@@ -404,13 +404,21 @@ struct getfsstat_args {
 int
 sys_getfsstat(struct thread *td, struct getfsstat_args *uap)
 {
+
+	return (user_getfsstat(td, __USER_CAP(uap->buf, uap->bufsize),
+	    uap->bufsize, uap->mode));
+}
+
+int
+user_getfsstat(struct thread *td, struct statfs * __capability buf,
+    long bufsize, int mode)
+{
 	size_t count;
 	int error;
 
-	if (uap->bufsize < 0 || uap->bufsize > SIZE_MAX)
+	if (bufsize < 0 || bufsize > SIZE_MAX)
 		return (EINVAL);
-	error = kern_getfsstat(td, &uap->buf, uap->bufsize, &count,
-	    UIO_USERSPACE, uap->mode);
+	error = kern_getfsstat(td, &buf, bufsize, &count, UIO_USERSPACE, mode);
 	if (error == 0)
 		td->td_retval[0] = count;
 	return (error);
@@ -422,11 +430,14 @@ sys_getfsstat(struct thread *td, struct getfsstat_args *uap)
  *	in '*buf'.
  */
 int
-kern_getfsstat(struct thread *td, struct statfs **buf, size_t bufsize,
-    size_t *countp, enum uio_seg bufseg, int mode)
+kern_getfsstat(struct thread *td, struct statfs * __capability *buf,
+    size_t bufsize, size_t *countp, enum uio_seg bufseg, int mode)
 {
 	struct mount *mp, *nmp;
-	struct statfs *sfsp, *sp, *sptmp, *tofree;
+	struct statfs * __capability sfsp;
+	struct statfs *sp;
+	struct statfs *sptmp;
+	struct statfs * __capability tofree;
 	size_t count, maxcount;
 	int error;
 
@@ -456,7 +467,7 @@ restart:
 		mtx_unlock(&mountlist_mtx);
 		if (maxcount > count)
 			maxcount = count;
-		tofree = sfsp = *buf = malloc(maxcount * sizeof(struct statfs),
+		tofree = sfsp = *buf = malloc_c(maxcount * sizeof(struct statfs),
 		    M_STATFS, M_WAITOK);
 	}
 	count = 0;
@@ -482,7 +493,7 @@ restart:
 				 * no other choice than to start over.
 				 */
 				mtx_unlock(&mountlist_mtx);
-				free(tofree, M_STATFS);
+				free_c(tofree, M_STATFS);
 				goto restart;
 			}
 		} else {
@@ -523,10 +534,13 @@ restart:
 			} else
 				sptmp = NULL;
 			if (bufseg == UIO_SYSSPACE) {
-				bcopy(sp, sfsp, sizeof(*sp));
+				bcopy(sp, (__cheri_fromcap struct statfs *)sfsp,
+				    sizeof(*sp));
 				free(sptmp, M_STATFS);
 			} else /* if (bufseg == UIO_USERSPACE) */ {
-				error = copyout(sp, sfsp, sizeof(*sp));
+				error = copyout_c((__cheri_tocap
+				    struct statfs * __capability)sp, sfsp,
+				    sizeof(*sp));
 				free(sptmp, M_STATFS);
 				if (error != 0) {
 					vfs_unbusy(mp);
@@ -616,7 +630,8 @@ struct freebsd4_getfsstat_args {
 int
 freebsd4_getfsstat(struct thread *td, struct freebsd4_getfsstat_args *uap)
 {
-	struct statfs *buf, *sp;
+	struct statfs * __capbility buf
+	struct statfs *sp;
 	struct ostatfs osb;
 	size_t count, size;
 	int error;
@@ -632,7 +647,7 @@ freebsd4_getfsstat(struct thread *td, struct freebsd4_getfsstat_args *uap)
 	if (error == 0)
 		td->td_retval[0] = count;
 	if (size != 0) {
-		sp = buf;
+		sp = (__cheri_fromcap struct statfs *)buf;
 		while (count != 0 && error == 0) {
 			freebsd4_cvtstatfs(sp, &osb);
 			error = copyout(&osb, uap->buf, sizeof(osb));
@@ -640,7 +655,7 @@ freebsd4_getfsstat(struct thread *td, struct freebsd4_getfsstat_args *uap)
 			uap->buf++;
 			count--;
 		}
-		free(buf, M_STATFS);
+		free_c(buf, M_STATFS);
 	}
 	return (error);
 }
@@ -758,7 +773,8 @@ int
 freebsd11_getfsstat(struct thread *td, struct freebsd11_getfsstat_args *uap)
 {
 	struct freebsd11_statfs osb;
-	struct statfs *buf, *sp;
+	struct statfs * __capability buf;
+	struct statfs *sp;
 	size_t count, size;
 	int error;
 
@@ -769,7 +785,7 @@ freebsd11_getfsstat(struct thread *td, struct freebsd11_getfsstat_args *uap)
 	if (error == 0)
 		td->td_retval[0] = count;
 	if (size > 0) {
-		sp = buf;
+		sp = (__cheri_fromcap struct statfs *)buf;
 		while (count > 0 && error == 0) {
 			freebsd11_cvtstatfs(sp, &osb);
 			error = copyout(&osb, uap->buf, sizeof(osb));
@@ -777,7 +793,7 @@ freebsd11_getfsstat(struct thread *td, struct freebsd11_getfsstat_args *uap)
 			uap->buf++;
 			count--;
 		}
-		free(buf, M_STATFS);
+		free_c(buf, M_STATFS);
 	}
 	return (error);
 }

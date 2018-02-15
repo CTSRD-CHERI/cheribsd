@@ -183,8 +183,8 @@ int	kern_getdirentries(struct thread *td, int fd, char * __capability buf,
 	    size_t count, off_t *basep, ssize_t *residp, enum uio_seg bufseg);
 int	kern_getfh(struct thread *td, const char * __capability path,
 	    fhandle_t * __capability fhp, int follow);
-int	kern_getfsstat(struct thread *td, struct statfs **buf, size_t bufsize,
-	    size_t *countp, enum uio_seg bufseg, int mode);
+int	kern_getfsstat(struct thread *td, struct statfs * __capability *buf,
+	    size_t bufsize, size_t *countp, enum uio_seg bufseg, int mode);
 int	kern_getgroups(struct thread *td, u_int gidsetsize,
 	    gid_t * __capability gidset);
 int	kern_getitimer(struct thread *, u_int, struct itimerval *);
@@ -445,6 +445,8 @@ int	user_fstatfs(struct thread *td, int fd,
 	    struct statfs * __capability buf);
 int	user_getdirentries(struct thread *td, int fd, char * __capability buf,
 	    size_t count, off_t * __capability basep);
+int	user_getfsstat(struct thread *td, struct statfs * __capability buf,
+	    long bufsize, int mode);
 int	user_pdgetpid(struct thread *td, int fd, pid_t * __capability pidp);
 int	user_procctl(struct thread *td, enum idtype idtype, id_t id, int com,
 	    void * __capability data);

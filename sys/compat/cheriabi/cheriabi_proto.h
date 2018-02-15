@@ -1056,6 +1056,11 @@ struct cheriabi_fstatfs_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char buf_l_[PADL_(struct statfs *__capability)]; struct statfs *__capability buf; char buf_r_[PADR_(struct statfs *__capability)];
 };
+struct cheriabi_getfsstat_args {
+	char buf_l_[PADL_(struct statfs *__capability)]; struct statfs *__capability buf; char buf_r_[PADR_(struct statfs *__capability)];
+	char bufsize_l_[PADL_(long)]; long bufsize; char bufsize_r_[PADR_(long)];
+	char mode_l_[PADL_(int)]; int mode; char mode_r_[PADR_(int)];
+};
 struct cheriabi_fhstatfs_args {
 	char u_fhp_l_[PADL_(const struct fhandle *__capability)]; const struct fhandle *__capability u_fhp; char u_fhp_r_[PADR_(const struct fhandle *__capability)];
 	char buf_l_[PADL_(struct statfs *__capability)]; struct statfs *__capability buf; char buf_r_[PADR_(struct statfs *__capability)];
@@ -1293,6 +1298,7 @@ int	cheriabi_fhstat(struct thread *, struct cheriabi_fhstat_args *);
 int	cheriabi_getdirentries(struct thread *, struct cheriabi_getdirentries_args *);
 int	cheriabi_statfs(struct thread *, struct cheriabi_statfs_args *);
 int	cheriabi_fstatfs(struct thread *, struct cheriabi_fstatfs_args *);
+int	cheriabi_getfsstat(struct thread *, struct cheriabi_getfsstat_args *);
 int	cheriabi_fhstatfs(struct thread *, struct cheriabi_fhstatfs_args *);
 int	cheriabi_mknodat(struct thread *, struct cheriabi_mknodat_args *);
 int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
@@ -1566,6 +1572,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_getdirentries	AUE_GETDIRENTRIES
 #define	CHERIABI_SYS_AUE_cheriabi_statfs	AUE_STATFS
 #define	CHERIABI_SYS_AUE_cheriabi_fstatfs	AUE_FSTATFS
+#define	CHERIABI_SYS_AUE_cheriabi_getfsstat	AUE_GETFSSTAT
 #define	CHERIABI_SYS_AUE_cheriabi_fhstatfs	AUE_FHSTATFS
 #define	CHERIABI_SYS_AUE_cheriabi_mknodat	AUE_MKNODAT
 #define	CHERIABI_SYS_AUE_cheriabi_kevent	AUE_KEVENT
