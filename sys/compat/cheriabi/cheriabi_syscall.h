@@ -34,7 +34,7 @@
 #define	CHERIABI_SYS_ptrace	26
 #define	CHERIABI_SYS_cheriabi_recvmsg	27
 #define	CHERIABI_SYS_cheriabi_sendmsg	28
-#define	CHERIABI_SYS_recvfrom	29
+#define	CHERIABI_SYS_cheriabi_recvfrom	29
 #define	CHERIABI_SYS_accept	30
 #define	CHERIABI_SYS_getpeername	31
 #define	CHERIABI_SYS_getsockname	32

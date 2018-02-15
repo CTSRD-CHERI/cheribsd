@@ -109,6 +109,14 @@ struct cheriabi_sendmsg_args {
 	char msg_l_[PADL_(const struct msghdr_c *__capability)]; const struct msghdr_c *__capability msg; char msg_r_[PADR_(const struct msghdr_c *__capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
+struct cheriabi_recvfrom_args {
+	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
+	char buf_l_[PADL_(void *__capability)]; void *__capability buf; char buf_r_[PADR_(void *__capability)];
+	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char from_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability from; char from_r_[PADR_(struct sockaddr * __capability)];
+	char fromlenaddr_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability fromlenaddr; char fromlenaddr_r_[PADR_(__socklen_t * __capability)];
+};
 struct cheriabi_access_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 	char amode_l_[PADL_(int)]; int amode; char amode_r_[PADR_(int)];
@@ -1132,6 +1140,7 @@ int	cheriabi_mount(struct thread *, struct cheriabi_mount_args *);
 int	cheriabi_unmount(struct thread *, struct cheriabi_unmount_args *);
 int	cheriabi_recvmsg(struct thread *, struct cheriabi_recvmsg_args *);
 int	cheriabi_sendmsg(struct thread *, struct cheriabi_sendmsg_args *);
+int	cheriabi_recvfrom(struct thread *, struct cheriabi_recvfrom_args *);
 int	cheriabi_access(struct thread *, struct cheriabi_access_args *);
 int	cheriabi_chflags(struct thread *, struct cheriabi_chflags_args *);
 int	cheriabi_profil(struct thread *, struct cheriabi_profil_args *);
@@ -1412,6 +1421,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_unmount	AUE_UMOUNT
 #define	CHERIABI_SYS_AUE_cheriabi_recvmsg	AUE_RECVMSG
 #define	CHERIABI_SYS_AUE_cheriabi_sendmsg	AUE_SENDMSG
+#define	CHERIABI_SYS_AUE_cheriabi_recvfrom	AUE_RECVFROM
 #define	CHERIABI_SYS_AUE_cheriabi_access	AUE_ACCESS
 #define	CHERIABI_SYS_AUE_cheriabi_chflags	AUE_CHFLAGS
 #define	CHERIABI_SYS_AUE_cheriabi_profil	AUE_PROFILE

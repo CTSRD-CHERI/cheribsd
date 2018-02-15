@@ -69,7 +69,8 @@ __FBSDID("$FreeBSD$");
 #include <security/mac/mac_framework.h>
 
 static int sendit(struct thread *td, int s, kmsghdr_t *mp, int flags);
-static int recvit(struct thread *td, int s, kmsghdr_t *mp, void *namelenp);
+static int recvit(struct thread *td, int s, kmsghdr_t *mp,
+    socklen_t * __capability namelenp);
 
 static int accept1(struct thread *td, int s, struct sockaddr *uname,
 		   socklen_t *anamelen, int flags);
@@ -1097,7 +1098,8 @@ out:
 }
 
 static int
-recvit(struct thread *td, int s, kmsghdr_t *mp, void *namelenp)
+recvit(struct thread *td, int s, kmsghdr_t *mp,
+    socklen_t * __capability namelenp)
 {
 	int error;
 
@@ -1105,7 +1107,9 @@ recvit(struct thread *td, int s, kmsghdr_t *mp, void *namelenp)
 	if (error != 0)
 		return (error);
 	if (namelenp != NULL) {
-		error = copyout(&mp->msg_namelen, namelenp, sizeof (socklen_t));
+		error = copyout_c(
+		    (__cheri_tocap socklen_t * __capability)&mp->msg_namelen,
+		    namelenp, sizeof (socklen_t));
 #ifdef COMPAT_OLDSOCK
 		if (mp->msg_flags & MSG_COMPAT)
 			error = 0;	/* old recvfrom didn't check */
@@ -1117,25 +1121,36 @@ recvit(struct thread *td, int s, kmsghdr_t *mp, void *namelenp)
 int
 sys_recvfrom(struct thread *td, struct recvfrom_args *uap)
 {
+
+	return (kern_recvfrom(td, uap->s, __USER_CAP(uap->buf, uap->len),
+	    uap->len, uap->flags, __USER_CAP_UNBOUND(uap->from),
+	    __USER_CAP_OBJ(uap->fromlenaddr)));
+}
+
+int
+kern_recvfrom(struct thread *td, int s, void * __capability buf, size_t len,
+    int flags, struct sockaddr * __capability __restrict from,
+    socklen_t * __capability __restrict fromlenaddr)
+{
 	kmsghdr_t msg;
 	kiovec_t aiov;
 	int error;
 
-	if (uap->fromlenaddr) {
-		error = copyin(uap->fromlenaddr,
-		    &msg.msg_namelen, sizeof (msg.msg_namelen));
+	if (fromlenaddr != NULL) {
+		error = copyin_c(fromlenaddr, &msg.msg_namelen,
+		    sizeof (msg.msg_namelen));
 		if (error != 0)
 			goto done2;
 	} else {
 		msg.msg_namelen = 0;
 	}
-	msg.msg_name = __USER_CAP_UNBOUND(uap->from);
+	msg.msg_name = from;
 	msg.msg_iov = &aiov;
 	msg.msg_iovlen = 1;
-	IOVEC_INIT(&aiov, uap->buf, uap->len);
+	IOVEC_INIT_C(&aiov, buf, len);
 	msg.msg_control = 0;
-	msg.msg_flags = uap->flags;
-	error = recvit(td, uap->s, &msg, uap->fromlenaddr);
+	msg.msg_flags = flags;
+	error = recvit(td, s, &msg, fromlenaddr);
 done2:
 	return (error);
 }

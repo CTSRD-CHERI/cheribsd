@@ -311,6 +311,10 @@ int	kern_readlinkat(struct thread *td, int fd,
 	    const char * __capability path, enum uio_seg pathseg,
 	    char * __capability buf, enum uio_seg bufseg, size_t count);
 int	kern_readv(struct thread *td, int fd, struct uio *auio);
+int	kern_recvfrom(struct thread *td, int s, void * __capability buf,
+	    size_t len, int flags,
+	    struct sockaddr * __capability __restrict from,
+	    socklen_t * __capability __restrict fromlenaddr);
 int	kern_recvit(struct thread *td, int s, kmsghdr_t *mp,
 	    enum uio_seg fromseg, struct mbuf **controlp);
 int	kern_renameat(struct thread *td, int oldfd,

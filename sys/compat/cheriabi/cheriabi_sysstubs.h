@@ -279,12 +279,12 @@ SYS_STUB_ARGHASPTRS(28, ssize_t, sendmsg,
 )
 
 SYS_STUB(29, ssize_t, recvfrom,
-    /* _protoargs */ (int s, void * buf, size_t len, int flags, struct sockaddr *__restrict from, __socklen_t *__restrict fromlenaddr),
-    /* _protoargs_chk */ (ssize_t *retp , int * __capability stub_errno, int s, void * __capability  buf, size_t len, int flags, struct sockaddr * __capability __restrict from, __socklen_t * __capability __restrict fromlenaddr),
-    /* _protoargs_err */ (__capability int *stub_errno, int s, void * __capability  buf, size_t len, int flags, struct sockaddr * __capability __restrict from, __socklen_t * __capability __restrict fromlenaddr),
-    /* _callargs */ (s, (__cheri_fromcap void *)buf, len, flags, (__cheri_fromcap struct sockaddr *)from, (__cheri_fromcap __socklen_t *)fromlenaddr),
+    /* _protoargs */ (int s, void * buf, size_t len, int flags, struct sockaddr *__restrict  from, __socklen_t *__restrict  fromlenaddr),
+    /* _protoargs_chk */ (ssize_t *retp , int * __capability stub_errno, int s, void * __capability  buf, size_t len, int flags, struct sockaddr * __capability __restrict  from, __socklen_t * __capability __restrict  fromlenaddr),
+    /* _protoargs_err */ (__capability int *stub_errno, int s, void * __capability  buf, size_t len, int flags, struct sockaddr * __capability __restrict  from, __socklen_t * __capability __restrict  fromlenaddr),
+    /* _callargs */ (s, (__cheri_fromcap void *)buf, len, flags, (__cheri_fromcap struct sockaddr * )from, (__cheri_fromcap __socklen_t * )fromlenaddr),
     /* _callargs_chk */ (&ret, stub_errno, s, buf, len, flags, from, fromlenaddr),
-    /* _callargs_err */ (&errno, s, (void *)buf, len, flags, (struct sockaddr *__restrict)from, (__socklen_t *__restrict)fromlenaddr),
+    /* _callargs_err */ (&errno, s, (void *)buf, len, flags, (struct sockaddr *__restrict )from, (__socklen_t *__restrict )fromlenaddr),
     /* _localcheck */ {if (!(cheri_getperm(buf) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((ssize_t)-1);} if (!(cheri_getperm(from) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((ssize_t)-1);} if (!(cheri_getperm(fromlenaddr) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((ssize_t)-1);} }
 )
 

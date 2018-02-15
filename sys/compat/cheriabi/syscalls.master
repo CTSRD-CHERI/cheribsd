@@ -129,13 +129,14 @@
 28	AUE_SENDMSG	STD	{ ssize_t cheriabi_sendmsg(int s, \
 				    _In_ const struct msghdr_c * __capability msg, \
 				    int flags); }
-29	AUE_RECVFROM	NOPROTO	{ ssize_t recvfrom(int s, \
-				    _Out_writes_bytes_(len) void *buf, \
+29	AUE_RECVFROM	STD	{ ssize_t cheriabi_recvfrom(int s, \
+				    _Out_writes_bytes_(len) \
+				    void * __capability buf, \
 				    size_t len, int flags, \
 				    _Out_writes_bytes_opt_(*fromlenaddr) \
-				    struct sockaddr * __restrict from, \
+				    struct sockaddr * __restrict __capability from, \
 				    _Inout_opt_ \
-				    __socklen_t * __restrict fromlenaddr); }
+				    __socklen_t * __restrict __capability fromlenaddr); }
 30	AUE_ACCEPT	NOPROTO	{ int accept(int s, \
 				    _Out_writes_bytes_opt_(*anamelen) \
 				    struct sockaddr * __restrict name, \

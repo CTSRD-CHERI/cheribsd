@@ -25,7 +25,7 @@ MIASM =  \
 	ptrace.o \
 	cheriabi_recvmsg.o \
 	cheriabi_sendmsg.o \
-	recvfrom.o \
+	cheriabi_recvfrom.o \
 	accept.o \
 	getpeername.o \
 	getsockname.o \

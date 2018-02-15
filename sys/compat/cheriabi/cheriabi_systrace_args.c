@@ -191,15 +191,15 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* recvfrom */
+	/* cheriabi_recvfrom */
 	case 29: {
-		struct recvfrom_args *p = params;
+		struct cheriabi_recvfrom_args *p = params;
 		iarg[0] = p->s; /* int */
-		uarg[1] = (intptr_t) p->buf; /* void * */
+		uarg[1] = (cheri_getbase(p->buf) + cheri_getoffset(p->buf)); /* void *__capability */
 		uarg[2] = p->len; /* size_t */
 		iarg[3] = p->flags; /* int */
-		uarg[4] = (intptr_t) p->from; /* struct sockaddr * */
-		uarg[5] = (intptr_t) p->fromlenaddr; /* __socklen_t * */
+		uarg[4] = (cheri_getbase(p->from) + cheri_getoffset(p->from)); /* struct sockaddr *__restrict __capability */
+		uarg[5] = (cheri_getbase(p->fromlenaddr) + cheri_getoffset(p->fromlenaddr)); /* __socklen_t *__restrict __capability */
 		*n_args = 6;
 		break;
 	}
@@ -3378,14 +3378,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* recvfrom */
+	/* cheriabi_recvfrom */
 	case 29:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 2:
 			p = "size_t";
@@ -3394,10 +3394,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 4:
-			p = "userland struct sockaddr *";
+			p = "userland struct sockaddr *__restrict __capability";
 			break;
 		case 5:
-			p = "userland __socklen_t *";
+			p = "userland __socklen_t *__restrict __capability";
 			break;
 		default:
 			break;
@@ -8355,7 +8355,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "ssize_t";
 		break;
-	/* recvfrom */
+	/* cheriabi_recvfrom */
 	case 29:
 		if (ndx == 0 || ndx == 1)
 			p = "ssize_t";

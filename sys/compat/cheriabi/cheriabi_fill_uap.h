@@ -374,73 +374,37 @@ CHERIABI_SYS_cheriabi_sendmsg_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_recvfrom_fill_uap(struct thread *td,
-    struct recvfrom_args *uap)
+CHERIABI_SYS_cheriabi_recvfrom_fill_uap(struct thread *td,
+    struct cheriabi_recvfrom_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] int s */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_recvfrom_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_recvfrom_PTRMASK);
 	uap->s = cheri_getoffset(tmpcap);
 
 	/* [2] size_t len */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_recvfrom_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_recvfrom_PTRMASK);
 	uap->len = cheri_getoffset(tmpcap);
 
 	/* [3] int flags */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_recvfrom_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_recvfrom_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [1] _Out_writes_bytes_(len) void * buf */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
+	/* [1] _Out_writes_bytes_(len) void *__capability buf */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->buf),
+	    1, CHERIABI_SYS_cheriabi_recvfrom_PTRMASK);
 
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_recvfrom_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->buf),
-		    tmpcap, 1 * uap->len, reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [4] _Out_writes_bytes_opt_(*fromlenaddr) struct sockaddr *__restrict __capability from */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->from),
+	    4, CHERIABI_SYS_cheriabi_recvfrom_PTRMASK);
 
-	/* [5] _Inout_opt_ __socklen_t *__restrict fromlenaddr */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD|CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 5, CHERIABI_SYS_recvfrom_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->fromlenaddr),
-		    tmpcap, sizeof(*uap->fromlenaddr), reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
-
-	/* [4] _Out_writes_bytes_opt_(*fromlenaddr) struct sockaddr *__restrict from */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		if (uap->fromlenaddr == NULL) {
-			uap->from = NULL;
-		} else {
-			size_t reqlen;
-			if (sizeof(*uap->fromlenaddr) == 2)
-				reqlen = fuword16(uap->fromlenaddr);
-			else if (sizeof(*uap->fromlenaddr) == 4)
-				reqlen = fuword32(uap->fromlenaddr);
-			else if (sizeof(*uap->fromlenaddr) == 8)
-				reqlen = fuword64(uap->fromlenaddr);
-			else
-				panic("unhandled dependant argument size %zu", sizeof(*uap->fromlenaddr));
-			if (reqlen == -1)
-				return (EINVAL);
-			cheriabi_fetch_syscall_arg(td, &tmpcap, 4, CHERIABI_SYS_recvfrom_PTRMASK);
-			error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->from),
-			    tmpcap, reqlen, reqperms, 1);
-			if (error != 0)
-				return (error);
-		}
-	}
+	/* [5] _Inout_opt_ __socklen_t *__restrict __capability fromlenaddr */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->fromlenaddr),
+	    5, CHERIABI_SYS_cheriabi_recvfrom_PTRMASK);
 
 	return (0);
 }

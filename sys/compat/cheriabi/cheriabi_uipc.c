@@ -92,40 +92,6 @@ cheriabi_sendto(struct thread *td, struct cheriabi_sendto_args *uap)
 }
 
 int
-cheriabi_recvmsg(struct thread *td, struct cheriabi_recvmsg_args *uap)
-{
-	kmsghdr_t msg;
-	struct iovec_c *__capability uiov;
-	kiovec_t * __capability iov;
-
-	int error;
-
-	error = copyincap_c(uap->msg, &msg, sizeof(msg));
-	if (error)
-		return (error);
-	uiov = (struct iovec_c * __capability)msg.msg_iov;
-	error = cheriabi_copyiniov(uiov, msg.msg_iovlen, &iov, EMSGSIZE);
-	if (error)
-		return (error);
-	msg.msg_flags = uap->flags;
-	msg.msg_iov = iov;
-
-	error = kern_recvit(td, uap->s, &msg, UIO_USERSPACE, NULL);
-	if (error == 0) {
-		msg.msg_iov = (kiovec_t * __capability)uiov;
-
-		/*
-		 * Message contents have already been copied out, update
-		 * lengths.
-		 */
-		error = copyoutcap_c(&msg, uap->msg, sizeof(msg));
-	}
-	free_c(iov, M_IOV);
-
-	return (error);
-}
-
-int
 cheriabi_sendmsg(struct thread *td, struct cheriabi_sendmsg_args *uap)
 {
 	kmsghdr_t msg;
@@ -180,6 +146,48 @@ out:
 	free_c(iov, M_IOV);
 	if (to)
 		free(to, M_SONAME);
+	return (error);
+}
+
+int
+cheriabi_recvfrom(struct thread *td, struct cheriabi_recvfrom_args *uap)
+{
+
+	return (kern_recvfrom(td, uap->s, uap->buf, uap->len, uap->flags,
+	    uap->from, uap->fromlenaddr));
+}
+
+int
+cheriabi_recvmsg(struct thread *td, struct cheriabi_recvmsg_args *uap)
+{
+	kmsghdr_t msg;
+	struct iovec_c *__capability uiov;
+	kiovec_t * __capability iov;
+
+	int error;
+
+	error = copyincap_c(uap->msg, &msg, sizeof(msg));
+	if (error)
+		return (error);
+	uiov = msg.msg_iov;
+	error = cheriabi_copyiniov(uiov, msg.msg_iovlen, &iov, EMSGSIZE);
+	if (error)
+		return (error);
+	msg.msg_flags = uap->flags;
+	msg.msg_iov = iov;
+
+	error = kern_recvit(td, uap->s, &msg, UIO_USERSPACE, NULL);
+	if (error == 0) {
+		msg.msg_iov = (kiovec_t * __capability)uiov;
+
+		/*
+		 * Message contents have already been copied out, update
+		 * lengths.
+		 */
+		error = copyoutcap_c(&msg, uap->msg, sizeof(msg));
+	}
+	free_c(iov, M_IOV);
+
 	return (error);
 }
 

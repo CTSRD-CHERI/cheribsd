@@ -27,7 +27,7 @@
 #define	CHERIABI_SYS_ptrace_PTRMASK	(0x0 | 0x4)
 #define	CHERIABI_SYS_cheriabi_recvmsg_PTRMASK	(0x0 | 0x2)
 #define	CHERIABI_SYS_cheriabi_sendmsg_PTRMASK	(0x0 | 0x2)
-#define	CHERIABI_SYS_recvfrom_PTRMASK	(0x0 | 0x2 | 0x10 | 0x20)
+#define	CHERIABI_SYS_cheriabi_recvfrom_PTRMASK	(0x0 | 0x2 | 0x10 | 0x20)
 #define	CHERIABI_SYS_accept_PTRMASK	(0x0 | 0x2 | 0x4)
 #define	CHERIABI_SYS_getpeername_PTRMASK	(0x0 | 0x2 | 0x4)
 #define	CHERIABI_SYS_getsockname_PTRMASK	(0x0 | 0x2 | 0x4)
