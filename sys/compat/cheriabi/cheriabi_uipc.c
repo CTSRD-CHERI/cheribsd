@@ -32,11 +32,115 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
-//#include <sys/namei.h>
-//#include <sys/signal.h>
+#include <sys/mbuf.h>
+#include <sys/socketvar.h>
 #include <sys/syscallsubr.h>
 
 #include <compat/cheriabi/cheriabi_proto.h>
+#include <compat/cheriabi/cheriabi_util.h>
+
+/*
+ * kern_uipc.c
+ */
+
+int
+cheriabi_recvmsg(struct thread *td, struct cheriabi_recvmsg_args *uap)
+{
+	kmsghdr_t msg;
+	struct iovec_c *__capability uiov;
+	kiovec_t * __capability iov;
+
+	int error;
+
+	error = copyincap(uap->msg, &msg, 1);
+	if (error)
+		return (error);
+	uiov = (struct iovec_c * __capability)msg.msg_iov;
+	error = cheriabi_copyiniov(uiov, msg.msg_iovlen, &iov, EMSGSIZE);
+	if (error)
+		return (error);
+	msg.msg_flags = uap->flags;
+	msg.msg_iov = iov;
+
+	error = kern_recvit(td, uap->s, &msg, UIO_USERSPACE, NULL);
+	if (error == 0) {
+		msg.msg_iov = (kiovec_t * __capability)uiov;
+
+		/*
+		 * Message contents have already been copied out, update
+		 * lengths.
+		 */
+		error = copyoutcap(&msg, uap->msg, sizeof(msg));
+	}
+	free_c(iov, M_IOV);
+
+	return (error);
+}
+
+int
+cheriabi_sendmsg(struct thread *td,
+		  struct cheriabi_sendmsg_args *uap)
+{
+	kmsghdr_t msg;
+	kiovec_t * __capability iov;
+	struct mbuf *control = NULL;
+	struct sockaddr *to = NULL;
+	int error;
+
+	error = copyincap(uap->msg, &msg, 0);
+	if (error)
+		return (error);
+	error = cheriabi_copyiniov(msg.msg_iov, msg.msg_iovlen, &iov, EMSGSIZE);
+	if (error)
+		return (error);
+	msg.msg_iov = iov;
+	if (msg.msg_name != NULL) {
+		error = getsockaddr(&to,
+		    __DECAP_CHECK(msg.msg_name, msg.msg_namelen),
+		    msg.msg_namelen);
+		if (error) {
+			to = NULL;
+			goto out;
+		}
+		msg.msg_name = (__cheri_tocap void * __capability)to;
+	}
+
+	if (msg.msg_control) {
+		if (msg.msg_controllen < sizeof(struct cmsghdr)) {
+			error = EINVAL;
+			goto out;
+		}
+
+		/*
+		 * Control messages are currently assumed to be free of
+		 * capabilities.  One could imagine passing capabilities
+		 * (most likely sealed) to another socket with the
+		 * expectation of receiving them back once some work is
+		 * performed, but that would be harder to implement and
+		 * easy to get wrong.  Lots of code likely assumes 64-bit
+		 * alignment of mbufs is sufficent as well.
+		 */
+		/* XXX: No support for COMPAT_OLDSOCK path */
+		error = sockargs(&control,
+		    __DECAP_CHECK(msg.msg_control, msg.msg_controllen),
+		    msg.msg_controllen, MT_CONTROL);
+		if (error)
+			goto out;
+	}
+
+	error = kern_sendit(td, uap->s, &msg, uap->flags, control,
+	    UIO_USERSPACE);
+
+out:
+	free_c(iov, M_IOV);
+	if (to)
+		free(to, M_SONAME);
+	return (error);
+}
+
+/*
+ * uipc_shm.c
+ */
 
 int
 cheriabi_shm_open(struct thread *td, struct cheriabi_shm_open_args *uap)
