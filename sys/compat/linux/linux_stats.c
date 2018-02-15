@@ -74,28 +74,26 @@ translate_vnhook_major_minor(struct vnode *vp, struct stat *sb)
 
 static int
 linux_kern_statat(struct thread *td, int flag, int fd, char *path,
-    enum uio_seg pathseg, struct stat *sbp)
+    struct stat *sbp)
 {
 
-	return (kern_statat(td, flag, fd, path, pathseg, sbp,
+	return (kern_statat(td, flag, fd, path, UIO_SYSSPACE, sbp,
 	    translate_vnhook_major_minor));
 }
 
 static int
-linux_kern_stat(struct thread *td, char *path, enum uio_seg pathseg,
-    struct stat *sbp)
+linux_kern_stat(struct thread *td, char *path, struct stat *sbp)
 {
 
-	return (linux_kern_statat(td, 0, AT_FDCWD, path, pathseg, sbp));
+	return (linux_kern_statat(td, 0, AT_FDCWD, path, sbp));
 }
 
 static int
-linux_kern_lstat(struct thread *td, char *path, enum uio_seg pathseg,
-    struct stat *sbp)
+linux_kern_lstat(struct thread *td, char *path, struct stat *sbp)
 {
 
 	return (linux_kern_statat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD, path,
-	    pathseg, sbp));
+	    sbp));
 }
 
 static void
@@ -169,7 +167,7 @@ linux_newstat(struct thread *td, struct linux_newstat_args *args)
 		printf(ARGS(newstat, "%s, *"), path);
 #endif
 
-	error = linux_kern_stat(td, path, UIO_SYSSPACE, &buf);
+	error = linux_kern_stat(td, path, &buf);
 	LFREEPATH(path);
 	if (error)
 		return (error);
@@ -190,7 +188,7 @@ linux_newlstat(struct thread *td, struct linux_newlstat_args *args)
 		printf(ARGS(newlstat, "%s, *"), path);
 #endif
 
-	error = linux_kern_lstat(td, path, UIO_SYSSPACE, &sb);
+	error = linux_kern_lstat(td, path, &sb);
 	LFREEPATH(path);
 	if (error)
 		return (error);
@@ -261,7 +259,7 @@ linux_stat(struct thread *td, struct linux_stat_args *args)
 	if (ldebug(stat))
 		printf(ARGS(stat, "%s, *"), path);
 #endif
-	error = linux_kern_stat(td, path, UIO_SYSSPACE, &buf);
+	error = linux_kern_stat(td, path, &buf);
 	if (error) {
 		LFREEPATH(path);
 		return (error);
@@ -283,7 +281,7 @@ linux_lstat(struct thread *td, struct linux_lstat_args *args)
 	if (ldebug(lstat))
 		printf(ARGS(lstat, "%s, *"), path);
 #endif
-	error = linux_kern_lstat(td, path, UIO_SYSSPACE, &buf);
+	error = linux_kern_lstat(td, path, &buf);
 	if (error) {
 		LFREEPATH(path);
 		return (error);
@@ -395,7 +393,8 @@ linux_statfs(struct thread *td, struct linux_statfs_args *args)
 		printf(ARGS(statfs, "%s, *"), path);
 #endif
 	bsd_statfs = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
-	error = kern_statfs(td, path, UIO_SYSSPACE, bsd_statfs);
+	error = kern_statfs(td, (__cheri_tocap char * __capability)path,
+	    UIO_SYSSPACE, bsd_statfs);
 	LFREEPATH(path);
 	if (error == 0)
 		error = bsd_to_linux_statfs(bsd_statfs, &linux_statfs);
@@ -443,7 +442,8 @@ linux_statfs64(struct thread *td, struct linux_statfs64_args *args)
 		printf(ARGS(statfs64, "%s, *"), path);
 #endif
 	bsd_statfs = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
-	error = kern_statfs(td, path, UIO_SYSSPACE, bsd_statfs);
+	error = kern_statfs(td, (__cheri_tocap char * __capability)path,
+	    UIO_SYSSPACE, bsd_statfs);
 	LFREEPATH(path);
 	if (error == 0)
 		bsd_to_linux_statfs64(bsd_statfs, &linux_statfs);
@@ -568,7 +568,7 @@ linux_stat64(struct thread *td, struct linux_stat64_args *args)
 		printf(ARGS(stat64, "%s, *"), filename);
 #endif
 
-	error = linux_kern_stat(td, filename, UIO_SYSSPACE, &buf);
+	error = linux_kern_stat(td, filename, &buf);
 	LFREEPATH(filename);
 	if (error)
 		return (error);
@@ -589,7 +589,7 @@ linux_lstat64(struct thread *td, struct linux_lstat64_args *args)
 		printf(ARGS(lstat64, "%s, *"), args->filename);
 #endif
 
-	error = linux_kern_lstat(td, filename, UIO_SYSSPACE, &sb);
+	error = linux_kern_lstat(td, filename, &sb);
 	LFREEPATH(filename);
 	if (error)
 		return (error);
@@ -635,7 +635,7 @@ linux_fstatat64(struct thread *td, struct linux_fstatat64_args *args)
 		printf(ARGS(fstatat64, "%i, %s, %i"), args->dfd, path, args->flag);
 #endif
 
-	error = linux_kern_statat(td, flag, dfd, path, UIO_SYSSPACE, &buf);
+	error = linux_kern_statat(td, flag, dfd, path, &buf);
 	if (!error)
 		error = stat64_copyout(&buf, args->statbuf);
 	LFREEPATH(path);
@@ -665,7 +665,7 @@ linux_newfstatat(struct thread *td, struct linux_newfstatat_args *args)
 		printf(ARGS(newfstatat, "%i, %s, %i"), args->dfd, path, args->flag);
 #endif
 
-	error = linux_kern_statat(td, flag, dfd, path, UIO_SYSSPACE, &buf);
+	error = linux_kern_statat(td, flag, dfd, path, &buf);
 	if (error == 0)
 		error = newstat_copyout(&buf, args->statbuf);
 	LFREEPATH(path);
