@@ -794,12 +794,21 @@ NESTED_NOPROFILE(MipsKernGenException, KERN_EXC_FRAME_SIZE, ra)
 	and	a1, a1, ~(MIPS_SR_INT_MASK|MIPS_SR_COP_USABILITY)
 	or	a1, a1, a0
 	SAVE_REG(a1, SR)
-	RESTORE_CPU			# v0 contains the return address.
 
 #ifndef CHERI_KERNEL
+	RESTORE_CPU			# v0 contains the return address.
 	/* Restore preempted sp from k1 now we are done with the stack. */
 	move	sp, k1
 #else /* CHERI_KERNEL */
+	/* c3 holds the return address, we need to fill v0 so that RESTORE_CPU
+	 * will restore the correct PC.
+	 */
+	/* XXX-AM: NOTYET need to modify trap() to return a capability
+	cgetbase	v0, $c3
+	cgetoffset	t0, $c3
+	PTR_ADDU	v0, v0, t0
+	*/
+	RESTORE_CPU
 	/* Restore preempted stc from kr1c now we are done with the stack. */
 	cmove	CHERI_REG_STC, CHERI_REG_KR1C
 #endif
@@ -1034,10 +1043,17 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
 1:
 
 	/* Save exception sp in k1 to put on the stack later. */
+#ifndef CHERI_KERNEL
 	move	k1, sp
 	PTR_SUBU	sp, sp, KERN_EXC_FRAME_SIZE
 	CHERI_ADJUST_SP(sp)
 	.mask	0x80000000, (CALLFRAME_RA - KERN_EXC_FRAME_SIZE)
+#else /* CHERI_KERNEL */
+	cmove	CHERI_REG_KR1C, CHERI_REG_STC
+	PTR_SUBU	k0, zero, KERN_EXC_FRAME_SIZE
+	cincoffset	CHERI_REG_STC, CHERI_REG_STC, k0
+	.mask	0x80000000, (CALLFRAME_RA - KERN_EXC_FRAME_SIZE)
+#endif 	/* CHERI_KERNEL */
 
 /*
  * Save CPU state, building 'frame'.  sp holds the location to save the trap
@@ -1054,8 +1070,15 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
 #else
 	PTR_LA	t9, _C_LABEL(cpu_intr)
 #endif
+#ifndef CHERI_KERNEL
 	jalr	t9
 	REG_S	a3, CALLFRAME_RA + KERN_REG_SIZE(sp)		# for debugging
+#else
+	cgetpccsetoffset $c12, t9
+	cjalr	$c12, $c17
+	/* XXX-AM: we should rely on EPCC instead of COP0_EXC_PC in a3 */
+	csd	a3, zero, CALLFRAME_RA + KERN_REG_SIZE(CHERI_REG_STC) # for debugging
+#endif	
 
 	/*
 	 * Update interrupt and CPU mask in saved status register
@@ -1069,11 +1092,20 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
 	and	a1, a1, ~(MIPS_SR_INT_MASK|MIPS_SR_COP_USABILITY)
 	or	a1, a1, a0
 	SAVE_REG(a1, SR)
+#ifndef CHERI_KERNEL
 	REG_L	v0, (CALLFRAME_RA + KERN_REG_SIZE)(sp)
 	RESTORE_CPU			# v0 contains the return address.
 
 	/* Restore preempted sp from k1 now we are done with the stack. */
 	move	sp, k1
+#else
+	/* XXX-AM: we should load a capability and use it to set EPCC later */
+	cld	v0, zero, (CALLFRAME_RA + KERN_REG_SIZE)(CHERI_REG_STC)
+	RESTORE_CPU			# v0 contains the return address.
+
+	/* Restore preempted stc from kr1c now we are done with the stack. */
+	cmove	CHERI_REG_STC, CHERI_REG_KR1C
+#endif
 	sync
 #ifdef CPU_CHERI
 	CHERI_EXCEPTION_RETURN(k0)
