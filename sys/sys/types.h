@@ -310,11 +310,11 @@ typedef	_Bool	bool;
  */
 #ifndef __ptr_set_flag
 /* if there are no machine-dependant defines, use this default */
-#define __ptr_set_flag(p, f) ((uintptr_t)(p) | (f))
+#define __ptr_set_flag(p, f) ((uintptr_t)(p) | (uintptr_t)(f))
 #endif
 #ifndef __ptr_get_flag
 /* if there are no machine-dependant defines, use this default */
-#define __ptr_get_flag(p, f) ((uintptr_t)(p) & (f))
+#define __ptr_get_flag(p, f) ((uintptr_t)(p) & (uintptr_t)(f))
 #endif
 #define ptr_set_flag(p, f) __ptr_set_flag(p, f)
 #define ptr_get_flag(p, f) __ptr_get_flag(p, f)
