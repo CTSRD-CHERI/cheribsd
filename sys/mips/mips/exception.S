@@ -948,17 +948,30 @@ END(MipsUserGenException)
 	.set	push
 	.set	noat
 NESTED(mips_wait, CALLFRAME_SIZ, ra)
+#ifndef CHERI_KERNEL	
 	PTR_SUBU        sp, sp, CALLFRAME_SIZ
 	.mask   0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ)
 	REG_S   ra, CALLFRAME_RA(sp)		# save RA
+#else
+	cincoffset	CHERI_REG_STC, CHERI_REG_STC, -CALLFRAME_SIZ
+	.mask   0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ) # XXX-AM: is this working in purecap?
+	csc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
+#endif	
 	mfc0	t0, MIPS_COP_0_STATUS
 	xori	t1, t0, MIPS_SR_INT_IE
 	mtc0	t1, MIPS_COP_0_STATUS
 	COP0_SYNC
 	PTR_LA	t9, sched_runnable
+#ifndef CHERI_KERNEL
 	jalr	t9
 	nop
 	REG_L   ra, CALLFRAME_RA(sp)
+#else
+	cgetpccsetoffset $c12, t9
+	cjalr	$c12, $c17
+	nop
+	clc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
+#endif
 	mfc0	t0, MIPS_COP_0_STATUS
 	ori	t1, t0, MIPS_SR_INT_IE
 	.align 4
@@ -972,8 +985,13 @@ GLOBAL(MipsWaitStart)			# this is 16 byte aligned
 	wait
 #endif
 GLOBAL(MipsWaitEnd)			# MipsWaitStart + 16
+#ifndef CHERI_KERNEL	
 	jr	ra
 	PTR_ADDU        sp, sp, CALLFRAME_SIZ
+#else
+	cjr	$c17
+	cincoffset	CHERI_REG_STC, CHERI_REG_STC, CALLFRAME_SIZ
+#endif
 END(mips_wait)
 	.set	pop
 
