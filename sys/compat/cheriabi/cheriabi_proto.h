@@ -228,6 +228,13 @@ struct cheriabi_bind_args {
 	char name_l_[PADL_(const struct sockaddr *__capability)]; const struct sockaddr *__capability name; char name_r_[PADR_(const struct sockaddr *__capability)];
 	char namelen_l_[PADL_(__socklen_t)]; __socklen_t namelen; char namelen_r_[PADR_(__socklen_t)];
 };
+struct cheriabi_setsockopt_args {
+	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
+	char level_l_[PADL_(int)]; int level; char level_r_[PADR_(int)];
+	char name_l_[PADL_(int)]; int name; char name_r_[PADR_(int)];
+	char val_l_[PADL_(const void *__capability)]; const void *__capability val; char val_r_[PADR_(const void *__capability)];
+	char valsize_l_[PADL_(__socklen_t)]; __socklen_t valsize; char valsize_r_[PADR_(__socklen_t)];
+};
 struct cheriabi_gettimeofday_args {
 	char tp_l_[PADL_(struct timeval *__capability)]; struct timeval *__capability tp; char tp_r_[PADR_(struct timeval *__capability)];
 	char tzp_l_[PADL_(struct timezone *__capability)]; struct timezone *__capability tzp; char tzp_r_[PADR_(struct timezone *__capability)];
@@ -235,6 +242,13 @@ struct cheriabi_gettimeofday_args {
 struct cheriabi_getrusage_args {
 	char who_l_[PADL_(int)]; int who; char who_r_[PADR_(int)];
 	char rusage_l_[PADL_(struct rusage *__capability)]; struct rusage *__capability rusage; char rusage_r_[PADR_(struct rusage *__capability)];
+};
+struct cheriabi_getsockopt_args {
+	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
+	char level_l_[PADL_(int)]; int level; char level_r_[PADR_(int)];
+	char name_l_[PADL_(int)]; int name; char name_r_[PADR_(int)];
+	char val_l_[PADL_(void *__capability)]; void *__capability val; char val_r_[PADR_(void *__capability)];
+	char avalsize_l_[PADL_(__socklen_t *__capability)]; __socklen_t *__capability avalsize; char avalsize_r_[PADR_(__socklen_t *__capability)];
 };
 struct cheriabi_readv_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
@@ -1166,8 +1180,10 @@ int	cheriabi_getitimer(struct thread *, struct cheriabi_getitimer_args *);
 int	cheriabi_select(struct thread *, struct cheriabi_select_args *);
 int	cheriabi_connect(struct thread *, struct cheriabi_connect_args *);
 int	cheriabi_bind(struct thread *, struct cheriabi_bind_args *);
+int	cheriabi_setsockopt(struct thread *, struct cheriabi_setsockopt_args *);
 int	cheriabi_gettimeofday(struct thread *, struct cheriabi_gettimeofday_args *);
 int	cheriabi_getrusage(struct thread *, struct cheriabi_getrusage_args *);
+int	cheriabi_getsockopt(struct thread *, struct cheriabi_getsockopt_args *);
 int	cheriabi_readv(struct thread *, struct cheriabi_readv_args *);
 int	cheriabi_writev(struct thread *, struct cheriabi_writev_args *);
 int	cheriabi_settimeofday(struct thread *, struct cheriabi_settimeofday_args *);
@@ -1447,8 +1463,10 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_select	AUE_SELECT
 #define	CHERIABI_SYS_AUE_cheriabi_connect	AUE_CONNECT
 #define	CHERIABI_SYS_AUE_cheriabi_bind	AUE_BIND
+#define	CHERIABI_SYS_AUE_cheriabi_setsockopt	AUE_SETSOCKOPT
 #define	CHERIABI_SYS_AUE_cheriabi_gettimeofday	AUE_GETTIMEOFDAY
 #define	CHERIABI_SYS_AUE_cheriabi_getrusage	AUE_GETRUSAGE
+#define	CHERIABI_SYS_AUE_cheriabi_getsockopt	AUE_GETSOCKOPT
 #define	CHERIABI_SYS_AUE_cheriabi_readv	AUE_READV
 #define	CHERIABI_SYS_AUE_cheriabi_writev	AUE_WRITEV
 #define	CHERIABI_SYS_AUE_cheriabi_settimeofday	AUE_SETTIMEOFDAY

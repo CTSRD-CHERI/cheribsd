@@ -1297,12 +1297,12 @@ sys_setsockopt(struct thread *td, struct setsockopt_args *uap)
 {
 
 	return (kern_setsockopt(td, uap->s, uap->level, uap->name,
-	    uap->val, UIO_USERSPACE, uap->valsize));
+	    __USER_CAP(uap->val, uap->valsize), UIO_USERSPACE, uap->valsize));
 }
 
 int
-kern_setsockopt(struct thread *td, int s, int level, int name, void *val,
-    enum uio_seg valseg, socklen_t valsize)
+kern_setsockopt(struct thread *td, int s, int level, int name,
+    const void * __capability val, enum uio_seg valseg, socklen_t valsize)
 {
 	struct socket *so;
 	struct file *fp;
@@ -1318,7 +1318,7 @@ kern_setsockopt(struct thread *td, int s, int level, int name, void *val,
 	sopt.sopt_dir = SOPT_SET;
 	sopt.sopt_level = level;
 	sopt.sopt_name = name;
-	sopt.sopt_val = val;
+	sopt.sopt_val = __DECONST_CAP(void * __capability, val);
 	sopt.sopt_valsize = valsize;
 	switch (valseg) {
 	case UIO_USERSPACE:
@@ -1345,20 +1345,29 @@ kern_setsockopt(struct thread *td, int s, int level, int name, void *val,
 int
 sys_getsockopt(struct thread *td, struct getsockopt_args *uap)
 {
+
+	return (user_getsockopt(td, uap->s, uap->level, uap->name,
+	    __USER_CAP_UNBOUND(uap->val), __USER_CAP_OBJ(uap->avalsize)));
+}
+
+int
+user_getsockopt(struct thread *td, int s, int level, int name,
+    void * __capability val, socklen_t * __capability avalsize)
+{
 	socklen_t valsize;
 	int error;
 
-	if (uap->val) {
-		error = copyin(uap->avalsize, &valsize, sizeof (valsize));
+	if (val != NULL) {
+		error = copyin_c(avalsize, &valsize, sizeof (valsize));
 		if (error != 0)
 			return (error);
 	}
 
-	error = kern_getsockopt(td, uap->s, uap->level, uap->name,
-	    uap->val, UIO_USERSPACE, &valsize);
+	error = kern_getsockopt(td, s, level, name, val, UIO_USERSPACE,
+	    &valsize);
 
 	if (error == 0)
-		error = copyout(&valsize, uap->avalsize, sizeof (valsize));
+		error = copyout_c(&valsize, avalsize, sizeof (valsize));
 	return (error);
 }
 
@@ -1367,8 +1376,8 @@ sys_getsockopt(struct thread *td, struct getsockopt_args *uap)
  * optval can be a userland or userspace. optlen is always a kernel pointer.
  */
 int
-kern_getsockopt(struct thread *td, int s, int level, int name, void *val,
-    enum uio_seg valseg, socklen_t *valsize)
+kern_getsockopt(struct thread *td, int s, int level, int name,
+    void * __capability val, enum uio_seg valseg, socklen_t *valsize)
 {
 	struct socket *so;
 	struct file *fp;

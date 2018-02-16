@@ -509,7 +509,7 @@ iw_create_listen(struct iw_cm_id *cm_id, int backlog)
 	sopt.sopt_dir = SOPT_SET;
 	sopt.sopt_level = IPPROTO_TCP;
 	sopt.sopt_name = TCP_NODELAY;
-	sopt.sopt_val = (caddr_t)&on;
+	sopt.sopt_val = &on;
 	sopt.sopt_valsize = sizeof(on);
 	sopt.sopt_td = NULL;
 	sosetopt(so, &sopt);

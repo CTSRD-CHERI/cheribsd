@@ -108,7 +108,7 @@
 				/* 102 is obsolete orecv */
 				/* 103 is obsolete sigreturn */
 #define	CHERIABI_SYS_cheriabi_bind	104
-#define	CHERIABI_SYS_setsockopt	105
+#define	CHERIABI_SYS_cheriabi_setsockopt	105
 #define	CHERIABI_SYS_listen	106
 				/* 107 is obsolete vtimes */
 				/* 108 is obsolete sigvec */
@@ -121,7 +121,7 @@
 				/* 115 is obsolete vtrace */
 #define	CHERIABI_SYS_cheriabi_gettimeofday	116
 #define	CHERIABI_SYS_cheriabi_getrusage	117
-#define	CHERIABI_SYS_getsockopt	118
+#define	CHERIABI_SYS_cheriabi_getsockopt	118
 #define	CHERIABI_SYS_cheriabi_readv	120
 #define	CHERIABI_SYS_cheriabi_writev	121
 #define	CHERIABI_SYS_cheriabi_settimeofday	122

@@ -588,13 +588,13 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* setsockopt */
+	/* cheriabi_setsockopt */
 	case 105: {
-		struct setsockopt_args *p = params;
+		struct cheriabi_setsockopt_args *p = params;
 		iarg[0] = p->s; /* int */
 		iarg[1] = p->level; /* int */
 		iarg[2] = p->name; /* int */
-		uarg[3] = (intptr_t) p->val; /* const void * */
+		uarg[3] = (cheri_getbase(p->val) + cheri_getoffset(p->val)); /* const void *__capability */
 		iarg[4] = p->valsize; /* __socklen_t */
 		*n_args = 5;
 		break;
@@ -623,14 +623,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* getsockopt */
+	/* cheriabi_getsockopt */
 	case 118: {
-		struct getsockopt_args *p = params;
+		struct cheriabi_getsockopt_args *p = params;
 		iarg[0] = p->s; /* int */
 		iarg[1] = p->level; /* int */
 		iarg[2] = p->name; /* int */
-		uarg[3] = (intptr_t) p->val; /* void * */
-		uarg[4] = (intptr_t) p->avalsize; /* __socklen_t * */
+		uarg[3] = (cheri_getbase(p->val) + cheri_getoffset(p->val)); /* void *__capability */
+		uarg[4] = (cheri_getbase(p->avalsize) + cheri_getoffset(p->avalsize)); /* __socklen_t *__capability */
 		*n_args = 5;
 		break;
 	}
@@ -4012,7 +4012,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* setsockopt */
+	/* cheriabi_setsockopt */
 	case 105:
 		switch(ndx) {
 		case 0:
@@ -4025,7 +4025,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "userland const void *";
+			p = "userland const void *__capability";
 			break;
 		case 4:
 			p = "__socklen_t";
@@ -4073,7 +4073,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* getsockopt */
+	/* cheriabi_getsockopt */
 	case 118:
 		switch(ndx) {
 		case 0:
@@ -4086,10 +4086,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 4:
-			p = "userland __socklen_t *";
+			p = "userland __socklen_t *__capability";
 			break;
 		default:
 			break;
@@ -8584,7 +8584,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* setsockopt */
+	/* cheriabi_setsockopt */
 	case 105:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -8604,7 +8604,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* getsockopt */
+	/* cheriabi_getsockopt */
 	case 118:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

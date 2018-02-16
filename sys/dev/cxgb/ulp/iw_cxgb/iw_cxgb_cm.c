@@ -310,7 +310,7 @@ abort_socket(struct iwch_ep *ep)
 	sopt.sopt_dir = SOPT_SET;
 	sopt.sopt_level = SOL_SOCKET;
 	sopt.sopt_name = SO_LINGER;
-	sopt.sopt_val = (caddr_t)&l;
+	sopt.sopt_val = &l;
 	sopt.sopt_valsize = sizeof l;
 	sopt.sopt_td = NULL;
 	err = sosetopt(ep->com.so, &sopt);
@@ -1258,7 +1258,7 @@ static int init_sock(struct iwch_ep_common *epc)
 	sopt.sopt_dir = SOPT_SET;
 	sopt.sopt_level = IPPROTO_TCP;
 	sopt.sopt_name = TCP_NODELAY;
-	sopt.sopt_val = (caddr_t)&on;
+	sopt.sopt_val = &on;
 	sopt.sopt_valsize = sizeof on;
 	sopt.sopt_td = NULL;
 	err = sosetopt(epc->so, &sopt);

@@ -203,7 +203,7 @@ int	kern_getrusage(struct thread *td, int who, struct rusage *rup);
 int	kern_getsockname(struct thread *td, int fd, struct sockaddr **sa,
 	    socklen_t *alen);
 int	kern_getsockopt(struct thread *td, int s, int level, int name,
-	    void *optval, enum uio_seg valseg, socklen_t *valsize);
+	    void * __capability val, enum uio_seg valseg, socklen_t *valsize);
 int	kern_gettimeofday(struct thread *td,
 	    struct timeval * __capability tp,
 	    struct timezone * __capability tzp);
@@ -358,7 +358,8 @@ int	kern_setitimer(struct thread *, u_int, struct itimerval *,
 	    struct itimerval *);
 int	kern_setrlimit(struct thread *, u_int, struct rlimit *);
 int	kern_setsockopt(struct thread *td, int s, int level, int name,
-	    void *optval, enum uio_seg valseg, socklen_t valsize);
+	    const void * __capability val, enum uio_seg valseg,
+	    socklen_t valsize);
 int	kern_settimeofday(struct thread *td, struct timeval *tv,
 	    struct timezone *tzp);
 int	kern_shm_open(struct thread *td, const char * __capability userpath,
@@ -461,6 +462,8 @@ int	user_getdirentries(struct thread *td, int fd, char * __capability buf,
 	    size_t count, off_t * __capability basep);
 int	user_getfsstat(struct thread *td, struct statfs * __capability buf,
 	    long bufsize, int mode);
+int	user_getsockopt(struct thread *td, int s, int level, int name,
+	    void * __capability val, socklen_t * __capability avalsize);
 int	user_pdgetpid(struct thread *td, int fd, pid_t * __capability pidp);
 int	user_procctl(struct thread *td, enum idtype idtype, id_t id, int com,
 	    void * __capability data);

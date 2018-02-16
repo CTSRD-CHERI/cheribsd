@@ -295,10 +295,10 @@
 				    _In_reads_bytes_(namelen) \
 				    const struct sockaddr * __capability name, \
 				    __socklen_t namelen); }
-105	AUE_SETSOCKOPT	NOPROTO	{ int setsockopt(int s, int level, \
+105	AUE_SETSOCKOPT	STD	{ int cheriabi_setsockopt(int s, int level, \
 				    int name, \
 				    _In_reads_bytes_opt_(valsize) \
-				    const void *val, \
+				    const void * __capability val, \
 				    __socklen_t valsize); }
 106	AUE_LISTEN	NOPROTO	{ int listen(int s, int backlog); }
 107	AUE_NULL	OBSOL	vtimes
@@ -316,10 +316,11 @@
 				    struct timezone * __capability tzp); }
 117	AUE_GETRUSAGE	STD	{ int cheriabi_getrusage(int who, \
 				    _Out_ struct rusage * __capability rusage); }
-118	AUE_GETSOCKOPT	NOPROTO	{ int getsockopt(int s, int level, \
+118	AUE_GETSOCKOPT	STD	{ int cheriabi_getsockopt(int s, int level, \
 				    int name, \
 				    _Out_writes_bytes_opt_(*avalsize) \
-				    void *val, _Inout_ __socklen_t *avalsize); }
+				    void * __capability val, \
+				    _Inout_ __socklen_t * __capability avalsize); }
 119	AUE_NULL	UNIMPL	resuba (BSD/OS 2.x)
 120	AUE_READV	STD	{ int cheriabi_readv(int fd, \
 				    _Inout_updates_(iovcnt) \

@@ -1312,38 +1312,31 @@ CHERIABI_SYS_cheriabi_bind_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_setsockopt_fill_uap(struct thread *td,
-    struct setsockopt_args *uap)
+CHERIABI_SYS_cheriabi_setsockopt_fill_uap(struct thread *td,
+    struct cheriabi_setsockopt_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] int s */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_setsockopt_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_setsockopt_PTRMASK);
 	uap->s = cheri_getoffset(tmpcap);
 
 	/* [1] int level */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_setsockopt_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_setsockopt_PTRMASK);
 	uap->level = cheri_getoffset(tmpcap);
 
 	/* [2] int name */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_setsockopt_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_setsockopt_PTRMASK);
 	uap->name = cheri_getoffset(tmpcap);
 
 	/* [4] __socklen_t valsize */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 4, CHERIABI_SYS_setsockopt_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 4, CHERIABI_SYS_cheriabi_setsockopt_PTRMASK);
 	uap->valsize = cheri_getoffset(tmpcap);
 
-	/* [3] _In_reads_bytes_opt_(valsize) const void * val */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_setsockopt_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->val),
-		    tmpcap, 1 * uap->valsize, reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
+	/* [3] _In_reads_bytes_opt_(valsize) const void *__capability val */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->val),
+	    3, CHERIABI_SYS_cheriabi_setsockopt_PTRMASK);
 
 	return (0);
 }
@@ -1402,61 +1395,32 @@ CHERIABI_SYS_cheriabi_getrusage_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_getsockopt_fill_uap(struct thread *td,
-    struct getsockopt_args *uap)
+CHERIABI_SYS_cheriabi_getsockopt_fill_uap(struct thread *td,
+    struct cheriabi_getsockopt_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] int s */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_getsockopt_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_getsockopt_PTRMASK);
 	uap->s = cheri_getoffset(tmpcap);
 
 	/* [1] int level */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_getsockopt_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_getsockopt_PTRMASK);
 	uap->level = cheri_getoffset(tmpcap);
 
 	/* [2] int name */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_getsockopt_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_getsockopt_PTRMASK);
 	uap->name = cheri_getoffset(tmpcap);
 
-	/* [4] _Inout_ __socklen_t * avalsize */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD|CHERI_PERM_STORE);
+	/* [3] _Out_writes_bytes_opt_(*avalsize) void *__capability val */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->val),
+	    3, CHERIABI_SYS_cheriabi_getsockopt_PTRMASK);
 
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 4, CHERIABI_SYS_getsockopt_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->avalsize),
-		    tmpcap, sizeof(*uap->avalsize), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
-
-	/* [3] _Out_writes_bytes_opt_(*avalsize) void * val */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		if (uap->avalsize == NULL) {
-			uap->val = NULL;
-		} else {
-			size_t reqlen;
-			if (sizeof(*uap->avalsize) == 2)
-				reqlen = fuword16(uap->avalsize);
-			else if (sizeof(*uap->avalsize) == 4)
-				reqlen = fuword32(uap->avalsize);
-			else if (sizeof(*uap->avalsize) == 8)
-				reqlen = fuword64(uap->avalsize);
-			else
-				panic("unhandled dependant argument size %zu", sizeof(*uap->avalsize));
-			if (reqlen == -1)
-				return (EINVAL);
-			cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_getsockopt_PTRMASK);
-			error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->val),
-			    tmpcap, reqlen, reqperms, 1);
-			if (error != 0)
-				return (error);
-		}
-	}
+	/* [4] _Inout_ __socklen_t *__capability avalsize */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->avalsize),
+	    4, CHERIABI_SYS_cheriabi_getsockopt_PTRMASK);
 
 	return (0);
 }

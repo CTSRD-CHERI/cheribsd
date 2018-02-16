@@ -75,11 +75,11 @@ MIASM =  \
 	cheriabi_connect.o \
 	getpriority.o \
 	cheriabi_bind.o \
-	setsockopt.o \
+	cheriabi_setsockopt.o \
 	listen.o \
 	cheriabi_gettimeofday.o \
 	cheriabi_getrusage.o \
-	getsockopt.o \
+	cheriabi_getsockopt.o \
 	cheriabi_readv.o \
 	cheriabi_writev.o \
 	cheriabi_settimeofday.o \

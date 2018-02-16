@@ -191,6 +191,22 @@ cheriabi_recvmsg(struct thread *td, struct cheriabi_recvmsg_args *uap)
 	return (error);
 }
 
+int
+cheriabi_setsockopt(struct thread *td, struct cheriabi_setsockopt_args *uap)
+{
+
+	return (kern_setsockopt(td, uap->s, uap->level, uap->name,
+	    uap->val, UIO_USERSPACE, uap->valsize));
+}
+
+int
+cheriabi_getsockopt(struct thread *td, struct cheriabi_getsockopt_args *uap)
+{
+
+	return (user_getsockopt(td, uap->s, uap->level, uap->name, uap->val,
+	    uap->avalsize));
+}
+
 /*
  * uipc_shm.c
  */

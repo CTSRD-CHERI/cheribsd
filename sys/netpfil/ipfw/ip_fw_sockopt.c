@@ -3511,7 +3511,8 @@ ipfw_flush_sopt_data(struct sockopt_data *sd)
 	sopt = sd->sopt;
 
 	if (sopt->sopt_dir == SOPT_GET) {
-		error = copyout(sd->kbuf, sopt->sopt_val, sz);
+		error = copyout_c((__cheri_tocap void * __capability)sd->kbuf,
+		    sopt->sopt_val, sz);
 		if (error != 0)
 			return (error);
 	}
@@ -3665,7 +3666,9 @@ ipfw_ctl3(struct sockopt *sopt)
 
 			if (size < valsize) {
 				/* We have to wire user buffer */
-				error = vslock(sopt->sopt_val, valsize);
+				error = vslock(
+				    (__cheri_fromcap void *)sopt->sopt_val,
+				    valsize);
 				if (error != 0)
 					return (error);
 				locked = 1;
@@ -3703,7 +3706,7 @@ ipfw_ctl3(struct sockopt *sopt)
 		ipfw_flush_sopt_data(&sdata);
 
 	if (locked != 0)
-		vsunlock(sdata.sopt_val, valsize);
+		vsunlock((__cheri_fromcap void *)sdata.sopt_val, valsize);
 
 	/* Restore original pointer and set number of bytes written */
 	sopt->sopt_val = sdata.sopt_val;

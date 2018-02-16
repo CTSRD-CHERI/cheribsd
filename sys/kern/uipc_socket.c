@@ -2696,9 +2696,10 @@ sooptcopyin(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
 		sopt->sopt_valsize = valsize = len;
 
 	if (sopt->sopt_td != NULL)
-		return (copyin(sopt->sopt_val, buf, valsize));
+		return (copyin_c(sopt->sopt_val,
+		   (__cheri_tocap void * __capability)buf, valsize));
 
-	bcopy(sopt->sopt_val, buf, valsize);
+	bcopy((__cheri_fromcap void *)sopt->sopt_val, buf, valsize);
 	return (0);
 }
 
@@ -2716,7 +2717,7 @@ so_setsockopt(struct socket *so, int level, int optname, void *optval,
 	sopt.sopt_level = level;
 	sopt.sopt_name = optname;
 	sopt.sopt_dir = SOPT_SET;
-	sopt.sopt_val = optval;
+	sopt.sopt_val = (__cheri_tocap void * __capability)optval;
 	sopt.sopt_valsize = optlen;
 	sopt.sopt_td = NULL;
 	return (sosetopt(so, &sopt));
@@ -2980,9 +2981,12 @@ sooptcopyout(struct sockopt *sopt, const void *buf, size_t len)
 	sopt->sopt_valsize = valsize;
 	if (sopt->sopt_val != NULL) {
 		if (sopt->sopt_td != NULL)
-			error = copyout(buf, sopt->sopt_val, valsize);
+			error = copyout_c(
+			    (__cheri_tocap const void * __capability)buf,
+			    sopt->sopt_val, valsize);
 		else
-			bcopy(buf, sopt->sopt_val, valsize);
+			bcopy(buf, (__cheri_fromcap void *)sopt->sopt_val,
+			    valsize);
 	}
 	return (error);
 }
@@ -3221,16 +3225,18 @@ soopt_mcopyin(struct sockopt *sopt, struct mbuf *m)
 		if (sopt->sopt_td != NULL) {
 			int error;
 
-			error = copyin(sopt->sopt_val, mtod(m, char *),
+			error = copyin_c(sopt->sopt_val,
+			    (__cheri_tocap void * __capability)mtod(m, char *),
 			    m->m_len);
 			if (error != 0) {
 				m_freem(m0);
 				return(error);
 			}
 		} else
-			bcopy(sopt->sopt_val, mtod(m, char *), m->m_len);
+			bcopy((__cheri_fromcap void *)sopt->sopt_val,
+			    mtod(m, char *), m->m_len);
 		sopt->sopt_valsize -= m->m_len;
-		sopt->sopt_val = (char *)sopt->sopt_val + m->m_len;
+		sopt->sopt_val = (char * __capability)sopt->sopt_val + m->m_len;
 		m = m->m_next;
 	}
 	if (m != NULL) /* should be allocated enoughly at ip6_sooptmcopyin() */
@@ -3250,16 +3256,18 @@ soopt_mcopyout(struct sockopt *sopt, struct mbuf *m)
 		if (sopt->sopt_td != NULL) {
 			int error;
 
-			error = copyout(mtod(m, char *), sopt->sopt_val,
-			    m->m_len);
+			error = copyout_c(
+			    (__cheri_tocap void * __capability)mtod(m, char *),
+			    sopt->sopt_val, m->m_len);
 			if (error != 0) {
 				m_freem(m0);
 				return(error);
 			}
 		} else
-			bcopy(mtod(m, char *), sopt->sopt_val, m->m_len);
+			bcopy(mtod(m, char *),
+			    (__cheri_fromcap void *)sopt->sopt_val, m->m_len);
 		sopt->sopt_valsize -= m->m_len;
-		sopt->sopt_val = (char *)sopt->sopt_val + m->m_len;
+		sopt->sopt_val = (char * __capability)sopt->sopt_val + m->m_len;
 		valsize += m->m_len;
 		m = m->m_next;
 	}
