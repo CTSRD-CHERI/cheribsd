@@ -50,6 +50,7 @@
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -5309,6 +5310,14 @@ __assert(const char *func, const char *file, int line, const char *failedexpr)
 		     failedexpr, func, file, line);
 	abort();
 	/* NOTREACHED */
+}
+
+/* FIXME: abort() will crash inside sigprocmask, let's just use raise() here */
+void
+abort(void)
+{
+	raise(SIGABRT);
+	 __builtin_unreachable();
 }
 
 /*
