@@ -79,6 +79,18 @@
 #endif
 
 /*
+ * XXX-AM: where does this happen?
+ * Note: The kernel stack is allocated above the pcb?
+ */
+#ifndef CHERI_KERNEL
+#define SWITCH_TO_KERNEL_STACK(pcb)		\
+	PTR_SUBU	sp, pcb, CALLFRAME_SIZ
+#else /* CHERI_KERNEL */
+/* Skip this in purecap kernel, we will do it after saving REG_STC */
+#define SWITCH_TO_KERNEL_STACK(pcb)
+#endif /* CHERI_KERNEL */
+
+/*
  * Save all of the registers except for the kernel temporaries in u.u_pcb.
  */
 #define	SAVE_REGS_TO_PCB(pcb)			\
@@ -117,7 +129,7 @@
 	SAVE_U_PCB_REG(gp, GP, pcb)		; \
 	SAVE_U_PCB_REG(sp, SP, pcb)		; \
 	SAVE_U_PCB_REG(s8, S8, pcb)		; \
-	PTR_SUBU	sp, pcb, CALLFRAME_SIZ	; \
+	SWITCH_TO_KERNEL_STACK(pcb)		; \
 	SAVE_U_PCB_REG(ra, RA, pcb)		; \
 	SAVE_U_PCB_REG(v0, MULLO, pcb)		; \
 	SAVE_U_PCB_REG(v1, MULHI, pcb)		; \

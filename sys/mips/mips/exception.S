@@ -297,7 +297,7 @@ not_superpage:
 	HAZARD_DELAY
 
 #else	/* CHERI_KERNEL - assumes __mips64 and ! MIPS64_NEW_PMAP */
-	GET_CPU_PCPU(CHERI_REG_KR1C)
+	GET_CPU_PCPU(CHERI_REG_KR1C, k1)
 	clc		CHERI_REG_KR1C, zero, PC_SEGBASE(CHERI_REG_KR1C)
 	cbez		CHERI_REG_KR1C, 2f			# == NULL no segbase
 	andi		k0, k0, PDEPTRMASK			# k0 = seg offset
@@ -549,6 +549,14 @@ SlowFault:
  * k0 is used as a temporary to hold the CP0 status register.
  *
  * sp and k1 may differ if we've had to re-align the stack for CHERI.
+ *
+ * The purecap kernel changes how stack is handled during exceptions.
+ *
+ * sp is now treated as a normal register
+ * KR1C holds the preempted stack pointer, to be saved as REG_STC
+ * c3 returns a pointer to the trap frame
+ * k0 is used as a temporary to hold CP0 status as before
+ * k1 is used as a temporary
  */
 
 #ifndef CHERI_KERNEL
@@ -770,8 +778,8 @@ NESTED_NOPROFILE(MipsKernGenException, KERN_EXC_FRAME_SIZE, ra)
 	PTR_LA	t9, _C_LABEL(trap)
 	cgetpccsetoffset $c12, t9
 	cjalr	$c12, $c17
-	/* XXX-AM: a3 this holds the exception PC from SAVE_CPU */
-	REG_S	a3, (CALLFRAME_RA + KERN_REG_SIZE)(sp)		# for debugging
+	/* XXX-AM: a3 this holds the exception PC from SAVE_CPU, find it a place once ddb is ported */
+	csd	a3, zero, (CALLFRAME_RA + KERN_REG_SIZE)(CHERI_REG_STC) # for debugging
 #endif /* CHERI_KERNEL */
 
 	/*
@@ -822,6 +830,7 @@ END(MipsKernGenException)
 NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	.set	noat
 	.mask	0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ)
+#ifndef CHERI_KERNEL
 	GET_CPU_PCPU_NOCAP(k1)
 	PTR_L	k1, PC_CURPCB(k1)
 	SAVE_REGS_TO_PCB(k1)
@@ -829,11 +838,21 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	/*
 	 * Note: This saves EPCC, matching the explicit EPC save above.
 	 */
-	SAVE_CREGS_TO_PCB(k1, t0)
+	SAVE_CREGS_TO_PCB(k1, t0, t1)
 #endif
 	REG_S	a3, CALLFRAME_RA(sp)	# for debugging
+#else /* CHERI_KERNEL */
+	GET_CPU_PCPU(CHERI_REG_KR1C, k1)	# get pcpu pointer
+	clc	CHERI_REG_KR1C, zero, PC_CURPCB(CHERI_REG_KR1C)
+	SAVE_REGS_TO_PCB(CHERI_REG_KR1C)
+	SAVE_CREGS_TO_PCB(CHERI_REG_KR1C, t0, t1)
+
+	/* XXX-AM: a3 this holds the exception PC from SAVE_CPU, find it a place once ddb is ported */
+	csd	a3, zero, CALLFRAME_RA(CHERI_REG_STC) # for debugging
+#endif /* CHERI_KERNEL */
+
 	PTR_LA	gp, _C_LABEL(_gp)	# switch to kernel GP
-# Turn off fpu and enter kernel mode
+/* Turn off fpu and enter kernel mode */
 	and	t0, a0, ~(MIPS_SR_COP_1_BIT | MIPS_SR_EXL | MIPS_SR_KSU_MASK | MIPS_SR_INT_IE)
 #if defined(CPU_CNMIPS)
 	and	t0, t0, ~(MIPS_SR_COP_2_BIT)
@@ -843,15 +862,26 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 #endif
 	mtc0	t0, MIPS_COP_0_STATUS
 
+#ifndef CHERI_KERNEL
 	PTR_ADDU a0, k1, U_PCB_REGS
 	ITLBNOPFIX
-
 /*
  * Call the exception handler.
  */
 	PTR_LA	t9, _C_LABEL(trap)
 	jalr	t9
 	nop
+#else /* CHERI_KERNEL */
+	cincoffset	$c3, CHERI_REG_KR1C, U_PCB_REGS
+	REG_LI	t0, TRAPFRAME_SIZE
+	csetbounds	$c3, $c3, t0
+	ITLBNOPFIX
+
+	PTR_LA	t9, _C_LABEL(trap)
+	cgetpccsetoffset $c12, t9
+	cjalr	$c12, $c17
+	nop
+#endif /* CHERI_KERNEL */
 
 /*
  * Restore user registers and return.
@@ -866,8 +896,13 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
  * after interrupts are disabled.  Otherwise it will get overwritten
  * by the interrupt code.
  */
-	GET_CPU_PCPU_NOCAP(k1)
+#ifndef CHERI_KERNEL
+	GET_CPU_PCPU(k1)
 	PTR_L	k1, PC_CURPCB(k1)
+#else /* CHERI_KERNEL */
+	GET_CPU_PCPU(CHERI_REG_KR1C, k1)
+	clc	CHERI_REG_KR1C, zero, PC_CURPCB(CHERI_REG_KR1C)
+#endif /* CHERI_KERNEL */
 
 	/*
 	 * Update interrupt mask in saved status register
@@ -876,9 +911,14 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	 */
 	mfc0	a0, MIPS_COP_0_STATUS
 	and	a0, a0, MIPS_SR_INT_MASK
+#ifndef CHERI_KERNEL
 	RESTORE_U_PCB_REG(a1, SR, k1)
+#else
+	RESTORE_U_PCB_REG(a1, SR, CHERI_REG_KR1C)
+#endif
 	and	a1, a1, ~MIPS_SR_INT_MASK
 	or	a1, a1, a0
+#ifndef CHERI_KERNEL
 	SAVE_U_PCB_REG(a1, SR, k1)
 
 #ifdef CPU_CHERI
@@ -888,6 +928,12 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	RESTORE_CREGS_FROM_PCB(k1, t0)
 #endif
 	RESTORE_REGS_FROM_PCB(k1)
+#else /* CHERI_KERNEL */
+	SAVE_U_PCB_REG(a1, SR, CHERI_REG_KR1C)
+	RESTORE_CREGS_FROM_PCB(CHERI_REG_KR1C, t0)
+	/* This also sets k0 from PCB */
+	RESTORE_REGS_FROM_PCB(CHERI_REG_KR1C)
+#endif /* CHERI_KERNEL */
 
 	mtc0	k0, MIPS_COP_0_STATUS	# still exception level
 	ITLBNOPFIX
@@ -1094,7 +1140,7 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 	/*
 	 * Note: This saves EPCC, matching the explicit EPC save above.
 	 */
-	SAVE_CREGS_TO_PCB(k1, t0)
+	SAVE_CREGS_TO_PCB(k1, t0, t1)
 #endif
 	PTR_SUBU	sp, k1, CALLFRAME_SIZ  # switch to kernel SP
 	PTR_LA	gp, _C_LABEL(_gp)	# switch to kernel GP

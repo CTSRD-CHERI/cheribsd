@@ -323,7 +323,7 @@ XNESTED(copyinstr_c)
 	cjr	$c12
 	nop
 1:
-	GET_CPU_PCPU($c1)	# clobbers at
+	GET_CPU_PCPU($c1, t0)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
 	PTR_LA	t0, copyerr
 	cgetpccsetoffset $c2, t0	# prepare the onfault jump point
@@ -333,7 +333,7 @@ XNESTED(copyinstr_c)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
 	clc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
-	GET_CPU_PCPU($c1)
+	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
 	CHERI_NULL($c2)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
@@ -362,7 +362,7 @@ NESTED(copyoutstr, CALLFRAME_SIZ, ra)
 	cjr	$c12
 	nop
 1:
-	GET_CPU_PCPU($c1)	# clobbers at
+	GET_CPU_PCPU($c1, t0)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
 	PTR_LA	t0, copyerr
 	cgetpccsetoffset $c2, t0	# prepare the onfault jump point
@@ -372,7 +372,7 @@ NESTED(copyoutstr, CALLFRAME_SIZ, ra)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
 	clc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
-	GET_CPU_PCPU($c1)
+	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
 	CHERI_NULL($c2)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
@@ -399,7 +399,7 @@ XNESTED(copyin_c)
 	cjr	$c12
 	nop
 1:
-	GET_CPU_PCPU($c1)	# clobbers at
+	GET_CPU_PCPU($c1, t0)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
 	PTR_LA	t0, copyerr
 	cgetpccsetoffset $c2, t0	# prepare the onfault jump point
@@ -409,7 +409,7 @@ XNESTED(copyin_c)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
 	clc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
-	GET_CPU_PCPU($c1)
+	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1) # bcopy modified v1, so reload
 	CHERI_NULL($c2)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
@@ -437,7 +437,7 @@ NESTED(copyincap, CALLFRAME_SIZ, ra)
 	cjr	$c12
 	nop
 1:
-	GET_CPU_PCPU($c1)	# clobbers at
+	GET_CPU_PCPU($c1, t0)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
 	PTR_LA	t0, copyerr
 	cgetpccsetoffset $c2, t0	# prepare the onfault jump point
@@ -447,7 +447,7 @@ NESTED(copyincap, CALLFRAME_SIZ, ra)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
 	clc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
-	GET_CPU_PCPU($c1)
+	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1) # bcopy modified v1, so reload
 	CHERI_NULL($c2)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
@@ -475,7 +475,7 @@ XNESTED(copyout_c)
 	cjr	$c12
 	nop
 1:
-	GET_CPU_PCPU($c1)	# clobbers at
+	GET_CPU_PCPU($c1, t0)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
 	PTR_LA	t0, copyerr
 	cgetpccsetoffset $c2, t0	# prepare the onfault jump point
@@ -485,7 +485,7 @@ XNESTED(copyout_c)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
 	clc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
-	GET_CPU_PCPU($c1)
+	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1) # bcopy modified v1, so reload
 	CHERI_NULL($c2)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
@@ -513,7 +513,7 @@ NESTED(copyoutcap, CALLFRAME_SIZ, ra)
 	cjr	$c12
 	nop
 1:
-	GET_CPU_PCPU($c1)	# clobbers at
+	GET_CPU_PCPU($c1, t0)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
 	PTR_LA	t0, copyerr
 	cgetpccsetoffset $c2, t0	# prepare the onfault jump point
@@ -523,7 +523,7 @@ NESTED(copyoutcap, CALLFRAME_SIZ, ra)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
 	clc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
-	GET_CPU_PCPU($c1)
+	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1) # bcopy modified v1, so reload
 	CHERI_NULL($c2)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
@@ -552,7 +552,7 @@ XLEAF(fuword)
 	cgetbase t0, $c3	# make sure source is in userspace
 	blt	t0, zero, 1f
 	nop
-	GET_CPU_PCPU($c1)
+	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
 	PTR_LA	v0, fswberr
 	cgetpccsetoffset $c2, v0
@@ -572,7 +572,7 @@ LEAF(fuword32)
 	cgetbase t0, $c3	# make sure source is in userspace
 	blt	t0, zero, 1f
 	nop
-	GET_CPU_PCPU($c1)
+	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
 	PTR_LA	v0, fswberr
 	cgetpccsetoffset $c2, v0
@@ -593,7 +593,7 @@ LEAF(fusword)
 	PTR_LA	v0, _C_LABEL(fswberr)
 	blt	t0, zero, 1f
 	cgetpccsetoffset	$c2, v0
-	GET_CPU_PCPU($c1)
+	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 	clhu	v0, zero, 0($c3)	# fetch short
@@ -610,7 +610,7 @@ LEAF(fubyte)
 	PTR_LA	v0, _C_LABEL(fswberr)
 	blt	t0, zero, 1f
 	cgetpccsetoffset	$c2, v0
-	GET_CPU_PCPU($c1)
+	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 	clbu	v0, zero, 0($c3)	# fetch byte
@@ -627,7 +627,7 @@ XLEAF(suword)
 	cgetbase t0, $c3	# make sure source is in userspace
 	blt	t0, zero, 1f
 	nop
-	GET_CPU_PCPU($c1)
+	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
 	PTR_LA	v0, fswberr
 	cgetpccsetoffset $c2, v0
@@ -647,7 +647,7 @@ LEAF(suword32)
 	cgetbase t0, $c3	# make sure source is in userspace
 	blt	t0, zero, 1f
 	nop
-	GET_CPU_PCPU($c1)
+	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
 	PTR_LA	v0, fswberr
 	cgetpccsetoffset $c2, v0
@@ -677,7 +677,7 @@ LEAF(casuword32)
 	PTR_LA	v0, _C_LABEL(fswberr)
 	blt	t0, zero, 1f
 	cgetpccsetoffset	$c2, v0
-	GET_CPU_PCPU($c1)
+	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 2:
@@ -708,7 +708,7 @@ XLEAF(casuword)
 	PTR_LA	v0, _C_LABEL(fswberr)
 	blt	t0, zero, 1f
 	cgetpccsetoffset	$c2, v0
-	GET_CPU_PCPU($c1)
+	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 2:
@@ -741,7 +741,7 @@ LEAF(susword)
 	PTR_LA	v0, _C_LABEL(fswberr)
 	blt	t0, zero, 1f
 	cgetpccsetoffset $c2, v0
-	GET_CPU_PCPU($c1)
+	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 	csh	a0, zero, 0($c3)	# store short
@@ -759,7 +759,7 @@ LEAF(subyte)
 	PTR_LA	v0, _C_LABEL(fswberr)
 	blt	t0, zero, 1f
 	cgetpccsetoffset $c2, v0
-	GET_CPU_PCPU($c1)
+	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 	csb	a0, zero, 0($c3)	# store short
@@ -787,7 +787,7 @@ LEAF(fuswintr)
 	PTR_LA	v0, _C_LABEL(fswintrberr)
 	blt	t0, zero, 1f
 	cgetpccsetoffset	$c2, v0
-	GET_CPU_PCPU($c1)
+	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 	clhu	v0, zero, 0($c3)	# fetch short
@@ -804,7 +804,7 @@ LEAF(suswintr)
 	PTR_LA	v0, _C_LABEL(fswintrberr)
 	blt	t0, zero, 1f
 	cgetpccsetoffset $c2, v0
-	GET_CPU_PCPU($c1)
+	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 	csh	a0, zero, 0($c3)	# store short

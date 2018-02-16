@@ -168,6 +168,35 @@
 	csetoffset	CHERI_REG_EPCC, CHERI_REG_EPCC, reg;		\
 66:
 
+#ifndef CHERI_KERNEL
+#define SWITCH_TO_KERNEL_CSTACK(pcb)
+
+/*
+ * Capcause access to PCB
+ */
+#define SAVE_CAPCAUSE_TO_PCB(treg, treg2, pcb)	\
+	SAVE_U_PCB_REG(treg, CAPCAUSE, pcb)
+#define RESTORE_CAPCAUSE_FROM_PCB(treg, pcb)	\
+	RESTORE_U_PCB_REG(treg, CAPCAUSE, pcb)
+
+#else /* CHERI_KERNEL */
+/* See SAVE_REGS_TO_PCB() 
+ * XXX-AM: also this should break because the pcb capability should not
+ * give access to the stack.
+ */
+#define SWITCH_TO_KERNEL_CSTACK(pcb)		\
+	cincoffset CHERI_REG_STC, pcb, -CALLFRAME_SIZ
+
+/*
+ * Capcause offset is too large for CHERI256 in this case and does not
+ * fit in the csd immediate offset.
+ */
+#define SAVE_CAPCAUSE_TO_PCB(treg, treg2, pcb)	\
+	SAVE_U_PCB_REG_FAR(treg, treg2, CAPCAUSE, pcb)
+#define RESTORE_CAPCAUSE_FROM_PCB(treg, pcb)	\
+	RESTORE_U_PCB_REG_FAR(treg, treg, CAPCAUSE, pcb)
+#endif /* CHERI_KERNEL */
+
 /*
  * Save and restore user CHERI state on an exception.  Assumes that $ddc has
  * already been moved to $sec0, and that if we write $sec0, it will get moved
@@ -178,7 +207,7 @@
  *
  * XXXRW: We should in fact also do this for the kernel version?
  */
-#define	SAVE_CREGS_TO_PCB(pcb, treg)					\
+#define	SAVE_CREGS_TO_PCB(pcb, treg, treg2)				\
 	SAVE_U_PCB_CREG(CHERI_REG_SEC0, DDC, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C1, C1, pcb);				\
 	SAVE_U_PCB_CREG(CHERI_REG_C2, C2, pcb);				\
@@ -191,6 +220,7 @@
 	SAVE_U_PCB_CREG(CHERI_REG_C9, C9, pcb);				\
 	SAVE_U_PCB_CREG(CHERI_REG_C10, C10, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_STC, STC, pcb);			\
+	SWITCH_TO_KERNEL_CSTACK(pcb);					\
 	SAVE_U_PCB_CREG(CHERI_REG_C12, C12, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C13, C13, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C14, C14, pcb);			\
@@ -208,7 +238,7 @@
 	SAVE_U_PCB_CREG(CHERI_REG_C26, IDC, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_EPCC, PCC, pcb);			\
 	cgetcause	treg;						\
-	SAVE_U_PCB_REG(treg, CAPCAUSE, pcb)
+	SAVE_CAPCAUSE_TO_PCB(treg, treg2, pcb)
 
 #define	RESTORE_CREGS_FROM_PCB(pcb, treg)				\
 	RESTORE_U_PCB_CREG(CHERI_REG_SEC0, DDC, pcb);			\
@@ -239,7 +269,7 @@
 	RESTORE_U_PCB_CREG(CHERI_REG_C25, C25, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C26, IDC, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_EPCC, PCC, pcb);			\
-	RESTORE_U_PCB_REG(treg, CAPCAUSE, pcb);				\
+	RESTORE_CAPCAUSE_FROM_PCB(treg, pcb);				\
 	csetcause	treg
 
 /*

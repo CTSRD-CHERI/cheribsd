@@ -94,6 +94,7 @@
  *
  * XXX Do we really need to disable interrupts?
  */
+#ifndef CHERI_KERNEL
 #define DO_AST				             \
 44:				                     \
 	mfc0	t0, MIPS_COP_0_STATUS               ;\
@@ -101,7 +102,7 @@
 	xor	t0, a0, t0                          ;\
 	mtc0	t0, MIPS_COP_0_STATUS               ;\
 	COP0_SYNC                                   ;\
-	GET_CPU_PCPU_NOCAP(s1)                      ;\
+	GET_CPU_PCPU(s1)                            ;\
 	PTR_L	s3, PC_CURPCB(s1)                   ;\
 	PTR_L	s1, PC_CURTHREAD(s1)                ;\
 	lw	s2, TD_FLAGS(s1)                    ;\
@@ -116,10 +117,47 @@
 	PTR_LA	t9, _C_LABEL(ast)                   ;\
 	jalr	t9                                  ;\
 	PTR_ADDU a0, s3, U_PCB_REGS                 ;\
-	j	44b		                    ;\
-        nop                                         ;\
+	j	44b                                 ;\
+	nop                                         ;\
 4:
+#else /* CHERI_KERNEL */
+/*
+ * Note: we are forced to load some constants in
+ * temporary registers because they do not fit in
+ * the offset fields.
+ */
+#define DO_AST				             \
+44:				                     \
+	mfc0	t0, MIPS_COP_0_STATUS               ;\
+	and	a0, t0, MIPS_SR_INT_IE              ;\
+	xor	t0, a0, t0                          ;\
+	mtc0	t0, MIPS_COP_0_STATUS               ;\
+	COP0_SYNC                                   ;\
+	GET_CPU_PCPU($c4, s1)                       ;\
+	clc	$c3, zero, PC_CURPCB($c4)           ;\
+	REG_LI	s2, TD_FLAGS                        ;\
+	clc	$c4, zero, PC_CURTHREAD($c4)        ;\
+	clw	s2, s2, 0($c4)                      ;\
+	li	s0, TDF_ASTPENDING | TDF_NEEDRESCHED;\
+	and	s2, s0                              ;\
+	mfc0	t0, MIPS_COP_0_STATUS               ;\
+	or	t0, a0, t0                          ;\
+	mtc0	t0, MIPS_COP_0_STATUS               ;\
+	COP0_SYNC                                   ;\
+	beq	s2, zero, 4f                        ;\
+	nop                                         ;\
+	PTR_LA	t9, _C_LABEL(ast)                   ;\
+	cgetpccsetoffset	$c12, t9            ;\
+	cincoffset	$c3, $c3, U_PCB_REGS        ;\
+	REG_LI	t0, TRAPFRAME_SIZE                  ;\
+	cjalr	$c12, $c17                          ;\
+	csetbounds	$c3, $c3, t0                ;\
+	j	44b                                 ;\
+	nop                                         ;\
+4:
+#endif /* CHERI_KERNEL */
 
+#ifndef CHERI_KERNEL
 #define	SAVE_U_PCB_REG(reg, offs, base) \
 	REG_S	reg, (U_PCB_REGS + (SZREG * offs)) (base)
 
@@ -133,6 +171,28 @@
 #define	RESTORE_U_PCB_CREG(creg, offs, base) \
 	clc	creg, base, (U_PCB_REGS + (SZREG * offs)) (CHERI_REG_KDC)
 #endif
+#else /* CHERI_KERNEL */
+#define	SAVE_U_PCB_REG(reg, offs, base)				\
+	csd	reg, zero, (U_PCB_REGS + (SZREG * offs)) (base)
+
+/* Save pcb reg to an offset that does not fit the immediate in csd */
+#define	SAVE_U_PCB_REG_FAR(reg, treg, offs, base)		\
+	REG_LI	treg, (U_PCB_REGS + (SZREG * offs));		\
+	csd	reg, treg, 0(base)
+
+#define	RESTORE_U_PCB_REG(reg, offs, base)			\
+	cld	reg, zero, (U_PCB_REGS + (SZREG * offs)) (base)
+
+#define	RESTORE_U_PCB_REG_FAR(reg, treg, offs, base)		\
+	REG_LI	treg, (U_PCB_REGS + (SZREG * offs));		\
+	cld	reg, treg, 0(base)
+
+#define	SAVE_U_PCB_CREG(creg, offs, base) \
+	csc	creg, zero, (U_PCB_REGS + (SZREG * offs)) (base)
+
+#define	RESTORE_U_PCB_CREG(creg, offs, base) \
+	clc	creg, zero, (U_PCB_REGS + (SZREG * offs)) (base)
+#endif /* CHERI_KERNEL */
 
 #define	SAVE_U_PCB_FPREG(reg, offs, base) \
 	FP_S	reg, (U_PCB_FPREGS + (SZFPREG * offs)) (base)

@@ -128,6 +128,9 @@ ASSYM(MIPS_XKSEG_START, (vaddr_t)(void *)MIPS_XKSEG_START);
 #ifdef	CPU_CHERI
 ASSYM(PCPU_SIZE, sizeof(struct pcpu));
 ASSYM(U_PCB_CHERIKFRAME, offsetof(struct pcb, pcb_cherikframe));
+#ifdef CHERI_KERNEL
+ASSYM(TRAPFRAME_SIZE, sizeof(struct trapframe));
+#endif
 #endif
 
 #ifdef	CPU_CNMIPS

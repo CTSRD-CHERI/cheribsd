@@ -692,11 +692,12 @@ _C_LABEL(x):
 #endif	/* __mips_n32 || __mips_n64 */
 
 #ifdef CHERI_KERNEL
-#define	GET_CPU_PCPU(reg)				\
-	PTR_LA	AT, _C_LABEL(pcpup);			\
-	cfromptr	reg, $c30, AT;			\
-	csetbounds	reg, reg, CHERICAP_SIZE;	\
-	clc	reg, zero, 0(reg)
+#define	GET_CPU_PCPU(creg, treg)			\
+	PTR_LA	treg, _C_LABEL(pcpup);			\
+	cgetkdc		creg;				\
+	cfromptr	creg, creg, treg;		\
+	csetbounds	creg, creg, CHERICAP_SIZE;	\
+	clc	creg, zero, 0(creg)
 #define	GET_CPU_PCPU_NOCAP(reg)		\
 	PTR_L	reg, _C_LABEL(pcpup);
 #else /* ! CHERI_KERNEL */
