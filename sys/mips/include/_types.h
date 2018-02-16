@@ -166,7 +166,7 @@ typedef	int		___wchar_t;
  * Make sure that the flag is extracted from a pointer as an integer
  * so that integer comparison will be properly used.
  */
-#define __ptr_get_flag(p, f) ((__vm_offset_t)(p) & (f))
+#define __ptr_get_flag(p, f) ((__cheri_addr __vm_offset_t)(void *)(p) & (__vm_offset_t)(f))
 #endif
 
 
