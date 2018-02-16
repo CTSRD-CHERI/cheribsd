@@ -1133,6 +1133,98 @@ END(MipsKernIntr)
  *
  *----------------------------------------------------------------------------
  */
+
+/*
+ * Save registers to U_PCB during an user interrupt.
+ * XXX-AM: I am not sure why we can not use SAVE_REGS_TO_PCB()
+ * since it does exactly the same things except the mflo/hi
+ * "to avoid stall".
+ * 
+ * Leaves:
+ * a3: exception PC
+ */
+#define SAVE_UINTR_PCB_REGS(pcb)		\
+	SAVE_U_PCB_REG(AT, AST, pcb);		\
+	.set	at;				\
+	SAVE_U_PCB_REG(v0, V0, pcb);		\
+	SAVE_U_PCB_REG(v1, V1, pcb);		\
+	SAVE_U_PCB_REG(a0, A0, pcb);		\
+	SAVE_U_PCB_REG(a1, A1, pcb);		\
+	SAVE_U_PCB_REG(a2, A2, pcb);		\
+	SAVE_U_PCB_REG(a3, A3, pcb);		\
+	SAVE_U_PCB_REG(t0, T0, pcb);		\
+	SAVE_U_PCB_REG(t1, T1, pcb);		\
+	SAVE_U_PCB_REG(t2, T2, pcb);		\
+	SAVE_U_PCB_REG(t3, T3, pcb);		\
+	SAVE_U_PCB_REG(ta0, TA0, pcb);		\
+	SAVE_U_PCB_REG(ta1, TA1, pcb);		\
+	SAVE_U_PCB_REG(ta2, TA2, pcb);		\
+	SAVE_U_PCB_REG(ta3, TA3, pcb);		\
+	SAVE_U_PCB_REG(t8, T8, pcb);		\
+	SAVE_U_PCB_REG(t9, T9, pcb);		\
+	SAVE_U_PCB_REG(gp, GP, pcb);		\
+	SAVE_U_PCB_REG(sp, SP, pcb);		\
+	SAVE_U_PCB_REG(ra, RA, pcb);		\
+	SAVE_U_PCB_REG(s0, S0, pcb);		\
+	SAVE_U_PCB_REG(s1, S1, pcb);		\
+	SAVE_U_PCB_REG(s2, S2, pcb);		\
+	SAVE_U_PCB_REG(s3, S3, pcb);		\
+	SAVE_U_PCB_REG(s4, S4, pcb);		\
+	SAVE_U_PCB_REG(s5, S5, pcb);		\
+	SAVE_U_PCB_REG(s6, S6, pcb);		\
+	SAVE_U_PCB_REG(s7, S7, pcb);		\
+	SAVE_U_PCB_REG(s8, S8, pcb);		\
+	mflo	v0 # get lo/hi late to avoid stall;	\
+	mfhi	v1;					\
+	mfc0	a0, MIPS_COP_0_STATUS;			\
+	mfc0	a1, MIPS_COP_0_CAUSE;			\
+	MFC0	a3, MIPS_COP_0_EXC_PC;			\
+	SAVE_U_PCB_REG(v0, MULLO, pcb);			\
+	SAVE_U_PCB_REG(v1, MULHI, pcb);			\
+	SAVE_U_PCB_REG(a0, SR, pcb);			\
+	SAVE_U_PCB_REG(a1, CAUSE, pcb);			\
+	SAVE_U_PCB_REG(a3, PC, pcb)
+
+#define RESTORE_UINTR_PCB_REGS(pcb)			\
+	RESTORE_U_PCB_REG(s0, S0, k1);			\
+	RESTORE_U_PCB_REG(s1, S1, k1);			\
+	RESTORE_U_PCB_REG(s2, S2, k1);			\
+	RESTORE_U_PCB_REG(s3, S3, k1);			\
+	RESTORE_U_PCB_REG(s4, S4, k1);			\
+	RESTORE_U_PCB_REG(s5, S5, k1);			\
+	RESTORE_U_PCB_REG(s6, S6, k1);			\
+	RESTORE_U_PCB_REG(s7, S7, k1);			\
+	RESTORE_U_PCB_REG(s8, S8, k1);			\
+	RESTORE_U_PCB_REG(t0, MULLO, k1);		\
+	RESTORE_U_PCB_REG(t1, MULHI, k1);		\
+	RESTORE_U_PCB_REG(t2, PC, k1);			\
+	mtlo	t0;					\
+	mthi	t1;					\
+	MTC0	t2, MIPS_COP_0_EXC_PC	# set return address;	\
+	RESTORE_U_PCB_REG(v0, V0, k1);			\
+	RESTORE_U_PCB_REG(v1, V1, k1);			\
+	RESTORE_U_PCB_REG(a0, A0, k1);			\
+	RESTORE_U_PCB_REG(a1, A1, k1);			\
+	RESTORE_U_PCB_REG(a2, A2, k1);			\
+	RESTORE_U_PCB_REG(a3, A3, k1);			\
+	RESTORE_U_PCB_REG(t0, T0, k1);			\
+	RESTORE_U_PCB_REG(t1, T1, k1);			\
+	RESTORE_U_PCB_REG(t2, T2, k1);			\
+	RESTORE_U_PCB_REG(t3, T3, k1);			\
+	RESTORE_U_PCB_REG(ta0, TA0, k1);		\
+	RESTORE_U_PCB_REG(ta1, TA1, k1);		\
+	RESTORE_U_PCB_REG(ta2, TA2, k1);		\
+	RESTORE_U_PCB_REG(ta3, TA3, k1);		\
+	RESTORE_U_PCB_REG(t8, T8, k1);			\
+	RESTORE_U_PCB_REG(t9, T9, k1);			\
+	RESTORE_U_PCB_REG(gp, GP, k1);			\
+	RESTORE_U_PCB_REG(k0, SR, k1);			\
+	RESTORE_U_PCB_REG(sp, SP, k1);			\
+	RESTORE_U_PCB_REG(ra, RA, k1);			\
+	.set	noat;					\
+	RESTORE_U_PCB_REG(AT, AST, k1)
+
+
 NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 	.set	noat
 	.mask	0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ)
@@ -1140,52 +1232,11 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
  * Save the relevant user registers into the u.u_pcb struct.
  * We don't need to save s0 - s8 because the compiler does it for us.
  */
-	GET_CPU_PCPU_NOCAP(k1)
+#ifndef CHERI_KERNEL
+	GET_CPU_PCPU(k1)
 	PTR_L	k1, PC_CURPCB(k1)
-	SAVE_U_PCB_REG(AT, AST, k1)
-	.set	at
-	SAVE_U_PCB_REG(v0, V0, k1)
-	SAVE_U_PCB_REG(v1, V1, k1)
-	SAVE_U_PCB_REG(a0, A0, k1)
-	SAVE_U_PCB_REG(a1, A1, k1)
-	SAVE_U_PCB_REG(a2, A2, k1)
-	SAVE_U_PCB_REG(a3, A3, k1)
-	SAVE_U_PCB_REG(t0, T0, k1)
-	SAVE_U_PCB_REG(t1, T1, k1)
-	SAVE_U_PCB_REG(t2, T2, k1)
-	SAVE_U_PCB_REG(t3, T3, k1)
-	SAVE_U_PCB_REG(ta0, TA0, k1)
-	SAVE_U_PCB_REG(ta1, TA1, k1)
-	SAVE_U_PCB_REG(ta2, TA2, k1)
-	SAVE_U_PCB_REG(ta3, TA3, k1)
-	SAVE_U_PCB_REG(t8, T8, k1)
-	SAVE_U_PCB_REG(t9, T9, k1)
-	SAVE_U_PCB_REG(gp, GP, k1)
-	SAVE_U_PCB_REG(sp, SP, k1)
-	SAVE_U_PCB_REG(ra, RA, k1)
-/*
- *  save remaining user state in u.u_pcb.
- */
-	SAVE_U_PCB_REG(s0, S0, k1)
-	SAVE_U_PCB_REG(s1, S1, k1)
-	SAVE_U_PCB_REG(s2, S2, k1)
-	SAVE_U_PCB_REG(s3, S3, k1)
-	SAVE_U_PCB_REG(s4, S4, k1)
-	SAVE_U_PCB_REG(s5, S5, k1)
-	SAVE_U_PCB_REG(s6, S6, k1)
-	SAVE_U_PCB_REG(s7, S7, k1)
-	SAVE_U_PCB_REG(s8, S8, k1)
+	SAVE_UINTR_PCB_REGS(k1)
 
-	mflo	v0			# get lo/hi late to avoid stall
-	mfhi	v1
-	mfc0	a0, MIPS_COP_0_STATUS
-	mfc0	a1, MIPS_COP_0_CAUSE
-	MFC0	a3, MIPS_COP_0_EXC_PC
-	SAVE_U_PCB_REG(v0, MULLO, k1)
-	SAVE_U_PCB_REG(v1, MULHI, k1)
-	SAVE_U_PCB_REG(a0, SR, k1)
-	SAVE_U_PCB_REG(a1, CAUSE, k1)
-	SAVE_U_PCB_REG(a3, PC, k1)	# PC in a3, note used later!
 #ifdef CPU_CHERI
 	/*
 	 * Note: This saves EPCC, matching the explicit EPC save above.
@@ -1193,6 +1244,17 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 	SAVE_CREGS_TO_PCB(k1, t0, t1)
 #endif
 	PTR_SUBU	sp, k1, CALLFRAME_SIZ  # switch to kernel SP
+#else /* CHERI_KERNEL */
+	GET_CPU_PCPU(CHERI_REG_KR1C, k1)
+	clc CHERI_REG_KR1C, zero, PC_CURPCB(CHERI_REG_KR1C)
+	SAVE_UINTR_PCB_REGS(CHERI_REG_KR1C)
+
+	SAVE_CREGS_TO_PCB(CHERI_REG_KR1C, t0, t1)
+	/* switch to kernel SP */
+	/* XXX-AM: This should break with cheri, pcb* can not access kernel stack */
+	cincoffset	CHERI_REG_STC, CHERI_REG_KR1C, CALLFRAME_SIZ
+#endif /* CHERI_KERNEL */
+
 	PTR_LA	gp, _C_LABEL(_gp)	# switch to kernel GP
 
 # Turn off fpu, disable interrupts, set kernel mode kernel mode, clear exception level.
@@ -1205,7 +1267,11 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 #endif
 	mtc0	t0, MIPS_COP_0_STATUS
 	ITLBNOPFIX
+#ifndef CHERI_KERNEL
 	PTR_ADDU a0, k1, U_PCB_REGS
+#else
+	cincoffset $c3, CHERI_REG_KR1C, U_PCB_REGS
+#endif	
 /*
  * Call the interrupt handler.
  */
@@ -1214,8 +1280,15 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 #else
 	PTR_LA	t9, _C_LABEL(cpu_intr)
 #endif
+#ifndef CHERI_KERNEL
 	jalr	t9
 	REG_S	a3, CALLFRAME_RA(sp)	# for debugging
+#else
+	cgetpccsetoffset	$c12, t9
+	cjalr	$c12, $c17
+	/* XXX-AM: we should use EPCC here, once ddb is in place we should find a place for it */
+	csd	a3, zero, CALLFRAME_RA(CHERI_REG_STC)	# for debugging
+#endif	
 
 /*
  * Enable interrupts before doing ast().
@@ -1239,8 +1312,13 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
  */
 	CLEAR_STATUS
 
-	GET_CPU_PCPU_NOCAP(k1)
+#ifndef CHERI_KERNEL
+	GET_CPU_PCPU(k1)
 	PTR_L	k1, PC_CURPCB(k1)
+#else
+	GET_CPU_PCPU(CHERI_REG_KR1C, k1)
+	clc	CHERI_REG_KR1C, zero, PC_CURPCB(CHERI_REG_KR1C)
+#endif
 
 	/*
 	 * Update interrupt mask in saved status register
@@ -1249,54 +1327,28 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 	 */
 	mfc0	a0, MIPS_COP_0_STATUS
 	and	a0, a0, MIPS_SR_INT_MASK
+#ifndef CHERI_KERNEL
 	RESTORE_U_PCB_REG(a1, SR, k1)
+#else
+	RESTORE_U_PCB_REG(a1, SR, CHERI_REG_KR1C)
+#endif
 	and	a1, a1, ~MIPS_SR_INT_MASK
 	or	a1, a1, a0
+#ifndef CHERI_KERNEL
 	SAVE_U_PCB_REG(a1, SR, k1)
-
 #ifdef CPU_CHERI
 	/*
 	 * Note: This restores EPCC, matching the explicit EPC restore below.
 	 */
 	RESTORE_CREGS_FROM_PCB(k1, t0)
 #endif
-	RESTORE_U_PCB_REG(s0, S0, k1)
-	RESTORE_U_PCB_REG(s1, S1, k1)
-	RESTORE_U_PCB_REG(s2, S2, k1)
-	RESTORE_U_PCB_REG(s3, S3, k1)
-	RESTORE_U_PCB_REG(s4, S4, k1)
-	RESTORE_U_PCB_REG(s5, S5, k1)
-	RESTORE_U_PCB_REG(s6, S6, k1)
-	RESTORE_U_PCB_REG(s7, S7, k1)
-	RESTORE_U_PCB_REG(s8, S8, k1)
-	RESTORE_U_PCB_REG(t0, MULLO, k1)
-	RESTORE_U_PCB_REG(t1, MULHI, k1)
-	RESTORE_U_PCB_REG(t2, PC, k1)
-	mtlo	t0
-	mthi	t1
-	MTC0	t2, MIPS_COP_0_EXC_PC	# set return address
-	RESTORE_U_PCB_REG(v0, V0, k1)
-	RESTORE_U_PCB_REG(v1, V1, k1)
-	RESTORE_U_PCB_REG(a0, A0, k1)
-	RESTORE_U_PCB_REG(a1, A1, k1)
-	RESTORE_U_PCB_REG(a2, A2, k1)
-	RESTORE_U_PCB_REG(a3, A3, k1)
-	RESTORE_U_PCB_REG(t0, T0, k1)
-	RESTORE_U_PCB_REG(t1, T1, k1)
-	RESTORE_U_PCB_REG(t2, T2, k1)
-	RESTORE_U_PCB_REG(t3, T3, k1)
-	RESTORE_U_PCB_REG(ta0, TA0, k1)
-	RESTORE_U_PCB_REG(ta1, TA1, k1)
-	RESTORE_U_PCB_REG(ta2, TA2, k1)
-	RESTORE_U_PCB_REG(ta3, TA3, k1)
-	RESTORE_U_PCB_REG(t8, T8, k1)
-	RESTORE_U_PCB_REG(t9, T9, k1)
-	RESTORE_U_PCB_REG(gp, GP, k1)
-	RESTORE_U_PCB_REG(k0, SR, k1)
-	RESTORE_U_PCB_REG(sp, SP, k1)
-	RESTORE_U_PCB_REG(ra, RA, k1)
-	.set	noat
-	RESTORE_U_PCB_REG(AT, AST, k1)
+	RESTORE_UINTR_PCB_REGS(k1)
+#else /* CHERI_KERNEL */
+	SAVE_U_PCB_REG(a1, SR, CHERI_REG_KR1C)
+
+	RESTORE_CREGS_FROM_PCB(CHERI_REG_KR1C, t0)
+	RESTORE_UINTR_PCB_REGS(CHERI_REG_KR1C)
+#endif /* CHERI_KERNEL */
 
 	mtc0	k0, MIPS_COP_0_STATUS	# SR with EXL set.
 	ITLBNOPFIX
