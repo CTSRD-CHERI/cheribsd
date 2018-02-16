@@ -58,6 +58,11 @@ SUBDIR.${MK_SENDMAIL}+=	rmail
 SUBDIR.${MK_TCSH}+=	csh
 SUBDIR.${MK_TESTS}+=	tests
 
+.if ${MK_CHERI_SHARED} != "no"
+SUBDIR.${MK_CHERI}+=	cheri_minimal_dynamic_exe
+.endif
+
+
 .include <bsd.arch.inc.mk>
 
 SUBDIR:=	${SUBDIR:O}
