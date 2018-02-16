@@ -303,19 +303,19 @@ pte_test(pt_entry_t *pte, pt_entry_t bit)
 static __inline void
 pde_clear(pd_entry_t *pde, pt_entry_t bit)
 {
-	ptr_set_flag(*(pt_entry_t *)pde, (~bit));
+	*(pt_entry_t *)pde &= (~bit);
 }
 
 static __inline void
 pde_set(pd_entry_t *pde, pt_entry_t bit)
 {
-	ptr_set_flag(*(pt_entry_t *)pde, bit);
+	*(pt_entry_t *)pde |= bit;
 }
 
 static __inline int
 pde_test(pd_entry_t *pde, pt_entry_t bit)
 {
-	return (ptr_get_flag(*(pt_entry_t *)pde, bit) == bit);
+	return ((*(pt_entry_t *)pde & bit) == bit);
 }
 
 static __inline pt_entry_t
