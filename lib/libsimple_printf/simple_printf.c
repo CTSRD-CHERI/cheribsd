@@ -296,6 +296,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 			goto handle_nosign;
 		case 'p':
 			ptr = va_arg(ap, void *);
+#ifdef __CHERI__
 			if (sharpflag) {
 				/* v:0 */
 				PCHAR('v'); PCHAR(':');
@@ -351,9 +352,9 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 				     NULL, 0);
 				while (*q)
 					PCHAR(*q--);
-
 				break;
 			}
+#endif	/* defined(__CHERI__) */
 			base = 16;
 			sharpflag = (width == 0);
 			sign = 0;
