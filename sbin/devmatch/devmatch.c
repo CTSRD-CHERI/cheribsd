@@ -289,7 +289,7 @@ search_hints(const char *bus, const char *dev, const char *pnpinfo)
 								break;
 							/*FALLTHROUGH*/
 						case 'I':
-							if (v != ival && ival != 0)
+							if (v != ival)
 								notme++;
 							break;
 						case 'G':
