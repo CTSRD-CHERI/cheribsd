@@ -75,6 +75,7 @@ XLEAF(FUNC_PREFIX(memmovenocap_c))
 	cmove	$c3, $c4
 	cmove	$c4, $c1
 XLEAF(FUNC_PREFIX(bcopynocap_c))
+	beqz		a0, return	/* return immediately if zero-length */
 	li	t0, ~CHERI_PERM_LOAD_CAP
 	candperm	$c3, $c3, t0	/* strip LOAD_CAP from dst */
 XLEAF(FUNC_PREFIX(bcopy_c))
