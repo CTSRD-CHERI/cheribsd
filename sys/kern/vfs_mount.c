@@ -1915,9 +1915,9 @@ mount_arg(struct mntarg *ma, const char *name, const void *val, int len)
 	ma->len++;
 
 	if (len < 0)
-		IOVEC_INIT_STR(&ma->v[ma->len], __DECONST(void *, val));
+		IOVEC_INIT_STR(&ma->v[ma->len], __DECONST(char *, val));
 	else
-		IOVEC_INIT(&ma->v[ma->len], len);
+		IOVEC_INIT(&ma->v[ma->len], __DECONST(char *, val), len);
 	ma->len++;
 	return (ma);
 }
