@@ -249,6 +249,7 @@ extern struct proc p0;
 #define	curproc		(&p0)
 
 #define	PS_NONE		-1
+
 extern kthread_t *zk_thread_create(void (*func)(void*), void *arg);
 
 #define	issig(why)	(FALSE)
