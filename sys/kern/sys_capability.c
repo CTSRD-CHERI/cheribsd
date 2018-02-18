@@ -212,10 +212,10 @@ cap_rights_to_vmprot(cap_rights_t *havep)
  */
 
 cap_rights_t *
-cap_rights_fde(struct filedescent *fde)
+cap_rights_fde(struct filedescent *fdep)
 {
 
-	return (&fde->fde_rights);
+	return (&fdep->fde_rights);
 }
 
 cap_rights_t *
@@ -229,24 +229,26 @@ int
 kern_cap_rights_limit(struct thread *td, int fd, cap_rights_t *rights)
 {
 	struct filedesc *fdp;
+	struct filedescent *fdep;
 	int error;
 
 	fdp = td->td_proc->p_fd;
 	FILEDESC_XLOCK(fdp);
-	if (fget_locked(fdp, fd) == NULL) {
+	fdep = fdeget_locked(fdp, fd);
+	if (fdep == NULL) {
 		FILEDESC_XUNLOCK(fdp);
 		return (EBADF);
 	}
 	error = _cap_check(cap_rights(fdp, fd), rights, CAPFAIL_INCREASE);
 	if (error == 0) {
-		fdp->fd_ofiles[fd].fde_rights = *rights;
+		fdep->fde_rights = *rights;
 		if (!cap_rights_is_set(rights, CAP_IOCTL)) {
-			free(fdp->fd_ofiles[fd].fde_ioctls, M_FILECAPS);
-			fdp->fd_ofiles[fd].fde_ioctls = NULL;
-			fdp->fd_ofiles[fd].fde_nioctls = 0;
+			free(fdep->fde_ioctls, M_FILECAPS);
+			fdep->fde_ioctls = NULL;
+			fdep->fde_nioctls = 0;
 		}
 		if (!cap_rights_is_set(rights, CAP_FCNTL))
-			fdp->fd_ofiles[fd].fde_fcntls = 0;
+			fdep->fde_fcntls = 0;
 	}
 	FILEDESC_XUNLOCK(fdp);
 	return (error);
@@ -364,19 +366,23 @@ kern_cap_rights_get(struct thread *td, int version, int fd,
 int
 cap_ioctl_check(struct filedesc *fdp, int fd, u_long cmd)
 {
+	struct filedescent *fdep;
 	u_long *cmds;
 	ssize_t ncmds;
 	long i;
 
-	FILEDESC_LOCK_ASSERT(fdp);
 	KASSERT(fd >= 0 && fd < fdp->fd_nfiles,
+		("%s: invalid fd=%d", __func__, fd));
+
+	fdep = fdeget_locked(fdp, fd);
+	KASSERT(fdep == NULL,
 	    ("%s: invalid fd=%d", __func__, fd));
 
-	ncmds = fdp->fd_ofiles[fd].fde_nioctls;
+	ncmds = fdep->fde_nioctls;
 	if (ncmds == -1)
 		return (0);
 
-	cmds = fdp->fd_ofiles[fd].fde_ioctls;
+	cmds = fdep->fde_ioctls;
 	for (i = 0; i < ncmds; i++) {
 		if (cmds[i] == cmd)
 			return (0);
@@ -389,7 +395,7 @@ cap_ioctl_check(struct filedesc *fdp, int fd, u_long cmd)
  * Check if the current ioctls list can be replaced by the new one.
  */
 static int
-cap_ioctl_limit_check(struct filedesc *fdp, int fd, const u_long *cmds,
+cap_ioctl_limit_check(struct filedescent *fdep, const u_long *cmds,
     size_t ncmds)
 {
 	u_long *ocmds;
@@ -397,13 +403,13 @@ cap_ioctl_limit_check(struct filedesc *fdp, int fd, const u_long *cmds,
 	u_long i;
 	long j;
 
-	oncmds = fdp->fd_ofiles[fd].fde_nioctls;
+	oncmds = fdep->fde_nioctls;
 	if (oncmds == -1)
 		return (0);
 	if (oncmds < (ssize_t)ncmds)
 		return (ENOTCAPABLE);
 
-	ocmds = fdp->fd_ofiles[fd].fde_ioctls;
+	ocmds = fdep->fde_ioctls;
 	for (i = 0; i < ncmds; i++) {
 		for (j = 0; j < oncmds; j++) {
 			if (cmds[i] == ocmds[j])
@@ -420,6 +426,7 @@ int
 kern_cap_ioctls_limit(struct thread *td, int fd, u_long *cmds, size_t ncmds)
 {
 	struct filedesc *fdp;
+	struct filedescent *fdep;
 	u_long *ocmds;
 	int error;
 
@@ -433,18 +440,19 @@ kern_cap_ioctls_limit(struct thread *td, int fd, u_long *cmds, size_t ncmds)
 	fdp = td->td_proc->p_fd;
 	FILEDESC_XLOCK(fdp);
 
-	if (fget_locked(fdp, fd) == NULL) {
+	fdep = fdeget_locked(fdp, fd);
+	if (fdep == NULL) {
 		error = EBADF;
 		goto out;
 	}
 
-	error = cap_ioctl_limit_check(fdp, fd, cmds, ncmds);
+	error = cap_ioctl_limit_check(fdep, cmds, ncmds);
 	if (error != 0)
 		goto out;
 
-	ocmds = fdp->fd_ofiles[fd].fde_ioctls;
-	fdp->fd_ofiles[fd].fde_ioctls = cmds;
-	fdp->fd_ofiles[fd].fde_nioctls = ncmds;
+	ocmds = fdep->fde_ioctls;
+	fdep->fde_ioctls = cmds;
+	fdep->fde_nioctls = ncmds;
 
 	cmds = ocmds;
 	error = 0;
@@ -557,7 +565,7 @@ out:
  * Test whether a capability grants the given fcntl command.
  */
 int
-cap_fcntl_check_fde(struct filedescent *fde, int cmd)
+cap_fcntl_check_fde(struct filedescent *fdep, int cmd)
 {
 	uint32_t fcntlcap;
 
@@ -565,7 +573,7 @@ cap_fcntl_check_fde(struct filedescent *fde, int cmd)
 	KASSERT((CAP_FCNTL_ALL & fcntlcap) != 0,
 	    ("Unsupported fcntl=%d.", cmd));
 
-	if ((fde->fde_fcntls & fcntlcap) != 0)
+	if ((fdep->fde_fcntls & fcntlcap) != 0)
 		return (0);
 
 	return (ENOTCAPABLE);
@@ -585,6 +593,7 @@ int
 sys_cap_fcntls_limit(struct thread *td, struct cap_fcntls_limit_args *uap)
 {
 	struct filedesc *fdp;
+	struct filedescent *fdep;
 	uint32_t fcntlrights;
 	int fd;
 
@@ -600,17 +609,18 @@ sys_cap_fcntls_limit(struct thread *td, struct cap_fcntls_limit_args *uap)
 	fdp = td->td_proc->p_fd;
 	FILEDESC_XLOCK(fdp);
 
-	if (fget_locked(fdp, fd) == NULL) {
+	fdep = fdeget_locked(fdp, fd);
+	if (fdep == NULL) {
 		FILEDESC_XUNLOCK(fdp);
 		return (EBADF);
 	}
 
-	if ((fcntlrights & ~fdp->fd_ofiles[fd].fde_fcntls) != 0) {
+	if ((fcntlrights & ~fdep->fde_fcntls) != 0) {
 		FILEDESC_XUNLOCK(fdp);
 		return (ENOTCAPABLE);
 	}
 
-	fdp->fd_ofiles[fd].fde_fcntls = fcntlrights;
+	fdep->fde_fcntls = fcntlrights;
 	FILEDESC_XUNLOCK(fdp);
 
 	return (0);
@@ -629,17 +639,19 @@ kern_cap_fcntls_get(struct thread *td, int fd,
     uint32_t * __capability fcntlrightsp)
 {
 	struct filedesc *fdp;
+	struct filedescent *fdep;
 	uint32_t rights;
 
 	AUDIT_ARG_FD(fd);
 
 	fdp = td->td_proc->p_fd;
 	FILEDESC_SLOCK(fdp);
-	if (fget_locked(fdp, fd) == NULL) {
+	fdep = fdeget_locked(fdp, fd);
+	if (fdep == NULL) {
 		FILEDESC_SUNLOCK(fdp);
 		return (EBADF);
 	}
-	rights = fdp->fd_ofiles[fd].fde_fcntls;
+	rights = fdep->fde_fcntls;
 	FILEDESC_SUNLOCK(fdp);
 
 	return (copyout_c(&rights, fcntlrightsp, sizeof(rights)));
