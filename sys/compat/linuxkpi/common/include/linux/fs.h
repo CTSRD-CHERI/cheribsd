@@ -42,6 +42,7 @@
 #include <linux/wait.h>
 #include <linux/semaphore.h>
 #include <linux/spinlock.h>
+#include <linux/dcache.h>
 
 struct module;
 struct kiocb;
@@ -63,11 +64,6 @@ struct pfs_node;
 
 
 typedef struct files_struct *fl_owner_t;
-
-struct dentry {
-	struct inode	*d_inode;
-	struct pfs_node	*d_pfs_node;
-};
 
 struct file_operations;
 
