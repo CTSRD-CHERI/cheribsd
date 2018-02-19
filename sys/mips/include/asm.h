@@ -707,11 +707,23 @@ _C_LABEL(x):
 
 #if defined(MIPS_EXC_CNTRS)
 
+#ifndef CHERI_KERNEL
 #define	INC_EXCEPTION_CNTR(name)				\
 	PTR_L		k1, _C_LABEL(pcpup);			\
 	PTR_L		k0, PC_ ## name ## (k1);		\
 	PTR_ADDIU	k0, k0, 1;				\
 	PTR_S		k0, PC_ ## name ## (k1)
+#else /* CHERI_KERNEL */
+#define	INC_EXCEPTION_CNTR(name)					\
+	PTR_LA		k1, _C_LABEL(pcpup);				\
+	cgetkdc	CHERI_REG_KR1C;						\
+	csetoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, k1;		\
+	csetbounds	CHERI_REG_KR1C, CHERI_REG_KR1C, CHERICAP_SIZE;	\
+	clc		CHERI_REG_KR1C, zero, 0(CHERI_REG_KR1C);	\
+	cld		k1, zero, PC_ ##name## (CHERI_REG_KR1C);	\
+	daddiu		k1, k1, 1;					\
+	csd		k1, zero, PC_ ##name## (CHERI_REG_KR1C)
+#endif /* CHERI_KERNEL */
 
 #else /* ! defined(MIPS_EXC_CNTRS) */
 

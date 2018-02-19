@@ -130,6 +130,9 @@ ASSYM(PCPU_SIZE, sizeof(struct pcpu));
 ASSYM(U_PCB_CHERIKFRAME, offsetof(struct pcb, pcb_cherikframe));
 #ifdef CHERI_KERNEL
 ASSYM(TRAPFRAME_SIZE, sizeof(struct trapframe));
+/* XXX-AM: This is hardcoded in pmap */
+ASSYM(SEGMAP_SIZE, PAGE_SIZE);
+ASSYM(MAXCPU, MAXCPU);
 #endif
 #endif
 

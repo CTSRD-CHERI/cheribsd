@@ -353,7 +353,7 @@ VECTOR(MipsException, unknown)
  * Find out what mode we came from and jump to the proper handler.
  *
  * Note: at turned off here because we cannot trash the at register
- * in this exception code. Only k0 and k1 may be modified before
+ * in this exception code. Only k0, k1 and kr1c may be modified before
  * we save registers. This is true of all functions called through
  * the pointer magic: Mips{User,Kern}Intr, Mips{User,Kern}GenException
  * and MipsTLBInvalidException
@@ -1224,7 +1224,9 @@ END(MipsKernIntr)
 	.set	noat;					\
 	RESTORE_U_PCB_REG(AT, AST, k1)
 
-
+/*
+ * XXX-AM: porting this to purecap kernel makes a mess, probably we should split it
+ */
 NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 	.set	noat
 	.mask	0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ)
@@ -1381,6 +1383,7 @@ LEAF_NOPROFILE(MipsTLBInvalidException)
 
 	# Increment exception counter, if enabled.
 	INC_EXCEPTION_CNTR(TLB_INVALID_CNT)
+#ifndef CHERI_KERNEL
 	MFC0		k0, MIPS_COP_0_BAD_VADDR
 	PTR_LI		k1, VM_MAXUSER_ADDRESS
 	sltu		k1, k0, k1
@@ -1393,7 +1396,7 @@ LEAF_NOPROFILE(MipsTLBInvalidException)
 	PTR_L		k1, %lo(kernel_segmap)(k1)	# k1=segment tab base
 
 1:	/* User address.  */
-	GET_CPU_PCPU_NOCAP(k1)
+	GET_CPU_PCPU(k1)
 	PTR_L		k1, PC_SEGBASE(k1)
 
 2:	/* Validate page directory pointer.  */
@@ -1542,7 +1545,7 @@ tlb_insert_random:
 	/*
 	 * Check for kernel stack overflow.
 	 */
-	GET_CPU_PCPU_NOCAP(k1)
+	GET_CPU_PCPU(k1)
 	PTR_L	k0, PC_CURTHREAD(k1)
 	PTR_L	k0, TD_KSTACK(k0)
 	sltu	k0, k0, sp
@@ -1555,7 +1558,7 @@ tlb_insert_random:
 	 * Move to a valid stack before we call panic. We use the boot stack
 	 * for this purpose.
 	 */
-	GET_CPU_PCPU_NOCAP(k1)
+	GET_CPU_PCPU(k1)
 	lw	k1, PC_CPUID(k1)
 	sll	k1, k1, PAGE_SHIFT + 1
 
@@ -1597,12 +1600,239 @@ tlb_insert_random:
 	/*
 	 * Squelch any more overflow checks by setting the stack base to 0.
 	 */
-	GET_CPU_PCPU_NOCAP(k1)
+	GET_CPU_PCPU(k1)
 	PTR_L	k0, PC_CURTHREAD(k1)
 	PTR_S	zero, TD_KSTACK(k0)
 
 	move	a1, a0
 	PANIC("kernel stack overflow - trapframe at %p")
+
+#else /* CHERI_KERNEL */
+/*
+ * XXX-AM: Some of the code is redundant with the non-purecap version
+ * but splitting it is more readable than adding ifdefs for every load/store.
+ */
+	/* XXX-AM: Leave this check for now, we should use EPCC later */
+	MFC0		k0, MIPS_COP_0_BAD_VADDR
+	PTR_LI		k1, VM_MAXUSER_ADDRESS
+	sltu		k1, k0, k1
+	bnez		k1, 1f
+	nop
+
+	/* Kernel address. */
+	PTR_LA		k1, _C_LABEL(kernel_segmap)
+	cgetkdc		CHERI_REG_KR1C
+	csetoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, k1
+	REG_LI		k1, SEGMAP_SIZE
+	b		2f
+	csetbounds	CHERI_REG_KR1C, CHERI_REG_KR1C, k1
+
+1:	/* User address.  */
+	GET_CPU_PCPU(CHERI_REG_KR1C, k1)
+	clc	CHERI_REG_KR1C, zero, PC_SEGBASE(CHERI_REG_KR1C)
+
+2:	/* Validate page directory pointer. If no seg tab go to exception processing */
+	cbez		CHERI_REG_KR1C, 3f
+	nop
+
+	PTR_SRL		k0, SEGSHIFT - PTRSHIFT		# k0=seg offset (almost)
+	andi		k0, k0, PDEPTRMASK		# k0=seg offset
+	cincoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, k0 # kr1c=seg entry address
+	clc		CHERI_REG_KR1C, zero, 0(CHERI_REG_KR1C) # kr1c=seg entry
+
+	/* Validate page table pointer.  */
+	cbez		CHERI_REG_KR1C, 3f
+	nop
+
+	/* Assumes __mips_n64 and ! defined(MIPS64_NEW_PMAP) */
+
+	MFC0		k0, MIPS_COP_0_BAD_VADDR
+	PTR_SRL		k0, PDRSHIFT - PTRSHIFT		# k0=pde offset (almost)
+	andi		k0, k0, PDEPTRMASK		# k0=pde offset
+	cincoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, k0 # kr1c=pde entry address
+	clc		CHERI_REG_KR1C, zero, 0(CHERI_REG_KR1C) # kr1c=pde entry
+
+	/* Validate pde table pointer.  */
+	cbez		CHERI_REG_KR1C, 3f
+	nop
+
+	MFC0		k0, MIPS_COP_0_BAD_VADDR	# k0=bad address (again)
+	PTR_SRL		k0, PAGE_SHIFT - PTESHIFT	# k0=VPN
+	andi		k0, k0, PTEMASK			# k0=page tab offset
+	cincoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, k0 # kr1c=pte address
+	cld		k0, zero, 0(CHERI_REG_KR1C)	# k0=this PTE
+
+	/* Validate page table entry.  */
+	andi		k0, PTE_VR
+	beqz		k0, 3f
+	nop
+
+	/* Check whether this is an even or odd entry.  */
+	cgetoffset	k1, CHERI_REG_KR1C
+	andi		k1, k1, PTESIZE
+	bnez		k1, odd_page
+	nop
+
+	CLEAR_PTE_SWBITS(k0)
+	PTE_MTC0	k0, MIPS_COP_0_TLB_LO0
+	COP0_SYNC
+
+	cld		k0, zero, PTESIZE(CHERI_REG_KR1C)
+
+	CLEAR_PTE_SWBITS(k0)
+	PTE_MTC0	k0, MIPS_COP_0_TLB_LO1
+	COP0_SYNC
+
+	b		tlb_insert_entry
+	nop
+
+odd_page:
+	cld		k0, zero, -PTESIZE(CHERI_REG_KR1C)
+
+	CLEAR_PTE_SWBITS(k0)
+	PTE_MTC0	k0, MIPS_COP_0_TLB_LO0
+	COP0_SYNC
+
+	cld		k0, zero, 0(CHERI_REG_KR1C)
+
+	CLEAR_PTE_SWBITS(k0)
+	PTE_MTC0	k0, MIPS_COP_0_TLB_LO1
+	COP0_SYNC
+
+tlb_insert_entry:
+	tlbp
+	HAZARD_DELAY
+	mfc0		k0, MIPS_COP_0_TLB_INDEX
+	bltz		k0, tlb_insert_random
+	nop
+	tlbwi
+	PTE_MTC0	zero, MIPS_COP_0_TLB_PG_MASK
+	COP0_SYNC
+	/* Assume defined(CPU_CHERI) */
+	CHERI_EXCEPTION_RETURN(k0)
+	eret
+	ssnop
+
+tlb_insert_random:
+	tlbwr
+	PTE_MTC0	zero, MIPS_COP_0_TLB_PG_MASK
+	COP0_SYNC
+	/* Assume defined(CPU_CHERI) */
+	CHERI_EXCEPTION_RETURN(k0)
+	eret
+	ssnop
+
+3:
+	/*
+	 * Branch to the comprehensive exception processing.
+	 */
+	mfc0	k1, MIPS_COP_0_STATUS
+	andi	k1, k1, MIPS_SR_KSU_USER
+	bnez	k1, _C_LABEL(MipsUserGenException)
+	nop
+
+	/*
+	 * Check for kernel stack overflow.
+	 */
+	GET_CPU_PCPU(CHERI_REG_KR1C, k1)
+	clc	CHERI_REG_KR1C, zero, PC_CURTHREAD(CHERI_REG_KR1C)
+	clc	CHERI_REG_KR1C, zero, TD_KSTACK(CHERI_REG_KR1C)
+	cltu	k0, CHERI_REG_KR1C, CHERI_REG_STC /* XXX-AM Who installed the kernel stack? */
+	bnez	k0, _C_LABEL(MipsKernGenException)
+	nop
+
+	/*
+	 * Kernel stack overflow.
+	 *
+	 * Move to a valid stack before we call panic. We use the boot stack
+	 * for this purpose.
+	 */
+	GET_CPU_PCPU(CHERI_REG_KR1C, k1)
+	clw	k1, zero, PC_CPUID(CHERI_REG_KR1C)
+	sll	k1, k1, PAGE_SHIFT + 1
+
+	/* XXX-AM: Note this is shared with locore, we may have macro for this */
+	PTR_LA	k0, _C_LABEL(pcpu_space)
+	cgetkdc	CHERI_REG_KR1C
+	csetoffset CHERI_REG_KR1C, CHERI_REG_KR1C, k0
+	/* set the pcpu space bounds */
+	REG_LI		k0, MAXCPU * PAGE_SIZE * 2
+	csetbounds	CHERI_REG_KR1C, CHERI_REG_KR1C, k0
+	/* go to beginning of the current cpu space */
+	cincoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, k1
+	/* skip the pcpu data */
+	REG_LI		k1, PCPU_SIZE
+	cincoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, k1
+	/* boot kstack bounds */
+	REG_LI		k1, (PAGE_SIZE * 2) - PCPU_SIZE
+	csetbounds	CHERI_REG_KR1C, CHERI_REG_KR1C, k1
+	/* go to the top of the kstack */
+	cincoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, k1
+
+	/*
+	 * Convergence of interests: save the original 'sp' in 'k1' so that
+	 * SAVE_CPU can preserve that rather than our modified 'sp' used to
+	 * access the stack during the exception handler.  But also save it so
+	 * that we can restore it later.
+	 *
+	 * XXX-AM: here we can not use KR2C (SEC0) because it holds the original
+	 * ddc saved by CHERI_EXCEPTION_ENTER in MipsException. So we cheat
+	 * by temporarily resetting the saved ddc in c0 and reload it later
+	 * when we have swapped kr1c and stc.
+	 * We also need a spare register to save $c17 to store it to the callframe.
+	 *
+	 * Another option is not to care about things saved in kr1c/kr2c since
+	 * we are going to panic anyway. This have an unknown effect on debuggability.
+	 */
+	csetdefault CHERI_REG_SEC0
+	cmove	CHERI_REG_KR1C, CHERI_REG_STC
+	cmove	CHERI_REG_STC, CHERI_REG_KR1C
+	cmove	CHERI_REG_KR1C, CHERI_REG_KR2C
+	PTR_SUBU	k0, zero, KERN_EXC_FRAME_SIZE
+	cincoffset	CHERI_REG_STC, CHERI_REG_STC, k0
+	/* Assume the stack is capability aligned */
+
+	cmove	CHERI_REG_KR2C, $c17
+	CHERI_NULL($c17)
+	/* stop the ddb backtrace right here */
+	csc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
+	csc	$c17, zero, CALLFRAME_SP(CHERI_REG_STC)
+	cmove	$c17, CHERI_REG_KR2C
+	cgetdefault CHERI_REG_SEC0
+	csetdefault CHERI_REG_KDC /* XXX-AM: end of hack */
+
+	/*
+	 * Save CPU state, building 'frame'. stc holds the location to save
+	 * the trap frame, whereas kr1c holds the value of sp to save in the
+	 * trap frame.
+	 */
+	SAVE_CPU
+
+	/*
+	 * Now restore the value of 'sp' at the time of the tlb exception in
+	 * the trapframe.
+	 * XXX-AM: This seems redundant, SAVE_CPU already does this...
+	 */
+	// SAVE_REG(k1, SP)
+
+	/*
+	 * Squelch any more overflow checks by setting the stack base to 0.
+	 * XXX-AM: This is slightly nonsensical in cheri because if we store
+	 * NULL in td_kstack it will fail pointer checks, setting it to
+	 * KDC with KDC.offset = 0 seems a more reasonable solution although
+	 * KDC may not be allowed to point to zero.
+	 * I decided to skip it.
+	 */
+	/*
+	GET_CPU_PCPU(CHERI_REG_KR1C, k1)
+	clc	CHERI_REG_KR1C, zero, PC_CURTHREAD(CHERI_REG_KR1C)
+	csc	CHERI_REG_KDC, zero, TD_KSTACK(CHERI_REG_KR1C)
+	*/
+
+	/* trapframe * in c3 is left there by SAVE_CPU */
+	PANIC("kernel stack overflow - trapframe at %p")
+
+#endif /* CHERI_KERNEL */
 
 	/*
 	 * This nop is necessary so that the 'ra' remains within the bounds

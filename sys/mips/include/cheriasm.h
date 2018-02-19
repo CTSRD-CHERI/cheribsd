@@ -102,7 +102,7 @@
 /*
  * Macro to abstract the creation of a NULL capability
  */
-#define CHERI_NULL(reg) cfromptr reg, $c30, zero
+#define CHERI_NULL(reg) cfromptr reg, CHERI_REG_KDC, zero
 
 /*
  * Macro to abstract use of cmove in kernel assembly, used as a temporary
