@@ -192,6 +192,13 @@ MD_ROOT_SIZE_CONFIGURED!=	grep MD_ROOT_SIZE opt_md.h || true ; echo
 SYSTEM_OBJS+= embedfs_${MFS_IMAGE:T:R}.o
 .endif
 .endif
+
+# If we are building for a cheri target, then LD_EMULATION should adapt.
+# Set CHERI_LD_TARGET accordingly
+.if ${ARCH_FLAGS:Mcheri-unknown-freebsd} != ""
+CHERI_LD_TARGET=cheri
+.endif
+
 SYSTEM_LD= @${LD} -m ${LD_EMULATION} -Bdynamic -T ${LDSCRIPT} ${_LDFLAGS} \
 	--no-warn-mismatch --warn-common --export-dynamic \
 	--dynamic-linker /red/herring \
