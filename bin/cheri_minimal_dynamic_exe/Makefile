@@ -13,7 +13,7 @@ LDADD+=		-lsimple_printf -nodefaultlibs
 SRCS=	main.c
 
 # For now avoid linking against libsyscalls since it crashes
-USE_LIBSYSCALLS=no
+USE_LIBSYSCALLS?=yes
 .if ${USE_LIBSYSCALLS} == "yes"
 LIBADD=		syscalls
 .else
