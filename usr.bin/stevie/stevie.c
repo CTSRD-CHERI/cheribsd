@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD$");
 #include <ctype.h>
 #include <err.h>
 #include <pthread.h>
+#include <pthread_np.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -122,6 +123,8 @@ call(void)
 	void * __capability lookedup;
 	int error;
 
+	fprintf(stderr, "%s: we are thread %d\n", __func__, pthread_getthreadid_np());
+
 	fprintf(stderr, "%s: setting up...\n", __func__);
 	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
 	if (error != 0)
@@ -144,6 +147,8 @@ service_proc(void *dummy __unused)
 	void * __capability switcher_data;
 	int error;
 
+	fprintf(stderr, "%s: we are thread %d\n", __func__, pthread_getthreadid_np());
+
 	fprintf(stderr, "%s: setting up...\n", __func__);
 	error = cosetup(COSETUP_COACCEPT, &switcher_code, &switcher_data);
 	if (error != 0)
@@ -156,7 +161,7 @@ service_proc(void *dummy __unused)
 
 	fprintf(stderr, "%s: code %p, data %p, accepting...\n", __func__, (__cheri_fromcap void *)switcher_code, (__cheri_fromcap void *)switcher_data);
 	while (coaccept(switcher_code, switcher_data)) {
-		fprintf(stderr, "%s: accepted, looping...", __func__);
+		fprintf(stderr, "%s: accepted, we are thread %d, looping...", __func__, pthread_getthreadid_np());
 	}
 	fprintf(stderr, "%s: we're not supposed to be here\n", __func__);
 	return (NULL);
