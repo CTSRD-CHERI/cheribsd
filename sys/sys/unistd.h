@@ -192,6 +192,11 @@
     RFPROCDESC | RFPPWAIT)
 #define	RFKERNELONLY	(RFSTOPPED | RFHIGHPID | RFPPWAIT | RFPROCDESC)
 
+#if __has_feature(capabilities)
+#define	COSETUP_COCALL		0
+#define	COSETUP_COACCEPT	1
+#endif
+
 #endif /* __BSD_VISIBLE */
 
 #endif /* !_SYS_UNISTD_H_ */

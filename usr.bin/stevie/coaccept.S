@@ -2,9 +2,9 @@
 .set noat
 
 .text
-.global cocall
+.global coaccept
 
-cocall:
+coaccept:
 	ccall	$c3, $c4, 1
 	cgetpcc $c11
 	jr	$ra

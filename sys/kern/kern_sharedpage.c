@@ -267,9 +267,12 @@ exec_sysvec_init(void *param)
 	sv->sv_shared_page_obj = shared_page_obj;
 	sv->sv_sigcode_base = sv->sv_shared_page_base +
 	    shared_page_fill(*(sv->sv_szsigcode), 16, sv->sv_sigcode);
-	sv->sv_switcher_base = sv->sv_shared_page_base +
-	    shared_page_fill(szswitcher, 16, switcher);
-	sv->sv_switcher_len = szswitcher;
+	sv->sv_cocall_base = sv->sv_shared_page_base +
+	    shared_page_fill(szswitcher_cocall, 16, switcher_cocall);
+	sv->sv_cocall_len = szswitcher_cocall;
+	sv->sv_coaccept_base = sv->sv_shared_page_base +
+	    shared_page_fill(szswitcher_coaccept, 16, switcher_coaccept);
+	sv->sv_coaccept_len = szswitcher_coaccept;
 	if ((sv->sv_flags & SV_ABI_MASK) != SV_ABI_FREEBSD)
 		return;
 	if ((sv->sv_flags & SV_TIMEKEEP) != 0) {

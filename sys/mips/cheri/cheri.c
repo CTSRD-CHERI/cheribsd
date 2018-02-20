@@ -39,6 +39,7 @@
 #include <sys/sysctl.h>
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
+#include <sys/unistd.h>
 
 #include <ddb/ddb.h>
 #include <sys/kdb.h>
@@ -259,27 +260,28 @@ cheri_serialize(struct cheri_serial *csp, void * __capability cap)
 		memcpy(&csp->cs_data, &cap, CHERICAP_SIZE);
 }
 
-int
-sys_cocreate(struct thread *td, struct cocreate_args *uap)
+static int
+cosetup(struct thread *td)
 {
 	vm_map_t map;
 	vm_map_entry_t entry;
-	void * __capability codecap;
-	void * __capability datacap;
 	vaddr_t addr;
 	boolean_t found;
 	int error;
+
+	KASSERT(td->td_switcher_data == 0, ("%s: already initialized\n", __func__));
 
 	/*
 	 * XXX: Race between this and setting the owner.
 	 */
 	error = kern_mmap(td, 0, 0, PAGE_SIZE, VM_PROT_READ | VM_PROT_WRITE, MAP_ANON, -1, 0);
 	if (error != 0) {
-		printf("%s: meh\n", __func__);
+		printf("%s: kern_mmap() failed with error %d\n", __func__, error);
 		return (error);
 	}
 
 	addr = td->td_retval[0];
+	td->td_switcher_data = addr;
 	td->td_retval[0] = 0;
 
 	map = &td->td_proc->p_vmspace->vm_map;
@@ -290,18 +292,57 @@ sys_cocreate(struct thread *td, struct cocreate_args *uap)
 	entry->owner = 0;
 	vm_map_unlock(map);
 
-	cheri_capability_set(&codecap, CHERI_CAP_USER_CODE_PERMS,
-	    td->td_proc->p_sysent->sv_switcher_base,
-	    td->td_proc->p_sysent->sv_switcher_len, 0);
-	codecap = cheri_seal(codecap, curproc->p_md.md_cheri_sealcap);
-	error = copyoutcap(&codecap, uap->code, sizeof(codecap));
-	if (error != 0)
-		return (error);
+	return (0);
+}
 
-	cheri_capability_set(&datacap, CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 0);
-	datacap = cheri_seal(datacap, curproc->p_md.md_cheri_sealcap);
-	error = copyoutcap(&datacap, uap->data, sizeof(datacap));
-	return (error);
+int
+sys_cosetup(struct thread *td, struct cosetup_args *uap)
+{
+	void * __capability codecap;
+	void * __capability datacap;
+	vaddr_t addr;
+	int error;
+
+	if (td->td_switcher_data == 0) {
+		error = cosetup(td);
+		if (error != 0)
+			return (error);
+	}
+
+	addr = td->td_switcher_data;
+
+	switch (uap->what) {
+	case COSETUP_COCALL:
+		cheri_capability_set(&codecap, CHERI_CAP_USER_CODE_PERMS,
+		    td->td_proc->p_sysent->sv_cocall_base,
+		    td->td_proc->p_sysent->sv_cocall_len, 0);
+		codecap = cheri_seal(codecap, curproc->p_md.md_cheri_sealcap);
+		error = copyoutcap(&codecap, uap->code, sizeof(codecap));
+		if (error != 0)
+			return (error);
+
+		cheri_capability_set(&datacap, CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 0);
+		datacap = cheri_seal(datacap, curproc->p_md.md_cheri_sealcap);
+		error = copyoutcap(&datacap, uap->data, sizeof(datacap));
+		return (0);
+
+	case COSETUP_COACCEPT:
+		cheri_capability_set(&codecap, CHERI_CAP_USER_CODE_PERMS,
+		    td->td_proc->p_sysent->sv_coaccept_base,
+		    td->td_proc->p_sysent->sv_coaccept_len, 0);
+		codecap = cheri_seal(codecap, curproc->p_md.md_cheri_sealcap);
+		error = copyoutcap(&codecap, uap->code, sizeof(codecap));
+		if (error != 0)
+			return (error);
+
+		cheri_capability_set(&datacap, CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 0);
+		datacap = cheri_seal(datacap, curproc->p_md.md_cheri_sealcap);
+		error = copyoutcap(&datacap, uap->data, sizeof(datacap));
+		return (0);
+
+	default:
+		return (EINVAL);
+	}
 }
 
 int
@@ -311,6 +352,7 @@ sys_coregister(struct thread *td, struct coregister_args *uap)
 	struct coname *con;
 	char name[PATH_MAX];
 	void * __capability cap;
+	vaddr_t addr;
 	int error;
 
 	vmspace = td->td_proc->p_vmspace;
@@ -325,6 +367,14 @@ sys_coregister(struct thread *td, struct coregister_args *uap)
 	if (strlen(name) >= PATH_MAX)
 		return (ENAMETOOLONG);
 
+	if (td->td_switcher_data == 0) {
+		error = cosetup(td);
+		if (error != 0)
+			return (error);
+	}
+
+	addr = td->td_switcher_data;
+
 	vm_map_lock(&vmspace->vm_map);
 	LIST_FOREACH(con, &vmspace->vm_conames, c_next) {
 		if (strcmp(name, con->c_name) == 0) {
@@ -333,12 +383,15 @@ sys_coregister(struct thread *td, struct coregister_args *uap)
 		}
 	}
 
-	cheri_capability_set(&cap, CHERI_CAP_USER_DATA_PERMS, 42 /* XXX */, PAGE_SIZE, 0);
+	cheri_capability_set(&cap, CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 1024 /* XXX */);
 	cap = cheri_seal(cap, curproc->p_md.md_cheri_sealcap);
-	error = copyoutcap(&cap, uap->cap, sizeof(cap));
-	if (error != 0) {
-		vm_map_unlock(&vmspace->vm_map);
-		return (error);
+
+	if (uap->cap != NULL) {
+		error = copyoutcap(&cap, uap->cap, sizeof(cap));
+		if (error != 0) {
+			vm_map_unlock(&vmspace->vm_map);
+			return (error);
+		}
 	}
 
 	con = malloc(sizeof(struct coname), M_TEMP, M_WAITOK);

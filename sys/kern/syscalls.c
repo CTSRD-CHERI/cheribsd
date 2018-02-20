@@ -568,7 +568,7 @@ const char *syscallnames[] = {
 	"mknodat",			/* 559 = mknodat */
 	"kevent",			/* 560 = kevent */
 	"coexecve",			/* 561 = coexecve */
-	"cocreate",			/* 562 = cocreate */
+	"cosetup",			/* 562 = cosetup */
 	"coregister",			/* 563 = coregister */
 	"colookup",			/* 564 = colookup */
 };

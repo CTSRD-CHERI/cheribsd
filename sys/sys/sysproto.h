@@ -1783,7 +1783,8 @@ struct coexecve_args {
 	char argv_l_[PADL_(char **)]; char ** argv; char argv_r_[PADR_(char **)];
 	char envv_l_[PADL_(char **)]; char ** envv; char envv_r_[PADR_(char **)];
 };
-struct cocreate_args {
+struct cosetup_args {
+	char what_l_[PADL_(int)]; int what; char what_r_[PADR_(int)];
 	char code_l_[PADL_(void *__capability *)]; void *__capability * code; char code_r_[PADR_(void *__capability *)];
 	char data_l_[PADL_(void *__capability *)]; void *__capability * data; char data_r_[PADR_(void *__capability *)];
 };
@@ -2177,7 +2178,7 @@ int	sys_fhstatfs(struct thread *, struct fhstatfs_args *);
 int	sys_mknodat(struct thread *, struct mknodat_args *);
 int	sys_kevent(struct thread *, struct kevent_args *);
 int	sys_coexecve(struct thread *, struct coexecve_args *);
-int	sys_cocreate(struct thread *, struct cocreate_args *);
+int	sys_cosetup(struct thread *, struct cosetup_args *);
 int	sys_coregister(struct thread *, struct coregister_args *);
 int	sys_colookup(struct thread *, struct colookup_args *);
 
@@ -3074,7 +3075,7 @@ int	freebsd11_mknodat(struct thread *, struct freebsd11_mknodat_args *);
 #define	SYS_AUE_mknodat	AUE_MKNODAT
 #define	SYS_AUE_kevent	AUE_KEVENT
 #define	SYS_AUE_coexecve	AUE_NULL
-#define	SYS_AUE_cocreate	AUE_NULL
+#define	SYS_AUE_cosetup	AUE_NULL
 #define	SYS_AUE_coregister	AUE_NULL
 #define	SYS_AUE_colookup	AUE_NULL
 

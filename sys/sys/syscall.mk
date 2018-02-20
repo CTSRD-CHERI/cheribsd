@@ -408,6 +408,6 @@ MIASM =  \
 	mknodat.o \
 	kevent.o \
 	coexecve.o \
-	cocreate.o \
+	cosetup.o \
 	coregister.o \
 	colookup.o

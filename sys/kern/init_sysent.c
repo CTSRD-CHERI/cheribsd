@@ -613,7 +613,7 @@ struct sysent sysent[] = {
 	{ AS(mknodat_args), (sy_call_t *)sys_mknodat, AUE_MKNODAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 559 = mknodat */
 	{ AS(kevent_args), (sy_call_t *)sys_kevent, AUE_KEVENT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 560 = kevent */
 	{ AS(coexecve_args), (sy_call_t *)sys_coexecve, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 561 = coexecve */
-	{ AS(cocreate_args), (sy_call_t *)sys_cocreate, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 562 = cocreate */
+	{ AS(cosetup_args), (sy_call_t *)sys_cosetup, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 562 = cosetup */
 	{ AS(coregister_args), (sy_call_t *)sys_coregister, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 563 = coregister */
 	{ AS(colookup_args), (sy_call_t *)sys_colookup, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 564 = colookup */
 };

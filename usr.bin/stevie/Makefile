@@ -3,7 +3,7 @@
 .include <src.opts.mk>
 
 PROG=		stevie
-SRCS=		stevie.c cocall.S
+SRCS=		stevie.c coaccept.S cocall.S
 MAN=
 
 #CFLAGS+=	-fPIE -pie -Wno-error=deprecated-declarations -fuse-ld=lld

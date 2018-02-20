@@ -45,7 +45,8 @@ __FBSDID("$FreeBSD$");
 
 pthread_t	service_thread;
 
-extern int	cocall(void * __capability, void * __capability);
+extern int	cocall(void * __capability, void * __capability, void * __capability);
+extern int	coaccept(void * __capability, void * __capability);
 
 #if 0
 #define SHARED_PAGE	0x7ffffff000
@@ -121,19 +122,19 @@ call(void)
 	void * __capability lookedup;
 	int error;
 
-	fprintf(stderr, "%s: cocreating...\n", __func__);
-	error = cocreate(&switcher_code, &switcher_data);
+	fprintf(stderr, "%s: setting up...\n", __func__);
+	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
 	if (error != 0)
-		err(1, "cocreate");
+		err(1, "cosetup");
 
 	fprintf(stderr, "%s: colookingup...\n", __func__);
 	error = colookup("kopytko", &lookedup);
 	if (error != 0)
 		err(1, "colookup");
 
-	fprintf(stderr, "cocall to code capability %p, data capability %p...\n", (__cheri_fromcap void *)switcher_code, (__cheri_fromcap void *)switcher_data);
-	error = cocall(switcher_code, switcher_data);
-	fprintf(stderr, "done, cocall returned %d\n", error);
+	fprintf(stderr, "%s: code %p, data %p, calling %p...\n", __func__, (__cheri_fromcap void *)switcher_code, (__cheri_fromcap void *)switcher_data, (__cheri_fromcap void *)lookedup);
+	error = cocall(switcher_code, switcher_data, lookedup);
+	fprintf(stderr, "%s: done, cocall returned %d\n", __func__, error);
 }
 
 static void *
@@ -141,24 +142,24 @@ service_proc(void *dummy __unused)
 {
 	void * __capability switcher_code;
 	void * __capability switcher_data;
-	void * __capability registered;
 	int error;
 
-	fprintf(stderr, "%s: cocreating...\n", __func__);
-	error = cocreate(&switcher_code, &switcher_data);
+	fprintf(stderr, "%s: setting up...\n", __func__);
+	error = cosetup(COSETUP_COACCEPT, &switcher_code, &switcher_data);
 	if (error != 0)
-		err(1, "cocreate");
+		err(1, "cosetup");
 
 	fprintf(stderr, "%s: coregistering...\n", __func__);
-	error = coregister("kopytko", &registered);
+	error = coregister("kopytko", NULL);
 	if (error != 0)
 		err(1, "coregister");
 
-	fprintf(stderr, "%s: serving...\n", __func__);
-	for (;;) {
-		fprintf(stderr, ".");
-		sleep(1);
+	fprintf(stderr, "%s: code %p, data %p, accepting...\n", __func__, (__cheri_fromcap void *)switcher_code, (__cheri_fromcap void *)switcher_data);
+	while (coaccept(switcher_code, switcher_data)) {
+		fprintf(stderr, "%s: accepted, looping...", __func__);
 	}
+	fprintf(stderr, "%s: we're not supposed to be here\n", __func__);
+	return (NULL);
 }
 
 int
