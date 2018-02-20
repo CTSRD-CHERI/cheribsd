@@ -362,7 +362,7 @@ sys_sctp_generic_sendmsg_iov(struct thread *td,
 	else
 #endif
 #ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAGS(SV_CHERI))
+	if (SV_CURPROC_FLAG(SV_CHERI))
 		error = cheriabi_copyiniov((struct iovec_c *)uap->iov,
 		    uap->iovlen, &iov, EMSGSIZE);
 	else
@@ -485,7 +485,7 @@ sys_sctp_generic_recvmsg(struct thread *td,
 	else
 #endif
 #ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAGS(SV_CHERI))
+	if (SV_CURPROC_FLAG(SV_CHERI))
 		error = cheriabi_copyiniov((struct iovec_c *)uap->iov,
 		    uap->iovlen, &iov, EMSGSIZE);
 	else
