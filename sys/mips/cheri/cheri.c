@@ -280,8 +280,9 @@ cheri_serialize(struct cheri_serial *csp, void * __capability cap)
 }
 
 struct switcher_context {
-	void * __capability	sc_unsealcap;
-	struct thread		*sc_td;
+	void * __capability			sc_unsealcap;
+	struct thread				*sc_td;
+	struct switcher_context * __capability	sc_caller_context;
 };
 
 static int
@@ -319,6 +320,7 @@ cosetup(struct thread *td)
 
 	sc.sc_unsealcap = switcher_sealcap2;
 	sc.sc_td = td;
+	sc.sc_caller_context = NULL;
 
 	error = copyoutcap(&sc, (void *)addr, sizeof(sc));
 	KASSERT(error == 0, ("%s: copyout failed with error %d\n", __func__, error));
@@ -416,7 +418,7 @@ sys_coregister(struct thread *td, struct coregister_args *uap)
 		}
 	}
 
-	cheri_capability_set(&cap, CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 1024 /* XXX */);
+	cheri_capability_set(&cap, CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 0);
 	cap = cheri_seal(cap, switcher_sealcap2);
 
 	if (uap->cap != NULL) {
