@@ -92,6 +92,16 @@ static struct syscall_helper_data sctp_syscalls[] = {
 	SYSCALL_INIT_LAST
 };
 
+#ifdef COMPAT_FREEBSD32
+static struct syscall_helper_data sctp_syscalls32[] = {
+	SYSCALL32_INIT_HELPER_COMPAT(sctp_peeloff),
+	SYSCALL32_INIT_HELPER_COMPAT(sctp_generic_sendmsg),
+	SYSCALL32_INIT_HELPER_COMPAT(sctp_generic_sendmsg_iov),
+	SYSCALL32_INIT_HELPER_COMPAT(sctp_generic_recvmsg),
+	SYSCALL_INIT_LAST
+};
+#endif
+
 static void
 sctp_syscalls_init(void *unused __unused)
 {
@@ -101,7 +111,7 @@ sctp_syscalls_init(void *unused __unused)
 	KASSERT((error == 0),
 	    ("%s: syscall_helper_register failed for sctp syscalls", __func__));
 #ifdef COMPAT_FREEBSD32
-	error = syscall32_helper_register(sctp_syscalls, SY_THR_STATIC);
+	error = syscall32_helper_register(sctp_syscalls32, SY_THR_STATIC);
 	KASSERT((error == 0),
 	    ("%s: syscall32_helper_register failed for sctp syscalls",
 	    __func__));
