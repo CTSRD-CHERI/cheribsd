@@ -108,6 +108,11 @@ CTASSERT(sizeof(struct cheri_object) == 64);
 #endif
 
 /*
+ * Capability used to seal capability pairs returned by cosetup(2).
+ */
+void * __capability	switcher_sealcap;
+
+/*
  * For now, all we do is declare what we support, as most initialisation took
  * place in the MIPS machine-dependent assembly.  CHERI doesn't need a lot of
  * actual boot-time initialisation.
@@ -133,6 +138,10 @@ cheri_cpu_startup(void)
 	if (cheri_testunion.ct_bytes[16] != 0)
 		panic("CPU implements 128-bit capabilities");
 #endif
+
+	cheri_capability_set(&switcher_sealcap, CHERI_SEALCAP_SWITCHER_PERMS,
+	    CHERI_SEALCAP_SWITCHER_BASE, CHERI_SEALCAP_SWITCHER_LENGTH,
+	    CHERI_SEALCAP_SWITCHER_OFFSET);
 }
 SYSINIT(cheri_cpu_startup, SI_SUB_CPU, SI_ORDER_FIRST, cheri_cpu_startup,
     NULL);
@@ -328,13 +337,14 @@ sys_cosetup(struct thread *td, struct cosetup_args *uap)
 		cheri_capability_set(&codecap, CHERI_CAP_USER_CODE_PERMS,
 		    td->td_proc->p_sysent->sv_cocall_base,
 		    td->td_proc->p_sysent->sv_cocall_len, 0);
-		codecap = cheri_seal(codecap, curproc->p_md.md_cheri_sealcap);
+		codecap = cheri_seal(codecap, switcher_sealcap);
 		error = copyoutcap(&codecap, uap->code, sizeof(codecap));
 		if (error != 0)
 			return (error);
 
-		cheri_capability_set(&datacap, CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 0);
-		datacap = cheri_seal(datacap, curproc->p_md.md_cheri_sealcap);
+		cheri_capability_set(&datacap,
+		    CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 0);
+		datacap = cheri_seal(datacap, switcher_sealcap);
 		error = copyoutcap(&datacap, uap->data, sizeof(datacap));
 		return (0);
 
@@ -342,13 +352,14 @@ sys_cosetup(struct thread *td, struct cosetup_args *uap)
 		cheri_capability_set(&codecap, CHERI_CAP_USER_CODE_PERMS,
 		    td->td_proc->p_sysent->sv_coaccept_base,
 		    td->td_proc->p_sysent->sv_coaccept_len, 0);
-		codecap = cheri_seal(codecap, curproc->p_md.md_cheri_sealcap);
+		codecap = cheri_seal(codecap, switcher_sealcap);
 		error = copyoutcap(&codecap, uap->code, sizeof(codecap));
 		if (error != 0)
 			return (error);
 
-		cheri_capability_set(&datacap, CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 0);
-		datacap = cheri_seal(datacap, curproc->p_md.md_cheri_sealcap);
+		cheri_capability_set(&datacap,
+		    CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 0);
+		datacap = cheri_seal(datacap, switcher_sealcap);
 		error = copyoutcap(&datacap, uap->data, sizeof(datacap));
 		return (0);
 
