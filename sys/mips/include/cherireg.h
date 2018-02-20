@@ -308,6 +308,15 @@
 #define	CHERI_SEALCAP_SWITCHER_OFFSET	0x0
 
 /*
+ * Sealing capability for capabilities returned by coregister(2)/colookup(2).
+ */
+#define	CHERI_SEALCAP_SWITCHER2_PERMS	CHERI_PERMS_KERNEL_SEALCAP
+#define	CHERI_SEALCAP_SWITCHER2_BASE	(CHERI_OTYPE_KERN_MIN + 1)
+#define	CHERI_SEALCAP_SWITCHER2_LENGTH	\
+    (CHERI_OTYPE_KERN_MAX - CHERI_OTYPE_KERN_MIN + 2)
+#define	CHERI_SEALCAP_SWITCHER2_OFFSET	0x0
+
+/*
  * A blend of hardware and software allocation of capability registers.
  * Ideally, this list wouldn't exist here, but be purely in the assembler.
  */

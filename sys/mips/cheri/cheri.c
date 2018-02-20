@@ -113,6 +113,11 @@ CTASSERT(sizeof(struct cheri_object) == 64);
 void * __capability	switcher_sealcap;
 
 /*
+ * Capability used to seal capabilities returned by coregister(2)/colookup(2).
+ */
+void * __capability	switcher_sealcap2;
+
+/*
  * For now, all we do is declare what we support, as most initialisation took
  * place in the MIPS machine-dependent assembly.  CHERI doesn't need a lot of
  * actual boot-time initialisation.
@@ -142,6 +147,11 @@ cheri_cpu_startup(void)
 	cheri_capability_set(&switcher_sealcap, CHERI_SEALCAP_SWITCHER_PERMS,
 	    CHERI_SEALCAP_SWITCHER_BASE, CHERI_SEALCAP_SWITCHER_LENGTH,
 	    CHERI_SEALCAP_SWITCHER_OFFSET);
+
+	cheri_capability_set(&switcher_sealcap2, CHERI_SEALCAP_SWITCHER2_PERMS,
+	    CHERI_SEALCAP_SWITCHER2_BASE, CHERI_SEALCAP_SWITCHER2_LENGTH,
+	    CHERI_SEALCAP_SWITCHER2_OFFSET);
+
 }
 SYSINIT(cheri_cpu_startup, SI_SUB_CPU, SI_ORDER_FIRST, cheri_cpu_startup,
     NULL);
@@ -307,7 +317,7 @@ cosetup(struct thread *td)
 	entry->owner = 0;
 	vm_map_unlock(map);
 
-	sc.sc_unsealcap = curproc->p_md.md_cheri_sealcap;
+	sc.sc_unsealcap = switcher_sealcap2;
 	sc.sc_td = td;
 
 	error = copyoutcap(&sc, (void *)addr, sizeof(sc));
@@ -407,7 +417,7 @@ sys_coregister(struct thread *td, struct coregister_args *uap)
 	}
 
 	cheri_capability_set(&cap, CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 1024 /* XXX */);
-	cap = cheri_seal(cap, curproc->p_md.md_cheri_sealcap);
+	cap = cheri_seal(cap, switcher_sealcap2);
 
 	if (uap->cap != NULL) {
 		error = copyoutcap(&cap, uap->cap, sizeof(cap));
