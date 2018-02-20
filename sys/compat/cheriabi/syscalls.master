@@ -137,10 +137,10 @@
 				    struct sockaddr * __restrict __capability from, \
 				    _Inout_opt_ \
 				    __socklen_t * __restrict __capability fromlenaddr); }
-30	AUE_ACCEPT	NOPROTO	{ int accept(int s, \
+30	AUE_ACCEPT	STD	{ int cheriabi_accept(int s, \
 				    _Out_writes_bytes_opt_(*anamelen) \
-				    struct sockaddr * __restrict name, \
-				    _Inout_opt_ __socklen_t *anamelen); }
+				    struct sockaddr * __restrict __capability name, \
+				    _Inout_opt_ __socklen_t * __capability anamelen); }
 31	AUE_GETPEERNAME	STD	{ int cheriabi_getpeername(int fdes, \
 				    _Out_writes_bytes_(*alen) \
 				    struct sockaddr * __restrict __capability asa, \
@@ -1315,11 +1315,11 @@
 540	AUE_CHFLAGSAT	STD	{ int cheriabi_chflagsat(int fd, \
 				    _In_z_ const char * __capability path, \
 				    u_long flags, int atflag); }
-541	AUE_ACCEPT	NOPROTO	{ int accept4(int s, \
+541	AUE_ACCEPT	STD	{ int cheriabi_accept4(int s, \
 				    _Out_writes_bytes_opt_(*anamelen) \
-				    struct sockaddr * __restrict name, \
+				    struct sockaddr * __restrict __capability name, \
 				    _Inout_opt_ \
-				    __socklen_t * __restrict anamelen, \
+				    __socklen_t * __restrict __capability anamelen, \
 				    int flags); }
 542	AUE_PIPE	STD	{ int cheriabi_pipe2( \
 				    _Out_writes_(2) int * __capability fildes, \

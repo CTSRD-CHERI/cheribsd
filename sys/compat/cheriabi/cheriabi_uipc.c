@@ -58,8 +58,20 @@ cheriabi_bindat(struct thread *td, struct cheriabi_bindat_args *uap)
 	return (user_bindat(td, uap->fd, uap->s, uap->name, uap->namelen));
 }
 
-// accept
-// accept4
+int
+cheriabi_accept(struct thread *td, struct cheriabi_accept_args *uap)
+{
+
+	return (user_accept(td, uap->s, uap->name, uap->anamelen,
+	    ACCEPT4_INHERIT));
+}
+
+int
+cheriabi_accept4(struct thread *td, struct cheriabi_accept4_args *uap)
+{
+
+	return (user_accept(td, uap->s, uap->name, uap->anamelen, uap->flags));
+}
 
 int
 cheriabi_connect(struct thread *td, struct cheriabi_connect_args *uap)

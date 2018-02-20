@@ -434,6 +434,9 @@ int	kern_writev(struct thread *td, int fd, struct uio *auio);
 int	kern_socketpair(struct thread *td, int domain, int type, int protocol,
 	    int *rsv);
 
+int	user_accept(struct thread *td, int s,
+	    struct sockaddr * __capability uname,
+	    socklen_t * __capability anamelen, int flags);
 int	user_bind(struct thread *td, int s,
 	    const struct sockaddr * __capability name, socklen_t namelen);
 int	user_bindat(struct thread *td, int fd, int s,

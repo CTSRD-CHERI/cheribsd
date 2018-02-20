@@ -72,9 +72,6 @@ static int sendit(struct thread *td, int s, kmsghdr_t *mp, int flags);
 static int recvit(struct thread *td, int s, kmsghdr_t *mp,
     socklen_t * __capability namelenp);
 
-static int accept1(struct thread *td, int s, struct sockaddr *uname,
-		   socklen_t *anamelen, int flags);
-
 /*
  * Convert a user file descriptor to a kernel file entry and check if required
  * capability rights are present.
@@ -269,16 +266,9 @@ kern_listen(struct thread *td, int s, int backlog)
 	return (error);
 }
 
-/*
- * accept1()
- */
-static int
-accept1(td, s, uname, anamelen, flags)
-	struct thread *td;
-	int s;
-	struct sockaddr *uname;
-	socklen_t *anamelen;
-	int flags;
+int
+user_accept(struct thread *td, int s, struct sockaddr * __capability uname,
+    socklen_t * __capability anamelen, int flags)
 {
 	struct sockaddr *name;
 	socklen_t namelen;
@@ -288,7 +278,7 @@ accept1(td, s, uname, anamelen, flags)
 	if (uname == NULL)
 		return (kern_accept4(td, s, NULL, NULL, flags, NULL));
 
-	error = copyin(anamelen, &namelen, sizeof (namelen));
+	error = copyin_c(anamelen, &namelen, sizeof(namelen));
 	if (error != 0)
 		return (error);
 
@@ -303,11 +293,12 @@ accept1(td, s, uname, anamelen, flags)
 			((struct osockaddr *)name)->sa_family =
 			    name->sa_family;
 #endif
-		error = copyout(name, uname, namelen);
+		error = copyout_c(
+		   (__cheri_tocap struct sockaddr * __capability)name,
+		   uname, namelen);
 	}
 	if (error == 0)
-		error = copyout(&namelen, anamelen,
-		    sizeof(namelen));
+		error = copyout_c(&namelen, anamelen, sizeof(namelen));
 	if (error != 0)
 		fdclose(td, fp, td->td_retval[0]);
 	fdrop(fp, td);
@@ -441,35 +432,31 @@ done:
 }
 
 int
-sys_accept(td, uap)
-	struct thread *td;
-	struct accept_args *uap;
+sys_accept(struct thread *td, struct accept_args *uap)
 {
 
-	return (accept1(td, uap->s, uap->name, uap->anamelen, ACCEPT4_INHERIT));
+	return (user_accept(td, uap->s, __USER_CAP_UNBOUND(uap->name),
+	    __USER_CAP_OBJ(uap->anamelen), ACCEPT4_INHERIT));
 }
 
 int
-sys_accept4(td, uap)
-	struct thread *td;
-	struct accept4_args *uap;
+sys_accept4(struct thread *td, struct accept4_args *uap)
 {
 
 	if (uap->flags & ~(SOCK_CLOEXEC | SOCK_NONBLOCK))
 		return (EINVAL);
 
-	return (accept1(td, uap->s, uap->name, uap->anamelen, uap->flags));
+	return (user_accept(td, uap->s, __USER_CAP_UNBOUND(uap->name),
+	    __USER_CAP_OBJ(uap->anamelen), uap->flags));
 }
 
 #ifdef COMPAT_OLDSOCK
 int
-oaccept(td, uap)
-	struct thread *td;
-	struct accept_args *uap;
+oaccept(struct thread *td, struct accept_args *uap)
 {
 
-	return (accept1(td, uap->s, uap->name, uap->anamelen,
-	    ACCEPT4_INHERIT | ACCEPT4_COMPAT));
+	return (user_accept(td, uap->s, __USER_CAP_UNBCOUND(uap->name),
+	    __USER_CAP_OBJ(uap->anamelen), ACCEPT4_INHERIT | ACCEPT4_COMPAT));
 }
 #endif /* COMPAT_OLDSOCK */
 

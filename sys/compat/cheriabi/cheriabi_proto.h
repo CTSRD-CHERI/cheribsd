@@ -117,6 +117,11 @@ struct cheriabi_recvfrom_args {
 	char from_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability from; char from_r_[PADR_(struct sockaddr * __capability)];
 	char fromlenaddr_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability fromlenaddr; char fromlenaddr_r_[PADR_(__socklen_t * __capability)];
 };
+struct cheriabi_accept_args {
+	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
+	char name_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability name; char name_r_[PADR_(struct sockaddr * __capability)];
+	char anamelen_l_[PADL_(__socklen_t *__capability)]; __socklen_t *__capability anamelen; char anamelen_r_[PADR_(__socklen_t *__capability)];
+};
 struct cheriabi_getpeername_args {
 	char fdes_l_[PADL_(int)]; int fdes; char fdes_r_[PADR_(int)];
 	char asa_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability asa; char asa_r_[PADR_(struct sockaddr * __capability)];
@@ -1067,6 +1072,12 @@ struct cheriabi_chflagsat_args {
 	char flags_l_[PADL_(u_long)]; u_long flags; char flags_r_[PADR_(u_long)];
 	char atflag_l_[PADL_(int)]; int atflag; char atflag_r_[PADR_(int)];
 };
+struct cheriabi_accept4_args {
+	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
+	char name_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability name; char name_r_[PADR_(struct sockaddr * __capability)];
+	char anamelen_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability anamelen; char anamelen_r_[PADR_(__socklen_t * __capability)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
 struct cheriabi_pipe2_args {
 	char fildes_l_[PADL_(int *__capability)]; int *__capability fildes; char fildes_r_[PADR_(int *__capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
@@ -1165,6 +1176,7 @@ int	cheriabi_unmount(struct thread *, struct cheriabi_unmount_args *);
 int	cheriabi_recvmsg(struct thread *, struct cheriabi_recvmsg_args *);
 int	cheriabi_sendmsg(struct thread *, struct cheriabi_sendmsg_args *);
 int	cheriabi_recvfrom(struct thread *, struct cheriabi_recvfrom_args *);
+int	cheriabi_accept(struct thread *, struct cheriabi_accept_args *);
 int	cheriabi_getpeername(struct thread *, struct cheriabi_getpeername_args *);
 int	cheriabi_getsockname(struct thread *, struct cheriabi_getsockname_args *);
 int	cheriabi_access(struct thread *, struct cheriabi_access_args *);
@@ -1365,6 +1377,7 @@ int	cheriabi_wait6(struct thread *, struct cheriabi_wait6_args *);
 int	cheriabi_bindat(struct thread *, struct cheriabi_bindat_args *);
 int	cheriabi_connectat(struct thread *, struct cheriabi_connectat_args *);
 int	cheriabi_chflagsat(struct thread *, struct cheriabi_chflagsat_args *);
+int	cheriabi_accept4(struct thread *, struct cheriabi_accept4_args *);
 int	cheriabi_pipe2(struct thread *, struct cheriabi_pipe2_args *);
 int	cheriabi_aio_mlock(struct thread *, struct cheriabi_aio_mlock_args *);
 int	cheriabi_procctl(struct thread *, struct cheriabi_procctl_args *);
@@ -1450,6 +1463,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_recvmsg	AUE_RECVMSG
 #define	CHERIABI_SYS_AUE_cheriabi_sendmsg	AUE_SENDMSG
 #define	CHERIABI_SYS_AUE_cheriabi_recvfrom	AUE_RECVFROM
+#define	CHERIABI_SYS_AUE_cheriabi_accept	AUE_ACCEPT
 #define	CHERIABI_SYS_AUE_cheriabi_getpeername	AUE_GETPEERNAME
 #define	CHERIABI_SYS_AUE_cheriabi_getsockname	AUE_GETSOCKNAME
 #define	CHERIABI_SYS_AUE_cheriabi_access	AUE_ACCESS
@@ -1650,6 +1664,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_bindat	AUE_BINDAT
 #define	CHERIABI_SYS_AUE_cheriabi_connectat	AUE_CONNECTAT
 #define	CHERIABI_SYS_AUE_cheriabi_chflagsat	AUE_CHFLAGSAT
+#define	CHERIABI_SYS_AUE_cheriabi_accept4	AUE_ACCEPT
 #define	CHERIABI_SYS_AUE_cheriabi_pipe2	AUE_PIPE
 #define	CHERIABI_SYS_AUE_cheriabi_aio_mlock	AUE_AIO_MLOCK
 #define	CHERIABI_SYS_AUE_cheriabi_procctl	AUE_PROCCTL
