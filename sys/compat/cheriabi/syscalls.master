@@ -141,14 +141,14 @@
 				    _Out_writes_bytes_opt_(*anamelen) \
 				    struct sockaddr * __restrict name, \
 				    _Inout_opt_ __socklen_t *anamelen); }
-31	AUE_GETPEERNAME	NOPROTO	{ int getpeername(int fdes, \
+31	AUE_GETPEERNAME	STD	{ int cheriabi_getpeername(int fdes, \
 				    _Out_writes_bytes_(*alen) \
-				    struct sockaddr * __restrict asa, \
-				    _Inout_opt_ __socklen_t *alen); }
-32	AUE_GETSOCKNAME	NOPROTO	{ int getsockname(int fdes, \
+				    struct sockaddr * __restrict __capability asa, \
+				    _Inout_ __socklen_t * __capability alen); }
+32	AUE_GETSOCKNAME	STD	{ int cheriabi_getsockname(int fdes, \
 				    _Out_writes_bytes_(*alen) \
-				    struct sockaddr * __restrict asa, \
-				    _Inout_ __socklen_t *alen); }
+				    struct sockaddr * __restrict __capability  asa, \
+				    _Inout_ __socklen_t * __capability alen); }
 33	AUE_ACCESS	STD	{ int cheriabi_access( \
 				    _In_z_ const char * __capability path, \
 				    int amode); }

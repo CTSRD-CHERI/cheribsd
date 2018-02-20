@@ -462,6 +462,12 @@ int	user_getdirentries(struct thread *td, int fd, char * __capability buf,
 	    size_t count, off_t * __capability basep);
 int	user_getfsstat(struct thread *td, struct statfs * __capability buf,
 	    long bufsize, int mode);
+int	user_getpeername(struct thread *td, int fdes,
+	    struct sockaddr * __restrict __capability asa,
+	    socklen_t * __capability alen, int compat);
+int	user_getsockname(struct thread *td, int fdes,
+	    struct sockaddr * __restrict __capability asa,
+	    socklen_t * __capability alen, int compat);
 int	user_getsockopt(struct thread *td, int s, int level, int name,
 	    void * __capability val, socklen_t * __capability avalsize);
 int	user_pdgetpid(struct thread *td, int fd, pid_t * __capability pidp);

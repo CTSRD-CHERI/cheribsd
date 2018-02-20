@@ -27,8 +27,8 @@ MIASM =  \
 	cheriabi_sendmsg.o \
 	cheriabi_recvfrom.o \
 	accept.o \
-	getpeername.o \
-	getsockname.o \
+	cheriabi_getpeername.o \
+	cheriabi_getsockname.o \
 	cheriabi_access.o \
 	cheriabi_chflags.o \
 	fchflags.o \

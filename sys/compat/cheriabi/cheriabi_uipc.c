@@ -207,6 +207,20 @@ cheriabi_getsockopt(struct thread *td, struct cheriabi_getsockopt_args *uap)
 	    uap->avalsize));
 }
 
+int
+cheriabi_getsockname(struct thread *td, struct cheriabi_getsockname_args *uap)
+{
+
+	return (user_getsockname(td, uap->fdes, uap->asa, uap->alen, 0));
+}
+
+int
+cheriabi_getpeername(struct thread *td, struct cheriabi_getpeername_args *uap)
+{
+
+	return (user_getpeername(td, uap->fdes, uap->asa, uap->alen, 0));
+}
+
 /*
  * uipc_shm.c
  */

@@ -212,21 +212,21 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* getpeername */
+	/* cheriabi_getpeername */
 	case 31: {
-		struct getpeername_args *p = params;
+		struct cheriabi_getpeername_args *p = params;
 		iarg[0] = p->fdes; /* int */
-		uarg[1] = (intptr_t) p->asa; /* struct sockaddr * */
-		uarg[2] = (intptr_t) p->alen; /* __socklen_t * */
+		uarg[1] = (cheri_getbase(p->asa) + cheri_getoffset(p->asa)); /* struct sockaddr *__restrict __capability */
+		uarg[2] = (cheri_getbase(p->alen) + cheri_getoffset(p->alen)); /* __socklen_t *__capability */
 		*n_args = 3;
 		break;
 	}
-	/* getsockname */
+	/* cheriabi_getsockname */
 	case 32: {
-		struct getsockname_args *p = params;
+		struct cheriabi_getsockname_args *p = params;
 		iarg[0] = p->fdes; /* int */
-		uarg[1] = (intptr_t) p->asa; /* struct sockaddr * */
-		uarg[2] = (intptr_t) p->alen; /* __socklen_t * */
+		uarg[1] = (cheri_getbase(p->asa) + cheri_getoffset(p->asa)); /* struct sockaddr *__restrict __capability */
+		uarg[2] = (cheri_getbase(p->alen) + cheri_getoffset(p->alen)); /* __socklen_t *__capability */
 		*n_args = 3;
 		break;
 	}
@@ -3419,33 +3419,33 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* getpeername */
+	/* cheriabi_getpeername */
 	case 31:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct sockaddr *";
+			p = "userland struct sockaddr *__restrict __capability";
 			break;
 		case 2:
-			p = "userland __socklen_t *";
+			p = "userland __socklen_t *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* getsockname */
+	/* cheriabi_getsockname */
 	case 32:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct sockaddr *";
+			p = "userland struct sockaddr *__restrict __capability";
 			break;
 		case 2:
-			p = "userland __socklen_t *";
+			p = "userland __socklen_t *__capability";
 			break;
 		default:
 			break;
@@ -8365,12 +8365,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* getpeername */
+	/* cheriabi_getpeername */
 	case 31:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* getsockname */
+	/* cheriabi_getsockname */
 	case 32:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

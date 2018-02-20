@@ -117,6 +117,16 @@ struct cheriabi_recvfrom_args {
 	char from_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability from; char from_r_[PADR_(struct sockaddr * __capability)];
 	char fromlenaddr_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability fromlenaddr; char fromlenaddr_r_[PADR_(__socklen_t * __capability)];
 };
+struct cheriabi_getpeername_args {
+	char fdes_l_[PADL_(int)]; int fdes; char fdes_r_[PADR_(int)];
+	char asa_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability asa; char asa_r_[PADR_(struct sockaddr * __capability)];
+	char alen_l_[PADL_(__socklen_t *__capability)]; __socklen_t *__capability alen; char alen_r_[PADR_(__socklen_t *__capability)];
+};
+struct cheriabi_getsockname_args {
+	char fdes_l_[PADL_(int)]; int fdes; char fdes_r_[PADR_(int)];
+	char asa_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability asa; char asa_r_[PADR_(struct sockaddr * __capability)];
+	char alen_l_[PADL_(__socklen_t *__capability)]; __socklen_t *__capability alen; char alen_r_[PADR_(__socklen_t *__capability)];
+};
 struct cheriabi_access_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 	char amode_l_[PADL_(int)]; int amode; char amode_r_[PADR_(int)];
@@ -1155,6 +1165,8 @@ int	cheriabi_unmount(struct thread *, struct cheriabi_unmount_args *);
 int	cheriabi_recvmsg(struct thread *, struct cheriabi_recvmsg_args *);
 int	cheriabi_sendmsg(struct thread *, struct cheriabi_sendmsg_args *);
 int	cheriabi_recvfrom(struct thread *, struct cheriabi_recvfrom_args *);
+int	cheriabi_getpeername(struct thread *, struct cheriabi_getpeername_args *);
+int	cheriabi_getsockname(struct thread *, struct cheriabi_getsockname_args *);
 int	cheriabi_access(struct thread *, struct cheriabi_access_args *);
 int	cheriabi_chflags(struct thread *, struct cheriabi_chflags_args *);
 int	cheriabi_profil(struct thread *, struct cheriabi_profil_args *);
@@ -1438,6 +1450,8 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_recvmsg	AUE_RECVMSG
 #define	CHERIABI_SYS_AUE_cheriabi_sendmsg	AUE_SENDMSG
 #define	CHERIABI_SYS_AUE_cheriabi_recvfrom	AUE_RECVFROM
+#define	CHERIABI_SYS_AUE_cheriabi_getpeername	AUE_GETPEERNAME
+#define	CHERIABI_SYS_AUE_cheriabi_getsockname	AUE_GETSOCKNAME
 #define	CHERIABI_SYS_AUE_cheriabi_access	AUE_ACCESS
 #define	CHERIABI_SYS_AUE_cheriabi_chflags	AUE_CHFLAGS
 #define	CHERIABI_SYS_AUE_cheriabi_profil	AUE_PROFILE

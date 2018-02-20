@@ -74,10 +74,6 @@ static int recvit(struct thread *td, int s, kmsghdr_t *mp,
 
 static int accept1(struct thread *td, int s, struct sockaddr *uname,
 		   socklen_t *anamelen, int flags);
-static int getsockname1(struct thread *td, struct getsockname_args *uap,
-			int compat);
-static int getpeername1(struct thread *td, struct getpeername_args *uap,
-			int compat);
 
 /*
  * Convert a user file descriptor to a kernel file entry and check if required
@@ -1418,21 +1414,20 @@ kern_getsockopt(struct thread *td, int s, int level, int name,
 	return (error);
 }
 
-/*
- * getsockname1() - Get socket name.
- */
-static int
-getsockname1(struct thread *td, struct getsockname_args *uap, int compat)
+int
+user_getsockname(struct thread *td, int fdes,
+    struct sockaddr * __restrict __capability asa,
+    socklen_t * __capability alen, int compat)
 {
 	struct sockaddr *sa;
 	socklen_t len;
 	int error;
 
-	error = copyin(uap->alen, &len, sizeof(len));
+	error = copyin_c(alen, &len, sizeof(len));
 	if (error != 0)
 		return (error);
 
-	error = kern_getsockname(td, uap->fdes, &sa, &len);
+	error = kern_getsockname(td, fdes, &sa, &len);
 	if (error != 0)
 		return (error);
 
@@ -1441,11 +1436,13 @@ getsockname1(struct thread *td, struct getsockname_args *uap, int compat)
 		if (compat)
 			((struct osockaddr *)sa)->sa_family = sa->sa_family;
 #endif
-		error = copyout(sa, uap->asa, (u_int)len);
+		error = copyout_c(
+		    (__cheri_tocap struct sockaddr * __capability)sa, asa,
+		    len);
 	}
 	free(sa, M_SONAME);
 	if (error == 0)
-		error = copyout(&len, uap->alen, sizeof(len));
+		error = copyout_c(&len, alen, sizeof(len));
 	return (error);
 }
 
@@ -1493,7 +1490,8 @@ int
 sys_getsockname(struct thread *td, struct getsockname_args *uap)
 {
 
-	return (getsockname1(td, uap, 0));
+	return (user_getsockname(td, uap->fdes,
+	    __USER_CAP_UNBOUND(uap->asa), __USER_CAP_OBJ(uap->alen), 0));
 }
 
 #ifdef COMPAT_OLDSOCK
@@ -1501,25 +1499,25 @@ int
 ogetsockname(struct thread *td, struct getsockname_args *uap)
 {
 
-	return (getsockname1(td, uap, 1));
+	return (user_getsockname(td, uap->fdes,
+	    __USER_CAP_UNBOUND(uap->asa), __USER_CAP_OBJ(uap->alen), 1));
 }
 #endif /* COMPAT_OLDSOCK */
 
-/*
- * getpeername1() - Get name of peer for connected socket.
- */
-static int
-getpeername1(struct thread *td, struct getpeername_args *uap, int compat)
+int
+user_getpeername(struct thread *td, int fdes,
+    struct sockaddr * __restrict __capability asa,
+    socklen_t * __capability alen, int compat)
 {
 	struct sockaddr *sa;
 	socklen_t len;
 	int error;
 
-	error = copyin(uap->alen, &len, sizeof (len));
+	error = copyin_c(alen, &len, sizeof (len));
 	if (error != 0)
 		return (error);
 
-	error = kern_getpeername(td, uap->fdes, &sa, &len);
+	error = kern_getpeername(td, fdes, &sa, &len);
 	if (error != 0)
 		return (error);
 
@@ -1528,11 +1526,12 @@ getpeername1(struct thread *td, struct getpeername_args *uap, int compat)
 		if (compat)
 			((struct osockaddr *)sa)->sa_family = sa->sa_family;
 #endif
-		error = copyout(sa, uap->asa, (u_int)len);
+		error = copyout_c(
+		    (__cheri_tocap struct sockaddr * __capability)sa, asa, len);
 	}
 	free(sa, M_SONAME);
 	if (error == 0)
-		error = copyout(&len, uap->alen, sizeof(len));
+		error = copyout_c(&len, alen, sizeof(len));
 	return (error);
 }
 
@@ -1585,7 +1584,8 @@ int
 sys_getpeername(struct thread *td, struct getpeername_args *uap)
 {
 
-	return (getpeername1(td, uap, 0));
+	return (user_getpeername(td, uap->fdes, __USER_CAP_UNBOUND(uap->asa),
+	    __USER_CAP_OBJ(uap->alen), 0));
 }
 
 #ifdef COMPAT_OLDSOCK
@@ -1593,8 +1593,8 @@ int
 ogetpeername(struct thread *td, struct ogetpeername_args *uap)
 {
 
-	/* XXX uap should have type `getpeername_args *' to begin with. */
-	return (getpeername1(td, (struct getpeername_args *)uap, 1));
+	return (user_getpeername(td, uap->fdes, __USER_CAP_UNBOUND(uap->asa),
+	    __USER_CAP_OBJ(uap->alen), 1));
 }
 #endif /* COMPAT_OLDSOCK */
 

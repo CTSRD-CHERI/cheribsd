@@ -462,105 +462,47 @@ CHERIABI_SYS_accept_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_getpeername_fill_uap(struct thread *td,
-    struct getpeername_args *uap)
+CHERIABI_SYS_cheriabi_getpeername_fill_uap(struct thread *td,
+    struct cheriabi_getpeername_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] int fdes */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_getpeername_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_getpeername_PTRMASK);
 	uap->fdes = cheri_getoffset(tmpcap);
 
-	/* [2] _Inout_opt_ __socklen_t * alen */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD|CHERI_PERM_STORE);
+	/* [1] _Out_writes_bytes_(*alen) struct sockaddr *__restrict __capability asa */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->asa),
+	    1, CHERIABI_SYS_cheriabi_getpeername_PTRMASK);
 
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_getpeername_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->alen),
-		    tmpcap, sizeof(*uap->alen), reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
-
-	/* [1] _Out_writes_bytes_(*alen) struct sockaddr *__restrict asa */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		if (uap->alen == NULL) {
-			uap->asa = NULL;
-		} else {
-			size_t reqlen;
-			if (sizeof(*uap->alen) == 2)
-				reqlen = fuword16(uap->alen);
-			else if (sizeof(*uap->alen) == 4)
-				reqlen = fuword32(uap->alen);
-			else if (sizeof(*uap->alen) == 8)
-				reqlen = fuword64(uap->alen);
-			else
-				panic("unhandled dependant argument size %zu", sizeof(*uap->alen));
-			if (reqlen == -1)
-				return (EINVAL);
-			cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_getpeername_PTRMASK);
-			error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->asa),
-			    tmpcap, reqlen, reqperms, 0);
-			if (error != 0)
-				return (error);
-		}
-	}
+	/* [2] _Inout_ __socklen_t *__capability alen */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->alen),
+	    2, CHERIABI_SYS_cheriabi_getpeername_PTRMASK);
 
 	return (0);
 }
 
 static inline int
-CHERIABI_SYS_getsockname_fill_uap(struct thread *td,
-    struct getsockname_args *uap)
+CHERIABI_SYS_cheriabi_getsockname_fill_uap(struct thread *td,
+    struct cheriabi_getsockname_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] int fdes */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_getsockname_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_getsockname_PTRMASK);
 	uap->fdes = cheri_getoffset(tmpcap);
 
-	/* [2] _Inout_ __socklen_t * alen */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD|CHERI_PERM_STORE);
+	/* [1] _Out_writes_bytes_(*alen) struct sockaddr *__restrict __capability asa */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->asa),
+	    1, CHERIABI_SYS_cheriabi_getsockname_PTRMASK);
 
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_getsockname_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->alen),
-		    tmpcap, sizeof(*uap->alen), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
-
-	/* [1] _Out_writes_bytes_(*alen) struct sockaddr *__restrict asa */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		if (uap->alen == NULL) {
-			uap->asa = NULL;
-		} else {
-			size_t reqlen;
-			if (sizeof(*uap->alen) == 2)
-				reqlen = fuword16(uap->alen);
-			else if (sizeof(*uap->alen) == 4)
-				reqlen = fuword32(uap->alen);
-			else if (sizeof(*uap->alen) == 8)
-				reqlen = fuword64(uap->alen);
-			else
-				panic("unhandled dependant argument size %zu", sizeof(*uap->alen));
-			if (reqlen == -1)
-				return (EINVAL);
-			cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_getsockname_PTRMASK);
-			error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->asa),
-			    tmpcap, reqlen, reqperms, 0);
-			if (error != 0)
-				return (error);
-		}
-	}
+	/* [2] _Inout_ __socklen_t *__capability alen */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->alen),
+	    2, CHERIABI_SYS_cheriabi_getsockname_PTRMASK);
 
 	return (0);
 }

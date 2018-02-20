@@ -36,8 +36,8 @@
 #define	CHERIABI_SYS_cheriabi_sendmsg	28
 #define	CHERIABI_SYS_cheriabi_recvfrom	29
 #define	CHERIABI_SYS_accept	30
-#define	CHERIABI_SYS_getpeername	31
-#define	CHERIABI_SYS_getsockname	32
+#define	CHERIABI_SYS_cheriabi_getpeername	31
+#define	CHERIABI_SYS_cheriabi_getsockname	32
 #define	CHERIABI_SYS_cheriabi_access	33
 #define	CHERIABI_SYS_cheriabi_chflags	34
 #define	CHERIABI_SYS_fchflags	35
