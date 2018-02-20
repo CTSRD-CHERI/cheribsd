@@ -260,9 +260,15 @@ cheri_serialize(struct cheri_serial *csp, void * __capability cap)
 		memcpy(&csp->cs_data, &cap, CHERICAP_SIZE);
 }
 
+struct switcher_context {
+	void * __capability	sc_unsealcap;
+	struct thread		*sc_td;
+};
+
 static int
 cosetup(struct thread *td)
 {
+	struct switcher_context sc;
 	vm_map_t map;
 	vm_map_entry_t entry;
 	vaddr_t addr;
@@ -291,6 +297,12 @@ cosetup(struct thread *td)
 
 	entry->owner = 0;
 	vm_map_unlock(map);
+
+	sc.sc_unsealcap = curproc->p_md.md_cheri_sealcap;
+	sc.sc_td = td;
+
+	error = copyoutcap(&sc, (void *)addr, sizeof(sc));
+	KASSERT(error == 0, ("%s: copyout failed with error %d\n", __func__, error));
 
 	return (0);
 }
