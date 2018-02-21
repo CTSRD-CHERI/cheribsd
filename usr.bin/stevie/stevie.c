@@ -138,6 +138,10 @@ call(void)
 	fprintf(stderr, "%s: code %p, data %p, calling %p...\n", __func__, (__cheri_fromcap void *)switcher_code, (__cheri_fromcap void *)switcher_data, (__cheri_fromcap void *)lookedup);
 	error = cocall(switcher_code, switcher_data, lookedup);
 	fprintf(stderr, "%s: done, cocall returned %d\n", __func__, error);
+
+	fprintf(stderr, "%s: code %p, data %p, calling %p...\n", __func__, (__cheri_fromcap void *)switcher_code, (__cheri_fromcap void *)switcher_data, (__cheri_fromcap void *)lookedup);
+	error = cocall(switcher_code, switcher_data, lookedup);
+	fprintf(stderr, "%s: done, cocall returned %d\n", __func__, error);
 }
 
 static void *
