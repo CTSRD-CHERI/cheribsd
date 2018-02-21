@@ -256,15 +256,15 @@ MIASM =  \
 	thr_suspend.o \
 	thr_wake.o \
 	kldunloadf.o \
-	audit.o \
+	cheriabi_audit.o \
 	cheriabi_auditon.o \
-	getauid.o \
-	setauid.o \
-	getaudit.o \
-	setaudit.o \
-	getaudit_addr.o \
-	setaudit_addr.o \
-	auditctl.o \
+	cheriabi_getauid.o \
+	cheriabi_setauid.o \
+	cheriabi_getaudit.o \
+	cheriabi_setaudit.o \
+	cheriabi_getaudit_addr.o \
+	cheriabi_setaudit_addr.o \
+	cheriabi_auditctl.o \
 	_umtx_op.o \
 	cheriabi_thr_new.o \
 	cheriabi_sigqueue.o \

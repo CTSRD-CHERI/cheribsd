@@ -2134,10 +2134,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* audit */
+	/* cheriabi_audit */
 	case 445: {
-		struct audit_args *p = params;
-		uarg[0] = (intptr_t) p->record; /* const void * */
+		struct cheriabi_audit_args *p = params;
+		uarg[0] = (cheri_getbase(p->record) + cheri_getoffset(p->record)); /* const void *__capability */
 		uarg[1] = p->length; /* u_int */
 		*n_args = 2;
 		break;
@@ -2151,54 +2151,54 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* getauid */
+	/* cheriabi_getauid */
 	case 447: {
-		struct getauid_args *p = params;
-		uarg[0] = (intptr_t) p->auid; /* uid_t * */
+		struct cheriabi_getauid_args *p = params;
+		uarg[0] = (cheri_getbase(p->auid) + cheri_getoffset(p->auid)); /* uid_t *__capability */
 		*n_args = 1;
 		break;
 	}
-	/* setauid */
+	/* cheriabi_setauid */
 	case 448: {
-		struct setauid_args *p = params;
-		uarg[0] = (intptr_t) p->auid; /* uid_t * */
+		struct cheriabi_setauid_args *p = params;
+		uarg[0] = (cheri_getbase(p->auid) + cheri_getoffset(p->auid)); /* uid_t *__capability */
 		*n_args = 1;
 		break;
 	}
-	/* getaudit */
+	/* cheriabi_getaudit */
 	case 449: {
-		struct getaudit_args *p = params;
-		uarg[0] = (intptr_t) p->auditinfo; /* struct auditinfo * */
+		struct cheriabi_getaudit_args *p = params;
+		uarg[0] = (cheri_getbase(p->auditinfo) + cheri_getoffset(p->auditinfo)); /* struct auditinfo *__capability */
 		*n_args = 1;
 		break;
 	}
-	/* setaudit */
+	/* cheriabi_setaudit */
 	case 450: {
-		struct setaudit_args *p = params;
-		uarg[0] = (intptr_t) p->auditinfo; /* struct auditinfo * */
+		struct cheriabi_setaudit_args *p = params;
+		uarg[0] = (cheri_getbase(p->auditinfo) + cheri_getoffset(p->auditinfo)); /* struct auditinfo *__capability */
 		*n_args = 1;
 		break;
 	}
-	/* getaudit_addr */
+	/* cheriabi_getaudit_addr */
 	case 451: {
-		struct getaudit_addr_args *p = params;
-		uarg[0] = (intptr_t) p->auditinfo_addr; /* struct auditinfo_addr * */
+		struct cheriabi_getaudit_addr_args *p = params;
+		uarg[0] = (cheri_getbase(p->auditinfo_addr) + cheri_getoffset(p->auditinfo_addr)); /* struct auditinfo_addr *__capability */
 		uarg[1] = p->length; /* u_int */
 		*n_args = 2;
 		break;
 	}
-	/* setaudit_addr */
+	/* cheriabi_setaudit_addr */
 	case 452: {
-		struct setaudit_addr_args *p = params;
-		uarg[0] = (intptr_t) p->auditinfo_addr; /* struct auditinfo_addr * */
+		struct cheriabi_setaudit_addr_args *p = params;
+		uarg[0] = (cheri_getbase(p->auditinfo_addr) + cheri_getoffset(p->auditinfo_addr)); /* struct auditinfo_addr *__capability */
 		uarg[1] = p->length; /* u_int */
 		*n_args = 2;
 		break;
 	}
-	/* auditctl */
+	/* cheriabi_auditctl */
 	case 453: {
-		struct auditctl_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_auditctl_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -6534,11 +6534,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* audit */
+	/* cheriabi_audit */
 	case 445:
 		switch(ndx) {
 		case 0:
-			p = "userland const void *";
+			p = "userland const void *__capability";
 			break;
 		case 1:
 			p = "u_int";
@@ -6563,51 +6563,51 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* getauid */
+	/* cheriabi_getauid */
 	case 447:
 		switch(ndx) {
 		case 0:
-			p = "userland uid_t *";
+			p = "userland uid_t *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* setauid */
+	/* cheriabi_setauid */
 	case 448:
 		switch(ndx) {
 		case 0:
-			p = "userland uid_t *";
+			p = "userland uid_t *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* getaudit */
+	/* cheriabi_getaudit */
 	case 449:
 		switch(ndx) {
 		case 0:
-			p = "userland struct auditinfo *";
+			p = "userland struct auditinfo *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* setaudit */
+	/* cheriabi_setaudit */
 	case 450:
 		switch(ndx) {
 		case 0:
-			p = "userland struct auditinfo *";
+			p = "userland struct auditinfo *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* getaudit_addr */
+	/* cheriabi_getaudit_addr */
 	case 451:
 		switch(ndx) {
 		case 0:
-			p = "userland struct auditinfo_addr *";
+			p = "userland struct auditinfo_addr *__capability";
 			break;
 		case 1:
 			p = "u_int";
@@ -6616,11 +6616,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* setaudit_addr */
+	/* cheriabi_setaudit_addr */
 	case 452:
 		switch(ndx) {
 		case 0:
-			p = "userland struct auditinfo_addr *";
+			p = "userland struct auditinfo_addr *__capability";
 			break;
 		case 1:
 			p = "u_int";
@@ -6629,11 +6629,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* auditctl */
+	/* cheriabi_auditctl */
 	case 453:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		default:
 			break;
@@ -9494,7 +9494,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* audit */
+	/* cheriabi_audit */
 	case 445:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9504,37 +9504,37 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* getauid */
+	/* cheriabi_getauid */
 	case 447:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* setauid */
+	/* cheriabi_setauid */
 	case 448:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* getaudit */
+	/* cheriabi_getaudit */
 	case 449:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* setaudit */
+	/* cheriabi_setaudit */
 	case 450:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* getaudit_addr */
+	/* cheriabi_getaudit_addr */
 	case 451:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* setaudit_addr */
+	/* cheriabi_setaudit_addr */
 	case 452:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* auditctl */
+	/* cheriabi_auditctl */
 	case 453:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

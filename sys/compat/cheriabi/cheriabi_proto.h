@@ -837,10 +837,37 @@ struct cheriabi_extattr_list_link_args {
 	char data_l_[PADL_(void *__capability)]; void *__capability data; char data_r_[PADR_(void *__capability)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
 };
+struct cheriabi_audit_args {
+	char record_l_[PADL_(const void *__capability)]; const void *__capability record; char record_r_[PADR_(const void *__capability)];
+	char length_l_[PADL_(u_int)]; u_int length; char length_r_[PADR_(u_int)];
+};
 struct cheriabi_auditon_args {
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
 	char data_l_[PADL_(void *__capability)]; void *__capability data; char data_r_[PADR_(void *__capability)];
 	char length_l_[PADL_(u_int)]; u_int length; char length_r_[PADR_(u_int)];
+};
+struct cheriabi_getauid_args {
+	char auid_l_[PADL_(uid_t *__capability)]; uid_t *__capability auid; char auid_r_[PADR_(uid_t *__capability)];
+};
+struct cheriabi_setauid_args {
+	char auid_l_[PADL_(uid_t *__capability)]; uid_t *__capability auid; char auid_r_[PADR_(uid_t *__capability)];
+};
+struct cheriabi_getaudit_args {
+	char auditinfo_l_[PADL_(struct auditinfo *__capability)]; struct auditinfo *__capability auditinfo; char auditinfo_r_[PADR_(struct auditinfo *__capability)];
+};
+struct cheriabi_setaudit_args {
+	char auditinfo_l_[PADL_(struct auditinfo *__capability)]; struct auditinfo *__capability auditinfo; char auditinfo_r_[PADR_(struct auditinfo *__capability)];
+};
+struct cheriabi_getaudit_addr_args {
+	char auditinfo_addr_l_[PADL_(struct auditinfo_addr *__capability)]; struct auditinfo_addr *__capability auditinfo_addr; char auditinfo_addr_r_[PADR_(struct auditinfo_addr *__capability)];
+	char length_l_[PADL_(u_int)]; u_int length; char length_r_[PADR_(u_int)];
+};
+struct cheriabi_setaudit_addr_args {
+	char auditinfo_addr_l_[PADL_(struct auditinfo_addr *__capability)]; struct auditinfo_addr *__capability auditinfo_addr; char auditinfo_addr_r_[PADR_(struct auditinfo_addr *__capability)];
+	char length_l_[PADL_(u_int)]; u_int length; char length_r_[PADR_(u_int)];
+};
+struct cheriabi_auditctl_args {
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 };
 struct cheriabi_thr_new_args {
 	char param_l_[PADL_(struct thr_param_c *)]; struct thr_param_c * param; char param_r_[PADR_(struct thr_param_c *)];
@@ -1397,7 +1424,15 @@ int	cheriabi_thr_create(struct thread *, struct cheriabi_thr_create_args *);
 int	cheriabi_extattr_list_fd(struct thread *, struct cheriabi_extattr_list_fd_args *);
 int	cheriabi_extattr_list_file(struct thread *, struct cheriabi_extattr_list_file_args *);
 int	cheriabi_extattr_list_link(struct thread *, struct cheriabi_extattr_list_link_args *);
+int	cheriabi_audit(struct thread *, struct cheriabi_audit_args *);
 int	cheriabi_auditon(struct thread *, struct cheriabi_auditon_args *);
+int	cheriabi_getauid(struct thread *, struct cheriabi_getauid_args *);
+int	cheriabi_setauid(struct thread *, struct cheriabi_setauid_args *);
+int	cheriabi_getaudit(struct thread *, struct cheriabi_getaudit_args *);
+int	cheriabi_setaudit(struct thread *, struct cheriabi_setaudit_args *);
+int	cheriabi_getaudit_addr(struct thread *, struct cheriabi_getaudit_addr_args *);
+int	cheriabi_setaudit_addr(struct thread *, struct cheriabi_setaudit_addr_args *);
+int	cheriabi_auditctl(struct thread *, struct cheriabi_auditctl_args *);
 int	cheriabi_thr_new(struct thread *, struct cheriabi_thr_new_args *);
 int	cheriabi_sigqueue(struct thread *, struct cheriabi_sigqueue_args *);
 int	cheriabi_kmq_notify(struct thread *, struct cheriabi_kmq_notify_args *);
@@ -1693,7 +1728,15 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_extattr_list_fd	AUE_EXTATTR_LIST_FD
 #define	CHERIABI_SYS_AUE_cheriabi_extattr_list_file	AUE_EXTATTR_LIST_FILE
 #define	CHERIABI_SYS_AUE_cheriabi_extattr_list_link	AUE_EXTATTR_LIST_LINK
+#define	CHERIABI_SYS_AUE_cheriabi_audit	AUE_AUDIT
 #define	CHERIABI_SYS_AUE_cheriabi_auditon	AUE_AUDITON
+#define	CHERIABI_SYS_AUE_cheriabi_getauid	AUE_GETAUID
+#define	CHERIABI_SYS_AUE_cheriabi_setauid	AUE_SETAUID
+#define	CHERIABI_SYS_AUE_cheriabi_getaudit	AUE_GETAUDIT
+#define	CHERIABI_SYS_AUE_cheriabi_setaudit	AUE_SETAUDIT
+#define	CHERIABI_SYS_AUE_cheriabi_getaudit_addr	AUE_GETAUDIT_ADDR
+#define	CHERIABI_SYS_AUE_cheriabi_setaudit_addr	AUE_SETAUDIT_ADDR
+#define	CHERIABI_SYS_AUE_cheriabi_auditctl	AUE_AUDITCTL
 #define	CHERIABI_SYS_AUE_cheriabi_thr_new	AUE_THR_NEW
 #define	CHERIABI_SYS_AUE_cheriabi_sigqueue	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_kmq_notify	AUE_MQ_NOTIFY

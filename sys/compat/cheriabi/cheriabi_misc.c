@@ -1724,17 +1724,6 @@ cheriabi_mac_syscall(struct thread *td, struct cheriabi_mac_syscall_args *uap)
 }
 
 int
-cheriabi_auditon(struct thread *td, struct cheriabi_auditon_args *uap)
-{
-
-#ifdef	AUDIT
-	return (kern_auditon(td, uap->cmd, uap->data, uap->length));
-#else
-	return (ENOSYS);
-#endif
-}
-
-int
 cheriabi_kenv(struct thread *td, struct cheriabi_kenv_args *uap)
 {
 
@@ -1772,6 +1761,111 @@ error:
 	free((__cheri_fromcap void *)bounce, M_TEMP);
 	return (error);
 }
+
+/*
+ * audit_syscalls.c
+ */
+int
+cheriabi_audit(struct thread *td, struct cheriabi_audit_args *uap)
+{
+
+#ifdef	AUDIT
+	return (kern_audit(td, uap->record, uap->length));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_auditon(struct thread *td, struct cheriabi_auditon_args *uap)
+{
+
+#ifdef	AUDIT
+	return (kern_auditon(td, uap->cmd, uap->data, uap->length));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_getauid(struct thread *td, struct cheriabi_getauid_args *uap)
+{
+
+#ifdef	AUDIT
+	return (kern_getauid(td, uap->auid));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_setauid(struct thread *td, struct cheriabi_setauid_args *uap)
+{
+
+#ifdef	AUDIT
+	return (kern_setauid(td, uap->auid));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_getaudit(struct thread *td, struct cheriabi_getaudit_args *uap)
+{
+
+#ifdef	AUDIT
+	return (kern_getaudit(td, uap->auditinfo));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_setaudit(struct thread *td, struct cheriabi_setaudit_args *uap)
+{
+
+#ifdef	AUDIT
+	return (kern_setaudit(td, uap->auditinfo));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_getaudit_addr(struct thread *td,
+    struct cheriabi_getaudit_addr_args *uap)
+{
+
+#ifdef	AUDIT
+	return (kern_getaudit_addr(td, uap->auditinfo_addr, uap->length));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_setaudit_addr(struct thread *td,
+    struct cheriabi_setaudit_addr_args *uap)
+{
+
+#ifdef	AUDIT
+	return (kern_setaudit_addr(td, uap->auditinfo_addr, uap->length));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_auditctl(struct thread *td, struct cheriabi_auditctl_args *uap)
+{
+
+#ifdef	AUDIT
+	return (kern_auditctl(td, uap->path));
+#else
+	return (ENOSYS);
+#endif
+}
+
 
 /*
  * kern_acct.c

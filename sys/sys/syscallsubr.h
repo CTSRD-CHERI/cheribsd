@@ -93,6 +93,9 @@ int	kern_adjtime(struct thread *td, struct timeval *delta,
 	    struct timeval *olddelta);
 int	kern_alternate_path(struct thread *td, const char *prefix, const char *path,
 	    enum uio_seg pathseg, char **pathbuf, int create, int dirfd);
+int	kern_audit(struct thread *td, const void * __capability record,
+	    u_int length);
+int	kern_auditctl(struct thread *td, const char * __capability path);
 int	kern_auditon(struct thread *td, int cmd, void * __CAPABILITY data,
 	    u_int length);
 int	kern_bindat(struct thread *td, int dirfd, int fd, struct sockaddr *sa);
@@ -179,6 +182,11 @@ int	kern_futimes(struct thread *td, int fd,
 	    enum uio_seg tptrseg);
 int	kern_futimens(struct thread *td, int fd,
 	    const struct timespec * __capability tptr, enum uio_seg tptrseg);
+int	kern_getaudit(struct thread *td,
+	    struct auditinfo * __capability auditinfo);
+int	kern_getaudit_addr(struct thread *td,
+	    struct auditinfo_addr * __capability auditinfo_addr, u_int length);
+int	kern_getauid(struct thread *td, uid_t * __capability auid);
 int	kern_getdirentries(struct thread *td, int fd, char * __capability buf,
 	    size_t count, off_t *basep, ssize_t *residp, enum uio_seg bufseg);
 int	kern_getfh(struct thread *td, const char * __capability path,
@@ -359,6 +367,11 @@ int	kern_sched_rr_get_interval_td(struct thread *td, struct thread *targettd,
 	    struct timespec *ts);
 int	kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 	    ksemun_t *arg, register_t *rval);
+int	kern_setaudit(struct thread *td,
+	    struct auditinfo * __capability auditinfo);
+int	kern_setaudit_addr(struct thread *td,
+	    struct auditinfo_addr * __capability auditinfo_addr, u_int length);
+int	kern_setauid(struct thread *td, uid_t * __capability auid);
 int	kern_setlogin(struct thread *td, const char * __CAPABILITY namebuf);
 int	kern_setloginclass(struct thread *td,
 	    const char * __capability namebuf);

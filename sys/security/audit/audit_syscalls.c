@@ -69,6 +69,14 @@ __FBSDID("$FreeBSD$");
 int
 sys_audit(struct thread *td, struct audit_args *uap)
 {
+
+	return (kern_audit(td, __USER_CAP(uap->record, uap->length),
+	    uap->length));
+}
+
+int
+kern_audit(struct thread *td, const void * __capability record, u_int length)
+{
 	int error;
 	void * rec;
 	struct kaudit_record *ar;
@@ -79,7 +87,7 @@ sys_audit(struct thread *td, struct audit_args *uap)
 	if (error)
 		return (error);
 
-	if ((uap->length <= 0) || (uap->length > audit_qctrl.aq_bufsz))
+	if ((length <= 0) || (length > audit_qctrl.aq_bufsz))
 		return (EINVAL);
 
 	ar = currecord();
@@ -105,12 +113,13 @@ sys_audit(struct thread *td, struct audit_args *uap)
 		ar = td->td_ar;
 	}
 
-	if (uap->length > MAX_AUDIT_RECORD_SIZE)
+	if (length > MAX_AUDIT_RECORD_SIZE)
 		return (EINVAL);
 
-	rec = malloc(uap->length, M_AUDITDATA, M_WAITOK);
+	rec = malloc(length, M_AUDITDATA, M_WAITOK);
 
-	error = copyin(uap->record, rec, uap->length);
+	error = copyin_c(record,
+	    (__cheri_tocap void * __capability)rec, length);
 	if (error)
 		goto free_out;
 
@@ -121,7 +130,7 @@ sys_audit(struct thread *td, struct audit_args *uap)
 	}
 
 #ifdef MAC
-	error = mac_system_check_audit(td->td_ucred, rec, uap->length);
+	error = mac_system_check_audit(td->td_ucred, rec, length);
 	if (error)
 		goto free_out;
 #endif
@@ -135,7 +144,7 @@ sys_audit(struct thread *td, struct audit_args *uap)
 	 * k_ar_commit & AR_COMMIT_USER?
 	 */
 	ar->k_udata = rec;
-	ar->k_ulen  = uap->length;
+	ar->k_ulen  = length;
 	ar->k_ar_commit |= AR_COMMIT_USER;
 
 	/*
@@ -164,7 +173,7 @@ int
 sys_auditon(struct thread *td, struct auditon_args *uap)
 {
 
-	return (kern_auditon(td, uap->cmd, (void * __CAPABILITY)uap->data,
+	return (kern_auditon(td, uap->cmd, __USER_CAP(uap->data, uap->length),
 	    uap->length));
 }
 
@@ -220,8 +229,7 @@ kern_auditon(struct thread *td, int cmd, void * __CAPABILITY data,
 	case A_GETPINFO:
 	case A_GETPINFO_ADDR:
 	case A_SENDTRIGGER:
-		error = copyin_c(data,
-		   (union auditon_udata * __CAPABILITY)&udata, length);
+		error = copyin_c(data, &udata, length);
 		if (error)
 			return (error);
 		AUDIT_ARG_AUDITON(&udata);
@@ -585,8 +593,7 @@ kern_auditon(struct thread *td, int cmd, void * __CAPABILITY data,
 	case A_GETFSIZE:
 	case A_GETPINFO_ADDR:
 	case A_GETKAUDIT:
-		error = copyout_c((union auditon_udata * __CAPABILITY)&udata,
-		    data, length);
+		error = copyout_c(&udata, data, length);
 		if (error)
 			return (error);
 		break;
@@ -602,6 +609,13 @@ kern_auditon(struct thread *td, int cmd, void * __CAPABILITY data,
 int
 sys_getauid(struct thread *td, struct getauid_args *uap)
 {
+
+	return (kern_getauid(td, __USER_CAP_OBJ(uap->auid)));
+}
+
+int
+kern_getauid(struct thread *td, uid_t * __capability auid)
+{
 	int error;
 
 	if (jailed(td->td_ucred))
@@ -609,13 +623,21 @@ sys_getauid(struct thread *td, struct getauid_args *uap)
 	error = priv_check(td, PRIV_AUDIT_GETAUDIT);
 	if (error)
 		return (error);
-	return (copyout(&td->td_ucred->cr_audit.ai_auid, uap->auid,
-	    sizeof(td->td_ucred->cr_audit.ai_auid)));
+	return (copyout_c(
+	    (__cheri_tocap uid_t * __capability)&td->td_ucred->cr_audit.ai_auid,
+	    auid, sizeof(td->td_ucred->cr_audit.ai_auid)));
 }
 
 /* ARGSUSED */
 int
 sys_setauid(struct thread *td, struct setauid_args *uap)
+{
+
+	return (kern_setauid(td, __USER_CAP_OBJ(uap->auid)));
+}
+
+int
+kern_setauid(struct thread *td, uid_t * __capability auid)
 {
 	struct ucred *newcred, *oldcred;
 	au_id_t id;
@@ -623,7 +645,7 @@ sys_setauid(struct thread *td, struct setauid_args *uap)
 
 	if (jailed(td->td_ucred))
 		return (ENOSYS);
-	error = copyin(uap->auid, &id, sizeof(id));
+	error = copyin_c(auid, &id, sizeof(id));
 	if (error)
 		return (error);
 	audit_arg_auid(id);
@@ -657,6 +679,13 @@ fail:
 int
 sys_getaudit(struct thread *td, struct getaudit_args *uap)
 {
+
+	return (kern_getaudit(td, __USER_CAP_OBJ(uap->auditinfo)));
+}
+
+int
+kern_getaudit(struct thread *td, struct auditinfo * __capability auditinfo)
+{
 	struct auditinfo ai;
 	struct ucred *cred;
 	int error;
@@ -675,12 +704,19 @@ sys_getaudit(struct thread *td, struct getaudit_args *uap)
 	ai.ai_asid = cred->cr_audit.ai_asid;
 	ai.ai_termid.machine = cred->cr_audit.ai_termid.at_addr[0];
 	ai.ai_termid.port = cred->cr_audit.ai_termid.at_port;
-	return (copyout(&ai, uap->auditinfo, sizeof(ai)));
+	return (copyout_c(&ai, auditinfo, sizeof(ai)));
 }
 
 /* ARGSUSED */
 int
 sys_setaudit(struct thread *td, struct setaudit_args *uap)
+{
+
+	return (kern_setaudit(td, __USER_CAP_OBJ(uap->auditinfo)));
+}
+
+int
+kern_setaudit(struct thread *td, struct auditinfo * __capability auditinfo)
 {
 	struct ucred *newcred, *oldcred;
 	struct auditinfo ai;
@@ -688,7 +724,7 @@ sys_setaudit(struct thread *td, struct setaudit_args *uap)
 
 	if (jailed(td->td_ucred))
 		return (ENOSYS);
-	error = copyin(uap->auditinfo, &ai, sizeof(ai));
+	error = copyin_c(auditinfo, &ai, sizeof(ai));
 	if (error)
 		return (error);
 	audit_arg_auditinfo(&ai);
@@ -725,22 +761,41 @@ fail:
 int
 sys_getaudit_addr(struct thread *td, struct getaudit_addr_args *uap)
 {
+
+	return (kern_getaudit_addr(td,
+	    __USER_CAP(uap->auditinfo_addr, uap->length), uap->length));
+}
+
+int
+kern_getaudit_addr(struct thread *td,
+    struct auditinfo_addr * __capability auditinfo_addr, u_int length)
+{
 	int error;
 
 	if (jailed(td->td_ucred))
 		return (ENOSYS);
-	if (uap->length < sizeof(*uap->auditinfo_addr))
+	if (length < sizeof(*auditinfo_addr))
 		return (EOVERFLOW);
 	error = priv_check(td, PRIV_AUDIT_GETAUDIT);
 	if (error)
 		return (error);
-	return (copyout(&td->td_ucred->cr_audit, uap->auditinfo_addr,
-	    sizeof(*uap->auditinfo_addr)));
+	return (copyout_c((__cheri_tocap struct auditinfo_addr * __capability)
+	    &td->td_ucred->cr_audit, auditinfo_addr,
+	    sizeof(*auditinfo_addr)));
 }
 
 /* ARGSUSED */
 int
 sys_setaudit_addr(struct thread *td, struct setaudit_addr_args *uap)
+{
+
+	return (kern_setaudit_addr(td,
+	    __USER_CAP(uap->auditinfo_addr, uap->length), uap->length));
+}
+
+int
+kern_setaudit_addr(struct thread *td,
+    struct auditinfo_addr * __capability auditinfo_addr, u_int length)
 {
 	struct ucred *newcred, *oldcred;
 	struct auditinfo_addr aia;
@@ -748,7 +803,7 @@ sys_setaudit_addr(struct thread *td, struct setaudit_addr_args *uap)
 
 	if (jailed(td->td_ucred))
 		return (ENOSYS);
-	error = copyin(uap->auditinfo_addr, &aia, sizeof(aia));
+	error = copyin_c(auditinfo_addr, &aia, sizeof(aia));
 	if (error)
 		return (error);
 	audit_arg_auditinfo_addr(&aia);
@@ -785,6 +840,13 @@ fail:
 int
 sys_auditctl(struct thread *td, struct auditctl_args *uap)
 {
+
+	return (kern_auditctl(td, __USER_CAP_STR(uap->path)));
+}
+
+int
+kern_auditctl(struct thread *td, const char * __capability path)
+{
 	struct nameidata nd;
 	struct ucred *cred;
 	struct vnode *vp;
@@ -807,11 +869,11 @@ sys_auditctl(struct thread *td, struct auditctl_args *uap)
 	 *
 	 * On Darwin, a NULL path argument is also used to disable audit.
 	 */
-	if (uap->path == NULL)
+	if (path == NULL)
 		return (EINVAL);
 
-	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF | AUDITVNODE1,
-	    UIO_USERSPACE, uap->path, td);
+	NDINIT_C(&nd, LOOKUP, FOLLOW | LOCKLEAF | AUDITVNODE1,
+	    UIO_USERSPACE, path, td);
 	flags = AUDIT_OPEN_FLAGS;
 	error = vn_open(&nd, &flags, 0, NULL);
 	if (error)

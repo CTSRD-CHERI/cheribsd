@@ -1012,28 +1012,31 @@
 				    const struct timespec *timeout); }
 443	AUE_NULL	NOPROTO	{ int thr_wake(long id); }
 444	AUE_MODUNLOAD	NOPROTO	{ int kldunloadf(int fileid, int flags); }
-445	AUE_AUDIT	NOPROTO	{ int audit( \
+445	AUE_AUDIT	STD	{ int cheriabi_audit( \
 				    _In_reads_bytes_(length) \
-				    const void *record, \
+				    const void * __capability record, \
 				    u_int length); }
 446	AUE_AUDITON	STD	{ int cheriabi_auditon(int cmd, \
 				    _In_opt_ void * __capability data, \
 				    u_int length); }
-447	AUE_GETAUID	NOPROTO	{ int getauid(_Out_ uid_t *auid); }
-448	AUE_SETAUID	NOPROTO	{ int setauid(_In_ uid_t *auid); }
-449	AUE_GETAUDIT	NOPROTO	{ int getaudit( \
-				    _Out_ struct auditinfo *auditinfo); }
-450	AUE_SETAUDIT	NOPROTO	{ int setaudit( \
-				    _In_ struct auditinfo *auditinfo); }
-451	AUE_GETAUDIT_ADDR	NOPROTO	{ int getaudit_addr( \
+447	AUE_GETAUID	STD	{ int cheriabi_getauid( \
+				    _Out_ uid_t * __capability auid); }
+448	AUE_SETAUID	STD	{ int cheriabi_setauid( \
+				    _In_ uid_t * __capability auid); }
+449	AUE_GETAUDIT	STD	{ int cheriabi_getaudit( \
+				    _Out_ struct auditinfo * __capability auditinfo); }
+450	AUE_SETAUDIT	STD	{ int cheriabi_setaudit( \
+				    _In_ struct auditinfo * __capability auditinfo); }
+451	AUE_GETAUDIT_ADDR	STD	{ int cheriabi_getaudit_addr( \
 				    _Out_writes_bytes_(length) \
-				    struct auditinfo_addr *auditinfo_addr, \
+				    struct auditinfo_addr * __capability auditinfo_addr, \
 				    u_int length); }
-452	AUE_SETAUDIT_ADDR	NOPROTO	{ int setaudit_addr( \
+452	AUE_SETAUDIT_ADDR	STD	{ int cheriabi_setaudit_addr( \
 				    _In_reads_bytes_(length) \
-				    struct auditinfo_addr *auditinfo_addr, \
+				    struct auditinfo_addr * __capability auditinfo_addr, \
 				    u_int length); }
-453	AUE_AUDITCTL	NOPROTO	{ int auditctl(_In_z_ const char *path); }
+453	AUE_AUDITCTL	STD	{ int cheriabi_auditctl( \
+				    _In_z_ const char * __capability path); }
 ; XXX-BD: args pretty much unauditable
 454	AUE_NULL	NOPROTO|NOPARSE	{ int _umtx_op(void *obj, int op,\
 				    u_long val, void *uaddr1, \
