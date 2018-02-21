@@ -40,39 +40,57 @@
 .set noat
 
 #define	CLEARLO_BITS	(1 << 1  /* $at */ | \
-			/* XXX: clearing $v0 leads to something quite strange */ \
-			 1 << 3  /* $v1 */ | \
-			 /* $a0-$a7 are preserved and passed to the callee */ \
+			 /* $v0 and $v1 are preserved and passed to the caller */ \
+			 1 << 4  /* $a0 */ | \
+			 1 << 5  /* $a1 */ | \
+			 1 << 6  /* $a2 */ | \
+			 1 << 7  /* $a3 */ | \
+			 1 << 8  /* $a4 */ | \
+			 1 << 9  /* $a5 */ | \
+			 1 << 10 /* $a6 */ | \
+			 1 << 11 /* $a7 */ | \
 			 1 << 12 /* $t4 */ | \
 			 1 << 13 /* $t5 */ | \
 			 1 << 14 /* $t6 */ | \
 			 1 << 15 /* $t7 */)
 
-#define	CLEARHI_BITS	(/* s0-s7 are loaded from the callee context */ \
+#define	CLEARHI_BITS	(/* s0-s7 are loaded from the caller's context */ \
 			 1 << 8  /* $t8 */ | \
 			 1 << 9  /* $t9 */)
 			 /* $k0 and $k1 are reserved for the kernel */
-			 /* $gp and $sp are loaded from the callee context */
-			 /* $s8 is loaded from the callee context */
-			 /* $ra is loaded from the callee context */ 
+			 /* $gp and $sp are loaded from the caller's context */
+			 /* $s8 is loaded from the caller's context */
+			 /* $ra is loaded from the caller's context */ 
 
 // XXX: $c0?
 #define	CCLEARLO_BITS	(1 << 1  /* PCC */ | \
 			 1 << 2  /* IDC */ | \
-			 /* $c3-$c10 are preserved and passed to the callee */ \
-			 /* $c11 is loaded from the callee context */ \
+			 1 << 3  /* $c3 */ | \
+			 1 << 4  /* $c4 */ | \
+			 1 << 5  /* $c5 */ | \
+			 1 << 6  /* $c6 */ | \
+			 1 << 7  /* $c7 */ | \
+			 1 << 8  /* $c8 */ | \
+			 1 << 9  /* $c9 */ | \
+			 1 << 10 /* $c10 */ | \
+			 /* $c11 is loaded from the caller's context */ \
 			 1 << 12 /* $c12 */ | \
 			 1 << 13 /* $c13 */ | \
 			 1 << 14 /* $c14 */ | \
 			 1 << 15 /* $c15 */)
 
 #define	CCLEARHI_BITS	(1 << 0  /* $c16 */ | \
-			 /* $c17-$c24 are loaded from the callee context */ \
+			 /* $c17-$c24 are loaded from the caller's context */ \
 			 1 << 9  /* $c25 */ | \
 			 1 << 10 /* $c26 */)
 			 /* $c27-$c33 are reserved for the kernel */
 
 /*
+ * Everywhere below the "caller" and "callee" terms are swapped.
+ * In other words, the "caller" here is the same thread as the "caller"
+ * on the cocall(2) side.  We - the thread calling into coaccept(2) - are
+ * called the callee here.
+ *
  * Register usage:
  *
  * Do not touch: a0-a7, c3-c10
@@ -82,21 +100,17 @@
  * Zero before calling the callee: at, v0, v1, t4-t7, s0-s7, t8, t9, gp, sp, s8, ra, hi, lo
  *
  * XXX: Floating point
- * XXX: lo/hi registers?
  */
 .text
-.globl _C_LABEL(switcher_cocall)
-_C_LABEL(switcher_cocall):
+.globl _C_LABEL(switcher_coaccept)
+_C_LABEL(switcher_coaccept):
 
 	/*
-	 * Save the caller's context in the caller's control block.  We are
+	 * Save the callee's context in the callee's control block.  We are
 	 * only saving the registeres which are defined as callee-saved;
 	 * the caller-saved ones will be zeroed on return.
 	 *
 	 * The "3*CHERICAP_SIZE" is to skip over 'struct switcher_context'.
-	 *
-	 * XXX: Would be nice if we could redefine the ABI for cocall(2)
-	 *      so that most of those don't need restoring.
 	 *
 	 * XXX: Make sure the IDC is cleared if we get a signal while here.
 	 */
@@ -123,36 +137,37 @@ _C_LABEL(switcher_cocall):
 	csc	$c24, zero, 8*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
 
 	/*
-	 * Save the PCC, put there by cocall().
+	 * Save the PCC, put there by coaccept().
 	 */
 	csc	$c11, zero, 9*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
 
 	/*
-	 * Unseal the callee's control block.
+	 * Load the capability to the callee's control block.
 	 */
-	clc	$c13, zero, 0($idc)	/* Load the unsealing capability */
-	cunseal	$c5, $c5, $c13		/* Unseal the calee control block */
+	clc	$c5, zero, 2*CHERICAP_SIZE($idc)
 
 	/*
-	 * Save the capability to the caller's control block in the callee
-	 * context.  This also serves as the callee's spinlock.
-	 *
-	 * XXX: Really, this is supposed to be a spinlock.
+	 * Is this the first invocation of coaccept, or rather a response
+	 * for a ccall()?  If the former - park the thread.
 	 */
-	csc	$idc, zero, 2*CHERICAP_SIZE($c5);
+	cbts	$c5, 8
+	nop
+	beq	zero, zero, -4 // XXX: This is rather suboptimal.
+	nop
+	nop
 
 	/*
-	 * Save the callee's thread identifier.  The kernel needs a way
+	 * Save the caller's thread identifier.  The kernel needs a way
 	 * to easily look it up from the current thread for the lazy thread
-	 * switching to work; that's the primary reason for storing it in
-	 * the caller's control block - or perhaps even having a caller's
-	 * control block.
+	 * switching to work.
 	 */
 	clc	$c14, zero, CHERICAP_SIZE($c5)
 	csc	$c14, zero, CHERICAP_SIZE($idc)
 
+	// XXX: Release the callee's context spinlock here.
+
 	/*
-	 * Restore the callee's context.
+	 * Restore the caller's context.
 	 */
 	cld	s0, zero, 3*CHERICAP_SIZE+0($c5)
 	cld	s1, zero, 3*CHERICAP_SIZE+8($c5)
@@ -184,15 +199,15 @@ _C_LABEL(switcher_cocall):
 	cclearhi	CCLEARHI_BITS
 
 	/*
-	 * "Return" to the callee.
+	 * Bye!
 	 */
 	cjr	$c11
 	nop
 
-.globl _C_LABEL(eswitcher_cocall)
-_C_LABEL(eswitcher_cocall):
+.globl _C_LABEL(eswitcher_coaccept)
+_C_LABEL(eswitcher_coaccept):
 
 .data
-.globl szswitcher_cocall
-szswitcher_cocall:
-.long eswitcher_cocall-switcher_cocall
+.globl szswitcher_coaccept
+szswitcher_coaccept:
+.long eswitcher_coaccept-switcher_coaccept

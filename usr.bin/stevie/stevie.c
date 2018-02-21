@@ -161,7 +161,7 @@ service_proc(void *dummy __unused)
 
 	fprintf(stderr, "%s: code %p, data %p, accepting...\n", __func__, (__cheri_fromcap void *)switcher_code, (__cheri_fromcap void *)switcher_data);
 	while (coaccept(switcher_code, switcher_data)) {
-		fprintf(stderr, "%s: accepted, we are thread %d, looping...", __func__, pthread_getthreadid_np());
+		fprintf(stderr, "%s: accepted, we are thread %d, looping...\n", __func__, pthread_getthreadid_np());
 	}
 	fprintf(stderr, "%s: we're not supposed to be here\n", __func__);
 	return (NULL);
