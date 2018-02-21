@@ -20,6 +20,7 @@ mips/cheri/cheri.c			optional cpu_cheri
 mips/cheri/cheri_bcopy.S		optional cpu_cheri
 mips/cheri/cheri_coaccept.S		optional cpu_cheri
 mips/cheri/cheri_cocall.S		optional cpu_cheri
+mips/cheri/cheri_colocation.c		optional cpu_cheri
 mips/cheri/cheri_debug.c		optional cpu_cheri
 mips/cheri/cheri_exception.c		optional cpu_cheri
 mips/cheri/cheri_ktrace.c		optional cpu_cheri ktrace
