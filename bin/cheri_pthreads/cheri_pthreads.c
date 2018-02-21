@@ -36,10 +36,12 @@
 
 #include <err.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sysexits.h>
+#include <unistd.h>
 
 
 struct thread_args {
@@ -76,6 +78,19 @@ thread_func(void *_arg)
 	}
 	fprintf(stderr, "Thread %d finished\n", arg->num);
 	return arg;
+}
+
+static volatile int* segv_pointer = NULL;
+static volatile _Bool segv_expected = 0;
+static volatile int good_value = 0;
+
+static void segv_handler(int sig) {
+	(void)sig;
+	write(STDERR_FILENO, "SEGV!\n", strlen("SEGV!\n"));
+	if (!segv_expected)
+		abort();
+	segv_expected = 0;
+	segv_pointer = &good_value;
 }
 
 int
@@ -151,5 +166,12 @@ main(void)
 	}
 	free((void*)s);
 	fprintf(stderr, "Finished main thread %p\n", pthread_self());
-	return (0);
+
+	fprintf(stderr, "Triggering SIGSEGV to test signal handlers:\n");
+	segv_expected = 1;
+	signal(SIGSEGV, &segv_handler);
+	/* The SEGV handler should update this value so that retrying works */
+	int exit_code = *segv_pointer;
+	fprintf(stderr, "Triggering SEGV handled successfully.\n");
+	return exit_code;
 }
