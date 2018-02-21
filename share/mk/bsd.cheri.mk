@@ -46,8 +46,6 @@ WANT_CHERI?=	hybrid
 # XXXAR: leave this for a while until everyone has updated clang to
 # a version that defaults to libc++
 LDFLAGS+=	-stdlib=libc++
-# exceptions currently require text relocations on MIPS
-ALLOW_SHARED_TEXTREL=yes
 .endif
 .endif
 
@@ -104,13 +102,9 @@ _CHERI_COMMON_FLAGS+=	-mllvm -cheri-exact-equals
 # Turn off deprecated warnings
 _CHERI_COMMON_FLAGS+= -Wno-deprecated-declarations
 
-.if ${WANT_CHERI} != "none"
-CFLAGS+=	${CHERI_OPTIMIZATION_FLAGS:U-O2}
-.endif
-
 .if ${WANT_CHERI} == "pure" || ${WANT_CHERI} == "sandbox"
 OBJCOPY:=	objcopy
-MIPS_ABI=	purecap
+MIPS_ABI:=	purecap
 _CHERI_COMMON_FLAGS+=	-fpic
 LIBDIR:=	/usr/libcheri
 ROOTOBJDIR=	${.OBJDIR:S,${.CURDIR},,}${SRCTOP}/worldcheri${SRCTOP}
@@ -131,22 +125,6 @@ _LIB_OBJTOP=	${ROOTOBJDIR}
 .ifdef LIBCHERI
 LDFLAGS+=	-Wl,-init=crt_init_globals
 .endif
-# remove any conflicting -fuse-ld= flags
-LDFLAGS:=${LDFLAGS:N-fuse-ld=*}
-LDFLAGS+=	-fuse-ld=lld -Wl,-z,norelro
-.ifdef CHERI_LLD_INTEGRATED_CAPSIZEFIX
-LDFLAGS+=      -no-capsizefix -Wl,--process-cap-relocs -Wl,-color-diagnostics
-LD_FATAL_WARNINGS:=no
-.endif
-.if ${CFLAGS:M-fexceptions} != ""
-# any code built with -fexceptions currently needs text relocations
-# See https://reviews.llvm.org/D33670
-ALLOW_SHARED_TEXTREL=yes
-.endif
-.ifdef ALLOW_SHARED_TEXTREL
-# By default text relocations are an error instead of a warning with LLD
-LDFLAGS+=	-Wl,-z,notext
-.endif
 .else
 STATIC_CFLAGS+= -ftls-model=local-exec # MIPS/hybrid case
 .endif
@@ -156,6 +134,13 @@ _CHERI_COMMON_FLAGS+=	-cheri=128
 .else
 _CHERI_COMMON_FLAGS+=	-cheri=256
 .endif
+
+CFLAGS+=	${CHERI_OPTIMIZATION_FLAGS:U-O2}
+# We now need LLD to link any code that uses capabilities:
+# We are expanding $LDFLAGS here so this must come after MIPS_ABI has been set!
+LDFLAGS:=${LDFLAGS:N-fuse-ld=*}
+LDFLAGS+=	-fuse-ld=lld
+
 # XXX: Needed as Clang rejects -mllvm -cheri128 when using $CC to link:
 # warning: argument unused during compilation: '-cheri=128'
 _CHERI_CFLAGS+=	-Qunused-arguments

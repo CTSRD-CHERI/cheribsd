@@ -37,4 +37,10 @@ CFLAGS+= -DSYMBOL_VERSIONING
 MAN=
 MLINKS=
 
+SOLINKOPTS+=	-Wl.-undefined=report-all
+# We need to disable --fatal-warnings when linking with -nodefaultlibs since errno
+# will be missing so we can't determine the size for .global_sizes
+LD_FATAL_WARNINGS=no
+LDFLAGS+=	-nostdlib -nodefaultlibs
+
 .include <bsd.lib.mk>

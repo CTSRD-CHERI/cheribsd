@@ -193,7 +193,11 @@
 /* #undef LG_QUANTUM */
 
 /* One page is 2^LG_PAGE bytes. */
+#ifndef __CHERI_PURE_CAPABILITY__
 #define LG_PAGE 12
+#else
+#define LG_PAGE 13
+#endif
 
 /*
  * One huge page is 2^LG_HUGEPAGE bytes.  Note that this is defined even if the

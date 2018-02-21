@@ -221,7 +221,11 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 			assert(ELF_ST_BIND(sym->st_info) == STB_LOCAL);
 			val += (vaddr_t)relocbase;
 #ifdef DEBUG_VERBOSE
-			dbg("REL32/L(%p) %p -> %p in <self>",
+			/*
+			 * FIXME this can never work since the debug var only
+			 * gets initialized later -> use rtld_printf for now
+			 */
+			rtld_printf("REL32/L(%p) %p -> %p in <self>\n",
 			    where, (void *)(uintptr_t)old,
 			    (void *)(uintptr_t)val);
 #endif

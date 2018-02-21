@@ -34,7 +34,7 @@
 
 #include "debug.h"
 #include "rtld.h"
-#include "rtld_printf.h"
+#include "simple_printf.h"
 
 static const char rel_header[] =
     " symbol name               r_info r_offset st_value st_size    address    value\n"

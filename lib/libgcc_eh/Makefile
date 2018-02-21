@@ -1,5 +1,7 @@
 # $FreeBSD$
 
+.include <src.opts.mk>
+
 PACKAGE=	clibs
 LIB=		gcc_eh
 NO_PIC=

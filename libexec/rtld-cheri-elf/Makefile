@@ -10,10 +10,13 @@ MK_CHERI_SHARED_PROG:=yes
 
 .PATH: ${.CURDIR}/../../lib/libmalloc_simple
 
+# TODO: disable this once we believe RTLD works reliably
+DEBUG=-DDEBUG
+
 PROG?=		ld-cheri-elf.so.1
 SRCS=		rtld_start.S \
-		reloc.c rtld.c rtld_lock.c rtld_printf.c map_object.c \
-		heap.c malloc.c xmalloc.c debug.c libmap.c write.S
+		reloc.c rtld.c rtld_lock.c map_object.c \
+		heap.c malloc.c xmalloc.c debug.c libmap.c
 MAN=
 NEED_CHERI=	pure
 WANT_DUMP=yes
@@ -39,10 +42,16 @@ CFLAGS+=	-fpic
 CFLAGS+=	-DPIC $(DEBUG)
 CFLAGS.reloc.c+=-fno-jump-tables
 LDFLAGS+=	-shared -Wl,-Bsymbolic -Wl,-z,defs
+# avoid accidentally depending on non-existent symbols
+LDFLAGS+=	-Wl,-no-undefined
 LIBADD=		c_pic
 
 # For floating-point functions used by gdtoa.
 LIBADD+=	compiler_rt
+
+# for the rtld_printf functions:
+SIMPLE_PRINTF_PREFIX=rtld
+.include "${SRCTOP}/lib/libsimple_printf/Makefile.inc"
 
 .if defined(NOT_YET)
 .if ${MK_SYMVER} == "yes"

@@ -289,12 +289,16 @@ optionEnumerationVal(tOptions * pOpts, tOptDesc * pOD,
      *  IF the program option descriptor pointer is invalid,
      *  then it is some sort of special request.
      */
-    if (pOpts == OPTPROC_EMIT_USAGE) {
+    switch ((uintptr_t)pOpts) {
+    case (uintptr_t)OPTPROC_EMIT_USAGE:
         /*
          *  print the list of enumeration names.
          */
         enum_err(pOpts, pOD, paz_names, (int)name_ct);
-    } else if (pOpts == OPTPROC_EMIT_SHELL) {
+        break;
+
+    case (uintptr_t)OPTPROC_EMIT_SHELL:
+    {
         unsigned int ix = (unsigned int)pOD->optArg.argEnum;
         /*
          *  print the name string.
@@ -303,7 +307,12 @@ optionEnumerationVal(tOptions * pOpts, tOptDesc * pOD,
             printf(INVALID_FMT, ix);
         else
             fputs(paz_names[ ix ], stdout);
-    } else if (pOpts == OPTPROC_RETURN_VALNAME) {
+
+        break;
+    }
+
+    case (uintptr_t)OPTPROC_RETURN_VALNAME:
+    {
         unsigned int ix = (unsigned int)pOD->optArg.argEnum;
         /*
          *  Replace the enumeration value with the name string.
@@ -312,7 +321,13 @@ optionEnumerationVal(tOptions * pOpts, tOptDesc * pOD,
             return (uintptr_t)INVALID_STR;
 
         pOD->optArg.argString = paz_names[ix];
-    } else if ((pOD->fOptState & OPTST_RESET) == 0) {
+        break;
+    }
+
+    default:
+        if ((pOD->fOptState & OPTST_RESET) != 0)
+            break;
+
         res = find_name(pOD->optArg.argString, pOpts, pOD, paz_names, name_ct);
 
         if (pOD->fOptState & OPTST_ALLOC_ARG) {
@@ -535,15 +550,21 @@ optionSetMembers(tOptions * opts, tOptDesc * od,
      *  IF the program option descriptor pointer is invalid,
      *  then it is some sort of special request.
      */
-    if (opts == OPTPROC_EMIT_USAGE) {
+    switch ((uintptr_t)opts) {
+    case (uintptr_t)OPTPROC_EMIT_USAGE:
         enum_err(OPTPROC_EMIT_USAGE, od, nm_list, nm_ct);
         return;
-    } else if (opts == OPTPROC_EMIT_SHELL) {
+
+    case (uintptr_t)OPTPROC_EMIT_SHELL:
         set_memb_shell(opts, od, nm_list, nm_ct);
         return;
-    } else if (opts == OPTPROC_RETURN_VALNAME) {
+
+    case (uintptr_t)OPTPROC_RETURN_VALNAME:
         set_memb_names(opts, od, nm_list, nm_ct);
         return;
+
+    default:
+        break;
     }
 
     if ((od->fOptState & OPTST_RESET) != 0)

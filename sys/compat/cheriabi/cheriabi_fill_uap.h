@@ -392,10 +392,10 @@ CHERIABI_SYS_cheriabi_recvmsg_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_recvmsg_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [1] _In_ struct msghdr_c * msg */
+	/* [1] _Inout_ struct msghdr_c * msg */
 	{
 		int error;
-		register_t reqperms = (CHERI_PERM_LOAD|CHERI_PERM_LOAD_CAP);
+		register_t reqperms = (CHERI_PERM_LOAD|CHERI_PERM_LOAD_CAP|CHERI_PERM_STORE|CHERI_PERM_STORE_CAP);
 
 		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_recvmsg_PTRMASK);
 		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->msg),
