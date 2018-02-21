@@ -691,7 +691,14 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	regs->c12 = psp->ps_sigcap[_SIG_IDX(sig)];
 	regs->c17 = td->td_pcb->pcb_cherisignal.csig_sigcode;
 	regs->ddc = csigp->csig_ddc;
-	regs->idc = csigp->csig_idc;
+	/*
+	 * For now only change IDC if we were sandboxed. This makes cap-table
+	 * binaries work as expected (since they need cgp to remain the same).
+	 *
+	 * TODO: remove csigp->csig_idc
+	 */
+	if (cheri_is_sandboxed)
+		regs->idc = csigp->csig_idc;
 	regs->pcc = csigp->csig_pcc;
 }
 
