@@ -59,7 +59,9 @@
 // XXX: $c0?
 #define	CCLEARLO_BITS	(1 << 1  /* PCC */ | \
 			 1 << 2  /* IDC */ | \
-			 /* $c3-$c10 are preserved and passed to the callee */ \
+			 1 << 3  /* $c3, containing the sealed code capability */ | \
+			 1 << 4  /* $c4, containing the sealed code capability */ | \
+			 /* $c5-$c10 are preserved and passed to the callee */ \
 			 /* $c11 is loaded from the callee context */ \
 			 1 << 12 /* $c12 */ | \
 			 1 << 13 /* $c13 */ | \
