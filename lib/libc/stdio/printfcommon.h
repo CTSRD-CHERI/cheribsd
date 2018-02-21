@@ -285,7 +285,12 @@ __cheri_ptr_alt(void *pointer, CHAR *cp, const char *xdigs)
 	CHAR *scp;
 
 	ujval = cheri_gettype(pointer);
-	cp = __ujtoa(ujval, cp, 16, 0, xdigs);
+	if (ujval == -1) {
+		*--cp = '1';
+		*--cp = '-';
+	} else {
+		cp = __ujtoa(ujval, cp, 16, 0, xdigs);
+	}
 	*--cp = ':';
 	*--cp = 't';
 	*--cp = ' ';
