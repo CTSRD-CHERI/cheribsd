@@ -81,12 +81,36 @@ copyin_nofault(const void *udaddr, void *kaddr, size_t len)
 }
 
 int
+copyin_nofault_c(const void * __capability udaddr, void * __capability kaddr,
+    size_t len)
+{
+	int error, save;
+
+	save = vm_fault_disable_pagefaults();
+	error = copyin_c(udaddr, kaddr, len);
+	vm_fault_enable_pagefaults(save);
+	return (error);
+}
+
+int
 copyout_nofault(const void *kaddr, void *udaddr, size_t len)
 {
 	int error, save;
 
 	save = vm_fault_disable_pagefaults();
 	error = copyout(kaddr, udaddr, len);
+	vm_fault_enable_pagefaults(save);
+	return (error);
+}
+
+int
+copyout_nofault_c(const void * __capability kaddr, void * __capability udaddr,
+    size_t len)
+{
+	int error, save;
+
+	save = vm_fault_disable_pagefaults();
+	error = copyout_c(kaddr, udaddr, len);
 	vm_fault_enable_pagefaults(save);
 	return (error);
 }
