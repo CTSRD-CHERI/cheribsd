@@ -953,6 +953,17 @@ cheriabi_set_threadregs(struct thread *td, struct thr_param_c *param)
 	frame->c12 = param->start_func;
 	frame->c3 = param->arg;
 
+
+	/*
+	 * Copy the $cgp for the current thread to the new one. This will work
+	 * both if the target function is in the current shared object (so the
+	 * $cgp value will be the same) or in a different one (in which case it
+	 * will point to a PLT stub that loads $cgp).
+	 *
+	 * XXXAR: could this break anything if sandboxes create threads?
+	 */
+	frame->idc = curthread->td_frame->idc;
+
 	/*
 	 * Set up CHERI-related state: register state, signal delivery,
 	 * sealing capabilities, trusted stack.
