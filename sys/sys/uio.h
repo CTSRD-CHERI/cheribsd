@@ -93,8 +93,8 @@ struct bus_dma_segment;
 struct uio *cloneuio(struct uio *uiop);
 int	copyinfrom(const void * __restrict src, void * __restrict dst,
 	    size_t len, int seg);
-int	copyiniov(const uiovec_t *iovp, u_int iovcnt, kiovec_t **iov,
-	    int error);
+int	copyiniov(const uiovec_t * __capability iovp, u_int iovcnt,
+	    kiovec_t **iov, int error);
 int	copyinstrfrom(const void * __restrict src, void * __restrict dst,
 	    size_t len, size_t * __restrict copied, int seg);
 int	copyinuio(const uiovec_t *iovp, u_int iovcnt, struct uio **uiop);

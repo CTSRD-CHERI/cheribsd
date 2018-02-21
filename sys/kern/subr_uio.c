@@ -410,7 +410,8 @@ copyinstrfrom(const void * __restrict src, void * __restrict dst, size_t len,
 }
 
 int
-copyiniov(const uiovec_t *iovp, u_int iovcnt, kiovec_t **iov, int error)
+copyiniov(const uiovec_t * __capability iovp, u_int iovcnt, kiovec_t **iov,
+    int error)
 {
 	uiovec_t useriov;
 	kiovec_t *iovs;
@@ -424,9 +425,10 @@ copyiniov(const uiovec_t *iovp, u_int iovcnt, kiovec_t **iov, int error)
 	iovs = malloc(iovlen, M_IOV, M_WAITOK);
 	/* XXXBD: needlessly slow when uiovec_t and kiovec_t are the same */
 	for (i = 0; i < iovcnt; i++) {
-		error = copyin(iovp, *iov, iovlen);
+		error = copyin_c(iovp + i, &useriov, sizeof(useriov));
 		if (error) {
-			free(*iov, M_IOV);
+			free(iovs, M_IOV);
+			return (error);
 		}
 		IOVEC_INIT(iovs + i, useriov.iov_base, useriov.iov_len);
 	}

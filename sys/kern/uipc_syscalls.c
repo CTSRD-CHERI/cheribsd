@@ -901,7 +901,8 @@ sys_sendmsg(struct thread *td, struct sendmsg_args *uap)
 		return (error);
 	msg.msg_name = __USER_CAP(umsg.msg_name, umsg.msg_namelen);
 	msg.msg_namelen = umsg.msg_namelen;
-	error = copyiniov(umsg.msg_iov, umsg.msg_iovlen, &iov, EMSGSIZE);
+	error = copyiniov(__USER_CAP_ARRAY(umsg.msg_iov, umsg.msg_iovlen),
+	    umsg.msg_iovlen, &iov, EMSGSIZE);
 	if (error != 0)
 		return (error);
 	msg.msg_iov = (__cheri_tocap kiovec_t * __capability)iov;
@@ -1213,7 +1214,8 @@ sys_recvmsg(struct thread *td, struct recvmsg_args *uap)
 		return (error);
 	msg.msg_name = __USER_CAP(umsg.msg_name, umsg.msg_namelen);
 	msg.msg_namelen = umsg.msg_namelen;
-	error = copyiniov(umsg.msg_iov, umsg.msg_iovlen, &iov, EMSGSIZE);
+	error = copyiniov(__USER_CAP_ARRAY(umsg.msg_iov, umsg.msg_iovlen),
+	    umsg.msg_iovlen, &iov, EMSGSIZE);
 	if (error != 0)
 		return (error);
 	msg.msg_iov = (__cheri_tocap kiovec_t * __capability)iov;
