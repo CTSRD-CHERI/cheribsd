@@ -2328,42 +2328,42 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* sctp_generic_sendmsg */
+	/* cheriabi_sctp_generic_sendmsg */
 	case 472: {
-		struct sctp_generic_sendmsg_args *p = params;
+		struct cheriabi_sctp_generic_sendmsg_args *p = params;
 		iarg[0] = p->sd; /* int */
-		uarg[1] = (intptr_t) p->msg; /* void * */
+		uarg[1] = (cheri_getbase(p->msg) + cheri_getoffset(p->msg)); /* void *__capability */
 		iarg[2] = p->mlen; /* int */
-		uarg[3] = (intptr_t) p->to; /* struct sockaddr * */
+		uarg[3] = (cheri_getbase(p->to) + cheri_getoffset(p->to)); /* struct sockaddr *__capability */
 		iarg[4] = p->tolen; /* __socklen_t */
-		uarg[5] = (intptr_t) p->sinfo; /* struct sctp_sndrcvinfo * */
+		uarg[5] = (cheri_getbase(p->sinfo) + cheri_getoffset(p->sinfo)); /* struct sctp_sndrcvinfo *__capability */
 		iarg[6] = p->flags; /* int */
 		*n_args = 7;
 		break;
 	}
-	/* sctp_generic_sendmsg_iov */
+	/* cheriabi_sctp_generic_sendmsg_iov */
 	case 473: {
-		struct sctp_generic_sendmsg_iov_args *p = params;
+		struct cheriabi_sctp_generic_sendmsg_iov_args *p = params;
 		iarg[0] = p->sd; /* int */
-		uarg[1] = (intptr_t) p->iov; /* struct iovec_c * */
+		uarg[1] = (cheri_getbase(p->iov) + cheri_getoffset(p->iov)); /* struct iovec_c *__capability */
 		iarg[2] = p->iovlen; /* int */
-		uarg[3] = (intptr_t) p->to; /* struct sockaddr * */
+		uarg[3] = (cheri_getbase(p->to) + cheri_getoffset(p->to)); /* struct sockaddr *__capability */
 		iarg[4] = p->tolen; /* __socklen_t */
-		uarg[5] = (intptr_t) p->sinfo; /* struct sctp_sndrcvinfo * */
+		uarg[5] = (cheri_getbase(p->sinfo) + cheri_getoffset(p->sinfo)); /* struct sctp_sndrcvinfo *__capability */
 		iarg[6] = p->flags; /* int */
 		*n_args = 7;
 		break;
 	}
-	/* sctp_generic_recvmsg */
+	/* cheriabi_sctp_generic_recvmsg */
 	case 474: {
-		struct sctp_generic_recvmsg_args *p = params;
+		struct cheriabi_sctp_generic_recvmsg_args *p = params;
 		iarg[0] = p->sd; /* int */
-		uarg[1] = (intptr_t) p->iov; /* struct iovec_c * */
+		uarg[1] = (cheri_getbase(p->iov) + cheri_getoffset(p->iov)); /* struct iovec_c *__capability */
 		iarg[2] = p->iovlen; /* int */
-		uarg[3] = (intptr_t) p->from; /* struct sockaddr * */
-		uarg[4] = (intptr_t) p->fromlenaddr; /* __socklen_t * */
-		uarg[5] = (intptr_t) p->sinfo; /* struct sctp_sndrcvinfo * */
-		uarg[6] = (intptr_t) p->msg_flags; /* int * */
+		uarg[3] = (cheri_getbase(p->from) + cheri_getoffset(p->from)); /* struct sockaddr *__capability */
+		uarg[4] = (cheri_getbase(p->fromlenaddr) + cheri_getoffset(p->fromlenaddr)); /* __socklen_t *__capability */
+		uarg[5] = (cheri_getbase(p->sinfo) + cheri_getoffset(p->sinfo)); /* struct sctp_sndrcvinfo *__capability */
+		uarg[6] = (cheri_getbase(p->msg_flags) + cheri_getoffset(p->msg_flags)); /* int *__capability */
 		*n_args = 7;
 		break;
 	}
@@ -6863,26 +6863,26 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* sctp_generic_sendmsg */
+	/* cheriabi_sctp_generic_sendmsg */
 	case 472:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 2:
 			p = "int";
 			break;
 		case 3:
-			p = "userland struct sockaddr *";
+			p = "userland struct sockaddr *__capability";
 			break;
 		case 4:
 			p = "__socklen_t";
 			break;
 		case 5:
-			p = "userland struct sctp_sndrcvinfo *";
+			p = "userland struct sctp_sndrcvinfo *__capability";
 			break;
 		case 6:
 			p = "int";
@@ -6891,26 +6891,26 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* sctp_generic_sendmsg_iov */
+	/* cheriabi_sctp_generic_sendmsg_iov */
 	case 473:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct iovec_c *";
+			p = "userland struct iovec_c *__capability";
 			break;
 		case 2:
 			p = "int";
 			break;
 		case 3:
-			p = "userland struct sockaddr *";
+			p = "userland struct sockaddr *__capability";
 			break;
 		case 4:
 			p = "__socklen_t";
 			break;
 		case 5:
-			p = "userland struct sctp_sndrcvinfo *";
+			p = "userland struct sctp_sndrcvinfo *__capability";
 			break;
 		case 6:
 			p = "int";
@@ -6919,29 +6919,29 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* sctp_generic_recvmsg */
+	/* cheriabi_sctp_generic_recvmsg */
 	case 474:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct iovec_c *";
+			p = "userland struct iovec_c *__capability";
 			break;
 		case 2:
 			p = "int";
 			break;
 		case 3:
-			p = "userland struct sockaddr *";
+			p = "userland struct sockaddr *__capability";
 			break;
 		case 4:
-			p = "userland __socklen_t *";
+			p = "userland __socklen_t *__capability";
 			break;
 		case 5:
-			p = "userland struct sctp_sndrcvinfo *";
+			p = "userland struct sctp_sndrcvinfo *__capability";
 			break;
 		case 6:
-			p = "userland int *";
+			p = "userland int *__capability";
 			break;
 		default:
 			break;
@@ -9609,17 +9609,17 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* sctp_generic_sendmsg */
+	/* cheriabi_sctp_generic_sendmsg */
 	case 472:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* sctp_generic_sendmsg_iov */
+	/* cheriabi_sctp_generic_sendmsg_iov */
 	case 473:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* sctp_generic_recvmsg */
+	/* cheriabi_sctp_generic_recvmsg */
 	case 474:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

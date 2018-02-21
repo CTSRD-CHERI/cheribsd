@@ -279,9 +279,9 @@ MIASM =  \
 	cheriabi_aio_fsync.o \
 	cheriabi_rtprio_thread.o \
 	sctp_peeloff.o \
-	sctp_generic_sendmsg.o \
-	sctp_generic_sendmsg_iov.o \
-	sctp_generic_recvmsg.o \
+	cheriabi_sctp_generic_sendmsg.o \
+	cheriabi_sctp_generic_sendmsg_iov.o \
+	cheriabi_sctp_generic_recvmsg.o \
 	cheriabi_pread.o \
 	cheriabi_pwrite.o \
 	cheriabi_mmap.o \

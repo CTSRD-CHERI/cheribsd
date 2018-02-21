@@ -1086,33 +1086,33 @@
 				     uint32_t name); }
 ; The sctp_generic_* syscall symbols are not exported from libc and thus
 ; stubs can not be generated.
-472	AUE_SCTP_GENERIC_SENDMSG	NOPROTO|NOSTD|NOSTUB	{ int sctp_generic_sendmsg( \
+472	AUE_SCTP_GENERIC_SENDMSG	NOSTD|NOSTUB	{ int cheriabi_sctp_generic_sendmsg( \
 				    int sd, \
-				    _In_reads_bytes_(mlen) void *msg, \
+				    _In_reads_bytes_(mlen) void * __capability msg, \
 				    int mlen, \
 				    _In_reads_bytes_(tolen) \
-				    struct sockaddr *to, \
+				    struct sockaddr * __capability to, \
 				    __socklen_t tolen, \
-				    _In_opt_ struct sctp_sndrcvinfo *sinfo, \
+				    _In_opt_ struct sctp_sndrcvinfo * __capability sinfo, \
 				    int flags); }
-473	AUE_SCTP_GENERIC_SENDMSG_IOV	NOPROTO|NOSTD|NOSTUB	{ int sctp_generic_sendmsg_iov( \
+473	AUE_SCTP_GENERIC_SENDMSG_IOV	NOSTD|NOSTUB	{ int cheriabi_sctp_generic_sendmsg_iov( \
 				    int sd, \
-				    _In_reads_(iovlen) struct iovec_c *iov, \
+				    _In_reads_(iovlen) struct iovec_c * __capability iov, \
 				    int iovlen, \
 				    _In_reads_bytes_(tolen) \
-				    struct sockaddr *to, \
+				    struct sockaddr * __capability to, \
 				    __socklen_t tolen, \
-				    _In_opt_ struct sctp_sndrcvinfo *sinfo, \
+				    _In_opt_ struct sctp_sndrcvinfo * __capability sinfo, \
 				    int flags); }
-474	AUE_SCTP_GENERIC_RECVMSG	NOPROTO|NOSTD|NOSTUB	{ int sctp_generic_recvmsg( \
+474	AUE_SCTP_GENERIC_RECVMSG	NOSTD|NOSTUB	{ int cheriabi_sctp_generic_recvmsg( \
 				    int sd, \
-				    _In_reads_(iovlen) struct iovec_c *iov, \
+				    _In_reads_(iovlen) struct iovec_c * __capability iov, \
 				    int iovlen, \
 				    _Out_writes_bytes_(*fromlenaddr) \
-				    struct sockaddr *from, \
-				    _Out_ __socklen_t *fromlenaddr, \
-				    _In_opt_ struct sctp_sndrcvinfo *sinfo, \
-				    _Out_opt_ int *msg_flags); }
+				    struct sockaddr * __capability from, \
+				    _Out_ __socklen_t * __capability fromlenaddr, \
+				    _In_opt_ struct sctp_sndrcvinfo * __capability sinfo, \
+				    _Out_opt_ int * __capability msg_flags); }
 475	AUE_PREAD	STD	{ ssize_t cheriabi_pread(int fd, \
 				    _Out_writes_bytes_(nbyte) \
 				    void * __capability buf, \

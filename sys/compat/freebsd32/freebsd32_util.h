@@ -114,7 +114,7 @@ int    syscall32_helper_unregister(struct syscall_helper_data *sd);
 struct iovec32;
 struct rusage32;
 register_t *freebsd32_copyout_strings(struct image_params *imgp);
-int	freebsd32_copyiniov(struct iovec32 *iovp, u_int iovcnt,
+int	freebsd32_copyiniov(struct iovec32 * __capability iovp, u_int iovcnt,
 	    kiovec_t **iov, int error);
 void	freebsd32_rusage_out(const struct rusage *s, struct rusage32 *s32);
 

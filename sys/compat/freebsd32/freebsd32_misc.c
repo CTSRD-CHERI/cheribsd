@@ -962,8 +962,8 @@ freebsd32_pwritev(struct thread *td, struct freebsd32_pwritev_args *uap)
 }
 
 int
-freebsd32_copyiniov(struct iovec32 *iovp32, u_int iovcnt, struct iovec **iovp,
-    int error)
+freebsd32_copyiniov(struct iovec32 * __capability iovp32, u_int iovcnt,
+    kiovec_t **iovp, int error)
 {
 	struct iovec32 iov32;
 	kiovec_t *iov;
@@ -976,7 +976,9 @@ freebsd32_copyiniov(struct iovec32 *iovp32, u_int iovcnt, struct iovec **iovp,
 	iovlen = iovcnt * sizeof(kiovec_t);
 	iov = malloc(iovlen, M_IOV, M_WAITOK);
 	for (i = 0; i < iovcnt; i++) {
-		error = copyin(&iovp32[i], &iov32, sizeof(struct iovec32));
+		error = copyin_c(&iovp32[i],
+		    (__capability struct iovec32 * __capability)&iov32,
+		    sizeof(struct iovec32));
 		if (error) {
 			free(iov, M_IOV);
 			return (error);
@@ -1146,7 +1148,8 @@ freebsd32_recvmsg(td, uap)
 	error = freebsd32_copyinmsghdr(uap->msg, &msg);
 	if (error)
 		return (error);
-	error = freebsd32_copyiniov(PTRIN(m32.msg_iov), m32.msg_iovlen, &iov,
+	error = freebsd32_copyiniov(__USER_CAP(PTRIN(m32.msg_iov),
+	    m32.msg_iovlen * sizeof(struct iovec32)), m32.msg_iovlen, &iov,
 	    EMSGSIZE);
 	if (error)
 		return (error);
@@ -1277,7 +1280,8 @@ freebsd32_sendmsg(struct thread *td,
 	error = freebsd32_copyinmsghdr(uap->msg, &msg);
 	if (error)
 		return (error);
-	error = freebsd32_copyiniov(PTRIN(m32.msg_iov), m32.msg_iovlen, &iov,
+	error = freebsd32_copyiniov(__USER_CAP(PTRIN(m32.msg_iov),
+	    m32.msg_iovlen * sizeof(struct iovec32)), m32.msg_iovlen, &iov,
 	    EMSGSIZE);
 	if (error)
 		return (error);

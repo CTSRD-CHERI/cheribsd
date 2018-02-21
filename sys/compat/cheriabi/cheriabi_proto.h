@@ -861,6 +861,33 @@ struct cheriabi_rtprio_thread_args {
 	char lwpid_l_[PADL_(lwpid_t)]; lwpid_t lwpid; char lwpid_r_[PADR_(lwpid_t)];
 	char rtp_l_[PADL_(struct rtprio *__capability)]; struct rtprio *__capability rtp; char rtp_r_[PADR_(struct rtprio *__capability)];
 };
+struct cheriabi_sctp_generic_sendmsg_args {
+	char sd_l_[PADL_(int)]; int sd; char sd_r_[PADR_(int)];
+	char msg_l_[PADL_(void *__capability)]; void *__capability msg; char msg_r_[PADR_(void *__capability)];
+	char mlen_l_[PADL_(int)]; int mlen; char mlen_r_[PADR_(int)];
+	char to_l_[PADL_(struct sockaddr *__capability)]; struct sockaddr *__capability to; char to_r_[PADR_(struct sockaddr *__capability)];
+	char tolen_l_[PADL_(__socklen_t)]; __socklen_t tolen; char tolen_r_[PADR_(__socklen_t)];
+	char sinfo_l_[PADL_(struct sctp_sndrcvinfo *__capability)]; struct sctp_sndrcvinfo *__capability sinfo; char sinfo_r_[PADR_(struct sctp_sndrcvinfo *__capability)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
+struct cheriabi_sctp_generic_sendmsg_iov_args {
+	char sd_l_[PADL_(int)]; int sd; char sd_r_[PADR_(int)];
+	char iov_l_[PADL_(struct iovec_c *__capability)]; struct iovec_c *__capability iov; char iov_r_[PADR_(struct iovec_c *__capability)];
+	char iovlen_l_[PADL_(int)]; int iovlen; char iovlen_r_[PADR_(int)];
+	char to_l_[PADL_(struct sockaddr *__capability)]; struct sockaddr *__capability to; char to_r_[PADR_(struct sockaddr *__capability)];
+	char tolen_l_[PADL_(__socklen_t)]; __socklen_t tolen; char tolen_r_[PADR_(__socklen_t)];
+	char sinfo_l_[PADL_(struct sctp_sndrcvinfo *__capability)]; struct sctp_sndrcvinfo *__capability sinfo; char sinfo_r_[PADR_(struct sctp_sndrcvinfo *__capability)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
+struct cheriabi_sctp_generic_recvmsg_args {
+	char sd_l_[PADL_(int)]; int sd; char sd_r_[PADR_(int)];
+	char iov_l_[PADL_(struct iovec_c *__capability)]; struct iovec_c *__capability iov; char iov_r_[PADR_(struct iovec_c *__capability)];
+	char iovlen_l_[PADL_(int)]; int iovlen; char iovlen_r_[PADR_(int)];
+	char from_l_[PADL_(struct sockaddr *__capability)]; struct sockaddr *__capability from; char from_r_[PADR_(struct sockaddr *__capability)];
+	char fromlenaddr_l_[PADL_(__socklen_t *__capability)]; __socklen_t *__capability fromlenaddr; char fromlenaddr_r_[PADR_(__socklen_t *__capability)];
+	char sinfo_l_[PADL_(struct sctp_sndrcvinfo *__capability)]; struct sctp_sndrcvinfo *__capability sinfo; char sinfo_r_[PADR_(struct sctp_sndrcvinfo *__capability)];
+	char msg_flags_l_[PADL_(int *__capability)]; int *__capability msg_flags; char msg_flags_r_[PADR_(int *__capability)];
+};
 struct cheriabi_pread_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char buf_l_[PADL_(void *__capability)]; void *__capability buf; char buf_r_[PADR_(void *__capability)];
@@ -1338,6 +1365,9 @@ int	cheriabi_kmq_notify(struct thread *, struct cheriabi_kmq_notify_args *);
 int	cheriabi_abort2(struct thread *, struct cheriabi_abort2_args *);
 int	cheriabi_aio_fsync(struct thread *, struct cheriabi_aio_fsync_args *);
 int	cheriabi_rtprio_thread(struct thread *, struct cheriabi_rtprio_thread_args *);
+int	cheriabi_sctp_generic_sendmsg(struct thread *, struct cheriabi_sctp_generic_sendmsg_args *);
+int	cheriabi_sctp_generic_sendmsg_iov(struct thread *, struct cheriabi_sctp_generic_sendmsg_iov_args *);
+int	cheriabi_sctp_generic_recvmsg(struct thread *, struct cheriabi_sctp_generic_recvmsg_args *);
 int	cheriabi_pread(struct thread *, struct cheriabi_pread_args *);
 int	cheriabi_pwrite(struct thread *, struct cheriabi_pwrite_args *);
 int	cheriabi_mmap(struct thread *, struct cheriabi_mmap_args *);
@@ -1625,6 +1655,9 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_abort2	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_aio_fsync	AUE_AIO_FSYNC
 #define	CHERIABI_SYS_AUE_cheriabi_rtprio_thread	AUE_RTPRIO
+#define	CHERIABI_SYS_AUE_cheriabi_sctp_generic_sendmsg	AUE_SCTP_GENERIC_SENDMSG
+#define	CHERIABI_SYS_AUE_cheriabi_sctp_generic_sendmsg_iov	AUE_SCTP_GENERIC_SENDMSG_IOV
+#define	CHERIABI_SYS_AUE_cheriabi_sctp_generic_recvmsg	AUE_SCTP_GENERIC_RECVMSG
 #define	CHERIABI_SYS_AUE_cheriabi_pread	AUE_PREAD
 #define	CHERIABI_SYS_AUE_cheriabi_pwrite	AUE_PWRITE
 #define	CHERIABI_SYS_AUE_cheriabi_mmap	AUE_MMAP

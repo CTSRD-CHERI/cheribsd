@@ -388,9 +388,9 @@
 #define	CHERIABI_SYS_cheriabi_aio_fsync	465
 #define	CHERIABI_SYS_cheriabi_rtprio_thread	466
 #define	CHERIABI_SYS_sctp_peeloff	471
-#define	CHERIABI_SYS_sctp_generic_sendmsg	472
-#define	CHERIABI_SYS_sctp_generic_sendmsg_iov	473
-#define	CHERIABI_SYS_sctp_generic_recvmsg	474
+#define	CHERIABI_SYS_cheriabi_sctp_generic_sendmsg	472
+#define	CHERIABI_SYS_cheriabi_sctp_generic_sendmsg_iov	473
+#define	CHERIABI_SYS_cheriabi_sctp_generic_recvmsg	474
 #define	CHERIABI_SYS_cheriabi_pread	475
 #define	CHERIABI_SYS_cheriabi_pwrite	476
 #define	CHERIABI_SYS_cheriabi_mmap	477
