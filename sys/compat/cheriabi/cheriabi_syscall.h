@@ -188,7 +188,7 @@
 				/* 199 is obsolete lseek */
 				/* 200 is obsolete truncate */
 				/* 201 is obsolete ftruncate */
-#define	CHERIABI_SYS___sysctl	202
+#define	CHERIABI_SYS_cheriabi___sysctl	202
 #define	CHERIABI_SYS_mlock	203
 #define	CHERIABI_SYS_munlock	204
 #define	CHERIABI_SYS_cheriabi_undelete	205

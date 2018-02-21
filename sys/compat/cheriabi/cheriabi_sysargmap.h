@@ -108,7 +108,7 @@
 #define	CHERIABI_SYS_fpathconf_PTRMASK	(0x0)
 #define	CHERIABI_SYS_cheriabi_getrlimit_PTRMASK	(0x0 | 0x2)
 #define	CHERIABI_SYS_cheriabi_setrlimit_PTRMASK	(0x0 | 0x2)
-#define	CHERIABI_SYS___sysctl_PTRMASK	(0x0 | 0x1 | 0x4 | 0x8 | 0x10)
+#define	CHERIABI_SYS_cheriabi___sysctl_PTRMASK	(0x0 | 0x1 | 0x4 | 0x8 | 0x10)
 #define	CHERIABI_SYS_mlock_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_munlock_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_undelete_PTRMASK	(0x0 | 0x1)

@@ -56,7 +56,7 @@ __FBSDID("$FreeBSD$");
 #include <netinet/cc/cc.h>
 #include <netinet/cc/cc_module.h>
 
-#define	CAST_PTR_INT(X)	(*((int*)(X)))
+#define	CAST_PTR_INT(X)	(*((int * __capability)(X)))
 
 #define MAX_ALPHA_VALUE 1024
 static VNET_DEFINE(uint32_t, dctcp_alpha) = 0;

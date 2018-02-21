@@ -606,7 +606,7 @@ struct vfsquery {
 /* Point a sysctl request at a vfsidctl's data. */
 #define VCTLTOREQ(vc, req)						\
 	do {								\
-		(req)->newptr = (vc)->vc_ptr;				\
+		(req)->newptr = __USER_CAP((vc)->vc_ptr, (vc)->vc_len);	\
 		(req)->newlen = (vc)->vc_len;				\
 		(req)->newidx = 0;					\
 	} while (0)

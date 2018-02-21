@@ -1946,81 +1946,38 @@ CHERIABI_SYS_cheriabi_setrlimit_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS___sysctl_fill_uap(struct thread *td,
-    struct sysctl_args *uap)
+CHERIABI_SYS_cheriabi___sysctl_fill_uap(struct thread *td,
+    struct cheriabi___sysctl_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [1] u_int namelen */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS___sysctl_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___sysctl_PTRMASK);
 	uap->namelen = cheri_getoffset(tmpcap);
 
 	/* [5] size_t newlen */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 5, CHERIABI_SYS___sysctl_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 5, CHERIABI_SYS_cheriabi___sysctl_PTRMASK);
 	uap->newlen = cheri_getoffset(tmpcap);
 
-	/* [0] _In_reads_(namelen) int * name */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
+	/* [0] _In_reads_(namelen) int *__capability name */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->name),
+	    0, CHERIABI_SYS_cheriabi___sysctl_PTRMASK);
 
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS___sysctl_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->name),
-		    tmpcap, (sizeof(*uap->name) * uap->namelen), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [2] _Out_writes_bytes_opt_(*oldlenp) void *__capability old */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->old),
+	    2, CHERIABI_SYS_cheriabi___sysctl_PTRMASK);
 
-	/* [3] _Inout_opt_ size_t * oldlenp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD|CHERI_PERM_STORE);
+	/* [3] _Inout_opt_ size_t *__capability oldlenp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->oldlenp),
+	    3, CHERIABI_SYS_cheriabi___sysctl_PTRMASK);
 
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS___sysctl_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->oldlenp),
-		    tmpcap, sizeof(*uap->oldlenp), reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
-
-	/* [4] _In_reads_bytes_opt_(newlen) void * new */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 4, CHERIABI_SYS___sysctl_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->new),
-		    tmpcap, 1 * uap->newlen, reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
-
-	/* [2] _Out_writes_bytes_opt_(*oldlenp) void * old */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		if (uap->oldlenp == NULL) {
-			uap->old = NULL;
-		} else {
-			size_t reqlen;
-			if (sizeof(*uap->oldlenp) == 2)
-				reqlen = fuword16(uap->oldlenp);
-			else if (sizeof(*uap->oldlenp) == 4)
-				reqlen = fuword32(uap->oldlenp);
-			else if (sizeof(*uap->oldlenp) == 8)
-				reqlen = fuword64(uap->oldlenp);
-			else
-				panic("unhandled dependant argument size %zu", sizeof(*uap->oldlenp));
-			if (reqlen == -1)
-				return (EINVAL);
-			cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS___sysctl_PTRMASK);
-			error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->old),
-			    tmpcap, reqlen, reqperms, 1);
-			if (error != 0)
-				return (error);
-		}
-	}
+	/* [4] _In_reads_bytes_opt_(newlen) void *__capability new */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->new),
+	    4, CHERIABI_SYS_cheriabi___sysctl_PTRMASK);
 
 	return (0);
 }

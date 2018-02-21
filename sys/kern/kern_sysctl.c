@@ -56,6 +56,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/mutex.h>
 #include <sys/rmlock.h>
 #include <sys/sbuf.h>
+#include <sys/syscallsubr.h>
 #include <sys/sysent.h>
 #include <sys/sx.h>
 #include <sys/sysproto.h>
@@ -311,7 +312,7 @@ sysctl_load_tunable_by_oid_locked(struct sysctl_oid *oidp)
 		if (penv == NULL)
 			return;
 		req.newlen = strlen(penv);
-		req.newptr = penv;
+		req.newptr = (__cheri_tocap char * __capability)penv;
 		break;
 	default:
 		return;
@@ -1589,7 +1590,7 @@ sysctl_old_kernel(struct sysctl_req *req, const void *p, size_t l)
 			if (i > req->oldlen - req->oldidx)
 				i = req->oldlen - req->oldidx;
 		if (i > 0)
-			bcopy(p, (char *)req->oldptr + req->oldidx, i);
+			bcopy(p, (__cheri_fromcap char *)req->oldptr + req->oldidx, i);
 	}
 	req->oldidx += l;
 	if (req->oldptr && i != l)
@@ -1604,7 +1605,7 @@ sysctl_new_kernel(struct sysctl_req *req, void *p, size_t l)
 		return (0);
 	if (req->newlen - req->newidx < l)
 		return (EINVAL);
-	bcopy((char *)req->newptr + req->newidx, p, l);
+	bcopy((__cheri_fromcap char *)req->newptr + req->newidx, p, l);
 	req->newidx += l;
 	return (0);
 }
@@ -1627,12 +1628,12 @@ kernel_sysctl(struct thread *td, int *name, u_int namelen, void *old,
 	req.validlen = req.oldlen;
 
 	if (old) {
-		req.oldptr= old;
+		req.oldptr= (__cheri_tocap void * __capability)old;
 	}
 
 	if (new != NULL) {
 		req.newlen = newlen;
-		req.newptr = new;
+		req.newptr = (__cheri_tocap void * __capability)new;
 	}
 
 	req.oldfunc = sysctl_old_kernel;
@@ -1642,7 +1643,7 @@ kernel_sysctl(struct thread *td, int *name, u_int namelen, void *old,
 	error = sysctl_root(0, name, namelen, &req);
 
 	if (req.lock == REQ_WIRED && req.validlen > 0)
-		vsunlock(req.oldptr, req.validlen);
+		vsunlock(__DECAP_CHECK(req.oldptr, req.validlen), req.validlen);
 
 	if (error && error != ENOMEM)
 		return (error);
@@ -1707,10 +1708,14 @@ sysctl_old_user(struct sysctl_req *req, const void *p, size_t l)
 		if (i > len - origidx)
 			i = len - origidx;
 		if (req->lock == REQ_WIRED) {
-			error = copyout_nofault(p, (char *)req->oldptr +
+			error = copyout_nofault_c(
+			    (__cheri_tocap const void * __capability)p,
+			    (char * __capability)req->oldptr +
 			    origidx, i);
 		} else
-			error = copyout(p, (char *)req->oldptr + origidx, i);
+			error = copyout_c(
+			    (__cheri_tocap const void * __capability)p,
+			    (char * __capability)req->oldptr + origidx, i);
 		if (error != 0)
 			return (error);
 	}
@@ -1730,7 +1735,8 @@ sysctl_new_user(struct sysctl_req *req, void *p, size_t l)
 		return (EINVAL);
 	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
 	    "sysctl_new_user()");
-	error = copyin((char *)req->newptr + req->newidx, p, l);
+	error = copyin_c((char * __capability )req->newptr + req->newidx,
+	    (__cheri_tocap void * __capability)p, l);
 	req->newidx += l;
 	return (error);
 }
@@ -1750,7 +1756,8 @@ sysctl_wire_old_buffer(struct sysctl_req *req, size_t len)
 	if (req->lock != REQ_WIRED && req->oldptr &&
 	    req->oldfunc == sysctl_old_user) {
 		if (wiredlen != 0) {
-			ret = vslock(req->oldptr, wiredlen);
+			ret = vslock(__DECAP_CHECK(req->oldptr, wiredlen),
+			    wiredlen);
 			if (ret != 0) {
 				if (ret != ENOMEM)
 					return (ret);
@@ -1927,29 +1934,34 @@ struct sysctl_args {
 int
 sys___sysctl(struct thread *td, struct sysctl_args *uap)
 {
-	int error, flags, i, name[CTL_MAXNAME];
+
+	return (kern_sysctl(td, __USER_CAP(uap->name, uap->namelen),
+	    uap->namelen, __USER_CAP_UNBOUND(uap->old),
+	    __USER_CAP_OBJ(uap->oldlenp), __USER_CAP(uap->new, uap->newlen),
+	    uap->newlen, 0));
+}
+
+int
+kern_sysctl(struct thread *td, int * __capability uname, u_int namelen,
+    void * __capability old, size_t * __capability oldlenp,
+    void * __capability new, size_t newlen, int flags)
+{
+	int error, i, name[CTL_MAXNAME];
 	size_t j;
 
-	flags = 0;
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI))
-		flags = SCTL_CHERIABI;
-#endif
-
-	if (uap->namelen > CTL_MAXNAME || uap->namelen < 2)
+	if (namelen > CTL_MAXNAME || namelen < 2)
 		return (EINVAL);
 
- 	error = copyin(uap->name, &name, uap->namelen * sizeof(int));
- 	if (error)
+	error = copyin_c(uname, &name[0], namelen * sizeof(int));
+	if (error)
 		return (error);
 
-	error = userland_sysctl(td, name, uap->namelen,
-		uap->old, uap->oldlenp, 0,
-		uap->new, uap->newlen, &j, flags);
+	error = userland_sysctl(td, name, namelen, old, oldlenp, 0,
+		new, newlen, &j, flags);
 	if (error && error != ENOMEM)
 		return (error);
-	if (uap->oldlenp) {
-		i = copyout(&j, uap->oldlenp, sizeof(j));
+	if (oldlenp) {
+		i = copyout_c(&j, oldlenp, sizeof(j));
 		if (i)
 			return (i);
 	}
@@ -1961,9 +1973,9 @@ sys___sysctl(struct thread *td, struct sysctl_args *uap)
  * must be in kernel space.
  */
 int
-userland_sysctl(struct thread *td, int *name, u_int namelen, void *old,
-    size_t *oldlenp, int inkernel, void *new, size_t newlen, size_t *retval,
-    int flags)
+userland_sysctl(struct thread *td, int *name, u_int namelen,
+    void * __capability old, size_t * __capability oldlenp, int inkernel,
+    void * __capability new, size_t newlen, size_t *retval, int flags)
 {
 	int error = 0, memlocked;
 	struct sysctl_req req;
@@ -1977,7 +1989,8 @@ userland_sysctl(struct thread *td, int *name, u_int namelen, void *old,
 		if (inkernel) {
 			req.oldlen = *oldlenp;
 		} else {
-			error = copyin(oldlenp, &req.oldlen, sizeof(*oldlenp));
+			error = copyin_c(oldlenp, &req.oldlen,
+			    sizeof(*oldlenp));
 			if (error)
 				return (error);
 		}
@@ -1985,13 +1998,14 @@ userland_sysctl(struct thread *td, int *name, u_int namelen, void *old,
 	req.validlen = req.oldlen;
 
 	if (old) {
-		if (!useracc(old, req.oldlen, VM_PROT_WRITE))
+		if (!useracc(__DECAP_CHECK(old, req.oldlen), req.oldlen,
+		    VM_PROT_WRITE))
 			return (EFAULT);
 		req.oldptr= old;
 	}
 
 	if (new != NULL) {
-		if (!useracc(new, newlen, VM_PROT_READ))
+		if (!useracc(__DECAP_CHECK(new, newlen), newlen, VM_PROT_READ))
 			return (EFAULT);
 		req.newlen = newlen;
 		req.newptr = new;
@@ -2006,7 +2020,7 @@ userland_sysctl(struct thread *td, int *name, u_int namelen, void *old,
 		ktrsysctl(name, namelen);
 #endif
 
-	if (req.oldptr && req.oldlen > PAGE_SIZE) {
+	if (req.oldptr != NULL && req.oldlen > PAGE_SIZE) {
 		memlocked = 1;
 		sx_xlock(&sysctlmemlock);
 	} else
@@ -2025,7 +2039,7 @@ userland_sysctl(struct thread *td, int *name, u_int namelen, void *old,
 	CURVNET_RESTORE();
 
 	if (req.lock == REQ_WIRED && req.validlen > 0)
-		vsunlock(req.oldptr, req.validlen);
+		vsunlock(__DECAP_CHECK(req.oldptr, req.validlen), req.validlen);
 	if (memlocked)
 		sx_xunlock(&sysctlmemlock);
 

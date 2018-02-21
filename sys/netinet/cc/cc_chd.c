@@ -76,7 +76,7 @@ __FBSDID("$FreeBSD$");
 
 #include <netinet/khelp/h_ertt.h>
 
-#define	CAST_PTR_INT(X)	(*((int*)(X)))
+#define	CAST_PTR_INT(X)	(*((int * __capability)(X)))
 
 /*
  * Private signal type for rate based congestion signal.

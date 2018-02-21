@@ -2113,6 +2113,18 @@ cheriabi_getrusage(struct thread *td, struct cheriabi_getrusage_args *uap)
 	return (error);
 }
 
+/*
+ * kern_sysctl.c
+ */
+
+int
+cheriabi___sysctl(struct thread *td, struct cheriabi___sysctl_args *uap)
+{
+
+	return (kern_sysctl(td, uap->name, uap->namelen, uap->old,
+	    uap->oldlenp, uap->new, uap->newlen, SCTL_CHERIABI));
+}
+
 #ifdef _KPOSIX_PRIORITY_SCHEDULING
 /*
  * p1003_1b.c

@@ -78,7 +78,7 @@ __FBSDID("$FreeBSD$");
 
 #define	CDG_VERSION "0.1"
 
-#define	CAST_PTR_INT(X) (*((int*)(X)))
+#define	CAST_PTR_INT(X) (*((int * __capability)(X)))
 
 /* Private delay-gradient induced congestion control signal. */
 #define	CC_CDG_DELAY 0x01000000

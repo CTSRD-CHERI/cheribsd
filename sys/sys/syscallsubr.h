@@ -394,6 +394,9 @@ int	kern_swapoff(struct thread *td, const char * __capability name);
 int	kern_swapon(struct thread *td, const char * __capability name);
 int	kern_symlinkat(struct thread *td, const char *__capability path1,
 	    int fd, const char * __capability path2, enum uio_seg segflg);
+int	kern_sysctl(struct thread *td, int * __capability uname, u_int namelen,
+	    void * __capability old, size_t * __capability oldlenp,
+	    void * __capability new, size_t newlen, int flags);
 int	kern_ktimer_create(struct thread *td, clockid_t clock_id,
 	    struct sigevent *evp, int *timerid, int preset_id);
 int	kern_ktimer_delete(struct thread *, int);
