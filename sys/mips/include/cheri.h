@@ -742,9 +742,9 @@ void cheri_trace_log(void *buf, size_t len, int format);
 	CHERI_CGETBASE(c_base, (crn));					\
 	CHERI_CGETLEN(c_length, (crn));					\
 	CHERI_CGETOFFSET(c_offset, (crn));				\
-	printf("v:%u s:%u p:%08jx b:%016jx l:%016jx o:%jx t:%jx\n",	\
+	printf("v:%u s:%u p:%08jx b:%016jx l:%016jx o:%jx t:%s%jx\n",	\
 	    ctag, c_sealed, c_perms, c_base, c_length, c_offset,	\
-	    c_otype);							\
+	    (c_otype == - 1 ? "-" : ""), (c_otype == -1 ? 1 : c_otype));\
 } while (0)
 
 #define	CHERI_REG_PRINT(crn, num) do {					\
