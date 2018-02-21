@@ -5,7 +5,7 @@
 PROG=	pie
 MAN=
 
-CFLAGS=	-fPIE -pie
+CFLAGS+=-fPIE -pie
 
 WARNS?=	5
 
