@@ -307,6 +307,21 @@ int	kern_pwrite(struct thread *td, int fd, const void *buf, size_t nbyte,
 int	kern_pwritev(struct thread *td, int fd, struct uio *auio, off_t offset);
 int	kern_quotactl(struct thread *td, const char * __CAPABILITY path,
 	    int cmd, int uid, void * __CAPABILITY arg);
+int	kern_rctl_get_racct(struct thread *td,
+	    const void * __capability inbufp, size_t inbuflen,
+	    void * __capability outbufp, size_t outbuflen);
+int	kern_rctl_get_rules(struct thread *td,
+	    const void * __capability inbufp, size_t inbuflen,
+	    void * __capability outbufp, size_t outbuflen);
+int	kern_rctl_get_limits(struct thread *td,
+	    const void * __capability inbufp, size_t inbuflen,
+	    void * __capability outbufp, size_t outbuflen);
+int	kern_rctl_add_rule(struct thread *td,
+	    const void * __capability inbufp, size_t inbuflen,
+	    void * __capability outbufp, size_t outbuflen);
+int	kern_rctl_remove_rule(struct thread *td,
+	    const void * __capability inbufp, size_t inbuflen,
+	    void * __capability outbufp, size_t outbuflen);
 int	kern_readlinkat(struct thread *td, int fd,
 	    const char * __capability path, enum uio_seg pathseg,
 	    char * __capability buf, enum uio_seg bufseg, size_t count);

@@ -1081,6 +1081,36 @@ struct cheriabi_getloginclass_args {
 struct cheriabi_setloginclass_args {
 	char namebuf_l_[PADL_(const char *__capability)]; const char *__capability namebuf; char namebuf_r_[PADR_(const char *__capability)];
 };
+struct cheriabi_rctl_get_racct_args {
+	char inbufp_l_[PADL_(const void *__capability)]; const void *__capability inbufp; char inbufp_r_[PADR_(const void *__capability)];
+	char inbuflen_l_[PADL_(size_t)]; size_t inbuflen; char inbuflen_r_[PADR_(size_t)];
+	char outbufp_l_[PADL_(void *__capability)]; void *__capability outbufp; char outbufp_r_[PADR_(void *__capability)];
+	char outbuflen_l_[PADL_(size_t)]; size_t outbuflen; char outbuflen_r_[PADR_(size_t)];
+};
+struct cheriabi_rctl_get_rules_args {
+	char inbufp_l_[PADL_(const void *__capability)]; const void *__capability inbufp; char inbufp_r_[PADR_(const void *__capability)];
+	char inbuflen_l_[PADL_(size_t)]; size_t inbuflen; char inbuflen_r_[PADR_(size_t)];
+	char outbufp_l_[PADL_(void *__capability)]; void *__capability outbufp; char outbufp_r_[PADR_(void *__capability)];
+	char outbuflen_l_[PADL_(size_t)]; size_t outbuflen; char outbuflen_r_[PADR_(size_t)];
+};
+struct cheriabi_rctl_get_limits_args {
+	char inbufp_l_[PADL_(const void *__capability)]; const void *__capability inbufp; char inbufp_r_[PADR_(const void *__capability)];
+	char inbuflen_l_[PADL_(size_t)]; size_t inbuflen; char inbuflen_r_[PADR_(size_t)];
+	char outbufp_l_[PADL_(void *__capability)]; void *__capability outbufp; char outbufp_r_[PADR_(void *__capability)];
+	char outbuflen_l_[PADL_(size_t)]; size_t outbuflen; char outbuflen_r_[PADR_(size_t)];
+};
+struct cheriabi_rctl_add_rule_args {
+	char inbufp_l_[PADL_(const void *__capability)]; const void *__capability inbufp; char inbufp_r_[PADR_(const void *__capability)];
+	char inbuflen_l_[PADL_(size_t)]; size_t inbuflen; char inbuflen_r_[PADR_(size_t)];
+	char outbufp_l_[PADL_(void *__capability)]; void *__capability outbufp; char outbufp_r_[PADR_(void *__capability)];
+	char outbuflen_l_[PADL_(size_t)]; size_t outbuflen; char outbuflen_r_[PADR_(size_t)];
+};
+struct cheriabi_rctl_remove_rule_args {
+	char inbufp_l_[PADL_(const void *__capability)]; const void *__capability inbufp; char inbufp_r_[PADR_(const void *__capability)];
+	char inbuflen_l_[PADL_(size_t)]; size_t inbuflen; char inbuflen_r_[PADR_(size_t)];
+	char outbufp_l_[PADL_(void *__capability)]; void *__capability outbufp; char outbufp_r_[PADR_(void *__capability)];
+	char outbuflen_l_[PADL_(size_t)]; size_t outbuflen; char outbuflen_r_[PADR_(size_t)];
+};
 struct cheriabi_wait6_args {
 	char idtype_l_[PADL_(int)]; int idtype; char idtype_r_[PADR_(int)];
 	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
@@ -1412,6 +1442,11 @@ int	cheriabi_pdgetpid(struct thread *, struct cheriabi_pdgetpid_args *);
 int	cheriabi_pselect(struct thread *, struct cheriabi_pselect_args *);
 int	cheriabi_getloginclass(struct thread *, struct cheriabi_getloginclass_args *);
 int	cheriabi_setloginclass(struct thread *, struct cheriabi_setloginclass_args *);
+int	cheriabi_rctl_get_racct(struct thread *, struct cheriabi_rctl_get_racct_args *);
+int	cheriabi_rctl_get_rules(struct thread *, struct cheriabi_rctl_get_rules_args *);
+int	cheriabi_rctl_get_limits(struct thread *, struct cheriabi_rctl_get_limits_args *);
+int	cheriabi_rctl_add_rule(struct thread *, struct cheriabi_rctl_add_rule_args *);
+int	cheriabi_rctl_remove_rule(struct thread *, struct cheriabi_rctl_remove_rule_args *);
 int	cheriabi_wait6(struct thread *, struct cheriabi_wait6_args *);
 int	cheriabi_bindat(struct thread *, struct cheriabi_bindat_args *);
 int	cheriabi_connectat(struct thread *, struct cheriabi_connectat_args *);
@@ -1703,6 +1738,11 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_pselect	AUE_SELECT
 #define	CHERIABI_SYS_AUE_cheriabi_getloginclass	AUE_GETLOGINCLASS
 #define	CHERIABI_SYS_AUE_cheriabi_setloginclass	AUE_SETLOGINCLASS
+#define	CHERIABI_SYS_AUE_cheriabi_rctl_get_racct	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_rctl_get_rules	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_rctl_get_limits	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_rctl_add_rule	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_rctl_remove_rule	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_wait6	AUE_WAIT6
 #define	CHERIABI_SYS_AUE_cheriabi_bindat	AUE_BINDAT
 #define	CHERIABI_SYS_AUE_cheriabi_connectat	AUE_CONNECTAT

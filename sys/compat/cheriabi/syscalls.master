@@ -1256,31 +1256,41 @@
 				    size_t namelen); }
 524	AUE_SETLOGINCLASS	STD	{ int cheriabi_setloginclass( \
 				    _In_z_ const char * __capability namebuf); }
-525	AUE_NULL	NOPROTO	{ int rctl_get_racct( \
+525	AUE_NULL	STD	{ int cheriabi_rctl_get_racct( \
 				    _In_reads_bytes_(inbuflen) \
-				    const void *inbufp, size_t inbuflen, \
+				    const void * __capability inbufp, \
+				    size_t inbuflen, \
 				    _Out_writes_bytes_(outbuflen) \
-				    void *outbufp, size_t outbuflen); }
-526	AUE_NULL	NOPROTO	{ int rctl_get_rules( \
+				    void * __capability outbufp, \
+				    size_t outbuflen); }
+526	AUE_NULL	STD	{ int cheriabi_rctl_get_rules( \
 				    _In_reads_bytes_(inbuflen) \
-				    const void *inbufp, size_t inbuflen, \
+				    const void * __capability inbufp, \
+				    size_t inbuflen, \
 				    _Out_writes_bytes_(outbuflen) \
-				    void *outbufp, size_t outbuflen); }
-527	AUE_NULL	NOPROTO	{ int rctl_get_limits( \
+				    void * __capability outbufp, \
+				    size_t outbuflen); }
+527	AUE_NULL	STD	{ int cheriabi_rctl_get_limits( \
 				    _In_reads_bytes_(inbuflen) \
-				    const void *inbufp, size_t inbuflen, \
+				    const void * __capability inbufp, \
+				    size_t inbuflen, \
 				    _Out_writes_bytes_(outbuflen) \
-				    void *outbufp, size_t outbuflen); }
-528	AUE_NULL	NOPROTO	{ int rctl_add_rule( \
+				    void * __capability outbufp, \
+				    size_t outbuflen); }
+528	AUE_NULL	STD	{ int cheriabi_rctl_add_rule( \
 				    _In_reads_bytes_(inbuflen) \
-				    const void *inbufp, size_t inbuflen, \
+				    const void * __capability inbufp, \
+				    size_t inbuflen, \
 				    _Out_writes_bytes_(outbuflen) \
-				    void *outbufp, size_t outbuflen); }
-529	AUE_NULL	NOPROTO	{ int rctl_remove_rule( \
+				    void * __capability outbufp, \
+				    size_t outbuflen); }
+529	AUE_NULL	STD	{ int cheriabi_rctl_remove_rule( \
 				    _In_reads_bytes_(inbuflen) \
-				    const void *inbufp, size_t inbuflen, \
+				    const void * __capability inbufp, \
+				    size_t inbuflen, \
 				    _Out_writes_bytes_(outbuflen) \
-				    void *outbufp, size_t outbuflen); }
+				    void * __capability outbufp, \
+				    size_t outbuflen); }
 530	AUE_POSIX_FALLOCATE	NOPROTO	{ int posix_fallocate(int fd,\
 				    off_t offset, off_t len); }
 531	AUE_POSIX_FADVISE	NOPROTO	{ int posix_fadvise(int fd, \

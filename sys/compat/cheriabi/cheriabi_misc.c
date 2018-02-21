@@ -2058,6 +2058,74 @@ cheriabi_setlogin(struct thread *td, struct cheriabi_setlogin_args *uap)
 }
 
 /*
+ * kern_rctl.h
+ */
+int
+cheriabi_rctl_get_racct(struct thread *td,
+    struct cheriabi_rctl_get_racct_args *uap)
+{
+
+#ifdef RCTL
+	return (kern_rctl_get_racct(td, uap->inbufp, uap->inbuflen,
+	    uap->outbufp, uap->outbuflen));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_rctl_get_rules(struct thread *td,
+    struct cheriabi_rctl_get_rules_args *uap)
+{
+
+#ifdef RCTL
+	return (kern_rctl_get_rules(td, uap->inbufp, uap->inbuflen,
+	    uap->outbufp, uap->outbuflen));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_rctl_get_limits(struct thread *td,
+    struct cheriabi_rctl_get_limits_args *uap)
+{
+
+#ifdef RCTL
+	return (kern_rctl_get_limits(td, uap->inbufp, uap->inbuflen,
+	    uap->outbufp, uap->outbuflen));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_rctl_add_rule(struct thread *td,
+    struct cheriabi_rctl_add_rule_args *uap)
+{
+
+#ifdef RCTL
+	return (kern_rctl_add_rule(td, uap->inbufp, uap->inbuflen,
+	    uap->outbufp, uap->outbuflen));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_rctl_remove_rule(struct thread *td,
+    struct cheriabi_rctl_remove_rule_args *uap)
+{
+
+#ifdef RCTL
+	return (kern_rctl_remove_rule(td, uap->inbufp, uap->inbuflen,
+	    uap->outbufp, uap->outbuflen));
+#else
+	return (ENOSYS);
+#endif
+}
+
+/*
  * kern_resource.h
  */
 int

@@ -328,11 +328,11 @@ MIASM =  \
 	cheriabi_pselect.o \
 	cheriabi_getloginclass.o \
 	cheriabi_setloginclass.o \
-	rctl_get_racct.o \
-	rctl_get_rules.o \
-	rctl_get_limits.o \
-	rctl_add_rule.o \
-	rctl_remove_rule.o \
+	cheriabi_rctl_get_racct.o \
+	cheriabi_rctl_get_rules.o \
+	cheriabi_rctl_get_limits.o \
+	cheriabi_rctl_add_rule.o \
+	cheriabi_rctl_remove_rule.o \
 	posix_fallocate.o \
 	posix_fadvise.o \
 	cheriabi_wait6.o \

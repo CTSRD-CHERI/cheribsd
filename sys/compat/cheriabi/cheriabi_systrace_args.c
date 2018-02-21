@@ -2777,52 +2777,52 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* rctl_get_racct */
+	/* cheriabi_rctl_get_racct */
 	case 525: {
-		struct rctl_get_racct_args *p = params;
-		uarg[0] = (intptr_t) p->inbufp; /* const void * */
+		struct cheriabi_rctl_get_racct_args *p = params;
+		uarg[0] = (cheri_getbase(p->inbufp) + cheri_getoffset(p->inbufp)); /* const void *__capability */
 		uarg[1] = p->inbuflen; /* size_t */
-		uarg[2] = (intptr_t) p->outbufp; /* void * */
+		uarg[2] = (cheri_getbase(p->outbufp) + cheri_getoffset(p->outbufp)); /* void *__capability */
 		uarg[3] = p->outbuflen; /* size_t */
 		*n_args = 4;
 		break;
 	}
-	/* rctl_get_rules */
+	/* cheriabi_rctl_get_rules */
 	case 526: {
-		struct rctl_get_rules_args *p = params;
-		uarg[0] = (intptr_t) p->inbufp; /* const void * */
+		struct cheriabi_rctl_get_rules_args *p = params;
+		uarg[0] = (cheri_getbase(p->inbufp) + cheri_getoffset(p->inbufp)); /* const void *__capability */
 		uarg[1] = p->inbuflen; /* size_t */
-		uarg[2] = (intptr_t) p->outbufp; /* void * */
+		uarg[2] = (cheri_getbase(p->outbufp) + cheri_getoffset(p->outbufp)); /* void *__capability */
 		uarg[3] = p->outbuflen; /* size_t */
 		*n_args = 4;
 		break;
 	}
-	/* rctl_get_limits */
+	/* cheriabi_rctl_get_limits */
 	case 527: {
-		struct rctl_get_limits_args *p = params;
-		uarg[0] = (intptr_t) p->inbufp; /* const void * */
+		struct cheriabi_rctl_get_limits_args *p = params;
+		uarg[0] = (cheri_getbase(p->inbufp) + cheri_getoffset(p->inbufp)); /* const void *__capability */
 		uarg[1] = p->inbuflen; /* size_t */
-		uarg[2] = (intptr_t) p->outbufp; /* void * */
+		uarg[2] = (cheri_getbase(p->outbufp) + cheri_getoffset(p->outbufp)); /* void *__capability */
 		uarg[3] = p->outbuflen; /* size_t */
 		*n_args = 4;
 		break;
 	}
-	/* rctl_add_rule */
+	/* cheriabi_rctl_add_rule */
 	case 528: {
-		struct rctl_add_rule_args *p = params;
-		uarg[0] = (intptr_t) p->inbufp; /* const void * */
+		struct cheriabi_rctl_add_rule_args *p = params;
+		uarg[0] = (cheri_getbase(p->inbufp) + cheri_getoffset(p->inbufp)); /* const void *__capability */
 		uarg[1] = p->inbuflen; /* size_t */
-		uarg[2] = (intptr_t) p->outbufp; /* void * */
+		uarg[2] = (cheri_getbase(p->outbufp) + cheri_getoffset(p->outbufp)); /* void *__capability */
 		uarg[3] = p->outbuflen; /* size_t */
 		*n_args = 4;
 		break;
 	}
-	/* rctl_remove_rule */
+	/* cheriabi_rctl_remove_rule */
 	case 529: {
-		struct rctl_remove_rule_args *p = params;
-		uarg[0] = (intptr_t) p->inbufp; /* const void * */
+		struct cheriabi_rctl_remove_rule_args *p = params;
+		uarg[0] = (cheri_getbase(p->inbufp) + cheri_getoffset(p->inbufp)); /* const void *__capability */
 		uarg[1] = p->inbuflen; /* size_t */
-		uarg[2] = (intptr_t) p->outbufp; /* void * */
+		uarg[2] = (cheri_getbase(p->outbufp) + cheri_getoffset(p->outbufp)); /* void *__capability */
 		uarg[3] = p->outbuflen; /* size_t */
 		*n_args = 4;
 		break;
@@ -7670,17 +7670,17 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* rctl_get_racct */
+	/* cheriabi_rctl_get_racct */
 	case 525:
 		switch(ndx) {
 		case 0:
-			p = "userland const void *";
+			p = "userland const void *__capability";
 			break;
 		case 1:
 			p = "size_t";
 			break;
 		case 2:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 3:
 			p = "size_t";
@@ -7689,17 +7689,17 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* rctl_get_rules */
+	/* cheriabi_rctl_get_rules */
 	case 526:
 		switch(ndx) {
 		case 0:
-			p = "userland const void *";
+			p = "userland const void *__capability";
 			break;
 		case 1:
 			p = "size_t";
 			break;
 		case 2:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 3:
 			p = "size_t";
@@ -7708,17 +7708,17 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* rctl_get_limits */
+	/* cheriabi_rctl_get_limits */
 	case 527:
 		switch(ndx) {
 		case 0:
-			p = "userland const void *";
+			p = "userland const void *__capability";
 			break;
 		case 1:
 			p = "size_t";
 			break;
 		case 2:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 3:
 			p = "size_t";
@@ -7727,17 +7727,17 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* rctl_add_rule */
+	/* cheriabi_rctl_add_rule */
 	case 528:
 		switch(ndx) {
 		case 0:
-			p = "userland const void *";
+			p = "userland const void *__capability";
 			break;
 		case 1:
 			p = "size_t";
 			break;
 		case 2:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 3:
 			p = "size_t";
@@ -7746,17 +7746,17 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* rctl_remove_rule */
+	/* cheriabi_rctl_remove_rule */
 	case 529:
 		switch(ndx) {
 		case 0:
-			p = "userland const void *";
+			p = "userland const void *__capability";
 			break;
 		case 1:
 			p = "size_t";
 			break;
 		case 2:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 3:
 			p = "size_t";
@@ -9851,27 +9851,27 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* rctl_get_racct */
+	/* cheriabi_rctl_get_racct */
 	case 525:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* rctl_get_rules */
+	/* cheriabi_rctl_get_rules */
 	case 526:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* rctl_get_limits */
+	/* cheriabi_rctl_get_limits */
 	case 527:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* rctl_add_rule */
+	/* cheriabi_rctl_add_rule */
 	case 528:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* rctl_remove_rule */
+	/* cheriabi_rctl_remove_rule */
 	case 529:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
