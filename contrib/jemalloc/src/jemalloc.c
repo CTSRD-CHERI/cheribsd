@@ -71,7 +71,7 @@ bool	opt_xmalloc = false;
 bool	opt_zero = false;
 unsigned	opt_narenas = 0;
 
-bool		opt_cheri_setbounds = 
+bool		opt_cheri_setbounds =
 #if defined(JEMALLOC_NO_PTR_BOUNDS)
     false
 #else

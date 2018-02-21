@@ -14,7 +14,7 @@ options 	SMP
 
 options 	HZ=200
 
-makeoptions	ARCH_FLAGS="-march=mips64 -mabi=64"
+makeoptions	ARCH_FLAGS="-march=mips64 -mabi=64 -Wno-unused-command-line-argument"
 
 makeoptions 	KERNLOADADDR=0xffffffff80100000
 

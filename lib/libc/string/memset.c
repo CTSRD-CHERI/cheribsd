@@ -60,15 +60,15 @@ bzero(void *dst0, size_t length)
 #define	VAL	c0
 #define	WIDEVAL	c
 
-__CAP void *
-__CAPSUFFIX(memset)(__CAP void *dst0, int c0, size_t length)
+void * __CAP
+__CAPSUFFIX(memset)(void * __CAP dst0, int c0, size_t length)
 #endif
 {
 	size_t t;
 #ifndef BZERO
 	u_int c;
 #endif
-	__CAP u_char *dst;
+	u_char * __CAP dst;
 
 	dst = dst0;
 	/*
@@ -115,7 +115,7 @@ __CAPSUFFIX(memset)(__CAP void *dst0, int c0, size_t length)
 	/* Fill words.  Length was >= 2*words so we know t >= 1 here. */
 	t = length / wsize;
 	do {
-		*(__CAP u_int *)(__CAP void *)dst = WIDEVAL;
+		*(u_int * __CAP)(void * __CAP)dst = WIDEVAL;
 		dst += wsize;
 	} while (--t != 0);
 

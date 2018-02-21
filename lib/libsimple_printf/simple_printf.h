@@ -1,5 +1,6 @@
 /*-
  * Copyright 2011 Konstantin Belousov <kib@FreeBSD.org>.
+ * Copyright 2018 Alex Richardson <arichardson@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,24 +26,34 @@
  * $FreeBSD$
  */
 
-#ifndef RTLD_PRINTF_H
-#define RTLD_PRINTF_H 1
+#ifndef SIMPLE_PRINTF_H
+#define SIMPLE_PRINTF_H 1
 
 #include <sys/cdefs.h>
+#include <stdarg.h>
 #include <unistd.h>
 
-ssize_t __rtld_write(int fd, const void *buf, size_t count) __hidden;
+#ifndef SIMPLE_PRINTF_PREFIX
+#error "You must define SIMPLE_PRINTF_PREFIX"
+#endif
 
-int rtld_snprintf(char *buf, size_t bufsize, const char *fmt, ...)
+#define SIMPLE_PRINTF_FN(x)	__CONCAT(__CONCAT(SIMPLE_PRINTF_PREFIX, _), x)
+
+int SIMPLE_PRINTF_FN(snprintf)(char *buf, size_t bufsize, const char *fmt, ...)
     __printflike(3, 4);
-int rtld_vsnprintf(char *buf, size_t bufsize, const char *fmt, va_list ap);
-int rtld_vfdprintf(int fd, const char *fmt, va_list ap);
-int rtld_fdprintf(int fd, const char *fmt, ...) __printflike(2, 3);
-void rtld_fdputstr(int fd, const char *str);
-void rtld_fdputchar(int fd, int c);
+int SIMPLE_PRINTF_FN(vsnprintf)(char *buf, size_t bufsize, const char *fmt,
+    va_list ap) __printflike(3, 0);
+int SIMPLE_PRINTF_FN(vfdprintf)(int fd, const char *fmt, va_list ap)
+    __printflike(2, 0);
+int SIMPLE_PRINTF_FN(fdprintf)(int fd, const char *fmt, ...)
+    __printflike(2, 3);
+int SIMPLE_PRINTF_FN(printf)(const char *fmt, ...) __printflike(1, 2);
 
-#define	rtld_printf(...) rtld_fdprintf(STDOUT_FILENO, __VA_ARGS__)
-#define	rtld_putstr(str) rtld_fdputstr(STDOUT_FILENO, (str))
-#define	rtld_putchar(c) rtld_fdputchar(STDOUT_FILENO, (c))
+void SIMPLE_PRINTF_FN(fdputstr)(int fd, const char *str);
+void SIMPLE_PRINTF_FN(putstr)(const char *str);
+void SIMPLE_PRINTF_FN(fdputchar)(int fd, int c);
+void SIMPLE_PRINTF_FN(putchar)(int c);
+
+ssize_t SIMPLE_PRINTF_FN(write)(int fd, const void *buf, size_t count) __hidden;
 
 #endif

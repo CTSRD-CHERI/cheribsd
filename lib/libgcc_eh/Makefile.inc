@@ -5,7 +5,6 @@
 COMPILERRTDIR=	${SRCTOP}/contrib/compiler-rt
 .if ${MK_CHERI} != "no"
 WANT_CHERI?=	hybrid
-ALLOW_SHARED_TEXTREL=yes
 UNWINDINCDIR=   ${SRCTOP}/contrib/cheri-libunwind/include
 UNWINDSRCDIR=   ${SRCTOP}/contrib/cheri-libunwind/src
 .elif ${MACHINE_ARCH:Mmips*}

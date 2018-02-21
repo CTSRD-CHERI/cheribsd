@@ -419,11 +419,4 @@ SUBDIR+=	tests
 .endif
 .endif
 
-.include <bsd.compiler.mk>
-
-# work around CTSRD-CHERI/clang#120
-.if ${COMPILER_TYPE} == "clang"
-CFLAGS+=       -Wno-varargs
-.endif
-
 .include <bsd.lib.mk>

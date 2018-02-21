@@ -37,6 +37,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "simple_printf.h"
+
 extern void debug_printf(const char *, ...) __printflike(1, 2);
 extern int debug;
 
@@ -50,8 +52,8 @@ extern int debug;
 
 #define assert(cond)	((cond) ? (void) 0 :		\
     (msg(_MYNAME ": assert failed: " __FILE__ ":"	\
-      __XSTRING(__LINE__) "\n"), abort()))
-#define msg(s)		write(STDOUT_FILENO, s, strlen(s))
+      __XSTRING(__LINE__) ":" #cond "\n"), abort()))
+#define msg(s)		rtld_write(STDOUT_FILENO, s, strlen(s))
 #define trace()		msg(_MYNAME ": " __XSTRING(__LINE__) "\n")
 
 

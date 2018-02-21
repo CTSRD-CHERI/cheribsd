@@ -39,19 +39,15 @@ __FBSDID("$FreeBSD$");
 #include <string.h>
 #include "cheri_private.h"
 
-/*
- * XXX-BD: The capability version renders all strings read-only which
- * likely isn't what the caller wanted.
- */
-__CAP void *
-__CAPSUFFIX(memchr)(__CAP const void *s, int c, size_t n)
+void * __CAP
+__CAPSUFFIX(memchr)(const void * __CAP s, int c, size_t n)
 {
 	if (n != 0) {
-		__CAP const unsigned char *p = s;
+		const unsigned char * __CAP p = s;
 
 		do {
 			if (*p == (unsigned char)c)
-				return ((__CAP void *)p);
+				return ((void * __CAP)p);
 			else
 				p++;
 		} while (--n != 0);

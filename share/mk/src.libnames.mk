@@ -278,7 +278,7 @@ _DP_radius=	crypto
 .endif
 _DP_rtld_db=	elf procstat
 _DP_procstat=	kvm util elf
-.if ${MK_CXX} == "yes" && !defined(LIBCHERI)
+.if ${MK_CXX} == "yes"
 .if ${MK_LIBCPLUSPLUS} != "no"
 _DP_proc=	cxxrt
 .else

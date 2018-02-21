@@ -30,7 +30,7 @@
 #include <string.h>
 #include <unistd.h>
 #include "rtld.h"
-#include "rtld_printf.h"
+#include "simple_printf.h"
 
 void *
 xcalloc(size_t number, size_t size)

@@ -40,7 +40,6 @@
 #endif
 #include <stdarg.h>
 #include <stddef.h>
-#define	_WITH_GETLINE
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>

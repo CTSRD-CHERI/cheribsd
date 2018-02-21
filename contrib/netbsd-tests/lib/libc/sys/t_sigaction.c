@@ -164,11 +164,11 @@ restore_handler(void (*handler_p)(int), int flags)
 	newsa.sa_handler = SIG_DFL;
 	ATF_REQUIRE(sigaction(SIGUSR1, &newsa, NULL) == 0);
 	/*
-	 * Set the handler to the previous set handler as reported by
+	 * Set the handler to the previously set handler as reported by
 	 * the kernel.
 	 */
 	ATF_REQUIRE(sigaction(SIGUSR1, &setsa, NULL) == 0);
-	/* Check that the newly set handler matches the previous one */
+	/* Check that the newly set handler matches the origional one. */
 	ATF_REQUIRE(sigaction(SIGUSR1, NULL, &setsa2) == 0);
 	ATF_REQUIRE_EQ(memcmp(&setsa, &setsa2, sizeof(setsa)), 0);
 	/* Reset the handler */
