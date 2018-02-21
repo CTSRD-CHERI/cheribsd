@@ -107,7 +107,7 @@ int
 cheriabi_sendmsg(struct thread *td, struct cheriabi_sendmsg_args *uap)
 {
 	kmsghdr_t msg;
-	kiovec_t * __capability iov;
+	kiovec_t *iov;
 	struct mbuf *control = NULL;
 	struct sockaddr *to = NULL;
 	int error;
@@ -118,7 +118,7 @@ cheriabi_sendmsg(struct thread *td, struct cheriabi_sendmsg_args *uap)
 	error = cheriabi_copyiniov(msg.msg_iov, msg.msg_iovlen, &iov, EMSGSIZE);
 	if (error)
 		return (error);
-	msg.msg_iov = iov;
+	msg.msg_iov = (__cheri_tocap kiovec_t * __capability)iov;
 	if (msg.msg_name != NULL) {
 		error = getsockaddr(&to, msg.msg_name, msg.msg_namelen);
 		if (error) {
@@ -155,7 +155,7 @@ cheriabi_sendmsg(struct thread *td, struct cheriabi_sendmsg_args *uap)
 	    UIO_USERSPACE);
 
 out:
-	free_c(iov, M_IOV);
+	free(iov, M_IOV);
 	if (to)
 		free(to, M_SONAME);
 	return (error);
@@ -174,7 +174,7 @@ cheriabi_recvmsg(struct thread *td, struct cheriabi_recvmsg_args *uap)
 {
 	kmsghdr_t msg;
 	struct iovec_c *__capability uiov;
-	kiovec_t * __capability iov;
+	kiovec_t *iov;
 
 	int error;
 
@@ -186,7 +186,7 @@ cheriabi_recvmsg(struct thread *td, struct cheriabi_recvmsg_args *uap)
 	if (error)
 		return (error);
 	msg.msg_flags = uap->flags;
-	msg.msg_iov = iov;
+	msg.msg_iov = (__cheri_tocap kiovec_t * __capability)iov;
 
 	error = kern_recvit(td, uap->s, &msg, UIO_USERSPACE, NULL);
 	if (error == 0) {
@@ -198,7 +198,7 @@ cheriabi_recvmsg(struct thread *td, struct cheriabi_recvmsg_args *uap)
 		 */
 		error = copyoutcap_c(&msg, uap->msg, sizeof(msg));
 	}
-	free_c(iov, M_IOV);
+	free(iov, M_IOV);
 
 	return (error);
 }

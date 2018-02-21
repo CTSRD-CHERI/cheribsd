@@ -583,19 +583,20 @@ cheriabi_pwritev(struct thread *td, struct cheriabi_pwritev_args *uap)
 
 int
 cheriabi_copyiniov(struct iovec_c * __capability iovp_c, u_int iovcnt,
-    kiovec_t * __capability *iovp, int error)
+    kiovec_t **iovp, int error)
 {
-	kiovec_t * __capability iov;
+	kiovec_t *iov;
 	u_int iovlen;
 
 	*iovp = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (error);
 	iovlen = iovcnt * sizeof(kiovec_t);
-	iov = malloc_c(iovlen, M_IOV, M_WAITOK);
-	error = copyincap_c(iovp_c, iov, iovlen);
+	iov = malloc(iovlen, M_IOV, M_WAITOK);
+	error = copyincap_c(iovp_c,
+	    (__cheri_tocap kiovec_t * __capability)iov, iovlen);
 	if (error) {
-		free_c(iov, M_IOV);
+		free(iov, M_IOV);
 		return (error);
 	}
 	*iovp = iov;
