@@ -298,6 +298,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 			ptr = va_arg(ap, void *);
 #ifdef __CHERI__
 			if (sharpflag) {
+				_Bool sealed = cheri_getsealed(ptr);
 				/* v:0 */
 				PCHAR('v'); PCHAR(':');
 				cheri_gettag(ptr) ? PCHAR('1') : PCHAR('0');
@@ -305,13 +306,13 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 
 				/* s:0 */
 				PCHAR('s'); PCHAR(':');
-				cheri_getsealed(ptr) ? PCHAR('1') : PCHAR('0');
+				sealed ? PCHAR('1') : PCHAR('0');
 				PCHAR(' ');
 
 				/* p:00000000 */
 				PCHAR('p'); PCHAR(':');
 				q = ksprintn(nbuf, cheri_getperm(ptr), 16,
-				     &n, 0);
+				    &n, 0);
 				for (width = 8 - n; width > 0; width--)
 					PCHAR('0');
 				while (*q)
@@ -321,7 +322,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 				/* b:0000000000000000 */
 				PCHAR('b'); PCHAR(':');
 				q = ksprintn(nbuf, cheri_getbase(ptr), 16,
-				     &n, 0);
+				    &n, 0);
 				for (width = 16 - n; width > 0; width--)
 					PCHAR('0');
 				while (*q)
@@ -331,7 +332,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 				/* l:0000000000000000 */
 				PCHAR('l'); PCHAR(':');
 				q = ksprintn(nbuf, cheri_getlen(ptr), 16,
-				     &n, 0);
+				    &n, 0);
 				for (width = 16 - n; width > 0; width--)
 					PCHAR('0');
 				while (*q)
@@ -341,17 +342,23 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 				/* o:0 */
 				PCHAR('o'); PCHAR(':');
 				q = ksprintn(nbuf, cheri_getoffset(ptr), 16,
-				     NULL, 0);
+				    &n, 0);
+				for (width = 16 - n; width > 0; width--)
+					PCHAR('0');
 				while (*q)
 					PCHAR(*q--);
 				PCHAR(' ');
 
-				/* t:0 */
+				/* t:0 (print -1 if not sealed) */
 				PCHAR('t'); PCHAR(':');
-				q = ksprintn(nbuf, cheri_gettype(ptr), 16,
-				     NULL, 0);
-				while (*q)
-					PCHAR(*q--);
+				if (!sealed) {
+					PCHAR('-'); PCHAR('1');
+				} else {
+					q = ksprintn(nbuf, cheri_gettype(ptr),
+					    16, NULL, 0);
+					while (*q)
+						PCHAR(*q--);
+				}
 				break;
 			}
 #endif	/* defined(__CHERI__) */
