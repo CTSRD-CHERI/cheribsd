@@ -46,9 +46,6 @@ __FBSDID("$FreeBSD$");
 
 pthread_t	service_thread;
 
-extern int	cocall(void * __capability, void * __capability, void * __capability);
-extern int	coaccept(void * __capability, void * __capability);
-
 #if 0
 #define SHARED_PAGE	0x7ffffff000
 
