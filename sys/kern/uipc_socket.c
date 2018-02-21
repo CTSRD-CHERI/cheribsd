@@ -3089,7 +3089,7 @@ integer:
 			    so, &extmac);
 			if (error)
 				goto bad;
-			error = sooptcopyout(sopt, &extmac, sizeof extmac);
+			/* Don't copy out extmac, it is unchanged. */
 #else
 			error = EOPNOTSUPP;
 #endif
@@ -3105,7 +3105,7 @@ integer:
 			    sopt->sopt_td->td_ucred, so, &extmac);
 			if (error)
 				goto bad;
-			error = sooptcopyout(sopt, &extmac, sizeof extmac);
+			/* Don't copy out extmac, it is unchanged. */
 #else
 			error = EOPNOTSUPP;
 #endif
