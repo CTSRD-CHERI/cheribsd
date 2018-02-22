@@ -43,6 +43,12 @@
 
 #include <sys/elf.h>
 
+#include <cheri/cheric.h>
+#ifdef CHERI_KERNEL
+#include <machine/cpuregs.h>
+#include <machine/cherireg.h>
+#endif /* CHERI_KERNEL */
+
 /*
  * Flags that describe the origin of the entries in Dl_serinfo.
  * SunOS has these in <sys/link.h>, we follow the suit.

@@ -413,7 +413,30 @@ link_elf_init(void* arg)
 #ifdef __powerpc__
 	ef->address = (caddr_t) (__startkernel - KERNBASE);
 #else
+#ifndef CHERI_KERNEL
 	ef->address = 0;
+#else /* CHERI_KERNEL */
+	/*
+	 * This is the top-level capability used to generate all pointers
+	 * to ELF structures in the kernel image.
+	 *
+	 * XXX-AM: Ideally this is derived from the kernel data capability
+	 * since it does not need access to anything else, the capability is
+	 * read-only on the assumption that we shouldn't ELF files do not
+	 * write to kernel ELF sections.
+	 * It is particularly sad that we have to use this capability to
+	 * load other things later, we may have some more luck if we link
+	 * the kernel at 0x00 and relocate it at boot using pcc/ddc...
+	 * This is incompatible with the way other kld are linked, they are
+	 * 0-based so the addresses in the ELF file can be used as offsets
+	 * relative to ef->address. This is not true for the kernel,
+	 * so we are forced to use a 0-based capability and rely on bounds
+	 * enforcement later.
+	 */
+	ef->address = cheri_andperm(cheri_kall_capability,
+		(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP));
+	linker_kernel_file->address = ef->address;
+#endif /* CHERI_KERNEL */
 #endif
 #ifdef SPARSE_MAPPING
 	ef->object = 0;
@@ -423,13 +446,22 @@ link_elf_init(void* arg)
 	if (dp != NULL)
 		parse_dynamic(ef);
 	linker_kernel_file->address += KERNBASE;
-	linker_kernel_file->size = -(intptr_t)linker_kernel_file->address;
+	linker_kernel_file->size = - ptr_to_va(linker_kernel_file->address);
 
 	if (modptr != NULL) {
 		ef->modptr = modptr;
 		baseptr = preload_search_info(modptr, MODINFO_ADDR);
 		if (baseptr != NULL)
+#ifndef CHERI_KERNEL
 			linker_kernel_file->address = *(caddr_t *)baseptr;
+#else
+			/* MODINFO_ADDR is really a virtual address,
+			 * not a pointer
+			 */
+			linker_kernel_file->address = cheri_setoffset(
+				linker_kernel_file->address,
+				*(vm_offset_t *)baseptr);
+#endif
 		sizeptr = preload_search_info(modptr, MODINFO_SIZE);
 		if (sizeptr != NULL)
 			linker_kernel_file->size = *(size_t *)sizeptr;
@@ -438,11 +470,14 @@ link_elf_init(void* arg)
 		ctors_sizep = (Elf_Size *)preload_search_info(modptr,
 			MODINFO_METADATA | MODINFOMD_CTORS_SIZE);
 		if (ctors_addrp != NULL && ctors_sizep != NULL) {
-			linker_kernel_file->ctors_addr = ef->address +
-			    *ctors_addrp;
+			linker_kernel_file->ctors_addr = cheri_bound(
+				ef->address + *ctors_addrp, *ctors_sizep);
 			linker_kernel_file->ctors_size = *ctors_sizep;
 		}
 	}
+	/* Set the bounds on load address */
+	linker_kernel_file->address = cheri_bound(linker_kernel_file->address,
+		linker_kernel_file->size);
 	(void)link_elf_preload_parse_symbols(ef);
 
 #ifdef GDB
@@ -529,8 +564,10 @@ parse_dynamic(elf_file_t ef)
 			    (ef->address + dp->d_un.d_ptr);
 			ef->nbuckets = hashtab[0];
 			ef->nchains = hashtab[1];
-			ef->buckets = hashtab + 2;
-			ef->chains = ef->buckets + ef->nbuckets;
+			ef->buckets = cheri_bound(hashtab + 2,
+				ef->nbuckets * sizeof(Elf_Hashelt));
+			ef->chains = cheri_bound(hashtab + 2 + ef->nbuckets,
+				ef->nchains * sizeof(Elf_Hashelt));
 			break;
 		}
 		case DT_STRTAB:
@@ -587,6 +624,29 @@ parse_dynamic(elf_file_t ef)
 #endif
 		}
 	}
+	/* Set bounds on all section pointers for which we know the size
+	 * If we are not a cheri kernel these are no-ops.
+	 */
+	if (ef->strtab)
+		ef->strtab = cheri_bound(ef->strtab, ef->strsz);
+	if (ef->rel)
+		ef->rel = cheri_bound(ef->rel, ef->relsize * sizeof(*ef->rel));
+	if (ef->pltrel)
+		ef->pltrel = cheri_bound(ef->pltrel,
+			ef->pltrelsize * sizeof(*ef->pltrel));
+	if (ef->rela)
+		ef->rela = cheri_bound(ef->rela,
+			ef->relasize * sizeof(*ef->rela));
+	if (ef->symtab)
+		ef->symtab = cheri_bound(ef->symtab,
+			ef->nchains * sizeof(Elf_Sym));
+	/* XXX-AM: How do we get .got size?
+	 * We probably have to leave it like this or define
+	 * a symbol after GOT, in any case the got capability
+	 * would be limited by ef->address capability.
+	 */
+	/* if (ef->got) */
+	/* 	ef->got */
 
 	if (plttype == DT_RELA) {
 		ef->pltrela = (const Elf_Rela *)ef->pltrel;
