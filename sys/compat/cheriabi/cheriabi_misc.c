@@ -222,13 +222,10 @@ int
 cheriabi_exec_copyin_args(struct image_args *args, const char *fname,
     enum uio_seg segflg, void * __capability *argv, void * __capability *envv)
 {
-	char *argp, *envp;
 	void * __capability *pcap;
-	void * __capability *argcap;
+	void * __capability argcap;
 	size_t length;
-	int error, tag;
-
-	argcap = NULL;
+	int error;
 
 	bzero(args, sizeof(*args));
 	if (argv == NULL)
@@ -243,15 +240,10 @@ cheriabi_exec_copyin_args(struct image_args *args, const char *fname,
 		return (error);
 
 	/*
-	 * XXX: Work around not being able to store capabilities to the stack
-	 * and use the allocated buffer instead.
-	 */
-	argcap = (void * __capability *)args->buf;
-	/*
 	 * Copy the file name.
 	 */
 	if (fname != NULL) {
-		args->fname = args->buf + sizeof(void * __capability);
+		args->fname = args->buf;
 		error = (segflg == UIO_SYSSPACE) ?
 		    copystr(fname, args->fname, PATH_MAX, &length) :
 		    copyinstr(fname, args->fname, PATH_MAX, &length);
@@ -260,7 +252,7 @@ cheriabi_exec_copyin_args(struct image_args *args, const char *fname,
 	} else
 		length = 0;
 
-	args->begin_argv = args->buf + sizeof(void * __capability) + length;
+	args->begin_argv = args->buf + length;
 	args->endp = args->begin_argv;
 	args->stringspace = ARG_MAX;
 
@@ -269,17 +261,14 @@ cheriabi_exec_copyin_args(struct image_args *args, const char *fname,
 	 */
 	pcap = argv;
 	for (;;) {
-		error = copyincap(pcap++, argcap, sizeof(*argcap));
+		error = copyincap(pcap++, &argcap, sizeof(argcap));
 		if (error)
 			goto err_exit;
-		tag = cheri_gettag(*argcap);
-		if (!tag)
+		if (argcap == NULL)
 			break;
-		error = cheriabi_strcap_to_ptr(&argp, *argcap, 0);
-		if (error)
-			goto err_exit;
-		/* Lose any stray caps in arg strings. */
-		error = copyinstr(argp, args->endp, args->stringspace, &length);
+		error = copyinstr_c(argcap,
+		    (__cheri_tocap char * __capability)args->endp,
+		    args->stringspace, &length);
 		if (error) {
 			if (error == ENAMETOOLONG)
 				error = E2BIG;
@@ -298,18 +287,14 @@ cheriabi_exec_copyin_args(struct image_args *args, const char *fname,
 	if (envv) {
 		pcap = envv;
 		for (;;) {
-			error = copyincap(pcap++, argcap, sizeof(*argcap));
+			error = copyincap(pcap++, &argcap, sizeof(argcap));
 			if (error)
 				goto err_exit;
-			tag = cheri_gettag(*argcap);
-			if (!tag)
+			if (argcap == NULL)
 				break;
-			error = cheriabi_strcap_to_ptr(&envp, *argcap, 0);
-			if (error)
-				goto err_exit;
-			/* Lose any stray caps in env strings. */
-			error = copyinstr(envp, args->endp, args->stringspace,
-			    &length);
+			error = copyinstr_c(argcap,
+			    (__cheri_tocap char * __capability)args->endp,
+			    args->stringspace, &length);
 			if (error) {
 				if (error == ENAMETOOLONG)
 					error = E2BIG;
