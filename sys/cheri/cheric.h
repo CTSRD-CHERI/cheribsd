@@ -219,7 +219,26 @@ cheri_bytes_remaining(const void * __capability cap)
 	   cheri_getbase((const void * __capability)(ptr)),		\
 	   cheri_getlen((const void * __capability)(ptr)),		\
 	   cheri_getoffset((const void * __capability)(ptr)))
-#endif
+#endif /* ! __has_feature(capabilities) */
+
+/* Allow use of some cheri_ptr macros in the purecap kernel
+ * without extra ifdefs.
+ * These become a no-op when compiling an hybrid kernel or a
+ * normal kernel.
+ */
+#ifdef CHERI_KERNEL
+#define cheri_bound(ptr, size) cheri_ptr(ptr, size)
+#define cheri_perm(ptr, size, perm) cheri_ptrperm(ptr, size, perm)
+#else /* ! CHERI_KERNEL */
+
+/* Allow use of some cheri_ptr macros in the purecap kernel
+ * without extra ifdefs.
+ * These become a no-op when compiling with no capabilities support.
+ */
+#define cheri_bound(ptr, size) (ptr)
+#define cheri_perm(ptr, size, perm) (ptr)
+
+#endif /* ! CHERI_KERNEL */
 
 #include <machine/cheric.h>
 
