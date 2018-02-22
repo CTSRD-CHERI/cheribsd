@@ -491,7 +491,7 @@ __sighandler_t *cheriabi_signal(int, __sighandler_t *, void*);
  * XXXAR: We need to pass the caller's $cgp to the kernel.
  * See comment on sigaction() for more details
  */
-static inline __always_inline __sighandler_t *
+static __inline __always_inline __sighandler_t *
 signal(int sig, __sighandler_t *handler)
 {
 	return cheriabi_signal(sig, handler,

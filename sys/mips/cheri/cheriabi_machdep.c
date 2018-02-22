@@ -466,6 +466,8 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	int sig;
 	int oonstack;
 
+	printf("%s\n", __func__);
+
 	td = curthread;
 	p = td->td_proc;
 	PROC_LOCK_ASSERT(p, MA_OWNED);
@@ -708,7 +710,7 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	printf("$c12: "); CHERI_PRINT_PTR(regs->c12);
 	printf("$c17: "); CHERI_PRINT_PTR(regs->c17);
 	printf("$pcc: "); CHERI_PRINT_PTR(regs->pcc);
-	printf("$pc: %016lx\n", regs->pc);
+	printf("$pc: %016lx", regs->pc);
 }
 
 static void
