@@ -84,7 +84,6 @@
  * Zero before calling the callee: at, v0, v1, t4-t7, s0-s7, t8, t9, gp, sp, s8, ra, hi, lo
  *
  * XXX: Floating point
- * XXX: lo/hi registers?
  */
 .text
 .globl _C_LABEL(switcher_cocall)
@@ -184,6 +183,11 @@ _C_LABEL(switcher_cocall):
 	clearhi		CLEARHI_BITS
 	cclearlo	CCLEARLO_BITS
 	cclearhi	CCLEARHI_BITS
+
+	/*
+	 * Clear lo and hi.
+	 */
+	multu	zero, zero
 
 	/*
 	 * "Return" to the callee.

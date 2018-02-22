@@ -199,6 +199,11 @@ _C_LABEL(switcher_coaccept):
 	cclearhi	CCLEARHI_BITS
 
 	/*
+	 * Clear lo and hi.
+	 */
+	multu	zero, zero
+
+	/*
 	 * Bye!
 	 */
 	cjr	$c11
