@@ -81,15 +81,18 @@ thread_func(void *_arg)
 }
 
 static volatile int* segv_pointer = NULL;
-static volatile _Bool segv_expected = 0;
-static volatile int good_value = 0;
+static volatile _Bool signal_expected = 0;
+static int good_value = 42;
 
-static void segv_handler(int sig) {
+static void signal_handler(int sig) {
 	(void)sig;
-	write(STDERR_FILENO, "SEGV!\n", strlen("SEGV!\n"));
-	if (!segv_expected)
+#define sighandler_puts(str) write(STDERR_FILENO, str, strlen(str));
+	sighandler_puts("Signal handler triggered!\n")
+	if (!signal_expected) {
+		sighandler_puts("Signal was not expected!\n")
 		abort();
-	segv_expected = 0;
+	}
+	signal_expected = 0;
 	segv_pointer = &good_value;
 }
 
@@ -168,10 +171,12 @@ main(void)
 	fprintf(stderr, "Finished main thread %p\n", pthread_self());
 
 	fprintf(stderr, "Triggering SIGSEGV to test signal handlers:\n");
-	segv_expected = 1;
-	signal(SIGSEGV, &segv_handler);
-	/* The SEGV handler should update this value so that retrying works */
-	int exit_code = *segv_pointer;
+	signal_expected = 1;
+	signal(SIGHUP, signal_handler);
+	raise(SIGHUP);
+	/* The SIGHUP handler should update this value so that it is not NULL! */
+	if (!segv_pointer || *segv_pointer != 42)
+		err(EX_DATAERR, "Signal handler not triggered?");
 	fprintf(stderr, "Triggering SEGV handled successfully.\n");
-	return exit_code;
+	return 0;
 }
