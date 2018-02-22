@@ -345,6 +345,9 @@ struct sigaction {
 	} __sigaction_u;		/* signal handler */
 	int	sa_flags;		/* see signal options below */
 	sigset_t sa_mask;		/* signal mask to apply */
+#ifdef __CHERI_PURE_CAPABILITY__
+	void *sa_cgp;
+#endif
 };
 
 #define	sa_handler	__sigaction_u.__sa_handler
@@ -481,7 +484,24 @@ struct sigstack {
  * defined by <sys/signal.h>.
  */
 __BEGIN_DECLS
+#ifdef __CHERI_PURE_CAPABILITY__
+__sighandler_t *cheriabi_signal(int, __sighandler_t *, void*);
+#if !defined(_BUILDING_SIGACTION)
+/*
+ * XXXAR: We need to pass the caller's $cgp to the kernel.
+ * See comment on sigaction() for more details
+ */
+static inline __always_inline __sighandler_t *
+signal(int sig, __sighandler_t *handler)
+{
+	return cheriabi_signal(sig, handler,
+	    /* XXXAR: MIPS specific! */
+	    __builtin_mips_cheri_get_invoke_data_cap());
+}
+#endif
+#else
 __sighandler_t *signal(int, __sighandler_t *);
+#endif
 __END_DECLS
 
 #endif /* !_SYS_SIGNAL_H_ */

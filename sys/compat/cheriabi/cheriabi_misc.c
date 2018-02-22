@@ -1003,6 +1003,7 @@ cheriabi_sigaction(struct thread *td, struct cheriabi_sigaction_args *uap)
 	struct sigaction_c sa_c;
 	struct sigaction sa, osa, *sap;
 	void * __capability cap;
+	void * __capability capglobals;
 
 	int error, tag;
 
@@ -1033,14 +1034,16 @@ cheriabi_sigaction(struct thread *td, struct cheriabi_sigaction_args *uap)
 		CP(sa_c, sa, sa_mask);
 		sap = &sa;
 		cap = sa_c.sa_u;
+		capglobals = sa_c.sa_cgp;
 	} else
 		sap = NULL;
 	error = kern_sigaction_cap(td, uap->sig, sap,
-	    uap->oact != NULL ? &osa : NULL, 0, &cap);
+	    uap->oact != NULL ? &osa : NULL, 0, &cap, &capglobals);
 	if (error != 0)
 		SYSERRCAUSE("error in kern_sigaction_cap");
 	if (error == 0 && uap->oact != NULL) {
 		sa_c.sa_u = cap;
+		sa_c.sa_cgp = capglobals;
 		CP(osa, sa_c, sa_flags);
 		CP(osa, sa_c, sa_mask);
 		error = copyoutcap(&sa_c, uap->oact, sizeof(sa_c));

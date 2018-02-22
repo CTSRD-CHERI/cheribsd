@@ -77,8 +77,32 @@ int	kill(__pid_t, int);
 int	pthread_kill(__pthread_t, int);
 int	pthread_sigmask(int, const __sigset_t * __restrict,
 	    __sigset_t * __restrict);
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * XXXAR: we need to pass in the current $cgp when setting up signal handlers.
+ * The easiest way for this is to use an inline wrapper function that calls the
+ * real sigaction() implementation once it has set the caller's (not the
+ * callee's, since that will be libc.so!) $sa_cgp
+ *
+ * TODO: we could also use a macro but that will break configure checks that
+ * do something like foo = &sigaction; to check whether it exists.
+ */
+int	cheriabi_sigaction(int, const struct sigaction * __restrict,
+	    struct sigaction * __restrict, void* cgp);
+/* HACK to hide the static inline function when building libc */
+#if !defined(_BUILDING_SIGACTION)
+static inline __always_inline int
+sigaction(int sig, const struct sigaction * __restrict act,
+	    struct sigaction * __restrict oact)
+{
+	return cheriabi_sigaction(sig, act, oact,
+	    __builtin_mips_cheri_get_invoke_data_cap());
+}
+#endif
+#else
 int	sigaction(int, const struct sigaction * __restrict,
 	    struct sigaction * __restrict);
+#endif
 int	sigaddset(sigset_t *, int);
 int	sigdelset(sigset_t *, int);
 int	sigemptyset(sigset_t *);

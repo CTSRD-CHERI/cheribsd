@@ -158,6 +158,8 @@ struct sigaction_c {
 	void * __capability	sa_u;
 	int		sa_flags;
 	sigset_t	sa_mask;
+	/* XXXAR: can we move this up for better layout or will it break? */
+	void * __capability	sa_cgp;
 };
 
 struct thr_param_c {

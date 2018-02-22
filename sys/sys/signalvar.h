@@ -74,6 +74,7 @@ struct sigacts {
 	struct mtx ps_mtx;
 #ifdef COMPAT_CHERIABI
 	void * __capability ps_sigcap[_SIG_MAXSIG];	/* CheriABI handlers */
+	void * __capability ps_sigglobals[_SIG_MAXSIG];	/* CheriABI $cgp values */
 #endif
 };
 

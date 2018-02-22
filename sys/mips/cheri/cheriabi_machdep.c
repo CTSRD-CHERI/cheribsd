@@ -689,6 +689,7 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	regs->pc = (register_t)(intptr_t)catcher;
 	regs->csp = (__cheri_tocap void * __capability)(void*)sfp;
 	regs->c12 = psp->ps_sigcap[_SIG_IDX(sig)];
+	regs->idc = psp->ps_sigglobals[_SIG_IDX(sig)];
 	regs->c17 = td->td_pcb->pcb_cherisignal.csig_sigcode;
 	regs->ddc = csigp->csig_ddc;
 	/*
@@ -697,9 +698,17 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 *
 	 * TODO: remove csigp->csig_idc
 	 */
-	if (cheri_is_sandboxed)
+	if (cheri_is_sandboxed && regs->idc == NULL)
 		regs->idc = csigp->csig_idc;
 	regs->pcc = csigp->csig_pcc;
+	printf("Delivering signal %d\n", sig);
+	printf("$idc: "); CHERI_PRINT_PTR(regs->idc);
+	printf("$ddc: "); CHERI_PRINT_PTR(regs->ddc);
+	printf("$csp: "); CHERI_PRINT_PTR(regs->csp);
+	printf("$c12: "); CHERI_PRINT_PTR(regs->c12);
+	printf("$c17: "); CHERI_PRINT_PTR(regs->c17);
+	printf("$pcc: "); CHERI_PRINT_PTR(regs->pcc);
+	printf("$pc: %016lx\n", regs->pc);
 }
 
 static void

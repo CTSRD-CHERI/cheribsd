@@ -93,6 +93,7 @@ __FBSDID("$FreeBSD$");
  * need to work on that.
  */
 #include <cheri/cheri.h>
+#include <cheri/cheric.h>
 #endif
 
 #include <machine/cpu.h>
@@ -685,17 +686,19 @@ kern_sigaction(struct thread *td, int sig, const struct sigaction *act,
     struct sigaction *oact, int flags)
 {
 
-	return (kern_sigaction_cap(td, sig, act, oact, flags, NULL));
+	return (kern_sigaction_cap(td, sig, act, oact, flags, NULL, NULL));
 }
 
 int
 kern_sigaction_cap(struct thread *td, int sig, const struct sigaction *act,
-    struct sigaction *oact, int flags, void * __CAPABILITY *cap)
+    struct sigaction *oact, int flags, void * __CAPABILITY *cap,
+    void * __CAPABILITY *capglobals)
 {
 	struct sigacts *ps;
 	struct proc *p = td->td_proc;
 #ifdef COMPAT_CHERIABI
-	void * __capability newhandler;
+	void * __capability newhandler = NULL;
+	void * __capability newglobals = NULL;
 #endif
 
 	if (!_SIG_VALID(sig))
@@ -708,8 +711,10 @@ kern_sigaction_cap(struct thread *td, int sig, const struct sigaction *act,
 
 #ifdef COMPAT_CHERIABI
 	/* Save handler capability so we copy the old one out first. */
-	if (act != NULL && cap != NULL)
+	if (act != NULL && cap != NULL) {
 		newhandler = *cap;
+		newglobals = *capglobals;
+	}
 #endif
 
 	PROC_LOCK(p);
@@ -734,8 +739,18 @@ kern_sigaction_cap(struct thread *td, int sig, const struct sigaction *act,
 			oact->sa_handler = ps->ps_sigact[_SIG_IDX(sig)];
 		}
 #ifdef COMPAT_CHERIABI
+		/*
+		 * XXXAR: Usespace may not be able to call this pointer since
+		 * it may be called with the wrong $cgp. For now we also copy
+		 * out the old cgp value but that will not work if the signal()
+		 * API is used instead. We may need to create a trampoline
+		 * instead or actually use a function descriptor for sig_t but
+		 * that will probably break lots of existing C code?
+		 */
 		if (cap != NULL)
 			*cap = ps->ps_sigcap[_SIG_IDX(sig)];
+		if (capglobals != NULL)
+			*capglobals = ps->ps_sigglobals[_SIG_IDX(sig)];
 #endif
 		if (sig == SIGCHLD && ps->ps_flag & PS_NOCLDSTOP)
 			oact->sa_flags |= SA_NOCLDSTOP;
@@ -765,8 +780,13 @@ kern_sigaction_cap(struct thread *td, int sig, const struct sigaction *act,
 			SIGDELSET(ps->ps_siginfo, sig);
 		}
 #ifdef COMPAT_CHERIABI
-		if (cap != NULL)
+		if (cap != NULL) {
 			ps->ps_sigcap[_SIG_IDX(sig)] = newhandler;
+			ps->ps_sigglobals[_SIG_IDX(sig)] = newglobals;
+			printf("Setting cheri signal handler:\n");
+			printf("newhandler -- "); CHERI_PRINT_PTR(newhandler);
+			printf("newglobals -- "); CHERI_PRINT_PTR(newglobals);
+		}
 #endif
 		if (!sigact_flag_test(act, SA_RESTART))
 			SIGADDSET(ps->ps_sigintr, sig);
@@ -3741,6 +3761,8 @@ sigacts_copy(struct sigacts *dest, struct sigacts *src)
 #ifdef COMPAT_CHERIABI
 	/* XXX-BD: make conditional? */
 	cheri_memcpy(&dest->ps_sigcap, &src->ps_sigcap, sizeof(dest->ps_sigcap));
+	cheri_memcpy(&dest->ps_sigglobals, &src->ps_sigglobals,
+	    sizeof(dest->ps_sigglobals));
 #endif
 	mtx_unlock(&src->ps_mtx);
 }
