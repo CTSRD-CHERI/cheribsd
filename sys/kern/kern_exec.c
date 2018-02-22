@@ -118,7 +118,7 @@ static int sysctl_kern_ps_strings(SYSCTL_HANDLER_ARGS);
 static int sysctl_kern_usrstack(SYSCTL_HANDLER_ARGS);
 static int sysctl_kern_stackprot(SYSCTL_HANDLER_ARGS);
 static int do_execve(struct thread *td, struct image_args *args,
-    struct mac *mac_p);
+    kmac_t * __capability mac_p);
 
 /* XXX This should be vm_size_t. */
 SYSCTL_PROC(_kern, KERN_PS_STRINGS, ps_strings, CTLTYPE_ULONG|CTLFLAG_RD|
@@ -256,7 +256,7 @@ struct __mac_execve_args {
 	char	*fname;
 	char	**argv;
 	char	**envv;
-	struct mac	*mac_p;
+	struct mac_native	*mac_p;
 };
 #endif
 
@@ -274,7 +274,7 @@ sys___mac_execve(struct thread *td, struct __mac_execve_args *uap)
 	error = exec_copyin_args(&args, uap->fname, UIO_USERSPACE,
 	    uap->argv, uap->envv);
 	if (error == 0)
-		error = kern_execve(td, &args, uap->mac_p);
+		error = kern_execve(td, &args, __USER_CAP_OBJ(uap->mac_p));
 	post_execve(td, error, oldvmspace);
 	return (error);
 #else
@@ -338,7 +338,8 @@ post_execve(struct thread *td, int error, struct vmspace *oldvmspace)
  * memory).
  */
 int
-kern_execve(struct thread *td, struct image_args *args, struct mac *mac_p)
+kern_execve(struct thread *td, struct image_args *args,
+    void * __capability mac_p)
 {
 
 	AUDIT_ARG_ARGV(args->begin_argv, args->argc,
@@ -353,7 +354,8 @@ kern_execve(struct thread *td, struct image_args *args, struct mac *mac_p)
  * userspace pointers from the passed thread.
  */
 static int
-do_execve(struct thread *td, struct image_args *args, struct mac *mac_p)
+do_execve(struct thread *td, struct image_args *args,
+    kmac_t * __capability umac)
 {
 	struct proc *p = td->td_proc;
 	struct nameidata nd;
@@ -375,6 +377,8 @@ do_execve(struct thread *td, struct image_args *args, struct mac *mac_p)
 	int credential_changing;
 	int textset;
 #ifdef MAC
+	kmac_t extmac;
+	kmac_t *mac_p;
 	struct label *interpvplabel = NULL;
 	int will_transition;
 #endif
@@ -408,6 +412,13 @@ do_execve(struct thread *td, struct image_args *args, struct mac *mac_p)
 	oldcred = p->p_ucred;
 
 #ifdef MAC
+	if (umac != NULL) {
+		error = copyin_mac(umac, &extmac);
+		if (error)
+			goto exec_fail;
+		mac_p = &extmac;
+	} else
+		mac_p = NULL;
 	error = mac_execve_enter(imgp, mac_p);
 	if (error)
 		goto exec_fail;

@@ -1019,26 +1019,26 @@ struct nmount_args {
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct __mac_get_proc_args {
-	char mac_p_l_[PADL_(struct mac *)]; struct mac * mac_p; char mac_p_r_[PADR_(struct mac *)];
+	char mac_p_l_[PADL_(struct mac_native *)]; struct mac_native * mac_p; char mac_p_r_[PADR_(struct mac_native *)];
 };
 struct __mac_set_proc_args {
-	char mac_p_l_[PADL_(struct mac *)]; struct mac * mac_p; char mac_p_r_[PADR_(struct mac *)];
+	char mac_p_l_[PADL_(struct mac_native *)]; struct mac_native * mac_p; char mac_p_r_[PADR_(struct mac_native *)];
 };
 struct __mac_get_fd_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char mac_p_l_[PADL_(struct mac *)]; struct mac * mac_p; char mac_p_r_[PADR_(struct mac *)];
+	char mac_p_l_[PADL_(struct mac_native *)]; struct mac_native * mac_p; char mac_p_r_[PADR_(struct mac_native *)];
 };
 struct __mac_get_file_args {
 	char path_p_l_[PADL_(const char *)]; const char * path_p; char path_p_r_[PADR_(const char *)];
-	char mac_p_l_[PADL_(struct mac *)]; struct mac * mac_p; char mac_p_r_[PADR_(struct mac *)];
+	char mac_p_l_[PADL_(struct mac_native *)]; struct mac_native * mac_p; char mac_p_r_[PADR_(struct mac_native *)];
 };
 struct __mac_set_fd_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char mac_p_l_[PADL_(struct mac *)]; struct mac * mac_p; char mac_p_r_[PADR_(struct mac *)];
+	char mac_p_l_[PADL_(struct mac_native *)]; struct mac_native * mac_p; char mac_p_r_[PADR_(struct mac_native *)];
 };
 struct __mac_set_file_args {
 	char path_p_l_[PADL_(const char *)]; const char * path_p; char path_p_r_[PADR_(const char *)];
-	char mac_p_l_[PADL_(struct mac *)]; struct mac * mac_p; char mac_p_r_[PADR_(struct mac *)];
+	char mac_p_l_[PADL_(struct mac_native *)]; struct mac_native * mac_p; char mac_p_r_[PADR_(struct mac_native *)];
 };
 struct kenv_args {
 	char what_l_[PADL_(int)]; int what; char what_r_[PADR_(int)];
@@ -1103,15 +1103,15 @@ struct ksem_destroy_args {
 };
 struct __mac_get_pid_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
-	char mac_p_l_[PADL_(struct mac *)]; struct mac * mac_p; char mac_p_r_[PADR_(struct mac *)];
+	char mac_p_l_[PADL_(struct mac_native *)]; struct mac_native * mac_p; char mac_p_r_[PADR_(struct mac_native *)];
 };
 struct __mac_get_link_args {
 	char path_p_l_[PADL_(const char *)]; const char * path_p; char path_p_r_[PADR_(const char *)];
-	char mac_p_l_[PADL_(struct mac *)]; struct mac * mac_p; char mac_p_r_[PADR_(struct mac *)];
+	char mac_p_l_[PADL_(struct mac_native *)]; struct mac_native * mac_p; char mac_p_r_[PADR_(struct mac_native *)];
 };
 struct __mac_set_link_args {
 	char path_p_l_[PADL_(const char *)]; const char * path_p; char path_p_r_[PADR_(const char *)];
-	char mac_p_l_[PADL_(struct mac *)]; struct mac * mac_p; char mac_p_r_[PADR_(struct mac *)];
+	char mac_p_l_[PADL_(struct mac_native *)]; struct mac_native * mac_p; char mac_p_r_[PADR_(struct mac_native *)];
 };
 struct extattr_set_link_args {
 	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
@@ -1136,7 +1136,7 @@ struct __mac_execve_args {
 	char fname_l_[PADL_(char *)]; char * fname; char fname_r_[PADR_(char *)];
 	char argv_l_[PADL_(char **)]; char ** argv; char argv_r_[PADR_(char **)];
 	char envv_l_[PADL_(char **)]; char ** envv; char envv_r_[PADR_(char **)];
-	char mac_p_l_[PADL_(struct mac *)]; struct mac * mac_p; char mac_p_r_[PADR_(struct mac *)];
+	char mac_p_l_[PADL_(struct mac_native *)]; struct mac_native * mac_p; char mac_p_r_[PADR_(struct mac_native *)];
 };
 struct sigaction_args {
 	char sig_l_[PADL_(int)]; int sig; char sig_r_[PADR_(int)];

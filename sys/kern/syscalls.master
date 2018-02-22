@@ -694,16 +694,18 @@
 381	AUE_NULL	UNIMPL	kse_create
 382	AUE_NULL	UNIMPL	kse_thr_interrupt
 383	AUE_NULL	UNIMPL	kse_release
-384	AUE_NULL	STD	{ int __mac_get_proc(struct mac *mac_p); }
-385	AUE_NULL	STD	{ int __mac_set_proc(struct mac *mac_p); }
+384	AUE_NULL	STD	{ int __mac_get_proc( \
+				    struct mac_native *mac_p); }
+385	AUE_NULL	STD	{ int __mac_set_proc( \
+				    struct mac_native *mac_p); }
 386	AUE_NULL	STD	{ int __mac_get_fd(int fd, \
-				    struct mac *mac_p); }
+				    struct mac_native *mac_p); }
 387	AUE_NULL	STD	{ int __mac_get_file(const char *path_p, \
-				    struct mac *mac_p); }
+				    struct mac_native *mac_p); }
 388	AUE_NULL	STD	{ int __mac_set_fd(int fd, \
-				    struct mac *mac_p); }
+				    struct mac_native *mac_p); }
 389	AUE_NULL	STD	{ int __mac_set_file(const char *path_p, \
-				    struct mac *mac_p); }
+				    struct mac_native *mac_p); }
 390	AUE_NULL	STD	{ int kenv(int what, const char *name, \
 				    char *value, int len); }
 391	AUE_LCHFLAGS	STD	{ int lchflags(const char *path, \
@@ -737,11 +739,11 @@
 407	AUE_SEMGETVALUE	NOSTD	{ int ksem_getvalue(semid_t id, int *val); }
 408	AUE_SEMDESTROY	NOSTD	{ int ksem_destroy(semid_t id); }
 409	AUE_NULL	STD	{ int __mac_get_pid(pid_t pid, \
-				    struct mac *mac_p); }
+				    struct mac_native *mac_p); }
 410	AUE_NULL	STD	{ int __mac_get_link(const char *path_p, \
-				    struct mac *mac_p); }
+				    struct mac_native *mac_p); }
 411	AUE_NULL	STD	{ int __mac_set_link(const char *path_p, \
-				    struct mac *mac_p); }
+				    struct mac_native *mac_p); }
 412	AUE_EXTATTR_SET_LINK	STD	{ ssize_t extattr_set_link( \
 				    const char *path, int attrnamespace, \
 				    const char *attrname, void *data, \
@@ -754,7 +756,7 @@
 				    const char *path, int attrnamespace, \
 				    const char *attrname); }
 415	AUE_NULL	STD	{ int __mac_execve(char *fname, char **argv, \
-				    char **envv, struct mac *mac_p); }
+				    char **envv, struct mac_native *mac_p); }
 416	AUE_SIGACTION	STD	{ int sigaction(int sig, \
 				    const struct sigaction *act, \
 				    struct sigaction *oact); }

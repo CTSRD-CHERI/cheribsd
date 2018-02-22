@@ -684,26 +684,26 @@ struct cheriabi_nmount_args {
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct cheriabi___mac_get_proc_args {
-	char mac_p_l_[PADL_(struct mac_c *)]; struct mac_c * mac_p; char mac_p_r_[PADR_(struct mac_c *)];
+	char mac_p_l_[PADL_(struct mac_c *__capability)]; struct mac_c *__capability mac_p; char mac_p_r_[PADR_(struct mac_c *__capability)];
 };
 struct cheriabi___mac_set_proc_args {
-	char mac_p_l_[PADL_(struct mac_c *)]; struct mac_c * mac_p; char mac_p_r_[PADR_(struct mac_c *)];
+	char mac_p_l_[PADL_(struct mac_c *__capability)]; struct mac_c *__capability mac_p; char mac_p_r_[PADR_(struct mac_c *__capability)];
 };
 struct cheriabi___mac_get_fd_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char mac_p_l_[PADL_(struct mac_c *)]; struct mac_c * mac_p; char mac_p_r_[PADR_(struct mac_c *)];
+	char mac_p_l_[PADL_(struct mac_c *__capability)]; struct mac_c *__capability mac_p; char mac_p_r_[PADR_(struct mac_c *__capability)];
 };
 struct cheriabi___mac_get_file_args {
-	char path_p_l_[PADL_(const char *)]; const char * path_p; char path_p_r_[PADR_(const char *)];
-	char mac_p_l_[PADL_(struct mac_c *)]; struct mac_c * mac_p; char mac_p_r_[PADR_(struct mac_c *)];
+	char path_p_l_[PADL_(const char *__capability)]; const char *__capability path_p; char path_p_r_[PADR_(const char *__capability)];
+	char mac_p_l_[PADL_(struct mac_c *__capability)]; struct mac_c *__capability mac_p; char mac_p_r_[PADR_(struct mac_c *__capability)];
 };
 struct cheriabi___mac_set_fd_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char mac_p_l_[PADL_(struct mac_c *)]; struct mac_c * mac_p; char mac_p_r_[PADR_(struct mac_c *)];
+	char mac_p_l_[PADL_(struct mac_c *__capability)]; struct mac_c *__capability mac_p; char mac_p_r_[PADR_(struct mac_c *__capability)];
 };
 struct cheriabi___mac_set_file_args {
-	char path_p_l_[PADL_(const char *)]; const char * path_p; char path_p_r_[PADR_(const char *)];
-	char mac_p_l_[PADL_(struct mac_c *)]; struct mac_c * mac_p; char mac_p_r_[PADR_(struct mac_c *)];
+	char path_p_l_[PADL_(const char *__capability)]; const char *__capability path_p; char path_p_r_[PADR_(const char *__capability)];
+	char mac_p_l_[PADL_(struct mac_c *__capability)]; struct mac_c *__capability mac_p; char mac_p_r_[PADR_(struct mac_c *__capability)];
 };
 struct cheriabi_kenv_args {
 	char what_l_[PADL_(int)]; int what; char what_r_[PADR_(int)];
@@ -735,15 +735,15 @@ struct cheriabi_mac_syscall_args {
 };
 struct cheriabi___mac_get_pid_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
-	char mac_p_l_[PADL_(struct mac_c *)]; struct mac_c * mac_p; char mac_p_r_[PADR_(struct mac_c *)];
+	char mac_p_l_[PADL_(struct mac_c *__capability)]; struct mac_c *__capability mac_p; char mac_p_r_[PADR_(struct mac_c *__capability)];
 };
 struct cheriabi___mac_get_link_args {
-	char path_p_l_[PADL_(const char *)]; const char * path_p; char path_p_r_[PADR_(const char *)];
-	char mac_p_l_[PADL_(struct mac_c *)]; struct mac_c * mac_p; char mac_p_r_[PADR_(struct mac_c *)];
+	char path_p_l_[PADL_(const char *__capability)]; const char *__capability path_p; char path_p_r_[PADR_(const char *__capability)];
+	char mac_p_l_[PADL_(struct mac_c *__capability)]; struct mac_c *__capability mac_p; char mac_p_r_[PADR_(struct mac_c *__capability)];
 };
 struct cheriabi___mac_set_link_args {
-	char path_p_l_[PADL_(const char *)]; const char * path_p; char path_p_r_[PADR_(const char *)];
-	char mac_p_l_[PADL_(struct mac_c *)]; struct mac_c * mac_p; char mac_p_r_[PADR_(struct mac_c *)];
+	char path_p_l_[PADL_(const char *__capability)]; const char *__capability path_p; char path_p_r_[PADR_(const char *__capability)];
+	char mac_p_l_[PADL_(struct mac_c *__capability)]; struct mac_c *__capability mac_p; char mac_p_r_[PADR_(struct mac_c *__capability)];
 };
 struct cheriabi_extattr_set_link_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];

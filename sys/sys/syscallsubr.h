@@ -133,7 +133,7 @@ int	kern_cpuset_setid(struct thread *td, cpuwhich_t which,
 	    id_t id, cpusetid_t setid);
 int	kern_dup(struct thread *td, u_int mode, int flags, int old, int new);
 int	kern_execve(struct thread *td, struct image_args *args,
-	    struct mac *mac_p);
+	    void * __capability mac_p);
 int	kern_extattrctl(struct thread *td, const char * __capability path,
 	    int cmd, const char * __capability filename, int attrnamespace,
 	    const char * __capability uattrname);
@@ -252,6 +252,18 @@ int	kern_lseek(struct thread *td, int fd, off_t offset, int whence);
 int	kern_lutimes(struct thread *td,
 	    const char * __capability path, enum uio_seg pathseg,
 	    const struct timeval * __capability tptr, enum uio_seg tptrseg);
+int	kern_mac_get_fd(struct thread *td, int fd, void * __capability mac_p);
+int	kern_mac_get_pid(struct thread *td, pid_t pid,
+	    void * __capability mac_p);
+int	kern_mac_get_path(struct thread *td, const char * __capability path_p,
+	    void * __capability mac_p, int follow);
+int	kern_mac_get_proc(struct thread *td, void * __capability mac_p);
+int	kern_mac_set_fd(struct thread *td, int fd, void * __capability mac_p);
+int	kern_mac_set_path(struct thread *td, const char * __capability path_p,
+	    void * __capability mac_p, int follow);
+int	kern_mac_set_proc(struct thread *td, void * __capability mac_p);
+int	kern_mac_syscall(struct thread *td, const char * __capability policy,
+	    int call, void * __capability arg);
 int	kern_madvise(struct thread *td, uintptr_t addr, size_t len, int behav);
 int	kern_mincore(struct thread *td, uintptr_t addr, size_t len,
 	    char * __capability vec);

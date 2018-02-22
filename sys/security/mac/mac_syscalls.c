@@ -56,8 +56,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/mutex.h>
 #include <sys/mac.h>
 #include <sys/proc.h>
-#include <sys/systm.h>
+#include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
+#include <sys/systm.h>
 #include <sys/sysproto.h>
 #include <sys/sysent.h>
 #include <sys/vnode.h>
@@ -76,21 +77,23 @@ __FBSDID("$FreeBSD$");
 
 FEATURE(security_mac, "Mandatory Access Control Framework support");
 
-static int	kern___mac_get_path(struct thread *td, const char *path_p,
-		    struct mac *mac_p, int follow);
-static int	kern___mac_set_path(struct thread *td, const char *path_p,
-		    struct mac *mac_p, int follow);
-
 int
 sys___mac_get_pid(struct thread *td, struct __mac_get_pid_args *uap)
 {
+
+	return (kern_mac_get_pid(td, uap->pid, __USER_CAP_OBJ(uap->mac_p)));
+}
+
+int
+kern_mac_get_pid(struct thread *td, pid_t pid, void * __capability mac_p)
+{
 	char *elements, *buffer;
-	struct mac mac;
+	kmac_t mac;
 	struct proc *tproc;
 	struct ucred *tcred;
 	int error;
 
-	error = copyin(uap->mac_p, &mac, sizeof(mac));
+	error = copyin_mac(mac_p, &mac);
 	if (error)
 		return (error);
 
@@ -98,7 +101,7 @@ sys___mac_get_pid(struct thread *td, struct __mac_get_pid_args *uap)
 	if (error)
 		return (error);
 
-	tproc = pfind(uap->pid);
+	tproc = pfind(pid);
 	if (tproc == NULL)
 		return (ESRCH);
 
@@ -111,7 +114,8 @@ sys___mac_get_pid(struct thread *td, struct __mac_get_pid_args *uap)
 		return (error);
 
 	elements = malloc(mac.m_buflen, M_MACTEMP, M_WAITOK);
-	error = copyinstr(mac.m_string, elements, mac.m_buflen, NULL);
+	error = copyinstr_c(mac.m_string,
+	    (__cheri_tocap char * __capability)elements, mac.m_buflen, NULL);
 	if (error) {
 		free(elements, M_MACTEMP);
 		crfree(tcred);
@@ -122,7 +126,8 @@ sys___mac_get_pid(struct thread *td, struct __mac_get_pid_args *uap)
 	error = mac_cred_externalize_label(tcred->cr_label, elements,
 	    buffer, mac.m_buflen);
 	if (error == 0)
-		error = copyout(buffer, mac.m_string, strlen(buffer)+1);
+		error = copyout_c((__cheri_tocap char * __capability)buffer,
+		    mac.m_string, strlen(buffer)+1);
 
 	free(buffer, M_MACTEMP);
 	free(elements, M_MACTEMP);
@@ -133,11 +138,18 @@ sys___mac_get_pid(struct thread *td, struct __mac_get_pid_args *uap)
 int
 sys___mac_get_proc(struct thread *td, struct __mac_get_proc_args *uap)
 {
+
+	return (kern_mac_get_proc(td, __USER_CAP_OBJ(uap->mac_p)));
+}
+
+int
+kern_mac_get_proc(struct thread *td, void * __capability mac_p)
+{
 	char *elements, *buffer;
-	struct mac mac;
+	kmac_t mac;
 	int error;
 
-	error = copyin(uap->mac_p, &mac, sizeof(mac));
+	error = copyin_mac(mac_p, &mac);
 	if (error)
 		return (error);
 
@@ -146,7 +158,8 @@ sys___mac_get_proc(struct thread *td, struct __mac_get_proc_args *uap)
 		return (error);
 
 	elements = malloc(mac.m_buflen, M_MACTEMP, M_WAITOK);
-	error = copyinstr(mac.m_string, elements, mac.m_buflen, NULL);
+	error = copyinstr_c(mac.m_string,
+	   (__cheri_tocap char * __capability)elements, mac.m_buflen, NULL);
 	if (error) {
 		free(elements, M_MACTEMP);
 		return (error);
@@ -156,7 +169,8 @@ sys___mac_get_proc(struct thread *td, struct __mac_get_proc_args *uap)
 	error = mac_cred_externalize_label(td->td_ucred->cr_label,
 	    elements, buffer, mac.m_buflen);
 	if (error == 0)
-		error = copyout(buffer, mac.m_string, strlen(buffer)+1);
+		error = copyout_c((__cheri_tocap char * __capability)buffer,
+		    mac.m_string, strlen(buffer)+1);
 
 	free(buffer, M_MACTEMP);
 	free(elements, M_MACTEMP);
@@ -166,17 +180,24 @@ sys___mac_get_proc(struct thread *td, struct __mac_get_proc_args *uap)
 int
 sys___mac_set_proc(struct thread *td, struct __mac_set_proc_args *uap)
 {
+
+	return (kern_mac_set_proc(td, __USER_CAP_OBJ(uap->mac_p)));
+}
+
+int
+kern_mac_set_proc(struct thread *td, void * __capability mac_p)
+{
 	struct ucred *newcred, *oldcred;
 	struct label *intlabel;
 	struct proc *p;
-	struct mac mac;
+	kmac_t mac;
 	char *buffer;
 	int error;
 
 	if (!(mac_labeled & MPC_OBJECT_CRED))
 		return (EINVAL);
 
-	error = copyin(uap->mac_p, &mac, sizeof(mac));
+	error = copyin_mac(mac_p, &mac);
 	if (error)
 		return (error);
 
@@ -185,7 +206,8 @@ sys___mac_set_proc(struct thread *td, struct __mac_set_proc_args *uap)
 		return (error);
 
 	buffer = malloc(mac.m_buflen, M_MACTEMP, M_WAITOK);
-	error = copyinstr(mac.m_string, buffer, mac.m_buflen, NULL);
+	error = copyinstr_c(mac.m_string,
+	    (__cheri_tocap char * __capability)buffer, mac.m_buflen, NULL);
 	if (error) {
 		free(buffer, M_MACTEMP);
 		return (error);
@@ -227,10 +249,17 @@ out:
 int
 sys___mac_get_fd(struct thread *td, struct __mac_get_fd_args *uap)
 {
+
+	return (kern_mac_get_fd(td, uap->fd, __USER_CAP_OBJ(uap->mac_p)));
+}
+
+int
+kern_mac_get_fd(struct thread *td, int fd, void * __capability mac_p)
+{
 	char *elements, *buffer;
 	struct label *intlabel;
 	struct file *fp;
-	struct mac mac;
+	kmac_t mac;
 	struct vnode *vp;
 	struct pipe *pipe;
 	struct socket *so;
@@ -238,7 +267,7 @@ sys___mac_get_fd(struct thread *td, struct __mac_get_fd_args *uap)
 	short label_type;
 	int error;
 
-	error = copyin(uap->mac_p, &mac, sizeof(mac));
+	error = copyin_mac(mac_p, &mac);
 	if (error)
 		return (error);
 
@@ -247,14 +276,15 @@ sys___mac_get_fd(struct thread *td, struct __mac_get_fd_args *uap)
 		return (error);
 
 	elements = malloc(mac.m_buflen, M_MACTEMP, M_WAITOK);
-	error = copyinstr(mac.m_string, elements, mac.m_buflen, NULL);
+	error = copyinstr_c(mac.m_string,
+	    (__cheri_tocap char * __capability)elements, mac.m_buflen, NULL);
 	if (error) {
 		free(elements, M_MACTEMP);
 		return (error);
 	}
 
 	buffer = malloc(mac.m_buflen, M_MACTEMP, M_WAITOK | M_ZERO);
-	error = fget(td, uap->fd, cap_rights_init(&rights, CAP_MAC_GET), &fp);
+	error = fget(td, fd, cap_rights_init(&rights, CAP_MAC_GET), &fp);
 	if (error)
 		goto out;
 
@@ -310,7 +340,8 @@ sys___mac_get_fd(struct thread *td, struct __mac_get_fd_args *uap)
 		error = EINVAL;
 	}
 	if (error == 0)
-		error = copyout(buffer, mac.m_string, strlen(buffer)+1);
+		error = copyout_c((__cheri_tocap char * __capability)buffer,
+		    mac.m_string, strlen(buffer)+1);
 out_fdrop:
 	fdrop(fp, td);
 out:
@@ -323,30 +354,32 @@ int
 sys___mac_get_file(struct thread *td, struct __mac_get_file_args *uap)
 {
 
-	return (kern___mac_get_path(td, uap->path_p, uap->mac_p, FOLLOW));
+	return (kern_mac_get_path(td, __USER_CAP_STR(uap->path_p),
+	    __USER_CAP_OBJ(uap->mac_p), FOLLOW));
 }
 
 int
 sys___mac_get_link(struct thread *td, struct __mac_get_link_args *uap)
 {
 
-	return (kern___mac_get_path(td, uap->path_p, uap->mac_p, NOFOLLOW));
+	return (kern_mac_get_path(td, __USER_CAP_STR(uap->path_p),
+	    __USER_CAP_OBJ(uap->mac_p), NOFOLLOW));
 }
 
-static int
-kern___mac_get_path(struct thread *td, const char *path_p, struct mac *mac_p,
-   int follow)
+int
+kern_mac_get_path(struct thread *td, const char * __capability path_p,
+   void * __capability mac_p, int follow)
 {
 	char *elements, *buffer;
 	struct nameidata nd;
 	struct label *intlabel;
-	struct mac mac;
+	kmac_t mac;
 	int error;
 
 	if (!(mac_labeled & MPC_OBJECT_VNODE))
 		return (EINVAL);
 
-	error = copyin(mac_p, &mac, sizeof(mac));
+	error = copyin_mac(mac_p, &mac);
 	if (error)
 		return (error);
 
@@ -355,14 +388,15 @@ kern___mac_get_path(struct thread *td, const char *path_p, struct mac *mac_p,
 		return (error);
 
 	elements = malloc(mac.m_buflen, M_MACTEMP, M_WAITOK);
-	error = copyinstr(mac.m_string, elements, mac.m_buflen, NULL);
+	error = copyinstr_c(mac.m_string,
+	    (__cheri_tocap char * __capability)elements, mac.m_buflen, NULL);
 	if (error) {
 		free(elements, M_MACTEMP);
 		return (error);
 	}
 
 	buffer = malloc(mac.m_buflen, M_MACTEMP, M_WAITOK | M_ZERO);
-	NDINIT(&nd, LOOKUP, LOCKLEAF | follow, UIO_USERSPACE, path_p, td);
+	NDINIT_C(&nd, LOOKUP, LOCKLEAF | follow, UIO_USERSPACE, path_p, td);
 	error = namei(&nd);
 	if (error)
 		goto out;
@@ -375,7 +409,8 @@ kern___mac_get_path(struct thread *td, const char *path_p, struct mac *mac_p,
 	mac_vnode_label_free(intlabel);
 
 	if (error == 0)
-		error = copyout(buffer, mac.m_string, strlen(buffer)+1);
+		error = copyout_c( (__cheri_tocap char * __capability)buffer,
+		    mac.m_string, strlen(buffer)+1);
 
 out:
 	free(buffer, M_MACTEMP);
@@ -387,18 +422,25 @@ out:
 int
 sys___mac_set_fd(struct thread *td, struct __mac_set_fd_args *uap)
 {
+
+	return (kern_mac_set_fd(td, uap->fd, __USER_CAP_OBJ(uap->mac_p)));
+}
+
+int
+kern_mac_set_fd(struct thread *td, int fd, void * __capability mac_p)
+{
 	struct label *intlabel;
 	struct pipe *pipe;
 	struct socket *so;
 	struct file *fp;
 	struct mount *mp;
 	struct vnode *vp;
-	struct mac mac;
+	kmac_t mac;
 	cap_rights_t rights;
 	char *buffer;
 	int error;
 
-	error = copyin(uap->mac_p, &mac, sizeof(mac));
+	error = copyin_mac(mac_p, &mac);
 	if (error)
 		return (error);
 
@@ -407,13 +449,14 @@ sys___mac_set_fd(struct thread *td, struct __mac_set_fd_args *uap)
 		return (error);
 
 	buffer = malloc(mac.m_buflen, M_MACTEMP, M_WAITOK);
-	error = copyinstr(mac.m_string, buffer, mac.m_buflen, NULL);
+	error = copyinstr_c(mac.m_string,
+	    (__cheri_tocap char * __capability)buffer, mac.m_buflen, NULL);
 	if (error) {
 		free(buffer, M_MACTEMP);
 		return (error);
 	}
 
-	error = fget(td, uap->fd, cap_rights_init(&rights, CAP_MAC_SET), &fp);
+	error = fget(td, fd, cap_rights_init(&rights, CAP_MAC_SET), &fp);
 	if (error)
 		goto out;
 
@@ -489,31 +532,33 @@ int
 sys___mac_set_file(struct thread *td, struct __mac_set_file_args *uap)
 {
 
-	return (kern___mac_set_path(td, uap->path_p, uap->mac_p, FOLLOW));
+	return (kern_mac_set_path(td, __USER_CAP_STR(uap->path_p),
+	    __USER_CAP_OBJ(uap->mac_p), FOLLOW));
 }
 
 int
 sys___mac_set_link(struct thread *td, struct __mac_set_link_args *uap)
 {
 
-	return (kern___mac_set_path(td, uap->path_p, uap->mac_p, NOFOLLOW));
+	return (kern_mac_set_path(td, __USER_CAP_STR(uap->path_p),
+	    __USER_CAP_OBJ(uap->mac_p), NOFOLLOW));
 }
 
-static int
-kern___mac_set_path(struct thread *td, const char *path_p, struct mac *mac_p,
-    int follow)
+int
+kern_mac_set_path(struct thread *td, const char * __capability path_p,
+    void * __capability mac_p, int follow)
 {
 	struct label *intlabel;
 	struct nameidata nd;
 	struct mount *mp;
-	struct mac mac;
+	kmac_t mac;
 	char *buffer;
 	int error;
 
 	if (!(mac_labeled & MPC_OBJECT_VNODE))
 		return (EINVAL);
 
-	error = copyin(mac_p, &mac, sizeof(mac));
+	error = copyin_mac(mac_p, &mac);
 	if (error)
 		return (error);
 
@@ -522,7 +567,8 @@ kern___mac_set_path(struct thread *td, const char *path_p, struct mac *mac_p,
 		return (error);
 
 	buffer = malloc(mac.m_buflen, M_MACTEMP, M_WAITOK);
-	error = copyinstr(mac.m_string, buffer, mac.m_buflen, NULL);
+	error = copyinstr_c(mac.m_string,
+	    (__cheri_tocap char * __capability)buffer, mac.m_buflen, NULL);
 	if (error) {
 		free(buffer, M_MACTEMP);
 		return (error);
@@ -534,7 +580,7 @@ kern___mac_set_path(struct thread *td, const char *path_p, struct mac *mac_p,
 	if (error)
 		goto out;
 
-	NDINIT(&nd, LOOKUP, LOCKLEAF | follow, UIO_USERSPACE, path_p, td);
+	NDINIT_C(&nd, LOOKUP, LOCKLEAF | follow, UIO_USERSPACE, path_p, td);
 	error = namei(&nd);
 	if (error == 0) {
 		error = vn_start_write(nd.ni_vp, &mp, V_WAIT | PCATCH);
@@ -554,11 +600,20 @@ out:
 int
 sys_mac_syscall(struct thread *td, struct mac_syscall_args *uap)
 {
+
+	return (kern_mac_syscall(td, __USER_CAP_STR(uap->policy), uap->call,
+	    __USER_CAP_UNBOUND(uap->arg)));
+}
+
+int
+kern_mac_syscall(struct thread *td, const char * __capability policy, int call,
+    void * __capability arg)
+{
 	struct mac_policy_conf *mpc;
 	char target[MAC_MAX_POLICY_NAME];
 	int error;
 
-	error = copyinstr(uap->policy, target, sizeof(target), NULL);
+	error = copyinstr_c(policy, &target[0], sizeof(target), NULL);
 	if (error)
 		return (error);
 
@@ -566,8 +621,7 @@ sys_mac_syscall(struct thread *td, struct mac_syscall_args *uap)
 	LIST_FOREACH(mpc, &mac_static_policy_list, mpc_list) {
 		if (strcmp(mpc->mpc_name, target) == 0 &&
 		    mpc->mpc_ops->mpo_syscall != NULL) {
-			error = mpc->mpc_ops->mpo_syscall(td,
-			    uap->call, uap->arg);
+			error = mpc->mpc_ops->mpo_syscall(td, call, arg);
 			goto out;
 		}
 	}
@@ -577,8 +631,8 @@ sys_mac_syscall(struct thread *td, struct mac_syscall_args *uap)
 		LIST_FOREACH(mpc, &mac_policy_list, mpc_list) {
 			if (strcmp(mpc->mpc_name, target) == 0 &&
 			    mpc->mpc_ops->mpo_syscall != NULL) {
-				error = mpc->mpc_ops->mpo_syscall(td,
-				    uap->call, uap->arg);
+				error = mpc->mpc_ops->mpo_syscall(td, call,
+				    arg);
 				break;
 			}
 		}

@@ -60,6 +60,8 @@
 #include <net80211/ieee80211_ioctl.h>
 #include <net80211/ieee80211_radiotap.h>
 
+#include <security/mac/mac_framework.h>
+
 #include <cam/scsi/scsi_sg.h>
 #include <dev/ath/if_athioctl.h>
 #include <dev/de/dc21040reg.h>

@@ -1717,13 +1717,6 @@ cheriabi_mount(struct thread *td, struct cheriabi_mount_args *uap)
 }
 
 int
-cheriabi_mac_syscall(struct thread *td, struct cheriabi_mac_syscall_args *uap)
-{
-
-	return (ENOSYS);
-}
-
-int
 cheriabi_kenv(struct thread *td, struct cheriabi_kenv_args *uap)
 {
 

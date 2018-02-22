@@ -135,6 +135,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/stat.h>
 #include <sys/sx.h>
 #include <sys/sysctl.h>
+#include <sys/sysent.h>
 #include <sys/taskqueue.h>
 #include <sys/uio.h>
 #include <sys/jail.h>
@@ -2695,9 +2696,15 @@ sooptcopyin(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
 	if (valsize > len)
 		sopt->sopt_valsize = valsize = len;
 
-	if (sopt->sopt_td != NULL)
-		return (copyin_c(sopt->sopt_val,
-		   (__cheri_tocap void * __capability)buf, valsize));
+	if (sopt->sopt_td != NULL) {
+		if (sopt->sopt_dir == SOPT_SETCAP ||
+		    sopt->sopt_dir == SOPT_GETCAP)
+			return (copyincap_c(sopt->sopt_val,
+			   (__cheri_tocap void * __capability)buf, valsize));
+		else
+			return (copyin_c(sopt->sopt_val,
+			   (__cheri_tocap void * __capability)buf, valsize));
+	}
 
 	bcopy((__cheri_fromcap void *)sopt->sopt_val, buf, valsize);
 	return (0);
@@ -2732,7 +2739,7 @@ sosetopt(struct socket *so, struct sockopt *sopt)
 	sbintime_t val;
 	uint32_t val32;
 #ifdef MAC
-	struct mac extmac;
+	kmac_t extmac;
 #endif
 
 	CURVNET_SET(so->so_vnet);
@@ -2911,8 +2918,22 @@ sosetopt(struct socket *so, struct sockopt *sopt)
 				error = EOPNOTSUPP;
 			else
 #endif
+#ifdef COMPAT_CHERIABI
+			if (SV_CURPROC_FLAG(SV_CHERI)) {
+				sopt->sopt_dir = SOPT_SETCAP;
 				error = sooptcopyin(sopt, &extmac,
 				    sizeof extmac, sizeof extmac);
+				sopt->sopt_dir = SOPT_SET;
+			} else
+#endif
+			{
+				struct mac_native tmpmac;
+				error = sooptcopyin(sopt, &tmpmac,
+				    sizeof tmpmac, sizeof tmpmac);
+				extmac.m_buflen = tmpmac.m_buflen;
+				extmac.m_string = __USER_CAP(tmpmac.m_string,
+				    tmpmac.m_buflen);
+			}
 			if (error)
 				goto bad;
 			error = mac_setsockopt_label(sopt->sopt_td->td_ucred,
@@ -2980,11 +3001,14 @@ sooptcopyout(struct sockopt *sopt, const void *buf, size_t len)
 	valsize = min(len, sopt->sopt_valsize);
 	sopt->sopt_valsize = valsize;
 	if (sopt->sopt_val != NULL) {
-		if (sopt->sopt_td != NULL)
+		if (sopt->sopt_td != NULL) {
+			KASSERT(sopt->sopt_dir != SOPT_GETCAP &&
+			   sopt->sopt_dir != SOPT_SETCAP,
+			   ("exporting capabilities not supproted"));
 			error = copyout_c(
 			    (__cheri_tocap const void * __capability)buf,
 			    sopt->sopt_val, valsize);
-		else
+		} else
 			bcopy(buf, (__cheri_fromcap void *)sopt->sopt_val,
 			    valsize);
 	}
@@ -2998,7 +3022,7 @@ sogetopt(struct socket *so, struct sockopt *sopt)
 	struct	linger l;
 	struct	timeval tv;
 #ifdef MAC
-	struct mac extmac;
+	kmac_t extmac;
 #endif
 
 	CURVNET_SET(so->so_vnet);
@@ -3095,8 +3119,22 @@ integer:
 				error = EOPNOTSUPP;
 			else
 #endif
+#ifdef COMPAT_CHERIABI
+			if (SV_CURPROC_FLAG(SV_CHERI)) {
+				sopt->sopt_dir = SOPT_GETCAP;
 				error = sooptcopyin(sopt, &extmac,
-				    sizeof(extmac), sizeof(extmac));
+				    sizeof extmac, sizeof extmac);
+				sopt->sopt_dir = SOPT_GET;
+			} else
+#endif
+			{
+				struct mac_native tmpmac;
+				error = sooptcopyin(sopt, &tmpmac,
+				    sizeof tmpmac, sizeof tmpmac);
+				extmac.m_buflen = tmpmac.m_buflen;
+				extmac.m_string = __USER_CAP(tmpmac.m_string,
+				    tmpmac.m_buflen);
+			}
 			if (error)
 				goto bad;
 			error = mac_getsockopt_label(sopt->sopt_td->td_ucred,
@@ -3116,8 +3154,22 @@ integer:
 				error = EOPNOTSUPP;
 			else
 #endif
+#ifdef COMPAT_CHERIABI
+			if (SV_CURPROC_FLAG(SV_CHERI)) {
+				sopt->sopt_dir = SOPT_GETCAP;
 				error = sooptcopyin(sopt, &extmac,
-				    sizeof(extmac), sizeof(extmac));
+				    sizeof extmac, sizeof extmac);
+				sopt->sopt_dir = SOPT_GET;
+			} else
+#endif
+			{
+				struct mac_native tmpmac;
+				error = sooptcopyin(sopt, &tmpmac,
+				    sizeof tmpmac, sizeof tmpmac);
+				extmac.m_buflen = tmpmac.m_buflen;
+				extmac.m_string = __USER_CAP(tmpmac.m_string,
+				    tmpmac.m_buflen);
+			}
 			if (error)
 				goto bad;
 			error = mac_getsockopt_peerlabel(

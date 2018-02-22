@@ -1792,14 +1792,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi___mac_get_proc */
 	case 384: {
 		struct cheriabi___mac_get_proc_args *p = params;
-		uarg[0] = (intptr_t) p->mac_p; /* struct mac_c * */
+		uarg[0] = (cheri_getbase(p->mac_p) + cheri_getoffset(p->mac_p)); /* struct mac_c *__capability */
 		*n_args = 1;
 		break;
 	}
 	/* cheriabi___mac_set_proc */
 	case 385: {
 		struct cheriabi___mac_set_proc_args *p = params;
-		uarg[0] = (intptr_t) p->mac_p; /* struct mac_c * */
+		uarg[0] = (cheri_getbase(p->mac_p) + cheri_getoffset(p->mac_p)); /* struct mac_c *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -1807,15 +1807,15 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 386: {
 		struct cheriabi___mac_get_fd_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->mac_p; /* struct mac_c * */
+		uarg[1] = (cheri_getbase(p->mac_p) + cheri_getoffset(p->mac_p)); /* struct mac_c *__capability */
 		*n_args = 2;
 		break;
 	}
 	/* cheriabi___mac_get_file */
 	case 387: {
 		struct cheriabi___mac_get_file_args *p = params;
-		uarg[0] = (intptr_t) p->path_p; /* const char * */
-		uarg[1] = (intptr_t) p->mac_p; /* struct mac_c * */
+		uarg[0] = (cheri_getbase(p->path_p) + cheri_getoffset(p->path_p)); /* const char *__capability */
+		uarg[1] = (cheri_getbase(p->mac_p) + cheri_getoffset(p->mac_p)); /* struct mac_c *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -1823,15 +1823,15 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 388: {
 		struct cheriabi___mac_set_fd_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->mac_p; /* struct mac_c * */
+		uarg[1] = (cheri_getbase(p->mac_p) + cheri_getoffset(p->mac_p)); /* struct mac_c *__capability */
 		*n_args = 2;
 		break;
 	}
 	/* cheriabi___mac_set_file */
 	case 389: {
 		struct cheriabi___mac_set_file_args *p = params;
-		uarg[0] = (intptr_t) p->path_p; /* const char * */
-		uarg[1] = (intptr_t) p->mac_p; /* struct mac_c * */
+		uarg[0] = (cheri_getbase(p->path_p) + cheri_getoffset(p->path_p)); /* const char *__capability */
+		uarg[1] = (cheri_getbase(p->mac_p) + cheri_getoffset(p->mac_p)); /* struct mac_c *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -1887,23 +1887,23 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 409: {
 		struct cheriabi___mac_get_pid_args *p = params;
 		iarg[0] = p->pid; /* pid_t */
-		uarg[1] = (intptr_t) p->mac_p; /* struct mac_c * */
+		uarg[1] = (cheri_getbase(p->mac_p) + cheri_getoffset(p->mac_p)); /* struct mac_c *__capability */
 		*n_args = 2;
 		break;
 	}
 	/* cheriabi___mac_get_link */
 	case 410: {
 		struct cheriabi___mac_get_link_args *p = params;
-		uarg[0] = (intptr_t) p->path_p; /* const char * */
-		uarg[1] = (intptr_t) p->mac_p; /* struct mac_c * */
+		uarg[0] = (cheri_getbase(p->path_p) + cheri_getoffset(p->path_p)); /* const char *__capability */
+		uarg[1] = (cheri_getbase(p->mac_p) + cheri_getoffset(p->mac_p)); /* struct mac_c *__capability */
 		*n_args = 2;
 		break;
 	}
 	/* cheriabi___mac_set_link */
 	case 411: {
 		struct cheriabi___mac_set_link_args *p = params;
-		uarg[0] = (intptr_t) p->path_p; /* const char * */
-		uarg[1] = (intptr_t) p->mac_p; /* struct mac_c * */
+		uarg[0] = (cheri_getbase(p->path_p) + cheri_getoffset(p->path_p)); /* const char *__capability */
+		uarg[1] = (cheri_getbase(p->mac_p) + cheri_getoffset(p->mac_p)); /* struct mac_c *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -5954,7 +5954,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 384:
 		switch(ndx) {
 		case 0:
-			p = "userland struct mac_c *";
+			p = "userland struct mac_c *__capability";
 			break;
 		default:
 			break;
@@ -5964,7 +5964,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 385:
 		switch(ndx) {
 		case 0:
-			p = "userland struct mac_c *";
+			p = "userland struct mac_c *__capability";
 			break;
 		default:
 			break;
@@ -5977,7 +5977,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct mac_c *";
+			p = "userland struct mac_c *__capability";
 			break;
 		default:
 			break;
@@ -5987,10 +5987,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 387:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
-			p = "userland struct mac_c *";
+			p = "userland struct mac_c *__capability";
 			break;
 		default:
 			break;
@@ -6003,7 +6003,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct mac_c *";
+			p = "userland struct mac_c *__capability";
 			break;
 		default:
 			break;
@@ -6013,10 +6013,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 389:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
-			p = "userland struct mac_c *";
+			p = "userland struct mac_c *__capability";
 			break;
 		default:
 			break;
@@ -6118,7 +6118,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "pid_t";
 			break;
 		case 1:
-			p = "userland struct mac_c *";
+			p = "userland struct mac_c *__capability";
 			break;
 		default:
 			break;
@@ -6128,10 +6128,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 410:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
-			p = "userland struct mac_c *";
+			p = "userland struct mac_c *__capability";
 			break;
 		default:
 			break;
@@ -6141,10 +6141,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 411:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
-			p = "userland struct mac_c *";
+			p = "userland struct mac_c *__capability";
 			break;
 		default:
 			break;

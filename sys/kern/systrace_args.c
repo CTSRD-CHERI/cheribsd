@@ -1900,14 +1900,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* __mac_get_proc */
 	case 384: {
 		struct __mac_get_proc_args *p = params;
-		uarg[0] = (intptr_t) p->mac_p; /* struct mac * */
+		uarg[0] = (intptr_t) p->mac_p; /* struct mac_native * */
 		*n_args = 1;
 		break;
 	}
 	/* __mac_set_proc */
 	case 385: {
 		struct __mac_set_proc_args *p = params;
-		uarg[0] = (intptr_t) p->mac_p; /* struct mac * */
+		uarg[0] = (intptr_t) p->mac_p; /* struct mac_native * */
 		*n_args = 1;
 		break;
 	}
@@ -1915,7 +1915,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 386: {
 		struct __mac_get_fd_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->mac_p; /* struct mac * */
+		uarg[1] = (intptr_t) p->mac_p; /* struct mac_native * */
 		*n_args = 2;
 		break;
 	}
@@ -1923,7 +1923,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 387: {
 		struct __mac_get_file_args *p = params;
 		uarg[0] = (intptr_t) p->path_p; /* const char * */
-		uarg[1] = (intptr_t) p->mac_p; /* struct mac * */
+		uarg[1] = (intptr_t) p->mac_p; /* struct mac_native * */
 		*n_args = 2;
 		break;
 	}
@@ -1931,7 +1931,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 388: {
 		struct __mac_set_fd_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->mac_p; /* struct mac * */
+		uarg[1] = (intptr_t) p->mac_p; /* struct mac_native * */
 		*n_args = 2;
 		break;
 	}
@@ -1939,7 +1939,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 389: {
 		struct __mac_set_file_args *p = params;
 		uarg[0] = (intptr_t) p->path_p; /* const char * */
-		uarg[1] = (intptr_t) p->mac_p; /* struct mac * */
+		uarg[1] = (intptr_t) p->mac_p; /* struct mac_native * */
 		*n_args = 2;
 		break;
 	}
@@ -2064,7 +2064,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 409: {
 		struct __mac_get_pid_args *p = params;
 		iarg[0] = p->pid; /* pid_t */
-		uarg[1] = (intptr_t) p->mac_p; /* struct mac * */
+		uarg[1] = (intptr_t) p->mac_p; /* struct mac_native * */
 		*n_args = 2;
 		break;
 	}
@@ -2072,7 +2072,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 410: {
 		struct __mac_get_link_args *p = params;
 		uarg[0] = (intptr_t) p->path_p; /* const char * */
-		uarg[1] = (intptr_t) p->mac_p; /* struct mac * */
+		uarg[1] = (intptr_t) p->mac_p; /* struct mac_native * */
 		*n_args = 2;
 		break;
 	}
@@ -2080,7 +2080,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 411: {
 		struct __mac_set_link_args *p = params;
 		uarg[0] = (intptr_t) p->path_p; /* const char * */
-		uarg[1] = (intptr_t) p->mac_p; /* struct mac * */
+		uarg[1] = (intptr_t) p->mac_p; /* struct mac_native * */
 		*n_args = 2;
 		break;
 	}
@@ -2121,7 +2121,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		uarg[0] = (intptr_t) p->fname; /* char * */
 		uarg[1] = (intptr_t) p->argv; /* char ** */
 		uarg[2] = (intptr_t) p->envv; /* char ** */
-		uarg[3] = (intptr_t) p->mac_p; /* struct mac * */
+		uarg[3] = (intptr_t) p->mac_p; /* struct mac_native * */
 		*n_args = 4;
 		break;
 	}
@@ -6333,7 +6333,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 384:
 		switch(ndx) {
 		case 0:
-			p = "userland struct mac *";
+			p = "userland struct mac_native *";
 			break;
 		default:
 			break;
@@ -6343,7 +6343,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 385:
 		switch(ndx) {
 		case 0:
-			p = "userland struct mac *";
+			p = "userland struct mac_native *";
 			break;
 		default:
 			break;
@@ -6356,7 +6356,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct mac *";
+			p = "userland struct mac_native *";
 			break;
 		default:
 			break;
@@ -6369,7 +6369,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland struct mac *";
+			p = "userland struct mac_native *";
 			break;
 		default:
 			break;
@@ -6382,7 +6382,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct mac *";
+			p = "userland struct mac_native *";
 			break;
 		default:
 			break;
@@ -6395,7 +6395,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland struct mac *";
+			p = "userland struct mac_native *";
 			break;
 		default:
 			break;
@@ -6605,7 +6605,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "pid_t";
 			break;
 		case 1:
-			p = "userland struct mac *";
+			p = "userland struct mac_native *";
 			break;
 		default:
 			break;
@@ -6618,7 +6618,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland struct mac *";
+			p = "userland struct mac_native *";
 			break;
 		default:
 			break;
@@ -6631,7 +6631,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland struct mac *";
+			p = "userland struct mac_native *";
 			break;
 		default:
 			break;
@@ -6710,7 +6710,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland char **";
 			break;
 		case 3:
-			p = "userland struct mac *";
+			p = "userland struct mac_native *";
 			break;
 		default:
 			break;

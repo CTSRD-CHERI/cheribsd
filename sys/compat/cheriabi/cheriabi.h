@@ -247,11 +247,6 @@ struct kinfo_proc_c {
 	long	ki_tdflags;
 };
 
-struct mac_c {
-	size_t		m_buflen;
-	char * __capability	m_string;
-};
-
 struct kld_file_stat_c {
     int		version;	/* set to sizeof(struct kld_file_stat_c) */
     char        name[MAXPATHLEN];
