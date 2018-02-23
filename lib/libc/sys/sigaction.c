@@ -68,7 +68,10 @@ cheriabi_sigaction(int sig, const struct sigaction *act,
 	 */
 	if (cheri_gettag(act)) {
 		struct sigaction copy;
-		printf("%s: setting cgp for sigaction(%d) to %#p\n", __func__, sig, cgp);
+#if 0
+		printf("%s: setting cgp for sigaction(%d) to %#p\n", __func__,
+		    sig, cgp);
+#endif
 		memcpy(&copy, act, sizeof(copy));
 		copy.sa_cgp = cgp;
 		return (__libc_sigaction(sig, &copy, oact));
