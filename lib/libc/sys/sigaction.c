@@ -67,11 +67,11 @@ cheriabi_sigaction(int sig, const struct sigaction *act,
 	 * so we can safely dereference act if it is tagged.
 	 */
 	if (cheri_gettag(act)) {
-		// printf("%s: setting cgp for sigaction(%d) to %#p\n", __func__, sig, cgp);
 		struct sigaction copy;
+		printf("%s: setting cgp for sigaction(%d) to %#p\n", __func__, sig, cgp);
 		memcpy(&copy, act, sizeof(copy));
 		copy.sa_cgp = cgp;
-		act = &copy;
+		return (__libc_sigaction(sig, &copy, oact));
 	}
 
 	return (__libc_sigaction(sig, act, oact));
