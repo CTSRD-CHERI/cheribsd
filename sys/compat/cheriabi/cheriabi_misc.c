@@ -1008,7 +1008,17 @@ cheriabi_sigaction(struct thread *td, struct cheriabi_sigaction_args *uap)
 	int error, tag;
 
 	if (uap->act) {
-		error = copyincap(uap->act, &sa_c, sizeof(sa_c));
+		if (uap->actsz == sizeof(struct sigaction_c_compat)) {
+			// FIXME: locking?
+			printf("sigaction called from old cheriabi binary %s\n", td->td_proc->p_comm);
+		}
+		KASSERT(uap->actsz == sizeof(sa_c) ||
+		    uap->actsz == sizeof(struct sigaction_c_compat),
+		    ("Bad cheriabi_sigaction act size: %zd", uap->actsz));
+		/* Don't copy in the sa_cgp member if we are running an old
+		 * binary that doesn't have it */
+		bzero(&sa_c, sizeof(sa_c));
+		error = copyincap(uap->act, &sa_c, uap->actsz);
 		if (error)
 			return (error);
 		tag = cheri_gettag(sa_c.sa_u);
@@ -1043,10 +1053,15 @@ cheriabi_sigaction(struct thread *td, struct cheriabi_sigaction_args *uap)
 		SYSERRCAUSE("error in kern_sigaction_cap");
 	if (error == 0 && uap->oact != NULL) {
 		sa_c.sa_u = cap;
-		sa_c.sa_cgp = capglobals;
 		CP(osa, sa_c, sa_flags);
 		CP(osa, sa_c, sa_mask);
-		error = copyoutcap(&sa_c, uap->oact, sizeof(sa_c));
+		/* Only copy out the old cgp if called from a new binary */
+		if (uap->oactsz == sizeof(sa_c))
+			sa_c.sa_cgp = capglobals;
+		KASSERT(uap->oactsz == sizeof(sa_c) ||
+		    uap->oactsz == sizeof(struct sigaction_c_compat),
+		    ("Bad cheriabi_sigaction oact size: %zd", uap->oactsz));
+		error = copyoutcap(&sa_c, uap->oact, uap->oactsz);
 		if (error != 0) {
 			SYSERRCAUSE("error in copyoutcap");
 		}

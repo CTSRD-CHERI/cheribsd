@@ -100,4 +100,14 @@ void siginfo_to_siginfo_c(const siginfo_t *src, struct siginfo_c *dst);
 void * __capability cheriabi_extract_sival(union sigval *sival);
 void cheriabi_free_sival(union sigval *sival);
 
+/* TODO: is this the right location for this struct? */
+struct cheriabi_sigaction_args {
+	int sig;
+	struct sigaction_c *act;
+	struct sigaction_c *oact;
+	size_t actsz;
+	size_t oactsz;
+};
+
+
 #endif /* _COMPAT_CHERIABI_CHERIABI_SIGNAL_H_ */

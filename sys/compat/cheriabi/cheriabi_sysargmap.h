@@ -223,7 +223,6 @@
 #define	CHERIABI_SYS_extattr_get_link_PTRMASK	(0x0 | 0x1 | 0x4 | 0x8)
 #define	CHERIABI_SYS_extattr_delete_link_PTRMASK	(0x0 | 0x1 | 0x4)
 #define	CHERIABI_SYS_cheriabi___mac_execve_PTRMASK	(0x0 | 0x1 | 0x2 | 0x4 | 0x8)
-#define	CHERIABI_SYS_cheriabi_sigaction_PTRMASK	(0x0 | 0x2 | 0x4)
 #define	CHERIABI_SYS_cheriabi_sigreturn_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_getcontext_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_setcontext_PTRMASK	(0x0 | 0x1)

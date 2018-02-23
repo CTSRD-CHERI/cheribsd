@@ -280,11 +280,6 @@ struct cheriabi___mac_execve_args {
 	char envv_l_[PADL_(void *__capability *)]; void *__capability * envv; char envv_r_[PADR_(void *__capability *)];
 	char mac_p_l_[PADL_(struct mac_c *)]; struct mac_c * mac_p; char mac_p_r_[PADR_(struct mac_c *)];
 };
-struct cheriabi_sigaction_args {
-	char sig_l_[PADL_(int)]; int sig; char sig_r_[PADR_(int)];
-	char act_l_[PADL_(struct sigaction_c *)]; struct sigaction_c * act; char act_r_[PADR_(struct sigaction_c *)];
-	char oact_l_[PADL_(struct sigaction_c *)]; struct sigaction_c * oact; char oact_r_[PADR_(struct sigaction_c *)];
-};
 struct cheriabi_sigreturn_args {
 	char sigcntxp_l_[PADL_(const ucontext_c_t *)]; const ucontext_c_t * sigcntxp; char sigcntxp_r_[PADR_(const ucontext_c_t *)];
 };
