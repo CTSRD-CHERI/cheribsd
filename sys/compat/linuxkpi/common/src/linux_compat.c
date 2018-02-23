@@ -889,9 +889,7 @@ linux_dev_read(struct cdev *dev, struct uio *uio, int ioflag)
 		bytes = filp->f_op->read(filp, uio->uio_iov->iov_base,
 		    uio->uio_iov->iov_len, &uio->uio_offset);
 		if (bytes >= 0) {
-			uio->uio_iov->iov_base =
-			    ((uint8_t *)uio->uio_iov->iov_base) + bytes;
-			uio->uio_iov->iov_len -= bytes;
+			IOVEC_ADVANCE(uio->uio_iov, bytes);
 			uio->uio_resid -= bytes;
 		} else {
 			error = -bytes;
@@ -931,9 +929,7 @@ linux_dev_write(struct cdev *dev, struct uio *uio, int ioflag)
 		bytes = filp->f_op->write(filp, uio->uio_iov->iov_base,
 		    uio->uio_iov->iov_len, &uio->uio_offset);
 		if (bytes >= 0) {
-			uio->uio_iov->iov_base =
-			    ((uint8_t *)uio->uio_iov->iov_base) + bytes;
-			uio->uio_iov->iov_len -= bytes;
+			IOVEC_ADVANCE(uio->uio_iov, bytes);
 			uio->uio_resid -= bytes;
 		} else {
 			error = -bytes;
@@ -1252,9 +1248,7 @@ linux_file_read(struct file *file, struct uio *uio, struct ucred *active_cred,
 		bytes = filp->f_op->read(filp, uio->uio_iov->iov_base,
 		    uio->uio_iov->iov_len, &uio->uio_offset);
 		if (bytes >= 0) {
-			uio->uio_iov->iov_base =
-			    ((uint8_t *)uio->uio_iov->iov_base) + bytes;
-			uio->uio_iov->iov_len -= bytes;
+			IOVEC_ADVANCE(uio->uio_iov, bytes);
 			uio->uio_resid -= bytes;
 		} else
 			error = -bytes;

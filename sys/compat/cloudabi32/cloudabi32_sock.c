@@ -69,8 +69,7 @@ cloudabi32_sys_sock_recv(struct thread *td,
 			free(iov, M_SOCKET);
 			return (error);
 		}
-		iov[i].iov_base = TO_PTR(iovobj.buf);
-		iov[i].iov_len = iovobj.buf_len;
+		IOVEC_INIT(&iov[i], TO_PTR(iovobj.buf), iovobj.buf_len);
 	}
 
 	error = cloudabi_sock_recv(td, uap->sock, iov, ri.ri_data_len,
@@ -113,8 +112,7 @@ cloudabi32_sys_sock_send(struct thread *td,
 			free(iov, M_SOCKET);
 			return (error);
 		}
-		iov[i].iov_base = TO_PTR(iovobj.buf);
-		iov[i].iov_len = iovobj.buf_len;
+		IOVEC_INIT(&iov[i], TO_PTR(iovobj.buf), iovobj.buf_len);
 	}
 
 	error = cloudabi_sock_send(td, uap->sock, iov, si.si_data_len,

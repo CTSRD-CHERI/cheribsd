@@ -157,9 +157,7 @@ ffs_susp_rdwr(struct cdev *dev, struct uio *uio, int ioflag)
 				if (error != 0)
 					goto out;
 			}
-			uio->uio_iov[i].iov_base =
-			    (char *)uio->uio_iov[i].iov_base + len;
-			uio->uio_iov[i].iov_len -= len;
+			IOVEC_ADVANCE(&uio->uio_iov[i], len);
 			uio->uio_resid -= len;
 			uio->uio_offset += len;
 		}

@@ -113,9 +113,9 @@ _vq_record(uint32_t offs, int i, volatile struct vring_desc *vd,
 	if (i >= n_iov)
 		return;
 
-	iov[i].iov_base = paddr_map(offs, be64toh(vd->addr),
-				be32toh(vd->len));
-	iov[i].iov_len = be32toh(vd->len);
+	IOVEC_INIT(&iov[i],
+	    paddr_map(offs, be64toh(vd->addr), be32toh(vd->len)),
+	    be32toh(vd->len));
 	if (flags != NULL)
 		flags[i] = be16toh(vd->flags);
 }
@@ -252,8 +252,7 @@ getcopy(struct iovec *iov, int n)
 
 	tiov = malloc(n * sizeof(struct iovec), M_DEVBUF, M_NOWAIT);
 	for (i = 0; i < n; i++) {
-		tiov[i].iov_base = iov[i].iov_base;
-		tiov[i].iov_len = iov[i].iov_len;
+		IOVEC_INIT(&tiov[i], iov[i].iov_base, iov[i].iov_len);
 	}
 
 	return (tiov);

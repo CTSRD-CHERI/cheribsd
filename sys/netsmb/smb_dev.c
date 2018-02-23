@@ -312,8 +312,7 @@ nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thre
 			error = ENOTCONN;
 			goto out;
 	 	}
-		iov.iov_base = rwrq->ioc_base;
-		iov.iov_len = rwrq->ioc_cnt;
+		IOVEC_INIT(&iov, rwrq->ioc_base, rwrq->ioc_cnt);
 		auio.uio_iov = &iov;
 		auio.uio_iovcnt = 1;
 		auio.uio_offset = rwrq->ioc_offset;

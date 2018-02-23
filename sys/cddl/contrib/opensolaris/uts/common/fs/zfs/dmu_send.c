@@ -122,8 +122,7 @@ dump_bytes(dmu_sendarg_t *dsp, void *buf, int len)
 
 	ASSERT0(len % 8);
 
-	aiov.iov_base = buf;
-	aiov.iov_len = len;
+	IOVEC_INIT(&aiov, buf, len);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_resid = len;
@@ -1918,8 +1917,7 @@ restore_bytes(struct receive_arg *ra, void *buf, int len, off_t off, ssize_t *re
 	struct iovec aiov;
 	int error;
 
-	aiov.iov_base = buf;
-	aiov.iov_len = len;
+	IOVEC_INIT(&aiov, buf, len);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_resid = len;

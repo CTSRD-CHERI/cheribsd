@@ -1219,8 +1219,7 @@ dqopen(struct vnode *vp, struct ufsmount *ump, int type)
 	ASSERT_VOP_LOCKED(vp, "dqopen");
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
-	aiov.iov_base = &dqh;
-	aiov.iov_len = sizeof(dqh);
+	IOVEC_INIT_OBJ(&aiov, dqh);
 	auio.uio_resid = sizeof(dqh);
 	auio.uio_offset = 0;
 	auio.uio_segflg = UIO_SYSSPACE;
@@ -1405,8 +1404,7 @@ hfound:		DQI_LOCK(dq);
 	}
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
-	aiov.iov_base = buf;
-	aiov.iov_len = recsize;
+	IOVEC_INIT(&aiov, buf, recsize);
 	auio.uio_resid = recsize;
 	auio.uio_offset = base + id * recsize;
 	auio.uio_segflg = UIO_SYSSPACE;
@@ -1599,8 +1597,7 @@ dqsync(struct vnode *vp, struct dquot *dq)
 
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
-	aiov.iov_base = buf;
-	aiov.iov_len = recsize;
+	IOVEC_INIT(&aiov, buf, recsize);
 	auio.uio_resid = recsize;
 	auio.uio_offset = base + dq->dq_id * recsize;
 	auio.uio_segflg = UIO_SYSSPACE;

@@ -242,8 +242,7 @@ sys_sctp_generic_sendmsg (td, uap)
 		ktrsockaddr(to);
 #endif
 
-	iov[0].iov_base = uap->msg;
-	iov[0].iov_len = uap->mlen;
+	IOVEC_INIT(&iov[0], uap->msg, uap->mlen);
 
 	so = (struct socket *)fp->f_data;
 	if (so->so_proto->pr_protocol != IPPROTO_SCTP) {

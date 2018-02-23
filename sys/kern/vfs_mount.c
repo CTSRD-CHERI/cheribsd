@@ -1849,8 +1849,7 @@ mount_argf(struct mntarg *ma, const char *name, const char *fmt, ...)
 
 	ma->v = realloc(ma->v, sizeof *ma->v * (ma->len + 2),
 	    M_MOUNT, M_WAITOK);
-	ma->v[ma->len].iov_base = (void *)(uintptr_t)name;
-	ma->v[ma->len].iov_len = strlen(name) + 1;
+	IOVEC_INIT_STR(&ma->v[ma->len], __DECONST(void *, name));
 	ma->len++;
 
 	sb = sbuf_new_auto();
@@ -1864,8 +1863,7 @@ mount_argf(struct mntarg *ma, const char *name, const char *fmt, ...)
 	bcopy(sbuf_data(sb), maa + 1, len);
 	sbuf_delete(sb);
 
-	ma->v[ma->len].iov_base = maa + 1;
-	ma->v[ma->len].iov_len = len;
+	IOVEC_INIT(&ma->v[ma->len], maa + 1, len);
 	ma->len++;
 
 	return (ma);
@@ -1913,15 +1911,13 @@ mount_arg(struct mntarg *ma, const char *name, const void *val, int len)
 
 	ma->v = realloc(ma->v, sizeof *ma->v * (ma->len + 2),
 	    M_MOUNT, M_WAITOK);
-	ma->v[ma->len].iov_base = (void *)(uintptr_t)name;
-	ma->v[ma->len].iov_len = strlen(name) + 1;
+	IOVEC_INIT_STR(&ma->v[ma->len], __DECONST(void *, name));
 	ma->len++;
 
-	ma->v[ma->len].iov_base = (void *)(uintptr_t)val;
 	if (len < 0)
-		ma->v[ma->len].iov_len = strlen(val) + 1;
+		IOVEC_INIT_STR(&ma->v[ma->len], __DECONST(char *, val));
 	else
-		ma->v[ma->len].iov_len = len;
+		IOVEC_INIT(&ma->v[ma->len], __DECONST(char *, val), len);
 	ma->len++;
 	return (ma);
 }

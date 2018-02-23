@@ -71,8 +71,7 @@ cloudabi32_copyinuio(const cloudabi32_iovec_t *iovp, size_t iovcnt,
 			free(uio, M_IOV);
 			return (error);
 		}
-		iov[i].iov_base = TO_PTR(iovobj.buf);
-		iov[i].iov_len = iovobj.buf_len;
+		IOVEC_INIT(&iov[i], TO_PTR(iovobj.buf), iovobj.buf_len);
 		if (iov[i].iov_len > INT32_MAX - uio->uio_resid) {
 			free(uio, M_IOV);
 			return (EINVAL);

@@ -867,8 +867,7 @@ pipe_build_write_buffer(wpipe, uio)
  * and update the uio data
  */
 
-	uio->uio_iov->iov_len -= size;
-	uio->uio_iov->iov_base = (char *)uio->uio_iov->iov_base + size;
+	IOVEC_ADVANCE(uio->uio_iov, size);
 	if (uio->uio_iov->iov_len == 0)
 		uio->uio_iov++;
 	uio->uio_resid -= size;
@@ -913,8 +912,7 @@ pipe_clone_write_buffer(wpipe)
 	wpipe->pipe_state &= ~PIPE_DIRECTW;
 
 	PIPE_UNLOCK(wpipe);
-	iov.iov_base = wpipe->pipe_buffer.buffer;
-	iov.iov_len = size;
+	IOVEC_INIT(&iov, wpipe->pipe_buffer.buffer, size);
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = 0;

@@ -888,8 +888,7 @@ mdstart_vnode(struct md_s *sc, struct bio *bp)
 		piov = malloc(sizeof(*piov) * auio.uio_iovcnt, M_MD, M_WAITOK);
 		auio.uio_iov = piov;
 		while (len > 0) {
-			piov->iov_base = __DECONST(void *, zero_region);
-			piov->iov_len = len;
+			IOVEC_INIT(piov, __DECONST(void *, zero_region), len);
 			if (len > zerosize)
 				piov->iov_len = zerosize;
 			len -= piov->iov_len;
@@ -901,11 +900,9 @@ mdstart_vnode(struct md_s *sc, struct bio *bp)
 		auio.uio_iov = piov;
 		vlist = (bus_dma_segment_t *)bp->bio_data;
 		while (len > 0) {
-			piov->iov_base = (void *)(uintptr_t)(vlist->ds_addr +
-			    ma_offs);
-			piov->iov_len = vlist->ds_len - ma_offs;
-			if (piov->iov_len > len)
-				piov->iov_len = len;
+			IOVEC_INIT(piov,
+			    (void *)(uintptr_t)(vlist->ds_addr + ma_offs),
+			    MIN(vlist->ds_len - ma_offs, len));
 			len -= piov->iov_len;
 			ma_offs = 0;
 			vlist++;
@@ -923,15 +920,14 @@ unmapped_step:
 		KASSERT(iolen > 0, ("zero iolen"));
 		pmap_qenter((vm_offset_t)pb->b_data,
 		    &bp->bio_ma[atop(ma_offs)], npages);
-		aiov.iov_base = (void *)((vm_offset_t)pb->b_data +
-		    (ma_offs & PAGE_MASK));
-		aiov.iov_len = iolen;
+		IOVEC_INIT(&aiov,
+		    (void *)(pb->b_data + (ma_offs & PAGE_MASK)),
+		    iolen);
 		auio.uio_iov = &aiov;
 		auio.uio_iovcnt = 1;
 		auio.uio_resid = iolen;
 	} else {
-		aiov.iov_base = bp->bio_data;
-		aiov.iov_len = bp->bio_length;
+		IOVEC_INIT(&aiov, bp->bio_data, bp->bio_length);
 		auio.uio_iov = &aiov;
 		auio.uio_iovcnt = 1;
 	}
@@ -1341,8 +1337,7 @@ mdsetcred(struct md_s *sc, struct ucred *cred)
 		tmpbuf = malloc(sc->sectorsize, M_TEMP, M_WAITOK);
 		bzero(&auio, sizeof(auio));
 
-		aiov.iov_base = tmpbuf;
-		aiov.iov_len = sc->sectorsize;
+		IOVEC_INIT(&aiov, tmpbuf, sc->sectorsize);
 		auio.uio_iov = &aiov;
 		auio.uio_iovcnt = 1;
 		auio.uio_offset = 0;

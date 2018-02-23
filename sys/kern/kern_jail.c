@@ -313,6 +313,7 @@ kern_jail(struct thread *td, struct jail *j)
 			    )];
 	struct uio opt;
 	char *u_path, *u_hostname, *u_name;
+	char *optstr;
 #ifdef INET
 	uint32_t ip4s;
 	struct in_addr *u_ip4;
@@ -335,19 +336,16 @@ kern_jail(struct thread *td, struct jail *j)
 	/* Set permissions for top-level jails from sysctls. */
 	if (!jailed(td->td_ucred)) {
 		for (fi = 0; fi < nitems(pr_allow_names); fi++) {
-			optiov[opt.uio_iovcnt].iov_base =
-			    (jail_default_allow & (1 << fi))
+			optstr = (jail_default_allow & (1 << fi))
 			    ? pr_allow_names[fi] : pr_allow_nonames[fi];
-			optiov[opt.uio_iovcnt].iov_len =
-			    strlen(optiov[opt.uio_iovcnt].iov_base) + 1;
+			IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
 			opt.uio_iovcnt += 2;
 		}
-		optiov[opt.uio_iovcnt].iov_base = "enforce_statfs";
-		optiov[opt.uio_iovcnt].iov_len = sizeof("enforce_statfs");
+		optstr = "enforce_statfs";
+		IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
 		opt.uio_iovcnt++;
 		enforce_statfs = jail_default_enforce_statfs;
-		optiov[opt.uio_iovcnt].iov_base = &enforce_statfs;
-		optiov[opt.uio_iovcnt].iov_len = sizeof(enforce_statfs);
+		IOVEC_INIT_OBJ(&optiov[opt.uio_iovcnt], enforce_statfs);
 		opt.uio_iovcnt++;
 	}
 
@@ -382,47 +380,44 @@ kern_jail(struct thread *td, struct jail *j)
 	u_ip6 = (struct in6_addr *)(u_name + MAXHOSTNAMELEN);
 #endif
 #endif
-	optiov[opt.uio_iovcnt].iov_base = "path";
-	optiov[opt.uio_iovcnt].iov_len = sizeof("path");
+	optstr = "path";
+	IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
 	opt.uio_iovcnt++;
-	optiov[opt.uio_iovcnt].iov_base = u_path;
-	error = copyinstr(j->path, u_path, MAXPATHLEN,
-	    &optiov[opt.uio_iovcnt].iov_len);
+	error = copyinstr(j->path, u_path, MAXPATHLEN, &tmplen);
 	if (error) {
 		free(u_path, M_TEMP);
 		return (error);
 	}
+	IOVEC_INIT(&optiov[opt.uio_iovcnt], u_path, tmplen);
 	opt.uio_iovcnt++;
-	optiov[opt.uio_iovcnt].iov_base = "host.hostname";
-	optiov[opt.uio_iovcnt].iov_len = sizeof("host.hostname");
+	optstr = "host.hostname";
+	IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
 	opt.uio_iovcnt++;
-	optiov[opt.uio_iovcnt].iov_base = u_hostname;
-	error = copyinstr(j->hostname, u_hostname, MAXHOSTNAMELEN,
-	    &optiov[opt.uio_iovcnt].iov_len);
+	error = copyinstr(j->hostname, u_hostname, MAXHOSTNAMELEN, &tmplen);
 	if (error) {
 		free(u_path, M_TEMP);
 		return (error);
 	}
+	IOVEC_INIT(&optiov[opt.uio_iovcnt], u_hostname, tmplen);
 	opt.uio_iovcnt++;
 	if (j->jailname != NULL) {
-		optiov[opt.uio_iovcnt].iov_base = "name";
-		optiov[opt.uio_iovcnt].iov_len = sizeof("name");
+		optstr = "name";
+		IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
 		opt.uio_iovcnt++;
-		optiov[opt.uio_iovcnt].iov_base = u_name;
-		error = copyinstr(j->jailname, u_name, MAXHOSTNAMELEN,
-		    &optiov[opt.uio_iovcnt].iov_len);
+		error = copyinstr(j->jailname, u_name, MAXHOSTNAMELEN, &tmplen);
 		if (error) {
 			free(u_path, M_TEMP);
 			return (error);
 		}
+		IOVEC_INIT(&optiov[opt.uio_iovcnt], u_name, tmplen);
 		opt.uio_iovcnt++;
 	}
 #ifdef INET
-	optiov[opt.uio_iovcnt].iov_base = "ip4.addr";
-	optiov[opt.uio_iovcnt].iov_len = sizeof("ip4.addr");
+	optstr = "ip4.addr";
+	IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
 	opt.uio_iovcnt++;
-	optiov[opt.uio_iovcnt].iov_base = u_ip4;
-	optiov[opt.uio_iovcnt].iov_len = ip4s * sizeof(struct in_addr);
+	IOVEC_INIT(&optiov[opt.uio_iovcnt], u_ip4,
+	    ip4s * sizeof(struct in_addr));
 	if (j->version == 0)
 		u_ip4->s_addr = j->ip4s;
 	else {
@@ -435,11 +430,11 @@ kern_jail(struct thread *td, struct jail *j)
 	opt.uio_iovcnt++;
 #endif
 #ifdef INET6
-	optiov[opt.uio_iovcnt].iov_base = "ip6.addr";
-	optiov[opt.uio_iovcnt].iov_len = sizeof("ip6.addr");
+	optstr = "ip6.addr";
+	IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
 	opt.uio_iovcnt++;
-	optiov[opt.uio_iovcnt].iov_base = u_ip6;
-	optiov[opt.uio_iovcnt].iov_len = j->ip6s * sizeof(struct in6_addr);
+	IOVEC_INIT(&optiov[opt.uio_iovcnt], u_ip6,
+	    j->ip6s * sizeof(struct in6_addr));
 	error = copyin(j->ip6, u_ip6, optiov[opt.uio_iovcnt].iov_len);
 	if (error) {
 		free(u_path, M_TEMP);

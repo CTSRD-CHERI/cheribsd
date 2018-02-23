@@ -213,8 +213,7 @@ cd9660_getattr(ap)
 		char *cp;
 
 		cp = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-		aiov.iov_base = cp;
-		aiov.iov_len = MAXPATHLEN;
+		IOVEC_INIT(&aiov, cp, MAXPATHLEN);
 		auio.uio_iov = &aiov;
 		auio.uio_iovcnt = 1;
 		auio.uio_offset = 0;
@@ -736,8 +735,7 @@ cd9660_readlink(ap)
 		return (error);
 	}
 	uio->uio_resid -= symlen;
-	uio->uio_iov->iov_base = (char *)uio->uio_iov->iov_base + symlen;
-	uio->uio_iov->iov_len -= symlen;
+	IOVEC_ADVANCE(uio->uio_iov, symlen);
 	return (0);
 }
 

@@ -716,13 +716,12 @@ cryptodev_op(
 	cse->uio.uio_segflg = UIO_SYSSPACE;
 	cse->uio.uio_rw = UIO_WRITE;
 	cse->uio.uio_td = td;
-	cse->uio.uio_iov[0].iov_len = cop->len;
 	if (cse->thash) {
-		cse->uio.uio_iov[0].iov_len += cse->thash->hashsize;
 		cse->uio.uio_resid += cse->thash->hashsize;
 	}
-	cse->uio.uio_iov[0].iov_base = malloc(cse->uio.uio_iov[0].iov_len,
-	    M_XDATA, M_WAITOK);
+	IOVEC_INIT(&cse->uio.uio_iov[0],
+	    malloc(cse->uio.uio_resid, M_XDATA, M_WAITOK),
+	    cse->uio.uio_resid);
 
 	crp = crypto_getreq((cse->txform != NULL) + (cse->thash != NULL));
 	if (crp == NULL) {
@@ -902,10 +901,8 @@ cryptodev_aead(
 	uio->uio_segflg = UIO_SYSSPACE;
 	uio->uio_rw = UIO_WRITE;
 	uio->uio_td = td;
-	uio->uio_iov[0].iov_len = uio->uio_resid;
-
-	uio->uio_iov[0].iov_base = malloc(uio->uio_iov[0].iov_len,
-	    M_XDATA, M_WAITOK);
+	IOVEC_INIT(&uio->uio_iov[0],
+	    malloc(uio->uio_iov[0].iov_len, M_XDATA, M_WAITOK), uio->uio_resid);
 
 	crp = crypto_getreq(2);
 	if (crp == NULL) {
