@@ -466,8 +466,6 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	int sig;
 	int oonstack;
 
-	printf("%s\n", __func__);
-
 	td = curthread;
 	p = td->td_proc;
 	PROC_LOCK_ASSERT(p, MA_OWNED);
@@ -484,6 +482,9 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 */
 	regs = td->td_frame;
 	oonstack = sigonstack((vaddr_t)regs->csp);
+
+	printf("%s(%d)\n", __func__, sig);
+
 
 	/*
 	 * CHERI affects signal delivery in the following ways:
@@ -710,7 +711,7 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	printf("$c12: "); CHERI_PRINT_PTR(regs->c12);
 	printf("$c17: "); CHERI_PRINT_PTR(regs->c17);
 	printf("$pcc: "); CHERI_PRINT_PTR(regs->pcc);
-	printf("$pc: %016lx", regs->pc);
+	printf("$pc: %016lx\n", regs->pc);
 }
 
 static void

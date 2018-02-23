@@ -783,7 +783,7 @@ kern_sigaction_cap(struct thread *td, int sig, const struct sigaction *act,
 		if (cap != NULL) {
 			ps->ps_sigcap[_SIG_IDX(sig)] = newhandler;
 			ps->ps_sigglobals[_SIG_IDX(sig)] = newglobals;
-			printf("Setting cheri signal handler:\n");
+			printf("Setting cheri signal handler for %d:\n", sig);
 			printf("newhandler -- "); CHERI_PRINT_PTR(newhandler);
 			printf("newglobals -- "); CHERI_PRINT_PTR(newglobals);
 		}
