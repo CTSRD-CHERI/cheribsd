@@ -118,7 +118,7 @@ static int sysctl_kern_ps_strings(SYSCTL_HANDLER_ARGS);
 static int sysctl_kern_usrstack(SYSCTL_HANDLER_ARGS);
 static int sysctl_kern_stackprot(SYSCTL_HANDLER_ARGS);
 static int do_execve(struct thread *td, struct image_args *args,
-    kmac_t * __capability mac_p);
+    void * __capability mac_p);
 
 /* XXX This should be vm_size_t. */
 SYSCTL_PROC(_kern, KERN_PS_STRINGS, ps_strings, CTLTYPE_ULONG|CTLFLAG_RD|
@@ -355,7 +355,7 @@ kern_execve(struct thread *td, struct image_args *args,
  */
 static int
 do_execve(struct thread *td, struct image_args *args,
-    kmac_t * __capability umac)
+    void * __capability umac)
 {
 	struct proc *p = td->td_proc;
 	struct nameidata nd;

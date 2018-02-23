@@ -382,9 +382,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_execve */
 	case 59: {
 		struct cheriabi_execve_args *p = params;
-		uarg[0] = (intptr_t) p->fname; /* const char * */
-		uarg[1] = (intptr_t) p->argv; /* void *__capability * */
-		uarg[2] = (intptr_t) p->envv; /* void *__capability * */
+		uarg[0] = (cheri_getbase(p->fname) + cheri_getoffset(p->fname)); /* const char *__capability */
+		uarg[1] = (cheri_getbase(p->argv) + cheri_getoffset(p->argv)); /* void *__capability *__capability */
+		uarg[2] = (cheri_getbase(p->envv) + cheri_getoffset(p->envv)); /* void *__capability *__capability */
 		*n_args = 3;
 		break;
 	}
@@ -1941,10 +1941,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi___mac_execve */
 	case 415: {
 		struct cheriabi___mac_execve_args *p = params;
-		uarg[0] = (intptr_t) p->fname; /* char * */
-		uarg[1] = (intptr_t) p->argv; /* void *__capability * */
-		uarg[2] = (intptr_t) p->envv; /* void *__capability * */
-		uarg[3] = (intptr_t) p->mac_p; /* struct mac_c * */
+		uarg[0] = (cheri_getbase(p->fname) + cheri_getoffset(p->fname)); /* char *__capability */
+		uarg[1] = (cheri_getbase(p->argv) + cheri_getoffset(p->argv)); /* void *__capability *__capability */
+		uarg[2] = (cheri_getbase(p->envv) + cheri_getoffset(p->envv)); /* void *__capability *__capability */
+		uarg[3] = (cheri_getbase(p->mac_p) + cheri_getoffset(p->mac_p)); /* struct mac_c *__capability */
 		*n_args = 4;
 		break;
 	}
@@ -2532,8 +2532,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 492: {
 		struct cheriabi_fexecve_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->argv; /* void *__capability * */
-		uarg[2] = (intptr_t) p->envv; /* void *__capability * */
+		uarg[1] = (cheri_getbase(p->argv) + cheri_getoffset(p->argv)); /* void *__capability *__capability */
+		uarg[2] = (cheri_getbase(p->envv) + cheri_getoffset(p->envv)); /* void *__capability *__capability */
 		*n_args = 3;
 		break;
 	}
@@ -3678,13 +3678,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 59:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
-			p = "userland void *__capability *";
+			p = "userland void *__capability *__capability";
 			break;
 		case 2:
-			p = "userland void *__capability *";
+			p = "userland void *__capability *__capability";
 			break;
 		default:
 			break;
@@ -6214,16 +6214,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 415:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland char *__capability";
 			break;
 		case 1:
-			p = "userland void *__capability *";
+			p = "userland void *__capability *__capability";
 			break;
 		case 2:
-			p = "userland void *__capability *";
+			p = "userland void *__capability *__capability";
 			break;
 		case 3:
-			p = "userland struct mac_c *";
+			p = "userland struct mac_c *__capability";
 			break;
 		default:
 			break;
@@ -7250,10 +7250,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland void *__capability *";
+			p = "userland void *__capability *__capability";
 			break;
 		case 2:
-			p = "userland void *__capability *";
+			p = "userland void *__capability *__capability";
 			break;
 		default:
 			break;

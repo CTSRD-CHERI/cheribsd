@@ -219,10 +219,12 @@ cheriabi_wait6(struct thread *td, struct cheriabi_wait6_args *uap)
  * the pointers.
  */
 int
-cheriabi_exec_copyin_args(struct image_args *args, const char *fname,
-    enum uio_seg segflg, void * __capability *argv, void * __capability *envv)
+cheriabi_exec_copyin_args(struct image_args *args,
+    const char * __capability fname, enum uio_seg segflg,
+    void * __capability * __capability argv,
+    void * __capability * __capability envv)
 {
-	void * __capability *pcap;
+	void * __capability * __capability pcap;
 	void * __capability argcap;
 	size_t length;
 	int error;
@@ -244,9 +246,14 @@ cheriabi_exec_copyin_args(struct image_args *args, const char *fname,
 	 */
 	if (fname != NULL) {
 		args->fname = args->buf;
-		error = (segflg == UIO_SYSSPACE) ?
-		    copystr(fname, args->fname, PATH_MAX, &length) :
-		    copyinstr(fname, args->fname, PATH_MAX, &length);
+		if (segflg == UIO_SYSSPACE) {
+			error = copystr((__cheri_fromcap const char *)fname,
+			    args->fname, PATH_MAX, &length);
+		} else {
+			error = copyinstr_c(fname,
+			    (__cheri_tocap char * __capability)args->fname,
+			    PATH_MAX, &length);
+		}
 		if (error != 0)
 			goto err_exit;
 	} else
@@ -261,7 +268,7 @@ cheriabi_exec_copyin_args(struct image_args *args, const char *fname,
 	 */
 	pcap = argv;
 	for (;;) {
-		error = copyincap(pcap++, &argcap, sizeof(argcap));
+		error = copyincap_c(pcap++, &argcap, sizeof(argcap));
 		if (error)
 			goto err_exit;
 		if (argcap == NULL)
@@ -269,7 +276,7 @@ cheriabi_exec_copyin_args(struct image_args *args, const char *fname,
 		error = copyinstr_c(argcap,
 		    (__cheri_tocap char * __capability)args->endp,
 		    args->stringspace, &length);
-		if (error) {
+		if (error != 0) {
 			if (error == ENAMETOOLONG)
 				error = E2BIG;
 			goto err_exit;
@@ -287,15 +294,15 @@ cheriabi_exec_copyin_args(struct image_args *args, const char *fname,
 	if (envv) {
 		pcap = envv;
 		for (;;) {
-			error = copyincap(pcap++, &argcap, sizeof(argcap));
-			if (error)
+			error = copyincap_c(pcap++, &argcap, sizeof(argcap));
+			if (error != 0)
 				goto err_exit;
 			if (argcap == NULL)
 				break;
 			error = copyinstr_c(argcap,
 			    (__cheri_tocap char * __capability)args->endp,
 			    args->stringspace, &length);
-			if (error) {
+			if (error != 0) {
 				if (error == ENAMETOOLONG)
 					error = E2BIG;
 				goto err_exit;

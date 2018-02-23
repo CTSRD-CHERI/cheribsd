@@ -184,9 +184,9 @@ struct cheriabi_readlink_args {
 	char count_l_[PADL_(size_t)]; size_t count; char count_r_[PADR_(size_t)];
 };
 struct cheriabi_execve_args {
-	char fname_l_[PADL_(const char *)]; const char * fname; char fname_r_[PADR_(const char *)];
-	char argv_l_[PADL_(void *__capability *)]; void *__capability * argv; char argv_r_[PADR_(void *__capability *)];
-	char envv_l_[PADL_(void *__capability *)]; void *__capability * envv; char envv_r_[PADR_(void *__capability *)];
+	char fname_l_[PADL_(const char *__capability)]; const char *__capability fname; char fname_r_[PADR_(const char *__capability)];
+	char argv_l_[PADL_(void *__capability *__capability)]; void *__capability *__capability argv; char argv_r_[PADR_(void *__capability *__capability)];
+	char envv_l_[PADL_(void *__capability *__capability)]; void *__capability *__capability envv; char envv_r_[PADR_(void *__capability *__capability)];
 };
 struct cheriabi_chroot_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
@@ -765,10 +765,10 @@ struct cheriabi_extattr_delete_link_args {
 	char attrname_l_[PADL_(const char *__capability)]; const char *__capability attrname; char attrname_r_[PADR_(const char *__capability)];
 };
 struct cheriabi___mac_execve_args {
-	char fname_l_[PADL_(char *)]; char * fname; char fname_r_[PADR_(char *)];
-	char argv_l_[PADL_(void *__capability *)]; void *__capability * argv; char argv_r_[PADR_(void *__capability *)];
-	char envv_l_[PADL_(void *__capability *)]; void *__capability * envv; char envv_r_[PADR_(void *__capability *)];
-	char mac_p_l_[PADL_(struct mac_c *)]; struct mac_c * mac_p; char mac_p_r_[PADR_(struct mac_c *)];
+	char fname_l_[PADL_(char *__capability)]; char *__capability fname; char fname_r_[PADR_(char *__capability)];
+	char argv_l_[PADL_(void *__capability *__capability)]; void *__capability *__capability argv; char argv_r_[PADR_(void *__capability *__capability)];
+	char envv_l_[PADL_(void *__capability *__capability)]; void *__capability *__capability envv; char envv_r_[PADR_(void *__capability *__capability)];
+	char mac_p_l_[PADL_(struct mac_c *__capability)]; struct mac_c *__capability mac_p; char mac_p_r_[PADR_(struct mac_c *__capability)];
 };
 struct cheriabi_sigaction_args {
 	char sig_l_[PADL_(int)]; int sig; char sig_r_[PADR_(int)];
@@ -999,8 +999,8 @@ struct cheriabi_fchownat_args {
 };
 struct cheriabi_fexecve_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char argv_l_[PADL_(void *__capability *)]; void *__capability * argv; char argv_r_[PADR_(void *__capability *)];
-	char envv_l_[PADL_(void *__capability *)]; void *__capability * envv; char envv_r_[PADR_(void *__capability *)];
+	char argv_l_[PADL_(void *__capability *__capability)]; void *__capability *__capability argv; char argv_r_[PADR_(void *__capability *__capability)];
+	char envv_l_[PADL_(void *__capability *__capability)]; void *__capability *__capability envv; char envv_r_[PADR_(void *__capability *__capability)];
 };
 struct cheriabi_futimesat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];

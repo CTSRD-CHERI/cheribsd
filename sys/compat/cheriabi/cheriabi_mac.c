@@ -35,10 +35,12 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/errno.h>
+#include <sys/imgact.h>
 #include <sys/namei.h>
 #include <sys/syscallsubr.h>
 
 #include <compat/cheriabi/cheriabi_proto.h>
+#include <compat/cheriabi/cheriabi_util.h>
 
 #include <security/mac/mac_framework.h>
 
@@ -122,6 +124,25 @@ cheriabi_mac_syscall(struct thread *td, struct cheriabi_mac_syscall_args *uap)
 	return (kern_mac_syscall(td, uap->policy, uap->call, uap->arg));
 }
 
+int
+cheriabi___mac_execve(struct thread *td, struct cheriabi___mac_execve_args *uap)
+{
+	struct image_args eargs;
+	struct vmspace *oldvmspace;
+	int error;
+
+	error = pre_execve(td, &oldvmspace);
+	if (error != 0)
+		return (error);
+	error = cheriabi_exec_copyin_args(&eargs, NULL, UIO_SYSSPACE,
+	    uap->argv, uap->envv);
+	if (error == 0)
+		error = kern_execve(td, &eargs, uap->mac_p);
+
+	post_execve(td, error, oldvmspace);
+	return (error);
+}
+
 #else /* !MAC */
 
 int
@@ -194,11 +215,11 @@ cheriabi_mac_syscall(struct thread *td, struct cheriabi_mac_syscall_args *uap)
 	return(ENOSYS);
 }
 
-#endif /* !MAC */
-
 int
 cheriabi___mac_execve(struct thread *td, struct cheriabi___mac_execve_args *uap)
 {
 
 	return(ENOSYS);
 }
+
+#endif /* !MAC */

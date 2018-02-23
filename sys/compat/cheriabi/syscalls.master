@@ -204,9 +204,9 @@
 ; inconsistant about NUL terminated string, vs NULL terminted array so
 ; _In_ for now.
 59	AUE_EXECVE	STD|NOSTUB	{ int cheriabi_execve( \
-				    _In_z_ const char *fname, \
-				    _In_ void * __capability *argv, \
-				    _In_ void * __capability *envv); }
+				    _In_z_ const char * __capability fname, \
+				    _In_ void * __capability * __capability argv, \
+				    _In_ void * __capability * __capability envv); }
 60	AUE_UMASK	NOPROTO	{ mode_t umask(mode_t newmask); }
 61	AUE_CHROOT	STD	{ int cheriabi_chroot( \
 				    _In_z_ const char * __capability path); }
@@ -940,10 +940,10 @@
 				    int attrnamespace, \
 				    _In_z_ const char * __capability attrname); }
 415	AUE_NULL	STD|NOSTUB	{ int cheriabi___mac_execve( \
-				    _In_z_ char *fname, \
-				    _In_ void * __capability *argv, \
-				    _In_ void * __capability *envv, \
-				    _In_ struct mac_c *mac_p); }
+				    _In_z_ char * __capability fname, \
+				    _In_ void * __capability * __capability argv, \
+				    _In_ void * __capability * __capability envv, \
+				    _In_ struct mac_c * __capability mac_p); }
 416	AUE_SIGACTION	STD	{ int cheriabi_sigaction(int sig, \
 				    _In_opt_ struct sigaction_c * __capability act, \
 				    _Out_opt_ struct sigaction_c * __capability oact); }
@@ -1170,8 +1170,8 @@
 				    _In_z_ const char * __capability path, \
 				    uid_t uid, gid_t gid, int flag); }
 492	AUE_FEXECVE	STD|NOSTUB	{ int cheriabi_fexecve(int fd, \
-				    _In_ void * __capability *argv, \
-				    _In_ void * __capability *envv); }
+				    _In_ void * __capability * __capability argv, \
+				    _In_ void * __capability * __capability envv); }
 493	AUE_FSTATAT	OBSOL	fbsd11_fstatat
 494	AUE_FUTIMESAT	STD	{ int cheriabi_futimesat(int fd, \
 				    _In_z_ const char * __capability path, \
