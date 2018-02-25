@@ -58,8 +58,8 @@ struct iovec {
 	size_t amount = (amt);						\
 	KASSERT(amount <= (iovp)->iov_len, ("%s: amount %zu > iov_len	\
 	    %zu", __func__, amount, (iovp)->iov_len));			\
-	(iovp)->iov_base = (char *)((iovp)->iov_base) + (amt);		\
-	(iovp)->iov_len -= (amt);					\
+	(iovp)->iov_base = (char *)((iovp)->iov_base) + amount;		\
+	(iovp)->iov_len -= amount;					\
 } while(0)
 
 #endif /* !_SYS__IOVEC_H_ */
