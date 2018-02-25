@@ -212,7 +212,7 @@ isc_sendPDU(isc_session_t *sp, pduq_t *pq)
      }
      if(ISOK2DIG(sp->hdrDigest, pp)) {
 	  debug(3, "hdr_dig=%04x", htonl(pp->hdr_dig));
-	  IOVEC_INIT_OBJ(iv, &pp->hdr_dig);
+	  IOVEC_INIT_OBJ(iv, pp->hdr_dig);
 	  uio->uio_resid += iv->iov_len ;
 	  iv++;
      }
@@ -224,7 +224,7 @@ isc_sendPDU(isc_session_t *sp, pduq_t *pq)
 	  iv++;
 	  if(ISOK2DIG(sp->dataDigest, pp)) {
 	       pp->ds_dig = sp->dataDigest(pp->ds, pp->ds_len, 0);
-	       IOVEC_INIT_OBJ(iv, &pp->ds_dig);
+	       IOVEC_INIT_OBJ(iv, pp->ds_dig);
 	       uio->uio_resid += iv->iov_len ;
 	       iv++;
 	  }
@@ -388,7 +388,7 @@ so_recv(isc_session_t *sp, pduq_t *pq)
      }
      if(ISOK2DIG(sp->hdrDigest, pp)) {
 	  len += sizeof(pp->hdr_dig);
-	  IOVEC_INIT_OBJ(iov, &pp->hdr_dig);
+	  IOVEC_INIT_OBJ(iov, pp->hdr_dig);
 	  uio->uio_iovcnt++;
      }
      if(len) {

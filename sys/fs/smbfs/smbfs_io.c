@@ -474,7 +474,7 @@ smbfs_getpages(ap)
 	VM_CNT_ADD(v_vnodepgsin, npages);
 
 	count = npages << PAGE_SHIFT;
-	IOVEC_INIT(&iov, bp->bp_data, count);
+	IOVEC_INIT(&iov, bp->b_data, count);
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = IDX_TO_OFF(pages[0]->pindex);
