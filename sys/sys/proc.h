@@ -204,6 +204,14 @@ struct rusage_ext {
 	uint64_t	rux_tu;         /* (c) Previous total time in usec. */
 };
 
+#ifdef CPU_CHERI
+struct switcher_context {
+	void * __capability			sc_unsealcap;
+	struct thread				*sc_td;
+	struct switcher_context * __capability	sc_peer_context;
+};
+#endif
+
 /*
  * Kernel runnable context (thread).
  * This is what is put to sleep and reactivated.

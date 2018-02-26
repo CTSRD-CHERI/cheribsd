@@ -616,4 +616,5 @@ struct sysent sysent[] = {
 	{ AS(cosetup_args), (sy_call_t *)sys_cosetup, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 562 = cosetup */
 	{ AS(coregister_args), (sy_call_t *)sys_coregister, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 563 = coregister */
 	{ AS(colookup_args), (sy_call_t *)sys_colookup, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 564 = colookup */
+	{ 0, (sy_call_t *)sys_copark, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 565 = copark */
 };

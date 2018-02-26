@@ -410,4 +410,5 @@ MIASM =  \
 	coexecve.o \
 	cosetup.o \
 	coregister.o \
-	colookup.o
+	colookup.o \
+	copark.o

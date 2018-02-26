@@ -148,12 +148,12 @@ _C_LABEL(switcher_coaccept):
 
 	/*
 	 * Is this the first invocation of coaccept, or rather a response
-	 * for a ccall()?  If the former - park the thread.
+	 * for a ccall()?  If the former - call copark(2).
 	 */
 	cbts	$c5, 8
 	nop
-	beq	zero, zero, -4 // XXX: This is rather suboptimal.
-	nop
+	li	v0, 565
+	syscall
 	nop
 
 	/*

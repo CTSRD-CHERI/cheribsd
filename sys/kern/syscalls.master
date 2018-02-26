@@ -1032,6 +1032,7 @@
 				    void * __capability *cap); }
 564	AUE_NULL	STD	{ int colookup(const char *name, \
 				    void * __capability *cap); }
+565	AUE_NULL	STD	{ int copark(void); }
 
 ; Please copy any additions and changes to the following compatability tables:
 ; sys/compat/freebsd32/syscalls.master
