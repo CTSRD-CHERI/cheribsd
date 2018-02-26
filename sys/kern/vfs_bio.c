@@ -992,13 +992,13 @@ kern_vfs_bio_buffer_alloc(caddr_t v, long physmem_est)
 	 * so we can not set bounds.
 	 */
 	if (!cheri_valid(v)) {
-		return (v + nbuf + nswbuf);
+	  return (v + (nbuf * sizeof(*buf)) + (nswbuf * sizeof(*swbuf)));
 	}
 
-	swbuf = (void *)cheri_bound(v, nswbuf);
-	v = (caddr_t)(v + nswbuf);
-	buf = (void *)cheri_bound(v, nbuf);
-	v = (caddr_t)(v + nbuf);
+	swbuf = (void *)cheri_bound(v, nswbuf * sizeof(*swbuf));
+	v = (caddr_t)(v + nswbuf * sizeof(*swbuf));
+	buf = (void *)cheri_bound(v, nbuf * sizeof(*buf));
+	v = (caddr_t)(v + nbuf * sizeof(*buf));
 
 	return(v);
 }
