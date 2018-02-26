@@ -220,7 +220,7 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 			sym = symtab + r_symndx;
 			assert(ELF_ST_BIND(sym->st_info) == STB_LOCAL);
 			val += (vaddr_t)relocbase;
-#ifdef DEBUG_VERBOSE
+#ifdef DEBUG_VERBOSE_SELF
 			/*
 			 * FIXME this can never work since the debug var only
 			 * gets initialized later -> use rtld_printf for now
