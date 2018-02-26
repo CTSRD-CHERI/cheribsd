@@ -183,6 +183,8 @@ typedef struct Struct_Obj_Entry {
     const Elf_Sym *symtab;	/* Symbol table */
     const char *strtab;		/* String table */
     unsigned long strsize;	/* Size in bytes of string table */
+    caddr_t cap_relocs;		/* start of the __cap_relocs section */
+    size_t cap_relocs_size;	/* size of the __cap_relocs section */
 #ifdef __mips__
     Elf_Word local_gotno;	/* Number of local GOT entries */
     Elf_Word symtabno;		/* Number of dynamic symbols */

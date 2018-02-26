@@ -122,13 +122,6 @@ LDFLAGS+=	-Wl,-melf64btsmip_cheri_fbsd
 .if defined(__BSD_PROG_MK)
 _LIB_OBJTOP=	${ROOTOBJDIR}
 .endif
-.ifdef LIBCHERI
-LDFLAGS+=	-Wl,-init=crt_init_globals
-# FIXME: we should really remove the norelro but currently RTLD crashes while
-# processing __cap_relocs for libc if LLD gerenerates relro segments
-# TODO: see if this is a bug in LLD or rtld (probably the latter)
-SOLINKOPTS+=	-Wl,-z,norelro
-.endif
 .else
 STATIC_CFLAGS+= -ftls-model=local-exec # MIPS/hybrid case
 .endif
