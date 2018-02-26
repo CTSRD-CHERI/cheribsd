@@ -5286,9 +5286,12 @@ _rtld_is_dlopened(void *arg)
 int
 obj_enforce_relro(Obj_Entry *obj)
 {
+	if (obj->relro_size == 0)
+		return (0);
 
-	if (obj->relro_size > 0 && mprotect(obj->relro_page, obj->relro_size,
-	    PROT_READ) == -1) {
+	dbg("Enforcing RELRO for %s (%p -> %p)", obj->path, obj->relro_page,
+	    obj->relro_page + obj->relro_size);
+	if (mprotect(obj->relro_page, obj->relro_size, PROT_READ) == -1) {
 		_rtld_error("%s: Cannot enforce relro protection: %s",
 		    obj->path, rtld_strerror(errno));
 		return (-1);
