@@ -371,6 +371,8 @@ DB_SHOW_COMMAND(thread, db_show_thread)
 		db_printf("??? (%#x)\n", td->td_state);
 		break;
 	}
+	db_printf(" td_critnest: %u\n", td->td_critnest);
+	db_printf(" td_lock: %p\n", td->td_lock);
 	if (TD_ON_LOCK(td))
 		db_printf(" lock: %s  turnstile: %p\n", td->td_lockname,
 		    td->td_blocked);
