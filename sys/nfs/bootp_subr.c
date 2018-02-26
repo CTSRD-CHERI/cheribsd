@@ -779,7 +779,7 @@ bootpc_call(struct bootpc_globalcontext *gctx, struct thread *td)
 		 */
 		atimo = timo + time_second;
 		while (time_second < atimo) {
-			IOVEC_INIT_OBJ(&aio, &gctx->reply);
+			IOVEC_INIT_OBJ(&aio, gctx->reply);
 
 			auio.uio_iov = &aio;
 			auio.uio_iovcnt = 1;
