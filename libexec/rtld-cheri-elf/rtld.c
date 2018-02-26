@@ -394,7 +394,7 @@ _LD(const char *var)
 func_ptr_type
 _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp)
 {
-    Elf_Auxinfo *auxp, *auxpf, *aux_info[AT_COUNT];
+    Elf_Auxinfo *aux_info[AT_COUNT];
     Objlist_Entry *entry;
     Obj_Entry *last_interposer, *obj, *preload_tail;
     const Elf_Phdr *phdr;
@@ -402,7 +402,7 @@ _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp)
     RtldLockState lockstate;
     struct stat st;
     Elf_Addr *argcp;
-    char **argv, *argv0, **env, **envp, *kexecpath, *library_path_rpath;
+    char **argv, *argv0, **env, *kexecpath, *library_path_rpath;
     caddr_t imgentry;
     char buf[MAXPATHLEN];
     int argc, fd, i, mib[2], phnum, rtld_argc;
@@ -419,11 +419,12 @@ _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp)
     /* Digest the auxiliary vector. */
     for (i = 0;  i < AT_COUNT;  i++)
 	aux_info[i] = NULL;
-    for (auxp = aux;  auxp->a_type != AT_NULL;  auxp++) {
+    for (Elf_Auxinfo *auxp = aux;  auxp->a_type != AT_NULL;  auxp++) {
 	if (auxp->a_type < AT_COUNT)
 	    aux_info[auxp->a_type] = auxp;
     }
-    argc = aux_info[AT_ARGC]->a_un.a_val;
+    argcp = &aux_info[AT_ARGC]->a_un.a_val;
+    argc = *argcp;
     argv = (char **)aux_info[AT_ARGV]->a_un.a_ptr;
     env = (char **)aux_info[AT_ENVV]->a_un.a_ptr;
 
@@ -526,11 +527,14 @@ _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp)
 		 * places environment pointers and aux vectors right
 		 * after the terminating NULL, we must shift
 		 * environment and aux as well.
+		 *
+		 * (Not true for CHERI, keeping this here to reduce the diff)
 		 */
 		main_argc = argc - rtld_argc;
 		for (i = 0; i <= main_argc; i++)
 		    argv[i] = argv[i + rtld_argc];
 		*argcp -= rtld_argc;
+#if 0
 		environ = env = envp = argv + main_argc + 1;
 		do {
 		    *envp = *(envp + rtld_argc);
@@ -543,6 +547,7 @@ _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp)
 		    if (auxp->a_type == AT_NULL)
 			    break;
 		}
+#endif
 	    } else {
 		rtld_printf("no binary\n");
 		rtld_die();
