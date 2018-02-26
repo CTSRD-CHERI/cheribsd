@@ -280,12 +280,14 @@ retry:
  *	superpage_align	Request that min is superpage aligned
  */
 vm_map_t
-kmem_suballoc(vm_map_t parent, vm_offset_t *min, vm_offset_t *max,
+kmem_suballoc(vm_map_t parent, vm_ptr_t *min, vm_ptr_t *max,
     vm_size_t size, boolean_t superpage_align)
 {
 	int ret;
 	vm_map_t result;
 
+	CHERI_VM_ASSERT_VALID(min);
+	CHERI_VM_ASSERT_VALID(max);
 	size = round_page(size);
 
 	*min = vm_map_min(parent);

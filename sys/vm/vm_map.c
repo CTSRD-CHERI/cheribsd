@@ -867,15 +867,15 @@ _vm_map_init(vm_map_t map, pmap_t pmap, vm_ptr_t min, vm_ptr_t max)
 	map->needs_wakeup = FALSE;
 	map->system_map = 0;
 	map->pmap = pmap;
-	map->min_offset = (vm_offset_t)(void *)min;
-	map->max_offset = (vm_offset_t)(void *)max;
+	map->min_offset = ptr_to_va(min);
+	map->max_offset = ptr_to_va(max);
 	map->flags = 0;
 	map->root = NULL;
 	map->timestamp = 0;
 	map->busy = 0;
 #ifdef CHERI_KERNEL
-	map->map_capability = cheri_csetbounds(
-		(void *)min, ((caddr_t)max - (caddr_t)min));
+	map->map_capability = cheri_bound((void *)min,
+	    ((caddr_t)max - (caddr_t)min));
 #endif
 }
 
@@ -1909,13 +1909,19 @@ _vm_map_clip_end(vm_map_t map, vm_map_entry_t entry, vm_offset_t end)
 int
 vm_map_submap(
 	vm_map_t map,
-	vm_offset_t start,
-	vm_offset_t end,
+	vm_ptr_t startp,
+	vm_ptr_t endp,
 	vm_map_t submap)
 {
 	vm_map_entry_t entry;
+	vm_offset_t start;
+	vm_offset_t end;
 	int result = KERN_INVALID_ARGUMENT;
 
+	CHERI_VM_ASSERT_VALID(startp);
+	CHERI_VM_ASSERT_VALID(endp);
+	start = ptr_to_va(startp);
+	end = ptr_to_va(endp);
 	vm_map_lock(map);
 
 	VM_MAP_RANGE_CHECK(map, start, end);
