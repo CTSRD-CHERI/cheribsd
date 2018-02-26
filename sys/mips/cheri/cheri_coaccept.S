@@ -150,12 +150,13 @@ _C_LABEL(switcher_coaccept):
 	 * Is this the first invocation of coaccept, or rather a response
 	 * for a ccall()?  If the former - call copark(2).
 	 */
-	cbts	$c5, 8
+	cbts	$c5, 1f
 	nop
 	li	v0, 565
 	syscall
 	nop
 
+1:
 	/*
 	 * Save the caller's thread identifier.  The kernel needs a way
 	 * to easily look it up from the current thread for the lazy thread
