@@ -82,6 +82,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_extern.h>
 #include <vm/vm_map.h>
 #include <vm/swap_pager.h>
+#include <cheri/cheric.h>
 #include "opt_compat.h"
 #include "opt_swap.h"
 
@@ -987,11 +988,17 @@ kern_vfs_bio_buffer_alloc(caddr_t v, long physmem_est)
 
 	/*
 	 * Reserve space for the buffer cache buffers
+	 * When we are called the first time, the capability is invalid
+	 * so we can not set bounds.
 	 */
-	swbuf = (void *)v;
-	v = (caddr_t)(swbuf + nswbuf);
-	buf = (void *)v;
-	v = (caddr_t)(buf + nbuf);
+	if (!cheri_valid(v)) {
+		return (v + nbuf + nswbuf);
+	}
+
+	swbuf = (void *)cheri_bound(v, nswbuf);
+	v = (caddr_t)(v + nswbuf);
+	buf = (void *)cheri_bound(v, nbuf);
+	v = (caddr_t)(v + nbuf);
 
 	return(v);
 }

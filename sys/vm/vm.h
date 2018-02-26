@@ -132,10 +132,10 @@ typedef struct vm_reserv *vm_reserv_t;
  * for use by machine-dependant code (mainly for MMU support)
  */
 struct kva_md_info {
-	vm_offset_t	buffer_sva;
-	vm_offset_t	buffer_eva;
-	vm_offset_t	clean_sva;
-	vm_offset_t	clean_eva;
+	vm_ptr_t	buffer_sva;
+	vm_ptr_t	buffer_eva;
+	vm_ptr_t	clean_sva;
+	vm_ptr_t	clean_eva;
 };
 
 extern struct kva_md_info	kmi;

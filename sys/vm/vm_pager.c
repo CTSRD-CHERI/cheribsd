@@ -168,7 +168,7 @@ struct pagerops *pagertab[] = {
 struct mtx_padalign pbuf_mtx;
 static TAILQ_HEAD(swqueue, buf) bswlist;
 static int bswneeded;
-vm_offset_t swapbkva;		/* swap buffers kva */
+vm_ptr_t swapbkva;		/* swap buffers kva */
 
 void
 vm_pager_init(void)

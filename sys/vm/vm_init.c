@@ -144,7 +144,7 @@ vm_mem_init(dummy)
 	vm_map_startup();
 	kmem_init(virtual_avail, virtual_end);
 	/* XXX-AM: in principle we could now destroy the virtual_avail/end capabilities */
-\
+
 	/*
 	 * Initialize the kernel_arena.  This can grow on demand.
 	 */
@@ -165,12 +165,12 @@ vm_mem_init(dummy)
 void
 vm_ksubmap_init(struct kva_md_info *kmi)
 {
-	vm_offset_t firstaddr;
+	caddr_t firstaddr;
 	caddr_t v;
 	vm_size_t size = 0;
 	long physmem_est;
-	vm_offset_t minaddr;
-	vm_offset_t maxaddr;
+	vm_ptr_t minaddr;
+	vm_ptr_t maxaddr;
 
 	/*
 	 * Allocate space for system data structures.
@@ -187,7 +187,7 @@ vm_ksubmap_init(struct kva_md_info *kmi)
 	 */
 	firstaddr = 0;
 again:
-	v = (caddr_t)firstaddr;
+	v = firstaddr;
 
 	/*
 	 * Discount the physical memory larger than the size of kernel_map
@@ -213,7 +213,7 @@ again:
 		    ~(vm_paddr_t)0, VM_MEMATTR_DEFAULT);
 		if (firstaddr == 0)
 #endif
-			firstaddr = kmem_malloc(kernel_arena, size,
+			firstaddr = (caddr_t)kmem_malloc(kernel_arena, size,
 			    M_ZERO | M_WAITOK);
 		if (firstaddr == 0)
 			panic("startup: no room for tables");
@@ -223,7 +223,7 @@ again:
 	/*
 	 * End of second pass, addresses have been assigned
 	 */
-	if ((vm_size_t)((char *)v - firstaddr) != size)
+	if ((vm_size_t)(v - firstaddr) != size)
 		panic("startup: table size inconsistency");
 
 	/*
@@ -232,8 +232,9 @@ again:
 	 */
 	size = (long)nbuf * BKVASIZE + (long)nswbuf * MAXPHYS +
 	    (long)bio_transient_maxcnt * MAXPHYS;
-	kmi->clean_sva = firstaddr = kva_alloc(size);
-	kmi->clean_eva = firstaddr + size;
+	kmi->clean_sva = kva_alloc(size);
+	kmi->clean_eva = kmi->clean_sva + size;
+	firstaddr = (caddr_t)kmi->clean_sva;
 
 	/*
 	 * Allocate the buffer arena.
@@ -242,7 +243,7 @@ again:
 	 * avoids lock contention at the expense of some fragmentation.
 	 */
 	size = (long)nbuf * BKVASIZE;
-	kmi->buffer_sva = firstaddr;
+	kmi->buffer_sva = (vm_ptr_t)cheri_bound(firstaddr, size);
 	kmi->buffer_eva = kmi->buffer_sva + size;
 	vmem_init(buffer_arena, "buffer arena", kmi->buffer_sva, size,
 	    PAGE_SIZE, (mp_ncpus > 4) ? BKVASIZE * 8 : 0, 0);
@@ -251,8 +252,8 @@ again:
 	/*
 	 * Now swap kva.
 	 */
-	swapbkva = firstaddr;
 	size = (long)nswbuf * MAXPHYS;
+	swapbkva = (vm_ptr_t)cheri_bound(firstaddr, size);
 	firstaddr += size;
 
 	/*
@@ -261,10 +262,10 @@ again:
 	if (bio_transient_maxcnt != 0) {
 		size = (long)bio_transient_maxcnt * MAXPHYS;
 		vmem_init(transient_arena, "transient arena",
-		    firstaddr, size, PAGE_SIZE, 0, 0);
+		    (vm_ptr_t)cheri_bound(firstaddr, size), size, PAGE_SIZE, 0, 0);
 		firstaddr += size;
 	}
-	if (firstaddr != kmi->clean_eva)
+	if (firstaddr != (caddr_t)kmi->clean_eva)
 		panic("Clean map calculation incorrect");
 
 	/*

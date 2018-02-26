@@ -1317,6 +1317,10 @@ pmap_growkernel(vm_offset_t addr)
 			nkpg = pmap_alloc_direct_page(nkpt, req_class);
 			if (nkpg == NULL)
 				panic("pmap_growkernel: no memory to grow kernel");
+			/* 
+			 * XXX-AM: this rederives the pointer, not good! pmap_alloc 
+			 * should return a valid capability already. 
+			 */
 			*pdpe = (pd_entry_t)MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(nkpg));
 			continue; /* try again */
 		}
