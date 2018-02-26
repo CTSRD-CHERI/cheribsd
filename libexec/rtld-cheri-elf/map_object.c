@@ -199,6 +199,8 @@ map_object(int fd, const char *path, const struct stat *sb)
     if (npagesizes > 1 && round_page(segs[0]->p_filesz) >= pagesizes[1])
 	base_flags |= MAP_ALIGNED_SUPER;
 
+    dbg("Allocating entire object: mmap(%#p, 0x%lx, 0x%x, 0x%x, -1, 0)",
+	    base_addr, mapsize, PROT_READ|PROT_WRITE|PROT_EXEC, base_flags);
     mapbase = mmap(base_addr, mapsize, PROT_READ|PROT_WRITE|PROT_EXEC,
 	base_flags, -1, 0);
     if (mapbase == MAP_FAILED) {
