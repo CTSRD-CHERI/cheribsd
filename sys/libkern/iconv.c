@@ -462,11 +462,11 @@ iconv_sysctl_add(SYSCTL_HANDLER_ARGS)
 		return EINVAL;
 	if (du.din.ia_datalen > ICONV_CSMAXDATALEN)
 		return EINVAL;
-	if (strlen(du.din.ia_from) >= ICONV_CSNMAXLEN)
+	if (strnlen(du.din.ia_from, sizeof(du.din.ia_from)) >= ICONV_CSNMAXLEN)
 		return EINVAL;
-	if (strlen(du.din.ia_to) >= ICONV_CSNMAXLEN)
+	if (strnlen(du.din.ia_to, sizeof(du.din.ia_to)) >= ICONV_CSNMAXLEN)
 		return EINVAL;
-	if (strlen(du.din.ia_converter) >= ICONV_CNVNMAXLEN)
+	if (strnlen(du.din.ia_converter, sizeof(du.din.ia_converter)) >= ICONV_CNVNMAXLEN)
 		return EINVAL;
 	if (iconv_lookupconv(du.din.ia_converter, &dcp) != 0)
 		return EINVAL;
