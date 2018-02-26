@@ -168,7 +168,7 @@ static Elf64_Brandinfo freebsd_cheriabi_brand_info = {
 	.interp_path	= "/libexec/ld-cheri-elf.so.1",
 	.sysvec		= &elf_freebsd_cheriabi_sysvec,
 	.interp_newpath = NULL,
-	.flags		= 0,
+	.flags		= BI_CAN_EXEC_DYN,
 	.header_supported = cheriabi_elf_header_supported
 };
 
