@@ -118,6 +118,9 @@ SECTIONS
 	.MIPS.options ALIGN(PAGE_ALIGN): {
 		*(.MIPS.options)
 	}
+	.MIPS.abiflags ALIGN(PAGE_ALIGN): {
+		*(.MIPS.abiflags)
+	}
 	.ctors ALIGN(CAP_ALIGN) : {
 		KEEP (crtbeginC.o(.ctors))
 		KEEP (*(EXCLUDE_FILE (*crtendC.o) .ctors))
