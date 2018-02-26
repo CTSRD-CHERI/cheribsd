@@ -854,7 +854,8 @@
 				    _In_ void * __capability *argv, \
 				    _In_ void * __capability *envv, \
 				    _In_ struct mac_c *mac_p); }
-416	AUE_SIGACTION	STD	{ int cheriabi_sigaction(int sig, \
+; NOPARSE to allow compatibility with old CheriABI binaries that don't have sa_cgp
+416	AUE_SIGACTION	NOARGS|NOPARSE	{ int cheriabi_sigaction(int sig, \
 				    _In_opt_ struct sigaction_c *act, \
 				    _Out_opt_ struct sigaction_c *oact); }
 417	AUE_SIGRETURN	STD	{ int cheriabi_sigreturn( \

@@ -37,18 +37,42 @@ __FBSDID("$FreeBSD$");
  * Almost backwards compatible signal.
  */
 #include "namespace.h"
+/* XXXAR: Hack to hide the static inline declaration for CHERIABI */
+#define _BUILDING_SIGACTION
 #include <signal.h>
+#include <stdio.h>
 #include "un-namespace.h"
 #include "libc_private.h"
+
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * In the CHERIABI case the sigaction declaration is inline so we need the
+ * prototype here
+ */
+sig_t	signal(int s, sig_t a);
+#endif
 
 sigset_t _sigintr __hidden;	/* shared with siginterrupt */
 
 sig_t
 signal(int s, sig_t a)
 {
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* For compatibility with old binaries keep the signal() symbol */
+	return cheriabi_signal(s, a, 0);
+}
+
+sig_t
+cheriabi_signal(int s, sig_t a, void* cgp)
+{
+#endif
 	struct sigaction sa, osa;
 
 	sa.sa_handler = a;
+#ifdef __CHERI_PURE_CAPABILITY__
+	sa.sa_cgp = cgp;
+	// printf("%s: setting cgp for signal(%d) to %#p\n", __func__, s, cgp);
+#endif
 	sigemptyset(&sa.sa_mask);
 	sa.sa_flags = 0;
 	if (!sigismember(&_sigintr, s))

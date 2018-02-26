@@ -27,6 +27,8 @@ FBSDprivate_1.0 {
 	_sbrk;
 	_end;
 
+	cheriabi_*; /* export the signal/sigaction wrappers */
+
 	/*
 	 * XXX-BD: Export .size.<var> symbols for <var>'s that are undefined
 	 * so rtld can update them.  This is a hack and should be replaced

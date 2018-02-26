@@ -46,8 +46,12 @@ Elf_Addr reloc_jmpslot(Elf_Addr *where, Elf_Addr target,
 #define make_function_pointer(def, defobj)				\
 	((defobj)->relocbase + (def)->st_value)
 
-#define call_initfini_pointer(obj, target)				\
-	(((InitFunc)(cheri_setoffset(cheri_getpcc(), (target))))())
+#define call_initfini_pointer(obj, target)	do {				\
+	InitFunc func = (InitFunc)(cheri_setoffset(cheri_getpcc(), (target)));	\
+	dbg("Calling init func %#p with $ddc=%#p", func, cheri_getdefault());	\
+	dbg("NULL=%#p", NULL);							\
+	func();									\
+} while(false)
 
 #define call_init_pointer(obj, target)					\
 	(((InitArrFunc)(cheri_setoffset(cheri_getpcc(), (target))))	\

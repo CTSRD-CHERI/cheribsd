@@ -34,11 +34,52 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
+/* XXXAR: Hack to hide the static inline declaration for CHERIABI */
+#define _BUILDING_SIGACTION
 #include <signal.h>
+#include <string.h>
+#include <stdio.h>
 #include "libc_private.h"
 
 __weak_reference(__sys_sigaction, __sigaction);
 __weak_reference(sigaction, __libc_sigaction);
+
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheri/cheric.h>
+/*
+ * In the CHERIABI case the sigaction declaration is inline so we need the
+ * prototype here
+ */
+int	sigaction(int, const struct sigaction * __restrict,
+	    struct sigaction * __restrict);
+
+/*
+ * In the CHERI pure capability ABI we also need to pass the CALLERS cgp to
+ * the kernel. We do this by changing sigaction into an inline function that
+ * passes cgp in addition to the normal parameters.
+ */
+int
+cheriabi_sigaction(int sig, const struct sigaction *act,
+    struct sigaction *oact, void* cgp)
+{
+	/*
+	 * All the SIG_IGN, SIG_DFL, etc constants won't have the tag bit set
+	 * so we can safely dereference act if it is tagged.
+	 */
+	if (cheri_gettag(act)) {
+		struct sigaction copy;
+#if 0
+		printf("%s: setting cgp for sigaction(%d) to %#p\n", __func__,
+		    sig, cgp);
+#endif
+		memcpy(&copy, act, sizeof(copy));
+		copy.sa_cgp = cgp;
+		return (__libc_sigaction(sig, &copy, oact));
+	}
+
+	return (__libc_sigaction(sig, act, oact));
+}
+#endif
 
 #pragma weak sigaction
 int

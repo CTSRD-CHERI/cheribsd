@@ -48,13 +48,21 @@
  */
 
 ROKEN_LIB_FUNCTION SigAction ROKEN_LIB_CALL
+#ifdef __CHERI_PURE_CAPABILITY__
+cheriabi_signal(int iSig, SigAction pAction, void* cgp)
+#else
 signal(int iSig, SigAction pAction)
+#endif
 {
     struct sigaction saNew, saOld;
 
     saNew.sa_handler = pAction;
     sigemptyset(&saNew.sa_mask);
     saNew.sa_flags = 0;
+#ifdef __CHERI_PURE_CAPABILITY__
+    saNew.sa_cgp = cgp;
+#endif
+
 
     if (iSig == SIGALRM)
 	{

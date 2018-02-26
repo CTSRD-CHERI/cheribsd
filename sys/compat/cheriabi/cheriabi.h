@@ -154,10 +154,19 @@ struct jail_c {
 	struct in6_addr * __capability	ip6;
 };
 
+/* Used by old binaries prior to $cgp in signal handler */
+struct sigaction_c_compat {
+	void * __capability	sa_u;
+	int		sa_flags;
+	sigset_t	sa_mask;
+};
+
 struct sigaction_c {
 	void * __capability	sa_u;
 	int		sa_flags;
 	sigset_t	sa_mask;
+	/* XXXAR: move this up for better layout once we can break userspace? */
+	void * __capability	sa_cgp;
 };
 
 struct thr_param_c {

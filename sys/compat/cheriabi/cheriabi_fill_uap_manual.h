@@ -776,3 +776,58 @@ CHERIABI_SYS_cheriabi_procctl_fill_uap(struct thread *td,
 
 	return (0);
 }
+
+/* XXXAR: the custom parsing is only needed as long as we want to support old binaries */
+#define	CHERIABI_SYS_cheriabi_sigaction_PTRMASK	(0x0 | 0x2 | 0x4)
+
+static inline int
+CHERIABI_SYS_cheriabi_sigaction_fill_uap(struct thread *td,
+    struct cheriabi_sigaction_args *uap)
+{
+	void * __capability tmpcap;
+
+	/* [0] int sig */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_sigaction_PTRMASK);
+	uap->sig = cheri_getoffset(tmpcap);
+
+	/* [1] _In_opt_ struct sigaction_c * act */
+	{
+		int error;
+		register_t reqperms = (CHERI_PERM_LOAD|CHERI_PERM_LOAD_CAP);
+		size_t actsz;
+
+		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_sigaction_PTRMASK);
+		/* fetch either the old struct or the new one and pass on that information */
+		actsz = MIN(cheri_getlen(tmpcap), sizeof(struct sigaction_c));
+		/* But we need to fetch at least sizeof(old struct sigaction) */
+		actsz = MAX(actsz, sizeof(struct sigaction_c_compat));
+
+		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->act),
+		    tmpcap, actsz, reqperms, 1);
+		if (error != 0)
+			return (error);
+		/* Tell cheriabi_sigaction which struct was passed */
+		uap->actsz = actsz;
+	}
+
+	/* [2] _Out_opt_ struct sigaction_c * oact */
+	{
+		int error;
+		register_t reqperms = (CHERI_PERM_STORE|CHERI_PERM_STORE_CAP);
+		size_t oactsz;
+
+		/* fetch either the old struct or the new one and pass on that information */
+		oactsz = MIN(cheri_getlen(tmpcap), sizeof(struct sigaction_c));
+		/* But we need to fetch at least sizeof(old struct sigaction) */
+		oactsz = MAX(oactsz, sizeof(struct sigaction_c_compat));
+		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_sigaction_PTRMASK);
+		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->oact),
+		    tmpcap, oactsz, reqperms, 1);
+		if (error != 0)
+			return (error);
+		/* Tell cheriabi_sigaction which struct was passed */
+		uap->oactsz = oactsz;
+	}
+
+	return (0);
+}
