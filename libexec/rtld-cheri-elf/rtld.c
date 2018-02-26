@@ -317,6 +317,11 @@ static void
 process___cap_relocs(Obj_Entry* obj, const struct capreloc* start,
     const struct capreloc* end)
 {
+	if (obj->cap_relocs_processed) {
+		dbg("__cap_relocs for %s have already been processed!", obj->path);
+		/* TODO: abort() to prevent this from happening? */
+		return;
+	}
 	/*
 	 * It would be nice if we could use a DDC and PCC with smaller bounds
 	 * here. However, the target could be in a different shared library so
@@ -336,8 +341,8 @@ process___cap_relocs(Obj_Entry* obj, const struct capreloc* start,
 #endif
 	vaddr_t base_addr = 0;
 
-	dbg("Processing %lu __cap_relocs for %s", (end - start) / sizeof(*start),
-		obj->path ? obj->path : "RTLD");
+	dbg("Processing %lu __cap_relocs for %s\n",
+	    (end - start) / sizeof(*start), obj->path ? obj->path : "RTLD");
 
 	gdc = __builtin_cheri_perms_and(gdc, global_pointer_permissions);
 	pcc = __builtin_cheri_perms_and(pcc, function_pointer_permissions);
@@ -356,6 +361,7 @@ process___cap_relocs(Obj_Entry* obj, const struct capreloc* start,
 		src = __builtin_cheri_offset_increment(src, reloc->offset);
 		*dest = src;
 	}
+	obj->cap_relocs_processed = true;
 }
 
 #define	LD_UTRACE(e, h, mb, ms, r, n) do {			\
