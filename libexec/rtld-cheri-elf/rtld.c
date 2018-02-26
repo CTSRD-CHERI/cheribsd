@@ -5415,7 +5415,7 @@ parse_args(char* argv[], int argc, bool *use_pathp, int *fdp)
 			opt = arg[j];
 			if (opt == 'h') {
 				print_usage(argv[0]);
-				rtld_die();
+				_exit(0);
 			} else if (opt == 'f') {
 			/*
 			 * -f XX can be used to specify a descriptor for the
