@@ -341,8 +341,8 @@ process___cap_relocs(Obj_Entry* obj, const struct capreloc* start,
 #endif
 	vaddr_t base_addr = 0;
 
-	dbg("Processing %lu __cap_relocs for %s\n",
-	    (end - start) / sizeof(*start), obj->path ? obj->path : "RTLD");
+	dbg("Processing %lu __cap_relocs for %s\n", (end - start),
+	    obj->path ? obj->path : "RTLD");
 
 	gdc = __builtin_cheri_perms_and(gdc, global_pointer_permissions);
 	pcc = __builtin_cheri_perms_and(pcc, function_pointer_permissions);
