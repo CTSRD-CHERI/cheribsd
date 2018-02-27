@@ -1202,7 +1202,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 }
 
 int
-convert_sigevent_c(struct sigevent_c *sig_c, struct sigevent *sig)
+convert_sigevent_c(const struct sigevent_c *sig_c, struct sigevent *sig)
 {
 
 	CP(*sig_c, *sig, sigev_notify);
