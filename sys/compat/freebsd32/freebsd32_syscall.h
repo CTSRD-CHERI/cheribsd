@@ -319,8 +319,8 @@
 #define	FREEBSD32_SYS_ksem_post	401
 #define	FREEBSD32_SYS_ksem_wait	402
 #define	FREEBSD32_SYS_ksem_trywait	403
-#define	FREEBSD32_SYS_freebsd32_ksem_init	404
-#define	FREEBSD32_SYS_freebsd32_ksem_open	405
+#define	FREEBSD32_SYS_ksem_init	404
+#define	FREEBSD32_SYS_ksem_open	405
 #define	FREEBSD32_SYS_ksem_unlink	406
 #define	FREEBSD32_SYS_ksem_getvalue	407
 #define	FREEBSD32_SYS_ksem_destroy	408
