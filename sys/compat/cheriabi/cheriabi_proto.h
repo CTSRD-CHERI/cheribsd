@@ -878,9 +878,37 @@ struct cheriabi_sigqueue_args {
 	char signum_l_[PADL_(int)]; int signum; char signum_r_[PADR_(int)];
 	char value_l_[PADL_(void *__capability)]; void *__capability value; char value_r_[PADR_(void *__capability)];
 };
+struct cheriabi_kmq_open_args {
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
+	char attr_l_[PADL_(const struct mq_attr *__capability)]; const struct mq_attr *__capability attr; char attr_r_[PADR_(const struct mq_attr *__capability)];
+};
+struct cheriabi_kmq_setattr_args {
+	char mqd_l_[PADL_(int)]; int mqd; char mqd_r_[PADR_(int)];
+	char attr_l_[PADL_(const struct mq_attr *__capability)]; const struct mq_attr *__capability attr; char attr_r_[PADR_(const struct mq_attr *__capability)];
+	char oattr_l_[PADL_(struct mq_attr *__capability)]; struct mq_attr *__capability oattr; char oattr_r_[PADR_(struct mq_attr *__capability)];
+};
+struct cheriabi_kmq_timedreceive_args {
+	char mqd_l_[PADL_(int)]; int mqd; char mqd_r_[PADR_(int)];
+	char msg_ptr_l_[PADL_(char *__capability)]; char *__capability msg_ptr; char msg_ptr_r_[PADR_(char *__capability)];
+	char msg_len_l_[PADL_(size_t)]; size_t msg_len; char msg_len_r_[PADR_(size_t)];
+	char msg_prio_l_[PADL_(unsigned *__capability)]; unsigned *__capability msg_prio; char msg_prio_r_[PADR_(unsigned *__capability)];
+	char abs_timeout_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability abs_timeout; char abs_timeout_r_[PADR_(const struct timespec *__capability)];
+};
+struct cheriabi_kmq_timedsend_args {
+	char mqd_l_[PADL_(int)]; int mqd; char mqd_r_[PADR_(int)];
+	char msg_ptr_l_[PADL_(const char *__capability)]; const char *__capability msg_ptr; char msg_ptr_r_[PADR_(const char *__capability)];
+	char msg_len_l_[PADL_(size_t)]; size_t msg_len; char msg_len_r_[PADR_(size_t)];
+	char msg_prio_l_[PADL_(unsigned)]; unsigned msg_prio; char msg_prio_r_[PADR_(unsigned)];
+	char abs_timeout_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability abs_timeout; char abs_timeout_r_[PADR_(const struct timespec *__capability)];
+};
 struct cheriabi_kmq_notify_args {
 	char mqd_l_[PADL_(int)]; int mqd; char mqd_r_[PADR_(int)];
-	char sigev_l_[PADL_(const struct sigevent_c *)]; const struct sigevent_c * sigev; char sigev_r_[PADR_(const struct sigevent_c *)];
+	char sigev_l_[PADL_(const struct sigevent_c *__capability)]; const struct sigevent_c *__capability sigev; char sigev_r_[PADR_(const struct sigevent_c *__capability)];
+};
+struct cheriabi_kmq_unlink_args {
+	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 };
 struct cheriabi_abort2_args {
 	char why_l_[PADL_(const char *__capability)]; const char *__capability why; char why_r_[PADR_(const char *__capability)];
@@ -1461,7 +1489,12 @@ int	cheriabi_setaudit_addr(struct thread *, struct cheriabi_setaudit_addr_args *
 int	cheriabi_auditctl(struct thread *, struct cheriabi_auditctl_args *);
 int	cheriabi_thr_new(struct thread *, struct cheriabi_thr_new_args *);
 int	cheriabi_sigqueue(struct thread *, struct cheriabi_sigqueue_args *);
+int	cheriabi_kmq_open(struct thread *, struct cheriabi_kmq_open_args *);
+int	cheriabi_kmq_setattr(struct thread *, struct cheriabi_kmq_setattr_args *);
+int	cheriabi_kmq_timedreceive(struct thread *, struct cheriabi_kmq_timedreceive_args *);
+int	cheriabi_kmq_timedsend(struct thread *, struct cheriabi_kmq_timedsend_args *);
 int	cheriabi_kmq_notify(struct thread *, struct cheriabi_kmq_notify_args *);
+int	cheriabi_kmq_unlink(struct thread *, struct cheriabi_kmq_unlink_args *);
 int	cheriabi_abort2(struct thread *, struct cheriabi_abort2_args *);
 int	cheriabi_aio_fsync(struct thread *, struct cheriabi_aio_fsync_args *);
 int	cheriabi_rtprio_thread(struct thread *, struct cheriabi_rtprio_thread_args *);
@@ -1771,7 +1804,12 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_auditctl	AUE_AUDITCTL
 #define	CHERIABI_SYS_AUE_cheriabi_thr_new	AUE_THR_NEW
 #define	CHERIABI_SYS_AUE_cheriabi_sigqueue	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_kmq_open	AUE_MQ_OPEN
+#define	CHERIABI_SYS_AUE_cheriabi_kmq_setattr	AUE_MQ_SETATTR
+#define	CHERIABI_SYS_AUE_cheriabi_kmq_timedreceive	AUE_MQ_TIMEDRECEIVE
+#define	CHERIABI_SYS_AUE_cheriabi_kmq_timedsend	AUE_MQ_TIMEDSEND
 #define	CHERIABI_SYS_AUE_cheriabi_kmq_notify	AUE_MQ_NOTIFY
+#define	CHERIABI_SYS_AUE_cheriabi_kmq_unlink	AUE_MQ_UNLINK
 #define	CHERIABI_SYS_AUE_cheriabi_abort2	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_aio_fsync	AUE_AIO_FSYNC
 #define	CHERIABI_SYS_AUE_cheriabi_rtprio_thread	AUE_RTPRIO

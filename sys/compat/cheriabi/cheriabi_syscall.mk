@@ -268,12 +268,12 @@ MIASM =  \
 	_umtx_op.o \
 	cheriabi_thr_new.o \
 	cheriabi_sigqueue.o \
-	kmq_open.o \
-	kmq_setattr.o \
-	kmq_timedreceive.o \
-	kmq_timedsend.o \
+	cheriabi_kmq_open.o \
+	cheriabi_kmq_setattr.o \
+	cheriabi_kmq_timedreceive.o \
+	cheriabi_kmq_timedsend.o \
 	cheriabi_kmq_notify.o \
-	kmq_unlink.o \
+	cheriabi_kmq_unlink.o \
 	cheriabi_abort2.o \
 	thr_set_name.o \
 	cheriabi_aio_fsync.o \

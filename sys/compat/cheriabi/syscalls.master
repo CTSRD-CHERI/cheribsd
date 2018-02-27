@@ -1046,30 +1046,31 @@
 				    int param_size); }
 456	AUE_NULL	STD	{ int cheriabi_sigqueue(pid_t pid, \
 				    int signum, void * __capability value); }
-457	AUE_MQ_OPEN	NOSTD|NOPROTO	{ int kmq_open( \
-				    _In_z_ const char *path, int flags, \
-				    mode_t mode, \
-				    _In_opt_ const struct mq_attr *attr); }
-458	AUE_MQ_SETATTR	NOSTD|NOPROTO	{ int kmq_setattr(int mqd, \
-				    _In_opt_ const struct mq_attr *attr, \
-				    _Out_opt_ struct mq_attr *oattr); }
-459	AUE_MQ_TIMEDRECEIVE	NOSTD|NOPROTO	{ int kmq_timedreceive( \
+457	AUE_MQ_OPEN	NOSTD	{ int cheriabi_kmq_open( \
+				    _In_z_ const char * __capability path, \
+				    int flags, mode_t mode, \
+				    _In_opt_ const struct mq_attr * __capability attr); }
+458	AUE_MQ_SETATTR	NOSTD	{ int cheriabi_kmq_setattr(int mqd, \
+				    _In_opt_ const struct mq_attr * __capability attr, \
+				    _Out_opt_ struct mq_attr * __capability oattr); }
+459	AUE_MQ_TIMEDRECEIVE	NOSTD	{ int cheriabi_kmq_timedreceive( \
 				    int mqd, \
-				    _Out_writes_bytes_(msg_len) char *msg_ptr, \
+				    _Out_writes_bytes_(msg_len) \
+				    char * __capability msg_ptr, \
 				    size_t msg_len, \
-				    _Out_opt_ unsigned *msg_prio, \
+				    _Out_opt_ unsigned * __capability msg_prio, \
 				    _In_opt_ \
-				    const struct timespec *abs_timeout); }
-460	AUE_MQ_TIMEDSEND	NOSTD|NOPROTO	{ int kmq_timedsend(int mqd, \
+				    const struct timespec * __capability abs_timeout); }
+460	AUE_MQ_TIMEDSEND	NOSTD	{ int cheriabi_kmq_timedsend(int mqd, \
 				    _In_reads_bytes_(msg_len) \
-				    const char *msg_ptr, size_t msg_len, \
-				    unsigned msg_prio, \
+				    const char * __capability msg_ptr, \
+				    size_t msg_len, unsigned msg_prio, \
 				    _In_opt_ \
-				    const struct timespec *abs_timeout); }
+				    const struct timespec * __capability abs_timeout); }
 461	AUE_MQ_NOTIFY	NOSTD	{ int cheriabi_kmq_notify(int mqd,	\
-				    _In_opt_ const struct sigevent_c *sigev); }
-462	AUE_MQ_UNLINK	NOPROTO|NOSTD	{ int kmq_unlink( \
-				    _In_z_ const char *path); }
+				    _In_opt_ const struct sigevent_c * __capability sigev); }
+462	AUE_MQ_UNLINK	NOSTD	{ int cheriabi_kmq_unlink( \
+				    _In_z_ const char * __capability path); }
 463	AUE_NULL	STD|NOSTUB	{ void cheriabi_abort2( \
 				    _In_z_ const char * __capability why, \
 				    int nargs, \

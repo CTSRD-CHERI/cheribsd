@@ -2230,44 +2230,44 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* kmq_open */
+	/* cheriabi_kmq_open */
 	case 457: {
-		struct kmq_open_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_kmq_open_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		iarg[1] = p->flags; /* int */
 		iarg[2] = p->mode; /* mode_t */
-		uarg[3] = (intptr_t) p->attr; /* const struct mq_attr * */
+		uarg[3] = (cheri_getbase(p->attr) + cheri_getoffset(p->attr)); /* const struct mq_attr *__capability */
 		*n_args = 4;
 		break;
 	}
-	/* kmq_setattr */
+	/* cheriabi_kmq_setattr */
 	case 458: {
-		struct kmq_setattr_args *p = params;
+		struct cheriabi_kmq_setattr_args *p = params;
 		iarg[0] = p->mqd; /* int */
-		uarg[1] = (intptr_t) p->attr; /* const struct mq_attr * */
-		uarg[2] = (intptr_t) p->oattr; /* struct mq_attr * */
+		uarg[1] = (cheri_getbase(p->attr) + cheri_getoffset(p->attr)); /* const struct mq_attr *__capability */
+		uarg[2] = (cheri_getbase(p->oattr) + cheri_getoffset(p->oattr)); /* struct mq_attr *__capability */
 		*n_args = 3;
 		break;
 	}
-	/* kmq_timedreceive */
+	/* cheriabi_kmq_timedreceive */
 	case 459: {
-		struct kmq_timedreceive_args *p = params;
+		struct cheriabi_kmq_timedreceive_args *p = params;
 		iarg[0] = p->mqd; /* int */
-		uarg[1] = (intptr_t) p->msg_ptr; /* char * */
+		uarg[1] = (cheri_getbase(p->msg_ptr) + cheri_getoffset(p->msg_ptr)); /* char *__capability */
 		uarg[2] = p->msg_len; /* size_t */
-		uarg[3] = (intptr_t) p->msg_prio; /* unsigned * */
-		uarg[4] = (intptr_t) p->abs_timeout; /* const struct timespec * */
+		uarg[3] = (cheri_getbase(p->msg_prio) + cheri_getoffset(p->msg_prio)); /* unsigned *__capability */
+		uarg[4] = (cheri_getbase(p->abs_timeout) + cheri_getoffset(p->abs_timeout)); /* const struct timespec *__capability */
 		*n_args = 5;
 		break;
 	}
-	/* kmq_timedsend */
+	/* cheriabi_kmq_timedsend */
 	case 460: {
-		struct kmq_timedsend_args *p = params;
+		struct cheriabi_kmq_timedsend_args *p = params;
 		iarg[0] = p->mqd; /* int */
-		uarg[1] = (intptr_t) p->msg_ptr; /* const char * */
+		uarg[1] = (cheri_getbase(p->msg_ptr) + cheri_getoffset(p->msg_ptr)); /* const char *__capability */
 		uarg[2] = p->msg_len; /* size_t */
 		uarg[3] = p->msg_prio; /* unsigned */
-		uarg[4] = (intptr_t) p->abs_timeout; /* const struct timespec * */
+		uarg[4] = (cheri_getbase(p->abs_timeout) + cheri_getoffset(p->abs_timeout)); /* const struct timespec *__capability */
 		*n_args = 5;
 		break;
 	}
@@ -2275,14 +2275,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 461: {
 		struct cheriabi_kmq_notify_args *p = params;
 		iarg[0] = p->mqd; /* int */
-		uarg[1] = (intptr_t) p->sigev; /* const struct sigevent_c * */
+		uarg[1] = (cheri_getbase(p->sigev) + cheri_getoffset(p->sigev)); /* const struct sigevent_c *__capability */
 		*n_args = 2;
 		break;
 	}
-	/* kmq_unlink */
+	/* cheriabi_kmq_unlink */
 	case 462: {
-		struct kmq_unlink_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
+		struct cheriabi_kmq_unlink_args *p = params;
+		uarg[0] = (cheri_getbase(p->path) + cheri_getoffset(p->path)); /* const char *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -6690,11 +6690,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* kmq_open */
+	/* cheriabi_kmq_open */
 	case 457:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 1:
 			p = "int";
@@ -6703,58 +6703,58 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "mode_t";
 			break;
 		case 3:
-			p = "userland const struct mq_attr *";
+			p = "userland const struct mq_attr *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* kmq_setattr */
+	/* cheriabi_kmq_setattr */
 	case 458:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct mq_attr *";
+			p = "userland const struct mq_attr *__capability";
 			break;
 		case 2:
-			p = "userland struct mq_attr *";
+			p = "userland struct mq_attr *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* kmq_timedreceive */
+	/* cheriabi_kmq_timedreceive */
 	case 459:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland char *";
+			p = "userland char *__capability";
 			break;
 		case 2:
 			p = "size_t";
 			break;
 		case 3:
-			p = "userland unsigned *";
+			p = "userland unsigned *__capability";
 			break;
 		case 4:
-			p = "userland const struct timespec *";
+			p = "userland const struct timespec *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* kmq_timedsend */
+	/* cheriabi_kmq_timedsend */
 	case 460:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		case 2:
 			p = "size_t";
@@ -6763,7 +6763,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "unsigned";
 			break;
 		case 4:
-			p = "userland const struct timespec *";
+			p = "userland const struct timespec *__capability";
 			break;
 		default:
 			break;
@@ -6776,17 +6776,17 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct sigevent_c *";
+			p = "userland const struct sigevent_c *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* kmq_unlink */
+	/* cheriabi_kmq_unlink */
 	case 462:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		default:
 			break;
@@ -9554,22 +9554,22 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* kmq_open */
+	/* cheriabi_kmq_open */
 	case 457:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* kmq_setattr */
+	/* cheriabi_kmq_setattr */
 	case 458:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* kmq_timedreceive */
+	/* cheriabi_kmq_timedreceive */
 	case 459:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* kmq_timedsend */
+	/* cheriabi_kmq_timedsend */
 	case 460:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9579,7 +9579,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* kmq_unlink */
+	/* cheriabi_kmq_unlink */
 	case 462:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

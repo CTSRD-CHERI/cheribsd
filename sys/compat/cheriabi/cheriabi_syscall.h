@@ -377,12 +377,12 @@
 #define	CHERIABI_SYS__umtx_op	454
 #define	CHERIABI_SYS_cheriabi_thr_new	455
 #define	CHERIABI_SYS_cheriabi_sigqueue	456
-#define	CHERIABI_SYS_kmq_open	457
-#define	CHERIABI_SYS_kmq_setattr	458
-#define	CHERIABI_SYS_kmq_timedreceive	459
-#define	CHERIABI_SYS_kmq_timedsend	460
+#define	CHERIABI_SYS_cheriabi_kmq_open	457
+#define	CHERIABI_SYS_cheriabi_kmq_setattr	458
+#define	CHERIABI_SYS_cheriabi_kmq_timedreceive	459
+#define	CHERIABI_SYS_cheriabi_kmq_timedsend	460
 #define	CHERIABI_SYS_cheriabi_kmq_notify	461
-#define	CHERIABI_SYS_kmq_unlink	462
+#define	CHERIABI_SYS_cheriabi_kmq_unlink	462
 #define	CHERIABI_SYS_cheriabi_abort2	463
 #define	CHERIABI_SYS_thr_set_name	464
 #define	CHERIABI_SYS_cheriabi_aio_fsync	465
