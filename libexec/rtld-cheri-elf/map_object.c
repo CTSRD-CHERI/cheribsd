@@ -222,9 +222,10 @@ map_object(int fd, const char *path, const struct stat *sb)
 	data_vaddr = trunc_page(segs[i]->p_vaddr);
 	data_vlimit = round_page(segs[i]->p_vaddr + segs[i]->p_filesz);
 	data_addr = mapbase + (data_vaddr - base_vaddr);
-	/* XXX-BD: add write for now. */
-	data_prot = convert_prot(segs[i]->p_flags) | PROT_WRITE;
+	data_prot = convert_prot(segs[i]->p_flags);
 	data_flags = convert_flags(segs[i]->p_flags) | MAP_FIXED;
+	dbg("Mapping %s PT_LOAD(%d) with flags 0x%x at %p", path, i,
+	    segs[i]->p_flags, data_addr, data_vlimit);
 	if (mmap(data_addr, data_vlimit - data_vaddr, data_prot,
 	  data_flags | MAP_PREFAULT_READ, fd, data_offset) == (caddr_t) -1) {
 	    _rtld_error("%s: mmap of data failed: %s", path,
