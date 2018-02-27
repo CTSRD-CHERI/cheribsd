@@ -431,9 +431,9 @@
 #define	CHERIABI_SYS_cheriabi_shmctl	512
 #define	CHERIABI_SYS_cheriabi_lpathconf	513
 				/* 514 is obsolete cap_new */
-#define	CHERIABI_SYS___cap_rights_get	515
+#define	CHERIABI_SYS_cheriabi___cap_rights_get	515
 #define	CHERIABI_SYS_cap_enter	516
-#define	CHERIABI_SYS_cap_getmode	517
+#define	CHERIABI_SYS_cheriabi_cap_getmode	517
 #define	CHERIABI_SYS_cheriabi_pdfork	518
 #define	CHERIABI_SYS_pdkill	519
 #define	CHERIABI_SYS_cheriabi_pdgetpid	520
@@ -448,11 +448,11 @@
 #define	CHERIABI_SYS_posix_fallocate	530
 #define	CHERIABI_SYS_posix_fadvise	531
 #define	CHERIABI_SYS_cheriabi_wait6	532
-#define	CHERIABI_SYS_cap_rights_limit	533
-#define	CHERIABI_SYS_cap_ioctls_limit	534
-#define	CHERIABI_SYS_cap_ioctls_get	535
+#define	CHERIABI_SYS_cheriabi_cap_rights_limit	533
+#define	CHERIABI_SYS_cheriabi_cap_ioctls_limit	534
+#define	CHERIABI_SYS_cheriabi_cap_ioctls_get	535
 #define	CHERIABI_SYS_cap_fcntls_limit	536
-#define	CHERIABI_SYS_cap_fcntls_get	537
+#define	CHERIABI_SYS_cheriabi_cap_fcntls_get	537
 #define	CHERIABI_SYS_cheriabi_bindat	538
 #define	CHERIABI_SYS_cheriabi_connectat	539
 #define	CHERIABI_SYS_cheriabi_chflagsat	540

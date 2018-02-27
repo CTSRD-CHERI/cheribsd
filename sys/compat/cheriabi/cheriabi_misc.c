@@ -2352,6 +2352,105 @@ cheriabi_swapoff(struct thread *td, struct cheriabi_swapoff_args *uap)
 }
 
 /*
+ * sys_capability.c
+ */
+#ifdef CAPABILITIES
+int
+cheriabi_cap_getmode(struct thread *td, struct cheriabi_cap_getmode_args *uap)
+{
+
+	return (kern_cap_getmode(td, uap->modep));
+}
+
+int
+cheriabi_cap_rights_limit(struct thread *td,
+   struct cheriabi_cap_rights_limit_args *uap)
+{
+
+	return (user_cap_rights_limit(td, uap->fd, uap->rightsp));
+}
+
+int
+cheriabi___cap_rights_get(struct thread *td,
+    struct cheriabi___cap_rights_get_args *uap)
+{
+
+	return (kern_cap_rights_get(td, uap->version, uap->fd, uap->rightsp));
+}
+
+int
+cheriabi_cap_ioctls_limit(struct thread *td,
+    struct cheriabi_cap_ioctls_limit_args *uap)
+{
+
+	return (user_cap_ioctls_limit(td, uap->fd, uap->cmds, uap->ncmds));
+}
+
+int
+cheriabi_cap_ioctls_get(struct thread *td,
+    struct cheriabi_cap_ioctls_get_args *uap)
+{
+
+	return (kern_cap_ioctls_get(td, uap->fd, uap->cmds, uap->maxcmds));
+}
+
+int
+cheriabi_cap_fcntls_get(struct thread *td,
+   struct cheriabi_cap_fcntls_get_args *uap)
+{
+
+	return (kern_cap_fcntls_get(td, uap->fd, uap->fcntlrightsp));
+}
+#else /* !CAPABILITIES */
+int
+cheriabi_cap_getmode(struct thread *td, struct cheriabi_cap_getmode_args *uap)
+{
+
+	return (ENOSYS);
+}
+
+int
+cheriabi_cap_rights_limit(struct thread *td,
+   struct cheriabi_cap_rights_limit_args *uap)
+{
+
+	return (ENOSYS);
+}
+
+int
+cheriabi___cap_rights_get(struct thread *td,
+    struct cheriabi___cap_rights_get_args *uap)
+{
+
+	return (ENOSYS);
+}
+
+int
+cheriabi_cap_ioctls_limit(struct thread *td,
+    struct cheriabi_cap_ioctls_limit_args *uap)
+{
+
+	return (ENOSYS);
+}
+
+int
+cheriabi_cap_ioctls_get(struct thread *td,
+    struct cheriabi_cap_ioctls_get_args *uap)
+{
+
+	return (ENOSYS);
+}
+
+int
+cheriabi_cap_fcntls_get(struct thread *td,
+   struct cheriabi_cap_fcntls_get_args *uap)
+{
+
+	return (ENOSYS);
+}
+#endif /* !CAPABILITIES */
+
+/*
  * sys_pipe.c
  */
 int

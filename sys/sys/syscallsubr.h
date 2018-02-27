@@ -99,8 +99,15 @@ int	kern_auditctl(struct thread *td, const char * __capability path);
 int	kern_auditon(struct thread *td, int cmd, void * __CAPABILITY data,
 	    u_int length);
 int	kern_bindat(struct thread *td, int dirfd, int fd, struct sockaddr *sa);
+int	kern_cap_getmode(struct thread *td, u_int * __capability modep);
+int	kern_cap_fcntls_get(struct thread *td, int fd,
+	    uint32_t * __capability fcntlrightsp);
+int	kern_cap_ioctls_get(struct thread *td, int fd,
+	    u_long * __capability dstcmds, size_t maxcmds);
 int	kern_cap_ioctls_limit(struct thread *td, int fd, u_long *cmds,
 	    size_t ncmds);
+int	kern_cap_rights_get(struct thread *td, int version, int fd,
+	    cap_rights_t * __capability rightsp);
 int	kern_cap_rights_limit(struct thread *td, int fd, cap_rights_t *rights);
 int	kern_chdir(struct thread *td, const char * __CAPABILITY path,
 	    enum uio_seg pathseg);

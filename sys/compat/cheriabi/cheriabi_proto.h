@@ -1085,6 +1085,14 @@ struct cheriabi_lpathconf_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 	char name_l_[PADL_(int)]; int name; char name_r_[PADR_(int)];
 };
+struct cheriabi___cap_rights_get_args {
+	char version_l_[PADL_(int)]; int version; char version_r_[PADR_(int)];
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char rightsp_l_[PADL_(cap_rights_t *__capability)]; cap_rights_t *__capability rightsp; char rightsp_r_[PADR_(cap_rights_t *__capability)];
+};
+struct cheriabi_cap_getmode_args {
+	char modep_l_[PADL_(u_int *__capability)]; u_int *__capability modep; char modep_r_[PADR_(u_int *__capability)];
+};
 struct cheriabi_pdfork_args {
 	char fdp_l_[PADL_(int *__capability)]; int *__capability fdp; char fdp_r_[PADR_(int *__capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
@@ -1145,6 +1153,24 @@ struct cheriabi_wait6_args {
 	char options_l_[PADL_(int)]; int options; char options_r_[PADR_(int)];
 	char wrusage_l_[PADL_(struct __wrusage *__capability)]; struct __wrusage *__capability wrusage; char wrusage_r_[PADR_(struct __wrusage *__capability)];
 	char info_l_[PADL_(struct siginfo_c *__capability)]; struct siginfo_c *__capability info; char info_r_[PADR_(struct siginfo_c *__capability)];
+};
+struct cheriabi_cap_rights_limit_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char rightsp_l_[PADL_(cap_rights_t *__capability)]; cap_rights_t *__capability rightsp; char rightsp_r_[PADR_(cap_rights_t *__capability)];
+};
+struct cheriabi_cap_ioctls_limit_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char cmds_l_[PADL_(const u_long *__capability)]; const u_long *__capability cmds; char cmds_r_[PADR_(const u_long *__capability)];
+	char ncmds_l_[PADL_(size_t)]; size_t ncmds; char ncmds_r_[PADR_(size_t)];
+};
+struct cheriabi_cap_ioctls_get_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char cmds_l_[PADL_(u_long *__capability)]; u_long *__capability cmds; char cmds_r_[PADR_(u_long *__capability)];
+	char maxcmds_l_[PADL_(size_t)]; size_t maxcmds; char maxcmds_r_[PADR_(size_t)];
+};
+struct cheriabi_cap_fcntls_get_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char fcntlrightsp_l_[PADL_(uint32_t *__capability)]; uint32_t *__capability fcntlrightsp; char fcntlrightsp_r_[PADR_(uint32_t *__capability)];
 };
 struct cheriabi_bindat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
@@ -1472,6 +1498,8 @@ int	cheriabi___semctl(struct thread *, struct cheriabi___semctl_args *);
 int	cheriabi_msgctl(struct thread *, struct cheriabi_msgctl_args *);
 int	cheriabi_shmctl(struct thread *, struct cheriabi_shmctl_args *);
 int	cheriabi_lpathconf(struct thread *, struct cheriabi_lpathconf_args *);
+int	cheriabi___cap_rights_get(struct thread *, struct cheriabi___cap_rights_get_args *);
+int	cheriabi_cap_getmode(struct thread *, struct cheriabi_cap_getmode_args *);
 int	cheriabi_pdfork(struct thread *, struct cheriabi_pdfork_args *);
 int	cheriabi_pdgetpid(struct thread *, struct cheriabi_pdgetpid_args *);
 int	cheriabi_pselect(struct thread *, struct cheriabi_pselect_args *);
@@ -1483,6 +1511,10 @@ int	cheriabi_rctl_get_limits(struct thread *, struct cheriabi_rctl_get_limits_ar
 int	cheriabi_rctl_add_rule(struct thread *, struct cheriabi_rctl_add_rule_args *);
 int	cheriabi_rctl_remove_rule(struct thread *, struct cheriabi_rctl_remove_rule_args *);
 int	cheriabi_wait6(struct thread *, struct cheriabi_wait6_args *);
+int	cheriabi_cap_rights_limit(struct thread *, struct cheriabi_cap_rights_limit_args *);
+int	cheriabi_cap_ioctls_limit(struct thread *, struct cheriabi_cap_ioctls_limit_args *);
+int	cheriabi_cap_ioctls_get(struct thread *, struct cheriabi_cap_ioctls_get_args *);
+int	cheriabi_cap_fcntls_get(struct thread *, struct cheriabi_cap_fcntls_get_args *);
 int	cheriabi_bindat(struct thread *, struct cheriabi_bindat_args *);
 int	cheriabi_connectat(struct thread *, struct cheriabi_connectat_args *);
 int	cheriabi_chflagsat(struct thread *, struct cheriabi_chflagsat_args *);
@@ -1776,6 +1808,8 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_msgctl	AUE_MSGCTL
 #define	CHERIABI_SYS_AUE_cheriabi_shmctl	AUE_SHMCTL
 #define	CHERIABI_SYS_AUE_cheriabi_lpathconf	AUE_LPATHCONF
+#define	CHERIABI_SYS_AUE_cheriabi___cap_rights_get	AUE_CAP_RIGHTS_GET
+#define	CHERIABI_SYS_AUE_cheriabi_cap_getmode	AUE_CAP_GETMODE
 #define	CHERIABI_SYS_AUE_cheriabi_pdfork	AUE_PDFORK
 #define	CHERIABI_SYS_AUE_cheriabi_pdgetpid	AUE_PDGETPID
 #define	CHERIABI_SYS_AUE_cheriabi_pselect	AUE_SELECT
@@ -1787,6 +1821,10 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_rctl_add_rule	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_rctl_remove_rule	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_wait6	AUE_WAIT6
+#define	CHERIABI_SYS_AUE_cheriabi_cap_rights_limit	AUE_CAP_RIGHTS_LIMIT
+#define	CHERIABI_SYS_AUE_cheriabi_cap_ioctls_limit	AUE_CAP_IOCTLS_LIMIT
+#define	CHERIABI_SYS_AUE_cheriabi_cap_ioctls_get	AUE_CAP_IOCTLS_GET
+#define	CHERIABI_SYS_AUE_cheriabi_cap_fcntls_get	AUE_CAP_FCNTLS_GET
 #define	CHERIABI_SYS_AUE_cheriabi_bindat	AUE_BINDAT
 #define	CHERIABI_SYS_AUE_cheriabi_connectat	AUE_CONNECTAT
 #define	CHERIABI_SYS_AUE_cheriabi_chflagsat	AUE_CHFLAGSAT

@@ -2705,12 +2705,12 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* __cap_rights_get */
+	/* cheriabi___cap_rights_get */
 	case 515: {
-		struct __cap_rights_get_args *p = params;
+		struct cheriabi___cap_rights_get_args *p = params;
 		iarg[0] = p->version; /* int */
 		iarg[1] = p->fd; /* int */
-		uarg[2] = (intptr_t) p->rightsp; /* cap_rights_t * */
+		uarg[2] = (cheri_getbase(p->rightsp) + cheri_getoffset(p->rightsp)); /* cap_rights_t *__capability */
 		*n_args = 3;
 		break;
 	}
@@ -2719,10 +2719,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 0;
 		break;
 	}
-	/* cap_getmode */
+	/* cheriabi_cap_getmode */
 	case 517: {
-		struct cap_getmode_args *p = params;
-		uarg[0] = (intptr_t) p->modep; /* u_int * */
+		struct cheriabi_cap_getmode_args *p = params;
+		uarg[0] = (cheri_getbase(p->modep) + cheri_getoffset(p->modep)); /* u_int *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -2858,28 +2858,28 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 6;
 		break;
 	}
-	/* cap_rights_limit */
+	/* cheriabi_cap_rights_limit */
 	case 533: {
-		struct cap_rights_limit_args *p = params;
+		struct cheriabi_cap_rights_limit_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->rightsp; /* cap_rights_t * */
+		uarg[1] = (cheri_getbase(p->rightsp) + cheri_getoffset(p->rightsp)); /* cap_rights_t *__capability */
 		*n_args = 2;
 		break;
 	}
-	/* cap_ioctls_limit */
+	/* cheriabi_cap_ioctls_limit */
 	case 534: {
-		struct cap_ioctls_limit_args *p = params;
+		struct cheriabi_cap_ioctls_limit_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->cmds; /* const u_long * */
+		uarg[1] = (cheri_getbase(p->cmds) + cheri_getoffset(p->cmds)); /* const u_long *__capability */
 		uarg[2] = p->ncmds; /* size_t */
 		*n_args = 3;
 		break;
 	}
-	/* cap_ioctls_get */
+	/* cheriabi_cap_ioctls_get */
 	case 535: {
-		struct cap_ioctls_get_args *p = params;
+		struct cheriabi_cap_ioctls_get_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->cmds; /* u_long * */
+		uarg[1] = (cheri_getbase(p->cmds) + cheri_getoffset(p->cmds)); /* u_long *__capability */
 		uarg[2] = p->maxcmds; /* size_t */
 		*n_args = 3;
 		break;
@@ -2892,11 +2892,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* cap_fcntls_get */
+	/* cheriabi_cap_fcntls_get */
 	case 537: {
-		struct cap_fcntls_get_args *p = params;
+		struct cheriabi_cap_fcntls_get_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->fcntlrightsp; /* uint32_t * */
+		uarg[1] = (cheri_getbase(p->fcntlrightsp) + cheri_getoffset(p->fcntlrightsp)); /* uint32_t *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -7554,7 +7554,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* __cap_rights_get */
+	/* cheriabi___cap_rights_get */
 	case 515:
 		switch(ndx) {
 		case 0:
@@ -7564,7 +7564,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland cap_rights_t *";
+			p = "userland cap_rights_t *__capability";
 			break;
 		default:
 			break;
@@ -7573,11 +7573,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* cap_enter */
 	case 516:
 		break;
-	/* cap_getmode */
+	/* cheriabi_cap_getmode */
 	case 517:
 		switch(ndx) {
 		case 0:
-			p = "userland u_int *";
+			p = "userland u_int *__capability";
 			break;
 		default:
 			break;
@@ -7825,27 +7825,27 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* cap_rights_limit */
+	/* cheriabi_cap_rights_limit */
 	case 533:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland cap_rights_t *";
+			p = "userland cap_rights_t *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* cap_ioctls_limit */
+	/* cheriabi_cap_ioctls_limit */
 	case 534:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland const u_long *";
+			p = "userland const u_long *__capability";
 			break;
 		case 2:
 			p = "size_t";
@@ -7854,14 +7854,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* cap_ioctls_get */
+	/* cheriabi_cap_ioctls_get */
 	case 535:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland u_long *";
+			p = "userland u_long *__capability";
 			break;
 		case 2:
 			p = "size_t";
@@ -7883,14 +7883,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* cap_fcntls_get */
+	/* cheriabi_cap_fcntls_get */
 	case 537:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland uint32_t *";
+			p = "userland uint32_t *__capability";
 			break;
 		default:
 			break;
@@ -9809,14 +9809,14 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* __cap_rights_get */
+	/* cheriabi___cap_rights_get */
 	case 515:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
 	/* cap_enter */
 	case 516:
-	/* cap_getmode */
+	/* cheriabi_cap_getmode */
 	case 517:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9891,17 +9891,17 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cap_rights_limit */
+	/* cheriabi_cap_rights_limit */
 	case 533:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cap_ioctls_limit */
+	/* cheriabi_cap_ioctls_limit */
 	case 534:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cap_ioctls_get */
+	/* cheriabi_cap_ioctls_get */
 	case 535:
 		if (ndx == 0 || ndx == 1)
 			p = "ssize_t";
@@ -9911,7 +9911,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cap_fcntls_get */
+	/* cheriabi_cap_fcntls_get */
 	case 537:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

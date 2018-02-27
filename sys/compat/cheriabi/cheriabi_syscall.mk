@@ -319,9 +319,9 @@ MIASM =  \
 	cheriabi_msgctl.o \
 	cheriabi_shmctl.o \
 	cheriabi_lpathconf.o \
-	__cap_rights_get.o \
+	cheriabi___cap_rights_get.o \
 	cap_enter.o \
-	cap_getmode.o \
+	cheriabi_cap_getmode.o \
 	cheriabi_pdfork.o \
 	pdkill.o \
 	cheriabi_pdgetpid.o \
@@ -336,11 +336,11 @@ MIASM =  \
 	posix_fallocate.o \
 	posix_fadvise.o \
 	cheriabi_wait6.o \
-	cap_rights_limit.o \
-	cap_ioctls_limit.o \
-	cap_ioctls_get.o \
+	cheriabi_cap_rights_limit.o \
+	cheriabi_cap_ioctls_limit.o \
+	cheriabi_cap_ioctls_get.o \
 	cap_fcntls_limit.o \
-	cap_fcntls_get.o \
+	cheriabi_cap_fcntls_get.o \
 	cheriabi_bindat.o \
 	cheriabi_connectat.o \
 	cheriabi_chflagsat.o \
