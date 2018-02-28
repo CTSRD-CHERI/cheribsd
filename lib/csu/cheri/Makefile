@@ -16,6 +16,10 @@ CFLAGS+=-mxgot -mllvm -mxmxgot
 
 NEED_CHERI=	pure
 
+# Currently needed for libcheri sandboxes
+SRCS+=	crt_init_globals.c
+FILES+=	crt_init_globals.o
+
 .if defined(LIBCHERI)
 CFLAGS+=	-I${.CURDIR}/../common		\
 		-I${.CURDIR}/../../libc/include
@@ -26,10 +30,6 @@ FILES+=	crt1.o					\
 	crtbeginT.o				\
 	crtend.o				\
 	crtendS.o
-
-# Currently needed for libcheri sandboxes
-SRCS+=	crt_init_globals.c
-FILES+=	crt_init_globals.o
 
 # Used for executables if neither -static nor -pie is passed
 crtbegin.o:	crtbeginC.c
