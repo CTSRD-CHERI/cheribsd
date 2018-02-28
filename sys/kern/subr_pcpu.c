@@ -104,7 +104,7 @@ dpcpu_init(void *dpcpu, int cpuid)
 	struct pcpu *pcpu;
 
 	pcpu = pcpu_find(cpuid);
-	pcpu->pc_dynamic = (uintptr_t)dpcpu - DPCPU_START;
+	pcpu->pc_dynamic = (uintptr_t)dpcpu + DPCPU_BIAS;
 
 	/*
 	 * Initialize defaults from our linker section.
@@ -257,10 +257,10 @@ dpcpu_copy(void *s, int size)
 		dpcpu = dpcpu_off[i];
 		if (dpcpu == 0)
 			continue;
-		memcpy((void *)(dpcpu + (uintptr_t)s), s, size);
+		memcpy((void *)(dpcpu + (ptraddr_t)s), s, size);
 	}
 #else
-	memcpy((void *)(dpcpu_off[0] + (uintptr_t)s), s, size);
+	memcpy((void *)(dpcpu_off[0] + (ptraddr_t)s), s, size);
 #endif
 }
 
@@ -294,11 +294,12 @@ sysctl_dpcpu_quad(SYSCTL_HANDLER_ARGS)
 	int i;
 
 	count = 0;
+	arg1 = (char *)arg1 - (ptraddr_t)DPCPU_START - DPCPU_BIAS;
 	CPU_FOREACH(i) {
 		dpcpu = dpcpu_off[i];
 		if (dpcpu == 0)
 			continue;
-		count += *(int64_t *)(dpcpu + (uintptr_t)arg1);
+		count += *(int64_t *)(dpcpu + (ptraddr_t)arg1);
 	}
 	return (SYSCTL_OUT(req, &count, sizeof(count)));
 }
@@ -311,11 +312,12 @@ sysctl_dpcpu_long(SYSCTL_HANDLER_ARGS)
 	int i;
 
 	count = 0;
+	arg1 = (char *)arg1 - (ptraddr_t)DPCPU_START - DPCPU_BIAS;
 	CPU_FOREACH(i) {
 		dpcpu = dpcpu_off[i];
 		if (dpcpu == 0)
 			continue;
-		count += *(long *)(dpcpu + (uintptr_t)arg1);
+		count += *(long *)(dpcpu + (ptraddr_t)arg1);
 	}
 	return (SYSCTL_OUT(req, &count, sizeof(count)));
 }
@@ -328,11 +330,12 @@ sysctl_dpcpu_int(SYSCTL_HANDLER_ARGS)
 	int i;
 
 	count = 0;
+	arg1 = (char *)arg1 - (ptraddr_t)DPCPU_START - DPCPU_BIAS;
 	CPU_FOREACH(i) {
 		dpcpu = dpcpu_off[i];
 		if (dpcpu == 0)
 			continue;
-		count += *(int *)(dpcpu + (uintptr_t)arg1);
+		count += *(int *)(dpcpu + (ptraddr_t)arg1);
 	}
 	return (SYSCTL_OUT(req, &count, sizeof(count)));
 }
@@ -343,9 +346,9 @@ DB_SHOW_COMMAND(dpcpu_off, db_show_dpcpu_off)
 	int id;
 
 	CPU_FOREACH(id) {
-		db_printf("dpcpu_off[%2d] = 0x%jx (+ DPCPU_START = %p)\n",
-		    id, (uintmax_t)dpcpu_off[id],
-		    (void *)(uintptr_t)(dpcpu_off[id] + DPCPU_START));
+		db_printf("dpcpu_off[%2d] = %p\n", id, (void *)dpcpu_off[id]);
+		db_printf("dpcpu_ptr[%2d] = %p\n", id, (void *)(dpcpu_off[id] -
+		    DPCPU_BIAS));
 	}
 }
 
@@ -423,3 +426,14 @@ DB_SHOW_ALL_COMMAND(pcpu, db_show_cpu_all)
 }
 DB_SHOW_ALIAS(allpcpu, db_show_cpu_all);
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "bounds_compression",
+//     "pointer_provenance",
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END
