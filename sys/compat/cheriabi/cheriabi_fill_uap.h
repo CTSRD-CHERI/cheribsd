@@ -2191,51 +2191,36 @@ CHERIABI_SYS_cheriabi_msgrcv_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_shmat_fill_uap(struct thread *td,
-    struct shmat_args *uap)
+CHERIABI_SYS_cheriabi_shmat_fill_uap(struct thread *td,
+    struct cheriabi_shmat_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] int shmid */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_shmat_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_shmat_PTRMASK);
 	uap->shmid = cheri_getoffset(tmpcap);
 
 	/* [2] int shmflg */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_shmat_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_shmat_PTRMASK);
 	uap->shmflg = cheri_getoffset(tmpcap);
 
-	/* [1] _Pagerange_vmmap_opt_(1) void * shmaddr */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_CHERIABI_VMMAP);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_shmat_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->shmaddr),
-		    tmpcap, 1, reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
+	/* [1] _Pagerange_vmmap_opt_(1) void *__capability shmaddr */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->shmaddr),
+	    1, CHERIABI_SYS_cheriabi_shmat_PTRMASK);
 
 	return (0);
 }
 
 static inline int
-CHERIABI_SYS_shmdt_fill_uap(struct thread *td,
-    struct shmdt_args *uap)
+CHERIABI_SYS_cheriabi_shmdt_fill_uap(struct thread *td,
+    struct cheriabi_shmdt_args *uap)
 {
-	void * __capability tmpcap;
 
-	/* [0] _Pagerange_vmmap_opt_(1) void * shmaddr */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_CHERIABI_VMMAP);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_shmdt_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->shmaddr),
-		    tmpcap, 1, reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _Pagerange_vmmap_(1) void *__capability shmaddr */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->shmaddr),
+	    0, CHERIABI_SYS_cheriabi_shmdt_PTRMASK);
 
 	return (0);
 }

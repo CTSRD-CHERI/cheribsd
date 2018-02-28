@@ -412,8 +412,6 @@ int	kern_settimeofday(struct thread *td, struct timeval *tv,
 int	kern_shm_open(struct thread *td, const char * __capability userpath,
 	    int flags, mode_t mode, struct filecaps *fcaps);
 int	kern_shm_unlink(struct thread *td, const char * __capability userpath);
-int	kern_shmat(struct thread *td, int shmid, const void *shmaddr,
-	    int shmflg);
 int	kern_shmctl(struct thread *td, int shmid, int cmd, void *buf,
 	    size_t *bufsz);
 int	kern_shutdown(struct thread *td, int s, int how);

@@ -1067,19 +1067,19 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 5;
 		break;
 	}
-	/* shmat */
+	/* cheriabi_shmat */
 	case 228: {
-		struct shmat_args *p = params;
+		struct cheriabi_shmat_args *p = params;
 		iarg[0] = p->shmid; /* int */
-		uarg[1] = (intptr_t) p->shmaddr; /* void * */
+		uarg[1] = (cheri_getbase(p->shmaddr) + cheri_getoffset(p->shmaddr)); /* void *__capability */
 		iarg[2] = p->shmflg; /* int */
 		*n_args = 3;
 		break;
 	}
-	/* shmdt */
+	/* cheriabi_shmdt */
 	case 230: {
-		struct shmdt_args *p = params;
-		uarg[0] = (intptr_t) p->shmaddr; /* void * */
+		struct cheriabi_shmdt_args *p = params;
+		uarg[0] = (cheri_getbase(p->shmaddr) + cheri_getoffset(p->shmaddr)); /* void *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -4759,14 +4759,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* shmat */
+	/* cheriabi_shmat */
 	case 228:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 2:
 			p = "int";
@@ -4775,11 +4775,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* shmdt */
+	/* cheriabi_shmdt */
 	case 230:
 		switch(ndx) {
 		case 0:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		default:
 			break;
@@ -8835,12 +8835,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* shmat */
+	/* cheriabi_shmat */
 	case 228:
 		if (ndx == 0 || ndx == 1)
 			p = "*";
 		break;
-	/* shmdt */
+	/* cheriabi_shmdt */
 	case 230:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

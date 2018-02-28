@@ -402,6 +402,14 @@ struct cheriabi_msgrcv_args {
 	char msgtyp_l_[PADL_(long)]; long msgtyp; char msgtyp_r_[PADR_(long)];
 	char msgflg_l_[PADL_(int)]; int msgflg; char msgflg_r_[PADR_(int)];
 };
+struct cheriabi_shmat_args {
+	char shmid_l_[PADL_(int)]; int shmid; char shmid_r_[PADR_(int)];
+	char shmaddr_l_[PADL_(void *__capability)]; void *__capability shmaddr; char shmaddr_r_[PADR_(void *__capability)];
+	char shmflg_l_[PADL_(int)]; int shmflg; char shmflg_r_[PADR_(int)];
+};
+struct cheriabi_shmdt_args {
+	char shmaddr_l_[PADL_(void *__capability)]; void *__capability shmaddr; char shmaddr_r_[PADR_(void *__capability)];
+};
 struct cheriabi_clock_gettime_args {
 	char clock_id_l_[PADL_(clockid_t)]; clockid_t clock_id; char clock_id_r_[PADR_(clockid_t)];
 	char tp_l_[PADL_(struct timespec *__capability)]; struct timespec *__capability tp; char tp_r_[PADR_(struct timespec *__capability)];
@@ -1383,6 +1391,8 @@ int	cheriabi_poll(struct thread *, struct cheriabi_poll_args *);
 int	cheriabi_semop(struct thread *, struct cheriabi_semop_args *);
 int	cheriabi_msgsnd(struct thread *, struct cheriabi_msgsnd_args *);
 int	cheriabi_msgrcv(struct thread *, struct cheriabi_msgrcv_args *);
+int	cheriabi_shmat(struct thread *, struct cheriabi_shmat_args *);
+int	cheriabi_shmdt(struct thread *, struct cheriabi_shmdt_args *);
 int	cheriabi_clock_gettime(struct thread *, struct cheriabi_clock_gettime_args *);
 int	cheriabi_clock_settime(struct thread *, struct cheriabi_clock_settime_args *);
 int	cheriabi_clock_getres(struct thread *, struct cheriabi_clock_getres_args *);
@@ -1698,6 +1708,8 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_semop	AUE_SEMOP
 #define	CHERIABI_SYS_AUE_cheriabi_msgsnd	AUE_MSGSND
 #define	CHERIABI_SYS_AUE_cheriabi_msgrcv	AUE_MSGRCV
+#define	CHERIABI_SYS_AUE_cheriabi_shmat	AUE_SHMAT
+#define	CHERIABI_SYS_AUE_cheriabi_shmdt	AUE_SHMDT
 #define	CHERIABI_SYS_AUE_cheriabi_clock_gettime	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_clock_settime	AUE_CLOCK_SETTIME
 #define	CHERIABI_SYS_AUE_cheriabi_clock_getres	AUE_NULL
