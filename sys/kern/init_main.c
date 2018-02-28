@@ -564,8 +564,25 @@ proc0_init(void *dummy __unused)
 	 * proc0 is not expected to enter usermode, so there is no special
 	 * handling for sv_minuser here, like is done for exec_new_vmspace().
 	 */
+#ifndef CHERI_KERNEL
 	vm_map_init(&vmspace0.vm_map, vmspace_pmap(&vmspace0),
 	    p->p_sysent->sv_minuser, p->p_sysent->sv_maxuser);
+#else
+	/*
+	 * We provide capabilities in xuseg for the map, note that we strip
+	 * all access permission because proc0 is not expected to enter
+	 * usermode.
+	 */
+	caddr_t minuser_cap = cheri_setoffset(cheri_xuseg_capability,
+	    p->p_sysent->sv_minuser);
+	minuser_cap = cheri_csetbounds(minuser_cap,
+	    p->p_sysent->sv_maxuser - p->p_sysent->sv_minuser);
+	minuser_cap = cheri_andperm(minuser_cap, 0);
+
+	vm_map_init(&vmspace0.vm_map, vmspace_pmap(&vmspace0),
+	    (vm_ptr_t)minuser_cap,
+	    (vm_ptr_t)minuser_cap + cheri_getlen(minuser_cap));
+#endif
 
 	/*
 	 * Call the init and ctor for the new thread and proc.  We wait
