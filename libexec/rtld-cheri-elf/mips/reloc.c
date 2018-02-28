@@ -324,7 +324,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 	    got, obj->symtabno);
 	/* Now do the global GOT entries */
 	for (i = obj->gotsym; i < obj->symtabno; i++) {
-#ifdef DEBUG_VERBOSE
+#if defined(DEBUG_VERBOSE) || defined(DEBUG_MIPS_GOT)
 		dbg(" doing got %d sym %p (%s, %lx)", i - obj->gotsym, sym,
 		    sym->st_name + obj->strtab, (u_long) *got);
 #endif
@@ -439,7 +439,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			}
 		}
 
-#ifdef DEBUG_VERBOSE
+#if defined(DEBUG_VERBOSE) || defined(DEBUG_MIPS_GOT)
 		dbg("  --> now %lx", (u_long) *got);
 #endif
 		++sym;
@@ -473,7 +473,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 
 			if (r_symndx >= obj->gotsym) {
 				val += got[obj->local_gotno + r_symndx - obj->gotsym];
-#ifdef DEBUG_VERBOSE
+#if defined(DEBUG_VERBOSE) || defined(DEBUG_MIPS_GOT)
 				dbg("REL32/G(%p) %p --> %p (%s) in %s",
 				    where, (void *)(uintptr_t)old, (void *)(uintptr_t)val,
 				    obj->strtab + def->st_name,
