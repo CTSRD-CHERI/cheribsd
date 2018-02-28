@@ -246,7 +246,8 @@ db_value_of_name_pcpu(const char *name, db_expr_t *valuep)
 	db_symbol_values(sym, &name, &value);
 	if (value < DPCPU_START || value >= DPCPU_STOP)
 		return (false);
-	*valuep = (db_expr_t)((uintptr_t)value + dpcpu_off[cpu]);
+	*valuep = (db_expr_t)(dpcpu_off[cpu] - DPCPU_BIAS +
+	    ((ptraddr_t)value - (ptraddr_t)DPCPU_START));
 	return (true);
 }
 
@@ -481,3 +482,13 @@ db_sym_numargs(c_db_sym_t sym, int *nargp, char **argnames)
 {
 	return (X_db_sym_numargs(db_last_symtab, sym, nargp, argnames));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190830,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "kdb",
+//     "pointer_provenance"
+//   ]
+// }
+// CHERI CHANGES END

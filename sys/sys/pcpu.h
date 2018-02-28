@@ -53,11 +53,14 @@
 #define	DPCPU_SYMPREFIX		"pcpu_entry_"
 
 #ifdef _KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheri/cheric.h>
+#endif
 
 /*
  * Define a set for pcpu data.
  */
-extern uintptr_t *__start_set_pcpu;
+extern uintptr_t *__start_set_pcpu __no_subobject_bounds;
 __GLOBL(__start_set_pcpu);
 extern uintptr_t *__stop_set_pcpu;
 __GLOBL(__stop_set_pcpu);
@@ -72,7 +75,7 @@ extern uintptr_t dpcpu_off[];
  */
 #define	DPCPU_START		((uintptr_t)&__start_set_pcpu)
 #define	DPCPU_STOP		((uintptr_t)&__stop_set_pcpu)
-#define	DPCPU_BYTES		(DPCPU_STOP - DPCPU_START)
+#define	DPCPU_BYTES		((ptraddr_t)DPCPU_STOP - (ptraddr_t)DPCPU_START)
 #define	DPCPU_MODMIN		2048
 #define	DPCPU_SIZE		roundup2(DPCPU_BYTES, PAGE_SIZE)
 #define	DPCPU_MODSIZE		(DPCPU_SIZE - (DPCPU_BYTES - DPCPU_MODMIN))
@@ -111,9 +114,24 @@ extern uintptr_t dpcpu_off[];
 
 /*
  * Accessors with a given base.
+ *
+ * The base points to a CPU's page of dynamic variables with a bias of
+ * DPCPU_BIAS.  In non-purecap kernels, the bias is -DPCPU_START
+ * removing a subtraction from the access.  In CHERI purecap kernels,
+ * the bias is 0 as the base pointer would be unrepresentable
+ * otherwise.
  */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	DPCPU_BIAS	0
+#define	_DPCPU_PTR(b, n)						\
+	cheri_setboundsexact((__typeof(DPCPU_NAME(n)) *)((b) +		\
+	    ((ptraddr_t)&DPCPU_NAME(n) - (ptraddr_t)DPCPU_START)),	\
+	    CHERI_REPRESENTABLE_LENGTH(sizeof(DPCPU_NAME(n))))
+#else /* __CHERI_PURE_CAPABILITY__ */
+#define	DPCPU_BIAS	((char *)NULL - (char *)DPCPU_START)
 #define	_DPCPU_PTR(b, n)						\
     (__typeof(DPCPU_NAME(n))*)((b) + (uintptr_t)&DPCPU_NAME(n))
+#endif /* __CHERI_PURE_CAPABILITY__ */
 #define	_DPCPU_GET(b, n)	(*_DPCPU_PTR(b, n))
 #define	_DPCPU_SET(b, n, v)	(*_DPCPU_PTR(b, n) = v)
 
@@ -328,3 +346,13 @@ void	pcpu_init(struct pcpu *pcpu, int cpuid, size_t size);
 #endif /* _KERNEL */
 
 #endif /* !_SYS_PCPU_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200708,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "bounds_compression",
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END
