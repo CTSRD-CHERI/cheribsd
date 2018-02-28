@@ -75,18 +75,24 @@ interpos_func_t __libc_interposing[INTERPOS_MAX] = {
 	SLOT_SYS(sigtimedwait)
 	SLOT_SYS(sigwaitinfo)
 	SLOT_SYS(swapcontext)
+#ifndef INTERPOS_SYSCALLS_ONLY
 	SLOT_LIBC(system)
 	SLOT_LIBC(tcdrain)
+#endif
 	SLOT_SYS(wait4)
 	SLOT_SYS(write)
 	SLOT_SYS(writev)
+#ifndef INTERPOS_SYSCALLS_ONLY
 	SLOT(_pthread_mutex_init_calloc_cb, _pthread_mutex_init_calloc_cb_stub)
 	SLOT(spinlock, __libc_spinlock_stub)
 	SLOT(spinunlock, __libc_spinunlock_stub)
+#endif
 	SLOT_SYS(kevent)
 	SLOT_SYS(wait6)
 	SLOT_SYS(ppoll)
+#ifndef INTERPOS_SYSCALLS_ONLY
 	SLOT_LIBC(map_stacks_exec)
+#endif
 	SLOT_SYS(fdatasync)
 	SLOT_SYS(clock_nanosleep)
 };
@@ -94,6 +100,10 @@ interpos_func_t __libc_interposing[INTERPOS_MAX] = {
 #undef SLOT_SYS
 #undef SLOT_LIBC
 
+#ifdef INTERPOS_SYSCALLS_ONLY
+/* Prefer __libc_interposing_slot from libc if available */
+#pragma weak __libc_interposing_slot
+#endif
 interpos_func_t *
 __libc_interposing_slot(int interposno)
 {
