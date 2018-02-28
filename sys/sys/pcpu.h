@@ -84,15 +84,30 @@ extern uintptr_t dpcpu_off[];
 /*
  * Accessors with a given base.
  */
+#ifndef CHERI_KERNEL
 #define	_DPCPU_PTR(b, n)						\
     (__typeof(DPCPU_NAME(n))*)((b) + (uintptr_t)&DPCPU_NAME(n))
+#else /* CHERI_KERNEL */
+/* The dpcpu entry symbol address VA should be considered here */
+#define	_DPCPU_PTR(b, n)						\
+    (__typeof(DPCPU_NAME(n))*)((b) + ptr_to_va(&DPCPU_NAME(n)))
+#endif /* CHERI_KERNEL */
 #define	_DPCPU_GET(b, n)	(*_DPCPU_PTR(b, n))
 #define	_DPCPU_SET(b, n, v)	(*_DPCPU_PTR(b, n) = v)
 
 /*
  * Accessors for the current cpu.
  */
+#ifndef CHERI_KERNEL
 #define	DPCPU_PTR(n)		_DPCPU_PTR(PCPU_GET(dynamic), n)
+#else /* CHERI_KERNEL */
+/*
+ * The pcpu dynamic field in the CHERI kernel is not preliminarly
+ * subtracted the DPCPU_START, so we do it now.
+ */
+#define	DPCPU_PTR(n)				\
+    _DPCPU_PTR(PCPU_GET(dynamic) - ptr_to_va(DPCPU_START), n)
+#endif /* CHERI_KERNEL */
 #define	DPCPU_GET(n)		(*DPCPU_PTR(n))
 #define	DPCPU_SET(n, v)		(*DPCPU_PTR(n) = v)
 

@@ -101,7 +101,16 @@ dpcpu_init(void *dpcpu, int cpuid)
 	struct pcpu *pcpu;
 
 	pcpu = pcpu_find(cpuid);
+#ifndef CHERI_KERNEL
 	pcpu->pc_dynamic = (uintptr_t)dpcpu - DPCPU_START;
+#else
+	/*
+	 * We can't subtract the linker set start address
+	 * because it would make the dpcpu capability
+	 * unrepresentable.
+	 */
+	pcpu->pc_dynamic = (uintptr_t)dpcpu;
+#endif
 
 	/*
 	 * Initialize defaults from our linker section.
