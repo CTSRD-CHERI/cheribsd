@@ -592,6 +592,8 @@ ksem_get(struct thread *td, semid_t id, cap_rights_t *rightsp,
 	struct file *fp;
 	int error;
 
+	if (id < 0 || id > INT_MAX)
+		return (EINVAL);
 	error = fget(td, id, rightsp, &fp);
 	if (error)
 		return (EINVAL);
