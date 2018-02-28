@@ -1618,9 +1618,9 @@ tlb_insert_random:
 	PTR_LA		k1, _C_LABEL(kernel_segmap)
 	cgetkdc		CHERI_REG_KR1C
 	csetoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, k1
-	REG_LI		k1, SEGMAP_SIZE
+	csetbounds	CHERI_REG_KR1C, CHERI_REG_KR1C, CHERICAP_SIZE	# kernel_segmap capability
 	b		2f
-	csetbounds	CHERI_REG_KR1C, CHERI_REG_KR1C, k1
+	clc		CHERI_REG_KR1C, zero, 0(CHERI_REG_KR1C)		# load from kernel_segmap
 
 1:	/* User address.  */
 	GET_CPU_PCPU(CHERI_REG_KR1C, k1)
