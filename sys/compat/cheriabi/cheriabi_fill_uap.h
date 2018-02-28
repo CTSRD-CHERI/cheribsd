@@ -2790,26 +2790,19 @@ CHERIABI_SYS_modnext_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_modstat_fill_uap(struct thread *td,
-    struct modstat_args *uap)
+CHERIABI_SYS_cheriabi_modstat_fill_uap(struct thread *td,
+    struct cheriabi_modstat_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [0] int modid */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_modstat_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_modstat_PTRMASK);
 	uap->modid = cheri_getoffset(tmpcap);
 
-	/* [1] _Out_ struct module_stat * stat */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_modstat_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->stat),
-		    tmpcap, sizeof(*uap->stat), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [1] _Out_ struct module_stat *__capability stat */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->stat),
+	    1, CHERIABI_SYS_cheriabi_modstat_PTRMASK);
 
 	return (0);
 }
@@ -2828,22 +2821,14 @@ CHERIABI_SYS_modfnext_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_modfind_fill_uap(struct thread *td,
-    struct modfind_args *uap)
+CHERIABI_SYS_cheriabi_modfind_fill_uap(struct thread *td,
+    struct cheriabi_modfind_args *uap)
 {
-	void * __capability tmpcap;
 
-	/* [0] _In_z_ const char * name */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_modfind_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->name),
-		    tmpcap, sizeof(*uap->name), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _In_z_ const char *__capability name */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->name),
+	    0, CHERIABI_SYS_cheriabi_modfind_PTRMASK);
 
 	return (0);
 }

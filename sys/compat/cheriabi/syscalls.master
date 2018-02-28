@@ -677,10 +677,10 @@
 299	AUE_FHSTAT	OBSOL	fbsd11_fhstat
 ; syscall numbers for FreeBSD
 300	AUE_NULL	NOPROTO	{ int modnext(int modid); }
-301	AUE_NULL	NOPROTO	{ int modstat(int modid, \
-				    _Out_ struct module_stat* stat); }
+301	AUE_NULL	STD	{ int cheriabi_modstat(int modid, \
+				    _Out_ struct module_stat * __capability stat); }
 302	AUE_NULL	NOPROTO	{ int modfnext(int modid); }
-303	AUE_NULL	NOPROTO	{ int modfind(_In_z_ const char *name); }
+303	AUE_NULL	STD	{ int cheriabi_modfind(_In_z_ const char * __capability name); }
 304	AUE_MODLOAD	STD	{ int cheriabi_kldload( \
 				    _In_z_ const char * __capability file); }
 305	AUE_MODUNLOAD	NOPROTO	{ int kldunload(int fileid); }

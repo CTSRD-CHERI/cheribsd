@@ -511,6 +511,13 @@ struct cheriabi_fhopen_args {
 	char u_fhp_l_[PADL_(const struct fhandle *__capability)]; const struct fhandle *__capability u_fhp; char u_fhp_r_[PADR_(const struct fhandle *__capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
+struct cheriabi_modstat_args {
+	char modid_l_[PADL_(int)]; int modid; char modid_r_[PADR_(int)];
+	char stat_l_[PADL_(struct module_stat *__capability)]; struct module_stat *__capability stat; char stat_r_[PADR_(struct module_stat *__capability)];
+};
+struct cheriabi_modfind_args {
+	char name_l_[PADL_(const char *__capability)]; const char *__capability name; char name_r_[PADR_(const char *__capability)];
+};
 struct cheriabi_kldload_args {
 	char file_l_[PADL_(const char *__capability)]; const char *__capability file; char file_r_[PADR_(const char *__capability)];
 };
@@ -1416,6 +1423,8 @@ int	cheriabi_lutimes(struct thread *, struct cheriabi_lutimes_args *);
 int	cheriabi_preadv(struct thread *, struct cheriabi_preadv_args *);
 int	cheriabi_pwritev(struct thread *, struct cheriabi_pwritev_args *);
 int	cheriabi_fhopen(struct thread *, struct cheriabi_fhopen_args *);
+int	cheriabi_modstat(struct thread *, struct cheriabi_modstat_args *);
+int	cheriabi_modfind(struct thread *, struct cheriabi_modfind_args *);
 int	cheriabi_kldload(struct thread *, struct cheriabi_kldload_args *);
 int	cheriabi_kldfind(struct thread *, struct cheriabi_kldfind_args *);
 int	cheriabi_kldstat(struct thread *, struct cheriabi_kldstat_args *);
@@ -1733,6 +1742,8 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_preadv	AUE_PREADV
 #define	CHERIABI_SYS_AUE_cheriabi_pwritev	AUE_PWRITEV
 #define	CHERIABI_SYS_AUE_cheriabi_fhopen	AUE_FHOPEN
+#define	CHERIABI_SYS_AUE_cheriabi_modstat	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_modfind	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_kldload	AUE_MODLOAD
 #define	CHERIABI_SYS_AUE_cheriabi_kldfind	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_kldstat	AUE_NULL

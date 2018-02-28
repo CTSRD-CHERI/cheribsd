@@ -2068,6 +2068,22 @@ cheriabi_uuidgen(struct thread *td, struct cheriabi_uuidgen_args *uap)
 	return (error);
 }
 
+/*
+ * kern_module.c
+ */
+int
+cheriabi_modfind(struct thread *td, struct cheriabi_modfind_args *uap)
+{
+
+	return (kern_modfind(td, uap->name));
+}
+
+int
+cheriabi_modstat(struct thread *td, struct cheriabi_modstat_args *uap)
+{
+
+	return (kern_modstat(td, uap->modid, uap->stat));
+}
 
 /*
  * kern_prot.c

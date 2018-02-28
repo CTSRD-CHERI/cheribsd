@@ -158,9 +158,9 @@ MIASM =  \
 	cheriabi_pwritev.o \
 	cheriabi_fhopen.o \
 	modnext.o \
-	modstat.o \
+	cheriabi_modstat.o \
 	modfnext.o \
-	modfind.o \
+	cheriabi_modfind.o \
 	cheriabi_kldload.o \
 	kldunload.o \
 	cheriabi_kldfind.o \

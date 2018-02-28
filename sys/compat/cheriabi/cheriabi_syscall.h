@@ -238,9 +238,9 @@
 #define	CHERIABI_SYS_cheriabi_fhopen	298
 				/* 299 is obsolete fbsd11_fhstat */
 #define	CHERIABI_SYS_modnext	300
-#define	CHERIABI_SYS_modstat	301
+#define	CHERIABI_SYS_cheriabi_modstat	301
 #define	CHERIABI_SYS_modfnext	302
-#define	CHERIABI_SYS_modfind	303
+#define	CHERIABI_SYS_cheriabi_modfind	303
 #define	CHERIABI_SYS_cheriabi_kldload	304
 #define	CHERIABI_SYS_kldunload	305
 #define	CHERIABI_SYS_cheriabi_kldfind	306

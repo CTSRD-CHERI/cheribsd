@@ -1327,11 +1327,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* modstat */
+	/* cheriabi_modstat */
 	case 301: {
-		struct modstat_args *p = params;
+		struct cheriabi_modstat_args *p = params;
 		iarg[0] = p->modid; /* int */
-		uarg[1] = (intptr_t) p->stat; /* struct module_stat * */
+		uarg[1] = (cheri_getbase(p->stat) + cheri_getoffset(p->stat)); /* struct module_stat *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -1342,10 +1342,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* modfind */
+	/* cheriabi_modfind */
 	case 303: {
-		struct modfind_args *p = params;
-		uarg[0] = (intptr_t) p->name; /* const char * */
+		struct cheriabi_modfind_args *p = params;
+		uarg[0] = (cheri_getbase(p->name) + cheri_getoffset(p->name)); /* const char *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -5186,14 +5186,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* modstat */
+	/* cheriabi_modstat */
 	case 301:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct module_stat *";
+			p = "userland struct module_stat *__capability";
 			break;
 		default:
 			break;
@@ -5209,11 +5209,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* modfind */
+	/* cheriabi_modfind */
 	case 303:
 		switch(ndx) {
 		case 0:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		default:
 			break;
@@ -8992,7 +8992,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* modstat */
+	/* cheriabi_modstat */
 	case 301:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9002,7 +9002,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* modfind */
+	/* cheriabi_modfind */
 	case 303:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
