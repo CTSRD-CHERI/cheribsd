@@ -361,7 +361,7 @@
 #define	CHERIABI_SYS_cheriabi_extattr_list_file	438
 #define	CHERIABI_SYS_cheriabi_extattr_list_link	439
 				/* 440 is obsolete kse_switchin */
-#define	CHERIABI_SYS_ksem_timedwait	441
+				/* 441 is obsolete ksem_timedwait */
 #define	CHERIABI_SYS_thr_suspend	442
 #define	CHERIABI_SYS_thr_wake	443
 #define	CHERIABI_SYS_kldunloadf	444

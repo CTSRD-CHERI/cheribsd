@@ -2499,16 +2499,6 @@ SYS_STUB(439, ssize_t, extattr_list_link,
     /* _localcheck */ {if (!(cheri_getperm(path) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((ssize_t)-1);} if (!(cheri_getperm(data) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((ssize_t)-1);} }
 )
 
-SYS_STUB(441, int, ksem_timedwait,
-    /* _protoargs */ (semid_t id, const struct timespec * abstime),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, semid_t id, const struct timespec * __capability  abstime),
-    /* _protoargs_err */ (__capability int *stub_errno, semid_t id, const struct timespec * __capability  abstime),
-    /* _callargs */ (id, (__cheri_fromcap const struct timespec *)abstime),
-    /* _callargs_chk */ (&ret, stub_errno, id, abstime),
-    /* _callargs_err */ (&errno, id, (const struct timespec *)abstime),
-    /* _localcheck */ {if (!(cheri_getperm(abstime) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
-)
-
 SYS_STUB(442, int, thr_suspend,
     /* _protoargs */ (const struct timespec * timeout),
     /* _protoargs_chk */ (int *retp , int * __capability stub_errno, const struct timespec * __capability  timeout),

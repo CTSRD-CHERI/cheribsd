@@ -4716,31 +4716,6 @@ CHERIABI_SYS_cheriabi_extattr_list_link_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_ksem_timedwait_fill_uap(struct thread *td,
-    struct ksem_timedwait_args *uap)
-{
-	void * __capability tmpcap;
-
-	/* [0] semid_t id */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_ksem_timedwait_PTRMASK);
-	uap->id = cheri_getoffset(tmpcap);
-
-	/* [1] _In_opt_ const struct timespec * abstime */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_ksem_timedwait_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->abstime),
-		    tmpcap, sizeof(*uap->abstime), reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
-
-	return (0);
-}
-
-static inline int
 CHERIABI_SYS_thr_suspend_fill_uap(struct thread *td,
     struct thr_suspend_args *uap)
 {

@@ -252,7 +252,6 @@ MIASM =  \
 	cheriabi_extattr_list_fd.o \
 	cheriabi_extattr_list_file.o \
 	cheriabi_extattr_list_link.o \
-	ksem_timedwait.o \
 	thr_suspend.o \
 	thr_wake.o \
 	kldunloadf.o \

@@ -1004,9 +1004,7 @@
 				    _Out_writes_bytes_opt_(nbytes) \
 				    void * __capability data, size_t nbytes); }
 440	AUE_NULL	OBSOL	kse_switchin
-441	AUE_SEMWAIT	NOSTD|NOPROTO	{ int ksem_timedwait(semid_t id, \
-				    _In_opt_ \
-				    const struct timespec *abstime); }
+441	AUE_SEMWAIT	OBSOL	ksem_timedwait
 442	AUE_NULL	NOPROTO	{ int thr_suspend( \
 				    _In_opt_ \
 				    const struct timespec *timeout); }

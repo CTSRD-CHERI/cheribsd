@@ -268,7 +268,6 @@ static fill_uap_fp cheriabi_fill_uap_funcs[CHERIABI_SYS_MAXSYSCALL] = {
 	[CHERIABI_SYS_cheriabi_extattr_list_fd] = (fill_uap_fp)CHERIABI_SYS_cheriabi_extattr_list_fd_fill_uap,
 	[CHERIABI_SYS_cheriabi_extattr_list_file] = (fill_uap_fp)CHERIABI_SYS_cheriabi_extattr_list_file_fill_uap,
 	[CHERIABI_SYS_cheriabi_extattr_list_link] = (fill_uap_fp)CHERIABI_SYS_cheriabi_extattr_list_link_fill_uap,
-	[CHERIABI_SYS_ksem_timedwait] = (fill_uap_fp)CHERIABI_SYS_ksem_timedwait_fill_uap,
 	[CHERIABI_SYS_thr_suspend] = (fill_uap_fp)CHERIABI_SYS_thr_suspend_fill_uap,
 	[CHERIABI_SYS_thr_wake] = (fill_uap_fp)CHERIABI_SYS_thr_wake_fill_uap,
 	[CHERIABI_SYS_kldunloadf] = (fill_uap_fp)CHERIABI_SYS_kldunloadf_fill_uap,

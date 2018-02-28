@@ -242,7 +242,6 @@
 #define	CHERIABI_SYS_cheriabi_extattr_list_fd_PTRMASK	(0x0 | 0x4)
 #define	CHERIABI_SYS_cheriabi_extattr_list_file_PTRMASK	(0x0 | 0x1 | 0x4)
 #define	CHERIABI_SYS_cheriabi_extattr_list_link_PTRMASK	(0x0 | 0x1 | 0x4)
-#define	CHERIABI_SYS_ksem_timedwait_PTRMASK	(0x0 | 0x2)
 #define	CHERIABI_SYS_thr_suspend_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_thr_wake_PTRMASK	(0x0)
 #define	CHERIABI_SYS_kldunloadf_PTRMASK	(0x0)

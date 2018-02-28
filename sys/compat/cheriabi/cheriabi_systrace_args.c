@@ -2104,14 +2104,6 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
-	/* ksem_timedwait */
-	case 441: {
-		struct ksem_timedwait_args *p = params;
-		iarg[0] = p->id; /* semid_t */
-		uarg[1] = (intptr_t) p->abstime; /* const struct timespec * */
-		*n_args = 2;
-		break;
-	}
 	/* thr_suspend */
 	case 442: {
 		struct thr_suspend_args *p = params;
@@ -6488,19 +6480,6 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* ksem_timedwait */
-	case 441:
-		switch(ndx) {
-		case 0:
-			p = "semid_t";
-			break;
-		case 1:
-			p = "userland const struct timespec *";
-			break;
-		default:
-			break;
-		};
-		break;
 	/* thr_suspend */
 	case 442:
 		switch(ndx) {
@@ -9473,11 +9452,6 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 439:
 		if (ndx == 0 || ndx == 1)
 			p = "ssize_t";
-		break;
-	/* ksem_timedwait */
-	case 441:
-		if (ndx == 0 || ndx == 1)
-			p = "int";
 		break;
 	/* thr_suspend */
 	case 442:
