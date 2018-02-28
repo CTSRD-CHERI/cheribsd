@@ -53,8 +53,9 @@ LIBADD+=	compiler_rt
 SIMPLE_PRINTF_PREFIX=rtld
 .include "${SRCTOP}/lib/libsimple_printf/Makefile.inc"
 
-.if defined(NOT_YET)
 .if ${MK_SYMVER} == "yes"
+# LIBCSRCDIR does not appear to be set correctly for libcheribuildenv
+LIBCSRCDIR=	${SRCTOP}/lib/libc
 VERSION_DEF=	${LIBCSRCDIR}/Versions.def
 SYMBOL_MAPS=	${.CURDIR}/../rtld-elf/Symbol.map
 VERSION_MAP=	Version.map
@@ -64,16 +65,13 @@ LDFLAGS+=	-Wl,--version-script=${VERSION_MAP}
 SYMBOL_MAPS+=	${.CURDIR}/${RTLD_ARCH}/Symbol.map
 .endif
 .endif
-.endif
 
 #.sinclude "${.CURDIR}/${RTLD_ARCH}/Makefile.inc"
 
 .PATH: ${.CURDIR}/${RTLD_ARCH}
 
 .include <bsd.prog.mk>
-.if defined(NOT_YET)
 ${PROG_FULL}:	${VERSION_MAP}
-.endif
 .include <bsd.symver.mk>
 
 #CFLAGS:=	${CFLAGS} -O0
