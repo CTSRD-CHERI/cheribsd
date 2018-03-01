@@ -87,6 +87,14 @@ extern struct sysent cheriabi_sysent[];
 	.syscall_no = CHERIABI_SYS_##syscallname			\
 }
 
+#define CHERIABI_SYSCALL_NOT_PRESENT_GEN(SC)				\
+int cheriabi_ ## SC (struct thread *td,					\
+    struct cheriabi_##SC##_args *uap)					\
+{									\
+									\
+	return syscall_not_present(td, #SC , (struct nosys_args *)uap); \
+}
+
 int    cheriabi_syscall_register(int *offset, struct sysent *new_sysent,
 	    struct sysent *old_sysent, int flags);
 int    cheriabi_syscall_deregister(int *offset, struct sysent *old_sysent);

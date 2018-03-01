@@ -2016,12 +2016,6 @@ cheriabi_sched_rr_get_interval(struct thread *td,
 }
 
 #else /* !_KPOSIX_PRIORITY_SCHEDULING */
-#define CHERIABI_SYSCALL_NOT_PRESENT_GEN(SC) \
-int cheriabi_ ## SC (struct thread *td, struct cheriabi_##SC##_args *uap) \
-{ \
-	return syscall_not_present(td, #SC , (struct nosys_args *)uap); \
-}
-
 CHERIABI_SYSCALL_NOT_PRESENT_GEN(sched_setparam)
 CHERIABI_SYSCALL_NOT_PRESENT_GEN(sched_getparam)
 CHERIABI_SYSCALL_NOT_PRESENT_GEN(sched_setscheduler)
