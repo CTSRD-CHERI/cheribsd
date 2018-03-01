@@ -24,7 +24,7 @@
 #define	CHERIABI_SYS_cheriabi_mount_PTRMASK	(0x0 | 0x1 | 0x2 | 0x8)
 #define	CHERIABI_SYS_cheriabi_unmount_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_setuid_PTRMASK	(0x0)
-#define	CHERIABI_SYS_ptrace_PTRMASK	(0x0 | 0x4)
+#define	CHERIABI_SYS_cheriabi_ptrace_PTRMASK	(0x0 | 0x4)
 #define	CHERIABI_SYS_cheriabi_recvmsg_PTRMASK	(0x0 | 0x2)
 #define	CHERIABI_SYS_cheriabi_sendmsg_PTRMASK	(0x0 | 0x2)
 #define	CHERIABI_SYS_cheriabi_recvfrom_PTRMASK	(0x0 | 0x2 | 0x10 | 0x20)

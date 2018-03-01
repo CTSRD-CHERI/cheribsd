@@ -99,6 +99,12 @@ struct cheriabi_unmount_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
+struct cheriabi_ptrace_args {
+	char req_l_[PADL_(int)]; int req; char req_r_[PADR_(int)];
+	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
+	char addr_l_[PADL_(caddr_t __capability)]; caddr_t __capability addr; char addr_r_[PADR_(caddr_t __capability)];
+	char data_l_[PADL_(int)]; int data; char data_r_[PADR_(int)];
+};
 struct cheriabi_recvmsg_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
 	char msg_l_[PADL_(struct msghdr_c *__capability)]; struct msghdr_c *__capability msg; char msg_r_[PADR_(struct msghdr_c *__capability)];
@@ -1369,6 +1375,7 @@ int	cheriabi_chmod(struct thread *, struct cheriabi_chmod_args *);
 int	cheriabi_chown(struct thread *, struct cheriabi_chown_args *);
 int	cheriabi_mount(struct thread *, struct cheriabi_mount_args *);
 int	cheriabi_unmount(struct thread *, struct cheriabi_unmount_args *);
+int	cheriabi_ptrace(struct thread *, struct cheriabi_ptrace_args *);
 int	cheriabi_recvmsg(struct thread *, struct cheriabi_recvmsg_args *);
 int	cheriabi_sendmsg(struct thread *, struct cheriabi_sendmsg_args *);
 int	cheriabi_recvfrom(struct thread *, struct cheriabi_recvfrom_args *);
@@ -1697,6 +1704,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_chown	AUE_CHOWN
 #define	CHERIABI_SYS_AUE_cheriabi_mount	AUE_MOUNT
 #define	CHERIABI_SYS_AUE_cheriabi_unmount	AUE_UMOUNT
+#define	CHERIABI_SYS_AUE_cheriabi_ptrace	AUE_PTRACE
 #define	CHERIABI_SYS_AUE_cheriabi_recvmsg	AUE_RECVMSG
 #define	CHERIABI_SYS_AUE_cheriabi_sendmsg	AUE_SENDMSG
 #define	CHERIABI_SYS_AUE_cheriabi_recvfrom	AUE_RECVFROM

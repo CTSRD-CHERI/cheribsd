@@ -31,7 +31,7 @@
 #define	CHERIABI_SYS_setuid	23
 #define	CHERIABI_SYS_getuid	24
 #define	CHERIABI_SYS_geteuid	25
-#define	CHERIABI_SYS_ptrace	26
+#define	CHERIABI_SYS_cheriabi_ptrace	26
 #define	CHERIABI_SYS_cheriabi_recvmsg	27
 #define	CHERIABI_SYS_cheriabi_sendmsg	28
 #define	CHERIABI_SYS_cheriabi_recvfrom	29

@@ -2171,3 +2171,8 @@ cheriabi_pdgetpid(struct thread *td, struct cheriabi_pdgetpid_args *uap)
 
 	return (user_pdgetpid(td, uap->fd, uap->pidp));
 }
+
+/*
+ * sys_process.c
+ */
+CHERIABI_SYSCALL_NOT_PRESENT_GEN(ptrace)

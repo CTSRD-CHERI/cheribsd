@@ -22,7 +22,7 @@ MIASM =  \
 	setuid.o \
 	getuid.o \
 	geteuid.o \
-	ptrace.o \
+	cheriabi_ptrace.o \
 	cheriabi_recvmsg.o \
 	cheriabi_sendmsg.o \
 	cheriabi_recvfrom.o \
