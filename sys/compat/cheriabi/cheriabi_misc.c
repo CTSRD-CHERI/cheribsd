@@ -775,7 +775,7 @@ cheriabi_getcontext(struct thread *td, struct cheriabi_getcontext_args *uap)
 	PROC_LOCK(td->td_proc);
 	uc.uc_sigmask = td->td_sigmask;
 	PROC_UNLOCK(td->td_proc);
-	return (copyoutcap(&uc, uap->ucp, UCC_COPY_SIZE));
+	return (copyoutcap_c( &uc, uap->ucp, UCC_COPY_SIZE));
 }
 
 int
@@ -786,7 +786,7 @@ cheriabi_setcontext(struct thread *td, struct cheriabi_setcontext_args *uap)
 
 	if (uap->ucp == NULL)
 		return (EINVAL);
-	if ((ret = copyincap(uap->ucp, &uc, UCC_COPY_SIZE)) != 0)
+	if ((ret = copyincap_c(uap->ucp, &uc, UCC_COPY_SIZE)) != 0)
 		return (ret);
 	if ((ret = cheriabi_set_mcontext(td, &uc.uc_mcontext)) != 0)
 		return (ret);
@@ -810,9 +810,9 @@ cheriabi_swapcontext(struct thread *td, struct cheriabi_swapcontext_args *uap)
 	PROC_LOCK(td->td_proc);
 	uc.uc_sigmask = td->td_sigmask;
 	PROC_UNLOCK(td->td_proc);
-	if ((ret = copyoutcap(&uc, uap->oucp, UCC_COPY_SIZE)) != 0)
+	if ((ret = copyoutcap_c( &uc, uap->oucp, UCC_COPY_SIZE)) != 0)
 		return (ret);
-	if ((ret = copyincap(uap->ucp, &uc, UCC_COPY_SIZE)) != 0)
+	if ((ret = copyincap_c(uap->ucp, &uc, UCC_COPY_SIZE)) != 0)
 		return (ret);
 	if ((ret = cheriabi_set_mcontext(td, &uc.uc_mcontext)) != 0)
 		return (ret);

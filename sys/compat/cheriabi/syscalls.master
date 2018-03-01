@@ -957,12 +957,12 @@
 419	AUE_NULL	UNIMPL	__xfstat
 420	AUE_NULL	UNIMPL	__xlstat
 421	AUE_NULL	STD	{ int cheriabi_getcontext( \
-				    _Out_ ucontext_c_t *ucp); }
+				    _Out_ ucontext_c_t * __capability ucp); }
 422	AUE_NULL	STD	{ int cheriabi_setcontext( \
-				    _In_ const ucontext_c_t *ucp); }
+				    _In_ const ucontext_c_t * __capability ucp); }
 423	AUE_NULL	STD	{ int cheriabi_swapcontext( \
-				    _Out_ ucontext_c_t *oucp, \
-				    _In_ const ucontext_c_t *ucp); }
+				    _Out_ ucontext_c_t * __capability oucp, \
+				    _In_ const ucontext_c_t * __capability ucp); }
 424	AUE_SWAPOFF	STD	{ int cheriabi_swapoff( \
 				    _In_z_ const char * __capability name); }
 425	AUE_ACL_GET_LINK	STD	{ int cheriabi___acl_get_link( \

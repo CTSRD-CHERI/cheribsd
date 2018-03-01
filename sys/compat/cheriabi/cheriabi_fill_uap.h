@@ -4228,19 +4228,11 @@ static inline int
 CHERIABI_SYS_cheriabi_getcontext_fill_uap(struct thread *td,
     struct cheriabi_getcontext_args *uap)
 {
-	void * __capability tmpcap;
 
-	/* [0] _Out_ ucontext_c_t * ucp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_getcontext_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->ucp),
-		    tmpcap, sizeof(*uap->ucp), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _Out_ ucontext_c_t *__capability ucp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->ucp),
+	    0, CHERIABI_SYS_cheriabi_getcontext_PTRMASK);
 
 	return (0);
 }
@@ -4249,19 +4241,11 @@ static inline int
 CHERIABI_SYS_cheriabi_setcontext_fill_uap(struct thread *td,
     struct cheriabi_setcontext_args *uap)
 {
-	void * __capability tmpcap;
 
-	/* [0] _In_ const ucontext_c_t * ucp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_setcontext_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->ucp),
-		    tmpcap, sizeof(*uap->ucp), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _In_ const ucontext_c_t *__capability ucp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->ucp),
+	    0, CHERIABI_SYS_cheriabi_setcontext_PTRMASK);
 
 	return (0);
 }
@@ -4270,31 +4254,16 @@ static inline int
 CHERIABI_SYS_cheriabi_swapcontext_fill_uap(struct thread *td,
     struct cheriabi_swapcontext_args *uap)
 {
-	void * __capability tmpcap;
 
-	/* [0] _Out_ ucontext_c_t * oucp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
+	/* [0] _Out_ ucontext_c_t *__capability oucp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->oucp),
+	    0, CHERIABI_SYS_cheriabi_swapcontext_PTRMASK);
 
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_swapcontext_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->oucp),
-		    tmpcap, sizeof(*uap->oucp), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
-
-	/* [1] _In_ const ucontext_c_t * ucp */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_swapcontext_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->ucp),
-		    tmpcap, sizeof(*uap->ucp), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [1] _In_ const ucontext_c_t *__capability ucp */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->ucp),
+	    1, CHERIABI_SYS_cheriabi_swapcontext_PTRMASK);
 
 	return (0);
 }

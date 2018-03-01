@@ -1967,22 +1967,22 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_getcontext */
 	case 421: {
 		struct cheriabi_getcontext_args *p = params;
-		uarg[0] = (intptr_t) p->ucp; /* ucontext_c_t * */
+		uarg[0] = (cheri_getbase(p->ucp) + cheri_getoffset(p->ucp)); /* ucontext_c_t *__capability */
 		*n_args = 1;
 		break;
 	}
 	/* cheriabi_setcontext */
 	case 422: {
 		struct cheriabi_setcontext_args *p = params;
-		uarg[0] = (intptr_t) p->ucp; /* const ucontext_c_t * */
+		uarg[0] = (cheri_getbase(p->ucp) + cheri_getoffset(p->ucp)); /* const ucontext_c_t *__capability */
 		*n_args = 1;
 		break;
 	}
 	/* cheriabi_swapcontext */
 	case 423: {
 		struct cheriabi_swapcontext_args *p = params;
-		uarg[0] = (intptr_t) p->oucp; /* ucontext_c_t * */
-		uarg[1] = (intptr_t) p->ucp; /* const ucontext_c_t * */
+		uarg[0] = (cheri_getbase(p->oucp) + cheri_getoffset(p->oucp)); /* ucontext_c_t *__capability */
+		uarg[1] = (cheri_getbase(p->ucp) + cheri_getoffset(p->ucp)); /* const ucontext_c_t *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -6251,7 +6251,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 421:
 		switch(ndx) {
 		case 0:
-			p = "userland ucontext_c_t *";
+			p = "userland ucontext_c_t *__capability";
 			break;
 		default:
 			break;
@@ -6261,7 +6261,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 422:
 		switch(ndx) {
 		case 0:
-			p = "userland const ucontext_c_t *";
+			p = "userland const ucontext_c_t *__capability";
 			break;
 		default:
 			break;
@@ -6271,10 +6271,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 423:
 		switch(ndx) {
 		case 0:
-			p = "userland ucontext_c_t *";
+			p = "userland ucontext_c_t *__capability";
 			break;
 		case 1:
-			p = "userland const ucontext_c_t *";
+			p = "userland const ucontext_c_t *__capability";
 			break;
 		default:
 			break;

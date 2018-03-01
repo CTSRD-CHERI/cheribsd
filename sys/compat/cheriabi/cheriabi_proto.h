@@ -794,14 +794,14 @@ struct cheriabi_sigreturn_args {
 	char sigcntxp_l_[PADL_(const ucontext_c_t *__capability)]; const ucontext_c_t *__capability sigcntxp; char sigcntxp_r_[PADR_(const ucontext_c_t *__capability)];
 };
 struct cheriabi_getcontext_args {
-	char ucp_l_[PADL_(ucontext_c_t *)]; ucontext_c_t * ucp; char ucp_r_[PADR_(ucontext_c_t *)];
+	char ucp_l_[PADL_(ucontext_c_t *__capability)]; ucontext_c_t *__capability ucp; char ucp_r_[PADR_(ucontext_c_t *__capability)];
 };
 struct cheriabi_setcontext_args {
-	char ucp_l_[PADL_(const ucontext_c_t *)]; const ucontext_c_t * ucp; char ucp_r_[PADR_(const ucontext_c_t *)];
+	char ucp_l_[PADL_(const ucontext_c_t *__capability)]; const ucontext_c_t *__capability ucp; char ucp_r_[PADR_(const ucontext_c_t *__capability)];
 };
 struct cheriabi_swapcontext_args {
-	char oucp_l_[PADL_(ucontext_c_t *)]; ucontext_c_t * oucp; char oucp_r_[PADR_(ucontext_c_t *)];
-	char ucp_l_[PADL_(const ucontext_c_t *)]; const ucontext_c_t * ucp; char ucp_r_[PADR_(const ucontext_c_t *)];
+	char oucp_l_[PADL_(ucontext_c_t *__capability)]; ucontext_c_t *__capability oucp; char oucp_r_[PADR_(ucontext_c_t *__capability)];
+	char ucp_l_[PADL_(const ucontext_c_t *__capability)]; const ucontext_c_t *__capability ucp; char ucp_r_[PADR_(const ucontext_c_t *__capability)];
 };
 struct cheriabi_swapoff_args {
 	char name_l_[PADL_(const char *__capability)]; const char *__capability name; char name_r_[PADR_(const char *__capability)];
