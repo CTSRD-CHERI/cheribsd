@@ -608,11 +608,12 @@ unborrow_curthread(struct thread *td, struct trapframe **trapframep)
 		return (0);
 	}
 
-	KASSERT(peertd != td,
-	    ("%s: peertd %p == td %p\n", __func__, peertd, td));
+	KASSERT(peertd != td, ("%s: peertd %p == td %p\n", __func__, peertd, td));
 
+#if 0
 	printf("%s: replacing current td %p, md_tls %p, md_tls_tcb_offset %zd, with %p, md_tls %p, md_tls_tcb_offset %zd\n",
 	    __func__, td, td->td_md.md_tls, td->td_md.md_tls_tcb_offset, peertd, peertd->td_md.md_tls, peertd->td_md.md_tls_tcb_offset);
+#endif
 
 	/*
 	 * Assign our trapframe (userspace context) to the thread waiting
