@@ -143,7 +143,7 @@ _C_LABEL(switcher_coaccept):
 	csc	$c11, zero, 9*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
 
 	/*
-	 * Load the capability to the callee's control block.
+	 * Load the capability to the caller's control block.
 	 */
 	clc	$c5, zero, 2*CHERICAP_SIZE($idc)
 
@@ -164,6 +164,15 @@ _C_LABEL(switcher_coaccept):
 	// XXX: Turn it into a proper spinlock release.
 	csd	zero, zero, 2*CHERICAP_SIZE($c5);
 	csd	zero, zero, 2*CHERICAP_SIZE($idc);
+
+	/*
+	 * Save the capability to the caller's thread in the callee context.
+	 * This is used by kernel to look up the real thread.  Also clear
+	 * the same field on the caller side.
+	 */
+	cld	t8, zero, 1*CHERICAP_SIZE($c5);
+	csd	t8, zero, 1*CHERICAP_SIZE+8($idc)
+	csd	zero, zero, 1*CHERICAP_SIZE+8($c5)
 
 	/*
 	 * Restore the caller's context.

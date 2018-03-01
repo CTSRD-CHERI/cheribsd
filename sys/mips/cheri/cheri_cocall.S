@@ -140,11 +140,20 @@ _C_LABEL(switcher_cocall):
 	 *
 	 * XXX: Really, this is supposed to be a spinlock.
 	 */
-	//csc	$idc, zero, 2*CHERICAP_SIZE($c5);
+	csc	$idc, zero, 2*CHERICAP_SIZE($c5);
+
+	/*
+	 * Save the capability to the callee's thread in the caller context.
+	 * This is used by kernel to look up the real thread.  Also clear
+	 * the same field on the callee side.
+	 */
+	cld	t8, zero, 1*CHERICAP_SIZE($c5);
+	csd	t8, zero, 1*CHERICAP_SIZE+8($idc)
+	csd	zero, zero, 1*CHERICAP_SIZE+8($c5)
 
 	/*
 	 * Save the capability to the callee's control block in the caller
-	 * context.  This is used by the kernel to look up the real thread.
+	 * context.
 	 */
 	csc	$c5, zero, 2*CHERICAP_SIZE($idc);
 

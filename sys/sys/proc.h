@@ -206,8 +206,26 @@ struct rusage_ext {
 
 #ifdef CPU_CHERI
 struct switcher_context {
+	/*
+	 * Capability to unseal peer context.
+	 */
 	void * __capability			sc_unsealcap;
+
+	/*
+	 * Thread owning the context; the same thread that called cosetup(2).
+	 */
 	struct thread				*sc_td;
+
+	/*
+	 * Thread owning the context we're lending our thread to.  When
+	 * calling cocall(), this will be the callee thread.  NULL when
+	 * not lending.
+	 */
+	struct thread				*sc_borrower_td;
+
+	/*
+	 * Peer context - callee in caller's context, caller in callee's.
+	 */
 	struct switcher_context * __capability	sc_peer_context;
 };
 #endif

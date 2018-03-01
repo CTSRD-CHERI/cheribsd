@@ -577,7 +577,6 @@ static int
 unborrow_curthread(struct thread *td, struct trapframe **trapframep)
 {
 	struct switcher_context sc;
-	struct switcher_context * __capability scp;
 	struct thread *peertd;
 	struct trapframe peertrapframe;
 	struct syscall_args peersa;
@@ -610,25 +609,13 @@ unborrow_curthread(struct thread *td, struct trapframe **trapframep)
 		return (0);
 	}
 
-	/*
-	 * Fetch our peer's switcher context.
-	 */
-	scp = sc.sc_peer_context;
-	error = copyincap((__cheri_fromcap const void *)scp, &sc, sizeof(sc));
-	if (error != 0) {
-		printf("%s: copyincap from peer %p failed with error %d\n",
-		    __func__, (__cheri_fromcap const void *)scp, error);
-		return (error);
-	}
-
-	if (sc.sc_td == NULL) {
+	peertd = sc.sc_borrower_td;
+	if (peertd == NULL) {
 		/*
 		 * Nothing borrowed yet.
 		 */
 		return (0);
 	}
-
-	peertd = sc.sc_td;
 
 	KASSERT(peertd != td,
 	    ("%s: peertd %p == td %p\n", __func__, peertd, td));
