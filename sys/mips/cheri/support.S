@@ -247,9 +247,10 @@ XLEAF(cheri_bcopy)
 	cincoffset	$c2, $c4, a0	/* end pointer in c2 */
 	/* copy forward */
 	li	v1, CHERICAP_SIZE	/* forward loop increment */
+	li	t3, 0			/* forward loop offset */
 1:	/* common copy loop */
-	clc	CHERI_REG_CTEMP0, zero, 0($c3)
-	csc	CHERI_REG_CTEMP0, zero, 0($c4)
+	clc	CHERI_REG_CTEMP0, t3, 0($c3)
+	csc	CHERI_REG_CTEMP0, t3, 0($c4)
 	cincoffset	$c4, $c4, v1	/* increment destination pointer. */
 	ceq	v0, $c2, $c4	/* Are we there yet?  If not, loop. */
 	beqz	v0, 1b # loop
@@ -262,8 +263,9 @@ XLEAF(cheri_bcopy)
 	cmove	$c2, $c4
 	cmove	$c4, CHERI_REG_CTEMP0
 	cincoffset	$c3, $c3, a0	/* set the source pointer at the end of the buffer */
+	li	t3, -CHERICAP_SIZE	/* backward loop offset */
 	b	1b	/* copy loop */
-	li	v1, -CHERICAP_SIZE	/* backward loop increment */
+	move	v1, t3	/* backward loop increment (avoid another li) */
 END(cheri_memcpy)
 
 #if 0
