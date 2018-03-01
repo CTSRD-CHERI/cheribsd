@@ -333,7 +333,7 @@ extern u_int ktr_geniosize;
 
 #ifdef KTRACE
 #define SYSERRCAUSE(fmt, ...) \
-        if (KTRPOINT(td, KTR_SYSERRCAUSE)) \
+        if (KTRPOINT(curthread, KTR_SYSERRCAUSE)) \
                 ktrsyserrcause("%s: " fmt, __func__, ##__VA_ARGS__);
 #else
 #define SYSERRCAUSE(fmt, ...)
