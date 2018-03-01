@@ -300,6 +300,18 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 	    uap->prot, flags, uap->fd, uap->pos));
 }
 
+int
+cheriabi_munmap(struct thread *td, struct cheriabi_munmap_args *uap)
+{
+
+	if (cap_covers_pages(uap->addr, uap->len) == 0)
+		return (ENOMEM);	/* XXX EPROT? */
+	if ((cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
+		return (EPROT);
+
+	return (kern_munmap(td, (__cheri_addr uintptr_t)uap->addr, uap->len));
+}
+
 
 int
 cheriabi_mprotect(struct thread *td, struct cheriabi_mprotect_args *uap)

@@ -817,26 +817,19 @@ CHERIABI_SYS_cheriabi_msync_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_munmap_fill_uap(struct thread *td,
-    struct munmap_args *uap)
+CHERIABI_SYS_cheriabi_munmap_fill_uap(struct thread *td,
+    struct cheriabi_munmap_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [1] size_t len */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_munmap_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_munmap_PTRMASK);
 	uap->len = cheri_getoffset(tmpcap);
 
-	/* [0] _Pagerange_vmmap_(len) void * addr */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_CHERIABI_VMMAP);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_munmap_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->addr),
-		    tmpcap, uap->len, reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _Pagerange_vmmap_(len) void *__capability addr */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->addr),
+	    0, CHERIABI_SYS_cheriabi_munmap_PTRMASK);
 
 	return (0);
 }

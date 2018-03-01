@@ -54,7 +54,7 @@ MIASM =  \
 	cheriabi_chroot.o \
 	cheriabi_msync.o \
 	vfork.o \
-	munmap.o \
+	cheriabi_munmap.o \
 	cheriabi_mprotect.o \
 	cheriabi_madvise.o \
 	cheriabi_mincore.o \

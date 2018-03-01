@@ -78,7 +78,7 @@
 				/* 70 is obsolete sstk */
 				/* 71 is obsolete mmap */
 				/* 72 is obsolete ovadvise */
-#define	CHERIABI_SYS_munmap	73
+#define	CHERIABI_SYS_cheriabi_munmap	73
 #define	CHERIABI_SYS_cheriabi_mprotect	74
 #define	CHERIABI_SYS_cheriabi_madvise	75
 				/* 76 is obsolete vhangup */

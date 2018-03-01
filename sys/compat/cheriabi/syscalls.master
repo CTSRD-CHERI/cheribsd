@@ -224,7 +224,9 @@
 70	AUE_SSTK	OBSOL	sstk
 71	AUE_MMAP	OBSOL	mmap
 72	AUE_O_VADVISE	OBSOL	ovadvise
-73	AUE_MUNMAP	NOPROTO	{ int munmap(_Pagerange_vmmap_(len) void *addr, \
+73	AUE_MUNMAP	STD	{ int cheriabi_munmap( \
+				    _Pagerange_vmmap_(len) \
+				    void * __capability addr, \
 				    size_t len); }
 74	AUE_MPROTECT	STD	{ int cheriabi_mprotect( \
 				    _Pagerange_(len) const void *addr, \

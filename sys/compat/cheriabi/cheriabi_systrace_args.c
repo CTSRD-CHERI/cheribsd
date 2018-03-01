@@ -416,10 +416,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 0;
 		break;
 	}
-	/* munmap */
+	/* cheriabi_munmap */
 	case 73: {
-		struct munmap_args *p = params;
-		uarg[0] = (intptr_t) p->addr; /* void * */
+		struct cheriabi_munmap_args *p = params;
+		uarg[0] = (cheri_getbase(p->addr) + cheri_getoffset(p->addr)); /* void *__capability */
 		uarg[1] = p->len; /* size_t */
 		*n_args = 2;
 		break;
@@ -3721,11 +3721,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* vfork */
 	case 66:
 		break;
-	/* munmap */
+	/* cheriabi_munmap */
 	case 73:
 		switch(ndx) {
 		case 0:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 1:
 			p = "size_t";
@@ -8464,7 +8464,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* vfork */
 	case 66:
-	/* munmap */
+	/* cheriabi_munmap */
 	case 73:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

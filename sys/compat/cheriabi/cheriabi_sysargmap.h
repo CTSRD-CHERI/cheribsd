@@ -51,7 +51,7 @@
 #define	CHERIABI_SYS_umask_PTRMASK	(0x0)
 #define	CHERIABI_SYS_cheriabi_chroot_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_msync_PTRMASK	(0x0 | 0x1)
-#define	CHERIABI_SYS_munmap_PTRMASK	(0x0 | 0x1)
+#define	CHERIABI_SYS_cheriabi_munmap_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_mprotect_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_madvise_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_mincore_PTRMASK	(0x0 | 0x1 | 0x4)
