@@ -245,14 +245,14 @@ MIASM =  \
 	cheriabi___acl_aclcheck_link.o \
 	cheriabi_sigwait.o \
 	cheriabi_thr_create.o \
-	thr_exit.o \
-	thr_self.o \
+	cheriabi_thr_exit.o \
+	cheriabi_thr_self.o \
 	thr_kill.o \
 	jail_attach.o \
 	cheriabi_extattr_list_fd.o \
 	cheriabi_extattr_list_file.o \
 	cheriabi_extattr_list_link.o \
-	thr_suspend.o \
+	cheriabi_thr_suspend.o \
 	thr_wake.o \
 	kldunloadf.o \
 	cheriabi_audit.o \
@@ -274,7 +274,7 @@ MIASM =  \
 	cheriabi_kmq_notify.o \
 	cheriabi_kmq_unlink.o \
 	cheriabi_abort2.o \
-	thr_set_name.o \
+	cheriabi_thr_set_name.o \
 	cheriabi_aio_fsync.o \
 	cheriabi_rtprio_thread.o \
 	sctp_peeloff.o \

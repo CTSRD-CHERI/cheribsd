@@ -88,6 +88,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/unistd.h>
 #include <sys/ucontext.h>
 #include <sys/user.h>
+#include <sys/umtx.h>
 #include <sys/uuid.h>
 #include <sys/vnode.h>
 #include <sys/vdso.h>
@@ -2216,51 +2217,114 @@ cheriabi___sysctl(struct thread *td, struct cheriabi___sysctl_args *uap)
 /*
  * kern_thr.c
  */
+
+struct thr_create_initthr_args_c {
+	ucontext_c_t ctx;
+	long * __capability tid;
+};
+
+static int
+cheriabi_thr_create_initthr(struct thread *td, void *thunk)
+{
+	struct thr_create_initthr_args_c *args;
+
+	args = thunk;
+	if (args->tid != NULL && suword_c(args->tid, td->td_tid) != 0)
+		return (EFAULT);
+
+	return (cheriabi_set_mcontext(td, &args->ctx.uc_mcontext));
+}
+
 int
 cheriabi_thr_create(struct thread *td, struct cheriabi_thr_create_args *uap)
 {
+	struct thr_create_initthr_args_c args;
+	int error;
 
-	return (ENOSYS);
+	if ((error = copyincap_c(uap->ctx, &args.ctx, sizeof(args.ctx))))
+		return (error);
+	args.tid = uap->id;
+	return (thread_create(td, NULL, cheriabi_thr_create_initthr, &args));
 }
 
 static int
 cheriabi_thr_new_initthr(struct thread *td, void *thunk)
 {
-	struct thr_param_c *param;
-	long *child_tidp, *parent_tidp;
-	int error;
+	struct thr_param_c *param = thunk;
 
-	param = thunk;
-	error = cheriabi_cap_to_ptr((caddr_t *)&child_tidp,
-	    param->child_tid, sizeof(*child_tidp),
-	    CHERI_PERM_GLOBAL | CHERI_PERM_STORE, 1);
-	if (error)
-		return (error);
-	error = cheriabi_cap_to_ptr((caddr_t *)&parent_tidp,
-	    param->parent_tid, sizeof(*parent_tidp),
-	    CHERI_PERM_GLOBAL | CHERI_PERM_STORE, 1);
-	if (error)
-		return (error);
-	if ((child_tidp != NULL && suword(child_tidp, td->td_tid)) ||
-	    (parent_tidp != NULL && suword(parent_tidp, td->td_tid)))
+	if ((param->child_tid != NULL &&
+	    suword_c(param->child_tid, td->td_tid)) ||
+	    (param->parent_tid != NULL &&
+	    suword_c(param->parent_tid, td->td_tid)))
 		return (EFAULT);
 	cheriabi_set_threadregs(td, param);
 	return (cheriabi_set_user_tls(td, param->tls_base));
 }
 
 int
+cheriabi_thr_self(struct thread *td, struct cheriabi_thr_self_args *uap)
+{
+	int error;
+
+	error = suword_c(uap->id, td->td_tid);
+	if (error == -1)
+		return (EFAULT);
+	return (0);
+}
+
+int
+cheriabi_thr_exit(struct thread *td, struct cheriabi_thr_exit_args *uap)
+{
+
+	umtx_thread_exit(td);
+
+	/* Signal userland that it can free the stack. */
+	if (uap->state != NULL) {
+		suword_c(uap->state, 1);
+		kern_umtx_wake(td, __DECAP_CHECK(uap->state, sizeof(long)),
+		    INT_MAX, 0);
+	}
+
+	return (kern_thr_exit(td));
+}
+
+int
+cheriabi_thr_suspend(struct thread *td, struct cheriabi_thr_suspend_args *uap)
+{
+	struct timespec ts, *tsp;
+	int error;
+
+	tsp = NULL;
+	if (uap->timeout != NULL) {
+		error = umtx_copyin_timeout(
+		    __DECAP_CHECK(__DECONST_CAP(struct timespec * __capability, uap->timeout),
+		    sizeof(struct timespec)), &ts);
+		if (error != 0)
+			return (error);
+		tsp = &ts;
+	}
+
+	return (kern_thr_suspend(td, tsp));
+}
+
+int
+cheriabi_thr_set_name(struct thread *td, struct cheriabi_thr_set_name_args *uap)
+{
+
+	return (kern_thr_set_name(td, uap->id, uap->name));
+}
+
+int
 cheriabi_thr_new(struct thread *td, struct cheriabi_thr_new_args *uap)
 {
 	struct thr_param_c param_c;
-	struct rtprio rtp, *rtpp, *rtpup;
+	struct rtprio rtp, *rtpp;
 	int error;
 
 	if (uap->param_size != sizeof(struct thr_param_c))
 		return (EINVAL);
 
-	error = copyincap_c(uap->param,
-	    (__cheri_tocap struct thr_param_c **capability)&param_c,
-	    uap->param_size);
+	error = copyincap_c(uap->param, &param_c, uap->param_size);
 	if (error != 0)
 		return (error);
 
@@ -2271,17 +2335,13 @@ cheriabi_thr_new(struct thread *td, struct cheriabi_thr_new_args *uap)
 	 * XXXRW: But should only do so if a suitable flag is set?
 	 */
 	cheriabi_thr_new_md(td, &param_c);
-	rtpp = NULL;
-	error = cheriabi_cap_to_ptr((caddr_t *)&rtpup, param_c.rtp,
-	    sizeof(rtp), CHERI_PERM_GLOBAL | CHERI_PERM_LOAD, 1);
-	if (error)
-		return (error);
-	if (rtpup != 0) {
-		error = copyin(rtpup, &rtp, sizeof(struct rtprio));
+	if (param_c.rtp != NULL) {
+		error = copyin_c(param_c.rtp, &rtp, sizeof(struct rtprio));
 		if (error)
 			return (error);
 		rtpp = &rtp;
-	}
+	} else
+		rtpp = NULL;
 	return (thread_create(td, rtpp, cheriabi_thr_new_initthr, &param_c));
 }
 

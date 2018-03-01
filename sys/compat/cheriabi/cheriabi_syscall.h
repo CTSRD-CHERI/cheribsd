@@ -353,8 +353,8 @@
 #define	CHERIABI_SYS_cheriabi___acl_aclcheck_link	428
 #define	CHERIABI_SYS_cheriabi_sigwait	429
 #define	CHERIABI_SYS_cheriabi_thr_create	430
-#define	CHERIABI_SYS_thr_exit	431
-#define	CHERIABI_SYS_thr_self	432
+#define	CHERIABI_SYS_cheriabi_thr_exit	431
+#define	CHERIABI_SYS_cheriabi_thr_self	432
 #define	CHERIABI_SYS_thr_kill	433
 #define	CHERIABI_SYS_jail_attach	436
 #define	CHERIABI_SYS_cheriabi_extattr_list_fd	437
@@ -362,7 +362,7 @@
 #define	CHERIABI_SYS_cheriabi_extattr_list_link	439
 				/* 440 is obsolete kse_switchin */
 				/* 441 is obsolete ksem_timedwait */
-#define	CHERIABI_SYS_thr_suspend	442
+#define	CHERIABI_SYS_cheriabi_thr_suspend	442
 #define	CHERIABI_SYS_thr_wake	443
 #define	CHERIABI_SYS_kldunloadf	444
 #define	CHERIABI_SYS_cheriabi_audit	445
@@ -384,7 +384,7 @@
 #define	CHERIABI_SYS_cheriabi_kmq_notify	461
 #define	CHERIABI_SYS_cheriabi_kmq_unlink	462
 #define	CHERIABI_SYS_cheriabi_abort2	463
-#define	CHERIABI_SYS_thr_set_name	464
+#define	CHERIABI_SYS_cheriabi_thr_set_name	464
 #define	CHERIABI_SYS_cheriabi_aio_fsync	465
 #define	CHERIABI_SYS_cheriabi_rtprio_thread	466
 #define	CHERIABI_SYS_sctp_peeloff	471

@@ -984,10 +984,12 @@
 				    _In_ const sigset_t * __capability set, \
 				    _Out_ int * __capability sig); }
 430	AUE_THR_CREATE	STD	{ int cheriabi_thr_create( \
-				    _In_ ucontext_c_t *ctx, \
-				    _Out_ long *id, int flags); }
-431	AUE_THR_EXIT	NOPROTO|NOSTUB	{ void thr_exit(_Out_opt_ long *state); }
-432	AUE_NULL	NOPROTO	{ int thr_self(_Out_ long *id); }
+				    _In_ ucontext_c_t * __capability ctx, \
+				    _Out_ long * __capability id, int flags); }
+431	AUE_THR_EXIT	STD|NOSTUB	{ void cheriabi_thr_exit( \
+				    _Out_opt_ long * __capability state); }
+432	AUE_NULL	STD	{ int cheriabi_thr_self( \
+				    _Out_ long * __capability id); }
 433	AUE_THR_KILL	NOPROTO	{ int thr_kill(long id, int sig); }
 434	AUE_NULL	UNIMPL	nosys
 435	AUE_NULL	UNIMPL	nosys
@@ -1009,9 +1011,9 @@
 				    void * __capability data, size_t nbytes); }
 440	AUE_NULL	OBSOL	kse_switchin
 441	AUE_SEMWAIT	OBSOL	ksem_timedwait
-442	AUE_NULL	NOPROTO	{ int thr_suspend( \
+442	AUE_NULL	STD	{ int cheriabi_thr_suspend( \
 				    _In_opt_ \
-				    const struct timespec *timeout); }
+				    const struct timespec * __capability timeout); }
 443	AUE_NULL	NOPROTO	{ int thr_wake(long id); }
 444	AUE_MODUNLOAD	NOPROTO	{ int kldunloadf(int fileid, int flags); }
 445	AUE_AUDIT	STD	{ int cheriabi_audit( \
@@ -1044,7 +1046,7 @@
 				    u_long val, void *uaddr1, \
 				    void *uaddr2); }
 455	AUE_THR_NEW	STD	{ int cheriabi_thr_new(	\
-				    _In_ struct thr_param_c *param, \
+				    _In_ struct thr_param_c * __capability param, \
 				    int param_size); }
 456	AUE_NULL	STD	{ int cheriabi_sigqueue(pid_t pid, \
 				    int signum, void * __capability value); }
@@ -1078,8 +1080,8 @@
 				    int nargs, \
 				    _In_reads_(nargs) void * __capability * \
 				    __capability args); }
-464	AUE_NULL 	NOPROTO	{ int thr_set_name(long id, \
-				    _In_z_ const char *name); }
+464	AUE_NULL 	STD	{ int cheriabi_thr_set_name(long id, \
+				    _In_z_ const char * __capability name); }
 465	AUE_AIO_FSYNC	STD	{ int cheriabi_aio_fsync(int op, \
 				    _Inout_ struct aiocb_c * __capability \
 				    aiocbp); }

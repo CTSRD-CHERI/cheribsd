@@ -2039,23 +2039,23 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_thr_create */
 	case 430: {
 		struct cheriabi_thr_create_args *p = params;
-		uarg[0] = (intptr_t) p->ctx; /* ucontext_c_t * */
-		uarg[1] = (intptr_t) p->id; /* long * */
+		uarg[0] = (cheri_getbase(p->ctx) + cheri_getoffset(p->ctx)); /* ucontext_c_t *__capability */
+		uarg[1] = (cheri_getbase(p->id) + cheri_getoffset(p->id)); /* long *__capability */
 		iarg[2] = p->flags; /* int */
 		*n_args = 3;
 		break;
 	}
-	/* thr_exit */
+	/* cheriabi_thr_exit */
 	case 431: {
-		struct thr_exit_args *p = params;
-		uarg[0] = (intptr_t) p->state; /* long * */
+		struct cheriabi_thr_exit_args *p = params;
+		uarg[0] = (cheri_getbase(p->state) + cheri_getoffset(p->state)); /* long *__capability */
 		*n_args = 1;
 		break;
 	}
-	/* thr_self */
+	/* cheriabi_thr_self */
 	case 432: {
-		struct thr_self_args *p = params;
-		uarg[0] = (intptr_t) p->id; /* long * */
+		struct cheriabi_thr_self_args *p = params;
+		uarg[0] = (cheri_getbase(p->id) + cheri_getoffset(p->id)); /* long *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -2104,10 +2104,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
-	/* thr_suspend */
+	/* cheriabi_thr_suspend */
 	case 442: {
-		struct thr_suspend_args *p = params;
-		uarg[0] = (intptr_t) p->timeout; /* const struct timespec * */
+		struct cheriabi_thr_suspend_args *p = params;
+		uarg[0] = (cheri_getbase(p->timeout) + cheri_getoffset(p->timeout)); /* const struct timespec *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -2208,7 +2208,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_thr_new */
 	case 455: {
 		struct cheriabi_thr_new_args *p = params;
-		uarg[0] = (intptr_t) p->param; /* struct thr_param_c * */
+		uarg[0] = (cheri_getbase(p->param) + cheri_getoffset(p->param)); /* struct thr_param_c *__capability */
 		iarg[1] = p->param_size; /* int */
 		*n_args = 2;
 		break;
@@ -2287,11 +2287,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* thr_set_name */
+	/* cheriabi_thr_set_name */
 	case 464: {
-		struct thr_set_name_args *p = params;
+		struct cheriabi_thr_set_name_args *p = params;
 		iarg[0] = p->id; /* long */
-		uarg[1] = (intptr_t) p->name; /* const char * */
+		uarg[1] = (cheri_getbase(p->name) + cheri_getoffset(p->name)); /* const char *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -6368,10 +6368,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 430:
 		switch(ndx) {
 		case 0:
-			p = "userland ucontext_c_t *";
+			p = "userland ucontext_c_t *__capability";
 			break;
 		case 1:
-			p = "userland long *";
+			p = "userland long *__capability";
 			break;
 		case 2:
 			p = "int";
@@ -6380,21 +6380,21 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* thr_exit */
+	/* cheriabi_thr_exit */
 	case 431:
 		switch(ndx) {
 		case 0:
-			p = "userland long *";
+			p = "userland long *__capability";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* thr_self */
+	/* cheriabi_thr_self */
 	case 432:
 		switch(ndx) {
 		case 0:
-			p = "userland long *";
+			p = "userland long *__capability";
 			break;
 		default:
 			break;
@@ -6480,11 +6480,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* thr_suspend */
+	/* cheriabi_thr_suspend */
 	case 442:
 		switch(ndx) {
 		case 0:
-			p = "userland const struct timespec *";
+			p = "userland const struct timespec *__capability";
 			break;
 		default:
 			break;
@@ -6644,7 +6644,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 455:
 		switch(ndx) {
 		case 0:
-			p = "userland struct thr_param_c *";
+			p = "userland struct thr_param_c *__capability";
 			break;
 		case 1:
 			p = "int";
@@ -6787,14 +6787,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* thr_set_name */
+	/* cheriabi_thr_set_name */
 	case 464:
 		switch(ndx) {
 		case 0:
 			p = "long";
 			break;
 		case 1:
-			p = "userland const char *";
+			p = "userland const char *__capability";
 			break;
 		default:
 			break;
@@ -9418,12 +9418,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* thr_exit */
+	/* cheriabi_thr_exit */
 	case 431:
 		if (ndx == 0 || ndx == 1)
 			p = "void";
 		break;
-	/* thr_self */
+	/* cheriabi_thr_self */
 	case 432:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9453,7 +9453,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "ssize_t";
 		break;
-	/* thr_suspend */
+	/* cheriabi_thr_suspend */
 	case 442:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9563,7 +9563,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "void";
 		break;
-	/* thr_set_name */
+	/* cheriabi_thr_set_name */
 	case 464:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

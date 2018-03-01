@@ -830,9 +830,15 @@ struct cheriabi_sigwait_args {
 	char sig_l_[PADL_(int *__capability)]; int *__capability sig; char sig_r_[PADR_(int *__capability)];
 };
 struct cheriabi_thr_create_args {
-	char ctx_l_[PADL_(ucontext_c_t *)]; ucontext_c_t * ctx; char ctx_r_[PADR_(ucontext_c_t *)];
-	char id_l_[PADL_(long *)]; long * id; char id_r_[PADR_(long *)];
+	char ctx_l_[PADL_(ucontext_c_t *__capability)]; ucontext_c_t *__capability ctx; char ctx_r_[PADR_(ucontext_c_t *__capability)];
+	char id_l_[PADL_(long *__capability)]; long *__capability id; char id_r_[PADR_(long *__capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
+struct cheriabi_thr_exit_args {
+	char state_l_[PADL_(long *__capability)]; long *__capability state; char state_r_[PADR_(long *__capability)];
+};
+struct cheriabi_thr_self_args {
+	char id_l_[PADL_(long *__capability)]; long *__capability id; char id_r_[PADR_(long *__capability)];
 };
 struct cheriabi_extattr_list_fd_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
@@ -851,6 +857,9 @@ struct cheriabi_extattr_list_link_args {
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
 	char data_l_[PADL_(void *__capability)]; void *__capability data; char data_r_[PADR_(void *__capability)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
+};
+struct cheriabi_thr_suspend_args {
+	char timeout_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability timeout; char timeout_r_[PADR_(const struct timespec *__capability)];
 };
 struct cheriabi_audit_args {
 	char record_l_[PADL_(const void *__capability)]; const void *__capability record; char record_r_[PADR_(const void *__capability)];
@@ -885,7 +894,7 @@ struct cheriabi_auditctl_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 };
 struct cheriabi_thr_new_args {
-	char param_l_[PADL_(struct thr_param_c *)]; struct thr_param_c * param; char param_r_[PADR_(struct thr_param_c *)];
+	char param_l_[PADL_(struct thr_param_c *__capability)]; struct thr_param_c *__capability param; char param_r_[PADR_(struct thr_param_c *__capability)];
 	char param_size_l_[PADL_(int)]; int param_size; char param_size_r_[PADR_(int)];
 };
 struct cheriabi_sigqueue_args {
@@ -929,6 +938,10 @@ struct cheriabi_abort2_args {
 	char why_l_[PADL_(const char *__capability)]; const char *__capability why; char why_r_[PADR_(const char *__capability)];
 	char nargs_l_[PADL_(int)]; int nargs; char nargs_r_[PADR_(int)];
 	char args_l_[PADL_(void *__capability *__capability)]; void *__capability *__capability args; char args_r_[PADR_(void *__capability *__capability)];
+};
+struct cheriabi_thr_set_name_args {
+	char id_l_[PADL_(long)]; long id; char id_r_[PADR_(long)];
+	char name_l_[PADL_(const char *__capability)]; const char *__capability name; char name_r_[PADR_(const char *__capability)];
 };
 struct cheriabi_aio_fsync_args {
 	char op_l_[PADL_(int)]; int op; char op_r_[PADR_(int)];
@@ -1494,9 +1507,12 @@ int	cheriabi___acl_delete_link(struct thread *, struct cheriabi___acl_delete_lin
 int	cheriabi___acl_aclcheck_link(struct thread *, struct cheriabi___acl_aclcheck_link_args *);
 int	cheriabi_sigwait(struct thread *, struct cheriabi_sigwait_args *);
 int	cheriabi_thr_create(struct thread *, struct cheriabi_thr_create_args *);
+int	cheriabi_thr_exit(struct thread *, struct cheriabi_thr_exit_args *);
+int	cheriabi_thr_self(struct thread *, struct cheriabi_thr_self_args *);
 int	cheriabi_extattr_list_fd(struct thread *, struct cheriabi_extattr_list_fd_args *);
 int	cheriabi_extattr_list_file(struct thread *, struct cheriabi_extattr_list_file_args *);
 int	cheriabi_extattr_list_link(struct thread *, struct cheriabi_extattr_list_link_args *);
+int	cheriabi_thr_suspend(struct thread *, struct cheriabi_thr_suspend_args *);
 int	cheriabi_audit(struct thread *, struct cheriabi_audit_args *);
 int	cheriabi_auditon(struct thread *, struct cheriabi_auditon_args *);
 int	cheriabi_getauid(struct thread *, struct cheriabi_getauid_args *);
@@ -1515,6 +1531,7 @@ int	cheriabi_kmq_timedsend(struct thread *, struct cheriabi_kmq_timedsend_args *
 int	cheriabi_kmq_notify(struct thread *, struct cheriabi_kmq_notify_args *);
 int	cheriabi_kmq_unlink(struct thread *, struct cheriabi_kmq_unlink_args *);
 int	cheriabi_abort2(struct thread *, struct cheriabi_abort2_args *);
+int	cheriabi_thr_set_name(struct thread *, struct cheriabi_thr_set_name_args *);
 int	cheriabi_aio_fsync(struct thread *, struct cheriabi_aio_fsync_args *);
 int	cheriabi_rtprio_thread(struct thread *, struct cheriabi_rtprio_thread_args *);
 int	cheriabi_sctp_generic_sendmsg(struct thread *, struct cheriabi_sctp_generic_sendmsg_args *);
@@ -1813,9 +1830,12 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi___acl_aclcheck_link	AUE_ACL_CHECK_LINK
 #define	CHERIABI_SYS_AUE_cheriabi_sigwait	AUE_SIGWAIT
 #define	CHERIABI_SYS_AUE_cheriabi_thr_create	AUE_THR_CREATE
+#define	CHERIABI_SYS_AUE_cheriabi_thr_exit	AUE_THR_EXIT
+#define	CHERIABI_SYS_AUE_cheriabi_thr_self	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_extattr_list_fd	AUE_EXTATTR_LIST_FD
 #define	CHERIABI_SYS_AUE_cheriabi_extattr_list_file	AUE_EXTATTR_LIST_FILE
 #define	CHERIABI_SYS_AUE_cheriabi_extattr_list_link	AUE_EXTATTR_LIST_LINK
+#define	CHERIABI_SYS_AUE_cheriabi_thr_suspend	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_audit	AUE_AUDIT
 #define	CHERIABI_SYS_AUE_cheriabi_auditon	AUE_AUDITON
 #define	CHERIABI_SYS_AUE_cheriabi_getauid	AUE_GETAUID
@@ -1834,6 +1854,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_kmq_notify	AUE_MQ_NOTIFY
 #define	CHERIABI_SYS_AUE_cheriabi_kmq_unlink	AUE_MQ_UNLINK
 #define	CHERIABI_SYS_AUE_cheriabi_abort2	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_thr_set_name	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_aio_fsync	AUE_AIO_FSYNC
 #define	CHERIABI_SYS_AUE_cheriabi_rtprio_thread	AUE_RTPRIO
 #define	CHERIABI_SYS_AUE_cheriabi_sctp_generic_sendmsg	AUE_SCTP_GENERIC_SENDMSG
