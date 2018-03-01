@@ -29,6 +29,7 @@
  */
 
 #include "opt_compat.h"
+#include <sys/syscall.h>
 #include <machine/asm.h>
 
 #ifdef CPU_CHERI
@@ -152,7 +153,7 @@ _C_LABEL(switcher_coaccept):
 	 */
 	cbts	$c5, 1f
 	nop
-	li	v0, 565
+	li	v0, SYS_copark
 	syscall
 	nop
 
