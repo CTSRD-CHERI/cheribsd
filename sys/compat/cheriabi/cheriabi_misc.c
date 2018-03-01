@@ -933,13 +933,6 @@ cheriabi_syscall_deregister(int *offset, struct sysent *old_sysent)
 	return (0);
 }
 
-#ifdef NOTYET
-int
-cheriabi_syscall_module_handler(struct module *mod, int what, void *arg)
-{
-}
-#endif
-
 int
 cheriabi_syscall_helper_register(struct syscall_helper_data *sd, int flags)
 {
