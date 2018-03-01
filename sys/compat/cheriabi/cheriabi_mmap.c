@@ -453,7 +453,9 @@ int
 cheriabi_mincore(struct thread *td, struct cheriabi_mincore_args *uap)
 {
 
-	/* XXX: check range of cap */
+	if (cap_covers_pages(uap->addr, uap->len) == 0)
+		return (ENOMEM);	/* XXX: EPROT? */
+
 	return (kern_mincore(td, (__cheri_addr uintptr_t)uap->addr, uap->len,
 	    uap->vec));
 }
