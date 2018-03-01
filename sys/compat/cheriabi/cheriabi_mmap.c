@@ -316,12 +316,17 @@ cheriabi_munmap(struct thread *td, struct cheriabi_munmap_args *uap)
 int
 cheriabi_mprotect(struct thread *td, struct cheriabi_mprotect_args *uap)
 {
-	void * __capability addr_cap;
 	register_t perms, reqperms;
 
-	cheriabi_fetch_syscall_arg(td, &addr_cap,
-	    0, CHERIABI_SYS_cheriabi_mprotect_PTRMASK);
-	perms = cheri_getperm(addr_cap);
+	if (cap_covers_pages(uap->addr, uap->len) == 0)
+		return (ENOMEM);	/* XXX EPROT? */
+	/*
+	 * XXX: should we require CHERI_PERM_CHERIABI_VMMAP?  On one
+	 * hand we don't change the contents, on the other hand, denied
+	 * access can turn into a fault...
+	 */
+
+	perms = cheri_getperm(uap->addr);
 	/*
 	 * Requested prot much be allowed by capability.
 	 *
@@ -334,8 +339,8 @@ cheriabi_mprotect(struct thread *td, struct cheriabi_mprotect_args *uap)
 	if ((perms & reqperms) != reqperms)
 		return (EPROT);
 
-	return (kern_mprotect(td, (vm_offset_t)uap->addr, uap->len,
-	    uap->prot));
+	return (kern_mprotect(td, (__cheri_addr vm_offset_t)uap->addr,
+	    uap->len, uap->prot));
 }
 
 int
