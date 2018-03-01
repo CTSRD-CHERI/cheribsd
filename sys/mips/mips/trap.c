@@ -581,8 +581,6 @@ unborrow_curthread(struct thread *td, struct trapframe **trapframep)
 	struct trapframe peertrapframe;
 	struct syscall_args peersa;
 	register_t peertpc;
-	void *peertls;
-	size_t peertls_tcb_offset;
 	int error;
 
 	if (td->td_switcher_data == 0) {
@@ -613,7 +611,8 @@ unborrow_curthread(struct thread *td, struct trapframe **trapframep)
 	KASSERT(peertd != td,
 	    ("%s: peertd %p == td %p\n", __func__, peertd, td));
 
-	printf("%s: replacing current td %p, md_tls %p, with %p, md_tls %p\n", __func__, td, td->td_md.md_tls, peertd, peertd->td_md.md_tls);
+	printf("%s: replacing current td %p, md_tls %p, md_tls_tcb_offset %zd, with %p, md_tls %p, md_tls_tcb_offset %zd\n",
+	    __func__, td, td->td_md.md_tls, td->td_md.md_tls_tcb_offset, peertd, peertd->td_md.md_tls, peertd->td_md.md_tls_tcb_offset);
 
 	/*
 	 * Assign our trapframe (userspace context) to the thread waiting
@@ -630,20 +629,14 @@ unborrow_curthread(struct thread *td, struct trapframe **trapframep)
 	peersa = peertd->td_sa;
 	cheri_memcpy(&peertrapframe, peertd->td_sa.trapframe, sizeof(struct trapframe));
 	peertpc = peertd->td_pcb->pcb_tpc;
-	peertls = peertd->td_md.md_tls;
-	peertls_tcb_offset = peertd->td_md.md_tls_tcb_offset;
 
 	peertd->td_sa = td->td_sa;
 	cheri_memcpy(&peertd->td_pcb->pcb_regs, *trapframep, sizeof(struct trapframe));
 	peertd->td_pcb->pcb_tpc = td->td_pcb->pcb_tpc;
-	peertd->td_md.md_tls = td->td_md.md_tls;
-	peertd->td_md.md_tls_tcb_offset = td->td_md.md_tls_tcb_offset;
 
 	td->td_sa = peersa;
 	cheri_memcpy(&td->td_pcb->pcb_regs, &peertrapframe, sizeof(struct trapframe));
 	td->td_pcb->pcb_tpc = peertpc;
-	td->td_md.md_tls = peertls;
-	td->td_md.md_tls_tcb_offset = peertls_tcb_offset;
 
 	*trapframep = &td->td_pcb->pcb_regs;
 
