@@ -18,6 +18,7 @@ LIB=thr
 SHLIB_MAJOR= 3
 NO_WTHREAD_SAFETY=1
 NO_WCAST_ALIGN.gcc=1    # for gcc 4.2
+CFLAGS+=        -DTLS_USE_SYSARCH=1
 CFLAGS+=-DPTHREAD_KERNEL
 CFLAGS+=-I${SRCTOP}/lib/libc/include -I${.CURDIR}/thread \
 	-I${SRCTOP}/include

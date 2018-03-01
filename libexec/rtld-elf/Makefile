@@ -55,6 +55,7 @@ CFLAGS+=	-fvisibility=hidden
 .endif
 .if ${MACHINE_CPUARCH} == "mips"
 CFLAGS.reloc.c+=-fno-jump-tables
+CFLAGS+=	-DTLS_USE_SYSARCH=1
 .endif
 LDFLAGS+=	-shared -Wl,-Bsymbolic -Wl,-z,defs
 LIBADD=		c_pic
