@@ -143,8 +143,7 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 		return (EINVAL);
 	}
 
-	cheriabi_fetch_syscall_arg(td, &addr_cap,
-	    0, CHERIABI_SYS_cheriabi_mmap_PTRMASK);
+	addr_cap = uap->addr;
 	usertag = cheri_gettag(addr_cap);
 	if (!usertag) {
 		if (flags & MAP_FIXED) {

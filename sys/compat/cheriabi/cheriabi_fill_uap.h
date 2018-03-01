@@ -5202,17 +5202,10 @@ CHERIABI_SYS_cheriabi_mmap_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 5, CHERIABI_SYS_cheriabi_mmap_PTRMASK);
 	uap->pos = cheri_getoffset(tmpcap);
 
-	/* [0] _Pagerange_vmmap_opt_(len) void * addr */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_CHERIABI_VMMAP);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_mmap_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->addr),
-		    tmpcap, uap->len, reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _Pagerange_vmmap_opt_(len) void *__capability addr */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->addr),
+	    0, CHERIABI_SYS_cheriabi_mmap_PTRMASK);
 
 	return (0);
 }
