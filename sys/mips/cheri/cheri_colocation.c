@@ -268,7 +268,7 @@ sys_copark(struct thread *td, struct copark_args *uap)
 {
 	int error;
 
-	printf("%s: go, td %p!\n", __func__, td);
+	//printf("%s: go, td %p!\n", __func__, td);
 
 	mtx_lock(&Giant);
 	error = msleep(&td->td_switcher_data, &Giant, PPAUSE | PCATCH, "copark", 0);
@@ -280,10 +280,10 @@ sys_copark(struct thread *td, struct copark_args *uap)
 		 * (its context is in our trapframe) and we can return with ERESTART,
 		 * to "bounce back" and execute the syscall userspace requested.
 		 */
-		printf("%s: got switched to, td %p, returning ERESTART\n", __func__, td);
+		//printf("%s: got switched to, td %p, returning ERESTART\n", __func__, td);
 		return (ERESTART);
 	} else {
-		printf("%s: error %d, td %p\n", __func__, error, td);
+		//printf("%s: error %d, td %p\n", __func__, error, td);
 	}
 
 	return (error);
