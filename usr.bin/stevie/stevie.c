@@ -120,8 +120,6 @@ call(void)
 	void * __capability lookedup;
 	int error;
 
-	fprintf(stderr, "%s: we are thread %d\n", __func__, pthread_getthreadid_np());
-
 	fprintf(stderr, "%s: setting up...\n", __func__);
 	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
 	if (error != 0)
@@ -132,13 +130,17 @@ call(void)
 	if (error != 0)
 		err(1, "colookup");
 
-	fprintf(stderr, "%s: code %p, data %p, calling %p...\n", __func__, (__cheri_fromcap void *)switcher_code, (__cheri_fromcap void *)switcher_data, (__cheri_fromcap void *)lookedup);
+	fprintf(stderr, "%s: code %p, data %p, calling %p, we are thread %d...\n",
+	    __func__, (__cheri_fromcap void *)switcher_code, (__cheri_fromcap void *)switcher_data, (__cheri_fromcap void *)lookedup, pthread_getthreadid_np());
 	error = cocall(switcher_code, switcher_data, lookedup);
-	fprintf(stderr, "%s: done, cocall returned %d\n", __func__, error);
+	fprintf(stderr, "%s: done, cocall returned %d, we are thread %d\n",
+	    __func__, error, pthread_getthreadid_np());
 
-	fprintf(stderr, "%s: code %p, data %p, calling %p...\n", __func__, (__cheri_fromcap void *)switcher_code, (__cheri_fromcap void *)switcher_data, (__cheri_fromcap void *)lookedup);
+	fprintf(stderr, "%s: code %p, data %p, calling %p, we are thread %d...\n",
+	    __func__, (__cheri_fromcap void *)switcher_code, (__cheri_fromcap void *)switcher_data, (__cheri_fromcap void *)lookedup, pthread_getthreadid_np());
 	error = cocall(switcher_code, switcher_data, lookedup);
-	fprintf(stderr, "%s: done, cocall returned %d\n", __func__, error);
+	fprintf(stderr, "%s: done, cocall returned %d, we are thread %d\n",
+	    __func__, error, pthread_getthreadid_np());
 }
 
 static void *
@@ -147,8 +149,6 @@ service_proc(void *dummy __unused)
 	void * __capability switcher_code;
 	void * __capability switcher_data;
 	int error;
-
-	fprintf(stderr, "%s: we are thread %d\n", __func__, pthread_getthreadid_np());
 
 	fprintf(stderr, "%s: setting up...\n", __func__);
 	error = cosetup(COSETUP_COACCEPT, &switcher_code, &switcher_data);
@@ -160,9 +160,11 @@ service_proc(void *dummy __unused)
 	if (error != 0)
 		err(1, "coregister");
 
-	fprintf(stderr, "%s: code %p, data %p, accepting...\n", __func__, (__cheri_fromcap void *)switcher_code, (__cheri_fromcap void *)switcher_data);
+	fprintf(stderr, "%s: code %p, data %p, we are thread %d, accepting...\n",
+	    __func__, (__cheri_fromcap void *)switcher_code, (__cheri_fromcap void *)switcher_data, pthread_getthreadid_np());
 	while (coaccept(switcher_code, switcher_data)) {
-		fprintf(stderr, "%s: accepted, we are thread %d, looping...\n", __func__, pthread_getthreadid_np());
+		fprintf(stderr, "%s: accepted, we are thread %d, looping...\n",
+		    __func__, pthread_getthreadid_np());
 	}
 	fprintf(stderr, "%s: we're not supposed to be here\n", __func__);
 	return (NULL);
