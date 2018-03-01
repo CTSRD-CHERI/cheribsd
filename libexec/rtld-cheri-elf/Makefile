@@ -11,7 +11,7 @@ MK_CHERI_SHARED_PROG:=yes
 .PATH: ${.CURDIR}/../../lib/libmalloc_simple
 
 # TODO: disable this once we believe RTLD works reliably
-DEBUG=-DDEBUG -DDEBUG_MIPS_GOT
+DEBUG=-DDEBUG
 
 PROG?=		ld-cheri-elf.so.1
 SRCS=		rtld_start.S \

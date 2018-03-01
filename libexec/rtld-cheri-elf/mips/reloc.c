@@ -474,8 +474,9 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			if (r_symndx >= obj->gotsym) {
 				val += got[obj->local_gotno + r_symndx - obj->gotsym];
 #if defined(DEBUG_VERBOSE) || defined(DEBUG_MIPS_GOT)
-				dbg("REL32/G(%p) %p --> %p (%s) in %s",
-				    where, (void *)(uintptr_t)old, (void *)(uintptr_t)val,
+				dbg("REL32/G(%p/0x%lx) %p --> %p (%s) in %s",
+				    where, (caddr_t)where - obj->relocbase,
+				    (void *)(uintptr_t)old, (void *)(uintptr_t)val,
 				    obj->strtab + def->st_name,
 				    obj->path);
 #endif
@@ -504,12 +505,16 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				    )
 					val += (Elf_Addr)def->st_value;
 
+				if (r_symndx != 0) {
+					_rtld_error("%s: local R_MIPS_REL32 relocation references symbol %s (%d). st_value=0x%lx, st_info=%x, st_shndx=%d",
+					    obj->path, obj->strtab + def->st_name, r_symndx, def->st_value, def->st_info, def->st_shndx);
+					return (-1);
+				}
 				val += (Elf_Addr)obj->relocbase;
-
-#ifdef DEBUG_VERBOSE
-				dbg("REL32/L(%p) %p -> %p (%s) in %s",
-				    where, (void *)(uintptr_t)old, (void *)(uintptr_t)val,
-				    obj->strtab + def->st_name, obj->path);
+#if defined(DEBUG_VERBOSE)
+				dbg("REL32/L(%p/0x%lx) %p -> %p (%s) in %s, st_value = 0x%lx, st_info=%x, r_symndx=%d, st_shndx=%d",
+				    where, rel->r_offset, (void *)(uintptr_t)old, (void *)(uintptr_t)val,
+				    obj->strtab + def->st_name, obj->path, def->st_value, def->st_info, r_symndx, def->st_shndx);
 #endif
 			}
 			store_ptr(where, val, rlen);
@@ -597,7 +602,32 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			break;
 		}
 
-
+#ifdef __mips_n64
+		case R_TYPE(64):
+#endif
+		case R_TYPE(32):
+			def = find_symdef(r_symndx, obj,
+			    &defobj, flags, NULL, lockstate);
+			if (def == NULL) {
+				_rtld_error("%s: Could not find symbol %s",
+				    obj->path, obj->strtab + obj->symtab[r_symndx].st_name);
+				return -1;
+			}
+			assert(ELF_ST_TYPE(def->st_info) != STT_GNU_IFUNC &&
+			    "IFUNC not implemented!");
+			Elf_Addr symval = (Elf_Addr)defobj->relocbase + def->st_value;
+			const size_t rlen =
+			    ELF_R_NXTTYPE_64_P(r_type)
+				? sizeof(Elf_Sxword)
+				: sizeof(Elf_Sword);
+			Elf_Addr old = load_ptr(where, rlen);
+			Elf_Addr val = old;
+			val += symval;
+			store_ptr(where, val, rlen);
+			dbg("ABS(%p) %s in %s %p --> %p in %s",
+			    where, obj->strtab + obj->symtab[r_symndx].st_name,
+			    obj->path, (void*)(uintptr_t)old, (void *)(uintptr_t)val, defobj->path);
+			break;
 
 		default:
 			dbg("sym = %lu, type = %lu, offset = %p, "
