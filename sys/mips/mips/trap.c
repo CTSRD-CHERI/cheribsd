@@ -573,6 +573,115 @@ cpu_fetch_syscall_args(struct thread *td)
 #define __FBSDID(x)
 #include "../../kern/subr_syscall.c"
 
+static int
+unborrow_curthread(struct thread *td, struct trapframe **trapframep)
+{
+	struct switcher_context sc;
+	struct switcher_context * __capability scp;
+	struct thread *peertd;
+	struct trapframe peertrapframe;
+	struct syscall_args peersa;
+	register_t peertpc;
+	void *peertls;
+	size_t peertls_tcb_offset;
+	int error;
+
+	if (td->td_switcher_data == 0) {
+		/*
+		 * We've never called cosetup(2).
+		 */
+		return (0);
+	}
+
+	/*
+	 * Fetch switcher context for currently executing userspace thread.
+	 */
+	error = copyincap((const void *)td->td_switcher_data, &sc, sizeof(sc));
+	if (error != 0) {
+		printf("%s: copyincap from %p failed with error %d\n",
+		    __func__, (void *)td->td_switcher_data, error);
+		return (error);
+	}
+
+	if (sc.sc_peer_context == 0) {
+		/*
+		 * No cocall in progress.
+		 */
+		return (0);
+	}
+
+	/*
+	 * Fetch our peer's switcher context.
+	 */
+	scp = sc.sc_peer_context;
+	error = copyincap((__cheri_fromcap const void *)scp, &sc, sizeof(sc));
+	if (error != 0) {
+		printf("%s: copyincap from peer %p failed with error %d\n",
+		    __func__, (__cheri_fromcap const void *)scp, error);
+		return (error);
+	}
+
+	if (sc.sc_td == NULL) {
+		/*
+		 * Nothing borrowed yet.
+		 */
+		return (0);
+	}
+
+	peertd = sc.sc_td;
+
+	KASSERT(peertd != td,
+	    ("%s: peertd %p == td %p\n", __func__, peertd, td));
+
+	printf("%s: replacing current td %p with %p\n", __func__, td, peertd);
+
+	/*
+	 * Assign our trapframe (userspace context) to the thread waiting
+	 * in copark(2) and wake it up; it'll return to userspace with ERESTART
+	 * and then bounce back.
+	 */
+	KASSERT(td->td_frame == &td->td_pcb->pcb_regs,
+	    ("%s: td->td_frame %p != &td->td_pcb->pcb_regs %p, td %p",
+	    __func__, td->td_frame, &td->td_pcb->pcb_regs, td));
+	KASSERT(peertd->td_frame == &peertd->td_pcb->pcb_regs,
+	    ("%s: peertd->td_frame %p != &peertd->td_pcb->pcb_regs %p, peertd %p",
+	    __func__, peertd->td_frame, &peertd->td_pcb->pcb_regs, peertd));
+
+	peersa = peertd->td_sa;
+	cheri_memcpy(&peertrapframe, peertd->td_sa.trapframe, sizeof(struct trapframe));
+	peertpc = peertd->td_pcb->pcb_tpc;
+	peertls = peertd->td_md.md_tls;
+	peertls_tcb_offset = peertd->td_md.md_tls_tcb_offset;
+
+	peertd->td_sa = td->td_sa;
+	//peertd->td_frame = *trapframep;
+	cheri_memcpy(&peertd->td_pcb->pcb_regs, *trapframep, sizeof(struct trapframe));
+	peertd->td_pcb->pcb_tpc = td->td_pcb->pcb_tpc;
+	peertd->td_md.md_tls = td->td_md.md_tls;
+	peertd->td_md.md_tls_tcb_offset = td->td_md.md_tls_tcb_offset;
+
+	td->td_sa = peersa;
+	//td->td_frame = peertrapframe;
+	cheri_memcpy(&td->td_pcb->pcb_regs, &peertrapframe, sizeof(struct trapframe));
+	td->td_pcb->pcb_tpc = peertpc;
+	td->td_md.md_tls = peertls;
+	td->td_md.md_tls_tcb_offset = peertls_tcb_offset;
+
+	//*trapframep = peertrapframe;
+	*trapframep = &td->td_pcb->pcb_regs;
+
+	wakeup(&peertd->td_switcher_data);
+
+	/*
+	 * Continue as usual, but calling copark(2) instead of whatever
+	 * syscall it was.
+	 */
+	KASSERT(td->td_sa.code == SYS_copark,
+	    ("%s: td_sa.code %d != %d\n", __func__, td->td_sa.code, SYS_copark));
+
+	return (0);
+}
+
 /*
  * Handle an exception.
  * Called from MipsKernGenException() or MipsUserGenException()
@@ -901,6 +1010,13 @@ dofault:
 	case T_SYSCALL + T_USER:
 		{
 			int error;
+
+			error = unborrow_curthread(td, &trapframe);
+			if (error != 0) {
+				(p->p_sysent->sv_set_syscall_retval)(td, error);
+				userret(td, trapframe);
+				return (trapframe->pc);
+			}
 
 			td->td_sa.trapframe = trapframe;
 			error = syscallenter(td);

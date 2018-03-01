@@ -140,17 +140,13 @@ _C_LABEL(switcher_cocall):
 	 *
 	 * XXX: Really, this is supposed to be a spinlock.
 	 */
-	csc	$idc, zero, 2*CHERICAP_SIZE($c5);
+	//csc	$idc, zero, 2*CHERICAP_SIZE($c5);
 
 	/*
-	 * Save the callee's thread identifier.  The kernel needs a way
-	 * to easily look it up from the current thread for the lazy thread
-	 * switching to work; that's the primary reason for storing it in
-	 * the caller's control block - or perhaps even having a caller's
-	 * control block.
+	 * Save the capability to the callee's control block in the caller
+	 * context.  This is used by the kernel to look up the real thread.
 	 */
-	clc	$c14, zero, CHERICAP_SIZE($c5)
-	csc	$c14, zero, CHERICAP_SIZE($idc)
+	csc	$c5, zero, 2*CHERICAP_SIZE($idc);
 
 	/*
 	 * Restore the callee's context.

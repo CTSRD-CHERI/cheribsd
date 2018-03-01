@@ -158,14 +158,11 @@ _C_LABEL(switcher_coaccept):
 
 1:
 	/*
-	 * Save the caller's thread identifier.  The kernel needs a way
-	 * to easily look it up from the current thread for the lazy thread
-	 * switching to work.
+	 * Zero out the sc_peer_context variables.
 	 */
-	clc	$c14, zero, CHERICAP_SIZE($c5)
-	csc	$c14, zero, CHERICAP_SIZE($idc)
-
-	// XXX: Release the callee's context spinlock here.
+	// XXX: Turn it into a proper spinlock release.
+	csd	zero, zero, 2*CHERICAP_SIZE($c5);
+	csd	zero, zero, 2*CHERICAP_SIZE($idc);
 
 	/*
 	 * Restore the caller's context.
