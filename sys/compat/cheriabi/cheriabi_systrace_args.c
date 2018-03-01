@@ -799,7 +799,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		iarg[0] = p->debug_level; /* int */
 		iarg[1] = p->grace_period; /* int */
 		iarg[2] = p->addr_count; /* int */
-		uarg[3] = (intptr_t) p->addrs; /* void *__capability * */
+		uarg[3] = (cheri_getbase(p->addrs) + cheri_getoffset(p->addrs)); /* void *__capability *__capability */
 		*n_args = 4;
 		break;
 	}
@@ -4367,7 +4367,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "userland void *__capability *";
+			p = "userland void *__capability *__capability";
 			break;
 		default:
 			break;

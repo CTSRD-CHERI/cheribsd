@@ -400,7 +400,7 @@
 154	AUE_NULL	NOSTD|NOSTUB	{ int cheriabi_nlm_syscall(int debug_level, \
 				    int grace_period , int addr_count, \
 				    _In_reads_(addr_count) \
-				    void * __capability *addrs); }
+				    void * __capability * __capability addrs); }
 ; 155 is initialized by the NFS code, if present.
 155	AUE_NFS_SVC	NOSTD	{ int cheriabi_nfssvc(int flag, \
 				    void * __capability argp); }

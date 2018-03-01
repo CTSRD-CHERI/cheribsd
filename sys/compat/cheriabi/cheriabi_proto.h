@@ -326,7 +326,7 @@ struct cheriabi_nlm_syscall_args {
 	char debug_level_l_[PADL_(int)]; int debug_level; char debug_level_r_[PADR_(int)];
 	char grace_period_l_[PADL_(int)]; int grace_period; char grace_period_r_[PADR_(int)];
 	char addr_count_l_[PADL_(int)]; int addr_count; char addr_count_r_[PADR_(int)];
-	char addrs_l_[PADL_(void *__capability *)]; void *__capability * addrs; char addrs_r_[PADR_(void *__capability *)];
+	char addrs_l_[PADL_(void *__capability *__capability)]; void *__capability *__capability addrs; char addrs_r_[PADR_(void *__capability *__capability)];
 };
 struct cheriabi_nfssvc_args {
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];

@@ -1693,17 +1693,10 @@ CHERIABI_SYS_cheriabi_nlm_syscall_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_nlm_syscall_PTRMASK);
 	uap->addr_count = cheri_getoffset(tmpcap);
 
-	/* [3] _In_reads_(addr_count) void *__capability * addrs */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_nlm_syscall_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->addrs),
-		    tmpcap, (sizeof(*uap->addrs) * uap->addr_count), reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [3] _In_reads_(addr_count) void *__capability *__capability addrs */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->addrs),
+	    3, CHERIABI_SYS_cheriabi_nlm_syscall_PTRMASK);
 
 	return (0);
 }
