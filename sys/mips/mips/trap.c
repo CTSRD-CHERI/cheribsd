@@ -602,13 +602,6 @@ unborrow_curthread(struct thread *td, struct trapframe **trapframep)
 		return (error);
 	}
 
-	if (sc.sc_peer_context == 0) {
-		/*
-		 * No cocall in progress.
-		 */
-		return (0);
-	}
-
 	peertd = sc.sc_borrower_td;
 	if (peertd == NULL) {
 		/*
@@ -620,7 +613,7 @@ unborrow_curthread(struct thread *td, struct trapframe **trapframep)
 	KASSERT(peertd != td,
 	    ("%s: peertd %p == td %p\n", __func__, peertd, td));
 
-	printf("%s: replacing current td %p with %p\n", __func__, td, peertd);
+	printf("%s: replacing current td %p, md_tls %p, with %p, md_tls %p\n", __func__, td, td->td_md.md_tls, peertd, peertd->td_md.md_tls);
 
 	/*
 	 * Assign our trapframe (userspace context) to the thread waiting
@@ -641,20 +634,17 @@ unborrow_curthread(struct thread *td, struct trapframe **trapframep)
 	peertls_tcb_offset = peertd->td_md.md_tls_tcb_offset;
 
 	peertd->td_sa = td->td_sa;
-	//peertd->td_frame = *trapframep;
 	cheri_memcpy(&peertd->td_pcb->pcb_regs, *trapframep, sizeof(struct trapframe));
 	peertd->td_pcb->pcb_tpc = td->td_pcb->pcb_tpc;
 	peertd->td_md.md_tls = td->td_md.md_tls;
 	peertd->td_md.md_tls_tcb_offset = td->td_md.md_tls_tcb_offset;
 
 	td->td_sa = peersa;
-	//td->td_frame = peertrapframe;
 	cheri_memcpy(&td->td_pcb->pcb_regs, &peertrapframe, sizeof(struct trapframe));
 	td->td_pcb->pcb_tpc = peertpc;
 	td->td_md.md_tls = peertls;
 	td->td_md.md_tls_tcb_offset = peertls_tcb_offset;
 
-	//*trapframep = peertrapframe;
 	*trapframep = &td->td_pcb->pcb_regs;
 
 	wakeup(&peertd->td_switcher_data);
