@@ -274,6 +274,8 @@ int	kern_mac_syscall(struct thread *td, const char * __capability policy,
 int	kern_madvise(struct thread *td, uintptr_t addr, size_t len, int behav);
 int	kern_mincore(struct thread *td, uintptr_t addr, size_t len,
 	    char * __capability vec);
+int	kern_minherit(struct thread *td, vm_offset_t addr, vm_size_t size,
+	    int inherit);
 int	kern_mkdirat(struct thread *td, int fd, const char * __capability path,
 	    enum uio_seg segflg, int mode);
 int	kern_mkfifoat(struct thread *td, int fd, const char * __capability path,

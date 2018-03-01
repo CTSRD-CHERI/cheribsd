@@ -144,7 +144,7 @@ MIASM =  \
 	cheriabi_clock_nanosleep.o \
 	cheriabi_clock_getcpuclockid2.o \
 	cheriabi_ntp_gettime.o \
-	minherit.o \
+	cheriabi_minherit.o \
 	rfork.o \
 	issetugid.o \
 	cheriabi_lchown.o \

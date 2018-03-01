@@ -338,6 +338,19 @@ cheriabi_mprotect(struct thread *td, struct cheriabi_mprotect_args *uap)
 	    uap->prot));
 }
 
+int
+cheriabi_minherit(struct thread *td, struct cheriabi_minherit_args *uap)
+{
+
+	
+	if (cap_covers_pages(uap->addr, uap->len) == 0)
+		return (ENOMEM);	/* XXX EPROT? */
+	/* XXX: require CHERI_PERM_CHERIABI_VMMAP? */
+
+	return (kern_minherit(td, (__cheri_addr vm_offset_t)uap->addr,
+	    uap->len, uap->inherit));
+}
+
 #define	PERM_READ	(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)
 #define	PERM_WRITE	(CHERI_PERM_STORE | CHERI_PERM_STORE_CAP | \
 			    CHERI_PERM_STORE_LOCAL_CAP)

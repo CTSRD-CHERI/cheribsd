@@ -2476,29 +2476,23 @@ CHERIABI_SYS_cheriabi_ntp_gettime_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_minherit_fill_uap(struct thread *td,
-    struct minherit_args *uap)
+CHERIABI_SYS_cheriabi_minherit_fill_uap(struct thread *td,
+    struct cheriabi_minherit_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [1] size_t len */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_minherit_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_minherit_PTRMASK);
 	uap->len = cheri_getoffset(tmpcap);
 
 	/* [2] int inherit */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_minherit_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_minherit_PTRMASK);
 	uap->inherit = cheri_getoffset(tmpcap);
 
-	/* [0] _Pagerange_(len) void * addr */
-	{
-		int error;
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_minherit_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->addr),
-		    tmpcap, uap->len, 0, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _Pagerange_(len) void *__capability addr */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->addr),
+	    0, CHERIABI_SYS_cheriabi_minherit_PTRMASK);
 
 	return (0);
 }

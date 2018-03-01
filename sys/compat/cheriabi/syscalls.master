@@ -599,8 +599,8 @@
 				    struct ntptimeval * __capability ntvp); }
 249	AUE_NULL	UNIMPL	nosys
 ; syscall numbers initially used in OpenBSD
-250	AUE_MINHERIT	NOPROTO	{ int minherit( \
-				    _Pagerange_(len) void *addr, \
+250	AUE_MINHERIT	STD	{ int cheriabi_minherit( \
+				    _Pagerange_(len) void * __capability addr, \
 				    size_t len, int inherit); }
 251	AUE_RFORK	NOPROTO	{ int rfork(int flags); }
 252	AUE_POLL	UNIMPL	openbsd_poll

@@ -831,13 +831,15 @@ struct minherit_args {
 int
 sys_minherit(struct thread *td, struct minherit_args *uap)
 {
-	vm_offset_t addr;
-	vm_size_t size, pageoff;
-	vm_inherit_t inherit;
 
-	addr = (vm_offset_t)uap->addr;
-	size = uap->len;
-	inherit = uap->inherit;
+	return (kern_minherit(td, (vm_offset_t)uap->addr, uap->len,
+	    uap->inherit));
+}
+
+int
+kern_minherit(struct thread *td, vm_offset_t addr, vm_size_t size, int inherit)
+{
+	vm_size_t pageoff;
 
 	pageoff = (addr & PAGE_MASK);
 	addr -= pageoff;
@@ -847,7 +849,7 @@ sys_minherit(struct thread *td, struct minherit_args *uap)
 		return (EINVAL);
 
 	switch (vm_map_inherit(&td->td_proc->p_vmspace->vm_map, addr,
-	    addr + size, inherit)) {
+	    addr + size, (vm_inherit_t)inherit)) {
 	case KERN_SUCCESS:
 		return (0);
 	case KERN_PROTECTION_FAILURE:

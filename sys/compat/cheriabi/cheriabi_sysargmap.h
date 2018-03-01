@@ -138,7 +138,7 @@
 #define	CHERIABI_SYS_cheriabi_clock_nanosleep_PTRMASK	(0x0 | 0x4 | 0x8)
 #define	CHERIABI_SYS_cheriabi_clock_getcpuclockid2_PTRMASK	(0x0 | 0x4)
 #define	CHERIABI_SYS_cheriabi_ntp_gettime_PTRMASK	(0x0 | 0x1)
-#define	CHERIABI_SYS_minherit_PTRMASK	(0x0 | 0x1)
+#define	CHERIABI_SYS_cheriabi_minherit_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_rfork_PTRMASK	(0x0)
 #define	CHERIABI_SYS_cheriabi_lchown_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_aio_read_PTRMASK	(0x0 | 0x1)

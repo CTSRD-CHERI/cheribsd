@@ -221,7 +221,7 @@
 #define	CHERIABI_SYS_cheriabi_clock_nanosleep	244
 #define	CHERIABI_SYS_cheriabi_clock_getcpuclockid2	247
 #define	CHERIABI_SYS_cheriabi_ntp_gettime	248
-#define	CHERIABI_SYS_minherit	250
+#define	CHERIABI_SYS_cheriabi_minherit	250
 #define	CHERIABI_SYS_rfork	251
 #define	CHERIABI_SYS_issetugid	253
 #define	CHERIABI_SYS_cheriabi_lchown	254
