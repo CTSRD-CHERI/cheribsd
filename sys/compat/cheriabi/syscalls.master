@@ -233,7 +233,7 @@
 ; MADV_CORE is probably an error if not a page.  Others don't really need
 ; _Pagerange_.
 75	AUE_MADVISE	STD	{ int cheriabi_madvise( \
-				    _Pagerange_(len) void *addr, \
+				    _Pagerange_(len) void * __capability addr, \
 				    size_t len, int behav); }
 76	AUE_NULL	OBSOL	vhangup
 77	AUE_NULL	OBSOL	vlimit

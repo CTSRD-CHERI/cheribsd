@@ -883,16 +883,10 @@ CHERIABI_SYS_cheriabi_madvise_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_madvise_PTRMASK);
 	uap->behav = cheri_getoffset(tmpcap);
 
-	/* [0] _Pagerange_(len) void * addr */
-	{
-		int error;
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_madvise_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->addr),
-		    tmpcap, uap->len, 0, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _Pagerange_(len) void *__capability addr */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->addr),
+	    0, CHERIABI_SYS_cheriabi_madvise_PTRMASK);
 
 	return (0);
 }

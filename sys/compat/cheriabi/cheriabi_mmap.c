@@ -111,22 +111,21 @@ cheriabi_msync(struct thread *td, struct cheriabi_msync_args *uap)
 int
 cheriabi_madvise(struct thread *td, struct cheriabi_madvise_args *uap)
 {
-	void * __capability addr_cap;
-	register_t perms;
+
+	if (cap_covers_pages(uap->addr, uap->len) == 0)
+		return (ENOMEM);	/* XXX EPROT? */
 
 	/*
 	 * MADV_FREE may change the page contents so require
 	 * CHERI_PERM_CHERIABI_VMMAP.
 	 */
 	if (uap->behav == MADV_FREE) {
-		cheriabi_fetch_syscall_arg(td, &addr_cap,
-		    0, CHERIABI_SYS_cheriabi_madvise_PTRMASK);
-		perms = cheri_getperm(addr_cap);
-		if ((perms & CHERI_PERM_CHERIABI_VMMAP) == 0)
+		if ((cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
 			return (EPROT);
 	}
 
-	return (kern_madvise(td, (uintptr_t)uap->addr, uap->len, uap->behav));
+	return (kern_madvise(td, (__cheri_addr uintptr_t)uap->addr, uap->len,
+	    uap->behav));
 }
 
 int

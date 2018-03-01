@@ -436,7 +436,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_madvise */
 	case 75: {
 		struct cheriabi_madvise_args *p = params;
-		uarg[0] = (intptr_t) p->addr; /* void * */
+		uarg[0] = (cheri_getbase(p->addr) + cheri_getoffset(p->addr)); /* void *__capability */
 		uarg[1] = p->len; /* size_t */
 		iarg[2] = p->behav; /* int */
 		*n_args = 3;
@@ -3754,7 +3754,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 75:
 		switch(ndx) {
 		case 0:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 1:
 			p = "size_t";
