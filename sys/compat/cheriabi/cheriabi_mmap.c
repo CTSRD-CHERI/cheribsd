@@ -259,7 +259,7 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 
 		/*
 		 * NB: We defer alignment checks to kern_vm_mmap where we
-		 * can account for file mapping with oddly aligned
+		 * can account for file mappings with odd alignment
 		 * that match the offset alignment.
 		 */
 
