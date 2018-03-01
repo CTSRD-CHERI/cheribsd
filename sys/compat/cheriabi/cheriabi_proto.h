@@ -191,6 +191,11 @@ struct cheriabi_execve_args {
 struct cheriabi_chroot_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 };
+struct cheriabi_msync_args {
+	char addr_l_[PADL_(void *__capability)]; void *__capability addr; char addr_r_[PADR_(void *__capability)];
+	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
 struct cheriabi_mprotect_args {
 	char addr_l_[PADL_(const void *)]; const void * addr; char addr_r_[PADR_(const void *)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
@@ -1367,6 +1372,7 @@ int	cheriabi_symlink(struct thread *, struct cheriabi_symlink_args *);
 int	cheriabi_readlink(struct thread *, struct cheriabi_readlink_args *);
 int	cheriabi_execve(struct thread *, struct cheriabi_execve_args *);
 int	cheriabi_chroot(struct thread *, struct cheriabi_chroot_args *);
+int	cheriabi_msync(struct thread *, struct cheriabi_msync_args *);
 int	cheriabi_mprotect(struct thread *, struct cheriabi_mprotect_args *);
 int	cheriabi_madvise(struct thread *, struct cheriabi_madvise_args *);
 int	cheriabi_mincore(struct thread *, struct cheriabi_mincore_args *);
@@ -1690,6 +1696,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_readlink	AUE_READLINK
 #define	CHERIABI_SYS_AUE_cheriabi_execve	AUE_EXECVE
 #define	CHERIABI_SYS_AUE_cheriabi_chroot	AUE_CHROOT
+#define	CHERIABI_SYS_AUE_cheriabi_msync	AUE_MSYNC
 #define	CHERIABI_SYS_AUE_cheriabi_mprotect	AUE_MPROTECT
 #define	CHERIABI_SYS_AUE_cheriabi_madvise	AUE_MADVISE
 #define	CHERIABI_SYS_AUE_cheriabi_mincore	AUE_MINCORE

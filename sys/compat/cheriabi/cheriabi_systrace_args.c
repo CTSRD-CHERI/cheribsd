@@ -402,10 +402,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* msync */
+	/* cheriabi_msync */
 	case 65: {
-		struct msync_args *p = params;
-		uarg[0] = (intptr_t) p->addr; /* void * */
+		struct cheriabi_msync_args *p = params;
+		uarg[0] = (cheri_getbase(p->addr) + cheri_getoffset(p->addr)); /* void *__capability */
 		uarg[1] = p->len; /* size_t */
 		iarg[2] = p->flags; /* int */
 		*n_args = 3;
@@ -3702,11 +3702,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* msync */
+	/* cheriabi_msync */
 	case 65:
 		switch(ndx) {
 		case 0:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 1:
 			p = "size_t";
@@ -8457,7 +8457,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* msync */
+	/* cheriabi_msync */
 	case 65:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

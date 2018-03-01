@@ -75,6 +75,39 @@ SYSCTL_INT(_compat_cheriabi_mmap, OID_AUTO, precise_bounds,
 
 static register_t cheriabi_mmap_prot2perms(int prot);
 
+static int
+cap_covers_pages(const void * __capability cap, size_t size)
+{
+	const char * __capability addr;
+	size_t pageoff;
+
+	addr = cap;
+	pageoff = ((vaddr_t)addr & PAGE_MASK);
+	addr -= pageoff;
+	size += pageoff;
+	size = (vm_size_t)round_page(size);
+
+	return (__DECAP_CHECK(__DECONST_CAP(void * __capability, addr), size)
+	    != NULL);
+}
+
+int
+cheriabi_msync(struct thread *td, struct cheriabi_msync_args *uap)
+{
+
+	/*
+	 * FreeBSD msync() has a non-standard behavior that a len of 0
+	 * effects the whole vm entry.  We allow this because it is used
+	 * and we currently think there is little attack value in
+	 * msync calls.
+	 */
+	if (uap->len != 0 && cap_covers_pages(uap->addr, uap->len) == 0)
+		return (EINVAL);
+
+	return (kern_msync(td, (__cheri_addr uintptr_t)uap->addr, uap->len,
+	    uap->flags));
+}
+
 int
 cheriabi_madvise(struct thread *td, struct cheriabi_madvise_args *uap)
 {

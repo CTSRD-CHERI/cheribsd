@@ -214,7 +214,8 @@
 63	AUE_NULL	OBSOL	ogetkerninfo
 64	AUE_NULL	OBSOL	getpagesize
 ; XXX-BD: msync may not need/want _Pagerange_ as it doesn't alter the map
-65	AUE_MSYNC	NOPROTO	{ int msync(_Pagerange_(len) void *addr, \
+65	AUE_MSYNC	STD	{ int cheriabi_msync( \
+				    _Pagerange_(len) void * __capability addr, \
 				    size_t len, int flags); }
 66	AUE_VFORK	NOPROTO	{ int vfork(void); }
 67	AUE_NULL	OBSOL	vread

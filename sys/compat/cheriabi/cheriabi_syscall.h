@@ -70,7 +70,7 @@
 				/* 62 is obsolete fstat */
 				/* 63 is obsolete ogetkerninfo */
 				/* 64 is obsolete getpagesize */
-#define	CHERIABI_SYS_msync	65
+#define	CHERIABI_SYS_cheriabi_msync	65
 #define	CHERIABI_SYS_vfork	66
 				/* 67 is obsolete vread */
 				/* 68 is obsolete vwrite */
