@@ -739,8 +739,8 @@ struct cheriabi_sendfile_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
 	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
-	char hdtr_l_[PADL_(struct sf_hdtr_c *)]; struct sf_hdtr_c * hdtr; char hdtr_r_[PADR_(struct sf_hdtr_c *)];
-	char sbytes_l_[PADL_(off_t *)]; off_t * sbytes; char sbytes_r_[PADR_(off_t *)];
+	char hdtr_l_[PADL_(struct sf_hdtr_c *__capability)]; struct sf_hdtr_c *__capability hdtr; char hdtr_r_[PADR_(struct sf_hdtr_c *__capability)];
+	char sbytes_l_[PADL_(off_t *__capability)]; off_t *__capability sbytes; char sbytes_r_[PADR_(off_t *__capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct cheriabi_mac_syscall_args {

@@ -595,9 +595,8 @@ cheriabi_copyiniov(struct iovec_c * __capability iovp_c, u_int iovcnt,
 	return (0);
 }
 
-static int
-cheriabi_do_sendfile(struct thread *td,
-    struct cheriabi_sendfile_args *uap)
+int
+cheriabi_sendfile(struct thread *td, struct cheriabi_sendfile_args *uap)
 {
 	struct sf_hdtr_c hdtr_c;
 	struct uio *hdr_uio, *trl_uio;
@@ -613,7 +612,7 @@ cheriabi_do_sendfile(struct thread *td,
 	hdr_uio = trl_uio = NULL;
 
 	if (uap->hdtr != NULL) {
-		error = copyincap(uap->hdtr, &hdtr_c, sizeof(hdtr_c));
+		error = copyincap_c(uap->hdtr, &hdtr_c, sizeof(hdtr_c));
 		if (error)
 			goto out;
 
@@ -642,7 +641,7 @@ cheriabi_do_sendfile(struct thread *td,
 	fdrop(fp, td);
 
 	if (uap->sbytes != NULL)
-		copyout(&sbytes, uap->sbytes, sizeof(off_t));
+		copyout_c(&sbytes, uap->sbytes, sizeof(off_t));
 
 out:
 	if (hdr_uio)
@@ -650,13 +649,6 @@ out:
 	if (trl_uio)
 		free(trl_uio, M_IOV);
 	return (error);
-}
-
-int
-cheriabi_sendfile(struct thread *td, struct cheriabi_sendfile_args *uap)
-{
-
-	return (cheriabi_do_sendfile(td, uap));
 }
 
 int

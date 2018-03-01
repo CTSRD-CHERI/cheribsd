@@ -3983,29 +3983,15 @@ CHERIABI_SYS_cheriabi_sendfile_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 6, CHERIABI_SYS_cheriabi_sendfile_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [4] _In_opt_ struct sf_hdtr_c * hdtr */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_LOAD|CHERI_PERM_LOAD_CAP);
+	/* [4] _In_opt_ struct sf_hdtr_c *__capability hdtr */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->hdtr),
+	    4, CHERIABI_SYS_cheriabi_sendfile_PTRMASK);
 
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 4, CHERIABI_SYS_cheriabi_sendfile_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->hdtr),
-		    tmpcap, sizeof(*uap->hdtr), reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
-
-	/* [5] _Out_opt_ off_t * sbytes */
-	{
-		int error;
-		register_t reqperms = (CHERI_PERM_STORE);
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 5, CHERIABI_SYS_cheriabi_sendfile_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->sbytes),
-		    tmpcap, sizeof(*uap->sbytes), reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
+	/* [5] _Out_opt_ off_t *__capability sbytes */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->sbytes),
+	    5, CHERIABI_SYS_cheriabi_sendfile_PTRMASK);
 
 	return (0);
 }

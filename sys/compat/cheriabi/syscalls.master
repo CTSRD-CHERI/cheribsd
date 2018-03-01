@@ -896,8 +896,9 @@
 393	AUE_SENDFILE	STD	{ int cheriabi_sendfile(int fd, int s, \
 				    off_t offset, \
 				    size_t nbytes, \
-				    _In_opt_ struct sf_hdtr_c *hdtr, \
-				    _Out_opt_ off_t *sbytes, int flags); }
+				    _In_opt_ struct sf_hdtr_c * __capability hdtr, \
+				    _Out_opt_ off_t * __capability sbytes, \
+				    int flags); }
 394	AUE_NULL	STD	{ int cheriabi_mac_syscall( \
 				    _In_z_ const char * __capability policy, \
 				    int call, \
