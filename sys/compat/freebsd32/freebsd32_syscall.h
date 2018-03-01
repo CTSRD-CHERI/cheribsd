@@ -254,7 +254,7 @@
 				/* 313 is obsolete signanosleep */
 #define	FREEBSD32_SYS_freebsd32_aio_return	314
 #define	FREEBSD32_SYS_freebsd32_aio_suspend	315
-#define	FREEBSD32_SYS_aio_cancel	316
+#define	FREEBSD32_SYS_freebsd32_aio_cancel	316
 #define	FREEBSD32_SYS_freebsd32_aio_error	317
 				/* 318 is freebsd6 freebsd32_aio_read */
 				/* 319 is freebsd6 freebsd32_aio_write */

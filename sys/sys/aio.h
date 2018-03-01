@@ -127,7 +127,7 @@ struct kaiocb {
 	struct	ucred *cred;		/* (*) active credential when created */
 	struct	file *fd_file;		/* (*) pointer to file structure */
 	struct	aioliojob *lio;		/* (*) optional lio job */
-	struct	aiocb *ujob;		/* (*) pointer in userspace of aiocb */
+	struct	aiocb * __capability ujob; /* (*) pointer to userspace aiocb */
 #if __has_feature(capabilities)
 	__intcap_t	ujobptr;
 #else

@@ -1260,9 +1260,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 257: {
 		struct cheriabi_lio_listio_args *p = params;
 		iarg[0] = p->mode; /* int */
-		uarg[1] = (intptr_t) p->acb_list; /* struct aiocb_c *const __capability * */
+		uarg[1] = (cheri_getbase(p->acb_list) + cheri_getoffset(p->acb_list)); /* struct aiocb_c *const __capability *__capability */
 		iarg[2] = p->nent; /* int */
-		uarg[3] = (intptr_t) p->sig; /* struct sigevent_c * */
+		uarg[3] = (cheri_getbase(p->sig) + cheri_getoffset(p->sig)); /* struct sigevent_c *__capability */
 		*n_args = 4;
 		break;
 	}
@@ -1427,9 +1427,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_aio_suspend */
 	case 315: {
 		struct cheriabi_aio_suspend_args *p = params;
-		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb_c *const __capability * */
+		uarg[0] = (cheri_getbase(p->aiocbp) + cheri_getoffset(p->aiocbp)); /* struct aiocb_c *const __capability *__capability */
 		iarg[1] = p->nent; /* int */
-		uarg[2] = (intptr_t) p->timeout; /* const struct timespec * */
+		uarg[2] = (cheri_getbase(p->timeout) + cheri_getoffset(p->timeout)); /* const struct timespec *__capability */
 		*n_args = 3;
 		break;
 	}
@@ -1437,14 +1437,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 316: {
 		struct cheriabi_aio_cancel_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->aiocbp; /* struct aiocb_c * */
+		uarg[1] = (cheri_getbase(p->aiocbp) + cheri_getoffset(p->aiocbp)); /* struct aiocb_c *__capability */
 		*n_args = 2;
 		break;
 	}
 	/* cheriabi_aio_error */
 	case 317: {
 		struct cheriabi_aio_error_args *p = params;
-		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb_c * */
+		uarg[0] = (cheri_getbase(p->aiocbp) + cheri_getoffset(p->aiocbp)); /* struct aiocb_c *__capability */
 		*n_args = 1;
 		break;
 	}
@@ -1706,8 +1706,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_aio_waitcomplete */
 	case 359: {
 		struct cheriabi_aio_waitcomplete_args *p = params;
-		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb_c *__capability * */
-		uarg[1] = (intptr_t) p->timeout; /* struct timespec * */
+		uarg[0] = (cheri_getbase(p->aiocbp) + cheri_getoffset(p->aiocbp)); /* struct aiocb_c *__capability *__capability */
+		uarg[1] = (cheri_getbase(p->timeout) + cheri_getoffset(p->timeout)); /* struct timespec *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -5068,13 +5068,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct aiocb_c *const __capability *";
+			p = "userland struct aiocb_c *const __capability *__capability";
 			break;
 		case 2:
 			p = "int";
 			break;
 		case 3:
-			p = "userland struct sigevent_c *";
+			p = "userland struct sigevent_c *__capability";
 			break;
 		default:
 			break;
@@ -5338,13 +5338,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 315:
 		switch(ndx) {
 		case 0:
-			p = "userland struct aiocb_c *const __capability *";
+			p = "userland struct aiocb_c *const __capability *__capability";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland const struct timespec *";
+			p = "userland const struct timespec *__capability";
 			break;
 		default:
 			break;
@@ -5357,7 +5357,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct aiocb_c *";
+			p = "userland struct aiocb_c *__capability";
 			break;
 		default:
 			break;
@@ -5367,7 +5367,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 317:
 		switch(ndx) {
 		case 0:
-			p = "userland struct aiocb_c *";
+			p = "userland struct aiocb_c *__capability";
 			break;
 		default:
 			break;
@@ -5799,10 +5799,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 359:
 		switch(ndx) {
 		case 0:
-			p = "userland struct aiocb_c *__capability *";
+			p = "userland struct aiocb_c *__capability *__capability";
 			break;
 		case 1:
-			p = "userland struct timespec *";
+			p = "userland struct timespec *__capability";
 			break;
 		default:
 			break;
