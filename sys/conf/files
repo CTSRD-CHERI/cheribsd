@@ -272,6 +272,7 @@ compat/cheriabi/cheriabi_abort2.c	optional compat_cheriabi
 compat/cheriabi/cheriabi_generic.c	optional compat_cheriabi
 compat/cheriabi/cheriabi_ioctl.c	optional compat_cheriabi
 compat/cheriabi/cheriabi_mac.c		optional compat_cheriabi
+compat/cheriabi/cheriabi_mmap.c		optional compat_cheriabi
 compat/cheriabi/cheriabi_misc.c		optional compat_cheriabi
 compat/cheriabi/cheriabi_signal.c	optional compat_cheriabi
 compat/cheriabi/cheriabi_syscalls.c	optional compat_cheriabi
