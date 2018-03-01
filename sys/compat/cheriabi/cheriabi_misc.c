@@ -821,73 +821,6 @@ cheriabi_swapcontext(struct thread *td, struct cheriabi_swapcontext_args *uap)
 }
 
 int
-cheriabi_thr_create(struct thread *td, struct cheriabi_thr_create_args *uap)
-{
-
-	return (ENOSYS);
-}
-
-static int
-cheriabi_thr_new_initthr(struct thread *td, void *thunk)
-{
-	struct thr_param_c *param;
-	long *child_tidp, *parent_tidp;
-	int error;
-
-	param = thunk;
-	error = cheriabi_cap_to_ptr((caddr_t *)&child_tidp,
-	    param->child_tid, sizeof(*child_tidp),
-	    CHERI_PERM_GLOBAL | CHERI_PERM_STORE, 1);
-	if (error)
-		return (error);
-	error = cheriabi_cap_to_ptr((caddr_t *)&parent_tidp,
-	    param->parent_tid, sizeof(*parent_tidp),
-	    CHERI_PERM_GLOBAL | CHERI_PERM_STORE, 1);
-	if (error)
-		return (error);
-	if ((child_tidp != NULL && suword(child_tidp, td->td_tid)) ||
-	    (parent_tidp != NULL && suword(parent_tidp, td->td_tid)))
-		return (EFAULT);
-	cheriabi_set_threadregs(td, param);
-	return (cheriabi_set_user_tls(td, param->tls_base));
-}
-
-int
-cheriabi_thr_new(struct thread *td, struct cheriabi_thr_new_args *uap)
-{
-	struct thr_param_c param_c;
-	struct rtprio rtp, *rtpp, *rtpup;
-	int error;
-
-	if (uap->param_size != sizeof(struct thr_param_c))
-		return (EINVAL);
-
-	error = copyincap(uap->param, &param_c, uap->param_size);
-	if (error != 0)
-		return (error);
-
-	/*
-	 * Opportunity for machine-dependent code to provide a DDC if the
-	 * caller didn't provide one.
-	 *
-	 * XXXRW: But should only do so if a suitable flag is set?
-	 */
-	cheriabi_thr_new_md(td, &param_c);
-	rtpp = NULL;
-	error = cheriabi_cap_to_ptr((caddr_t *)&rtpup, param_c.rtp,
-	    sizeof(rtp), CHERI_PERM_GLOBAL | CHERI_PERM_LOAD, 1);
-	if (error)
-		return (error);
-	if (rtpup != 0) {
-		error = copyin(rtpup, &rtp, sizeof(struct rtprio));
-		if (error)
-			return (error);
-		rtpp = &rtp;
-	}
-	return (thread_create(td, rtpp, cheriabi_thr_new_initthr, &param_c));
-}
-
-int
 cheriabi_procctl(struct thread *td, struct cheriabi_procctl_args *uap)
 {
 
@@ -2278,6 +2211,78 @@ cheriabi___sysctl(struct thread *td, struct cheriabi___sysctl_args *uap)
 
 	return (kern_sysctl(td, uap->name, uap->namelen, uap->old,
 	    uap->oldlenp, uap->new, uap->newlen, SCTL_CHERIABI));
+}
+
+/*
+ * kern_thr.c
+ */
+int
+cheriabi_thr_create(struct thread *td, struct cheriabi_thr_create_args *uap)
+{
+
+	return (ENOSYS);
+}
+
+static int
+cheriabi_thr_new_initthr(struct thread *td, void *thunk)
+{
+	struct thr_param_c *param;
+	long *child_tidp, *parent_tidp;
+	int error;
+
+	param = thunk;
+	error = cheriabi_cap_to_ptr((caddr_t *)&child_tidp,
+	    param->child_tid, sizeof(*child_tidp),
+	    CHERI_PERM_GLOBAL | CHERI_PERM_STORE, 1);
+	if (error)
+		return (error);
+	error = cheriabi_cap_to_ptr((caddr_t *)&parent_tidp,
+	    param->parent_tid, sizeof(*parent_tidp),
+	    CHERI_PERM_GLOBAL | CHERI_PERM_STORE, 1);
+	if (error)
+		return (error);
+	if ((child_tidp != NULL && suword(child_tidp, td->td_tid)) ||
+	    (parent_tidp != NULL && suword(parent_tidp, td->td_tid)))
+		return (EFAULT);
+	cheriabi_set_threadregs(td, param);
+	return (cheriabi_set_user_tls(td, param->tls_base));
+}
+
+int
+cheriabi_thr_new(struct thread *td, struct cheriabi_thr_new_args *uap)
+{
+	struct thr_param_c param_c;
+	struct rtprio rtp, *rtpp, *rtpup;
+	int error;
+
+	if (uap->param_size != sizeof(struct thr_param_c))
+		return (EINVAL);
+
+	error = copyincap_c(uap->param,
+	    (__cheri_tocap struct thr_param_c **capability)&param_c,
+	    uap->param_size);
+	if (error != 0)
+		return (error);
+
+	/*
+	 * Opportunity for machine-dependent code to provide a DDC if the
+	 * caller didn't provide one.
+	 *
+	 * XXXRW: But should only do so if a suitable flag is set?
+	 */
+	cheriabi_thr_new_md(td, &param_c);
+	rtpp = NULL;
+	error = cheriabi_cap_to_ptr((caddr_t *)&rtpup, param_c.rtp,
+	    sizeof(rtp), CHERI_PERM_GLOBAL | CHERI_PERM_LOAD, 1);
+	if (error)
+		return (error);
+	if (rtpup != 0) {
+		error = copyin(rtpup, &rtp, sizeof(struct rtprio));
+		if (error)
+			return (error);
+		rtpp = &rtp;
+	}
+	return (thread_create(td, rtpp, cheriabi_thr_new_initthr, &param_c));
 }
 
 #ifdef _KPOSIX_PRIORITY_SCHEDULING
