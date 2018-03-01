@@ -481,11 +481,13 @@
 ; XXX-BD: unclear if these really require _Pagerange_.  It's mostly
 ; harmless to lock memory you don't own, but unlocking could cause (e.g.)
 ; keys to leak to swap so could be malicous.
-203	AUE_MLOCK	NOPROTO	{ int mlock( \
-				    _Pagerange_(len) const void *addr, \
+203	AUE_MLOCK	STD	{ int cheriabi_mlock( \
+				    _Pagerange_(len) \
+				    const void * __capability addr, \
 				    size_t len); }
-204	AUE_MUNLOCK	NOPROTO	{ int munlock( \
-				    _Pagerange_(len) const void *addr, \
+204	AUE_MUNLOCK	STD	{ int cheriabi_munlock( \
+				    _Pagerange_(len) \
+				    const void * __capability addr, \
 				    size_t len); }
 205	AUE_UNDELETE	STD	{ int cheriabi_undelete( \
 				    _In_z_ const char * __capability path); }

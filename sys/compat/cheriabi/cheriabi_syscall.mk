@@ -115,8 +115,8 @@ MIASM =  \
 	cheriabi_getrlimit.o \
 	cheriabi_setrlimit.o \
 	cheriabi___sysctl.o \
-	mlock.o \
-	munlock.o \
+	cheriabi_mlock.o \
+	cheriabi_munlock.o \
 	cheriabi_undelete.o \
 	cheriabi_futimes.o \
 	getpgid.o \

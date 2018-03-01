@@ -470,3 +470,24 @@ cheriabi_mincore(struct thread *td, struct cheriabi_mincore_args *uap)
 	return (kern_mincore(td, (__cheri_addr uintptr_t)uap->addr, uap->len,
 	    uap->vec));
 }
+
+int
+cheriabi_mlock(struct thread *td, struct cheriabi_mlock_args *uap)
+{
+
+	if (cap_covers_pages(uap->addr, uap->len) == 0)
+		return (ENOMEM);	/* XXX: EPROT? */
+
+	return (kern_mlock(td->td_proc, td->td_ucred,
+	    (__cheri_addr uintptr_t)uap->addr, uap->len));
+}
+
+int
+cheriabi_munlock(struct thread *td, struct cheriabi_munlock_args *uap)
+{
+
+	if (cap_covers_pages(uap->addr, uap->len) == 0)
+		return (ENOMEM);	/* XXX: EPROT? */
+
+	return (kern_munlock(td, (__cheri_addr uintptr_t)uap->addr, uap->len));
+}

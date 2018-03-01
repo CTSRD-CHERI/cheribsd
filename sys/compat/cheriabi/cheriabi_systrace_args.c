@@ -923,18 +923,18 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 6;
 		break;
 	}
-	/* mlock */
+	/* cheriabi_mlock */
 	case 203: {
-		struct mlock_args *p = params;
-		uarg[0] = (intptr_t) p->addr; /* const void * */
+		struct cheriabi_mlock_args *p = params;
+		uarg[0] = (cheri_getbase(p->addr) + cheri_getoffset(p->addr)); /* const void *__capability */
 		uarg[1] = p->len; /* size_t */
 		*n_args = 2;
 		break;
 	}
-	/* munlock */
+	/* cheriabi_munlock */
 	case 204: {
-		struct munlock_args *p = params;
-		uarg[0] = (intptr_t) p->addr; /* const void * */
+		struct cheriabi_munlock_args *p = params;
+		uarg[0] = (cheri_getbase(p->addr) + cheri_getoffset(p->addr)); /* const void *__capability */
 		uarg[1] = p->len; /* size_t */
 		*n_args = 2;
 		break;
@@ -4568,11 +4568,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* mlock */
+	/* cheriabi_mlock */
 	case 203:
 		switch(ndx) {
 		case 0:
-			p = "userland const void *";
+			p = "userland const void *__capability";
 			break;
 		case 1:
 			p = "size_t";
@@ -4581,11 +4581,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* munlock */
+	/* cheriabi_munlock */
 	case 204:
 		switch(ndx) {
 		case 0:
-			p = "userland const void *";
+			p = "userland const void *__capability";
 			break;
 		case 1:
 			p = "size_t";
@@ -8760,12 +8760,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* mlock */
+	/* cheriabi_mlock */
 	case 203:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* munlock */
+	/* cheriabi_munlock */
 	case 204:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

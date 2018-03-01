@@ -381,6 +381,14 @@ struct cheriabi___sysctl_args {
 	char new_l_[PADL_(void *__capability)]; void *__capability new; char new_r_[PADR_(void *__capability)];
 	char newlen_l_[PADL_(size_t)]; size_t newlen; char newlen_r_[PADR_(size_t)];
 };
+struct cheriabi_mlock_args {
+	char addr_l_[PADL_(const void *__capability)]; const void *__capability addr; char addr_r_[PADR_(const void *__capability)];
+	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
+};
+struct cheriabi_munlock_args {
+	char addr_l_[PADL_(const void *__capability)]; const void *__capability addr; char addr_r_[PADR_(const void *__capability)];
+	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
+};
 struct cheriabi_undelete_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 };
@@ -1416,6 +1424,8 @@ int	cheriabi_pathconf(struct thread *, struct cheriabi_pathconf_args *);
 int	cheriabi_getrlimit(struct thread *, struct cheriabi_getrlimit_args *);
 int	cheriabi_setrlimit(struct thread *, struct cheriabi_setrlimit_args *);
 int	cheriabi___sysctl(struct thread *, struct cheriabi___sysctl_args *);
+int	cheriabi_mlock(struct thread *, struct cheriabi_mlock_args *);
+int	cheriabi_munlock(struct thread *, struct cheriabi_munlock_args *);
 int	cheriabi_undelete(struct thread *, struct cheriabi_undelete_args *);
 int	cheriabi_futimes(struct thread *, struct cheriabi_futimes_args *);
 int	cheriabi_poll(struct thread *, struct cheriabi_poll_args *);
@@ -1741,6 +1751,8 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_getrlimit	AUE_GETRLIMIT
 #define	CHERIABI_SYS_AUE_cheriabi_setrlimit	AUE_SETRLIMIT
 #define	CHERIABI_SYS_AUE_cheriabi___sysctl	AUE_SYSCTL
+#define	CHERIABI_SYS_AUE_cheriabi_mlock	AUE_MLOCK
+#define	CHERIABI_SYS_AUE_cheriabi_munlock	AUE_MUNLOCK
 #define	CHERIABI_SYS_AUE_cheriabi_undelete	AUE_UNDELETE
 #define	CHERIABI_SYS_AUE_cheriabi_futimes	AUE_FUTIMES
 #define	CHERIABI_SYS_AUE_cheriabi_poll	AUE_POLL

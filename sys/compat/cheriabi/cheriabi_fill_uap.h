@@ -1935,49 +1935,37 @@ CHERIABI_SYS_cheriabi___sysctl_fill_uap(struct thread *td,
 }
 
 static inline int
-CHERIABI_SYS_mlock_fill_uap(struct thread *td,
-    struct mlock_args *uap)
+CHERIABI_SYS_cheriabi_mlock_fill_uap(struct thread *td,
+    struct cheriabi_mlock_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [1] size_t len */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_mlock_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_mlock_PTRMASK);
 	uap->len = cheri_getoffset(tmpcap);
 
-	/* [0] _Pagerange_(len) const void * addr */
-	{
-		int error;
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_mlock_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->addr),
-		    tmpcap, uap->len, 0, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _Pagerange_(len) const void *__capability addr */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->addr),
+	    0, CHERIABI_SYS_cheriabi_mlock_PTRMASK);
 
 	return (0);
 }
 
 static inline int
-CHERIABI_SYS_munlock_fill_uap(struct thread *td,
-    struct munlock_args *uap)
+CHERIABI_SYS_cheriabi_munlock_fill_uap(struct thread *td,
+    struct cheriabi_munlock_args *uap)
 {
 	void * __capability tmpcap;
 
 	/* [1] size_t len */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_munlock_PTRMASK);
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_munlock_PTRMASK);
 	uap->len = cheri_getoffset(tmpcap);
 
-	/* [0] _Pagerange_(len) const void * addr */
-	{
-		int error;
-
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_munlock_PTRMASK);
-		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->addr),
-		    tmpcap, uap->len, 0, 0);
-		if (error != 0)
-			return (error);
-	}
+	/* [0] _Pagerange_(len) const void *__capability addr */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->addr),
+	    0, CHERIABI_SYS_cheriabi_munlock_PTRMASK);
 
 	return (0);
 }
