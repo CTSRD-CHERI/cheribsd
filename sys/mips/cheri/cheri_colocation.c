@@ -111,7 +111,7 @@ cosetup(struct thread *td)
 	entry->owner = 0;
 	vm_map_unlock(map);
 
-	printf("%s: context at %p, td %p\n", __func__, (void *)addr, td);
+	//printf("%s: context at %p, td %p\n", __func__, (void *)addr, td);
 	sc.sc_unsealcap = switcher_sealcap2;
 	sc.sc_td = td;
 	sc.sc_borrower_td = NULL;
