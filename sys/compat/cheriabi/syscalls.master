@@ -422,8 +422,8 @@
 163	AUE_NULL	OBSOL	setdomainname
 164	AUE_NULL	OBSOL	uname
 ; XXX-BD params is basically uncheckable
-165	AUE_SYSARCH	STD|NOPARSE	{ int cheriabi_sysarch(int op, \
-				    char *parms); }
+165	AUE_SYSARCH	STD	{ int cheriabi_sysarch(int op, \
+				    char * __capability parms); }
 ; XXX-BD rtp is _In_ or _Out_ depending on function
 166	AUE_RTPRIO	STD	{ int cheriabi_rtprio(int function, pid_t pid, \
 				    _Inout_ struct rtprio * __capability rtp); }

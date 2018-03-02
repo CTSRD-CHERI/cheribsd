@@ -118,7 +118,8 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 #endif
 
 	case CHERI_GET_SEALCAP:
-		return (cheri_sysarch_getsealcap(td, uap));
+		return (cheri_sysarch_getsealcap(td,
+		    __USER_CAP(uap->parms, sizeof(void * __capability))));
 #endif
 
 	default:

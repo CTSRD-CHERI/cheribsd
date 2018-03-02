@@ -831,7 +831,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 165: {
 		struct cheriabi_sysarch_args *p = params;
 		iarg[0] = p->op; /* int */
-		uarg[1] = (intptr_t) p->parms; /* char * */
+		uarg[1] = (cheri_getbase(p->parms) + cheri_getoffset(p->parms)); /* char *__capability */
 		*n_args = 2;
 		break;
 	}
@@ -4419,7 +4419,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char *";
+			p = "userland char *__capability";
 			break;
 		default:
 			break;

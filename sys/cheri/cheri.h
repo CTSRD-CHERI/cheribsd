@@ -135,7 +135,7 @@ struct pcb;
 struct sysarch_args;
 void	cheri_sealcap_copy(struct proc *dst, struct proc *src);
 void	cheri_signal_copy(struct pcb *dst, struct pcb *src);
-int	cheri_sysarch_getsealcap(struct thread *td, struct sysarch_args *uap);
+int	cheri_sysarch_getsealcap(struct thread *td, void * __capability ucap);
 int	cheri_sysarch_getstack(struct thread *td, struct sysarch_args *uap);
 int	cheri_sysarch_setstack(struct thread *td, struct sysarch_args *uap);
 

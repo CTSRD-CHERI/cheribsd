@@ -28,29 +28,6 @@
  * SUCH DAMAGE.
  */
 
-static inline int
-CHERIABI_SYS_cheriabi_sysarch_fill_uap(struct thread *td,
-    struct cheriabi_sysarch_args *uap)
-{
-	void * __capability tmpcap;
-
-	/* [0] int op */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_sysarch_PTRMASK);
-	uap->op = cheri_getoffset(tmpcap);
-
-	/* [1] char * parms */
-	/*
-	 * parms could be basically anything and sysarch is fundamentally
-	 * machine dependant.  Punt all the duty of checking and
-	 * handling parms to the MD cheriabi_sysarch.  This is safe enough
-	 * because if porter's fail to do the work, they will end up with
-	 * NULL in uap->parms.
-	 */
-	uap->parms = NULL;
-
-	return (0);
-}
-
 #include <sys/umtx.h>
 
 static inline int

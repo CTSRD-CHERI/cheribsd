@@ -362,7 +362,7 @@ struct cheriabi_getfh_args {
 };
 struct cheriabi_sysarch_args {
 	char op_l_[PADL_(int)]; int op; char op_r_[PADR_(int)];
-	char parms_l_[PADL_(char *)]; char * parms; char parms_r_[PADR_(char *)];
+	char parms_l_[PADL_(char *__capability)]; char *__capability parms; char parms_r_[PADR_(char *__capability)];
 };
 struct cheriabi_rtprio_args {
 	char function_l_[PADL_(int)]; int function; char function_r_[PADR_(int)];

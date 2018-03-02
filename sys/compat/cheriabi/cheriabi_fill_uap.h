@@ -1761,8 +1761,23 @@ CHERIABI_SYS_cheriabi_getfh_fill_uap(struct thread *td,
 	return (0);
 }
 
-static inline int	CHERIABI_SYS_cheriabi_sysarch_fill_uap(struct thread *td,
-    struct cheriabi_sysarch_args *uap);
+static inline int
+CHERIABI_SYS_cheriabi_sysarch_fill_uap(struct thread *td,
+    struct cheriabi_sysarch_args *uap)
+{
+	void * __capability tmpcap;
+
+	/* [0] int op */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_sysarch_PTRMASK);
+	uap->op = cheri_getoffset(tmpcap);
+
+	/* [1] char *__capability parms */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->parms),
+	    1, CHERIABI_SYS_cheriabi_sysarch_PTRMASK);
+
+	return (0);
+}
 
 static inline int
 CHERIABI_SYS_cheriabi_rtprio_fill_uap(struct thread *td,
