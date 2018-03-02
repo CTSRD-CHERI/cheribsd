@@ -145,7 +145,7 @@ _C_LABEL(switcher_coaccept):
 	/*
 	 * Load the capability to the caller's control block.
 	 */
-	clc	$c5, zero, 2*CHERICAP_SIZE($idc)
+	clc	$c5, zero, 0($idc)
 
 	/*
 	 * Is this the first invocation of coaccept, or rather a response
@@ -159,11 +159,10 @@ _C_LABEL(switcher_coaccept):
 
 1:
 	/*
-	 * Zero out the sc_peer_context variables.
+	 * Zero out the sc_peer_context variables, releasing the spinlock.
 	 */
-	// XXX: Turn it into a proper spinlock release.
-	csd	zero, zero, 2*CHERICAP_SIZE($c5);
-	csd	zero, zero, 2*CHERICAP_SIZE($idc);
+	csd	zero, zero, 0($c5);
+	csd	zero, zero, 0($idc);
 
 	/*
 	 * Save the capability to the caller's thread in the callee context.

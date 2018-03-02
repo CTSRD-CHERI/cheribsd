@@ -131,16 +131,18 @@ _C_LABEL(switcher_cocall):
 	/*
 	 * Unseal the callee's control block.
 	 */
-	clc	$c13, zero, 0($idc)	/* Load the unsealing capability */
-	cunseal	$c5, $c5, $c13		/* Unseal the calee control block */
+	clc	$c13, zero, 2*CHERICAP_SIZE($idc)	/* Load the unsealing capability */
+	cunseal	$c5, $c5, $c13				/* Unseal the calee control block */
 
+1:
 	/*
 	 * Save the capability to the caller's control block in the callee
 	 * context.  This also serves as the callee's spinlock.
-	 *
-	 * XXX: Really, this is supposed to be a spinlock.
 	 */
-	csc	$idc, zero, 2*CHERICAP_SIZE($c5);
+	cllc	$c12, $c5
+	cbts	$c12, 1b
+	cscc	t8, $idc, $c5
+	beq	t8, zero, 1b
 
 	/*
 	 * Save the capability to the callee's thread in the caller context.
@@ -155,7 +157,7 @@ _C_LABEL(switcher_cocall):
 	 * Save the capability to the callee's control block in the caller
 	 * context.
 	 */
-	csc	$c5, zero, 2*CHERICAP_SIZE($idc);
+	csc	$c5, zero, 0($idc);
 
 	/*
 	 * Restore the callee's context.

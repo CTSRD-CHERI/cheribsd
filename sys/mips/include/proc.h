@@ -49,9 +49,10 @@
 #ifdef CPU_CHERI
 struct switcher_context {
 	/*
-	 * Capability to unseal peer context.
+	 * Peer context - callee in caller's context, caller in callee's.
+	 * Must be first, the cllc instruction doesn't take an offset.
 	 */
-	void * __capability			sc_unsealcap;
+	struct switcher_context * __capability	sc_peer_context;
 
 	/*
 	 * Thread owning the context; the same thread that called cosetup(2).
@@ -66,9 +67,13 @@ struct switcher_context {
 	struct thread				*sc_borrower_td;
 
 	/*
-	 * Peer context - callee in caller's context, caller in callee's.
+	 * Capability to unseal peer context.
 	 */
-	struct switcher_context * __capability	sc_peer_context;
+	void * __capability			sc_unsealcap;
+
+	/*
+	 * There's more stuff here; we allocate an entire page.
+	 */
 };
 #endif
 
