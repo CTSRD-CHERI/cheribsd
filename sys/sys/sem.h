@@ -75,17 +75,17 @@ union semun_old {
 	unsigned short	*array;		/* array for GETALL & SETALL */
 };
 #endif
-
+#if defined(_WANT_SEMUN) && !defined(_KERNEL)
 /*
  * semctl's arg parameter structure
  */
-#if !defined(_KERNEL) || defined(_WANT_SEMUN)
 union semun {
 	int		val;		/* value for SETVAL */
 	struct		semid_ds *buf;	/* buffer for IPC_STAT & IPC_SET */
 	unsigned short	*array;		/* array for GETALL & SETALL */
 };
-#else
+#endif
+#if defined(_KERNEL)
 #if __has_feature(capabilities)
 /*
  * XXX: We'd like to use semun_c here, but semid_ds currently contains
@@ -109,7 +109,7 @@ typedef union semun_kernel	ksemun_t;
 typedef union semun_native	ksemun_t;
 #endif
 typedef union semun_native	usemun_t;
-#endif
+#endif /* defined(_KERNEL) */
 
 /*
  * commands for semctl
