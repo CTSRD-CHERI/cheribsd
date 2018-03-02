@@ -31,6 +31,7 @@ SUBDIR=	alias \
 	column \
 	comm \
 	compress \
+	coping \
 	copong \
 	cpuset \
 	csplit \
