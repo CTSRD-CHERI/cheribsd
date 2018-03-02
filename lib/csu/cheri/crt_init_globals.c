@@ -57,6 +57,23 @@ extern struct capreloc __stop___cap_relocs;
 void
 crt_init_globals(void)
 {
+	uint64_t _dynamic_addr = 0;
+	/*
+	 *  We can't get the address of _DYNAMIC in the purecap ABI before globals
+	 *  are initialized so we need to use dla here. If _DYNAMIC exists
+	 *  then the runtime-linker will have done the __cap_relocs already
+	 *  so we should be processing them here. Furthermore it will also have
+	 *  enforced relro so we will probably crash when attempting to write
+	 *  const pointers that are initialized to global addresses.
+	 *
+	 *  TODO: can we do this without dla? Maybe clang should provide a
+	 *  __builtin_symbol_address() that is always filled in a static link
+	 *  time.
+	 */
+	__asm__ volatile("dla %0, _DYNAMIC": "=r"(_dynamic_addr));
+	if (_dynamic_addr != 0)
+		return;
+
 	void *gdc = __builtin_cheri_global_data_get();
 	void *pcc = __builtin_cheri_program_counter_get();
 
