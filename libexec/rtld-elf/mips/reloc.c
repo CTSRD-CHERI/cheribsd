@@ -575,8 +575,8 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			Elf_Addr val = old;
 			val += symval;
 			store_ptr(where, val, rlen);
-			dbg("ABS(%p) %s in %s %p --> %p in %s",
-			    where, obj->strtab + obj->symtab[r_symndx].st_name,
+			dbg("ABS(%p/0x%lx) %s in %s %p --> %p in %s",
+			    where, rel->r_offset, obj->strtab + obj->symtab[r_symndx].st_name,
 			    obj->path, (void*)(uintptr_t)old, (void *)(uintptr_t)val, defobj->path);
 			break;
 
