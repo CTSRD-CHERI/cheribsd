@@ -31,6 +31,7 @@ SUBDIR=	alias \
 	column \
 	comm \
 	compress \
+	copong \
 	cpuset \
 	csplit \
 	ctlstat \
