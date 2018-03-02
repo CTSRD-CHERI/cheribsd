@@ -632,14 +632,14 @@ unborrow_curthread(struct thread *td, struct trapframe **trapframep)
 	peertpc = peertd->td_pcb->pcb_tpc;
 
 	peertd->td_sa = td->td_sa;
-	cheri_memcpy(&peertd->td_pcb->pcb_regs, *trapframep, sizeof(struct trapframe));
+	cheri_memcpy(peertd->td_frame, *trapframep, sizeof(struct trapframe));
 	peertd->td_pcb->pcb_tpc = td->td_pcb->pcb_tpc;
 
 	td->td_sa = peersa;
-	cheri_memcpy(&td->td_pcb->pcb_regs, &peertrapframe, sizeof(struct trapframe));
+	cheri_memcpy(td->td_frame, &peertrapframe, sizeof(struct trapframe));
 	td->td_pcb->pcb_tpc = peertpc;
 
-	*trapframep = &td->td_pcb->pcb_regs;
+	*trapframep = td->td_frame;
 
 	wakeup(&peertd->td_md.md_switcher_context);
 
