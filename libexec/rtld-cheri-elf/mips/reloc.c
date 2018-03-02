@@ -481,6 +481,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				    obj->path);
 #endif
 			} else {
+#if 0
 				/*
 				 * XXX: ABI DIFFERENCE!
 				 *
@@ -503,7 +504,9 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				    && !broken
 #endif
 				    )
-					val += (Elf_Addr)def->st_value;
+#endif
+				/* XXXAR: always adding st_value seems to be required (also glibc does it)*/
+				val += (Elf_Addr)def->st_value;
 
 				if (r_symndx != 0) {
 					_rtld_error("%s: local R_MIPS_REL32 relocation references symbol %s (%d). st_value=0x%lx, st_info=%x, st_shndx=%d",
@@ -511,10 +514,18 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 					return (-1);
 				}
 				val += (Elf_Addr)obj->relocbase;
+#if defined(DEBUG)
+				_Bool print_local_reloc_dbg = false;
+				if (def->st_value != 0) {
+					print_local_reloc_dbg = true;
+				}
 #if defined(DEBUG_VERBOSE)
-				dbg("REL32/L(%p/0x%lx) %p -> %p (%s) in %s, st_value = 0x%lx, st_info=%x, r_symndx=%d, st_shndx=%d",
-				    where, rel->r_offset, (void *)(uintptr_t)old, (void *)(uintptr_t)val,
-				    obj->strtab + def->st_name, obj->path, def->st_value, def->st_info, r_symndx, def->st_shndx);
+				print_local_reloc_dbg = true;
+#endif
+				if (print_local_reloc_dbg)
+					dbg("REL32/L(%p/0x%lx) %p -> %p (%s) in %s, st_value = 0x%lx, st_info=%x, r_symndx=%d, st_shndx=%d",
+					    where, rel->r_offset, (void *)(uintptr_t)old, (void *)(uintptr_t)val,
+					    obj->strtab + def->st_name, obj->path, def->st_value, def->st_info, r_symndx, def->st_shndx);
 #endif
 			}
 			store_ptr(where, val, rlen);
