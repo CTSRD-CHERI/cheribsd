@@ -60,15 +60,16 @@ main(int argc, char **argv)
 	if (argc != 2)
 		usage();
 
-	fprintf(stderr, "%s: setting up...\n", argv[0]);
 	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
 	if (error != 0)
 		err(1, "cosetup");
 
-	fprintf(stderr, "%s: colookingup \"%s\"...\n", argv[0], argv[1]);
 	error = colookup(argv[1], &lookedup);
-	if (error != 0)
+	if (error != 0) {
+		warnx("received ESRCH; this usually means there's nothing coregistered for \"%s\"", argv[1]);
+		warnx("use coexec(1) to colocate; you might also find \"ps aux -o vmaddr\" useful");
 		err(1, "colookup");
+	}
 
 	error = cocall(switcher_code, switcher_data, lookedup);
 	if (error != 0)
