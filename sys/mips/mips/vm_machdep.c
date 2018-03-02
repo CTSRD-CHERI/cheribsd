@@ -180,6 +180,7 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2,int flags)
 	td2->td_md.md_saved_intr = MIPS_SR_INT_IE;
 	td2->td_md.md_spinlock_count = 1;
 #ifdef CPU_CHERI
+	td2->td_md.md_switcher_context = 0;
 #ifdef COMPAT_CHERIABI
 	td2->td_md.md_tls_cap = td1->td_md.md_tls_cap;
 	td2->td_md.md_cheri_mmap_cap = td1->td_md.md_cheri_mmap_cap;
@@ -494,6 +495,7 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 	td->td_md.md_saved_intr = MIPS_SR_INT_IE;
 #if defined(CPU_CHERI) && defined(COMPAT_CHERIABI)
 	td->td_md.md_cheri_mmap_cap = td0->td_md.md_cheri_mmap_cap;
+	td->td_md.md_switcher_context = 0;
 #endif
 #if 0
 	    /* Maybe we need to fix this? */

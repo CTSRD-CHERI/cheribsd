@@ -46,6 +46,32 @@
 #include <machine/octeon_cop2.h>
 #endif
 
+#ifdef CPU_CHERI
+struct switcher_context {
+	/*
+	 * Capability to unseal peer context.
+	 */
+	void * __capability			sc_unsealcap;
+
+	/*
+	 * Thread owning the context; the same thread that called cosetup(2).
+	 */
+	struct thread				*sc_td;
+
+	/*
+	 * Thread owning the context we're lending our thread to.  When
+	 * calling cocall(), this will be the callee thread.  NULL when
+	 * not lending.
+	 */
+	struct thread				*sc_borrower_td;
+
+	/*
+	 * Peer context - callee in caller's context, caller in callee's.
+	 */
+	struct switcher_context * __capability	sc_peer_context;
+};
+#endif
+
 /*
  * Machine-dependent part of the proc structure.
  */
@@ -75,6 +101,7 @@ struct mdthread {
 #endif
 #ifdef CPU_CHERI
 	void * __capability	md_tls_cap;
+	vaddr_t		md_switcher_context;
 #ifdef COMPAT_CHERIABI
 	void * __capability	md_cheri_mmap_cap;
 #endif

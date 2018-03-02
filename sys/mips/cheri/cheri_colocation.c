@@ -88,7 +88,7 @@ cosetup(struct thread *td)
 	boolean_t found;
 	int error;
 
-	KASSERT(td->td_switcher_data == 0, ("%s: already initialized\n", __func__));
+	KASSERT(td->td_md.md_switcher_context == 0, ("%s: already initialized\n", __func__));
 
 	/*
 	 * XXX: Race between this and setting the owner.
@@ -100,7 +100,7 @@ cosetup(struct thread *td)
 	}
 
 	addr = td->td_retval[0];
-	td->td_switcher_data = addr;
+	td->td_md.md_switcher_context = addr;
 	td->td_retval[0] = 0;
 
 	map = &td->td_proc->p_vmspace->vm_map;
@@ -131,13 +131,13 @@ sys_cosetup(struct thread *td, struct cosetup_args *uap)
 	vaddr_t addr;
 	int error;
 
-	if (td->td_switcher_data == 0) {
+	if (td->td_md.md_switcher_context == 0) {
 		error = cosetup(td);
 		if (error != 0)
 			return (error);
 	}
 
-	addr = td->td_switcher_data;
+	addr = td->td_md.md_switcher_context;
 
 	switch (uap->what) {
 	case COSETUP_COCALL:
@@ -197,13 +197,13 @@ sys_coregister(struct thread *td, struct coregister_args *uap)
 	if (strlen(name) >= PATH_MAX)
 		return (ENAMETOOLONG);
 
-	if (td->td_switcher_data == 0) {
+	if (td->td_md.md_switcher_context == 0) {
 		error = cosetup(td);
 		if (error != 0)
 			return (error);
 	}
 
-	addr = td->td_switcher_data;
+	addr = td->td_md.md_switcher_context;
 
 	vm_map_lock(&vmspace->vm_map);
 	LIST_FOREACH(con, &vmspace->vm_conames, c_next) {
@@ -271,7 +271,7 @@ sys_copark(struct thread *td, struct copark_args *uap)
 	//printf("%s: go, td %p!\n", __func__, td);
 
 	mtx_lock(&Giant);
-	error = msleep(&td->td_switcher_data, &Giant, PPAUSE | PCATCH, "copark", 0);
+	error = msleep(&td->td_md.md_switcher_context, &Giant, PPAUSE | PCATCH, "copark", 0);
 	mtx_unlock(&Giant);
 
 	if (error == 0) {

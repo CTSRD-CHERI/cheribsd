@@ -583,7 +583,7 @@ unborrow_curthread(struct thread *td, struct trapframe **trapframep)
 	register_t peertpc;
 	int error;
 
-	if (td->td_switcher_data == 0) {
+	if (td->td_md.md_switcher_context == 0) {
 		/*
 		 * We've never called cosetup(2).
 		 */
@@ -593,10 +593,10 @@ unborrow_curthread(struct thread *td, struct trapframe **trapframep)
 	/*
 	 * Fetch switcher context for currently executing userspace thread.
 	 */
-	error = copyincap((const void *)td->td_switcher_data, &sc, sizeof(sc));
+	error = copyincap((const void *)td->td_md.md_switcher_context, &sc, sizeof(sc));
 	if (error != 0) {
 		printf("%s: copyincap from %p failed with error %d\n",
-		    __func__, (void *)td->td_switcher_data, error);
+		    __func__, (void *)td->td_md.md_switcher_context, error);
 		return (error);
 	}
 
@@ -641,7 +641,7 @@ unborrow_curthread(struct thread *td, struct trapframe **trapframep)
 
 	*trapframep = &td->td_pcb->pcb_regs;
 
-	wakeup(&peertd->td_switcher_data);
+	wakeup(&peertd->td_md.md_switcher_context);
 
 	/*
 	 * Continue as usual, but calling copark(2) instead of whatever

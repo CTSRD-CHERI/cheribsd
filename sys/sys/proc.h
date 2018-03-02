@@ -204,32 +204,6 @@ struct rusage_ext {
 	uint64_t	rux_tu;         /* (c) Previous total time in usec. */
 };
 
-#ifdef CPU_CHERI
-struct switcher_context {
-	/*
-	 * Capability to unseal peer context.
-	 */
-	void * __capability			sc_unsealcap;
-
-	/*
-	 * Thread owning the context; the same thread that called cosetup(2).
-	 */
-	struct thread				*sc_td;
-
-	/*
-	 * Thread owning the context we're lending our thread to.  When
-	 * calling cocall(), this will be the callee thread.  NULL when
-	 * not lending.
-	 */
-	struct thread				*sc_borrower_td;
-
-	/*
-	 * Peer context - callee in caller's context, caller in callee's.
-	 */
-	struct switcher_context * __capability	sc_peer_context;
-};
-#endif
-
 /*
  * Kernel runnable context (thread).
  * This is what is put to sleep and reactivated.
@@ -312,7 +286,6 @@ struct thread {
 	void		*td_su;		/* (k) FFS SU private */
 	sbintime_t	td_sleeptimo;	/* (t) Sleep timeout. */
 	int		td_rtcgen;	/* (s) rtc_generation of abs. sleep */
-	vaddr_t		td_switcher_data;
 #define	td_endzero td_sigmask
 
 /* Copied during fork1() or create_thread(). */
