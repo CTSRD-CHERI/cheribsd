@@ -556,7 +556,29 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			break;
 		}
 
-
+		case R_TYPE(CHERI_ABSPTR):
+			def = find_symdef(r_symndx, obj,
+			    &defobj, flags, NULL, lockstate);
+			if (def == NULL) {
+				_rtld_error("%s: Could not find symbol %s",
+				    obj->path, obj->strtab + obj->symtab[r_symndx].st_name);
+				return -1;
+			}
+			assert(ELF_ST_TYPE(def->st_info) != STT_GNU_IFUNC &&
+			    "IFUNC not implemented!");
+			Elf_Addr symval = (Elf_Addr)defobj->relocbase + def->st_value;
+			const size_t rlen =
+			    ELF_R_NXTTYPE_64_P(r_type)
+				? sizeof(Elf_Sxword)
+				: sizeof(Elf_Sword);
+			Elf_Addr old = load_ptr(where, rlen);
+			Elf_Addr val = old;
+			val += symval;
+			store_ptr(where, val, rlen);
+			dbg("ABS(%p) %s in %s %p --> %p in %s",
+			    where, obj->strtab + obj->symtab[r_symndx].st_name,
+			    obj->path, (void*)(uintptr_t)old, (void *)(uintptr_t)val, defobj->path);
+			break;
 
 		default:
 			dbg("sym = %lu, type = %lu, offset = %p, "

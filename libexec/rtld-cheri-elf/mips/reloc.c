@@ -613,10 +613,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			break;
 		}
 
-#ifdef __mips_n64
-		case R_TYPE(64):
-#endif
-		case R_TYPE(32):
+		case R_TYPE(CHERI_ABSPTR):
 			def = find_symdef(r_symndx, obj,
 			    &defobj, flags, NULL, lockstate);
 			if (def == NULL) {
