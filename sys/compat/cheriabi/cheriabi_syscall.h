@@ -96,7 +96,7 @@
 				/* 88 is obsolete osethostname */
 #define	CHERIABI_SYS_getdtablesize	89
 #define	CHERIABI_SYS_dup2	90
-#define	CHERIABI_SYS_fcntl	92
+#define	CHERIABI_SYS_cheriabi_fcntl	92
 #define	CHERIABI_SYS_cheriabi_select	93
 #define	CHERIABI_SYS_fsync	95
 #define	CHERIABI_SYS_setpriority	96

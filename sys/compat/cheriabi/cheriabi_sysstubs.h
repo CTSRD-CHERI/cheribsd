@@ -678,17 +678,6 @@ SYS_STUB(90, int, dup2,
     /* _localcheck */ {}
 )
 
-SYS_STUB_VA(92, int, fcntl, cmd,
-    /* _protoargs */ (int fd, int cmd, intptr_t arg),
-    /* _vprotoargs */ (int fd, int cmd, ...),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, int fd, int cmd, __intcap_t arg),
-    /* _protoargs_err */ (__capability int *stub_errno, int fd, int cmd, __intcap_t arg),
-    /* _callargs */ (fd, cmd, arg),
-    /* _callargs_chk */ (&ret, stub_errno, fd, cmd, arg),
-    /* _callargs_err */ (&errno, fd, cmd, (intptr_t)arg),
-    /* _localcheck */ {if (!(cheri_getperm(arg) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
-)
-
 SYS_STUB(93, int, select,
     /* _protoargs */ (int nd, fd_set * in, fd_set * ou, fd_set * ex, struct timeval * tv),
     /* _protoargs_chk */ (int *retp , int * __capability stub_errno, int nd, fd_set * __capability  in, fd_set * __capability  ou, fd_set * __capability  ex, struct timeval * __capability  tv),

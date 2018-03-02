@@ -67,7 +67,7 @@ MIASM =  \
 	cheriabi_getitimer.o \
 	getdtablesize.o \
 	dup2.o \
-	fcntl.o \
+	cheriabi_fcntl.o \
 	cheriabi_select.o \
 	fsync.o \
 	setpriority.o \

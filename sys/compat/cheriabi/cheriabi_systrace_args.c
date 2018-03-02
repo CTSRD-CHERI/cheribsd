@@ -517,12 +517,12 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* fcntl */
+	/* cheriabi_fcntl */
 	case 92: {
-		struct fcntl_args *p = params;
+		struct cheriabi_fcntl_args *p = params;
 		iarg[0] = p->fd; /* int */
 		iarg[1] = p->cmd; /* int */
-		uarg[2] = (intptr_t) p->arg; /* intptr_t */
+		uarg[2] = (cheri_getbase(p->arg) + cheri_getoffset(p->arg)); /* intcap_t */
 		*n_args = 3;
 		break;
 	}
@@ -3879,7 +3879,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* fcntl */
+	/* cheriabi_fcntl */
 	case 92:
 		switch(ndx) {
 		case 0:
@@ -3889,7 +3889,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "intptr_t";
+			p = "intcap_t";
 			break;
 		default:
 			break;
@@ -8523,7 +8523,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* fcntl */
+	/* cheriabi_fcntl */
 	case 92:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

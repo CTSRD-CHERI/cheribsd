@@ -404,12 +404,28 @@ struct fcntl_args {
 int
 sys_fcntl(struct thread *td, struct fcntl_args *uap)
 {
+	intcap_t tmp;
 
-	return (kern_fcntl_freebsd(td, uap->fd, uap->cmd, uap->arg));
+	switch (uap->cmd) {
+	case F_GETLK:
+	case F_OGETLK:
+	case F_OSETLK:
+	case F_OSETLKW:
+	case F_SETLK:
+	case F_SETLKW:
+	case F_SETLK_REMOTE:
+		tmp = (intcap_t)__USER_CAP_UNBOUND((void *)uap->arg);
+		break;
+
+	default:
+		tmp = (intcap_t)uap->arg;
+	}
+
+	return (kern_fcntl_freebsd(td, uap->fd, uap->cmd, tmp));
 }
 
 int
-kern_fcntl_freebsd(struct thread *td, int fd, int cmd, long arg)
+kern_fcntl_freebsd(struct thread *td, int fd, int cmd, intcap_t arg)
 {
 	struct flock fl;
 	struct __oflock ofl;
@@ -425,7 +441,7 @@ kern_fcntl_freebsd(struct thread *td, int fd, int cmd, long arg)
 		/*
 		 * Convert old flock structure to new.
 		 */
-		error = copyin((void *)(intptr_t)arg, &ofl, sizeof(ofl));
+		error = copyin_c((void * __capability)arg, &ofl, sizeof(ofl));
 		fl.l_start = ofl.l_start;
 		fl.l_len = ofl.l_len;
 		fl.l_pid = ofl.l_pid;
@@ -450,7 +466,7 @@ kern_fcntl_freebsd(struct thread *td, int fd, int cmd, long arg)
 	case F_SETLK:
 	case F_SETLKW:
 	case F_SETLK_REMOTE:
-		error = copyin((void *)(intptr_t)arg, &fl, sizeof(fl));
+		error = copyin_c((void * __capability)arg, &fl, sizeof(fl));
 		arg1 = (intptr_t)&fl;
 		break;
 	default:
@@ -468,9 +484,9 @@ kern_fcntl_freebsd(struct thread *td, int fd, int cmd, long arg)
 		ofl.l_pid = fl.l_pid;
 		ofl.l_type = fl.l_type;
 		ofl.l_whence = fl.l_whence;
-		error = copyout(&ofl, (void *)(intptr_t)arg, sizeof(ofl));
+		error = copyout_c(&ofl, (void * __capability)arg, sizeof(ofl));
 	} else if (cmd == F_GETLK) {
-		error = copyout(&fl, (void *)(intptr_t)arg, sizeof(fl));
+		error = copyout_c(&fl, (void * __capability)arg, sizeof(fl));
 	}
 	return (error);
 }

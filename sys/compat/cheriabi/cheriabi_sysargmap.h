@@ -62,7 +62,7 @@
 #define	CHERIABI_SYS_cheriabi_swapon_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_getitimer_PTRMASK	(0x0 | 0x2)
 #define	CHERIABI_SYS_dup2_PTRMASK	(0x0)
-#define	CHERIABI_SYS_fcntl_PTRMASK	(0x0 | 0x4)
+#define	CHERIABI_SYS_cheriabi_fcntl_PTRMASK	(0x0 | 0x4)
 #define	CHERIABI_SYS_cheriabi_select_PTRMASK	(0x0 | 0x2 | 0x4 | 0x8 | 0x10)
 #define	CHERIABI_SYS_fsync_PTRMASK	(0x0)
 #define	CHERIABI_SYS_setpriority_PTRMASK	(0x0)

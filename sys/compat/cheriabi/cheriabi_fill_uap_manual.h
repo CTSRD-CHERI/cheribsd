@@ -29,64 +29,6 @@
  */
 
 static inline int
-CHERIABI_SYS_fcntl_fill_uap(struct thread *td,
-    struct fcntl_args *uap)
-{
-	void * __capability tmpcap;
-	int error;
-
-	/* [0] int fd */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_fcntl_PTRMASK);
-	uap->fd = cheri_getoffset(tmpcap);
-
-	/* [1] int cmd */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_fcntl_PTRMASK);
-	uap->cmd = cheri_getoffset(tmpcap);
-
-	/* [2] intptr_t arg */
-	/*
-	 * There are three cases.  arg is ignored, arg is an int, and arg
-	 * is a pointer to struct flock.  We rely on userspace to have
-	 * promoted integers to intptr_t so we're only dealing with a
-	 * capability argument.
-	 */
-	switch (uap->cmd) {
-	case F_GETFD:
-	case F_GETFL:
-	case F_GETOWN:
-		uap->arg = (intptr_t)NULL;
-		break;
-
-	case F_DUPFD:
-	case F_DUPFD_CLOEXEC:
-	case F_DUP2FD:
-	case F_DUP2FD_CLOEXEC:
-	case F_SETFD:
-	case F_SETFL:
-	case F_SETOWN:
-	case F_READAHEAD:
-	case F_RDAHEAD:
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_fcntl_PTRMASK);
-		uap->arg = cheri_getoffset(tmpcap);
-		break;
-
-	case F_GETLK:
-	case F_SETLK:
-	case F_SETLKW:
-		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_fcntl_PTRMASK);
-		error = cheriabi_cap_to_ptr((caddr_t *)&uap->arg,
-		    tmpcap, sizeof(struct flock), CHERI_PERM_LOAD, 0);
-		if (error != 0)
-			return (error);
-		break;
-	default:
-		return (EINVAL);
-	}
-
-	return (0);
-}
-
-static inline int
 CHERIABI_SYS_cheriabi_sysarch_fill_uap(struct thread *td,
     struct cheriabi_sysarch_args *uap)
 {

@@ -1037,8 +1037,27 @@ CHERIABI_SYS_dup2_fill_uap(struct thread *td,
 	return (0);
 }
 
-static inline int	CHERIABI_SYS_fcntl_fill_uap(struct thread *td,
-    struct fcntl_args *uap);
+static inline int
+CHERIABI_SYS_cheriabi_fcntl_fill_uap(struct thread *td,
+    struct cheriabi_fcntl_args *uap)
+{
+	void * __capability tmpcap;
+
+	/* [0] int fd */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_fcntl_PTRMASK);
+	uap->fd = cheri_getoffset(tmpcap);
+
+	/* [1] int cmd */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_fcntl_PTRMASK);
+	uap->cmd = cheri_getoffset(tmpcap);
+
+	/* [2] intcap_t arg */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->arg),
+	    2, CHERIABI_SYS_cheriabi_fcntl_PTRMASK);
+
+	return (0);
+}
 
 static inline int
 CHERIABI_SYS_cheriabi_select_fill_uap(struct thread *td,

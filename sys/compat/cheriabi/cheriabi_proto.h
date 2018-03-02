@@ -241,6 +241,11 @@ struct cheriabi_getitimer_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
 	char itv_l_[PADL_(struct itimerval *__capability)]; struct itimerval *__capability itv; char itv_r_[PADR_(struct itimerval *__capability)];
 };
+struct cheriabi_fcntl_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
+	char arg_l_[PADL_(intcap_t)]; intcap_t arg; char arg_r_[PADR_(intcap_t)];
+};
 struct cheriabi_select_args {
 	char nd_l_[PADL_(int)]; int nd; char nd_r_[PADR_(int)];
 	char in_l_[PADL_(fd_set *__capability)]; fd_set *__capability in; char in_r_[PADR_(fd_set *__capability)];
@@ -1406,6 +1411,7 @@ int	cheriabi_setgroups(struct thread *, struct cheriabi_setgroups_args *);
 int	cheriabi_setitimer(struct thread *, struct cheriabi_setitimer_args *);
 int	cheriabi_swapon(struct thread *, struct cheriabi_swapon_args *);
 int	cheriabi_getitimer(struct thread *, struct cheriabi_getitimer_args *);
+int	cheriabi_fcntl(struct thread *, struct cheriabi_fcntl_args *);
 int	cheriabi_select(struct thread *, struct cheriabi_select_args *);
 int	cheriabi_connect(struct thread *, struct cheriabi_connect_args *);
 int	cheriabi_bind(struct thread *, struct cheriabi_bind_args *);
@@ -1735,6 +1741,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_setitimer	AUE_SETITIMER
 #define	CHERIABI_SYS_AUE_cheriabi_swapon	AUE_SWAPON
 #define	CHERIABI_SYS_AUE_cheriabi_getitimer	AUE_GETITIMER
+#define	CHERIABI_SYS_AUE_cheriabi_fcntl	AUE_FCNTL
 #define	CHERIABI_SYS_AUE_cheriabi_select	AUE_SELECT
 #define	CHERIABI_SYS_AUE_cheriabi_connect	AUE_CONNECT
 #define	CHERIABI_SYS_AUE_cheriabi_bind	AUE_BIND

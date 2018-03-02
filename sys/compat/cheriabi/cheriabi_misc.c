@@ -1474,6 +1474,13 @@ cheriabi_cpuset_setaffinity(struct thread *td,
  * kern_descrip.c
  */
 int
+cheriabi_fcntl(struct thread *td, struct cheriabi_fcntl_args *uap)
+{
+
+	return (kern_fcntl_freebsd(td, uap->fd, uap->cmd, uap->arg));
+}
+
+int
 cheriabi_fstat(struct thread *td, struct cheriabi_fstat_args *uap)
 {
 

@@ -171,7 +171,7 @@ int	kern_fchmodat(struct thread *td, int fd, const char * __capability path,
 int	kern_fchownat(struct thread *td, int fd, const char * __capability path,
 	    enum uio_seg pathseg, int uid, int gid, int flag);
 int	kern_fcntl(struct thread *td, int fd, int cmd, intptr_t arg);
-int	kern_fcntl_freebsd(struct thread *td, int fd, int cmd, long arg);
+int	kern_fcntl_freebsd(struct thread *td, int fd, int cmd, intcap_t arg);
 int	kern_ffclock_getestimate(struct thread *td,
 	    struct ffclock_estimate * __capability cest);
 int	kern_ffclock_setestimate(struct thread *td,

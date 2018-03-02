@@ -342,11 +342,12 @@ sed -e '
 	}
 	# Returns true if the given type is a pointer type
 	function isptrtype(type) {
-		return (type ~ /\*/ || type ~ /caddr_t/ || type ~ /intptr_t/)
+		return (type ~ /\*/ || type ~ /caddr_t/ || type ~ /intcap_t/ ||
+		    type ~ /intptr_t/)
 	}
 	# Returns true if the given type is an explict capability type
 	function iscaptype(type) {
-		return (type ~ /__capability$/)
+		return (type ~ /__capability$/ || type ~ /intcap_t/)
 	}
 	# Returns true if the flag "name" is set in the type field
 	function flag(name, flags, i, n) {

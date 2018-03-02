@@ -101,6 +101,7 @@ openat(int fd, const char * path, int flags, ...)
 	return (__libcheri_system_sys_openat(&errno, fd, path, flags, mode));
 }
 
+#if HAVE_LIBCHERI_SYSTEM_SYS_FCNTL
 int
 fcntl(int fd, int cmd, ...)
 {
@@ -129,6 +130,14 @@ fcntl(int fd, int cmd, ...)
 
 	return (__libcheri_system_sys_fcntl(&errno, fd, cmd, arg));
 }
+#else
+int
+fcntl(int fd __unused, int cmd __unused, ...)
+{
+
+	return (ENOSYS);
+}
+#endif
 
 int	ioctl(int fd __unused, unsigned long request __unused, ...);
 int
