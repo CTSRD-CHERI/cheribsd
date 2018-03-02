@@ -668,8 +668,27 @@ CHERIABI_SYS_cheriabi_sigaltstack_fill_uap(struct thread *td,
 	return (0);
 }
 
-static inline int	CHERIABI_SYS_cheriabi_ioctl_fill_uap(struct thread *td,
-    struct cheriabi_ioctl_args *uap);
+static inline int
+CHERIABI_SYS_cheriabi_ioctl_fill_uap(struct thread *td,
+    struct cheriabi_ioctl_args *uap)
+{
+	void * __capability tmpcap;
+
+	/* [0] int fd */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_ioctl_PTRMASK);
+	uap->fd = cheri_getoffset(tmpcap);
+
+	/* [1] u_long com */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_ioctl_PTRMASK);
+	uap->com = cheri_getoffset(tmpcap);
+
+	/* [2] _Inout_opt_ void *__capability data */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->data),
+	    2, CHERIABI_SYS_cheriabi_ioctl_PTRMASK);
+
+	return (0);
+}
 
 static inline int
 CHERIABI_SYS_reboot_fill_uap(struct thread *td,

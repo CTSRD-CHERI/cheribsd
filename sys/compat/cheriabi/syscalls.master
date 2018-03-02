@@ -187,9 +187,9 @@
 53	AUE_SIGALTSTACK	STD	{ int cheriabi_sigaltstack( \
 				    _In_opt_ const cheriabi_stack_t * __capability ss, \
 				    _Out_opt_ cheriabi_stack_t * __capability oss); }
-54	AUE_NULL	STD|NOPARSE|VARARG|NOSTUB	{ int cheriabi_ioctl( \
+54	AUE_NULL	STD|VARARG|NOSTUB	{ int cheriabi_ioctl( \
 				    int fd, u_long com, \
-				    _Inout_opt_ void *data); }
+				    _Inout_opt_ void * __capability data); }
 55	AUE_REBOOT	NOPROTO	{ int reboot(int opt); }
 56	AUE_REVOKE	STD	{ int cheriabi_revoke( \
 				    _In_z_ const char * __capability path); }

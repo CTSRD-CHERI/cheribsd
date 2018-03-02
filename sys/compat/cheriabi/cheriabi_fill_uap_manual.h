@@ -29,56 +29,6 @@
  */
 
 static inline int
-CHERIABI_SYS_cheriabi_ioctl_fill_uap(struct thread *td,
-    struct cheriabi_ioctl_args *uap)
-{
-	void * __capability tmpcap;
-	register_t reqperms, tag;
-	int error;
-
-	/* [0] int fd */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_ioctl_PTRMASK);
-	uap->fd = cheri_getoffset(tmpcap);
-
-	/* [1] u_long com */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_ioctl_PTRMASK);
-	uap->com = cheri_getoffset(tmpcap);
-
-	/* [2] _Inout_opt_ caddr_t data */
-	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_ioctl_PTRMASK);
-	if (uap->com & IOC_VOID) {
-		tag = cheri_gettag(tmpcap);
-		if (!tag)
-			uap->data = (void *)cheri_getoffset(tmpcap);
-		else
-			return (EPROT);
-	} else {
-		reqperms = 0;
-		if (uap->com & IOC_IN)
-			reqperms |= CHERI_PERM_LOAD;
-		if (uap->com & IOC_OUT)
-			reqperms |= CHERI_PERM_STORE;
-		if (ioctl_data_contains_pointers(uap->com)) {
-			if (reqperms & CHERI_PERM_LOAD)
-				reqperms |= CHERI_PERM_LOAD_CAP;
-			if (reqperms & CHERI_PERM_STORE)
-				reqperms |= CHERI_PERM_STORE_CAP;
-		}
-
-		/*
-		 * XXX-BD: not sure about may_be_null=1 here, but lower
-		 * levels will fail cleanly is it is a problem.
-		 */
-		error = cheriabi_cap_to_ptr((caddr_t *)&uap->data,
-		    tmpcap, IOCPARM_LEN(uap->com), reqperms, 1);
-		if (error != 0)
-			return (error);
-	}
-
-	return (0);
-}
-
-static inline int
 CHERIABI_SYS_fcntl_fill_uap(struct thread *td,
     struct fcntl_args *uap)
 {
