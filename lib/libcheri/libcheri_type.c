@@ -75,13 +75,7 @@ libcheri_type_init(void)
 	 * properties of the capability later, should compartmentalisation
 	 * actually be used by the application.
 	 */
-#ifdef __CHERI_PURE_CAPABILITY__
 	if (sysarch(CHERI_GET_SEALCAP, &libcheri_sealing_root) < 0)
-#else
-	/* Work around CTSRD-CHERI/clang#186 */
-	if (sysarch(CHERI_GET_SEALCAP,
-	    (__cheri_fromcap void * __capability *)&libcheri_sealing_root) < 0)
-#endif
 		libcheri_sealing_root = NULL;
 	assert((cheri_getperm(libcheri_sealing_root) & CHERI_PERM_SEAL) != 0);
 	assert(cheri_getlen(libcheri_sealing_root) != 0);
