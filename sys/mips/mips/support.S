@@ -664,6 +664,190 @@ LEAF(fswintrberr)
 	li	v0, -1
 END(fswintrberr)
 
+#ifdef CPU_CHERI
+/*
+ * {fu,su},{ibyte,isword,iword}, fetch or store a byte, short or word to
+ * user text space.
+ * {fu,su},{byte,sword,word}, fetch or store a byte, short or word to
+ * user data space.
+ */
+LEAF(fuword64_c)
+XLEAF(fuword_c)
+	PTR_LA	v0, fswberr
+	cgetbase	t0, $c3
+	blt	t0, zero, fswberr	# make sure address is in user space
+	nop
+	GET_CPU_PCPU(v1)
+	PTR_L	v1, PC_CURPCB(v1)
+	PTR_S	v0, U_PCB_ONFAULT(v1)
+	cld	v0, zero, 0($c3)	# fetch word
+	j	ra
+	PTR_S	zero, U_PCB_ONFAULT(v1)
+END(fuword64_c)
+
+LEAF(fuword32_c)
+	PTR_LA	v0, fswberr
+	cgetbase	t0, $c3
+	blt	t0, zero, fswberr	# make sure address is in user space
+	nop
+	GET_CPU_PCPU(v1)
+	PTR_L	v1, PC_CURPCB(v1)
+	PTR_S	v0, U_PCB_ONFAULT(v1)
+	clw	v0, zero, 0($c3)	# fetch word
+	j	ra
+	PTR_S	zero, U_PCB_ONFAULT(v1)
+END(fuword32_c)
+
+LEAF(fusword_c)
+	PTR_LA	v0, fswberr
+	cgetbase	t0, $c3
+	blt	t0, zero, fswberr	# make sure address is in user space
+	nop
+	GET_CPU_PCPU(v1)
+	PTR_L	v1, PC_CURPCB(v1)
+	PTR_S	v0, U_PCB_ONFAULT(v1)
+	clhu	v0, zero, 0($c3)	# fetch short
+	j	ra
+	PTR_S	zero, U_PCB_ONFAULT(v1)
+END(fusword_c)
+
+LEAF(fubyte_c)
+	PTR_LA	v0, fswberr
+	cgetbase	t0, $c3
+	blt	t0, zero, fswberr	# make sure address is in user space
+	nop
+	GET_CPU_PCPU(v1)
+	PTR_L	v1, PC_CURPCB(v1)
+	PTR_S	v0, U_PCB_ONFAULT(v1)
+	clbu	v0, zero, 0($c3)	# fetch byte
+	j	ra
+	PTR_S	zero, U_PCB_ONFAULT(v1)
+END(fubyte_c)
+
+LEAF(suword32_c)
+	PTR_LA	v0, fswberr
+	cgetbase	t0, $c3
+	blt	t0, zero, fswberr	# make sure address is in user space
+	nop
+	GET_CPU_PCPU(v1)
+	PTR_L	v1, PC_CURPCB(v1)
+	PTR_S	v0, U_PCB_ONFAULT(v1)
+	csw	a0, zero, 0($c3)	# store word
+	PTR_S	zero, U_PCB_ONFAULT(v1)
+	j	ra
+	move	v0, zero
+END(suword32_c)
+
+LEAF(suword64_c)
+XLEAF(suword_c)
+	PTR_LA	v0, fswberr
+	cgetbase	t0, $c3
+	blt	t0, zero, fswberr	# make sure address is in user space
+	nop
+	GET_CPU_PCPU(v1)
+	PTR_L	v1, PC_CURPCB(v1)
+	PTR_S	v0, U_PCB_ONFAULT(v1)
+	csd	a0, zero, 0($c3)	# store word
+	PTR_S	zero, U_PCB_ONFAULT(v1)
+	j	ra
+	move	v0, zero
+END(suword64_c)
+
+/*
+ * casuword(9)
+ * <v0>u_long casuword(<a0>u_long *p, <a1>u_long oldval, <a2>u_long newval)
+ */
+/*
+ * casuword32(9)
+ * <v0>uint32_t casuword(<a0>uint32_t *p, <a1>uint32_t oldval, 
+ *							<a2>uint32_t newval)
+ */
+LEAF(casuword32_c)
+	PTR_LA	v0, fswberr
+	cgetbase	t0, $c3
+	blt	t0, zero, fswberr	# make sure address is in user space
+	nop
+	GET_CPU_PCPU(v1)
+	PTR_L	v1, PC_CURPCB(v1)
+	PTR_S	v0, U_PCB_ONFAULT(v1)
+1:
+	move	t0, a1
+	cllw	v0, $c3			# load word
+	bne	a0, v0, 2f
+	nop
+	cscw	t0, zero, $c3		# store word
+	beqz	t0, 1b
+	nop
+	j	3f
+	nop
+2:
+	li	v0, -1
+3:
+	PTR_S	zero, U_PCB_ONFAULT(v1)
+	jr	ra
+	nop
+END(casuword32_c)
+
+LEAF(casuword64_c)
+XLEAF(casuword_c)
+	PTR_LA	v0, fswberr
+	cgetbase	t0, $c3
+	blt	t0, zero, fswberr	# make sure address is in user space
+	nop
+	GET_CPU_PCPU(v1)
+	PTR_L	v1, PC_CURPCB(v1)
+	PTR_S	v0, U_PCB_ONFAULT(v1)
+1:
+	move	t0, a1
+	clld	v0, $c3			# load double word
+	bne	a0, v0, 2f
+	nop
+	cscd	t0, zero, $c3		# store double word
+	beqz	t0, 1b
+	nop
+	j	3f
+	nop
+2:
+	li	v0, -1
+3:
+	PTR_S	zero, U_PCB_ONFAULT(v1)
+	jr	ra
+	nop
+END(casuword64_c)
+
+/*
+ * Will have to flush the instruction cache if byte merging is done in hardware.
+ */
+LEAF(susword_c)
+	PTR_LA	v0, fswberr
+	cgetbase	t0, $c3
+	blt	t0, zero, fswberr	# make sure address is in user space
+	nop
+	GET_CPU_PCPU(v1)
+	PTR_L	v1, PC_CURPCB(v1)
+	PTR_S	v0, U_PCB_ONFAULT(v1)
+	csh	a0, zero, 0($c3)	# store short
+	PTR_S	zero, U_PCB_ONFAULT(v1)
+	j	ra
+	move	v0, zero
+END(susword_c)
+
+LEAF(subyte_c)
+	PTR_LA	v0, fswberr
+	cgetbase	t0, $c3
+	blt	t0, zero, fswberr	# make sure address is in user space
+	nop
+	GET_CPU_PCPU(v1)
+	PTR_L	v1, PC_CURPCB(v1)
+	PTR_S	v0, U_PCB_ONFAULT(v1)
+	csb	a0, zero, 0($c3)	# store shore
+	PTR_S	zero, U_PCB_ONFAULT(v1)
+	j	ra
+	move	v0, zero
+END(subyte_c)
+
+#endif /* CPU_CHERI */
+
 /*
  * memset(void *s1, int c, int len)
  * NetBSD: memset.S,v 1.3 2001/10/16 15:40:53 uch Exp
