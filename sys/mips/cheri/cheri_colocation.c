@@ -57,6 +57,8 @@ void * __capability	switcher_sealcap;
  */
 void * __capability	switcher_sealcap2;
 
+struct mtx		switcher_lock;
+
 /*
  * For now, all we do is declare what we support, as most initialisation took
  * place in the MIPS machine-dependent assembly.  CHERI doesn't need a lot of
@@ -74,6 +76,7 @@ colocation_startup(void)
 	    CHERI_SEALCAP_SWITCHER2_BASE, CHERI_SEALCAP_SWITCHER2_LENGTH,
 	    CHERI_SEALCAP_SWITCHER2_OFFSET);
 
+	mtx_init(&switcher_lock, "switcher lock", NULL, MTX_DEF);
 }
 SYSINIT(colocation_startup, SI_SUB_CPU, SI_ORDER_FIRST, colocation_startup,
     NULL);
@@ -270,9 +273,10 @@ sys_copark(struct thread *td, struct copark_args *uap)
 
 	//printf("%s: go, td %p!\n", __func__, td);
 
-	mtx_lock(&Giant);
-	error = msleep(&td->td_md.md_switcher_context, &Giant, PPAUSE | PCATCH, "copark", 0);
-	mtx_unlock(&Giant);
+	mtx_lock(&switcher_lock);
+	error = msleep(&td->td_md.md_switcher_context, &switcher_lock,
+	    PPAUSE | PCATCH, "copark", 0);
+	mtx_unlock(&switcher_lock);
 
 	if (error == 0) {
 		/*
