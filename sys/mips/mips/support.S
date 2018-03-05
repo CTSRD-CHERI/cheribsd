@@ -668,7 +668,7 @@ END(fswintrberr)
 /*
  * {fu,su},{ibyte,isword,iword}, fetch or store a byte, short or word to
  * user text space.
- * {fu,su},{byte,sword,word}, fetch or store a byte, short or word to
+ * {fu,su},{byte,cap,sword,word}, fetch or store a byte, short or word to
  * user data space.
  */
 LEAF(fuword64_c)
@@ -723,6 +723,22 @@ LEAF(fubyte_c)
 	j	ra
 	PTR_S	zero, U_PCB_ONFAULT(v1)
 END(fubyte_c)
+
+LEAF(fuecap_c)
+	PTR_LA	v0, fswberr
+	cgetbase	t0, $c3
+	blt	t0, zero, fswberr	# make sure address is in user space
+	cgetdefault	$c4
+	csetoffset	$c4, $c4, a0
+	GET_CPU_PCPU(v1)
+	PTR_L	v1, PC_CURPCB(v1)
+	PTR_S	v0, U_PCB_ONFAULT(v1)
+	clw	v0, zero, 0($c3)	# fetch capability
+	csc	v0, zero, 0($c4)	# store capability
+	PTR_S	zero, U_PCB_ONFAULT(v1)
+	j	ra
+	li	v0, 0
+END(fuecap_c)
 
 LEAF(suword32_c)
 	PTR_LA	v0, fswberr

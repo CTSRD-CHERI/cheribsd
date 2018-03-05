@@ -382,6 +382,7 @@ long	fuword_c(volatile const void * __capability base);
 int	fuword16_c(volatile const void * __capability base);
 int32_t	fuword32_c(volatile const void * __capability base);
 int64_t	fuword64_c(volatile const void * __capability base);
+int	fuecap_c(volatile const void * __capability base, intcap_t *val);
 int	fueword_c(volatile const void * __capability base, long *val);
 int	fueword32_c(volatile const void * __capability base, int32_t *val);
 int	subyte_c(volatile void * __capability base, int byte);
@@ -401,6 +402,7 @@ int	casueword32_c(volatile uint32_t * __capability base, uint32_t oldval,
 #define	fuword16_c	fuword16
 #define	fuword32_c	fuword32
 #define	fuword64_c	fuword64
+#define	fuecap_c	fuecap
 #define	fueword_c	fueword
 #define	fueword32_c	fueword32
 #define	subyte_c	subyte
