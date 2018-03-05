@@ -141,8 +141,10 @@ _C_LABEL(switcher_cocall):
 	 */
 	cllc	$c12, $c5
 	cbts	$c12, 1b
+	nop
 	cscc	t8, $idc, $c5
 	beq	t8, zero, 1b
+	/* no branch delay slot needed */
 
 	/*
 	 * Save the capability to the callee's thread in the caller context.
