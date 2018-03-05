@@ -181,12 +181,12 @@ umtx_key_match(const struct umtx_key *k1, const struct umtx_key *k2)
 	        k1->info.both.b == k2->info.both.b);
 }
 
-int umtx_copyin_timeout(const void *, struct timespec *);
-int umtx_key_get(const void *, int, int, struct umtx_key *);
+int umtx_copyin_timeout(const void * __capability, struct timespec *);
+int umtx_key_get(const void * __capability, int, int, struct umtx_key *);
 void umtx_key_release(struct umtx_key *);
 struct umtx_q *umtxq_alloc(void);
 void umtxq_free(struct umtx_q *);
-int kern_umtx_wake(struct thread *, void *, int, int);
+int kern_umtx_wake(struct thread *, void * __capability , int, int);
 void umtx_pi_adjust(struct thread *, u_char);
 void umtx_thread_init(struct thread *);
 void umtx_thread_fini(struct thread *);

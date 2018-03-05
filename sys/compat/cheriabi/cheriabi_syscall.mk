@@ -264,7 +264,7 @@ MIASM =  \
 	cheriabi_getaudit_addr.o \
 	cheriabi_setaudit_addr.o \
 	cheriabi_auditctl.o \
-	_umtx_op.o \
+	cheriabi__umtx_op.o \
 	cheriabi_thr_new.o \
 	cheriabi_sigqueue.o \
 	cheriabi_kmq_open.o \

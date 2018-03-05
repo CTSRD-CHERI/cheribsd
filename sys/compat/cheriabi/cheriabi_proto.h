@@ -926,6 +926,13 @@ struct cheriabi_setaudit_addr_args {
 struct cheriabi_auditctl_args {
 	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
 };
+struct cheriabi__umtx_op_args {
+	char obj_l_[PADL_(void *__capability)]; void *__capability obj; char obj_r_[PADR_(void *__capability)];
+	char op_l_[PADL_(int)]; int op; char op_r_[PADR_(int)];
+	char val_l_[PADL_(u_long)]; u_long val; char val_r_[PADR_(u_long)];
+	char uaddr1_l_[PADL_(void *__capability)]; void *__capability uaddr1; char uaddr1_r_[PADR_(void *__capability)];
+	char uaddr2_l_[PADL_(void *__capability)]; void *__capability uaddr2; char uaddr2_r_[PADR_(void *__capability)];
+};
 struct cheriabi_thr_new_args {
 	char param_l_[PADL_(struct thr_param_c *__capability)]; struct thr_param_c *__capability param; char param_r_[PADR_(struct thr_param_c *__capability)];
 	char param_size_l_[PADL_(int)]; int param_size; char param_size_r_[PADR_(int)];
@@ -1562,6 +1569,7 @@ int	cheriabi_setaudit(struct thread *, struct cheriabi_setaudit_args *);
 int	cheriabi_getaudit_addr(struct thread *, struct cheriabi_getaudit_addr_args *);
 int	cheriabi_setaudit_addr(struct thread *, struct cheriabi_setaudit_addr_args *);
 int	cheriabi_auditctl(struct thread *, struct cheriabi_auditctl_args *);
+int	cheriabi__umtx_op(struct thread *, struct cheriabi__umtx_op_args *);
 int	cheriabi_thr_new(struct thread *, struct cheriabi_thr_new_args *);
 int	cheriabi_sigqueue(struct thread *, struct cheriabi_sigqueue_args *);
 int	cheriabi_kmq_open(struct thread *, struct cheriabi_kmq_open_args *);
@@ -1892,6 +1900,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_getaudit_addr	AUE_GETAUDIT_ADDR
 #define	CHERIABI_SYS_AUE_cheriabi_setaudit_addr	AUE_SETAUDIT_ADDR
 #define	CHERIABI_SYS_AUE_cheriabi_auditctl	AUE_AUDITCTL
+#define	CHERIABI_SYS_AUE_cheriabi__umtx_op	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_thr_new	AUE_THR_NEW
 #define	CHERIABI_SYS_AUE_cheriabi_sigqueue	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_kmq_open	AUE_MQ_OPEN

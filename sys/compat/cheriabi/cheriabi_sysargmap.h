@@ -254,7 +254,7 @@
 #define	CHERIABI_SYS_cheriabi_getaudit_addr_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_setaudit_addr_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_auditctl_PTRMASK	(0x0 | 0x1)
-#define	CHERIABI_SYS__umtx_op_PTRMASK	(0x0 | 0x1 | 0x8 | 0x10)
+#define	CHERIABI_SYS_cheriabi__umtx_op_PTRMASK	(0x0 | 0x1 | 0x8 | 0x10)
 #define	CHERIABI_SYS_cheriabi_thr_new_PTRMASK	(0x0 | 0x1)
 #define	CHERIABI_SYS_cheriabi_sigqueue_PTRMASK	(0x0 | 0x4)
 #define	CHERIABI_SYS_cheriabi_kmq_open_PTRMASK	(0x0 | 0x1 | 0x8)

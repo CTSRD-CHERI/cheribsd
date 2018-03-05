@@ -1922,8 +1922,7 @@ cheriabi_thr_exit(struct thread *td, struct cheriabi_thr_exit_args *uap)
 	/* Signal userland that it can free the stack. */
 	if (uap->state != NULL) {
 		suword_c(uap->state, 1);
-		kern_umtx_wake(td, __DECAP_CHECK(uap->state, sizeof(long)),
-		    INT_MAX, 0);
+		kern_umtx_wake(td, uap->state, INT_MAX, 0);
 	}
 
 	return (kern_thr_exit(td));
@@ -1937,9 +1936,7 @@ cheriabi_thr_suspend(struct thread *td, struct cheriabi_thr_suspend_args *uap)
 
 	tsp = NULL;
 	if (uap->timeout != NULL) {
-		error = umtx_copyin_timeout(
-		    __DECAP_CHECK(__DECONST_CAP(struct timespec * __capability, uap->timeout),
-		    sizeof(struct timespec)), &ts);
+		error = umtx_copyin_timeout(uap->timeout, &ts);
 		if (error != 0)
 			return (error);
 		tsp = &ts;

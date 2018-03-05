@@ -315,7 +315,8 @@ sys_thr_exit(struct thread *td, struct thr_exit_args *uap)
 	/* Signal userland that it can free the stack. */
 	if ((void *)uap->state != NULL) {
 		suword_lwpid(uap->state, 1);
-		kern_umtx_wake(td, uap->state, INT_MAX, 0);
+		kern_umtx_wake(td,
+		    __USER_CAP(uap->state, sizeof(struct umutex)), INT_MAX, 0);
 	}
 
 	return (kern_thr_exit(td));
@@ -490,7 +491,8 @@ sys_thr_suspend(struct thread *td, struct thr_suspend_args *uap)
 
 	tsp = NULL;
 	if (uap->timeout != NULL) {
-		error = umtx_copyin_timeout(uap->timeout, &ts);
+		error = umtx_copyin_timeout(
+		    __USER_CAP(uap->timeout, sizeof(struct timespec)), &ts);
 		if (error != 0)
 			return (error);
 		tsp = &ts;

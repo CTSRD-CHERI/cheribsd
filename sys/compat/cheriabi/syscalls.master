@@ -1048,9 +1048,10 @@
 453	AUE_AUDITCTL	STD	{ int cheriabi_auditctl( \
 				    _In_z_ const char * __capability path); }
 ; XXX-BD: args pretty much unauditable
-454	AUE_NULL	NOPROTO|NOPARSE	{ int _umtx_op(void *obj, int op,\
-				    u_long val, void *uaddr1, \
-				    void *uaddr2); }
+454	AUE_NULL	STD	{ int cheriabi__umtx_op( \
+				    void * __capability obj, int op,\
+				    u_long val, void * __capability uaddr1, \
+				    void * __capability uaddr2); }
 455	AUE_THR_NEW	STD	{ int cheriabi_thr_new(	\
 				    _In_ struct thr_param_c * __capability param, \
 				    int param_size); }

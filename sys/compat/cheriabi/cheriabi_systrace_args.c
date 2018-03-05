@@ -2194,14 +2194,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* _umtx_op */
+	/* cheriabi__umtx_op */
 	case 454: {
-		struct _umtx_op_args *p = params;
-		uarg[0] = (intptr_t) p->obj; /* void * */
+		struct cheriabi__umtx_op_args *p = params;
+		uarg[0] = (cheri_getbase(p->obj) + cheri_getoffset(p->obj)); /* void *__capability */
 		iarg[1] = p->op; /* int */
 		uarg[2] = p->val; /* u_long */
-		uarg[3] = (intptr_t) p->uaddr1; /* void * */
-		uarg[4] = (intptr_t) p->uaddr2; /* void * */
+		uarg[3] = (cheri_getbase(p->uaddr1) + cheri_getoffset(p->uaddr1)); /* void *__capability */
+		uarg[4] = (cheri_getbase(p->uaddr2) + cheri_getoffset(p->uaddr2)); /* void *__capability */
 		*n_args = 5;
 		break;
 	}
@@ -6618,11 +6618,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* _umtx_op */
+	/* cheriabi__umtx_op */
 	case 454:
 		switch(ndx) {
 		case 0:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 1:
 			p = "int";
@@ -6631,10 +6631,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "u_long";
 			break;
 		case 3:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		case 4:
-			p = "userland void *";
+			p = "userland void *__capability";
 			break;
 		default:
 			break;
@@ -9513,7 +9513,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* _umtx_op */
+	/* cheriabi__umtx_op */
 	case 454:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

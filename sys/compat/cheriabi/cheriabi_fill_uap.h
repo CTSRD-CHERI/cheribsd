@@ -4732,8 +4732,37 @@ CHERIABI_SYS_cheriabi_auditctl_fill_uap(struct thread *td,
 	return (0);
 }
 
-static inline int	CHERIABI_SYS__umtx_op_fill_uap(struct thread *td,
-    struct _umtx_op_args *uap);
+static inline int
+CHERIABI_SYS_cheriabi__umtx_op_fill_uap(struct thread *td,
+    struct cheriabi__umtx_op_args *uap)
+{
+	void * __capability tmpcap;
+
+	/* [1] int op */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi__umtx_op_PTRMASK);
+	uap->op = cheri_getoffset(tmpcap);
+
+	/* [2] u_long val */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi__umtx_op_PTRMASK);
+	uap->val = cheri_getoffset(tmpcap);
+
+	/* [0] void *__capability obj */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->obj),
+	    0, CHERIABI_SYS_cheriabi__umtx_op_PTRMASK);
+
+	/* [3] void *__capability uaddr1 */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->uaddr1),
+	    3, CHERIABI_SYS_cheriabi__umtx_op_PTRMASK);
+
+	/* [4] void *__capability uaddr2 */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->uaddr2),
+	    4, CHERIABI_SYS_cheriabi__umtx_op_PTRMASK);
+
+	return (0);
+}
 
 static inline int
 CHERIABI_SYS_cheriabi_thr_new_fill_uap(struct thread *td,
