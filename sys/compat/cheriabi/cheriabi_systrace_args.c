@@ -198,8 +198,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		uarg[1] = (__cheri_addr intptr_t) p->buf; /* void *__capability */
 		uarg[2] = p->len; /* size_t */
 		iarg[3] = p->flags; /* int */
-		uarg[4] = (__cheri_addr intptr_t) p->from; /* struct sockaddr *__restrict __capability */
-		uarg[5] = (__cheri_addr intptr_t) p->fromlenaddr; /* __socklen_t *__restrict __capability */
+		uarg[4] = (__cheri_addr intptr_t) p->from; /* struct sockaddr *__capability */
+		uarg[5] = (__cheri_addr intptr_t) p->fromlenaddr; /* __socklen_t *__capability */
 		*n_args = 6;
 		break;
 	}
@@ -207,7 +207,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 30: {
 		struct cheriabi_accept_args *p = params;
 		iarg[0] = p->s; /* int */
-		uarg[1] = (__cheri_addr intptr_t) p->name; /* struct sockaddr *__restrict __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->name; /* struct sockaddr *__capability */
 		uarg[2] = (__cheri_addr intptr_t) p->anamelen; /* __socklen_t *__capability */
 		*n_args = 3;
 		break;
@@ -216,7 +216,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 31: {
 		struct cheriabi_getpeername_args *p = params;
 		iarg[0] = p->fdes; /* int */
-		uarg[1] = (__cheri_addr intptr_t) p->asa; /* struct sockaddr *__restrict __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->asa; /* struct sockaddr *__capability */
 		uarg[2] = (__cheri_addr intptr_t) p->alen; /* __socklen_t *__capability */
 		*n_args = 3;
 		break;
@@ -225,7 +225,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 32: {
 		struct cheriabi_getsockname_args *p = params;
 		iarg[0] = p->fdes; /* int */
-		uarg[1] = (__cheri_addr intptr_t) p->asa; /* struct sockaddr *__restrict __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->asa; /* struct sockaddr *__capability */
 		uarg[2] = (__cheri_addr intptr_t) p->alen; /* __socklen_t *__capability */
 		*n_args = 3;
 		break;
@@ -2926,8 +2926,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 541: {
 		struct cheriabi_accept4_args *p = params;
 		iarg[0] = p->s; /* int */
-		uarg[1] = (__cheri_addr intptr_t) p->name; /* struct sockaddr *__restrict __capability */
-		uarg[2] = (__cheri_addr intptr_t) p->anamelen; /* __socklen_t *__restrict __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->name; /* struct sockaddr *__capability */
+		uarg[2] = (__cheri_addr intptr_t) p->anamelen; /* __socklen_t *__capability */
 		iarg[3] = p->flags; /* int */
 		*n_args = 4;
 		break;
@@ -3386,10 +3386,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 4:
-			p = "userland struct sockaddr *__restrict __capability";
+			p = "userland struct sockaddr *__capability";
 			break;
 		case 5:
-			p = "userland __socklen_t *__restrict __capability";
+			p = "userland __socklen_t *__capability";
 			break;
 		default:
 			break;
@@ -3402,7 +3402,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct sockaddr *__restrict __capability";
+			p = "userland struct sockaddr *__capability";
 			break;
 		case 2:
 			p = "userland __socklen_t *__capability";
@@ -3418,7 +3418,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct sockaddr *__restrict __capability";
+			p = "userland struct sockaddr *__capability";
 			break;
 		case 2:
 			p = "userland __socklen_t *__capability";
@@ -3434,7 +3434,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct sockaddr *__restrict __capability";
+			p = "userland struct sockaddr *__capability";
 			break;
 		case 2:
 			p = "userland __socklen_t *__capability";
@@ -7939,10 +7939,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct sockaddr *__restrict __capability";
+			p = "userland struct sockaddr *__capability";
 			break;
 		case 2:
-			p = "userland __socklen_t *__restrict __capability";
+			p = "userland __socklen_t *__capability";
 			break;
 		case 3:
 			p = "int";

@@ -389,12 +389,12 @@ CHERIABI_SYS_cheriabi_recvfrom_fill_uap(struct thread *td,
 	    __DECONST(void * __capability *, &uap->buf),
 	    1, CHERIABI_SYS_cheriabi_recvfrom_PTRMASK);
 
-	/* [4] struct sockaddr *__restrict __capability from */
+	/* [4] struct sockaddr *__capability from */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->from),
 	    4, CHERIABI_SYS_cheriabi_recvfrom_PTRMASK);
 
-	/* [5] __socklen_t *__restrict __capability fromlenaddr */
+	/* [5] __socklen_t *__capability fromlenaddr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->fromlenaddr),
 	    5, CHERIABI_SYS_cheriabi_recvfrom_PTRMASK);
@@ -412,7 +412,7 @@ CHERIABI_SYS_cheriabi_accept_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_accept_PTRMASK);
 	uap->s = cheri_getoffset(tmpcap);
 
-	/* [1] struct sockaddr *__restrict __capability name */
+	/* [1] struct sockaddr *__capability name */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->name),
 	    1, CHERIABI_SYS_cheriabi_accept_PTRMASK);
@@ -435,7 +435,7 @@ CHERIABI_SYS_cheriabi_getpeername_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_getpeername_PTRMASK);
 	uap->fdes = cheri_getoffset(tmpcap);
 
-	/* [1] struct sockaddr *__restrict __capability asa */
+	/* [1] struct sockaddr *__capability asa */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->asa),
 	    1, CHERIABI_SYS_cheriabi_getpeername_PTRMASK);
@@ -458,7 +458,7 @@ CHERIABI_SYS_cheriabi_getsockname_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_getsockname_PTRMASK);
 	uap->fdes = cheri_getoffset(tmpcap);
 
-	/* [1] struct sockaddr *__restrict __capability asa */
+	/* [1] struct sockaddr *__capability asa */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->asa),
 	    1, CHERIABI_SYS_cheriabi_getsockname_PTRMASK);
@@ -6561,12 +6561,12 @@ CHERIABI_SYS_cheriabi_accept4_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_accept4_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [1] struct sockaddr *__restrict __capability name */
+	/* [1] struct sockaddr *__capability name */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->name),
 	    1, CHERIABI_SYS_cheriabi_accept4_PTRMASK);
 
-	/* [2] __socklen_t *__restrict __capability anamelen */
+	/* [2] __socklen_t *__capability anamelen */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->anamelen),
 	    2, CHERIABI_SYS_cheriabi_accept4_PTRMASK);

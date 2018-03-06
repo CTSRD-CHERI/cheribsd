@@ -120,22 +120,22 @@ struct cheriabi_recvfrom_args {
 	char buf_l_[PADL_(void *__capability)]; void *__capability buf; char buf_r_[PADR_(void *__capability)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
-	char from_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability from; char from_r_[PADR_(struct sockaddr * __capability)];
-	char fromlenaddr_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability fromlenaddr; char fromlenaddr_r_[PADR_(__socklen_t * __capability)];
+	char from_l_[PADL_(struct sockaddr *__capability)]; struct sockaddr *__capability from; char from_r_[PADR_(struct sockaddr *__capability)];
+	char fromlenaddr_l_[PADL_(__socklen_t *__capability)]; __socklen_t *__capability fromlenaddr; char fromlenaddr_r_[PADR_(__socklen_t *__capability)];
 };
 struct cheriabi_accept_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char name_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability name; char name_r_[PADR_(struct sockaddr * __capability)];
+	char name_l_[PADL_(struct sockaddr *__capability)]; struct sockaddr *__capability name; char name_r_[PADR_(struct sockaddr *__capability)];
 	char anamelen_l_[PADL_(__socklen_t *__capability)]; __socklen_t *__capability anamelen; char anamelen_r_[PADR_(__socklen_t *__capability)];
 };
 struct cheriabi_getpeername_args {
 	char fdes_l_[PADL_(int)]; int fdes; char fdes_r_[PADR_(int)];
-	char asa_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability asa; char asa_r_[PADR_(struct sockaddr * __capability)];
+	char asa_l_[PADL_(struct sockaddr *__capability)]; struct sockaddr *__capability asa; char asa_r_[PADR_(struct sockaddr *__capability)];
 	char alen_l_[PADL_(__socklen_t *__capability)]; __socklen_t *__capability alen; char alen_r_[PADR_(__socklen_t *__capability)];
 };
 struct cheriabi_getsockname_args {
 	char fdes_l_[PADL_(int)]; int fdes; char fdes_r_[PADR_(int)];
-	char asa_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability asa; char asa_r_[PADR_(struct sockaddr * __capability)];
+	char asa_l_[PADL_(struct sockaddr *__capability)]; struct sockaddr *__capability asa; char asa_r_[PADR_(struct sockaddr *__capability)];
 	char alen_l_[PADL_(__socklen_t *__capability)]; __socklen_t *__capability alen; char alen_r_[PADR_(__socklen_t *__capability)];
 };
 struct cheriabi_access_args {
@@ -1288,8 +1288,8 @@ struct cheriabi_chflagsat_args {
 };
 struct cheriabi_accept4_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char name_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability name; char name_r_[PADR_(struct sockaddr * __capability)];
-	char anamelen_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability anamelen; char anamelen_r_[PADR_(__socklen_t * __capability)];
+	char name_l_[PADL_(struct sockaddr *__capability)]; struct sockaddr *__capability name; char name_r_[PADR_(struct sockaddr *__capability)];
+	char anamelen_l_[PADL_(__socklen_t *__capability)]; __socklen_t *__capability anamelen; char anamelen_r_[PADR_(__socklen_t *__capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct cheriabi_pipe2_args {
