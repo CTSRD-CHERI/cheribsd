@@ -249,12 +249,12 @@ SYS_STUB(25, uid_t, geteuid,
 )
 
 SYS_STUB(26, int, ptrace,
-    /* _protoargs */ (int req, pid_t pid, caddr_t  addr, int data),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, int req, pid_t pid, caddr_t  addr, int data),
-    /* _protoargs_err */ (__capability int *stub_errno, int req, pid_t pid, caddr_t  addr, int data),
-    /* _callargs */ (req, pid, addr, data),
+    /* _protoargs */ (int req, pid_t pid, char * addr, int data),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, int req, pid_t pid, char * __capability  addr, int data),
+    /* _protoargs_err */ (__capability int *stub_errno, int req, pid_t pid, char * __capability  addr, int data),
+    /* _callargs */ (req, pid, (__cheri_fromcap char *)addr, data),
     /* _callargs_chk */ (&ret, stub_errno, req, pid, addr, data),
-    /* _callargs_err */ (&errno, req, pid, addr, data),
+    /* _callargs_err */ (&errno, req, pid, (char *)addr, data),
     /* _localcheck */ {if (!(cheri_getperm(addr) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 

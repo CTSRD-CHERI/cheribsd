@@ -102,7 +102,7 @@ struct cheriabi_unmount_args {
 struct cheriabi_ptrace_args {
 	char req_l_[PADL_(int)]; int req; char req_r_[PADR_(int)];
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
-	char addr_l_[PADL_(caddr_t __capability)]; caddr_t __capability addr; char addr_r_[PADR_(caddr_t __capability)];
+	char addr_l_[PADL_(char *__capability)]; char *__capability addr; char addr_r_[PADR_(char *__capability)];
 	char data_l_[PADL_(int)]; int data; char data_r_[PADR_(int)];
 };
 struct cheriabi_recvmsg_args {

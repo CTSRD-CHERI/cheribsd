@@ -314,7 +314,7 @@ CHERIABI_SYS_cheriabi_ptrace_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_ptrace_PTRMASK);
 	uap->data = cheri_getoffset(tmpcap);
 
-	/* [2] caddr_t __capability addr */
+	/* [2] char *__capability addr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->addr),
 	    2, CHERIABI_SYS_cheriabi_ptrace_PTRMASK);
