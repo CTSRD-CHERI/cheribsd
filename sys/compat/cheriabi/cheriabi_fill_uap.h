@@ -2612,7 +2612,7 @@ CHERIABI_SYS_cheriabi_lio_listio_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_lio_listio_PTRMASK);
 	uap->nent = cheri_getoffset(tmpcap);
 
-	/* [1] struct aiocb_c *const __capability *__capability acb_list */
+	/* [1] struct aiocb_c *__capability const *__capability acb_list */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->acb_list),
 	    1, CHERIABI_SYS_cheriabi_lio_listio_PTRMASK);
@@ -2976,7 +2976,7 @@ CHERIABI_SYS_cheriabi_aio_suspend_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_aio_suspend_PTRMASK);
 	uap->nent = cheri_getoffset(tmpcap);
 
-	/* [0] struct aiocb_c *const __capability *__capability aiocbp */
+	/* [0] struct aiocb_c *__capability const *__capability aiocbp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->aiocbp),
 	    0, CHERIABI_SYS_cheriabi_aio_suspend_PTRMASK);

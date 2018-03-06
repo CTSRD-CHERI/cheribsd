@@ -510,7 +510,7 @@ struct cheriabi_aio_write_args {
 };
 struct cheriabi_lio_listio_args {
 	char mode_l_[PADL_(int)]; int mode; char mode_r_[PADR_(int)];
-	char acb_list_l_[PADL_(struct aiocb_c *const __capability *__capability)]; struct aiocb_c *const __capability *__capability acb_list; char acb_list_r_[PADR_(struct aiocb_c *const __capability *__capability)];
+	char acb_list_l_[PADL_(struct aiocb_c *__capability const *__capability)]; struct aiocb_c *__capability const *__capability acb_list; char acb_list_r_[PADR_(struct aiocb_c *__capability const *__capability)];
 	char nent_l_[PADL_(int)]; int nent; char nent_r_[PADR_(int)];
 	char sig_l_[PADL_(struct sigevent_c *__capability)]; struct sigevent_c *__capability sig; char sig_r_[PADR_(struct sigevent_c *__capability)];
 };
@@ -565,7 +565,7 @@ struct cheriabi_aio_return_args {
 	char aiocbp_l_[PADL_(struct aiocb_c *__capability)]; struct aiocb_c *__capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c *__capability)];
 };
 struct cheriabi_aio_suspend_args {
-	char aiocbp_l_[PADL_(struct aiocb_c *const __capability *__capability)]; struct aiocb_c *const __capability *__capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c *const __capability *__capability)];
+	char aiocbp_l_[PADL_(struct aiocb_c *__capability const *__capability)]; struct aiocb_c *__capability const *__capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c *__capability const *__capability)];
 	char nent_l_[PADL_(int)]; int nent; char nent_r_[PADR_(int)];
 	char timeout_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability timeout; char timeout_r_[PADR_(const struct timespec *__capability)];
 };

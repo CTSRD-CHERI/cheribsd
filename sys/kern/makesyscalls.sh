@@ -31,6 +31,7 @@ switchname="sysent"
 namesname="syscallnames"
 systrace="systrace_args.c"
 ptr_intptr_t_cast="intptr_t"
+ptr_qualified="*"
 
 # tmp files:
 sysaue="sysent.aue.$$"
@@ -142,6 +143,7 @@ sed -e '
 		capenabled_string = \"$capenabled\"
 		cap_prefix = \"$cap_prefix\"
 		ptr_intptr_t_cast = \"$ptr_intptr_t_cast\"
+		ptr_qualified = \"$ptr_qualified\"
 		"'
 
 		split(capenabled_string, capenabled, ",");
@@ -486,6 +488,9 @@ sed -e '
 			gsub(/_In[^ ]*[_)] /, "", argtype[argc]);
 			gsub(/_Out[^ ]*[_)] /, "", argtype[argc]);
 			gsub(/_Pagerange[^ ]*[_)] /, "", argtype[argc]);
+			# Allow pointers to be qualified
+			gsub(/\*/, ptr_qualified, argtype[argc]);
+			sub(/ $/, "", argtype[argc]);
 			argname[argc]=$f;
 			f += 2;			# skip name, and any comma
 		}
