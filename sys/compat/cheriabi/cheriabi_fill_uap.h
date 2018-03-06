@@ -48,7 +48,7 @@ CHERIABI_SYS_cheriabi_read_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_read_PTRMASK);
 	uap->nbyte = cheri_getoffset(tmpcap);
 
-	/* [1] void *__capability buf */
+	/* [1] void * __capability buf */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->buf),
 	    1, CHERIABI_SYS_cheriabi_read_PTRMASK);
@@ -70,7 +70,7 @@ CHERIABI_SYS_cheriabi_write_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_write_PTRMASK);
 	uap->nbyte = cheri_getoffset(tmpcap);
 
-	/* [1] const void *__capability buf */
+	/* [1] const void * __capability buf */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->buf),
 	    1, CHERIABI_SYS_cheriabi_write_PTRMASK);
@@ -92,7 +92,7 @@ CHERIABI_SYS_cheriabi_open_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_open_PTRMASK);
 	uap->mode = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_open_PTRMASK);
@@ -127,12 +127,12 @@ CHERIABI_SYS_cheriabi_wait4_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_wait4_PTRMASK);
 	uap->options = cheri_getoffset(tmpcap);
 
-	/* [1] int *__capability status */
+	/* [1] int * __capability status */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->status),
 	    1, CHERIABI_SYS_cheriabi_wait4_PTRMASK);
 
-	/* [3] struct rusage *__capability rusage */
+	/* [3] struct rusage * __capability rusage */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->rusage),
 	    3, CHERIABI_SYS_cheriabi_wait4_PTRMASK);
@@ -145,12 +145,12 @@ CHERIABI_SYS_cheriabi_link_fill_uap(struct thread *td,
     struct cheriabi_link_args *uap)
 {
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_link_PTRMASK);
 
-	/* [1] const char *__capability to */
+	/* [1] const char * __capability to */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->to),
 	    1, CHERIABI_SYS_cheriabi_link_PTRMASK);
@@ -163,7 +163,7 @@ CHERIABI_SYS_cheriabi_unlink_fill_uap(struct thread *td,
     struct cheriabi_unlink_args *uap)
 {
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_unlink_PTRMASK);
@@ -176,7 +176,7 @@ CHERIABI_SYS_cheriabi_chdir_fill_uap(struct thread *td,
     struct cheriabi_chdir_args *uap)
 {
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_chdir_PTRMASK);
@@ -207,7 +207,7 @@ CHERIABI_SYS_cheriabi_chmod_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_chmod_PTRMASK);
 	uap->mode = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_chmod_PTRMASK);
@@ -229,7 +229,7 @@ CHERIABI_SYS_cheriabi_chown_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_chown_PTRMASK);
 	uap->gid = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_chown_PTRMASK);
@@ -247,17 +247,17 @@ CHERIABI_SYS_cheriabi_mount_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_mount_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability type */
+	/* [0] const char * __capability type */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->type),
 	    0, CHERIABI_SYS_cheriabi_mount_PTRMASK);
 
-	/* [1] const char *__capability path */
+	/* [1] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    1, CHERIABI_SYS_cheriabi_mount_PTRMASK);
 
-	/* [3] void *__capability data */
+	/* [3] void * __capability data */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->data),
 	    3, CHERIABI_SYS_cheriabi_mount_PTRMASK);
@@ -275,7 +275,7 @@ CHERIABI_SYS_cheriabi_unmount_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_unmount_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_unmount_PTRMASK);
@@ -314,7 +314,7 @@ CHERIABI_SYS_cheriabi_ptrace_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_ptrace_PTRMASK);
 	uap->data = cheri_getoffset(tmpcap);
 
-	/* [2] char *__capability addr */
+	/* [2] char * __capability addr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->addr),
 	    2, CHERIABI_SYS_cheriabi_ptrace_PTRMASK);
@@ -336,7 +336,7 @@ CHERIABI_SYS_cheriabi_recvmsg_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_recvmsg_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [1] struct msghdr_c *__capability msg */
+	/* [1] struct msghdr_c * __capability msg */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->msg),
 	    1, CHERIABI_SYS_cheriabi_recvmsg_PTRMASK);
@@ -358,7 +358,7 @@ CHERIABI_SYS_cheriabi_sendmsg_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_sendmsg_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [1] const struct msghdr_c *__capability msg */
+	/* [1] const struct msghdr_c * __capability msg */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->msg),
 	    1, CHERIABI_SYS_cheriabi_sendmsg_PTRMASK);
@@ -384,17 +384,17 @@ CHERIABI_SYS_cheriabi_recvfrom_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_recvfrom_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [1] void *__capability buf */
+	/* [1] void * __capability buf */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->buf),
 	    1, CHERIABI_SYS_cheriabi_recvfrom_PTRMASK);
 
-	/* [4] struct sockaddr *__capability from */
+	/* [4] struct sockaddr * __capability from */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->from),
 	    4, CHERIABI_SYS_cheriabi_recvfrom_PTRMASK);
 
-	/* [5] __socklen_t *__capability fromlenaddr */
+	/* [5] __socklen_t * __capability fromlenaddr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->fromlenaddr),
 	    5, CHERIABI_SYS_cheriabi_recvfrom_PTRMASK);
@@ -412,12 +412,12 @@ CHERIABI_SYS_cheriabi_accept_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_accept_PTRMASK);
 	uap->s = cheri_getoffset(tmpcap);
 
-	/* [1] struct sockaddr *__capability name */
+	/* [1] struct sockaddr * __capability name */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->name),
 	    1, CHERIABI_SYS_cheriabi_accept_PTRMASK);
 
-	/* [2] __socklen_t *__capability anamelen */
+	/* [2] __socklen_t * __capability anamelen */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->anamelen),
 	    2, CHERIABI_SYS_cheriabi_accept_PTRMASK);
@@ -435,12 +435,12 @@ CHERIABI_SYS_cheriabi_getpeername_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_getpeername_PTRMASK);
 	uap->fdes = cheri_getoffset(tmpcap);
 
-	/* [1] struct sockaddr *__capability asa */
+	/* [1] struct sockaddr * __capability asa */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->asa),
 	    1, CHERIABI_SYS_cheriabi_getpeername_PTRMASK);
 
-	/* [2] __socklen_t *__capability alen */
+	/* [2] __socklen_t * __capability alen */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->alen),
 	    2, CHERIABI_SYS_cheriabi_getpeername_PTRMASK);
@@ -458,12 +458,12 @@ CHERIABI_SYS_cheriabi_getsockname_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_getsockname_PTRMASK);
 	uap->fdes = cheri_getoffset(tmpcap);
 
-	/* [1] struct sockaddr *__capability asa */
+	/* [1] struct sockaddr * __capability asa */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->asa),
 	    1, CHERIABI_SYS_cheriabi_getsockname_PTRMASK);
 
-	/* [2] __socklen_t *__capability alen */
+	/* [2] __socklen_t * __capability alen */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->alen),
 	    2, CHERIABI_SYS_cheriabi_getsockname_PTRMASK);
@@ -481,7 +481,7 @@ CHERIABI_SYS_cheriabi_access_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_access_PTRMASK);
 	uap->amode = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_access_PTRMASK);
@@ -499,7 +499,7 @@ CHERIABI_SYS_cheriabi_chflags_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_chflags_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_chflags_PTRMASK);
@@ -572,7 +572,7 @@ CHERIABI_SYS_cheriabi_profil_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_profil_PTRMASK);
 	uap->scale = cheri_getoffset(tmpcap);
 
-	/* [0] void *__capability samples */
+	/* [0] void * __capability samples */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->samples),
 	    0, CHERIABI_SYS_cheriabi_profil_PTRMASK);
@@ -598,7 +598,7 @@ CHERIABI_SYS_cheriabi_ktrace_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_ktrace_PTRMASK);
 	uap->pid = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability fname */
+	/* [0] const char * __capability fname */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->fname),
 	    0, CHERIABI_SYS_cheriabi_ktrace_PTRMASK);
@@ -616,7 +616,7 @@ CHERIABI_SYS_cheriabi_getlogin_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_getlogin_PTRMASK);
 	uap->namelen = cheri_getoffset(tmpcap);
 
-	/* [0] char *__capability namebuf */
+	/* [0] char * __capability namebuf */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->namebuf),
 	    0, CHERIABI_SYS_cheriabi_getlogin_PTRMASK);
@@ -629,7 +629,7 @@ CHERIABI_SYS_cheriabi_setlogin_fill_uap(struct thread *td,
     struct cheriabi_setlogin_args *uap)
 {
 
-	/* [0] const char *__capability namebuf */
+	/* [0] const char * __capability namebuf */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->namebuf),
 	    0, CHERIABI_SYS_cheriabi_setlogin_PTRMASK);
@@ -642,7 +642,7 @@ CHERIABI_SYS_cheriabi_acct_fill_uap(struct thread *td,
     struct cheriabi_acct_args *uap)
 {
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_acct_PTRMASK);
@@ -655,12 +655,12 @@ CHERIABI_SYS_cheriabi_sigaltstack_fill_uap(struct thread *td,
     struct cheriabi_sigaltstack_args *uap)
 {
 
-	/* [0] const cheriabi_stack_t *__capability ss */
+	/* [0] const cheriabi_stack_t * __capability ss */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->ss),
 	    0, CHERIABI_SYS_cheriabi_sigaltstack_PTRMASK);
 
-	/* [1] cheriabi_stack_t *__capability oss */
+	/* [1] cheriabi_stack_t * __capability oss */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->oss),
 	    1, CHERIABI_SYS_cheriabi_sigaltstack_PTRMASK);
@@ -682,7 +682,7 @@ CHERIABI_SYS_cheriabi_ioctl_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_ioctl_PTRMASK);
 	uap->com = cheri_getoffset(tmpcap);
 
-	/* [2] void *__capability data */
+	/* [2] void * __capability data */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->data),
 	    2, CHERIABI_SYS_cheriabi_ioctl_PTRMASK);
@@ -708,7 +708,7 @@ CHERIABI_SYS_cheriabi_revoke_fill_uap(struct thread *td,
     struct cheriabi_revoke_args *uap)
 {
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_revoke_PTRMASK);
@@ -721,12 +721,12 @@ CHERIABI_SYS_cheriabi_symlink_fill_uap(struct thread *td,
     struct cheriabi_symlink_args *uap)
 {
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_symlink_PTRMASK);
 
-	/* [1] const char *__capability link */
+	/* [1] const char * __capability link */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->link),
 	    1, CHERIABI_SYS_cheriabi_symlink_PTRMASK);
@@ -744,12 +744,12 @@ CHERIABI_SYS_cheriabi_readlink_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_readlink_PTRMASK);
 	uap->count = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_readlink_PTRMASK);
 
-	/* [1] char *__capability buf */
+	/* [1] char * __capability buf */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->buf),
 	    1, CHERIABI_SYS_cheriabi_readlink_PTRMASK);
@@ -762,17 +762,17 @@ CHERIABI_SYS_cheriabi_execve_fill_uap(struct thread *td,
     struct cheriabi_execve_args *uap)
 {
 
-	/* [0] const char *__capability fname */
+	/* [0] const char * __capability fname */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->fname),
 	    0, CHERIABI_SYS_cheriabi_execve_PTRMASK);
 
-	/* [1] void *__capability *__capability argv */
+	/* [1] void * __capability * __capability argv */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->argv),
 	    1, CHERIABI_SYS_cheriabi_execve_PTRMASK);
 
-	/* [2] void *__capability *__capability envv */
+	/* [2] void * __capability * __capability envv */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->envv),
 	    2, CHERIABI_SYS_cheriabi_execve_PTRMASK);
@@ -798,7 +798,7 @@ CHERIABI_SYS_cheriabi_chroot_fill_uap(struct thread *td,
     struct cheriabi_chroot_args *uap)
 {
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_chroot_PTRMASK);
@@ -820,7 +820,7 @@ CHERIABI_SYS_cheriabi_msync_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_msync_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [0] void *__capability addr */
+	/* [0] void * __capability addr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->addr),
 	    0, CHERIABI_SYS_cheriabi_msync_PTRMASK);
@@ -838,7 +838,7 @@ CHERIABI_SYS_cheriabi_munmap_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_munmap_PTRMASK);
 	uap->len = cheri_getoffset(tmpcap);
 
-	/* [0] void *__capability addr */
+	/* [0] void * __capability addr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->addr),
 	    0, CHERIABI_SYS_cheriabi_munmap_PTRMASK);
@@ -860,7 +860,7 @@ CHERIABI_SYS_cheriabi_mprotect_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_mprotect_PTRMASK);
 	uap->prot = cheri_getoffset(tmpcap);
 
-	/* [0] const void *__capability addr */
+	/* [0] const void * __capability addr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->addr),
 	    0, CHERIABI_SYS_cheriabi_mprotect_PTRMASK);
@@ -882,7 +882,7 @@ CHERIABI_SYS_cheriabi_madvise_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_madvise_PTRMASK);
 	uap->behav = cheri_getoffset(tmpcap);
 
-	/* [0] void *__capability addr */
+	/* [0] void * __capability addr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->addr),
 	    0, CHERIABI_SYS_cheriabi_madvise_PTRMASK);
@@ -900,12 +900,12 @@ CHERIABI_SYS_cheriabi_mincore_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_mincore_PTRMASK);
 	uap->len = cheri_getoffset(tmpcap);
 
-	/* [0] const void *__capability addr */
+	/* [0] const void * __capability addr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->addr),
 	    0, CHERIABI_SYS_cheriabi_mincore_PTRMASK);
 
-	/* [2] char *__capability vec */
+	/* [2] char * __capability vec */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->vec),
 	    2, CHERIABI_SYS_cheriabi_mincore_PTRMASK);
@@ -923,7 +923,7 @@ CHERIABI_SYS_cheriabi_getgroups_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_getgroups_PTRMASK);
 	uap->gidsetsize = cheri_getoffset(tmpcap);
 
-	/* [1] gid_t *__capability gidset */
+	/* [1] gid_t * __capability gidset */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->gidset),
 	    1, CHERIABI_SYS_cheriabi_getgroups_PTRMASK);
@@ -941,7 +941,7 @@ CHERIABI_SYS_cheriabi_setgroups_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_setgroups_PTRMASK);
 	uap->gidsetsize = cheri_getoffset(tmpcap);
 
-	/* [1] const gid_t *__capability gidset */
+	/* [1] const gid_t * __capability gidset */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->gidset),
 	    1, CHERIABI_SYS_cheriabi_setgroups_PTRMASK);
@@ -976,12 +976,12 @@ CHERIABI_SYS_cheriabi_setitimer_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_setitimer_PTRMASK);
 	uap->which = cheri_getoffset(tmpcap);
 
-	/* [1] const struct itimerval *__capability itv */
+	/* [1] const struct itimerval * __capability itv */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->itv),
 	    1, CHERIABI_SYS_cheriabi_setitimer_PTRMASK);
 
-	/* [2] struct itimerval *__capability oitv */
+	/* [2] struct itimerval * __capability oitv */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->oitv),
 	    2, CHERIABI_SYS_cheriabi_setitimer_PTRMASK);
@@ -994,7 +994,7 @@ CHERIABI_SYS_cheriabi_swapon_fill_uap(struct thread *td,
     struct cheriabi_swapon_args *uap)
 {
 
-	/* [0] const char *__capability name */
+	/* [0] const char * __capability name */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->name),
 	    0, CHERIABI_SYS_cheriabi_swapon_PTRMASK);
@@ -1012,7 +1012,7 @@ CHERIABI_SYS_cheriabi_getitimer_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_getitimer_PTRMASK);
 	uap->which = cheri_getoffset(tmpcap);
 
-	/* [1] struct itimerval *__capability itv */
+	/* [1] struct itimerval * __capability itv */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->itv),
 	    1, CHERIABI_SYS_cheriabi_getitimer_PTRMASK);
@@ -1069,22 +1069,22 @@ CHERIABI_SYS_cheriabi_select_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_select_PTRMASK);
 	uap->nd = cheri_getoffset(tmpcap);
 
-	/* [1] fd_set *__capability in */
+	/* [1] fd_set * __capability in */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->in),
 	    1, CHERIABI_SYS_cheriabi_select_PTRMASK);
 
-	/* [2] fd_set *__capability ou */
+	/* [2] fd_set * __capability ou */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->ou),
 	    2, CHERIABI_SYS_cheriabi_select_PTRMASK);
 
-	/* [3] fd_set *__capability ex */
+	/* [3] fd_set * __capability ex */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->ex),
 	    3, CHERIABI_SYS_cheriabi_select_PTRMASK);
 
-	/* [4] struct timeval *__capability tv */
+	/* [4] struct timeval * __capability tv */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->tv),
 	    4, CHERIABI_SYS_cheriabi_select_PTRMASK);
@@ -1161,7 +1161,7 @@ CHERIABI_SYS_cheriabi_connect_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_connect_PTRMASK);
 	uap->namelen = cheri_getoffset(tmpcap);
 
-	/* [1] const struct sockaddr *__capability name */
+	/* [1] const struct sockaddr * __capability name */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->name),
 	    1, CHERIABI_SYS_cheriabi_connect_PTRMASK);
@@ -1200,7 +1200,7 @@ CHERIABI_SYS_cheriabi_bind_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_bind_PTRMASK);
 	uap->namelen = cheri_getoffset(tmpcap);
 
-	/* [1] const struct sockaddr *__capability name */
+	/* [1] const struct sockaddr * __capability name */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->name),
 	    1, CHERIABI_SYS_cheriabi_bind_PTRMASK);
@@ -1230,7 +1230,7 @@ CHERIABI_SYS_cheriabi_setsockopt_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 4, CHERIABI_SYS_cheriabi_setsockopt_PTRMASK);
 	uap->valsize = cheri_getoffset(tmpcap);
 
-	/* [3] const void *__capability val */
+	/* [3] const void * __capability val */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->val),
 	    3, CHERIABI_SYS_cheriabi_setsockopt_PTRMASK);
@@ -1260,12 +1260,12 @@ CHERIABI_SYS_cheriabi_gettimeofday_fill_uap(struct thread *td,
     struct cheriabi_gettimeofday_args *uap)
 {
 
-	/* [0] struct timeval *__capability tp */
+	/* [0] struct timeval * __capability tp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->tp),
 	    0, CHERIABI_SYS_cheriabi_gettimeofday_PTRMASK);
 
-	/* [1] struct timezone *__capability tzp */
+	/* [1] struct timezone * __capability tzp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->tzp),
 	    1, CHERIABI_SYS_cheriabi_gettimeofday_PTRMASK);
@@ -1283,7 +1283,7 @@ CHERIABI_SYS_cheriabi_getrusage_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_getrusage_PTRMASK);
 	uap->who = cheri_getoffset(tmpcap);
 
-	/* [1] struct rusage *__capability rusage */
+	/* [1] struct rusage * __capability rusage */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->rusage),
 	    1, CHERIABI_SYS_cheriabi_getrusage_PTRMASK);
@@ -1309,12 +1309,12 @@ CHERIABI_SYS_cheriabi_getsockopt_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_getsockopt_PTRMASK);
 	uap->name = cheri_getoffset(tmpcap);
 
-	/* [3] void *__capability val */
+	/* [3] void * __capability val */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->val),
 	    3, CHERIABI_SYS_cheriabi_getsockopt_PTRMASK);
 
-	/* [4] __socklen_t *__capability avalsize */
+	/* [4] __socklen_t * __capability avalsize */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->avalsize),
 	    4, CHERIABI_SYS_cheriabi_getsockopt_PTRMASK);
@@ -1336,7 +1336,7 @@ CHERIABI_SYS_cheriabi_readv_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_readv_PTRMASK);
 	uap->iovcnt = cheri_getoffset(tmpcap);
 
-	/* [1] struct iovec_c *__capability iovp */
+	/* [1] struct iovec_c * __capability iovp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->iovp),
 	    1, CHERIABI_SYS_cheriabi_readv_PTRMASK);
@@ -1358,7 +1358,7 @@ CHERIABI_SYS_cheriabi_writev_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_writev_PTRMASK);
 	uap->iovcnt = cheri_getoffset(tmpcap);
 
-	/* [1] struct iovec_c *__capability iovp */
+	/* [1] struct iovec_c * __capability iovp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->iovp),
 	    1, CHERIABI_SYS_cheriabi_writev_PTRMASK);
@@ -1371,12 +1371,12 @@ CHERIABI_SYS_cheriabi_settimeofday_fill_uap(struct thread *td,
     struct cheriabi_settimeofday_args *uap)
 {
 
-	/* [0] const struct timeval *__capability tv */
+	/* [0] const struct timeval * __capability tv */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->tv),
 	    0, CHERIABI_SYS_cheriabi_settimeofday_PTRMASK);
 
-	/* [1] const struct timezone *__capability tzp */
+	/* [1] const struct timezone * __capability tzp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->tzp),
 	    1, CHERIABI_SYS_cheriabi_settimeofday_PTRMASK);
@@ -1461,12 +1461,12 @@ CHERIABI_SYS_cheriabi_rename_fill_uap(struct thread *td,
     struct cheriabi_rename_args *uap)
 {
 
-	/* [0] const char *__capability from */
+	/* [0] const char * __capability from */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->from),
 	    0, CHERIABI_SYS_cheriabi_rename_PTRMASK);
 
-	/* [1] const char *__capability to */
+	/* [1] const char * __capability to */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->to),
 	    1, CHERIABI_SYS_cheriabi_rename_PTRMASK);
@@ -1501,7 +1501,7 @@ CHERIABI_SYS_cheriabi_mkfifo_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_mkfifo_PTRMASK);
 	uap->mode = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_mkfifo_PTRMASK);
@@ -1531,12 +1531,12 @@ CHERIABI_SYS_cheriabi_sendto_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 5, CHERIABI_SYS_cheriabi_sendto_PTRMASK);
 	uap->tolen = cheri_getoffset(tmpcap);
 
-	/* [1] const void *__capability buf */
+	/* [1] const void * __capability buf */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->buf),
 	    1, CHERIABI_SYS_cheriabi_sendto_PTRMASK);
 
-	/* [4] const struct sockaddr *__capability to */
+	/* [4] const struct sockaddr * __capability to */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->to),
 	    4, CHERIABI_SYS_cheriabi_sendto_PTRMASK);
@@ -1579,7 +1579,7 @@ CHERIABI_SYS_cheriabi_socketpair_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_socketpair_PTRMASK);
 	uap->protocol = cheri_getoffset(tmpcap);
 
-	/* [3] int *__capability rsv */
+	/* [3] int * __capability rsv */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->rsv),
 	    3, CHERIABI_SYS_cheriabi_socketpair_PTRMASK);
@@ -1597,7 +1597,7 @@ CHERIABI_SYS_cheriabi_mkdir_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_mkdir_PTRMASK);
 	uap->mode = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_mkdir_PTRMASK);
@@ -1610,7 +1610,7 @@ CHERIABI_SYS_cheriabi_rmdir_fill_uap(struct thread *td,
     struct cheriabi_rmdir_args *uap)
 {
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_rmdir_PTRMASK);
@@ -1623,12 +1623,12 @@ CHERIABI_SYS_cheriabi_utimes_fill_uap(struct thread *td,
     struct cheriabi_utimes_args *uap)
 {
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_utimes_PTRMASK);
 
-	/* [1] const struct timeval *__capability tptr */
+	/* [1] const struct timeval * __capability tptr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->tptr),
 	    1, CHERIABI_SYS_cheriabi_utimes_PTRMASK);
@@ -1641,12 +1641,12 @@ CHERIABI_SYS_cheriabi_adjtime_fill_uap(struct thread *td,
     struct cheriabi_adjtime_args *uap)
 {
 
-	/* [0] const struct timeval *__capability delta */
+	/* [0] const struct timeval * __capability delta */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->delta),
 	    0, CHERIABI_SYS_cheriabi_adjtime_PTRMASK);
 
-	/* [1] struct timeval *__capability olddelta */
+	/* [1] struct timeval * __capability olddelta */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->olddelta),
 	    1, CHERIABI_SYS_cheriabi_adjtime_PTRMASK);
@@ -1668,12 +1668,12 @@ CHERIABI_SYS_cheriabi_quotactl_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_quotactl_PTRMASK);
 	uap->uid = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_quotactl_PTRMASK);
 
-	/* [3] void *__capability arg */
+	/* [3] void * __capability arg */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->arg),
 	    3, CHERIABI_SYS_cheriabi_quotactl_PTRMASK);
@@ -1699,7 +1699,7 @@ CHERIABI_SYS_cheriabi_nlm_syscall_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_nlm_syscall_PTRMASK);
 	uap->addr_count = cheri_getoffset(tmpcap);
 
-	/* [3] void *__capability *__capability addrs */
+	/* [3] void * __capability * __capability addrs */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->addrs),
 	    3, CHERIABI_SYS_cheriabi_nlm_syscall_PTRMASK);
@@ -1717,7 +1717,7 @@ CHERIABI_SYS_cheriabi_nfssvc_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_nfssvc_PTRMASK);
 	uap->flag = cheri_getoffset(tmpcap);
 
-	/* [1] void *__capability argp */
+	/* [1] void * __capability argp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->argp),
 	    1, CHERIABI_SYS_cheriabi_nfssvc_PTRMASK);
@@ -1730,12 +1730,12 @@ CHERIABI_SYS_cheriabi_lgetfh_fill_uap(struct thread *td,
     struct cheriabi_lgetfh_args *uap)
 {
 
-	/* [0] const char *__capability fname */
+	/* [0] const char * __capability fname */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->fname),
 	    0, CHERIABI_SYS_cheriabi_lgetfh_PTRMASK);
 
-	/* [1] struct fhandle *__capability fhp */
+	/* [1] struct fhandle * __capability fhp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->fhp),
 	    1, CHERIABI_SYS_cheriabi_lgetfh_PTRMASK);
@@ -1748,12 +1748,12 @@ CHERIABI_SYS_cheriabi_getfh_fill_uap(struct thread *td,
     struct cheriabi_getfh_args *uap)
 {
 
-	/* [0] const char *__capability fname */
+	/* [0] const char * __capability fname */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->fname),
 	    0, CHERIABI_SYS_cheriabi_getfh_PTRMASK);
 
-	/* [1] struct fhandle *__capability fhp */
+	/* [1] struct fhandle * __capability fhp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->fhp),
 	    1, CHERIABI_SYS_cheriabi_getfh_PTRMASK);
@@ -1771,7 +1771,7 @@ CHERIABI_SYS_cheriabi_sysarch_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_sysarch_PTRMASK);
 	uap->op = cheri_getoffset(tmpcap);
 
-	/* [1] char *__capability parms */
+	/* [1] char * __capability parms */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->parms),
 	    1, CHERIABI_SYS_cheriabi_sysarch_PTRMASK);
@@ -1793,7 +1793,7 @@ CHERIABI_SYS_cheriabi_rtprio_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_rtprio_PTRMASK);
 	uap->pid = cheri_getoffset(tmpcap);
 
-	/* [2] struct rtprio *__capability rtp */
+	/* [2] struct rtprio * __capability rtp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->rtp),
 	    2, CHERIABI_SYS_cheriabi_rtprio_PTRMASK);
@@ -1819,7 +1819,7 @@ CHERIABI_SYS_cheriabi_ntp_adjtime_fill_uap(struct thread *td,
     struct cheriabi_ntp_adjtime_args *uap)
 {
 
-	/* [0] struct timex *__capability tp */
+	/* [0] struct timex * __capability tp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->tp),
 	    0, CHERIABI_SYS_cheriabi_ntp_adjtime_PTRMASK);
@@ -1876,7 +1876,7 @@ CHERIABI_SYS_cheriabi_pathconf_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_pathconf_PTRMASK);
 	uap->name = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_pathconf_PTRMASK);
@@ -1911,7 +1911,7 @@ CHERIABI_SYS_cheriabi_getrlimit_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_getrlimit_PTRMASK);
 	uap->which = cheri_getoffset(tmpcap);
 
-	/* [1] struct rlimit *__capability rlp */
+	/* [1] struct rlimit * __capability rlp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->rlp),
 	    1, CHERIABI_SYS_cheriabi_getrlimit_PTRMASK);
@@ -1929,7 +1929,7 @@ CHERIABI_SYS_cheriabi_setrlimit_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_setrlimit_PTRMASK);
 	uap->which = cheri_getoffset(tmpcap);
 
-	/* [1] struct rlimit *__capability rlp */
+	/* [1] struct rlimit * __capability rlp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->rlp),
 	    1, CHERIABI_SYS_cheriabi_setrlimit_PTRMASK);
@@ -1951,22 +1951,22 @@ CHERIABI_SYS_cheriabi___sysctl_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 5, CHERIABI_SYS_cheriabi___sysctl_PTRMASK);
 	uap->newlen = cheri_getoffset(tmpcap);
 
-	/* [0] int *__capability name */
+	/* [0] int * __capability name */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->name),
 	    0, CHERIABI_SYS_cheriabi___sysctl_PTRMASK);
 
-	/* [2] void *__capability old */
+	/* [2] void * __capability old */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->old),
 	    2, CHERIABI_SYS_cheriabi___sysctl_PTRMASK);
 
-	/* [3] size_t *__capability oldlenp */
+	/* [3] size_t * __capability oldlenp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->oldlenp),
 	    3, CHERIABI_SYS_cheriabi___sysctl_PTRMASK);
 
-	/* [4] void *__capability new */
+	/* [4] void * __capability new */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->new),
 	    4, CHERIABI_SYS_cheriabi___sysctl_PTRMASK);
@@ -1984,7 +1984,7 @@ CHERIABI_SYS_cheriabi_mlock_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_mlock_PTRMASK);
 	uap->len = cheri_getoffset(tmpcap);
 
-	/* [0] const void *__capability addr */
+	/* [0] const void * __capability addr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->addr),
 	    0, CHERIABI_SYS_cheriabi_mlock_PTRMASK);
@@ -2002,7 +2002,7 @@ CHERIABI_SYS_cheriabi_munlock_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_munlock_PTRMASK);
 	uap->len = cheri_getoffset(tmpcap);
 
-	/* [0] const void *__capability addr */
+	/* [0] const void * __capability addr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->addr),
 	    0, CHERIABI_SYS_cheriabi_munlock_PTRMASK);
@@ -2015,7 +2015,7 @@ CHERIABI_SYS_cheriabi_undelete_fill_uap(struct thread *td,
     struct cheriabi_undelete_args *uap)
 {
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_undelete_PTRMASK);
@@ -2033,7 +2033,7 @@ CHERIABI_SYS_cheriabi_futimes_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_futimes_PTRMASK);
 	uap->fd = cheri_getoffset(tmpcap);
 
-	/* [1] const struct timeval *__capability tptr */
+	/* [1] const struct timeval * __capability tptr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->tptr),
 	    1, CHERIABI_SYS_cheriabi_futimes_PTRMASK);
@@ -2068,7 +2068,7 @@ CHERIABI_SYS_cheriabi_poll_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_poll_PTRMASK);
 	uap->timeout = cheri_getoffset(tmpcap);
 
-	/* [0] struct pollfd *__capability fds */
+	/* [0] struct pollfd * __capability fds */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->fds),
 	    0, CHERIABI_SYS_cheriabi_poll_PTRMASK);
@@ -2111,7 +2111,7 @@ CHERIABI_SYS_cheriabi_semop_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_semop_PTRMASK);
 	uap->nsops = cheri_getoffset(tmpcap);
 
-	/* [1] struct sembuf *__capability sops */
+	/* [1] struct sembuf * __capability sops */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->sops),
 	    1, CHERIABI_SYS_cheriabi_semop_PTRMASK);
@@ -2154,7 +2154,7 @@ CHERIABI_SYS_cheriabi_msgsnd_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_msgsnd_PTRMASK);
 	uap->msgflg = cheri_getoffset(tmpcap);
 
-	/* [1] void *__capability msgp */
+	/* [1] void * __capability msgp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->msgp),
 	    1, CHERIABI_SYS_cheriabi_msgsnd_PTRMASK);
@@ -2184,7 +2184,7 @@ CHERIABI_SYS_cheriabi_msgrcv_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 4, CHERIABI_SYS_cheriabi_msgrcv_PTRMASK);
 	uap->msgflg = cheri_getoffset(tmpcap);
 
-	/* [1] void *__capability msgp */
+	/* [1] void * __capability msgp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->msgp),
 	    1, CHERIABI_SYS_cheriabi_msgrcv_PTRMASK);
@@ -2206,7 +2206,7 @@ CHERIABI_SYS_cheriabi_shmat_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_shmat_PTRMASK);
 	uap->shmflg = cheri_getoffset(tmpcap);
 
-	/* [1] void *__capability shmaddr */
+	/* [1] void * __capability shmaddr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->shmaddr),
 	    1, CHERIABI_SYS_cheriabi_shmat_PTRMASK);
@@ -2219,7 +2219,7 @@ CHERIABI_SYS_cheriabi_shmdt_fill_uap(struct thread *td,
     struct cheriabi_shmdt_args *uap)
 {
 
-	/* [0] void *__capability shmaddr */
+	/* [0] void * __capability shmaddr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->shmaddr),
 	    0, CHERIABI_SYS_cheriabi_shmdt_PTRMASK);
@@ -2258,7 +2258,7 @@ CHERIABI_SYS_cheriabi_clock_gettime_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_clock_gettime_PTRMASK);
 	uap->clock_id = cheri_getoffset(tmpcap);
 
-	/* [1] struct timespec *__capability tp */
+	/* [1] struct timespec * __capability tp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->tp),
 	    1, CHERIABI_SYS_cheriabi_clock_gettime_PTRMASK);
@@ -2276,7 +2276,7 @@ CHERIABI_SYS_cheriabi_clock_settime_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_clock_settime_PTRMASK);
 	uap->clock_id = cheri_getoffset(tmpcap);
 
-	/* [1] const struct timespec *__capability tp */
+	/* [1] const struct timespec * __capability tp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->tp),
 	    1, CHERIABI_SYS_cheriabi_clock_settime_PTRMASK);
@@ -2294,7 +2294,7 @@ CHERIABI_SYS_cheriabi_clock_getres_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_clock_getres_PTRMASK);
 	uap->clock_id = cheri_getoffset(tmpcap);
 
-	/* [1] struct timespec *__capability tp */
+	/* [1] struct timespec * __capability tp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->tp),
 	    1, CHERIABI_SYS_cheriabi_clock_getres_PTRMASK);
@@ -2312,12 +2312,12 @@ CHERIABI_SYS_cheriabi_ktimer_create_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_ktimer_create_PTRMASK);
 	uap->clock_id = cheri_getoffset(tmpcap);
 
-	/* [1] struct sigevent_c *__capability evp */
+	/* [1] struct sigevent_c * __capability evp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->evp),
 	    1, CHERIABI_SYS_cheriabi_ktimer_create_PTRMASK);
 
-	/* [2] int *__capability timerid */
+	/* [2] int * __capability timerid */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->timerid),
 	    2, CHERIABI_SYS_cheriabi_ktimer_create_PTRMASK);
@@ -2352,12 +2352,12 @@ CHERIABI_SYS_cheriabi_ktimer_settime_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_ktimer_settime_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [2] const struct itimerspec *__capability value */
+	/* [2] const struct itimerspec * __capability value */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->value),
 	    2, CHERIABI_SYS_cheriabi_ktimer_settime_PTRMASK);
 
-	/* [3] struct itimerspec *__capability ovalue */
+	/* [3] struct itimerspec * __capability ovalue */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->ovalue),
 	    3, CHERIABI_SYS_cheriabi_ktimer_settime_PTRMASK);
@@ -2375,7 +2375,7 @@ CHERIABI_SYS_cheriabi_ktimer_gettime_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_ktimer_gettime_PTRMASK);
 	uap->timerid = cheri_getoffset(tmpcap);
 
-	/* [1] struct itimerspec *__capability value */
+	/* [1] struct itimerspec * __capability value */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->value),
 	    1, CHERIABI_SYS_cheriabi_ktimer_gettime_PTRMASK);
@@ -2401,12 +2401,12 @@ CHERIABI_SYS_cheriabi_nanosleep_fill_uap(struct thread *td,
     struct cheriabi_nanosleep_args *uap)
 {
 
-	/* [0] const struct timespec *__capability rqtp */
+	/* [0] const struct timespec * __capability rqtp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->rqtp),
 	    0, CHERIABI_SYS_cheriabi_nanosleep_PTRMASK);
 
-	/* [1] struct timespec *__capability rmtp */
+	/* [1] struct timespec * __capability rmtp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->rmtp),
 	    1, CHERIABI_SYS_cheriabi_nanosleep_PTRMASK);
@@ -2419,7 +2419,7 @@ CHERIABI_SYS_cheriabi_ffclock_getcounter_fill_uap(struct thread *td,
     struct cheriabi_ffclock_getcounter_args *uap)
 {
 
-	/* [0] ffcounter *__capability ffcount */
+	/* [0] ffcounter * __capability ffcount */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->ffcount),
 	    0, CHERIABI_SYS_cheriabi_ffclock_getcounter_PTRMASK);
@@ -2432,7 +2432,7 @@ CHERIABI_SYS_cheriabi_ffclock_setestimate_fill_uap(struct thread *td,
     struct cheriabi_ffclock_setestimate_args *uap)
 {
 
-	/* [0] struct ffclock_estimate *__capability cest */
+	/* [0] struct ffclock_estimate * __capability cest */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->cest),
 	    0, CHERIABI_SYS_cheriabi_ffclock_setestimate_PTRMASK);
@@ -2445,7 +2445,7 @@ CHERIABI_SYS_cheriabi_ffclock_getestimate_fill_uap(struct thread *td,
     struct cheriabi_ffclock_getestimate_args *uap)
 {
 
-	/* [0] struct ffclock_estimate *__capability cest */
+	/* [0] struct ffclock_estimate * __capability cest */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->cest),
 	    0, CHERIABI_SYS_cheriabi_ffclock_getestimate_PTRMASK);
@@ -2467,12 +2467,12 @@ CHERIABI_SYS_cheriabi_clock_nanosleep_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_clock_nanosleep_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [2] const struct timespec *__capability rqtp */
+	/* [2] const struct timespec * __capability rqtp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->rqtp),
 	    2, CHERIABI_SYS_cheriabi_clock_nanosleep_PTRMASK);
 
-	/* [3] struct timespec *__capability rmtp */
+	/* [3] struct timespec * __capability rmtp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->rmtp),
 	    3, CHERIABI_SYS_cheriabi_clock_nanosleep_PTRMASK);
@@ -2494,7 +2494,7 @@ CHERIABI_SYS_cheriabi_clock_getcpuclockid2_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_clock_getcpuclockid2_PTRMASK);
 	uap->which = cheri_getoffset(tmpcap);
 
-	/* [2] clockid_t *__capability clock_id */
+	/* [2] clockid_t * __capability clock_id */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->clock_id),
 	    2, CHERIABI_SYS_cheriabi_clock_getcpuclockid2_PTRMASK);
@@ -2507,7 +2507,7 @@ CHERIABI_SYS_cheriabi_ntp_gettime_fill_uap(struct thread *td,
     struct cheriabi_ntp_gettime_args *uap)
 {
 
-	/* [0] struct ntptimeval *__capability ntvp */
+	/* [0] struct ntptimeval * __capability ntvp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->ntvp),
 	    0, CHERIABI_SYS_cheriabi_ntp_gettime_PTRMASK);
@@ -2529,7 +2529,7 @@ CHERIABI_SYS_cheriabi_minherit_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_minherit_PTRMASK);
 	uap->inherit = cheri_getoffset(tmpcap);
 
-	/* [0] void *__capability addr */
+	/* [0] void * __capability addr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->addr),
 	    0, CHERIABI_SYS_cheriabi_minherit_PTRMASK);
@@ -2564,7 +2564,7 @@ CHERIABI_SYS_cheriabi_lchown_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_lchown_PTRMASK);
 	uap->gid = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_lchown_PTRMASK);
@@ -2577,7 +2577,7 @@ CHERIABI_SYS_cheriabi_aio_read_fill_uap(struct thread *td,
     struct cheriabi_aio_read_args *uap)
 {
 
-	/* [0] struct aiocb_c *__capability aiocbp */
+	/* [0] struct aiocb_c * __capability aiocbp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->aiocbp),
 	    0, CHERIABI_SYS_cheriabi_aio_read_PTRMASK);
@@ -2590,7 +2590,7 @@ CHERIABI_SYS_cheriabi_aio_write_fill_uap(struct thread *td,
     struct cheriabi_aio_write_args *uap)
 {
 
-	/* [0] struct aiocb_c *__capability aiocbp */
+	/* [0] struct aiocb_c * __capability aiocbp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->aiocbp),
 	    0, CHERIABI_SYS_cheriabi_aio_write_PTRMASK);
@@ -2612,12 +2612,12 @@ CHERIABI_SYS_cheriabi_lio_listio_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_lio_listio_PTRMASK);
 	uap->nent = cheri_getoffset(tmpcap);
 
-	/* [1] struct aiocb_c *__capability const *__capability acb_list */
+	/* [1] struct aiocb_c * __capability const * __capability acb_list */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->acb_list),
 	    1, CHERIABI_SYS_cheriabi_lio_listio_PTRMASK);
 
-	/* [3] struct sigevent_c *__capability sig */
+	/* [3] struct sigevent_c * __capability sig */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->sig),
 	    3, CHERIABI_SYS_cheriabi_lio_listio_PTRMASK);
@@ -2639,12 +2639,12 @@ CHERIABI_SYS_cheriabi_kbounce_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_kbounce_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [0] const void *__capability src */
+	/* [0] const void * __capability src */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->src),
 	    0, CHERIABI_SYS_cheriabi_kbounce_PTRMASK);
 
-	/* [1] void *__capability dst */
+	/* [1] void * __capability dst */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->dst),
 	    1, CHERIABI_SYS_cheriabi_kbounce_PTRMASK);
@@ -2662,7 +2662,7 @@ CHERIABI_SYS_cheriabi_lchmod_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_lchmod_PTRMASK);
 	uap->mode = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_lchmod_PTRMASK);
@@ -2675,12 +2675,12 @@ CHERIABI_SYS_cheriabi_lutimes_fill_uap(struct thread *td,
     struct cheriabi_lutimes_args *uap)
 {
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_lutimes_PTRMASK);
 
-	/* [1] const struct timeval *__capability tptr */
+	/* [1] const struct timeval * __capability tptr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->tptr),
 	    1, CHERIABI_SYS_cheriabi_lutimes_PTRMASK);
@@ -2706,7 +2706,7 @@ CHERIABI_SYS_cheriabi_preadv_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_preadv_PTRMASK);
 	uap->offset = cheri_getoffset(tmpcap);
 
-	/* [1] struct iovec_c *__capability iovp */
+	/* [1] struct iovec_c * __capability iovp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->iovp),
 	    1, CHERIABI_SYS_cheriabi_preadv_PTRMASK);
@@ -2732,7 +2732,7 @@ CHERIABI_SYS_cheriabi_pwritev_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_pwritev_PTRMASK);
 	uap->offset = cheri_getoffset(tmpcap);
 
-	/* [1] struct iovec_c *__capability iovp */
+	/* [1] struct iovec_c * __capability iovp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->iovp),
 	    1, CHERIABI_SYS_cheriabi_pwritev_PTRMASK);
@@ -2750,7 +2750,7 @@ CHERIABI_SYS_cheriabi_fhopen_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_fhopen_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [0] const struct fhandle *__capability u_fhp */
+	/* [0] const struct fhandle * __capability u_fhp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->u_fhp),
 	    0, CHERIABI_SYS_cheriabi_fhopen_PTRMASK);
@@ -2781,7 +2781,7 @@ CHERIABI_SYS_cheriabi_modstat_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_modstat_PTRMASK);
 	uap->modid = cheri_getoffset(tmpcap);
 
-	/* [1] struct module_stat *__capability stat */
+	/* [1] struct module_stat * __capability stat */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->stat),
 	    1, CHERIABI_SYS_cheriabi_modstat_PTRMASK);
@@ -2807,7 +2807,7 @@ CHERIABI_SYS_cheriabi_modfind_fill_uap(struct thread *td,
     struct cheriabi_modfind_args *uap)
 {
 
-	/* [0] const char *__capability name */
+	/* [0] const char * __capability name */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->name),
 	    0, CHERIABI_SYS_cheriabi_modfind_PTRMASK);
@@ -2820,7 +2820,7 @@ CHERIABI_SYS_cheriabi_kldload_fill_uap(struct thread *td,
     struct cheriabi_kldload_args *uap)
 {
 
-	/* [0] const char *__capability file */
+	/* [0] const char * __capability file */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->file),
 	    0, CHERIABI_SYS_cheriabi_kldload_PTRMASK);
@@ -2846,7 +2846,7 @@ CHERIABI_SYS_cheriabi_kldfind_fill_uap(struct thread *td,
     struct cheriabi_kldfind_args *uap)
 {
 
-	/* [0] const char *__capability file */
+	/* [0] const char * __capability file */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->file),
 	    0, CHERIABI_SYS_cheriabi_kldfind_PTRMASK);
@@ -2877,7 +2877,7 @@ CHERIABI_SYS_cheriabi_kldstat_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_kldstat_PTRMASK);
 	uap->fileid = cheri_getoffset(tmpcap);
 
-	/* [1] struct kld_file_stat_c *__capability stat */
+	/* [1] struct kld_file_stat_c * __capability stat */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->stat),
 	    1, CHERIABI_SYS_cheriabi_kldstat_PTRMASK);
@@ -2958,7 +2958,7 @@ CHERIABI_SYS_cheriabi_aio_return_fill_uap(struct thread *td,
     struct cheriabi_aio_return_args *uap)
 {
 
-	/* [0] struct aiocb_c *__capability aiocbp */
+	/* [0] struct aiocb_c * __capability aiocbp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->aiocbp),
 	    0, CHERIABI_SYS_cheriabi_aio_return_PTRMASK);
@@ -2976,12 +2976,12 @@ CHERIABI_SYS_cheriabi_aio_suspend_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_aio_suspend_PTRMASK);
 	uap->nent = cheri_getoffset(tmpcap);
 
-	/* [0] struct aiocb_c *__capability const *__capability aiocbp */
+	/* [0] struct aiocb_c * __capability const * __capability aiocbp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->aiocbp),
 	    0, CHERIABI_SYS_cheriabi_aio_suspend_PTRMASK);
 
-	/* [2] const struct timespec *__capability timeout */
+	/* [2] const struct timespec * __capability timeout */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->timeout),
 	    2, CHERIABI_SYS_cheriabi_aio_suspend_PTRMASK);
@@ -2999,7 +2999,7 @@ CHERIABI_SYS_cheriabi_aio_cancel_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_aio_cancel_PTRMASK);
 	uap->fd = cheri_getoffset(tmpcap);
 
-	/* [1] struct aiocb_c *__capability aiocbp */
+	/* [1] struct aiocb_c * __capability aiocbp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->aiocbp),
 	    1, CHERIABI_SYS_cheriabi_aio_cancel_PTRMASK);
@@ -3012,7 +3012,7 @@ CHERIABI_SYS_cheriabi_aio_error_fill_uap(struct thread *td,
     struct cheriabi_aio_error_args *uap)
 {
 
-	/* [0] struct aiocb_c *__capability aiocbp */
+	/* [0] struct aiocb_c * __capability aiocbp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->aiocbp),
 	    0, CHERIABI_SYS_cheriabi_aio_error_PTRMASK);
@@ -3043,7 +3043,7 @@ CHERIABI_SYS_cheriabi___getcwd_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___getcwd_PTRMASK);
 	uap->buflen = cheri_getoffset(tmpcap);
 
-	/* [0] char *__capability buf */
+	/* [0] char * __capability buf */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->buf),
 	    0, CHERIABI_SYS_cheriabi___getcwd_PTRMASK);
@@ -3061,7 +3061,7 @@ CHERIABI_SYS_cheriabi_sched_setparam_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_sched_setparam_PTRMASK);
 	uap->pid = cheri_getoffset(tmpcap);
 
-	/* [1] const struct sched_param *__capability param */
+	/* [1] const struct sched_param * __capability param */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->param),
 	    1, CHERIABI_SYS_cheriabi_sched_setparam_PTRMASK);
@@ -3079,7 +3079,7 @@ CHERIABI_SYS_cheriabi_sched_getparam_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_sched_getparam_PTRMASK);
 	uap->pid = cheri_getoffset(tmpcap);
 
-	/* [1] struct sched_param *__capability param */
+	/* [1] struct sched_param * __capability param */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->param),
 	    1, CHERIABI_SYS_cheriabi_sched_getparam_PTRMASK);
@@ -3101,7 +3101,7 @@ CHERIABI_SYS_cheriabi_sched_setscheduler_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_sched_setscheduler_PTRMASK);
 	uap->policy = cheri_getoffset(tmpcap);
 
-	/* [2] const struct sched_param *__capability param */
+	/* [2] const struct sched_param * __capability param */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->param),
 	    2, CHERIABI_SYS_cheriabi_sched_setscheduler_PTRMASK);
@@ -3158,7 +3158,7 @@ CHERIABI_SYS_cheriabi_sched_rr_get_interval_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_sched_rr_get_interval_PTRMASK);
 	uap->pid = cheri_getoffset(tmpcap);
 
-	/* [1] struct timespec *__capability interval */
+	/* [1] struct timespec * __capability interval */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->interval),
 	    1, CHERIABI_SYS_cheriabi_sched_rr_get_interval_PTRMASK);
@@ -3176,7 +3176,7 @@ CHERIABI_SYS_cheriabi_utrace_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_utrace_PTRMASK);
 	uap->len = cheri_getoffset(tmpcap);
 
-	/* [0] const void *__capability addr */
+	/* [0] const void * __capability addr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->addr),
 	    0, CHERIABI_SYS_cheriabi_utrace_PTRMASK);
@@ -3198,7 +3198,7 @@ CHERIABI_SYS_cheriabi_kldsym_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_kldsym_PTRMASK);
 	uap->cmd = cheri_getoffset(tmpcap);
 
-	/* [2] struct kld_sym_lookup_c *__capability data */
+	/* [2] struct kld_sym_lookup_c * __capability data */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->data),
 	    2, CHERIABI_SYS_cheriabi_kldsym_PTRMASK);
@@ -3211,7 +3211,7 @@ CHERIABI_SYS_cheriabi_jail_fill_uap(struct thread *td,
     struct cheriabi_jail_args *uap)
 {
 
-	/* [0] struct jail_c *__capability jailp */
+	/* [0] struct jail_c * __capability jailp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->jailp),
 	    0, CHERIABI_SYS_cheriabi_jail_PTRMASK);
@@ -3229,12 +3229,12 @@ CHERIABI_SYS_cheriabi_sigprocmask_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_sigprocmask_PTRMASK);
 	uap->how = cheri_getoffset(tmpcap);
 
-	/* [1] const sigset_t *__capability set */
+	/* [1] const sigset_t * __capability set */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->set),
 	    1, CHERIABI_SYS_cheriabi_sigprocmask_PTRMASK);
 
-	/* [2] sigset_t *__capability oset */
+	/* [2] sigset_t * __capability oset */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->oset),
 	    2, CHERIABI_SYS_cheriabi_sigprocmask_PTRMASK);
@@ -3247,7 +3247,7 @@ CHERIABI_SYS_cheriabi_sigsuspend_fill_uap(struct thread *td,
     struct cheriabi_sigsuspend_args *uap)
 {
 
-	/* [0] const sigset_t *__capability sigmask */
+	/* [0] const sigset_t * __capability sigmask */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->sigmask),
 	    0, CHERIABI_SYS_cheriabi_sigsuspend_PTRMASK);
@@ -3260,7 +3260,7 @@ CHERIABI_SYS_cheriabi_sigpending_fill_uap(struct thread *td,
     struct cheriabi_sigpending_args *uap)
 {
 
-	/* [0] sigset_t *__capability set */
+	/* [0] sigset_t * __capability set */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->set),
 	    0, CHERIABI_SYS_cheriabi_sigpending_PTRMASK);
@@ -3273,17 +3273,17 @@ CHERIABI_SYS_cheriabi_sigtimedwait_fill_uap(struct thread *td,
     struct cheriabi_sigtimedwait_args *uap)
 {
 
-	/* [0] const sigset_t *__capability set */
+	/* [0] const sigset_t * __capability set */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->set),
 	    0, CHERIABI_SYS_cheriabi_sigtimedwait_PTRMASK);
 
-	/* [1] struct siginfo_c *__capability info */
+	/* [1] struct siginfo_c * __capability info */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->info),
 	    1, CHERIABI_SYS_cheriabi_sigtimedwait_PTRMASK);
 
-	/* [2] const struct timespec *__capability timeout */
+	/* [2] const struct timespec * __capability timeout */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->timeout),
 	    2, CHERIABI_SYS_cheriabi_sigtimedwait_PTRMASK);
@@ -3296,12 +3296,12 @@ CHERIABI_SYS_cheriabi_sigwaitinfo_fill_uap(struct thread *td,
     struct cheriabi_sigwaitinfo_args *uap)
 {
 
-	/* [0] const sigset_t *__capability set */
+	/* [0] const sigset_t * __capability set */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->set),
 	    0, CHERIABI_SYS_cheriabi_sigwaitinfo_PTRMASK);
 
-	/* [1] struct siginfo_c *__capability info */
+	/* [1] struct siginfo_c * __capability info */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->info),
 	    1, CHERIABI_SYS_cheriabi_sigwaitinfo_PTRMASK);
@@ -3319,12 +3319,12 @@ CHERIABI_SYS_cheriabi___acl_get_file_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___acl_get_file_PTRMASK);
 	uap->type = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi___acl_get_file_PTRMASK);
 
-	/* [2] struct acl *__capability aclp */
+	/* [2] struct acl * __capability aclp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->aclp),
 	    2, CHERIABI_SYS_cheriabi___acl_get_file_PTRMASK);
@@ -3342,12 +3342,12 @@ CHERIABI_SYS_cheriabi___acl_set_file_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___acl_set_file_PTRMASK);
 	uap->type = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi___acl_set_file_PTRMASK);
 
-	/* [2] struct acl *__capability aclp */
+	/* [2] struct acl * __capability aclp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->aclp),
 	    2, CHERIABI_SYS_cheriabi___acl_set_file_PTRMASK);
@@ -3369,7 +3369,7 @@ CHERIABI_SYS_cheriabi___acl_get_fd_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___acl_get_fd_PTRMASK);
 	uap->type = cheri_getoffset(tmpcap);
 
-	/* [2] struct acl *__capability aclp */
+	/* [2] struct acl * __capability aclp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->aclp),
 	    2, CHERIABI_SYS_cheriabi___acl_get_fd_PTRMASK);
@@ -3391,7 +3391,7 @@ CHERIABI_SYS_cheriabi___acl_set_fd_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___acl_set_fd_PTRMASK);
 	uap->type = cheri_getoffset(tmpcap);
 
-	/* [2] struct acl *__capability aclp */
+	/* [2] struct acl * __capability aclp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->aclp),
 	    2, CHERIABI_SYS_cheriabi___acl_set_fd_PTRMASK);
@@ -3409,7 +3409,7 @@ CHERIABI_SYS_cheriabi___acl_delete_file_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___acl_delete_file_PTRMASK);
 	uap->type = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi___acl_delete_file_PTRMASK);
@@ -3444,12 +3444,12 @@ CHERIABI_SYS_cheriabi___acl_aclcheck_file_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___acl_aclcheck_file_PTRMASK);
 	uap->type = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi___acl_aclcheck_file_PTRMASK);
 
-	/* [2] struct acl *__capability aclp */
+	/* [2] struct acl * __capability aclp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->aclp),
 	    2, CHERIABI_SYS_cheriabi___acl_aclcheck_file_PTRMASK);
@@ -3471,7 +3471,7 @@ CHERIABI_SYS_cheriabi___acl_aclcheck_fd_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___acl_aclcheck_fd_PTRMASK);
 	uap->type = cheri_getoffset(tmpcap);
 
-	/* [2] struct acl *__capability aclp */
+	/* [2] struct acl * __capability aclp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->aclp),
 	    2, CHERIABI_SYS_cheriabi___acl_aclcheck_fd_PTRMASK);
@@ -3493,17 +3493,17 @@ CHERIABI_SYS_cheriabi_extattrctl_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_extattrctl_PTRMASK);
 	uap->attrnamespace = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_extattrctl_PTRMASK);
 
-	/* [2] const char *__capability filename */
+	/* [2] const char * __capability filename */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->filename),
 	    2, CHERIABI_SYS_cheriabi_extattrctl_PTRMASK);
 
-	/* [4] const char *__capability attrname */
+	/* [4] const char * __capability attrname */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->attrname),
 	    4, CHERIABI_SYS_cheriabi_extattrctl_PTRMASK);
@@ -3525,17 +3525,17 @@ CHERIABI_SYS_cheriabi_extattr_set_file_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 4, CHERIABI_SYS_cheriabi_extattr_set_file_PTRMASK);
 	uap->nbytes = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_extattr_set_file_PTRMASK);
 
-	/* [2] const char *__capability attrname */
+	/* [2] const char * __capability attrname */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->attrname),
 	    2, CHERIABI_SYS_cheriabi_extattr_set_file_PTRMASK);
 
-	/* [3] void *__capability data */
+	/* [3] void * __capability data */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->data),
 	    3, CHERIABI_SYS_cheriabi_extattr_set_file_PTRMASK);
@@ -3557,17 +3557,17 @@ CHERIABI_SYS_cheriabi_extattr_get_file_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 4, CHERIABI_SYS_cheriabi_extattr_get_file_PTRMASK);
 	uap->nbytes = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_extattr_get_file_PTRMASK);
 
-	/* [2] const char *__capability attrname */
+	/* [2] const char * __capability attrname */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->attrname),
 	    2, CHERIABI_SYS_cheriabi_extattr_get_file_PTRMASK);
 
-	/* [3] void *__capability data */
+	/* [3] void * __capability data */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->data),
 	    3, CHERIABI_SYS_cheriabi_extattr_get_file_PTRMASK);
@@ -3585,12 +3585,12 @@ CHERIABI_SYS_cheriabi_extattr_delete_file_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_extattr_delete_file_PTRMASK);
 	uap->attrnamespace = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_extattr_delete_file_PTRMASK);
 
-	/* [2] const char *__capability attrname */
+	/* [2] const char * __capability attrname */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->attrname),
 	    2, CHERIABI_SYS_cheriabi_extattr_delete_file_PTRMASK);
@@ -3603,12 +3603,12 @@ CHERIABI_SYS_cheriabi_aio_waitcomplete_fill_uap(struct thread *td,
     struct cheriabi_aio_waitcomplete_args *uap)
 {
 
-	/* [0] struct aiocb_c *__capability *__capability aiocbp */
+	/* [0] struct aiocb_c * __capability * __capability aiocbp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->aiocbp),
 	    0, CHERIABI_SYS_cheriabi_aio_waitcomplete_PTRMASK);
 
-	/* [1] struct timespec *__capability timeout */
+	/* [1] struct timespec * __capability timeout */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->timeout),
 	    1, CHERIABI_SYS_cheriabi_aio_waitcomplete_PTRMASK);
@@ -3621,17 +3621,17 @@ CHERIABI_SYS_cheriabi_getresuid_fill_uap(struct thread *td,
     struct cheriabi_getresuid_args *uap)
 {
 
-	/* [0] uid_t *__capability ruid */
+	/* [0] uid_t * __capability ruid */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->ruid),
 	    0, CHERIABI_SYS_cheriabi_getresuid_PTRMASK);
 
-	/* [1] uid_t *__capability euid */
+	/* [1] uid_t * __capability euid */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->euid),
 	    1, CHERIABI_SYS_cheriabi_getresuid_PTRMASK);
 
-	/* [2] uid_t *__capability suid */
+	/* [2] uid_t * __capability suid */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->suid),
 	    2, CHERIABI_SYS_cheriabi_getresuid_PTRMASK);
@@ -3644,17 +3644,17 @@ CHERIABI_SYS_cheriabi_getresgid_fill_uap(struct thread *td,
     struct cheriabi_getresgid_args *uap)
 {
 
-	/* [0] gid_t *__capability rgid */
+	/* [0] gid_t * __capability rgid */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->rgid),
 	    0, CHERIABI_SYS_cheriabi_getresgid_PTRMASK);
 
-	/* [1] gid_t *__capability egid */
+	/* [1] gid_t * __capability egid */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->egid),
 	    1, CHERIABI_SYS_cheriabi_getresgid_PTRMASK);
 
-	/* [2] gid_t *__capability sgid */
+	/* [2] gid_t * __capability sgid */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->sgid),
 	    2, CHERIABI_SYS_cheriabi_getresgid_PTRMASK);
@@ -3680,12 +3680,12 @@ CHERIABI_SYS_cheriabi_extattr_set_fd_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 4, CHERIABI_SYS_cheriabi_extattr_set_fd_PTRMASK);
 	uap->nbytes = cheri_getoffset(tmpcap);
 
-	/* [2] const char *__capability attrname */
+	/* [2] const char * __capability attrname */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->attrname),
 	    2, CHERIABI_SYS_cheriabi_extattr_set_fd_PTRMASK);
 
-	/* [3] void *__capability data */
+	/* [3] void * __capability data */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->data),
 	    3, CHERIABI_SYS_cheriabi_extattr_set_fd_PTRMASK);
@@ -3711,12 +3711,12 @@ CHERIABI_SYS_cheriabi_extattr_get_fd_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 4, CHERIABI_SYS_cheriabi_extattr_get_fd_PTRMASK);
 	uap->nbytes = cheri_getoffset(tmpcap);
 
-	/* [2] const char *__capability attrname */
+	/* [2] const char * __capability attrname */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->attrname),
 	    2, CHERIABI_SYS_cheriabi_extattr_get_fd_PTRMASK);
 
-	/* [3] void *__capability data */
+	/* [3] void * __capability data */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->data),
 	    3, CHERIABI_SYS_cheriabi_extattr_get_fd_PTRMASK);
@@ -3738,7 +3738,7 @@ CHERIABI_SYS_cheriabi_extattr_delete_fd_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_extattr_delete_fd_PTRMASK);
 	uap->attrnamespace = cheri_getoffset(tmpcap);
 
-	/* [2] const char *__capability attrname */
+	/* [2] const char * __capability attrname */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->attrname),
 	    2, CHERIABI_SYS_cheriabi_extattr_delete_fd_PTRMASK);
@@ -3769,7 +3769,7 @@ CHERIABI_SYS_cheriabi_eaccess_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_eaccess_PTRMASK);
 	uap->amode = cheri_getoffset(tmpcap);
 
-	/* [0] char *__capability path */
+	/* [0] char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_eaccess_PTRMASK);
@@ -3791,7 +3791,7 @@ CHERIABI_SYS_cheriabi_nmount_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_nmount_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [0] struct iovec_c *__capability iovp */
+	/* [0] struct iovec_c * __capability iovp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->iovp),
 	    0, CHERIABI_SYS_cheriabi_nmount_PTRMASK);
@@ -3804,7 +3804,7 @@ CHERIABI_SYS_cheriabi___mac_get_proc_fill_uap(struct thread *td,
     struct cheriabi___mac_get_proc_args *uap)
 {
 
-	/* [0] struct mac_c *__capability mac_p */
+	/* [0] struct mac_c * __capability mac_p */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->mac_p),
 	    0, CHERIABI_SYS_cheriabi___mac_get_proc_PTRMASK);
@@ -3817,7 +3817,7 @@ CHERIABI_SYS_cheriabi___mac_set_proc_fill_uap(struct thread *td,
     struct cheriabi___mac_set_proc_args *uap)
 {
 
-	/* [0] struct mac_c *__capability mac_p */
+	/* [0] struct mac_c * __capability mac_p */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->mac_p),
 	    0, CHERIABI_SYS_cheriabi___mac_set_proc_PTRMASK);
@@ -3835,7 +3835,7 @@ CHERIABI_SYS_cheriabi___mac_get_fd_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi___mac_get_fd_PTRMASK);
 	uap->fd = cheri_getoffset(tmpcap);
 
-	/* [1] struct mac_c *__capability mac_p */
+	/* [1] struct mac_c * __capability mac_p */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->mac_p),
 	    1, CHERIABI_SYS_cheriabi___mac_get_fd_PTRMASK);
@@ -3848,12 +3848,12 @@ CHERIABI_SYS_cheriabi___mac_get_file_fill_uap(struct thread *td,
     struct cheriabi___mac_get_file_args *uap)
 {
 
-	/* [0] const char *__capability path_p */
+	/* [0] const char * __capability path_p */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path_p),
 	    0, CHERIABI_SYS_cheriabi___mac_get_file_PTRMASK);
 
-	/* [1] struct mac_c *__capability mac_p */
+	/* [1] struct mac_c * __capability mac_p */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->mac_p),
 	    1, CHERIABI_SYS_cheriabi___mac_get_file_PTRMASK);
@@ -3871,7 +3871,7 @@ CHERIABI_SYS_cheriabi___mac_set_fd_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi___mac_set_fd_PTRMASK);
 	uap->fd = cheri_getoffset(tmpcap);
 
-	/* [1] struct mac_c *__capability mac_p */
+	/* [1] struct mac_c * __capability mac_p */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->mac_p),
 	    1, CHERIABI_SYS_cheriabi___mac_set_fd_PTRMASK);
@@ -3884,12 +3884,12 @@ CHERIABI_SYS_cheriabi___mac_set_file_fill_uap(struct thread *td,
     struct cheriabi___mac_set_file_args *uap)
 {
 
-	/* [0] const char *__capability path_p */
+	/* [0] const char * __capability path_p */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path_p),
 	    0, CHERIABI_SYS_cheriabi___mac_set_file_PTRMASK);
 
-	/* [1] struct mac_c *__capability mac_p */
+	/* [1] struct mac_c * __capability mac_p */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->mac_p),
 	    1, CHERIABI_SYS_cheriabi___mac_set_file_PTRMASK);
@@ -3911,12 +3911,12 @@ CHERIABI_SYS_cheriabi_kenv_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_kenv_PTRMASK);
 	uap->len = cheri_getoffset(tmpcap);
 
-	/* [1] const char *__capability name */
+	/* [1] const char * __capability name */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->name),
 	    1, CHERIABI_SYS_cheriabi_kenv_PTRMASK);
 
-	/* [2] char *__capability value */
+	/* [2] char * __capability value */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->value),
 	    2, CHERIABI_SYS_cheriabi_kenv_PTRMASK);
@@ -3934,7 +3934,7 @@ CHERIABI_SYS_cheriabi_lchflags_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_lchflags_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_lchflags_PTRMASK);
@@ -3952,7 +3952,7 @@ CHERIABI_SYS_cheriabi_uuidgen_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_uuidgen_PTRMASK);
 	uap->count = cheri_getoffset(tmpcap);
 
-	/* [0] struct uuid *__capability store */
+	/* [0] struct uuid * __capability store */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->store),
 	    0, CHERIABI_SYS_cheriabi_uuidgen_PTRMASK);
@@ -3986,12 +3986,12 @@ CHERIABI_SYS_cheriabi_sendfile_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 6, CHERIABI_SYS_cheriabi_sendfile_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [4] struct sf_hdtr_c *__capability hdtr */
+	/* [4] struct sf_hdtr_c * __capability hdtr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->hdtr),
 	    4, CHERIABI_SYS_cheriabi_sendfile_PTRMASK);
 
-	/* [5] off_t *__capability sbytes */
+	/* [5] off_t * __capability sbytes */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->sbytes),
 	    5, CHERIABI_SYS_cheriabi_sendfile_PTRMASK);
@@ -4009,12 +4009,12 @@ CHERIABI_SYS_cheriabi_mac_syscall_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_mac_syscall_PTRMASK);
 	uap->call = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability policy */
+	/* [0] const char * __capability policy */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->policy),
 	    0, CHERIABI_SYS_cheriabi_mac_syscall_PTRMASK);
 
-	/* [2] void *__capability arg */
+	/* [2] void * __capability arg */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->arg),
 	    2, CHERIABI_SYS_cheriabi_mac_syscall_PTRMASK);
@@ -4032,7 +4032,7 @@ CHERIABI_SYS_cheriabi___mac_get_pid_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi___mac_get_pid_PTRMASK);
 	uap->pid = cheri_getoffset(tmpcap);
 
-	/* [1] struct mac_c *__capability mac_p */
+	/* [1] struct mac_c * __capability mac_p */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->mac_p),
 	    1, CHERIABI_SYS_cheriabi___mac_get_pid_PTRMASK);
@@ -4045,12 +4045,12 @@ CHERIABI_SYS_cheriabi___mac_get_link_fill_uap(struct thread *td,
     struct cheriabi___mac_get_link_args *uap)
 {
 
-	/* [0] const char *__capability path_p */
+	/* [0] const char * __capability path_p */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path_p),
 	    0, CHERIABI_SYS_cheriabi___mac_get_link_PTRMASK);
 
-	/* [1] struct mac_c *__capability mac_p */
+	/* [1] struct mac_c * __capability mac_p */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->mac_p),
 	    1, CHERIABI_SYS_cheriabi___mac_get_link_PTRMASK);
@@ -4063,12 +4063,12 @@ CHERIABI_SYS_cheriabi___mac_set_link_fill_uap(struct thread *td,
     struct cheriabi___mac_set_link_args *uap)
 {
 
-	/* [0] const char *__capability path_p */
+	/* [0] const char * __capability path_p */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path_p),
 	    0, CHERIABI_SYS_cheriabi___mac_set_link_PTRMASK);
 
-	/* [1] struct mac_c *__capability mac_p */
+	/* [1] struct mac_c * __capability mac_p */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->mac_p),
 	    1, CHERIABI_SYS_cheriabi___mac_set_link_PTRMASK);
@@ -4090,17 +4090,17 @@ CHERIABI_SYS_cheriabi_extattr_set_link_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 4, CHERIABI_SYS_cheriabi_extattr_set_link_PTRMASK);
 	uap->nbytes = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_extattr_set_link_PTRMASK);
 
-	/* [2] const char *__capability attrname */
+	/* [2] const char * __capability attrname */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->attrname),
 	    2, CHERIABI_SYS_cheriabi_extattr_set_link_PTRMASK);
 
-	/* [3] void *__capability data */
+	/* [3] void * __capability data */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->data),
 	    3, CHERIABI_SYS_cheriabi_extattr_set_link_PTRMASK);
@@ -4122,17 +4122,17 @@ CHERIABI_SYS_cheriabi_extattr_get_link_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 4, CHERIABI_SYS_cheriabi_extattr_get_link_PTRMASK);
 	uap->nbytes = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_extattr_get_link_PTRMASK);
 
-	/* [2] const char *__capability attrname */
+	/* [2] const char * __capability attrname */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->attrname),
 	    2, CHERIABI_SYS_cheriabi_extattr_get_link_PTRMASK);
 
-	/* [3] void *__capability data */
+	/* [3] void * __capability data */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->data),
 	    3, CHERIABI_SYS_cheriabi_extattr_get_link_PTRMASK);
@@ -4150,12 +4150,12 @@ CHERIABI_SYS_cheriabi_extattr_delete_link_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_extattr_delete_link_PTRMASK);
 	uap->attrnamespace = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_extattr_delete_link_PTRMASK);
 
-	/* [2] const char *__capability attrname */
+	/* [2] const char * __capability attrname */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->attrname),
 	    2, CHERIABI_SYS_cheriabi_extattr_delete_link_PTRMASK);
@@ -4168,22 +4168,22 @@ CHERIABI_SYS_cheriabi___mac_execve_fill_uap(struct thread *td,
     struct cheriabi___mac_execve_args *uap)
 {
 
-	/* [0] char *__capability fname */
+	/* [0] char * __capability fname */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->fname),
 	    0, CHERIABI_SYS_cheriabi___mac_execve_PTRMASK);
 
-	/* [1] void *__capability *__capability argv */
+	/* [1] void * __capability * __capability argv */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->argv),
 	    1, CHERIABI_SYS_cheriabi___mac_execve_PTRMASK);
 
-	/* [2] void *__capability *__capability envv */
+	/* [2] void * __capability * __capability envv */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->envv),
 	    2, CHERIABI_SYS_cheriabi___mac_execve_PTRMASK);
 
-	/* [3] struct mac_c *__capability mac_p */
+	/* [3] struct mac_c * __capability mac_p */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->mac_p),
 	    3, CHERIABI_SYS_cheriabi___mac_execve_PTRMASK);
@@ -4201,12 +4201,12 @@ CHERIABI_SYS_cheriabi_sigaction_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_sigaction_PTRMASK);
 	uap->sig = cheri_getoffset(tmpcap);
 
-	/* [1] struct sigaction_c *__capability act */
+	/* [1] struct sigaction_c * __capability act */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->act),
 	    1, CHERIABI_SYS_cheriabi_sigaction_PTRMASK);
 
-	/* [2] struct sigaction_c *__capability oact */
+	/* [2] struct sigaction_c * __capability oact */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->oact),
 	    2, CHERIABI_SYS_cheriabi_sigaction_PTRMASK);
@@ -4219,7 +4219,7 @@ CHERIABI_SYS_cheriabi_sigreturn_fill_uap(struct thread *td,
     struct cheriabi_sigreturn_args *uap)
 {
 
-	/* [0] const ucontext_c_t *__capability sigcntxp */
+	/* [0] const ucontext_c_t * __capability sigcntxp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->sigcntxp),
 	    0, CHERIABI_SYS_cheriabi_sigreturn_PTRMASK);
@@ -4232,7 +4232,7 @@ CHERIABI_SYS_cheriabi_getcontext_fill_uap(struct thread *td,
     struct cheriabi_getcontext_args *uap)
 {
 
-	/* [0] ucontext_c_t *__capability ucp */
+	/* [0] ucontext_c_t * __capability ucp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->ucp),
 	    0, CHERIABI_SYS_cheriabi_getcontext_PTRMASK);
@@ -4245,7 +4245,7 @@ CHERIABI_SYS_cheriabi_setcontext_fill_uap(struct thread *td,
     struct cheriabi_setcontext_args *uap)
 {
 
-	/* [0] const ucontext_c_t *__capability ucp */
+	/* [0] const ucontext_c_t * __capability ucp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->ucp),
 	    0, CHERIABI_SYS_cheriabi_setcontext_PTRMASK);
@@ -4258,12 +4258,12 @@ CHERIABI_SYS_cheriabi_swapcontext_fill_uap(struct thread *td,
     struct cheriabi_swapcontext_args *uap)
 {
 
-	/* [0] ucontext_c_t *__capability oucp */
+	/* [0] ucontext_c_t * __capability oucp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->oucp),
 	    0, CHERIABI_SYS_cheriabi_swapcontext_PTRMASK);
 
-	/* [1] const ucontext_c_t *__capability ucp */
+	/* [1] const ucontext_c_t * __capability ucp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->ucp),
 	    1, CHERIABI_SYS_cheriabi_swapcontext_PTRMASK);
@@ -4276,7 +4276,7 @@ CHERIABI_SYS_cheriabi_swapoff_fill_uap(struct thread *td,
     struct cheriabi_swapoff_args *uap)
 {
 
-	/* [0] const char *__capability name */
+	/* [0] const char * __capability name */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->name),
 	    0, CHERIABI_SYS_cheriabi_swapoff_PTRMASK);
@@ -4294,12 +4294,12 @@ CHERIABI_SYS_cheriabi___acl_get_link_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___acl_get_link_PTRMASK);
 	uap->type = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi___acl_get_link_PTRMASK);
 
-	/* [2] struct acl *__capability aclp */
+	/* [2] struct acl * __capability aclp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->aclp),
 	    2, CHERIABI_SYS_cheriabi___acl_get_link_PTRMASK);
@@ -4317,12 +4317,12 @@ CHERIABI_SYS_cheriabi___acl_set_link_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___acl_set_link_PTRMASK);
 	uap->type = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi___acl_set_link_PTRMASK);
 
-	/* [2] struct acl *__capability aclp */
+	/* [2] struct acl * __capability aclp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->aclp),
 	    2, CHERIABI_SYS_cheriabi___acl_set_link_PTRMASK);
@@ -4340,7 +4340,7 @@ CHERIABI_SYS_cheriabi___acl_delete_link_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___acl_delete_link_PTRMASK);
 	uap->type = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi___acl_delete_link_PTRMASK);
@@ -4358,12 +4358,12 @@ CHERIABI_SYS_cheriabi___acl_aclcheck_link_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___acl_aclcheck_link_PTRMASK);
 	uap->type = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi___acl_aclcheck_link_PTRMASK);
 
-	/* [2] struct acl *__capability aclp */
+	/* [2] struct acl * __capability aclp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->aclp),
 	    2, CHERIABI_SYS_cheriabi___acl_aclcheck_link_PTRMASK);
@@ -4376,12 +4376,12 @@ CHERIABI_SYS_cheriabi_sigwait_fill_uap(struct thread *td,
     struct cheriabi_sigwait_args *uap)
 {
 
-	/* [0] const sigset_t *__capability set */
+	/* [0] const sigset_t * __capability set */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->set),
 	    0, CHERIABI_SYS_cheriabi_sigwait_PTRMASK);
 
-	/* [1] int *__capability sig */
+	/* [1] int * __capability sig */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->sig),
 	    1, CHERIABI_SYS_cheriabi_sigwait_PTRMASK);
@@ -4399,12 +4399,12 @@ CHERIABI_SYS_cheriabi_thr_create_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_thr_create_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [0] ucontext_c_t *__capability ctx */
+	/* [0] ucontext_c_t * __capability ctx */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->ctx),
 	    0, CHERIABI_SYS_cheriabi_thr_create_PTRMASK);
 
-	/* [1] long *__capability id */
+	/* [1] long * __capability id */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->id),
 	    1, CHERIABI_SYS_cheriabi_thr_create_PTRMASK);
@@ -4417,7 +4417,7 @@ CHERIABI_SYS_cheriabi_thr_exit_fill_uap(struct thread *td,
     struct cheriabi_thr_exit_args *uap)
 {
 
-	/* [0] long *__capability state */
+	/* [0] long * __capability state */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->state),
 	    0, CHERIABI_SYS_cheriabi_thr_exit_PTRMASK);
@@ -4430,7 +4430,7 @@ CHERIABI_SYS_cheriabi_thr_self_fill_uap(struct thread *td,
     struct cheriabi_thr_self_args *uap)
 {
 
-	/* [0] long *__capability id */
+	/* [0] long * __capability id */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->id),
 	    0, CHERIABI_SYS_cheriabi_thr_self_PTRMASK);
@@ -4486,7 +4486,7 @@ CHERIABI_SYS_cheriabi_extattr_list_fd_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_extattr_list_fd_PTRMASK);
 	uap->nbytes = cheri_getoffset(tmpcap);
 
-	/* [2] void *__capability data */
+	/* [2] void * __capability data */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->data),
 	    2, CHERIABI_SYS_cheriabi_extattr_list_fd_PTRMASK);
@@ -4508,12 +4508,12 @@ CHERIABI_SYS_cheriabi_extattr_list_file_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_extattr_list_file_PTRMASK);
 	uap->nbytes = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_extattr_list_file_PTRMASK);
 
-	/* [2] void *__capability data */
+	/* [2] void * __capability data */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->data),
 	    2, CHERIABI_SYS_cheriabi_extattr_list_file_PTRMASK);
@@ -4535,12 +4535,12 @@ CHERIABI_SYS_cheriabi_extattr_list_link_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_extattr_list_link_PTRMASK);
 	uap->nbytes = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_extattr_list_link_PTRMASK);
 
-	/* [2] void *__capability data */
+	/* [2] void * __capability data */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->data),
 	    2, CHERIABI_SYS_cheriabi_extattr_list_link_PTRMASK);
@@ -4553,7 +4553,7 @@ CHERIABI_SYS_cheriabi_thr_suspend_fill_uap(struct thread *td,
     struct cheriabi_thr_suspend_args *uap)
 {
 
-	/* [0] const struct timespec *__capability timeout */
+	/* [0] const struct timespec * __capability timeout */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->timeout),
 	    0, CHERIABI_SYS_cheriabi_thr_suspend_PTRMASK);
@@ -4601,7 +4601,7 @@ CHERIABI_SYS_cheriabi_audit_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_audit_PTRMASK);
 	uap->length = cheri_getoffset(tmpcap);
 
-	/* [0] const void *__capability record */
+	/* [0] const void * __capability record */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->record),
 	    0, CHERIABI_SYS_cheriabi_audit_PTRMASK);
@@ -4623,7 +4623,7 @@ CHERIABI_SYS_cheriabi_auditon_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_auditon_PTRMASK);
 	uap->length = cheri_getoffset(tmpcap);
 
-	/* [1] void *__capability data */
+	/* [1] void * __capability data */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->data),
 	    1, CHERIABI_SYS_cheriabi_auditon_PTRMASK);
@@ -4636,7 +4636,7 @@ CHERIABI_SYS_cheriabi_getauid_fill_uap(struct thread *td,
     struct cheriabi_getauid_args *uap)
 {
 
-	/* [0] uid_t *__capability auid */
+	/* [0] uid_t * __capability auid */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->auid),
 	    0, CHERIABI_SYS_cheriabi_getauid_PTRMASK);
@@ -4649,7 +4649,7 @@ CHERIABI_SYS_cheriabi_setauid_fill_uap(struct thread *td,
     struct cheriabi_setauid_args *uap)
 {
 
-	/* [0] uid_t *__capability auid */
+	/* [0] uid_t * __capability auid */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->auid),
 	    0, CHERIABI_SYS_cheriabi_setauid_PTRMASK);
@@ -4662,7 +4662,7 @@ CHERIABI_SYS_cheriabi_getaudit_fill_uap(struct thread *td,
     struct cheriabi_getaudit_args *uap)
 {
 
-	/* [0] struct auditinfo *__capability auditinfo */
+	/* [0] struct auditinfo * __capability auditinfo */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->auditinfo),
 	    0, CHERIABI_SYS_cheriabi_getaudit_PTRMASK);
@@ -4675,7 +4675,7 @@ CHERIABI_SYS_cheriabi_setaudit_fill_uap(struct thread *td,
     struct cheriabi_setaudit_args *uap)
 {
 
-	/* [0] struct auditinfo *__capability auditinfo */
+	/* [0] struct auditinfo * __capability auditinfo */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->auditinfo),
 	    0, CHERIABI_SYS_cheriabi_setaudit_PTRMASK);
@@ -4693,7 +4693,7 @@ CHERIABI_SYS_cheriabi_getaudit_addr_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_getaudit_addr_PTRMASK);
 	uap->length = cheri_getoffset(tmpcap);
 
-	/* [0] struct auditinfo_addr *__capability auditinfo_addr */
+	/* [0] struct auditinfo_addr * __capability auditinfo_addr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->auditinfo_addr),
 	    0, CHERIABI_SYS_cheriabi_getaudit_addr_PTRMASK);
@@ -4711,7 +4711,7 @@ CHERIABI_SYS_cheriabi_setaudit_addr_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_setaudit_addr_PTRMASK);
 	uap->length = cheri_getoffset(tmpcap);
 
-	/* [0] struct auditinfo_addr *__capability auditinfo_addr */
+	/* [0] struct auditinfo_addr * __capability auditinfo_addr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->auditinfo_addr),
 	    0, CHERIABI_SYS_cheriabi_setaudit_addr_PTRMASK);
@@ -4724,7 +4724,7 @@ CHERIABI_SYS_cheriabi_auditctl_fill_uap(struct thread *td,
     struct cheriabi_auditctl_args *uap)
 {
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_auditctl_PTRMASK);
@@ -4746,17 +4746,17 @@ CHERIABI_SYS_cheriabi__umtx_op_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi__umtx_op_PTRMASK);
 	uap->val = cheri_getoffset(tmpcap);
 
-	/* [0] void *__capability obj */
+	/* [0] void * __capability obj */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->obj),
 	    0, CHERIABI_SYS_cheriabi__umtx_op_PTRMASK);
 
-	/* [3] void *__capability uaddr1 */
+	/* [3] void * __capability uaddr1 */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->uaddr1),
 	    3, CHERIABI_SYS_cheriabi__umtx_op_PTRMASK);
 
-	/* [4] void *__capability uaddr2 */
+	/* [4] void * __capability uaddr2 */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->uaddr2),
 	    4, CHERIABI_SYS_cheriabi__umtx_op_PTRMASK);
@@ -4774,7 +4774,7 @@ CHERIABI_SYS_cheriabi_thr_new_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_thr_new_PTRMASK);
 	uap->param_size = cheri_getoffset(tmpcap);
 
-	/* [0] struct thr_param_c *__capability param */
+	/* [0] struct thr_param_c * __capability param */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->param),
 	    0, CHERIABI_SYS_cheriabi_thr_new_PTRMASK);
@@ -4796,7 +4796,7 @@ CHERIABI_SYS_cheriabi_sigqueue_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_sigqueue_PTRMASK);
 	uap->signum = cheri_getoffset(tmpcap);
 
-	/* [2] void *__capability value */
+	/* [2] void * __capability value */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->value),
 	    2, CHERIABI_SYS_cheriabi_sigqueue_PTRMASK);
@@ -4818,12 +4818,12 @@ CHERIABI_SYS_cheriabi_kmq_open_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_kmq_open_PTRMASK);
 	uap->mode = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_kmq_open_PTRMASK);
 
-	/* [3] const struct mq_attr *__capability attr */
+	/* [3] const struct mq_attr * __capability attr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->attr),
 	    3, CHERIABI_SYS_cheriabi_kmq_open_PTRMASK);
@@ -4841,12 +4841,12 @@ CHERIABI_SYS_cheriabi_kmq_setattr_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_kmq_setattr_PTRMASK);
 	uap->mqd = cheri_getoffset(tmpcap);
 
-	/* [1] const struct mq_attr *__capability attr */
+	/* [1] const struct mq_attr * __capability attr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->attr),
 	    1, CHERIABI_SYS_cheriabi_kmq_setattr_PTRMASK);
 
-	/* [2] struct mq_attr *__capability oattr */
+	/* [2] struct mq_attr * __capability oattr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->oattr),
 	    2, CHERIABI_SYS_cheriabi_kmq_setattr_PTRMASK);
@@ -4868,17 +4868,17 @@ CHERIABI_SYS_cheriabi_kmq_timedreceive_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_kmq_timedreceive_PTRMASK);
 	uap->msg_len = cheri_getoffset(tmpcap);
 
-	/* [1] char *__capability msg_ptr */
+	/* [1] char * __capability msg_ptr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->msg_ptr),
 	    1, CHERIABI_SYS_cheriabi_kmq_timedreceive_PTRMASK);
 
-	/* [3] unsigned *__capability msg_prio */
+	/* [3] unsigned * __capability msg_prio */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->msg_prio),
 	    3, CHERIABI_SYS_cheriabi_kmq_timedreceive_PTRMASK);
 
-	/* [4] const struct timespec *__capability abs_timeout */
+	/* [4] const struct timespec * __capability abs_timeout */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->abs_timeout),
 	    4, CHERIABI_SYS_cheriabi_kmq_timedreceive_PTRMASK);
@@ -4904,12 +4904,12 @@ CHERIABI_SYS_cheriabi_kmq_timedsend_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_kmq_timedsend_PTRMASK);
 	uap->msg_prio = cheri_getoffset(tmpcap);
 
-	/* [1] const char *__capability msg_ptr */
+	/* [1] const char * __capability msg_ptr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->msg_ptr),
 	    1, CHERIABI_SYS_cheriabi_kmq_timedsend_PTRMASK);
 
-	/* [4] const struct timespec *__capability abs_timeout */
+	/* [4] const struct timespec * __capability abs_timeout */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->abs_timeout),
 	    4, CHERIABI_SYS_cheriabi_kmq_timedsend_PTRMASK);
@@ -4927,7 +4927,7 @@ CHERIABI_SYS_cheriabi_kmq_notify_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_kmq_notify_PTRMASK);
 	uap->mqd = cheri_getoffset(tmpcap);
 
-	/* [1] const struct sigevent_c *__capability sigev */
+	/* [1] const struct sigevent_c * __capability sigev */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->sigev),
 	    1, CHERIABI_SYS_cheriabi_kmq_notify_PTRMASK);
@@ -4940,7 +4940,7 @@ CHERIABI_SYS_cheriabi_kmq_unlink_fill_uap(struct thread *td,
     struct cheriabi_kmq_unlink_args *uap)
 {
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_kmq_unlink_PTRMASK);
@@ -4958,12 +4958,12 @@ CHERIABI_SYS_cheriabi_abort2_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_abort2_PTRMASK);
 	uap->nargs = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability why */
+	/* [0] const char * __capability why */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->why),
 	    0, CHERIABI_SYS_cheriabi_abort2_PTRMASK);
 
-	/* [2] void *__capability *__capability args */
+	/* [2] void * __capability * __capability args */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->args),
 	    2, CHERIABI_SYS_cheriabi_abort2_PTRMASK);
@@ -4981,7 +4981,7 @@ CHERIABI_SYS_cheriabi_thr_set_name_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_thr_set_name_PTRMASK);
 	uap->id = cheri_getoffset(tmpcap);
 
-	/* [1] const char *__capability name */
+	/* [1] const char * __capability name */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->name),
 	    1, CHERIABI_SYS_cheriabi_thr_set_name_PTRMASK);
@@ -4999,7 +4999,7 @@ CHERIABI_SYS_cheriabi_aio_fsync_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_aio_fsync_PTRMASK);
 	uap->op = cheri_getoffset(tmpcap);
 
-	/* [1] struct aiocb_c *__capability aiocbp */
+	/* [1] struct aiocb_c * __capability aiocbp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->aiocbp),
 	    1, CHERIABI_SYS_cheriabi_aio_fsync_PTRMASK);
@@ -5021,7 +5021,7 @@ CHERIABI_SYS_cheriabi_rtprio_thread_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_rtprio_thread_PTRMASK);
 	uap->lwpid = cheri_getoffset(tmpcap);
 
-	/* [2] struct rtprio *__capability rtp */
+	/* [2] struct rtprio * __capability rtp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->rtp),
 	    2, CHERIABI_SYS_cheriabi_rtprio_thread_PTRMASK);
@@ -5068,17 +5068,17 @@ CHERIABI_SYS_cheriabi_sctp_generic_sendmsg_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 6, CHERIABI_SYS_cheriabi_sctp_generic_sendmsg_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [1] void *__capability msg */
+	/* [1] void * __capability msg */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->msg),
 	    1, CHERIABI_SYS_cheriabi_sctp_generic_sendmsg_PTRMASK);
 
-	/* [3] struct sockaddr *__capability to */
+	/* [3] struct sockaddr * __capability to */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->to),
 	    3, CHERIABI_SYS_cheriabi_sctp_generic_sendmsg_PTRMASK);
 
-	/* [5] struct sctp_sndrcvinfo *__capability sinfo */
+	/* [5] struct sctp_sndrcvinfo * __capability sinfo */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->sinfo),
 	    5, CHERIABI_SYS_cheriabi_sctp_generic_sendmsg_PTRMASK);
@@ -5108,17 +5108,17 @@ CHERIABI_SYS_cheriabi_sctp_generic_sendmsg_iov_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 6, CHERIABI_SYS_cheriabi_sctp_generic_sendmsg_iov_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [1] struct iovec_c *__capability iov */
+	/* [1] struct iovec_c * __capability iov */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->iov),
 	    1, CHERIABI_SYS_cheriabi_sctp_generic_sendmsg_iov_PTRMASK);
 
-	/* [3] struct sockaddr *__capability to */
+	/* [3] struct sockaddr * __capability to */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->to),
 	    3, CHERIABI_SYS_cheriabi_sctp_generic_sendmsg_iov_PTRMASK);
 
-	/* [5] struct sctp_sndrcvinfo *__capability sinfo */
+	/* [5] struct sctp_sndrcvinfo * __capability sinfo */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->sinfo),
 	    5, CHERIABI_SYS_cheriabi_sctp_generic_sendmsg_iov_PTRMASK);
@@ -5140,27 +5140,27 @@ CHERIABI_SYS_cheriabi_sctp_generic_recvmsg_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_sctp_generic_recvmsg_PTRMASK);
 	uap->iovlen = cheri_getoffset(tmpcap);
 
-	/* [1] struct iovec_c *__capability iov */
+	/* [1] struct iovec_c * __capability iov */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->iov),
 	    1, CHERIABI_SYS_cheriabi_sctp_generic_recvmsg_PTRMASK);
 
-	/* [3] struct sockaddr *__capability from */
+	/* [3] struct sockaddr * __capability from */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->from),
 	    3, CHERIABI_SYS_cheriabi_sctp_generic_recvmsg_PTRMASK);
 
-	/* [4] __socklen_t *__capability fromlenaddr */
+	/* [4] __socklen_t * __capability fromlenaddr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->fromlenaddr),
 	    4, CHERIABI_SYS_cheriabi_sctp_generic_recvmsg_PTRMASK);
 
-	/* [5] struct sctp_sndrcvinfo *__capability sinfo */
+	/* [5] struct sctp_sndrcvinfo * __capability sinfo */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->sinfo),
 	    5, CHERIABI_SYS_cheriabi_sctp_generic_recvmsg_PTRMASK);
 
-	/* [6] int *__capability msg_flags */
+	/* [6] int * __capability msg_flags */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->msg_flags),
 	    6, CHERIABI_SYS_cheriabi_sctp_generic_recvmsg_PTRMASK);
@@ -5186,7 +5186,7 @@ CHERIABI_SYS_cheriabi_pread_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_pread_PTRMASK);
 	uap->offset = cheri_getoffset(tmpcap);
 
-	/* [1] void *__capability buf */
+	/* [1] void * __capability buf */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->buf),
 	    1, CHERIABI_SYS_cheriabi_pread_PTRMASK);
@@ -5212,7 +5212,7 @@ CHERIABI_SYS_cheriabi_pwrite_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_pwrite_PTRMASK);
 	uap->offset = cheri_getoffset(tmpcap);
 
-	/* [1] const void *__capability buf */
+	/* [1] const void * __capability buf */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->buf),
 	    1, CHERIABI_SYS_cheriabi_pwrite_PTRMASK);
@@ -5246,7 +5246,7 @@ CHERIABI_SYS_cheriabi_mmap_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 5, CHERIABI_SYS_cheriabi_mmap_PTRMASK);
 	uap->pos = cheri_getoffset(tmpcap);
 
-	/* [0] void *__capability addr */
+	/* [0] void * __capability addr */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->addr),
 	    0, CHERIABI_SYS_cheriabi_mmap_PTRMASK);
@@ -5285,7 +5285,7 @@ CHERIABI_SYS_cheriabi_truncate_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_truncate_PTRMASK);
 	uap->length = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_truncate_PTRMASK);
@@ -5345,7 +5345,7 @@ CHERIABI_SYS_cheriabi_shm_open_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_shm_open_PTRMASK);
 	uap->mode = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_shm_open_PTRMASK);
@@ -5358,7 +5358,7 @@ CHERIABI_SYS_cheriabi_shm_unlink_fill_uap(struct thread *td,
     struct cheriabi_shm_unlink_args *uap)
 {
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_shm_unlink_PTRMASK);
@@ -5371,7 +5371,7 @@ CHERIABI_SYS_cheriabi_cpuset_fill_uap(struct thread *td,
     struct cheriabi_cpuset_args *uap)
 {
 
-	/* [0] cpusetid_t *__capability setid */
+	/* [0] cpusetid_t * __capability setid */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->setid),
 	    0, CHERIABI_SYS_cheriabi_cpuset_PTRMASK);
@@ -5418,7 +5418,7 @@ CHERIABI_SYS_cheriabi_cpuset_getid_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_cpuset_getid_PTRMASK);
 	uap->id = cheri_getoffset(tmpcap);
 
-	/* [3] cpusetid_t *__capability setid */
+	/* [3] cpusetid_t * __capability setid */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->setid),
 	    3, CHERIABI_SYS_cheriabi_cpuset_getid_PTRMASK);
@@ -5448,7 +5448,7 @@ CHERIABI_SYS_cheriabi_cpuset_getaffinity_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_cpuset_getaffinity_PTRMASK);
 	uap->cpusetsize = cheri_getoffset(tmpcap);
 
-	/* [4] cpuset_t *__capability mask */
+	/* [4] cpuset_t * __capability mask */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->mask),
 	    4, CHERIABI_SYS_cheriabi_cpuset_getaffinity_PTRMASK);
@@ -5478,7 +5478,7 @@ CHERIABI_SYS_cheriabi_cpuset_setaffinity_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_cpuset_setaffinity_PTRMASK);
 	uap->cpusetsize = cheri_getoffset(tmpcap);
 
-	/* [4] const cpuset_t *__capability mask */
+	/* [4] const cpuset_t * __capability mask */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->mask),
 	    4, CHERIABI_SYS_cheriabi_cpuset_setaffinity_PTRMASK);
@@ -5504,7 +5504,7 @@ CHERIABI_SYS_cheriabi_faccessat_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_faccessat_PTRMASK);
 	uap->flag = cheri_getoffset(tmpcap);
 
-	/* [1] const char *__capability path */
+	/* [1] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    1, CHERIABI_SYS_cheriabi_faccessat_PTRMASK);
@@ -5530,7 +5530,7 @@ CHERIABI_SYS_cheriabi_fchmodat_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_fchmodat_PTRMASK);
 	uap->flag = cheri_getoffset(tmpcap);
 
-	/* [1] const char *__capability path */
+	/* [1] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    1, CHERIABI_SYS_cheriabi_fchmodat_PTRMASK);
@@ -5560,7 +5560,7 @@ CHERIABI_SYS_cheriabi_fchownat_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 4, CHERIABI_SYS_cheriabi_fchownat_PTRMASK);
 	uap->flag = cheri_getoffset(tmpcap);
 
-	/* [1] const char *__capability path */
+	/* [1] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    1, CHERIABI_SYS_cheriabi_fchownat_PTRMASK);
@@ -5578,12 +5578,12 @@ CHERIABI_SYS_cheriabi_fexecve_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_fexecve_PTRMASK);
 	uap->fd = cheri_getoffset(tmpcap);
 
-	/* [1] void *__capability *__capability argv */
+	/* [1] void * __capability * __capability argv */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->argv),
 	    1, CHERIABI_SYS_cheriabi_fexecve_PTRMASK);
 
-	/* [2] void *__capability *__capability envv */
+	/* [2] void * __capability * __capability envv */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->envv),
 	    2, CHERIABI_SYS_cheriabi_fexecve_PTRMASK);
@@ -5601,12 +5601,12 @@ CHERIABI_SYS_cheriabi_futimesat_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_futimesat_PTRMASK);
 	uap->fd = cheri_getoffset(tmpcap);
 
-	/* [1] const char *__capability path */
+	/* [1] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    1, CHERIABI_SYS_cheriabi_futimesat_PTRMASK);
 
-	/* [2] const struct timeval *__capability times */
+	/* [2] const struct timeval * __capability times */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->times),
 	    2, CHERIABI_SYS_cheriabi_futimesat_PTRMASK);
@@ -5632,12 +5632,12 @@ CHERIABI_SYS_cheriabi_linkat_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 4, CHERIABI_SYS_cheriabi_linkat_PTRMASK);
 	uap->flag = cheri_getoffset(tmpcap);
 
-	/* [1] const char *__capability path1 */
+	/* [1] const char * __capability path1 */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path1),
 	    1, CHERIABI_SYS_cheriabi_linkat_PTRMASK);
 
-	/* [3] const char *__capability path2 */
+	/* [3] const char * __capability path2 */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path2),
 	    3, CHERIABI_SYS_cheriabi_linkat_PTRMASK);
@@ -5659,7 +5659,7 @@ CHERIABI_SYS_cheriabi_mkdirat_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_mkdirat_PTRMASK);
 	uap->mode = cheri_getoffset(tmpcap);
 
-	/* [1] const char *__capability path */
+	/* [1] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    1, CHERIABI_SYS_cheriabi_mkdirat_PTRMASK);
@@ -5681,7 +5681,7 @@ CHERIABI_SYS_cheriabi_mkfifoat_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_mkfifoat_PTRMASK);
 	uap->mode = cheri_getoffset(tmpcap);
 
-	/* [1] const char *__capability path */
+	/* [1] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    1, CHERIABI_SYS_cheriabi_mkfifoat_PTRMASK);
@@ -5707,7 +5707,7 @@ CHERIABI_SYS_cheriabi_openat_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_openat_PTRMASK);
 	uap->mode = cheri_getoffset(tmpcap);
 
-	/* [1] const char *__capability path */
+	/* [1] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    1, CHERIABI_SYS_cheriabi_openat_PTRMASK);
@@ -5729,12 +5729,12 @@ CHERIABI_SYS_cheriabi_readlinkat_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_readlinkat_PTRMASK);
 	uap->bufsize = cheri_getoffset(tmpcap);
 
-	/* [1] const char *__capability path */
+	/* [1] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    1, CHERIABI_SYS_cheriabi_readlinkat_PTRMASK);
 
-	/* [2] char *__capability buf */
+	/* [2] char * __capability buf */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->buf),
 	    2, CHERIABI_SYS_cheriabi_readlinkat_PTRMASK);
@@ -5756,12 +5756,12 @@ CHERIABI_SYS_cheriabi_renameat_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_renameat_PTRMASK);
 	uap->newfd = cheri_getoffset(tmpcap);
 
-	/* [1] const char *__capability old */
+	/* [1] const char * __capability old */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->old),
 	    1, CHERIABI_SYS_cheriabi_renameat_PTRMASK);
 
-	/* [3] const char *__capability new */
+	/* [3] const char * __capability new */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->new),
 	    3, CHERIABI_SYS_cheriabi_renameat_PTRMASK);
@@ -5779,12 +5779,12 @@ CHERIABI_SYS_cheriabi_symlinkat_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_symlinkat_PTRMASK);
 	uap->fd = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path1 */
+	/* [0] const char * __capability path1 */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path1),
 	    0, CHERIABI_SYS_cheriabi_symlinkat_PTRMASK);
 
-	/* [2] const char *__capability path2 */
+	/* [2] const char * __capability path2 */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path2),
 	    2, CHERIABI_SYS_cheriabi_symlinkat_PTRMASK);
@@ -5806,7 +5806,7 @@ CHERIABI_SYS_cheriabi_unlinkat_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_unlinkat_PTRMASK);
 	uap->flag = cheri_getoffset(tmpcap);
 
-	/* [1] const char *__capability path */
+	/* [1] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    1, CHERIABI_SYS_cheriabi_unlinkat_PTRMASK);
@@ -5832,7 +5832,7 @@ CHERIABI_SYS_cheriabi_gssd_syscall_fill_uap(struct thread *td,
     struct cheriabi_gssd_syscall_args *uap)
 {
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_gssd_syscall_PTRMASK);
@@ -5854,7 +5854,7 @@ CHERIABI_SYS_cheriabi_jail_get_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_jail_get_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [0] struct iovec_c *__capability iovp */
+	/* [0] struct iovec_c * __capability iovp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->iovp),
 	    0, CHERIABI_SYS_cheriabi_jail_get_PTRMASK);
@@ -5876,7 +5876,7 @@ CHERIABI_SYS_cheriabi_jail_set_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_jail_set_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [0] struct iovec_c *__capability iovp */
+	/* [0] struct iovec_c * __capability iovp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->iovp),
 	    0, CHERIABI_SYS_cheriabi_jail_set_PTRMASK);
@@ -5928,7 +5928,7 @@ CHERIABI_SYS_cheriabi___semctl_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi___semctl_PTRMASK);
 	uap->cmd = cheri_getoffset(tmpcap);
 
-	/* [3] union semun_c *__capability arg */
+	/* [3] union semun_c * __capability arg */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->arg),
 	    3, CHERIABI_SYS_cheriabi___semctl_PTRMASK);
@@ -5950,7 +5950,7 @@ CHERIABI_SYS_cheriabi_msgctl_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_msgctl_PTRMASK);
 	uap->cmd = cheri_getoffset(tmpcap);
 
-	/* [2] struct msqid_ds_c *__capability buf */
+	/* [2] struct msqid_ds_c * __capability buf */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->buf),
 	    2, CHERIABI_SYS_cheriabi_msgctl_PTRMASK);
@@ -5972,7 +5972,7 @@ CHERIABI_SYS_cheriabi_shmctl_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_shmctl_PTRMASK);
 	uap->cmd = cheri_getoffset(tmpcap);
 
-	/* [2] struct shmid_ds *__capability buf */
+	/* [2] struct shmid_ds * __capability buf */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->buf),
 	    2, CHERIABI_SYS_cheriabi_shmctl_PTRMASK);
@@ -5990,7 +5990,7 @@ CHERIABI_SYS_cheriabi_lpathconf_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_lpathconf_PTRMASK);
 	uap->name = cheri_getoffset(tmpcap);
 
-	/* [0] const char *__capability path */
+	/* [0] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_lpathconf_PTRMASK);
@@ -6012,7 +6012,7 @@ CHERIABI_SYS_cheriabi___cap_rights_get_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi___cap_rights_get_PTRMASK);
 	uap->fd = cheri_getoffset(tmpcap);
 
-	/* [2] cap_rights_t *__capability rightsp */
+	/* [2] cap_rights_t * __capability rightsp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->rightsp),
 	    2, CHERIABI_SYS_cheriabi___cap_rights_get_PTRMASK);
@@ -6025,7 +6025,7 @@ CHERIABI_SYS_cheriabi_cap_getmode_fill_uap(struct thread *td,
     struct cheriabi_cap_getmode_args *uap)
 {
 
-	/* [0] u_int *__capability modep */
+	/* [0] u_int * __capability modep */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->modep),
 	    0, CHERIABI_SYS_cheriabi_cap_getmode_PTRMASK);
@@ -6043,7 +6043,7 @@ CHERIABI_SYS_cheriabi_pdfork_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_pdfork_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [0] int *__capability fdp */
+	/* [0] int * __capability fdp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->fdp),
 	    0, CHERIABI_SYS_cheriabi_pdfork_PTRMASK);
@@ -6078,7 +6078,7 @@ CHERIABI_SYS_cheriabi_pdgetpid_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_pdgetpid_PTRMASK);
 	uap->fd = cheri_getoffset(tmpcap);
 
-	/* [1] pid_t *__capability pidp */
+	/* [1] pid_t * __capability pidp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->pidp),
 	    1, CHERIABI_SYS_cheriabi_pdgetpid_PTRMASK);
@@ -6096,27 +6096,27 @@ CHERIABI_SYS_cheriabi_pselect_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_pselect_PTRMASK);
 	uap->nd = cheri_getoffset(tmpcap);
 
-	/* [1] fd_set *__capability in */
+	/* [1] fd_set * __capability in */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->in),
 	    1, CHERIABI_SYS_cheriabi_pselect_PTRMASK);
 
-	/* [2] fd_set *__capability ou */
+	/* [2] fd_set * __capability ou */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->ou),
 	    2, CHERIABI_SYS_cheriabi_pselect_PTRMASK);
 
-	/* [3] fd_set *__capability ex */
+	/* [3] fd_set * __capability ex */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->ex),
 	    3, CHERIABI_SYS_cheriabi_pselect_PTRMASK);
 
-	/* [4] const struct timespec *__capability ts */
+	/* [4] const struct timespec * __capability ts */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->ts),
 	    4, CHERIABI_SYS_cheriabi_pselect_PTRMASK);
 
-	/* [5] const sigset_t *__capability sm */
+	/* [5] const sigset_t * __capability sm */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->sm),
 	    5, CHERIABI_SYS_cheriabi_pselect_PTRMASK);
@@ -6134,7 +6134,7 @@ CHERIABI_SYS_cheriabi_getloginclass_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_getloginclass_PTRMASK);
 	uap->namelen = cheri_getoffset(tmpcap);
 
-	/* [0] char *__capability namebuf */
+	/* [0] char * __capability namebuf */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->namebuf),
 	    0, CHERIABI_SYS_cheriabi_getloginclass_PTRMASK);
@@ -6147,7 +6147,7 @@ CHERIABI_SYS_cheriabi_setloginclass_fill_uap(struct thread *td,
     struct cheriabi_setloginclass_args *uap)
 {
 
-	/* [0] const char *__capability namebuf */
+	/* [0] const char * __capability namebuf */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->namebuf),
 	    0, CHERIABI_SYS_cheriabi_setloginclass_PTRMASK);
@@ -6169,12 +6169,12 @@ CHERIABI_SYS_cheriabi_rctl_get_racct_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_rctl_get_racct_PTRMASK);
 	uap->outbuflen = cheri_getoffset(tmpcap);
 
-	/* [0] const void *__capability inbufp */
+	/* [0] const void * __capability inbufp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->inbufp),
 	    0, CHERIABI_SYS_cheriabi_rctl_get_racct_PTRMASK);
 
-	/* [2] void *__capability outbufp */
+	/* [2] void * __capability outbufp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->outbufp),
 	    2, CHERIABI_SYS_cheriabi_rctl_get_racct_PTRMASK);
@@ -6196,12 +6196,12 @@ CHERIABI_SYS_cheriabi_rctl_get_rules_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_rctl_get_rules_PTRMASK);
 	uap->outbuflen = cheri_getoffset(tmpcap);
 
-	/* [0] const void *__capability inbufp */
+	/* [0] const void * __capability inbufp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->inbufp),
 	    0, CHERIABI_SYS_cheriabi_rctl_get_rules_PTRMASK);
 
-	/* [2] void *__capability outbufp */
+	/* [2] void * __capability outbufp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->outbufp),
 	    2, CHERIABI_SYS_cheriabi_rctl_get_rules_PTRMASK);
@@ -6223,12 +6223,12 @@ CHERIABI_SYS_cheriabi_rctl_get_limits_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_rctl_get_limits_PTRMASK);
 	uap->outbuflen = cheri_getoffset(tmpcap);
 
-	/* [0] const void *__capability inbufp */
+	/* [0] const void * __capability inbufp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->inbufp),
 	    0, CHERIABI_SYS_cheriabi_rctl_get_limits_PTRMASK);
 
-	/* [2] void *__capability outbufp */
+	/* [2] void * __capability outbufp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->outbufp),
 	    2, CHERIABI_SYS_cheriabi_rctl_get_limits_PTRMASK);
@@ -6250,12 +6250,12 @@ CHERIABI_SYS_cheriabi_rctl_add_rule_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_rctl_add_rule_PTRMASK);
 	uap->outbuflen = cheri_getoffset(tmpcap);
 
-	/* [0] const void *__capability inbufp */
+	/* [0] const void * __capability inbufp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->inbufp),
 	    0, CHERIABI_SYS_cheriabi_rctl_add_rule_PTRMASK);
 
-	/* [2] void *__capability outbufp */
+	/* [2] void * __capability outbufp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->outbufp),
 	    2, CHERIABI_SYS_cheriabi_rctl_add_rule_PTRMASK);
@@ -6277,12 +6277,12 @@ CHERIABI_SYS_cheriabi_rctl_remove_rule_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_rctl_remove_rule_PTRMASK);
 	uap->outbuflen = cheri_getoffset(tmpcap);
 
-	/* [0] const void *__capability inbufp */
+	/* [0] const void * __capability inbufp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->inbufp),
 	    0, CHERIABI_SYS_cheriabi_rctl_remove_rule_PTRMASK);
 
-	/* [2] void *__capability outbufp */
+	/* [2] void * __capability outbufp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->outbufp),
 	    2, CHERIABI_SYS_cheriabi_rctl_remove_rule_PTRMASK);
@@ -6354,17 +6354,17 @@ CHERIABI_SYS_cheriabi_wait6_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_wait6_PTRMASK);
 	uap->options = cheri_getoffset(tmpcap);
 
-	/* [2] int *__capability status */
+	/* [2] int * __capability status */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->status),
 	    2, CHERIABI_SYS_cheriabi_wait6_PTRMASK);
 
-	/* [4] struct __wrusage *__capability wrusage */
+	/* [4] struct __wrusage * __capability wrusage */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->wrusage),
 	    4, CHERIABI_SYS_cheriabi_wait6_PTRMASK);
 
-	/* [5] struct siginfo_c *__capability info */
+	/* [5] struct siginfo_c * __capability info */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->info),
 	    5, CHERIABI_SYS_cheriabi_wait6_PTRMASK);
@@ -6382,7 +6382,7 @@ CHERIABI_SYS_cheriabi_cap_rights_limit_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_cap_rights_limit_PTRMASK);
 	uap->fd = cheri_getoffset(tmpcap);
 
-	/* [1] cap_rights_t *__capability rightsp */
+	/* [1] cap_rights_t * __capability rightsp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->rightsp),
 	    1, CHERIABI_SYS_cheriabi_cap_rights_limit_PTRMASK);
@@ -6404,7 +6404,7 @@ CHERIABI_SYS_cheriabi_cap_ioctls_limit_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_cap_ioctls_limit_PTRMASK);
 	uap->ncmds = cheri_getoffset(tmpcap);
 
-	/* [1] const u_long *__capability cmds */
+	/* [1] const u_long * __capability cmds */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->cmds),
 	    1, CHERIABI_SYS_cheriabi_cap_ioctls_limit_PTRMASK);
@@ -6426,7 +6426,7 @@ CHERIABI_SYS_cheriabi_cap_ioctls_get_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_cap_ioctls_get_PTRMASK);
 	uap->maxcmds = cheri_getoffset(tmpcap);
 
-	/* [1] u_long *__capability cmds */
+	/* [1] u_long * __capability cmds */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->cmds),
 	    1, CHERIABI_SYS_cheriabi_cap_ioctls_get_PTRMASK);
@@ -6461,7 +6461,7 @@ CHERIABI_SYS_cheriabi_cap_fcntls_get_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_cap_fcntls_get_PTRMASK);
 	uap->fd = cheri_getoffset(tmpcap);
 
-	/* [1] uint32_t *__capability fcntlrightsp */
+	/* [1] uint32_t * __capability fcntlrightsp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->fcntlrightsp),
 	    1, CHERIABI_SYS_cheriabi_cap_fcntls_get_PTRMASK);
@@ -6487,7 +6487,7 @@ CHERIABI_SYS_cheriabi_bindat_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_bindat_PTRMASK);
 	uap->namelen = cheri_getoffset(tmpcap);
 
-	/* [2] const struct sockaddr *__capability name */
+	/* [2] const struct sockaddr * __capability name */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->name),
 	    2, CHERIABI_SYS_cheriabi_bindat_PTRMASK);
@@ -6513,7 +6513,7 @@ CHERIABI_SYS_cheriabi_connectat_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_connectat_PTRMASK);
 	uap->namelen = cheri_getoffset(tmpcap);
 
-	/* [2] const struct sockaddr *__capability name */
+	/* [2] const struct sockaddr * __capability name */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->name),
 	    2, CHERIABI_SYS_cheriabi_connectat_PTRMASK);
@@ -6539,7 +6539,7 @@ CHERIABI_SYS_cheriabi_chflagsat_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_chflagsat_PTRMASK);
 	uap->atflag = cheri_getoffset(tmpcap);
 
-	/* [1] const char *__capability path */
+	/* [1] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    1, CHERIABI_SYS_cheriabi_chflagsat_PTRMASK);
@@ -6561,12 +6561,12 @@ CHERIABI_SYS_cheriabi_accept4_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_accept4_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [1] struct sockaddr *__capability name */
+	/* [1] struct sockaddr * __capability name */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->name),
 	    1, CHERIABI_SYS_cheriabi_accept4_PTRMASK);
 
-	/* [2] __socklen_t *__capability anamelen */
+	/* [2] __socklen_t * __capability anamelen */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->anamelen),
 	    2, CHERIABI_SYS_cheriabi_accept4_PTRMASK);
@@ -6584,7 +6584,7 @@ CHERIABI_SYS_cheriabi_pipe2_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_pipe2_PTRMASK);
 	uap->flags = cheri_getoffset(tmpcap);
 
-	/* [0] int *__capability fildes */
+	/* [0] int * __capability fildes */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->fildes),
 	    0, CHERIABI_SYS_cheriabi_pipe2_PTRMASK);
@@ -6597,7 +6597,7 @@ CHERIABI_SYS_cheriabi_aio_mlock_fill_uap(struct thread *td,
     struct cheriabi_aio_mlock_args *uap)
 {
 
-	/* [0] struct aiocb_c *__capability aiocbp */
+	/* [0] struct aiocb_c * __capability aiocbp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->aiocbp),
 	    0, CHERIABI_SYS_cheriabi_aio_mlock_PTRMASK);
@@ -6623,7 +6623,7 @@ CHERIABI_SYS_cheriabi_procctl_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_procctl_PTRMASK);
 	uap->com = cheri_getoffset(tmpcap);
 
-	/* [3] void *__capability data */
+	/* [3] void * __capability data */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->data),
 	    3, CHERIABI_SYS_cheriabi_procctl_PTRMASK);
@@ -6641,17 +6641,17 @@ CHERIABI_SYS_cheriabi_ppoll_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_ppoll_PTRMASK);
 	uap->nfds = cheri_getoffset(tmpcap);
 
-	/* [0] struct pollfd *__capability fds */
+	/* [0] struct pollfd * __capability fds */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->fds),
 	    0, CHERIABI_SYS_cheriabi_ppoll_PTRMASK);
 
-	/* [2] const struct timespec *__capability ts */
+	/* [2] const struct timespec * __capability ts */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->ts),
 	    2, CHERIABI_SYS_cheriabi_ppoll_PTRMASK);
 
-	/* [3] const sigset_t *__capability set */
+	/* [3] const sigset_t * __capability set */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->set),
 	    3, CHERIABI_SYS_cheriabi_ppoll_PTRMASK);
@@ -6669,7 +6669,7 @@ CHERIABI_SYS_cheriabi_futimens_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_futimens_PTRMASK);
 	uap->fd = cheri_getoffset(tmpcap);
 
-	/* [1] const struct timespec *__capability times */
+	/* [1] const struct timespec * __capability times */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->times),
 	    1, CHERIABI_SYS_cheriabi_futimens_PTRMASK);
@@ -6691,12 +6691,12 @@ CHERIABI_SYS_cheriabi_utimensat_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_utimensat_PTRMASK);
 	uap->flag = cheri_getoffset(tmpcap);
 
-	/* [1] const char *__capability path */
+	/* [1] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    1, CHERIABI_SYS_cheriabi_utimensat_PTRMASK);
 
-	/* [2] const struct timespec *__capability times */
+	/* [2] const struct timespec * __capability times */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->times),
 	    2, CHERIABI_SYS_cheriabi_utimensat_PTRMASK);
@@ -6727,7 +6727,7 @@ CHERIABI_SYS_cheriabi_fstat_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_fstat_PTRMASK);
 	uap->fd = cheri_getoffset(tmpcap);
 
-	/* [1] struct stat *__capability sb */
+	/* [1] struct stat * __capability sb */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->sb),
 	    1, CHERIABI_SYS_cheriabi_fstat_PTRMASK);
@@ -6749,12 +6749,12 @@ CHERIABI_SYS_cheriabi_fstatat_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_fstatat_PTRMASK);
 	uap->flag = cheri_getoffset(tmpcap);
 
-	/* [1] const char *__capability path */
+	/* [1] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    1, CHERIABI_SYS_cheriabi_fstatat_PTRMASK);
 
-	/* [2] struct stat *__capability buf */
+	/* [2] struct stat * __capability buf */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->buf),
 	    2, CHERIABI_SYS_cheriabi_fstatat_PTRMASK);
@@ -6767,12 +6767,12 @@ CHERIABI_SYS_cheriabi_fhstat_fill_uap(struct thread *td,
     struct cheriabi_fhstat_args *uap)
 {
 
-	/* [0] const struct fhandle *__capability u_fhp */
+	/* [0] const struct fhandle * __capability u_fhp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->u_fhp),
 	    0, CHERIABI_SYS_cheriabi_fhstat_PTRMASK);
 
-	/* [1] struct stat *__capability sb */
+	/* [1] struct stat * __capability sb */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->sb),
 	    1, CHERIABI_SYS_cheriabi_fhstat_PTRMASK);
@@ -6794,12 +6794,12 @@ CHERIABI_SYS_cheriabi_getdirentries_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_getdirentries_PTRMASK);
 	uap->count = cheri_getoffset(tmpcap);
 
-	/* [1] char *__capability buf */
+	/* [1] char * __capability buf */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->buf),
 	    1, CHERIABI_SYS_cheriabi_getdirentries_PTRMASK);
 
-	/* [3] off_t *__capability basep */
+	/* [3] off_t * __capability basep */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->basep),
 	    3, CHERIABI_SYS_cheriabi_getdirentries_PTRMASK);
@@ -6812,12 +6812,12 @@ CHERIABI_SYS_cheriabi_statfs_fill_uap(struct thread *td,
     struct cheriabi_statfs_args *uap)
 {
 
-	/* [0] char *__capability path */
+	/* [0] char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    0, CHERIABI_SYS_cheriabi_statfs_PTRMASK);
 
-	/* [1] struct statfs *__capability buf */
+	/* [1] struct statfs * __capability buf */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->buf),
 	    1, CHERIABI_SYS_cheriabi_statfs_PTRMASK);
@@ -6835,7 +6835,7 @@ CHERIABI_SYS_cheriabi_fstatfs_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_fstatfs_PTRMASK);
 	uap->fd = cheri_getoffset(tmpcap);
 
-	/* [1] struct statfs *__capability buf */
+	/* [1] struct statfs * __capability buf */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->buf),
 	    1, CHERIABI_SYS_cheriabi_fstatfs_PTRMASK);
@@ -6857,7 +6857,7 @@ CHERIABI_SYS_cheriabi_getfsstat_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_getfsstat_PTRMASK);
 	uap->mode = cheri_getoffset(tmpcap);
 
-	/* [0] struct statfs *__capability buf */
+	/* [0] struct statfs * __capability buf */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->buf),
 	    0, CHERIABI_SYS_cheriabi_getfsstat_PTRMASK);
@@ -6870,12 +6870,12 @@ CHERIABI_SYS_cheriabi_fhstatfs_fill_uap(struct thread *td,
     struct cheriabi_fhstatfs_args *uap)
 {
 
-	/* [0] const struct fhandle *__capability u_fhp */
+	/* [0] const struct fhandle * __capability u_fhp */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->u_fhp),
 	    0, CHERIABI_SYS_cheriabi_fhstatfs_PTRMASK);
 
-	/* [1] struct statfs *__capability buf */
+	/* [1] struct statfs * __capability buf */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->buf),
 	    1, CHERIABI_SYS_cheriabi_fhstatfs_PTRMASK);
@@ -6901,7 +6901,7 @@ CHERIABI_SYS_cheriabi_mknodat_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_mknodat_PTRMASK);
 	uap->dev = cheri_getoffset(tmpcap);
 
-	/* [1] const char *__capability path */
+	/* [1] const char * __capability path */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->path),
 	    1, CHERIABI_SYS_cheriabi_mknodat_PTRMASK);
@@ -6927,17 +6927,17 @@ CHERIABI_SYS_cheriabi_kevent_fill_uap(struct thread *td,
 	cheriabi_fetch_syscall_arg(td, &tmpcap, 4, CHERIABI_SYS_cheriabi_kevent_PTRMASK);
 	uap->nevents = cheri_getoffset(tmpcap);
 
-	/* [1] const struct kevent_c *__capability changelist */
+	/* [1] const struct kevent_c * __capability changelist */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->changelist),
 	    1, CHERIABI_SYS_cheriabi_kevent_PTRMASK);
 
-	/* [3] struct kevent_c *__capability eventlist */
+	/* [3] struct kevent_c * __capability eventlist */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->eventlist),
 	    3, CHERIABI_SYS_cheriabi_kevent_PTRMASK);
 
-	/* [5] const struct timespec *__capability timeout */
+	/* [5] const struct timespec * __capability timeout */
 	cheriabi_fetch_syscall_arg(td,
 	    __DECONST(void * __capability *, &uap->timeout),
 	    5, CHERIABI_SYS_cheriabi_kevent_PTRMASK);

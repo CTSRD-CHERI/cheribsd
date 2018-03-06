@@ -51,195 +51,195 @@ struct cheriabi_syscall_args {
 };
 struct cheriabi_read_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char buf_l_[PADL_(void *__capability)]; void *__capability buf; char buf_r_[PADR_(void *__capability)];
+	char buf_l_[PADL_(void * __capability)]; void * __capability buf; char buf_r_[PADR_(void * __capability)];
 	char nbyte_l_[PADL_(size_t)]; size_t nbyte; char nbyte_r_[PADR_(size_t)];
 };
 struct cheriabi_write_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char buf_l_[PADL_(const void *__capability)]; const void *__capability buf; char buf_r_[PADR_(const void *__capability)];
+	char buf_l_[PADL_(const void * __capability)]; const void * __capability buf; char buf_r_[PADR_(const void * __capability)];
 	char nbyte_l_[PADL_(size_t)]; size_t nbyte; char nbyte_r_[PADR_(size_t)];
 };
 struct cheriabi_open_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 };
 struct cheriabi_wait4_args {
 	char pid_l_[PADL_(int)]; int pid; char pid_r_[PADR_(int)];
-	char status_l_[PADL_(int *__capability)]; int *__capability status; char status_r_[PADR_(int *__capability)];
+	char status_l_[PADL_(int * __capability)]; int * __capability status; char status_r_[PADR_(int * __capability)];
 	char options_l_[PADL_(int)]; int options; char options_r_[PADR_(int)];
-	char rusage_l_[PADL_(struct rusage *__capability)]; struct rusage *__capability rusage; char rusage_r_[PADR_(struct rusage *__capability)];
+	char rusage_l_[PADL_(struct rusage * __capability)]; struct rusage * __capability rusage; char rusage_r_[PADR_(struct rusage * __capability)];
 };
 struct cheriabi_link_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
-	char to_l_[PADL_(const char *__capability)]; const char *__capability to; char to_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char to_l_[PADL_(const char * __capability)]; const char * __capability to; char to_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_unlink_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_chdir_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_chmod_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 };
 struct cheriabi_chown_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char uid_l_[PADL_(int)]; int uid; char uid_r_[PADR_(int)];
 	char gid_l_[PADL_(int)]; int gid; char gid_r_[PADR_(int)];
 };
 struct cheriabi_mount_args {
-	char type_l_[PADL_(const char *__capability)]; const char *__capability type; char type_r_[PADR_(const char *__capability)];
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char type_l_[PADL_(const char * __capability)]; const char * __capability type; char type_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
-	char data_l_[PADL_(void *__capability)]; void *__capability data; char data_r_[PADR_(void *__capability)];
+	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
 };
 struct cheriabi_unmount_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct cheriabi_ptrace_args {
 	char req_l_[PADL_(int)]; int req; char req_r_[PADR_(int)];
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
-	char addr_l_[PADL_(char *__capability)]; char *__capability addr; char addr_r_[PADR_(char *__capability)];
+	char addr_l_[PADL_(char * __capability)]; char * __capability addr; char addr_r_[PADR_(char * __capability)];
 	char data_l_[PADL_(int)]; int data; char data_r_[PADR_(int)];
 };
 struct cheriabi_recvmsg_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char msg_l_[PADL_(struct msghdr_c *__capability)]; struct msghdr_c *__capability msg; char msg_r_[PADR_(struct msghdr_c *__capability)];
+	char msg_l_[PADL_(struct msghdr_c * __capability)]; struct msghdr_c * __capability msg; char msg_r_[PADR_(struct msghdr_c * __capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct cheriabi_sendmsg_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char msg_l_[PADL_(const struct msghdr_c *__capability)]; const struct msghdr_c *__capability msg; char msg_r_[PADR_(const struct msghdr_c *__capability)];
+	char msg_l_[PADL_(const struct msghdr_c * __capability)]; const struct msghdr_c * __capability msg; char msg_r_[PADR_(const struct msghdr_c * __capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct cheriabi_recvfrom_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char buf_l_[PADL_(void *__capability)]; void *__capability buf; char buf_r_[PADR_(void *__capability)];
+	char buf_l_[PADL_(void * __capability)]; void * __capability buf; char buf_r_[PADR_(void * __capability)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
-	char from_l_[PADL_(struct sockaddr *__capability)]; struct sockaddr *__capability from; char from_r_[PADR_(struct sockaddr *__capability)];
-	char fromlenaddr_l_[PADL_(__socklen_t *__capability)]; __socklen_t *__capability fromlenaddr; char fromlenaddr_r_[PADR_(__socklen_t *__capability)];
+	char from_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability from; char from_r_[PADR_(struct sockaddr * __capability)];
+	char fromlenaddr_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability fromlenaddr; char fromlenaddr_r_[PADR_(__socklen_t * __capability)];
 };
 struct cheriabi_accept_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char name_l_[PADL_(struct sockaddr *__capability)]; struct sockaddr *__capability name; char name_r_[PADR_(struct sockaddr *__capability)];
-	char anamelen_l_[PADL_(__socklen_t *__capability)]; __socklen_t *__capability anamelen; char anamelen_r_[PADR_(__socklen_t *__capability)];
+	char name_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability name; char name_r_[PADR_(struct sockaddr * __capability)];
+	char anamelen_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability anamelen; char anamelen_r_[PADR_(__socklen_t * __capability)];
 };
 struct cheriabi_getpeername_args {
 	char fdes_l_[PADL_(int)]; int fdes; char fdes_r_[PADR_(int)];
-	char asa_l_[PADL_(struct sockaddr *__capability)]; struct sockaddr *__capability asa; char asa_r_[PADR_(struct sockaddr *__capability)];
-	char alen_l_[PADL_(__socklen_t *__capability)]; __socklen_t *__capability alen; char alen_r_[PADR_(__socklen_t *__capability)];
+	char asa_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability asa; char asa_r_[PADR_(struct sockaddr * __capability)];
+	char alen_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability alen; char alen_r_[PADR_(__socklen_t * __capability)];
 };
 struct cheriabi_getsockname_args {
 	char fdes_l_[PADL_(int)]; int fdes; char fdes_r_[PADR_(int)];
-	char asa_l_[PADL_(struct sockaddr *__capability)]; struct sockaddr *__capability asa; char asa_r_[PADR_(struct sockaddr *__capability)];
-	char alen_l_[PADL_(__socklen_t *__capability)]; __socklen_t *__capability alen; char alen_r_[PADR_(__socklen_t *__capability)];
+	char asa_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability asa; char asa_r_[PADR_(struct sockaddr * __capability)];
+	char alen_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability alen; char alen_r_[PADR_(__socklen_t * __capability)];
 };
 struct cheriabi_access_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char amode_l_[PADL_(int)]; int amode; char amode_r_[PADR_(int)];
 };
 struct cheriabi_chflags_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char flags_l_[PADL_(u_long)]; u_long flags; char flags_r_[PADR_(u_long)];
 };
 struct cheriabi_profil_args {
-	char samples_l_[PADL_(void *__capability)]; void *__capability samples; char samples_r_[PADR_(void *__capability)];
+	char samples_l_[PADL_(void * __capability)]; void * __capability samples; char samples_r_[PADR_(void * __capability)];
 	char size_l_[PADL_(size_t)]; size_t size; char size_r_[PADR_(size_t)];
 	char offset_l_[PADL_(size_t)]; size_t offset; char offset_r_[PADR_(size_t)];
 	char scale_l_[PADL_(u_int)]; u_int scale; char scale_r_[PADR_(u_int)];
 };
 struct cheriabi_ktrace_args {
-	char fname_l_[PADL_(const char *__capability)]; const char *__capability fname; char fname_r_[PADR_(const char *__capability)];
+	char fname_l_[PADL_(const char * __capability)]; const char * __capability fname; char fname_r_[PADR_(const char * __capability)];
 	char ops_l_[PADL_(int)]; int ops; char ops_r_[PADR_(int)];
 	char facs_l_[PADL_(int)]; int facs; char facs_r_[PADR_(int)];
 	char pid_l_[PADL_(int)]; int pid; char pid_r_[PADR_(int)];
 };
 struct cheriabi_getlogin_args {
-	char namebuf_l_[PADL_(char *__capability)]; char *__capability namebuf; char namebuf_r_[PADR_(char *__capability)];
+	char namebuf_l_[PADL_(char * __capability)]; char * __capability namebuf; char namebuf_r_[PADR_(char * __capability)];
 	char namelen_l_[PADL_(u_int)]; u_int namelen; char namelen_r_[PADR_(u_int)];
 };
 struct cheriabi_setlogin_args {
-	char namebuf_l_[PADL_(const char *__capability)]; const char *__capability namebuf; char namebuf_r_[PADR_(const char *__capability)];
+	char namebuf_l_[PADL_(const char * __capability)]; const char * __capability namebuf; char namebuf_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_acct_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_sigaltstack_args {
-	char ss_l_[PADL_(const cheriabi_stack_t *__capability)]; const cheriabi_stack_t *__capability ss; char ss_r_[PADR_(const cheriabi_stack_t *__capability)];
-	char oss_l_[PADL_(cheriabi_stack_t *__capability)]; cheriabi_stack_t *__capability oss; char oss_r_[PADR_(cheriabi_stack_t *__capability)];
+	char ss_l_[PADL_(const cheriabi_stack_t * __capability)]; const cheriabi_stack_t * __capability ss; char ss_r_[PADR_(const cheriabi_stack_t * __capability)];
+	char oss_l_[PADL_(cheriabi_stack_t * __capability)]; cheriabi_stack_t * __capability oss; char oss_r_[PADR_(cheriabi_stack_t * __capability)];
 };
 struct cheriabi_ioctl_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char com_l_[PADL_(u_long)]; u_long com; char com_r_[PADR_(u_long)];
-	char data_l_[PADL_(void *__capability)]; void *__capability data; char data_r_[PADR_(void *__capability)];
+	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
 };
 struct cheriabi_revoke_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_symlink_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
-	char link_l_[PADL_(const char *__capability)]; const char *__capability link; char link_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char link_l_[PADL_(const char * __capability)]; const char * __capability link; char link_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_readlink_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
-	char buf_l_[PADL_(char *__capability)]; char *__capability buf; char buf_r_[PADR_(char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char buf_l_[PADL_(char * __capability)]; char * __capability buf; char buf_r_[PADR_(char * __capability)];
 	char count_l_[PADL_(size_t)]; size_t count; char count_r_[PADR_(size_t)];
 };
 struct cheriabi_execve_args {
-	char fname_l_[PADL_(const char *__capability)]; const char *__capability fname; char fname_r_[PADR_(const char *__capability)];
-	char argv_l_[PADL_(void *__capability *__capability)]; void *__capability *__capability argv; char argv_r_[PADR_(void *__capability *__capability)];
-	char envv_l_[PADL_(void *__capability *__capability)]; void *__capability *__capability envv; char envv_r_[PADR_(void *__capability *__capability)];
+	char fname_l_[PADL_(const char * __capability)]; const char * __capability fname; char fname_r_[PADR_(const char * __capability)];
+	char argv_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability argv; char argv_r_[PADR_(void * __capability * __capability)];
+	char envv_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability envv; char envv_r_[PADR_(void * __capability * __capability)];
 };
 struct cheriabi_chroot_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_msync_args {
-	char addr_l_[PADL_(void *__capability)]; void *__capability addr; char addr_r_[PADR_(void *__capability)];
+	char addr_l_[PADL_(void * __capability)]; void * __capability addr; char addr_r_[PADR_(void * __capability)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct cheriabi_munmap_args {
-	char addr_l_[PADL_(void *__capability)]; void *__capability addr; char addr_r_[PADR_(void *__capability)];
+	char addr_l_[PADL_(void * __capability)]; void * __capability addr; char addr_r_[PADR_(void * __capability)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 };
 struct cheriabi_mprotect_args {
-	char addr_l_[PADL_(const void *__capability)]; const void *__capability addr; char addr_r_[PADR_(const void *__capability)];
+	char addr_l_[PADL_(const void * __capability)]; const void * __capability addr; char addr_r_[PADR_(const void * __capability)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char prot_l_[PADL_(int)]; int prot; char prot_r_[PADR_(int)];
 };
 struct cheriabi_madvise_args {
-	char addr_l_[PADL_(void *__capability)]; void *__capability addr; char addr_r_[PADR_(void *__capability)];
+	char addr_l_[PADL_(void * __capability)]; void * __capability addr; char addr_r_[PADR_(void * __capability)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char behav_l_[PADL_(int)]; int behav; char behav_r_[PADR_(int)];
 };
 struct cheriabi_mincore_args {
-	char addr_l_[PADL_(const void *__capability)]; const void *__capability addr; char addr_r_[PADR_(const void *__capability)];
+	char addr_l_[PADL_(const void * __capability)]; const void * __capability addr; char addr_r_[PADR_(const void * __capability)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
-	char vec_l_[PADL_(char *__capability)]; char *__capability vec; char vec_r_[PADR_(char *__capability)];
+	char vec_l_[PADL_(char * __capability)]; char * __capability vec; char vec_r_[PADR_(char * __capability)];
 };
 struct cheriabi_getgroups_args {
 	char gidsetsize_l_[PADL_(u_int)]; u_int gidsetsize; char gidsetsize_r_[PADR_(u_int)];
-	char gidset_l_[PADL_(gid_t *__capability)]; gid_t *__capability gidset; char gidset_r_[PADR_(gid_t *__capability)];
+	char gidset_l_[PADL_(gid_t * __capability)]; gid_t * __capability gidset; char gidset_r_[PADR_(gid_t * __capability)];
 };
 struct cheriabi_setgroups_args {
 	char gidsetsize_l_[PADL_(u_int)]; u_int gidsetsize; char gidsetsize_r_[PADR_(u_int)];
-	char gidset_l_[PADL_(const gid_t *__capability)]; const gid_t *__capability gidset; char gidset_r_[PADR_(const gid_t *__capability)];
+	char gidset_l_[PADL_(const gid_t * __capability)]; const gid_t * __capability gidset; char gidset_r_[PADR_(const gid_t * __capability)];
 };
 struct cheriabi_setitimer_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char itv_l_[PADL_(const struct itimerval *__capability)]; const struct itimerval *__capability itv; char itv_r_[PADR_(const struct itimerval *__capability)];
-	char oitv_l_[PADL_(struct itimerval *__capability)]; struct itimerval *__capability oitv; char oitv_r_[PADR_(struct itimerval *__capability)];
+	char itv_l_[PADL_(const struct itimerval * __capability)]; const struct itimerval * __capability itv; char itv_r_[PADR_(const struct itimerval * __capability)];
+	char oitv_l_[PADL_(struct itimerval * __capability)]; struct itimerval * __capability oitv; char oitv_r_[PADR_(struct itimerval * __capability)];
 };
 struct cheriabi_swapon_args {
-	char name_l_[PADL_(const char *__capability)]; const char *__capability name; char name_r_[PADR_(const char *__capability)];
+	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_getitimer_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char itv_l_[PADL_(struct itimerval *__capability)]; struct itimerval *__capability itv; char itv_r_[PADR_(struct itimerval *__capability)];
+	char itv_l_[PADL_(struct itimerval * __capability)]; struct itimerval * __capability itv; char itv_r_[PADR_(struct itimerval * __capability)];
 };
 struct cheriabi_fcntl_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
@@ -248,523 +248,523 @@ struct cheriabi_fcntl_args {
 };
 struct cheriabi_select_args {
 	char nd_l_[PADL_(int)]; int nd; char nd_r_[PADR_(int)];
-	char in_l_[PADL_(fd_set *__capability)]; fd_set *__capability in; char in_r_[PADR_(fd_set *__capability)];
-	char ou_l_[PADL_(fd_set *__capability)]; fd_set *__capability ou; char ou_r_[PADR_(fd_set *__capability)];
-	char ex_l_[PADL_(fd_set *__capability)]; fd_set *__capability ex; char ex_r_[PADR_(fd_set *__capability)];
-	char tv_l_[PADL_(struct timeval *__capability)]; struct timeval *__capability tv; char tv_r_[PADR_(struct timeval *__capability)];
+	char in_l_[PADL_(fd_set * __capability)]; fd_set * __capability in; char in_r_[PADR_(fd_set * __capability)];
+	char ou_l_[PADL_(fd_set * __capability)]; fd_set * __capability ou; char ou_r_[PADR_(fd_set * __capability)];
+	char ex_l_[PADL_(fd_set * __capability)]; fd_set * __capability ex; char ex_r_[PADR_(fd_set * __capability)];
+	char tv_l_[PADL_(struct timeval * __capability)]; struct timeval * __capability tv; char tv_r_[PADR_(struct timeval * __capability)];
 };
 struct cheriabi_connect_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char name_l_[PADL_(const struct sockaddr *__capability)]; const struct sockaddr *__capability name; char name_r_[PADR_(const struct sockaddr *__capability)];
+	char name_l_[PADL_(const struct sockaddr * __capability)]; const struct sockaddr * __capability name; char name_r_[PADR_(const struct sockaddr * __capability)];
 	char namelen_l_[PADL_(__socklen_t)]; __socklen_t namelen; char namelen_r_[PADR_(__socklen_t)];
 };
 struct cheriabi_bind_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char name_l_[PADL_(const struct sockaddr *__capability)]; const struct sockaddr *__capability name; char name_r_[PADR_(const struct sockaddr *__capability)];
+	char name_l_[PADL_(const struct sockaddr * __capability)]; const struct sockaddr * __capability name; char name_r_[PADR_(const struct sockaddr * __capability)];
 	char namelen_l_[PADL_(__socklen_t)]; __socklen_t namelen; char namelen_r_[PADR_(__socklen_t)];
 };
 struct cheriabi_setsockopt_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
 	char level_l_[PADL_(int)]; int level; char level_r_[PADR_(int)];
 	char name_l_[PADL_(int)]; int name; char name_r_[PADR_(int)];
-	char val_l_[PADL_(const void *__capability)]; const void *__capability val; char val_r_[PADR_(const void *__capability)];
+	char val_l_[PADL_(const void * __capability)]; const void * __capability val; char val_r_[PADR_(const void * __capability)];
 	char valsize_l_[PADL_(__socklen_t)]; __socklen_t valsize; char valsize_r_[PADR_(__socklen_t)];
 };
 struct cheriabi_gettimeofday_args {
-	char tp_l_[PADL_(struct timeval *__capability)]; struct timeval *__capability tp; char tp_r_[PADR_(struct timeval *__capability)];
-	char tzp_l_[PADL_(struct timezone *__capability)]; struct timezone *__capability tzp; char tzp_r_[PADR_(struct timezone *__capability)];
+	char tp_l_[PADL_(struct timeval * __capability)]; struct timeval * __capability tp; char tp_r_[PADR_(struct timeval * __capability)];
+	char tzp_l_[PADL_(struct timezone * __capability)]; struct timezone * __capability tzp; char tzp_r_[PADR_(struct timezone * __capability)];
 };
 struct cheriabi_getrusage_args {
 	char who_l_[PADL_(int)]; int who; char who_r_[PADR_(int)];
-	char rusage_l_[PADL_(struct rusage *__capability)]; struct rusage *__capability rusage; char rusage_r_[PADR_(struct rusage *__capability)];
+	char rusage_l_[PADL_(struct rusage * __capability)]; struct rusage * __capability rusage; char rusage_r_[PADR_(struct rusage * __capability)];
 };
 struct cheriabi_getsockopt_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
 	char level_l_[PADL_(int)]; int level; char level_r_[PADR_(int)];
 	char name_l_[PADL_(int)]; int name; char name_r_[PADR_(int)];
-	char val_l_[PADL_(void *__capability)]; void *__capability val; char val_r_[PADR_(void *__capability)];
-	char avalsize_l_[PADL_(__socklen_t *__capability)]; __socklen_t *__capability avalsize; char avalsize_r_[PADR_(__socklen_t *__capability)];
+	char val_l_[PADL_(void * __capability)]; void * __capability val; char val_r_[PADR_(void * __capability)];
+	char avalsize_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability avalsize; char avalsize_r_[PADR_(__socklen_t * __capability)];
 };
 struct cheriabi_readv_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char iovp_l_[PADL_(struct iovec_c *__capability)]; struct iovec_c *__capability iovp; char iovp_r_[PADR_(struct iovec_c *__capability)];
+	char iovp_l_[PADL_(struct iovec_c * __capability)]; struct iovec_c * __capability iovp; char iovp_r_[PADR_(struct iovec_c * __capability)];
 	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
 };
 struct cheriabi_writev_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char iovp_l_[PADL_(struct iovec_c *__capability)]; struct iovec_c *__capability iovp; char iovp_r_[PADR_(struct iovec_c *__capability)];
+	char iovp_l_[PADL_(struct iovec_c * __capability)]; struct iovec_c * __capability iovp; char iovp_r_[PADR_(struct iovec_c * __capability)];
 	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
 };
 struct cheriabi_settimeofday_args {
-	char tv_l_[PADL_(const struct timeval *__capability)]; const struct timeval *__capability tv; char tv_r_[PADR_(const struct timeval *__capability)];
-	char tzp_l_[PADL_(const struct timezone *__capability)]; const struct timezone *__capability tzp; char tzp_r_[PADR_(const struct timezone *__capability)];
+	char tv_l_[PADL_(const struct timeval * __capability)]; const struct timeval * __capability tv; char tv_r_[PADR_(const struct timeval * __capability)];
+	char tzp_l_[PADL_(const struct timezone * __capability)]; const struct timezone * __capability tzp; char tzp_r_[PADR_(const struct timezone * __capability)];
 };
 struct cheriabi_rename_args {
-	char from_l_[PADL_(const char *__capability)]; const char *__capability from; char from_r_[PADR_(const char *__capability)];
-	char to_l_[PADL_(const char *__capability)]; const char *__capability to; char to_r_[PADR_(const char *__capability)];
+	char from_l_[PADL_(const char * __capability)]; const char * __capability from; char from_r_[PADR_(const char * __capability)];
+	char to_l_[PADL_(const char * __capability)]; const char * __capability to; char to_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_mkfifo_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 };
 struct cheriabi_sendto_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char buf_l_[PADL_(const void *__capability)]; const void *__capability buf; char buf_r_[PADR_(const void *__capability)];
+	char buf_l_[PADL_(const void * __capability)]; const void * __capability buf; char buf_r_[PADR_(const void * __capability)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
-	char to_l_[PADL_(const struct sockaddr *__capability)]; const struct sockaddr *__capability to; char to_r_[PADR_(const struct sockaddr *__capability)];
+	char to_l_[PADL_(const struct sockaddr * __capability)]; const struct sockaddr * __capability to; char to_r_[PADR_(const struct sockaddr * __capability)];
 	char tolen_l_[PADL_(__socklen_t)]; __socklen_t tolen; char tolen_r_[PADR_(__socklen_t)];
 };
 struct cheriabi_socketpair_args {
 	char domain_l_[PADL_(int)]; int domain; char domain_r_[PADR_(int)];
 	char type_l_[PADL_(int)]; int type; char type_r_[PADR_(int)];
 	char protocol_l_[PADL_(int)]; int protocol; char protocol_r_[PADR_(int)];
-	char rsv_l_[PADL_(int *__capability)]; int *__capability rsv; char rsv_r_[PADR_(int *__capability)];
+	char rsv_l_[PADL_(int * __capability)]; int * __capability rsv; char rsv_r_[PADR_(int * __capability)];
 };
 struct cheriabi_mkdir_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 };
 struct cheriabi_rmdir_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_utimes_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
-	char tptr_l_[PADL_(const struct timeval *__capability)]; const struct timeval *__capability tptr; char tptr_r_[PADR_(const struct timeval *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char tptr_l_[PADL_(const struct timeval * __capability)]; const struct timeval * __capability tptr; char tptr_r_[PADR_(const struct timeval * __capability)];
 };
 struct cheriabi_adjtime_args {
-	char delta_l_[PADL_(const struct timeval *__capability)]; const struct timeval *__capability delta; char delta_r_[PADR_(const struct timeval *__capability)];
-	char olddelta_l_[PADL_(struct timeval *__capability)]; struct timeval *__capability olddelta; char olddelta_r_[PADR_(struct timeval *__capability)];
+	char delta_l_[PADL_(const struct timeval * __capability)]; const struct timeval * __capability delta; char delta_r_[PADR_(const struct timeval * __capability)];
+	char olddelta_l_[PADL_(struct timeval * __capability)]; struct timeval * __capability olddelta; char olddelta_r_[PADR_(struct timeval * __capability)];
 };
 struct cheriabi_quotactl_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
 	char uid_l_[PADL_(int)]; int uid; char uid_r_[PADR_(int)];
-	char arg_l_[PADL_(void *__capability)]; void *__capability arg; char arg_r_[PADR_(void *__capability)];
+	char arg_l_[PADL_(void * __capability)]; void * __capability arg; char arg_r_[PADR_(void * __capability)];
 };
 struct cheriabi_nlm_syscall_args {
 	char debug_level_l_[PADL_(int)]; int debug_level; char debug_level_r_[PADR_(int)];
 	char grace_period_l_[PADL_(int)]; int grace_period; char grace_period_r_[PADR_(int)];
 	char addr_count_l_[PADL_(int)]; int addr_count; char addr_count_r_[PADR_(int)];
-	char addrs_l_[PADL_(void *__capability *__capability)]; void *__capability *__capability addrs; char addrs_r_[PADR_(void *__capability *__capability)];
+	char addrs_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability addrs; char addrs_r_[PADR_(void * __capability * __capability)];
 };
 struct cheriabi_nfssvc_args {
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
-	char argp_l_[PADL_(void *__capability)]; void *__capability argp; char argp_r_[PADR_(void *__capability)];
+	char argp_l_[PADL_(void * __capability)]; void * __capability argp; char argp_r_[PADR_(void * __capability)];
 };
 struct cheriabi_lgetfh_args {
-	char fname_l_[PADL_(const char *__capability)]; const char *__capability fname; char fname_r_[PADR_(const char *__capability)];
-	char fhp_l_[PADL_(struct fhandle *__capability)]; struct fhandle *__capability fhp; char fhp_r_[PADR_(struct fhandle *__capability)];
+	char fname_l_[PADL_(const char * __capability)]; const char * __capability fname; char fname_r_[PADR_(const char * __capability)];
+	char fhp_l_[PADL_(struct fhandle * __capability)]; struct fhandle * __capability fhp; char fhp_r_[PADR_(struct fhandle * __capability)];
 };
 struct cheriabi_getfh_args {
-	char fname_l_[PADL_(const char *__capability)]; const char *__capability fname; char fname_r_[PADR_(const char *__capability)];
-	char fhp_l_[PADL_(struct fhandle *__capability)]; struct fhandle *__capability fhp; char fhp_r_[PADR_(struct fhandle *__capability)];
+	char fname_l_[PADL_(const char * __capability)]; const char * __capability fname; char fname_r_[PADR_(const char * __capability)];
+	char fhp_l_[PADL_(struct fhandle * __capability)]; struct fhandle * __capability fhp; char fhp_r_[PADR_(struct fhandle * __capability)];
 };
 struct cheriabi_sysarch_args {
 	char op_l_[PADL_(int)]; int op; char op_r_[PADR_(int)];
-	char parms_l_[PADL_(char *__capability)]; char *__capability parms; char parms_r_[PADR_(char *__capability)];
+	char parms_l_[PADL_(char * __capability)]; char * __capability parms; char parms_r_[PADR_(char * __capability)];
 };
 struct cheriabi_rtprio_args {
 	char function_l_[PADL_(int)]; int function; char function_r_[PADR_(int)];
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
-	char rtp_l_[PADL_(struct rtprio *__capability)]; struct rtprio *__capability rtp; char rtp_r_[PADR_(struct rtprio *__capability)];
+	char rtp_l_[PADL_(struct rtprio * __capability)]; struct rtprio * __capability rtp; char rtp_r_[PADR_(struct rtprio * __capability)];
 };
 struct cheriabi_ntp_adjtime_args {
-	char tp_l_[PADL_(struct timex *__capability)]; struct timex *__capability tp; char tp_r_[PADR_(struct timex *__capability)];
+	char tp_l_[PADL_(struct timex * __capability)]; struct timex * __capability tp; char tp_r_[PADR_(struct timex * __capability)];
 };
 struct cheriabi_pathconf_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char name_l_[PADL_(int)]; int name; char name_r_[PADR_(int)];
 };
 struct cheriabi_getrlimit_args {
 	char which_l_[PADL_(u_int)]; u_int which; char which_r_[PADR_(u_int)];
-	char rlp_l_[PADL_(struct rlimit *__capability)]; struct rlimit *__capability rlp; char rlp_r_[PADR_(struct rlimit *__capability)];
+	char rlp_l_[PADL_(struct rlimit * __capability)]; struct rlimit * __capability rlp; char rlp_r_[PADR_(struct rlimit * __capability)];
 };
 struct cheriabi_setrlimit_args {
 	char which_l_[PADL_(u_int)]; u_int which; char which_r_[PADR_(u_int)];
-	char rlp_l_[PADL_(struct rlimit *__capability)]; struct rlimit *__capability rlp; char rlp_r_[PADR_(struct rlimit *__capability)];
+	char rlp_l_[PADL_(struct rlimit * __capability)]; struct rlimit * __capability rlp; char rlp_r_[PADR_(struct rlimit * __capability)];
 };
 struct cheriabi___sysctl_args {
-	char name_l_[PADL_(int *__capability)]; int *__capability name; char name_r_[PADR_(int *__capability)];
+	char name_l_[PADL_(int * __capability)]; int * __capability name; char name_r_[PADR_(int * __capability)];
 	char namelen_l_[PADL_(u_int)]; u_int namelen; char namelen_r_[PADR_(u_int)];
-	char old_l_[PADL_(void *__capability)]; void *__capability old; char old_r_[PADR_(void *__capability)];
-	char oldlenp_l_[PADL_(size_t *__capability)]; size_t *__capability oldlenp; char oldlenp_r_[PADR_(size_t *__capability)];
-	char new_l_[PADL_(void *__capability)]; void *__capability new; char new_r_[PADR_(void *__capability)];
+	char old_l_[PADL_(void * __capability)]; void * __capability old; char old_r_[PADR_(void * __capability)];
+	char oldlenp_l_[PADL_(size_t * __capability)]; size_t * __capability oldlenp; char oldlenp_r_[PADR_(size_t * __capability)];
+	char new_l_[PADL_(void * __capability)]; void * __capability new; char new_r_[PADR_(void * __capability)];
 	char newlen_l_[PADL_(size_t)]; size_t newlen; char newlen_r_[PADR_(size_t)];
 };
 struct cheriabi_mlock_args {
-	char addr_l_[PADL_(const void *__capability)]; const void *__capability addr; char addr_r_[PADR_(const void *__capability)];
+	char addr_l_[PADL_(const void * __capability)]; const void * __capability addr; char addr_r_[PADR_(const void * __capability)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 };
 struct cheriabi_munlock_args {
-	char addr_l_[PADL_(const void *__capability)]; const void *__capability addr; char addr_r_[PADR_(const void *__capability)];
+	char addr_l_[PADL_(const void * __capability)]; const void * __capability addr; char addr_r_[PADR_(const void * __capability)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 };
 struct cheriabi_undelete_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_futimes_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char tptr_l_[PADL_(const struct timeval *__capability)]; const struct timeval *__capability tptr; char tptr_r_[PADR_(const struct timeval *__capability)];
+	char tptr_l_[PADL_(const struct timeval * __capability)]; const struct timeval * __capability tptr; char tptr_r_[PADR_(const struct timeval * __capability)];
 };
 struct cheriabi_poll_args {
-	char fds_l_[PADL_(struct pollfd *__capability)]; struct pollfd *__capability fds; char fds_r_[PADR_(struct pollfd *__capability)];
+	char fds_l_[PADL_(struct pollfd * __capability)]; struct pollfd * __capability fds; char fds_r_[PADR_(struct pollfd * __capability)];
 	char nfds_l_[PADL_(u_int)]; u_int nfds; char nfds_r_[PADR_(u_int)];
 	char timeout_l_[PADL_(int)]; int timeout; char timeout_r_[PADR_(int)];
 };
 struct cheriabi_semop_args {
 	char semid_l_[PADL_(int)]; int semid; char semid_r_[PADR_(int)];
-	char sops_l_[PADL_(struct sembuf *__capability)]; struct sembuf *__capability sops; char sops_r_[PADR_(struct sembuf *__capability)];
+	char sops_l_[PADL_(struct sembuf * __capability)]; struct sembuf * __capability sops; char sops_r_[PADR_(struct sembuf * __capability)];
 	char nsops_l_[PADL_(u_int)]; u_int nsops; char nsops_r_[PADR_(u_int)];
 };
 struct cheriabi_msgsnd_args {
 	char msqid_l_[PADL_(int)]; int msqid; char msqid_r_[PADR_(int)];
-	char msgp_l_[PADL_(void *__capability)]; void *__capability msgp; char msgp_r_[PADR_(void *__capability)];
+	char msgp_l_[PADL_(void * __capability)]; void * __capability msgp; char msgp_r_[PADR_(void * __capability)];
 	char msgsz_l_[PADL_(size_t)]; size_t msgsz; char msgsz_r_[PADR_(size_t)];
 	char msgflg_l_[PADL_(int)]; int msgflg; char msgflg_r_[PADR_(int)];
 };
 struct cheriabi_msgrcv_args {
 	char msqid_l_[PADL_(int)]; int msqid; char msqid_r_[PADR_(int)];
-	char msgp_l_[PADL_(void *__capability)]; void *__capability msgp; char msgp_r_[PADR_(void *__capability)];
+	char msgp_l_[PADL_(void * __capability)]; void * __capability msgp; char msgp_r_[PADR_(void * __capability)];
 	char msgsz_l_[PADL_(size_t)]; size_t msgsz; char msgsz_r_[PADR_(size_t)];
 	char msgtyp_l_[PADL_(long)]; long msgtyp; char msgtyp_r_[PADR_(long)];
 	char msgflg_l_[PADL_(int)]; int msgflg; char msgflg_r_[PADR_(int)];
 };
 struct cheriabi_shmat_args {
 	char shmid_l_[PADL_(int)]; int shmid; char shmid_r_[PADR_(int)];
-	char shmaddr_l_[PADL_(void *__capability)]; void *__capability shmaddr; char shmaddr_r_[PADR_(void *__capability)];
+	char shmaddr_l_[PADL_(void * __capability)]; void * __capability shmaddr; char shmaddr_r_[PADR_(void * __capability)];
 	char shmflg_l_[PADL_(int)]; int shmflg; char shmflg_r_[PADR_(int)];
 };
 struct cheriabi_shmdt_args {
-	char shmaddr_l_[PADL_(void *__capability)]; void *__capability shmaddr; char shmaddr_r_[PADR_(void *__capability)];
+	char shmaddr_l_[PADL_(void * __capability)]; void * __capability shmaddr; char shmaddr_r_[PADR_(void * __capability)];
 };
 struct cheriabi_clock_gettime_args {
 	char clock_id_l_[PADL_(clockid_t)]; clockid_t clock_id; char clock_id_r_[PADR_(clockid_t)];
-	char tp_l_[PADL_(struct timespec *__capability)]; struct timespec *__capability tp; char tp_r_[PADR_(struct timespec *__capability)];
+	char tp_l_[PADL_(struct timespec * __capability)]; struct timespec * __capability tp; char tp_r_[PADR_(struct timespec * __capability)];
 };
 struct cheriabi_clock_settime_args {
 	char clock_id_l_[PADL_(clockid_t)]; clockid_t clock_id; char clock_id_r_[PADR_(clockid_t)];
-	char tp_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability tp; char tp_r_[PADR_(const struct timespec *__capability)];
+	char tp_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability tp; char tp_r_[PADR_(const struct timespec * __capability)];
 };
 struct cheriabi_clock_getres_args {
 	char clock_id_l_[PADL_(clockid_t)]; clockid_t clock_id; char clock_id_r_[PADR_(clockid_t)];
-	char tp_l_[PADL_(struct timespec *__capability)]; struct timespec *__capability tp; char tp_r_[PADR_(struct timespec *__capability)];
+	char tp_l_[PADL_(struct timespec * __capability)]; struct timespec * __capability tp; char tp_r_[PADR_(struct timespec * __capability)];
 };
 struct cheriabi_ktimer_create_args {
 	char clock_id_l_[PADL_(clockid_t)]; clockid_t clock_id; char clock_id_r_[PADR_(clockid_t)];
-	char evp_l_[PADL_(struct sigevent_c *__capability)]; struct sigevent_c *__capability evp; char evp_r_[PADR_(struct sigevent_c *__capability)];
-	char timerid_l_[PADL_(int *__capability)]; int *__capability timerid; char timerid_r_[PADR_(int *__capability)];
+	char evp_l_[PADL_(struct sigevent_c * __capability)]; struct sigevent_c * __capability evp; char evp_r_[PADR_(struct sigevent_c * __capability)];
+	char timerid_l_[PADL_(int * __capability)]; int * __capability timerid; char timerid_r_[PADR_(int * __capability)];
 };
 struct cheriabi_ktimer_settime_args {
 	char timerid_l_[PADL_(int)]; int timerid; char timerid_r_[PADR_(int)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
-	char value_l_[PADL_(const struct itimerspec *__capability)]; const struct itimerspec *__capability value; char value_r_[PADR_(const struct itimerspec *__capability)];
-	char ovalue_l_[PADL_(struct itimerspec *__capability)]; struct itimerspec *__capability ovalue; char ovalue_r_[PADR_(struct itimerspec *__capability)];
+	char value_l_[PADL_(const struct itimerspec * __capability)]; const struct itimerspec * __capability value; char value_r_[PADR_(const struct itimerspec * __capability)];
+	char ovalue_l_[PADL_(struct itimerspec * __capability)]; struct itimerspec * __capability ovalue; char ovalue_r_[PADR_(struct itimerspec * __capability)];
 };
 struct cheriabi_ktimer_gettime_args {
 	char timerid_l_[PADL_(int)]; int timerid; char timerid_r_[PADR_(int)];
-	char value_l_[PADL_(struct itimerspec *__capability)]; struct itimerspec *__capability value; char value_r_[PADR_(struct itimerspec *__capability)];
+	char value_l_[PADL_(struct itimerspec * __capability)]; struct itimerspec * __capability value; char value_r_[PADR_(struct itimerspec * __capability)];
 };
 struct cheriabi_nanosleep_args {
-	char rqtp_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability rqtp; char rqtp_r_[PADR_(const struct timespec *__capability)];
-	char rmtp_l_[PADL_(struct timespec *__capability)]; struct timespec *__capability rmtp; char rmtp_r_[PADR_(struct timespec *__capability)];
+	char rqtp_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability rqtp; char rqtp_r_[PADR_(const struct timespec * __capability)];
+	char rmtp_l_[PADL_(struct timespec * __capability)]; struct timespec * __capability rmtp; char rmtp_r_[PADR_(struct timespec * __capability)];
 };
 struct cheriabi_ffclock_getcounter_args {
-	char ffcount_l_[PADL_(ffcounter *__capability)]; ffcounter *__capability ffcount; char ffcount_r_[PADR_(ffcounter *__capability)];
+	char ffcount_l_[PADL_(ffcounter * __capability)]; ffcounter * __capability ffcount; char ffcount_r_[PADR_(ffcounter * __capability)];
 };
 struct cheriabi_ffclock_setestimate_args {
-	char cest_l_[PADL_(struct ffclock_estimate *__capability)]; struct ffclock_estimate *__capability cest; char cest_r_[PADR_(struct ffclock_estimate *__capability)];
+	char cest_l_[PADL_(struct ffclock_estimate * __capability)]; struct ffclock_estimate * __capability cest; char cest_r_[PADR_(struct ffclock_estimate * __capability)];
 };
 struct cheriabi_ffclock_getestimate_args {
-	char cest_l_[PADL_(struct ffclock_estimate *__capability)]; struct ffclock_estimate *__capability cest; char cest_r_[PADR_(struct ffclock_estimate *__capability)];
+	char cest_l_[PADL_(struct ffclock_estimate * __capability)]; struct ffclock_estimate * __capability cest; char cest_r_[PADR_(struct ffclock_estimate * __capability)];
 };
 struct cheriabi_clock_nanosleep_args {
 	char clock_id_l_[PADL_(clockid_t)]; clockid_t clock_id; char clock_id_r_[PADR_(clockid_t)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
-	char rqtp_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability rqtp; char rqtp_r_[PADR_(const struct timespec *__capability)];
-	char rmtp_l_[PADL_(struct timespec *__capability)]; struct timespec *__capability rmtp; char rmtp_r_[PADR_(struct timespec *__capability)];
+	char rqtp_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability rqtp; char rqtp_r_[PADR_(const struct timespec * __capability)];
+	char rmtp_l_[PADL_(struct timespec * __capability)]; struct timespec * __capability rmtp; char rmtp_r_[PADR_(struct timespec * __capability)];
 };
 struct cheriabi_clock_getcpuclockid2_args {
 	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char clock_id_l_[PADL_(clockid_t *__capability)]; clockid_t *__capability clock_id; char clock_id_r_[PADR_(clockid_t *__capability)];
+	char clock_id_l_[PADL_(clockid_t * __capability)]; clockid_t * __capability clock_id; char clock_id_r_[PADR_(clockid_t * __capability)];
 };
 struct cheriabi_ntp_gettime_args {
-	char ntvp_l_[PADL_(struct ntptimeval *__capability)]; struct ntptimeval *__capability ntvp; char ntvp_r_[PADR_(struct ntptimeval *__capability)];
+	char ntvp_l_[PADL_(struct ntptimeval * __capability)]; struct ntptimeval * __capability ntvp; char ntvp_r_[PADR_(struct ntptimeval * __capability)];
 };
 struct cheriabi_minherit_args {
-	char addr_l_[PADL_(void *__capability)]; void *__capability addr; char addr_r_[PADR_(void *__capability)];
+	char addr_l_[PADL_(void * __capability)]; void * __capability addr; char addr_r_[PADR_(void * __capability)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char inherit_l_[PADL_(int)]; int inherit; char inherit_r_[PADR_(int)];
 };
 struct cheriabi_lchown_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char uid_l_[PADL_(int)]; int uid; char uid_r_[PADR_(int)];
 	char gid_l_[PADL_(int)]; int gid; char gid_r_[PADR_(int)];
 };
 struct cheriabi_aio_read_args {
-	char aiocbp_l_[PADL_(struct aiocb_c *__capability)]; struct aiocb_c *__capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c *__capability)];
+	char aiocbp_l_[PADL_(struct aiocb_c * __capability)]; struct aiocb_c * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c * __capability)];
 };
 struct cheriabi_aio_write_args {
-	char aiocbp_l_[PADL_(struct aiocb_c *__capability)]; struct aiocb_c *__capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c *__capability)];
+	char aiocbp_l_[PADL_(struct aiocb_c * __capability)]; struct aiocb_c * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c * __capability)];
 };
 struct cheriabi_lio_listio_args {
 	char mode_l_[PADL_(int)]; int mode; char mode_r_[PADR_(int)];
-	char acb_list_l_[PADL_(struct aiocb_c *__capability const *__capability)]; struct aiocb_c *__capability const *__capability acb_list; char acb_list_r_[PADR_(struct aiocb_c *__capability const *__capability)];
+	char acb_list_l_[PADL_(struct aiocb_c * __capability const * __capability)]; struct aiocb_c * __capability const * __capability acb_list; char acb_list_r_[PADR_(struct aiocb_c * __capability const * __capability)];
 	char nent_l_[PADL_(int)]; int nent; char nent_r_[PADR_(int)];
-	char sig_l_[PADL_(struct sigevent_c *__capability)]; struct sigevent_c *__capability sig; char sig_r_[PADR_(struct sigevent_c *__capability)];
+	char sig_l_[PADL_(struct sigevent_c * __capability)]; struct sigevent_c * __capability sig; char sig_r_[PADR_(struct sigevent_c * __capability)];
 };
 struct cheriabi_kbounce_args {
-	char src_l_[PADL_(const void *__capability)]; const void *__capability src; char src_r_[PADR_(const void *__capability)];
-	char dst_l_[PADL_(void *__capability)]; void *__capability dst; char dst_r_[PADR_(void *__capability)];
+	char src_l_[PADL_(const void * __capability)]; const void * __capability src; char src_r_[PADR_(const void * __capability)];
+	char dst_l_[PADL_(void * __capability)]; void * __capability dst; char dst_r_[PADR_(void * __capability)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct cheriabi_lchmod_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 };
 struct cheriabi_lutimes_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
-	char tptr_l_[PADL_(const struct timeval *__capability)]; const struct timeval *__capability tptr; char tptr_r_[PADR_(const struct timeval *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char tptr_l_[PADL_(const struct timeval * __capability)]; const struct timeval * __capability tptr; char tptr_r_[PADR_(const struct timeval * __capability)];
 };
 struct cheriabi_preadv_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char iovp_l_[PADL_(struct iovec_c *__capability)]; struct iovec_c *__capability iovp; char iovp_r_[PADR_(struct iovec_c *__capability)];
+	char iovp_l_[PADL_(struct iovec_c * __capability)]; struct iovec_c * __capability iovp; char iovp_r_[PADR_(struct iovec_c * __capability)];
 	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
 	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
 };
 struct cheriabi_pwritev_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char iovp_l_[PADL_(struct iovec_c *__capability)]; struct iovec_c *__capability iovp; char iovp_r_[PADR_(struct iovec_c *__capability)];
+	char iovp_l_[PADL_(struct iovec_c * __capability)]; struct iovec_c * __capability iovp; char iovp_r_[PADR_(struct iovec_c * __capability)];
 	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
 	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
 };
 struct cheriabi_fhopen_args {
-	char u_fhp_l_[PADL_(const struct fhandle *__capability)]; const struct fhandle *__capability u_fhp; char u_fhp_r_[PADR_(const struct fhandle *__capability)];
+	char u_fhp_l_[PADL_(const struct fhandle * __capability)]; const struct fhandle * __capability u_fhp; char u_fhp_r_[PADR_(const struct fhandle * __capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct cheriabi_modstat_args {
 	char modid_l_[PADL_(int)]; int modid; char modid_r_[PADR_(int)];
-	char stat_l_[PADL_(struct module_stat *__capability)]; struct module_stat *__capability stat; char stat_r_[PADR_(struct module_stat *__capability)];
+	char stat_l_[PADL_(struct module_stat * __capability)]; struct module_stat * __capability stat; char stat_r_[PADR_(struct module_stat * __capability)];
 };
 struct cheriabi_modfind_args {
-	char name_l_[PADL_(const char *__capability)]; const char *__capability name; char name_r_[PADR_(const char *__capability)];
+	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_kldload_args {
-	char file_l_[PADL_(const char *__capability)]; const char *__capability file; char file_r_[PADR_(const char *__capability)];
+	char file_l_[PADL_(const char * __capability)]; const char * __capability file; char file_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_kldfind_args {
-	char file_l_[PADL_(const char *__capability)]; const char *__capability file; char file_r_[PADR_(const char *__capability)];
+	char file_l_[PADL_(const char * __capability)]; const char * __capability file; char file_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_kldstat_args {
 	char fileid_l_[PADL_(int)]; int fileid; char fileid_r_[PADR_(int)];
-	char stat_l_[PADL_(struct kld_file_stat_c *__capability)]; struct kld_file_stat_c *__capability stat; char stat_r_[PADR_(struct kld_file_stat_c *__capability)];
+	char stat_l_[PADL_(struct kld_file_stat_c * __capability)]; struct kld_file_stat_c * __capability stat; char stat_r_[PADR_(struct kld_file_stat_c * __capability)];
 };
 struct cheriabi_aio_return_args {
-	char aiocbp_l_[PADL_(struct aiocb_c *__capability)]; struct aiocb_c *__capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c *__capability)];
+	char aiocbp_l_[PADL_(struct aiocb_c * __capability)]; struct aiocb_c * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c * __capability)];
 };
 struct cheriabi_aio_suspend_args {
-	char aiocbp_l_[PADL_(struct aiocb_c *__capability const *__capability)]; struct aiocb_c *__capability const *__capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c *__capability const *__capability)];
+	char aiocbp_l_[PADL_(struct aiocb_c * __capability const * __capability)]; struct aiocb_c * __capability const * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c * __capability const * __capability)];
 	char nent_l_[PADL_(int)]; int nent; char nent_r_[PADR_(int)];
-	char timeout_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability timeout; char timeout_r_[PADR_(const struct timespec *__capability)];
+	char timeout_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability timeout; char timeout_r_[PADR_(const struct timespec * __capability)];
 };
 struct cheriabi_aio_cancel_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char aiocbp_l_[PADL_(struct aiocb_c *__capability)]; struct aiocb_c *__capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c *__capability)];
+	char aiocbp_l_[PADL_(struct aiocb_c * __capability)]; struct aiocb_c * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c * __capability)];
 };
 struct cheriabi_aio_error_args {
-	char aiocbp_l_[PADL_(struct aiocb_c *__capability)]; struct aiocb_c *__capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c *__capability)];
+	char aiocbp_l_[PADL_(struct aiocb_c * __capability)]; struct aiocb_c * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c * __capability)];
 };
 struct cheriabi___getcwd_args {
-	char buf_l_[PADL_(char *__capability)]; char *__capability buf; char buf_r_[PADR_(char *__capability)];
+	char buf_l_[PADL_(char * __capability)]; char * __capability buf; char buf_r_[PADR_(char * __capability)];
 	char buflen_l_[PADL_(size_t)]; size_t buflen; char buflen_r_[PADR_(size_t)];
 };
 struct cheriabi_sched_setparam_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
-	char param_l_[PADL_(const struct sched_param *__capability)]; const struct sched_param *__capability param; char param_r_[PADR_(const struct sched_param *__capability)];
+	char param_l_[PADL_(const struct sched_param * __capability)]; const struct sched_param * __capability param; char param_r_[PADR_(const struct sched_param * __capability)];
 };
 struct cheriabi_sched_getparam_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
-	char param_l_[PADL_(struct sched_param *__capability)]; struct sched_param *__capability param; char param_r_[PADR_(struct sched_param *__capability)];
+	char param_l_[PADL_(struct sched_param * __capability)]; struct sched_param * __capability param; char param_r_[PADR_(struct sched_param * __capability)];
 };
 struct cheriabi_sched_setscheduler_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
 	char policy_l_[PADL_(int)]; int policy; char policy_r_[PADR_(int)];
-	char param_l_[PADL_(const struct sched_param *__capability)]; const struct sched_param *__capability param; char param_r_[PADR_(const struct sched_param *__capability)];
+	char param_l_[PADL_(const struct sched_param * __capability)]; const struct sched_param * __capability param; char param_r_[PADR_(const struct sched_param * __capability)];
 };
 struct cheriabi_sched_rr_get_interval_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
-	char interval_l_[PADL_(struct timespec *__capability)]; struct timespec *__capability interval; char interval_r_[PADR_(struct timespec *__capability)];
+	char interval_l_[PADL_(struct timespec * __capability)]; struct timespec * __capability interval; char interval_r_[PADR_(struct timespec * __capability)];
 };
 struct cheriabi_utrace_args {
-	char addr_l_[PADL_(const void *__capability)]; const void *__capability addr; char addr_r_[PADR_(const void *__capability)];
+	char addr_l_[PADL_(const void * __capability)]; const void * __capability addr; char addr_r_[PADR_(const void * __capability)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 };
 struct cheriabi_kldsym_args {
 	char fileid_l_[PADL_(int)]; int fileid; char fileid_r_[PADR_(int)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char data_l_[PADL_(struct kld_sym_lookup_c *__capability)]; struct kld_sym_lookup_c *__capability data; char data_r_[PADR_(struct kld_sym_lookup_c *__capability)];
+	char data_l_[PADL_(struct kld_sym_lookup_c * __capability)]; struct kld_sym_lookup_c * __capability data; char data_r_[PADR_(struct kld_sym_lookup_c * __capability)];
 };
 struct cheriabi_jail_args {
-	char jailp_l_[PADL_(struct jail_c *__capability)]; struct jail_c *__capability jailp; char jailp_r_[PADR_(struct jail_c *__capability)];
+	char jailp_l_[PADL_(struct jail_c * __capability)]; struct jail_c * __capability jailp; char jailp_r_[PADR_(struct jail_c * __capability)];
 };
 struct cheriabi_sigprocmask_args {
 	char how_l_[PADL_(int)]; int how; char how_r_[PADR_(int)];
-	char set_l_[PADL_(const sigset_t *__capability)]; const sigset_t *__capability set; char set_r_[PADR_(const sigset_t *__capability)];
-	char oset_l_[PADL_(sigset_t *__capability)]; sigset_t *__capability oset; char oset_r_[PADR_(sigset_t *__capability)];
+	char set_l_[PADL_(const sigset_t * __capability)]; const sigset_t * __capability set; char set_r_[PADR_(const sigset_t * __capability)];
+	char oset_l_[PADL_(sigset_t * __capability)]; sigset_t * __capability oset; char oset_r_[PADR_(sigset_t * __capability)];
 };
 struct cheriabi_sigsuspend_args {
-	char sigmask_l_[PADL_(const sigset_t *__capability)]; const sigset_t *__capability sigmask; char sigmask_r_[PADR_(const sigset_t *__capability)];
+	char sigmask_l_[PADL_(const sigset_t * __capability)]; const sigset_t * __capability sigmask; char sigmask_r_[PADR_(const sigset_t * __capability)];
 };
 struct cheriabi_sigpending_args {
-	char set_l_[PADL_(sigset_t *__capability)]; sigset_t *__capability set; char set_r_[PADR_(sigset_t *__capability)];
+	char set_l_[PADL_(sigset_t * __capability)]; sigset_t * __capability set; char set_r_[PADR_(sigset_t * __capability)];
 };
 struct cheriabi_sigtimedwait_args {
-	char set_l_[PADL_(const sigset_t *__capability)]; const sigset_t *__capability set; char set_r_[PADR_(const sigset_t *__capability)];
-	char info_l_[PADL_(struct siginfo_c *__capability)]; struct siginfo_c *__capability info; char info_r_[PADR_(struct siginfo_c *__capability)];
-	char timeout_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability timeout; char timeout_r_[PADR_(const struct timespec *__capability)];
+	char set_l_[PADL_(const sigset_t * __capability)]; const sigset_t * __capability set; char set_r_[PADR_(const sigset_t * __capability)];
+	char info_l_[PADL_(struct siginfo_c * __capability)]; struct siginfo_c * __capability info; char info_r_[PADR_(struct siginfo_c * __capability)];
+	char timeout_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability timeout; char timeout_r_[PADR_(const struct timespec * __capability)];
 };
 struct cheriabi_sigwaitinfo_args {
-	char set_l_[PADL_(const sigset_t *__capability)]; const sigset_t *__capability set; char set_r_[PADR_(const sigset_t *__capability)];
-	char info_l_[PADL_(struct siginfo_c *__capability)]; struct siginfo_c *__capability info; char info_r_[PADR_(struct siginfo_c *__capability)];
+	char set_l_[PADL_(const sigset_t * __capability)]; const sigset_t * __capability set; char set_r_[PADR_(const sigset_t * __capability)];
+	char info_l_[PADL_(struct siginfo_c * __capability)]; struct siginfo_c * __capability info; char info_r_[PADR_(struct siginfo_c * __capability)];
 };
 struct cheriabi___acl_get_file_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
-	char aclp_l_[PADL_(struct acl *__capability)]; struct acl *__capability aclp; char aclp_r_[PADR_(struct acl *__capability)];
+	char aclp_l_[PADL_(struct acl * __capability)]; struct acl * __capability aclp; char aclp_r_[PADR_(struct acl * __capability)];
 };
 struct cheriabi___acl_set_file_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
-	char aclp_l_[PADL_(struct acl *__capability)]; struct acl *__capability aclp; char aclp_r_[PADR_(struct acl *__capability)];
+	char aclp_l_[PADL_(struct acl * __capability)]; struct acl * __capability aclp; char aclp_r_[PADR_(struct acl * __capability)];
 };
 struct cheriabi___acl_get_fd_args {
 	char filedes_l_[PADL_(int)]; int filedes; char filedes_r_[PADR_(int)];
 	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
-	char aclp_l_[PADL_(struct acl *__capability)]; struct acl *__capability aclp; char aclp_r_[PADR_(struct acl *__capability)];
+	char aclp_l_[PADL_(struct acl * __capability)]; struct acl * __capability aclp; char aclp_r_[PADR_(struct acl * __capability)];
 };
 struct cheriabi___acl_set_fd_args {
 	char filedes_l_[PADL_(int)]; int filedes; char filedes_r_[PADR_(int)];
 	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
-	char aclp_l_[PADL_(struct acl *__capability)]; struct acl *__capability aclp; char aclp_r_[PADR_(struct acl *__capability)];
+	char aclp_l_[PADL_(struct acl * __capability)]; struct acl * __capability aclp; char aclp_r_[PADR_(struct acl * __capability)];
 };
 struct cheriabi___acl_delete_file_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
 };
 struct cheriabi___acl_aclcheck_file_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
-	char aclp_l_[PADL_(struct acl *__capability)]; struct acl *__capability aclp; char aclp_r_[PADR_(struct acl *__capability)];
+	char aclp_l_[PADL_(struct acl * __capability)]; struct acl * __capability aclp; char aclp_r_[PADR_(struct acl * __capability)];
 };
 struct cheriabi___acl_aclcheck_fd_args {
 	char filedes_l_[PADL_(int)]; int filedes; char filedes_r_[PADR_(int)];
 	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
-	char aclp_l_[PADL_(struct acl *__capability)]; struct acl *__capability aclp; char aclp_r_[PADR_(struct acl *__capability)];
+	char aclp_l_[PADL_(struct acl * __capability)]; struct acl * __capability aclp; char aclp_r_[PADR_(struct acl * __capability)];
 };
 struct cheriabi_extattrctl_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char filename_l_[PADL_(const char *__capability)]; const char *__capability filename; char filename_r_[PADR_(const char *__capability)];
+	char filename_l_[PADL_(const char * __capability)]; const char * __capability filename; char filename_r_[PADR_(const char * __capability)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
-	char attrname_l_[PADL_(const char *__capability)]; const char *__capability attrname; char attrname_r_[PADR_(const char *__capability)];
+	char attrname_l_[PADL_(const char * __capability)]; const char * __capability attrname; char attrname_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_extattr_set_file_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
-	char attrname_l_[PADL_(const char *__capability)]; const char *__capability attrname; char attrname_r_[PADR_(const char *__capability)];
-	char data_l_[PADL_(void *__capability)]; void *__capability data; char data_r_[PADR_(void *__capability)];
+	char attrname_l_[PADL_(const char * __capability)]; const char * __capability attrname; char attrname_r_[PADR_(const char * __capability)];
+	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
 };
 struct cheriabi_extattr_get_file_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
-	char attrname_l_[PADL_(const char *__capability)]; const char *__capability attrname; char attrname_r_[PADR_(const char *__capability)];
-	char data_l_[PADL_(void *__capability)]; void *__capability data; char data_r_[PADR_(void *__capability)];
+	char attrname_l_[PADL_(const char * __capability)]; const char * __capability attrname; char attrname_r_[PADR_(const char * __capability)];
+	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
 };
 struct cheriabi_extattr_delete_file_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
-	char attrname_l_[PADL_(const char *__capability)]; const char *__capability attrname; char attrname_r_[PADR_(const char *__capability)];
+	char attrname_l_[PADL_(const char * __capability)]; const char * __capability attrname; char attrname_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_aio_waitcomplete_args {
-	char aiocbp_l_[PADL_(struct aiocb_c *__capability *__capability)]; struct aiocb_c *__capability *__capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c *__capability *__capability)];
-	char timeout_l_[PADL_(struct timespec *__capability)]; struct timespec *__capability timeout; char timeout_r_[PADR_(struct timespec *__capability)];
+	char aiocbp_l_[PADL_(struct aiocb_c * __capability * __capability)]; struct aiocb_c * __capability * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c * __capability * __capability)];
+	char timeout_l_[PADL_(struct timespec * __capability)]; struct timespec * __capability timeout; char timeout_r_[PADR_(struct timespec * __capability)];
 };
 struct cheriabi_getresuid_args {
-	char ruid_l_[PADL_(uid_t *__capability)]; uid_t *__capability ruid; char ruid_r_[PADR_(uid_t *__capability)];
-	char euid_l_[PADL_(uid_t *__capability)]; uid_t *__capability euid; char euid_r_[PADR_(uid_t *__capability)];
-	char suid_l_[PADL_(uid_t *__capability)]; uid_t *__capability suid; char suid_r_[PADR_(uid_t *__capability)];
+	char ruid_l_[PADL_(uid_t * __capability)]; uid_t * __capability ruid; char ruid_r_[PADR_(uid_t * __capability)];
+	char euid_l_[PADL_(uid_t * __capability)]; uid_t * __capability euid; char euid_r_[PADR_(uid_t * __capability)];
+	char suid_l_[PADL_(uid_t * __capability)]; uid_t * __capability suid; char suid_r_[PADR_(uid_t * __capability)];
 };
 struct cheriabi_getresgid_args {
-	char rgid_l_[PADL_(gid_t *__capability)]; gid_t *__capability rgid; char rgid_r_[PADR_(gid_t *__capability)];
-	char egid_l_[PADL_(gid_t *__capability)]; gid_t *__capability egid; char egid_r_[PADR_(gid_t *__capability)];
-	char sgid_l_[PADL_(gid_t *__capability)]; gid_t *__capability sgid; char sgid_r_[PADR_(gid_t *__capability)];
+	char rgid_l_[PADL_(gid_t * __capability)]; gid_t * __capability rgid; char rgid_r_[PADR_(gid_t * __capability)];
+	char egid_l_[PADL_(gid_t * __capability)]; gid_t * __capability egid; char egid_r_[PADR_(gid_t * __capability)];
+	char sgid_l_[PADL_(gid_t * __capability)]; gid_t * __capability sgid; char sgid_r_[PADR_(gid_t * __capability)];
 };
 struct cheriabi_extattr_set_fd_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
-	char attrname_l_[PADL_(const char *__capability)]; const char *__capability attrname; char attrname_r_[PADR_(const char *__capability)];
-	char data_l_[PADL_(void *__capability)]; void *__capability data; char data_r_[PADR_(void *__capability)];
+	char attrname_l_[PADL_(const char * __capability)]; const char * __capability attrname; char attrname_r_[PADR_(const char * __capability)];
+	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
 };
 struct cheriabi_extattr_get_fd_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
-	char attrname_l_[PADL_(const char *__capability)]; const char *__capability attrname; char attrname_r_[PADR_(const char *__capability)];
-	char data_l_[PADL_(void *__capability)]; void *__capability data; char data_r_[PADR_(void *__capability)];
+	char attrname_l_[PADL_(const char * __capability)]; const char * __capability attrname; char attrname_r_[PADR_(const char * __capability)];
+	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
 };
 struct cheriabi_extattr_delete_fd_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
-	char attrname_l_[PADL_(const char *__capability)]; const char *__capability attrname; char attrname_r_[PADR_(const char *__capability)];
+	char attrname_l_[PADL_(const char * __capability)]; const char * __capability attrname; char attrname_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_eaccess_args {
-	char path_l_[PADL_(char *__capability)]; char *__capability path; char path_r_[PADR_(char *__capability)];
+	char path_l_[PADL_(char * __capability)]; char * __capability path; char path_r_[PADR_(char * __capability)];
 	char amode_l_[PADL_(int)]; int amode; char amode_r_[PADR_(int)];
 };
 struct cheriabi_nmount_args {
-	char iovp_l_[PADL_(struct iovec_c *__capability)]; struct iovec_c *__capability iovp; char iovp_r_[PADR_(struct iovec_c *__capability)];
+	char iovp_l_[PADL_(struct iovec_c * __capability)]; struct iovec_c * __capability iovp; char iovp_r_[PADR_(struct iovec_c * __capability)];
 	char iovcnt_l_[PADL_(unsigned int)]; unsigned int iovcnt; char iovcnt_r_[PADR_(unsigned int)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct cheriabi___mac_get_proc_args {
-	char mac_p_l_[PADL_(struct mac_c *__capability)]; struct mac_c *__capability mac_p; char mac_p_r_[PADR_(struct mac_c *__capability)];
+	char mac_p_l_[PADL_(struct mac_c * __capability)]; struct mac_c * __capability mac_p; char mac_p_r_[PADR_(struct mac_c * __capability)];
 };
 struct cheriabi___mac_set_proc_args {
-	char mac_p_l_[PADL_(struct mac_c *__capability)]; struct mac_c *__capability mac_p; char mac_p_r_[PADR_(struct mac_c *__capability)];
+	char mac_p_l_[PADL_(struct mac_c * __capability)]; struct mac_c * __capability mac_p; char mac_p_r_[PADR_(struct mac_c * __capability)];
 };
 struct cheriabi___mac_get_fd_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char mac_p_l_[PADL_(struct mac_c *__capability)]; struct mac_c *__capability mac_p; char mac_p_r_[PADR_(struct mac_c *__capability)];
+	char mac_p_l_[PADL_(struct mac_c * __capability)]; struct mac_c * __capability mac_p; char mac_p_r_[PADR_(struct mac_c * __capability)];
 };
 struct cheriabi___mac_get_file_args {
-	char path_p_l_[PADL_(const char *__capability)]; const char *__capability path_p; char path_p_r_[PADR_(const char *__capability)];
-	char mac_p_l_[PADL_(struct mac_c *__capability)]; struct mac_c *__capability mac_p; char mac_p_r_[PADR_(struct mac_c *__capability)];
+	char path_p_l_[PADL_(const char * __capability)]; const char * __capability path_p; char path_p_r_[PADR_(const char * __capability)];
+	char mac_p_l_[PADL_(struct mac_c * __capability)]; struct mac_c * __capability mac_p; char mac_p_r_[PADR_(struct mac_c * __capability)];
 };
 struct cheriabi___mac_set_fd_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char mac_p_l_[PADL_(struct mac_c *__capability)]; struct mac_c *__capability mac_p; char mac_p_r_[PADR_(struct mac_c *__capability)];
+	char mac_p_l_[PADL_(struct mac_c * __capability)]; struct mac_c * __capability mac_p; char mac_p_r_[PADR_(struct mac_c * __capability)];
 };
 struct cheriabi___mac_set_file_args {
-	char path_p_l_[PADL_(const char *__capability)]; const char *__capability path_p; char path_p_r_[PADR_(const char *__capability)];
-	char mac_p_l_[PADL_(struct mac_c *__capability)]; struct mac_c *__capability mac_p; char mac_p_r_[PADR_(struct mac_c *__capability)];
+	char path_p_l_[PADL_(const char * __capability)]; const char * __capability path_p; char path_p_r_[PADR_(const char * __capability)];
+	char mac_p_l_[PADL_(struct mac_c * __capability)]; struct mac_c * __capability mac_p; char mac_p_r_[PADR_(struct mac_c * __capability)];
 };
 struct cheriabi_kenv_args {
 	char what_l_[PADL_(int)]; int what; char what_r_[PADR_(int)];
-	char name_l_[PADL_(const char *__capability)]; const char *__capability name; char name_r_[PADR_(const char *__capability)];
-	char value_l_[PADL_(char *__capability)]; char *__capability value; char value_r_[PADR_(char *__capability)];
+	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
+	char value_l_[PADL_(char * __capability)]; char * __capability value; char value_r_[PADR_(char * __capability)];
 	char len_l_[PADL_(int)]; int len; char len_r_[PADR_(int)];
 };
 struct cheriabi_lchflags_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char flags_l_[PADL_(u_long)]; u_long flags; char flags_r_[PADR_(u_long)];
 };
 struct cheriabi_uuidgen_args {
-	char store_l_[PADL_(struct uuid *__capability)]; struct uuid *__capability store; char store_r_[PADR_(struct uuid *__capability)];
+	char store_l_[PADL_(struct uuid * __capability)]; struct uuid * __capability store; char store_r_[PADR_(struct uuid * __capability)];
 	char count_l_[PADL_(int)]; int count; char count_r_[PADR_(int)];
 };
 struct cheriabi_sendfile_args {
@@ -772,267 +772,267 @@ struct cheriabi_sendfile_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
 	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
-	char hdtr_l_[PADL_(struct sf_hdtr_c *__capability)]; struct sf_hdtr_c *__capability hdtr; char hdtr_r_[PADR_(struct sf_hdtr_c *__capability)];
-	char sbytes_l_[PADL_(off_t *__capability)]; off_t *__capability sbytes; char sbytes_r_[PADR_(off_t *__capability)];
+	char hdtr_l_[PADL_(struct sf_hdtr_c * __capability)]; struct sf_hdtr_c * __capability hdtr; char hdtr_r_[PADR_(struct sf_hdtr_c * __capability)];
+	char sbytes_l_[PADL_(off_t * __capability)]; off_t * __capability sbytes; char sbytes_r_[PADR_(off_t * __capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct cheriabi_mac_syscall_args {
-	char policy_l_[PADL_(const char *__capability)]; const char *__capability policy; char policy_r_[PADR_(const char *__capability)];
+	char policy_l_[PADL_(const char * __capability)]; const char * __capability policy; char policy_r_[PADR_(const char * __capability)];
 	char call_l_[PADL_(int)]; int call; char call_r_[PADR_(int)];
-	char arg_l_[PADL_(void *__capability)]; void *__capability arg; char arg_r_[PADR_(void *__capability)];
+	char arg_l_[PADL_(void * __capability)]; void * __capability arg; char arg_r_[PADR_(void * __capability)];
 };
 struct cheriabi___mac_get_pid_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
-	char mac_p_l_[PADL_(struct mac_c *__capability)]; struct mac_c *__capability mac_p; char mac_p_r_[PADR_(struct mac_c *__capability)];
+	char mac_p_l_[PADL_(struct mac_c * __capability)]; struct mac_c * __capability mac_p; char mac_p_r_[PADR_(struct mac_c * __capability)];
 };
 struct cheriabi___mac_get_link_args {
-	char path_p_l_[PADL_(const char *__capability)]; const char *__capability path_p; char path_p_r_[PADR_(const char *__capability)];
-	char mac_p_l_[PADL_(struct mac_c *__capability)]; struct mac_c *__capability mac_p; char mac_p_r_[PADR_(struct mac_c *__capability)];
+	char path_p_l_[PADL_(const char * __capability)]; const char * __capability path_p; char path_p_r_[PADR_(const char * __capability)];
+	char mac_p_l_[PADL_(struct mac_c * __capability)]; struct mac_c * __capability mac_p; char mac_p_r_[PADR_(struct mac_c * __capability)];
 };
 struct cheriabi___mac_set_link_args {
-	char path_p_l_[PADL_(const char *__capability)]; const char *__capability path_p; char path_p_r_[PADR_(const char *__capability)];
-	char mac_p_l_[PADL_(struct mac_c *__capability)]; struct mac_c *__capability mac_p; char mac_p_r_[PADR_(struct mac_c *__capability)];
+	char path_p_l_[PADL_(const char * __capability)]; const char * __capability path_p; char path_p_r_[PADR_(const char * __capability)];
+	char mac_p_l_[PADL_(struct mac_c * __capability)]; struct mac_c * __capability mac_p; char mac_p_r_[PADR_(struct mac_c * __capability)];
 };
 struct cheriabi_extattr_set_link_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
-	char attrname_l_[PADL_(const char *__capability)]; const char *__capability attrname; char attrname_r_[PADR_(const char *__capability)];
-	char data_l_[PADL_(void *__capability)]; void *__capability data; char data_r_[PADR_(void *__capability)];
+	char attrname_l_[PADL_(const char * __capability)]; const char * __capability attrname; char attrname_r_[PADR_(const char * __capability)];
+	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
 };
 struct cheriabi_extattr_get_link_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
-	char attrname_l_[PADL_(const char *__capability)]; const char *__capability attrname; char attrname_r_[PADR_(const char *__capability)];
-	char data_l_[PADL_(void *__capability)]; void *__capability data; char data_r_[PADR_(void *__capability)];
+	char attrname_l_[PADL_(const char * __capability)]; const char * __capability attrname; char attrname_r_[PADR_(const char * __capability)];
+	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
 };
 struct cheriabi_extattr_delete_link_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
-	char attrname_l_[PADL_(const char *__capability)]; const char *__capability attrname; char attrname_r_[PADR_(const char *__capability)];
+	char attrname_l_[PADL_(const char * __capability)]; const char * __capability attrname; char attrname_r_[PADR_(const char * __capability)];
 };
 struct cheriabi___mac_execve_args {
-	char fname_l_[PADL_(char *__capability)]; char *__capability fname; char fname_r_[PADR_(char *__capability)];
-	char argv_l_[PADL_(void *__capability *__capability)]; void *__capability *__capability argv; char argv_r_[PADR_(void *__capability *__capability)];
-	char envv_l_[PADL_(void *__capability *__capability)]; void *__capability *__capability envv; char envv_r_[PADR_(void *__capability *__capability)];
-	char mac_p_l_[PADL_(struct mac_c *__capability)]; struct mac_c *__capability mac_p; char mac_p_r_[PADR_(struct mac_c *__capability)];
+	char fname_l_[PADL_(char * __capability)]; char * __capability fname; char fname_r_[PADR_(char * __capability)];
+	char argv_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability argv; char argv_r_[PADR_(void * __capability * __capability)];
+	char envv_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability envv; char envv_r_[PADR_(void * __capability * __capability)];
+	char mac_p_l_[PADL_(struct mac_c * __capability)]; struct mac_c * __capability mac_p; char mac_p_r_[PADR_(struct mac_c * __capability)];
 };
 struct cheriabi_sigaction_args {
 	char sig_l_[PADL_(int)]; int sig; char sig_r_[PADR_(int)];
-	char act_l_[PADL_(struct sigaction_c *__capability)]; struct sigaction_c *__capability act; char act_r_[PADR_(struct sigaction_c *__capability)];
-	char oact_l_[PADL_(struct sigaction_c *__capability)]; struct sigaction_c *__capability oact; char oact_r_[PADR_(struct sigaction_c *__capability)];
+	char act_l_[PADL_(struct sigaction_c * __capability)]; struct sigaction_c * __capability act; char act_r_[PADR_(struct sigaction_c * __capability)];
+	char oact_l_[PADL_(struct sigaction_c * __capability)]; struct sigaction_c * __capability oact; char oact_r_[PADR_(struct sigaction_c * __capability)];
 };
 struct cheriabi_sigreturn_args {
-	char sigcntxp_l_[PADL_(const ucontext_c_t *__capability)]; const ucontext_c_t *__capability sigcntxp; char sigcntxp_r_[PADR_(const ucontext_c_t *__capability)];
+	char sigcntxp_l_[PADL_(const ucontext_c_t * __capability)]; const ucontext_c_t * __capability sigcntxp; char sigcntxp_r_[PADR_(const ucontext_c_t * __capability)];
 };
 struct cheriabi_getcontext_args {
-	char ucp_l_[PADL_(ucontext_c_t *__capability)]; ucontext_c_t *__capability ucp; char ucp_r_[PADR_(ucontext_c_t *__capability)];
+	char ucp_l_[PADL_(ucontext_c_t * __capability)]; ucontext_c_t * __capability ucp; char ucp_r_[PADR_(ucontext_c_t * __capability)];
 };
 struct cheriabi_setcontext_args {
-	char ucp_l_[PADL_(const ucontext_c_t *__capability)]; const ucontext_c_t *__capability ucp; char ucp_r_[PADR_(const ucontext_c_t *__capability)];
+	char ucp_l_[PADL_(const ucontext_c_t * __capability)]; const ucontext_c_t * __capability ucp; char ucp_r_[PADR_(const ucontext_c_t * __capability)];
 };
 struct cheriabi_swapcontext_args {
-	char oucp_l_[PADL_(ucontext_c_t *__capability)]; ucontext_c_t *__capability oucp; char oucp_r_[PADR_(ucontext_c_t *__capability)];
-	char ucp_l_[PADL_(const ucontext_c_t *__capability)]; const ucontext_c_t *__capability ucp; char ucp_r_[PADR_(const ucontext_c_t *__capability)];
+	char oucp_l_[PADL_(ucontext_c_t * __capability)]; ucontext_c_t * __capability oucp; char oucp_r_[PADR_(ucontext_c_t * __capability)];
+	char ucp_l_[PADL_(const ucontext_c_t * __capability)]; const ucontext_c_t * __capability ucp; char ucp_r_[PADR_(const ucontext_c_t * __capability)];
 };
 struct cheriabi_swapoff_args {
-	char name_l_[PADL_(const char *__capability)]; const char *__capability name; char name_r_[PADR_(const char *__capability)];
+	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
 };
 struct cheriabi___acl_get_link_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
-	char aclp_l_[PADL_(struct acl *__capability)]; struct acl *__capability aclp; char aclp_r_[PADR_(struct acl *__capability)];
+	char aclp_l_[PADL_(struct acl * __capability)]; struct acl * __capability aclp; char aclp_r_[PADR_(struct acl * __capability)];
 };
 struct cheriabi___acl_set_link_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
-	char aclp_l_[PADL_(struct acl *__capability)]; struct acl *__capability aclp; char aclp_r_[PADR_(struct acl *__capability)];
+	char aclp_l_[PADL_(struct acl * __capability)]; struct acl * __capability aclp; char aclp_r_[PADR_(struct acl * __capability)];
 };
 struct cheriabi___acl_delete_link_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
 };
 struct cheriabi___acl_aclcheck_link_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char type_l_[PADL_(acl_type_t)]; acl_type_t type; char type_r_[PADR_(acl_type_t)];
-	char aclp_l_[PADL_(struct acl *__capability)]; struct acl *__capability aclp; char aclp_r_[PADR_(struct acl *__capability)];
+	char aclp_l_[PADL_(struct acl * __capability)]; struct acl * __capability aclp; char aclp_r_[PADR_(struct acl * __capability)];
 };
 struct cheriabi_sigwait_args {
-	char set_l_[PADL_(const sigset_t *__capability)]; const sigset_t *__capability set; char set_r_[PADR_(const sigset_t *__capability)];
-	char sig_l_[PADL_(int *__capability)]; int *__capability sig; char sig_r_[PADR_(int *__capability)];
+	char set_l_[PADL_(const sigset_t * __capability)]; const sigset_t * __capability set; char set_r_[PADR_(const sigset_t * __capability)];
+	char sig_l_[PADL_(int * __capability)]; int * __capability sig; char sig_r_[PADR_(int * __capability)];
 };
 struct cheriabi_thr_create_args {
-	char ctx_l_[PADL_(ucontext_c_t *__capability)]; ucontext_c_t *__capability ctx; char ctx_r_[PADR_(ucontext_c_t *__capability)];
-	char id_l_[PADL_(long *__capability)]; long *__capability id; char id_r_[PADR_(long *__capability)];
+	char ctx_l_[PADL_(ucontext_c_t * __capability)]; ucontext_c_t * __capability ctx; char ctx_r_[PADR_(ucontext_c_t * __capability)];
+	char id_l_[PADL_(long * __capability)]; long * __capability id; char id_r_[PADR_(long * __capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct cheriabi_thr_exit_args {
-	char state_l_[PADL_(long *__capability)]; long *__capability state; char state_r_[PADR_(long *__capability)];
+	char state_l_[PADL_(long * __capability)]; long * __capability state; char state_r_[PADR_(long * __capability)];
 };
 struct cheriabi_thr_self_args {
-	char id_l_[PADL_(long *__capability)]; long *__capability id; char id_r_[PADR_(long *__capability)];
+	char id_l_[PADL_(long * __capability)]; long * __capability id; char id_r_[PADR_(long * __capability)];
 };
 struct cheriabi_extattr_list_fd_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
-	char data_l_[PADL_(void *__capability)]; void *__capability data; char data_r_[PADR_(void *__capability)];
+	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
 };
 struct cheriabi_extattr_list_file_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
-	char data_l_[PADL_(void *__capability)]; void *__capability data; char data_r_[PADR_(void *__capability)];
+	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
 };
 struct cheriabi_extattr_list_link_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
-	char data_l_[PADL_(void *__capability)]; void *__capability data; char data_r_[PADR_(void *__capability)];
+	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
 };
 struct cheriabi_thr_suspend_args {
-	char timeout_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability timeout; char timeout_r_[PADR_(const struct timespec *__capability)];
+	char timeout_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability timeout; char timeout_r_[PADR_(const struct timespec * __capability)];
 };
 struct cheriabi_audit_args {
-	char record_l_[PADL_(const void *__capability)]; const void *__capability record; char record_r_[PADR_(const void *__capability)];
+	char record_l_[PADL_(const void * __capability)]; const void * __capability record; char record_r_[PADR_(const void * __capability)];
 	char length_l_[PADL_(u_int)]; u_int length; char length_r_[PADR_(u_int)];
 };
 struct cheriabi_auditon_args {
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char data_l_[PADL_(void *__capability)]; void *__capability data; char data_r_[PADR_(void *__capability)];
+	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
 	char length_l_[PADL_(u_int)]; u_int length; char length_r_[PADR_(u_int)];
 };
 struct cheriabi_getauid_args {
-	char auid_l_[PADL_(uid_t *__capability)]; uid_t *__capability auid; char auid_r_[PADR_(uid_t *__capability)];
+	char auid_l_[PADL_(uid_t * __capability)]; uid_t * __capability auid; char auid_r_[PADR_(uid_t * __capability)];
 };
 struct cheriabi_setauid_args {
-	char auid_l_[PADL_(uid_t *__capability)]; uid_t *__capability auid; char auid_r_[PADR_(uid_t *__capability)];
+	char auid_l_[PADL_(uid_t * __capability)]; uid_t * __capability auid; char auid_r_[PADR_(uid_t * __capability)];
 };
 struct cheriabi_getaudit_args {
-	char auditinfo_l_[PADL_(struct auditinfo *__capability)]; struct auditinfo *__capability auditinfo; char auditinfo_r_[PADR_(struct auditinfo *__capability)];
+	char auditinfo_l_[PADL_(struct auditinfo * __capability)]; struct auditinfo * __capability auditinfo; char auditinfo_r_[PADR_(struct auditinfo * __capability)];
 };
 struct cheriabi_setaudit_args {
-	char auditinfo_l_[PADL_(struct auditinfo *__capability)]; struct auditinfo *__capability auditinfo; char auditinfo_r_[PADR_(struct auditinfo *__capability)];
+	char auditinfo_l_[PADL_(struct auditinfo * __capability)]; struct auditinfo * __capability auditinfo; char auditinfo_r_[PADR_(struct auditinfo * __capability)];
 };
 struct cheriabi_getaudit_addr_args {
-	char auditinfo_addr_l_[PADL_(struct auditinfo_addr *__capability)]; struct auditinfo_addr *__capability auditinfo_addr; char auditinfo_addr_r_[PADR_(struct auditinfo_addr *__capability)];
+	char auditinfo_addr_l_[PADL_(struct auditinfo_addr * __capability)]; struct auditinfo_addr * __capability auditinfo_addr; char auditinfo_addr_r_[PADR_(struct auditinfo_addr * __capability)];
 	char length_l_[PADL_(u_int)]; u_int length; char length_r_[PADR_(u_int)];
 };
 struct cheriabi_setaudit_addr_args {
-	char auditinfo_addr_l_[PADL_(struct auditinfo_addr *__capability)]; struct auditinfo_addr *__capability auditinfo_addr; char auditinfo_addr_r_[PADR_(struct auditinfo_addr *__capability)];
+	char auditinfo_addr_l_[PADL_(struct auditinfo_addr * __capability)]; struct auditinfo_addr * __capability auditinfo_addr; char auditinfo_addr_r_[PADR_(struct auditinfo_addr * __capability)];
 	char length_l_[PADL_(u_int)]; u_int length; char length_r_[PADR_(u_int)];
 };
 struct cheriabi_auditctl_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 };
 struct cheriabi__umtx_op_args {
-	char obj_l_[PADL_(void *__capability)]; void *__capability obj; char obj_r_[PADR_(void *__capability)];
+	char obj_l_[PADL_(void * __capability)]; void * __capability obj; char obj_r_[PADR_(void * __capability)];
 	char op_l_[PADL_(int)]; int op; char op_r_[PADR_(int)];
 	char val_l_[PADL_(u_long)]; u_long val; char val_r_[PADR_(u_long)];
-	char uaddr1_l_[PADL_(void *__capability)]; void *__capability uaddr1; char uaddr1_r_[PADR_(void *__capability)];
-	char uaddr2_l_[PADL_(void *__capability)]; void *__capability uaddr2; char uaddr2_r_[PADR_(void *__capability)];
+	char uaddr1_l_[PADL_(void * __capability)]; void * __capability uaddr1; char uaddr1_r_[PADR_(void * __capability)];
+	char uaddr2_l_[PADL_(void * __capability)]; void * __capability uaddr2; char uaddr2_r_[PADR_(void * __capability)];
 };
 struct cheriabi_thr_new_args {
-	char param_l_[PADL_(struct thr_param_c *__capability)]; struct thr_param_c *__capability param; char param_r_[PADR_(struct thr_param_c *__capability)];
+	char param_l_[PADL_(struct thr_param_c * __capability)]; struct thr_param_c * __capability param; char param_r_[PADR_(struct thr_param_c * __capability)];
 	char param_size_l_[PADL_(int)]; int param_size; char param_size_r_[PADR_(int)];
 };
 struct cheriabi_sigqueue_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
 	char signum_l_[PADL_(int)]; int signum; char signum_r_[PADR_(int)];
-	char value_l_[PADL_(void *__capability)]; void *__capability value; char value_r_[PADR_(void *__capability)];
+	char value_l_[PADL_(void * __capability)]; void * __capability value; char value_r_[PADR_(void * __capability)];
 };
 struct cheriabi_kmq_open_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
-	char attr_l_[PADL_(const struct mq_attr *__capability)]; const struct mq_attr *__capability attr; char attr_r_[PADR_(const struct mq_attr *__capability)];
+	char attr_l_[PADL_(const struct mq_attr * __capability)]; const struct mq_attr * __capability attr; char attr_r_[PADR_(const struct mq_attr * __capability)];
 };
 struct cheriabi_kmq_setattr_args {
 	char mqd_l_[PADL_(int)]; int mqd; char mqd_r_[PADR_(int)];
-	char attr_l_[PADL_(const struct mq_attr *__capability)]; const struct mq_attr *__capability attr; char attr_r_[PADR_(const struct mq_attr *__capability)];
-	char oattr_l_[PADL_(struct mq_attr *__capability)]; struct mq_attr *__capability oattr; char oattr_r_[PADR_(struct mq_attr *__capability)];
+	char attr_l_[PADL_(const struct mq_attr * __capability)]; const struct mq_attr * __capability attr; char attr_r_[PADR_(const struct mq_attr * __capability)];
+	char oattr_l_[PADL_(struct mq_attr * __capability)]; struct mq_attr * __capability oattr; char oattr_r_[PADR_(struct mq_attr * __capability)];
 };
 struct cheriabi_kmq_timedreceive_args {
 	char mqd_l_[PADL_(int)]; int mqd; char mqd_r_[PADR_(int)];
-	char msg_ptr_l_[PADL_(char *__capability)]; char *__capability msg_ptr; char msg_ptr_r_[PADR_(char *__capability)];
+	char msg_ptr_l_[PADL_(char * __capability)]; char * __capability msg_ptr; char msg_ptr_r_[PADR_(char * __capability)];
 	char msg_len_l_[PADL_(size_t)]; size_t msg_len; char msg_len_r_[PADR_(size_t)];
-	char msg_prio_l_[PADL_(unsigned *__capability)]; unsigned *__capability msg_prio; char msg_prio_r_[PADR_(unsigned *__capability)];
-	char abs_timeout_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability abs_timeout; char abs_timeout_r_[PADR_(const struct timespec *__capability)];
+	char msg_prio_l_[PADL_(unsigned * __capability)]; unsigned * __capability msg_prio; char msg_prio_r_[PADR_(unsigned * __capability)];
+	char abs_timeout_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability abs_timeout; char abs_timeout_r_[PADR_(const struct timespec * __capability)];
 };
 struct cheriabi_kmq_timedsend_args {
 	char mqd_l_[PADL_(int)]; int mqd; char mqd_r_[PADR_(int)];
-	char msg_ptr_l_[PADL_(const char *__capability)]; const char *__capability msg_ptr; char msg_ptr_r_[PADR_(const char *__capability)];
+	char msg_ptr_l_[PADL_(const char * __capability)]; const char * __capability msg_ptr; char msg_ptr_r_[PADR_(const char * __capability)];
 	char msg_len_l_[PADL_(size_t)]; size_t msg_len; char msg_len_r_[PADR_(size_t)];
 	char msg_prio_l_[PADL_(unsigned)]; unsigned msg_prio; char msg_prio_r_[PADR_(unsigned)];
-	char abs_timeout_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability abs_timeout; char abs_timeout_r_[PADR_(const struct timespec *__capability)];
+	char abs_timeout_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability abs_timeout; char abs_timeout_r_[PADR_(const struct timespec * __capability)];
 };
 struct cheriabi_kmq_notify_args {
 	char mqd_l_[PADL_(int)]; int mqd; char mqd_r_[PADR_(int)];
-	char sigev_l_[PADL_(const struct sigevent_c *__capability)]; const struct sigevent_c *__capability sigev; char sigev_r_[PADR_(const struct sigevent_c *__capability)];
+	char sigev_l_[PADL_(const struct sigevent_c * __capability)]; const struct sigevent_c * __capability sigev; char sigev_r_[PADR_(const struct sigevent_c * __capability)];
 };
 struct cheriabi_kmq_unlink_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_abort2_args {
-	char why_l_[PADL_(const char *__capability)]; const char *__capability why; char why_r_[PADR_(const char *__capability)];
+	char why_l_[PADL_(const char * __capability)]; const char * __capability why; char why_r_[PADR_(const char * __capability)];
 	char nargs_l_[PADL_(int)]; int nargs; char nargs_r_[PADR_(int)];
-	char args_l_[PADL_(void *__capability *__capability)]; void *__capability *__capability args; char args_r_[PADR_(void *__capability *__capability)];
+	char args_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability args; char args_r_[PADR_(void * __capability * __capability)];
 };
 struct cheriabi_thr_set_name_args {
 	char id_l_[PADL_(long)]; long id; char id_r_[PADR_(long)];
-	char name_l_[PADL_(const char *__capability)]; const char *__capability name; char name_r_[PADR_(const char *__capability)];
+	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_aio_fsync_args {
 	char op_l_[PADL_(int)]; int op; char op_r_[PADR_(int)];
-	char aiocbp_l_[PADL_(struct aiocb_c *__capability)]; struct aiocb_c *__capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c *__capability)];
+	char aiocbp_l_[PADL_(struct aiocb_c * __capability)]; struct aiocb_c * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c * __capability)];
 };
 struct cheriabi_rtprio_thread_args {
 	char function_l_[PADL_(int)]; int function; char function_r_[PADR_(int)];
 	char lwpid_l_[PADL_(lwpid_t)]; lwpid_t lwpid; char lwpid_r_[PADR_(lwpid_t)];
-	char rtp_l_[PADL_(struct rtprio *__capability)]; struct rtprio *__capability rtp; char rtp_r_[PADR_(struct rtprio *__capability)];
+	char rtp_l_[PADL_(struct rtprio * __capability)]; struct rtprio * __capability rtp; char rtp_r_[PADR_(struct rtprio * __capability)];
 };
 struct cheriabi_sctp_generic_sendmsg_args {
 	char sd_l_[PADL_(int)]; int sd; char sd_r_[PADR_(int)];
-	char msg_l_[PADL_(void *__capability)]; void *__capability msg; char msg_r_[PADR_(void *__capability)];
+	char msg_l_[PADL_(void * __capability)]; void * __capability msg; char msg_r_[PADR_(void * __capability)];
 	char mlen_l_[PADL_(int)]; int mlen; char mlen_r_[PADR_(int)];
-	char to_l_[PADL_(struct sockaddr *__capability)]; struct sockaddr *__capability to; char to_r_[PADR_(struct sockaddr *__capability)];
+	char to_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability to; char to_r_[PADR_(struct sockaddr * __capability)];
 	char tolen_l_[PADL_(__socklen_t)]; __socklen_t tolen; char tolen_r_[PADR_(__socklen_t)];
-	char sinfo_l_[PADL_(struct sctp_sndrcvinfo *__capability)]; struct sctp_sndrcvinfo *__capability sinfo; char sinfo_r_[PADR_(struct sctp_sndrcvinfo *__capability)];
+	char sinfo_l_[PADL_(struct sctp_sndrcvinfo * __capability)]; struct sctp_sndrcvinfo * __capability sinfo; char sinfo_r_[PADR_(struct sctp_sndrcvinfo * __capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct cheriabi_sctp_generic_sendmsg_iov_args {
 	char sd_l_[PADL_(int)]; int sd; char sd_r_[PADR_(int)];
-	char iov_l_[PADL_(struct iovec_c *__capability)]; struct iovec_c *__capability iov; char iov_r_[PADR_(struct iovec_c *__capability)];
+	char iov_l_[PADL_(struct iovec_c * __capability)]; struct iovec_c * __capability iov; char iov_r_[PADR_(struct iovec_c * __capability)];
 	char iovlen_l_[PADL_(int)]; int iovlen; char iovlen_r_[PADR_(int)];
-	char to_l_[PADL_(struct sockaddr *__capability)]; struct sockaddr *__capability to; char to_r_[PADR_(struct sockaddr *__capability)];
+	char to_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability to; char to_r_[PADR_(struct sockaddr * __capability)];
 	char tolen_l_[PADL_(__socklen_t)]; __socklen_t tolen; char tolen_r_[PADR_(__socklen_t)];
-	char sinfo_l_[PADL_(struct sctp_sndrcvinfo *__capability)]; struct sctp_sndrcvinfo *__capability sinfo; char sinfo_r_[PADR_(struct sctp_sndrcvinfo *__capability)];
+	char sinfo_l_[PADL_(struct sctp_sndrcvinfo * __capability)]; struct sctp_sndrcvinfo * __capability sinfo; char sinfo_r_[PADR_(struct sctp_sndrcvinfo * __capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct cheriabi_sctp_generic_recvmsg_args {
 	char sd_l_[PADL_(int)]; int sd; char sd_r_[PADR_(int)];
-	char iov_l_[PADL_(struct iovec_c *__capability)]; struct iovec_c *__capability iov; char iov_r_[PADR_(struct iovec_c *__capability)];
+	char iov_l_[PADL_(struct iovec_c * __capability)]; struct iovec_c * __capability iov; char iov_r_[PADR_(struct iovec_c * __capability)];
 	char iovlen_l_[PADL_(int)]; int iovlen; char iovlen_r_[PADR_(int)];
-	char from_l_[PADL_(struct sockaddr *__capability)]; struct sockaddr *__capability from; char from_r_[PADR_(struct sockaddr *__capability)];
-	char fromlenaddr_l_[PADL_(__socklen_t *__capability)]; __socklen_t *__capability fromlenaddr; char fromlenaddr_r_[PADR_(__socklen_t *__capability)];
-	char sinfo_l_[PADL_(struct sctp_sndrcvinfo *__capability)]; struct sctp_sndrcvinfo *__capability sinfo; char sinfo_r_[PADR_(struct sctp_sndrcvinfo *__capability)];
-	char msg_flags_l_[PADL_(int *__capability)]; int *__capability msg_flags; char msg_flags_r_[PADR_(int *__capability)];
+	char from_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability from; char from_r_[PADR_(struct sockaddr * __capability)];
+	char fromlenaddr_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability fromlenaddr; char fromlenaddr_r_[PADR_(__socklen_t * __capability)];
+	char sinfo_l_[PADL_(struct sctp_sndrcvinfo * __capability)]; struct sctp_sndrcvinfo * __capability sinfo; char sinfo_r_[PADR_(struct sctp_sndrcvinfo * __capability)];
+	char msg_flags_l_[PADL_(int * __capability)]; int * __capability msg_flags; char msg_flags_r_[PADR_(int * __capability)];
 };
 struct cheriabi_pread_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char buf_l_[PADL_(void *__capability)]; void *__capability buf; char buf_r_[PADR_(void *__capability)];
+	char buf_l_[PADL_(void * __capability)]; void * __capability buf; char buf_r_[PADR_(void * __capability)];
 	char nbyte_l_[PADL_(size_t)]; size_t nbyte; char nbyte_r_[PADR_(size_t)];
 	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
 };
 struct cheriabi_pwrite_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char buf_l_[PADL_(const void *__capability)]; const void *__capability buf; char buf_r_[PADR_(const void *__capability)];
+	char buf_l_[PADL_(const void * __capability)]; const void * __capability buf; char buf_r_[PADR_(const void * __capability)];
 	char nbyte_l_[PADL_(size_t)]; size_t nbyte; char nbyte_r_[PADR_(size_t)];
 	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
 };
 struct cheriabi_mmap_args {
-	char addr_l_[PADL_(void *__capability)]; void *__capability addr; char addr_r_[PADR_(void *__capability)];
+	char addr_l_[PADL_(void * __capability)]; void * __capability addr; char addr_r_[PADR_(void * __capability)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char prot_l_[PADL_(int)]; int prot; char prot_r_[PADR_(int)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
@@ -1040,124 +1040,124 @@ struct cheriabi_mmap_args {
 	char pos_l_[PADL_(off_t)]; off_t pos; char pos_r_[PADR_(off_t)];
 };
 struct cheriabi_truncate_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char length_l_[PADL_(off_t)]; off_t length; char length_r_[PADR_(off_t)];
 };
 struct cheriabi_shm_open_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 };
 struct cheriabi_shm_unlink_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_cpuset_args {
-	char setid_l_[PADL_(cpusetid_t *__capability)]; cpusetid_t *__capability setid; char setid_r_[PADR_(cpusetid_t *__capability)];
+	char setid_l_[PADL_(cpusetid_t * __capability)]; cpusetid_t * __capability setid; char setid_r_[PADR_(cpusetid_t * __capability)];
 };
 struct cheriabi_cpuset_getid_args {
 	char level_l_[PADL_(cpulevel_t)]; cpulevel_t level; char level_r_[PADR_(cpulevel_t)];
 	char which_l_[PADL_(cpuwhich_t)]; cpuwhich_t which; char which_r_[PADR_(cpuwhich_t)];
 	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
-	char setid_l_[PADL_(cpusetid_t *__capability)]; cpusetid_t *__capability setid; char setid_r_[PADR_(cpusetid_t *__capability)];
+	char setid_l_[PADL_(cpusetid_t * __capability)]; cpusetid_t * __capability setid; char setid_r_[PADR_(cpusetid_t * __capability)];
 };
 struct cheriabi_cpuset_getaffinity_args {
 	char level_l_[PADL_(cpulevel_t)]; cpulevel_t level; char level_r_[PADR_(cpulevel_t)];
 	char which_l_[PADL_(cpuwhich_t)]; cpuwhich_t which; char which_r_[PADR_(cpuwhich_t)];
 	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
 	char cpusetsize_l_[PADL_(size_t)]; size_t cpusetsize; char cpusetsize_r_[PADR_(size_t)];
-	char mask_l_[PADL_(cpuset_t *__capability)]; cpuset_t *__capability mask; char mask_r_[PADR_(cpuset_t *__capability)];
+	char mask_l_[PADL_(cpuset_t * __capability)]; cpuset_t * __capability mask; char mask_r_[PADR_(cpuset_t * __capability)];
 };
 struct cheriabi_cpuset_setaffinity_args {
 	char level_l_[PADL_(cpulevel_t)]; cpulevel_t level; char level_r_[PADR_(cpulevel_t)];
 	char which_l_[PADL_(cpuwhich_t)]; cpuwhich_t which; char which_r_[PADR_(cpuwhich_t)];
 	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
 	char cpusetsize_l_[PADL_(size_t)]; size_t cpusetsize; char cpusetsize_r_[PADR_(size_t)];
-	char mask_l_[PADL_(const cpuset_t *__capability)]; const cpuset_t *__capability mask; char mask_r_[PADR_(const cpuset_t *__capability)];
+	char mask_l_[PADL_(const cpuset_t * __capability)]; const cpuset_t * __capability mask; char mask_r_[PADR_(const cpuset_t * __capability)];
 };
 struct cheriabi_faccessat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char amode_l_[PADL_(int)]; int amode; char amode_r_[PADR_(int)];
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 };
 struct cheriabi_fchmodat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 };
 struct cheriabi_fchownat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char uid_l_[PADL_(uid_t)]; uid_t uid; char uid_r_[PADR_(uid_t)];
 	char gid_l_[PADL_(gid_t)]; gid_t gid; char gid_r_[PADR_(gid_t)];
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 };
 struct cheriabi_fexecve_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char argv_l_[PADL_(void *__capability *__capability)]; void *__capability *__capability argv; char argv_r_[PADR_(void *__capability *__capability)];
-	char envv_l_[PADL_(void *__capability *__capability)]; void *__capability *__capability envv; char envv_r_[PADR_(void *__capability *__capability)];
+	char argv_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability argv; char argv_r_[PADR_(void * __capability * __capability)];
+	char envv_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability envv; char envv_r_[PADR_(void * __capability * __capability)];
 };
 struct cheriabi_futimesat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
-	char times_l_[PADL_(const struct timeval *__capability)]; const struct timeval *__capability times; char times_r_[PADR_(const struct timeval *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char times_l_[PADL_(const struct timeval * __capability)]; const struct timeval * __capability times; char times_r_[PADR_(const struct timeval * __capability)];
 };
 struct cheriabi_linkat_args {
 	char fd1_l_[PADL_(int)]; int fd1; char fd1_r_[PADR_(int)];
-	char path1_l_[PADL_(const char *__capability)]; const char *__capability path1; char path1_r_[PADR_(const char *__capability)];
+	char path1_l_[PADL_(const char * __capability)]; const char * __capability path1; char path1_r_[PADR_(const char * __capability)];
 	char fd2_l_[PADL_(int)]; int fd2; char fd2_r_[PADR_(int)];
-	char path2_l_[PADL_(const char *__capability)]; const char *__capability path2; char path2_r_[PADR_(const char *__capability)];
+	char path2_l_[PADL_(const char * __capability)]; const char * __capability path2; char path2_r_[PADR_(const char * __capability)];
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 };
 struct cheriabi_mkdirat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 };
 struct cheriabi_mkfifoat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 };
 struct cheriabi_openat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 };
 struct cheriabi_readlinkat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
-	char buf_l_[PADL_(char *__capability)]; char *__capability buf; char buf_r_[PADR_(char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char buf_l_[PADL_(char * __capability)]; char * __capability buf; char buf_r_[PADR_(char * __capability)];
 	char bufsize_l_[PADL_(size_t)]; size_t bufsize; char bufsize_r_[PADR_(size_t)];
 };
 struct cheriabi_renameat_args {
 	char oldfd_l_[PADL_(int)]; int oldfd; char oldfd_r_[PADR_(int)];
-	char old_l_[PADL_(const char *__capability)]; const char *__capability old; char old_r_[PADR_(const char *__capability)];
+	char old_l_[PADL_(const char * __capability)]; const char * __capability old; char old_r_[PADR_(const char * __capability)];
 	char newfd_l_[PADL_(int)]; int newfd; char newfd_r_[PADR_(int)];
-	char new_l_[PADL_(const char *__capability)]; const char *__capability new; char new_r_[PADR_(const char *__capability)];
+	char new_l_[PADL_(const char * __capability)]; const char * __capability new; char new_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_symlinkat_args {
-	char path1_l_[PADL_(const char *__capability)]; const char *__capability path1; char path1_r_[PADR_(const char *__capability)];
+	char path1_l_[PADL_(const char * __capability)]; const char * __capability path1; char path1_r_[PADR_(const char * __capability)];
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path2_l_[PADL_(const char *__capability)]; const char *__capability path2; char path2_r_[PADR_(const char *__capability)];
+	char path2_l_[PADL_(const char * __capability)]; const char * __capability path2; char path2_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_unlinkat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 };
 struct cheriabi_gssd_syscall_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_jail_get_args {
-	char iovp_l_[PADL_(struct iovec_c *__capability)]; struct iovec_c *__capability iovp; char iovp_r_[PADR_(struct iovec_c *__capability)];
+	char iovp_l_[PADL_(struct iovec_c * __capability)]; struct iovec_c * __capability iovp; char iovp_r_[PADR_(struct iovec_c * __capability)];
 	char iovcnt_l_[PADL_(unsigned int)]; unsigned int iovcnt; char iovcnt_r_[PADR_(unsigned int)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct cheriabi_jail_set_args {
-	char iovp_l_[PADL_(struct iovec_c *__capability)]; struct iovec_c *__capability iovp; char iovp_r_[PADR_(struct iovec_c *__capability)];
+	char iovp_l_[PADL_(struct iovec_c * __capability)]; struct iovec_c * __capability iovp; char iovp_r_[PADR_(struct iovec_c * __capability)];
 	char iovcnt_l_[PADL_(unsigned int)]; unsigned int iovcnt; char iovcnt_r_[PADR_(unsigned int)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
@@ -1165,212 +1165,212 @@ struct cheriabi___semctl_args {
 	char semid_l_[PADL_(int)]; int semid; char semid_r_[PADR_(int)];
 	char semnum_l_[PADL_(int)]; int semnum; char semnum_r_[PADR_(int)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char arg_l_[PADL_(union semun_c *__capability)]; union semun_c *__capability arg; char arg_r_[PADR_(union semun_c *__capability)];
+	char arg_l_[PADL_(union semun_c * __capability)]; union semun_c * __capability arg; char arg_r_[PADR_(union semun_c * __capability)];
 };
 struct cheriabi_msgctl_args {
 	char msqid_l_[PADL_(int)]; int msqid; char msqid_r_[PADR_(int)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char buf_l_[PADL_(struct msqid_ds_c *__capability)]; struct msqid_ds_c *__capability buf; char buf_r_[PADR_(struct msqid_ds_c *__capability)];
+	char buf_l_[PADL_(struct msqid_ds_c * __capability)]; struct msqid_ds_c * __capability buf; char buf_r_[PADR_(struct msqid_ds_c * __capability)];
 };
 struct cheriabi_shmctl_args {
 	char shmid_l_[PADL_(int)]; int shmid; char shmid_r_[PADR_(int)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char buf_l_[PADL_(struct shmid_ds *__capability)]; struct shmid_ds *__capability buf; char buf_r_[PADR_(struct shmid_ds *__capability)];
+	char buf_l_[PADL_(struct shmid_ds * __capability)]; struct shmid_ds * __capability buf; char buf_r_[PADR_(struct shmid_ds * __capability)];
 };
 struct cheriabi_lpathconf_args {
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char name_l_[PADL_(int)]; int name; char name_r_[PADR_(int)];
 };
 struct cheriabi___cap_rights_get_args {
 	char version_l_[PADL_(int)]; int version; char version_r_[PADR_(int)];
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char rightsp_l_[PADL_(cap_rights_t *__capability)]; cap_rights_t *__capability rightsp; char rightsp_r_[PADR_(cap_rights_t *__capability)];
+	char rightsp_l_[PADL_(cap_rights_t * __capability)]; cap_rights_t * __capability rightsp; char rightsp_r_[PADR_(cap_rights_t * __capability)];
 };
 struct cheriabi_cap_getmode_args {
-	char modep_l_[PADL_(u_int *__capability)]; u_int *__capability modep; char modep_r_[PADR_(u_int *__capability)];
+	char modep_l_[PADL_(u_int * __capability)]; u_int * __capability modep; char modep_r_[PADR_(u_int * __capability)];
 };
 struct cheriabi_pdfork_args {
-	char fdp_l_[PADL_(int *__capability)]; int *__capability fdp; char fdp_r_[PADR_(int *__capability)];
+	char fdp_l_[PADL_(int * __capability)]; int * __capability fdp; char fdp_r_[PADR_(int * __capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct cheriabi_pdgetpid_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char pidp_l_[PADL_(pid_t *__capability)]; pid_t *__capability pidp; char pidp_r_[PADR_(pid_t *__capability)];
+	char pidp_l_[PADL_(pid_t * __capability)]; pid_t * __capability pidp; char pidp_r_[PADR_(pid_t * __capability)];
 };
 struct cheriabi_pselect_args {
 	char nd_l_[PADL_(int)]; int nd; char nd_r_[PADR_(int)];
-	char in_l_[PADL_(fd_set *__capability)]; fd_set *__capability in; char in_r_[PADR_(fd_set *__capability)];
-	char ou_l_[PADL_(fd_set *__capability)]; fd_set *__capability ou; char ou_r_[PADR_(fd_set *__capability)];
-	char ex_l_[PADL_(fd_set *__capability)]; fd_set *__capability ex; char ex_r_[PADR_(fd_set *__capability)];
-	char ts_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability ts; char ts_r_[PADR_(const struct timespec *__capability)];
-	char sm_l_[PADL_(const sigset_t *__capability)]; const sigset_t *__capability sm; char sm_r_[PADR_(const sigset_t *__capability)];
+	char in_l_[PADL_(fd_set * __capability)]; fd_set * __capability in; char in_r_[PADR_(fd_set * __capability)];
+	char ou_l_[PADL_(fd_set * __capability)]; fd_set * __capability ou; char ou_r_[PADR_(fd_set * __capability)];
+	char ex_l_[PADL_(fd_set * __capability)]; fd_set * __capability ex; char ex_r_[PADR_(fd_set * __capability)];
+	char ts_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability ts; char ts_r_[PADR_(const struct timespec * __capability)];
+	char sm_l_[PADL_(const sigset_t * __capability)]; const sigset_t * __capability sm; char sm_r_[PADR_(const sigset_t * __capability)];
 };
 struct cheriabi_getloginclass_args {
-	char namebuf_l_[PADL_(char *__capability)]; char *__capability namebuf; char namebuf_r_[PADR_(char *__capability)];
+	char namebuf_l_[PADL_(char * __capability)]; char * __capability namebuf; char namebuf_r_[PADR_(char * __capability)];
 	char namelen_l_[PADL_(size_t)]; size_t namelen; char namelen_r_[PADR_(size_t)];
 };
 struct cheriabi_setloginclass_args {
-	char namebuf_l_[PADL_(const char *__capability)]; const char *__capability namebuf; char namebuf_r_[PADR_(const char *__capability)];
+	char namebuf_l_[PADL_(const char * __capability)]; const char * __capability namebuf; char namebuf_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_rctl_get_racct_args {
-	char inbufp_l_[PADL_(const void *__capability)]; const void *__capability inbufp; char inbufp_r_[PADR_(const void *__capability)];
+	char inbufp_l_[PADL_(const void * __capability)]; const void * __capability inbufp; char inbufp_r_[PADR_(const void * __capability)];
 	char inbuflen_l_[PADL_(size_t)]; size_t inbuflen; char inbuflen_r_[PADR_(size_t)];
-	char outbufp_l_[PADL_(void *__capability)]; void *__capability outbufp; char outbufp_r_[PADR_(void *__capability)];
+	char outbufp_l_[PADL_(void * __capability)]; void * __capability outbufp; char outbufp_r_[PADR_(void * __capability)];
 	char outbuflen_l_[PADL_(size_t)]; size_t outbuflen; char outbuflen_r_[PADR_(size_t)];
 };
 struct cheriabi_rctl_get_rules_args {
-	char inbufp_l_[PADL_(const void *__capability)]; const void *__capability inbufp; char inbufp_r_[PADR_(const void *__capability)];
+	char inbufp_l_[PADL_(const void * __capability)]; const void * __capability inbufp; char inbufp_r_[PADR_(const void * __capability)];
 	char inbuflen_l_[PADL_(size_t)]; size_t inbuflen; char inbuflen_r_[PADR_(size_t)];
-	char outbufp_l_[PADL_(void *__capability)]; void *__capability outbufp; char outbufp_r_[PADR_(void *__capability)];
+	char outbufp_l_[PADL_(void * __capability)]; void * __capability outbufp; char outbufp_r_[PADR_(void * __capability)];
 	char outbuflen_l_[PADL_(size_t)]; size_t outbuflen; char outbuflen_r_[PADR_(size_t)];
 };
 struct cheriabi_rctl_get_limits_args {
-	char inbufp_l_[PADL_(const void *__capability)]; const void *__capability inbufp; char inbufp_r_[PADR_(const void *__capability)];
+	char inbufp_l_[PADL_(const void * __capability)]; const void * __capability inbufp; char inbufp_r_[PADR_(const void * __capability)];
 	char inbuflen_l_[PADL_(size_t)]; size_t inbuflen; char inbuflen_r_[PADR_(size_t)];
-	char outbufp_l_[PADL_(void *__capability)]; void *__capability outbufp; char outbufp_r_[PADR_(void *__capability)];
+	char outbufp_l_[PADL_(void * __capability)]; void * __capability outbufp; char outbufp_r_[PADR_(void * __capability)];
 	char outbuflen_l_[PADL_(size_t)]; size_t outbuflen; char outbuflen_r_[PADR_(size_t)];
 };
 struct cheriabi_rctl_add_rule_args {
-	char inbufp_l_[PADL_(const void *__capability)]; const void *__capability inbufp; char inbufp_r_[PADR_(const void *__capability)];
+	char inbufp_l_[PADL_(const void * __capability)]; const void * __capability inbufp; char inbufp_r_[PADR_(const void * __capability)];
 	char inbuflen_l_[PADL_(size_t)]; size_t inbuflen; char inbuflen_r_[PADR_(size_t)];
-	char outbufp_l_[PADL_(void *__capability)]; void *__capability outbufp; char outbufp_r_[PADR_(void *__capability)];
+	char outbufp_l_[PADL_(void * __capability)]; void * __capability outbufp; char outbufp_r_[PADR_(void * __capability)];
 	char outbuflen_l_[PADL_(size_t)]; size_t outbuflen; char outbuflen_r_[PADR_(size_t)];
 };
 struct cheriabi_rctl_remove_rule_args {
-	char inbufp_l_[PADL_(const void *__capability)]; const void *__capability inbufp; char inbufp_r_[PADR_(const void *__capability)];
+	char inbufp_l_[PADL_(const void * __capability)]; const void * __capability inbufp; char inbufp_r_[PADR_(const void * __capability)];
 	char inbuflen_l_[PADL_(size_t)]; size_t inbuflen; char inbuflen_r_[PADR_(size_t)];
-	char outbufp_l_[PADL_(void *__capability)]; void *__capability outbufp; char outbufp_r_[PADR_(void *__capability)];
+	char outbufp_l_[PADL_(void * __capability)]; void * __capability outbufp; char outbufp_r_[PADR_(void * __capability)];
 	char outbuflen_l_[PADL_(size_t)]; size_t outbuflen; char outbuflen_r_[PADR_(size_t)];
 };
 struct cheriabi_wait6_args {
 	char idtype_l_[PADL_(int)]; int idtype; char idtype_r_[PADR_(int)];
 	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
-	char status_l_[PADL_(int *__capability)]; int *__capability status; char status_r_[PADR_(int *__capability)];
+	char status_l_[PADL_(int * __capability)]; int * __capability status; char status_r_[PADR_(int * __capability)];
 	char options_l_[PADL_(int)]; int options; char options_r_[PADR_(int)];
-	char wrusage_l_[PADL_(struct __wrusage *__capability)]; struct __wrusage *__capability wrusage; char wrusage_r_[PADR_(struct __wrusage *__capability)];
-	char info_l_[PADL_(struct siginfo_c *__capability)]; struct siginfo_c *__capability info; char info_r_[PADR_(struct siginfo_c *__capability)];
+	char wrusage_l_[PADL_(struct __wrusage * __capability)]; struct __wrusage * __capability wrusage; char wrusage_r_[PADR_(struct __wrusage * __capability)];
+	char info_l_[PADL_(struct siginfo_c * __capability)]; struct siginfo_c * __capability info; char info_r_[PADR_(struct siginfo_c * __capability)];
 };
 struct cheriabi_cap_rights_limit_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char rightsp_l_[PADL_(cap_rights_t *__capability)]; cap_rights_t *__capability rightsp; char rightsp_r_[PADR_(cap_rights_t *__capability)];
+	char rightsp_l_[PADL_(cap_rights_t * __capability)]; cap_rights_t * __capability rightsp; char rightsp_r_[PADR_(cap_rights_t * __capability)];
 };
 struct cheriabi_cap_ioctls_limit_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char cmds_l_[PADL_(const u_long *__capability)]; const u_long *__capability cmds; char cmds_r_[PADR_(const u_long *__capability)];
+	char cmds_l_[PADL_(const u_long * __capability)]; const u_long * __capability cmds; char cmds_r_[PADR_(const u_long * __capability)];
 	char ncmds_l_[PADL_(size_t)]; size_t ncmds; char ncmds_r_[PADR_(size_t)];
 };
 struct cheriabi_cap_ioctls_get_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char cmds_l_[PADL_(u_long *__capability)]; u_long *__capability cmds; char cmds_r_[PADR_(u_long *__capability)];
+	char cmds_l_[PADL_(u_long * __capability)]; u_long * __capability cmds; char cmds_r_[PADR_(u_long * __capability)];
 	char maxcmds_l_[PADL_(size_t)]; size_t maxcmds; char maxcmds_r_[PADR_(size_t)];
 };
 struct cheriabi_cap_fcntls_get_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char fcntlrightsp_l_[PADL_(uint32_t *__capability)]; uint32_t *__capability fcntlrightsp; char fcntlrightsp_r_[PADR_(uint32_t *__capability)];
+	char fcntlrightsp_l_[PADL_(uint32_t * __capability)]; uint32_t * __capability fcntlrightsp; char fcntlrightsp_r_[PADR_(uint32_t * __capability)];
 };
 struct cheriabi_bindat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char name_l_[PADL_(const struct sockaddr *__capability)]; const struct sockaddr *__capability name; char name_r_[PADR_(const struct sockaddr *__capability)];
+	char name_l_[PADL_(const struct sockaddr * __capability)]; const struct sockaddr * __capability name; char name_r_[PADR_(const struct sockaddr * __capability)];
 	char namelen_l_[PADL_(__socklen_t)]; __socklen_t namelen; char namelen_r_[PADR_(__socklen_t)];
 };
 struct cheriabi_connectat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char name_l_[PADL_(const struct sockaddr *__capability)]; const struct sockaddr *__capability name; char name_r_[PADR_(const struct sockaddr *__capability)];
+	char name_l_[PADL_(const struct sockaddr * __capability)]; const struct sockaddr * __capability name; char name_r_[PADR_(const struct sockaddr * __capability)];
 	char namelen_l_[PADL_(__socklen_t)]; __socklen_t namelen; char namelen_r_[PADR_(__socklen_t)];
 };
 struct cheriabi_chflagsat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char flags_l_[PADL_(u_long)]; u_long flags; char flags_r_[PADR_(u_long)];
 	char atflag_l_[PADL_(int)]; int atflag; char atflag_r_[PADR_(int)];
 };
 struct cheriabi_accept4_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char name_l_[PADL_(struct sockaddr *__capability)]; struct sockaddr *__capability name; char name_r_[PADR_(struct sockaddr *__capability)];
-	char anamelen_l_[PADL_(__socklen_t *__capability)]; __socklen_t *__capability anamelen; char anamelen_r_[PADR_(__socklen_t *__capability)];
+	char name_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability name; char name_r_[PADR_(struct sockaddr * __capability)];
+	char anamelen_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability anamelen; char anamelen_r_[PADR_(__socklen_t * __capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct cheriabi_pipe2_args {
-	char fildes_l_[PADL_(int *__capability)]; int *__capability fildes; char fildes_r_[PADR_(int *__capability)];
+	char fildes_l_[PADL_(int * __capability)]; int * __capability fildes; char fildes_r_[PADR_(int * __capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct cheriabi_aio_mlock_args {
-	char aiocbp_l_[PADL_(struct aiocb_c *__capability)]; struct aiocb_c *__capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c *__capability)];
+	char aiocbp_l_[PADL_(struct aiocb_c * __capability)]; struct aiocb_c * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c * __capability)];
 };
 struct cheriabi_procctl_args {
 	char idtype_l_[PADL_(int)]; int idtype; char idtype_r_[PADR_(int)];
 	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
 	char com_l_[PADL_(int)]; int com; char com_r_[PADR_(int)];
-	char data_l_[PADL_(void *__capability)]; void *__capability data; char data_r_[PADR_(void *__capability)];
+	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
 };
 struct cheriabi_ppoll_args {
-	char fds_l_[PADL_(struct pollfd *__capability)]; struct pollfd *__capability fds; char fds_r_[PADR_(struct pollfd *__capability)];
+	char fds_l_[PADL_(struct pollfd * __capability)]; struct pollfd * __capability fds; char fds_r_[PADR_(struct pollfd * __capability)];
 	char nfds_l_[PADL_(u_int)]; u_int nfds; char nfds_r_[PADR_(u_int)];
-	char ts_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability ts; char ts_r_[PADR_(const struct timespec *__capability)];
-	char set_l_[PADL_(const sigset_t *__capability)]; const sigset_t *__capability set; char set_r_[PADR_(const sigset_t *__capability)];
+	char ts_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability ts; char ts_r_[PADR_(const struct timespec * __capability)];
+	char set_l_[PADL_(const sigset_t * __capability)]; const sigset_t * __capability set; char set_r_[PADR_(const sigset_t * __capability)];
 };
 struct cheriabi_futimens_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char times_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability times; char times_r_[PADR_(const struct timespec *__capability)];
+	char times_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability times; char times_r_[PADR_(const struct timespec * __capability)];
 };
 struct cheriabi_utimensat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
-	char times_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability times; char times_r_[PADR_(const struct timespec *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char times_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability times; char times_r_[PADR_(const struct timespec * __capability)];
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 };
 struct cheriabi_fstat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char sb_l_[PADL_(struct stat *__capability)]; struct stat *__capability sb; char sb_r_[PADR_(struct stat *__capability)];
+	char sb_l_[PADL_(struct stat * __capability)]; struct stat * __capability sb; char sb_r_[PADR_(struct stat * __capability)];
 };
 struct cheriabi_fstatat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
-	char buf_l_[PADL_(struct stat *__capability)]; struct stat *__capability buf; char buf_r_[PADR_(struct stat *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char buf_l_[PADL_(struct stat * __capability)]; struct stat * __capability buf; char buf_r_[PADR_(struct stat * __capability)];
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 };
 struct cheriabi_fhstat_args {
-	char u_fhp_l_[PADL_(const struct fhandle *__capability)]; const struct fhandle *__capability u_fhp; char u_fhp_r_[PADR_(const struct fhandle *__capability)];
-	char sb_l_[PADL_(struct stat *__capability)]; struct stat *__capability sb; char sb_r_[PADR_(struct stat *__capability)];
+	char u_fhp_l_[PADL_(const struct fhandle * __capability)]; const struct fhandle * __capability u_fhp; char u_fhp_r_[PADR_(const struct fhandle * __capability)];
+	char sb_l_[PADL_(struct stat * __capability)]; struct stat * __capability sb; char sb_r_[PADR_(struct stat * __capability)];
 };
 struct cheriabi_getdirentries_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char buf_l_[PADL_(char *__capability)]; char *__capability buf; char buf_r_[PADR_(char *__capability)];
+	char buf_l_[PADL_(char * __capability)]; char * __capability buf; char buf_r_[PADR_(char * __capability)];
 	char count_l_[PADL_(size_t)]; size_t count; char count_r_[PADR_(size_t)];
-	char basep_l_[PADL_(off_t *__capability)]; off_t *__capability basep; char basep_r_[PADR_(off_t *__capability)];
+	char basep_l_[PADL_(off_t * __capability)]; off_t * __capability basep; char basep_r_[PADR_(off_t * __capability)];
 };
 struct cheriabi_statfs_args {
-	char path_l_[PADL_(char *__capability)]; char *__capability path; char path_r_[PADR_(char *__capability)];
-	char buf_l_[PADL_(struct statfs *__capability)]; struct statfs *__capability buf; char buf_r_[PADR_(struct statfs *__capability)];
+	char path_l_[PADL_(char * __capability)]; char * __capability path; char path_r_[PADR_(char * __capability)];
+	char buf_l_[PADL_(struct statfs * __capability)]; struct statfs * __capability buf; char buf_r_[PADR_(struct statfs * __capability)];
 };
 struct cheriabi_fstatfs_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char buf_l_[PADL_(struct statfs *__capability)]; struct statfs *__capability buf; char buf_r_[PADR_(struct statfs *__capability)];
+	char buf_l_[PADL_(struct statfs * __capability)]; struct statfs * __capability buf; char buf_r_[PADR_(struct statfs * __capability)];
 };
 struct cheriabi_getfsstat_args {
-	char buf_l_[PADL_(struct statfs *__capability)]; struct statfs *__capability buf; char buf_r_[PADR_(struct statfs *__capability)];
+	char buf_l_[PADL_(struct statfs * __capability)]; struct statfs * __capability buf; char buf_r_[PADR_(struct statfs * __capability)];
 	char bufsize_l_[PADL_(long)]; long bufsize; char bufsize_r_[PADR_(long)];
 	char mode_l_[PADL_(int)]; int mode; char mode_r_[PADR_(int)];
 };
 struct cheriabi_fhstatfs_args {
-	char u_fhp_l_[PADL_(const struct fhandle *__capability)]; const struct fhandle *__capability u_fhp; char u_fhp_r_[PADR_(const struct fhandle *__capability)];
-	char buf_l_[PADL_(struct statfs *__capability)]; struct statfs *__capability buf; char buf_r_[PADR_(struct statfs *__capability)];
+	char u_fhp_l_[PADL_(const struct fhandle * __capability)]; const struct fhandle * __capability u_fhp; char u_fhp_r_[PADR_(const struct fhandle * __capability)];
+	char buf_l_[PADL_(struct statfs * __capability)]; struct statfs * __capability buf; char buf_r_[PADR_(struct statfs * __capability)];
 };
 struct cheriabi_mknodat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char *__capability)]; const char *__capability path; char path_r_[PADR_(const char *__capability)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 	char dev_l_[PADL_(dev_t)]; dev_t dev; char dev_r_[PADR_(dev_t)];
 };
 struct cheriabi_kevent_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char changelist_l_[PADL_(const struct kevent_c *__capability)]; const struct kevent_c *__capability changelist; char changelist_r_[PADR_(const struct kevent_c *__capability)];
+	char changelist_l_[PADL_(const struct kevent_c * __capability)]; const struct kevent_c * __capability changelist; char changelist_r_[PADR_(const struct kevent_c * __capability)];
 	char nchanges_l_[PADL_(int)]; int nchanges; char nchanges_r_[PADR_(int)];
-	char eventlist_l_[PADL_(struct kevent_c *__capability)]; struct kevent_c *__capability eventlist; char eventlist_r_[PADR_(struct kevent_c *__capability)];
+	char eventlist_l_[PADL_(struct kevent_c * __capability)]; struct kevent_c * __capability eventlist; char eventlist_r_[PADR_(struct kevent_c * __capability)];
 	char nevents_l_[PADL_(int)]; int nevents; char nevents_r_[PADR_(int)];
-	char timeout_l_[PADL_(const struct timespec *__capability)]; const struct timespec *__capability timeout; char timeout_r_[PADR_(const struct timespec *__capability)];
+	char timeout_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability timeout; char timeout_r_[PADR_(const struct timespec * __capability)];
 };
 #if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
 #define PAD64_REQUIRED
