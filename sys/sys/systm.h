@@ -326,8 +326,12 @@ int	copyincap(const void * _Nonnull __restrict udaddr,
 #endif
 int	copyin_nofault(const void * _Nonnull __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
+#if __has_feature(capabilities)
 int	copyin_nofault_c(const void * __capability _Nonnull __restrict udaddr,
 	    void * __capability _Nonnull __restrict kaddr, size_t len);
+#else
+#define	copyin_nofault_c	copyin_nofault
+#endif
 int	copyout(const void * _Nonnull __restrict kaddr,
 	    void * _Nonnull __restrict udaddr, size_t len);
 int	copyout_part(const void * _Nonnull __restrict kaddr,
@@ -359,8 +363,12 @@ copyoutcap(const void * _Nonnull __restrict kaddr,
 #endif
 int	copyout_nofault(const void * _Nonnull __restrict kaddr,
 	    void * _Nonnull __restrict udaddr, size_t len);
+#if __has_feature(capabilities)
 int	copyout_nofault_c(const void * __capability _Nonnull __restrict kaddr,
 	    void * __capability _Nonnull __restrict udaddr, size_t len);
+#else
+#define	copyout_nofault_c	copyout_nofault
+#endif
 
 int	fubyte(volatile const void *base);
 long	fuword(volatile const void *base);

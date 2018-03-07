@@ -80,6 +80,7 @@ copyin_nofault(const void *udaddr, void *kaddr, size_t len)
 	return (error);
 }
 
+#if __has_feature(capabilities)
 int
 copyin_nofault_c(const void * __capability udaddr, void * __capability kaddr,
     size_t len)
@@ -91,6 +92,7 @@ copyin_nofault_c(const void * __capability udaddr, void * __capability kaddr,
 	vm_fault_enable_pagefaults(save);
 	return (error);
 }
+#endif
 
 int
 copyout_nofault(const void *kaddr, void *udaddr, size_t len)
@@ -103,6 +105,7 @@ copyout_nofault(const void *kaddr, void *udaddr, size_t len)
 	return (error);
 }
 
+#if __has_feature(capabilities)
 int
 copyout_nofault_c(const void * __capability kaddr, void * __capability udaddr,
     size_t len)
@@ -114,6 +117,7 @@ copyout_nofault_c(const void * __capability kaddr, void * __capability udaddr,
 	vm_fault_enable_pagefaults(save);
 	return (error);
 }
+#endif
 
 #define	PHYS_PAGE_COUNT(len)	(howmany(len, PAGE_SIZE) + 1)
 
