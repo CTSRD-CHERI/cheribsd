@@ -474,8 +474,8 @@ END(copyerr)
  * user data space.
  */
 #ifdef __mips_n64
-LEAF(fuword64)
-XLEAF(fuword)
+LEAF(fueword64)
+XLEAF(fueword)
 	PTR_LA	v0, fswberr
 	blt	a0, zero, fswberr	# make sure address is in user space
 	nop
@@ -483,14 +483,16 @@ XLEAF(fuword)
 	PTR_L	v1, PC_CURPCB(v1)
 	PTR_S	v0, U_PCB_ONFAULT(v1)
 	ld	v0, 0(a0)		# fetch word
-	j	ra
+	sd	v0, 0(a1)		# store word
 	PTR_S	zero, U_PCB_ONFAULT(v1)
-END(fuword64)
+	j	ra
+	li	v0, 0
+END(fueword64)
 #endif
 
-LEAF(fuword32)
+LEAF(fueword32)
 #ifndef __mips_n64
-XLEAF(fuword)
+XLEAF(fueword)
 #endif
 	PTR_LA	v0, fswberr
 	blt	a0, zero, fswberr	# make sure address is in user space
@@ -499,11 +501,13 @@ XLEAF(fuword)
 	PTR_L	v1, PC_CURPCB(v1)
 	PTR_S	v0, U_PCB_ONFAULT(v1)
 	lw	v0, 0(a0)		# fetch word
-	j	ra
+	sw	v0, 0(a1)		# store word
 	PTR_S	zero, U_PCB_ONFAULT(v1)
-END(fuword32)
+	j	ra
+	li	v0, 0
+END(fueword32)
 
-LEAF(fusword)
+LEAF(fuesword)
 	PTR_LA	v0, fswberr
 	blt	a0, zero, fswberr	# make sure address is in user space
 	nop
@@ -511,9 +515,11 @@ LEAF(fusword)
 	PTR_L	v1, PC_CURPCB(v1)
 	PTR_S	v0, U_PCB_ONFAULT(v1)
 	lhu	v0, 0(a0)		# fetch short
-	j	ra
+	sh	v0, 0(a1)		# store short
 	PTR_S	zero, U_PCB_ONFAULT(v1)
-END(fusword)
+	j	ra
+	li	v0, 0
+END(fuesword)
 
 LEAF(fubyte)
 	PTR_LA	v0, fswberr
@@ -561,16 +567,17 @@ END(suword64)
 
 /*
  * casuword(9)
- * <v0>u_long casuword(<a0>u_long *p, <a1>u_long oldval, <a2>u_long newval)
+ * <v0>u_long casuword(<a0>u_long *p, <a1>u_long oldval, <a2>u_long *oldval_p,
+ *		       <a3>u_long newval)
  */
 /*
  * casuword32(9)
  * <v0>uint32_t casuword(<a0>uint32_t *p, <a1>uint32_t oldval, 
- *							<a2>uint32_t newval)
+ *			 <a2>uint32_t newval)
  */
-LEAF(casuword32)
+LEAF(casueword32)
 #ifndef __mips_n64
-XLEAF(casuword)
+XLEAF(casueword)
 #endif
 	PTR_LA	v0, fswberr
 	blt	a0, zero, fswberr	# make sure address is in user space
@@ -579,26 +586,27 @@ XLEAF(casuword)
 	PTR_L	v1, PC_CURPCB(v1)
 	PTR_S	v0, U_PCB_ONFAULT(v1)
 1:
-	move	t0, a2
-	ll	v0, 0(a0)
-	bne	a1, v0, 2f
+	move	t0, a3
+	ll	t1, 0(a0)
+	bne	a1, t1, 2f
 	nop
 	sc	t0, 0(a0)		# store word
 	beqz	t0, 1b
 	nop
 	j	3f
-	nop
+	li	v0, 0
 2:
 	li	v0, -1
 3:
+	sw	t1, 0(a2)		# unconditionally store old word
 	PTR_S	zero, U_PCB_ONFAULT(v1)
 	jr	ra
 	nop
-END(casuword32)
+END(casueword32)
 
 #ifdef __mips_n64
-LEAF(casuword64)
-XLEAF(casuword)
+LEAF(casueword64)
+XLEAF(casueword)
 	PTR_LA	v0, fswberr
 	blt	a0, zero, fswberr	# make sure address is in user space
 	nop
@@ -606,22 +614,23 @@ XLEAF(casuword)
 	PTR_L	v1, PC_CURPCB(v1)
 	PTR_S	v0, U_PCB_ONFAULT(v1)
 1:
-	move	t0, a2
-	lld	v0, 0(a0)
-	bne	a1, v0, 2f
+	move	t0, a3
+	lld	t1, 0(a0)
+	bne	a1, t1, 2f
 	nop
 	scd	t0, 0(a0)		# store double word
 	beqz	t0, 1b
 	nop
 	j	3f
-	nop
+	li	v0, 0
 2:
 	li	v0, -1
 3:
+	sd	t1, 0(a2)		# unconditionally store old word
 	PTR_S	zero, U_PCB_ONFAULT(v1)
 	jr	ra
 	nop
-END(casuword64)
+END(casueword64)
 #endif
 
 /*
