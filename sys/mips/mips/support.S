@@ -483,8 +483,8 @@ XLEAF(fueword)
 	PTR_L	v1, PC_CURPCB(v1)
 	PTR_S	v0, U_PCB_ONFAULT(v1)
 	ld	v0, 0(a0)		# fetch word
-	sd	v0, 0(a1)		# store word
 	PTR_S	zero, U_PCB_ONFAULT(v1)
+	sd	v0, 0(a1)		# store word
 	j	ra
 	li	v0, 0
 END(fueword64)
@@ -501,8 +501,8 @@ XLEAF(fueword)
 	PTR_L	v1, PC_CURPCB(v1)
 	PTR_S	v0, U_PCB_ONFAULT(v1)
 	lw	v0, 0(a0)		# fetch word
-	sw	v0, 0(a1)		# store word
 	PTR_S	zero, U_PCB_ONFAULT(v1)
+	sw	v0, 0(a1)		# store word
 	j	ra
 	li	v0, 0
 END(fueword32)
@@ -515,8 +515,8 @@ LEAF(fuesword)
 	PTR_L	v1, PC_CURPCB(v1)
 	PTR_S	v0, U_PCB_ONFAULT(v1)
 	lhu	v0, 0(a0)		# fetch short
-	sh	v0, 0(a1)		# store short
 	PTR_S	zero, U_PCB_ONFAULT(v1)
+	sh	v0, 0(a1)		# store short
 	j	ra
 	li	v0, 0
 END(fuesword)
@@ -566,12 +566,12 @@ END(suword64)
 #endif
 
 /*
- * casuword(9)
+ * casueword(9)
  * <v0>u_long casuword(<a0>u_long *p, <a1>u_long oldval, <a2>u_long *oldval_p,
  *		       <a3>u_long newval)
  */
 /*
- * casuword32(9)
+ * casueword32(9)
  * <v0>uint32_t casuword(<a0>uint32_t *p, <a1>uint32_t oldval, 
  *			 <a2>uint32_t newval)
  */
@@ -598,10 +598,9 @@ XLEAF(casueword)
 2:
 	li	v0, -1
 3:
-	sw	t1, 0(a2)		# unconditionally store old word
 	PTR_S	zero, U_PCB_ONFAULT(v1)
 	jr	ra
-	nop
+	sw	t1, 0(a2)		# unconditionally store old word
 END(casueword32)
 
 #ifdef __mips_n64
@@ -626,10 +625,9 @@ XLEAF(casueword)
 2:
 	li	v0, -1
 3:
-	sd	t1, 0(a2)		# unconditionally store old word
 	PTR_S	zero, U_PCB_ONFAULT(v1)
 	jr	ra
-	nop
+	sd	t1, 0(a2)		# unconditionally store old word
 END(casueword64)
 #endif
 
