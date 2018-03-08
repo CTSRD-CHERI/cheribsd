@@ -657,10 +657,14 @@
 #define	__DEQUALIFY(type, var)	((type)(__uintptr_t)(const volatile void *)(var))
 #endif
 
-#ifdef __CHERI__
+#if __has_feature(capabilities)
 #define	__DECONST_CAP(type, var)	((type)(__uintcap_t)(const void * __capability)(var))
 #define	__DEVOLATILE_CAP(type, var)	((type)(__uintcap_t)(volatile void * __capability)(var))
 #define	__DEQUALIFY_CAP(type, var)	((type)(__uintcap_t)(const volatile void * __capability)(var))
+#else
+#define	__DECONST_CAP		__DECONST
+#define	__DEVOLATILE_CAP	__DEVOLATILE
+#define	__DEQUALIFY_CAP		__DEQUALIFY
 #endif
 
 /*-
