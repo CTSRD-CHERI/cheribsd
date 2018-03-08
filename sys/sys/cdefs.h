@@ -909,6 +909,7 @@
 #define	__CAPABILITY	__capability
 #else
 #define	__CAPABILITY
+#define	__capability
 #endif
 
 #if !__has_feature(cheri_casts)
