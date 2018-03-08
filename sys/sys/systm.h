@@ -261,6 +261,11 @@ void	bcopy_c(const void * _Nonnull __capability from,
 	    void * _Nonnull __capability to, size_t len);
 void	bcopynocap_c(const void * _Nonnull __capability from,
 	    void * _Nonnull __capability to, size_t len);
+void	cheri_bcopy(const void *src, void *dst, size_t len);
+#else
+#define	bcopy_c		bcopy
+#define	bcopynocap_c	bcopy
+#define	cheri_bcopy	bcopy
 #endif
 void	bzero(void * _Nonnull buf, size_t len);
 void	explicit_bzero(void * _Nonnull, size_t);
@@ -271,6 +276,9 @@ void	*memcpy_c(void * _Nonnull __capability to,
 	    const void * _Nonnull __capability from, size_t len);
 void	*memcpynocap_c(void * _Nonnull __capability to,
 	    const void * _Nonnull __capability from, size_t len);
+void	*cheri_memcpy(void *dst, const void *src, size_t len);
+#else
+#define	cheri_memcpy	memcpy
 #endif
 void	*memmove(void * _Nonnull dest, const void * _Nonnull src, size_t n);
 #if __has_feature(capabilities)
@@ -289,6 +297,13 @@ struct copy_map {
 int	copystr(const void * _Nonnull __restrict kfaddr,
 	    void * _Nonnull __restrict kdaddr, size_t len,
 	    size_t * __restrict lencopied);
+#if __has_feature(capabilities)
+int	copystr_c(const void * __capability _Nonnull __restrict kfaddr,
+	    void * __capability _Nonnull __restrict kdaddr, size_t len,
+	    size_t * __capability __restrict lencopied);
+#else
+#define	copystr_c	copystr
+#endif
 int	copyinstr(const void * __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len,
 	    size_t * __restrict lencopied);
@@ -297,32 +312,21 @@ int	copyinstr_c(const void * _Nonnull __restrict __CAPABILITY udaddr,
 	    void * _Nonnull __restrict __CAPABILITY kaddr, size_t len,
 	    size_t * __restrict __CAPABILITY lencopied);
 #else
-static inline
-int
-copyinstr_c(const void * __restrict udaddr,
-    void * _Nonnull __restrict kaddr, size_t len,
-    size_t * __restrict lencopied) {
-
-	return (copyinstr(udaddr, kaddr, len, lencopied));
-}
+#define	copyinstr_c	copyinstr
 #endif
 int	copyin(const void * _Nonnull __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
 #if __has_feature(capabilities)
 int	copyin_c(const void * _Nonnull __restrict __capability udaddr,
 	    void * _Nonnull __restrict __capability kaddr, size_t len);
-#else
-static inline int
-copyin_c(const void * _Nonnull __restrict uaddr,
-    void * _Nonnull __restrict kaddr, size_t len)
-{
-
-	return(copyin(uaddr, kaddr, len));
-}
-#endif
-#ifdef CPU_CHERI
 int	copyincap(const void * _Nonnull __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
+int	copyincap_c(const void * _Nonnull __restrict __capability udaddr,
+	    void * _Nonnull __restrict __capability kaddr, size_t len);
+#else
+#define	copyin_c	copyin
+#define	copyincap	copyin
+#define	copyincap_c	copyin
 #endif
 int	copyin_nofault(const void * _Nonnull __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
@@ -346,20 +350,9 @@ int	copyoutcap(const void * _Nonnull __restrict kaddr,
 int	copyoutcap_c(const void * __capability _Nonnull __restrict kaddr,
 	    void * __capability _Nonnull __restrict udaddr, size_t len);
 #else
-static inline int
-copyout_c(const void * _Nonnull __restrict kaddr,
-    void * _Nonnull __restrict udaddr, size_t len)
-{
-
-	return (copyout(kaddr, udaddr, len));
-}
-static inline int
-copyoutcap(const void * _Nonnull __restrict kaddr,
-    void * _Nonnull __restrict udaddr, size_t len)
-{
-
-	return (copyout(kaddr, udaddr, len));
-}
+#define	copyout_c	copyout
+#define	copyoutcap	copyout
+#define	copyoutcap_c	copyout
 #endif
 int	copyout_nofault(const void * _Nonnull __restrict kaddr,
 	    void * _Nonnull __restrict udaddr, size_t len);
