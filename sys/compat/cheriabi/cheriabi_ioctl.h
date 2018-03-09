@@ -107,13 +107,6 @@ struct fiodgname_arg_c {
 };
 #define	FIODGNAME_C	_IOC_NEWTYPE(FIODGNAME, struct fiodgname_arg_c)
 
-struct mem_range_op_c {
-	void * __capability	mo_desc;
-	int		mo_arg[2];
-};
-#define	MEMRANGE_GET_C	_IOC_NEWTYPE(MEMRANGE_GET, struct mem_range_op_c)
-#define	MEMRANGE_SET_C	_IOC_NEWTYPE(MEMRANGE_SET, struct mem_range_op_c)
-
 struct pci_conf_io_c {
 	u_int32_t		pat_buf_len;	/* pattern buffer length */
 	u_int32_t		num_patterns;	/* number of patterns */

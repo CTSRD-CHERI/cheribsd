@@ -73,7 +73,6 @@ MALLOC_DECLARE(M_IOCTLOPS);
 CTASSERT((sizeof(struct md_ioctl32)+4) == 436);
 CTASSERT(sizeof(struct ioc_read_toc_entry32) == 8);
 CTASSERT(sizeof(struct ioc_toc_header32) == 4);
-CTASSERT(sizeof(struct mem_range_op32) == 12);
 CTASSERT(sizeof(struct pci_conf_io32) == 36);
 CTASSERT(sizeof(struct pci_match_conf32) == 44);
 CTASSERT(sizeof(struct pci_conf32) == 44);
@@ -166,41 +165,6 @@ cheriabi_ioctl_translate_in(u_long com, void *data, u_long *t_comp,
 			return (error);
 
 		return(0);
-	}
-
-	case MEMRANGE_GET_C:
-	case MEMRANGE_SET_C: {
-		struct mem_range_op *mro;
-		struct mem_range_op_c *mro_c = data;
-		size_t ndesc;
-
-		mro = malloc(sizeof(struct mem_range_op), M_IOCTLOPS,
-		    M_WAITOK | M_ZERO);
-		*t_datap = mro;
-		*t_comp = _IOC_NEWTYPE(com, struct mem_range_op);
-
-		CP((*mro_c), (*mro), mo_arg[0]);
-		CP((*mro_c), (*mro), mo_arg[1]);
-		switch (com) {
-		case MEMRANGE_GET_C:
-			/*
-			 * _Out_writes_(mro->mo_arg[0])
-			 * struct mem_range_desc *mo_desc
-			 */
-			ndesc = mro->mo_arg[0];
-			break;
-		case MEMRANGE_SET_C:
-			/* _Out_writes_ struct mem_range_desc *mo_desc */
-			ndesc = 1;
-			break;
-		}
-		error = cheriabi_cap_to_ptr((caddr_t *)&mro->mo_desc,
-		    mro_c->mo_desc, ndesc * sizeof(*mro->mo_desc),
-		    CHERI_PERM_STORE, 0);
-		if (error != 0)
-			return (error);
-
-		return (0);
 	}
 
 	case PCIOCGETCONF_C: {
@@ -577,16 +541,6 @@ cheriabi_ioctl_translate_out(u_long com, void *data, void *t_data)
 
 	/* FIODGNAME_C: Input only */
 
-	case MEMRANGE_GET_C:
-	case MEMRANGE_SET_C: {
-		struct mem_range_op *mro = t_data;
-		struct mem_range_op_c *mro_c = data;
-
-		CP((*mro), (*mro_c), mo_arg[0]);
-		CP((*mro), (*mro_c), mo_arg[1]);
-		break;
-	}
-
 	case PCIOCGETCONF_C: {
 		struct pci_conf_io *pci = t_data;
 		struct pci_conf_io_c *pci_c = data;
@@ -794,8 +748,6 @@ ioctl_data_contains_pointers(u_long cmd)
 	case MDIOCQUERY_C:
 	case MDIOCLIST_C:
 	case FIODGNAME_C:
-	case MEMRANGE_GET_C:
-	case MEMRANGE_SET_C:
 	case PCIOCGETCONF_C:
 	case SG_IO_C:
 
