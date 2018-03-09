@@ -325,7 +325,7 @@ namei(struct nameidata *ndp)
 	if ((cnp->cn_flags & HASBUF) == 0)
 		cnp->cn_pnbuf = uma_zalloc(namei_zone, M_WAITOK);
 	if (ndp->ni_segflg == UIO_SYSSPACE)
-		error = copystr((__cheri_fromcap void *)ndp->ni_dirp,
+		error = copystr((__cheri_fromcap const char *)ndp->ni_dirp,
 		    cnp->cn_pnbuf, MAXPATHLEN, &ndp->ni_pathlen);
 	else
 		error = copyinstr_c(ndp->ni_dirp,
