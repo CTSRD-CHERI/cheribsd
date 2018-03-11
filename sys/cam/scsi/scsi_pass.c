@@ -1847,6 +1847,12 @@ passdoioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, struct thread 
 		union ccb **user_ccb, *ccb;
 		xpt_opcode fc;
 
+#ifdef COMPAT_CHERIABI
+		if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
+			error = ENOTTY;
+			goto bailout;
+		}
+#endif
 #ifdef COMPAT_FREEBSD32
 		if (SV_PROC_FLAG(td->td_proc, SV_ILP32)) {
 			error = ENOTTY;
@@ -2026,6 +2032,12 @@ camioqueue_error:
 		struct pass_io_req *io_req;
 		int old_error;
 
+#ifdef COMPAT_CHERIABI
+		if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
+			error = ENOTTY;
+			goto bailout;
+		}
+#endif
 #ifdef COMPAT_FREEBSD32
 		if (SV_PROC_FLAG(td->td_proc, SV_ILP32)) {
 			error = ENOTTY;
