@@ -520,12 +520,12 @@ END(suword64)
 
 /*
  * casueword(9)
- * <v0>u_long casuword(<a0>u_long *p, <a1>u_long oldval, <a2>u_long *oldval_p,
+ * <v0>u_long casueword(<a0>u_long *p, <a1>u_long oldval, <a2>u_long *oldval_p,
  *		       <a3>u_long newval)
  */
 /*
  * casueword32(9)
- * <v0>uint32_t casuword(<a0>uint32_t *p, <a1>uint32_t oldval, 
+ * <v0>uint32_t casueword(<a0>uint32_t *p, <a1>uint32_t oldval,
  *			 <a2>uint32_t newval)
  */
 LEAF(casueword32)
