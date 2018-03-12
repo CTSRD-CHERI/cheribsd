@@ -903,21 +903,18 @@ cheriabi_ioctl(struct thread *td, struct cheriabi_ioctl_args *uap)
 	} else
 		data = (void *)&uap->data;
 	t_data = NULL;
-	if ((com & IOC_IN) && !ioctl_data_contains_pointers(com)) {
-		error = copyin_c(uap->data,
-		    (__cheri_tocap void * __capability)data, size);
-		if (error != 0)
-			goto out;
-	} else if (com & IOC_IN) {
+	if (com & IOC_IN) {
 		error = copyincap_c(uap->data,
 		    (__cheri_tocap void * __capability)data, size);
 		if (error != 0)
 			goto out;
-		error = cheriabi_ioctl_translate_in(com, data, &t_com, &t_data);
-		if (error != 0)
-			goto out;
-		o_com = com;
-		com = t_com;
+		if (ioctl_data_contains_pointers(com)) {
+			error = cheriabi_ioctl_translate_in(com, data, &t_com, &t_data);
+			if (error != 0)
+				goto out;
+			o_com = com;
+			com = t_com;
+		}
 	} else if (com & IOC_OUT) {
 		/*
 		 * Zero the buffer so the user always
@@ -934,14 +931,9 @@ cheriabi_ioctl(struct thread *td, struct cheriabi_ioctl_args *uap)
 	if (t_data && error == 0)
 		error = cheriabi_ioctl_translate_out(o_com, data, t_data);
 	if (error == 0 && (com & IOC_OUT)) {
-		if (t_data)
-			error = copyoutcap_c(
-			    (__cheri_tocap void * __capability)data,
-			    uap->data, (u_int)size);
-		else
-			error = copyout_c(
-			    (__cheri_tocap void * __capability)data,
-			    uap->data, (u_int)size);
+		error = copyoutcap_c(
+		    (__cheri_tocap void * __capability)data,
+		    uap->data, (u_int)size);
 	}
 
 out:
