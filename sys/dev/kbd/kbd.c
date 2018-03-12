@@ -28,6 +28,7 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include "opt_compat.h"
 #include "opt_kbd.h"
 
 #include <sys/param.h>
@@ -837,6 +838,7 @@ static int fkey_change_ok(fkeytab_t *, fkeyarg_t *, struct thread *);
 int
 genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 {
+	void * __capability data;
 	keymap_t *mapp;
 	okeymap_t *omapp;
 	keyarg_t *keyp;
@@ -869,8 +871,15 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 		break;
 
 	case GIO_KEYMAP:	/* get keyboard translation table */
-		error = copyout(kbd->kb_keymap, *(void **)arg,
-		    sizeof(keymap_t));
+#ifdef COMPAT_CHERIABI
+			if (SV_CURPROC_FLAG(SV_CHERI))
+				data = *(void * __capability *)arg;
+			else
+#endif
+				data = __USER_CAP_UNBOUND(*(void **)arg);
+		error = copyout_c(
+		    (__cheri_tocap keymap_t * __capability)kbd->kb_keymap,
+		    data, sizeof(keymap_t));
 		splx(s);
 		return (error);
 	case OGIO_KEYMAP:	/* get keyboard translation table (compat) */
@@ -900,7 +909,15 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 				mapp->key[i].flgs = omapp->key[i].flgs;
 			}
 		} else {
-			error = copyin(*(void **)arg, mapp, sizeof *mapp);
+#ifdef COMPAT_CHERIABI
+			if (SV_CURPROC_FLAG(SV_CHERI))
+				data = *(void * __capability *)arg;
+			else
+#endif
+				data = __USER_CAP_UNBOUND(*(void **)arg);
+			error = copyin_c(data,
+			    (__cheri_tocap keymap_t * __capability)mapp,
+			    sizeof *mapp);
 			if (error != 0) {
 				splx(s);
 				free(mapp, M_TEMP);
