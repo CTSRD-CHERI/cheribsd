@@ -54,6 +54,8 @@ extern struct capreloc __start___cap_relocs;
 __attribute__((weak))
 extern struct capreloc __stop___cap_relocs;
 
+__attribute__((weak)) extern int _DYNAMIC;
+
 void
 crt_init_globals(void)
 {
@@ -70,7 +72,15 @@ crt_init_globals(void)
 	 *  __builtin_symbol_address() that is always filled in a static link
 	 *  time.
 	 */
-	__asm__ volatile("dla %0, _DYNAMIC": "=r"(_dynamic_addr));
+	__asm__ volatile(".global _DYNAMIC\n\t"
+	    /*
+	     * XXXAR: For some reason the attribute weak above is ignored if we
+	     * don't also include it in the incline assembly
+	     */
+	    ".weak _DYNAMIC\n\t"
+	    /* Use %pcrel here to avoid adding GOT slots here */
+	    "lui %0, %%pcrel_hi(_DYNAMIC)\n\t"
+	    "daddiu %0, %0, %%pcrel_lo(_DYNAMIC + 4)\n\t" : "=r"(_dynamic_addr));
 	if (_dynamic_addr != 0)
 		return;
 
