@@ -37,7 +37,6 @@
 
 int __isthreaded = 0;
 void (*__cleanup)(void) __hidden;
-void * _DYNAMIC = 0;
 
 void
 exit(int status __unused)
