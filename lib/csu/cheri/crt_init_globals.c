@@ -59,28 +59,35 @@ __attribute__((weak)) extern int _DYNAMIC;
 void
 crt_init_globals(void)
 {
-	uint64_t _dynamic_addr = 0;
+	uint64_t _dynamic_addr = 0;;
 	/*
-	 *  We can't get the address of _DYNAMIC in the purecap ABI before globals
-	 *  are initialized so we need to use dla here. If _DYNAMIC exists
-	 *  then the runtime-linker will have done the __cap_relocs already
-	 *  so we should be processing them here. Furthermore it will also have
-	 *  enforced relro so we will probably crash when attempting to write
-	 *  const pointers that are initialized to global addresses.
+	 * We can't get the address of _DYNAMIC in the purecap ABI before globals
+	 * are initialized so we need to use dla here. If _DYNAMIC exists
+	 * then the runtime-linker will have done the __cap_relocs already
+	 * so we should be processing them here. Furthermore it will also have
+	 * enforced relro so we will probably crash when attempting to write
+	 * const pointers that are initialized to global addresses.
 	 *
-	 *  TODO: can we do this without dla? Maybe clang should provide a
-	 *  __builtin_symbol_address() that is always filled in a static link
-	 *  time.
+	 * TODO: Maybe clang should provide a __builtin_symbol_address() that is
+	 * always filled in a static link time...
 	 */
 	__asm__ volatile(".global _DYNAMIC\n\t"
 	    /*
 	     * XXXAR: For some reason the attribute weak above is ignored if we
-	     * don't also include it in the incline assembly
+	     * don't also include it in the inline assembly
 	     */
 	    ".weak _DYNAMIC\n\t"
-	    /* Use %pcrel here to avoid adding GOT slots here */
-	    "lui %0, %%pcrel_hi(_DYNAMIC)\n\t"
-	    "daddiu %0, %0, %%pcrel_lo(_DYNAMIC + 4)\n\t" : "=r"(_dynamic_addr));
+	    /*
+	     * TODO: Try to use %pcrel here to avoid adding GOT slots here
+	     * TODO: Or add a symbol that is always a link-time constant to lld.
+	     * For example something like _CHERI_IS_DYNAMIC_
+	     */
+	    "dla %0, _DYNAMIC\n\t" : "=r"(_dynamic_addr));
+
+	/*
+	 * If the address of _DYNAMIC is non-zero then we are dynamically linked
+	 * and RTLD will be responsible for processing the capability relocs
+	 */
 	if (_dynamic_addr != 0)
 		return;
 
