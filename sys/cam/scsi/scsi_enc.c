@@ -360,11 +360,11 @@ enc_ioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag,
 
 #ifdef	COMPAT_CHERIABI
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
-		return(ENOTTY);
+		return (ENOTTY);
 #endif
 #ifdef	COMPAT_FREEBSD32
 	if (SV_PROC_FLAG(td->td_proc, SV_ILP32))
-		return(ENOTTY);
+		return (ENOTTY);
 #endif
 
 	if (arg_addr)
