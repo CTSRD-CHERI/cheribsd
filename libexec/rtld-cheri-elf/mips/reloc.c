@@ -222,7 +222,7 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 			val += (vaddr_t)relocbase;
 #ifdef DEBUG_VERBOSE_SELF
 			/*
-			 * FIXME this can never work since the debug var only
+			 * FIXME dbg() can never work since the debug var only
 			 * gets initialized later -> use rtld_printf for now
 			 */
 			rtld_printf("REL32/L(%p) %p -> %p in <self>\n",
@@ -614,6 +614,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 		}
 
 		case R_TYPE(CHERI_ABSPTR):
+		{
 			def = find_symdef(r_symndx, obj,
 			    &defobj, flags, NULL, lockstate);
 			if (def == NULL) {
@@ -636,6 +637,34 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			    where, rel->r_offset, obj->strtab + obj->symtab[r_symndx].st_name,
 			    obj->path, (void*)(uintptr_t)old, (void *)(uintptr_t)val, defobj->path);
 			break;
+		}
+
+
+		case R_TYPE(CHERI_SIZE):
+		{
+			def = find_symdef(r_symndx, obj,
+			    &defobj, flags, NULL, lockstate);
+			if (def == NULL) {
+				_rtld_error("%s: Could not find symbol %s",
+				    obj->path, obj->strtab + obj->symtab[r_symndx].st_name);
+				return -1;
+			}
+			assert(ELF_ST_TYPE(def->st_info) != STT_GNU_IFUNC &&
+			    "IFUNC not implemented!");
+			Elf_Sxword size = def->st_size;
+			const size_t rlen =
+			    ELF_R_NXTTYPE_64_P(r_type)
+				? sizeof(Elf_Sxword)
+				: sizeof(Elf_Sword);
+			Elf_Addr old = load_ptr(where, rlen);
+			Elf_Addr val = old;
+			val += size;
+			store_ptr(where, val, rlen);
+			dbg("SIZE(%p/0x%lx) %s in %s %p --> %p in %s",
+			    where, rel->r_offset, obj->strtab + obj->symtab[r_symndx].st_name,
+			    obj->path, (void*)(uintptr_t)old, (void *)(uintptr_t)val, defobj->path);
+			break;
+		}
 
 		default:
 			dbg("sym = %lu, type = %lu, offset = %p, "
