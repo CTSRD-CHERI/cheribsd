@@ -3521,7 +3521,12 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 
 	old_map = &vm1->vm_map;
 	/* Copy immutable fields of vm1 to vm2. */
+#ifndef CHERI_KERNEL
 	vm2 = vmspace_alloc(old_map->min_offset, old_map->max_offset, NULL);
+#else
+	vm2 = vmspace_alloc(old_map->map_capability,
+	    old_map->map_capability + old_map->max_offset, NULL);
+#endif
 	if (vm2 == NULL)
 		return (NULL);
 	vm2->vm_taddr = vm1->vm_taddr;

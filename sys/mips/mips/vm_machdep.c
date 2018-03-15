@@ -320,14 +320,30 @@ cpu_thread_alloc(struct thread *td)
 	pt_entry_t *pte;
 
 #ifdef KSTACK_LARGE_PAGE
-	KASSERT((td->td_kstack & (KSTACK_PAGE_SIZE - 1) ) == 0,
+	KASSERT((ptr_to_va(td->td_kstack) & (KSTACK_PAGE_SIZE - 1) ) == 0,
 	    ("kernel stack must be aligned to 16K boundary."));
 #else
-	KASSERT((td->td_kstack & ((KSTACK_PAGE_SIZE * 2) - 1) ) == 0,
+	KASSERT((ptr_to_va(td->td_kstack) & ((KSTACK_PAGE_SIZE * 2) - 1) ) == 0,
 	    ("kernel stack must be aligned."));
 #endif
+#ifndef CHERI_KERNEL
 	td->td_pcb = (struct pcb *)(td->td_kstack +
 	    td->td_kstack_pages * PAGE_SIZE) - 1;
+#else
+	/*
+	 * XXX-AM: kstack and pcb are allocated toghether, so we need to split
+	 * the two capabilities properly.
+	 * Note that this also cuts out the guard pages if any.
+	 */
+	td->td_pcb = cheri_csetbounds(
+	    (struct pcb *)(td->td_kstack + td->td_kstack_pages * PAGE_SIZE) - 1,
+	    sizeof(struct pcb));
+	td->td_kstack = (vm_ptr_t)cheri_csetbounds(
+	    (void *)td->td_kstack, td->td_kstack_pages * PAGE_SIZE - 1);
+	td->td_kstack = (vm_ptr_t)cheri_andperm((void *)td->td_kstack,
+	    CHERI_PERMS_KERNEL_DATA);
+
+#endif
 	td->td_frame = &td->td_pcb->pcb_regs;
 #ifdef KSTACK_LARGE_PAGE
 	/* Just one entry for one large kernel page. */

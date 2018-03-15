@@ -314,10 +314,10 @@ SYSCTL_INT(_vm, OID_AUTO, kstacks, CTLFLAG_RD, &kstacks, 0,
 
 #if defined(__mips__)
 
-static vm_offset_t
+static vm_ptr_t
 vm_kstack_valloc(int pages)
 {
-	vm_offset_t ks;
+	vm_ptr_t ks;
 
 	/*
 	 * We need to align the kstack's mapped address to fit within
@@ -338,7 +338,7 @@ vm_kstack_valloc(int pages)
 #define	KSTACK_OBJT		OBJT_PHYS
 
 static int
-vm_kstack_palloc(vm_object_t ksobj, vm_offset_t ks, int allocflags, int pages,
+vm_kstack_palloc(vm_object_t ksobj, vm_ptr_t ks, int allocflags, int pages,
     vm_page_t ma[])
 {
 	vm_page_t m, end_m;
@@ -405,7 +405,7 @@ retrylookup:
 #define	KSTACK_OBJT		OBJT_DEFAULT
 
 static int
-vm_kstack_palloc(vm_object_t ksobj, vm_offset_t ks, int allocflags, int pages,
+vm_kstack_palloc(vm_object_t ksobj, vm_ptr_t ks, int allocflags, int pages,
     vm_page_t ma[])
 {
 	int i;
@@ -476,7 +476,7 @@ int
 vm_thread_new(struct thread *td, int pages)
 {
 	vm_object_t ksobj;
-	vm_offset_t ks;
+	vm_ptr_t ks;
 	vm_page_t ma[KSTACK_MAX_PAGES];
 	struct kstack_cache_entry *ks_ce;
 
@@ -518,7 +518,8 @@ vm_thread_new(struct thread *td, int pages)
 
 	atomic_add_int(&kstacks, 1);
 	if (KSTACK_GUARD_PAGES != 0) {
-		pmap_qremove(ks, KSTACK_GUARD_PAGES);
+		/* XXX-AM: in cheri we may just avoid having guard pages */
+		pmap_qremove(ptr_to_va(ks), KSTACK_GUARD_PAGES);
 		ks += KSTACK_GUARD_PAGES * PAGE_SIZE;
 	}
 	td->td_kstack_obj = ksobj;
@@ -537,18 +538,18 @@ vm_thread_new(struct thread *td, int pages)
 		printf("vm_thread_new: vm_kstack_palloc() failed\n");
 		return (0);
 	}
-	pmap_qenter(ks, ma, pages);
+	pmap_qenter(ptr_to_va(ks), ma, pages);
 	return (1);
 }
 
 static void
-vm_thread_stack_dispose(vm_object_t ksobj, vm_offset_t ks, int pages)
+vm_thread_stack_dispose(vm_object_t ksobj, vm_ptr_t ks, int pages)
 {
 	vm_page_t m;
 	int i;
 
 	atomic_add_int(&kstacks, -1);
-	pmap_qremove(ks, pages);
+	pmap_qremove(ptr_to_va(ks), pages);
 	VM_OBJECT_WLOCK(ksobj);
 	for (i = 0; i < pages; i++) {
 		m = vm_page_lookup(ksobj, i);
@@ -572,7 +573,7 @@ void
 vm_thread_dispose(struct thread *td)
 {
 	vm_object_t ksobj;
-	vm_offset_t ks;
+	vm_ptr_t ks;
 	struct kstack_cache_entry *ks_ce;
 	int pages;
 
