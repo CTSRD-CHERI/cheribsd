@@ -113,14 +113,12 @@ END(copystr_c)
  *
  * memcpy() has inverted source/destination pointers.
  */
-LEAF(memcpy)
-XLEAF(memcpy_c)
+LEAF(memcpynocap)
 XLEAF(memcpynocap_c)
 	cmove	$c1, $c3
 	cmove	$c3, $c4
 	cmove	$c4, $c1
-XLEAF(bcopy)
-XLEAF(bcopy_c)
+XLEAF(bcopynocap)
 XLEAF(bcopynocap_c)
 	beqz	a0, 5f	/* return immediately if zero-length */
 	cltu	t0, $c4, $c3	/* forward or backward copy? */
@@ -226,7 +224,7 @@ XLEAF(bcopynocap_c)
 5:	/* return: */
 	cjr	$c17
 	cmove	$c3, $c1	/* need to return original c3 for memcpy */
-END(memcpy)
+END(memcpynocap)
 
 /*
  * See memcpy() bcopy()
@@ -234,74 +232,81 @@ END(memcpy)
  * the input and output pointers to be capability-aligned.
  * XXX-AM: should we also copy the remaining unaligned bytes?
  */
-LEAF(cheri_memcpy)
+LEAF(memcpy)
+XLEAF(memcpy_c)
+XLEAF(cheri_memcpy)
 	cmove	$c1, $c3
 	cmove	$c3, $c4
 	cmove	$c4, $c1
+XLEAF(bcopy)
+XLEAF(bcopy_c)
 XLEAF(cheri_bcopy)
-	beqz	a0, 2f /* return immediately if zero-length. */
-	li	v0, -CHERICAP_SIZE	/* Handle under-aligned lengths by... */
-	and	a0, a0, v0	/* .. truncating the length to capsize bytes. */
-	cltu	v0, $c4, $c3	/* forward or backward copy? */
-	beqz	v0, 3f 	/* backward */
-	cincoffset	$c2, $c4, a0	/* end pointer in c2 */
-	/* copy forward */
-	li	v1, CHERICAP_SIZE	/* forward loop increment */
-	li	t3, 0			/* forward loop offset */
-1:	/* common copy loop */
-	clc	CHERI_REG_CTEMP0, t3, 0($c3)
-	csc	CHERI_REG_CTEMP0, t3, 0($c4)
-	cincoffset	$c4, $c4, v1	/* increment destination pointer. */
-	ceq	v0, $c2, $c4	/* Are we there yet?  If not, loop. */
-	beqz	v0, 1b # loop
-	cincoffset	$c3, $c3, v1	/* branch delay: increment src ptr. */
-2:	/* return */
+	//ori	zero, zero, 0xbeef
+	beqz	a0, 9f /* return immediately if zero-length. */
+	cltu	v0, $c4, $c3	/* v0 <- forward or backward copy? */
+	bnez	v0, 2f		/* forward */
+	li	v0, +1	/* delay slot: loop increment direction (forward copy) */
+
+	/* backward bcopy */
+	cincoffset	$c4, $c4, a0	/* dst to the end of buffer */
+	cincoffset 	$c3, $c3, a0	/* src to the end of buffer */
+	li	v0, -1	/* loop increment direction */
+	b	2f	/* bcopy main loop */
+	/* fall through to bcopy main loop */
+2:
+	cgetbase	t3, $c4	/* t3 <- base of dst, used to check alignment */
+	cgetbase	t2, $c3	/* t2 <- base of src, used to check alignment */
+	/* compute loop shift from direction */
+	daddiu	a1, v0, -1
+	sra	a1, a1, 1	/* a1 = (fwd) ? 0 : -1 bytecopy loop offset */
+3:	/* copy bytes until we are aligned to CHERICAP_SIZE or we are done */
+	beqz	a0, 9f	/* if we are done copying just return */
+	cgetoffset	t1, $c4
+	daddu	t1, t1, t3	/* current dst cursor */
+	andi	t1, t1, (CHERICAP_SIZE - 1)	/* t1 <- !aligned(dst) */
+	seq	t1, t1, zero
+	cgetoffset	t0, $c3
+	daddu	t0, t0, t2	/* current src cursor */
+	andi	t0, t0, (CHERICAP_SIZE - 1)	/* a0 <- !aligned(src) */
+	seq	t0, t0, zero
+	and	t1, t1, t0	/* t1 <- aligned(dst) and aligned(src) */
+	bnez	t1, 2f	/* done, next loop */
+	nop	/* XXX-AM probably we can remove this */
+	clb	t0, a1, 0($c3)
+	cincoffset	$c3, $c3, v0
+	csb	t0, a1, 0($c4)
+	cincoffset	$c4, $c4, v0
+	b	3b	/* loop */
+	daddiu	a0, a0, -1	/* consumed another byte */
+
+2:	/* copy aligned bytes until we are past end */
+	sll	v1, v0, CHERICAP_SHIFT	/* v1 <- loop increment +- CHERICAP_SIZE */
+	sll	t2, a1, CHERICAP_SHIFT	/* t2 <- loop offset 0/-CHERICAP_SIZE */
+	li	t0, (-CHERICAP_SIZE) /* find aligned length to copy */
+	and	t0, a0, t0
+	srl	t3, t0, CHERICAP_SHIFT	/* number of aligned loop iterations */
+	dsubu	a0, a0, t0	/* update a0 with remaining tail bytes */
+3:
+	beqz	t3, 2f	/* done, next loop */
+	daddiu	t3, t3, -1
+	clc	$c5, t2, 0($c3)
+	cincoffset	$c3, $c3, v1
+	csc	$c5, t2, 0($c4)
+	b	3b	/* loop */
+	cincoffset	$c4, $c4, v1
+
+2:	/* copy unaligned bytes until the end */
+	beqz	a0, 9f	/* done */
+	daddiu	a0, a0, -1
+	clb	t0, a1, 0($c3)
+	cincoffset	$c3, $c3, v0
+	csb	t0, a1, 0($c4)
+	b	2b	/* loop */
+	cincoffset	$c4, $c4, v0
+9:	/* done, just return */
 	cjr	$c17
 	cmove	$c3, $c1	/* need to return original c3 for memcpy */
-3:	/* copy backwards */
-	cmove	CHERI_REG_CTEMP0, $c2	/* swap destination start and end pointers */
-	cmove	$c2, $c4
-	cmove	$c4, CHERI_REG_CTEMP0
-	cincoffset	$c3, $c3, a0	/* set the source pointer at the end of the buffer */
-	li	t3, -CHERICAP_SIZE	/* backward loop offset */
-	b	1b	/* copy loop */
-	move	v1, t3	/* backward loop increment (avoid another li) */
-END(cheri_memcpy)
-
-#if 0
-/* XXX-AM: is this even ever used? */
-/*
- * See if access to addr with a len type instruction causes a machine check.
- * len is length of access (1=byte, 2=short, 4=int)
- *
- * badaddr(addr, len)
- *	char *addr;
- *	int len;
- */
-LEAF(badaddr)
-	PTR_LA	v0, baderr
-	GET_CPU_PCPU(v1)
-	PTR_L	v1, PC_CURPCB(v1)
-	bne	a1, 1, 2f
-	PTR_S	v0, U_PCB_ONFAULT(v1)
-	b	5f
-	lbu	v0, (a0)
-2:
-	bne	a1, 2, 4f
-	nop
-	b	5f
-	lhu	v0, (a0)
-4:
-	lw	v0, (a0)
-5:
-	PTR_S	zero, U_PCB_ONFAULT(v1)
-	j	ra
-	move	v0, zero		# made it w/o errors
-baderr:
-	j	ra
-	li	v0, 1			# trap sends us here
-END(badaddr)
-#endif
+END(memcpy)
 
 /*
  * Copy a null terminated string from the user address space into
@@ -1021,237 +1026,6 @@ LEAF(ffs)
 	j	ra
 	nop
 END(ffs)
-
-#if 0 /* XXX-AM these seems not being used */
-
-/**
- * void
- * atomic_set_16(u_int16_t *a, u_int16_t b)
- * {
- *	*a |= b;
- * }
- */
-LEAF(atomic_set_16)
-	.set	noreorder
-	srl	a0, a0, 2	# round down address to be 32-bit aligned
-	sll	a0, a0, 2
-	andi	a1, a1, 0xffff
-1:
-	ll	t0, 0(a0)
-	or	t0, t0, a1
-	sc	t0, 0(a0)
-	beq	t0, zero, 1b
-	nop
-	j	ra
-	nop
-END(atomic_set_16)
-
-/**
- * void
- * atomic_clear_16(u_int16_t *a, u_int16_t b)
- * {
- *	*a &= ~b;
- * }
- */
-LEAF(atomic_clear_16)
-	.set	noreorder
-	srl	a0, a0, 2	# round down address to be 32-bit aligned
-	sll	a0, a0, 2
-	nor	a1, zero, a1
-1:
-	ll	t0, 0(a0)
-	move	t1, t0
-	andi	t1, t1, 0xffff	# t1 has the original lower 16 bits
-	and	t1, t1, a1	# t1 has the new lower 16 bits
-	srl	t0, t0, 16	# preserve original top 16 bits
-	sll	t0, t0, 16
-	or	t0, t0, t1
-	sc	t0, 0(a0)
-	beq	t0, zero, 1b
-	nop
-	j	ra
-	nop
-END(atomic_clear_16)
-
-
-/**
- * void
- * atomic_subtract_16(uint16_t *a, uint16_t b)
- * {
- *	*a -= b;
- * }
- */
-LEAF(atomic_subtract_16)
-	.set	noreorder
-	srl	a0, a0, 2	# round down address to be 32-bit aligned
-	sll	a0, a0, 2
-1:
-	ll	t0, 0(a0)
-	move	t1, t0
-	andi	t1, t1, 0xffff	# t1 has the original lower 16 bits
-	subu	t1, t1, a1
-	andi	t1, t1, 0xffff	# t1 has the new lower 16 bits
-	srl	t0, t0, 16	# preserve original top 16 bits
-	sll	t0, t0, 16
-	or	t0, t0, t1
-	sc	t0, 0(a0)
-	beq	t0, zero, 1b
-	nop
-	j	ra
-	nop
-END(atomic_subtract_16)
-
-/**
- * void
- * atomic_add_16(uint16_t *a, uint16_t b)
- * {
- *	*a += b;
- * }
- */
-LEAF(atomic_add_16)
-	.set	noreorder
-	srl	a0, a0, 2	# round down address to be 32-bit aligned
-	sll	a0, a0, 2
-1:
-	ll	t0, 0(a0)
-	move	t1, t0
-	andi	t1, t1, 0xffff	# t1 has the original lower 16 bits
-	addu	t1, t1, a1
-	andi	t1, t1, 0xffff	# t1 has the new lower 16 bits
-	srl	t0, t0, 16	# preserve original top 16 bits
-	sll	t0, t0, 16
-	or	t0, t0, t1
-	sc	t0, 0(a0)
-	beq	t0, zero, 1b
-	nop
-	j	ra
-	nop
-END(atomic_add_16)
-
-/**
- * void
- * atomic_add_8(uint8_t *a, uint8_t b)
- * {
- *	*a += b;
- * }
- */
-LEAF(atomic_add_8)
-	.set	noreorder
-	srl	a0, a0, 2	# round down address to be 32-bit aligned
-	sll	a0, a0, 2
-1:
-	ll	t0, 0(a0)
-	move	t1, t0
-	andi	t1, t1, 0xff	# t1 has the original lower 8 bits
-	addu	t1, t1, a1
-	andi	t1, t1, 0xff	# t1 has the new lower 8 bits
-	srl	t0, t0, 8	# preserve original top 24 bits
-	sll	t0, t0, 8
-	or	t0, t0, t1
-	sc	t0, 0(a0)
-	beq	t0, zero, 1b
-	nop
-	j	ra
-	nop
-END(atomic_add_8)
-
-
-/**
- * void
- * atomic_subtract_8(uint8_t *a, uint8_t b)
- * {
- *	*a += b;
- * }
- */
-LEAF(atomic_subtract_8)
-	.set	noreorder
-	srl	a0, a0, 2	# round down address to be 32-bit aligned
-	sll	a0, a0, 2
-1:
-	ll	t0, 0(a0)
-	move	t1, t0
-	andi	t1, t1, 0xff	# t1 has the original lower 8 bits
-	subu	t1, t1, a1
-	andi	t1, t1, 0xff	# t1 has the new lower 8 bits
-	srl	t0, t0, 8	# preserve original top 24 bits
-	sll	t0, t0, 8
-	or	t0, t0, t1
-	sc	t0, 0(a0)
-	beq	t0, zero, 1b
-	nop
-	j	ra
-	nop
-END(atomic_subtract_8)
-
-/*
- *	atomic 64-bit register read/write assembly language support routines.
- */
-
-	.set	noreorder		# Noreorder is default style!
-
-#if !defined(__mips_n64) && !defined(__mips_n32)
-	/*
-	 * I don't know if these routines have the right number of
-	 * NOPs in it for all processors.  XXX
-	 *
-	 * Maybe it would be better to just leave this undefined in that case.
-	 *
-	 * XXX These routines are not safe in the case of a TLB miss on a1 or
-	 *     a0 unless the trapframe is 64-bit, which it just isn't with O32.
-	 *     If we take any exception, not just an interrupt, the upper
-	 *     32-bits will be clobbered.  Use only N32 and N64 kernels if you
-	 *     want to use 64-bit registers while interrupts are enabled or
-	 *     with memory operations.  Since this isn't even using load-linked
-	 *     and store-conditional, perhaps it should just use two registers
-	 *     instead, as is right and good with the O32 ABI.
-	 */
-LEAF(atomic_store_64)
-	mfc0	t1, MIPS_COP_0_STATUS
-	and	t2, t1, ~MIPS_SR_INT_IE
-	mtc0	t2, MIPS_COP_0_STATUS
-	nop
-	nop
-	nop
-	nop
-	ld	t0, (a1)
-	nop
-	nop
-	sd	t0, (a0)
-	nop
-	nop
-	mtc0	t1,MIPS_COP_0_STATUS
-	nop
-	nop
-	nop
-	nop
-	j	ra
-	nop
-END(atomic_store_64)
-
-LEAF(atomic_load_64)
-	mfc0	t1, MIPS_COP_0_STATUS
-	and	t2, t1, ~MIPS_SR_INT_IE
-	mtc0	t2, MIPS_COP_0_STATUS
-	nop
-	nop
-	nop
-	nop
-	ld	t0, (a0)
-	nop
-	nop
-	sd	t0, (a1)
-	nop
-	nop
-	mtc0	t1,MIPS_COP_0_STATUS
-	nop
-	nop
-	nop
-	nop
-	j	ra
-	nop
-END(atomic_load_64)
-#endif
-#endif /* XXX-AM seemingly not used */
 
 #if defined(DDB) || defined(DEBUG)
 
