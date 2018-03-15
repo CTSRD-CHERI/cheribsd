@@ -680,6 +680,17 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			// TODO: derive from correct permissions cap
 			void* symval = defobj->relocbase + def->st_value;
 			symval = cheri_csetbounds(symval, def->st_size);
+			uint64_t remove_perms = __CHERI_CAP_PERMISSION_PERMIT_SEAL__;
+			if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
+				/* remove write permission from functions */
+				remove_perms |= (__CHERI_CAP_PERMISSION_PERMIT_STORE__ |
+				    __CHERI_CAP_PERMISSION_PERMIT_STORE_CAPABILITY__ |
+				    __CHERI_CAP_PERMISSION_PERMIT_STORE_LOCAL__);
+			} else {
+				/* remove execute permission from functions */
+				remove_perms |= __CHERI_CAP_PERMISSION_PERMIT_EXECUTE__;
+			}
+			symval = cheri_andperm(symval, ~remove_perms);
 			/*
 			 * The capability offset is the addend for the
 			 * relocation. Since we are using Elf_Rel this is the
