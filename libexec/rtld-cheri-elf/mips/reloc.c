@@ -666,6 +666,41 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			break;
 		}
 
+		case R_TYPE(CHERI_CAPABILITY):
+		{
+			def = find_symdef(r_symndx, obj, &defobj, flags, NULL,
+			    lockstate);
+			if (def == NULL) {
+				_rtld_error("%s: Could not find symbol %s",
+				    obj->path, obj->strtab + obj->symtab[r_symndx].st_name);
+				return -1;
+			}
+			assert(ELF_ST_TYPE(def->st_info) != STT_GNU_IFUNC &&
+			    "IFUNC not implemented!");
+			// TODO: derive from correct permissions cap
+			void* symval = defobj->relocbase + def->st_value;
+			symval = cheri_csetbounds(symval, def->st_size);
+			/*
+			 * The capability offset is the addend for the
+			 * relocation. Since we are using Elf_Rel this is the
+			 * first 8 bytes of the target location (which is the
+			 * virtual address for both 128 and 256-bit CHERI).
+			 */
+			uint64_t offset = load_ptr(where, sizeof(uint64_t));
+			symval + offset;
+			if (!cheri_gettag(symval)) {
+				_rtld_error("%s: constructed invalid capability"
+				   "for %s: %#p",  obj->path,
+				    obj->strtab + obj->symtab[r_symndx].st_name,
+				    symval);
+				return -1;
+			}
+			dbg("CAP(%p/0x%lx) %s in %s --> %#p in %s",
+			    where, rel->r_offset, obj->strtab + obj->symtab[r_symndx].st_name,
+			    obj->path, symval, defobj->path);
+			break;
+		}
+
 		default:
 			dbg("sym = %lu, type = %lu, offset = %p, "
 			    "contents = %p, symbol = %s",
