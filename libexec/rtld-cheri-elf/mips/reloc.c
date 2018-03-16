@@ -275,6 +275,11 @@ _mips_rtld_bind(Obj_Entry *obj, Elf_Size reloff)
 	return (Elf_Addr)target;
 }
 
+static inline const char*
+symname(Obj_Entry* obj, size_t r_symndx) {
+	return obj->strtab + obj->symtab[r_symndx].st_name;
+}
+
 int
 reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
     RtldLockState *lockstate)
@@ -552,7 +557,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 
 			store_ptr(where, val, rlen);
 			dbg("DTPMOD %s in %s %p --> %p in %s",
-			    obj->strtab + obj->symtab[r_symndx].st_name,
+			    symname(obj, r_symndx),
 			    obj->path, (void *)(uintptr_t)old, (void*)(uintptr_t)val, defobj->path);
 			break;
 		}
@@ -579,7 +584,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			store_ptr(where, val, rlen);
 
 			dbg("DTPREL %s in %s %p --> %p in %s",
-			    obj->strtab + obj->symtab[r_symndx].st_name,
+			    symname(obj, r_symndx),
 			    obj->path, (void*)(uintptr_t)old, (void *)(uintptr_t)val, defobj->path);
 			break;
 		}
@@ -608,7 +613,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			store_ptr(where, val, rlen);
 
 			dbg("TPREL %s in %s %p --> %p in %s",
-			    obj->strtab + obj->symtab[r_symndx].st_name,
+			    symname(obj, r_symndx),
 			    obj->path, (void*)(uintptr_t)old, (void *)(uintptr_t)val, defobj->path);
 			break;
 		}
@@ -619,7 +624,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			    &defobj, flags, NULL, lockstate);
 			if (def == NULL) {
 				_rtld_error("%s: Could not find symbol %s",
-				    obj->path, obj->strtab + obj->symtab[r_symndx].st_name);
+				    obj->path, symname(obj, r_symndx));
 				return -1;
 			}
 			assert(ELF_ST_TYPE(def->st_info) != STT_GNU_IFUNC &&
@@ -634,7 +639,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			val += symval;
 			store_ptr(where, val, rlen);
 			dbg("ABS(%p/0x%lx) %s in %s %p --> %p in %s",
-			    where, rel->r_offset, obj->strtab + obj->symtab[r_symndx].st_name,
+			    where, rel->r_offset, symname(obj, r_symndx),
 			    obj->path, (void*)(uintptr_t)old, (void *)(uintptr_t)val, defobj->path);
 			break;
 		}
@@ -646,7 +651,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			    &defobj, flags, NULL, lockstate);
 			if (def == NULL) {
 				_rtld_error("%s: Could not find symbol %s",
-				    obj->path, obj->strtab + obj->symtab[r_symndx].st_name);
+				    obj->path, symname(obj, r_symndx));
 				return -1;
 			}
 			assert(ELF_ST_TYPE(def->st_info) != STT_GNU_IFUNC &&
@@ -661,7 +666,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			val += size;
 			store_ptr(where, val, rlen);
 			dbg("SIZE(%p/0x%lx) %s in %s %p --> %p in %s",
-			    where, rel->r_offset, obj->strtab + obj->symtab[r_symndx].st_name,
+			    where, rel->r_offset, symname(obj, r_symndx),
 			    obj->path, (void*)(uintptr_t)old, (void *)(uintptr_t)val, defobj->path);
 			break;
 		}
@@ -672,7 +677,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			    lockstate);
 			if (def == NULL) {
 				_rtld_error("%s: Could not find symbol %s",
-				    obj->path, obj->strtab + obj->symtab[r_symndx].st_name);
+				    obj->path, symname(obj, r_symndx));
 				return -1;
 			}
 			assert(ELF_ST_TYPE(def->st_info) != STT_GNU_IFUNC &&
@@ -705,13 +710,12 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			if (!cheri_gettag(symval)) {
 				_rtld_error("%s: constructed invalid capability"
 				   "for %s: %#p",  obj->path,
-				    obj->strtab + obj->symtab[r_symndx].st_name,
-				    symval);
+				    symname(obj, r_symndx), symval);
 				return -1;
 			}
 			*((void**)where) = symval;
 			dbg("CAP(%p/0x%lx) %s in %s --> %-#p in %s",
-			    where, rel->r_offset, obj->strtab + obj->symtab[r_symndx].st_name,
+			    where, rel->r_offset, symname(obj, r_symndx),
 			    obj->path, *((void**)where), defobj->path);
 			break;
 		}
@@ -722,7 +726,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			    (u_long)r_symndx, (u_long)ELF_R_TYPE(rel->r_info),
 			    (void *)(uintptr_t)rel->r_offset,
 			    (void *)(uintptr_t)load_ptr(where, sizeof(Elf_Sword)),
-			    obj->strtab + obj->symtab[r_symndx].st_name);
+			    symname(obj, r_symndx));
 			_rtld_error("%s: Unsupported relocation type %ld "
 			    "in non-PLT relocations",
 			    obj->path, (u_long) ELF_R_TYPE(rel->r_info));
