@@ -706,9 +706,10 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				    symval);
 				return -1;
 			}
+			*((void**)where) = symval;
 			dbg("CAP(%p/0x%lx) %s in %s --> %-#p in %s",
 			    where, rel->r_offset, obj->strtab + obj->symtab[r_symndx].st_name,
-			    obj->path, symval, defobj->path);
+			    obj->path, *((void**)where), defobj->path);
 			break;
 		}
 
