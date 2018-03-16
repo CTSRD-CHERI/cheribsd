@@ -47,7 +47,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/file.h>
 #include <sys/ioccom.h>
 #include <sys/malloc.h>
-#include <sys/mdioctl.h>
 #include <sys/memrange.h>
 #include <sys/pciio.h>
 #include <sys/proc.h>
@@ -70,7 +69,6 @@ MALLOC_DECLARE(M_IOCTLOPS);
 
 #if 0
 /* Cannot get exact size in 64-bit due to alignment issue of entire struct. */
-CTASSERT((sizeof(struct md_ioctl32)+4) == 436);
 CTASSERT(sizeof(struct ioc_read_toc_entry32) == 8);
 CTASSERT(sizeof(struct ioc_toc_header32) == 4);
 CTASSERT(sizeof(struct pci_conf_io32) == 36);
@@ -93,40 +91,6 @@ cheriabi_ioctl_translate_in(u_long com, void *data, u_long *t_comp,
 	int error;
 
 	switch (com) {
-	case MDIOCATTACH_C:
-	case MDIOCDETACH_C:
-	case MDIOCQUERY_C:
-	case MDIOCLIST_C: {
-		struct md_ioctl *mdv;
-		struct md_ioctl_c *md_c = data;
-
-		mdv = malloc(sizeof(struct md_ioctl), M_IOCTLOPS,
-		     M_WAITOK | M_ZERO);
-		*t_datap = mdv;
-		*t_comp = _IOC_NEWTYPE(com, struct md_ioctl);
-
-		if (!(com & IOC_IN))
-			return (0);
-
-		CP((*md_c), (*mdv), md_version);
-		CP((*md_c), (*mdv), md_unit);
-		CP((*md_c), (*mdv), md_type);
-		CP((*md_c), (*mdv), md_mediasize);
-		CP((*md_c), (*mdv), md_sectorsize);
-		CP((*md_c), (*mdv), md_options);
-		CP((*md_c), (*mdv), md_base);
-		CP((*md_c), (*mdv), md_fwheads);
-		CP((*md_c), (*mdv), md_fwsectors);
-
-		/* _In_z_opt_ const char * md_file */
-		error = cheriabi_strcap_to_ptr(&mdv->md_file, md_c->md_file,
-		    1);
-		if (error != 0)
-			return (error);
-
-		return (0);
-	}
-
 	case CDIOREADTOCENTRYS_C: {
 		struct ioc_read_toc_entry *toce;
 		struct ioc_read_toc_entry_c *toce_c = data;
@@ -502,34 +466,6 @@ cheriabi_ioctl_translate_out(u_long com, void *data, void *t_data)
 	}
 
 	switch (com) {
-	case MDIOCATTACH_C:
-	case MDIOCDETACH_C:
-	case MDIOCQUERY_C:
-	case MDIOCLIST_C: {
-		int i;
-		struct md_ioctl *mdv = t_data;
-		struct md_ioctl_c *md_c = data;
-
-		CP((*mdv), (*md_c), md_version);
-		CP((*mdv), (*md_c), md_unit);
-		CP((*mdv), (*md_c), md_type);
-		/*
-		 * Don't copy out a new value for md_file.  Either we've
-		 * used the one that was copied in or there wasn't one.
-		 */
-		CP((*mdv), (*md_c), md_mediasize);
-		CP((*mdv), (*md_c), md_sectorsize);
-		CP((*mdv), (*md_c), md_options);
-		CP((*mdv), (*md_c), md_base);
-		CP((*mdv), (*md_c), md_fwheads);
-		CP((*mdv), (*md_c), md_fwsectors);
-		if (com == MDIOCLIST_C) {
-			for (i = 0; i < MDNPAD; i++)
-				CP((*mdv), (*md_c), md_pad[i]);
-		}
-		break;
-	}
-
 	case CDIOREADTOCENTRYS_C: {
 		struct ioc_read_toc_entry *toce = t_data;
 		struct ioc_read_toc_entry_c *toce_c = data;
@@ -743,10 +679,6 @@ ioctl_data_contains_pointers(u_long cmd)
 	case BIOCSETWF_C:
 	case BIOCSETFNR_C:
 	case CDIOREADTOCENTRYS_C:
-	case MDIOCATTACH_C:
-	case MDIOCDETACH_C:
-	case MDIOCQUERY_C:
-	case MDIOCLIST_C:
 	case FIODGNAME_C:
 	case PCIOCGETCONF_C:
 	case SG_IO_C:

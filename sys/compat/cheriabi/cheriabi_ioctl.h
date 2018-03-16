@@ -83,24 +83,6 @@ struct ioc_read_toc_entry_c {
 #define	CDIOREADTOCENTRYS_C \
     _IOC_NEWTYPE(CDIOREADTOCENTRYS, struct ioc_read_toc_entry_c)
 
-struct md_ioctl_c {
-	unsigned	md_version;	/* Structure layout version */
-	unsigned	md_unit;	/* unit number */
-	enum md_types	md_type;	/* type of disk */
-	void * __capability	md_file;	/* pathname of file to mount */
-	off_t		md_mediasize;	/* size of disk in bytes */
-	unsigned	md_sectorsize;	/* sectorsize */
-	unsigned	md_options;	/* options */
-	u_int64_t	md_base;	/* base address */
-	int		md_fwheads;	/* firmware heads */
-	int		md_fwsectors;	/* firmware sectors */
-	int		md_pad[MDNPAD];	/* used by MDIOCLIST */
-};
-#define	MDIOCATTACH_C	_IOC_NEWTYPE(MDIOCATTACH, struct md_ioctl_c)
-#define	MDIOCDETACH_C	_IOC_NEWTYPE(MDIOCDETACH, struct md_ioctl_c)
-#define	MDIOCQUERY_C	_IOC_NEWTYPE(MDIOCQUERY, struct md_ioctl_c)
-#define	MDIOCLIST_C	_IOC_NEWTYPE(MDIOCLIST, struct md_ioctl_c)
-
 struct fiodgname_arg_c {
 	int		len;
 	void * __capability	buf;

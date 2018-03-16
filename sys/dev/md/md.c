@@ -121,12 +121,35 @@ struct md_req {
 	unsigned	md_options;	/* options */
 	int		md_fwheads;	/* firmware heads */
 	int		md_fwsectors;	/* firmware sectors */
-	char		*md_file;	/* pathname of file to mount */
+	char * __capability md_file;	/* pathname of file to mount */
 	enum uio_seg	md_file_seg;	/* location of md_file */
-	char		*md_label;	/* label of the device (userspace) */
+	char * __capability md_label;	/* label of the device (userspace) */
 	int		*md_units;	/* pointer to units array (kernel) */
 	size_t		md_units_nitems; /* items in md_units array */
 };
+
+#ifdef COMPAT_CHERIABI
+struct md_ioctl_c {
+	unsigned	md_version;	/* Structure layout version */
+	unsigned	md_unit;	/* unit number */
+	enum md_types	md_type;	/* type of disk */
+	void * __capability md_file;	/* pathname of file to mount */
+	off_t		md_mediasize;	/* size of disk in bytes */
+	unsigned	md_sectorsize;	/* sectorsize */
+	unsigned	md_options;	/* options */
+	u_int64_t	md_base;	/* base address */
+	int		md_fwheads;	/* firmware heads */
+	int		md_fwsectors;	/* firmware sectors */
+	char * __capability md_label;	/* label of the device (userspace) */
+	int		md_pad[MDNPAD];	/* used by MDIOCLIST */
+};
+
+#define	MDIOCATTACH_C	_IOC_NEWTYPE(MDIOCATTACH, struct md_ioctl_c)
+#define	MDIOCDETACH_C	_IOC_NEWTYPE(MDIOCDETACH, struct md_ioctl_c)
+#define	MDIOCQUERY_C	_IOC_NEWTYPE(MDIOCQUERY, struct md_ioctl_c)
+/* MDIOCLIST is broken by design and not supported in CheriABI */
+#define	MDIOCRESIZE_C	_IOC_NEWTYPE(MDIOCRESIZE, struct md_ioctl_c)
+#endif /* COMPAT_CHERIABI */
 
 #ifdef COMPAT_FREEBSD32
 struct md_ioctl32 {
@@ -146,7 +169,7 @@ struct md_ioctl32 {
 CTASSERT((sizeof(struct md_ioctl32)) == 436);
 
 #define	MDIOCATTACH_32	_IOC_NEWTYPE(MDIOCATTACH, struct md_ioctl32)
-#define	MDIOCDETACH_32	_IOC_NEWTYPE(MDIOCDETACH struct md_ioctl32)
+#define	MDIOCDETACH_32	_IOC_NEWTYPE(MDIOCDETACH, struct md_ioctl32)
 #define	MDIOCQUERY_32	_IOC_NEWTYPE(MDIOCQUERY, struct md_ioctl32)
 #define	MDIOCLIST_32	_IOC_NEWTYPE(MDIOCLIST, struct md_ioctl32)
 #define	MDIOCRESIZE_32	_IOC_NEWTYPE(MDIOCRESIZE, struct md_ioctl32)
@@ -1405,18 +1428,22 @@ mdcreate_vnode(struct md_s *sc, struct md_req *mdr, struct thread *td)
 {
 	struct vattr vattr;
 	struct nameidata nd;
-	char *fname;
+	char * __capability fname;
 	int error, flags;
 
 	fname = mdr->md_file;
-	if (mdr->md_file_seg == UIO_USERSPACE) {
-		error = copyinstr(fname, sc->file, sizeof(sc->file), NULL);
-		if (error != 0)
-			return (error);
-	} else if (mdr->md_file_seg == UIO_SYSSPACE)
-		strlcpy(sc->file, fname, sizeof(sc->file));
+	if (mdr->md_file_seg == UIO_USERSPACE)
+		error = copyinstr_c(fname,
+		    (__cheri_tocap char * __capability)sc->file,
+		    sizeof(sc->file), NULL);
+	else if (mdr->md_file_seg == UIO_SYSSPACE)
+		error = copystr_c(fname,
+		    (__cheri_tocap char * __capability)sc->file,
+		    sizeof(sc->file), NULL);
 	else
-		return (EDOOFUS);
+		error = EDOOFUS;
+	if (error != 0)
+		return (error);
 
 	/*
 	 * If the user specified that this is a read only device, don't
@@ -1672,7 +1699,8 @@ kern_mdattach_locked(struct thread *td, struct md_req *mdr)
 	if (sc == NULL)
 		return (error);
 	if (mdr->md_label != NULL)
-		error = copyinstr(mdr->md_label, sc->label,
+		error = copyinstr_c(mdr->md_label,
+		    (__cheri_tocap char * __capability)sc->label,
 		    sizeof(sc->label), NULL);
 	if (error != 0)
 		goto err_after_new;
@@ -1813,15 +1841,16 @@ kern_mdquery_locked(struct md_req *mdr)
 	mdr->md_sectorsize = sc->sectorsize;
 	error = 0;
 	if (mdr->md_label != NULL) {
-		error = copyout(sc->label, mdr->md_label,
-		    strlen(sc->label) + 1);
+		error = copyout_c(
+		    (__cheri_tocap char * __capability)sc->label,
+		    mdr->md_label, strlen(sc->label) + 1);
 		if (error != 0)
 			return (error);
 	}
 	if (sc->type == MD_VNODE ||
 	    (sc->type == MD_PRELOAD && mdr->md_file != NULL))
-		error = copyout(sc->file, mdr->md_file,
-		    strlen(sc->file) + 1);
+		error = copyout_c((__cheri_tocap char * __capability)sc->file,
+		    mdr->md_file, strlen(sc->file) + 1);
 	return (error);
 }
 
@@ -1924,14 +1953,33 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		if (mdio->md_version != MDIOVERSION)
 			return (EINVAL);
 		MD_IOCTL2REQ(mdio, &mdr);
+		/* If the file is adjacent to the md_ioctl it's in kernel. */
+		if ((void *)mdio->md_file == (void *)(mdio + 1)) {
+			mdr.md_file =
+			    (__cheri_tocap char * __capability)mdio->md_file;
+			mdr.md_file_seg = UIO_SYSSPACE;
+		} else {
+			mdr.md_file = __USER_CAP_STR(mdio->md_file);
+			mdr.md_file_seg = UIO_USERSPACE;
+		}
+		mdr.md_label = __USER_CAP_STR(mdio->md_label);
+		break;
+	}
+#ifdef COMPAT_CHERIABI
+	case MDIOCATTACH_C:
+	case MDIOCDETACH_C:
+	case MDIOCRESIZE_C:
+	case MDIOCQUERY_C: {
+		struct md_ioctl_c *mdio = (struct md_ioctl_c *)addr;
+		if (mdio->md_version != MDIOVERSION)
+			return (EINVAL);
+		MD_IOCTL2REQ(mdio, &mdr);
 		mdr.md_file = mdio->md_file;
 		mdr.md_file_seg = UIO_USERSPACE;
-		/* If the file is adjacent to the md_ioctl it's in kernel. */
-		if ((void *)mdio->md_file == (void *)(mdio + 1))
-			mdr.md_file_seg = UIO_SYSSPACE;
 		mdr.md_label = mdio->md_label;
 		break;
 	}
+#endif
 #ifdef COMPAT_FREEBSD32
 	case MDIOCATTACH_32:
 	case MDIOCDETACH_32:
@@ -1942,9 +1990,13 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		if (mdio->md_version != MDIOVERSION)
 			return (EINVAL);
 		MD_IOCTL2REQ(mdio, &mdr);
+<<<<<<< HEAD
 		mdr.md_file = (void *)(uintptr_t)mdio->md_file;
 		mdr.md_file_seg = UIO_USERSPACE;
 		mdr.md_label = (void *)(uintptr_t)mdio->md_label;
+=======
+		mdr.md_file = __USER_CAP_STR((void *)(uintptr_t)mdio->md_file);
+>>>>>>> a9b8f08bd3c... Move CheriABI support for md(4) ioctls to md.c and handle capabilities
 		mdr.md_label =
 		    __USER_CAP_STR((void *)(uintptr_t)mdio->md_label);
 		break;
@@ -1958,24 +2010,36 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	error = 0;
 	switch (cmd) {
 	case MDIOCATTACH:
+#ifdef COMPAT_CHERIABI
+	case MDIOCATTACH_C:
+#endif
 #ifdef COMPAT_FREEBSD32
 	case MDIOCATTACH_32:
 #endif
 		error = kern_mdattach(td, &mdr);
 		break;
 	case MDIOCDETACH:
+#ifdef COMPAT_CHERIABI
+	case MDIOCDETACH_C:
+#endif
 #ifdef COMPAT_FREEBSD32
 	case MDIOCDETACH_32:
 #endif
 		error = kern_mddetach(td, &mdr);
 		break;
 	case MDIOCRESIZE:
+#ifdef COMPAT_CHERIABI
+	case MDIOCRESIZE_C:
+#endif
 #ifdef COMPAT_FREEBSD32
 	case MDIOCRESIZE_32:
 #endif
 		error = kern_mdresize(&mdr);
 		break;
 	case MDIOCQUERY:
+#ifdef COMPAT_CHERIABI
+	case MDIOCQUERY_C:
+#endif
 #ifdef COMPAT_FREEBSD32
 	case MDIOCQUERY_32:
 #endif
@@ -1998,6 +2062,14 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		MD_REQ2IOCTL(&mdr, mdio);
 		break;
 	}
+#ifdef COMPAT_CHERIABI
+	case MDIOCATTACH_C:
+	case MDIOCQUERY_C: {
+		struct md_ioctl_c *mdio = (struct md_ioctl_c *)addr;
+		MD_REQ2IOCTL(&mdr, mdio);
+		break;
+	}
+#endif
 #ifdef COMPAT_FREEBSD32
 	case MDIOCATTACH_32:
 	case MDIOCQUERY_32: {
