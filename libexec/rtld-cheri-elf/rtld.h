@@ -39,7 +39,6 @@
 #include <stddef.h>
 
 #include "rtld_lock.h"
-#include "rtld_machdep.h"
 
 #define NEW(type)	((type *) xmalloc(sizeof(type)))
 #define CNEW(type)	((type *) xcalloc(1, sizeof(type)))
@@ -271,6 +270,16 @@ typedef struct Struct_Obj_Entry {
     bool unholdfree : 1;	/* unmap upon last unhold */
     bool doomed : 1;		/* Object cannot be referenced */
     bool cap_relocs_processed : 1; /* __cap_relocs section has been processed */
+    /*
+     * If restrict_pcc_basic is true we can restricted $pcc to the object's
+     * executable segment, if restrict_pcc_strict is true we can restrict it
+     * to just the functions bounds in dlsym()/dlfunc(). Otherwise we need to
+     * fall back to giving the full address space bounds in $pcc.
+     *
+     * TODO: remove these options once we have decided on the correct ABI
+     */
+    bool restrict_pcc_basic : 1;
+    bool restrict_pcc_strict : 1;
 
     struct link_map linkmap;	/* For GDB and dlinfo() */
     Objlist dldags;		/* Object belongs to these dlopened DAGs (%) */
@@ -367,6 +376,10 @@ void dump_relocations(Obj_Entry *);
 void dump_obj_relocations(Obj_Entry *);
 void dump_Elf_Rel(Obj_Entry *, const Elf_Rel *, u_long);
 void dump_Elf_Rela(Obj_Entry *, const Elf_Rela *, u_long);
+
+
+// rtld_machdep.h depends on struct Obj_Entry and _rtld_error()
+#include "rtld_machdep.h"
 
 /*
  * Function declarations.

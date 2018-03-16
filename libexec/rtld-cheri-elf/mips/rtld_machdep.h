@@ -30,8 +30,11 @@
 #define RTLD_MACHDEP_H	1
 
 #include <sys/types.h>
+#include <cheri/cheric.h>
 #include <machine/atomic.h>
 #include <machine/tls.h>
+
+#include <assert.h>
 
 struct Struct_Obj_Entry;
 
@@ -43,8 +46,20 @@ Elf_Addr reloc_jmpslot(Elf_Addr *where, Elf_Addr target,
 		       const struct Struct_Obj_Entry *obj,
 		       const Elf_Rel *rel);
 
-#define make_function_pointer(def, defobj)				\
-	((defobj)->relocbase + (def)->st_value)
+static inline void*
+make_function_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
+{
+	void* ret = defobj->relocbase + def->st_value;
+	// TODO: remove permissions
+	if (defobj->restrict_pcc_strict)
+		return cheri_csetbounds(ret, def->st_size);
+	if (defobj->restrict_pcc_basic)
+		return ret;
+
+	/* Otherwise we need to give it full address space range (legacy) */
+	assert(cheri_getbase(cheri_getpcc()) == 0);
+	return cheri_setoffset(cheri_getpcc(), (vaddr_t)ret);
+}
 
 #define call_initfini_pointer(obj, target)				\
 	(((InitFunc)(cheri_setoffset(cheri_getpcc(), (target))))())
