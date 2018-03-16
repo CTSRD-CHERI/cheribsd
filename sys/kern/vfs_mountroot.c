@@ -47,6 +47,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/jail.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/uio.h>	/* required by mdioctl.h */
 #include <sys/mdioctl.h>
 #include <sys/mount.h>
 #include <sys/mutex.h>
@@ -104,6 +105,15 @@ struct vnode *rootvnode;
 struct mount *rootdevmp;
 
 char *rootdevnames[2] = {NULL, NULL};
+
+/*
+ * Hooks into md(4) for mount.conf(8)'s .md support.  Stored here as
+ * this is the only place they are used.  Great care should be taken
+ * when expanding use as crashes may occur if md(4) is unloaded during
+ * calls.
+ */
+int (*kern_mdattach_p)(struct thread *td, struct md_req *mdr);
+int (*kern_mddetach_p)(struct thread *td, struct md_req *mdr);
 
 struct mtx root_holds_mtx;
 MTX_SYSINIT(root_holds, &root_holds_mtx, "root_holds", MTX_DEF);
@@ -541,21 +551,18 @@ parse_dir_md(char **conf)
 {
 	struct stat sb;
 	struct thread *td;
-	struct md_ioctl *mdio;
-	char *path, *tok;
-	int error, fd, len;
+	struct md_req mdr;
+	char *path;
+	int error;
+
+	if (kern_mdattach_p == NULL || kern_mddetach_p == NULL)
+		return (ENOENT);
 
 	td = curthread;
 
-	error = parse_token(conf, &tok);
+	error = parse_token(conf, &path);
 	if (error)
 		return (error);
-
-	len = strlen(tok);
-	mdio = malloc(sizeof(*mdio) + len + 1, M_TEMP, M_WAITOK | M_ZERO);
-	path = (void *)(mdio + 1);
-	bcopy(tok, path, len);
-	free(tok, M_TEMP);
 
 	/* Get file status. */
 	error = kern_statat(td, 0, AT_FDCWD,
@@ -563,55 +570,46 @@ parse_dir_md(char **conf)
 	if (error)
 		goto out;
 
-	/* Open /dev/mdctl so that we can attach/detach. */
-	error = kern_openat(td, AT_FDCWD, "/dev/" MDCTL_NAME, UIO_SYSSPACE,
-	    O_RDWR, 0);
-	if (error)
-		goto out;
-
-	fd = td->td_retval[0];
-	mdio->md_version = MDIOVERSION;
-	mdio->md_type = MD_VNODE;
+	mdr.md_type = MD_VNODE;
 
 	if (root_mount_mddev != -1) {
-		mdio->md_unit = root_mount_mddev;
+		mdr.md_unit = root_mount_mddev;
 		DROP_GIANT();
-		error = kern_ioctl(td, fd, MDIOCDETACH, (void *)mdio);
+		error = kern_mddetach_p(td, &mdr);
 		PICKUP_GIANT();
 		/* Ignore errors. We don't care. */
 		root_mount_mddev = -1;
 	}
 
-	mdio->md_file = (void *)(mdio + 1);
-	mdio->md_options = MD_AUTOUNIT | MD_READONLY;
-	mdio->md_mediasize = sb.st_size;
-	mdio->md_unit = 0;
+	mdr.md_file = (__cheri_tocap char * __capability)path;
+	mdr.md_file_seg = UIO_SYSSPACE;
+	mdr.md_options = MD_AUTOUNIT | MD_READONLY;
+	mdr.md_mediasize = sb.st_size;
+	mdr.md_unit = 0;
 	DROP_GIANT();
-	error = kern_ioctl(td, fd, MDIOCATTACH, (void *)mdio);
+	error = kern_mdattach_p(td, &mdr);
 	PICKUP_GIANT();
 	if (error)
 		goto out;
 
-	if (mdio->md_unit > 9) {
+	if (mdr.md_unit > 9) {
 		printf("rootmount: too many md units\n");
-		mdio->md_file = NULL;
-		mdio->md_options = 0;
-		mdio->md_mediasize = 0;
+		mdr.md_file = NULL;
+		mdr.md_options = 0;
+		mdr.md_mediasize = 0;
 		DROP_GIANT();
-		error = kern_ioctl(td, fd, MDIOCDETACH, (void *)mdio);
+		error = kern_mddetach_p(td, &mdr);
 		PICKUP_GIANT();
 		/* Ignore errors. We don't care. */
 		error = ERANGE;
 		goto out;
 	}
 
-	root_mount_mddev = mdio->md_unit;
-	printf(MD_NAME "%u attached to %s\n", root_mount_mddev, mdio->md_file);
-
-	error = kern_close(td, fd);
+	root_mount_mddev = mdr.md_unit;
+	printf(MD_NAME "%u attached to %s\n", root_mount_mddev, path);
 
  out:
-	free(mdio, M_TEMP);
+	free(path, M_TEMP);
 	return (error);
 }
 

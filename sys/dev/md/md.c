@@ -76,6 +76,7 @@
 #include <sys/linker.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
+#include <sys/uio.h>	/* required by mdioctl.h */
 #include <sys/mdioctl.h>
 #include <sys/mount.h>
 #include <sys/mutex.h>
@@ -112,21 +113,6 @@
 #ifndef MD_NSECT
 #define MD_NSECT (10000 * 2)
 #endif
-
-struct md_req {
-	unsigned	md_unit;	/* unit number */
-	enum md_types	md_type;	/* type of disk */
-	off_t		md_mediasize;	/* size of disk in bytes */
-	unsigned	md_sectorsize;	/* sectorsize */
-	unsigned	md_options;	/* options */
-	int		md_fwheads;	/* firmware heads */
-	int		md_fwsectors;	/* firmware sectors */
-	char * __capability md_file;	/* pathname of file to mount */
-	enum uio_seg	md_file_seg;	/* location of md_file */
-	char * __capability md_label;	/* label of the device (userspace) */
-	int		*md_units;	/* pointer to units array (kernel) */
-	size_t		md_units_nitems; /* items in md_units array */
-};
 
 #ifdef COMPAT_CHERIABI
 struct md_ioctl_c {
@@ -2167,6 +2153,8 @@ g_md_init(struct g_class *mp __unused)
 	md_vnode_pbuf_freecnt = nswbuf / 10;
 	status_dev = make_dev(&mdctl_cdevsw, INT_MAX, UID_ROOT, GID_WHEEL,
 	    0600, MDCTL_NAME);
+	kern_mdattach_p = &kern_mdattach;
+	kern_mddetach_p = &kern_mddetach;
 	g_topology_lock();
 }
 
