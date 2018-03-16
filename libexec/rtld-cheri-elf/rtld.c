@@ -851,7 +851,13 @@ rtld_resolve_ifunc(const Obj_Entry *obj, const Elf_Sym *def)
 
 	ptr = (void *)make_function_pointer(def, obj);
 	target = call_ifunc_resolver(ptr);
+	// FIXME: this is probably wrong in most cases
+#if 0
 	return ((void *)cheri_setoffset(cheri_getdefault(), target));
+#endif
+	_rtld_error("GNU IFUNC is broken for CheriABI");
+	rtld_die();
+	return NULL;
 }
 
 /*
