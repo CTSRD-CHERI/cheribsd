@@ -3577,16 +3577,26 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	 * of the symbol. this is simply the relocated value of the
 	 * symbol.
 	 */
-	if (ELF_ST_TYPE(def->st_info) == STT_FUNC)
+	if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
 	    sym = make_function_pointer(def, defobj);
-	else if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC)
+	    dbg("dlsym(%s) is function: %-#p", name, sym);
+	} else if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {
 	    sym = rtld_resolve_ifunc(defobj, def);
-	else if (ELF_ST_TYPE(def->st_info) == STT_TLS) {
+	    dbg("dlsym(%s) is ifunc. Resolved to: %-#p", name, sym);
+	} else if (ELF_ST_TYPE(def->st_info) == STT_TLS) {
 	    ti.ti_module = defobj->tlsindex;
 	    ti.ti_offset = def->st_value;
 	    sym = __tls_get_addr(&ti);
-	} else
+	    // TODO: this is probably wrong, abort instead?
+	    dbg("dlsym(%s) is TLS. Resolved to: %-#p", name, sym);
+	} else {
 	    sym = defobj->relocbase + def->st_value;
+	    dbg("dlsym(%s) is type %d. Resolved to: %-#p",
+		name, ELF_ST_TYPE(def->st_info), sym);
+	    // TODO: can we safely do a CSetBounds here?
+	    dbg("%s: Setting length of %s to %zd", __func__, name, def->st_size);
+	    cheri_csetbounds(sym, def->st_size);
+	}
 	LD_UTRACE(UTRACE_DLSYM_STOP, handle, sym, 0, 0, name);
 	return (sym);
     }
