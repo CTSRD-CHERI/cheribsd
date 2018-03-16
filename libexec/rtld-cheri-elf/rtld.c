@@ -3590,12 +3590,13 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	    // TODO: this is probably wrong, abort instead?
 	    dbg("dlsym(%s) is TLS. Resolved to: %-#p", name, sym);
 	} else {
-	    sym = defobj->relocbase + def->st_value;
+	    sym = make_data_pointer(def, defobj);
 	    dbg("dlsym(%s) is type %d. Resolved to: %-#p",
 		name, ELF_ST_TYPE(def->st_info), sym);
-	    // TODO: can we safely do a CSetBounds here?
-	    dbg("%s: Setting length of %s to %zd", __func__, name, def->st_size);
-	    cheri_csetbounds(sym, def->st_size);
+	}
+	if (cheri_getlen(sym) <= 0) {
+		rtld_printf("Warning: created zero length capability for %s "
+		    "(in %s): %-#p\n", name, defobj->path, sym);
 	}
 	LD_UTRACE(UTRACE_DLSYM_STOP, handle, sym, 0, 0, name);
 	return (sym);

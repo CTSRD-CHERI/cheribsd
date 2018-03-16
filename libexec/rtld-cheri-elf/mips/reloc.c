@@ -682,23 +682,20 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			}
 			assert(ELF_ST_TYPE(def->st_info) != STT_GNU_IFUNC &&
 			    "IFUNC not implemented!");
-			// TODO: derive from correct permissions cap
+
 			void* symval = NULL;
-			uint64_t remove_perms = __CHERI_CAP_PERMISSION_PERMIT_SEAL__;
 			if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
+				/* Remove write permissions and set bounds */
 				symval = make_function_pointer(def, defobj);
-				/* remove write permission from functions */
-				remove_perms |= (__CHERI_CAP_PERMISSION_PERMIT_STORE__ |
-				    __CHERI_CAP_PERMISSION_PERMIT_STORE_CAPABILITY__ |
-				    __CHERI_CAP_PERMISSION_PERMIT_STORE_LOCAL__);
 			} else {
-				// TODO: add make_data_pointer() function
-				symval = defobj->relocbase + def->st_value;
-				/* remove execute permission from functions */
-				remove_perms |= __CHERI_CAP_PERMISSION_PERMIT_EXECUTE__;
-				symval = cheri_csetbounds(symval, def->st_size);
+				/* Remove execute permissions and set bounds */
+				symval = make_data_pointer(def, defobj);
 			}
-			symval = cheri_andperm(symval, ~remove_perms);
+			if (cheri_getlen(symval) <= 0) {
+				rtld_printf("Warning: created zero length "
+				    "capability for %s (in %s): %-#p\n",
+				    symname(obj, r_symndx), obj->path, symval);
+			}
 			/*
 			 * The capability offset is the addend for the
 			 * relocation. Since we are using Elf_Rel this is the
