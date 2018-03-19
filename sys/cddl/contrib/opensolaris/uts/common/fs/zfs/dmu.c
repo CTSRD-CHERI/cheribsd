@@ -1112,8 +1112,7 @@ dmu_xuio_add(xuio_t *xuio, arc_buf_t *abuf, offset_t off, size_t n)
 	ASSERT(i < priv->cnt);
 	ASSERT(off + n <= arc_buf_lsize(abuf));
 	iov = uio->uio_iov + i;
-	iov->iov_base = (char *)abuf->b_data + off;
-	iov->iov_len = n;
+	IOVEC_INIT(iov, (char *)abuf->b_data + off, n);
 	priv->bufs[i] = abuf;
 	return (0);
 }

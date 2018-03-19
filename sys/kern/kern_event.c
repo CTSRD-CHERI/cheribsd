@@ -990,16 +990,14 @@ kern_kevent_generic(struct thread *td, struct g_kevent_args *uap,
 #ifdef KTRACE
 	if (KTRPOINT(td, KTR_GENIO)) {
 		kgio = ktr_geniosize;
-		ktriov.iov_base = uap->changelist;
-		ktriov.iov_len = kev_iovlen(uap->nchanges, kgio,
-		    k_ops->kevent_size);
+		IOVEC_INIT(&ktriov, uap->changelist,
+		    kev_iovlen(uap->nchanges, kgio, k_ops->kevent_size));
 		ktruio = (struct uio){ .uio_iov = &ktriov, .uio_iovcnt = 1,
 		    .uio_segflg = UIO_USERSPACE, .uio_rw = UIO_READ,
 		    .uio_td = td };
 		ktruioin = cloneuio(&ktruio);
-		ktriov.iov_base = uap->eventlist;
-		ktriov.iov_len = kev_iovlen(uap->nevents, kgio,
-		    k_ops->kevent_size);
+		IOVEC_INIT(&ktriov, uap->eventlist,
+		    kev_iovlen(uap->nevents, kgio, k_ops->kevent_size));
 		ktriov.iov_len = uap->nevents * k_ops->kevent_size;
 		ktruioout = cloneuio(&ktruio);
 	}

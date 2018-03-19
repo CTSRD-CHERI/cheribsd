@@ -122,9 +122,6 @@ LDFLAGS+=	-Wl,-melf64btsmip_cheri_fbsd
 .if defined(__BSD_PROG_MK)
 _LIB_OBJTOP=	${ROOTOBJDIR}
 .endif
-.ifdef LIBCHERI
-LDFLAGS+=	-Wl,-init=crt_init_globals
-.endif
 .else
 STATIC_CFLAGS+= -ftls-model=local-exec # MIPS/hybrid case
 .endif
@@ -140,6 +137,9 @@ CFLAGS+=	${CHERI_OPTIMIZATION_FLAGS:U-O2}
 # We are expanding $LDFLAGS here so this must come after MIPS_ABI has been set!
 LDFLAGS:=${LDFLAGS:N-fuse-ld=*}
 LDFLAGS+=	-fuse-ld=lld
+.ifdef CHERI_USE_ELF_CAP_RELOCS
+LDFLAGS+=	-Wl,-preemptible-caprelocs=elf
+.endif
 
 # XXX: Needed as Clang rejects -mllvm -cheri128 when using $CC to link:
 # warning: argument unused during compilation: '-cheri=128'

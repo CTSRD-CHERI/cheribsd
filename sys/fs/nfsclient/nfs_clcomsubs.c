@@ -260,7 +260,7 @@ nfsm_uiombuf(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 	struct mbuf *mp, *mp2;
 	int xfer, left, mlen;
 	int uiosiz, clflg, rem;
-	char *cp, *tcp;
+	char *cp;
 
 	KASSERT(uiop->uio_iovcnt == 1, ("nfsm_uiotombuf: iovcnt != 1"));
 
@@ -309,10 +309,7 @@ nfsm_uiombuf(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 			uiop->uio_offset += xfer;
 			uiop->uio_resid -= xfer;
 		}
-		tcp = (char *)uiop->uio_iov->iov_base;
-		tcp += uiosiz;
-		uiop->uio_iov->iov_base = (void *)tcp;
-		uiop->uio_iov->iov_len -= uiosiz;
+		IOVEC_ADVANCE(uiop->uio_iov, uiosiz);
 		siz -= uiosiz;
 	}
 	if (rem > 0) {

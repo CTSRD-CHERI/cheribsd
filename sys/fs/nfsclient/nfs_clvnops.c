@@ -447,8 +447,7 @@ nfs_access(struct vop_access_args *ap)
 			char buf[1];
 
 			mtx_unlock(&np->n_mtx);
-			aiov.iov_base = buf;
-			aiov.iov_len = 1;
+			IOVEC_INIT(&aiov, buf, 1);
 			auio.uio_iov = &aiov;
 			auio.uio_iovcnt = 1;
 			auio.uio_offset = 0;
@@ -462,8 +461,8 @@ nfs_access(struct vop_access_args *ap)
 			else if (vp->v_type == VDIR) {
 				char* bp;
 				bp = malloc(NFS_DIRBLKSIZ, M_TEMP, M_WAITOK);
-				aiov.iov_base = bp;
-				aiov.iov_len = auio.uio_resid = NFS_DIRBLKSIZ;
+				IOVEC_INIT(&aiov, bp, NFS_DIRBLKSIZ);
+				auio.uio_resid = NFS_DIRBLKSIZ;
 				error = ncl_readdirrpc(vp, &auio, ap->a_cred,
 				    ap->a_td);
 				free(bp, M_TEMP);

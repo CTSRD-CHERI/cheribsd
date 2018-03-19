@@ -279,8 +279,7 @@ get_next_dirent(struct vnode *vp, struct dirent **dpp, char *dirbuf,
 	KASSERT(vp->v_type == VDIR, ("vp %p is not a directory", vp));
 
 	if (*len == 0) {
-		iov.iov_base = dirbuf;
-		iov.iov_len = dirbuflen;
+		IOVEC_INIT(&iov, dirbuf, dirbuflen);
 
 		uio.uio_iov = &iov;
 		uio.uio_iovcnt = 1;
@@ -1015,8 +1014,7 @@ vop_stdallocate(struct vop_allocate_args *ap)
 		if (cur > len)
 			cur = len;
 		if (offset < fsize) {
-			aiov.iov_base = buf;
-			aiov.iov_len = cur;
+			IOVEC_INIT(&aiov, buf, cur);
 			auio.uio_iov = &aiov;
 			auio.uio_iovcnt = 1;
 			auio.uio_offset = offset;
@@ -1035,8 +1033,7 @@ vop_stdallocate(struct vop_allocate_args *ap)
 			bzero(buf, cur);
 		}
 
-		aiov.iov_base = buf;
-		aiov.iov_len = cur;
+		IOVEC_INIT(&aiov, buf, cur);
 		auio.uio_iov = &aiov;
 		auio.uio_iovcnt = 1;
 		auio.uio_offset = offset;

@@ -594,8 +594,7 @@ retry:
 
 	done = job->aio_done;
 	cnt = job->uaiocb.aio_nbytes - done;
-	iov.iov_base = (void *)((uintptr_t)job->uaiocb.aio_buf + done);
-	iov.iov_len = cnt;
+	IOVEC_INIT(&iov, (void *)((uintptr_t)job->uaiocb.aio_buf + done), cnt);
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = 0;

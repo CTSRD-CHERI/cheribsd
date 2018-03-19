@@ -228,6 +228,11 @@ __ElfType(Auxinfo);
 
 #define	R_MIPS_max		51
 
+#define	R_MIPS_CHERI_ABSPTR	70
+#define	R_MIPS_CHERI_SIZE	71
+
+#define	R_MIPS_CHERI_CAPABILITY	90
+
 #define	R_TYPE(name)		__CONCAT(R_MIPS_,name)
 
 #define	R_MIPS16_min		100

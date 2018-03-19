@@ -951,8 +951,7 @@ xs_single(struct xs_transaction t, enum xsd_sockmsg_type request_type,
 {
 	struct iovec iovec;
 
-	iovec.iov_base = (void *)(uintptr_t)body;
-	iovec.iov_len = strlen(body) + 1;
+	IOVEC_INIT_STR(&iovec, __DECONST(void *, body));
 
 	return (xs_talkv(t, request_type, &iovec, 1, len, result));
 }
@@ -972,10 +971,8 @@ xs_watch(const char *path, const char *token)
 {
 	struct iovec iov[2];
 
-	iov[0].iov_base = (void *)(uintptr_t) path;
-	iov[0].iov_len = strlen(path) + 1;
-	iov[1].iov_base = (void *)(uintptr_t) token;
-	iov[1].iov_len = strlen(token) + 1;
+	IOVEC_INIT_STR(&iov[0], __DECONST(void *, path));
+	IOVEC_INIT_STR(&iov[1], __DECONST(void *, token));
 
 	return (xs_talkv(XST_NIL, XS_WATCH, iov, 2, NULL, NULL));
 }
@@ -994,10 +991,8 @@ xs_unwatch(const char *path, const char *token)
 {
 	struct iovec iov[2];
 
-	iov[0].iov_base = (void *)(uintptr_t) path;
-	iov[0].iov_len = strlen(path) + 1;
-	iov[1].iov_base = (void *)(uintptr_t) token;
-	iov[1].iov_len = strlen(token) + 1;
+	IOVEC_INIT_STR(&iov[0], __DECONST(void *, path));
+	IOVEC_INIT_STR(&iov[1], __DECONST(void *, token));
 
 	return (xs_talkv(XST_NIL, XS_UNWATCH, iov, 2, NULL, NULL));
 }
@@ -1380,10 +1375,9 @@ xs_write(struct xs_transaction t, const char *dir, const char *node,
 
 	path = xs_join(dir, node);
 
-	iovec[0].iov_base = (void *)(uintptr_t) sbuf_data(path);
-	iovec[0].iov_len = sbuf_len(path) + 1;
-	iovec[1].iov_base = (void *)(uintptr_t) string;
-	iovec[1].iov_len = strlen(string);
+	IOVEC_INIT(&iovec[0], __DECONST(void *, sbuf_data(path)),
+	    sbuf_len(path) + 1);
+	IOVEC_INIT(&iovec[1], __DECONST(void *, string), strlen(string));
 
 	error = xs_talkv(t, XS_WRITE, iovec, 2, NULL, NULL);
 	sbuf_delete(path);

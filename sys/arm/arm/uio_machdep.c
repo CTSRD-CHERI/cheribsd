@@ -110,8 +110,7 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 			break;
 		}
 		sf_buf_free(sf);
-		iov->iov_base = (char *)iov->iov_base + cnt;
-		iov->iov_len -= cnt;
+		IOVEC_ADVANCE(iov, cnt);
 		uio->uio_resid -= cnt;
 		uio->uio_offset += cnt;
 		offset += cnt;

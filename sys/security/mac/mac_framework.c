@@ -583,7 +583,7 @@ mac_error_select(int error1, int error2)
 }
 
 int
-mac_check_structmac_consistent(struct mac *mac)
+mac_check_structmac_consistent(const struct mac *mac)
 {
 
 	if (mac->m_buflen > MAC_MAX_LABEL_BUF_LEN)

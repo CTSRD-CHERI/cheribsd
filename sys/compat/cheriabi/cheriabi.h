@@ -59,9 +59,6 @@ cheriabi_cap_to_ptr(caddr_t *ptrp, void * __capability cap, size_t reqlen,
     register_t reqperms, int may_be_null)
 {
 	size_t length, offset;
-#ifdef KTRACE
-	struct thread *td = curthread;
-#endif
 
 	if (!cheri_gettag(cap)) {
 		if (!may_be_null)

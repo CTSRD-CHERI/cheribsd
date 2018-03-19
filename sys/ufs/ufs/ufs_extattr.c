@@ -392,8 +392,7 @@ ufs_extattr_iterate_directory(struct ufsmount *ump, struct vnode *dvp,
 
 	while (!eofflag) {
 		auio.uio_resid = DIRBLKSIZ;
-		aiov.iov_base = dirbuf;
-		aiov.iov_len = DIRBLKSIZ;
+		IOVEC_INIT(&aiov, dirbuf, DIRBLKSIZ);
 		error = ufs_readdir(&vargs);
 		if (error) {
 			printf("ufs_extattr_iterate_directory: ufs_readdir "
@@ -620,8 +619,7 @@ ufs_extattr_enable(struct ufsmount *ump, int attrnamespace,
 
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
-	aiov.iov_base = (caddr_t) &attribute->uele_fileheader;
-	aiov.iov_len = sizeof(struct ufs_extattr_fileheader);
+	IOVEC_INIT_OBJ(&aiov, attribute->uele_fileheader);
 	auio.uio_resid = sizeof(struct ufs_extattr_fileheader);
 	auio.uio_offset = (off_t) 0;
 	auio.uio_segflg = UIO_SYSSPACE;
@@ -884,8 +882,7 @@ ufs_extattr_get(struct vnode *vp, int attrnamespace, const char *name,
 	 * how much.
 	 */
 	bzero(&ueh, sizeof(struct ufs_extattr_header));
-	local_aiov.iov_base = (caddr_t) &ueh;
-	local_aiov.iov_len = sizeof(struct ufs_extattr_header);
+	IOVEC_INIT_OBJ(&local_aiov, &ueh);
 	local_aio.uio_iov = &local_aiov;
 	local_aio.uio_iovcnt = 1;
 	local_aio.uio_rw = UIO_READ;
@@ -1093,8 +1090,7 @@ ufs_extattr_set(struct vnode *vp, int attrnamespace, const char *name,
 	ueh.ueh_len = uio->uio_resid;
 	ueh.ueh_flags = UFS_EXTATTR_ATTR_FLAG_INUSE;
 	ueh.ueh_i_gen = ip->i_gen;
-	local_aiov.iov_base = (caddr_t) &ueh;
-	local_aiov.iov_len = sizeof(struct ufs_extattr_header);
+	IOVEC_INIT_OBJ(&local_aiov, &ueh);
 	local_aio.uio_iov = &local_aiov;
 	local_aio.uio_iovcnt = 1;
 	local_aio.uio_rw = UIO_WRITE;
@@ -1191,8 +1187,7 @@ ufs_extattr_rm(struct vnode *vp, int attrnamespace, const char *name,
 	 */
 	bzero(&ueh, sizeof(struct ufs_extattr_header));
 
-	local_aiov.iov_base = (caddr_t) &ueh;
-	local_aiov.iov_len = sizeof(struct ufs_extattr_header);
+	IOVEC_INIT_OBJ(&local_aiov, &ueh);
 	local_aio.uio_iov = &local_aiov;
 	local_aio.uio_iovcnt = 1;
 	local_aio.uio_rw = UIO_READ;
@@ -1237,8 +1232,7 @@ ufs_extattr_rm(struct vnode *vp, int attrnamespace, const char *name,
 	ueh.ueh_flags = 0;
 	ueh.ueh_len = 0;
 
-	local_aiov.iov_base = (caddr_t) &ueh;
-	local_aiov.iov_len = sizeof(struct ufs_extattr_header);
+	IOVEC_INIT_OBJ(&local_aiov, &ueh);
 	local_aio.uio_iov = &local_aiov;
 	local_aio.uio_iovcnt = 1;
 	local_aio.uio_rw = UIO_WRITE;

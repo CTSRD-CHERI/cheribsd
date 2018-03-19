@@ -251,9 +251,7 @@ nfsm_mbufuio(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 			uiop->uio_iovcnt--;
 			uiop->uio_iov++;
 		} else {
-			uiop->uio_iov->iov_base = (void *)
-				((char *)uiop->uio_iov->iov_base + uiosiz);
-			uiop->uio_iov->iov_len -= uiosiz;
+			IOVEC_ADVANCE(uiop->uio_iov, uiosiz);
 		}
 		siz -= uiosiz;
 	}

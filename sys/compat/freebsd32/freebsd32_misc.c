@@ -883,8 +883,7 @@ freebsd32_copyinuio(struct iovec32 *iovp, u_int iovcnt, struct uio **uiop)
 			free(uio, M_IOV);
 			return (error);
 		}
-		iov[i].iov_base = PTRIN(iov32.iov_base);
-		iov[i].iov_len = iov32.iov_len;
+		IOVEC_INIT(&iov[i], PTRIN(iov32.iov_base), iov32.iov_len);
 	}
 	uio->uio_iov = iov;
 	uio->uio_iovcnt = iovcnt;
@@ -979,8 +978,7 @@ freebsd32_copyiniov(struct iovec32 *iovp32, u_int iovcnt, struct iovec **iovp,
 			free(iov, M_IOV);
 			return (error);
 		}
-		iov[i].iov_base = PTRIN(iov32.iov_base);
-		iov[i].iov_len = iov32.iov_len;
+		IOVEC_INIT(&iov[i], PTRIN(iov32.iov_base), iov32.iov_len);
 	}
 	*iovp = iov;
 	return (0);
@@ -1335,8 +1333,7 @@ freebsd32_recvfrom(struct thread *td,
 	msg.msg_name = PTRIN(uap->from);
 	msg.msg_iov = &aiov;
 	msg.msg_iovlen = 1;
-	aiov.iov_base = PTRIN(uap->buf);
-	aiov.iov_len = uap->len;
+	IOVEC_INIT(&aiov, PTRIN(uap->buf), uap->len);
 	msg.msg_control = NULL;
 	msg.msg_flags = uap->flags;
 	error = kern_recvit(td, uap->s, &msg, UIO_USERSPACE, NULL);

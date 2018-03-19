@@ -310,6 +310,7 @@ alq_doio(struct alq *alq)
 	struct thread *td;
 	struct mount *mp;
 	struct vnode *vp;
+	void *write_start;
 	struct uio auio;
 	struct iovec aiov[2];
 	int totlen;
@@ -328,26 +329,28 @@ alq_doio(struct alq *alq)
 	bzero(&auio, sizeof(auio));
 
 	/* Start the write from the location of our buffer tail pointer. */
-	aiov[0].iov_base = alq->aq_entbuf + alq->aq_writetail;
+	write_start = alq->aq_entbuf + alq->aq_writetail;
 
 	if (alq->aq_writetail < alq->aq_writehead) {
 		/* Buffer not wrapped. */
-		totlen = aiov[0].iov_len = alq->aq_writehead - alq->aq_writetail;
+		IOVEC_INIT(&aiov[0], write_start,
+		    alq->aq_writehead - alq->aq_writetail);
+		totlen = aiov[0].iov_len;
 	} else if (alq->aq_writehead == 0) {
 		/* Buffer not wrapped (special case to avoid an empty iov). */
-		totlen = aiov[0].iov_len = alq->aq_buflen - alq->aq_writetail -
-		    wrapearly;
+		IOVEC_INIT(&aiov[0], write_start,
+		    alq->aq_buflen - alq->aq_writetail - wrapearly);
+		totlen = aiov[0].iov_len;
 	} else {
 		/*
 		 * Buffer wrapped, requires 2 aiov entries:
 		 * - first is from writetail to end of buffer
 		 * - second is from start of buffer to writehead
 		 */
-		aiov[0].iov_len = alq->aq_buflen - alq->aq_writetail -
-		    wrapearly;
+		IOVEC_INIT(&aiov[0], write_start,
+		    alq->aq_buflen - alq->aq_writetail - wrapearly);
 		iov++;
-		aiov[1].iov_base = alq->aq_entbuf;
-		aiov[1].iov_len =  alq->aq_writehead;
+		IOVEC_INIT(&aiov[1], alq->aq_entbuf, alq->aq_writehead);
 		totlen = aiov[0].iov_len + aiov[1].iov_len;
 	}
 

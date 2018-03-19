@@ -730,9 +730,7 @@ cheriabi___semctl(struct thread *td, struct cheriabi___semctl_args *uap)
 		semun.buf = &dsbuf;
 		break;
 	case IPC_SET:
-		error = copyin_c(arg.buf,
-		    (__cheri_tocap struct semid_ds_c * __capability)&dsbuf_c,
-		    sizeof(dsbuf_c));
+		error = copyin_c(arg.buf, &dsbuf_c, sizeof(dsbuf_c));
 		if (error)
 			return (error);
 		memset(&dsbuf, 0, sizeof(dsbuf));
@@ -783,9 +781,7 @@ cheriabi___semctl(struct thread *td, struct cheriabi___semctl_args *uap)
 		CP(dsbuf, dsbuf_c, sem_nsems);
 		CP(dsbuf, dsbuf_c, sem_otime);
 		CP(dsbuf, dsbuf_c, sem_ctime);
-		error = copyout_c(
-		    (__cheri_tocap struct semid_ds_c * __capability)&dsbuf_c,
-		    arg.buf, sizeof(dsbuf_c));
+		error = copyout_c( &dsbuf_c, arg.buf, sizeof(dsbuf_c));
 		break;
 	}
 

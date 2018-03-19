@@ -446,8 +446,8 @@ cryptocteon_process(device_t dev, struct cryptop *crp, int hint)
 		iovlen = 0;
 
 		while (m != NULL) {
-			od->octo_iov[iovcnt].iov_base = mtod(m, void *);
-			od->octo_iov[iovcnt].iov_len = m->m_len;
+			IOVEC_INIT(&od->octo_iov[iovcnt], mtod(m, void *),
+			    m->m_len);
 
 			m = m->m_next;
 			iovlen += od->octo_iov[iovcnt++].iov_len;
@@ -455,15 +455,15 @@ cryptocteon_process(device_t dev, struct cryptop *crp, int hint)
 	} else if (crp->crp_flags & CRYPTO_F_IOV) {
 		iovlen = 0;
 		for (iovcnt = 0; iovcnt < uiop->uio_iovcnt; iovcnt++) {
-			od->octo_iov[iovcnt].iov_base = uiop->uio_iov[iovcnt].iov_base;
-			od->octo_iov[iovcnt].iov_len = uiop->uio_iov[iovcnt].iov_len;
+			IOVEC_INIT(&od->octo_iov[iovcnt],
+			    uiop->uio_iov[iovcnt].iov_base,
+			    uiop->uio_iov[iovcnt].iov_len);
 
 			iovlen += od->octo_iov[iovcnt].iov_len;
 		}
 	} else {
 		iovlen = crp->crp_ilen;
-		od->octo_iov[0].iov_base = crp->crp_buf;
-		od->octo_iov[0].iov_len = crp->crp_ilen;
+		IOVEC_INIT(&uiop->uio_iov[0], crp->crp_buf, crp->crp_ilen);
 		iovcnt = 1;
 	}
 

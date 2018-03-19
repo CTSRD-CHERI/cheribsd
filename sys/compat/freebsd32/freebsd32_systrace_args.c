@@ -1907,18 +1907,18 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* freebsd32_ksem_init */
+	/* ksem_init */
 	case 404: {
-		struct freebsd32_ksem_init_args *p = params;
-		uarg[0] = (intptr_t) p->idp; /* semid_t * */
+		struct ksem_init_args *p = params;
+		uarg[0] = (intptr_t) p->idp; /* uint32_t * */
 		uarg[1] = p->value; /* unsigned int */
 		*n_args = 2;
 		break;
 	}
-	/* freebsd32_ksem_open */
+	/* ksem_open */
 	case 405: {
-		struct freebsd32_ksem_open_args *p = params;
-		uarg[0] = (intptr_t) p->idp; /* semid_t * */
+		struct ksem_open_args *p = params;
+		uarg[0] = (intptr_t) p->idp; /* uint32_t * */
 		uarg[1] = (intptr_t) p->name; /* const char * */
 		iarg[2] = p->oflag; /* int */
 		iarg[3] = p->mode; /* mode_t */
@@ -6332,11 +6332,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* freebsd32_ksem_init */
+	/* ksem_init */
 	case 404:
 		switch(ndx) {
 		case 0:
-			p = "userland semid_t *";
+			p = "userland uint32_t *";
 			break;
 		case 1:
 			p = "unsigned int";
@@ -6345,11 +6345,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* freebsd32_ksem_open */
+	/* ksem_open */
 	case 405:
 		switch(ndx) {
 		case 0:
-			p = "userland semid_t *";
+			p = "userland uint32_t *";
 			break;
 		case 1:
 			p = "userland const char *";
@@ -9909,12 +9909,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* freebsd32_ksem_init */
+	/* ksem_init */
 	case 404:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* freebsd32_ksem_open */
+	/* ksem_open */
 	case 405:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

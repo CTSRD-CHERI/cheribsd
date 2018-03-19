@@ -28,7 +28,7 @@ typedef unsigned long bitmap_t;
  * force linear search, if we would have to call ffs_lu() more than 2^3 times,
  * use a tree instead.
  */
-#if LG_BITMAP_MAXBITS - LG_BITMAP_GROUP_NBITS > 3
+#if LG_BITMAP_MAXBITS - LG_BITMAP_GROUP_NBITS > 4
 #  define BITMAP_USE_TREE
 #endif
 

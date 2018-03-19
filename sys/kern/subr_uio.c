@@ -80,6 +80,20 @@ copyin_nofault(const void *udaddr, void *kaddr, size_t len)
 	return (error);
 }
 
+#if __has_feature(capabilities)
+int
+copyin_nofault_c(const void * __capability udaddr, void * __capability kaddr,
+    size_t len)
+{
+	int error, save;
+
+	save = vm_fault_disable_pagefaults();
+	error = copyin_c(udaddr, kaddr, len);
+	vm_fault_enable_pagefaults(save);
+	return (error);
+}
+#endif
+
 int
 copyout_nofault(const void *kaddr, void *udaddr, size_t len)
 {
@@ -91,6 +105,20 @@ copyout_nofault(const void *kaddr, void *udaddr, size_t len)
 	return (error);
 }
 
+#if __has_feature(capabilities)
+int
+copyout_nofault_c(const void * __capability kaddr, void * __capability udaddr,
+    size_t len)
+{
+	int error, save;
+
+	save = vm_fault_disable_pagefaults();
+	error = copyout_c(kaddr, udaddr, len);
+	vm_fault_enable_pagefaults(save);
+	return (error);
+}
+#endif
+
 #define	PHYS_PAGE_COUNT(len)	(howmany(len, PAGE_SIZE) + 1)
 
 int
@@ -101,8 +129,7 @@ physcopyin(void *src, vm_paddr_t dst, size_t len)
 	struct uio uio;
 	int i;
 
-	iov[0].iov_base = src;
-	iov[0].iov_len = len;
+	IOVEC_INIT(&iov[0], src, len);
 	uio.uio_iov = iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = 0;
@@ -122,8 +149,7 @@ physcopyout(vm_paddr_t src, void *dst, size_t len)
 	struct uio uio;
 	int i;
 
-	iov[0].iov_base = dst;
-	iov[0].iov_len = len;
+	IOVEC_INIT(&iov[0], dst, len);
 	uio.uio_iov = iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = 0;
@@ -264,8 +290,7 @@ uiomove_faultflag(void *cp, int n, struct uio *uio, int nofault)
 		case UIO_NOCOPY:
 			break;
 		}
-		iov->iov_base = (char *)iov->iov_base + cnt;
-		iov->iov_len -= cnt;
+		IOVEC_ADVANCE(iov, cnt);
 		uio->uio_resid -= cnt;
 		uio->uio_offset += cnt;
 		cp = (char *)cp + cnt;
@@ -334,8 +359,7 @@ again:
 	case UIO_NOCOPY:
 		break;
 	}
-	iov->iov_base = (char *)iov->iov_base + 1;
-	iov->iov_len--;
+	IOVEC_ADVANCE(iov, 1);
 	uio->uio_resid--;
 	uio->uio_offset++;
 	return (0);
@@ -525,8 +549,8 @@ copyout_part(const void * __restrict kaddr, void * __restrict udaddr,
 /*
  * XXXKIB The temporal implementation of fue*() functions which do not
  * handle usermode -1 properly, mixing it with the fault code.  Keep
- * this until MD code is written.  Currently sparc64 and mips do not
- * have proper implementation.
+ * this until MD code is written.  Currently sparc64 does not have a
+ * proper implementation.
  */
 
 int
@@ -579,6 +603,7 @@ casueword32(volatile uint32_t *base, uint32_t oldval, uint32_t *oldvalp,
 	*oldvalp = ov;
 	return (0);
 }
+
 
 int
 casueword(volatile u_long *p, u_long oldval, u_long *oldvalp, u_long newval)
@@ -645,3 +670,42 @@ casuword(volatile u_long *addr, u_long old, u_long new)
 }
 
 #endif /* NO_FUEWORD */
+
+#if __has_feature(capabilities)
+int
+fueword_c(volatile const void * __capability base, long *val)
+{
+	long res;
+
+	res = fuword_c(base);
+	if (res == -1)
+		return (-1);
+	*val = res;
+	return (0);
+}
+
+int
+fueword32_c(volatile const void * __capability base, int32_t *val)
+{
+	int32_t res;
+
+	res = fuword32_c(base);
+	if (res == -1)
+		return (-1);
+	*val = res;
+	return (0);
+}
+
+int
+casueword32_c(volatile uint32_t * __capability base, uint32_t oldval,
+    uint32_t *oldvalp, uint32_t newval)
+{
+	int32_t ov;
+
+	ov = casuword32_c(base, oldval, newval);
+	if (ov == -1)
+		return (-1);
+	*oldvalp = ov;
+	return (0);
+}
+#endif

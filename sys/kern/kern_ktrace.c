@@ -1253,22 +1253,19 @@ ktr_writerequest(struct thread *td, struct ktr_request *req)
 	auio.uio_offset = 0;
 	auio.uio_segflg = UIO_SYSSPACE;
 	auio.uio_rw = UIO_WRITE;
-	aiov[0].iov_base = (caddr_t)kth;
-	aiov[0].iov_len = sizeof(struct ktr_header);
+	IOVEC_INIT(&aiov[0], kth, sizeof(struct ktr_header));
 	auio.uio_resid = sizeof(struct ktr_header);
 	auio.uio_iovcnt = 1;
 	auio.uio_td = td;
 	if (datalen != 0) {
-		aiov[1].iov_base = (caddr_t)&req->ktr_data;
-		aiov[1].iov_len = datalen;
+		IOVEC_INIT(&aiov[1], &req->ktr_data, datalen);
 		auio.uio_resid += datalen;
 		auio.uio_iovcnt++;
 		kth->ktr_len += datalen;
 	}
 	if (buflen != 0) {
 		KASSERT(req->ktr_buffer != NULL, ("ktrace: nothing to write"));
-		aiov[auio.uio_iovcnt].iov_base = req->ktr_buffer;
-		aiov[auio.uio_iovcnt].iov_len = buflen;
+		IOVEC_INIT(&aiov[auio.uio_iovcnt], req->ktr_buffer, buflen);
 		auio.uio_resid += buflen;
 		auio.uio_iovcnt++;
 	}

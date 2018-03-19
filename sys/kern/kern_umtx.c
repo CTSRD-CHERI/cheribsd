@@ -3413,9 +3413,17 @@ __umtx_op_wake(struct thread *td, struct _umtx_op_args *uap)
 static int
 __umtx_op_nwake_private(struct thread *td, struct _umtx_op_args *uap)
 {
-#ifndef COMPAT_CHERIABI
 	char *uaddrs[BATCH_SIZE], **upp;
 	int count, error, i, pos, tocopy;
+
+#ifdef COMPAT_CHERIABI
+	/*
+	 * XXX-BD: we'll get an array of capabilities and need to
+	 * convert them into addresses.
+	 */
+	if (SV_CURPROC_FLAG(SV_CHERI))
+	    return (__umtx_op_unimpl(td, uap));
+#endif
 
 	upp = (char **)uap->obj;
 	error = 0;
@@ -3430,13 +3438,6 @@ __umtx_op_nwake_private(struct thread *td, struct _umtx_op_args *uap)
 		maybe_yield();
 	}
 	return (error);
-#else
-	/*
-	 * XXX-BD: we'll get an array of capabilities and need to
-	 * convert them into addresses.
-	 */
-	return (__umtx_op_unimpl(td, uap));
-#endif
 }
 
 static int

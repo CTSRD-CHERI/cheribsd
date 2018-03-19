@@ -75,6 +75,7 @@ XLEAF(FUNC_PREFIX(memmovenocap_c))
 	cmove	$c3, $c4
 	cmove	$c4, $c1
 XLEAF(FUNC_PREFIX(bcopynocap_c))
+	beqz		a0, return	/* return immediately if zero-length */
 	li	t0, ~CHERI_PERM_LOAD_CAP
 	candperm	$c3, $c3, t0	/* strip LOAD_CAP from dst */
 XLEAF(FUNC_PREFIX(bcopy_c))
@@ -217,8 +218,11 @@ b_byte_copy:
 	 */
 	andi		t2, t0, (SZREG-1)
 	andi		t3, t1, (SZREG-1)
-	bne		t2, t3, b_cannot_be_dword_aligned
+	li		t9, SZREG
+	slt		t9, a0, t9
+	bnez		t9, b_cannot_be_dword_aligned
 	move		a1, a0		// a1: how much to copy
+	bne		t2, t3, b_cannot_be_dword_aligned
 b_can_be_dword_aligned:
 	andi		t8, t0, (SZREG-1)	// a1: just to align
 	beqz		t8, b_dword_copy	// tail is dword aligned

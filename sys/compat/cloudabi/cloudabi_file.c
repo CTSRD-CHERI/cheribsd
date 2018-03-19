@@ -378,10 +378,8 @@ int
 cloudabi_sys_file_readdir(struct thread *td,
     struct cloudabi_sys_file_readdir_args *uap)
 {
-	struct iovec iov = {
-		.iov_base = uap->buf,
-		.iov_len = uap->buf_len
-	};
+	struct iovec iov;
+	IOVEC_INIT(&iov, uap->buf, uap->buf_len);
 	struct uio uio = {
 		.uio_iov = &iov,
 		.uio_iovcnt = 1,
@@ -417,10 +415,8 @@ cloudabi_sys_file_readdir(struct thread *td,
 	offset = uap->cookie;
 	vp = fp->f_vnode;
 	while (uio.uio_resid > 0) {
-		struct iovec readiov = {
-			.iov_base = readbuf,
-			.iov_len = MAXBSIZE
-		};
+		struct iovec readiov;
+		IOVEC_INIT(&readiov, readbuf, MAXBSIZE);
 		struct uio readuio = {
 			.uio_iov = &readiov,
 			.uio_iovcnt = 1,

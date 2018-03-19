@@ -759,9 +759,6 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 		if (phdr[i].p_type == PT_LOAD && phdr[i].p_memsz != 0) {
 			/* Loadable segment */
 			prot = __elfN(trans_prot)(phdr[i].p_flags);
-			/* XXX-BD: .text currently contains relocations. */
-			if (p->p_sysent->sv_flags & SV_CHERI)
-				prot |= PROT_WRITE;
 			error = __elfN(load_section)(imgp, phdr[i].p_offset,
 			    (caddr_t)(uintptr_t)phdr[i].p_vaddr + rbase,
 			    phdr[i].p_memsz, phdr[i].p_filesz, prot, pagesize);
@@ -994,25 +991,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 			if (phdr[i].p_memsz == 0)
 				break;
 			prot = __elfN(trans_prot)(phdr[i].p_flags);
-#ifdef COMPAT_CHERIABI
-			/*
-			 * XXX-BD: we need to be able to write to .rodata
-			 * to initalize capabilities.  For now, just make
-			 * all sections writiable.  We will want to add a
-			 * a new .rocapdata or the like which starts RW
-			 * and gets mapped RO by the appropriate startup
-			 * code after initalization.
-			 */
-			/* XXXAR: use PT_GNU_RELRO once we change to lld? */
-			if ((brand_info->sysvec->sv_flags & SV_CHERI) &&
-			    !(prot & PF_W)) {
-				prot |= PF_W;
-				/*
-				 * XXX-BD: how to tell the process we did
-				 * this?
-				 */
-			}
-#endif
 			error = __elfN(load_section)(imgp, phdr[i].p_offset,
 			    (caddr_t)(uintptr_t)phdr[i].p_vaddr + et_dyn_addr,
 			    phdr[i].p_memsz, phdr[i].p_filesz, prot,

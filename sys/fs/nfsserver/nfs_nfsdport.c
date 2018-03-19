@@ -456,8 +456,7 @@ nfsvno_namei(struct nfsrv_descript *nd, struct nameidata *ndp,
 			cp = uma_zalloc(namei_zone, M_WAITOK);
 		else
 			cp = cnp->cn_pnbuf;
-		aiov.iov_base = cp;
-		aiov.iov_len = MAXPATHLEN;
+		IOVEC_INIT(&aiov, cp, MAXPATHLEN);
 		auio.uio_iov = &aiov;
 		auio.uio_iovcnt = 1;
 		auio.uio_offset = 0;
@@ -592,8 +591,7 @@ nfsvno_readlink(struct vnode *vp, struct ucred *cred, struct thread *p,
 		} else {
 			len += mp->m_len;
 		}
-		ivp->iov_base = mtod(mp, caddr_t);
-		ivp->iov_len = mp->m_len;
+		IOVEC_INIT(ivp, mtod(mp, caddr_t), mp->m_len);
 		i++;
 		ivp++;
 	}
@@ -670,8 +668,7 @@ nfsvno_read(struct vnode *vp, off_t off, int cnt, struct ucred *cred,
 			panic("nfsvno_read iov");
 		siz = min(M_TRAILINGSPACE(m), left);
 		if (siz > 0) {
-			iv->iov_base = mtod(m, caddr_t) + m->m_len;
-			iv->iov_len = siz;
+			IOVEC_INIT(iv, mtod(m, caddr_t) + m->m_len, siz);
 			m->m_len += siz;
 			left -= siz;
 			iv++;
@@ -738,8 +735,7 @@ nfsvno_write(struct vnode *vp, off_t off, int retlen, int cnt, int stable,
 			panic("nfsvno_write");
 		if (i > 0) {
 			i = min(i, len);
-			ivp->iov_base = cp;
-			ivp->iov_len = i;
+			IOVEC_INIT(ivp, cp, i);
 			ivp++;
 			len -= i;
 		}
@@ -1642,8 +1638,7 @@ again:
 		cookies = NULL;
 	}
 
-	iv.iov_base = rbuf;
-	iv.iov_len = siz;
+	IOVEC_INIT(&iv, rbuf, siz);
 	io.uio_iov = &iv;
 	io.uio_iovcnt = 1;
 	io.uio_offset = (off_t)off;
@@ -1920,8 +1915,7 @@ again:
 		cookies = NULL;
 	}
 
-	iv.iov_base = rbuf;
-	iv.iov_len = siz;
+	IOVEC_INIT(&iv, rbuf, siz);
 	io.uio_iov = &iv;
 	io.uio_iovcnt = 1;
 	io.uio_offset = (off_t)off;

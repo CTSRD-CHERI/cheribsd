@@ -530,8 +530,7 @@ vn_rdwr(enum uio_rw rw, struct vnode *vp, void *base, int len, off_t offset,
 
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
-	aiov.iov_base = base;
-	aiov.iov_len = len;
+	IOVEC_INIT(&aiov, base, len);
 	auio.uio_resid = len;
 	auio.uio_offset = offset;
 	auio.uio_segflg = segflg;
@@ -1115,9 +1114,9 @@ vn_io_fault1(struct vnode *vp, struct uio *uio, struct vn_io_fault_args *args,
 			break;
 		}
 		short_uio.uio_iov = &short_iovec[0];
-		short_iovec[0].iov_base = (void *)addr;
+		IOVEC_INIT(&short_iovec[0], (void *)addr, len);
 		short_uio.uio_iovcnt = 1;
-		short_uio.uio_resid = short_iovec[0].iov_len = len;
+		short_uio.uio_resid = len;
 		short_uio.uio_offset = uio_clone->uio_offset;
 		td->td_ma = ma;
 		td->td_ma_cnt = cnt;
@@ -1126,9 +1125,7 @@ vn_io_fault1(struct vnode *vp, struct uio *uio, struct vn_io_fault_args *args,
 		vm_page_unhold_pages(ma, cnt);
 		adv = len - short_uio.uio_resid;
 
-		uio_clone->uio_iov->iov_base =
-		    (char *)uio_clone->uio_iov->iov_base + adv;
-		uio_clone->uio_iov->iov_len -= adv;
+		IOVEC_ADVANCE(uio_clone->uio_iov, adv);
 		uio_clone->uio_resid -= adv;
 		uio_clone->uio_offset += adv;
 
@@ -1213,12 +1210,12 @@ vn_io_fault_uiomove(char *data, int xfersize, struct uio *uio)
 		return (uiomove(data, xfersize, uio));
 
 	KASSERT(uio->uio_iovcnt == 1, ("uio_iovcnt %d", uio->uio_iovcnt));
-	transp_iov[0].iov_base = data;
 	transp_uio.uio_iov = &transp_iov[0];
 	transp_uio.uio_iovcnt = 1;
 	if (xfersize > uio->uio_resid)
 		xfersize = uio->uio_resid;
-	transp_uio.uio_resid = transp_iov[0].iov_len = xfersize;
+	IOVEC_INIT(&transp_iov[0], data, xfersize);
+	transp_uio.uio_resid = xfersize;
 	transp_uio.uio_offset = 0;
 	transp_uio.uio_segflg = UIO_SYSSPACE;
 	/*
@@ -1247,8 +1244,7 @@ vn_io_fault_uiomove(char *data, int xfersize, struct uio *uio)
 	KASSERT(td->td_ma_cnt >= pgadv, ("consumed pages %d %d", td->td_ma_cnt,
 	    pgadv));
 	td->td_ma_cnt -= pgadv;
-	uio->uio_iov->iov_base = (char *)uio->uio_iov->iov_base + adv;
-	uio->uio_iov->iov_len -= adv;
+	IOVEC_ADVANCE(uio->uio_iov, adv);
 	uio->uio_resid -= adv;
 	uio->uio_offset += adv;
 	return (error);
@@ -1285,8 +1281,7 @@ vn_io_fault_pgmove(vm_page_t ma[], vm_offset_t offset, int xfersize,
 	KASSERT(td->td_ma_cnt >= pgadv, ("consumed pages %d %d", td->td_ma_cnt,
 	    pgadv));
 	td->td_ma_cnt -= pgadv;
-	uio->uio_iov->iov_base = (char *)(iov_base + cnt);
-	uio->uio_iov->iov_len -= cnt;
+	IOVEC_ADVANCE(uio->uio_iov, cnt);
 	uio->uio_resid -= cnt;
 	uio->uio_offset += cnt;
 	return (0);
@@ -1932,8 +1927,7 @@ vn_extattr_get(struct vnode *vp, int ioflg, int attrnamespace,
 	struct iovec	iov;
 	int	error;
 
-	iov.iov_len = *buflen;
-	iov.iov_base = buf;
+	IOVEC_INIT(&iov, buf, *buflen);
 
 	auio.uio_iov = &iov;
 	auio.uio_iovcnt = 1;
@@ -1974,8 +1968,7 @@ vn_extattr_set(struct vnode *vp, int ioflg, int attrnamespace,
 	struct mount	*mp;
 	int	error;
 
-	iov.iov_len = buflen;
-	iov.iov_base = buf;
+	IOVEC_INIT(&iov, buf, buflen);
 
 	auio.uio_iov = &iov;
 	auio.uio_iovcnt = 1;

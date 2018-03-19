@@ -323,8 +323,8 @@ smbfs_doio(struct vnode *vp, struct buf *bp, struct ucred *cr, struct thread *td
 	smb_makescred(scred, td, cr);
 
 	if (bp->b_iocmd == BIO_READ) {
-	    io.iov_len = uiop->uio_resid = bp->b_bcount;
-	    io.iov_base = bp->b_data;
+	    IOVEC_INIT(&io, bp->b_data, bp->b_bcount);
+	    uiop->uio_resid = bp->b_bcount;
 	    uiop->uio_rw = UIO_READ;
 	    switch (vp->v_type) {
 	      case VREG:
@@ -352,9 +352,9 @@ smbfs_doio(struct vnode *vp, struct buf *bp, struct ucred *cr, struct thread *td
 		bp->b_dirtyend = np->n_size - (bp->b_blkno * DEV_BSIZE);
 
 	    if (bp->b_dirtyend > bp->b_dirtyoff) {
-		io.iov_len = uiop->uio_resid = bp->b_dirtyend - bp->b_dirtyoff;
+		uiop->uio_resid = bp->b_dirtyend - bp->b_dirtyoff;
 		uiop->uio_offset = ((off_t)bp->b_blkno) * DEV_BSIZE + bp->b_dirtyoff;
-		io.iov_base = (char *)bp->b_data + bp->b_dirtyoff;
+		IOVEC_INIT(&io, (char *)bp->b_data + bp->b_dirtyoff, uiop->uio_resid);
 		uiop->uio_rw = UIO_WRITE;
 		error = smb_write(smp->sm_share, np->n_fid, uiop, scred);
 
@@ -474,8 +474,7 @@ smbfs_getpages(ap)
 	VM_CNT_ADD(v_vnodepgsin, npages);
 
 	count = npages << PAGE_SHIFT;
-	iov.iov_base = (caddr_t) kva;
-	iov.iov_len = count;
+	IOVEC_INIT(&iov, bp->b_data, count);
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = IDX_TO_OFF(pages[0]->pindex);
@@ -598,8 +597,7 @@ smbfs_putpages(ap)
 	VM_CNT_INC(v_vnodeout);
 	VM_CNT_ADD(v_vnodepgsout, count);
 
-	iov.iov_base = (caddr_t) kva;
-	iov.iov_len = count;
+	IOVEC_INIT(&iov, bp->b_data, count);
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = IDX_TO_OFF(pages[0]->pindex);

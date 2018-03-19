@@ -177,6 +177,9 @@ const char *openpam_policy_path[] = {
 const char *openpam_module_path[] = {
 #ifdef OPENPAM_MODULES_DIRECTORY
 	OPENPAM_MODULES_DIRECTORY,
+#elif defined(__CHERI_PURE_CAPABILITY__)
+	"/usr/libcheri",
+	"/usr/local/libcheri",
 #elif COMPAT_32BIT
 	"/usr/lib32",
 	"/usr/local/lib32",
