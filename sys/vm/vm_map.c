@@ -4658,8 +4658,9 @@ vm_map_print(vm_map_t map)
 	db_indent += 2;
 	for (entry = map->header.next; entry != &map->header;
 	    entry = entry->next) {
-		db_iprintf("map entry %p: start=%p, end=%p\n",
-		    (void *)entry, (void *)entry->start, (void *)entry->end);
+		db_iprintf("map entry %p: start=%p, end=%p, owner=%d\n",
+		    (void *)entry, (void *)entry->start, (void *)entry->end,
+		    entry->owner);
 		{
 			static char *inheritance_name[4] =
 			{"share", "copy", "none", "donate_copy"};
