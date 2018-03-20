@@ -53,17 +53,17 @@
 /* read a uleb128 encoded value and advance pointer */
 static uintptr_t readULEB128(const uint8_t** data)
 {
-    uintptr_t result = 0;
-    uintptr_t shift = 0;
+    vaddr_t result = 0;
+    int shift = 0;
     unsigned char byte;
     const uint8_t* p = *data;
     do {
         byte = *p++;
-        result |= (uintptr_t)((byte & 0x7f) << shift);
+        result |= (vaddr_t)((byte & 0x7f) << shift);
         shift += 7;
     } while (byte & 0x80);
     *data = p;
-    return result;
+    return (uintptr_t)result;
 }
 
 /* read a pointer encoded value and advance pointer */
