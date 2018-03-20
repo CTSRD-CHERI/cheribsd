@@ -114,7 +114,13 @@ extern uintptr_t dpcpu_off[];
 /*
  * Accessors for remote cpus.
  */
+#ifndef CHERI_KERNEL
 #define	DPCPU_ID_PTR(i, n)	_DPCPU_PTR(dpcpu_off[(i)], n)
+#else /* CHERI_KERNEL */
+/* see DPCPU_PTR() */
+#define	DPCPU_ID_PTR(i, n)					\
+    _DPCPU_PTR(dpcpu_off[(i)] - ptr_to_va(DPCPU_START), n)
+#endif /* CHERI_KERNEL */
 #define	DPCPU_ID_GET(i, n)	(*DPCPU_ID_PTR(i, n))
 #define	DPCPU_ID_SET(i, n, v)	(*DPCPU_ID_PTR(i, n) = v)
 
