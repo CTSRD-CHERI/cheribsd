@@ -1292,8 +1292,7 @@ cheriabi_kbounce(struct thread *td, struct cheriabi_kbounce_args *uap)
 	if (src == NULL || dst == NULL)
 		return (EINVAL);
 
-	bounce = (__cheri_tocap void * __capability )malloc(len,
-	    M_TEMP, M_WAITOK | M_ZERO);
+	bounce = malloc_c(len, M_TEMP, M_WAITOK | M_ZERO);
 	error = copyin_c(src, bounce, len);
 	if (error != 0) {
 		printf("%s: error in copyin_c %d\n", __func__, error);
@@ -1303,7 +1302,7 @@ cheriabi_kbounce(struct thread *td, struct cheriabi_kbounce_args *uap)
 	if (error != 0)
 		printf("%s: error in copyout_c %d\n", __func__, error);
 error:
-	free((__cheri_fromcap void *)bounce, M_TEMP);
+	free_c(bounce, M_TEMP);
 	return (error);
 }
 
