@@ -316,7 +316,7 @@ int
 cheriabi_open(struct thread *td, struct cheriabi_open_args *uap)
 {
 
-	return (kern_openat_c(td, AT_FDCWD, uap->path, UIO_USERSPACE,
+	return (kern_openat(td, AT_FDCWD, uap->path, UIO_USERSPACE,
 	    uap->flags, uap->mode));
 }
 
@@ -324,7 +324,7 @@ int
 cheriabi_openat(struct thread *td, struct cheriabi_openat_args *uap)
 {
 
-	return (kern_openat_c(td, uap->fd, uap->path, UIO_USERSPACE, uap->flag,
+	return (kern_openat(td, uap->fd, uap->path, UIO_USERSPACE, uap->flag,
 	    uap->mode));
 }
 
@@ -357,7 +357,7 @@ int
 cheriabi_link(struct thread *td, struct cheriabi_link_args *uap)
 {
 
-	return (kern_linkat_c(td, AT_FDCWD, AT_FDCWD, uap->path, uap->to,
+	return (kern_linkat(td, AT_FDCWD, AT_FDCWD, uap->path, uap->to,
 	    UIO_USERSPACE, FOLLOW));
 }
 
@@ -370,7 +370,7 @@ cheriabi_linkat(struct thread *td, struct cheriabi_linkat_args *uap)
 	if (flag & ~AT_SYMLINK_FOLLOW)
 		return (EINVAL);
 
-	return (kern_linkat_c(td, uap->fd1, uap->fd2, uap->path1, uap->path2,
+	return (kern_linkat(td, uap->fd1, uap->fd2, uap->path1, uap->path2,
 	    UIO_USERSPACE, (flag & AT_SYMLINK_FOLLOW) ? FOLLOW : NOFOLLOW));
 }
 
@@ -401,7 +401,7 @@ int
 cheriabi_unlink(struct thread *td, struct cheriabi_unlink_args *uap)
 {
 
-	return (kern_unlinkat_c(td, AT_FDCWD, uap->path, UIO_USERSPACE, 0));
+	return (kern_unlinkat(td, AT_FDCWD, uap->path, UIO_USERSPACE, 0));
 }
 
 int
@@ -413,9 +413,9 @@ cheriabi_unlinkat(struct thread *td, struct cheriabi_unlinkat_args *uap)
 		return (EINVAL);
 
 	if (flag & AT_REMOVEDIR)
-		return (kern_rmdirat_c(td, uap->fd, uap->path, UIO_USERSPACE));
+		return (kern_rmdirat(td, uap->fd, uap->path, UIO_USERSPACE));
 	else
-		return (kern_unlinkat_c(td, uap->fd, uap->path, UIO_USERSPACE,
+		return (kern_unlinkat(td, uap->fd, uap->path, UIO_USERSPACE,
 		    0));
 }
 
@@ -647,7 +647,7 @@ int
 cheriabi_rmdir(struct thread *td, struct cheriabi_rmdir_args *uap)
 {
 
-	return (kern_rmdirat_c(td, AT_FDCWD, uap->path, UIO_USERSPACE));
+	return (kern_rmdirat(td, AT_FDCWD, uap->path, UIO_USERSPACE));
 }
 
 int

@@ -249,10 +249,8 @@ int	kern_kldsym(struct thread *td, int fileid, int cmd, const char *symstr,
 int	kern_kldunload(struct thread *td, int fileid, int flags);
 int	kern_ktrace(struct thread *td, const char * __capability fname,
 	    int uops, int ufacs, int pid);
-int	kern_linkat(struct thread *td, int fd1, int fd2, const char *path1,
-	    const char *path2, enum uio_seg segflg, int follow);
-int	kern_linkat_c(struct thread *td, int fd1, int fd2,
-	    const char * __CAPABILITY path1, const char * __CAPABILITY path2,
+int	kern_linkat(struct thread *td, int fd1, int fd2,
+	    const char * __capability path1, const char * __capability path2,
 	    enum uio_seg segflg, int follow);
 int	kern_listen(struct thread *td, int s, int backlog);
 int	kern_lseek(struct thread *td, int fd, off_t offset, int whence);
@@ -305,9 +303,7 @@ int	kern_ntp_gettime(struct thread *td,
 	    struct ntptimeval * __capability ntvp);
 int	kern_ogetdirentries(struct thread *td, struct ogetdirentries_args *uap,
 	    long *ploff);
-int	kern_openat(struct thread *td, int fd, char *path,
-	    enum uio_seg pathseg, int flags, int mode);
-int	kern_openat_c(struct thread *td, int fd, char const * __CAPABILITY path,
+int	kern_openat(struct thread *td, int fd, char const * __capability path,
 	    enum uio_seg pathseg, int flags, int mode);
 int	kern_pathconf(struct thread *td, const char * __capability path,
 	    enum uio_seg pathseg, int name, u_long flags);
@@ -369,9 +365,7 @@ int	kern_renameat(struct thread *td, int oldfd,
 	    const char * __capability new, enum uio_seg pathseg);
 int	kern_revoke(struct thread *td, const char * __capability path,
 	    enum uio_seg pathseg);
-int	kern_rmdirat(struct thread *td, int fd, const char *path,
-	    enum uio_seg pathseg);
-int	kern_rmdirat_c(struct thread *td, int fd, const char * __CAPABILITY path,
+int	kern_rmdirat(struct thread *td, int fd, const char * __capability path,
 	    enum uio_seg pathseg);
 int	kern_rtprio(struct thread *td, int function, pid_t pid,
 	    struct rtprio * __capability urtp);
@@ -467,10 +461,9 @@ int	kern_undelete(struct thread *td, const char * __capability path,
 	    enum uio_seg pathseg);
 int	kern_unmount(struct thread *td, const char * __capability path,
 	    int flags);
-int	kern_unlinkat(struct thread *td, int fd, const char *path,
-	    enum uio_seg pathseg, ino_t oldinum);
-int	kern_unlinkat_c(struct thread *td, int fd,
-	    const char * __CAPABILITY path, enum uio_seg pathseg, ino_t oldinum);
+int	kern_unlinkat(struct thread *td, int fd,
+	    const char * __capability path, enum uio_seg pathseg,
+	    ino_t oldinum);
 int	kern_utimesat(struct thread *td, int fd, const char * __capability path,
 	    enum uio_seg pathseg, const struct timeval * __capability tptr,
 	    enum uio_seg tptrseg);

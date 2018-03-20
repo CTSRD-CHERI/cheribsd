@@ -1061,8 +1061,8 @@ int
 sys_open(struct thread *td, struct open_args *uap)
 {
 
-	return (kern_openat(td, AT_FDCWD, uap->path, UIO_USERSPACE,
-	    uap->flags, uap->mode));
+	return (kern_openat(td, AT_FDCWD, __USER_CAP_STR(uap->path),
+	    UIO_USERSPACE, uap->flags, uap->mode));
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -1078,22 +1078,13 @@ sys_openat(struct thread *td, struct openat_args *uap)
 {
 
 	AUDIT_ARG_FD(uap->fd);
-	return (kern_openat(td, uap->fd, uap->path, UIO_USERSPACE, uap->flag,
-	    uap->mode));
+	return (kern_openat(td, uap->fd, __USER_CAP_STR(uap->path),
+	    UIO_USERSPACE, uap->flag, uap->mode));
 }
 
 int
-kern_openat(struct thread *td, int fd, char *path, enum uio_seg pathseg,
-    int flags, int mode)
-{
-
-	return (kern_openat_c(td, fd, (__cheri_tocap char * __CAPABILITY)path,
-	    pathseg, flags, mode));
-}
-
-int
-kern_openat_c(struct thread *td, int fd, char const * __CAPABILITY path, enum uio_seg pathseg,
-    int flags, int mode)
+kern_openat(struct thread *td, int fd, char const * __capability path,
+    enum uio_seg pathseg, int flags, int mode)
 {
 	struct proc *p = td->td_proc;
 	struct filedesc *fdp = p->p_fd;
@@ -1492,8 +1483,8 @@ int
 sys_link(struct thread *td, struct link_args *uap)
 {
 
-	return (kern_linkat(td, AT_FDCWD, AT_FDCWD, uap->path, uap->to,
-	    UIO_USERSPACE, FOLLOW));
+	return (kern_linkat(td, AT_FDCWD, AT_FDCWD, __USER_CAP_STR(uap->path),
+	    __USER_CAP_STR(uap->to), UIO_USERSPACE, FOLLOW));
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -1514,8 +1505,9 @@ sys_linkat(struct thread *td, struct linkat_args *uap)
 	if (flag & ~AT_SYMLINK_FOLLOW)
 		return (EINVAL);
 
-	return (kern_linkat(td, uap->fd1, uap->fd2, uap->path1, uap->path2,
-	    UIO_USERSPACE, (flag & AT_SYMLINK_FOLLOW) ? FOLLOW : NOFOLLOW));
+	return (kern_linkat(td, uap->fd1, uap->fd2, __USER_CAP_STR(uap->path1),
+	    __USER_CAP_STR(uap->path2), UIO_USERSPACE,
+	    (flag & AT_SYMLINK_FOLLOW) ? FOLLOW : NOFOLLOW));
 }
 
 int hardlink_check_uid = 0;
@@ -1558,18 +1550,8 @@ can_hardlink(struct vnode *vp, struct ucred *cred)
 }
 
 int
-kern_linkat(struct thread *td, int fd1, int fd2, const char *path1, const char *path2,
-    enum uio_seg segflg, int follow)
-{
-
-	return (kern_linkat_c(td, fd1, fd2,
-	    (__cheri_tocap const char * __CAPABILITY)path1,
-	    (__cheri_tocap const char * __CAPABILITY)path2, segflg, follow));
-}
-
-int
-kern_linkat_c(struct thread *td, int fd1, int fd2,
-    const char * __CAPABILITY path1, const char * __CAPABILITY path2,
+kern_linkat(struct thread *td, int fd1, int fd2,
+    const char * __capability path1, const char * __capability path2,
     enum uio_seg segflg, int follow)
 {
 	struct vnode *vp;
@@ -1823,7 +1805,8 @@ int
 sys_unlink(struct thread *td, struct unlink_args *uap)
 {
 
-	return (kern_unlinkat(td, AT_FDCWD, uap->path, UIO_USERSPACE, 0));
+	return (kern_unlinkat(td, AT_FDCWD, __USER_CAP_STR(uap->path),
+	    UIO_USERSPACE, 0));
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -1838,7 +1821,7 @@ sys_unlinkat(struct thread *td, struct unlinkat_args *uap)
 {
 	int flag = uap->flag;
 	int fd = uap->fd;
-	char *path = uap->path;
+	char * __capability path = __USER_CAP_STR(uap->path);
 
 	if (flag & ~AT_REMOVEDIR)
 		return (EINVAL);
@@ -1850,15 +1833,7 @@ sys_unlinkat(struct thread *td, struct unlinkat_args *uap)
 }
 
 int
-kern_unlinkat(struct thread *td, int fd, const char *path, enum uio_seg pathseg,
-    ino_t oldinum)
-{
-
-	return (kern_unlinkat_c(td, fd, __USER_CAP_STR(path), pathseg, oldinum));
-}
-
-int
-kern_unlinkat_c(struct thread *td, int fd, const char * __CAPABILITY path,
+kern_unlinkat(struct thread *td, int fd, const char * __capability path,
     enum uio_seg pathseg, ino_t oldinum)
 {
 	struct mount *mp;
@@ -3790,19 +3765,12 @@ int
 sys_rmdir(struct thread *td, struct rmdir_args *uap)
 {
 
-	return (kern_rmdirat(td, AT_FDCWD, uap->path, UIO_USERSPACE));
+	return (kern_rmdirat(td, AT_FDCWD, __USER_CAP_STR(uap->path),
+	    UIO_USERSPACE));
 }
 
 int
-kern_rmdirat(struct thread *td, int fd, const char *path, enum uio_seg pathseg)
-{
-
-	return (kern_rmdirat_c(td, fd,
-	    (__cheri_tocap const char * __CAPABILITY)path, pathseg));
-}
-
-int
-kern_rmdirat_c(struct thread *td, int fd, const char * __CAPABILITY path,
+kern_rmdirat(struct thread *td, int fd, const char * __capability path,
     enum uio_seg pathseg)
 {
 	struct mount *mp;
