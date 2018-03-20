@@ -96,7 +96,7 @@ int	kern_alternate_path(struct thread *td, const char *prefix, const char *path,
 int	kern_audit(struct thread *td, const void * __capability record,
 	    u_int length);
 int	kern_auditctl(struct thread *td, const char * __capability path);
-int	kern_auditon(struct thread *td, int cmd, void * __CAPABILITY data,
+int	kern_auditon(struct thread *td, int cmd, void * __capability data,
 	    u_int length);
 int	kern_bindat(struct thread *td, int dirfd, int fd, struct sockaddr *sa);
 int	kern_cap_getmode(struct thread *td, u_int * __capability modep);
@@ -109,7 +109,7 @@ int	kern_cap_ioctls_limit(struct thread *td, int fd, u_long *cmds,
 int	kern_cap_rights_get(struct thread *td, int version, int fd,
 	    cap_rights_t * __capability rightsp);
 int	kern_cap_rights_limit(struct thread *td, int fd, cap_rights_t *rights);
-int	kern_chdir(struct thread *td, const char * __CAPABILITY path,
+int	kern_chdir(struct thread *td, const char * __capability path,
 	    enum uio_seg pathseg);
 int	kern_chflagsat(struct thread *td, int fd, const char * __capability path,
 	    enum uio_seg pathseg, u_long flags, int atflag);
@@ -231,8 +231,8 @@ int	kern_jail(struct thread *td, const char * __capability path,
 	    enum uio_seg ipseg);
 int	kern_jail_get(struct thread *td, struct uio *options, int flags);
 int	kern_jail_set(struct thread *td, struct uio *options, int flags);
-int	kern_kenv(struct thread *td, int what, const char * __CAPABILITY namep,
-	    char * __CAPABILITY val, int vallen);
+int	kern_kenv(struct thread *td, int what, const char * __capability namep,
+	    char * __capability val, int vallen);
 int	kern_kevent(struct thread *td, int fd, int nchanges, int nevents,
 	    struct kevent_copyops *k_ops, const struct timespec *timeout);
 int	kern_kevent_anonymous(struct thread *td, int nevents,
@@ -333,8 +333,8 @@ int	kern_ptrace(struct thread *td, int req, pid_t pid, void *addr,
 int	kern_pwrite(struct thread *td, int fd, const void *buf, size_t nbyte,
 	    off_t offset);
 int	kern_pwritev(struct thread *td, int fd, struct uio *auio, off_t offset);
-int	kern_quotactl(struct thread *td, const char * __CAPABILITY path,
-	    int cmd, int uid, void * __CAPABILITY arg);
+int	kern_quotactl(struct thread *td, const char * __capability path,
+	    int cmd, int uid, void * __capability arg);
 int	kern_rctl_get_racct(struct thread *td,
 	    const void * __capability inbufp, size_t inbuflen,
 	    void * __capability outbufp, size_t outbuflen);
@@ -390,7 +390,7 @@ int	kern_setaudit(struct thread *td,
 int	kern_setaudit_addr(struct thread *td,
 	    struct auditinfo_addr * __capability auditinfo_addr, u_int length);
 int	kern_setauid(struct thread *td, uid_t * __capability auid);
-int	kern_setlogin(struct thread *td, const char * __CAPABILITY namebuf);
+int	kern_setlogin(struct thread *td, const char * __capability namebuf);
 int	kern_setloginclass(struct thread *td,
 	    const char * __capability namebuf);
 int	kern_select(struct thread *td, int nd, fd_set * __capability fd_in,
@@ -418,7 +418,7 @@ int	kern_sigaction(struct thread *td, int sig, const struct sigaction *act,
 	    struct sigaction *oact, int flags);
 int	kern_sigaction_cap(struct thread *td, int sig,
 	    const struct sigaction *act, struct sigaction *oact, int flags,
-	    void * __CAPABILITY *cap);
+	    void * __capability *cap);
 int	kern_sigaltstack(struct thread *td, stack_t *ss, stack_t *oss);
 int	kern_sigprocmask(struct thread *td, int how,
 	    sigset_t *set, sigset_t *oset, int flags);

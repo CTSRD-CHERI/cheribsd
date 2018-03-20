@@ -178,7 +178,7 @@ sys_auditon(struct thread *td, struct auditon_args *uap)
 }
 
 int
-kern_auditon(struct thread *td, int cmd, void * __CAPABILITY data,
+kern_auditon(struct thread *td, int cmd, void * __capability data,
     u_int length)
 {
 	struct ucred *cred, *newcred, *oldcred;
