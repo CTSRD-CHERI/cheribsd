@@ -115,13 +115,14 @@ SYSINIT(sctp_syscalls, SI_SUB_SYSCALLS, SI_ORDER_ANY, sctp_syscalls_init, NULL);
  * otherwise all return EOPNOTSUPP.
  * XXX: We should make this loadable one day.
  */
+#ifndef _SYS_SYSPROTO_H_
+struct sctp_peeloff_args {
+int	sd;
+	caddr_t	name;
+};
+#endif
 int
-sys_sctp_peeloff(td, uap)
-	struct thread *td;
-	struct sctp_peeloff_args /* {
-		int	sd;
-		caddr_t	name;
-	} */ *uap;
+sys_sctp_peeloff(struct thread *td, struct sctp_peeloff_args *uap)
 {
 #if (defined(INET) || defined(INET6)) && defined(SCTP)
 	struct file *headfp, *nfp = NULL;
@@ -190,18 +191,20 @@ done2:
 #endif /* SCTP */
 }
 
+#ifndef _SYS_SYSPROTO_H_
+struct sctp_generic_sendmsg_args {
+	int sd;
+	caddr_t msg;
+	int mlen;
+	struct sockaddr *to;
+	__socklen_t tolen;
+	struct sctp_sndrcvinfo *sinfo;
+	int flags;
+};
+#endif
 int
-sys_sctp_generic_sendmsg (td, uap)
-	struct thread *td;
-	struct sctp_generic_sendmsg_args /* {
-		int sd,
-		caddr_t msg,
-		int mlen,
-		caddr_t to,
-		__socklen_t tolen,
-		struct sctp_sndrcvinfo *sinfo,
-		int flags
-	} */ *uap;
+sys_sctp_generic_sendmsg(struct thread *td,
+    struct sctp_generic_sendmsg_args *uap)
 {
 #if (defined(INET) || defined(INET6)) && defined(SCTP)
 	struct sctp_sndrcvinfo sinfo, *u_sinfo = NULL;
@@ -242,8 +245,7 @@ sys_sctp_generic_sendmsg (td, uap)
 		ktrsockaddr(to);
 #endif
 
-	iov[0].iov_base = uap->msg;
-	iov[0].iov_len = uap->mlen;
+	IOVEC_INIT(&iov[0], uap->msg, uap->mlen);
 
 	so = (struct socket *)fp->f_data;
 	if (so->so_proto->pr_protocol != IPPROTO_SCTP) {
@@ -303,18 +305,20 @@ sctp_bad2:
 #endif /* SCTP */
 }
 
+#ifndef _SYS_SYSPROTO_H_
+struct sctp_generic_sendmsg_iov_args {
+	int sd;
+	struct iovec *iov;
+	int iovlen;
+	struct sockaddr *to;
+	__socklen_t tolen;
+	struct sctp_sndrcvinfo *sinfo;
+	int flags;
+};
+#endif
 int
-sys_sctp_generic_sendmsg_iov(td, uap)
-	struct thread *td;
-	struct sctp_generic_sendmsg_iov_args /* {
-		int sd,
-		struct iovec *iov,
-		int iovlen,
-		caddr_t to,
-		__socklen_t tolen,
-		struct sctp_sndrcvinfo *sinfo,
-		int flags
-	} */ *uap;
+sys_sctp_generic_sendmsg_iov(struct thread *td,
+    struct sctp_generic_sendmsg_iov_args *uap)
 {
 #if (defined(INET) || defined(INET6)) && defined(SCTP)
 	struct sctp_sndrcvinfo sinfo, *u_sinfo = NULL;
@@ -358,7 +362,7 @@ sys_sctp_generic_sendmsg_iov(td, uap)
 	else
 #endif
 #ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAGS(SV_CHERI))
+	if (SV_CURPROC_FLAG(SV_CHERI))
 		error = cheriabi_copyiniov((struct iovec_c *)uap->iov,
 		    uap->iovlen, &iov, EMSGSIZE);
 	else
@@ -439,18 +443,20 @@ sctp_bad2:
 #endif /* SCTP */
 }
 
+#ifndef _SYS_SYSPROTO_H_
+struct sctp_generic_recvmsg_args {
+	int sd;
+	struct iovec *iov;
+	int iovlen;
+	struct sockaddr *from;
+	__socklen_t *fromlenaddr;
+	struct sctp_sndrcvinfo *sinfo;
+	int *msg_flags;
+};
+#endif
 int
-sys_sctp_generic_recvmsg(td, uap)
-	struct thread *td;
-	struct sctp_generic_recvmsg_args /* {
-		int sd,
-		struct iovec *iov,
-		int iovlen,
-		struct sockaddr *from,
-		__socklen_t *fromlenaddr,
-		struct sctp_sndrcvinfo *sinfo,
-		int *msg_flags
-	} */ *uap;
+sys_sctp_generic_recvmsg(struct thread *td,
+    struct sctp_generic_recvmsg_args *uap)
 {
 #if (defined(INET) || defined(INET6)) && defined(SCTP)
 	uint8_t sockbufstore[256];
@@ -479,7 +485,7 @@ sys_sctp_generic_recvmsg(td, uap)
 	else
 #endif
 #ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAGS(SV_CHERI))
+	if (SV_CURPROC_FLAG(SV_CHERI))
 		error = cheriabi_copyiniov((struct iovec_c *)uap->iov,
 		    uap->iovlen, &iov, EMSGSIZE);
 	else

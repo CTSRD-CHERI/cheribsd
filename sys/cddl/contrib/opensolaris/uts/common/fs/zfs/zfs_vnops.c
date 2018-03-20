@@ -2586,8 +2586,7 @@ zfs_readdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp, int *ncookies, u_lon
 		*ncookies -= ncooks;
 
 	if (uio->uio_segflg == UIO_SYSSPACE && uio->uio_iovcnt == 1) {
-		iovp->iov_base += outcount;
-		iovp->iov_len -= outcount;
+		IOVEC_ADVANCE(iovp, outcount);
 		uio->uio_resid -= outcount;
 	} else if (error = uiomove(outbuf, (long)outcount, UIO_READ, uio)) {
 		/*
@@ -5787,8 +5786,7 @@ vop_listextattr {
 	do {
 		u_char nlen;
 
-		aiov.iov_base = (void *)dirbuf;
-		aiov.iov_len = sizeof(dirbuf);
+		IOVEC_INIT_OBJ(&aiov, dirbuf);
 		auio.uio_resid = sizeof(dirbuf);
 		error = VOP_READDIR(vp, &auio, ap->a_cred, &eof, NULL, NULL);
 		done = sizeof(dirbuf) - auio.uio_resid;

@@ -734,9 +734,9 @@
 401	AUE_SEMPOST	NOSTD|NOPROTO	{ int ksem_post(semid_t id); }
 402	AUE_SEMWAIT	NOSTD|NOPROTO	{ int ksem_wait(semid_t id); }
 403	AUE_SEMTRYWAIT	NOSTD|NOPROTO	{ int ksem_trywait(semid_t id); }
-404	AUE_SEMINIT	NOSTD	{ int freebsd32_ksem_init(semid_t *idp, \
+404	AUE_SEMINIT	NOSTD|NOPROTO	{ int ksem_init(uint32_t *idp, \
 				    unsigned int value); }
-405	AUE_SEMOPEN	NOSTD	{ int freebsd32_ksem_open(semid_t *idp, \
+405	AUE_SEMOPEN	NOSTD|NOPROTO	{ int ksem_open(uint32_t *idp, \
 				    const char *name, int oflag, \
 				    mode_t mode, unsigned int value); }
 406	AUE_SEMUNLINK	NOSTD|NOPROTO	{ int ksem_unlink(const char *name); }

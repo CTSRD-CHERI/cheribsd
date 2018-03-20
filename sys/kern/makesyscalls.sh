@@ -974,6 +974,7 @@ sed -e '
 					sub(/_c /, "", a_type)
 					sub(/_c_/, "_", a_type)
 					sub(/__capability/, "", a_type);
+					sub(/__restrict/, "", a_type);
 					cast = "(__cheri_fromcap " a_type ")"
 				} else
 					cast = ""

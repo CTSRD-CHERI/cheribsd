@@ -1090,7 +1090,7 @@ buildcheri:
 .endif
 
 distributecheri installcheri:
-.for _lib in lib ${LOCAL_LIB_DIRS} secure/lib
+.for _lib in lib ${LOCAL_LIB_DIRS} cddl/lib gnu/lib secure/lib kerberos5/lib
 	cd ${.CURDIR}/${_lib}; ${LIBCHERIIMAKE} ${.TARGET:S/cheri$//}
 .endfor
 .endif
@@ -2841,7 +2841,7 @@ DTBOUTPUTPATH= ${.CURDIR}
 #
 builddtb: .PHONY
 	@PATH=${TMPPATH} MACHINE=${TARGET} \
-	${.CURDIR}/sys/tools/fdt/make_dtb.sh ${.CURDIR}/sys \
+	sh ${.CURDIR}/sys/tools/fdt/make_dtb.sh ${.CURDIR}/sys \
 	    "${FDT_DTS_FILE}" ${DTBOUTPUTPATH}
 
 ###############

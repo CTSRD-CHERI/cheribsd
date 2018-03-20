@@ -224,8 +224,7 @@ crypto_mbuftoiov(struct mbuf *mbuf, struct iovec **iovptr, int *cnt,
 			memcpy(iov, *iovptr, sizeof *iov * i);
 		}
 
-		iov[i].iov_base = m->m_data;
-		iov[i].iov_len = m->m_len;
+		IOVEC_INIT(&iov[i], m->m_data, m->m_len);
 
 		i++;
 		m = m->m_next;

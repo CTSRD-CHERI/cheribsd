@@ -33,6 +33,7 @@
 
 #define	LIBSTDBUF	"/usr/lib/libstdbuf.so"
 #define	LIBSTDBUF32	"/usr/lib32/libstdbuf.so"
+#define	LIBSTDBUFCHERI	"/usr/libcheri/libstdbuf.so"
 
 extern char *__progname;
 
@@ -104,6 +105,16 @@ main(int argc, char *argv[])
 
 	if (i < 0 || putenv(preload1) == -1)
 		warn("Failed to set environment variable: LD_32_PRELOAD");
+
+	preload0 = getenv("LD_CHERI_PRELOAD");
+	if (preload0 == NULL)
+		i = asprintf(&preload1, "LD_CHERI_PRELOAD=" LIBSTDBUFCHERI);
+	else
+		i = asprintf(&preload1, "LD_CHERI_PRELOAD=%s:%s", preload0,
+		    LIBSTDBUFCHERI);
+
+	if (i < 0 || putenv(preload1) == -1)
+		warn("Failed to set environment variable: LD_CHERI_PRELOAD");
 
 	execvp(argv[0], argv);
 	err(2, "%s", argv[0]);

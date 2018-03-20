@@ -318,8 +318,8 @@ pmclog_loop(void *arg)
 		    lb->plb_base, lb->plb_ptr);
 		/* change our thread's credentials before issuing the I/O */
 
-		aiov.iov_base = lb->plb_base;
-		aiov.iov_len  = nbytes = lb->plb_ptr - lb->plb_base;
+		nbytes = lb->plb_ptr - lb->plb_base;
+		IOVEC_INIT(&aiov, lb->plb_base, nbytes);
 
 		auio.uio_iov    = &aiov;
 		auio.uio_iovcnt = 1;

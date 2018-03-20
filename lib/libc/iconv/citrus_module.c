@@ -267,7 +267,7 @@ _citrus_find_getops(_citrus_module_t handle, const char *modname,
 
 	snprintf(name, sizeof(name), "_citrus_%s_%s_getops",
 	    modname, ifname);
-	p = dlsym((void *)handle, name);
+	p = dlfunc((void *)handle, name);
 	return (p);
 }
 

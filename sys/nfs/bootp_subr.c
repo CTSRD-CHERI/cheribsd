@@ -725,8 +725,7 @@ bootpc_call(struct bootpc_globalcontext *gctx, struct thread *td)
 				ifctx->sentmsg = 1;
 			}
 
-			aio.iov_base = (caddr_t) &ifctx->call;
-			aio.iov_len = sizeof(ifctx->call);
+			IOVEC_INIT_OBJ(&aio, ifctx->call);
 
 			auio.uio_iov = &aio;
 			auio.uio_iovcnt = 1;
@@ -780,8 +779,7 @@ bootpc_call(struct bootpc_globalcontext *gctx, struct thread *td)
 		 */
 		atimo = timo + time_second;
 		while (time_second < atimo) {
-			aio.iov_base = (caddr_t) &gctx->reply;
-			aio.iov_len = sizeof(gctx->reply);
+			IOVEC_INIT_OBJ(&aio, gctx->reply);
 
 			auio.uio_iov = &aio;
 			auio.uio_iovcnt = 1;

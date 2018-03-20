@@ -644,8 +644,8 @@ fuse_io_strategy(struct vnode *vp, struct buf *bp)
 	KASSERT(!(bp->b_flags & B_DONE),
 	    ("fuse_io_strategy: bp %p already marked done", bp));
 	if (bp->b_iocmd == BIO_READ) {
-		io.iov_len = uiop->uio_resid = bp->b_bcount;
-		io.iov_base = bp->b_data;
+		IOVEC_INIT(&io, bp->b_data, bp->b_bcount);
+		uiop->uio_resid = bp->b_bcount;
 		uiop->uio_rw = UIO_READ;
 
 		uiop->uio_offset = ((off_t)bp->b_blkno) * biosize;
@@ -698,11 +698,11 @@ fuse_io_strategy(struct vnode *vp, struct buf *bp)
 				(off_t)bp->b_blkno * biosize;
 
 		if (bp->b_dirtyend > bp->b_dirtyoff) {
-			io.iov_len = uiop->uio_resid = bp->b_dirtyend
-			    - bp->b_dirtyoff;
+			uiop->uio_resid = bp->b_dirtyend - bp->b_dirtyoff;
 			uiop->uio_offset = (off_t)bp->b_blkno * biosize
 			    + bp->b_dirtyoff;
-			io.iov_base = (char *)bp->b_data + bp->b_dirtyoff;
+			IOVEC_INIT(&io, (char *)bp->b_data + bp->b_dirtyoff,
+			    uiop->uio_resid);
 			uiop->uio_rw = UIO_WRITE;
 
 			error = fuse_write_directbackend(vp, uiop, cred, fufh);

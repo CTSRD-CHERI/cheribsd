@@ -161,8 +161,7 @@ kobj_read_file_vnode(struct _buf *file, char *buf, unsigned size, unsigned off)
 	bzero(&aiov, sizeof(aiov));
 	bzero(&auio, sizeof(auio));
 
-	aiov.iov_base = buf;
-	aiov.iov_len = size;
+	IOVEC_INIT(&aiov, buf, size);
 
 	auio.uio_iov = &aiov;
 	auio.uio_offset = (off_t)off;

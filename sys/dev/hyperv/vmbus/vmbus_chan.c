@@ -1034,12 +1034,9 @@ vmbus_chan_send(struct vmbus_channel *chan, uint16_t type, uint16_t flags,
 	VMBUS_CHANPKT_SETLEN(pkt.cp_hdr.cph_tlen, pad_pktlen);
 	pkt.cp_hdr.cph_xactid = xactid;
 
-	iov[0].iov_base = &pkt;
-	iov[0].iov_len = hlen;
-	iov[1].iov_base = data;
-	iov[1].iov_len = dlen;
-	iov[2].iov_base = &pad;
-	iov[2].iov_len = pad_pktlen - pktlen;
+	IOVEC_INIT(&iov[0], &pkt, hlen);
+	IOVEC_INIT(&iov[1], data, dlen);
+	IOVEC_INIT(&iov[2], &pad, pad_pktlen - pktlen);
 
 	error = vmbus_txbr_write(&chan->ch_txbr, iov, 3, &send_evt);
 	if (!error && send_evt)
@@ -1071,14 +1068,10 @@ vmbus_chan_send_sglist(struct vmbus_channel *chan,
 	pkt.cp_rsvd = 0;
 	pkt.cp_gpa_cnt = sglen;
 
-	iov[0].iov_base = &pkt;
-	iov[0].iov_len = sizeof(pkt);
-	iov[1].iov_base = sg;
-	iov[1].iov_len = sizeof(struct vmbus_gpa) * sglen;
-	iov[2].iov_base = data;
-	iov[2].iov_len = dlen;
-	iov[3].iov_base = &pad;
-	iov[3].iov_len = pad_pktlen - pktlen;
+	IOVEC_INIT_OBJ(&iov[0], pkt);
+	IOVEC_INIT(&iov[1], sg, sizeof(struct vmbus_gpa) * sglen);
+	IOVEC_INIT(&iov[2], data, dlen);
+	IOVEC_INIT(&iov[3], &pad, pad_pktlen - pktlen);
 
 	error = vmbus_txbr_write(&chan->ch_txbr, iov, 4, &send_evt);
 	if (!error && send_evt)
@@ -1112,14 +1105,11 @@ vmbus_chan_send_prplist(struct vmbus_channel *chan,
 	pkt.cp_rsvd = 0;
 	pkt.cp_range_cnt = 1;
 
-	iov[0].iov_base = &pkt;
-	iov[0].iov_len = sizeof(pkt);
-	iov[1].iov_base = prp;
-	iov[1].iov_len = __offsetof(struct vmbus_gpa_range, gpa_page[prp_cnt]);
-	iov[2].iov_base = data;
-	iov[2].iov_len = dlen;
-	iov[3].iov_base = &pad;
-	iov[3].iov_len = pad_pktlen - pktlen;
+	IOVEC_INIT_OBJ(&iov[0], pkt);
+	IOVEC_INIT(&iov[1], prp,
+	    __offsetof(struct vmbus_gpa_range, gpa_page[prp_cnt]));
+	IOVEC_INIT(&iov[2], data, dlen);
+	IOVEC_INIT(&iov[3], &pad, pad_pktlen - pktlen);
 
 	error = vmbus_txbr_write(&chan->ch_txbr, iov, 4, &send_evt);
 	if (!error && send_evt)

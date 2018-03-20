@@ -30,8 +30,11 @@
 #define RTLD_MACHDEP_H	1
 
 #include <sys/types.h>
+#include <cheri/cheric.h>
 #include <machine/atomic.h>
 #include <machine/tls.h>
+
+#include <assert.h>
 
 struct Struct_Obj_Entry;
 
@@ -43,8 +46,47 @@ Elf_Addr reloc_jmpslot(Elf_Addr *where, Elf_Addr target,
 		       const struct Struct_Obj_Entry *obj,
 		       const Elf_Rel *rel);
 
-#define make_function_pointer(def, defobj)				\
-	((defobj)->relocbase + (def)->st_value)
+#define FUNC_PTR_REMOVE_PERMS	(__CHERI_CAP_PERMISSION_PERMIT_SEAL__ |	\
+	__CHERI_CAP_PERMISSION_PERMIT_STORE__ |				\
+	__CHERI_CAP_PERMISSION_PERMIT_STORE_CAPABILITY__ |		\
+	__CHERI_CAP_PERMISSION_PERMIT_STORE_LOCAL__)
+
+#define DATA_PTR_REMOVE_PERMS	(__CHERI_CAP_PERMISSION_PERMIT_SEAL__ |	\
+	__CHERI_CAP_PERMISSION_PERMIT_EXECUTE__)
+
+static inline void*
+make_function_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
+{
+	void* ret = defobj->relocbase + def->st_value;
+
+	/* Remove store and seal permissions */
+	cheri_andperm(ret, ~FUNC_PTR_REMOVE_PERMS);
+	if (defobj->restrict_pcc_strict)
+		return cheri_csetbounds(ret, def->st_size);
+	if (defobj->restrict_pcc_basic)
+		return ret;
+
+	/*
+	 * Otherwise we need to give it full address space range (including
+	 * the full permissions mask) to support legacy binaries.
+	 *
+	 * TODO: remove once we have decided on a sane(r) ABI
+	 */
+	assert(cheri_getbase(cheri_getpcc()) == 0);
+	return cheri_setoffset(cheri_getpcc(), (vaddr_t)ret);
+}
+
+static inline void*
+make_data_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
+{
+	void* ret = defobj->relocbase + def->st_value;
+
+	/* Remove execute and seal permissions */
+	cheri_andperm(ret, ~DATA_PTR_REMOVE_PERMS);
+	/* TODO: can we always set bounds here or does it break compat? */
+	ret = cheri_csetbounds(ret, def->st_size);
+	return ret;
+}
 
 #define call_initfini_pointer(obj, target)				\
 	(((InitFunc)(cheri_setoffset(cheri_getpcc(), (target))))())

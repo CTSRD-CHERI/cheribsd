@@ -198,15 +198,13 @@ isc_sendPDU(isc_session_t *sp, pduq_t *pq)
      uio->uio_td = sp->td;
      uio->uio_iov = iv = pq->iov;
 
-     iv->iov_base = &pp->ipdu;
-     iv->iov_len = sizeof(union ipdu_u);
+     IOVEC_INIT_OBJ(iv, pp->ipdu);
      uio->uio_resid = iv->iov_len;
      iv++;
      if(ISOK2DIG(sp->hdrDigest, pp))
 	  pq->pdu.hdr_dig = sp->hdrDigest(&pp->ipdu, sizeof(union ipdu_u), 0);
      if(pp->ahs_len) {
-	  iv->iov_base = pp->ahs_addr;
-	  iv->iov_len = pp->ahs_len;
+	  IOVEC_INIT(iv, pp->ahs_addr, pp->ahs_len)
 	  uio->uio_resid += iv->iov_len;
 	  iv++;
 	  if(ISOK2DIG(sp->hdrDigest, pp))
@@ -214,22 +212,19 @@ isc_sendPDU(isc_session_t *sp, pduq_t *pq)
      }
      if(ISOK2DIG(sp->hdrDigest, pp)) {
 	  debug(3, "hdr_dig=%04x", htonl(pp->hdr_dig));
-	  iv->iov_base = &pp->hdr_dig;
-	  iv->iov_len = sizeof(int);
+	  IOVEC_INIT_OBJ(iv, pp->hdr_dig);
 	  uio->uio_resid += iv->iov_len ;
 	  iv++;
      }
      if(pq->pdu.ds_addr &&  pp->ds_len) {
-	  iv->iov_base = pp->ds_addr;
-	  iv->iov_len = pp->ds_len;
+	  IOVEC_INIT(iv, pp->ds_addr, pp->ds_len);
 	  while(iv->iov_len & 03) // the specs say it must be int aligned
 	       iv->iov_len++;
 	  uio->uio_resid += iv->iov_len ;
 	  iv++;
 	  if(ISOK2DIG(sp->dataDigest, pp)) {
 	       pp->ds_dig = sp->dataDigest(pp->ds, pp->ds_len, 0);
-	       iv->iov_base = &pp->ds_dig;
-	       iv->iov_len = sizeof(pp->ds_dig);
+	       IOVEC_INIT_OBJ(iv, pp->ds_dig);
 	       uio->uio_resid += iv->iov_len ;
 	       iv++;
 	  }
@@ -265,10 +260,7 @@ isc_sendPDU(isc_session_t *sp, pduq_t *pq)
 	  len -= uio->uio_resid;
 	  while(uio->uio_iovcnt > 0) {
 	       if(iv->iov_len > len) {
-		    caddr_t bp = (caddr_t)iv->iov_base;
-
-		    iv->iov_len -= len;
-		    iv->iov_base = (void *)&bp[len];
+		    IOVEC_ADVANCE(iv, len);
 		    break;
 	       }
 	       len -= iv->iov_len;
@@ -390,15 +382,13 @@ so_recv(isc_session_t *sp, pduq_t *pq)
 	  pp->ahs_len = bhs->AHSLength * 4;
 	  len += pp->ahs_len;
 	  pp->ahs_addr = malloc(pp->ahs_len, M_TEMP, M_WAITOK); // XXX: could get stuck here
-	  iov->iov_base = pp->ahs_addr;
-	  iov->iov_len = pp->ahs_len;
+	  IOVEC_INIT(iov, pp->ahs_addr, pp->ahs_len);
 	  uio->uio_iovcnt++;
 	  iov++;
      }
      if(ISOK2DIG(sp->hdrDigest, pp)) {
 	  len += sizeof(pp->hdr_dig);
-	  iov->iov_base = &pp->hdr_dig;
-	  iov->iov_len = sizeof(pp->hdr_dig);
+	  IOVEC_INIT_OBJ(iov, pp->hdr_dig);
 	  uio->uio_iovcnt++;
      }
      if(len) {

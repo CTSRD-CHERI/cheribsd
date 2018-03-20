@@ -1630,8 +1630,7 @@ sbcopy:
 		struct uio uio;
 		int error;
 
-		iov[0].iov_base = mtod(m, void *);
-		iov[0].iov_len = m->m_len;
+		IOVEC_INIT(&iov[0], mtod(m, void *), m->m_len);
 		if (iov[0].iov_len > resid)
 			iov[0].iov_len = resid;
 		uio.uio_iov = iov;

@@ -5,6 +5,4 @@ PROG=	unifdef
 SCRIPTS=unifdefall.sh
 MLINKS=	unifdef.1 unifdefall.1
 
-CHERI_NO_SHARED=	build: does not link
-
 .include <bsd.prog.mk>

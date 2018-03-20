@@ -62,7 +62,9 @@
 #define	_PATH_GBDE	"/sbin/gbde"
 #define	_PATH_GELI	"/sbin/geli"
 #define	_PATH_HALT	"/sbin/halt"
-#ifdef COMPAT_32BIT
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define	_PATH_I18NMODULE	"/usr/libcheri/i18n"
+#elif defined(COMPAT_32BIT)
 #define	_PATH_I18NMODULE	"/usr/lib32/i18n"
 #else
 #define	_PATH_I18NMODULE	"/usr/lib/i18n"

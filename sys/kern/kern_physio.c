@@ -203,9 +203,7 @@ physio(struct cdev *dev, struct uio *uio, int ioflag)
 			iolen = bp->bio_length - bp->bio_resid;
 			if (iolen == 0 && !(bp->bio_flags & BIO_ERROR))
 				goto doerror;	/* EOF */
-			uio->uio_iov[i].iov_len -= iolen;
-			uio->uio_iov[i].iov_base =
-			    (char *)uio->uio_iov[i].iov_base + iolen;
+			IOVEC_ADVANCE(&uio->uio_iov[i], iolen);
 			uio->uio_resid -= iolen;
 			uio->uio_offset += iolen;
 			if (bp->bio_flags & BIO_ERROR) {

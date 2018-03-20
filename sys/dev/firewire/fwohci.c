@@ -2810,13 +2810,11 @@ fwohci_arcv(struct fwohci_softc *sc, struct fwohci_dbch *dbch, int count)
 						goto err;
 					}
 					offset = sizeof(pktbuf);
-					vec[0].iov_base = (char *)&pktbuf;
-					vec[0].iov_len = offset;
+					IOVEC_INIT(&vec[0], &pktbuf, offset);
 				} else {
 					/* splitted in payload */
 					offset = rlen;
-					vec[0].iov_base = buf;
-					vec[0].iov_len = rlen;
+					IOVEC_INIT(&vec[0], buf, rlen);
 				}
 				fp=(struct fw_pkt *)vec[0].iov_base;
 				nvec = 1;
@@ -2863,8 +2861,7 @@ fwohci_arcv(struct fwohci_softc *sc, struct fwohci_dbch *dbch, int count)
 					}
 					goto out;
 				}
-				vec[nvec].iov_base = ld;
-				vec[nvec].iov_len = plen;
+				IOVEC_INIT(&vec[nvec], ld, plen);
 				nvec++;
 				ld += plen;
 			}

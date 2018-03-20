@@ -685,8 +685,7 @@ linux_sendto_hdrincl(struct thread *td, struct linux_sendto_args *linux_args)
 	msg.msg_iovlen = 1;
 	msg.msg_control = NULL;
 	msg.msg_flags = 0;
-	aiov[0].iov_base = (char *)packet;
-	aiov[0].iov_len = linux_args->len;
+	IOVEC_INIT(&aiov[0], packet, linux_args->len);
 	error = linux_sendit(td, linux_args->s, &msg, linux_args->flags,
 	    NULL, UIO_SYSSPACE);
 goout:
@@ -1030,8 +1029,7 @@ linux_sendto(struct thread *td, struct linux_sendto_args *args)
 	msg.msg_iovlen = 1;
 	msg.msg_control = NULL;
 	msg.msg_flags = 0;
-	aiov.iov_base = PTRIN(args->msg);
-	aiov.iov_len = args->len;
+	IOVEC_INIT(&aiov, PTRIN(args->msg), args->len);
 	return (linux_sendit(td, args->s, &msg, args->flags, NULL,
 	    UIO_USERSPACE));
 }
@@ -1057,8 +1055,7 @@ linux_recvfrom(struct thread *td, struct linux_recvfrom_args *args)
 	msg.msg_name = (struct sockaddr * __restrict)PTRIN(args->from);
 	msg.msg_iov = &aiov;
 	msg.msg_iovlen = 1;
-	aiov.iov_base = PTRIN(args->buf);
-	aiov.iov_len = args->len;
+	IOVEC_INIT(&aiov, PTRIN(args->buf), args->len);
 	msg.msg_control = 0;
 	msg.msg_flags = linux_to_bsd_msg_flags(args->flags);
 

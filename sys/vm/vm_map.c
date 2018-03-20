@@ -1422,6 +1422,7 @@ charged:
 	    (prev_entry->cred == cred ||
 	    (prev_entry->object.vm_object != NULL &&
 	    prev_entry->object.vm_object->cred == cred)) &&
+	    prev_entry->owner == curproc->p_pid &&
 	    vm_object_coalesce(prev_entry->object.vm_object,
 	    prev_entry->offset,
 	    (vm_size_t)(prev_entry->end - prev_entry->start),
@@ -2141,9 +2142,8 @@ vm_map_check_owner(vm_map_t map, vm_offset_t start, vm_offset_t end)
 	for (; entry != &map->header && entry->start < end;
 	    entry = entry->next) {
 		if (entry->owner != curproc->p_pid) {
-			printf("%s: entry owner %d != %d (%s)\n",
-			    __func__, entry->owner, curproc->p_pid,
-			    curproc->p_comm);
+			printf("%s: requested range [%#lx, %#lx], owner %d (%s) would overlap with existing entry [%#lx, %#lx], owner %d\n",
+			    __func__, start, end, curproc->p_pid, curproc->p_comm, entry->start, entry->end, entry->owner);
 			return (KERN_PROTECTION_FAILURE);
 		}
 	}
@@ -4666,8 +4666,9 @@ vm_map_print(vm_map_t map)
 	db_indent += 2;
 	for (entry = map->header.next; entry != &map->header;
 	    entry = entry->next) {
-		db_iprintf("map entry %p: start=%p, end=%p\n",
-		    (void *)entry, (void *)entry->start, (void *)entry->end);
+		db_iprintf("map entry %p: start=%p, end=%p, owner=%d\n",
+		    (void *)entry, (void *)entry->start, (void *)entry->end,
+		    entry->owner);
 		{
 			static char *inheritance_name[4] =
 			{"share", "copy", "none", "donate_copy"};

@@ -168,7 +168,7 @@ static Elf64_Brandinfo freebsd_cheriabi_brand_info = {
 	.interp_path	= "/libexec/ld-cheri-elf.so.1",
 	.sysvec		= &elf_freebsd_cheriabi_sysvec,
 	.interp_newpath = NULL,
-	.flags		= 0,
+	.flags		= BI_CAN_EXEC_DYN,
 	.header_supported = cheriabi_elf_header_supported
 };
 
@@ -691,7 +691,14 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	regs->c12 = psp->ps_sigcap[_SIG_IDX(sig)];
 	regs->c17 = td->td_pcb->pcb_cherisignal.csig_sigcode;
 	regs->ddc = csigp->csig_ddc;
-	regs->idc = csigp->csig_idc;
+	/*
+	 * For now only change IDC if we were sandboxed. This makes cap-table
+	 * binaries work as expected (since they need cgp to remain the same).
+	 *
+	 * TODO: remove csigp->csig_idc
+	 */
+	if (cheri_is_sandboxed)
+		regs->idc = csigp->csig_idc;
 	regs->pcc = csigp->csig_pcc;
 }
 
@@ -952,6 +959,17 @@ cheriabi_set_threadregs(struct thread *td, struct thr_param_c *param)
 	frame->pcc = param->start_func;
 	frame->c12 = param->start_func;
 	frame->c3 = param->arg;
+
+
+	/*
+	 * Copy the $cgp for the current thread to the new one. This will work
+	 * both if the target function is in the current shared object (so the
+	 * $cgp value will be the same) or in a different one (in which case it
+	 * will point to a PLT stub that loads $cgp).
+	 *
+	 * XXXAR: could this break anything if sandboxes create threads?
+	 */
+	frame->idc = curthread->td_frame->idc;
 
 	/*
 	 * Set up CHERI-related state: register state, signal delivery,

@@ -3228,10 +3228,8 @@ mprsas_send_smpcmd(struct mprsas_softc *sassc, union ccb *ccb, uint64_t sasaddr)
 	 */
 	cm->cm_uio.uio_rw = UIO_WRITE;
 
-	cm->cm_iovec[0].iov_base = request;
-	cm->cm_iovec[0].iov_len = le16toh(req->RequestDataLength);
-	cm->cm_iovec[1].iov_base = response;
-	cm->cm_iovec[1].iov_len = ccb->smpio.smp_response_len;
+	IOVEC_INIT(&cm->cm_iovec[0], request, le16toh(req->RequestDataLength));
+	IOVEC_INIT(&cm->cm_iovec[1], response, ccb->smpio.smp_response_len);
 
 	cm->cm_uio.uio_resid = cm->cm_iovec[0].iov_len +
 			       cm->cm_iovec[1].iov_len;

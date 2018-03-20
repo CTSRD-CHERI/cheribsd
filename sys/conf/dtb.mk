@@ -53,7 +53,7 @@ all: ${DTB}
 .for _dts in ${DTS}
 ${_dts:R:S/$/.dtb/}:	${_dts} ${OP_META}
 	@echo Generating ${.TARGET} from ${_dts}
-	@${SYSDIR}/tools/fdt/make_dtb.sh ${SYSDIR} ${_dts} ${.OBJDIR}
+	sh @${SYSDIR}/tools/fdt/make_dtb.sh ${SYSDIR} ${_dts} ${.OBJDIR}
 CLEANFILES+=${_dts:R:S/$/.dtb/}
 .endfor
 .endif

@@ -23,24 +23,22 @@ NOASM=
 
 .include "${LIBC_SRCTOP}/sys/Makefile.inc"
 
-# since we build the libc interposing_table.c we also have to
-# build the stub sources so that cap_relocs can work
 .PATH:	${LIBC_SRCTOP}/gen
-SRCS+=	_spinlock_stub.c \
-	__pthread_mutex_init_calloc_cb_stub.c \
-	elf_utils.c
+# We don't really need these:
+#SRCS+=	_spinlock_stub.c \
+#	__pthread_mutex_init_calloc_cb_stub.c
+# But we do need errno
+SRCS+=	errno.c
+CFLAGS.interposing_table.c+=	-DINTERPOS_SYSCALLS_ONLY=1
 
-VERSION_DEF=${LIBC_SRCTOP}/Versions.def
-SYMBOL_MAPS=${SYM_MAPS}
+SYMBOL_MAPS=	${SYM_MAPS}
+VERSION_DEF=	${LIBC_SRCTOP}/Versions.def
 CFLAGS+= -DSYMBOL_VERSIONING
 
 MAN=
 MLINKS=
 
-SOLINKOPTS+=	-Wl.-undefined=report-all
-# We need to disable --fatal-warnings when linking with -nodefaultlibs since errno
-# will be missing so we can't determine the size for .global_sizes
-LD_FATAL_WARNINGS=no
+SOLINKOPTS+=	-Wl.-undefined=report-all -Wl,-no-undefined
 LDFLAGS+=	-nostdlib -nodefaultlibs
 
 .include <bsd.lib.mk>

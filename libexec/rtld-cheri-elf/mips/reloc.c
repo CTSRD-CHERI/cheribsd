@@ -220,9 +220,9 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 			sym = symtab + r_symndx;
 			assert(ELF_ST_BIND(sym->st_info) == STB_LOCAL);
 			val += (vaddr_t)relocbase;
-#ifdef DEBUG_VERBOSE
+#ifdef DEBUG_VERBOSE_SELF
 			/*
-			 * FIXME this can never work since the debug var only
+			 * FIXME dbg() can never work since the debug var only
 			 * gets initialized later -> use rtld_printf for now
 			 */
 			rtld_printf("REL32/L(%p) %p -> %p in <self>\n",
@@ -275,6 +275,11 @@ _mips_rtld_bind(Obj_Entry *obj, Elf_Size reloff)
 	return (Elf_Addr)target;
 }
 
+static inline const char*
+symname(Obj_Entry* obj, size_t r_symndx) {
+	return obj->strtab + obj->symtab[r_symndx].st_name;
+}
+
 int
 reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
     RtldLockState *lockstate)
@@ -324,7 +329,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 	    got, obj->symtabno);
 	/* Now do the global GOT entries */
 	for (i = obj->gotsym; i < obj->symtabno; i++) {
-#ifdef DEBUG_VERBOSE
+#if defined(DEBUG_VERBOSE) || defined(DEBUG_MIPS_GOT)
 		dbg(" doing got %d sym %p (%s, %lx)", i - obj->gotsym, sym,
 		    sym->st_name + obj->strtab, (u_long) *got);
 #endif
@@ -439,7 +444,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			}
 		}
 
-#ifdef DEBUG_VERBOSE
+#if defined(DEBUG_VERBOSE) || defined(DEBUG_MIPS_GOT)
 		dbg("  --> now %lx", (u_long) *got);
 #endif
 		++sym;
@@ -473,13 +478,15 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 
 			if (r_symndx >= obj->gotsym) {
 				val += got[obj->local_gotno + r_symndx - obj->gotsym];
-#ifdef DEBUG_VERBOSE
-				dbg("REL32/G(%p) %p --> %p (%s) in %s",
-				    where, (void *)(uintptr_t)old, (void *)(uintptr_t)val,
+#if defined(DEBUG_VERBOSE) || defined(DEBUG_MIPS_GOT)
+				dbg("REL32/G(%p/0x%lx) %p --> %p (%s) in %s",
+				    where, (caddr_t)where - obj->relocbase,
+				    (void *)(uintptr_t)old, (void *)(uintptr_t)val,
 				    obj->strtab + def->st_name,
 				    obj->path);
 #endif
 			} else {
+#if 0
 				/*
 				 * XXX: ABI DIFFERENCE!
 				 *
@@ -502,14 +509,28 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				    && !broken
 #endif
 				    )
-					val += (Elf_Addr)def->st_value;
+#endif
+				/* XXXAR: always adding st_value seems to be required (also glibc does it)*/
+				val += (Elf_Addr)def->st_value;
 
+				if (r_symndx != 0) {
+					_rtld_error("%s: local R_MIPS_REL32 relocation references symbol %s (%d). st_value=0x%lx, st_info=%x, st_shndx=%d",
+					    obj->path, obj->strtab + def->st_name, r_symndx, def->st_value, def->st_info, def->st_shndx);
+					return (-1);
+				}
 				val += (Elf_Addr)obj->relocbase;
-
-#ifdef DEBUG_VERBOSE
-				dbg("REL32/L(%p) %p -> %p (%s) in %s",
-				    where, (void *)(uintptr_t)old, (void *)(uintptr_t)val,
-				    obj->strtab + def->st_name, obj->path);
+#if defined(DEBUG)
+				_Bool print_local_reloc_dbg = false;
+				if (def->st_value != 0) {
+					print_local_reloc_dbg = true;
+				}
+#if defined(DEBUG_VERBOSE)
+				print_local_reloc_dbg = true;
+#endif
+				if (print_local_reloc_dbg)
+					dbg("REL32/L(%p/0x%lx) %p -> %p (%s) in %s, st_value = 0x%lx, st_info=%x, r_symndx=%d, st_shndx=%d",
+					    where, rel->r_offset, (void *)(uintptr_t)old, (void *)(uintptr_t)val,
+					    obj->strtab + def->st_name, obj->path, def->st_value, def->st_info, r_symndx, def->st_shndx);
 #endif
 			}
 			store_ptr(where, val, rlen);
@@ -536,7 +557,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 
 			store_ptr(where, val, rlen);
 			dbg("DTPMOD %s in %s %p --> %p in %s",
-			    obj->strtab + obj->symtab[r_symndx].st_name,
+			    symname(obj, r_symndx),
 			    obj->path, (void *)(uintptr_t)old, (void*)(uintptr_t)val, defobj->path);
 			break;
 		}
@@ -563,7 +584,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			store_ptr(where, val, rlen);
 
 			dbg("DTPREL %s in %s %p --> %p in %s",
-			    obj->strtab + obj->symtab[r_symndx].st_name,
+			    symname(obj, r_symndx),
 			    obj->path, (void*)(uintptr_t)old, (void *)(uintptr_t)val, defobj->path);
 			break;
 		}
@@ -592,12 +613,109 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			store_ptr(where, val, rlen);
 
 			dbg("TPREL %s in %s %p --> %p in %s",
-			    obj->strtab + obj->symtab[r_symndx].st_name,
+			    symname(obj, r_symndx),
+			    obj->path, (void*)(uintptr_t)old, (void *)(uintptr_t)val, defobj->path);
+			break;
+		}
+
+		case R_TYPE(CHERI_ABSPTR):
+		{
+			def = find_symdef(r_symndx, obj,
+			    &defobj, flags, NULL, lockstate);
+			if (def == NULL) {
+				_rtld_error("%s: Could not find symbol %s",
+				    obj->path, symname(obj, r_symndx));
+				return -1;
+			}
+			assert(ELF_ST_TYPE(def->st_info) != STT_GNU_IFUNC &&
+			    "IFUNC not implemented!");
+			Elf_Addr symval = (Elf_Addr)defobj->relocbase + def->st_value;
+			const size_t rlen =
+			    ELF_R_NXTTYPE_64_P(r_type)
+				? sizeof(Elf_Sxword)
+				: sizeof(Elf_Sword);
+			Elf_Addr old = load_ptr(where, rlen);
+			Elf_Addr val = old;
+			val += symval;
+			store_ptr(where, val, rlen);
+			dbg("ABS(%p/0x%lx) %s in %s %p --> %p in %s",
+			    where, rel->r_offset, symname(obj, r_symndx),
 			    obj->path, (void*)(uintptr_t)old, (void *)(uintptr_t)val, defobj->path);
 			break;
 		}
 
 
+		case R_TYPE(CHERI_SIZE):
+		{
+			def = find_symdef(r_symndx, obj,
+			    &defobj, flags, NULL, lockstate);
+			if (def == NULL) {
+				_rtld_error("%s: Could not find symbol %s",
+				    obj->path, symname(obj, r_symndx));
+				return -1;
+			}
+			assert(ELF_ST_TYPE(def->st_info) != STT_GNU_IFUNC &&
+			    "IFUNC not implemented!");
+			Elf_Sxword size = def->st_size;
+			const size_t rlen =
+			    ELF_R_NXTTYPE_64_P(r_type)
+				? sizeof(Elf_Sxword)
+				: sizeof(Elf_Sword);
+			Elf_Addr old = load_ptr(where, rlen);
+			Elf_Addr val = old;
+			val += size;
+			store_ptr(where, val, rlen);
+			dbg("SIZE(%p/0x%lx) %s in %s %p --> %p in %s",
+			    where, rel->r_offset, symname(obj, r_symndx),
+			    obj->path, (void*)(uintptr_t)old, (void *)(uintptr_t)val, defobj->path);
+			break;
+		}
+
+		case R_TYPE(CHERI_CAPABILITY):
+		{
+			def = find_symdef(r_symndx, obj, &defobj, flags, NULL,
+			    lockstate);
+			if (def == NULL) {
+				_rtld_error("%s: Could not find symbol %s",
+				    obj->path, symname(obj, r_symndx));
+				return -1;
+			}
+			assert(ELF_ST_TYPE(def->st_info) != STT_GNU_IFUNC &&
+			    "IFUNC not implemented!");
+
+			void* symval = NULL;
+			if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
+				/* Remove write permissions and set bounds */
+				symval = make_function_pointer(def, defobj);
+			} else {
+				/* Remove execute permissions and set bounds */
+				symval = make_data_pointer(def, defobj);
+			}
+			if (cheri_getlen(symval) <= 0) {
+				rtld_printf("Warning: created zero length "
+				    "capability for %s (in %s): %-#p\n",
+				    symname(obj, r_symndx), obj->path, symval);
+			}
+			/*
+			 * The capability offset is the addend for the
+			 * relocation. Since we are using Elf_Rel this is the
+			 * first 8 bytes of the target location (which is the
+			 * virtual address for both 128 and 256-bit CHERI).
+			 */
+			uint64_t offset = load_ptr(where, sizeof(uint64_t));
+			symval + offset;
+			if (!cheri_gettag(symval)) {
+				_rtld_error("%s: constructed invalid capability"
+				   "for %s: %#p",  obj->path,
+				    symname(obj, r_symndx), symval);
+				return -1;
+			}
+			*((void**)where) = symval;
+			dbg("CAP(%p/0x%lx) %s in %s --> %-#p in %s",
+			    where, rel->r_offset, symname(obj, r_symndx),
+			    obj->path, *((void**)where), defobj->path);
+			break;
+		}
 
 		default:
 			dbg("sym = %lu, type = %lu, offset = %p, "
@@ -605,7 +723,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			    (u_long)r_symndx, (u_long)ELF_R_TYPE(rel->r_info),
 			    (void *)(uintptr_t)rel->r_offset,
 			    (void *)(uintptr_t)load_ptr(where, sizeof(Elf_Sword)),
-			    obj->strtab + obj->symtab[r_symndx].st_name);
+			    symname(obj, r_symndx));
 			_rtld_error("%s: Unsupported relocation type %ld "
 			    "in non-PLT relocations",
 			    obj->path, (u_long) ELF_R_TYPE(rel->r_info));

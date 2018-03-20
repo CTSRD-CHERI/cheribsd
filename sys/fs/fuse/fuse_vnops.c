@@ -1797,8 +1797,7 @@ fuse_vnop_getpages(struct vop_getpages_args *ap)
 	VM_CNT_ADD(v_vnodepgsin, npages);
 
 	count = npages << PAGE_SHIFT;
-	iov.iov_base = (caddr_t)kva;
-	iov.iov_len = count;
+	IOVEC_INIT(&iov, (void *)kva, count);
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = IDX_TO_OFF(pages[0]->pindex);
@@ -1930,8 +1929,7 @@ fuse_vnop_putpages(struct vop_putpages_args *ap)
 	VM_CNT_INC(v_vnodeout);
 	VM_CNT_ADD(v_vnodepgsout, count);
 
-	iov.iov_base = (caddr_t)kva;
-	iov.iov_len = count;
+	IOVEC_INIT(&iov, bp->b_data, count);
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = offset;

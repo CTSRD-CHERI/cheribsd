@@ -197,8 +197,7 @@ sys_read(td, uap)
 
 	if (uap->nbyte > IOSIZE_MAX)
 		return (EINVAL);
-	aiov.iov_base = uap->buf;
-	aiov.iov_len = uap->nbyte;
+	IOVEC_INIT(&aiov, uap->buf, uap->nbyte);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_resid = uap->nbyte;
@@ -235,8 +234,7 @@ kern_pread(struct thread *td, int fd, void *buf, size_t nbyte, off_t offset)
 
 	if (nbyte > IOSIZE_MAX)
 		return (EINVAL);
-	aiov.iov_base = buf;
-	aiov.iov_len = nbyte;
+	IOVEC_INIT(&aiov, buf, nbyte);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_resid = nbyte;
@@ -411,8 +409,7 @@ sys_write(td, uap)
 
 	if (uap->nbyte > IOSIZE_MAX)
 		return (EINVAL);
-	aiov.iov_base = (void *)(uintptr_t)uap->buf;
-	aiov.iov_len = uap->nbyte;
+	IOVEC_INIT(&aiov, __DECONST(void *, uap->buf), uap->nbyte);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_resid = uap->nbyte;
@@ -450,8 +447,7 @@ kern_pwrite(struct thread *td, int fd, const void *buf, size_t nbyte,
 
 	if (nbyte > IOSIZE_MAX)
 		return (EINVAL);
-	aiov.iov_base = (void *)(uintptr_t)buf;
-	aiov.iov_len = nbyte;
+	IOVEC_INIT(&aiov, __DECONST(void *, buf), nbyte);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_resid = nbyte;

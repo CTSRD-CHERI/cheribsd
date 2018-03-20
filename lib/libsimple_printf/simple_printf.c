@@ -298,6 +298,8 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 			ptr = va_arg(ap, void *);
 #ifdef __CHERI__
 			if (sharpflag) {
+				_Bool sealed = cheri_getsealed(ptr);
+				uintmax_t perms = cheri_getperm(ptr);
 				/* v:0 */
 				PCHAR('v'); PCHAR(':');
 				cheri_gettag(ptr) ? PCHAR('1') : PCHAR('0');
@@ -305,23 +307,55 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 
 				/* s:0 */
 				PCHAR('s'); PCHAR(':');
-				cheri_getsealed(ptr) ? PCHAR('1') : PCHAR('0');
+				sealed ? PCHAR('1') : PCHAR('0');
 				PCHAR(' ');
 
-				/* p:00000000 */
+				/*
+				 * p:00000000 or p:GxrwRWL+7fff8100
+				 * XXXAR: we abuse the left adjust flag (-) to
+				 * print character representation for the perms
+				 * instead of a hex value
+				 */
 				PCHAR('p'); PCHAR(':');
-				q = ksprintn(nbuf, cheri_getperm(ptr), 16,
-				     &n, 0);
-				for (width = 8 - n; width > 0; width--)
-					PCHAR('0');
-				while (*q)
-					PCHAR(*q--);
+				if (ladjust) {
+#define PRINT_PERM(flag, c)	do {				\
+	if (perms & (__CHERI_CAP_PERMISSION_ ## flag ## __)) {	\
+		PCHAR(c);					\
+	} else {						\
+		PCHAR('-');					\
+	}							\
+	/* remove printed perm to print remainder */		\
+	perms &= ~(__CHERI_CAP_PERMISSION_ ## flag ## __);	\
+} while(0)
+					PRINT_PERM(GLOBAL, 'G');
+					PRINT_PERM(PERMIT_EXECUTE, 'x');
+					PRINT_PERM(PERMIT_LOAD, 'r');
+					PRINT_PERM(PERMIT_STORE, 'w');
+					PRINT_PERM(PERMIT_LOAD_CAPABILITY, 'R');
+					PRINT_PERM(PERMIT_STORE_CAPABILITY, 'W');
+					PRINT_PERM(PERMIT_STORE_LOCAL, 'L');
+					PRINT_PERM(PERMIT_SEAL, 'S');
+#undef PRINT_PERM
+					/*
+					 * If any permissions were not printed
+					 * yet add them as a hex number now
+					 */
+					if (perms != 0)
+						PCHAR('+');
+				}
+				if (!ladjust || perms != 0) {
+					q = ksprintn(nbuf, perms, 16, &n, 0);
+					for (width = 8 - n; width > 0; width--)
+						PCHAR('0');
+					while (*q)
+						PCHAR(*q--);
+				}
 				PCHAR(' ');
 
 				/* b:0000000000000000 */
 				PCHAR('b'); PCHAR(':');
 				q = ksprintn(nbuf, cheri_getbase(ptr), 16,
-				     &n, 0);
+				    &n, 0);
 				for (width = 16 - n; width > 0; width--)
 					PCHAR('0');
 				while (*q)
@@ -331,7 +365,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 				/* l:0000000000000000 */
 				PCHAR('l'); PCHAR(':');
 				q = ksprintn(nbuf, cheri_getlen(ptr), 16,
-				     &n, 0);
+				    &n, 0);
 				for (width = 16 - n; width > 0; width--)
 					PCHAR('0');
 				while (*q)
@@ -341,17 +375,23 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 				/* o:0 */
 				PCHAR('o'); PCHAR(':');
 				q = ksprintn(nbuf, cheri_getoffset(ptr), 16,
-				     NULL, 0);
+				    &n, 0);
+				for (width = 16 - n; width > 0; width--)
+					PCHAR('0');
 				while (*q)
 					PCHAR(*q--);
 				PCHAR(' ');
 
-				/* t:0 */
+				/* t:0 (print -1 if not sealed) */
 				PCHAR('t'); PCHAR(':');
-				q = ksprintn(nbuf, cheri_gettype(ptr), 16,
-				     NULL, 0);
-				while (*q)
-					PCHAR(*q--);
+				if (!sealed) {
+					PCHAR('-'); PCHAR('1');
+				} else {
+					q = ksprintn(nbuf, cheri_gettype(ptr),
+					    16, NULL, 0);
+					while (*q)
+						PCHAR(*q--);
+				}
 				break;
 			}
 #endif	/* defined(__CHERI__) */
