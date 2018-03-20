@@ -25,6 +25,11 @@ nooptions	DDB
 nooptions	MSDOSFS
 nooptions	NFSD, NFSCL
 nooptions	FFS
+# disable raid, we don't need it
+nooptions	GEOM_RAID
+
+# debugging
+options		VERBOSE_SYSINIT
 
 #
 # Features required for CHERI CPU and CheriBSD support.
