@@ -19,8 +19,8 @@
 struct __wrusage;
 struct acl;
 struct aiocb;
-struct auditinfo;
 struct auditinfo_addr;
+struct auditinfo;
 struct ffclock_estimate;
 struct fhandle;
 struct iovec;
@@ -3548,5 +3548,15 @@ SYS_STUB(562, int, cpuset_setdomain,
     /* _callargs_chk */ (&ret, stub_errno, level, which, id, domainsetsize, mask, policy),
     /* _callargs_err */ (&errno, level, which, id, domainsetsize, (domainset_t * )mask, policy),
     /* _localcheck */ {if (!(cheri_getperm(mask) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
+)
+
+SYS_STUB(563, int, getrandom,
+    /* _protoargs */ (void *  buf, size_t buflen, unsigned int flags),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, void * __capability   buf, size_t buflen, unsigned int flags),
+    /* _protoargs_err */ (__capability int *stub_errno, void * __capability   buf, size_t buflen, unsigned int flags),
+    /* _callargs */ ((__cheri_fromcap void * )buf, buflen, flags),
+    /* _callargs_chk */ (&ret, stub_errno, buf, buflen, flags),
+    /* _callargs_err */ (&errno, (void * )buf, buflen, flags),
+    /* _localcheck */ {if (!(cheri_getperm(buf) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
