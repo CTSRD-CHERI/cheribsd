@@ -392,6 +392,7 @@ FBSD_1.5 {
 	getdents;
 	getdirentries;
 	getfsstat;
+	getrandom;
 	kbounce;
 	kevent;
 	lstat;
@@ -628,6 +629,8 @@ FBSDprivate_1.0 {
 	__sys_getppid;
 	_getpriority;
 	__sys_getpriority;
+	_getrandom;
+	__sys_getrandom;
 	_getresgid;
 	__sys_getresgid;
 	_getresuid;

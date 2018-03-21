@@ -2035,6 +2035,16 @@ cheriabi_cap_fcntls_get(struct thread *td,
 #endif /* !CAPABILITIES */
 
 /*
+ * sys_getrandom.c
+ */
+int
+cheriabi_getrandom(struct thread *td, struct cheriabi_getrandom_args *uap)
+{
+
+	return (kern_getrandom(td, uap->buf, uap->buflen, uap->flags));
+}
+
+/*
  * sys_pipe.c
  */
 int

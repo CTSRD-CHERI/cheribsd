@@ -1427,3 +1427,5 @@
 				    cpuwhich_t which, id_t id, \
 				    size_t domainsetsize, domainset_t *mask, \
 				    int policy); }
+563	AUE_NULL	STD	{ int cheriabi_getrandom(void *buf, \
+				    size_t buflen, unsigned int flags); }
