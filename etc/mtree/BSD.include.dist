@@ -164,6 +164,8 @@
         ..
         speaker
         ..
+        tcp_log
+        ..
         usb
         ..
         vkbd
