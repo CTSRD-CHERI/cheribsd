@@ -1412,7 +1412,11 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 			break;
 		}
 
+#if __has_builtin(__builtin_align_up)
+		len = __builtin_align_up(addr, PAGE_SIZE) - addr;
+#else
 		len = PAGE_SIZE - (addr & (uintptr_t)PAGE_MASK);
+#endif
 		if (get_struct(pid, addr, u.buf, len) == -1) {
 			fprintf(fp, "0x%lx", args[sc->offset]);
 			break;

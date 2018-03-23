@@ -77,8 +77,13 @@ __makecontext(ucontext_t *ucp, void (*func)(void), int argc, ...)
 	    ((uintptr_t)sp & (uintptr_t)~0x7);	/* Align on double-word boundary. */
 #elif defined(__mips_n32) || defined(__mips_n64)
 	sp -= (argc > 8 ? argc - 8 : 0); /* Make room for > 8 arguments. */
+#if !__has_feature(capabilities)
 	sp  = (register_t *)
 	    ((uintptr_t)sp & (uintptr_t)~0xf);	/* Align on quad-word boundary. */
+#else
+	sp  = (register_t *)
+	    __builtin_align_up(sp, 16);	/* Align on quad-word boundary. */
+#endif
 #endif
 
 	mc->mc_regs[SP] = (intptr_t)sp;

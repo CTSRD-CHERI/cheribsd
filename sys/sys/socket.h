@@ -529,8 +529,7 @@ struct sockcred {
  * Don't align for capabilities in CheriABI.  Sending them makes little
  * sense and would be a major potential security hole.
  */
-#define	_CMSG_ALIGNBYTES	(sizeof(u_long) - 1)
-#define	_CMSG_ALIGN(n)	(((uintptr_t)(n) + _CMSG_ALIGNBYTES) &~ (uintptr_t)_CMSG_ALIGNBYTES)
+#define	_CMSG_ALIGN(n)	__builtin_align_up((n), sizeof(u_long))
 #endif
 
 /* given pointer to struct cmsghdr, return pointer to data */
