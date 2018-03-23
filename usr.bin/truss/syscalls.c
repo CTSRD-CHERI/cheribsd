@@ -1148,7 +1148,7 @@ get_string(pid_t pid, uintptr_t addr, int max)
 		size = max + 1;
 	else {
 		/* Read up to the end of the current page. */
-		size = PAGE_SIZE - (addr % PAGE_SIZE);
+		size = PAGE_SIZE - ((vaddr_t)addr % PAGE_SIZE);
 		if (size > MAXSIZE)
 			size = MAXSIZE;
 	}

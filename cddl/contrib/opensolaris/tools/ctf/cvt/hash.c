@@ -60,7 +60,7 @@ struct hash_data {
 static int
 hash_def_hash(int nbuckets, void *arg)
 {
-	uintptr_t data = (uintptr_t) arg;
+	size_t data = (size_t) arg;
 	return (data % nbuckets);
 }
 
