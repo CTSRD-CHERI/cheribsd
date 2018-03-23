@@ -1407,7 +1407,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 		 * a partial page.
 		 */
 		addr = args[sc->offset];
-		if (addr % sizeof(char *) != 0) {
+		if ((vaddr_t)addr % sizeof(char *) != 0) {
 			fprintf(fp, "0x%lx", args[sc->offset]);
 			break;
 		}
