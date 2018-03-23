@@ -2886,7 +2886,7 @@ sourceroute(struct addrinfo *ai, char *arg, unsigned char **cpp, int *lenp, int 
 		lsrp = *cpp;
 		ep = lsrp + *lenp;
 	} else {
-		*cpp = lsrp = (char *)ALIGN(buf);
+		*cpp = lsrp = (char *)ALIGN(&buf[0]);
 		ep = lsrp + 1024;
 	}
 
