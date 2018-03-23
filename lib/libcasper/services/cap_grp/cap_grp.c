@@ -103,7 +103,7 @@ group_unpack_members(const nvlist_t *nvl, char ***fieldp, char **bufferp,
 		datasize = _ALIGNBYTES + sizeof(char *);
 		if (datasize >= *bufsizep)
 			return (ERANGE);
-		outstrs = (char **)_ALIGN(*bufferp);
+		outstrs = (char **)(uintptr_t)_ALIGN(*bufferp);
 		outstrs[0] = NULL;
 		*fieldp = outstrs;
 		*bufferp += datasize;
@@ -125,7 +125,7 @@ group_unpack_members(const nvlist_t *nvl, char ***fieldp, char **bufferp,
 	if (datasize >= *bufsizep)
 		return (ERANGE);
 
-	outstrs = (char **)_ALIGN(*bufferp);
+	outstrs = (char **)(uintptr_t)_ALIGN(*bufferp);
 	str = (char *)outstrs + sizeof(char *) * (nmem + 1);
 	for (ii = 0; ii < nmem; ii++) {
 		n = snprintf(nvlname, sizeof(nvlname), "gr_mem[%u]", ii);
