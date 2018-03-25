@@ -211,35 +211,6 @@ cheriabi_ioctl_translate_in(u_long com, void *data, u_long *t_comp,
 		return (0);
 	}
 
-	/* Consumers of ifr_buffer */
-	case SIOCSIFDESCR_C:
-	case SIOCGIFDESCR_C: {
-		struct ifreq *ifr;
-		struct ifreq_c *ifr_c = data;
-		register_t reqperms;
-
-		ifr = malloc(sizeof(struct ifreq), M_IOCTLOPS, M_WAITOK);
-		memcpy(&ifr->ifr_name, &ifr_c->ifr_name, sizeof(ifr->ifr_name));
-		ifr->ifr_buffer.length = ifr_c->ifr_buffer.length;
-		*t_datap = ifr;
-		*t_comp = _IOC_NEWTYPE(com, struct ifreq);
-		switch (com) {
-		case SIOCSIFDESCR_C:
-			reqperms = CHERI_PERM_LOAD;
-			break;
-		case SIOCGIFDESCR_C:
-			reqperms = CHERI_PERM_STORE;
-			break;
-		}
-		error = cheriabi_cap_to_ptr((caddr_t *)&ifr->ifr_buffer.buffer,
-		    ifr_c->ifr_buffer.buffer, ifr->ifr_buffer.length,
-		    reqperms, 0);
-		if (error != 0)
-			return (error);
-
-		return (0);
-	}
-
 	/* ifr_data consumers */
 	case SIOCGIFMAC_C:
 	case SIOCSIFMAC_C:
@@ -519,19 +490,6 @@ cheriabi_ioctl_translate_out(u_long com, void *data, void *t_data)
 		break;
 	}
 
-	/* Consumers of ifr_buffer */
-	/* SIOCSIFDESCR_C: Input only */
-	case SIOCGIFDESCR_C: {
-		struct ifreq *ifr = t_data;
-		struct ifreq_c *ifr_c = data;
-
-		/* XXX-BD: does anyone actually update ifr_name? */
-		memcpy(ifr_c->ifr_name, ifr->ifr_name,
-		    sizeof(ifr_c->ifr_name));
-		CP((*ifr), (*ifr_c), ifr_buffer.length);
-		break;
-	}
-
 	/* ifr_ifdata users */
 	case SIOCGIFMAC_C:
 	case SIOCSIFMAC_C:
@@ -682,10 +640,6 @@ ioctl_data_contains_pointers(u_long cmd)
 	case FIODGNAME_C:
 	case PCIOCGETCONF_C:
 	case SG_IO_C:
-
-	/* ifr_ifbuffer users */
-	case SIOCSIFDESCR_C:
-	case SIOCGIFDESCR_C:
 
 	/* ifr_ifdata users */
 	case SIOCGIFMAC_C:

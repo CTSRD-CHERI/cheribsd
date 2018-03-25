@@ -161,10 +161,6 @@ struct ifreq_c {
 	} ifr_ifru;
 };
 
-/* ifr_buffer consumers */
-#define	SIOCSIFDESCR_C		_IOC_NEWTYPE(SIOCSIFDESCR, struct ifreq_c)
-#define	SIOCGIFDESCR_C		_IOC_NEWTYPE(SIOCGIFDESCR, struct ifreq_c)
-
 /* ifr_data consumers */
 #define	SIOCGIFMAC_C		_IOC_NEWTYPE(SIOCGIFMAC, struct ifreq_c)
 #define	SIOCSIFMAC_C		_IOC_NEWTYPE(SIOCSIFMAC, struct ifreq_c)
