@@ -138,9 +138,7 @@ CFLAGS+=	${CHERI_OPTIMIZATION_FLAGS:U-O2}
 # We are expanding $LDFLAGS here so this must come after MIPS_ABI has been set!
 LDFLAGS:=${LDFLAGS:N-fuse-ld=*}
 LDFLAGS+=	-fuse-ld=lld
-.ifdef CHERI_USE_ELF_CAP_RELOCS
 LDFLAGS+=	-Wl,-preemptible-caprelocs=elf
-.endif
 
 # XXX: Needed as Clang rejects -mllvm -cheri128 when using $CC to link:
 # warning: argument unused during compilation: '-cheri=128'
