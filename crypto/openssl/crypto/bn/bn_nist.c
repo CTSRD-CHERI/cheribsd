@@ -964,7 +964,11 @@ int BN_nist_mod_384(BIGNUM *r, const BIGNUM *a, const BIGNUM *field,
                         sizeof(unsigned int)];
     } buf;
     BN_ULONG c_d[BN_NIST_384_TOP], *res;
+#ifndef __CHERI_PURE_CAPABILITY__
     PTR_SIZE_INT mask;
+#else
+    vaddr_t mask;
+#endif
     union {
         bn_addsub_f f;
         PTR_SIZE_INT p;
@@ -1211,7 +1215,7 @@ int BN_nist_mod_384(BIGNUM *r, const BIGNUM *a, const BIGNUM *field,
     mask =
         0 - (PTR_SIZE_INT) (*u.f) (c_d, r_d, _nist_p_384[0], BN_NIST_384_TOP);
     mask &= 0 - (PTR_SIZE_INT) carry;
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifndef __CHERI_PURE_CAPABILITY__
     res = c_d;
     res = (BN_ULONG *)(((PTR_SIZE_INT) res & ~mask) |
                        ((PTR_SIZE_INT) r_d & mask));
