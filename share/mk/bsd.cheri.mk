@@ -109,6 +109,9 @@ _CHERI_COMMON_FLAGS+=	-fpic
 LIBDIR:=	/usr/libcheri
 ROOTOBJDIR=	${.OBJDIR:S,${.CURDIR},,}${SRCTOP}/worldcheri${SRCTOP}
 CFLAGS+=	-ftls-model=local-exec
+.if !empty(CHERI_USE_CAP_TABLE)
+CFLAGS+=	-mllvm -cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
+.endif
 CXXFLAGS+=	-Wno-cheri-bitwise-operations
 .ifdef NO_WERROR
 # Implicit function declarations should always be an error in purecap mode as
