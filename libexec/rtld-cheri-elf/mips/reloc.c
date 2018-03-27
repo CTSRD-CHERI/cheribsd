@@ -233,6 +233,40 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 			break;
 		}
 
+		case R_TYPE(CHERI_SIZE):
+		case R_TYPE(CHERI_ABSPTR): {
+			/* This is needed for __auxargs, otherwise there
+			 * are no initialized globals
+			 */
+			const size_t rlen =
+			    ELF_R_NXTTYPE_64_P(r_type)
+				? sizeof(Elf_Sxword)
+				: sizeof(Elf_Sword);
+			Elf_Sxword old = load_ptr(where, rlen);
+			Elf_Sxword val = old;
+			sym = symtab + r_symndx;
+			assert(ELF_ST_BIND(sym->st_info) == STB_LOCAL ||
+			    ELF_ST_BIND(sym->st_info) == STB_WEAK);
+			if ((r_type & 0xff) == R_TYPE(CHERI_SIZE)) {
+				val += sym->st_size;
+			} else {
+				Elf_Addr symval = (Elf_Addr)relocbase + sym->st_value;
+				val += symval;
+			}
+#ifdef DEBUG_VERBOSE_SELF
+			/*
+			 * FIXME dbg() can never work since the debug var only
+			 * gets initialized later -> use rtld_printf for now
+			 */
+			rtld_printf("%s/L(%p) %p -> %p in <self>\n",
+			    (r_type & 0xff) == R_TYPE(CHERI_SIZE) ? "SIZE" : "ABS",
+			    where, (void *)(uintptr_t)old,
+			    (void *)(uintptr_t)val);
+#endif
+			store_ptr(where, val, rlen);
+			break;
+		}
+
 		case R_TYPE(GPREL32):
 		case R_TYPE(NONE):
 			break;
