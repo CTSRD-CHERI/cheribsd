@@ -1108,7 +1108,8 @@ ether_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	case CASE_IOC_IFREQ(SIOCGIFADDR):
-		bcopy(IF_LLADDR(ifp), ifr_addr_get_data(ifr), ETHER_ADDR_LEN);
+		bcopy(IF_LLADDR(ifp), ifr_addr_get_data(ifr),
+		    ETHER_ADDR_LEN);
 		break;
 
 	case CASE_IOC_IFREQ(SIOCSIFMTU):
