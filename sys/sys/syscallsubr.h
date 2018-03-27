@@ -33,13 +33,14 @@
 #include <sys/acl.h>
 #include <sys/signal.h>
 #include <sys/sem.h>
-#include <sys/uio.h>
 #include <sys/socket.h>
 #include <sys/mac.h>
 #include <sys/mount.h>
 #include <sys/_cpuset.h>
 #include <sys/_domainset.h>
+#include <sys/_uio.h>
 
+struct __wrusage;
 struct ffclock_estimate;
 struct file;
 struct filecaps;
@@ -60,12 +61,13 @@ struct ogetdirentries_args;
 struct rlimit;
 struct rusage;
 struct rtprio;
+struct sched_param;
 struct sockaddr;
 struct stat;
 struct thr_param;
 struct timex;
-struct sched_param;
-struct __wrusage;
+struct uio;
+
 
 int	kern___acl_aclcheck_fd(struct thread *td, int filedes, acl_type_t type,
 	    const struct acl * __capability aclp);
