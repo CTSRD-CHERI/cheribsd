@@ -149,6 +149,9 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 	const Elf_Rel *rel = NULL, *rellim;
 	Elf_Addr relsz = 0;
 	const Elf_Sym *symtab = NULL, *sym;
+#ifdef DEBUG
+	const char* strtab = NULL;
+#endif
 	Elf_Addr *where;
 	Elf_Addr *got = NULL;
 	Elf_Word local_gotno = 0, symtabno = 0, gotsym = 0;
@@ -165,6 +168,11 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 		case DT_SYMTAB:
 			symtab = (const Elf_Sym *)(relocbase + dynp->d_un.d_ptr);
 			break;
+#ifdef DEBUG
+		case DT_STRTAB:
+			strtab = (const char *)(relocbase + dynp->d_un.d_ptr);
+			break;
+#endif
 		case DT_PLTGOT:
 			got = (Elf_Addr *)(relocbase + dynp->d_un.d_ptr);
 			break;
@@ -273,7 +281,20 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 
 
 		default:
-			abort();
+#ifdef DEBUG
+			rtld_printf("sym = %lu, type = %lu, offset = %p, "
+			    "contents = %p, symbol = %s\n",
+			    (u_long)r_symndx, (u_long)ELF_R_TYPE(rel->r_info),
+			    (void *)(uintptr_t)rel->r_offset,
+			    (void *)(uintptr_t)load_ptr(where, sizeof(Elf_Sword)),
+			    strtab + symtab[r_symndx].st_name);
+#endif
+			rtld_printf("%s: Unsupported relocation type %ld "
+			    "in non-PLT relocations\n",
+			    __func__, (u_long) ELF_R_TYPE(rel->r_info));
+			/* Abort won't work yet since it needs global caps */
+			/* abort(); */
+			__builtin_trap();
 			break;
 		}
 	}
