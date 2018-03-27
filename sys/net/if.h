@@ -399,6 +399,7 @@ struct	ifreq {
 		u_int	ifru_fib;
 		u_char	ifru_vlan_pcp;
 	} ifr_ifru;
+};
 #ifndef _KERNEL
 #define	ifr_addr	ifr_ifru.ifru_addr	/* address */
 #define	ifr_dstaddr	ifr_ifru.ifru_dstaddr	/* other end of p-to-p link */
@@ -417,8 +418,8 @@ struct	ifreq {
 #define	ifr_index	ifr_ifru.ifru_index	/* interface index */
 #define	ifr_fib		ifr_ifru.ifru_fib	/* interface fib */
 #define	ifr_vlan_pcp	ifr_ifru.ifru_vlan_pcp	/* VLAN priority */
-#endif
-};
+#define	ifr_lan_pcp	ifr_ifru.ifru_vlan_pcp	/* VLAN priority */
+#endif /* !defined(_KERNEL) */
 
 #if defined(_KERNEL) && __has_feature(capabilities)
 struct ifreq_buffer_c {
@@ -596,6 +597,8 @@ struct ifrsshash {
 	uint16_t	ifrh_spare1;
 	uint32_t	ifrh_types;		/* RSS_TYPE_ */
 };
+
+#define	IFNET_PCP_NONE	0xff	/* PCP disabled */
 
 #endif /* __BSD_VISIBLE */
 

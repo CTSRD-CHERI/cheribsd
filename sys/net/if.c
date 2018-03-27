@@ -602,6 +602,7 @@ if_alloc(u_char type)
 	for (int i = 0; i < IFCOUNTERS; i++)
 		ifp->if_counters[i] = counter_u64_alloc(M_WAITOK);
 	ifp->if_get_counter = if_get_counter_default;
+	ifp->if_pcp = IFNET_PCP_NONE;
 	ifnet_setbyindex(ifp->if_index, ifp);
 	return (ifp);
 }
@@ -2880,6 +2881,20 @@ ifr_reqcap_set(void *ifrp, int val)
 
 	/* ifr_ifru.ifru_cap[0] */
 	ifr__int0_set(ifrp, val);
+}
+
+u_char
+ifr_lan_pcp_get(void *ifrp)
+{
+
+	return (ifr__u_char_get(ifrp));
+}
+
+void
+ifr_lan_pcp_set(void *ifrp, u_char pcp)
+{
+
+	ifr__u_char_set(ifrp, pcp);
 }
 
 u_char

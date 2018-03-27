@@ -365,6 +365,9 @@ struct ifnet {
 	if_snd_tag_query_t *if_snd_tag_query;
 	if_snd_tag_free_t *if_snd_tag_free;
 
+	/* Ethernet PCP */
+	uint8_t if_pcp;
+
 	/*
 	 * Spare fields to be added before branching a stable branch, so
 	 * that structure can be enhanced without changing the kernel
@@ -739,6 +742,8 @@ int ifr_media_get(void *ifrp);
 int ifr_mtu_get(void *ifrp);
 void ifr_mtu_set(void *ifrp, int val);
 int ifr_reqcap_get(void *ifrp);
+u_char ifr_lan_pcp_get(void *ifrp);
+void ifr_lan_pcp_set(void *ifrp, u_char pcp);
 u_char ifr_vlan_pcp_get(void *ifrp);
 void ifr_vlan_pcp_set(void *ifrp, u_char pcp);
 
