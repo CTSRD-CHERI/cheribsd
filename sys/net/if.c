@@ -101,37 +101,6 @@
 #endif
 
 #ifdef COMPAT_CHERIABI
-struct ifreq_buffer_c {
-	size_t			length;		/* (size_t) */
-	void * __capability	buffer;		/* (void *) */
-};
-
-/*
- * Interface request structure used for socket
- * ioctl's.  All interface ioctl's must have parameter
- * definitions which begin with ifr_name.  The
- * remainder may be interface specific.
- */
-struct ifreq_c {
-	char	ifr_name[IFNAMSIZ];		/* if name, e.g. "en0" */
-	union {
-		struct sockaddr	ifru_addr;
-		struct sockaddr	ifru_dstaddr;
-		struct sockaddr	ifru_broadaddr;
-		struct ifreq_buffer_c ifru_buffer;
-		short		ifru_flags[2];
-		short		ifru_index;
-		int		ifru_jid;
-		int		ifru_metric;
-		int		ifru_mtu;
-		int		ifru_phys;
-		int		ifru_media;
-		void * __capability ifru_data;
-		int		ifru_cap[2];
-		u_int		ifru_fib;
-		u_char		ifru_vlan_pcp;
-	} ifr_ifru;
-};
 #define	SIOCGIFDESCR_C	_IOC_NEWTYPE(SIOCGIFDESCR, struct ifreq_c)
 #define	SIOCSIFDESCR_C	_IOC_NEWTYPE(SIOCSIFDESCR, struct ifreq_c)
 #endif /* COMPAT_CHERIABI */

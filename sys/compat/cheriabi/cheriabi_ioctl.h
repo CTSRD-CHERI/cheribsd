@@ -136,31 +136,6 @@ struct bpf_program_c {
 #define BIOCSETWF_C	_IOC_NEWTYPE(BIOCSETWF, struct bpf_program_c)
 #define BIOCSETFNR_C	_IOC_NEWTYPE(BIOCSETFNR, struct bpf_program_c)
 
-struct ifreq_buffer_c {
-	size_t	length;
-	void * __capability buffer;
-};
-
-struct ifreq_c {
-	char    ifr_name[IFNAMSIZ];
-	union {
-		struct sockaddr		ifru_addr;
-		struct sockaddr		ifru_dstaddr;
-		struct sockaddr		ifru_broadaddr;
-		struct ifreq_buffer_c	ifru_buffer;
-		short			ifru_flags[2];
-		short			ifru_index;
-		int			ifru_jid;
-		int			ifru_metric;
-		int			ifru_mtu;
-		int			ifru_phys;
-		int			ifru_media;
-		void * __capability		ifru_data;
-		int			ifru_cap[2];
-		u_int			ifru_fib;
-	} ifr_ifru;
-};
-
 /* ifr_data consumers */
 #define	SIOCGIFMAC_C		_IOC_NEWTYPE(SIOCGIFMAC, struct ifreq_c)
 #define	SIOCSIFMAC_C		_IOC_NEWTYPE(SIOCSIFMAC, struct ifreq_c)
