@@ -380,6 +380,11 @@ static fill_uap_fp cheriabi_fill_uap_funcs[CHERIABI_SYS_MAXSYSCALL] = {
 	[CHERIABI_SYS_fhstatfs] = (fill_uap_fp)CHERIABI_SYS_fhstatfs_fill_uap,
 	[CHERIABI_SYS_mknodat] = (fill_uap_fp)CHERIABI_SYS_mknodat_fill_uap,
 	[CHERIABI_SYS_cheriabi_kevent] = (fill_uap_fp)CHERIABI_SYS_cheriabi_kevent_fill_uap,
+	[CHERIABI_SYS_cheriabi_coexecve] = (fill_uap_fp)CHERIABI_SYS_cheriabi_coexecve_fill_uap,
+	[CHERIABI_SYS_cosetup] = (fill_uap_fp)CHERIABI_SYS_cosetup_fill_uap,
+	[CHERIABI_SYS_coregister] = (fill_uap_fp)CHERIABI_SYS_coregister_fill_uap,
+	[CHERIABI_SYS_colookup] = (fill_uap_fp)CHERIABI_SYS_colookup_fill_uap,
+	[CHERIABI_SYS_copark] = nop_fill_uap,
 };
 
 static inline int

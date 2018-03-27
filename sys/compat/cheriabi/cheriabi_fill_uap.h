@@ -9441,4 +9441,156 @@ CHERIABI_SYS_cheriabi_kevent_fill_uap(struct thread *td,
 	return (0);
 }
 
+static inline int
+CHERIABI_SYS_cheriabi_coexecve_fill_uap(struct thread *td,
+    struct cheriabi_coexecve_args *uap)
+{
+	void * __capability tmpcap;
+
+	/* [0] pid_t pid */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_coexecve_PTRMASK);
+	uap->pid = cheri_getoffset(tmpcap);
+
+	/* [1] _In_z_ const char * fname */
+	{
+		int error;
+		register_t reqperms = (CHERI_PERM_LOAD);
+
+		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_coexecve_PTRMASK);
+		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->fname),
+		    tmpcap, sizeof(*uap->fname), reqperms, 0);
+		if (error != 0)
+			return (error);
+	}
+
+	/* [2] _In_ void *__capability * argv */
+	{
+		int error;
+		register_t reqperms = (CHERI_PERM_LOAD);
+
+		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_coexecve_PTRMASK);
+		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->argv),
+		    tmpcap, sizeof(*uap->argv), reqperms, 0);
+		if (error != 0)
+			return (error);
+	}
+
+	/* [3] _In_ void *__capability * envv */
+	{
+		int error;
+		register_t reqperms = (CHERI_PERM_LOAD);
+
+		cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_coexecve_PTRMASK);
+		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->envv),
+		    tmpcap, sizeof(*uap->envv), reqperms, 0);
+		if (error != 0)
+			return (error);
+	}
+
+	return (0);
+}
+
+static inline int
+CHERIABI_SYS_cosetup_fill_uap(struct thread *td,
+    struct cosetup_args *uap)
+{
+	void * __capability tmpcap;
+
+	/* [0] int what */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cosetup_PTRMASK);
+	uap->what = cheri_getoffset(tmpcap);
+
+	/* [1] _Out_ void *__capability * code */
+	{
+		int error;
+		register_t reqperms = (CHERI_PERM_STORE);
+
+		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cosetup_PTRMASK);
+		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->code),
+		    tmpcap, sizeof(*uap->code), reqperms, 0);
+		if (error != 0)
+			return (error);
+	}
+
+	/* [2] _Out_ void *__capability * data */
+	{
+		int error;
+		register_t reqperms = (CHERI_PERM_STORE);
+
+		cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cosetup_PTRMASK);
+		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->data),
+		    tmpcap, sizeof(*uap->data), reqperms, 0);
+		if (error != 0)
+			return (error);
+	}
+
+	return (0);
+}
+
+static inline int
+CHERIABI_SYS_coregister_fill_uap(struct thread *td,
+    struct coregister_args *uap)
+{
+	void * __capability tmpcap;
+
+	/* [0] _In_z_ const char * name */
+	{
+		int error;
+		register_t reqperms = (CHERI_PERM_LOAD);
+
+		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_coregister_PTRMASK);
+		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->name),
+		    tmpcap, sizeof(*uap->name), reqperms, 0);
+		if (error != 0)
+			return (error);
+	}
+
+	/* [1] _Out_opt_ void *__capability * cap */
+	{
+		int error;
+		register_t reqperms = (CHERI_PERM_STORE);
+
+		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_coregister_PTRMASK);
+		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->cap),
+		    tmpcap, sizeof(*uap->cap), reqperms, 1);
+		if (error != 0)
+			return (error);
+	}
+
+	return (0);
+}
+
+static inline int
+CHERIABI_SYS_colookup_fill_uap(struct thread *td,
+    struct colookup_args *uap)
+{
+	void * __capability tmpcap;
+
+	/* [0] _In_z_ const char * name */
+	{
+		int error;
+		register_t reqperms = (CHERI_PERM_LOAD);
+
+		cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_colookup_PTRMASK);
+		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->name),
+		    tmpcap, sizeof(*uap->name), reqperms, 0);
+		if (error != 0)
+			return (error);
+	}
+
+	/* [1] _Out_ void *__capability * cap */
+	{
+		int error;
+		register_t reqperms = (CHERI_PERM_STORE);
+
+		cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_colookup_PTRMASK);
+		error = cheriabi_cap_to_ptr(__DECONST(caddr_t *, &uap->cap),
+		    tmpcap, sizeof(*uap->cap), reqperms, 0);
+		if (error != 0)
+			return (error);
+	}
+
+	return (0);
+}
+
 #endif /* !_SYS_COMPAT_CHERIABI_FILL_UAP_H_ */

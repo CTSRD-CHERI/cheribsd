@@ -590,4 +590,9 @@ struct sysent cheriabi_sysent[] = {
 	{ AS(fhstatfs_args), (sy_call_t *)sys_fhstatfs, AUE_FHSTATFS, NULL, 0, 0, 0, SY_THR_STATIC },	/* 558 = fhstatfs */
 	{ AS(mknodat_args), (sy_call_t *)sys_mknodat, AUE_MKNODAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 559 = mknodat */
 	{ AS(cheriabi_kevent_args), (sy_call_t *)cheriabi_kevent, AUE_KEVENT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 560 = cheriabi_kevent */
+	{ AS(cheriabi_coexecve_args), (sy_call_t *)cheriabi_coexecve, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 561 = cheriabi_coexecve */
+	{ AS(cosetup_args), (sy_call_t *)sys_cosetup, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 562 = cosetup */
+	{ AS(coregister_args), (sy_call_t *)sys_coregister, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 563 = coregister */
+	{ AS(colookup_args), (sy_call_t *)sys_colookup, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 564 = colookup */
+	{ 0, (sy_call_t *)sys_copark, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 565 = copark */
 };

@@ -366,4 +366,9 @@ MIASM =  \
 	getfsstat.o \
 	fhstatfs.o \
 	mknodat.o \
-	cheriabi_kevent.o
+	cheriabi_kevent.o \
+	cheriabi_coexecve.o \
+	cosetup.o \
+	coregister.o \
+	colookup.o \
+	copark.o

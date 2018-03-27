@@ -353,4 +353,8 @@
 #define	CHERIABI_SYS_fhstatfs_PTRMASK	(0x0 | 0x1 | 0x2)
 #define	CHERIABI_SYS_mknodat_PTRMASK	(0x0 | 0x2)
 #define	CHERIABI_SYS_cheriabi_kevent_PTRMASK	(0x0 | 0x2 | 0x8 | 0x20)
+#define	CHERIABI_SYS_cheriabi_coexecve_PTRMASK	(0x0 | 0x2 | 0x4 | 0x8)
+#define	CHERIABI_SYS_cosetup_PTRMASK	(0x0 | 0x2 | 0x4)
+#define	CHERIABI_SYS_coregister_PTRMASK	(0x0 | 0x1 | 0x2)
+#define	CHERIABI_SYS_colookup_PTRMASK	(0x0 | 0x1 | 0x2)
 #endif /* !_CHERIABI_SYSARGMAP_H_ */

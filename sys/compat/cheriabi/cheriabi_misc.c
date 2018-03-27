@@ -384,6 +384,33 @@ cheriabi_execve(struct thread *td, struct cheriabi_execve_args *uap)
 }
 
 int
+cheriabi_coexecve(struct thread *td, struct cheriabi_coexecve_args *uap)
+{
+	struct image_args eargs;
+	struct vmspace *oldvmspace;
+	struct proc *p;
+	int error;
+
+	// XXX: Revisit the flags.
+	error = pget(uap->pid, PGET_HOLD | PGET_CANDEBUG, &p);
+	if (error != 0)
+		return (error);
+	error = pre_execve(td, &oldvmspace);
+	if (error != 0) {
+		PRELE(p);
+		return (error);
+	}
+	error = cheriabi_exec_copyin_args(&eargs, uap->fname, UIO_USERSPACE,
+	    uap->argv, uap->envv);
+	if (error == 0)
+		error = kern_coexecve(td, &eargs, NULL, p);
+	post_execve(td, error, oldvmspace);
+	PRELE(p);
+
+	return (error);
+}
+
+int
 cheriabi_fexecve(struct thread *td, struct cheriabi_fexecve_args *uap)
 {
 	struct image_args eargs;

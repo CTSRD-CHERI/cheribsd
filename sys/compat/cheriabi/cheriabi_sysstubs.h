@@ -3572,3 +3572,53 @@ SYS_STUB_ARGHASPTRS(560, int, kevent,
     /* _localcheck */ {if (!(cheri_getperm(changelist) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(eventlist) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(timeout) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
+SYS_STUB(561, int, coexecve,
+    /* _protoargs */ (pid_t pid, const char * fname, void * * argv, void * * envv),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, pid_t pid, const char * __capability  fname, void * __capability  * __capability  argv, void * __capability  * __capability  envv),
+    /* _protoargs_err */ (__capability int *stub_errno, pid_t pid, const char * __capability  fname, void * __capability  * __capability  argv, void * __capability  * __capability  envv),
+    /* _callargs */ (pid, (__cheri_fromcap const char *)fname, (__cheri_fromcap void * *)argv, (__cheri_fromcap void * *)envv),
+    /* _callargs_chk */ (&ret, stub_errno, pid, fname, argv, envv),
+    /* _callargs_err */ (&errno, pid, (const char *)fname, (void * *)argv, (void * *)envv),
+    /* _localcheck */ {if (!(cheri_getperm(fname) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(argv) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(envv) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
+)
+
+SYS_STUB(562, int, cosetup,
+    /* _protoargs */ (int what, void * * code, void * * data),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, int what, void * __capability  * __capability  code, void * __capability  * __capability  data),
+    /* _protoargs_err */ (__capability int *stub_errno, int what, void * __capability  * __capability  code, void * __capability  * __capability  data),
+    /* _callargs */ (what, (__cheri_fromcap void * *)code, (__cheri_fromcap void * *)data),
+    /* _callargs_chk */ (&ret, stub_errno, what, code, data),
+    /* _callargs_err */ (&errno, what, (void * *)code, (void * *)data),
+    /* _localcheck */ {if (!(cheri_getperm(code) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(data) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
+)
+
+SYS_STUB(563, int, coregister,
+    /* _protoargs */ (const char * name, void * * cap),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, const char * __capability  name, void * __capability  * __capability  cap),
+    /* _protoargs_err */ (__capability int *stub_errno, const char * __capability  name, void * __capability  * __capability  cap),
+    /* _callargs */ ((__cheri_fromcap const char *)name, (__cheri_fromcap void * *)cap),
+    /* _callargs_chk */ (&ret, stub_errno, name, cap),
+    /* _callargs_err */ (&errno, (const char *)name, (void * *)cap),
+    /* _localcheck */ {if (!(cheri_getperm(name) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(cap) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
+)
+
+SYS_STUB(564, int, colookup,
+    /* _protoargs */ (const char * name, void * * cap),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, const char * __capability  name, void * __capability  * __capability  cap),
+    /* _protoargs_err */ (__capability int *stub_errno, const char * __capability  name, void * __capability  * __capability  cap),
+    /* _callargs */ ((__cheri_fromcap const char *)name, (__cheri_fromcap void * *)cap),
+    /* _callargs_chk */ (&ret, stub_errno, name, cap),
+    /* _callargs_err */ (&errno, (const char *)name, (void * *)cap),
+    /* _localcheck */ {if (!(cheri_getperm(name) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(cap) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
+)
+
+SYS_STUB(565, int, copark,
+    /* _protoargs */ (void),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno),
+    /* _protoargs_err */ (__capability int *stub_errno),
+    /* _callargs */ (),
+    /* _callargs_chk */ (&ret, stub_errno),
+    /* _callargs_err */ (&errno),
+    /* _localcheck */ {}
+)
+

@@ -407,6 +407,12 @@ struct cheriabi_kevent_args {
 	char nevents_l_[PADL_(int)]; int nevents; char nevents_r_[PADR_(int)];
 	char timeout_l_[PADL_(const struct timespec *)]; const struct timespec * timeout; char timeout_r_[PADR_(const struct timespec *)];
 };
+struct cheriabi_coexecve_args {
+	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
+	char fname_l_[PADL_(const char *)]; const char * fname; char fname_r_[PADR_(const char *)];
+	char argv_l_[PADL_(void *__capability *)]; void *__capability * argv; char argv_r_[PADR_(void *__capability *)];
+	char envv_l_[PADL_(void *__capability *)]; void *__capability * envv; char envv_r_[PADR_(void *__capability *)];
+};
 #if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
 #define PAD64_REQUIRED
 #endif
@@ -487,6 +493,7 @@ int	cheriabi_wait6(struct thread *, struct cheriabi_wait6_args *);
 int	cheriabi_aio_mlock(struct thread *, struct cheriabi_aio_mlock_args *);
 int	cheriabi_procctl(struct thread *, struct cheriabi_procctl_args *);
 int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
+int	cheriabi_coexecve(struct thread *, struct cheriabi_coexecve_args *);
 
 #ifdef COMPAT_43
 
@@ -618,6 +625,7 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_aio_mlock	AUE_AIO_MLOCK
 #define	CHERIABI_SYS_AUE_cheriabi_procctl	AUE_PROCCTL
 #define	CHERIABI_SYS_AUE_cheriabi_kevent	AUE_KEVENT
+#define	CHERIABI_SYS_AUE_cheriabi_coexecve	AUE_NULL
 
 #undef PAD_
 #undef PADL_

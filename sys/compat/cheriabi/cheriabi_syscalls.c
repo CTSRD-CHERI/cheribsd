@@ -570,4 +570,9 @@ const char *cheriabi_syscallnames[] = {
 	"fhstatfs",			/* 558 = fhstatfs */
 	"mknodat",			/* 559 = mknodat */
 	"cheriabi_kevent",			/* 560 = cheriabi_kevent */
+	"cheriabi_coexecve",			/* 561 = cheriabi_coexecve */
+	"cosetup",			/* 562 = cosetup */
+	"coregister",			/* 563 = coregister */
+	"colookup",			/* 564 = colookup */
+	"copark",			/* 565 = copark */
 };

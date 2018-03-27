@@ -479,4 +479,9 @@
 #define	CHERIABI_SYS_fhstatfs	558
 #define	CHERIABI_SYS_mknodat	559
 #define	CHERIABI_SYS_cheriabi_kevent	560
-#define	CHERIABI_SYS_MAXSYSCALL	561
+#define	CHERIABI_SYS_cheriabi_coexecve	561
+#define	CHERIABI_SYS_cosetup	562
+#define	CHERIABI_SYS_coregister	563
+#define	CHERIABI_SYS_colookup	564
+#define	CHERIABI_SYS_copark	565
+#define	CHERIABI_SYS_MAXSYSCALL	566

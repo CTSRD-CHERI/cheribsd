@@ -1262,3 +1262,15 @@
 				    _In_reads_opt_(nevents) \
 				    struct kevent_c *eventlist, int nevents, \
 				    _In_opt_ const struct timespec *timeout); }
+561	AUE_NULL	STD	{ int cheriabi_coexecve(pid_t pid, \
+				    _In_z_ const char *fname, \
+				    _In_ void * __capability *argv, \
+				    _In_ void * __capability *envv); }
+562	AUE_NULL	NOPROTO	{ int cosetup(int what, \
+				    _Out_ void * __capability *code, \
+				    _Out_ void * __capability *data); }
+563	AUE_NULL	NOPROTO	{ int coregister(_In_z_ const char *name, \
+				    _Out_opt_ void * __capability *cap); }
+564	AUE_NULL	NOPROTO	{ int colookup(_In_z_ const char *name, \
+				    _Out_ void * __capability *cap); }
+565	AUE_NULL	NOPROTO	{ int copark(void); }
