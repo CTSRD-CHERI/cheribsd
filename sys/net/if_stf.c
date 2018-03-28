@@ -182,7 +182,8 @@ static int stf_checkaddr6(struct stf_softc *, struct in6_addr *,
 static int stf_ioctl(struct ifnet *, u_long, caddr_t);
 
 static int stf_clone_match(struct if_clone *, const char *);
-static int stf_clone_create(struct if_clone *, char *, size_t, caddr_t);
+static int stf_clone_create(struct if_clone *, char *, size_t,
+    void * __capability);
 static int stf_clone_destroy(struct if_clone *, struct ifnet *);
 static struct if_clone *stf_cloner;
 
@@ -200,7 +201,8 @@ stf_clone_match(struct if_clone *ifc, const char *name)
 }
 
 static int
-stf_clone_create(struct if_clone *ifc, char *name, size_t len, caddr_t params)
+stf_clone_create(struct if_clone *ifc, char *name, size_t len,
+    void * __capability params)
 {
 	char *dp;
 	int err, unit, wildcard;

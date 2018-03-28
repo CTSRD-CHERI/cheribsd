@@ -2442,24 +2442,22 @@ ifr_buffer_set_length(struct thread *td, void *data, size_t len)
 		ifrup->ifr.ifr_ifru.ifru_buffer.length = len;
 }
 
-void *
+void * __capability
 ifr_data_get_ptr(void *ifrp)
 {
-	union {
-		struct ifreq	ifr;
-#ifdef COMPAT_FREEBSD32
-		struct ifreq32	ifr32;
-#endif
-	} *ifrup;
+	union ifreq_union *ifrup;
 
 	ifrup = ifrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		return (ifrup->ifr_c.ifr_ifru.ifru_data);
+#endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
-		return ((void *)(uintptr_t)
-		    ifrup->ifr32.ifr_ifru.ifru_data);
-	else
+		return (__USER_CAP_UNBOUND((void *)(uintptr_t)
+		    ifrup->ifr32.ifr_ifru.ifru_data));
 #endif
-		return (ifrup->ifr.ifr_ifru.ifru_data);
+		return (__USER_CAP_UNBOUND(ifrup->ifr.ifr_ifru.ifru_data));
 }
 
 /*
@@ -2657,7 +2655,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		error = priv_check(td, PRIV_NET_SETIFNAME);
 		if (error)
 			return (error);
-		error = copyinstr(ifr_data_get_ptr(ifr), new_name, IFNAMSIZ,
+		error = copyinstr_c(ifr_data_get_ptr(ifr), new_name, IFNAMSIZ,
 		    NULL);
 		if (error != 0)
 			return (error);

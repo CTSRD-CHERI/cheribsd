@@ -97,7 +97,8 @@ static int epair_media_change(struct ifnet *);
 static void epair_media_status(struct ifnet *, struct ifmediareq *);
 
 static int epair_clone_match(struct if_clone *, const char *);
-static int epair_clone_create(struct if_clone *, char *, size_t, caddr_t);
+static int epair_clone_create(struct if_clone *, char *, size_t,
+    void * __capability);
 static int epair_clone_destroy(struct if_clone *, struct ifnet *);
 
 static const char epairname[] = "epair";
@@ -705,7 +706,8 @@ epair_clone_match(struct if_clone *ifc, const char *name)
 }
 
 static int
-epair_clone_create(struct if_clone *ifc, char *name, size_t len, caddr_t params)
+epair_clone_create(struct if_clone *ifc, char *name, size_t len,
+    void * __capability params)
 {
 	struct epair_softc *sca, *scb;
 	struct ifnet *ifp;
@@ -720,7 +722,7 @@ epair_clone_create(struct if_clone *ifc, char *name, size_t len, caddr_t params)
 	 * it cannot fail anymore. So just do attach it here.
 	 */
 	if (params) {
-		scb = (struct epair_softc *)params;
+		scb = (__cheri_fromcap struct epair_softc *)params;
 		ifp = scb->ifp;
 		/* Assign a hopefully unique, locally administered etheraddr. */
 		eaddr[0] = 0x02;
@@ -862,7 +864,8 @@ epair_clone_create(struct if_clone *ifc, char *name, size_t len, caddr_t params)
 	if_setsendqready(ifp);
 	/* We need to play some tricks here for the second interface. */
 	strlcpy(name, epairname, len);
-	error = if_clone_create(name, len, (caddr_t)scb);
+	error = if_clone_create(name, len,
+	    (__cheri_tocap void * __capability)scb);
 	if (error)
 		panic("%s: if_clone_create() for our 2nd iface failed: %d",
 		    __func__, error);

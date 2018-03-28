@@ -39,10 +39,11 @@ struct if_clone;
 
 /* Methods. */
 typedef int	ifc_match_t(struct if_clone *, const char *);
-typedef int	ifc_create_t(struct if_clone *, char *, size_t, caddr_t);
+typedef int	ifc_create_t(struct if_clone *, char *, size_t,
+		    void * __capability);
 typedef int	ifc_destroy_t(struct if_clone *, struct ifnet *);
 
-typedef int	ifcs_create_t(struct if_clone *, int, caddr_t);
+typedef int	ifcs_create_t(struct if_clone *, int, void * __capability);
 typedef void	ifcs_destroy_t(struct ifnet *);
 
 /* Interface cloner (de)allocating functions. */
@@ -66,7 +67,7 @@ EVENTHANDLER_DECLARE(if_clone_event, if_clone_event_handler_t);
 
 /* The below interfaces used only by net/if.c. */
 void	vnet_if_clone_init(void);
-int	if_clone_create(char *, size_t, caddr_t);
+int	if_clone_create(char *, size_t, void * __capability);
 int	if_clone_destroy(const char *);
 int	if_clone_list(struct if_clonereq *);
 struct if_clone *if_clone_findifc(struct ifnet *);

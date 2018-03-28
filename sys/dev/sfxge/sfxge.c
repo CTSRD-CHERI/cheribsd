@@ -527,7 +527,7 @@ sfxge_if_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 	{
 		struct ifi2creq i2c;
 
-		error = copyin(ifr_data_get_ptr(ifr), &i2c, sizeof(i2c));
+		error = copyin_c(ifr_data_get_ptr(ifr), &i2c, sizeof(i2c));
 		if (error != 0)
 			break;
 
@@ -542,24 +542,21 @@ sfxge_if_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 						&i2c.data[0]);
 		SFXGE_ADAPTER_UNLOCK(sc);
 		if (error == 0)
-			error = copyout(&i2c, ifr_data_get_ptr(ifr),
+			error = copyout_c(&i2c, ifr_data_get_ptr(ifr),
 			    sizeof(i2c));
 		break;
 	}
 #endif
 	case SIOCGPRIVATE_0:
-#ifdef CPU_CHERI
-#error Unvalidatable ifr_data use.  Unsafe with CheriABI.
-#endif
 		error = priv_check(curthread, PRIV_DRIVER);
 		if (error != 0)
 			break;
-		error = copyin(ifr_data_get_ptr(ifr), &ioc, sizeof(ioc));
+		error = copyin_c(ifr_data_get_ptr(ifr), &ioc, sizeof(ioc));
 		if (error != 0)
 			return (error);
 		error = sfxge_private_ioctl(sc, &ioc);
 		if (error == 0) {
-			error = copyout(&ioc, ifr_data_get_ptr(ifr),
+			error = copyout_c(&ioc, ifr_data_get_ptr(ifr),
 			    sizeof(ioc));
 		}
 		break;

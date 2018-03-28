@@ -2056,7 +2056,9 @@ iwi_ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 	switch (cmd) {
 	case SIOCGIWISTATS:
 		/* XXX validate permissions/memory/etc? */
-		error = copyout(&sc->sc_linkqual, ifr_data_get_ptr(ifr),
+		error = copyout_c(
+		    (__cheri_tocap struct iwi_notif_link_quality * __capability)
+		    &sc->sc_linkqual, ifr_data_get_ptr(ifr),
 		    sizeof(struct iwi_notif_link_quality));
 		break;
 	case SIOCZIWISTATS:

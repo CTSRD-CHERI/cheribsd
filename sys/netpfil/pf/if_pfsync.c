@@ -1317,7 +1317,7 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		pfsyncr.pfsyncr_defer = (PFSYNCF_DEFER ==
 		    (sc->sc_flags & PFSYNCF_DEFER));
 		PFSYNC_UNLOCK(sc);
-		return (copyout(&pfsyncr, ifr_data_get_ptr(ifr),
+		return (copyout_c(&pfsyncr, ifr_data_get_ptr(ifr),
 		    sizeof(pfsyncr)));
 
 	case SIOCSETPFSYNC:
@@ -1329,7 +1329,7 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 		if ((error = priv_check(curthread, PRIV_NETINET_PF)) != 0)
 			return (error);
-		if ((error = copyin(ifr_data_get_ptr(ifr), &pfsyncr,
+		if ((error = copyin_c(ifr_data_get_ptr(ifr), &pfsyncr,
 		    sizeof(pfsyncr))))
 			return (error);
 

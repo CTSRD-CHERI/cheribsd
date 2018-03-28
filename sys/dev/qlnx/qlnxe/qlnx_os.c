@@ -2360,7 +2360,7 @@ qlnx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		struct ecore_hwfn *p_hwfn = &ha->cdev.hwfns[0];
 		struct ecore_ptt *p_ptt;
 
-		ret = copyin(ifr_data_get_ptr(ifr), &i2c, sizeof(i2c));
+		ret = copyin_c(ifr_data_get_ptr(ifr), &i2c, sizeof(i2c));
 
 		if (ret)
 			break;
@@ -2390,7 +2390,7 @@ qlnx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		}
 
-		ret = copyout(&i2c, ifr_data_get_ptr(ifr), sizeof(i2c));
+		ret = copyout_c(&i2c, ifr_data_get_ptr(ifr), sizeof(i2c));
 
 		QL_DPRINT8(ha, "SIOCGI2C copyout ret = %d \
 			 len = %d addr = 0x%02x offset = 0x%04x \

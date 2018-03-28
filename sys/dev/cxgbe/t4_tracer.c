@@ -133,7 +133,8 @@ t4_cloner_match(struct if_clone *ifc, const char *name)
 }
 
 static int
-t4_cloner_create(struct if_clone *ifc, char *name, size_t len, caddr_t params)
+t4_cloner_create(struct if_clone *ifc, char *name, size_t len,
+    void * __capability params __unused)
 {
 	struct match_rr mrr;
 	struct adapter *sc;

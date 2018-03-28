@@ -2973,12 +2973,12 @@ ndis_80211ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 	switch (cmd) {
 	case SIOCGDRVSPEC:
 	case SIOCSDRVSPEC:
-		error = copyin(ifr_data_get_ptr(ifr), &oid, sizeof(oid));
+		error = copyin_c(ifr_data_get_ptr(ifr), &oid, sizeof(oid));
 		if (error)
 			break;
 		oidbuf = malloc(oid.len, M_TEMP, M_WAITOK | M_ZERO);
-		error = copyin((caddr_t)ifr_data_get_ptr(ifr) + sizeof(oid),
-		    oidbuf, oid.len);
+		error = copyin_c((char * __capability)ifr_data_get_ptr(ifr) +
+		    sizeof(oid), oidbuf, oid.len);
 	}
 
 	if (error) {
@@ -3000,7 +3000,7 @@ ndis_80211ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 			NDIS_UNLOCK(sc);
 			break;
 		}
-		error = copyin(ifr_data_get_ptr(ifr), &evt, sizeof(evt));
+		error = copyin_c(ifr_data_get_ptr(ifr), &evt, sizeof(evt));
 		if (error) {
 			NDIS_UNLOCK(sc);
 			break;
@@ -3010,15 +3010,15 @@ ndis_80211ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 			NDIS_UNLOCK(sc);
 			break;
 		}
-		error = copyout(&sc->ndis_evt[sc->ndis_evtcidx],
+		error = copyout_c(&sc->ndis_evt[sc->ndis_evtcidx],
 		    ifr_data_get_ptr(ifr), sizeof(uint32_t) * 2);
 		if (error) {
 			NDIS_UNLOCK(sc);
 			break;
 		}
 		if (sc->ndis_evt[sc->ndis_evtcidx].ne_len) {
-			error = copyout(sc->ndis_evt[sc->ndis_evtcidx].ne_buf,
-			    (caddr_t)ifr_data_get_ptr(ifr) +
+			error = copyout_c(sc->ndis_evt[sc->ndis_evtcidx].ne_buf,
+			    (char * __capability)ifr_data_get_ptr(ifr) +
 			    (sizeof(uint32_t) * 2),
 			    sc->ndis_evt[sc->ndis_evtcidx].ne_len);
 			if (error) {
@@ -3041,11 +3041,12 @@ ndis_80211ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 	switch (cmd) {
 	case SIOCGDRVSPEC:
 	case SIOCSDRVSPEC:
-		error = copyout(&oid, ifr_data_get_ptr(ifr), sizeof(oid));
+		error = copyout_c(&oid, ifr_data_get_ptr(ifr), sizeof(oid));
 		if (error)
 			break;
-		error = copyout(oidbuf,
-		    (caddr_t)ifr_data_get_ptr(ifr) + sizeof(oid), oid.len);
+		error = copyout_c(oidbuf,
+		    (char * __capability)ifr_data_get_ptr(ifr) + sizeof(oid),
+		    oid.len);
 	}
 
 	free(oidbuf, M_TEMP);

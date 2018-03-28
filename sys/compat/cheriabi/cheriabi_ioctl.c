@@ -265,8 +265,8 @@ cheriabi_ioctl_translate_in(u_long com, void *data, u_long *t_comp,
 		reqsize = cheriabi_ioctl_iru_data_consumers[i].size;
 		reqperms = cheriabi_ioctl_iru_data_consumers[i].perms;
 
-		return (cheriabi_cap_to_ptr((caddr_t *)&ifr->ifr_data,
-		    ifr_c->ifr_data, reqsize, reqperms, 1));
+		return (cheriabi_cap_to_ptr((caddr_t *)&ifr->ifr_ifru.ifru_data,
+		    ifr_c->ifr_ifru.ifru_data, reqsize, reqperms, 1));
 	}
 
 	/* Other struct ifreq consumers */

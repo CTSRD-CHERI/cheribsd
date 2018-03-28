@@ -888,7 +888,8 @@ vlan_clone_match(struct if_clone *ifc, const char *name)
 }
 
 static int
-vlan_clone_create(struct if_clone *ifc, char *name, size_t len, caddr_t params)
+vlan_clone_create(struct if_clone *ifc, char *name, size_t len,
+    void * __capability params)
 {
 	char *dp;
 	int wildcard;
@@ -916,7 +917,7 @@ vlan_clone_create(struct if_clone *ifc, char *name, size_t len, caddr_t params)
 	 * called for.
 	 */
 	if (params) {
-		error = copyin(params, &vlr, sizeof(vlr));
+		error = copyin_c(params, &vlr, sizeof(vlr));
 		if (error)
 			return error;
 		p = ifunit_ref(vlr.vlr_parent);
@@ -1757,7 +1758,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		}
 #endif
-		error = copyin(ifr_data_get_ptr(ifr), &vlr, sizeof(vlr));
+		error = copyin_c(ifr_data_get_ptr(ifr), &vlr, sizeof(vlr));
 		if (error)
 			break;
 		if (vlr.vlr_parent[0] == '\0') {
@@ -1794,7 +1795,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			vlr.vlr_tag = ifv->ifv_vid;
 		}
 		VLAN_UNLOCK();
-		error = copyout(&vlr, ifr_data_get_ptr(ifr), sizeof(vlr));
+		error = copyout_c(&vlr, ifr_data_get_ptr(ifr), sizeof(vlr));
 		break;
 		
 	case SIOCSIFFLAGS:

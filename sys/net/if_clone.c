@@ -97,10 +97,11 @@ struct if_clone {
 
 static void	if_clone_free(struct if_clone *ifc);
 static int	if_clone_createif(struct if_clone *ifc, char *name, size_t len,
-		    caddr_t params);
+		    void * __capability params);
 
 static int     ifc_simple_match(struct if_clone *, const char *);
-static int     ifc_simple_create(struct if_clone *, char *, size_t, caddr_t);
+static int     ifc_simple_create(struct if_clone *, char *, size_t,
+		    void * __capability);
 static int     ifc_simple_destroy(struct if_clone *, struct ifnet *);
 
 static struct mtx if_cloners_mtx;
@@ -172,7 +173,7 @@ vnet_if_clone_init(void)
  * Lookup and create a clone network interface.
  */
 int
-if_clone_create(char *name, size_t len, caddr_t params)
+if_clone_create(char *name, size_t len, void * __capability params)
 {
 	struct if_clone *ifc;
 
@@ -212,7 +213,8 @@ if_clone_create(char *name, size_t len, caddr_t params)
  * Create a clone network interface.
  */
 static int
-if_clone_createif(struct if_clone *ifc, char *name, size_t len, caddr_t params)
+if_clone_createif(struct if_clone *ifc, char *name, size_t len,
+   void * __capability params)
 {
 	int err;
 	struct ifnet *ifp;
@@ -665,7 +667,8 @@ ifc_simple_match(struct if_clone *ifc, const char *name)
 }
 
 static int
-ifc_simple_create(struct if_clone *ifc, char *name, size_t len, caddr_t params)
+ifc_simple_create(struct if_clone *ifc, char *name, size_t len,
+    void * __capability params)
 {
 	char *dp;
 	int wildcard;

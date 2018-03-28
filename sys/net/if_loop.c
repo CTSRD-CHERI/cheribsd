@@ -91,7 +91,7 @@
 int		loioctl(struct ifnet *, u_long, caddr_t);
 int		looutput(struct ifnet *ifp, struct mbuf *m,
 		    const struct sockaddr *dst, struct route *ro);
-static int	lo_clone_create(struct if_clone *, int, caddr_t);
+static int	lo_clone_create(struct if_clone *, int, void * __capability);
 static void	lo_clone_destroy(struct ifnet *);
 
 VNET_DEFINE(struct ifnet *, loif);	/* Used externally */
@@ -119,7 +119,8 @@ lo_clone_destroy(struct ifnet *ifp)
 }
 
 static int
-lo_clone_create(struct if_clone *ifc, int unit, caddr_t params)
+lo_clone_create(struct if_clone *ifc, int unit,
+    void * __capability params __unused)
 {
 	struct ifnet *ifp;
 

@@ -707,7 +707,7 @@ void if_hw_tsomax_common(if_t ifp, struct ifnet_hw_tsomax *);
 int if_hw_tsomax_update(if_t ifp, struct ifnet_hw_tsomax *);
 
 /* accessors for struct ifreq */
-void *ifr_data_get_ptr(void *ifrp);
+void * __capability ifr_data_get_ptr(void *ifrp);
 
 #ifdef DEVICE_POLLING
 enum poll_cmd { POLL_ONLY, POLL_AND_CHECK_STATUS };

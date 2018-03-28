@@ -582,9 +582,6 @@ oce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	case SIOCGPRIVATE_0:
-#ifdef CPU_CHERI
-#error Unvalidatable ifr_data use.  Unsafe with CheriABI.
-#endif
 		rc = oce_handle_passthrough(ifp, data);
 		break;
 	default:
@@ -2277,21 +2274,21 @@ oce_handle_passthrough(struct ifnet *ifp, caddr_t data)
 	struct ifreq *ifr = (struct ifreq *)data;
 	int rc = ENXIO;
 	char cookie[32] = {0};
-	void *priv_data = ifr_data_get_ptr(ifr);
-	void *ioctl_ptr;
+	void * __capability priv_data = ifr_data_get_ptr(ifr);
+	void * __capabilty ioctl_ptr;
 	uint32_t req_size;
 	struct mbx_hdr req;
 	OCE_DMA_MEM dma_mem;
 	struct mbx_common_get_cntl_attr *fw_cmd;
 
-	if (copyin(priv_data, cookie, strlen(IOCTL_COOKIE)))
+	if (copyin_c(priv_data, cookie, strlen(IOCTL_COOKIE)))
 		return EFAULT;
 
 	if (memcmp(cookie, IOCTL_COOKIE, strlen(IOCTL_COOKIE)))
 		return EINVAL;
 
-	ioctl_ptr = (char *)priv_data + strlen(IOCTL_COOKIE);
-	if (copyin(ioctl_ptr, &req, sizeof(struct mbx_hdr)))
+	ioctl_ptr = (char * __capability)priv_data + strlen(IOCTL_COOKIE);
+	if (copyin_c(ioctl_ptr, &req, sizeof(struct mbx_hdr)))
 		return EFAULT;
 
 	req_size = le32toh(req.u0.req.request_length);

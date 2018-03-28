@@ -32,6 +32,10 @@
 
 #include <dev/vxge/vxge.h>
 
+#ifdef CPU_CHERI
+#error ifr_data access not converted to CHERI as it is broken (PR 227058)
+#endif
+
 static int vxge_pci_bd_no = -1;
 static u32 vxge_drv_copyright = 0;
 static u32 vxge_dev_ref_count = 0;
@@ -3677,9 +3681,6 @@ vxge_ioctl(ifnet_t ifp, u_long command, caddr_t data)
 		break;
 
 	case SIOCGPRIVATE_1:
-#ifdef CPU_CHERI
-#error Unvalidatable ifr_data use.  Unsafe with CheriABI.
-#endif
 		VXGE_DRV_LOCK(vdev);
 		err = vxge_ioctl_regs(vdev, ifr);
 		VXGE_DRV_UNLOCK(vdev);

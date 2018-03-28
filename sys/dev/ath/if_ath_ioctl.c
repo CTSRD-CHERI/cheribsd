@@ -267,11 +267,15 @@ ath_ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 		    rt->info[sc->sc_txrix].dot11Rate &~ IEEE80211_RATE_BASIC;
 		if (rt->info[sc->sc_txrix].phy & IEEE80211_T_HT)
 			sc->sc_stats.ast_tx_rate |= IEEE80211_RATE_MCS;
-		return copyout(&sc->sc_stats, ifr_data_get_ptr(ifr),
+		return copyout_c(
+		    (__cheri_tocap struct ath_stats * __capability)
+		    &sc->sc_stats, ifr_data_get_ptr(ifr),
 		    sizeof (sc->sc_stats));
 	}
 	case SIOCGATHAGSTATS:
-		return copyout(&sc->sc_aggr_stats, ifr_data_get_ptr(ifr),
+		return copyout_c(
+		    (__cheri_tocap struct ath_stats * __capability)
+		    &sc->sc_aggr_stats, ifr_data_get_ptr(ifr),
 		    sizeof (sc->sc_aggr_stats));
 	case SIOCZATHSTATS: {
 		int error;
