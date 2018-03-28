@@ -212,9 +212,6 @@ cheriabi_ioctl_translate_in(u_long com, void *data, u_long *t_comp,
 	}
 
 	/* ifr_data consumers */
-	case SIOCGIFMAC_C:
-	case SIOCSIFMAC_C:
-	case SIOCSIFNAME_C:
 	case BXE_IOC_RD_NVRAM_C:
 	case BXE_IOC_STATS_SHOW_CNT_C:
 	case BXE_IOC_STATS_SHOW_NUM_C:
@@ -252,9 +249,6 @@ cheriabi_ioctl_translate_in(u_long com, void *data, u_long *t_comp,
 		switch (com) {
 		case BXE_IOC_RD_NVRAM_C:	/* requires parsing for size */
 		case BXE_IOC_WR_NVRAM_C:	/* requires parsing for size  */
-		case SIOCGIFMAC_C:		/* contains string */
-		case SIOCSIFMAC_C:		/* contains string */
-		case SIOCSIFNAME_C:		/* string */
 		case SIOCGVH_C:			/* copies multiple */
 			*t_comp = com;	/* Direct handling required */
 			break;
@@ -491,9 +485,6 @@ cheriabi_ioctl_translate_out(u_long com, void *data, void *t_data)
 	}
 
 	/* ifr_ifdata users */
-	case SIOCGIFMAC_C:
-	case SIOCSIFMAC_C:
-	case SIOCSIFNAME_C:
 	case BXE_IOC_RD_NVRAM_C:
 	case BXE_IOC_STATS_SHOW_CNT_C:
 	case BXE_IOC_STATS_SHOW_NUM_C:
@@ -642,9 +633,6 @@ ioctl_data_contains_pointers(u_long cmd)
 	case SG_IO_C:
 
 	/* ifr_ifdata users */
-	case SIOCGIFMAC_C:
-	case SIOCSIFMAC_C:
-	case SIOCSIFNAME_C:
 	case BXE_IOC_RD_NVRAM_C:
 	case BXE_IOC_STATS_SHOW_CNT_C:
 	case BXE_IOC_STATS_SHOW_NUM_C:

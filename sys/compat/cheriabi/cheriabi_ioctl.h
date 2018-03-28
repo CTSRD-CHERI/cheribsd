@@ -137,9 +137,6 @@ struct bpf_program_c {
 #define BIOCSETFNR_C	_IOC_NEWTYPE(BIOCSETFNR, struct bpf_program_c)
 
 /* ifr_data consumers */
-#define	SIOCGIFMAC_C		_IOC_NEWTYPE(SIOCGIFMAC, struct ifreq_c)
-#define	SIOCSIFMAC_C		_IOC_NEWTYPE(SIOCSIFMAC, struct ifreq_c)
-#define	SIOCSIFNAME_C		_IOC_NEWTYPE(SIOCSIFNAME, struct ifreq_c)
 #define	BXE_IOC_RD_NVRAM_C	_IOC_NEWTYPE(BXE_IOC_RD_NVRAM, struct ifreq_c)
 #define	BXE_IOC_STATS_SHOW_C	_IOC_NEWTYPE(BXE_IOC_STATS_SHOW, struct ifreq_c)
 #define	BXE_IOC_STATS_SHOW_CNT_C \
@@ -181,12 +178,6 @@ static const struct {
 	register_t	perms;
 } cheriabi_ioctl_iru_data_consumers[] =
 {
-	{ SIOCGIFMAC_C,	sizeof(struct mac_c),
-	    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP },
-	{ SIOCSIFMAC_C,	sizeof(struct mac_c),
-	    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP },
-	{ SIOCSIFNAME_C, 1 /* up to IFNAMSIZ, but is a string */,
-	    CHERI_PERM_LOAD },
 	{ BXE_IOC_RD_NVRAM_C, sizeof(struct bxe_nvram_data),
 	    CHERI_PERM_STORE },
 	{ BXE_IOC_WR_NVRAM_C, sizeof(struct bxe_nvram_data), CHERI_PERM_LOAD },
