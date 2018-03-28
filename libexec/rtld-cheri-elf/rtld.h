@@ -420,4 +420,6 @@ int reloc_iresolve(Obj_Entry *, struct Struct_RtldLockState *);
 int reloc_gnu_ifunc(Obj_Entry *, int flags, struct Struct_RtldLockState *);
 void allocate_initial_tls(Obj_Entry *);
 
+void process___cap_relocs(Obj_Entry*);
+
 #endif /* } */

@@ -47,6 +47,8 @@ __FBSDID("$FreeBSD$");
 #include "debug.h"
 #include "rtld.h"
 
+#include <cheri_init_globals.h>
+
 #define	GOT1_MASK	0x8000000000000000UL
 
 /*
@@ -281,6 +283,10 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 
 
 		default:
+			/*
+			 * XXXAR: the printf will fault in cap-table mode since
+			 * the __cap_relocs have not been processed yet!
+			 */
 #ifdef DEBUG
 			rtld_printf("sym = %lu, type = %lu, offset = %p, "
 			    "contents = %p, symbol = %s\n",
@@ -915,4 +921,97 @@ __tls_get_addr(tls_index* ti)
 	p = tls_get_addr_common(tls, ti->ti_module, ti->ti_offset + TLS_DTP_OFFSET);
 
 	return (p);
+}
+
+/* FIXME: replace this with cheri_init_globals_impl once everyone has updated clang */
+static __attribute__((always_inline))
+void _do___caprelocs(const struct capreloc *start_relocs,
+    const struct capreloc * stop_relocs, void* gdc, void* pcc, vaddr_t base_addr)
+{
+
+	gdc = __builtin_cheri_perms_and(gdc, global_pointer_permissions);
+	pcc = __builtin_cheri_perms_and(pcc, function_pointer_permissions);
+	for (const struct capreloc *reloc = start_relocs; reloc < stop_relocs; reloc++) {
+		_Bool isFunction = (reloc->permissions & function_reloc_flag) ==
+		    function_reloc_flag;
+		void **dest = __builtin_cheri_offset_set(gdc,
+		    reloc->capability_location + base_addr);
+		if (reloc->object == 0) {
+			/*
+			 * XXXAR: clang fills uninitialized capabilities with
+			 * 0xcacaca..., so we we need to explicitly write NUL
+			 * here.
+			 */
+			*dest = (void*)0;
+			continue;
+		}
+		void *base = isFunction ? pcc : gdc;
+		void *src = __builtin_cheri_offset_set(base, reloc->object);
+		if (!isFunction && (reloc->size != 0))
+		{
+			src = __builtin_cheri_bounds_set(src, reloc->size);
+		}
+		src = __builtin_cheri_offset_increment(src, reloc->offset);
+		*dest = src;
+	}
+}
+
+/*
+ * XXXAR: We can't use cheri_init_globals since that uses dla and
+ * therefore would cause text relocations. Instead use the PIC_LOAD_CODE_PTR()
+ * macro in the assembly and pass in __start_cap_relocs/__stop_cap_relocs.
+ *
+ * TODO: We could also parse the DT_CHERI___CAPRELOCS and DT_CHERI___CAPRELOCSSZ
+ * in _rtld_relocate_nonplt_self and save that to the stack instead. Might
+ * save a few instructions but not sure it's worth the effort of writing more asm.
+ */
+void
+_rtld_do___caprelocs_self(const struct capreloc *start_relocs,
+    const struct capreloc* end_relocs)
+{
+	void *ddc = __builtin_cheri_global_data_get();
+	void *pcc = __builtin_cheri_program_counter_get();
+
+	_do___caprelocs(start_relocs, end_relocs, ddc, pcc, 0);
+}
+
+void
+process___cap_relocs(Obj_Entry* obj)
+{
+	if (obj->cap_relocs_processed) {
+		dbg("__cap_relocs for %s have already been processed!", obj->path);
+		/* TODO: abort() to prevent this from happening? */
+		return;
+	}
+	struct capreloc *start_relocs = (struct capreloc *)obj->cap_relocs;
+	struct capreloc *end_relocs =
+	    (struct capreloc *)(obj->cap_relocs + obj->cap_relocs_size);
+	/*
+	 * It would be nice if we could use a DDC and PCC with smaller bounds
+	 * here. However, the target could be in a different shared library so
+	 * while we are still using __cap_relocs just derive it from RTLD.
+	 *
+	 * TODO: reject those binaries and suggest relinking with the right flag
+	 */
+	void *ddc = __builtin_cheri_global_data_get();
+	void *pcc = __builtin_cheri_program_counter_get();
+
+	dbg("Processing %lu __cap_relocs for %s\n",
+	    (start_relocs - start_relocs), obj->path);
+
+	/*
+	 * We currently emit dynamic relocations for the cap_relocs location, so
+	 * they will already have been processed when this function is called.
+	 * This means the load address will already be included in
+	 * reloc->capability_location.
+	 */
+#if 0
+	/* TODO: don't emit dynamic relocations for obj->capability_location */
+	vaddr_t base_addr = (vaddr_t)obj->relocbase;
+#endif
+	vaddr_t base_addr = 0;
+
+	_do___caprelocs(start_relocs, end_relocs, ddc, pcc, base_addr);
+
+	obj->cap_relocs_processed = true;
 }
