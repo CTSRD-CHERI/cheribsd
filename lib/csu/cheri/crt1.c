@@ -57,6 +57,7 @@ __FBSDID("$FreeBSD: head/lib/csu/mips/crt1_c.c 245133 2013-01-07 17:58:27Z kib $
 #include "ignore_init.c"
 /* For -pie executables rtld will initialize the __cap_relocs */
 #ifndef POSITION_INDEPENDENT_STARTUP
+#define DONT_EXPORT_CRT_INIT_GLOBALS
 #include "crt_init_globals.c"
 #endif
 

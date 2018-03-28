@@ -34,11 +34,19 @@
 
 #include <cheri_init_globals.h>
 
-void crt_init_globals(void) __hidden;
+/* Avoid adding an unncessary crt_init_globals() export from crt1.o for a
+ * function that the compiler will inline anyway: */
+#ifndef DONT_EXPORT_CRT_INIT_GLOBALS
+#define CRT_INIT_GLOBALS_STATIC
+#else
+#define CRT_INIT_GLOBALS_STATIC static __always_inline
+#endif
+
+CRT_INIT_GLOBALS_STATIC void crt_init_globals(void) __hidden;
 
 __attribute__((weak)) extern int _DYNAMIC;
 
-void
+CRT_INIT_GLOBALS_STATIC void
 crt_init_globals(void)
 {
 #ifdef PCREL_SYMBOL_ADDRESSES_WORK
