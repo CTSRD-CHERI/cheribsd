@@ -81,10 +81,21 @@ Elf_Auxinfo *__auxargs;
 DEFINE_CHERI_START_FUNCTION(_start)
 #else
 /* RTLD takes care of initializing $cgp, and all the globals */
+/* FIXME: we should probably just rename _start to __start instead of jumping */
 asm(
+	".text\n\t"
 	".global __start\n\t"
 	"__start:\n\t"
-	"b _start\n\t");
+	".set noreorder\n\t"
+	".set noat\n\t"
+	".protected _start\n\t"
+	/* Setup $c12 correctly in case we are inferring $cgp from $c12 */
+	"lui $1, %pcrel_hi(_start - 8)\n\t"
+	"daddiu $1, $1, %pcrel_lo(_start - 4)\n\t"
+	"cgetpcc $c12\n\t"
+	"cincoffset $c12, $c12, $1\n\t"
+	"cjr $c12\n\t"
+	"nop\n\t");
 #endif
 
 /* The entry function, C part. This performs the bulk of program initialisation
