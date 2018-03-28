@@ -228,7 +228,6 @@ cheriabi_ioctl_translate_in(u_long com, void *data, u_long *t_comp,
 	case SIOCGETPFSYNC_C:
 	case SIOCGETVLAN_C:
 	case SIOCGI2C_C:
-	case SIOCGIFADDR_C:
 	case SIOCGIFGENERIC_C:
 	case SIOCGIWISTATS_C:
 	/* case SIOCGMVSTATS_C: conficts with SIOCGATHSTATS_C */
@@ -283,6 +282,7 @@ cheriabi_ioctl_translate_in(u_long com, void *data, u_long *t_comp,
 	case SIOCDIFADDR_C:
 	case SIOCDIFPHYADDR_C:
 	case SIOCGHWFLAGS_C:
+	case SIOCGIFADDR_C:
 	case SIOCGIFBRDADDR_C:
 	case SIOCGIFCAP_C:
 	case SIOCGIFDSTADDR_C:
@@ -502,7 +502,6 @@ cheriabi_ioctl_translate_out(u_long com, void *data, void *t_data)
 	case SIOCGETPFSYNC_C:
 	case SIOCGETVLAN_C:
 	case SIOCGI2C_C:
-	case SIOCGIFADDR_C:
 	case SIOCGIFGENERIC_C:
 	case SIOCGIWISTATS_C:
 	/* case SIOCGMVSTATS_C: conflicts with SIOCGATHSTATS_C */
@@ -534,6 +533,7 @@ cheriabi_ioctl_translate_out(u_long com, void *data, void *t_data)
 	case SIOCDIFADDR_C:
 	case SIOCDIFPHYADDR_C:
 	case SIOCGHWFLAGS_C:
+	case SIOCGIFADDR_C:
 	case SIOCGIFBRDADDR_C:
 	case SIOCGIFCAP_C:
 	case SIOCGIFDSTADDR_C:
@@ -650,7 +650,6 @@ ioctl_data_contains_pointers(u_long cmd)
 	case SIOCGETPFSYNC_C:
 	case SIOCGETVLAN_C:
 	case SIOCGI2C_C:
-	case SIOCGIFADDR_C:
 	case SIOCGIFGENERIC_C:
 	case SIOCGIWISTATS_C:
 	/* case SIOCGMVSTATS_C: conflicts with SIOCGATHSTATS_C */
@@ -674,6 +673,7 @@ ioctl_data_contains_pointers(u_long cmd)
 	case SIOCDIFADDR_C:
 	case SIOCDIFPHYADDR_C:
 	case SIOCGHWFLAGS_C:
+	case SIOCGIFADDR_C:
 	case SIOCGIFBRDADDR_C:
 	case SIOCGIFCAP_C:
 	case SIOCGIFDSTADDR_C:

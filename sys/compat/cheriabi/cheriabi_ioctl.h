@@ -159,7 +159,6 @@ struct bpf_program_c {
 #define	SIOCGI2C_C		_IOC_NEWTYPE(SIOCGI2C, struct ifreq_c)
 #define	SIOCGI2C_C		_IOC_NEWTYPE(SIOCGI2C, struct ifreq_c)
 #define	SIOCGI2C_C		_IOC_NEWTYPE(SIOCGI2C, struct ifreq_c)
-#define	SIOCGIFADDR_C		_IOC_NEWTYPE(SIOCGIFADDR, struct ifreq_c)
 #define	SIOCGIFGENERIC_C	_IOC_NEWTYPE(SIOCGIFGENERIC, struct ifreq_c)
 #define	SIOCGIWISTATS_C		_IOC_NEWTYPE(SIOCGIWISTATS, struct ifreq_c)
 #define	SIOCGVH_C		_IOC_NEWTYPE(SIOCGVH, struct ifreq_c)
@@ -200,8 +199,6 @@ static const struct {
 	{ SIOCGETVLAN_C, sizeof(struct vlanreq), CHERI_PERM_STORE },
 	{ SIOCGI2C_C, sizeof(struct ifi2creq),
 	    CHERI_PERM_LOAD | CHERI_PERM_STORE },
-	/* XXX-BD: size varies by family, bcopy used. Dissallow for now. */
-	{ SIOCGIFADDR_C, SIZE_MAX, CHERI_PERM_STORE},
 	/*
 	 * XXX-BD: Also used in an(4) and wl(4) which I've marked broken
 	 * for CPU_CHERI.
