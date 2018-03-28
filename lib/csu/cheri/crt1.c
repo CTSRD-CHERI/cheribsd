@@ -55,7 +55,10 @@ __FBSDID("$FreeBSD: head/lib/csu/mips/crt1_c.c 245133 2013-01-07 17:58:27Z kib $
 #include "libc_private.h"
 #include "crtbrand.c"
 #include "ignore_init.c"
+/* For -pie executables rtld will initialize the __cap_relocs */
+#ifndef POSITION_INDEPENDENT_STARTUP
 #include "crt_init_globals.c"
+#endif
 
 struct Struct_Obj_Entry;
 
@@ -94,7 +97,10 @@ __start(void *auxv,
 	char **env = NULL;
 	Elf_Auxinfo *auxp;
 
+	/* For -pie executables rtld will initialize the __cap_relocs */
+#ifndef POSITION_INDEPENDENT_STARTUP
 	crt_init_globals();
+#endif
 
 	__auxargs = auxv;
 	/* Digest the auxiliary vector. */
