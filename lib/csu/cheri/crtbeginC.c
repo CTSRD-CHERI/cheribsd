@@ -45,23 +45,14 @@ void	crt_call_constructors(void);
 typedef unsigned long long mips_function_ptr;
 typedef void (*cheri_function_ptr)(void);
 
-static mips_function_ptr __attribute__((used))
-    __attribute__((section(".ctors")))
-    __CTOR_LIST__[1] = { (mips_function_ptr)(-1) };
+extern mips_function_ptr __ctors_start[];
+extern mips_function_ptr __ctors_end;
 
-static mips_function_ptr __attribute__((used))
-    __attribute__((section(".dtors")))
-    __DTOR_LIST__[1] = { (mips_function_ptr)(-1) };
+extern mips_function_ptr __dtors_start[];
+extern mips_function_ptr __dtors_end;
 
 extern void *__dso_handle;
 void *__dso_handle;
-
-/*
- * Symbols provided by crtendC.c, which provide us with the tails for the
- * constructor and destructor arrays.
- */
-extern mips_function_ptr __CTOR_END__;
-extern mips_function_ptr __DTOR_END__;
 
 /*
  * Execute constructors; invoked by the crt_sb.S startup code.
@@ -73,11 +64,10 @@ extern mips_function_ptr __DTOR_END__;
 void
 crt_call_constructors(void)
 {
-	mips_function_ptr *func;
-
-	for (func = &__CTOR_LIST__[0];
-	    (vaddr_t)func != (vaddr_t)&__CTOR_END__;
-	    func++) {
+	mips_function_ptr *func = &__ctors_start[0];
+	mips_function_ptr *end = __builtin_cheri_offset_set(func,
+	    (char*)&__ctors_end - (char*)func);
+	for (; func != end; func++) {
 		if (*func != (mips_function_ptr)-1) {
 			cheri_function_ptr cheri_func =
 				(cheri_function_ptr)__builtin_cheri_offset_set(
