@@ -62,7 +62,7 @@ __FBSDID("$FreeBSD: head/lib/csu/mips/crt1_c.c 245133 2013-01-07 17:58:27Z kib $
 
 struct Struct_Obj_Entry;
 
-void __start(void *, void (*)(void), struct Struct_Obj_Entry *);
+static void _start(void *, void (*)(void), struct Struct_Obj_Entry *) __used;
 extern void crt_call_constructors(void);
 
 #ifdef GCRT
@@ -75,6 +75,17 @@ extern int etext;
 
 Elf_Auxinfo *__auxargs;
 
+/* Define an assembly stub that sets up $cgp and jumps to _start */
+#ifndef POSITION_INDEPENDENT_STARTUP
+DEFINE_CHERI_START_FUNCTION(_start)
+#else
+/* RTLD takes care of initializing $cgp, and all the globals */
+asm(
+	".global __start\n\t"
+	"__start:\n\t"
+	"b _start\n\t");
+#endif
+
 /* The entry function, C part. This performs the bulk of program initialisation
  * before handing off to main(). It is called by __start, which is defined in
  * crt1_s.s, and necessarily written in raw assembly so that it can re-align
@@ -85,8 +96,8 @@ Elf_Auxinfo *__auxargs;
  * the position independent code in __start.
  * See: http://stackoverflow.com/questions/8095531/mips-elf-and-partial-linking
  */
-void
-__start(void *auxv,
+static void
+_start(void *auxv,
 	void (*cleanup)(void),			/* from shared loader */
 	struct Struct_Obj_Entry *obj __unused)	/* from shared loader */
 {
@@ -99,6 +110,7 @@ __start(void *auxv,
 
 	/* For -pie executables rtld will initialize the __cap_relocs */
 #ifndef POSITION_INDEPENDENT_STARTUP
+	/* Must be called before accessing any globals */
 	crt_init_globals();
 #endif
 
