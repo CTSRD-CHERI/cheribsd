@@ -1639,7 +1639,7 @@ hme_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 	case SIOCSIFCAP:
 		HME_LOCK(sc);
-		ifp->if_capenable = ifr->ifr_reqcap;
+		ifp->if_capenable = ifr_reqcap_get(ifr);
 		if ((ifp->if_capenable & IFCAP_TXCSUM) != 0)
 			ifp->if_hwassist = sc->sc_csum_features;
 		else

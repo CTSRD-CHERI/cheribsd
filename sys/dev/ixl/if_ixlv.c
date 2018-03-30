@@ -684,14 +684,14 @@ ixlv_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	case SIOCSIFMTU:
 		IOCTL_DBG_IF2(ifp, "SIOCSIFMTU (Set Interface MTU)");
 		mtx_lock(&sc->mtx);
-		if (ifr->ifr_mtu > IXL_MAX_FRAME -
+		if (ifr_mtu_get(ifr) > IXL_MAX_FRAME -
 		    ETHER_HDR_LEN - ETHER_CRC_LEN - ETHER_VLAN_ENCAP_LEN) {
 			error = EINVAL;
 			IOCTL_DBG_IF(ifp, "mtu too large");
 		} else {
-			IOCTL_DBG_IF2(ifp, "mtu: %lu -> %d", (u_long)ifp->if_mtu, ifr->ifr_mtu);
+			IOCTL_DBG_IF2(ifp, "mtu: %lu -> %d", (u_long)ifp->if_mtu, ifr_mtu_get(ifr));
 			// ERJ: Interestingly enough, these types don't match
-			ifp->if_mtu = (u_long)ifr->ifr_mtu;
+			ifp->if_mtu = (u_long)ifr_mtu_get(ifr);
 			vsi->max_frame_size =
 			    ifp->if_mtu + ETHER_HDR_LEN + ETHER_CRC_LEN
 			    + ETHER_VLAN_ENCAP_LEN;
@@ -739,7 +739,7 @@ ixlv_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 	case SIOCSIFCAP:
 	{
-		int mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		int mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		IOCTL_DBG_IF2(ifp, "SIOCSIFCAP (Set Capabilities)");
 
 		ixlv_cap_txcsum_tso(vsi, ifp, mask);

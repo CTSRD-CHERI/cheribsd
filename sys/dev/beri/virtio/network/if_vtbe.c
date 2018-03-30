@@ -312,7 +312,7 @@ vtbe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ifmr->ifm_current = ifmr->ifm_active;
 		break;
 	case SIOCSIFCAP:
-		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
+		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
 		if (mask & IFCAP_VLAN_MTU) {
 			ifp->if_capenable ^= IFCAP_VLAN_MTU;
 		}

@@ -4508,28 +4508,23 @@ bxe_ioctl(if_t ifp,
     {
     case SIOCSIFMTU:
         BLOGD(sc, DBG_IOCTL, "Received SIOCSIFMTU ioctl (mtu=%d)\n",
-              ifr->ifr_mtu);
+              ifr_mtu_get(ifr));
 
-        if (sc->mtu == ifr->ifr_mtu) {
+        if (sc->mtu == ifr_mtu_get(ifr)) {
             /* nothing to change */
             break;
         }
 
-        if ((ifr->ifr_mtu < mtu_min) || (ifr->ifr_mtu > mtu_max)) {
+        if ((ifr_mtu_get(ifr) < mtu_min) || (ifr_mtu_get(ifr) > mtu_max)) {
             BLOGE(sc, "Unsupported MTU size %d (range is %d-%d)\n",
-                  ifr->ifr_mtu, mtu_min, mtu_max);
+                  ifr_mtu_get(ifr), mtu_min, mtu_max);
             error = EINVAL;
             break;
         }
 
         atomic_store_rel_int((volatile unsigned int *)&sc->mtu,
-                             (unsigned long)ifr->ifr_mtu);
-	/* 
-        atomic_store_rel_long((volatile unsigned long *)&if_getmtu(ifp),
-                              (unsigned long)ifr->ifr_mtu);
-	XXX - Not sure why it needs to be atomic
-	*/
-	if_setmtu(ifp, ifr->ifr_mtu);
+                             ifr_mtu_get(ifr));
+	if_setmtu(ifp, ifr_mtu_get(ifr));
         reinit = 1;
         break;
 
@@ -4573,7 +4568,7 @@ bxe_ioctl(if_t ifp,
 
     case SIOCSIFCAP:
         /* find out which capabilities have changed */
-        mask = (ifr->ifr_reqcap ^ if_getcapenable(ifp));
+        mask = (ifr_reqcap_get(ifr) ^ if_getcapenable(ifp));
 
         BLOGD(sc, DBG_IOCTL, "Received SIOCSIFCAP ioctl (mask=0x%08x)\n",
               mask);

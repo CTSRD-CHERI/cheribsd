@@ -459,11 +459,11 @@ octe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		 * require reprogramming hardware, they just toggle whether we
 		 * make use of already-present facilities in software.
 		 */
-		ifp->if_capenable = ifr->ifr_reqcap;
+		ifp->if_capenable = ifr_reqcap_get(ifr);
 		return (0);
 
 	case SIOCSIFMTU:
-		error = cvm_oct_common_change_mtu(ifp, ifr->ifr_mtu);
+		error = cvm_oct_common_change_mtu(ifp, ifr_mtu_get(ifr));
 		if (error != 0)
 			return (EINVAL);
 		return (0);

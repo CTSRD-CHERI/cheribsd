@@ -240,12 +240,12 @@ icioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 
 	case SIOCSIFMTU:
-		ic_alloc_buffers(sc, ifr->ifr_mtu);
+		ic_alloc_buffers(sc, ifr_mtu_get(ifr));
 		break;
 
 	case SIOCGIFMTU:
 		mtx_lock(&sc->ic_lock);
-		ifr->ifr_mtu = sc->ic_ifp->if_mtu;
+		ifr_mtu_set(ifr, sc->ic_ifp->if_mtu);
 		mtx_unlock(&sc->ic_lock);
 		break;
 
@@ -253,7 +253,7 @@ icioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	case SIOCDELMULTI:
 		if (ifr == NULL)
 			return (EAFNOSUPPORT);		/* XXX */
-		switch (ifr->ifr_addr.sa_family) {
+		switch (ifr_addr_get_family(ifr)) {
 		case AF_INET:
 			break;
 		default:

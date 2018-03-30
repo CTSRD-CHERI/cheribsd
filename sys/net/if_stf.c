@@ -747,9 +747,7 @@ stf_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
 		ifr = (struct ifreq *)data;
-		if (ifr && ifr->ifr_addr.sa_family == AF_INET6)
-			;
-		else
+		if (ifr == NULL || ifr_addr_get_family(ifr) != AF_INET6)
 			error = EAFNOSUPPORT;
 		break;
 
@@ -758,7 +756,7 @@ stf_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	case SIOCSIFMTU:
 		ifr = (struct ifreq *)data;
-		mtu = ifr->ifr_mtu;
+		mtu = ifr_mtu_get(ifr);
 		/* RFC 4213 3.2 ideal world MTU */
 		if (mtu < IPV6_MINMTU || mtu > IF_MAXMTU - 20)
 			return (EINVAL);

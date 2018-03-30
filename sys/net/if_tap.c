@@ -629,7 +629,7 @@ tapifioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 
 		case SIOCSIFMTU:
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			break;
 
 		case SIOCGIFSTATUS:

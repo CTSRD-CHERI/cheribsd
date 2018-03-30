@@ -1572,7 +1572,7 @@ lagg_setcaps(struct lagg_port *lp, int cap)
 		return (0);
 	if (lp->lp_ioctl == NULL)
 		return (ENXIO);
-	ifr.ifr_reqcap = cap;
+	ifr.ifr_ifru.ifru_cap[0] = cap;	/* ifr_reqcap */
 	return ((*lp->lp_ioctl)(lp->lp_ifp, SIOCSIFCAP, (caddr_t)&ifr));
 }
 

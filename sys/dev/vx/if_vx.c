@@ -931,10 +931,10 @@ vx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	         * Set the interface MTU.
 	         */
 		VX_LOCK(sc);
-		if (ifr->ifr_mtu > ETHERMTU) {
+		if (ifr_mtu_get(ifr) > ETHERMTU) {
 			error = EINVAL;
 		} else {
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 		}
 		VX_UNLOCK(sc);
 		break;

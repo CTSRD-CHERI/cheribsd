@@ -2062,12 +2062,12 @@ mvneta_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 	case SIOCSIFCAP:
 		if (ifp->if_mtu > MVNETA_MAX_CSUM_MTU &&
-		    ifr->ifr_reqcap & IFCAP_TXCSUM)
-			ifr->ifr_reqcap &= ~IFCAP_TXCSUM;
-		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
+		    ifr_reqcap_get(ifr) & IFCAP_TXCSUM)
+			ifr_reqcap_get(ifr) &= ~IFCAP_TXCSUM;
+		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
 		if (mask & IFCAP_HWCSUM) {
 			ifp->if_capenable &= ~IFCAP_HWCSUM;
-			ifp->if_capenable |= IFCAP_HWCSUM & ifr->ifr_reqcap;
+			ifp->if_capenable |= IFCAP_HWCSUM & ifr_reqcap_get(ifr);
 			if (ifp->if_capenable & IFCAP_TXCSUM)
 				ifp->if_hwassist = CSUM_IP | CSUM_TCP |
 				    CSUM_UDP;
@@ -2088,12 +2088,12 @@ mvneta_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		VLAN_CAPABILITIES(ifp);
 		break;
 	case SIOCSIFMEDIA:
-		if ((IFM_SUBTYPE(ifr->ifr_media) == IFM_1000_T ||
-		    IFM_SUBTYPE(ifr->ifr_media) == IFM_2500_T) &&
-		    (ifr->ifr_media & IFM_FDX) == 0) {
+		if ((IFM_SUBTYPE(ifr_media_get(ifr)) == IFM_1000_T ||
+		    IFM_SUBTYPE(ifr_media_get(ifr)) == IFM_2500_T) &&
+		    (ifr_media_get(ifr) & IFM_FDX) == 0) {
 			device_printf(sc->dev,
 			    "%s half-duplex unsupported\n",
-			    IFM_SUBTYPE(ifr->ifr_media) == IFM_1000_T ?
+			    IFM_SUBTYPE(ifr_media_get(ifr)) == IFM_1000_T ?
 			    "1000Base-T" :
 			    "2500Base-T");
 			error = EINVAL;
@@ -2108,11 +2108,11 @@ mvneta_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			    cmd);
 		break;
 	case SIOCSIFMTU:
-		if (ifr->ifr_mtu < 68 || ifr->ifr_mtu > MVNETA_MAX_FRAME -
+		if (ifr_mtu_get(ifr) < 68 || ifr_mtu_get(ifr) > MVNETA_MAX_FRAME -
 		    MVNETA_ETHER_SIZE) {
 			error = EINVAL;
 		} else {
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			mvneta_sc_lock(sc);
 			if (ifp->if_mtu > MVNETA_MAX_CSUM_MTU) {
 				ifp->if_capenable &= ~IFCAP_TXCSUM;

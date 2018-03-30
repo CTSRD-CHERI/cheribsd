@@ -234,9 +234,9 @@ me_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	switch (cmd) {
 	case SIOCSIFMTU:
-		if (ifr->ifr_mtu < 576)
+		if (ifr_mtu_get(ifr) < 576)
 			return (EINVAL);
-		ifp->if_mtu = ifr->ifr_mtu;
+		ifp->if_mtu = ifr_mtu_get(ifr);
 		return (0);
 	case SIOCSIFADDR:
 		ifp->if_flags |= IFF_UP;
@@ -283,7 +283,7 @@ me_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ME_RUNLOCK(sc);
 			break;
 		}
-		src = (struct sockaddr_in *)&ifr->ifr_addr;
+		src = ifr_addr_get_sa(ifr);
 		memset(src, 0, sizeof(*src));
 		src->sin_family = AF_INET;
 		src->sin_len = sizeof(*src);
@@ -301,15 +301,15 @@ me_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			memset(src, 0, sizeof(*src));
 		break;
 	case SIOCGTUNFIB:
-		ifr->ifr_fib = sc->me_fibnum;
+		ifr_fib_set(ifr, sc->me_fibnum);
 		break;
 	case SIOCSTUNFIB:
 		if ((error = priv_check(curthread, PRIV_NET_GRE)) != 0)
 			break;
-		if (ifr->ifr_fib >= rt_numfibs)
+		if (ifr_fib_get(ifr) >= rt_numfibs)
 			error = EINVAL;
 		else
-			sc->me_fibnum = ifr->ifr_fib;
+			sc->me_fibnum = ifr_fib_get(ifr);
 		break;
 	default:
 		error = EINVAL;

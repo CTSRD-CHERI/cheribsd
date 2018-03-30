@@ -444,7 +444,7 @@ nfs_mountroot(struct mount *mp)
 	if (error)
 		panic("nfs_mountroot: SIOCAIFADDR: %d", error);
 	if ((cp = kern_getenv("boot.netif.mtu")) != NULL) {
-		ir.ifr_mtu = strtol(cp, NULL, 10);
+		ir.ifr_ifru.ifru_mtu = strtol(cp, NULL, 10);
 		bcopy(nd->myif.ifra_name, ir.ifr_name, IFNAMSIZ);
 		freeenv(cp);
 		error = ifioctl(so, SIOCSIFMTU, (caddr_t)&ir, td);

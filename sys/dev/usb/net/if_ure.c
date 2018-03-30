@@ -897,7 +897,7 @@ ure_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	reinit = 0;
 	if (cmd == SIOCSIFCAP) {
 		URE_LOCK(sc);
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if (reinit > 0 && ifp->if_drv_flags & IFF_DRV_RUNNING)
 			ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 		else

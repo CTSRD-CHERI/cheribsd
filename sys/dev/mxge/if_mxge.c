@@ -4162,7 +4162,7 @@ mxge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	err = 0;
 	switch (command) {
 	case SIOCSIFMTU:
-		err = mxge_change_mtu(sc, ifr->ifr_mtu);
+		err = mxge_change_mtu(sc, ifr_mtu_get(ifr));
 		break;
 
 	case SIOCSIFFLAGS:
@@ -4198,7 +4198,7 @@ mxge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 
 	case SIOCSIFCAP:
 		mtx_lock(&sc->driver_mtx);
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if (mask & IFCAP_TXCSUM) {
 			if (IFCAP_TXCSUM & ifp->if_capenable) {
 				ifp->if_capenable &= ~(IFCAP_TXCSUM|IFCAP_TSO4);

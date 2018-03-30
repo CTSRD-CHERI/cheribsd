@@ -2261,14 +2261,15 @@ vge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	switch (command) {
 	case SIOCSIFMTU:
 		VGE_LOCK(sc);
-		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > VGE_JUMBO_MTU)
+		if (ifr_mtu_get(ifr) < ETHERMIN ||
+		    ifr_mtu_get(ifr) > VGE_JUMBO_MTU)
 			error = EINVAL;
-		else if (ifp->if_mtu != ifr->ifr_mtu) {
-			if (ifr->ifr_mtu > ETHERMTU &&
+		else if (ifp->if_mtu != ifr_mtu_get(ifr)) {
+			if (ifr_mtu_get(ifr) > ETHERMTU &&
 			    (sc->vge_flags & VGE_FLAG_JUMBO) == 0)
 				error = EINVAL;
 			else
-				ifp->if_mtu = ifr->ifr_mtu;
+				ifp->if_mtu = ifr_mtu_get(ifr);
 		}
 		VGE_UNLOCK(sc);
 		break;
@@ -2299,10 +2300,10 @@ vge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;
 	case SIOCSIFCAP:
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 #ifdef DEVICE_POLLING
 		if (mask & IFCAP_POLLING) {
-			if (ifr->ifr_reqcap & IFCAP_POLLING) {
+			if (ifr_reqcap_get(ifr) & IFCAP_POLLING) {
 				error = ether_poll_register(vge_poll, ifp);
 				if (error)
 					return (error);

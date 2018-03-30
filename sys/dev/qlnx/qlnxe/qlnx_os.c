@@ -2258,11 +2258,11 @@ qlnx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	case SIOCSIFMTU:
 		QL_DPRINT4(ha, "SIOCSIFMTU (0x%lx)\n", cmd);
 
-		if (ifr->ifr_mtu > QLNX_MAX_MTU) {
+		if (ifr_mtu_get(ifr) > QLNX_MAX_MTU) {
 			ret = EINVAL;
 		} else {
 			QLNX_LOCK(ha);
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			ha->max_frame_size =
 				ifp->if_mtu + ETHER_HDR_LEN + ETHER_CRC_LEN;
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -2329,7 +2329,7 @@ qlnx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	case SIOCSIFCAP:
 		
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 
 		QL_DPRINT4(ha, "SIOCSIFCAP (0x%lx)\n", cmd);
 

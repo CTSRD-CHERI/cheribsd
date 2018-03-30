@@ -324,7 +324,7 @@ gx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		return (0);
 
 	case SIOCSIFMTU:
-		if (ifr->ifr_mtu + ifp->if_hdrlen > GXEMUL_ETHER_DEV_MTU)
+		if (ifr_mtu_get(ifr) + ifp->if_hdrlen > GXEMUL_ETHER_DEV_MTU)
 			return (ENOTSUP);
 		return (0);
 

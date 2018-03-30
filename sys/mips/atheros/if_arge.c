@@ -1767,9 +1767,9 @@ arge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	case SIOCSIFCAP:
 		/* XXX: Check other capabilities */
 #ifdef DEVICE_POLLING
-		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
+		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
 		if (mask & IFCAP_POLLING) {
-			if (ifr->ifr_reqcap & IFCAP_POLLING) {
+			if (ifr_reqcap_get(ifr) & IFCAP_POLLING) {
 				ARGE_WRITE(sc, AR71XX_DMA_INTR, 0);
 				error = ether_poll_register(arge_poll, ifp);
 				if (error)

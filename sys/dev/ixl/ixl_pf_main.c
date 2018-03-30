@@ -5049,12 +5049,12 @@ ixl_ioctl(struct ifnet * ifp, u_long command, caddr_t data)
 #endif
 	case SIOCSIFMTU:
 		IOCTL_DEBUGOUT("ioctl: SIOCSIFMTU (Set Interface MTU)");
-		if (ifr->ifr_mtu > IXL_MAX_FRAME -
+		if (ifr_mtu_get(ifr) > IXL_MAX_FRAME -
 		   ETHER_HDR_LEN - ETHER_CRC_LEN - ETHER_VLAN_ENCAP_LEN) {
 			error = EINVAL;
 		} else {
 			IXL_PF_LOCK(pf);
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			vsi->max_frame_size =
 				ifp->if_mtu + ETHER_HDR_LEN + ETHER_CRC_LEN
 			    + ETHER_VLAN_ENCAP_LEN;
@@ -5124,7 +5124,7 @@ ixl_ioctl(struct ifnet * ifp, u_long command, caddr_t data)
 		break;
 	case SIOCSIFCAP:
 	{
-		int mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		int mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		IOCTL_DEBUGOUT("ioctl: SIOCSIFCAP (Set Capabilities)");
 
 		ixl_cap_txcsum_tso(vsi, ifp, mask);

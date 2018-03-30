@@ -3577,7 +3577,7 @@ vxge_ioctl(ifnet_t ifp, u_long command, caddr_t data)
 	switch (command) {
 		/* Set Interface MTU */
 	case SIOCSIFMTU:
-		err = vxge_change_mtu(vdev, (unsigned long)ifr->ifr_mtu);
+		err = vxge_change_mtu(vdev, (unsigned long)ifr_mtu_get(ifr));
 		break;
 
 		/* Set Interface Flags */
@@ -3613,7 +3613,7 @@ vxge_ioctl(ifnet_t ifp, u_long command, caddr_t data)
 		/* Set Capabilities */
 	case SIOCSIFCAP:
 		VXGE_DRV_LOCK(vdev);
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 
 		if (mask & IFCAP_TXCSUM) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;

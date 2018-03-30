@@ -527,7 +527,7 @@ epic_ifioctl(struct ifnet *ifp, u_long command, caddr_t data)
 
 	switch (command) {
 	case SIOCSIFMTU:
-		if (ifp->if_mtu == ifr->ifr_mtu)
+		if (ifp->if_mtu == ifr_mtu_get(ifr))
 			break;
 
 		/* XXX Though the datasheet doesn't imply any
@@ -537,8 +537,8 @@ epic_ifioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		 * up if more data is sent).
 		 */
 		EPIC_LOCK(sc);
-		if (ifr->ifr_mtu + ifp->if_hdrlen <= EPIC_MAX_MTU) {
-			ifp->if_mtu = ifr->ifr_mtu;
+		if (ifr_mtu_get(ifr) + ifp->if_hdrlen <= EPIC_MAX_MTU) {
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			epic_stop(sc);
 			epic_init_locked(sc);
 		} else

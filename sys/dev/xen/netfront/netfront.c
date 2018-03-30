@@ -1767,10 +1767,10 @@ xn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #endif
 		break;
 	case SIOCSIFMTU:
-		if (ifp->if_mtu == ifr->ifr_mtu)
+		if (ifp->if_mtu == ifr_mtu_get(ifr))
 			break;
 
-		ifp->if_mtu = ifr->ifr_mtu;
+		ifp->if_mtu = ifr_mtu_get(ifr);
 		ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 		xn_ifinit(sc);
 		break;
@@ -1795,7 +1795,7 @@ xn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		XN_UNLOCK(sc);
 		break;
 	case SIOCSIFCAP:
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		reinit = 0;
 
 		if (mask & IFCAP_TXCSUM) {

@@ -414,19 +414,19 @@ sfxge_if_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 		SFXGE_ADAPTER_UNLOCK(sc);
 		break;
 	case SIOCSIFMTU:
-		if (ifr->ifr_mtu == ifp->if_mtu) {
+		if (ifr_mtu_get(ifr) == ifp->if_mtu) {
 			/* Nothing to do */
 			error = 0;
-		} else if (ifr->ifr_mtu > SFXGE_MAX_MTU) {
+		} else if (ifr_mtu_get(ifr) > SFXGE_MAX_MTU) {
 			error = EINVAL;
 		} else if (!(ifp->if_drv_flags & IFF_DRV_RUNNING)) {
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			error = 0;
 		} else {
 			/* Restart required */
 			SFXGE_ADAPTER_LOCK(sc);
 			sfxge_stop(sc);
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			error = sfxge_start(sc);
 			SFXGE_ADAPTER_UNLOCK(sc);
 			if (error != 0) {
@@ -443,7 +443,7 @@ sfxge_if_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 		break;
 	case SIOCSIFCAP:
 	{
-		int reqcap = ifr->ifr_reqcap;
+		int reqcap = ifr_reqcap_get(ifr);
 		int capchg_mask;
 
 		SFXGE_ADAPTER_LOCK(sc);

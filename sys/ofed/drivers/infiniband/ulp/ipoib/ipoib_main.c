@@ -293,15 +293,14 @@ ipoib_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	case SIOCGIFADDR:
-		bcopy(IF_LLADDR(ifp), &ifr->ifr_addr.sa_data[0],
-		    INFINIBAND_ALEN);
+		bcopy(IF_LLADDR(ifp), ifr_addr_get_data(ifr), INFINIBAND_ALEN);
 		break;
 
 	case SIOCSIFMTU:
 		/*
 		 * Set the interface MTU.
 		 */
-		error = -ipoib_change_mtu(priv, ifr->ifr_mtu);
+		error = -ipoib_change_mtu(priv, ifr_mtu_get(ifr));
 		break;
 	default:
 		error = EINVAL;

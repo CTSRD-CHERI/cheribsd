@@ -75,17 +75,17 @@ r12a_ioctl_net(struct ieee80211com *ic, u_long cmd, void *data)
 		struct ieee80211vap *vap;
 		int changed, rxmask;
 
-		rxmask = ifr->ifr_reqcap & (IFCAP_RXCSUM | IFCAP_RXCSUM_IPV6);
+		rxmask = ifr_reqcap_get(ifr) & (IFCAP_RXCSUM | IFCAP_RXCSUM_IPV6);
 
 		RTWN_LOCK(sc);
 		changed = 0;
 		if (!(rs->rs_flags & R12A_RXCKSUM_EN) ^
-		    !(ifr->ifr_reqcap & IFCAP_RXCSUM)) {
+		    !(ifr_reqcap_get(ifr) & IFCAP_RXCSUM)) {
 			rs->rs_flags ^= R12A_RXCKSUM_EN;
 			changed = 1;
 		}
 		if (!(rs->rs_flags & R12A_RXCKSUM6_EN) ^
-		    !(ifr->ifr_reqcap & IFCAP_RXCSUM_IPV6)) {
+		    !(ifr_reqcap_get(ifr) & IFCAP_RXCSUM_IPV6)) {
 			rs->rs_flags ^= R12A_RXCKSUM6_EN;
 			changed = 1;
 		}

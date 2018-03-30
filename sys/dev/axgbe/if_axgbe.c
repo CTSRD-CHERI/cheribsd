@@ -139,10 +139,11 @@ axgbe_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 
 	switch(command) {
 	case SIOCSIFMTU:
-		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > ETHERMTU_JUMBO)
+		if (ifr_mtu_get(ifr) < ETHERMIN ||
+		    ifr_mtu_get(ifr) > ETHERMTU_JUMBO)
 			error = EINVAL;
 		else
-			error = xgbe_change_mtu(ifp, ifr->ifr_mtu);
+			error = xgbe_change_mtu(ifp, ifr_mtu_get(ifr));
 		break;
 	case SIOCSIFFLAGS:
 		error = 0;

@@ -2940,7 +2940,7 @@ ndis_ifioctl(ifp, command, data)
 		error = ifmedia_ioctl(ifp, ifr, &sc->ifmedia, command);
 		break;
 	case SIOCSIFCAP:
-		ifp->if_capenable = ifr->ifr_reqcap;
+		ifp->if_capenable = ifr_reqcap_get(ifr);
 		if (ifp->if_capenable & IFCAP_TXCSUM)
 			ifp->if_hwassist = sc->ndis_hwassist;
 		else

@@ -3890,7 +3890,7 @@ dc_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 	case SIOCSIFCAP:
 #ifdef DEVICE_POLLING
-		if (ifr->ifr_reqcap & IFCAP_POLLING &&
+		if (ifr_reqcap_get(ifr) & IFCAP_POLLING &&
 		    !(ifp->if_capenable & IFCAP_POLLING)) {
 			error = ether_poll_register(dc_poll, ifp);
 			if (error)
@@ -3902,7 +3902,7 @@ dc_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			DC_UNLOCK(sc);
 			return (error);
 		}
-		if (!(ifr->ifr_reqcap & IFCAP_POLLING) &&
+		if (!(ifr_reqcap_get(ifr) & IFCAP_POLLING) &&
 		    ifp->if_capenable & IFCAP_POLLING) {
 			error = ether_poll_deregister(ifp);
 			/* Enable interrupts. */

@@ -1692,8 +1692,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #endif
 		break;
 	case SIOCGIFADDR:
-		bcopy(IF_LLADDR(ifp), &ifr->ifr_addr.sa_data[0],
-		    ifp->if_addrlen);
+		bcopy(IF_LLADDR(ifp), ifr_addr_get_data(ifr), ifp->if_addrlen);
 		break;
 	case SIOCGIFMEDIA:
 		VLAN_LOCK();
@@ -1731,13 +1730,13 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		 */
 		VLAN_LOCK();
 		if (TRUNK(ifv) != NULL) {
-			if (ifr->ifr_mtu >
+			if (ifr_mtu_get(ifr) >
 			     (PARENT(ifv)->if_mtu - ifv->ifv_mtufudge) ||
-			    ifr->ifr_mtu <
+			    ifr_mtu_get(ifr) <
 			     (ifv->ifv_mintu - ifv->ifv_mtufudge))
 				error = EINVAL;
 			else
-				ifp->if_mtu = ifr->ifr_mtu;
+				ifp->if_mtu = ifr_mtu_get(ifr);
 		} else
 			error = EINVAL;
 		VLAN_UNLOCK();
@@ -1828,7 +1827,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		}
 #endif
-		ifr->ifr_vlan_pcp = ifv->ifv_pcp;
+		ifr_vlan_pcp_set(ifr, ifv->ifv_pcp);
 		break;
 
 	case SIOCSVLANPCP:
@@ -1841,17 +1840,17 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = priv_check(curthread, PRIV_NET_SETVLANPCP);
 		if (error)
 			break;
-		if (ifr->ifr_vlan_pcp > 7) {
+		if (ifr_vlan_pcp_get(ifr) > 7) {
 			error = EINVAL;
 			break;
 		}
-		ifv->ifv_pcp = ifr->ifr_vlan_pcp;
+		ifv->ifv_pcp = ifr_vlan_pcp_get(ifr);
 		vlan_tag_recalculate(ifv);
 		break;
 
 	case SIOCSIFCAP:
 		VLAN_LOCK();
-		ifv->ifv_capenable = ifr->ifr_reqcap;
+		ifv->ifv_capenable = ifr_reqcap_get(ifr);
 		trunk = TRUNK(ifv);
 		if (trunk != NULL) {
 			TRUNK_LOCK(trunk);

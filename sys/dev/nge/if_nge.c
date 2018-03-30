@@ -2271,17 +2271,17 @@ nge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 
 	switch (command) {
 	case SIOCSIFMTU:
-		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > NGE_JUMBO_MTU)
+		if (ifr_mtu_get(ifr) < ETHERMIN || ifr_mtu_get(ifr) > NGE_JUMBO_MTU)
 			error = EINVAL;
 		else {
 			NGE_LOCK(sc);
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			/*
 			 * Workaround: if the MTU is larger than
 			 * 8152 (TX FIFO size minus 64 minus 18), turn off
 			 * TX checksum offloading.
 			 */
-			if (ifr->ifr_mtu >= 8152) {
+			if (ifr_mtu_get(ifr) >= 8152) {
 				ifp->if_capenable &= ~IFCAP_TXCSUM;
 				ifp->if_hwassist &= ~NGE_CSUM_FEATURES;
 			} else {
@@ -2325,7 +2325,7 @@ nge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 	case SIOCSIFCAP:
 		NGE_LOCK(sc);
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 #ifdef DEVICE_POLLING
 		if ((mask & IFCAP_POLLING) != 0 &&
 		    (IFCAP_POLLING & ifp->if_capabilities) != 0) {

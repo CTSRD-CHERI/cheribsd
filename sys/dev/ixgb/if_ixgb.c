@@ -526,11 +526,12 @@ ixgb_ioctl(struct ifnet * ifp, IOCTL_CMD_TYPE command, caddr_t data)
 	switch (command) {
 	case SIOCSIFMTU:
 		IOCTL_DEBUGOUT("ioctl rcv'd: SIOCSIFMTU (Set Interface MTU)");
-		if (ifr->ifr_mtu > IXGB_MAX_JUMBO_FRAME_SIZE - ETHER_HDR_LEN) {
+		if (ifr_mtu_get(ifr) >
+		    IXGB_MAX_JUMBO_FRAME_SIZE - ETHER_HDR_LEN) {
 			error = EINVAL;
 		} else {
 			IXGB_LOCK(adapter);
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			adapter->hw.max_frame_size =
 				ifp->if_mtu + ETHER_HDR_LEN + ETHER_CRC_LEN;
 
@@ -573,10 +574,10 @@ ixgb_ioctl(struct ifnet * ifp, IOCTL_CMD_TYPE command, caddr_t data)
 		break;
 	case SIOCSIFCAP:
 		IOCTL_DEBUGOUT("ioctl rcv'd: SIOCSIFCAP (Set Capabilities)");
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 #ifdef DEVICE_POLLING
 		if (mask & IFCAP_POLLING) {
-			if (ifr->ifr_reqcap & IFCAP_POLLING) {
+			if (ifr_reqcap_get(ifr) & IFCAP_POLLING) {
 				error = ether_poll_register(ixgb_poll, ifp);
 				if (error)
 					return(error);

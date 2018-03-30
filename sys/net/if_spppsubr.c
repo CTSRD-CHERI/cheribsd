@@ -1242,9 +1242,9 @@ sppp_ioctl(struct ifnet *ifp, IOCTL_CMD_T cmd, void *data)
 #define ifr_mtu ifr_metric
 #endif
 	case SIOCSIFMTU:
-		if (ifr->ifr_mtu < 128 || ifr->ifr_mtu > sp->lcp.their_mru)
+		if (ifr_mtu_get(ifr) < 128 || ifr_mtu_get(ifr) > sp->lcp.their_mru)
 			return (EINVAL);
-		ifp->if_mtu = ifr->ifr_mtu;
+		ifp->if_mtu = ifr_mtu_get(ifr);
 		break;
 #endif
 #ifdef SLIOCSETMTU
@@ -1256,7 +1256,7 @@ sppp_ioctl(struct ifnet *ifp, IOCTL_CMD_T cmd, void *data)
 #endif
 #ifdef SIOCGIFMTU
 	case SIOCGIFMTU:
-		ifr->ifr_mtu = ifp->if_mtu;
+		ifr_mtu_set(ifr, ifp->if_mtu);
 		break;
 #endif
 #ifdef SLIOCGETMTU

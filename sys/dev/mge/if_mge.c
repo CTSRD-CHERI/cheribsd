@@ -1519,10 +1519,10 @@ mge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		break;
 	case SIOCSIFCAP:
-		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
+		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
 		if (mask & IFCAP_HWCSUM) {
 			ifp->if_capenable &= ~IFCAP_HWCSUM;
-			ifp->if_capenable |= IFCAP_HWCSUM & ifr->ifr_reqcap;
+			ifp->if_capenable |= IFCAP_HWCSUM & ifr_reqcap_get(ifr);
 			if (ifp->if_capenable & IFCAP_TXCSUM)
 				ifp->if_hwassist = MGE_CHECKSUM_FEATURES;
 			else
@@ -1530,7 +1530,7 @@ mge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 #ifdef DEVICE_POLLING
 		if (mask & IFCAP_POLLING) {
-			if (ifr->ifr_reqcap & IFCAP_POLLING) {
+			if (ifr_reqcap_get(ifr) & IFCAP_POLLING) {
 				error = ether_poll_register(mge_poll, ifp);
 				if (error)
 					return(error);
@@ -1563,8 +1563,8 @@ mge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			break;
 		}
 
-		if (IFM_SUBTYPE(ifr->ifr_media) == IFM_1000_T
-		    && !(ifr->ifr_media & IFM_FDX)) {
+		if (IFM_SUBTYPE(ifr_media_get(ifr)) == IFM_1000_T
+		    && !(ifr_media_get(ifr) & IFM_FDX)) {
 			device_printf(sc->dev,
 			    "1000baseTX half-duplex unsupported\n");
 			return 0;

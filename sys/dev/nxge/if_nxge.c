@@ -1635,7 +1635,7 @@ xge_ioctl(struct ifnet *ifnetp, unsigned long command, caddr_t data)
 	switch(command) {
 	    /* Set ifnet MTU */
 	    case SIOCSIFMTU:
-	        retValue = xge_change_mtu(lldev, ifreqp->ifr_mtu);
+	        retValue = xge_change_mtu(lldev, ifr_mtu_get(ifreqp));
 	        break;
 
 	    /* Set ifnet flags */
@@ -1674,7 +1674,7 @@ xge_ioctl(struct ifnet *ifnetp, unsigned long command, caddr_t data)
 	    /* Set capabilities */
 	    case SIOCSIFCAP:
 	        mtx_lock(&lldev->mtx_drv);
-	        mask = ifreqp->ifr_reqcap ^ ifnetp->if_capenable;
+	        mask = ifr_reqcap_get(ifreqp) ^ ifnetp->if_capenable;
 	        if(mask & IFCAP_TXCSUM) {
 	            if(ifnetp->if_capenable & IFCAP_TXCSUM) {
 	                ifnetp->if_capenable &= ~(IFCAP_TSO4 | IFCAP_TXCSUM);

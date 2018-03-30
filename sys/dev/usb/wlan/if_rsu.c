@@ -3048,7 +3048,7 @@ rsu_ioctl_net(struct ieee80211com *ic, u_long cmd, void *data)
 		struct ieee80211vap *vap;
 		int rxmask;
 
-		rxmask = ifr->ifr_reqcap & (IFCAP_RXCSUM | IFCAP_RXCSUM_IPV6);
+		rxmask = ifr_reqcap_get(ifr) & (IFCAP_RXCSUM | IFCAP_RXCSUM_IPV6);
 
 		RSU_LOCK(sc);
 		/* Both RXCSUM bits must be set (or unset). */

@@ -2547,8 +2547,8 @@ mlx5e_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		PRIV_LOCK(priv);
 		mlx5_query_port_max_mtu(priv->mdev, &max_mtu);
 
-		if (ifr->ifr_mtu >= MLX5E_MTU_MIN &&
-		    ifr->ifr_mtu <= MIN(MLX5E_MTU_MAX, max_mtu)) {
+		if (ifr_mtu_get(ifr) >= MLX5E_MTU_MIN &&
+		    ifr_mtu_get(ifr) <= MIN(MLX5E_MTU_MAX, max_mtu)) {
 			int was_opened;
 
 			was_opened = test_bit(MLX5E_STATE_OPENED, &priv->state);
@@ -2556,7 +2556,7 @@ mlx5e_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 				mlx5e_close_locked(ifp);
 
 			/* set new MTU */
-			mlx5e_set_dev_port_mtu(ifp, ifr->ifr_mtu);
+			mlx5e_set_dev_port_mtu(ifp, ifr_mtu_get(ifr));
 
 			if (was_opened)
 				mlx5e_open_locked(ifp);
@@ -2606,7 +2606,7 @@ mlx5e_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	case SIOCSIFCAP:
 		ifr = (struct ifreq *)data;
 		PRIV_LOCK(priv);
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 
 		if (mask & IFCAP_TXCSUM) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;

@@ -1843,9 +1843,9 @@ rl_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;
 	case SIOCSIFCAP:
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 #ifdef DEVICE_POLLING
-		if (ifr->ifr_reqcap & IFCAP_POLLING &&
+		if (ifr_reqcap_get(ifr) & IFCAP_POLLING &&
 		    !(ifp->if_capenable & IFCAP_POLLING)) {
 			error = ether_poll_register(rl_poll, ifp);
 			if (error)
@@ -1858,7 +1858,7 @@ rl_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			return (error);
 			
 		}
-		if (!(ifr->ifr_reqcap & IFCAP_POLLING) &&
+		if (!(ifr_reqcap_get(ifr) & IFCAP_POLLING) &&
 		    ifp->if_capenable & IFCAP_POLLING) {
 			error = ether_poll_deregister(ifp);
 			/* Enable interrupts. */

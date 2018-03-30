@@ -937,8 +937,8 @@ tsec_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	switch (command) {
 	case SIOCSIFMTU:
 		TSEC_GLOBAL_LOCK(sc);
-		if (tsec_set_mtu(sc, ifr->ifr_mtu))
-			ifp->if_mtu = ifr->ifr_mtu;
+		if (tsec_set_mtu(sc, ifr_mtu_get(ifr)))
+			ifp->if_mtu = ifr_mtu_get(ifr);
 		else
 			error = EINVAL;
 		TSEC_GLOBAL_UNLOCK(sc);
@@ -975,17 +975,17 @@ tsec_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		    command);
 		break;
 	case SIOCSIFCAP:
-		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
+		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
 		if ((mask & IFCAP_HWCSUM) && sc->is_etsec) {
 			TSEC_GLOBAL_LOCK(sc);
 			ifp->if_capenable &= ~IFCAP_HWCSUM;
-			ifp->if_capenable |= IFCAP_HWCSUM & ifr->ifr_reqcap;
+			ifp->if_capenable |= IFCAP_HWCSUM & ifr_reqcap_get(ifr);
 			tsec_offload_setup(sc);
 			TSEC_GLOBAL_UNLOCK(sc);
 		}
 #ifdef DEVICE_POLLING
 		if (mask & IFCAP_POLLING) {
-			if (ifr->ifr_reqcap & IFCAP_POLLING) {
+			if (ifr_reqcap_get(ifr) & IFCAP_POLLING) {
 				error = ether_poll_register(tsec_poll, ifp);
 				if (error)
 					return (error);

@@ -758,14 +758,14 @@ ptnet_ioctl(if_t ifp, u_long cmd, caddr_t data)
 
 	case SIOCSIFCAP:
 		device_printf(dev, "SIOCSIFCAP %x %x\n",
-			      ifr->ifr_reqcap, ifp->if_capenable);
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+			      ifr_reqcap_get(ifr), ifp->if_capenable);
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 #ifdef DEVICE_POLLING
 		if (mask & IFCAP_POLLING) {
 			struct ptnet_queue *pq;
 			int i;
 
-			if (ifr->ifr_reqcap & IFCAP_POLLING) {
+			if (ifr_reqcap_get(ifr) & IFCAP_POLLING) {
 				err = ether_poll_register(ptnet_poll, ifp);
 				if (err) {
 					break;
@@ -797,17 +797,17 @@ ptnet_ioctl(if_t ifp, u_long cmd, caddr_t data)
 			}
 		}
 #endif  /* DEVICE_POLLING */
-		ifp->if_capenable = ifr->ifr_reqcap;
+		ifp->if_capenable = ifr_reqcap_get(ifr);
 		break;
 
 	case SIOCSIFMTU:
 		/* We support any reasonable MTU. */
-		if (ifr->ifr_mtu < ETHERMIN ||
-				ifr->ifr_mtu > PTNET_MAX_PKT_SIZE) {
+		if (ifr_mtu_get(ifr) < ETHERMIN ||
+				ifr_mtu_get(ifr) > PTNET_MAX_PKT_SIZE) {
 			err = EINVAL;
 		} else {
 			PTNET_CORE_LOCK(sc);
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			PTNET_CORE_UNLOCK(sc);
 		}
 		break;

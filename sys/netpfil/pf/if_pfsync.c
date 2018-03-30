@@ -1294,16 +1294,16 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 	case SIOCSIFMTU:
 		if (!sc->sc_sync_if ||
-		    ifr->ifr_mtu <= PFSYNC_MINPKT ||
-		    ifr->ifr_mtu > sc->sc_sync_if->if_mtu)
+		    ifr_mtu_get(ifr) <= PFSYNC_MINPKT ||
+		    ifr_mtu_get(ifr) > sc->sc_sync_if->if_mtu)
 			return (EINVAL);
-		if (ifr->ifr_mtu < ifp->if_mtu) {
+		if (ifr_mtu_get(ifr) < ifp->if_mtu) {
 			PFSYNC_LOCK(sc);
 			if (sc->sc_len > PFSYNC_MINPKT)
 				pfsync_sendout(1);
 			PFSYNC_UNLOCK(sc);
 		}
-		ifp->if_mtu = ifr->ifr_mtu;
+		ifp->if_mtu = ifr_mtu_get(ifr);
 		break;
 	case SIOCGETPFSYNC:
 		bzero(&pfsyncr, sizeof(pfsyncr));

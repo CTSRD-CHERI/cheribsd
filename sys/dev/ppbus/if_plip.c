@@ -433,7 +433,7 @@ lpioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	case SIOCSIFMTU:
 		ppb_lock(ppbus);
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
-			ptr = malloc(ifr->ifr_mtu + MLPIPHDRLEN, M_DEVBUF,
+			ptr = malloc(ifr_mtu_get(ifr) + MLPIPHDRLEN, M_DEVBUF,
 			    M_NOWAIT);
 			if (ptr == NULL) {
 				ppb_unlock(ppbus);
@@ -443,12 +443,12 @@ lpioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				free(sc->sc_ifbuf, M_DEVBUF);
 			sc->sc_ifbuf = ptr;
 		}
-		sc->sc_ifp->if_mtu = ifr->ifr_mtu;
+		sc->sc_ifp->if_mtu = ifr_mtu_get(ifr);
 		ppb_unlock(ppbus);
 		break;
 
 	case SIOCGIFMTU:
-		ifr->ifr_mtu = sc->sc_ifp->if_mtu;
+		ifr_mtu_set(ifr, sc->sc_ifp->if_mtu);
 		break;
 
 	case SIOCADDMULTI:
@@ -456,7 +456,7 @@ lpioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		if (ifr == NULL) {
 			return (EAFNOSUPPORT);		/* XXX */
 		}
-		switch (ifr->ifr_addr.sa_family) {
+		switch (ifr_addr_get_family(ifr)) {
 		case AF_INET:
 			break;
 		default:

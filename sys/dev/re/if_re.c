@@ -3391,16 +3391,16 @@ re_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 
 	switch (command) {
 	case SIOCSIFMTU:
-		if (ifr->ifr_mtu < ETHERMIN ||
-		    ifr->ifr_mtu > sc->rl_hwrev->rl_max_mtu ||
+		if (ifr_mtu_get(ifr) < ETHERMIN ||
+		    ifr_mtu_get(ifr) > sc->rl_hwrev->rl_max_mtu ||
 		    ((sc->rl_flags & RL_FLAG_FASTETHER) != 0 &&
-		    ifr->ifr_mtu > RL_MTU)) {
+		    ifr_mtu_get(ifr) > RL_MTU)) {
 			error = EINVAL;
 			break;
 		}
 		RL_LOCK(sc);
-		if (ifp->if_mtu != ifr->ifr_mtu) {
-			ifp->if_mtu = ifr->ifr_mtu;
+		if (ifp->if_mtu != ifr_mtu_get(ifr)) {
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			if ((sc->rl_flags & RL_FLAG_JUMBOV2) != 0 &&
 			    (ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
 				ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
@@ -3448,11 +3448,11 @@ re_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	    {
 		int mask, reinit;
 
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		reinit = 0;
 #ifdef DEVICE_POLLING
 		if (mask & IFCAP_POLLING) {
-			if (ifr->ifr_reqcap & IFCAP_POLLING) {
+			if (ifr_reqcap_get(ifr) & IFCAP_POLLING) {
 				error = ether_poll_register(re_poll, ifp);
 				if (error)
 					return (error);

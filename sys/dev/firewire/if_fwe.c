@@ -385,7 +385,7 @@ fwe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			struct ifreq *ifr = (struct ifreq *) data;
 			struct firewire_comm *fc = fwe->fd.fc;
 
-			if (ifr->ifr_reqcap & IFCAP_POLLING &&
+			if (ifr_reqcap_get(ifr) & IFCAP_POLLING &&
 			    !(ifp->if_capenable & IFCAP_POLLING)) {
 				error = ether_poll_register(fwe_poll, ifp);
 				if (error)
@@ -396,7 +396,7 @@ fwe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				ifp->if_capenable |= IFCAP_POLLING_NOCOUNT;
 				return (error);
 			}
-			if (!(ifr->ifr_reqcap & IFCAP_POLLING) &&
+			if (!(ifr_reqcap_get(ifr) & IFCAP_POLLING) &&
 			    ifp->if_capenable & IFCAP_POLLING) {
 				error = ether_poll_deregister(ifp);
 				/* Enable interrupts. */

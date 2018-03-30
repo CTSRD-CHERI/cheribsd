@@ -289,7 +289,7 @@ ng_iface_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		 * If the interface is marked up and stopped, then start it.
 		 * If it is marked down and running, then stop it.
 		 */
-		if (ifr->ifr_flags & IFF_UP) {
+		if (ifr_flags_get(ifr) & IFF_UP) {
 			if (!(ifp->if_drv_flags & IFF_DRV_RUNNING)) {
 				ifp->if_drv_flags &= ~(IFF_DRV_OACTIVE);
 				ifp->if_drv_flags |= IFF_DRV_RUNNING;
@@ -303,11 +303,11 @@ ng_iface_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 
 	/* Set the interface MTU */
 	case SIOCSIFMTU:
-		if (ifr->ifr_mtu > NG_IFACE_MTU_MAX
-		    || ifr->ifr_mtu < NG_IFACE_MTU_MIN)
+		if (ifr_mtu_get(ifr) > NG_IFACE_MTU_MAX
+		    || ifr_mtu_get(ifr) < NG_IFACE_MTU_MIN)
 			error = EINVAL;
 		else
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 		break;
 
 	/* Stuff that's not supported */

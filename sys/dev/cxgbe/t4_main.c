@@ -1618,7 +1618,7 @@ cxgbe_ioctl(struct ifnet *ifp, unsigned long cmd, caddr_t data)
 
 	switch (cmd) {
 	case SIOCSIFMTU:
-		mtu = ifr->ifr_mtu;
+		mtu = ifr_mtu_get(ifr);
 		if (mtu < ETHERMIN || mtu > MAX_MTU)
 			return (EINVAL);
 
@@ -1690,7 +1690,7 @@ redo_sifflags:
 		if (rc)
 			return (rc);
 
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if (mask & IFCAP_TXCSUM) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;
 			ifp->if_hwassist ^= (CSUM_TCP | CSUM_UDP | CSUM_IP);

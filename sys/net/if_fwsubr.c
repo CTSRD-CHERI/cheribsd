@@ -660,7 +660,7 @@ firewire_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	case SIOCGIFADDR:
-		bcopy(&IFP2FWC(ifp)->fc_hwaddr, &ifr->ifr_addr.sa_data[0],
+		bcopy(&IFP2FWC(ifp)->fc_hwaddr, ifr_addr_get_data(ifr),
 		    sizeof(struct fw_hwaddr));
 		break;
 
@@ -668,10 +668,10 @@ firewire_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		/*
 		 * Set the interface MTU.
 		 */
-		if (ifr->ifr_mtu > 1500) {
+		if (ifr_mtu_get(ifr) > 1500) {
 			error = EINVAL;
 		} else {
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 		}
 		break;
 	default:

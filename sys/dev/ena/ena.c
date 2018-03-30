@@ -2301,7 +2301,7 @@ ena_ioctl(if_t ifp, u_long command, caddr_t data)
 		sx_xlock(&adapter->ioctl_sx);
 		ena_down(adapter);
 
-		ena_change_mtu(ifp, ifr->ifr_mtu);
+		ena_change_mtu(ifp, ifr_mtu_get(ifr));
 
 		rc = ena_up(adapter);
 		sx_unlock(&adapter->ioctl_sx);
@@ -2342,8 +2342,8 @@ ena_ioctl(if_t ifp, u_long command, caddr_t data)
 		{
 			int reinit = 0;
 
-			if (ifr->ifr_reqcap != ifp->if_capenable) {
-				ifp->if_capenable = ifr->ifr_reqcap;
+			if (ifr_reqcap_get(ifr) != ifp->if_capenable) {
+				ifp->if_capenable = ifr_reqcap_get(ifr);
 				reinit = 1;
 			}
 

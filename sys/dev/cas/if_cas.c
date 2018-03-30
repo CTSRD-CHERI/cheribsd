@@ -2489,7 +2489,7 @@ cas_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			CAS_UNLOCK(sc);
 			break;
 		}
-		ifp->if_capenable = ifr->ifr_reqcap;
+		ifp->if_capenable = ifr_reqcap_get(ifr);
 		if ((ifp->if_capenable & IFCAP_TXCSUM) != 0)
 			ifp->if_hwassist = CAS_CSUM_FEATURES;
 		else
@@ -2504,11 +2504,11 @@ cas_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		CAS_UNLOCK(sc);
 		break;
 	case SIOCSIFMTU:
-		if ((ifr->ifr_mtu < ETHERMIN) ||
-		    (ifr->ifr_mtu > ETHERMTU_JUMBO))
+		if ((ifr_mtu_get(ifr) < ETHERMIN) ||
+		    (ifr_mtu_get(ifr) > ETHERMTU_JUMBO))
 			error = EINVAL;
 		else
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 		break;
 	case SIOCGIFMEDIA:
 	case SIOCSIFMEDIA:

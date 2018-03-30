@@ -557,17 +557,16 @@ fddi_ioctl (ifp, command, data)
 		}
 		break;
 	case SIOCGIFADDR:
-		bcopy(IF_LLADDR(ifp), &ifr->ifr_addr.sa_data[0],
-		    FDDI_ADDR_LEN);
+		bcopy(IF_LLADDR(ifp), ifr_addr_get_data(ifr), FDDI_ADDR_LEN);
 		break;
 	case SIOCSIFMTU:
 		/*
 		 * Set the interface MTU.
 		 */
-		if (ifr->ifr_mtu > FDDIMTU) {
+		if (ifr_mtu_get(ifr) > FDDIMTU) {
 			error = EINVAL;
 		} else {
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 		}
 		break;
 	default:

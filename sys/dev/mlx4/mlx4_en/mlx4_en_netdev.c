@@ -1906,7 +1906,7 @@ static int mlx4_en_ioctl(struct ifnet *dev, u_long command, caddr_t data)
 	switch (command) {
 
 	case SIOCSIFMTU:
-		error = -mlx4_en_change_mtu(dev, ifr->ifr_mtu);
+		error = -mlx4_en_change_mtu(dev, ifr_mtu_get(ifr));
 		break;
 	case SIOCSIFFLAGS:
 		if (dev->if_flags & IFF_UP) {
@@ -1936,7 +1936,7 @@ static int mlx4_en_ioctl(struct ifnet *dev, u_long command, caddr_t data)
 		break;
 	case SIOCSIFCAP:
 		mutex_lock(&mdev->state_lock);
-		mask = ifr->ifr_reqcap ^ dev->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ dev->if_capenable;
 		if (mask & IFCAP_TXCSUM) {
 			dev->if_capenable ^= IFCAP_TXCSUM;
 			dev->if_hwassist ^= (CSUM_TCP | CSUM_UDP | CSUM_IP);

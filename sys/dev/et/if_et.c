@@ -1335,14 +1335,14 @@ et_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #endif
 			max_framelen = MCLBYTES - 1;
 
-		if (ET_FRAMELEN(ifr->ifr_mtu) > max_framelen) {
+		if (ET_FRAMELEN(ifr_mtu_get(ifr)) > max_framelen) {
 			error = EOPNOTSUPP;
 			ET_UNLOCK(sc);
 			break;
 		}
 
-		if (ifp->if_mtu != ifr->ifr_mtu) {
-			ifp->if_mtu = ifr->ifr_mtu;
+		if (ifp->if_mtu != ifr_mtu_get(ifr)) {
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 				ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 				et_init_locked(sc);
@@ -1353,7 +1353,7 @@ et_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	case SIOCSIFCAP:
 		ET_LOCK(sc);
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&
 		    (IFCAP_TXCSUM & ifp->if_capabilities) != 0) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;

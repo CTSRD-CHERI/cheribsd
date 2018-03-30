@@ -469,11 +469,12 @@ octm_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		 * require reprogramming hardware, they just toggle whether we
 		 * make use of already-present facilities in software.
 		 */
-		ifp->if_capenable = ifr->ifr_reqcap;
+		ifp->if_capenable = ifr_reqcap_get(ifr);
 		return (0);
 
 	case SIOCSIFMTU:
-		cvmx_mgmt_port_set_max_packet_size(sc->sc_port, ifr->ifr_mtu + ifp->if_hdrlen);
+		cvmx_mgmt_port_set_max_packet_size(sc->sc_port,
+		    ifr_mtu_get(ifr) + ifp->if_hdrlen);
 		return (0);
 
 	case SIOCSIFMEDIA:

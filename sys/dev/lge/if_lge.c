@@ -1443,10 +1443,10 @@ lge_ioctl(ifp, command, data)
 	switch(command) {
 	case SIOCSIFMTU:
 		LGE_LOCK(sc);
-		if (ifr->ifr_mtu > LGE_JUMBO_MTU)
+		if (ifr_mtu_get(ifr) > LGE_JUMBO_MTU)
 			error = EINVAL;
 		else
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 		LGE_UNLOCK(sc);
 		break;
 	case SIOCSIFFLAGS:

@@ -5760,18 +5760,18 @@ bge_ioctl(if_t ifp, u_long command, caddr_t data)
 	case SIOCSIFMTU:
 		if (BGE_IS_JUMBO_CAPABLE(sc) ||
 		    (sc->bge_flags & BGE_FLAG_JUMBO_STD)) {
-			if (ifr->ifr_mtu < ETHERMIN ||
-			    ifr->ifr_mtu > BGE_JUMBO_MTU) {
+			if (ifr_mtu_get(ifr) < ETHERMIN ||
+			    ifr_mtu_get(ifr) > BGE_JUMBO_MTU) {
 				error = EINVAL;
 				break;
 			}
-		} else if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > ETHERMTU) {
+		} else if (ifr_mtu_get(ifr) < ETHERMIN || ifr_mtu_get(ifr) > ETHERMTU) {
 			error = EINVAL;
 			break;
 		}
 		BGE_LOCK(sc);
-		if (if_getmtu(ifp) != ifr->ifr_mtu) {
-			if_setmtu(ifp, ifr->ifr_mtu);
+		if (if_getmtu(ifp) != ifr_mtu_get(ifr)) {
+			if_setmtu(ifp, ifr_mtu_get(ifr));
 			if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
 				if_setdrvflagbits(ifp, 0, IFF_DRV_RUNNING);
 				bge_init_locked(sc);
@@ -5828,10 +5828,10 @@ bge_ioctl(if_t ifp, u_long command, caddr_t data)
 		}
 		break;
 	case SIOCSIFCAP:
-		mask = ifr->ifr_reqcap ^ if_getcapenable(ifp);
+		mask = ifr_reqcap_get(ifr) ^ if_getcapenable(ifp);
 #ifdef DEVICE_POLLING
 		if (mask & IFCAP_POLLING) {
-			if (ifr->ifr_reqcap & IFCAP_POLLING) {
+			if (ifr_reqcap_get(ifr) & IFCAP_POLLING) {
 				error = ether_poll_register(bge_poll, ifp);
 				if (error)
 					return (error);

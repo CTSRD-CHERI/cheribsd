@@ -213,13 +213,13 @@ edsc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		 * The generic ifioctl() function has already made sure
 		 * that they are supported, i.e., set in if_capabilities.
 		 */
-		ifp->if_capenable = ifr->ifr_reqcap;
+		ifp->if_capenable = ifr_reqcap_get(ifr);
 #else
 		/*
 		 * A h/w driver would need to analyze the requested
 		 * bits and program the hardware, e.g.:
 		 */
-		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
+		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
 
 		if (mask & IFCAP_VLAN_HWTAGGING) {
 			ifp->if_capenable ^= IFCAP_VLAN_HWTAGGING;

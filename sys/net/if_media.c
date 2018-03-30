@@ -58,6 +58,7 @@
 
 #include <net/if.h>
 #include <net/if_media.h>
+#include <net/if_var.h>
 
 /*
  * Compile-time options:
@@ -237,7 +238,7 @@ ifmedia_ioctl(ifp, ifr, ifm, cmd)
 	{
 		struct ifmedia_entry *oldentry;
 		int oldmedia;
-		int newmedia = ifr->ifr_media;
+		int newmedia = ifr_media_get(ifr);
 
 		match = ifmedia_match(ifm, newmedia, ifm->ifm_mask);
 		if (match == NULL) {

@@ -2555,7 +2555,7 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	switch (cmd) {
 	case SIOCSIFMTU:
-		if (ifr->ifr_mtu > HN_MTU_MAX) {
+		if (ifr_mtu_get(ifr) > HN_MTU_MAX) {
 			error = EINVAL;
 			break;
 		}
@@ -2574,7 +2574,7 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		}
 
-		if (ifp->if_mtu == ifr->ifr_mtu) {
+		if (ifp->if_mtu == ifr_mtu_get(ifr)) {
 			HN_UNLOCK(sc);
 			break;
 		}
@@ -2594,7 +2594,7 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		 * Reattach the synthetic parts, i.e. NVS and RNDIS,
 		 * with the new MTU setting.
 		 */
-		error = hn_synth_attach(sc, ifr->ifr_mtu);
+		error = hn_synth_attach(sc, ifr_mtu_get(ifr));
 		if (error) {
 			HN_UNLOCK(sc);
 			break;
@@ -2604,7 +2604,7 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		 * Commit the requested MTU, after the synthetic parts
 		 * have been successfully attached.
 		 */
-		ifp->if_mtu = ifr->ifr_mtu;
+		ifp->if_mtu = ifr_mtu_get(ifr);
 
 		/*
 		 * Make sure that various parameters based on MTU are
@@ -2659,7 +2659,7 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	case SIOCSIFCAP:
 		HN_LOCK(sc);
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 
 		if (mask & IFCAP_TXCSUM) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;

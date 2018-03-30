@@ -3570,11 +3570,11 @@ ieee80211_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 	case SIOCSIFMTU:
 		ifr = (struct ifreq *)data;
-		if (!(IEEE80211_MTU_MIN <= ifr->ifr_mtu &&
-		    ifr->ifr_mtu <= IEEE80211_MTU_MAX))
+		if (!(IEEE80211_MTU_MIN <= ifr_mtu_get(ifr) &&
+		    ifr_mtu_get(ifr) <= IEEE80211_MTU_MAX))
 			error = EINVAL;
 		else
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 		break;
 	case SIOCSIFADDR:
 		/*

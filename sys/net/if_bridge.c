@@ -855,27 +855,27 @@ bridge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 
 	case SIOCSIFMTU:
-		if (ifr->ifr_mtu < 576) {
+		if (ifr_mtu_get(ifr) < 576) {
 			error = EINVAL;
 			break;
 		}
 		if (LIST_EMPTY(&sc->sc_iflist)) {
-			sc->sc_ifp->if_mtu = ifr->ifr_mtu;
+			sc->sc_ifp->if_mtu = ifr_mtu_get(ifr);
 			break;
 		}
 		BRIDGE_LOCK(sc);
 		LIST_FOREACH(bif, &sc->sc_iflist, bif_next) {
-			if (bif->bif_ifp->if_mtu != ifr->ifr_mtu) {
+			if (bif->bif_ifp->if_mtu != ifr_mtu_get(ifr)) {
 				log(LOG_NOTICE, "%s: invalid MTU: %u(%s)"
 				    " != %d\n", sc->sc_ifp->if_xname,
 				    bif->bif_ifp->if_mtu,
-				    bif->bif_ifp->if_xname, ifr->ifr_mtu);
+				    bif->bif_ifp->if_xname, ifr_mtu_get(ifr));
 				error = EINVAL;
 				break;
 			}
 		}
 		if (!error)
-			sc->sc_ifp->if_mtu = ifr->ifr_mtu;
+			sc->sc_ifp->if_mtu = ifr_mtu_get(ifr);
 		BRIDGE_UNLOCK(sc);
 		break;
 	default:
@@ -934,7 +934,7 @@ bridge_set_ifcap(struct bridge_softc *sc, struct bridge_iflist *bif, int set)
 	BRIDGE_UNLOCK_ASSERT(sc);
 
 	bzero(&ifr, sizeof(ifr));
-	ifr.ifr_reqcap = set;
+	ifr.ifr_ifru.ifru_cap[0] = set;	/* ifr_reqcap */
 
 	if (ifp->if_capenable != set) {
 		error = (*ifp->if_ioctl)(ifp, SIOCSIFCAP, (caddr_t)&ifr);

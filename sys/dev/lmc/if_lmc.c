@@ -3576,7 +3576,7 @@ lmc_raw_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
       ifp->if_flags |= IFF_UP;	/* a Unix tradition */
       break;
     case SIOCSIFMTU:
-      ifp->if_mtu = ifr->ifr_mtu;
+      ifp->if_mtu = ifr_mtu_get(ifr);
       break;
     default:
       error = EINVAL;

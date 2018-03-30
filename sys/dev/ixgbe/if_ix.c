@@ -886,11 +886,11 @@ ixgbe_ioctl(struct ifnet * ifp, u_long command, caddr_t data)
 		break;
 	case SIOCSIFMTU:
 		IOCTL_DEBUGOUT("ioctl: SIOCSIFMTU (Set Interface MTU)");
-		if (ifr->ifr_mtu > IXGBE_MAX_MTU) {
+		if (ifr_mtu_get(ifr) > IXGBE_MAX_MTU) {
 			error = EINVAL;
 		} else {
 			IXGBE_CORE_LOCK(adapter);
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			adapter->max_frame_size =
 				ifp->if_mtu + IXGBE_MTU_HDR;
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING)
@@ -938,7 +938,7 @@ ixgbe_ioctl(struct ifnet * ifp, u_long command, caddr_t data)
 	{
 		IOCTL_DEBUGOUT("ioctl: SIOCSIFCAP (Set Capabilities)");
 
-		int mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		int mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if (!mask)
 			break;
 

@@ -3321,7 +3321,7 @@ al_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	switch (command) {
 	case SIOCSIFMTU:
 	{
-		error = al_eth_check_mtu(adapter, ifr->ifr_mtu);
+		error = al_eth_check_mtu(adapter, ifr_mtu_get(ifr));
 		if (error != 0) {
 			device_printf(adapter->dev, "ioctl wrong mtu %u\n",
 			    adapter->netdev->if_mtu);
@@ -3329,7 +3329,7 @@ al_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 
 		ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
-		adapter->netdev->if_mtu = ifr->ifr_mtu;
+		adapter->netdev->if_mtu = ifr_mtu_get(ifr);
 		al_init(adapter);
 		break;
 	}
@@ -3382,10 +3382,10 @@ al_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		int mask, reinit;
 
 		reinit = 0;
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 #ifdef DEVICE_POLLING
 		if ((mask & IFCAP_POLLING) != 0) {
-			if ((ifr->ifr_reqcap & IFCAP_POLLING) != 0) {
+			if ((ifr_reqcap_get(ifr) & IFCAP_POLLING) != 0) {
 				if (error != 0)
 					return (error);
 				ifp->if_capenable |= IFCAP_POLLING;

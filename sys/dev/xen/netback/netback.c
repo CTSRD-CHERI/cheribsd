@@ -2257,14 +2257,14 @@ xnb_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		case SIOCSIFCAP:
 			mtx_lock(&xnb->sc_lock);
-			if (ifr->ifr_reqcap & IFCAP_TXCSUM) {
+			if (ifr_reqcap_get(ifr) & IFCAP_TXCSUM) {
 				ifp->if_capenable |= IFCAP_TXCSUM;
 				ifp->if_hwassist |= XNB_CSUM_FEATURES;
 			} else {
 				ifp->if_capenable &= ~(IFCAP_TXCSUM);
 				ifp->if_hwassist &= ~(XNB_CSUM_FEATURES);
 			}
-			if ((ifr->ifr_reqcap & IFCAP_RXCSUM)) {
+			if ((ifr_reqcap_get(ifr) & IFCAP_RXCSUM)) {
 				ifp->if_capenable |= IFCAP_RXCSUM;
 			} else {
 				ifp->if_capenable &= ~(IFCAP_RXCSUM);
@@ -2297,7 +2297,7 @@ xnb_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			mtx_unlock(&xnb->sc_lock);
 			break;
 		case SIOCSIFMTU:
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 			xnb_ifinit(xnb);
 			break;

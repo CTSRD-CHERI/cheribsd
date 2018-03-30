@@ -1013,10 +1013,10 @@ awg_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
 	case SIOCSIFCAP:
-		mask = ifr->ifr_reqcap ^ if_getcapenable(ifp);
+		mask = ifr_reqcap_get(ifr) ^ if_getcapenable(ifp);
 #ifdef DEVICE_POLLING
 		if (mask & IFCAP_POLLING) {
-			if ((ifr->ifr_reqcap & IFCAP_POLLING) != 0) {
+			if ((ifr_reqcap_get(ifr) & IFCAP_POLLING) != 0) {
 				error = ether_poll_register(awg_poll, ifp);
 				if (error != 0)
 					break;

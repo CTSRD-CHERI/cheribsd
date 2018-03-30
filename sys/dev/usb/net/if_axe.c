@@ -1476,7 +1476,7 @@ axe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	reinit = 0;
 	if (cmd == SIOCSIFCAP) {
 		AXE_LOCK(sc);
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&
 		    (ifp->if_capabilities & IFCAP_TXCSUM) != 0) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;

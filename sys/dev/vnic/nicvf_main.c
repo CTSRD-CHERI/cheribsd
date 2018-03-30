@@ -467,14 +467,14 @@ nicvf_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		err = ether_ioctl(ifp, cmd, data);
 		break;
 	case SIOCSIFMTU:
-		if (ifr->ifr_mtu < NIC_HW_MIN_FRS ||
-		    ifr->ifr_mtu > NIC_HW_MAX_FRS) {
+		if (ifr_mtu_get(ifr) < NIC_HW_MIN_FRS ||
+		    ifr_mtu_get(ifr) > NIC_HW_MAX_FRS) {
 			err = EINVAL;
 		} else {
 			NICVF_CORE_LOCK(nic);
-			err = nicvf_update_hw_max_frs(nic, ifr->ifr_mtu);
+			err = nicvf_update_hw_max_frs(nic, ifr_mtu_get(ifr));
 			if (err == 0)
-				if_setmtu(ifp, ifr->ifr_mtu);
+				if_setmtu(ifp, ifr_mtu_get(ifr));
 			NICVF_CORE_UNLOCK(nic);
 		}
 		break;
@@ -528,7 +528,7 @@ nicvf_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 
 	case SIOCSIFCAP:
-		mask = if_getcapenable(ifp) ^ ifr->ifr_reqcap;
+		mask = if_getcapenable(ifp) ^ ifr_reqcap_get(ifr);
 		if (mask & IFCAP_VLAN_MTU) {
 			/* No work to do except acknowledge the change took. */
 			if_togglecapenable(ifp, IFCAP_VLAN_MTU);

@@ -1079,9 +1079,9 @@ vtnet_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	switch (cmd) {
 	case SIOCSIFMTU:
-		if (ifp->if_mtu != ifr->ifr_mtu) {
+		if (ifp->if_mtu != ifr_mtu_get(ifr)) {
 			VTNET_CORE_LOCK(sc);
-			error = vtnet_change_mtu(sc, ifr->ifr_mtu);
+			error = vtnet_change_mtu(sc, ifr_mtu_get(ifr));
 			VTNET_CORE_UNLOCK(sc);
 		}
 		break;
@@ -1128,7 +1128,7 @@ vtnet_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	case SIOCSIFCAP:
 		VTNET_CORE_LOCK(sc);
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 
 		if (mask & IFCAP_TXCSUM)
 			ifp->if_capenable ^= IFCAP_TXCSUM;

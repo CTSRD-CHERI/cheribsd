@@ -2884,10 +2884,10 @@ fxp_ioctl(if_t ifp, u_long command, caddr_t data)
 
 	case SIOCSIFCAP:
 		reinit = 0;
-		mask = if_getcapenable(ifp) ^ ifr->ifr_reqcap;
+		mask = if_getcapenable(ifp) ^ ifr_reqcap_get(ifr);
 #ifdef DEVICE_POLLING
 		if (mask & IFCAP_POLLING) {
-			if (ifr->ifr_reqcap & IFCAP_POLLING) {
+			if (ifr_reqcap_get(ifr) & IFCAP_POLLING) {
 				error = ether_poll_register(fxp_poll, ifp);
 				if (error)
 					return(error);

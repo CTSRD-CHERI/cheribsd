@@ -3751,7 +3751,7 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 		break;
 	case SIOCSIFMTU:
 		CTX_LOCK(ctx);
-		if (ifr->ifr_mtu == if_getmtu(ifp)) {
+		if (ifr_mtu_get(ifr) == if_getmtu(ifp)) {
 			CTX_UNLOCK(ctx);
 			break;
 		}
@@ -3759,12 +3759,12 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 		/* stop the driver and free any clusters before proceeding */
 		iflib_stop(ctx);
 
-		if ((err = IFDI_MTU_SET(ctx, ifr->ifr_mtu)) == 0) {
-			if (ifr->ifr_mtu > ctx->ifc_max_fl_buf_size)
+		if ((err = IFDI_MTU_SET(ctx, ifr_mtu_get(ifr))) == 0) {
+			if (ifr_mtu_get(ifr) > ctx->ifc_max_fl_buf_size)
 				ctx->ifc_flags |= IFC_MULTISEG;
 			else
 				ctx->ifc_flags &= ~IFC_MULTISEG;
-			err = if_setmtu(ifp, ifr->ifr_mtu);
+			err = if_setmtu(ifp, ifr_mtu_get(ifr));
 		}
 		iflib_init_locked(ctx);
 		if_setdrvflags(ifp, bits);
@@ -3829,7 +3829,7 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 	{
 		int mask, setmask;
 
-		mask = ifr->ifr_reqcap ^ if_getcapenable(ifp);
+		mask = ifr_reqcap_get(ifr) ^ if_getcapenable(ifp);
 		setmask = 0;
 #ifdef TCP_OFFLOAD
 		setmask |= mask & (IFCAP_TOE4|IFCAP_TOE6);

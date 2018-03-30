@@ -364,7 +364,7 @@ in6_control(struct socket *so, u_long cmd, caddr_t data,
 	case SIOCGIFALIFETIME_IN6:
 	case SIOCGIFSTAT_IN6:
 	case SIOCGIFSTAT_ICMP6:
-		sa6 = &ifr->ifr_addr;
+		sa6 = (struct sockaddr_in6 *)ifr_addr_get_sa(ifr);
 		break;
 	case SIOCSIFADDR:
 	case SIOCSIFBRDADDR:
@@ -464,8 +464,9 @@ in6_control(struct socket *so, u_long cmd, caddr_t data,
 
 	switch (cmd) {
 	case SIOCGIFADDR_IN6:
-		ifr->ifr_addr = ia->ia_addr;
-		if ((error = sa6_recoverscope(&ifr->ifr_addr)) != 0)
+		sa6 = (struct sockaddr_in6 *)ifr_addr_get_sa(ifr);
+		*sa6 = ia->ia_addr;
+		if ((error = sa6_recoverscope(sa6)) != 0)
 			goto out;
 		break;
 
@@ -474,17 +475,15 @@ in6_control(struct socket *so, u_long cmd, caddr_t data,
 			error = EINVAL;
 			goto out;
 		}
-		/*
-		 * XXX: should we check if ifa_dstaddr is NULL and return
-		 * an error?
-		 */
-		ifr->ifr_dstaddr = ia->ia_dstaddr;
-		if ((error = sa6_recoverscope(&ifr->ifr_dstaddr)) != 0)
+		sa6 = (struct sockaddr_in6 *)ifr_addr_get_sa(ifr);
+		*sa6 = ia->ia_dstaddr;
+		if ((error = sa6_recoverscope(sa6)) != 0)
 			goto out;
 		break;
 
 	case SIOCGIFNETMASK_IN6:
-		ifr->ifr_addr = ia->ia_prefixmask;
+		sa6 = (struct sockaddr_in6 *)ifr_addr_get_sa(ifr);
+		*sa6 = ia->ia_prefixmask;
 		break;
 
 	case SIOCGIFAFLAG_IN6:

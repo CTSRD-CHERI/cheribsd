@@ -1883,7 +1883,7 @@ fail:
 			return (error);
 		}
 
-		mtu = ifr->ifr_mtu;
+		mtu = ifr_mtu_get(ifr);
 		if ((mtu < ETHERMIN) || (mtu > ETHERMTU_JUMBO)) {
 			error = EINVAL;
 		} else {
@@ -1945,7 +1945,7 @@ fail:
 		if (error)
 			goto fail;
 
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if (mask & IFCAP_TXCSUM) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;
 			ifp->if_hwassist ^= (CSUM_TCP | CSUM_UDP | CSUM_IP);

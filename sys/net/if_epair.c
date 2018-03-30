@@ -655,7 +655,7 @@ epair_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	case SIOCSIFMTU:
 		/* We basically allow all kinds of MTUs. */
-		ifp->if_mtu = ifr->ifr_mtu;
+		ifp->if_mtu = ifr_mtu_get(ifr);
 		error = 0;
 		break;
 

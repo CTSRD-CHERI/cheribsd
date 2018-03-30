@@ -172,7 +172,7 @@ iso88025_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
                 break;
 
         case SIOCGIFADDR:
-		bcopy(IF_LLADDR(ifp), &ifr->ifr_addr.sa_data[0],
+		bcopy(IF_LLADDR(ifp), ifr_addr_get_data(ifr),
 		    ISO88025_ADDR_LEN);
                 break;
 
@@ -180,10 +180,10 @@ iso88025_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
                 /*
                  * Set the interface MTU.
                  */
-                if (ifr->ifr_mtu > ISO88025_MAX_MTU) {
+                if (ifr_mtu_get(ifr) > ISO88025_MAX_MTU) {
                         error = EINVAL;
                 } else {
-                        ifp->if_mtu = ifr->ifr_mtu;
+                        ifp->if_mtu = ifr_mtu_get(ifr);
                 }
                 break;
 	default:

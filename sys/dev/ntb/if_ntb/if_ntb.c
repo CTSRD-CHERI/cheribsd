@@ -245,12 +245,12 @@ ntb_ioctl(if_t ifp, u_long command, caddr_t data)
 
 	case SIOCSIFMTU:
 	    {
-		if (ifr->ifr_mtu > sc->mtu - ETHER_HDR_LEN) {
+		if (ifr_mtu_get(ifr) > sc->mtu - ETHER_HDR_LEN) {
 			error = EINVAL;
 			break;
 		}
 
-		if_setmtu(ifp, ifr->ifr_mtu);
+		if_setmtu(ifp, ifr_mtu_get(ifr));
 		break;
 	    }
 
@@ -260,22 +260,22 @@ ntb_ioctl(if_t ifp, u_long command, caddr_t data)
 		break;
 
 	case SIOCSIFCAP:
-		if (ifr->ifr_reqcap & IFCAP_RXCSUM)
+		if (ifr_reqcap_get(ifr) & IFCAP_RXCSUM)
 			if_setcapenablebit(ifp, IFCAP_RXCSUM, 0);
 		else
 			if_setcapenablebit(ifp, 0, IFCAP_RXCSUM);
-		if (ifr->ifr_reqcap & IFCAP_TXCSUM) {
+		if (ifr_reqcap_get(ifr) & IFCAP_TXCSUM) {
 			if_setcapenablebit(ifp, IFCAP_TXCSUM, 0);
 			if_sethwassistbits(ifp, NTB_CSUM_FEATURES, 0);
 		} else {
 			if_setcapenablebit(ifp, 0, IFCAP_TXCSUM);
 			if_sethwassistbits(ifp, 0, NTB_CSUM_FEATURES);
 		}
-		if (ifr->ifr_reqcap & IFCAP_RXCSUM_IPV6)
+		if (ifr_reqcap_get(ifr) & IFCAP_RXCSUM_IPV6)
 			if_setcapenablebit(ifp, IFCAP_RXCSUM_IPV6, 0);
 		else
 			if_setcapenablebit(ifp, 0, IFCAP_RXCSUM_IPV6);
-		if (ifr->ifr_reqcap & IFCAP_TXCSUM_IPV6) {
+		if (ifr_reqcap_get(ifr) & IFCAP_TXCSUM_IPV6) {
 			if_setcapenablebit(ifp, IFCAP_TXCSUM_IPV6, 0);
 			if_sethwassistbits(ifp, NTB_CSUM_FEATURES6, 0);
 		} else {

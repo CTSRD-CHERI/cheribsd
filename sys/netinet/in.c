@@ -224,8 +224,7 @@ int
 in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
     struct thread *td)
 {
-	struct ifreq *ifr = (struct ifreq *)data;
-	struct sockaddr_in *addr = (struct sockaddr_in *)&ifr->ifr_addr;
+	struct sockaddr_in *addr = (struct sockaddr_in *)ifr_addr_get_sa(data);
 	struct ifaddr *ifa;
 	struct in_ifaddr *ia;
 	int error;
@@ -547,9 +546,8 @@ fail1:
 static int
 in_difaddr_ioctl(u_long cmd, caddr_t data, struct ifnet *ifp, struct thread *td)
 {
-	const struct ifreq *ifr = (struct ifreq *)data;
-	const struct sockaddr_in *addr = (const struct sockaddr_in *)
-	    &ifr->ifr_addr;
+	const struct sockaddr_in *addr = (struct sockaddr_in *)
+	    ifr_addr_get_sa(data);
 	struct ifaddr *ifa;
 	struct in_ifaddr *ia;
 	bool deleteAny, iaIsLast;

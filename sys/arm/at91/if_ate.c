@@ -1428,10 +1428,10 @@ ateioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
 	case SIOCSIFCAP:
-		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
+		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
 		if (mask & IFCAP_VLAN_MTU) {
 			ATE_LOCK(sc);
-			if (ifr->ifr_reqcap & IFCAP_VLAN_MTU) {
+			if (ifr_reqcap_get(ifr) & IFCAP_VLAN_MTU) {
 				WR4(sc, ETH_CFG, RD4(sc, ETH_CFG) | ETH_CFG_BIG);
 				ifp->if_capenable |= IFCAP_VLAN_MTU;
 			} else {

@@ -553,7 +553,7 @@ tunifioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		TUNDEBUG(ifp, "address set\n");
 		break;
 	case SIOCSIFMTU:
-		ifp->if_mtu = ifr->ifr_mtu;
+		ifp->if_mtu = ifr_mtu_get(ifr);
 		TUNDEBUG(ifp, "mtu set\n");
 		break;
 	case SIOCSIFFLAGS:

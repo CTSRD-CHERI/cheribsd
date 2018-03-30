@@ -220,7 +220,7 @@ discioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			error = EAFNOSUPPORT;		/* XXX */
 			break;
 		}
-		switch (ifr->ifr_addr.sa_family) {
+		switch (ifr_addr_get_family(ifr)) {
 #ifdef INET
 		case AF_INET:
 			break;
@@ -235,7 +235,7 @@ discioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 	case SIOCSIFMTU:
-		ifp->if_mtu = ifr->ifr_mtu;
+		ifp->if_mtu = ifr_mtu_get(ifr);
 		break;
 	default:
 		error = EINVAL;

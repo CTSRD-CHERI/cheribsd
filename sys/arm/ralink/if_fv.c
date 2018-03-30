@@ -1030,7 +1030,7 @@ fv_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	case SIOCSIFCAP:
 		error = 0;
 #if 0
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if ((mask & IFCAP_HWCSUM) != 0) {
 			ifp->if_capenable ^= IFCAP_HWCSUM;
 			if ((IFCAP_HWCSUM & ifp->if_capenable) &&

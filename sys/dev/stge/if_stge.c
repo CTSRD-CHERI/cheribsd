@@ -1260,10 +1260,11 @@ stge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	error = 0;
 	switch (cmd) {
 	case SIOCSIFMTU:
-		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > STGE_JUMBO_MTU)
+		if (ifr_mtu_get(ifr) < ETHERMIN ||
+		   ifr_mtu_get(ifr) > STGE_JUMBO_MTU)
 			error = EINVAL;
-		else if (ifp->if_mtu != ifr->ifr_mtu) {
-			ifp->if_mtu = ifr->ifr_mtu;
+		else if (ifp->if_mtu != ifr_mtu_get(ifr)) {
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			STGE_LOCK(sc);
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
 				ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
@@ -1303,10 +1304,10 @@ stge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
 	case SIOCSIFCAP:
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 #ifdef DEVICE_POLLING
 		if ((mask & IFCAP_POLLING) != 0) {
-			if ((ifr->ifr_reqcap & IFCAP_POLLING) != 0) {
+			if ((ifr_reqcap_get(ifr) & IFCAP_POLLING) != 0) {
 				error = ether_poll_register(stge_poll, ifp);
 				if (error != 0)
 					break;

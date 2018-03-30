@@ -1512,9 +1512,9 @@ npeioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 #ifdef DEVICE_POLLING
 	case SIOCSIFCAP:
-		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
+		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
 		if (mask & IFCAP_POLLING) {
-			if (ifr->ifr_reqcap & IFCAP_POLLING) {
+			if (ifr_reqcap_get(ifr) & IFCAP_POLLING) {
 				error = ether_poll_register(npe_poll, ifp);
 				if (error)
 					return error;

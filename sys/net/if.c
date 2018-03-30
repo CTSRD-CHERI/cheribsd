@@ -2358,6 +2358,224 @@ ifunit(const char *name)
 	return (ifp);
 }
 
+static int
+ifr__int0_get(void *ifrp)
+{
+	union ifreq_union *ifrup;
+
+	ifrup = ifrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		return (ifrup->ifr_c.ifr_ifru.ifru_cap[0]);
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		return (ifrup->ifr32.ifr_ifru.ifru_cap[0]);
+#endif
+	return (ifrup->ifr.ifr_ifru.ifru_cap[0]);
+}
+
+static void
+ifr__int0_set(void *ifrp, int val)
+{
+	union ifreq_union *ifrup;
+
+	ifrup = ifrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		ifrup->ifr_c.ifr_ifru.ifru_cap[0] = val;
+	else
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		ifrup->ifr32.ifr_ifru.ifru_cap[0] = val;
+	else
+#endif
+		ifrup->ifr.ifr_ifru.ifru_cap[0] = val;
+}
+
+static int
+ifr__int1_get(void *ifrp)
+{
+	union ifreq_union *ifrup;
+
+	ifrup = ifrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		return (ifrup->ifr_c.ifr_ifru.ifru_cap[1]);
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		return (ifrup->ifr32.ifr_ifru.ifru_cap[1]);
+#endif
+	return (ifrup->ifr.ifr_ifru.ifru_cap[1]);
+}
+
+static void
+ifr__int1_set(void *ifrp, int val)
+{
+	union ifreq_union *ifrup;
+
+	ifrup = ifrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		ifrup->ifr_c.ifr_ifru.ifru_cap[1] = val;
+	else
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		ifrup->ifr32.ifr_ifru.ifru_cap[1] = val;
+	else
+#endif
+		ifrup->ifr.ifr_ifru.ifru_cap[1] = val;
+}
+
+static short
+ifr__short0_get(void *ifrp)
+{
+	union ifreq_union *ifrup;
+
+	ifrup = ifrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		return (ifrup->ifr_c.ifr_ifru.ifru_flags[0]);
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		return (ifrup->ifr32.ifr_ifru.ifru_flags[0]);
+#endif
+	return (ifrup->ifr.ifr_ifru.ifru_flags[0]);
+}
+
+static void
+ifr__short0_set(void *ifrp, short val)
+{
+	union ifreq_union *ifrup;
+
+	ifrup = ifrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		ifrup->ifr_c.ifr_ifru.ifru_flags[0] = val;
+	else
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		ifrup->ifr32.ifr_ifru.ifru_flags[0] = val;
+	else
+#endif
+		ifrup->ifr.ifr_ifru.ifru_flags[0] = val;
+}
+
+static short
+ifr__short1_get(void *ifrp)
+{
+	union ifreq_union *ifrup;
+
+	ifrup = ifrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		return (ifrup->ifr_c.ifr_ifru.ifru_flags[1]);
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		return (ifrup->ifr32.ifr_ifru.ifru_flags[1]);
+#endif
+	return (ifrup->ifr.ifr_ifru.ifru_flags[1]);
+}
+
+static void
+ifr__short1_set(void *ifrp, short val)
+{
+	union ifreq_union *ifrup;
+
+	ifrup = ifrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		ifrup->ifr_c.ifr_ifru.ifru_flags[1] = val;
+	else
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		ifrup->ifr32.ifr_ifru.ifru_flags[1] = val;
+	else
+#endif
+		ifrup->ifr.ifr_ifru.ifru_flags[1] = val;
+}
+
+static u_char
+ifr__u_char_get(void *ifrp)
+{
+	union ifreq_union *ifrup;
+
+	ifrup = ifrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		return (ifrup->ifr_c.ifr_ifru.ifru_vlan_pcp);
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		return (ifrup->ifr32.ifr_ifru.ifru_vlan_pcp);
+#endif
+	return (ifrup->ifr.ifr_ifru.ifru_vlan_pcp);
+}
+
+static void
+ifr__u_char_set(void *ifrp, u_char val)
+{
+	union ifreq_union *ifrup;
+
+	ifrup = ifrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		ifrup->ifr_c.ifr_ifru.ifru_vlan_pcp = val;
+	else
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		ifrup->ifr32.ifr_ifru.ifru_vlan_pcp = val;
+	else
+#endif
+		ifrup->ifr.ifr_ifru.ifru_vlan_pcp = val;
+}
+
+char *
+ifr_addr_get_data(void *ifrp)
+{
+
+	return (&ifr_addr_get_sa(ifrp)->sa_data[0]);
+}
+
+sa_family_t
+ifr_addr_get_family(void *ifrp)
+{
+
+	return (ifr_addr_get_sa(ifrp)->sa_family);
+}
+
+unsigned char
+ifr_addr_get_len(void *ifrp)
+{
+
+	return (ifr_addr_get_sa(ifrp)->sa_len);
+}
+
+struct sockaddr *
+ifr_addr_get_sa(void *ifrp)
+{
+	union ifreq_union *ifrup;
+
+	ifrup = ifrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		return (&ifrup->ifr_c.ifr_ifru.ifru_addr);
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		return (&ifrup->ifr32.ifr_ifru.ifru_addr);
+#endif
+	return (&ifrup->ifr.ifr_ifru.ifru_addr);
+}
+
 static void * __capability
 ifr_buffer_get_buffer(struct thread *td, void *data)
 {
@@ -2442,6 +2660,14 @@ ifr_buffer_set_length(struct thread *td, void *data, size_t len)
 		ifrup->ifr.ifr_ifru.ifru_buffer.length = len;
 }
 
+static void
+ifr_curcap_set(void *ifrp, int val)
+{
+
+	/* ifr_ifru.ifru_cap[1] */
+	ifr__int1_set(ifrp, val);
+}
+
 void * __capability
 ifr_data_get_ptr(void *ifrp)
 {
@@ -2458,6 +2684,136 @@ ifr_data_get_ptr(void *ifrp)
 		    ifrup->ifr32.ifr_ifru.ifru_data));
 #endif
 		return (__USER_CAP_UNBOUND(ifrup->ifr.ifr_ifru.ifru_data));
+}
+
+u_int
+ifr_fib_get(void *ifrp)
+{
+
+	return ((u_int)ifr__int0_get(ifrp));
+}
+
+void
+ifr_fib_set(void *ifrp, u_int fib)
+{
+
+	ifr__int0_set(ifrp, (u_int)fib);
+}
+
+short
+ifr_flags_get(void *ifrp)
+{
+
+	return (ifr__short0_get(ifrp));
+}
+
+static void
+ifr_flags_set(void *ifrp, short val)
+{
+
+	ifr__short0_set(ifrp, val);
+}
+
+static short
+ifr_flagshigh_get(void *ifrp)
+{
+
+	return (ifr__short1_get(ifrp));
+}
+
+static void
+ifr_flagshigh_set(void *ifrp, short val)
+{
+
+	ifr__short1_set(ifrp, val);
+}
+
+static void
+ifr_index_set(void *ifrp, short idx)
+{
+
+	ifr__short0_set(ifrp, idx);
+}
+
+#ifdef VIMAGE
+static int
+ifr_jid_get(void *ifrp)
+{
+	
+	return (ifr__int0_get(ifrp));
+}
+#endif
+
+int
+ifr_media_get(void *ifrp)
+{
+	
+	return (ifr__int0_get(ifrp));
+}
+
+static int
+ifr_metric_get(void *ifrp)
+{
+	
+	return (ifr__int0_get(ifrp));
+}
+
+static void
+ifr_metric_set(void *ifrp, int val)
+{
+
+	ifr__int0_set(ifrp, val);
+}
+
+int
+ifr_mtu_get(void *ifrp)
+{
+	
+	return (ifr__int0_get(ifrp));
+}
+
+void
+ifr_mtu_set(void *ifrp, int val)
+{
+
+	ifr__int0_set(ifrp, val);
+}
+
+static void
+ifr_phys_set(void *ifrp, int val)
+{
+
+	ifr__int0_set(ifrp, val);
+}
+
+int
+ifr_reqcap_get(void *ifrp)
+{
+
+	/* ifr_ifru.ifru_cap[0] */
+	return (ifr__int0_get(ifrp));
+}
+
+static void
+ifr_reqcap_set(void *ifrp, int val)
+{
+
+	/* ifr_ifru.ifru_cap[0] */
+	ifr__int0_set(ifrp, val);
+}
+
+u_char
+ifr_vlan_pcp_get(void *ifrp)
+{
+
+	return (ifr__u_char_get(ifrp));
+}
+
+void
+ifr_vlan_pcp_set(void *ifrp, u_char pcp)
+{
+
+	ifr__u_char_set(ifrp, pcp);
 }
 
 /*
@@ -2479,18 +2835,18 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 	ifr = (struct ifreq *)data;
 	switch (cmd) {
 	case SIOCGIFINDEX:
-		ifr->ifr_index = ifp->if_index;
+		ifr_index_set(ifr, ifp->if_index);
 		break;
 
 	case SIOCGIFFLAGS:
 		temp_flags = ifp->if_flags | ifp->if_drv_flags;
-		ifr->ifr_flags = temp_flags & 0xffff;
-		ifr->ifr_flagshigh = temp_flags >> 16;
+		ifr_flags_set(ifr, temp_flags & 0xffff);
+		ifr_flagshigh_set(ifr, temp_flags >> 16);
 		break;
 
 	case SIOCGIFCAP:
-		ifr->ifr_reqcap = ifp->if_capabilities;
-		ifr->ifr_curcap = ifp->if_capenable;
+		ifr_reqcap_set(ifr, ifp->if_capabilities);
+		ifr_curcap_set(ifr, ifp->if_capenable);
 		break;
 
 #ifdef MAC
@@ -2503,16 +2859,16 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 #endif
 
 	case SIOCGIFMETRIC:
-		ifr->ifr_metric = ifp->if_metric;
+		ifr_metric_set(ifr, ifp->if_metric);
 		break;
 
 	case SIOCGIFMTU:
-		ifr->ifr_mtu = ifp->if_mtu;
+		ifr_mtu_set(ifr, ifp->if_mtu);
 		break;
 
 	case SIOCGIFPHYS:
 		/* XXXGL: did this ever worked? */
-		ifr->ifr_phys = 0;
+		ifr_phys_set(ifr, 0);
 		break;
 
 	case SIOCGIFDESCR:
@@ -2574,17 +2930,17 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 
 	case SIOCGIFFIB:
-		ifr->ifr_fib = ifp->if_fib;
+		ifr_fib_set(ifr, ifp->if_fib);
 		break;
 
 	case SIOCSIFFIB:
 		error = priv_check(td, PRIV_NET_SETIFFIB);
 		if (error)
 			return (error);
-		if (ifr->ifr_fib >= rt_numfibs)
+		if (ifr_fib_get(ifr) >= rt_numfibs)
 			return (EINVAL);
 
-		ifp->if_fib = ifr->ifr_fib;
+		ifp->if_fib = ifr_fib_get(ifr);
 		break;
 
 	case SIOCSIFFLAGS:
@@ -2595,8 +2951,8 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		 * Currently, no driver owned flags pass the IFF_CANTCHANGE
 		 * check, so we don't need special handling here yet.
 		 */
-		new_flags = (ifr->ifr_flags & 0xffff) |
-		    (ifr->ifr_flagshigh << 16);
+		new_flags = (ifr_flags_get(ifr) & 0xffff) |
+		    (ifr_flagshigh_get(ifr) << 16);
 		if (ifp->if_flags & IFF_UP &&
 		    (new_flags & IFF_UP) == 0) {
 			if_down(ifp);
@@ -2632,7 +2988,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 			return (error);
 		if (ifp->if_ioctl == NULL)
 			return (EOPNOTSUPP);
-		if (ifr->ifr_reqcap & ~ifp->if_capabilities)
+		if (ifr_reqcap_get(ifr) & ~ifp->if_capabilities)
 			return (EINVAL);
 		error = (*ifp->if_ioctl)(ifp, cmd, data);
 		if (error == 0)
@@ -2719,7 +3075,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		error = priv_check(td, PRIV_NET_SETIFVNET);
 		if (error)
 			return (error);
-		error = if_vmove_loan(td, ifp, ifr->ifr_name, ifr->ifr_jid);
+		error = if_vmove_loan(td, ifp, ifr->ifr_name, ifr_jid_get(ifr));
 		break;
 #endif
 
@@ -2727,7 +3083,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		error = priv_check(td, PRIV_NET_SETIFMETRIC);
 		if (error)
 			return (error);
-		ifp->if_metric = ifr->ifr_metric;
+		ifp->if_metric = ifr_metric_get(ifr);
 		getmicrotime(&ifp->if_lastchange);
 		break;
 
@@ -2749,7 +3105,8 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		error = priv_check(td, PRIV_NET_SETIFMTU);
 		if (error)
 			return (error);
-		if (ifr->ifr_mtu < IF_MINMTU || ifr->ifr_mtu > IF_MAXMTU)
+		if (ifr_mtu_get(ifr) < IF_MINMTU ||
+		    ifr_mtu_get(ifr) > IF_MAXMTU)
 			return (EINVAL);
 		if (ifp->if_ioctl == NULL)
 			return (EOPNOTSUPP);
@@ -2784,7 +3141,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 			return (EOPNOTSUPP);
 
 		/* Don't let users screw up protocols' entries. */
-		if (ifr->ifr_addr.sa_family != AF_LINK)
+		if (ifr_addr_get_family(ifr) != AF_LINK)
 			return (EINVAL);
 
 		if (cmd == SIOCADDMULTI) {
@@ -2798,14 +3155,14 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 			 * already exists.
 			 */
 			IF_ADDR_RLOCK(ifp);
-			ifma = if_findmulti(ifp, &ifr->ifr_addr);
+			ifma = if_findmulti(ifp, ifr_addr_get_sa(ifr));
 			IF_ADDR_RUNLOCK(ifp);
 			if (ifma != NULL)
 				error = EADDRINUSE;
 			else
-				error = if_addmulti(ifp, &ifr->ifr_addr, &ifma);
+				error = if_addmulti(ifp, ifr_addr_get_sa(ifr), &ifma);
 		} else {
-			error = if_delmulti(ifp, &ifr->ifr_addr);
+			error = if_delmulti(ifp, ifr_addr_get_sa(ifr));
 		}
 		if (error == 0)
 			getmicrotime(&ifp->if_lastchange);
@@ -2843,8 +3200,8 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		error = priv_check(td, PRIV_NET_SETLLADDR);
 		if (error)
 			return (error);
-		error = if_setlladdr(ifp,
-		    ifr->ifr_addr.sa_data, ifr->ifr_addr.sa_len);
+		error = if_setlladdr(ifp, ifr_addr_get_data(ifr),
+		    ifr_addr_get_len(ifr));
 		break;
 
 	case SIOCGHWADDR:
@@ -2956,7 +3313,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		error = priv_check(td, PRIV_NET_SETIFVNET);
 		if (error == 0)
 			error = if_vmove_reclaim(td, ifr->ifr_name,
-			    ifr->ifr_jid);
+			    ifr_jid_get(ifr));
 		CURVNET_RESTORE();
 		return (error);
 #endif
@@ -3100,8 +3457,8 @@ if_setflag(struct ifnet *ifp, int flag, int pflag, int *refcount, int onswitch)
 		error = EOPNOTSUPP;
 		goto recover;
 	}
-	ifr.ifr_flags = ifp->if_flags & 0xffff;
-	ifr.ifr_flagshigh = ifp->if_flags >> 16;
+	ifr.ifr_ifru.ifru_flags[0] = ifp->if_flags & 0xffff;
+	ifr.ifr_ifru.ifru_flags[1] = ifp->if_flags >> 16;
 	error = (*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, (caddr_t)&ifr);
 	if (error)
 		goto recover;
@@ -3211,8 +3568,8 @@ again:
 				max_len += sizeof(ifr);
 			} else {
 				sbuf_bcat(sb, &ifr,
-				    offsetof(struct ifreq, ifr_addr));
-				max_len += offsetof(struct ifreq, ifr_addr);
+				    offsetof(struct ifreq, ifr_ifru));
+				max_len += offsetof(struct ifreq, ifr_ifru);
 				sbuf_bcat(sb, sa, sa->sa_len);
 				max_len += sa->sa_len;
 			}
@@ -3724,12 +4081,12 @@ if_setlladdr(struct ifnet *ifp, const u_char *lladdr, int len)
 	if ((ifp->if_flags & IFF_UP) != 0) {
 		if (ifp->if_ioctl) {
 			ifp->if_flags &= ~IFF_UP;
-			ifr.ifr_flags = ifp->if_flags & 0xffff;
-			ifr.ifr_flagshigh = ifp->if_flags >> 16;
+			ifr.ifr_ifru.ifru_flags[0] = ifp->if_flags & 0xffff;
+			ifr.ifr_ifru.ifru_flags[1] = ifp->if_flags >> 16;
 			(*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, (caddr_t)&ifr);
 			ifp->if_flags |= IFF_UP;
-			ifr.ifr_flags = ifp->if_flags & 0xffff;
-			ifr.ifr_flagshigh = ifp->if_flags >> 16;
+			ifr.ifr_ifru.ifru_flags[0] = ifp->if_flags & 0xffff;
+			ifr.ifr_ifru.ifru_flags[1] = ifp->if_flags >> 16;
 			(*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, (caddr_t)&ifr);
 		}
 	}
@@ -3790,7 +4147,7 @@ if_gethwaddr(struct ifnet *ifp, struct ifreq *ifr)
 	switch (ifp->if_type) {
 	case IFT_ETHER:
 	case IFT_IEEE8023ADLAG:
-		bcopy(ifp->if_hw_addr, ifr->ifr_addr.sa_data, ifp->if_addrlen);
+		bcopy(ifp->if_hw_addr, ifr_addr_get_data(ifr), ifp->if_addrlen);
 		return (0);
 	default:
 		return (ENODEV);

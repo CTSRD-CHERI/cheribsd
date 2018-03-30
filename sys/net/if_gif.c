@@ -700,11 +700,11 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	case SIOCSIFFLAGS:
 		return (0);
 	case SIOCSIFMTU:
-		if (ifr->ifr_mtu < GIF_MTU_MIN ||
-		    ifr->ifr_mtu > GIF_MTU_MAX)
+		if (ifr_mtu_get(ifr) < GIF_MTU_MIN ||
+		    ifr_mtu_get(ifr) > GIF_MTU_MAX)
 			return (EINVAL);
 		else
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 		return (0);
 	}
 	sx_xlock(&gif_ioctl_sx);
@@ -817,7 +817,7 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				error = EADDRNOTAVAIL;
 				break;
 			}
-			sin = (struct sockaddr_in *)&ifr->ifr_addr;
+			sin = ifr_addr_get_sa(ifr);
 			memset(sin, 0, sizeof(*sin));
 			sin->sin_family = AF_INET;
 			sin->sin_len = sizeof(*sin);
@@ -830,8 +830,7 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				error = EADDRNOTAVAIL;
 				break;
 			}
-			sin6 = (struct sockaddr_in6 *)
-				&(((struct in6_ifreq *)data)->ifr_addr);
+			sin6 = (struct sockaddr_in6 *)ifr_addr_get_sa(data);
 			memset(sin6, 0, sizeof(*sin6));
 			sin6->sin6_family = AF_INET6;
 			sin6->sin6_len = sizeof(*sin6);
@@ -886,15 +885,15 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 	case SIOCGTUNFIB:
-		ifr->ifr_fib = sc->gif_fibnum;
+		ifr_fib_set(ifr, sc->gif_fibnum);
 		break;
 	case SIOCSTUNFIB:
 		if ((error = priv_check(curthread, PRIV_NET_GIF)) != 0)
 			break;
-		if (ifr->ifr_fib >= rt_numfibs)
+		if (ifr_fib_get(ifr) >= rt_numfibs)
 			error = EINVAL;
 		else
-			sc->gif_fibnum = ifr->ifr_fib;
+			sc->gif_fibnum = ifr_fib_get(ifr);
 		break;
 	case GIFGOPTS:
 		options = sc->gif_options;

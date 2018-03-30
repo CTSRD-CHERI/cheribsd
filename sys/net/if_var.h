@@ -707,7 +707,20 @@ void if_hw_tsomax_common(if_t ifp, struct ifnet_hw_tsomax *);
 int if_hw_tsomax_update(if_t ifp, struct ifnet_hw_tsomax *);
 
 /* accessors for struct ifreq */
+char *ifr_addr_get_data(void *ifrp);
+sa_family_t ifr_addr_get_family(void *ifrp);
+unsigned char ifr_addr_get_len(void *ifrp);
+struct sockaddr *ifr_addr_get_sa(void *ifrp);
 void * __capability ifr_data_get_ptr(void *ifrp);
+u_int ifr_fib_get(void *ifrp);
+void ifr_fib_set(void *ifrp, u_int fib);
+short ifr_flags_get(void *ifrp);
+int ifr_media_get(void *ifrp);
+int ifr_mtu_get(void *ifrp);
+void ifr_mtu_set(void *ifrp, int val);
+int ifr_reqcap_get(void *ifrp);
+u_char ifr_vlan_pcp_get(void *ifrp);
+void ifr_vlan_pcp_set(void *ifrp, u_char pcp);
 
 #ifdef DEVICE_POLLING
 enum poll_cmd { POLL_ONLY, POLL_AND_CHECK_STATUS };
