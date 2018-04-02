@@ -100,14 +100,6 @@
 #include <compat/freebsd32/freebsd32.h>
 #endif
 
-#ifdef COMPAT_CHERIABI
-#define	SIOCGIFDESCR_C	_IOC_NEWTYPE(SIOCGIFDESCR, struct ifreq_c)
-#define	SIOCSIFDESCR_C	_IOC_NEWTYPE(SIOCSIFDESCR, struct ifreq_c)
-#define	SIOCGIFMAC_C	_IOC_NEWTYPE(SIOCGIFMAC, struct ifreq_c)
-#define	SIOCSIFMAC_C	_IOC_NEWTYPE(SIOCSIFMAC, struct ifreq_c)
-#define	SIOCSIFNAME_C	_IOC_NEWTYPE(SIOCSIFNAME, struct ifreq_c)
-#endif /* COMPAT_CHERIABI */
-
 #ifdef COMPAT_FREEBSD32
 struct ifreq_buffer32 {
 	uint32_t	length;		/* (size_t) */
@@ -2833,9 +2825,6 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 
 #ifdef MAC
-#ifdef COMPAT_CHERIABI
-	case SIOCGIFMAC_C:
-#endif
 	case SIOCGIFMAC:
 		error = mac_ifnet_ioctl_get(td->td_ucred, ifr, ifp);
 		break;
@@ -2855,7 +2844,6 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 
 	case SIOCGIFDESCR:
-	case SIOCGIFDESCR_C:
 		error = 0;
 		sx_slock(&ifdescr_sx);
 		if (ifp->if_description == NULL)
@@ -2876,7 +2864,6 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 
 	case SIOCSIFDESCR:
-	case SIOCSIFDESCR_C:
 		error = priv_check(td, PRIV_NET_SETIFDESCR);
 		if (error)
 			return (error);
@@ -2979,17 +2966,11 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 
 #ifdef MAC
-#ifdef COMPAT_CHERIABI
-	case SIOCSIFMAC_C:
-#endif
 	case SIOCSIFMAC:
 		error = mac_ifnet_ioctl_set(td->td_ucred, ifr, ifp);
 		break;
 #endif
 
-#ifdef COMPAT_CHERIABI
-	case SIOCSIFNAME_C:
-#endif
 	case SIOCSIFNAME:
 		error = priv_check(td, PRIV_NET_SETIFNAME);
 		if (error)
