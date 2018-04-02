@@ -3571,11 +3571,11 @@ lmc_raw_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
   switch (cmd)
     {
     case SIOCAIFADDR:
-    case SIOCSIFFLAGS:
-    case SIOCSIFADDR:
+    CASE_IOC_IFREQ(SIOCSIFFLAGS):
+    CASE_IOC_IFREQ(SIOCSIFADDR):
       ifp->if_flags |= IFF_UP;	/* a Unix tradition */
       break;
-    case SIOCSIFMTU:
+    CASE_IOC_IFREQ(SIOCSIFMTU):
       ifp->if_mtu = ifr_mtu_get(ifr);
       break;
     default:

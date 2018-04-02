@@ -3482,7 +3482,7 @@ ieee80211_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	struct ifaddr *ifa;			/* XXX */
 
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		IEEE80211_LOCK(ic);
 		if ((ifp->if_flags ^ vap->iv_ifflags) & IFF_PROMISC) {
 			/*
@@ -3543,11 +3543,11 @@ ieee80211_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			if_addr_runlock(ifp);
 		}
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		ieee80211_runtask(ic, &ic->ic_mcast_task);
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		ifr = (struct ifreq *)data;
 		error = ifmedia_ioctl(ifp, ifr, &vap->iv_media, cmd);
@@ -3562,13 +3562,13 @@ ieee80211_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			error = ieee80211_ioctl_set80211(vap, cmd,
 					(struct ieee80211req *) data);
 		break;
-	case SIOCG80211STATS:
+	CASE_IOC_IFREQ(SIOCG80211STATS):
 		ifr = (struct ifreq *)data;
 		copyout_c((__cheri_tocap struct ieee80211_stats * __capability)
 		    &vap->iv_stats, ifr_data_get_ptr(ifr),
 		    sizeof (vap->iv_stats));
 		break;
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		ifr = (struct ifreq *)data;
 		if (!(IEEE80211_MTU_MIN <= ifr_mtu_get(ifr) &&
 		    ifr_mtu_get(ifr) <= IEEE80211_MTU_MAX))
@@ -3576,7 +3576,7 @@ ieee80211_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		else
 			ifp->if_mtu = ifr_mtu_get(ifr);
 		break;
-	case SIOCSIFADDR:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
 		/*
 		 * XXX Handle this directly so we can suppress if_init calls.
 		 * XXX This should be done in ether_ioctl but for the moment

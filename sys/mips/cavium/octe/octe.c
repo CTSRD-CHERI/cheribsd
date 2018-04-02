@@ -421,7 +421,7 @@ octe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #endif
 
 	switch (cmd) {
-	case SIOCSIFADDR:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
 #ifdef INET
 		/*
 		 * Avoid reinitialization unless it's necessary.
@@ -440,7 +440,7 @@ octe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			return (error);
 		return (0);
 
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		if (ifp->if_flags == priv->if_flags)
 			return (0);
 		if ((ifp->if_flags & IFF_UP) != 0) {
@@ -453,7 +453,7 @@ octe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		priv->if_flags = ifp->if_flags;
 		return (0);
 	
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		/*
 		 * Just change the capabilities in software, currently none
 		 * require reprogramming hardware, they just toggle whether we
@@ -462,13 +462,13 @@ octe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ifp->if_capenable = ifr_reqcap_get(ifr);
 		return (0);
 
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		error = cvm_oct_common_change_mtu(ifp, ifr_mtu_get(ifr));
 		if (error != 0)
 			return (EINVAL);
 		return (0);
 
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		if (priv->miibus != NULL) {
 			mii = device_get_softc(priv->miibus);

@@ -233,16 +233,16 @@ me_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error;
 
 	switch (cmd) {
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (ifr_mtu_get(ifr) < 576)
 			return (EINVAL);
 		ifp->if_mtu = ifr_mtu_get(ifr);
 		return (0);
-	case SIOCSIFADDR:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
 		ifp->if_flags |= IFF_UP;
-	case SIOCSIFFLAGS:
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		return (0);
 	}
 	sx_xlock(&me_ioctl_sx);
@@ -272,11 +272,11 @@ me_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		error = me_set_tunnel(ifp, src, dst);
 		break;
-	case SIOCDIFPHYADDR:
+	CASE_IOC_IFREQ(SIOCDIFPHYADDR):
 		me_delete_tunnel(ifp);
 		break;
-	case SIOCGIFPSRCADDR:
-	case SIOCGIFPDSTADDR:
+	CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
+	CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
 		ME_RLOCK(sc);
 		if (!ME_READY(sc)) {
 			error = EADDRNOTAVAIL;
@@ -288,10 +288,10 @@ me_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		src->sin_family = AF_INET;
 		src->sin_len = sizeof(*src);
 		switch (cmd) {
-		case SIOCGIFPSRCADDR:
+		CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
 			src->sin_addr = sc->me_src;
 			break;
-		case SIOCGIFPDSTADDR:
+		CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
 			src->sin_addr = sc->me_dst;
 			break;
 		}
@@ -300,10 +300,10 @@ me_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		if (error != 0)
 			memset(src, 0, sizeof(*src));
 		break;
-	case SIOCGTUNFIB:
+	CASE_IOC_IFREQ(SIOCGTUNFIB):
 		ifr_fib_set(ifr, sc->me_fibnum);
 		break;
-	case SIOCSTUNFIB:
+	CASE_IOC_IFREQ(SIOCSTUNFIB):
 		if ((error = priv_check(curthread, PRIV_NET_GRE)) != 0)
 			break;
 		if (ifr_fib_get(ifr) >= rt_numfibs)

@@ -1280,7 +1280,7 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error;
 
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		PFSYNC_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			ifp->if_drv_flags |= IFF_DRV_RUNNING;
@@ -1292,7 +1292,7 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			pfsync_pointers_uninit();
 		}
 		break;
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (!sc->sc_sync_if ||
 		    ifr_mtu_get(ifr) <= PFSYNC_MINPKT ||
 		    ifr_mtu_get(ifr) > sc->sc_sync_if->if_mtu)
@@ -1305,7 +1305,7 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		ifp->if_mtu = ifr_mtu_get(ifr);
 		break;
-	case SIOCGETPFSYNC:
+	CASE_IOC_IFREQ(SIOCGETPFSYNC):
 		bzero(&pfsyncr, sizeof(pfsyncr));
 		PFSYNC_LOCK(sc);
 		if (sc->sc_sync_if) {
@@ -1320,7 +1320,7 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		return (copyout_c(&pfsyncr, ifr_data_get_ptr(ifr),
 		    sizeof(pfsyncr)));
 
-	case SIOCSETPFSYNC:
+	CASE_IOC_IFREQ(SIOCSETPFSYNC):
 	    {
 		struct ip_moptions *imo = &sc->sc_imo;
 		struct ifnet *sifp;

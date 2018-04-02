@@ -1192,7 +1192,7 @@ vte_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ifr = (struct ifreq *)data;
 	error = 0;
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		VTE_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
@@ -1206,14 +1206,14 @@ vte_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->vte_if_flags = ifp->if_flags;
 		VTE_UNLOCK(sc);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		VTE_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			vte_rxfilter(sc);
 		VTE_UNLOCK(sc);
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->vte_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);

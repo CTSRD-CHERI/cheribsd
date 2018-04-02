@@ -842,7 +842,7 @@ kr_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int			error;
 
 	switch (command) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 #if 0
 		KR_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
@@ -863,8 +863,8 @@ kr_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 #endif
 		error = 0;
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 #if 0
 		KR_LOCK(sc);
 		kr_set_filter(sc);
@@ -873,11 +873,11 @@ kr_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		error = 0;
 		break;
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		mii = device_get_softc(sc->kr_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		error = 0;
 #if 0
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;

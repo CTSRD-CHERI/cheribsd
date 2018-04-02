@@ -3856,7 +3856,7 @@ dc_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int error = 0;
 
 	switch (command) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		DC_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			int need_setfilt = (ifp->if_flags ^ sc->dc_if_flags) &
@@ -3876,19 +3876,19 @@ dc_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->dc_if_flags = ifp->if_flags;
 		DC_UNLOCK(sc);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		DC_LOCK(sc);
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 			dc_setfilt(sc);
 		DC_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		mii = device_get_softc(sc->dc_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 #ifdef DEVICE_POLLING
 		if (ifr_reqcap_get(ifr) & IFCAP_POLLING &&
 		    !(ifp->if_capenable & IFCAP_POLLING)) {

@@ -981,7 +981,7 @@ fv_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int			csr;
 
 	switch (command) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		FV_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -1009,8 +1009,8 @@ fv_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		FV_UNLOCK(sc);
 		error = 0;
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 #if 0
 		FV_LOCK(sc);
 		fv_set_filter(sc);
@@ -1019,7 +1019,7 @@ fv_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		error = 0;
 		break;
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 #ifdef MII
 		mii = device_get_softc(sc->fv_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
@@ -1027,7 +1027,7 @@ fv_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		error = ifmedia_ioctl(ifp, ifr, &sc->fv_ifmedia, command);
 #endif
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		error = 0;
 #if 0
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;

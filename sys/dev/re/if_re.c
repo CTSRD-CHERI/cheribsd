@@ -3390,7 +3390,7 @@ re_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int			error = 0;
 
 	switch (command) {
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (ifr_mtu_get(ifr) < ETHERMIN ||
 		    ifr_mtu_get(ifr) > sc->rl_hwrev->rl_max_mtu ||
 		    ((sc->rl_flags & RL_FLAG_FASTETHER) != 0 &&
@@ -3416,7 +3416,7 @@ re_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		RL_UNLOCK(sc);
 		break;
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		RL_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
@@ -3432,19 +3432,19 @@ re_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->rl_if_flags = ifp->if_flags;
 		RL_UNLOCK(sc);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		RL_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			re_set_rxmode(sc);
 		RL_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		mii = device_get_softc(sc->rl_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 	    {
 		int mask, reinit;
 

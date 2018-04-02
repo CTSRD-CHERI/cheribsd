@@ -1905,10 +1905,10 @@ static int mlx4_en_ioctl(struct ifnet *dev, u_long command, caddr_t data)
 	ifr = (struct ifreq *) data;
 	switch (command) {
 
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		error = -mlx4_en_change_mtu(dev, ifr_mtu_get(ifr));
 		break;
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		if (dev->if_flags & IFF_UP) {
 			if ((dev->if_drv_flags & IFF_DRV_RUNNING) == 0) {
 				mutex_lock(&mdev->state_lock);
@@ -1926,15 +1926,15 @@ static int mlx4_en_ioctl(struct ifnet *dev, u_long command, caddr_t data)
 			mutex_unlock(&mdev->state_lock);
 		}
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		mlx4_en_set_rx_mode(dev);
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(dev, ifr, &priv->media, command);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		mutex_lock(&mdev->state_lock);
 		mask = ifr_reqcap_get(ifr) ^ dev->if_capenable;
 		if (mask & IFCAP_TXCSUM) {
@@ -2001,7 +2001,7 @@ out:
 		VLAN_CAPABILITIES(dev);
 		break;
 #if __FreeBSD_version >= 1100036
-	case SIOCGI2C: {
+	CASE_IOC_IFREQ(SIOCGI2C) {
 		struct ifi2creq i2c;
 
 		error = copyin(ifr_data_get_ptr(ifr), &i2c, sizeof(i2c));

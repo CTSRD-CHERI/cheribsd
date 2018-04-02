@@ -1775,7 +1775,7 @@ bfe_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int error = 0;
 
 	switch (command) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		BFE_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING)
@@ -1786,15 +1786,15 @@ bfe_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			bfe_stop(sc);
 		BFE_UNLOCK(sc);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		BFE_LOCK(sc);
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 			bfe_set_rx_mode(sc);
 		BFE_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		mii = device_get_softc(sc->bfe_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;

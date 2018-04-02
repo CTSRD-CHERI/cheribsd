@@ -692,14 +692,14 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error;
 
 	switch (cmd) {
-	case SIOCSIFADDR:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
 		ifp->if_flags |= IFF_UP;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
-	case SIOCGIFMTU:
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
+	CASE_IOC_IFREQ(SIOCGIFMTU):
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		return (0);
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (ifr_mtu_get(ifr) < GIF_MTU_MIN ||
 		    ifr_mtu_get(ifr) > GIF_MTU_MAX)
 			return (EINVAL);
@@ -795,11 +795,11 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		error = gif_set_tunnel(ifp, src, dst);
 		break;
-	case SIOCDIFPHYADDR:
+	CASE_IOC_IFREQ(SIOCDIFPHYADDR):
 		gif_delete_tunnel(ifp);
 		break;
-	case SIOCGIFPSRCADDR:
-	case SIOCGIFPDSTADDR:
+	CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
+	CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
 #ifdef INET6
 	case SIOCGIFPSRCADDR_IN6:
 	case SIOCGIFPDSTADDR_IN6:
@@ -811,8 +811,8 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		GIF_RLOCK(sc);
 		switch (cmd) {
 #ifdef INET
-		case SIOCGIFPSRCADDR:
-		case SIOCGIFPDSTADDR:
+		CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
+		CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
 			if (sc->gif_family != AF_INET) {
 				error = EADDRNOTAVAIL;
 				break;
@@ -842,10 +842,10 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		if (error == 0) {
 			switch (cmd) {
 #ifdef INET
-			case SIOCGIFPSRCADDR:
+			CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
 				sin->sin_addr = sc->gif_iphdr->ip_src;
 				break;
-			case SIOCGIFPDSTADDR:
+			CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
 				sin->sin_addr = sc->gif_iphdr->ip_dst;
 				break;
 #endif
@@ -864,8 +864,8 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		switch (cmd) {
 #ifdef INET
-		case SIOCGIFPSRCADDR:
-		case SIOCGIFPDSTADDR:
+		CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
+		CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
 			error = prison_if(curthread->td_ucred,
 			    (struct sockaddr *)sin);
 			if (error != 0)
@@ -884,10 +884,10 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #endif
 		}
 		break;
-	case SIOCGTUNFIB:
+	CASE_IOC_IFREQ(SIOCGTUNFIB):
 		ifr_fib_set(ifr, sc->gif_fibnum);
 		break;
-	case SIOCSTUNFIB:
+	CASE_IOC_IFREQ(SIOCSTUNFIB):
 		if ((error = priv_check(curthread, PRIV_NET_GIF)) != 0)
 			break;
 		if (ifr_fib_get(ifr) >= rt_numfibs)
@@ -895,12 +895,12 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		else
 			sc->gif_fibnum = ifr_fib_get(ifr);
 		break;
-	case GIFGOPTS:
+	CASE_IOC_IFREQ(GIFGOPTS):
 		options = sc->gif_options;
 		error = copyout_c(&options, ifr_data_get_ptr(ifr),
 		    sizeof(options));
 		break;
-	case GIFSOPTS:
+	CASE_IOC_IFREQ(GIFSOPTS):
 		if ((error = priv_check(curthread, PRIV_NET_GIF)) != 0)
 			break;
 		error = copyin_c(ifr_data_get_ptr(ifr), &options,

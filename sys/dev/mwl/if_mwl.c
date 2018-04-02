@@ -4729,7 +4729,7 @@ mwl_ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 	int error = 0;
 
 	switch (cmd) {
-	case SIOCGMVSTATS:
+	CASE_IOC_IFREQ(SIOCGMVSTATS):
 		mwl_hal_gethwstats(sc->sc_mh, &sc->sc_stats.hw_stats);
 #if 0
 		/* NB: embed these numbers to get a consistent view */

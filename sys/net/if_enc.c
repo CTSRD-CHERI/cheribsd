@@ -185,8 +185,12 @@ static int
 enc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
 
-	if (cmd != SIOCSIFFLAGS)
+	switch (cmd) {
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+		break;
+	default:
 		return (EINVAL);
+	}
 	if (ifp->if_flags & IFF_UP)
 		ifp->if_drv_flags |= IFF_DRV_RUNNING;
 	else

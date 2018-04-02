@@ -797,7 +797,7 @@ admsw_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ADMSW_LOCK(sc);
 
 	switch (cmd) {
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		port = 0;
 		while(port < SW_DEVS)

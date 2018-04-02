@@ -237,12 +237,12 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
 	 * to specific functions and ifp->if_ioctl().
 	 */
 	switch (cmd) {
-	case SIOCGIFADDR:
-	case SIOCGIFBRDADDR:
-	case SIOCGIFDSTADDR:
-	case SIOCGIFNETMASK:
+	CASE_IOC_IFREQ(SIOCGIFADDR):
+	CASE_IOC_IFREQ(SIOCGIFBRDADDR):
+	CASE_IOC_IFREQ(SIOCGIFDSTADDR):
+	CASE_IOC_IFREQ(SIOCGIFNETMASK):
 		break;
-	case SIOCDIFADDR:
+	CASE_IOC_IFREQ(SIOCDIFADDR):
 		sx_xlock(&in_control_sx);
 		error = in_difaddr_ioctl(cmd, data, ifp, td);
 		sx_xunlock(&in_control_sx);
@@ -253,10 +253,10 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
 		error = in_aifaddr_ioctl(cmd, data, ifp, td);
 		sx_xunlock(&in_control_sx);
 		return (error);
-	case SIOCSIFADDR:
-	case SIOCSIFBRDADDR:
-	case SIOCSIFDSTADDR:
-	case SIOCSIFNETMASK:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
+	CASE_IOC_IFREQ(SIOCSIFBRDADDR):
+	CASE_IOC_IFREQ(SIOCSIFDSTADDR):
+	CASE_IOC_IFREQ(SIOCSIFNETMASK):
 		/* We no longer support that old commands. */
 		return (EINVAL);
 	default:
@@ -298,11 +298,11 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
 
 	error = 0;
 	switch (cmd) {
-	case SIOCGIFADDR:
+	CASE_IOC_IFREQ(SIOCGIFADDR):
 		*addr = ia->ia_addr;
 		break;
 
-	case SIOCGIFBRDADDR:
+	CASE_IOC_IFREQ(SIOCGIFBRDADDR):
 		if ((ifp->if_flags & IFF_BROADCAST) == 0) {
 			error = EINVAL;
 			break;
@@ -310,7 +310,7 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
 		*addr = ia->ia_broadaddr;
 		break;
 
-	case SIOCGIFDSTADDR:
+	CASE_IOC_IFREQ(SIOCGIFDSTADDR):
 		if ((ifp->if_flags & IFF_POINTOPOINT) == 0) {
 			error = EINVAL;
 			break;
@@ -318,7 +318,7 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
 		*addr = ia->ia_dstaddr;
 		break;
 
-	case SIOCGIFNETMASK:
+	CASE_IOC_IFREQ(SIOCGIFNETMASK):
 		*addr = ia->ia_sockmask;
 		break;
 	}
@@ -615,9 +615,14 @@ in_difaddr_ioctl(u_long cmd, caddr_t data, struct ifnet *ifp, struct thread *td)
 	 */
 	in_ifadown(&ia->ia_ifa, 1);
 
-	if (ia->ia_ifa.ifa_carp)
-		(*carp_detach_p)(&ia->ia_ifa,
-		    (cmd == SIOCDIFADDR) ? false : true);
+	if (ia->ia_ifa.ifa_carp) {
+		switch (cmd) {
+		CASE_IOC_IFREQ(SIOCDIFADDR):
+			(*carp_detach_p)(&ia->ia_ifa, false);
+		default:
+			(*carp_detach_p)(&ia->ia_ifa, true);
+		}
+	}
 
 	/*
 	 * If this is the last IPv4 address configured on this

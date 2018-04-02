@@ -1179,12 +1179,12 @@ sppp_ioctl(struct ifnet *ifp, IOCTL_CMD_T cmd, void *data)
 	case SIOCAIFADDR:
 		break;
 
-	case SIOCSIFADDR:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
 		/* set the interface "up" when assigning an IP address */
 		ifp->if_flags |= IFF_UP;
 		/* FALLTHROUGH */
 
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		going_up = ifp->if_flags & IFF_UP &&
 			(ifp->if_drv_flags & IFF_DRV_RUNNING) == 0;
 		going_down = (ifp->if_flags & IFF_UP) == 0 &&
@@ -1241,7 +1241,7 @@ sppp_ioctl(struct ifnet *ifp, IOCTL_CMD_T cmd, void *data)
 #ifndef ifr_mtu
 #define ifr_mtu ifr_metric
 #endif
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (ifr_mtu_get(ifr) < 128 || ifr_mtu_get(ifr) > sp->lcp.their_mru)
 			return (EINVAL);
 		ifp->if_mtu = ifr_mtu_get(ifr);
@@ -1255,7 +1255,7 @@ sppp_ioctl(struct ifnet *ifp, IOCTL_CMD_T cmd, void *data)
 		break;
 #endif
 #ifdef SIOCGIFMTU
-	case SIOCGIFMTU:
+	CASE_IOC_IFREQ(SIOCGIFMTU):
 		ifr_mtu_set(ifr, ifp->if_mtu);
 		break;
 #endif
@@ -1264,12 +1264,12 @@ sppp_ioctl(struct ifnet *ifp, IOCTL_CMD_T cmd, void *data)
 		*(short*)data = ifp->if_mtu;
 		break;
 #endif
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		break;
 
-	case SIOCGIFGENERIC:
-	case SIOCSIFGENERIC:
+	CASE_IOC_IFREQ(SIOCGIFGENERIC):
+	CASE_IOC_IFREQ(SIOCSIFGENERIC):
 		rv = sppp_params(sp, cmd, data);
 		break;
 
@@ -5077,9 +5077,12 @@ sppp_params(struct sppp *sp, u_long cmd, void *data)
 
 	switch (subcmd) {
 	case (u_long)SPPPIOGDEFS:
-		if (cmd != SIOCGIFGENERIC) {
-			rv = EINVAL;
+		switch (cmd) {
+		CASE_IOC_IFREQ(SIOCGIFGENERIC):
 			break;
+		default:
+			rv = EINVAL;
+			goto quit;
 		}
 		/*
 		 * We copy over the entire current state, but clean
@@ -5113,9 +5116,12 @@ sppp_params(struct sppp *sp, u_long cmd, void *data)
 		break;
 
 	case (u_long)SPPPIOSDEFS:
-		if (cmd != SIOCSIFGENERIC) {
-			rv = EINVAL;
+		switch (cmd) {
+		CASE_IOC_IFREQ(SIOCGIFGENERIC):
 			break;
+		default:
+			rv = EINVAL;
+			goto quit;
 		}
 		/*
 		 * We have a very specific idea of which fields we

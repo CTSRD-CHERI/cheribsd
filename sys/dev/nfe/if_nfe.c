@@ -1722,7 +1722,7 @@ nfe_ioctl(if_t ifp, u_long cmd, caddr_t data)
 	error = 0;
 	init = 0;
 	switch (cmd) {
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (ifr_mtu_get(ifr) < ETHERMIN ||
 		    ifr_mtu_get(ifr) > NFE_JUMBO_MTU)
 			error = EINVAL;
@@ -1742,7 +1742,7 @@ nfe_ioctl(if_t ifp, u_long cmd, caddr_t data)
 			}
 		}
 		break;
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		NFE_LOCK(sc);
 		if (if_getflags(ifp) & IFF_UP) {
 			/*
@@ -1764,8 +1764,8 @@ nfe_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		NFE_UNLOCK(sc);
 		error = 0;
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0) {
 			NFE_LOCK(sc);
 			nfe_setmulti(sc);
@@ -1773,12 +1773,12 @@ nfe_ioctl(if_t ifp, u_long cmd, caddr_t data)
 			error = 0;
 		}
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->nfe_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		mask = ifr_reqcap_get(ifr) ^ if_getcapenable(ifp);
 #ifdef DEVICE_POLLING
 		if ((mask & IFCAP_POLLING) != 0) {

@@ -1073,10 +1073,10 @@ static int cx_sioctl (struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	switch (cmd) {
 	default:	   CX_DEBUG2 (d, ("ioctl 0x%lx\n", cmd)); return 0;
-	case SIOCADDMULTI: CX_DEBUG2 (d, ("SIOCADDMULTI\n"));     return 0;
-	case SIOCDELMULTI: CX_DEBUG2 (d, ("SIOCDELMULTI\n"));     return 0;
-	case SIOCSIFFLAGS: CX_DEBUG2 (d, ("SIOCSIFFLAGS\n"));     break;
-	case SIOCSIFADDR:  CX_DEBUG2 (d, ("SIOCSIFADDR\n"));      break;
+	CASE_IOC_IFREQ(SIOCADDMULTI) CX_DEBUG2 (d, ("SIOCADDMULTI\n"));     return 0;
+	CASE_IOC_IFREQ(SIOCDELMULTI) CX_DEBUG2 (d, ("SIOCDELMULTI\n"));     return 0;
+	CASE_IOC_IFREQ(SIOCSIFFLAGS) CX_DEBUG2 (d, ("SIOCSIFFLAGS\n"));     break;
+	CASE_IOC_IFREQ(SIOCSIFADDR)  CX_DEBUG2 (d, ("SIOCSIFADDR\n"));      break;
 	}
 
 	/* We get here only in case of SIFFLAGS or SIFADDR. */

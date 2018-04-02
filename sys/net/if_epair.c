@@ -641,19 +641,19 @@ epair_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	ifr = (struct ifreq *)data;
 	switch (cmd) {
-	case SIOCSIFFLAGS:
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		error = 0;
 		break;
 
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		sc = ifp->if_softc;
 		error = ifmedia_ioctl(ifp, ifr, &sc->media, cmd);
 		break;
 
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		/* We basically allow all kinds of MTUs. */
 		ifp->if_mtu = ifr_mtu_get(ifr);
 		error = 0;

@@ -136,8 +136,4 @@
 #define	SIOCGIFGMEMB	_IOWR('i', 138, struct ifgroupreq) /* get members */
 #define	SIOCGIFXMEDIA	_IOWR('i', 139, struct ifmediareq) /* get net xmedia */
 
-#if defined(_KERNEL) && __has_feature(capabilities)
-#define	SIOCGIFADDR_C	_IOC_NEWTYPE(SIOCGIFADDR, struct ifreq_c)
-#endif
-
 #endif /* !_SYS_SOCKIO_H_ */

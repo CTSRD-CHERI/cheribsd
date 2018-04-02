@@ -1901,7 +1901,7 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	}
 
 	switch (command) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		AN_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING &&
@@ -1922,12 +1922,12 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		AN_UNLOCK(sc);
 		error = 0;
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->an_ifmedia, command);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		/* The Aironet has no multicast filter. */
 		error = 0;
 		break;
@@ -1979,7 +1979,7 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		an_setdef(sc, &sc->areq);
 		AN_UNLOCK(sc);
 		break;
-	case SIOCGPRIVATE_0:		/* used by Cisco client utility */
+	CASE_IOC_IFREQ(SIOCGPRIVATE_0)		/* used by Cisco client utility */
 		if ((error = priv_check(td, PRIV_DRIVER)))
 			goto out;
 		error = copyin_c(ifr_data_get_ptr(ifr),
@@ -2008,7 +2008,7 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			    sizeof(l_ioctl));
 		}
 		break;
-	case SIOCGPRIVATE_1:		/* used by Cisco client utility */
+	CASE_IOC_IFREQ(SIOCGPRIVATE_1)		/* used by Cisco client utility */
 		if ((error = priv_check(td, PRIV_DRIVER)))
 			goto out;
 		error = copyin_c(ifr_data_get_ptr(ifr),

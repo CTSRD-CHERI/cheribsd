@@ -2270,7 +2270,7 @@ nge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int error = 0, mask;
 
 	switch (command) {
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (ifr_mtu_get(ifr) < ETHERMIN || ifr_mtu_get(ifr) > NGE_JUMBO_MTU)
 			error = EINVAL;
 		else {
@@ -2292,7 +2292,7 @@ nge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			VLAN_CAPABILITIES(ifp);
 		}
 		break;
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		NGE_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
@@ -2311,19 +2311,19 @@ nge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		NGE_UNLOCK(sc);
 		error = 0;
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		NGE_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			nge_rxfilter(sc);
 		NGE_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		mii = device_get_softc(sc->nge_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		NGE_LOCK(sc);
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 #ifdef DEVICE_POLLING

@@ -1482,7 +1482,7 @@ npeioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #endif
 
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		NPE_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) == 0 &&
 		    ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -1495,8 +1495,8 @@ npeioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		NPE_UNLOCK(sc);
 		break;
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		/* update multicast filter list. */
 		NPE_LOCK(sc);
 		npe_setmcast(sc);
@@ -1504,14 +1504,14 @@ npeioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = 0;
 		break;
 
-  	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
   	case SIOCGIFMEDIA:
  		mii = device_get_softc(sc->sc_mii);
  		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
   		break;
 
 #ifdef DEVICE_POLLING
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
 		if (mask & IFCAP_POLLING) {
 			if (ifr_reqcap_get(ifr) & IFCAP_POLLING) {

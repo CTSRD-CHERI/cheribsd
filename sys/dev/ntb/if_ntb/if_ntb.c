@@ -238,12 +238,12 @@ ntb_ioctl(if_t ifp, u_long command, caddr_t data)
 	int error = 0;
 
 	switch (command) {
-	case SIOCSIFFLAGS:
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		break;
 
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 	    {
 		if (ifr_mtu_get(ifr) > sc->mtu - ETHER_HDR_LEN) {
 			error = EINVAL;
@@ -254,12 +254,12 @@ ntb_ioctl(if_t ifp, u_long command, caddr_t data)
 		break;
 	    }
 
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->media, command);
 		break;
 
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		if (ifr_reqcap_get(ifr) & IFCAP_RXCSUM)
 			if_setcapenablebit(ifp, IFCAP_RXCSUM, 0);
 		else

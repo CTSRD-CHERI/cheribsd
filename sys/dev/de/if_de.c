@@ -4239,21 +4239,21 @@ tulip_ifioctl(struct ifnet * ifp, u_long cmd, caddr_t data)
     int error = 0;
 
     switch (cmd) {
-	case SIOCSIFFLAGS: {
+	CASE_IOC_IFREQ(SIOCSIFFLAGS) {
 	    TULIP_LOCK(sc);
 	    tulip_init_locked(sc);
 	    TULIP_UNLOCK(sc);
 	    break;
 	}
 
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA: {
 	    error = ifmedia_ioctl(ifp, ifr, &sc->tulip_ifmedia, cmd);
 	    break;
 	}
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI: {
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI) {
 	    /*
 	     * Update multicast listeners
 	     */
@@ -4265,14 +4265,14 @@ tulip_ifioctl(struct ifnet * ifp, u_long cmd, caddr_t data)
 	}
 
 #ifdef SIOCGADDRROM
-	case SIOCGADDRROM: {
+	CASE_IOC_IFREQ(SIOCGADDRROM) {
 	    error = copyout(sc->tulip_rombuf, ifr_data_get_ptr(ifr),
 		sizeof(sc->tulip_rombuf));
 	    break;
 	}
 #endif
 #ifdef SIOCGCHIPID
-	case SIOCGCHIPID: {
+	CASE_IOC_IFREQ(SIOCGCHIPID) {
 	    ifr->ifr_metric = (int) sc->tulip_chipid;
 	    break;
 	}

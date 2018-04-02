@@ -479,14 +479,14 @@ oce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		rc = ifmedia_ioctl(ifp, ifr, &sc->media, command);
 		break;
 
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (ifr_mtu_get(ifr) > OCE_MAX_MTU)
 			rc = EINVAL;
 		else
 			ifp->if_mtu = ifr_mtu_get(ifr);
 		break;
 
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		if (ifp->if_flags & IFF_UP) {
 			if (!(ifp->if_drv_flags & IFF_DRV_RUNNING)) {
 				sc->ifp->if_drv_flags |= IFF_DRV_RUNNING;	
@@ -515,15 +515,15 @@ oce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 
 		break;
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		rc = oce_hw_update_multicast(sc);
 		if (rc)
 			device_printf(sc->dev,
 				"Update multicast address failed\n");
 		break;
 
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		u = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 
 		if (u & IFCAP_TXCSUM) {
@@ -581,7 +581,7 @@ oce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 
 		break;
 
-	case SIOCGPRIVATE_0:
+	CASE_IOC_IFREQ(SIOCGPRIVATE_0):
 		rc = oce_handle_passthrough(ifp, data);
 		break;
 	default:

@@ -1981,7 +1981,7 @@ jme_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ifr = (struct ifreq *)data;
 	error = 0;
 	switch (cmd) {
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (ifr_mtu_get(ifr) < ETHERMIN || ifr_mtu_get(ifr) > JME_JUMBO_MTU ||
 		    ((sc->jme_flags & JME_FLAG_NOJUMBO) != 0 &&
 		    ifr_mtu_get(ifr) > JME_MAX_MTU)) {
@@ -2012,7 +2012,7 @@ jme_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			JME_UNLOCK(sc);
 		}
 		break;
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		JME_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
@@ -2030,19 +2030,19 @@ jme_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->jme_if_flags = ifp->if_flags;
 		JME_UNLOCK(sc);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		JME_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			jme_set_filter(sc);
 		JME_UNLOCK(sc);
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->jme_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		JME_LOCK(sc);
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&

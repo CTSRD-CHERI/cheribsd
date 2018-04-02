@@ -234,7 +234,7 @@ ifmedia_ioctl(ifp, ifr, ifm, cmd)
 	/*
 	 * Set the current media.
 	 */
-	case  SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	{
 		struct ifmedia_entry *oldentry;
 		int oldmedia;

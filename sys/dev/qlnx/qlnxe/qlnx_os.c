@@ -2236,7 +2236,7 @@ qlnx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ha = (qlnx_host_t *)ifp->if_softc;
 
 	switch (cmd) {
-	case SIOCSIFADDR:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
 		QL_DPRINT4(ha, "SIOCSIFADDR (0x%lx)\n", cmd);
 
 		if (ifa->ifa_addr->sa_family == AF_INET) {
@@ -2255,7 +2255,7 @@ qlnx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		QL_DPRINT4(ha, "SIOCSIFMTU (0x%lx)\n", cmd);
 
 		if (ifr_mtu_get(ifr) > QLNX_MAX_MTU) {
@@ -2274,7 +2274,7 @@ qlnx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 		break;
 
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		QL_DPRINT4(ha, "SIOCSIFFLAGS (0x%lx)\n", cmd);
 
 		QLNX_LOCK(ha);
@@ -2302,7 +2302,7 @@ qlnx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		QLNX_UNLOCK(ha);
 		break;
 
-	case SIOCADDMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
 		QL_DPRINT4(ha, "%s (0x%lx)\n", "SIOCADDMULTI", cmd);
 
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -2311,7 +2311,7 @@ qlnx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		QL_DPRINT4(ha, "%s (0x%lx)\n", "SIOCDELMULTI", cmd);
 
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -2320,14 +2320,14 @@ qlnx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		QL_DPRINT4(ha, "SIOCSIFMEDIA/SIOCGIFMEDIA (0x%lx)\n", cmd);
 
 		ret = ifmedia_ioctl(ifp, ifr, &ha->media, cmd);
 		break;
 
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 
@@ -2354,7 +2354,7 @@ qlnx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 #if (__FreeBSD_version >= 1100101)
 
-	case SIOCGI2C:
+	CASE_IOC_IFREQ(SIOCGI2C):
 	{
 		struct ifi2creq i2c;
 		struct ecore_hwfn *p_hwfn = &ha->cdev.hwfns[0];

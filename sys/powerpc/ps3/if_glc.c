@@ -469,7 +469,7 @@ glc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int err = 0;
 
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
                 mtx_lock(&sc->sc_mtx);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
@@ -484,14 +484,14 @@ glc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->sc_ifpflags = ifp->if_flags;
 		mtx_unlock(&sc->sc_mtx);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
                 mtx_lock(&sc->sc_mtx);
 		glc_set_multicast(sc);
                 mtx_unlock(&sc->sc_mtx);
 		break;
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		err = ifmedia_ioctl(ifp, ifr, &sc->sc_media, cmd);
 		break;
 	default:

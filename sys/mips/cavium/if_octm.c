@@ -429,7 +429,7 @@ octm_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #endif
 
 	switch (cmd) {
-	case SIOCSIFADDR:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
 #ifdef INET
 		/*
 		 * Avoid reinitialization unless it's necessary.
@@ -448,7 +448,7 @@ octm_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			return (error);
 		return (0);
 
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		if (ifp->if_flags == sc->sc_flags)
 			return (0);
 		if ((ifp->if_flags & IFF_UP) != 0) {
@@ -463,7 +463,7 @@ octm_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->sc_flags = ifp->if_flags;
 		return (0);
 	
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		/*
 		 * Just change the capabilities in software, currently none
 		 * require reprogramming hardware, they just toggle whether we
@@ -472,12 +472,12 @@ octm_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ifp->if_capenable = ifr_reqcap_get(ifr);
 		return (0);
 
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		cvmx_mgmt_port_set_max_packet_size(sc->sc_port,
 		    ifr_mtu_get(ifr) + ifp->if_hdrlen);
 		return (0);
 
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->sc_ifmedia, cmd);
 		if (error != 0)

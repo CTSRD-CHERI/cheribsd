@@ -545,7 +545,7 @@ ixv_ioctl(struct ifnet * ifp, u_long command, caddr_t data)
 
 	switch (command) {
 
-	case SIOCSIFADDR:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
 #ifdef INET
 		if (ifa->ifa_addr->sa_family == AF_INET)
 			avoid_reset = TRUE;
@@ -569,7 +569,7 @@ ixv_ioctl(struct ifnet * ifp, u_long command, caddr_t data)
 			error = ether_ioctl(ifp, command, data);
 		break;
 #endif
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		IOCTL_DEBUGOUT("ioctl: SIOCSIFMTU (Set Interface MTU)");
 		if (ifr_mtu_get(ifr) > IXGBE_MAX_FRAME_SIZE - IXGBE_MTU_HDR) {
 			error = EINVAL;
@@ -583,7 +583,7 @@ ixv_ioctl(struct ifnet * ifp, u_long command, caddr_t data)
 			IXGBE_CORE_UNLOCK(adapter);
 		}
 		break;
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		IOCTL_DEBUGOUT("ioctl: SIOCSIFFLAGS (Set Interface Flags)");
 		IXGBE_CORE_LOCK(adapter);
 		if (ifp->if_flags & IFF_UP) {
@@ -595,8 +595,8 @@ ixv_ioctl(struct ifnet * ifp, u_long command, caddr_t data)
 		adapter->if_flags = ifp->if_flags;
 		IXGBE_CORE_UNLOCK(adapter);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		IOCTL_DEBUGOUT("ioctl: SIOC(ADD|DEL)MULTI");
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 			IXGBE_CORE_LOCK(adapter);
@@ -606,12 +606,12 @@ ixv_ioctl(struct ifnet * ifp, u_long command, caddr_t data)
 			IXGBE_CORE_UNLOCK(adapter);
 		}
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		IOCTL_DEBUGOUT("ioctl: SIOCxIFMEDIA (Get/Set Interface Media)");
 		error = ifmedia_ioctl(ifp, ifr, &adapter->media, command);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 	{
 		int mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		IOCTL_DEBUGOUT("ioctl: SIOCSIFCAP (Set Capabilities)");

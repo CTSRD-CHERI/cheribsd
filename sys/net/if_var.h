@@ -706,6 +706,16 @@ int drbr_enqueue_drv(if_t ifp, struct buf_ring *br, struct mbuf *m);
 void if_hw_tsomax_common(if_t ifp, struct ifnet_hw_tsomax *);
 int if_hw_tsomax_update(if_t ifp, struct ifnet_hw_tsomax *);
 
+/* Helper macro for struct ifreq ioctls */
+#if __has_feature(capabilities)
+#define	CASE_IOC_IFREQ(cmd)					\
+    case (cmd):							\
+    case _IOC_NEWTYPE((cmd), struct ifreq_c)
+#else
+#define	CASE_IOC_IFREQ(cmd)					\
+    case (cmd)
+#endif
+
 /* accessors for struct ifreq */
 char *ifr_addr_get_data(void *ifrp);
 sa_family_t ifr_addr_get_family(void *ifrp);

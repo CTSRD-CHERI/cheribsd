@@ -275,16 +275,16 @@ ng_iface_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	switch (command) {
 
 	/* These two are mostly handled at a higher layer */
-	case SIOCSIFADDR:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
 		ifp->if_flags |= IFF_UP;
 		ifp->if_drv_flags |= IFF_DRV_RUNNING;
 		ifp->if_drv_flags &= ~(IFF_DRV_OACTIVE);
 		break;
-	case SIOCGIFADDR:
+	CASE_IOC_IFREQ(SIOCGIFADDR):
 		break;
 
 	/* Set flags */
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		/*
 		 * If the interface is marked up and stopped, then start it.
 		 * If it is marked down and running, then stop it.
@@ -302,7 +302,7 @@ ng_iface_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	/* Set the interface MTU */
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (ifr_mtu_get(ifr) > NG_IFACE_MTU_MAX
 		    || ifr_mtu_get(ifr) < NG_IFACE_MTU_MIN)
 			error = EINVAL;
@@ -311,11 +311,11 @@ ng_iface_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	/* Stuff that's not supported */
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		error = 0;
 		break;
-	case SIOCSIFPHYS:
+	CASE_IOC_IFREQ(SIOCSIFPHYS):
 		error = EOPNOTSUPP;
 		break;
 

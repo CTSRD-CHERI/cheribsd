@@ -724,7 +724,7 @@ stf_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	error = 0;
 	switch (cmd) {
-	case SIOCSIFADDR:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
 		ifa = (struct ifaddr *)data;
 		if (ifa == NULL || ifa->ifa_addr->sa_family != AF_INET6) {
 			error = EAFNOSUPPORT;
@@ -744,17 +744,17 @@ stf_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ifp->if_flags |= IFF_UP;
 		break;
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		ifr = (struct ifreq *)data;
 		if (ifr == NULL || ifr_addr_get_family(ifr) != AF_INET6)
 			error = EAFNOSUPPORT;
 		break;
 
-	case SIOCGIFMTU:
+	CASE_IOC_IFREQ(SIOCGIFMTU):
 		break;
 
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		ifr = (struct ifreq *)data;
 		mtu = ifr_mtu_get(ifr);
 		/* RFC 4213 3.2 ideal world MTU */

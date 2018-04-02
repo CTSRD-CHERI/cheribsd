@@ -366,10 +366,10 @@ in6_control(struct socket *so, u_long cmd, caddr_t data,
 	case SIOCGIFSTAT_ICMP6:
 		sa6 = (struct sockaddr_in6 *)ifr_addr_get_sa(ifr);
 		break;
-	case SIOCSIFADDR:
-	case SIOCSIFBRDADDR:
-	case SIOCSIFDSTADDR:
-	case SIOCSIFNETMASK:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
+	CASE_IOC_IFREQ(SIOCSIFBRDADDR):
+	CASE_IOC_IFREQ(SIOCSIFDSTADDR):
+	CASE_IOC_IFREQ(SIOCSIFNETMASK):
 		/*
 		 * Although we should pass any non-INET6 ioctl requests
 		 * down to driver, we filter some legacy INET requests.

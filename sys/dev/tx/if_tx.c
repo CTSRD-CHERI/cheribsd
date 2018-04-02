@@ -526,7 +526,7 @@ epic_ifioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int error = 0;
 
 	switch (command) {
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (ifp->if_mtu == ifr_mtu_get(ifr))
 			break;
 
@@ -546,7 +546,7 @@ epic_ifioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		EPIC_UNLOCK(sc);
 		break;
 
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		/*
 		 * If the interface is marked up and stopped, then start it.
 		 * If it is marked down and running, then stop it.
@@ -574,15 +574,15 @@ epic_ifioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		EPIC_UNLOCK(sc);
 		break;
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		EPIC_LOCK(sc);
 		epic_set_mc_table(sc);
 		EPIC_UNLOCK(sc);
 		error = 0;
 		break;
 
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);

@@ -3576,12 +3576,12 @@ vxge_ioctl(ifnet_t ifp, u_long command, caddr_t data)
 
 	switch (command) {
 		/* Set Interface MTU */
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		err = vxge_change_mtu(vdev, (unsigned long)ifr_mtu_get(ifr));
 		break;
 
 		/* Set Interface Flags */
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		VXGE_DRV_LOCK(vdev);
 		if (ifp->if_flags & IFF_UP) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING)) {
@@ -3600,18 +3600,18 @@ vxge_ioctl(ifnet_t ifp, u_long command, caddr_t data)
 		break;
 
 		/* Add/delete multicast address */
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		break;
 
 		/* Get/Set Interface Media */
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		err = ifmedia_ioctl(ifp, ifr, &vdev->media, command);
 		break;
 
 		/* Set Capabilities */
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		VXGE_DRV_LOCK(vdev);
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 
@@ -3674,13 +3674,13 @@ vxge_ioctl(ifnet_t ifp, u_long command, caddr_t data)
 		VXGE_DRV_UNLOCK(vdev);
 		break;
 
-	case SIOCGPRIVATE_0:
+	CASE_IOC_IFREQ(SIOCGPRIVATE_0):
 		VXGE_DRV_LOCK(vdev);
 		err = vxge_ioctl_stats(vdev, ifr);
 		VXGE_DRV_UNLOCK(vdev);
 		break;
 
-	case SIOCGPRIVATE_1:
+	CASE_IOC_IFREQ(SIOCGPRIVATE_1):
 		VXGE_DRV_LOCK(vdev);
 		err = vxge_ioctl_regs(vdev, ifr);
 		VXGE_DRV_UNLOCK(vdev);

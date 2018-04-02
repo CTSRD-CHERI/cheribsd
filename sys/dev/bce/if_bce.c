@@ -7690,7 +7690,7 @@ bce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	switch(command) {
 
 	/* Set the interface MTU. */
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		/* Check that the MTU setting is supported. */
 		if ((ifr_mtu_get(ifr) < BCE_MIN_MTU) ||
 			(ifr_mtu_get(ifr) > BCE_MAX_JUMBO_MTU)) {
@@ -7712,7 +7712,7 @@ bce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	/* Set interface flags. */
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		DBPRINT(sc, BCE_VERBOSE_SPECIAL, "Received SIOCSIFFLAGS\n");
 
 		BCE_LOCK(sc);
@@ -7744,8 +7744,8 @@ bce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	/* Add/Delete multicast address */
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		DBPRINT(sc, BCE_VERBOSE_MISC,
 		    "Received SIOCADDMULTI/SIOCDELMULTI\n");
 
@@ -7757,7 +7757,7 @@ bce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	/* Set/Get Interface media */
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		DBPRINT(sc, BCE_VERBOSE_MISC,
 		    "Received SIOCSIFMEDIA/SIOCGIFMEDIA\n");
@@ -7772,7 +7772,7 @@ bce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	/* Set interface capability */
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		DBPRINT(sc, BCE_INFO_MISC,
 		    "Received SIOCSIFCAP = 0x%08X\n", (u32) mask);

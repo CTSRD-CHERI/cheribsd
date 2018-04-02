@@ -2035,7 +2035,7 @@ mvneta_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	sc = ifp->if_softc;
 	ifr = (struct ifreq *)data;
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		mvneta_sc_lock(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -2060,7 +2060,7 @@ mvneta_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->mvneta_if_flags = ifp->if_flags;
 		mvneta_sc_unlock(sc);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		if (ifp->if_mtu > MVNETA_MAX_CSUM_MTU &&
 		    ifr_reqcap_get(ifr) & IFCAP_TXCSUM)
 			ifr_reqcap_get(ifr) &= ~IFCAP_TXCSUM;
@@ -2087,7 +2087,7 @@ mvneta_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		VLAN_CAPABILITIES(ifp);
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		if ((IFM_SUBTYPE(ifr_media_get(ifr)) == IFM_1000_T ||
 		    IFM_SUBTYPE(ifr_media_get(ifr)) == IFM_2500_T) &&
 		    (ifr_media_get(ifr) & IFM_FDX) == 0) {
@@ -2107,7 +2107,7 @@ mvneta_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			error = ifmedia_ioctl(ifp, ifr, &sc->mii->mii_media,
 			    cmd);
 		break;
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (ifr_mtu_get(ifr) < 68 || ifr_mtu_get(ifr) > MVNETA_MAX_FRAME -
 		    MVNETA_ETHER_SIZE) {
 			error = EINVAL;

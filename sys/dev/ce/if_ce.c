@@ -906,10 +906,10 @@ static int ce_sioctl (struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	switch (cmd) {
 	default:	   CE_DEBUG2 (d, ("ioctl 0x%lx\n", cmd));   return 0;
-	case SIOCADDMULTI: CE_DEBUG2 (d, ("ioctl SIOCADDMULTI\n")); return 0;
-	case SIOCDELMULTI: CE_DEBUG2 (d, ("ioctl SIOCDELMULTI\n")); return 0;
-	case SIOCSIFFLAGS: CE_DEBUG2 (d, ("ioctl SIOCSIFFLAGS\n")); break;
-	case SIOCSIFADDR:  CE_DEBUG2 (d, ("ioctl SIOCSIFADDR\n"));  break;
+	CASE_IOC_IFREQ(SIOCADDMULTI) CE_DEBUG2 (d, ("ioctl SIOCADDMULTI\n")); return 0;
+	CASE_IOC_IFREQ(SIOCDELMULTI) CE_DEBUG2 (d, ("ioctl SIOCDELMULTI\n")); return 0;
+	CASE_IOC_IFREQ(SIOCSIFFLAGS) CE_DEBUG2 (d, ("ioctl SIOCSIFFLAGS\n")); break;
+	CASE_IOC_IFREQ(SIOCSIFADDR)  CE_DEBUG2 (d, ("ioctl SIOCSIFADDR\n"));  break;
 	}
 
 	/* We get here only in case of SIFFLAGS or SIFADDR. */

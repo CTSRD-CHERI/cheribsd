@@ -895,7 +895,8 @@ ure_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ifr = (struct ifreq *)data;
 	error = 0;
 	reinit = 0;
-	if (cmd == SIOCSIFCAP) {
+	switch (cmd) {
+	CASE_IOC_IFREQ(SIOCSIFCAP)
 		URE_LOCK(sc);
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if (reinit > 0 && ifp->if_drv_flags & IFF_DRV_RUNNING)
@@ -905,8 +906,11 @@ ure_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		URE_UNLOCK(sc);
 		if (reinit > 0)
 			uether_init(ue);
-	} else
+		break;
+	default:
 		error = uether_ioctl(ifp, cmd, data);
+		break;
+	}
 
 	return (error);
 }

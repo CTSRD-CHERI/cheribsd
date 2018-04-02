@@ -3233,7 +3233,7 @@ vmxnet3_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	error = 0;
 
 	switch (cmd) {
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (ifp->if_mtu != ifr_mtu_get(ifr)) {
 			VMXNET3_CORE_LOCK(sc);
 			error = vmxnet3_change_mtu(sc, ifr_mtu_get(ifr));
@@ -3241,7 +3241,7 @@ vmxnet3_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		VMXNET3_CORE_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING)) {
@@ -3259,20 +3259,20 @@ vmxnet3_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		VMXNET3_CORE_UNLOCK(sc);
 		break;
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		VMXNET3_CORE_LOCK(sc);
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 			vmxnet3_set_rxfilter(sc);
 		VMXNET3_CORE_UNLOCK(sc);
 		break;
 
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->vmx_media, cmd);
 		break;
 
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		VMXNET3_CORE_LOCK(sc);
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 

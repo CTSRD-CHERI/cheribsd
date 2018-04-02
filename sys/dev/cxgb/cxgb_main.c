@@ -1874,7 +1874,7 @@ cxgb_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 	uint32_t mask;
 
 	switch (command) {
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		ADAPTER_LOCK(sc);
 		error = IS_DOOMED(p) ? ENXIO : (IS_BUSY(sc) ? EBUSY : 0);
 		if (error) {
@@ -1894,7 +1894,7 @@ fail:
 		}
 		ADAPTER_UNLOCK(sc);
 		break;
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		ADAPTER_LOCK(sc);
 		if (IS_DOOMED(p)) {
 			error = ENXIO;
@@ -1924,8 +1924,8 @@ fail:
 
 		ADAPTER_LOCK_ASSERT_NOTOWNED(sc);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		ADAPTER_LOCK(sc);
 		error = IS_DOOMED(p) ? ENXIO : (IS_BUSY(sc) ? EBUSY : 0);
 		if (error)
@@ -1939,7 +1939,7 @@ fail:
 		ADAPTER_UNLOCK(sc);
 
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		ADAPTER_LOCK(sc);
 		error = IS_DOOMED(p) ? ENXIO : (IS_BUSY(sc) ? EBUSY : 0);
 		if (error)
@@ -2038,7 +2038,7 @@ fail:
 #endif
 		ADAPTER_UNLOCK(sc);
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &p->media, command);
 		break;

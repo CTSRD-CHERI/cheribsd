@@ -440,7 +440,7 @@ nicvf_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #endif
 	err = 0;
 	switch (cmd) {
-	case SIOCSIFADDR:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
 #ifdef INET
 		if (ifa->ifa_addr->sa_family == AF_INET)
 			avoid_reset = TRUE;
@@ -466,7 +466,7 @@ nicvf_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #endif
 		err = ether_ioctl(ifp, cmd, data);
 		break;
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (ifr_mtu_get(ifr) < NIC_HW_MIN_FRS ||
 		    ifr_mtu_get(ifr) > NIC_HW_MAX_FRS) {
 			err = EINVAL;
@@ -478,7 +478,7 @@ nicvf_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			NICVF_CORE_UNLOCK(nic);
 		}
 		break;
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		NICVF_CORE_LOCK(nic);
 		if (if_getflags(ifp) & IFF_UP) {
 			if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
@@ -510,8 +510,8 @@ nicvf_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		NICVF_CORE_UNLOCK(nic);
 		break;
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
 #if 0
 			NICVF_CORE_LOCK(nic);
@@ -522,12 +522,12 @@ nicvf_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		err = ifmedia_ioctl(ifp, ifr, &nic->if_media, cmd);
 		break;
 
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		mask = if_getcapenable(ifp) ^ ifr_reqcap_get(ifr);
 		if (mask & IFCAP_VLAN_MTU) {
 			/* No work to do except acknowledge the change took. */

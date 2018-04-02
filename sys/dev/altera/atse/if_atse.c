@@ -1051,7 +1051,7 @@ atse_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	ifr = (struct ifreq *)data;
 
 	switch (command) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		ATSE_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
@@ -1065,7 +1065,7 @@ atse_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->atse_if_flags = ifp->if_flags;
 		ATSE_UNLOCK(sc);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		ATSE_LOCK(sc);
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 #ifdef DEVICE_POLLING
@@ -1103,14 +1103,14 @@ atse_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 #endif /* DEVICE_POLLING */
 		ATSE_UNLOCK(sc);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		ATSE_LOCK(sc);
 		atse_rxfilter_locked(sc);
 		ATSE_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	{
 		struct mii_data *mii;
 		struct ifreq *ifr;

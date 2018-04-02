@@ -741,7 +741,7 @@ ptnet_ioctl(if_t ifp, u_long cmd, caddr_t data)
 	int mask, err = 0;
 
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		device_printf(dev, "SIOCSIFFLAGS %x\n", ifp->if_flags);
 		PTNET_CORE_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
@@ -756,7 +756,7 @@ ptnet_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		PTNET_CORE_UNLOCK(sc);
 		break;
 
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		device_printf(dev, "SIOCSIFCAP %x %x\n",
 			      ifr_reqcap_get(ifr), ifp->if_capenable);
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
@@ -800,7 +800,7 @@ ptnet_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		ifp->if_capenable = ifr_reqcap_get(ifr);
 		break;
 
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		/* We support any reasonable MTU. */
 		if (ifr_mtu_get(ifr) < ETHERMIN ||
 				ifr_mtu_get(ifr) > PTNET_MAX_PKT_SIZE) {
@@ -812,7 +812,7 @@ ptnet_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		err = ifmedia_ioctl(ifp, ifr, &sc->media, cmd);
 		break;

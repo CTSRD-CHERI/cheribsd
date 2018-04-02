@@ -1605,7 +1605,7 @@ hme_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error = 0;
 
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		HME_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
@@ -1626,18 +1626,18 @@ hme_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		HME_UNLOCK(sc);
 		break;
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		HME_LOCK(sc);
 		hme_setladrf(sc, 1);
 		HME_UNLOCK(sc);
 		error = 0;
 		break;
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		error = ifmedia_ioctl(ifp, ifr, &sc->sc_mii->mii_media, cmd);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		HME_LOCK(sc);
 		ifp->if_capenable = ifr_reqcap_get(ifr);
 		if ((ifp->if_capenable & IFCAP_TXCSUM) != 0)

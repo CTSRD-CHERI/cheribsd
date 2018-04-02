@@ -3515,7 +3515,7 @@ ti_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int mask, error = 0;
 
 	switch (command) {
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		TI_LOCK(sc);
 		if (ifr_mtu_get(ifr) < ETHERMIN ||
 		    ifr_mtu_get(ifr) > TI_JUMBO_MTU)
@@ -3529,7 +3529,7 @@ ti_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		TI_UNLOCK(sc);
 		break;
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		TI_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			/*
@@ -3560,18 +3560,18 @@ ti_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->ti_if_flags = ifp->if_flags;
 		TI_UNLOCK(sc);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		TI_LOCK(sc);
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 			ti_setmulti(sc);
 		TI_UNLOCK(sc);
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->ifmedia, command);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		TI_LOCK(sc);
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&

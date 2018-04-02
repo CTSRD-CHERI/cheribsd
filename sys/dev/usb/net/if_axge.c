@@ -899,7 +899,8 @@ axge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ifr = (struct ifreq *)data;
 	error = 0;
 	reinit = 0;
-	if (cmd == SIOCSIFCAP) {
+	switch (cmd) {
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		AXGE_LOCK(sc);
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&
@@ -923,8 +924,11 @@ axge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		AXGE_UNLOCK(sc);
 		if (reinit > 0)
 			uether_init(ue);
-	} else
+		break;
+	default:
 		error = uether_ioctl(ifp, cmd, data);
+		break;
+	}
 
 	return (error);
 }

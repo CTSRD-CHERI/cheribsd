@@ -2468,7 +2468,7 @@ cas_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	error = 0;
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		CAS_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
@@ -2482,7 +2482,7 @@ cas_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->sc_ifflags = ifp->if_flags;
 		CAS_UNLOCK(sc);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		CAS_LOCK(sc);
 		if ((sc->sc_flags & CAS_NO_CSUM) != 0) {
 			error = EINVAL;
@@ -2496,14 +2496,14 @@ cas_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ifp->if_hwassist = 0;
 		CAS_UNLOCK(sc);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		CAS_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			cas_setladrf(sc);
 		CAS_UNLOCK(sc);
 		break;
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		if ((ifr_mtu_get(ifr) < ETHERMIN) ||
 		    (ifr_mtu_get(ifr) > ETHERMTU_JUMBO))
 			error = EINVAL;
@@ -2511,7 +2511,7 @@ cas_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ifp->if_mtu = ifr_mtu_get(ifr);
 		break;
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		error = ifmedia_ioctl(ifp, ifr, &sc->sc_mii->mii_media, cmd);
 		break;
 	default:

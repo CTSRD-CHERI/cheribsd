@@ -2206,8 +2206,8 @@ vxlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ifd = (struct ifdrv *) data;
 
 	switch (cmd) {
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		error = 0;
 		break;
 
@@ -2216,7 +2216,7 @@ vxlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = vxlan_ioctl_drvspec(sc, ifd, cmd == SIOCGDRVSPEC);
 		break;
 
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		error = vxlan_ioctl_ifflags(sc);
 		break;
 	default:
