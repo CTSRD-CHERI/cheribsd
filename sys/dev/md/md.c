@@ -1976,13 +1976,8 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		if (mdio->md_version != MDIOVERSION)
 			return (EINVAL);
 		MD_IOCTL2REQ(mdio, &mdr);
-<<<<<<< HEAD
-		mdr.md_file = (void *)(uintptr_t)mdio->md_file;
-		mdr.md_file_seg = UIO_USERSPACE;
-		mdr.md_label = (void *)(uintptr_t)mdio->md_label;
-=======
 		mdr.md_file = __USER_CAP_STR((void *)(uintptr_t)mdio->md_file);
->>>>>>> a9b8f08bd3c... Move CheriABI support for md(4) ioctls to md.c and handle capabilities
+		mdr.md_file_seg = UIO_USERSPACE;
 		mdr.md_label =
 		    __USER_CAP_STR((void *)(uintptr_t)mdio->md_label);
 		break;
