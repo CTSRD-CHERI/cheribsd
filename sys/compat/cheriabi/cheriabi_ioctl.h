@@ -137,15 +137,6 @@ struct bpf_program_c {
 #define BIOCSETFNR_C	_IOC_NEWTYPE(BIOCSETFNR, struct bpf_program_c)
 
 /* ifr_data consumers */
-#define	BXE_IOC_RD_NVRAM_C	_IOC_NEWTYPE(BXE_IOC_RD_NVRAM, struct ifreq_c)
-#define	BXE_IOC_STATS_SHOW_C	_IOC_NEWTYPE(BXE_IOC_STATS_SHOW, struct ifreq_c)
-#define	BXE_IOC_STATS_SHOW_CNT_C \
-    _IOC_NEWTYPE(BXE_IOC_STATS_SHOW_CNT, struct ifreq_c)
-#define	BXE_IOC_STATS_SHOW_NUM_C \
-    _IOC_NEWTYPE(BXE_IOC_STATS_SHOW_NUM, struct ifreq_c)
-#define	BXE_IOC_STATS_SHOW_STR_C \
-    _IOC_NEWTYPE(BXE_IOC_STATS_SHOW_STR, struct ifreq_c)
-#define	BXE_IOC_WR_NVRAM_C	_IOC_NEWTYPE(BXE_IOC_WR_NVRAM, struct ifreq_c)
 #define	GIFGOPTS_C		_IOC_NEWTYPE(GIFGOPTS, struct ifreq_c)
 #define	GIFSOPTS_C		_IOC_NEWTYPE(GIFSOPTS, struct ifreq_c)
 #define	GREGKEY_C		_IOC_NEWTYPE(GREGKEY, struct ifreq_c)
@@ -177,12 +168,6 @@ static const struct {
 	register_t	perms;
 } cheriabi_ioctl_iru_data_consumers[] =
 {
-	{ BXE_IOC_RD_NVRAM_C, sizeof(struct bxe_nvram_data),
-	    CHERI_PERM_STORE },
-	{ BXE_IOC_WR_NVRAM_C, sizeof(struct bxe_nvram_data), CHERI_PERM_LOAD },
-	{ BXE_IOC_STATS_SHOW_CNT_C, SIZE_MAX },	/* Internal, dissallow */
-	{ BXE_IOC_STATS_SHOW_NUM_C, SIZE_MAX },	/* Internal, dissallow */
-	{ BXE_IOC_STATS_SHOW_STR_C, SIZE_MAX },	/* Internal, dissallow */
 	{ GIFGOPTS_C, sizeof(u_int), CHERI_PERM_STORE },
 	{ GIFSOPTS_C, sizeof(u_int), CHERI_PERM_LOAD },
 	{ GREGKEY_C, sizeof(uint32_t), CHERI_PERM_STORE },

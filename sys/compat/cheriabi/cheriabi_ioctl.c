@@ -212,11 +212,6 @@ cheriabi_ioctl_translate_in(u_long com, void *data, u_long *t_comp,
 	}
 
 	/* ifr_data consumers */
-	case BXE_IOC_RD_NVRAM_C:
-	case BXE_IOC_STATS_SHOW_CNT_C:
-	case BXE_IOC_STATS_SHOW_NUM_C:
-	case BXE_IOC_STATS_SHOW_STR_C:
-	case BXE_IOC_WR_NVRAM_C:
 	case GIFGOPTS_C:
 	case GIFSOPTS_C:
 	case GREGKEY_C:
@@ -246,8 +241,6 @@ cheriabi_ioctl_translate_in(u_long com, void *data, u_long *t_comp,
 		memcpy(&ifr->ifr_name, &ifr_c->ifr_name, sizeof(ifr->ifr_name));
 		*t_datap = ifr;
 		switch (com) {
-		case BXE_IOC_RD_NVRAM_C:	/* requires parsing for size */
-		case BXE_IOC_WR_NVRAM_C:	/* requires parsing for size  */
 		case SIOCGVH_C:			/* copies multiple */
 			*t_comp = com;	/* Direct handling required */
 			break;
@@ -485,11 +478,6 @@ cheriabi_ioctl_translate_out(u_long com, void *data, void *t_data)
 	}
 
 	/* ifr_ifdata users */
-	case BXE_IOC_RD_NVRAM_C:
-	case BXE_IOC_STATS_SHOW_CNT_C:
-	case BXE_IOC_STATS_SHOW_NUM_C:
-	case BXE_IOC_STATS_SHOW_STR_C:
-	case BXE_IOC_WR_NVRAM_C:
 	case GIFGOPTS_C:
 	case GIFSOPTS_C:
 	case GREGKEY_C:
@@ -633,11 +621,6 @@ ioctl_data_contains_pointers(u_long cmd)
 	case SG_IO_C:
 
 	/* ifr_ifdata users */
-	case BXE_IOC_RD_NVRAM_C:
-	case BXE_IOC_STATS_SHOW_CNT_C:
-	case BXE_IOC_STATS_SHOW_NUM_C:
-	case BXE_IOC_STATS_SHOW_STR_C:
-	case BXE_IOC_WR_NVRAM_C:
 	case GIFGOPTS_C:
 	case GIFSOPTS_C:
 	case GREGKEY_C:
