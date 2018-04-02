@@ -2394,23 +2394,6 @@ ifr__int0_set(void *ifrp, int val)
 		ifrup->ifr.ifr_ifru.ifru_cap[0] = val;
 }
 
-static int
-ifr__int1_get(void *ifrp)
-{
-	union ifreq_union *ifrup;
-
-	ifrup = ifrp;
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI))
-		return (ifrup->ifr_c.ifr_ifru.ifru_cap[1]);
-#endif
-#ifdef COMPAT_FREEBSD32
-	if (SV_CURPROC_FLAG(SV_ILP32))
-		return (ifrup->ifr32.ifr_ifru.ifru_cap[1]);
-#endif
-	return (ifrup->ifr.ifr_ifru.ifru_cap[1]);
-}
-
 static void
 ifr__int1_set(void *ifrp, int val)
 {
