@@ -996,8 +996,8 @@ process___cap_relocs(Obj_Entry* obj)
 	void *ddc = __builtin_cheri_global_data_get();
 	void *pcc = __builtin_cheri_program_counter_get();
 
-	dbg("Processing %lu __cap_relocs for %s\n",
-	    (start_relocs - start_relocs), obj->path);
+	dbg("Processing %lu __cap_relocs for %s\n", (end_relocs - start_relocs),
+	    obj->path);
 
 	/*
 	 * We currently emit dynamic relocations for the cap_relocs location, so
