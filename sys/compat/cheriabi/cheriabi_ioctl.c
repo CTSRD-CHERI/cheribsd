@@ -230,40 +230,6 @@ cheriabi_ioctl_translate_in(u_long com, void *data, u_long *t_comp,
 		return (0);
 	}
 
-	case SIOCAIFGROUP_C:
-	case SIOCGIFGROUP_C:
-	case SIOCDIFGROUP_C:
-	case SIOCGIFGMEMB_C: {
-		struct ifgroupreq	*ifgrp;
-		struct ifgroupreq_c	*ifgrp_c = data;
-
-		ifgrp = malloc(sizeof(struct ifgroupreq), M_IOCTLOPS,
-		     M_WAITOK | M_ZERO);
-		*t_datap = ifgrp;
-		*t_comp = _IOC_NEWTYPE(com, struct ifgroupreq);
-
-		memcpy(ifgrp->ifgr_name, ifgrp_c->ifgr_name,
-		    sizeof(ifgrp->ifgr_name));
-		CP((*ifgrp_c), (*ifgrp), ifgr_len);
-		switch (com) {
-		case SIOCAIFGROUP_C:
-		case SIOCDIFGROUP_C:
-			memcpy(ifgrp->ifgr_group, ifgrp_c->ifgr_group,
-			   sizeof(ifgrp->ifgr_group));
-			break;
-		case SIOCGIFGROUP_C:
-		case SIOCGIFGMEMB_C:
-			error = cheriabi_cap_to_ptr(
-			    (caddr_t *)&ifgrp->ifgr_groups,
-			    ifgrp_c->ifgr_groups, ifgrp->ifgr_len,
-			    CHERI_PERM_STORE, 1);
-			if (error != 0)
-				return(error);
-			break;
-		}
-		return (0);
-	}
-
 	case SIOCGIFMEDIA_C:
 	case SIOCGIFXMEDIA_C: {
 		struct ifmediareq	*ifmp;
@@ -359,17 +325,6 @@ cheriabi_ioctl_translate_out(u_long com, void *data, void *t_data)
 		break;
 	}
 
-	case SIOCAIFGROUP_C:
-	case SIOCGIFGROUP_C:
-	case SIOCDIFGROUP_C:
-	case SIOCGIFGMEMB_C: {
-		struct ifgroupreq	*ifgrp = t_data;
-		struct ifgroupreq_c	*ifgrp_c = data;
-
-		CP((*ifgrp), (*ifgrp_c), ifgr_len);
-		break;
-	}
-
 	case SIOCGIFMEDIA_C:
 	case SIOCGIFXMEDIA_C: {
 		struct ifmediareq	*ifmp = t_data;
@@ -408,11 +363,6 @@ ioctl_data_contains_pointers(u_long cmd)
 	case FIODGNAME_C:
 	case PCIOCGETCONF_C:
 	case SG_IO_C:
-
-	case SIOCAIFGROUP_C:
-	case SIOCGIFGROUP_C:
-	case SIOCDIFGROUP_C:
-	case SIOCGIFGMEMB_C:
 
 	case SIOCGIFMEDIA_C:
 	case SIOCGIFXMEDIA_C:

@@ -100,6 +100,21 @@
 #include <compat/freebsd32/freebsd32.h>
 #endif
 
+#ifdef COMPAT_CHERIABI
+struct ifgroupreq_c {
+	char	ifgr_name[IFNAMSIZ];
+	u_int	ifgr_len;
+	union {
+		char		ifgru_group[IFNAMSIZ];
+		struct ifg_req * __capability ifgru_groups;
+	} ifgr_ifgru;
+};
+#define	_CASE_IOC_IFGROUPREQ_C(cmd)				\
+    case _IOC_NEWTYPE((cmd), struct ifgroupreq_c):
+#else
+#define _CASE_IOC_IFGROUPREQ_C(cmd)
+#endif
+
 #ifdef COMPAT_FREEBSD32
 struct ifreq_buffer32 {
 	uint32_t	length;		/* (size_t) */
@@ -152,6 +167,7 @@ struct ifgroupreq32 {
 
 #define CASE_IOC_IFGROUPREQ(cmd)	\
     _CASE_IOC_IFGROUPREQ_32(cmd)	\
+    _CASE_IOC_IFGROUPREQ_C(cmd)		\
     case (cmd)
 
 union ifreq_union {
@@ -166,6 +182,9 @@ union ifreq_union {
 
 union ifgroupreq_union {
 	struct ifgroupreq ifgr;
+#ifdef COMPAT_CHERIABI
+	struct ifgroupreq_c ifgr_c;
+#endif
 #ifdef COMPAT_FREEBSD32
 	struct ifgroupreq32 ifgr32;
 #endif
@@ -1525,6 +1544,10 @@ ifgr_group_get(void *ifgrp)
 	union ifgroupreq_union *ifgrup;
 
 	ifgrup = ifgrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		return (&ifgrup->ifgr_c.ifgr_ifgru.ifgru_group[0]);
+#endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		return (&ifgrup->ifgr32.ifgr_ifgru.ifgru_group[0]);
@@ -1532,18 +1555,24 @@ ifgr_group_get(void *ifgrp)
 	return (&ifgrup->ifgr.ifgr_ifgru.ifgru_group[0]);
 }
 
-static struct ifg_req *
+static struct ifg_req * __capability
 ifgr_groups_get(void *ifgrp)
 {
 	union ifgroupreq_union *ifgrup;
 
 	ifgrup = ifgrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		return (ifgrup->ifgr_c.ifgr_ifgru.ifgru_groups);
+#endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
-		return ((struct ifg_req *)(uintptr_t)
-		    ifgrup->ifgr32.ifgr_ifgru.ifgru_groups);
+		return (__USER_CAP((struct ifg_req *)(uintptr_t)
+		    ifgrup->ifgr32.ifgr_ifgru.ifgru_groups,
+		    ifgrup->ifgr32.ifgr_len));
 #endif
-	return (ifgrup->ifgr.ifgr_ifgru.ifgru_groups);
+	return (__USER_CAP(ifgrup->ifgr.ifgr_ifgru.ifgru_groups,
+	    ifgrup->ifgr.ifgr_len));
 }
 
 /*
@@ -1554,7 +1583,7 @@ if_getgroup(struct ifgroupreq *ifgr, struct ifnet *ifp)
 {
 	int			 len, error;
 	struct ifg_list		*ifgl;
-	struct ifg_req		 ifgrq, *ifgp;
+	struct ifg_req		 ifgrq, * __capability ifgp;
 
 	if (ifgr->ifgr_len == 0) {
 		IF_ADDR_RLOCK(ifp);
@@ -1576,7 +1605,7 @@ if_getgroup(struct ifgroupreq *ifgr, struct ifnet *ifp)
 		bzero(&ifgrq, sizeof ifgrq);
 		strlcpy(ifgrq.ifgrq_group, ifgl->ifgl_group->ifg_group,
 		    sizeof(ifgrq.ifgrq_group));
-		if ((error = copyout(&ifgrq, ifgp, sizeof(struct ifg_req)))) {
+		if ((error = copyout_c(&ifgrq, ifgp, sizeof(struct ifg_req)))) {
 		    	IF_ADDR_RUNLOCK(ifp);
 			return (error);
 		}
@@ -1596,7 +1625,7 @@ if_getgroupmembers(struct ifgroupreq *ifgr)
 {
 	struct ifg_group	*ifg;
 	struct ifg_member	*ifgm;
-	struct ifg_req		 ifgrq, *ifgp;
+	struct ifg_req		 ifgrq, * __capability ifgp;
 	int			 len, error;
 
 	IFNET_RLOCK();
@@ -1625,7 +1654,7 @@ if_getgroupmembers(struct ifgroupreq *ifgr)
 		bzero(&ifgrq, sizeof ifgrq);
 		strlcpy(ifgrq.ifgrq_member, ifgm->ifgm_ifp->if_xname,
 		    sizeof(ifgrq.ifgrq_member));
-		if ((error = copyout(&ifgrq, ifgp, sizeof(struct ifg_req)))) {
+		if ((error = copyout_c(&ifgrq, ifgp, sizeof(struct ifg_req)))) {
 			IFNET_RUNLOCK();
 			return (error);
 		}

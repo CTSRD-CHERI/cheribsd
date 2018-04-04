@@ -136,20 +136,6 @@ struct bpf_program_c {
 #define BIOCSETWF_C	_IOC_NEWTYPE(BIOCSETWF, struct bpf_program_c)
 #define BIOCSETFNR_C	_IOC_NEWTYPE(BIOCSETFNR, struct bpf_program_c)
 
-struct ifgroupreq_c {
-	char	ifgr_name[IFNAMSIZ];
-	u_int	ifgr_len;
-	union {
-		char	ifgru_group[IFNAMSIZ];
-		void * __capability	ifgru_groups;	/* struct ifg_req * */
-	} ifgr_ifgru;
-};
-
-#define	SIOCAIFGROUP_C		_IOC_NEWTYPE(SIOCAIFGROUP, struct ifgroupreq_c)
-#define	SIOCGIFGROUP_C		_IOC_NEWTYPE(SIOCGIFGROUP, struct ifgroupreq_c)
-#define	SIOCDIFGROUP_C		_IOC_NEWTYPE(SIOCDIFGROUP, struct ifgroupreq_c)
-#define	SIOCGIFGMEMB_C		_IOC_NEWTYPE(SIOCGIFGMEMB, struct ifgroupreq_c)
-
 struct ifmediareq_c {
 	char		ifm_name[IFNAMSIZ];
 	int		ifm_current;
