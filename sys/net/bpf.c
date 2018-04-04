@@ -123,7 +123,6 @@ CTASSERT(offsetof(struct bpf_if, bif_ext) == 0);
 #define BPF_ALIGNMENT32 sizeof(int32_t)
 #define	BPF_WORDALIGN32(x) roundup2(x, BPF_ALIGNMENT32)
 
-#ifndef BURN_BRIDGES
 /*
  * 32-bit version of structure prepended to each packet.  We use this header
  * instead of the standard one for 32-bit streams.  We mark the a stream as
@@ -136,7 +135,6 @@ struct bpf_hdr32 {
 	uint16_t	bh_hdrlen;	/* length of bpf header (this struct
 					   plus alignment padding) */
 };
-#endif
 
 struct bpf_program32 {
 	u_int bf_len;
@@ -2303,7 +2301,6 @@ bpf_hdrlen(struct bpf_d *d)
 	int hdrlen;
 
 	hdrlen = d->bd_bif->bif_hdrlen;
-#ifndef BURN_BRIDGES
 	if (d->bd_tstamp == BPF_T_NONE ||
 	    BPF_T_FORMAT(d->bd_tstamp) == BPF_T_MICROTIME)
 #ifdef COMPAT_FREEBSD32
@@ -2313,7 +2310,6 @@ bpf_hdrlen(struct bpf_d *d)
 #endif
 			hdrlen += SIZEOF_BPF_HDR(struct bpf_hdr);
 	else
-#endif
 		hdrlen += SIZEOF_BPF_HDR(struct bpf_xhdr);
 #ifdef COMPAT_FREEBSD32
 	if (d->bd_compat32)
@@ -2369,11 +2365,9 @@ catchpacket(struct bpf_d *d, u_char *pkt, u_int pktlen, u_int snaplen,
     struct bintime *bt)
 {
 	struct bpf_xhdr hdr;
-#ifndef BURN_BRIDGES
 	struct bpf_hdr hdr_old;
 #ifdef COMPAT_FREEBSD32
 	struct bpf_hdr32 hdr32_old;
-#endif
 #endif
 	int caplen, curlen, hdrlen, totlen;
 	int do_wakeup = 0;
@@ -2446,7 +2440,6 @@ catchpacket(struct bpf_d *d, u_char *pkt, u_int pktlen, u_int snaplen,
 	caplen = totlen - hdrlen;
 	tstype = d->bd_tstamp;
 	do_timestamp = tstype != BPF_T_NONE;
-#ifndef BURN_BRIDGES
 	if (tstype == BPF_T_NONE || BPF_T_FORMAT(tstype) == BPF_T_MICROTIME) {
 		struct bpf_ts ts;
 		if (do_timestamp)
@@ -2478,7 +2471,6 @@ catchpacket(struct bpf_d *d, u_char *pkt, u_int pktlen, u_int snaplen,
 		    sizeof(hdr_old));
 		goto copy;
 	}
-#endif
 
 	/*
 	 * Append the bpf header.  Note we append the actual header size, but
@@ -2495,9 +2487,7 @@ catchpacket(struct bpf_d *d, u_char *pkt, u_int pktlen, u_int snaplen,
 	/*
 	 * Copy the packet data into the store buffer and update its length.
 	 */
-#ifndef BURN_BRIDGES
 copy:
-#endif
 	(*cpfn)(d, d->bd_sbuf, curlen + hdrlen, pkt, caplen);
 	d->bd_slen = curlen + totlen;
 
