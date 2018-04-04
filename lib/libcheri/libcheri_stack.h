@@ -73,7 +73,7 @@ struct libcheri_stack {
 
 #define	LIBCHERI_STACKFRAME_SIZE	sizeof(struct libcheri_stack_frame)
 #define	LIBCHERI_STACK_SIZE						\
-			    (LIBCHERI_STACK_DEPTH * LIBCHERI_STACKFRAME_SIZE)
+		(register_t)(LIBCHERI_STACK_DEPTH * LIBCHERI_STACKFRAME_SIZE)
 
 /*
  * Public libcheri APIs to interact with the trusted stack.

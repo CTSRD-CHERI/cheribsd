@@ -99,7 +99,7 @@ libcheri_enter_init(void)
 	 * a global $sp and use $c0.
 	 */
 #ifdef __CHERI_PURE_CAPABILITY__
-	__libcheri_enter_stack_csp = __libcheri_enter_stack +
+	__libcheri_enter_stack_csp = (caddr_t)__libcheri_enter_stack +
 	    LIBCHERI_ENTER_STACK_SIZE;
 #else
 	__libcheri_enter_stack_cap = cheri_getdefault();

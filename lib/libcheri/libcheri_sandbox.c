@@ -523,7 +523,7 @@ sandbox_object_new(struct sandbox_class *sbcp, size_t heaplen,
  */
 int
 sandbox_object_new_system_object(__capability void *private_data,
-    __capability void *invoke_pcc, __capability intptr_t *vtable,
+    __capability void *invoke_pcc, __capability vm_offset_t *vtable,
     struct sandbox_object **sbopp)
 {
 
