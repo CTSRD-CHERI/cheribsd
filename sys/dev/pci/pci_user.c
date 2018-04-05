@@ -733,17 +733,19 @@ pci_conf_io_init(struct pci_conf_io *cio, caddr_t data, u_long cmd)
 #ifdef PRE7_COMPAT
 	case PCIOCGETCONF_OLD32:
 #endif
-               cio32 = (struct pci_conf_io32 *)data;
-               cio->pat_buf_len = cio32->pat_buf_len;
-               cio->num_patterns = cio32->num_patterns;
-               cio->patterns = (void *)(uintptr_t)cio32->patterns;
-               cio->match_buf_len = cio32->match_buf_len;
-               cio->num_matches = cio32->num_matches;
-               cio->matches = (void *)(uintptr_t)cio32->matches;
-               cio->offset = cio32->offset;
-               cio->generation = cio32->generation;
-               cio->status = cio32->status;
-               return;
+		cio32 = (struct pci_conf_io32 *)data;
+		cio->pat_buf_len = cio32->pat_buf_len;
+		cio->num_patterns = cio32->num_patterns;
+		cio->patterns = __USER_CAP((void *)(uintptr_t)cio32->patterns,
+		    cio32->pat_buf_len);
+		cio->match_buf_len = cio32->match_buf_len;
+		cio->num_matches = cio32->num_matches;
+		cio->matches = __USER_CAP((void *)(uintptr_t)cio32->matches,
+		    cio32->match_buf_len);
+		cio->offset = cio32->offset;
+		cio->generation = cio32->generation;
+		cio->status = cio32->status;
+		return;
 #endif	/* COMPAT_FREEBSD32 */
 
 	default:
