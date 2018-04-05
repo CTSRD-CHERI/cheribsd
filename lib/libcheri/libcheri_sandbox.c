@@ -57,13 +57,14 @@
 #include "libcheri_enter.h"
 #include "libcheri_fd.h"
 #include "libcheri_invoke.h"
-#include "libcheri_system.h"
 #include "libcheri_init.h"
+#include "libcheri_private.h"
 #include "libcheri_sandbox.h"
 #include "libcheri_sandbox_elf.h"
 #include "libcheri_sandbox_internal.h"
 #include "libcheri_sandbox_methods.h"
 #include "libcheri_sandboxasm.h"
+#include "libcheri_system.h"
 
 static size_t			num_sandbox_classes;
 static size_t			max_sandbox_classes;
@@ -204,6 +205,7 @@ sandbox_class_new(const char *path, size_t maxmaplen,
 	int fd, saved_errno;
 	size_t i;
 
+	loader_dbg("Loading sandbox %s\n", path);
 	fd = open(path, O_RDONLY);
 	if (fd == -1) {
 		saved_errno = errno;
