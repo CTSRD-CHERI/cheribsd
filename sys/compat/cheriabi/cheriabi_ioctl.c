@@ -48,7 +48,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/ioccom.h>
 #include <sys/malloc.h>
 #include <sys/memrange.h>
-#include <sys/pciio.h>
 #include <sys/proc.h>
 #include <sys/syscall.h>
 #include <sys/syscallsubr.h>
@@ -71,9 +70,6 @@ MALLOC_DECLARE(M_IOCTLOPS);
 /* Cannot get exact size in 64-bit due to alignment issue of entire struct. */
 CTASSERT(sizeof(struct ioc_read_toc_entry32) == 8);
 CTASSERT(sizeof(struct ioc_toc_header32) == 4);
-CTASSERT(sizeof(struct pci_conf_io32) == 36);
-CTASSERT(sizeof(struct pci_match_conf32) == 44);
-CTASSERT(sizeof(struct pci_conf32) == 44);
 #endif
 
 /*
@@ -129,34 +125,6 @@ cheriabi_ioctl_translate_in(u_long com, void *data, u_long *t_comp,
 			return (error);
 
 		return(0);
-	}
-
-	case PCIOCGETCONF_C: {
-		struct pci_conf_io *pci;
-		struct pci_conf_io_c *pci_c = data;
-
-		pci = malloc(sizeof(struct pci_conf_io), M_IOCTLOPS,
-		    M_WAITOK | M_ZERO);
-		*t_datap = pci;
-		*t_comp = PCIOCGETCONF;
-
-		CP((*pci_c), (*pci), pat_buf_len);
-		CP((*pci_c), (*pci), num_patterns);
-		CP((*pci_c), (*pci), match_buf_len);
-		/* num_matches is an output parameter */
-		CP((*pci_c), (*pci), offset);
-		CP((*pci_c), (*pci), generation);
-		/* status is an output parameter */
-
-		error = cheriabi_cap_to_ptr((caddr_t *)&pci->patterns,
-		    pci_c->patterns, pci->pat_buf_len, CHERI_PERM_LOAD, 1);
-		if (error != 0)
-			return (error);
-		error = cheriabi_cap_to_ptr((caddr_t *)&pci->matches,
-		    pci_c->matches, pci->match_buf_len, CHERI_PERM_LOAD, 1);
-		if (error != 0)
-			return (error);
-		return (0);
 	}
 
 	case SG_IO_C: {
@@ -264,17 +232,6 @@ cheriabi_ioctl_translate_out(u_long com, void *data, void *t_data)
 
 	/* FIODGNAME_C: Input only */
 
-	case PCIOCGETCONF_C: {
-		struct pci_conf_io *pci = t_data;
-		struct pci_conf_io_c *pci_c = data;
-
-		CP((*pci), (*pci_c), num_matches);
-		CP((*pci), (*pci_c), offset);
-		CP((*pci), (*pci_c), generation);
-		CP((*pci), (*pci_c), status);
-		break;
-	}
-
 	case SG_IO_C: {
 		struct sg_io_hdr *io = t_data;
 		struct sg_io_hdr_c *io_c = data;
@@ -339,7 +296,6 @@ ioctl_data_contains_pointers(u_long cmd)
 	switch (cmd) {
 	case CDIOREADTOCENTRYS_C:
 	case FIODGNAME_C:
-	case PCIOCGETCONF_C:
 	case SG_IO_C:
 
 	case SIOCGIFMEDIA_C:

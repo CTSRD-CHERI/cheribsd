@@ -58,6 +58,27 @@ __FBSDID("$FreeBSD$");
 #include "pcib_if.h"
 #include "pci_if.h"
 
+#if __has_feature(capabilities)
+struct pci_conf_io_c {
+	u_int32_t		pat_buf_len;
+	u_int32_t		num_patterns;
+	struct pci_match_conf * __capability patterns;
+	u_int32_t		match_buf_len;
+	u_int32_t		num_matches;
+	struct pci_conf * __capability matches;
+	u_int32_t		offset;
+	u_int32_t		generation;
+	u_int32_t		status;
+};
+typedef	struct pci_conf_io_c	kpci_conf_io_t;
+#else
+typedef	struct pci_conf_io	kpci_conf_io_t;
+#endif
+
+#ifdef COMPAT_CHERIABI
+#define	PCIOCGETCONF_C	_IOC_NEWTYPE(PCIOCGETCONF, struct pci_conf_io_c)
+#endif
+
 #ifdef COMPAT_FREEBSD32
 struct pci_conf32 {
 	struct pcisel	pc_sel;		/* domain+bus+slot+function */
@@ -511,6 +532,12 @@ pci_conf_match_old32(struct pci_match_conf_old32 *matches, int num_matches,
 #endif	/* COMPAT_FREEBSD32 */
 #endif	/* !PRE7_COMPAT */
 
+#ifdef COMPAT_CHERIABI
+#define	_CASE_PCIOCGETCONF_C	case PCIOCGETCONF_C:
+#else
+#define	_CASE_PCIOCGETCONF_C
+#endif
+
 #ifdef COMPAT_FREEBSD32
 #define	_CASE_PCIOCGETCONF32	case PCIOCGETCONF32:
 #else
@@ -530,6 +557,7 @@ pci_conf_match_old32(struct pci_match_conf_old32 *matches, int num_matches,
 #endif
 
 #define CASE_PCIOCGETCONF					\
+    _CASE_PCIOCGETCONF_C					\
     _CASE_PCIOCGETCONF32					\
     _CASE_PCIOCGETCONF_OLD					\
     _CASE_PCIOCGETCONF_OLD32					\
@@ -555,6 +583,9 @@ pci_conf_match(u_long cmd, struct pci_match_conf *matches, int num_matches,
 
 	switch (cmd) {
 	case PCIOCGETCONF:
+#ifdef COMPAT_CHERIABI
+	case PCIOCGETCONF_C:
+#endif
 		return (pci_conf_match_native(
 		    (struct pci_match_conf *)matches, num_matches, match_buf));
 #ifdef COMPAT_FREEBSD32
@@ -669,6 +700,9 @@ pci_match_conf_size(u_long cmd)
 
 	switch (cmd) {
 	case PCIOCGETCONF:
+#ifdef COMPAT_CHERIABI
+	case PCIOCGETCONF_C:
+#endif
 		return (sizeof(struct pci_match_conf));
 #ifdef COMPAT_FREEBSD32
 	case PCIOCGETCONF32:
@@ -694,6 +728,9 @@ pci_conf_size(u_long cmd)
 
 	switch (cmd) {
 	case PCIOCGETCONF:
+#ifdef COMPAT_CHERIABI
+	case PCIOCGETCONF_C:
+#endif
 		return (sizeof(struct pci_conf));
 #ifdef COMPAT_FREEBSD32
 	case PCIOCGETCONF32:
@@ -714,8 +751,9 @@ pci_conf_size(u_long cmd)
 }
 
 static void
-pci_conf_io_init(struct pci_conf_io *cio, caddr_t data, u_long cmd)
+pci_conf_io_init(kpci_conf_io_t *cio, caddr_t data, u_long cmd)
 {
+	struct pci_conf_io *cio_native;
 #ifdef COMPAT_FREEBSD32
 	struct pci_conf_io32 *cio32;
 #endif
@@ -725,8 +763,25 @@ pci_conf_io_init(struct pci_conf_io *cio, caddr_t data, u_long cmd)
 #ifdef PRE7_COMPAT
 	case PCIOCGETCONF_OLD:
 #endif
-		*cio = *(struct pci_conf_io *)data;
+		cio_native = (struct pci_conf_io *)data;
+		cio->pat_buf_len = cio_native->pat_buf_len;
+		cio->num_patterns = cio_native->num_patterns;
+		cio->patterns = __USER_CAP(cio_native->patterns,
+		    cio_native->pat_buf_len);
+		cio->match_buf_len = cio_native->match_buf_len;
+		cio->num_matches = cio_native->num_matches;
+		cio->matches = __USER_CAP(cio_native->matches,
+		    cio_native->match_buf_len);
+		cio->offset = cio_native->offset;
+		cio->generation = cio_native->generation;
+		cio->status = cio_native->status;
 		return;
+
+#ifdef COMPAT_CHERIABI
+	case PCIOCGETCONF_C:
+		*cio = *(struct pci_conf_io_c *)data;
+		return;
+#endif
 
 #ifdef COMPAT_FREEBSD32
 	case PCIOCGETCONF32:
@@ -755,10 +810,13 @@ pci_conf_io_init(struct pci_conf_io *cio, caddr_t data, u_long cmd)
 }
 
 static void
-pci_conf_io_update_data(const struct pci_conf_io *cio, caddr_t data,
+pci_conf_io_update_data(const kpci_conf_io_t *cio, caddr_t data,
     u_long cmd)
 {
 	struct pci_conf_io *d_cio;
+#ifdef COMPAT_CHERIABI
+	struct pci_conf_io_c *cio_c;
+#endif
 #ifdef COMPAT_FREEBSD32
 	struct pci_conf_io32 *cio32;
 #endif
@@ -774,6 +832,16 @@ pci_conf_io_update_data(const struct pci_conf_io *cio, caddr_t data,
 		d_cio->offset = cio->offset;
 		d_cio->num_matches = cio->num_matches;
 		return;
+
+#ifdef COMPAT_CHERIABI
+	case PCIOCGETCONF_C:
+		cio_c = (struct pci_conf_io_c *)data;
+		cio_c->status = cio->status;
+		cio_c->generation = cio->generation;
+		cio_c->offset = cio->offset;
+		cio_c->num_matches = cio->num_matches;
+		return;
+#endif
 
 #ifdef COMPAT_FREEBSD32
 	case PCIOCGETCONF32:
@@ -804,6 +872,9 @@ pci_conf_for_copyout(const struct pci_conf *pcp, union pci_conf_union *pcup,
 
 	switch (cmd) {
 	case PCIOCGETCONF:
+#ifdef COMPAT_CHERIABI
+	case PCIOCGETCONF_C:
+#endif
 		pcup->pc = *pcp;
 		return;
 
@@ -877,7 +948,7 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 	device_t pcidev;
 	const char *name;
 	struct devlist *devlist_head;
-	struct pci_conf_io *cio = NULL;
+	kpci_conf_io_t *cio = NULL;
 	struct pci_devinfo *dinfo;
 	struct pci_io *io;
 	struct pci_bar_io *bio;
@@ -991,7 +1062,8 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 			 */
 			pattern_buf = malloc(cio->pat_buf_len, M_TEMP,
 			    M_WAITOK);
-			error = copyin(cio->patterns, pattern_buf,
+			error = copyin_c(cio->patterns,
+			    (__cheri_tocap void * __capability)pattern_buf,
 			    cio->pat_buf_len);
 			if (error != 0) {
 				error = EINVAL;
@@ -1050,8 +1122,8 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 					break;
 
 				pci_conf_for_copyout(&dinfo->conf, &pcu, cmd);
-				error = copyout(&pcu,
-				    (caddr_t)cio->matches +
+				error = copyout_c(&pcu,
+				    (char * __capability)cio->matches +
 				    confsz * cio->num_matches, confsz);
 				if (error)
 					break;

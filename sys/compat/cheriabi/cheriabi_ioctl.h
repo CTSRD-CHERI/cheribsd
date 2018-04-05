@@ -89,19 +89,6 @@ struct fiodgname_arg_c {
 };
 #define	FIODGNAME_C	_IOC_NEWTYPE(FIODGNAME, struct fiodgname_arg_c)
 
-struct pci_conf_io_c {
-	u_int32_t		pat_buf_len;	/* pattern buffer length */
-	u_int32_t		num_patterns;	/* number of patterns */
-	void * __capability		patterns;	/* struct pci_match_conf ptr */
-	u_int32_t		match_buf_len;	/* match buffer length */
-	u_int32_t		num_matches;	/* number of matches returned */
-	void * __capability		matches;	/* struct pci_conf ptr */
-	u_int32_t		offset;		/* offset into device list */
-	u_int32_t		generation;	/* device list generation */
-	u_int32_t		status;		/* request status */
-};
-#define	PCIOCGETCONF_C	_IOC_NEWTYPE(PCIOCGETCONF, struct pci_conf_io_c)
-
 struct sg_io_hdr_c {
 	int		interface_id;
 	int		dxfer_direction;
