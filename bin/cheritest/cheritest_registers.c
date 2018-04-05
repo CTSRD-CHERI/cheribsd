@@ -127,7 +127,7 @@ test_listregs(const struct cheri_test *ctp __unused)
 static void
 check_initreg_code(__capability void *c)
 {
-	register_t v;
+	uintmax_t v;
 
 	/* Base. */
 	v = cheri_getbase(c);
@@ -199,7 +199,7 @@ check_initreg_code(__capability void *c)
 
 	if ((v & CHERI_PERMS_SWALL) !=
 	    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP))
-		cheritest_failure_errx("perms %jx (expected swperms %jx)", v,
+		cheritest_failure_errx("perms %jx (expected swperms %x)", v,
 		    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP));
 
 	/* Sealed bit. */
@@ -217,7 +217,7 @@ check_initreg_code(__capability void *c)
 static void
 check_initreg_data(__capability void *c)
 {
-	register_t v;
+	uintmax_t v;
 
 	/* Base. */
 	v = cheri_getbase(c);
@@ -288,7 +288,7 @@ check_initreg_data(__capability void *c)
 		cheritest_failure_errx("perms %jx (system_regs present)", v);
 
 	if ((v & CHERI_PERMS_SWALL) != CHERI_PERMS_SWALL)
-		cheritest_failure_errx("perms %jx (expected swperms %jx)", v,
+		cheritest_failure_errx("perms %jx (expected swperms %x)", v,
 		    CHERI_PERMS_SWALL);
 
 	/* Sealed bit. */
@@ -397,7 +397,7 @@ test_initregs_stack(const struct cheri_test *ctp __unused)
 
 	if ((v & CHERI_PERMS_SWALL) !=
 	    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP))
-		cheritest_failure_errx("perms %jx (expected swperms %jx)", v,
+		cheritest_failure_errx("perms %jx (expected swperms %x)", v,
 		    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP));
 
 	/* Sealed bit. */
