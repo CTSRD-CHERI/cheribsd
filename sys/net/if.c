@@ -3311,16 +3311,13 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 
 	case CASE_IOC_IFGROUPREQ(SIOCAIFGROUP):
-	{
-		struct ifgroupreq *ifgr = (struct ifgroupreq *)ifr;
-
 		error = priv_check(td, PRIV_NET_ADDIFGROUP);
 		if (error)
 			return (error);
-		if ((error = if_addgroup(ifp, ifgr_group_get(ifgr))))
+		if ((error = if_addgroup(ifp,
+		    ifgr_group_get((struct ifgroupreq *)data))))
 			return (error);
 		break;
-	}
 
 	case CASE_IOC_IFGROUPREQ(SIOCGIFGROUP):
 		if ((error = if_getgroup((struct ifgroupreq *)ifr, ifp)))
@@ -3328,16 +3325,13 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 
 	case CASE_IOC_IFGROUPREQ(SIOCDIFGROUP):
-	{
-		struct ifgroupreq *ifgr = (struct ifgroupreq *)ifr;
-
 		error = priv_check(td, PRIV_NET_DELIFGROUP);
 		if (error)
 			return (error);
-		if ((error = if_delgroup(ifp, ifgr_group_get(ifgr))))
+		if ((error = if_delgroup(ifp,
+		    ifgr_group_get((struct ifgroupreq *)data))))
 			return (error);
 		break;
-	}
 
 	default:
 		error = ENOIOCTL;
