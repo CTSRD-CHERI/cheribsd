@@ -118,6 +118,26 @@ CTASSERT(offsetof(struct bpf_if, bif_ext) == 0);
 #define	SIZEOF_BPF_HDR(type)	\
     (offsetof(type, bh_hdrlen) + sizeof(((type *)0)->bh_hdrlen))
 
+#ifdef COMPAT_CHERIABI
+
+struct bpf_program_c {
+	u_int bf_len;
+	struct bpf_insn * __capability bf_insns;
+};
+struct bpf_dltlist_c {
+	u_int bfl_len;
+	u_int * __capability bfl_list;
+};
+
+#define	_CASE_IOC_BPF_DLTLIST_C(cmd)				\
+    case _IOC_NEWTYPE((cmd), struct bpf_dltlist_c):
+#define	_CASE_IOC_BPF_PROGRAM_C(cmd)				\
+    case _IOC_NEWTYPE((cmd), struct bpf_program_c):
+#else /* !COMPAT_CHERIABI */
+#define	_CASE_IOC_BPF_DLTLIST_C(cmd)
+#define	_CASE_IOC_BPF_PROGRAM_C(cmd)
+#endif /* !COMPAT_CHERIABI */
+
 #ifdef COMPAT_FREEBSD32
 #include <sys/mount.h>
 #include <compat/freebsd32/freebsd32.h>
@@ -160,9 +180,11 @@ struct bpf_dltlist32 {
 #endif /* !COMPAT_FREEBSD32 */
 
 #define	CASE_IOC_BPF_DLTLIST(cmd)				\
+    _CASE_IOC_BPF_DLTLIST_C(cmd)				\
     _CASE_IOC_BPF_DLTLIST32(cmd)				\
     case (cmd)
 #define	CASE_IOC_BPF_PROGRAM(cmd)				\
+    _CASE_IOC_BPF_PROGRAM_C(cmd)				\
     _CASE_IOC_BPF_PROGRAM32(cmd)				\
     case (cmd)
 
@@ -1777,22 +1799,32 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	return (error);
 }
 
-static struct bpf_insn *
+static struct bpf_insn * __capability
 bf_insns_get_ptr(void *fpp)
 {
 	union {
 		struct bpf_program fp;
+#ifdef COMPAT_CHERIABI
+		struct bpf_program_c fp_c;
+#endif
 #ifdef COMPAT_FREEBSD32
 		struct bpf_program32 fp32;
 #endif
 	} *fpup;
 
 	fpup = fpp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		return (fpup->fp_c.bf_insns);
+#endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
-		return ((struct bpf_insn *)(uintptr_t)fpup->fp32.bf_insns);
+		return (__USER_CAP(
+		    (struct bpf_insn *)(uintptr_t)fpup->fp32.bf_insns,
+		    fpup->fp32.bf_len * sizeof(bpf_insn)));
 #endif
-	return (fpup->fp.bf_insns);
+	return (__USER_CAP(fpup->fp.bf_insns,
+	    fpup->fp.bf_len * sizeof(bpf_insn)));
 }
 
 /*
@@ -1840,7 +1872,8 @@ bpf_setf(struct bpf_d *d, struct bpf_program *fp, u_long cmd)
 	if (size > 0) {
 		/* We're setting up new filter.  Copy and check actual data. */
 		fcode = malloc(size, M_BPF, M_WAITOK);
-		if (copyin(bf_insns_get_ptr(fp), fcode, size) != 0 ||
+		if (copyin_c(bf_insns_get_ptr(fp),
+		    (__cheri_tocap struct bpf_insn * __capability)fcode, size) != 0 ||
 		    !bpf_validate(fcode, flen)) {
 			free(fcode, M_BPF);
 			return (EINVAL);
@@ -2675,22 +2708,31 @@ bpf_ifdetach(void *arg __unused, struct ifnet *ifp)
 		ifp->if_bpf = NULL;
 }
 
-static u_int *
+static u_int * __capability
 bfl_list_get_ptr(void *bflp)
 {
 	union {
 		struct bpf_dltlist bfl;
+#ifdef COMPAT_CHERIABI
+		struct bpf_dltlist_c bfl_c;
+#endif
 #ifdef COMPAT_FREEBSD32
 		struct bpf_dltlist32 bfl32;
 #endif
 	} *bflup;
 
 	bflup = bflp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		return (bflup->bfl_c.bfl_list);
+#endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
-		return ((u_int *)(uintptr_t)bflup->bfl32.bfl_list);
+		return (__USER_CAP((u_int *)(uintptr_t)bflup->bfl32.bfl_list,
+		    bflup->bfl32.bfl_len * sizeof(u_int)));
 #endif
-	return (bflup->bfl.bfl_list);
+	return (__USER_CAP(bflup->bfl.bfl_list,
+	    bflup->bfl.bfl_len * sizeof(u_int)));
 }
 
 /*
@@ -2734,7 +2776,9 @@ again:
 		n++;
 	}
 	BPF_UNLOCK();
-	error = copyout(lst, bfl_list_get_ptr(bfl), sizeof(u_int) * n);
+	error = copyout_c(
+	    (__cheri_tocap u_int * __capability)lst, bfl_list_get_ptr(bfl),
+	    sizeof(u_int) * n);
 	free(lst, M_TEMP);
 	BPF_LOCK();
 	bfl->bfl_len = n;

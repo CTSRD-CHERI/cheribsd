@@ -211,25 +211,6 @@ cheriabi_ioctl_translate_in(u_long com, void *data, u_long *t_comp,
 		return (0);
 	}
 
-	case BIOCSETF_C:
-	case BIOCSETWF_C:
-	case BIOCSETFNR_C: {
-		struct bpf_program *bfpp;
-		struct bpf_program_c *bfpp_c = data;
-
-		bfpp = malloc(sizeof(struct bpf_program), M_IOCTLOPS,
-		     M_WAITOK | M_ZERO);
-		*t_datap = bfpp;
-		*t_comp = _IOC_NEWTYPE(com, struct bpf_program);
-
-		bfpp->bf_len = bfpp_c->bf_len;
-		error = cheriabi_cap_to_ptr((caddr_t *)&bfpp->bf_insns,
-		    bfpp_c->bf_insns, bfpp->bf_len, CHERI_PERM_LOAD, 0);
-		if (error != 0)
-			return(error);
-		return (0);
-	}
-
 	case SIOCGIFMEDIA_C:
 	case SIOCGIFXMEDIA_C: {
 		struct ifmediareq	*ifmp;
@@ -356,9 +337,6 @@ static int
 ioctl_data_contains_pointers(u_long cmd)
 {
 	switch (cmd) {
-	case BIOCSETF_C:
-	case BIOCSETWF_C:
-	case BIOCSETFNR_C:
 	case CDIOREADTOCENTRYS_C:
 	case FIODGNAME_C:
 	case PCIOCGETCONF_C:

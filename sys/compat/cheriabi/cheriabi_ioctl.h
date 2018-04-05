@@ -128,14 +128,6 @@ struct sg_io_hdr_c {
 };
 #define	SG_IO_C	_IOC_NEWTYPE(SG_IO, struct sg_io_hdr_c)
 
-struct bpf_program_c {
-	u_int bf_len;
-	void * __capability bf_insns;
-};
-#define BIOCSETF_C	_IOC_NEWTYPE(BIOCSETF, struct bpf_program_c)
-#define BIOCSETWF_C	_IOC_NEWTYPE(BIOCSETWF, struct bpf_program_c)
-#define BIOCSETFNR_C	_IOC_NEWTYPE(BIOCSETFNR, struct bpf_program_c)
-
 struct ifmediareq_c {
 	char		ifm_name[IFNAMSIZ];
 	int		ifm_current;
