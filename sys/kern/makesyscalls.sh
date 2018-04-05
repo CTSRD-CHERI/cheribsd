@@ -472,11 +472,12 @@ sed -e '
 			}
 			if (argtype[argc] == "")
 				parserr($f, "argument definition")
+
 			# The parser adds space around parens.
 			# Remove it from annotations.
 			gsub(/ \( /, "(", argtype[argc]);
 			gsub(/ \)/, ")", argtype[argc]);
-			# Strip SAL annotations
+			#remove annotations
 			gsub(/_In[^ ]*[_)] /, "", argtype[argc]);
 			gsub(/_Out[^ ]*[_)] /, "", argtype[argc]);
 			gsub(/_Pagerange[^ ]*[_)] /, "", argtype[argc]);
