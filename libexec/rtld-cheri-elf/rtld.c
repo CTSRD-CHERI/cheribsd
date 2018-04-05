@@ -1264,7 +1264,7 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 		break;
 
 	case DT_MIPS_RLD_MAP:
-		*((Elf_Addr *)cheri_setoffset(cheri_getdefault(), dynp->d_un.d_ptr)) = (Elf_Addr) &r_debug;
+		*((Elf_Addr *)(obj->relocbase + dynp->d_un.d_ptr)) = (Elf_Addr) &r_debug;
 		break;
 #endif
 
