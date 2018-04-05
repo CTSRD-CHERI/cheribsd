@@ -3,7 +3,6 @@
 SRCS+=	trivial-vdso_tc.c
 
 MDASM=	cerror.S \
-	shmat.S \
 	syscall.S \
 	vfork.S
 
