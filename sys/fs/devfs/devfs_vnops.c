@@ -41,8 +41,6 @@
  *	mkdir: want it ?
  */
 
-#include "opt_compat.h"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>

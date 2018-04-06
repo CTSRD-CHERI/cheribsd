@@ -45,7 +45,6 @@
  * SUCH DAMAGE.
  */
 
-#include "opt_compat.h"
 #include "opt_ddb.h"
 
 #include <sys/types.h>

@@ -39,6 +39,7 @@
 #include <sys/poll.h>
 #include <sys/proc.h>
 #include <sys/selinfo.h>
+#include <sys/sysent.h>
 #include <sys/systm.h>
 #include <sys/sx.h>
 #include <sys/uio.h>
@@ -596,7 +597,7 @@ uinput_ioctl_sub(struct uinput_cdev_state *state, u_long cmd, caddr_t data)
 		void * __capability cap;
 
 #ifdef COMPAT_CHERIABI
-		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+		if (SV_CURPROC_FLAG(SV_CHERI))
 			cap = *(void * __capability *)data;
 		else
 #endif
