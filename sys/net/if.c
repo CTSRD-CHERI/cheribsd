@@ -2664,18 +2664,18 @@ ifr_addr_get_sa(void *ifrp)
 }
 
 static void * __capability
-ifr_buffer_get_buffer(struct thread *td, void *data)
+ifr_buffer_get_buffer(void *data)
 {
 	union ifreq_union *ifrup;
 
 	ifrup = data;
 #ifdef COMPAT_CHERIABI
-	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+	if (SV_CURPROC_FLAG(SV_CHERI))
 		return (ifrup->ifr_c.ifr_ifru.ifru_buffer.buffer);
 	else
 #endif
 #ifdef COMPAT_FREEBSD32
-	if (SV_PROC_FLAG(td->td_proc, SV_ILP32))
+	if (SV_CURPROC_FLAG(SV_ILP32))
 		return (__USER_CAP((void *)(uintptr_t)
 		    ifrup->ifr32.ifr_ifru.ifru_buffer.buffer,
 		    ifrup->ifr32.ifr_ifru.ifru_buffer.length));
@@ -2686,42 +2686,37 @@ ifr_buffer_get_buffer(struct thread *td, void *data)
 }
 
 static void
-ifr_buffer_set_buffer(struct thread *td, void *data, void * __capability buf)
+ifr_buffer_set_buffer_null(void *data)
 {
 	union ifreq_union *ifrup;
 
-	KASSERT(buf == NULL,
-	    ("ifr_buffer_set_buffer called with non-NULL (%lx)", (vaddr_t)buf));
-
 	ifrup = data;
 #ifdef COMPAT_CHERIABI
-	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
-		ifrup->ifr_c.ifr_ifru.ifru_buffer.buffer = buf;
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		ifrup->ifr_c.ifr_ifru.ifru_buffer.buffer = NULL;
 	else
 #endif
 #ifdef COMPAT_FREEBSD32
-	if (SV_PROC_FLAG(td->td_proc, SV_ILP32))
-		ifrup->ifr32.ifr_ifru.ifru_buffer.buffer =
-		    (uint32_t)(uintptr_t)(vaddr_t)buf;
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		ifrup->ifr32.ifr_ifru.ifru_buffer.buffer = 0;
 	else
 #endif
-		ifrup->ifr.ifr_ifru.ifru_buffer.buffer =
-		    (void *)(uintptr_t)(vaddr_t)buf;
+		ifrup->ifr.ifr_ifru.ifru_buffer.buffer = NULL;
 }
 
 static size_t
-ifr_buffer_get_length(struct thread *td, void *data)
+ifr_buffer_get_length(void *data)
 {
 	union ifreq_union *ifrup;
 
 	ifrup = data;
 #ifdef COMPAT_CHERIABI
-	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+	if (SV_CURPROC_FLAG(SV_CHERI))
 		return (ifrup->ifr_c.ifr_ifru.ifru_buffer.length);
 	else
 #endif
 #ifdef COMPAT_FREEBSD32
-	if (SV_PROC_FLAG(td->td_proc, SV_ILP32))
+	if (SV_CURPROC_FLAG(SV_ILP32))
 		return (ifrup->ifr32.ifr_ifru.ifru_buffer.length);
 	else
 #endif
@@ -2729,18 +2724,18 @@ ifr_buffer_get_length(struct thread *td, void *data)
 }
 
 static void
-ifr_buffer_set_length(struct thread *td, void *data, size_t len)
+ifr_buffer_set_length(void *data, size_t len)
 {
 	union ifreq_union *ifrup;
 
 	ifrup = data;
 #ifdef COMPAT_CHERIABI
-	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+	if (SV_CURPROC_FLAG(SV_CHERI))
 		ifrup->ifr_c.ifr_ifru.ifru_buffer.length = len;
 	else
 #endif
 #ifdef COMPAT_FREEBSD32
-	if (SV_PROC_FLAG(td->td_proc, SV_ILP32))
+	if (SV_CURPROC_FLAG(SV_ILP32))
 		ifrup->ifr32.ifr_ifru.ifru_buffer.length = len;
 	else
 #endif
@@ -2977,12 +2972,12 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		else {
 			/* space for terminating nul */
 			descrlen = strlen(ifp->if_description) + 1;
-			if (ifr_buffer_get_length(td, ifr) < descrlen)
-				ifr_buffer_set_buffer(td, ifr, NULL);
+			if (ifr_buffer_get_length(ifr) < descrlen)
+				ifr_buffer_set_buffer_null(ifr);
 			else
 				error = copyout_c(ifp->if_description,
-				    ifr_buffer_get_buffer(td, ifr), descrlen);
-			ifr_buffer_set_length(td, ifr, descrlen);
+				    ifr_buffer_get_buffer(ifr), descrlen);
+			ifr_buffer_set_length(ifr, descrlen);
 		}
 		sx_sunlock(&ifdescr_sx);
 		break;
@@ -2998,15 +2993,15 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		 * length parameter is supposed to count the
 		 * terminating nul in.
 		 */
-		if (ifr_buffer_get_length(td, ifr) > ifdescr_maxlen)
+		if (ifr_buffer_get_length(ifr) > ifdescr_maxlen)
 			return (ENAMETOOLONG);
-		else if (ifr_buffer_get_length(td, ifr) == 0)
+		else if (ifr_buffer_get_length(ifr) == 0)
 			descrbuf = NULL;
 		else {
-			descrbuf = malloc(ifr_buffer_get_length(td, ifr),
+			descrbuf = malloc(ifr_buffer_get_length(ifr),
 			    M_IFDESCR, M_WAITOK | M_ZERO);
-			error = copyin_c(ifr_buffer_get_buffer(td, ifr),
-			    descrbuf, ifr_buffer_get_length(td, ifr) - 1);
+			error = copyin_c(ifr_buffer_get_buffer(ifr),
+			    descrbuf, ifr_buffer_get_length(ifr) - 1);
 			if (error) {
 				free(descrbuf, M_IFDESCR);
 				break;
