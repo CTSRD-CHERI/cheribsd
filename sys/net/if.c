@@ -3764,8 +3764,6 @@ again:
 					    sizeof(ifr.ifr_ifru.ifru_addr));
 					memcpy(&ifr.ifr_ifru.ifru_addr, sa,
 					    sa->sa_len);
-					ifr.ifr_ifru.ifru_addr.sa_len =
-					    sizeof(ifr.ifr_ifru.ifru_addr);
 				} else
 					ifr.ifr_ifru.ifru_addr = *sa;
 				sbuf_bcat(sb, &ifr, sizeof(ifr));
