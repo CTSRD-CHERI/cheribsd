@@ -89,32 +89,6 @@ struct fiodgname_arg_c {
 };
 #define	FIODGNAME_C	_IOC_NEWTYPE(FIODGNAME, struct fiodgname_arg_c)
 
-struct sg_io_hdr_c {
-	int		interface_id;
-	int		dxfer_direction;
-	u_char		cmd_len;
-	u_char		mx_sb_len;
-	u_short		iovec_count;
-	u_int		dxfer_len;
-	void * __capability	dxferp;
-	void * __capability	cmdp;
-	void * __capability	sbp;
-	u_int		timeout;
-	u_int		flags;
-	int		pack_id;
-	void * __capability	usr_ptr;
-	u_char		status;
-	u_char		masked_status;
-	u_char		msg_status;
-	u_char		sb_len_wr;
-	u_short		host_status;
-	u_short		driver_status;
-	int		resid;
-	u_int		duration;
-	u_int		info;
-};
-#define	SG_IO_C	_IOC_NEWTYPE(SG_IO, struct sg_io_hdr_c)
-
 struct ifmediareq_c {
 	char		ifm_name[IFNAMSIZ];
 	int		ifm_current;

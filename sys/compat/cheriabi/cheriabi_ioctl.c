@@ -127,58 +127,6 @@ cheriabi_ioctl_translate_in(u_long com, void *data, u_long *t_comp,
 		return(0);
 	}
 
-	case SG_IO_C: {
-		struct sg_io_hdr *io;
-		struct sg_io_hdr_c *io_c = data;
-
-		io = malloc(sizeof(struct sg_io_hdr), M_IOCTLOPS,
-		    M_WAITOK | M_ZERO);
-		*t_datap = io;
-		*t_comp = SG_IO_C;
-
-		CP((*io_c), (*io), interface_id);
-		CP((*io_c), (*io), dxfer_direction);
-		CP((*io_c), (*io), cmd_len);
-		CP((*io_c), (*io), mx_sb_len);
-		CP((*io_c), (*io), iovec_count);
-		CP((*io_c), (*io), dxfer_len);
-		/*
-		 * XXX-BD: unclear if NULL is allowed, but the lower levels
-		 * will handle it, so let it through.
-		 */
-		error = cheriabi_cap_to_ptr((caddr_t *)&io->dxferp,
-		    io_c->dxferp, io->dxfer_len, CHERI_PERM_LOAD, 1);
-		if (error != 0)
-			return (error);
-		error = cheriabi_cap_to_ptr((caddr_t *)&io->cmdp,
-		    io_c->cmdp, io->cmd_len, CHERI_PERM_LOAD, 0);
-		if (error != 0)
-			return (error);
-		error = cheriabi_cap_to_ptr((caddr_t *)&io->sbp, io_c->sbp,
-		    io->mx_sb_len, CHERI_PERM_LOAD, 1);
-		if (error != 0)
-			return (error);
-		CP((*io_c), (*io), timeout);
-		CP((*io_c), (*io), flags);
-		CP((*io_c), (*io), pack_id);
-		/* usr_ptr appears to be unused in kernel, to leave untouched */
-		/*
-		 * XXX-BD: the entries below appear to be output parameters,
-		 * but more auditing is required to remove them.
-		 */
-		CP((*io_c), (*io), status);
-		CP((*io_c), (*io), masked_status);
-		CP((*io_c), (*io), msg_status);
-		CP((*io_c), (*io), sb_len_wr);
-		CP((*io_c), (*io), host_status);
-		CP((*io_c), (*io), driver_status);
-		CP((*io_c), (*io), resid);
-		CP((*io_c), (*io), duration);
-		CP((*io_c), (*io), info);
-
-		return (0);
-	}
-
 	case SIOCGIFMEDIA_C:
 	case SIOCGIFXMEDIA_C: {
 		struct ifmediareq	*ifmp;
@@ -232,37 +180,6 @@ cheriabi_ioctl_translate_out(u_long com, void *data, void *t_data)
 
 	/* FIODGNAME_C: Input only */
 
-	case SG_IO_C: {
-		struct sg_io_hdr *io = t_data;
-		struct sg_io_hdr_c *io_c = data;
-
-		/*
-		 * XXX-BD: a number of these are input only, but need
-		 * audting before removal/
-		 */
-		CP((*io), (*io_c), interface_id);
-		CP((*io), (*io_c), dxfer_direction);
-		CP((*io), (*io_c), cmd_len);
-		CP((*io), (*io_c), mx_sb_len);
-		CP((*io), (*io_c), iovec_count);
-		CP((*io), (*io_c), dxfer_len);
-		/* Don't change dxferp, cmdp, or sbp */
-		CP((*io), (*io_c), timeout);
-		CP((*io), (*io_c), flags);
-		CP((*io), (*io_c), pack_id);
-		/* Don't change usr_ptr */
-		CP((*io), (*io_c), status);
-		CP((*io), (*io_c), masked_status);
-		CP((*io), (*io_c), msg_status);
-		CP((*io), (*io_c), sb_len_wr);
-		CP((*io), (*io_c), host_status);
-		CP((*io), (*io_c), driver_status);
-		CP((*io), (*io_c), resid);
-		CP((*io), (*io_c), duration);
-		CP((*io), (*io_c), info);
-		break;
-	}
-
 	case SIOCGIFMEDIA_C:
 	case SIOCGIFXMEDIA_C: {
 		struct ifmediareq	*ifmp = t_data;
@@ -296,7 +213,6 @@ ioctl_data_contains_pointers(u_long cmd)
 	switch (cmd) {
 	case CDIOREADTOCENTRYS_C:
 	case FIODGNAME_C:
-	case SG_IO_C:
 
 	case SIOCGIFMEDIA_C:
 	case SIOCGIFXMEDIA_C:
