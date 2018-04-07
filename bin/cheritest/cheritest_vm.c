@@ -75,10 +75,10 @@
  * preserve tags.  Pages from the filesystem should not -- unless they are
  * mapped MAP_PRIVATE, in which case they should, since they are effectively
  * anonymous pages.  Or so I claim.
+ *
+ * Most test cases only differ in the mmap flags and the file descriptor, this
+ * function does all the shared checks
  */
-
-/* most test cases only differ in the mmap flags and the file descriptor, this
- * function does all the shared checks */
 static void
 mmap_and_check_tag_stored(int fd, int protflags, int mapflags)
 {
