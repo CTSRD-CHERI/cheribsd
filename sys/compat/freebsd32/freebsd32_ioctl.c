@@ -84,22 +84,6 @@ freebsd32_ioctl_ioc_read_toc(struct thread *td,
 }
 
 static int
-freebsd32_ioctl_fiodgname(struct thread *td,
-    struct freebsd32_ioctl_args *uap, struct file *fp)
-{
-	struct fiodgname_arg fgn;
-	struct fiodgname_arg32 fgn32;
-	int error;
-
-	if ((error = copyin(uap->data, &fgn32, sizeof fgn32)) != 0)
-		return (error);
-	CP(fgn32, fgn, len);
-	PTRIN_CP(fgn32, fgn, buf);
-	error = fo_ioctl(fp, FIODGNAME, (caddr_t)&fgn, td->td_ucred, td);
-	return (error);
-}
-
-static int
 freebsd32_ioctl_memrange(struct thread *td,
     struct freebsd32_ioctl_args *uap, struct file *fp)
 {
@@ -230,10 +214,6 @@ freebsd32_ioctl(struct thread *td, struct freebsd32_ioctl_args *uap)
 	switch (uap->com) {
 	case CDIOREADTOCENTRYS_32:
 		error = freebsd32_ioctl_ioc_read_toc(td, uap, fp);
-		break;
-
-	case FIODGNAME_32:
-		error = freebsd32_ioctl_fiodgname(td, uap, fp);
 		break;
 
 	case MEMRANGE_GET32:	/* FALLTHROUGH */
