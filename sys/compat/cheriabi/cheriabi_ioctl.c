@@ -108,25 +108,6 @@ cheriabi_ioctl_translate_in(u_long com, void *data, u_long *t_comp,
 		return (0);
 	}
 
-	case FIODGNAME_C: {
-		struct fiodgname_arg *fgn;
-		struct fiodgname_arg_c *fgn_c = data;
-
-		fgn = malloc(sizeof(struct fiodgname_arg), M_IOCTLOPS,
-		    M_WAITOK | M_ZERO);
-		*t_datap = fgn;
-		*t_comp = FIODGNAME;
-
-		CP((*fgn_c), (*fgn), len);
-		/* _Out_writes_bytes_(fgn->len) const char * buf */
-		error = cheriabi_cap_to_ptr((caddr_t *)&fgn->buf, fgn_c->buf,
-		    fgn->len, CHERI_PERM_STORE, 0);
-		if (error != 0)
-			return (error);
-
-		return(0);
-	}
-
 	case SIOCGIFMEDIA_C:
 	case SIOCGIFXMEDIA_C: {
 		struct ifmediareq	*ifmp;
@@ -178,8 +159,6 @@ cheriabi_ioctl_translate_out(u_long com, void *data, void *t_data)
 		break;
 	}
 
-	/* FIODGNAME_C: Input only */
-
 	case SIOCGIFMEDIA_C:
 	case SIOCGIFXMEDIA_C: {
 		struct ifmediareq	*ifmp = t_data;
@@ -212,7 +191,6 @@ ioctl_data_contains_pointers(u_long cmd)
 {
 	switch (cmd) {
 	case CDIOREADTOCENTRYS_C:
-	case FIODGNAME_C:
 
 	case SIOCGIFMEDIA_C:
 	case SIOCGIFXMEDIA_C:

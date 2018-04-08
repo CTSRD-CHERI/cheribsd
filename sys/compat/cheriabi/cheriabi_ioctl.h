@@ -83,12 +83,6 @@ struct ioc_read_toc_entry_c {
 #define	CDIOREADTOCENTRYS_C \
     _IOC_NEWTYPE(CDIOREADTOCENTRYS, struct ioc_read_toc_entry_c)
 
-struct fiodgname_arg_c {
-	int		len;
-	void * __capability	buf;
-};
-#define	FIODGNAME_C	_IOC_NEWTYPE(FIODGNAME, struct fiodgname_arg_c)
-
 struct ifmediareq_c {
 	char		ifm_name[IFNAMSIZ];
 	int		ifm_current;
