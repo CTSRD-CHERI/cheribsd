@@ -61,7 +61,7 @@
 #ifdef	__mips_n64
 #if defined(CHERI_KERNEL) && defined(CPU_CHERI128)
 // struct pcpu aligns to 512 bytes boundary
-#define PCPU_MD_MIPS64_PAD (105 - (PCPU_NUM_EXC_CNTRS * 8))
+#define PCPU_MD_MIPS64_PAD (128 - (PCPU_NUM_EXC_CNTRS * 8))
 #elif defined(CHERI_KERNEL) && defined(CPU_CHERI)
 // struct pcpu aligns to 1024 bytes boundary
 #define PCPU_MD_MIPS64_PAD (352 - (PCPU_NUM_EXC_CNTRS * 8))
