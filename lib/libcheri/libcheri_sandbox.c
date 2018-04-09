@@ -73,6 +73,13 @@ static struct sandbox_class	**sandbox_classes;
 static struct sandbox_provided_classes	*main_provided_classes;
 static struct sandbox_required_methods	*main_required_methods;
 
+/*
+ * libcheri_system_vtable is defined here and not in libcheri_system.h to avoid
+ * running into https://github.com/CTSRD-CHERI/cheribsd/issues/180
+ */
+__capability vm_offset_t	*libcheri_system_vtable;
+
+
 static int	sandbox_program_init(void);
 
 #define	SANDBOX_STACK_SIZE	32 * PAGE_SIZE
