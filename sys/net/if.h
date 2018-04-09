@@ -473,7 +473,7 @@ struct ifmediareq {
 	int	ifm_status;		/* media status */
 	int	ifm_active;		/* active options */
 	int	ifm_count;		/* # entries in ifm_ulist array */
-	int	*ifm_ulist;		/* media words */
+	int * __kerncap ifm_ulist;		/* media words */
 };
 
 struct  ifdrv {

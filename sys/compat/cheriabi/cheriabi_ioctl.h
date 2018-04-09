@@ -83,17 +83,4 @@ struct ioc_read_toc_entry_c {
 #define	CDIOREADTOCENTRYS_C \
     _IOC_NEWTYPE(CDIOREADTOCENTRYS, struct ioc_read_toc_entry_c)
 
-struct ifmediareq_c {
-	char		ifm_name[IFNAMSIZ];
-	int		ifm_current;
-	int		ifm_mask;
-	int		ifm_status;
-	int		ifm_active;
-	int		ifm_count;
-	void * __capability	ifm_ulist;	/* int * */
-};
-
-#define	SIOCGIFMEDIA_C		_IOC_NEWTYPE(SIOCGIFMEDIA, struct ifmediareq_c)
-#define	SIOCGIFXMEDIA_C		_IOC_NEWTYPE(SIOCGIFXMEDIA, struct ifmediareq_c)
-
 #endif	/* _COMPAT_CHERIABI_IOCTL_H_ */

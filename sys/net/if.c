@@ -109,6 +109,19 @@ struct ifgroupreq_c {
 		struct ifg_req * __capability ifgru_groups;
 	} ifgr_ifgru;
 };
+
+struct ifmediareq64 {
+	char	ifm_name[IFNAMSIZ];
+	int	ifm_current;
+	int	ifm_mask;
+	int	ifm_status;
+	int	ifm_active;
+	int	ifm_count;
+	int	*ifm_ulist;
+};
+#define	SIOCGIFMEDIA64	_IOC_NEWTYPE(SIOCGIFMEDIA, struct ifmediareq64)
+#define	SIOCGIFXMEDIA64	_IOC_NEWTYPE(SIOCGIFXMEDIA, struct ifmediareq64)
+
 #define	_CASE_IOC_IFGROUPREQ_C(cmd)				\
     case _IOC_NEWTYPE((cmd), struct ifgroupreq_c):
 #else
@@ -3324,9 +3337,29 @@ struct ifconf32 {
 static void
 ifmr_init(struct ifmediareq *ifmr, caddr_t data)
 {
+#ifdef COMPAT_CHERIABI
+	struct ifmediareq64 *ifmr64;
+#endif
 #ifdef COMPAT_FREEBSD32
 	struct ifmediareq32 *ifmr32;
+#endif
 
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_LP64) && !SV_CURPROC_FLAG(SV_CHERI)) {
+		ifmr64 = (struct ifmediareq64 *)data;
+		memcpy(ifmr->ifm_name, ifmr64->ifm_name,
+		    sizeof(ifmr->ifm_name));
+		ifmr->ifm_current = ifmr64->ifm_current;
+		ifmr->ifm_mask = ifmr64->ifm_mask;
+		ifmr->ifm_status = ifmr64->ifm_status;
+		ifmr->ifm_active = ifmr64->ifm_active;
+		ifmr->ifm_count = ifmr64->ifm_count;
+		ifmr->ifm_ulist =
+		    __USER_CAP(ifmr64->ifm_ulist,
+			ifrm64->ifm_count * sizeof(int));
+	} else
+#endif
+#ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32)) {
 		ifmr32 = (struct ifmediareq32 *)data;
 		memcpy(ifmr->ifm_name, ifmr32->ifm_name,
@@ -3336,18 +3369,35 @@ ifmr_init(struct ifmediareq *ifmr, caddr_t data)
 		ifmr->ifm_status = ifmr32->ifm_status;
 		ifmr->ifm_active = ifmr32->ifm_active;
 		ifmr->ifm_count = ifmr32->ifm_count;
-		ifmr->ifm_ulist = (int *)(uintptr_t)ifmr32->ifm_ulist;
+		ifmr->ifm_ulist =
+		    __USER_CAP((int *)(uintptr_t)ifmr32->ifm_ulist,
+			ifrm32->ifm_count * sizeof(int));
 	} else
 #endif
-		memcpy(ifmr, data, sizeof(struct ifmediareq));
+		cheri_memcpy(ifmr, data, sizeof(struct ifmediareq));
 }
 
 static void
 ifmr_update(const struct ifmediareq *ifmr, caddr_t data)
 {
+#ifdef COMPAT_CHERIABI
+	struct ifmediareq64 *ifmr64;
+#endif
 #ifdef COMPAT_FREEBSD32
 	struct ifmediareq32 *ifmr32;
+#endif
 
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_LP64) && !SV_CURPROC_FLAG(SV_CHERI)) {
+		ifmr64 = (struct ifmediareq64 *)data;
+		ifmr64->ifm_current = ifmr->ifm_current;
+		ifmr64->ifm_mask = ifmr->ifm_mask;
+		ifmr64->ifm_status = ifmr->ifm_status;
+		ifmr64->ifm_active = ifmr->ifm_active;
+		ifmr64->ifm_count = ifmr->ifm_count;
+	} else
+#endif
+#ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32)) {
 		ifmr32 = (struct ifmediareq32 *)data;
 		ifmr32->ifm_current = ifmr->ifm_current;
@@ -3357,7 +3407,7 @@ ifmr_update(const struct ifmediareq *ifmr, caddr_t data)
 		ifmr32->ifm_count = ifmr->ifm_count;
 	} else
 #endif
-		memcpy(data, ifmr, sizeof(struct ifmediareq));
+		cheri_memcpy(data, ifmr, sizeof(struct ifmediareq));
 }
 
 /*
@@ -3420,6 +3470,10 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 #ifdef COMPAT_FREEBSD32
 	case SIOCGIFMEDIA32:
 	case SIOCGIFXMEDIA32:
+#endif
+#ifdef COMPAT_CHERIABI
+	case SIOCGIFMEDIA64:
+	case SIOCGIFXMEDIA64:
 #endif
 		ifmr = malloc(sizeof(struct ifmediareq), M_TEMP,
 		    M_WAITOK | M_ZERO);
