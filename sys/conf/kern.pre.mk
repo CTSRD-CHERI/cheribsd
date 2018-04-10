@@ -195,7 +195,7 @@ SYSTEM_OBJS+= embedfs_${MFS_IMAGE:T:R}.o
 
 # If we are building for a cheri target, then LD_EMULATION should adapt.
 # Set CHERI_LD_TARGET accordingly
-.if ${ARCH_FLAGS:Mcheri-unknown-freebsd} != ""
+.if ${ARCH_FLAGS:M-mabi=purecap} != ""
 CHERI_LD_TARGET=cheri
 .endif
 
