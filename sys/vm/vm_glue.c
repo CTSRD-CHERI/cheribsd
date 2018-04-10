@@ -176,16 +176,19 @@ useracc(addr, len, rw)
 }
 
 int
-vslock(void *addr, size_t len)
+vslock(void * __capability addr, size_t len)
 {
-	vm_offset_t end, last, start;
+	vm_offset_t end, last, start, vaddr;
 	vm_size_t npages;
 	int error;
 
-	last = (vm_offset_t)addr + len;
-	start = trunc_page((vm_offset_t)addr);
+	if (!__CAP_CHECK(addr, len))
+		return (EPROT);
+	vaddr = (__cheri_addr vm_offset_t)addr;
+	last = vaddr + len;
+	start = trunc_page(vaddr);
 	end = round_page(last);
-	if (last < (vm_offset_t)addr || end < (vm_offset_t)addr)
+	if (last < vaddr || end < vaddr)
 		return (EINVAL);
 	npages = atop(end - start);
 	if (npages > vm_page_max_wired)
@@ -213,12 +216,14 @@ vslock(void *addr, size_t len)
 }
 
 void
-vsunlock(void *addr, size_t len)
+vsunlock(void * __capability addr, size_t len)
 {
+	vm_offset_t vaddr;
 
 	/* Rely on the parameter sanity checks performed by vslock(). */
+	vaddr = (__cheri_addr vm_offset_t)addr;
 	(void)vm_map_unwire(&curproc->p_vmspace->vm_map,
-	    trunc_page((vm_offset_t)addr), round_page((vm_offset_t)addr + len),
+	    trunc_page(vaddr), round_page(vaddr + len),
 	    VM_MAP_WIRE_SYSTEM | VM_MAP_WIRE_NOHOLES);
 }
 

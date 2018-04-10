@@ -3666,8 +3666,7 @@ ipfw_ctl3(struct sockopt *sopt)
 
 			if (size < valsize) {
 				/* We have to wire user buffer */
-				error = vslock(
-				    (__cheri_fromcap void *)sopt->sopt_val,
+				error = vslock(sopt->sopt_val,
 				    valsize);
 				if (error != 0)
 					return (error);
@@ -3706,7 +3705,7 @@ ipfw_ctl3(struct sockopt *sopt)
 		ipfw_flush_sopt_data(&sdata);
 
 	if (locked != 0)
-		vsunlock((__cheri_fromcap void *)sdata.sopt_val, valsize);
+		vsunlock(sdata.sopt_val, valsize);
 
 	/* Restore original pointer and set number of bytes written */
 	sopt->sopt_val = sdata.sopt_val;
