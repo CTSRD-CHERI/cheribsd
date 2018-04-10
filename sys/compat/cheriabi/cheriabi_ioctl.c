@@ -61,40 +61,8 @@ __FBSDID("$FreeBSD$");
 
 #include <compat/cheriabi/cheriabi.h>
 #include <compat/cheriabi/cheriabi_proto.h>
-/* Must come last due to massive header polution breaking cheriabi_proto.h */
-#include <compat/cheriabi/cheriabi_ioctl.h>
 
 MALLOC_DECLARE(M_IOCTLOPS);
-
-/*
- * cheriabi_ioctl_translate_in - translate ioctl command and structure
- *
- * Maps *_C command in `com` to `*t_comp`.
- *
- * Allocates the appropriate structure and populates it, returning it in
- * `*t_datap`.
- */
-static int
-cheriabi_ioctl_translate_in(u_long com, void *data, u_long *t_comp,
-    void **t_datap)
-{
-
-	return (EINVAL);
-}
-
-static int
-cheriabi_ioctl_translate_out(u_long com, void *data, void *t_data)
-{
-
-	return (EINVAL);
-}
-
-static int
-ioctl_data_contains_pointers(u_long cmd)
-{
-
-	return (0);
-}
 
 #define SYS_IOCTL_SMALL_SIZE	128
 #define SYS_IOCTL_SMALL_ALIGN	sizeof(void * __capability)
@@ -102,11 +70,10 @@ int
 cheriabi_ioctl(struct thread *td, struct cheriabi_ioctl_args *uap)
 {
 	u_char smalldata[SYS_IOCTL_SMALL_SIZE] __aligned(SYS_IOCTL_SMALL_ALIGN);
-	u_long com, t_com, o_com;
+	u_long com;
 	int arg, error;
 	u_int size;
 	caddr_t data;
-	void *t_data;
 
 	if (uap->com > 0xffffffff) {
 		printf(
@@ -145,19 +112,11 @@ cheriabi_ioctl(struct thread *td, struct cheriabi_ioctl_args *uap)
 		}
 	} else
 		data = (void *)&uap->data;
-	t_data = NULL;
 	if (com & IOC_IN) {
 		error = copyincap_c(uap->data,
 		    (__cheri_tocap void * __capability)data, size);
 		if (error != 0)
 			goto out;
-		if (ioctl_data_contains_pointers(com)) {
-			error = cheriabi_ioctl_translate_in(com, data, &t_com, &t_data);
-			if (error != 0)
-				goto out;
-			o_com = com;
-			com = t_com;
-		}
 	} else if (com & IOC_OUT) {
 		/*
 		 * Zero the buffer so the user always
@@ -166,13 +125,8 @@ cheriabi_ioctl(struct thread *td, struct cheriabi_ioctl_args *uap)
 		bzero(data, size);
 	}
 
-	if (t_data == NULL)
-		error = kern_ioctl(td, uap->fd, com, data);
-	else
-		error = kern_ioctl(td, uap->fd, com, t_data);
+	error = kern_ioctl(td, uap->fd, com, data);
 
-	if (t_data && error == 0)
-		error = cheriabi_ioctl_translate_out(o_com, data, t_data);
 	if (error == 0 && (com & IOC_OUT)) {
 		error = copyoutcap_c(
 		    (__cheri_tocap void * __capability)data,

@@ -101,7 +101,6 @@
 
 #include <compat/cheriabi/cheriabi_signal.h>
 #include <compat/cheriabi/cheriabi_aio.h>
-#include <compat/cheriabi/cheriabi_ioctl.h>
 #include <compat/cheriabi/cheriabi_fill_uap.h>
 #include <compat/cheriabi/cheriabi_dispatch_fill_uap.h>
 
