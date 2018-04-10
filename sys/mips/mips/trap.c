@@ -127,6 +127,25 @@ SYSCTL_INT(_machdep, OID_AUTO, log_cheri_exceptions, CTLFLAG_RW,
 int log_cheri_registers = 1;
 SYSCTL_INT(_machdep, OID_AUTO, log_cheri_registers, CTLFLAG_RW,
     &log_cheri_registers, 1, "Print CHERI registers for non-CHERI exceptions");
+
+#ifdef CPU_QEMU_MALTA
+extern u_int qemu_trace_perthread;
+
+static void
+stop_cheri_perthread_trace(struct thread *td)
+{
+	if (qemu_trace_perthread && (td->td_md.md_flags & MDTD_QTRACE)) {
+		/*
+		 * If we are currently tracing per-thread and the traced process
+		 * crashed we have to stop tracing here because the logic to
+		 * turn on and off tracing in swtch.S will no be reached.
+		 */
+		CHERI_STOP_TRACE;
+		td->td_md.md_flags &= ~MDTD_QTRACE;
+	}
+}
+#endif
+
 #endif
 
 #define	lbu_macro(data, addr)						\
@@ -376,6 +395,7 @@ char *access_name[] = {
 #endif
 
 };
+
 
 #ifdef	CPU_CNMIPS
 #include <machine/octeon_cop2.h>
@@ -1307,6 +1327,24 @@ err:
 	ksi.ksi_code = ucode;
 	ksi.ksi_addr = (void *)addr;
 	ksi.ksi_trapno = type;
+
+#if defined(CPU_CHERI) && defined(CPU_QEMU_MALTA)
+	PROC_LOCK(p);
+	if ((sigprop(i) & SIGPROP_KILL) && (p->p_flag & P_TRACED) == 0) {
+		/*
+		 * If the process is about to be terminated we have to stop
+		 * the per-thread trace here, as otherwise it will continue
+		 * until the next time cpu_switch() is called.
+		 *
+		 * XXXAR: is this correct? check and locking taken from kern_sig.c
+		 */
+		mtx_lock(&p->p_sigacts->ps_mtx);
+		if (!SIGISMEMBER(p->p_sigacts->ps_sigcatch, i))
+			stop_cheri_perthread_trace(td);
+		mtx_unlock(&p->p_sigacts->ps_mtx);
+	}
+	PROC_UNLOCK(p);
+#endif
 	trapsignal(td, &ksi);
 out:
 
