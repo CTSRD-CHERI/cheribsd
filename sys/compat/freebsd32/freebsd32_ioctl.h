@@ -36,20 +36,12 @@
 
 typedef __uint32_t caddr_t32;
 
-struct ioc_read_toc_entry32 {
-	u_char	address_format;
-	u_char	starting_track;
-	u_short	data_len;
-	uint32_t data;		/* struct cd_toc_entry* */
-};
-
 struct mem_range_op32
 {
 	caddr_t32	mo_desc;
 	int		mo_arg[2];
 };
 
-#define	CDIOREADTOCENTRYS_32 _IOWR('c', 5, struct ioc_read_toc_entry32)
 #define	MEMRANGE_GET32	_IOWR('m', 50, struct mem_range_op32)
 #define	MEMRANGE_SET32	_IOW('m', 51, struct mem_range_op32)
 #define	SG_IO_32	_IOWR(SGIOC, 0x85, struct sg_io_hdr32)

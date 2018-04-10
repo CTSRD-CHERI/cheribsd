@@ -61,8 +61,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/cdrio.h>
 #include <sys/dvdio.h>
 #include <sys/devicestat.h>
+#include <sys/proc.h>
 #include <sys/sbuf.h>
 #include <sys/sysctl.h>
+#include <sys/sysent.h>
 #include <sys/taskqueue.h>
 #include <geom/geom_disk.h>
 
@@ -207,6 +209,17 @@ static struct cd_quirk_entry cd_quirk_table[] =
 		/*quirks*/ CD_Q_RETRY_BUSY
 	}
 };
+
+#ifdef COMPAT_FREEBSD32
+struct ioc_read_toc_entry32 {
+	u_char	address_format;
+	u_char	starting_track;
+	u_short	data_len;
+	uint32_t data;	/* (struct cd_toc_entry *) */
+};
+#define	CDIOREADTOCENTRYS_32	\
+    _IOC_NEWTYPE(CDIOREADTOCENTRYS, struct ioc_read_toc_entry32)
+#endif
 
 static	disk_open_t	cdopen;
 static	disk_close_t	cdclose;
@@ -1271,6 +1284,24 @@ cdgetpagesize(int page_num)
 	return (-1);
 }
 
+static struct cd_toc_entry *
+te_data_get_ptr(void *irtep)
+{
+	union {
+		struct ioc_read_toc_entry irte;
+#ifdef COMPAT_FREEBSD32
+		struct ioc_read_toc_entry32 irte32;
+#endif
+	} *irteup;
+
+	irteup = irtep;
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		return ((struct cd_toc_entry *)(uintptr_t)irteup->irte32.data);
+#endif
+	return (irteup->irte.data);
+}
+
 static int
 cdioctl(struct disk *dp, u_long cmd, void *addr, int flag, struct thread *td)
 {
@@ -1586,6 +1617,9 @@ cdioctl(struct disk *dp, u_long cmd, void *addr, int flag, struct thread *td)
 		}
 		break;
 	case CDIOREADTOCENTRYS:
+#ifdef COMPAT_FREEBSD32
+	case CDIOREADTOCENTRYS_32:
+#endif
 		{
 			struct cd_tocdata *data;
 			struct cd_toc_single *lead;
@@ -1711,7 +1745,8 @@ cdioctl(struct disk *dp, u_long cmd, void *addr, int flag, struct thread *td)
 			}
 
 			cam_periph_unlock(periph);
-			error = copyout(data->entries, te->data, len);
+			error = copyout(data->entries, te_data_get_ptr(te),
+			    len);
 			free(data, M_SCSICD);
 			free(lead, M_SCSICD);
 		}

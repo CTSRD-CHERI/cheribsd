@@ -54,34 +54,7 @@ __FBSDID("$FreeBSD$");
 #include <compat/freebsd32/freebsd32_proto.h>
 
 /* Cannot get exact size in 64-bit due to alignment issue of entire struct. */
-CTASSERT(sizeof(struct ioc_read_toc_entry32) == 8);
 CTASSERT(sizeof(struct mem_range_op32) == 12);
-
-static int
-freebsd32_ioctl_ioc_read_toc(struct thread *td,
-    struct freebsd32_ioctl_args *uap, struct file *fp)
-{
-	struct ioc_read_toc_entry toce;
-	struct ioc_read_toc_entry32 toce32;
-	int error;
-
-	if ((error = copyin(uap->data, &toce32, sizeof(toce32))))
-		return (error);
-	CP(toce32, toce, address_format);
-	CP(toce32, toce, starting_track);
-	CP(toce32, toce, data_len);
-	PTRIN_CP(toce32, toce, data);
-
-	if ((error = fo_ioctl(fp, CDIOREADTOCENTRYS, (caddr_t)&toce,
-	    td->td_ucred, td))) {
-		CP(toce, toce32, address_format);
-		CP(toce, toce32, starting_track);
-		CP(toce, toce32, data_len);
-		PTROUT_CP(toce, toce32, data);
-		error = copyout(&toce32, uap->data, sizeof(toce32));
-	}
-	return error;
-}
 
 static int
 freebsd32_ioctl_memrange(struct thread *td,
@@ -212,10 +185,6 @@ freebsd32_ioctl(struct thread *td, struct freebsd32_ioctl_args *uap)
 	}
 
 	switch (uap->com) {
-	case CDIOREADTOCENTRYS_32:
-		error = freebsd32_ioctl_ioc_read_toc(td, uap, fp);
-		break;
-
 	case MEMRANGE_GET32:	/* FALLTHROUGH */
 	case MEMRANGE_SET32:
 		error = freebsd32_ioctl_memrange(td, uap, fp);
