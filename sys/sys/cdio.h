@@ -157,7 +157,7 @@ struct ioc_read_toc_entry {
 	u_char	address_format;
 	u_char	starting_track;
 	u_short	data_len;
-	struct  cd_toc_entry *data;
+	struct  cd_toc_entry * __kerncap data;
 };
 #define CDIOREADTOCENTRYS _IOWR('c',5,struct ioc_read_toc_entry)
 

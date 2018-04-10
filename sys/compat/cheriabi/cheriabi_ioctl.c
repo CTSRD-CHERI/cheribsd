@@ -66,12 +66,6 @@ __FBSDID("$FreeBSD$");
 
 MALLOC_DECLARE(M_IOCTLOPS);
 
-#if 0
-/* Cannot get exact size in 64-bit due to alignment issue of entire struct. */
-CTASSERT(sizeof(struct ioc_read_toc_entry32) == 8);
-CTASSERT(sizeof(struct ioc_toc_header32) == 4);
-#endif
-
 /*
  * cheriabi_ioctl_translate_in - translate ioctl command and structure
  *
@@ -84,79 +78,22 @@ static int
 cheriabi_ioctl_translate_in(u_long com, void *data, u_long *t_comp,
     void **t_datap)
 {
-	int error;
 
-	switch (com) {
-	case CDIOREADTOCENTRYS_C: {
-		struct ioc_read_toc_entry *toce;
-		struct ioc_read_toc_entry_c *toce_c = data;
-
-		toce = malloc(sizeof(struct md_ioctl), M_IOCTLOPS,
-		    M_WAITOK | M_ZERO);
-		*t_datap = toce;
-		*t_comp = CDIOREADTOCENTRYS;
-
-		CP((*toce_c), (*toce), address_format);
-		CP((*toce_c), (*toce), starting_track);
-		CP((*toce_c), (*toce), data_len);
-		/* _Out_writes_bytes_(data_len) const char * data */
-		error = cheriabi_cap_to_ptr((caddr_t *)&toce->data,
-		    toce_c->data, toce->data_len, CHERI_PERM_STORE, 0);
-		if (error != 0)
-			return (error);
-
-		return (0);
-	}
-
-	default:
-		return (EINVAL);
-	}
-
+	return (EINVAL);
 }
 
 static int
 cheriabi_ioctl_translate_out(u_long com, void *data, void *t_data)
 {
-	int error = 0;
 
-	if (!(com & IOC_OUT)) {
-		free(t_data, M_IOCTLOPS);
-		return (0);
-	}
-
-	switch (com) {
-	case CDIOREADTOCENTRYS_C: {
-		struct ioc_read_toc_entry *toce = t_data;
-		struct ioc_read_toc_entry_c *toce_c = data;
-		CP((*toce), (*toce_c), address_format);
-		CP((*toce), (*toce_c), starting_track);
-		CP((*toce), (*toce_c), data_len);
-		break;
-	}
-
-	default:
-		printf("%s: unhandled command 0x%lx _IO%s('%c', %d, %d)\n",
-		    __func__, com,
-		    (IOC_VOID & com) ? (IOCPARM_LEN(com) == 0 ? "" : "INT") :
-		    ((IOC_OUT & com) ? ((IOC_IN & com) ? "WR" : "W") : "R"),
-		    (int)IOCGROUP(com), (int)(com & 0xFF),
-		    (int)IOCPARM_LEN(com));
-		error = EINVAL;
-	}
-
-	free(t_data, M_IOCTLOPS);
-	return (error);
+	return (EINVAL);
 }
 
 static int
 ioctl_data_contains_pointers(u_long cmd)
 {
-	switch (cmd) {
-	case CDIOREADTOCENTRYS_C:
-		return (1);
-	default:
-		return (0);
-	}
+
+	return (0);
 }
 
 #define SYS_IOCTL_SMALL_SIZE	128

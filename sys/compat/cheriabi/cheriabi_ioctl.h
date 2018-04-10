@@ -74,13 +74,4 @@
 #include <dev/sbni/if_sbnireg.h>
 #include <dev/sbni/if_sbnivar.h>
 
-struct ioc_read_toc_entry_c {
-	u_char	address_format;
-	u_char	starting_track;
-	u_short	data_len;
-	void * __capability data;		/* struct cd_toc_entry* */
-};
-#define	CDIOREADTOCENTRYS_C \
-    _IOC_NEWTYPE(CDIOREADTOCENTRYS, struct ioc_read_toc_entry_c)
-
 #endif	/* _COMPAT_CHERIABI_IOCTL_H_ */
