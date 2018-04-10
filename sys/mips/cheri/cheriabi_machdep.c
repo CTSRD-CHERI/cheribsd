@@ -395,7 +395,7 @@ cheriabi_get_mcontext(struct thread *td, mcontext_c_t *mcp, int flags)
 	mcp->mc_pc = td->td_frame->pc;
 	mcp->mullo = td->td_frame->mullo;
 	mcp->mulhi = td->td_frame->mulhi;
-	mcp->mc_tls = td->td_md.md_tls_cap;
+	mcp->mc_tls = td->td_md.md_tls;
 
 	return (0);
 }
@@ -422,12 +422,8 @@ cheriabi_set_mcontext(struct thread *td, mcontext_c_t *mcp)
 	td->td_frame->mullo = mcp->mullo;
 	td->td_frame->mulhi = mcp->mulhi;
 
-	td->td_md.md_tls_cap =  mcp->mc_tls;
+	td->td_md.md_tls =  mcp->mc_tls;
 	tag = cheri_gettag(mcp->mc_tls);
-	if (tag)
-		td->td_md.md_tls = (__cheri_fromcap void *)mcp->mc_tls; // XXX: __capability?
-	else
-		td->td_md.md_tls = NULL;
 
 	/* Dont let user to set any bits in status and cause registers.  */
 
@@ -545,7 +541,7 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	sf.sf_uc.uc_mcontext.mc_pc = regs->pc;
 	sf.sf_uc.uc_mcontext.mullo = regs->mullo;
 	sf.sf_uc.uc_mcontext.mulhi = regs->mulhi;
-	sf.sf_uc.uc_mcontext.mc_tls = td->td_md.md_tls_cap;
+	sf.sf_uc.uc_mcontext.mc_tls = td->td_md.md_tls;
 	sf.sf_uc.uc_mcontext.mc_regs[0] = UCONTEXT_MAGIC;  /* magic number */
 	bcopy((void *)&regs->ast, (void *)&sf.sf_uc.uc_mcontext.mc_regs[1],
 	    sizeof(sf.sf_uc.uc_mcontext.mc_regs) - sizeof(register_t));
@@ -1020,19 +1016,10 @@ cheriabi_thr_new_md(struct thread *parent_td, struct thr_param_c *param)
 int
 cheriabi_set_user_tls(struct thread *td, void * __capability tls_base)
 {
-	int error;
-	/* XXX-AR: add a TLS alignment check here */
 
 	td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET + TLS_TCB_SIZE_C;
-	/*
-	 * Don't require any particular permissions or size and allow NULL.
-	 * If the caller passes nonsense, they just get nonsense results.
-	 */
-	error = cheriabi_cap_to_ptr((caddr_t *)&td->td_md.md_tls, tls_base,
-	    0, 0, 1);
-	if (error)
-		return (error);
-	td->td_md.md_tls_cap = tls_base;
+	/* XXX-AR: add a TLS alignment check here */
+	td->td_md.md_tls = tls_base;
 	/* XXX: should support a crdhwr version */
 	if (curthread == td && cpuinfo.userlocal_reg == true) {
 		/*
@@ -1048,8 +1035,8 @@ cheriabi_set_user_tls(struct thread *td, void * __capability tls_base)
 		 * storage (i.e., variables with the '_thread'
 		 * attribute).
 		 */
-		mips_wr_userlocal((unsigned long)((caddr_t)td->td_md.md_tls +
-		    td->td_md.md_tls_tcb_offset));
+		mips_wr_userlocal((__cheri_addr u_long)td->td_md.md_tls +
+		    td->td_md.md_tls_tcb_offset);
 	}
 
 	return (0);
@@ -1091,7 +1078,7 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 
 	case MIPS_GET_TLS:
 		error = copyoutcap_c(
-		    (__cheri_tocap void * __capability)&td->td_md.md_tls_cap,
+		    (__cheri_tocap void * __capability)&td->td_md.md_tls,
 		    uap->parms, sizeof(void * __capability));
 		return (error);
 

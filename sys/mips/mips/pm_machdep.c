@@ -180,7 +180,8 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	sf.sf_uc.uc_mcontext.mc_pc = regs->pc;
 	sf.sf_uc.uc_mcontext.mullo = regs->mullo;
 	sf.sf_uc.uc_mcontext.mulhi = regs->mulhi;
-	sf.sf_uc.uc_mcontext.mc_tls = td->td_md.md_tls;
+	sf.sf_uc.uc_mcontext.mc_tls =
+	    (__cheri_fromcap void *)td->td_md.md_tls;
 	sf.sf_uc.uc_mcontext.mc_regs[0] = UCONTEXT_MAGIC;  /* magic number */
 	bcopy((void *)&regs->ast, (void *)&sf.sf_uc.uc_mcontext.mc_regs[1],
 	    sizeof(sf.sf_uc.uc_mcontext.mc_regs) - sizeof(register_t));
@@ -482,7 +483,7 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int flags)
 	mcp->mc_pc = td->td_frame->pc;
 	mcp->mullo = td->td_frame->mullo;
 	mcp->mulhi = td->td_frame->mulhi;
-	mcp->mc_tls = td->td_md.md_tls;
+	mcp->mc_tls = (__cheri_fromcap void *)td->td_md.md_tls;
 
 #ifdef CPU_CHERI
 	/*
@@ -544,7 +545,7 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 	td->td_frame->pc = mcp->mc_pc;
 	td->td_frame->mullo = mcp->mullo;
 	td->td_frame->mulhi = mcp->mulhi;
-	td->td_md.md_tls = mcp->mc_tls;
+	td->td_md.md_tls = __USER_CAP_UNBOUND(mcp->mc_tls);
 	/* Dont let user to set any bits in status and cause registers. */
 
 	return (0);

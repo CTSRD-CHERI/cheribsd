@@ -75,7 +75,6 @@ static union {
  * that work on other architectures might break alignment on CHERI.
  */
 CTASSERT(offsetof(struct trapframe, ddc) % CHERICAP_SIZE == 0);
-CTASSERT(offsetof(struct mdthread, md_tls_cap) % CHERICAP_SIZE == 0);
 CTASSERT(offsetof(struct mdthread, md_cheri_mmap_cap) % CHERICAP_SIZE == 0);
 
 /*
