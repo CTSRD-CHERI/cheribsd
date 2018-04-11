@@ -135,11 +135,14 @@ typedef	__uid_t		uid_t;
 #define	SIGRTMIN	65
 #define	SIGRTMAX	126
 
-#define	SIG_DFL		((__sighandler_t *)0)
-#define	SIG_IGN		((__sighandler_t *)1)
-#define	SIG_ERR		((__sighandler_t *)-1)
-/* #define	SIG_CATCH	((__sighandler_t *)2) See signalvar.h */
-#define SIG_HOLD        ((__sighandler_t *)3)
+#if !__has_feature(capabilities)
+#define	__intcap_t __intptr_t
+#endif
+#define	SIG_DFL		((__sighandler_t * __kerncap)(__intcap_t)0)
+#define	SIG_IGN		((__sighandler_t * __kerncap)(__intcap_t)1)
+#define	SIG_ERR		((__sighandler_t * __kerncap)(__intcap_t)-1)
+/* #define	SIG_CATCH	((__sighandler_t *)(__intcap_t)2) See signalvar.h */
+#define SIG_HOLD        ((__sighandler_t * __kerncap)(__intcap_t)3)
 
 /*
  * Type of a signal handling function.
@@ -338,6 +341,7 @@ struct __siginfo;
 /*
  * Signal vector "template" used in sigaction call.
  */
+#ifndef _KERNEL
 struct sigaction {
 	union {
 		void    (*__sa_handler)(int);
@@ -346,6 +350,32 @@ struct sigaction {
 	int	sa_flags;		/* see signal options below */
 	sigset_t sa_mask;		/* signal mask to apply */
 };
+#else
+#if __has_feature(capabilities)
+struct sigaction_c {
+	union {
+		void    (* __capability __sa_handler)(int);
+		void    (* __capability __sa_sigaction)
+			    (int, struct __siginfo *, void *);
+	} __sigaction_u;		/* signal handler */
+	int	sa_flags;		/* see signal options below */
+	sigset_t sa_mask;		/* signal mask to apply */
+};
+#endif
+struct sigaction_native {
+	union {
+		void    (*__sa_handler)(int);
+		void    (*__sa_sigaction)(int, struct __siginfo *, void *);
+	} __sigaction_u;		/* signal handler */
+	int	sa_flags;		/* see signal options below */
+	sigset_t sa_mask;		/* signal mask to apply */
+};
+#if __has_feature(capabilities)
+typedef struct sigaction_c	ksigaction_t;
+#else
+typedef	struct sigaction_native	ksigaction_t;
+#endif
+#endif
 
 #define	sa_handler	__sigaction_u.__sa_handler
 #endif
@@ -390,7 +420,7 @@ struct sigaction {
 #endif
 
 #if __BSD_VISIBLE
-typedef	__sighandler_t	*sig_t;	/* type of pointer to a signal function */
+typedef	__sighandler_t	* __kerncap sig_t;	/* type of pointer to a signal function */
 typedef	void __siginfohandler_t(int, struct __siginfo *, void *);
 #endif
 

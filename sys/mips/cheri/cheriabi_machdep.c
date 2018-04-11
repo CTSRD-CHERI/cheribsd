@@ -453,12 +453,14 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	struct thread *td;
 	struct trapframe *regs;
 	struct sigacts *psp;
-	struct sigframe_c sf, *sfp;
+	struct sigframe_c sf, * __capability sfp;
 	struct cheri_signal *csigp;
-	intptr_t csp; /* XXXAR: shouldn't this be intcap_t */
+	char * __capability csp;
 	int cheri_is_sandboxed;
 	int sig;
 	int oonstack;
+
+	KASSERT(cheri_gettag(catcher), ("signal handler is untagged!"));
 
 	td = curthread;
 	p = td->td_proc;
@@ -570,7 +572,7 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !oonstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		csp = (intptr_t)csigp->csig_csp;
+		csp = csigp->csig_csp;
 	} else {
 		/*
 		 * Signals delivered when a CHERI sandbox is present must be
@@ -587,12 +589,12 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 			sigexit(td, SIGILL);
 			/* NOTREACHED */
 		}
-		csp = (intptr_t)regs->csp;
+		csp = regs->csp;
 	}
 	csp -= sizeof(struct sigframe_c);
 	/* For CHERI, keep the stack pointer capability aligned. */
-	csp &= ~(CHERICAP_SIZE - 1);
-	sfp = (void *)csp;
+	csp = __builtin_align_down(csp, CHERICAP_SIZE);
+	sfp = (struct sigframe_c * __capability)csp;
 
 	/* Build the argument list for the signal handler. */
 	regs->a0 = sig;
@@ -648,11 +650,8 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 	/*
 	 * Copy the sigframe out to the user's stack.
-	 *
-	 * XXXRW: Should copy out using the user capability, so as to receive
-	 * permission/bounds faults.
 	 */
-	if (copyoutcap(&sf, (void *)(vaddr_t)sfp, sizeof(sf)) != 0) {
+	if (copyoutcap_c(&sf, sfp, sizeof(sf)) != 0) {
 		/*
 		 * Something is wrong with the stack pointer.
 		 * ...Kill the process.
@@ -676,13 +675,11 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 * Install CHERI signal-delivery register state for handler to run
 	 * in.  As we don't install this in the CHERI frame on the user stack,
 	 * it will be (generally) be removed automatically on sigreturn().
-	 *
-	 * XXXRW: Seems awkward to set both $pc and $pcc here .. and to
-	 * different things.
 	 */
 	regs->pc = (register_t)(intptr_t)catcher;
-	regs->csp = (__cheri_tocap void * __capability)(void*)sfp;
-	regs->c12 = psp->ps_sigcap[_SIG_IDX(sig)];
+	regs->pcc = catcher;
+	regs->csp = sfp;
+	regs->c12 = catcher;
 	regs->c17 = td->td_pcb->pcb_cherisignal.csig_sigcode;
 	regs->ddc = csigp->csig_ddc;
 	/*
@@ -693,7 +690,6 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 */
 	if (cheri_is_sandboxed)
 		regs->idc = csigp->csig_idc;
-	regs->pcc = csigp->csig_pcc;
 }
 
 static void

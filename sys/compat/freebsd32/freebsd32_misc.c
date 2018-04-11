@@ -300,7 +300,7 @@ freebsd32_sigaltstack(struct thread *td,
 		error = copyin(uap->ss, &s32, sizeof(s32));
 		if (error)
 			return (error);
-		PTRIN_CP(s32, ss, ss_sp);
+		ss.ss_sp = __USER_CAP_UNBOUND(PTRIN(s32.ss_sp));
 		CP(s32, ss, ss_size);
 		CP(s32, ss, ss_flags);
 		ssp = &ss;
@@ -308,7 +308,7 @@ freebsd32_sigaltstack(struct thread *td,
 		ssp = NULL;
 	error = kern_sigaltstack(td, ssp, &oss);
 	if (error == 0 && uap->oss != NULL) {
-		PTROUT_CP(oss, s32, ss_sp);
+		s32.ss_sp = PTROUT((__cheri_fromcap void *)oss.ss_sp);
 		CP(oss, s32, ss_size);
 		CP(oss, s32, ss_flags);
 		error = copyout(&s32, uap->oss, sizeof(s32));
@@ -2314,7 +2314,7 @@ int
 freebsd32_sigaction(struct thread *td, struct freebsd32_sigaction_args *uap)
 {
 	struct sigaction32 s32;
-	struct sigaction sa, osa, *sap;
+	ksigaction_t sa, osa, *sap;
 	int error;
 
 	if (uap->act) {

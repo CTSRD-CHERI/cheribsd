@@ -97,7 +97,7 @@ struct sysentvec {
 					/* translate trap-to-signal mapping */
 	int		(*sv_fixup)(register_t **, struct image_params *);
 					/* stack fixup function */
-	void		(*sv_sendsig)(void (*)(int), struct ksiginfo *, struct __sigset *);
+	void		(*sv_sendsig)(void (* __capability)(int), struct ksiginfo *, struct __sigset *);
 			    		/* send signal */
 	char 		*sv_sigcode;	/* start of sigtramp code */
 	int 		*sv_szsigcode;	/* size of sigtramp code */

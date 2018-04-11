@@ -2129,8 +2129,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 416: {
 		struct sigaction_args *p = params;
 		iarg[0] = p->sig; /* int */
-		uarg[1] = (intptr_t) p->act; /* const struct sigaction * */
-		uarg[2] = (intptr_t) p->oact; /* struct sigaction * */
+		uarg[1] = (intptr_t) p->act; /* const struct sigaction_native * */
+		uarg[2] = (intptr_t) p->oact; /* struct sigaction_native * */
 		*n_args = 3;
 		break;
 	}
@@ -6723,10 +6723,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct sigaction *";
+			p = "userland const struct sigaction_native *";
 			break;
 		case 2:
-			p = "userland struct sigaction *";
+			p = "userland struct sigaction_native *";
 			break;
 		default:
 			break;

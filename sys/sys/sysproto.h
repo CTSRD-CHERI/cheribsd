@@ -1140,8 +1140,8 @@ struct __mac_execve_args {
 };
 struct sigaction_args {
 	char sig_l_[PADL_(int)]; int sig; char sig_r_[PADR_(int)];
-	char act_l_[PADL_(const struct sigaction *)]; const struct sigaction * act; char act_r_[PADR_(const struct sigaction *)];
-	char oact_l_[PADL_(struct sigaction *)]; struct sigaction * oact; char oact_r_[PADR_(struct sigaction *)];
+	char act_l_[PADL_(const struct sigaction_native *)]; const struct sigaction_native * act; char act_r_[PADR_(const struct sigaction_native *)];
+	char oact_l_[PADL_(struct sigaction_native *)]; struct sigaction_native * oact; char oact_r_[PADR_(struct sigaction_native *)];
 };
 struct sigreturn_args {
 	char sigcntxp_l_[PADL_(const struct __ucontext *)]; const struct __ucontext * sigcntxp; char sigcntxp_r_[PADR_(const struct __ucontext *)];
@@ -2372,8 +2372,8 @@ struct freebsd4_sendfile_args {
 };
 struct freebsd4_sigaction_args {
 	char sig_l_[PADL_(int)]; int sig; char sig_r_[PADR_(int)];
-	char act_l_[PADL_(const struct sigaction *)]; const struct sigaction * act; char act_r_[PADR_(const struct sigaction *)];
-	char oact_l_[PADL_(struct sigaction *)]; struct sigaction * oact; char oact_r_[PADR_(struct sigaction *)];
+	char act_l_[PADL_(const struct sigaction_native *)]; const struct sigaction_native * act; char act_r_[PADR_(const struct sigaction_native *)];
+	char oact_l_[PADL_(struct sigaction_native *)]; struct sigaction_native * oact; char oact_r_[PADR_(struct sigaction_native *)];
 };
 struct freebsd4_sigreturn_args {
 	char sigcntxp_l_[PADL_(const struct ucontext4 *)]; const struct ucontext4 * sigcntxp; char sigcntxp_r_[PADR_(const struct ucontext4 *)];

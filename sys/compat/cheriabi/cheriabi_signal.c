@@ -51,68 +51,27 @@ __FBSDID("$FreeBSD$");
 #include <compat/cheriabi/cheriabi_util.h>
 #include <compat/cheriabi/cheriabi_proto.h>
 
-struct sigaction_c {
-	void * __capability	sa_u;
-	int			sa_flags;
-	sigset_t		sa_mask;
-};
-
 #ifdef CHERIABI_NEEDS_UPDATE
 CTASSERT(sizeof(struct sigaltstack32) == 12);
-CTASSERT(sizeof(struct sigaction32) == 24);
 #endif
 
 int
 cheriabi_sigaction(struct thread *td, struct cheriabi_sigaction_args *uap)
 {
-	struct sigaction_c sa_c;
-	struct sigaction sa, osa, *sap;
-	void * __capability cap;
+	struct sigaction_c act, oact;
+	struct sigaction_c *actp, *oactp;
+	int error;
 
-	int error, tag;
-
-	if (uap->act) {
-		error = copyincap_c(uap->act, &sa_c, sizeof(sa_c));
+	actp = (uap->act != NULL) ? &act : NULL;
+	oactp = (uap->oact != NULL) ? &oact : NULL;
+	if (actp) {
+		error = copyincap_c(uap->act, &act, sizeof(act));
 		if (error)
 			return (error);
-		tag = cheri_gettag(sa_c.sa_u);
-		if (!tag) {
-			sa.sa_handler = (void (*)(int))(uintptr_t)(__intcap_t)sa_c.sa_u;
-			if (sa.sa_handler != SIG_DFL &&
-			    sa.sa_handler != SIG_IGN) {
-				SYSERRCAUSE("untagged sa_handler and not "
-				    "SIG_DFL or SIG_IGN (%p)", sa.sa_handler);
-				return (EPROT);
-			}
-		} else {
-			error = cheriabi_cap_to_ptr((caddr_t *)&sa.sa_handler,
-			    sa_c.sa_u,
-			    8 /* XXX-BD: at least two instructions */,
-		            CHERI_PERM_LOAD | CHERI_PERM_EXECUTE, 0);
-			if (error) {
-				SYSERRCAUSE("in cheriabi_cap_to_ptr");
-				return (error);
-			}
-		}
-		CP(sa_c, sa, sa_flags);
-		CP(sa_c, sa, sa_mask);
-		sap = &sa;
-		cap = sa_c.sa_u;
-	} else
-		sap = NULL;
-	error = kern_sigaction_cap(td, uap->sig, sap,
-	    uap->oact != NULL ? &osa : NULL, 0, &cap);
-	if (error != 0)
-		SYSERRCAUSE("error in kern_sigaction_cap");
-	if (error == 0 && uap->oact != NULL) {
-		sa_c.sa_u = cap;
-		CP(osa, sa_c, sa_flags);
-		CP(osa, sa_c, sa_mask);
-		error = copyoutcap_c(&sa_c, uap->oact, sizeof(sa_c));
-		if (error != 0) {
-			SYSERRCAUSE("error in copyoutcap");
-		}
 	}
+	error = kern_sigaction(td, uap->sig, actp, oactp, 0);
+	if (oactp && !error)
+		error = copyoutcap_c(&oact, uap->oact, sizeof(oact));
 	return (error);
 }
 

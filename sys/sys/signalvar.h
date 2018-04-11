@@ -72,9 +72,6 @@ struct sigacts {
 	int	ps_flag;
 	u_int	ps_refcnt;
 	struct mtx ps_mtx;
-#ifdef COMPAT_CHERIABI
-	void * __capability ps_sigcap[_SIG_MAXSIG];	/* CheriABI handlers */
-#endif
 };
 
 #define	PS_NOCLDWAIT	0x0001	/* No zombies if child dies */
@@ -104,7 +101,7 @@ typedef void __osiginfohandler_t(int, osiginfo_t *, void *);
 #endif /* COMPAT_43 */
 
 /* additional signal action values, used only temporarily/internally */
-#define	SIG_CATCH	((__sighandler_t *)2)
+#define	SIG_CATCH	((__sighandler_t * __capability )2)
 /* #define SIG_HOLD        ((__sighandler_t *)3) See signal.h */
 
 /*

@@ -611,8 +611,8 @@
 				    const sigset_t *set, sigset_t *oset); }
 341	AUE_SIGSUSPEND	STD	{ int sigsuspend(const sigset_t *sigmask); }
 342	AUE_SIGACTION	COMPAT4	{ int sigaction(int sig, const \
-				    struct sigaction *act, \
-				    struct sigaction *oact); }
+				    struct sigaction_native *act, \
+				    struct sigaction_native *oact); }
 343	AUE_SIGPENDING	STD	{ int sigpending(sigset_t *set); }
 344	AUE_SIGRETURN	COMPAT4	{ int sigreturn( \
 				    const struct ucontext4 *sigcntxp); }
@@ -758,8 +758,8 @@
 415	AUE_NULL	STD	{ int __mac_execve(char *fname, char **argv, \
 				    char **envv, struct mac_native *mac_p); }
 416	AUE_SIGACTION	STD	{ int sigaction(int sig, \
-				    const struct sigaction *act, \
-				    struct sigaction *oact); }
+				    const struct sigaction_native *act, \
+				    struct sigaction_native *oact); }
 417	AUE_SIGRETURN	STD	{ int sigreturn( \
 				    const struct __ucontext *sigcntxp); }
 418	AUE_NULL	UNIMPL	__xstat
