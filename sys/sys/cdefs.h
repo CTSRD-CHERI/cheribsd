@@ -700,6 +700,13 @@
 #define	__USER_CAP_STR(strp)	__USER_CAP_UNBOUND(strp)
 #endif
 
+#ifndef __USER_CODE_CAP
+/*
+ * XXX-BD: should derive from pcc
+ */
+#define	__USER_CODE_CAP(ptr)	__USER_CAP_UNBOUND(ptr)
+#endif
+
 #ifndef __CAP_CHECK
 #if __has_feature(capabilities)
 #define __CAP_CHECK(cap, len) ({					\
