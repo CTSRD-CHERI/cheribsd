@@ -217,43 +217,20 @@ int
 cheriabi_sigaltstack(struct thread *td,
     struct cheriabi_sigaltstack_args *uap)
 {
-	void * __capability old_ss_sp;
-	struct sigaltstack_c s_c;
-	struct sigaltstack ss, oss, *ssp;
+	struct sigaltstack ss, oss;
 	int error;
 
 	if (uap->ss != NULL) {
-		error = copyincap_c(uap->ss, &s_c, sizeof(s_c));
-		if (error)
+		error = copyincap_c(uap->ss, &ss, sizeof(ss));
+		if (error != 0)
 			return (error);
-		CP(s_c, ss, ss_size);
-		CP(s_c, ss, ss_flags);
-		/* XXX-BD: what perms to enforce? */
-		error = cheriabi_cap_to_ptr((caddr_t *)&ss.ss_sp, s_c.ss_sp,
-		    s_c.ss_size, CHERI_PERM_GLOBAL, 1);
-		if (error)
-			return (error);
-		ssp = &ss;
-	} else
-		ssp = NULL;
-	error = kern_sigaltstack(td, ssp, &oss);
-	if (error == 0) {
-		cheriabi_get_signal_stack_capability(td, &old_ss_sp);
-		if (uap->ss != NULL) {
-			/*
-			 * Install the new signal capability or restore the
-			 * thread's default one.
-			 */
-			cheriabi_set_signal_stack_capability(td,
-			    (ss.ss_flags & SS_DISABLE) ? NULL : &s_c.ss_sp);
-		}
-		if (uap->oss != NULL) {
-			s_c.ss_sp = old_ss_sp;
-			CP(oss, s_c, ss_size);
-			CP(oss, s_c, ss_flags);
-			error = copyoutcap_c(&s_c, uap->oss, sizeof(s_c));
-		}
 	}
+	error = kern_sigaltstack(td, (uap->ss != NULL) ? &ss : NULL,
+	    (uap->oss != NULL) ? &oss : NULL);
+	if (error != 0)
+		return (error);
+	if (uap->oss != NULL)
+		error = copyoutcap_c(&oss, uap->oss, sizeof(oss));
 	return (error);
 }
 

@@ -144,8 +144,9 @@
 50	AUE_SETLOGIN	STD	{ int setlogin(char *namebuf); }
 51	AUE_ACCT	STD	{ int acct(char *path); }
 52	AUE_SIGPENDING	COMPAT	{ int sigpending(void); }
-53	AUE_SIGALTSTACK	STD	{ int sigaltstack(stack_t *ss, \
-				    stack_t *oss); }
+53	AUE_SIGALTSTACK	STD	{ int sigaltstack( \
+				    const struct sigaltstack_native *ss, \
+				    struct sigaltstack_native *oss); }
 54	AUE_IOCTL	STD	{ int ioctl(int fd, u_long com, \
 				    caddr_t data); }
 55	AUE_REBOOT	STD	{ int reboot(int opt); }

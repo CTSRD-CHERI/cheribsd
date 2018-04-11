@@ -161,7 +161,7 @@ thr_new_initthr(struct thread *td, void *thunk)
 		return (EFAULT);
 
 	/* Set up our machine context. */
-	stack.ss_sp = param->stack_base;
+	stack.ss_sp = __USER_CAP_UNBOUND(param->stack_base);
 	stack.ss_size = param->stack_size;
 	/* Set upcall address to user thread entry function. */
 	cpu_set_upcall(td, param->start_func, param->arg, &stack);

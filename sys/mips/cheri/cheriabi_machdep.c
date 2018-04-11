@@ -1038,25 +1038,6 @@ cheriabi_set_user_tls(struct thread *td, void * __capability tls_base)
 	return (0);
 }
 
-void
-cheriabi_get_signal_stack_capability(struct thread *td, void * __capability *csig)
-{
-
-	*csig = td->td_pcb->pcb_cherisignal.csig_csp;
-}
-
-/*
- * Set a thread's signal stack capability.  If NULL is passed, restore
- * the default stack capability.
- */
-void
-cheriabi_set_signal_stack_capability(struct thread *td, void * __capability *csig)
-{
-
-	td->td_pcb->pcb_cherisignal.csig_csp = csig != NULL ? *csig :
-	    td->td_pcb->pcb_cherisignal.csig_default_stack;
-}
-
 int
 cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 {
