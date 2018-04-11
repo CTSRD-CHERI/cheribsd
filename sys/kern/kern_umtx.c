@@ -3421,8 +3421,10 @@ __umtx_op_nwake_private(struct thread *td, struct _umtx_op_args *uap)
 	 * XXX-BD: we'll get an array of capabilities and need to
 	 * convert them into addresses.
 	 */
-	if (SV_CURPROC_FLAG(SV_CHERI))
-	    return (__umtx_op_unimpl(td, uap));
+	if (SV_CURPROC_FLAG(SV_CHERI)) {
+		killproc(curproc, "Used unimplemented NWAKE_PRIVATE umtx op");
+		return (__umtx_op_unimpl(td, uap));
+	}
 #endif
 
 	upp = (char **)uap->obj;
