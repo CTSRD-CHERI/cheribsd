@@ -755,7 +755,7 @@ kern_sendit(struct thread *td, int s, kmsghdr_t *mp, int flags,
 #ifdef MAC
 	if (mp->msg_name != NULL) {
 		error = mac_socket_check_connect(td->td_ucred, so,
-		    __DECAP_CHECK(mp->msg_name, mp->msg_namelen));
+		    (__cheri_fromcap void *)mp->msg_name);
 		if (error != 0) {
 			m_freem(control);
 			goto bad;
