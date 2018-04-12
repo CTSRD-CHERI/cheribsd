@@ -114,6 +114,7 @@ CPU_QEMU_MALTA			opt_global.h
 #
 BERI_LARGE_TLB			opt_global.h
 PLATFORM_INIT_SECONDARY		opt_global.h
+
 FDT_DTB_STATIC_ONLY		opt_platform.h
 
 #
