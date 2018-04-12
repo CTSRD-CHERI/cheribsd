@@ -35,6 +35,7 @@
 #endif
 
 #include <sys/types.h>
+#include <sys/endian.h>
 #include <sys/param.h>
 #include <sys/mman.h>
 
@@ -71,3 +72,10 @@ typedef unsigned long vm_offset_t;
 #define __unused __attribute__((unused))
 #endif
 
+
+#ifndef __bswap64
+/* Not defined on MacOS */
+#define __bswap16(x) __builtin_bswap16(x)
+#define __bswap32(x) __builtin_bswap32(x)
+#define __bswap64(x) __builtin_bswap64(x)
+#endif

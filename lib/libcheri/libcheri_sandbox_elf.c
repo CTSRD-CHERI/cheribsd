@@ -35,6 +35,7 @@
 #endif
 
 #include <sys/types.h>
+#include <sys/endian.h>
 #include <sys/mman.h>
 #include <sys/param.h>
 #include <sys/queue.h>
@@ -103,8 +104,8 @@ sandbox_map_entry_mmap(void *base, struct sandbox_map_entry *sme, int add_prot)
 
 	taddr = (caddr_t)base + sme->sme_map_offset;
 	if (sme->sme_fd > -1)
-		loader_dbg("mapping 0x%zx bytes at %p, file offset 0x%lx\n",
-		    sme->sme_len, taddr, sme->sme_file_offset);
+		loader_dbg("mapping 0x%zx bytes at %p, file offset 0x%zx\n",
+		    sme->sme_len, taddr, (size_t)sme->sme_file_offset);
 	else
 		loader_dbg("mapping 0x%zx bytes at 0x%p\n", sme->sme_len, taddr);
 	if ((addr = mmap(taddr, sme->sme_len, sme->sme_prot | add_prot,
@@ -354,7 +355,30 @@ sandbox_map_optimize(struct sandbox_map *sm)
 }
 
 /* We support only MIPS big endian */
+#define LIBCHERI_EXPECTED_ELF_MACHINE EM_MIPS
 #define LIBCHERI_EXPECTED_ELF_ORDER ELFDATA2MSB
+/*
+ * But for debugging we want to be able to parse the sandbox files on a machine
+ * with different endianess. We use a hacky from_elf() macro to access the
+ * values since we can't use C++ here.
+ */
+#if LIBCHERI_EXPECTED_ELF_ORDER == ELFDATA2MSB
+#define from_elf64(x) be64toh(x)
+#define from_elf32(x) be32toh(x)
+#define from_elf16(x) be16toh(x)
+#elif LIBCHERI_EXPECTED_ELF_ORDER == ELFDATA2LSB
+#define from_elf64(x) le64toh(x)
+#define from_elf32(x) le32toh(x)
+#define from_elf16(x) le16toh(x)
+#endif
+/* _Generic doesn't seem to work so use this as a workaround for templates */
+#define from_elf(x)	__builtin_choose_expr(					\
+	__builtin_types_compatible_p(__typeof__(&(x)), uint64_t*),		\
+		from_elf64(x),	__builtin_choose_expr(				\
+	__builtin_types_compatible_p(__typeof__(&(x)), uint32_t*),		\
+		from_elf32(x),	__builtin_choose_expr(				\
+	__builtin_types_compatible_p(__typeof__(&(x)), uint16_t*),		\
+		from_elf16(x), (void)0 /*error on assignment*/)))
 
 struct sandbox_map *
 sandbox_parse_elf64(int fd, const char* name, unsigned flags)
@@ -364,9 +388,9 @@ sandbox_parse_elf64(int fd, const char* name, unsigned flags)
 	ssize_t rlen;
 	size_t maplen, mappedbytes, offset, tailbytes;
 	size_t min_section_addr = (size_t)-1;
-	Elf64_Ehdr ehdr;
-	Elf64_Phdr phdr;
-	Elf64_Shdr shdr;
+	Elf64_Ehdr raw_ehdr; /* Not endian converted */
+	Elf64_Phdr raw_phdr;
+	Elf64_Shdr raw_shdr;
 	struct sandbox_map *sm;
 	struct sandbox_map_entry *sme;
 
@@ -376,8 +400,8 @@ sandbox_parse_elf64(int fd, const char* name, unsigned flags)
 	}
 	STAILQ_INIT(&sm->sm_head);
 
-	if ((rlen = pread(fd, &ehdr, sizeof(ehdr), 0)) != sizeof(ehdr)) {
-		warn("%s: read ELF header", __func__);
+	if ((rlen = pread(fd, &raw_ehdr, sizeof(raw_ehdr), 0)) != sizeof(raw_ehdr)) {
+		warn("%s: read ELF header for %s", __func__, name);
 		return (NULL);
 	}
 
@@ -404,46 +428,63 @@ sandbox_parse_elf64(int fd, const char* name, unsigned flags)
 		return (NULL);
 	}
 
-	loader_dbg("type %d\n", ehdr.e_type);
-	loader_dbg("version %d\n", ehdr.e_version);
-	loader_dbg("entry %zx\n", (size_t)ehdr.e_entry);
-	loader_dbg("flags 0x%zx\n", (size_t)ehdr.e_flags);
-	loader_dbg("elf header size %jd (read %jd)\n", (intmax_t)ehdr.e_ehsize,
-	    rlen);
-	loader_dbg("program header offset %jd\n", (intmax_t)ehdr.e_phoff);
-	loader_dbg("program header size %jd\n", (intmax_t)ehdr.e_phentsize);
-	loader_dbg("program header number %jd\n", (intmax_t)ehdr.e_phnum);
-	loader_dbg("section header offset %jd\n", (intmax_t)ehdr.e_shoff);
-	loader_dbg("section header size %jd\n", (intmax_t)ehdr.e_shentsize);
-	loader_dbg("section header number %jd\n", (intmax_t)ehdr.e_shnum);
-	loader_dbg("section name strings section %jd\n", (intmax_t)ehdr.e_shstrndx);
-	unsigned num_phdrs = ehdr_member(phnum);
+	/*
+	 * All the fields may be in the wrong endianess so we use macros
+	 * to access them. This should compile to nothing on CheriBSD but is
+	 * useful to debug loading of sandbox binaries on the host system.
+	 */
+#define ehdr_member(name) from_elf(raw_ehdr.name)
+#define phdr_member(name) from_elf(raw_phdr.name)
+	if (ehdr_member(e_machine) != LIBCHERI_EXPECTED_ELF_MACHINE) {
+		warnx("%s: %s has wrong e_machine %d", __func__, name,
+		    ehdr_member(e_machine));
+		return (NULL);
+	}
+	loader_dbg("type %d\n", ehdr_member(e_type));
+	loader_dbg("version %d\n", ehdr_member(e_version));
+	loader_dbg("machine %d\n", ehdr_member(e_machine));
+	loader_dbg("entry %zx\n", (size_t)ehdr_member(e_entry));
+	loader_dbg("flags 0x%zx\n", (size_t)ehdr_member(e_flags));
+	loader_dbg("elf header size %jd (read %jd)\n",
+	    (intmax_t)ehdr_member(e_ehsize), rlen);
+	loader_dbg("program header offset %jd\n", (intmax_t)ehdr_member(e_phoff));
+	loader_dbg("program header size %jd\n", (intmax_t)ehdr_member(e_phentsize));
+	loader_dbg("program header number %jd\n", (intmax_t)ehdr_member(e_phnum));
+	loader_dbg("section header offset %jd\n", (intmax_t)ehdr_member(e_shoff));
+	loader_dbg("section header size %jd\n", (intmax_t)ehdr_member(e_shentsize));
+	loader_dbg("section header number %jd\n", (intmax_t)ehdr_member(e_shnum));
+	loader_dbg("section name strings section %jd\n",
+	    (intmax_t)ehdr_member(e_shstrndx));
 
-	for (i = 0; i < ehdr.e_phnum; i++) {
-		Elf64_Addr phdr_offset = ehdr.e_phoff + ehdr.e_phentsize * i;
-		if ((rlen = pread(fd, &phdr, sizeof(phdr), phdr_offset)) != sizeof(phdr)) {
+	for (i = 0; i < ehdr_member(e_phnum); i++) {
+		Elf64_Addr phdr_offset =
+		    ehdr_member(e_phoff) + ehdr_member(e_phentsize) * i;
+		if ((rlen = pread(fd, &raw_phdr, sizeof(raw_phdr),
+		    phdr_offset)) != sizeof(raw_phdr)) {
 			warn("%s: failed to reading program header %d: Read %zd"
-			    " instead of %zd bytes", __func__, i+1, rlen, sizeof(phdr));
+			    " instead of %zd bytes", __func__, i+1, rlen,
+			    sizeof(raw_phdr));
 			return (NULL);
 		}
 #if defined(ELF_LOADER_DEBUG) && ELF_LOADER_DEBUG > 1
 
-		loader_dbg("phdr[%d] type        %jx\n", i, (intmax_t)phdr.p_type);
+		loader_dbg("phdr[%d] type        %jx\n", i,
+		    (intmax_t)phdr_member(p_type));
 		loader_dbg("phdr[%d] flags       %jx (%c%c%c)\n", i,
-		   (intmax_t)phdr.p_flags,
-		   phdr.p_flags & PF_R ? 'r' : '-',
-		   phdr.p_flags & PF_W ? 'w' : '-',
-		   phdr.p_flags & PF_X ? 'x' : '-');
+		    (intmax_t)phdr_member(p_flags),
+		    phdr_member(p_flags) & PF_R ? 'r' : '-',
+		    phdr_member(p_flags) & PF_W ? 'w' : '-',
+		    phdr_member(p_flags) & PF_X ? 'x' : '-');
 		loader_dbg("phdr[%d] offset      0x%016jx\n", i,
-		    (intmax_t)phdr.p_offset);
+		    (intmax_t)phdr_member(p_offset));
 		loader_dbg("phdr[%d] vaddr       0x%016jx\n", i,
-		    (intmax_t)phdr.p_vaddr);
+		    (intmax_t)phdr_member(p_vaddr));
 		loader_dbg("phdr[%d] file size   0x%016jx\n", i,
-		    (intmax_t)phdr.p_filesz);
+		    (intmax_t)phdr_member(p_filesz));
 		loader_dbg("phdr[%d] memory size 0x%016jx\n", i,
-		    (intmax_t)phdr.p_memsz);
+		    (intmax_t)phdr_member(p_memsz));
 #endif
-		if (phdr.p_type != PT_LOAD) {
+		if (phdr_member(p_type) != PT_LOAD) {
 			/* XXXBD: should we handled GNU_STACK? */
 			loader_dbg("skipping non-PT_LOAD segment phdr[%d]\n", i);
 			continue;
@@ -454,7 +495,7 @@ sandbox_parse_elf64(int fd, const char* name, unsigned flags)
 		 * consider it code.  Either way, load it only if requested by
 		 * a suitable flag.
 		 */
-		if (phdr.p_flags & PF_X) {
+		if (phdr_member(p_flags) & PF_X) {
 #ifdef NOTYET
 			/*
 			 * XXXRW: Our current linker script will sometimes
@@ -474,9 +515,9 @@ sandbox_parse_elf64(int fd, const char* name, unsigned flags)
 		}
 
 		prot = (
-		    (phdr.p_flags & PF_R ? PROT_READ : 0) |
-		    (phdr.p_flags & PF_W ? PROT_WRITE : 0) |
-		    (phdr.p_flags & PF_X ? PROT_EXEC : 0));
+		    (phdr_member(p_flags) & PF_R ? PROT_READ : 0) |
+		    (phdr_member(p_flags) & PF_W ? PROT_WRITE : 0) |
+		    (phdr_member(p_flags) & PF_X ? PROT_EXEC : 0));
 		/* XXXBD: write should not be required for code! */
 		/* XXXBD: ideally read would not be required for code. */
 		if (flags & SANDBOX_LOADELF_CODE)
@@ -484,12 +525,12 @@ sandbox_parse_elf64(int fd, const char* name, unsigned flags)
 		if (flags & SANDBOX_LOADELF_DATA)
 			prot &= PROT_READ | PROT_WRITE;
 
-		taddr = rounddown2((phdr.p_vaddr), PAGE_SIZE);
-		offset = rounddown2(phdr.p_offset, PAGE_SIZE);
-		maplen = phdr.p_offset - rounddown2(phdr.p_offset, PAGE_SIZE)
-		    + phdr.p_filesz;
+		taddr = rounddown2((phdr_member(p_vaddr)), PAGE_SIZE);
+		offset = rounddown2(phdr_member(p_offset), PAGE_SIZE);
+		maplen = phdr_member(p_offset) - rounddown2(phdr_member(p_offset), PAGE_SIZE)
+		    + phdr_member(p_filesz);
 		/* XXX-BD: rtld handles this, but I don't see why you would. */
-		if (phdr.p_filesz != phdr.p_memsz && !(phdr.p_flags & PF_W)) {
+		if (phdr_member(p_filesz) != phdr_member(p_memsz) && !(phdr_member(p_flags) & PF_W)) {
 			warnx("%s: segment %d expects 0 fill, but is not "
 			    "writable, skipping", __func__, i+1);
 			continue;
@@ -505,19 +546,19 @@ sandbox_parse_elf64(int fd, const char* name, unsigned flags)
 			goto error;
 		STAILQ_INSERT_TAIL(&sm->sm_head, sme, sme_entries);
 
-		sm->sm_maxoffset = MAX(sm->sm_maxoffset, phdr.p_vaddr +
-		    phdr.p_memsz);
+		sm->sm_maxoffset = MAX(sm->sm_maxoffset, phdr_member(p_vaddr) +
+		    phdr_member(p_memsz));
 
 		/*
 		 * If we would map everything directly or everything fit
 		 * in the mapped range we're done.
 		 */
-		if (phdr.p_filesz == phdr.p_memsz || phdr.p_memsz <= mappedbytes)
+		if (phdr_member(p_filesz) == phdr_member(p_memsz) || phdr_member(p_memsz) <= mappedbytes)
 			continue;
 
 		taddr = taddr + mappedbytes;
-		maplen = (phdr.p_offset - rounddown2(phdr.p_offset, PAGE_SIZE)) +
-		    phdr.p_memsz - mappedbytes;
+		maplen = (phdr_member(p_offset) - rounddown2(phdr_member(p_offset), PAGE_SIZE)) +
+		    phdr_member(p_memsz) - mappedbytes;
 
 		if ((sme = sandbox_map_entry_new(taddr, maplen, prot,
 		    MAP_FIXED | MAP_ANON, -1, 0, 0)) == NULL)
@@ -525,9 +566,10 @@ sandbox_parse_elf64(int fd, const char* name, unsigned flags)
 		STAILQ_INSERT_TAIL(&sm->sm_head, sme, sme_entries);
 	}
 
-	for (i = 1; i < ehdr.e_shnum; i++) {	/* Skip section 0 */
-		if ((rlen = pread(fd, &shdr, sizeof(shdr), ehdr.e_shoff +
-		    ehdr.e_shentsize * i)) != sizeof(shdr)) {
+	for (i = 1; i < ehdr_member(e_shnum); i++) {	/* Skip section 0 */
+		if ((rlen = pread(fd, &raw_shdr, sizeof(raw_shdr),
+		    ehdr_member(e_shoff) + ehdr_member(e_shentsize) * i)) !=
+		    sizeof(raw_shdr)) {
 			warn("%s: reading %d section header", __func__, i+1);
 			goto error;
 		}
@@ -538,9 +580,9 @@ sandbox_parse_elf64(int fd, const char* name, unsigned flags)
 		 * either introduce potential NULL related bugs or
 		 * treat various ELF stables as valid.
 		 */
-		if (shdr.sh_addr >= 0x1000 &&
-		    min_section_addr > shdr.sh_addr)
-			min_section_addr = shdr.sh_addr;
+		Elf64_Addr sh_addr = from_elf(raw_shdr.sh_addr);
+		if (sh_addr >= 0x1000 && min_section_addr > sh_addr)
+			min_section_addr = sh_addr;
 	}
 	loader_dbg("minimum section address 0x%lx\n", min_section_addr);
 	sm->sm_minoffset = rounddown2(min_section_addr, PAGE_SIZE);
