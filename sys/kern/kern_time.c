@@ -622,8 +622,7 @@ user_clock_nanosleep(struct thread *td, clockid_t clock_id, int flags,
 	if (error)
 		return (error);
 	if (ua_rmtp != NULL && (flags & TIMER_ABSTIME) == 0 &&
-	    !useracc(__DECAP_CHECK(ua_rmtp, sizeof(rmt)), sizeof(rmt),
-	    VM_PROT_WRITE))
+	    !useracc(ua_rmtp, sizeof(rmt), VM_PROT_WRITE))
 		return (EFAULT);
 	error = kern_clock_nanosleep(td, clock_id, flags, &rqt, &rmt);
 	if (error == EINTR && ua_rmtp != NULL && (flags & TIMER_ABSTIME) == 0) {

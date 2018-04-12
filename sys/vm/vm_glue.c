@@ -101,6 +101,10 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/cpu.h>
 
+#ifdef CPU_CHERI
+#include <cheri/cheric.h>
+#endif
+
 #ifndef NO_SWAPPING
 static int swapout(struct proc *);
 static void swapclear(struct proc *);
@@ -152,25 +156,40 @@ kernacc(addr, len, rw)
  * used in conjunction with this call.
  */
 int
-useracc(addr, len, rw)
-	void *addr;
-	int len, rw;
+useracc(void * __capability cap, int len, int rw)
 {
+	vm_offset_t addr;
 	boolean_t rv;
 	vm_prot_t prot;
 	vm_map_t map;
+#ifdef CPU_CHERI
+	register_t reqperm;
+#endif
 
 	KASSERT((rw & ~VM_PROT_ALL) == 0,
 	    ("illegal ``rw'' argument to useracc (%x)\n", rw));
 	prot = rw;
+#ifdef CPU_CHERI
+	if (!__CAP_CHECK(cap, len))
+		return (FALSE);
+	reqperm = CHERI_PERM_GLOBAL;
+	if (prot & VM_PROT_READ)
+		reqperm |= CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP;
+	if (prot & VM_PROT_WRITE)
+		reqperm |= CHERI_PERM_STORE | CHERI_PERM_STORE_CAP;
+	if (prot & VM_PROT_EXECUTE)
+		reqperm |= CHERI_PERM_EXECUTE;
+	if ((cheri_getperm(cap) & reqperm) != reqperm)
+		return (FALSE);
+#endif
+	addr = (__cheri_addr vm_offset_t)cap;
 	map = &curproc->p_vmspace->vm_map;
-	if ((vm_offset_t)addr + len > vm_map_max(map) ||
-	    (vm_offset_t)addr + len < (vm_offset_t)addr) {
+	if (addr + len > vm_map_max(map) || addr + len < addr) {
 		return (FALSE);
 	}
 	vm_map_lock_read(map);
-	rv = vm_map_check_protection(map, trunc_page((vm_offset_t)addr),
-	    round_page((vm_offset_t)addr + len), prot);
+	rv = vm_map_check_protection(map, trunc_page(addr),
+	    round_page(addr + len), prot);
 	vm_map_unlock_read(map);
 	return (rv == TRUE);
 }

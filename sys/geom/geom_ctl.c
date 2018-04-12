@@ -465,7 +465,8 @@ g_ctl_ioctl_ctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct th
 	/* It is an error if we cannot return an error text */
 	if (req->lerror < 2)
 		return (EINVAL);
-	if (!useracc(req->error, req->lerror, VM_PROT_WRITE))
+	if (!useracc(__USER_CAP(req->error, req->lerror), req->lerror,
+	    VM_PROT_WRITE))
 		return (EINVAL);
 
 	req->serror = sbuf_new_auto();
