@@ -353,6 +353,9 @@ sandbox_map_optimize(struct sandbox_map *sm)
 	return (0);
 }
 
+/* We support only MIPS big endian */
+#define LIBCHERI_EXPECTED_ELF_ORDER ELFDATA2MSB
+
 struct sandbox_map *
 sandbox_parse_elf64(int fd, const char* name, unsigned flags)
 {
@@ -383,11 +386,28 @@ sandbox_parse_elf64(int fd, const char* name, unsigned flags)
 	if (flags & SANDBOX_LOADELF_DATA)
 		loader_dbg("%s: loading data\n", __func__);
 
-	/* XXX: check for magic number */
+	/* Check for a valid ELF file  */
+	if (memcmp(&raw_ehdr.e_ident, ELFMAG, strlen(ELFMAG)) != 0) {
+		warnx("%s: %s is not a valid ELF file:", __func__, name);
+		return (NULL);
+	}
+	if (raw_ehdr.e_ident[EI_CLASS] != ELFCLASS64) {
+		warnx("%s: %s is not a 64-bit ELF file", __func__, name);
+		return (NULL);
+	}
+	if (raw_ehdr.e_ident[EI_OSABI] != ELFOSABI_FREEBSD) {
+		warnx("%s: %s is not a FreeBSD ELF file", __func__, name);
+		return (NULL);
+	}
+	if (raw_ehdr.e_ident[EI_DATA] != LIBCHERI_EXPECTED_ELF_ORDER) {
+		warnx("%s: %s has wrong endianess", __func__, name);
+		return (NULL);
+	}
 
 	loader_dbg("type %d\n", ehdr.e_type);
 	loader_dbg("version %d\n", ehdr.e_version);
 	loader_dbg("entry %zx\n", (size_t)ehdr.e_entry);
+	loader_dbg("flags 0x%zx\n", (size_t)ehdr.e_flags);
 	loader_dbg("elf header size %jd (read %jd)\n", (intmax_t)ehdr.e_ehsize,
 	    rlen);
 	loader_dbg("program header offset %jd\n", (intmax_t)ehdr.e_phoff);
@@ -397,11 +417,13 @@ sandbox_parse_elf64(int fd, const char* name, unsigned flags)
 	loader_dbg("section header size %jd\n", (intmax_t)ehdr.e_shentsize);
 	loader_dbg("section header number %jd\n", (intmax_t)ehdr.e_shnum);
 	loader_dbg("section name strings section %jd\n", (intmax_t)ehdr.e_shstrndx);
+	unsigned num_phdrs = ehdr_member(phnum);
 
 	for (i = 0; i < ehdr.e_phnum; i++) {
-		if ((rlen = pread(fd, &phdr, sizeof(phdr), ehdr.e_phoff +
-		    ehdr.e_phentsize * i)) != sizeof(phdr)) {
-			warn("%s: reading %d program header", __func__, i+1);
+		Elf64_Addr phdr_offset = ehdr.e_phoff + ehdr.e_phentsize * i;
+		if ((rlen = pread(fd, &phdr, sizeof(phdr), phdr_offset)) != sizeof(phdr)) {
+			warn("%s: failed to reading program header %d: Read %zd"
+			    " instead of %zd bytes", __func__, i+1, rlen, sizeof(phdr));
 			return (NULL);
 		}
 #if defined(ELF_LOADER_DEBUG) && ELF_LOADER_DEBUG > 1
