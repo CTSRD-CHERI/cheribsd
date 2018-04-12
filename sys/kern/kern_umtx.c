@@ -925,8 +925,7 @@ umtx_key_get(const void * __capability addr, int type, int share,
 	 * ensures that capabilities from non-CheriABI binaries are
 	 * inside the bounds of the correct DDC.
 	 */
-	if (addr != NULL &&
-	    __DECAP_CHECK(__DECONST_CAP(void * __capability, addr), 0) == NULL)
+	if (!__CAP_CHECK(__DECONST_CAP(void * __capability, addr), 0))
 		return (EPROT);
 	key->type = type;
 	if (share == THREAD_SHARE) {

@@ -87,8 +87,7 @@ cap_covers_pages(const void * __capability cap, size_t size)
 	size += pageoff;
 	size = (vm_size_t)round_page(size);
 
-	return (__DECAP_CHECK(__DECONST_CAP(void * __capability, addr), size)
-	    != NULL);
+	return (__CAP_CHECK(__DECONST_CAP(void * __capability, addr), size));
 }
 
 int
