@@ -1404,7 +1404,8 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 #endif
 			){
 				pl->pl_flags |= PL_FLAG_SI;
-				pl->pl_siginfo = td2->td_si;
+				siginfo_to_siginfo_native(&td2->td_si,
+				    &pl->pl_siginfo);
 			}
 		}
 		if ((pl->pl_flags & PL_FLAG_SI) == 0)

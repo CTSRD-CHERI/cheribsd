@@ -1297,7 +1297,8 @@ err:
 	ksiginfo_init_trap(&ksi);
 	ksi.ksi_signo = i;
 	ksi.ksi_code = ucode;
-	ksi.ksi_addr = (void *)addr;
+	/* XXXBD: probably not quite right for CheriABI */
+	ksi.ksi_addr = (void * __capability)(intcap_t)addr;
 	ksi.ksi_trapno = type;
 	trapsignal(td, &ksi);
 out:

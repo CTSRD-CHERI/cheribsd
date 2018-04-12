@@ -452,7 +452,7 @@
 234	AUE_NULL	STD	{ int clock_getres(clockid_t clock_id, \
 				    struct timespec *tp); }
 235	AUE_NULL	STD	{ int ktimer_create(clockid_t clock_id, \
-				    struct sigevent *evp, int *timerid); }
+				    struct sigevent_native *evp, int *timerid); }
 236	AUE_NULL	STD	{ int ktimer_delete(int timerid); }
 237	AUE_NULL	STD	{ int ktimer_settime(int timerid, int flags, \
 				    const struct itimerspec *value, \
@@ -483,10 +483,10 @@
 252	AUE_POLL	OBSOL	openbsd_poll
 253	AUE_ISSETUGID	STD	{ int issetugid(void); }
 254	AUE_LCHOWN	STD	{ int lchown(char *path, int uid, int gid); }
-255	AUE_AIO_READ	STD	{ int aio_read(struct aiocb *aiocbp); }
-256	AUE_AIO_WRITE	STD	{ int aio_write(struct aiocb *aiocbp); }
+255	AUE_AIO_READ	STD	{ int aio_read(struct aiocb_native *aiocbp); }
+256	AUE_AIO_WRITE	STD	{ int aio_write(struct aiocb_native *aiocbp); }
 257	AUE_LIO_LISTIO	STD	{ int lio_listio(int mode, \
-				    struct aiocb * const *acb_list, \
+				    struct aiocb_native * const *acb_list, \
 				    int nent, struct sigevent *sig); }
 258	AUE_NULL	STD	{ int kbounce(void *src, void *dst, \
 				    size_t len, int flags); }
@@ -563,13 +563,13 @@
 312	AUE_SETRESGID	STD	{ int setresgid(gid_t rgid, gid_t egid, \
 				    gid_t sgid); }
 313	AUE_NULL	OBSOL	signanosleep
-314	AUE_AIO_RETURN	STD	{ ssize_t aio_return(struct aiocb *aiocbp); }
+314	AUE_AIO_RETURN	STD	{ ssize_t aio_return(struct aiocb_native *aiocbp); }
 315	AUE_AIO_SUSPEND	STD	{ int aio_suspend( \
-				    struct aiocb * const * aiocbp, int nent, \
+				    struct aiocb_native * const * aiocbp, int nent, \
 				    const struct timespec *timeout); }
 316	AUE_AIO_CANCEL	STD	{ int aio_cancel(int fd, \
-				    struct aiocb *aiocbp); }
-317	AUE_AIO_ERROR	STD	{ int aio_error(struct aiocb *aiocbp); }
+				    struct aiocb_native *aiocbp); }
+317	AUE_AIO_ERROR	STD	{ int aio_error(struct aiocb_native *aiocbp); }
 318	AUE_AIO_READ	COMPAT6	{ int aio_read(struct oaiocb *aiocbp); }
 319	AUE_AIO_WRITE	COMPAT6	{ int aio_write(struct oaiocb *aiocbp); }
 320	AUE_LIO_LISTIO	COMPAT6	{ int lio_listio(int mode, \
@@ -618,10 +618,10 @@
 344	AUE_SIGRETURN	COMPAT4	{ int sigreturn( \
 				    const struct ucontext4 *sigcntxp); }
 345	AUE_SIGWAIT	STD	{ int sigtimedwait(const sigset_t *set, \
-				    siginfo_t *info, \
+				    struct siginfo_native *info, \
 				    const struct timespec *timeout); }
 346	AUE_NULL	STD	{ int sigwaitinfo(const sigset_t *set, \
-				    siginfo_t *info); }
+				    struct siginfo_native *info); }
 347	AUE_ACL_GET_FILE	STD	{ int __acl_get_file(const char *path, \
 				    acl_type_t type, struct acl *aclp); }
 348	AUE_ACL_SET_FILE	STD	{ int __acl_set_file(const char *path, \
@@ -653,7 +653,7 @@
 				    int attrnamespace, \
 				    const char *attrname); }
 359	AUE_AIO_WAITCOMPLETE	STD	{ ssize_t aio_waitcomplete( \
-				    struct aiocb **aiocbp, \
+				    struct aiocb_native **aiocbp, \
 				    struct timespec *timeout); }
 360	AUE_GETRESUID	STD	{ int getresuid(uid_t *ruid, uid_t *euid, \
 				    uid_t *suid); }
@@ -844,7 +844,7 @@
 462	AUE_MQ_UNLINK	NOSTD	{ int kmq_unlink(const char *path); }
 463	AUE_NULL	STD	{ int abort2(const char *why, int nargs, void **args); }
 464	AUE_NULL	STD	{ int thr_set_name(long id, const char *name); }
-465	AUE_AIO_FSYNC	STD	{ int aio_fsync(int op, struct aiocb *aiocbp); }
+465	AUE_AIO_FSYNC	STD	{ int aio_fsync(int op, struct aiocb_native *aiocbp); }
 466	AUE_RTPRIO	STD	{ int rtprio_thread(int function, \
 				    lwpid_t lwpid, struct rtprio *rtp); }
 467	AUE_NULL	UNIMPL	nosys
@@ -969,7 +969,7 @@
 532	AUE_WAIT6	STD	{ int wait6(idtype_t idtype, id_t id, \
 				    int *status, int options, \
 				    struct __wrusage *wrusage, \
-				    siginfo_t *info); }
+				    struct siginfo_native *info); }
 533	AUE_CAP_RIGHTS_LIMIT	STD	{ int cap_rights_limit(int fd, \
 					    cap_rights_t *rightsp); }
 534	AUE_CAP_IOCTLS_LIMIT	STD	{ int cap_ioctls_limit(int fd, \
@@ -991,7 +991,7 @@
 				    __socklen_t * __restrict anamelen, \
 				    int flags); }
 542	AUE_PIPE	STD	{ int pipe2(int *fildes, int flags); }
-543	AUE_AIO_MLOCK	STD	{ int aio_mlock(struct aiocb *aiocbp); }
+543	AUE_AIO_MLOCK	STD	{ int aio_mlock(struct aiocb_native *aiocbp); }
 544	AUE_PROCCTL	STD	{ int procctl(idtype_t idtype, id_t id, \
 				    int com, void *data); }
 545	AUE_POLL	STD	{ int ppoll(struct pollfd *fds, u_int nfds, \
@@ -1025,8 +1025,10 @@
 559	AUE_MKNODAT	STD	{ int mknodat(int fd, char *path, mode_t mode, \
 				    dev_t dev); }
 560	AUE_KEVENT	STD	{ int kevent(int fd, \
-				    struct kevent *changelist, int nchanges, \
-				    struct kevent *eventlist, int nevents, \
+				    struct kevent_native *changelist, \
+				    int nchanges, \
+				    struct kevent_native *eventlist, \
+				    int nevents, \
 				    const struct timespec *timeout); }
 
 ; Please copy any additions and changes to the following compatability tables:

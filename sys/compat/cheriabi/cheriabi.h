@@ -115,16 +115,6 @@ cheriabi_strcap_to_ptr(char **strp, void * __capability cap, int may_be_null)
 	    CHERI_PERM_LOAD, may_be_null));
 }
 
-struct kevent_c {
-	__intcap_t		ident;	/* identifier for this event */
-	short			filter;	/* filter for event */
-	u_short			flags;
-	u_int			fflags;
-	int64_t			data;
-	void * __capability	udata;	/* opaque user data identifier */
-	__uint64_t		ext[4];
-};
-
 struct jail_c {
 	uint32_t			version;
 	char * __capability		path;

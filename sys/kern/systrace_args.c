@@ -1181,7 +1181,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 235: {
 		struct ktimer_create_args *p = params;
 		iarg[0] = p->clock_id; /* clockid_t */
-		uarg[1] = (intptr_t) p->evp; /* struct sigevent * */
+		uarg[1] = (intptr_t) p->evp; /* struct sigevent_native * */
 		uarg[2] = (intptr_t) p->timerid; /* int * */
 		*n_args = 3;
 		break;
@@ -1306,14 +1306,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* aio_read */
 	case 255: {
 		struct aio_read_args *p = params;
-		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb * */
+		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb_native * */
 		*n_args = 1;
 		break;
 	}
 	/* aio_write */
 	case 256: {
 		struct aio_write_args *p = params;
-		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb * */
+		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb_native * */
 		*n_args = 1;
 		break;
 	}
@@ -1321,7 +1321,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 257: {
 		struct lio_listio_args *p = params;
 		iarg[0] = p->mode; /* int */
-		uarg[1] = (intptr_t) p->acb_list; /* struct aiocb *const * */
+		uarg[1] = (intptr_t) p->acb_list; /* struct aiocb_native *const * */
 		iarg[2] = p->nent; /* int */
 		uarg[3] = (intptr_t) p->sig; /* struct sigevent * */
 		*n_args = 4;
@@ -1499,14 +1499,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* aio_return */
 	case 314: {
 		struct aio_return_args *p = params;
-		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb * */
+		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb_native * */
 		*n_args = 1;
 		break;
 	}
 	/* aio_suspend */
 	case 315: {
 		struct aio_suspend_args *p = params;
-		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb *const * */
+		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb_native *const * */
 		iarg[1] = p->nent; /* int */
 		uarg[2] = (intptr_t) p->timeout; /* const struct timespec * */
 		*n_args = 3;
@@ -1516,14 +1516,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 316: {
 		struct aio_cancel_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->aiocbp; /* struct aiocb * */
+		uarg[1] = (intptr_t) p->aiocbp; /* struct aiocb_native * */
 		*n_args = 2;
 		break;
 	}
 	/* aio_error */
 	case 317: {
 		struct aio_error_args *p = params;
-		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb * */
+		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb_native * */
 		*n_args = 1;
 		break;
 	}
@@ -1673,7 +1673,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 345: {
 		struct sigtimedwait_args *p = params;
 		uarg[0] = (intptr_t) p->set; /* const sigset_t * */
-		uarg[1] = (intptr_t) p->info; /* siginfo_t * */
+		uarg[1] = (intptr_t) p->info; /* struct siginfo_native * */
 		uarg[2] = (intptr_t) p->timeout; /* const struct timespec * */
 		*n_args = 3;
 		break;
@@ -1682,7 +1682,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 346: {
 		struct sigwaitinfo_args *p = params;
 		uarg[0] = (intptr_t) p->set; /* const sigset_t * */
-		uarg[1] = (intptr_t) p->info; /* siginfo_t * */
+		uarg[1] = (intptr_t) p->info; /* struct siginfo_native * */
 		*n_args = 2;
 		break;
 	}
@@ -1801,7 +1801,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* aio_waitcomplete */
 	case 359: {
 		struct aio_waitcomplete_args *p = params;
-		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb ** */
+		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb_native ** */
 		uarg[1] = (intptr_t) p->timeout; /* struct timespec * */
 		*n_args = 2;
 		break;
@@ -2484,7 +2484,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 465: {
 		struct aio_fsync_args *p = params;
 		iarg[0] = p->op; /* int */
-		uarg[1] = (intptr_t) p->aiocbp; /* struct aiocb * */
+		uarg[1] = (intptr_t) p->aiocbp; /* struct aiocb_native * */
 		*n_args = 2;
 		break;
 	}
@@ -3031,7 +3031,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		uarg[2] = (intptr_t) p->status; /* int * */
 		iarg[3] = p->options; /* int */
 		uarg[4] = (intptr_t) p->wrusage; /* struct __wrusage * */
-		uarg[5] = (intptr_t) p->info; /* siginfo_t * */
+		uarg[5] = (intptr_t) p->info; /* struct siginfo_native * */
 		*n_args = 6;
 		break;
 	}
@@ -3128,7 +3128,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* aio_mlock */
 	case 543: {
 		struct aio_mlock_args *p = params;
-		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb * */
+		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb_native * */
 		*n_args = 1;
 		break;
 	}
@@ -3278,9 +3278,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 560: {
 		struct kevent_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->changelist; /* struct kevent * */
+		uarg[1] = (intptr_t) p->changelist; /* struct kevent_native * */
 		iarg[2] = p->nchanges; /* int */
-		uarg[3] = (intptr_t) p->eventlist; /* struct kevent * */
+		uarg[3] = (intptr_t) p->eventlist; /* struct kevent_native * */
 		iarg[4] = p->nevents; /* int */
 		uarg[5] = (intptr_t) p->timeout; /* const struct timespec * */
 		*n_args = 6;
@@ -5149,7 +5149,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "clockid_t";
 			break;
 		case 1:
-			p = "userland struct sigevent *";
+			p = "userland struct sigevent_native *";
 			break;
 		case 2:
 			p = "userland int *";
@@ -5347,7 +5347,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 255:
 		switch(ndx) {
 		case 0:
-			p = "userland struct aiocb *";
+			p = "userland struct aiocb_native *";
 			break;
 		default:
 			break;
@@ -5357,7 +5357,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 256:
 		switch(ndx) {
 		case 0:
-			p = "userland struct aiocb *";
+			p = "userland struct aiocb_native *";
 			break;
 		default:
 			break;
@@ -5370,7 +5370,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct aiocb *const *";
+			p = "userland struct aiocb_native *const *";
 			break;
 		case 2:
 			p = "int";
@@ -5662,7 +5662,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 314:
 		switch(ndx) {
 		case 0:
-			p = "userland struct aiocb *";
+			p = "userland struct aiocb_native *";
 			break;
 		default:
 			break;
@@ -5672,7 +5672,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 315:
 		switch(ndx) {
 		case 0:
-			p = "userland struct aiocb *const *";
+			p = "userland struct aiocb_native *const *";
 			break;
 		case 1:
 			p = "int";
@@ -5691,7 +5691,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct aiocb *";
+			p = "userland struct aiocb_native *";
 			break;
 		default:
 			break;
@@ -5701,7 +5701,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 317:
 		switch(ndx) {
 		case 0:
-			p = "userland struct aiocb *";
+			p = "userland struct aiocb_native *";
 			break;
 		default:
 			break;
@@ -5928,7 +5928,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const sigset_t *";
 			break;
 		case 1:
-			p = "userland siginfo_t *";
+			p = "userland struct siginfo_native *";
 			break;
 		case 2:
 			p = "userland const struct timespec *";
@@ -5944,7 +5944,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const sigset_t *";
 			break;
 		case 1:
-			p = "userland siginfo_t *";
+			p = "userland struct siginfo_native *";
 			break;
 		default:
 			break;
@@ -6158,7 +6158,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 359:
 		switch(ndx) {
 		case 0:
-			p = "userland struct aiocb **";
+			p = "userland struct aiocb_native **";
 			break;
 		case 1:
 			p = "userland struct timespec *";
@@ -7315,7 +7315,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct aiocb *";
+			p = "userland struct aiocb_native *";
 			break;
 		default:
 			break;
@@ -8306,7 +8306,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland struct __wrusage *";
 			break;
 		case 5:
-			p = "userland siginfo_t *";
+			p = "userland struct siginfo_native *";
 			break;
 		default:
 			break;
@@ -8476,7 +8476,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 543:
 		switch(ndx) {
 		case 0:
-			p = "userland struct aiocb *";
+			p = "userland struct aiocb_native *";
 			break;
 		default:
 			break;
@@ -8739,13 +8739,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct kevent *";
+			p = "userland struct kevent_native *";
 			break;
 		case 2:
 			p = "int";
 			break;
 		case 3:
-			p = "userland struct kevent *";
+			p = "userland struct kevent_native *";
 			break;
 		case 4:
 			p = "int";

@@ -134,7 +134,11 @@ struct ptrace_lwpinfo {
 #define	PL_FLAG_VFORK_DONE 0x800 /* vfork parent has resumed */
 	sigset_t	pl_sigmask;	/* LWP signal mask */
 	sigset_t	pl_siglist;	/* LWP pending signal */
-	struct __siginfo pl_siginfo;	/* siginfo for signal */
+#ifdef _KERNEL
+	struct siginfo_native pl_siginfo;	/* siginfo for signal */
+#else
+	siginfo_t	pl_siginfo;	/* siginfo for signal */
+#endif
 	char		pl_tdname[MAXCOMLEN + 1]; /* LWP name */
 	pid_t		pl_child_pid;	/* New child pid */
 	u_int		pl_syscall_code;

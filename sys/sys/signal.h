@@ -170,6 +170,7 @@ typedef	__sigset_t	sigset_t;
 #endif
 
 #if __POSIX_VISIBLE >= 199309 || __XSI_VISIBLE >= 500
+#ifndef _KERNEL
 union sigval {
 	/* Members as suggested by Annex C of POSIX 1003.1b. */
 	int	sival_int;
@@ -178,12 +179,30 @@ union sigval {
 	int     sigval_int;
 	void    *sigval_ptr;
 };
+
+#else
+union sigval_native {
+	int	sival_int;
+	void	*sival_ptr;
+};
+#if __has_feature(capabilities)
+union sigval_c {
+	int	sival_int;
+	void * __capability sival_ptr;
+};
+typedef union sigval_c		ksigval_union;
+#else
+typedef union sigval_native	ksigval_union;
+#endif
+#endif
+
 #endif
 
 #if __POSIX_VISIBLE >= 199309
 
 struct pthread_attr;
 
+#ifndef _KERNEL
 struct sigevent {
 	int	sigev_notify;		/* Notification type */
 	int	sigev_signo;		/* Signal number */
@@ -198,6 +217,44 @@ struct sigevent {
 		long __spare__[8];
 	} _sigev_un;
 };
+
+#else /* _KERNEL */
+
+struct sigevent_native {
+	int	sigev_notify;		/* Notification type */
+	int	sigev_signo;		/* Signal number */
+	ksigval_union sigev_value;	/* Signal value */
+	union {
+		__lwpid_t	_threadid;
+		struct {
+			void (*_function)(union sigval_native);
+			struct pthread_attr **_attribute;
+		} _sigev_thread;
+		unsigned short _kevent_flags;
+		long __spare__[8];
+	} _sigev_un;
+};
+
+#if __has_feature(capabilities)
+struct sigevent_c {
+	int	sigev_notify;		/* Notification type */
+	int	sigev_signo;		/* Signal number */
+	ksigval_union sigev_value;	/* Signal value */
+	union {
+		__lwpid_t	_threadid;
+		struct {
+			void (* __capability _function)(ksigval_union);
+			struct pthread_attr * __capability * __capability _attribute;
+		} _sigev_thread;
+		unsigned short _kevent_flags;
+		long __spare__[8];
+	} _sigev_un;
+};
+typedef	struct sigevent_c	ksigevent_t;
+#else
+typedef	struct sigevent_native	ksigevent_t;
+#endif
+#endif /* _KERNEL */
 
 #if __BSD_VISIBLE
 #define	sigev_notify_kqueue		sigev_signo
@@ -218,6 +275,7 @@ struct sigevent {
 #endif /* __POSIX_VISIBLE >= 199309 */
 
 #if __POSIX_VISIBLE >= 199309 || __XSI_VISIBLE
+#ifndef _KERNEL
 typedef	struct __siginfo {
 	int	si_signo;		/* signal number */
 	int	si_errno;		/* errno association */
@@ -253,6 +311,83 @@ typedef	struct __siginfo {
 		} __spare__;
 	} _reason;
 } siginfo_t;
+#else /* _KERNEL */
+struct siginfo_native {
+	int	si_signo;		/* signal number */
+	int	si_errno;		/* errno association */
+	/*
+	 * Cause of signal, one of the SI_ macros or signal-specific
+	 * values, i.e. one of the FPE_... values for SIGFPE.  This
+	 * value is equivalent to the second argument to an old-style
+	 * FreeBSD signal handler.
+	 */
+	int	si_code;		/* signal code */
+	__pid_t	si_pid;			/* sending process */
+	__uid_t	si_uid;			/* sender's ruid */
+	int	si_status;		/* exit value */
+	void	*si_addr;		/* faulting instruction */
+	union sigval_native si_value;
+	union	{
+		struct {
+			int	_trapno;/* machine specific trap code */
+		} _fault;
+		struct {
+			int	_timerid;
+			int	_overrun;
+		} _timer;
+		struct {
+			int	_mqd;
+		} _mesgq;
+		struct {
+			long	_band;		/* band event for SIGPOLL */
+		} _poll;			/* was this ever used ? */
+		struct {
+			long	__spare1__;
+			int	__spare2__[7];
+		} __spare__;
+	} _reason;
+};
+#if __has_feature(capabilities)
+struct siginfo_c {
+	int	si_signo;		/* signal number */
+	int	si_errno;		/* errno association */
+	/*
+	 * Cause of signal, one of the SI_ macros or signal-specific
+	 * values, i.e. one of the FPE_... values for SIGFPE.  This
+	 * value is equivalent to the second argument to an old-style
+	 * FreeBSD signal handler.
+	 */
+	int	si_code;		/* signal code */
+	__pid_t	si_pid;			/* sending process */
+	__uid_t	si_uid;			/* sender's ruid */
+	int	si_status;		/* exit value */
+	void* __capability si_addr;	/* faulting instruction */
+	union sigval_c si_value;
+	union	{
+		struct {
+			int	_trapno;/* machine specific trap code */
+		} _fault;
+		struct {
+			int	_timerid;
+			int	_overrun;
+		} _timer;
+		struct {
+			int	_mqd;
+		} _mesgq;
+		struct {
+			long	_band;		/* band event for SIGPOLL */
+		} _poll;			/* was this ever used ? */
+		struct {
+			long	__spare1__;
+			int	__spare2__[7];
+		} __spare__;
+	} _reason;
+};
+typedef	struct siginfo_c	_siginfo_t;
+#else
+typedef	struct siginfo_native	_siginfo_t;
+#endif
+#endif /* _KERNEL */
 
 #define si_trapno	_reason._fault._trapno
 #define si_timerid	_reason._timer._timerid
@@ -521,5 +656,9 @@ struct sigstack {
 __BEGIN_DECLS
 __sighandler_t *signal(int, __sighandler_t *);
 __END_DECLS
+
+#ifdef _KERNEL
+int	convert_sigevent(const struct sigevent_native *, ksigevent_t *);
+#endif
 
 #endif /* !_SYS_SIGNAL_H_ */

@@ -46,7 +46,7 @@
  */
 struct itimer {
 	struct mtx  		it_mtx;
-	struct sigevent		it_sigev;
+	ksigevent_t		it_sigev;
 	struct itimerspec	it_time;
 	struct proc 		*it_proc;
 	int	it_flags;

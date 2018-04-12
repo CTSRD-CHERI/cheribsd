@@ -768,7 +768,8 @@ int
 sys_wait6(struct thread *td, struct wait6_args *uap)
 {
 	struct __wrusage wru, *wrup;
-	siginfo_t si, *sip;
+	_siginfo_t si, *sip;
+	struct siginfo_native si_n;
 	idtype_t idtype;
 	id_t id;
 	int error, status;
@@ -797,8 +798,10 @@ sys_wait6(struct thread *td, struct wait6_args *uap)
 		error = copyout(&status, uap->status, sizeof(status));
 	if (uap->wrusage != NULL && error == 0 && td->td_retval[0] != 0)
 		error = copyout(&wru, uap->wrusage, sizeof(wru));
-	if (uap->info != NULL && error == 0)
-		error = copyout(&si, uap->info, sizeof(si));
+	if (uap->info != NULL && error == 0) {
+		siginfo_to_siginfo_native(&si, &si_n);
+		error = copyout(&si_n, uap->info, sizeof(si_n));
+	}
 	return (error);
 }
 
@@ -949,7 +952,7 @@ proc_reap(struct thread *td, struct proc *p, int *status, int options)
 
 static int
 proc_to_reap(struct thread *td, struct proc *p, idtype_t idtype, id_t id,
-    int *status, int options, struct __wrusage *wrusage, siginfo_t *siginfo,
+    int *status, int options, struct __wrusage *wrusage, _siginfo_t *siginfo,
     int check_only)
 {
 	struct rusage *rup;
@@ -1140,7 +1143,7 @@ kern_wait(struct thread *td, pid_t pid, int *status, int options,
 }
 
 static void
-report_alive_proc(struct thread *td, struct proc *p, siginfo_t *siginfo,
+report_alive_proc(struct thread *td, struct proc *p, _siginfo_t *siginfo,
     int *status, int options, int si_code)
 {
 	bool cont;
@@ -1173,7 +1176,7 @@ report_alive_proc(struct thread *td, struct proc *p, siginfo_t *siginfo,
 
 int
 kern_wait6(struct thread *td, idtype_t idtype, id_t id, int *status,
-    int options, struct __wrusage *wrusage, siginfo_t *siginfo)
+    int options, struct __wrusage *wrusage, _siginfo_t *siginfo)
 {
 	struct proc *p, *q;
 	pid_t pid;

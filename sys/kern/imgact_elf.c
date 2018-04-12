@@ -2109,7 +2109,7 @@ __elfN(note_ptlwpinfo)(void *arg, struct sbuf *sb, size_t *sizep)
 		if (td->td_si.si_signo != 0) {
 			pl.pl_event = PL_EVENT_SIGNAL;
 			pl.pl_flags |= PL_FLAG_SI;
-			pl.pl_siginfo = td->td_si;
+			siginfo_to_siginfo_native(&td->td_si, &pl.pl_siginfo);
 		}
 		strcpy(pl.pl_tdname, td->td_name);
 		/* XXX TODO: supply more information in struct ptrace_lwpinfo*/

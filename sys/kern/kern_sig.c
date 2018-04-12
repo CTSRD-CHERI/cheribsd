@@ -272,10 +272,6 @@ ksiginfo_alloc(int wait)
 void
 ksiginfo_free(ksiginfo_t *ksi)
 {
-#ifdef COMPAT_CHERIABI
-	if (ksi->ksi_flags & KSI_CHERI)
-		cheriabi_free_sival(&ksi->ksi_info.si_value);
-#endif
 	uma_zfree(ksiginfo_zone, ksi);
 }
 
@@ -283,14 +279,30 @@ static __inline int
 ksiginfo_tryfree(ksiginfo_t *ksi)
 {
 	if (!(ksi->ksi_flags & KSI_EXT)) {
-#ifdef COMPAT_CHERIABI
-		if (ksi->ksi_flags & KSI_CHERI)
-			cheriabi_free_sival(&ksi->ksi_info.si_value);
-#endif
 		uma_zfree(ksiginfo_zone, ksi);
 		return (1);
 	}
 	return (0);
+}
+
+void
+siginfo_to_siginfo_native(const _siginfo_t *si,
+    struct siginfo_native *si_n)
+{
+
+#if !__has_feature(capabilities)
+	memcpy(si_n, si, sizeof(*si_n));
+#else
+	si_n->si_signo = si->si_signo;
+	si_n->si_errno = si->si_errno;
+	si_n->si_code = si->si_code;
+	si_n->si_pid = si->si_pid;
+	si_n->si_uid = si->si_uid;
+	si_n->si_status = si->si_status;
+	si_n->si_addr = (void *)(uintptr_t)si->si_addr;
+	si_n->si_value.sival_ptr = (void *)(intcap_t)si->si_value.sival_ptr;
+	memcpy(&si_n->_reason, &si->_reason, sizeof(si_n->_reason));
+#endif
 }
 
 void
@@ -1245,6 +1257,7 @@ sys_sigtimedwait(struct thread *td, struct sigtimedwait_args *uap)
 {
 	struct timespec ts;
 	struct timespec *timeout;
+	struct siginfo_native si_n;
 	sigset_t set;
 	ksiginfo_t ksi;
 	int error;
@@ -1266,8 +1279,10 @@ sys_sigtimedwait(struct thread *td, struct sigtimedwait_args *uap)
 	if (error)
 		return (error);
 
-	if (uap->info)
-		error = copyout(&ksi.ksi_info, uap->info, sizeof(siginfo_t));
+	if (uap->info) {
+		siginfo_to_siginfo_native(&ksi.ksi_info, &si_n);
+		error = copyout(&si_n, uap->info, sizeof(si_n));
+	}
 
 	if (error == 0)
 		td->td_retval[0] = ksi.ksi_signo;
@@ -1278,6 +1293,7 @@ int
 sys_sigwaitinfo(struct thread *td, struct sigwaitinfo_args *uap)
 {
 	ksiginfo_t ksi;
+	struct siginfo_native si_n;
 	sigset_t set;
 	int error;
 
@@ -1289,8 +1305,10 @@ sys_sigwaitinfo(struct thread *td, struct sigwaitinfo_args *uap)
 	if (error)
 		return (error);
 
-	if (uap->info)
-		error = copyout(&ksi.ksi_info, uap->info, sizeof(siginfo_t));
+	if (uap->info) {
+		siginfo_to_siginfo_native(&ksi.ksi_info, &si_n);
+		error = copyout(&si_n, uap->info, sizeof(si_n));
+	}
 
 	if (error == 0)
 		td->td_retval[0] = ksi.ksi_signo;
@@ -1298,7 +1316,7 @@ sys_sigwaitinfo(struct thread *td, struct sigwaitinfo_args *uap)
 }
 
 static void
-proc_td_siginfo_capture(struct thread *td, siginfo_t *si)
+proc_td_siginfo_capture(struct thread *td, _siginfo_t *si)
 {
 	struct thread *thr;
 
@@ -1924,15 +1942,15 @@ struct sigqueue_args {
 int
 sys_sigqueue(struct thread *td, struct sigqueue_args *uap)
 {
-	union sigval sv;
+	ksigval_union sv;
 
-	sv.sival_ptr = uap->value;
+	sv.sival_ptr = (void * __capability)(intcap_t)uap->value;
 
 	return (kern_sigqueue(td, uap->pid, uap->signum, &sv, 0));
 }
 
 int
-kern_sigqueue(struct thread *td, pid_t pid, int signum, union sigval *value,
+kern_sigqueue(struct thread *td, pid_t pid, int signum, ksigval_union *value,
     int flags)
 {
 	ksiginfo_t ksi;
@@ -2149,7 +2167,7 @@ pksignal(struct proc *p, int sig, ksiginfo_t *ksi)
 
 /* Utility function for finding a thread to send signal event to. */
 int
-sigev_findtd(struct proc *p ,struct sigevent *sigev, struct thread **ttd)
+sigev_findtd(struct proc *p, ksigevent_t *sigev, struct thread **ttd)
 {
 	struct thread *td;
 

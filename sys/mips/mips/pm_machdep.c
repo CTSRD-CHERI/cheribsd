@@ -249,10 +249,10 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		/* sf.sf_ahu.sf_action = (__siginfohandler_t *)catcher; */
 
 		/* fill siginfo structure */
-		sf.sf_si = ksi->ksi_info;
+		siginfo_to_siginfo_native(&ksi->ksi_info, &sf.sf_si);
 		sf.sf_si.si_signo = sig;
 		sf.sf_si.si_code = ksi->ksi_code;
-		sf.sf_si.si_addr = (void*)(intptr_t)regs->badvaddr;
+		sf.sf_si.si_addr = (void *)(uintptr_t)regs->badvaddr;
 	} else {
 		/* Old FreeBSD-style arguments. */
 		regs->a1 = ksi->ksi_code;

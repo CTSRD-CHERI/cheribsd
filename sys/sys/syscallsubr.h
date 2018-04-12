@@ -46,7 +46,6 @@ struct image_args;
 struct in_addr;
 struct in6_addr;
 struct jail;
-struct kevent;
 struct kevent_copyops;
 struct kld_file_stat;
 struct ksiginfo;
@@ -426,7 +425,7 @@ int	kern_sigsuspend(struct thread *td, sigset_t mask);
 int	kern_sigtimedwait(struct thread *td, sigset_t waitset,
 	    struct ksiginfo *ksi, struct timespec *timeout);
 int	kern_sigqueue(struct thread *td, pid_t pid, int signum,
-	    union sigval *value, int flags);
+	    ksigval_union *value, int flags);
 int	kern_socket(struct thread *td, int domain, int type, int protocol);
 int	kern_statat(struct thread *td, int flag, int fd,
 	    const char * __capability path,
@@ -442,7 +441,7 @@ int	kern_sysctl(struct thread *td, int * __capability uname, u_int namelen,
 	    void * __capability old, size_t * __capability oldlenp,
 	    void * __capability new, size_t newlen, int flags);
 int	kern_ktimer_create(struct thread *td, clockid_t clock_id,
-	    struct sigevent *evp, int *timerid, int preset_id);
+	    ksigevent_t *evp, int *timerid, int preset_id);
 int	kern_ktimer_delete(struct thread *, int);
 int	kern_ktimer_settime(struct thread *td, int timer_id, int flags,
 	    struct itimerspec *val, struct itimerspec *oval);
@@ -477,7 +476,7 @@ int	kern_wait(struct thread *td, pid_t pid, int *status, int options,
 int	kern_wait4(struct thread *td, int pid, int * __capability status,
 	    int options, struct rusage * __capability rusage);
 int	kern_wait6(struct thread *td, enum idtype idtype, id_t id, int *status,
-	    int options, struct __wrusage *wrup, siginfo_t *sip);
+	    int options, struct __wrusage *wrup, _siginfo_t *sip);
 int	kern_writev(struct thread *td, int fd, struct uio *auio);
 int	kern_socketpair(struct thread *td, int domain, int type, int protocol,
 	    int *rsv);

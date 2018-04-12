@@ -267,26 +267,20 @@ int
 cheriabi_ktimer_create(struct thread *td,
     struct cheriabi_ktimer_create_args *uap)
 {
-	struct sigevent_c ev_c;
-	struct sigevent ev, *evp;
+	struct sigevent_c ev, *evp;
 	int error, id;
 
 	if (uap->evp == NULL) {
 		evp = NULL;
 	} else {
+		error = copyincap_c(uap->evp, &ev, sizeof(ev));
+		if (error != 0)
+			return (error);
 		evp = &ev;
-		error = copyincap_c(uap->evp, &ev_c, sizeof(ev_c));
-		if (error != 0)
-			return (error);
-		error = convert_sigevent_c(&ev_c, &ev);
-		if (error != 0)
-			return (error);
 	}
 	error = kern_ktimer_create(td, uap->clock_id, evp, &id, -1);
-	if (error != 0 && evp != NULL) {
-		cheriabi_free_sival(&evp->sigev_value);
+	if (error != 0)
 		return (error);
-	}
 	error = copyout_c(&id, uap->timerid, sizeof(int));
 	if (error != 0)
 		kern_ktimer_delete(td, id);

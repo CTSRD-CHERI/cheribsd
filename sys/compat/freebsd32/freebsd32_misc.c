@@ -130,8 +130,8 @@ CTASSERT(sizeof(struct freebsd11_stat32) == 96);
 #endif
 CTASSERT(sizeof(struct sigaction32) == 24);
 
-static int freebsd32_kevent_copyout(void *arg, struct kevent *kevp, int count);
-static int freebsd32_kevent_copyin(void *arg, struct kevent *kevp, int count);
+static int freebsd32_kevent_copyout(void *arg, kkevent_t *kevp, int count);
+static int freebsd32_kevent_copyin(void *arg, kkevent_t *kevp, int count);
 static int freebsd32_user_clock_nanosleep(struct thread *td, clockid_t clock_id,
     int flags, const struct timespec32 *ua_rqtp, struct timespec32 *ua_rmtp);
 
@@ -186,7 +186,7 @@ freebsd32_wait6(struct thread *td, struct freebsd32_wait6_args *uap)
 	struct wrusage32 wru32;
 	struct __wrusage wru, *wrup;
 	struct siginfo32 si32;
-	struct __siginfo si, *sip;
+	_siginfo_t si, *sip;
 	int error, status;
 
 	if (uap->wrusage != NULL)
@@ -622,7 +622,7 @@ freebsd32_pselect(struct thread *td, struct freebsd32_pselect_args *uap)
  * Copy 'count' items into the destination list pointed to by uap->eventlist.
  */
 static int
-freebsd32_kevent_copyout(void *arg, struct kevent *kevp, int count)
+freebsd32_kevent_copyout(void *arg, kkevent_t *kevp, int count)
 {
 	struct freebsd32_kevent_args *uap;
 	struct kevent32	ks32[KQ_NEVENTS];
@@ -666,7 +666,7 @@ freebsd32_kevent_copyout(void *arg, struct kevent *kevp, int count)
  * Copy 'count' items from the list pointed to by uap->changelist.
  */
 static int
-freebsd32_kevent_copyin(void *arg, struct kevent *kevp, int count)
+freebsd32_kevent_copyin(void *arg, kkevent_t *kevp, int count)
 {
 	struct freebsd32_kevent_args *uap;
 	struct kevent32	ks32[KQ_NEVENTS];
@@ -742,7 +742,7 @@ struct kevent32_freebsd11 {
 };
 
 static int
-freebsd32_kevent11_copyout(void *arg, struct kevent *kevp, int count)
+freebsd32_kevent11_copyout(void *arg, kkevent_t *kevp, int count)
 {
 	struct freebsd11_freebsd32_kevent_args *uap;
 	struct kevent32_freebsd11 ks32[KQ_NEVENTS];
@@ -769,7 +769,7 @@ freebsd32_kevent11_copyout(void *arg, struct kevent *kevp, int count)
  * Copy 'count' items from the list pointed to by uap->changelist.
  */
 static int
-freebsd32_kevent11_copyin(void *arg, struct kevent *kevp, int count)
+freebsd32_kevent11_copyin(void *arg, kkevent_t *kevp, int count)
 {
 	struct freebsd11_freebsd32_kevent_args *uap;
 	struct kevent32_freebsd11 ks32[KQ_NEVENTS];
@@ -2657,7 +2657,7 @@ int freebsd32_ktimer_create(struct thread *td,
     struct freebsd32_ktimer_create_args *uap)
 {
 	struct sigevent32 ev32;
-	struct sigevent ev, *evp;
+	ksigevent_t ev, *evp;
 	int error, id;
 
 	if (uap->evp == NULL) {
@@ -2786,7 +2786,7 @@ freebsd32_thr_suspend(struct thread *td, struct freebsd32_thr_suspend_args *uap)
 }
 
 void
-siginfo_to_siginfo32(const siginfo_t *src, struct siginfo32 *dst)
+siginfo_to_siginfo32(const _siginfo_t *src, struct siginfo32 *dst)
 {
 	bzero(dst, sizeof(*dst));
 	dst->si_signo = src->si_signo;
@@ -2811,7 +2811,7 @@ struct freebsd32_sigqueue_args {
 int
 freebsd32_sigqueue(struct thread *td, struct freebsd32_sigqueue_args *uap)
 {
-	union sigval sv;
+	ksigval_union sv;
 
 	/*
 	 * On 32-bit ABIs, sival_int and sival_ptr are the same.
@@ -3321,7 +3321,7 @@ freebsd32_posix_fadvise(struct thread *td,
 }
 
 int
-convert_sigevent32(struct sigevent32 *sig32, struct sigevent *sig)
+convert_sigevent32(struct sigevent32 *sig32, ksigevent_t *sig)
 {
 
 	CP(*sig32, *sig, sigev_notify);
@@ -3333,12 +3333,14 @@ convert_sigevent32(struct sigevent32 *sig32, struct sigevent *sig)
 		/* FALLTHROUGH */
 	case SIGEV_SIGNAL:
 		CP(*sig32, *sig, sigev_signo);
-		PTRIN_CP(*sig32, *sig, sigev_value.sival_ptr);
+		sig->sigev_value.sival_ptr =
+		    (void * __capability)(intcap_t)sig32->sigev_value.sival_ptr;
 		break;
 	case SIGEV_KEVENT:
 		CP(*sig32, *sig, sigev_notify_kqueue);
 		CP(*sig32, *sig, sigev_notify_kevent_flags);
-		PTRIN_CP(*sig32, *sig, sigev_value.sival_ptr);
+		sig->sigev_value.sival_ptr =
+		    (void * __capability)(intcap_t)sig32->sigev_value.sival_ptr;
 		break;
 	default:
 		return (EINVAL);

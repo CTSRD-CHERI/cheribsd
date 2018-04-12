@@ -134,7 +134,6 @@ cheriabi_sigtimedwait(struct thread *td, struct cheriabi_sigtimedwait_args *uap)
 	struct timespec *timeout;
 	sigset_t set;
 	ksiginfo_t ksi;
-	struct siginfo_c si_c;
 	int error;
 
 	if (uap->timeout) {
@@ -153,10 +152,9 @@ cheriabi_sigtimedwait(struct thread *td, struct cheriabi_sigtimedwait_args *uap)
 	if (error)
 		return (error);
 
-	if (uap->info != NULL) {
-		siginfo_to_siginfo_c(&ksi.ksi_info, &si_c);
-		error = copyout_c(&si_c, uap->info, sizeof(struct siginfo_c));
-	}
+	if (uap->info != NULL)
+		error = copyout_c(&ksi.ksi_info, uap->info,
+		    sizeof(struct siginfo_c));
 
 	if (error == 0)
 		td->td_retval[0] = ksi.ksi_signo;
@@ -167,7 +165,6 @@ int
 cheriabi_sigwaitinfo(struct thread *td, struct cheriabi_sigwaitinfo_args *uap)
 {
 	ksiginfo_t ksi;
-	struct siginfo_c si_c;
 	sigset_t set;
 	int error;
 
@@ -179,10 +176,9 @@ cheriabi_sigwaitinfo(struct thread *td, struct cheriabi_sigwaitinfo_args *uap)
 	if (error)
 		return (error);
 
-	if (uap->info) {
-		siginfo_to_siginfo_c(&ksi.ksi_info, &si_c);
-		error = copyout_c(&si_c, uap->info, sizeof(struct siginfo_c));
-	}
+	if (uap->info != NULL)
+		error = copyout_c(&ksi.ksi_info, uap->info,
+		    sizeof(struct siginfo_c));
 	if (error == 0)
 		td->td_retval[0] = ksi.ksi_signo;
 	return (error);
@@ -238,14 +234,12 @@ int
 cheriabi_sigqueue(struct thread *td, struct cheriabi_sigqueue_args *uap)
 {
 	union sigval_c	value_union;
-	union sigval	sv;
+	ksigval_union	sv;
 	int		flags = 0, tag;
 
 	value_union.sival_ptr = uap->value;
 	if (uap->pid == td->td_proc->p_pid) {
-		sv.sival_ptr = malloc(sizeof(value_union), M_TEMP, M_WAITOK);
-		*((void * __capability *)sv.sival_ptr) = value_union.sival_ptr;
-		flags = KSI_CHERI;
+		sv.sival_ptr = value_union.sival_ptr;
 	} else {
 		/*
 		 * Cowardly refuse to send capabilities to other

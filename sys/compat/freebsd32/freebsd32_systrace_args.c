@@ -1482,7 +1482,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 316: {
 		struct freebsd32_aio_cancel_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->aiocbp; /* struct aiocb * */
+		uarg[1] = (intptr_t) p->aiocbp; /* struct aiocb32 * */
 		*n_args = 2;
 		break;
 	}
@@ -1628,7 +1628,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 345: {
 		struct freebsd32_sigtimedwait_args *p = params;
 		uarg[0] = (intptr_t) p->set; /* const sigset_t * */
-		uarg[1] = (intptr_t) p->info; /* siginfo_t * */
+		uarg[1] = (intptr_t) p->info; /* struct siginfo32 * */
 		uarg[2] = (intptr_t) p->timeout; /* const struct timespec * */
 		*n_args = 3;
 		break;
@@ -1637,7 +1637,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 346: {
 		struct freebsd32_sigwaitinfo_args *p = params;
 		uarg[0] = (intptr_t) p->set; /* const sigset_t * */
-		uarg[1] = (intptr_t) p->info; /* siginfo_t * */
+		uarg[1] = (intptr_t) p->info; /* struct siginfo32 * */
 		*n_args = 2;
 		break;
 	}
@@ -2967,7 +2967,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		uarg[4] = (intptr_t) p->status; /* int * */
 		iarg[5] = p->options; /* int */
 		uarg[6] = (intptr_t) p->wrusage; /* struct wrusage32 * */
-		uarg[7] = (intptr_t) p->info; /* siginfo_t * */
+		uarg[7] = (intptr_t) p->info; /* struct siginfo32 * */
 		*n_args = 8;
 		break;
 	}
@@ -3004,7 +3004,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		uarg[3] = (intptr_t) p->status; /* int * */
 		iarg[4] = p->options; /* int */
 		uarg[5] = (intptr_t) p->wrusage; /* struct wrusage32 * */
-		uarg[6] = (intptr_t) p->info; /* siginfo_t * */
+		uarg[6] = (intptr_t) p->info; /* struct siginfo32 * */
 		*n_args = 7;
 		break;
 	}
@@ -5628,7 +5628,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct aiocb *";
+			p = "userland struct aiocb32 *";
 			break;
 		default:
 			break;
@@ -5843,7 +5843,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const sigset_t *";
 			break;
 		case 1:
-			p = "userland siginfo_t *";
+			p = "userland struct siginfo32 *";
 			break;
 		case 2:
 			p = "userland const struct timespec *";
@@ -5859,7 +5859,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const sigset_t *";
 			break;
 		case 1:
-			p = "userland siginfo_t *";
+			p = "userland struct siginfo32 *";
 			break;
 		default:
 			break;
@@ -8238,7 +8238,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland struct wrusage32 *";
 			break;
 		case 7:
-			p = "userland siginfo_t *";
+			p = "userland struct siginfo32 *";
 			break;
 		default:
 			break;
@@ -8314,7 +8314,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland struct wrusage32 *";
 			break;
 		case 6:
-			p = "userland siginfo_t *";
+			p = "userland struct siginfo32 *";
 			break;
 		default:
 			break;

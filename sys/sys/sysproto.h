@@ -652,7 +652,7 @@ struct clock_getres_args {
 };
 struct ktimer_create_args {
 	char clock_id_l_[PADL_(clockid_t)]; clockid_t clock_id; char clock_id_r_[PADR_(clockid_t)];
-	char evp_l_[PADL_(struct sigevent *)]; struct sigevent * evp; char evp_r_[PADR_(struct sigevent *)];
+	char evp_l_[PADL_(struct sigevent_native *)]; struct sigevent_native * evp; char evp_r_[PADR_(struct sigevent_native *)];
 	char timerid_l_[PADL_(int *)]; int * timerid; char timerid_r_[PADR_(int *)];
 };
 struct ktimer_delete_args {
@@ -715,14 +715,14 @@ struct lchown_args {
 	char gid_l_[PADL_(int)]; int gid; char gid_r_[PADR_(int)];
 };
 struct aio_read_args {
-	char aiocbp_l_[PADL_(struct aiocb *)]; struct aiocb * aiocbp; char aiocbp_r_[PADR_(struct aiocb *)];
+	char aiocbp_l_[PADL_(struct aiocb_native *)]; struct aiocb_native * aiocbp; char aiocbp_r_[PADR_(struct aiocb_native *)];
 };
 struct aio_write_args {
-	char aiocbp_l_[PADL_(struct aiocb *)]; struct aiocb * aiocbp; char aiocbp_r_[PADR_(struct aiocb *)];
+	char aiocbp_l_[PADL_(struct aiocb_native *)]; struct aiocb_native * aiocbp; char aiocbp_r_[PADR_(struct aiocb_native *)];
 };
 struct lio_listio_args {
 	char mode_l_[PADL_(int)]; int mode; char mode_r_[PADR_(int)];
-	char acb_list_l_[PADL_(struct aiocb *const *)]; struct aiocb *const * acb_list; char acb_list_r_[PADR_(struct aiocb *const *)];
+	char acb_list_l_[PADL_(struct aiocb_native *const *)]; struct aiocb_native *const * acb_list; char acb_list_r_[PADR_(struct aiocb_native *const *)];
 	char nent_l_[PADL_(int)]; int nent; char nent_r_[PADR_(int)];
 	char sig_l_[PADL_(struct sigevent *)]; struct sigevent * sig; char sig_r_[PADR_(struct sigevent *)];
 };
@@ -802,19 +802,19 @@ struct setresgid_args {
 	char sgid_l_[PADL_(gid_t)]; gid_t sgid; char sgid_r_[PADR_(gid_t)];
 };
 struct aio_return_args {
-	char aiocbp_l_[PADL_(struct aiocb *)]; struct aiocb * aiocbp; char aiocbp_r_[PADR_(struct aiocb *)];
+	char aiocbp_l_[PADL_(struct aiocb_native *)]; struct aiocb_native * aiocbp; char aiocbp_r_[PADR_(struct aiocb_native *)];
 };
 struct aio_suspend_args {
-	char aiocbp_l_[PADL_(struct aiocb *const *)]; struct aiocb *const * aiocbp; char aiocbp_r_[PADR_(struct aiocb *const *)];
+	char aiocbp_l_[PADL_(struct aiocb_native *const *)]; struct aiocb_native *const * aiocbp; char aiocbp_r_[PADR_(struct aiocb_native *const *)];
 	char nent_l_[PADL_(int)]; int nent; char nent_r_[PADR_(int)];
 	char timeout_l_[PADL_(const struct timespec *)]; const struct timespec * timeout; char timeout_r_[PADR_(const struct timespec *)];
 };
 struct aio_cancel_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char aiocbp_l_[PADL_(struct aiocb *)]; struct aiocb * aiocbp; char aiocbp_r_[PADR_(struct aiocb *)];
+	char aiocbp_l_[PADL_(struct aiocb_native *)]; struct aiocb_native * aiocbp; char aiocbp_r_[PADR_(struct aiocb_native *)];
 };
 struct aio_error_args {
-	char aiocbp_l_[PADL_(struct aiocb *)]; struct aiocb * aiocbp; char aiocbp_r_[PADR_(struct aiocb *)];
+	char aiocbp_l_[PADL_(struct aiocb_native *)]; struct aiocb_native * aiocbp; char aiocbp_r_[PADR_(struct aiocb_native *)];
 };
 struct yield_args {
 	register_t dummy;
@@ -890,12 +890,12 @@ struct sigpending_args {
 };
 struct sigtimedwait_args {
 	char set_l_[PADL_(const sigset_t *)]; const sigset_t * set; char set_r_[PADR_(const sigset_t *)];
-	char info_l_[PADL_(siginfo_t *)]; siginfo_t * info; char info_r_[PADR_(siginfo_t *)];
+	char info_l_[PADL_(struct siginfo_native *)]; struct siginfo_native * info; char info_r_[PADR_(struct siginfo_native *)];
 	char timeout_l_[PADL_(const struct timespec *)]; const struct timespec * timeout; char timeout_r_[PADR_(const struct timespec *)];
 };
 struct sigwaitinfo_args {
 	char set_l_[PADL_(const sigset_t *)]; const sigset_t * set; char set_r_[PADR_(const sigset_t *)];
-	char info_l_[PADL_(siginfo_t *)]; siginfo_t * info; char info_r_[PADR_(siginfo_t *)];
+	char info_l_[PADL_(struct siginfo_native *)]; struct siginfo_native * info; char info_r_[PADR_(struct siginfo_native *)];
 };
 struct __acl_get_file_args {
 	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
@@ -962,7 +962,7 @@ struct extattr_delete_file_args {
 	char attrname_l_[PADL_(const char *)]; const char * attrname; char attrname_r_[PADR_(const char *)];
 };
 struct aio_waitcomplete_args {
-	char aiocbp_l_[PADL_(struct aiocb **)]; struct aiocb ** aiocbp; char aiocbp_r_[PADR_(struct aiocb **)];
+	char aiocbp_l_[PADL_(struct aiocb_native **)]; struct aiocb_native ** aiocbp; char aiocbp_r_[PADR_(struct aiocb_native **)];
 	char timeout_l_[PADL_(struct timespec *)]; struct timespec * timeout; char timeout_r_[PADR_(struct timespec *)];
 };
 struct getresuid_args {
@@ -1323,7 +1323,7 @@ struct thr_set_name_args {
 };
 struct aio_fsync_args {
 	char op_l_[PADL_(int)]; int op; char op_r_[PADR_(int)];
-	char aiocbp_l_[PADL_(struct aiocb *)]; struct aiocb * aiocbp; char aiocbp_r_[PADR_(struct aiocb *)];
+	char aiocbp_l_[PADL_(struct aiocb_native *)]; struct aiocb_native * aiocbp; char aiocbp_r_[PADR_(struct aiocb_native *)];
 };
 struct rtprio_thread_args {
 	char function_l_[PADL_(int)]; int function; char function_r_[PADR_(int)];
@@ -1636,7 +1636,7 @@ struct wait6_args {
 	char status_l_[PADL_(int *)]; int * status; char status_r_[PADR_(int *)];
 	char options_l_[PADL_(int)]; int options; char options_r_[PADR_(int)];
 	char wrusage_l_[PADL_(struct __wrusage *)]; struct __wrusage * wrusage; char wrusage_r_[PADR_(struct __wrusage *)];
-	char info_l_[PADL_(siginfo_t *)]; siginfo_t * info; char info_r_[PADR_(siginfo_t *)];
+	char info_l_[PADL_(struct siginfo_native *)]; struct siginfo_native * info; char info_r_[PADR_(struct siginfo_native *)];
 };
 struct cap_rights_limit_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
@@ -1689,7 +1689,7 @@ struct pipe2_args {
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct aio_mlock_args {
-	char aiocbp_l_[PADL_(struct aiocb *)]; struct aiocb * aiocbp; char aiocbp_r_[PADR_(struct aiocb *)];
+	char aiocbp_l_[PADL_(struct aiocb_native *)]; struct aiocb_native * aiocbp; char aiocbp_r_[PADR_(struct aiocb_native *)];
 };
 struct procctl_args {
 	char idtype_l_[PADL_(idtype_t)]; idtype_t idtype; char idtype_r_[PADR_(idtype_t)];
@@ -1771,9 +1771,9 @@ struct mknodat_args {
 };
 struct kevent_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char changelist_l_[PADL_(struct kevent *)]; struct kevent * changelist; char changelist_r_[PADR_(struct kevent *)];
+	char changelist_l_[PADL_(struct kevent_native *)]; struct kevent_native * changelist; char changelist_r_[PADR_(struct kevent_native *)];
 	char nchanges_l_[PADL_(int)]; int nchanges; char nchanges_r_[PADR_(int)];
-	char eventlist_l_[PADL_(struct kevent *)]; struct kevent * eventlist; char eventlist_r_[PADR_(struct kevent *)];
+	char eventlist_l_[PADL_(struct kevent_native *)]; struct kevent_native * eventlist; char eventlist_r_[PADR_(struct kevent_native *)];
 	char nevents_l_[PADL_(int)]; int nevents; char nevents_r_[PADR_(int)];
 	char timeout_l_[PADL_(const struct timespec *)]; const struct timespec * timeout; char timeout_r_[PADR_(const struct timespec *)];
 };

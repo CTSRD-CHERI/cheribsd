@@ -74,16 +74,7 @@
 
 #endif
 
-/*
- * Private members for aiocb -- don't access
- * directly.
- */
-struct __aiocb_private {
-	long	status;
-	long	error;
-	void	*kernelinfo;
-};
-
+#ifndef _KERNEL
 /*
  * I/O control block
  */
@@ -96,11 +87,54 @@ typedef struct aiocb {
 	void	*__spare2__;
 	int	aio_lio_opcode;		/* LIO opcode */
 	int	aio_reqprio;		/* Request priority -- ignored */
-	struct	__aiocb_private	_aiocb_private;
+	struct {
+		long	status;
+		long	error;
+		void	*kernelinfo;
+	} _aiocb_private;
 	struct	sigevent aio_sigevent;	/* Signal to deliver */
 } aiocb_t;
+#endif
 
 #ifdef _KERNEL
+
+struct aiocb_native {
+	int	aio_fildes;		/* File descriptor */
+	off_t	aio_offset;		/* File offset for I/O */
+	volatile void *aio_buf;         /* I/O buffer in process space */
+	size_t	aio_nbytes;		/* Number of bytes for I/O */
+	int	__spare__[2];
+	void	*__spare2__;
+	int	aio_lio_opcode;		/* LIO opcode */
+	int	aio_reqprio;		/* Request priority -- ignored */
+	struct {
+		long	status;
+		long	error;
+		void	*kernelinfo;
+	} _aiocb_private;
+	struct sigevent_native aio_sigevent;	/* Signal to deliver */
+};
+#if __has_feature(capabilities)
+struct aiocb_c {
+	int	aio_fildes;		/* File descriptor */
+	off_t	aio_offset;		/* File offset for I/O */
+	volatile void * __capability aio_buf; /* I/O buffer in process space */
+	size_t	aio_nbytes;		/* Number of bytes for I/O */
+	int	__spare__[2];
+	void * __capability __spare2__;
+	int	aio_lio_opcode;		/* LIO opcode */
+	int	aio_reqprio;		/* Request priority -- ignored */
+	struct {
+		long	status;
+		long	error;
+		void * __capability kernelinfo;
+	} _aiocb_private;
+	struct sigevent_c aio_sigevent;	/* Signal to deliver */
+};
+typedef	struct aiocb_c		kaiocb_t;
+#else
+typedef	struct aiocb_native	kaiocb_t;
+#endif
 
 typedef void aio_cancel_fn_t(struct kaiocb *);
 typedef void aio_handle_fn_t(struct kaiocb *);
@@ -127,14 +161,10 @@ struct kaiocb {
 	struct	ucred *cred;		/* (*) active credential when created */
 	struct	file *fd_file;		/* (*) pointer to file structure */
 	struct	aioliojob *lio;		/* (*) optional lio job */
-	struct	aiocb * __capability ujob; /* (*) pointer to userspace aiocb */
-#if __has_feature(capabilities)
-	__intcap_t	ujobptr;
-#else
-	intptr_t	ujobptr;
-#endif
+	void * __capability ujob;	/* (*) pointer to userspace aiocb */
+	intcap_t	ujobptr;
 	struct	knlist klist;		/* (a) list of knotes */
-	struct	aiocb uaiocb;		/* (*) copy of user I/O control block */
+	kaiocb_t uaiocb;		/* (*) copy of user I/O control block */
 	ksiginfo_t ksi;			/* (a) realtime signal info */
 	uint64_t seqno;			/* (*) job number */
 	aio_cancel_fn_t *cancel_fn;	/* (a) backend cancel function */

@@ -138,8 +138,8 @@ CTASSERT(sizeof(struct kevent32) == 20);
 CTASSERT(sizeof(struct iovec32) == 8);
 #endif
 
-static int cheriabi_kevent_copyout(void *arg, struct kevent *kevp, int count);
-static int cheriabi_kevent_copyin(void *arg, struct kevent *kevp, int count);
+static int cheriabi_kevent_copyout(void *arg, kkevent_t *kevp, int count);
+static int cheriabi_kevent_copyin(void *arg, kkevent_t *kevp, int count);
 
 int
 cheriabi_syscall(struct thread *td, struct cheriabi_syscall_args *uap)
@@ -170,8 +170,7 @@ int
 cheriabi_wait6(struct thread *td, struct cheriabi_wait6_args *uap)
 {
 	struct __wrusage wru, *wrup;
-	struct siginfo_c si_c;
-	struct __siginfo si, *sip;
+	struct siginfo_c si, *sip;
 	int error, status;
 
 	if (uap->wrusage != NULL)
@@ -192,8 +191,7 @@ cheriabi_wait6(struct thread *td, struct cheriabi_wait6_args *uap)
 	if (uap->wrusage != NULL && error == 0)
 		error = copyout_c(&wru, uap->wrusage, sizeof(wru));
 	if (uap->info != NULL && error == 0) {
-		siginfo_to_siginfo_c (&si, &si_c);
-		error = copyout_c(&si_c, uap->info, sizeof(si_c));
+		error = copyout_c(&si, uap->info, sizeof(si));
 	}
 	return (error);
 }
@@ -346,100 +344,39 @@ cheriabi_fexecve(struct thread *td, struct cheriabi_fexecve_args *uap)
  * Copy 'count' items into the destination list pointed to by uap->eventlist.
  */
 static int
-cheriabi_kevent_copyout(void *arg, struct kevent *kevp, int count)
+cheriabi_kevent_copyout(void *arg, kkevent_t *kevp, int count)
 {
 	struct cheriabi_kevent_args *uap;
-	struct kevent_c	ks_c[KQ_NEVENTS];
-	int i, j, error = 0;
+	int error;
 
 	KASSERT(count <= KQ_NEVENTS, ("count (%d) > KQ_NEVENTS", count));
 	uap = (struct cheriabi_kevent_args *)arg;
 
-	for (i = 0; i < count; i++) {
-		CP(kevp[i], ks_c[i], filter);
-		CP(kevp[i], ks_c[i], flags);
-		CP(kevp[i], ks_c[i], fflags);
-		CP(kevp[i], ks_c[i], data);
-		for (j = 0; j < nitems(kevp->ext); j++)
-			CP(kevp[i], ks_c[i], ext[j]);
-
-		/*
-		 * Retrieve the ident and udata capabilities stashed by
-		 * cheriabi_kevent_copyin().
-		 */
-		void * __capability * udata = kevp[i].udata;
-		ks_c[i].ident = (__intcap_t)udata[0];
-		ks_c[i].udata = udata[1];
-	}
-	error = copyoutcap_c(&ks_c[0], uap->eventlist, count * sizeof(*ks_c));
+	error = copyoutcap_c(
+	    (__cheri_tocap struct kevent_c * __capability)kevp,
+	    uap->eventlist, count * sizeof(*kevp));
 	if (error == 0)
 		uap->eventlist += count;
 	return (error);
-}
-
-void *
-cheriabi_build_kevent_udata(__intcap_t ident, void * __capability udata)
-{
-	void * __capability * newudata;
-
-	newudata = malloc(2*sizeof(void * __capability), M_KQUEUE, M_WAITOK);
-	newudata[0] = (void * __capability)ident;
-	newudata[1] = udata;
-
-	return (newudata);
 }
 
 /*
  * Copy 'count' items from the list pointed to by uap->changelist.
  */
 static int
-cheriabi_kevent_copyin(void *arg, struct kevent *kevp, int count)
+cheriabi_kevent_copyin(void *arg, kkevent_t *kevp, int count)
 {
 	struct cheriabi_kevent_args *uap;
-	struct kevent_c	ks_c[KQ_NEVENTS];
-	int error, i, j;
+	int error;
 
 	KASSERT(count <= KQ_NEVENTS, ("count (%d) > KQ_NEVENTS", count));
 	uap = (struct cheriabi_kevent_args *)arg;
 
-	error = copyincap_c(uap->changelist, &ks_c[0], count * sizeof(*ks_c));
-	if (error)
-		goto done;
-	uap->changelist += count;
-
-	for (i = 0; i < count; i++) {
-		/*
-		 * XXX-BD: this is quite awkward.  ident could be anything.
-		 * If it's a capabilty, we'll hang on to it in udata.
-		 */
-		if (cheri_gettag((void * __capability)ks_c[i].ident)) {
-			if (!(cheri_getperm((void * __capability)ks_c[i].ident)
-			    | CHERI_PERM_GLOBAL))
-				return (EPROT);
-		}
-		kevp[i].ident = (uintptr_t)(__uintcap_t)ks_c[i].ident;
-		CP(ks_c[i], kevp[i], filter);
-		CP(ks_c[i], kevp[i], flags);
-		CP(ks_c[i], kevp[i], fflags);
-		CP(ks_c[i], kevp[i], data);
-		for (j = 0; j < nitems(kevp->ext); j++)
-			CP(ks_c[i], kevp[i], ext[j]);
-
-		if (ks_c[i].flags & EV_DELETE)
-			continue;
-
-		if (cheri_gettag(ks_c[i].udata)) {
-			if (!(cheri_getperm(ks_c[i].udata) & CHERI_PERM_GLOBAL))
-				return (EPROT);
-		}
-		/*
-		 * We stash the real ident and udata capabilities in
-		 * a malloced array in udata.
-		 */
-		kevp[i].udata = cheriabi_build_kevent_udata(ks_c[i].ident,
-		    ks_c[i].udata);
-	}
-done:
+	error = copyincap_c(uap->changelist,
+	    (__cheri_tocap struct kevent_c * __capability)kevp,
+	    count * sizeof(*kevp));
+	if (error == 0)
+		uap->changelist += count;
 	return (error);
 }
 
@@ -811,25 +748,6 @@ cheriabi_procctl(struct thread *td, struct cheriabi_procctl_args *uap)
 	return (user_procctl(td, uap->idtype, uap->id, uap->com, uap->data));
 }
 
-void
-siginfo_to_siginfo_c(const siginfo_t *src, struct siginfo_c *dst)
-{
-	bzero(dst, sizeof(*dst));
-	dst->si_signo = src->si_signo;
-	dst->si_errno = src->si_errno;
-	dst->si_code = src->si_code;
-	dst->si_pid = src->si_pid;
-	dst->si_uid = src->si_uid;
-	dst->si_status = src->si_status;
-	/*
-	 * XXX: should copy out something related to src->si_addr, but
-	 * what?  Presumably not a valid pointer to a faulting address.
-	 */
-	dst->si_value.sival_int = src->si_value.sival_int;
-	dst->si_timerid = src->si_timerid;
-	dst->si_overrun = src->si_overrun;
-}
-
 int
 cheriabi_nmount(struct thread *td,
     struct cheriabi_nmount_args /* {
@@ -1101,52 +1019,6 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	suword(vectp++, 0);
 
 	return ((register_t *)stack_base);
-}
-
-int
-convert_sigevent_c(const struct sigevent_c *sig_c, struct sigevent *sig)
-{
-
-	CP(*sig_c, *sig, sigev_notify);
-	switch (sig->sigev_notify) {
-	case SIGEV_NONE:
-		break;
-	case SIGEV_THREAD_ID:
-		CP(*sig_c, *sig, sigev_notify_thread_id);
-		/* FALLTHROUGH */
-	case SIGEV_SIGNAL:
-		CP(*sig_c, *sig, sigev_signo);
-		sig->sigev_value.sival_ptr = malloc(sizeof(sig_c->sigev_value),
-		    M_TEMP, M_WAITOK);
-		*((void * __capability *)sig->sigev_value.sival_ptr) =
-		    sig_c->sigev_value.sival_ptr;
-		break;
-	case SIGEV_KEVENT:
-		CP(*sig_c, *sig, sigev_notify_kqueue);
-		CP(*sig_c, *sig, sigev_notify_kevent_flags);
-		sig->sigev_value.sival_ptr = malloc(sizeof(sig_c->sigev_value),
-		    M_TEMP, M_WAITOK);
-		*((void * __capability *)sig->sigev_value.sival_ptr) = 
-		    sig_c->sigev_value.sival_ptr;
-		break;
-	default:
-		return (EINVAL);
-	}
-	return (0);
-}
-
-void * __capability
-cheriabi_extract_sival(union sigval *sival)
-{
-
-	return (*((void * __capability *)sival->sival_ptr));
-}
-
-void
-cheriabi_free_sival(union sigval *sival)
-{
-
-	free(sival->sival_ptr, M_TEMP);
 }
 
 #define	AUXARGS_ENTRY_CAP(pos, id, base, offset, len, perm)		\

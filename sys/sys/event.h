@@ -61,6 +61,7 @@
 	(kevp)->ext[3] = 0;			\
 } while(0)
 
+#ifndef _KERNEL
 struct kevent {
 	__uintptr_t	ident;		/* identifier for this event */
 	short		filter;		/* filter for event */
@@ -70,6 +71,31 @@ struct kevent {
 	void		*udata;		/* opaque user data identifier */
 	__uint64_t	ext[4];
 };
+#else /* _KERNEL */
+struct kevent_native {
+	__uintptr_t	ident;		/* identifier for this event */
+	short		filter;		/* filter for event */
+	unsigned short	flags;
+	unsigned int	fflags;
+	__int64_t	data;
+	void		*udata;		/* opaque user data identifier */
+	__uint64_t	ext[4];
+};
+#if __has_feature(capabilities)
+struct kevent_c {
+	__uintcap_t	ident;		/* identifier for this event */
+	short		filter;		/* filter for event */
+	unsigned short	flags;
+	unsigned int	fflags;
+	__int64_t	data;
+	void * __capability udata;	/* opaque user data identifier */
+	__uint64_t	ext[4];
+};
+typedef	struct kevent_c		kkevent_t;
+#else
+typedef	struct kevent_native	kkevent_t;
+#endif
+#endif /* _KERNEL */
 
 /* actions */
 #define EV_ADD		0x0001		/* add event to kq (implies enable) */
@@ -206,7 +232,7 @@ struct filterops {
 	int	(*f_attach)(struct knote *kn);
 	void	(*f_detach)(struct knote *kn);
 	int	(*f_event)(struct knote *kn, long hint);
-	void	(*f_touch)(struct knote *kn, struct kevent *kev, u_long type);
+	void	(*f_touch)(struct knote *kn, kkevent_t *kev, u_long type);
 };
 
 /*
@@ -224,7 +250,7 @@ struct knote {
 	struct			knlist *kn_knlist;	/* f_attach populated */
 	TAILQ_ENTRY(knote)	kn_tqe;
 	struct			kqueue *kn_kq;	/* which queue we are on */
-	struct 			kevent kn_kevent;
+	kkevent_t		kn_kevent;
 	void			*kn_hook;
 	int			kn_hookid;
 	int			kn_status;	/* protected by kq lock */
@@ -257,8 +283,8 @@ struct knote {
 };
 struct kevent_copyops {
 	void	*arg;
-	int	(*k_copyout)(void *arg, struct kevent *kevp, int count);
-	int	(*k_copyin)(void *arg, struct kevent *kevp, int count);
+	int	(*k_copyout)(void *arg, kkevent_t *kevp, int count);
+	int	(*k_copyin)(void *arg, kkevent_t *kevp, int count);
 	size_t	kevent_size;
 };
 
@@ -288,7 +314,7 @@ void	knlist_cleardel(struct knlist *knl, struct thread *td,
 #define knlist_delete(knl, td, islocked)			\
 	knlist_cleardel((knl), (td), (islocked), 1)
 void	knote_fdclose(struct thread *p, int fd);
-int 	kqfd_register(int fd, struct kevent *kev, struct thread *p,
+int 	kqfd_register(int fd, kkevent_t *kev, struct thread *p,
 	    int waitok);
 int	kqueue_add_filteropts(int filt, struct filterops *filtops);
 int	kqueue_del_filteropts(int filt);

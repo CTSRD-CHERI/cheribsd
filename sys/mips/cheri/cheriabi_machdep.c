@@ -615,18 +615,11 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		/* fill siginfo structure */
 		sf.sf_si.si_signo = sig;
 		sf.sf_si.si_code = ksi->ksi_code;
-		if (ksi->ksi_flags & KSI_CHERI)
-			sf.sf_si.si_value.sival_ptr =
-			    cheriabi_extract_sival(&ksi->ksi_info.si_value);
-		else
-			sf.sf_si.si_value.sival_int =
-			    ksi->ksi_info.si_value.sival_int;
+		sf.sf_si.si_value.sival_int =
+		    ksi->ksi_info.si_value.sival_int;
 		/*
 		 * Write out badvaddr, but don't create a valid capability
 		 * since that might allow privilege amplification.
-		 *
-		 * XXX-BD: This probably isn't the right method.
-		 * XXX-BD: Do we want to set base or offset?
 		 *
 		 * XXXRW: I think there's some argument that anything
 		 * receiving this signal is fairly privileged.  But we could
@@ -637,9 +630,11 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		 * of that capability.  If badvaddr is not in range, then we
 		 * should just deliver an untagged NULL-derived version
 		 * (perhaps)?
+		 *
+		 * XXXBD: We really need a regs->badcap here.  There's no
+		 * sensable value to derive in the CheriABI context.
 		 */
-		*((uintptr_t *)&sf.sf_si.si_addr) =
-		    (uintptr_t)(void *)regs->badvaddr;
+		sf.sf_si.si_addr = (void * __capability)(intcap_t)regs->badvaddr;
 	}
 	/*
 	 * XXX: No support for undocumented arguments to old style handlers.
