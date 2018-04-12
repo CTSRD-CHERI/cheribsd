@@ -2,7 +2,7 @@
 
 SRCS+=	trivial-vdso_tc.c
 
-MDASM=	Ovfork.S cerror.S exect.S syscall.S
+MDASM=	Ovfork.S cerror.S syscall.S
 
 .if !defined(LIBCHERI)
 MDASM+=	brk.S sbrk.S
