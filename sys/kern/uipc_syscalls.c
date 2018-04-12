@@ -692,9 +692,8 @@ sendit(struct thread *td, int s, kmsghdr_t *mp, int flags)
 			error = EINVAL;
 			goto bad;
 		}
-		error = sockargs(&control,
-		   __DECAP_CHECK(mp->msg_control, mp->msg_controllen),
-		   mp->msg_controllen, MT_CONTROL);
+		error = sockargs(&control, mp->msg_control, mp->msg_controllen,
+		MT_CONTROL);
 		if (error != 0)
 			goto bad;
 #ifdef COMPAT_OLDSOCK
@@ -1588,7 +1587,7 @@ ogetpeername(struct thread *td, struct ogetpeername_args *uap)
 #endif /* COMPAT_OLDSOCK */
 
 int
-sockargs(struct mbuf **mp, char *buf, socklen_t buflen, int type)
+sockargs(struct mbuf **mp, char * __capability buf, socklen_t buflen, int type)
 {
 	struct sockaddr *sa;
 	struct mbuf *m;
@@ -1605,7 +1604,8 @@ sockargs(struct mbuf **mp, char *buf, socklen_t buflen, int type)
 	}
 	m = m_get2(buflen, M_WAITOK, type, 0);
 	m->m_len = buflen;
-	error = copyin(buf, mtod(m, void *), buflen);
+	error = copyin_c(buf,
+	    (__cheri_tocap void * __capability) mtod(m, void *), buflen);
 	if (error != 0)
 		(void) m_free(m);
 	else {

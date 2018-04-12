@@ -144,8 +144,7 @@ cheriabi_sendmsg(struct thread *td, struct cheriabi_sendmsg_args *uap)
 		 * alignment of mbufs is sufficent as well.
 		 */
 		/* XXX: No support for COMPAT_OLDSOCK path */
-		error = sockargs(&control,
-		    __DECAP_CHECK(msg.msg_control, msg.msg_controllen),
+		error = sockargs(&control, msg.msg_control,
 		    msg.msg_controllen, MT_CONTROL);
 		if (error)
 			goto out;

@@ -365,7 +365,8 @@ struct uio;
 /*
  * From uipc_socket and friends
  */
-int	sockargs(struct mbuf **mp, char *buf, socklen_t buflen, int type);
+int	sockargs(struct mbuf **mp, char * __capability buf, socklen_t buflen,
+	    int type);
 int	getsockaddr(struct sockaddr **namp,
 	    const struct sockaddr * __capability uaddr,
 	    size_t len);
