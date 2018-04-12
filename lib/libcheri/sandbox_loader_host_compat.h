@@ -1,6 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 SRI International
- * Copyright (c) 2015-2017 Robert N. M. Watson
+ * Copyright (c) 2018 Alex Richardson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -28,22 +27,47 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#pragma once
 
-#ifndef __LIBCHERI_SANDBOX_ELF_H__
-#define __LIBCHERI_SANDBOX_ELF_H__
+#ifdef __linux__
+/* The Linux queue macros don't have FOREACH_SAFE */
+#include <bsd/sys/queue.h>
+#endif
 
-struct sandbox_map;
+#include <sys/types.h>
+#include <sys/param.h>
+#include <sys/mman.h>
 
-/* Flags to loadelf64(). */
-#define	SANDBOX_LOADELF_DATA	0x00000001u
-#define	SANDBOX_LOADELF_CODE	0x00000002u
+#include <stdint.h>
+// Use the same page size as CHERI MIPS:
+#undef PAGE_SIZE
+#define PAGE_SIZE 4096
 
-struct sandbox_map	*sandbox_parse_elf64(int fd, unsigned flags);
-int			 sandbox_map_load(void *base, struct sandbox_map *sm);
-int			 sandbox_map_protect(void *base, struct sandbox_map *sm);
-int			 sandbox_map_reload(void *base, struct sandbox_map *sm);
-void			 sandbox_map_free(struct sandbox_map *sm);
-size_t			 sandbox_map_maxoffset(struct sandbox_map *sm);
-size_t			 sandbox_map_minoffset(struct sandbox_map *sm);
+#define TEST_LOADELF 1
+#define ELF_LOADER_DEBUG 2
+#define DEBUG 2
 
-#endif /* __LIBCHERI_SANDBOX_ELF_H__ */
+/* On MacOS __CONCAT is defined as x ## y, which won't expand macros */
+#undef __CONCAT
+#define        __CONCAT1(x,y)        x ## y
+#define        __CONCAT(x,y)        __CONCAT1(x,y)
+#define __capability
+
+#define	roundup2(x, y)	(((x)+((y)-1))&(~((y)-1))) /* if y is powers of two */
+#define	rounddown2(x, y) ((x)&(~((y)-1)))          /* if y is power of two */
+
+typedef unsigned long vaddr_t;
+typedef unsigned long vm_offset_t;
+
+#ifndef MAP_PREFAULT_READ
+#ifdef MAP_POPULATE
+#define MAP_PREFAULT_READ MAP_POPULATE
+#else
+#define MAP_PREFAULT_READ 0
+#endif
+#endif
+
+#ifndef __unused
+#define __unused __attribute__((unused))
+#endif
+

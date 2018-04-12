@@ -66,6 +66,10 @@
 #include "libcheri_sandboxasm.h"
 #include "libcheri_system.h"
 
+#if !__has_feature(capabilities)
+#error "This code requires a CHERI-aware compiler"
+#endif
+
 static size_t			num_sandbox_classes;
 static size_t			max_sandbox_classes;
 static struct sandbox_class	**sandbox_classes;

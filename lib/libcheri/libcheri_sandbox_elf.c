@@ -29,6 +29,11 @@
  * SUCH DAMAGE.
  */
 
+/* Allow building the sandbox loader debug program on the host: */
+#ifndef __FreeBSD__
+#include "sandbox_loader_host_compat.h"
+#endif
+
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <sys/param.h>
@@ -98,7 +103,7 @@ sandbox_map_entry_mmap(void *base, struct sandbox_map_entry *sme, int add_prot)
 
 	taddr = (caddr_t)base + sme->sme_map_offset;
 	if (sme->sme_fd > -1)
-		loader_dbg("mapping 0x%zx bytes at %p, file offset 0x%zx\n",
+		loader_dbg("mapping 0x%zx bytes at %p, file offset 0x%lx\n",
 		    sme->sme_len, taddr, sme->sme_file_offset);
 	else
 		loader_dbg("mapping 0x%zx bytes at 0x%p\n", sme->sme_len, taddr);
@@ -407,13 +412,13 @@ sandbox_parse_elf64(int fd, u_int flags)
 		   phdr.p_flags & PF_R ? 'r' : '-',
 		   phdr.p_flags & PF_W ? 'w' : '-',
 		   phdr.p_flags & PF_X ? 'x' : '-');
-		loader_dbg("phdr[%d] offset      0x%0.16jx\n", i,
+		loader_dbg("phdr[%d] offset      0x%016jx\n", i,
 		    (intmax_t)phdr.p_offset);
-		loader_dbg("phdr[%d] vaddr       0x%0.16jx\n", i,
+		loader_dbg("phdr[%d] vaddr       0x%016jx\n", i,
 		    (intmax_t)phdr.p_vaddr);
-		loader_dbg("phdr[%d] file size   0x%0.16jx\n", i,
+		loader_dbg("phdr[%d] file size   0x%016jx\n", i,
 		    (intmax_t)phdr.p_filesz);
-		loader_dbg("phdr[%d] memory size 0x%0.16jx\n", i,
+		loader_dbg("phdr[%d] memory size 0x%016jx\n", i,
 		    (intmax_t)phdr.p_memsz);
 #endif
 		if (phdr.p_type != PT_LOAD) {
@@ -527,8 +532,11 @@ error:
 }
 
 #ifdef TEST_LOADELF64
+
+#include <errno.h>
+
 static ssize_t
-sandbox_loadelf64(int fd, void *base, size_t maxsize __unused, u_int flags)
+sandbox_loadelf64(int fd, void *base, size_t maxsize __unused, unsigned flags)
 {
 	struct sandbox_map *sm;
 	ssize_t maxoffset;
@@ -549,11 +557,14 @@ sandbox_loadelf64(int fd, void *base, size_t maxsize __unused, u_int flags)
 	return (maxoffset);
 }
 
+int sb_verbose = 1;
+
 int
 main(int argc, char **argv)
 {
 	void *base;
-	ssize_t len;
+	ssize_t codelen;
+	ssize_t datalen;
 	size_t maxlen;
 	int fd;
 
@@ -561,17 +572,26 @@ main(int argc, char **argv)
 		errx(1, "usage: elf_loader <file>");
 
 	maxlen = 10 * 1024 * 1024;
-	base = mmap(NULL, maxlen, 0, MAP_ANON, -1, 0);
+	long pagesize = sysconf(_SC_PAGE_SIZE);
+	fprintf(stderr, "Pagesize = %ld\n", pagesize);
+	assert(maxlen % pagesize == 0);
+	// Linux needs MAP_PRIVATE or MAP_SHARED set otherwise it returns -EINVAL
+	base = mmap(NULL, 4096, PROT_NONE, MAP_PRIVATE | MAP_ANON, -1, 0);
 	if (base == MAP_FAILED)
 		err(1, "%s: mmap region", __func__);
 
 	if ((fd = open(argv[1], O_RDONLY)) == -1)
 		err(1, "%s: open(%s)", __func__, argv[1]);
 
-	if ((len = sandbox_loadelf64(fd, base, maxlen, SANDBOX_LOADELF_CODE))
-	    == -1)
-		err(1, "%s: sandbox_loadelf64", __func__);
-	printf("mapped %jd bytes from %s\n", len, argv[1]);
+	if ((codelen = sandbox_loadelf64(fd, base, maxlen,
+	    SANDBOX_LOADELF_CODE)) == -1)
+		errx(1, "%s: sandbox_loadelf64 (code) failed", __func__);
+	printf("mapped %jd code bytes from %s\n", codelen, argv[1]);
+
+	if ((datalen = sandbox_loadelf64(fd, base, maxlen,
+	    SANDBOX_LOADELF_DATA)) == -1)
+		errx(1, "%s: sandbox_loadelf64 (data) failed", __func__);
+	printf("mapped %jd datalen bytes from %s\n", datalen, argv[1]);
 
 	return (0);
 }
