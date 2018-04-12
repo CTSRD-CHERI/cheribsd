@@ -38,7 +38,8 @@ struct sandbox_map;
 #define	SANDBOX_LOADELF_DATA	0x00000001u
 #define	SANDBOX_LOADELF_CODE	0x00000002u
 
-struct sandbox_map	*sandbox_parse_elf64(int fd, unsigned flags);
+struct sandbox_map	*sandbox_parse_elf64(int fd, const char* name,
+    unsigned flags);
 int			 sandbox_map_load(void *base, struct sandbox_map *sm);
 int			 sandbox_map_protect(void *base, struct sandbox_map *sm);
 int			 sandbox_map_reload(void *base, struct sandbox_map *sm);

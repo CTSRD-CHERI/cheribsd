@@ -250,14 +250,14 @@ sandbox_class_new(const char *path, size_t maxmaplen,
 	/*
 	 * Parse the ELF and produce mappings for code and data.
 	 */
-	if ((sbcp->sbc_codemap = sandbox_parse_elf64(fd,
+	if ((sbcp->sbc_codemap = sandbox_parse_elf64(fd, path,
 	    SANDBOX_LOADELF_CODE)) == NULL) {
 		saved_errno = EINVAL;
 		warnx("%s: sandbox_parse_elf64(CODE) failed for %s", __func__,
 		    path);
 		goto error;
 	}
-	if ((sbcp->sbc_datamap = sandbox_parse_elf64(fd,
+	if ((sbcp->sbc_datamap = sandbox_parse_elf64(fd, path,
 	    SANDBOX_LOADELF_DATA)) == NULL) {
 		saved_errno = EINVAL;
 		warnx("%s: sandbox_parse_elf64(DATA) failed for %s", __func__,

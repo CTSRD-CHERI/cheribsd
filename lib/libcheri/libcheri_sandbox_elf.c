@@ -354,7 +354,7 @@ sandbox_map_optimize(struct sandbox_map *sm)
 }
 
 struct sandbox_map *
-sandbox_parse_elf64(int fd, u_int flags)
+sandbox_parse_elf64(int fd, const char* name, unsigned flags)
 {
 	int i, prot;
 	size_t taddr;
@@ -536,14 +536,15 @@ error:
 #include <errno.h>
 
 static ssize_t
-sandbox_loadelf64(int fd, void *base, size_t maxsize __unused, unsigned flags)
+sandbox_loadelf64(int fd, const char* name, void *base, size_t maxsize __unused,
+    unsigned flags)
 {
 	struct sandbox_map *sm;
 	ssize_t maxoffset;
 
 	assert((intptr_t)base % PAGE_SIZE == 0);
 
-	if ((sm = sandbox_parse_elf64(fd, flags)) == NULL) {
+	if ((sm = sandbox_parse_elf64(fd, name, flags)) == NULL) {
 		warnx("%s: sandbox_parse_elf64", __func__);
 		return (-1);
 	}
@@ -583,12 +584,12 @@ main(int argc, char **argv)
 	if ((fd = open(argv[1], O_RDONLY)) == -1)
 		err(1, "%s: open(%s)", __func__, argv[1]);
 
-	if ((codelen = sandbox_loadelf64(fd, base, maxlen,
+	if ((codelen = sandbox_loadelf64(fd, argv[1], base, maxlen,
 	    SANDBOX_LOADELF_CODE)) == -1)
 		errx(1, "%s: sandbox_loadelf64 (code) failed", __func__);
 	printf("mapped %jd code bytes from %s\n", codelen, argv[1]);
 
-	if ((datalen = sandbox_loadelf64(fd, base, maxlen,
+	if ((datalen = sandbox_loadelf64(fd, argv[1], base, maxlen,
 	    SANDBOX_LOADELF_DATA)) == -1)
 		errx(1, "%s: sandbox_loadelf64 (data) failed", __func__);
 	printf("mapped %jd datalen bytes from %s\n", datalen, argv[1]);
