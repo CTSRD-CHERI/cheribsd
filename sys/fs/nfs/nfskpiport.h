@@ -61,7 +61,7 @@ typedef struct mbuf *		mbuf_t;
 #define	uio_uio_resid_add(p, v)	((p)->uio_resid += (v))
 #define	uio_uio_resid_set(p, v)	((p)->uio_resid = (v))
 #define	uio_iov_base(p) \
-	(__DECAP_CHECK((p)->uio_iov->iov_base, (p)->uio_iov->iov_len))
+	((__cheri_fromcap void *)(p)->uio_iov->iov_base)
 #define	uio_iov_base_add(p, v)	do {					\
 	char * __capability pp;							\
 	pp = (char * __capability)(p)->uio_iov->iov_base;		\

@@ -1114,8 +1114,7 @@ RestartScan:
 			 */
 			while ((lastvecindex + 1) < vecindex) {
 				++lastvecindex;
-				error = subyte(
-				    __DECAP_CHECK(vec + lastvecindex, 1), 0);
+				error = subyte_c(vec + lastvecindex, 0);
 				if (error) {
 					error = EFAULT;
 					goto done2;
@@ -1125,8 +1124,7 @@ RestartScan:
 			/*
 			 * Pass the page information to the user
 			 */
-			error = subyte(__DECAP_CHECK(vec + vecindex, 1),
-			    mincoreinfo);
+			error = subyte_c(vec + vecindex, mincoreinfo);
 			if (error) {
 				error = EFAULT;
 				goto done2;
@@ -1157,7 +1155,7 @@ RestartScan:
 	vecindex = atop(end - first_addr);
 	while ((lastvecindex + 1) < vecindex) {
 		++lastvecindex;
-		error = subyte(__DECAP_CHECK(vec + lastvecindex, 1), 0);
+		error = subyte_c(vec + lastvecindex, 0);
 		if (error) {
 			error = EFAULT;
 			goto done2;

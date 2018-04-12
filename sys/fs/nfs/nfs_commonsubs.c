@@ -196,7 +196,7 @@ static void nfsrv_refstrbigenough(int, u_char **, u_char **, int *);
 int
 nfsm_mbufuio(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 {
-	char *mbufcp, *uiocp;
+	char *mbufcp, * __capability uiocp;
 	int xfer, left, len;
 	mbuf_t mp;
 	long uiosiz, rem;
@@ -212,8 +212,7 @@ nfsm_mbufuio(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 			goto out;
 		}
 		left = uiop->uio_iov->iov_len;
-		uiocp = __DECAP_CHECK(uiop->uio_iov->iov_base,
-		    uiop->uio_iov->iov_len);
+		uiocp = uiop->uio_iov->iov_base;
 		if (left > siz)
 			left = siz;
 		uiosiz = left;
@@ -238,9 +237,12 @@ nfsm_mbufuio(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 			else
 #endif
 			if (uiop->uio_segflg == UIO_SYSSPACE)
-				NFSBCOPY(mbufcp, uiocp, xfer);
+				NFSBCOPY(mbufcp,
+				    (__cheri_fromcap char *)uiocp, xfer);
 			else
-				copyout(mbufcp, CAST_USER_ADDR_T(uiocp), xfer);
+				copyout_c(
+				    (__cheri_tocap char * __capability)mbufcp,
+				    CAST_USER_ADDR_T(uiocp), xfer);
 			left -= xfer;
 			len -= xfer;
 			mbufcp += xfer;

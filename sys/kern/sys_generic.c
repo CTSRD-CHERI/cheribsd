@@ -960,7 +960,7 @@ static int
 select_check_badfd(fd_set * __capability fd_in, int nd, int ndu,
     int abi_nfdbits)
 {
-	char *addr, *oaddr;
+	char * __capability addr, * __capability oaddr;
 	int b, i, res;
 	uint8_t bits;
 
@@ -972,10 +972,9 @@ select_check_badfd(fd_set * __capability fd_in, int nd, int ndu,
 	for (i = nd; i < ndu; i++) {
 		b = i / NBBY;
 #if BYTE_ORDER == LITTLE_ENDIAN
-		addr =
-		    (char *)__DECAP_CHECK(fd_in, roundup(ndu, NBBY) / NBBY) + b;
+		addr = (char * __capability)fd_in + b;
 #else
-		addr = (char *)__DECAP_CHECK(fd_in, roundup(ndu, NBBY) / NBBY);
+		addr = (char * __capability)fd_in;
 		if (abi_nfdbits == NFDBITS) {
 			addr += rounddown(b, sizeof(fd_mask)) +
 			    sizeof(fd_mask) - 1 - b % sizeof(fd_mask);
@@ -985,7 +984,7 @@ select_check_badfd(fd_set * __capability fd_in, int nd, int ndu,
 		}
 #endif
 		if (addr != oaddr) {
-			res = fubyte(addr);
+			res = fubyte_c(addr);
 			if (res == -1)
 				return (EFAULT);
 			oaddr = addr;
@@ -1106,7 +1105,7 @@ kern_select(struct thread *td, int nd, fd_set * __capability fd_in,
 	swizzle_fdset(ibits[2]);
 	
 	if (nbufbytes != 0)
-		bzero(__DECAP_CHECK(selbits, nbufbytes / 2), nbufbytes / 2);
+		bzero((__cheri_fromcap void *)selbits, nbufbytes / 2);
 
 	precision = 0;
 	if (tvp != NULL) {

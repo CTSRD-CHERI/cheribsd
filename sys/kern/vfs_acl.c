@@ -174,8 +174,8 @@ acl_copyout(const struct acl *kernel_acl, void * __capability user_acl,
 		break;
 
 	default:
-		error = fueword32(__DECAP_CHECK((char * __capability)user_acl +
-		    offsetof(struct acl, acl_maxcnt), sizeof(am)), &am);
+		error = fueword32_c((char * __capability)user_acl +
+		    offsetof(struct acl, acl_maxcnt), &am);
 		if (error == -1)
 			return (EFAULT);
 		if (am != ACL_MAX_ENTRIES)

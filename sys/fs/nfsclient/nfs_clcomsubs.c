@@ -256,7 +256,7 @@ nfscl_reqstart(struct nfsrv_descript *nd, int procnum, struct nfsmount *nmp,
 APPLESTATIC void
 nfsm_uiombuf(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 {
-	char *uiocp;
+	char * __capability uiocp;
 	struct mbuf *mp, *mp2;
 	int xfer, left, mlen;
 	int uiosiz, clflg, rem;
@@ -272,8 +272,7 @@ nfsm_uiombuf(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 	mp = mp2 = nd->nd_mb;
 	while (siz > 0) {
 		left = uiop->uio_iov->iov_len;
-		uiocp = __DECAP_CHECK(uiop->uio_iov->iov_base,
-		    uiop->uio_iov->iov_len);
+		uiocp = uiop->uio_iov->iov_base;
 		if (left > siz)
 			left = siz;
 		uiosiz = left;
@@ -299,11 +298,12 @@ nfsm_uiombuf(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 			else
 #endif
 			if (uiop->uio_segflg == UIO_SYSSPACE)
-			    NFSBCOPY(uiocp, NFSMTOD(mp, caddr_t) + mbuf_len(mp),
-				xfer);
+			    NFSBCOPY((__cheri_fromcap char *)uiocp,
+				NFSMTOD(mp, caddr_t) + mbuf_len(mp), xfer);
 			else
-			    copyin(CAST_USER_ADDR_T(uiocp), NFSMTOD(mp, caddr_t)
-				+ mbuf_len(mp), xfer);
+			    copyin_c(CAST_USER_ADDR_T(uiocp),
+				(__cheri_tocap char * __capability)
+				NFSMTOD(mp, caddr_t) + mbuf_len(mp), xfer);
 			mbuf_setlen(mp, mbuf_len(mp) + xfer);
 			left -= xfer;
 			uiocp += xfer;
