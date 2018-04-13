@@ -305,13 +305,14 @@ sandbox_map_optimize(struct sandbox_map *sm)
 	 */
 	STAILQ_FOREACH_SAFE(sme, &sm->sm_head, sme_entries, tmp_sme) {
 #if defined(ELF_LOADER_DEBUG) && ELF_LOADER_DEBUG > 1
-		printf("sme_map_offset  = 0x%zx\n", sme->sme_map_offset);
-		printf("sme_len         = 0x%zx\n", sme->sme_len);
-		printf("sme_prot        = 0x%x\n", (uint)sme->sme_prot);
-		printf("sme_flags       = 0x%x\n", (uint)sme->sme_flags);
-		printf("sme_fd          = 0x%d\n", sme->sme_fd);
-		printf("sme_file_offset = 0x%zx\n", (size_t)sme->sme_file_offset);
-		printf("sme_tailbytes   = 0x%zx\n\n", sme->sme_tailbytes);
+		fprintf(stderr, "sme_map_offset  = 0x%zx\n", sme->sme_map_offset);
+		fprintf(stderr, "sme_len         = 0x%zx\n", sme->sme_len);
+		fprintf(stderr, "sme_prot        = 0x%x\n", (uint)sme->sme_prot);
+		fprintf(stderr, "sme_flags       = 0x%x\n", (uint)sme->sme_flags);
+		fprintf(stderr, "sme_fd          = 0x%d\n", sme->sme_fd);
+		fprintf(stderr, "sme_file_offset = 0x%zx\n",
+		    (size_t)sme->sme_file_offset);
+		fprintf(stderr, "sme_tailbytes   = 0x%zx\n\n", sme->sme_tailbytes);
 #endif
 		next_sme = STAILQ_NEXT(sme, sme_entries);
 		if (next_sme == NULL)
