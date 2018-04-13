@@ -403,7 +403,7 @@ sandbox_parse_elf64(int fd, const char* name, unsigned flags)
 
 	if ((rlen = pread(fd, &raw_ehdr, sizeof(raw_ehdr), 0)) != sizeof(raw_ehdr)) {
 		warn("%s: read ELF header for %s", __func__, name);
-		return (NULL);
+		goto error;
 	}
 
 	if (flags & SANDBOX_LOADELF_CODE)
@@ -414,19 +414,19 @@ sandbox_parse_elf64(int fd, const char* name, unsigned flags)
 	/* Check for a valid ELF file  */
 	if (memcmp(&raw_ehdr.e_ident, ELFMAG, strlen(ELFMAG)) != 0) {
 		warnx("%s: %s is not a valid ELF file:", __func__, name);
-		return (NULL);
+		goto error;
 	}
 	if (raw_ehdr.e_ident[EI_CLASS] != ELFCLASS64) {
 		warnx("%s: %s is not a 64-bit ELF file", __func__, name);
-		return (NULL);
+		goto error;
 	}
 	if (raw_ehdr.e_ident[EI_OSABI] != ELFOSABI_FREEBSD) {
 		warnx("%s: %s is not a FreeBSD ELF file", __func__, name);
-		return (NULL);
+		goto error;
 	}
 	if (raw_ehdr.e_ident[EI_DATA] != LIBCHERI_EXPECTED_ELF_ORDER) {
 		warnx("%s: %s has wrong endianess", __func__, name);
-		return (NULL);
+		goto error;
 	}
 
 	/*
@@ -439,7 +439,7 @@ sandbox_parse_elf64(int fd, const char* name, unsigned flags)
 	if (ehdr_member(e_machine) != LIBCHERI_EXPECTED_ELF_MACHINE) {
 		warnx("%s: %s has wrong e_machine %d", __func__, name,
 		    ehdr_member(e_machine));
-		return (NULL);
+		goto error;
 	}
 	loader_dbg("type %d\n", ehdr_member(e_type));
 	loader_dbg("version %d\n", ehdr_member(e_version));
@@ -465,7 +465,7 @@ sandbox_parse_elf64(int fd, const char* name, unsigned flags)
 			warn("%s: failed to reading program header %d: Read %zd"
 			    " instead of %zd bytes", __func__, i+1, rlen,
 			    sizeof(raw_phdr));
-			return (NULL);
+			goto error;
 		}
 #if defined(ELF_LOADER_DEBUG) && ELF_LOADER_DEBUG > 1
 
