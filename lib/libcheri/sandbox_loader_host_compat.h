@@ -54,6 +54,10 @@
 #define        __CONCAT(x,y)        __CONCAT1(x,y)
 #define __capability
 
+#ifndef __DECONST
+#define	__DECONST(type, var)	((type)(uintptr_t)(const void *)(var))
+#endif
+
 #define	roundup2(x, y)	(((x)+((y)-1))&(~((y)-1))) /* if y is powers of two */
 #define	rounddown2(x, y) ((x)&(~((y)-1)))          /* if y is power of two */
 

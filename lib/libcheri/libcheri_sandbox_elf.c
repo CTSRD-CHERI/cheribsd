@@ -73,6 +73,11 @@ struct sandbox_map {
 	struct sandbox_map_head	sm_head;
 	size_t			sm_minoffset;
 	size_t			sm_maxoffset;
+	unsigned		sm_flags;	/* code or data */
+#ifdef ELF_LOADER_DEBUG
+	const char *		sm_name;	/* File name for debugging */
+	const char *		sm_kind;	/* code/data (for debugging) */
+#endif
 };
 
 static struct sandbox_map_entry *
@@ -187,6 +192,9 @@ sandbox_map_free(struct sandbox_map *sm)
 		    sme_entries);
 		free(sme);
 	}
+#ifdef ELF_LOADER_DEBUG
+	free(__DECONST(char*, sm->sm_name));
+#endif
 	free(sm);
 }
 
@@ -202,6 +210,35 @@ sandbox_map_minoffset(struct sandbox_map *sm)
 {
 
 	return(sm->sm_minoffset);
+}
+
+static void
+dump_sandbox_map_entry(const struct sandbox_map_entry *sme __unused)
+{
+
+#if defined(ELF_LOADER_DEBUG) && ELF_LOADER_DEBUG > 1
+	fprintf(stderr, "  sme_map_offset  = 0x%zx\n", sme->sme_map_offset);
+	fprintf(stderr, "  sme_len         = 0x%zx\n", sme->sme_len);
+	fprintf(stderr, "  sme_prot        = 0x%x\n", (uint)sme->sme_prot);
+	fprintf(stderr, "  sme_flags       = 0x%x\n", (uint)sme->sme_flags);
+	fprintf(stderr, "  sme_fd          = 0x%d\n", sme->sme_fd);
+	fprintf(stderr, "  sme_file_offset = 0x%zx\n",
+	    (size_t)sme->sme_file_offset);
+	fprintf(stderr, "  sme_tailbytes   = 0x%zx\n\n", sme->sme_tailbytes);
+#endif
+}
+
+static void
+dump_sandbox_map(struct sandbox_map *sm __unused)
+{
+#if defined(ELF_LOADER_DEBUG) && ELF_LOADER_DEBUG > 1
+	struct sandbox_map_entry *sme;
+
+	fprintf(stderr, "sandbox map for %s (%s)\n", sm->sm_name, sm->sm_kind);
+	STAILQ_FOREACH(sme, &sm->sm_head, sme_entries) {
+		dump_sandbox_map_entry(sme);
+	}
+#endif
 }
 
 static int
@@ -299,21 +336,14 @@ sandbox_map_optimize(struct sandbox_map *sm)
 		}
 	}
 
+	loader_dbg("Attempting to merge adjacent mappings in %s (flags %x)\n",
+	    sm->sm_name, sm->sm_flags);
 	/*
 	 * Search for adjacent mappings of the same file with the same
 	 * permissions and combine them.
 	 */
 	STAILQ_FOREACH_SAFE(sme, &sm->sm_head, sme_entries, tmp_sme) {
-#if defined(ELF_LOADER_DEBUG) && ELF_LOADER_DEBUG > 1
-		fprintf(stderr, "sme_map_offset  = 0x%zx\n", sme->sme_map_offset);
-		fprintf(stderr, "sme_len         = 0x%zx\n", sme->sme_len);
-		fprintf(stderr, "sme_prot        = 0x%x\n", (uint)sme->sme_prot);
-		fprintf(stderr, "sme_flags       = 0x%x\n", (uint)sme->sme_flags);
-		fprintf(stderr, "sme_fd          = 0x%d\n", sme->sme_fd);
-		fprintf(stderr, "sme_file_offset = 0x%zx\n",
-		    (size_t)sme->sme_file_offset);
-		fprintf(stderr, "sme_tailbytes   = 0x%zx\n\n", sme->sme_tailbytes);
-#endif
+		dump_sandbox_map_entry(sme);
 		next_sme = STAILQ_NEXT(sme, sme_entries);
 		if (next_sme == NULL)
 			continue;
@@ -400,6 +430,11 @@ sandbox_parse_elf64(int fd, const char* name, unsigned flags)
 		return (NULL);
 	}
 	STAILQ_INIT(&sm->sm_head);
+	sm->sm_flags = flags;
+#ifdef ELF_LOADER_DEBUG
+	if (name)
+		sm->sm_name = strdup(name);
+#endif
 
 	if ((rlen = pread(fd, &raw_ehdr, sizeof(raw_ehdr), 0)) != sizeof(raw_ehdr)) {
 		warn("%s: read ELF header for %s", __func__, name);
@@ -468,7 +503,6 @@ sandbox_parse_elf64(int fd, const char* name, unsigned flags)
 			goto error;
 		}
 #if defined(ELF_LOADER_DEBUG) && ELF_LOADER_DEBUG > 1
-
 		loader_dbg("phdr[%d] type        %jx\n", i,
 		    (intmax_t)phdr_member(p_type));
 		loader_dbg("phdr[%d] flags       %jx (%c%c%c)\n", i,
@@ -589,6 +623,9 @@ sandbox_parse_elf64(int fd, const char* name, unsigned flags)
 	sm->sm_minoffset = rounddown2(min_section_addr, PAGE_SIZE);
 
 	sandbox_map_optimize(sm);
+
+	loader_dbg("%s: final layout:\n", __func__);
+	dump_sandbox_map(sm);
 
 	return (sm);
 error:
