@@ -216,13 +216,14 @@ retry:
  *	through the given flags, then the pages are zeroed before they are
  *	mapped.
  */
-vm_offset_t
+vm_ptr_t
 kmem_alloc_contig(struct vmem *vmem, vm_size_t size, int flags, vm_paddr_t low,
     vm_paddr_t high, u_long alignment, vm_paddr_t boundary,
     vm_memattr_t memattr)
 {
 	vm_object_t object = vmem == kmem_arena ? kmem_object : kernel_object;
-	vm_offset_t addr, offset, tmp;
+	vm_ptr_t addr;
+	vm_offset_t offset, tmp;
 	vm_page_t end_m, m;
 	u_long npages;
 	int pflags, tries;
@@ -230,7 +231,7 @@ kmem_alloc_contig(struct vmem *vmem, vm_size_t size, int flags, vm_paddr_t low,
 	size = round_page(size);
 	if (vmem_alloc(vmem, size, flags | M_BESTFIT, &addr))
 		return (0);
-	offset = addr - VM_MIN_KERNEL_ADDRESS;
+	offset = ptr_to_va(addr) - VM_MIN_KERNEL_ADDRESS;
 	pflags = malloc2vm_flags(flags) | VM_ALLOC_NOBUSY | VM_ALLOC_WIRED;
 	npages = atop(size);
 	VM_OBJECT_WLOCK(object);
@@ -252,7 +253,7 @@ retry:
 		return (0);
 	}
 	end_m = m + npages;
-	tmp = addr;
+	tmp = ptr_to_va(addr);
 	for (; m < end_m; m++) {
 		if ((flags & M_ZERO) && (m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
