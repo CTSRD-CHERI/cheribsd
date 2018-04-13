@@ -179,7 +179,11 @@
  * For a large kernel stack page the KSTACK_SIZE needs to be a page size
  * supported by the hardware (e.g. 16K).
  */
+#if defined(CHERI_KERNEL) && !defined(CPU_CHERI128)
+#define	KSTACK_SIZE		(1 << 15)	/* Single 32K page */
+#else
 #define	KSTACK_SIZE		(1 << 14)	/* Single 16K page */
+#endif
 #define	KSTACK_PAGE_SIZE	KSTACK_SIZE
 #define	KSTACK_PAGE_MASK	(KSTACK_PAGE_SIZE - 1)
 #define	KSTACK_PAGES		(KSTACK_SIZE / PAGE_SIZE)
