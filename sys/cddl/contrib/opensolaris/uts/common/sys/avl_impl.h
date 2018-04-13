@@ -35,6 +35,8 @@
  */
 
 #include <sys/types.h>
+/* Needed to make all the low pointer bits twiddling work on CHERI */
+#include <cheri/cheric.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -97,16 +99,18 @@ struct avl_node {
  *
  * pointer to the parent of the current node is the high order bits
  */
-#define	AVL_XPARENT(n)		((struct avl_node *)((n)->avl_pcb & (uintptr_t)~7))
+#define	AVL_XPARENT(n)		((struct avl_node *)(cheri_clear_low_ptr_bits((n)->avl_pcb, 7)))
 #define	AVL_SETPARENT(n, p)						\
-	((n)->avl_pcb = (((n)->avl_pcb & (uintptr_t)7) | (uintptr_t)(p)))
+	((n)->avl_pcb = cheri_get_low_ptr_bits((n)->avl_pcb, 7) | (uintptr_t)(p))
+/* Originally: ((n)->avl_pcb = (((n)->avl_pcb & (uintptr_t)7) | (uintptr_t)(p))) */
 
 /*
  * index of this node in its parent's avl_child[]: bit #2
  */
-#define	AVL_XCHILD(n)		(((vaddr_t)(n)->avl_pcb >> 2) & 1)
+#define	AVL_XCHILD(n)		((cheri_get_low_ptr_bits((n)->avl_pcb, 7) >> 2) & 1)
 #define	AVL_SETCHILD(n, c)						\
-	((n)->avl_pcb = (uintptr_t)(((n)->avl_pcb & (uintptr_t)~4) | (uintptr_t)((c) << 2)))
+	((n)->avl_pcb = cheri_clear_low_ptr_bits((n)->avl_pcb, 4) | (uintptr_t)((c) << 2))
+/* Originally: ((n)->avl_pcb = (uintptr_t)(((n)->avl_pcb & (uintptr_t)~4) | (uintptr_t)((c) << 2))) */
 
 /*
  * balance indication for a node, lowest 2 bits. A valid balance is
@@ -115,7 +119,8 @@ struct avl_node {
  */
 #define	AVL_XBALANCE(n)		((int)(((vaddr_t)(n)->avl_pcb & 3) - 1))
 #define	AVL_SETBALANCE(n, b)						\
-	((n)->avl_pcb = (uintptr_t)((((n)->avl_pcb & (uintptr_t)~3) | (uintptr_t)((b) + 1))))
+	((n)->avl_pcb = cheri_clear_low_ptr_bits((n)->avl_pcb, 3) | (uintptr_t)((b) + 1))
+/* Originally: ((n)->avl_pcb = (uintptr_t)((((n)->avl_pcb & (uintptr_t)~3) | (uintptr_t)((b) + 1)))) */
 
 #endif /* _LP64 */
 
@@ -133,9 +138,9 @@ struct avl_node {
 /*
  * macros used to create/access an avl_index_t
  */
-#define	AVL_INDEX2NODE(x)	((avl_node_t *)((x) & (uintptr_t)~1))
-#define	AVL_INDEX2CHILD(x)	((x) & (uintptr_t)1)
-#define	AVL_MKINDEX(n, c)	((avl_index_t)(n) | (uintptr_t)(c))
+#define	AVL_INDEX2NODE(x)	((avl_node_t *)cheri_clear_low_ptr_bits(x, 1))
+#define	AVL_INDEX2CHILD(x)	(cheri_get_low_ptr_bits(x, 1))
+#define	AVL_MKINDEX(n, c)	((avl_index_t)cheri_set_low_ptr_bits((uintptr_t)n, c))
 
 
 /*
