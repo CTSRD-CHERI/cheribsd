@@ -55,7 +55,7 @@ static int
 alist_hash(int nbuckets, void *arg)
 {
 	alist_el_t *el = arg;
-	uintptr_t num = (uintptr_t)el->ale_name;
+	int num = (int)(uintptr_t)el->ale_name;
 
 	return (num % nbuckets);
 }

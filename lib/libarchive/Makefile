@@ -15,6 +15,9 @@ SHLIB_MAJOR= 7
 
 CFLAGS+=	-DPLATFORM_CONFIG_H=\"${.CURDIR}/config_freebsd.h\"
 CFLAGS+=	-I${.OBJDIR}
+.ifdef LIBCHERI
+CFLAGS+=	-Wno-cheri-bitwise-operations
+.endif
 
 .if ${MK_OPENSSL} != "no"
 CFLAGS+=	-DWITH_OPENSSL

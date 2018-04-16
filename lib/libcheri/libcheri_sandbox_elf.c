@@ -46,6 +46,8 @@
 #include <unistd.h>
 
 #include "libcheri_sandbox_elf.h"
+#include "libcheri_private.h"
+#include "libcheri_sandbox.h"
 
 STAILQ_HEAD(sandbox_map_head, sandbox_map_entry);
 
@@ -95,13 +97,11 @@ sandbox_map_entry_mmap(void *base, struct sandbox_map_entry *sme, int add_prot)
 	void *addr;
 
 	taddr = (caddr_t)base + sme->sme_map_offset;
-#ifdef DEBUG
 	if (sme->sme_fd > -1)
-		printf("mapping 0x%zx bytes at %p, file offset 0x%zx\n",
+		loader_dbg("mapping 0x%zx bytes at %p, file offset 0x%zx\n",
 		    sme->sme_len, taddr, sme->sme_file_offset);
 	else
-		printf("mapping 0x%zx bytes at 0x%p\n", sme->sme_len, taddr);
-#endif
+		loader_dbg("mapping 0x%zx bytes at 0x%p\n", sme->sme_len, taddr);
 	if ((addr = mmap(taddr, sme->sme_len, sme->sme_prot | add_prot,
 	    sme->sme_flags, sme->sme_fd, sme->sme_file_offset)) ==
 	    MAP_FAILED) {
@@ -110,7 +110,7 @@ sandbox_map_entry_mmap(void *base, struct sandbox_map_entry *sme, int add_prot)
 	}
 	assert((vaddr_t)addr == (vaddr_t)taddr);
 
-	memset(addr + sme->sme_len - sme->sme_tailbytes, 0, sme->sme_tailbytes);
+	memset((caddr_t)addr + sme->sme_len - sme->sme_tailbytes, 0, sme->sme_tailbytes);
 
 	return (addr);
 }
@@ -214,10 +214,8 @@ sandbox_map_optimize(struct sandbox_map *sm)
 	STAILQ_FOREACH(sme, &sm->sm_head, sme_entries) {
 		if (sme->sme_map_offset < sm->sm_minoffset) {
 			delta = sm->sm_minoffset - sme->sme_map_offset;
-#ifdef DEBUG
-			printf("shifting map up by 0x%zx from 0x%zx\n", delta,
-			    sme->sme_map_offset);
-#endif
+			loader_dbg("shifting map up by 0x%zx from 0x%zx\n",
+			    delta, sme->sme_map_offset);
 			assert(sme->sme_len > delta);
 			sme->sme_map_offset += delta;
 			sme->sme_len -= delta;
@@ -258,10 +256,8 @@ sandbox_map_optimize(struct sandbox_map *sm)
 			continue;
 		}
 		newlen = next_sme->sme_map_offset - sme->sme_map_offset;
-#ifdef DEBUG
-		printf("truncating mapping at 0x%zx from 0x%zx to 0x%zx\n",
+		loader_dbg("truncating mapping at 0x%zx from 0x%zx to 0x%zx\n",
 		    sme->sme_map_offset, sme->sme_len, newlen);
-#endif
 		sme->sme_len = newlen;
 		sme->sme_tailbytes = 0;
 		if (sme->sme_len == 0) {
@@ -279,10 +275,8 @@ sandbox_map_optimize(struct sandbox_map *sm)
 		char *lastpage;
 		if (sme->sme_tailbytes == 0)
 			continue;
-#ifdef DEBUG
-		printf("Testing %zu tailbytes for mapping at 0x%zx\n",
+		loader_dbg("Testing %zu tailbytes for mapping at 0x%zx\n",
 		    sme->sme_tailbytes, sme->sme_map_offset);
-#endif
 		if ((lastpage = mmap(0, PAGE_SIZE, PROT_READ, MAP_PRIVATE,
 		    sme->sme_fd, sme->sme_file_offset + sme->sme_len -
 		    PAGE_SIZE)) == MAP_FAILED) {
@@ -292,9 +286,7 @@ sandbox_map_optimize(struct sandbox_map *sm)
 		for (/**/; sme->sme_tailbytes > 0; sme->sme_tailbytes--)
 			if (lastpage[PAGE_SIZE - sme->sme_tailbytes] != 0)
 				break;
-#ifdef DEBUG
-		printf("%zu actual tailbytes\n", sme->sme_tailbytes);
-#endif
+		loader_dbg("%zu actual tailbytes\n", sme->sme_tailbytes);
 		if (munmap(lastpage, PAGE_SIZE) == -1) {
 			warn("%s: munmap", __func__);
 			return (-1);
@@ -306,14 +298,14 @@ sandbox_map_optimize(struct sandbox_map *sm)
 	 * permissions and combine them.
 	 */
 	STAILQ_FOREACH_SAFE(sme, &sm->sm_head, sme_entries, tmp_sme) {
-#if defined(DEBUG) && DEBUG > 1
+#if defined(ELF_LOADER_DEBUG) && ELF_LOADER_DEBUG > 1
 		printf("sme_map_offset  = 0x%zx\n", sme->sme_map_offset);
 		printf("sme_len         = 0x%zx\n", sme->sme_len);
 		printf("sme_prot        = 0x%x\n", (uint)sme->sme_prot);
 		printf("sme_flags       = 0x%x\n", (uint)sme->sme_flags);
 		printf("sme_fd          = 0x%d\n", sme->sme_fd);
 		printf("sme_file_offset = 0x%zx\n", (size_t)sme->sme_file_offset);
-		printf("sme_tailbytes   = 0x%zx\n", sme->sme_tailbytes);
+		printf("sme_tailbytes   = 0x%zx\n\n", sme->sme_tailbytes);
 #endif
 		next_sme = STAILQ_NEXT(sme, sme_entries);
 		if (next_sme == NULL)
@@ -342,10 +334,9 @@ sandbox_map_optimize(struct sandbox_map *sm)
 		    != delta)
 			continue;
 
-#ifdef DEBUG
-		printf("combining mapping at 0x%zx with mapping at 0x%zx\n",
+		loader_dbg("combining mapping at 0x%zx with mapping at 0x%zx\n",
 		    sme->sme_map_offset, next_sme->sme_map_offset);
-#endif
+
 		next_sme->sme_map_offset -= delta;
 		next_sme->sme_len += delta;
 		next_sme->sme_file_offset -= delta;
@@ -382,22 +373,25 @@ sandbox_parse_elf64(int fd, u_int flags)
 		return (NULL);
 	}
 
+	if (flags & SANDBOX_LOADELF_CODE)
+		loader_dbg("%s: loading code\n", __func__);
+	if (flags & SANDBOX_LOADELF_DATA)
+		loader_dbg("%s: loading data\n", __func__);
+
 	/* XXX: check for magic number */
 
-#ifdef DEBUG
-	printf("type %d\n", ehdr.e_type);
-	printf("version %d\n", ehdr.e_version);
-	printf("entry %zx\n", (size_t)ehdr.e_entry);
-	printf("elf header size %jd (read %jd)\n", (intmax_t)ehdr.e_ehsize,
+	loader_dbg("type %d\n", ehdr.e_type);
+	loader_dbg("version %d\n", ehdr.e_version);
+	loader_dbg("entry %zx\n", (size_t)ehdr.e_entry);
+	loader_dbg("elf header size %jd (read %jd)\n", (intmax_t)ehdr.e_ehsize,
 	    rlen);
-	printf("program header offset %jd\n", (intmax_t)ehdr.e_phoff);
-	printf("program header size %jd\n", (intmax_t)ehdr.e_phentsize);
-	printf("program header number %jd\n", (intmax_t)ehdr.e_phnum);
-	printf("section header offset %jd\n", (intmax_t)ehdr.e_shoff);
-	printf("section header size %jd\n", (intmax_t)ehdr.e_shentsize);
-	printf("section header number %jd\n", (intmax_t)ehdr.e_shnum);
-	printf("section name strings section %jd\n", (intmax_t)ehdr.e_shstrndx);
-#endif
+	loader_dbg("program header offset %jd\n", (intmax_t)ehdr.e_phoff);
+	loader_dbg("program header size %jd\n", (intmax_t)ehdr.e_phentsize);
+	loader_dbg("program header number %jd\n", (intmax_t)ehdr.e_phnum);
+	loader_dbg("section header offset %jd\n", (intmax_t)ehdr.e_shoff);
+	loader_dbg("section header size %jd\n", (intmax_t)ehdr.e_shentsize);
+	loader_dbg("section header number %jd\n", (intmax_t)ehdr.e_shnum);
+	loader_dbg("section name strings section %jd\n", (intmax_t)ehdr.e_shstrndx);
 
 	for (i = 0; i < ehdr.e_phnum; i++) {
 		if ((rlen = pread(fd, &phdr, sizeof(phdr), ehdr.e_phoff +
@@ -405,28 +399,26 @@ sandbox_parse_elf64(int fd, u_int flags)
 			warn("%s: reading %d program header", __func__, i+1);
 			return (NULL);
 		}
-#ifdef DEBUG
-		printf("phdr[%d] type        %jx\n", i, (intmax_t)phdr.p_type);
-		printf("phdr[%d] flags       %jx (%c%c%c)\n", i,
+#if defined(ELF_LOADER_DEBUG) && ELF_LOADER_DEBUG > 1
+
+		loader_dbg("phdr[%d] type        %jx\n", i, (intmax_t)phdr.p_type);
+		loader_dbg("phdr[%d] flags       %jx (%c%c%c)\n", i,
 		   (intmax_t)phdr.p_flags,
 		   phdr.p_flags & PF_R ? 'r' : '-',
 		   phdr.p_flags & PF_W ? 'w' : '-',
 		   phdr.p_flags & PF_X ? 'x' : '-');
-		printf("phdr[%d] offset      0x%0.16jx\n", i,
+		loader_dbg("phdr[%d] offset      0x%0.16jx\n", i,
 		    (intmax_t)phdr.p_offset);
-		printf("phdr[%d] vaddr       0x%0.16jx\n", i,
+		loader_dbg("phdr[%d] vaddr       0x%0.16jx\n", i,
 		    (intmax_t)phdr.p_vaddr);
-		printf("phdr[%d] file size   0x%0.16jx\n", i,
+		loader_dbg("phdr[%d] file size   0x%0.16jx\n", i,
 		    (intmax_t)phdr.p_filesz);
-		printf("phdr[%d] memory size 0x%0.16jx\n", i,
+		loader_dbg("phdr[%d] memory size 0x%0.16jx\n", i,
 		    (intmax_t)phdr.p_memsz);
 #endif
-
 		if (phdr.p_type != PT_LOAD) {
-#ifdef DEBUG
 			/* XXXBD: should we handled GNU_STACK? */
-			printf("skipping program segment %d\n", i+1);
-#endif
+			loader_dbg("skipping non-PT_LOAD segment phdr[%d]\n", i);
 			continue;
 		}
 
@@ -442,12 +434,16 @@ sandbox_parse_elf64(int fd, u_int flags)
 			 * place data and code in the same page.  For now,
 			 * map code into object instances.
 			 */
-			if (!(flags & SANDBOX_LOADELF_CODE))
+			if (!(flags & SANDBOX_LOADELF_CODE)) {
+				loader_dbg("skipping code segment %d\n", i+1);
 				continue;
+			}
 #endif
 		} else {
-			if (!(flags & SANDBOX_LOADELF_DATA))
+			if (!(flags & SANDBOX_LOADELF_DATA)) {
+				loader_dbg("skipping data segment %d\n", i+1);
 				continue;
+			}
 		}
 
 		prot = (
@@ -519,9 +515,7 @@ sandbox_parse_elf64(int fd, u_int flags)
 		    min_section_addr > shdr.sh_addr)
 			min_section_addr = shdr.sh_addr;
 	}
-#ifdef DEBUG
-	printf("minimum section address 0x%lx\n", min_section_addr);
-#endif
+	loader_dbg("minimum section address 0x%lx\n", min_section_addr);
 	sm->sm_minoffset = rounddown2(min_section_addr, PAGE_SIZE);
 
 	sandbox_map_optimize(sm);

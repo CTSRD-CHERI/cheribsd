@@ -123,8 +123,13 @@ _libelf_xlate(Elf_Data *dst, const Elf_Data *src, unsigned int encoding,
 		return (NULL);
 	}
 
+#if __has_builtin(__builtin_is_aligned)
+	if (!__builtin_is_aligned((direction == ELF_TOMEMORY ? db : sb),
+	    _libelf_malign(src->d_type, elfclass))) {
+#else
 	if ((direction == ELF_TOMEMORY ? db : sb) %
 	    _libelf_malign(src->d_type, elfclass)) {
+#endif
 		LIBELF_SET_ERROR(DATA, 0);
 		return (NULL);
 	}

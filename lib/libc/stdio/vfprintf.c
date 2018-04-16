@@ -304,8 +304,12 @@ vfprintf(FILE * __restrict fp, const char * __restrict fmt0, va_list ap)
 #ifndef __CHERI_PURE_CAPABILITY__
 #define	BUF	32
 #else
-/* For the CHERI sandbox ABI we need enough space to print a capability dump */
-#define BUF	84
+/* For the CHERI sandbox ABI we need enough space to print a capability dump:
+ * v:1 s:0 p:0007807d b:00000001200ff73c l:0000000000000004 o:0123456789abcdef t:-1
+ * The current maximum length 80 chars but in case we decide to print more info
+ * in the future we just use 128 since we have enough stack space here anyway.
+*/
+#define BUF	128
 #endif
 #else
 #error "BUF must be large enough to format a uintmax_t"

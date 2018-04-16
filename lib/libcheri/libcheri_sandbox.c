@@ -57,13 +57,14 @@
 #include "libcheri_enter.h"
 #include "libcheri_fd.h"
 #include "libcheri_invoke.h"
-#include "libcheri_system.h"
 #include "libcheri_init.h"
+#include "libcheri_private.h"
 #include "libcheri_sandbox.h"
 #include "libcheri_sandbox_elf.h"
 #include "libcheri_sandbox_internal.h"
 #include "libcheri_sandbox_methods.h"
 #include "libcheri_sandboxasm.h"
+#include "libcheri_system.h"
 
 static size_t			num_sandbox_classes;
 static size_t			max_sandbox_classes;
@@ -71,6 +72,13 @@ static struct sandbox_class	**sandbox_classes;
 
 static struct sandbox_provided_classes	*main_provided_classes;
 static struct sandbox_required_methods	*main_required_methods;
+
+/*
+ * libcheri_system_vtable is defined here and not in libcheri_system.h to avoid
+ * running into https://github.com/CTSRD-CHERI/cheribsd/issues/180
+ */
+__capability vm_offset_t	*libcheri_system_vtable;
+
 
 static int	sandbox_program_init(void);
 
@@ -204,6 +212,7 @@ sandbox_class_new(const char *path, size_t maxmaplen,
 	int fd, saved_errno;
 	size_t i;
 
+	loader_dbg("Loading sandbox %s\n", path);
 	fd = open(path, O_RDONLY);
 	if (fd == -1) {
 		saved_errno = errno;
@@ -455,7 +464,7 @@ sandbox_object_new_flags(struct sandbox_class *sbcp, size_t heaplen,
 	    sbop->sbo_stacklen, CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |
 	    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
 	    CHERI_PERM_STORE_LOCAL_CAP));
-	sbop->sbo_csp = (__capability void *)((uintptr_t)sbop->sbo_stackcap +
+	sbop->sbo_csp = ((char *__capability )sbop->sbo_stackcap +
 	    sbop->sbo_stacklen);
 
 	/*
@@ -523,7 +532,7 @@ sandbox_object_new(struct sandbox_class *sbcp, size_t heaplen,
  */
 int
 sandbox_object_new_system_object(__capability void *private_data,
-    __capability void *invoke_pcc, __capability intptr_t *vtable,
+    __capability void *invoke_pcc, __capability vm_offset_t *vtable,
     struct sandbox_object **sbopp)
 {
 

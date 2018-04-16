@@ -154,12 +154,22 @@ typedef int malloc_cpuid_t;
 	((vaddr_t)(a) & (vaddr_t)((~(alignment)) + 1))
 
 /* Return the offset between a and the nearest aligned address at or below a. */
+#if __has_builtin(__builtin_align_down)
+#define ALIGNMENT_ADDR2OFFSET(a, alignment)				\
+	((size_t)((a) - __builtin_align_down((a), alignment)))
+#else
 #define ALIGNMENT_ADDR2OFFSET(a, alignment)				\
 	((size_t)((a) & (alignment - 1)))
+#endif
 
 /* Return the smallest alignment multiple that is >= s. */
+#if __has_builtin(__builtin_align_up)
+#define ALIGNMENT_CEILING(s, alignment)					\
+	__builtin_align_up((s), (alignment))
+#else
 #define ALIGNMENT_CEILING(s, alignment)					\
 	((uintptr_t)((s) + (alignment - 1)) & (uintptr_t)((~(alignment)) + 1))
+#endif
 
 /* Declare a variable-length array. */
 #if __STDC_VERSION__ < 199901L

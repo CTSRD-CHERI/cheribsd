@@ -96,7 +96,6 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	liby \
 	libz \
 	libzstd \
-	libsimple_printf \
 	ncurses
 
 # Inter-library dependencies.  When the makefile for a library contains LDADD
@@ -144,6 +143,10 @@ SUBDIR.${MK_CHERI}+=	libpng_sb
 .if ${MK_CHERI} != "no"
 _libc_cheri=	libc_cheri
 _libcheri=	libcheri
+.endif
+
+.if ${MACHINE_CPUARCH} == mips
+SUBDIR+= libsimple_printf
 .endif
 
 .if !defined(COMPAT_32BIT) && !defined(COMPAT_SOFTFP)

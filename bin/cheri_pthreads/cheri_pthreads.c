@@ -35,6 +35,7 @@
 #endif
 
 #include <err.h>
+#include <errno.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
@@ -109,6 +110,8 @@ thread_func(void *_arg)
 		fprintf(stderr, "Thread %d did not receive signal!\n", arg->num);
 		pthread_exit(NULL);
 	}
+	errno = arg->num;
+	fprintf(stderr, "Thread %d set errno to %d\n", arg->num, errno);
 	fprintf(stderr, "Thread %d finished\n", arg->num);
 	return arg;
 }

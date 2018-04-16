@@ -1148,7 +1148,7 @@ get_string(pid_t pid, uintptr_t addr, int max)
 		size = max + 1;
 	else {
 		/* Read up to the end of the current page. */
-		size = PAGE_SIZE - (addr % PAGE_SIZE);
+		size = PAGE_SIZE - ((vaddr_t)addr % PAGE_SIZE);
 		if (size > MAXSIZE)
 			size = MAXSIZE;
 	}
@@ -1407,12 +1407,16 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 		 * a partial page.
 		 */
 		addr = args[sc->offset];
-		if (addr % sizeof(char *) != 0) {
+		if ((vaddr_t)addr % sizeof(char *) != 0) {
 			fprintf(fp, "0x%lx", args[sc->offset]);
 			break;
 		}
 
+#if __has_builtin(__builtin_align_up)
+		len = __builtin_align_up(addr, PAGE_SIZE) - addr;
+#else
 		len = PAGE_SIZE - (addr & (uintptr_t)PAGE_MASK);
+#endif
 		if (get_struct(pid, addr, u.buf, len) == -1) {
 			fprintf(fp, "0x%lx", args[sc->offset]);
 			break;

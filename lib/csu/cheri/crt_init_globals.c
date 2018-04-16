@@ -30,36 +30,28 @@
  */
 #include <sys/cdefs.h>
 #include <stdint.h>
+#include <stdlib.h>
 
-void crt_init_globals(void) __hidden;
+#include <cheri_init_globals.h>
 
-struct capreloc
-{
-	uint64_t capability_location;
-	uint64_t object;
-	uint64_t offset;
-	uint64_t size;
-	uint64_t permissions;
-};
-static const uint64_t function_reloc_flag = 1ULL<<63;
-static const uint64_t function_pointer_permissions =
-	~0 &
-	~__CHERI_CAP_PERMISSION_PERMIT_STORE_CAPABILITY__ &
-	~__CHERI_CAP_PERMISSION_PERMIT_STORE__;
-static const uint64_t global_pointer_permissions =
-	~0 & ~__CHERI_CAP_PERMISSION_PERMIT_EXECUTE__;
+/* Avoid adding an unncessary crt_init_globals() export from crt1.o for a
+ * function that the compiler will inline anyway: */
+#ifndef DONT_EXPORT_CRT_INIT_GLOBALS
+#define CRT_INIT_GLOBALS_STATIC
+#else
+#define CRT_INIT_GLOBALS_STATIC static __always_inline
+#endif
 
-__attribute__((weak))
-extern struct capreloc __start___cap_relocs;
-__attribute__((weak))
-extern struct capreloc __stop___cap_relocs;
+CRT_INIT_GLOBALS_STATIC void crt_init_globals(void) __hidden;
 
 __attribute__((weak)) extern int _DYNAMIC;
 
-void
+CRT_INIT_GLOBALS_STATIC void
 crt_init_globals(void)
 {
-	uint64_t _dynamic_addr = 0;;
+#ifdef PCREL_SYMBOL_ADDRESSES_WORK
+	void* _pcc_after_daddui = 0;
+	int64_t _dynamic_pcrel = 0;
 	/*
 	 * We can't get the address of _DYNAMIC in the purecap ABI before globals
 	 * are initialized so we need to use dla here. If _DYNAMIC exists
@@ -77,38 +69,41 @@ crt_init_globals(void)
 	     * don't also include it in the inline assembly
 	     */
 	    ".weak _DYNAMIC\n\t"
-	    /*
-	     * TODO: Try to use %pcrel here to avoid adding GOT slots here
-	     * TODO: Or add a symbol that is always a link-time constant to lld.
-	     * For example something like _CHERI_IS_DYNAMIC_
-	     */
-	    "dla %0, _DYNAMIC\n\t" : "=r"(_dynamic_addr));
+	    "lui %0, %%pcrel_hi(_DYNAMIC - 8)\n\t"
+	    "daddiu %0, %0, %%pcrel_lo(_DYNAMIC - 4)\n\t"
+	    "cgetpcc %1\n\t"
+	    : "+r"(_dynamic_pcrel), "+C"(_pcc_after_daddui));
 
 	/*
 	 * If the address of _DYNAMIC is non-zero then we are dynamically linked
 	 * and RTLD will be responsible for processing the capability relocs
+	 * FIXME: MIPS only has 32-bit pcrelative relocations so this overflows
+	 * For now just assume that if the pcrel value is greater than INT_MAX
+	 * the value of _DYNAMIC is zero
 	 */
-	if (_dynamic_addr != 0)
+	if ((vaddr_t)_pcc_after_daddui + _dynamic_pcrel != 0 &&
+	    labs(_dynamic_pcrel) <= (int64_t)INT32_MAX)
 		return;
-
-	void *gdc = __builtin_cheri_global_data_get();
-	void *pcc = __builtin_cheri_program_counter_get();
-
-	gdc = __builtin_cheri_perms_and(gdc, global_pointer_permissions);
-	pcc = __builtin_cheri_perms_and(pcc, function_pointer_permissions);
-	for (struct capreloc *reloc = &__start___cap_relocs ;
-	     reloc < &__stop___cap_relocs ; reloc++)
-	{
-		_Bool isFunction = (reloc->permissions & function_reloc_flag) ==
-			function_reloc_flag;
-		void **dest = __builtin_cheri_offset_set(gdc, reloc->capability_location);
-		void *base = isFunction ? pcc : gdc;
-		void *src = __builtin_cheri_offset_set(base, reloc->object);
-		if (!isFunction && (reloc->size != 0))
-		{
-			src = __builtin_cheri_bounds_set(src, reloc->size);
-		}
-		src = __builtin_cheri_offset_increment(src, reloc->offset);
-		*dest = src;
-	}
+#else
+	/*
+	 * XXXAR: Since the MIPS %pcrel doesn't appear to work to get the value
+	 * of _DYNAMIC without a text relocation I changed LLD to emit a symbol
+	 * _HAS__DYNAMIC instead. This also has the advantage that it only needs
+	 * a single instruction to load rather than the full dla/pcrel sequence.
+	 */
+	int64_t _has__DYNAMIC;
+	__asm__ volatile(".global _DYNAMIC\n\t"
+	    /*
+	     * XXXAR: For some reason the attribute weak above is ignored if we
+	     * don't also include it in the inline assembly
+	     */
+	    ".weak _DYNAMIC\n\t"
+	    "ori %0, $zero, %%lo(_HAS__DYNAMIC)\n\t"
+	    : "+r"(_has__DYNAMIC));
+	/* If we are dynamically linked, the runtime linker takes care of this */
+	if (_has__DYNAMIC)
+		return;
+#endif
+	/* Otherwise we need to initialize globals manually */
+	cheri_init_globals();
 }

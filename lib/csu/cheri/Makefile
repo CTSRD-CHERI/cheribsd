@@ -31,6 +31,8 @@ FILES+=	crt1.o					\
 	crtend.o				\
 	crtendS.o
 
+PICFLAG+=-DPOSITION_INDEPENDENT_STARTUP=1
+
 # Used for executables if neither -static nor -pie is passed
 crtbegin.o:	crtbeginC.c
 	${CC} ${CFLAGS} -c -o ${.TARGET} ${.ALLSRC}

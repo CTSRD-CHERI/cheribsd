@@ -21,6 +21,9 @@ CFLAGS+= -I${SRCTOP}/sys/cddl/contrib/opensolaris/uts/common/fs/zfs
 CFLAGS+= -I${SRCTOP}/sys
 CFLAGS+= -I${SRCTOP}/cddl/contrib/opensolaris/head
 CFLAGS+= -I${SRCTOP}/cddl/compat/opensolaris/lib/libumem
+.if defined(LIBCHERI)
+CFLAGS+= -Wno-cheri-bitwise-operations
+.endif
 
 # This library uses macros to define fprintf behavior for several object types
 # The compiler will see the non-string literal arguments to the fprintf calls and

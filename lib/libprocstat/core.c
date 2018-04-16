@@ -48,6 +48,22 @@ __FBSDID("$FreeBSD$");
 
 #include "core.h"
 
+#ifndef EF_MIPS_ABI
+#define	EF_MIPS_ABI		0x0000f000
+#endif
+#ifndef EF_MIPS_ABI_CHERIABI
+#define	EF_MIPS_ABI_CHERIABI	0x0000c000
+#endif
+#ifndef EF_MIPS_MACH_CHERI128
+#define	EF_MIPS_MACH_CHERI128	0x00C10000
+#endif
+#ifndef	EF_MIPS_MACH_CHERI256
+#define EF_MIPS_MACH_CHERI256	0x00C20000
+#endif
+#ifndef EF_MIPS_MACH
+#define	EF_MIPS_MACH		0x00FF0000
+#endif
+
 #define PROCSTAT_CORE_MAGIC	0x012DADB8
 struct procstat_core
 {
