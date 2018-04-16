@@ -820,7 +820,6 @@ MLINKS+=fail.9 KFAIL_POINT_CODE.9 \
 	fail.9 KFAIL_POINT_RETURN.9 \
 	fail.9 KFAIL_POINT_RETURN_VOID.9
 MLINKS+=fetch.9 fubyte.9 \
-	fetch.9 fuswintr.9 \
 	fetch.9 fuword.9 \
 	fetch.9 fuword16.9 \
 	fetch.9 fuword32.9 \
@@ -1751,7 +1750,6 @@ MLINKS+=stack.9 stack_copy.9 \
 	stack.9 stack_sbuf_print_ddb.9 \
 	stack.9 stack_zero.9
 MLINKS+=store.9 subyte.9 \
-	store.9 suswintr.9 \
 	store.9 suword.9 \
 	store.9 suword16.9 \
 	store.9 suword32.9 \
