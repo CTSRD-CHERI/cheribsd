@@ -77,6 +77,20 @@ LEAF(rtld_start)
 
 	PIC_CALL(_rtld_relocate_nonplt_self) /* &_DYNAMIC, relocbase */
 
+	/*
+	 * Now that we have processed the self relocations we can do the
+	 * __cap_relocs processing (the location needs to be adjusted to the
+	 * real address).
+	 * TODO: since there should be no external symbols in __cap_relocs we
+	 * should be able to do this before _rtld_relocate_nonplt_self and just
+	 * add the relocabase value to all targets and sources instead of the
+	 * more expensive ELF_REL processing.
+	 */
+	PIC_LOAD_CODE_PTR($c3, a0, __start___cap_relocs)
+	PIC_LOAD_CODE_PTR($c4, a1, __stop___cap_relocs)
+	PIC_CALL(_rtld_do___caprelocs_self) /* (&__start___cap_relocs, &__stop___cap_relocs) */
+
+
 	clc		$c3, zero, SFRAME_AUXARGS($c11)
 	/* XXX-BD: Should allocate cleanup and objp outside stack. */
 	dli		t1, CHERICAP_SIZE

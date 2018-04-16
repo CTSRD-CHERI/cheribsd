@@ -62,6 +62,7 @@
 #include "libcheri_sandbox_metadata.h"
 #include "libcheri_sandbox_methods.h"
 #include "libcheri_sandboxasm.h"
+#include "libcheri_private.h"
 
 #define	roundup2(x, y)	(((x)+((y)-1))&(~((y)-1))) /* if y is powers of two */
 

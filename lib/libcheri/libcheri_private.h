@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014 Robert N. M. Watson
+ * Copyright (c) 2018 Alex Richardson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -28,51 +28,23 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/types.h>
+#ifndef _LIBCHERI_PRIVATE_H_
+#define _LIBCHERI_PRIVATE_H_
 
-#include <assert.h>
-#include <stdlib.h>
+#ifdef DEBUG
+#define dbg(...)	fprintf(stderr, __VA_ARGS__)
+#else
+#define dbg(...)	do {} while(0)
+#endif
 
-void	crt_init_globals(void);
-void	crt_call_constructors(void);
+#ifdef ELF_LOADER_DEBUG
+#define loader_dbg(...)	\
+	do {							\
+		if (sb_verbose) fprintf(stderr, __VA_ARGS__);	\
+	} while (0)
+#else
+#define loader_dbg(...) do {} while(0)
+#endif
 
-/*
- * In version 3 of the CHERI sandbox ABI, function pointers are capabilities.
- * The CTORs list is the single exception: CTORs are used to set up globals
- * that contain function pointers so (until we have proper linker support) we
- * are still generating them as a sequence of PCC-relative integers.
- */
-typedef unsigned long long mips_function_ptr;
-typedef void (*cheri_function_ptr)(void);
 
-extern mips_function_ptr __ctors_start[];
-extern mips_function_ptr __ctors_end;
-
-extern mips_function_ptr __dtors_start[];
-extern mips_function_ptr __dtors_end;
-
-extern void *__dso_handle;
-void *__dso_handle;
-
-/*
- * Execute constructors; invoked by the crt_sb.S startup code.
- *
- * NB: This code and approach is borrowed from the MIPS ABI, and works as long
- * as CHERI code generation continues to use 64-bit integers for pointers.  If
- * that changes, this might need to become more capability-appropriate.
- */
-void
-crt_call_constructors(void)
-{
-	mips_function_ptr *func = &__ctors_start[0];
-	mips_function_ptr *end = __builtin_cheri_offset_set(func,
-	    (char*)&__ctors_end - (char*)func);
-	for (; func != end; func++) {
-		if (*func != (mips_function_ptr)-1) {
-			cheri_function_ptr cheri_func =
-				(cheri_function_ptr)__builtin_cheri_offset_set(
-						__builtin_cheri_program_counter_get(), *func);
-			cheri_func();
-		}
-	}
-}
+#endif

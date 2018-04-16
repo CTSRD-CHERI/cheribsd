@@ -55,11 +55,15 @@ __FBSDID("$FreeBSD: head/lib/csu/mips/crt1_c.c 245133 2013-01-07 17:58:27Z kib $
 #include "libc_private.h"
 #include "crtbrand.c"
 #include "ignore_init.c"
+/* For -pie executables rtld will initialize the __cap_relocs */
+#ifndef POSITION_INDEPENDENT_STARTUP
+#define DONT_EXPORT_CRT_INIT_GLOBALS
 #include "crt_init_globals.c"
+#endif
 
 struct Struct_Obj_Entry;
 
-void __start(void *, void (*)(void), struct Struct_Obj_Entry *);
+static void _start(void *, void (*)(void), struct Struct_Obj_Entry *) __used;
 extern void crt_call_constructors(void);
 
 #ifdef GCRT
@@ -72,6 +76,28 @@ extern int etext;
 
 Elf_Auxinfo *__auxargs;
 
+/* Define an assembly stub that sets up $cgp and jumps to _start */
+#ifndef POSITION_INDEPENDENT_STARTUP
+DEFINE_CHERI_START_FUNCTION(_start)
+#else
+/* RTLD takes care of initializing $cgp, and all the globals */
+/* FIXME: we should probably just rename _start to __start instead of jumping */
+asm(
+	".text\n\t"
+	".global __start\n\t"
+	"__start:\n\t"
+	".set noreorder\n\t"
+	".set noat\n\t"
+	".protected _start\n\t"
+	/* Setup $c12 correctly in case we are inferring $cgp from $c12 */
+	"lui $1, %pcrel_hi(_start - 8)\n\t"
+	"daddiu $1, $1, %pcrel_lo(_start - 4)\n\t"
+	"cgetpcc $c12\n\t"
+	"cincoffset $c12, $c12, $1\n\t"
+	"cjr $c12\n\t"
+	"nop\n\t");
+#endif
+
 /* The entry function, C part. This performs the bulk of program initialisation
  * before handing off to main(). It is called by __start, which is defined in
  * crt1_s.s, and necessarily written in raw assembly so that it can re-align
@@ -82,8 +108,8 @@ Elf_Auxinfo *__auxargs;
  * the position independent code in __start.
  * See: http://stackoverflow.com/questions/8095531/mips-elf-and-partial-linking
  */
-void
-__start(void *auxv,
+static void
+_start(void *auxv,
 	void (*cleanup)(void),			/* from shared loader */
 	struct Struct_Obj_Entry *obj __unused)	/* from shared loader */
 {
@@ -94,7 +120,11 @@ __start(void *auxv,
 	char **env = NULL;
 	Elf_Auxinfo *auxp;
 
+	/* For -pie executables rtld will initialize the __cap_relocs */
+#ifndef POSITION_INDEPENDENT_STARTUP
+	/* Must be called before accessing any globals */
 	crt_init_globals();
+#endif
 
 	__auxargs = auxv;
 	/* Digest the auxiliary vector. */

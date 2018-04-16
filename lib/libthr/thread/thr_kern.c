@@ -209,5 +209,11 @@ _thr_wake_all(unsigned int *waddrs[], int count)
 
 	for (i = 0; i < count; ++i)
 		*waddrs[i] = 1;
+#ifndef __CHERI_PURE_CAPABILITY__
 	_umtx_op(waddrs, UMTX_OP_NWAKE_PRIVATE, count, NULL, NULL);
+#else
+	/* Work around https://github.com/CTSRD-CHERI/cheribsd/issues/255 */
+	for (i = 0; i < count; ++i)
+		_umtx_op(waddrs[i], UMTX_OP_WAKE_PRIVATE, INT_MAX, NULL, NULL);
+#endif
 }

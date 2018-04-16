@@ -39,11 +39,11 @@
  * For an AVL tree we know that its maximum height of a tree is bounded
  * by approximately 1.44 * log2(n) - 0.328. Given that the number of
  * entries of the tree is constrained by the size of the address space,
- * two uintptr_t's provide sufficient space to store the path from the
+ * two size_t's provide sufficient space to store the path from the
  * root to any leaf.
  */
 struct path {
-	uintptr_t steps[2];
+	size_t steps[2];
 	unsigned int nsteps;
 };
 
@@ -55,7 +55,7 @@ path_init(struct path *p)
 	p->nsteps = 0;
 }
 
-#define	STEPS_BIT (sizeof(uintptr_t) * CHAR_BIT)
+#define	STEPS_BIT (sizeof(size_t) * CHAR_BIT)
 
 /* Pushes a step to the left to the end of the path. */
 static inline void
@@ -63,7 +63,7 @@ path_taking_left(struct path *p)
 {
 
 	p->steps[p->nsteps / STEPS_BIT] |=
-	    (uintptr_t)1 << (p->nsteps % STEPS_BIT);
+	    (size_t)1 << (p->nsteps % STEPS_BIT);
 	++p->nsteps;
 }
 
@@ -73,7 +73,7 @@ path_taking_right(struct path *p)
 {
 
 	p->steps[p->nsteps / STEPS_BIT] &=
-	    ~((uintptr_t)1 << (p->nsteps % STEPS_BIT));
+	    ~((size_t)1 << (p->nsteps % STEPS_BIT));
 	++p->nsteps;
 }
 
@@ -86,7 +86,7 @@ path_took_left(struct path *p)
 {
 	bool result;
 
-	result = (uintptr_t)p->steps[0] & (uintptr_t)0x1;
+	result = (size_t)p->steps[0] & (size_t)0x1;
 	p->steps[0] = (p->steps[0] >> 1) | (p->steps[1] << (STEPS_BIT - 1));
 	p->steps[1] >>= 1;
 	return (result);

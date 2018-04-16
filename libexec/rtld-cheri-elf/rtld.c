@@ -291,79 +291,6 @@ char *ld_env_prefix = LD_;
     (dlp)->num_alloc = obj_count,				\
     (dlp)->num_used = 0)
 
-/* TODO: Use the version in from clang cheri_init_globals.h */
-struct capreloc {
-	uint64_t capability_location;
-	uint64_t object;
-	uint64_t offset;
-	uint64_t size;
-	uint64_t permissions;
-};
-
-static const uint64_t function_reloc_flag = 1ULL<<63;
-static const uint64_t function_pointer_permissions =
-	~0 &
-	~__CHERI_CAP_PERMISSION_PERMIT_STORE_CAPABILITY__ &
-	~__CHERI_CAP_PERMISSION_PERMIT_STORE__;
-static const uint64_t global_pointer_permissions =
-	~0 & ~__CHERI_CAP_PERMISSION_PERMIT_EXECUTE__;
-
-__attribute__((weak))
-extern struct capreloc __start___cap_relocs;
-__attribute__((weak))
-extern struct capreloc __stop___cap_relocs;
-
-static void
-process___cap_relocs(Obj_Entry* obj, const struct capreloc* start,
-    const struct capreloc* end)
-{
-	if (obj->cap_relocs_processed) {
-		dbg("__cap_relocs for %s have already been processed!", obj->path);
-		/* TODO: abort() to prevent this from happening? */
-		return;
-	}
-	/*
-	 * It would be nice if we could use a DDC and PCC with smaller bounds
-	 * here. However, the target could be in a different shared library so
-	 * while we are still using __cap_relocs just derive it from RTLD.
-	 */
-	void *gdc = __builtin_cheri_global_data_get();
-	void *pcc = __builtin_cheri_program_counter_get();
-	/*
-	 * We currently emit dynamic relocations for the cap_relocs location, so
-	 * they will already have been processed when this function is called.
-	 * This means the load address will already be included in
-	 * reloc->capability_location.
-	 */
-#if 0
-	/* TODO: don't emit dynamic relocations for obj->capability_location */
-	vaddr_t base_addr = (vaddr_t)obj->relocbase;
-#endif
-	vaddr_t base_addr = 0;
-
-	dbg("Processing %lu __cap_relocs for %s\n", (end - start),
-	    obj->path ? obj->path : "RTLD");
-
-	gdc = __builtin_cheri_perms_and(gdc, global_pointer_permissions);
-	pcc = __builtin_cheri_perms_and(pcc, function_pointer_permissions);
-	for (const struct capreloc *reloc = start; reloc < end; reloc++)
-	{
-		_Bool isFunction = (reloc->permissions & function_reloc_flag) ==
-		    function_reloc_flag;
-		void **dest = __builtin_cheri_offset_set(gdc,
-		    reloc->capability_location + base_addr);
-		void *base = isFunction ? pcc : gdc;
-		void *src = __builtin_cheri_offset_set(base, reloc->object);
-		if (!isFunction && (reloc->size != 0))
-		{
-			src = __builtin_cheri_bounds_set(src, reloc->size);
-		}
-		src = __builtin_cheri_offset_increment(src, reloc->offset);
-		*dest = src;
-	}
-	obj->cap_relocs_processed = true;
-}
-
 #define	LD_UTRACE(e, h, mb, ms, r, n) do {			\
 	if (ld_utrace != NULL)					\
 		ld_utrace_log(e, h, mb, ms, r, n);		\
@@ -1337,7 +1264,7 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 		break;
 
 	case DT_MIPS_RLD_MAP:
-		*((Elf_Addr *)cheri_setoffset(cheri_getdefault(), dynp->d_un.d_ptr)) = (Elf_Addr) &r_debug;
+		*((Elf_Addr *)(obj->relocbase + dynp->d_un.d_ptr)) = (Elf_Addr) &r_debug;
 		break;
 #endif
 
@@ -2116,6 +2043,8 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
      * The "path" member can't be initialized yet because string constants
      * cannot yet be accessed. Below we will set it correctly.
      */
+    // FIXME:calling memset will fault in cap-table abi, we need to do
+    // crt_init_globals before here.....
     memset(&objtmp, 0, sizeof(objtmp));
     objtmp.path = NULL;
     objtmp.rtld = true;
@@ -2144,19 +2073,20 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
     /* Initialize the object list. */
     TAILQ_INIT(&obj_list);
 
+#ifdef DEBUG_VERBOSE
     if (objtmp.cap_relocs) {
 	size_t cap_relocs_size =
 	    ((caddr_t)&__stop___cap_relocs - (caddr_t)&__start___cap_relocs);
-#ifdef DEBUG_VERBOSE
-	rtld_printf("RTLD has DT_CHERI___CAPRELOCS = %#p, __start___cap_relocs
+	rtld_printf("RTLD has DT_CHERI___CAPRELOCS = %#p, __start___cap_relocs"
 	    "= %#p\nDT_CHERI___CAPRELOCSSZ = %zd, difference = %zd",
 	    objtmp.cap_relocs, &__start___cap_relocs, cap_relocs_size,
 	    objtmp.cap_relocs_size);
-#endif
 	assert((vaddr_t)objtmp.cap_relocs == (vaddr_t)&__start___cap_relocs);
 	assert(objtmp.cap_relocs_size == cap_relocs_size);
     }
-    process___cap_relocs(&objtmp, &__start___cap_relocs, &__stop___cap_relocs);
+#endif
+    /* This was done in _rtld_do___caprelocs_self */
+    objtmp.cap_relocs_processed = true;
 
     /* Now that non-local variables can be accesses, copy out obj_rtld. */
     memcpy(&obj_rtld, &objtmp, sizeof(obj_rtld));
@@ -2914,12 +2844,9 @@ relocate_object(Obj_Entry *obj, bool bind_now, Obj_Entry *rtldobj,
 		return (-1);
 
 	/* Process the __cap_relocs section to initialize global capabilities */
-	if (obj->cap_relocs_size) {
-		struct capreloc *cap_relocs_end =
-		    (struct capreloc*)(obj->cap_relocs + obj->cap_relocs_size);
-		process___cap_relocs(obj, (struct capreloc*)obj->cap_relocs,
-		    cap_relocs_end);
-	}
+	if (obj->cap_relocs_size)
+		process___cap_relocs(obj);
+
 
 	/* Re-protected the text segment. */
 	if (obj->textrel && reloc_textrel_prot(obj, false) != 0)

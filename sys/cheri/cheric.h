@@ -43,36 +43,36 @@
  * CHERI-aware Clang/LLVM, and full capability context switching, so not yet
  * usable in the kernel.
  */
-#define	cheri_getlen(x)		__builtin_mips_cheri_get_cap_length((x))
-#define	cheri_getbase(x)	__builtin_mips_cheri_get_cap_base((x))
-#define	cheri_getoffset(x)	__builtin_mips_cheri_cap_offset_get((x))
-#define	cheri_getperm(x)	__builtin_mips_cheri_get_cap_perms((x))
-#define	cheri_getsealed(x)	__builtin_mips_cheri_get_cap_sealed((x))
-#define	cheri_gettag(x)		__builtin_mips_cheri_get_cap_tag((x))
-#define	cheri_gettype(x)	__builtin_mips_cheri_get_cap_type((x))
+#define	cheri_getlen(x)		__builtin_cheri_length_get((x))
+#define	cheri_getbase(x)	__builtin_cheri_base_get((x))
+#define	cheri_getoffset(x)	__builtin_cheri_offset_get((x))
+#define	cheri_getperm(x)	__builtin_cheri_perms_get((x))
+#define	cheri_getsealed(x)	__builtin_cheri_sealed_get((x))
+#define	cheri_gettag(x)		__builtin_cheri_tag_get((x))
+#define	cheri_gettype(x)	__builtin_cheri_type_get((x))
 
-#define	cheri_andperm(x, y)	__builtin_mips_cheri_and_cap_perms((x), (y))
-#define	cheri_cleartag(x)	__builtin_mips_cheri_clear_cap_tag((x))
-#define	cheri_incoffset(x, y)	__builtin_mips_cheri_cap_offset_increment((x), (y))
-#define	cheri_setoffset(x, y)	__builtin_mips_cheri_cap_offset_set((x), (y))
+#define	cheri_andperm(x, y)	__builtin_cheri_perms_and((x), (y))
+#define	cheri_cleartag(x)	__builtin_cheri_tag_clear((x))
+#define	cheri_incoffset(x, y)	__builtin_cheri_offset_increment((x), (y))
+#define	cheri_setoffset(x, y)	__builtin_cheri_offset_set((x), (y))
 
-#define	cheri_seal(x, y)	__builtin_mips_cheri_seal_cap((x), (y))
-#define	cheri_unseal(x, y)	__builtin_mips_cheri_unseal_cap((x), (y))
+#define	cheri_seal(x, y)	__builtin_cheri_seal((x), (y))
+#define	cheri_unseal(x, y)	__builtin_cheri_unseal((x), (y))
 
 #define	cheri_getcause()	__builtin_mips_cheri_get_cause()
 #define	cheri_setcause(x)	__builtin_mips_cheri_set_cause(x)
 
-#define	cheri_ccheckperm(c, p)	__builtin_mips_cheri_check_perms((c), (p))
-#define	cheri_cchecktype(c, t)	__builtin_mips_cheri_check_type((c), (t))
+#define	cheri_ccheckperm(c, p)	__builtin_cheri_perms_check((c), (p))
+#define	cheri_cchecktype(c, t)	__builtin_cheri_type_check((c), (t))
 
-#define	cheri_getdefault()	__builtin_mips_cheri_get_global_data_cap()
+#define	cheri_getdefault()	__builtin_cheri_global_data_get()
 #define	cheri_getidc()		__builtin_mips_cheri_get_invoke_data_cap()
 #define	cheri_getkr0c()		__builtin_mips_cheri_get_kernel_cap1()
 #define	cheri_getkr1c()		__builtin_mips_cheri_get_kernel_cap2()
 #define	cheri_getkcc()		__builtin_mips_cheri_get_kernel_code_cap()
 #define	cheri_getkdc()		__builtin_mips_cheri_get_kernel_data_cap()
 #define	cheri_getepcc()		__builtin_mips_cheri_get_exception_program_counter_cap()
-#define	cheri_getpcc()		__builtin_mips_cheri_get_program_counter_cap()
+#define	cheri_getpcc()		__builtin_cheri_program_counter_get()
 #define	cheri_getstack()	__builtin_cheri_stack_get()
 
 #define	cheri_local(c)		cheri_andperm((c), ~CHERI_PERM_GLOBAL)

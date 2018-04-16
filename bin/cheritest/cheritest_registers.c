@@ -127,7 +127,7 @@ test_listregs(const struct cheri_test *ctp __unused)
 static void
 check_initreg_code(__capability void *c)
 {
-	register_t v;
+	uintmax_t v;
 
 	/* Base. */
 	v = cheri_getbase(c);
@@ -199,7 +199,7 @@ check_initreg_code(__capability void *c)
 
 	if ((v & CHERI_PERMS_SWALL) !=
 	    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP))
-		cheritest_failure_errx("perms %jx (expected swperms %jx)", v,
+		cheritest_failure_errx("perms %jx (expected swperms %x)", v,
 		    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP));
 
 	/* Sealed bit. */
@@ -217,7 +217,7 @@ check_initreg_code(__capability void *c)
 static void
 check_initreg_data(__capability void *c)
 {
-	register_t v;
+	uintmax_t v;
 
 	/* Base. */
 	v = cheri_getbase(c);
@@ -288,7 +288,7 @@ check_initreg_data(__capability void *c)
 		cheritest_failure_errx("perms %jx (system_regs present)", v);
 
 	if ((v & CHERI_PERMS_SWALL) != CHERI_PERMS_SWALL)
-		cheritest_failure_errx("perms %jx (expected swperms %jx)", v,
+		cheritest_failure_errx("perms %jx (expected swperms %x)", v,
 		    CHERI_PERMS_SWALL);
 
 	/* Sealed bit. */
@@ -397,7 +397,7 @@ test_initregs_stack(const struct cheri_test *ctp __unused)
 
 	if ((v & CHERI_PERMS_SWALL) !=
 	    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP))
-		cheritest_failure_errx("perms %jx (expected swperms %jx)", v,
+		cheritest_failure_errx("perms %jx (expected swperms %x)", v,
 		    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP));
 
 	/* Sealed bit. */
@@ -417,7 +417,42 @@ void
 test_initregs_idc(const struct cheri_test *ctp __unused)
 {
 
+#ifndef __CHERI_CAPABILITY_TABLE__
 	check_initreg_data(cheri_getidc());
+#else
+	void* __capability cgp = cheri_getidc();
+	uintmax_t perms = cheri_getperm(cgp);
+	extern void _CHERI_CAPABILITY_TABLE_;
+	void* __capability cap_table = &_CHERI_CAPABILITY_TABLE_;
+	/* TODO: this should probably be a preprocessor macro instead */
+	_Bool pcrelative_captable = (perms & CHERI_PERM_EXECUTE) != 0;
+
+	CHERITEST_VERIFY(cheri_getlen(cgp) != 0);
+	CHERITEST_VERIFY2((perms & CHERI_PERM_STORE) == 0,
+	    "perms %jx (store should not be set)", perms);
+	CHERITEST_VERIFY2((perms & CHERI_PERM_STORE_CAP) == 0,
+	    "perms %jx (store_cap should not be set)", perms);
+	CHERITEST_VERIFY2((perms & CHERI_PERM_STORE_LOCAL_CAP) == 0,
+	    "perms %jx (store_local_cap should not be set)", perms);
+	CHERITEST_VERIFY2((vaddr_t)cap_table == (vaddr_t)cgp,
+	    "$cgp (%#p) does not point to _CHERI_CAPABILITY_TABLE_ (%#p)", cgp,
+	    cap_table);
+
+	/* XXXAR: pcrelative ABI is a bit different: */
+	if (pcrelative_captable) {
+		CHERITEST_VERIFY(cheri_getoffset(cgp) != 0);
+		void* __capability pcc = cheri_getpcc();
+		CHERITEST_VERIFY(cheri_getbase(cgp) == cheri_getbase(pcc));
+	} else {
+		CHERITEST_VERIFY(cheri_getbase(cgp) != 0);
+		CHERITEST_VERIFY(cheri_getbase(cgp) == cheri_getbase(cap_table));
+		CHERITEST_VERIFY(cheri_getlen(cgp) == cheri_getlen(cap_table));
+		CHERITEST_VERIFY(cheri_getoffset(cgp) == cheri_getoffset(cap_table));
+		CHERITEST_VERIFY2((perms & CHERI_PERM_EXECUTE) == 0,
+			"perms %jx (execute should not be set)", perms);
+	}
+#endif
+	cheritest_success();
 }
 
 void

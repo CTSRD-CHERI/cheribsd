@@ -8,21 +8,41 @@
 #define PAGE		((size_t)(1U << LG_PAGE))
 #define PAGE_MASK	((size_t)(PAGE - 1))
 /* Return the page base address for the page containing address a. */
+#if __has_builtin(__builtin_align_down)
+#define PAGE_ADDR2BASE(a)						\
+	__builtin_align_down((a), PAGE)
+#else
 #define PAGE_ADDR2BASE(a)						\
 	((void *)((uintptr_t)(a) & (uintptr_t)~PAGE_MASK))
+#endif
 /* Return the smallest pagesize multiple that is >= s. */
+#if __has_builtin(__builtin_align_up)
+#define PAGE_CEILING(s)							\
+	__builtin_align_up((s), PAGE)
+#else
 #define PAGE_CEILING(s)							\
 	((uintptr_t)((s) + PAGE_MASK) & (uintptr_t)~PAGE_MASK)
+#endif
 
 /* Huge page size.  LG_HUGEPAGE is determined by the configure script. */
 #define HUGEPAGE	((size_t)(1U << LG_HUGEPAGE))
 #define HUGEPAGE_MASK	((size_t)(HUGEPAGE - 1))
 /* Return the huge page base address for the huge page containing address a. */
+#if __has_builtin(__builtin_align_down)
+#define HUGEPAGE_ADDR2BASE(a)						\
+	__builtin_align_down((a), HUGEPAGE)
+#else
 #define HUGEPAGE_ADDR2BASE(a)						\
 	((void *)((uintptr_t)(a) & (uintptr_t)~HUGEPAGE_MASK))
+#endif
 /* Return the smallest pagesize multiple that is >= s. */
+#if __has_builtin(__builtin_align_up)
+#define HUGEPAGE_CEILING(s)						\
+	__builtin_align_up((s), HUGEPAGE)
+#else
 #define HUGEPAGE_CEILING(s)						\
 	(((s) + HUGEPAGE_MASK) & ~HUGEPAGE_MASK)
+#endif
 
 /* PAGES_CAN_PURGE_LAZY is defined if lazy purging is supported. */
 #if defined(_WIN32) || defined(JEMALLOC_PURGE_MADVISE_FREE)

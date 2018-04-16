@@ -98,11 +98,11 @@ extern bool Sm_IO_DidInit;
 
 extern const char SmFileMagic[];
 
-/*
- * XXX-CHERI: Relies on p having a sufficently aligned base.  This is true
- * for malloc() or stack allocations.
- */
+#if __has_builtin(__builtin_align_up)
+#define	SM_ALIGN(p)	__builtin_align_up((p), SM_ALIGN_BITS + 1)
+#else
 #define SM_ALIGN(p)	(((uintptr_t)(p) + SM_ALIGN_BITS) & (uintptr_t)~SM_ALIGN_BITS)
+#endif
 
 #define sm_io_flockfile(fp)	((void) 0)
 #define sm_io_funlockfile(fp)	((void) 0)
