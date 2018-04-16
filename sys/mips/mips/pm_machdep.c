@@ -516,7 +516,9 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 			return (EINVAL);
 		}
 		cfp = malloc(sizeof(*cfp), M_TEMP, M_WAITOK);
-		error = copyincap((void *)mcp->mc_cp2state, cfp,
+		error = copyincap_c(__USER_CAP((void *)mcp->mc_cp2state,
+		    mcp->mc_cp2state_len),
+		    (__cheri_tocap struct cheri_frame * __capability)cfp,
 		    sizeof(*cfp));
 		if (error) {
 			free(cfp, M_TEMP);

@@ -226,34 +226,6 @@ END(copyin)
 
 #ifdef CPU_CHERI
 /*
- * Copy specified amount of data from user space into the kernel, preserving
- * capability tags
- *	copyincap(from, to, len)
- *	          caddr_t *from;	(user source address)
- *	          caddr_t *to;		(kernel destination address)
- *	          unsigned len;
- */
-NESTED(copyincap, CALLFRAME_SIZ, ra)
-	PTR_SUBU	sp, sp, CALLFRAME_SIZ
-	.mask	0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ)
-	PTR_LA	v0, copyerr
-	blt	a0, zero, _C_LABEL(copyerr)  # make sure address is in user space
-	REG_S	ra, CALLFRAME_RA(sp)
-	GET_CPU_PCPU(v1)
-	PTR_L	v1, PC_CURPCB(v1)
-	PTR_LA	t9, _C_LABEL(cheri_bcopy)
-	jalr	t9
-	PTR_S	v0, U_PCB_ONFAULT(v1)
-	REG_L	ra, CALLFRAME_RA(sp)
-	GET_CPU_PCPU(v1)
-	PTR_L	v1, PC_CURPCB(v1)	# cheri_bcopy modified v1, so reload
-	PTR_S	zero, U_PCB_ONFAULT(v1)
-	PTR_ADDU	sp, sp, CALLFRAME_SIZ
-	j	ra
-	move	v0, zero
-END(copyincap)
-
-/*
  * Copy specified amount of data from user space into the kernel via
  * capabilities
  * NOTE: Does not copy capabilities
