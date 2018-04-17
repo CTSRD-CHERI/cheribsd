@@ -402,6 +402,8 @@ uint32_t casuword32_c(volatile uint32_t * __capability base, uint32_t oldval,
 	    uint32_t newval);
 u_long	casuword_c(volatile u_long * __capability base, u_long oldval,
 	    u_long newval);
+int	casueword_c(volatile u_long * __capability base, u_long oldval,
+	    u_long *oldvalp, u_long newval);
 int	casueword32_c(volatile uint32_t * __capability base, uint32_t oldval,
 	    uint32_t *oldvalp, uint32_t newval);
 #else
