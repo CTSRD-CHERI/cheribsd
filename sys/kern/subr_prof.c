@@ -470,20 +470,16 @@ void
 addupc_intr(struct thread *td, uintfptr_t pc, u_int ticks)
 {
 	struct uprof *prof;
-	caddr_t addr;
-	u_int i;
 
 	if (ticks == 0)
 		return;
 	prof = &td->td_proc->p_stats->p_prof;
 	PROC_PROFLOCK(td->td_proc);
-	if (pc < prof->pr_off ||
-	    (i = PC_TO_INDEX(pc, prof)) >= prof->pr_size) {
+	if (pc < prof->pr_off || PC_TO_INDEX(pc, prof) >= prof->pr_size) {
 		PROC_PROFUNLOCK(td->td_proc);
 		return;			/* out of range; ignore */
 	}
 
-	addr = __DECAP_CHECK(prof->pr_base + i, sizeof(short));
 	PROC_PROFUNLOCK(td->td_proc);
 	td->td_profil_addr = pc;
 	td->td_profil_ticks = ticks;
@@ -494,8 +490,8 @@ addupc_intr(struct thread *td, uintfptr_t pc, u_int ticks)
 }
 
 /*
- * Much like before, but we can afford to take faults here.  If the
- * update fails, we simply turn off profiling.
+ * Actually update the profiling statistics.  If the update fails, we
+ * simply turn off profiling.
  */
 void
 addupc_task(struct thread *td, uintfptr_t pc, u_int ticks)
