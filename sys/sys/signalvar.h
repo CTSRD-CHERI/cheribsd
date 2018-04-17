@@ -217,6 +217,7 @@ struct osigevent {
 };
 #endif
 
+#ifdef _KERNEL
 typedef struct ksiginfo {
 	TAILQ_ENTRY(ksiginfo)	ksi_link;
 	siginfo_t		ksi_info;
@@ -249,6 +250,7 @@ typedef struct ksiginfo {
 #define	KSI_COPYMASK	(KSI_TRAP | KSI_SIGQ | KSI_PTRACE | KSI_CHERI)
 
 #define	KSI_ONQ(ksi)	((ksi)->ksi_sigq != NULL)
+#endif /* _KERNEL */
 
 typedef struct sigqueue {
 	sigset_t	sq_signals;	/* All pending signals. */
