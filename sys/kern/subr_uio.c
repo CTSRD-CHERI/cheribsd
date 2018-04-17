@@ -672,40 +672,44 @@ casuword(volatile u_long *addr, u_long old, u_long new)
 #endif /* NO_FUEWORD */
 
 #if __has_feature(capabilities)
-int
-fueword_c(volatile const void * __capability base, long *val)
+long
+fuword_c(volatile const void * __capability base)
 {
-	long res;
+	long val;
 
-	res = fuword_c(base);
-	if (res == -1)
+	if (fueword_c(base, &val) == -1)
 		return (-1);
-	*val = res;
-	return (0);
+	return (val);
 }
 
 int
-fueword32_c(volatile const void * __capability base, int32_t *val)
+fuword32_c(volatile const void * __capability base)
 {
-	int32_t res;
+	int32_t val;
 
-	res = fuword32_c(base);
-	if (res == -1)
+	if (fueword32_c(base, &val) == -1)
 		return (-1);
-	*val = res;
-	return (0);
+	return (val);
 }
 
-int
-casueword32_c(volatile uint32_t * __capability base, uint32_t oldval,
-    uint32_t *oldvalp, uint32_t newval)
+int64_t
+fuword64_c(volatile const void * __capability base)
+{
+	int64_t val;
+
+	if (fueword64_c(base, &val) == -1)
+		return (-1);
+	return (val);
+}
+
+uint32_t
+casuword32_c(volatile uint32_t * __capability base, uint32_t oldval,
+    uint32_t newval)
 {
 	int32_t ov;
 
-	ov = casuword32_c(base, oldval, newval);
-	if (ov == -1)
+	if (casueword32_c(base, oldval, &ov, newval) == -1)
 		return (-1);
-	*oldvalp = ov;
-	return (0);
+	return (ov);
 }
 #endif

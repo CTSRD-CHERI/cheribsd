@@ -606,13 +606,11 @@ END(fswberr)
 
 #ifdef CPU_CHERI
 /*
- * {fu,su},{ibyte,isword,iword}, fetch or store a byte, short or word to
- * user text space.
- * {fu,su},{byte,cap,sword,word}, fetch or store a byte, short or word to
+ * {fue,su},{byte,cap,sword,word}, fetch or store a byte, short or word to
  * user data space.
  */
-LEAF(fuword64_c)
-XLEAF(fuword_c)
+LEAF(fueword64_c)
+XLEAF(fueword_c)
 	PTR_LA	v0, fswberr
 	cgetbase	t0, $c3
 	blt	t0, zero, fswberr	# make sure address is in user space
@@ -621,11 +619,13 @@ XLEAF(fuword_c)
 	PTR_L	v1, PC_CURPCB(v1)
 	PTR_S	v0, U_PCB_ONFAULT(v1)
 	cld	v0, zero, 0($c3)	# fetch word
-	j	ra
 	PTR_S	zero, U_PCB_ONFAULT(v1)
-END(fuword64_c)
+	sd	v0, 0(a0)		# store word
+	j	ra
+	li	v0, 0
+END(fueword64_c)
 
-LEAF(fuword32_c)
+LEAF(fueword32_c)
 	PTR_LA	v0, fswberr
 	cgetbase	t0, $c3
 	blt	t0, zero, fswberr	# make sure address is in user space
@@ -634,11 +634,13 @@ LEAF(fuword32_c)
 	PTR_L	v1, PC_CURPCB(v1)
 	PTR_S	v0, U_PCB_ONFAULT(v1)
 	clw	v0, zero, 0($c3)	# fetch word
-	j	ra
 	PTR_S	zero, U_PCB_ONFAULT(v1)
-END(fuword32_c)
+	sw	v0, 0(a0)		# store word
+	j	ra
+	li	v0, 0
+END(fueword32_c)
 
-LEAF(fusword_c)
+LEAF(fuesword_c)
 	PTR_LA	v0, fswberr
 	cgetbase	t0, $c3
 	blt	t0, zero, fswberr	# make sure address is in user space
@@ -647,9 +649,11 @@ LEAF(fusword_c)
 	PTR_L	v1, PC_CURPCB(v1)
 	PTR_S	v0, U_PCB_ONFAULT(v1)
 	clhu	v0, zero, 0($c3)	# fetch short
-	j	ra
 	PTR_S	zero, U_PCB_ONFAULT(v1)
-END(fusword_c)
+	sh	v0, 0(a0)		# store short
+	j	ra
+	li	v0, 0
+END(fuesword_c)
 
 LEAF(fubyte_c)
 	PTR_LA	v0, fswberr
@@ -674,8 +678,8 @@ LEAF(fuecap_c)
 	PTR_L	v1, PC_CURPCB(v1)
 	PTR_S	v0, U_PCB_ONFAULT(v1)
 	clw	v0, zero, 0($c3)	# fetch capability
-	csc	v0, zero, 0($c4)	# store capability
 	PTR_S	zero, U_PCB_ONFAULT(v1)
+	csc	v0, zero, 0($c4)	# store capability
 	j	ra
 	li	v0, 0
 END(fuecap_c)
@@ -710,15 +714,16 @@ XLEAF(suword_c)
 END(suword64_c)
 
 /*
- * casuword(9)
- * <v0>u_long casuword(<a0>u_long *p, <a1>u_long oldval, <a2>u_long newval)
+ * casueword_c(9)
+ * <v0>u_long casueword_c(<c3>u_long * __capability p, <a0>u_long oldval,
+ *     <a1>u_long *oldval_p, <a2>u_long newval);
  */
 /*
- * casuword32(9)
- * <v0>uint32_t casuword(<a0>uint32_t *p, <a1>uint32_t oldval, 
- *							<a2>uint32_t newval)
+ * casueword32_c(9)
+ * <v0>uint32_t casueword32_c(<c3>uint32_t *p, <a0>uint32_t oldval,
+ *     <a1>int32_t *oldval_p, <a2>uint32_t newval);
  */
-LEAF(casuword32_c)
+LEAF(casueword32_c)
 	PTR_LA	v0, fswberr
 	cgetbase	t0, $c3
 	blt	t0, zero, fswberr	# make sure address is in user space
@@ -727,25 +732,25 @@ LEAF(casuword32_c)
 	PTR_L	v1, PC_CURPCB(v1)
 	PTR_S	v0, U_PCB_ONFAULT(v1)
 1:
-	move	t0, a1
-	cllw	v0, $c3			# load word
-	bne	a0, v0, 2f
+	move	t0, a2
+	cllw	t1, $c3			# load word
+	bne	a0, t1, 2f
 	nop
 	cscw	t0, zero, $c3		# store word
 	beqz	t0, 1b
 	nop
 	j	3f
-	nop
+	li	v0, 0
 2:
 	li	v0, -1
 3:
 	PTR_S	zero, U_PCB_ONFAULT(v1)
 	jr	ra
-	nop
-END(casuword32_c)
+	sw	t1, 0(a1)	# unconditionally store old word
+END(casueword32_c)
 
-LEAF(casuword64_c)
-XLEAF(casuword_c)
+LEAF(casueword64_c)
+XLEAF(casueword_c)
 	PTR_LA	v0, fswberr
 	cgetbase	t0, $c3
 	blt	t0, zero, fswberr	# make sure address is in user space
@@ -754,22 +759,22 @@ XLEAF(casuword_c)
 	PTR_L	v1, PC_CURPCB(v1)
 	PTR_S	v0, U_PCB_ONFAULT(v1)
 1:
-	move	t0, a1
-	clld	v0, $c3			# load double word
-	bne	a0, v0, 2f
+	move	t0, a2
+	clld	t1, $c3			# load double word
+	bne	a0, t1, 2f
 	nop
 	cscd	t0, zero, $c3		# store double word
 	beqz	t0, 1b
 	nop
 	j	3f
-	nop
+	li	v0, 0
 2:
 	li	v0, -1
 3:
 	PTR_S	zero, U_PCB_ONFAULT(v1)
 	jr	ra
-	nop
-END(casuword64_c)
+	sd	t1, 0(a1)	# unconditionally store old word
+END(casueword64_c)
 
 /*
  * Will have to flush the instruction cache if byte merging is done in hardware.

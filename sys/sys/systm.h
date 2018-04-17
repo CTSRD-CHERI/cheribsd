@@ -392,6 +392,7 @@ int64_t	fuword64_c(volatile const void * __capability base);
 int	fuecap_c(volatile const void * __capability base, intcap_t *val);
 int	fueword_c(volatile const void * __capability base, long *val);
 int	fueword32_c(volatile const void * __capability base, int32_t *val);
+int	fueword64_c(volatile const void * __capability base, int64_t *val);
 int	subyte_c(volatile void * __capability base, int byte);
 int	suword_c(volatile void * __capability base, long word);
 int	suword16_c(volatile void * __capability base, int word);
