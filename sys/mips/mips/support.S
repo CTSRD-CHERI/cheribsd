@@ -97,6 +97,13 @@
 #include <machine/cherireg.h>
 #endif
 
+/* Always build normal userspace access functions for non-CHERI */
+#ifndef CPU_CHERI
+#ifndef CHERI_IMPLICIT_USER_DDC
+#define	CHERI_IMPLICIT_USER_DDC
+#endif
+#endif
+
 #include "assym.s"
 
 	.set	noreorder		# Noreorder is default style!
@@ -136,6 +143,7 @@ LEAF(copystr)
 END(copystr)
 
 
+#ifdef CHERI_IMPLICIT_USER_DDC
 /*
  * Copy a null terminated string from the user address space into
  * the kernel address space.
@@ -164,6 +172,7 @@ NESTED(copyinstr, CALLFRAME_SIZ, ra)
 	j	ra
 	PTR_ADDU	sp, sp, CALLFRAME_SIZ
 END(copyinstr)
+#endif /* CHERI_IMPLICIT_USER_DDC */
 
 /*
  * Copy a null terminated string from the kernel address space into
@@ -197,6 +206,7 @@ NESTED(copyinstr_c, CALLFRAME_SIZ, ra)
 END(copyinstr_c)
 #endif
 
+#ifdef CHERI_IMPLICIT_USER_DDC
 /*
  * Copy specified amount of data from user space into the kernel
  *	copyin(from, to, len)
@@ -223,6 +233,7 @@ NESTED(copyin, CALLFRAME_SIZ, ra)
 	j	ra
 	move	v0, zero
 END(copyin)
+#endif /* CHERI_IMPLICIT_USER_DDC */
 
 #ifdef CPU_CHERI
 /*
@@ -285,6 +296,7 @@ NESTED(copyincap_c, CALLFRAME_SIZ, ra)
 END(copyincap_c)
 #endif
 
+#ifdef CHERI_IMPLICIT_USER_DDC
 /*
  * Copy specified amount of data from kernel to the user space
  *	copyout(from, to, len)
@@ -311,6 +323,7 @@ NESTED(copyout, CALLFRAME_SIZ, ra)
 	j	ra
 	move	v0, zero
 END(copyout)
+#endif /* CHERI_IMPLICIT_USER_DDC */
 
 #ifdef CPU_CHERI
 /*
@@ -407,6 +420,7 @@ LEAF(copyerr)
 	li	v0, EFAULT			# return error
 END(copyerr)
 
+#ifdef CHERI_IMPLICIT_USER_DDC
 /*
  * {fu,su},{ibyte,isword,iword}, fetch or store a byte, short or word to
  * user text space.
@@ -599,6 +613,7 @@ LEAF(subyte)
 	j	ra
 	move	v0, zero
 END(subyte)
+#endif /* CHERI_IMPLICIT_USER_DDC */
 
 LEAF(fswberr)
 	j	ra

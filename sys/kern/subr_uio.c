@@ -581,6 +581,105 @@ copyout_part(const void * __restrict kaddr, void * __restrict udaddr,
 	return (error);
 }
 
+#if __has_feature(capabilities) && !defined(CHERI_IMPLICIT_USER_DDC)
+int
+copyinstr(const void *uaddr, void *kaddr, size_t len, size_t *done)
+{
+
+	return (copyinstr_c(__USER_CAP(uaddr, len),
+	   (__cheri_tocap void * __capability)kaddr, len,
+	   (__cheri_tocap size_t * __capability)done));
+}
+
+int
+copyin(const void *uaddr, void *kaddr, size_t len)
+{
+
+	return (copyin_c(__USER_CAP(uaddr, len),
+	    (__cheri_tocap void * __capability)kaddr, len));
+}
+
+int
+copyout(const void *kaddr, void *uaddr, size_t len)
+{
+
+	return (copyout_c((__cheri_tocap void * __capability)kaddr,
+	    __USER_CAP(uaddr, len), len));
+}
+
+int
+fubyte(volatile const void *base)
+{
+
+	return (fubyte_c(__USER_CAP(base, 1)));
+}
+
+int
+fueword(volatile const void *base, long *val)
+{
+
+	return (fueword_c(__USER_CAP(base, sizeof(long)), val));
+}
+
+int
+fueword32(volatile const void *base, int32_t *val)
+{
+
+	return (fueword32_c(__USER_CAP(base, sizeof(int32_t)), val));
+}
+
+int
+fueword64(volatile const void *base, int64_t *val)
+{
+
+	return (fueword64_c(__USER_CAP(base, sizeof(int64_t)), val));
+}
+
+int
+subyte(volatile void *base, int byte)
+{
+
+	return (subyte_c(__USER_CAP(base, 1), byte));
+}
+
+int
+suword(volatile void *base, long word)
+{
+
+	return (suword_c(__USER_CAP(base, sizeof(long)), word));
+}
+
+int
+suword32(volatile void *base, int32_t word)
+{
+
+	return (suword32_c(__USER_CAP(base, sizeof(int32_t)), word));
+}
+
+int
+suword64(volatile void *base, int64_t word)
+{
+
+	return (suword64_c(__USER_CAP(base, sizeof(int64_t)), word));
+}
+
+int
+casueword32(volatile uint32_t *base, uint32_t oldval, uint32_t *oldvalp,
+    uint32_t newval)
+{
+
+	return (casueword32_c(__USER_CAP_OBJ(base), oldval, oldvalp, newval));
+}
+
+int
+casueword(volatile u_long *p, u_long oldval, u_long *oldvalp, u_long newval)
+{
+
+	return (casueword_c(__USER_CAP_OBJ(p), oldval, oldvalp, newval));
+}
+
+#endif	/* __has_feature(capabilities) && !defined(CHERI_IMPLICIT_USER_DDC) */
+
 #ifdef NO_FUEWORD
 /*
  * XXXKIB The temporal implementation of fue*() functions which do not
