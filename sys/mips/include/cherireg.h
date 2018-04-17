@@ -63,7 +63,7 @@
 #define	CHERI_PERM_STORE_LOCAL_CAP		(1 << 6)	/* 0x00000040 */
 #define	CHERI_PERM_SEAL				(1 << 7)	/* 0x00000080 */
 #define	CHERI_PERM_CCALL			(1 << 8)	/* 0x00000100 */
-#define	CHERI_PERM_RESERVED1			(1 << 9)	/* 0x00000200 */
+#define	CHERI_PERM_UNSEAL			(1 << 9)	/* 0x00000200 */
 #define	CHERI_PERM_SYSTEM_REGS			(1 << 10)	/* 0x00000400 */
 
 /*
@@ -215,7 +215,7 @@
 	CHERI_PERM_STORE_LOCAL_CAP)
 
 #define	CHERI_PERMS_KERNEL_SEALCAP					\
-	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL)
+	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL | CHERI_PERM_UNSEAL)
 
 /*
  * The CHERI object-type space is split between userspace and kernel,

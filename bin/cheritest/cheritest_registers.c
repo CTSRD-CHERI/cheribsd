@@ -191,8 +191,8 @@ check_initreg_code(__capability void *c)
 	if ((v & CHERI_PERM_CCALL) == 0)
 		cheritest_failure_errx("perms %jx (ccall missing)", v);
 
-	if ((v & CHERI_PERM_RESERVED1) != 0)
-		cheritest_failure_errx("perms %jx (reserved1 present)", v);
+	if ((v & CHERI_PERM_UNSEAL) != 0)
+		cheritest_failure_errx("perms %jx (unseal present)", v);
 
 	if ((v & CHERI_PERM_SYSTEM_REGS) != 0)
 		cheritest_failure_errx("perms %jx (system_regs present)", v);
@@ -281,8 +281,8 @@ check_initreg_data(__capability void *c)
 	if ((v & CHERI_PERM_CCALL) == 0)
 		cheritest_failure_errx("perms %jx (ccall missing)", v);
 
-	if ((v & CHERI_PERM_RESERVED1) != 0)
-		cheritest_failure_errx("perms %jx (reserved1 present)", v);
+	if ((v & CHERI_PERM_UNSEAL) != 0)
+		cheritest_failure_errx("perms %jx (cunseal present)", v);
 
 	if ((v & CHERI_PERM_SYSTEM_REGS) != 0)
 		cheritest_failure_errx("perms %jx (system_regs present)", v);
@@ -392,8 +392,8 @@ test_initregs_stack(const struct cheri_test *ctp __unused)
 	if ((v & CHERI_PERM_CCALL) == 0)
 		cheritest_failure_errx("perms %jx (ccall missing)", v);
 
-	if ((v & CHERI_PERM_RESERVED1) != 0)
-		cheritest_failure_errx("perms %jx (reserved1 present)", v);
+	if ((v & CHERI_PERM_UNSEAL) != 0)
+		cheritest_failure_errx("perms %jx (unseal present)", v);
 
 	if ((v & CHERI_PERMS_SWALL) !=
 	    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP))
