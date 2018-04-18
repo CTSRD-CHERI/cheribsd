@@ -37,6 +37,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/wait.h>
 #include <ctype.h>
 #include <err.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -45,7 +46,7 @@ static void
 usage(void)
 {
 
-	fprintf(stderr, "usage: copong service-name\n");
+	fprintf(stderr, "usage: copong [-v] service-name\n");
 	exit(0);
 }
 
@@ -54,27 +55,47 @@ main(int argc, char **argv)
 {
 	void * __capability switcher_code;
 	void * __capability switcher_data;
-	int error;
+	bool vflag = false;
+	int ch, error;
 
-	if (argc != 2)
+	while ((ch = getopt(argc, argv, "v")) != -1) {
+		switch (ch) {
+		case 'v':
+			vflag = true;
+			break;
+		case '?':
+		default:
+			usage();
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+	if (argc != 1)
 		usage();
 
-	fprintf(stderr, "%s: setting up...\n", argv[0]);
+	if (vflag)
+		fprintf(stderr, "%s: setting up...\n", getprogname());
 	error = cosetup(COSETUP_COACCEPT, &switcher_code, &switcher_data);
 	if (error != 0)
 		err(1, "cosetup");
 
-	fprintf(stderr, "%s: coregistering as \"%s\"...\n", argv[0], argv[1]);
-	error = coregister(argv[1], NULL);
+	if (vflag)
+		fprintf(stderr, "%s: coregistering as \"%s\"...\n", getprogname(), argv[0]);
+	error = coregister(argv[0], NULL);
 	if (error != 0)
 		err(1, "coregister");
 
-	fprintf(stderr, "%s: coaccepting...\n", argv[0]);
-	while (coaccept(switcher_code, switcher_data)) {
-		printf(".");
+	if (vflag)
+		fprintf(stderr, "%s: coaccepting...\n", getprogname());
+
+	for (;;) {
+		error = coaccept(switcher_code, switcher_data);
+		if (error != 0)
+			err(1, "coaccept");
+		if (vflag)
+			printf("pong, pid %d, error %d\n", getpid(), error);
 	}
 
-	fprintf(stderr, "%s: we're not supposed to be here\n", argv[0]);
-
-	return (0);
+	err(1, "we're not supposed to be here, pid %d\n", getpid());
 }
