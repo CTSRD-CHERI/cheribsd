@@ -180,6 +180,44 @@ test_clock_gettime(uintmax_t num, uintmax_t int_arg, const char *path)
 	return (i);
 }
 
+#ifdef __CHERI__
+uintmax_t
+test_coping(uintmax_t num, uintmax_t int_arg, const char *path)
+{
+	void * __capability switcher_code;
+	void * __capability switcher_data;
+	void * __capability lookedup;
+	struct timespec ts;
+	uintmax_t i;
+	int error;
+
+	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
+	if (error != 0)
+		err(1, "cosetup");
+
+	error = colookup(path, &lookedup);
+	if (error != 0) {
+		if (errno == ESRCH) {
+			warnx("received ESRCH; this usually means there's nothing coregistered for \"%s\"", path);
+			warnx("use coexec(1) to colocate; you might also find \"ps aux -o vmaddr\" useful");
+		}
+		err(1, "colookup");
+	}
+
+	benchmark_start();
+	for (i = 0; i < num; i++) {
+		if (alarm_fired)
+			break;
+
+		error = cocall(switcher_code, switcher_data, lookedup);
+		if (error != 0)
+			err(1, "cocall");
+	}
+	benchmark_stop();
+	return (i);
+}
+#endif
+
 uintmax_t
 test_gettimeofday(uintmax_t num, uintmax_t int_arg, const char *path)
 {
@@ -739,12 +777,16 @@ struct test {
 };
 
 #define	FLAG_PATH	0x00000001
+#define	FLAG_NAME	0x00000002
 
 static const struct test tests[] = {
 	{ "getuid", test_getuid },
 	{ "getppid", test_getppid },
 	{ "getresuid", test_getresuid },
 	{ "clock_gettime", test_clock_gettime },
+#ifdef __CHERI__
+	{ "coping", test_coping, .t_flags = FLAG_NAME },
+#endif
 	{ "gettimeofday", test_gettimeofday },
 	{ "getpriority", test_getpriority },
 	{ "pipe", test_pipe },
@@ -809,6 +851,7 @@ main(int argc, char *argv[])
 {
 	struct timespec ts_res;
 	const struct test *the_test;
+	const char *name;
 	const char *path;
 	char *tmp_dir, *tmp_path;
 	long long ll;
@@ -822,9 +865,10 @@ main(int argc, char *argv[])
 #ifdef __CHERI__
 	trace = 0;
 #endif
+	name = NULL;
 	path = NULL;
 	tmp_path = NULL;
-	while ((ch = getopt(argc, argv, "i:l:p:s:t")) != -1) {
+	while ((ch = getopt(argc, argv, "i:l:n:p:s:t")) != -1) {
 		switch (ch) {
 		case 'i':
 			ll = strtol(optarg, &endp, 10);
@@ -838,6 +882,10 @@ main(int argc, char *argv[])
 			if (*endp != 0 || ll < 1 || ll > 100000)
 				usage();
 			loops = ll;
+			break;
+
+		case 'n':
+			name = optarg;
 			break;
 
 		case 'p':
@@ -900,6 +948,8 @@ main(int argc, char *argv[])
 			if (rv <= 0)
 				err(1, "asprintf");
 		}
+		if ((the_test->t_flags & FLAG_NAME) && (name == NULL))
+			errx(1, "test %s requires -n", the_test->t_name);
 	}
 
 	error = clock_getres(CLOCK_REALTIME, &ts_res);
@@ -929,6 +979,9 @@ main(int argc, char *argv[])
 				err(1, "close");
 			path = tmp_path;
 		}
+
+		if (the_test->t_flags & FLAG_NAME)
+			path = name;
 
 		/*
 		 * Run one warmup, then do the real thing (loops) times.
