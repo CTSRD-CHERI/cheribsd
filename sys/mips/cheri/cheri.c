@@ -150,9 +150,6 @@ cheri_capability_set(void * __capability *cp, uint32_t perms, vaddr_t basep,
 	 * NB: With imprecise bounds, we want to assert that the results will
 	 * be 'as requested' -- i.e., that the kernel always request bounds
 	 * that can be represented precisly.
-	 *
-	 * XXXRW: Given these assupmtions, we actually don't need to do the
-	 * '+= off' above.
 	 */
 #ifdef INVARIANTS
 	KASSERT(cheri_gettag(*cp) != 0, ("%s: capability untagged", __func__));
