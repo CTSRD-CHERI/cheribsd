@@ -101,7 +101,8 @@ STD_HEADERS+=	__libcpp_version
 STD_HEADERS+=	__locale
 STD_HEADERS+=	__mutex_base
 STD_HEADERS+=	__nullptr
-STD_HEADERS+=	__refstring
+# No longer exists in latest libc++
+# STD_HEADERS+=	__refstring
 STD_HEADERS+=	__split_buffer
 STD_HEADERS+=	__sso_allocator
 STD_HEADERS+=	__std_stream
@@ -109,7 +110,9 @@ STD_HEADERS+=	__string
 STD_HEADERS+=	__threading_support
 STD_HEADERS+=	__tree
 STD_HEADERS+=	__tuple
-STD_HEADERS+=	__undef_min_max
+# STD_HEADERS+=	__undef_min_max
+# renamed upstream
+STD_HEADERS+=	__undef_macros
 STD_HEADERS+=	algorithm
 STD_HEADERS+=	any
 STD_HEADERS+=	array
