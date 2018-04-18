@@ -32,7 +32,9 @@
 
 #include <sys/time.h>
 
+#include <curses.h>
 #include <ctype.h>
+#include <termcap.h>
 #include <time.h>
 #include <stdarg.h>
 #include <unistd.h>
@@ -256,7 +258,7 @@ double *avenrun;
     register int i;
 
     /* i_loadave also clears the screen, since it is first */
-    clear();
+    top_clear();
 
     /* mpid == -1 implies this system doesn't have an _mpid */
     if (mpid != -1)
@@ -798,7 +800,7 @@ i_message()
     }
     if (next_msg[0] != '\0')
     {
-	standout(next_msg);
+	top_standout(next_msg);
 	msglen = strlen(next_msg);
 	next_msg[0] = '\0';
     }
@@ -1080,7 +1082,7 @@ new_message(int type, char* msgfmt, ...)
 	    i = strlen(next_msg);
 	    if ((type & MT_delayed) == 0)
 	    {
-		type & MT_standout ? standout(next_msg) :
+		type & MT_standout ? top_standout(next_msg) :
 		                     fputs(next_msg, stdout);
 		(void) clear_eol(msglen - i);
 		msglen = i;
@@ -1092,7 +1094,7 @@ new_message(int type, char* msgfmt, ...)
     {
 	if ((type & MT_delayed) == 0)
 	{
-	    type & MT_standout ? standout(next_msg) : fputs(next_msg, stdout);
+	    type & MT_standout ? top_standout(next_msg) : fputs(next_msg, stdout);
 	    msglen = strlen(next_msg);
 	    next_msg[0] = '\0';
 	}
