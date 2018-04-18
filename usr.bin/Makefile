@@ -147,6 +147,7 @@ SUBDIR=	alias \
 	stdbuf \
 	strings \
 	su \
+	syscall_timing \
 	systat \
 	tabs \
 	tail \
