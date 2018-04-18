@@ -52,7 +52,7 @@ extern char kernel_start[];
 extern char kernel_end[];
 
 static __inline void *
-memcpy(void *dst, const void *src, size_t len)
+memcpy_local(void *dst, const void *src, size_t len)
 {
 	const char *s = src;
     	char *d = dst;
@@ -126,10 +126,10 @@ load_kernel(void * kstart)
 	eh = (Elf32_Ehdr *)kstart;
 #endif
 	entry_point = mkptr(eh->e_entry);
-	memcpy(phdr, (void *)(kstart + eh->e_phoff),
+	memcpy_local(phdr, (void *)(kstart + eh->e_phoff),
 	    eh->e_phnum * sizeof(phdr[0]));
 
-	memcpy(shdr, (void *)(kstart + eh->e_shoff),
+	memcpy_local(shdr, (void *)(kstart + eh->e_shoff),
 	    sizeof(*shdr) * eh->e_shnum);
 
 	if (eh->e_shnum * eh->e_shentsize != 0 && eh->e_shoff != 0) {
@@ -156,7 +156,7 @@ load_kernel(void * kstart)
 		if (phdr[i].p_type != PT_LOAD)
 			continue;
 		
-		memcpy(mkptr(phdr[i].p_vaddr),
+		memcpy_local(mkptr(phdr[i].p_vaddr),
 		    (void*)(kstart + phdr[i].p_offset), phdr[i].p_filesz);
 
 		/* Clean space from oversized segments, eg: bss. */
@@ -172,35 +172,35 @@ load_kernel(void * kstart)
 	lastaddr = (intptr_t)(int)loadend;
 	if (symtabindex >= 0 && symstrindex >= 0) {
 		tmp = SYMTAB_MAGIC;
-		memcpy((void *)lastaddr, &tmp, sizeof(tmp));
+		memcpy_local((void *)lastaddr, &tmp, sizeof(tmp));
 		lastaddr += sizeof(Elf_Size);
 		tmp = shdr[symtabindex].sh_size +
 		    shdr[symstrindex].sh_size + 2*sizeof(Elf_Size);
-		memcpy((void *)lastaddr, &tmp, sizeof(tmp));
+		memcpy_local((void *)lastaddr, &tmp, sizeof(tmp));
 		lastaddr += sizeof(Elf_Size);
 		/* .symtab size */
 		tmp = shdr[symtabindex].sh_size;
-		memcpy((void *)lastaddr, &tmp, sizeof(tmp));
+		memcpy_local((void *)lastaddr, &tmp, sizeof(tmp));
 		lastaddr += sizeof(shdr[symtabindex].sh_size);
 		/* .symtab data */
-		memcpy((void*)lastaddr,
+		memcpy_local((void*)lastaddr,
 		    shdr[symtabindex].sh_offset + kstart,
 		    shdr[symtabindex].sh_size);
 		lastaddr += shdr[symtabindex].sh_size;
 
 		/* .strtab size */
 		tmp = shdr[symstrindex].sh_size;
-		memcpy((void *)lastaddr, &tmp, sizeof(tmp));
+		memcpy_local((void *)lastaddr, &tmp, sizeof(tmp));
 		lastaddr += sizeof(shdr[symstrindex].sh_size);
 
 		/* .strtab data */
-		memcpy((void*)lastaddr,
+		memcpy_local((void*)lastaddr,
 		    shdr[symstrindex].sh_offset + kstart,
 		    shdr[symstrindex].sh_size);
 	} else {
 		/* Do not take any chances */
 		tmp = 0;
-		memcpy((void *)lastaddr, &tmp, sizeof(tmp));
+		memcpy_local((void *)lastaddr, &tmp, sizeof(tmp));
 	}
 
 	return entry_point;
