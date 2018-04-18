@@ -87,10 +87,10 @@ int     resident = (-1);		/* -1, 0: unknown; +1: yes */
 
 /* Forward declarations. */
 
-static int table_match();
-static int list_match();
-static int server_match();
-static int client_match();
+static int table_match(char *table, struct request_info *request);
+static int list_match(char *list, struct request_info *request, int (*match_fn)());
+static int server_match(char *tok, struct request_info *request);
+static int client_match(char *tok, struct request_info *request);
 static int host_match();
 static int string_match();
 static int masked_match();
