@@ -37,6 +37,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/wait.h>
 #include <ctype.h>
 #include <err.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -66,8 +67,10 @@ main(int argc, char **argv)
 
 	error = colookup(argv[1], &lookedup);
 	if (error != 0) {
-		warnx("received ESRCH; this usually means there's nothing coregistered for \"%s\"", argv[1]);
-		warnx("use coexec(1) to colocate; you might also find \"ps aux -o vmaddr\" useful");
+		if (errno == ESRCH) {
+			warnx("received ESRCH; this usually means there's nothing coregistered for \"%s\"", argv[1]);
+			warnx("use coexec(1) to colocate; you might also find \"ps aux -o vmaddr\" useful");
+		}
 		err(1, "colookup");
 	}
 
