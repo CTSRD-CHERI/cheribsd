@@ -1244,15 +1244,17 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 }
 
 #ifdef CHERI_KERNEL
-static void
-process_kernel_cap_relocs()
+/*
+ * This is called from locore to initialise the cap table entries
+ * and other capability relocations.
+ */
+void
+process_kernel_cap_relocs(Elf64_Capreloc *start, Elf64_Capreloc *end)
 {
 	void *pcc = cheri_getpcc();
 	void *gdc = cheri_getdefault();
 
-	for (Elf64_Capreloc *reloc = &__start___cap_relocs;
-	     reloc < &__stop___cap_relocs; reloc++)
-	{
+	for (Elf64_Capreloc *reloc = start; reloc < end; reloc++) {
 		void *cap;
 		void **dst = cheri_setoffset(gdc, reloc->location);
 
@@ -1287,7 +1289,6 @@ cheri_init_capabilities()
 {
 	void *kdc = cheri_getkdc();
 
-	process_kernel_cap_relocs();
 	/*
 	 * Split kdc and generate a capability for each memory segment.
 	 * XXX-AM: we should also have a separate capability for

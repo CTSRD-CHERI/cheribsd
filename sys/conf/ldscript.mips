@@ -218,6 +218,10 @@ SECTIONS
   .plt      : { *(.plt)	}
   _gp = ALIGN(16) + 0x7ff0;
   .got		  : { *(.got.plt) *(.got) }
+  _captable = ALIGN(0x20);
+  .cap_table ALIGN(0x20): { *(.cap_table) }
+  _ecaptable = .;
+
   .dynamic       : { *(.dynamic) }
   /* We want the small data sections together, so single-instruction offsets
      can access them all, and initialized data all before uninitialized, so

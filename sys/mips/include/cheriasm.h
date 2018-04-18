@@ -68,6 +68,8 @@
 #define	CHERI_REG_C25	$c25
 #define	CHERI_REG_C26	$c26	/* Invoked data capability. */
 #define	CHERI_REG_IDC	CHERI_REG_C26
+/* Global pointer capability (capability table ABI) */
+#define CHERI_REG_GPC	CHERI_REG_C26
 
 /* 5 exception-context registers -- with names where appropriate. */
 #define	CHERI_REG_KR1C	$c27	/* Kernel exception handling capability (1). */

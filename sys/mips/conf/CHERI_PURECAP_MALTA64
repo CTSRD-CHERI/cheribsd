@@ -13,7 +13,8 @@ machine		mips mips64	# Malta supports both, so it isn't in std.malta
 
 nomakeoptions 	ARCH_FLAGS
 makeoptions	ARCH_PIC_FLAGS="-fpic"
-makeoptions	ARCH_FLAGS="-target cheri-unknown-freebsd -march=mips64 -mabi=purecap -cheri=256"
+# makeoptions	ARCH_FLAGS="-target cheri-unknown-freebsd -march=mips64 -mabi=purecap -cheri=256"
+makeoptions	ARCH_FLAGS="-target cheri-unknown-freebsd -march=mips64 -mabi=purecap -cheri=256 -cheri-cap-table-abi=plt -mxcaptable"
 makeoptions	WERROR="-Wno-error"
 makeoptions 	KERNLOADADDR=0xffffffff80100000
 
@@ -30,6 +31,8 @@ nooptions	GEOM_RAID
 
 # debugging
 options		VERBOSE_SYSINIT
+options		BUS_DEBUG
+# should enable witness and invariants?
 
 #
 # Features required for CHERI CPU and CheriBSD support.

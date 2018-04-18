@@ -67,8 +67,8 @@ extern uintptr_t dpcpu_off[];
 /*
  * Convenience defines.
  */
-#define	DPCPU_START		((uintptr_t)&__start_set_pcpu)
-#define	DPCPU_STOP		((uintptr_t)&__stop_set_pcpu)
+#define	DPCPU_START		((caddr_t)&__start_set_pcpu)
+#define	DPCPU_STOP		((caddr_t)&__stop_set_pcpu)
 #define	DPCPU_BYTES		(DPCPU_STOP - DPCPU_START)
 #define	DPCPU_MODMIN		2048
 #define	DPCPU_SIZE		roundup2(DPCPU_BYTES, PAGE_SIZE)

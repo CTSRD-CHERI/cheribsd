@@ -35,6 +35,9 @@
 #ifdef _KERNEL
 #include <sys/sysctl.h>		/* SYSCTL_DECL() */
 #include <sys/systm.h>		/* CTASSERT() */
+#ifdef CHERI_KERNEL
+#include <sys/elf.h>
+#endif
 #endif
 
 #include <machine/cherireg.h>
@@ -682,6 +685,7 @@ cheri_capability_setoffset(struct chericap *cp, register_t offset)
 #ifdef _KERNEL
 #ifdef CHERI_KERNEL
 /* purecap kernel specific startup */
+void process_kernel_cap_relocs(Elf64_Capreloc *start, Elf64_Capreloc *end);
 void cheri_init_capabilities(void);
 #endif
 

@@ -230,7 +230,6 @@ END(memcpynocap)
  * See memcpy() bcopy()
  * This version preserves memory tags, however it requres
  * the input and output pointers to be capability-aligned.
- * XXX-AM: should we also copy the remaining unaligned bytes?
  */
 LEAF(memcpy)
 XLEAF(memcpy_c)

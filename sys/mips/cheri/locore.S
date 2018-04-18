@@ -70,6 +70,7 @@
 #include <machine/regnum.h>
 
 #include <machine/cheriasm.h>
+#include <machine/cherireg.h>
 
 #include "assym.s"
 
@@ -186,9 +187,19 @@ VECTOR(_locore, unknown)
 	csc		$c1, zero, CALLFRAME_CSP(CHERI_REG_STC)
 	csc		$c1, zero, CALLFRAME_CRA(CHERI_REG_STC)
 
+	/* set up global pointer */
+	// PTR_LA	gp, _C_LABEL(_gp)
+	PTR_LA	gp, _C_LABEL(_captable)
+	csetoffset CHERI_REG_GPC, CHERI_REG_KDC, gp
+	PTR_LA	t0, _C_LABEL(_ecaptable)
+	PTR_SUBU t0, t0, gp
+	csetbounds CHERI_REG_GPC, CHERI_REG_GPC, t0
+	REG_LI	t0, (CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)
+	candperm CHERI_REG_GPC, CHERI_REG_GPC, t0
+
 	/* Clear all remaining capabilities */
-	cclearlo	0xf7fe 	# keep c0, c11
-	cclearhi	0x9fff	# keep c29, c30
+	cclearlo	0xf7fe 	# keep c0, c11 /* XXX-AM c0 will eventually be cleared */
+	cclearhi	0x9bff	# keep c26, c29, c30
 #if 0
 	/* Restrict kernel KCC and KDC */
 	/*
@@ -208,10 +219,26 @@ VECTOR(_locore, unknown)
 	nop
 restrict_pcc:
 #endif
-
-	PTR_LA	gp, _C_LABEL(_gp)
 	/* XXX-AM: zero out ra so we catch anything that returns improperly */
 	PTR_LA	ra, 0
+
+	/* Process capability relocations.
+	 * This must be done before any PIC global access that uses the cap-table.
+	 * Pointers to the start and end of the __cap_relocs section are created
+	 * here in position-dependant code to avoid accessing the capability table.
+	 */
+	// generate pointer to the __cap_relocs section start
+	PTR_LA	t0, _C_LABEL(__start___cap_relocs)
+	csetoffset	$c3, CHERI_REG_KDC, t0
+	PTR_LA	t1, _C_LABEL(__stop___cap_relocs)
+	PTR_SUBU	t0, t1, t0
+	csetbounds	$c3, $c3, t0
+	// generate pointer to the __cap_relocs section end
+	csetoffset	$c4, $c3, t0
+	PTR_LA	t0, _C_LABEL(process_kernel_cap_relocs)
+	cgetpccsetoffset	$c12, t0
+	cjalr	$c12, $c17
+	nop
 
 	/* Call the platform-specific startup code. */
 	cfromptr	$c3, CHERI_REG_KDC, a1
