@@ -45,6 +45,7 @@ static pthread_once_t aux_vector_once = PTHREAD_ONCE_INIT;
 
 #ifdef __CHERI_PURE_CAPABILITY__
 extern Elf_Auxinfo *__auxargs; /* This will be NULL when dynamically linked */
+#pragma weak __auxargs
 #endif
 
 static void
