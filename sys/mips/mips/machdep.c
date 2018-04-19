@@ -287,8 +287,7 @@ mips_proc0_init(void)
 		panic("BSP must be processor number 0");
 #endif
 	proc_linkup0(&proc0, &thread0);
-
-	KASSERT(((vm_offset_t)kstack0 & ((KSTACK_PAGE_SIZE * 2) - 1)) == 0,
+	KASSERT(is_aligned(kstack0, KSTACK_PAGE_SIZE * 2),
 		("kstack0 is not aligned on a page (0x%0lx) boundary: 0x%0lx",
 		(long)(KSTACK_PAGE_SIZE * 2), (long)kstack0));
 
