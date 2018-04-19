@@ -101,7 +101,7 @@ void _rtld_relocate_nonplt_self(Elf_Dyn *, caddr_t);
 #define ELF_R_TYPE(r_info)		bswap32((r_info) >> 32)
 #endif
 
-static __inline Elf_Sxword
+static __inline __always_inline Elf_Sxword
 load_ptr(void *where, size_t len)
 {
 	Elf_Sxword val;
@@ -124,7 +124,7 @@ load_ptr(void *where, size_t len)
 	return (len == sizeof(Elf_Sxword)) ? val : (Elf_Sword)val;
 }
 
-static __inline void
+static __inline __always_inline void
 store_ptr(void *where, Elf_Sxword val, size_t len)
 {
 	if (__predict_true(((size_t)where & (len - 1)) == 0)) {
@@ -148,6 +148,15 @@ store_ptr(void *where, Elf_Sxword val, size_t len)
 void
 _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 {
+	/*
+	 * Warning: global capabilities have not been initialized yet so we
+	 * can't call any functions here (only ones with __always_inline)
+	 *
+	 * FIXME: all the debug printfs will crash
+	 * TODO: change __cap_relocs emission in lld so that we can process
+	 * __cap_relocs before this function (add a flag to say this entry does
+	 * not need any relocations)
+	 */
 	const Elf_Rel *rel = NULL, *rellim;
 	Elf_Addr relsz = 0;
 	const Elf_Sym *symtab = NULL, *sym;

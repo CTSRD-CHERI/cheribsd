@@ -4783,9 +4783,7 @@ free_tls(void *tcb, size_t tcbsize, size_t tcbalign)
     free(tcb);
 }
 
-#endif
-
-#if defined(__i386__) || defined(__amd64__) || defined(__sparc64__)
+#elif defined(__i386__) || defined(__amd64__) || defined(__sparc64__)
 
 /*
  * Allocate Static TLS using the Variant II method.
