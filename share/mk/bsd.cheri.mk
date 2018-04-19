@@ -112,7 +112,7 @@ CFLAGS+=	-ftls-model=local-exec
 .if !empty(CHERI_USE_CAP_TABLE)
 CFLAGS+=	-mllvm -cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
 .endif
-CXXFLAGS+=	-Wno-cheri-bitwise-operations
+
 .ifdef NO_WERROR
 # Implicit function declarations should always be an error in purecap mode as
 # we will probably generate wrong code for calling them
@@ -146,6 +146,8 @@ LDFLAGS+=	-Wl,-preemptible-caprelocs=elf
 # XXX: Needed as Clang rejects -mllvm -cheri128 when using $CC to link:
 # warning: argument unused during compilation: '-cheri=128'
 _CHERI_CFLAGS+=	-Qunused-arguments
+_CHERI_CFLAGS+=	-Werror=cheri-bitwise-operations
+
 .if ${WANT_CHERI} != "variables"
 .if ${MK_CHERI_SHARED} == "no" || defined(CHERI_NO_SHARED)
 NO_SHARED=	yes
