@@ -251,7 +251,7 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 			store_ptr(where, val, rlen);
 			break;
 		}
-
+		// FIXME: should not be needed
 		case R_TYPE(CHERI_SIZE):
 		case R_TYPE(CHERI_ABSPTR): {
 			/* This is needed for __auxargs, otherwise there
@@ -285,6 +285,17 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 			store_ptr(where, val, rlen);
 			break;
 		}
+
+		// FIXME: should not be needed
+		case R_TYPE(CHERI_CAPABILITY): {
+			sym = symtab + r_symndx;
+			/* This is a hack for the undef weak __auxargs */
+			/* TODO: try to remove __auxargs dependency */
+			assert(ELF_ST_BIND(sym->st_info) == STB_WEAK);
+			assert(sym->st_shndx == SHN_UNDEF);
+			*((void**)where) = NULL;
+		}
+
 
 		case R_TYPE(GPREL32):
 		case R_TYPE(NONE):

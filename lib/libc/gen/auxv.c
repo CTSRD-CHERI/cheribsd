@@ -47,13 +47,15 @@ static pthread_once_t aux_vector_once = PTHREAD_ONCE_INIT;
 extern Elf_Auxinfo *__auxargs;
 /* __auxargs will not exist in dynamically linked binaries so mark it weak */
 #pragma weak __auxargs
+#define __get_auxargs() __auxargs
+/* TODO: extern void *__get_auxargs(void); */
 #endif
 
 static void
 init_aux_vector_once(void)
 {
 #if defined(__CHERI_PURE_CAPABILITY__)
-	__elf_aux_vector = __auxargs;
+	__elf_aux_vector = __get_auxargs();
 #else
 	Elf_Addr *sp;
 
