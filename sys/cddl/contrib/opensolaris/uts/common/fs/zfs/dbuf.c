@@ -168,7 +168,7 @@ static uint64_t dbuf_hash_count;
 static uint64_t
 dbuf_hash(void *os, uint64_t obj, uint8_t lvl, uint64_t blkid)
 {
-	uintptr_t osv = (uintptr_t)os;
+	vaddr_t osv = (vaddr_t)os;
 	uint64_t crc = -1ULL;
 
 	ASSERT(zfs_crc64_table[128] == ZFS_CRC64_POLY);

@@ -705,7 +705,7 @@ mzap_create_impl(objset_t *os, uint64_t obj, int normflags, zap_flags_t flags,
 	dmu_buf_will_dirty(db, tx);
 	zp = db->db_data;
 	zp->mz_block_type = ZBT_MICRO;
-	zp->mz_salt = ((uintptr_t)db ^ (uintptr_t)tx ^ (obj << 1)) | 1ULL;
+	zp->mz_salt = ((vaddr_t)db ^ (vaddr_t)tx ^ (obj << 1)) | 1ULL;
 	zp->mz_normflags = normflags;
 	dmu_buf_rele(db, FTAG);
 

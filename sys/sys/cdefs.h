@@ -924,4 +924,10 @@
 #define __cheri_addr
 #endif
 
+/* allow __builtin_is_aligned unconditionally */
+#if !__has_builtin(__builtin_is_aligned)
+#define __builtin_is_aligned(addr, align) \
+	(((vaddr_t)addr & ((vaddr_t)(align) - 1)) == 0)
+#endif
+
 #endif /* !_SYS_CDEFS_H_ */
