@@ -5576,3 +5576,6 @@ rtld_strerror(int errnum)
 		return ("Unknown error");
 	return (sys_errlist[errnum]);
 }
+
+/* Hack to avoid a relocation against __auxargs from libc/gen/auxv.c */
+Elf_Auxinfo *__auxargs = NULL;

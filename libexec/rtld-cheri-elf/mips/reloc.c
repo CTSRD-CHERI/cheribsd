@@ -251,7 +251,16 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 			store_ptr(where, val, rlen);
 			break;
 		}
-		// FIXME: should not be needed
+
+	/*
+	 * There should be no dynamic CHERI_SIZE/CHERI_ABSPTR/CHERI_CAPABILITY
+	 * relocations inside rtld since there are no global capabilities that
+	 * are initialized to point to something.
+	 *
+	 * The reason this code is still here is that this may change at some
+	 * point in the future.
+	 */
+#if 0
 		case R_TYPE(CHERI_SIZE):
 		case R_TYPE(CHERI_ABSPTR): {
 			/* This is needed for __auxargs, otherwise there
@@ -285,8 +294,6 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 			store_ptr(where, val, rlen);
 			break;
 		}
-
-		// FIXME: should not be needed
 		case R_TYPE(CHERI_CAPABILITY): {
 			sym = symtab + r_symndx;
 			/* This is a hack for the undef weak __auxargs */
@@ -295,7 +302,7 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 			assert(sym->st_shndx == SHN_UNDEF);
 			*((void**)where) = NULL;
 		}
-
+#endif
 
 		case R_TYPE(GPREL32):
 		case R_TYPE(NONE):
