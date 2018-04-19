@@ -252,8 +252,8 @@ swcr_encdec(struct cryptodesc *crd, struct swcr_data *sw, caddr_t buf,
 			size_t nb, rem;
 
 			nb = blks;
-			rem = uio->uio_iov[ind].iov_len - k;
-			/* XXX-CHERI: we should push these down further. */
+			rem = MIN((size_t)i,
+			    uio->uio_iov[ind].iov_len - (size_t)k);
 			idat = (__cheri_fromcap uint8_t *)
 			    uio->uio_iov[ind].iov_base + k;
 
