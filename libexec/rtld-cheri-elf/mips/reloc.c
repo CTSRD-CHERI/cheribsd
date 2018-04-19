@@ -772,14 +772,33 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			    "IFUNC not implemented!");
 
 			void* symval = NULL;
-			if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
+			bool is_undef_weak = false;
+			if (def->st_shndx == SHN_UNDEF) {
+				/* Verify that we are resolving a weak symbol */
+				const Elf_Sym* src_sym = obj->symtab + r_symndx;
+#ifdef DEBUG
+				dbg("NOTE: found undefined R_CHERI_CAPABILITY "
+				    "for %s (in %s): value=%ld, size=%ld, "
+				    "type=%d, def bind=%d,sym bind=%d\n",
+				    symname(obj, r_symndx), obj->path,
+				    def->st_value, def->st_size,
+				    ELF_ST_TYPE(def->st_info),
+				    ELF_ST_BIND(def->st_info),
+				    ELF_ST_BIND(src_sym->st_info));
+#endif
+				assert(ELF_ST_BIND(src_sym->st_info) == STB_WEAK);
+				assert(def->st_value == 0);
+				assert(def->st_size == 0);
+				is_undef_weak = true;
+			}
+			else if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
 				/* Remove write permissions and set bounds */
 				symval = make_function_pointer(def, defobj);
 			} else {
 				/* Remove execute permissions and set bounds */
 				symval = make_data_pointer(def, defobj);
 			}
-			if (cheri_getlen(symval) <= 0) {
+			if (symval != NULL && cheri_getlen(symval) <= 0) {
 				rtld_printf("Warning: created zero length "
 				    "capability for %s (in %s): %-#p\n",
 				    symname(obj, r_symndx), obj->path, symval);
@@ -790,9 +809,9 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			 * first 8 bytes of the target location (which is the
 			 * virtual address for both 128 and 256-bit CHERI).
 			 */
-			uint64_t offset = load_ptr(where, sizeof(uint64_t));
-			symval + offset;
-			if (!cheri_gettag(symval)) {
+			uint64_t src_offset = load_ptr(where, sizeof(uint64_t));
+			symval += src_offset;
+			if (!cheri_gettag(symval) && !is_undef_weak) {
 				_rtld_error("%s: constructed invalid capability"
 				   "for %s: %#p",  obj->path,
 				    symname(obj, r_symndx), symval);
