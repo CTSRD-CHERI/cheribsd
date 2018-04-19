@@ -1159,7 +1159,10 @@ dt_module_update(dtrace_hdl_t *dtp, struct kld_file_stat *k_stat)
 	GElf_Ehdr ehdr;
 	GElf_Phdr ph;
 	char name[MAXPATHLEN];
-	uintptr_t mapbase, alignmask;
+	uintptr_t mapbase;
+#ifndef __CHERI__
+	uintptr_t alignmask;
+#endif
 	int i = 0;
 	int is_elf_obj;
 
@@ -1232,9 +1235,13 @@ dt_module_update(dtrace_hdl_t *dtp, struct kld_file_stat *k_stat)
 		if (sh.sh_size == 0)
 			continue;
 		if (sh.sh_type == SHT_PROGBITS || sh.sh_type == SHT_NOBITS) {
+#if __has_builtin(__builtin_align_up)
+			mapbase = __builtin_align_up(mapbase, sh.sh_addralign);
+#else
 			alignmask = sh.sh_addralign - 1;
 			mapbase += alignmask;
 			mapbase &= ~alignmask;
+#endif
 			sh.sh_addr = mapbase;
 			if (is_elf_obj)
 				dmp->dm_sec_offsets[elf_ndxscn(sp)] = sh.sh_addr;

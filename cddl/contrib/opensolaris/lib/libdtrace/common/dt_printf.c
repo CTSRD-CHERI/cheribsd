@@ -1262,8 +1262,7 @@ dt_printf_getint(dtrace_hdl_t *dtp, const dtrace_recdesc_t *recp,
 
 	if (addr + sizeof (int) > (uintptr_t)buf + len)
 		return (dt_set_errno(dtp, EDT_DOFFSET));
-
-	if (addr & (uintptr_t)(recp->dtrd_alignment - 1))
+	if (!__builtin_is_aligned(addr, recp->dtrd_alignment))
 		return (dt_set_errno(dtp, EDT_DALIGN));
 
 	switch (recp->dtrd_size) {
@@ -1507,7 +1506,7 @@ dt_printf_format(dtrace_hdl_t *dtp, FILE *fp, const dt_pfargv_t *pfv,
 		}
 
 		if (rec->dtrd_alignment != 0 &&
-		    ((uintptr_t)addr & (uintptr_t)(rec->dtrd_alignment - 1)) != 0) {
+		    !__builtin_is_aligned(addr, rec->dtrd_alignment)) {
 			dt_dprintf("bad align: addr=%p size=0x%x align=0x%x\n",
 			    (void *)addr, rec->dtrd_size, rec->dtrd_alignment);
 			return (dt_set_errno(dtp, EDT_DALIGN));
