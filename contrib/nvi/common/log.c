@@ -741,10 +741,17 @@ apply_with(
 
 	static size_t blen;
 	static nword *bp;
+#if __has_builtin(__builtin_align_down)
+	nword *lp = (nword *)__builtin_align_down(p, sizeof(nword));
+#else
+	/*
+	 * XXXAR: This is probably the weirdest way to align a pointer down to
+	 * sizeof(nword) that I've seen so far...
+	 */
 	nword *lp = (nword *)((uintptr_t)p / sizeof(nword) * sizeof(nword));
-
+#endif
 	if (lp != (nword *)p) {
-		int offl = ((uintptr_t)p - (uintptr_t)lp) << 3;
+		int offl = ((caddr_t)p - (caddr_t)lp) << 3;
 		int offr = (sizeof(nword) << 3) - offl;
 		size_t i, cnt = (len + sizeof(nword) / 2) / sizeof(nword);
 
