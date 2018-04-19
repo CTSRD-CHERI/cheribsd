@@ -34,6 +34,7 @@ SRCS+=		chrono.cpp
 SRCS+=		condition_variable.cpp
 SRCS+=		debug.cpp
 SRCS+=		exception.cpp
+SRCS+=		functional.cpp
 SRCS+=		future.cpp
 SRCS+=		hash.cpp
 SRCS+=		ios.cpp
@@ -55,6 +56,7 @@ SRCS+=		typeinfo.cpp
 SRCS+=		utility.cpp
 SRCS+=		valarray.cpp
 SRCS+=		variant.cpp
+SRCS+=		vector.cpp
 
 CXXRT_SRCS+=	auxhelper.cc
 CXXRT_SRCS+=	dynamic_cast.cc
@@ -74,7 +76,12 @@ cxxrt_${_S}: ${_LIBCXXRTDIR}/${_S} .NOMETA
 .endfor
 
 WARNS=		0
-CFLAGS+=	-isystem ${HDRDIR} -isystem ${_LIBCXXRTDIR} -nostdinc++ -nostdlib -D_LIBCPP_BUILDING_LIBRARY -DLIBCXXRT
+CFLAGS+=	-isystem ${HDRDIR}
+CFLAGS+=	-isystem ${_LIBCXXRTDIR}
+CFLAGS+=	-nostdinc++
+CFLAGS+=	-nostdlib
+CFLAGS+=	-D_LIBCPP_BUILDING_LIBRARY
+CFLAGS+=	-DLIBCXXRT
 .if empty(CXXFLAGS:M-std=*)
 CXXFLAGS+=	-std=c++11
 .endif
@@ -101,8 +108,6 @@ STD_HEADERS+=	__libcpp_version
 STD_HEADERS+=	__locale
 STD_HEADERS+=	__mutex_base
 STD_HEADERS+=	__nullptr
-# No longer exists in latest libc++
-# STD_HEADERS+=	__refstring
 STD_HEADERS+=	__split_buffer
 STD_HEADERS+=	__sso_allocator
 STD_HEADERS+=	__std_stream
@@ -110,8 +115,6 @@ STD_HEADERS+=	__string
 STD_HEADERS+=	__threading_support
 STD_HEADERS+=	__tree
 STD_HEADERS+=	__tuple
-# STD_HEADERS+=	__undef_min_max
-# renamed upstream
 STD_HEADERS+=	__undef_macros
 STD_HEADERS+=	algorithm
 STD_HEADERS+=	any
@@ -233,6 +236,7 @@ EXP_HEADERS+=	__memory
 EXP_HEADERS+=	algorithm
 EXP_HEADERS+=	any
 EXP_HEADERS+=	chrono
+EXP_HEADERS+=	coroutine
 EXP_HEADERS+=	deque
 EXP_HEADERS+=	dynarray
 EXP_HEADERS+=	filesystem
