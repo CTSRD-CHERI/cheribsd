@@ -342,8 +342,6 @@ int	copyout_part(const void * _Nonnull __restrict kaddr,
 #if __has_feature(capabilities)
 int	copyout_c(const void * _Nonnull __restrict __capability kaddr,
 	    void * _Nonnull __restrict __capability udaddr, size_t len);
-int	copyoutcap(const void * _Nonnull __restrict kaddr,
-	    void * _Nonnull __restrict udaddr, size_t len);
 int	copyoutcap_c(const void * __capability _Nonnull __restrict kaddr,
 	    void * __capability _Nonnull __restrict udaddr, size_t len);
 #else

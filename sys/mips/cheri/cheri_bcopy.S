@@ -47,14 +47,14 @@
 .set noreorder
 
 /*
- * Implement CHERI memcpy() and bcopy() variants in assembly; C works fine in
- * the kernel most of the time, but copyincap() and copyoutcap() require that
- * no callee-save registers be trampled over due to fault-based error
- * handling.
+ * Implement CHERI memcpy() and bcopy() variants in assembly.
  *
  * These routines attempt to handle only fully aligned access, and will throw
  * exceptions if that is not the case.  Likewise, they do not handle
  * overlapping copies, a typical requirement of bcopy() implementations.
+ *
+ * XXX-BD: these should probably go away in favor of capability
+ * oblivious memcpy/bcopy.
  *
  * cheri_bcopy() accepts:
  * a0 - source pointer
