@@ -269,8 +269,9 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 #ifdef CPU_CHERI
 	cfp = malloc(sizeof(*cfp), M_TEMP, M_WAITOK);
 	cheri_trapframe_to_cheriframe(&td->td_pcb->pcb_regs, cfp);
-	if (copyoutcap(cfp,
-	    (void *)sf.sf_uc.uc_mcontext.mc_cp2state, cp2_len) != 0) {
+	if (copyoutcap_c((__cheri_tocap struct cheri_frame * __capability)cfp,
+	    __USER_CAP((void *)(uintptr_t)sf.sf_uc.uc_mcontext.mc_cp2state,
+	    cp2_len), cp2_len) != 0) {
 		free(cfp, M_TEMP);
 		PROC_LOCK(p);
 		printf("pid %d, tid %d: could not copy out cheriframe\n",
