@@ -950,23 +950,18 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	destp -= ARG_MAX - imgp->args->stringspace;
 	destp = __builtin_align_down(destp, sizeof(void * __capability));
 
+	vectp = (void * __capability * __capability)destp;
 	/*
-	 * Prepare some room * on the stack for auxargs.
+	 * Allocate room on the stack for the ELF auxargs array.  It has
+	 * up to AT_COUNT entries.
 	 */
+	vectp -= AT_COUNT * 2;
+
 	/*
-	 * 'AT_COUNT*2' is size for the ELF Auxargs data. This is for
-	 * lower compatibility.
+	 * Allocate room for the argv[] and env vectors including the
+	 * terminating NULL pointers.
 	 */
-	imgp->auxarg_size = (imgp->auxarg_size) ? imgp->auxarg_size
-		: (AT_COUNT * 2);
-	/*
-	 * The '+ 2' is for the null pointers at the end of each of
-	 * the arg and env vector sets, and imgp->auxarg_size is room
-	 * for argument of runtime loader if any.
-	 */
-	vectp = (void * __capability * __capability)(destp - (imgp->args->argc +
-	    imgp->args->envc + 2 + imgp->auxarg_size) *
-	    sizeof(void * __capability));
+	vectp -= imgp->args->argc + 1 + imgp->args->envc +1;
 
 	/*
 	 * vectp also becomes our initial stack base
@@ -1123,7 +1118,7 @@ cheriabi_elf_fixup(register_t **stack_base, struct image_params *imgp)
 	argenvcount = imgp->args->argc + 1 + imgp->args->envc + 1;
 	cheri_capability_set((void * __capability *)&base,
 	    CHERI_CAP_USER_DATA_PERMS, (vaddr_t)*stack_base,
-	    (argenvcount + imgp->auxarg_size) * sizeof(void * __capability),
+	    (argenvcount + (AT_COUNT * 2)) * sizeof(void * __capability),
 	    0);
 	base += imgp->args->argc + imgp->args->envc + 2;
 

@@ -875,7 +875,7 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	auxv = stack +
 	    (imgp->args->argc + imgp->args->envc + 2) * sizeof(void * __capability);
 	cheri_capability_set(&td->td_frame->c3, CHERI_CAP_USER_DATA_PERMS,
-	    auxv, imgp->auxarg_size * 2 * sizeof(void * __capability), 0);
+	    auxv, AT_COUNT * 2 * sizeof(void * __capability), 0);
 	/*
 	 * Load relocbase into $c4 so that rtld has a capability with the
 	 * correct bounds available on startup
