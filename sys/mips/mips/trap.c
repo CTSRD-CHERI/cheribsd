@@ -1933,7 +1933,7 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, re
 		kaddr += sizeof(register_t) - size;
 #endif
 		int err;
-		if ((err = copyout(kaddr, (void*)addr, size))) {
+		if ((err = copyout_implicit_cap(kaddr, (void*)addr, size))) {
 			return (0);
 		}
 		return (op_type);
@@ -1945,7 +1945,7 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, re
 		kaddr += sizeof(register_t) - size;
 #endif
 		int err;
-		if ((err = copyin((void*)addr, kaddr, size))) {
+		if ((err = copyin_implicit_cap((void*)addr, kaddr, size))) {
 			return (0);
 		}
 		/* If we need to sign extend it, then shift it so that the sign

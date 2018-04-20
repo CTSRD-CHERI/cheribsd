@@ -44,6 +44,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/limits.h>
 #include <sys/lock.h>
@@ -52,6 +53,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/resourcevar.h>
 #include <sys/rwlock.h>
 #include <sys/sched.h>
+#include <sys/sysent.h>
 #include <sys/sysctl.h>
 #include <sys/vnode.h>
 
@@ -558,11 +560,50 @@ copyout_unmap(struct thread *td, vm_offset_t addr, size_t sz)
 }
 
 #if __has_feature(capabilities) && !defined(CHERI_IMPLICIT_USER_DDC)
+static inline bool
+allow_implicit_capability_use(void)
+{
+
+	if (SV_CURPROC_FLAG(SV_CHERI)) {
+		kdb_backtrace();
+		/* XXX-BD: kill process? */
+		return (false);
+	}
+	return (true);
+}
+
+/*
+ * Construct a user data capability.  Ordinarily, we use __USER_CAP to
+ * retrieve DDC, but the pcb isn't set up yet in do_execve() so while
+ * we're in there we derive one from whole cloth.
+ *
+ * Longer term, we should store appropriate capabilities in struct
+ * image_args along the way and use those.
+ */
+static inline void * __capability
+io_user_cap(volatile const void * uaddr, size_t len)
+{
+	bool inexec;
+
+	/* XXX: this is rather expensive... */
+	PROC_LOCK(curproc);
+	inexec = ((curproc->p_flag & P_INEXEC) != 0);
+	PROC_UNLOCK(curproc);
+
+	if (inexec)
+		return (cheri_capability_build_user_data(
+		    CHERI_CAP_USER_DATA_PERMS, (vaddr_t)uaddr, len, 0));
+	return (__USER_CAP(uaddr, len));
+}
+
 int
 copyinstr(const void *uaddr, void *kaddr, size_t len, size_t *done)
 {
 
-	return (copyinstr_c(__USER_CAP(uaddr, len),
+	if (!allow_implicit_capability_use())
+		return (EPROT);
+
+	return (copyinstr_c(io_user_cap(uaddr, len),
 	   (__cheri_tocap void * __capability)kaddr, len,
 	   (__cheri_tocap size_t * __capability)done));
 }
@@ -571,7 +612,10 @@ int
 copyin(const void *uaddr, void *kaddr, size_t len)
 {
 
-	return (copyin_c(__USER_CAP(uaddr, len),
+	if (!allow_implicit_capability_use())
+		return (EPROT);
+
+	return (copyin_c(io_user_cap(uaddr, len),
 	    (__cheri_tocap void * __capability)kaddr, len));
 }
 
@@ -579,64 +623,91 @@ int
 copyout(const void *kaddr, void *uaddr, size_t len)
 {
 
+	if (!allow_implicit_capability_use())
+		return (EPROT);
+
 	return (copyout_c((__cheri_tocap void * __capability)kaddr,
-	    __USER_CAP(uaddr, len), len));
+	    io_user_cap(uaddr, len), len));
 }
 
 int
 fubyte(volatile const void *base)
 {
 
-	return (fubyte_c(__USER_CAP(base, 1)));
+	if (!allow_implicit_capability_use())
+		return (-1);
+
+	return (fubyte_c(io_user_cap(base, 1)));
 }
 
 int
 fueword(volatile const void *base, long *val)
 {
 
-	return (fueword_c(__USER_CAP(base, sizeof(long)), val));
+	if (!allow_implicit_capability_use())
+		return (-1);
+
+	return (fueword_c(io_user_cap(base, sizeof(long)), val));
 }
 
 int
 fueword32(volatile const void *base, int32_t *val)
 {
 
-	return (fueword32_c(__USER_CAP(base, sizeof(int32_t)), val));
+	if (!allow_implicit_capability_use())
+		return (-1);
+
+	return (fueword32_c(io_user_cap(base, sizeof(int32_t)), val));
 }
 
 int
 fueword64(volatile const void *base, int64_t *val)
 {
 
-	return (fueword64_c(__USER_CAP(base, sizeof(int64_t)), val));
+	if (!allow_implicit_capability_use())
+		return (-1);
+
+	return (fueword64_c(io_user_cap(base, sizeof(int64_t)), val));
 }
 
 int
 subyte(volatile void *base, int byte)
 {
 
-	return (subyte_c(__USER_CAP(base, 1), byte));
+	if (!allow_implicit_capability_use())
+		return (-1);
+
+	return (subyte_c(io_user_cap(base, 1), byte));
 }
 
 int
 suword(volatile void *base, long word)
 {
 
-	return (suword_c(__USER_CAP(base, sizeof(long)), word));
+	if (!allow_implicit_capability_use())
+		return (-1);
+
+	return (suword_c(io_user_cap(base, sizeof(long)), word));
 }
 
 int
 suword32(volatile void *base, int32_t word)
 {
 
-	return (suword32_c(__USER_CAP(base, sizeof(int32_t)), word));
+	if (!allow_implicit_capability_use())
+		return (-1);
+
+	return (suword32_c(io_user_cap(base, sizeof(int32_t)), word));
 }
 
 int
 suword64(volatile void *base, int64_t word)
 {
 
-	return (suword64_c(__USER_CAP(base, sizeof(int64_t)), word));
+	if (!allow_implicit_capability_use())
+		return (-1);
+
+	return (suword64_c(io_user_cap(base, sizeof(int64_t)), word));
 }
 
 int
@@ -644,17 +715,56 @@ casueword32(volatile uint32_t *base, uint32_t oldval, uint32_t *oldvalp,
     uint32_t newval)
 {
 
-	return (casueword32_c(__USER_CAP_OBJ(base), oldval, oldvalp, newval));
+	if (!allow_implicit_capability_use())
+		return (-1);
+
+	return (casueword32_c(io_user_cap(base, sizeof(u_long)), oldval,
+	    oldvalp, newval));
 }
 
 int
 casueword(volatile u_long *p, u_long oldval, u_long *oldvalp, u_long newval)
 {
 
-	return (casueword_c(__USER_CAP_OBJ(p), oldval, oldvalp, newval));
+	if (!allow_implicit_capability_use())
+		return (-1);
+
+	return (casueword_c(io_user_cap(p, sizeof(u_long)), oldval,
+	    oldvalp, newval));
 }
 
-#endif	/* __has_feature(capabilities) && !defined(CHERI_IMPLICIT_USER_DDC) */
+int
+copyin_implicit_cap(const void *uaddr, void *kaddr, size_t len)
+{
+
+	return (copyin_c(cheri_capability_build_user_data(
+	    CHERI_CAP_USER_DATA_PERMS, (vaddr_t)uaddr, len, 0),
+	    (__cheri_tocap void * __capability)kaddr, len));
+}
+
+int
+copyout_implicit_cap(const void *kaddr, void *uaddr, size_t len)
+{
+
+	return (copyout_c((__cheri_tocap void * __capability)kaddr,
+	    cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
+	    (vaddr_t)uaddr, len, 0), len));
+}
+#else /* !( __has_feature(capabilities) && !defined(CHERI_IMPLICIT_USER_DDC)) */
+int
+copyin_implicit_cap(const void *uaddr, void *kaddr, size_t len)
+{
+
+	return (copyin(uaddr, kaddr, len));
+}
+
+int
+copyout_implicit_cap(const void *kaddr, void *uaddr, size_t len)
+{
+
+	return (copyout(kaddr, uaddr, len));
+}
+#endif /* !(__has_feature(capabilities) && !defined(CHERI_IMPLICIT_USER_DDC)) */
 
 #ifdef NO_FUEWORD
 /*
