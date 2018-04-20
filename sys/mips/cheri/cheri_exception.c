@@ -72,7 +72,7 @@ static const char *cheri_exccode_isa_array[] = {
 	"access system registers violation",	/* CHERI_EXCCODE_SYSTEM_REGS */
 	"permit ccall violation",		/* CHERI_EXCCODE_PERM_CCALL */
 	"access ccall IDC violation",		/* CHERI_EXCCODE_CCALL_IDC */
-	"reserved",				/* 0x1b */
+	"unseal",				/* CHERI_EXCODE_PERM_UNSEAL */
 	"reserved",				/* 0x1c */
 	"reserved",				/* 0x1d */
 	"reserved",				/* 0x1e */ 

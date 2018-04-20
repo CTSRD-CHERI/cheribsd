@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2017 Robert N. M. Watson
+ * Copyright (c) 2018 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -119,8 +119,8 @@ test_sealcap_sysarch(const struct cheri_test *ctp __unused)
 	if ((v & CHERI_PERM_CCALL) != 0)
 		cheritest_failure_errx("perms %jx (ccall present)", v);
 
-	if ((v & CHERI_PERM_RESERVED1) != 0)
-		cheritest_failure_errx("perms %jx (reserved1 present)", v);
+	if ((v & CHERI_PERM_UNSEAL) == 0)
+		cheritest_failure_errx("perms %jx (unseal present)", v);
 
 	if ((v & CHERI_PERM_SYSTEM_REGS) != 0)
 		cheritest_failure_errx("perms %jx (system_regs present)", v);
