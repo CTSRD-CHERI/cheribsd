@@ -335,9 +335,6 @@ int	copyin_nofault_c(const void * __capability _Nonnull __restrict udaddr,
 #endif
 int	copyout(const void * _Nonnull __restrict kaddr,
 	    void * _Nonnull __restrict udaddr, size_t len);
-int	copyout_part(const void * _Nonnull __restrict kaddr,
-	     void * _Nonnull __restrict udaddr,
-	    struct copy_map * _Nonnull cmap, size_t cmap_ents);
 
 #if __has_feature(capabilities)
 int	copyout_c(const void * _Nonnull __restrict __capability kaddr,
