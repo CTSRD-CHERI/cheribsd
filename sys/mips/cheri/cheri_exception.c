@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2011-2017 Robert N. M. Watson
+ * Copyright (c) 2011-2018 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -72,7 +72,7 @@ static const char *cheri_exccode_isa_array[] = {
 	"access system registers violation",	/* CHERI_EXCCODE_SYSTEM_REGS */
 	"permit ccall violation",		/* CHERI_EXCCODE_PERM_CCALL */
 	"access ccall IDC violation",		/* CHERI_EXCCODE_CCALL_IDC */
-	"unseal",				/* CHERI_EXCODE_PERM_UNSEAL */
+	"permit unseal violation",		/* CHERI_EXCODE_PERM_UNSEAL */
 	"reserved",				/* 0x1c */
 	"reserved",				/* 0x1d */
 	"reserved",				/* 0x1e */ 
@@ -374,6 +374,7 @@ cheri_capcause_to_sicode(register_t capcause)
 	case CHERI_EXCCODE_PERM_LOADCAP:
 	case CHERI_EXCCODE_PERM_STORECAP:
 	case CHERI_EXCCODE_PERM_SEAL:
+	case CHERI_EXCCODE_PERM_UNSEAL:
 	case CHERI_EXCCODE_USER_PERM:
 		return (PROT_CHERI_PERM);
 
