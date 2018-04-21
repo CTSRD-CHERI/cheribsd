@@ -180,6 +180,16 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Exercise capability load permission success",
 	  .ct_func = test_nofault_perm_load },
 
+	{ .ct_name = "test_fault_perm_seal",
+	  .ct_desc = "Exercise capability seal permission failure",
+	  .ct_func = test_fault_perm_seal,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
+	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_PERM,
+	  .ct_mips_exccode = T_C2E,
+	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_SEAL },
+
 	{ .ct_name = "test_fault_perm_store",
 	  .ct_desc = "Exercise capability store permission failure",
 	  .ct_func = test_fault_perm_store,
@@ -193,6 +203,16 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_nofault_perm_store",
 	  .ct_desc = "Exercise capability store permission success",
 	  .ct_func = test_nofault_perm_store },
+
+	{ .ct_name = "test_fault_perm_unseal",
+	  .ct_desc = "Exercise capability unseal permission failure",
+	  .ct_func = test_fault_perm_unseal,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
+	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_PERM,
+	  .ct_mips_exccode = T_C2E,
+	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_UNSEAL },
 
 	{ .ct_name = "test_fault_tag",
 	  .ct_desc = "Store via untagged capability",

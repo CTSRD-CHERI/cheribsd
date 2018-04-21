@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012-2017 Robert N. M. Watson
+ * Copyright (c) 2012-2018 Robert N. M. Watson
  * Copyright (c) 2014 SRI International
  * All rights reserved.
  *
@@ -40,6 +40,7 @@
 #include <sys/time.h>
 
 #include <machine/cpuregs.h>
+#include <machine/sysarch.h>
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
@@ -94,6 +95,22 @@ test_nofault_perm_load(const struct cheri_test *ctp __unused)
 }
 
 void
+test_fault_perm_seal(const struct cheri_test *ctp __unused)
+{
+	int i;
+	__capability void *ip = &i;
+	__capability void *sealcap;
+	__capability void *sealed;
+
+	if (sysarch(CHERI_GET_SEALCAP, &sealcap) < 0)
+		cheritest_failure_err("sysarch(CHERI_GET_SEALCAP)");
+	sealcap = cheri_andperm(sealcap, ~CHERI_PERM_SEAL);
+	sealed = cheri_seal(ip, sealcap);
+	cheritest_failure_errx("cheri_seal() performed successfully (%jx)",
+	    (vaddr_t)sealed);
+}
+
+void
 test_fault_perm_store(const struct cheri_test *ctp __unused)
 {
 	__capability char *arrayp = cheri_ptrperm(array, sizeof(array), 0);
@@ -109,6 +126,26 @@ test_nofault_perm_store(const struct cheri_test *ctp __unused)
 
 	arrayp[0] = sink;
 	cheritest_success();
+}
+
+void
+test_fault_perm_unseal(const struct cheri_test *ctp __unused)
+{
+	int i;
+	__capability void *ip = &i;
+	__capability void *sealcap;
+	__capability void *sealed;
+	__capability void *unsealed;
+
+	if (sysarch(CHERI_GET_SEALCAP, &sealcap) < 0)
+		cheritest_failure_err("sysarch(CHERI_GET_SEALCAP)");
+	if ((cheri_getperm(sealcap) & CHERI_PERM_SEAL) == 0)
+		cheritest_failure_errx("unexpected !seal perm on sealcap");
+	sealed = cheri_seal(ip, sealcap);
+	sealcap = cheri_andperm(sealcap, ~CHERI_PERM_UNSEAL);
+	unsealed = cheri_unseal(sealed, sealcap);
+	cheritest_failure_errx("cheri_unseal() performed successfully (%jx)",
+	    (vaddr_t)unsealed);
 }
 
 void
