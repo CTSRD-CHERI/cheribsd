@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012-2017 Robert N. M. Watson
+ * Copyright (c) 2012-2018 Robert N. M. Watson
  * Copyright (c) 2014-2016 SRI International
  * All rights reserved.
  *
@@ -274,6 +274,14 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_sealcap_sysarch",
 	  .ct_desc = "Retrieve sealcap using sysarch(2)",
 	  .ct_func = test_sealcap_sysarch, },
+
+	{ .ct_name = "test_sealcap_seal",
+	  .ct_desc = "Use sealcap to seal a capability",
+	  .ct_func = test_sealcap_seal, },
+
+	{ .ct_name = "test_sealcap_seal_unseal",
+	  .ct_desc = "Use sealcap to seal and unseal a capability",
+	  .ct_func = test_sealcap_seal_unseal, },
 
 	/*
 	 * Test bounds on globals in the same file they are allocated in.

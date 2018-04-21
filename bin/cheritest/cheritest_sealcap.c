@@ -51,11 +51,10 @@ void
 test_sealcap_sysarch(const struct cheri_test *ctp __unused)
 {
 	__capability void *sealcap;
+	register_t v;
 
 	if (sysarch(CHERI_GET_SEALCAP, &sealcap) < 0)
 		cheritest_failure_err("sysarch(CHERI_GET_SEALCAP)");
-
-	register_t v;
 
 	/* Base. */
 	v = cheri_getbase(sealcap);
@@ -120,7 +119,7 @@ test_sealcap_sysarch(const struct cheri_test *ctp __unused)
 		cheritest_failure_errx("perms %jx (ccall present)", v);
 
 	if ((v & CHERI_PERM_UNSEAL) == 0)
-		cheritest_failure_errx("perms %jx (unseal present)", v);
+		cheritest_failure_errx("perms %jx (unseal missing)", v);
 
 	if ((v & CHERI_PERM_SYSTEM_REGS) != 0)
 		cheritest_failure_errx("perms %jx (system_regs present)", v);
@@ -137,5 +136,122 @@ test_sealcap_sysarch(const struct cheri_test *ctp __unused)
 	v = cheri_gettag(sealcap);
 	if (v != 1)
 		cheritest_failure_errx("tag %jx (expected 1)", v);
+	cheritest_success();
+}
+
+static uint8_t sealdata[4096] __attribute__ ((aligned(4096)));
+
+void
+test_sealcap_seal(const struct cheri_test *ctp __unused)
+{
+	__capability void *sealdatap;
+	__capability void *sealcap;
+	__capability void *sealed;
+	register_t v;
+
+	if (sysarch(CHERI_GET_SEALCAP, &sealcap) < 0)
+		cheritest_failure_err("sysarch(CHERI_GET_SEALCAP)");
+
+	sealdatap = &sealdata;
+	sealed = cheri_seal(sealdatap, sealcap);
+
+	/* Base. */
+	v = cheri_getbase(sealed);
+	if (v != cheri_getbase(sealdatap))
+		cheritest_failure_errx("base %jx (expected %jx)", v,
+		    (uintmax_t)cheri_getbase(sealdatap));
+
+	/* Length. */
+	v = cheri_getlen(sealed);
+	if (v != cheri_getlen(sealdatap))
+		cheritest_failure_errx("length 0x%jx (expected 0x%jx)", v,
+		    (uintmax_t)cheri_getlen(sealdatap));
+
+	/* Offset. */
+	v = cheri_getoffset(sealed);
+	if (v != cheri_getoffset(sealdatap))
+		cheritest_failure_errx("offset %jx (expected %jx)", v,
+		    (uintmax_t)cheri_getoffset(sealdatap));
+
+	/* Type. */
+	v = cheri_gettype(sealed);
+	if (v != (vaddr_t)sealcap)
+		cheritest_failure_errx("otype %jx (expected %jx)", v,
+		    (uintmax_t)(vaddr_t)sealcap);
+
+	/* Sealed bit. */
+	v = cheri_getsealed(sealed);
+	if (v != 1)
+		cheritest_failure_errx("sealed %jx (expected 0)", v);
+
+	/* Tag bit. */
+	v = cheri_gettag(sealed);
+	if (v != 1)
+		cheritest_failure_errx("tag %jx (expected 1)", v);
+
+	/* Permissions. */
+	v = cheri_getperm(sealed);
+	if (v != cheri_getperm(sealdatap))
+		cheritest_failure_errx("perms %jx (expected %jx)", v,
+		    cheri_getperm(sealdatap));
+
+	cheritest_success();
+}
+
+void
+test_sealcap_seal_unseal(const struct cheri_test *ctp __unused)
+{
+	__capability void *sealdatap;
+	__capability void *sealcap;
+	__capability void *sealed, *unsealed;
+	register_t v;
+
+	if (sysarch(CHERI_GET_SEALCAP, &sealcap) < 0)
+		cheritest_failure_err("sysarch(CHERI_GET_SEALCAP)");
+
+	sealdatap = &sealdata;
+	sealed = cheri_seal(sealdatap, sealcap);
+	unsealed = cheri_unseal(sealed, sealcap);
+
+	/* Base. */
+	v = cheri_getbase(unsealed);
+	if (v != cheri_getbase(sealdatap))
+		cheritest_failure_errx("base %jx (expected %jx)", v,
+		    (uintmax_t)cheri_getbase(sealdatap));
+
+	/* Length. */
+	v = cheri_getlen(unsealed);
+	if (v != cheri_getlen(sealdatap))
+		cheritest_failure_errx("length 0x%jx (expected 0x%jx)", v,
+		    (uintmax_t)cheri_getlen(sealdatap));
+
+	/* Offset. */
+	v = cheri_getoffset(unsealed);
+	if (v != cheri_getoffset(sealdatap))
+		cheritest_failure_errx("offset %jx (expected %jx)", v,
+		    (uintmax_t)cheri_getoffset(sealdatap));
+
+	/* Type -- should be (-1) for an unsealed capability. */
+	v = cheri_gettype(unsealed);
+	if (v != 0xffffffffffffffff)
+		cheritest_failure_errx("otype %jx (expected %jx)", v,
+		    (uintmax_t)0xffffffffffffffff);
+
+	/* Sealed bit. */
+	v = cheri_getsealed(unsealed);
+	if (v != 0)
+		cheritest_failure_errx("sealed %jx (expected 0)", v);
+
+	/* Tag bit. */
+	v = cheri_gettag(unsealed);
+	if (v != 1)
+		cheritest_failure_errx("tag %jx (expected 1)", v);
+
+	/* Permissions. */
+	v = cheri_getperm(unsealed);
+	if (v != cheri_getperm(sealdatap))
+		cheritest_failure_errx("perms %jx (expected %jx)", v,
+		    cheri_getperm(sealdatap));
+
 	cheritest_success();
 }

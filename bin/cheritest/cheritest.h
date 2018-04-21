@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012-2017 Robert N. M. Watson
+ * Copyright (c) 2012-2018 Robert N. M. Watson
  * Copyright (c) 2014 SRI International
  * All rights reserved.
  *
@@ -434,6 +434,8 @@ DECLARE_CHERI_TEST(cheritest_setjmp_longjmp);
 
 /* cheritest_sealcap.c */
 DECLARE_CHERI_TEST(test_sealcap_sysarch);
+DECLARE_CHERI_TEST(test_sealcap_seal);
+DECLARE_CHERI_TEST(test_sealcap_seal_unseal);
 
 /* cheritest_string.c */
 DECLARE_CHERI_TEST(test_string_kern_memcpy_c);
