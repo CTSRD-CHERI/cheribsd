@@ -237,11 +237,27 @@ X${BINUTIL}?=	${${BINUTIL}}
 .if !empty(SUBDIR_OVERRIDE)
 SUBDIR=	${SUBDIR_OVERRIDE}
 .else
-SUBDIR=	lib libexec
+SUBDIR=	lib
+.if !defined(SYSROOT_ONLY)
+# We don't need libexec for just a sysroot
+SUBDIR+=libexec
+.endif
+
 .if !defined(NO_ROOT) && (make(installworld) || make(install))
 # Ensure libraries are installed before progressing.
 SUBDIR+=.WAIT
 .endif
+.if defined(SYSROOT_ONLY)
+# Only install libraries and headers:
+SUBDIR+=include
+.if ${MK_CDDL} != "no"
+SUBDIR+=cddl/lib
+.endif
+SUBDIR+=gnu/lib secure/lib
+.if ${MK_KERBEROS} != "no"
+SUBDIR+=kerberos5/lib
+.endif
+.else # !defined(SYSROOT_ONLY)
 SUBDIR+=bin
 .if ${MK_CDDL} != "no"
 SUBDIR+=cddl
@@ -267,10 +283,12 @@ SUBDIR+=	tests
 .if ${MK_OFED} != "no"
 SUBDIR+=contrib/ofed
 .endif
+.endif # !defined(SYSROOT_ONLY)
 
 # Local directories are last, since it is nice to at least get the base
 # system rebuilt before you do them.
 SUBDIR+=.WAIT
+.if !defined(SYSROOT_ONLY)
 .for _DIR in ${LOCAL_DIRS}
 .if exists(${.CURDIR}/${_DIR}/Makefile)
 SUBDIR+=	${_DIR}
@@ -282,6 +300,7 @@ SUBDIR+=	${_DIR}
 .for _DIR in ${LOCAL_DIRS:M*/} ${LOCAL_DIRS:N*/:S|$|/|}
 _REDUNDANT_LIB_DIRS+=    ${LOCAL_LIB_DIRS:M${_DIR}*}
 .endfor
+.endif  # !defined(SYSROOT_ONLY)
 .for _DIR in ${LOCAL_LIB_DIRS}
 .if empty(_REDUNDANT_LIB_DIRS:M${_DIR}) && exists(${.CURDIR}/${_DIR}/Makefile)
 SUBDIR+=	${_DIR}
@@ -295,7 +314,9 @@ SUBDIR+=	${_DIR}
 .if make(installworld) || make(install)
 SUBDIR+=.WAIT
 .endif
+.if !defined(SYSROOT_ONLY)
 SUBDIR+=etc
+.endif
 
 .endif	# !empty(SUBDIR_OVERRIDE)
 
@@ -1115,7 +1136,9 @@ WMAKE_TGTS+=	_libraries
 WMAKE_TGTS+=	buildcheri
 .endif
 .endif
+.if !defined(SYSROOT_ONLY)
 WMAKE_TGTS+=	everything
+.endif # !defined(SYSROOT_ONLY)
 .if defined(LIBCOMPAT) && empty(SUBDIR_OVERRIDE)
 WMAKE_TGTS+=	build${libcompat}
 .endif
@@ -1477,6 +1500,9 @@ redistribute: .MAKE .PHONY
 .endif
 
 distrib-dirs distribution: .MAKE .PHONY
+.if defined(SYSROOT_ONLY)
+	@echo "Skipping make ${.TARGET} due to SYSROOT_ONLY=${SYSROOT_ONLY}"
+.else
 	${_+_}cd ${.CURDIR}/etc; ${CROSSENV} PATH=${TMPPATH} ${MAKE} \
 	    ${IMAKE_INSTALL} ${IMAKE_MTREE} METALOG=${METALOG} ${.TARGET}
 .if make(distribution)
@@ -1484,6 +1510,7 @@ distrib-dirs distribution: .MAKE .PHONY
 		${MAKE} -f Makefile.inc1 ${IMAKE_INSTALL} \
 		METALOG=${METALOG} MK_TESTS=no installconfig
 .endif
+.endif  # !defined(SYSROOT_ONLY)
 
 #
 # buildkernel and installkernel
