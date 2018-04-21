@@ -55,7 +55,7 @@ static const char *cheri_exccode_isa_array[] = {
 	"underflow of trusted system stack",	/* CHERI_EXCCODE_UNDERFLOW */
 	"user-defined permission violation",	/* CHERI_EXCCODE_PERM_USER */
 	"TLB prohibits store capability",	/* CHERI_EXCCODE_TLBSTORE */
-    "Bounds cannot be represented precisely", /* 0xa: CHERI_EXCCODE_IMPRECISE */
+    "bounds cannot be represented precisely", /* 0xa: CHERI_EXCCODE_IMPRECISE */
 	"reserved",				/* 0xb: TBD */
 	"reserved",				/* 0xc: TBD */
 	"reserved",				/* 0xd: TBD */
