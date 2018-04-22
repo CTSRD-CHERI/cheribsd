@@ -2534,6 +2534,10 @@ _cddl_lib_libctf= cddl/lib/libctf
 _cddl_lib= cddl/lib
 cddl/lib/libavl__L: cddl/lib/libnvpair__L
 cddl/lib/libctf__L: lib/libz__L
+.if ${MK_LLVM_LIBUNWIND} != "no"
+# Jenkins sometimes fails to find libgcc_s when building libctf
+cddl/lib/libctf__L: lib/libgcc_s__L
+.endif
 cddl/lib/libuutil__L: cddl/lib/libnvpair__L
 cddl/lib/libzfs_core__L: cddl/lib/libnvpair__L
 cddl/lib/libzfs__L: lib/libgeom__L
