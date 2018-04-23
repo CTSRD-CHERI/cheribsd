@@ -138,6 +138,15 @@
 #define	ASM_ENTRY(sym)						\
 	.text; .globl sym; .type sym,@function; sym:
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define _FRAME_STACK_REG	$c11
+/* FIXME: uncomment this in a few days when everyone has updated clang:
+ * #define _FRAME_RETURN_REG	$c17 */
+#define _FRAME_RETURN_REG	ra
+#else
+#define _FRAME_STACK_REG	sp
+#define _FRAME_RETURN_REG	ra
+#endif
 /*
  * LEAF
  *	A leaf routine does
@@ -150,7 +159,7 @@
 	.ent	_C_LABEL(x);	\
 	.type	_C_LABEL(x),@function;	\
 _C_LABEL(x): ;			\
-	.frame sp, 0, ra;	\
+	.frame _FRAME_STACK_REG, 0, _FRAME_RETURN_REG;	\
 	MCOUNT
 
 /*
@@ -162,7 +171,7 @@ _C_LABEL(x): ;			\
 	.ent	_C_LABEL(x);	\
 	.type	_C_LABEL(x),@function;	\
 _C_LABEL(x): ;			\
-	.frame	sp, 0, ra
+	.frame	_FRAME_STACK_REG, 0, _FRAME_RETURN_REG
 
 /*
  * XLEAF
@@ -184,7 +193,7 @@ _C_LABEL(x):
 	.ent	_C_LABEL(x);		\
 	.type	_C_LABEL(x),@function;	\
 _C_LABEL(x): ;				\
-	.frame	sp, fsize, retpc;	\
+	.frame	_FRAME_STACK_REG, fsize, retpc;	\
 	MCOUNT
 
 /*
@@ -196,7 +205,7 @@ _C_LABEL(x): ;				\
 	.ent	_C_LABEL(x);			\
 	.type	_C_LABEL(x),@function;	\
 _C_LABEL(x): ;					\
-	.frame	sp, fsize, retpc
+	.frame	_FRAME_STACK_REG, fsize, retpc
 
 /*
  * XNESTED

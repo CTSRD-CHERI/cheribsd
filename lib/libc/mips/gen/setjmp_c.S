@@ -61,7 +61,7 @@ __FBSDID("$FreeBSD$");
 /* Stack space required to save original $c3. */
 #define SETJMP_FRAME_SIZE	(CALLFRAME_SIZ + _MIPS_SZCAP/8)
 
-NESTED(setjmp, SETJMP_FRAME_SIZE, ra)
+NESTED(setjmp, SETJMP_FRAME_SIZE, _FRAME_RETURN_REG)
 	.protected _C_LABEL(setjmp)
 	/* XXXRW: CFI annotations for debugger. */
 
@@ -167,7 +167,7 @@ END(setjmp)
 
 #define LONGJMP_FRAME_SIZE	(CALLFRAME_SIZ + _MIPS_SZCAP/8)
 
-NESTED(longjmp, LONGJMP_FRAME_SIZE, ra)
+NESTED(longjmp, LONGJMP_FRAME_SIZE, _FRAME_RETURN_REG)
 	.protected _C_LABEL(longjmp)
 	/* XXXRW: CFI annotations for debugger. */
 
