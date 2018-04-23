@@ -861,8 +861,10 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 */
 	/* XXXAR: is there a better way to check for dynamic binaries? */
 	is_dynamic_binary = imgp->end_addr == 0 && imgp->reloc_base != 0;
-	data_length = is_dynamic_binary ? CHERI_CAP_USER_DATA_LENGTH : text_end;
-	code_length = is_dynamic_binary ? CHERI_CAP_USER_CODE_LENGTH : text_end;
+	data_length = is_dynamic_binary ?
+	    CHERI_CAP_USER_DATA_LENGTH - imgp->reloc_base : text_end;
+	code_length = is_dynamic_binary ?
+	    CHERI_CAP_USER_CODE_LENGTH - imgp->reloc_base : text_end;
 	frame = &td->td_pcb->pcb_regs;
 	cheriabi_capability_set_user_ddc(&frame->ddc, data_length);
 	cheriabi_capability_set_user_idc(&frame->idc, data_length);
