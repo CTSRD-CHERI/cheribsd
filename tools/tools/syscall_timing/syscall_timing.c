@@ -877,6 +877,7 @@ main(int argc, char *argv[])
 	name = NULL;
 	path = NULL;
 #ifdef RAW
+	raw_fp = NULL;
 	raw_path = NULL;
 #endif
 	tmp_path = NULL;
