@@ -865,11 +865,16 @@ cheriabi_syscall_helper_unregister(struct syscall_helper_data *sd)
 	return (0);
 }
 
+/*
+ * This macro uses cheri_capability_build_user_rwx() because it can
+ * create both types of capabilities (and currently creates W|X caps).
+ * Its use should be replaced.
+ */
 #define sucap(uaddr, base, offset, length, perms)			\
 	do {								\
 		void * __capability _tmpcap;				\
-		cheri_capability_set(&_tmpcap, (perms), (vaddr_t)(base),\
-		    (length), (offset));				\
+		_tmpcap = cheri_capability_build_user_rwx((perms),	\
+		    (vaddr_t)(base), (length), (offset));		\
 		copyoutcap_c(&_tmpcap, uaddr, sizeof(_tmpcap));		\
 	} while(0)
 
@@ -898,7 +903,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	else
 		execpath_len = 0;
 	/* XXX: should be derived from a capability to the strings region */
-	cheri_capability_set((void * __capability *)&arginfo,
+	arginfo = cheri_capability_build_user_data(
 	    CHERI_CAP_USER_DATA_PERMS, CHERI_CAP_USER_DATA_BASE,
 	    CHERI_CAP_USER_DATA_LENGTH,
 	    curproc->p_sysent->sv_psstrings);
@@ -1117,11 +1122,11 @@ cheriabi_elf_fixup(register_t **stack_base, struct image_params *imgp)
 	    ("*stack_base (%p) is not capability aligned", *stack_base));
 
 	argenvcount = imgp->args->argc + 1 + imgp->args->envc + 1;
-	cheri_capability_set((void * __capability *)&base,
+	base = cheri_capability_build_user_data(
 	    CHERI_CAP_USER_DATA_PERMS, (vaddr_t)*stack_base,
 	    (argenvcount + (AT_COUNT * 2)) * sizeof(void * __capability),
 	    0);
-	base += imgp->args->argc + imgp->args->envc + 2;
+	base += imgp->args->argc + 1 + imgp->args->envc + 1;
 
 	cheriabi_set_auxargs(base, imgp);
 

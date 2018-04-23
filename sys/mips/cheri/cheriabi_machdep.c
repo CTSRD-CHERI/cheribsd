@@ -606,10 +606,12 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		 * user-originated stack capability, rather than $kdc, to be
 		 * on the safe side.
 		 */
-		cheri_capability_set(&regs->c3, CHERI_CAP_USER_DATA_PERMS,
-		    (vaddr_t)&sfp->sf_si, sizeof(sfp->sf_si), 0);
-		cheri_capability_set(&regs->c4, CHERI_CAP_USER_DATA_PERMS,
-		    (vaddr_t)&sfp->sf_uc, sizeof(sfp->sf_uc), 0);
+		regs->c3 = cheri_capability_build_user_data(
+		    CHERI_CAP_USER_DATA_PERMS, (vaddr_t)&sfp->sf_si,
+		    sizeof(sfp->sf_si), 0);
+		regs->c4 = cheri_capability_build_user_data(
+		    CHERI_CAP_USER_DATA_PERMS, (vaddr_t)&sfp->sf_uc,
+		    sizeof(sfp->sf_uc), 0);
 		/* sf.sf_ahu.sf_action = (__siginfohandler_t *)catcher; */
 
 		/* fill siginfo structure */
@@ -691,9 +693,8 @@ static void
 cheriabi_capability_set_user_ddc(void * __capability *cp, size_t length)
 {
 
-	cheri_capability_set(cp, CHERI_CAP_USER_DATA_PERMS,
-	    CHERI_CAP_USER_DATA_BASE, length,
-	    CHERI_CAP_USER_DATA_OFFSET);
+	*cp = cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
+	    CHERI_CAP_USER_DATA_BASE, length, CHERI_CAP_USER_DATA_OFFSET);
 }
 
 static void
@@ -715,7 +716,7 @@ cheriabi_capability_set_user_entry(void * __capability *cp,
 	 * Set the jump target regigster for the pure capability calling
 	 * convention.
 	 */
-	cheri_capability_set(cp, CHERI_CAP_USER_CODE_PERMS,
+	*cp = cheri_capability_build_user_code(CHERI_CAP_USER_CODE_PERMS,
 	    CHERI_CAP_USER_CODE_BASE, length, entry_addr);
 }
 
@@ -802,8 +803,8 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	    rounddown2(stackbase, 1ULL << CHERI_ALIGN_SHIFT(stacklen)),
 	    ("stackbase 0x%lx is not representable at length 0x%lx",
 	    stackbase, stacklen));
-	cheri_capability_set(&td->td_frame->csp, CHERI_CAP_USER_DATA_PERMS,
-	    stackbase, stacklen, 0);
+	td->td_frame->csp = cheri_capability_build_user_data(
+	    CHERI_CAP_USER_DATA_PERMS, stackbase, stacklen, 0);
 	td->td_frame->sp = stacklen;
 
 	/* Using addr as length means ddc base must be 0. */
@@ -830,7 +831,11 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	map_length = stackbase - map_base;
 	map_length = rounddown2(map_length,
 	    1ULL << CHERI_ALIGN_SHIFT(map_length));
-	cheri_capability_set(&td->td_md.md_cheri_mmap_cap,
+	/*
+	 * Use cheri_capability_build_user_rwx so mmap() can return
+	 * appropriate permissions derived from a single capability.
+	 */
+	td->td_md.md_cheri_mmap_cap = cheri_capability_build_user_rwx(
 	    CHERI_CAP_USER_MMAP_PERMS, map_base, map_length,
 	    CHERI_CAP_USER_MMAP_OFFSET);
 
@@ -872,16 +877,17 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	/*
 	 * Pass a pointer to the ELF auxiliary argument vector.
 	 */
-	auxv = stack +
-	    (imgp->args->argc + imgp->args->envc + 2) * sizeof(void * __capability);
-	cheri_capability_set(&td->td_frame->c3, CHERI_CAP_USER_DATA_PERMS,
-	    auxv, AT_COUNT * 2 * sizeof(void * __capability), 0);
+	auxv = stack + (imgp->args->argc + 1 + imgp->args->envc + 1) *
+	    sizeof(void * __capability);
+	td->td_frame->c3 = cheri_capability_build_user_data(
+	    CHERI_CAP_USER_DATA_PERMS, auxv,
+	    AT_COUNT * 2 * sizeof(void * __capability), 0);
 	/*
 	 * Load relocbase into $c4 so that rtld has a capability with the
 	 * correct bounds available on startup
 	 */
 	if (imgp->reloc_base)
-		cheri_capability_set(&td->td_frame->c4,
+		td->td_frame->c4 = cheri_capability_build_user_data(
 		   CHERI_CAP_USER_DATA_PERMS, imgp->reloc_base, data_length, 0);
 	/*
 	 * Restrict the stack capability to the maximum region allowed for
@@ -894,8 +900,8 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	KASSERT(stack > stackbase,
 	    ("top of stack 0x%lx is below stack base 0x%lx", stack, stackbase));
 	stacklen = stack - stackbase;
-	cheri_capability_set(&td->td_frame->csp, CHERI_CAP_USER_DATA_PERMS,
-	    stackbase, stacklen, stacklen);
+	td->td_frame->csp = cheri_capability_build_user_data(
+	    CHERI_CAP_USER_DATA_PERMS, stackbase, stacklen, stacklen);
 
 	/*
 	 * Update privileged signal-delivery environment for actual stack.
