@@ -53,8 +53,16 @@
 #include <string.h>
 #include <unistd.h>
 
+/*
+ * Enable by default; comment out to measure the overhead.
+ */
+#define RAW
+
 static struct timespec ts_start, ts_end;
 static int alarm_timeout;
+#ifdef RAW
+static int *raw_numbers = NULL;
+#endif
 #ifdef __CHERI__
 static volatile int trace;
 #endif
@@ -69,8 +77,6 @@ static volatile int alarm_fired;
 			(vvp)->tv_nsec += 1000000000;			\
 		}							\
 	} while (0)
-
-#define	BENCHMARK_FOREACH(I, NUM) for (I = 0; I < NUM && alarm_fired == 0; I++)
 
 static void
 alarm_handler(int signum __unused)
@@ -111,7 +117,43 @@ benchmark_stop(void)
 	error = clock_gettime(CLOCK_REALTIME, &ts_end);
 	assert(error == 0);
 }
+
+#ifdef RAW
+static void
+benchmark_iteration(int i)
+{
+	static struct timespec ts_prev;
+	struct timespec ts_diff, ts_now;
+	int error;
+
+	if (raw_numbers == NULL)
+		return;
+
+	/*
+	 * Note that this function gets called iterations + 1 times.
+	 */
+
+	error = clock_gettime(CLOCK_REALTIME, &ts_now);
+	assert(error == 0);
+
+	if (i > 0) {
+		ts_diff = ts_now;
+		timespecsub(&ts_diff, &ts_prev);
+		assert(ts_diff.tv_sec == 0);
+		raw_numbers[i] = ts_diff.tv_nsec;
+	} else {
+		raw_numbers[i] = 0;
+	}
+
+	ts_prev = ts_now;
+}
+#else /* !RAW */
+#define benchmark_iteration(X)	42
+#endif
   
+#define	BENCHMARK_FOREACH(I, NUM) for (I = 0; benchmark_iteration(I), \
+	I < NUM && alarm_fired == 0; I++)
+
 static uintmax_t
 test_getuid(uintmax_t num, uintmax_t int_arg __unused, const char *path __unused)
 {
@@ -803,7 +845,7 @@ usage(void)
 	int i;
 
 	fprintf(stderr, "syscall_timing [-i iterations] [-l loops] "
-	    "[-p path] [-s seconds] [-t] test\n");
+	    "[-p path] [-r] [-s seconds] [-t] test\n");
 	for (i = 0; i < tests_count; i++)
 		fprintf(stderr, "  %s\n", tests[i].t_name);
 	exit(-1);
@@ -813,14 +855,18 @@ int
 main(int argc, char *argv[])
 {
 	struct timespec ts_res;
+#ifdef RAW
+	FILE *raw_fp;
+	char *raw_path;
+#endif
 	const struct test *the_test;
 	const char *name;
 	const char *path;
 	char *tmp_dir, *tmp_path;
 	long long ll;
 	char *endp;
-	int ch, fd, error, i, j, rv;
-	uintmax_t iterations, k, loops;
+	int ch, fd, error, j, rv;
+	uintmax_t i, iterations, k, loops;
 
 	alarm_timeout = 1;
 	iterations = 0;
@@ -830,8 +876,11 @@ main(int argc, char *argv[])
 #endif
 	name = NULL;
 	path = NULL;
+#ifdef RAW
+	raw_path = NULL;
+#endif
 	tmp_path = NULL;
-	while ((ch = getopt(argc, argv, "i:l:n:p:s:t")) != -1) {
+	while ((ch = getopt(argc, argv, "i:l:n:p:r:s:t")) != -1) {
 		switch (ch) {
 		case 'i':
 			ll = strtol(optarg, &endp, 10);
@@ -853,6 +902,14 @@ main(int argc, char *argv[])
 
 		case 'p':
 			path = optarg;
+			break;
+
+		case 'r':
+#ifdef RAW
+			raw_path = optarg;
+#else
+			errx(1, "compiled without RAW");
+#endif
 			break;
 
 		case 's':
@@ -878,6 +935,10 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+#ifdef RAW
+	if (raw_path != NULL && iterations <= 0)
+		errx(1, "-r must be followed by -i");
+#endif
 	if (iterations < 1 && alarm_timeout < 1)
 		usage();
 	if (iterations < 1)
@@ -914,6 +975,18 @@ main(int argc, char *argv[])
 		if ((the_test->t_flags & FLAG_NAME) && (name == NULL))
 			errx(1, "test %s requires -n", the_test->t_name);
 	}
+
+#ifdef RAW
+	if (raw_path != 0) {
+		raw_fp = fopen(raw_path, "w");
+		if (raw_fp == NULL)
+			err(1, "%s", raw_path);
+
+		raw_numbers = calloc(iterations, sizeof(raw_numbers[0]));
+		if (raw_numbers == NULL)
+			err(1, "calloc");
+	}
+#endif
 
 	error = clock_getres(CLOCK_REALTIME, &ts_res);
 	assert(error == 0);
@@ -971,6 +1044,16 @@ main(int argc, char *argv[])
 			printf("0.%09ju\n", (uintmax_t)nsecsperit);
 		}
 	}
+
+#ifdef RAW
+	if (raw_fp != NULL) {
+		for (i = 0; i < iterations; i++)
+			fprintf(raw_fp, "%d\n", raw_numbers[i]);
+		error = fclose(raw_fp);
+		if (error != 0)
+			warn("%s", raw_path);
+	}
+#endif
 
 	if (tmp_path != NULL) {
 		error = unlink(tmp_path);
