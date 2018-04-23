@@ -1048,7 +1048,7 @@ main(int argc, char *argv[])
 
 #ifdef RAW
 	if (raw_fp != NULL) {
-		for (i = 0; i < iterations; i++)
+		for (i = 1; i < iterations + 1; i++)
 			fprintf(raw_fp, "%d\n", raw_numbers[i]);
 		error = fclose(raw_fp);
 		if (error != 0)
