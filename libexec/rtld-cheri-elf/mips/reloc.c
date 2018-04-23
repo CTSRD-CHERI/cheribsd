@@ -779,7 +779,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 #ifdef DEBUG
 				dbg("NOTE: found undefined R_CHERI_CAPABILITY "
 				    "for %s (in %s): value=%ld, size=%ld, "
-				    "type=%d, def bind=%d,sym bind=%d\n",
+				    "type=%d, def bind=%d,sym bind=%d",
 				    symname(obj, r_symndx), obj->path,
 				    def->st_value, def->st_size,
 				    ELF_ST_TYPE(def->st_info),
@@ -818,9 +818,11 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				return -1;
 			}
 			*((void**)where) = symval;
+#if defined(DEBUG_VERBOSE)
 			dbg("CAP(%p/0x%lx) %s in %s --> %-#p in %s",
 			    where, rel->r_offset, symname(obj, r_symndx),
 			    obj->path, *((void**)where), defobj->path);
+#endif
 			break;
 		}
 
