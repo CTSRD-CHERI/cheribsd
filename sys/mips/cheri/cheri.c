@@ -100,6 +100,7 @@ CTASSERT(sizeof(struct cheri_object) == 64);
 #endif
 
 static void * __capability userspace_cap;
+static void * __capability user_sealcap;
 
 /*
  * For now, all we do is declare what we support, as most initialisation took
@@ -152,6 +153,14 @@ cheri_cpu_startup(void)
 	    cheri_setoffset(cheri_getkdc(), CHERI_CAP_USER_DATA_BASE),
 	    CHERI_CAP_USER_DATA_LENGTH),
 	    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
+
+	/*
+	 * Create a capability for userspace to seal capabilities with.
+	 */
+	cheri_capability_set(&user_sealcap, CHERI_SEALCAP_USERSPACE_PERMS,
+	    CHERI_SEALCAP_USERSPACE_BASE, CHERI_SEALCAP_USERSPACE_LENGTH,
+	    CHERI_SEALCAP_USERSPACE_OFFSET);
+
 	/*
 	 * XXX-BD: KDC may now be reduced.
 	 */
@@ -301,9 +310,7 @@ void
 cheri_capability_set_user_sealcap(void * __capability *cp)
 {
 
-	cheri_capability_set(cp, CHERI_SEALCAP_USERSPACE_PERMS,
-	    CHERI_SEALCAP_USERSPACE_BASE, CHERI_SEALCAP_USERSPACE_LENGTH,
-	    CHERI_SEALCAP_USERSPACE_OFFSET);
+	*cp = user_sealcap;
 }
 
 void
