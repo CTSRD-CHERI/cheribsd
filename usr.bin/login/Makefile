@@ -3,8 +3,10 @@
 
 .include <src.opts.mk>
 
+.if ${MK_CHERI_SHARED_PROG} == "no"
 # can't be static (missing pam_self)
 WANT_CHERI=none
+.endif
 
 PROG=	login
 SRCS=	login.c login_fbtab.c
