@@ -136,7 +136,30 @@ dtrace_invop_calltrap_addr:
  * upper bits (bits 23 to 31 for MIPS32 and bits 23 to 63) are set under
  * kernel control (i.e. point to the page table). The Context/XContext
  * registers are not currently used by FreeBSD.
+*/
+
+/*
+ * Load the kerge GP pointer in the appropriate register
+ * CHERI for now regenerates GPC from KDC, in future KDC will become
+ * GPC and this macro will become cmove GPC, KDC
+ * XXX-AM: This may be appropriate in an header file?
+ * Note: this assumes that t0 can be used as scracth.
  */
+#ifdef CHERI_KERNEL
+#define LOAD_KERNEL_GP	\
+	PTR_LA gp, _C_LABEL(_captable) ;\
+	csetoffset CHERI_REG_GPC, CHERI_REG_KDC, gp ;\
+	PTR_LA t0, _C_LABEL(_ecaptable)		    ;\
+	PTR_SUBU t0, t0, gp			    ;\
+	csetbounds CHERI_REG_GPC, CHERI_REG_GPC, t0 ;\
+	REG_LI	t0, (CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP) ;\
+	candperm CHERI_REG_GPC, CHERI_REG_GPC, t0
+#else /* ! CHERI_KERNEL */
+#define LOAD_KERNEL_GP		\
+	PTR_LA	gp, _C_LABEL(_gp)
+#endif /* ! CHERI_KERNEL */
+
+
 
 /*
  *----------------------------------------------------------------------------
@@ -454,10 +477,18 @@ SlowFault:
  * previous value of sp should be saved prior to calling this macro --
  * typically, in k1.  There are no free registers, so we do this using shift
  * instructions.
- */
+*/
+#ifndef CHERI_KERNEL
 #define	CHERI_ADJUST_SP(reg)						\
 	dsrl	reg, reg, CHERICAP_SHIFT;				\
 	dsll	reg, reg, CHERICAP_SHIFT
+#else
+#define CHERI_ADJUST_STC(reg)						\
+	cgetoffset reg, CHERI_REG_STC;					\
+	dsrl	reg, reg, CHERICAP_SHIFT ;				\
+	dsll	reg, reg, CHERICAP_SHIFT ;				\
+	csetoffset CHERI_REG_STC, CHERI_REG_STC, reg
+#endif /* CHERI_KERNEL */
 #else
 #define	CHERI_ADJUST_SP(reg)
 #endif
@@ -475,8 +506,8 @@ SlowFault:
 	daddiu	treg, sp, (CALLFRAME_SIZ + (SZREG * offs));		\
 	csd	reg, treg, 0(CHERI_REG_KDC)
 
-/* Register to save in the trap frame cheri STC register offset */
-#define CHERI_EXC_STC_REG	CHERI_REG_STC
+#define SAVE_STC			\
+	SAVE_CREG(CHERI_REG_STC, STC)
 #else /* CHERI_KERNEL */
 #define	SAVE_CREG(creg, offs)						\
 	csc	creg, zero, (CALLFRAME_SIZ + (SZREG * offs))(CHERI_REG_STC)
@@ -485,10 +516,13 @@ SlowFault:
 	REG_LI	treg, (CALLFRAME_SIZ + (SZREG * offs)); 		\
 	csd	reg, treg, 0(CHERI_REG_STC)
 
-/* Register to save in the trap frame cheri STC register offset.
- * In this case KR1C holds the exception stack pointer.
+/*
+ * The CHERI kernel holds the preempted STC in KR1C
+ * and restores it outside the SAVE/RESTORE macros.
+ * We save it here to keep the traframe consistent.
  */
-#define CHERI_EXC_STC_REG	CHERI_REG_KR1C
+#define SAVE_STC			\
+	SAVE_CREG(CHERI_REG_KR1C, STC)
 #endif /* CHERI_KERNEL */
 
 #define	SAVE_CHERI(treg0, treg1)			\
@@ -503,7 +537,7 @@ SlowFault:
 	SAVE_CREG(CHERI_REG_C8, C8);		\
 	SAVE_CREG(CHERI_REG_C9, C9);		\
 	SAVE_CREG(CHERI_REG_C10, C10);		\
-	SAVE_CREG(CHERI_EXC_STC_REG, STC);	\
+	SAVE_STC		     ;		\
 	SAVE_CREG(CHERI_REG_C12, C12);		\
 	SAVE_CREG(CHERI_REG_C13, C13);		\
 	SAVE_CREG(CHERI_REG_C14, C14);		\
@@ -635,16 +669,24 @@ SlowFault:
 #ifndef CHERI_KERNEL
 #define	RESTORE_CREG(creg, offs)	\
 	clc	creg, sp, (CALLFRAME_SIZ + (SZREG * offs))(CHERI_REG_KDC)
+#define RESTORE_STC			\
+	RESTORE_CREG(CHERI_REG_STC, STC)
 #else /* CHERI_KERNEL */
 #define RESTORE_CREG(creg, offs)	\
 	clc	creg, zero, (CALLFRAME_SIZ + (SZREG * offs))(CHERI_REG_STC)
+/*
+ * STC must be restored later in the cheri kernel, otherwise we can not
+ * restore the rest.
+ */
+#define RESTORE_STC			\
+	RESTORE_CREG(CHERI_REG_KR1C, STC)
 #endif /* CHERI_KERNEL */
 
 /*
  * Restore CHERI registers from the on-stack kernel trap frame.
  *
  * Notice: the capability cause register is saved, but not restored.
-*/
+ */
 #define	RESTORE_CHERI				\
 	RESTORE_CREG(CHERI_REG_DDC, DDC);	\
 	RESTORE_CREG(CHERI_REG_C1, C1);	\
@@ -657,7 +699,7 @@ SlowFault:
 	RESTORE_CREG(CHERI_REG_C8, C8);	\
 	RESTORE_CREG(CHERI_REG_C9, C9);	\
 	RESTORE_CREG(CHERI_REG_C10, C10);	\
-	RESTORE_CREG(CHERI_REG_STC, STC);	\
+	RESTORE_STC			;	\
 	RESTORE_CREG(CHERI_REG_C12, C12);	\
 	RESTORE_CREG(CHERI_REG_C13, C13);	\
 	RESTORE_CREG(CHERI_REG_C14, C14);	\
@@ -748,8 +790,8 @@ NESTED_NOPROFILE(MipsKernGenException, KERN_EXC_FRAME_SIZE, ra)
 /*
  * Call the exception handler.  SAVE_CPU has left a0 pointing at the saved
  * frame.
- */
-	PTR_LA	gp, _C_LABEL(_gp)
+	*/
+	LOAD_KERNEL_GP
 	PTR_LA	t9, _C_LABEL(trap)
 	jalr	t9
 	REG_S	a3, (CALLFRAME_RA + KERN_REG_SIZE)(sp)		# for debugging
@@ -758,6 +800,7 @@ NESTED_NOPROFILE(MipsKernGenException, KERN_EXC_FRAME_SIZE, ra)
 	cmove	CHERI_REG_KR1C, CHERI_REG_STC
 	PTR_SUBU	k0, zero, KERN_EXC_FRAME_SIZE
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, k0
+	CHERI_ADJUST_STC(k0)
 	/* No stack alignment adjustment needed */
 	/* XXX-AM: Can we use .mask/.frame in cheriabi? */
 	.mask	0x80000000, (CALLFRAME_RA - KERN_EXC_FRAME_SIZE)
@@ -769,7 +812,7 @@ NESTED_NOPROFILE(MipsKernGenException, KERN_EXC_FRAME_SIZE, ra)
 /*
  * Call the exception handler.  SAVE_CPU has left c3 pointing at the saved frame.
  */
-	PTR_LA	gp, _C_LABEL(_gp)
+	LOAD_KERNEL_GP
 	PTR_LA	t9, _C_LABEL(trap)
 	cgetpccsetoffset $c12, t9
 	cjalr	$c12, $c17
@@ -855,7 +898,7 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	csd	a3, zero, CALLFRAME_RA(CHERI_REG_STC) # for debugging
 #endif /* CHERI_KERNEL */
 
-	PTR_LA	gp, _C_LABEL(_gp)	# switch to kernel GP
+	LOAD_KERNEL_GP
 /* Turn off fpu and enter kernel mode */
 	and	t0, a0, ~(MIPS_SR_COP_1_BIT | MIPS_SR_EXL | MIPS_SR_KSU_MASK | MIPS_SR_INT_IE)
 #if defined(CPU_CNMIPS)
@@ -1047,6 +1090,7 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
 	cmove	CHERI_REG_KR1C, CHERI_REG_STC
 	PTR_SUBU	k0, zero, KERN_EXC_FRAME_SIZE
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, k0
+	CHERI_ADJUST_STC(k0)
 	.mask	0x80000000, (CALLFRAME_RA - KERN_EXC_FRAME_SIZE)
 #endif 	/* CHERI_KERNEL */
 
@@ -1059,7 +1103,7 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
  * Call the interrupt handler.   SAVE_CPU has left a0 pointing at the saved
  * frame.
  */
-	PTR_LA	gp, _C_LABEL(_gp)
+	LOAD_KERNEL_GP
 #ifdef INTRNG
 	PTR_LA	t9, _C_LABEL(intr_irq_handler)
 #else
@@ -1073,7 +1117,7 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
 	cjalr	$c12, $c17
 	/* XXX-AM: we should rely on EPCC instead of COP0_EXC_PC in a3 */
 	csd	a3, zero, CALLFRAME_RA + KERN_REG_SIZE(CHERI_REG_STC) # for debugging
-#endif	
+#endif
 
 	/*
 	 * Update interrupt and CPU mask in saved status register
@@ -1252,7 +1296,7 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 	cincoffset	CHERI_REG_STC, CHERI_REG_KR1C, CALLFRAME_SIZ
 #endif /* CHERI_KERNEL */
 
-	PTR_LA	gp, _C_LABEL(_gp)	# switch to kernel GP
+	LOAD_KERNEL_GP	# switch to kernel GP
 
 # Turn off fpu, disable interrupts, set kernel mode kernel mode, clear exception level.
 	and	t0, a0, ~(MIPS_SR_COP_1_BIT | MIPS_SR_EXL | MIPS_SR_INT_IE | MIPS_SR_KSU_MASK)
