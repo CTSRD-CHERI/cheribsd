@@ -984,7 +984,7 @@ usage(void)
 	int i;
 
 	fprintf(stderr, "syscall_timing [-i iterations] [-l loops] "
-	    "[-p path] [-r] [-s seconds] [-t] test\n");
+	    "[-p path] [-r path] [-s seconds] [-t] test\n");
 	for (i = 0; i < tests_count; i++)
 		fprintf(stderr, "  %s\n", tests[i].t_name);
 	exit(-1);
