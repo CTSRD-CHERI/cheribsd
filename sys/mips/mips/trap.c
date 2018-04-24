@@ -691,7 +691,7 @@ trap(struct trapframe *trapframe)
 	char *msg = NULL;
 	intptr_t addr = 0;
 	register_t pc;
-	int cop;
+	int cop, error;
 	register_t *frame_regs;
 
 	trapdebug_enter(trapframe, 0);
@@ -1043,27 +1043,37 @@ dofault:
 
 	case T_BREAK + T_USER:
 		{
-			/* get address of break instruction and fetch it */
-			addr = fetch_bad_instr(trapframe);
-#if 0
-			printf("trap: %s (%d) breakpoint %x at %x: (adr %x ins %x)\n",
-			    p->p_comm, p->p_pid, instr, trapframe->pc,
-			    p->p_md.md_ss_addr, p->p_md.md_ss_instr);	/* XXX */
-#endif
-			if (td->td_md.md_ss_addr != addr ||
-			    trapframe->badinstr.inst != MIPS_BREAK_SSTEP) {
-				i = SIGTRAP;
-				ucode = TRAP_BRKPT;
-				break;
-			}
-			/*
-			 * The restoration of the original instruction and
-			 * the clearing of the breakpoint will be done later
-			 * by the call to ptrace_clear_single_step() in
-			 * issignal() when SIGTRAP is processed.
-			 */
+			intptr_t va;
+			uint32_t instr;
+
 			i = SIGTRAP;
-			ucode = TRAP_TRACE;
+			ucode = TRAP_BRKPT;
+			addr = trapframe->pc;
+
+			/* compute address of break instruction */
+			va = trapframe->pc;
+			if (DELAYBRANCH(trapframe->cause))
+				va += sizeof(int);
+
+			if (td->td_md.md_ss_addr != va)
+				break;
+
+			/* read break instruction */
+			instr = fuword32_c(__USER_CODE_CAP((void *)va));
+
+			if (instr != MIPS_BREAK_SSTEP)
+				break;
+
+			CTR3(KTR_PTRACE,
+			    "trap: tid %d, single step at %#lx: %#08x",
+			    td->td_tid, va, instr);
+			PROC_LOCK(p);
+			_PHOLD(p);
+			error = ptrace_clear_single_step(td);
+			_PRELE(p);
+			PROC_UNLOCK(p);
+			if (error == 0)
+				ucode = TRAP_TRACE;
 			break;
 		}
 
