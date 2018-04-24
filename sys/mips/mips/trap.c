@@ -1087,7 +1087,6 @@ dofault:
 		{
 			struct trapframe *locr0 = td->td_frame;
 
-			/* get address of trap instruction and fetch it */
 			addr = fetch_bad_instr(trapframe);
 
 			if (DELAYBRANCH(trapframe->cause)) {	/* Check BD bit */
