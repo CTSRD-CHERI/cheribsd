@@ -303,14 +303,26 @@ invalid:
 	 */
 	handle(badsys, SIGSYS, 0);
 	handle(disaster, SIGABRT, SIGFPE, SIGILL, SIGSEGV, SIGBUS, SIGXCPU,
-	    SIGXFSZ, 0);
+	    SIGXFSZ,
+#ifdef SIGPROT
+	    /*
+	     * Don't keep going if we receive SIGPROT since that will cause
+	     * QEMU to loop forever if we break something in init.
+	     */
+	    SIGPROT,
+#endif
+	    0);
 	handle(transition_handler, SIGHUP, SIGINT, SIGEMT, SIGTERM, SIGTSTP,
 	    SIGUSR1, SIGUSR2, 0);
 	handle(alrm_handler, SIGALRM, 0);
 	sigfillset(&mask);
 	delset(&mask, SIGABRT, SIGFPE, SIGILL, SIGSEGV, SIGBUS, SIGSYS,
 	    SIGXCPU, SIGXFSZ, SIGHUP, SIGINT, SIGEMT, SIGTERM, SIGTSTP,
-	    SIGALRM, SIGUSR1, SIGUSR2, 0);
+	    SIGALRM, SIGUSR1, SIGUSR2,
+#ifdef SIGPROT
+	    SIGPROT, /* Don't mask CHERI exceptions */
+#endif
+	    0);
 	sigprocmask(SIG_SETMASK, &mask, (sigset_t *) 0);
 	sigemptyset(&sa.sa_mask);
 	sa.sa_flags = 0;
@@ -324,6 +336,15 @@ invalid:
 	close(0);
 	close(1);
 	close(2);
+
+#ifdef __DEBUG_CHERI_TRAP_DURING_INIT__
+	warning("RAISING a CHERI violation:\n");
+	void * __capability cap = __builtin_cheri_global_data_get();
+	cap = __builtin_cheri_offset_set(cap, (vaddr_t)&Reboot);
+	cap = __builtin_cheri_perms_and(cap, ~__CHERI_CAP_PERMISSION_PERMIT_LOAD__);
+	Reboot = *((int * __capability)cap);
+	__builtin_trap();
+#endif
 
 	if (kenv(KENV_GET, "init_script", kenv_value, sizeof(kenv_value)) > 0) {
 		state_func_t next_transition;
