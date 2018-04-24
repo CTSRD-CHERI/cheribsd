@@ -1053,6 +1053,7 @@ dofault:
 			if (td->td_md.md_ss_addr != addr ||
 			    trapframe->badinstr.inst != MIPS_BREAK_SSTEP) {
 				i = SIGTRAP;
+				ucode = TRAP_BRKPT;
 				break;
 			}
 			/*
@@ -1062,6 +1063,7 @@ dofault:
 			 * issignal() when SIGTRAP is processed.
 			 */
 			i = SIGTRAP;
+			ucode = TRAP_TRACE;
 			break;
 		}
 
@@ -1076,6 +1078,7 @@ dofault:
 				va += sizeof(int);
 			printf("watch exception @ %p\n", (void *)va);
 			i = SIGTRAP;
+			ucode = TRAP_BRKPT;
 			addr = va;
 			break;
 		}
