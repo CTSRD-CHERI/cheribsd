@@ -9,8 +9,6 @@ PROG=	syslogd
 MAN=	syslog.conf.5 syslogd.8
 SRCS=	syslogd.c ttymsg.c
 
-CHERI_NO_SHARED=	fails: length violation
-
 LIBADD=	util
 
 WARNS?= 3

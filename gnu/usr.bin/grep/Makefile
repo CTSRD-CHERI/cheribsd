@@ -4,7 +4,6 @@
 
 .if ${MK_CHERI_PURE} == "yes"
 WANT_CHERI=	pure
-CHERI_NO_SHARED=	can not find libgnuregex
 .endif
 
 GREP_LIBZ=YES
