@@ -31,6 +31,7 @@
 
 #include <sys/types.h>
 #include <sys/mman.h>
+#include <sys/procdesc.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -249,6 +250,52 @@ test_coping(uintmax_t num, uintmax_t int_arg __unused, const char *path)
 	return (i);
 }
 #endif
+
+static uintmax_t
+test_pipeping(uintmax_t num, uintmax_t int_arg, const char *path __unused)
+{
+	char buf[int_arg];
+	uintmax_t i;
+	ssize_t ret;
+	pid_t pid;
+	int fd[2], procfd;
+
+	if (pipe(fd) < 0)
+		err(-1, "pipe");
+
+	pid = pdfork(&procfd, 0);
+	if (pid < 0)
+		err(1, "pdfork");
+
+	if (pid == 0) {
+		close(fd[0]);
+
+		for (;;) {
+			ret = read(fd[1], buf, int_arg);
+			if ((uintmax_t)ret != int_arg)
+				err(1, "read");
+			ret = write(fd[1], buf, int_arg);
+			if ((uintmax_t)ret != int_arg)
+				err(1, "write");
+		}
+	}
+
+	close(fd[1]);
+
+	benchmark_start();
+	BENCHMARK_FOREACH(i, num) {
+		ret = write(fd[0], buf, int_arg);
+		if ((uintmax_t)ret != int_arg)
+			err(1, "write");
+		ret = read(fd[0], buf, int_arg);
+		if ((uintmax_t)ret != int_arg)
+			err(1, "read");
+	}
+	benchmark_stop();
+
+	close(procfd);
+	return (i);
+}
 
 static uintmax_t
 test_gettimeofday(uintmax_t num, uintmax_t int_arg __unused, const char *path __unused)
@@ -790,6 +837,18 @@ static const struct test tests[] = {
 	{ "clock_gettime", test_clock_gettime, .t_flags = 0 },
 #ifdef __CHERI__
 	{ "coping", test_coping, .t_flags = FLAG_NAME },
+#endif
+	{ "pipeping_1", test_pipeping, .t_flags = 0, .t_int = 1 },
+	{ "pipeping_10", test_pipeping, .t_flags = 0, .t_int = 10 },
+	{ "pipeping_100", test_pipeping, .t_flags = 0, .t_int = 100 },
+	{ "pipeping_1000", test_pipeping, .t_flags = 0, .t_int = 1000 },
+	{ "pipeping_10000", test_pipeping, .t_flags = 0, .t_int = 10000 },
+#ifdef notyet
+	/*
+	 * XXX: Don't work; kernel pipe buffer too small?
+	 */
+	{ "pipeping_100000", test_pipeping, .t_flags = 0, .t_int = 100000 },
+	{ "pipeping_1000000", test_pipeping, .t_flags = 0, .t_int = 1000000 },
 #endif
 	{ "gettimeofday", test_gettimeofday, .t_flags = 0 },
 	{ "getpriority", test_getpriority, .t_flags = 0 },
