@@ -2275,7 +2275,7 @@ oce_handle_passthrough(struct ifnet *ifp, caddr_t data)
 	int rc = ENXIO;
 	char cookie[32] = {0};
 	void * __capability priv_data = ifr_data_get_ptr(ifr);
-	void * __capabilty ioctl_ptr;
+	void * __capability ioctl_ptr;
 	uint32_t req_size;
 	struct mbx_hdr req;
 	OCE_DMA_MEM dma_mem;
