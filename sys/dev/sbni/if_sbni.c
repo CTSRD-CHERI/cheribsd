@@ -1136,7 +1136,7 @@ sbni_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		/*
 		 * SBNI specific ioctl
 		 */
-	CASE_IOC_IFREQ(SIOCGHWFLAGS)	/* get flags */
+	CASE_IOC_IFREQ(SIOCGHWFLAGS):	/* get flags */
 		SBNI_LOCK(sc);
 		bcopy((caddr_t)IF_LLADDR(sc->ifp)+3, (caddr_t) &flags, 3);
 		flags.rxl = sc->cur_rxl_index;
@@ -1159,7 +1159,7 @@ sbni_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		free(in_stats, M_DEVBUF);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSHWFLAGS)	/* set flags */
+	CASE_IOC_IFREQ(SIOCSHWFLAGS):	/* set flags */
 		/* root only */
 		error = priv_check(td, PRIV_DRIVER);
 		if (error)

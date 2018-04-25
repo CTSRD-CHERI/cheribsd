@@ -1676,7 +1676,7 @@ redo_sifflags:
 		break;
 
 	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI) /* these two are called with a mutex held :-( */
+	CASE_IOC_IFREQ(SIOCDELMULTI): /* these two are called with a mutex held :-( */
 		rc = begin_synchronized_op(sc, vi, HOLD_LOCK, "t4multi");
 		if (rc)
 			return (rc);
@@ -1795,7 +1795,7 @@ fail:
 		ifmedia_ioctl(ifp, ifr, &vi->media, cmd);
 		break;
 
-	CASE_IOC_IFREQ(SIOCGI2C) {
+	CASE_IOC_IFREQ(SIOCGI2C): {
 		struct ifi2creq i2c;
 
 		rc = copyin_c(ifr_data_get_ptr(ifr), &i2c, sizeof(i2c));

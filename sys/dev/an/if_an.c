@@ -1979,7 +1979,7 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		an_setdef(sc, &sc->areq);
 		AN_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCGPRIVATE_0)		/* used by Cisco client utility */
+	CASE_IOC_IFREQ(SIOCGPRIVATE_0):	/* used by Cisco client utility */
 		if ((error = priv_check(td, PRIV_DRIVER)))
 			goto out;
 		error = copyin_c(ifr_data_get_ptr(ifr),
@@ -2008,7 +2008,7 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			    sizeof(l_ioctl));
 		}
 		break;
-	CASE_IOC_IFREQ(SIOCGPRIVATE_1)		/* used by Cisco client utility */
+	CASE_IOC_IFREQ(SIOCGPRIVATE_1):	/* used by Cisco client utility */
 		if ((error = priv_check(td, PRIV_DRIVER)))
 			goto out;
 		error = copyin_c(ifr_data_get_ptr(ifr),
