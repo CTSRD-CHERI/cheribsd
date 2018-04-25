@@ -143,6 +143,15 @@ call(void)
 	    __func__, error, pthread_getthreadid_np());
 }
 
+static int
+f(void * __capability a, void * __capability b, void * __capability c)
+{
+
+	fprintf(stderr, "%s: accepted, a %p, b %p, c %p, we are thread %d, looping...\n",
+	    __func__, (__cheri_fromcap void *)a, (__cheri_fromcap void *)b, (__cheri_fromcap void *)c, pthread_getthreadid_np());
+	return (0);
+}
+
 static void *
 service_proc(void *dummy __unused)
 {
@@ -160,12 +169,11 @@ service_proc(void *dummy __unused)
 	if (error != 0)
 		err(1, "coregister");
 
-	fprintf(stderr, "%s: code %p, data %p, we are thread %d, accepting...\n",
-	    __func__, (__cheri_fromcap void *)switcher_code, (__cheri_fromcap void *)switcher_data, pthread_getthreadid_np());
-	while (coaccept(switcher_code, switcher_data)) {
-		fprintf(stderr, "%s: accepted, we are thread %d, looping...\n",
-		    __func__, pthread_getthreadid_np());
-	}
+	fprintf(stderr, "%s: code %p, data %p, f %p, we are thread %d, accepting...\n",
+	    __func__, (__cheri_fromcap void *)switcher_code, (__cheri_fromcap void *)switcher_data, f, pthread_getthreadid_np());
+	error = coaccept(switcher_code, switcher_data, f);
+	if (error != 0)
+		err(1, "coaccept");
 	fprintf(stderr, "%s: we're not supposed to be here\n", __func__);
 	return (NULL);
 }
