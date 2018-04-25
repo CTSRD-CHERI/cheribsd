@@ -195,9 +195,9 @@ struct ifmediareq32 {
 
 #define	_CASE_IOC_IFGROUPREQ_32(cmd)				\
     _IOC_NEWTYPE((cmd), struct ifgroupreq32): case
-#else
+#else /* !COMPAT_FREEBSD32 */
 #define _CASE_IOC_IFGROUPREQ_32(cmd)
-#endif /* COMPAT_FREEBSD32 */
+#endif /* !COMPAT_FREEBSD32 */
 
 #define CASE_IOC_IFGROUPREQ(cmd)	\
     _CASE_IOC_IFGROUPREQ_32(cmd)	\
@@ -3429,6 +3429,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 {
 	caddr_t saved_data;
 	struct ifmediareq *ifmr;
+	struct ifmediareq *ifmrp;
 	struct ifnet *ifp;
 	struct ifreq *ifr;
 	u_long saved_cmd;
@@ -3475,6 +3476,20 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 #endif
 	}
 
+	ifmrp = NULL;
+#ifdef COMPAT_FREEBSD32
+	switch (cmd) {
+	case SIOCGIFMEDIA32:
+	case SIOCGIFXMEDIA32:
+		ifmrp = &ifmr;
+		ifmr_init(ifmrp, data);
+		cmd = _IOC_NEWTYPE(cmd, struct ifmediareq);
+		saved_data = data;
+		data = (caddr_t)ifmrp;
+	}
+#endif
+
+	ifr = (struct ifreq *)data;
 	switch (cmd) {
 	case SIOCGIFMEDIA:
 	case SIOCGIFXMEDIA:
@@ -3528,6 +3543,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case SIOCIFGCLONERS:
 		error = if_clone_list((struct if_clonereq *)data);
 		goto out_noref;
+
 	case CASE_IOC_IFGROUPREQ(SIOCGIFGMEMB):
 		error = if_getgroupmembers((struct ifgroupreq *)data);
 		goto out_noref;
