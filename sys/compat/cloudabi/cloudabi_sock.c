@@ -328,7 +328,7 @@ cloudabi_sock_send(struct thread *td, cloudabi_fd_t fd, kiovec_t *data,
     cloudabi_msgflags_t flags, size_t *rdatalen)
 {
 	kmsghdr_t hdr = {
-		.msg_iov = (__cheri_tocap struct iovec_c * __capability)data,
+		.msg_iov = data,
 		.msg_iovlen = datalen,
 	};
 	struct mbuf *control;
