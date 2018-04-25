@@ -40,6 +40,9 @@
 # xdev-links          - Create traditional links in /usr/bin for cc, etc
 # native-xtools       - Create host binaries that produce target objects
 #                       for use in qemu user-mode jails.
+# buildsysroot        - build all the boostrap tools and libraries needed for
+#                       a cross-compile sysroot
+# installsysroot      - install the sysroot created by buildsysroot
 # 
 # "quick" way to test all kernel builds:
 # 	_jflag=`sysctl -n hw.ncpu`
@@ -134,7 +137,7 @@ TGTS=	all all-man buildenv buildenvvars buildkernel buildworld \
 	xdev-links native-xtools stageworld stagekernel stage-packages \
 	create-world-packages create-kernel-packages create-packages \
 	packages installconfig real-packages sign-packages package-pkg \
-	print-dir test-system-compiler
+	print-dir test-system-compiler buildsysroot installsysroot
 
 # XXX: r156740: This can't work since bsd.subdir.mk is not included ever.
 # It will only work for SUBDIR_TARGETS in make.conf.
@@ -167,6 +170,7 @@ META_TGT_WHITELIST+= \
 .ORDER: buildkernel installkernel.debug
 .ORDER: buildkernel reinstallkernel
 .ORDER: buildkernel reinstallkernel.debug
+.ORDER: buildsysroot installsysroot
 
 PATH=	/sbin:/bin:/usr/sbin:/usr/bin
 MAKEOBJDIRPREFIX?=	/usr/obj

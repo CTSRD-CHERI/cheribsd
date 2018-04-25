@@ -93,7 +93,7 @@ OBJTREE=	${MAKEOBJDIRPREFIX}/${TARGET}.${TARGET_ARCH}
 
 # Pull in compiler metadata from buildworld/toolchain if possible to avoid
 # running CC from bsd.compiler.mk.
-.if make(installworld) || make(install)
+.if make(installworld) || make(installsysroot) || make(install)
 .-include "${OBJTREE}${.CURDIR}/compiler-metadata.mk"
 .endif
 
@@ -243,7 +243,7 @@ SUBDIR=	lib
 SUBDIR+=libexec
 .endif
 
-.if !defined(NO_ROOT) && (make(installworld) || make(install))
+.if !defined(NO_ROOT) && (make(installworld) || make(installsysroot) || make(install))
 # Ensure libraries are installed before progressing.
 SUBDIR+=.WAIT
 .endif
@@ -253,7 +253,10 @@ SUBDIR+=include
 .if ${MK_CDDL} != "no"
 SUBDIR+=cddl/lib
 .endif
-SUBDIR+=gnu/lib secure/lib
+SUBDIR+=gnu/lib
+.if ${MK_CRYPT} != "no"
+SUBDIR+= secure/lib
+.endif
 .if ${MK_KERBEROS} != "no"
 SUBDIR+=kerberos5/lib
 .endif
@@ -311,7 +314,7 @@ SUBDIR+=	${_DIR}
 # by calling 'makedb' in share/man.  This is only relevant for
 # install/distribute so they build the whatis file after every manpage is
 # installed.
-.if make(installworld) || make(install)
+.if make(installworld) || make(install) || make(installsysroot)
 SUBDIR+=.WAIT
 .endif
 .if !defined(SYSROOT_ONLY)
@@ -478,7 +481,7 @@ TMPPATH=	${STRICTTMPPATH}:${PATH}
 # It may not be functional, e.g., due to new ABI
 # when in the middle of installing over this system.
 #
-.if make(distributeworld) || make(installworld) || make(stageworld)
+.if make(distributeworld) || make(installworld) || make(stageworld) || make(installsysroot)
 INSTALLTMP!=	/usr/bin/mktemp -d -u -t install
 .endif
 
@@ -765,6 +768,14 @@ LIBCHERIIMAKE=	${LIBCHERIWMAKE:NINSTALL=*:NDESTDIR=*} \
 IMAKEENV=	${CROSSENV}
 IMAKE=		${IMAKEENV} ${MAKE} -f Makefile.inc1 \
 		${IMAKE_INSTALL} ${IMAKE_MTREE}
+.if make(installsysroot)
+# Don't try to install files that have not been built
+# FIXME: MK_TESTS breaks installsysroot for some reason:
+# ===> lib/libc/tests/tls_dso (install)
+# install: libh_tls_dynamic.a: No such file or directory
+IMAKE+=	-DSYSROOT_ONLY MK_TESTS=no
+.endif
+
 .if empty(.MAKEFLAGS:M-n)
 IMAKEENV+=	PATH=${STRICTTMPPATH}:${INSTALLTMP} \
 		LD_LIBRARY_PATH=${INSTALLTMP} \
@@ -1202,6 +1213,14 @@ TOOLCHAIN_TGTS=	${WMAKE_TGTS:Neverything:Nbuild${libcompat}:Nbuildcheri}
 toolchain: ${TOOLCHAIN_TGTS} .PHONY
 kernel-toolchain: ${TOOLCHAIN_TGTS:N_includes:N_libraries} .PHONY
 
+BUILDSYSROOT_TGTS=	${WMAKE_TGTS:Neverything}
+
+buildsysroot: buildworld_prologue ${BUILDSYSROOT_TGTS} buildworld_epilogue .PHONY
+.if !empty(SUBDIR_OVERRIDE)
+	@echo "buildsysroot is incompatible with SUBDIR_OVERRIDE"
+.endif
+	@echo "Built sysroot for ${TARGET}. Run installsysroot to install it."
+
 #
 # installcheck
 #
@@ -1322,7 +1341,7 @@ DEBUG_DISTRIBUTIONS+=	base ${EXTRA_DISTRIBUTIONS:S,doc,,:S,tests,,}
 
 MTREE_MAGIC?=	mtree 2.0
 
-distributeworld installworld stageworld: _installcheck_world .PHONY
+distributeworld installworld stageworld installsysroot: _installcheck_world .PHONY
 	mkdir -p ${INSTALLTMP}
 	progs=$$(for prog in ${ITOOLS}; do \
 		if progpath=`which $$prog`; then \
@@ -1460,7 +1479,7 @@ packageworld: .PHONY
 # and do a 'make reinstall' on the *client* to install new binaries from the
 # most recent server build.
 #
-restage reinstall: .MAKE .PHONY
+restage reinstall reinstallsysroot: .MAKE .PHONY
 	@echo "--------------------------------------------------------------"
 	@echo ">>> Making hierarchy"
 	@echo "--------------------------------------------------------------"
@@ -1483,6 +1502,14 @@ restage reinstall: .MAKE .PHONY
 .endif
 .if ${MK_CHERI} != "no"
 	${_+_}cd ${.CURDIR}; ${MAKE} -f Makefile.inc1 installcheri
+.endif
+.if make(reinstallsysroot)
+	@echo "Removing $$(find ${DESTDIR} -type d -empty -print | wc -l) empty directories from ${DESTDIR}"
+	find ${DESTDIR} -type d -empty -delete
+	@echo
+	@echo "--------------------------------------------------------------"
+	@echo ">>> Done installing sysroot"
+	@echo "--------------------------------------------------------------"
 .endif
 
 redistribute: .MAKE .PHONY
