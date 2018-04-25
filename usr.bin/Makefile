@@ -150,6 +150,7 @@ SUBDIR=	alias \
 	soelim \
 	sort \
 	split \
+	stevie \
 	stat \
 	stdbuf \
 	su \
