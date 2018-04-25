@@ -2,6 +2,9 @@
 
 .include <src.opts.mk>
 
+CHERI_NO_SHARED=	appears to crash during scp
+# Apr 24 23:13:59 qemu-cheri128-alr48 kernel: BAD_PAGE_FAULT: pid 637 tid 100050 (sshd), uid 0: pc 0x7c007c7d14 got a read fault (type 0x2) at 0x38af
+
 PROG=	sshd
 SRCS=	sshd.c auth-rhosts.c auth-passwd.c \
 	audit.c audit-bsm.c audit-linux.c platform.c \
