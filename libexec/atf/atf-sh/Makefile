@@ -75,5 +75,12 @@ SUBR=		libatf-sh.subr
 SUBDIR+=	tests
 .endif
 
+# Allow building atf as a static MIPS binary to speed up running tests
+# on QEMU (since QEMU it can only 'JIT' plain MIPS instructions)
+.if ${MK_CHERI_PURE} != "no" && defined(ATF_BUILD_STATIC_MIPS)
+WANT_CHERI:=hybrid
+NO_SHARED:=yes
+.endif
+
 .include "../../../lib/atf/common.mk"
 .include <bsd.prog.mk>
