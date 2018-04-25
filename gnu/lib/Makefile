@@ -20,9 +20,14 @@ SUBDIR+=		libgcc
 
 # libsupc++ uses libstdc++ headers, although 'make includes' should
 # have taken care of that already.
-.if ${MK_GNUCXX} != "no"
+# When targeting for CHERI we have to build a MIPS version of libstdc++ for packages
+.if ${MK_GNUCXX} != "no" && !defined(LIBCHERI)
 SUBDIR+= libstdc++ libsupc++
 SUBDIR_DEPENDS_libsupc++:= libstdc++
+.endif
+
+.if ${MACHINE_CPUARCH} == "mips" && ${MK_GNUCXX} == "no"
+.error "libstdc++ is still needed for MIPS atf-sh packages"
 .endif
 
 .if defined(LIBCHERI)
