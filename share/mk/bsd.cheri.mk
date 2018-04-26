@@ -106,7 +106,12 @@ _CHERI_COMMON_FLAGS+= -Wno-deprecated-declarations
 OBJCOPY:=	objcopy
 MIPS_ABI:=	purecap
 _CHERI_COMMON_FLAGS+=	-fpic
+# Don't override libdir for tests since that causes the dlopen tests to fail
+.if !defined(LIBDIR) || ${LIBDIR:S/^${TESTSBASE}//} == ${LIBDIR}
 LIBDIR:=	/usr/libcheri
+.else
+.info "Not overriding LIBDIR for CHERI since ${.CURDIR} is a test library"
+.endif
 ROOTOBJDIR=	${.OBJDIR:S,${.CURDIR},,}${SRCTOP}/worldcheri${SRCTOP}
 CFLAGS+=	-ftls-model=local-exec
 .if !empty(CHERI_USE_CAP_TABLE)
