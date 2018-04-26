@@ -68,8 +68,14 @@ _rtld_error(const char *fmt, ...)
 	va_list ap;
 
 	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
-	fputc('\n', stderr);
+	/*
+	 * XXXAR: Don't print these messages during kyua tests since it
+	 * breaks tests that assume empty stderr
+	*/
+	if (!getenv("__RUNNING_INSIDE_ATF_RUN")) {
+		vfprintf(stderr, fmt, ap);
+		fputc('\n', stderr);
+	}
 	va_end(ap);
 }
 
