@@ -1474,7 +1474,7 @@ axe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ifr = (struct ifreq *)data;
 	error = 0;
 	reinit = 0;
-	switch (cmd)
+	switch (cmd) {
 	CASE_IOC_IFREQ(SIOCSIFCAP):
 		AXE_LOCK(sc);
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
