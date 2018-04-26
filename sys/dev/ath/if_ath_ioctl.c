@@ -274,7 +274,7 @@ ath_ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 	}
 	CASE_IOC_IFREQ(SIOCGATHAGSTATS):
 		return copyout_c(
-		    (__cheri_tocap struct ath_stats * __capability)
+		    (__cheri_tocap struct ath_tx_aggr_stats * __capability)
 		    &sc->sc_aggr_stats, ifr_data_get_ptr(ifr),
 		    sizeof (sc->sc_aggr_stats));
 	CASE_IOC_IFREQ(SIOCZATHSTATS): {

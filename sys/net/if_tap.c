@@ -625,7 +625,7 @@ tapifioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ifmr->ifm_current = ifmr->ifm_active;
 			if (dummy >= 1) {
 				int media = IFM_ETHER;
-				error = copyout(&media, ifmr->ifm_ulist,
+				error = copyout_c(&media, ifmr->ifm_ulist,
 				    sizeof(int));
 			}
 			break;

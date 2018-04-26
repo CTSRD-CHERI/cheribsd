@@ -2654,7 +2654,7 @@ vxlan_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 	vxlan_set_default_config(sc);
 
 	if (params != 0) {
-		error = copyin(params, &vxlp, sizeof(vxlp));
+		error = copyin_c(params, &vxlp, sizeof(vxlp));
 		if (error)
 			goto fail;
 

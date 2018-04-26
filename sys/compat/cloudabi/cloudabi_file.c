@@ -190,7 +190,9 @@ cloudabi_sys_file_link(struct thread *td,
 		return (error);
 	}
 
-	error = kern_linkat(td, uap->fd1.fd, uap->fd2, path1, path2,
+	error = kern_linkat(td, uap->fd1.fd, uap->fd2,
+	    (__cheri_tocap const char * __capability)path1,
+	    (__cheri_tocap const char * __capability)path2,
 	    UIO_SYSSPACE, (uap->fd1.flags & CLOUDABI_LOOKUP_SYMLINK_FOLLOW) ?
 	    FOLLOW : NOFOLLOW);
 	cloudabi_freestr(path1);
@@ -760,9 +762,11 @@ cloudabi_sys_file_unlink(struct thread *td,
 		return (error);
 
 	if (uap->flags & CLOUDABI_UNLINK_REMOVEDIR)
-		error = kern_rmdirat(td, uap->fd, path, UIO_SYSSPACE);
+		error = kern_rmdirat(td, uap->fd,
+		    (__cheri_tocap char * __capability)path, UIO_SYSSPACE);
 	else
-		error = kern_unlinkat(td, uap->fd, path, UIO_SYSSPACE, 0);
+		error = kern_unlinkat(td, uap->fd,
+		    (__cheri_tocap char * __capability)path, UIO_SYSSPACE, 0);
 	cloudabi_freestr(path);
 	return (error);
 }

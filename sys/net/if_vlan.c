@@ -1710,7 +1710,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				ifmr = (struct ifmediareq *)data;
 				if (ifmr->ifm_count >= 1 && ifmr->ifm_ulist) {
 					ifmr->ifm_count = 1;
-					error = copyout(&ifmr->ifm_current,
+					error = copyout_c((__cheri_tocap int * __capability)&ifmr->ifm_current,
 						ifmr->ifm_ulist,
 						sizeof(int));
 				}
