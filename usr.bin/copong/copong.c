@@ -53,6 +53,7 @@ usage(void)
 int
 main(int argc, char **argv)
 {
+	char buf[10000];
 	void * __capability switcher_code;
 	void * __capability switcher_data;
 	bool vflag = false;
@@ -86,15 +87,17 @@ main(int argc, char **argv)
 	if (error != 0)
 		err(1, "coregister");
 
+	fprintf(stderr, "buf at %p\n", buf);
+
 	if (vflag)
 		fprintf(stderr, "%s: coaccepting...\n", getprogname());
 
 	for (;;) {
-		error = coaccept(switcher_code, switcher_data);
+		error = coaccept(switcher_code, switcher_data, buf, sizeof(buf));
 		if (error != 0)
 			err(1, "coaccept");
 		if (vflag)
-			printf("pong, pid %d, error %d\n", getpid(), error);
+			printf("pong, pid %d, error %d, buf[0] is %d\n", getpid(), error, buf[0]);
 	}
 
 	err(1, "we're not supposed to be here, pid %d\n", getpid());

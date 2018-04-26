@@ -124,6 +124,12 @@ _C_LABEL(switcher_cocall):
 	csc	$c24, zero, 8*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
 
 	/*
+	 * Save the data transfer args.
+	 */
+	csd	a0, zero, 3*CHERICAP_SIZE+96($idc)
+	csd	a1, zero, 3*CHERICAP_SIZE+104($idc)
+
+	/*
 	 * Save the PCC, put there by cocall().
 	 */
 	csc	$c11, zero, 9*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
@@ -188,8 +194,31 @@ _C_LABEL(switcher_cocall):
 
 	clc	$c11, zero, 9*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c5)
 
-	clearlo		CLEARLO_BITS
-	clearhi		CLEARHI_BITS
+	/*
+	 * Do the data transfer.
+	 */
+	cld	t0, zero, 3*CHERICAP_SIZE+96($c5)
+	cld	t1, zero, 3*CHERICAP_SIZE+104($c5)
+
+	/*
+	 * Compare buffer sizes, put the smaller one into t1.
+	 */
+	dsub	t3, a1, t1
+	bgez	t3, 2f
+	nop
+	daddiu	t1, a1, 0
+
+2:
+	ld	t2, 0(a0)
+	sd	t2, 0(t0)
+	daddiu	a0, 8
+	daddiu	t0, 8
+	daddi	t1, -8
+	bgtz	t1, 2b
+	nop
+
+	//clearlo		CLEARLO_BITS
+	//clearhi		CLEARHI_BITS
 	cclearlo	CCLEARLO_BITS
 	cclearhi	CCLEARHI_BITS
 

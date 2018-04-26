@@ -220,8 +220,9 @@ test_clock_gettime(uintmax_t num, uintmax_t int_arg __unused, const char *path _
 
 #ifdef __CHERI__
 static uintmax_t
-test_coping(uintmax_t num, uintmax_t int_arg __unused, const char *path)
+test_coping(uintmax_t num, uintmax_t int_arg, const char *path)
 {
+	char buf[int_arg];
 	void * __capability switcher_code;
 	void * __capability switcher_data;
 	void * __capability lookedup;
@@ -243,7 +244,7 @@ test_coping(uintmax_t num, uintmax_t int_arg __unused, const char *path)
 
 	benchmark_start();
 	BENCHMARK_FOREACH(i, num) {
-		error = cocall(switcher_code, switcher_data, lookedup);
+		error = cocall(switcher_code, switcher_data, lookedup, buf, int_arg);
 		if (error != 0)
 			err(1, "cocall");
 	}
@@ -904,7 +905,11 @@ static const struct test tests[] = {
 	{ "getresuid", test_getresuid, .t_flags = 0 },
 	{ "clock_gettime", test_clock_gettime, .t_flags = 0 },
 #ifdef __CHERI__
-	{ "coping", test_coping, .t_flags = FLAG_NAME },
+	{ "coping_1", test_coping, .t_flags = FLAG_NAME, .t_int = 1 },
+	{ "coping_10", test_coping, .t_flags = FLAG_NAME, .t_int = 10 },
+	{ "coping_100", test_coping, .t_flags = FLAG_NAME, .t_int = 100 },
+	{ "coping_1000", test_coping, .t_flags = FLAG_NAME, .t_int = 1000 },
+	{ "coping_10000", test_coping, .t_flags = FLAG_NAME, .t_int = 10000 },
 #endif
 	{ "pipeping_1", test_pipeping, .t_flags = 0, .t_int = 1 },
 	{ "pipeping_10", test_pipeping, .t_flags = 0, .t_int = 10 },

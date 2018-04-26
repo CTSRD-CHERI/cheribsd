@@ -53,6 +53,7 @@ usage(void)
 int
 main(int argc, char **argv)
 {
+	char buf[10000];
 	void * __capability switcher_code;
 	void * __capability switcher_data;
 	void * __capability lookedup;
@@ -74,7 +75,8 @@ main(int argc, char **argv)
 		err(1, "colookup");
 	}
 
-	error = cocall(switcher_code, switcher_data, lookedup);
+	buf[0] = 42;
+	error = cocall(switcher_code, switcher_data, lookedup, buf, sizeof(buf));
 	if (error != 0)
 		err(1, "cocall");
 
