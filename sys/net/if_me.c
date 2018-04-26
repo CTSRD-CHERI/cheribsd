@@ -283,7 +283,7 @@ me_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ME_RUNLOCK(sc);
 			break;
 		}
-		src = ifr_addr_get_sa(ifr);
+		src = (struct sockaddr_in *)ifr_addr_get_sa(ifr);
 		memset(src, 0, sizeof(*src));
 		src->sin_family = AF_INET;
 		src->sin_len = sizeof(*src);

@@ -373,7 +373,7 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				error = EADDRNOTAVAIL;
 				break;
 			}
-			sin = ifr_addr_get_sa(ifr);
+			sin = (struct sockaddr_in *)ifr_addr_get_sa(ifr);
 			memset(sin, 0, sizeof(*sin));
 			sin->sin_family = AF_INET;
 			sin->sin_len = sizeof(*sin);
