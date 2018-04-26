@@ -3528,10 +3528,14 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	    dbg("dlsym(%s) is type %d. Resolved to: %-#p",
 		name, ELF_ST_TYPE(def->st_info), sym);
 	}
+#if 0
+	// FIXME: this warning breaks some tests that expect clean stdout/stderr
+	// FIXME: See https://github.com/CTSRD-CHERI/cheribsd/issues/257
 	if (cheri_getlen(sym) <= 0) {
-		rtld_printf("Warning: created zero length capability for %s "
-		    "(in %s): %-#p\n", name, defobj->path, sym);
+		rtld_fdprintf(STDERR_FILENO, "Warning: created zero length "
+		    "capability for %s (in %s): %-#p\n", name, defobj->path, sym);
 	}
+#endif
 	LD_UTRACE(UTRACE_DLSYM_STOP, handle, sym, 0, 0, name);
 	return (sym);
     }
