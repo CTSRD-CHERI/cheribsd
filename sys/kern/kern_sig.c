@@ -187,6 +187,11 @@ static int	do_coredump = 1;
 SYSCTL_INT(_kern, OID_AUTO, coredump, CTLFLAG_RW,
 	&do_coredump, 0, "Enable/Disable coredumps");
 
+/* XXXAR: default to 0660 mode to allow host to read it on NFS mounted rootfs */
+static int	coredump_fs_mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
+SYSCTL_INT(_kern, OID_AUTO, coredump_fs_mode, CTLFLAG_RW,
+	&coredump_fs_mode, 0, "File mode for coredump files");
+
 static int	set_core_nodump_flag = 0;
 SYSCTL_INT(_kern, OID_AUTO, nodump_coredump, CTLFLAG_RW, &set_core_nodump_flag,
 	0, "Enable setting the NODUMP flag on coredump files");
@@ -3392,7 +3397,7 @@ corefile_open(const char *comm, uid_t uid, pid_t pid, struct thread *td,
 	sbuf_finish(&sb);
 	sbuf_delete(&sb);
 
-	cmode = S_IRUSR | S_IWUSR;
+	cmode = coredump_fs_mode;
 	oflags = VN_OPEN_NOAUDIT | VN_OPEN_NAMECACHE |
 	    (capmode_coredump ? VN_OPEN_NOCAPCHECK : 0);
 
