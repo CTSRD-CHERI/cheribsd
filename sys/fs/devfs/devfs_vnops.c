@@ -807,7 +807,7 @@ fiodgname_buf_get_ptr(void *fgnp)
 		return (__USER_CAP((void *)(uintptr_t)fgnup->fgn32.buf,
 		    fgnup->fgn32.len));
 #endif
-	return (__USER_CAP(fgnup->fgn.buf, fgnup->fgn32.len));
+	return (__USER_CAP(fgnup->fgn.buf, fgnup->fgn.len));
 }
 
 static int
