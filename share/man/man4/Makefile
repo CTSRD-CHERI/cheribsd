@@ -477,6 +477,7 @@ MAN=	aac.4 \
 	sio.4 \
 	sis.4 \
 	sk.4 \
+	smartpqi.4 \
 	smb.4 \
 	smbus.4 \
 	smp.4 \
