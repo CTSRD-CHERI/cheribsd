@@ -3134,7 +3134,7 @@ out:
 
 #if defined(COMPAT_FREEBSD9) || defined(COMPAT_FREEBSD10)
 static int
-do_sem_wait(struct thread *td, struct _usem *sem, struct _umtx_time *timeout)
+do_sem_wait(struct thread *td, struct _usem * __capability sem, struct _umtx_time *timeout)
 {
 	struct abs_timeout timo;
 	struct umtx_q *uq;
@@ -3190,7 +3190,7 @@ do_sem_wait(struct thread *td, struct _usem *sem, struct _umtx_time *timeout)
  * Signal a userland semaphore.
  */
 static int
-do_sem_wake(struct thread *td, struct _usem *sem)
+do_sem_wake(struct thread *td, struct _usem * __capability sem)
 {
 	struct umtx_key key;
 	int error, cnt;
@@ -3690,14 +3690,14 @@ __umtx_op_sem_wait(struct thread *td, struct _umtx_op_args *uap)
 			return (error);
 		tm_p = &timeout;
 	}
-	return (do_sem_wait(td, uap->obj, tm_p));
+	return (do_sem_wait(td, __USER_CAP_UNBOUND(uap->obj), tm_p));
 }
 
 static int
 __umtx_op_sem_wake(struct thread *td, struct _umtx_op_args *uap)
 {
 
-	return (do_sem_wake(td, uap->obj));
+	return (do_sem_wake(td, __USER_CAP_UNBOUND(uap->obj)));
 }
 #endif
 
@@ -4710,7 +4710,7 @@ __umtx_op_sem_wait_compat32(struct thread *td, struct _umtx_op_args *uap)
 			return (error);
 		tm_p = &timeout;
 	}
-	return (do_sem_wait(td, uap->obj, tm_p));
+	return (do_sem_wait(td, __USER_CAP_UNBOUND(uap->obj), tm_p));
 }
 #endif
 
