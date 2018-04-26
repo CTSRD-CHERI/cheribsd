@@ -84,7 +84,7 @@ ATF_TC_BODY(barrier, tc)
 		ATF_REQUIRE_EQ(after_barrier_count, 0);
 		PTHREAD_REQUIRE(pthread_mutex_unlock(&mutex));
 		PTHREAD_REQUIRE(pthread_create(&new[i], NULL, threadfunc,
-						(void *)(long)i));
+						(void *)(intptr_t)i));
 		sleep(2);
 	}
 
