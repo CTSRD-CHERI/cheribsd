@@ -125,7 +125,7 @@ static void	gif_delete_tunnel(struct ifnet *);
 static int	gif_ioctl(struct ifnet *, u_long, caddr_t);
 static int	gif_transmit(struct ifnet *, struct mbuf *);
 static void	gif_qflush(struct ifnet *);
-static int	gif_clone_create(struct if_clone *, int, caddr_t);
+static int	gif_clone_create(struct if_clone *, int, void * __capability);
 static void	gif_clone_destroy(struct ifnet *);
 static VNET_DEFINE(struct if_clone *, gif_cloner);
 #define	V_gif_cloner	VNET(gif_cloner)
@@ -167,7 +167,7 @@ SYSCTL_INT(_net_link_gif, OID_AUTO, parallel_tunnels,
     "Allow parallel tunnels?");
 
 static int
-gif_clone_create(struct if_clone *ifc, int unit, caddr_t params)
+gif_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 {
 	struct gif_softc *sc;
 

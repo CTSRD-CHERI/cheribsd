@@ -72,7 +72,7 @@ struct edsc_softc {
  */
 static VNET_DEFINE(struct if_clone *, edsc_cloner);
 #define	V_edsc_cloner	VNET(edsc_cloner)
-static int	edsc_clone_create(struct if_clone *, int, caddr_t);
+static int	edsc_clone_create(struct if_clone *, int, void * __capability);
 static void	edsc_clone_destroy(struct ifnet *);
 
 /*
@@ -92,7 +92,7 @@ static		MALLOC_DEFINE(M_EDSC, edscname, "Ethernet discard interface");
  * Create an interface instance.
  */
 static int
-edsc_clone_create(struct if_clone *ifc, int unit, caddr_t params)
+edsc_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 {
 	struct edsc_softc	*sc;
 	struct ifnet		*ifp;

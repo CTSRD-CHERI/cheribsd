@@ -104,7 +104,7 @@ static VNET_DEFINE(LIST_HEAD(, gre_softc), gre_softc_list);
 static struct sx gre_ioctl_sx;
 SX_SYSINIT(gre_ioctl_sx, &gre_ioctl_sx, "gre_ioctl");
 
-static int	gre_clone_create(struct if_clone *, int, caddr_t);
+static int	gre_clone_create(struct if_clone *, int, void * __capability);
 static void	gre_clone_destroy(struct ifnet *);
 static VNET_DEFINE(struct if_clone *, gre_cloner);
 #define	V_gre_cloner	VNET(gre_cloner)
@@ -162,7 +162,7 @@ VNET_SYSUNINIT(vnet_gre_uninit, SI_SUB_PROTO_IFATTACHDOMAIN, SI_ORDER_ANY,
     vnet_gre_uninit, NULL);
 
 static int
-gre_clone_create(struct if_clone *ifc, int unit, caddr_t params)
+gre_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 {
 	struct gre_softc *sc;
 

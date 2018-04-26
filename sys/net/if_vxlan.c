@@ -337,7 +337,7 @@ static int	vxlan_input(struct vxlan_socket *, uint32_t, struct mbuf **,
 static void	vxlan_set_default_config(struct vxlan_softc *);
 static int	vxlan_set_user_config(struct vxlan_softc *,
 		     struct ifvxlanparam *);
-static int	vxlan_clone_create(struct if_clone *, int, caddr_t);
+static int	vxlan_clone_create(struct if_clone *, int, void * __capability);
 static void	vxlan_clone_destroy(struct ifnet *);
 
 static uint32_t vxlan_mac_hash(struct vxlan_softc *, const uint8_t *);
@@ -2642,7 +2642,7 @@ vxlan_set_user_config(struct vxlan_softc *sc, struct ifvxlanparam *vxlp)
 }
 
 static int
-vxlan_clone_create(struct if_clone *ifc, int unit, caddr_t params)
+vxlan_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 {
 	struct vxlan_softc *sc;
 	struct ifnet *ifp;

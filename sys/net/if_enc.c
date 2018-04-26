@@ -92,7 +92,7 @@ static VNET_DEFINE(struct if_clone *, enc_cloner);
 static int	enc_ioctl(struct ifnet *, u_long, caddr_t);
 static int	enc_output(struct ifnet *, struct mbuf *,
     const struct sockaddr *, struct route *);
-static int	enc_clone_create(struct if_clone *, int, caddr_t);
+static int	enc_clone_create(struct if_clone *, int, void * __capability);
 static void	enc_clone_destroy(struct ifnet *);
 static int	enc_add_hhooks(struct enc_softc *);
 static void	enc_remove_hhooks(struct enc_softc *);
@@ -144,7 +144,7 @@ enc_clone_destroy(struct ifnet *ifp)
 }
 
 static int
-enc_clone_create(struct if_clone *ifc, int unit, caddr_t params)
+enc_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 {
 	struct ifnet *ifp;
 	struct enc_softc *sc;

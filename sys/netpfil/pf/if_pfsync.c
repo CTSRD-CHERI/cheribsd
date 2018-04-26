@@ -254,7 +254,8 @@ SYSCTL_STRUCT(_net_pfsync, OID_AUTO, stats, CTLFLAG_VNET | CTLFLAG_RW,
 SYSCTL_INT(_net_pfsync, OID_AUTO, carp_demotion_factor, CTLFLAG_RW,
     &VNET_NAME(pfsync_carp_adj), 0, "pfsync's CARP demotion factor adjustment");
 
-static int	pfsync_clone_create(struct if_clone *, int, caddr_t);
+static int	pfsync_clone_create(struct if_clone *, int,
+		    void * __capability);
 static void	pfsync_clone_destroy(struct ifnet *);
 static int	pfsync_alloc_scrub_memory(struct pfsync_state_peer *,
 		    struct pf_state_peer *);
@@ -289,7 +290,7 @@ VNET_DEFINE(struct if_clone *, pfsync_cloner);
 #define	V_pfsync_cloner	VNET(pfsync_cloner)
 
 static int
-pfsync_clone_create(struct if_clone *ifc, int unit, caddr_t param)
+pfsync_clone_create(struct if_clone *ifc, int unit, void * __capability param)
 {
 	struct pfsync_softc *sc;
 	struct ifnet *ifp;

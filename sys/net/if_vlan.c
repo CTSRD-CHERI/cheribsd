@@ -233,7 +233,8 @@ static	void vlan_trunk_capabilities(struct ifnet *ifp);
 
 static	struct ifnet *vlan_clone_match_ethervid(const char *, int *);
 static	int vlan_clone_match(struct if_clone *, const char *);
-static	int vlan_clone_create(struct if_clone *, char *, size_t, caddr_t);
+static	int vlan_clone_create(struct if_clone *, char *, size_t,
+	    void * __capability);
 static	int vlan_clone_destroy(struct if_clone *, struct ifnet *);
 
 static	void vlan_ifdetach(void *arg, struct ifnet *ifp);

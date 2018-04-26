@@ -68,7 +68,7 @@ struct disc_softc {
 static int	discoutput(struct ifnet *, struct mbuf *,
 		    const struct sockaddr *, struct route *);
 static int	discioctl(struct ifnet *, u_long, caddr_t);
-static int	disc_clone_create(struct if_clone *, int, caddr_t);
+static int	disc_clone_create(struct if_clone *, int, void * __capability);
 static void	disc_clone_destroy(struct ifnet *);
 
 static const char discname[] = "disc";
@@ -78,7 +78,7 @@ static VNET_DEFINE(struct if_clone *, disc_cloner);
 #define	V_disc_cloner	VNET(disc_cloner)
 
 static int
-disc_clone_create(struct if_clone *ifc, int unit, caddr_t params)
+disc_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 {
 	struct ifnet		*ifp;
 	struct disc_softc	*sc;

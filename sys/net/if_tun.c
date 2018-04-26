@@ -129,7 +129,7 @@ static int	tunoutput(struct ifnet *, struct mbuf *,
 		    const struct sockaddr *, struct route *ro);
 static void	tunstart(struct ifnet *);
 
-static int	tun_clone_create(struct if_clone *, int, caddr_t);
+static int	tun_clone_create(struct if_clone *, int, void * __capability);
 static void	tun_clone_destroy(struct ifnet *);
 static struct if_clone *tun_cloner;
 
@@ -173,7 +173,7 @@ static struct cdevsw tun_cdevsw = {
 };
 
 static int
-tun_clone_create(struct if_clone *ifc, int unit, caddr_t params)
+tun_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 {
 	struct cdev *dev;
 	int i;

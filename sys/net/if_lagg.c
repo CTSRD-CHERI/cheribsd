@@ -94,7 +94,7 @@ static VNET_DEFINE(struct mtx, lagg_list_mtx);
 #define	LAGG_LIST_UNLOCK(x)		mtx_unlock(&V_lagg_list_mtx)
 eventhandler_tag	lagg_detach_cookie = NULL;
 
-static int	lagg_clone_create(struct if_clone *, int, caddr_t);
+static int	lagg_clone_create(struct if_clone *, int, void * __capability);
 static void	lagg_clone_destroy(struct ifnet *);
 static VNET_DEFINE(struct if_clone *, lagg_cloner);
 #define	V_lagg_cloner	VNET(lagg_cloner)
@@ -463,7 +463,7 @@ lagg_unregister_vlan(void *arg, struct ifnet *ifp, u_int16_t vtag)
 }
 
 static int
-lagg_clone_create(struct if_clone *ifc, int unit, caddr_t params)
+lagg_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 {
 	struct lagg_softc *sc;
 	struct ifnet *ifp;

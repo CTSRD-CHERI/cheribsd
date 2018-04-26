@@ -72,7 +72,7 @@ static const char wlanname[] = "wlan";
 static struct if_clone *wlan_cloner;
 
 static int
-wlan_clone_create(struct if_clone *ifc, int unit, caddr_t params)
+wlan_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 {
 	struct ieee80211_clone_params cp;
 	struct ieee80211vap *vap;
