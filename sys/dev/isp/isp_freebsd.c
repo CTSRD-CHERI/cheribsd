@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/conf.h>
 #include <sys/module.h>
 #include <sys/ioccom.h>
+#include <sys/sysent.h>
 #include <dev/isp/isp_ioctl.h>
 #include <sys/devicestat.h>
 #include <cam/cam_periph.h>
