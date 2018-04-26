@@ -106,8 +106,7 @@ WITH_CHERI256:=	yes
 MK_CHERI:=	yes
 MK_CLANG:=	no
 # We want to use libc++ for CHERI (even when targeting MIPS)
-# Keep building libstdc++ for plain MIPS (atf-sh needs it)
-MK_GNUCXX:=	yes
+MK_GNUCXX:=	no
 MK_LIBCPLUSPLUS:=yes
 # LLVM libunwind is needed for libc++
 MK_LLVM_LIBUNWIND:=	yes
