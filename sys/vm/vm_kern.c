@@ -440,12 +440,13 @@ kmem_free(struct vmem *vmem, vm_offset_t addr, vm_size_t size)
  *
  *	This routine may block.
  */
-vm_offset_t
+vm_ptr_t
 kmap_alloc_wait(map, size)
 	vm_map_t map;
 	vm_size_t size;
 {
 	vm_offset_t addr;
+	vm_ptr_t mapped;
 
 	size = round_page(size);
 	if (!swap_reserve(size))
@@ -471,8 +472,10 @@ kmap_alloc_wait(map, size)
 	vm_map_insert(map, NULL, 0, addr, addr + size, VM_PROT_ALL,
 	    VM_PROT_ALL, MAP_ACC_CHARGED);
 	vm_map_unlock(map);
-	CHERI_VM_ASSERT_VALID(addr);
-	return (addr);
+
+	mapped = vm_map_make_ptr(map, addr, size, VM_PROT_ALL);
+	CHERI_VM_ASSERT_VALID(mapped);
+	return (mapped);
 }
 
 /*

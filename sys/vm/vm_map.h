@@ -302,6 +302,16 @@ void vm_map_wait_busy(vm_map_t map);
 			_vm_map_lock_downgrade(map, LOCK_FILE, LOCK_LINE)
 
 long vmspace_resident_count(struct vmspace *vmspace);
+
+#ifdef CHERI_KERNEL
+/*
+ * Derive a pointer from the map capability.
+ */
+vm_ptr_t vm_map_make_ptr(vm_map_t map, vm_offset_t addr, vm_size_t size, vm_prot_t prot);
+#else /* ! CHERI_KERNEL */
+#define vm_map_make_ptr(map, addr, size, prot) (addr)
+#endif /* ! CHERI_KERNEL */
+
 #endif	/* _KERNEL */
 
 

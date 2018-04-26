@@ -228,7 +228,7 @@ vm_prot_to_cheri(vm_prot_t prot)
 /*
  * Create a valid pointer for the given region in a map.
  */
-static vm_ptr_t
+vm_ptr_t
 vm_map_make_ptr(vm_map_t map, vm_offset_t addr, vm_size_t size, vm_prot_t prot)
 {
 	void *mapped;
@@ -241,9 +241,7 @@ vm_map_make_ptr(vm_map_t map, vm_offset_t addr, vm_size_t size, vm_prot_t prot)
 
 	return ((vm_ptr_t)mapped);
 }
-#else /* ! CHERI_KERNEL */
-#define vm_map_make_ptr(map, addr, size, prot) (addr)
-#endif /* ! CHERI_KERNEL */
+#endif /* CHERI_KERNEL */
 
 /*
  *	vm_map_startup:
