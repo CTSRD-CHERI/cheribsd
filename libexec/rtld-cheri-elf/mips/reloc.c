@@ -798,11 +798,16 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				/* Remove execute permissions and set bounds */
 				symval = make_data_pointer(def, defobj);
 			}
+#if 0
+			// FIXME: this warning breaks some tests that expect clean stdout/stderr
+			// FIXME: See https://github.com/CTSRD-CHERI/cheribsd/issues/257
+			// TODO: or use this approach: https://github.com/CTSRD-CHERI/cheribsd/commit/c1920496c0086d9c5214fb0f491e4d6cdff3828e?
 			if (symval != NULL && cheri_getlen(symval) <= 0) {
-				rtld_printf("Warning: created zero length "
-				    "capability for %s (in %s): %-#p\n",
+				rtld_fdprintf(STDERR_FILENO, "Warning: created "
+				    "zero length capability for %s (in %s): %-#p\n",
 				    symname(obj, r_symndx), obj->path, symval);
 			}
+#endif
 			/*
 			 * The capability offset is the addend for the
 			 * relocation. Since we are using Elf_Rel this is the
