@@ -71,7 +71,7 @@ struct uio {
 	enum	uio_seg uio_segflg;	/* address space */
 	enum	uio_rw uio_rw;		/* operation */
 	struct	thread *uio_td;		/* owner */
-};
+} __aligned(sizeof(void * __capability));
 
 /*
  * Limits
