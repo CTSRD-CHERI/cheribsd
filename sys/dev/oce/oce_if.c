@@ -2319,7 +2319,9 @@ oce_handle_passthrough(struct ifnet *ifp, caddr_t data)
 	   the driver version..so fill it 
 	 */
 	if(req.u0.rsp.opcode == OPCODE_COMMON_GET_CNTL_ATTRIBUTES) {
-		fw_cmd = (struct mbx_common_get_cntl_attr *) ioctl_ptr;
+		/* XXX-BD: this seems to be directly acces to userspace... */
+		fw_cmd = (struct mbx_common_get_cntl_attr *)
+		(__cheri_fromcap void *) ioctl_ptr;
 		strncpy(fw_cmd->params.rsp.cntl_attr_info.hba_attr.drv_ver_str,
 			COMPONENT_REVISION, strlen(COMPONENT_REVISION));	
 	}
