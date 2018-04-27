@@ -452,9 +452,16 @@ config_init(void)
 	}
 
 	/* Read LOCALBASE/etc/pkg.conf first. */
-	localbase = getenv("LOCALBASE") ? getenv("LOCALBASE") : _LOCALBASE;
-	snprintf(confpath, sizeof(confpath), "%s/etc/pkg.conf",
-	    localbase);
+
+	if (getenv("PKG_BOOSTRAP_CONFIG_FILE")) {
+		strlcpy(confpath, getenv("PKG_BOOSTRAP_CONFIG_FILE"),
+		    sizeof(confpath));
+	} else {
+		localbase = getenv("LOCALBASE") ? getenv("LOCALBASE") :
+		    _LOCALBASE;
+		snprintf(confpath, sizeof(confpath), "%s/etc/pkg.conf",
+		    localbase);
+	}
 
 	if (access(confpath, F_OK) == 0 && read_conf_file(confpath,
 	    CONFFILE_PKG))
