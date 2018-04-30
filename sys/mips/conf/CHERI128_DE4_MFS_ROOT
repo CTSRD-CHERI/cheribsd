@@ -10,6 +10,5 @@ include		BERI_DE4_MFS_ROOT
 ident		CHERI128_DE4_MFS_ROOT
 
 include		"std.CHERI128"
-include		"std.MFS_ROOT"
 
 makeoptions	EMBED_CHERITEST_LIST=YES
