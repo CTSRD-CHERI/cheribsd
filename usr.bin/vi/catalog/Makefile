@@ -106,7 +106,7 @@ english.base: dump ${SCAN} #Makefile
 
 
 dump: dump.c ${BUILD_TOOLS_META}
-	${CC} -o ${.TARGET} ${.ALLSRC}
+	${BUILD_TOOLS_CC} ${BUILD_TOOLS_CFLAGS} ${BUILD_TOOLS_LDFLAGS} -o ${.TARGET} ${.ALLSRC}
 
 CLEANFILES+= dump ${CAT} english.base *.check __ck1 __ck2
 

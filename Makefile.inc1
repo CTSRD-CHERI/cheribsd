@@ -571,7 +571,11 @@ TMAKE=		MAKEOBJDIRPREFIX=${OBJTREE} \
 		-DNO_LINT \
 		-DNO_CPU_CFLAGS MK_WARNS=no MK_CTF=no \
 		MK_CLANG_EXTRAS=no MK_CLANG_FULL=no \
-		MK_LLDB=no MK_TESTS=no
+		MK_LLDB=no MK_TESTS=no \
+		BUILD_TOOLS_CC="${CC}"
+
+# These get set in tools/build/mk/Makefile.boot
+# BUILD_TOOLS_CLFAGS="${CFLAGS}" BUILD_TOOLS_LDFLAGS="${LDFLAGS}"
 
 # cross-tools stage
 XMAKE=		TOOLS_PREFIX=${WORLDTMP} ${BMAKE} \
