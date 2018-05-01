@@ -1,0 +1,100 @@
+.\"
+.\" Copyright (c) 2018 Edward Tomasz Napierala <en322@cl.cam.ac.uk>
+.\" All rights reserved.
+.\"
+.\" This software was developed by SRI International and the University of
+.\" Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
+.\" ("CTSRD"), as part of the DARPA CRASH research programme.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\" $FreeBSD$
+.\"
+.Dd April 30, 2018
+.Dt COSETUP 2
+.Os
+.Sh NAME
+.Nm cosetup
+.Nd create colocated call context
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In unistd.h
+.Ft int
+.Fn cosetup "int what" "void * __capability *code, void * __capability data"
+.Sh DESCRIPTION
+The
+.Fn cosetup
+function allocates the colocated call context for the calling thread,
+and returns a sealed capability pair.
+It should only be called once per thread.
+The
+.Ar what
+must be either
+.Dv COSETUP_COCALL ,
+which results in capability pair that can be used with
+.Xr cocall 2 ,
+or
+.Dv COSETUP_COACCEPT ,
+which results in capability pair that can be used with
+.Xr coaccept 2 .
+.Pp
+The sealed capability pair must not be used by another thread, and must not
+be passed to another process.
+.Sh RETURN VALUES
+.Rv -std cosetup
+.Sh ERRORS
+The
+.Fn cosetup
+system call
+will fail if:
+.Bl -tag -width Er
+.It Bq Er EINVAL
+The
+.Fa what
+argument
+is not valid.
+.It Bq Er EFAULT
+The
+.Fa code
+or
+.Fa data
+arguments
+point outside the process's allocated address space.
+.El
+.Sh SEE ALSO
+.Xr coexec 2 ,
+.Xr coregister 2 ,
+.Xr colookup 2 ,
+.Xr cocall 2 ,
+.Xr coaccept 2
+.Sh HISTORY
+The
+.Fn cosetup
+system call first appeared in
+.Tn CheriBSD .
+.Sh AUTHORS
+.An -nosplit
+These functions were created by
+.An Edward Tomasz Napierala Aq Mt trasz@FreeBSD.org
+at the University of Cambridge Computer Laboratory under DARPA/AFRL contract
+(FA8750-10-C-0237) ("CTSRD"), as part of the DARPA CRASH research programme.
