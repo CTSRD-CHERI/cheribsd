@@ -644,7 +644,10 @@ arenas_tdata_cleanup(tsd_t *tsd) {
 	arenas_tdata = tsd_arenas_tdata_get(tsd);
 	if (arenas_tdata != NULL) {
 		tsd_arenas_tdata_set(tsd, NULL);
+		/* Work around https://github.com/CTSRD-CHERI/cheribsd/issues/260 */
+#ifdef ISSUE_260_HAS_BEEN_FIXED
 		a0dalloc(arenas_tdata);
+#endif
 	}
 }
 
