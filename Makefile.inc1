@@ -310,6 +310,13 @@ SUBDIR+=	${_DIR}
 .endif
 .endfor
 
+# Finally build cheribsdbox if requested
+.if ${MK_CHERIBSDBOX} != "no" && !defined(SYSROOT_ONLY)
+SUBDIR+=	tools/cheribsdbox
+.endif
+
+
+
 # We must do etc/ last as it hooks into building the man whatis file
 # by calling 'makedb' in share/man.  This is only relevant for
 # install/distribute so they build the whatis file after every manpage is
