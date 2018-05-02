@@ -79,6 +79,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/priv.h>
 #include <sys/proc.h>
+#include <sys/protosw.h>
 #include <sys/time.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
@@ -735,6 +736,30 @@ out:
 }
 
 
+static struct in6_multi_mship *
+in6_joingroup_legacy(struct ifnet *ifp, const struct in6_addr *mcaddr,
+    int *errorp, int delay)
+{
+	struct in6_multi_mship *imm;
+	int error;
+
+	imm = malloc(sizeof(*imm), M_IP6MADDR, M_NOWAIT);
+	if (imm == NULL) {
+		*errorp = ENOBUFS;
+		return (NULL);
+	}
+
+	delay = (delay * PR_FASTHZ) / hz;
+
+	error = in6_joingroup(ifp, mcaddr, NULL, &imm->i6mm_maddr, delay);
+	if (error) {
+		*errorp = error;
+		free(imm, M_IP6MADDR);
+		return (NULL);
+	}
+
+	return (imm);
+}
 /*
  * Join necessary multicast groups.  Factored out from in6_update_ifa().
  * This entire work should only be done once, for the default FIB.
@@ -771,7 +796,7 @@ in6_update_ifa_join_mc(struct ifnet *ifp, struct in6_aliasreq *ifra,
 		 */
 		delay = arc4random() % (MAX_RTR_SOLICITATION_DELAY * hz);
 	}
-	imm = in6_joingroup(ifp, &mltaddr, &error, delay);
+	imm = in6_joingroup_legacy(ifp, &mltaddr, &error, delay);
 	if (imm == NULL) {
 		nd6log((LOG_WARNING, "%s: in6_joingroup failed for %s on %s "
 		    "(errno=%d)\n", __func__, ip6_sprintf(ip6buf, &mltaddr),
@@ -788,7 +813,7 @@ in6_update_ifa_join_mc(struct ifnet *ifp, struct in6_aliasreq *ifra,
 	if ((error = in6_setscope(&mltaddr, ifp, NULL)) != 0)
 		goto cleanup; /* XXX: should not fail */
 
-	imm = in6_joingroup(ifp, &mltaddr, &error, 0);
+	imm = in6_joingroup_legacy(ifp, &mltaddr, &error, 0);
 	if (imm == NULL) {
 		nd6log((LOG_WARNING, "%s: in6_joingroup failed for %s on %s "
 		    "(errno=%d)\n", __func__, ip6_sprintf(ip6buf, &mltaddr),
@@ -810,7 +835,7 @@ in6_update_ifa_join_mc(struct ifnet *ifp, struct in6_aliasreq *ifra,
 	}
 	if (in6_nigroup(ifp, NULL, -1, &mltaddr) == 0) {
 		/* XXX jinmei */
-		imm = in6_joingroup(ifp, &mltaddr, &error, delay);
+		imm = in6_joingroup_legacy(ifp, &mltaddr, &error, delay);
 		if (imm == NULL)
 			nd6log((LOG_WARNING,
 			    "%s: in6_joingroup failed for %s on %s "
@@ -822,7 +847,7 @@ in6_update_ifa_join_mc(struct ifnet *ifp, struct in6_aliasreq *ifra,
 	}
 	if (V_icmp6_nodeinfo_oldmcprefix &&
 	    in6_nigroup_oldmcprefix(ifp, NULL, -1, &mltaddr) == 0) {
-		imm = in6_joingroup(ifp, &mltaddr, &error, delay);
+		imm = in6_joingroup_legacy(ifp, &mltaddr, &error, delay);
 		if (imm == NULL)
 			nd6log((LOG_WARNING,
 			    "%s: in6_joingroup failed for %s on %s "
@@ -841,7 +866,7 @@ in6_update_ifa_join_mc(struct ifnet *ifp, struct in6_aliasreq *ifra,
 	if ((error = in6_setscope(&mltaddr, ifp, NULL)) != 0)
 		goto cleanup; /* XXX: should not fail */
 
-	imm = in6_joingroup(ifp, &mltaddr, &error, 0);
+	imm = in6_joingroup_legacy(ifp, &mltaddr, &error, 0);
 	if (imm == NULL) {
 		nd6log((LOG_WARNING, "%s: in6_joingroup failed for %s on %s "
 		    "(errno=%d)\n", __func__, ip6_sprintf(ip6buf,
@@ -1276,7 +1301,9 @@ in6_purgeaddr(struct ifaddr *ifa)
 	/* Leave multicast groups. */
 	while ((imm = LIST_FIRST(&ia->ia6_memberships)) != NULL) {
 		LIST_REMOVE(imm, i6mm_chain);
-		in6_leavegroup(imm);
+		if (imm->i6mm_maddr != NULL)
+			in6_leavegroup(imm->i6mm_maddr, NULL);
+		free(imm, M_IP6MADDR);
 	}
 	plen = in6_mask2len(&ia->ia_prefixmask.sin6_addr, NULL); /* XXX */
 	if ((ia->ia_flags & IFA_ROUTE) && plen == 128) {
