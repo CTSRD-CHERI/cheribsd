@@ -101,6 +101,7 @@ CRUNCH_PROGS_bin+=	cat \
 		chflags \
 		chmod \
 		cp \
+		csh \
 		dd \
 		df \
 		expr \
@@ -120,8 +121,9 @@ CRUNCH_PROGS_bin+=	cat \
 		test
 
 CRUNCH_ALIAS_test=	[
-CRUNCH_BUILDTOOLS+=	bin/sh
+CRUNCH_BUILDTOOLS+=	bin/sh bin/csh
 CRUNCH_ALIAS_sh=	-sh
+CRUNCH_ALIAS_csh=	tcsh
 
 # TODO: tcsh and csh?
 
@@ -160,6 +162,7 @@ CRUNCH_PROGS_sbin+= dhclient \
 		sysctl \
 		umount
 CRUNCH_ALIAS_md5=	sha256
+CRUNCH_ALIAS_shutdown=	poweroff
 
 # TODO: add init once the image works fine:
 # CRUNCH_PROGS_sbin+= init
@@ -193,6 +196,7 @@ CRUNCH_PROGS_usr.bin+= \
 		bzip2 \
 		dirname \
 		fetch \
+		find \
 		grep \
 		head \
 		hexdump \
@@ -340,12 +344,12 @@ cheribsdbox.mtree: Makefile
 .for P in ${CRUNCH_PROGS_${D}}
 .ifndef CRUNCH_SUPPRESS_LINK_${P}
 	#echo ".${INSTALLDIR_${D}}/${P} type=link uname=root gname=wheel mode=0755 link=${LINKPATH_${D}}" >> ${.TARGET}
-	echo ".${INSTALLDIR_${D}}/${P} type=file uname=root gname=wheel mode=0755 contents=./${BINDIR}/${PROG}" >> ${.TARGET}
+	echo ".${INSTALLDIR_${D}}/${P} type=file uname=root gname=wheel mode=0755 contents=.${BINDIR}/${PROG}" >> ${.TARGET}
 .endif
 .for A in ${CRUNCH_ALIAS_${P}}
 .ifndef CRUNCH_SUPPRESS_LINK_${A}
 	#echo ".${INSTALLDIR_${D}}/${A} type=link uname=root gname=wheel mode=0755 link=${P}" >> ${.TARGET}
-	echo ".${INSTALLDIR_${D}}/${A} type=file uname=root gname=wheel mode=0755 contents=./${BINDIR}/${PROG}" >> ${.TARGET}
+	echo ".${INSTALLDIR_${D}}/${A} type=file uname=root gname=wheel mode=0755 contents=.${BINDIR}/${PROG}" >> ${.TARGET}
 .endif
 .endfor
 .endfor
