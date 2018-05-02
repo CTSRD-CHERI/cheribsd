@@ -57,7 +57,6 @@ CRUNCH_SHLIBS+= -lcrypto -lssl
 CRUNCH_SHLIBS+=	-lc -lutil -lcrypt -lxo
 # libm is also needed by other tools so let's link dynamically
 CRUNCH_SHLIBS+=	-lm
-# TODO: build zlib shared?
 CRUNCH_LIBS+=	-lz
 
 
@@ -145,7 +144,6 @@ CRUNCH_PROGS_sbin+= dhclient \
 		dmesg \
 		dumpfs \
 		ifconfig \
-		init \
 		md5 \
 		mount \
 		mount_msdosfs \
@@ -155,13 +153,16 @@ CRUNCH_PROGS_sbin+= dhclient \
 		ping6 \
 		rcorder \
 		reboot \
-		resolvconf \
 		route \
 		rtsol \
 		shutdown \
 		sysctl \
 		umount
 CRUNCH_ALIAS_md5=	sha256
+
+# TODO: add init once the image works fine:
+# CRUNCH_PROGS_sbin+= init
+
 
 # TODO: do we need these:
 # sbin/fsck
@@ -314,7 +315,7 @@ CRUNCH_PROGS_libexec+=	getty
 # this should also work fine
 
 FILES=cheribsdbox.mtree
-FILESDIR= /etc/mtree
+FILESDIR=/
 
 # Example entry for symlinks::
 # ./usr/bin/chfn type=link uname=root gname=wheel mode=0755 link=chpass tags=package=runtime
@@ -337,18 +338,25 @@ cheribsdbox.mtree: Makefile
 .endif
 .for P in ${CRUNCH_PROGS_${D}}
 .ifndef CRUNCH_SUPPRESS_LINK_${P}
-	echo ".${INSTALLDIR_${D}}/${P} type=link uname=root gname=wheel mode=0755 link=${LINKPATH_${D}} tags=package=runtime" >> ${.TARGET}
+	#echo ".${INSTALLDIR_${D}}/${P} type=link uname=root gname=wheel mode=0755 link=${LINKPATH_${D}}" >> ${.TARGET}
+	echo ".${INSTALLDIR_${D}}/${P} type=file uname=root gname=wheel mode=0755 contents=./${BINDIR}/${PROG}" >> ${.TARGET}
 .endif
 .for A in ${CRUNCH_ALIAS_${P}}
 .ifndef CRUNCH_SUPPRESS_LINK_${A}
-	echo ".${INSTALLDIR_${D}}/${A} type=link uname=root gname=wheel mode=0755 link=${P} tags=package=runtime" >> ${.TARGET}
+	#echo ".${INSTALLDIR_${D}}/${A} type=link uname=root gname=wheel mode=0755 link=${P}" >> ${.TARGET}
+	echo ".${INSTALLDIR_${D}}/${A} type=file uname=root gname=wheel mode=0755 contents=./${BINDIR}/${PROG}" >> ${.TARGET}
 .endif
 .endfor
 .endfor
 .endfor
 	@echo "cheribsdbox manifest written"
 
-
+# Work around makefs stupidity:
+# Check for hardlinks. If the contents key is used, then the check
+# will only trigger if the contents file is a link even if it is used
+# by more than one file
+# -> we need to create at last one hardlink to cheribsdbox
+LINKS+=${BINDIR}/${PROG} ${BINDIR}/${PROG}.dummy-hardlink-for-makefs
 
 # the crunchgen build environment
 .include <bsd.crunchgen.mk>
