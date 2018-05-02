@@ -57,7 +57,8 @@ CRUNCH_SHLIBS+= -lcrypto -lssl
 CRUNCH_SHLIBS+=	-lc -lutil -lcrypt -lxo
 # libm is also needed by other tools so let's link dynamically
 CRUNCH_SHLIBS+=	-lm
-CRUNCH_LIBS+=	-lz
+# libz is needed by libprivatessh so we might as well link dynamically
+CRUNCH_SHLIBS+=	-lz
 
 
 # grep/tar/xz
