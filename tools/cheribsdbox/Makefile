@@ -7,41 +7,16 @@ MAN=
 MK_SSP=	no
 
 PROG=	cheribsdbox
-CHERIBSDBOX_DIR?=	/minimal
+CHERIBSDBOX_DIR?=	/bin
 BINDIR?=${CHERIBSDBOX_DIR}
 # We want to build all these tools as statically linked MIPS binaries to save size
 WANT_CHERI=		none
 CRUNCH_BUILDOPTS+=	WANT_CHERI=none
-# Do symlinks as part of the install
-CRUNCH_GENERATE_LINKS= yes
 
-#### BEGIN copied from bsdbox makefile
-
-
-#################################################################
-#
-# General notes:
-#
-# A number of Make variables are used to generate the crunchgen config file.
-#
-#  CRUNCH_SRCDIRS: lists directories to search for included programs
-#  CRUNCH_PROGS:  lists programs to be included
-#  CRUNCH_LIBS:  libraries to statically link with
-#  CRUNCH_SHLIBS:  libraries to dynamically link with
-#  CRUNCH_BUILDOPTS: generic build options to be added to every program
-#  CRUNCH_BUILDTOOLS: lists programs that need build tools built in the
-#	local architecture.
-#
-# Special options can be specified for individual programs
-#  CRUNCH_SRCDIR_$(P): base source directory for program $(P)
-#  CRUNCH_BUILDOPTS_$(P): additional build options for $(P)
-#  CRUNCH_ALIAS_$(P): additional names to be used for $(P)
-#
-# By default, any name appearing in CRUNCH_PROGS or CRUNCH_ALIAS_${P}
-# will be used to generate a hard link to the resulting binary.
-# Specific links can be suppressed by setting
-# CRUNCH_SUPPRESS_LINK_$(NAME) to 1.
-#
+# Do not do hardlinks as part of the install since we want to be able to install
+# this without conflicting with the real binaries and instead do some mtree
+# magic to generate a sensible image
+CRUNCH_GENERATE_LINKS= no
 
 # Define Makefile variable RESCUE
 CRUNCH_BUILDOPTS+= -DRESCUE
@@ -51,7 +26,7 @@ CRUNCH_BUILDOPTS+= -DRESCUE
 CRUNCH_BUILDTOOLS=
 
 
-
+.if 0  # we can just add  the original scripts to the list of needed files
 # Shell scripts need #! line to be edited from /bin/sh to /rescue/sh
 SCRIPTS+= dhclient_FIXED
 SCRIPTSNAME_dhclient_FIXED= dhclient-script
@@ -72,6 +47,7 @@ SCRIPTSNAME_nextboot_FIXED= nextboot
 nextboot_FIXED: ../../sbin/reboot/nextboot.sh
 	sed '1s/\/bin\//\${CHERIBSDBOX_DIR}\//' ${.ALLSRC} > ${.TARGET}
 CLEANFILES+= nextboot_FIXED
+.endif
 
 # Libraries:
 # We install sshd so we need a shared libcrypto and libc anyway
@@ -326,6 +302,53 @@ CRUNCH_PROGS_usr.sbin+= \
 CRUNCH_SRCDIRS+= libexec
 CRUNCH_PROGS_libexec+=	getty
 # from sshd: usr/libexec/sftp-server
+
+
+
+# Generate an mtree file to be used when building the FPGA images
+# I'm not sure how to add hardlinks to makefs without actually writing the
+# hardlinks. The problem is that we want to install the original programs to
+# the rootfs but replace them with links to cheribsdbox on the FPGA memory fs
+# image. It seems to me like the easiest way to do this is to just write an
+# mtree manifest with symlinks. Since crunchgen should only be checking argv[0]
+# this should also work fine
+
+FILES=cheribsdbox.mtree
+FILESDIR= /etc/mtree
+
+# Example entry for symlinks::
+# ./usr/bin/chfn type=link uname=root gname=wheel mode=0755 link=chpass tags=package=runtime
+INSTALLDIR_bin=/bin
+LINKPATH_bin:=${PROG}
+INSTALLDIR_sbin=/sbin
+LINKPATH_sbin:=../${PROG}
+INSTALLDIR_usr.bin=/usr/bin
+LINKPATH_usr.bin:=../../${PROG}
+INSTALLDIR_usr.sbin=/usr/sbin
+LINKPATH_usr.sbin:=../../${PROG}
+INSTALLDIR_libexec=/usr/libexec
+LINKPATH_libexec:=../../${PROG}
+
+cheribsdbox.mtree: Makefile
+	echo '#mtree 2.0' > ${.TARGET}
+.for D in ${CRUNCH_SRCDIRS}
+.if empty(INSTALLDIR_${D}) || empty(LINKPATH_${D})
+.error "empty(INSTALLDIR_${D}) || empty(LINKPATH_${D})"
+.endif
+.for P in ${CRUNCH_PROGS_${D}}
+.ifndef CRUNCH_SUPPRESS_LINK_${P}
+	echo ".${INSTALLDIR_${D}}/${P} type=link uname=root gname=wheel mode=0755 link=${LINKPATH_${D}} tags=package=runtime" >> ${.TARGET}
+.endif
+.for A in ${CRUNCH_ALIAS_${P}}
+.ifndef CRUNCH_SUPPRESS_LINK_${A}
+	echo ".${INSTALLDIR_${D}}/${A} type=link uname=root gname=wheel mode=0755 link=${P} tags=package=runtime" >> ${.TARGET}
+.endif
+.endfor
+.endfor
+.endfor
+	@echo "cheribsdbox manifest written"
+
+
 
 # the crunchgen build environment
 .include <bsd.crunchgen.mk>
