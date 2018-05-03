@@ -588,11 +588,7 @@ xo_depth_check (xo_handle_t *xop, int depth)
     if (depth >= xop->xo_stack_size) {
 	depth += XO_DEPTH;	/* Extra room */
 
-#ifndef XO_MALLOC_HACK
 	xsp = xo_realloc(xop->xo_stack, sizeof(xop->xo_stack[0]) * depth);
-#else
-	xsp = realloc(xop->xo_stack, sizeof(xop->xo_stack[0]) * depth);
-#endif /* XO_MALLOC_HACK */
 	if (xsp == NULL) {
 	    xo_failure(xop, "xo_depth_check: out of memory (%d)", depth);
 	    return -1;
@@ -1899,11 +1895,7 @@ xo_failure (xo_handle_t *xop, const char *fmt, ...)
 xo_handle_t *
 xo_create (xo_style_t style, xo_xof_flags_t flags)
 {
-#ifndef XO_MALLOC_HACK
     xo_handle_t *xop = xo_realloc(NULL, sizeof(*xop));
-#else
-    xo_handle_t *xop = realloc(NULL, sizeof(*xop));
-#endif /* XO_MALLOC_HACK */
 
     if (xop) {
 	bzero(xop, sizeof(*xop));
@@ -1994,11 +1986,7 @@ xo_destroy (xo_handle_t *xop_arg)
     if (xop->xo_close && XOF_ISSET(xop, XOF_CLOSE_FP))
 	xop->xo_close(xop->xo_opaque);
 
-#ifndef XO_MALLOC_HACK
     xo_free(xop->xo_stack);
-#else
-    free(xop->xo_stack);
-#endif /* XO_MALLOC_HACK */
     xo_buf_cleanup(&xop->xo_data);
     xo_buf_cleanup(&xop->xo_fmt);
     xo_buf_cleanup(&xop->xo_predicate);
@@ -2006,21 +1994,13 @@ xo_destroy (xo_handle_t *xop_arg)
     xo_buf_cleanup(&xop->xo_color_buf);
 
     if (xop->xo_version)
-#ifndef XO_MALLOC_HACK
 	xo_free(xop->xo_version);
-#else
-	free(xop->xo_version);
-#endif /* XO_MALLOC_HACK */
 
     if (xop_arg == NULL) {
 	bzero(&xo_default_handle, sizeof(xo_default_handle));
 	xo_default_inited = 0;
     } else
-#ifndef XO_MALLOC_HACK
 	xo_free(xop);
-#else
-	free(xop);
-#endif /* XO_MALLOC_HACK */
 }
 
 /**
@@ -2505,11 +2485,7 @@ xo_strndup (const char *str, ssize_t len)
     if (len < 0)
 	len = strlen(str);
 
-#ifndef XO_MALLOC_HACK
     char *cp = xo_realloc(NULL, len + 1);
-#else
-    char *cp = realloc(NULL, len + 1);
-#endif /* XO_MALLOC_HACK */
     if (cp) {
 	memcpy(cp, str, len);
 	cp[len] = '\0';
@@ -2532,11 +2508,7 @@ xo_set_leading_xpath (xo_handle_t *xop, const char *path)
     xop = xo_default(xop);
 
     if (xop->xo_leading_xpath) {
-#ifndef XO_MALLOC_HACK
 	xo_free(xop->xo_leading_xpath);
-#else
-	free(xop->xo_leading_xpath);
-#endif /* XO_MALLOC_HACK */
 	xop->xo_leading_xpath = NULL;
     }
 
@@ -3914,11 +3886,7 @@ xo_buf_append_div (xo_handle_t *xop, const char *class, xo_xff_flags_t flags,
 	ssize_t olen = xsp->xs_keys ? strlen(xsp->xs_keys) : 0;
 	ssize_t dlen = pbp->xb_curp - pbp->xb_bufp;
 
-#ifndef XO_MALLOC_HACK
 	char *cp = xo_realloc(xsp->xs_keys, olen + dlen + 1);
-#else
-	char *cp = realloc(xsp->xs_keys, olen + dlen + 1);
-#endif /* XO_MALLOC_HACK */
 	if (cp) {
 	    memcpy(cp + olen, pbp->xb_bufp, dlen);
 	    cp[olen + dlen] = '\0';
@@ -4587,11 +4555,7 @@ xo_set_gettext_domain (xo_handle_t *xop, xo_field_info_t *xfip,
 
     /* Start by discarding previous domain */
     if (xop->xo_gt_domain) {
-#ifndef XO_MALLOC_HACK
 	xo_free(xop->xo_gt_domain);
-#else
-	free(xop->xo_gt_domain);
-#endif /* XO_MALLOC_HACK */
 	xop->xo_gt_domain = NULL;
     }
 
@@ -6166,11 +6130,7 @@ xo_gettext_rebuild_content (xo_handle_t *xop, xo_field_info_t *fields,
     if (blen == 0)
 	return;
 
-#ifndef XO_MALLOC_HACK
     buf = xo_realloc(NULL, blen);
-#else
-    buf = realloc(NULL, blen);
-#endif /* XO_MALLOC_HACK */
     if (buf == NULL)
 	return;
 
@@ -6205,11 +6165,7 @@ xo_gettext_rebuild_content (xo_handle_t *xop, xo_field_info_t *fields,
 	}
     }
 
-#ifndef XO_MALLOC_HACK
     xo_free(buf);
-#else
-    free(buf);
-#endif /* XO_MALLOC_HACK */
 }
 #else  /* HAVE_GETTEXT */
 static const char *
@@ -6358,11 +6314,7 @@ xo_do_emit_fields (xo_handle_t *xop, xo_field_info_t *fields,
 	    if (!gettext_inuse) { /* Only translate once */
 		gettext_inuse = 1;
 		if (new_fmt) {
-#ifndef XO_MALLOC_HACK
 		    xo_free(new_fmt);
-#else
-		    free(new_fmt);
-#endif /* XO_MALLOC_HACK */
 		    new_fmt = NULL;
 		}
 
@@ -6460,11 +6412,7 @@ xo_do_emit_fields (xo_handle_t *xop, xo_field_info_t *fields,
     }
 
     if (new_fmt)
-#ifndef XO_MALLOC_HACK
 	xo_free(new_fmt);
-#else
-	free(new_fmt);
-#endif /* XO_MALLOC_HACK */
 
     /*
      * We've carried the gettext domainname inside our handle just for
@@ -6472,11 +6420,7 @@ xo_do_emit_fields (xo_handle_t *xop, xo_field_info_t *fields,
      * xo_emit calls.
      */
     if (xop->xo_gt_domain) {
-#ifndef XO_MALLOC_HACK
 	xo_free(xop->xo_gt_domain);
-#else
-	free(xop->xo_gt_domain);
-#endif /* XO_MALLOC_HACK */
 	xop->xo_gt_domain = NULL;
     }
 
@@ -6873,19 +6817,11 @@ xo_depth_change (xo_handle_t *xop, const char *name,
 	}
 
 	if (xsp->xs_name) {
-#ifndef XO_MALLOC_HACK
 	    xo_free(xsp->xs_name);
-#else
-	    free(xsp->xs_name);
-#endif /* XO_MALLOC_HACK */
 	    xsp->xs_name = NULL;
 	}
 	if (xsp->xs_keys) {
-#ifndef XO_MALLOC_HACK
 	    xo_free(xsp->xs_keys);
-#else
-	    free(xsp->xs_keys);
-#endif /* XO_MALLOC_HACK */
 	    xsp->xs_keys = NULL;
 	}
     }
@@ -6923,11 +6859,7 @@ xo_emit_top (xo_handle_t *xop, const char *ppn)
     if (xop->xo_version) {
 	xo_printf(xop, "%*s\"__version\": \"%s\", %s",
 		  xo_indent(xop), "", xop->xo_version, ppn);
-#ifndef XO_MALLOC_HACK
 	xo_free(xop->xo_version);
-#else
-	free(xop->xo_version);
-#endif /* XO_MALLOC_HACK */
 	xop->xo_version = NULL;
     }
 }
@@ -8276,11 +8208,7 @@ xo_emit_warn_hcv (xo_handle_t *xop, int as_warning, int code,
 	xo_format_value(xop, "message", 7, src->xb_bufp,
 			src->xb_curp - src->xb_bufp, NULL, 0, NULL, 0, 0);
 
-#ifndef XO_MALLOC_HACK
 	xo_free(temp.xo_stack);
-#else
-	free(temp.xo_stack);
-#endif /* XO_MALLOC_HACK */
 	xo_buf_cleanup(src);
     }
 
