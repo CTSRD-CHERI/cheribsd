@@ -6,8 +6,13 @@
 #define SLAB_MAXREGS		(1U << LG_SLAB_MAXREGS)
 
 /* Default decay times in milliseconds. */
+#if 0
 #define DIRTY_DECAY_MS_DEFAULT	ZD(10 * 1000)
 #define MUZZY_DECAY_MS_DEFAULT	ZD(10 * 1000)
+#else
+#define DIRTY_DECAY_MS_DEFAULT	ZD(-1)
+#define MUZZY_DECAY_MS_DEFAULT	ZD(-1)
+#endif
 /* Number of event ticks between time checks. */
 #define DECAY_NTICKS_PER_UPDATE	1000
 
