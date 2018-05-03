@@ -101,7 +101,6 @@ CRUNCH_PROGS_bin+=	cat \
 		chflags \
 		chmod \
 		cp \
-		csh \
 		dd \
 		df \
 		expr \
@@ -115,17 +114,11 @@ CRUNCH_PROGS_bin+=	cat \
 		realpath \
 		rm \
 		rmdir \
-		sh \
 		sleep \
 		stty \
 		test
 
 CRUNCH_ALIAS_test=	[
-CRUNCH_BUILDTOOLS+=	bin/sh bin/csh
-CRUNCH_ALIAS_sh=	-sh
-CRUNCH_ALIAS_csh=	tcsh
-
-# TODO: tcsh and csh?
 
 ###################################################################
 # Programs from standard /sbin
@@ -162,7 +155,6 @@ CRUNCH_PROGS_sbin+= dhclient \
 		sysctl \
 		umount
 CRUNCH_ALIAS_md5=	sha256
-CRUNCH_ALIAS_shutdown=	poweroff
 
 # TODO: add init once the image works fine:
 # CRUNCH_PROGS_sbin+= init
@@ -215,7 +207,6 @@ CRUNCH_PROGS_usr.bin+= \
 		sed \
 		seq \
 		sockstat \
-		su \
 		tail \
 		tee \
 		tftp \
@@ -228,11 +219,22 @@ CRUNCH_PROGS_usr.bin+= \
 		uuencode \
 		vmstat \
 		w \
+		which \
 		xargs
 
 CRUNCH_ALIAS_bzip2= bunzip2
 CRUNCH_ALIAS_hexdump= hd od
 CRUNCH_ALIAS_w= uptime
+
+# Su breaks bin/sh and bin/csh because it sets argv[0] and then cheribsdbox
+# thinks it should execute _su
+CRUNCH_PROGS_usr.bin+=su
+.if 0
+CRUNCH_BUILDTOOLS+=	bin/sh
+CRUNCH_ALIAS_sh=	-sh
+CRUNCH_BUILDTOOLS+=	bin/csh
+CRUNCH_ALIAS_csh=	-csh tcsh -tcsh
+.endif
 
 
 # FIXME: wait -> usr.bin/alias (but that is just a script so how to add
