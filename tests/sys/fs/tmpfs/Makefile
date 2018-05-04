@@ -33,7 +33,8 @@ NETBSD_ATF_TESTS_SH+=	symlink_test
 NETBSD_ATF_TESTS_SH+=	times_test
 NETBSD_ATF_TESTS_SH+=	truncate_test
 NETBSD_ATF_TESTS_SH+=	vnd_test
-NETBSD_ATF_TESTS_SH+=	vnode_leak_test
+# kernel panic
+#NETBSD_ATF_TESTS_SH+=	vnode_leak_test
 
 ${PACKAGE}FILES+=	h_funcs.subr
 ${PACKAGE}FILESDIR=	${TESTSDIR}

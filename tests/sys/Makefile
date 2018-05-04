@@ -9,10 +9,7 @@ TESTS_SUBDIRS+=		file
 TESTS_SUBDIRS+=		fs
 TESTS_SUBDIRS+=		geom
 TESTS_SUBDIRS+=		kern
-# XXX-BD TLB miss (store) - kernel mode
-.if ${MACHINE_CPUARCH} != "mips"
 TESTS_SUBDIRS+=		kqueue
-.endif
 TESTS_SUBDIRS+=		mac
 TESTS_SUBDIRS+=		mqueue
 TESTS_SUBDIRS+=		netinet

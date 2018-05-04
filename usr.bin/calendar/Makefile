@@ -33,7 +33,7 @@ beforeinstall:
 	    ${DESTDIR}${SHAREDIR}/calendar/${link}
 .endfor
 
-.if ${MK_TESTS} != "no" && ${MACHINE_CPUARCH} != "mips"
+.if ${MK_TESTS} != "no"
 SUBDIR+= tests
 .endif
 

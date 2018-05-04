@@ -22,6 +22,7 @@ TESTS_SUBDIRS+=	termios
 TESTS_SUBDIRS+=	ttyio
 
 .if !defined(LIBCHERI)
+# Fails to link
 SUBDIR=		tls_dso
 TESTS_SUBDIRS+=	tls
 SUBDIR_DEPEND_tls= tls_dso
