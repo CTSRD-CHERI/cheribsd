@@ -197,7 +197,7 @@ ATF_TC_WITH_CLEANUP(msg);
 ATF_TC_HEAD(msg, tc)
 {  
 
-	atf_tc_set_md_var(tc, "timeout", "3");
+	atf_tc_set_md_var(tc, "timeout", "15");
 	atf_tc_set_md_var(tc, "descr", "Checks sysvmsg passing");
 }
 
@@ -435,7 +435,7 @@ ATF_TC_WITH_CLEANUP(sem);
 ATF_TC_HEAD(sem, tc)
 {  
 
-	atf_tc_set_md_var(tc, "timeout", "3");
+	atf_tc_set_md_var(tc, "timeout", "15");
 	atf_tc_set_md_var(tc, "descr", "Checks sysvmsg passing");
 }
 
@@ -662,7 +662,7 @@ ATF_TC_WITH_CLEANUP(shm);
 ATF_TC_HEAD(shm, tc)
 {  
 
-	atf_tc_set_md_var(tc, "timeout", "3");
+	atf_tc_set_md_var(tc, "timeout", "15");
 	atf_tc_set_md_var(tc, "descr", "Checks sysv shared memory");
 }
 
