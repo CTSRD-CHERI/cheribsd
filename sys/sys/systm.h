@@ -344,6 +344,10 @@ void	bzero(void * _Nonnull buf, size_t len);
 void	explicit_bzero(void * _Nonnull, size_t);
 
 void	*memcpy(void * _Nonnull to, const void * _Nonnull from, size_t len);
+#if !__has_feature(capabilities)
+/* Causes a compiler crash. */
+#define memcpy(to, from, len) __builtin_memcpy(to, from, len)
+#endif
 #if __has_feature(capabilities)
 void	*memcpy_c(void * _Nonnull __capability to,
 	    const void * _Nonnull __capability from, size_t len);
