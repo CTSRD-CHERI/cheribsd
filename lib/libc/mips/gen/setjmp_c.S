@@ -134,32 +134,23 @@ NESTED(setjmp, SETJMP_FRAME_SIZE, _FRAME_RETURN_REG)
 	csdc1	$f30, zero, (_JB_FPREG_F30 * SZREG)($c3)
 	csdc1	$f31, zero, (_JB_FPREG_F31 * SZREG)($c3)
 #endif	/* ! __mips_soft_float */
-	/* jmp_buf is 64-bit aligned, so we need to round it up. */
-	cgetbase	t0, $c3
-	cgetoffset	t1, $c3
-	daddu		t1, t0, t1
-	daddiu		t0, t1, ((_JB_CHERI_START * SZREG) + _MIPS_SZCAP/8 - SZREG)
-	li		t2, _MIPS_CAP_ALIGN_MASK
-	and		t2, t2, t0
-	dsubu		t1, t2, t1
-
-	csc		$c11, t1, (_JB_CHERI_C11 * _MIPS_SZCAP/8)($c3)
-	csc		$c12, t1, (_JB_CHERI_C12 * _MIPS_SZCAP/8)($c3)
-	csc		$c13, t1, (_JB_CHERI_C13 * _MIPS_SZCAP/8)($c3)
-	csc		$c14, t1, (_JB_CHERI_C14 * _MIPS_SZCAP/8)($c3)
-	csc		$c15, t1, (_JB_CHERI_C15 * _MIPS_SZCAP/8)($c3)
-	csc		$c16, t1, (_JB_CHERI_C16 * _MIPS_SZCAP/8)($c3)
-	csc		$c17, t1, (_JB_CHERI_C17 * _MIPS_SZCAP/8)($c3)
-	csc		$c18, t1, (_JB_CHERI_C18 * _MIPS_SZCAP/8)($c3)
-	csc		$c19, t1, (_JB_CHERI_C19 * _MIPS_SZCAP/8)($c3)
-	csc		$c20, t1, (_JB_CHERI_C20 * _MIPS_SZCAP/8)($c3)
-	csc		$c21, t1, (_JB_CHERI_C21 * _MIPS_SZCAP/8)($c3)
-	csc		$c22, t1, (_JB_CHERI_C22 * _MIPS_SZCAP/8)($c3)
-	csc		$c23, t1, (_JB_CHERI_C23 * _MIPS_SZCAP/8)($c3)
-	csc		$c24, t1, (_JB_CHERI_C24 * _MIPS_SZCAP/8)($c3)
-	csc		$c25, t1, (_JB_CHERI_C25 * _MIPS_SZCAP/8)($c3)
+	csc		$c11, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C11 * _MIPS_SZCAP/8)($c3)
+	csc		$c12, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C12 * _MIPS_SZCAP/8)($c3)
+	csc		$c13, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C13 * _MIPS_SZCAP/8)($c3)
+	csc		$c14, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C14 * _MIPS_SZCAP/8)($c3)
+	csc		$c15, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C15 * _MIPS_SZCAP/8)($c3)
+	csc		$c16, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C16 * _MIPS_SZCAP/8)($c3)
+	csc		$c17, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C17 * _MIPS_SZCAP/8)($c3)
+	csc		$c18, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C18 * _MIPS_SZCAP/8)($c3)
+	csc		$c19, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C19 * _MIPS_SZCAP/8)($c3)
+	csc		$c20, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C20 * _MIPS_SZCAP/8)($c3)
+	csc		$c21, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C21 * _MIPS_SZCAP/8)($c3)
+	csc		$c22, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C22 * _MIPS_SZCAP/8)($c3)
+	csc		$c23, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C23 * _MIPS_SZCAP/8)($c3)
+	csc		$c24, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C24 * _MIPS_SZCAP/8)($c3)
+	csc		$c25, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C25 * _MIPS_SZCAP/8)($c3)
 	cgetdefault	$c4
-	csc		$c4, t1, (_JB_CHERI_DDC * _MIPS_SZCAP/8)($c3)
+	csc		$c4, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_DDC * _MIPS_SZCAP/8)($c3)
 
 	move		v0, zero
 	cjr		$c17
@@ -235,30 +226,23 @@ NESTED(longjmp, LONGJMP_FRAME_SIZE, _FRAME_RETURN_REG)
 	cldc1		$f30, zero, (_JB_FPREG_F30 * SZREG)($c3)
 	cldc1		$f31, zero, (_JB_FPREG_F31 * SZREG)($c3)
 #endif	/* ! __mips_soft_float */
-	/* jmp_buf is 64-bit aligned, so we need to round it up. */
-	cgetbase	t0, $c3
-	cgetoffset	t1, $c3
-	daddu		t1, t0, t1
-	daddiu		t0, t1, ((_JB_CHERI_START * SZREG) + _MIPS_SZCAP/8 - SZREG)
-	li		t2, _MIPS_CAP_ALIGN_MASK
-	and		t2, t2, t0
-	dsubu		t1, t2, t1
-
-	clc		$c11, t1, (_JB_CHERI_C11 * _MIPS_SZCAP/8)($c3)
-	clc		$c12, t1, (_JB_CHERI_C12 * _MIPS_SZCAP/8)($c3)
-	clc		$c13, t1, (_JB_CHERI_C13 * _MIPS_SZCAP/8)($c3)
-	clc		$c14, t1, (_JB_CHERI_C14 * _MIPS_SZCAP/8)($c3)
-	clc		$c15, t1, (_JB_CHERI_C15 * _MIPS_SZCAP/8)($c3)
-	clc		$c16, t1, (_JB_CHERI_C16 * _MIPS_SZCAP/8)($c3)
-	clc		$c17, t1, (_JB_CHERI_C17 * _MIPS_SZCAP/8)($c3)
-	clc		$c18, t1, (_JB_CHERI_C18 * _MIPS_SZCAP/8)($c3)
-	clc		$c19, t1, (_JB_CHERI_C19 * _MIPS_SZCAP/8)($c3)
-	clc		$c20, t1, (_JB_CHERI_C20 * _MIPS_SZCAP/8)($c3)
-	clc		$c21, t1, (_JB_CHERI_C21 * _MIPS_SZCAP/8)($c3)
-	clc		$c22, t1, (_JB_CHERI_C22 * _MIPS_SZCAP/8)($c3)
-	clc		$c23, t1, (_JB_CHERI_C23 * _MIPS_SZCAP/8)($c3)
-	clc		$c24, t1, (_JB_CHERI_C24 * _MIPS_SZCAP/8)($c3)
-	clc		$c25, t1, (_JB_CHERI_C25 * _MIPS_SZCAP/8)($c3)
+	clc		$c11, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C11 * _MIPS_SZCAP/8)($c3)
+	clc		$c12, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C12 * _MIPS_SZCAP/8)($c3)
+	clc		$c13, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C13 * _MIPS_SZCAP/8)($c3)
+	clc		$c14, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C14 * _MIPS_SZCAP/8)($c3)
+	clc		$c15, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C15 * _MIPS_SZCAP/8)($c3)
+	clc		$c16, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C16 * _MIPS_SZCAP/8)($c3)
+	clc		$c17, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C17 * _MIPS_SZCAP/8)($c3)
+	clc		$c18, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C18 * _MIPS_SZCAP/8)($c3)
+	clc		$c19, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C19 * _MIPS_SZCAP/8)($c3)
+	clc		$c20, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C20 * _MIPS_SZCAP/8)($c3)
+	clc		$c21, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C21 * _MIPS_SZCAP/8)($c3)
+	clc		$c22, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C22 * _MIPS_SZCAP/8)($c3)
+	clc		$c23, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C23 * _MIPS_SZCAP/8)($c3)
+	clc		$c24, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C24 * _MIPS_SZCAP/8)($c3)
+	clc		$c25, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_C25 * _MIPS_SZCAP/8)($c3)
+	clc		$c4, zero, ((_JB_CHERI_START * SZREG) + _JB_CHERI_DDC * _MIPS_SZCAP/8)($c3)
+	csetdefault	$c4
 
 	/* Install $a0 as the return value from setjmp(). */
 	move		v0, a0
