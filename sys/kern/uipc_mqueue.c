@@ -2999,17 +2999,15 @@ cheriabi_kmq_timedreceive(struct thread *td,
 int
 cheriabi_kmq_notify(struct thread *td, struct cheriabi_kmq_notify_args *uap)
 {
-	struct sigevent_c evc;
-	struct sigevent ev, *evp;
+	struct sigevent_c ev, *evp;
 	int error;
 
 	if (uap->sigev == NULL) {
 		evp = NULL;
 	} else {
-		error = copyin_c(uap->sigev, &evc, sizeof(ev));
+		error = copyin_c(uap->sigev, &ev, sizeof(ev));
 		if (error != 0)
 			return (error);
-		convert_sigevent_c(&evc, &ev);
 		evp = &ev;
 	}
 	return (kern_kmq_notify(td, uap->mqd, evp));
