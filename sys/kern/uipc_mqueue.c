@@ -168,7 +168,7 @@ struct mqueue;
 
 struct mqueue_notifier {
 	LIST_ENTRY(mqueue_notifier)	nt_link;
-	struct sigevent			nt_sigev;
+	ksigevent_t			nt_sigev;
 	ksiginfo_t			nt_ksi;
 	struct proc			*nt_proc;
 };
@@ -2388,7 +2388,7 @@ kern_kmq_timedsend(struct thread *td, int mqd,
 }
 
 static int
-kern_kmq_notify(struct thread *td, int mqd, struct sigevent *sigev)
+kern_kmq_notify(struct thread *td, int mqd, ksigevent_t *sigev)
 {
 #ifdef CAPABILITIES
 	cap_rights_t rights;
@@ -2497,15 +2497,17 @@ out:
 int
 sys_kmq_notify(struct thread *td, struct kmq_notify_args *uap)
 {
-	struct sigevent ev, *evp;
+	struct sigevent_native ev_n;
+	ksigevent_t ev, *evp;
 	int error;
 
 	if (uap->sigev == NULL) {
 		evp = NULL;
 	} else {
-		error = copyin(uap->sigev, &ev, sizeof(ev));
+		error = copyin(uap->sigev, &ev_n, sizeof(ev));
 		if (error != 0)
 			return (error);
+		convert_sigevent(&ev_n, &ev);
 		evp = &ev;
 	}
 	return (kern_kmq_notify(td, uap->mqd, evp));

@@ -1323,7 +1323,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		iarg[0] = p->mode; /* int */
 		uarg[1] = (intptr_t) p->acb_list; /* struct aiocb_native *const * */
 		iarg[2] = p->nent; /* int */
-		uarg[3] = (intptr_t) p->sig; /* struct sigevent * */
+		uarg[3] = (intptr_t) p->sig; /* struct sigevent_native * */
 		*n_args = 4;
 		break;
 	}
@@ -2452,7 +2452,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 461: {
 		struct kmq_notify_args *p = params;
 		iarg[0] = p->mqd; /* int */
-		uarg[1] = (intptr_t) p->sigev; /* const struct sigevent * */
+		uarg[1] = (intptr_t) p->sigev; /* const struct sigevent_native * */
 		*n_args = 2;
 		break;
 	}
@@ -5376,7 +5376,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "userland struct sigevent *";
+			p = "userland struct sigevent_native *";
 			break;
 		default:
 			break;
@@ -7263,7 +7263,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct sigevent *";
+			p = "userland const struct sigevent_native *";
 			break;
 		default:
 			break;

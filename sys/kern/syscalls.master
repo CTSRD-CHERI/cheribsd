@@ -487,7 +487,7 @@
 256	AUE_AIO_WRITE	STD	{ int aio_write(struct aiocb_native *aiocbp); }
 257	AUE_LIO_LISTIO	STD	{ int lio_listio(int mode, \
 				    struct aiocb_native * const *acb_list, \
-				    int nent, struct sigevent *sig); }
+				    int nent, struct sigevent_native *sig); }
 258	AUE_NULL	STD	{ int kbounce(void *src, void *dst, \
 				    size_t len, int flags); }
 259	AUE_NULL	UNIMPL	nosys
@@ -840,7 +840,7 @@
 				    unsigned msg_prio,			\
 				    const struct timespec *abs_timeout);}
 461	AUE_MQ_NOTIFY	NOSTD	{ int kmq_notify(int mqd,		\
-				    const struct sigevent *sigev); }
+				    const struct sigevent_native *sigev); }
 462	AUE_MQ_UNLINK	NOSTD	{ int kmq_unlink(const char *path); }
 463	AUE_NULL	STD	{ int abort2(const char *why, int nargs, void **args); }
 464	AUE_NULL	STD	{ int thr_set_name(long id, const char *name); }

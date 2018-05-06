@@ -724,7 +724,7 @@ struct lio_listio_args {
 	char mode_l_[PADL_(int)]; int mode; char mode_r_[PADR_(int)];
 	char acb_list_l_[PADL_(struct aiocb_native *const *)]; struct aiocb_native *const * acb_list; char acb_list_r_[PADR_(struct aiocb_native *const *)];
 	char nent_l_[PADL_(int)]; int nent; char nent_r_[PADR_(int)];
-	char sig_l_[PADL_(struct sigevent *)]; struct sigevent * sig; char sig_r_[PADR_(struct sigevent *)];
+	char sig_l_[PADL_(struct sigevent_native *)]; struct sigevent_native * sig; char sig_r_[PADR_(struct sigevent_native *)];
 };
 struct kbounce_args {
 	char src_l_[PADL_(void *)]; void * src; char src_r_[PADR_(void *)];
@@ -1307,7 +1307,7 @@ struct kmq_timedsend_args {
 };
 struct kmq_notify_args {
 	char mqd_l_[PADL_(int)]; int mqd; char mqd_r_[PADR_(int)];
-	char sigev_l_[PADL_(const struct sigevent *)]; const struct sigevent * sigev; char sigev_r_[PADR_(const struct sigevent *)];
+	char sigev_l_[PADL_(const struct sigevent_native *)]; const struct sigevent_native * sigev; char sigev_r_[PADR_(const struct sigevent_native *)];
 };
 struct kmq_unlink_args {
 	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
