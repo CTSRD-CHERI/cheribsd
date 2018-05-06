@@ -296,6 +296,8 @@
     netinet
         cc
         ..
+        netdump
+        ..
     ..
     netinet6
     ..
