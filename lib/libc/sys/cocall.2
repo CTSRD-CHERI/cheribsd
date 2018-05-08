@@ -85,6 +85,26 @@ The
 argument
 points outside the process's allocated address space.
 .El
+.Sh EXAMPLES
+Basic usage example:
+.Bd -literal
+	char buf[MAXBSIZE];
+	void * __capability switcher_code;
+	void * __capability switcher_data;
+	void * __capability lookedup;
+
+	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
+	if (error != 0)
+		err(1, "cosetup");
+
+	error = colookup("target-name", &lookedup);
+	if (error != 0)
+		err(1, "colookup");
+
+	error = cocall(switcher_code, switcher_data, lookedup, buf, sizeof(buf));
+	if (error != 0)
+		err(1, "cocall");
+.Ed
 .Sh SEE ALSO
 .Xr coexec 2 ,
 .Xr cosetup 2 ,
