@@ -29,94 +29,50 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd April 30, 2018
-.Dt COCALL 2
+.Dd May 6, 2016
+.Dt COPONG 1
 .Os
 .Sh NAME
-.Nm COCALL
-.Nd accept a colocated call
-.Sh LIBRARY
-.Lb libc
+.Nm copong
+.Nd colocated ping responder
 .Sh SYNOPSIS
-.In unistd.h
-.Ft int
-.Fn coaccept "void * __capability code" "void * __capability data" "void *data" "size_t len"
+.Nm
+.Op Fl v
 .Sh DESCRIPTION
 The
-.Fn coaccept
-function accepts a colocated call.
-Before passing the execution to the callee, at most
-.Fa len
-bytes pointed to by
-.Fa data
-will be copied from buffer provided by the caller; before returning the data
-will be copied back to the caller.
-.Pp
-The
-.Ar code
+.Nm
+utility is used to answer to colocated pings from
+.Xr coping 1
 and
-.Ar data
-arguments must point to a sealed capability pair obtained from
-.Xr cosetup 2 .
-.Sh RETURN VALUES
-.Rv -std coaccept
-.Sh ERRORS
-The
-.Fn coaccept
-system call
-will fail if:
-.Bl -tag -width Er
-.It Bq Er EINVAL
-The
-.Fa code or
-.Fa data
-arguments are invalid.
-.It Bq Er EFAULT
-The
-.Fa data
-argument
-points outside the process's allocated address space.
+.Xr syscall_timing 1 .
+.Pp
+The following options are available:
+.Bl -tag -width ".Fl v"
+.It Fl v
+Be verbose.
 .El
+.Sh EXIT STATUS
+The
+.Nm
+utility exits 0 on success, and >0 if an error occurs.
 .Sh EXAMPLES
-Basic usage example:
-.Bd -literal
-	char buf[MAXBSIZE];
-	void * __capability switcher_code;
-	void * __capability switcher_data;
-	void * __capability lookedup;
-
-	error = cosetup(COSETUP_COACCEPT, &switcher_code, &switcher_data);
-	if (error != 0)
-		err(1, "cosetup");
-
-	error = coregister("target-name", NULL);
-	if (error != 0)
-		err(1, "coregister");
-
-	for (;;) {
-		error = coaccept(switcher_code, switcher_data, buf, sizeof(buf));
-		if (error != 0)
-			err(1, "coaccept");
-	}
-.Ed
-.Sh EXAMPLES
-.Bd -literal
+Execute in background within the address space of the current
+shell process:
+.Dl coexec Ar $$ Ar /usr/bin/copong &
+.Pp
 .Sh SEE ALSO
-.Xr copong 1 ,
-.Xr cocall 2 ,
-.Xr coexec 2 ,
-.Xr cosetup 2 ,
-.Xr coregister 2 ,
-.Xr colookup 2 ,
+.Xr coping 1 ,
 .Xr coaccept 2
 .Sh HISTORY
 The
-.Fn coaccept
-system call first appeared in
+.Nm
+command appeared in
 .Tn CheriBSD .
 .Sh AUTHORS
 .An -nosplit
-These functions were created by
+The
+.Nm
+utility was developed by
 .An Edward Tomasz Napierala Aq Mt trasz@FreeBSD.org
 at the University of Cambridge Computer Laboratory under DARPA/AFRL contract
 (FA8750-10-C-0237) ("CTSRD"), as part of the DARPA CRASH research programme.
