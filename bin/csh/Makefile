@@ -12,9 +12,6 @@ PACKAGE=runtime
 TCSHDIR= ${SRCTOP}/contrib/tcsh
 .PATH: ${TCSHDIR}
 
-# HACK to work around https://github.com/CTSRD-CHERI/cheribsd/issues/256 (https://github.com/CTSRD-CHERI/cheribsd/issues/198)
-WANT_CHERI=none
-
 PROG=	csh
 .if defined(RESCUE)
 DFLAGS= -D_PATH_TCSHELL='"/rescue/${PROG}"'
