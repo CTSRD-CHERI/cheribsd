@@ -3,7 +3,6 @@
 .include <src.opts.mk>
 
 PROG=	coexec
-MAN=
 
 WARNS?=	5
 
