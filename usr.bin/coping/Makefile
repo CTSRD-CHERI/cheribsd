@@ -4,7 +4,6 @@
 
 PROG=		coping
 SRCS=		coping.c
-MAN=
 
 CFLAGS+=	-fPIE -pie -Wno-error=deprecated-declarations -fuse-ld=lld
 NEED_CHERI=	hybrid
