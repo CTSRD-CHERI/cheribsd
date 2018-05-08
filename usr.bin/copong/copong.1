@@ -38,6 +38,7 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl v
+.Ar target-name
 .Sh DESCRIPTION
 The
 .Nm
@@ -58,7 +59,7 @@ utility exits 0 on success, and >0 if an error occurs.
 .Sh EXAMPLES
 Execute in background within the address space of the current
 shell process:
-.Dl coexec Ar $$ Ar /usr/bin/copong &
+.Dl coexec Ar $$ Ar /usr/bin/copong target-name &
 .Pp
 .Sh SEE ALSO
 .Xr coping 1 ,
