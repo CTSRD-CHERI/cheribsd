@@ -87,8 +87,6 @@ main(int argc, char **argv)
 	if (error != 0)
 		err(1, "coregister");
 
-	fprintf(stderr, "buf at %p\n", buf);
-
 	if (vflag)
 		fprintf(stderr, "%s: coaccepting...\n", getprogname());
 
