@@ -181,7 +181,7 @@ struct sem_undo {
  * SEMUSZ is properly aligned.
  */
 
-#define	SEM_ALIGN(bytes) roundup2(bytes, sizeof(long))
+#define	SEM_ALIGN(bytes) roundup2(bytes, sizeof(uintptr_t))
 
 /* actual size of an undo structure */
 #define SEMUSZ	SEM_ALIGN(offsetof(struct sem_undo, un_ent[SEMUME]))
