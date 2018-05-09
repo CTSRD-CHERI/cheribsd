@@ -111,7 +111,7 @@ int log_bad_page_faults = 1;
 SYSCTL_INT(_machdep, OID_AUTO, log_bad_page_faults, CTLFLAG_RW,
     &log_bad_page_faults, 1, "Print trap frame on bad page fault");
 #ifdef TRAP_DEBUG
-int trap_debug = 0;
+int trap_debug = 1;
 SYSCTL_INT(_machdep, OID_AUTO, trap_debug, CTLFLAG_RW,
     &trap_debug, 0, "Debug information on all traps");
 #endif
@@ -639,10 +639,16 @@ trap(struct trapframe *trapframe)
 		printf("cpuid = %d\n", PCPU_GET(cpuid));
 #endif
 		pid = mips_rd_entryhi() & TLBHI_ASID_MASK;
+#ifdef CHERI_KERNEL
+		printf("badaddr = %#jx, pc = %#jx, ra = %p, sp = %p, sr = %jx, pid = %d, ASID = %u\n",
+		    (intmax_t)trapframe->badvaddr, (intmax_t)trapframe->pc, trapframe->c17,
+		    trapframe->csp, (intmax_t)trapframe->sr, (curproc ? curproc->p_pid : -1), pid);
+#else
 		printf("badaddr = %#jx, pc = %#jx, ra = %#jx, sp = %#jx, sr = %jx, pid = %d, ASID = %u\n",
 		    (intmax_t)trapframe->badvaddr, (intmax_t)trapframe->pc, (intmax_t)trapframe->ra,
 		    (intmax_t)trapframe->sp, (intmax_t)trapframe->sr,
 		    (curproc ? curproc->p_pid : -1), pid);
+#endif
 
 		switch (type & ~T_USER) {
 		case T_TLB_MOD:

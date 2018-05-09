@@ -973,7 +973,7 @@ callout_when(sbintime_t sbt, sbintime_t precision, int flags,
 		 * This value is per-CPU, but it is equal for all
 		 * active ones.
 		 */
-#ifdef __LP64__
+#ifdef __LP64__ /* XXX-AM: This should also be for CHERI */
 		to_sbt = DPCPU_GET(hardclocktime);
 #else
 		spinlock_enter();
