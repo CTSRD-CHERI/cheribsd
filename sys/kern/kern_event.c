@@ -1326,7 +1326,6 @@ kqueue_register(struct kqueue *kq, kkevent_t *kev, struct thread *td, int waitok
 	struct file *fp;
 	struct knote *kn, *tkn;
 	struct knlist *knl;
-	cap_rights_t rights;
 	int error, filt, event;
 	int haskqglobal, filedesc_unlock;
 
@@ -1362,8 +1361,7 @@ findkn:
 		if (kev->ident > INT_MAX)
 			error = EBADF;
 		else
-			error = fget(td, kev->ident,
-			    cap_rights_init(&rights, CAP_EVENT), &fp);
+			error = fget(td, kev->ident, &cap_event_rights, &fp);
 		if (error)
 			goto done;
 
