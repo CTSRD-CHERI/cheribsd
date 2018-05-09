@@ -164,6 +164,12 @@
 #define	RESTORE_U_PCB_REG(reg, offs, base) \
 	REG_L	reg, (U_PCB_REGS + (SZREG * offs)) (base)
 
+#define	SAVE_U_PCB_CONTEXT(reg, offs, base) \
+	REG_S	reg, (U_PCB_CONTEXT + (SZREG * offs)) (base)
+
+#define	RESTORE_U_PCB_CONTEXT(reg, offs, base) \
+	REG_L	reg, (U_PCB_CONTEXT + (SZREG * offs)) (base)
+
 #ifdef CPU_CHERI
 #define	SAVE_U_PCB_CREG(creg, offs, base) \
 	csc	creg, base, (U_PCB_REGS + (SZREG * offs)) (CHERI_REG_KDC)
@@ -171,6 +177,7 @@
 #define	RESTORE_U_PCB_CREG(creg, offs, base) \
 	clc	creg, base, (U_PCB_REGS + (SZREG * offs)) (CHERI_REG_KDC)
 #endif
+
 #else /* CHERI_KERNEL */
 #define	SAVE_U_PCB_REG(reg, offs, base)				\
 	csd	reg, zero, (U_PCB_REGS + (SZREG * offs)) (base)
@@ -188,10 +195,19 @@
 	cld	reg, treg, 0(base)
 
 #define	SAVE_U_PCB_CREG(creg, offs, base) \
-	csc	creg, zero, (U_PCB_REGS + (SZREG * offs)) (base)
+	cscbi	creg, (U_PCB_REGS + (SZREG * offs)) (base)
 
-#define	RESTORE_U_PCB_CREG(creg, offs, base) \
-	clc	creg, zero, (U_PCB_REGS + (SZREG * offs)) (base)
+#define	RESTORE_U_PCB_CREG(creg, offs, base)			\
+	clcbi	creg, (U_PCB_REGS + (SZREG * offs)) (base)
+
+#define	SAVE_U_PCB_CONTEXT(reg, offs, base)			\
+	REG_LI	t0, (U_PCB_CONTEXT + (SZREG * offs));		\
+	csd	reg, t0, 0(base)
+
+#define	RESTORE_U_PCB_CONTEXT(reg, offs, base)			\
+	REG_LI	t0, (U_PCB_CONTEXT + (SZREG * offs));		\
+	cld	reg, t0, 0(base)
+
 #endif /* CHERI_KERNEL */
 
 #define	SAVE_U_PCB_FPREG(reg, offs, base) \
@@ -205,12 +221,6 @@
 
 #define	RESTORE_U_PCB_FPSR(reg, offs, base) \
 	REG_L	reg, (U_PCB_FPREGS + (SZFPREG * offs)) (base)
-
-#define	SAVE_U_PCB_CONTEXT(reg, offs, base) \
-	REG_S	reg, (U_PCB_CONTEXT + (SZREG * offs)) (base)
-
-#define	RESTORE_U_PCB_CONTEXT(reg, offs, base) \
-	REG_L	reg, (U_PCB_CONTEXT + (SZREG * offs)) (base)
 
 #ifndef LOCORE
 #include <machine/frame.h>

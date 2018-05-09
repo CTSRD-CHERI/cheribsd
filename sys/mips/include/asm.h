@@ -692,6 +692,10 @@ _C_LABEL(x):
 #endif	/* __mips_n32 || __mips_n64 */
 
 #ifdef CHERI_KERNEL
+/**
+ * XXX-AM: This should become a cap-table load
+ * using KDC (which will become GPC at some point)
+ */
 #define	GET_CPU_PCPU(creg, treg)			\
 	PTR_LA	treg, _C_LABEL(pcpup);			\
 	cgetkdc		creg;				\

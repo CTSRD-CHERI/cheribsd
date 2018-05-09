@@ -154,6 +154,7 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2,int flags)
 		MipsSaveCurFPState(td1);
 #endif
 
+#ifndef CHERI_KERNEL
 	pcb2->pcb_context[PCB_REG_RA] = (register_t)(intptr_t)fork_trampoline;
 	/* Make sp 64-bit aligned */
 	pcb2->pcb_context[PCB_REG_SP] = (register_t)(((vm_offset_t)td2->td_pcb &
@@ -166,6 +167,24 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2,int flags)
 	pcb2->pcb_context[PCB_REG_S0] = (register_t)(intptr_t)fork_return;
 	pcb2->pcb_context[PCB_REG_S1] = (register_t)(intptr_t)td2;
 	pcb2->pcb_context[PCB_REG_S2] = (register_t)(intptr_t)td2->td_frame;
+#else /* CHERI_KERNEL */
+	/* Implies CPU_CHERI */
+	pcb2->pcb_cherikframe.ckf_c17 = fork_trampoline;
+	/* The pcb capability and the kernel stack capabilities are separate */
+	pcb2->pcb_cherikframe.ckf_stc =
+		rounddown2(td2->td_kstack, CHERICAP_SIZE) - CALLFRAME_SIZ;
+	/* Set up fork_trampoline arguments in the frame registers 
+	 * Note that in CHERI we do not have an RA slot, we use C17.
+	 */
+	pcb2->pcb_cherikframe.ckf_c18 = fork_return;
+	pcb2->pcb_cherikframe.ckf_c19 = td2;
+	pcb2->pcb_cherikframe.ckf_c20 = td2->td_frame;
+	/*
+	 * Set up globals cap-table pointer. For now clone the one from this
+	 * kernel thread.
+	 */
+	pcb2->pcb_cherikframe.ckf_gpc = cheri_getidc();
+#endif /* CHERI_KERNEL */
 	pcb2->pcb_context[PCB_REG_SR] = mips_rd_status() &
 	    (MIPS_SR_KX | MIPS_SR_UX | MIPS_SR_INT_MASK);
 	/*
@@ -238,8 +257,13 @@ cpu_fork_kthread_handler(struct thread *td, void (*func)(void *), void *arg)
 	 * Note that the trap frame follows the args, so the function
 	 * is really called like this:	func(arg, frame);
 	 */
+#ifndef CHERI_KERNEL
 	td->td_pcb->pcb_context[PCB_REG_S0] = (register_t)(intptr_t)func;
 	td->td_pcb->pcb_context[PCB_REG_S1] = (register_t)(intptr_t)arg;
+#else
+	td->td_pcb->pcb_cherikframe.ckf_c18 = func;
+	td->td_pcb->pcb_cherikframe.ckf_c19 = arg;
+#endif
 }
 
 void
@@ -472,7 +496,7 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 	/*
 	 * Set registers for trampoline to user mode.
 	 */
-
+#ifndef CHERI_KERNEL
 	pcb2->pcb_context[PCB_REG_RA] = (register_t)(intptr_t)fork_trampoline;
 	/* Make sp 64-bit aligned */
 	pcb2->pcb_context[PCB_REG_SP] = (register_t)(((vm_offset_t)td->td_pcb &
@@ -485,6 +509,16 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 	pcb2->pcb_context[PCB_REG_S0] = (register_t)(intptr_t)fork_return;
 	pcb2->pcb_context[PCB_REG_S1] = (register_t)(intptr_t)td;
 	pcb2->pcb_context[PCB_REG_S2] = (register_t)(intptr_t)td->td_frame;
+#else /* CHERI_KERNEL */
+	/* Implies CPU_CHERI, see cpu_fork() */
+	pcb2->pcb_cherikframe.ckf_c17 = fork_trampoline;
+	pcb2->pcb_cherikframe.ckf_stc =
+		rounddown2(td->td_kstack, CHERICAP_SIZE) - CALLFRAME_SIZ;
+	pcb2->pcb_cherikframe.ckf_c18 = fork_return;
+	pcb2->pcb_cherikframe.ckf_c19 = td;
+	pcb2->pcb_cherikframe.ckf_c20 = td->td_frame;
+	pcb2->pcb_cherikframe.ckf_gpc = cheri_getidc();
+#endif /* CHERI_KERNEL */
 	/* Dont set IE bit in SR. sched lock release will take care of it */
 	pcb2->pcb_context[PCB_REG_SR] = mips_rd_status() &
 	    (MIPS_SR_PX | MIPS_SR_KX | MIPS_SR_UX | MIPS_SR_INT_MASK);

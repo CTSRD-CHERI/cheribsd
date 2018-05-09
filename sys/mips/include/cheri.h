@@ -144,6 +144,11 @@ struct cheri_kframe {
 	void * __capability	ckf_c22;
 	void * __capability	ckf_c23;
 	void * __capability	ckf_c24;
+#ifdef CHERI_KERNEL
+	void *			ckf_pcc;
+	void *			ckf_stc;
+	void *			ckf_gpc;
+#endif
 };
 #endif
 

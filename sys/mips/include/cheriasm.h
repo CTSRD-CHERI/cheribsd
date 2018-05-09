@@ -171,7 +171,6 @@
 66:
 
 #ifndef CHERI_KERNEL
-#define SWITCH_TO_KERNEL_CSTACK(pcb)
 
 /*
  * Capcause access to PCB
@@ -182,12 +181,6 @@
 	RESTORE_U_PCB_REG(treg, CAPCAUSE, pcb)
 
 #else /* CHERI_KERNEL */
-/* See SAVE_REGS_TO_PCB() 
- * XXX-AM: also this should break because the pcb capability should not
- * give access to the stack.
- */
-#define SWITCH_TO_KERNEL_CSTACK(pcb)		\
-	cincoffset CHERI_REG_STC, pcb, -CALLFRAME_SIZ
 
 /*
  * Capcause offset is too large for CHERI256 in this case and does not
@@ -222,7 +215,6 @@
 	SAVE_U_PCB_CREG(CHERI_REG_C9, C9, pcb);				\
 	SAVE_U_PCB_CREG(CHERI_REG_C10, C10, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_STC, STC, pcb);			\
-	SWITCH_TO_KERNEL_CSTACK(pcb);					\
 	SAVE_U_PCB_CREG(CHERI_REG_C12, C12, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C13, C13, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C14, C14, pcb);			\
@@ -278,6 +270,7 @@
  * Macros saving capability state to, and restoring it from, voluntary kernel
  * context-switch storage in pcb.pcb_cherikframe.
  */
+#ifndef CHERI_KERNEL
 #define	SAVE_U_PCB_CHERIKFRAME_CREG(creg, offs, base)			\
 	csc		creg, base, (U_PCB_CHERIKFRAME +		\
 			    CHERICAP_SIZE * offs)(CHERI_REG_KDC)
@@ -285,6 +278,26 @@
 #define	RESTORE_U_PCB_CHERIKFRAME_CREG(creg, offs, base)		\
 	clc		creg, base, (U_PCB_CHERIKFRAME +		\
 			    CHERICAP_SIZE * offs)(CHERI_REG_KDC)
+
+#define SAVE_CHERIKFRAME_GPC
+#define RESTORE_CHERIKFRAME_GPC
+#else /* CHERI_KERNEL */
+#define	SAVE_U_PCB_CHERIKFRAME_CREG(creg, offs, base)			\
+	cscbi		creg, (U_PCB_CHERIKFRAME +			\
+			    CHERICAP_SIZE * offs)(base)
+
+#define	RESTORE_U_PCB_CHERIKFRAME_CREG(creg, offs, base)		\
+	clcbi		creg, (U_PCB_CHERIKFRAME +			\
+			    CHERICAP_SIZE * offs)(base)
+
+/* Save and restore globals pointer as well */
+#define SAVE_CHERIKFRAME_GPC(base)					\
+	SAVE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_GPC, CHERIKFRAME_OFF_GPC, \
+				    base)
+#define RESTORE_CHERIKFRAME_GPC(base)					\
+	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_GPC,			\
+				       CHERIKFRAME_OFF_GPC, base)
+#endif /* CHERI_KERNEL */
 
 /*
  * Macros to save (and restore) callee-save capability registers when
@@ -307,7 +320,9 @@
 	SAVE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C23, CHERIKFRAME_OFF_C23,	\
 	    base);							\
 	SAVE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C24, CHERIKFRAME_OFF_C24,	\
-	    base)
+	    base);					    	        \
+	SAVE_CHERIKFRAME_GPC(base)
+
 
 #define	RESTORE_U_PCB_CHERIKFRAME(base)					\
 	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C17,			\
@@ -325,7 +340,8 @@
 	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C23,			\
 	    CHERIKFRAME_OFF_C23, base);					\
 	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C24,			\
-	    CHERIKFRAME_OFF_C24, base)
+	    CHERIKFRAME_OFF_C24, base);	    	    	    	    	\
+	RESTORE_CHERIKFRAME_GPC(base)
 
 /* This macro is just until assembler supports clearregs */
 #define CHERI_CLEARREGS(regset, mask) \
@@ -403,5 +419,13 @@
 
 /* Ensure that this is kept in sync with CHERI_REG_SEC0. */
 #define	CHERI_CLEAR_CAPHI_SEC0	CHERI_CLEAR_CAPHI_KR2C
+
+/*
+ * Load symbol from capability table
+ */
+#define CAPTABLE_LOAD(dst, sym)				\
+	clcbi dst, %captab20(sym)(CHERI_REG_GPC)
+#define CAPCALL_LOAD(dst, sym)				\
+	clcbi dst, %capcall20(sym)(CHERI_REG_GPC)
 
 #endif /* _MIPS_INCLUDE_CHERIASM_H_ */

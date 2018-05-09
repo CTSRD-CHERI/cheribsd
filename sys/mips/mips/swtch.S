@@ -95,7 +95,7 @@ LEAF(fork_trampoline)
  * by the interrupt code.
  */
 	.set	noat
-	GET_CPU_PCPU_NOCAP(k1)
+	GET_CPU_PCPU(k1)
 	PTR_L	k1, PC_CURPCB(k1)
 
 #ifdef CPU_CHERI
@@ -351,7 +351,7 @@ blocked_loop:
 /*
  * Switch to new context.
  */
-	GET_CPU_PCPU_NOCAP(a3)
+	GET_CPU_PCPU(a3)
 	PTR_S	a1, PC_CURTHREAD(a3)
 	PTR_L	a2, TD_PCB(a1)
 	PTR_S	a2, PC_CURPCB(a3)
@@ -673,11 +673,7 @@ LEAF(MipsFPID)
 	cfc1	v0, MIPS_FPU_ID
 	mtc0	t1, MIPS_COP_0_STATUS		# Restore the status register.
 	ITLBNOPFIX
-#ifdef CHERI_KERNEL
-	cjr	$c17
-#else
 	j	ra
-#endif
 	nop
 	.set pop
 END(MipsFPID)
@@ -714,7 +710,7 @@ LEAF(MipsSaveCurFPState)
 	mtc0	t0, MIPS_COP_0_STATUS
 	HAZARD_DELAY
 	ITLBNOPFIX
-	GET_CPU_PCPU_NOCAP(a1)
+	GET_CPU_PCPU(a1)
 	PTR_S	zero, PC_FPCURTHREAD(a1)	# indicate state has been saved
 /*
  * First read out the status register to make sure that all FP operations
