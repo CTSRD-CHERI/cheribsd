@@ -45,12 +45,33 @@ static inline void resetStatCounters (void)
     __asm __volatile(".word (0x1F << 26) | (0x0 << 21) | (0x0 << 16) | (0x7 << 11) | (0x0 << 6) | (0x3B)");
 }
 
+#define STATCOUNTER_NAMES_MAX	128
+
+static int statcounter_names_len = 0;
+
+static struct {
+	const char	*counter_name;
+	uint64_t	(*counter_get)(void);
+} statcounter_names[STATCOUNTER_NAMES_MAX];
+
+/*
+ * XXX: The "_foo" below is inexplicably required for this to build;
+ * 	I'm refusing to dwelve into its cause, as I'm already running
+ * 	low on sanity points.
+ */
 #define DEFINE_GET_STAT_COUNTER(name,X,Y)   \
 static inline uint64_t get_##name##_count (void)   \
 {                                           \
     uint64_t ret;                           \
     __asm __volatile(".word (0x1f << 26) | (0x0 << 21) | (12 << 16) | ("#X" << 11) | ( "#Y"  << 6) | 0x3b\n\tmove %0,$12" : "=r" (ret) :: "$12"); \
     return ret;                             \
+}                                           \
+__attribute__((constructor))                \
+static void register_##name##_foo (void)    \
+{                                           \
+    statcounter_names[statcounter_names_len].counter_name = #name;		\
+    statcounter_names[statcounter_names_len].counter_get = get_##name##_count;	\
+    statcounter_names_len++;               \
 }
 
 // available modules, module type, associated rdhw primary selector
@@ -637,6 +658,42 @@ int statcounters_dump_with_args (
     if (!use_stdout)
         fclose(fp);
     return 0;
+}
+
+const char *statcounters_get_next_name (const char *name)
+{
+	int i;
+
+	if (name == NULL)
+		return (statcounter_names[0].counter_name);
+
+	for (i = 0; i < statcounter_names_len; i++) {
+		if (strcmp(statcounter_names[i].counter_name, name) == 0)
+			break;
+	}
+
+	if (i == statcounter_names_len)
+		return (NULL);
+
+	return (statcounter_names[i + 1].counter_name);
+}
+
+int statcounters_id_from_name (const char *name)
+{
+	int i;
+
+	for (i = 0; i < statcounter_names_len; i++) {
+		if (strcmp(statcounter_names[i].counter_name, name) == 0)
+			return (i);
+	}
+
+	return (-1);
+}
+
+uint64_t statcounters_sample_by_id (int id)
+{
+
+	return (statcounter_names[id].counter_get());
 }
 
 // C constructor / atexit interface
