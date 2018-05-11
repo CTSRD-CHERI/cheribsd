@@ -12,5 +12,5 @@ SHLIB_MAJOR?=	11
 # the .cap_table section we are wasting 50% of the immediate space.
 # If it pointed to the start this would not be necessary
 # TODO: would it make sense to have clc scale by cap size instead of always by 16
-STATIC_CFLAGS+=-mllvm -mxcaptable
+STATIC_CFLAGS+=-mxcaptable
 .endif
