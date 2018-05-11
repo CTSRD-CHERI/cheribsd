@@ -989,7 +989,7 @@ prof_dump_flush(bool propagate_err) {
 
 	cassert(config_prof);
 
-	err = write(prof_dump_fd, prof_dump_buf, prof_dump_buf_end);
+	err = malloc_write_fd(prof_dump_fd, prof_dump_buf, prof_dump_buf_end);
 	if (err == -1) {
 		if (!propagate_err) {
 			malloc_write("<jemalloc>: write() failed during heap "
@@ -1420,7 +1420,15 @@ prof_open_maps(const char *format, ...) {
 	va_start(ap, format);
 	malloc_vsnprintf(filename, sizeof(filename), format, ap);
 	va_end(ap);
+
+#if defined(O_CLOEXEC)
 	mfd = open(filename, O_RDONLY | O_CLOEXEC);
+#else
+	mfd = open(filename, O_RDONLY);
+	if (mfd != -1) {
+		fcntl(mfd, F_SETFD, fcntl(mfd, F_GETFD) | FD_CLOEXEC);
+	}
+#endif
 
 	return mfd;
 }
@@ -1474,8 +1482,9 @@ prof_dump_maps(bool propagate_err) {
 					goto label_return;
 				}
 			}
-			nread = read(mfd, &prof_dump_buf[prof_dump_buf_end],
-			    PROF_DUMP_BUFSIZE - prof_dump_buf_end);
+			nread = malloc_read_fd(mfd,
+			    &prof_dump_buf[prof_dump_buf_end], PROF_DUMP_BUFSIZE
+			    - prof_dump_buf_end);
 		} while (nread > 0);
 	} else {
 		ret = true;
@@ -1783,7 +1792,7 @@ prof_idump(tsdn_t *tsdn) {
 
 	cassert(config_prof);
 
-	if (!prof_booted || tsdn_null(tsdn)) {
+	if (!prof_booted || tsdn_null(tsdn) || !prof_active_get_unlocked()) {
 		return;
 	}
 	tsd = tsdn_tsd(tsdn);
@@ -1840,7 +1849,7 @@ prof_gdump(tsdn_t *tsdn) {
 
 	cassert(config_prof);
 
-	if (!prof_booted || tsdn_null(tsdn)) {
+	if (!prof_booted || tsdn_null(tsdn) || !prof_active_get_unlocked()) {
 		return;
 	}
 	tsd = tsdn_tsd(tsdn);
