@@ -104,4 +104,8 @@ int statcounters_dump_with_args (
     FILE * const fp,
     const statcounters_fmt_flag_t fmt_flg);
 
+const char *statcounters_get_next_name (const char *name);
+int statcounters_id_from_name (const char *name);
+uint64_t statcounters_sample_by_id (int id);
+
 #endif
