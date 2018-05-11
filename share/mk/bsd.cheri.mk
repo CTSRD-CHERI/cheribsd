@@ -115,7 +115,7 @@ LIBDIR:=	/usr/libcheri
 ROOTOBJDIR=	${.OBJDIR:S,${.CURDIR},,}${SRCTOP}/worldcheri${SRCTOP}
 CFLAGS+=	-ftls-model=local-exec
 .if !empty(CHERI_USE_CAP_TABLE)
-CFLAGS+=	-mllvm -cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
+CFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
 .endif
 
 .ifdef NO_WERROR
