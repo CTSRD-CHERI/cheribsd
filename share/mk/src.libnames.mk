@@ -181,6 +181,7 @@ _LIBRARIES=	\
 		smb \
 		ssl \
 		ssp_nonshared \
+		statcounters \
 		stdthreads \
 		supcplusplus \
 		svgtiny \

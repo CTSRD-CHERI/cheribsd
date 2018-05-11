@@ -151,6 +151,7 @@ LIBSMB?=	${DESTDIR}${LIBDIR}/libsmb.a
 LIBSSL?=	${DESTDIR}${LIBDIR}/libssl.a
 LIBSSP_NONSHARED?=	${DESTDIR}${LIBDIR}/libssp_nonshared.a
 LIBSTAND?=	${DESTDIR}${LIBDIR}/libstand.a
+LIBSTATCOUNTERS?=	${DESTDIR}${LIBDIR}/libstatcounters.a
 LIBSTDCPLUSPLUS?= ${DESTDIR}${LIBDIR}/libstdc++.a
 LIBSTDTHREADS?=	${DESTDIR}${LIBDIR}/libstdthreads.a
 LIBSYSCALLS?=	${DESTDIR}${LIBDIR}/libsyscalls.a
