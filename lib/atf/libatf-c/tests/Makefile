@@ -30,7 +30,7 @@ ATF_TESTS_C+=	${_T}
 SRCS.${_T}=	${_T}.c test_helpers.c
 .endfor
 
-.if ${CC} == "cc
+.if ${CC} == "cc" && !defined(LIBCHERI)
 # These tests are broken when using a cross toolchain (they embed ${CC}
 # and try to compile with it).
 .for _T in	atf_c_test \
