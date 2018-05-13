@@ -720,11 +720,10 @@ LEAF(casueword32_c)
 	PTR_L	v1, PC_CURPCB(v1)
 	PTR_S	v0, U_PCB_ONFAULT(v1)
 1:
-	move	t0, a2
 	cllw	t1, $c3			# load word
 	bne	a0, t1, 2f
 	nop
-	cscw	t0, zero, $c3		# store word
+	cscw	t0, a2, $c3		# store word
 	beqz	t0, 1b
 	nop
 	j	3f
@@ -747,11 +746,10 @@ XLEAF(casueword_c)
 	PTR_L	v1, PC_CURPCB(v1)
 	PTR_S	v0, U_PCB_ONFAULT(v1)
 1:
-	move	t0, a2
 	clld	t1, $c3			# load double word
 	bne	a0, t1, 2f
 	nop
-	cscd	t0, zero, $c3		# store double word
+	cscd	t0, a2, $c3		# store double word
 	beqz	t0, 1b
 	nop
 	j	3f
