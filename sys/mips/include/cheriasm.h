@@ -126,10 +126,8 @@
 	beq	reg, $0, 64f;						\
 	nop;								\
 	/* Save user $ddc; install kernel $ddc. */			\
-	CHERI_ASM_CMOVE(CHERI_REG_SEC0, CHERI_REG_C0);			\
-	CHERI_ASM_CMOVE(CHERI_REG_C0, CHERI_REG_KDC);			\
-	/* cgetdefault	CHERI_REG_SEC0; */				\
-	/* csetdefault	CHERI_REG_KDC; */				\
+	cgetdefault	CHERI_REG_SEC0;					\
+	csetdefault	CHERI_REG_KDC;					\
 64:
 
 /*
@@ -152,8 +150,7 @@
 	nop;								\
 	b	66f;							\
 	/* If returning to userspace, restore saved user $ddc. */	\
-	CHERI_ASM_CMOVE(CHERI_REG_C0, CHERI_REG_SEC0); /* Branch-delay. */ \
-	/* csetdefault	CHERI_REG_SEC0; */	/* Branch-delay. */	\
+	csetdefault	CHERI_REG_SEC0; 	/* Branch-delay. */	\
 65:									\
 	/* If returning to kernelspace, reinstall kernel code $pcc. */	\
 	/*								\
@@ -161,9 +158,11 @@
 	 * adjust $epcc.offset, which will overwrite an earlier $epc	\
 	 * assignment.							\
 	 */								\
-	CHERI_ASM_CMOVE(CHERI_REG_EPCC, CHERI_REG_KCC);			\
 	MFC0	reg, MIPS_COP_0_EXC_PC;					\
-	csetoffset	CHERI_REG_EPCC, CHERI_REG_EPCC, reg;		\
+	CGetKCC		CHERI_REG_KR1C;					\
+	CSetOffset	CHERI_REG_KR1C, CHERI_REG_KR1C, reg;		\
+	CSetEPCC	CHERI_REG_KR1C;					\
+	CGetNull	CHERI_REG_KR1C; /* Clear KR1C before return */	\
 66:
 
 /*
@@ -204,7 +203,9 @@
 	SAVE_U_PCB_CREG(CHERI_REG_C24, C24, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C25, C25, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C26, IDC, pcb);			\
-	SAVE_U_PCB_CREG(CHERI_REG_EPCC, PCC, pcb);			\
+	/* EPCC is no longer a GPR so load it into KR1C first */	\
+	CGetEPCC	CHERI_REG_KR1C;					\
+	SAVE_U_PCB_CREG(CHERI_REG_KR1C, IDC, pcb);			\
 	cgetcause	treg;						\
 	SAVE_U_PCB_REG(treg, CAPCAUSE, pcb)
 
@@ -236,7 +237,9 @@
 	RESTORE_U_PCB_CREG(CHERI_REG_C24, C24, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C25, C25, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C26, IDC, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_EPCC, PCC, pcb);			\
+	/* EPCC is no longer a GPR so load it into KR1C first */	\
+	RESTORE_U_PCB_CREG(CHERI_REG_KR1C, PCC, pcb);			\
+	CSetEPCC	CHERI_REG_KR1C;					\
 	RESTORE_U_PCB_REG(treg, CAPCAUSE, pcb);				\
 	csetcause	treg
 

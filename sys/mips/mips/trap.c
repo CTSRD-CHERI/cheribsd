@@ -1008,26 +1008,17 @@ dofault:
 #ifdef CPU_CHERI
 
 			/*
-			 * XXXRW: We really need a cfuword(), and also to use
-			 * a frame-extracted EPCC rather than the live one, as
-			 * we may have taken a further exception if interrupts
-			 * are enabled.  However, this helps with debugging in
-			 * the mean time.
-			 *
-			 * XXXRW: Especially, we need to be prepared for the
+			 * XXXRW: Wwe need to be prepared for the
 			 * possibility that $pcc ($epcc) is not readable or
 			 * unaligned.
-			 *
-			 * XXXRW: Should just use the CP0 'faulting
-			 * instruction' register available in CHERI.
-			 *
-			 * XXXRW: As interrupts have been enabled at this
-			 * point, EPCC may not be the faulting one we would
-			 * like -- e.g., it could be for a kernel TLB miss.
-			 * We should be loading CTEMP0 from the saved EPCC
-			 * from the trap frame instead.
 			 */
-			CHERI_CLW(inst.word, 0, 0, CHERI_CR_EPCC);
+			if (fueword32_c(trapframe->pcc, &inst.word) != 0) {
+				printf("Reserved inst trap: Failed to fetch "
+				    "bad inst from epcc: ");
+				CHERI_PRINT_PTR(trapframe->pcc);
+				/* Ensure none of the switch cases match */
+				inst.word = 0;
+			}
 #else
 			inst = *(InstFmt *)(intptr_t)trapframe->pc;
 #endif
