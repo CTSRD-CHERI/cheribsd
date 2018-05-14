@@ -782,6 +782,7 @@ _C_LABEL(x):
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	_JB_CHERI_DDC	15
 #endif
+#define _JB_CHERI_OFFSET(gpr) ((_JB_CHERI_START * SZREG) + _JB_CHERI_##gpr * _MIPS_SZCAP/8)
 #endif
 
 /*
