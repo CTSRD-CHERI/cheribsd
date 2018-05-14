@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet6.h"
 #include "opt_ktrace.h"
 #include "opt_posix.h"
+#include "opt_capsicum.h"
 
 #include <sys/param.h>
 #include <sys/bus.h>
