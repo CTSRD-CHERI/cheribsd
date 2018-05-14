@@ -55,6 +55,10 @@
 #include <string.h>
 #include <unistd.h>
 
+#ifdef WITH_LIBSTATCOUNTERS
+#include <statcounters.h>
+#endif
+
 /*
  * Enable by default; comment out to measure the overhead.
  */
@@ -63,7 +67,15 @@
 static struct timespec ts_start, ts_end;
 static int alarm_timeout;
 #ifdef RAW
-static int *raw_numbers = NULL;
+#define	RAW_LEN_MAX	10
+static int raw_len = 1; /* 1, the time is always measured */
+#ifdef WITH_LIBSTATCOUNTERS
+static int raw_ids[RAW_LEN_MAX]; /* Array of counter ids */
+static uint64_t raw_prevs[RAW_LEN_MAX]; /* Array of last values for each counter */
+#endif
+static int *raw_numbers = NULL; /* Array of deltas between last and current */
+#define	RAW_NUMBER(iteration, counter)	raw_numbers[iteration * raw_len + counter]
+#define	RAW_PREV(counter)		raw_prevs[counter]
 #endif
 #ifdef __CHERI__
 static volatile int trace;
@@ -126,6 +138,10 @@ benchmark_iteration(int i)
 {
 	static struct timespec ts_prev;
 	struct timespec ts_diff, ts_now;
+#ifdef WITH_LIBSTATCOUNTERS
+	uint64_t val;
+	int j;
+#endif
 	int error;
 
 	if (raw_numbers == NULL)
@@ -138,16 +154,32 @@ benchmark_iteration(int i)
 	error = clock_gettime(CLOCK_REALTIME, &ts_now);
 	assert(error == 0);
 
-	if (i > 0) {
-		ts_diff = ts_now;
-		timespecsub(&ts_diff, &ts_prev);
-		assert(ts_diff.tv_sec == 0);
-		raw_numbers[i] = ts_diff.tv_nsec;
-	} else {
-		raw_numbers[i] = 0;
+	if (i == 0) {
+		ts_prev = ts_now;
+#ifdef WITH_LIBSTATCOUNTERS
+		for (j = 1; j < raw_len; j++)
+			RAW_PREV(j) = statcounters_sample_by_id(raw_ids[j]);
+#endif
+		return;
 	}
 
+	/*
+	 * 0 is a special case, it's always the time.
+	 */
+	ts_diff = ts_now;
+	timespecsub(&ts_diff, &ts_prev);
+	assert(ts_diff.tv_sec == 0);
+	RAW_NUMBER(i, 0) = ts_diff.tv_nsec;
 	ts_prev = ts_now;
+
+#ifdef WITH_LIBSTATCOUNTERS
+	for (j = 1; j < raw_len; j++) {
+		val = statcounters_sample_by_id(raw_ids[j]);
+		assert(val >= RAW_PREV(j));
+		RAW_NUMBER(i, j) = val - RAW_PREV(j);
+		RAW_PREV(j) = val;
+	}
+#endif
 }
 #else /* !RAW */
 #define benchmark_iteration(X)	42
@@ -986,12 +1018,22 @@ static const int tests_count = sizeof(tests) / sizeof(tests[0]);
 static void
 usage(void)
 {
+#ifdef WITH_LIBSTATCOUNTERS
+	const char *name;
+#endif
 	int i;
 
-	fprintf(stderr, "syscall_timing [-i iterations] [-l loops] "
+	fprintf(stderr, "syscall_timing [-c counter,...] [-i iterations] [-l loops] "
 	    "[-p path] [-r path] [-s seconds] [-t] test\n");
+	fprintf(stderr, "Available tests:\n");
 	for (i = 0; i < tests_count; i++)
 		fprintf(stderr, "  %s\n", tests[i].t_name);
+#ifdef WITH_LIBSTATCOUNTERS
+	name = NULL;
+	fprintf(stderr, "Available counters, to use with -c:\n");
+	while ((name = statcounters_get_next_name(name)) != NULL)
+		fprintf(stderr, "  %s\n", name);
+#endif
 	exit(-1);
 }
 
@@ -1025,8 +1067,20 @@ main(int argc, char *argv[])
 	raw_path = NULL;
 #endif
 	tmp_path = NULL;
-	while ((ch = getopt(argc, argv, "i:l:n:p:r:s:t")) != -1) {
+	while ((ch = getopt(argc, argv, "c:i:l:n:p:r:s:t")) != -1) {
 		switch (ch) {
+		case 'c':
+#ifndef WITH_LIBSTATCOUNTERS
+			errx(1, "compiled without WITH_LIBSTATCOUNTERS");
+#else
+			if (raw_len >= RAW_LEN_MAX)
+				errx(1, "must specify at most %d counters", RAW_LEN_MAX);
+			raw_ids[raw_len] = statcounters_id_from_name(optarg);
+			if (raw_ids[raw_len] < 0)
+				errx(1, "invalid counter name, see usage for list");
+			raw_len++;
+#endif
+			break;
 		case 'i':
 			ll = strtol(optarg, &endp, 10);
 			if (*endp != 0 || ll < 1)
@@ -1084,6 +1138,10 @@ main(int argc, char *argv[])
 	if (raw_path != NULL && iterations <= 0)
 		errx(1, "-r must be followed by -i");
 #endif
+#ifdef WITH_LIBSTATCOUNTERS
+	if (raw_len > 1 && raw_path == NULL)
+		errx(1, "-c must be followed by -r");
+#endif
 	if (iterations < 1 && alarm_timeout < 1)
 		usage();
 	if (iterations < 1)
@@ -1127,7 +1185,7 @@ main(int argc, char *argv[])
 		if (raw_fp == NULL)
 			err(1, "%s", raw_path);
 
-		raw_numbers = calloc(iterations, sizeof(raw_numbers[0]));
+		raw_numbers = calloc(iterations + 1, sizeof(raw_numbers[0]) * raw_len);
 		if (raw_numbers == NULL)
 			err(1, "calloc");
 	}
@@ -1192,8 +1250,12 @@ main(int argc, char *argv[])
 
 #ifdef RAW
 	if (raw_fp != NULL) {
-		for (i = 1; i < iterations + 1; i++)
-			fprintf(raw_fp, "%d\n", raw_numbers[i]);
+		for (i = 1; i < iterations + 1; i++) {
+			for (j = 0; j < raw_len; j++) {
+				fprintf(raw_fp, "%d%s", RAW_NUMBER(i, j),
+				    j == raw_len - 1 ? "\n" : "\t");
+			}
+		}
 		error = fclose(raw_fp);
 		if (error != 0)
 			warn("%s", raw_path);
