@@ -155,6 +155,7 @@ CRUNCH_PROGS_sbin+= dhclient \
 		sysctl \
 		umount
 CRUNCH_ALIAS_md5=	sha256
+CRUNCH_ALIAS_shutdown= poweroff
 
 # TODO: add init once the image works fine:
 # CRUNCH_PROGS_sbin+= init
