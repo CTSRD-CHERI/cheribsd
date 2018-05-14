@@ -665,9 +665,9 @@ LEAF(fuecap_c)
 	GET_CPU_PCPU(v1)
 	PTR_L	v1, PC_CURPCB(v1)
 	PTR_S	v0, U_PCB_ONFAULT(v1)
-	clw	v0, zero, 0($c3)	# fetch capability
+	clc	$c3, zero, 0($c3)	# fetch capability
 	PTR_S	zero, U_PCB_ONFAULT(v1)
-	csc	v0, zero, 0($c4)	# store capability
+	csc	$c3, zero, 0($c4)	# store capability
 	j	ra
 	li	v0, 0
 END(fuecap_c)
