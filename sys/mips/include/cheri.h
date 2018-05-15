@@ -740,26 +740,6 @@ void cheri_trace_log(void *buf, size_t len, int format);
 #define CHERI_TRACE_MEM(buf, len)					\
 	cheri_trace_log((buf), (len), 1);
 
-#define	CHERI_CAP_PRINT(crn) do {					\
-	uintmax_t c_perms, c_otype, c_base, c_length, c_offset;		\
-	u_int ctag, c_sealed;						\
-									\
-	CHERI_CGETTAG(ctag, (crn));					\
-	CHERI_CGETSEALED(c_sealed, (crn));				\
-	CHERI_CGETPERM(c_perms, (crn));					\
-	CHERI_CGETTYPE(c_otype, (crn));					\
-	CHERI_CGETBASE(c_base, (crn));					\
-	CHERI_CGETLEN(c_length, (crn));					\
-	CHERI_CGETOFFSET(c_offset, (crn));				\
-	printf("v:%u s:%u p:%08jx b:%016jx l:%016jx o:%jx t:%s%jx\n",	\
-	    ctag, c_sealed, c_perms, c_base, c_length, c_offset,	\
-	    (c_otype == - 1 ? "-" : ""), (c_otype == -1 ? 1 : c_otype));\
-} while (0)
-
-#define	CHERI_REG_PRINT(crn, num) do {					\
-	printf("$c%02u: ", num);					\
-	CHERI_CAP_PRINT(crn);						\
-} while (0)
 #endif /* !_KERNEL */
 
 #endif /* _MIPS_INCLUDE_CHERI_H_ */
