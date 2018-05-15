@@ -38,12 +38,13 @@
 #ifndef _SYS_SYSTM_H_
 #define	_SYS_SYSTM_H_
 
-#include <machine/atomic.h>
-#include <machine/cpufunc.h>
 #include <sys/callout.h>
-#include <sys/cdefs.h>
 #include <sys/queue.h>
 #include <sys/stdint.h>		/* for people using printf mainly */
+
+#include <machine/atomic.h>
+#include <machine/cpufunc.h>
+#include <machine/pcb.h>
 
 __NULLABILITY_PRAGMA_PUSH
 
@@ -133,6 +134,40 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
 	__predict_false((td)->td_stopsched);				\
 })
 #define	SCHEDULER_STOPPED() SCHEDULER_STOPPED_TD(curthread)
+
+/*
+ * Macros to create userspace capabilities from virtual addresses.
+ * Addresses are assumed to be relative to the current userspace
+ * thread's address space and are created from the DDC or PCC of
+ * the current PCB.
+ */
+#if __has_feature(capabilities)
+#define	__USER_CAP_UNBOUND(ptr)						\
+    ((ptr) == NULL ? NULL :						\
+	__builtin_cheri_offset_set(curthread->td_pcb->pcb_regs.ddc,	\
+	(vaddr_t)(ptr)))
+
+#define	__USER_CODE_CAP(ptr)						\
+    ((ptr) == NULL ? NULL :						\
+	__builtin_cheri_offset_set(curthread->td_pcb->pcb_regs.pcc,	\
+	(vaddr_t)(ptr)))
+
+#else /* !has_feature(capabilities) */
+#define	__USER_CAP_UNBOUND(ptr)	(ptr)
+#define	__USER_CODE_CAP(ptr)	(ptr)
+#endif /* !has_feature(capabilities) */
+
+#define	__USER_CAP(ptr, len)	__USER_CAP_UNBOUND(ptr)
+#define	__USER_CAP_ADDR(ptr)	__USER_CAP_UNBOUND(ptr)
+#define	__USER_CAP_ARRAY(objp, cnt) \
+     __USER_CAP((objp), sizeof(*(objp)) * (cnt))
+#define	__USER_CAP_OBJ(objp)	__USER_CAP((objp), sizeof(*(objp)))
+/*
+ * NOTE: we can't place tigher bounds because we don't know what the
+ * length is until after we use it.
+ * XXX: We should probably have a __USER_CAP_PATH() with a MAXPATH limit.
+ */
+#define	__USER_CAP_STR(strp)	__USER_CAP_UNBOUND(strp)
 
 /*
  * Align variables.

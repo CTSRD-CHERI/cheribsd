@@ -667,46 +667,6 @@
 #define	__DEQUALIFY_CAP		__DEQUALIFY
 #endif
 
-#ifndef __USER_CAP_UNBOUND
-#if __has_feature(capabilities)
-/*
- * XXX-BD: should look up ddc and derive.
- */
-#define	__USER_CAP_UNBOUND(ptr)	\
-    ((__cheri_tocap void * __capability)(ptr))
-#else
-#define	__USER_CAP_UNBOUND(ptr)	(ptr)
-#endif
-#endif
-
-#ifndef __USER_CAP
-#define	__USER_CAP(ptr, len)	__USER_CAP_UNBOUND(ptr)
-#endif
-#ifndef __USER_CAP_ADDR
-#define	__USER_CAP_ADDR(ptr)	__USER_CAP_UNBOUND(ptr)
-#endif
-#ifndef __USER_CAP_ARRAY
-#define	__USER_CAP_ARRAY(objp, cnt) \
-     __USER_CAP((objp), sizeof(*(objp)) * (cnt))
-#endif
-#ifndef __USER_CAP_OBJ
-#define	__USER_CAP_OBJ(objp)	__USER_CAP((objp), sizeof(*(objp)))
-#endif
-#ifndef __USER_CAP_STR
-/*
- * NOTE: we can't place tigher bounds because we don't know what the
- * length is until after we use it.
- */
-#define	__USER_CAP_STR(strp)	__USER_CAP_UNBOUND(strp)
-#endif
-
-#ifndef __USER_CODE_CAP
-/*
- * XXX-BD: should derive from pcc
- */
-#define	__USER_CODE_CAP(ptr)	__USER_CAP_UNBOUND(ptr)
-#endif
-
 #ifndef __CAP_CHECK
 #if __has_feature(capabilities)
 #define __CAP_CHECK(cap, len) ({					\
