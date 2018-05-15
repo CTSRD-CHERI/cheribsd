@@ -31,6 +31,8 @@
 
 #ifndef _LOCORE
 #include <machine/param.h>
+#include <machine/cherireg.h>
+#include <cheri/cheric.h>
 
 #if defined(__mips_n64) || defined(__mips_n32) /*  PHYSADDR_64_BIT */
 typedef	uint64_t pt_entry_t;
@@ -40,18 +42,31 @@ typedef	uint32_t pt_entry_t;
 
 #if defined(_KERNEL) && (defined(CHERI_KERNEL) || !defined(__CHERI_PURE_CAPABILITY__))
 /*
- * XXX-AM: The pointer to the second-level page table entry can (and should) be a capability
+ * The pointer to the second-level page table entry can is a capability
  * in the purecap kernel.
  */
 typedef	pt_entry_t *pd_entry_t;
+
+/*
+ * Create a CHERI bounded pointer to a page table page.
+ */
+static __inline pd_entry_t
+pde_page_bound(vm_ptr_t ptr)
+{
+	pd_entry_t pde = cheri_csetbounds((pd_entry_t)ptr, PAGE_SIZE);
+	return cheri_andperm(pde, (CHERI_PERM_LOAD | CHERI_PERM_STORE |
+	    CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP |
+	    CHERI_PERM_STORE_LOCAL_CAP));
+}
 #else
 /*
  * XXX: used in the kernel to set VM system paramaters.  Only used for
  * the parameter macros (which use its size) in usespace.
  */
 typedef uint64_t pd_entry_t;
+#define pde_page_bound(ptr) (pd_entry_t)(ptr)
 #endif
-#endif
+#endif /* ! _LOCORE */
 
 /*
  * TLB and PTE management.  Most things operate within the context of

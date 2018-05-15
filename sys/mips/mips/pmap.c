@@ -475,11 +475,11 @@ pmap_create_kernel_pagetable(void)
 
 #ifdef __mips_n64
 	for (i = 0,  npt = nkpt; npt > 0; i++) {
-		kernel_segmap[i] = (pd_entry_t)(pdaddr + i * PAGE_SIZE);
+		kernel_segmap[i] = pde_page_bound(pdaddr + i * PAGE_SIZE);
 		pde = (pd_entry_t *)kernel_segmap[i];
 
 		for (j = 0; j < NPDEPG && npt > 0; j++, npt--)
-			pde[j] = (pd_entry_t)(ptaddr + (i * NPDEPG + j) * PAGE_SIZE);
+			pde[j] = pde_page_bound(ptaddr + (i * NPDEPG + j) * PAGE_SIZE);
 	}
 #else
 	for (i = 0, j = pmap_seg_index(VM_MIN_KERNEL_ADDRESS); i < nkpt; i++, j++)
@@ -1196,7 +1196,7 @@ _pmap_allocpte(pmap_t pmap, unsigned ptepindex, u_int flags)
 
 #ifdef __mips_n64
 	if (ptepindex >= NUPDE) {
-		pmap->pm_segtab[ptepindex - NUPDE] = (pd_entry_t)pageva;
+		pmap->pm_segtab[ptepindex - NUPDE] = pde_page_bound(pageva);
 	} else {
 		pd_entry_t *pdep, *pde;
 		int segindex = ptepindex >> (SEGSHIFT - PDRSHIFT);
@@ -1220,7 +1220,7 @@ _pmap_allocpte(pmap_t pmap, unsigned ptepindex, u_int flags)
 		}
 		/* Next level entry */
 		pde = (pd_entry_t *)*pdep;
-		pde[pdeindex] = (pd_entry_t)pageva;
+		pde[pdeindex] = pde_page_bound(pageva);
 	}
 #else
 	pmap->pm_segtab[ptepindex] = (pd_entry_t)pageva;
