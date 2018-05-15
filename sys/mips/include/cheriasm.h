@@ -205,7 +205,7 @@
 	SAVE_U_PCB_CREG(CHERI_REG_C26, IDC, pcb);			\
 	/* EPCC is no longer a GPR so load it into KR1C first */	\
 	CGetEPCC	CHERI_REG_KR1C;					\
-	SAVE_U_PCB_CREG(CHERI_REG_KR1C, IDC, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_KR1C, PCC, pcb);			\
 	cgetcause	treg;						\
 	SAVE_U_PCB_REG(treg, CAPCAUSE, pcb)
 
