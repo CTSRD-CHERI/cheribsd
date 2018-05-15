@@ -238,6 +238,7 @@ test_fault_read_kdc(const struct cheri_test *ctp __unused)
 void
 test_fault_read_epcc(const struct cheri_test *ctp __unused)
 {
-
-	CHERI_CAPREG_PRINT(31);
+	__capability void *epcc;
+	epcc = __builtin_mips_cheri_exception_program_counter_cap_get();
+	CHERI_CAP_PRINT(epcc);
 }
