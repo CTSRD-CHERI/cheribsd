@@ -82,7 +82,7 @@
 	test_bounds_##test(const struct cheri_test *ctp __unused)	\
 	{								\
 		__capability void *allocation =				\
-		    (__capability void *)&test;				\
+		    (__cheri_tocap void * __capability )&test;		\
 		size_t allocation_offset = cheri_getoffset(allocation);	\
 		size_t allocation_len = cheri_getlen(allocation);	\
 		size_t pointer_offset = cheri_getoffset(test##p);	\
@@ -121,46 +121,46 @@
 static uint8_t			 global_static_uint8;
 extern __capability void	*global_static_uint8p;
 __capability void		*global_static_uint8p =
-		    (__capability void *)&global_static_uint8;
+		    (__cheri_tocap void * __capability)&global_static_uint8;
 
 extern uint8_t			 global_uint8;
 uint8_t				 global_uint8;
 extern __capability void	*global_uint8p;
 __capability void		*global_uint8p =
-		    (__capability void *)&global_uint8;
+		    (__cheri_tocap void * __capability)&global_uint8;
 
 static uint16_t			 global_static_uint16;
 extern __capability void	*global_static_uint16p;
 __capability void		*global_static_uint16p =
-		    (__capability void *)&global_static_uint16;
+		    (__cheri_tocap void * __capability)&global_static_uint16;
 
 extern uint16_t			 global_uint16;
 uint16_t			 global_uint16;
 extern __capability void	*global_uint16p;
 __capability void		*global_uint16p =
-		    (__capability void *)&global_uint16;
+		    (__cheri_tocap void * __capability)&global_uint16;
 
 static uint32_t			 global_static_uint32;
 extern __capability void	*global_static_uint32p;
 __capability void		*global_static_uint32p =
-		    (__capability void *)&global_static_uint32;
+		    (__cheri_tocap void * __capability)&global_static_uint32;
 
 extern uint32_t			 global_uint32;
 uint32_t			 global_uint32;
 extern __capability void	*global_uint32p;
 __capability void		*global_uint32p =
-		    (__capability void *)&global_uint32;
+		    (__cheri_tocap void * __capability)&global_uint32;
 
 static uint64_t	 global_static_uint64;
 extern __capability void	*global_static_uint64p;
 __capability void		*global_static_uint64p =
-		    (__capability void *)&global_static_uint64;
+		    (__cheri_tocap void * __capability)&global_static_uint64;
 
 extern uint64_t			 global_uint64;
 uint64_t			 global_uint64;
 extern __capability void	*global_uint64p;
 __capability void		*global_uint64p =
-		    (__capability void *)&global_uint64;
+		    (__cheri_tocap void * __capability)&global_uint64;
 
 TEST_BOUNDS(global_static_uint8);
 TEST_BOUNDS(global_uint8);
@@ -177,46 +177,46 @@ TEST_BOUNDS(global_uint64);
 static uint8_t			 global_static_uint8_array1[1];
 extern __capability void	*global_static_uint8_array1p;
 __capability void		*global_static_uint8_array1p =
-		    (__capability void *)&global_static_uint8_array1;
+		    (__cheri_tocap void * __capability)&global_static_uint8_array1;
 
 extern uint8_t			 global_uint8_array1[1];
 uint8_t				 global_uint8_array1[1];
 extern __capability void	*global_uint8_array1p;
 __capability void		*global_uint8_array1p =
-		    (__capability void *)&global_uint8_array1;
+		    (__cheri_tocap void * __capability)&global_uint8_array1;
 
 static uint8_t			 global_static_uint8_array3[3];
 extern __capability void	*global_static_uint8_array3p;
 __capability void		*global_static_uint8_array3p =
-		    (__capability void *)&global_static_uint8_array3;
+		    (__cheri_tocap void * __capability)&global_static_uint8_array3;
 
 extern uint8_t			 global_uint8_array3[3];
 uint8_t				 global_uint8_array3[3];
 extern __capability void	*global_uint8_array3p;
 __capability void		*global_uint8_array3p =
-		    (__capability void *)&global_uint8_array3;
+		    (__cheri_tocap void * __capability)&global_uint8_array3;
 
 static uint8_t			 global_static_uint8_array17[17];
 extern __capability void	*global_static_uint8_array17p;
 __capability void		*global_static_uint8_array17p =
-		    (__capability void *)&global_static_uint8_array17;
+		    (__cheri_tocap void * __capability)&global_static_uint8_array17;
 
 extern uint8_t			 global_uint8_array17[17];
 uint8_t				 global_uint8_array17[17];
 extern __capability void	*global_uint8_array17p;
 __capability void		*global_uint8_array17p =
-		    (__capability void *)&global_uint8_array17;
+		    (__cheri_tocap void * __capability)&global_uint8_array17;
 
 static uint8_t			 global_static_uint8_array65537[65537];
 extern __capability void	*global_static_uint8_array65537p;
 __capability void		*global_static_uint8_array65537p =
-		    (__capability void *)&global_static_uint8_array65537;
+		    (__cheri_tocap void * __capability)&global_static_uint8_array65537;
 
 extern uint8_t			 global_uint8_array65537[65537];
 uint8_t				 global_uint8_array65537[65537];
 extern __capability void	*global_uint8_array65537p;
 __capability void		*global_uint8_array65537p =
-		    (__capability void *)&global_uint8_array65537;
+		    (__cheri_tocap void * __capability)&global_uint8_array65537;
 
 TEST_BOUNDS(global_static_uint8_array1);
 TEST_BOUNDS(global_uint8_array1);
@@ -233,134 +233,134 @@ TEST_BOUNDS(global_uint8_array65537);
 static uint8_t			 global_static_uint8_array32[32];
 extern __capability void	*global_static_uint8_array32p;
 __capability void		*global_static_uint8_array32p =
-		    (__capability void *)&global_static_uint8_array32;
+		    (__cheri_tocap void * __capability)&global_static_uint8_array32;
 
 extern uint8_t			 global_uint8_array32[32];
 uint8_t		 		 global_uint8_array32[32];
 extern __capability void	*global_uint8_array32p;
 __capability void		*global_uint8_array32p =
-		    (__capability void *)&global_uint8_array32;
+		    (__cheri_tocap void * __capability)&global_uint8_array32;
 
 static uint8_t	 global_static_uint8_array64[64];
 extern __capability void	*global_static_uint8_array64p;
 __capability void		*global_static_uint8_array64p =
-		    (__capability void *)&global_static_uint8_array64;
+		    (__cheri_tocap void * __capability)&global_static_uint8_array64;
 
 extern uint8_t			 global_uint8_array64[64];
 uint8_t				 global_uint8_array64[64];
 extern __capability void	*global_uint8_array64p;
 __capability void		*global_uint8_array64p =
-		    (__capability void *)&global_uint8_array64;
+		    (__cheri_tocap void * __capability)&global_uint8_array64;
 
 static uint8_t			 global_static_uint8_array128[128];
 extern __capability void	*global_static_uint8_array128p;
 __capability void		*global_static_uint8_array128p =
-		    (__capability void *)&global_static_uint8_array128;
+		    (__cheri_tocap void * __capability)&global_static_uint8_array128;
 
 extern uint8_t			 global_uint8_array128[128];
 uint8_t				 global_uint8_array128[128];
 extern __capability void	*global_uint8_array128p;
 __capability void		*global_uint8_array128p =
-		    (__capability void *)&global_uint8_array128;
+		    (__cheri_tocap void * __capability)&global_uint8_array128;
 
 static uint8_t			 global_static_uint8_array256[256];
 extern __capability void	*global_static_uint8_array256p;
 __capability void		*global_static_uint8_array256p =
-		    (__capability void *)&global_static_uint8_array256;
+		    (__cheri_tocap void * __capability)&global_static_uint8_array256;
 
 extern uint8_t			 global_uint8_array256[256];
 uint8_t				 global_uint8_array256[256];
 extern __capability void	*global_uint8_array256p;
 __capability void		*global_uint8_array256p =
-		    (__capability void *)&global_uint8_array256;
+		    (__cheri_tocap void * __capability)&global_uint8_array256;
 
 static uint8_t			 global_static_uint8_array512[512];
 extern __capability void	*global_static_uint8_array512p;
 __capability void		*global_static_uint8_array512p =
-		    (__capability void *)&global_static_uint8_array512;
+		    (__cheri_tocap void * __capability)&global_static_uint8_array512;
 
 extern uint8_t			 global_uint8_array512[512];
 uint8_t				 global_uint8_array512[512];
 extern __capability void	*global_uint8_array512p;
 __capability void		*global_uint8_array512p =
-		    (__capability void *)&global_uint8_array512;
+		    (__cheri_tocap void * __capability)&global_uint8_array512;
 
 static uint8_t			 global_static_uint8_array1024[1024];
 extern __capability void	*global_static_uint8_array1024p;
 __capability void		*global_static_uint8_array1024p =
-		    (__capability void *)&global_static_uint8_array1024;
+		    (__cheri_tocap void * __capability)&global_static_uint8_array1024;
 
 extern uint8_t			 global_uint8_array1024[1024];
 uint8_t				 global_uint8_array1024[1024];
 extern __capability void	*global_uint8_array1024p;
 __capability void		*global_uint8_array1024p =
-		    (__capability void *)&global_uint8_array1024;
+		    (__cheri_tocap void * __capability)&global_uint8_array1024;
 
 static uint8_t			 global_static_uint8_array2048[2048];
 extern __capability void	*global_static_uint8_array2048p;
 __capability void		*global_static_uint8_array2048p =
-		    (__capability void *)&global_static_uint8_array2048;
+		    (__cheri_tocap void * __capability)&global_static_uint8_array2048;
 
 extern uint8_t			 global_uint8_array2048[2048];
 uint8_t				 global_uint8_array2048[2048];
 extern __capability void	*global_uint8_array2048p;
 __capability void		*global_uint8_array2048p =
-		    (__capability void *)&global_uint8_array2048;
+		    (__cheri_tocap void * __capability)&global_uint8_array2048;
 
 static uint8_t			 global_static_uint8_array4096[4096];
 extern __capability void	*global_static_uint8_array4096p;
 __capability void		*global_static_uint8_array4096p =
-		    (__capability void *)&global_static_uint8_array4096;
+		    (__cheri_tocap void * __capability)&global_static_uint8_array4096;
 
 extern uint8_t			 global_uint8_array4096[4096];
 uint8_t				 global_uint8_array4096[4096];
 extern __capability void	*global_uint8_array4096p;
 __capability void		*global_uint8_array4096p =
-		    (__capability void *)&global_uint8_array4096;
+		    (__cheri_tocap void * __capability)&global_uint8_array4096;
 
 static uint8_t			 global_static_uint8_array8192[8192];
 extern __capability void	*global_static_uint8_array8192p;
 __capability void		*global_static_uint8_array8192p =
-		    (__capability void *)&global_static_uint8_array8192;
+		    (__cheri_tocap void * __capability)&global_static_uint8_array8192;
 
 extern uint8_t			 global_uint8_array8192[8192];
 uint8_t				 global_uint8_array8192[8192];
 extern __capability void	*global_uint8_array8192p;
 __capability void		*global_uint8_array8192p =
-		    (__capability void *)&global_uint8_array8192;
+		    (__cheri_tocap void * __capability)&global_uint8_array8192;
 
 static uint8_t			 global_static_uint8_array16384[16384];
 extern __capability void	*global_static_uint8_array16384p;
 __capability void		*global_static_uint8_array16384p =
-		    (__capability void *)&global_static_uint8_array16384;
+		    (__cheri_tocap void * __capability)&global_static_uint8_array16384;
 
 extern uint8_t			 global_uint8_array16384[16384];
 uint8_t				 global_uint8_array16384[16384];
 extern __capability void	*global_uint8_array16384p;
 __capability void		*global_uint8_array16384p =
-		    (__capability void *)&global_uint8_array16384;
+		    (__cheri_tocap void * __capability)&global_uint8_array16384;
 
 static uint8_t			 global_static_uint8_array32768[32768];
 extern __capability void	*global_static_uint8_array32768p;
 __capability void		*global_static_uint8_array32768p =
-		    (__capability void *)&global_static_uint8_array32768;
+		    (__cheri_tocap void * __capability)&global_static_uint8_array32768;
 
 extern uint8_t			 global_uint8_array32768[32768];
 uint8_t				 global_uint8_array32768[32768];
 extern __capability void	*global_uint8_array32768p;
 __capability void		*global_uint8_array32768p =
-		    (__capability void *)&global_uint8_array32768;
+		    (__cheri_tocap void * __capability)&global_uint8_array32768;
 
 static uint8_t			 global_static_uint8_array65536[65536];
 extern __capability void	*global_static_uint8_array65536p;
 __capability void		*global_static_uint8_array65536p =
-		    (__capability void *)&global_static_uint8_array65536;
+		    (__cheri_tocap void * __capability)&global_static_uint8_array65536;
 
 extern uint8_t			 global_uint8_array65536[65536];
 uint8_t				 global_uint8_array65536[65536];
 extern __capability void	*global_uint8_array65536p;
 __capability void		*global_uint8_array65536p =
-		    (__capability void *)&global_uint8_array65536;
+		    (__cheri_tocap void * __capability)&global_uint8_array65536;
 
 TEST_BOUNDS(global_static_uint8_array32);
 TEST_BOUNDS(global_uint8_array32);
@@ -397,61 +397,61 @@ TEST_BOUNDS(global_uint8_array65536);
 extern uint8_t			 extern_global_uint8;
 extern __capability void	*extern_global_uint8p;
 __capability void		*extern_global_uint8p =
-		    (__capability void *)&extern_global_uint8;
+		    (__cheri_tocap void * __capability)&extern_global_uint8;
 
 /* 2-byte global with incorrect type information. */
 extern uint8_t			 extern_global_uint16;
 extern __capability void	*extern_global_uint16p;
 __capability void		*extern_global_uint16p =
-		    (__capability void *)&extern_global_uint16;
+		    (__cheri_tocap void * __capability)&extern_global_uint16;
 
 /* 4-byte global with correct type information. */
 extern uint32_t			 extern_global_uint32;
 extern __capability void	*extern_global_uint32p;
 __capability void		*extern_global_uint32p =
-		    (__capability void *)&extern_global_uint32;
+		    (__cheri_tocap void * __capability)&extern_global_uint32;
 
 /* 8-byte global with incorrect type information. */
 extern uint32_t			 extern_global_uint64;
 extern __capability void	*extern_global_uint64p;
 __capability void		*extern_global_uint64p =
-		    (__capability void *)&extern_global_uint64;
+		    (__cheri_tocap void * __capability)&extern_global_uint64;
 
 /* 1-byte global with incorrect type information. */
 extern uint8_t			 extern_global_array1[2];
 extern __capability void	*extern_global_array1p;
 __capability void		*extern_global_array1p =
-		    (__capability void *)&extern_global_array1;
+		    (__cheri_tocap void * __capability)&extern_global_array1;
 
 /* 7-byte global with correct type information. */
 extern uint8_t			 extern_global_array7[7];
 extern __capability void	*extern_global_array7p;
 __capability void		*extern_global_array7p =
-		    (__capability void *)&extern_global_array7;
+		    (__cheri_tocap void * __capability)&extern_global_array7;
 
 /* 65,537-byte global with incorrect type information. */
 extern uint8_t			 extern_global_array65537[127];
 extern __capability void	*extern_global_array65537p;
 __capability void		*extern_global_array65537p =
-		    (__capability void *)&extern_global_array65537;
+		    (__cheri_tocap void * __capability)&extern_global_array65537;
 
 /* 16-byte global with correct type information. */
 extern uint8_t			 extern_global_array16[16];
 extern __capability void	*extern_global_array16p;
 __capability void		*extern_global_array16p =
-		    (__capability void *)&extern_global_array16;
+		    (__cheri_tocap void * __capability)&extern_global_array16;
 
 /* 256-byte global with incorrect type information. */
 extern uint8_t			 extern_global_array256[128];
 extern __capability void	*extern_global_array256p;
 __capability void		*extern_global_array256p =
-		    (__capability void *)&extern_global_array256;
+		    (__cheri_tocap void * __capability)&extern_global_array256;
 
 /* 65,536-byte global with correct type information. */
 extern uint8_t			 extern_global_array65536[65536];
 extern __capability void	*extern_global_array65536p;
 __capability void		*extern_global_array65536p =
-		    (__capability void *)&extern_global_array65536;
+		    (__cheri_tocap void * __capability)&extern_global_array65536;
 
 /*
  * Checks against C-based types.
@@ -475,7 +475,7 @@ TEST_BOUNDS(extern_global_array65536);
 	test_bounds_##test(const struct cheri_test *ctp __unused)	\
 	{								\
 		__capability void *allocation =				\
-		    (__capability void *)&test;				\
+		    (__cheri_tocap void * __capability)&test;		\
 		size_t allocation_offset = cheri_getoffset(allocation);	\
 		size_t allocation_len = cheri_getlen(allocation);	\
 		size_t pointer_offset = cheri_getoffset(test##p);	\
