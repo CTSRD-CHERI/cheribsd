@@ -291,16 +291,19 @@ mips_proc0_init(void)
 		("kstack0 is not aligned on a page (0x%0lx) boundary: 0x%0lx",
 		(long)(KSTACK_PAGE_SIZE * 2), (long)kstack0));
 
+	thread0.td_kstack = kstack0;
 #ifdef KSTACK_LARGE_PAGE
 	/*
 	 * For 16K page size the stack uses the odd page
 	 * and kstack0 was allocated on the 32K boundary.
 	 * So we bump up the address to the odd page boundary.
+	 * For cheri256 we use both pages, so do not bump the
+	 * address.
 	 */
-	thread0.td_kstack = kstack0 + KSTACK_PAGE_SIZE;
-#else
-	thread0.td_kstack = kstack0;
+#if !defined(CHERI_KERNEL) || defined(CPU_CHERI128)
+	thread0.td_kstack += KSTACK_PAGE_SIZE;
 #endif
+#endif /* KSTACK_LARGE_PAGE */
 	thread0.td_kstack_pages = KSTACK_PAGES;
 	/*
 	 * Do not use cpu_thread_alloc to initialize these fields

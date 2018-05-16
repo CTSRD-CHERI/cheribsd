@@ -381,7 +381,7 @@ retrylookup:
 
 	for (;;) {
 		m = vm_page_alloc_contig(ksobj, 0, allocflags,
-		    atop(KSTACK_PAGE_SIZE), 0ul, ~0ul, KSTACK_PAGE_SIZE, 0,
+		    atop(KSTACK_SIZE), 0ul, ~0ul, KSTACK_PAGE_SIZE, 0,
 		    VM_MEMATTR_DEFAULT);
 		if (m != NULL)
 			break;
@@ -389,7 +389,7 @@ retrylookup:
 		VM_WAIT;
 		VM_OBJECT_WLOCK(ksobj);
 	}
-	end_m = m + atop(KSTACK_PAGE_SIZE);
+	end_m = m + atop(KSTACK_SIZE);
 	for (i = 0; m < end_m; m++) {
 		m->pindex = (vm_pindex_t)i;
 		if ((allocflags & VM_ALLOC_NOBUSY) != 0)
@@ -494,7 +494,7 @@ vm_thread_new(struct thread *td, int pages)
 			mtx_unlock(&kstack_cache_mtx);
 
 			td->td_kstack_obj = ks_ce->ksobj;
-			td->td_kstack = (vm_offset_t)ks_ce;
+			td->td_kstack = (vm_ptr_t)ks_ce;
 			td->td_kstack_pages = kstack_pages;
 			return (1);
 		}
@@ -518,7 +518,6 @@ vm_thread_new(struct thread *td, int pages)
 
 	atomic_add_int(&kstacks, 1);
 	if (KSTACK_GUARD_PAGES != 0) {
-		/* XXX-AM: in cheri we may just avoid having guard pages */
 		pmap_qremove(ptr_to_va(ks), KSTACK_GUARD_PAGES);
 		ks += KSTACK_GUARD_PAGES * PAGE_SIZE;
 	}

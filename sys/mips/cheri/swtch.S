@@ -74,6 +74,7 @@
 #include <machine/regnum.h>
 #include <machine/pte.h>
 #include <machine/pcb.h>
+#include <machine/param.h>
 
 #include <machine/cheriasm.h>
 #include <machine/cherireg.h>
@@ -220,6 +221,36 @@ NESTED(cpu_throw, CALLFRAME_SIZ, ra)
 	nop					# BDSLOT
 END(cpu_throw)
 
+
+/*
+ * Helper macro that checks whether the TLB contains a mapping to
+ * a given address, and invalidates it.
+ * This is used by cpu_switch() to set up TLB entry 0 for the new
+ * kernel stack.
+ * If an entry is found, it is replaced by KSEG0_START + 2 * index * PAGE_SIZE
+ * so that it is invalidated.
+ */
+#define TLB_KSTACK_INVAL(kaddr, tregA, tregB)		\
+	MTC0	kaddr, MIPS_COP_0_TLB_HI		;\
+	HAZARD_DELAY					;\
+	tlbp						;\
+	HAZARD_DELAY					;\
+	mfc0	tregA, MIPS_COP_0_TLB_INDEX		;\
+	HAZARD_DELAY					;\
+	bltz	tregA, 1337f				;\
+	PTR_LI	tregB, MIPS_KSEG0_START			;\
+	sll	tregA, PAGE_SHIFT + 1			;\
+	daddu	tregA, tregA, tregB			;\
+	MTC0	tregA, MIPS_COP_0_TLB_HI		;\
+	PTE_MTC0	zero, MIPS_COP_0_TLB_LO0	;\
+	PTE_MTC0	zero, MIPS_COP_0_TLB_LO1	;\
+	MTC0	zero, MIPS_COP_0_TLB_PG_MASK		;\
+	HAZARD_DELAY					;\
+	tlbwi						;\
+	HAZARD_DELAY					;\
+1337:	# NO matching TLB entry
+
+
 /*
  * cpu_switch(struct thread *old, struct thread *new, struct mutex *mtx);
  *	c3 - old
@@ -260,13 +291,13 @@ NESTED(cpu_switch, CALLFRAME_SIZ, ra)
 	cgetpcc	$c2
 	cgetoffset ra, $c2
 	SAVE_U_PCB_CHERIKFRAME_CREG($c2, CHERIKFRAME_OFF_PCC, $c1)
-	SAVE_U_PCB_CONTEXT(ra, PCB_REG_PC, a0)		# save return address
+	SAVE_U_PCB_CONTEXT(ra, PCB_REG_PC, $c1)		# save return address
 
 	/* Do cheri savectx() */
-	SAVE_U_PCB_CHERIKFRAME(a0);
+	SAVE_U_PCB_CHERIKFRAME($c1);
 
 	/* Switchout td_lock */
-	clc	$c1, zero, TD_LOCK($c3)
+	clc	$c1, zero, TD_LOCK($c3) // XXX-AM: not sure what this is for
 
 mips_sw1:
 #ifdef CPU_QEMU_MALTA
@@ -335,31 +366,8 @@ blocked_loop:
  * invalidate that TLB entry.
  * NOTE: This is hard coded to UPAGES == 2.
  * Also, there should be no TLB faults at this point.
- */
-	MTC0		v0, MIPS_COP_0_TLB_HI	# VPN = va
-	HAZARD_DELAY
-	tlbp					# probe VPN
-	HAZARD_DELAY
-	mfc0		s0, MIPS_COP_0_TLB_INDEX
-	HAZARD_DELAY
-
-	# MIPS_KSEG0_START + (2 * index * PAGE_SIZE) -> MIPS_COP_0_TLB_HI
-	PTR_LI		t1, MIPS_KSEG0_START		# invalidate tlb entry
-#ifdef KSTACK_LARGE_PAGE
-	bltz		s0, inval_nxt1
-#else
-	bltz		s0, entry0set
-#endif /* KSTACK_LARGE_PAGE */
-	nop
-	sll		s0, PAGE_SHIFT + 1
-	PTR_ADDU	t1, s0
-	MTC0		t1, MIPS_COP_0_TLB_HI
-	PTE_MTC0	zero, MIPS_COP_0_TLB_LO0
-	PTE_MTC0	zero, MIPS_COP_0_TLB_LO1
-	MTC0		zero, MIPS_COP_0_TLB_PG_MASK
-	HAZARD_DELAY
-	tlbwi
-	HAZARD_DELAY
+*/
+	TLB_KSTACK_INVAL(v0, s0, t1)
 
 #ifdef KSTACK_LARGE_PAGE
 /*
@@ -368,32 +376,23 @@ blocked_loop:
  * regular 4K sized page(s). Check for this case and, if so, invalidate
  * that TLB entry as well.
  */
-#if (PAGE_SIZE != 4096) && (KSTACK_PAGE_SIZE != 16384) // XXX-AM: should this be an ||?
+#if (PAGE_SIZE != 4096) || (KSTACK_PAGE_SIZE != 16384)
 #error PAGE_SIZE is not 4K or KSTACK_PAGE_SIZE is not 16K.
 #endif
-inval_nxt1:
 	move		v1, v0
+	PTR_ADDU	v1, PAGE_SIZE * 2	# advance by 2 pages and try again
+	TLB_KSTACK_INVAL(v1, t0, t1)
+#if defined(CHERI_KERNEL) && !defined(CPU_CHERI128)
+	/*
+	 * On cheri256 we use a larger stack (2*16K pages) with no guard page
+	 * so we need to perform another couple of checks for the upper 16K
+	 * of the kstack.
+	 */
 	PTR_ADDU	v1, PAGE_SIZE * 2
-	MTC0		v1, MIPS_COP_0_TLB_HI		# VPN = va
-	HAZARD_DELAY
-	tlbp						# probe VPN
-	HAZARD_DELAY
-	mfc0		s0, MIPS_COP_0_TLB_INDEX
-	HAZARD_DELAY
-
-	# MIPS_KSEG0_START + (2 * index * PAGE_SIZE) -> MIPS_COP_0_TLB_HI
-	PTR_LI		t1, MIPS_KSEG0_START		# invalidate tlb entry
-	bltz		s0, entry0set
-	nop
-	sll		s0, PAGE_SHIFT + 1
-	PTR_ADDU	t1, s0
-	MTC0		t1, MIPS_COP_0_TLB_HI
-	PTE_MTC0	zero, MIPS_COP_0_TLB_LO0
-	PTE_MTC0	zero, MIPS_COP_0_TLB_LO1
-	MTC0		zero, MIPS_COP_0_TLB_PG_MASK
-	HAZARD_DELAY
-	tlbwi
-	HAZARD_DELAY
+	TLB_KSTACK_INVAL(v1, t0, t1)
+	PTR_ADDU	v1, PAGE_SIZE * 2
+	TLB_KSTACK_INVAL(v1, t0, t1)
+#endif
 #endif /* KSTACK_LARGE_PAGE */
 
 entry0set:
@@ -424,8 +423,8 @@ entry0set:
  * Now running on new u struct.
  */
 sw2:
-	clc	$c19, zero, TD_PCB($c4)
-	/* grab newthread kstack */
+	clc	$c19, zero, TD_PCB($c18)	
+	/* grab newthread kstack */	
 	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_STC, CHERIKFRAME_OFF_STC, $c19)
 	RESTORE_U_PCB_CONTEXT(sp, PCB_REG_SP, $c19)
 	// Note we have newthr in c18
@@ -435,8 +434,8 @@ sw2:
 /*
  * Restore registers and return.
  */
-	cmove	$c4, $c18	# newthr
 	cmove	$c3, $c19	# newthr pcb
+	cmove	$c4, $c18	# newthr
 	RESTORE_U_PCB_CONTEXT(gp, PCB_REG_GP, $c3)
 	RESTORE_U_PCB_CONTEXT(v0, PCB_REG_SR, $c3)	# restore kernel context
 	RESTORE_U_PCB_CONTEXT(ra, PCB_REG_RA, $c3)

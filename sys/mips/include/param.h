@@ -180,16 +180,26 @@
  * supported by the hardware (e.g. 16K).
  */
 #if defined(CHERI_KERNEL) && !defined(CPU_CHERI128)
-#define	KSTACK_SIZE		(1 << 15)	/* Single 32K page */
-#else
+/*
+ * Cheri-256 uses two 16K pages for the kernel stack, without any guard pages.
+ * The stack capability is bounded properly so the stack should never overflow.
+ */
+#define KSTACK_PAGE_SIZE	(1 << 14)	/* Single 16K page */
+#define	KSTACK_SIZE		(KSTACK_PAGE_SIZE * 2)
+#define KSTACK_GUARD_PAGES	0
+
+#else /* ! CHERI_KERNEL || CPU_CHERI128 */
+
 #define	KSTACK_SIZE		(1 << 14)	/* Single 16K page */
-#endif
 #define	KSTACK_PAGE_SIZE	KSTACK_SIZE
+#define	KSTACK_GUARD_PAGES	(KSTACK_PAGE_SIZE / PAGE_SIZE)
+
+#endif /* ! CHERI_KERNEL || CPU_CHERI128 */
+
 #define	KSTACK_PAGE_MASK	(KSTACK_PAGE_SIZE - 1)
 #define	KSTACK_PAGES		(KSTACK_SIZE / PAGE_SIZE)
 #define	KSTACK_TLBMASK_MASK	((KSTACK_PAGE_MASK >> (TLBMASK_SHIFT - 1)) \
 					<< TLBMASK_SHIFT)
-#define	KSTACK_GUARD_PAGES	(KSTACK_PAGE_SIZE / PAGE_SIZE)
 
 #else /* ! KSTACK_LARGE_PAGE */
 

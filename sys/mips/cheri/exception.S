@@ -1346,6 +1346,7 @@ LEAF_NOPROFILE(MipsTLBMissException)
 	PTR_LI		k1, VM_MAX_KERNEL_ADDRESS	# check fault address against
 	sltu		k1, k1, k0			# upper bound of kernel_segmap
 	bnez		k1, MipsKernGenException	# out of bound
+	/* XXX-AM: This can be a cap-table load when KDC= kernel GPC */
 	PTR_LA		k1, _C_LABEL(kernel_segmap)	# k1 = segbase ptr (should not use $at)	
 	PTR_SRL		k0, SEGSHIFT - PTRSHIFT		# k0 = seg offset (almost)
 	/* XXX-AM: MUST set bounds on kernel_segmap, also readonly */
