@@ -304,6 +304,31 @@ struct xo_handle_s {
     void *xo_private;		/* Private data for external encoders */
 };
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheri/cheric.h>
+/*
+ * We know that the purecap ABI represents a va_list as a single capabilty.
+ * In order to check whether we have gone past the end of the list we can simply
+ * check if offset >= length. While it will trap anyway on access this allows
+ * us to print an error message even if the result of va_arg is not used.
+ */
+static inline void check_xo_vap_in_bounds(xo_handle_t* xop, const char* fmt) {
+	/* TODO: use an assert instead of always checking? */
+	if (cheri_getoffset((void*)(xop->xo_vap)) >=
+	    cheri_getlen((void*)(xop->xo_vap))) {
+		fprintf(stderr, "ERROR: libxo va_list out of bounds: %#p\n"
+		    "Format string was: %s\n", (void*)(xop->xo_vap), fmt);
+		abort();
+	}
+}
+#define xo_va_arg_checked(xop, type) __extension__({ \
+	check_xo_vap_in_bounds(xop, fmt); va_arg(xop->xo_vap, type); })
+#else
+/* In MIPS code we can't check whether we are out-of-bounds, just use va_list */
+#define xo_va_arg_checked(xop, type) va_arg(xop->xo_vap, type)
+#endif
+
+
 /* Flag operations */
 #define XOF_BIT_ISSET(_flag, _bit)	(((_flag) & (_bit)) ? 1 : 0)
 #define XOF_BIT_SET(_flag, _bit)	do { (_flag) |= (_bit); } while (0)
@@ -2898,10 +2923,13 @@ xo_needed_encoding (xo_handle_t *xop)
 
 static ssize_t
 xo_format_string (xo_handle_t *xop, xo_buffer_t *xbp, xo_xff_flags_t flags,
-		  xo_format_t *xfp)
+		  xo_format_t *xfp, const char* fmt)
 {
     static char null[] = "(null)";
     static char null_no_quotes[] = "null";
+#ifndef __CHERI_PURE_CAPABILITY__
+    (void)fmt;
+#endif
 
     char *cp = NULL;
     wchar_t *wcp = NULL;
@@ -2922,7 +2950,7 @@ xo_format_string (xo_handle_t *xop, xo_buffer_t *xbp, xo_xff_flags_t flags,
 	goto normal_string;
 
     } else if (xfp->xf_enc == XF_ENC_WIDE) {
-	wcp = va_arg(xop->xo_vap, wchar_t *);
+	wcp = xo_va_arg_checked(xop, wchar_t *);
 	if (xfp->xf_skip)
 	    return 0;
 
@@ -2936,7 +2964,7 @@ xo_format_string (xo_handle_t *xop, xo_buffer_t *xbp, xo_xff_flags_t flags,
 	}
 
     } else {
-	cp = va_arg(xop->xo_vap, char *); /* UTF-8 or native */ /* FIXME: this sometimes crashes on CHERI */
+	cp = xo_va_arg_checked(xop, char*); /* UTF-8 or native */ /* FIXME: this sometimes crashes on CHERI */
 
     normal_string:
 	if (xfp->xf_skip)
@@ -3381,7 +3409,7 @@ xo_do_format_field (xo_handle_t *xop, xo_buffer_t *xbp,
 		     * we want to ignore
 		     */
 		    if (!XOF_ISSET(xop, XOF_NO_VA_ARG))
-			va_arg(xop->xo_vap, int);
+			xo_va_arg_checked(xop, int);
 		}
 	    }
 	}
@@ -3454,7 +3482,7 @@ xo_do_format_field (xo_handle_t *xop, xo_buffer_t *xbp,
 		int s;
 		for (s = 0; s < XF_WIDTH_NUM; s++) {
 		    if (xf.xf_star[s]) {
-			xf.xf_width[s] = va_arg(xop->xo_vap, int);
+			xf.xf_width[s] = xo_va_arg_checked(xop, int);
 			
 			/* Normalize a negative width value */
 			if (xf.xf_width[s] < 0) {
@@ -3500,7 +3528,7 @@ xo_do_format_field (xo_handle_t *xop, xo_buffer_t *xbp,
 		    : (xf.xf_lflag || (xf.xf_fc == 'S')) ? XF_ENC_WIDE
 		    : xf.xf_hflag ? XF_ENC_LOCALE : XF_ENC_UTF8;
 
-		rc = xo_format_string(xop, xbp, flags, &xf);
+		rc = xo_format_string(xop, xbp, flags, &xf, fmt);
 
 		if ((flags & XFF_TRIM_WS) && xo_style_is_encoding(xop))
 		    rc = xo_trim_ws(xbp, rc);
@@ -3569,7 +3597,7 @@ xo_do_format_field (xo_handle_t *xop, xo_buffer_t *xbp,
 		 * need to pop it.
 		 */
 		if (xf.xf_skip)
-		    va_arg(xop->xo_vap, char *);
+		    xo_va_arg_checked(xop, char *);
 
 	    } else if (xf.xf_fc == 'm') {
 		/* Nothing on the stack for "%m" */
@@ -3578,51 +3606,51 @@ xo_do_format_field (xo_handle_t *xop, xo_buffer_t *xbp,
 		int s;
 		for (s = 0; s < XF_WIDTH_NUM; s++) {
 		    if (xf.xf_star[s])
-			va_arg(xop->xo_vap, int);
+			xo_va_arg_checked(xop, int);
 		}
 
 		if (strchr("diouxXDOU", xf.xf_fc) != NULL) {
 		    if (xf.xf_hflag > 1) {
-			va_arg(xop->xo_vap, int);
+			xo_va_arg_checked(xop, int);
 
 		    } else if (xf.xf_hflag > 0) {
-			va_arg(xop->xo_vap, int);
+			xo_va_arg_checked(xop, int);
 
 		    } else if (xf.xf_lflag > 1) {
-			va_arg(xop->xo_vap, unsigned long long);
+			xo_va_arg_checked(xop, unsigned long long);
 
 		    } else if (xf.xf_lflag > 0) {
-			va_arg(xop->xo_vap, unsigned long);
+			xo_va_arg_checked(xop, unsigned long);
 
 		    } else if (xf.xf_jflag > 0) {
-			va_arg(xop->xo_vap, intmax_t);
+			xo_va_arg_checked(xop, intmax_t);
 
 		    } else if (xf.xf_tflag > 0) {
-			va_arg(xop->xo_vap, ptrdiff_t);
+			xo_va_arg_checked(xop, ptrdiff_t);
 
 		    } else if (xf.xf_zflag > 0) {
-			va_arg(xop->xo_vap, size_t);
+			xo_va_arg_checked(xop, size_t);
 
 		    } else if (xf.xf_qflag > 0) {
-			va_arg(xop->xo_vap, quad_t);
+			xo_va_arg_checked(xop, quad_t);
 
 		    } else {
-			va_arg(xop->xo_vap, int);
+			xo_va_arg_checked(xop, int);
 		    }
 		} else if (strchr("eEfFgGaA", xf.xf_fc) != NULL)
 		    if (xf.xf_lflag)
-			va_arg(xop->xo_vap, long double);
+			xo_va_arg_checked(xop, long double);
 		    else
-			va_arg(xop->xo_vap, double);
+			xo_va_arg_checked(xop, double);
 
 		else if (xf.xf_fc == 'C' || (xf.xf_fc == 'c' && xf.xf_lflag))
-		    va_arg(xop->xo_vap, wint_t);
+		    xo_va_arg_checked(xop, wint_t);
 
 		else if (xf.xf_fc == 'c')
-		    va_arg(xop->xo_vap, int);
+		    xo_va_arg_checked(xop, int);
 
 		else if (xf.xf_fc == 'p')
-		    va_arg(xop->xo_vap, void *);
+		    xo_va_arg_checked(xop, void *);
 	    }
 	}
     }
@@ -4203,7 +4231,7 @@ void
 xo_arg (xo_handle_t *xop)
 {
     xop = xo_default(xop);
-    fprintf(stderr, "0x%x", va_arg(xop->xo_vap, unsigned));
+    fprintf(stderr, "0x%x", xo_va_arg_checked(xop, unsigned));
 }
 #endif /* 0 */
 
@@ -4314,7 +4342,7 @@ xo_format_value (xo_handle_t *xop, const char *name, ssize_t nlen,
     case XO_STYLE_XML:
 	/*
 	 * Even though we're not making output, we still need to
-	 * let the formatting code handle the va_arg popping.
+	 * let the formatting code handle the xo_va_arg_checked popping.
 	 */
 	if (flags & XFF_DISPLAY_ONLY) {
 	    xo_simple_field(xop, TRUE, value, vlen, fmt, flen, flags);
@@ -5089,11 +5117,11 @@ xo_find_width (xo_handle_t *xop, xo_field_info_t *xfip,
 	if (xop->xo_formatter == NULL && flen == 2
 	        && strncmp("%d", fmt, flen) == 0) {
 	    if (!XOF_ISSET(xop, XOF_NO_VA_ARG))
-		width = va_arg(xop->xo_vap, int);
+		width = xo_va_arg_checked(xop, int);
 	} else if (xop->xo_formatter == NULL && flen == 2
 		   && strncmp("%u", fmt, flen) == 0) {
 	    if (!XOF_ISSET(xop, XOF_NO_VA_ARG))
-		width = va_arg(xop->xo_vap, unsigned);
+		width = xo_va_arg_checked(xop, unsigned);
 	} else {
 	    /*
 	     * So we have a format and it's not a simple one like
@@ -6258,7 +6286,7 @@ xo_do_emit_fields (xo_handle_t *xop, xo_field_info_t *fields,
 	     * Argument flag means the content isn't given in the descriptor,
 	     * but as a UTF-8 string ('const char *') argument in xo_vap.
 	     */
-	    content = va_arg(xop->xo_vap, char *);
+	    content = xo_va_arg_checked(xop, char *);
 	    clen = content ? strlen(content) : 0;
 	}
 
