@@ -238,62 +238,62 @@ cheri_log_cheri_frame(struct trapframe *frame)
 
 	/* C0 - $ddc */
 	printf("$ddc: ");
-	cheri_cap_print(&frame->ddc);
+	cheri_cap_print(frame->ddc);
 	/* C1 */
-	CHERI_REG_PRINT(&frame->c1, 1);
+	CHERI_REG_PRINT(frame->c1, 1);
 	/* C2 */
-	CHERI_REG_PRINT(&frame->c2, 2);
+	CHERI_REG_PRINT(frame->c2, 2);
 	/* C3 */
-	CHERI_REG_PRINT(&frame->c3, 3);
+	CHERI_REG_PRINT(frame->c3, 3);
 	/* C4 */
-	CHERI_REG_PRINT(&frame->c4, 4);
+	CHERI_REG_PRINT(frame->c4, 4);
 	/* C5 */
-	CHERI_REG_PRINT(&frame->c5, 5);
+	CHERI_REG_PRINT(frame->c5, 5);
 	/* C6 */
-	CHERI_REG_PRINT(&frame->c6, 6);
+	CHERI_REG_PRINT(frame->c6, 6);
 	/* C7 */
-	CHERI_REG_PRINT(&frame->c7, 7);
+	CHERI_REG_PRINT(frame->c7, 7);
 	/* C8 */
-	CHERI_REG_PRINT(&frame->c8, 8);
+	CHERI_REG_PRINT(frame->c8, 8);
 	/* C9 */
-	CHERI_REG_PRINT(&frame->c9, 9);
+	CHERI_REG_PRINT(frame->c9, 9);
 	/* C10 */
-	CHERI_REG_PRINT(&frame->c10, 10);
+	CHERI_REG_PRINT(frame->c10, 10);
 	/* C11 */
-	CHERI_REG_PRINT(&frame->csp, 11);
+	CHERI_REG_PRINT(frame->csp, 11);
 	/* C12 */
-	CHERI_REG_PRINT(&frame->c12, 12);
+	CHERI_REG_PRINT(frame->c12, 12);
 	/* C13 */
-	CHERI_REG_PRINT(&frame->c13, 13);
+	CHERI_REG_PRINT(frame->c13, 13);
 	/* C14 */
-	CHERI_REG_PRINT(&frame->c14, 14);
+	CHERI_REG_PRINT(frame->c14, 14);
 	/* C15 */
-	CHERI_REG_PRINT(&frame->c15, 15);
+	CHERI_REG_PRINT(frame->c15, 15);
 	/* C16 */
-	CHERI_REG_PRINT(&frame->c16, 16);
+	CHERI_REG_PRINT(frame->c16, 16);
 	/* C17 */
-	CHERI_REG_PRINT(&frame->c17, 17);
+	CHERI_REG_PRINT(frame->c17, 17);
 	/* C18 */
-	CHERI_REG_PRINT(&frame->c18, 18);
+	CHERI_REG_PRINT(frame->c18, 18);
 	/* C19 */
-	CHERI_REG_PRINT(&frame->c19, 19);
+	CHERI_REG_PRINT(frame->c19, 19);
 	/* C20 */
-	CHERI_REG_PRINT(&frame->c20, 20);
+	CHERI_REG_PRINT(frame->c20, 20);
 	/* C21 */
-	CHERI_REG_PRINT(&frame->c21, 21);
+	CHERI_REG_PRINT(frame->c21, 21);
 	/* C22 */
-	CHERI_REG_PRINT(&frame->c22, 22);
+	CHERI_REG_PRINT(frame->c22, 22);
 	/* C23 */
-	CHERI_REG_PRINT(&frame->c23, 23);
+	CHERI_REG_PRINT(frame->c23, 23);
 	/* C24 */
-	CHERI_REG_PRINT(&frame->c24, 24);
+	CHERI_REG_PRINT(frame->c24, 24);
 	/* C25 */
-	CHERI_REG_PRINT(&frame->c25, 25);
+	CHERI_REG_PRINT(frame->c25, 25);
 	/* C26 - $idc / $cgp */
-	CHERI_REG_PRINT(&frame->idc, 26);
+	CHERI_REG_PRINT(frame->idc, 26);
 	/* C31 - saved $pcc */
 	printf("$pcc: ");
-	cheri_cap_print(&frame->pcc);
+	cheri_cap_print(frame->pcc);
 }
 
 void
