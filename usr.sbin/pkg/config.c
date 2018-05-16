@@ -454,7 +454,7 @@ config_init(void)
 	/* Read LOCALBASE/etc/pkg.conf first. */
 
 	if (getenv("PKG_BOOTSTRAP_CONFIG_FILE")) {
-		strlcpy(confpath, getenv("PKG_BOOSTRAP_CONFIG_FILE"),
+		strlcpy(confpath, getenv("PKG_BOOTSTRAP_CONFIG_FILE"),
 		    sizeof(confpath));
 	} else {
 		localbase = getenv("LOCALBASE") ? getenv("LOCALBASE") :
