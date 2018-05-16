@@ -49,6 +49,10 @@
 #include <machine/proc.h>
 #include <machine/sysarch.h>
 
+CTASSERT(sizeof(void * __capability) == CHERICAP_SIZE);
+/* 28 capability registers + capcause + padding. */
+CTASSERT(sizeof(struct cheri_frame) == (29 * CHERICAP_SIZE));
+
 /*
  * Beginnings of a programming interface for explicitly managing capability
  * registers.  Convert back and forth between capability registers and

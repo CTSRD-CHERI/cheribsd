@@ -34,7 +34,6 @@
 
 #ifdef _KERNEL
 #include <sys/sysctl.h>		/* SYSCTL_DECL() */
-#include <sys/systm.h>		/* CTASSERT() */
 #endif
 
 #include <sys/types.h>
@@ -50,9 +49,6 @@
 struct chericap {
 	uint8_t		c_data[CHERICAP_SIZE];
 } __packed __aligned(CHERICAP_SIZE);
-#ifdef _KERNEL
-CTASSERT(sizeof(struct chericap) == CHERICAP_SIZE);
-#endif
 
 /*
  * Canonical C-language representation of a CHERI object capability -- code and
