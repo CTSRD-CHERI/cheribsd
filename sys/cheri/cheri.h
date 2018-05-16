@@ -132,6 +132,7 @@ void	hybridabi_sendsig(struct thread *td);
  * Functions to set up and manipulate CHERI contexts and stacks.
  */
 struct pcb;
+struct proc;
 struct sysarch_args;
 void	cheri_sealcap_copy(struct proc *dst, struct proc *src);
 void	cheri_signal_copy(struct pcb *dst, struct pcb *src);

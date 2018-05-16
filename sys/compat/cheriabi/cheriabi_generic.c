@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/poll.h>
 #include <sys/syscallsubr.h>
+#include <sys/systm.h>
 
 #include <compat/cheriabi/cheriabi_proto.h>
 

@@ -297,6 +297,7 @@ struct ktr_cexception {
 #define	KTRFAC_DROP	0x20000000	/* last event was dropped */
 
 #ifdef	_KERNEL
+struct uio;
 struct vnode;
 
 void	ktrnamei(char *);
