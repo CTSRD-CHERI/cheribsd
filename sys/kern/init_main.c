@@ -680,6 +680,7 @@ start_init(void *dummy)
 	struct image_args args;
 	int options, error;
 	size_t pathlen;
+	char flags[8], *flagp;
 	char *var, *path;
 	char *free_init_path, *tmp_init_path;
 	struct thread *td;
@@ -722,29 +723,32 @@ start_init(void *dummy)
 
 		error = exec_args_add_arg_str(&args, path, UIO_SYSSPACE);
 		if (error != 0)
-			panic("%s: Can't add fname %d", __func__, error);
+			panic("%s: Can't add argv[0] %d", __func__, error);
 
 		options = 0;
-		error += exec_args_add_arg_char(&args, '-');
+		flagp = &flags[0];
+		*flagp++ = '-';
 #ifdef BOOTCDROM
-		error += exec_args_add_arg_char(&args, 'C');
+		*flagp++ = 'C';
 		options++;
 #endif
 #ifdef notyet
                 if (boothowto & RB_FASTBOOT) {
-			error += exec_args_add_arg_char(&args, 'f');
+			*flagp++ = 'f';
 			options++;
 		}
 #endif
 		if (boothowto & RB_SINGLE) {
-			error += exec_args_add_arg_char(&args, 's');
+			*flagp++ = 's';
 			options++;
 		}
 		if (options == 0)
-			error += exec_args_add_arg_char(&args, '-');
-		error += exec_args_add_arg_char(&args, 0);
+			*flagp++ = '-';
+		*flagp++ = 0;
+		KASSERT(flagp <= &flags[0] + sizeof(flags), ("Overran flags"));
+		error = exec_args_add_arg_str(&args, flags, UIO_SYSSPACE);
 		if (error != 0)
-			panic("%s: failed to construct argv[1]", __func__);
+			panic("%s: Can't add argv[0] %d", __func__, error);
 
 		/*
 		 * Now try to exec the program.  If can't for any reason
