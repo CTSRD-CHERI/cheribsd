@@ -1180,7 +1180,6 @@ exec_copyin_args(struct image_args *args, char *fname,
 {
 	u_long argp, envp;
 	int error;
-	size_t length;
 
 	bzero(args, sizeof(*args));
 	if (argv == NULL)
@@ -1197,19 +1196,9 @@ exec_copyin_args(struct image_args *args, char *fname,
 	/*
 	 * Copy the file name.
 	 */
-	if (fname != NULL) {
-		args->fname = args->buf;
-		error = (segflg == UIO_SYSSPACE) ?
-		    copystr(fname, args->fname, PATH_MAX, &length) :
-		    copyinstr(fname, args->fname, PATH_MAX, &length);
-		if (error != 0)
-			goto err_exit;
-	} else
-		length = 0;
-
-	args->begin_argv = args->buf + length;
-	args->endp = args->begin_argv;
-	args->stringspace = ARG_MAX;
+	error = exec_args_add_fname(args, fname, segflg);
+	if (error != 0)
+		goto err_exit;
 
 	/*
 	 * extract arguments first
@@ -1222,16 +1211,10 @@ exec_copyin_args(struct image_args *args, char *fname,
 		}
 		if (argp == 0)
 			break;
-		error = copyinstr((void *)(uintptr_t)argp, args->endp,
-		    args->stringspace, &length);
-		if (error != 0) {
-			if (error == ENAMETOOLONG) 
-				error = E2BIG;
+		error = exec_args_add_arg_str(args, (void *)argp,
+		    UIO_USERSPACE);
+		if (error != 0)
 			goto err_exit;
-		}
-		args->stringspace -= length;
-		args->endp += length;
-		args->argc++;
 	}
 
 	args->begin_envv = args->endp;
@@ -1248,16 +1231,10 @@ exec_copyin_args(struct image_args *args, char *fname,
 			}
 			if (envp == 0)
 				break;
-			error = copyinstr((void *)(uintptr_t)envp,
-			    args->endp, args->stringspace, &length);
-			if (error != 0) {
-				if (error == ENAMETOOLONG)
-					error = E2BIG;
+			error = exec_args_add_env_str(args, (void *)envp,
+			    UIO_USERSPACE);
+			if (error != 0)
 				goto err_exit;
-			}
-			args->stringspace -= length;
-			args->endp += length;
-			args->envc++;
 		}
 	}
 
