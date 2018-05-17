@@ -719,9 +719,7 @@ start_init(void *dummy)
 		strlcpy(init_path, var, sizeof(init_path));
 		freeenv(var);
 	}
-	pathlen = strlen(init_path) + 1;
-	free_init_path = tmp_init_path = malloc(pathlen, M_TEMP, M_WAITOK);
-	strlcpy(tmp_init_path, init_path, pathlen);
+	free_init_path = tmp_init_path = strdup(init_path, M_TEMP);
 	
 	while ((path = strsep(&tmp_init_path, ":")) != NULL) {
 		pathlen = strlen(path) + 1;
