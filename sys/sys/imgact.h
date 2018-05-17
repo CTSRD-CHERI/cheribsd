@@ -102,7 +102,6 @@ struct vmspace;
 int	exec_alloc_args(struct image_args *);
 int	exec_args_add_arg_str(struct image_args *args, char *argp,
 	    enum uio_seg segflg);
-int	exec_args_add_arg_char(struct image_args *args, char c);
 int	exec_args_add_env_str(struct image_args *args, char *envp,
 	    enum uio_seg segflg);
 int	exec_args_add_fname(struct image_args *args, char *fname,

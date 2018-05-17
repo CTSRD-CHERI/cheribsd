@@ -1455,7 +1455,6 @@ exec_free_args(struct image_args *args)
  *
  * exec_args_add_fname() - install path to be executed
  * exec_args_add_arg_str() - append an argument string
- * exec_args_add_arg_char() - append a character to the argument in progress
  * exec_args_add_env_str() - append an env string
  */
 int
@@ -1506,25 +1505,6 @@ exec_args_add_arg_str(struct image_args *args, char *argp, enum uio_seg segflg)
 	args->endp += length;
 	args->begin_envv += length;
 	args->argc++;
-
-	return (0);
-}
-
-int
-exec_args_add_arg_char(struct image_args *args, char c)
-{
-
-	KASSERT(args->begin_argv != NULL, ("begin_argp not initialzed"));
-	KASSERT(args->begin_envv == args->endp, ("appending args after env"));
-
-	if (args->stringspace == 0)
-		return (E2BIG);
-	*args->endp = c;
-	args->stringspace--;
-	args->endp++;
-	args->begin_envv++;
-	if (c == 0)
-		args->argc++;
 
 	return (0);
 }
