@@ -395,7 +395,6 @@ blocked_loop:
 #endif
 #endif /* KSTACK_LARGE_PAGE */
 
-entry0set:
 	MTC0		v0, MIPS_COP_0_TLB_HI		# set VPN again
 	HAZARD_DELAY
 /* SMP!! - Works only for  unshared TLB case - i.e. no v-cpus */
@@ -428,7 +427,8 @@ sw2:
 	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_STC, CHERIKFRAME_OFF_STC, $c19)
 	RESTORE_U_PCB_CONTEXT(sp, PCB_REG_SP, $c19)
 	// Note we have newthr in c18
-	CAPCALL_LOAD($c12, pmap_activate) // XXX-AM: this presumes that our global pointer is sensible
+	// XXX-AM: this presumes that our global pointer is sensible
+	CAPCALL_LOAD($c12, pmap_activate)
 	cjalr	$c12, $c17
 	cmove	$c3, $c4
 /*
@@ -465,9 +465,7 @@ sw2:
 	li	t0, TD_MDTLS_TCB_OFFSET
 	cld	t0, t0, 0($c4)				# TLS/TCB offset
 	cincoffset $c1, $c1, t0
-	/* XXX-AM: it is unclear how we are going to recover a capability from this...
-	 * should be written to the CHERI TLS reg instead.
-	 */
+	/* XXX-AM: should be written to the CHERI TLS reg instead. */
 	cgetbase v0, $c1
 	cgetoffset t0, $c1
 	daddu	v0, v0, t0

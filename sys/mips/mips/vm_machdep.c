@@ -169,11 +169,12 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2,int flags)
 	pcb2->pcb_context[PCB_REG_S2] = (register_t)(intptr_t)td2->td_frame;
 #else /* CHERI_KERNEL */
 	/* Implies CPU_CHERI */
+	size_t kstack_size = td2->td_kstack_pages * PAGE_SIZE - sizeof(struct pcb);
+
 	pcb2->pcb_cherikframe.ckf_c17 = fork_trampoline;
 	/* kstack is the top of the stack, we initialise it at the bottom */
-	pcb2->pcb_cherikframe.ckf_stc =
-		rounddown2(td2->td_kstack + td2->td_kstack_pages * PAGE_SIZE,
-			   CHERICAP_SIZE) - CALLFRAME_SIZ;
+	pcb2->pcb_cherikframe.ckf_stc = rounddown2(td2->td_kstack + kstack_size,
+	    CHERICAP_SIZE) - CALLFRAME_SIZ;
 	/* Set up fork_trampoline arguments in the frame registers 
 	 * Note that in CHERI we do not have an RA slot, we use C17.
 	 */
@@ -318,11 +319,18 @@ cpu_thread_swapin(struct thread *td)
 	 * the pcb struct and kernel stack.
 	 */
 #ifdef KSTACK_LARGE_PAGE
+#if defined(CHERI_KERNEL) && !defined(CPU_CHERI128)
+	pte = pmap_pte(kernel_pmap, ptr_to_va(td->td_kstack));
+	td->td_md.md_upte[0] = *pte & ~TLBLO_SWBITS_MASK;
+	pte = pmap_pte(kernel_pmap,
+	    ptr_to_va(td->td_kstack + KSTACK_PAGE_SIZE));
+	td->td_md.md_upte[1] = *pte & ~TLBLO_SWBITS_MASK;
+#else /* ! CHERI_KERNEL */
 	/* Just one entry for one large kernel page. */
 	pte = pmap_pte(kernel_pmap, td->td_kstack);
 	td->td_md.md_upte[0] = PTE_G;   /* Guard Page */
 	td->td_md.md_upte[1] = *pte & ~TLBLO_SWBITS_MASK;
-
+#endif /* ! CHERI_KERNEL */
 #else
 
 	int i;
@@ -360,14 +368,16 @@ cpu_thread_alloc(struct thread *td)
 	 * the two capabilities properly.
 	 * Note that this also cuts out the guard pages if any.
 	 */
-	td->td_pcb = cheri_csetbounds(
-	    (struct pcb *)(td->td_kstack + td->td_kstack_pages * PAGE_SIZE) - 1,
-	    sizeof(struct pcb));
+	struct pcb *pcb_base = (struct pcb *)(td->td_kstack +
+	    td->td_kstack_pages * PAGE_SIZE) - 1;
+	size_t kstack_size = td->td_kstack_pages * PAGE_SIZE -
+	    sizeof(struct pcb);
+
+	td->td_pcb = cheri_csetbounds((void *)pcb_base, sizeof(struct pcb));
 	td->td_kstack = (vm_ptr_t)cheri_csetbounds(
-	    (void *)td->td_kstack, td->td_kstack_pages * PAGE_SIZE - 1);
+	    (void *)td->td_kstack, kstack_size);
 	td->td_kstack = (vm_ptr_t)cheri_andperm((void *)td->td_kstack,
 	    CHERI_PERMS_KERNEL_DATA);
-
 #endif
 	td->td_frame = &td->td_pcb->pcb_regs;
 #ifdef KSTACK_LARGE_PAGE
@@ -519,10 +529,11 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 	pcb2->pcb_context[PCB_REG_S2] = (register_t)(intptr_t)td->td_frame;
 #else /* CHERI_KERNEL */
 	/* Implies CPU_CHERI, see cpu_fork() */
+	size_t kstack_size = td->td_kstack_pages * PAGE_SIZE - sizeof(struct pcb);
+
 	pcb2->pcb_cherikframe.ckf_c17 = fork_trampoline;
-	pcb2->pcb_cherikframe.ckf_stc =
-		rounddown2(td->td_kstack + td->td_kstack_pages * PAGE_SIZE,
-			   CHERICAP_SIZE) - CALLFRAME_SIZ;
+	pcb2->pcb_cherikframe.ckf_stc = rounddown2(td->td_kstack + kstack_size,
+	    CHERICAP_SIZE) - CALLFRAME_SIZ;
 	pcb2->pcb_cherikframe.ckf_c18 = fork_return;
 	pcb2->pcb_cherikframe.ckf_c19 = td;
 	pcb2->pcb_cherikframe.ckf_c20 = td->td_frame;
