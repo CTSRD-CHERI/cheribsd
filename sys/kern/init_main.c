@@ -53,6 +53,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/exec.h>
 #include <sys/file.h>
 #include <sys/filedesc.h>
+#include <sys/imgact.h>
 #include <sys/jail.h>
 #include <sys/ktr.h>
 #include <sys/lock.h>
@@ -676,13 +677,11 @@ SYSCTL_INT(_kern, OID_AUTO, init_shutdown_timeout,
 static void
 start_init(void *dummy)
 {
-	vm_offset_t addr;
-	struct execve_args args;
+	struct image_args args;
 	int options, error;
 	size_t pathlen;
 	char *var, *path;
 	char *free_init_path, *tmp_init_path;
-	char *ucp, **uap, *arg0, *arg1;
 	struct thread *td;
 	struct proc *p;
 
@@ -698,16 +697,6 @@ start_init(void *dummy)
 	/* Wipe GELI passphrase from the environment. */
 	kern_unsetenv("kern.geom.eli.passphrase");
 
-	/*
-	 * Need just enough stack to hold the faked-up "execve()" arguments.
-	 */
-	addr = p->p_sysent->sv_usrstack - PAGE_SIZE;
-	if (vm_map_find(&p->p_vmspace->vm_map, NULL, 0, &addr, PAGE_SIZE, 0,
-	    VMFS_NO_SPACE, VM_PROT_ALL, VM_PROT_ALL, 0) != 0)
-		panic("init: couldn't allocate argument space");
-	p->p_vmspace->vm_maxsaddr = (caddr_t)addr;
-	p->p_vmspace->vm_ssize = 1;
-
 	if ((var = kern_getenv("init_path")) != NULL) {
 		strlcpy(init_path, var, sizeof(init_path));
 		freeenv(var);
@@ -721,54 +710,41 @@ start_init(void *dummy)
 		if (bootverbose)
 			printf("start_init: trying %s\n", path);
 			
-		/*
-		 * Move out the boot flag argument.
-		 */
+		memset(&args, 0, sizeof(args));
+		error = exec_alloc_args(&args);
+		if (error != 0)
+			panic("%s: Can't allocate space for init arguments %d",
+			    __func__, error);
+
+		error = exec_args_add_fname(&args, path, UIO_SYSSPACE);
+		if (error != 0)
+			panic("%s: Can't add fname %d", __func__, error);
+
+		error = exec_args_add_arg_str(&args, path, UIO_SYSSPACE);
+		if (error != 0)
+			panic("%s: Can't add fname %d", __func__, error);
+
 		options = 0;
-		ucp = (char *)p->p_sysent->sv_usrstack;
-		(void)subyte(--ucp, 0);		/* trailing zero */
-		if (boothowto & RB_SINGLE) {
-			(void)subyte(--ucp, 's');
-			options = 1;
-		}
+		error += exec_args_add_arg_char(&args, '-');
+#ifdef BOOTCDROM
+		error += exec_args_add_arg_char(&args, 'C');
+		options++;
+#endif
 #ifdef notyet
                 if (boothowto & RB_FASTBOOT) {
-			(void)subyte(--ucp, 'f');
-			options = 1;
+			error += exec_args_add_arg_char(&args, 'f');
+			options++;
 		}
 #endif
-
-#ifdef BOOTCDROM
-		(void)subyte(--ucp, 'C');
-		options = 1;
-#endif
-
+		if (boothowto & RB_SINGLE) {
+			error += exec_args_add_arg_char(&args, 's');
+			options++;
+		}
 		if (options == 0)
-			(void)subyte(--ucp, '-');
-		(void)subyte(--ucp, '-');		/* leading hyphen */
-		arg1 = ucp;
-
-		/*
-		 * Move out the file name (also arg 0).
-		 */
-		ucp -= pathlen;
-		copyout(path, ucp, pathlen);
-		arg0 = ucp;
-
-		/*
-		 * Move out the arg pointers.
-		 */
-		uap = (char **)rounddown2((intptr_t)ucp, sizeof(intptr_t));
-		(void)suword((caddr_t)--uap, (long)0);	/* terminator */
-		(void)suword((caddr_t)--uap, (long)(intptr_t)arg1);
-		(void)suword((caddr_t)--uap, (long)(intptr_t)arg0);
-
-		/*
-		 * Point at the arguments.
-		 */
-		args.fname = arg0;
-		args.argv = uap;
-		args.envv = NULL;
+			error += exec_args_add_arg_char(&args, '-');
+		error += exec_args_add_arg_char(&args, 0);
+		if (error != 0)
+			panic("%s: failed to construct argv[1]", __func__);
 
 		/*
 		 * Now try to exec the program.  If can't for any reason
@@ -777,7 +753,8 @@ start_init(void *dummy)
 		 * Otherwise, return via fork_trampoline() all the way
 		 * to user mode as init!
 		 */
-		if ((error = sys_execve(td, &args)) == 0) {
+		error = kern_execve(td, &args, NULL);
+		if (error == 0) {
 			free(free_init_path, M_TEMP);
 			mtx_unlock(&Giant);
 			return;
