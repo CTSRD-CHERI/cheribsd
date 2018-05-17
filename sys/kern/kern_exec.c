@@ -1470,6 +1470,109 @@ exec_free_args(struct image_args *args)
 }
 
 /*
+ * A set to functions to fill struct image args.
+ *
+ * NOTE: exec_args_add_fname() must be called (possiably with a NULL
+ * fname) before any _arg_ or _env_ functions.  All _arg_ calls should be
+ * made before any _env_ calls.
+ *
+ * exec_args_add_fname() - install path to be executed
+ * exec_args_add_arg_str() - append an argument string
+ * exec_args_add_arg_char() - append a character to the argument in progress
+ * exec_args_add_env_str() - append an env string
+ */
+int
+exec_args_add_fname(struct image_args *args, char *fname,
+    enum uio_seg segflg)
+{
+	int error;
+	size_t length;
+
+	KASSERT(args->fname == NULL, ("fname already appended"));
+	KASSERT(args->endp == NULL, ("already appending to args"));
+
+	if (fname != NULL) {
+		args->fname = args->buf;
+		error = (segflg == UIO_SYSSPACE) ?
+		    copystr(fname, args->fname, PATH_MAX, &length) :
+		    copyinstr(fname, args->fname, PATH_MAX, &length);
+		if (error != 0)
+			return (error == ENAMETOOLONG ? E2BIG : error);
+	} else
+		length = 0;
+
+	/* Set up for _arg_*()/_env_*() */
+	args->endp = args->buf + length;
+	/* begin_argv and begin_envv must be set and updated */
+	args->begin_argv = args->begin_envv = args->endp;
+	/* Actually (exec_map_entry_size - length) which is >= ARG_MAX */
+	args->stringspace = ARG_MAX;
+
+	return (0);
+}
+
+int
+exec_args_add_arg_str(struct image_args *args, char *argp, enum uio_seg segflg)
+{
+	int error;
+	size_t length;
+
+	KASSERT(args->begin_argv != NULL, ("begin_argp not initialzed"));
+	KASSERT(args->begin_envv == args->endp, ("appending args after env"));
+
+	error = (segflg == UIO_SYSSPACE) ?
+	    copystr(argp, args->endp, args->stringspace, &length) :
+	    copyinstr(argp, args->endp, args->stringspace, &length);
+	if (error != 0)
+		return (error == ENAMETOOLONG ? E2BIG : error);
+	args->stringspace -= length;
+	args->endp += length;
+	args->begin_envv += length;
+	args->argc++;
+
+	return (0);
+}
+
+int
+exec_args_add_arg_char(struct image_args *args, char c)
+{
+
+	KASSERT(args->begin_argv != NULL, ("begin_argp not initialzed"));
+	KASSERT(args->begin_envv == args->endp, ("appending args after env"));
+
+	if (args->stringspace == 0)
+		return (E2BIG);
+	*args->endp = c;
+	args->stringspace--;
+	args->endp++;
+	args->begin_envv++;
+	if (c == 0)
+		args->argc++;
+
+	return (0);
+}
+
+int
+exec_args_add_env_str(struct image_args *args, char *envp, enum uio_seg segflg)
+{
+	int error;
+	size_t length;
+
+	KASSERT(args->begin_envv != NULL, ("begin_envv not initialzed"));
+
+	error = (segflg == UIO_SYSSPACE) ?
+	    copystr(envp, args->endp, args->stringspace, &length) :
+	    copyinstr(envp, args->endp, args->stringspace, &length);
+	if (error != 0)
+		return (error == ENAMETOOLONG ? E2BIG : error);
+	args->stringspace -= length;
+	args->endp += length;
+	args->envc++;
+
+	return (0);
+}
+
+/*
  * Copy strings out to the new process address space, constructing new arg
  * and env vector tables. Return a pointer to the base so that it can be used
  * as the initial stack pointer.
