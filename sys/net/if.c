@@ -41,6 +41,7 @@
 #include <sys/malloc.h>
 #include <sys/sbuf.h>
 #include <sys/bus.h>
+#include <sys/epoch.h>
 #include <sys/mbuf.h>
 #include <sys/systm.h>
 #include <sys/priv.h>
@@ -597,8 +598,8 @@ if_alloc(u_char type)
 	TASK_INIT(&ifp->if_linktask, 0, do_link_state_change, ifp);
 	ifp->if_afdata_initialized = 0;
 	IF_AFDATA_LOCK_INIT(ifp);
-	TAILQ_INIT(&ifp->if_addrhead);
-	TAILQ_INIT(&ifp->if_multiaddrs);
+	CK_STAILQ_INIT(&ifp->if_addrhead);
+	CK_STAILQ_INIT(&ifp->if_multiaddrs);
 	TAILQ_INIT(&ifp->if_groups);
 #ifdef MAC
 	mac_ifnet_init(ifp);
@@ -867,7 +868,7 @@ if_attach_internal(struct ifnet *ifp, int vmove, struct if_clone *ifc)
 		sdl->sdl_len = masklen;
 		while (namelen != 0)
 			sdl->sdl_data[--namelen] = 0xff;
-		TAILQ_INSERT_HEAD(&ifp->if_addrhead, ifa, ifa_link);
+		CK_STAILQ_INSERT_HEAD(&ifp->if_addrhead, ifa, ifa_link);
 		/* Reliably crash if used uninitialized. */
 		ifp->if_broadcastaddr = NULL;
 
@@ -909,7 +910,7 @@ if_attach_internal(struct ifnet *ifp, int vmove, struct if_clone *ifc)
 		 * of the interface.
 		 */
 		for (ifa = ifp->if_addr; ifa != NULL;
-		    ifa = TAILQ_NEXT(ifa, ifa_link)) {
+		    ifa = CK_STAILQ_NEXT(ifa, ifa_link)) {
 			if (ifa->ifa_addr->sa_family == AF_LINK) {
 				sdl = (struct sockaddr_dl *)ifa->ifa_addr;
 				sdl->sdl_index = ifp->if_index;
@@ -994,7 +995,7 @@ if_purgeaddrs(struct ifnet *ifp)
 	struct ifaddr *ifa, *next;
 
 	/* XXX cannot hold IF_ADDR_WLOCK over called functions. */
-	TAILQ_FOREACH_SAFE(ifa, &ifp->if_addrhead, ifa_link, next) {
+	CK_STAILQ_FOREACH_SAFE(ifa, &ifp->if_addrhead, ifa_link, next) {
 		if (ifa->ifa_addr->sa_family == AF_LINK)
 			continue;
 #ifdef INET
@@ -1019,7 +1020,7 @@ if_purgeaddrs(struct ifnet *ifp)
 		}
 #endif /* INET6 */
 		IF_ADDR_WLOCK(ifp);
-		TAILQ_REMOVE(&ifp->if_addrhead, ifa, ifa_link);
+		CK_STAILQ_REMOVE(&ifp->if_addrhead, ifa, ifaddr, ifa_link);
 		IF_ADDR_WUNLOCK(ifp);
 		ifa_free(ifa);
 	}
@@ -1035,9 +1036,9 @@ if_purgemaddrs(struct ifnet *ifp)
 	struct ifmultiaddr *ifma;
 
 	IF_ADDR_WLOCK(ifp);
-	while (!TAILQ_EMPTY(&ifp->if_multiaddrs)) {
-		ifma = TAILQ_FIRST(&ifp->if_multiaddrs);
-		TAILQ_REMOVE(&ifp->if_multiaddrs, ifma, ifma_link);
+	while (!CK_STAILQ_EMPTY(&ifp->if_multiaddrs)) {
+		ifma = CK_STAILQ_FIRST(&ifp->if_multiaddrs);
+		CK_STAILQ_REMOVE(&ifp->if_multiaddrs, ifma, ifmultiaddr, ifma_link);
 		if_delmulti_locked(ifp, ifma, 1);
 	}
 	IF_ADDR_WUNLOCK(ifp);
@@ -1209,9 +1210,9 @@ if_detach_internal(struct ifnet *ifp, int vmove, struct if_clone **ifcp)
 
 		/* We can now free link ifaddr. */
 		IF_ADDR_WLOCK(ifp);
-		if (!TAILQ_EMPTY(&ifp->if_addrhead)) {
-			ifa = TAILQ_FIRST(&ifp->if_addrhead);
-			TAILQ_REMOVE(&ifp->if_addrhead, ifa, ifa_link);
+		if (!CK_STAILQ_EMPTY(&ifp->if_addrhead)) {
+			ifa = CK_STAILQ_FIRST(&ifp->if_addrhead);
+			CK_STAILQ_REMOVE(&ifp->if_addrhead, ifa, ifaddr, ifa_link);
 			IF_ADDR_WUNLOCK(ifp);
 			ifa_free(ifa);
 		} else
@@ -1854,18 +1855,27 @@ ifa_ref(struct ifaddr *ifa)
 	refcount_acquire(&ifa->ifa_refcnt);
 }
 
+static void
+ifa_destroy(epoch_context_t ctx)
+{
+	struct ifaddr *ifa;
+
+	ifa = __containerof(ctx, struct ifaddr, ifa_epoch_ctx);
+	counter_u64_free(ifa->ifa_opackets);
+	counter_u64_free(ifa->ifa_ipackets);
+	counter_u64_free(ifa->ifa_obytes);
+	counter_u64_free(ifa->ifa_ibytes);
+	free(ifa, M_IFADDR);
+}
+
 void
 ifa_free(struct ifaddr *ifa)
 {
 
-	if (refcount_release(&ifa->ifa_refcnt)) {
-		counter_u64_free(ifa->ifa_opackets);
-		counter_u64_free(ifa->ifa_ipackets);
-		counter_u64_free(ifa->ifa_obytes);
-		counter_u64_free(ifa->ifa_ibytes);
-		free(ifa, M_IFADDR);
-	}
+	if (refcount_release(&ifa->ifa_refcnt))
+		epoch_call(net_epoch_preempt, &ifa->ifa_epoch_ctx, ifa_destroy);
 }
+
 
 static int
 ifa_maintain_loopback_route(int cmd, const char *otype, struct ifaddr *ifa,
@@ -1943,7 +1953,7 @@ ifa_ifwithaddr_internal(const struct sockaddr *addr, int getref)
 	IFNET_RLOCK_NOSLEEP();
 	TAILQ_FOREACH(ifp, &V_ifnet, if_link) {
 		IF_ADDR_RLOCK(ifp);
-		TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
+		CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
 			if (ifa->ifa_addr->sa_family != addr->sa_family)
 				continue;
 			if (sa_equal(addr, ifa->ifa_addr)) {
@@ -2000,7 +2010,7 @@ ifa_ifwithbroadaddr(const struct sockaddr *addr, int fibnum)
 		if ((fibnum != RT_ALL_FIBS) && (ifp->if_fib != fibnum))
 			continue;
 		IF_ADDR_RLOCK(ifp);
-		TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
+		CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
 			if (ifa->ifa_addr->sa_family != addr->sa_family)
 				continue;
 			if ((ifp->if_flags & IFF_BROADCAST) &&
@@ -2037,7 +2047,7 @@ ifa_ifwithdstaddr(const struct sockaddr *addr, int fibnum)
 		if ((fibnum != RT_ALL_FIBS) && (ifp->if_fib != fibnum))
 			continue;
 		IF_ADDR_RLOCK(ifp);
-		TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
+		CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
 			if (ifa->ifa_addr->sa_family != addr->sa_family)
 				continue;
 			if (ifa->ifa_dstaddr != NULL &&
@@ -2089,7 +2099,7 @@ ifa_ifwithnet(const struct sockaddr *addr, int ignore_ptp, int fibnum)
 		if ((fibnum != RT_ALL_FIBS) && (ifp->if_fib != fibnum))
 			continue;
 		IF_ADDR_RLOCK(ifp);
-		TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
+		CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
 			const char *cp, *cp2, *cp3;
 
 			if (ifa->ifa_addr->sa_family != af)
@@ -2174,7 +2184,7 @@ ifaof_ifpforaddr(const struct sockaddr *addr, struct ifnet *ifp)
 	if (af >= AF_MAX)
 		return (NULL);
 	IF_ADDR_RLOCK(ifp);
-	TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
+	CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
 		if (ifa->ifa_addr->sa_family != af)
 			continue;
 		if (ifa_maybe == NULL)
@@ -2296,7 +2306,7 @@ if_unroute(struct ifnet *ifp, int flag, int fam)
 
 	ifp->if_flags &= ~flag;
 	getmicrotime(&ifp->if_lastchange);
-	TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link)
+	CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link)
 		if (fam == PF_UNSPEC || (fam == ifa->ifa_addr->sa_family))
 			pfctlinput(PRC_IFDOWN, ifa->ifa_addr);
 	ifp->if_qflush(ifp);
@@ -2319,7 +2329,7 @@ if_route(struct ifnet *ifp, int flag, int fam)
 
 	ifp->if_flags |= flag;
 	getmicrotime(&ifp->if_lastchange);
-	TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link)
+	CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link)
 		if (fam == PF_UNSPEC || (fam == ifa->ifa_addr->sa_family))
 			pfctlinput(PRC_IFUP, ifa->ifa_addr);
 	if (ifp->if_carp)
@@ -3767,7 +3777,7 @@ again:
 
 		addrs = 0;
 		IF_ADDR_RLOCK(ifp);
-		TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
+		CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
 			struct sockaddr *sa = ifa->ifa_addr;
 
 			if (prison_if(curthread->td_ucred, sa) != 0)
@@ -3839,7 +3849,7 @@ if_findmulti(struct ifnet *ifp, const struct sockaddr *sa)
 
 	IF_ADDR_LOCK_ASSERT(ifp);
 
-	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (sa->sa_family == AF_LINK) {
 			if (sa_dl_equal(ifma->ifma_addr, sa))
 				break;
@@ -3909,8 +3919,8 @@ if_allocmulti(struct ifnet *ifp, struct sockaddr *sa, struct sockaddr *llsa,
 #ifdef MCAST_VERBOSE
 extern void kdb_backtrace(void);
 #endif
-void
-if_freemulti(struct ifmultiaddr *ifma)
+static void
+if_freemulti_internal(struct ifmultiaddr *ifma)
 {
 
 	KASSERT(ifma->ifma_refcount == 0, ("if_freemulti: refcount %d",
@@ -3925,6 +3935,25 @@ if_freemulti(struct ifmultiaddr *ifma)
 	free(ifma->ifma_addr, M_IFMADDR);
 	free(ifma, M_IFMADDR);
 }
+
+static void
+if_destroymulti(epoch_context_t ctx)
+{
+	struct ifmultiaddr *ifma;
+
+	ifma = __containerof(ctx, struct ifmultiaddr, ifma_epoch_ctx);
+	if_freemulti_internal(ifma);
+}
+
+void
+if_freemulti(struct ifmultiaddr *ifma)
+{
+	KASSERT(ifma->ifma_refcount == 0, ("if_freemulti_epoch: refcount %d",
+	    ifma->ifma_refcount));
+
+	epoch_call(net_epoch_preempt, &ifma->ifma_epoch_ctx, if_destroymulti);
+}
+
 
 /*
  * Register an additional multicast address with a network interface.
@@ -4019,7 +4048,7 @@ if_addmulti(struct ifnet *ifp, struct sockaddr *sa,
 				error = ENOMEM;
 				goto free_llsa_out;
 			}
-			TAILQ_INSERT_HEAD(&ifp->if_multiaddrs, ll_ifma,
+			CK_STAILQ_INSERT_HEAD(&ifp->if_multiaddrs, ll_ifma,
 			    ifma_link);
 		} else
 			ll_ifma->ifma_refcount++;
@@ -4031,7 +4060,7 @@ if_addmulti(struct ifnet *ifp, struct sockaddr *sa,
 	 * referenced link layer address.  Add the primary address to the
 	 * ifnet address list.
 	 */
-	TAILQ_INSERT_HEAD(&ifp->if_multiaddrs, ifma, ifma_link);
+	CK_STAILQ_INSERT_HEAD(&ifp->if_multiaddrs, ifma, ifma_link);
 
 	if (retifma != NULL)
 		*retifma = ifma;
@@ -4123,7 +4152,7 @@ if_delallmulti(struct ifnet *ifp)
 	struct ifmultiaddr *next;
 
 	IF_ADDR_WLOCK(ifp);
-	TAILQ_FOREACH_SAFE(ifma, &ifp->if_multiaddrs, ifma_link, next)
+	CK_STAILQ_FOREACH_SAFE(ifma, &ifp->if_multiaddrs, ifma_link, next)
 		if_delmulti_locked(ifp, ifma, 0);
 	IF_ADDR_WUNLOCK(ifp);
 }
@@ -4234,7 +4263,7 @@ if_delmulti_locked(struct ifnet *ifp, struct ifmultiaddr *ifma, int detaching)
 		return 0;
 
 	if (ifp != NULL && detaching == 0)
-		TAILQ_REMOVE(&ifp->if_multiaddrs, ifma, ifma_link);
+		CK_STAILQ_REMOVE(&ifp->if_multiaddrs, ifma, ifmultiaddr, ifma_link);
 
 	/*
 	 * If this ifma is a network-layer ifma, a link-layer ifma may
@@ -4248,7 +4277,7 @@ if_delmulti_locked(struct ifnet *ifp, struct ifmultiaddr *ifma, int detaching)
 			ll_ifma->ifma_ifp = NULL;	/* XXX */
 		if (--ll_ifma->ifma_refcount == 0) {
 			if (ifp != NULL) {
-				TAILQ_REMOVE(&ifp->if_multiaddrs, ll_ifma,
+				CK_STAILQ_REMOVE(&ifp->if_multiaddrs, ll_ifma, ifmultiaddr,
 				    ifma_link);
 			}
 			if_freemulti(ll_ifma);
@@ -4258,7 +4287,7 @@ if_delmulti_locked(struct ifnet *ifp, struct ifmultiaddr *ifma, int detaching)
 	if (ifp) {
 		struct ifmultiaddr *ifmatmp;
 
-		TAILQ_FOREACH(ifmatmp, &ifp->if_multiaddrs, ifma_link)
+		CK_STAILQ_FOREACH(ifmatmp, &ifp->if_multiaddrs, ifma_link)
 			MPASS(ifma != ifmatmp);
 	}
 #endif
@@ -4787,7 +4816,7 @@ if_setupmultiaddr(if_t ifp, void *mta, int *cnt, int max)
 	uint8_t *lmta = (uint8_t *)mta;
 	int mcnt = 0;
 
-	TAILQ_FOREACH(ifma, &((struct ifnet *)ifp)->if_multiaddrs, ifma_link) {
+	CK_STAILQ_FOREACH(ifma, &((struct ifnet *)ifp)->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
 
@@ -4822,7 +4851,7 @@ if_multiaddr_count(if_t ifp, int max)
 
 	count = 0;
 	if_maddr_rlock(ifp);
-	TAILQ_FOREACH(ifma, &((struct ifnet *)ifp)->if_multiaddrs, ifma_link) {
+	CK_STAILQ_FOREACH(ifma, &((struct ifnet *)ifp)->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
 		count++;
@@ -4840,7 +4869,7 @@ if_multi_apply(struct ifnet *ifp, int (*filter)(void *, struct ifmultiaddr *, in
 	int cnt = 0;
 
 	if_maddr_rlock(ifp);
-	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link)
+	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link)
 		cnt += filter(arg, ifma, cnt);
 	if_maddr_runlock(ifp);
 	return (cnt);
