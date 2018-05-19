@@ -1224,7 +1224,6 @@ register char **names;
     register char *p;
     register int num;
     register char *thisname;
-    register int useM = No;
     char rbuf[6];
 
     /* format each number followed by its string */
