@@ -28,12 +28,13 @@
  *        *_process, u_endscreen.
  */
 
-#include "os.h"
-
 #include <sys/time.h>
 
 #include <curses.h>
 #include <ctype.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
 #include <termcap.h>
 #include <time.h>
 #include <stdarg.h>
@@ -929,7 +930,7 @@ char *thisline;
     p = strecpy(base, thisline);
 
     /* zero fill the rest of it */
-    memzero(p, display_width - (p - base));
+    bzero(p, display_width - (p - base));
 }
 
 void
@@ -972,7 +973,7 @@ char *newline;
 	optr = strecpy(bufferline, newline);
 
 	/* zero fill the rest of it */
-	memzero(optr, display_width - (optr - bufferline));
+	bzero(optr, display_width - (optr - bufferline));
     }
     else
     {
@@ -1385,7 +1386,7 @@ int line;
     diff = display_width - newcol;
     if (diff > 0)
     {
-	memzero(old, diff);
+	bzero(old, diff);
     }
 
     /* remember where the current line is */
