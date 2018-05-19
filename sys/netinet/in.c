@@ -1155,7 +1155,6 @@ in_lltable_match_prefix(const struct sockaddr *saddr,
 static void
 in_lltable_free_entry(struct lltable *llt, struct llentry *lle)
 {
-	struct ifnet *ifp;
 	size_t pkts_dropped;
 
 	LLE_WLOCK_ASSERT(lle);
@@ -1163,8 +1162,7 @@ in_lltable_free_entry(struct lltable *llt, struct llentry *lle)
 
 	/* Unlink entry from table if not already */
 	if ((lle->la_flags & LLE_LINKED) != 0) {
-		ifp = llt->llt_ifp;
-		IF_AFDATA_WLOCK_ASSERT(ifp);
+		IF_AFDATA_WLOCK_ASSERT(llt->llt_ifp);
 		lltable_unlink_entry(llt, lle);
 	}
 

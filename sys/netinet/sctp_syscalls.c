@@ -131,7 +131,7 @@ static int	kern_sctp_generic_recvmsg(struct thread *td, int sd,
 static void
 sctp_syscalls_init(void *unused __unused)
 {
-	int error;
+	int error __unused;
 
 	error = syscall_helper_register(sctp_syscalls, SY_THR_STATIC);
 	KASSERT((error == 0),
