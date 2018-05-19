@@ -370,8 +370,7 @@ char *argv[];
 	    switch(i)
 	    {
 	      case 'v':			/* show version number */
-		fprintf(stderr, "%s: version %s\n",
-			myname, version_string());
+		fprintf(stderr, "%s: version FreeBSD\n", myname);
 		exit(1);
 		break;
 
@@ -506,10 +505,9 @@ char *argv[];
 
 	      default:
 		fprintf(stderr,
-"Top version %s\n"
 "Usage: %s [-abCHIijnPqStuvwz] [-d count] [-m io | cpu] [-o field] [-s time]\n"
 "       [-J jail] [-U username] [number]\n",
-			version_string(), myname);
+			myname);
 		exit(1);
 	    }
 	}
