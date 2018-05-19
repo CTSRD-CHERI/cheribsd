@@ -563,6 +563,7 @@ malloc(size_t size, struct malloc_type *mtp, int flags)
 #endif
 
 #ifdef MALLOC_DEBUG
+	va = NULL;
 	if (malloc_dbg(&va, &size, mtp, flags) != 0)
 		return (va);
 #endif
@@ -608,6 +609,7 @@ malloc_domain(size_t size, struct malloc_type *mtp, int domain,
 #endif
 
 #ifdef MALLOC_DEBUG
+	va = NULL;
 	if (malloc_dbg(&va, &size, mtp, flags) != 0)
 		return (va);
 #endif
