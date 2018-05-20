@@ -351,7 +351,7 @@ nfsm_uiombuflist(struct uio *uiop, int siz, struct mbuf **mbp, char **cpp)
 	char * __capability uiocp;
 	struct mbuf *mp, *mp2, *firstmp;
 	int xfer, left, mlen;
-	int uiosiz, clflg, rem;
+	int uiosiz, clflg;
 
 	KASSERT(uiop->uio_iovcnt == 1, ("nfsm_uiotombuf: iovcnt != 1"));
 
@@ -359,7 +359,6 @@ nfsm_uiombuflist(struct uio *uiop, int siz, struct mbuf **mbp, char **cpp)
 		clflg = 1;
 	else
 		clflg = 0;
-	rem = NFSM_RNDUP(siz) - siz;
 	if (clflg != 0)
 		NFSMCLGET(mp, M_WAITOK);
 	else
