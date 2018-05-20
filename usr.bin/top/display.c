@@ -127,7 +127,7 @@ int  Header_lines =	7;
 int display_resize()
 
 {
-    register int lines;
+    int lines;
 
     /* first, deallocate any previous buffer that may have been there */
     if (screenbuf != NULL)
@@ -168,9 +168,9 @@ int display_updatecpus(statics)
 struct statics *statics;
 
 {
-    register int *lp;
-    register int lines;
-    register int i;
+    int *lp;
+    int lines;
+    int i;
     
     /* call resize to do the dirty work */
     lines = display_resize();
@@ -200,10 +200,10 @@ int display_init(statics)
 struct statics *statics;
 
 {
-    register int lines;
-    register char **pp;
-    register int *ip;
-    register int i;
+    int lines;
+    char **pp;
+    int *ip;
+    int i;
 
     lines = display_updatecpus(statics);
 
@@ -256,7 +256,7 @@ int mpid;
 double *avenrun;
 
 {
-    register int i;
+    int i;
 
     /* i_loadave also clears the screen, since it is first */
     top_clear();
@@ -285,7 +285,7 @@ int mpid;
 double *avenrun;
 
 {
-    register int i;
+    int i;
 
     if (mpid != -1)
     {
@@ -371,7 +371,7 @@ int total;
 int *brkdn;
 
 {
-    register int i;
+    int i;
 
     /* write current number of processes and remember the value */
     printf("%d processes:", total);
@@ -400,7 +400,7 @@ int *brkdn;
 
 {
     static char new[MAX_COLS];
-    register int i;
+    int i;
 
     /* update number of processes only if it has changed */
     if (ltotal != total)
@@ -453,7 +453,7 @@ int *brkdn;
 char *cpustates_tag()
 
 {
-    register char *use;
+    char *use;
 
     static char *short_tag = "CPU: ";
     static char *long_tag = "CPU states: ";
@@ -481,10 +481,10 @@ i_cpustates(states)
 int *states;
 
 {
-    register int i = 0;
-    register int value;
-    register char **names;
-    register char *thisname;
+    int i = 0;
+    int value;
+    char **names;
+    char *thisname;
     int cpu;
 
     /* copy over values into "last" array */
@@ -528,11 +528,11 @@ u_cpustates(states)
 int *states;
 
 {
-    register int value;
-    register char **names;
-    register char *thisname;
-    register int *lp;
-    register int *colp;
+    int value;
+    char **names;
+    char *thisname;
+    int *lp;
+    int *colp;
     int cpu;
 
 for (cpu = 0; cpu < num_cpus; cpu++) {
@@ -579,10 +579,10 @@ void
 z_cpustates()
 
 {
-    register int i = 0;
-    register char **names;
-    register char *thisname;
-    register int *lp;
+    int i = 0;
+    char **names;
+    char *thisname;
+    int *lp;
     int cpu, value;
 
 for (cpu = 0; cpu < num_cpus; cpu++) {
@@ -909,8 +909,8 @@ int line;
 char *thisline;
 
 {
-    register char *p;
-    register char *base;
+    char *p;
+    char *base;
 
     /* make sure we are on the correct line */
     while (lastline < y_procs + line)
@@ -940,9 +940,9 @@ int line;
 char *newline;
 
 {
-    register char *optr;
-    register int screen_line = line + Header_lines;
-    register char *bufferline;
+    char *optr;
+    int screen_line = line + Header_lines;
+    char *bufferline;
 
     /* remember a pointer to the current line in the screen buffer */
     bufferline = &screenbuf[lineindex(line)];
@@ -987,8 +987,8 @@ u_endscreen(hi)
 int hi;
 
 {
-    register int screen_line = hi + Header_lines;
-    register int i;
+    int screen_line = hi + Header_lines;
+    int i;
 
     if (smart_terminal)
     {
@@ -1066,7 +1066,7 @@ int t;
 void
 new_message(int type, char* msgfmt, ...)
 {
-    register int i;
+    int i;
     va_list arglist;
 
     /* first, format the message */
@@ -1120,10 +1120,10 @@ int  size;
 int  numeric;
 
 {
-    register char *ptr = buffer;
-    register char ch;
-    register char cnt = 0;
-    register char maxcnt = 0;
+    char *ptr = buffer;
+    char ch;
+    char cnt = 0;
+    char maxcnt = 0;
 
     /* allow room for null terminator */
     size -= 1;
@@ -1202,10 +1202,10 @@ int  numeric;
 
 static int string_count(pp)
 
-register char **pp;
+char **pp;
 
 {
-    register int cnt;
+    int cnt;
 
     cnt = 0;
     while (*pp++ != NULL)
@@ -1219,12 +1219,12 @@ static void summary_format(str, numbers, names)
 
 char *str;
 int *numbers;
-register char **names;
+char **names;
 
 {
-    register char *p;
-    register int num;
-    register char *thisname;
+    char *p;
+    int num;
+    char *thisname;
     char rbuf[6];
 
     /* format each number followed by its string */
@@ -1278,16 +1278,16 @@ register char **names;
 
 static void line_update(old, new, start, line)
 
-register char *old;
-register char *new;
+char *old;
+char *new;
 int start;
 int line;
 
 {
-    register int ch;
-    register int diff;
-    register int newcol = start + 1;
-    register int lastcol = start;
+    int ch;
+    int diff;
+    int newcol = start + 1;
+    int lastcol = start;
     char cursor_on_line = No;
     char *current;
 
@@ -1408,8 +1408,8 @@ char *printable(str)
 char *str;
 
 {
-    register char *ptr;
-    register char ch;
+    char *ptr;
+    char ch;
 
     ptr = str;
     while ((ch = *ptr) != '\0')
