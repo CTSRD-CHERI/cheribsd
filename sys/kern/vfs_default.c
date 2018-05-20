@@ -504,7 +504,7 @@ vop_stdlock(ap)
 
 	ilk = VI_MTX(vp);
 	return (lockmgr_lock_fast_path(vp->v_vnlock, ap->a_flags,
-	    (ilk != NULL) ? &ilk->lock_object : NULL, ap->a_file, ap->a_line));
+	    &ilk->lock_object, ap->a_file, ap->a_line));
 }
 
 /* See above. */
@@ -520,7 +520,7 @@ vop_stdunlock(ap)
 
 	ilk = VI_MTX(vp);
 	return (lockmgr_unlock_fast_path(vp->v_vnlock, ap->a_flags,
-	    (ilk != NULL) ? &ilk->lock_object : NULL));
+	    &ilk->lock_object));
 }
 
 /* See above. */
