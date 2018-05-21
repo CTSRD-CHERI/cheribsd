@@ -1,3 +1,4 @@
+/* $FreeBSD$ */
 /* constants needed for display.c */
 
 /* "type" argument for new_message function */

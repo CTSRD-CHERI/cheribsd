@@ -93,9 +93,9 @@ static int cpustates_column;
 
 static enum { OFF, ON, ERASE } header_status = ON;
 
-static int string_count(char **pp);
-static void summary_format(char *str, int *numbers, register char **names);
-static void line_update(char *old, char *new, int start, int line);
+static int string_count(char **);
+static void summary_format(char *, int *, char **);
+static void line_update(char *, char *, int, int);
 
 int  x_lastpid =	10;
 int  y_lastpid =	0;
@@ -1043,11 +1043,9 @@ int hi;
 }
 
 void
-display_header(t)
-
-int t;
-
+display_header(int t)
 {
+
     if (t)
     {
 	header_status = ON;
@@ -1200,10 +1198,7 @@ int  numeric;
 
 /* internal support routines */
 
-static int string_count(pp)
-
-char **pp;
-
+static int string_count(char **pp)
 {
     int cnt;
 
@@ -1215,12 +1210,7 @@ char **pp;
     return(cnt);
 }
 
-static void summary_format(str, numbers, names)
-
-char *str;
-int *numbers;
-char **names;
-
+static void summary_format(char *str, int *numbers, char **names)
 {
     char *p;
     int num;

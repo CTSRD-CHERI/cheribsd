@@ -3,17 +3,13 @@
  *
  *  This file contains all the definitions necessary to use the hand-written
  *  screen package in "screen.c"
+ *
+ *  $FreeBSD$
  */
 
 #define TCputs(str)	tputs(str, 1, putstdout)
 #define putcap(str)	(void)((str) != NULL ? TCputs(str) : 0)
 #define Move_to(x, y)	TCputs(tgoto(cursor_motion, x, y))
-
-/* declare return values for termcap functions */
-extern int tgetent(char *bp, const char *name);
-extern char *tgoto(const char *cap, int col, int row);
-extern int tputs(const char *str, int affcnt, int (*putc)(int));
-
 
 extern char ch_erase;		/* set to the user's erase character */
 extern char ch_kill;		/* set to the user's kill  character */
