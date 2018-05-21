@@ -402,7 +402,7 @@ char *argv[];
 		if (getuid() == 0)
 		{
 		    /* be very un-nice! */
-		    (void) nice(-20);
+		    nice(-20);
 		}
 		else
 		{
@@ -588,25 +588,13 @@ char *argv[];
     }
 
     /* hold interrupt signals while setting up the screen and the handlers */
-#ifdef SIGHOLD
-    sighold(SIGINT);
-    sighold(SIGQUIT);
-    sighold(SIGTSTP);
-#else
     old_sigmask = sigblock(Smask(SIGINT) | Smask(SIGQUIT) | Smask(SIGTSTP));
-#endif
     init_screen();
     signal(SIGINT, leave);
     signal(SIGQUIT, leave);
     signal(SIGTSTP, tstop);
     signal(SIGWINCH, top_winch);
-#ifdef SIGRELSE
-    sigrelse(SIGINT);
-    sigrelse(SIGQUIT);
-    sigrelse(SIGTSTP);
-#else
-    (void) sigsetmask(old_sigmask);
-#endif
+    sigsetmask(old_sigmask);
     if (warnings)
     {
 	fputs("....", stderr);
@@ -687,7 +675,7 @@ restart:
 	    /* determine number of processes to actually display */
 	    /* this number will be the smallest of:  active processes,
 	       number user requested, number current screen accomodates */
-	    active_procs = system_info.P_ACTIVE;
+	    active_procs = system_info.p_pactive;
 	    if (active_procs > topn)
 	    {
 		active_procs = topn;
@@ -777,18 +765,14 @@ restart:
 		    fflush(stdout);
 
 		    /* default the signal handler action */
-		    (void) signal(SIGTSTP, SIG_DFL);
+		    signal(SIGTSTP, SIG_DFL);
 
 		    /* unblock the signal and send ourselves one */
-#ifdef SIGRELSE
-		    sigrelse(SIGTSTP);
-#else
-		    (void) sigsetmask(sigblock(0) & ~(1 << (SIGTSTP - 1)));
-#endif
-		    (void) kill(0, SIGTSTP);
+		    sigsetmask(sigblock(0) & ~(1 << (SIGTSTP - 1)));
+		    kill(0, SIGTSTP);
 
 		    /* reset the signal handler */
-		    (void) signal(SIGTSTP, tstop);
+		    signal(SIGTSTP, tstop);
 
 		    /* reinit screen */
 		    reinit_screen();
@@ -805,7 +789,7 @@ restart:
 		    max_topn = display_resize();
 
 		    /* reset the signal handler */
-		    (void) signal(SIGWINCH, top_winch);
+		    signal(SIGWINCH, top_winch);
 
 		    reset_display();
 		    winchflag = 0;
@@ -883,7 +867,7 @@ restart:
 				show_help();
 				top_standout("Hit any key to continue: ");
 				fflush(stdout);
-				(void) read(0, &ch, 1);
+				read(0, &ch, 1);
 				break;
 	
 			    case CMD_errors:	/* show errors */
@@ -901,7 +885,7 @@ restart:
 				    show_errors();
 				    top_standout("Hit any key to continue: ");
 				    fflush(stdout);
-				    (void) read(0, &ch, 1);
+				    read(0, &ch, 1);
 				}
 				break;
 	
