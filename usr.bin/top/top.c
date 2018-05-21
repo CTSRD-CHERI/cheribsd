@@ -624,8 +624,7 @@ restart:
 
     while ((displays == -1) || (displays-- > 0))
     {
-	int (*compare)(const void *, const void *);
-
+	int (*compare)(const void * const, const void * const);
 	    
 	/* get the current stats */
 	get_system_info(&system_info);

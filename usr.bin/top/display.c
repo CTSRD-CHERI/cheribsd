@@ -32,6 +32,7 @@
 
 #include <curses.h>
 #include <ctype.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
@@ -1044,21 +1045,16 @@ display_header(int t)
     }
 }
 
-/*
- * XXXAR: This was previously using missing prototypes to do completely
- * broken forwarding of arguments to snprintf().
- * Seems like it worked on x86 but it is a absolutely broken on CHERI...
- */
 void
-new_message(int type, char* msgfmt, ...)
+new_message(int type, char *msgfmt, ...)
 {
-    int i;
-    va_list arglist;
+    va_list args;
+    size_t i;
+
+    va_start(args, msgfmt);
 
     /* first, format the message */
-    va_start(arglist, msgfmt);
-    (void) vsnprintf(next_msg, sizeof(next_msg), msgfmt, arglist);
-    va_end(arglist);
+    snprintf(next_msg, sizeof(next_msg), msgfmt, args);
 
     if (msglen > 0)
     {
