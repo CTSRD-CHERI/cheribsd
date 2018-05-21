@@ -1,5 +1,4 @@
 /*-
- * Copyright (c) 2017 M. Warner Losh <imp@FreeBSD.org>
  * Copyright (c) 2012 Gleb Kurtsou <gleb@FreeBSD.org>
  * All rights reserved.
  *
@@ -30,22 +29,15 @@ __FBSDID("$FreeBSD$");
 
 #include "namespace.h"
 #include <sys/param.h>
+#include <sys/fcntl.h>
 #include <sys/syscall.h>
-#include "compat-ino64.h"
+#include <sys/stat.h>
 #include <unistd.h>
-
 #include "libc_private.h"
 
 int
 lstat(const char *path, struct stat *sb)
 {
-	struct freebsd11_stat stat11;
-	int rv;
 
-	if (__getosreldate() >= INO64_FIRST)
-		return (__sys_fstatat(AT_FDCWD, path, sb, AT_SYMLINK_NOFOLLOW));
-	rv = syscall(SYS_freebsd11_lstat, path, &stat11);
-	if (rv == 0)
-		__stat11_to_stat(&stat11, sb);
-	return (rv);
+	return (__sys_fstatat(AT_FDCWD, path, sb, AT_SYMLINK_NOFOLLOW));
 }
