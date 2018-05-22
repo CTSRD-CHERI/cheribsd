@@ -953,15 +953,14 @@ static const struct test tests[] = {
 	{ "coping_100", test_coping, .t_flags = FLAG_NAME, .t_int = 100 },
 	{ "coping_1000", test_coping, .t_flags = FLAG_NAME, .t_int = 1000 },
 	{ "coping_10000", test_coping, .t_flags = FLAG_NAME, .t_int = 10000 },
+	{ "coping_100000", test_coping, .t_flags = FLAG_NAME, .t_int = 100000 },
+	{ "coping_1000000", test_coping, .t_flags = FLAG_NAME, .t_int = 1000000 },
 #endif
 	{ "pipeping_1", test_pipeping, .t_flags = 0, .t_int = 1 },
 	{ "pipeping_10", test_pipeping, .t_flags = 0, .t_int = 10 },
 	{ "pipeping_100", test_pipeping, .t_flags = 0, .t_int = 100 },
 	{ "pipeping_1000", test_pipeping, .t_flags = 0, .t_int = 1000 },
 	{ "pipeping_10000", test_pipeping, .t_flags = 0, .t_int = 10000 },
-	/*
-	 * XXX: Doesn't work; kernel pipe buffer too small?
-	 */
 	{ "pipeping_100000", test_pipeping, .t_flags = 0, .t_int = 100000 },
 	{ "pipeping_1000000", test_pipeping, .t_flags = 0, .t_int = 1000000 },
 	{ "pipepingtd_1", test_pipepingtd, .t_flags = 0, .t_int = 1 },
@@ -969,9 +968,6 @@ static const struct test tests[] = {
 	{ "pipepingtd_100", test_pipepingtd, .t_flags = 0, .t_int = 100 },
 	{ "pipepingtd_1000", test_pipepingtd, .t_flags = 0, .t_int = 1000 },
 	{ "pipepingtd_10000", test_pipepingtd, .t_flags = 0, .t_int = 10000 },
-	/*
-	 * XXX: Doesn't work; kernel pipe buffer too small?
-	 */
 	{ "pipepingtd_100000", test_pipepingtd, .t_flags = 0, .t_int = 100000 },
 	{ "pipepingtd_1000000", test_pipepingtd, .t_flags = 0, .t_int = 1000000 },
 	{ "gettimeofday", test_gettimeofday, .t_flags = 0 },
