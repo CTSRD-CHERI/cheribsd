@@ -95,6 +95,7 @@
 #ifdef CPU_CHERI
 #include <machine/cheriasm.h>
 #include <machine/cherireg.h>
+.set cheri_sysregs_accessible	# Don't warn on access to c27-c30
 #endif
 
 #include "assym.s"

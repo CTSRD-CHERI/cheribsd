@@ -134,13 +134,23 @@ struct cheri_kframe {
 };
 #endif
 
+
+#ifdef _KERNEL
+#define _INLINE_CHERI_ASM_OPTIONS		\
+	".set noreorder\n.set cheri_sysregs_accessible\n"
+#else
+#define _INLINE_CHERI_ASM_OPTIONS		\
+	".set noreorder\n"
+#endif
+
+
 /*
  * CHERI capability register manipulation macros.
  */
 #define	CHERI_CGETBASE(v, cb) do {					\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	  _INLINE_CHERI_ASM_OPTIONS					\
 	    "cgetbase %0, $c%1\n"					\
 	    ".set pop\n"						\
 	    : "=r" (v) : "i" (cb));					\
@@ -149,7 +159,7 @@ struct cheri_kframe {
 #define	CHERI_CGETLEN(v, cb) do {					\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	  _INLINE_CHERI_ASM_OPTIONS					\
 	    "cgetlen %0, $c%1\n"					\
 	    ".set pop\n"						\
 	    : "=r" (v) :"i" (cb));					\
@@ -158,7 +168,7 @@ struct cheri_kframe {
 #define	CHERI_CGETOFFSET(v, cb) do {					\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	    _INLINE_CHERI_ASM_OPTIONS					\
 	    "cgetoffset %0, $c%1\n"					\
 	    ".set pop\n"						\
 	    : "=r" (v) : "i" (cb));					\
@@ -167,7 +177,7 @@ struct cheri_kframe {
 #define	CHERI_CGETTAG(v, cb) do {					\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	    _INLINE_CHERI_ASM_OPTIONS					\
 	    "cgettag %0, $c%1\n"					\
 	    ".set pop\n"						\
 	    : "=r" (v) : "i" (cb));					\
@@ -176,7 +186,7 @@ struct cheri_kframe {
 #define	CHERI_CGETSEALED(v, cb) do {					\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	    _INLINE_CHERI_ASM_OPTIONS					\
 	    "cgetsealed %0, $c%1\n"					\
 	    ".set pop\n"						\
 	    : "=r" (v) : "i" (cb));					\
@@ -185,7 +195,7 @@ struct cheri_kframe {
 #define	CHERI_CGETPERM(v, cb) do {					\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	    _INLINE_CHERI_ASM_OPTIONS					\
 	    "cgetperm %0, $c%1\n"					\
 	    ".set pop\n"						\
 	    : "=r" (v) : "i" (cb));					\
@@ -194,7 +204,7 @@ struct cheri_kframe {
 #define	CHERI_CGETTYPE(v, cb) do {					\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	    _INLINE_CHERI_ASM_OPTIONS					\
 	    "cgettype %0, $c%1\n"					\
 	    ".set pop\n"						\
 	    : "=r" (v) : "i" (cb));					\
@@ -203,7 +213,7 @@ struct cheri_kframe {
 #define	CHERI_CGETCAUSE(v) do {						\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	    _INLINE_CHERI_ASM_OPTIONS					\
 	    "cgetcause %0\n"						\
 	    ".set pop\n"						\
 	    : "=r" (v));						\
@@ -212,7 +222,7 @@ struct cheri_kframe {
 #define	CHERI_CTOPTR(v, cb, ct) do {					\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	    _INLINE_CHERI_ASM_OPTIONS					\
 	    "ctoptr %0, $c%1, $c%2\n"					\
 	    ".set pop\n"						\
 	    : "=r" (v) : "i" (cb), "i" (ct));				\
@@ -226,7 +236,7 @@ struct cheri_kframe {
 #define	CHERI_CGETDEFAULT(cd) do {					\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	    _INLINE_CHERI_ASM_OPTIONS					\
 	    "cgetdefault $c%0\n"					\
 	    ".set pop\n"						\
 	    : : "i" (cd));						\
@@ -235,7 +245,7 @@ struct cheri_kframe {
 #define	CHERI_CGETEPCC(cd) do {						\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	    _INLINE_CHERI_ASM_OPTIONS					\
 	    "cgetepcc $c%0\n"						\
 	    ".set pop\n"						\
 	    : : "i" (cd));						\
@@ -248,7 +258,7 @@ struct cheri_kframe {
 #define	CHERI_CCHECKPERM(cs, v) do {					\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	    _INLINE_CHERI_ASM_OPTIONS					\
 	    "ccheckperm $c%0, %1\n" 					\
 	    ".set pop\n"						\
 	    : : "i" (cd), "r" (v));					\
@@ -257,7 +267,7 @@ struct cheri_kframe {
 #define	CHERI_CCHECKTYPE(cs, cb) do {					\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	    _INLINE_CHERI_ASM_OPTIONS					\
 	    "cchecktype $c%0, $c%1\n"					\
 	    ".set pop\n"						\
 	    : : "i" (cs), "i" (cb));					\
@@ -275,14 +285,14 @@ struct cheri_kframe {
 	if ((cd) == 0)							\
 		__asm__ __volatile__ (					\
 		    ".set push\n"					\
-		    ".set noreorder\n"					\
+		    _INLINE_CHERI_ASM_OPTIONS				\
 		    "cseal $c%0, $c%1, $c%2\n"				\
 		    ".set pop\n"					\
 		    : : "i" (cd), "i" (cs), "i" (ct) : "memory");	\
 	else								\
 		__asm__ __volatile__ (					\
 		    ".set push\n"					\
-		    ".set noreorder\n"					\
+		    _INLINE_CHERI_ASM_OPTIONS				\
 		    "cseal $c%0, $c%1, $c%2\n"				\
 		    ".set pop\n"					\
 		    : : "i" (cd), "i" (cs), "i" (ct));			\
@@ -292,14 +302,14 @@ struct cheri_kframe {
 	if ((cd) == 0)							\
 		__asm__ __volatile__ (					\
 		    ".set push\n"					\
-		    ".set noreorder\n"					\
+		    _INLINE_CHERI_ASM_OPTIONS				\
 		    "cunseal $c%0, $c%1, $c%2\n"			\
 		    ".set pop\n"					\
 		    : : "i" (cd), "i" (cb), "i" (ct) : "memory");	\
 	else								\
 		__asm__ __volatile__ (					\
 		    ".set push\n"					\
-		    ".set noreorder\n"					\
+		    _INLINE_CHERI_ASM_OPTIONS				\
 		    "cunseal $c%0, $c%1, $c%2\n"			\
 		    ".set pop\n"					\
 		    : : "i" (cd), "i" (cb), "i" (ct));			\
@@ -308,7 +318,7 @@ struct cheri_kframe {
 #define	CHERI_CCALL(cs, cb) do {					\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	    _INLINE_CHERI_ASM_OPTIONS					\
 	    "ccall $c%0, $c%1\n"					\
 	    ".set pop\n"						\
 	    : :	"i" (cs), "i" (cb) : "memory");				\
@@ -317,7 +327,7 @@ struct cheri_kframe {
 #define	CHERI_CRETURN() do {						\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	    _INLINE_CHERI_ASM_OPTIONS					\
 	    "creturn\n"							\
 	    ".set pop\n"						\
 	    : : : "memory");						\
@@ -330,7 +340,7 @@ struct cheri_kframe {
 #define	CHERI_CSC(cs, cb, regbase, offset) do {				\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	    _INLINE_CHERI_ASM_OPTIONS					\
 	    "csc $c%0, %1, %2($c%3)\n"					\
 	    ".set pop\n"						\
 	    : : "i" (cs), "r" (regbase), "i" (offset), "i" (cb) :	\
@@ -344,7 +354,7 @@ struct cheri_kframe {
 #define	CHERI_CSB(rs, rt, offset, cb) do {				\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	    _INLINE_CHERI_ASM_OPTIONS					\
 	    "csb %0, %1, %2($c%3)\n"					\
 	    ".set pop\n"						\
 	    : : "r" (rs), "r" (rt), "i" (offset), "i" (cb) : "memory");	\
@@ -353,7 +363,7 @@ struct cheri_kframe {
 #define	CHERI_CSH(rs, rt, offset, cb) do {				\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	    _INLINE_CHERI_ASM_OPTIONS					\
 	    "csh %0, %1, %2($c%3)\n"					\
 	    ".set pop\n"						\
 	    : : "r" (rs), "r" (rt), "i" (offset), "i" (cb) : "memory");	\
@@ -362,7 +372,7 @@ struct cheri_kframe {
 #define	CHERI_CSW(rs, rt, offset, cb) do {				\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	    _INLINE_CHERI_ASM_OPTIONS					\
 	    "csw %0, %1, %2($c%3)\n"					\
 	    ".set pop\n"						\
 	    : : "r" (rs), "r" (rt), "i" (offset), "i" (cb) : "memory");	\
@@ -371,7 +381,7 @@ struct cheri_kframe {
 #define	CHERI_CSD(rs, rt, offset, cb) do {				\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	    _INLINE_CHERI_ASM_OPTIONS					\
 	    "csd %0, %1, %2($c%3)\n"					\
 	    ".set pop\n"						\
 	    : : "r" (rs), "r" (rt), "i" (offset), "i" (cb) : "memory");	\
@@ -384,7 +394,7 @@ struct cheri_kframe {
 #define	CHERI_CLB(rd, rt, offset, cb) do {				\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	    _INLINE_CHERI_ASM_OPTIONS					\
 	    "clb %0, %1, %2($c%3)\n"					\
 	    ".set pop\n"						\
 	     : "=r" (rd) : "r" (rt), "i" (offset),"i" (cb) : "memory");	\
@@ -393,7 +403,7 @@ struct cheri_kframe {
 #define	CHERI_CLH(rd, rt, offset, cb) do {				\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	    _INLINE_CHERI_ASM_OPTIONS					\
 	    "clh %0, %1, %2($c%3)\n"					\
 	    ".set pop\n"						\
 	    : "=r" (rd) : "r" (rt), "i" (offset), "i" (cb) : "memory");	\
@@ -402,7 +412,7 @@ struct cheri_kframe {
 #define	CHERI_CLW(rd, rt, offset, cb) do {				\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	    _INLINE_CHERI_ASM_OPTIONS					\
 	    "clw %0, %1, %2($c%3)\n"					\
 	    ".set pop\n"						\
 	    : "=r" (rd) : "r" (rt), "i" (offset), "i" (cb) : "memory");	\
@@ -411,7 +421,7 @@ struct cheri_kframe {
 #define	CHERI_CLD(rd, rt, offset, cb) do {				\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	    _INLINE_CHERI_ASM_OPTIONS					\
 	    "cld %0, %1, %2($c%3)\n"					\
 	    ".set pop\n"						\
 	    : "=r" (rd) : "r" (rt), "i" (offset), "i" (cb) : "memory");	\
@@ -420,7 +430,7 @@ struct cheri_kframe {
 #define	CHERI_CLBU(rd, rt, offset, cb) do {				\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	    _INLINE_CHERI_ASM_OPTIONS					\
 	    "clbu %0, %1, %2($c%3)\n"					\
 	    ".set pop\n"						\
 	    : "=r" (rd) : "r" (rt), "i" (offset), "i" (cb) : "memory");	\
@@ -429,7 +439,7 @@ struct cheri_kframe {
 #define	CHERI_CLHU(rd, rt, offset, cb) do {				\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	    _INLINE_CHERI_ASM_OPTIONS					\
 	    "clhu %0, %1, %2($c%3)\n"					\
 	    ".set pop\n"						\
 	    : "=r" (rd) : "r" (rt), "i" (offset), "i" (cb) : "memory");	\
@@ -438,7 +448,7 @@ struct cheri_kframe {
 #define	CHERI_CLWU(rd, rt, offset, cb) do {				\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	    _INLINE_CHERI_ASM_OPTIONS					\
 	    "clwu %0, %1, %2($c%3)\n"					\
 	    ".set pop\n"						\
 	    : "=r" (rd) : "r" (rt), "i" (offset), "i" (cb) : "memory");	\
@@ -456,14 +466,14 @@ struct cheri_kframe {
 	if ((cd) == 0)							\
 		__asm__ __volatile__ (					\
 		    ".set push\n"					\
-		    ".set noreorder\n"					\
+		    _INLINE_CHERI_ASM_OPTIONS				\
 		    "cgetpcc %0, $c%1\n"				\
 		    ".set pop\n"					\
 		    : "=r" (v) : "i" (cd) : "memory");			\
 	else								\
 		__asm__ __volatile__ (					\
 		    ".set push\n"					\
-		    ".set noreorder\n"					\
+		    _INLINE_CHERI_ASM_OPTIONS				\
 		    "cgetpcc %0, $c%1\n"				\
 		    ".set pop\n"					\
 		    : "=r" (v) : "i" (cd));				\
@@ -473,14 +483,14 @@ struct cheri_kframe {
 	if ((cd) == 0)							\
 		__asm__ __volatile__ (					\
 		    ".set push\n"					\
-		    ".set noreorder\n"					\
+		    _INLINE_CHERI_ASM_OPTIONS				\
 		    "cincbase $c%0, $c%1, %2\n"				\
 		    ".set pop\n"					\
 		    : :	"i" (cd), "i" (cb), "r" (v) : "memory");	\
 	else								\
 		__asm__ __volatile__ (					\
 		    ".set push\n"					\
-		    ".set noreorder\n"					\
+		    _INLINE_CHERI_ASM_OPTIONS				\
 		    "cincbase $c%0, $c%1, %2\n"				\
 		    ".set pop\n"					\
 		    : :	"i" (cd), "i" (cb), "r" (v));			\
@@ -490,14 +500,14 @@ struct cheri_kframe {
 	if ((cd) == 0)							\
 		__asm__ __volatile__ (					\
 		    ".set push\n"					\
-		    ".set noreorder\n"					\
+		    _INLINE_CHERI_ASM_OPTIONS				\
 		    "cincoffset $c%0, $c%1, %2\n"			\
 		    ".set pop\n"					\
 		    : :	"i" (cd), "i" (cb), "r" (v) : "memory");	\
 	else								\
 		__asm__ __volatile__ (					\
 		    ".set push\n"					\
-		    ".set noreorder\n"					\
+		    _INLINE_CHERI_ASM_OPTIONS				\
 		    "cincoffset $c%0, $c%1, %2\n"			\
 		    ".set pop\n"					\
 		    : :	"i" (cd), "i" (cb), "r" (v));			\
@@ -508,14 +518,14 @@ struct cheri_kframe {
 	if ((cd) == 0)							\
 		__asm__ __volatile__ (					\
 		    ".set push\n"					\
-		    ".set noreorder\n"					\
+		    _INLINE_CHERI_ASM_OPTIONS				\
 		    "cmove $c%0, $c%1\n"				\
 		    ".set pop\n"					\
 		    : : "i" (cd), "i" (cb) : "memory");			\
 	else								\
 		__asm__ __volatile__ (					\
 		    ".set push\n"					\
-		    ".set noreorder\n"					\
+		    _INLINE_CHERI_ASM_OPTIONS				\
 		    "cmove $c%0, $c%1\n"				\
 		    ".set pop\n"					\
 		    : : "i" (cd), "i" (cb));				\
@@ -527,7 +537,7 @@ struct cheri_kframe {
 #define	CHERI_CSETDEFAULT(cb) do {					\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
-	    ".set noreorder\n"						\
+	    _INLINE_CHERI_ASM_OPTIONS					\
 	    "csetdefault %c%0\n"					\
 	    ".set pop\n"						\
 	    : : "i" (cb) : "memory");					\
@@ -537,14 +547,14 @@ struct cheri_kframe {
 	if ((cd) == 0)							\
 		__asm__ __volatile__ (					\
 		    ".set push\n"					\
-		    ".set noreorder\n"					\
+		    _INLINE_CHERI_ASM_OPTIONS				\
 		    "csetlen $c%0, $c%1, %2\n"				\
 		    ".set pop\n"					\
 		    : :	"i" (cd), "i" (cb), "r" (v) : "memory");	\
 	else								\
 		__asm__ __volatile__ (					\
 		    ".set push\n"					\
-		    ".set noreorder\n"					\
+		    _INLINE_CHERI_ASM_OPTIONS				\
 		    "csetlen $c%0, $c%1, %2\n"				\
 		    ".set pop\n"					\
 		    : :	"i" (cd), "i" (cb), "r" (v));			\
@@ -554,14 +564,14 @@ struct cheri_kframe {
 	if ((cd) == 0)							\
 		__asm__ __volatile__ (					\
 		    ".set push\n"					\
-		    ".set noreorder\n"					\
+		    _INLINE_CHERI_ASM_OPTIONS				\
 		    "csetoffset $c%0, $c%1, %2\n"			\
 		    ".set pop\n"					\
 		    : :	"i" (cd), "i" (cb), "r" (v) : "memory");	\
 	else								\
 		__asm__ __volatile__ (					\
 		    ".set push\n"					\
-		    ".set noreorder\n"					\
+		    _INLINE_CHERI_ASM_OPTIONS				\
 		    "csetoffset $c%0, $c%1, %2\n"			\
 		    ".set pop\n"					\
 		    : :	"i" (cd), "i" (cb), "r" (v));			\
@@ -571,14 +581,14 @@ struct cheri_kframe {
 	if ((cd) == 0)							\
 		__asm__ __volatile__ (					\
 		    ".set push\n"					\
-		    ".set noreorder\n"					\
+		    _INLINE_CHERI_ASM_OPTIONS				\
 		    "ccleartag $c%0, $c%1\n"				\
 		    ".set pop\n"					\
 		    : : "i" (cd), "i" (cb) : "memory");			\
 	else								\
 		__asm__ __volatile__ (					\
 		    ".set push\n"					\
-		    ".set noreorder\n"					\
+		    _INLINE_CHERI_ASM_OPTIONS				\
 		    "ccleartag $c%0, $c%1\n"				\
 		    ".set pop\n"					\
 		    : :	"i" (cd), "i" (cb));				\
@@ -588,14 +598,14 @@ struct cheri_kframe {
 	if ((cd) == 0)							\
 		__asm__ __volatile__ (					\
 		    ".set push\n"					\
-		    ".set noreorder\n"					\
+		    _INLINE_CHERI_ASM_OPTIONS				\
 		    "candperm $c%0, $c%1, %2\n"				\
 		    ".set pop\n"					\
 		    : :	"i" (cd), "i" (cb), "r" (v) : "memory");	\
 	else								\
 		__asm__ __volatile__ (					\
 		    ".set push\n"					\
-		    ".set noreorder\n"					\
+		    _INLINE_CHERI_ASM_OPTIONS				\
 		    "candperm $c%0, $c%1, %2\n"				\
 		    ".set pop\n"					\
 		    : :	"i" (cd), "i" (cb), "r" (v));			\
@@ -605,14 +615,14 @@ struct cheri_kframe {
 	if ((cd) == 0)							\
 		__asm__ __volatile__ (					\
 		    ".set push\n"					\
-		    ".set noreorder\n"					\
+		    _INLINE_CHERI_ASM_OPTIONS				\
 		    "csetbounds $c%0, $c%1, %2\n"			\
 		    ".set pop\n"					\
 		    : :	"i" (cd), "i" (cb), "r" (v) : "memory");	\
 	else								\
 		__asm__ __volatile__ (					\
 		    ".set push\n"					\
-		    ".set noreorder\n"					\
+		    _INLINE_CHERI_ASM_OPTIONS				\
 		    "csetbounds $c%0, $c%1, %2\n"			\
 		    ".set pop\n"					\
 		    : :	"i" (cd), "i" (cb), "r" (v));			\
@@ -622,14 +632,14 @@ struct cheri_kframe {
 	if ((cd) == 0)							\
 		__asm__ __volatile__ (					\
 		    ".set push\n"					\
-		    ".set noreorder\n"					\
+		    _INLINE_CHERI_ASM_OPTIONS				\
 		    "cfromptr $c%0, $c%1, %2\n"				\
 		    ".set pop\n"					\
 		    : :	"i" (cd), "i" (cb), "r" (v) : "memory");	\
 	else								\
 		__asm__ __volatile__ (					\
 		    ".set push\n"					\
-		    ".set noreorder\n"					\
+		    _INLINE_CHERI_ASM_OPTIONS				\
 		    "cfromptr $c%0, $c%1, %2\n"				\
 		    ".set pop\n"					\
 		    : :	"i" (cd), "i" (cb), "r" (v));			\
@@ -639,7 +649,7 @@ struct cheri_kframe {
 	if ((cd) == 0)							\
 		__asm__ __volatile__ (					\
 		    ".set push\n"					\
-		    ".set noreorder\n"					\
+		    _INLINE_CHERI_ASM_OPTIONS				\
 		    "clc $c%0, %1, %2($c%3)\n"				\
 		    ".set pop\n"					\
 		    : :	"i" (cd), "r" (regbase), "i" (offset), "i" (cb)	\
@@ -647,7 +657,7 @@ struct cheri_kframe {
 	else								\
 		__asm__ __volatile__ (					\
 		    ".set push\n"					\
-		    ".set noreorder\n"					\
+		    _INLINE_CHERI_ASM_OPTIONS				\
 		    "clc $c%0, %1, %2($c%3)\n"				\
 		    ".set pop\n"					\
 		    : : "i" (cd), "r" (regbase), "i" (offset),		\

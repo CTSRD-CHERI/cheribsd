@@ -67,6 +67,7 @@
 #ifdef CPU_CHERI
 #include <machine/cheriasm.h>
 #include <machine/cherireg.h>
+.set cheri_sysregs_accessible
 #endif
 
 #include "assym.s"

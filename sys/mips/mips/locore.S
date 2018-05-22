@@ -72,6 +72,7 @@
 
 #if defined(CPU_CHERI)
 #include <machine/cheriasm.h>
+.set cheri_sysregs_accessible	# Don't warn about uses of c27-c30
 #endif
 
 #include "assym.s"
