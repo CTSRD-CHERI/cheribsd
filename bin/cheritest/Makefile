@@ -52,7 +52,10 @@ CFLAGS+=	-DKERNEL_MEMCPY_TESTS
 .ifdef CHERI_C_TESTS
 CHERI_C_TESTS_DIR=	${SRCTOP}/contrib/cheri-c-tests
 .if exists(${CHERI_C_TESTS_DIR}/Makefile)
-.PATH: ${CHERI_C_TESTS_DIR}
+.PATH: ${CHERI_C_TESTS_DIR} \
+		${CHERI_C_TESTS_DIR}/clang-hybrid \
+		${CHERI_C_TESTS_DIR}/clang-purecap \
+		${CHERI_C_TESTS_DIR}/libc
 CFLAGS+=	-DCHERI_C_TESTS \
 		-I${CHERI_C_TESTS_DIR}
 
@@ -62,6 +65,7 @@ CFLAGS+=	-DTEST_CUSTOM_FRAMEWORK -I${CHERITEST_DIR} \
 		-DHAVE_MALLOC_USUABLE_SIZE
 TEST_SRCS!=	grep ^DECLARE_TEST ${CHERI_C_TESTS_DIR}/cheri_c_testdecls.h | \
 		    sed -e 's/.*(\([^,]*\),.*/\1.c/'
+.info TEST_SRCS=${TEST_SRCS}
 SRCS+=	test_runtime.c	\
 	${TEST_SRCS}
 .endif
