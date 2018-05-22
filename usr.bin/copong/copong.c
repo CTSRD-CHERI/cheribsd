@@ -42,6 +42,8 @@ __FBSDID("$FreeBSD$");
 #include <stdlib.h>
 #include <unistd.h>
 
+static char buf[1000000];
+
 static void
 usage(void)
 {
@@ -53,7 +55,6 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	char buf[10000];
 	void * __capability switcher_code;
 	void * __capability switcher_data;
 	bool vflag = false;
