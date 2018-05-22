@@ -4,7 +4,7 @@ SHLIB_MAJOR?=	11
 
 .include "../Makefile.inc"
 
-.if defined(LIBCHERI) && !empty(CHERI_USE_CAP_TABLE) && ${MK_CHERI256} == "yes"
+.if defined(LIBCHERI) && ${MK_CHERI256} == "yes"
 # For shared libraries it is fine since each of them has it's own table but
 # when statically linking sshd we are slightly over the limit:
 # added 18093 entries to .cap_table but current maximum is 16384; try recompiling non-performance critical source files with -mllvm -mxcaptable
