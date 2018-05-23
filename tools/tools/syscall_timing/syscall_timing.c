@@ -48,7 +48,9 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <limits.h>
+#ifdef WITH_PTHREAD
 #include <pthread.h>
+#endif
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -352,6 +354,7 @@ test_pipeping(uintmax_t num, uintmax_t int_arg, const char *path __unused)
 	return (i);
 }
 
+#ifdef WITH_PTHREAD
 struct pipepingtd_ctx {
 	int		fd;
 	uintmax_t	int_arg;
@@ -408,6 +411,7 @@ test_pipepingtd(uintmax_t num, uintmax_t int_arg, const char *path __unused)
 
 	return (i);
 }
+#endif
 
 static uintmax_t
 test_gettimeofday(uintmax_t num, uintmax_t int_arg __unused, const char *path __unused)
@@ -962,6 +966,7 @@ static const struct test tests[] = {
 	{ "pipeping_1000", test_pipeping, .t_flags = 0, .t_int = 1000 },
 	{ "pipeping_10000", test_pipeping, .t_flags = 0, .t_int = 10000 },
 	{ "pipeping_100000", test_pipeping, .t_flags = 0, .t_int = 100000 },
+#ifdef WITH_PTHREAD
 	{ "pipeping_1000000", test_pipeping, .t_flags = 0, .t_int = 1000000 },
 	{ "pipepingtd_1", test_pipepingtd, .t_flags = 0, .t_int = 1 },
 	{ "pipepingtd_10", test_pipepingtd, .t_flags = 0, .t_int = 10 },
@@ -970,6 +975,7 @@ static const struct test tests[] = {
 	{ "pipepingtd_10000", test_pipepingtd, .t_flags = 0, .t_int = 10000 },
 	{ "pipepingtd_100000", test_pipepingtd, .t_flags = 0, .t_int = 100000 },
 	{ "pipepingtd_1000000", test_pipepingtd, .t_flags = 0, .t_int = 1000000 },
+#endif
 	{ "gettimeofday", test_gettimeofday, .t_flags = 0 },
 	{ "getpriority", test_getpriority, .t_flags = 0 },
 	{ "getprogname", test_getprogname, .t_flags = 0 },

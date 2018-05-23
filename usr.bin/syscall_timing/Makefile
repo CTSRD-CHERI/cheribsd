@@ -5,7 +5,7 @@
 PROG=	syscall_timing
 MAN=
 
-LIBADD=		pthread statcounters
+LIBADD=		statcounters
 CFLAGS+=	-DWITH_LIBSTATCOUNTERS
 CFLAGS+=	-fPIE -pie -Wno-error=deprecated-declarations -fuse-ld=lld
 NEED_CHERI=	hybrid
