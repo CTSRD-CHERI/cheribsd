@@ -10,6 +10,7 @@ copong "${CONAME}" &
 
 for b in ${BENCHMARKS}; do
 	export STATCOUNTERS_OUTPUT="${b}.statcounters"
-	syscall_timing -s 600 -n 2 -i 1000 -l 1 -n "${CONAME}" "${b}" | tee -a results.txt
-	syscall_timing -s 600 -n 2 -i 1000 -l 1 -n "${CONAME}" -r "${b}.out" -c cycle -c inst -c itlb_miss -c dtlb_miss "${b}" | tee -a results.txt
+	syscall_timing -s 600 -i 1000 -l 1 -n "${CONAME}" "${b}" | tee -a results.txt
+	unset STATCOUNTERS_OUTPUT
+	syscall_timing -s 600 -i 1000 -l 1 -n "${CONAME}" -r "${b}.out" -c cycle -c inst -c itlb_miss -c dtlb_miss "${b}" | tee -a results.txt
 done
