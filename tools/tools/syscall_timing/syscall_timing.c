@@ -966,8 +966,8 @@ static const struct test tests[] = {
 	{ "pipeping_1000", test_pipeping, .t_flags = 0, .t_int = 1000 },
 	{ "pipeping_10000", test_pipeping, .t_flags = 0, .t_int = 10000 },
 	{ "pipeping_100000", test_pipeping, .t_flags = 0, .t_int = 100000 },
-#ifdef WITH_PTHREAD
 	{ "pipeping_1000000", test_pipeping, .t_flags = 0, .t_int = 1000000 },
+#ifdef WITH_PTHREAD
 	{ "pipepingtd_1", test_pipepingtd, .t_flags = 0, .t_int = 1 },
 	{ "pipepingtd_10", test_pipepingtd, .t_flags = 0, .t_int = 10 },
 	{ "pipepingtd_100", test_pipepingtd, .t_flags = 0, .t_int = 100 },
