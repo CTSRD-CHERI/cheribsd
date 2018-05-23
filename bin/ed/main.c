@@ -103,7 +103,7 @@ static const char *usage = "usage: %s [-] [-sx] [-p string] [file]\n";
 
 /* ed: line editor */
 int
-main(int argc, char ** argv)
+main(volatile int argc, char ** volatile argv)
 {
 	int c, n;
 	long status = 0;
