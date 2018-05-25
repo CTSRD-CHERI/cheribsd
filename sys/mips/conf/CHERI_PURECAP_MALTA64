@@ -32,7 +32,16 @@ nooptions	GEOM_RAID
 # debugging
 options		VERBOSE_SYSINIT
 options		BUS_DEBUG
+# options		KTR
+# options		KTR_VERBOSE=2
+# nooptions	KTR_ALQ
 # should enable witness and invariants?
+
+# XXX TODO
+# nodevice ata
+# nodevice vga
+# disable nfs
+nooptions	COMPAT_CHERIABI
 
 #
 # Features required for CHERI CPU and CheriBSD support.
