@@ -76,7 +76,9 @@ static union {
  */
 CTASSERT(offsetof(struct trapframe, ddc) % CHERICAP_SIZE == 0);
 CTASSERT(offsetof(struct mdthread, md_tls_cap) % CHERICAP_SIZE == 0);
+#ifdef COMPAT_CHERIABI
 CTASSERT(offsetof(struct mdthread, md_cheri_mmap_cap) % CHERICAP_SIZE == 0);
+#endif
 
 /*
  * Ensure that the compiler being used to build the kernel agrees with the
@@ -102,6 +104,114 @@ CTASSERT(sizeof(void *__capability) == 32);
 CTASSERT(sizeof(struct chericap) == 32);
 CTASSERT(sizeof(struct cheri_object) == 64);
 #endif
+
+#ifdef CHERI_KERNEL
+__attribute__((weak))
+extern Elf64_Capreloc __start___cap_relocs;
+__attribute__((weak))
+extern Elf64_Capreloc __stop___cap_relocs;
+
+/* Defined in linker script, mark the end of .text and kernel image */
+extern char etext[], end[];
+
+/* 
+ * Global capabilities for various address-space segments.
+ */
+caddr_t cheri_xuseg_capability;
+caddr_t cheri_xkphys_capability;
+caddr_t cheri_xkseg_capability;
+caddr_t cheri_kseg0_capability;
+caddr_t cheri_kseg1_capability;
+caddr_t cheri_kseg2_capability;
+caddr_t cheri_kcode_capability;
+caddr_t cheri_kdata_capability;
+caddr_t cheri_kall_capability;
+
+/*
+ * This is called from locore to initialise the cap table entries
+ * and other capability relocations.
+ */
+void
+process_kernel_cap_relocs(Elf64_Capreloc *start, Elf64_Capreloc *end)
+{
+	void *pcc = cheri_getpcc();
+	void *gdc = cheri_getdefault();
+
+	for (Elf64_Capreloc *reloc = start; reloc < end; reloc++) {
+		void *cap;
+		void **dst = cheri_setoffset(gdc, reloc->location);
+
+		/* XXX-AM: at some point we should be able to switch to
+		 * the cbuildcap instruction to reconstruct the capability.
+		 */
+		if ((reloc->permissions & ELF64_CAPRELOC_FUNCTION) ==
+		    ELF64_CAPRELOC_FUNCTION) {
+			cap = cheri_setoffset(pcc, reloc->object);
+		}
+		else {
+			cap = cheri_setoffset(gdc, reloc->object);
+			if (reloc->size != 0)
+				cap = cheri_csetbounds(cap, reloc->size);
+		}
+		cap = cheri_incoffset(cap, reloc->offset);
+		*dst = cap;
+	}
+}
+
+/*
+ * Early capability initialization.
+ * Process capability relocations and initialize
+ * kernel segment capabilities.
+ *
+ * Note this must be called before accessing any global
+ * pointer. And after clearing .bss and .sbss because
+ * it stores data in those sections.
+ */
+void
+cheri_init_capabilities()
+{
+	void *kdc = cheri_getkdc();
+
+	/*
+	 * Split kdc and generate a capability for each memory segment.
+	 * XXX-AM: we should also have a separate capability for
+	 * KCC that covers only kernel .text and exception vectors
+	 * KDC that covers only kernel .data/.rodata/.bss etc.
+	 * Those should fall both into kseg0.
+	 */
+	cheri_xuseg_capability = cheri_csetbounds(
+		cheri_setoffset(kdc, MIPS_XUSEG_START),
+		MIPS_XUSEG_END - MIPS_XUSEG_START);
+	cheri_xkphys_capability = cheri_andperm(
+		cheri_csetbounds(cheri_setoffset(kdc, MIPS_XKPHYS_START),
+				 MIPS_XKPHYS_END - MIPS_XKPHYS_START),
+		(CHERI_PERM_LOAD | CHERI_PERM_STORE | CHERI_PERM_LOAD_CAP |
+		 CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP));
+	cheri_xkseg_capability = cheri_csetbounds(
+		cheri_setoffset(kdc, MIPS_XKSEG_START),
+		MIPS_XKSEG_END - MIPS_XKSEG_START);
+	cheri_kseg0_capability = cheri_csetbounds(
+		cheri_setoffset(kdc, MIPS_KSEG0_START),
+		MIPS_KSEG0_END - MIPS_KSEG0_START);
+	cheri_kseg1_capability = cheri_csetbounds(
+		cheri_setoffset(kdc, MIPS_KSEG1_START),
+		MIPS_KSEG1_END - MIPS_KSEG1_START);
+	cheri_kseg2_capability = cheri_csetbounds(
+		cheri_setoffset(kdc, MIPS_KSEG2_START),
+		MIPS_KSEG2_END - MIPS_KSEG2_START);
+	cheri_kcode_capability = cheri_andperm(
+		cheri_csetbounds(cheri_setoffset(kdc, MIPS_KSEG0_START),
+				 (vm_offset_t)&etext - MIPS_KSEG0_START),
+		(CHERI_PERM_EXECUTE | CHERI_PERM_LOAD | CHERI_PERM_CCALL | CHERI_PERM_SYSTEM_REGS));
+	cheri_kdata_capability = cheri_andperm(
+		cheri_csetbounds(cheri_setoffset(kdc, (vm_offset_t)&etext),
+				 (vm_offset_t)&end - (vm_offset_t)&etext),
+		~(CHERI_PERM_EXECUTE | CHERI_PERM_CCALL | CHERI_PERM_SEAL |
+		  CHERI_PERM_SYSTEM_REGS));
+	cheri_kall_capability = kdc;
+}
+
+#endif /* CHERI_KERNEL */
 
 /*
  * For now, all we do is declare what we support, as most initialisation took
