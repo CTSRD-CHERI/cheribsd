@@ -349,9 +349,14 @@ struct thread {
 	void		*td_lkpi_task;	/* LinuxKPI task struct pointer */
 };
 
+/*
+ * The td_sched structure size for thread0.
+ * It is assumed that the ts_name is 19 + 5 + nchars in uintmax
+ */
+#define T0ST_SCHED_SIZE sizeof(uint64_t) * 9 + sizeof(uintptr_t)
 struct thread0_storage {
 	struct thread t0st_thread;
-	uint64_t t0st_sched[10];
+	char t0st_sched[T0ST_SCHED_SIZE];
 };
 
 struct mtx *thread_lock_block(struct thread *);
