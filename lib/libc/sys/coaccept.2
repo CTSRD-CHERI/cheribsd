@@ -83,7 +83,6 @@ Basic usage example:
 	char buf[MAXBSIZE];
 	void * __capability switcher_code;
 	void * __capability switcher_data;
-	void * __capability lookedup;
 
 	error = cosetup(COSETUP_COACCEPT, &switcher_code, &switcher_data);
 	if (error != 0)
