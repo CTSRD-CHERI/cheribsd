@@ -42,6 +42,7 @@ SRCS+=	\
 SRCS+= getdents.c lstat.c mknod.c stat.c
 
 SRCS+= pipe.c
+SRCS+= vadvise.c
 
 INTERPOSED = \
 	accept \
