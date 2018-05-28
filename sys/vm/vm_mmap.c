@@ -1420,6 +1420,10 @@ retry:
 				    pmap_is_referenced(m) ||
 				    (m->a.flags & PGA_REFERENCED) != 0)
 					mincoreinfo |= MINCORE_REFERENCED_OTHER;
+
+				/* Expose capability tracking information */
+				if ((m->a.flags & PGA_CAPSTORE) != 0)
+					mincoreinfo |= MINCORE_CAPSTORE;
 			}
 			if (object != NULL)
 				VM_OBJECT_WUNLOCK(object);
