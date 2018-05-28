@@ -3424,6 +3424,8 @@ retry:
 	val = MINCORE_INCORE;
 	if (pte_test(&pte, PTE_D))
 		val |= MINCORE_MODIFIED | MINCORE_MODIFIED_OTHER;
+	if (pte_test(&pte, PTE_SC) == 0)
+		val |= MINCORE_MAYHAVECAP;
 	pa = TLBLO_PTE_TO_PA(pte);
 	if (pte_test(&pte, PTE_MANAGED)) {
 		/*
@@ -3699,7 +3701,7 @@ pmap_tc_capdirty(vm_page_t m)
 	if (!vm_page_xbusied(m) && (m->aflags & PGA_WRITEABLE) == 0)
 		return (FALSE);
 
-	found = !!(m->aflags & PGA_CAPSTORED);
+	found = (m->aflags & PGA_CAPSTORED) != 0;
 
 	rw_wlock(&pvh_global_lock);
 	TAILQ_FOREACH(pv, &m->md.pv_list, pv_next) {
