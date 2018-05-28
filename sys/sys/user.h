@@ -611,7 +611,7 @@ int	kern_proc_filedesc_out(struct proc *p, struct sbuf *sb, ssize_t maxlen,
 int	kern_proc_cwd_out(struct proc *p, struct sbuf *sb, ssize_t maxlen);
 int	kern_proc_out(struct proc *p, struct sbuf *sb, int flags);
 int	kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen,
-	int flags);
+	vm_offset_t startaddr, size_t max, int flags);
 
 int	vntype_to_kinfo(int vtype);
 void	pack_kinfo(struct kinfo_file *kif);

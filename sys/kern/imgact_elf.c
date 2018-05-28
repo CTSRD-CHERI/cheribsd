@@ -2629,7 +2629,7 @@ note_procstat_vmmap(void *arg, struct sbuf *sb, size_t *sizep)
 		sbuf_set_drain(sb, sbuf_count_drain, &size);
 		sbuf_bcat(sb, &structsize, sizeof(structsize));
 		PROC_LOCK(p);
-		kern_proc_vmmap_out(p, sb, -1, vmmap_flags);
+		kern_proc_vmmap_out(p, sb, -1, 0, 0, vmmap_flags);
 		sbuf_finish(sb);
 		sbuf_delete(sb);
 		*sizep = size;
@@ -2637,7 +2637,7 @@ note_procstat_vmmap(void *arg, struct sbuf *sb, size_t *sizep)
 		sbuf_bcat(sb, &structsize, sizeof(structsize));
 		PROC_LOCK(p);
 		kern_proc_vmmap_out(p, sb, *sizep - sizeof(structsize),
-		    vmmap_flags);
+		    0, 0, vmmap_flags);
 	}
 }
 
