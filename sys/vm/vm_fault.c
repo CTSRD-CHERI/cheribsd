@@ -489,10 +489,9 @@ vm_fault_populate(struct faultstate *fs, vm_prot_t prot, int fault_type,
 		m_mtx = NULL;
 		for (i = 0; i < npages; i++) {
 			vm_page_change_lock(&m[i], &m_mtx);
-			if ((fault_flags & VM_FAULT_WIRE) != 0) {
-				KASSERT(wired, ("VM_FAULT_WIRE && !wired"));
+			if ((fault_flags & VM_FAULT_WIRE) != 0)
 				vm_page_wire(&m[i]);
-			} else
+			else
 				vm_page_activate(&m[i]);
 			if (m_hold != NULL && m[i].pindex == fs->first_pindex) {
 				*m_hold = &m[i];
@@ -1265,6 +1264,10 @@ readrest:
 				unlock_and_deallocate(&fs);
 				goto RetryFault;
 			}
+
+			/* Reassert because wired may have changed. */
+			KASSERT(wired || (fault_flags & VM_FAULT_WIRE) == 0,
+			    ("!wired && VM_FAULT_WIRE"));
 		}
 	}
 
@@ -1316,10 +1319,9 @@ readrest:
 	 * If the page is not wired down, then put it where the pageout daemon
 	 * can find it.
 	 */
-	if ((fault_flags & VM_FAULT_WIRE) != 0) {
-		KASSERT(wired, ("VM_FAULT_WIRE && !wired"));
+	if ((fault_flags & VM_FAULT_WIRE) != 0)
 		vm_page_wire(fs.m);
-	} else
+	else
 		vm_page_activate(fs.m);
 	if (m_hold != NULL) {
 		*m_hold = fs.m;
