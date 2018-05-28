@@ -3443,6 +3443,12 @@ pmap_mincore(pmap_t pmap, vm_offset_t addr, vm_paddr_t *pap)
 	val = MINCORE_INCORE;
 	if (pte_test(&pte, PTE_D))
 		val |= MINCORE_MODIFIED | MINCORE_MODIFIED_OTHER;
+#ifdef CPU_CHERI
+	if (!pte_test(&pte, PTE_CRO))
+		val |= MINCORE_CAPSTORE;
+	if (!pte_test(&pte, PTE_SCN))
+		val |= MINCORE_CAPDIRTY;
+#endif
 	pa = TLBLO_PTE_TO_PA(pte);
 	if (pte_test(&pte, PTE_MANAGED)) {
 		/*
