@@ -4360,6 +4360,15 @@ pmap_mincore(pmap_t pmap, vm_offset_t addr, vm_paddr_t *pap)
 		if ((tpte & PTE_A) != 0)
 			val |= MINCORE_REFERENCED | MINCORE_REFERENCED_OTHER;
 
+#if __has_feature(capabilities)
+		/* XXX This should be PTE_SC, once hardware catches up */
+		if ((tpte & PTE_CD) != 0)
+			val |= MINCORE_CAPSTORE;
+		/* XXX This should be PTE_CD, once hardware catches up */
+		if ((tpte & PTE_SC) != 0)
+			val |= (MINCORE_CAPSTORE | MINCORE_CAPDIRTY);
+#endif
+
 		managed = (tpte & PTE_SW_MANAGED) == PTE_SW_MANAGED;
 	} else {
 		managed = false;
