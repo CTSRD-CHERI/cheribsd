@@ -3420,6 +3420,10 @@ pmap_mincore(pmap_t pmap, vm_offset_t addr, vm_paddr_t *pap)
 	val = MINCORE_INCORE;
 	if (pte_test(&pte, PTE_D))
 		val |= MINCORE_MODIFIED | MINCORE_MODIFIED_OTHER;
+	if (!pte_test(&pte, PTE_CRO))
+		val |= MINCORE_CAPSTORE;
+	if (!pte_test(&pte, PTE_SC))
+		val |= MINCORE_CAPDIRTY;
 	pa = TLBLO_PTE_TO_PA(pte);
 	if (pte_test(&pte, PTE_MANAGED)) {
 		/*
