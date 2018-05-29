@@ -1182,6 +1182,10 @@ exec_new_vmspace(struct image_params *imgp, const struct sysentvec *sv)
 		shmexit(vmspace);
 		pmap_remove_pages(vmspace_pmap(vmspace));
 		vm_map_remove(map, vm_map_min(map), vm_map_max(map));
+		/* An exec terminates mlockall(MCL_FUTURE). */
+		vm_map_lock(map);
+		vm_map_modflags(map, 0, MAP_WIREFUTURE);
+		vm_map_unlock(map);
 	} else if (imgp->cop != NULL) {
 		error = vmspace_coexec(p, imgp->cop, sv_minuser, sv->sv_maxuser);
 		if (error)
@@ -1194,11 +1198,6 @@ exec_new_vmspace(struct image_params *imgp, const struct sysentvec *sv)
 			return (error);
 		vmspace = p->p_vmspace;
 		map = &vmspace->vm_map;
-
-		/* An exec terminates mlockall(MCL_FUTURE). */
-		vm_map_lock(map);
-		vm_map_modflags(map, 0, MAP_WIREFUTURE);
-		vm_map_unlock(map);
 	}
 
 #ifdef CPU_QEMU_MALTA
@@ -1675,7 +1674,6 @@ exec_copyout_strings(struct image_params *imgp)
 		if (p->p_sysent->sv_szsigcode != NULL)
 			szsigcode = *(p->p_sysent->sv_szsigcode);
 	}
-
 	destp =	(uintptr_t)arginfo;
 
 	/*
