@@ -86,8 +86,6 @@ CANONICALOBJDIR:=/usr/obj${.CURDIR}
 
 OBJTOP?= ${.OBJDIR:S,${.CURDIR},,}${SRCTOP}
 
-EXTRAOBJDIRS+=	${SRCS:C|[^/]*$||:S|/$||:O:u}
-
 #
 # Warn of unorthodox object directory.
 #
@@ -127,10 +125,6 @@ obj: .PHONY
 			exit 1; \
 		fi; \
 		${ECHO} "${CANONICALOBJDIR} created for ${.CURDIR}"; \
-		if [ -n "${EXTRAOBJDIRS}" ]; then \
-			(cd ${CANONICALOBJDIR}; mkdir -p ${EXTRAOBJDIRS}); \
-			${ECHO} "Created ${EXTRAOBJDIRS} in ${CANONICALOBJDIR}"; \
-		fi; \
 	fi
 .for dir in ${SRCS:H:O:u} ${DPSRCS:H:O:u}
 	@if ! test -d ${CANONICALOBJDIR}/${dir}/; then \
