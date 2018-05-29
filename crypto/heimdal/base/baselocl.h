@@ -61,6 +61,8 @@
 #include <dispatch/dispatch.h>
 #endif
 
+#include <cheri/cheric.h>
+
 #if defined(__GNUC__) && defined(HAVE___SYNC_ADD_AND_FETCH)
 
 #define heim_base_atomic_inc(x) __sync_add_and_fetch((x), 1)
@@ -111,13 +113,14 @@ heim_base_atomic_dec(heim_base_atomic_type *x)
 #endif
 
 /* tagged strings/object/XXX */
-#define heim_base_is_tagged(x) (((uintptr_t)(x)) & 0x3)
+#define heim_base_is_tagged(x) (cheri_get_low_ptr_bits((uintptr_t)(x), 0x3) == 0x3)
 
-#define heim_base_is_tagged_object(x) ((((uintptr_t)(x)) & 0x3) == 1)
+#define heim_base_is_tagged_object(x) (cheri_get_low_ptr_bits((uintptr_t)(x), 0x3) == 1)
+/* XXXAR: I hope x is never a valid pointer... */
 #define heim_base_make_tagged_object(x, tid) \
-    ((heim_object_t)((((uintptr_t)(x)) << 5) | ((tid) << 2) | 0x1))
-#define heim_base_tagged_object_tid(x) ((((uintptr_t)(x)) & 0x1f) >> 2)
-#define heim_base_tagged_object_value(x) (((uintptr_t)(x)) >> 5)
+    ((heim_object_t)((((vaddr_t)(x)) << 5) | ((tid) << 2) | 0x1))
+#define heim_base_tagged_object_tid(x) ((((vaddr_t)(x)) & 0x1f) >> 2)
+#define heim_base_tagged_object_value(x) (((vaddr_t)(x)) >> 5)
 
 /*
  *

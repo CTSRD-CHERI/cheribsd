@@ -63,6 +63,7 @@
 #define _CRYPTO_CRYPTO_H_
 
 #include <sys/ioccom.h>
+#include <sys/_iovec.h>
 
 /* Some initial values */
 #define CRYPTO_DRIVERS_INITIAL	4
@@ -511,8 +512,7 @@ extern	int cuio_apply(struct uio *uio, int off, int len,
 	    int (*f)(void *, void *, u_int), void *arg);
 
 struct mbuf;
-struct iovec;
-extern	int crypto_mbuftoiov(struct mbuf *mbuf, struct iovec **iovptr,
+extern	int crypto_mbuftoiov(struct mbuf *mbuf, kiovec_t **iovptr,
 	    int *cnt, int *allocated);
 
 extern	void crypto_copyback(int flags, caddr_t buf, int off, int size,

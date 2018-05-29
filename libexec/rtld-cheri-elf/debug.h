@@ -50,6 +50,7 @@ extern int debug;
 
 #define _MYNAME	"ld-cheri-elf.so.1"
 
+#undef assert
 #define assert(cond)	((cond) ? (void) 0 :		\
     (msg(_MYNAME ": assert failed: " __FILE__ ":"	\
       __XSTRING(__LINE__) ":" #cond "\n"), abort()))

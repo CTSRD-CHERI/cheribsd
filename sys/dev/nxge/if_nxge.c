@@ -1362,18 +1362,23 @@ int
 xge_ioctl_stats(xge_lldev_t *lldev, struct ifreq *ifreqp)
 {
 	xge_hal_status_e status = XGE_HAL_OK;
-	char *data = (char *)ifreqp->ifr_data;
+	char cmd, mode;
 	void *info = NULL;
 	int retValue = EINVAL;
 
-	switch(*data) {
+	cmd = fubyte_c(ifr_data_get_ptr(ifreqp));
+	if (cmd == -1)
+		return (EFAULT);
+
+	switch(cmd) {
 	    case XGE_QUERY_STATS:
 	        mtx_lock(&lldev->mtx_drv);
 	        status = xge_hal_stats_hw(lldev->devh,
 	            (xge_hal_stats_hw_info_t **)&info);
 	        mtx_unlock(&lldev->mtx_drv);
 	        if(status == XGE_HAL_OK) {
-	            if(copyout(info, ifreqp->ifr_data,
+	            if(copyout_c((__cheri_tocap void * __capability)info,
+			ifr_data_get_ptr(ifreqp),
 	                sizeof(xge_hal_stats_hw_info_t)) == 0)
 	                retValue = 0;
 	        }
@@ -1391,7 +1396,8 @@ xge_ioctl_stats(xge_lldev_t *lldev, struct ifreq *ifreqp)
 	                sizeof(xge_hal_pci_config_t));
 	            mtx_unlock(&lldev->mtx_drv);
 	            if(status == XGE_HAL_OK) {
-	                if(copyout(info, ifreqp->ifr_data,
+	                if(copyout_c((__cheri_tocap void * __capability)info,
+			    ifr_data_get_ptr(ifreqp),
 	                    sizeof(xge_hal_pci_config_t)) == 0)
 	                    retValue = 0;
 	            }
@@ -1411,7 +1417,8 @@ xge_ioctl_stats(xge_lldev_t *lldev, struct ifreq *ifreqp)
 	                sizeof(xge_hal_stats_device_info_t));
 	            mtx_unlock(&lldev->mtx_drv);
 	            if(status == XGE_HAL_OK) {
-	                if(copyout(info, ifreqp->ifr_data,
+	                if(copyout_c((__cheri_tocap void * __capability)info,
+			    ifr_data_get_ptr(ifreqp),
 	                    sizeof(xge_hal_stats_device_info_t)) == 0)
 	                    retValue = 0;
 	            }
@@ -1432,7 +1439,8 @@ xge_ioctl_stats(xge_lldev_t *lldev, struct ifreq *ifreqp)
 	                sizeof(xge_hal_stats_sw_err_t));
 	            mtx_unlock(&lldev->mtx_drv);
 	            if(status == XGE_HAL_OK) {
-	                if(copyout(info, ifreqp->ifr_data,
+	                if(copyout_c((__cheri_tocap void * __capability)info,
+			    ifr_data_get_ptr(ifreqp),
 	                    sizeof(xge_hal_stats_sw_err_t)) == 0)
 	                    retValue = 0;
 	            }
@@ -1445,7 +1453,9 @@ xge_ioctl_stats(xge_lldev_t *lldev, struct ifreq *ifreqp)
 	        break;
 
 	    case XGE_QUERY_DRIVERSTATS:
-		if(copyout(&lldev->driver_stats, ifreqp->ifr_data,
+		if(copyout_c(
+		    (__cheri_tocap void * __capability)&lldev->driver_stats,
+		    ifr_data_get_ptr(ifreqp),
 	            sizeof(xge_driver_stats_t)) == 0) {
 	            retValue = 0;
 	        }
@@ -1459,7 +1469,8 @@ xge_ioctl_stats(xge_lldev_t *lldev, struct ifreq *ifreqp)
 	        info = xge_os_malloc(NULL, XGE_BUFFER_SIZE);
 	        if(info != NULL) {
 	            strcpy(info, XGE_DRIVER_VERSION);
-	            if(copyout(info, ifreqp->ifr_data, XGE_BUFFER_SIZE) == 0)
+	            if(copyout_c((__cheri_tocap void * __capability)info,
+			ifr_data_get_ptr(ifreqp), XGE_BUFFER_SIZE) == 0)
 	                retValue = 0;
 	            xge_os_free(NULL, info, XGE_BUFFER_SIZE);
 	        }
@@ -1473,7 +1484,8 @@ xge_ioctl_stats(xge_lldev_t *lldev, struct ifreq *ifreqp)
 	                sizeof(xge_hal_device_config_t));
 	            mtx_unlock(&lldev->mtx_drv);
 	            if(status == XGE_HAL_OK) {
-	                if(copyout(info, ifreqp->ifr_data,
+	                if(copyout_c((__cheri_tocap void * __capability)info,
+			    ifr_data_get_ptr(ifreqp),
 	                    sizeof(xge_hal_device_config_t)) == 0)
 	                    retValue = 0;
 	            }
@@ -1486,7 +1498,9 @@ xge_ioctl_stats(xge_lldev_t *lldev, struct ifreq *ifreqp)
 	        break;
 
 	    case XGE_QUERY_BUFFER_MODE:
-	        if(copyout(&lldev->buffer_mode, ifreqp->ifr_data,
+	        if(copyout_c(
+		    (__cheri_tocap void * __capability)&lldev->buffer_mode,
+		    ifr_data_get_ptr(ifreqp),
 	            sizeof(int)) == 0)
 	            retValue = 0;
 	        break;
@@ -1494,8 +1508,9 @@ xge_ioctl_stats(xge_lldev_t *lldev, struct ifreq *ifreqp)
 	    case XGE_SET_BUFFER_MODE_1:
 	    case XGE_SET_BUFFER_MODE_2:
 	    case XGE_SET_BUFFER_MODE_5:
-	        *data = (*data == XGE_SET_BUFFER_MODE_1) ? 'Y':'N';
-	        if(copyout(data, ifreqp->ifr_data, sizeof(data)) == 0)
+	        mode = (cmd == XGE_SET_BUFFER_MODE_1) ? 'Y':'N';
+	        if(copyout_c(&mode, ifr_data_get_ptr(ifreqp),
+		    sizeof(mode)) == 0)
 	            retValue = 0;
 	        break;
 	    default:
@@ -1516,10 +1531,17 @@ xge_ioctl_stats(xge_lldev_t *lldev, struct ifreq *ifreqp)
 int
 xge_ioctl_registers(xge_lldev_t *lldev, struct ifreq *ifreqp)
 {
-	xge_register_t *data = (xge_register_t *)ifreqp->ifr_data;
+	xge_register_t tmpdata;
+	xge_register_t *data;
 	xge_hal_status_e status = XGE_HAL_OK;
 	int retValue = EINVAL, offset = 0, index = 0;
+	int error;
 	u64 val64 = 0;
+
+	error = copyin_c(ifr_data_get_ptr(ifreqp), &tmpdata, sizeof(tmpdata));
+	if (error != 0)
+		return (error);
+	data = &tmpdata;
 
 	/* Reading a register */
 	if(strcmp(data->option, "-r") == 0) {
@@ -1529,7 +1551,9 @@ xge_ioctl_registers(xge_lldev_t *lldev, struct ifreq *ifreqp)
 	        &data->value);
 	    mtx_unlock(&lldev->mtx_drv);
 	    if(status == XGE_HAL_OK) {
-	        if(copyout(data, ifreqp->ifr_data, sizeof(xge_register_t)) == 0)
+	        if(copyout_c((__cheri_tocap void * __capability)data,
+		    ifr_data_get_ptr(ifreqp),
+		    sizeof(xge_register_t)) == 0)
 	            retValue = 0;
 	    }
 	}
@@ -1574,7 +1598,8 @@ xge_ioctl_registers(xge_lldev_t *lldev, struct ifreq *ifreqp)
 	    mtx_unlock(&lldev->mtx_drv);
 
 	    if(retValue == 0) {
-	        if(copyout(data, ifreqp->ifr_data,
+	        if(copyout_c((__cheri_tocap void * __capability)data,
+		    ifr_data_get_ptr(ifreqp),
 	            sizeof(xge_hal_pci_bar0_t)) != 0) {
 	            xge_trace(XGE_ERR, "Copyout of register values failed");
 	            retValue = EINVAL;
@@ -1608,19 +1633,13 @@ xge_ioctl(struct ifnet *ifnetp, unsigned long command, caddr_t data)
 	}
 
 	switch(command) {
-	    /* Set/Get ifnet address */
-	    case SIOCSIFADDR:
-	    case SIOCGIFADDR:
-	        ether_ioctl(ifnetp, command, data);
-	        break;
-
 	    /* Set ifnet MTU */
-	    case SIOCSIFMTU:
-	        retValue = xge_change_mtu(lldev, ifreqp->ifr_mtu);
+	    CASE_IOC_IFREQ(SIOCSIFMTU):
+	        retValue = xge_change_mtu(lldev, ifr_mtu_get(ifreqp));
 	        break;
 
 	    /* Set ifnet flags */
-	    case SIOCSIFFLAGS:
+	    CASE_IOC_IFREQ(SIOCSIFFLAGS):
 	        if(ifnetp->if_flags & IFF_UP) {
 	            /* Link status is UP */
 	            if(!(ifnetp->if_drv_flags & IFF_DRV_RUNNING)) {
@@ -1639,23 +1658,23 @@ xge_ioctl(struct ifnet *ifnetp, unsigned long command, caddr_t data)
 	        break;
 
 	    /* Add/delete multicast address */
-	    case SIOCADDMULTI:
-	    case SIOCDELMULTI:
+	    CASE_IOC_IFREQ(SIOCADDMULTI):
+	    CASE_IOC_IFREQ(SIOCDELMULTI):
 	        if(ifnetp->if_drv_flags & IFF_DRV_RUNNING) {
 	            xge_setmulti(lldev);
 	        }
 	        break;
 
 	    /* Set/Get net media */
-	    case SIOCSIFMEDIA:
+	    CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	    case SIOCGIFMEDIA:
 	        retValue = ifmedia_ioctl(ifnetp, ifreqp, ifmediap, command);
 	        break;
 
 	    /* Set capabilities */
-	    case SIOCSIFCAP:
+	    CASE_IOC_IFREQ(SIOCSIFCAP):
 	        mtx_lock(&lldev->mtx_drv);
-	        mask = ifreqp->ifr_reqcap ^ ifnetp->if_capenable;
+	        mask = ifr_reqcap_get(ifreqp) ^ ifnetp->if_capenable;
 	        if(mask & IFCAP_TXCSUM) {
 	            if(ifnetp->if_capenable & IFCAP_TXCSUM) {
 	                ifnetp->if_capenable &= ~(IFCAP_TSO4 | IFCAP_TXCSUM);
@@ -1688,20 +1707,17 @@ xge_ioctl(struct ifnet *ifnetp, unsigned long command, caddr_t data)
 	        break;
 
 	    /* Custom IOCTL 0 */
-	    case SIOCGPRIVATE_0:
-#ifdef CPU_CHERI
-#error Unvalidatable ifr_data use.  Unsafe with CheriABI.
-#endif
+	    CASE_IOC_IFREQ(SIOCGPRIVATE_0):
 	        retValue = xge_ioctl_stats(lldev, ifreqp);
 	        break;
 
 	    /* Custom IOCTL 1 */
-	    case SIOCGPRIVATE_1:
+	    CASE_IOC_IFREQ(SIOCGPRIVATE_1):
 	        retValue = xge_ioctl_registers(lldev, ifreqp);
 	        break;
 
 	    default:
-	        retValue = EINVAL;
+	        retValue = ether_ioctl(ifnetp, command, data);
 	        break;
 	}
 	return retValue;

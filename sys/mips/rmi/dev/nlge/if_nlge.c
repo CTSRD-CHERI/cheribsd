@@ -590,7 +590,7 @@ nlge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	ifr = (struct ifreq *)data;
 
 	switch(command) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		NLGE_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0) {
@@ -615,7 +615,7 @@ nlge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		error = 0;
 		break;
 		
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		if (sc->mii_bus != NULL) {
 			mii = (struct mii_data *)device_get_softc(sc->mii_bus);

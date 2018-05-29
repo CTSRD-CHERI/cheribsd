@@ -622,15 +622,14 @@ init_iwarp_socket(struct socket *so, void *arg)
 	struct sockopt sopt;
 	int on = 1;
 
-	/* Note that SOCK_LOCK(so) is same as SOCKBUF_LOCK(&so->so_rcv) */
-	SOCK_LOCK(so);
+	SOCKBUF_LOCK(&so->so_rcv);
 	soupcall_set(so, SO_RCV, c4iw_so_upcall, arg);
 	so->so_state |= SS_NBIO;
-	SOCK_UNLOCK(so);
+	SOCKBUF_UNLOCK(&so->so_rcv);
 	sopt.sopt_dir = SOPT_SET;
 	sopt.sopt_level = IPPROTO_TCP;
 	sopt.sopt_name = TCP_NODELAY;
-	sopt.sopt_val = (caddr_t)&on;
+	sopt.sopt_val = &on;
 	sopt.sopt_valsize = sizeof on;
 	sopt.sopt_td = NULL;
 	rc = sosetopt(so, &sopt);
@@ -882,7 +881,7 @@ static int enable_tcp_window_scaling = 1;
 SYSCTL_INT(_hw_iw_cxgbe, OID_AUTO, enable_tcp_window_scaling, CTLFLAG_RWTUN, &enable_tcp_window_scaling, 0,
 		"Enable tcp window scaling (default = 1)");
 
-int c4iw_debug = 1;
+int c4iw_debug = 0;
 SYSCTL_INT(_hw_iw_cxgbe, OID_AUTO, c4iw_debug, CTLFLAG_RWTUN, &c4iw_debug, 0,
 		"Enable debug logging (default = 0)");
 
@@ -1315,7 +1314,7 @@ send_abort(struct c4iw_ep *ep)
 	sopt.sopt_dir = SOPT_SET;
 	sopt.sopt_level = SOL_SOCKET;
 	sopt.sopt_name = SO_LINGER;
-	sopt.sopt_val = (caddr_t)&l;
+	sopt.sopt_val = &l;
 	sopt.sopt_valsize = sizeof l;
 	sopt.sopt_td = NULL;
 	rc = sosetopt(so, &sopt);
@@ -1847,7 +1846,7 @@ process_mpa_request(struct c4iw_ep *ep)
 	u16 plen;
 	int flags = MSG_DONTWAIT;
 	int rc;
-	struct iovec iov;
+	kiovec_t iov;
 	struct uio uio;
 	enum c4iw_ep_state state = state_read(&ep->com);
 

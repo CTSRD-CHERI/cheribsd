@@ -94,7 +94,7 @@ static VNET_DEFINE(struct mtx, lagg_list_mtx);
 #define	LAGG_LIST_UNLOCK(x)		mtx_unlock(&V_lagg_list_mtx)
 eventhandler_tag	lagg_detach_cookie = NULL;
 
-static int	lagg_clone_create(struct if_clone *, int, caddr_t);
+static int	lagg_clone_create(struct if_clone *, int, void * __capability);
 static void	lagg_clone_destroy(struct ifnet *);
 static VNET_DEFINE(struct if_clone *, lagg_cloner);
 #define	V_lagg_cloner	VNET(lagg_cloner)
@@ -463,7 +463,7 @@ lagg_unregister_vlan(void *arg, struct ifnet *ifp, u_int16_t vtag)
 }
 
 static int
-lagg_clone_create(struct if_clone *ifc, int unit, caddr_t params)
+lagg_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 {
 	struct lagg_softc *sc;
 	struct ifnet *ifp;
@@ -888,7 +888,7 @@ lagg_port_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		LAGG_SUNLOCK(sc);
 		break;
 
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		if (lp->lp_ioctl == NULL) {
 			error = EINVAL;
 			break;
@@ -904,7 +904,7 @@ lagg_port_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		VLAN_CAPABILITIES(sc->sc_ifp);
 		break;
 
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		/* Do not allow the MTU to be changed once joined */
 		error = EINVAL;
 		break;
@@ -1401,7 +1401,7 @@ lagg_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		if_rele(tpif);
 		VLAN_CAPABILITIES(ifp);
 		break;
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		/* Set flags on ports too */
 		LAGG_XLOCK(sc);
 		SLIST_FOREACH(lp, &sc->sc_ports, lp_entries) {
@@ -1427,8 +1427,8 @@ lagg_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		} else
 			LAGG_XUNLOCK(sc);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		LAGG_WLOCK(sc);
 		SLIST_FOREACH(lp, &sc->sc_ports, lp_entries) {
 			lagg_clrmulti(lp);
@@ -1437,12 +1437,12 @@ lagg_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		LAGG_WUNLOCK(sc);
 		error = 0;
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->sc_media, cmd);
 		break;
 
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		LAGG_XLOCK(sc);
 		SLIST_FOREACH(lp, &sc->sc_ports, lp_entries) {
 			if (lp->lp_ioctl != NULL)
@@ -1454,7 +1454,7 @@ lagg_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = 0;
 		break;
 
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		/* Do not allow the MTU to be directly changed */
 		error = EINVAL;
 		break;
@@ -1572,7 +1572,7 @@ lagg_setcaps(struct lagg_port *lp, int cap)
 		return (0);
 	if (lp->lp_ioctl == NULL)
 		return (ENXIO);
-	ifr.ifr_reqcap = cap;
+	ifr.ifr_ifru.ifru_cap[0] = cap;	/* ifr_reqcap */
 	return ((*lp->lp_ioctl)(lp->lp_ifp, SIOCSIFCAP, (caddr_t)&ifr));
 }
 

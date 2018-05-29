@@ -87,20 +87,6 @@ struct ptrace_vm_entry32 {
 	u_int		pve_fsid;
 	uint32_t	pve_path;
 };
-
-struct ptrace_lwpinfo32 {
-	lwpid_t	pl_lwpid;	/* LWP described. */
-	int	pl_event;	/* Event that stopped the LWP. */
-	int	pl_flags;	/* LWP flags. */
-	sigset_t	pl_sigmask;	/* LWP signal mask */
-	sigset_t	pl_siglist;	/* LWP pending signal */
-	struct siginfo32 pl_siginfo;	/* siginfo for signal */
-	char	pl_tdname[MAXCOMLEN + 1];	/* LWP name. */
-	pid_t	pl_child_pid;		/* New child pid */
-	u_int		pl_syscall_code;
-	u_int		pl_syscall_narg;
-};
-
 #endif
 
 /*
@@ -360,7 +346,7 @@ static ssize_t
 proc_iop(struct thread *td, struct proc *p, vm_offset_t va, void *buf,
     size_t len, enum uio_rw rw)
 {
-	struct iovec iov;
+	kiovec_t iov;
 	struct uio uio;
 	ssize_t slen;
 	int error;
@@ -756,7 +742,7 @@ proc_set_traced(struct proc *p, bool stop)
 int
 kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 {
-	struct iovec iov;
+	kiovec_t iov;
 	struct uio uio;
 	struct proc *curp, *p, *pp;
 	struct thread *td2 = NULL, *td3;
@@ -1404,7 +1390,8 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 #endif
 			){
 				pl->pl_flags |= PL_FLAG_SI;
-				pl->pl_siginfo = td2->td_si;
+				siginfo_to_siginfo_native(&td2->td_si,
+				    &pl->pl_siginfo);
 			}
 		}
 		if ((pl->pl_flags & PL_FLAG_SI) == 0)

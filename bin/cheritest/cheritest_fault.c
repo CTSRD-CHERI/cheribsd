@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012-2017 Robert N. M. Watson
+ * Copyright (c) 2012-2018 Robert N. M. Watson
  * Copyright (c) 2014 SRI International
  * All rights reserved.
  *
@@ -40,11 +40,10 @@
 #include <sys/time.h>
 
 #include <machine/cpuregs.h>
+#include <machine/sysarch.h>
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-#include <cheri/libcheri_fd.h>
-#include <cheri/libcheri_sandbox.h>
 
 #include <cheritest-helper.h>
 #include <err.h>
@@ -60,7 +59,7 @@
 #include "cheritest.h"
 
 /*
- * First batch of tests exercises CHERI faults outside of sandboxes.
+ * Exercises CHERI faults outside of sandboxes.
  */
 #define	ARRAY_LEN	2
 static char array[ARRAY_LEN];
@@ -96,6 +95,22 @@ test_nofault_perm_load(const struct cheri_test *ctp __unused)
 }
 
 void
+test_fault_perm_seal(const struct cheri_test *ctp __unused)
+{
+	int i;
+	__capability void *ip = &i;
+	__capability void *sealcap;
+	__capability void *sealed;
+
+	if (sysarch(CHERI_GET_SEALCAP, &sealcap) < 0)
+		cheritest_failure_err("sysarch(CHERI_GET_SEALCAP)");
+	sealcap = cheri_andperm(sealcap, ~CHERI_PERM_SEAL);
+	sealed = cheri_seal(ip, sealcap);
+	cheritest_failure_errx("cheri_seal() performed successfully (%jx)",
+	    (vaddr_t)sealed);
+}
+
+void
 test_fault_perm_store(const struct cheri_test *ctp __unused)
 {
 	__capability char *arrayp = cheri_ptrperm(array, sizeof(array), 0);
@@ -111,6 +126,26 @@ test_nofault_perm_store(const struct cheri_test *ctp __unused)
 
 	arrayp[0] = sink;
 	cheritest_success();
+}
+
+void
+test_fault_perm_unseal(const struct cheri_test *ctp __unused)
+{
+	int i;
+	__capability void *ip = &i;
+	__capability void *sealcap;
+	__capability void *sealed;
+	__capability void *unsealed;
+
+	if (sysarch(CHERI_GET_SEALCAP, &sealcap) < 0)
+		cheritest_failure_err("sysarch(CHERI_GET_SEALCAP)");
+	if ((cheri_getperm(sealcap) & CHERI_PERM_SEAL) == 0)
+		cheritest_failure_errx("unexpected !seal perm on sealcap");
+	sealed = cheri_seal(ip, sealcap);
+	sealcap = cheri_andperm(sealcap, ~CHERI_PERM_UNSEAL);
+	unsealed = cheri_unseal(sealed, sealcap);
+	cheritest_failure_errx("cheri_unseal() performed successfully (%jx)",
+	    (vaddr_t)unsealed);
 }
 
 void
@@ -203,181 +238,7 @@ test_fault_read_kdc(const struct cheri_test *ctp __unused)
 void
 test_fault_read_epcc(const struct cheri_test *ctp __unused)
 {
-
-	CHERI_CAPREG_PRINT(31);
-}
-
-/*
- * Second batch of tests exercises various faults inside of sandboxes,
- * including VM faults, arithmetic faults, etc.
- */
-void
-test_sandbox_cp2_bound_catch(const struct cheri_test *ctp __unused)
-{
-
-	invoke_cap_fault(CHERITEST_HELPER_CAP_FAULT_CP2_BOUND);
-	cheritest_failure_errx("invoke returned");
-}
-
-void
-test_sandbox_cp2_bound_nocatch(const struct cheri_test *ctp __unused)
-{
-
-	signal_handler_clear(SIGPROT);
-	invoke_cap_fault(CHERITEST_HELPER_CAP_FAULT_CP2_BOUND);
-	cheritest_failure_errx("invoke returned");
-}
-
-void
-test_sandbox_cp2_bound_nocatch_noaltstack(
-    const struct cheri_test *ctp __unused)
-{
-	stack_t ss;
-
-	bzero(&ss, sizeof(ss));
-	ss.ss_flags = SS_DISABLE;
-	if (sigaltstack(&ss, NULL) < 0)
-		cheritest_failure_err("sigaltstack");
-	invoke_cap_fault(CHERITEST_HELPER_CAP_FAULT_CP2_BOUND);
-	cheritest_failure_errx("invoke returned");
-}
-
-void
-test_sandbox_cp2_perm_load_catch(const struct cheri_test *ctp __unused)
-{
-
-	invoke_cap_fault(CHERITEST_HELPER_CAP_FAULT_CP2_PERM_LOAD);
-	cheritest_failure_errx("invoke returned");
-}
-
-void
-test_sandbox_cp2_perm_load_nocatch(const struct cheri_test *ctp __unused)
-{
-
-	signal_handler_clear(SIGPROT);
-	invoke_cap_fault(CHERITEST_HELPER_CAP_FAULT_CP2_PERM_LOAD);
-	cheritest_failure_errx("invoke returned");
-}
-
-void
-test_sandbox_cp2_perm_store_catch(const struct cheri_test *ctp __unused)
-{
-
-	invoke_cap_fault(CHERITEST_HELPER_CAP_FAULT_CP2_PERM_STORE);
-	cheritest_failure_errx("invoke returned");
-}
-
-void
-test_sandbox_cp2_perm_store_nocatch(const struct cheri_test *ctp __unused)
-{
-
-	signal_handler_clear(SIGPROT);
-	invoke_cap_fault(CHERITEST_HELPER_CAP_FAULT_CP2_PERM_STORE);
-	cheritest_failure_errx("invoke returned");
-}
-
-void
-test_sandbox_cp2_tag_catch(const struct cheri_test *ctp __unused)
-{
-
-	invoke_cap_fault(CHERITEST_HELPER_CAP_FAULT_CP2_TAG);
-	cheritest_failure_errx("invoke returned");
-}
-
-void
-test_sandbox_cp2_tag_nocatch(const struct cheri_test *ctp __unused)
-{
-	register_t v;
-
-	signal_handler_clear(SIGPROT);
-	v = invoke_cap_fault(CHERITEST_HELPER_CAP_FAULT_CP2_TAG);
-	if (v != -1)
-		cheritest_failure_errx("invoke returned %ld (expected %d)", v,
-		    -1);
-	cheritest_failure_errx("invoke returned");
-}
-
-void
-test_sandbox_cp2_seal_catch(const struct cheri_test *ctp __unused)
-{
-
-	invoke_cap_fault(CHERITEST_HELPER_CAP_FAULT_CP2_SEAL);
-	cheritest_failure_errx("invoke returned");
-}
-
-void
-test_sandbox_cp2_seal_nocatch(const struct cheri_test *ctp __unused)
-{
-
-	signal_handler_clear(SIGPROT);
-	invoke_cap_fault(CHERITEST_HELPER_CAP_FAULT_CP2_SEAL);
-	cheritest_failure_errx("invoke returned");
-}
-
-void
-test_sandbox_divzero_catch(const struct cheri_test *ctp __unused)
-{
-
-	invoke_divzero();
-	cheritest_failure_errx("invoke returned");
-}
-
-void
-test_sandbox_divzero_nocatch(const struct cheri_test *ctp __unused)
-{
-
-	signal_handler_clear(SIGEMT);
-	invoke_divzero();
-	cheritest_failure_errx("invoke returned");
-}
-
-void
-test_sandbox_vm_rfault_catch(const struct cheri_test *ctp __unused)
-{
-
-	invoke_vm_fault(CHERITEST_HELPER_VM_FAULT_RFAULT);
-	cheritest_failure_errx("invoke returned");
-}
-
-void
-test_sandbox_vm_rfault_nocatch(const struct cheri_test *ctp __unused)
-{
-
-	signal_handler_clear(SIGSEGV);
-	invoke_vm_fault(CHERITEST_HELPER_VM_FAULT_RFAULT);
-	cheritest_failure_errx("invoke returned");
-}
-
-void
-test_sandbox_vm_wfault_catch(const struct cheri_test *ctp __unused)
-{
-
-	invoke_vm_fault(CHERITEST_HELPER_VM_FAULT_WFAULT);
-	cheritest_failure_errx("invoke returned");
-}
-
-void
-test_sandbox_vm_wfault_nocatch(const struct cheri_test *ctp __unused)
-{
-
-	signal_handler_clear(SIGSEGV);
-	invoke_vm_fault(CHERITEST_HELPER_VM_FAULT_WFAULT);
-	cheritest_failure_errx("invoke returned");
-}
-
-void
-test_sandbox_vm_xfault_catch(const struct cheri_test *ctp __unused)
-{
-
-	invoke_vm_fault(CHERITEST_HELPER_VM_FAULT_XFAULT);
-	cheritest_failure_errx("invoke returned");
-}
-
-void
-test_sandbox_vm_xfault_nocatch(const struct cheri_test *ctp __unused)
-{
-
-	signal_handler_clear(SIGSEGV);
-	invoke_vm_fault(CHERITEST_HELPER_VM_FAULT_XFAULT);
-	cheritest_failure_errx("invoke returned");
+	__capability void *epcc;
+	epcc = __builtin_mips_cheri_exception_program_counter_cap_get();
+	CHERI_CAP_PRINT(epcc);
 }

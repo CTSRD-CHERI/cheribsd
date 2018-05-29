@@ -41,6 +41,21 @@
 #endif
 
 /*
+ * NOTE: pr_base is the native pointer type in userspace and a
+ * capabililty in kernel unless they aren't supported.
+ */
+struct uprof {
+#ifdef _KERNEL
+	char * __capability	pr_base;	/* Buffer base. */
+#else
+	char *			pr_base;	/* Buffer base. */
+#endif
+	u_long			pr_size;	/* Buffer size. */
+	u_long			pr_off;		/* PC offset. */
+	u_long			pr_scale;	/* PC scaling. */
+};
+
+/*
  * Kernel per-process accounting / statistics
  * (not necessarily resident except when running).
  *
@@ -58,12 +73,7 @@ struct pstats {
 #define	pstat_endzero	pstat_startcopy
 
 #define	pstat_startcopy	p_prof
-	struct uprof {			/* Profile arguments. */
-		caddr_t	pr_base;	/* (c + w2) Buffer base. */
-		u_long	pr_size;	/* (c + w2) Buffer size. */
-		u_long	pr_off;		/* (c + w2) PC offset. */
-		u_long	pr_scale;	/* (c + w2) PC scaling. */
-	} p_prof;
+	struct	uprof p_prof;		/* (c + w2) Profile arguments. */
 #define	pstat_endcopy	p_start
 	struct	timeval p_start;	/* (b) Starting time. */
 };
@@ -126,7 +136,6 @@ int	 chgsbsize(struct uidinfo *uip, u_int *hiwat, u_int to,
 	    rlim_t maxval);
 int	 chgptscnt(struct uidinfo *uip, int diff, rlim_t maxval);
 int	 chgumtxcnt(struct uidinfo *uip, int diff, rlim_t maxval);
-int	 fuswintr(void *base);
 int	 kern_proc_setrlimit(struct thread *td, struct proc *p, u_int which,
 	    struct rlimit *limp);
 struct plimit
@@ -150,7 +159,6 @@ void	 rufetchcalc(struct proc *p, struct rusage *ru, struct timeval *up,
 	    struct timeval *sp);
 void	 rufetchtd(struct thread *td, struct rusage *ru);
 void	 ruxagg(struct proc *p, struct thread *td);
-int	 suswintr(void *base, int word);
 struct uidinfo
 	*uifind(uid_t uid);
 void	 uifree(struct uidinfo *uip);

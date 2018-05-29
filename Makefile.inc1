@@ -93,7 +93,8 @@ OBJTREE=	${MAKEOBJDIRPREFIX}/${TARGET}.${TARGET_ARCH}
 
 # Pull in compiler metadata from buildworld/toolchain if possible to avoid
 # running CC from bsd.compiler.mk.
-.if make(installworld) || make(install)
+.if make(installworld) || make(installsysroot) || make(install) || \
+    make(distributeworld) || make(stageworld)
 .-include "${OBJTREE}${.CURDIR}/compiler-metadata.mk"
 .endif
 
@@ -155,7 +156,8 @@ TEST_SYSTEM_COMPILER_VARS= \
 	WANT_COMPILER_TYPE WANT_COMPILER_VERSION WANT_COMPILER_VERSION_FILE \
 	WANT_COMPILER_FREEBSD_VERSION WANT_COMPILER_FREEBSD_VERSION_FILE \
 	CC COMPILER_TYPE COMPILER_FEATURES COMPILER_VERSION \
-	COMPILER_FREEBSD_VERSION
+	COMPILER_FREEBSD_VERSION \
+	LINKER_TYPE LINKER_VERSION
 test-system-compiler: .PHONY
 .for v in ${TEST_SYSTEM_COMPILER_VARS}
 	${_+_}@printf "%-35s= %s\n" "${v}" "${${v}}"
@@ -187,7 +189,9 @@ CROSSENV+=	COMPILER_VERSION=${X_COMPILER_VERSION} \
 _COMPILER_METADATA_VARS=	COMPILER_VERSION \
 				COMPILER_TYPE \
 				COMPILER_FEATURES \
-				COMPILER_FREEBSD_VERSION
+				COMPILER_FREEBSD_VERSION \
+				LINKER_VERSION \
+				LINKER_TYPE
 compiler-metadata.mk: .PHONY .META
 	@: > ${.TARGET}
 	@echo ".info Using cached compiler metadata from build at $$(hostname) on $$(date)" \
@@ -237,11 +241,30 @@ X${BINUTIL}?=	${${BINUTIL}}
 .if !empty(SUBDIR_OVERRIDE)
 SUBDIR=	${SUBDIR_OVERRIDE}
 .else
-SUBDIR=	lib libexec
-.if !defined(NO_ROOT) && (make(installworld) || make(install))
+SUBDIR=	lib
+.if !defined(SYSROOT_ONLY)
+# We don't need libexec for just a sysroot
+SUBDIR+=libexec
+.endif
+
+.if !defined(NO_ROOT) && (make(installworld) || make(installsysroot) || make(install))
 # Ensure libraries are installed before progressing.
 SUBDIR+=.WAIT
 .endif
+.if defined(SYSROOT_ONLY)
+# Only install libraries and headers:
+SUBDIR+=include
+.if ${MK_CDDL} != "no"
+SUBDIR+=cddl/lib
+.endif
+SUBDIR+=gnu/lib
+.if ${MK_CRYPT} != "no"
+SUBDIR+= secure/lib
+.endif
+.if ${MK_KERBEROS} != "no"
+SUBDIR+=kerberos5/lib
+.endif
+.else # !defined(SYSROOT_ONLY)
 SUBDIR+=bin
 .if ${MK_CDDL} != "no"
 SUBDIR+=cddl
@@ -267,10 +290,12 @@ SUBDIR+=	tests
 .if ${MK_OFED} != "no"
 SUBDIR+=contrib/ofed
 .endif
+.endif # !defined(SYSROOT_ONLY)
 
 # Local directories are last, since it is nice to at least get the base
 # system rebuilt before you do them.
 SUBDIR+=.WAIT
+.if !defined(SYSROOT_ONLY)
 .for _DIR in ${LOCAL_DIRS}
 .if exists(${.CURDIR}/${_DIR}/Makefile)
 SUBDIR+=	${_DIR}
@@ -282,20 +307,30 @@ SUBDIR+=	${_DIR}
 .for _DIR in ${LOCAL_DIRS:M*/} ${LOCAL_DIRS:N*/:S|$|/|}
 _REDUNDANT_LIB_DIRS+=    ${LOCAL_LIB_DIRS:M${_DIR}*}
 .endfor
+.endif  # !defined(SYSROOT_ONLY)
 .for _DIR in ${LOCAL_LIB_DIRS}
 .if empty(_REDUNDANT_LIB_DIRS:M${_DIR}) && exists(${.CURDIR}/${_DIR}/Makefile)
 SUBDIR+=	${_DIR}
 .endif
 .endfor
 
+# Finally build cheribsdbox if requested
+.if ${MK_CHERIBSDBOX} != "no" && !defined(SYSROOT_ONLY)
+SUBDIR+=	tools/cheribsdbox
+.endif
+
+
+
 # We must do etc/ last as it hooks into building the man whatis file
 # by calling 'makedb' in share/man.  This is only relevant for
 # install/distribute so they build the whatis file after every manpage is
 # installed.
-.if make(installworld) || make(install)
+.if make(installworld) || make(install) || make(installsysroot)
 SUBDIR+=.WAIT
 .endif
+.if !defined(SYSROOT_ONLY)
 SUBDIR+=etc
+.endif
 
 .endif	# !empty(SUBDIR_OVERRIDE)
 
@@ -457,7 +492,7 @@ TMPPATH=	${STRICTTMPPATH}:${PATH}
 # It may not be functional, e.g., due to new ABI
 # when in the middle of installing over this system.
 #
-.if make(distributeworld) || make(installworld) || make(stageworld)
+.if make(distributeworld) || make(installworld) || make(stageworld) || make(installsysroot)
 INSTALLTMP!=	/usr/bin/mktemp -d -u -t install
 .endif
 
@@ -525,6 +560,7 @@ BMAKEENV=	INSTALL="sh ${.CURDIR}/tools/install.sh" \
 # need to keep this in sync with targets/pseudo/bootstrap-tools/Makefile
 BSARGS= 	DESTDIR= \
 		BOOTSTRAPPING=${OSRELDATE} \
+		BWPHASE=${.TARGET:C,^_,,} \
 		SSP_CFLAGS= \
 		MK_HTML=no NO_LINT=yes MK_MAN=no \
 		-DNO_PIC MK_PROFILE=no -DNO_SHARED \
@@ -543,11 +579,16 @@ TMAKE=		MAKEOBJDIRPREFIX=${OBJTREE} \
 		TARGET=${TARGET} TARGET_ARCH=${TARGET_ARCH} \
 		DESTDIR= \
 		BOOTSTRAPPING=${OSRELDATE} \
+		BWPHASE=${.TARGET:C,^_,,} \
 		SSP_CFLAGS= \
 		-DNO_LINT \
 		-DNO_CPU_CFLAGS MK_WARNS=no MK_CTF=no \
 		MK_CLANG_EXTRAS=no MK_CLANG_FULL=no \
-		MK_LLDB=no MK_TESTS=no
+		MK_LLDB=no MK_TESTS=no \
+		BUILD_TOOLS_CC="${CC}"
+
+# These get set in tools/build/mk/Makefile.boot
+# BUILD_TOOLS_CLFAGS="${CFLAGS}" BUILD_TOOLS_LDFLAGS="${LDFLAGS}"
 
 # cross-tools stage
 XMAKE=		TOOLS_PREFIX=${WORLDTMP} ${BMAKE} \
@@ -569,9 +610,10 @@ KTMAKE=		TOOLS_PREFIX=${WORLDTMP} MAKEOBJDIRPREFIX=${WORLDTMP} \
 
 # world stage
 WMAKEENV=	${CROSSENV} \
-		SYSROOT=${WORLDTMP} \
 		INSTALL="sh ${.CURDIR}/tools/install.sh" \
-		PATH=${TMPPATH}
+		PATH=${TMPPATH} \
+		SYSROOT=${WORLDTMP}
+
 .if defined(CHERI_CC)
 WMAKEENV+=	CHERI_CC=${CHERI_CC:Q} CHERI_CXX=${CHERI_CXX:Q}
 .endif
@@ -705,7 +747,9 @@ NO_META_IGNORE_HOST_HEADERS=	1
 host-osreldate.h: # DO NOT ADD /usr/include/osreldate.h here
 	@cp -f /usr/include/osreldate.h ${.TARGET}
 
-WMAKE=		${WMAKEENV} ${MAKE} ${WORLD_FLAGS} -f Makefile.inc1 DESTDIR=${WORLDTMP}
+WMAKE=		${WMAKEENV} ${MAKE} ${WORLD_FLAGS} -f Makefile.inc1 \
+		BWPHASE=${.TARGET:C,^_,,} \
+		DESTDIR=${WORLDTMP}
 
 .if ${MK_CHERI} != "no"
 # cheri world
@@ -744,6 +788,14 @@ LIBCHERIIMAKE=	${LIBCHERIWMAKE:NINSTALL=*:NDESTDIR=*} \
 IMAKEENV=	${CROSSENV}
 IMAKE=		${IMAKEENV} ${MAKE} -f Makefile.inc1 \
 		${IMAKE_INSTALL} ${IMAKE_MTREE}
+.if make(installsysroot)
+# Don't try to install files that have not been built
+# FIXME: MK_TESTS breaks installsysroot for some reason:
+# ===> lib/libc/tests/tls_dso (install)
+# install: libh_tls_dynamic.a: No such file or directory
+IMAKE+=	-DSYSROOT_ONLY MK_TESTS=no
+.endif
+
 .if empty(.MAKEFLAGS:M-n)
 IMAKEENV+=	PATH=${STRICTTMPPATH}:${INSTALLTMP} \
 		LD_LIBRARY_PATH=${INSTALLTMP} \
@@ -760,6 +812,7 @@ _INSTALL_DDIR=	${DESTDIR}/${DISTDIR}
 INSTALL_DDIR=	${_INSTALL_DDIR:S://:/:g:C:/$::}
 .if defined(NO_ROOT)
 METALOG?=	${DESTDIR}/${DISTDIR}/METALOG
+METALOG:=	${METALOG:C,//+,/,g}
 IMAKE+=		-DNO_ROOT METALOG=${METALOG}
 INSTALLFLAGS+=	-U -M ${METALOG} -D ${INSTALL_DDIR}
 MTREEFLAGS+=	-W
@@ -773,7 +826,7 @@ IMAKE_MTREE=	MTREE_CMD="mtree ${MTREEFLAGS}"
 .endif
 
 # kernel stage
-KMAKEENV=	${WMAKEENV}
+KMAKEENV=	${WMAKEENV:NSYSROOT=*}
 KMAKE=		${KMAKEENV} ${MAKE} ${.MAKEFLAGS} ${KERNEL_FLAGS} KERNEL=${INSTKERNNAME}
 
 #
@@ -803,14 +856,18 @@ _worldtmp: .PHONY
 .else
 	rm -rf ${WORLDTMP}/legacy/usr/include
 .endif
-# Dependencies cannot cope with certain source tree changes, particularly
-# with respect to removing source files and replacing generated files.
-# Handle these cases here in an ad-hoc fashion.
-# 20160829 remove stale dependencies for ptrace stub, rewritten in C
-# in r305012
-.for f in ptrace
+
+# Our current approach to dependency tracking cannot cope with certain source
+# tree changes, particularly with respect to removing source files and
+# replacing generated files.  Handle these cases here in an ad-hoc fashion.
+#
+# Syscall stubs rewritten in C
+# Date      SVN Rev  Syscalls
+# 20160829  r305012  ptrace
+# 20170624  r320278  fstat fstatat fstatfs getdirentries getfsstat statfs
+.for f in fstat fstatat fstatfs getdirentries getfsstat ptrace statfs           
 .if exists(${OBJTREE}${.CURDIR}/lib/libc/.depend.${f}.o)
-	@if egrep -q '/${f}.[sS]' \
+	@if egrep -qw '${f}\.[sS]' \
 	    ${OBJTREE}${.CURDIR}/lib/libc/.depend.${f}.o; then \
 		echo Removing stale dependencies for ${f} syscall wrappers; \
 		rm -f ${OBJTREE}${.CURDIR}/lib/libc/.depend.${f}.* \
@@ -949,7 +1006,7 @@ _cross-tools:
 	@echo "--------------------------------------------------------------"
 	@echo ">>> stage 3: cross tools"
 	@echo "--------------------------------------------------------------"
-	@rm -f ${.OBJDIR}/compiler-metadata.mk
+	@rm -f ${OBJTREE}${.CURDIR}/compiler-metadata.mk
 	${_+_}cd ${.CURDIR}; ${XMAKE} cross-tools
 	${_+_}cd ${.CURDIR}; ${XMAKE} kernel-tools
 _build-metadata:
@@ -1115,7 +1172,9 @@ WMAKE_TGTS+=	_libraries
 WMAKE_TGTS+=	buildcheri
 .endif
 .endif
+.if !defined(SYSROOT_ONLY)
 WMAKE_TGTS+=	everything
+.endif # !defined(SYSROOT_ONLY)
 .if defined(LIBCOMPAT) && empty(SUBDIR_OVERRIDE)
 WMAKE_TGTS+=	build${libcompat}
 .endif
@@ -1178,6 +1237,14 @@ libcheribuildenv:
 TOOLCHAIN_TGTS=	${WMAKE_TGTS:Neverything:Nbuild${libcompat}:Nbuildcheri}
 toolchain: ${TOOLCHAIN_TGTS} .PHONY
 kernel-toolchain: ${TOOLCHAIN_TGTS:N_includes:N_libraries} .PHONY
+
+BUILDSYSROOT_TGTS=	${WMAKE_TGTS:Neverything}
+
+buildsysroot: buildworld_prologue ${BUILDSYSROOT_TGTS} buildworld_epilogue .PHONY
+.if !empty(SUBDIR_OVERRIDE)
+	@echo "buildsysroot is incompatible with SUBDIR_OVERRIDE"
+.endif
+	@echo "Built sysroot for ${TARGET}. Run installsysroot to install it."
 
 #
 # installcheck
@@ -1299,7 +1366,7 @@ DEBUG_DISTRIBUTIONS+=	base ${EXTRA_DISTRIBUTIONS:S,doc,,:S,tests,,}
 
 MTREE_MAGIC?=	mtree 2.0
 
-distributeworld installworld stageworld: _installcheck_world .PHONY
+distributeworld installworld stageworld installsysroot: _installcheck_world .PHONY
 	mkdir -p ${INSTALLTMP}
 	progs=$$(for prog in ${ITOOLS}; do \
 		if progpath=`which $$prog`; then \
@@ -1437,7 +1504,7 @@ packageworld: .PHONY
 # and do a 'make reinstall' on the *client* to install new binaries from the
 # most recent server build.
 #
-restage reinstall: .MAKE .PHONY
+restage reinstall reinstallsysroot: .MAKE .PHONY
 	@echo "--------------------------------------------------------------"
 	@echo ">>> Making hierarchy"
 	@echo "--------------------------------------------------------------"
@@ -1461,6 +1528,14 @@ restage reinstall: .MAKE .PHONY
 .if ${MK_CHERI} != "no"
 	${_+_}cd ${.CURDIR}; ${MAKE} -f Makefile.inc1 installcheri
 .endif
+.if make(reinstallsysroot)
+	@echo "Removing $$(find ${DESTDIR} -type d -empty -print | wc -l) empty directories from ${DESTDIR}"
+	find ${DESTDIR} -type d -empty -delete
+	@echo
+	@echo "--------------------------------------------------------------"
+	@echo ">>> Done installing sysroot"
+	@echo "--------------------------------------------------------------"
+.endif
 
 redistribute: .MAKE .PHONY
 	@echo "--------------------------------------------------------------"
@@ -1477,6 +1552,9 @@ redistribute: .MAKE .PHONY
 .endif
 
 distrib-dirs distribution: .MAKE .PHONY
+.if defined(SYSROOT_ONLY)
+	@echo "Skipping make ${.TARGET} due to SYSROOT_ONLY=${SYSROOT_ONLY}"
+.else
 	${_+_}cd ${.CURDIR}/etc; ${CROSSENV} PATH=${TMPPATH} ${MAKE} \
 	    ${IMAKE_INSTALL} ${IMAKE_MTREE} METALOG=${METALOG} ${.TARGET}
 .if make(distribution)
@@ -1484,6 +1562,7 @@ distrib-dirs distribution: .MAKE .PHONY
 		${MAKE} -f Makefile.inc1 ${IMAKE_INSTALL} \
 		METALOG=${METALOG} MK_TESTS=no installconfig
 .endif
+.endif  # !defined(SYSROOT_ONLY)
 
 #
 # buildkernel and installkernel
@@ -1740,20 +1819,35 @@ package-pkg: .PHONY
 
 real-packages:	stage-packages create-packages sign-packages .PHONY
 
-stage-packages: .PHONY
-	@mkdir -p ${REPODIR} ${WSTAGEDIR} ${KSTAGEDIR}
+stage-packages-world: .PHONY
+	@mkdir -p ${WSTAGEDIR}
 	${_+_}@cd ${.CURDIR}; \
-		${MAKE} DESTDIR=${WSTAGEDIR} -DNO_ROOT -B stageworld ; \
-		${MAKE} DESTDIR=${KSTAGEDIR} -DNO_ROOT -B stagekernel
+		${MAKE} DESTDIR=${WSTAGEDIR} -DNO_ROOT stageworld
 
-create-packages:	_pkgbootstrap .PHONY
-	@mkdir -p ${REPODIR}
+stage-packages-kernel: .PHONY
+	@mkdir -p ${KSTAGEDIR}
 	${_+_}@cd ${.CURDIR}; \
-		${MAKE} DESTDIR=${WSTAGEDIR} \
-			PKG_VERSION=${PKG_VERSION} create-world-packages ; \
-		${MAKE} DESTDIR=${KSTAGEDIR} \
+		${MAKE} DESTDIR=${KSTAGEDIR} -DNO_ROOT stagekernel
+
+stage-packages: .PHONY stage-packages-world stage-packages-kernel
+
+_repodir: .PHONY
+	@mkdir -p ${REPODIR}
+
+create-packages-world:	_pkgbootstrap _repodir .PHONY
+	${_+_}@cd ${.CURDIR}; \
+		${MAKE} -f Makefile.inc1 \
+			DESTDIR=${WSTAGEDIR} \
+			PKG_VERSION=${PKG_VERSION} create-world-packages
+
+create-packages-kernel:	_pkgbootstrap _repodir .PHONY
+	${_+_}@cd ${.CURDIR}; \
+		${MAKE} -f Makefile.inc1 \
+			DESTDIR=${KSTAGEDIR} \
 			PKG_VERSION=${PKG_VERSION} DISTDIR=kernel \
 			create-kernel-packages
+
+create-packages: .PHONY create-packages-world create-packages-kernel
 
 create-world-packages:	_pkgbootstrap .PHONY
 	@rm -f ${WSTAGEDIR}/*.plist 2>/dev/null || :
@@ -1761,28 +1855,41 @@ create-world-packages:	_pkgbootstrap .PHONY
 		awk -f ${SRCDIR}/release/scripts/mtree-to-plist.awk \
 		${WSTAGEDIR}/METALOG
 	@for plist in ${WSTAGEDIR}/*.plist; do \
-		plist=$${plist##*/} ; \
-		pkgname=$${plist%.plist} ; \
-		sh ${SRCDIR}/release/packages/generate-ucl.sh -o $${pkgname} \
-			-s ${SRCDIR} -u ${WSTAGEDIR}/$${pkgname}.ucl ; \
-	done
-	@for plist in ${WSTAGEDIR}/*.plist; do \
-		plist=$${plist##*/} ; \
-		pkgname=$${plist%.plist} ; \
-		awk -F\" ' \
-			/^name/ { printf("===> Creating %s-", $$2); next } \
-			/^version/ { print $$2; next } \
-			' ${WSTAGEDIR}/$${pkgname}.ucl ; \
-		${PKG_CMD} -o ABI_FILE=${WSTAGEDIR}/bin/sh -o ALLOW_BASE_SHLIBS=yes \
-			create -M ${WSTAGEDIR}/$${pkgname}.ucl \
-			-p ${WSTAGEDIR}/$${pkgname}.plist \
-			-r ${WSTAGEDIR} \
-			-o ${REPODIR}/$$(${PKG_CMD} -o ABI_FILE=${WSTAGEDIR}/bin/sh config ABI)/${PKG_VERSION} ; \
-	done
+	  plist=$${plist##*/} ; \
+	  pkgname=$${plist%.plist} ; \
+	  echo "_PKGS+= $${pkgname}" ; \
+	done > ${WSTAGEDIR}/packages.mk
+	${_+_}@cd ${.CURDIR}; \
+		${MAKE} -f Makefile.inc1 create-world-packages-jobs \
+		.MAKE.JOB.PREFIX=
 
-create-kernel-packages:	_pkgbootstrap .PHONY
+.if make(create-world-packages-jobs)
+.include "${WSTAGEDIR}/packages.mk"
+.endif
+
+create-world-packages-jobs: .PHONY
+.for pkgname in ${_PKGS}
+create-world-packages-jobs: create-world-package-${pkgname}
+create-world-package-${pkgname}: .PHONY
+	@sh ${SRCDIR}/release/packages/generate-ucl.sh -o ${pkgname} \
+		-s ${SRCDIR} -u ${WSTAGEDIR}/${pkgname}.ucl
+	@awk -F\" ' \
+		/^name/ { printf("===> Creating %s-", $$2); next } \
+		/^version/ { print $$2; next } \
+		' ${WSTAGEDIR}/${pkgname}.ucl ; \
+	${PKG_CMD} -o ABI_FILE=${WSTAGEDIR}/bin/sh -o ALLOW_BASE_SHLIBS=yes \
+		create -M ${WSTAGEDIR}/${pkgname}.ucl \
+		-p ${WSTAGEDIR}/${pkgname}.plist \
+		-r ${WSTAGEDIR} \
+		-o ${REPODIR}/$$(${PKG_CMD} -o ABI_FILE=${WSTAGEDIR}/bin/sh config ABI)/${PKG_VERSION}
+.endfor
+
+create-kernel-packages:	.PHONY
+_default_flavor=	-default
 .if exists(${KSTAGEDIR}/kernel.meta)
 .for flavor in "" -debug
+create-kernel-packages: create-kernel-packages-flavor${flavor:C,^""$,${_default_flavor},}
+create-kernel-packages-flavor${flavor:C,^""$,${_default_flavor},}: _pkgbootstrap .PHONY
 	@cd ${KSTAGEDIR}/${DISTDIR} ; \
 	awk -f ${SRCDIR}/release/scripts/mtree-to-plist.awk \
 		-v kernel=yes -v _kernconf=${INSTALLKERNEL} \
@@ -1812,6 +1919,8 @@ create-kernel-packages:	_pkgbootstrap .PHONY
 .for _kernel in ${BUILDKERNELS:[2..-1]}
 .if exists(${KSTAGEDIR}/kernel.${_kernel}.meta)
 .for flavor in "" -debug
+create-kernel-packages: create-kernel-packages-extra-flavor${flavor:C,^""$,${_default_flavor},}-${_kernel}
+create-kernel-packages-extra-flavor${flavor:C,^""$,${_default_flavor},}-${_kernel}: _pkgbootstrap .PHONY
 	@cd ${KSTAGEDIR}/kernel.${_kernel} ; \
 	awk -f ${SRCDIR}/release/scripts/mtree-to-plist.awk \
 		-v kernel=yes -v _kernconf=${_kernel} \
@@ -2507,6 +2616,10 @@ _cddl_lib_libctf= cddl/lib/libctf
 _cddl_lib= cddl/lib
 cddl/lib/libavl__L: cddl/lib/libnvpair__L
 cddl/lib/libctf__L: lib/libz__L
+.if ${MK_LLVM_LIBUNWIND} != "no"
+# Jenkins sometimes fails to find libgcc_s when building libctf
+cddl/lib/libctf__L: lib/libgcc_s__L
+.endif
 cddl/lib/libuutil__L: cddl/lib/libnvpair__L
 cddl/lib/libzfs_core__L: cddl/lib/libnvpair__L
 cddl/lib/libzfs__L: lib/libgeom__L

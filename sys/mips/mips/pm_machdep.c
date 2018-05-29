@@ -180,7 +180,8 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	sf.sf_uc.uc_mcontext.mc_pc = regs->pc;
 	sf.sf_uc.uc_mcontext.mullo = regs->mullo;
 	sf.sf_uc.uc_mcontext.mulhi = regs->mulhi;
-	sf.sf_uc.uc_mcontext.mc_tls = td->td_md.md_tls;
+	sf.sf_uc.uc_mcontext.mc_tls =
+	    (__cheri_fromcap void *)td->td_md.md_tls;
 	sf.sf_uc.uc_mcontext.mc_regs[0] = UCONTEXT_MAGIC;  /* magic number */
 	bcopy((void *)&regs->ast, (void *)&sf.sf_uc.uc_mcontext.mc_regs[1],
 	    sizeof(sf.sf_uc.uc_mcontext.mc_regs) - sizeof(register_t));
@@ -248,10 +249,10 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		/* sf.sf_ahu.sf_action = (__siginfohandler_t *)catcher; */
 
 		/* fill siginfo structure */
-		sf.sf_si = ksi->ksi_info;
+		siginfo_to_siginfo_native(&ksi->ksi_info, &sf.sf_si);
 		sf.sf_si.si_signo = sig;
 		sf.sf_si.si_code = ksi->ksi_code;
-		sf.sf_si.si_addr = (void*)(intptr_t)regs->badvaddr;
+		sf.sf_si.si_addr = (void *)(uintptr_t)regs->badvaddr;
 	} else {
 		/* Old FreeBSD-style arguments. */
 		regs->a1 = ksi->ksi_code;
@@ -268,8 +269,9 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 #ifdef CPU_CHERI
 	cfp = malloc(sizeof(*cfp), M_TEMP, M_WAITOK);
 	cheri_trapframe_to_cheriframe(&td->td_pcb->pcb_regs, cfp);
-	if (copyoutcap(cfp,
-	    (void *)sf.sf_uc.uc_mcontext.mc_cp2state, cp2_len) != 0) {
+	if (copyoutcap_c((__cheri_tocap struct cheri_frame * __capability)cfp,
+	    __USER_CAP((void *)(uintptr_t)sf.sf_uc.uc_mcontext.mc_cp2state,
+	    cp2_len), cp2_len) != 0) {
 		free(cfp, M_TEMP);
 		PROC_LOCK(p);
 		printf("pid %d, tid %d: could not copy out cheriframe\n",
@@ -300,8 +302,8 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	hybridabi_sendsig(td);
 #endif
 
-	regs->pc = (register_t)(intptr_t)catcher;
-	regs->t9 = (register_t)(intptr_t)catcher;
+	regs->pc = (register_t)(__cheri_addr intptr_t)catcher;
+	regs->t9 = (register_t)(__cheri_addr intptr_t)catcher;
 	regs->sp = (register_t)(intptr_t)sfp;
 	if (p->p_sysent->sv_sigcode_base != 0) {
 		/* Signal trampoline code is in the shared page */
@@ -482,7 +484,7 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int flags)
 	mcp->mc_pc = td->td_frame->pc;
 	mcp->mullo = td->td_frame->mullo;
 	mcp->mulhi = td->td_frame->mulhi;
-	mcp->mc_tls = td->td_md.md_tls;
+	mcp->mc_tls = (__cheri_fromcap void *)td->td_md.md_tls;
 
 #ifdef CPU_CHERI
 	/*
@@ -515,7 +517,9 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 			return (EINVAL);
 		}
 		cfp = malloc(sizeof(*cfp), M_TEMP, M_WAITOK);
-		error = copyincap((void *)mcp->mc_cp2state, cfp,
+		error = copyincap_c(__USER_CAP((void *)mcp->mc_cp2state,
+		    mcp->mc_cp2state_len),
+		    (__cheri_tocap struct cheri_frame * __capability)cfp,
 		    sizeof(*cfp));
 		if (error) {
 			free(cfp, M_TEMP);
@@ -544,7 +548,7 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 	td->td_frame->pc = mcp->mc_pc;
 	td->td_frame->mullo = mcp->mullo;
 	td->td_frame->mulhi = mcp->mulhi;
-	td->td_md.md_tls = mcp->mc_tls;
+	td->td_md.md_tls = __USER_CAP_UNBOUND(mcp->mc_tls);
 	/* Dont let user to set any bits in status and cause registers. */
 
 	return (0);

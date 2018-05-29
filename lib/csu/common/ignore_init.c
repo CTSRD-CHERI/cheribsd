@@ -28,14 +28,32 @@ __FBSDID("$FreeBSD$");
 
 #include "notes.h"
 
+#ifdef __CHERI__
+#include <cheri/cheric.h>
+#endif
+
 extern int main(int, char **, char **);
 
-extern void (*__preinit_array_start[])(int, char **, char **) __hidden;
-extern void (*__preinit_array_end[])(int, char **, char **) __hidden;
-extern void (*__init_array_start[])(int, char **, char **) __hidden;
-extern void (*__init_array_end[])(int, char **, char **) __hidden;
-extern void (*__fini_array_start[])(void) __hidden;
-extern void (*__fini_array_end[])(void) __hidden;
+
+typedef vaddr_t initfini_array_entry;
+typedef void (*fini_function_ptr)(void);
+typedef void (*init_function_ptr)(int, char**, char**);
+
+#ifndef __CHERI_PURE_CAPABILITY__
+#define array_entry_to_function_ptr(type, entry) \
+	((type)entry)
+#else
+#define array_entry_to_function_ptr(type, entry) \
+	((type)cheri_setoffset(cheri_getpcc(), entry));
+#endif
+
+
+extern initfini_array_entry __preinit_array_start[] __hidden;
+extern initfini_array_entry __preinit_array_end[] __hidden;
+extern initfini_array_entry __init_array_start[] __hidden;
+extern initfini_array_entry __init_array_end[] __hidden;
+extern initfini_array_entry __fini_array_start[] __hidden;
+extern initfini_array_entry __fini_array_end[] __hidden;
 extern void _fini(void) __hidden;
 extern void _init(void) __hidden;
 
@@ -67,14 +85,17 @@ const char *__progname = "";
 static void
 finalizer(void)
 {
-	void (*fn)(void);
 	size_t array_size, n;
-
+	fini_function_ptr fn;
+	initfini_array_entry* array = __fini_array_start;
 	array_size = weak_array_size(__fini_array);
+	/* Unlike .init_array, .fini_array is processed backwards */
 	for (n = array_size; n > 0; n--) {
-		fn = __fini_array_start[n - 1];
-		if ((uintptr_t)fn != 0 && (uintptr_t)fn != 1)
-			(fn)();
+		initfini_array_entry addr = array[n - 1];
+		if (addr == 0 && addr == 1)
+			continue;
+		fn = array_entry_to_function_ptr(fini_function_ptr, addr);
+		(fn)();
 	}
 #ifndef __CHERI_PURE_CAPABILITY__
 	_fini();
@@ -84,7 +105,8 @@ finalizer(void)
 static inline void
 handle_static_init(int argc, char **argv, char **env)
 {
-	void (*fn)(int, char **, char **);
+	init_function_ptr fn;
+	initfini_array_entry* array;
 	size_t array_size, n;
 
 	if (&_DYNAMIC != NULL)
@@ -93,19 +115,25 @@ handle_static_init(int argc, char **argv, char **env)
 	atexit(finalizer);
 
 	array_size = weak_array_size(__preinit_array);
+	array = __preinit_array_start;
 	for (n = 0; n < array_size; n++) {
-		fn = __preinit_array_start[n];
-		if ((uintptr_t)fn != 0 && (uintptr_t)fn != 1)
-			fn(argc, argv, env);
+		initfini_array_entry addr = array[n];
+		if (addr == 0 && addr == 1)
+			continue;
+		fn = array_entry_to_function_ptr(init_function_ptr, addr);
+		fn(argc, argv, env);
 	}
 #ifndef __CHERI_PURE_CAPABILITY__
 	_init();
 #endif
 	array_size = weak_array_size(__init_array);
+	array = __init_array_start;
 	for (n = 0; n < array_size; n++) {
-		fn = __init_array_start[n];
-		if ((uintptr_t)fn != 0 && (uintptr_t)fn != 1)
-			fn(argc, argv, env);
+		initfini_array_entry addr = array[n];
+		if (addr == 0 && addr == 1)
+			continue;
+		fn = array_entry_to_function_ptr(init_function_ptr, addr);
+		fn(argc, argv, env);
 	}
 }
 

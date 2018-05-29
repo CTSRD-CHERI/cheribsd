@@ -1,6 +1,7 @@
 /*-
  * Copyright (c) 2002 Doug Rabson
- * Copyright (c) 2015-2016 SRI International
+ * Copyright (c) 2002 Marcel Moolenaar
+ * Copyright (c) 2015-2018 SRI International
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -36,6 +37,8 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ktrace.h"
+#include "opt_posix.h"
+#include "opt_capsicum.h"
 
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -62,6 +65,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/namei.h>
 #include <sys/proc.h>
 #include <sys/procctl.h>
+#include <sys/posix4.h>
 #include <sys/reboot.h>
 #include <sys/resource.h>
 #include <sys/resourcevar.h>
@@ -85,6 +89,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/unistd.h>
 #include <sys/ucontext.h>
 #include <sys/user.h>
+#include <sys/umtx.h>
+#include <sys/uuid.h>
 #include <sys/vnode.h>
 #include <sys/vdso.h>
 #include <sys/wait.h>
@@ -129,32 +135,12 @@ MALLOC_DECLARE(M_KQUEUE);
 FEATURE(compat_cheri_abi, "Compatible CHERI system call ABI");
 
 #ifdef CHERIABI_NEEDS_UPDATE
-CTASSERT(sizeof(struct sigaltstack32) == 12);
 CTASSERT(sizeof(struct kevent32) == 20);
 CTASSERT(sizeof(struct iovec32) == 8);
-CTASSERT(sizeof(struct msghdr32) == 28);
-CTASSERT(sizeof(struct sigaction32) == 24);
 #endif
 
-SYSCTL_NODE(_compat, OID_AUTO, cheriabi, CTLFLAG_RW, 0, "CheriABI mode");
-static SYSCTL_NODE(_compat_cheriabi, OID_AUTO, mmap, CTLFLAG_RW, 0, "mmap");
-
-static int	cheriabi_mmap_honor_prot = 1;
-SYSCTL_INT(_compat_cheriabi_mmap, OID_AUTO, honor_prot,
-    CTLFLAG_RWTUN, &cheriabi_mmap_honor_prot, 0,
-    "Reduce returned permissions to those requested by the prot argument.");
-static int	cheriabi_mmap_setbounds = 1;
-SYSCTL_INT(_compat_cheriabi_mmap, OID_AUTO, setbounds,
-    CTLFLAG_RWTUN, &cheriabi_mmap_setbounds, 0,
-    "Set bounds on returned capabilities.");
-int	cheriabi_mmap_precise_bounds = 1;
-SYSCTL_INT(_compat_cheriabi_mmap, OID_AUTO, precise_bounds,
-    CTLFLAG_RWTUN, &cheriabi_mmap_precise_bounds, 0,
-    "Require that bounds on returned capabilities be precise.");
-
-static int cheriabi_kevent_copyout(void *arg, struct kevent *kevp, int count);
-static int cheriabi_kevent_copyin(void *arg, struct kevent *kevp, int count);
-static register_t cheriabi_mmap_prot2perms(int prot);
+static int cheriabi_kevent_copyout(void *arg, kkevent_t *kevp, int count);
+static int cheriabi_kevent_copyin(void *arg, kkevent_t *kevp, int count);
 
 int
 cheriabi_syscall(struct thread *td, struct cheriabi_syscall_args *uap)
@@ -173,13 +159,19 @@ cheriabi_syscall(struct thread *td, struct cheriabi_syscall_args *uap)
 	}
 }
 
-/* syscall #532 */
+int
+cheriabi_wait4(struct thread *td, struct cheriabi_wait4_args *uap)
+{
+
+	return (kern_wait4(td, uap->pid, uap->status, uap->options,
+	    uap->rusage));
+}
+
 int
 cheriabi_wait6(struct thread *td, struct cheriabi_wait6_args *uap)
 {
 	struct __wrusage wru, *wrup;
-	struct siginfo_c si_c;
-	struct __siginfo si, *sip;
+	struct siginfo_c si, *sip;
 	int error, status;
 
 	if (uap->wrusage != NULL)
@@ -196,57 +188,11 @@ cheriabi_wait6(struct thread *td, struct cheriabi_wait6_args *uap)
 	if (error != 0)
 		return (error);
 	if (uap->status != NULL)
-		error = copyout(&status, uap->status, sizeof(status));
+		error = copyout_c(&status, uap->status, sizeof(status));
 	if (uap->wrusage != NULL && error == 0)
-		error = copyout(&wru, uap->wrusage, sizeof(wru));
+		error = copyout_c(&wru, uap->wrusage, sizeof(wru));
 	if (uap->info != NULL && error == 0) {
-		siginfo_to_siginfo_c (&si, &si_c);
-		error = copyout(&si_c, uap->info, sizeof(si_c));
-	}
-	return (error);
-}
-
-/* syscall #53 */
-int
-cheriabi_sigaltstack(struct thread *td,
-    struct cheriabi_sigaltstack_args *uap)
-{
-	void * __capability old_ss_sp;
-	struct sigaltstack_c s_c;
-	struct sigaltstack ss, oss, *ssp;
-	int error;
-
-	if (uap->ss != NULL) {
-		error = copyincap(uap->ss, &s_c, sizeof(s_c));
-		if (error)
-			return (error);
-		CP(s_c, ss, ss_size);
-		CP(s_c, ss, ss_flags);
-		/* XXX-BD: what perms to enforce? */
-		error = cheriabi_cap_to_ptr((caddr_t *)&ss.ss_sp, s_c.ss_sp,
-		    s_c.ss_size, CHERI_PERM_GLOBAL, 1);
-		if (error)
-			return (error);
-		ssp = &ss;
-	} else
-		ssp = NULL;
-	error = kern_sigaltstack(td, ssp, &oss);
-	if (error == 0) {
-		cheriabi_get_signal_stack_capability(td, &old_ss_sp);
-		if (uap->ss != NULL) {
-			/*
-			 * Install the new signal capability or restore the
-			 * thread's default one.
-			 */
-			cheriabi_set_signal_stack_capability(td,
-			    (ss.ss_flags & SS_DISABLE) ? NULL : &s_c.ss_sp);
-		}
-		if (uap->oss != NULL) {
-			cheriabi_get_signal_stack_capability(td, &s_c.ss_sp);
-			CP(oss, s_c, ss_size);
-			CP(oss, s_c, ss_flags);
-			error = copyoutcap(&s_c, uap->oss, sizeof(s_c));
-		}
+		error = copyout_c(&si, uap->info, sizeof(si));
 	}
 	return (error);
 }
@@ -256,16 +202,15 @@ cheriabi_sigaltstack(struct thread *td,
  * the pointers.
  */
 int
-cheriabi_exec_copyin_args(struct image_args *args, const char *fname,
-    enum uio_seg segflg, void * __capability *argv, void * __capability *envv)
+cheriabi_exec_copyin_args(struct image_args *args,
+    const char * __capability fname, enum uio_seg segflg,
+    void * __capability * __capability argv,
+    void * __capability * __capability envv)
 {
-	char *argp, *envp;
-	void * __capability *pcap;
-	void * __capability *argcap;
+	void * __capability * __capability pcap;
+	void * __capability argcap;
 	size_t length;
-	int error, tag;
-
-	argcap = NULL;
+	int error;
 
 	bzero(args, sizeof(*args));
 	if (argv == NULL)
@@ -280,24 +225,24 @@ cheriabi_exec_copyin_args(struct image_args *args, const char *fname,
 		return (error);
 
 	/*
-	 * XXX: Work around not being able to store capabilities to the stack
-	 * and use the allocated buffer instead.
-	 */
-	argcap = (void * __capability *)args->buf;
-	/*
 	 * Copy the file name.
 	 */
 	if (fname != NULL) {
-		args->fname = args->buf + sizeof(void * __capability);
-		error = (segflg == UIO_SYSSPACE) ?
-		    copystr(fname, args->fname, PATH_MAX, &length) :
-		    copyinstr(fname, args->fname, PATH_MAX, &length);
+		args->fname = args->buf;
+		if (segflg == UIO_SYSSPACE) {
+			error = copystr((__cheri_fromcap const char *)fname,
+			    args->fname, PATH_MAX, &length);
+		} else {
+			error = copyinstr_c(fname,
+			    (__cheri_tocap char * __capability)args->fname,
+			    PATH_MAX, &length);
+		}
 		if (error != 0)
 			goto err_exit;
 	} else
 		length = 0;
 
-	args->begin_argv = args->buf + sizeof(void * __capability) + length;
+	args->begin_argv = args->buf + length;
 	args->endp = args->begin_argv;
 	args->stringspace = ARG_MAX;
 
@@ -306,18 +251,15 @@ cheriabi_exec_copyin_args(struct image_args *args, const char *fname,
 	 */
 	pcap = argv;
 	for (;;) {
-		error = copyincap(pcap++, argcap, sizeof(*argcap));
+		error = copyincap_c(pcap++, &argcap, sizeof(argcap));
 		if (error)
 			goto err_exit;
-		tag = cheri_gettag(*argcap);
-		if (!tag)
+		if (argcap == NULL)
 			break;
-		error = cheriabi_strcap_to_ptr(&argp, *argcap, 0);
-		if (error)
-			goto err_exit;
-		/* Lose any stray caps in arg strings. */
-		error = copyinstr(argp, args->endp, args->stringspace, &length);
-		if (error) {
+		error = copyinstr_c(argcap,
+		    (__cheri_tocap char * __capability)args->endp,
+		    args->stringspace, &length);
+		if (error != 0) {
 			if (error == ENAMETOOLONG)
 				error = E2BIG;
 			goto err_exit;
@@ -335,19 +277,15 @@ cheriabi_exec_copyin_args(struct image_args *args, const char *fname,
 	if (envv) {
 		pcap = envv;
 		for (;;) {
-			error = copyincap(pcap++, argcap, sizeof(*argcap));
-			if (error)
+			error = copyincap_c(pcap++, &argcap, sizeof(argcap));
+			if (error != 0)
 				goto err_exit;
-			tag = cheri_gettag(*argcap);
-			if (!tag)
+			if (argcap == NULL)
 				break;
-			error = cheriabi_strcap_to_ptr(&envp, *argcap, 0);
-			if (error)
-				goto err_exit;
-			/* Lose any stray caps in env strings. */
-			error = copyinstr(envp, args->endp, args->stringspace,
-			    &length);
-			if (error) {
+			error = copyinstr_c(argcap,
+			    (__cheri_tocap char * __capability)args->endp,
+			    args->stringspace, &length);
+			if (error != 0) {
 				if (error == ENAMETOOLONG)
 					error = E2BIG;
 				goto err_exit;
@@ -407,100 +345,39 @@ cheriabi_fexecve(struct thread *td, struct cheriabi_fexecve_args *uap)
  * Copy 'count' items into the destination list pointed to by uap->eventlist.
  */
 static int
-cheriabi_kevent_copyout(void *arg, struct kevent *kevp, int count)
+cheriabi_kevent_copyout(void *arg, kkevent_t *kevp, int count)
 {
 	struct cheriabi_kevent_args *uap;
-	struct kevent_c	ks_c[KQ_NEVENTS];
-	int i, j, error = 0;
+	int error;
 
 	KASSERT(count <= KQ_NEVENTS, ("count (%d) > KQ_NEVENTS", count));
 	uap = (struct cheriabi_kevent_args *)arg;
 
-	for (i = 0; i < count; i++) {
-		CP(kevp[i], ks_c[i], filter);
-		CP(kevp[i], ks_c[i], flags);
-		CP(kevp[i], ks_c[i], fflags);
-		CP(kevp[i], ks_c[i], data);
-		for (j = 0; j < nitems(kevp->ext); j++)
-			CP(kevp[i], ks_c[i], ext[j]);
-
-		/*
-		 * Retrieve the ident and udata capabilities stashed by
-		 * cheriabi_kevent_copyin().
-		 */
-		void * __capability * udata = kevp[i].udata;
-		ks_c[i].ident = (__intcap_t)udata[0];
-		ks_c[i].udata = udata[1];
-	}
-	error = copyoutcap(ks_c, uap->eventlist, count * sizeof(*ks_c));
+	error = copyoutcap_c(
+	    (__cheri_tocap struct kevent_c * __capability)kevp,
+	    uap->eventlist, count * sizeof(*kevp));
 	if (error == 0)
 		uap->eventlist += count;
 	return (error);
-}
-
-void *
-cheriabi_build_kevent_udata(__intcap_t ident, void * __capability udata)
-{
-	void * __capability * newudata;
-
-	newudata = malloc(2*sizeof(void * __capability), M_KQUEUE, M_WAITOK);
-	newudata[0] = (void * __capability)ident;
-	newudata[1] = udata;
-
-	return (newudata);
 }
 
 /*
  * Copy 'count' items from the list pointed to by uap->changelist.
  */
 static int
-cheriabi_kevent_copyin(void *arg, struct kevent *kevp, int count)
+cheriabi_kevent_copyin(void *arg, kkevent_t *kevp, int count)
 {
 	struct cheriabi_kevent_args *uap;
-	struct kevent_c	ks_c[KQ_NEVENTS];
-	int error, i, j;
+	int error;
 
 	KASSERT(count <= KQ_NEVENTS, ("count (%d) > KQ_NEVENTS", count));
 	uap = (struct cheriabi_kevent_args *)arg;
 
-	error = copyincap(uap->changelist, ks_c, count * sizeof *ks_c);
-	if (error)
-		goto done;
-	uap->changelist += count;
-
-	for (i = 0; i < count; i++) {
-		/*
-		 * XXX-BD: this is quite awkward.  ident could be anything.
-		 * If it's a capabilty, we'll hang on to it in udata.
-		 */
-		if (cheri_gettag((void * __capability)ks_c[i].ident)) {
-			if (!(cheri_getperm((void * __capability)ks_c[i].ident)
-			    | CHERI_PERM_GLOBAL))
-				return (EPROT);
-		}
-		kevp[i].ident = (uintptr_t)(__uintcap_t)ks_c[i].ident;
-		CP(ks_c[i], kevp[i], filter);
-		CP(ks_c[i], kevp[i], flags);
-		CP(ks_c[i], kevp[i], fflags);
-		CP(ks_c[i], kevp[i], data);
-		for (j = 0; j < nitems(kevp->ext); j++)
-			CP(ks_c[i], kevp[i], ext[j]);
-
-		if (ks_c[i].flags & EV_DELETE)
-			continue;
-
-		if (cheri_gettag(ks_c[i].udata)) {
-			if (!(cheri_getperm(ks_c[i].udata) & CHERI_PERM_GLOBAL))
-				return (EPROT);
-		}
-		/*
-		 * We stash the real ident and udata capabilities in
-		 * a malloced array in udata.
-		 */
-		kevp[i].udata = cheriabi_build_kevent_udata(ks_c[i].ident,
-		    ks_c[i].udata);
-	}
-done:
+	error = copyincap_c(uap->changelist,
+	    (__cheri_tocap struct kevent_c * __capability)kevp,
+	    count * sizeof(*kevp));
+	if (error == 0)
+		uap->changelist += count;
 	return (error);
 }
 
@@ -515,7 +392,7 @@ cheriabi_kevent(struct thread *td, struct cheriabi_kevent_args *uap)
 
 
 	if (uap->timeout) {
-		error = copyin(uap->timeout, &ts, sizeof(ts));
+		error = copyin_c(uap->timeout, &ts, sizeof(ts));
 		if (error)
 			return (error);
 		tsp = &ts;
@@ -527,47 +404,36 @@ cheriabi_kevent(struct thread *td, struct cheriabi_kevent_args *uap)
 }
 
 static int
-cheriabi_copyinuio(struct iovec_c *iovp, u_int iovcnt, struct uio **uiop)
+cheriabi_copyinuio(struct iovec_c * __capability iovp, u_int iovcnt,
+    struct uio **uiop)
 {
-	struct iovec_c iov_c;
-	struct iovec *iov;
+	kiovec_t * __capability iov;
 	struct uio *uio;
-	u_int iovlen;
+	size_t iovlen;
 	int error, i;
 
 	*uiop = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (EINVAL);
-	iovlen = iovcnt * sizeof(struct iovec);
+	iovlen = iovcnt * sizeof(kiovec_t);
 	uio = malloc(iovlen + sizeof(*uio), M_IOV, M_WAITOK);
-	iov = (struct iovec *)(uio + 1);
-	for (i = 0; i < iovcnt; i++) {
-		error = copyincap(&iovp[i], &iov_c, sizeof(struct iovec_c));
-		if (error) {
-			free(uio, M_IOV);
-			return (error);
-		}
-		iov[i].iov_len = iov_c.iov_len;
-		error = cheriabi_cap_to_ptr((caddr_t *)&iov[i].iov_base,
-		    iov_c.iov_base, iov[i].iov_len,
-		    CHERI_PERM_GLOBAL | CHERI_PERM_LOAD, 1);
-		if (error) {
-			free(uio, M_IOV);
-			return (error);
-		}
+	iov = (__cheri_tocap kiovec_t * __capability)(kiovec_t *)(uio + 1);
+	error = copyincap_c(iovp, iov, iovlen);
+	if (error) {
+		free(uio, M_IOV);
+		return (error);
 	}
-	uio->uio_iov = iov;
+	uio->uio_iov = (__cheri_fromcap kiovec_t *)iov;
 	uio->uio_iovcnt = iovcnt;
 	uio->uio_segflg = UIO_USERSPACE;
 	uio->uio_offset = -1;
 	uio->uio_resid = 0;
 	for (i = 0; i < iovcnt; i++) {
-		if (iov->iov_len > INT_MAX - uio->uio_resid) {
+		if (iov[i].iov_len > SIZE_MAX - uio->uio_resid) {
 			free(uio, M_IOV);
 			return (EINVAL);
 		}
-		uio->uio_resid += iov->iov_len;
-		iov++;
+		uio->uio_resid += iov[i].iov_len;
 	}
 	*uiop = uio;
 	return (0);
@@ -630,206 +496,36 @@ cheriabi_pwritev(struct thread *td, struct cheriabi_pwritev_args *uap)
 }
 
 int
-cheriabi_copyiniov(struct iovec_c *iovp_c, u_int iovcnt, struct iovec **iovp,
-    int error)
+cheriabi_copyiniov(struct iovec_c * __capability iovp_c, u_int iovcnt,
+    kiovec_t **iovp, int error)
 {
-	struct iovec_c iov_c;
-	struct iovec *iov;
+	kiovec_t *iov;
 	u_int iovlen;
-	int i;
 
 	*iovp = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (error);
-	iovlen = iovcnt * sizeof(struct iovec);
+	iovlen = iovcnt * sizeof(kiovec_t);
 	iov = malloc(iovlen, M_IOV, M_WAITOK);
-	for (i = 0; i < iovcnt; i++) {
-		error = copyincap(&iovp_c[i], &iov_c, sizeof(struct iovec_c));
-		if (error) {
-			free(iov, M_IOV);
-			return (error);
-		}
-		iov[i].iov_len = iov_c.iov_len;
-		error = cheriabi_cap_to_ptr((caddr_t *)&iov[i].iov_base,
-		    iov_c.iov_base, iov[i].iov_len,
-		    CHERI_PERM_GLOBAL | CHERI_PERM_LOAD, 0);
-		if (error) {
-			free(iov, M_IOV);
-			return (error);
-		}
+	error = copyincap_c(iovp_c,
+	    (__cheri_tocap kiovec_t * __capability)iov, iovlen);
+	if (error) {
+		free(iov, M_IOV);
+		return (error);
 	}
 	*iovp = iov;
 	return (0);
 }
 
-static int
-cheriabi_copyinmsghdr(const struct msghdr_c *msg_cp, struct msghdr *msg,
-    int out)
-{
-	struct msghdr_c msg_c;
-	int error;
-
-	error = copyincap(msg_cp, &msg_c, sizeof(msg_c));
-	if (error)
-		return (error);
-	error = cheriabi_cap_to_ptr((caddr_t *)&msg->msg_name, msg_c.msg_name,
-	    msg_c.msg_namelen, CHERI_PERM_GLOBAL | CHERI_PERM_LOAD, 1);
-	if (error)
-		return (error);
-	msg->msg_namelen = msg_c.msg_namelen;
-	error = cheriabi_cap_to_ptr((caddr_t *)&msg->msg_iov, msg_c.msg_iov,
-	    sizeof(struct iovec_c) * msg_c.msg_iovlen,
-	    CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP, 0);
-	if (error)
-		return (error);
-	msg->msg_iovlen = msg_c.msg_iovlen;
-	error = cheriabi_cap_to_ptr((caddr_t *)&msg->msg_control,
-	    msg_c.msg_control, msg_c.msg_controllen,
-	    CHERI_PERM_GLOBAL | (out ? CHERI_PERM_STORE : CHERI_PERM_LOAD), 1);
-	if (error)
-		return (error);
-	msg->msg_controllen = msg_c.msg_controllen;
-	msg->msg_flags = msg_c.msg_flags;
-	return (0);
-}
-
-static int
-cheriabi_copyoutmsghdr(struct msghdr *msg, struct msghdr_c *msg_c)
-{
-	struct copy_map cm[3];
-	int error;
-
-	cm[0].koffset = offsetof(struct msghdr, msg_namelen);
-	cm[0].uoffset = offsetof(struct msghdr_c, msg_namelen);
-	cm[0].len = sizeof(msg_c->msg_namelen);
-	cm[1].koffset = offsetof(struct msghdr, msg_iovlen);
-	cm[1].uoffset = offsetof(struct msghdr_c, msg_iovlen);
-	cm[1].len = sizeof(msg_c->msg_iovlen);
-	/* Copy out msg_controllen and msg_flags */
-	cm[2].koffset = offsetof(struct msghdr, msg_controllen);
-	cm[2].uoffset = offsetof(struct msghdr_c, msg_controllen);
-	cm[2].len = sizeof(struct msghdr_c) -
-	    offsetof(struct msghdr_c, msg_controllen);
-
-	error = copyout_part(msg, msg_c, cm, 3);
-	return (error);
-}
-
 int
-cheriabi_recvmsg(struct thread *td,
-	struct cheriabi_recvmsg_args /* {
-		int	s;
-		struct	msghdr_c *msg;
-		int	flags;
-	} */ *uap)
-{
-	struct msghdr msg;
-	struct iovec *uiov, *iov;
-
-	int error;
-
-	error = cheriabi_copyinmsghdr(uap->msg, &msg, 1);
-	if (error)
-		return (error);
-	error = cheriabi_copyiniov((struct iovec_c *)msg.msg_iov, msg.msg_iovlen,
-	    &iov, EMSGSIZE);
-	if (error)
-		return (error);
-	msg.msg_flags = uap->flags;
-	uiov = msg.msg_iov;
-	msg.msg_iov = iov;
-
-	error = kern_recvit(td, uap->s, &msg, UIO_USERSPACE, NULL);
-	if (error == 0) {
-		msg.msg_iov = uiov;
-
-		/*
-		 * Message contents have already been copied out, update
-		 * lengths.
-		 */
-		error = cheriabi_copyoutmsghdr(&msg, uap->msg);
-	}
-	free(iov, M_IOV);
-
-	return (error);
-}
-
-int
-cheriabi_sendmsg(struct thread *td,
-		  struct cheriabi_sendmsg_args *uap)
-{
-	struct msghdr msg;
-	struct iovec *iov;
-	struct mbuf *control = NULL;
-	struct sockaddr *to = NULL;
-	int error;
-
-	error = cheriabi_copyinmsghdr(uap->msg, &msg, 0);
-	if (error)
-		return (error);
-	error = cheriabi_copyiniov((struct iovec_c *)msg.msg_iov, msg.msg_iovlen,
-	    &iov, EMSGSIZE);
-	if (error)
-		return (error);
-	msg.msg_iov = iov;
-	if (msg.msg_name != NULL) {
-		error = getsockaddr(&to, msg.msg_name, msg.msg_namelen);
-		if (error) {
-			to = NULL;
-			goto out;
-		}
-		msg.msg_name = to;
-	}
-
-	if (msg.msg_control) {
-		if (msg.msg_controllen < sizeof(struct cmsghdr)) {
-			error = EINVAL;
-			goto out;
-		}
-
-		/*
-		 * Control messages are currently assumed to be free of
-		 * capabilities.  One could imagine passing capabilities
-		 * (most likely sealed) to another socket with the
-		 * expectation of receiving them back once some work is
-		 * performed, but that would be harder to implement and
-		 * easy to get wrong.  Lots of code likely assumes 64-bit
-		 * alignment of mbufs is sufficent as well.
-		 */
-		/* XXX: No support for COMPAT_OLDSOCK path */
-		error = sockargs(&control, msg.msg_control, msg.msg_controllen,
-		    MT_CONTROL);
-		if (error)
-			goto out;
-
-		/* XXXBD: sys_sendmsg doesn't do this */
-		msg.msg_control = NULL;
-		msg.msg_controllen = 0;
-	}
-
-	error = kern_sendit(td, uap->s, &msg, uap->flags, control,
-	    UIO_USERSPACE);
-
-out:
-	free(iov, M_IOV);
-	if (to)
-		free(to, M_SONAME);
-	return (error);
-}
-
-static int
-cheriabi_do_sendfile(struct thread *td,
-    struct cheriabi_sendfile_args *uap)
+cheriabi_sendfile(struct thread *td, struct cheriabi_sendfile_args *uap)
 {
 	struct sf_hdtr_c hdtr_c;
-	struct iovec_c *headers, *trailers;
 	struct uio *hdr_uio, *trl_uio;
 	struct file *fp;
 	cap_rights_t rights;
 	off_t offset, sbytes;
 	int error;
-	static register_t reqperms = CHERI_PERM_GLOBAL |
-	    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP;
 
 	offset = uap->offset;
 	if (offset < 0)
@@ -838,29 +534,19 @@ cheriabi_do_sendfile(struct thread *td,
 	hdr_uio = trl_uio = NULL;
 
 	if (uap->hdtr != NULL) {
-		error = copyincap(uap->hdtr, &hdtr_c, sizeof(hdtr_c));
-		if (error)
-			goto out;
-		error = cheriabi_cap_to_ptr((caddr_t *)&headers,
-		    hdtr_c.headers, sizeof(struct iovec_c) * hdtr_c.hdr_cnt,
-		    reqperms, 1);
-		if (error)
-			goto out;
-		error = cheriabi_cap_to_ptr((caddr_t *)&trailers,
-		    hdtr_c.trailers, sizeof(struct iovec_c) * hdtr_c.trl_cnt,
-		    reqperms, 1);
+		error = copyincap_c(uap->hdtr, &hdtr_c, sizeof(hdtr_c));
 		if (error)
 			goto out;
 
-		if (headers != NULL) {
-			error = cheriabi_copyinuio(headers, hdtr_c.hdr_cnt,
-			    &hdr_uio);
+		if (hdtr_c.headers != NULL) {
+			error = cheriabi_copyinuio(hdtr_c.headers,
+			    hdtr_c.hdr_cnt, &hdr_uio);
 			if (error)
 				goto out;
 		}
-		if (trailers != NULL) {
-			error = cheriabi_copyinuio(trailers, hdtr_c.trl_cnt,
-			    &trl_uio);
+		if (hdtr_c.trailers != NULL) {
+			error = cheriabi_copyinuio(hdtr_c.trailers,
+			    hdtr_c.trl_cnt, &trl_uio);
 			if (error)
 				goto out;
 		}
@@ -877,7 +563,7 @@ cheriabi_do_sendfile(struct thread *td,
 	fdrop(fp, td);
 
 	if (uap->sbytes != NULL)
-		copyout(&sbytes, uap->sbytes, sizeof(off_t));
+		copyout_c(&sbytes, uap->sbytes, sizeof(off_t));
 
 out:
 	if (hdr_uio)
@@ -888,20 +574,12 @@ out:
 }
 
 int
-cheriabi_sendfile(struct thread *td, struct cheriabi_sendfile_args *uap)
-{
-
-	return (cheriabi_do_sendfile(td, uap));
-}
-
-int
 cheriabi_jail(struct thread *td, struct cheriabi_jail_args *uap)
 {
-	uint32_t version;
+	unsigned int version;
 	int error;
-	struct jail j;
 
-	error = copyin(uap->jailp, &version, sizeof(uint32_t));
+	error = copyin_c(&uap->jailp->version, &version, sizeof(version));
 	if (error)
 		return (error);
 
@@ -913,36 +591,20 @@ cheriabi_jail(struct thread *td, struct cheriabi_jail_args *uap)
 
 	case 2:	/* JAIL_API_VERSION */
 	{
+		struct jail_c j;
 		/* FreeBSD multi-IPv4/IPv6,noIP jails. */
-		struct jail_c j_c;
 
-		error = copyincap(uap->jailp, &j_c, sizeof(j_c));
-		if (error)
+		error = copyincap_c(uap->jailp, &j, sizeof(j));
+		if (error != 0)
 			return (error);
-		CP(j_c, j, version);
-		cheriabi_strcap_to_ptr(&j.path, j_c.path, 1);
-		cheriabi_strcap_to_ptr(&j.hostname, j_c.hostname, 1);
-		cheriabi_strcap_to_ptr(&j.jailname, j_c.jailname, 1);
-		CP(j_c, j, ip4s);
-		CP(j_c, j, ip6s);
-		error = cheriabi_cap_to_ptr((caddr_t *)&j.ip4, j_c.ip4,
-		    sizeof(*j.ip4) * j.ip4s,
-		    CHERI_PERM_GLOBAL | CHERI_PERM_LOAD, 1);
-		if (error)
-			return (error);
-		error = cheriabi_cap_to_ptr((caddr_t *)&j.ip6, j_c.ip6,
-		    sizeof(*j.ip6) * j.ip6s,
-		    CHERI_PERM_GLOBAL | CHERI_PERM_LOAD, 1);
-		if (error)
-			return (error);
-		break;
+		return (kern_jail(td, j.path, j.hostname, j.jailname,
+		    j.ip4, j.ip4s, j.ip6, j.ip6s, UIO_USERSPACE));
 	}
 
 	default:
 		/* Sci-Fi jails are not supported, sorry. */
 		return (EINVAL);
 	}
-	return (kern_jail(td, &j));
 }
 
 int
@@ -963,11 +625,27 @@ cheriabi_jail_set(struct thread *td, struct cheriabi_jail_set_args *uap)
 	return (error);
 }
 
+static int
+cheriabi_updateiov(const struct uio * uiop, struct iovec_c * __capability iovp)
+{
+	int i, error;
+
+	for (i = 0; i < uiop->uio_iovcnt; i++) {
+		error = copyout_c(
+		    (__cheri_tocap size_t * __capability)
+		    &uiop->uio_iov[i].iov_len, &iovp[i].iov_len,
+		    sizeof(uiop->uio_iov[i].iov_len));
+		if (error != 0)
+			return (error);
+	}
+	return (0);
+}
+
 int
 cheriabi_jail_get(struct thread *td, struct cheriabi_jail_get_args *uap)
 {
 	struct uio *auio;
-	int error, i;
+	int error;
 
 	/* Check that we have an even number of iovecs. */
 	if (uap->iovcnt & 1)
@@ -978,76 +656,8 @@ cheriabi_jail_get(struct thread *td, struct cheriabi_jail_get_args *uap)
 		return (error);
 	error = kern_jail_get(td, auio, uap->flags);
 	if (error == 0)
-		for (i = 0; i < uap->iovcnt; i++) {
-			/*
-			 * Copyout the length of data previously copied
-			 * to userspace by kern_jail_get.  Do not touch the
-			 * capabilities as we have no way to reconstruct
-			 * the correct values short of pulling them from
-			 * userspace again.
-			 */
-			error = copyout(&auio->uio_iov[i].iov_len,
-			    ((char *)uap->iovp + i) +
-			     offsetof(struct iovec_c, iov_len),
-			    sizeof(auio->uio_iov[i].iov_len));
-			if (error != 0)
-				break;
-		}
+		error = cheriabi_updateiov(auio, uap->iovp);
 	free(auio, M_IOV);
-	return (error);
-}
-
-int
-cheriabi_sigaction(struct thread *td, struct cheriabi_sigaction_args *uap)
-{
-	struct sigaction_c sa_c;
-	struct sigaction sa, osa, *sap;
-	void * __capability cap;
-
-	int error, tag;
-
-	if (uap->act) {
-		error = copyincap(uap->act, &sa_c, sizeof(sa_c));
-		if (error)
-			return (error);
-		tag = cheri_gettag(sa_c.sa_u);
-		if (!tag) {
-			sa.sa_handler = (void (*)(int))(uintptr_t)(__intcap_t)sa_c.sa_u;
-			if (sa.sa_handler != SIG_DFL &&
-			    sa.sa_handler != SIG_IGN) {
-				SYSERRCAUSE("untagged sa_handler and not "
-				    "SIG_DFL or SIG_IGN (%p)", sa.sa_handler);
-				return (EPROT);
-			}
-		} else {
-			error = cheriabi_cap_to_ptr((caddr_t *)&sa.sa_handler,
-			    sa_c.sa_u,
-			    8 /* XXX-BD: at least two instructions */,
-		            CHERI_PERM_LOAD | CHERI_PERM_EXECUTE, 0);
-			if (error) {
-				SYSERRCAUSE("in cheriabi_cap_to_ptr");
-				return (error);
-			}
-		}
-		CP(sa_c, sa, sa_flags);
-		CP(sa_c, sa, sa_mask);
-		sap = &sa;
-		cap = sa_c.sa_u;
-	} else
-		sap = NULL;
-	error = kern_sigaction_cap(td, uap->sig, sap,
-	    uap->oact != NULL ? &osa : NULL, 0, &cap);
-	if (error != 0)
-		SYSERRCAUSE("error in kern_sigaction_cap");
-	if (error == 0 && uap->oact != NULL) {
-		sa_c.sa_u = cap;
-		CP(osa, sa_c, sa_flags);
-		CP(osa, sa_c, sa_mask);
-		error = copyoutcap(&sa_c, uap->oact, sizeof(sa_c));
-		if (error != 0) {
-			SYSERRCAUSE("error in copyoutcap");
-		}
-	}
 	return (error);
 }
 
@@ -1057,7 +667,7 @@ cheriabi_sigreturn(struct thread *td, struct cheriabi_sigreturn_args *uap)
 	ucontext_c_t uc;
 	int error;
 
-	error = copyincap(uap->sigcntxp, &uc, sizeof(uc));
+	error = copyincap_c(uap->sigcntxp, &uc, sizeof(uc));
 	if (error != 0)
 		return (error);
 
@@ -1086,7 +696,7 @@ cheriabi_getcontext(struct thread *td, struct cheriabi_getcontext_args *uap)
 	PROC_LOCK(td->td_proc);
 	uc.uc_sigmask = td->td_sigmask;
 	PROC_UNLOCK(td->td_proc);
-	return (copyoutcap(&uc, uap->ucp, UCC_COPY_SIZE));
+	return (copyoutcap_c( &uc, uap->ucp, UCC_COPY_SIZE));
 }
 
 int
@@ -1097,7 +707,7 @@ cheriabi_setcontext(struct thread *td, struct cheriabi_setcontext_args *uap)
 
 	if (uap->ucp == NULL)
 		return (EINVAL);
-	if ((ret = copyincap(uap->ucp, &uc, UCC_COPY_SIZE)) != 0)
+	if ((ret = copyincap_c(uap->ucp, &uc, UCC_COPY_SIZE)) != 0)
 		return (ret);
 	if ((ret = cheriabi_set_mcontext(td, &uc.uc_mcontext)) != 0)
 		return (ret);
@@ -1121,9 +731,9 @@ cheriabi_swapcontext(struct thread *td, struct cheriabi_swapcontext_args *uap)
 	PROC_LOCK(td->td_proc);
 	uc.uc_sigmask = td->td_sigmask;
 	PROC_UNLOCK(td->td_proc);
-	if ((ret = copyoutcap(&uc, uap->oucp, UCC_COPY_SIZE)) != 0)
+	if ((ret = copyoutcap_c( &uc, uap->oucp, UCC_COPY_SIZE)) != 0)
 		return (ret);
-	if ((ret = copyincap(uap->ucp, &uc, UCC_COPY_SIZE)) != 0)
+	if ((ret = copyincap_c(uap->ucp, &uc, UCC_COPY_SIZE)) != 0)
 		return (ret);
 	if ((ret = cheriabi_set_mcontext(td, &uc.uc_mcontext)) != 0)
 		return (ret);
@@ -1132,254 +742,19 @@ cheriabi_swapcontext(struct thread *td, struct cheriabi_swapcontext_args *uap)
 	return (EJUSTRETURN);
 }
 
-struct sigvec_c {
-	void * __capability	sv_handler;
-	int		sv_mask;
-	int		sv_flags;
-};
-
-struct sigstack32 {
-	u_int32_t	ss_sp;
-	int		ss_onstack;
-};
-
-int cheriabi_ktimer_create(struct thread *td,
-    struct cheriabi_ktimer_create_args *uap)
-{
-	struct sigevent_c ev_c;
-	struct sigevent ev, *evp;
-	int error, id;
-
-	if (uap->evp == NULL) {
-		evp = NULL;
-	} else {
-		evp = &ev;
-		error = copyincap(uap->evp, &ev_c, sizeof(ev_c));
-		if (error != 0)
-			return (error);
-		error = convert_sigevent_c(&ev_c, &ev);
-		if (error != 0)
-			return (error);
-	}
-	error = kern_ktimer_create(td, uap->clock_id, evp, &id, -1);
-	if (error != 0 && evp != NULL) {
-		cheriabi_free_sival(&evp->sigev_value);
-		return (error);
-	}
-	error = copyout(&id, uap->timerid, sizeof(int));
-	if (error != 0)
-		kern_ktimer_delete(td, id);
-	return (error);
-}
-
-int
-cheriabi_thr_create(struct thread *td, struct cheriabi_thr_create_args *uap)
-{
-
-	return (ENOSYS);
-}
-
-static int
-cheriabi_thr_new_initthr(struct thread *td, void *thunk)
-{
-	struct thr_param_c *param;
-	long *child_tidp, *parent_tidp;
-	int error;
-
-	param = thunk;
-	error = cheriabi_cap_to_ptr((caddr_t *)&child_tidp,
-	    param->child_tid, sizeof(*child_tidp),
-	    CHERI_PERM_GLOBAL | CHERI_PERM_STORE, 1);
-	if (error)
-		return (error);
-	error = cheriabi_cap_to_ptr((caddr_t *)&parent_tidp,
-	    param->parent_tid, sizeof(*parent_tidp),
-	    CHERI_PERM_GLOBAL | CHERI_PERM_STORE, 1);
-	if (error)
-		return (error);
-	if ((child_tidp != NULL && suword(child_tidp, td->td_tid)) ||
-	    (parent_tidp != NULL && suword(parent_tidp, td->td_tid)))
-		return (EFAULT);
-	cheriabi_set_threadregs(td, param);
-	return (cheriabi_set_user_tls(td, param->tls_base));
-}
-
-int
-cheriabi_thr_new(struct thread *td, struct cheriabi_thr_new_args *uap)
-{
-	struct thr_param_c param_c;
-	struct rtprio rtp, *rtpp, *rtpup;
-	int error;
-
-	if (uap->param_size != sizeof(struct thr_param_c))
-		return (EINVAL);
-
-	error = copyincap(uap->param, &param_c, uap->param_size);
-	if (error != 0)
-		return (error);
-
-	/*
-	 * Opportunity for machine-dependent code to provide a DDC if the
-	 * caller didn't provide one.
-	 *
-	 * XXXRW: But should only do so if a suitable flag is set?
-	 */
-	cheriabi_thr_new_md(td, &param_c);
-	rtpp = NULL;
-	error = cheriabi_cap_to_ptr((caddr_t *)&rtpup, param_c.rtp,
-	    sizeof(rtp), CHERI_PERM_GLOBAL | CHERI_PERM_LOAD, 1);
-	if (error)
-		return (error);
-	if (rtpup != 0) {
-		error = copyin(rtpup, &rtp, sizeof(struct rtprio));
-		if (error)
-			return (error);
-		rtpp = &rtp;
-	}
-	return (thread_create(td, rtpp, cheriabi_thr_new_initthr, &param_c));
-}
-
 int
 cheriabi_procctl(struct thread *td, struct cheriabi_procctl_args *uap)
 {
 
-	switch (uap->com) {
-	case PROC_REAP_GETPIDS:
-		/*
-		 * XXX-BD: implement struct procctl_reaper_pids_c
-		 * support in reap_getpids()
-		 */
-		return (EOPNOTSUPP);
-	}
-	return (sys_procctl(td, (struct procctl_args *)uap));
-}
-
-void
-siginfo_to_siginfo_c(const siginfo_t *src, struct siginfo_c *dst)
-{
-	bzero(dst, sizeof(*dst));
-	dst->si_signo = src->si_signo;
-	dst->si_errno = src->si_errno;
-	dst->si_code = src->si_code;
-	dst->si_pid = src->si_pid;
-	dst->si_uid = src->si_uid;
-	dst->si_status = src->si_status;
-	/*
-	 * XXX: should copy out something related to src->si_addr, but
-	 * what?  Presumably not a valid pointer to a faulting address.
-	 */
-	dst->si_value.sival_int = src->si_value.sival_int;
-	dst->si_timerid = src->si_timerid;
-	dst->si_overrun = src->si_overrun;
-}
-
-#ifndef _SYS_SYSPROTO_H_
-struct cheriabi_sigqueue_args {
-	pid_t pid;
-	int signum;
-	/* union sigval_c */ void *value;
-};
-#endif
-int
-cheriabi_sigqueue(struct thread *td, struct cheriabi_sigqueue_args *uap)
-{
-	union sigval_c	value_union;
-	union sigval	sv;
-	int		flags = 0, tag;
-
-	cheriabi_fetch_syscall_arg(td, &value_union.sival_ptr,
-	    2, CHERIABI_SYS_cheriabi_sigqueue_PTRMASK);
-	if (uap->pid == td->td_proc->p_pid) {
-		sv.sival_ptr = malloc(sizeof(value_union), M_TEMP, M_WAITOK);
-		*((void * __capability *)sv.sival_ptr) = value_union.sival_ptr;
-		flags = KSI_CHERI;
-	} else {
-		/*
-		 * Cowardly refuse to send capabilities to other
-		 * processes.
-		 *
-		 * XXX-BD: allow untagged capablities between
-		 * CheriABI processess? (Would have to happen in
-		 * delivery code to avoid a race).
-		 */
-		tag = cheri_gettag(value_union.sival_ptr);
-		if (tag)
-			return (EPROT);
-		sv.sival_int = value_union.sival_int;
-	}
-	return (kern_sigqueue(td, uap->pid, uap->signum, &sv, flags));
-}
-
-int
-cheriabi_sigtimedwait(struct thread *td, struct cheriabi_sigtimedwait_args *uap)
-{
-	struct timespec ts;
-	struct timespec *timeout;
-	sigset_t set;
-	ksiginfo_t ksi;
-	struct siginfo_c si_c;
-	int error;
-
-	if (uap->timeout) {
-		error = copyin(uap->timeout, &ts, sizeof(ts));
-		if (error)
-			return (error);
-		timeout = &ts;
-	} else
-		timeout = NULL;
-
-	error = copyin(uap->set, &set, sizeof(set));
-	if (error)
-		return (error);
-
-	error = kern_sigtimedwait(td, set, &ksi, timeout);
-	if (error)
-		return (error);
-
-	if (uap->info) {
-		siginfo_to_siginfo_c(&ksi.ksi_info, &si_c);
-		error = copyout(&si_c, uap->info, sizeof(struct siginfo_c));
-	}
-
-	if (error == 0)
-		td->td_retval[0] = ksi.ksi_signo;
-	return (error);
-}
-
-/*
- * MPSAFE
- */
-int
-cheriabi_sigwaitinfo(struct thread *td, struct cheriabi_sigwaitinfo_args *uap)
-{
-	ksiginfo_t ksi;
-	struct siginfo_c si_c;
-	sigset_t set;
-	int error;
-
-	error = copyin(uap->set, &set, sizeof(set));
-	if (error)
-		return (error);
-
-	error = kern_sigtimedwait(td, set, &ksi, NULL);
-	if (error)
-		return (error);
-
-	if (uap->info) {
-		siginfo_to_siginfo_c(&ksi.ksi_info, &si_c);
-		error = copyout(&si_c, uap->info, sizeof(struct siginfo_c));
-	}
-	if (error == 0)
-		td->td_retval[0] = ksi.ksi_signo;
-	return (error);
+	return (user_procctl(td, uap->idtype, uap->id, uap->com, uap->data));
 }
 
 int
 cheriabi_nmount(struct thread *td,
     struct cheriabi_nmount_args /* {
-    	struct iovec_c *iovp;
-    	unsigned int iovcnt;
-    	int flags;
+	struct iovec_c * __capability iovp;
+	unsigned int iovcnt;
+	int flags;
     } */ *uap)
 {
 	struct uio *auio;
@@ -1418,65 +793,6 @@ cheriabi_nmount(struct thread *td,
 
 	free(auio, M_IOV);
 	return (error);
-}
-
-/*
- * Convert pointers to NULL capabilities with the offset of the
- * virtual address to avoid leaking kernel capbilities.  One
- * alternative to consider is sealed capabilities, but would seem
- * to complicate attempts to impose hardware enforced flow control.
- */
-#define PTREXPAND_CP(src,dst,fld) \
-	do { (dst).fld = (void * __capability)(__intcap_t)(src).fld; } while (0)
-
-int
-cheriabi_kldstat(struct thread *td, struct cheriabi_kldstat_args *uap)
-{
-        struct kld_file_stat stat;
-        struct kld_file_stat_c stat_c;
-        int error, version;
-
-        if ((error = copyin(&uap->stat->version, &version, sizeof(version)))
-            != 0)
-                return (error);
-        if (version != sizeof(struct kld_file_stat_c))
-                return (EINVAL);
-
-        error = kern_kldstat(td, uap->fileid, &stat);
-        if (error != 0)
-                return (error);
-
-        bcopy(&stat.name[0], &stat_c.name[0], sizeof(stat.name));
-        CP(stat, stat_c, refs);
-        CP(stat, stat_c, id);
-        PTREXPAND_CP(stat, stat_c, address);
-        CP(stat, stat_c, size);
-        bcopy(&stat.pathname[0], &stat_c.pathname[0], sizeof(stat.pathname));
-        return (copyout(&stat_c, uap->stat, version));
-}
-
-int
-cheriabi_kldsym(struct thread *td, struct cheriabi_kldsym_args *uap)
-{
-
-	/* XXX-BD: split sys_kldsym into kern_kldsym */
-	return (ENOSYS);
-}
-
-int
-cheriabi_abort2(struct thread *td, struct cheriabi_abort2_args *uap)
-{
-	struct abort2_args a2args;
-
-	a2args.why = uap->why;
-	/*
-	 * XXX-BD: need to duplication much of the abort2 logic or
-	 * refactor to support passing array of args in kernelspace.
-	 */
-	a2args.nargs = 0;
-	a2args.args = NULL;
-
-	return (sys_abort2(td, &a2args));
 }
 
 int
@@ -1519,13 +835,6 @@ cheriabi_syscall_deregister(int *offset, struct sysent *old_sysent)
 	return (0);
 }
 
-#ifdef NOTYET
-int
-cheriabi_syscall_module_handler(struct module *mod, int what, void *arg)
-{
-}
-#endif
-
 int
 cheriabi_syscall_helper_register(struct syscall_helper_data *sd, int flags)
 {
@@ -1556,23 +865,28 @@ cheriabi_syscall_helper_unregister(struct syscall_helper_data *sd)
 	return (0);
 }
 
+/*
+ * This macro uses cheri_capability_build_user_rwx() because it can
+ * create both types of capabilities (and currently creates W|X caps).
+ * Its use should be replaced.
+ */
 #define sucap(uaddr, base, offset, length, perms)			\
 	do {								\
 		void * __capability _tmpcap;				\
-		cheri_capability_set(&_tmpcap, (perms), (vaddr_t)(base),\
-		    (length), (offset));				\
-		copyoutcap(&_tmpcap, uaddr, sizeof(_tmpcap));		\
+		_tmpcap = cheri_capability_build_user_rwx((perms),	\
+		    (vaddr_t)(base), (length), (offset));		\
+		copyoutcap_c(&_tmpcap, uaddr, sizeof(_tmpcap));		\
 	} while(0)
 
 register_t *
 cheriabi_copyout_strings(struct image_params *imgp)
 {
 	int argc, envc;
-	void * __capability *vectp;
+	void * __capability * __capability vectp;
 	char *stringp;
-	uintptr_t destp;
+	char * __capability destp;
 	void * __capability *stack_base;
-	struct cheriabi_ps_strings *arginfo;
+	struct cheriabi_ps_strings * __capability arginfo;
 	char canary[sizeof(long) * 8];
 	size_t execpath_len;
 	int szsigcode, szps;
@@ -1588,27 +902,33 @@ cheriabi_copyout_strings(struct image_params *imgp)
 		execpath_len = strlen(imgp->execpath) + 1;
 	else
 		execpath_len = 0;
+
 	curproc->p_psstrings = curproc->p_sysent->sv_psstrings;
-	arginfo = (struct cheriabi_ps_strings *)curproc->p_psstrings;
+	/* XXX: should be derived from a capability to the strings region */
+	arginfo = cheri_capability_build_user_data(
+	    CHERI_CAP_USER_DATA_PERMS, CHERI_CAP_USER_DATA_BASE,
+	    CHERI_CAP_USER_DATA_LENGTH,
+	    curproc->p_psstrings);
+
 	if (imgp->proc->p_sysent->sv_sigcode_base == 0)
 		szsigcode = *(imgp->proc->p_sysent->sv_szsigcode);
 	else
 		szsigcode = 0;
-
 	if (imgp->cop != NULL) {
 		printf("%s: XXX: needs to adjust arginfo, like exec_copyout_strings() does\n", __func__);
 	}
 
-	destp =	(uintptr_t)arginfo;
+	destp =	(char * __capability)arginfo;
 
 	/*
 	 * install sigcode
 	 */
 	if (szsigcode != 0) {
 		destp -= szsigcode;
-		destp = rounddown2(destp, sizeof(void * __capability));
-		copyout(imgp->proc->p_sysent->sv_sigcode, (void *)destp,
-		    szsigcode);
+		destp = __builtin_align_down(destp,
+		    sizeof(void * __capability));
+		copyout_c((__cheri_tocap void * __capability)
+		    imgp->proc->p_sysent->sv_sigcode, destp, szsigcode);
 	}
 
 	/*
@@ -1616,8 +936,9 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	 */
 	if (execpath_len != 0) {
 		destp -= execpath_len;
-		imgp->execpathp = destp;
-		copyout(imgp->execpath, (void *)destp, execpath_len);
+		imgp->execpathp = (__cheri_addr unsigned long)destp;
+		copyout_c((__cheri_tocap char * __capability)imgp->execpath,
+		    destp, execpath_len);
 	}
 
 	/*
@@ -1625,44 +946,39 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	 */
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
-	imgp->canary = destp;
-	copyout(canary, (void *)destp, sizeof(canary));
+	imgp->canary = (__cheri_addr unsigned long)destp;
+	copyout_c(canary, destp, sizeof(canary));
 	imgp->canarylen = sizeof(canary);
 
 	/*
 	 * Prepare the pagesizes array.
 	 */
 	destp -= szps;
-	destp = rounddown2(destp, sizeof(void * __capability));
-	imgp->pagesizes = destp;
-	copyout(pagesizes, (void *)destp, szps);
+	destp = __builtin_align_down(destp, sizeof(void * __capability));
+	imgp->pagesizes = (__cheri_addr unsigned long)destp;
+	copyout_c(pagesizes, destp, szps);
 	imgp->pagesizeslen = szps;
 
 	destp -= ARG_MAX - imgp->args->stringspace;
-	destp = rounddown2(destp, sizeof(void * __capability));
+	destp = __builtin_align_down(destp, sizeof(void * __capability));
+
+	vectp = (void * __capability * __capability)destp;
+	/*
+	 * Allocate room on the stack for the ELF auxargs array.  It has
+	 * up to AT_COUNT entries.
+	 */
+	vectp -= AT_COUNT * 2;
 
 	/*
-	 * Prepare some room * on the stack for auxargs.
+	 * Allocate room for the argv[] and env vectors including the
+	 * terminating NULL pointers.
 	 */
-	/*
-	 * 'AT_COUNT*2' is size for the ELF Auxargs data. This is for
-	 * lower compatibility.
-	 */
-	imgp->auxarg_size = (imgp->auxarg_size) ? imgp->auxarg_size
-		: (AT_COUNT * 2);
-	/*
-	 * The '+ 2' is for the null pointers at the end of each of
-	 * the arg and env vector sets, and imgp->auxarg_size is room
-	 * for argument of runtime loader if any.
-	 */
-	vectp = (void * __capability *)(destp - (imgp->args->argc +
-	    imgp->args->envc + 2 + imgp->auxarg_size) *
-	    sizeof(void * __capability));
+	vectp -= imgp->args->argc + 1 + imgp->args->envc +1;
 
 	/*
 	 * vectp also becomes our initial stack base
 	 */
-	stack_base = vectp;
+	stack_base = (__cheri_fromcap void * __capability *)vectp;
 
 	stringp = imgp->args->begin_argv;
 	argc = imgp->args->argc;
@@ -1670,19 +986,20 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	/*
 	 * Copy out strings - arguments and environment.
 	 */
-	copyout(stringp, (void *)destp, ARG_MAX - imgp->args->stringspace);
+	copyout_c((__cheri_tocap char * __capability)stringp, destp,
+	    ARG_MAX - imgp->args->stringspace);
 
 	/*
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
 	sucap(&arginfo->ps_argvstr, vectp, 0, argc * sizeof(void * __capability),
 	    CHERI_CAP_USER_DATA_PERMS);
-	suword32(&arginfo->ps_nargvstr, argc);
+	suword32_c(&arginfo->ps_nargvstr, argc);
 
 	/*
 	 * Fill in argument portion of vector table.
 	 */
-	imgp->args->argv = (void *)vectp;
+	imgp->args->argv = (__cheri_fromcap void *)vectp;
 	for (; argc > 0; --argc) {
 		sucap(vectp++, destp, 0, strlen(stringp) + 1,
 		    CHERI_CAP_USER_DATA_PERMS);
@@ -1693,17 +1010,17 @@ cheriabi_copyout_strings(struct image_params *imgp)
 
 	/* a null vector table pointer separates the argp's from the envp's */
 	/* XXX: suword clears the tag */
-	suword(vectp++, 0);
+	suword_c(vectp++, 0);
 
 	sucap(&arginfo->ps_envstr, vectp, 0,
 	    arginfo->ps_nenvstr * sizeof(void * __capability),
 	    CHERI_CAP_USER_DATA_PERMS);
-	suword32(&arginfo->ps_nenvstr, envc);
+	suword32_c(&arginfo->ps_nenvstr, envc);
 
 	/*
 	 * Fill in environment portion of vector table.
 	 */
-	imgp->args->envv = (void *)vectp;
+	imgp->args->envv = (__cheri_fromcap void *)vectp;
 	for (; envc > 0; --envc) {
 		sucap(vectp++, destp, 0, strlen(stringp) + 1,
 		    CHERI_CAP_USER_DATA_PERMS);
@@ -1714,92 +1031,33 @@ cheriabi_copyout_strings(struct image_params *imgp)
 
 	/* end of vector table is a null pointer */
 	/* XXX: suword clears the tag */
-	suword(vectp++, 0);
+	suword_c(vectp++, 0);
 
 	return ((register_t *)stack_base);
 }
 
-int
-convert_sigevent_c(struct sigevent_c *sig_c, struct sigevent *sig)
-{
-
-	CP(*sig_c, *sig, sigev_notify);
-	switch (sig->sigev_notify) {
-	case SIGEV_NONE:
-		break;
-	case SIGEV_THREAD_ID:
-		CP(*sig_c, *sig, sigev_notify_thread_id);
-		/* FALLTHROUGH */
-	case SIGEV_SIGNAL:
-		CP(*sig_c, *sig, sigev_signo);
-		sig->sigev_value.sival_ptr = malloc(sizeof(sig_c->sigev_value),
-		    M_TEMP, M_WAITOK);
-		*((void * __capability *)sig->sigev_value.sival_ptr) =
-		    sig_c->sigev_value.sival_ptr;
-		break;
-	case SIGEV_KEVENT:
-		CP(*sig_c, *sig, sigev_notify_kqueue);
-		CP(*sig_c, *sig, sigev_notify_kevent_flags);
-		sig->sigev_value.sival_ptr = malloc(sizeof(sig_c->sigev_value),
-		    M_TEMP, M_WAITOK);
-		*((void * __capability *)sig->sigev_value.sival_ptr) = 
-		    sig_c->sigev_value.sival_ptr;
-		break;
-	default:
-		return (EINVAL);
-	}
-	return (0);
-}
-
-void * __capability
-cheriabi_extract_sival(union sigval *sival)
-{
-
-	return (*((void * __capability *)sival->sival_ptr));
-}
-
-void
-cheriabi_free_sival(union sigval *sival)
-{
-
-	free(sival->sival_ptr, M_TEMP);
-}
-
-#define	AUXARGS_ENTRY_CAP(pos, id, base, offset, len, perm)		\
-	do {								\
-		suword(pos++, id); sucap(pos++, base,	\
-		    offset, len, perm);					\
+#define	AUXARGS_ENTRY_NOCAP(pos, id, val)				\
+	{suword_c(pos++, id); suword_c(pos++, val);}
+#define	AUXARGS_ENTRY_CAP(pos, id, base, offset, len, perm) do {	\
+		suword_c(pos++, id);					\
+		sucap(pos++, base, offset, len, perm);			\
 	} while(0)
 
-/*
- * Write out ELF auxilery arguments.  In CheriABI, Elf64_Auxinfo pads out to:
- * typedef struct {
- *	uint64_t	a_type;
- *	uint64_t	[(sizeof(struct chericap)/sizeof(uint64_t)) - 1];
- *	union {
- *		long		a_val;
- *		struct chericap	a_ptr;
- *		struct chericap	a_fcn;
- *	};
- * } Elf64_Auxinfo;
- *
- * As a result, the AUXARGS_ENTRY macro works so long as "pos" is
- * a pointer to something capability sized.
- */
 static void
-cheriabi_set_auxargs(void * __capability *pos, struct image_params *imgp)
+cheriabi_set_auxargs(void * __capability * __capability pos,
+    struct image_params *imgp)
 {
 	Elf_Auxargs *args = (Elf_Auxargs *)imgp->auxargs;
 
 	if (args->execfd != -1)
-		AUXARGS_ENTRY(pos, AT_EXECFD, args->execfd);
+		AUXARGS_ENTRY_NOCAP(pos, AT_EXECFD, args->execfd);
 	CTASSERT(CHERI_CAP_USER_CODE_BASE == 0);
 	AUXARGS_ENTRY_CAP(pos, AT_PHDR, CHERI_CAP_USER_DATA_BASE, args->phdr,
 	    CHERI_CAP_USER_DATA_LENGTH, CHERI_CAP_USER_DATA_PERMS);
-	AUXARGS_ENTRY(pos, AT_PHENT, args->phent);
-	AUXARGS_ENTRY(pos, AT_PHNUM, args->phnum);
-	AUXARGS_ENTRY(pos, AT_PAGESZ, args->pagesz);
-	AUXARGS_ENTRY(pos, AT_FLAGS, args->flags);
+	AUXARGS_ENTRY_NOCAP(pos, AT_PHENT, args->phent);
+	AUXARGS_ENTRY_NOCAP(pos, AT_PHNUM, args->phnum);
+	AUXARGS_ENTRY_NOCAP(pos, AT_PAGESZ, args->pagesz);
+	AUXARGS_ENTRY_NOCAP(pos, AT_FLAGS, args->flags);
 	/*
 	 * XXX-BD: the should be bounded to the mapping, but for now
 	 * they aren't as struct image_params doesn't contain the
@@ -1814,24 +1072,24 @@ cheriabi_set_auxargs(void * __capability *pos, struct image_params *imgp)
 	    CHERI_CAP_USER_DATA_LENGTH,
 	    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
 #ifdef AT_EHDRFLAGS
-	AUXARGS_ENTRY(pos, AT_EHDRFLAGS, args->hdr_eflags);
+	AUXARGS_ENTRY_NOCAP(pos, AT_EHDRFLAGS, args->hdr_eflags);
 #endif
 	if (imgp->execpathp != 0)
 		AUXARGS_ENTRY_CAP(pos, AT_EXECPATH, imgp->execpathp, 0,
 		    strlen(imgp->execpath) + 1,
 		    CHERI_CAP_USER_DATA_PERMS);
-	AUXARGS_ENTRY(pos, AT_OSRELDATE,
+	AUXARGS_ENTRY_NOCAP(pos, AT_OSRELDATE,
 	    imgp->proc->p_ucred->cr_prison->pr_osreldate);
 	if (imgp->canary != 0) {
 		AUXARGS_ENTRY_CAP(pos, AT_CANARY, imgp->canary, 0,
 		    imgp->canarylen, CHERI_CAP_USER_DATA_PERMS);
-		AUXARGS_ENTRY(pos, AT_CANARYLEN, imgp->canarylen);
+		AUXARGS_ENTRY_NOCAP(pos, AT_CANARYLEN, imgp->canarylen);
 	}
-	AUXARGS_ENTRY(pos, AT_NCPUS, mp_ncpus);
+	AUXARGS_ENTRY_NOCAP(pos, AT_NCPUS, mp_ncpus);
 	if (imgp->pagesizes != 0) {
 		AUXARGS_ENTRY_CAP(pos, AT_PAGESIZES, imgp->pagesizes, 0,
 		   imgp->pagesizeslen, CHERI_CAP_USER_DATA_PERMS);
-		AUXARGS_ENTRY(pos, AT_PAGESIZESLEN, imgp->pagesizeslen);
+		AUXARGS_ENTRY_NOCAP(pos, AT_PAGESIZESLEN, imgp->pagesizeslen);
 	}
 	if (imgp->sysent->sv_timekeep_base != 0) {
 		AUXARGS_ENTRY_CAP(pos, AT_TIMEKEEP,
@@ -1840,21 +1098,21 @@ cheriabi_set_auxargs(void * __capability *pos, struct image_params *imgp)
 		    sizeof(struct vdso_timehands) * VDSO_TH_NUM,
 		    CHERI_CAP_USER_DATA_PERMS); /* XXX: readonly? */
 	}
-	AUXARGS_ENTRY(pos, AT_STACKPROT, imgp->sysent->sv_shared_page_obj
+	AUXARGS_ENTRY_NOCAP(pos, AT_STACKPROT, imgp->sysent->sv_shared_page_obj
 	    != NULL && imgp->stack_prot != 0 ? imgp->stack_prot :
 	    imgp->sysent->sv_stackprot);
 
-	AUXARGS_ENTRY(pos, AT_ARGC, imgp->args->argc);
+	AUXARGS_ENTRY_NOCAP(pos, AT_ARGC, imgp->args->argc);
 	/* XXX-BD: Includes terminating NULL.  Should it? */
 	AUXARGS_ENTRY_CAP(pos, AT_ARGV, imgp->args->argv, 0,
 	   sizeof(void * __capability) * (imgp->args->argc + 1),
 	   CHERI_CAP_USER_DATA_PERMS);
-	AUXARGS_ENTRY(pos, AT_ENVC, imgp->args->envc);
+	AUXARGS_ENTRY_NOCAP(pos, AT_ENVC, imgp->args->envc);
 	AUXARGS_ENTRY_CAP(pos, AT_ENVV, imgp->args->envv, 0,
 	   sizeof(void * __capability) * (imgp->args->envc + 1),
 	   CHERI_CAP_USER_DATA_PERMS);
 
-	AUXARGS_ENTRY(pos, AT_NULL, 0);
+	AUXARGS_ENTRY_NOCAP(pos, AT_NULL, 0);
 
 	free(imgp->auxargs, M_TEMP);
 	imgp->auxargs = NULL;
@@ -1863,358 +1121,20 @@ cheriabi_set_auxargs(void * __capability *pos, struct image_params *imgp)
 int
 cheriabi_elf_fixup(register_t **stack_base, struct image_params *imgp)
 {
-	void * __capability *base;
+	size_t argenvcount;
+	void * __capability * __capability base;
 
 	KASSERT(((vaddr_t)*stack_base & (sizeof(void * __capability) - 1)) == 0,
 	    ("*stack_base (%p) is not capability aligned", *stack_base));
 
-	base = (void * __capability *)
-	    __builtin_assume_aligned(*stack_base, sizeof(void * __capability));
-	base += imgp->args->argc + imgp->args->envc + 2;
+	argenvcount = imgp->args->argc + 1 + imgp->args->envc + 1;
+	base = cheri_capability_build_user_data(
+	    CHERI_CAP_USER_DATA_PERMS, (vaddr_t)*stack_base,
+	    (argenvcount + (AT_COUNT * 2)) * sizeof(void * __capability),
+	    0);
+	base += imgp->args->argc + 1 + imgp->args->envc + 1;
 
 	cheriabi_set_auxargs(base, imgp);
-
-	return (0);
-}
-
-int
-cheriabi_madvise(struct thread *td, struct cheriabi_madvise_args *uap)
-{
-	void * __capability addr_cap;
-	register_t perms;
-
-	/*
-	 * MADV_FREE may change the page contents so require
-	 * CHERI_PERM_CHERIABI_VMMAP.
-	 */
-	if (uap->behav == MADV_FREE) {
-		cheriabi_fetch_syscall_arg(td, &addr_cap,
-		    0, CHERIABI_SYS_cheriabi_madvise_PTRMASK);
-		perms = cheri_getperm(addr_cap);
-		if ((perms & CHERI_PERM_CHERIABI_VMMAP) == 0)
-			return (EPROT);
-	}
-
-	return (kern_madvise(td, (uintptr_t)uap->addr, uap->len, uap->behav));
-}
-
-int
-cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
-{
-	int flags = uap->flags;
-	int usertag;
-	size_t cap_base, cap_len, cap_offset;
-	void * __capability addr_cap;
-	register_t perms, reqperms;
-	vm_offset_t reqaddr;
-
-	if (flags & MAP_32BIT) {
-		SYSERRCAUSE("MAP_32BIT not supported in CheriABI");
-		return (EINVAL);
-	}
-
-	cheriabi_fetch_syscall_arg(td, &addr_cap,
-	    0, CHERIABI_SYS_cheriabi_mmap_PTRMASK);
-	usertag = cheri_gettag(addr_cap);
-	if (!usertag) {
-		if (flags & MAP_FIXED) {
-			SYSERRCAUSE(
-			    "MAP_FIXED without a valid addr capability");
-			return (EINVAL);
-		}
-		if (flags & MAP_CHERI_NOSETBOUNDS) {
-			SYSERRCAUSE("MAP_CHERI_NOSETBOUNDS without a valid"
-			    "addr capability");
-			return (EINVAL);
-		}
-
-		/* User didn't provide a capability so get one. */
-		if (flags & MAP_CHERI_DDC) {
-			if ((cheri_getperm(td->td_pcb->pcb_regs.ddc) &
-			    CHERI_PERM_CHERIABI_VMMAP) == 0) {
-				SYSERRCAUSE("DDC lacks "
-				    "CHERI_PERM_CHERIABI_VMMAP");
-				return (EPROT);
-			}
-			addr_cap = td->td_pcb->pcb_regs.ddc;
-		} else {
-			/* Use the per-thread one */
-			addr_cap = td->td_md.md_cheri_mmap_cap;
-			KASSERT(cheri_gettag(addr_cap),
-			    ("td->td_md.md_cheri_mmap_cap is untagged!"));
-		}
-	} else {
-		if (flags & MAP_CHERI_DDC) {
-			SYSERRCAUSE("MAP_CHERI_DDC with non-NULL addr");
-			return (EINVAL);
-		}
-	}
-	cap_base = cheri_getbase(addr_cap);
-	cap_len = cheri_getlen(addr_cap);
-	if (usertag) {
-		cap_offset = cheri_getoffset(addr_cap);
-	} else {
-		/*
-		 * Ignore offset of default cap, it's only used to set bounds.
-		 */
-		cap_offset = 0;
-	}
-	if (cap_offset >= cap_len) {
-		SYSERRCAUSE("capability has out of range offset");
-		return (EPROT);
-	}
-	reqaddr = cap_base + cap_offset;
-	if (reqaddr == 0)
-		reqaddr = PAGE_SIZE;
-	perms = cheri_getperm(addr_cap);
-	reqperms = cheriabi_mmap_prot2perms(uap->prot);
-	if ((perms & reqperms) != reqperms) {
-		SYSERRCAUSE("capability has insufficient perms (0x%lx)"
-		    "for request (0x%lx)", perms, reqperms);
-		return (EPROT);
-	}
-
-	/*
-	 * If alignment is specified, check that it is sufficent and
-	 * increase as required.  If not, assume data alignment.
-	 */
-	switch (flags & MAP_ALIGNMENT_MASK) {
-	case MAP_ALIGNED(0):
-		/*
-		 * Request CHERI data alignment when no other request
-		 * is made.
-		 */
-		flags &= ~MAP_ALIGNMENT_MASK;
-		flags |= MAP_ALIGNED_CHERI;
-		break;
-	case MAP_ALIGNED_CHERI:
-	case MAP_ALIGNED_CHERI_SEAL:
-		break;
-	case MAP_ALIGNED_SUPER:
-#ifdef __mips_n64
-		/*
-		 * pmap_align_superpage() is a no-op for allocations
-		 * less than a super page so request data alignment
-		 * in that case.
-		 *
-		 * In practice this is a no-op as super-pages are
-		 * precisely representable.
-		 */
-		if (uap->len < PDRSIZE &&
-		    CHERI_ALIGN_SHIFT(uap->len) > PAGE_SHIFT) {
-			flags &= ~MAP_ALIGNMENT_MASK;
-			flags |= MAP_ALIGNED_CHERI;
-		}
-#else
-#error	MAP_ALIGNED_SUPER handling unimplemented for this architecture
-#endif
-		break;
-	default:
-		/* Reject nonsensical sub-page alignment requests */
-		if ((flags >> MAP_ALIGNMENT_SHIFT) < PAGE_SHIFT) {
-			SYSERRCAUSE("subpage alignment request");
-			return (EINVAL);
-		}
-
-		/*
-		 * Honor the caller's alignment request, if any unless
-		 * it is too small.  If is, promote the request to
-		 * MAP_ALIGNED_CHERI.
-		 *
-		 * XXX: It seems likely a user passing too small an
-		 * alignment will have also passed an invalid length,
-		 * but upgrading the alignment is always safe and
-		 * we'll catch the length later.
-		 */
-		if ((flags >> MAP_ALIGNMENT_SHIFT) <
-		    CHERI_ALIGN_SHIFT(uap->len)) {
-			flags &= ~MAP_ALIGNMENT_MASK;
-			flags |= MAP_ALIGNED_CHERI;
-		}
-		break;
-	}
-	/*
-	 * NOTE: If this architecture requires an alignment constraint, it is
-	 * set at this point.  A simple assert is not easy to contruct...
-	 */
-
-	if (flags & MAP_FIXED) {
-		if (cap_len - cap_offset <
-		    roundup2(uap->len, PAGE_SIZE)) {
-			SYSERRCAUSE("MAP_FIXED and too little space in "
-			    "capablity (0x%zx < 0x%zx)", cap_len - cap_offset,
-			    roundup2(uap->len, PAGE_SIZE));
-			return (EPROT);
-		}
-
-		/*
-		 * If our address is under aligned, make sure
-		 * we have room to shift it down to the page
-		 * boundary.
-		 */
-		if ((reqaddr & PAGE_MASK) > cap_offset) {
-			SYSERRCAUSE("insufficent space to shift addr (0x%lx) "
-			    "down in capability (offset 0x%zx)",
-			    reqaddr, cap_offset);
-			return (EPROT);
-		}
-
-		/*
-		 * NB: We defer alignment checks to kern_vm_mmap where we
-		 * can account for file mapping with oddly aligned
-		 * that match the offset alignment.
-		 */
-
-	}
-
-	return (kern_mmap(td, reqaddr, cap_base + cap_len, uap->len,
-	    uap->prot, flags, uap->fd, uap->pos));
-}
-
-
-int
-cheriabi_mprotect(struct thread *td, struct cheriabi_mprotect_args *uap)
-{
-	void * __capability addr_cap;
-	register_t perms, reqperms;
-
-	cheriabi_fetch_syscall_arg(td, &addr_cap,
-	    0, CHERIABI_SYS_cheriabi_mprotect_PTRMASK);
-	perms = cheri_getperm(addr_cap);
-	/*
-	 * Requested prot much be allowed by capability.
-	 *
-	 * XXX-BD: An argument could be made for allowing a union of the
-	 * current page permissions with the capability permissions (e.g.
-	 * allowing a writable cap to add write permissions to an RX
-	 * region as required to match up objects with textrel sections.
-	 */
-	reqperms = cheriabi_mmap_prot2perms(uap->prot);
-	if ((perms & reqperms) != reqperms)
-		return (EPROT);
-
-	return (kern_mprotect(td, (vm_offset_t)uap->addr, uap->len,
-	    uap->prot));
-}
-
-#define	PERM_READ	(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)
-#define	PERM_WRITE	(CHERI_PERM_STORE | CHERI_PERM_STORE_CAP | \
-			    CHERI_PERM_STORE_LOCAL_CAP)
-#define	PERM_EXEC	CHERI_PERM_EXECUTE
-#define	PERM_RWX	(PERM_READ | PERM_WRITE | PERM_EXEC)
-/*
- * Given a starting set of CHERI permissions (operms), set (not AND) the load,
- * store, and execute permissions based on the mmap permissions (prot).
- *
- * This function is intended to be used when creating a capability to a
- * new region or rederiving a capability when upgrading a sub-region.
- */
-static register_t
-cheriabi_mmap_prot2perms(int prot)
-{
-	register_t perms = 0;
-
-	if (prot & PROT_READ)
-		perms |= CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP;
-	if (prot & PROT_WRITE)
-		perms |= CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
-		CHERI_PERM_STORE_LOCAL_CAP;
-	if (prot & PROT_EXEC)
-		perms |= CHERI_PERM_EXECUTE;
-
-	return (perms);
-}
-
-int
-cheriabi_mmap_set_retcap(struct thread *td, void * __capability *retcap,
-   void * __capability *addrp, size_t len, int prot, int flags)
-{
-	register_t ret;
-	size_t mmap_cap_base, mmap_cap_len;
-	vm_map_t map;
-	register_t perms;
-	size_t addr_base;
-	void * __capability addr;
-
-	ret = td->td_retval[0];
-	/* On failure, return a NULL capability with an offset of -1. */
-	if ((void *)ret == MAP_FAILED) {
-		/* XXX-BD: the return of -1 is in userspace, not here. */
-		*retcap = (void * __capability)-1;
-		return (0);
-	}
-
-	/*
-	 * In the strong case (cheriabi_mmap_setbounds), leave addr untouched
-	 * when MAP_CHERI_NOSETBOUNDS is set.
-	 *
-	 * In the weak case (!cheriabi_mmap_setbounds), return addr untouched
-	 * for *all* fixed requests.
-	 *
-	 * NB: This means no permission changes.
-	 * The assumption is that the larger capability has the correct
-	 * permissions and we're only intrested in adjusting page mappings.
-	 */
-	if (flags & MAP_CHERI_NOSETBOUNDS ||
-	    (!cheriabi_mmap_setbounds && flags & MAP_FIXED)) {
-		*retcap = *addrp;
-		return (0);
-	}
-
-	if (flags & MAP_FIXED) {
-		addr = *addrp;
-	} else if (flags & MAP_CHERI_DDC) {
-		addr = td->td_pcb->pcb_regs.ddc;
-	} else {
-		addr = td->td_md.md_cheri_mmap_cap;
-	}
-
-	if (cheriabi_mmap_honor_prot) {
-		perms = cheri_getperm(addr);
-		/*
-		 * Set the permissions to PROT_MAX to allow a full
-		 * range of access subject to page permissions.
-		 */
-		addr = cheri_andperm(addr, ~PERM_RWX |
-		    cheriabi_mmap_prot2perms(EXTRACT_PROT_MAX(prot)));
-	}
-
-	if (flags & MAP_FIXED) {
-		KASSERT(cheriabi_mmap_setbounds,
-		    ("%s: trying to set bounds on fixed map when disabled",
-		    __func__));
-		/*
-		 * If addr was under aligned, we need to return a
-		 * capability to the whole, properly aligned region
-		 * with the offset pointing to addr.
-		 */
-		addr_base = cheri_getbase(addr);
-		/* Set offset to vaddr of page */
-		addr = cheri_setoffset(addr,
-		    rounddown2(ret, PAGE_SIZE) - addr_base);
-		addr = cheri_csetbounds(addr,
-		    roundup2(len + (ret - rounddown2(ret, PAGE_SIZE)),
-		    PAGE_SIZE));
-		/* Shift offset up if required */
-		addr_base = cheri_getbase(addr);
-		addr = cheri_setoffset(addr, addr_base - ret);
-	} else {
-		mmap_cap_base = cheri_getbase(addr);
-		mmap_cap_len = cheri_getlen(addr);
-		if (ret < mmap_cap_base ||
-		    ret + len > mmap_cap_base + mmap_cap_len) {
-			map = &td->td_proc->p_vmspace->vm_map;
-			vm_map_lock(map);
-			vm_map_remove(map, ret, ret + len);
-			vm_map_unlock(map);
-
-			return (EPERM);
-		}
-		addr = cheri_setoffset(addr, ret - mmap_cap_base);
-		if (cheriabi_mmap_setbounds)
-			addr = cheri_csetbounds(addr, roundup2(len, PAGE_SIZE));
-	}
-	*retcap = addr;
 
 	return (0);
 }
@@ -2224,31 +1144,6 @@ cheriabi_mount(struct thread *td, struct cheriabi_mount_args *uap)
 {
 
 	return (ENOSYS);
-}
-
-int
-cheriabi_mac_syscall(struct thread *td, struct cheriabi_mac_syscall_args *uap)
-{
-
-	return (ENOSYS);
-}
-
-int
-cheriabi_auditon(struct thread *td, struct cheriabi_auditon_args *uap)
-{
-
-#ifdef	AUDIT
-	return (kern_auditon(td, uap->cmd, uap->data, uap->length));
-#else
-	return (ENOSYS);
-#endif
-}
-
-int
-cheriabi_setlogin(struct thread *td, struct cheriabi_setlogin_args *uap)
-{
-
-	return (kern_setlogin(td, uap->namebuf));
 }
 
 int
@@ -2275,8 +1170,7 @@ cheriabi_kbounce(struct thread *td, struct cheriabi_kbounce_args *uap)
 	if (src == NULL || dst == NULL)
 		return (EINVAL);
 
-	bounce = (__cheri_tocap void * __capability )malloc(len,
-	    M_TEMP, M_WAITOK | M_ZERO);
+	bounce = malloc_c(len, M_TEMP, M_WAITOK | M_ZERO);
 	error = copyin_c(src, bounce, len);
 	if (error != 0) {
 		printf("%s: error in copyin_c %d\n", __func__, error);
@@ -2286,6 +1180,880 @@ cheriabi_kbounce(struct thread *td, struct cheriabi_kbounce_args *uap)
 	if (error != 0)
 		printf("%s: error in copyout_c %d\n", __func__, error);
 error:
-	free((__cheri_fromcap void *)bounce, M_TEMP);
+	free_c(bounce, M_TEMP);
 	return (error);
 }
+
+/*
+ * audit_syscalls.c
+ */
+int
+cheriabi_audit(struct thread *td, struct cheriabi_audit_args *uap)
+{
+
+#ifdef	AUDIT
+	return (kern_audit(td, uap->record, uap->length));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_auditon(struct thread *td, struct cheriabi_auditon_args *uap)
+{
+
+#ifdef	AUDIT
+	return (kern_auditon(td, uap->cmd, uap->data, uap->length));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_getauid(struct thread *td, struct cheriabi_getauid_args *uap)
+{
+
+#ifdef	AUDIT
+	return (kern_getauid(td, uap->auid));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_setauid(struct thread *td, struct cheriabi_setauid_args *uap)
+{
+
+#ifdef	AUDIT
+	return (kern_setauid(td, uap->auid));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_getaudit(struct thread *td, struct cheriabi_getaudit_args *uap)
+{
+
+#ifdef	AUDIT
+	return (kern_getaudit(td, uap->auditinfo));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_setaudit(struct thread *td, struct cheriabi_setaudit_args *uap)
+{
+
+#ifdef	AUDIT
+	return (kern_setaudit(td, uap->auditinfo));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_getaudit_addr(struct thread *td,
+    struct cheriabi_getaudit_addr_args *uap)
+{
+
+#ifdef	AUDIT
+	return (kern_getaudit_addr(td, uap->auditinfo_addr, uap->length));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_setaudit_addr(struct thread *td,
+    struct cheriabi_setaudit_addr_args *uap)
+{
+
+#ifdef	AUDIT
+	return (kern_setaudit_addr(td, uap->auditinfo_addr, uap->length));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_auditctl(struct thread *td, struct cheriabi_auditctl_args *uap)
+{
+
+#ifdef	AUDIT
+	return (kern_auditctl(td, uap->path));
+#else
+	return (ENOSYS);
+#endif
+}
+
+
+/*
+ * kern_acct.c
+ */
+
+int
+cheriabi_acct(struct thread *td, struct cheriabi_acct_args *uap)
+{
+
+	return (kern_acct(td, uap->path));
+}
+
+/*
+ * kern_fork.c
+ */
+int
+cheriabi_pdfork(struct thread *td, struct cheriabi_pdfork_args *uap)
+{
+
+	return (kern_pdfork(td, uap->fdp, uap->flags));
+}
+
+/*
+ * kern_cpuset.c
+ */
+int
+cheriabi_cpuset(struct thread *td, struct cheriabi_cpuset_args *uap)
+{
+
+	return (kern_cpuset(td, uap->setid));
+}
+
+int
+cheriabi_cpuset_getid(struct thread *td,
+    struct cheriabi_cpuset_getid_args *uap)
+{
+
+	return (kern_cpuset_getid(td, uap->level, uap->which, uap->id,
+	    uap->setid));
+}
+
+int
+cheriabi_cpuset_getaffinity(struct thread *td,
+    struct cheriabi_cpuset_getaffinity_args *uap)
+{
+
+	return (kern_cpuset_getaffinity(td, uap->level, uap->which,
+	    uap->id, uap->cpusetsize, uap->mask));
+}
+
+int
+cheriabi_cpuset_setaffinity(struct thread *td,
+    struct cheriabi_cpuset_setaffinity_args *uap)
+{
+
+	return (kern_cpuset_setaffinity(td, uap->level, uap->which, uap->id,
+	    uap->cpusetsize, uap->mask));
+}
+
+/*
+ * kern_descrip.c
+ */
+int
+cheriabi_fcntl(struct thread *td, struct cheriabi_fcntl_args *uap)
+{
+
+	return (kern_fcntl_freebsd(td, uap->fd, uap->cmd, uap->arg));
+}
+
+int
+cheriabi_fstat(struct thread *td, struct cheriabi_fstat_args *uap)
+{
+
+	return (user_fstat(td, uap->fd, uap->sb));
+}
+
+/*
+ * kern_ktrace.c
+ */
+
+int
+cheriabi_ktrace(struct thread *td, struct cheriabi_ktrace_args *uap)
+{
+
+	return (kern_ktrace(td, uap->fname, uap->ops, uap->facs, uap->pid));
+}
+
+int
+cheriabi_utrace(struct thread *td, struct cheriabi_utrace_args *uap)
+{
+
+	return (kern_utrace(td, uap->addr, uap->len));
+}
+
+/*
+ * kern_linker.c
+ */
+
+int
+cheriabi_kldload(struct thread *td, struct cheriabi_kldload_args *uap)
+{
+	char *pathname = NULL;
+	int error, fileid;
+
+	td->td_retval[0] = -1;
+
+	pathname = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
+	error = copyinstr_c(uap->file, &pathname[0], MAXPATHLEN, NULL);
+	if (error != 0)
+		goto error;
+	error = kern_kldload(td, pathname, &fileid);
+	if (error == 0)
+		td->td_retval[0] = fileid;
+error:
+	free(pathname, M_TEMP);
+	return (error);
+}
+
+int
+cheriabi_kldfind(struct thread *td, struct cheriabi_kldfind_args *uap)
+{
+
+	return (kern_kldfind(td, uap->file));
+}
+
+int
+cheriabi_kldstat(struct thread *td, struct cheriabi_kldstat_args *uap)
+{
+        struct kld_file_stat stat;
+        struct kld_file_stat_c stat_c;
+        int error, version;
+
+        error = copyin_c(&uap->stat->version, &version, sizeof(version));
+	if (error != 0)
+                return (error);
+        if (version != sizeof(struct kld_file_stat_c))
+                return (EINVAL);
+
+        error = kern_kldstat(td, uap->fileid, &stat);
+        if (error != 0)
+                return (error);
+
+        bcopy(&stat.name[0], &stat_c.name[0], sizeof(stat.name));
+        CP(stat, stat_c, refs);
+        CP(stat, stat_c, id);
+	stat_c.address = (void * __capability)(intcap_t)stat.address;
+        CP(stat, stat_c, size);
+        bcopy(&stat.pathname[0], &stat_c.pathname[0], sizeof(stat.pathname));
+        return (copyout_c(&stat_c, uap->stat, version));
+}
+
+int
+cheriabi_kldsym(struct thread *td, struct cheriabi_kldsym_args *uap)
+{
+	struct kld_sym_lookup_c lookup;
+	char *symstr;
+	int error;
+
+	error = copyincap_c(uap->data, &lookup, sizeof(lookup));
+	if (error != 0)
+		return (error);
+	if (lookup.version != sizeof(lookup) ||
+	    uap->cmd != KLDSYM_LOOKUP)
+		return (EINVAL);
+	symstr = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
+	error = copyinstr_c(lookup.symname,
+	    (__cheri_tocap char * __capability)symstr, MAXPATHLEN, NULL);
+	if (error != 0)
+		goto done;
+	error = kern_kldsym(td, uap->fileid, uap->cmd, symstr,
+	    &lookup.symvalue, &lookup.symsize);
+	if (error != 0)
+		goto done;
+	error = copyoutcap_c(&lookup, uap->data, sizeof(lookup));
+
+done:
+	free(symstr, M_TEMP);
+	return (error);
+}
+
+/*
+ * kern_loginclass.c
+ */
+int
+cheriabi_getloginclass(struct thread *td,
+    struct cheriabi_getloginclass_args *uap)
+{
+
+	return (kern_getloginclass(td, uap->namebuf, uap->namelen));
+}
+
+int
+cheriabi_setloginclass(struct thread *td,
+    struct cheriabi_setloginclass_args *uap)
+{
+
+	return (kern_setloginclass(td, uap->namebuf));
+}
+
+int
+cheriabi_uuidgen(struct thread *td, struct cheriabi_uuidgen_args *uap)
+{
+	struct uuid *store;
+	size_t count;
+	int error;
+
+	/*
+	 * Limit the number of UUIDs that can be created at the same time
+	 * to some arbitrary number. This isn't really necessary, but I
+	 * like to have some sort of upper-bound that's less than 2G :-)
+	 * XXX probably needs to be tunable.
+	 */
+	if (uap->count < 1 || uap->count > 2048)
+		return (EINVAL);
+
+	count = uap->count;
+	store = malloc(count * sizeof(struct uuid), M_TEMP, M_WAITOK);
+	kern_uuidgen(store, count);
+	error = copyout_c((__cheri_tocap struct uuid * __capability)store,
+	    uap->store, count * sizeof(struct uuid));
+	free(store, M_TEMP);
+	return (error);
+}
+
+/*
+ * kern_module.c
+ */
+int
+cheriabi_modfind(struct thread *td, struct cheriabi_modfind_args *uap)
+{
+
+	return (kern_modfind(td, uap->name));
+}
+
+int
+cheriabi_modstat(struct thread *td, struct cheriabi_modstat_args *uap)
+{
+
+	return (kern_modstat(td, uap->modid, uap->stat));
+}
+
+/*
+ * kern_prot.c
+ */
+int
+cheriabi_getgroups(struct thread *td, struct cheriabi_getgroups_args *uap)
+{
+
+	return (kern_getgroups(td, uap->gidsetsize, uap->gidset));
+}
+
+int
+cheriabi_setgroups(struct thread *td, struct cheriabi_setgroups_args *uap)
+{
+	gid_t smallgroups[XU_NGROUPS];
+	gid_t *groups;
+	u_int gidsetsize;
+	int error;
+
+	gidsetsize = uap->gidsetsize;
+	if (gidsetsize > ngroups_max + 1)
+		return (EINVAL);
+
+	if (gidsetsize > XU_NGROUPS)
+		groups = malloc(gidsetsize * sizeof(gid_t), M_TEMP, M_WAITOK);
+	else
+		/* XXX: CTSRD-CHERI/clang#179 */
+		groups = &smallgroups[0];
+
+	error = copyin_c(uap->gidset,
+	    (__cheri_tocap gid_t * __capability)groups,
+	    gidsetsize * sizeof(gid_t));
+	if (error == 0)
+		error = kern_setgroups(td, gidsetsize, groups);
+
+	if (gidsetsize > XU_NGROUPS)
+		free(groups, M_TEMP);
+	return (error);
+}
+
+int
+cheriabi_getresuid(struct thread *td, struct cheriabi_getresuid_args *uap)
+{
+
+	return (kern_getresuid(td, uap->ruid, uap->euid, uap->suid));
+}
+
+int
+cheriabi_getresgid(struct thread *td, struct cheriabi_getresgid_args *uap)
+{
+
+	return (kern_getresgid(td, uap->rgid, uap->egid, uap->sgid));
+}
+
+int
+cheriabi_getlogin(struct thread *td, struct cheriabi_getlogin_args *uap)
+{
+
+	return (kern_getlogin(td, uap->namebuf, uap->namelen));
+}
+
+int
+cheriabi_setlogin(struct thread *td, struct cheriabi_setlogin_args *uap)
+{
+
+	return (kern_setlogin(td, uap->namebuf));
+}
+
+/*
+ * kern_rctl.h
+ */
+int
+cheriabi_rctl_get_racct(struct thread *td,
+    struct cheriabi_rctl_get_racct_args *uap)
+{
+
+#ifdef RCTL
+	return (kern_rctl_get_racct(td, uap->inbufp, uap->inbuflen,
+	    uap->outbufp, uap->outbuflen));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_rctl_get_rules(struct thread *td,
+    struct cheriabi_rctl_get_rules_args *uap)
+{
+
+#ifdef RCTL
+	return (kern_rctl_get_rules(td, uap->inbufp, uap->inbuflen,
+	    uap->outbufp, uap->outbuflen));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_rctl_get_limits(struct thread *td,
+    struct cheriabi_rctl_get_limits_args *uap)
+{
+
+#ifdef RCTL
+	return (kern_rctl_get_limits(td, uap->inbufp, uap->inbuflen,
+	    uap->outbufp, uap->outbuflen));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_rctl_add_rule(struct thread *td,
+    struct cheriabi_rctl_add_rule_args *uap)
+{
+
+#ifdef RCTL
+	return (kern_rctl_add_rule(td, uap->inbufp, uap->inbuflen,
+	    uap->outbufp, uap->outbuflen));
+#else
+	return (ENOSYS);
+#endif
+}
+
+int
+cheriabi_rctl_remove_rule(struct thread *td,
+    struct cheriabi_rctl_remove_rule_args *uap)
+{
+
+#ifdef RCTL
+	return (kern_rctl_remove_rule(td, uap->inbufp, uap->inbuflen,
+	    uap->outbufp, uap->outbuflen));
+#else
+	return (ENOSYS);
+#endif
+}
+
+/*
+ * kern_resource.h
+ */
+int
+cheriabi_rtprio_thread(struct thread *td,
+    struct cheriabi_rtprio_thread_args *uap)
+{
+
+	return (kern_rtprio_thread(td, uap->function, uap->lwpid,
+	    uap->rtp));
+}
+
+int
+cheriabi_rtprio(struct thread *td, struct cheriabi_rtprio_args *uap)
+{
+
+	return (kern_rtprio(td, uap->function, uap->pid, uap->rtp));
+}
+
+int
+cheriabi_setrlimit(struct thread *td, struct cheriabi_setrlimit_args *uap)
+{
+	struct rlimit alim;
+	int error;
+
+	error = copyin_c(uap->rlp, &alim, sizeof(struct rlimit));
+	if (error != 0)
+		return (error);
+	return (kern_setrlimit(td, uap->which, &alim));
+}
+
+int
+cheriabi_getrlimit(struct thread *td, struct cheriabi_getrlimit_args *uap)
+{
+	struct rlimit rlim;
+	int error;
+
+	if (uap->which >= RLIM_NLIMITS)
+		return (EINVAL);
+	lim_rlimit(td, uap->which, &rlim);
+	error = copyout_c(&rlim, uap->rlp, sizeof(struct rlimit));
+	return (error);
+}
+
+int
+cheriabi_getrusage(struct thread *td, struct cheriabi_getrusage_args *uap)
+{
+	struct rusage ru;
+	int error;
+
+	error = kern_getrusage(td, uap->who, &ru);
+	if (error == 0)
+		error = copyout_c(&ru, uap->rusage, sizeof(struct rusage));
+	return (error);
+}
+
+/*
+ * kern_sysctl.c
+ */
+
+int
+cheriabi___sysctl(struct thread *td, struct cheriabi___sysctl_args *uap)
+{
+
+	return (kern_sysctl(td, uap->name, uap->namelen, uap->old,
+	    uap->oldlenp, uap->new, uap->newlen, SCTL_CHERIABI));
+}
+
+/*
+ * kern_thr.c
+ */
+
+struct thr_create_initthr_args_c {
+	ucontext_c_t ctx;
+	long * __capability tid;
+};
+
+static int
+cheriabi_thr_create_initthr(struct thread *td, void *thunk)
+{
+	struct thr_create_initthr_args_c *args;
+
+	args = thunk;
+	if (args->tid != NULL && suword_c(args->tid, td->td_tid) != 0)
+		return (EFAULT);
+
+	return (cheriabi_set_mcontext(td, &args->ctx.uc_mcontext));
+}
+
+int
+cheriabi_thr_create(struct thread *td, struct cheriabi_thr_create_args *uap)
+{
+	struct thr_create_initthr_args_c args;
+	int error;
+
+	if ((error = copyincap_c(uap->ctx, &args.ctx, sizeof(args.ctx))))
+		return (error);
+	args.tid = uap->id;
+	return (thread_create(td, NULL, cheriabi_thr_create_initthr, &args));
+}
+
+static int
+cheriabi_thr_new_initthr(struct thread *td, void *thunk)
+{
+	struct thr_param_c *param = thunk;
+
+	if ((param->child_tid != NULL &&
+	    suword_c(param->child_tid, td->td_tid)) ||
+	    (param->parent_tid != NULL &&
+	    suword_c(param->parent_tid, td->td_tid)))
+		return (EFAULT);
+	cheriabi_set_threadregs(td, param);
+	return (cheriabi_set_user_tls(td, param->tls_base));
+}
+
+int
+cheriabi_thr_self(struct thread *td, struct cheriabi_thr_self_args *uap)
+{
+	int error;
+
+	error = suword_c(uap->id, td->td_tid);
+	if (error == -1)
+		return (EFAULT);
+	return (0);
+}
+
+int
+cheriabi_thr_exit(struct thread *td, struct cheriabi_thr_exit_args *uap)
+{
+
+	umtx_thread_exit(td);
+
+	/* Signal userland that it can free the stack. */
+	if (uap->state != NULL) {
+		suword_c(uap->state, 1);
+		kern_umtx_wake(td, uap->state, INT_MAX, 0);
+	}
+
+	return (kern_thr_exit(td));
+}
+
+int
+cheriabi_thr_suspend(struct thread *td, struct cheriabi_thr_suspend_args *uap)
+{
+	struct timespec ts, *tsp;
+	int error;
+
+	tsp = NULL;
+	if (uap->timeout != NULL) {
+		error = umtx_copyin_timeout(uap->timeout, &ts);
+		if (error != 0)
+			return (error);
+		tsp = &ts;
+	}
+
+	return (kern_thr_suspend(td, tsp));
+}
+
+int
+cheriabi_thr_set_name(struct thread *td, struct cheriabi_thr_set_name_args *uap)
+{
+
+	return (kern_thr_set_name(td, uap->id, uap->name));
+}
+
+int
+cheriabi_thr_new(struct thread *td, struct cheriabi_thr_new_args *uap)
+{
+	struct thr_param_c param_c;
+	struct rtprio rtp, *rtpp;
+	int error;
+
+	if (uap->param_size != sizeof(struct thr_param_c))
+		return (EINVAL);
+
+	error = copyincap_c(uap->param, &param_c, uap->param_size);
+	if (error != 0)
+		return (error);
+
+	/*
+	 * Opportunity for machine-dependent code to provide a DDC if the
+	 * caller didn't provide one.
+	 *
+	 * XXXRW: But should only do so if a suitable flag is set?
+	 */
+	cheriabi_thr_new_md(td, &param_c);
+	if (param_c.rtp != NULL) {
+		error = copyin_c(param_c.rtp, &rtp, sizeof(struct rtprio));
+		if (error)
+			return (error);
+		rtpp = &rtp;
+	} else
+		rtpp = NULL;
+	return (thread_create(td, rtpp, cheriabi_thr_new_initthr, &param_c));
+}
+
+#ifdef _KPOSIX_PRIORITY_SCHEDULING
+/*
+ * p1003_1b.c
+ */
+int
+cheriabi_sched_setparam(struct thread *td,
+    struct cheriabi_sched_setparam_args * uap)
+{
+
+	return (user_sched_setparam(td, uap->pid, uap->param));
+}
+
+int
+cheriabi_sched_getparam(struct thread *td,
+    struct cheriabi_sched_getparam_args *uap)
+{
+
+	return (user_sched_getparam(td, uap->pid, uap->param));
+}
+
+int
+cheriabi_sched_setscheduler(struct thread *td,
+    struct cheriabi_sched_setscheduler_args *uap)
+{
+
+	return (user_sched_setscheduler(td, uap->pid, uap->policy, uap->param));
+}
+
+int
+cheriabi_sched_rr_get_interval(struct thread *td,
+    struct cheriabi_sched_rr_get_interval_args *uap)
+{
+
+	return (user_sched_rr_get_interval(td, uap->pid, uap->interval));
+}
+
+#else /* !_KPOSIX_PRIORITY_SCHEDULING */
+CHERIABI_SYSCALL_NOT_PRESENT_GEN(sched_setparam)
+CHERIABI_SYSCALL_NOT_PRESENT_GEN(sched_getparam)
+CHERIABI_SYSCALL_NOT_PRESENT_GEN(sched_setscheduler)
+CHERIABI_SYSCALL_NOT_PRESENT_GEN(sched_rr_get_interval)
+#endif /* !_KPOSIX_PRIORITY_SCHEDULING */
+
+/*
+ * subr_profil.c
+ */
+
+int
+cheriabi_profil(struct thread *td, struct cheriabi_profil_args *uap)
+{
+
+	return (kern_profil(td, uap->samples, uap->size, uap->offset,
+	    uap->scale));
+}
+
+/*
+ * vm/swap_pager.c
+ */
+
+int
+cheriabi_swapon(struct thread *td, struct cheriabi_swapon_args *uap)
+{
+
+	return (kern_swapon(td, uap->name));
+}
+
+int
+cheriabi_swapoff(struct thread *td, struct cheriabi_swapoff_args *uap)
+{
+
+	return (kern_swapoff(td, uap->name));
+}
+
+/*
+ * sys_capability.c
+ */
+#ifdef CAPABILITIES
+int
+cheriabi_cap_getmode(struct thread *td, struct cheriabi_cap_getmode_args *uap)
+{
+
+	return (kern_cap_getmode(td, uap->modep));
+}
+
+int
+cheriabi_cap_rights_limit(struct thread *td,
+   struct cheriabi_cap_rights_limit_args *uap)
+{
+
+	return (user_cap_rights_limit(td, uap->fd, uap->rightsp));
+}
+
+int
+cheriabi___cap_rights_get(struct thread *td,
+    struct cheriabi___cap_rights_get_args *uap)
+{
+
+	return (kern_cap_rights_get(td, uap->version, uap->fd, uap->rightsp));
+}
+
+int
+cheriabi_cap_ioctls_limit(struct thread *td,
+    struct cheriabi_cap_ioctls_limit_args *uap)
+{
+
+	return (user_cap_ioctls_limit(td, uap->fd, uap->cmds, uap->ncmds));
+}
+
+int
+cheriabi_cap_ioctls_get(struct thread *td,
+    struct cheriabi_cap_ioctls_get_args *uap)
+{
+
+	return (kern_cap_ioctls_get(td, uap->fd, uap->cmds, uap->maxcmds));
+}
+
+int
+cheriabi_cap_fcntls_get(struct thread *td,
+   struct cheriabi_cap_fcntls_get_args *uap)
+{
+
+	return (kern_cap_fcntls_get(td, uap->fd, uap->fcntlrightsp));
+}
+#else /* !CAPABILITIES */
+int
+cheriabi_cap_getmode(struct thread *td, struct cheriabi_cap_getmode_args *uap)
+{
+
+	return (ENOSYS);
+}
+
+int
+cheriabi_cap_rights_limit(struct thread *td,
+   struct cheriabi_cap_rights_limit_args *uap)
+{
+
+	return (ENOSYS);
+}
+
+int
+cheriabi___cap_rights_get(struct thread *td,
+    struct cheriabi___cap_rights_get_args *uap)
+{
+
+	return (ENOSYS);
+}
+
+int
+cheriabi_cap_ioctls_limit(struct thread *td,
+    struct cheriabi_cap_ioctls_limit_args *uap)
+{
+
+	return (ENOSYS);
+}
+
+int
+cheriabi_cap_ioctls_get(struct thread *td,
+    struct cheriabi_cap_ioctls_get_args *uap)
+{
+
+	return (ENOSYS);
+}
+
+int
+cheriabi_cap_fcntls_get(struct thread *td,
+   struct cheriabi_cap_fcntls_get_args *uap)
+{
+
+	return (ENOSYS);
+}
+#endif /* !CAPABILITIES */
+
+/*
+ * sys_pipe.c
+ */
+int
+cheriabi_pipe2(struct thread *td, struct cheriabi_pipe2_args *uap)
+{
+
+	return (kern_pipe2(td, uap->fildes, uap->flags));
+}
+
+/*
+ * sys_procdesc.c
+ */
+
+int
+cheriabi_pdgetpid(struct thread *td, struct cheriabi_pdgetpid_args *uap)
+{
+
+	return (user_pdgetpid(td, uap->fd, uap->pidp));
+}
+
+/*
+ * sys_process.c
+ */
+CHERIABI_SYSCALL_NOT_PRESENT_GEN(ptrace)

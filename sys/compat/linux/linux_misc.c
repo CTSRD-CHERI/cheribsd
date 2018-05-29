@@ -540,8 +540,11 @@ linux_select(struct thread *td, struct linux_select_args *args)
 	} else
 		tvp = NULL;
 
-	error = kern_select(td, args->nfds, args->readfds, args->writefds,
-	    args->exceptfds, tvp, LINUX_NFDBITS);
+	error = kern_select(td, args->nfds,
+	    (__cheri_tocap fd_set * __capability)args->readfds,
+	    (__cheri_tocap fd_set * __capability)args->writefds,
+	    (__cheri_tocap fd_set * __capability)args->exceptfds,
+	    tvp, LINUX_NFDBITS);
 
 #ifdef DEBUG
 	if (ldebug(select))
@@ -2270,8 +2273,11 @@ linux_pselect6(struct thread *td, struct linux_pselect6_args *args)
 	} else
 		tvp = NULL;
 
-	error = kern_pselect(td, args->nfds, args->readfds, args->writefds,
-	    args->exceptfds, tvp, ssp, LINUX_NFDBITS);
+	error = kern_pselect(td, args->nfds,
+	    (__cheri_tocap fd_set * __capability)args->readfds,
+	    (__cheri_tocap fd_set * __capability)args->writefds,
+	    (__cheri_tocap fd_set * __capability)args->exceptfds,
+	    tvp, ssp, LINUX_NFDBITS);
 
 	if (error == 0 && args->tsp != NULL) {
 		if (td->td_retval[0] != 0) {
@@ -2334,7 +2340,9 @@ linux_ppoll(struct thread *td, struct linux_ppoll_args *args)
 	} else
 		tsp = NULL;
 
-	error = kern_poll(td, args->fds, args->nfds, tsp, ssp);
+	error = kern_poll(td,
+	    (__cheri_tocap struct pollfd * __capability)args->fds, args->nfds,
+	    tsp, ssp);
 
 	if (error == 0 && args->tsp != NULL) {
 		if (td->td_retval[0]) {
@@ -2515,7 +2523,7 @@ int
 linux_getrandom(struct thread *td, struct linux_getrandom_args *args)
 {
 	struct uio uio;
-	struct iovec iov;
+	kiobec_t iov;
 	int error;
 
 	if (args->flags & ~(LINUX_GRND_NONBLOCK|LINUX_GRND_RANDOM))
@@ -2545,5 +2553,6 @@ linux_mincore(struct thread *td, struct linux_mincore_args *args)
 	/* Needs to be page-aligned */
 	if (args->start & PAGE_MASK)
 		return (EINVAL);
-	return (kern_mincore(td, args->start, args->len, args->vec));
+	return (kern_mincore(td, args->start, args->len,
+	    __USER_CAP(args->vec, args->len)));
 }

@@ -89,7 +89,7 @@ static int	pflogoutput(struct ifnet *, struct mbuf *,
 static void	pflogattach(int);
 static int	pflogioctl(struct ifnet *, u_long, caddr_t);
 static void	pflogstart(struct ifnet *);
-static int	pflog_clone_create(struct if_clone *, int, caddr_t);
+static int	pflog_clone_create(struct if_clone *, int, void * __capability);
 static void	pflog_clone_destroy(struct ifnet *);
 
 static const char pflogname[] = "pflog";
@@ -111,7 +111,7 @@ pflogattach(int npflog __unused)
 }
 
 static int
-pflog_clone_create(struct if_clone *ifc, int unit, caddr_t param)
+pflog_clone_create(struct if_clone *ifc, int unit, void * __capability param)
 {
 	struct ifnet *ifp;
 
@@ -185,7 +185,7 @@ static int
 pflogioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		if (ifp->if_flags & IFF_UP)
 			ifp->if_drv_flags |= IFF_DRV_RUNNING;
 		else

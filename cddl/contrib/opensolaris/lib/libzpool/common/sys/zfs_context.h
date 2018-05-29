@@ -389,7 +389,7 @@ typedef struct taskq_ent {
 	struct taskq_ent	*tqent_prev;
 	task_func_t		*tqent_func;
 	void			*tqent_arg;
-	uintptr_t		tqent_flags;
+	vaddr_t			tqent_flags;
 } taskq_ent_t;
 
 #define	TQENT_FLAG_PREALLOC	0x1	/* taskq_dispatch_ent used */

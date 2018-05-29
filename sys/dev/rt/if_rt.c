@@ -1255,7 +1255,7 @@ rt_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	error = 0;
 
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		startall = 0;
 		RT_SOFTC_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
@@ -1275,7 +1275,7 @@ rt_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		RT_SOFTC_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 #ifdef IF_RT_PHY_SUPPORT
 		mii = device_get_softc(sc->rt_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);

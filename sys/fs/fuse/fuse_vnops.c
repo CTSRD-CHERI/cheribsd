@@ -1750,7 +1750,7 @@ fuse_vnop_getpages(struct vop_getpages_args *ap)
 {
 	int i, error, nextoff, size, toff, count, npages;
 	struct uio uio;
-	struct iovec iov;
+	kiovec_t iov;
 	vm_offset_t kva;
 	struct buf *bp;
 	struct vnode *vp;
@@ -1878,7 +1878,7 @@ static int
 fuse_vnop_putpages(struct vop_putpages_args *ap)
 {
 	struct uio uio;
-	struct iovec iov;
+	kiovec_t iov;
 	vm_offset_t kva;
 	struct buf *bp;
 	int i, error, npages, count;

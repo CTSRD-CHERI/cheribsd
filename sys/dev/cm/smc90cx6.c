@@ -863,15 +863,15 @@ cm_ioctl(ifp, command, data)
 #endif
 
 	switch (command) {
-	case SIOCSIFADDR:
-	case SIOCGIFADDR:
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
+	CASE_IOC_IFREQ(SIOCGIFADDR):
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		error = arc_ioctl(ifp, command, data);
 		break;
 
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		CM_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) == 0 &&
 		    (ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {

@@ -1161,7 +1161,7 @@ macbioctl(struct ifnet * ifp, u_long cmd, caddr_t data)
 	int error = 0;
 
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		MACB_LOCK(sc);
 
 		if ((ifp->if_flags & IFF_UP) != 0) {
@@ -1178,15 +1178,15 @@ macbioctl(struct ifnet * ifp, u_long cmd, caddr_t data)
 		sc->if_flags = ifp->if_flags;
 		MACB_UNLOCK(sc);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		MACB_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			set_filter(sc);
 
 		MACB_UNLOCK(sc);
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);

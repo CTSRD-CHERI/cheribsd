@@ -780,14 +780,6 @@ trap(struct trapframe *trapframe)
 		if (td->td_pcb->pcb_onfault == NULL)
 			goto err;
 
-		/* check for fuswintr() or suswintr() getting a page fault */
-		/* XXX There must be a nicer way to do this.  */
-		if (td->td_pcb->pcb_onfault == fswintrberr) {
-			pc = (register_t)(intptr_t)td->td_pcb->pcb_onfault;
-			td->td_pcb->pcb_onfault = NULL;
-			return (pc);
-		}
-
 		goto dofault;
 
 	case T_TLB_LD_MISS + T_USER:
@@ -1016,26 +1008,17 @@ dofault:
 #ifdef CPU_CHERI
 
 			/*
-			 * XXXRW: We really need a cfuword(), and also to use
-			 * a frame-extracted EPCC rather than the live one, as
-			 * we may have taken a further exception if interrupts
-			 * are enabled.  However, this helps with debugging in
-			 * the mean time.
-			 *
-			 * XXXRW: Especially, we need to be prepared for the
+			 * XXXRW: Wwe need to be prepared for the
 			 * possibility that $pcc ($epcc) is not readable or
 			 * unaligned.
-			 *
-			 * XXXRW: Should just use the CP0 'faulting
-			 * instruction' register available in CHERI.
-			 *
-			 * XXXRW: As interrupts have been enabled at this
-			 * point, EPCC may not be the faulting one we would
-			 * like -- e.g., it could be for a kernel TLB miss.
-			 * We should be loading CTEMP0 from the saved EPCC
-			 * from the trap frame instead.
 			 */
-			CHERI_CLW(inst.word, 0, 0, CHERI_CR_EPCC);
+			if (fueword32_c(trapframe->pcc, &inst.word) != 0) {
+				printf("Reserved inst trap: Failed to fetch "
+				    "bad inst from epcc: ");
+				CHERI_PRINT_PTR(trapframe->pcc);
+				/* Ensure none of the switch cases match */
+				inst.word = 0;
+			}
 #else
 			inst = *(InstFmt *)(intptr_t)trapframe->pc;
 #endif
@@ -1046,7 +1029,7 @@ dofault:
 					/* Register 29 used for TLS */
 					if (inst.RType.rd == 29) {
 						frame_regs = &(trapframe->zero);
-						frame_regs[inst.RType.rt] = (register_t)(intptr_t)td->td_md.md_tls;
+						frame_regs[inst.RType.rt] = (register_t)(intptr_t)(__cheri_fromcap void *)td->td_md.md_tls;
 						frame_regs[inst.RType.rt] += td->td_md.md_tls_tcb_offset;
 						trapframe->pc += sizeof(int);
 						goto out;
@@ -1305,7 +1288,8 @@ err:
 	ksiginfo_init_trap(&ksi);
 	ksi.ksi_signo = i;
 	ksi.ksi_code = ucode;
-	ksi.ksi_addr = (void *)addr;
+	/* XXXBD: probably not quite right for CheriABI */
+	ksi.ksi_addr = (void * __capability)(intcap_t)addr;
 	ksi.ksi_trapno = type;
 	trapsignal(td, &ksi);
 out:
@@ -1949,7 +1933,7 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, re
 		kaddr += sizeof(register_t) - size;
 #endif
 		int err;
-		if ((err = copyout(kaddr, (void*)addr, size))) {
+		if ((err = copyout_implicit_cap(kaddr, (void*)addr, size))) {
 			return (0);
 		}
 		return (op_type);
@@ -1961,7 +1945,7 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, re
 		kaddr += sizeof(register_t) - size;
 #endif
 		int err;
-		if ((err = copyin((void*)addr, kaddr, size))) {
+		if ((err = copyin_implicit_cap((void*)addr, kaddr, size))) {
 			return (0);
 		}
 		/* If we need to sign extend it, then shift it so that the sign

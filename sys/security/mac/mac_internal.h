@@ -209,7 +209,7 @@ void		 mac_labelzone_init(void);
 
 void	mac_init_label(struct label *label);
 void	mac_destroy_label(struct label *label);
-int	mac_check_structmac_consistent(const struct mac *mac);
+int	mac_check_structmac_consistent(const kmac_t *mac);
 int	mac_allocate_slot(void);
 
 #define MAC_IFNET_LOCK(ifp)	mtx_lock(&mac_ifnet_mtx)

@@ -101,6 +101,10 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/cpu.h>
 
+#ifdef CPU_CHERI
+#include <cheri/cheric.h>
+#endif
+
 #ifndef NO_SWAPPING
 static int swapout(struct proc *);
 static void swapclear(struct proc *);
@@ -152,40 +156,58 @@ kernacc(addr, len, rw)
  * used in conjunction with this call.
  */
 int
-useracc(addr, len, rw)
-	void *addr;
-	int len, rw;
+useracc(void * __capability cap, int len, int rw)
 {
+	vm_offset_t addr;
 	boolean_t rv;
 	vm_prot_t prot;
 	vm_map_t map;
+#ifdef CPU_CHERI
+	register_t reqperm;
+#endif
 
 	KASSERT((rw & ~VM_PROT_ALL) == 0,
 	    ("illegal ``rw'' argument to useracc (%x)\n", rw));
 	prot = rw;
+#ifdef CPU_CHERI
+	if (!__CAP_CHECK(cap, len))
+		return (FALSE);
+	reqperm = CHERI_PERM_GLOBAL;
+	if (prot & VM_PROT_READ)
+		reqperm |= CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP;
+	if (prot & VM_PROT_WRITE)
+		reqperm |= CHERI_PERM_STORE | CHERI_PERM_STORE_CAP;
+	if (prot & VM_PROT_EXECUTE)
+		reqperm |= CHERI_PERM_EXECUTE;
+	if ((cheri_getperm(cap) & reqperm) != reqperm)
+		return (FALSE);
+#endif
+	addr = (__cheri_addr vm_offset_t)cap;
 	map = &curproc->p_vmspace->vm_map;
-	if ((vm_offset_t)addr + len > vm_map_max(map) ||
-	    (vm_offset_t)addr + len < (vm_offset_t)addr) {
+	if (addr + len > vm_map_max(map) || addr + len < addr) {
 		return (FALSE);
 	}
 	vm_map_lock_read(map);
-	rv = vm_map_check_protection(map, trunc_page((vm_offset_t)addr),
-	    round_page((vm_offset_t)addr + len), prot);
+	rv = vm_map_check_protection(map, trunc_page(addr),
+	    round_page(addr + len), prot);
 	vm_map_unlock_read(map);
 	return (rv == TRUE);
 }
 
 int
-vslock(void *addr, size_t len)
+vslock(void * __capability addr, size_t len)
 {
-	vm_offset_t end, last, start;
+	vm_offset_t end, last, start, vaddr;
 	vm_size_t npages;
 	int error;
 
-	last = (vm_offset_t)addr + len;
-	start = trunc_page((vm_offset_t)addr);
+	if (!__CAP_CHECK(addr, len))
+		return (EPROT);
+	vaddr = (__cheri_addr vm_offset_t)addr;
+	last = vaddr + len;
+	start = trunc_page(vaddr);
 	end = round_page(last);
-	if (last < (vm_offset_t)addr || end < (vm_offset_t)addr)
+	if (last < vaddr || end < vaddr)
 		return (EINVAL);
 	npages = atop(end - start);
 	if (npages > vm_page_max_wired)
@@ -213,12 +235,14 @@ vslock(void *addr, size_t len)
 }
 
 void
-vsunlock(void *addr, size_t len)
+vsunlock(void * __capability addr, size_t len)
 {
+	vm_offset_t vaddr;
 
 	/* Rely on the parameter sanity checks performed by vslock(). */
+	vaddr = (__cheri_addr vm_offset_t)addr;
 	(void)vm_map_unwire(&curproc->p_vmspace->vm_map,
-	    trunc_page((vm_offset_t)addr), round_page((vm_offset_t)addr + len),
+	    trunc_page(vaddr), round_page(vaddr + len),
 	    VM_MAP_WIRE_SYSTEM | VM_MAP_WIRE_NOHOLES);
 }
 

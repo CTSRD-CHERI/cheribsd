@@ -32,8 +32,6 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
 #include <sys/elf_common.h>
-#include <sys/elf.h>
-#include <sys/endian.h>
 #include <sys/errno.h>
 #include <err.h>
 #include <fcntl.h>
@@ -62,11 +60,11 @@ static struct ELFtypes elftypes[] = {
 int
 main(int argc, char **argv)
 {
+
 	const char *strtype = "FreeBSD";
 	int type = ELFOSABI_FREEBSD;
 	int retval = 0;
 	int ch, change = 0, force = 0, listed = 0;
-	ssize_t writeout;
 
 	while ((ch = getopt(argc, argv, "f:lt:v")) != -1)
 		switch (ch) {
@@ -116,48 +114,43 @@ main(int argc, char **argv)
 
 	while (argc) {
 		int fd;
-		union {
-			unsigned char	ident[EI_NIDENT];
-			Elf32_Ehdr	ehdr32;
-			Elf64_Ehdr	ehdr64;
-		} buffer;
+		char buffer[EI_NIDENT];
 
-		if ((fd = open(argv[0], change || force ? O_RDWR : O_RDONLY,
-		    0)) < 0) {
+		if ((fd = open(argv[0], change || force ? O_RDWR : O_RDONLY, 0)) < 0) {
 			warn("error opening file %s", argv[0]);
 			retval = 1;
 			goto fail;
 		}
-		if (read(fd, &buffer, EI_NIDENT) < EI_NIDENT) {
+		if (read(fd, buffer, EI_NIDENT) < EI_NIDENT) {
 			warnx("file '%s' too short", argv[0]);
 			retval = 1;
 			goto fail;
 		}
-		if (buffer.ident[0] != ELFMAG0 || buffer.ident[1] != ELFMAG1 ||
-		    buffer.ident[2] != ELFMAG2 || buffer.ident[3] != ELFMAG3) {
+		if (buffer[0] != ELFMAG0 || buffer[1] != ELFMAG1 ||
+		    buffer[2] != ELFMAG2 || buffer[3] != ELFMAG3) {
 			warnx("file '%s' is not ELF format", argv[0]);
 			retval = 1;
 			goto fail;
 		}
 		if (!change && !force) {
-			writeout = 0;
 			fprintf(stdout,
 				"File '%s' is of brand '%s' (%u).\n",
-				argv[0], iselftype(buffer.ident[EI_OSABI]),
-				buffer.ident[EI_OSABI]);
+				argv[0], iselftype(buffer[EI_OSABI]),
+				buffer[EI_OSABI]);
 			if (!iselftype(type)) {
 				warnx("ELF ABI Brand '%u' is unknown",
 				      type);
 				printelftypes();
 			}
-		} else {
-			writeout = EI_NIDENT;
-			buffer.ident[EI_OSABI] = type;
 		}
-		if (pwrite(fd, &buffer, writeout, 0) != writeout) {
-			warn("error writing %s %d", argv[0], fd);
-			retval = 1;
-			goto fail;
+		else {
+			buffer[EI_OSABI] = type;
+			lseek(fd, 0, SEEK_SET);
+			if (write(fd, buffer, EI_NIDENT) != EI_NIDENT) {
+				warn("error writing %s %d", argv[0], fd);
+				retval = 1;
+				goto fail;
+			}
 		}
 fail:
 		close(fd);
@@ -172,9 +165,7 @@ static void
 usage(void)
 {
 	(void)fprintf(stderr,
-	    "usage: brandelf [-lv] [-c CHERI_capability_size] file ...\n"
-	    "       brandelf [-lv] [-f ELF_ABI_number] file ...\n"
-	    "       brandelf [-lv] [-t string] file ...\n");
+	    "usage: brandelf [-lv] [-f ELF_ABI_number] [-t string] file ...\n");
 	exit(1);
 }
 

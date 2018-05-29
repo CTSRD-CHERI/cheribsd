@@ -254,7 +254,8 @@ SYSCTL_STRUCT(_net_pfsync, OID_AUTO, stats, CTLFLAG_VNET | CTLFLAG_RW,
 SYSCTL_INT(_net_pfsync, OID_AUTO, carp_demotion_factor, CTLFLAG_RW,
     &VNET_NAME(pfsync_carp_adj), 0, "pfsync's CARP demotion factor adjustment");
 
-static int	pfsync_clone_create(struct if_clone *, int, caddr_t);
+static int	pfsync_clone_create(struct if_clone *, int,
+		    void * __capability);
 static void	pfsync_clone_destroy(struct ifnet *);
 static int	pfsync_alloc_scrub_memory(struct pfsync_state_peer *,
 		    struct pf_state_peer *);
@@ -289,7 +290,7 @@ VNET_DEFINE(struct if_clone *, pfsync_cloner);
 #define	V_pfsync_cloner	VNET(pfsync_cloner)
 
 static int
-pfsync_clone_create(struct if_clone *ifc, int unit, caddr_t param)
+pfsync_clone_create(struct if_clone *ifc, int unit, void * __capability param)
 {
 	struct pfsync_softc *sc;
 	struct ifnet *ifp;
@@ -1280,7 +1281,7 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error;
 
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		PFSYNC_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			ifp->if_drv_flags |= IFF_DRV_RUNNING;
@@ -1292,20 +1293,20 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			pfsync_pointers_uninit();
 		}
 		break;
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (!sc->sc_sync_if ||
-		    ifr->ifr_mtu <= PFSYNC_MINPKT ||
-		    ifr->ifr_mtu > sc->sc_sync_if->if_mtu)
+		    ifr_mtu_get(ifr) <= PFSYNC_MINPKT ||
+		    ifr_mtu_get(ifr) > sc->sc_sync_if->if_mtu)
 			return (EINVAL);
-		if (ifr->ifr_mtu < ifp->if_mtu) {
+		if (ifr_mtu_get(ifr) < ifp->if_mtu) {
 			PFSYNC_LOCK(sc);
 			if (sc->sc_len > PFSYNC_MINPKT)
 				pfsync_sendout(1);
 			PFSYNC_UNLOCK(sc);
 		}
-		ifp->if_mtu = ifr->ifr_mtu;
+		ifp->if_mtu = ifr_mtu_get(ifr);
 		break;
-	case SIOCGETPFSYNC:
+	CASE_IOC_IFREQ(SIOCGETPFSYNC):
 		bzero(&pfsyncr, sizeof(pfsyncr));
 		PFSYNC_LOCK(sc);
 		if (sc->sc_sync_if) {
@@ -1317,9 +1318,10 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		pfsyncr.pfsyncr_defer = (PFSYNCF_DEFER ==
 		    (sc->sc_flags & PFSYNCF_DEFER));
 		PFSYNC_UNLOCK(sc);
-		return (copyout(&pfsyncr, ifr->ifr_data, sizeof(pfsyncr)));
+		return (copyout_c(&pfsyncr, ifr_data_get_ptr(ifr),
+		    sizeof(pfsyncr)));
 
-	case SIOCSETPFSYNC:
+	CASE_IOC_IFREQ(SIOCSETPFSYNC):
 	    {
 		struct ip_moptions *imo = &sc->sc_imo;
 		struct ifnet *sifp;
@@ -1328,7 +1330,8 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 		if ((error = priv_check(curthread, PRIV_NETINET_PF)) != 0)
 			return (error);
-		if ((error = copyin(ifr->ifr_data, &pfsyncr, sizeof(pfsyncr))))
+		if ((error = copyin_c(ifr_data_get_ptr(ifr), &pfsyncr,
+		    sizeof(pfsyncr))))
 			return (error);
 
 		if (pfsyncr.pfsyncr_maxupdates > 255)

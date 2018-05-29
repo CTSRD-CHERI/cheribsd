@@ -47,7 +47,7 @@ static void
 filemon_output(struct filemon *filemon, char *msg, size_t len)
 {
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	int error;
 
 	if (filemon->fp == NULL)

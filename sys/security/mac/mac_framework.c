@@ -583,13 +583,39 @@ mac_error_select(int error1, int error2)
 }
 
 int
-mac_check_structmac_consistent(const struct mac *mac)
+mac_check_structmac_consistent(const kmac_t *mac)
 {
 
 	if (mac->m_buflen > MAC_MAX_LABEL_BUF_LEN)
 		return (EINVAL);
 
 	return (0);
+}
+
+int
+copyin_mac(void * __capability mac_p, kmac_t *mac)
+{
+	int error;
+
+	memset(mac, 0, sizeof(*mac));
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		error = EOPNOTSUPP;
+	else
+#endif
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI)) {
+		error = copyincap_c(mac_p,
+		    (__cheri_tocap kmac_t * __capability)mac, sizeof(*mac))
+	} else
+#endif
+	{
+		struct mac_native tmpmac;
+		error = copyin_c(mac_p, &tmpmac, sizeof(tmpmac));
+		mac->m_buflen = tmpmac.m_buflen;
+		mac->m_string = __USER_CAP(tmpmac.m_string, tmpmac.m_buflen);
+	}
+	return (error);
 }
 
 SYSINIT(mac, SI_SUB_MAC, SI_ORDER_FIRST, mac_init, NULL);

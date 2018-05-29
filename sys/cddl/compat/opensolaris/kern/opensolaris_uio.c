@@ -50,7 +50,7 @@
 int
 uiocopy(void *p, size_t n, enum uio_rw rw, struct uio *uio, size_t *cbytes)
 {
-	struct iovec *iov;
+	kiovec_t iovec *iov;
 	ulong_t cnt;
 	int error, iovcnt;
 

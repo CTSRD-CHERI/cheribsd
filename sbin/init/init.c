@@ -303,14 +303,26 @@ invalid:
 	 */
 	handle(badsys, SIGSYS, 0);
 	handle(disaster, SIGABRT, SIGFPE, SIGILL, SIGSEGV, SIGBUS, SIGXCPU,
-	    SIGXFSZ, 0);
+	    SIGXFSZ,
+#ifdef SIGPROT
+	    /*
+	     * Don't keep going if we receive SIGPROT since that will cause
+	     * QEMU to loop forever if we break something in init.
+	     */
+	    SIGPROT,
+#endif
+	    0);
 	handle(transition_handler, SIGHUP, SIGINT, SIGEMT, SIGTERM, SIGTSTP,
 	    SIGUSR1, SIGUSR2, 0);
 	handle(alrm_handler, SIGALRM, 0);
 	sigfillset(&mask);
 	delset(&mask, SIGABRT, SIGFPE, SIGILL, SIGSEGV, SIGBUS, SIGSYS,
 	    SIGXCPU, SIGXFSZ, SIGHUP, SIGINT, SIGEMT, SIGTERM, SIGTSTP,
-	    SIGALRM, SIGUSR1, SIGUSR2, 0);
+	    SIGALRM, SIGUSR1, SIGUSR2,
+#ifdef SIGPROT
+	    SIGPROT, /* Don't mask CHERI exceptions */
+#endif
+	    0);
 	sigprocmask(SIG_SETMASK, &mask, (sigset_t *) 0);
 	sigemptyset(&sa.sa_mask);
 	sa.sa_flags = 0;
@@ -324,6 +336,15 @@ invalid:
 	close(0);
 	close(1);
 	close(2);
+
+#ifdef __DEBUG_CHERI_TRAP_DURING_INIT__
+	warning("RAISING a CHERI violation:\n");
+	void * __capability cap = __builtin_cheri_global_data_get();
+	cap = __builtin_cheri_offset_set(cap, (vaddr_t)&Reboot);
+	cap = __builtin_cheri_perms_and(cap, ~__CHERI_CAP_PERMISSION_PERMIT_LOAD__);
+	Reboot = *((int * __capability)cap);
+	__builtin_trap();
+#endif
 
 	if (kenv(KENV_GET, "init_script", kenv_value, sizeof(kenv_value)) > 0) {
 		state_func_t next_transition;
@@ -1240,8 +1261,8 @@ new_session(session_t *sprev, struct ttyent *typ)
 
 	sp->se_flags |= SE_PRESENT;
 
-	sp->se_device = malloc(sizeof(_PATH_DEV) + strlen(typ->ty_name));
-	sprintf(sp->se_device, "%s%s", _PATH_DEV, typ->ty_name);
+	if (asprintf(&sp->se_device, "%s%s", _PATH_DEV, typ->ty_name) < 0)
+		err(1, "asprintf");
 
 	/*
 	 * Attempt to open the device, if we get "device not configured"
@@ -1284,8 +1305,8 @@ setupargv(session_t *sp, struct ttyent *typ)
 		free(sp->se_getty_argv_space);
 		free(sp->se_getty_argv);
 	}
-	sp->se_getty = malloc(strlen(typ->ty_getty) + strlen(typ->ty_name) + 2);
-	sprintf(sp->se_getty, "%s %s", typ->ty_getty, typ->ty_name);
+	if (asprintf(&sp->se_getty, "%s %s", typ->ty_getty, typ->ty_name) < 0)
+		err(1, "asprintf");
 	sp->se_getty_argv_space = strdup(sp->se_getty);
 	sp->se_getty_argv = construct_argv(sp->se_getty_argv_space);
 	if (sp->se_getty_argv == NULL) {
@@ -1396,7 +1417,7 @@ start_window_system(session_t *sp)
 	if (sp->se_type) {
 		/* Don't use malloc after fork */
 		strcpy(term, "TERM=");
-		strncat(term, sp->se_type, sizeof(term) - 6);
+		strlcat(term, sp->se_type, sizeof(term));
 		env[0] = term;
 		env[1] = 0;
 	}
@@ -1460,7 +1481,7 @@ start_getty(session_t *sp)
 	if (sp->se_type) {
 		/* Don't use malloc after fork */
 		strcpy(term, "TERM=");
-		strncat(term, sp->se_type, sizeof(term) - 6);
+		strlcat(term, sp->se_type, sizeof(term));
 		env[0] = term;
 		env[1] = 0;
 	} else

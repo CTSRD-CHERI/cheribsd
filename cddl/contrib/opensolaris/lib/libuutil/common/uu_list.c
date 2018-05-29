@@ -32,6 +32,8 @@
 #include <unistd.h>
 #include <sys/time.h>
 
+#include <cheri/cheric.h>
+
 #define	ELEM_TO_NODE(lp, e) \
 	((uu_list_node_impl_t *)((uintptr_t)(e) + (lp)->ul_offset))
 
@@ -49,14 +51,14 @@
 #ifndef __CHERI_PURE_CAPABILITY__
 #define	INDEX_MAX		(sizeof (uintptr_t) - 1)
 #else
-#define	INDEX_MAX		(uintptr_t)(sizeof (vaddr_t) - 1)
+#define	INDEX_MAX		(size_t)(sizeof (vaddr_t) - 1)
 #endif
-#define	INDEX_NEXT(m)		(((m) == INDEX_MAX)? 1 : ((uintptr_t)(m) + 1) & INDEX_MAX)
+#define	INDEX_NEXT(m)		(((m) == INDEX_MAX)? 1 : ((size_t)(m) + 1) & INDEX_MAX)
 
-#define	INDEX_TO_NODE(i)	((uu_list_node_impl_t *)((i) & ~INDEX_MAX))
-#define	NODE_TO_INDEX(p, n)	(((uintptr_t)(n) & ~INDEX_MAX) | (uintptr_t)(p)->ul_index)
-#define	INDEX_VALID(p, i)	(((i) & INDEX_MAX) == (p)->ul_index)
-#define	INDEX_CHECK(i)		(((i) & INDEX_MAX) != 0)
+#define	INDEX_TO_NODE(i)	((uu_list_node_impl_t *)cheri_clear_low_ptr_bits(i, INDEX_MAX))
+#define	NODE_TO_INDEX(p, n)	(cheri_set_low_ptr_bits(cheri_clear_low_ptr_bits((uintptr_t)n, INDEX_MAX), (p)->ul_index))
+#define	INDEX_VALID(p, i)	(cheri_get_low_ptr_bits(i, INDEX_MAX) == (p)->ul_index)
+#define	INDEX_CHECK(i)		(cheri_get_low_ptr_bits(i, INDEX_MAX) != 0)
 
 #define	POOL_TO_MARKER(pp) ((void *)((uintptr_t)(pp) | (uintptr_t)1))
 

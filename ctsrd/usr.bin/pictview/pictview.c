@@ -915,6 +915,7 @@ usage(void)
 	exit(1);
 }
 
+extern int sb_verbose;
 
 int
 main(int argc, char *argv[])
@@ -987,5 +988,6 @@ main(int argc, char *argv[])
 
   fb_fini();
   printf("The End\n");
+  sb_verbose = 0;  // pull in the .o file containing sb_verbose
   return 0;
 }

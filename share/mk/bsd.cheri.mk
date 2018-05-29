@@ -106,13 +106,18 @@ _CHERI_COMMON_FLAGS+= -Wno-deprecated-declarations
 OBJCOPY:=	objcopy
 MIPS_ABI:=	purecap
 _CHERI_COMMON_FLAGS+=	-fpic
-LIBDIR:=	/usr/libcheri
+# Don't override libdir for tests since that causes the dlopen tests to fail
+.if !defined(LIBDIR) || ${LIBDIR:S/^${TESTSBASE}//} == ${LIBDIR}
+LIBDIR_BASE:=	/usr/libcheri
+.else
+.info "Not overriding LIBDIR for CHERI since ${.CURDIR} is a test library"
+.endif
 ROOTOBJDIR=	${.OBJDIR:S,${.CURDIR},,}${SRCTOP}/worldcheri${SRCTOP}
 CFLAGS+=	-ftls-model=local-exec
-.if !empty(CHERI_USE_CAP_TABLE)
-CFLAGS+=	-mllvm -cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
+.ifdef CHERI_USE_CAP_TABLE
+CFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
 .endif
-CXXFLAGS+=	-Wno-cheri-bitwise-operations
+
 .ifdef NO_WERROR
 # Implicit function declarations should always be an error in purecap mode as
 # we will probably generate wrong code for calling them
@@ -142,10 +147,15 @@ CFLAGS+=	${CHERI_OPTIMIZATION_FLAGS:U-O2}
 LDFLAGS:=${LDFLAGS:N-fuse-ld=*}
 LDFLAGS+=	-fuse-ld=lld
 LDFLAGS+=	-Wl,-preemptible-caprelocs=elf
+# Work around cheri-unknown-freebsd-ld.lld: error: section: .init_array is not contiguous with other relro sections
+# TODO: remove this once I've debugged the root cause
+LDFLAGS+=	-Wl,-z,norelro
 
 # XXX: Needed as Clang rejects -mllvm -cheri128 when using $CC to link:
 # warning: argument unused during compilation: '-cheri=128'
 _CHERI_CFLAGS+=	-Qunused-arguments
+_CHERI_CFLAGS+=	-Werror=cheri-bitwise-operations
+
 .if ${WANT_CHERI} != "variables"
 .if ${MK_CHERI_SHARED} == "no" || defined(CHERI_NO_SHARED)
 NO_SHARED=	yes

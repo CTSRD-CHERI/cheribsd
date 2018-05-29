@@ -40,15 +40,47 @@ typedef	__size_t	size_t;
 #define	_SIZE_T_DECLARED
 #endif
 
+#ifndef _KERNEL
 struct iovec {
-	void	*iov_base;	/* Base address. */
-	size_t	 iov_len;	/* Length. */
+	void *	iov_base;	/* Base address. */
+	size_t			iov_len;	/* Length. */
 };
+#endif
+#if __has_feature(capabilities)
+struct iovec_c {
+	void * __capability	iov_base;	/* Base address. */
+	size_t			iov_len;	/* Length. */
+};
+#endif
+struct iovec_native {
+	void *	iov_base;	/* Base address. */
+	size_t			iov_len;	/* Length. */
+};
+/* XXX: need some ifdefs */
+#if __has_feature(capabilities)
+typedef struct iovec_c		kiovec_t;
+#else
+typedef	struct iovec_native	kiovec_t;
+#endif
+typedef struct iovec_native	uiovec_t;
 
+#if defined(_KERNEL)
 #define	IOVEC_INIT(iovp, base, len)	do {				\
+	(iovp)->iov_base = (__cheri_tocap void * __capability)(base);	\
+	(iovp)->iov_len = (len);					\
+} while(0)
+#define IOVEC_INIT_C(iovp, base, len)	do {				\
 	(iovp)->iov_base = (base);					\
 	(iovp)->iov_len = (len);					\
 } while(0)
+#else
+#define IOVEC_INIT(iovp, base, len)	do {				\
+	(iovp)->iov_base = (base);					\
+	(iovp)->iov_len = (len);					\
+} while(0)
+#define	IOVEC_INIT_C IOVEC_INIT
+#endif
+
 #define	IOVEC_INIT_STR(iovp, str)					\
 	IOVEC_INIT(iovp, str, strlen(str) + 1)
 #define	IOVEC_INIT_OBJ(iovp, obj)					\
@@ -58,7 +90,7 @@ struct iovec {
 	size_t amount = (amt);						\
 	KASSERT(amount <= (iovp)->iov_len, ("%s: amount %zu > iov_len	\
 	    %zu", __func__, amount, (iovp)->iov_len));			\
-	(iovp)->iov_base = (char *)((iovp)->iov_base) + amount;		\
+	(iovp)->iov_base = (char * __capability)((iovp)->iov_base) + amount; \
 	(iovp)->iov_len -= amount;					\
 } while(0)
 

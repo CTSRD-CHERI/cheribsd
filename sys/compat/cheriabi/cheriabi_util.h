@@ -69,31 +69,6 @@ typedef struct {	/* Auxiliary vector entry on initial stack */
 
 extern struct sysent cheriabi_sysent[];
 
-#define CHERIABI_SYSCALL_MODULE(name, offset, new_sysent, evh, arg)	\
-static struct syscall_module_data name##_cheriabi_syscall_mod = {	\
-	evh, arg, offset, new_sysent, { 0, NULL }			\
-};									\
-									\
-static moduledata_t cheriabi_##name##_mod = {				\
-	"cheriabi_sys/" #name,						\
-	cheriabi_syscall_module_handler,				\
-	&name##_cheriabi_syscall_mod					\
-};									\
-DECLARE_MODULE(cheriabi_##name##32, cheriabi_##name##_mod,		\
-    SI_SUB_SYSCALLS, SI_ORDER_MIDDLE)
-
-#define CHERIABI_SYSCALL_MODULE_HELPER(syscallname)			\
-static int syscallname##_cheriabi_syscall = CHERIABI_SYS_##syscallname;	\
-static struct sysent syscallname##_cheriabi_sysent = {			\
-	(sizeof(struct syscallname ## _args )				\
-	/ sizeof(register_t)),						\
-	(sy_call_t *)& syscallname					\
-};									\
-CHERIABI_SYSCALL_MODULE(syscallname,					\
-	& syscallname##_cheriabi_syscall,				\
-	& syscallname##_cheriabi_sysent,				\
-	NULL, NULL);
-
 #define CHERIABI_SYSCALL_INIT_HELPER(syscallname) {			\
 	.new_sysent = {							\
 	.sy_narg = (sizeof(struct syscallname ## _args )		\
@@ -112,21 +87,30 @@ CHERIABI_SYSCALL_MODULE(syscallname,					\
 	.syscall_no = CHERIABI_SYS_##syscallname			\
 }
 
+#define CHERIABI_SYSCALL_NOT_PRESENT_GEN(SC)				\
+int cheriabi_ ## SC (struct thread *td,					\
+    struct cheriabi_##SC##_args *uap)					\
+{									\
+									\
+	return syscall_not_present(td, #SC , (struct nosys_args *)uap); \
+}
+
 int    cheriabi_syscall_register(int *offset, struct sysent *new_sysent,
 	    struct sysent *old_sysent, int flags);
 int    cheriabi_syscall_deregister(int *offset, struct sysent *old_sysent);
-int    cheriabi_syscall_module_handler(struct module *mod, int what, void *arg);
 int    cheriabi_syscall_helper_register(struct syscall_helper_data *sd, int flags);
 int    cheriabi_syscall_helper_unregister(struct syscall_helper_data *sd);
 
 struct iovec_c;
 register_t *cheriabi_copyout_strings(struct image_params *imgp);
-int	cheriabi_copyiniov(struct iovec_c *iovp, u_int iovcnt,
-	    struct iovec **iov, int error);
+int	cheriabi_copyiniov(struct iovec_c * __capability iovp, u_int iovcnt,
+	    kiovec_t **iov, int error);
 
 struct image_args;
-int	cheriabi_exec_copyin_args(struct image_args *args, const char *fname,
-	    enum uio_seg segflg, void * __capability *argv, void * __capability *envv);
+int	cheriabi_exec_copyin_args(struct image_args *args,
+	    const char * __capability fname, enum uio_seg segflg,
+	    void * __capability * __capability argv,
+	    void * __capability * __capability envv);
 
 int	cheriabi_elf_fixup(register_t **stack_base, struct image_params *imgp);
 

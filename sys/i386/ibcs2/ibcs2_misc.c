@@ -319,7 +319,7 @@ ibcs2_getdents(struct thread *td, struct ibcs2_getdents_args *uap)
 	cap_rights_t rights;
 	struct file *fp;
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	struct ibcs2_dirent idb;
 	off_t off;			/* true file offset */
 	int buflen, error, eofflag;
@@ -470,7 +470,7 @@ ibcs2_read(struct thread *td, struct ibcs2_read_args *uap)
 	cap_rights_t rights;
 	struct file *fp;
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	struct ibcs2_direct {
 		ibcs2_ino_t ino;
 		char name[14];
@@ -1075,7 +1075,7 @@ ibcs2_chdir(struct thread *td, struct ibcs2_chdir_args *uap)
 	int error;
 
 	CHECKALTEXIST(td, uap->path, &path);
-	error = kern_chdir(td, (char * __CAPABILITY)path, UIO_SYSSPACE);
+	error = kern_chdir(td, UADDR2PTR(path), UIO_SYSSPACE);
 	free(path, M_TEMP);
 	return (error);
 }
@@ -1087,7 +1087,7 @@ ibcs2_chmod(struct thread *td, struct ibcs2_chmod_args *uap)
 	int error;
 
 	CHECKALTEXIST(td, uap->path, &path);
-	error = kern_fchmodat(td, AT_FDCWD, path, UIO_SYSSPACE, uap->mode, 0);
+	error = kern_fchmodat(td, AT_FDCWD, UADDR2PTR(path), UIO_SYSSPACE, uap->mode, 0);
 	free(path, M_TEMP);
 	return (error);
 }
@@ -1099,8 +1099,9 @@ ibcs2_chown(struct thread *td, struct ibcs2_chown_args *uap)
 	int error;
 
 	CHECKALTEXIST(td, uap->path, &path);
-	error = kern_fchownat(td, AT_FDCWD, path, UIO_SYSSPACE, uap->uid,
-	    uap->gid, 0);
+	error = kern_fchownat(td, AT_FDCWD,
+	    (__cheri_tocap const char * __capability)path, UIO_SYSSPACE,
+	    uap->uid, uap->gid, 0);
 	free(path, M_TEMP);
 	return (error);
 }

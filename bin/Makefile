@@ -52,6 +52,7 @@ SUBDIR.${MK_CHERI}+=	cheriabitest-mt
 SUBDIR.${MK_CHERI}+=	cheritest
 SUBDIR.${MK_CHERI}+=	cheritest-mt
 SUBDIR.${MK_CHERI}+=	helloworld
+SUBDIR.${MK_CHERI}+=	helloworld_cxx
 
 SUBDIR.${MK_RCMDS}+=	rcp
 SUBDIR.${MK_SENDMAIL}+=	rmail
@@ -65,8 +66,6 @@ SUBDIR.${MK_CHERI}+=	cheri_minimal_pie_exe
 
 
 .include <bsd.arch.inc.mk>
-
-SUBDIR:=	${SUBDIR:O}
 
 SUBDIR_PARALLEL=
 

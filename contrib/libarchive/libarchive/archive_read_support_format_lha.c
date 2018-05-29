@@ -1702,7 +1702,11 @@ lha_crc16(uint16_t crc, const void *pp, size_t len)
 		return crc;
 
 	/* Process unaligned address. */
-	if (((uintptr_t)p) & (uintptr_t)0x1) {
+#if __has_builtin(__builtin_is_aligned)
+	if (!__builtin_is_aligned(p, sizeof(uint16_t))) {
+#else
+	if (((vaddr_t)p) & (vaddr_t)0x1) {
+#endif
 		crc = (crc >> 8) ^ crc16tbl[0][(crc ^ *p++) & 0xff];
 		len--;
 	}

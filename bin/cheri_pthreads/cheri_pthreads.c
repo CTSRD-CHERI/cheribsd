@@ -112,6 +112,10 @@ thread_func(void *_arg)
 	}
 	errno = arg->num;
 	fprintf(stderr, "Thread %d set errno to %d\n", arg->num, errno);
+	void* tmp = malloc(42);
+	fprintf(stderr, "Thread %d malloc(): %#p\n", arg->num, tmp);
+	free(tmp);
+	fprintf(stderr, "Thread %d free() completed\n", arg->num);
 	fprintf(stderr, "Thread %d finished\n", arg->num);
 	return arg;
 }

@@ -55,7 +55,7 @@ cleanup_common()
 	fi
 }
 
-atf_test_case attach_vnode_non_explicit_type cleanup
+atf_test_case attach_vnode_non_explicit_type cleanup_common
 attach_vnode_non_explicit_type_head()
 {
 	atf_set "descr" "Tests out -a / -f without -t"
@@ -63,7 +63,7 @@ attach_vnode_non_explicit_type_head()
 attach_vnode_non_explicit_type_body()
 {
 	local md
-	local size_in_mb=1024
+	local size_in_mb=8
 
 	check_space ${size_in_mb}
 
@@ -71,9 +71,9 @@ attach_vnode_non_explicit_type_body()
 	atf_check -s exit:0 -o save:mdconfig.out -x 'mdconfig -af xxx'
 	md=$(cat mdconfig.out)
 	atf_check -s exit:0 -o match:'^md[0-9]+$' -x "echo $md"
-	check_diskinfo "$md" "1073741824" "2097152"
+	check_diskinfo "$md" "8388608" "16384"
 	# This awk strips the file path.
-	atf_check -s exit:0 -o match:"^$md vnode ${size_in_mb}M$" \
+	atf_check -s exit:0 -o match:"^$md vnode 8192K$" \
 	    -x "mdconfig -lv | awk '\$1 == \"$md\" { print \$1, \$2, \$3 }'"
 }
 attach_vnode_non_explicit_type_cleanup()
@@ -89,7 +89,7 @@ attach_vnode_implicit_a_f_head()
 attach_vnode_implicit_a_f_body()
 {
 	local md
-	local size_in_mb=1024
+	local size_in_mb=8
 
 	check_space ${size_in_mb}
 
@@ -97,9 +97,9 @@ attach_vnode_implicit_a_f_body()
 	atf_check -s exit:0 -o save:mdconfig.out -x 'mdconfig xxx'
 	md=$(cat mdconfig.out)
 	atf_check -s exit:0 -o match:'^md[0-9]+$' -x "echo $md"
-	check_diskinfo "$md" "1073741824" "2097152"
+	check_diskinfo "$md" "8388608" "16384"
 	# This awk strips the file path.
-	atf_check -s exit:0 -o match:"^$md vnode ${size_in_mb}M$" \
+	atf_check -s exit:0 -o match:"^$md vnode 8192K$" \
 	    -x "mdconfig -lv | awk '\$1 == \"$md\" { print \$1, \$2, \$3 }'"
 }
 attach_vnode_implicit_a_f_cleanup()
@@ -115,7 +115,7 @@ attach_vnode_explicit_type_head()
 attach_vnode_explicit_type_body()
 {
 	local md
-	local size_in_mb=1024
+	local size_in_mb=8
 
 	check_space ${size_in_mb}
 
@@ -123,9 +123,9 @@ attach_vnode_explicit_type_body()
 	atf_check -s exit:0 -o save:mdconfig.out -x 'mdconfig -af xxx -t vnode'
 	md=$(cat mdconfig.out)
 	atf_check -s exit:0 -o match:'^md[0-9]+$' -x "echo $md"
-	check_diskinfo "$md" "1073741824" "2097152"
+	check_diskinfo "$md" "8388608" "16384"
 	# This awk strips the file path.
-	atf_check -s exit:0 -o match:"^$md vnode ${size_in_mb}M$" \
+	atf_check -s exit:0 -o match:"^$md vnode 8192K$" \
 	    -x "mdconfig -lv | awk '\$1 == \"$md\" { print \$1, \$2, \$3 }'"
 }
 attach_vnode_explicit_type_cleanup()
@@ -142,18 +142,18 @@ attach_vnode_smaller_than_file_head()
 attach_vnode_smaller_than_file_body()
 {
 	local md
-	local size_in_mb=128
+	local size_in_mb=8
 
-	check_space 1024
+	check_space 16
 
-	atf_check -s exit:0 -x "truncate -s 1024m xxx"
+	atf_check -s exit:0 -x "truncate -s 16m xxx"
 	atf_check -s exit:0 -o save:mdconfig.out \
 	    -x "mdconfig -af xxx -s ${size_in_mb}m"
 	md=$(cat mdconfig.out)
 	atf_check -s exit:0 -o match:'^md[0-9]+$' -x "echo $md"
-	check_diskinfo "$md" "134217728" "262144"
+	check_diskinfo "$md" "8388608" "16384"
 	# This awk strips the file path.
-	atf_check -s exit:0 -o match:"^$md vnode ${size_in_mb}M$" \
+	atf_check -s exit:0 -o match:"^$md vnode 8192K$" \
 	    -x "mdconfig -lv | awk '\$1 == \"$md\" { print \$1, \$2, \$3 }'"
 }
 attach_vnode_smaller_than_file_cleanup()
@@ -171,9 +171,9 @@ attach_vnode_larger_than_file_body()
 	local md
 	local size_in_gb=128
 
-	check_space 1024
+	check_space 8
 
-	atf_check -s exit:0 -x "truncate -s 1024m xxx"
+	atf_check -s exit:0 -x "truncate -s 8m xxx"
 	atf_check -s exit:0 -o save:mdconfig.out \
 	    -x "mdconfig -af xxx -s ${size_in_gb}g"
 	md=$(cat mdconfig.out)
@@ -196,7 +196,7 @@ attach_vnode_sector_size_head()
 attach_vnode_sector_size_body()
 {
 	local md
-	local size_in_mb=1024
+	local size_in_mb=8
 
 	check_space ${size_in_mb}
 
@@ -205,9 +205,9 @@ attach_vnode_sector_size_body()
 	    -x "mdconfig -af xxx -S 2048"
 	md=$(cat mdconfig.out)
 	atf_check -s exit:0 -o match:'^md[0-9]+$' -x "echo $md"
-	check_diskinfo "$md" "1073741824" "524288" "2048"
+	check_diskinfo "$md" "8388608" "4096" "2048"
 	# This awk strips the file path.
-	atf_check -s exit:0 -o match:"^$md vnode ${size_in_mb}M$" \
+	atf_check -s exit:0 -o match:"^$md vnode 8192K$" \
 	    -x "mdconfig -lv | awk '\$1 == \"$md\" { print \$1, \$2, \$3 }'"
 }
 attach_vnode_sector_size_cleanup()
@@ -291,12 +291,12 @@ attach_with_specific_unit_number_cleanup()
 
 atf_init_test_cases()
 {
-	atf_add_test_case attach_vnode_non_explicit_type
-	atf_add_test_case attach_vnode_explicit_type
-	atf_add_test_case attach_vnode_smaller_than_file
-	atf_add_test_case attach_vnode_larger_than_file
-	atf_add_test_case attach_vnode_sector_size
-	atf_add_test_case attach_malloc
-	atf_add_test_case attach_swap
-	atf_add_test_case attach_with_specific_unit_number
+	atf_add_test_case attach_vnode_non_explicit_type cleanup_common
+	atf_add_test_case attach_vnode_explicit_type cleanup_common
+	atf_add_test_case attach_vnode_smaller_than_file cleanup_common
+	atf_add_test_case attach_vnode_larger_than_file cleanup_common
+	atf_add_test_case attach_vnode_sector_size cleanup_common
+	atf_add_test_case attach_malloc cleanup_common
+	atf_add_test_case attach_swap cleanup_common
+	atf_add_test_case attach_with_specific_unit_number cleanup_common
 }

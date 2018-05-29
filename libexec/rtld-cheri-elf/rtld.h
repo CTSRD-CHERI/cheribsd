@@ -224,11 +224,11 @@ typedef struct Struct_Obj_Entry {
     Ver_Entry *vertab;		/* Versions required /defined by this object */
     int vernum;			/* Number of entries in vertab */
 
-    Elf_Addr init;		/* Initialization function to call */
-    Elf_Addr fini;		/* Termination function to call */
-    Elf_Addr preinit_array;	/* Pre-initialization array of functions */
-    Elf_Addr init_array;	/* Initialization array of functions */
-    Elf_Addr fini_array;	/* Termination array of functions */
+    void* init_cap;		/* Initialization function to call */
+    void* fini_cap;		/* Termination function to call */
+    Elf_Addr* preinit_array_cap;	/* Pre-initialization array of functions */
+    Elf_Addr* init_array_cap;	/* Initialization array of functions */
+    Elf_Addr* fini_array_cap;	/* Termination array of functions */
     int preinit_array_num;	/* Number of entries in preinit_array */
     int init_array_num; 	/* Number of entries in init_array */
     int fini_array_num; 	/* Number of entries in fini_array */

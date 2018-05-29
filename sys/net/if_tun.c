@@ -129,7 +129,7 @@ static int	tunoutput(struct ifnet *, struct mbuf *,
 		    const struct sockaddr *, struct route *ro);
 static void	tunstart(struct ifnet *);
 
-static int	tun_clone_create(struct if_clone *, int, caddr_t);
+static int	tun_clone_create(struct if_clone *, int, void * __capability);
 static void	tun_clone_destroy(struct ifnet *);
 static struct if_clone *tun_cloner;
 
@@ -173,7 +173,7 @@ static struct cdevsw tun_cdevsw = {
 };
 
 static int
-tun_clone_create(struct if_clone *ifc, int unit, caddr_t params)
+tun_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 {
 	struct cdev *dev;
 	int i;
@@ -548,17 +548,17 @@ tunifioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ifs->ascii[0] = '\0';
 		mtx_unlock(&tp->tun_mtx);
 		break;
-	case SIOCSIFADDR:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
 		tuninit(ifp);
 		TUNDEBUG(ifp, "address set\n");
 		break;
-	case SIOCSIFMTU:
-		ifp->if_mtu = ifr->ifr_mtu;
+	CASE_IOC_IFREQ(SIOCSIFMTU):
+		ifp->if_mtu = ifr_mtu_get(ifr);
 		TUNDEBUG(ifp, "mtu set\n");
 		break;
-	case SIOCSIFFLAGS:
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		break;
 	default:
 		error = EINVAL;

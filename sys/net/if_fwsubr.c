@@ -643,7 +643,7 @@ firewire_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int error = 0;
 
 	switch (command) {
-	case SIOCSIFADDR:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
 		ifp->if_flags |= IFF_UP;
 
 		switch (ifa->ifa_addr->sa_family) {
@@ -659,24 +659,19 @@ firewire_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		break;
 
-	case SIOCGIFADDR:
-		{
-			struct sockaddr *sa;
-
-			sa = (struct sockaddr *) & ifr->ifr_data;
-			bcopy(&IFP2FWC(ifp)->fc_hwaddr,
-			    (caddr_t) sa->sa_data, sizeof(struct fw_hwaddr));
-		}
+	CASE_IOC_IFREQ(SIOCGIFADDR):
+		bcopy(&IFP2FWC(ifp)->fc_hwaddr, ifr_addr_get_data(ifr),
+		    sizeof(struct fw_hwaddr));
 		break;
 
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		/*
 		 * Set the interface MTU.
 		 */
-		if (ifr->ifr_mtu > 1500) {
+		if (ifr_mtu_get(ifr) > 1500) {
 			error = EINVAL;
 		} else {
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 		}
 		break;
 	default:

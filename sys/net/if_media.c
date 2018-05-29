@@ -58,6 +58,7 @@
 
 #include <net/if.h>
 #include <net/if_media.h>
+#include <net/if_var.h>
 
 /*
  * Compile-time options:
@@ -233,11 +234,11 @@ ifmedia_ioctl(ifp, ifr, ifm, cmd)
 	/*
 	 * Set the current media.
 	 */
-	case  SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	{
 		struct ifmedia_entry *oldentry;
 		int oldmedia;
-		int newmedia = ifr->ifr_media;
+		int newmedia = ifr_media_get(ifr);
 
 		match = ifmedia_match(ifm, newmedia, ifm->ifm_mask);
 		if (match == NULL) {
@@ -318,7 +319,9 @@ ifmedia_ioctl(ifp, ifr, ifm, cmd)
 		i = 0;
 		LIST_FOREACH(ep, &ifm->ifm_list, ifm_list)
 			if (i++ < ifmr->ifm_count) {
-				error = copyout(&ep->ifm_media,
+				error = copyout_c(
+				    (__cheri_tocap int * __capability)
+				    &ep->ifm_media,
 				    ifmr->ifm_ulist + i - 1, sizeof(int));
 				if (error)
 					break;

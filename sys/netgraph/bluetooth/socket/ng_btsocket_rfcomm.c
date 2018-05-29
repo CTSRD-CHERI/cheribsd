@@ -1324,7 +1324,7 @@ ng_btsocket_rfcomm_session_create(ng_btsocket_rfcomm_session_p *sp,
 	l2sopt.sopt_dir = SOPT_SET;
 	l2sopt.sopt_level = SOL_L2CAP;
 	l2sopt.sopt_name = SO_L2CAP_IMTU;
-	l2sopt.sopt_val = (void *) &mtu;
+	l2sopt.sopt_val = &mtu;
 	l2sopt.sopt_valsize = sizeof(mtu);
 	l2sopt.sopt_td = NULL;
 

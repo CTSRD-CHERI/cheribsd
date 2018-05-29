@@ -365,8 +365,11 @@ struct uio;
 /*
  * From uipc_socket and friends
  */
-int	sockargs(struct mbuf **mp, char *buf, socklen_t buflen, int type);
-int	getsockaddr(struct sockaddr **namp, caddr_t uaddr, size_t len);
+int	sockargs(struct mbuf **mp, char * __capability buf, socklen_t buflen,
+	    int type);
+int	getsockaddr(struct sockaddr **namp,
+	    const struct sockaddr * __capability uaddr,
+	    size_t len);
 int	getsock_cap(struct thread *td, int fd, cap_rights_t *rightsp,
 	    struct file **fpp, u_int *fflagp, struct filecaps *havecaps);
 void	soabort(struct socket *so);

@@ -155,7 +155,7 @@ kobj_read_file_vnode(struct _buf *file, char *buf, unsigned size, unsigned off)
 	struct vnode *vp = file->ptr;
 	struct thread *td = curthread;
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	int error;
 
 	bzero(&aiov, sizeof(aiov));

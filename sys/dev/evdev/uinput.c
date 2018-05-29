@@ -593,10 +593,18 @@ uinput_ioctl_sub(struct uinput_cdev_state *state, u_long cmd, caddr_t data)
 		/* Fake unsupported ioctl */
 		return (0);
 
-	case UI_SET_PHYS:
+	case UI_SET_PHYS: {
+		void * __capability cap;
+
+#ifdef COMPAT_CHERIABI
+		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+			cap = *(void * __capability *)data;
+		else
+#endif
+			cap = __USER_CAP_STR(*(void **)data);
 		if (state->ucs_state == UINPUT_RUNNING)
 			return (EINVAL);
-		ret = copyinstr(*(void **)data, buf, sizeof(buf), NULL);
+		ret = copyinstr_c(cap, buf, sizeof(buf), NULL);
 		/* Linux returns EINVAL when string does not fit the buffer */
 		if (ret == ENAMETOOLONG)
 			ret = EINVAL;
@@ -604,6 +612,7 @@ uinput_ioctl_sub(struct uinput_cdev_state *state, u_long cmd, caddr_t data)
 			return (ret);
 		evdev_set_phys(state->ucs_evdev, buf);
 		return (0);
+	}
 
 	case UI_SET_SWBIT:
 		if (state->ucs_state == UINPUT_RUNNING ||

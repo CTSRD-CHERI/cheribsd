@@ -931,7 +931,7 @@ out:
 static int
 sendfile(struct thread *td, struct sendfile_args *uap, int compat)
 {
-	struct sf_hdtr hdtr;
+	usf_hdtr_t hdtr;
 	struct uio *hdr_uio, *trl_uio;
 	struct file *fp;
 	cap_rights_t rights;

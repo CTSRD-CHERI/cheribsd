@@ -72,14 +72,14 @@ static const char wlanname[] = "wlan";
 static struct if_clone *wlan_cloner;
 
 static int
-wlan_clone_create(struct if_clone *ifc, int unit, caddr_t params)
+wlan_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 {
 	struct ieee80211_clone_params cp;
 	struct ieee80211vap *vap;
 	struct ieee80211com *ic;
 	int error;
 
-	error = copyin(params, &cp, sizeof(cp));
+	error = copyin_c(params, &cp, sizeof(cp));
 	if (error)
 		return error;
 	ic = ieee80211_find_com(cp.icp_parent);

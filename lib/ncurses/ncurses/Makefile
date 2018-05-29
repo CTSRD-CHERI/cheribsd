@@ -389,13 +389,16 @@ keys.list: MKkeys_list.sh Caps
 
 # Build tools
 build-tools: make_hash make_keys
+BUILD_TOOLS_CFLAGS+=	-I. -I${.CURDIR}/../ncurses
+BUILD_TOOLS_CFLAGS+=	-I${NCURSES_DIR}/ncurses -I${NCURSES_DIR}/include
 
 make_keys: make_keys.c names.c ncurses_def.h ${HEADERS} ${BUILD_TOOLS_META}
-	${CC} -o $@ ${CFLAGS} ${NCURSES_DIR}/ncurses/tinfo/make_keys.c
+	${BUILD_TOOLS_CC} -o ${.TARGET} ${BUILD_TOOLS_CFLAGS} \
+	    ${BUILD_TOOLS_LDFLAGS} ${NCURSES_DIR}/ncurses/tinfo/make_keys.c
 
 make_hash: make_hash.c hashsize.h ncurses_def.h ${HEADERS} ${BUILD_TOOLS_META}
-	${CC} -o $@ ${CFLAGS} -DMAIN_PROGRAM \
-		${NCURSES_DIR}/ncurses/tinfo/make_hash.c
+	${BUILD_TOOLS_CC} -o ${.TARGET} ${BUILD_TOOLS_CFLAGS} -DMAIN_PROGRAM \
+	    ${BUILD_TOOLS_LDFLAGS} ${NCURSES_DIR}/ncurses/tinfo/make_hash.c
 
 # ./configure generated
 MKterm.h.awk: MKterm.h.awk.in

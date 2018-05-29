@@ -186,7 +186,7 @@ int
 isc_sendPDU(isc_session_t *sp, pduq_t *pq)
 {
      struct uio *uio = &pq->uio;
-     struct iovec *iv;
+     kiovec_t	*iv;
      pdu_t	*pp = &pq->pdu;
      int	len, error;
 
@@ -308,15 +308,13 @@ isc_sendPDU(isc_session_t *sp, pduq_t *pq)
 static __inline int
 so_getbhs(isc_session_t *sp)
 {
-     bhs_t *bhs		= &sp->bhs;
      struct uio		*uio = &sp->uio;
-     struct iovec	*iov = &sp->iov;
+     kiovec_t		*iov = &sp->iov;
      int		error, flags;
 
      debug_called(8);
 
-     iov->iov_base	= bhs;
-     iov->iov_len	= sizeof(bhs_t);
+     IOVEC_INIT_OBJ(iov, sp->bhs);
 
      uio->uio_iov	= iov;
      uio->uio_iovcnt	= 1;
@@ -364,7 +362,7 @@ so_recv(isc_session_t *sp, pduq_t *pq)
      struct uio		*uio = &pq->uio;
      pdu_t		*pp = &pq->pdu;
      bhs_t		*bhs = &pp->ipdu.bhs;
-     struct iovec	*iov = pq->iov;
+     kiovec_t		*iov = pq->iov;
      int		error;
      u_int		len;
      u_int		max, exp;

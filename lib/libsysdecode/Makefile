@@ -120,7 +120,7 @@ CFLAGS.ioctl.c+=	-Wno-error-cheri-capability-misuse
 
 DEPENDOBJS+=	tables.h
 tables.h: mktables
-	sh ${.CURDIR}/mktables ${DESTDIR:U${SYSROOT}}${INCLUDEDIR} ${.TARGET}
+	sh ${.CURDIR}/mktables ${SYSROOT:U${DESTDIR}}${INCLUDEDIR} ${.TARGET}
 
 # mkioctls runs find(1) for headers so needs to rebuild every time.  This used
 # to be a hack only done in buildworld.
@@ -129,7 +129,7 @@ ioctl.c: .PHONY
 .endif
 ioctl.c: mkioctls .META
 	env CPP="${CPP}" \
-		/bin/sh ${.CURDIR}/mkioctls ${DESTDIR:U${SYSROOT}}${INCLUDEDIR} > ${.TARGET}
+	    /bin/sh ${.CURDIR}/mkioctls ${SYSROOT:U${DESTDIR}}${INCLUDEDIR} > ${.TARGET}
 
 beforedepend: ioctl.c tables.h
 

@@ -91,6 +91,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/resource.h>
 #include <sys/resourcevar.h>
 #include <sys/rwlock.h>
+#include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
 #include <sys/sysproto.h>
 #include <sys/blist.h>
@@ -134,7 +135,7 @@ __FBSDID("$FreeBSD$");
  * The 64-page limit is due to the radix code (kern/subr_blist.c).
  */
 #ifndef MAX_PAGEOUT_CLUSTER
-#define MAX_PAGEOUT_CLUSTER 16
+#define	MAX_PAGEOUT_CLUSTER	32
 #endif
 
 #if !defined(SWB_NPAGES)
@@ -148,8 +149,7 @@ __FBSDID("$FreeBSD$");
  * Unused disk addresses within a swap area are allocated and managed
  * using a blist.
  */
-#define SWCORRECT(n) (sizeof(void *) * (n) / sizeof(daddr_t))
-#define SWAP_META_PAGES		(SWB_NPAGES * 2)
+#define	SWAP_META_PAGES		32
 #define SWAP_META_MASK		(SWAP_META_PAGES - 1)
 #ifdef CPU_CHERI
 #define	BITS_PER_TAGS_PER_PAGE					\
@@ -2215,6 +2215,13 @@ struct swapon_args {
 int
 sys_swapon(struct thread *td, struct swapon_args *uap)
 {
+
+	return (kern_swapon(td, __USER_CAP_STR(uap->name)));
+}
+
+int
+kern_swapon(struct thread *td, const char * __capability name)
+{
 	struct vattr attr;
 	struct vnode *vp;
 	struct nameidata nd;
@@ -2235,8 +2242,8 @@ sys_swapon(struct thread *td, struct swapon_args *uap)
 		goto done;
 	}
 
-	NDINIT(&nd, LOOKUP, ISOPEN | FOLLOW | AUDITVNODE1, UIO_USERSPACE,
-	    uap->name, td);
+	NDINIT_C(&nd, LOOKUP, ISOPEN | FOLLOW | AUDITVNODE1, UIO_USERSPACE,
+	    name, td);
 	error = namei(&nd);
 	if (error)
 		goto done;
@@ -2381,6 +2388,13 @@ struct swapoff_args {
 int
 sys_swapoff(struct thread *td, struct swapoff_args *uap)
 {
+
+	return (kern_swapoff(td, __USER_CAP_STR(uap->name)));
+}
+
+int
+kern_swapoff(struct thread *td, const char * __capability name)
+{
 	struct vnode *vp;
 	struct nameidata nd;
 	struct swdevt *sp;
@@ -2392,8 +2406,7 @@ sys_swapoff(struct thread *td, struct swapoff_args *uap)
 
 	sx_xlock(&swdev_syscall_lock);
 
-	NDINIT(&nd, LOOKUP, FOLLOW | AUDITVNODE1, UIO_USERSPACE, uap->name,
-	    td);
+	NDINIT_C(&nd, LOOKUP, FOLLOW | AUDITVNODE1, UIO_USERSPACE, name, td);
 	error = namei(&nd);
 	if (error)
 		goto done;

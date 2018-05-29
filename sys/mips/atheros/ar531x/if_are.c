@@ -964,7 +964,7 @@ are_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int			error;
 
 	switch (command) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		ARE_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -983,15 +983,15 @@ are_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		ARE_UNLOCK(sc);
 		error = 0;
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		ARE_LOCK(sc);
 		are_set_filter(sc);
 		ARE_UNLOCK(sc);
 		error = 0;
 		break;
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 #ifdef ARE_MII
 		mii = device_get_softc(sc->are_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
@@ -999,7 +999,7 @@ are_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		error = ifmedia_ioctl(ifp, ifr, &sc->are_ifmedia, command);
 #endif
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		error = 0;
 		break;
 	default:

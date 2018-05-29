@@ -82,7 +82,7 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 {
 	int o;
 	u_int c = 0, v;
-	struct iovec *iov;
+	kiovec_t *iov;
 	int error = 0;
 	vm_offset_t addr, eaddr;
 

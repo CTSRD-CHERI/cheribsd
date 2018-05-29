@@ -667,6 +667,35 @@
 #define	__DEQUALIFY_CAP		__DEQUALIFY
 #endif
 
+#ifndef __CAP_CHECK
+#if __has_feature(capabilities)
+#define __CAP_CHECK(cap, len) ({					\
+	int ret = 1;							\
+	size_t caplen = __builtin_mips_cheri_get_cap_length(cap);	\
+	size_t capoff = __builtin_mips_cheri_cap_offset_get(cap);	\
+	if (capoff < 0 || capoff > caplen || caplen - capoff < (len))	\
+		ret = 0;						\
+	ret;								\
+})
+#else
+#define	__CAP_CHECK(cap, len)	1
+#endif
+#endif
+
+#ifndef __DECAP_CHECK
+#if __has_feature(capabilities)
+#define __DECAP_CHECK(cap, len)						\
+({									\
+	void * __capability tmpcap = (cap);				\
+	if (!__CAP_CHECK((cap), (len)))					\
+		tmpcap = NULL;						\
+	(__cheri_fromcap void *)(tmpcap);				\
+})
+#else
+#define __DECAP_CHECK(cap, len) (cap)
+#endif
+#endif
+
 /*-
  * The following definitions are an extension of the behavior originally
  * implemented in <sys/_posix.h>, but with a different level of granularity.
@@ -911,9 +940,15 @@
 
 #if __has_feature(capabilities)
 #define	__CAPABILITY	__capability
+#ifdef _KERNEL
+#define	__kerncap	__capability
+#else
+#define	__kerncap
+#endif
 #else
 #define	__CAPABILITY
 #define	__capability
+#define	__kerncap
 #endif
 
 #if !__has_feature(cheri_casts)
@@ -922,6 +957,12 @@
 #define __cheri_fromcap
 #define __cheri_offset
 #define __cheri_addr
+#endif
+
+/* allow __builtin_is_aligned unconditionally */
+#if !__has_builtin(__builtin_is_aligned)
+#define __builtin_is_aligned(addr, align) \
+	(((vaddr_t)addr & ((vaddr_t)(align) - 1)) == 0)
 #endif
 
 #endif /* !_SYS_CDEFS_H_ */

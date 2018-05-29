@@ -73,7 +73,7 @@ void kmeminit(void);
 
 void swapout_procs(int);
 int kernacc(void *, int, int);
-int useracc(void *, int, int);
+int useracc(void * __capability, int, int);
 int vm_fault(vm_map_t, vm_offset_t, vm_prot_t, int);
 void vm_fault_copy_entry(vm_map_t, vm_map_t, vm_map_entry_t, vm_map_entry_t,
     vm_ooffset_t *);
@@ -110,8 +110,8 @@ void vmspace_free(struct vmspace *);
 void vmspace_exitfree(struct proc *);
 void vmspace_switch_aio(struct vmspace *);
 void vnode_pager_setsize(struct vnode *, vm_ooffset_t);
-int vslock(void *, size_t);
-void vsunlock(void *, size_t);
+int vslock(void * __capability, size_t);
+void vsunlock(void * __capability, size_t);
 struct sf_buf *vm_imgact_map_page(vm_object_t object, vm_ooffset_t offset);
 void vm_imgact_unmap_page(struct sf_buf *sf);
 void vm_thread_dispose(struct thread *td);

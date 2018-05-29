@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2011-2017 Robert N. M. Watson
+ * Copyright (c) 2011-2018 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -63,7 +63,7 @@
 #define	CHERI_PERM_STORE_LOCAL_CAP		(1 << 6)	/* 0x00000040 */
 #define	CHERI_PERM_SEAL				(1 << 7)	/* 0x00000080 */
 #define	CHERI_PERM_CCALL			(1 << 8)	/* 0x00000100 */
-#define	CHERI_PERM_RESERVED1			(1 << 9)	/* 0x00000200 */
+#define	CHERI_PERM_UNSEAL			(1 << 9)	/* 0x00000200 */
 #define	CHERI_PERM_SYSTEM_REGS			(1 << 10)	/* 0x00000400 */
 
 /*
@@ -161,14 +161,15 @@
 	(CHERI_PERM_GLOBAL | CHERI_PERM_EXECUTE |			\
 	CHERI_PERM_LOAD | CHERI_PERM_STORE | CHERI_PERM_LOAD_CAP |	\
 	CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP |		\
-	CHERI_PERM_SEAL | CHERI_PERM_CCALL | CHERI_PERM_RESERVED1 |	\
+	CHERI_PERM_SEAL | CHERI_PERM_CCALL | CHERI_PERM_UNSEAL |	\
 	CHERI_PERM_SYSTEM_REGS)
 
 /*
  * Root "object-type" capability for the kernel.  This can be used neither as
  * a data nor code capability.
  */
-#define	CHERI_PERM_KERN_TYPE	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL)
+#define	CHERI_PERM_KERN_TYPE	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL |	\
+	CHERI_PERM_UNSEAL)
 
 /*
  * Basic userspace permission mask; CHERI_PERM_EXECUTE will be added for
@@ -185,7 +186,7 @@
 	(CHERI_PERMS_USERSPACE | CHERI_PERM_EXECUTE)
 
 #define	CHERI_PERMS_USERSPACE_SEALCAP					\
-	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL)
+	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL | CHERI_PERM_UNSEAL)
 
 /*
  * _DATA includes _VMMAP to support MAP_CHERI_DDC.  This should be removed
@@ -215,7 +216,7 @@
 	CHERI_PERM_STORE_LOCAL_CAP)
 
 #define	CHERI_PERMS_KERNEL_SEALCAP					\
-	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL)
+	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL | CHERI_PERM_UNSEAL)
 
 /*
  * The CHERI object-type space is split between userspace and kernel,
@@ -392,7 +393,7 @@
 #define	CHERI_EXCCODE_SYSTEM_REGS	0x18
 #define	CHERI_EXCCODE_PERM_CCALL	0x19
 #define	CHERI_EXCCODE_CCALL_IDC		0x1a
-#define	_CHERI_EXCCODE_RESERVED1b	0x1b
+#define	CHERI_EXCCODE_PERM_UNSEAL	0x1b
 #define	_CHERI_EXCCODE_RESERVED1c	0x1c
 #define	_CHERI_EXCCODE_RESERVED1d	0x1d
 #define	_CHERI_EXCCODE_RESERVED1e	0x1e

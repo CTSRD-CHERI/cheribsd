@@ -186,6 +186,20 @@ void	*realloc(void *addr, unsigned long size, struct malloc_type *type,
 void	*reallocf(void *addr, unsigned long size, struct malloc_type *type,
 	    int flags) __alloc_size(2);
 
+static inline void
+free_c(void * __capability addr, struct malloc_type *type)
+{
+
+	free((__cheri_fromcap void *)addr, M_IOV);
+}
+
+static inline void * __capability
+malloc_c(unsigned long size, struct malloc_type *type, int flags)
+{
+
+	return ((__cheri_tocap void * __capability)malloc(size, type, flags));
+}
+
 struct malloc_type *malloc_desc2type(const char *desc);
 #endif /* _KERNEL */
 

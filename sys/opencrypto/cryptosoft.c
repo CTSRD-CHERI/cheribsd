@@ -89,8 +89,8 @@ swcr_encdec(struct cryptodesc *crd, struct swcr_data *sw, caddr_t buf,
 	struct enc_xform *exf;
 	int i, j, k, blks, ind, count, ivlen;
 	struct uio *uio, uiolcl;
-	struct iovec iovlcl[4];
-	struct iovec *iov;
+	kiovec_t iovlcl[4];
+	kiovec_t *iov;
 	int iovcnt, iovalloc;
 	int error;
 
@@ -252,7 +252,8 @@ swcr_encdec(struct cryptodesc *crd, struct swcr_data *sw, caddr_t buf,
 		 * we only use it in the while() loop, only if
 		 * there are indeed enough data.
 		 */
-		idat = (char *)uio->uio_iov[ind].iov_base + k;
+		/* XXX-CHERI: we should push these down further. */
+		idat = (__cheri_fromcap char *)uio->uio_iov[ind].iov_base + k;
 
 		while (uio->uio_iov[ind].iov_len >= k + blks && i > 0) {
 			if (exf->reinit) {

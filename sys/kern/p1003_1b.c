@@ -110,21 +110,30 @@ sched_attach(void)
 int
 sys_sched_setparam(struct thread *td, struct sched_setparam_args *uap)
 {
+
+	return (user_sched_setparam(td, uap->pid,
+	    __USER_CAP_OBJ(uap->param)));
+}
+
+int
+user_sched_setparam(struct thread *td, pid_t pid,
+    const struct sched_param * __capability param)
+{
 	struct thread *targettd;
 	struct proc *targetp;
 	int e;
 	struct sched_param sched_param;
 
-	e = copyin(uap->param, &sched_param, sizeof(sched_param));
+	e = copyin_c(param, &sched_param, sizeof(sched_param));
 	if (e)
 		return (e);
 
-	if (uap->pid == 0) {
+	if (pid == 0) {
 		targetp = td->td_proc;
 		targettd = td;
 		PROC_LOCK(targetp);
 	} else {
-		targetp = pfind(uap->pid);
+		targetp = pfind(pid);
 		if (targetp == NULL)
 			return (ESRCH);
 		targettd = FIRST_THREAD_IN_PROC(targetp);
@@ -155,17 +164,25 @@ kern_sched_setparam(struct thread *td, struct thread *targettd,
 int
 sys_sched_getparam(struct thread *td, struct sched_getparam_args *uap)
 {
+
+	return (user_sched_getparam(td, uap->pid, __USER_CAP_OBJ(uap->param)));
+}
+
+int
+user_sched_getparam(struct thread *td, pid_t pid,
+    struct sched_param * __capability param)
+{
 	int e;
 	struct sched_param sched_param;
 	struct thread *targettd;
 	struct proc *targetp;
 
-	if (uap->pid == 0) {
+	if (pid == 0) {
 		targetp = td->td_proc;
 		targettd = td;
 		PROC_LOCK(targetp);
 	} else {
-		targetp = pfind(uap->pid);
+		targetp = pfind(pid);
 		if (targetp == NULL) {
 			return (ESRCH);
 		}
@@ -175,7 +192,7 @@ sys_sched_getparam(struct thread *td, struct sched_getparam_args *uap)
 	e = kern_sched_getparam(td, targettd, &sched_param);
 	PROC_UNLOCK(targetp);
 	if (e == 0)
-		e = copyout(&sched_param, uap->param, sizeof(sched_param));
+		e = copyout_c(&sched_param, param, sizeof(sched_param));
 	return (e);
 }
 
@@ -198,28 +215,36 @@ kern_sched_getparam(struct thread *td, struct thread *targettd,
 int
 sys_sched_setscheduler(struct thread *td, struct sched_setscheduler_args *uap)
 {
+
+	return (user_sched_setscheduler(td, uap->pid, uap->policy,
+	    __USER_CAP_OBJ(uap->param)));
+}
+
+int
+user_sched_setscheduler(struct thread *td, pid_t pid, int policy,
+    const struct sched_param * __capability param)
+{
 	int e;
 	struct sched_param sched_param;
 	struct thread *targettd;
 	struct proc *targetp;
 
-	e = copyin(uap->param, &sched_param, sizeof(sched_param));
+	e = copyin_c(param, &sched_param, sizeof(sched_param));
 	if (e)
 		return (e);
 
-	if (uap->pid == 0) {
+	if (pid == 0) {
 		targetp = td->td_proc;
 		targettd = td;
 		PROC_LOCK(targetp);
 	} else {
-		targetp = pfind(uap->pid);
+		targetp = pfind(pid);
 		if (targetp == NULL)
 			return (ESRCH);
 		targettd = FIRST_THREAD_IN_PROC(targetp);
 	}
 
-	e = kern_sched_setscheduler(td, targettd, uap->policy,
-	    &sched_param);
+	e = kern_sched_setscheduler(td, targettd, policy, &sched_param);
 	PROC_UNLOCK(targetp);
 	return (e);
 }
@@ -322,12 +347,21 @@ int
 sys_sched_rr_get_interval(struct thread *td,
     struct sched_rr_get_interval_args *uap)
 {
+
+	return (user_sched_rr_get_interval(td, uap->pid,
+	    __USER_CAP_OBJ(uap->interval)));
+}
+
+int
+user_sched_rr_get_interval(struct thread *td, pid_t pid,
+    struct timespec * __capability interval)
+{
 	struct timespec timespec;
 	int error;
 
-	error = kern_sched_rr_get_interval(td, uap->pid, &timespec);
+	error = kern_sched_rr_get_interval(td, pid, &timespec);
 	if (error == 0)
-		error = copyout(&timespec, uap->interval, sizeof(timespec));
+		error = copyout_c(&timespec, interval, sizeof(timespec));
 	return (error);
 }
 

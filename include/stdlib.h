@@ -331,7 +331,7 @@ long double
 #if !defined(__CHERI_PURE_CAPABILITY__)
 #define	malloc_c(size) cheri_ptr(malloc(size), size)
 #define	calloc_c(num, size) cheri_ptr(calloc(num, size), num * size)
-#define	realloc_c(cap, size) cheri_ptr(realloc(cheri_cap_to_ptr(cap, 0), size))
+#define	realloc_c(cap, size) cheri_ptr(realloc(cheri_cap_to_ptr(cap, 0), size), size)
 #define	free_c(cap) free(cheri_cap_to_ptr(cap, 0))
 #else
 #define	malloc_c(size) malloc(size)

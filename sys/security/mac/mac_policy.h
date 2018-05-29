@@ -110,7 +110,8 @@ typedef void	(*mpo_init_t)(struct mac_policy_conf *mpc);
  * General policy-directed security system call so that policies may
  * implement new services without reserving explicit system call numbers.
  */
-typedef int	(*mpo_syscall_t)(struct thread *td, int call, void *arg);
+typedef int	(*mpo_syscall_t)(struct thread *td, int call,
+		    void * __capability arg);
 
 /*
  * Place-holder function pointers for ABI-compatibility purposes.

@@ -72,6 +72,7 @@
 
 #if defined(CPU_CHERI)
 #include <machine/cheriasm.h>
+.set cheri_sysregs_accessible	# Don't warn about uses of c27-c30
 #endif
 
 #include "assym.s"
@@ -153,10 +154,8 @@ VECTOR(_locore, unknown)
 	 * XXXRW: Do we want to rely on default initialisation of all CP2
 	 * registers here?
 	 */
-	CHERI_ASM_CMOVE(CHERI_REG_KDC, $c0)	# Preserve $kdc
-	CHERI_ASM_CMOVE(CHERI_REG_KCC, $c0)	# Preserve $kcc
-	/* cgetdefault	CHERI_REG_KCC	# Preserve $kcc */
-	/* cgetdefault	CHERI_REG_KDC	# Preserve $kdc */
+	cgetdefault	CHERI_REG_KCC	# Preserve $kcc
+	cgetdefault	CHERI_REG_KDC	# Preserve $kdc
 #endif
 
 #if defined(CPU_BERI)

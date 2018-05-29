@@ -1715,7 +1715,7 @@ carp_ioctl(struct ifreq *ifr, u_long cmd, struct thread *td)
 	struct carp_softc *sc = NULL;
 	int error = 0, locked = 0;
 
-	if ((error = copyin(ifr->ifr_data, &carpr, sizeof carpr)))
+	if ((error = copyin_c(ifr_data_get_ptr(ifr), &carpr, sizeof carpr)))
 		return (error);
 
 	ifp = ifunit_ref(ifr->ifr_name);
@@ -1741,7 +1741,7 @@ carp_ioctl(struct ifreq *ifr, u_long cmd, struct thread *td)
 
 	sx_xlock(&carp_sx);
 	switch (cmd) {
-	case SIOCSVH:
+	CASE_IOC_IFREQ(SIOCSVH):
 		if ((error = priv_check(td, PRIV_NETINET_CARP)))
 			break;
 		if (carpr.carpr_vhid <= 0 || carpr.carpr_vhid > CARP_MAXVHID ||
@@ -1807,7 +1807,7 @@ carp_ioctl(struct ifreq *ifr, u_long cmd, struct thread *td)
 		}
 		break;
 
-	case SIOCGVH:
+	CASE_IOC_IFREQ(SIOCGVH):
 	    {
 		int priveleged;
 
@@ -1836,7 +1836,8 @@ carp_ioctl(struct ifreq *ifr, u_long cmd, struct thread *td)
 				break;
 			}
 			carp_carprcp(&carpr, sc, priveleged);
-			error = copyout(&carpr, ifr->ifr_data, sizeof(carpr));
+			error = copyout_c(&carpr, ifr_data_get_ptr(ifr),
+			    sizeof(carpr));
 		} else  {
 			int i, count;
 
@@ -1855,7 +1856,8 @@ carp_ioctl(struct ifreq *ifr, u_long cmd, struct thread *td)
 			IFNET_FOREACH_CARP(ifp, sc) {
 				carp_carprcp(&carpr, sc, priveleged);
 				carpr.carpr_count = count;
-				error = copyout(&carpr, ifr->ifr_data +
+				error = copyout_c(&carpr,
+				    (char * __capability)ifr_data_get_ptr(ifr) +
 				    (i * sizeof(carpr)), sizeof(carpr));
 				if (error) {
 					CIF_UNLOCK(ifp->if_carp);

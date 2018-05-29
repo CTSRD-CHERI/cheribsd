@@ -715,7 +715,7 @@ nf10bmac_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	ifr = (struct ifreq *)data;
 
 	switch (command) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		NF10BMAC_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
@@ -729,9 +729,9 @@ nf10bmac_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->nf10bmac_if_flags = ifp->if_flags;
 		NF10BMAC_UNLOCK(sc);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		NF10BMAC_LOCK(sc);
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 #ifdef DEVICE_POLLING
 		if ((mask & IFCAP_POLLING) != 0 &&
 		    (IFCAP_POLLING & ifp->if_capabilities) != 0) {
@@ -763,7 +763,7 @@ nf10bmac_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
                 NF10BMAC_UNLOCK(sc);
                 break;
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
                 error = ifmedia_ioctl(ifp, ifr, &sc->nf10bmac_media, command);
 		break;
 	default:

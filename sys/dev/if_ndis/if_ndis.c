@@ -2901,7 +2901,7 @@ ndis_ifioctl(ifp, command, data)
 	/*NDIS_LOCK(sc);*/
 
 	switch (command) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		if (ifp->if_flags & IFF_UP) {
 			if (sc->ndis_running &&
 			    ifp->if_flags & IFF_PROMISC &&
@@ -2930,17 +2930,17 @@ ndis_ifioctl(ifp, command, data)
 		sc->ndis_if_flags = ifp->if_flags;
 		error = 0;
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		ndis_setmulti(sc);
 		error = 0;
 		break;
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		error = ifmedia_ioctl(ifp, ifr, &sc->ifmedia, command);
 		break;
-	case SIOCSIFCAP:
-		ifp->if_capenable = ifr->ifr_reqcap;
+	CASE_IOC_IFREQ(SIOCSIFCAP):
+		ifp->if_capenable = ifr_reqcap_get(ifr);
 		if (ifp->if_capenable & IFCAP_TXCSUM)
 			ifp->if_hwassist = sc->ndis_hwassist;
 		else
@@ -2973,11 +2973,12 @@ ndis_80211ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 	switch (cmd) {
 	case SIOCGDRVSPEC:
 	case SIOCSDRVSPEC:
-		error = copyin(ifr->ifr_data, &oid, sizeof(oid));
+		error = copyin_c(ifr_data_get_ptr(ifr), &oid, sizeof(oid));
 		if (error)
 			break;
 		oidbuf = malloc(oid.len, M_TEMP, M_WAITOK | M_ZERO);
-		error = copyin(ifr->ifr_data + sizeof(oid), oidbuf, oid.len);
+		error = copyin_c((char * __capability)ifr_data_get_ptr(ifr) +
+		    sizeof(oid), oidbuf, oid.len);
 	}
 
 	if (error) {
@@ -2992,17 +2993,14 @@ ndis_80211ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 	case SIOCSDRVSPEC:
 		error = ndis_set_info(sc, oid.oid, oidbuf, &oid.len);
 		break;
-	case SIOCGPRIVATE_0:
-#ifdef CPU_CHERI
-#error Unvalidatable ifr_data use.  Unsafe with CheriABI.
-#endif
+	CASE_IOC_IFREQ(SIOCGPRIVATE_0):
 		NDIS_LOCK(sc);
 		if (sc->ndis_evt[sc->ndis_evtcidx].ne_sts == 0) {
 			error = ENOENT;
 			NDIS_UNLOCK(sc);
 			break;
 		}
-		error = copyin(ifr->ifr_data, &evt, sizeof(evt));
+		error = copyin_c(ifr_data_get_ptr(ifr), &evt, sizeof(evt));
 		if (error) {
 			NDIS_UNLOCK(sc);
 			break;
@@ -3012,15 +3010,16 @@ ndis_80211ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 			NDIS_UNLOCK(sc);
 			break;
 		}
-		error = copyout(&sc->ndis_evt[sc->ndis_evtcidx],
-		    ifr->ifr_data, sizeof(uint32_t) * 2);
+		error = copyout_c(&sc->ndis_evt[sc->ndis_evtcidx],
+		    ifr_data_get_ptr(ifr), sizeof(uint32_t) * 2);
 		if (error) {
 			NDIS_UNLOCK(sc);
 			break;
 		}
 		if (sc->ndis_evt[sc->ndis_evtcidx].ne_len) {
-			error = copyout(sc->ndis_evt[sc->ndis_evtcidx].ne_buf,
-			    ifr->ifr_data + (sizeof(uint32_t) * 2),
+			error = copyout_c(sc->ndis_evt[sc->ndis_evtcidx].ne_buf,
+			    (char * __capability)ifr_data_get_ptr(ifr) +
+			    (sizeof(uint32_t) * 2),
 			    sc->ndis_evt[sc->ndis_evtcidx].ne_len);
 			if (error) {
 				NDIS_UNLOCK(sc);
@@ -3042,10 +3041,12 @@ ndis_80211ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 	switch (cmd) {
 	case SIOCGDRVSPEC:
 	case SIOCSDRVSPEC:
-		error = copyout(&oid, ifr->ifr_data, sizeof(oid));
+		error = copyout_c(&oid, ifr_data_get_ptr(ifr), sizeof(oid));
 		if (error)
 			break;
-		error = copyout(oidbuf, ifr->ifr_data + sizeof(oid), oid.len);
+		error = copyout_c(oidbuf,
+		    (char * __capability)ifr_data_get_ptr(ifr) + sizeof(oid),
+		    oid.len);
 	}
 
 	free(oidbuf, M_TEMP);
