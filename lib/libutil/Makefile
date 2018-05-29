@@ -3,7 +3,6 @@
 
 PACKAGE=lib${LIB}
 SHLIBDIR?= /lib
-WANT_DUMP=	yes
 
 .include <src.opts.mk>
 
