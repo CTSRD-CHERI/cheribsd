@@ -944,7 +944,7 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ha = (qla_host_t *)ifp->if_softc;
 
 	switch (cmd) {
-	case SIOCSIFADDR:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
 		QL_DPRINT4(ha, (ha->pci_dev, "%s: SIOCSIFADDR (0x%lx)\n",
 			__func__, cmd));
 
@@ -966,22 +966,21 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		QL_DPRINT4(ha, (ha->pci_dev, "%s: SIOCSIFMTU (0x%lx)\n",
 			__func__, cmd));
 
-		if (ifr->ifr_mtu > QLA_MAX_MTU) {
+		if (ifr_mtu_get(ifr) > QLA_MAX_MTU) {
 			ret = EINVAL;
 		} else {
 			QLA_LOCK(ha);
 
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			ha->max_frame_size =
 				ifp->if_mtu + ETHER_HDR_LEN + ETHER_CRC_LEN;
 
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING)) {
-				ret = ql_set_max_mtu(ha, ha->max_frame_size,
-					ha->hw.rcv_cntxt_id);
+				qla_init_locked(ha);
 			}
 
 			if (ifp->if_mtu > ETHERMTU)
@@ -998,7 +997,7 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 		break;
 
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		QL_DPRINT4(ha, (ha->pci_dev, "%s: SIOCSIFFLAGS (0x%lx)\n",
 			__func__, cmd));
 
@@ -1014,11 +1013,9 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 					ret = ql_set_allmulti(ha);
 				}
 			} else {
-				qla_init_locked(ha);
 				ha->max_frame_size = ifp->if_mtu +
 					ETHER_HDR_LEN + ETHER_CRC_LEN;
-				ret = ql_set_max_mtu(ha, ha->max_frame_size,
-					ha->hw.rcv_cntxt_id);
+				qla_init_locked(ha);
 			}
 		} else {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING)
@@ -1029,7 +1026,7 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		QLA_UNLOCK(ha);
 		break;
 
-	case SIOCADDMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
 		QL_DPRINT4(ha, (ha->pci_dev,
 			"%s: %s (0x%lx)\n", __func__, "SIOCADDMULTI", cmd));
 
@@ -1037,7 +1034,7 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ret = EINVAL;
 		break;
 
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		QL_DPRINT4(ha, (ha->pci_dev,
 			"%s: %s (0x%lx)\n", __func__, "SIOCDELMULTI", cmd));
 
@@ -1045,7 +1042,7 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ret = EINVAL;
 		break;
 
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		QL_DPRINT4(ha, (ha->pci_dev,
 			"%s: SIOCSIFMEDIA/SIOCGIFMEDIA (0x%lx)\n",
@@ -1053,9 +1050,9 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ret = ifmedia_ioctl(ifp, ifr, &ha->media, cmd);
 		break;
 
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 	{
-		int mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		int mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 
 		QL_DPRINT4(ha, (ha->pci_dev, "%s: SIOCSIFCAP (0x%lx)\n",
 			__func__, cmd));
@@ -1522,8 +1519,11 @@ qla_stop(qla_host_t *ha)
 
 	ha->flags.qla_watchdog_pause = 1;
 
-	while (!ha->qla_watchdog_paused)
+	while (!ha->qla_watchdog_paused) {
+		QLA_UNLOCK(ha);
 		qla_mdelay(__func__, 1);
+		QLA_LOCK(ha);
+	}
 
 	ha->flags.qla_interface_up = 0;
 
@@ -1918,7 +1918,10 @@ qla_error_recovery(void *context, int pending)
 	if (ha->flags.qla_interface_up) {
 
 		ha->hw.imd_compl = 1;
+
+		QLA_UNLOCK(ha);
 		qla_mdelay(__func__, 300);
+		QLA_LOCK(ha);
 
 	        ifp->if_drv_flags &= ~(IFF_DRV_OACTIVE | IFF_DRV_RUNNING);
 

@@ -182,7 +182,6 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2,int flags)
 #ifdef CPU_CHERI
 	td2->td_md.md_switcher_context = 0;
 #ifdef COMPAT_CHERIABI
-	td2->td_md.md_tls_cap = td1->td_md.md_tls_cap;
 	td2->td_md.md_cheri_mmap_cap = td1->td_md.md_cheri_mmap_cap;
 #endif
 	/*
@@ -610,7 +609,7 @@ cpu_set_user_tls(struct thread *td, void *tls_base)
 	else
 #endif
 	td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET + TLS_TCB_SIZE;
-	td->td_md.md_tls = (char*)tls_base;
+	td->td_md.md_tls = __USER_CAP_UNBOUND(tls_base);
 	if (td == curthread && cpuinfo.userlocal_reg == true) {
 		mips_wr_userlocal((unsigned long)tls_base +
 		    td->td_md.md_tls_tcb_offset);

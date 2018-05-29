@@ -2273,13 +2273,20 @@ fasttrap_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int fflag,
 		return (EAGAIN);
 
 	if (cmd == FASTTRAPIOC_MAKEPROBE) {
-		fasttrap_probe_spec_t *uprobe = *(fasttrap_probe_spec_t **)arg;
+		fasttrap_probe_spec_t * __capability uprobe;
 		fasttrap_probe_spec_t *probe;
 		uint64_t noffs;
 		size_t size;
 		int ret, err;
 
-		if (copyin(&uprobe->ftps_noffs, &noffs,
+#ifdef COMPAT_CHERIABI
+		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+			uprobe = *(fasttrap_probe_spec_t * __capability *)arg;
+		else
+#endif
+			uprobe = __USER_CAP(*(void **)arg,
+			    sizeof(fasttrap_probe_spec_t));
+		if (copyin_c(&uprobe->ftps_noffs, &noffs,
 		    sizeof (uprobe->ftps_noffs)))
 			return (EFAULT);
 
@@ -2297,7 +2304,7 @@ fasttrap_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int fflag,
 
 		probe = kmem_alloc(size, KM_SLEEP);
 
-		if (copyin(uprobe, probe, size) != 0 ||
+		if (copyin_c(uprobe, probe, size) != 0 ||
 		    probe->ftps_noffs != noffs) {
 			kmem_free(probe, size);
 			return (EFAULT);

@@ -95,6 +95,7 @@
 #ifdef CPU_CHERI
 #include <machine/cheriasm.h>
 #include <machine/cherireg.h>
+.set cheri_sysregs_accessible	# Don't warn on access to c27-c30
 #endif
 
 #include "assym.s"
@@ -428,7 +429,9 @@ SlowFault:
 	csd	reg, treg, 0(cregbase)
 
 #define	SAVE_CHERI(treg0, treg1)				\
-	SAVE_CREG(CHERI_REG_DDC, sp, DDC, CHERI_REG_KDC);	\
+	/* $ddc should no longer be accessed using $c0 */	\
+	CGetDefault CHERI_REG_KR1C;				\
+	SAVE_CREG(CHERI_REG_KR1C, sp, DDC, CHERI_REG_KDC);	\
 	SAVE_CREG(CHERI_REG_C1, sp, C1, CHERI_REG_KDC);		\
 	SAVE_CREG(CHERI_REG_C2, sp, C2, CHERI_REG_KDC);		\
 	SAVE_CREG(CHERI_REG_C3, sp, C3, CHERI_REG_KDC);		\
@@ -455,7 +458,9 @@ SlowFault:
 	SAVE_CREG(CHERI_REG_C24, sp, C24, CHERI_REG_KDC);	\
 	SAVE_CREG(CHERI_REG_C25, sp, C25, CHERI_REG_KDC);	\
 	SAVE_CREG(CHERI_REG_C26, sp, IDC, CHERI_REG_KDC);	\
-	SAVE_CREG(CHERI_REG_EPCC, sp, PCC, CHERI_REG_KDC);	\
+	/* EPCC is no longer a GPR so load it into KR1C first */\
+	CGetEPCC CHERI_REG_KR1C;				\
+	SAVE_CREG(CHERI_REG_KR1C, sp, PCC, CHERI_REG_KDC);	\
 	cgetcause	treg0;					\
 	SAVE_CAPCAUSE(treg0, treg1, sp, CAPCAUSE, CHERI_REG_KDC)
 #else
@@ -545,7 +550,9 @@ SlowFault:
  * Notice: the capability cause register is saved, but not restored.
  */
 #define	RESTORE_CHERI						\
-	RESTORE_CREG(CHERI_REG_DDC, sp, DDC, CHERI_REG_KDC);	\
+	/* $ddc should no longer be accessed using $c0 */	\
+	RESTORE_CREG(CHERI_REG_KR1C, sp, DDC, CHERI_REG_KDC);	\
+	CSetDefault CHERI_REG_KR1C;				\
 	RESTORE_CREG(CHERI_REG_C1, sp, C1, CHERI_REG_KDC);	\
 	RESTORE_CREG(CHERI_REG_C2, sp, C2, CHERI_REG_KDC);	\
 	RESTORE_CREG(CHERI_REG_C3, sp, C3, CHERI_REG_KDC);	\
@@ -572,7 +579,9 @@ SlowFault:
 	RESTORE_CREG(CHERI_REG_C24, sp, C24, CHERI_REG_KDC);	\
 	RESTORE_CREG(CHERI_REG_C25, sp, C25, CHERI_REG_KDC);	\
 	RESTORE_CREG(CHERI_REG_C26, sp, IDC, CHERI_REG_KDC);	\
-	RESTORE_CREG(CHERI_REG_EPCC, sp, PCC, CHERI_REG_KDC)
+	/* EPCC is no longer a GPR so load it into KR1C first */\
+	RESTORE_CREG(CHERI_REG_KR1C, sp, PCC, CHERI_REG_KDC);	\
+	CSetEPCC CHERI_REG_KR1C;
 #else
 #define	RESTORE_CHERI
 #endif

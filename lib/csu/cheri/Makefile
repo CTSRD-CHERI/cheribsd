@@ -39,7 +39,7 @@ crtbegin.o:	crtbeginC.c
 
 # Used for executables with -pie or libraries with -shared
 crtbeginS.o:	crtbeginC.c
-	${CC} ${CFLAGS} ${PICFLAG} -c -o ${.TARGET} ${.ALLSRC}
+	${CC} ${CFLAGS} -DSHLIB_INIT ${PICFLAG} -c -o ${.TARGET} ${.ALLSRC}
 
 # Used for executables if -static is passed
 crtbeginT.o:	crtbeginC.c

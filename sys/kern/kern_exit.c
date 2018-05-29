@@ -686,7 +686,7 @@ sys_abort2(struct thread *td, struct abort2_args *uap)
 	 * maximal number of arguments was chosen to be logged.
 	 */
 	if (uap->why != NULL) {
-		error = sbuf_copyin(sb, uap->why, 128);
+		error = sbuf_copyin(sb, __USER_CAP_STR(uap->why), 128);
 		if (error < 0)
 			goto out;
 	} else {
@@ -740,18 +740,27 @@ owait(struct thread *td, struct owait_args *uap __unused)
 int
 sys_wait4(struct thread *td, struct wait4_args *uap)
 {
+
+	return (kern_wait4(td, uap->pid, __USER_CAP_OBJ(uap->status),
+	    uap->options, __USER_CAP_OBJ(uap->rusage)));
+}
+
+int
+kern_wait4(struct thread *td, int pid, int * __capability statusp, int options,
+    struct rusage * __capability rusage)
+{
 	struct rusage ru, *rup;
 	int error, status;
 
-	if (uap->rusage != NULL)
+	if (rusage != NULL)
 		rup = &ru;
 	else
 		rup = NULL;
-	error = kern_wait(td, uap->pid, &status, uap->options, rup);
-	if (uap->status != NULL && error == 0 && td->td_retval[0] != 0)
-		error = copyout(&status, uap->status, sizeof(status));
-	if (uap->rusage != NULL && error == 0 && td->td_retval[0] != 0)
-		error = copyout(&ru, uap->rusage, sizeof(struct rusage));
+	error = kern_wait(td, pid, &status, options, rup);
+	if (statusp != NULL && error == 0 && td->td_retval[0] != 0)
+		error = copyout_c(&status, statusp, sizeof(status));
+	if (rusage != NULL && error == 0 && td->td_retval[0] != 0)
+		error = copyout_c(&ru, rusage, sizeof(struct rusage));
 	return (error);
 }
 
@@ -759,7 +768,8 @@ int
 sys_wait6(struct thread *td, struct wait6_args *uap)
 {
 	struct __wrusage wru, *wrup;
-	siginfo_t si, *sip;
+	_siginfo_t si, *sip;
+	struct siginfo_native si_n;
 	idtype_t idtype;
 	id_t id;
 	int error, status;
@@ -788,8 +798,10 @@ sys_wait6(struct thread *td, struct wait6_args *uap)
 		error = copyout(&status, uap->status, sizeof(status));
 	if (uap->wrusage != NULL && error == 0 && td->td_retval[0] != 0)
 		error = copyout(&wru, uap->wrusage, sizeof(wru));
-	if (uap->info != NULL && error == 0)
-		error = copyout(&si, uap->info, sizeof(si));
+	if (uap->info != NULL && error == 0) {
+		siginfo_to_siginfo_native(&si, &si_n);
+		error = copyout(&si_n, uap->info, sizeof(si_n));
+	}
 	return (error);
 }
 
@@ -940,7 +952,7 @@ proc_reap(struct thread *td, struct proc *p, int *status, int options)
 
 static int
 proc_to_reap(struct thread *td, struct proc *p, idtype_t idtype, id_t id,
-    int *status, int options, struct __wrusage *wrusage, siginfo_t *siginfo,
+    int *status, int options, struct __wrusage *wrusage, _siginfo_t *siginfo,
     int check_only)
 {
 	struct rusage *rup;
@@ -1131,7 +1143,7 @@ kern_wait(struct thread *td, pid_t pid, int *status, int options,
 }
 
 static void
-report_alive_proc(struct thread *td, struct proc *p, siginfo_t *siginfo,
+report_alive_proc(struct thread *td, struct proc *p, _siginfo_t *siginfo,
     int *status, int options, int si_code)
 {
 	bool cont;
@@ -1164,7 +1176,7 @@ report_alive_proc(struct thread *td, struct proc *p, siginfo_t *siginfo,
 
 int
 kern_wait6(struct thread *td, idtype_t idtype, id_t id, int *status,
-    int options, struct __wrusage *wrusage, siginfo_t *siginfo)
+    int options, struct __wrusage *wrusage, _siginfo_t *siginfo)
 {
 	struct proc *p, *q;
 	pid_t pid;

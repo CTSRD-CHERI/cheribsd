@@ -36,10 +36,6 @@
 #include <exception>
 #endif
 
-#if !__has_feature(capabilities)
-#error "This code requires a CHERI-aware compiler"
-#endif
-
 /*
  * This section defines interfaces for setting up, invoking, resetting, and
  * destroying sandbox classes and objects.

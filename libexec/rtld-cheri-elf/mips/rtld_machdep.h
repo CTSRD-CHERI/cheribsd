@@ -89,9 +89,17 @@ make_data_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
 }
 
 #define call_initfini_pointer(obj, target)				\
-	(((InitFunc)(cheri_setoffset(cheri_getpcc(), (target))))())
+	(((InitFunc)(target))())
+/*	(((InitFunc)(cheri_setoffset(cheri_getppcc(), (target))))()) */
 
-#define call_init_pointer(obj, target)					\
+/*
+ * XXXAR: FIXME: this should not be using cheri_getppc()/obj->relocbase, we want
+ * a obj->text_segment_only or similar
+ */
+#define call_init_array_pointer(obj, target)				\
+	(((InitArrFunc)(cheri_setoffset(cheri_getpcc(), (target))))	\
+	    (main_argc, main_argv, environ))
+#define call_fini_array_pointer(obj, target)				\
 	(((InitArrFunc)(cheri_setoffset(cheri_getpcc(), (target))))	\
 	    (main_argc, main_argv, environ))
 

@@ -444,7 +444,7 @@ nfs_mountroot(struct mount *mp)
 	if (error)
 		panic("nfs_mountroot: SIOCAIFADDR: %d", error);
 	if ((cp = kern_getenv("boot.netif.mtu")) != NULL) {
-		ir.ifr_mtu = strtol(cp, NULL, 10);
+		ir.ifr_ifru.ifru_mtu = strtol(cp, NULL, 10);
 		bcopy(nd->myif.ifra_name, ir.ifr_name, IFNAMSIZ);
 		freeenv(cp);
 		error = ifioctl(so, SIOCSIFMTU, (caddr_t)&ir, td);
@@ -1235,7 +1235,7 @@ nfs_mount(struct mount *mp)
 		bzero(&hst[hstlen], MNAMELEN - hstlen);
 		args.hostname = hst;
 		/* getsockaddr() call must be after above copyin() calls */
-		error = getsockaddr(&nam, (caddr_t)args.addr,
+		error = getsockaddr(&nam, __USER_CAP(args.addr, args.addrlen),
 		    args.addrlen);
 		if (error != 0)
 			goto out;

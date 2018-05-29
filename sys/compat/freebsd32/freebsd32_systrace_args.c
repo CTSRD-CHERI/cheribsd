@@ -592,7 +592,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 98: {
 		struct connect_args *p = params;
 		iarg[0] = p->s; /* int */
-		uarg[1] = (intptr_t) p->name; /* caddr_t */
+		iarg[1] = p->name; /* const struct sockaddr */
 		iarg[2] = p->namelen; /* int */
 		*n_args = 3;
 		break;
@@ -609,7 +609,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 104: {
 		struct bind_args *p = params;
 		iarg[0] = p->s; /* int */
-		uarg[1] = (intptr_t) p->name; /* caddr_t */
+		uarg[1] = (intptr_t) p->name; /* const struct sockaddr * */
 		iarg[2] = p->namelen; /* int */
 		*n_args = 3;
 		break;
@@ -750,7 +750,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		uarg[1] = (intptr_t) p->buf; /* caddr_t */
 		uarg[2] = p->len; /* size_t */
 		iarg[3] = p->flags; /* int */
-		uarg[4] = (intptr_t) p->to; /* caddr_t */
+		uarg[4] = (intptr_t) p->to; /* struct sockaddr * */
 		iarg[5] = p->tolen; /* int */
 		*n_args = 6;
 		break;
@@ -1478,11 +1478,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* aio_cancel */
+	/* freebsd32_aio_cancel */
 	case 316: {
-		struct aio_cancel_args *p = params;
+		struct freebsd32_aio_cancel_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->aiocbp; /* struct aiocb * */
+		uarg[1] = (intptr_t) p->aiocbp; /* struct aiocb32 * */
 		*n_args = 2;
 		break;
 	}
@@ -1628,7 +1628,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 345: {
 		struct freebsd32_sigtimedwait_args *p = params;
 		uarg[0] = (intptr_t) p->set; /* const sigset_t * */
-		uarg[1] = (intptr_t) p->info; /* siginfo_t * */
+		uarg[1] = (intptr_t) p->info; /* struct siginfo32 * */
 		uarg[2] = (intptr_t) p->timeout; /* const struct timespec * */
 		*n_args = 3;
 		break;
@@ -1637,7 +1637,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 346: {
 		struct freebsd32_sigwaitinfo_args *p = params;
 		uarg[0] = (intptr_t) p->set; /* const sigset_t * */
-		uarg[1] = (intptr_t) p->info; /* siginfo_t * */
+		uarg[1] = (intptr_t) p->info; /* struct siginfo32 * */
 		*n_args = 2;
 		break;
 	}
@@ -2967,7 +2967,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		uarg[4] = (intptr_t) p->status; /* int * */
 		iarg[5] = p->options; /* int */
 		uarg[6] = (intptr_t) p->wrusage; /* struct wrusage32 * */
-		uarg[7] = (intptr_t) p->info; /* siginfo_t * */
+		uarg[7] = (intptr_t) p->info; /* struct siginfo32 * */
 		*n_args = 8;
 		break;
 	}
@@ -3004,7 +3004,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		uarg[3] = (intptr_t) p->status; /* int * */
 		iarg[4] = p->options; /* int */
 		uarg[5] = (intptr_t) p->wrusage; /* struct wrusage32 * */
-		uarg[6] = (intptr_t) p->info; /* siginfo_t * */
+		uarg[6] = (intptr_t) p->info; /* struct siginfo32 * */
 		*n_args = 7;
 		break;
 	}
@@ -3056,7 +3056,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct bindat_args *p = params;
 		iarg[0] = p->fd; /* int */
 		iarg[1] = p->s; /* int */
-		uarg[2] = (intptr_t) p->name; /* caddr_t */
+		uarg[2] = (intptr_t) p->name; /* const struct sockaddr * */
 		iarg[3] = p->namelen; /* int */
 		*n_args = 4;
 		break;
@@ -3066,7 +3066,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct connectat_args *p = params;
 		iarg[0] = p->fd; /* int */
 		iarg[1] = p->s; /* int */
-		uarg[2] = (intptr_t) p->name; /* caddr_t */
+		iarg[2] = p->name; /* const struct sockaddr */
 		iarg[3] = p->namelen; /* int */
 		*n_args = 4;
 		break;
@@ -4192,7 +4192,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "caddr_t";
+			p = "const struct sockaddr";
 			break;
 		case 2:
 			p = "int";
@@ -4221,7 +4221,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "caddr_t";
+			p = "userland const struct sockaddr *";
 			break;
 		case 2:
 			p = "int";
@@ -4468,7 +4468,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 4:
-			p = "caddr_t";
+			p = "userland struct sockaddr *";
 			break;
 		case 5:
 			p = "int";
@@ -5621,14 +5621,14 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* aio_cancel */
+	/* freebsd32_aio_cancel */
 	case 316:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct aiocb *";
+			p = "userland struct aiocb32 *";
 			break;
 		default:
 			break;
@@ -5843,7 +5843,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const sigset_t *";
 			break;
 		case 1:
-			p = "userland siginfo_t *";
+			p = "userland struct siginfo32 *";
 			break;
 		case 2:
 			p = "userland const struct timespec *";
@@ -5859,7 +5859,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const sigset_t *";
 			break;
 		case 1:
-			p = "userland siginfo_t *";
+			p = "userland struct siginfo32 *";
 			break;
 		default:
 			break;
@@ -8238,7 +8238,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland struct wrusage32 *";
 			break;
 		case 7:
-			p = "userland siginfo_t *";
+			p = "userland struct siginfo32 *";
 			break;
 		default:
 			break;
@@ -8314,7 +8314,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland struct wrusage32 *";
 			break;
 		case 6:
-			p = "userland siginfo_t *";
+			p = "userland struct siginfo32 *";
 			break;
 		default:
 			break;
@@ -8402,7 +8402,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "caddr_t";
+			p = "userland const struct sockaddr *";
 			break;
 		case 3:
 			p = "int";
@@ -8421,7 +8421,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "caddr_t";
+			p = "const struct sockaddr";
 			break;
 		case 3:
 			p = "int";
@@ -9661,7 +9661,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* aio_cancel */
+	/* freebsd32_aio_cancel */
 	case 316:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

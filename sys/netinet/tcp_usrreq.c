@@ -1883,6 +1883,9 @@ unlock_and_done:
 			break;
 		}
 		break;
+	default:
+		error = EINVAL;
+		break;
 	}
 	return (error);
 }

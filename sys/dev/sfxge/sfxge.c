@@ -397,7 +397,7 @@ sfxge_if_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 	error = 0;
 
 	switch (command) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		SFXGE_ADAPTER_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -413,20 +413,20 @@ sfxge_if_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 		sc->if_flags = ifp->if_flags;
 		SFXGE_ADAPTER_UNLOCK(sc);
 		break;
-	case SIOCSIFMTU:
-		if (ifr->ifr_mtu == ifp->if_mtu) {
+	CASE_IOC_IFREQ(SIOCSIFMTU):
+		if (ifr_mtu_get(ifr) == ifp->if_mtu) {
 			/* Nothing to do */
 			error = 0;
-		} else if (ifr->ifr_mtu > SFXGE_MAX_MTU) {
+		} else if (ifr_mtu_get(ifr) > SFXGE_MAX_MTU) {
 			error = EINVAL;
 		} else if (!(ifp->if_drv_flags & IFF_DRV_RUNNING)) {
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			error = 0;
 		} else {
 			/* Restart required */
 			SFXGE_ADAPTER_LOCK(sc);
 			sfxge_stop(sc);
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			error = sfxge_start(sc);
 			SFXGE_ADAPTER_UNLOCK(sc);
 			if (error != 0) {
@@ -436,14 +436,14 @@ sfxge_if_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 			}
 		}
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 			sfxge_mac_filter_set(sc);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 	{
-		int reqcap = ifr->ifr_reqcap;
+		int reqcap = ifr_reqcap_get(ifr);
 		int capchg_mask;
 
 		SFXGE_ADAPTER_LOCK(sc);
@@ -518,16 +518,16 @@ sfxge_if_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 		SFXGE_ADAPTER_UNLOCK(sc);
 		break;
 	}
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->media, command);
 		break;
 #ifdef SIOCGI2C
-	case SIOCGI2C:
+	CASE_IOC_IFREQ(SIOCGI2C):
 	{
 		struct ifi2creq i2c;
 
-		error = copyin(ifr->ifr_data, &i2c, sizeof(i2c));
+		error = copyin_c(ifr_data_get_ptr(ifr), &i2c, sizeof(i2c));
 		if (error != 0)
 			break;
 
@@ -542,23 +542,22 @@ sfxge_if_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 						&i2c.data[0]);
 		SFXGE_ADAPTER_UNLOCK(sc);
 		if (error == 0)
-			error = copyout(&i2c, ifr->ifr_data, sizeof(i2c));
+			error = copyout_c(&i2c, ifr_data_get_ptr(ifr),
+			    sizeof(i2c));
 		break;
 	}
 #endif
-	case SIOCGPRIVATE_0:
-#ifdef CPU_CHERI
-#error Unvalidatable ifr_data use.  Unsafe with CheriABI.
-#endif
+	CASE_IOC_IFREQ(SIOCGPRIVATE_0):
 		error = priv_check(curthread, PRIV_DRIVER);
 		if (error != 0)
 			break;
-		error = copyin(ifr->ifr_data, &ioc, sizeof(ioc));
+		error = copyin_c(ifr_data_get_ptr(ifr), &ioc, sizeof(ioc));
 		if (error != 0)
 			return (error);
 		error = sfxge_private_ioctl(sc, &ioc);
 		if (error == 0) {
-			error = copyout(&ioc, ifr->ifr_data, sizeof(ioc));
+			error = copyout_c(&ioc, ifr_data_get_ptr(ifr),
+			    sizeof(ioc));
 		}
 		break;
 	default:

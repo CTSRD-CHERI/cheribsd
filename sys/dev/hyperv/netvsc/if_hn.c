@@ -2554,8 +2554,8 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int mask, error = 0;
 
 	switch (cmd) {
-	case SIOCSIFMTU:
-		if (ifr->ifr_mtu > HN_MTU_MAX) {
+	CASE_IOC_IFREQ(SIOCSIFMTU):
+		if (ifr_mtu_get(ifr) > HN_MTU_MAX) {
 			error = EINVAL;
 			break;
 		}
@@ -2574,7 +2574,7 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		}
 
-		if (ifp->if_mtu == ifr->ifr_mtu) {
+		if (ifp->if_mtu == ifr_mtu_get(ifr)) {
 			HN_UNLOCK(sc);
 			break;
 		}
@@ -2594,7 +2594,7 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		 * Reattach the synthetic parts, i.e. NVS and RNDIS,
 		 * with the new MTU setting.
 		 */
-		error = hn_synth_attach(sc, ifr->ifr_mtu);
+		error = hn_synth_attach(sc, ifr_mtu_get(ifr));
 		if (error) {
 			HN_UNLOCK(sc);
 			break;
@@ -2604,7 +2604,7 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		 * Commit the requested MTU, after the synthetic parts
 		 * have been successfully attached.
 		 */
-		ifp->if_mtu = ifr->ifr_mtu;
+		ifp->if_mtu = ifr_mtu_get(ifr);
 
 		/*
 		 * Make sure that various parameters based on MTU are
@@ -2627,7 +2627,7 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		HN_UNLOCK(sc);
 		break;
 
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		HN_LOCK(sc);
 
 		if ((sc->hn_flags & HN_FLAG_SYNTH_ATTACHED) == 0) {
@@ -2657,9 +2657,9 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		HN_UNLOCK(sc);
 		break;
 
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		HN_LOCK(sc);
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 
 		if (mask & IFCAP_TXCSUM) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;
@@ -2706,8 +2706,8 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		HN_UNLOCK(sc);
 		break;
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		HN_LOCK(sc);
 
 		if ((sc->hn_flags & HN_FLAG_SYNTH_ATTACHED) == 0) {
@@ -2727,7 +2727,7 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		HN_UNLOCK(sc);
 		break;
 
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->hn_media, cmd);
 		break;

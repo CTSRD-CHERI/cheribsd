@@ -70,6 +70,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/unistd.h>	
 #include <sys/sdt.h>
 #include <sys/sx.h>
+#include <sys/syscallsubr.h>
 #include <sys/sysent.h>
 #include <sys/signalvar.h>
 
@@ -119,6 +120,13 @@ sys_fork(struct thread *td, struct fork_args *uap)
 int
 sys_pdfork(struct thread *td, struct pdfork_args *uap)
 {
+
+	return (kern_pdfork(td, __USER_CAP_OBJ(uap->fdp), uap->flags));
+}
+
+int
+kern_pdfork(struct thread *td, int * __capability fdp, int flags)
+{
 	struct fork_req fr;
 	int error, fd, pid;
 
@@ -126,7 +134,7 @@ sys_pdfork(struct thread *td, struct pdfork_args *uap)
 	fr.fr_flags = RFFDG | RFPROC | RFPROCDESC;
 	fr.fr_pidp = &pid;
 	fr.fr_pd_fd = &fd;
-	fr.fr_pd_flags = uap->flags;
+	fr.fr_pd_flags = flags;
 	/*
 	 * It is necessary to return fd by reference because 0 is a valid file
 	 * descriptor number, and the child needs to be able to distinguish
@@ -136,7 +144,7 @@ sys_pdfork(struct thread *td, struct pdfork_args *uap)
 	if (error == 0) {
 		td->td_retval[0] = pid;
 		td->td_retval[1] = 0;
-		error = copyout(&fd, uap->fdp, sizeof(fd));
+		error = copyout_c(&fd, fdp, sizeof(fd));
 	}
 	return (error);
 }

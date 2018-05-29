@@ -104,6 +104,9 @@
 /* Defined if pthread_atfork(3) is available. */
 #define JEMALLOC_HAVE_PTHREAD_ATFORK 
 
+/* Defined if pthread_setname_np(3) is available. */
+/* #undef JEMALLOC_HAVE_PTHREAD_SETNAME_NP */
+
 /*
  * Defined if clock_gettime(CLOCK_MONOTONIC_COARSE, ...) is available.
  */
@@ -112,7 +115,10 @@
 /*
  * Defined if clock_gettime(CLOCK_MONOTONIC, ...) is available.
  */
+/* XXX: CLOCK_MONOTONIC goes backwards on mips under qemu... */
+#ifndef __mips__
 #define JEMALLOC_HAVE_CLOCK_MONOTONIC 1
+#endif
 
 /*
  * Defined if mach_absolute_time() is available.
@@ -340,7 +346,7 @@
 /* #undef JEMALLOC_EXPORT */
 
 /* config.malloc_conf options string. */
-#define JEMALLOC_CONFIG_MALLOC_CONF ""
+#define JEMALLOC_CONFIG_MALLOC_CONF "abort_conf:false"
 
 /* If defined, jemalloc takes the malloc/free/etc. symbol names. */
 #define JEMALLOC_IS_MALLOC 1

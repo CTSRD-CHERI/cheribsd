@@ -38,12 +38,13 @@
 #ifndef _SYS_SYSTM_H_
 #define	_SYS_SYSTM_H_
 
-#include <machine/atomic.h>
-#include <machine/cpufunc.h>
 #include <sys/callout.h>
-#include <sys/cdefs.h>
 #include <sys/queue.h>
 #include <sys/stdint.h>		/* for people using printf mainly */
+
+#include <machine/atomic.h>
+#include <machine/cpufunc.h>
+#include <machine/pcb.h>
 
 __NULLABILITY_PRAGMA_PUSH
 
@@ -133,6 +134,40 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
 	__predict_false((td)->td_stopsched);				\
 })
 #define	SCHEDULER_STOPPED() SCHEDULER_STOPPED_TD(curthread)
+
+/*
+ * Macros to create userspace capabilities from virtual addresses.
+ * Addresses are assumed to be relative to the current userspace
+ * thread's address space and are created from the DDC or PCC of
+ * the current PCB.
+ */
+#if __has_feature(capabilities)
+#define	__USER_CAP_UNBOUND(ptr)						\
+    ((ptr) == NULL ? NULL :						\
+	__builtin_cheri_offset_set(curthread->td_pcb->pcb_regs.ddc,	\
+	(vaddr_t)(ptr)))
+
+#define	__USER_CODE_CAP(ptr)						\
+    ((ptr) == NULL ? NULL :						\
+	__builtin_cheri_offset_set(curthread->td_pcb->pcb_regs.pcc,	\
+	(vaddr_t)(ptr)))
+
+#else /* !has_feature(capabilities) */
+#define	__USER_CAP_UNBOUND(ptr)	(ptr)
+#define	__USER_CODE_CAP(ptr)	(ptr)
+#endif /* !has_feature(capabilities) */
+
+#define	__USER_CAP(ptr, len)	__USER_CAP_UNBOUND(ptr)
+#define	__USER_CAP_ADDR(ptr)	__USER_CAP_UNBOUND(ptr)
+#define	__USER_CAP_ARRAY(objp, cnt) \
+     __USER_CAP((objp), sizeof(*(objp)) * (cnt))
+#define	__USER_CAP_OBJ(objp)	__USER_CAP((objp), sizeof(*(objp)))
+/*
+ * NOTE: we can't place tigher bounds because we don't know what the
+ * length is until after we use it.
+ * XXX: We should probably have a __USER_CAP_PATH() with a MAXPATH limit.
+ */
+#define	__USER_CAP_STR(strp)	__USER_CAP_UNBOUND(strp)
 
 /*
  * Align variables.
@@ -316,16 +351,15 @@ int	copyinstr_c(const void * _Nonnull __restrict __CAPABILITY udaddr,
 #endif
 int	copyin(const void * _Nonnull __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
+int	copyin_implicit_cap(const void * _Nonnull __restrict udaddr,
+	    void * _Nonnull __restrict kaddr, size_t len);
 #if __has_feature(capabilities)
 int	copyin_c(const void * _Nonnull __restrict __capability udaddr,
 	    void * _Nonnull __restrict __capability kaddr, size_t len);
-int	copyincap(const void * _Nonnull __restrict udaddr,
-	    void * _Nonnull __restrict kaddr, size_t len);
 int	copyincap_c(const void * _Nonnull __restrict __capability udaddr,
 	    void * _Nonnull __restrict __capability kaddr, size_t len);
 #else
 #define	copyin_c	copyin
-#define	copyincap	copyin
 #define	copyincap_c	copyin
 #endif
 int	copyin_nofault(const void * _Nonnull __restrict udaddr,
@@ -338,15 +372,12 @@ int	copyin_nofault_c(const void * __capability _Nonnull __restrict udaddr,
 #endif
 int	copyout(const void * _Nonnull __restrict kaddr,
 	    void * _Nonnull __restrict udaddr, size_t len);
-int	copyout_part(const void * _Nonnull __restrict kaddr,
-	     void * _Nonnull __restrict udaddr,
-	    struct copy_map * _Nonnull cmap, size_t cmap_ents);
+int	copyout_implicit_cap(const void * _Nonnull __restrict kaddr,
+	    void * _Nonnull __restrict udaddr, size_t len);
 
 #if __has_feature(capabilities)
 int	copyout_c(const void * _Nonnull __restrict __capability kaddr,
 	    void * _Nonnull __restrict __capability udaddr, size_t len);
-int	copyoutcap(const void * _Nonnull __restrict kaddr,
-	    void * _Nonnull __restrict udaddr, size_t len);
 int	copyoutcap_c(const void * __capability _Nonnull __restrict kaddr,
 	    void * __capability _Nonnull __restrict udaddr, size_t len);
 #else
@@ -392,6 +423,7 @@ int64_t	fuword64_c(volatile const void * __capability base);
 int	fuecap_c(volatile const void * __capability base, intcap_t *val);
 int	fueword_c(volatile const void * __capability base, long *val);
 int	fueword32_c(volatile const void * __capability base, int32_t *val);
+int	fueword64_c(volatile const void * __capability base, int64_t *val);
 int	subyte_c(volatile void * __capability base, int byte);
 int	suword_c(volatile void * __capability base, long word);
 int	suword16_c(volatile void * __capability base, int word);
@@ -401,6 +433,8 @@ uint32_t casuword32_c(volatile uint32_t * __capability base, uint32_t oldval,
 	    uint32_t newval);
 u_long	casuword_c(volatile u_long * __capability base, u_long oldval,
 	    u_long newval);
+int	casueword_c(volatile u_long * __capability base, u_long oldval,
+	    u_long *oldvalp, u_long newval);
 int	casueword32_c(volatile uint32_t * __capability base, uint32_t oldval,
 	    uint32_t *oldvalp, uint32_t newval);
 #else

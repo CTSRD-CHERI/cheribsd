@@ -182,7 +182,8 @@ static int stf_checkaddr6(struct stf_softc *, struct in6_addr *,
 static int stf_ioctl(struct ifnet *, u_long, caddr_t);
 
 static int stf_clone_match(struct if_clone *, const char *);
-static int stf_clone_create(struct if_clone *, char *, size_t, caddr_t);
+static int stf_clone_create(struct if_clone *, char *, size_t,
+    void * __capability);
 static int stf_clone_destroy(struct if_clone *, struct ifnet *);
 static struct if_clone *stf_cloner;
 
@@ -200,7 +201,8 @@ stf_clone_match(struct if_clone *ifc, const char *name)
 }
 
 static int
-stf_clone_create(struct if_clone *ifc, char *name, size_t len, caddr_t params)
+stf_clone_create(struct if_clone *ifc, char *name, size_t len,
+    void * __capability params)
 {
 	char *dp;
 	int err, unit, wildcard;
@@ -722,7 +724,7 @@ stf_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	error = 0;
 	switch (cmd) {
-	case SIOCSIFADDR:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
 		ifa = (struct ifaddr *)data;
 		if (ifa == NULL || ifa->ifa_addr->sa_family != AF_INET6) {
 			error = EAFNOSUPPORT;
@@ -742,21 +744,19 @@ stf_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ifp->if_flags |= IFF_UP;
 		break;
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		ifr = (struct ifreq *)data;
-		if (ifr && ifr->ifr_addr.sa_family == AF_INET6)
-			;
-		else
+		if (ifr == NULL || ifr_addr_get_family(ifr) != AF_INET6)
 			error = EAFNOSUPPORT;
 		break;
 
-	case SIOCGIFMTU:
+	CASE_IOC_IFREQ(SIOCGIFMTU):
 		break;
 
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		ifr = (struct ifreq *)data;
-		mtu = ifr->ifr_mtu;
+		mtu = ifr_mtu_get(ifr);
 		/* RFC 4213 3.2 ideal world MTU */
 		if (mtu < IPV6_MINMTU || mtu > IF_MAXMTU - 20)
 			return (EINVAL);

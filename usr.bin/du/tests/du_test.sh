@@ -33,7 +33,10 @@ A_flag_head()
 A_flag_body()
 {
 	# XXX: compressed volumes?
-	atf_check truncate -s 10g sparse.file
+	if ! truncate -s 10g sparse.file; then
+		atf_skip "Unable to create 10GB sparse file (running on tmpfs?)"
+		rm -f sparse.file
+	fi
 	atf_check -o inline:'1\tsparse.file\n' du -g sparse.file
 	atf_check -o inline:'10\tsparse.file\n' du -A -g sparse.file
 }

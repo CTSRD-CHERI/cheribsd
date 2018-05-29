@@ -95,7 +95,7 @@ struct mdthread {
 	int		md_pc_ctrl;	/* performance counter control */
 	int		md_pc_count;	/* performance counter */
 	int		md_pc_spill;	/* performance counter spill */
-	void		*md_tls;	/* XXX: shouldn't this be __capability? */
+	void * __capability md_tls;
 	size_t		md_tls_tcb_offset;	/* TCB offset */
 #ifdef	CPU_CNMIPS
 	struct octeon_cop2_state	*md_cop2; /* kernel context */

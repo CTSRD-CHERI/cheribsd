@@ -241,7 +241,7 @@ ath_ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 	struct ath_softc *sc = ic->ic_softc;
 
 	switch (cmd) {
-	case SIOCGATHSTATS: {
+	CASE_IOC_IFREQ(SIOCGATHSTATS): {
 		struct ieee80211vap *vap;
 		struct ifnet *ifp;
 		const HAL_RATE_TABLE *rt;
@@ -267,13 +267,17 @@ ath_ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 		    rt->info[sc->sc_txrix].dot11Rate &~ IEEE80211_RATE_BASIC;
 		if (rt->info[sc->sc_txrix].phy & IEEE80211_T_HT)
 			sc->sc_stats.ast_tx_rate |= IEEE80211_RATE_MCS;
-		return copyout(&sc->sc_stats,
-		    ifr->ifr_data, sizeof (sc->sc_stats));
+		return copyout_c(
+		    (__cheri_tocap struct ath_stats * __capability)
+		    &sc->sc_stats, ifr_data_get_ptr(ifr),
+		    sizeof (sc->sc_stats));
 	}
-	case SIOCGATHAGSTATS:
-		return copyout(&sc->sc_aggr_stats,
-		    ifr->ifr_data, sizeof (sc->sc_aggr_stats));
-	case SIOCZATHSTATS: {
+	CASE_IOC_IFREQ(SIOCGATHAGSTATS):
+		return copyout_c(
+		    (__cheri_tocap struct ath_tx_aggr_stats * __capability)
+		    &sc->sc_aggr_stats, ifr_data_get_ptr(ifr),
+		    sizeof (sc->sc_aggr_stats));
+	CASE_IOC_IFREQ(SIOCZATHSTATS): {
 		int error;
 
 		error = priv_check(curthread, PRIV_DRIVER);

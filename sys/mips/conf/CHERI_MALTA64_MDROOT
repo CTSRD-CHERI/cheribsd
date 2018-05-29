@@ -16,7 +16,7 @@ ident		CHERI_MALTA64_MDROOT
 # Adjust the following path based on local requirements.
 #
 options 	MD_ROOT			# MD is a potential root device
-options 	MD_ROOT_SIZE=61440	# 60MB
+options 	MD_ROOT_SIZE=92160	# 90MB
 nooptions	ROOTDEVNAME
 options 	ROOTDEVNAME=\"ufs:md0\"
 

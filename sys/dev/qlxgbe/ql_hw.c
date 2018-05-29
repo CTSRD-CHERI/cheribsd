@@ -1554,6 +1554,8 @@ qla_rcv_stats(qla_host_t *ha, q80_rcv_stats_t *rstat)
 		rstat->lro_flows_active);
 	device_printf(dev, "%s: pkts_droped_unknown\t\t%" PRIu64 "\n",
 		__func__, rstat->pkts_droped_unknown);
+	device_printf(dev, "%s: pkts_cnt_oversized\t\t%" PRIu64 "\n",
+		__func__, rstat->pkts_cnt_oversized);
 }
 
 static void
@@ -2494,6 +2496,9 @@ ql_init_hw_if(qla_host_t *ha)
 	 * program any cached multicast addresses
 	 */
 	if (qla_hw_add_all_mcast(ha))
+		return (-1);
+
+	if (ql_set_max_mtu(ha, ha->max_frame_size, ha->hw.rcv_cntxt_id))
 		return (-1);
 
 	if (qla_config_rss(ha, ha->hw.rcv_cntxt_id))

@@ -94,6 +94,7 @@ static xo_ssize_t
 formatter (xo_handle_t *xop, char *buf, xo_ssize_t bufsiz,
 	   const char *fmt, va_list vap UNUSED)
 {
+    /* FIXME: this is completely BROKEN on systems that pass varargs on the stack! */
     int lflag UNUSED = 0;	/* Parse long flag, though currently ignored */
     int hflag = 0, jflag = 0, tflag = 0,
 	zflag = 0, qflag = 0, star1 = 0, star2 = 0;
@@ -148,7 +149,7 @@ formatter (xo_handle_t *xop, char *buf, xo_ssize_t bufsiz,
 	else
 	    rc = snprintf(buf, bufsiz, fmt, value);
 
-    } else if (strchr("ouxXOUp", fc) != NULL) {
+    } else if (strchr("ouxXOU", fc) != NULL) {
 	unsigned long long value = strtoull(next_arg(), NULL, 0);
 	if (star1 && star2)
 	    rc = snprintf(buf, bufsiz, fmt, w1, w2, value);
@@ -156,7 +157,20 @@ formatter (xo_handle_t *xop, char *buf, xo_ssize_t bufsiz,
 	    rc = snprintf(buf, bufsiz, fmt, w1, value);
 	else
 	    rc = snprintf(buf, bufsiz, fmt, value);
-
+    } else if (fc == 'p') {
+	/*
+	 * XXXAR: passing the unsigned long long from the command line to %p
+	 * happens to work on little endian systems but is completely wrong on
+	 * CHERI (and also 32 bit big endian systems).
+	 */
+	unsigned long long numeric_value = strtoull(next_arg(), NULL, 0);
+	void* value = (void*)(intptr_t)numeric_value;
+	if (star1 && star2)
+	    rc = snprintf(buf, bufsiz, fmt, w1, w2, value);
+	else if (star1)
+	    rc = snprintf(buf, bufsiz, fmt, w1, value);
+	else
+	    rc = snprintf(buf, bufsiz, fmt, value);
     } else if (strchr("eEfFgGaA", fc) != NULL) {
 	double value = strtold(next_arg(), NULL);
 	if (star1 && star2)
@@ -175,6 +189,7 @@ formatter (xo_handle_t *xop, char *buf, xo_ssize_t bufsiz,
 	else
 	    rc = snprintf(buf, bufsiz, fmt, value);
     }
+    /* fprintf(stderr, "In fmt: %s -- resulting buf: %s\n", fmt, buf); */
 
     return rc;
 }

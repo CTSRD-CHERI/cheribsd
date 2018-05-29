@@ -9,6 +9,7 @@ ATF_TESTS_C+=		qsort_test
 ATF_TESTS_C+=		set_constraint_handler_s_test
 ATF_TESTS_C+=		tsearch_test
 .if ${COMPILER_FEATURES:Mc++11} && !defined(LIBCHERI)
+# CHERI: compiler crashes
 ATF_TESTS_CXX+=		cxa_thread_atexit_test
 ATF_TESTS_CXX+=		cxa_thread_atexit_nothr_test
 .endif

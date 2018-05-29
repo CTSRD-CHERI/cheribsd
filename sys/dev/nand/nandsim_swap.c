@@ -189,7 +189,7 @@ swap_file_write(struct chip_swap *swap, struct block_state *blk_state)
 	struct mount *mp;
 	struct vnode *vp;
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 
 	if (swap == NULL || blk_state == NULL)
 		return (-1);
@@ -234,7 +234,7 @@ swap_file_read(struct chip_swap *swap, struct block_state *blk_state)
 	struct thread *td;
 	struct vnode *vp;
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 
 	if (swap == NULL || blk_state == NULL)
 		return (-1);

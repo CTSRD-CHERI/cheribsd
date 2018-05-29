@@ -61,6 +61,10 @@
 #include <vm/vm_pageout.h>
 #include <vm/vm_map.h>
 
+CTASSERT(sizeof(void * __capability) == CHERICAP_SIZE);
+/* 28 capability registers + capcause + padding. */
+CTASSERT(sizeof(struct cheri_frame) == (29 * CHERICAP_SIZE));
+
 /*
  * Beginnings of a programming interface for explicitly managing capability
  * registers.  Convert back and forth between capability registers and
@@ -87,7 +91,6 @@ static union {
  * that work on other architectures might break alignment on CHERI.
  */
 CTASSERT(offsetof(struct trapframe, ddc) % CHERICAP_SIZE == 0);
-CTASSERT(offsetof(struct mdthread, md_tls_cap) % CHERICAP_SIZE == 0);
 CTASSERT(offsetof(struct mdthread, md_cheri_mmap_cap) % CHERICAP_SIZE == 0);
 
 /*
@@ -106,6 +109,9 @@ CTASSERT(sizeof(void *__capability) == 32);
 CTASSERT(sizeof(struct chericap) == 32);
 CTASSERT(sizeof(struct cheri_object) == 64);
 #endif
+
+static void * __capability userspace_cap;
+static void * __capability user_sealcap;
 
 /*
  * For now, all we do is declare what we support, as most initialisation took
@@ -133,9 +139,104 @@ cheri_cpu_startup(void)
 	if (cheri_testunion.ct_bytes[16] != 0)
 		panic("CPU implements 128-bit capabilities");
 #endif
+
+	/*
+	 * Create a capability covering all of userspace from which to
+	 * derive new capabilities in execve(), etc.
+	 *
+	 * XXX-BD: A hardline, no-exceptions W^X implementation would split
+	 * the userspace capability here.
+	 *
+	 * XXX-BD: This is actually an ABI property and should probably
+	 * per sysent.
+	 *
+	 * XXX-BD: this should happen earlier in startup.
+	 */
+	_Static_assert(CHERI_CAP_USER_DATA_BASE == CHERI_CAP_USER_CODE_BASE,
+	    "Code and data bases differ");
+	_Static_assert(CHERI_CAP_USER_DATA_LENGTH == CHERI_CAP_USER_CODE_LENGTH,
+	    "Code and data lengths differ");
+	_Static_assert(CHERI_CAP_USER_DATA_OFFSET == 0,
+	    "Data offset is non-zero");
+	_Static_assert(CHERI_CAP_USER_CODE_OFFSET == 0,
+	    "Code offset is non-zero");
+	userspace_cap = cheri_andperm(cheri_csetbounds(
+	    cheri_setoffset(cheri_getkdc(), CHERI_CAP_USER_DATA_BASE),
+	    CHERI_CAP_USER_DATA_LENGTH),
+	    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
+
+	/*
+	 * Create a capability for userspace to seal capabilities with.
+	 */
+	cheri_capability_set(&user_sealcap, CHERI_SEALCAP_USERSPACE_PERMS,
+	    CHERI_SEALCAP_USERSPACE_BASE, CHERI_SEALCAP_USERSPACE_LENGTH,
+	    CHERI_SEALCAP_USERSPACE_OFFSET);
+
+	/*
+	 * XXX-BD: KDC may now be reduced.
+	 */
 }
 SYSINIT(cheri_cpu_startup, SI_SUB_CPU, SI_ORDER_FIRST, cheri_cpu_startup,
     NULL);
+
+/*
+ * Build a new userspace capability derived from userspace_cap.
+ * The resulting capability may include both read and execute permissions,
+ * but not write.
+ */
+void * __capability
+cheri_capability_build_user_code(uint32_t perms, vaddr_t basep, size_t length,
+    off_t off)
+{
+
+	KASSERT((perms & ~CHERI_CAP_USER_CODE_PERMS) == 0,
+	    ("perms %x has permission not in CHERI_CAP_USER_CODE_PERMS %x",
+	    perms, CHERI_CAP_USER_CODE_PERMS));
+
+	return (cheri_capability_build_user_rwx(
+	    perms & CHERI_CAP_USER_CODE_PERMS, basep, length, off));
+}
+
+/*
+ * Build a new userspace capability derived from userspace_cap.
+ * The resulting capability may include read and write permissions, but
+ * not execute.
+ */
+void * __capability
+cheri_capability_build_user_data(uint32_t perms, vaddr_t basep, size_t length,
+    off_t off)
+{
+
+	KASSERT((perms & ~CHERI_CAP_USER_DATA_PERMS) == 0,
+	    ("perms %x has permission not in CHERI_CAP_USER_DATA_PERMS %x",
+	    perms, CHERI_CAP_USER_DATA_PERMS));
+
+	return (cheri_capability_build_user_rwx(
+	    perms & CHERI_CAP_USER_DATA_PERMS, basep, length, off));
+}
+
+/*
+ * Build a new userspace capability derived from userspace_cap.
+ * The resulting capability may include read, write, and execute permissions.
+ *
+ * This function violates W^X and its use is discouraged and the reason for
+ * use should be documented in a comment when it is used.
+ */
+void * __capability
+cheri_capability_build_user_rwx(uint32_t perms, vaddr_t basep, size_t length,
+    off_t off)
+{
+	void * __capability tmpcap;
+
+	tmpcap = cheri_setoffset(cheri_andperm(cheri_csetbounds(
+	    cheri_setoffset(userspace_cap, basep), length), perms), off);
+
+	KASSERT(cheri_getlen(tmpcap) == length,
+	    ("Constructed capability has wrong length %zu != %zu",
+	    cheri_getlen(tmpcap), length));
+
+	return (tmpcap);
+}
 
 /*
  * Build a new capabilty derived from $kdc with the contents of the passed
@@ -162,9 +263,6 @@ cheri_capability_set(void * __capability *cp, uint32_t perms, vaddr_t basep,
 	 * NB: With imprecise bounds, we want to assert that the results will
 	 * be 'as requested' -- i.e., that the kernel always request bounds
 	 * that can be represented precisly.
-	 *
-	 * XXXRW: Given these assupmtions, we actually don't need to do the
-	 * '+= off' above.
 	 */
 #ifdef INVARIANTS
 	KASSERT(cheri_gettag(*cp) != 0, ("%s: capability untagged", __func__));
@@ -215,17 +313,15 @@ cheri_capability_set_user_sigcode(void * __capability *cp,
 		base = rounddown2(base, sizeof(struct chericap));
 	}
 
-	cheri_capability_set(cp, CHERI_CAP_USER_CODE_PERMS, base,
-	    szsigcode, 0);
+	*cp = cheri_capability_build_user_code(CHERI_CAP_USER_CODE_PERMS,
+	    base, szsigcode, 0);
 }
 
 void
 cheri_capability_set_user_sealcap(void * __capability *cp)
 {
 
-	cheri_capability_set(cp, CHERI_SEALCAP_USERSPACE_PERMS,
-	    CHERI_SEALCAP_USERSPACE_BASE, CHERI_SEALCAP_USERSPACE_LENGTH,
-	    CHERI_SEALCAP_USERSPACE_OFFSET);
+	*cp = user_sealcap;
 }
 
 void

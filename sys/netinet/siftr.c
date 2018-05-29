@@ -150,7 +150,7 @@ __FBSDID("$FreeBSD$");
 #endif
 
 /* useful macros */
-#define CAST_PTR_INT(X) (*((int*)(X)))
+#define CAST_PTR_INT(X) (*((int * __capability)(X)))
 
 #define UPPER_SHORT(X)	(((X) & 0xFFFF0000) >> 16)
 #define LOWER_SHORT(X)	((X) & 0x0000FFFF)

@@ -312,7 +312,7 @@ alq_doio(struct alq *alq)
 	struct vnode *vp;
 	void *write_start;
 	struct uio auio;
-	struct iovec aiov[2];
+	kiovec_t aiov[2];
 	int totlen;
 	int iov;
 	int wrapearly;

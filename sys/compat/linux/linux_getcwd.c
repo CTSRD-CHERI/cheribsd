@@ -76,8 +76,8 @@ linux_getcwd(struct thread *td, struct linux_getcwd_args *args)
 
 	path = malloc(LINUX_PATH_MAX, M_LINUX, M_WAITOK);
 
-	error = kern___getcwd(td, path, UIO_SYSSPACE, args->bufsize,
-	    LINUX_PATH_MAX);
+	error = kern___getcwd(td, (__cheri_tocap char * __capability)path,
+	    UIO_SYSSPACE, args->bufsize, LINUX_PATH_MAX);
 	if (error == 0) {
 		lenused = strlen(path) + 1;
 		error = copyout(path, args->buf, lenused);

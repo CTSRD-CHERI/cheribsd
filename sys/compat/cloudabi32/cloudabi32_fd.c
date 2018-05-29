@@ -46,16 +46,16 @@ cloudabi32_copyinuio(const cloudabi32_iovec_t *iovp, size_t iovcnt,
 {
 	cloudabi32_iovec_t iovobj;
 	struct uio *uio;
-	struct iovec *iov;
+	kiovec_t *iov;
 	size_t i;
 	int error;
 
 	/* Allocate uio and iovecs. */
 	if (iovcnt > UIO_MAXIOV)
 		return (EINVAL);
-	uio = malloc(sizeof(struct uio) + iovcnt * sizeof(struct iovec),
+	uio = malloc(sizeof(struct uio) + iovcnt * sizeof(kiovec_t),
 	    M_IOV, M_WAITOK);
-	iov = (struct iovec *)(uio + 1);
+	iov = (kiovec_t *)(uio + 1);
 
 	/* Initialize uio. */
 	uio->uio_iov = iov;

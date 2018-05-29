@@ -1205,7 +1205,7 @@ static int
 dqopen(struct vnode *vp, struct ufsmount *ump, int type)
 {
 	struct dqhdr64 dqh;
-	struct iovec aiov;
+	kiovec_t aiov;
 	struct uio auio;
 	int error;
 
@@ -1255,7 +1255,7 @@ dqget(struct vnode *vp, u_long id, struct ufsmount *ump, int type,
 	struct dquot *dq, *dq1;
 	struct dqhash *dqh;
 	struct vnode *dqvp;
-	struct iovec aiov;
+	kiovec_t aiov;
 	struct uio auio;
 	int dqvplocked, error;
 
@@ -1397,7 +1397,8 @@ hfound:		DQI_LOCK(dq);
 	}
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
-	IOVEC_INIT(&aiov, buf, recsize);
+	/* XXXBD: CTSRD-CHERI/clang#179 */
+	IOVEC_INIT(&aiov, &buf[0], recsize);
 	auio.uio_resid = recsize;
 	auio.uio_offset = base + id * recsize;
 	auio.uio_segflg = UIO_SYSSPACE;
@@ -1527,7 +1528,7 @@ dqsync(struct vnode *vp, struct dquot *dq)
 	uint8_t buf[sizeof(struct dqblk64)];
 	off_t base, recsize;
 	struct vnode *dqvp;
-	struct iovec aiov;
+	kiovec_t aiov;
 	struct uio auio;
 	int error;
 	struct mount *mp;
@@ -1590,7 +1591,8 @@ dqsync(struct vnode *vp, struct dquot *dq)
 
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
-	IOVEC_INIT(&aiov, buf, recsize);
+	/* XXXBD: CTSRD-CHERI/clang#179 */
+	IOVEC_INIT(&aiov, &buf[0], recsize);
 	auio.uio_resid = recsize;
 	auio.uio_offset = base + dq->dq_id * recsize;
 	auio.uio_segflg = UIO_SYSSPACE;

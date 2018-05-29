@@ -148,7 +148,7 @@ int
 linux32_copyinuio(struct l_iovec32 *iovp, l_ulong iovcnt, struct uio **uiop)
 {
 	struct l_iovec32 iov32;
-	struct iovec *iov;
+	kiovec_t *iov;
 	struct uio *uio;
 	uint32_t iovlen;
 	int error, i;
@@ -156,9 +156,9 @@ linux32_copyinuio(struct l_iovec32 *iovp, l_ulong iovcnt, struct uio **uiop)
 	*uiop = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (EINVAL);
-	iovlen = iovcnt * sizeof(struct iovec);
+	iovlen = iovcnt * sizeof(kiovec_t);
 	uio = malloc(iovlen + sizeof(*uio), M_IOV, M_WAITOK);
-	iov = (struct iovec *)(uio + 1);
+	iov = (kiovec_t *)(uio + 1);
 	for (i = 0; i < iovcnt; i++) {
 		error = copyin(&iovp[i], &iov32, sizeof(struct l_iovec32));
 		if (error) {
@@ -185,18 +185,18 @@ linux32_copyinuio(struct l_iovec32 *iovp, l_ulong iovcnt, struct uio **uiop)
 }
 
 int
-linux32_copyiniov(struct l_iovec32 *iovp32, l_ulong iovcnt, struct iovec **iovp,
+linux32_copyiniov(struct l_iovec32 *iovp32, l_ulong iovcnt, kiovec_t **iovp,
     int error)
 {
 	struct l_iovec32 iov32;
-	struct iovec *iov;
+	kiovec_t *iov;
 	uint32_t iovlen;
 	int i;
 
 	*iovp = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (error);
-	iovlen = iovcnt * sizeof(struct iovec);
+	iovlen = iovcnt * sizeof(kiovec_t);
 	iov = malloc(iovlen, M_IOV, M_WAITOK);
 	for (i = 0; i < iovcnt; i++) {
 		error = copyin(&iovp32[i], &iov32, sizeof(struct l_iovec32));

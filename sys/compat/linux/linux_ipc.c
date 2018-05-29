@@ -544,7 +544,7 @@ linux_semctl(struct thread *td, struct linux_semctl_args *args)
 	struct l_semid64_ds linux_semid64;
 	struct l_seminfo linux_seminfo;
 	struct semid_ds semid;
-	union semun semun;
+	ksemun_t semun;
 	register_t rval;
 	int cmd, error;
 
@@ -629,11 +629,11 @@ linux_semctl(struct thread *td, struct linux_semctl_args *args)
 		return (0);
 	case LINUX_GETALL:
 		cmd = GETALL;
-		semun.array = PTRIN(args->arg.array);
+		semun.array = __USER_CAP_UNBOUND(PTRIN(args->arg.array));
 		break;
 	case LINUX_SETALL:
 		cmd = SETALL;
-		semun.array = PTRIN(args->arg.array);
+		semun.array = __USER_CAP_UNBOUND(PTRIN(args->arg.array));
 		break;
 	default:
 		linux_msg(td, "ipc type %d is not implemented",
@@ -659,7 +659,7 @@ linux_msgsnd(struct thread *td, struct linux_msgsnd_args *args)
 		return (error);
 	mtype = (long)lmtype;
 	return (kern_msgsnd(td, args->msqid,
-	    (const char *)msgp + sizeof(lmtype),
+	    (__cheri_tocap const char * __capability)msgp + sizeof(lmtype),
 	    args->msgsz, args->msgflg, mtype));
 }
 
@@ -675,8 +675,8 @@ linux_msgrcv(struct thread *td, struct linux_msgrcv_args *args)
 		return (EINVAL);
 	msgp = PTRIN(args->msgp);
 	if ((error = kern_msgrcv(td, args->msqid,
-	    (char *)msgp + sizeof(lmtype), args->msgsz,
-	    args->msgtyp, args->msgflg, &mtype)) != 0)
+	    (__cheri_tocap char * __capability)msgp + sizeof(lmtype),
+	    args->msgsz, args->msgtyp, args->msgflg, &mtype)) != 0)
 		return (error);
 	lmtype = (l_long)mtype;
 	return (copyout(&lmtype, msgp, sizeof(lmtype)));

@@ -11,7 +11,8 @@ PLAIN_TESTS_SH=
 PLAIN_TESTS_SH+=	${test}
 TEST_METADATA.${test}+=	required_user="root"
 # Double the default timeout, some are very slow under emulation
-TEST_METADATA.${test}+=	timeout="600"
+# XXXAR: doubled again for CHERI purecap
+TEST_METADATA.${test}+=	timeout="1200"
 .endfor
 
 .include <bsd.test.mk>

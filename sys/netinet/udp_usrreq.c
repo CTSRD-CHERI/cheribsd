@@ -1087,6 +1087,9 @@ udp_ctloutput(struct socket *so, struct sockopt *sopt)
 			break;
 		}
 		break;
+	default:
+		error = EINVAL;
+		break;
 	}	
 	return (error);
 }

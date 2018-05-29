@@ -382,7 +382,7 @@ struct iflib_fl {
 #endif
 	/* implicit pad */
 
-	bitstr_t 	*ifl_rx_bitmap;;
+	bitstr_t 	*ifl_rx_bitmap;
 	qidx_t		ifl_fragidx;
 	/* constant */
 	qidx_t		ifl_size;
@@ -1800,7 +1800,8 @@ static void
 _iflib_fl_refill(if_ctx_t ctx, iflib_fl_t fl, int count)
 {
 	struct mbuf *m;
-	int idx, frag_idx = fl->ifl_fragidx, pidx = fl->ifl_pidx;
+	int idx, frag_idx = fl->ifl_fragidx;
+        int pidx = fl->ifl_pidx;
 	caddr_t cl, *sd_cl;
 	struct mbuf **sd_m;
 	uint8_t *sd_flags;
@@ -1992,7 +1993,7 @@ iflib_fl_bufs_free(iflib_fl_t fl)
 	/*
 	 * Reset free list values
 	 */
-	fl->ifl_credits = fl->ifl_cidx = fl->ifl_pidx = fl->ifl_gen = 0;;
+	fl->ifl_credits = fl->ifl_cidx = fl->ifl_pidx = fl->ifl_gen = fl->ifl_fragidx = 0;
 	bzero(idi->idi_vaddr, idi->idi_size);
 }
 
@@ -2008,7 +2009,7 @@ iflib_fl_setup(iflib_fl_t fl)
 	if_ctx_t ctx = rxq->ifr_ctx;
 	if_softc_ctx_t sctx = &ctx->ifc_softc_ctx;
 
-       fl->ifl_rx_bitmap = bit_alloc(fl->ifl_size, M_IFLIB, M_WAITOK|M_ZERO);
+	bit_nclear(fl->ifl_rx_bitmap, 0, fl->ifl_size);
 	/*
 	** Free current RX buffer structs and their mbufs
 	*/
@@ -2891,7 +2892,7 @@ iflib_busdma_load_mbuf_sg(iflib_txq_t txq, bus_dma_tag_t tag, bus_dmamap_t map,
 	if_ctx_t ctx;
 	if_shared_ctx_t		sctx;
 	if_softc_ctx_t		scctx;
-	int i, next, pidx, err, maxsegsz, ntxd, count;
+	int i, next, pidx, err, ntxd, count;
 	struct mbuf *m, *tmp, **ifsd_m;
 
 	m = *m0;
@@ -2934,13 +2935,17 @@ iflib_busdma_load_mbuf_sg(iflib_txq_t txq, bus_dma_tag_t tag, bus_dmamap_t map,
 			m = m->m_next;
 		} while (m != NULL);
 	} else {
-		int buflen, sgsize, max_sgsize;
+		int buflen, sgsize, maxsegsz, max_sgsize;
 		vm_offset_t vaddr;
 		vm_paddr_t curaddr;
 
 		count = i = 0;
-		maxsegsz = sctx->isc_tx_maxsize;
 		m = *m0;
+		if (m->m_pkthdr.csum_flags & CSUM_TSO)
+			maxsegsz = scctx->isc_tx_tso_segsize_max;
+		else
+			maxsegsz = sctx->isc_tx_maxsegsize;
+
 		do {
 			if (__predict_false(m->m_len <= 0)) {
 				tmp = m;
@@ -3725,7 +3730,7 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 	int		err = 0, reinit = 0, bits;
 
 	switch (command) {
-	case SIOCSIFADDR:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
 #ifdef INET
 		if (ifa->ifa_addr->sa_family == AF_INET)
 			avoid_reset = TRUE;
@@ -3749,9 +3754,9 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 		} else
 			err = ether_ioctl(ifp, command, data);
 		break;
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		CTX_LOCK(ctx);
-		if (ifr->ifr_mtu == if_getmtu(ifp)) {
+		if (ifr_mtu_get(ifr) == if_getmtu(ifp)) {
 			CTX_UNLOCK(ctx);
 			break;
 		}
@@ -3759,18 +3764,18 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 		/* stop the driver and free any clusters before proceeding */
 		iflib_stop(ctx);
 
-		if ((err = IFDI_MTU_SET(ctx, ifr->ifr_mtu)) == 0) {
-			if (ifr->ifr_mtu > ctx->ifc_max_fl_buf_size)
+		if ((err = IFDI_MTU_SET(ctx, ifr_mtu_get(ifr))) == 0) {
+			if (ifr_mtu_get(ifr) > ctx->ifc_max_fl_buf_size)
 				ctx->ifc_flags |= IFC_MULTISEG;
 			else
 				ctx->ifc_flags &= ~IFC_MULTISEG;
-			err = if_setmtu(ifp, ifr->ifr_mtu);
+			err = if_setmtu(ifp, ifr_mtu_get(ifr));
 		}
 		iflib_init_locked(ctx);
 		if_setdrvflags(ifp, bits);
 		CTX_UNLOCK(ctx);
 		break;
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		CTX_LOCK(ctx);
 		if (if_getflags(ifp) & IFF_UP) {
 			if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
@@ -3786,8 +3791,8 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 		ctx->ifc_if_flags = if_getflags(ifp);
 		CTX_UNLOCK(ctx);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
 			CTX_LOCK(ctx);
 			IFDI_INTR_DISABLE(ctx);
@@ -3796,7 +3801,7 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 			CTX_UNLOCK(ctx);
 		}
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		CTX_LOCK(ctx);
 		IFDI_MEDIA_SET(ctx);
 		CTX_UNLOCK(ctx);
@@ -3804,11 +3809,11 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 	case SIOCGIFMEDIA:
 		err = ifmedia_ioctl(ifp, ifr, &ctx->ifc_media, command);
 		break;
-	case SIOCGI2C:
+	CASE_IOC_IFREQ(SIOCGI2C):
 	{
 		struct ifi2creq i2c;
 
-		err = copyin(ifr->ifr_data, &i2c, sizeof(i2c));
+		err = copyin_c(ifr_data_get_ptr(ifr), &i2c, sizeof(i2c));
 		if (err != 0)
 			break;
 		if (i2c.dev_addr != 0xA0 && i2c.dev_addr != 0xA2) {
@@ -3821,14 +3826,15 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 		}
 
 		if ((err = IFDI_I2C_REQ(ctx, &i2c)) == 0)
-			err = copyout(&i2c, ifr->ifr_data, sizeof(i2c));
+			err = copyout_c(&i2c, ifr_data_get_ptr(ifr),
+			    sizeof(i2c));
 		break;
 	}
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 	{
 		int mask, setmask;
 
-		mask = ifr->ifr_reqcap ^ if_getcapenable(ifp);
+		mask = ifr_reqcap_get(ifr) ^ if_getcapenable(ifp);
 		setmask = 0;
 #ifdef TCP_OFFLOAD
 		setmask |= mask & (IFCAP_TOE4|IFCAP_TOE6);
@@ -3857,7 +3863,7 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 		}
 		break;
 	    }
-	case SIOCGPRIVATE_0:
+	CASE_IOC_IFREQ(SIOCGPRIVATE_0):
 	case SIOCSDRVSPEC:
 	case SIOCGDRVSPEC:
 		CTX_LOCK(ctx);
@@ -4688,6 +4694,9 @@ iflib_queues_alloc(if_ctx_t ctx)
 			err = ENOMEM;
 			goto err_rx_desc;
 		}
+
+		for (j = 0, fl = rxq->ifr_fl; j < rxq->ifr_nfl; j++, fl++) 
+			fl->ifl_rx_bitmap = bit_alloc(fl->ifl_size, M_IFLIB, M_WAITOK|M_ZERO);
 	}
 
 	/* TXQs */

@@ -138,10 +138,10 @@ static int pio_enable_irq(struct vtbe_softc *sc, int enable);
 static void
 vtbe_txstart_locked(struct vtbe_softc *sc)
 {
-	struct iovec iov[DESC_COUNT];
+	kiovec_t iov[DESC_COUNT];
 	struct virtio_net_hdr *vnh;
 	struct vqueue_info *vq;
-	struct iovec *tiov;
+	kiovec_t *tiov;
 	struct ifnet *ifp;
 	struct mbuf *m;
 	struct uio uio;
@@ -282,7 +282,7 @@ vtbe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	error = 0;
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		VTBE_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			pio_enable_irq(sc, 1);
@@ -300,10 +300,10 @@ vtbe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->if_flags = ifp->if_flags;
 		VTBE_UNLOCK(sc);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		ifmr = (struct ifmediareq *)data;
 		ifmr->ifm_count = 1;
@@ -311,14 +311,14 @@ vtbe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ifmr->ifm_active = (IFM_ETHER | IFM_10G_T | IFM_FDX);
 		ifmr->ifm_current = ifmr->ifm_active;
 		break;
-	case SIOCSIFCAP:
-		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
+	CASE_IOC_IFREQ(SIOCSIFCAP):
+		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
 		if (mask & IFCAP_VLAN_MTU) {
 			ifp->if_capenable ^= IFCAP_VLAN_MTU;
 		}
 		break;
 
-	case SIOCSIFADDR:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
 		pio_enable_irq(sc, 1);
 	default:
 		error = ether_ioctl(ifp, cmd, data);
@@ -382,8 +382,8 @@ vq_init(struct vtbe_softc *sc)
 static void
 vtbe_proc_rx(struct vtbe_softc *sc, struct vqueue_info *vq)
 {
-	struct iovec iov[DESC_COUNT];
-	struct iovec *tiov;
+	kiovec_t iov[DESC_COUNT];
+	kiovec_t *tiov;
 	struct ifnet *ifp;
 	struct uio uio;
 	struct mbuf *m;

@@ -54,6 +54,9 @@ extern mips_function_ptr __dtors_end;
 extern void *__dso_handle;
 void *__dso_handle;
 
+
+/* For cheri purecap shared libraries we should not have any .ctors/.ctors */
+#ifndef SHLIB_INIT
 /*
  * Execute constructors; invoked by the crt_sb.S startup code.
  *
@@ -64,6 +67,10 @@ void *__dso_handle;
 void
 crt_call_constructors(void)
 {
+	/*
+	 * TODO: once lld converts ctors to init_array print a warning
+	 * message that the binary should be relinked
+	 */
 	mips_function_ptr *func = &__ctors_start[0];
 	mips_function_ptr *end = __builtin_cheri_offset_set(func,
 	    (char*)&__ctors_end - (char*)func);
@@ -76,3 +83,4 @@ crt_call_constructors(void)
 		}
 	}
 }
+#endif

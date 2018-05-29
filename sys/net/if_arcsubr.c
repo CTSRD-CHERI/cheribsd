@@ -663,7 +663,7 @@ arc_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int error = 0;
 
 	switch (command) {
-	case SIOCSIFADDR:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
 		ifp->if_flags |= IFF_UP;
 		switch (ifa->ifa_addr->sa_family) {
 #ifdef INET
@@ -678,21 +678,16 @@ arc_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		break;
 
-	case SIOCGIFADDR:
-		{
-			struct sockaddr *sa;
-
-			sa = (struct sockaddr *) &ifr->ifr_data;
-			*(u_int8_t *)sa->sa_data = ARC_LLADDR(ifp);
-		}
+	CASE_IOC_IFREQ(SIOCGIFADDR):
+		ifr_addr_get_data(ifr)[0] = ARC_LLADDR(ifp);
 		break;
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		if (ifr == NULL)
 			error = EAFNOSUPPORT;
 		else {
-			switch (ifr->ifr_addr.sa_family) {
+			switch (ifr_addr_get_family(ifr)) {
 			case AF_INET:
 			case AF_INET6:
 				error = 0;
@@ -704,17 +699,17 @@ arc_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		break;
 
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		/*
 		 * Set the interface MTU.
 		 * mtu can't be larger than ARCMTU for RFC1051
 		 * and can't be larger than ARC_PHDS_MTU
 		 */
-		if (((ifp->if_flags & IFF_LINK0) && ifr->ifr_mtu > ARCMTU) ||
-		    ifr->ifr_mtu > ARC_PHDS_MAXMTU)
+		if (((ifp->if_flags & IFF_LINK0) && ifr_mtu_get(ifr) > ARCMTU) ||
+		    ifr_mtu_get(ifr) > ARC_PHDS_MAXMTU)
 			error = EINVAL;
 		else
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 		break;
 	}
 

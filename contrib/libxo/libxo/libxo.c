@@ -141,7 +141,7 @@ static const char xo_default_format[] = "%s";
 
 #define XO_INDENT_BY 2	/* Amount to indent when pretty printing */
 #define XO_DEPTH	128	 /* Default stack depth */
-#define XO_MAX_ANCHOR_WIDTH (8*1024) /* Anything wider is just sillyb */
+#define XO_MAX_ANCHOR_WIDTH (8*1024) /* Anything wider is just silly */
 
 #define XO_FAILURE_NAME	"failure"
 
@@ -303,6 +303,31 @@ struct xo_handle_s {
     xo_encoder_func_t xo_encoder; /* Encoding function */
     void *xo_private;		/* Private data for external encoders */
 };
+
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheri/cheric.h>
+/*
+ * We know that the purecap ABI represents a va_list as a single capabilty.
+ * In order to check whether we have gone past the end of the list we can simply
+ * check if offset >= length. While it will trap anyway on access this allows
+ * us to print an error message even if the result of va_arg is not used.
+ */
+static inline void check_xo_vap_in_bounds(xo_handle_t* xop, const char* fmt) {
+	/* TODO: use an assert instead of always checking? */
+	if (cheri_getoffset((void*)(xop->xo_vap)) >=
+	    cheri_getlen((void*)(xop->xo_vap))) {
+		fprintf(stderr, "ERROR: libxo va_list out of bounds: %#p\n"
+		    "Format string was: %s\n", (void*)(xop->xo_vap), fmt);
+		abort();
+	}
+}
+#define xo_va_arg_checked(xop, type) __extension__({ \
+	check_xo_vap_in_bounds(xop, fmt); va_arg(xop->xo_vap, type); })
+#else
+/* In MIPS code we can't check whether we are out-of-bounds, just use va_list */
+#define xo_va_arg_checked(xop, type) va_arg(xop->xo_vap, type)
+#endif
+
 
 /* Flag operations */
 #define XOF_BIT_ISSET(_flag, _bit)	(((_flag) & (_bit)) ? 1 : 0)
@@ -588,11 +613,7 @@ xo_depth_check (xo_handle_t *xop, int depth)
     if (depth >= xop->xo_stack_size) {
 	depth += XO_DEPTH;	/* Extra room */
 
-#ifndef XO_MALLOC_HACK
 	xsp = xo_realloc(xop->xo_stack, sizeof(xop->xo_stack[0]) * depth);
-#else
-	xsp = realloc(xop->xo_stack, sizeof(xop->xo_stack[0]) * depth);
-#endif /* XO_MALLOC_HACK */
 	if (xsp == NULL) {
 	    xo_failure(xop, "xo_depth_check: out of memory (%d)", depth);
 	    return -1;
@@ -1899,11 +1920,7 @@ xo_failure (xo_handle_t *xop, const char *fmt, ...)
 xo_handle_t *
 xo_create (xo_style_t style, xo_xof_flags_t flags)
 {
-#ifndef XO_MALLOC_HACK
     xo_handle_t *xop = xo_realloc(NULL, sizeof(*xop));
-#else
-    xo_handle_t *xop = realloc(NULL, sizeof(*xop));
-#endif /* XO_MALLOC_HACK */
 
     if (xop) {
 	bzero(xop, sizeof(*xop));
@@ -1994,11 +2011,7 @@ xo_destroy (xo_handle_t *xop_arg)
     if (xop->xo_close && XOF_ISSET(xop, XOF_CLOSE_FP))
 	xop->xo_close(xop->xo_opaque);
 
-#ifndef XO_MALLOC_HACK
     xo_free(xop->xo_stack);
-#else
-    free(xop->xo_stack);
-#endif /* XO_MALLOC_HACK */
     xo_buf_cleanup(&xop->xo_data);
     xo_buf_cleanup(&xop->xo_fmt);
     xo_buf_cleanup(&xop->xo_predicate);
@@ -2006,21 +2019,13 @@ xo_destroy (xo_handle_t *xop_arg)
     xo_buf_cleanup(&xop->xo_color_buf);
 
     if (xop->xo_version)
-#ifndef XO_MALLOC_HACK
 	xo_free(xop->xo_version);
-#else
-	free(xop->xo_version);
-#endif /* XO_MALLOC_HACK */
 
     if (xop_arg == NULL) {
 	bzero(&xo_default_handle, sizeof(xo_default_handle));
 	xo_default_inited = 0;
     } else
-#ifndef XO_MALLOC_HACK
 	xo_free(xop);
-#else
-	free(xop);
-#endif /* XO_MALLOC_HACK */
 }
 
 /**
@@ -2505,11 +2510,7 @@ xo_strndup (const char *str, ssize_t len)
     if (len < 0)
 	len = strlen(str);
 
-#ifndef XO_MALLOC_HACK
     char *cp = xo_realloc(NULL, len + 1);
-#else
-    char *cp = realloc(NULL, len + 1);
-#endif /* XO_MALLOC_HACK */
     if (cp) {
 	memcpy(cp, str, len);
 	cp[len] = '\0';
@@ -2532,11 +2533,7 @@ xo_set_leading_xpath (xo_handle_t *xop, const char *path)
     xop = xo_default(xop);
 
     if (xop->xo_leading_xpath) {
-#ifndef XO_MALLOC_HACK
 	xo_free(xop->xo_leading_xpath);
-#else
-	free(xop->xo_leading_xpath);
-#endif /* XO_MALLOC_HACK */
 	xop->xo_leading_xpath = NULL;
     }
 
@@ -2926,10 +2923,13 @@ xo_needed_encoding (xo_handle_t *xop)
 
 static ssize_t
 xo_format_string (xo_handle_t *xop, xo_buffer_t *xbp, xo_xff_flags_t flags,
-		  xo_format_t *xfp)
+		  xo_format_t *xfp, const char* fmt)
 {
     static char null[] = "(null)";
     static char null_no_quotes[] = "null";
+#ifndef __CHERI_PURE_CAPABILITY__
+    (void)fmt;
+#endif
 
     char *cp = NULL;
     wchar_t *wcp = NULL;
@@ -2950,7 +2950,7 @@ xo_format_string (xo_handle_t *xop, xo_buffer_t *xbp, xo_xff_flags_t flags,
 	goto normal_string;
 
     } else if (xfp->xf_enc == XF_ENC_WIDE) {
-	wcp = va_arg(xop->xo_vap, wchar_t *);
+	wcp = xo_va_arg_checked(xop, wchar_t *);
 	if (xfp->xf_skip)
 	    return 0;
 
@@ -2964,7 +2964,7 @@ xo_format_string (xo_handle_t *xop, xo_buffer_t *xbp, xo_xff_flags_t flags,
 	}
 
     } else {
-	cp = va_arg(xop->xo_vap, char *); /* UTF-8 or native */
+	cp = xo_va_arg_checked(xop, char*); /* UTF-8 or native */ /* FIXME: this sometimes crashes on CHERI */
 
     normal_string:
 	if (xfp->xf_skip)
@@ -3409,7 +3409,7 @@ xo_do_format_field (xo_handle_t *xop, xo_buffer_t *xbp,
 		     * we want to ignore
 		     */
 		    if (!XOF_ISSET(xop, XOF_NO_VA_ARG))
-			va_arg(xop->xo_vap, int);
+			xo_va_arg_checked(xop, int);
 		}
 	    }
 	}
@@ -3482,7 +3482,7 @@ xo_do_format_field (xo_handle_t *xop, xo_buffer_t *xbp,
 		int s;
 		for (s = 0; s < XF_WIDTH_NUM; s++) {
 		    if (xf.xf_star[s]) {
-			xf.xf_width[s] = va_arg(xop->xo_vap, int);
+			xf.xf_width[s] = xo_va_arg_checked(xop, int);
 			
 			/* Normalize a negative width value */
 			if (xf.xf_width[s] < 0) {
@@ -3528,7 +3528,7 @@ xo_do_format_field (xo_handle_t *xop, xo_buffer_t *xbp,
 		    : (xf.xf_lflag || (xf.xf_fc == 'S')) ? XF_ENC_WIDE
 		    : xf.xf_hflag ? XF_ENC_LOCALE : XF_ENC_UTF8;
 
-		rc = xo_format_string(xop, xbp, flags, &xf);
+		rc = xo_format_string(xop, xbp, flags, &xf, fmt);
 
 		if ((flags & XFF_TRIM_WS) && xo_style_is_encoding(xop))
 		    rc = xo_trim_ws(xbp, rc);
@@ -3597,7 +3597,7 @@ xo_do_format_field (xo_handle_t *xop, xo_buffer_t *xbp,
 		 * need to pop it.
 		 */
 		if (xf.xf_skip)
-		    va_arg(xop->xo_vap, char *);
+		    xo_va_arg_checked(xop, char *);
 
 	    } else if (xf.xf_fc == 'm') {
 		/* Nothing on the stack for "%m" */
@@ -3606,51 +3606,51 @@ xo_do_format_field (xo_handle_t *xop, xo_buffer_t *xbp,
 		int s;
 		for (s = 0; s < XF_WIDTH_NUM; s++) {
 		    if (xf.xf_star[s])
-			va_arg(xop->xo_vap, int);
+			xo_va_arg_checked(xop, int);
 		}
 
 		if (strchr("diouxXDOU", xf.xf_fc) != NULL) {
 		    if (xf.xf_hflag > 1) {
-			va_arg(xop->xo_vap, int);
+			xo_va_arg_checked(xop, int);
 
 		    } else if (xf.xf_hflag > 0) {
-			va_arg(xop->xo_vap, int);
+			xo_va_arg_checked(xop, int);
 
 		    } else if (xf.xf_lflag > 1) {
-			va_arg(xop->xo_vap, unsigned long long);
+			xo_va_arg_checked(xop, unsigned long long);
 
 		    } else if (xf.xf_lflag > 0) {
-			va_arg(xop->xo_vap, unsigned long);
+			xo_va_arg_checked(xop, unsigned long);
 
 		    } else if (xf.xf_jflag > 0) {
-			va_arg(xop->xo_vap, intmax_t);
+			xo_va_arg_checked(xop, intmax_t);
 
 		    } else if (xf.xf_tflag > 0) {
-			va_arg(xop->xo_vap, ptrdiff_t);
+			xo_va_arg_checked(xop, ptrdiff_t);
 
 		    } else if (xf.xf_zflag > 0) {
-			va_arg(xop->xo_vap, size_t);
+			xo_va_arg_checked(xop, size_t);
 
 		    } else if (xf.xf_qflag > 0) {
-			va_arg(xop->xo_vap, quad_t);
+			xo_va_arg_checked(xop, quad_t);
 
 		    } else {
-			va_arg(xop->xo_vap, int);
+			xo_va_arg_checked(xop, int);
 		    }
 		} else if (strchr("eEfFgGaA", xf.xf_fc) != NULL)
 		    if (xf.xf_lflag)
-			va_arg(xop->xo_vap, long double);
+			xo_va_arg_checked(xop, long double);
 		    else
-			va_arg(xop->xo_vap, double);
+			xo_va_arg_checked(xop, double);
 
 		else if (xf.xf_fc == 'C' || (xf.xf_fc == 'c' && xf.xf_lflag))
-		    va_arg(xop->xo_vap, wint_t);
+		    xo_va_arg_checked(xop, wint_t);
 
 		else if (xf.xf_fc == 'c')
-		    va_arg(xop->xo_vap, int);
+		    xo_va_arg_checked(xop, int);
 
 		else if (xf.xf_fc == 'p')
-		    va_arg(xop->xo_vap, void *);
+		    xo_va_arg_checked(xop, void *);
 	    }
 	}
     }
@@ -3914,11 +3914,7 @@ xo_buf_append_div (xo_handle_t *xop, const char *class, xo_xff_flags_t flags,
 	ssize_t olen = xsp->xs_keys ? strlen(xsp->xs_keys) : 0;
 	ssize_t dlen = pbp->xb_curp - pbp->xb_bufp;
 
-#ifndef XO_MALLOC_HACK
 	char *cp = xo_realloc(xsp->xs_keys, olen + dlen + 1);
-#else
-	char *cp = realloc(xsp->xs_keys, olen + dlen + 1);
-#endif /* XO_MALLOC_HACK */
 	if (cp) {
 	    memcpy(cp + olen, pbp->xb_bufp, dlen);
 	    cp[olen + dlen] = '\0';
@@ -4235,7 +4231,7 @@ void
 xo_arg (xo_handle_t *xop)
 {
     xop = xo_default(xop);
-    fprintf(stderr, "0x%x", va_arg(xop->xo_vap, unsigned));
+    fprintf(stderr, "0x%x", xo_va_arg_checked(xop, unsigned));
 }
 #endif /* 0 */
 
@@ -4346,7 +4342,7 @@ xo_format_value (xo_handle_t *xop, const char *name, ssize_t nlen,
     case XO_STYLE_XML:
 	/*
 	 * Even though we're not making output, we still need to
-	 * let the formatting code handle the va_arg popping.
+	 * let the formatting code handle the xo_va_arg_checked popping.
 	 */
 	if (flags & XFF_DISPLAY_ONLY) {
 	    xo_simple_field(xop, TRUE, value, vlen, fmt, flen, flags);
@@ -4587,11 +4583,7 @@ xo_set_gettext_domain (xo_handle_t *xop, xo_field_info_t *xfip,
 
     /* Start by discarding previous domain */
     if (xop->xo_gt_domain) {
-#ifndef XO_MALLOC_HACK
 	xo_free(xop->xo_gt_domain);
-#else
-	free(xop->xo_gt_domain);
-#endif /* XO_MALLOC_HACK */
 	xop->xo_gt_domain = NULL;
     }
 
@@ -5111,16 +5103,60 @@ xo_find_width (xo_handle_t *xop, xo_field_info_t *xfip,
 	bp[vlen] = '\0';
 
 	width = strtol(bp, &cp, 0);
-	if (width == LONG_MIN || width == LONG_MAX
-	    || bp == cp || *cp != '\0' ) {
+	if (width == LONG_MIN || width == LONG_MAX || bp == cp || *cp != '\0') {
 	    width = 0;
 	    xo_failure(xop, "invalid width for anchor: '%s'", bp);
 	}
     } else if (flen) {
-	if (flen != 2 || strncmp("%d", fmt, flen) != 0)
-	    xo_failure(xop, "invalid width format: '%*.*s'", flen, flen, fmt);
-	if (!XOF_ISSET(xop, XOF_NO_VA_ARG))
-	    width = va_arg(xop->xo_vap, int);
+	/*
+	 * We really expect the format for width to be "{:/%d}" or
+	 * "{:/%u}", so if that's the case, we just grab our width off
+	 * the argument list.  But we need to avoid optimized logic if
+	 * there's a custom formatter.
+	 */
+	if (xop->xo_formatter == NULL && flen == 2
+	        && strncmp("%d", fmt, flen) == 0) {
+	    if (!XOF_ISSET(xop, XOF_NO_VA_ARG))
+		width = xo_va_arg_checked(xop, int);
+	} else if (xop->xo_formatter == NULL && flen == 2
+		   && strncmp("%u", fmt, flen) == 0) {
+	    if (!XOF_ISSET(xop, XOF_NO_VA_ARG))
+		width = xo_va_arg_checked(xop, unsigned);
+	} else {
+	    /*
+	     * So we have a format and it's not a simple one like
+	     * "{:/%d}".  That means we need to format the field,
+	     * extract the value from the formatted output, and then
+	     * discard that output.
+	     */
+	    int anchor_was_set = FALSE;
+	    xo_buffer_t *xbp = &xop->xo_data;
+	    ssize_t start_offset = xo_buf_offset(xbp);
+	    bp = xo_buf_cur(xbp);	/* Save start of the string */
+	    cp = NULL;
+
+	    if (XOIF_ISSET(xop, XOIF_ANCHOR)) {
+		XOIF_CLEAR(xop, XOIF_ANCHOR);
+		anchor_was_set = TRUE;
+	    }
+
+	    ssize_t rc = xo_do_format_field(xop, xbp, fmt, flen, 0);
+	    if (rc >= 0) {
+		xo_buf_append(xbp, "", 1); /* Append a NUL */
+
+		width = strtol(bp, &cp, 0);
+		if (width == LONG_MIN || width == LONG_MAX
+		        || bp == cp || *cp != '\0') {
+		    width = 0;
+		    xo_failure(xop, "invalid width for anchor: '%s'", bp);
+		}
+	    }
+
+	    /* Reset the cur pointer to where we found it */
+	    xbp->xb_curp = xbp->xb_bufp + start_offset;
+	    if (anchor_was_set)
+		XOIF_SET(xop, XOIF_ANCHOR);
+	}
     }
 
     return width;
@@ -5147,9 +5183,6 @@ static void
 xo_anchor_start (xo_handle_t *xop, xo_field_info_t *xfip,
 		 const char *value, ssize_t vlen)
 {
-    if (xo_style(xop) != XO_STYLE_TEXT && xo_style(xop) != XO_STYLE_HTML)
-	return;
-
     if (XOIF_ISSET(xop, XOIF_ANCHOR))
 	xo_failure(xop, "the anchor already recording is discarded");
 
@@ -5169,9 +5202,6 @@ static void
 xo_anchor_stop (xo_handle_t *xop, xo_field_info_t *xfip,
 		 const char *value, ssize_t vlen)
 {
-    if (xo_style(xop) != XO_STYLE_TEXT && xo_style(xop) != XO_STYLE_HTML)
-	return;
-
     if (!XOIF_ISSET(xop, XOIF_ANCHOR)) {
 	xo_failure(xop, "no start anchor");
 	return;
@@ -6128,11 +6158,7 @@ xo_gettext_rebuild_content (xo_handle_t *xop, xo_field_info_t *fields,
     if (blen == 0)
 	return;
 
-#ifndef XO_MALLOC_HACK
     buf = xo_realloc(NULL, blen);
-#else
-    buf = realloc(NULL, blen);
-#endif /* XO_MALLOC_HACK */
     if (buf == NULL)
 	return;
 
@@ -6167,11 +6193,7 @@ xo_gettext_rebuild_content (xo_handle_t *xop, xo_field_info_t *fields,
 	}
     }
 
-#ifndef XO_MALLOC_HACK
     xo_free(buf);
-#else
-    free(buf);
-#endif /* XO_MALLOC_HACK */
 }
 #else  /* HAVE_GETTEXT */
 static const char *
@@ -6264,7 +6286,7 @@ xo_do_emit_fields (xo_handle_t *xop, xo_field_info_t *fields,
 	     * Argument flag means the content isn't given in the descriptor,
 	     * but as a UTF-8 string ('const char *') argument in xo_vap.
 	     */
-	    content = va_arg(xop->xo_vap, char *);
+	    content = xo_va_arg_checked(xop, char *);
 	    clen = content ? strlen(content) : 0;
 	}
 
@@ -6320,11 +6342,7 @@ xo_do_emit_fields (xo_handle_t *xop, xo_field_info_t *fields,
 	    if (!gettext_inuse) { /* Only translate once */
 		gettext_inuse = 1;
 		if (new_fmt) {
-#ifndef XO_MALLOC_HACK
 		    xo_free(new_fmt);
-#else
-		    free(new_fmt);
-#endif /* XO_MALLOC_HACK */
 		    new_fmt = NULL;
 		}
 
@@ -6422,11 +6440,7 @@ xo_do_emit_fields (xo_handle_t *xop, xo_field_info_t *fields,
     }
 
     if (new_fmt)
-#ifndef XO_MALLOC_HACK
 	xo_free(new_fmt);
-#else
-	free(new_fmt);
-#endif /* XO_MALLOC_HACK */
 
     /*
      * We've carried the gettext domainname inside our handle just for
@@ -6434,11 +6448,7 @@ xo_do_emit_fields (xo_handle_t *xop, xo_field_info_t *fields,
      * xo_emit calls.
      */
     if (xop->xo_gt_domain) {
-#ifndef XO_MALLOC_HACK
 	xo_free(xop->xo_gt_domain);
-#else
-	free(xop->xo_gt_domain);
-#endif /* XO_MALLOC_HACK */
 	xop->xo_gt_domain = NULL;
     }
 
@@ -6835,19 +6845,11 @@ xo_depth_change (xo_handle_t *xop, const char *name,
 	}
 
 	if (xsp->xs_name) {
-#ifndef XO_MALLOC_HACK
 	    xo_free(xsp->xs_name);
-#else
-	    free(xsp->xs_name);
-#endif /* XO_MALLOC_HACK */
 	    xsp->xs_name = NULL;
 	}
 	if (xsp->xs_keys) {
-#ifndef XO_MALLOC_HACK
 	    xo_free(xsp->xs_keys);
-#else
-	    free(xsp->xs_keys);
-#endif /* XO_MALLOC_HACK */
 	    xsp->xs_keys = NULL;
 	}
     }
@@ -6885,11 +6887,7 @@ xo_emit_top (xo_handle_t *xop, const char *ppn)
     if (xop->xo_version) {
 	xo_printf(xop, "%*s\"__version\": \"%s\", %s",
 		  xo_indent(xop), "", xop->xo_version, ppn);
-#ifndef XO_MALLOC_HACK
 	xo_free(xop->xo_version);
-#else
-	free(xop->xo_version);
-#endif /* XO_MALLOC_HACK */
 	xop->xo_version = NULL;
     }
 }
@@ -8238,11 +8236,7 @@ xo_emit_warn_hcv (xo_handle_t *xop, int as_warning, int code,
 	xo_format_value(xop, "message", 7, src->xb_bufp,
 			src->xb_curp - src->xb_bufp, NULL, 0, NULL, 0, 0);
 
-#ifndef XO_MALLOC_HACK
 	xo_free(temp.xo_stack);
-#else
-	free(temp.xo_stack);
-#endif /* XO_MALLOC_HACK */
 	xo_buf_cleanup(src);
     }
 

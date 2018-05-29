@@ -64,9 +64,11 @@ cheri_sealcap_copy(struct proc *dst, struct proc *src)
  * sysarch(2).
  */
 int
-cheri_sysarch_getsealcap(struct thread *td, struct sysarch_args *uap)
+cheri_sysarch_getsealcap(struct thread *td, void * __capability ucap)
 {
 
-	return (copyoutcap(&td->td_proc->p_md.md_cheri_sealcap, uap->parms,
+	return (copyoutcap_c(
+	    (__cheri_tocap void * __capability)
+	    &td->td_proc->p_md.md_cheri_sealcap, ucap,
 	    sizeof(td->td_proc->p_md.md_cheri_sealcap)));
 }

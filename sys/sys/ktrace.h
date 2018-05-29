@@ -57,7 +57,7 @@ struct ktr_header {
 	pid_t	ktr_pid;		/* process id */
 	char	ktr_comm[MAXCOMLEN + 1];/* command name */
 	struct	timeval ktr_time;	/* timestamp */
-	intptr_t	ktr_tid;	/* was ktr_buffer */
+	long	ktr_tid;		/* thread being traced */
 };
 
 /*
@@ -297,6 +297,7 @@ struct ktr_cexception {
 #define	KTRFAC_DROP	0x20000000	/* last event was dropped */
 
 #ifdef	_KERNEL
+struct uio;
 struct vnode;
 
 void	ktrnamei(char *);

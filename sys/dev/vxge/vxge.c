@@ -32,6 +32,10 @@
 
 #include <dev/vxge/vxge.h>
 
+#ifdef CPU_CHERI
+#error ifr_data access not converted to CHERI as it is broken (PR 227058)
+#endif
+
 static int vxge_pci_bd_no = -1;
 static u32 vxge_drv_copyright = 0;
 static u32 vxge_dev_ref_count = 0;
@@ -3571,19 +3575,13 @@ vxge_ioctl(ifnet_t ifp, u_long command, caddr_t data)
 		return (EBUSY);
 
 	switch (command) {
-		/* Set/Get ifnet address */
-	case SIOCSIFADDR:
-	case SIOCGIFADDR:
-		ether_ioctl(ifp, command, data);
-		break;
-
 		/* Set Interface MTU */
-	case SIOCSIFMTU:
-		err = vxge_change_mtu(vdev, (unsigned long)ifr->ifr_mtu);
+	CASE_IOC_IFREQ(SIOCSIFMTU):
+		err = vxge_change_mtu(vdev, (unsigned long)ifr_mtu_get(ifr));
 		break;
 
 		/* Set Interface Flags */
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		VXGE_DRV_LOCK(vdev);
 		if (ifp->if_flags & IFF_UP) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING)) {
@@ -3602,20 +3600,20 @@ vxge_ioctl(ifnet_t ifp, u_long command, caddr_t data)
 		break;
 
 		/* Add/delete multicast address */
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		break;
 
 		/* Get/Set Interface Media */
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		err = ifmedia_ioctl(ifp, ifr, &vdev->media, command);
 		break;
 
 		/* Set Capabilities */
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		VXGE_DRV_LOCK(vdev);
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 
 		if (mask & IFCAP_TXCSUM) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;
@@ -3676,16 +3674,13 @@ vxge_ioctl(ifnet_t ifp, u_long command, caddr_t data)
 		VXGE_DRV_UNLOCK(vdev);
 		break;
 
-	case SIOCGPRIVATE_0:
+	CASE_IOC_IFREQ(SIOCGPRIVATE_0):
 		VXGE_DRV_LOCK(vdev);
 		err = vxge_ioctl_stats(vdev, ifr);
 		VXGE_DRV_UNLOCK(vdev);
 		break;
 
-	case SIOCGPRIVATE_1:
-#ifdef CPU_CHERI
-#error Unvalidatable ifr_data use.  Unsafe with CheriABI.
-#endif
+	CASE_IOC_IFREQ(SIOCGPRIVATE_1):
 		VXGE_DRV_LOCK(vdev);
 		err = vxge_ioctl_regs(vdev, ifr);
 		VXGE_DRV_UNLOCK(vdev);
@@ -3711,8 +3706,8 @@ vxge_ioctl_regs(vxge_dev_t *vdev, struct ifreq *ifr)
 	u32 offset, reqd_size = 0;
 	int i, err = EINVAL;
 
-	char *command = (char *) ifr->ifr_data;
-	void *reg_info = (void *) ifr->ifr_data;
+	char *command = ifr_data_get_ptr(ifr);
+	void *reg_info = ifr_data_get_ptr(ifr);
 
 	vxge_vpath_t *vpath;
 	vxge_hal_status_e status = VXGE_HAL_OK;
@@ -3819,7 +3814,7 @@ vxge_ioctl_stats(vxge_dev_t *vdev, struct ifreq *ifr)
 	vxge_drv_stats_t *drv_stat;
 
 	char *buffer = NULL;
-	char *command = (char *) ifr->ifr_data;
+	char *command = ifr_data_get_ptr(ifr);
 	vxge_hal_status_e status = VXGE_HAL_OK;
 
 	switch (*command) {
@@ -3830,7 +3825,8 @@ vxge_ioctl_stats(vxge_dev_t *vdev, struct ifreq *ifr)
 			status = vxge_hal_aux_pci_config_read(vdev->devh,
 			    bufsize, buffer, &retsize);
 			if (status == VXGE_HAL_OK)
-				err = copyout(buffer, ifr->ifr_data, retsize);
+				err = copyout(buffer, ifr_data_get_ptr(ifr),
+				    retsize);
 			else
 				device_printf(vdev->ndev,
 				    "failed pciconfig statistics query\n");
@@ -3849,7 +3845,8 @@ vxge_ioctl_stats(vxge_dev_t *vdev, struct ifreq *ifr)
 			status = vxge_hal_aux_stats_mrpcim_read(vdev->devh,
 			    bufsize, buffer, &retsize);
 			if (status == VXGE_HAL_OK)
-				err = copyout(buffer, ifr->ifr_data, retsize);
+				err = copyout(buffer, ifr_data_get_ptr(ifr),
+				    retsize);
 			else
 				device_printf(vdev->ndev,
 				    "failed mrpcim statistics query\n");
@@ -3865,7 +3862,8 @@ vxge_ioctl_stats(vxge_dev_t *vdev, struct ifreq *ifr)
 			status = vxge_hal_aux_stats_device_read(vdev->devh,
 			    bufsize, buffer, &retsize);
 			if (status == VXGE_HAL_OK)
-				err = copyout(buffer, ifr->ifr_data, retsize);
+				err = copyout(buffer, ifr_data_get_ptr(ifr),
+				    retsize);
 			else
 				device_printf(vdev->ndev,
 				    "failed device statistics query\n");
@@ -3889,7 +3887,7 @@ vxge_ioctl_stats(vxge_dev_t *vdev, struct ifreq *ifr)
 			((vxge_device_hw_info_t *) buffer)->port_failure =
 			    vdev->port_failure;
 
-			err = copyout(buffer, ifr->ifr_data, bufsize);
+			err = copyout(buffer, ifr_data_get_ptr(ifr), bufsize);
 			if (err != 0)
 				device_printf(vdev->ndev,
 				    "failed device hardware info query\n");
@@ -3916,7 +3914,7 @@ vxge_ioctl_stats(vxge_dev_t *vdev, struct ifreq *ifr)
 				    sizeof(vxge_drv_stats_t));
 			}
 
-			err = copyout(drv_stat, ifr->ifr_data, bufsize);
+			err = copyout(drv_stat, ifr_data_get_ptr(ifr), bufsize);
 			if (err != 0)
 				device_printf(vdev->ndev,
 				    "failed driver statistics query\n");
@@ -3926,7 +3924,7 @@ vxge_ioctl_stats(vxge_dev_t *vdev, struct ifreq *ifr)
 		break;
 
 	case VXGE_GET_BANDWIDTH:
-		bw_info = (vxge_bw_info_t *) ifr->ifr_data;
+		bw_info = ifr_data_get_ptr(ifr);
 
 		if ((vdev->config.hw_info.func_id != 0) &&
 		    (vdev->hw_fw_version < VXGE_FW_VERSION(1, 8, 0)))
@@ -3939,7 +3937,8 @@ vxge_ioctl_stats(vxge_dev_t *vdev, struct ifreq *ifr)
 		if (status != VXGE_HAL_OK)
 			break;
 
-		err = copyout(bw_info, ifr->ifr_data, sizeof(vxge_bw_info_t));
+		err = copyout(bw_info, ifr_data_get_ptr(ifr),
+		    sizeof(vxge_bw_info_t));
 		break;
 
 	case VXGE_SET_BANDWIDTH:
@@ -3950,7 +3949,7 @@ vxge_ioctl_stats(vxge_dev_t *vdev, struct ifreq *ifr)
 	case VXGE_SET_PORT_MODE:
 		if (vdev->is_privilaged) {
 			if (vdev->config.hw_info.ports == VXGE_DUAL_PORT_MODE) {
-				port_info = (vxge_port_info_t *) ifr->ifr_data;
+				port_info = ifr_data_get_ptr(ifr);
 				vdev->config.port_mode = port_info->port_mode;
 				err = vxge_port_mode_update(vdev);
 				if (err != ENXIO)
@@ -3967,10 +3966,11 @@ vxge_ioctl_stats(vxge_dev_t *vdev, struct ifreq *ifr)
 	case VXGE_GET_PORT_MODE:
 		if (vdev->is_privilaged) {
 			if (vdev->config.hw_info.ports == VXGE_DUAL_PORT_MODE) {
-				port_info = (vxge_port_info_t *) ifr->ifr_data;
+				port_info = ifr_data_get_ptr(ifr);
 				err = vxge_port_mode_get(vdev, port_info);
 				if (err == VXGE_HAL_OK) {
-					err = copyout(port_info, ifr->ifr_data,
+					err = copyout(port_info,
+					    ifr_data_get_ptr(ifr),
 					    sizeof(vxge_port_info_t));
 				}
 			}
@@ -4006,7 +4006,7 @@ vxge_bw_priority_set(vxge_dev_t *vdev, struct ifreq *ifr)
 	u32 func_id;
 	vxge_bw_info_t *bw_info;
 
-	bw_info = (vxge_bw_info_t *) ifr->ifr_data;
+	bw_info = ifr_data_get_ptr(ifr);
 	func_id = bw_info->func_id;
 
 	vdev->config.bw_info[func_id].priority = bw_info->priority;

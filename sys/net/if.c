@@ -55,6 +55,7 @@
 #include <sys/sockio.h>
 #include <sys/syslog.h>
 #include <sys/sysctl.h>
+#include <sys/sysent.h>
 #include <sys/taskqueue.h>
 #include <sys/domain.h>
 #include <sys/jail.h>
@@ -98,6 +99,122 @@
 #include <sys/mount.h>
 #include <compat/freebsd32/freebsd32.h>
 #endif
+
+#ifdef COMPAT_CHERIABI
+struct ifgroupreq_c {
+	char	ifgr_name[IFNAMSIZ];
+	u_int	ifgr_len;
+	union {
+		char		ifgru_group[IFNAMSIZ];
+		struct ifg_req * __capability ifgru_groups;
+	} ifgr_ifgru;
+};
+
+struct ifmediareq64 {
+	char	ifm_name[IFNAMSIZ];
+	int	ifm_current;
+	int	ifm_mask;
+	int	ifm_status;
+	int	ifm_active;
+	int	ifm_count;
+	int	*ifm_ulist;
+};
+#define	SIOCGIFMEDIA64	_IOC_NEWTYPE(SIOCGIFMEDIA, struct ifmediareq64)
+#define	SIOCGIFXMEDIA64	_IOC_NEWTYPE(SIOCGIFXMEDIA, struct ifmediareq64)
+
+#define	_CASE_IOC_IFGROUPREQ_C(cmd)				\
+    case _IOC_NEWTYPE((cmd), struct ifgroupreq_c):
+#else
+#define _CASE_IOC_IFGROUPREQ_C(cmd)
+#endif
+
+#ifdef COMPAT_FREEBSD32
+struct ifreq_buffer32 {
+	uint32_t	length;		/* (size_t) */
+	uint32_t	buffer;		/* (void *) */
+};
+
+/*
+ * Interface request structure used for socket
+ * ioctl's.  All interface ioctl's must have parameter
+ * definitions which begin with ifr_name.  The
+ * remainder may be interface specific.
+ */
+struct ifreq32 {
+	char	ifr_name[IFNAMSIZ];		/* if name, e.g. "en0" */
+	union {
+		struct sockaddr	ifru_addr;
+		struct sockaddr	ifru_dstaddr;
+		struct sockaddr	ifru_broadaddr;
+		struct ifreq_buffer32 ifru_buffer;
+		short		ifru_flags[2];
+		short		ifru_index;
+		int		ifru_jid;
+		int		ifru_metric;
+		int		ifru_mtu;
+		int		ifru_phys;
+		int		ifru_media;
+		uint32_t	ifru_data;
+		int		ifru_cap[2];
+		u_int		ifru_fib;
+		u_char		ifru_vlan_pcp;
+	} ifr_ifru;
+};
+CTASSERT(sizeof(struct ifreq) == sizeof(struct ifreq32));
+CTASSERT(__offsetof(struct ifreq, ifr_ifru) ==
+    __offsetof(struct ifreq32, ifr_ifru));
+
+struct ifgroupreq32 {
+	char	ifgr_name[IFNAMSIZ];
+	u_int	ifgr_len;
+	union {
+		char		ifgru_group[IFNAMSIZ];
+		uint32_t	ifgru_groups;
+	} ifgr_ifgru;
+};
+
+struct ifmediareq32 {
+	char		ifm_name[IFNAMSIZ];
+	int		ifm_current;
+	int		ifm_mask;
+	int		ifm_status;
+	int		ifm_active;
+	int		ifm_count;
+	uint32_t	ifm_ulist;	/* (int *) */
+};
+#define	SIOCGIFMEDIA32	_IOC_NEWTYPE(SIOCGIFMEDIA, struct ifmediareq32)
+#define	SIOCGIFXMEDIA32	_IOC_NEWTYPE(SIOCGIFXMEDIA, struct ifmediareq32)
+
+#define	_CASE_IOC_IFGROUPREQ_32(cmd)				\
+    case _IOC_NEWTYPE((cmd), struct ifgroupreq32):
+#else
+#define _CASE_IOC_IFGROUPREQ_32(cmd)
+#endif /* COMPAT_FREEBSD32 */
+
+#define CASE_IOC_IFGROUPREQ(cmd)	\
+    _CASE_IOC_IFGROUPREQ_32(cmd)	\
+    _CASE_IOC_IFGROUPREQ_C(cmd)		\
+    case (cmd)
+
+union ifreq_union {
+	struct ifreq	ifr;
+#ifdef COMPAT_CHERIABI
+	struct ifreq_c	ifr_c;
+#endif
+#ifdef COMPAT_FREEBSD32
+	struct ifreq32	ifr32;
+#endif
+};
+
+union ifgroupreq_union {
+	struct ifgroupreq ifgr;
+#ifdef COMPAT_CHERIABI
+	struct ifgroupreq_c ifgr_c;
+#endif
+#ifdef COMPAT_FREEBSD32
+	struct ifgroupreq32 ifgr32;
+#endif
+};
 
 SYSCTL_NODE(_net, PF_LINK, link, CTLFLAG_RW, 0, "Link layers");
 SYSCTL_NODE(_net_link, 0, generic, CTLFLAG_RW, 0, "Generic link-management");
@@ -1447,17 +1564,52 @@ if_delgroups(struct ifnet *ifp)
 	IFNET_WUNLOCK();
 }
 
+static char *
+ifgr_group_get(void *ifgrp)
+{
+	union ifgroupreq_union *ifgrup;
+
+	ifgrup = ifgrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		return (&ifgrup->ifgr_c.ifgr_ifgru.ifgru_group[0]);
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		return (&ifgrup->ifgr32.ifgr_ifgru.ifgru_group[0]);
+#endif
+	return (&ifgrup->ifgr.ifgr_ifgru.ifgru_group[0]);
+}
+
+static struct ifg_req * __capability
+ifgr_groups_get(void *ifgrp)
+{
+	union ifgroupreq_union *ifgrup;
+
+	ifgrup = ifgrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		return (ifgrup->ifgr_c.ifgr_ifgru.ifgru_groups);
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		return (__USER_CAP((struct ifg_req *)(uintptr_t)
+		    ifgrup->ifgr32.ifgr_ifgru.ifgru_groups,
+		    ifgrup->ifgr32.ifgr_len));
+#endif
+	return (__USER_CAP(ifgrup->ifgr.ifgr_ifgru.ifgru_groups,
+	    ifgrup->ifgr.ifgr_len));
+}
+
 /*
- * Stores all groups from an interface in memory pointed
- * to by data
+ * Stores all groups from an interface in memory pointed to by ifgr.
  */
 static int
-if_getgroup(struct ifgroupreq *data, struct ifnet *ifp)
+if_getgroup(struct ifgroupreq *ifgr, struct ifnet *ifp)
 {
 	int			 len, error;
 	struct ifg_list		*ifgl;
-	struct ifg_req		 ifgrq, *ifgp;
-	struct ifgroupreq	*ifgr = data;
+	struct ifg_req		 ifgrq, * __capability ifgp;
 
 	if (ifgr->ifgr_len == 0) {
 		IF_ADDR_RLOCK(ifp);
@@ -1468,7 +1620,7 @@ if_getgroup(struct ifgroupreq *data, struct ifnet *ifp)
 	}
 
 	len = ifgr->ifgr_len;
-	ifgp = ifgr->ifgr_groups;
+	ifgp = ifgr_groups_get(ifgr);
 	/* XXX: wire */
 	IF_ADDR_RLOCK(ifp);
 	TAILQ_FOREACH(ifgl, &ifp->if_groups, ifgl_next) {
@@ -1479,7 +1631,7 @@ if_getgroup(struct ifgroupreq *data, struct ifnet *ifp)
 		bzero(&ifgrq, sizeof ifgrq);
 		strlcpy(ifgrq.ifgrq_group, ifgl->ifgl_group->ifg_group,
 		    sizeof(ifgrq.ifgrq_group));
-		if ((error = copyout(&ifgrq, ifgp, sizeof(struct ifg_req)))) {
+		if ((error = copyout_c(&ifgrq, ifgp, sizeof(struct ifg_req)))) {
 		    	IF_ADDR_RUNLOCK(ifp);
 			return (error);
 		}
@@ -1492,15 +1644,14 @@ if_getgroup(struct ifgroupreq *data, struct ifnet *ifp)
 }
 
 /*
- * Stores all members of a group in memory pointed to by data
+ * Stores all members of a group in memory pointed to by igfr
  */
 static int
-if_getgroupmembers(struct ifgroupreq *data)
+if_getgroupmembers(struct ifgroupreq *ifgr)
 {
-	struct ifgroupreq	*ifgr = data;
 	struct ifg_group	*ifg;
 	struct ifg_member	*ifgm;
-	struct ifg_req		 ifgrq, *ifgp;
+	struct ifg_req		 ifgrq, * __capability ifgp;
 	int			 len, error;
 
 	IFNET_RLOCK();
@@ -1520,7 +1671,7 @@ if_getgroupmembers(struct ifgroupreq *data)
 	}
 
 	len = ifgr->ifgr_len;
-	ifgp = ifgr->ifgr_groups;
+	ifgp = ifgr_groups_get(ifgr);
 	TAILQ_FOREACH(ifgm, &ifg->ifg_members, ifgm_next) {
 		if (len < sizeof(ifgrq)) {
 			IFNET_RUNLOCK();
@@ -1529,7 +1680,7 @@ if_getgroupmembers(struct ifgroupreq *data)
 		bzero(&ifgrq, sizeof ifgrq);
 		strlcpy(ifgrq.ifgrq_member, ifgm->ifgm_ifp->if_xname,
 		    sizeof(ifgrq.ifgrq_member));
-		if ((error = copyout(&ifgrq, ifgp, sizeof(struct ifg_req)))) {
+		if ((error = copyout_c(&ifgrq, ifgp, sizeof(struct ifg_req)))) {
 			IFNET_RUNLOCK();
 			return (error);
 		}
@@ -2302,6 +2453,447 @@ ifunit(const char *name)
 	return (ifp);
 }
 
+static int
+ifr__int0_get(void *ifrp)
+{
+	union ifreq_union *ifrup;
+
+	ifrup = ifrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		return (ifrup->ifr_c.ifr_ifru.ifru_cap[0]);
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		return (ifrup->ifr32.ifr_ifru.ifru_cap[0]);
+#endif
+	return (ifrup->ifr.ifr_ifru.ifru_cap[0]);
+}
+
+static void
+ifr__int0_set(void *ifrp, int val)
+{
+	union ifreq_union *ifrup;
+
+	ifrup = ifrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		ifrup->ifr_c.ifr_ifru.ifru_cap[0] = val;
+	else
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		ifrup->ifr32.ifr_ifru.ifru_cap[0] = val;
+	else
+#endif
+		ifrup->ifr.ifr_ifru.ifru_cap[0] = val;
+}
+
+static void
+ifr__int1_set(void *ifrp, int val)
+{
+	union ifreq_union *ifrup;
+
+	ifrup = ifrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		ifrup->ifr_c.ifr_ifru.ifru_cap[1] = val;
+	else
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		ifrup->ifr32.ifr_ifru.ifru_cap[1] = val;
+	else
+#endif
+		ifrup->ifr.ifr_ifru.ifru_cap[1] = val;
+}
+
+static short
+ifr__short0_get(void *ifrp)
+{
+	union ifreq_union *ifrup;
+
+	ifrup = ifrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		return (ifrup->ifr_c.ifr_ifru.ifru_flags[0]);
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		return (ifrup->ifr32.ifr_ifru.ifru_flags[0]);
+#endif
+	return (ifrup->ifr.ifr_ifru.ifru_flags[0]);
+}
+
+static void
+ifr__short0_set(void *ifrp, short val)
+{
+	union ifreq_union *ifrup;
+
+	ifrup = ifrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		ifrup->ifr_c.ifr_ifru.ifru_flags[0] = val;
+	else
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		ifrup->ifr32.ifr_ifru.ifru_flags[0] = val;
+	else
+#endif
+		ifrup->ifr.ifr_ifru.ifru_flags[0] = val;
+}
+
+static short
+ifr__short1_get(void *ifrp)
+{
+	union ifreq_union *ifrup;
+
+	ifrup = ifrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		return (ifrup->ifr_c.ifr_ifru.ifru_flags[1]);
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		return (ifrup->ifr32.ifr_ifru.ifru_flags[1]);
+#endif
+	return (ifrup->ifr.ifr_ifru.ifru_flags[1]);
+}
+
+static void
+ifr__short1_set(void *ifrp, short val)
+{
+	union ifreq_union *ifrup;
+
+	ifrup = ifrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		ifrup->ifr_c.ifr_ifru.ifru_flags[1] = val;
+	else
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		ifrup->ifr32.ifr_ifru.ifru_flags[1] = val;
+	else
+#endif
+		ifrup->ifr.ifr_ifru.ifru_flags[1] = val;
+}
+
+static u_char
+ifr__u_char_get(void *ifrp)
+{
+	union ifreq_union *ifrup;
+
+	ifrup = ifrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		return (ifrup->ifr_c.ifr_ifru.ifru_vlan_pcp);
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		return (ifrup->ifr32.ifr_ifru.ifru_vlan_pcp);
+#endif
+	return (ifrup->ifr.ifr_ifru.ifru_vlan_pcp);
+}
+
+static void
+ifr__u_char_set(void *ifrp, u_char val)
+{
+	union ifreq_union *ifrup;
+
+	ifrup = ifrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		ifrup->ifr_c.ifr_ifru.ifru_vlan_pcp = val;
+	else
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		ifrup->ifr32.ifr_ifru.ifru_vlan_pcp = val;
+	else
+#endif
+		ifrup->ifr.ifr_ifru.ifru_vlan_pcp = val;
+}
+
+char *
+ifr_addr_get_data(void *ifrp)
+{
+
+	return (&ifr_addr_get_sa(ifrp)->sa_data[0]);
+}
+
+sa_family_t
+ifr_addr_get_family(void *ifrp)
+{
+
+	return (ifr_addr_get_sa(ifrp)->sa_family);
+}
+
+unsigned char
+ifr_addr_get_len(void *ifrp)
+{
+
+	return (ifr_addr_get_sa(ifrp)->sa_len);
+}
+
+struct sockaddr *
+ifr_addr_get_sa(void *ifrp)
+{
+	union ifreq_union *ifrup;
+
+	ifrup = ifrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		return (&ifrup->ifr_c.ifr_ifru.ifru_addr);
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		return (&ifrup->ifr32.ifr_ifru.ifru_addr);
+#endif
+	return (&ifrup->ifr.ifr_ifru.ifru_addr);
+}
+
+static void * __capability
+ifr_buffer_get_buffer(struct thread *td, void *data)
+{
+	union ifreq_union *ifrup;
+
+	ifrup = data;
+#ifdef COMPAT_CHERIABI
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+		return (ifrup->ifr_c.ifr_ifru.ifru_buffer.buffer);
+	else
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_PROC_FLAG(td->td_proc, SV_ILP32))
+		return (__USER_CAP((void *)(uintptr_t)
+		    ifrup->ifr32.ifr_ifru.ifru_buffer.buffer,
+		    ifrup->ifr32.ifr_ifru.ifru_buffer.length));
+	else
+#endif
+		return (__USER_CAP(ifrup->ifr.ifr_ifru.ifru_buffer.buffer,
+		    ifrup->ifr32.ifr_ifru.ifru_buffer.length));
+}
+
+static void
+ifr_buffer_set_buffer(struct thread *td, void *data, void * __capability buf)
+{
+	union ifreq_union *ifrup;
+
+	KASSERT(buf == NULL,
+	    ("ifr_buffer_set_buffer called with non-NULL (%lx)", (vaddr_t)buf));
+
+	ifrup = data;
+#ifdef COMPAT_CHERIABI
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+		ifrup->ifr_c.ifr_ifru.ifru_buffer.buffer = buf;
+	else
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_PROC_FLAG(td->td_proc, SV_ILP32))
+		ifrup->ifr32.ifr_ifru.ifru_buffer.buffer =
+		    (uint32_t)(uintptr_t)(vaddr_t)buf;
+	else
+#endif
+		ifrup->ifr.ifr_ifru.ifru_buffer.buffer =
+		    (void *)(uintptr_t)(vaddr_t)buf;
+}
+
+static size_t
+ifr_buffer_get_length(struct thread *td, void *data)
+{
+	union ifreq_union *ifrup;
+
+	ifrup = data;
+#ifdef COMPAT_CHERIABI
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+		return (ifrup->ifr_c.ifr_ifru.ifru_buffer.length);
+	else
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_PROC_FLAG(td->td_proc, SV_ILP32))
+		return (ifrup->ifr32.ifr_ifru.ifru_buffer.length);
+	else
+#endif
+		return (ifrup->ifr.ifr_ifru.ifru_buffer.length);
+}
+
+static void
+ifr_buffer_set_length(struct thread *td, void *data, size_t len)
+{
+	union ifreq_union *ifrup;
+
+	ifrup = data;
+#ifdef COMPAT_CHERIABI
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+		ifrup->ifr_c.ifr_ifru.ifru_buffer.length = len;
+	else
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_PROC_FLAG(td->td_proc, SV_ILP32))
+		ifrup->ifr32.ifr_ifru.ifru_buffer.length = len;
+	else
+#endif
+		ifrup->ifr.ifr_ifru.ifru_buffer.length = len;
+}
+
+static void
+ifr_curcap_set(void *ifrp, int val)
+{
+
+	/* ifr_ifru.ifru_cap[1] */
+	ifr__int1_set(ifrp, val);
+}
+
+void * __capability
+ifr_data_get_ptr(void *ifrp)
+{
+	union ifreq_union *ifrup;
+
+	ifrup = ifrp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		return (ifrup->ifr_c.ifr_ifru.ifru_data);
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		return (__USER_CAP_UNBOUND((void *)(uintptr_t)
+		    ifrup->ifr32.ifr_ifru.ifru_data));
+#endif
+		return (__USER_CAP_UNBOUND(ifrup->ifr.ifr_ifru.ifru_data));
+}
+
+u_int
+ifr_fib_get(void *ifrp)
+{
+
+	return ((u_int)ifr__int0_get(ifrp));
+}
+
+void
+ifr_fib_set(void *ifrp, u_int fib)
+{
+
+	ifr__int0_set(ifrp, (u_int)fib);
+}
+
+short
+ifr_flags_get(void *ifrp)
+{
+
+	return (ifr__short0_get(ifrp));
+}
+
+static void
+ifr_flags_set(void *ifrp, short val)
+{
+
+	ifr__short0_set(ifrp, val);
+}
+
+static short
+ifr_flagshigh_get(void *ifrp)
+{
+
+	return (ifr__short1_get(ifrp));
+}
+
+static void
+ifr_flagshigh_set(void *ifrp, short val)
+{
+
+	ifr__short1_set(ifrp, val);
+}
+
+static void
+ifr_index_set(void *ifrp, short idx)
+{
+
+	ifr__short0_set(ifrp, idx);
+}
+
+#ifdef VIMAGE
+static int
+ifr_jid_get(void *ifrp)
+{
+	
+	return (ifr__int0_get(ifrp));
+}
+#endif
+
+int
+ifr_media_get(void *ifrp)
+{
+	
+	return (ifr__int0_get(ifrp));
+}
+
+static int
+ifr_metric_get(void *ifrp)
+{
+	
+	return (ifr__int0_get(ifrp));
+}
+
+static void
+ifr_metric_set(void *ifrp, int val)
+{
+
+	ifr__int0_set(ifrp, val);
+}
+
+int
+ifr_mtu_get(void *ifrp)
+{
+	
+	return (ifr__int0_get(ifrp));
+}
+
+void
+ifr_mtu_set(void *ifrp, int val)
+{
+
+	ifr__int0_set(ifrp, val);
+}
+
+static void
+ifr_phys_set(void *ifrp, int val)
+{
+
+	ifr__int0_set(ifrp, val);
+}
+
+int
+ifr_reqcap_get(void *ifrp)
+{
+
+	/* ifr_ifru.ifru_cap[0] */
+	return (ifr__int0_get(ifrp));
+}
+
+static void
+ifr_reqcap_set(void *ifrp, int val)
+{
+
+	/* ifr_ifru.ifru_cap[0] */
+	ifr__int0_set(ifrp, val);
+}
+
+u_char
+ifr_vlan_pcp_get(void *ifrp)
+{
+
+	return (ifr__u_char_get(ifrp));
+}
+
+void
+ifr_vlan_pcp_set(void *ifrp, u_char pcp)
+{
+
+	ifr__u_char_set(ifrp, pcp);
+}
+
 /*
  * Hardware specific interface ioctls.
  */
@@ -2320,41 +2912,41 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 
 	ifr = (struct ifreq *)data;
 	switch (cmd) {
-	case SIOCGIFINDEX:
-		ifr->ifr_index = ifp->if_index;
+	CASE_IOC_IFREQ(SIOCGIFINDEX):
+		ifr_index_set(ifr, ifp->if_index);
 		break;
 
-	case SIOCGIFFLAGS:
+	CASE_IOC_IFREQ(SIOCGIFFLAGS):
 		temp_flags = ifp->if_flags | ifp->if_drv_flags;
-		ifr->ifr_flags = temp_flags & 0xffff;
-		ifr->ifr_flagshigh = temp_flags >> 16;
+		ifr_flags_set(ifr, temp_flags & 0xffff);
+		ifr_flagshigh_set(ifr, temp_flags >> 16);
 		break;
 
-	case SIOCGIFCAP:
-		ifr->ifr_reqcap = ifp->if_capabilities;
-		ifr->ifr_curcap = ifp->if_capenable;
+	CASE_IOC_IFREQ(SIOCGIFCAP):
+		ifr_reqcap_set(ifr, ifp->if_capabilities);
+		ifr_curcap_set(ifr, ifp->if_capenable);
 		break;
 
 #ifdef MAC
-	case SIOCGIFMAC:
+	CASE_IOC_IFREQ(SIOCGIFMAC):
 		error = mac_ifnet_ioctl_get(td->td_ucred, ifr, ifp);
 		break;
 #endif
 
-	case SIOCGIFMETRIC:
-		ifr->ifr_metric = ifp->if_metric;
+	CASE_IOC_IFREQ(SIOCGIFMETRIC):
+		ifr_metric_set(ifr, ifp->if_metric);
 		break;
 
-	case SIOCGIFMTU:
-		ifr->ifr_mtu = ifp->if_mtu;
+	CASE_IOC_IFREQ(SIOCGIFMTU):
+		ifr_mtu_set(ifr, ifp->if_mtu);
 		break;
 
-	case SIOCGIFPHYS:
+	CASE_IOC_IFREQ(SIOCGIFPHYS):
 		/* XXXGL: did this ever worked? */
-		ifr->ifr_phys = 0;
+		ifr_phys_set(ifr, 0);
 		break;
 
-	case SIOCGIFDESCR:
+	CASE_IOC_IFREQ(SIOCGIFDESCR):
 		error = 0;
 		sx_slock(&ifdescr_sx);
 		if (ifp->if_description == NULL)
@@ -2362,17 +2954,19 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		else {
 			/* space for terminating nul */
 			descrlen = strlen(ifp->if_description) + 1;
-			if (ifr->ifr_buffer.length < descrlen)
-				ifr->ifr_buffer.buffer = NULL;
+			if (ifr_buffer_get_length(td, ifr) < descrlen)
+				ifr_buffer_set_buffer(td, ifr, NULL);
 			else
-				error = copyout(ifp->if_description,
-				    ifr->ifr_buffer.buffer, descrlen);
-			ifr->ifr_buffer.length = descrlen;
+				error = copyout_c(
+				    (__cheri_tocap char * __capability)
+				    ifp->if_description,
+				    ifr_buffer_get_buffer(td, ifr), descrlen);
+			ifr_buffer_set_length(td, ifr, descrlen);
 		}
 		sx_sunlock(&ifdescr_sx);
 		break;
 
-	case SIOCSIFDESCR:
+	CASE_IOC_IFREQ(SIOCSIFDESCR):
 		error = priv_check(td, PRIV_NET_SETIFDESCR);
 		if (error)
 			return (error);
@@ -2383,15 +2977,16 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		 * length parameter is supposed to count the
 		 * terminating nul in.
 		 */
-		if (ifr->ifr_buffer.length > ifdescr_maxlen)
+		if (ifr_buffer_get_length(td, ifr) > ifdescr_maxlen)
 			return (ENAMETOOLONG);
-		else if (ifr->ifr_buffer.length == 0)
+		else if (ifr_buffer_get_length(td, ifr) == 0)
 			descrbuf = NULL;
 		else {
-			descrbuf = malloc(ifr->ifr_buffer.length, M_IFDESCR,
-			    M_WAITOK | M_ZERO);
-			error = copyin(ifr->ifr_buffer.buffer, descrbuf,
-			    ifr->ifr_buffer.length - 1);
+			descrbuf = malloc(ifr_buffer_get_length(td, ifr),
+			    M_IFDESCR, M_WAITOK | M_ZERO);
+			error = copyin_c(ifr_buffer_get_buffer(td, ifr),
+			    (__cheri_tocap char * __capability)descrbuf,
+			    ifr_buffer_get_length(td, ifr) - 1);
 			if (error) {
 				free(descrbuf, M_IFDESCR);
 				break;
@@ -2407,21 +3002,21 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		free(odescrbuf, M_IFDESCR);
 		break;
 
-	case SIOCGIFFIB:
-		ifr->ifr_fib = ifp->if_fib;
+	CASE_IOC_IFREQ(SIOCGIFFIB):
+		ifr_fib_set(ifr, ifp->if_fib);
 		break;
 
-	case SIOCSIFFIB:
+	CASE_IOC_IFREQ(SIOCSIFFIB):
 		error = priv_check(td, PRIV_NET_SETIFFIB);
 		if (error)
 			return (error);
-		if (ifr->ifr_fib >= rt_numfibs)
+		if (ifr_fib_get(ifr) >= rt_numfibs)
 			return (EINVAL);
 
-		ifp->if_fib = ifr->ifr_fib;
+		ifp->if_fib = ifr_fib_get(ifr);
 		break;
 
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		error = priv_check(td, PRIV_NET_SETIFFLAGS);
 		if (error)
 			return (error);
@@ -2429,8 +3024,8 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		 * Currently, no driver owned flags pass the IFF_CANTCHANGE
 		 * check, so we don't need special handling here yet.
 		 */
-		new_flags = (ifr->ifr_flags & 0xffff) |
-		    (ifr->ifr_flagshigh << 16);
+		new_flags = (ifr_flags_get(ifr) & 0xffff) |
+		    (ifr_flagshigh_get(ifr) << 16);
 		if (ifp->if_flags & IFF_UP &&
 		    (new_flags & IFF_UP) == 0) {
 			if_down(ifp);
@@ -2460,13 +3055,13 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		getmicrotime(&ifp->if_lastchange);
 		break;
 
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		error = priv_check(td, PRIV_NET_SETIFCAP);
 		if (error)
 			return (error);
 		if (ifp->if_ioctl == NULL)
 			return (EOPNOTSUPP);
-		if (ifr->ifr_reqcap & ~ifp->if_capabilities)
+		if (ifr_reqcap_get(ifr) & ~ifp->if_capabilities)
 			return (EINVAL);
 		error = (*ifp->if_ioctl)(ifp, cmd, data);
 		if (error == 0)
@@ -2474,16 +3069,17 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 
 #ifdef MAC
-	case SIOCSIFMAC:
+	CASE_IOC_IFREQ(SIOCSIFMAC):
 		error = mac_ifnet_ioctl_set(td->td_ucred, ifr, ifp);
 		break;
 #endif
 
-	case SIOCSIFNAME:
+	CASE_IOC_IFREQ(SIOCSIFNAME):
 		error = priv_check(td, PRIV_NET_SETIFNAME);
 		if (error)
 			return (error);
-		error = copyinstr(ifr->ifr_data, new_name, IFNAMSIZ, NULL);
+		error = copyinstr_c(ifr_data_get_ptr(ifr), new_name, IFNAMSIZ,
+		    NULL);
 		if (error != 0)
 			return (error);
 		if (new_name[0] == '\0')
@@ -2542,23 +3138,23 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 
 #ifdef VIMAGE
-	case SIOCSIFVNET:
+	CASE_IOC_IFREQ(SIOCSIFVNET):
 		error = priv_check(td, PRIV_NET_SETIFVNET);
 		if (error)
 			return (error);
-		error = if_vmove_loan(td, ifp, ifr->ifr_name, ifr->ifr_jid);
+		error = if_vmove_loan(td, ifp, ifr->ifr_name, ifr_jid_get(ifr));
 		break;
 #endif
 
-	case SIOCSIFMETRIC:
+	CASE_IOC_IFREQ(SIOCSIFMETRIC):
 		error = priv_check(td, PRIV_NET_SETIFMETRIC);
 		if (error)
 			return (error);
-		ifp->if_metric = ifr->ifr_metric;
+		ifp->if_metric = ifr_metric_get(ifr);
 		getmicrotime(&ifp->if_lastchange);
 		break;
 
-	case SIOCSIFPHYS:
+	CASE_IOC_IFREQ(SIOCSIFPHYS):
 		error = priv_check(td, PRIV_NET_SETIFPHYS);
 		if (error)
 			return (error);
@@ -2569,14 +3165,15 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 			getmicrotime(&ifp->if_lastchange);
 		break;
 
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 	{
 		u_long oldmtu = ifp->if_mtu;
 
 		error = priv_check(td, PRIV_NET_SETIFMTU);
 		if (error)
 			return (error);
-		if (ifr->ifr_mtu < IF_MINMTU || ifr->ifr_mtu > IF_MAXMTU)
+		if (ifr_mtu_get(ifr) < IF_MINMTU ||
+		    ifr_mtu_get(ifr) > IF_MAXMTU)
 			return (EINVAL);
 		if (ifp->if_ioctl == NULL)
 			return (EOPNOTSUPP);
@@ -2597,12 +3194,11 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 	}
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
-		if (cmd == SIOCADDMULTI)
-			error = priv_check(td, PRIV_NET_ADDMULTI);
-		else
-			error = priv_check(td, PRIV_NET_DELMULTI);
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	{
+		struct ifmultiaddr *ifma;
+
+		error = priv_check(td, PRIV_NET_ADDMULTI);
 		if (error)
 			return (error);
 
@@ -2611,40 +3207,53 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 			return (EOPNOTSUPP);
 
 		/* Don't let users screw up protocols' entries. */
-		if (ifr->ifr_addr.sa_family != AF_LINK)
+		if (ifr_addr_get_family(ifr) != AF_LINK)
 			return (EINVAL);
 
-		if (cmd == SIOCADDMULTI) {
-			struct ifmultiaddr *ifma;
+		/*
+		 * Userland is only permitted to join groups once
+		 * via the if_addmulti() KPI, because it cannot hold
+		 * struct ifmultiaddr * between calls. It may also
+		 * lose a race while we check if the membership
+		 * already exists.
+		 */
+		IF_ADDR_RLOCK(ifp);
+		ifma = if_findmulti(ifp, ifr_addr_get_sa(ifr));
+		IF_ADDR_RUNLOCK(ifp);
+		if (ifma != NULL)
+			error = EADDRINUSE;
+		else
+			error = if_addmulti(ifp, ifr_addr_get_sa(ifr), &ifma);
+		if (error == 0)
+			getmicrotime(&ifp->if_lastchange);
+		break;
+	}
 
-			/*
-			 * Userland is only permitted to join groups once
-			 * via the if_addmulti() KPI, because it cannot hold
-			 * struct ifmultiaddr * between calls. It may also
-			 * lose a race while we check if the membership
-			 * already exists.
-			 */
-			IF_ADDR_RLOCK(ifp);
-			ifma = if_findmulti(ifp, &ifr->ifr_addr);
-			IF_ADDR_RUNLOCK(ifp);
-			if (ifma != NULL)
-				error = EADDRINUSE;
-			else
-				error = if_addmulti(ifp, &ifr->ifr_addr, &ifma);
-		} else {
-			error = if_delmulti(ifp, &ifr->ifr_addr);
-		}
+	CASE_IOC_IFREQ(SIOCDELMULTI):
+		error = priv_check(td, PRIV_NET_DELMULTI);
+		if (error)
+			return (error);
+
+		/* Don't allow group membership on non-multicast interfaces. */
+		if ((ifp->if_flags & IFF_MULTICAST) == 0)
+			return (EOPNOTSUPP);
+
+		/* Don't let users screw up protocols' entries. */
+		if (ifr_addr_get_family(ifr) != AF_LINK)
+			return (EINVAL);
+
+		error = if_delmulti(ifp, ifr_addr_get_sa(ifr));
 		if (error == 0)
 			getmicrotime(&ifp->if_lastchange);
 		break;
 
 	case SIOCSIFPHYADDR:
-	case SIOCDIFPHYADDR:
+	CASE_IOC_IFREQ(SIOCDIFPHYADDR):
 #ifdef INET6
 	case SIOCSIFPHYADDR_IN6:
 #endif
-	case SIOCSIFMEDIA:
-	case SIOCSIFGENERIC:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	CASE_IOC_IFREQ(SIOCSIFGENERIC):
 		error = priv_check(td, PRIV_NET_HWIOCTL);
 		if (error)
 			return (error);
@@ -2656,53 +3265,53 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 
 	case SIOCGIFSTATUS:
-	case SIOCGIFPSRCADDR:
-	case SIOCGIFPDSTADDR:
+	CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
+	CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
 	case SIOCGIFMEDIA:
 	case SIOCGIFXMEDIA:
-	case SIOCGIFGENERIC:
+	CASE_IOC_IFREQ(SIOCGIFGENERIC):
 		if (ifp->if_ioctl == NULL)
 			return (EOPNOTSUPP);
 		error = (*ifp->if_ioctl)(ifp, cmd, data);
 		break;
 
-	case SIOCSIFLLADDR:
+	CASE_IOC_IFREQ(SIOCSIFLLADDR):
 		error = priv_check(td, PRIV_NET_SETLLADDR);
 		if (error)
 			return (error);
-		error = if_setlladdr(ifp,
-		    ifr->ifr_addr.sa_data, ifr->ifr_addr.sa_len);
+		error = if_setlladdr(ifp, ifr_addr_get_data(ifr),
+		    ifr_addr_get_len(ifr));
 		break;
 
-	case SIOCGHWADDR:
+	CASE_IOC_IFREQ(SIOCGHWADDR):
 		error = if_gethwaddr(ifp, ifr);
 		break;
 
-	case SIOCAIFGROUP:
+	CASE_IOC_IFGROUPREQ(SIOCAIFGROUP):
 	{
 		struct ifgroupreq *ifgr = (struct ifgroupreq *)ifr;
 
 		error = priv_check(td, PRIV_NET_ADDIFGROUP);
 		if (error)
 			return (error);
-		if ((error = if_addgroup(ifp, ifgr->ifgr_group)))
+		if ((error = if_addgroup(ifp, ifgr_group_get(ifgr))))
 			return (error);
 		break;
 	}
 
-	case SIOCGIFGROUP:
+	CASE_IOC_IFGROUPREQ(SIOCGIFGROUP):
 		if ((error = if_getgroup((struct ifgroupreq *)ifr, ifp)))
 			return (error);
 		break;
 
-	case SIOCDIFGROUP:
+	CASE_IOC_IFGROUPREQ(SIOCDIFGROUP):
 	{
 		struct ifgroupreq *ifgr = (struct ifgroupreq *)ifr;
 
 		error = priv_check(td, PRIV_NET_DELIFGROUP);
 		if (error)
 			return (error);
-		if ((error = if_delgroup(ifp, ifgr->ifgr_group)))
+		if ((error = if_delgroup(ifp, ifgr_group_get(ifgr))))
 			return (error);
 		break;
 	}
@@ -2725,14 +3334,93 @@ struct ifconf32 {
 #define	SIOCGIFCONF32	_IOWR('i', 36, struct ifconf32)
 #endif
 
+static void
+ifmr_init(struct ifmediareq *ifmr, caddr_t data)
+{
+#ifdef COMPAT_CHERIABI
+	struct ifmediareq64 *ifmr64;
+#endif
+#ifdef COMPAT_FREEBSD32
+	struct ifmediareq32 *ifmr32;
+#endif
+
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_LP64) && !SV_CURPROC_FLAG(SV_CHERI)) {
+		ifmr64 = (struct ifmediareq64 *)data;
+		memcpy(ifmr->ifm_name, ifmr64->ifm_name,
+		    sizeof(ifmr->ifm_name));
+		ifmr->ifm_current = ifmr64->ifm_current;
+		ifmr->ifm_mask = ifmr64->ifm_mask;
+		ifmr->ifm_status = ifmr64->ifm_status;
+		ifmr->ifm_active = ifmr64->ifm_active;
+		ifmr->ifm_count = ifmr64->ifm_count;
+		ifmr->ifm_ulist =
+		    __USER_CAP(ifmr64->ifm_ulist,
+			ifrm64->ifm_count * sizeof(int));
+	} else
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32)) {
+		ifmr32 = (struct ifmediareq32 *)data;
+		memcpy(ifmr->ifm_name, ifmr32->ifm_name,
+		    sizeof(ifmr->ifm_name));
+		ifmr->ifm_current = ifmr32->ifm_current;
+		ifmr->ifm_mask = ifmr32->ifm_mask;
+		ifmr->ifm_status = ifmr32->ifm_status;
+		ifmr->ifm_active = ifmr32->ifm_active;
+		ifmr->ifm_count = ifmr32->ifm_count;
+		ifmr->ifm_ulist =
+		    __USER_CAP((int *)(uintptr_t)ifmr32->ifm_ulist,
+			ifrm32->ifm_count * sizeof(int));
+	} else
+#endif
+		cheri_memcpy(ifmr, data, sizeof(struct ifmediareq));
+}
+
+static void
+ifmr_update(const struct ifmediareq *ifmr, caddr_t data)
+{
+#ifdef COMPAT_CHERIABI
+	struct ifmediareq64 *ifmr64;
+#endif
+#ifdef COMPAT_FREEBSD32
+	struct ifmediareq32 *ifmr32;
+#endif
+
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_LP64) && !SV_CURPROC_FLAG(SV_CHERI)) {
+		ifmr64 = (struct ifmediareq64 *)data;
+		ifmr64->ifm_current = ifmr->ifm_current;
+		ifmr64->ifm_mask = ifmr->ifm_mask;
+		ifmr64->ifm_status = ifmr->ifm_status;
+		ifmr64->ifm_active = ifmr->ifm_active;
+		ifmr64->ifm_count = ifmr->ifm_count;
+	} else
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32)) {
+		ifmr32 = (struct ifmediareq32 *)data;
+		ifmr32->ifm_current = ifmr->ifm_current;
+		ifmr32->ifm_mask = ifmr->ifm_mask;
+		ifmr32->ifm_status = ifmr->ifm_status;
+		ifmr32->ifm_active = ifmr->ifm_active;
+		ifmr32->ifm_count = ifmr->ifm_count;
+	} else
+#endif
+		cheri_memcpy(data, ifmr, sizeof(struct ifmediareq));
+}
+
 /*
  * Interface ioctls.
  */
 int
 ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 {
+	caddr_t saved_data;
+	struct ifmediareq *ifmr;
 	struct ifnet *ifp;
 	struct ifreq *ifr;
+	u_long saved_cmd;
 	int error;
 	int oif_flags;
 #ifdef VIMAGE
@@ -2775,72 +3463,88 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		}
 #endif
 	}
-	ifr = (struct ifreq *)data;
 
 	switch (cmd) {
+	case SIOCGIFMEDIA:
+	case SIOCGIFXMEDIA:
+#ifdef COMPAT_FREEBSD32
+	case SIOCGIFMEDIA32:
+	case SIOCGIFXMEDIA32:
+#endif
+#ifdef COMPAT_CHERIABI
+	case SIOCGIFMEDIA64:
+	case SIOCGIFXMEDIA64:
+#endif
+		ifmr = malloc(sizeof(struct ifmediareq), M_TEMP,
+		    M_WAITOK | M_ZERO);
+		ifmr_init(ifmr, data);
+		saved_cmd = cmd;
+		cmd = _IOC_NEWTYPE(cmd, struct ifmediareq);
+		saved_data = data;
+		data = (caddr_t)ifmr;
+	}
+
+	ifr = (struct ifreq *)data;
+	switch (cmd) {
 #ifdef VIMAGE
-	case SIOCSIFRVNET:
+	CASE_IOC_IFREQ(SIOCSIFRVNET):
 		error = priv_check(td, PRIV_NET_SETIFVNET);
 		if (error == 0)
 			error = if_vmove_reclaim(td, ifr->ifr_name,
-			    ifr->ifr_jid);
-		CURVNET_RESTORE();
-		return (error);
+			    ifr_jid_get(ifr));
+		goto out_noref;
 #endif
-	case SIOCIFCREATE:
-	case SIOCIFCREATE2:
+	CASE_IOC_IFREQ(SIOCIFCREATE):
 		error = priv_check(td, PRIV_NET_IFCREATE);
 		if (error == 0)
 			error = if_clone_create(ifr->ifr_name,
-			    sizeof(ifr->ifr_name),
-			    cmd == SIOCIFCREATE2 ? ifr->ifr_data : NULL);
-		CURVNET_RESTORE();
-		return (error);
-	case SIOCIFDESTROY:
+			    sizeof(ifr->ifr_name), NULL);
+		goto out_noref;
+
+	CASE_IOC_IFREQ(SIOCIFCREATE2):
+		error = priv_check(td, PRIV_NET_IFCREATE);
+		if (error == 0)
+			error = if_clone_create(ifr->ifr_name,
+			    sizeof(ifr->ifr_name), ifr_data_get_ptr(ifr));
+		goto out_noref;
+
+	CASE_IOC_IFREQ(SIOCIFDESTROY):
 		error = priv_check(td, PRIV_NET_IFDESTROY);
 		if (error == 0)
 			error = if_clone_destroy(ifr->ifr_name);
-		CURVNET_RESTORE();
-		return (error);
+		goto out_noref;
 
 	case SIOCIFGCLONERS:
 		error = if_clone_list((struct if_clonereq *)data);
-		CURVNET_RESTORE();
-		return (error);
-	case SIOCGIFGMEMB:
+		goto out_noref;
+	CASE_IOC_IFGROUPREQ(SIOCGIFGMEMB):
 		error = if_getgroupmembers((struct ifgroupreq *)data);
-		CURVNET_RESTORE();
-		return (error);
+		goto out_noref;
 #if defined(INET) || defined(INET6)
-	case SIOCSVH:
-	case SIOCGVH:
+	CASE_IOC_IFREQ(SIOCSVH):
+	CASE_IOC_IFREQ(SIOCGVH):
 		if (carp_ioctl_p == NULL)
 			error = EPROTONOSUPPORT;
 		else
 			error = (*carp_ioctl_p)(ifr, cmd, td);
-		CURVNET_RESTORE();
-		return (error);
+		goto out_noref;
 #endif
 	}
 
 	ifp = ifunit_ref(ifr->ifr_name);
 	if (ifp == NULL) {
-		CURVNET_RESTORE();
-		return (ENXIO);
+		error = ENXIO;
+		goto out_noref;
 	}
 
 	error = ifhwioctl(cmd, ifp, data, td);
-	if (error != ENOIOCTL) {
-		if_rele(ifp);
-		CURVNET_RESTORE();
-		return (error);
-	}
+	if (error != ENOIOCTL)
+		goto out_ref;
 
 	oif_flags = ifp->if_flags;
 	if (so->so_proto == NULL) {
-		if_rele(ifp);
-		CURVNET_RESTORE();
-		return (EOPNOTSUPP);
+		error = EOPNOTSUPP;
+		goto out_ref;
 	}
 
 	/*
@@ -2854,10 +3558,16 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	 */
 	error = ((*so->so_proto->pr_usrreqs->pru_control)(so, cmd, data,
 	    ifp, td));
-	if (error == EOPNOTSUPP && ifp != NULL && ifp->if_ioctl != NULL &&
-	    cmd != SIOCSIFADDR && cmd != SIOCSIFBRDADDR &&
-	    cmd != SIOCSIFDSTADDR && cmd != SIOCSIFNETMASK)
-		error = (*ifp->if_ioctl)(ifp, cmd, data);
+	if (error == EOPNOTSUPP && ifp != NULL && ifp->if_ioctl != NULL)
+		switch (cmd) {
+		CASE_IOC_IFREQ(SIOCSIFADDR):
+		CASE_IOC_IFREQ(SIOCSIFBRDADDR):
+		CASE_IOC_IFREQ(SIOCSIFDSTADDR):
+		CASE_IOC_IFREQ(SIOCSIFNETMASK):
+			break;
+		default:
+			error = (*ifp->if_ioctl)(ifp, cmd, data);
+		}
 
 	if ((oif_flags ^ ifp->if_flags) & IFF_UP) {
 #ifdef INET6
@@ -2865,7 +3575,15 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 			in6_if_up(ifp);
 #endif
 	}
+
+out_ref:
 	if_rele(ifp);
+out_noref:
+	if (cmd == SIOCGIFMEDIA || cmd == SIOCGIFXMEDIA) {
+		data = saved_data;
+		ifmr_update(ifmr, data);
+		free(ifmr, M_TEMP);
+	}
 	CURVNET_RESTORE();
 	return (error);
 }
@@ -2927,8 +3645,8 @@ if_setflag(struct ifnet *ifp, int flag, int pflag, int *refcount, int onswitch)
 		error = EOPNOTSUPP;
 		goto recover;
 	}
-	ifr.ifr_flags = ifp->if_flags & 0xffff;
-	ifr.ifr_flagshigh = ifp->if_flags >> 16;
+	ifr.ifr_ifru.ifru_flags[0] = ifp->if_flags & 0xffff;
+	ifr.ifr_ifru.ifru_flags[1] = ifp->if_flags >> 16;
 	error = (*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, (caddr_t)&ifr);
 	if (error)
 		goto recover;
@@ -3004,10 +3722,10 @@ again:
 		int addrs;
 
 		/*
-		 * Zero the ifr_name buffer to make sure we don't
-		 * disclose the contents of the stack.
+		 * Zero the ifr to make sure we don't disclose the contents
+		 * of the stack.
 		 */
-		memset(ifr.ifr_name, 0, sizeof(ifr.ifr_name));
+		memset(&ifr, 0, sizeof(ifr));
 
 		if (strlcpy(ifr.ifr_name, ifp->if_xname, sizeof(ifr.ifr_name))
 		    >= sizeof(ifr.ifr_name)) {
@@ -3025,13 +3743,21 @@ again:
 				continue;
 			addrs++;
 			if (sa->sa_len <= sizeof(*sa)) {
-				ifr.ifr_addr = *sa;
+				if (sa->sa_len < sizeof(*sa)) {
+					memset(&ifr.ifr_ifru.ifru_addr, 0,
+					    sizeof(ifr.ifr_ifru.ifru_addr));
+					memcpy(&ifr.ifr_ifru.ifru_addr, sa,
+					    sa->sa_len);
+					ifr.ifr_ifru.ifru_addr.sa_len =
+					    sizeof(ifr.ifr_ifru.ifru_addr);
+				} else
+					ifr.ifr_ifru.ifru_addr = *sa;
 				sbuf_bcat(sb, &ifr, sizeof(ifr));
 				max_len += sizeof(ifr);
 			} else {
 				sbuf_bcat(sb, &ifr,
-				    offsetof(struct ifreq, ifr_addr));
-				max_len += offsetof(struct ifreq, ifr_addr);
+				    offsetof(struct ifreq, ifr_ifru));
+				max_len += offsetof(struct ifreq, ifr_ifru);
 				sbuf_bcat(sb, sa, sa->sa_len);
 				max_len += sa->sa_len;
 			}
@@ -3041,7 +3767,6 @@ again:
 		}
 		IF_ADDR_RUNLOCK(ifp);
 		if (addrs == 0) {
-			bzero((caddr_t)&ifr.ifr_addr, sizeof(ifr.ifr_addr));
 			sbuf_bcat(sb, &ifr, sizeof(ifr));
 			max_len += sizeof(ifr);
 
@@ -3544,12 +4269,12 @@ if_setlladdr(struct ifnet *ifp, const u_char *lladdr, int len)
 	if ((ifp->if_flags & IFF_UP) != 0) {
 		if (ifp->if_ioctl) {
 			ifp->if_flags &= ~IFF_UP;
-			ifr.ifr_flags = ifp->if_flags & 0xffff;
-			ifr.ifr_flagshigh = ifp->if_flags >> 16;
+			ifr.ifr_ifru.ifru_flags[0] = ifp->if_flags & 0xffff;
+			ifr.ifr_ifru.ifru_flags[1] = ifp->if_flags >> 16;
 			(*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, (caddr_t)&ifr);
 			ifp->if_flags |= IFF_UP;
-			ifr.ifr_flags = ifp->if_flags & 0xffff;
-			ifr.ifr_flagshigh = ifp->if_flags >> 16;
+			ifr.ifr_ifru.ifru_flags[0] = ifp->if_flags & 0xffff;
+			ifr.ifr_ifru.ifru_flags[1] = ifp->if_flags >> 16;
 			(*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, (caddr_t)&ifr);
 		}
 	}
@@ -3610,7 +4335,7 @@ if_gethwaddr(struct ifnet *ifp, struct ifreq *ifr)
 	switch (ifp->if_type) {
 	case IFT_ETHER:
 	case IFT_IEEE8023ADLAG:
-		bcopy(ifp->if_hw_addr, ifr->ifr_addr.sa_data, ifp->if_addrlen);
+		bcopy(ifp->if_hw_addr, ifr_addr_get_data(ifr), ifp->if_addrlen);
 		return (0);
 	default:
 		return (ENODEV);

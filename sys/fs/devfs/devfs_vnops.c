@@ -39,6 +39,8 @@
  *	mkdir: want it ?
  */
 
+#include "opt_compat.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
@@ -59,6 +61,7 @@
 #include <sys/stat.h>
 #include <sys/sx.h>
 #include <sys/sysctl.h>
+#include <sys/sysent.h>
 #include <sys/time.h>
 #include <sys/ttycom.h>
 #include <sys/unistd.h>
@@ -76,6 +79,22 @@ static struct fileops devfs_ops_f;
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
 #include <vm/vm_object.h>
+
+#ifdef COMPAT_CHERIABI
+struct fiodgname_arg_c {
+	int		len;
+	void * __capability buf;
+};
+#define FIODGNAME_C	_IOC_NEWTYPE(FIODGNAME, struct fiodgname_arg_c)
+#endif
+
+#ifdef COMPAT_FREEBSD32
+struct fiodgname_arg32 {
+	int		len;
+	uint32_t	buf;	/* (void *) */
+};
+#define FIODGNAME_32	_IOC_NEWTYPE(FIODGNAME, struct fiodgname_arg32)
+#endif
 
 static MALLOC_DEFINE(M_CDEVPDATA, "DEVFSP", "Metainfo for cdev-fp data");
 
@@ -765,6 +784,32 @@ devfs_ioctl_f(struct file *fp, u_long com, void *data, struct ucred *cred, struc
 	return (error);
 }
 
+static void * __capability
+fiodgname_buf_get_ptr(void *fgnp)
+{
+	union {
+		struct fiodgname_arg	fgn;
+#ifdef COMPAT_CHERIABI
+		struct fiodgname_arg_c	fgn_c;
+#endif
+#ifdef COMPAT_FREEBSD32
+		struct fiodgname_arg32	fgn32;
+#endif
+	} *fgnup;
+
+	fgnup = fgnp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		return (fgnup->fgn_c.buf);
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		return (__USER_CAP((void *)(uintptr_t)fgnup->fgn32.buf,
+		    fgnup->fgn32.len));
+#endif
+	return (__USER_CAP(fgnup->fgn.buf, fgnup->fgn.len));
+}
+
 static int
 devfs_ioctl(struct vop_ioctl_args *ap)
 {
@@ -787,24 +832,32 @@ devfs_ioctl(struct vop_ioctl_args *ap)
 	KASSERT(dev->si_refcount > 0,
 	    ("devfs: un-referenced struct cdev *(%s)", devtoname(dev)));
 
-	if (com == FIODTYPE) {
+	switch (com) {
+	case FIODTYPE:
 		*(int *)ap->a_data = dsw->d_flags & D_TYPEMASK;
 		error = 0;
-		goto out;
-	} else if (com == FIODGNAME) {
+		break;
+	case FIODGNAME:
+#ifdef COMPAT_CHERIABI
+	case FIODGNAME_C:
+#endif
+#ifdef	COMPAT_FREEBSD32
+	case FIODGNAME_32:
+#endif
 		fgn = ap->a_data;
 		p = devtoname(dev);
 		i = strlen(p) + 1;
 		if (i > fgn->len)
 			error = EINVAL;
 		else
-			error = copyout(p, fgn->buf, i);
-		goto out;
+			error = copyout_c(
+			    (__cheri_tocap const char * __capability)p,
+			    fiodgname_buf_get_ptr(fgn), i);
+		break;
+	default:
+		error = dsw->d_ioctl(dev, com, ap->a_data, ap->a_fflag, td);
 	}
 
-	error = dsw->d_ioctl(dev, com, ap->a_data, ap->a_fflag, td);
-
-out:
 	dev_relthread(dev, ref);
 	if (error == ENOIOCTL)
 		error = ENOTTY;

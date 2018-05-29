@@ -26,6 +26,8 @@ proctab.c: maketab
 	${BTOOLSPATH:U.}/maketab > proctab.c
 
 build-tools: maketab
-maketab: ytab.h maketab.c ${BUILD_TOOLS_META}
+maketab: maketab.c ytab.h ${BUILD_TOOLS_META}
+	${BUILD_TOOLS_CC} ${BUILD_TOOLS_CFLAGS} -I. ${BUILD_TOOLS_LDFLAGS} \
+	    ${.ALLSRC:[1]} -o ${.TARGET}
 
 .include <bsd.prog.mk>

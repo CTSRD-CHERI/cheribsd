@@ -52,6 +52,7 @@ MLINKS+=	\
 		atf-sh.3 atf_fail.3 \
 		atf-sh.3 atf_get.3 \
 		atf-sh.3 atf_get_srcdir.3 \
+		atf-sh.3 atf_init_test_cases.3 \
 		atf-sh.3 atf_pass.3 \
 		atf-sh.3 atf_require_prog.3 \
 		atf-sh.3 atf_set.3 \
@@ -73,6 +74,13 @@ SUBR=		libatf-sh.subr
 
 .if ${MK_TESTS} != "no"
 SUBDIR+=	tests
+.endif
+
+# Allow building atf as a static MIPS binary to speed up running tests
+# on QEMU (since QEMU it can only 'JIT' plain MIPS instructions)
+.if ${MK_CHERI_PURE} != "no" && defined(ATF_BUILD_STATIC_MIPS)
+WANT_CHERI:=hybrid
+NO_SHARED:=yes
 .endif
 
 .include "../../../lib/atf/common.mk"

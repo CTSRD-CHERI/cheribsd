@@ -309,7 +309,7 @@ dmu_objset_byteswap(void *buf, size_t size)
 static uint64_t
 dnode_hash(const objset_t *os, uint64_t obj)
 {
-	uintptr_t osv = (uintptr_t)os;
+	vaddr_t osv = (vaddr_t)os;
 	uint64_t crc = -1ULL;
 
 	ASSERT(zfs_crc64_table[128] == ZFS_CRC64_POLY);

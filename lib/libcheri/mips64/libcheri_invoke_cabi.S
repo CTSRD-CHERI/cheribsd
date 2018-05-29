@@ -228,7 +228,6 @@ libcheri_set_errno:
 	b	libcheri_invoke_restore_regs
 	sw	$a0, 0($at)
 
-	.end	libcheri_invoke
 
 #else
 	#
@@ -237,8 +236,12 @@ libcheri_set_errno:
 	dla	$a2, libcheri_errno
 	b	libcheri_invoke_restore_regs
 	csw	$a0, $a2, 0($c0)
-	.end	libcheri_invoke
 #endif
+	.end	libcheri_invoke
+	# Also add size information for cheri_invoke to avoid linker warnings
+.L.cheri_invoke.end:
+	.size cheri_invoke, .L.cheri_invoke.end - cheri_invoke
+
 
 	.type	libcheri_errno,@object      # @libcheri_errno
 #ifdef HAVE_WORKING_TLS

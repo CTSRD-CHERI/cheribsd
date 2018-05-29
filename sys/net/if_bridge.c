@@ -235,7 +235,8 @@ int	bridge_rtable_prune_period = BRIDGE_RTABLE_PRUNE_PERIOD;
 
 uma_zone_t bridge_rtnode_zone;
 
-static int	bridge_clone_create(struct if_clone *, int, caddr_t);
+static int	bridge_clone_create(struct if_clone *, int,
+		    void * __capability);
 static void	bridge_clone_destroy(struct ifnet *);
 
 static int	bridge_ioctl(struct ifnet *, u_long, caddr_t);
@@ -627,7 +628,7 @@ SYSCTL_PROC(_net_link_bridge, OID_AUTO, ipfw,
  *	Create a new bridge instance.
  */
 static int
-bridge_clone_create(struct if_clone *ifc, int unit, caddr_t params)
+bridge_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 {
 	struct bridge_softc *sc, *sc2;
 	struct ifnet *bifp, *ifp;
@@ -781,8 +782,8 @@ bridge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	switch (cmd) {
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		break;
 
 	case SIOCGDRVSPEC:
@@ -834,7 +835,7 @@ bridge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 		break;
 
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		if (!(ifp->if_flags & IFF_UP) &&
 		    (ifp->if_drv_flags & IFF_DRV_RUNNING)) {
 			/*
@@ -854,28 +855,28 @@ bridge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case SIOCSIFMTU:
-		if (ifr->ifr_mtu < 576) {
+	CASE_IOC_IFREQ(SIOCSIFMTU):
+		if (ifr_mtu_get(ifr) < 576) {
 			error = EINVAL;
 			break;
 		}
 		if (LIST_EMPTY(&sc->sc_iflist)) {
-			sc->sc_ifp->if_mtu = ifr->ifr_mtu;
+			sc->sc_ifp->if_mtu = ifr_mtu_get(ifr);
 			break;
 		}
 		BRIDGE_LOCK(sc);
 		LIST_FOREACH(bif, &sc->sc_iflist, bif_next) {
-			if (bif->bif_ifp->if_mtu != ifr->ifr_mtu) {
+			if (bif->bif_ifp->if_mtu != ifr_mtu_get(ifr)) {
 				log(LOG_NOTICE, "%s: invalid MTU: %u(%s)"
 				    " != %d\n", sc->sc_ifp->if_xname,
 				    bif->bif_ifp->if_mtu,
-				    bif->bif_ifp->if_xname, ifr->ifr_mtu);
+				    bif->bif_ifp->if_xname, ifr_mtu_get(ifr));
 				error = EINVAL;
 				break;
 			}
 		}
 		if (!error)
-			sc->sc_ifp->if_mtu = ifr->ifr_mtu;
+			sc->sc_ifp->if_mtu = ifr_mtu_get(ifr);
 		BRIDGE_UNLOCK(sc);
 		break;
 	default:
@@ -934,7 +935,7 @@ bridge_set_ifcap(struct bridge_softc *sc, struct bridge_iflist *bif, int set)
 	BRIDGE_UNLOCK_ASSERT(sc);
 
 	bzero(&ifr, sizeof(ifr));
-	ifr.ifr_reqcap = set;
+	ifr.ifr_ifru.ifru_cap[0] = set;	/* ifr_reqcap */
 
 	if (ifp->if_capenable != set) {
 		error = (*ifp->if_ioctl)(ifp, SIOCSIFCAP, (caddr_t)&ifr);

@@ -34,7 +34,6 @@
 
 #ifdef _KERNEL
 #include <sys/sysctl.h>		/* SYSCTL_DECL() */
-#include <sys/systm.h>		/* CTASSERT() */
 #endif
 
 #include <sys/types.h>
@@ -50,9 +49,6 @@
 struct chericap {
 	uint8_t		c_data[CHERICAP_SIZE];
 } __packed __aligned(CHERICAP_SIZE);
-#ifdef _KERNEL
-CTASSERT(sizeof(struct chericap) == CHERICAP_SIZE);
-#endif
 
 /*
  * Canonical C-language representation of a CHERI object capability -- code and
@@ -104,6 +100,13 @@ struct cheri_signal {
  * capabilities themselves.
  */
 #ifdef _KERNEL
+void * __capability	cheri_capability_build_user_code(uint32_t perms,
+			    vaddr_t basep, size_t length, off_t off);
+void * __capability	cheri_capability_build_user_data(uint32_t perms,
+			    vaddr_t basep, size_t length, off_t off);
+void * __capability	cheri_capability_build_user_rwx(uint32_t perms,
+			    vaddr_t basep, size_t length, off_t off);
+
 void	cheri_capability_set(void * __capability *capp, uint32_t uperms,
 	    vaddr_t basep, size_t length, off_t off);
 
@@ -132,10 +135,11 @@ void	hybridabi_sendsig(struct thread *td);
  * Functions to set up and manipulate CHERI contexts and stacks.
  */
 struct pcb;
+struct proc;
 struct sysarch_args;
 void	cheri_sealcap_copy(struct proc *dst, struct proc *src);
 void	cheri_signal_copy(struct pcb *dst, struct pcb *src);
-int	cheri_sysarch_getsealcap(struct thread *td, struct sysarch_args *uap);
+int	cheri_sysarch_getsealcap(struct thread *td, void * __capability ucap);
 int	cheri_sysarch_getstack(struct thread *td, struct sysarch_args *uap);
 int	cheri_sysarch_setstack(struct thread *td, struct sysarch_args *uap);
 

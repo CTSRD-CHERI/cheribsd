@@ -1519,8 +1519,8 @@ smsc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int mask;
 	int reinit;
 	
-	if (cmd == SIOCSIFCAP) {
-
+	switch (cmd) {
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		sc = uether_getsc(ue);
 		ifr = (struct ifreq *)data;
 
@@ -1529,7 +1529,7 @@ smsc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		rc = 0;
 		reinit = 0;
 
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 
 		/* Modify the RX CSUM enable bits */
 		if ((mask & IFCAP_RXCSUM) != 0 &&
@@ -1549,9 +1549,10 @@ smsc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #else
 			ifp->if_init(ue);
 #endif
-
-	} else {
+		break;
+	default:
 		rc = uether_ioctl(ifp, cmd, data);
+		break;
 	}
 
 	return (rc);

@@ -426,7 +426,7 @@ aesni_cipher_alloc(struct cryptodesc *enccrd, struct cryptop *crp,
 {
 	struct mbuf *m;
 	struct uio *uio;
-	struct iovec *iov;
+	kiovec_t *iov;
 	uint8_t *addr;
 
 	if (crp->crp_flags & CRYPTO_F_IMBUF) {

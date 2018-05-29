@@ -275,7 +275,11 @@ struct thread {
 	char		td_name[MAXCOMLEN + 1];	/* (*) Thread name. */
 	struct file	*td_fpop;	/* (k) file referencing cdev under op */
 	int		td_dbgflags;	/* (c) Userland debugger flags */
+#ifdef _KERNEL
+	_siginfo_t	td_si;		/* (c) For debugger or core file */
+#else
 	siginfo_t	td_si;		/* (c) For debugger or core file */
+#endif
 	int		td_ng_outbound;	/* (k) Thread entered ng from above. */
 	struct osd	td_osd;		/* (k) Object specific data. */
 	struct vm_map_entry *td_map_def_user; /* (k) Deferred entries. */
@@ -297,9 +301,9 @@ struct thread {
 	u_char		td_pri_class;	/* (t) Scheduling class. */
 	u_char		td_user_pri;	/* (t) User pri from estcpu and nice. */
 	u_char		td_base_user_pri; /* (t) Base user pri */
-	uintptr_t	td_rb_list;	/* (k) Robust list head. */
-	uintptr_t	td_rbp_list;	/* (k) Robust priv list head. */
-	uintptr_t	td_rb_inact;	/* (k) Current in-action mutex loc. */
+	uintcap_t	td_rb_list;	/* (k) Robust list head. */
+	uintcap_t	td_rbp_list;	/* (k) Robust priv list head. */
+	uintcap_t	td_rb_inact;	/* (k) Current in-action mutex loc. */
 	struct syscall_args td_sa;	/* (kx) Syscall parameters. Copied on
 					   fork for child tracing. */
 #define	td_endcopy td_pcb

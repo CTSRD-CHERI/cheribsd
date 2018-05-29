@@ -97,20 +97,9 @@
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
 #ifdef __PIC__
 # define PIC_PROLOGUE(x)
-/*
- * XXXAR: current CHERI clang ignores any arithmetic expressions in a statement
- * if it encounters %pc_rel. Therefore we need to manually subtract 8 from
- * t9 (offset between daddiu and cgetpcc) to get the right value.
- *
- * This appears to have been fixed in the latest clang HEAD so we can remove
- * the extra subtraction after it has been merged into CHERI clang.
- *
- * FIXME: if the difference is at a 16 bit boundary this calculation is wrong.
- */
 # define PIC_LOAD_CODE_PTR(capreg, gpr, l)		\
-	lui		gpr, %pcrel_hi(l);		\
-	daddiu		gpr, gpr, %pcrel_lo(l);		\
-	daddiu		gpr, gpr, -8;			\
+	lui		gpr, %pcrel_hi(l - 8);		\
+	daddiu		gpr, gpr, %pcrel_lo(l - 4);	\
 	cgetpcc		capreg;				\
 	cincoffset	capreg, capreg, gpr;
 # define PIC_TAILCALL(l)				\

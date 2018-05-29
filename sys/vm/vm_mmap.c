@@ -288,7 +288,8 @@ kern_mmap(struct thread *td, uintptr_t addr0, uintptr_t max_addr0,
 	unsigned int extra_flags =
 	    (flags & ~(MAP_SHARED | MAP_PRIVATE | MAP_FIXED | MAP_HASSEMAPHORE |
 	    MAP_STACK | MAP_NOSYNC | MAP_ANON | MAP_EXCL | MAP_NOCORE |
-	    MAP_PREFAULT_READ | MAP_CHERI_DDC | MAP_CHERI_NOSETBOUNDS |
+	    MAP_PREFAULT_READ | MAP_GUARD |
+	    MAP_CHERI_DDC | MAP_CHERI_NOSETBOUNDS |
 #ifdef MAP_32BIT
 	    MAP_32BIT |
 #endif
@@ -325,6 +326,16 @@ kern_mmap(struct thread *td, uintptr_t addr0, uintptr_t max_addr0,
 			ktrsyserrcause("%s: Unexpected protections 0x%x",
 			    __func__,
 			    (prot & ~(PROT_READ | PROT_WRITE | PROT_EXEC)));
+#endif
+		return (EINVAL);
+	}
+	if ((flags & MAP_GUARD) != 0 && (prot != PROT_NONE || fd != -1 ||
+	    pos != 0 || (flags & (MAP_SHARED | MAP_PRIVATE | MAP_PREFAULT |
+	    MAP_PREFAULT_READ | MAP_ANON | MAP_STACK)) != 0)) {
+#ifdef KTRACE
+		if (KTRPOINT(td, KTR_SYSERRCAUSE))
+			ktrsyserrcause("%s: Invalid arguments with MAP_GUARD",
+			    __func__);
 #endif
 		return (EINVAL);
 	}
@@ -512,7 +523,10 @@ kern_mmap(struct thread *td, uintptr_t addr0, uintptr_t max_addr0,
 		 * returns an error earlier.
 		 */
 		error = 0;
-	} else if (flags & MAP_ANON) {
+	} else if ((flags & MAP_GUARD) != 0) {
+		error = vm_mmap_object(&vms->vm_map, &addr, max_addr, size,
+		    VM_PROT_NONE, VM_PROT_NONE, flags, NULL, pos, FALSE, td);
+	} else if ((flags & MAP_ANON) != 0) {
 		/*
 		 * Mapping blank space is trivial.
 		 *
@@ -841,13 +855,15 @@ struct minherit_args {
 int
 sys_minherit(struct thread *td, struct minherit_args *uap)
 {
-	vm_offset_t addr;
-	vm_size_t size, pageoff;
-	vm_inherit_t inherit;
 
-	addr = (vm_offset_t)uap->addr;
-	size = uap->len;
-	inherit = uap->inherit;
+	return (kern_minherit(td, (vm_offset_t)uap->addr, uap->len,
+	    uap->inherit));
+}
+
+int
+kern_minherit(struct thread *td, vm_offset_t addr, vm_size_t size, int inherit)
+{
+	vm_size_t pageoff;
 
 	pageoff = (addr & PAGE_MASK);
 	addr -= pageoff;
@@ -857,7 +873,7 @@ sys_minherit(struct thread *td, struct minherit_args *uap)
 		return (EINVAL);
 
 	switch (vm_map_inherit(&td->td_proc->p_vmspace->vm_map, addr,
-	    addr + size, inherit)) {
+	    addr + size, (vm_inherit_t)inherit)) {
 	case KERN_SUCCESS:
 		return (0);
 	case KERN_PROTECTION_FAILURE:
@@ -938,11 +954,13 @@ int
 sys_mincore(struct thread *td, struct mincore_args *uap)
 {
 
-	return (kern_mincore(td, (uintptr_t)uap->addr, uap->len, uap->vec));
+	return (kern_mincore(td, (uintptr_t)uap->addr, uap->len,
+	    __USER_CAP(uap->vec, uap->len)));
 }
 
 int
-kern_mincore(struct thread *td, uintptr_t addr0, size_t len, char *vec)
+kern_mincore(struct thread *td, uintptr_t addr0, size_t len,
+    char * __capability vec)
 {
 	vm_offset_t addr, first_addr;
 	vm_offset_t end, cend;
@@ -1120,7 +1138,7 @@ RestartScan:
 			 */
 			while ((lastvecindex + 1) < vecindex) {
 				++lastvecindex;
-				error = subyte(vec + lastvecindex, 0);
+				error = subyte_c(vec + lastvecindex, 0);
 				if (error) {
 					error = EFAULT;
 					goto done2;
@@ -1130,7 +1148,7 @@ RestartScan:
 			/*
 			 * Pass the page information to the user
 			 */
-			error = subyte(vec + vecindex, mincoreinfo);
+			error = subyte_c(vec + vecindex, mincoreinfo);
 			if (error) {
 				error = EFAULT;
 				goto done2;
@@ -1161,7 +1179,7 @@ RestartScan:
 	vecindex = atop(end - first_addr);
 	while ((lastvecindex + 1) < vecindex) {
 		++lastvecindex;
-		error = subyte(vec + lastvecindex, 0);
+		error = subyte_c(vec + lastvecindex, 0);
 		if (error) {
 			error = EFAULT;
 			goto done2;
@@ -1658,10 +1676,11 @@ vm_mmap_object(vm_map_t map, vm_offset_t *addr, vm_offset_t max_addr,
     vm_prot_t maxprot, int flags, vm_object_t object, vm_ooffset_t foff,
     boolean_t writecounted, struct thread *td)
 {
-	boolean_t fitit;
+	boolean_t curmap, fitit;
 	int docow, error, findspace, rv;
 
-	if (map == &td->td_proc->p_vmspace->vm_map) {
+	curmap = map == &td->td_proc->p_vmspace->vm_map;
+	if (curmap) {
 		PROC_LOCK(td->td_proc);
 		if (map->size + size > lim_cur_proc(td->td_proc, RLIMIT_VMEM)) {
 			PROC_UNLOCK(td->td_proc);
@@ -1738,6 +1757,8 @@ vm_mmap_object(vm_map_t map, vm_offset_t *addr, vm_offset_t max_addr,
 	}
 	if ((flags & MAP_EXCL) != 0)
 		docow |= MAP_CHECK_EXCL;
+	if ((flags & MAP_GUARD) != 0)
+		docow |= MAP_CREATE_GUARD;
 
 	if (fitit) {
 		if ((flags & MAP_ALIGNMENT_MASK) == MAP_ALIGNED_SUPER)
@@ -1747,8 +1768,15 @@ vm_mmap_object(vm_map_t map, vm_offset_t *addr, vm_offset_t max_addr,
 			    MAP_ALIGNMENT_SHIFT);
 		else
 			findspace = VMFS_OPTIMAL_SPACE;
-		rv = vm_map_find(map, object, foff, addr, size,
-		    max_addr, findspace, prot, maxprot, docow);
+		if (curmap) {
+			rv = vm_map_find_min(map, object, foff, addr, size,
+			    round_page((vm_offset_t)td->td_proc->p_vmspace->
+			    vm_daddr + lim_max(td, RLIMIT_DATA)), max_addr,
+			    findspace, prot, maxprot, docow);
+		} else {
+			rv = vm_map_find(map, object, foff, addr, size,
+			    max_addr, findspace, prot, maxprot, docow);
+		}
 	} else {
 		if (max_addr != 0 && *addr + size > max_addr)
 			return (ENOMEM);

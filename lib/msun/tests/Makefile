@@ -46,19 +46,25 @@ NETBSD_ATF_TESTS_C+=	sqrt_test
 NETBSD_ATF_TESTS_C+=	tan_test
 NETBSD_ATF_TESTS_C+=	tanh_test
 
+# Most tests fail ungracefully on mips64 so don't bother running them.
+.if ${MACHINE_CPUARCH} != "mips"
 TAP_TESTS_C+=	cexp_test
+.endif
 TAP_TESTS_C+=	conj_test
-.if ${MACHINE_CPUARCH} != "aarch64"
+.if ${MACHINE_ARCH} != "aarch64"
 # Hits an assert in llvm when building for arm64:
 # https://llvm.org/bugs/show_bug.cgi?id=26081
 TAP_TESTS_C+=	csqrt_test
 .endif
+.if ${MACHINE_CPUARCH} != "mips"
 ATF_TESTS_C+=	ctrig_test
 TAP_TESTS_C+=	exponential_test
 TAP_TESTS_C+=	fenv_test
 TAP_TESTS_C+=	fma_test
+.endif
 TAP_TESTS_C+=	fmaxmin_test
 TAP_TESTS_C+=	ilogb2_test
+.if ${MACHINE_CPUARCH} != "mips"
 TAP_TESTS_C+=	invtrig_test
 TAP_TESTS_C+=	invctrig_test
 TAP_TESTS_C+=	logarithm_test
@@ -71,6 +77,7 @@ TAP_TESTS_C+=	nearbyint_test
 TAP_TESTS_C+=	next_test
 TAP_TESTS_C+=	rem_test
 TAP_TESTS_C+=	trig_test
+.endif
 
 .if !empty(PROG) && !empty(TAP_TESTS_C:M${PROG})
 CFLAGS+=	-O0

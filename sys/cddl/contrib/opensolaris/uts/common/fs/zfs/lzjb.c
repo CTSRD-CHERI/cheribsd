@@ -75,8 +75,8 @@ lzjb_compress(void *s_start, void *d_start, size_t s_len, size_t d_len, int n)
 		hash += hash >> 9;
 		hash += hash >> 5;
 		hp = &lempel[hash & (LEMPEL_SIZE - 1)];
-		offset = (intptr_t)(src - *hp) & OFFSET_MASK;
-		*hp = (uint16_t)(uintptr_t)src;
+		offset = (vaddr_t)(src - *hp) & OFFSET_MASK;
+		*hp = (uint16_t)(vaddr_t)src;
 		cpy = src - offset;
 		if (cpy >= (uchar_t *)s_start && cpy != src &&
 		    src[0] == cpy[0] && src[1] == cpy[1] && src[2] == cpy[2]) {

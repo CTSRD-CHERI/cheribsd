@@ -251,7 +251,7 @@ pmclog_loop(void *arg)
 	struct ucred *mycred;
 	struct thread *td;
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	size_t nbytes;
 
 	po = (struct pmc_owner *) arg;

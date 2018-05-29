@@ -61,7 +61,7 @@ __FBSDID("$FreeBSD$");
 void
 cuio_copydata(struct uio* uio, int off, int len, caddr_t cp)
 {
-	struct iovec *iov = uio->uio_iov;
+	kiovec_t *iov = uio->uio_iov;
 	int iol = uio->uio_iovcnt;
 	unsigned count;
 
@@ -69,7 +69,8 @@ cuio_copydata(struct uio* uio, int off, int len, caddr_t cp)
 	while (len > 0) {
 		KASSERT(iol >= 0, ("%s: empty", __func__));
 		count = min(iov->iov_len - off, len);
-		bcopy(((caddr_t)iov->iov_base) + off, cp, count);
+		bcopy_c(((char * __capability)iov->iov_base) + off,
+		    (__cheri_tocap char * __capability)cp, count);
 		len -= count;
 		cp += count;
 		off = 0;
@@ -81,7 +82,7 @@ cuio_copydata(struct uio* uio, int off, int len, caddr_t cp)
 void
 cuio_copyback(struct uio* uio, int off, int len, c_caddr_t cp)
 {
-	struct iovec *iov = uio->uio_iov;
+	kiovec_t *iov = uio->uio_iov;
 	int iol = uio->uio_iovcnt;
 	unsigned count;
 
@@ -89,7 +90,8 @@ cuio_copyback(struct uio* uio, int off, int len, c_caddr_t cp)
 	while (len > 0) {
 		KASSERT(iol >= 0, ("%s: empty", __func__));
 		count = min(iov->iov_len - off, len);
-		bcopy(cp, ((caddr_t)iov->iov_base) + off, count);
+		bcopy_c((__cheri_tocap const char * __capability)cp,
+		    ((char * __capability)iov->iov_base) + off, count);
 		len -= count;
 		cp += count;
 		off = 0;
@@ -134,7 +136,7 @@ int
 cuio_apply(struct uio *uio, int off, int len, int (*f)(void *, void *, u_int),
     void *arg)
 {
-	struct iovec *iov = uio->uio_iov;
+	kiovec_t *iov = uio->uio_iov;
 	int iol = uio->uio_iovcnt;
 	unsigned count;
 	int rval;
@@ -143,7 +145,9 @@ cuio_apply(struct uio *uio, int off, int len, int (*f)(void *, void *, u_int),
 	while (len > 0) {
 		KASSERT(iol >= 0, ("%s: empty", __func__));
 		count = min(iov->iov_len - off, len);
-		rval = (*f)(arg, ((caddr_t)iov->iov_base) + off, count);
+		rval = (*f)(arg,
+		    __DECAP_CHECK(((char * __capability)iov->iov_base) + off,
+		    count), count);
 		if (rval)
 			return (rval);
 		len -= count;
@@ -194,10 +198,10 @@ crypto_apply(int flags, caddr_t buf, int off, int len,
 }
 
 int
-crypto_mbuftoiov(struct mbuf *mbuf, struct iovec **iovptr, int *cnt,
+crypto_mbuftoiov(struct mbuf *mbuf, kiovec_t **iovptr, int *cnt,
     int *allocated)
 {
-	struct iovec *iov;
+	kiovec_t *iov;
 	struct mbuf *m, *mtmp;
 	int i, j;
 

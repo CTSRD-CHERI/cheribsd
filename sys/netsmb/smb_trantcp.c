@@ -291,7 +291,7 @@ nbssn_recvhdr(struct nbpcb *nbp, int *lenp,
 {
 	struct socket *so = nbp->nbp_tso;
 	struct uio auio;
-	struct iovec aio;
+	kiovec_t aio;
 	u_int32_t len;
 	int error;
 

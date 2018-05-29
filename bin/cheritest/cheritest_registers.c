@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012-2017 Robert N. M. Watson
+ * Copyright (c) 2012-2018 Robert N. M. Watson
  * Copyright (c) 2014 SRI International
  * All rights reserved.
  *
@@ -282,7 +282,7 @@ check_initreg_data(__capability void *c)
 		cheritest_failure_errx("perms %jx (ccall missing)", v);
 
 	if ((v & CHERI_PERM_UNSEAL) != 0)
-		cheritest_failure_errx("perms %jx (cunseal present)", v);
+		cheritest_failure_errx("perms %jx (unseal present)", v);
 
 	if ((v & CHERI_PERM_SYSTEM_REGS) != 0)
 		cheritest_failure_errx("perms %jx (system_regs present)", v);

@@ -28,6 +28,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include "opt_compat.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -43,6 +45,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/poll.h>
 #include <sys/selinfo.h>
 #include <sys/sdt.h>
+#include <sys/sysent.h>
 #include <sys/taskqueue.h>
 #include <vm/uma.h>
 #include <vm/vm.h>
@@ -1229,7 +1232,7 @@ passcopysglist(struct cam_periph *periph, struct pass_io_req *io_req,
 		user_watermark += len_to_copy;
 		kern_watermark += len_to_copy;
 
-		if (!useracc(user_ptr, len_to_copy,
+		if (!useracc(__USER_CAP(user_ptr, len_to_copy), len_to_copy,
 		    (direction == CAM_DIR_IN) ? VM_PROT_WRITE : VM_PROT_READ)) {
 			xpt_print(periph->path, "%s: unable to access user "
 				  "S/G list element %p len %zu\n", __func__,
@@ -1431,7 +1434,8 @@ passmemsetup(struct cam_periph *periph, struct pass_io_req *io_req)
 			 * Make sure that the user's buffer is accessible
 			 * to that process.
 			 */
-			if (!useracc(io_req->user_bufs[i], io_req->lengths[i],
+			if (!useracc(__USER_CAP(io_req->user_bufs[i],
+			    io_req->lengths[i]), io_req->lengths[i],
 			    (io_req->dirs[i] == CAM_DIR_IN) ? VM_PROT_WRITE :
 			     VM_PROT_READ)) {
 				xpt_print(periph->path, "%s: user address %p "
@@ -1543,7 +1547,8 @@ passmemsetup(struct cam_periph *periph, struct pass_io_req *io_req)
 		} else
 			io_req->user_segptr = io_req->user_segs;
 
-		if (!useracc(*data_ptrs[0], sg_length, VM_PROT_READ)) {
+		if (!useracc(__USER_CAP(*data_ptrs[0], sg_length), sg_length,
+		    VM_PROT_READ)) {
 			xpt_print(periph->path, "%s: unable to access user "
 				  "S/G list at %p\n", __func__, *data_ptrs[0]);
 			error = EFAULT;
@@ -1844,6 +1849,18 @@ passdoioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, struct thread 
 		union ccb **user_ccb, *ccb;
 		xpt_opcode fc;
 
+#ifdef COMPAT_CHERIABI
+		if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
+			error = ENOTTY;
+			goto bailout;
+		}
+#endif
+#ifdef COMPAT_FREEBSD32
+		if (SV_PROC_FLAG(td->td_proc, SV_ILP32)) {
+			error = ENOTTY;
+			goto bailout;
+		}
+#endif
 		if ((softc->flags & PASS_FLAG_ZONE_VALID) == 0) {
 			error = passcreatezone(periph);
 			if (error != 0)
@@ -2017,6 +2034,18 @@ camioqueue_error:
 		struct pass_io_req *io_req;
 		int old_error;
 
+#ifdef COMPAT_CHERIABI
+		if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
+			error = ENOTTY;
+			goto bailout;
+		}
+#endif
+#ifdef COMPAT_FREEBSD32
+		if (SV_PROC_FLAG(td->td_proc, SV_ILP32)) {
+			error = ENOTTY;
+			goto bailout;
+		}
+#endif
 		user_ccb = (union ccb **)addr;
 		old_error = 0;
 

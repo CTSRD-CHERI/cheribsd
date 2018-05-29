@@ -42,6 +42,10 @@ MAKE_PRINT_VAR_ON_ERROR += .MAKE.MAKEFILES .PATH
 OBJTOP?= ${.OBJDIR:S,${.CURDIR},,}${SRCTOP}
 .endif
 
+.if !empty(LIBDIR)
+_PREMK_LIBDIR:=	${LIBDIR}
+.endif
+
 .include "src.sys.mk"
 
 .if ${.MAKE.MODE:Mmeta*} != ""
@@ -77,3 +81,16 @@ META_NOPHONY?=
 META_COOKIE_RM?=
 META_COOKIE_TOUCH?=
 META_DEPS+=	${META_NOPHONY}
+
+
+# Variables to use in the build-tools target so that they work correctly when
+# cross-compiling.
+# XXXAR: not sure this is the right place to define these variables:
+BUILD_TOOLS_CC?=	cc
+BUILD_TOOLS_CFLAGS?=
+BUILD_TOOLS_CFLAGS+=	-O2 -D_FREEBSD_BUILD_TOOLS
+BUILD_TOOLS_LDFLAGS?=
+# XXXAR: currently not used anywhere
+# BUILD_TOOLS_CPP?=	cpp
+# BUILD_TOOLS_CXX?=	c++
+# BUILD_TOOLS_CXXLAGS?=

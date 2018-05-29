@@ -17,7 +17,7 @@ ident		BERI_DE4_MDROOT
 # Adjust the following path based on local requirements.
 #
 options 	MD_ROOT			# MD is a potential root device
-options 	MD_ROOT_SIZE=61440	# 60MB
+options 	MD_ROOT_SIZE=92160	# 90MB
 options 	ROOTDEVNAME=\"ufs:md0\"
 
 # XXX: MD_ROOT_SIZE and MFS_IMAGE are mutually exclusive.  When adding an

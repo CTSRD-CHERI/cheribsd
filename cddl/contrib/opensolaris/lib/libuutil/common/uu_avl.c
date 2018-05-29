@@ -44,10 +44,10 @@ static pthread_mutex_t	uu_apool_list_lock = PTHREAD_MUTEX_INITIALIZER;
 #define	INDEX_MAX		(sizeof (uintptr_t) - 2)
 #define	INDEX_NEXT(m)		(((m) == INDEX_MAX)? 2 : ((m) + 2) & INDEX_MAX)
 
-#define	INDEX_DECODE(i)		((i) & (uintptr_t)~INDEX_MAX)
-#define	INDEX_ENCODE(p, n)	(((n) & (uintptr_t)~INDEX_MAX) | (uintptr_t)(p)->ua_index)
-#define	INDEX_VALID(p, i)	(((vaddr_t)(i) & INDEX_MAX) == (p)->ua_index)
-#define	INDEX_CHECK(i)		(((vaddr_t)(i) & INDEX_MAX) != 0)
+#define	INDEX_DECODE(i)		(cheri_clear_low_ptr_bits(i, INDEX_MAX))
+#define	INDEX_ENCODE(p, n)	(cheri_set_low_ptr_bits(cheri_clear_low_ptr_bits(n, INDEX_MAX), (p)->ua_index))
+#define	INDEX_VALID(p, i)	(cheri_get_low_ptr_bits(i, INDEX_MAX) == (p)->ua_index)
+#define	INDEX_CHECK(i)		(cheri_get_low_ptr_bits(i, INDEX_MAX) != 0)
 
 /*
  * When an element is inactive (not in a tree), we keep a marked pointer to

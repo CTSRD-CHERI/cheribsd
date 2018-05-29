@@ -121,17 +121,15 @@ ATF_TC_BODY(msgget_exit, tc)
 	ATF_REQUIRE(pid >= 0);
 
 	if (pid == 0) {
-
-		if (msgget(MSG_KEY, IPC_CREAT | IPC_EXCL | 0600) == -1) {
-			if (errno == ENOSYS) {
-				/*
-				 * Fib about our status if we're going
-				 * to call skip in our parent.
-				 */
-				_exit(EXIT_SUCCESS);
-			} else
-				_exit(EXIT_FAILURE);
-		}
+		/*
+		 * If we fail with ENOSYS, assume our parent (below) will
+		 * also get ENOSYS and skip the test.  If we exit with an
+		 * error in that case then the test fails rather than
+		 * being skipped.
+		 */
+		if (msgget(MSG_KEY, IPC_CREAT | IPC_EXCL | 0600) == -1 &&
+		    errno != ENOSYS)
+			_exit(EXIT_FAILURE);
 
 		_exit(EXIT_SUCCESS);
 	}

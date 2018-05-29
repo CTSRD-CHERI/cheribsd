@@ -1,0 +1,15 @@
+#
+# CHERI128_MALTA64_MFS_ROOT -- Kernel for the SRI/Cambridge CHERI port to
+# MALTA64 (qemu) with MFS_ROOT support.
+#
+# $FreeBSD$
+#
+
+#NO_UNIVERSE
+
+include "CHERI128_MALTA64"
+
+ident		CHERI128_MALTA64_MFS_ROOT
+
+include "std.MFS_ROOT"
+

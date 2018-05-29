@@ -864,7 +864,7 @@ ext2_direnter(struct inode *ip, struct vnode *dvp, struct componentname *cnp)
 {
 	struct inode *dp;
 	struct ext2fs_direct_2 newdir;
-	struct iovec aiov;
+	kiovec_t aiov;
 	struct uio auio;
 	int error, newentrysize;
 	int DIRBLKSIZ = ip->i_e2fs->e2fs_bsize;

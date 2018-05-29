@@ -1,6 +1,6 @@
 # $FreeBSD$
 
-# Doesn't work when built as CheriABI.
+# Requires CAMIOCOMMAND (uses union ccb)
 WANT_CHERI=	none
 
 PACKAGE=runtime

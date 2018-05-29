@@ -44,6 +44,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/limits.h>
 #include <sys/lock.h>
@@ -52,6 +53,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/resourcevar.h>
 #include <sys/rwlock.h>
 #include <sys/sched.h>
+#include <sys/sysent.h>
 #include <sys/sysctl.h>
 #include <sys/vnode.h>
 
@@ -125,7 +127,7 @@ int
 physcopyin(void *src, vm_paddr_t dst, size_t len)
 {
 	vm_page_t m[PHYS_PAGE_COUNT(len)];
-	struct iovec iov[1];
+	kiovec_t iov[1];
 	struct uio uio;
 	int i;
 
@@ -145,7 +147,7 @@ int
 physcopyout(vm_paddr_t src, void *dst, size_t len)
 {
 	vm_page_t m[PHYS_PAGE_COUNT(len)];
-	struct iovec iov[1];
+	kiovec_t iov[1];
 	struct uio uio;
 	int i;
 
@@ -232,31 +234,32 @@ uiomove_nofault(void *cp, int n, struct uio *uio)
 static int
 uiomove_faultflag(void *cp, int n, struct uio *uio, int nofault)
 {
-	struct thread *td;
-	struct iovec *iov;
+	kiovec_t *iov;
 	size_t cnt;
 	int error, newflags, save;
 
-	td = curthread;
 	error = 0;
 
 	KASSERT(uio->uio_rw == UIO_READ || uio->uio_rw == UIO_WRITE,
 	    ("uiomove: mode"));
-	KASSERT(uio->uio_segflg != UIO_USERSPACE || uio->uio_td == td,
+	KASSERT(uio->uio_segflg != UIO_USERSPACE || uio->uio_td == curthread,
 	    ("uiomove proc"));
-	if (!nofault)
-		WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
-		    "Calling uiomove()");
 
-	/* XXX does it make a sense to set TDP_DEADLKTREAT for UIO_SYSSPACE ? */
-	newflags = TDP_DEADLKTREAT;
-	if (uio->uio_segflg == UIO_USERSPACE && nofault) {
-		/*
-		 * Fail if a non-spurious page fault occurs.
-		 */
-		newflags |= TDP_NOFAULTING | TDP_RESETSPUR;
+	if (uio->uio_segflg == UIO_USERSPACE) {
+		newflags = TDP_DEADLKTREAT;
+		if (nofault) {
+			/*
+			 * Fail if a non-spurious page fault occurs.
+			 */
+			newflags |= TDP_NOFAULTING | TDP_RESETSPUR;
+		} else {
+			WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
+			    "Calling uiomove()");
+		}
+		save = curthread_pflags_set(newflags);
+	} else {
+		KASSERT(nofault == 0, ("uiomove: nofault"));
 	}
-	save = curthread_pflags_set(newflags);
 
 	while (n > 0 && uio->uio_resid) {
 		iov = uio->uio_iov;
@@ -274,18 +277,24 @@ uiomove_faultflag(void *cp, int n, struct uio *uio, int nofault)
 		case UIO_USERSPACE:
 			maybe_yield();
 			if (uio->uio_rw == UIO_READ)
-				error = copyout(cp, iov->iov_base, cnt);
+				error = copyout_c(
+				    (__cheri_tocap void * __capability)cp,
+				    iov->iov_base, cnt);
 			else
-				error = copyin(iov->iov_base, cp, cnt);
+				error = copyin_c(iov->iov_base,
+				    (__cheri_tocap void * __capability)cp, cnt);
 			if (error)
 				goto out;
 			break;
 
 		case UIO_SYSSPACE:
 			if (uio->uio_rw == UIO_READ)
-				bcopy(cp, iov->iov_base, cnt);
+				bcopy(cp,
+				    (__cheri_fromcap void *)iov->iov_base,
+				    cnt);
 			else
-				bcopy(iov->iov_base, cp, cnt);
+				bcopy((__cheri_fromcap void *)iov->iov_base,
+				    cp, cnt);
 			break;
 		case UIO_NOCOPY:
 			break;
@@ -297,7 +306,8 @@ uiomove_faultflag(void *cp, int n, struct uio *uio, int nofault)
 		n -= cnt;
 	}
 out:
-	curthread_pflags_restore(save);
+	if (uio->uio_segflg == UIO_USERSPACE) 
+		curthread_pflags_restore(save);
 	return (error);
 }
 
@@ -329,8 +339,8 @@ uiomove_frombuf(void *buf, int buflen, struct uio *uio)
 int
 ureadc(int c, struct uio *uio)
 {
-	struct iovec *iov;
-	char *iov_base;
+	kiovec_t *iov;
+	char * __capability iov_base;
 
 	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
 	    "Calling ureadc()");
@@ -347,7 +357,7 @@ again:
 	switch (uio->uio_segflg) {
 
 	case UIO_USERSPACE:
-		if (subyte(iov->iov_base, c) < 0)
+		if (subyte_c(iov->iov_base, c) < 0)
 			return (EFAULT);
 		break;
 
@@ -404,41 +414,54 @@ copyinstrfrom(const void * __restrict src, void * __restrict dst, size_t len,
 }
 
 int
-copyiniov(const struct iovec *iovp, u_int iovcnt, struct iovec **iov, int error)
+copyiniov(const uiovec_t * __capability iovp, u_int iovcnt, kiovec_t **iov,
+    int error)
 {
-	u_int iovlen;
+	uiovec_t useriov;
+	kiovec_t *iovs;
+	size_t iovlen;
+	int i;
 
 	*iov = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (error);
-	iovlen = iovcnt * sizeof (struct iovec);
-	*iov = malloc(iovlen, M_IOV, M_WAITOK);
-	error = copyin(iovp, *iov, iovlen);
-	if (error) {
-		free(*iov, M_IOV);
-		*iov = NULL;
+	iovlen = iovcnt * sizeof (kiovec_t);
+	iovs = malloc(iovlen, M_IOV, M_WAITOK);
+	/* XXXBD: needlessly slow when uiovec_t and kiovec_t are the same */
+	for (i = 0; i < iovcnt; i++) {
+		error = copyin_c(iovp + i, &useriov, sizeof(useriov));
+		if (error) {
+			free(iovs, M_IOV);
+			return (error);
+		}
+		IOVEC_INIT(iovs + i, useriov.iov_base, useriov.iov_len);
 	}
+	*iov = iovs;
 	return (error);
 }
 
 int
-copyinuio(const struct iovec *iovp, u_int iovcnt, struct uio **uiop)
+copyinuio(const uiovec_t *iovp, u_int iovcnt, struct uio **uiop)
 {
-	struct iovec *iov;
+	uiovec_t u_iov;
+	kiovec_t *iov;
 	struct uio *uio;
-	u_int iovlen;
+	size_t iovlen;
 	int error, i;
 
 	*uiop = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (EINVAL);
-	iovlen = iovcnt * sizeof (struct iovec);
+	iovlen = iovcnt * sizeof (kiovec_t);
 	uio = malloc(iovlen + sizeof *uio, M_IOV, M_WAITOK);
-	iov = (struct iovec *)(uio + 1);
-	error = copyin(iovp, iov, iovlen);
-	if (error) {
-		free(uio, M_IOV);
-		return (error);
+	iov = (kiovec_t *)(uio + 1);
+	for (i = 0; i < iovcnt; i++) {
+		error = copyin(&iovp[i], &u_iov, sizeof(u_iov));
+		if (error) {
+			free(uio, M_IOV);
+			return (error);
+		}
+		IOVEC_INIT(&iov[i], u_iov.iov_base, u_iov.iov_len);
 	}
 	uio->uio_iov = iov;
 	uio->uio_iovcnt = iovcnt;
@@ -457,17 +480,34 @@ copyinuio(const struct iovec *iovp, u_int iovcnt, struct uio **uiop)
 	return (0);
 }
 
+/*
+ * Update the lengths in a userspace iovec to match those in a struct uio's
+ * iovec.
+ */
+int
+updateiov(const struct uio *uiop, uiovec_t *iovp)
+{
+	int i, error;
+
+	for (i = 0; i < uiop->uio_iovcnt; i++) {
+		error = suword(&iovp[i].iov_len, uiop->uio_iov[i].iov_len);
+		if (error != 0)
+			return (error);
+	}
+	return (0);
+}
+
 struct uio *
 cloneuio(struct uio *uiop)
 {
 	struct uio *uio;
 	int iovlen;
 
-	iovlen = uiop->uio_iovcnt * sizeof (struct iovec);
+	iovlen = uiop->uio_iovcnt * sizeof (kiovec_t);
 	uio = malloc(iovlen + sizeof *uio, M_IOV, M_WAITOK);
 	*uio = *uiop;
-	uio->uio_iov = (struct iovec *)(uio + 1);
-	bcopy(uiop->uio_iov, uio->uio_iov, iovlen);
+	uio->uio_iov = (kiovec_t *)(uio + 1);
+	cheri_bcopy(uiop->uio_iov, uio->uio_iov, iovlen);
 	return (uio);
 }
 
@@ -521,29 +561,212 @@ copyout_unmap(struct thread *td, vm_offset_t addr, size_t sz)
 	return (0);
 }
 
-/*
- * Copy parts of region of memory to user space.
- *
- * XXXBD: Machine dependent implementations that don't call copyout
- * repeatidly are probably a good idea.
- */
-int
-copyout_part(const void * __restrict kaddr, void * __restrict udaddr,
-    struct copy_map *cmap, size_t cmap_ents)
+#if __has_feature(capabilities) && !defined(CHERI_IMPLICIT_USER_DDC)
+static inline bool
+allow_implicit_capability_use(void)
 {
-	int error;
-	size_t i;
-	struct copy_map *cm;
 
-	for (i = 0; i < cmap_ents; i++) {
-		cm = cmap + i;
-		error = copyout((const char *)kaddr + cm->koffset,
-		    (char *)udaddr + cm->uoffset, cm->len);
-		if (error != 0)
-			return (error);
+	if (SV_CURPROC_FLAG(SV_CHERI)) {
+		kdb_backtrace();
+		/* XXX-BD: kill process? */
+		return (false);
 	}
-	return (error);
+	return (true);
 }
+
+/*
+ * Construct a user data capability.  Ordinarily, we use __USER_CAP to
+ * retrieve DDC, but the pcb isn't set up yet in do_execve() so while
+ * we're in there we derive one from whole cloth.
+ *
+ * Longer term, we should store appropriate capabilities in struct
+ * image_args along the way and use those.
+ */
+static inline void * __capability
+io_user_cap(volatile const void * uaddr, size_t len)
+{
+	bool inexec;
+
+	/* XXX: this is rather expensive... */
+	PROC_LOCK(curproc);
+	inexec = ((curproc->p_flag & P_INEXEC) != 0);
+	PROC_UNLOCK(curproc);
+
+	if (inexec)
+		return (cheri_capability_build_user_data(
+		    CHERI_CAP_USER_DATA_PERMS, (vaddr_t)uaddr, len, 0));
+	return (__USER_CAP(uaddr, len));
+}
+
+int
+copyinstr(const void *uaddr, void *kaddr, size_t len, size_t *done)
+{
+
+	if (!allow_implicit_capability_use())
+		return (EPROT);
+
+	return (copyinstr_c(io_user_cap(uaddr, len),
+	   (__cheri_tocap void * __capability)kaddr, len,
+	   (__cheri_tocap size_t * __capability)done));
+}
+
+int
+copyin(const void *uaddr, void *kaddr, size_t len)
+{
+
+	if (!allow_implicit_capability_use())
+		return (EPROT);
+
+	return (copyin_c(io_user_cap(uaddr, len),
+	    (__cheri_tocap void * __capability)kaddr, len));
+}
+
+int
+copyout(const void *kaddr, void *uaddr, size_t len)
+{
+
+	if (!allow_implicit_capability_use())
+		return (EPROT);
+
+	return (copyout_c((__cheri_tocap void * __capability)kaddr,
+	    io_user_cap(uaddr, len), len));
+}
+
+int
+fubyte(volatile const void *base)
+{
+
+	if (!allow_implicit_capability_use())
+		return (-1);
+
+	return (fubyte_c(io_user_cap(base, 1)));
+}
+
+int
+fueword(volatile const void *base, long *val)
+{
+
+	if (!allow_implicit_capability_use())
+		return (-1);
+
+	return (fueword_c(io_user_cap(base, sizeof(long)), val));
+}
+
+int
+fueword32(volatile const void *base, int32_t *val)
+{
+
+	if (!allow_implicit_capability_use())
+		return (-1);
+
+	return (fueword32_c(io_user_cap(base, sizeof(int32_t)), val));
+}
+
+int
+fueword64(volatile const void *base, int64_t *val)
+{
+
+	if (!allow_implicit_capability_use())
+		return (-1);
+
+	return (fueword64_c(io_user_cap(base, sizeof(int64_t)), val));
+}
+
+int
+subyte(volatile void *base, int byte)
+{
+
+	if (!allow_implicit_capability_use())
+		return (-1);
+
+	return (subyte_c(io_user_cap(base, 1), byte));
+}
+
+int
+suword(volatile void *base, long word)
+{
+
+	if (!allow_implicit_capability_use())
+		return (-1);
+
+	return (suword_c(io_user_cap(base, sizeof(long)), word));
+}
+
+int
+suword32(volatile void *base, int32_t word)
+{
+
+	if (!allow_implicit_capability_use())
+		return (-1);
+
+	return (suword32_c(io_user_cap(base, sizeof(int32_t)), word));
+}
+
+int
+suword64(volatile void *base, int64_t word)
+{
+
+	if (!allow_implicit_capability_use())
+		return (-1);
+
+	return (suword64_c(io_user_cap(base, sizeof(int64_t)), word));
+}
+
+int
+casueword32(volatile uint32_t *base, uint32_t oldval, uint32_t *oldvalp,
+    uint32_t newval)
+{
+
+	if (!allow_implicit_capability_use())
+		return (-1);
+
+	return (casueword32_c(io_user_cap(base, sizeof(u_long)), oldval,
+	    oldvalp, newval));
+}
+
+int
+casueword(volatile u_long *p, u_long oldval, u_long *oldvalp, u_long newval)
+{
+
+	if (!allow_implicit_capability_use())
+		return (-1);
+
+	return (casueword_c(io_user_cap(p, sizeof(u_long)), oldval,
+	    oldvalp, newval));
+}
+
+int
+copyin_implicit_cap(const void *uaddr, void *kaddr, size_t len)
+{
+
+	return (copyin_c(cheri_capability_build_user_data(
+	    CHERI_CAP_USER_DATA_PERMS, (vaddr_t)uaddr, len, 0),
+	    (__cheri_tocap void * __capability)kaddr, len));
+}
+
+int
+copyout_implicit_cap(const void *kaddr, void *uaddr, size_t len)
+{
+
+	return (copyout_c((__cheri_tocap void * __capability)kaddr,
+	    cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
+	    (vaddr_t)uaddr, len, 0), len));
+}
+#else /* !( __has_feature(capabilities) && !defined(CHERI_IMPLICIT_USER_DDC)) */
+int
+copyin_implicit_cap(const void *uaddr, void *kaddr, size_t len)
+{
+
+	return (copyin(uaddr, kaddr, len));
+}
+
+int
+copyout_implicit_cap(const void *kaddr, void *uaddr, size_t len)
+{
+
+	return (copyout(kaddr, uaddr, len));
+}
+#endif /* !(__has_feature(capabilities) && !defined(CHERI_IMPLICIT_USER_DDC)) */
 
 #ifdef NO_FUEWORD
 /*
@@ -672,40 +895,44 @@ casuword(volatile u_long *addr, u_long old, u_long new)
 #endif /* NO_FUEWORD */
 
 #if __has_feature(capabilities)
-int
-fueword_c(volatile const void * __capability base, long *val)
+long
+fuword_c(volatile const void * __capability base)
 {
-	long res;
+	long val;
 
-	res = fuword_c(base);
-	if (res == -1)
+	if (fueword_c(base, &val) == -1)
 		return (-1);
-	*val = res;
-	return (0);
+	return (val);
 }
 
 int
-fueword32_c(volatile const void * __capability base, int32_t *val)
+fuword32_c(volatile const void * __capability base)
 {
-	int32_t res;
+	int32_t val;
 
-	res = fuword32_c(base);
-	if (res == -1)
+	if (fueword32_c(base, &val) == -1)
 		return (-1);
-	*val = res;
-	return (0);
+	return (val);
 }
 
-int
-casueword32_c(volatile uint32_t * __capability base, uint32_t oldval,
-    uint32_t *oldvalp, uint32_t newval)
+int64_t
+fuword64_c(volatile const void * __capability base)
+{
+	int64_t val;
+
+	if (fueword64_c(base, &val) == -1)
+		return (-1);
+	return (val);
+}
+
+uint32_t
+casuword32_c(volatile uint32_t * __capability base, uint32_t oldval,
+    uint32_t newval)
 {
 	int32_t ov;
 
-	ov = casuword32_c(base, oldval, newval);
-	if (ov == -1)
+	if (casueword32_c(base, oldval, &ov, newval) == -1)
 		return (-1);
-	*oldvalp = ov;
-	return (0);
+	return (ov);
 }
 #endif

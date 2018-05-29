@@ -101,7 +101,7 @@ void _rtld_relocate_nonplt_self(Elf_Dyn *, caddr_t);
 #define ELF_R_TYPE(r_info)		bswap32((r_info) >> 32)
 #endif
 
-static __inline Elf_Sxword
+static __inline __always_inline Elf_Sxword
 load_ptr(void *where, size_t len)
 {
 	Elf_Sxword val;
@@ -124,7 +124,7 @@ load_ptr(void *where, size_t len)
 	return (len == sizeof(Elf_Sxword)) ? val : (Elf_Sword)val;
 }
 
-static __inline void
+static __inline __always_inline void
 store_ptr(void *where, Elf_Sxword val, size_t len)
 {
 	if (__predict_true(((size_t)where & (len - 1)) == 0)) {
@@ -148,6 +148,15 @@ store_ptr(void *where, Elf_Sxword val, size_t len)
 void
 _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 {
+	/*
+	 * Warning: global capabilities have not been initialized yet so we
+	 * can't call any functions here (only ones with __always_inline)
+	 *
+	 * FIXME: all the debug printfs will crash
+	 * TODO: change __cap_relocs emission in lld so that we can process
+	 * __cap_relocs before this function (add a flag to say this entry does
+	 * not need any relocations)
+	 */
 	const Elf_Rel *rel = NULL, *rellim;
 	Elf_Addr relsz = 0;
 	const Elf_Sym *symtab = NULL, *sym;
@@ -243,6 +252,15 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 			break;
 		}
 
+	/*
+	 * There should be no dynamic CHERI_SIZE/CHERI_ABSPTR/CHERI_CAPABILITY
+	 * relocations inside rtld since there are no global capabilities that
+	 * are initialized to point to something.
+	 *
+	 * The reason this code is still here is that this may change at some
+	 * point in the future.
+	 */
+#if 0
 		case R_TYPE(CHERI_SIZE):
 		case R_TYPE(CHERI_ABSPTR): {
 			/* This is needed for __auxargs, otherwise there
@@ -276,6 +294,15 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 			store_ptr(where, val, rlen);
 			break;
 		}
+		case R_TYPE(CHERI_CAPABILITY): {
+			sym = symtab + r_symndx;
+			/* This is a hack for the undef weak __auxargs */
+			/* TODO: try to remove __auxargs dependency */
+			assert(ELF_ST_BIND(sym->st_info) == STB_WEAK);
+			assert(sym->st_shndx == SHN_UNDEF);
+			*((void**)where) = NULL;
+		}
+#endif
 
 		case R_TYPE(GPREL32):
 		case R_TYPE(NONE):
@@ -745,36 +772,62 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			    "IFUNC not implemented!");
 
 			void* symval = NULL;
-			if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
+			bool is_undef_weak = false;
+			if (def->st_shndx == SHN_UNDEF) {
+				/* Verify that we are resolving a weak symbol */
+				const Elf_Sym* src_sym = obj->symtab + r_symndx;
+#ifdef DEBUG
+				dbg("NOTE: found undefined R_CHERI_CAPABILITY "
+				    "for %s (in %s): value=%ld, size=%ld, "
+				    "type=%d, def bind=%d,sym bind=%d",
+				    symname(obj, r_symndx), obj->path,
+				    def->st_value, def->st_size,
+				    ELF_ST_TYPE(def->st_info),
+				    ELF_ST_BIND(def->st_info),
+				    ELF_ST_BIND(src_sym->st_info));
+#endif
+				assert(ELF_ST_BIND(src_sym->st_info) == STB_WEAK);
+				assert(def->st_value == 0);
+				assert(def->st_size == 0);
+				is_undef_weak = true;
+			}
+			else if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
 				/* Remove write permissions and set bounds */
 				symval = make_function_pointer(def, defobj);
 			} else {
 				/* Remove execute permissions and set bounds */
 				symval = make_data_pointer(def, defobj);
 			}
-			if (cheri_getlen(symval) <= 0) {
-				rtld_printf("Warning: created zero length "
-				    "capability for %s (in %s): %-#p\n",
+#if 0
+			// FIXME: this warning breaks some tests that expect clean stdout/stderr
+			// FIXME: See https://github.com/CTSRD-CHERI/cheribsd/issues/257
+			// TODO: or use this approach: https://github.com/CTSRD-CHERI/cheribsd/commit/c1920496c0086d9c5214fb0f491e4d6cdff3828e?
+			if (symval != NULL && cheri_getlen(symval) <= 0) {
+				rtld_fdprintf(STDERR_FILENO, "Warning: created "
+				    "zero length capability for %s (in %s): %-#p\n",
 				    symname(obj, r_symndx), obj->path, symval);
 			}
+#endif
 			/*
 			 * The capability offset is the addend for the
 			 * relocation. Since we are using Elf_Rel this is the
 			 * first 8 bytes of the target location (which is the
 			 * virtual address for both 128 and 256-bit CHERI).
 			 */
-			uint64_t offset = load_ptr(where, sizeof(uint64_t));
-			symval + offset;
-			if (!cheri_gettag(symval)) {
+			uint64_t src_offset = load_ptr(where, sizeof(uint64_t));
+			symval += src_offset;
+			if (!cheri_gettag(symval) && !is_undef_weak) {
 				_rtld_error("%s: constructed invalid capability"
 				   "for %s: %#p",  obj->path,
 				    symname(obj, r_symndx), symval);
 				return -1;
 			}
 			*((void**)where) = symval;
+#if defined(DEBUG_VERBOSE)
 			dbg("CAP(%p/0x%lx) %s in %s --> %-#p in %s",
 			    where, rel->r_offset, symname(obj, r_symndx),
 			    obj->path, *((void**)where), defobj->path);
+#endif
 			break;
 		}
 

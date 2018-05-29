@@ -46,6 +46,7 @@
 #include <sys/zio_compress.h>
 #include <sys/sa.h>
 #include <sys/zfeature.h>
+#include <sys/abd.h>
 #ifdef _KERNEL
 #include <sys/racct.h>
 #include <sys/vm.h>
@@ -1104,7 +1105,7 @@ dmu_xuio_fini(xuio_t *xuio)
 int
 dmu_xuio_add(xuio_t *xuio, arc_buf_t *abuf, offset_t off, size_t n)
 {
-	struct iovec *iov;
+	kiovec_t *iov;
 	uio_t *uio = &xuio->xu_uio;
 	dmu_xuio_t *priv = XUIO_XUZC_PRIV(xuio);
 	int i = priv->next++;
@@ -1714,6 +1715,7 @@ dmu_sync_late_arrival_done(zio_t *zio)
 
 	dsa->dsa_done(dsa->dsa_zgd, zio->io_error);
 
+	abd_put(zio->io_abd);
 	kmem_free(dsa, sizeof (*dsa));
 }
 
@@ -1739,10 +1741,10 @@ dmu_sync_late_arrival(zio_t *pio, objset_t *os, dmu_sync_cb_t *done, zgd_t *zgd,
 	dsa->dsa_tx = tx;
 
 	zio_nowait(zio_write(pio, os->os_spa, dmu_tx_get_txg(tx), zgd->zgd_bp,
-	    zgd->zgd_db->db_data, zgd->zgd_db->db_size, zgd->zgd_db->db_size,
-	    zp, dmu_sync_late_arrival_ready, NULL,
-	    NULL, dmu_sync_late_arrival_done, dsa, ZIO_PRIORITY_SYNC_WRITE,
-	    ZIO_FLAG_CANFAIL, zb));
+	    abd_get_from_buf(zgd->zgd_db->db_data, zgd->zgd_db->db_size),
+	    zgd->zgd_db->db_size, zgd->zgd_db->db_size, zp,
+	    dmu_sync_late_arrival_ready, NULL, NULL, dmu_sync_late_arrival_done,
+	    dsa, ZIO_PRIORITY_SYNC_WRITE, ZIO_FLAG_CANFAIL, zb));
 
 	return (0);
 }
@@ -2264,6 +2266,7 @@ byteswap_uint8_array(void *vbuf, size_t size)
 void
 dmu_init(void)
 {
+	abd_init();
 	zfs_dbgmsg_init();
 	sa_cache_init();
 	xuio_stat_init();
@@ -2289,4 +2292,5 @@ dmu_fini(void)
 	xuio_stat_fini();
 	sa_cache_fini();
 	zfs_dbgmsg_fini();
+	abd_fini();
 }

@@ -118,7 +118,7 @@ static int sysctl_kern_ps_strings(SYSCTL_HANDLER_ARGS);
 static int sysctl_kern_usrstack(SYSCTL_HANDLER_ARGS);
 static int sysctl_kern_stackprot(SYSCTL_HANDLER_ARGS);
 static int do_execve(struct thread *td, struct image_args *args,
-    struct mac *mac_p, struct proc *cop);
+    void * __capability mac_p, struct proc *cop);
 
 /* XXX This should be vm_size_t. */
 SYSCTL_PROC(_kern, KERN_PS_STRINGS, ps_strings, CTLTYPE_ULONG|CTLFLAG_RD|
@@ -288,7 +288,7 @@ struct __mac_execve_args {
 	char	*fname;
 	char	**argv;
 	char	**envv;
-	struct mac	*mac_p;
+	struct mac_native	*mac_p;
 };
 #endif
 
@@ -306,7 +306,7 @@ sys___mac_execve(struct thread *td, struct __mac_execve_args *uap)
 	error = exec_copyin_args(&args, uap->fname, UIO_USERSPACE,
 	    uap->argv, uap->envv);
 	if (error == 0)
-		error = kern_execve(td, &args, uap->mac_p);
+		error = kern_execve(td, &args, __USER_CAP_OBJ(uap->mac_p));
 	post_execve(td, error, oldvmspace);
 	return (error);
 #else
@@ -375,8 +375,8 @@ post_execve(struct thread *td, int error, struct vmspace *oldvmspace)
  * memory).
  */
 int
-kern_coexecve(struct thread *td, struct image_args *args, struct mac *mac_p,
-    struct proc *cop)
+kern_coexecve(struct thread *td, struct image_args *args,
+    void * __capability mac_p, struct proc *cop)
 {
 
 	AUDIT_ARG_ARGV(args->begin_argv, args->argc,
@@ -387,7 +387,8 @@ kern_coexecve(struct thread *td, struct image_args *args, struct mac *mac_p,
 }
 
 int
-kern_execve(struct thread *td, struct image_args *args, struct mac *mac_p)
+kern_execve(struct thread *td, struct image_args *args,
+    void * __capability mac_p)
 {
 	struct proc *cop;
 	int error;
@@ -430,8 +431,8 @@ kern_execve(struct thread *td, struct image_args *args, struct mac *mac_p)
  * userspace pointers from the passed thread.
  */
 static int
-do_execve(struct thread *td, struct image_args *args, struct mac *mac_p,
-    struct proc *cop)
+do_execve(struct thread *td, struct image_args *args,
+    void * __capability umac, struct proc *cop)
 {
 	struct proc *p = td->td_proc;
 	struct nameidata nd;
@@ -453,6 +454,8 @@ do_execve(struct thread *td, struct image_args *args, struct mac *mac_p,
 	int credential_changing;
 	int textset;
 #ifdef MAC
+	kmac_t extmac;
+	kmac_t *mac_p;
 	struct label *interpvplabel = NULL;
 	int will_transition;
 #endif
@@ -487,6 +490,13 @@ do_execve(struct thread *td, struct image_args *args, struct mac *mac_p,
 	oldcred = p->p_ucred;
 
 #ifdef MAC
+	if (umac != NULL) {
+		error = copyin_mac(umac, &extmac);
+		if (error)
+			goto exec_fail;
+		mac_p = &extmac;
+	} else
+		mac_p = NULL;
 	error = mac_execve_enter(imgp, mac_p);
 	if (error)
 		goto exec_fail;
@@ -1135,9 +1145,9 @@ exec_unmap_first_page(struct image_params *imgp)
 }
 
 /*
- * Destroy old address space, and allocate a new stack
- *	The new stack is only SGROWSIZ large because it is grown
- *	automatically in trap.c.
+ * Destroy old address space, and allocate a new stack.
+ *	The new stack is only sgrowsiz large because it is grown
+ *	automatically on a page fault.
  */
 int
 exec_new_vmspace(struct image_params *imgp, const struct sysentvec *sv)
@@ -1172,6 +1182,10 @@ exec_new_vmspace(struct image_params *imgp, const struct sysentvec *sv)
 		shmexit(vmspace);
 		pmap_remove_pages(vmspace_pmap(vmspace));
 		vm_map_remove(map, vm_map_min(map), vm_map_max(map));
+		/* An exec terminates mlockall(MCL_FUTURE). */
+		vm_map_lock(map);
+		vm_map_modflags(map, 0, MAP_WIREFUTURE);
+		vm_map_unlock(map);
 	} else if (imgp->cop != NULL) {
 		error = vmspace_coexec(p, imgp->cop, sv_minuser, sv->sv_maxuser);
 		if (error)
@@ -1205,9 +1219,9 @@ exec_new_vmspace(struct image_params *imgp, const struct sysentvec *sv)
 		    VM_PROT_READ | VM_PROT_EXECUTE,
 		    VM_PROT_READ | VM_PROT_EXECUTE,
 		    MAP_INHERIT_SHARE | MAP_ACC_NO_CHARGE);
-		if (error) {
+		if (error != KERN_SUCCESS) {
 			vm_object_deallocate(obj);
-			return (error);
+			return (vm_mmap_to_errno(error));
 		}
 	}
 
@@ -1245,10 +1259,9 @@ exec_new_vmspace(struct image_params *imgp, const struct sysentvec *sv)
 	}
 	error = vm_map_stack(map, stack_addr, (vm_size_t)ssiz,
 	    obj != NULL && imgp->stack_prot != 0 ? imgp->stack_prot :
-		sv->sv_stackprot,
-	    VM_PROT_ALL, MAP_STACK_GROWS_DOWN);
-	if (error)
-		return (error);
+	    sv->sv_stackprot, VM_PROT_ALL, MAP_STACK_GROWS_DOWN);
+	if (error != KERN_SUCCESS)
+		return (vm_mmap_to_errno(error));
 
 	if (imgp->cop == NULL) {
 		/*
@@ -1272,7 +1285,6 @@ exec_copyin_args(struct image_args *args, char *fname,
 {
 	u_long argp, envp;
 	int error;
-	size_t length;
 
 	bzero(args, sizeof(*args));
 	if (argv == NULL)
@@ -1289,19 +1301,9 @@ exec_copyin_args(struct image_args *args, char *fname,
 	/*
 	 * Copy the file name.
 	 */
-	if (fname != NULL) {
-		args->fname = args->buf;
-		error = (segflg == UIO_SYSSPACE) ?
-		    copystr(fname, args->fname, PATH_MAX, &length) :
-		    copyinstr(fname, args->fname, PATH_MAX, &length);
-		if (error != 0)
-			goto err_exit;
-	} else
-		length = 0;
-
-	args->begin_argv = args->buf + length;
-	args->endp = args->begin_argv;
-	args->stringspace = ARG_MAX;
+	error = exec_args_add_fname(args, fname, segflg);
+	if (error != 0)
+		goto err_exit;
 
 	/*
 	 * extract arguments first
@@ -1314,16 +1316,10 @@ exec_copyin_args(struct image_args *args, char *fname,
 		}
 		if (argp == 0)
 			break;
-		error = copyinstr((void *)(uintptr_t)argp, args->endp,
-		    args->stringspace, &length);
-		if (error != 0) {
-			if (error == ENAMETOOLONG) 
-				error = E2BIG;
+		error = exec_args_add_arg_str(args, (void *)argp,
+		    UIO_USERSPACE);
+		if (error != 0)
 			goto err_exit;
-		}
-		args->stringspace -= length;
-		args->endp += length;
-		args->argc++;
 	}
 
 	args->begin_envv = args->endp;
@@ -1340,16 +1336,10 @@ exec_copyin_args(struct image_args *args, char *fname,
 			}
 			if (envp == 0)
 				break;
-			error = copyinstr((void *)(uintptr_t)envp,
-			    args->endp, args->stringspace, &length);
-			if (error != 0) {
-				if (error == ENAMETOOLONG)
-					error = E2BIG;
+			error = exec_args_add_env_str(args, (void *)envp,
+			    UIO_USERSPACE);
+			if (error != 0)
 				goto err_exit;
-			}
-			args->stringspace -= length;
-			args->endp += length;
-			args->envc++;
 		}
 	}
 
@@ -1562,6 +1552,89 @@ exec_free_args(struct image_args *args)
 }
 
 /*
+ * A set to functions to fill struct image args.
+ *
+ * NOTE: exec_args_add_fname() must be called (possiably with a NULL
+ * fname) before any _arg_ or _env_ functions.  All _arg_ calls should be
+ * made before any _env_ calls.
+ *
+ * exec_args_add_fname() - install path to be executed
+ * exec_args_add_arg_str() - append an argument string
+ * exec_args_add_env_str() - append an env string
+ */
+int
+exec_args_add_fname(struct image_args *args, char *fname,
+    enum uio_seg segflg)
+{
+	int error;
+	size_t length;
+
+	KASSERT(args->fname == NULL, ("fname already appended"));
+	KASSERT(args->endp == NULL, ("already appending to args"));
+
+	if (fname != NULL) {
+		args->fname = args->buf;
+		error = (segflg == UIO_SYSSPACE) ?
+		    copystr(fname, args->fname, PATH_MAX, &length) :
+		    copyinstr(fname, args->fname, PATH_MAX, &length);
+		if (error != 0)
+			return (error == ENAMETOOLONG ? E2BIG : error);
+	} else
+		length = 0;
+
+	/* Set up for _arg_*()/_env_*() */
+	args->endp = args->buf + length;
+	/* begin_argv and begin_envv must be set and updated */
+	args->begin_argv = args->begin_envv = args->endp;
+	/* Actually (exec_map_entry_size - length) which is >= ARG_MAX */
+	args->stringspace = ARG_MAX;
+
+	return (0);
+}
+
+int
+exec_args_add_arg_str(struct image_args *args, char *argp, enum uio_seg segflg)
+{
+	int error;
+	size_t length;
+
+	KASSERT(args->begin_argv != NULL, ("begin_argp not initialzed"));
+	KASSERT(args->begin_envv == args->endp, ("appending args after env"));
+
+	error = (segflg == UIO_SYSSPACE) ?
+	    copystr(argp, args->endp, args->stringspace, &length) :
+	    copyinstr(argp, args->endp, args->stringspace, &length);
+	if (error != 0)
+		return (error == ENAMETOOLONG ? E2BIG : error);
+	args->stringspace -= length;
+	args->endp += length;
+	args->begin_envv += length;
+	args->argc++;
+
+	return (0);
+}
+
+int
+exec_args_add_env_str(struct image_args *args, char *envp, enum uio_seg segflg)
+{
+	int error;
+	size_t length;
+
+	KASSERT(args->begin_envv != NULL, ("begin_envv not initialzed"));
+
+	error = (segflg == UIO_SYSSPACE) ?
+	    copystr(envp, args->endp, args->stringspace, &length) :
+	    copyinstr(envp, args->endp, args->stringspace, &length);
+	if (error != 0)
+		return (error == ENAMETOOLONG ? E2BIG : error);
+	args->stringspace -= length;
+	args->endp += length;
+	args->envc++;
+
+	return (0);
+}
+
+/*
  * Copy strings out to the new process address space, constructing new arg
  * and env vector tables. Return a pointer to the base so that it can be used
  * as the initial stack pointer.
@@ -1601,7 +1674,6 @@ exec_copyout_strings(struct image_params *imgp)
 		if (p->p_sysent->sv_szsigcode != NULL)
 			szsigcode = *(p->p_sysent->sv_szsigcode);
 	}
-
 	destp =	(uintptr_t)arginfo;
 
 	/*

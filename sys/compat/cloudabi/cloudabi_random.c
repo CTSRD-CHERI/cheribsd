@@ -36,7 +36,7 @@ int
 cloudabi_sys_random_get(struct thread *td,
     struct cloudabi_sys_random_get_args *uap)
 {
-	struct iovec iov;
+	kiovec_t iov;
 	IOVEC_INIT(&iov, uap->buf, uap->buf_len);
 	struct uio uio = {
 		.uio_iov = &iov,

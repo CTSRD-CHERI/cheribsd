@@ -408,7 +408,8 @@ freebsd32_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	sf.sf_uc.uc_mcontext.mc_pc = regs.r_regs[PC];
 	sf.sf_uc.uc_mcontext.mullo = regs.r_regs[MULLO];
 	sf.sf_uc.uc_mcontext.mulhi = regs.r_regs[MULHI];
-	sf.sf_uc.uc_mcontext.mc_tls = (int32_t)(intptr_t)td->td_md.md_tls;
+	sf.sf_uc.uc_mcontext.mc_tls =
+	    (int32_t)(intptr_t)(__cheri_fromcap void *)td->td_md.md_tls;
 	sf.sf_uc.uc_mcontext.mc_regs[0] = UCONTEXT_MAGIC;  /* magic number */
 	for (i = 1; i < 32; i++)
 		sf.sf_uc.uc_mcontext.mc_regs[i] = regs.r_regs[i];
@@ -487,10 +488,11 @@ freebsd32_sysarch(struct thread *td, struct freebsd32_sysarch_args *uap)
 
 	switch (uap->op) {
 	case MIPS_SET_TLS:
-		td->td_md.md_tls = (void *)(intptr_t)uap->parms;
+		td->td_md.md_tls = __USER_CAP_UNBOUND((void *)(intptr_t)uap->parms);
 		return (0);
 	case MIPS_GET_TLS: 
-		tlsbase = (int32_t)(intptr_t)td->td_md.md_tls;
+		tlsbase =
+		    (int32_t)(intptr_t)(__cheri_fromcap void *)td->td_md.md_tls;
 		error = copyout(&tlsbase, uap->parms, sizeof(tlsbase));
 		return (error);
 	default:

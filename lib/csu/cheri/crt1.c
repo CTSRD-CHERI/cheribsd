@@ -145,7 +145,13 @@ _start(void *auxv,
 	else
 		_init_tls();
 
+#ifndef POSITION_INDEPENDENT_STARTUP
+	/*
+	 * .ctors and .dtors are no longer supported for dynamically linked
+	 * binaries. TODO: remove for statically linked ones too
+	 */
 	crt_call_constructors();
+#endif
 
 #ifdef GCRT
 	/* Set up profiling support for the program, if we're being compiled

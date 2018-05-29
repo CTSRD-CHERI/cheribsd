@@ -220,7 +220,7 @@ ffs_snapshot(mp, snapfile)
 	struct vattr vat;
 	struct vnode *vp, *xvp, *mvp, *devvp;
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	struct snapdata *sn;
 	struct ufsmount *ump;
 
@@ -887,17 +887,8 @@ cgaccount(cg, vp, nbp, passno)
 
 	ip = VTOI(vp);
 	fs = ITOFS(ip);
-	error = bread(ITODEVVP(ip), fsbtodb(fs, cgtod(fs, cg)),
-	    (int)fs->fs_cgsize, KERNCRED, &bp);
-	if (error) {
-		brelse(bp);
+	if ((error = ffs_getcg(fs, ITODEVVP(ip), cg, &bp, &cgp)) != 0)
 		return (error);
-	}
-	cgp = (struct cg *)bp->b_data;
-	if (!cg_chkmagic(cgp)) {
-		brelse(bp);
-		return (EIO);
-	}
 	UFS_LOCK(ITOUMP(ip));
 	ACTIVESET(fs, cg);
 	/*
@@ -1959,7 +1950,7 @@ ffs_snapshot_mount(mp)
 	struct vnode *lastvp;
 	struct inode *ip;
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	void *snapblklist;
 	char *reason;
 	daddr_t snaplistsize;

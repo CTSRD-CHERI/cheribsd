@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012-2017 Robert N. M. Watson
+ * Copyright (c) 2012-2018 Robert N. M. Watson
  * Copyright (c) 2014 SRI International
  * All rights reserved.
  *
@@ -322,8 +322,10 @@ DECLARE_CHERI_TEST(test_fault_cgetcause);
 DECLARE_CHERI_TEST(test_nofault_cfromptr);
 DECLARE_CHERI_TEST(test_fault_perm_load);
 DECLARE_CHERI_TEST(test_nofault_perm_load);
+DECLARE_CHERI_TEST(test_fault_perm_seal);
 DECLARE_CHERI_TEST(test_fault_perm_store);
 DECLARE_CHERI_TEST(test_nofault_perm_store);
+DECLARE_CHERI_TEST(test_fault_perm_unseal);
 DECLARE_CHERI_TEST(test_fault_tag);
 DECLARE_CHERI_TEST(test_fault_ccheck_user_fail);
 DECLARE_CHERI_TEST(test_fault_read_kr1c);
@@ -332,26 +334,6 @@ DECLARE_CHERI_TEST(test_fault_read_kcc);
 DECLARE_CHERI_TEST(test_fault_read_kdc);
 DECLARE_CHERI_TEST(test_fault_read_epcc);
 DECLARE_CHERI_TEST(test_nofault_ccheck_user_pass);
-
-DECLARE_CHERI_TEST(test_sandbox_cp2_bound_catch);
-DECLARE_CHERI_TEST(test_sandbox_cp2_bound_nocatch);
-DECLARE_CHERI_TEST(test_sandbox_cp2_bound_nocatch_noaltstack);
-DECLARE_CHERI_TEST(test_sandbox_cp2_perm_load_catch);
-DECLARE_CHERI_TEST(test_sandbox_cp2_perm_load_nocatch);
-DECLARE_CHERI_TEST(test_sandbox_cp2_perm_store_catch);
-DECLARE_CHERI_TEST(test_sandbox_cp2_perm_store_nocatch);
-DECLARE_CHERI_TEST(test_sandbox_cp2_tag_catch);
-DECLARE_CHERI_TEST(test_sandbox_cp2_tag_nocatch);
-DECLARE_CHERI_TEST(test_sandbox_cp2_seal_catch);
-DECLARE_CHERI_TEST(test_sandbox_cp2_seal_nocatch);
-DECLARE_CHERI_TEST(test_sandbox_divzero_catch);
-DECLARE_CHERI_TEST(test_sandbox_divzero_nocatch);
-DECLARE_CHERI_TEST(test_sandbox_vm_rfault_catch);
-DECLARE_CHERI_TEST(test_sandbox_vm_rfault_nocatch);
-DECLARE_CHERI_TEST(test_sandbox_vm_wfault_catch);
-DECLARE_CHERI_TEST(test_sandbox_vm_wfault_nocatch);
-DECLARE_CHERI_TEST(test_sandbox_vm_xfault_catch);
-DECLARE_CHERI_TEST(test_sandbox_vm_xfault_nocatch);
 
 /* cheritest_fd.c */
 #define	CHERITEST_FD_READ_STR	"read123"
@@ -399,6 +381,27 @@ DECLARE_CHERI_TEST(test_2sandbox_newdestroy);
 int	cheritest_libcheri_setup(void);
 void	cheritest_libcheri_destroy(void);
 
+/* cheritest_libcheritest_fault.c */
+DECLARE_CHERI_TEST(test_sandbox_cp2_bound_catch);
+DECLARE_CHERI_TEST(test_sandbox_cp2_bound_nocatch);
+DECLARE_CHERI_TEST(test_sandbox_cp2_bound_nocatch_noaltstack);
+DECLARE_CHERI_TEST(test_sandbox_cp2_perm_load_catch);
+DECLARE_CHERI_TEST(test_sandbox_cp2_perm_load_nocatch);
+DECLARE_CHERI_TEST(test_sandbox_cp2_perm_store_catch);
+DECLARE_CHERI_TEST(test_sandbox_cp2_perm_store_nocatch);
+DECLARE_CHERI_TEST(test_sandbox_cp2_tag_catch);
+DECLARE_CHERI_TEST(test_sandbox_cp2_tag_nocatch);
+DECLARE_CHERI_TEST(test_sandbox_cp2_seal_catch);
+DECLARE_CHERI_TEST(test_sandbox_cp2_seal_nocatch);
+DECLARE_CHERI_TEST(test_sandbox_divzero_catch);
+DECLARE_CHERI_TEST(test_sandbox_divzero_nocatch);
+DECLARE_CHERI_TEST(test_sandbox_vm_rfault_catch);
+DECLARE_CHERI_TEST(test_sandbox_vm_rfault_nocatch);
+DECLARE_CHERI_TEST(test_sandbox_vm_wfault_catch);
+DECLARE_CHERI_TEST(test_sandbox_vm_wfault_nocatch);
+DECLARE_CHERI_TEST(test_sandbox_vm_xfault_catch);
+DECLARE_CHERI_TEST(test_sandbox_vm_xfault_nocatch);
+
 /* cheritest_libcheri_local.c */
 DECLARE_CHERI_TEST(test_sandbox_store_global_capability_in_bss);
 DECLARE_CHERI_TEST(test_sandbox_store_local_capability_in_bss_catch);
@@ -434,6 +437,8 @@ DECLARE_CHERI_TEST(cheritest_setjmp_longjmp);
 
 /* cheritest_sealcap.c */
 DECLARE_CHERI_TEST(test_sealcap_sysarch);
+DECLARE_CHERI_TEST(test_sealcap_seal);
+DECLARE_CHERI_TEST(test_sealcap_seal_unseal);
 
 /* cheritest_string.c */
 DECLARE_CHERI_TEST(test_string_kern_memcpy_c);

@@ -112,6 +112,8 @@ static struct {
 	{ NFSV4OP_WRITE, 1, "WriteDS", 7, },
 	{ NFSV4OP_READ, 1, "ReadDS", 6, },
 	{ NFSV4OP_COMMIT, 1, "CommitDS", 8, },
+	{ NFSV4OP_OPEN, 3, "OpenLayoutGet", 13, },
+	{ NFSV4OP_OPEN, 8, "CreateLayGet", 12, },
 };
 
 /*
@@ -120,7 +122,7 @@ static struct {
 static int nfs_bigrequest[NFSV41_NPROCS] = {
 	0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 1, 0, 0
+	0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0
 };
 
 /*
@@ -256,7 +258,7 @@ nfscl_reqstart(struct nfsrv_descript *nd, int procnum, struct nfsmount *nmp,
 APPLESTATIC void
 nfsm_uiombuf(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 {
-	char *uiocp;
+	char * __capability uiocp;
 	struct mbuf *mp, *mp2;
 	int xfer, left, mlen;
 	int uiosiz, clflg, rem;
@@ -298,11 +300,12 @@ nfsm_uiombuf(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 			else
 #endif
 			if (uiop->uio_segflg == UIO_SYSSPACE)
-			    NFSBCOPY(uiocp, NFSMTOD(mp, caddr_t) + mbuf_len(mp),
-				xfer);
+			    NFSBCOPY((__cheri_fromcap char *)uiocp,
+				NFSMTOD(mp, caddr_t) + mbuf_len(mp), xfer);
 			else
-			    copyin(CAST_USER_ADDR_T(uiocp), NFSMTOD(mp, caddr_t)
-				+ mbuf_len(mp), xfer);
+			    copyin_c(CAST_USER_ADDR_T(uiocp),
+				(__cheri_tocap char * __capability)
+				NFSMTOD(mp, caddr_t) + mbuf_len(mp), xfer);
 			mbuf_setlen(mp, mbuf_len(mp) + xfer);
 			left -= xfer;
 			uiocp += xfer;
