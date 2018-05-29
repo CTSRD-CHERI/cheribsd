@@ -231,9 +231,9 @@ _thr_umtx_timedwait_uint(volatile u_int *mtx, u_int id, int clockid,
 		tm_size = sizeof(timeout);
 	}
 
-	return _umtx_op_err(__DEVOLATILE(void *, mtx), shared ?
-	    UMTX_OP_WAIT_UINT : UMTX_OP_WAIT_UINT_PRIVATE, id, 
-	    (void *)(uintptr_t)tm_size, __DECONST(void *, tm_p));
+	return (_umtx_op_err(__DEVOLATILE(void *, mtx), shared ?
+	    UMTX_OP_WAIT_UINT : UMTX_OP_WAIT_UINT_PRIVATE, id,
+	    (void *)(uintptr_t)tm_size, __DECONST(void *, tm_p)));
 }
 
 int
