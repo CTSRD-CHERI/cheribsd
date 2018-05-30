@@ -61,7 +61,12 @@
 #include <dispatch/dispatch.h>
 #endif
 
+#ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheric.h>
+#define __get_bits(ptr, mask)	cheri_get_low_ptr_bits((ptr), (mask))
+#else
+#define __get_bits(ptr, mask)	((__intptr_t)(ptr) & (mask))
+#endif
 
 #if defined(__GNUC__) && defined(HAVE___SYNC_ADD_AND_FETCH)
 
@@ -113,9 +118,9 @@ heim_base_atomic_dec(heim_base_atomic_type *x)
 #endif
 
 /* tagged strings/object/XXX */
-#define heim_base_is_tagged(x) (cheri_get_low_ptr_bits((uintptr_t)(x), 0x3) == 0x3)
+#define heim_base_is_tagged(x) (__get_bits((x), 0x3) == 0x3)
 
-#define heim_base_is_tagged_object(x) (cheri_get_low_ptr_bits((uintptr_t)(x), 0x3) == 1)
+#define heim_base_is_tagged_object(x) (__get_bits((x), 0x3) == 1)
 /* XXXAR: I hope x is never a valid pointer... */
 #define heim_base_make_tagged_object(x, tid) \
     ((heim_object_t)((((vaddr_t)(x)) << 5) | ((tid) << 2) | 0x1))

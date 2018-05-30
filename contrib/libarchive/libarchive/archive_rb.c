@@ -35,7 +35,14 @@
 
 #include "archive_rb.h"
 
+#ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheric.h>
+#define	__clear_bits(ptr, mask) cheri_clear_low_ptr_bits((ptr), (mask))
+#define	__get_bits(ptr, mask) cheri_get_low_ptr_bits((ptr), (mask))
+#else
+#define	__clear_bits(ptr, mask) ((ptr) & ~(mask))
+#define	__get_bits(ptr, mask)	((ptr) & (mask))
+#endif
 
 /* Keep in sync with archive_rb.h */
 #define	RB_DIR_LEFT		0
@@ -48,9 +55,9 @@
 #define	RB_FLAG_RED		(uintptr_t)0x1
 #define	RB_FLAG_MASK		(RB_FLAG_POSITION|RB_FLAG_RED)
 #define	RB_FATHER(rb) \
-    ((struct archive_rb_node *)cheri_clear_low_ptr_bits((rb)->rb_info, RB_FLAG_MASK))
+    ((struct archive_rb_node *)__clear_bits((rb)->rb_info, RB_FLAG_MASK))
 #define	RB_SET_FATHER(rb, father) \
-    ((void)((rb)->rb_info = (uintptr_t)(father)|cheri_get_low_ptr_bits((rb)->rb_info, RB_FLAG_MASK)))
+    ((void)((rb)->rb_info = (uintptr_t)(father)|__get_bits((rb)->rb_info, RB_FLAG_MASK)))
 
 #define	RB_SENTINEL_P(rb)	((rb) == NULL)
 #define	RB_LEFT_SENTINEL_P(rb)	RB_SENTINEL_P((rb)->rb_left)
@@ -62,21 +69,21 @@
     (!RB_SENTINEL_P(rb) && !RB_LEFT_SENTINEL_P(rb) && !RB_RIGHT_SENTINEL_P(rb))
 
 #define	RB_POSITION(rb)	\
-    (cheri_get_low_ptr_bits((rb)->rb_info, RB_FLAG_POSITION) ? RB_DIR_RIGHT : RB_DIR_LEFT)
+    (__get_bits((rb)->rb_info, RB_FLAG_POSITION) ? RB_DIR_RIGHT : RB_DIR_LEFT)
 #define	RB_RIGHT_P(rb)		(RB_POSITION(rb) == RB_DIR_RIGHT)
 #define	RB_LEFT_P(rb)		(RB_POSITION(rb) == RB_DIR_LEFT)
-#define	RB_RED_P(rb) 		(!RB_SENTINEL_P(rb) && cheri_get_low_ptr_bits((rb)->rb_info, RB_FLAG_RED) != 0)
-#define	RB_BLACK_P(rb) 		(RB_SENTINEL_P(rb) || cheri_get_low_ptr_bits((rb)->rb_info, RB_FLAG_RED) == 0)
+#define	RB_RED_P(rb) 		(!RB_SENTINEL_P(rb) && __get_bits((rb)->rb_info, RB_FLAG_RED) != 0)
+#define	RB_BLACK_P(rb) 		(RB_SENTINEL_P(rb) || __get_bits((rb)->rb_info, RB_FLAG_RED) == 0)
 #define	RB_MARK_RED(rb) 	((void)((rb)->rb_info |= RB_FLAG_RED))
-#define	RB_MARK_BLACK(rb) 	((void)(cheri_clear_low_ptr_bits((rb)->rb_info, RB_FLAG_RED)))
+#define	RB_MARK_BLACK(rb) 	((void)(__clear_bits((rb)->rb_info, RB_FLAG_RED)))
 #ifndef __CHERI_PURE_CAPABILITY__
 #define	RB_INVERT_COLOR(rb) 	((void)((rb)->rb_info ^= RB_FLAG_RED))
 #endif
 #define	RB_ROOT_P(rbt, rb)	((rbt)->rbt_root == (rb))
 #define	RB_SET_POSITION(rb, position) \
     ((void)((position) ? ((rb)->rb_info |= RB_FLAG_POSITION) : \
-    ((rb)->rb_info = cheri_clear_low_ptr_bits((rb)->rb_info, RB_FLAG_POSITION))))
-#define	RB_ZERO_PROPERTIES(rb)	((void)((rb)->rb_info = cheri_clear_low_ptr_bits((rb)->rb_info, RB_FLAG_MASK)))
+    ((rb)->rb_info = __clear_bits((rb)->rb_info, RB_FLAG_POSITION))))
+#define	RB_ZERO_PROPERTIES(rb)	((void)((rb)->rb_info = __clear_bits((rb)->rb_info, RB_FLAG_MASK)))
 #ifndef __CHERI_PURE_CAPABILITY__
 #define	RB_COPY_PROPERTIES(dst, src) \
     ((void)((dst)->rb_info ^= ((dst)->rb_info ^ (src)->rb_info) & RB_FLAG_MASK))
@@ -94,16 +101,16 @@
 static inline void
 RB_COPY_PROPERTIES(struct archive_rb_node * const dst, struct archive_rb_node * const src)
 {
-	vaddr_t src_bits = cheri_get_low_ptr_bits(src->rb_info, RB_FLAG_MASK);
-	dst->rb_info = cheri_clear_low_ptr_bits(dst->rb_info, RB_FLAG_MASK) | src_bits;
+	vaddr_t src_bits = __get_bits(src->rb_info, RB_FLAG_MASK);
+	dst->rb_info = __clear_bits(dst->rb_info, RB_FLAG_MASK) | src_bits;
 }
 static inline void
 RB_SWAP_PROPERTIES(struct archive_rb_node * const a, struct archive_rb_node * const b)
 {
-	vaddr_t a_bits = cheri_get_low_ptr_bits(a->rb_info, RB_FLAG_MASK);
-	vaddr_t b_bits = cheri_get_low_ptr_bits(b->rb_info, RB_FLAG_MASK);
-	a->rb_info = cheri_clear_low_ptr_bits(a->rb_info, RB_FLAG_MASK) | b_bits;
-	b->rb_info = cheri_clear_low_ptr_bits(b->rb_info, RB_FLAG_MASK) | a_bits;
+	vaddr_t a_bits = __get_bits(a->rb_info, RB_FLAG_MASK);
+	vaddr_t b_bits = __get_bits(b->rb_info, RB_FLAG_MASK);
+	a->rb_info = __clear_bits(a->rb_info, RB_FLAG_MASK) | b_bits;
+	b->rb_info = __clear_bits(b->rb_info, RB_FLAG_MASK) | a_bits;
 }
 #endif
 
