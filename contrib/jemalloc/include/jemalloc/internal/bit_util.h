@@ -1,5 +1,16 @@
 #ifndef JEMALLOC_INTERNAL_BIT_UTIL_H
 #define JEMALLOC_INTERNAL_BIT_UTIL_H
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_size"
+ *   ],
+ *   "change_comment": "confusing sizeof(size_t) with sizeof(void *)"
+ * }
+ * CHERI CHANGES END
+ */
 
 #include "jemalloc/internal/assert.h"
 

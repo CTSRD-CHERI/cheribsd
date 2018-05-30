@@ -1,5 +1,17 @@
 #ifndef JEMALLOC_INTERNAL_RTREE_H
 #define JEMALLOC_INTERNAL_RTREE_H
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_bit_flags",
+ *     "pointer_size",
+ *     "virtual_address"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include "jemalloc/internal/atomic.h"
 #include "jemalloc/internal/mutex.h"

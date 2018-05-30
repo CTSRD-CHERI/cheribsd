@@ -28,6 +28,17 @@
  *
  * $FreeBSD$
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "virtual_address"
+ *   ],
+ *   "change_comment": "is this still needed?"
+ * }
+ * CHERI CHANGES END
+ */
 
 #ifndef _XLOCALE_PRIVATE__H_
 #define _XLOCALE_PRIVATE__H_

@@ -28,6 +28,17 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "unsupported"
+ *   ],
+ *   "change_comment": "sbrk()"
+ * }
+ * CHERI CHANGES END
+ */
 #include <sys/cdefs.h>
 __RCSID("$NetBSD: t_mlock.c,v 1.6 2016/08/09 12:02:44 kre Exp $");
 

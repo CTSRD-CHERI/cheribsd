@@ -24,6 +24,16 @@
  *
  * $FreeBSD$
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_size"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #ifndef TSEARCH_PATH_H
 #define	TSEARCH_PATH_H

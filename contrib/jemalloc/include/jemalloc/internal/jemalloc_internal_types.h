@@ -1,5 +1,17 @@
 #ifndef JEMALLOC_INTERNAL_TYPES_H
 #define JEMALLOC_INTERNAL_TYPES_H
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_alignment",
+ *     "pointer_size",
+ *     "virtual_address"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 /* Page size index type. */
 typedef unsigned pszind_t;

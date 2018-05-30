@@ -23,6 +23,17 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "support"
+ *   ],
+ *   "change_comment": "find auxargs without walking off of envv"
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");

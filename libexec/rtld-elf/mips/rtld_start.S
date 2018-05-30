@@ -29,6 +29,16 @@
  *
  * $FreeBSD$
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_size"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <machine/asm.h>
 

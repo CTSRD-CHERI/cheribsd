@@ -19,6 +19,16 @@
  * CDDL HEADER END
  */
 /*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
+/*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.

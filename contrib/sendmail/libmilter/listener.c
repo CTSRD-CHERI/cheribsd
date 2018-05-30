@@ -7,6 +7,16 @@
  * the sendmail distribution.
  *
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sm/gen.h>
 SM_RCSID("@(#)$Id: listener.c,v 8.127 2013-11-22 20:51:36 ca Exp $")

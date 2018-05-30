@@ -26,6 +26,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_size"
+ *   ],
+ *   "change_comment": "aligning struct key_hint, not packing struct key_value"
+ * }
+ * CHERI CHANGES END
+ */
 
 #if !defined(__COLL_H__)
 #define	__COLL_H__

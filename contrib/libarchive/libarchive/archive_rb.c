@@ -28,6 +28,18 @@
  *
  * Based on: NetBSD: rb.c,v 1.6 2010/04/30 13:58:09 joerg Exp
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_bit_flags",
+ *     "unsupported"
+ *   ],
+ *   "change_comment": "can't use xor to swap bit flags"
+ * }
+ * CHERI CHANGES END
+ */
 
 #include "archive_platform.h"
 

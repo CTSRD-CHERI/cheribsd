@@ -25,6 +25,17 @@
  *
  *	$FreeBSD$
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_size"
+ *   ],
+ *   "change_comment": "TLS alignment"
+ * }
+ * CHERI CHANGES END
+ */
 
 /*
  * Define stubs for TLS internals so that programs and libraries can

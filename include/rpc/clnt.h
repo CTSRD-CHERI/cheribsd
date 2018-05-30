@@ -31,6 +31,17 @@
  *	from: @(#)clnt.h	2.1 88/07/29 4.0 RPCSRC
  * $FreeBSD$
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "sunrpc"
+ * }
+ * CHERI CHANGES END
+ */
 
 /*
  * clnt.h - Client side remote procedure call interface.

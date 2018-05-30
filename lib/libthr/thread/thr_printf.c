@@ -23,6 +23,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "support"
+ *   ],
+ *   "change_comment: "printf"
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");

@@ -18,6 +18,16 @@
  *
  * CDDL HEADER END
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_alignment"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.

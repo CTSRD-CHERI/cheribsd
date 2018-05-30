@@ -1,5 +1,15 @@
 #ifndef JEMALLOC_INTERNAL_PAGES_EXTERNS_H
 #define JEMALLOC_INTERNAL_PAGES_EXTERNS_H
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_alignment"
+ *   }
+ * }
+ * CHERI CHANGES END
+ */
 
 /* Page size.  LG_PAGE is determined by the configure script. */
 #ifdef PAGE_MASK

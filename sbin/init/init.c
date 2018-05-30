@@ -29,6 +29,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_integrity"
+ *   ],
+ *   "change_comments": "BDB hashes don't preserve pointers"
+ * }
+ * CHERI CHANGES END
+ */
 
 #ifndef lint
 static const char copyright[] =

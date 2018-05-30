@@ -29,6 +29,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_integrity"
+ *   ],
+ *   "change_comment": "BDB hashes don't preserve tags"
+ * }
+ * CHERI CHANGES END
+ */
 
 /*
  * Luke Mewburn <lm@rmit.edu.au> added the following on 940622:

@@ -7,6 +7,18 @@
  *
  * ===----------------------------------------------------------------------===
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "monotonicity",
+ *     "unsupported"
+ *   ],
+ *   "change_comment": "Attempts to make stack executable"
+ * }
+ * CHERI CHANGES END
+ */
 
 #include "int_lib.h"
 

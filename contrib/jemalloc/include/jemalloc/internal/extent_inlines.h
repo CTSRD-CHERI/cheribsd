@@ -1,5 +1,15 @@
 #ifndef JEMALLOC_INTERNAL_EXTENT_INLINES_H
 #define JEMALLOC_INTERNAL_EXTENT_INLINES_H
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "virtual_address"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include "jemalloc/internal/mutex.h"
 #include "jemalloc/internal/mutex_pool.h"

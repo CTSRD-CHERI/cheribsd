@@ -1,6 +1,16 @@
 /*
  * Override settings that were generated in jemalloc_defs.h as necessary.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_size"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #undef JEMALLOC_OVERRIDE_VALLOC
 

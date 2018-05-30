@@ -1,5 +1,15 @@
 #ifndef JEMALLOC_INTERNAL_RTREE_CTX_H
 #define JEMALLOC_INTERNAL_RTREE_CTX_H
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "virtual_address"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 /*
  * Number of leafkey/leaf pairs to cache in L1 and L2 level respectively.  Each

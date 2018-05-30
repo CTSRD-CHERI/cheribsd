@@ -1,5 +1,15 @@
 #ifndef JEMALLOC_INTERNAL_PRNG_H
 #define JEMALLOC_INTERNAL_PRNG_H
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_size"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include "jemalloc/internal/atomic.h"
 #include "jemalloc/internal/bit_util.h"

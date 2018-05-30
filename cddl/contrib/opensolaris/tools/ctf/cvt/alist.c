@@ -20,6 +20,16 @@
  * CDDL HEADER END
  */
 /*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "hashing"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
+/*
  * Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */

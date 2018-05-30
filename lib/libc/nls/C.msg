@@ -1,4 +1,13 @@
 $ $FreeBSD$
+$ CHERI CHANGES START
+$ {
+$   "updated": 20180530,
+$   "changes": [
+$     "support"
+$   ],
+$   "change_comment": "EPROT, SIGPROT"
+$ }
+$ CHERI CHANGES END
 $
 $ Message catalog for C locale (template)
 $

@@ -27,6 +27,17 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
  * POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "sunrpc"
+ * }
+ * CHERI CHANGES END
+ */
 
 /* #ident	"@(#)rpc_soc.c	1.17	94/04/24 SMI" */
 

@@ -1,5 +1,15 @@
 #ifndef JEMALLOC_INTERNAL_HASH_H
 #define JEMALLOC_INTERNAL_HASH_H
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "virtual_address"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include "jemalloc/internal/assert.h"
 

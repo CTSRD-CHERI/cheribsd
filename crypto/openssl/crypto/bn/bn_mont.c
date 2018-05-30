@@ -108,6 +108,18 @@
  * Hudson (tjh@cryptsoft.com).
  *
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_integrity",
+ *     "unsupported"
+ *   ],
+ *   "change_comment": "xor for constant time conditional assignment"
+ * }
+ * CHERI CHANGES END
+ */
 
 /*
  * Details about Montgomery multiplication algorithms can be found at

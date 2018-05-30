@@ -7,6 +7,17 @@
 // Source Licenses. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "other"
+ *   ],
+ *   "change_comment": "conflict with __output qualifier"
+ * }
+ * CHERI CHANGES END
+ */
 
 #ifndef _LIBCPP_REGEX
 #define _LIBCPP_REGEX

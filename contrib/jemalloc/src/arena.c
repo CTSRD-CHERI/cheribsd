@@ -1,3 +1,13 @@
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "virtual_address"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 #define JEMALLOC_ARENA_C_
 #include "jemalloc/internal/jemalloc_preamble.h"
 #include "jemalloc/internal/jemalloc_internal_includes.h"

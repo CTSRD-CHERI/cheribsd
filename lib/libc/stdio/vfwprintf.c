@@ -34,6 +34,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "support"
+ *   ],
+ *   "change_comment: ""
+ * }
+ * CHERI CHANGES END
+ */
 
 #if 0
 #if defined(LIBC_SCCS) && !defined(lint)

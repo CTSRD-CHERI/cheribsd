@@ -28,6 +28,18 @@
  *
  * $FreeBSD$
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi",
+ *     "unsupported"
+ *   ]
+ *   "change_comment": "stack pointer"
+ * }
+ * CHERI CHANGES END
+ */
 
 #ifndef _THR_PRIVATE_H
 #define _THR_PRIVATE_H
