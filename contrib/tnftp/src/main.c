@@ -140,7 +140,7 @@ static void	setupoption(const char *, const char *, const char *);
 int		main(int, char *[]);
 
 int
-main(int argc, char **argv)
+main(int volatile argc, char **volatile argv)
 {
 	int ch, rval;
 	struct passwd *pw;
