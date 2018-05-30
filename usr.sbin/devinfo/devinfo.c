@@ -36,6 +36,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
 #include <err.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -252,7 +253,7 @@ int
 main(int argc, char *argv[]) 
 {
 	struct devinfo_dev	*root;
-	int			c, uflag;
+	int			c, uflag, rv;
 	char			*path = NULL;
 
 	uflag = 0;
@@ -281,8 +282,10 @@ main(int argc, char *argv[])
 	if (path && (rflag || uflag))
 		usage();
 
-	if (devinfo_init())
+	if ((rv = devinfo_init()) != 0) {
+		errno = rv;
 		err(1, "devinfo_init");
+	}
 
 	if ((root = devinfo_handle_to_device(DEVINFO_ROOT_DEVICE)) == NULL)
 		errx(1, "can't find root device");
