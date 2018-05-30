@@ -92,7 +92,7 @@ is_empty_sector(void *buf)
 	uint64_t *p = buf;
 	size_t n, max;
 
-	assert(((size_t)p & 3) == 0);
+	assert(((vaddr_t)p & 3) == 0);
 
 	max = secsz / sizeof(uint64_t);
 	for (n = 0; n < max; n++) {
