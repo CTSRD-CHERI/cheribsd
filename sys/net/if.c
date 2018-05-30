@@ -4342,6 +4342,7 @@ if_setlladdr(struct ifnet *ifp, const u_char *lladdr, int len)
 	 * to re-init it in order to reprogram its
 	 * address filter.
 	 */
+	NET_EPOCH_EXIT();
 	if ((ifp->if_flags & IFF_UP) != 0) {
 		if (ifp->if_ioctl) {
 			ifp->if_flags &= ~IFF_UP;
@@ -4355,6 +4356,7 @@ if_setlladdr(struct ifnet *ifp, const u_char *lladdr, int len)
 		}
 	}
 	EVENTHANDLER_INVOKE(iflladdr_event, ifp);
+	return (0);
  out:
 	NET_EPOCH_EXIT();
 	return (rc);
