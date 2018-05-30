@@ -38,8 +38,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/linker.h>
 #include <strings.h>
 
-// The conditional is a CHERI hack - without it, the "Address" field is far too wide.
-#define	POINTER_WIDTH	((int)((sizeof(void *) <= 8 ? sizeof(void *) : 8) * 2 + 2))
+#define	POINTER_WIDTH	((int)(sizeof(vaddr_t) * 2 + 2))
 
 static int showdata = 0;
 
