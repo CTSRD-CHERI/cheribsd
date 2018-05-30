@@ -34,10 +34,15 @@ Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston, MA 02110-1301, USA. 
    E.g. align to an 8-byte boundary with argument of 8.  Take care never
    to wrap around if the address is within boundary-1 of the end of the
    address space.  */
+#if __has_feature(__builtin_align_up)
+#define BFD_ALIGN(this, boundry)					  \
+   __builtin_align_up((this), (boundry))
+#else
 #define BFD_ALIGN(this, boundary)					  \
   ((((bfd_vma) (this) + (boundary) - 1) >= (bfd_vma) (this))		  \
    ? (((bfd_vma) (this) + ((boundary) - 1)) & ~ (bfd_vma) ((boundary)-1)) \
    : ~ (bfd_vma) 0)
+#endif
 
 /* If you want to read and write large blocks, you might want to do it
    in quanta of this amount */
