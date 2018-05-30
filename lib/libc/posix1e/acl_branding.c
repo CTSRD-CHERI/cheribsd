@@ -54,7 +54,7 @@ entry2acl(acl_entry_t entry)
 #if __has_builtin(__builtin_align_down)
 	aclp = (acl_t)__builtin_align_down(entry, 1 << _ACL_T_ALIGNMENT_BITS);
 #else
-	aclp = (acl_t)(((intptr_t)entry >> _ACL_T_ALIGNMENT_BITS) << _ACL_T_ALIGNMENT_BITS);
+	aclp = (acl_t)(((long)entry >> _ACL_T_ALIGNMENT_BITS) << _ACL_T_ALIGNMENT_BITS);
 #endif
 
 	return (aclp);

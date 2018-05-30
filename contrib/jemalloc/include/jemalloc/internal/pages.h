@@ -13,7 +13,7 @@
 	__builtin_align_down((a), PAGE)
 #else
 #define PAGE_ADDR2BASE(a)						\
-	((void *)((uintptr_t)(a) & (uintptr_t)~PAGE_MASK))
+	((void *)((uintptr_t)(a) & ~PAGE_MASK))
 #endif
 /* Return the smallest pagesize multiple that is >= s. */
 #if __has_builtin(__builtin_align_up)
@@ -21,7 +21,7 @@
 	__builtin_align_up((s), PAGE)
 #else
 #define PAGE_CEILING(s)							\
-	((uintptr_t)((s) + PAGE_MASK) & (uintptr_t)~PAGE_MASK)
+	(((s) + PAGE_MASK) & ~PAGE_MASK)
 #endif
 
 /* Huge page size.  LG_HUGEPAGE is determined by the configure script. */
@@ -33,7 +33,7 @@
 	__builtin_align_down((a), HUGEPAGE)
 #else
 #define HUGEPAGE_ADDR2BASE(a)						\
-	((void *)((uintptr_t)(a) & (uintptr_t)~HUGEPAGE_MASK))
+	((void *)((uintptr_t)(a) & ~HUGEPAGE_MASK))
 #endif
 /* Return the smallest pagesize multiple that is >= s. */
 #if __has_builtin(__builtin_align_up)

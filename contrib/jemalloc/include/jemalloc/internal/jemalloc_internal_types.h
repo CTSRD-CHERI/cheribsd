@@ -159,7 +159,7 @@ typedef int malloc_cpuid_t;
 	((size_t)((a) - __builtin_align_down((a), alignment)))
 #else
 #define ALIGNMENT_ADDR2OFFSET(a, alignment)				\
-	((size_t)((a) & (alignment - 1)))
+	((size_t)((uintptr_t)(a) & (alignment - 1)))
 #endif
 
 /* Return the smallest alignment multiple that is >= s. */
@@ -168,7 +168,7 @@ typedef int malloc_cpuid_t;
 	__builtin_align_up((s), (alignment))
 #else
 #define ALIGNMENT_CEILING(s, alignment)					\
-	((uintptr_t)((s) + (alignment - 1)) & (uintptr_t)((~(alignment)) + 1))
+	(((s) + (alignment - 1)) & ((~(alignment)) + 1))
 #endif
 
 /* Declare a variable-length array. */
