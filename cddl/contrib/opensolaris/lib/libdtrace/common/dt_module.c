@@ -1160,7 +1160,7 @@ dt_module_update(dtrace_hdl_t *dtp, struct kld_file_stat *k_stat)
 	GElf_Phdr ph;
 	char name[MAXPATHLEN];
 	uintptr_t mapbase;
-#ifndef __CHERI__
+#if !__has_builtin(__builtin_align_up)
 	uintptr_t alignmask;
 #endif
 	int i = 0;
