@@ -53,7 +53,7 @@ procstat_vm(struct procstat *procstat, struct kinfo_proc *kipp)
 
 	ptrwidth = 2*sizeof(void *) + 2;
 	if ((procstat_opts & PS_OPT_NOHEADER) == 0)
-		xo_emit("{T:/%5s %*s %*s %3s %4s %4s %3s %3s %-5s %-2s %-s}\n",
+		xo_emit("{T:/%5s %*s %*s %5s %4s %4s %3s %3s %-5s %-2s %-s}\n",
 		    "PID", ptrwidth, "START", ptrwidth, "END", "PRT", "RES",
 		    "PRES", "REF", "SHD", "FLAG", "TP", "PATH");
 
@@ -77,8 +77,12 @@ procstat_vm(struct procstat *procstat, struct kinfo_proc *kipp)
 		    "r" : "-");
 		xo_emit("{d:write/%s}", kve->kve_protection & KVME_PROT_WRITE ?
 		    "w" : "-");
-		xo_emit("{d:exec/%s} ", kve->kve_protection & KVME_PROT_EXEC ?
+		xo_emit("{d:exec/%s}", kve->kve_protection & KVME_PROT_EXEC ?
 		    "x" : "-");
+		xo_emit("{d:rcap/%s}",
+		    kve->kve_protection & KVME_PROT_READCAPS ? "L" : "-");
+		xo_emit("{d:wcap/%s} ",
+		    kve->kve_protection & KVME_PROT_WRITECAPS ? "S" : "-");
 		xo_open_container("kve_protection");
 		xo_emit("{en:read/%s}", kve->kve_protection & KVME_PROT_READ ?
 		    "true" : "false");
@@ -86,6 +90,10 @@ procstat_vm(struct procstat *procstat, struct kinfo_proc *kipp)
 		    "true" : "false");
 		xo_emit("{en:exec/%s}", kve->kve_protection & KVME_PROT_EXEC ?
 		    "true" : "false");
+		xo_emit("{en:rcap/%s}",
+		    kve->kve_protection & KVME_PROT_READCAPS ? "true" : "false");
+		xo_emit("{en:wcap/%s}",
+		    kve->kve_protection & KVME_PROT_WRITECAPS ? "true" : "false");
 		xo_close_container("kve_protection");
 		xo_emit("{:kve_resident/%4d/%d} ", kve->kve_resident);
 		xo_emit("{:kve_private_resident/%4d/%d} ",
