@@ -32,10 +32,13 @@ nooptions	GEOM_RAID
 # debugging
 options		VERBOSE_SYSINIT
 options		BUS_DEBUG
+options		CAMDEBUG
+options		CAM_DEBUG_FLAGS=3
 # options		KTR
 # options		KTR_VERBOSE=2
 # nooptions	KTR_ALQ
 # should enable witness and invariants?
+# options	LOCK_DEBUG
 
 # XXX TODO
 # nodevice ata
