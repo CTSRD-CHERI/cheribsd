@@ -2681,6 +2681,7 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 	unsigned int last_timestamp;
 	int error;
 	bool super;
+	size_t pathlen;
 
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 
@@ -2805,16 +2806,16 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 			kve->kve_shadow_count = 0;
 		}
 
-		strlcpy(kve->kve_path, fullpath, sizeof(kve->kve_path));
+		pathlen = strlcpy(kve->kve_path, fullpath, sizeof(kve->kve_path));
 		if (freepath != NULL)
 			free(freepath, M_TEMP);
 
 		/* Pack record size down */
-		if ((flags & KERN_VMMAP_PACK_KINFO) != 0)
+		if ((flags & KERN_VMMAP_PACK_KINFO) != 0) {
 			kve->kve_structsize =
 			    offsetof(struct kinfo_vmentry, kve_path) +
-			    strlen(kve->kve_path) + 1;
-		else
+			    pathlen + 1;
+		} else
 			kve->kve_structsize = sizeof(*kve);
 		kve->kve_structsize = roundup(kve->kve_structsize,
 		    sizeof(uint64_t));
