@@ -96,7 +96,7 @@ __FBSDID("$FreeBSD$");
 #define	SC_TABLESIZE	256			/* Must be power of 2. */
 #define	SC_MASK		(SC_TABLESIZE - 1)
 #define	SC_SHIFT	8
-#define	SC_HASH(wc)	((((uintptr_t)(wc) >> SC_SHIFT) ^ (uintptr_t)(wc)) & \
+#define	SC_HASH(wc)	(((ptr_to_va(wc) >> SC_SHIFT) ^ ptr_to_va(wc)) & \
 			    SC_MASK)
 #define	SC_LOOKUP(wc)	&sleepq_chains[SC_HASH(wc)]
 #define NR_SLEEPQS      2
