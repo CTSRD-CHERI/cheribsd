@@ -296,8 +296,8 @@ NESTED(cpu_switch, CALLFRAME_SIZ, ra)
 	/* Do cheri savectx() */
 	SAVE_U_PCB_CHERIKFRAME($c1);
 
-	/* Switchout td_lock */
-	clc	$c1, zero, TD_LOCK($c3) // XXX-AM: not sure what this is for
+	/* Reset original thread mutex that we temporarily replaced with sched_lock */
+	csc	$c5, zero, TD_LOCK($c3)
 
 mips_sw1:
 #ifdef CPU_QEMU_MALTA
