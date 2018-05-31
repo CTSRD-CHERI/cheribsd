@@ -2803,6 +2803,15 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen,
 			if (lobj != obj)
 				VM_OBJECT_RUNLOCK(lobj);
 
+			if ((obj->flags & OBJ_NOSTORETAGS) == 0) {
+				kve->kve_protection |= KVME_PROT_WRITECAPS;
+				kve->kve_max_protection |= KVME_PROT_WRITECAPS;
+			}
+			if ((obj->flags & OBJ_NOLOADTAGS) == 0) {
+				kve->kve_protection |= KVME_PROT_READCAPS;
+				kve->kve_max_protection |= KVME_PROT_READCAPS;
+			}
+
 			kve->kve_ref_count = obj->ref_count;
 			kve->kve_shadow_count = obj->shadow_count;
 			VM_OBJECT_RUNLOCK(obj);
@@ -2831,7 +2840,23 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen,
 			kve->kve_type = KVME_TYPE_NONE;
 			kve->kve_ref_count = 0;
 			kve->kve_shadow_count = 0;
+
+			/* Anonymous memory is presumed able to have tags */
+			kve->kve_protection |= KVME_PROT_READCAPS
+					       | KVME_PROT_WRITECAPS;
+
+			kve->kve_max_protection |= KVME_PROT_READCAPS
+						   | KVME_PROT_WRITECAPS;
 		}
+
+		if ((kve->kve_protection & KVME_PROT_READ) == 0)
+			kve->kve_protection &= ~KVME_PROT_READCAPS;
+		if ((kve->kve_protection & KVME_PROT_WRITE) == 0)
+			kve->kve_protection &= ~KVME_PROT_WRITECAPS;
+		if ((kve->kve_max_protection & KVME_PROT_READ) == 0)
+			kve->kve_max_protection &= ~KVME_PROT_READCAPS;
+		if ((kve->kve_max_protection & KVME_PROT_WRITE) == 0)
+			kve->kve_max_protection &= ~KVME_PROT_WRITECAPS;
 
 		pathlen = strlcpy(kve->kve_path, fullpath, sizeof(kve->kve_path));
 		if (freepath != NULL)
