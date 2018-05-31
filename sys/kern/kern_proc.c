@@ -2765,6 +2765,13 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen,
 			kve->kve_protection |= KVME_PROT_STORETAGS;
 #endif
 
+		if (entry->max_protection & VM_PROT_READ)
+			kve->kve_max_protection |= KVME_PROT_READ;
+		if (entry->max_protection & VM_PROT_WRITE)
+			kve->kve_max_protection |= KVME_PROT_WRITE;
+		if (entry->max_protection & VM_PROT_EXECUTE)
+			kve->kve_max_protection |= KVME_PROT_EXEC;
+
 		if (entry->eflags & MAP_ENTRY_COW)
 			kve->kve_flags |= KVME_FLAG_COW;
 		if (entry->eflags & MAP_ENTRY_NEEDS_COPY)

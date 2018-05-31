@@ -529,7 +529,8 @@ struct kinfo_vmentry {
 	uint64_t kve_vn_fsid;			/* dev_t of vnode location */
 	uint64_t kve_vn_rdev;			/* Device id if device. */
 	uint64_t kve_reservation;		/* Map reservation */
-	int	 _kve_ispare[6];		/* Space for more stuff. */
+	int      kve_max_protection;		/* Maximum protection bitmask */
+	int	 _kve_ispare[5];		/* Space for more stuff. */
 	/* Truncated before copyout in sysctl */
 	char	 kve_path[PATH_MAX];		/* Path to VM obj, if any. */
 };
