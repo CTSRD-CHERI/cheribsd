@@ -2757,12 +2757,16 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen,
 		if (entry->protection & VM_PROT_EXECUTE)
 			kve->kve_protection |= KVME_PROT_EXEC;
 #ifdef OBJ_NOLOADTAGS
-		if (obj != NULL && (obj->flags & OBJ_NOLOADTAGS) == 0)
+		if (obj != NULL && (obj->flags & OBJ_NOLOADTAGS) == 0) {
+			kve->kve_max_protection |= KVME_PROT_LOADTAGS;
 			kve->kve_protection |= KVME_PROT_LOADTAGS;
+		}
 #endif
 #ifdef OBJ_NOSTORETAGS
-		if (obj != NULL && (obj->flags & OBJ_NOSTORETAGS) == 0)
+		if (obj != NULL && (obj->flags & OBJ_NOSTORETAGS) == 0) {
+			kve->kve_max_protection |= KVME_PROT_STORETAGS;
 			kve->kve_protection |= KVME_PROT_STORETAGS;
+		}
 #endif
 
 		if (entry->max_protection & VM_PROT_READ)
