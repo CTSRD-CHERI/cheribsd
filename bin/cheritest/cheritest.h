@@ -470,6 +470,7 @@ DECLARE_CHERI_TEST(test_tls_align_ptr);
 DECLARE_CHERI_TEST(cheritest_vm_tag_mmap_anon);;
 DECLARE_CHERI_TEST(cheritest_vm_tag_shm_open_anon_shared);
 DECLARE_CHERI_TEST(cheritest_vm_tag_shm_open_anon_private);
+DECLARE_CHERI_TEST(cheritest_vm_tag_shm_open_anon_shared2x);
 DECLARE_CHERI_TEST(cheritest_vm_tag_dev_zero_shared);
 DECLARE_CHERI_TEST(cheritest_vm_tag_dev_zero_private);
 DECLARE_CHERI_TEST(cheritest_vm_notag_tmpfile_shared);

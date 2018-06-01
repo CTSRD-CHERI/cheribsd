@@ -968,6 +968,10 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "check tags are stored for SHM_ANON MAP_PRIVATE pages",
 	  .ct_func = cheritest_vm_tag_shm_open_anon_private, },
 
+	{ .ct_name = "cheritest_vm_tag_shm_open_anon_shared2x",
+	  .ct_desc = "test multiply-mapped SHM_ANON objects",
+	  .ct_func = cheritest_vm_tag_shm_open_anon_shared2x, },
+
 	{ .ct_name = "cheritest_vm_tag_dev_zero_shared",
 	  .ct_desc = "check tags are stored for /dev/zero MAP_SHARED pages",
 	  .ct_func = cheritest_vm_tag_dev_zero_shared, },
