@@ -155,11 +155,10 @@ ksyms_size_calc(struct tsizes *ts)
 static int
 ksyms_emit(struct ksyms_softc *sc, void *buf, off_t off, size_t sz)
 {
-	struct iovec iov;
+	kiovec_t iov;
 	struct uio uio;
 
-	iov.iov_base = buf;
-	iov.iov_len = sz;
+	IOVEC_INIT(&iov, buf, sz);
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = off;
