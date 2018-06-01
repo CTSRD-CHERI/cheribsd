@@ -2023,7 +2023,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	CASE_IOC_IFREQ(SIOCSIFCAP):
 		VLAN_SLOCK();
-		ifv->ifv_capenable = ifr->ifr_reqcap;
+		ifv->ifv_capenable = ifr_reqcap_get(ifr);
 		trunk = TRUNK(ifv);
 		if (trunk != NULL) {
 			TRUNK_WLOCK(trunk);
