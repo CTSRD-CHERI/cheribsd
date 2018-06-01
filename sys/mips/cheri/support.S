@@ -891,39 +891,37 @@ XLEAF(blkclr)
 	blt	a0, 12, smallclr	# small amount to clear?
 	nop
 
-	/* XXX-AM: can we ignore the base? */
 	cgetbase	t0, $c3
 	cgetoffset	a3, $c3
 	PTR_ADDU	a3, a3, t0
-	PTR_SUBU	a3, zero, a0	# compute # bytes to word align address
-	and	a3, a3, 3
+	// PTR_SUBU	a3, zero, a0
+	and	a3, a3, 3		# compute # bytes to word align address	
 	beq	a3, zero, 1f		# skip if word aligned
 	PTR_SUBU	a0, a0, a3	# subtract from remaining count
 
-	REG_LI	t3, 0			# clear 1, 2, or 3 bytes to align
 	cincoffset	$c2, $c3, a3
 3:
 	cincoffset	$c3, $c3, 1
-	ceq	t0, $c3, $c2
-	beq	t0, zero, 3b
-	csb	zero, zero, -1($c1)
+	cltu	t0, $c3, $c2
+	bne	t0, zero, 3b
+	csb	zero, zero, -1($c3)
 1:
-	and	v0, a0, 3		# compute number of words left
-	PTR_SUBU	a3, a0, v0
-	move	a0, v0
+	and		v0, a0, 3	# compute misaligned tail
+	PTR_SUBU	a3, a0, v0	# compute number of bytes to copy
+	move	a0, v0			# a0 is the remaining tail bytes to copy
 	cincoffset	$c2, $c3, a3	# compute ending address
 2:
 	cincoffset	$c3, $c3, 4	# clear words
-	ceq	t0, $c3, $c2		#  unrolling loop does not help
-	beq	t0, zero, 2b		#  since we are limited by memory speed
+	cltu	t0, $c3, $c2		#  unrolling loop does not help
+	bne	t0, zero, 2b		#  since we are limited by memory speed
 	csw	zero, zero, -4($c3)
 smallclr:
 	ble	a0, zero, 2f
 	cincoffset	$c2, $c3, a0	# compute ending address
 1:
 	cincoffset	$c3, $c3, 1	# clear bytes
-	ceq	t0, $c3, $c2
-	beq	t0, zero, 1b
+	cltu	t0, $c3, $c2
+	bne	t0, zero, 1b
 	csb	zero, zero, -1($c3)
 2:
 	cjr	$c17
