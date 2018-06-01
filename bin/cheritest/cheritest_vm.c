@@ -122,6 +122,36 @@ cheritest_vm_tag_shm_open_anon_private(const struct cheri_test *ctp __unused)
 	cheritest_success();
 }
 
+/*
+ * Test aliasing of SHM_ANON objects
+ */
+void
+cheritest_vm_tag_shm_open_anon_shared2x(const struct cheri_test *ctp __unused)
+{
+	void * __capability volatile * map2;
+	void * __capability c2;
+	int fd = CHERITEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR, 0600));
+	CHERITEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
+
+	map2 = CHERITEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
+		PROT_READ, MAP_SHARED, fd, 0));
+
+	/* Verify that no capability present */
+	c2 = *map2;
+	CHERITEST_VERIFY2(cheri_gettag(c2) == 0, "tag exists on first read");
+	CHERITEST_VERIFY2(c2 == NULL, "Initial read NULL");
+
+	mmap_and_check_tag_stored(fd, PROT_READ | PROT_WRITE, MAP_SHARED);
+
+	/* And now verify that it is, thanks to the aliased maps */
+	c2 = *map2;
+	CHERITEST_VERIFY2(cheri_gettag(c2) != 0, "tag lost on second read");
+	CHERITEST_VERIFY2(c2 != NULL, "Second read not NULL");
+
+	cheritest_success();
+}
+
+
 void
 cheritest_vm_tag_dev_zero_shared(const struct cheri_test *ctp __unused)
 {
