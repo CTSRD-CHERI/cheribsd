@@ -343,6 +343,7 @@ void	bzero(void * _Nonnull buf, size_t len);
 })
 void	explicit_bzero(void * _Nonnull, size_t);
 
+void	*memset(void * _Nonnull buf, int c, size_t len);
 void	*memcpy(void * _Nonnull to, const void * _Nonnull from, size_t len);
 #if !__has_feature(capabilities)
 /* Causes a compiler crash. */
