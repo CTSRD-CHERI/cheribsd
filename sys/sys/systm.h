@@ -317,12 +317,7 @@ void	hexdump(const void *ptr, int length, const char *hdr, int flags);
 
 #define ovbcopy(f, t, l) bcopy((f), (t), (l))
 void	bcopy(const void * _Nonnull from, void * _Nonnull to, size_t len);
-#define bcopy(from, to, len) ({				\
-	if (__builtin_constant_p(len) && (len) <= 64)	\
-		__builtin_memmove((to), (from), (len));	\
-	else						\
-		bcopy((from), (to), (len));		\
-})
+#define bcopy(from, to, len) __builtin_memmove((to), (from), (len))
 #if __has_feature(capabilities)
 void	bcopy_c(const void * _Nonnull __capability from,
 	    void * _Nonnull __capability to, size_t len);
@@ -335,15 +330,13 @@ void	cheri_bcopy(const void *src, void *dst, size_t len);
 #define	cheri_bcopy	bcopy
 #endif
 void	bzero(void * _Nonnull buf, size_t len);
-#define bzero(buf, len) ({				\
-	if (__builtin_constant_p(len) && (len) <= 64)	\
-		__builtin_memset((buf), 0, (len));	\
-	else						\
-		bzero((buf), (len));			\
-})
+#define bzero(buf, len) __builtin_memset((buf), 0, (len))
 void	explicit_bzero(void * _Nonnull, size_t);
+int	bcmp(const void *b1, const void *b2, size_t len);
+#define bcmp(b1, b2, len) __builtin_memcmp((b1), (b2), (len))
 
 void	*memset(void * _Nonnull buf, int c, size_t len);
+#define memset(buf, c, len) __builtin_memset((buf), (c), (len))
 void	*memcpy(void * _Nonnull to, const void * _Nonnull from, size_t len);
 #if !__has_feature(capabilities)
 /* Causes a compiler crash. */
@@ -359,6 +352,7 @@ void	*cheri_memcpy(void *dst, const void *src, size_t len);
 #define	cheri_memcpy	memcpy
 #endif
 void	*memmove(void * _Nonnull dest, const void * _Nonnull src, size_t n);
+#define memmove(dest, src, n) __builtin_memmove((dest), (src), (n))
 #if __has_feature(capabilities)
 void	*memmove_c(void * _Nonnull __capability dest,
 	    const void * _Nonnull __capability src, size_t n);
@@ -371,6 +365,8 @@ struct copy_map {
 	size_t	uoffset;
 	size_t	koffset;
 };
+int	memcmp(const void *b1, const void *b2, size_t len);
+#define memcmp(b1, b2, len) __builtin_memcmp((b1), (b2), (len))
 
 int	copystr(const void * _Nonnull __restrict kfaddr,
 	    void * _Nonnull __restrict kdaddr, size_t len,
