@@ -28,17 +28,17 @@
  *        *_process, u_endscreen.
  */
 
+#include <sys/cdefs.h>
 #include <sys/resource.h>
 #include <sys/time.h>
 
 #include <assert.h>
-#include <curses.h>
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
-#include <strings.h>
 #include <termcap.h>
 #include <time.h>
 #include <stdarg.h>
@@ -825,7 +825,7 @@ i_process(int line, char *thisline)
     p = stpcpy(base, thisline);
 
     /* zero fill the rest of it */
-    bzero(p, display_width - (p - base));
+    memset(p, 0, display_width - (p - base));
 }
 
 void
@@ -864,7 +864,7 @@ u_process(int line, char *newline)
 	optr = stpcpy(bufferline, newline);
 
 	/* zero fill the rest of it */
-	bzero(optr, display_width - (optr - bufferline));
+	memset(optr, 0, display_width - (optr - bufferline));
     }
     else
     {
@@ -1238,7 +1238,7 @@ line_update(char *old, char *new, int start, int line)
     diff = display_width - newcol;
     if (diff > 0)
     {
-	bzero(old, diff);
+	memset(old, 0, diff);
     }
 
     /* remember where the current line is */

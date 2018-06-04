@@ -4,8 +4,8 @@
 #define  MT_standout  1
 #define  MT_delayed   2
 
-#include <sys/cdefs.h>
-#include "machine.h"
+#include <sys/time.h>
+struct statics;
 
 int		 display_updatecpus(struct statics *statics);
 void	 clear_message(void);
