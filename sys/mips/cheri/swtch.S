@@ -259,10 +259,10 @@ END(cpu_throw)
  * Find the highest priority process and resume it.
  */
 NESTED(cpu_switch, CALLFRAME_SIZ, ra)
-	mfc0	t0, MIPS_COP_0_STATUS		# t0 = saved status register
+	mfc0	t1, MIPS_COP_0_STATUS		# t1 = saved status register
 	nop
 	nop
-	and     a3, t0, ~(MIPS_SR_INT_IE)	
+	and     a3, t1, ~(MIPS_SR_INT_IE)
 	mtc0	a3, MIPS_COP_0_STATUS		# Disable all interrupts
 	ITLBNOPFIX
 	cbez	$c3, mips_sw1
@@ -273,7 +273,7 @@ NESTED(cpu_switch, CALLFRAME_SIZ, ra)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, -CALLFRAME_SIZ
 	csc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
 	.mask	0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ) // XXX-AM: this is meaningless in purecap...
-	/* Do a savectx() */
+	/* Do a savectx(), note SAVE_U_PCB_CONTEXT trashes t0 */
 	SAVE_U_PCB_CONTEXT(s0, PCB_REG_S0, $c1)
 	SAVE_U_PCB_CONTEXT(s1, PCB_REG_S1, $c1)
 	SAVE_U_PCB_CONTEXT(s2, PCB_REG_S2, $c1)
@@ -284,7 +284,7 @@ NESTED(cpu_switch, CALLFRAME_SIZ, ra)
 	SAVE_U_PCB_CONTEXT(s7, PCB_REG_S7, $c1)
 	SAVE_U_PCB_CONTEXT(s8, PCB_REG_S8, $c1)
 	SAVE_U_PCB_CONTEXT(ra, PCB_REG_RA, $c1)		# save return address
-	SAVE_U_PCB_CONTEXT(t0, PCB_REG_SR, $c1)		# save status register
+	SAVE_U_PCB_CONTEXT(t1, PCB_REG_SR, $c1)		# save status register
 	SAVE_U_PCB_CONTEXT(gp, PCB_REG_GP, $c1)
 
 	/* Save pc and pcc to context */
