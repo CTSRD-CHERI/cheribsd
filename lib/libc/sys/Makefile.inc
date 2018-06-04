@@ -22,8 +22,7 @@ MIASM:=	${MIASM:S/^cheriabi_//}
 # While historically machine dependent, all architectures have the following
 # declarations in common:
 #
-NOASM=	break.o \
-	exit.o \
+NOASM=	exit.o \
 	getlogin.o \
 	sstk.o \
 	yield.o
@@ -41,6 +40,7 @@ SRCS+=	\
 
 SRCS+= getdents.c lstat.c mknod.c stat.c
 
+SRCS+= brk.c
 SRCS+= pipe.c
 SRCS+= vadvise.c
 

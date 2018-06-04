@@ -37,6 +37,10 @@ FBSDprivate_1.0 {
 	signalcontext;
 	_signalcontext;
 	__siglongjmp;
+	__sys_vfork;
+	_vfork;
+	_brk;
+	_sbrk;
 
 	/*
 	 * XXX-BD: Export .size.<var> symbols for <var>'s that are undefined
