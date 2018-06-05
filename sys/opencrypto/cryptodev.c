@@ -930,7 +930,8 @@ cryptodev_aead(
 		goto bail;
 
 	if ((error = copyin_c(__USER_CAP(caead->src, caead->len),
-	    (char *)cse->uio.uio_iov[0].iov_base + caead->aadlen, caead->len)))
+	    (char * __capability)cse->uio.uio_iov[0].iov_base + caead->aadlen,
+	    caead->len)))
 		goto bail;
 
 	/*
@@ -1023,11 +1024,12 @@ again:
 	}
 
 	if (caead->dst && (error = copyout_c(
-	    (caddr_t)cse->uio.uio_iov[0].iov_base + caead->aadlen,
+	    (char * __capability)cse->uio.uio_iov[0].iov_base + caead->aadlen,
 	    __USER_CAP(caead->dst, cse->thash->hashsize), caead->len)))
 		goto bail;
 
-	if ((error = copyout_c((caddr_t)cse->uio.uio_iov[0].iov_base +
+	if ((error = copyout_c(
+	    (char * __capability)cse->uio.uio_iov[0].iov_base +
 	    caead->aadlen + caead->len,
 	    __USER_CAP(caead->tag, cse->thash->hashsize),
 	    cse->thash->hashsize)))
