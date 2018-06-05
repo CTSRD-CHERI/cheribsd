@@ -381,7 +381,14 @@ char *access_name[] = {
 #include <machine/octeon_cop2.h>
 #endif
 
-static int allow_unaligned_acc = 1;
+/*
+ * Unaligned access handling is completely broken if the trap happens in a
+ * CHERI instructions. Since we are now running lots of CHERI purecap code and
+ * the LLVM branch delay slot filler actually fills CHERI delay slots, having
+ * this on by default makes it really hard to debug where something is going
+ * wrong since we will just die with a completely unrelated exception later.
+ */
+static int allow_unaligned_acc = 0;
 
 SYSCTL_INT(_vm, OID_AUTO, allow_unaligned_acc, CTLFLAG_RW,
     &allow_unaligned_acc, 0, "Allow unaligned accesses");
@@ -1338,6 +1345,7 @@ trapDump(char *msg)
  * Return the resulting PC as if the branch was executed.
  *
  * XXXRW: What about CHERI branch instructions?
+ * XXXAR: This needs to be fixed for cbez/cbnz/cbtu/cbts/cjalr/cjr/ccall_fast
  */
 uintptr_t
 MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
