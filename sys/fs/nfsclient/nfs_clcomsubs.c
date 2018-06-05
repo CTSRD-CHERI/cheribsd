@@ -338,11 +338,11 @@ nfsm_uiombuf(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 struct mbuf *
 nfsm_uiombuflist(struct uio *uiop, int siz, struct mbuf **mbp, char **cpp)
 {
-	char *uiocp;
+	char * __capability uiocp;
 	struct mbuf *mp, *mp2, *firstmp;
 	int xfer, left, mlen;
 	int uiosiz, clflg, rem;
-	char *cp, *tcp;
+	char *cp;
 
 	KASSERT(uiop->uio_iovcnt == 1, ("nfsm_uiotombuf: iovcnt != 1"));
 
@@ -377,10 +377,11 @@ nfsm_uiombuflist(struct uio *uiop, int siz, struct mbuf **mbp, char **cpp)
 			}
 			xfer = (left > mlen) ? mlen : left;
 			if (uiop->uio_segflg == UIO_SYSSPACE)
-				NFSBCOPY(uiocp, NFSMTOD(mp, caddr_t) +
-				    mbuf_len(mp), xfer);
+				NFSBCOPY((__cheri_fromcap char *)uiocp,
+				    NFSMTOD(mp, caddr_t) + mbuf_len(mp), xfer);
 			else
-				copyin(uiocp, NFSMTOD(mp, caddr_t) +
+				copyin_c(uiocp,
+				    (__cheri_tocap char * __capability)NFSMTOD(mp, caddr_t) +
 				    mbuf_len(mp), xfer);
 			mbuf_setlen(mp, mbuf_len(mp) + xfer);
 			left -= xfer;
@@ -388,10 +389,7 @@ nfsm_uiombuflist(struct uio *uiop, int siz, struct mbuf **mbp, char **cpp)
 			uiop->uio_offset += xfer;
 			uiop->uio_resid -= xfer;
 		}
-		tcp = (char *)uiop->uio_iov->iov_base;
-		tcp += uiosiz;
-		uiop->uio_iov->iov_base = (void *)tcp;
-		uiop->uio_iov->iov_len -= uiosiz;
+		IOVEC_ADVANCE(uiop->uio_iov, uiosiz);
 		siz -= uiosiz;
 	}
 	if (rem > 0) {
