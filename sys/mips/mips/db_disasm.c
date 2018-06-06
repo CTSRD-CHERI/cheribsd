@@ -146,20 +146,128 @@ static const char *cheri_flow_control_opname[16] = {
 	"cjr", "invalid", "invalid", "invalid",
 	"ctoptr", "cgetoffset", "invalid", "invalid"
 };
-static const char *cheri_cap_inspect_opname[8] = {
-	"cgetperm", "cgettype", "cgetbase", "cgetlen",
-	"cgetcause", "cgettag", "cgetsealed", "cgetpcc"
-};
+
 static const char *cheri_cap_modify_name[8] = {
 	"candperm", "invalid", "invalid", "invalid",
 	"invalid", "ccleartag", "invalid", "cfromptr"
 };
+
+enum CheriOperandType {
+	COPT_UNKNOWN,	/* Unknown register kind (for undefined instrs) */
+	COPT_GPR,	/* General-purpose integer register */
+	COPT_CAP,	/* General-purpose capability register */
+	COPT_OTHER,	/* Other register kind (e.g. special cap hwregs) */
+	COPT_NONE,	/* Do not print another operand */
+};
+
+struct cheri_operand_info {
+	const char* name;
+	enum CheriOperandType op1_type;
+	enum CheriOperandType op2_type;
+	enum CheriOperandType op3_type;
+};
+
+static struct cheri_operand_info cheri_three_op_info[64] = {
+	/* 0x00 */ {"cgetperm (old)", COPT_GPR, COPT_CAP },
+	/* 0x01 */ {"cgettype (old)", COPT_GPR, COPT_CAP },
+	/* 0x02 */ {"cgetbase (old)", COPT_GPR, COPT_CAP },
+	/* 0x03 */ {"cgetlen (old)", COPT_GPR, COPT_CAP },
+	/* 0x04 */ {"cgetcause (old)", COPT_GPR, COPT_NONE },
+	/* 0x05 */ {"cgettag (old)", COPT_GPR, COPT_CAP },
+	/* 0x06 */ {"cgetsealed (old)", COPT_GPR, COPT_CAP },
+	/* 0x07 */ {"cgetpcc (old)", COPT_CAP, COPT_NONE },
+
+	/* 0x08 */ {"csetbounds", COPT_CAP, COPT_CAP, COPT_GPR },
+	/* 0x09 */ {"csetboundsexact", COPT_CAP, COPT_CAP, COPT_GPR },
+	/* 0x0a */ {"csub", COPT_GPR, COPT_CAP, COPT_CAP },
+	/* 0x0b */ {"cseal", COPT_CAP, COPT_CAP, COPT_CAP },
+	/* 0x0c */ {"cunseal", COPT_CAP, COPT_CAP, COPT_CAP },
+	/* 0x0d */ {"candperm", COPT_CAP, COPT_CAP, COPT_GPR },
+	/* 0x0e */ {"invalid", COPT_UNKNOWN, COPT_UNKNOWN, COPT_UNKNOWN },
+	/* 0x0f */ {"csetoffset", COPT_CAP, COPT_CAP, COPT_GPR },
+
+	/* 0x10 */ {"invalid", COPT_UNKNOWN, COPT_UNKNOWN, COPT_UNKNOWN },
+	/* 0x11 */ {"cincoffset", COPT_CAP, COPT_CAP, COPT_GPR },
+	/* 0x12 */ {"ctoptr", COPT_GPR, COPT_CAP, COPT_CAP },
+	/* 0x13 */ {"cfromptr", COPT_CAP, COPT_CAP, COPT_GPR },
+	/* 0x14 */ {"ceq", COPT_GPR, COPT_CAP, COPT_GPR },
+	/* 0x15 */ {"cne", COPT_GPR, COPT_CAP, COPT_GPR },
+	/* 0x16 */ {"clt", COPT_GPR, COPT_CAP, COPT_GPR },
+	/* 0x17 */ {"cle", COPT_GPR, COPT_CAP, COPT_GPR },
+
+	/* 0x18 */ {"cltu", COPT_GPR, COPT_CAP, COPT_GPR },
+	/* 0x19 */ {"cleu", COPT_GPR, COPT_CAP, COPT_GPR },
+	/* 0x1a */ {"cexeq", COPT_GPR, COPT_CAP, COPT_GPR },
+	/* 0x1b */ {"cmovn", COPT_CAP, COPT_CAP, COPT_GPR },
+	/* 0x1c */ {"cmovz", COPT_CAP, COPT_CAP, COPT_GPR },
+	/* 0x00 */ {"cbuildcap", COPT_CAP, COPT_CAP, COPT_CAP },
+	/* 0x00 */ {"ccopytype", COPT_CAP, COPT_CAP, COPT_CAP },
+	/* 0x1f */ {"ccseal", COPT_CAP, COPT_CAP, COPT_CAP },
+
+	/* 0x20 */ {"ctestsubset", COPT_GPR, COPT_CAP, COPT_CAP },
+	/* 0x21 */ {"cnexeq", COPT_GPR, COPT_CAP, COPT_CAP },
+};
+
+static struct cheri_operand_info cheri_two_op_info[32] = {
+	/* 0x00 */ { "cgetperm", COPT_GPR, COPT_CAP },
+	/* 0x01 */ { "cgettype", COPT_GPR, COPT_CAP },
+	/* 0x02 */ { "cgetbase", COPT_GPR, COPT_CAP },
+	/* 0x03 */ { "cgetlen", COPT_GPR, COPT_CAP },
+	/* 0x04 */ { "cgettag", COPT_GPR, COPT_CAP },
+	/* 0x05 */ { "cgetsealed", COPT_GPR, COPT_CAP },
+	/* 0x06 */ { "cgetoffset", COPT_GPR, COPT_CAP },
+	/* 0x07 */ { "cgetpccsetoffset", COPT_CAP, COPT_GPR },
+
+	/* 0x08 */ { "ccheckperm", COPT_CAP, COPT_GPR },
+	/* 0x09 */ { "cchecktype", COPT_CAP, COPT_GPR },
+	/* 0x0a */ { "cmove", COPT_CAP, COPT_CAP },
+	/* 0x0b */ { "ccleartag", COPT_CAP, COPT_CAP },
+	/* 0x0c */ { "cjalr", COPT_CAP, COPT_CAP },
+	/* 0x0d */ { "creadhwr", COPT_CAP, COPT_OTHER },
+	/* 0x0e */ { "cwritehwr", COPT_CAP, COPT_OTHER },
+	/* 0x0f */ { "cgetaddr", COPT_GPR, COPT_CAP },
+};
+
+static struct cheri_operand_info cheri_one_op_info[32] = {
+	/* 0x00 */ { "cgetpcc", COPT_CAP },
+	/* 0x01 */ { "cgetcause", COPT_GPR },
+	/* 0x02 */ { "csetcause", COPT_GPR },
+	/* 0x03 */ { "cjr", COPT_CAP },
+	/* 0x04 */ { "cgetcid", COPT_GPR },
+	/* 0x05 */ { "csetcid", COPT_GPR },
+};
+
 static const char *c2_reg[32] = {
-	"ddc/c0", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9",
+	"ddc/cnull", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9",
 	"c10", "c11", "c12", "c13", "c14", "c15", "c16", "c17", "c18", "c19",
 	"c20", "c21", "c22", "c23", "c24", "c25", "idc/c26", "kr1c/c27",
 	"kr2c/c28", "kcc/c29", "kdc/c30", "epcc/c31"
 };
+
+static const char *unknown_reg_names[32] = {
+	"$0", "$1", "$2", "$3", "$4", "$5", "$6", "$7",
+	"$8", "$9", "$10", "$11", "$12", "$13", "$14", "$15",
+	"$16", "$17", "$18", "$19", "$20", "$21", "$22", "$23",
+	"$24", "$25", "$26", "$27", "$28", "$29", "$30", "$31"
+};
+
+static const char*
+cheri_operand_to_str(enum CheriOperandType type, unsigned regno)
+{
+	KASSERT(regno <= 31,
+	    ("invalid regno %d, corrupted disasm state?", regno));
+	switch (type) {
+	case COPT_GPR:
+		return (reg_name[regno]);
+	case COPT_CAP:
+		return (c2_reg[regno]);
+	case COPT_NONE:
+		return ("(no-operand)");
+	default:
+		return (unknown_reg_names[regno]);
+	}
+}
+
 #endif /* CPU_CHERI */
 
 static int md_printins(int ins, int mdbdot);
@@ -178,6 +286,7 @@ db_disasm(db_addr_t loc, bool altfmt)
 
 	return (loc + sizeof(int));
 }
+
 
 /* ARGSUSED */
 static int
@@ -298,59 +407,74 @@ md_printins(int ins, int mdbdot)
 		int ops = -1;
 		const char *opcode = NULL;
 		const char *operands[3] = { 0 };
+		struct cheri_operand_info* op_info = NULL;
 		switch (i.CType.fmt) {
 		case 0:
-			opcode = cheri_cap_inspect_opname[i.CType.fmt2];
-			if (i.CType.fmt2 == OP_CHERI_CGETPCC) {
-				ops = 1;
-				operands[0] = c2_reg[i.CType.r2];
-			} else if (i.CType.fmt2 == OP_CHERI_CGETCAUSE) {
-				ops = 1;
-				operands[0] = reg_name[i.CType.r1];
-			} else {
+			if (i.CType.func != 0x3f) {
+				/* Three operand instruction */
+				ops = 3;
+				op_info = &cheri_three_op_info[i.CType.func];
+			} else if (i.CType.r3 != 0x1f) {
+				/* Two operands instruction */
 				ops = 2;
-				operands[0] = reg_name[i.CType.r1];
-				operands[1] = c2_reg[i.CType.r2];
+				op_info = &cheri_two_op_info[i.CType.r3];
+			} else {
+				/* One operand instruction */
+				ops = 1;
+				op_info = &cheri_one_op_info[i.CType.r2];
 			}
+			opcode = op_info->name;
+			if (!opcode)
+				opcode = "invalid";
+
+			if (ops >= 3)
+				operands[2] = cheri_operand_to_str(
+				    op_info->op3_type, i.CType.r3);
+			if (ops >= 2)
+				operands[1] = cheri_operand_to_str(
+				    op_info->op2_type, i.CType.r2);
+			if (ops >= 1)
+				operands[0] = cheri_operand_to_str(
+				    op_info->op1_type, i.CType.r1);
 			break;
 		case 3:
 			ops = 3;
-			opcode = cheri_flow_control_opname[i.CType.fmt];
+			opcode = cheri_flow_control_opname[i.CTypeOld.fmt];
 			operands[0] = c2_reg[i.CType.r1];
 			operands[1] = c2_reg[i.CType.r2];
 			operands[2] = c2_reg[i.CType.r3];
 			break;
 		case 4:
-			opcode = cheri_cap_modify_name[i.CType.fmt2];
-			if (i.CType.fmt2 == 5) {
+			opcode = cheri_cap_modify_name[i.CTypeOld.fmt2];
+			if (i.CTypeOld.fmt2 == 5) {
 				ops = 0;
-			} else if (i.CType.fmt2 == 7) {
+			} else if (i.CTypeOld.fmt2 == 7) {
 				ops = 3;
-				operands[0] = c2_reg[i.CType.r1];
-				operands[1] = c2_reg[i.CType.r2];
-				operands[2] = reg_name[i.CType.r3];
+				operands[0] = c2_reg[i.CTypeOld.r1];
+				operands[1] = c2_reg[i.CTypeOld.r2];
+				operands[2] = reg_name[i.CTypeOld.r3];
 			} else {
 				ops = 3;
-				operands[0] = reg_name[i.CType.r1];
-				operands[1] = c2_reg[i.CType.r2];
+				operands[0] = reg_name[i.CTypeOld.r1];
+				operands[1] = c2_reg[i.CTypeOld.r2];
 			}
 			break;
 		case 5:
 			ops = 2;
-			opcode = cheri_flow_control_opname[i.CType.fmt];
-			operands[0] = c2_reg[i.CType.r1];
-			operands[1] = c2_reg[i.CType.r2];
+			opcode = cheri_flow_control_opname[i.CTypeOld.fmt];
+			operands[0] = c2_reg[i.CTypeOld.r1];
+			operands[1] = c2_reg[i.CTypeOld.r2];
 			break;
 		case 6:
 			ops = 0;
-			opcode = cheri_flow_control_opname[i.CType.fmt];
+			opcode = cheri_flow_control_opname[i.CTypeOld.fmt];
 			break;
 		case 7:
 		case 8:
 			ops = 2;
-			opcode = cheri_flow_control_opname[i.CType.fmt];
-			operands[0] = c2_reg[i.CType.r2];
-			operands[1] = reg_name[i.CType.r3];
+			opcode = cheri_flow_control_opname[i.CTypeOld.fmt];
+			operands[0] = c2_reg[i.CTypeOld.r2];
+			operands[1] = reg_name[i.CTypeOld.r3];
 			break;
 		case 9:
 			db_printf("cbtu\t%s,", c2_reg[i.BC2FType.cd]);
@@ -358,18 +482,21 @@ md_printins(int ins, int mdbdot)
 		case 10:
 			db_printf("cbts\t%s,", c2_reg[i.BC2FType.cd]);
 			goto pr_displ;
+		case 11:
+			db_printf("cbez\t%s,", c2_reg[i.BC2FType.cd]);
+			goto pr_displ;
 		case 12:
-			ops = 3;
-			opcode = cheri_flow_control_opname[i.CType.fmt];
-			operands[0] = reg_name[i.CType.r1];
-			operands[1] = c2_reg[i.CType.r2];
-			operands[2] = c2_reg[i.CType.r3];
-			break;
+			db_printf("cbnz\t%s,", c2_reg[i.BC2FType.cd]);
+			goto pr_displ;
 		case 13:
 			ops = 2;
-			opcode = cheri_flow_control_opname[i.CType.fmt];
-			operands[0] = reg_name[i.CType.r1];
-			operands[1] = c2_reg[i.CType.r2];
+			opcode = cheri_flow_control_opname[i.CTypeOld.fmt];
+			operands[0] = reg_name[i.CTypeOld.r1];
+			operands[1] = c2_reg[i.CTypeOld.r2];
+			break;
+		default:
+			ops = 0;
+			opcode = "<unknown inst>";
 			break;
 		}
 
@@ -388,7 +515,7 @@ md_printins(int ins, int mdbdot)
 					operands[2]);
 			break;
 		default:
-			db_printf("unknown COP2 opcode (fmt %d, fmt2 %d)", i.CType.fmt, i.CType.fmt2);
+			db_printf("unknown COP2 opcode (fmt %d, func %d)", i.CType.fmt, i.CType.func);
 			break;
 		}
 	}
