@@ -388,7 +388,7 @@ char *access_name[] = {
  * this on by default makes it really hard to debug where something is going
  * wrong since we will just die with a completely unrelated exception later.
  */
-static int allow_unaligned_acc = 0;
+static int allow_unaligned_acc = 1;
 
 SYSCTL_INT(_vm, OID_AUTO, allow_unaligned_acc, CTLFLAG_RW,
     &allow_unaligned_acc, 0, "Allow unaligned accesses");
@@ -1493,7 +1493,10 @@ MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
 		break;
 
 	default:
-		retAddr = instPC + 4;
+		printf("Unhandled opcode in %s: 0x%x\n", __func__, inst.word);
+		/* retAddr = instPC + 4;  */
+		/* Return to NULL to force a crash in the user program */
+		retAddr = 0;
 	}
 	return (retAddr);
 }
