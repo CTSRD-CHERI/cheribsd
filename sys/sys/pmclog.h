@@ -42,7 +42,7 @@ enum pmclog_type {
 	PMCLOG_TYPE_CLOSELOG = 1,
 	PMCLOG_TYPE_DROPNOTIFY = 2,
 	PMCLOG_TYPE_INITIALIZE = 3,
-	PMCLOG_TYPE_MAPPINGCHANGE = 4, /* unused in v1 */
+
 	PMCLOG_TYPE_PMCALLOCATE = 5,
 	PMCLOG_TYPE_PMCATTACH = 6,
 	PMCLOG_TYPE_PMCDETACH = 7,
@@ -94,10 +94,13 @@ enum pmclog_type {
  */
 
 #define	PMCLOG_ENTRY_HEADER				\
-	uint32_t		pl_header;		\
-	uint32_t		pl_ts_sec;		\
-	uint32_t		pl_ts_nsec;
+	uint32_t		pl_header;			\
+	uint32_t		pl_spare;			\
+	uint64_t		pl_tsc;			\
 
+struct pmclog_header {
+	PMCLOG_ENTRY_HEADER;
+};
 
 /*
  * The following structures are used to describe the size of each kind
@@ -115,7 +118,6 @@ struct pmclog_callchain {
 	uint32_t		pl_tid;
 	uint32_t		pl_pmcid;
 	uint32_t		pl_cpuflags;
-	uint32_t		pl_cpuflags2;
 	/* 8 byte aligned */
 	/*
 	 * XXXAR: not sure whether this actually needs to be a valid cap.
@@ -131,25 +133,25 @@ struct pmclog_callchain {
 
 struct pmclog_closelog {
 	PMCLOG_ENTRY_HEADER
-	uint32_t		pl_pad;
 };
 
 struct pmclog_dropnotify {
 	PMCLOG_ENTRY_HEADER
-	uint32_t		pl_pad;
 };
 
 struct pmclog_initialize {
 	PMCLOG_ENTRY_HEADER
 	uint32_t		pl_version;	/* driver version */
 	uint32_t		pl_cpu;		/* enum pmc_cputype */
-	uint32_t		pl_pad;
+	uint64_t		pl_tsc_freq;
+	struct timespec	pl_ts;
 	char			pl_cpuid[PMC_CPUID_LEN];
 } __packed;
 
 struct pmclog_map_in {
 	PMCLOG_ENTRY_HEADER
 	uint32_t		pl_pid;
+	uint32_t		pl_pad;
 	uintfptr_t		pl_start;	/* 8 byte aligned */
 	char			pl_pathname[PATH_MAX];
 } __packed;
@@ -157,6 +159,7 @@ struct pmclog_map_in {
 struct pmclog_map_out {
 	PMCLOG_ENTRY_HEADER
 	uint32_t		pl_pid;
+	uint32_t		pl_pad;
 	uintfptr_t		pl_start;	/* 8 byte aligned */
 	uintfptr_t		pl_end;
 } __packed;
@@ -166,6 +169,7 @@ struct pmclog_pmcallocate {
 	uint32_t		pl_pmcid;
 	uint32_t		pl_event;
 	uint32_t		pl_flags;
+	uint32_t		pl_pad;
 	uint64_t		pl_rate;
 } __packed;
 
@@ -173,7 +177,6 @@ struct pmclog_pmcattach {
 	PMCLOG_ENTRY_HEADER
 	uint32_t		pl_pmcid;
 	uint32_t		pl_pid;
-	uint32_t		pl_pad;
 	char			pl_pathname[PATH_MAX];
 } __packed;
 
@@ -181,30 +184,28 @@ struct pmclog_pmcdetach {
 	PMCLOG_ENTRY_HEADER
 	uint32_t		pl_pmcid;
 	uint32_t		pl_pid;
-	uint32_t		pl_pad;
 } __packed;
 
 struct pmclog_proccsw {
 	PMCLOG_ENTRY_HEADER
-	uint32_t		pl_pmcid;
 	uint64_t		pl_value;	/* keep 8 byte aligned */
+	uint32_t		pl_pmcid;
 	uint32_t		pl_pid;
 	uint32_t		pl_tid;
+	uint32_t		pl_pad;
 } __packed;
 
 struct pmclog_proccreate {
 	PMCLOG_ENTRY_HEADER
 	uint32_t		pl_pid;
 	uint32_t		pl_flags;
-	uint32_t		pl_pad;
-	uint64_t		pl_pcomm[MAXCOMLEN+1];	/* keep 8 byte aligned */
+	char			pl_pcomm[MAXCOMLEN+1];	/* keep 8 byte aligned */
 } __packed;
 
 struct pmclog_procexec {
 	PMCLOG_ENTRY_HEADER
 	uint32_t		pl_pid;
 	uint32_t		pl_pmcid;
-	uint32_t		pl_pad;
 	uintfptr_t		pl_start;	/* keep 8 byte aligned */
 	char			pl_pathname[PATH_MAX];
 } __packed;
@@ -213,7 +214,6 @@ struct pmclog_procexit {
 	PMCLOG_ENTRY_HEADER
 	uint32_t		pl_pmcid;
 	uint32_t		pl_pid;
-	uint32_t		pl_pad;
 	uint64_t		pl_value;	/* keep 8 byte aligned */
 } __packed;
 
@@ -221,12 +221,12 @@ struct pmclog_procfork {
 	PMCLOG_ENTRY_HEADER
 	uint32_t		pl_oldpid;
 	uint32_t		pl_newpid;
-	uint32_t		pl_pad;
 } __packed;
 
 struct pmclog_sysexit {
 	PMCLOG_ENTRY_HEADER
 	uint32_t		pl_pid;
+	uint32_t		pl_pad;
 } __packed;
 
 struct pmclog_threadcreate {
@@ -234,17 +234,20 @@ struct pmclog_threadcreate {
 	uint32_t		pl_tid;
 	uint32_t		pl_pid;
 	uint32_t		pl_flags;
-	uint64_t		pl_tdname[MAXCOMLEN+1];	/* keep 8 byte aligned */
+	uint32_t		pl_pad;
+	char			pl_tdname[MAXCOMLEN+1];	/* keep 8 byte aligned */
 } __packed;
 
 struct pmclog_threadexit {
 	PMCLOG_ENTRY_HEADER
 	uint32_t		pl_tid;
+	uint32_t		pl_pad;
 } __packed;
 
 struct pmclog_userdata {
 	PMCLOG_ENTRY_HEADER
 	uint32_t		pl_userdata;
+	uint32_t		pl_pad;
 } __packed;
 
 struct pmclog_pmcallocatedyn {
@@ -252,6 +255,7 @@ struct pmclog_pmcallocatedyn {
 	uint32_t		pl_pmcid;
 	uint32_t		pl_event;
 	uint32_t		pl_flags;
+	uint32_t		pl_pad;
 	char			pl_evname[PMC_NAME_MAX];
 } __packed;
 
