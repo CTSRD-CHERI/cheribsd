@@ -239,10 +239,6 @@ SUBDIR+=	libmalloc_simple
 SUBDIR+=	libcheri_syscalls
 SUBDIR+=	libcheri_support
 SUBDIR_BOOTSTRAP:=	libgcc_s libgcc_eh ${SUBDIR_BOOTSTRAP}
-
-# libstand is for bootloaders and the like, no need to build
-# pure-capablity yet.
-SUBDIR:=	${SUBDIR:Nlibstand}
 .endif
 
 .include <bsd.subdir.mk>
