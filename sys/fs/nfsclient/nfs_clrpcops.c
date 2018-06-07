@@ -5550,7 +5550,7 @@ nfscl_doiods(vnode_t vp, struct uio *uiop, int *iomode, int *must_commit,
 	int eof, error, firstmirror, i, iolaymode, mirrorcnt, recalled;
 	void *lckp;
 	uint8_t *dev;
-	void *iovbase;
+	void * __capability iovbase;
 	size_t iovlen;
 	off_t offs;
 	ssize_t resid;
