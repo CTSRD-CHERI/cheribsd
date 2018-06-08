@@ -217,12 +217,21 @@ _C_LABEL(x): ;					\
 	.type	_C_LABEL(x),@function;	\
 _C_LABEL(x):
 
+
 /*
  * END
  *	Mark end of a procedure.
  */
 #define	END(x)			\
 	.end _C_LABEL(x)
+
+/*
+ * END
+ *	Mark end of an alternate entry point.
+ */
+#define	XEND(x)				\
+	.size _C_LABEL(x), . - _C_LABEL(x)
+
 
 /*
  * IMPORT -- import external symbol
