@@ -289,8 +289,13 @@ CRUNCH_PROGS_usr.sbin+= \
 		usbconfig \
 		watch
 
+
+# Also build mount_smb for QEMU user-mode smb shares:
+CRUNCH_PROGS_usr.sbin+=	mount_smbfs
+CRUNCH_LIBS+=	-lsmb
+
 # TODO: (not sure how to make this work because -lnetbsd is marked as internallib
-# so it will give a linker error
+# so it will give a linker error)
 # TODO: maybe just add the c files needed from libnetbsd?
 # Or maybe we don't actually need mtree which would be even better
 # CRUNCH_SRCDIRS+=nmtree
