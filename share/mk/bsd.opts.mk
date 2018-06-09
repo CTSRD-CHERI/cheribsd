@@ -73,7 +73,6 @@ __DEFAULT_YES_OPTIONS+= \
 
 __DEFAULT_NO_OPTIONS = \
     CCACHE_BUILD \
-    CHERIBSDBOX \
     CTF \
     INSTALL_AS_USER \
     STALE_STAGED
@@ -84,6 +83,7 @@ __DEFAULT_NO_OPTIONS+= \
     CHERI_SHARED_PROG \
     CHERI128 \
     CHERI256 \
+    CHERIBSDBOX \
     DEMO_VULNERABILITIES
 
 __DEFAULT_DEPENDENT_OPTIONS = \
@@ -117,6 +117,9 @@ MK_LLVM_LIBUNWIND:=	yes
 # GROFF is broken when building WITH_CHERI_PURE and it will be removed
 # soon anyway
 MK_GROFF:=	no
+# Build cheribsdbox by default so that we have a emergency MIPS tool if the
+# CHERI world is broken
+MK_CHERIBSDBOX:=	yes
 .else
 MK_CHERI:=	no
 .endif
