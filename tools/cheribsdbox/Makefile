@@ -12,6 +12,8 @@ BINDIR?=${CHERIBSDBOX_DIR}
 # We want to build all these tools as statically linked MIPS binaries to save size
 WANT_CHERI=		none
 CRUNCH_BUILDOPTS+=	WANT_CHERI=none -DWITHOUT_TESTS MK_TESTS=no
+# Avoid linking against libcasper for tcpdump/traceroute/kdump:
+CRUNCH_BUILDOPTS+=	-DWITHOUT_CASPER MK_CASPER=no
 
 # Do not do hardlinks as part of the install since we want to be able to install
 # this without conflicting with the real binaries and instead do some mtree
@@ -66,12 +68,6 @@ CRUNCH_LIBS+=	-llzma
 CRUNCH_LIBS+=	-larchive
 # ktrace:
 CRUNCH_LIBS+=	-lsysdecode
-
-# Avoid linking against libcasper for tcpdump/traceroute/kdump:
-CRUNCH_BUILDOPTS_tcpdump= -DWITHOUT_CASPER MK_CASPER=no
-CRUNCH_BUILDOPTS_traceroute= -DWITHOUT_CASPER MK_CASPER=no
-CRUNCH_BUILDOPTS_traceroute6= -DWITHOUT_CASPER MK_CASPER=no
-CRUNCH_BUILDOPTS_kdump= -DWITHOUT_CASPER MK_CASPER=no
 
 # login/su (could theoretically use static_libpam but that will probably not work)
 CRUNCH_SHLIBS+= -lpam -lbsm
