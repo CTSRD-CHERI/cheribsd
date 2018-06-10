@@ -187,6 +187,7 @@ CRUNCH_LIBS+=	-lbz2
 CRUNCH_PROGS_usr.bin+= \
 		basename \
 		bzip2 \
+		diff \
 		dirname \
 		fetch \
 		find \
