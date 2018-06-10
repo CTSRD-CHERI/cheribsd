@@ -20,4 +20,10 @@ void	show_help(void);
 char	*kill_procs(char *str);
 char	*renice_procs(char *str);
 
+struct command {
+	char c;
+	const char * const desc;
+	bool available_to_dumb;
+};
+
 #endif /* COMMANDS_H */
