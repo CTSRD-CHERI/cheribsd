@@ -63,6 +63,7 @@ CRUNCH_SHLIBS+=	-lz
 
 # grep/tar/xz
 CRUNCH_LIBS+=	-llzma
+CRUNCH_LIBS+=	-larchive
 # ktrace:
 CRUNCH_LIBS+=	-lsysdecode
 
@@ -228,6 +229,7 @@ CRUNCH_PROGS_usr.bin+= \
 		seq \
 		sockstat \
 		tail \
+		tar \
 		tee \
 		tftp \
 		time \
@@ -242,9 +244,10 @@ CRUNCH_PROGS_usr.bin+= \
 		which \
 		xargs
 
-CRUNCH_ALIAS_bzip2= bunzip2
-CRUNCH_ALIAS_hexdump= hd od
-CRUNCH_ALIAS_w= uptime
+CRUNCH_ALIAS_bzip2=	bunzip2
+CRUNCH_ALIAS_tar=	bsdtar
+CRUNCH_ALIAS_hexdump=	hd od
+CRUNCH_ALIAS_w=	uptime
 CRUNCH_PROGS_usr.bin+=su
 
 # FIXME: wait -> usr.bin/alias (but that is just a script so how to add
