@@ -323,6 +323,9 @@ CRUNCH_LIBS+=	${LIBNETBSD}
 # TODO: do we need ctsrd/bin/wr?
 
 
+
+
+
 ##################################################################
 
 CRUNCH_SRCDIRS+= libexec
@@ -330,6 +333,47 @@ CRUNCH_PROGS_libexec+=	getty
 # from sshd: usr/libexec/sftp-server
 
 
+##### sshd, ssh, scp: #####
+# TODO: should we build a separate binary for these programs?
+
+CRUNCH_SRCDIRS+= secure/usr.sbin
+CRUNCH_PROGS_secure/usr.sbin+=	sshd
+# TODO: should we link libssh static and use ${LIBSSH}?
+CRUNCH_SHLIBS+=	-lpam -lutil
+
+# Build ssh deps static?
+CRUNCH_LIBS+=	${LIBSSH}
+.if ${MK_LDNS} != "no"
+# needed by LIBSSH
+CRUNCH_LIBS+=	${LIBLDNS}
+.endif
+
+
+CRUNCH_SRCDIRS+= secure/usr.bin
+CRUNCH_PROGS_secure/usr.bin+=	scp sftp ssh ssh-keygen
+
+CRUNCH_SRCDIRS+= secure/libexec
+CRUNCH_PROGS_secure/libexec+=	sftp-server
+
+# Disable all optional SSH features to make sshd,scp,ssh as small as possible
+DISABLE_OPTIONAL_SSH_FEATURES+=	\
+	MK_AUDIT=no \
+	MK_BLACKLIST_SUPPORT=no \
+	MK_TCP_WRAPPERS=no
+# Kerberos support uses up way too much space on our minimal images:
+# so let's build sshd without it
+DISABLE_OPTIONAL_SSH_FEATURES+=MK_KERBEROS_SUPPORT=no
+# TODO: would be nice to add CRUNCH_BUILDOPTS+=	MK_LDNS=no
+# However, libprivatessh links against ldns so we can't skip it
+
+CRUNCH_BUILDOPTS_sshd+=${DISABLE_OPTIONAL_SSH_FEATURES}
+CRUNCH_BUILDOPTS_scp+=${DISABLE_OPTIONAL_SSH_FEATURES}
+CRUNCH_BUILDOPTS_ssh+=${DISABLE_OPTIONAL_SSH_FEATURES}
+CRUNCH_BUILDOPTS_ssh-keygen+=${DISABLE_OPTIONAL_SSH_FEATURES}
+CRUNCH_BUILDOPTS_sftp-server+=${DISABLE_OPTIONAL_SSH_FEATURES}
+
+
+### END programs ####
 
 # Generate an mtree file to be used when building the FPGA images
 # I'm not sure how to add hardlinks to makefs without actually writing the
@@ -354,6 +398,12 @@ INSTALLDIR_usr.sbin=/usr/sbin
 LINKPATH_usr.sbin:=../../${PROG}
 INSTALLDIR_libexec=/usr/libexec
 LINKPATH_libexec:=../../${PROG}
+INSTALLDIR_secure/usr.sbin=/usr/sbin
+LINKPATH_secure/usr.sbin:=../../${PROG}
+INSTALLDIR_secure/usr.bin=/usr/bin
+LINKPATH_secure/usr.bin:=../../${PROG}
+INSTALLDIR_secure/libexec=/usr/libexec
+LINKPATH_secure/libexec:=../../${PROG}
 
 cheribsdbox.mtree: Makefile
 	echo '#mtree 2.0' > ${.TARGET}
