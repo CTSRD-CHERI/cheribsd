@@ -120,6 +120,19 @@ CRUNCH_PROGS_bin+=	cat \
 
 CRUNCH_ALIAS_test=	[
 
+# Su doesn't work with cheribsdbox bin/sh and bin/csh because it sets argv[0]
+# and then cheribsdbox thinks it should execute _su
+CRUNCH_SUPPRESS_LINK_sh=	1
+CRUNCH_BUILDTOOLS+=	bin/sh
+CRUNCH_PROGS_bin+=	sh
+# For now don't include csh
+.if 0
+CRUNCH_ALIAS_sh=	-sh
+CRUNCH_BUILDTOOLS+=	bin/csh
+CRUNCH_ALIAS_csh=	-csh tcsh -tcsh
+.endif
+
+
 ###################################################################
 # Programs from standard /sbin
 #
@@ -227,17 +240,7 @@ CRUNCH_PROGS_usr.bin+= \
 CRUNCH_ALIAS_bzip2= bunzip2
 CRUNCH_ALIAS_hexdump= hd od
 CRUNCH_ALIAS_w= uptime
-
-# Su breaks bin/sh and bin/csh because it sets argv[0] and then cheribsdbox
-# thinks it should execute _su
 CRUNCH_PROGS_usr.bin+=su
-.if 0
-CRUNCH_BUILDTOOLS+=	bin/sh
-CRUNCH_ALIAS_sh=	-sh
-CRUNCH_BUILDTOOLS+=	bin/csh
-CRUNCH_ALIAS_csh=	-csh tcsh -tcsh
-.endif
-
 
 # FIXME: wait -> usr.bin/alias (but that is just a script so how to add
 .if 0
