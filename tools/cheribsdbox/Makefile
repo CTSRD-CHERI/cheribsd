@@ -11,7 +11,7 @@ CHERIBSDBOX_DIR?=	/bin
 BINDIR?=${CHERIBSDBOX_DIR}
 # We want to build all these tools as statically linked MIPS binaries to save size
 WANT_CHERI=		none
-CRUNCH_BUILDOPTS+=	WANT_CHERI=none
+CRUNCH_BUILDOPTS+=	WANT_CHERI=none -DWITHOUT_TESTS MK_TESTS=no
 
 # Do not do hardlinks as part of the install since we want to be able to install
 # this without conflicting with the real binaries and instead do some mtree
@@ -101,22 +101,27 @@ CRUNCH_PROGS_bin+=	cat \
 		chflags \
 		chmod \
 		cp \
+		date \
 		dd \
 		df \
+		echo \
 		expr \
 		hostname \
 		kenv \
+		kill \
 		ln \
 		ls \
 		mkdir \
 		mv \
 		ps \
+		pwd \
 		realpath \
 		rm \
 		rmdir \
 		sleep \
 		stty \
-		test
+		test \
+		uuidgen
 
 CRUNCH_ALIAS_test=	[
 
