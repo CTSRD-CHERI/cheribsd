@@ -237,6 +237,7 @@ CRUNCH_PROGS_usr.bin+= \
 		uuencode \
 		vmstat \
 		w \
+		wall \
 		which \
 		xargs
 
