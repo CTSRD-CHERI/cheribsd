@@ -86,6 +86,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/uma.h>
 #include <vm/uma_int.h>
 #include <vm/uma_dbg.h>
+#include <vm/cheri.h>
 
 #include <ddb/ddb.h>
 
@@ -1530,6 +1531,7 @@ zone_ctor(void *mem, int size, void *udata, int flags)
 	 * This is a pure cache zone, no kegs.
 	 */
 	if (arg->import) {
+		CHERI_VM_ASSERT_VALID(arg->import);
 		if (arg->flags & UMA_ZONE_VM)
 			arg->flags |= UMA_ZFLAG_CACHEONLY;
 		zone->uz_flags = arg->flags;
