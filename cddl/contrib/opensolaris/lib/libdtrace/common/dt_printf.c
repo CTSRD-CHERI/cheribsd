@@ -18,6 +18,16 @@
  *
  * CDDL HEADER END
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_alignment"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
@@ -311,7 +321,7 @@ pfprint_fp(dtrace_hdl_t *dtp, FILE *fp, const char *format,
 		return (dt_printf(dtp, fp, format,
 		    *((double *)addr) / n));
 #if !defined(__arm__) && !defined(__powerpc__) && \
-    !defined(__mips__) && !defined(__riscv__)
+    !defined(__mips__) && !defined(__riscv)
 	case sizeof (long double):
 		return (dt_printf(dtp, fp, format,
 		    *((long double *)addr) / ldn));

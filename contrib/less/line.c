@@ -6,6 +6,16 @@
  *
  * For more information, see the README file.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 
 /*

@@ -52,6 +52,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/frame.h>
 #include <machine/pcb.h>
 #include <machine/pcpu.h>
+#include <machine/undefined.h>
 
 #ifdef KDTRACE_HOOKS
 #include <sys/dtrace_bsd.h>
@@ -255,6 +256,7 @@ print_registers(struct trapframe *frame)
 void
 do_el1h_sync(struct thread *td, struct trapframe *frame)
 {
+	struct trapframe *oframe;
 	uint32_t exception;
 	uint64_t esr, far;
 
@@ -270,6 +272,18 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 	CTR4(KTR_TRAP,
 	    "do_el1_sync: curthread: %p, esr %lx, elr: %lx, frame: %p", td,
 	    esr, frame->tf_elr, frame);
+
+	oframe = td->td_frame;
+
+	switch (exception) {
+	case EXCP_BRK:
+	case EXCP_WATCHPT_EL1:
+	case EXCP_SOFTSTP_EL1:
+		break;
+	default:
+		td->td_frame = frame;
+		break;
+	}
 
 	switch(exception) {
 	case EXCP_FP_SIMD:
@@ -303,30 +317,23 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 	case EXCP_WATCHPT_EL1:
 	case EXCP_SOFTSTP_EL1:
 #ifdef KDB
-		kdb_trap(exception, 0, frame);
+		kdb_trap(exception, 0,
+		    (td->td_frame != NULL) ? td->td_frame : frame);
 #else
 		panic("No debugger in kernel.\n");
 #endif
 		break;
+	case EXCP_UNKNOWN:
+		if (undef_insn(1, frame))
+			break;
+		/* FALLTHROUGH */
 	default:
 		print_registers(frame);
 		panic("Unknown kernel exception %x esr_el1 %lx\n", exception,
 		    esr);
 	}
-}
 
-/*
- * The attempted execution of an instruction bit pattern that has no allocated
- * instruction results in an exception with an unknown reason.
- */
-static void
-el0_excp_unknown(struct trapframe *frame, uint64_t far)
-{
-	struct thread *td;
-
-	td = curthread;
-	call_trapsignal(td, SIGILL, ILL_ILLTRP, (void *)far);
-	userret(td, frame);
+	td->td_frame = oframe;
 }
 
 void
@@ -373,7 +380,9 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 		data_abort(td, frame, esr, far, 1);
 		break;
 	case EXCP_UNKNOWN:
-		el0_excp_unknown(frame, far);
+		if (!undef_insn(0, frame))
+			call_trapsignal(td, SIGILL, ILL_ILLTRP, (void *)far);
+		userret(td, frame);
 		break;
 	case EXCP_SP_ALIGN:
 		call_trapsignal(td, SIGBUS, BUS_ADRALN, (void *)frame->tf_sp);

@@ -161,11 +161,6 @@ cloudabi_sys_file_create(struct thread *td,
 		    (__cheri_tocap char * __capability)path, UIO_SYSSPACE,
 		    0777);
 		break;
-	case CLOUDABI_FILETYPE_FIFO:
-		error = kern_mkfifoat(td, uap->fd,
-		    (__cheri_tocap char * __capability)path, UIO_SYSSPACE,
-		    0666);
-		break;
 	default:
 		error = EINVAL;
 		break;
@@ -352,7 +347,7 @@ write_dirent(struct dirent *bde, cloudabi_dircookie_t cookie, struct uio *uio)
 		cde.d_type = CLOUDABI_FILETYPE_DIRECTORY;
 		break;
 	case DT_FIFO:
-		cde.d_type = CLOUDABI_FILETYPE_FIFO;
+		cde.d_type = CLOUDABI_FILETYPE_SOCKET_STREAM;
 		break;
 	case DT_LNK:
 		cde.d_type = CLOUDABI_FILETYPE_SYMBOLIC_LINK;
@@ -678,7 +673,7 @@ cloudabi_sys_file_stat_get(struct thread *td,
 	else if (S_ISDIR(sb.st_mode))
 		csb.st_filetype = CLOUDABI_FILETYPE_DIRECTORY;
 	else if (S_ISFIFO(sb.st_mode))
-		csb.st_filetype = CLOUDABI_FILETYPE_FIFO;
+		csb.st_filetype = CLOUDABI_FILETYPE_SOCKET_STREAM;
 	else if (S_ISREG(sb.st_mode))
 		csb.st_filetype = CLOUDABI_FILETYPE_REGULAR_FILE;
 	else if (S_ISSOCK(sb.st_mode)) {

@@ -28,6 +28,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 /*
  * Transform a hwpmc(4) log into human readable form, and into

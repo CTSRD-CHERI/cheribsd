@@ -355,9 +355,11 @@ mlx5e_poll_rx_cq(struct mlx5e_rq *rq, int budget)
 			rq->stats.wqe_err++;
 			goto wq_ll_pop;
 		}
-
-		if (MHLEN >= byte_cnt &&
+		if ((MHLEN - MLX5E_NET_IP_ALIGN) >= byte_cnt &&
 		    (mb = m_gethdr(M_NOWAIT, MT_DATA)) != NULL) {
+			/* get IP header aligned */
+			mb->m_data += MLX5E_NET_IP_ALIGN;
+
 			bcopy(rq->mbuf[wqe_counter].data, mtod(mb, caddr_t),
 			    byte_cnt);
 		} else {
@@ -428,7 +430,7 @@ mlx5e_rx_cq_comp(struct mlx5_core_cq *mcq)
 		mlx5e_post_rx_wqes(rq);
 	}
 	mlx5e_post_rx_wqes(rq);
-	mlx5e_cq_arm(&rq->cq);
+	mlx5e_cq_arm(&rq->cq, MLX5_GET_DOORBELL_LOCK(&rq->channel->priv->doorbell_lock));
 	tcp_lro_flush_all(&rq->lro);
 	mtx_unlock(&rq->mtx);
 }

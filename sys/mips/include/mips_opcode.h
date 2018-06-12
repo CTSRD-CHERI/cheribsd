@@ -110,6 +110,14 @@ typedef union {
 		unsigned r3: 5;
 		unsigned unused: 3;
 		unsigned fmt2: 3;
+	} CTypeOld;
+	struct {
+		unsigned op: 6;
+		unsigned fmt: 5;
+		unsigned r1: 5;
+		unsigned r2: 5;
+		unsigned r3: 5;
+		unsigned func: 6;
 	} CType;
 	/* BC2F format */
 	struct {
@@ -462,8 +470,8 @@ typedef union {
  * Some CHERI opcodes are known to the disassembler as they are exceptions to
  * the normal (if any) formatting rules.
  */
-#define	OP_CHERI_CGETCAUSE	0x04	/* CGetCause - 0x12 0x00 .. 0x04 */
-#define	OP_CHERI_CGETPCC	0x07	/* CGetPCC - 0x12 0x00 .. 0x07 */
+#define	OP_CHERI_CGETCAUSE_OLD	0x04	/* CGetCause - 0x12 0x00 .. 0x04 */
+#define	OP_CHERI_CGETPCC_OLD	0x07	/* CGetPCC - 0x12 0x00 .. 0x07 */
 #endif
 
 #endif /* !_MACHINE_MIPS_OPCODE_H_ */

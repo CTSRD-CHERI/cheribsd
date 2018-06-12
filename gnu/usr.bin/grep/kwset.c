@@ -21,6 +21,16 @@
 /* Written August 1989 by Mike Haertel.
    The author may be reached (Email) at the address mike@ai.mit.edu,
    or (US mail) as Mike Haertel c/o Free Software Foundation. */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 /* The algorithm implemented by these routines bears a startling resemblence
    to one discovered by Beate Commentz-Walter, although it is not identical.

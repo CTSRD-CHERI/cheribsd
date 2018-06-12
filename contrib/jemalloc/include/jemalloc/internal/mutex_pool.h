@@ -1,5 +1,16 @@
 #ifndef JEMALLOC_INTERNAL_MUTEX_POOL_H
 #define JEMALLOC_INTERNAL_MUTEX_POOL_H
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "hashing",
+ *     "virtual_address"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include "jemalloc/internal/hash.h"
 #include "jemalloc/internal/mutex.h"

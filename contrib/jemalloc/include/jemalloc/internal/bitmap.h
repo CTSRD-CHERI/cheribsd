@@ -1,5 +1,16 @@
 #ifndef JEMALLOC_INTERNAL_BITMAP_H
 #define JEMALLOC_INTERNAL_BITMAP_H
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_size"
+ *   ],
+ *   "change_comment": "Fixed premature optimization"
+ * }
+ * CHERI CHANGES END
+ */
 
 #include "jemalloc/internal/arena_types.h"
 #include "jemalloc/internal/bit_util.h"

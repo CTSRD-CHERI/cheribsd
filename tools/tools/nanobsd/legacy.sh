@@ -191,13 +191,13 @@ create_diskimage ( ) (
 	fi
 
 	if ${do_copyout_partition} ; then
-		echo "Writing out _.disk.image..."
-		dd conv=sparse if=/dev/${MD}${NANO_SLICE_ROOT} of=${NANO_DISKIMGDIR}/_.disk.image bs=64k
+		echo "Writing out ${NANO_IMG1NAME}..."
+		dd conv=sparse if=/dev/${MD}${NANO_SLICE_ROOT} \
+		   of=${NANO_DISKIMGDIR}/${NANO_IMG1NAME} bs=64k
 	fi
 	mdconfig -d -u $MD
 
-	trap - 1 2 15
-	trap nano_cleanup EXIT
+	trap - 1 2 15 EXIT
 
 	) > ${NANO_LOG}/_.di 2>&1
 )

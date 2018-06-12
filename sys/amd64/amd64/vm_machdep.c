@@ -172,6 +172,7 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 
 	/* Ensure that td1's pcb is up to date. */
 	fpuexit(td1);
+	update_pcb_bases(td1->td_pcb);
 
 	/* Point the pcb to the top of the stack */
 	pcb2 = get_pcb_td(td2);
@@ -238,11 +239,15 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	pcb2->pcb_tssp = NULL;
 
 	/* New segment registers. */
-	set_pcb_flags(pcb2, PCB_FULL_IRET);
+	set_pcb_flags_raw(pcb2, PCB_FULL_IRET);
 
 	/* Copy the LDT, if necessary. */
 	mdp1 = &td1->td_proc->p_md;
 	mdp2 = &p2->p_md;
+	if (mdp1->md_ldt == NULL) {
+		mdp2->md_ldt = NULL;
+		return;
+	}
 	mtx_lock(&dt_lock);
 	if (mdp1->md_ldt != NULL) {
 		if (flags & RFMEM) {
@@ -298,11 +303,8 @@ cpu_exit(struct thread *td)
 	/*
 	 * If this process has a custom LDT, release it.
 	 */
-	mtx_lock(&dt_lock);
-	if (td->td_proc->p_md.md_ldt != 0)
+	if (td->td_proc->p_md.md_ldt != NULL)
 		user_ldt_free(td);
-	else
-		mtx_unlock(&dt_lock);
 }
 
 void
@@ -433,13 +435,14 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 	 * Those not loaded individually below get their default
 	 * values here.
 	 */
+	update_pcb_bases(td0->td_pcb);
 	bcopy(td0->td_pcb, pcb2, sizeof(*pcb2));
 	clear_pcb_flags(pcb2, PCB_FPUINITDONE | PCB_USERFPUINITDONE |
 	    PCB_KERNFPU);
 	pcb2->pcb_save = get_pcb_user_save_pcb(pcb2);
 	bcopy(get_pcb_user_save_td(td0), pcb2->pcb_save,
 	    cpu_max_ext_state_size);
-	set_pcb_flags(pcb2, PCB_FULL_IRET);
+	set_pcb_flags_raw(pcb2, PCB_FULL_IRET);
 
 	/*
 	 * Create a new fresh stack for the new thread.

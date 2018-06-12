@@ -26,6 +26,16 @@
  * $FreeBSD$
  *
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "hashing"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sys/types.h>
 

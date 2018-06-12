@@ -23,6 +23,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_alignment"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -92,7 +102,7 @@ is_empty_sector(void *buf)
 	uint64_t *p = buf;
 	size_t n, max;
 
-	assert(((size_t)p & 3) == 0);
+	assert(((vaddr_t)p & 3) == 0);
 
 	max = secsz / sizeof(uint64_t);
 	for (n = 0; n < max; n++) {

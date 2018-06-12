@@ -534,7 +534,6 @@ END(cpu_switch)
  *
  *----------------------------------------------------------------------------
  */
-#if defined(CPU_HAVEFPU)
 LEAF(MipsSwitchFPState)
 	.set push
 	.set hardfloat
@@ -647,7 +646,6 @@ LEAF(MipsSwitchFPState)
 	nop
 	.set pop
 END(MipsSwitchFPState)
-#endif /* CPU_HAVEFPU */
 
 /*----------------------------------------------------------------------------
  *

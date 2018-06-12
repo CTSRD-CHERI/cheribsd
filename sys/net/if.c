@@ -3270,6 +3270,8 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 	case SIOCGIFMEDIA:
 	case SIOCGIFXMEDIA:
 	CASE_IOC_IFREQ(SIOCGIFGENERIC):
+	case SIOCGIFRSSKEY:
+	case SIOCGIFRSSHASH:
 		if (ifp->if_ioctl == NULL)
 			return (EOPNOTSUPP);
 		error = (*ifp->if_ioctl)(ifp, cmd, data);

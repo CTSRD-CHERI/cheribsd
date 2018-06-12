@@ -29,6 +29,17 @@
  *	@(#)extern.h	8.2 (Berkeley) 4/28/95
  * $FreeBSD$
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_integrity"
+ *   ],
+ *   "change_comment": "BDB hashes don't preserve tags"
+ * }
+ * CHERI CHANGES END
+ */
 
 #ifndef	_EXTERN_H_
 #define	_EXTERN_H_

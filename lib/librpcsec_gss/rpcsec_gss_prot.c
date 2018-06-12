@@ -34,6 +34,17 @@
 
   $Id: authgss_prot.c,v 1.18 2000/09/01 04:14:03 dugsong Exp $
 */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "sunrpc"
+ * }
+ * CHERI CHANGES END
+ */
 /* $FreeBSD$ */
 
 #include <stdio.h>

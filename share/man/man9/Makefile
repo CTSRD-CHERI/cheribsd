@@ -184,7 +184,6 @@ MAN=	accept_filter.9 \
 	make_dev.9 \
 	malloc.9 \
 	mbchain.9 \
-	mbpool.9 \
 	mbuf.9 \
 	mbuf_tags.9 \
 	MD5.9 \
@@ -414,6 +413,7 @@ MAN=	accept_filter.9 \
 MLINKS=	unr.9 alloc_unr.9 \
 	unr.9 alloc_unrl.9 \
 	unr.9 alloc_unr_specific.9 \
+	unr.9 clear_unrhdr.9 \
 	unr.9 delete_unrhdr.9 \
 	unr.9 free_unr.9 \
 	unr.9 new_unrhdr.9
@@ -669,7 +669,8 @@ MLINKS+=condvar.9 cv_broadcast.9 \
 	condvar.9 cv_wait_unlock.9 \
 	condvar.9 cv_wmesg.9
 MLINKS+=config_intrhook.9 config_intrhook_disestablish.9 \
-	config_intrhook.9 config_intrhook_establish.9
+	config_intrhook.9 config_intrhook_establish.9 \
+	config_intrhook.9 config_intrhook_oneshot.9
 MLINKS+=contigmalloc.9 contigfree.9
 MLINKS+=casuword.9 casueword.9 \
 	casuword.9 casueword32.9 \
@@ -1159,16 +1160,6 @@ MLINKS+=mbchain.9 mb_detach.9 \
 	mbchain.9 mb_put_uint8.9 \
 	mbchain.9 mb_put_uio.9 \
 	mbchain.9 mb_reserve.9
-MLINKS+=mbpool.9 mbp_alloc.9 \
-	mbpool.9 mbp_card_free.9 \
-	mbpool.9 mbp_count.9 \
-	mbpool.9 mbp_create.9 \
-	mbpool.9 mbp_destroy.9 \
-	mbpool.9 mbp_ext_free.9 \
-	mbpool.9 mbp_free.9 \
-	mbpool.9 mbp_get.9 \
-	mbpool.9 mbp_get_keep.9 \
-	mbpool.9 mbp_sync.9
 MLINKS+=\
 	mbuf.9 m_adj.9 \
 	mbuf.9 m_align.9 \
@@ -1314,13 +1305,18 @@ MLINKS+=nv.9 libnv.9 \
 	nv.9 nvlist.9 \
 	nv.9 nvlist_add_binary.9 \
 	nv.9 nvlist_add_bool.9 \
+	nv.9 nvlist_add_bool_array.9 \
 	nv.9 nvlist_add_descriptor.9 \
+	nv.9 nvlist_add_descriptor_array.9 \
 	nv.9 nvlist_add_null.9 \
 	nv.9 nvlist_add_number.9 \
+	nv.9 nvlist_add_number_array.9 \
 	nv.9 nvlist_add_nvlist.9 \
+	nv.9 nvlist_add_nvlist_array.9 \
 	nv.9 nvlist_add_string.9 \
 	nv.9 nvlist_add_stringf.9 \
 	nv.9 nvlist_add_stringv.9 \
+	nv.9 nvlist_add_string_array.9 \
 	nv.9 nvlist_clone.9 \
 	nv.9 nvlist_create.9 \
 	nv.9 nvlist_destroy.9 \
@@ -1330,10 +1326,14 @@ MLINKS+=nv.9 libnv.9 \
 	nv.9 nvlist_exists.9 \
 	nv.9 nvlist_exists_binary.9 \
 	nv.9 nvlist_exists_bool.9 \
+	nv.9 nvlist_exists_bool_array.9 \
 	nv.9 nvlist_exists_descriptor.9 \
+	nv.9 nvlist_exists_descriptor_array.9 \
 	nv.9 nvlist_exists_null.9 \
 	nv.9 nvlist_exists_number.9 \
+	nv.9 nvlist_exists_number_array.9 \
 	nv.9 nvlist_exists_nvlist.9 \
+	nv.9 nvlist_exists_nvlist_array.9 \
 	nv.9 nvlist_exists_string.9 \
 	nv.9 nvlist_exists_type.9 \
 	nv.9 nvlist_fdump.9 \
@@ -1341,23 +1341,36 @@ MLINKS+=nv.9 libnv.9 \
 	nv.9 nvlist_free.9 \
 	nv.9 nvlist_free_binary.9 \
 	nv.9 nvlist_free_bool.9 \
+	nv.9 nvlist_free_bool_array.9 \
 	nv.9 nvlist_free_descriptor.9 \
+	nv.9 nvlist_free_descriptor_array.9 \
 	nv.9 nvlist_free_null.9 \
 	nv.9 nvlist_free_number.9 \
+	nv.9 nvlist_free_number_array.9 \
 	nv.9 nvlist_free_nvlist.9 \
+	nv.9 nvlist_free_nvlist_array.9 \
 	nv.9 nvlist_free_string.9 \
+	nv.9 nvlist_free_string_array.9 \
 	nv.9 nvlist_free_type.9 \
 	nv.9 nvlist_get_binary.9 \
 	nv.9 nvlist_get_bool.9 \
+	nv.9 nvlist_get_bool_array.9 \
 	nv.9 nvlist_get_descriptor.9 \
+	nv.9 nvlist_get_descriptor_array.9 \
 	nv.9 nvlist_get_number.9 \
+	nv.9 nvlist_get_number_array.9 \
 	nv.9 nvlist_get_nvlist.9 \
+	nv.9 nvlist_get_nvlist_array.9 \
 	nv.9 nvlist_get_parent.9 \
 	nv.9 nvlist_get_string.9 \
+	nv.9 nvlist_get_string_array.9 \
 	nv.9 nvlist_move_binary.9 \
 	nv.9 nvlist_move_descriptor.9 \
+	nv.9 nvlist_move_descriptor_array.9 \
 	nv.9 nvlist_move_nvlist.9 \
+	nv.9 nvlist_move_nvlist_array.9 \
 	nv.9 nvlist_move_string.9 \
+	nv.9 nvlist_move_string_array.9 \
 	nv.9 nvlist_next.9 \
 	nv.9 nvlist_pack.9 \
 	nv.9 nvlist_recv.9 \
@@ -1366,10 +1379,15 @@ MLINKS+=nv.9 libnv.9 \
 	nv.9 nvlist_size.9 \
 	nv.9 nvlist_take_binary.9 \
 	nv.9 nvlist_take_bool.9 \
+	nv.9 nvlist_take_bool_array.9 \
 	nv.9 nvlist_take_descriptor.9 \
+	nv.9 nvlist_take_descriptor_array.9 \
 	nv.9 nvlist_take_number.9 \
+	nv.9 nvlist_take_number_array.9 \
 	nv.9 nvlist_take_nvlist.9 \
+	nv.9 nvlist_take_nvlist_array.9 \
 	nv.9 nvlist_take_string.9 \
+	nv.9 nvlist_take_string_array.9 \
 	nv.9 nvlist_unpack.9 \
 	nv.9 nvlist_xfer.9
 MLINKS+=osd.9 osd_call.9 \
@@ -1899,7 +1917,6 @@ MLINKS+=ucred.9 cred_update_thread.9 \
 	ucred.9 crget.9 \
 	ucred.9 crhold.9 \
 	ucred.9 crsetgroups.9 \
-	ucred.9 crshared.9 \
 	ucred.9 cru2x.9
 MLINKS+=uidinfo.9 uifind.9 \
 	uidinfo.9 uifree.9 \

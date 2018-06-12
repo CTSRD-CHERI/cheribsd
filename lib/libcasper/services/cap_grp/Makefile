@@ -18,8 +18,7 @@ LIBADD=	nv
 
 CFLAGS+=-I${.CURDIR}
 
-.if ${MK_TESTS} != "no"
-SUBDIR+=	tests
-.endif
+HAS_TESTS=
+SUBDIR.${MK_TESTS}+= tests
 
 .include <bsd.lib.mk>

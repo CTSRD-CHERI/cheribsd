@@ -8,16 +8,13 @@ LIB=		uboot
 INTERNALLIB=
 WARNS?=		2
 
-SRCS=	crc32.c console.c copy.c devicename.c elf_freebsd.c glue.c
+SRCS=	console.c copy.c devicename.c elf_freebsd.c glue.c
 SRCS+=	module.c net.c reboot.c time.c
 
 CFLAGS+=	-ffreestanding -msoft-float
 
-CFLAGS+=	-I${.CURDIR}/../../../../lib/libstand/
-
-.if !defined(LOADER_NO_DISK_SUPPORT)
-SRCS+=	disk.c
-CFLAGS+= -DLOADER_DISK_SUPPORT
+.if ${LOADER_DISK_SUPPORT:Uyes} == "yes"
+SRCS+= disk.c
 .endif
 
 .if ${MK_FDT} != "no"
@@ -31,7 +28,7 @@ CFLAGS+= -DLOADER_FDT_SUPPORT -I${.CURDIR}/../../fdt
 .endif
 
 # Pick up FDT includes
-CFLAGS+=	-I${.CURDIR}/../../../../sys/contrib/libfdt/
+CFLAGS+=	-I${SYSDIR}/contrib/libfdt/
 
 # Pick up the bootstrap header for some interface items
 CFLAGS+=	-I${.CURDIR}/../../common -I${.CURDIR}/../../.. -I.

@@ -23,6 +23,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_size"
+ *   ],
+ *   "change_comment": "pointer size is not equivalent to address size"
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -38,8 +49,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/linker.h>
 #include <strings.h>
 
-// The conditional is a CHERI hack - without it, the "Address" field is far too wide.
-#define	POINTER_WIDTH	((int)((sizeof(void *) <= 8 ? sizeof(void *) : 8) * 2 + 2))
+#define	POINTER_WIDTH	((int)(sizeof(vaddr_t) * 2 + 2))
 
 static int showdata = 0;
 

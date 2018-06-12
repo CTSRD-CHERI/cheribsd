@@ -63,6 +63,17 @@
 
   $Id: auth_gss.c,v 1.32 2002/01/15 15:43:00 andros Exp $
 */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "sunrpc"
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <stdio.h>
 #include <stdlib.h>

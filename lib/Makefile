@@ -44,6 +44,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libdevctl \
 	libdevinfo \
 	libdevstat \
+	${_libdl} \
 	libdwarf \
 	libedit \
 	libevent \
@@ -79,7 +80,6 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libsbuf \
 	libsmb \
 	libsqlite3 \
-	libstand \
 	libstdbuf \
 	libstdthreads \
 	libsysdecode \
@@ -177,9 +177,7 @@ _libclang_rt=	libclang_rt
 .if ${MK_LIBCPLUSPLUS} != "no"
 _libcxxrt=	libcxxrt
 _libcplusplus=	libc++
-.if ${MACHINE_CPUARCH} != "arm" && ${MACHINE_CPUARCH} != "mips"
 _libcplusplus+=	libc++experimental
-.endif
 .endif
 
 SUBDIR.${MK_EFI}+=	libefivar
@@ -207,8 +205,12 @@ _libproc=	libproc
 _librtld_db=	librtld_db
 .endif
 
+.if defined(LINKER_FEATURES) && ${LINKER_FEATURES:Mfilter}
+_libdl=		libdl
+.endif
+
 SUBDIR.${MK_OPENSSL}+=	libmp
-SUBDIR.${MK_PMC}+=	libpmc
+SUBDIR.${MK_PMC}+=	libpmc libpmcstat
 SUBDIR.${MK_RADIUS_SUPPORT}+=	libradius
 SUBDIR.${MK_SENDMAIL}+=	libmilter libsm libsmdb libsmutil
 SUBDIR.${MK_TELNET}+=	libtelnet
@@ -235,10 +237,6 @@ SUBDIR+=	libmalloc_simple
 SUBDIR+=	libcheri_syscalls
 SUBDIR+=	libcheri_support
 SUBDIR_BOOTSTRAP:=	libgcc_s libgcc_eh ${SUBDIR_BOOTSTRAP}
-
-# libstand is for bootloaders and the like, no need to build
-# pure-capablity yet.
-SUBDIR:=	${SUBDIR:Nlibstand}
 .endif
 
 .include <bsd.subdir.mk>

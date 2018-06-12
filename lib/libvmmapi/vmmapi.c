@@ -25,6 +25,18 @@
  *
  * $FreeBSD$
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "monotonicity"
+ *   ],
+ *   "change_comment": "request max perms on mmap not PROT_NONE",
+ *   "hybrid_specific": false
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");

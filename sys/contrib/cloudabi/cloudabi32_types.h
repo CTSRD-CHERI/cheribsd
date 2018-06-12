@@ -109,7 +109,7 @@ typedef struct {
   _Alignas(4) uint32_t ri_data_len;
   _Alignas(4) uint32_t ri_fds;
   _Alignas(4) uint32_t ri_fds_len;
-  _Alignas(2) cloudabi_msgflags_t ri_flags;
+  _Alignas(2) cloudabi_riflags_t ri_flags;
 } cloudabi32_recv_in_t;
 _Static_assert(offsetof(cloudabi32_recv_in_t, ri_data) == 0, "Incorrect layout");
 _Static_assert(offsetof(cloudabi32_recv_in_t, ri_data_len) == 4, "Incorrect layout");
@@ -120,11 +120,24 @@ _Static_assert(sizeof(cloudabi32_recv_in_t) == 20, "Incorrect layout");
 _Static_assert(_Alignof(cloudabi32_recv_in_t) == 4, "Incorrect layout");
 
 typedef struct {
+  _Alignas(4) uint32_t ro_datalen;
+  _Alignas(4) uint32_t ro_fdslen;
+  _Alignas(1) char ro_unused[40];
+  _Alignas(2) cloudabi_roflags_t ro_flags;
+} cloudabi32_recv_out_t;
+_Static_assert(offsetof(cloudabi32_recv_out_t, ro_datalen) == 0, "Incorrect layout");
+_Static_assert(offsetof(cloudabi32_recv_out_t, ro_fdslen) == 4, "Incorrect layout");
+_Static_assert(offsetof(cloudabi32_recv_out_t, ro_unused) == 8, "Incorrect layout");
+_Static_assert(offsetof(cloudabi32_recv_out_t, ro_flags) == 48, "Incorrect layout");
+_Static_assert(sizeof(cloudabi32_recv_out_t) == 52, "Incorrect layout");
+_Static_assert(_Alignof(cloudabi32_recv_out_t) == 4, "Incorrect layout");
+
+typedef struct {
   _Alignas(4) uint32_t si_data;
   _Alignas(4) uint32_t si_data_len;
   _Alignas(4) uint32_t si_fds;
   _Alignas(4) uint32_t si_fds_len;
-  _Alignas(2) cloudabi_msgflags_t si_flags;
+  _Alignas(2) cloudabi_siflags_t si_flags;
 } cloudabi32_send_in_t;
 _Static_assert(offsetof(cloudabi32_send_in_t, si_data) == 0, "Incorrect layout");
 _Static_assert(offsetof(cloudabi32_send_in_t, si_data_len) == 4, "Incorrect layout");
@@ -143,7 +156,7 @@ _Static_assert(_Alignof(cloudabi32_send_out_t) == 4, "Incorrect layout");
 
 typedef struct {
   _Alignas(8) cloudabi_userdata_t userdata;
-  _Alignas(2) cloudabi_subflags_t flags;
+  _Alignas(2) uint16_t unused;
   _Alignas(1) cloudabi_eventtype_t type;
   union {
     struct {
@@ -173,7 +186,7 @@ typedef struct {
   };
 } cloudabi32_subscription_t;
 _Static_assert(offsetof(cloudabi32_subscription_t, userdata) == 0, "Incorrect layout");
-_Static_assert(offsetof(cloudabi32_subscription_t, flags) == 8, "Incorrect layout");
+_Static_assert(offsetof(cloudabi32_subscription_t, unused) == 8, "Incorrect layout");
 _Static_assert(offsetof(cloudabi32_subscription_t, type) == 10, "Incorrect layout");
 _Static_assert(offsetof(cloudabi32_subscription_t, clock.identifier) == 16, "Incorrect layout");
 _Static_assert(offsetof(cloudabi32_subscription_t, clock.clock_id) == 24, "Incorrect layout");
@@ -200,21 +213,6 @@ _Static_assert(sizeof(cloudabi32_tcb_t) == 4, "Incorrect layout");
 _Static_assert(_Alignof(cloudabi32_tcb_t) == 4, "Incorrect layout");
 
 typedef void cloudabi32_threadentry_t(cloudabi_tid_t tid, uint32_t aux);
-
-typedef struct {
-  _Alignas(4) uint32_t ro_datalen;
-  _Alignas(4) uint32_t ro_fdslen;
-  _Alignas(2) cloudabi_sockaddr_t ro_sockname;
-  _Alignas(2) cloudabi_sockaddr_t ro_peername;
-  _Alignas(2) cloudabi_msgflags_t ro_flags;
-} cloudabi32_recv_out_t;
-_Static_assert(offsetof(cloudabi32_recv_out_t, ro_datalen) == 0, "Incorrect layout");
-_Static_assert(offsetof(cloudabi32_recv_out_t, ro_fdslen) == 4, "Incorrect layout");
-_Static_assert(offsetof(cloudabi32_recv_out_t, ro_sockname) == 8, "Incorrect layout");
-_Static_assert(offsetof(cloudabi32_recv_out_t, ro_peername) == 28, "Incorrect layout");
-_Static_assert(offsetof(cloudabi32_recv_out_t, ro_flags) == 48, "Incorrect layout");
-_Static_assert(sizeof(cloudabi32_recv_out_t) == 52, "Incorrect layout");
-_Static_assert(_Alignof(cloudabi32_recv_out_t) == 4, "Incorrect layout");
 
 typedef struct {
   _Alignas(4) uint32_t entry_point;

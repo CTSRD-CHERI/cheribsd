@@ -1082,8 +1082,8 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 
 		switch (req) {
 		case PT_STEP:
-			CTR2(KTR_PTRACE, "PT_STEP: tid %d (pid %d)",
-			    td2->td_tid, p->p_pid);
+			CTR3(KTR_PTRACE, "PT_STEP: tid %d (pid %d), sig = %d",
+			    td2->td_tid, p->p_pid, data);
 			error = ptrace_single_step(td2);
 			if (error)
 				goto out;
@@ -1172,6 +1172,13 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 		}
 
 	sendsig:
+		/*
+		 * Clear the pending event for the thread that just
+		 * reported its event (p_xthread).  This may not be
+		 * the thread passed to PT_CONTINUE, PT_STEP, etc. if
+		 * the debugger is resuming a different thread.
+		 */
+		td2 = p->p_xthread;
 		if (proctree_locked) {
 			sx_xunlock(&proctree_lock);
 			proctree_locked = 0;

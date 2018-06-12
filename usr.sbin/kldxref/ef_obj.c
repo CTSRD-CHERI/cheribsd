@@ -33,6 +33,16 @@
  *
  * $FreeBSD$
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_alignment"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sys/param.h>
 #include <sys/linker.h>
@@ -508,7 +518,7 @@ ef_obj_open(const char *filename, struct elf_file *efile, int verbose)
 #else
 			alignmask = shdr[i].sh_addralign - 1;
 			mapbase += alignmask;
-			mapbase  = (char *)((uintptr_t)mapbase & (uintptr_t)~alignmask);
+			mapbase  = (char *)((uintptr_t)mapbase & ~alignmask);
 #endif
 			ef->progtab[pb].addr = (void *)(uintptr_t)mapbase;
 			if (shdr[i].sh_type == SHT_PROGBITS) {

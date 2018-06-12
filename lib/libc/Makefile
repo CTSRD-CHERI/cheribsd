@@ -122,7 +122,7 @@ CFLAGS+=	-DNO_SYSCALLS
 .include "${LIBC_SRCTOP}/uuid/Makefile.inc"
 .include "${LIBC_SRCTOP}/xdr/Makefile.inc"
 .if (${LIBC_ARCH} == "arm" && \
-	(${MACHINE_ARCH:Marmv6*} == "" || (defined(CPUTYPE) && ${CPUTYPE:M*soft*}))) || \
+	(${MACHINE_ARCH:Marmv[67]*} == "" || (defined(CPUTYPE) && ${CPUTYPE:M*soft*}))) || \
     (${LIBC_ARCH} == "mips" && ${MACHINE_ARCH:Mmips*hf} == "") || \
     (${LIBC_ARCH} == "riscv" && ${MACHINE_ARCH:Mriscv*sf} != "")
 .include "${LIBC_SRCTOP}/softfloat/Makefile.inc"
@@ -185,8 +185,9 @@ libkern.${LIBC_ARCH}:: ${KMSRCS}
 	${CP} ${.ALLSRC} ${DESTDIR}/sys/libkern/${LIBC_ARCH}
 .endif
 
-.if ${MK_TESTS} != "no" && !defined(NO_SYSCALLS)
-SUBDIR+=	tests
+.if !defined(NO_SYSCALLS)
+HAS_TESTS=
+SUBDIR.${MK_TESTS}+= tests
 .endif
 
 .if defined(NO_SYSCALLS)

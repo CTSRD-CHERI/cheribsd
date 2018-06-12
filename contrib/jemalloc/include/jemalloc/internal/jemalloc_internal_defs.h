@@ -2,6 +2,19 @@
 #ifndef JEMALLOC_INTERNAL_DEFS_H_
 #define JEMALLOC_INTERNAL_DEFS_H_
 /*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "unsupported",
+ *     "other"
+ *   ],
+ *   "change_comment": "sbrk, use C11 atomics, etc",
+ *   "hybrid_specific": false
+ * }
+ * CHERI CHANGES END
+ */
+/*
  * If JEMALLOC_PREFIX is defined via --with-jemalloc-prefix, it will cause all
  * public APIs to be prefixed.  This makes it possible, with some care, to use
  * multiple allocators simultaneously.

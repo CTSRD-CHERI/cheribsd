@@ -24,6 +24,16 @@
  *
  *===----------------------------------------------------------------------===
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "hashing"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <stdint.h>
 #include <string.h>

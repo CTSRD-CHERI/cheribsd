@@ -73,8 +73,8 @@ TAG_ARGS=	-T ${TAGS:[*]:S/ /,/g}
 
 .if ${MK_DEBUG_FILES} != "no" && empty(DEBUG_FLAGS:M-g) && \
     empty(DEBUG_FLAGS:M-gdwarf*)
-SHARED_CFLAGS+= -g
-SHARED_CXXFLAGS+= -g
+CFLAGS+= ${DEBUG_FILES_CFLAGS}
+CXXFLAGS+= ${DEBUG_FILES_CFLAGS}
 CTFFLAGS+= -g
 STATIC_CFLAGS+= -g
 STATIC_CXXFLAGS+= -g
@@ -192,8 +192,10 @@ LDFLAGS+=	-Wl,--version-script=${VERSION_MAP}
 .endif
 
 .if defined(LIB) && !empty(LIB) || defined(SHLIB_NAME)
-OBJS+=		${SRCS:N*.h:R:S/$/.o/}
-CLEANFILES+=	${OBJS} ${STATICOBJS}
+OBJS+=		${SRCS:N*.h:${OBJS_SRCS_FILTER:ts:}:S/$/.o/}
+BCOBJS+=	${SRCS:N*.[hsS]:N*.asm:${OBJS_SRCS_FILTER:ts:}:S/$/.bco/g}
+LLOBJS+=	${SRCS:N*.[hsS]:N*.asm:${OBJS_SRCS_FILTER:ts:}:S/$/.llo/g}
+CLEANFILES+=	${OBJS} ${BCOBJS} ${LLOBJS} ${STATICOBJS}
 .endif
 
 .if defined(LIB) && !empty(LIB)
@@ -224,15 +226,13 @@ lib${LIB_PRIVATE}${LIB}_p.a: ${POBJS}
 .endif
 
 .if defined(LLVM_LINK)
-BCOBJS=		${OBJS:.o=.bco} ${STATICOBJS:.o=.bco}
-LLOBJS=		${OBJS:.o=.llo} ${STATICOBJS:.o=.llo}
-CLEANFILES+=	${BCOBJS} ${LLOBJS}
-
 lib${LIB_PRIVATE}${LIB}.bc: ${BCOBJS}
 	${LLVM_LINK} -o ${.TARGET} ${BCOBJS}
 
 lib${LIB_PRIVATE}${LIB}.ll: ${LLOBJS}
 	${LLVM_LINK} -S -o ${.TARGET} ${LLOBJS}
+
+CLEANFILES+=	lib${LIB_PRIVATE}${LIB}.bc lib${LIB_PRIVATE}${LIB}.ll
 .endif
 
 .if defined(SHLIB_NAME) || \
@@ -367,6 +367,11 @@ _EXTRADEPEND:
 .if !defined(NO_FSCHG)
 SHLINSTALLFLAGS+= -fschg
 .endif
+.endif
+# Install libraries with -S to avoid risk of modifying in-use libraries when
+# installing to a running system.  It is safe to avoid this for NO_ROOT builds
+# that are only creating an image.
+.if !defined(NO_SAFE_LIBINSTALL) && !defined(NO_ROOT)
 SHLINSTALLFLAGS+= -S
 .endif
 
@@ -483,14 +488,20 @@ lint: ${SRCS:M*.c}
 .if defined(LIB) && !empty(LIB)
 OBJS_DEPEND_GUESS+= ${SRCS:M*.h}
 .for _S in ${SRCS:N*.[hly]}
-OBJS_DEPEND_GUESS.${_S:R}.po+=	${_S}
+OBJS_DEPEND_GUESS.${_S:${OBJS_SRCS_FILTER:ts:}}.po+=	${_S}
 .endfor
 .endif
 .if defined(SHLIB_NAME) || \
     defined(INSTALL_PIC_ARCHIVE) && defined(LIB) && !empty(LIB)
 .for _S in ${SRCS:N*.[hly]}
-OBJS_DEPEND_GUESS.${_S:R}.pico+=	${_S}
+OBJS_DEPEND_GUESS.${_S:${OBJS_SRCS_FILTER:ts:}}.pico+=	${_S}
 .endfor
+.endif
+
+.if defined(HAS_TESTS)
+MAKE+=			MK_MAKE_CHECK_USE_SANDBOX=yes
+SUBDIR_TARGETS+=	check
+TESTS_LD_LIBRARY_PATH+=	${.OBJDIR}
 .endif
 
 .include <bsd.dep.mk>

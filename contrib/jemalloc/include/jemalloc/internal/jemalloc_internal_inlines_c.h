@@ -1,5 +1,18 @@
 #ifndef JEMALLOC_INTERNAL_INLINES_C_H
 #define JEMALLOC_INTERNAL_INLINES_C_H
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "monotonicity",
+ *     "pointer_alignment",
+ *     "virtual_address"
+ *   ],
+ *   "change_comment": "unbound_ptr()"
+ * }
+ * CHERI CHANGES END
+ */
 
 #include "jemalloc/internal/jemalloc_internal_types.h"
 #include "jemalloc/internal/sz.h"

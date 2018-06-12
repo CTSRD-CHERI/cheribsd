@@ -1471,6 +1471,8 @@ END(MipsTLBMissException)
  */
 #if defined(CPU_HAVEFPU)
 NESTED(MipsFPTrap, CALLFRAME_SIZ, ra)
+	.set push
+	.set hardfloat
 	PTR_SUBU	sp, sp, CALLFRAME_SIZ
 	mfc0	t0, MIPS_COP_0_STATUS
 	HAZARD_DELAY
@@ -1570,6 +1572,7 @@ FPReturn:
 	ITLBNOPFIX
 	j	ra
 	PTR_ADDU sp, sp, CALLFRAME_SIZ
+	.set pop
 END(MipsFPTrap)
 #endif /* CPU_HAVEFPU */
 

@@ -1,3 +1,17 @@
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "unsupported",
+ *     "virtual_address",
+ *     "other"
+ *   ],
+ *   "change_comment": "No MAP_FIXED, LG_PAGE hack",
+ *   "hybrid_specific": false
+ * }
+ * CHERI CHANGES END
+ */
 #define JEMALLOC_PAGES_C_
 #include "jemalloc/internal/jemalloc_preamble.h"
 

@@ -28,6 +28,7 @@
  * Copyright 2013 Saso Kiselkov. All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
  * Copyright 2016 Toomas Soome <tsoome@me.com>
+ * Copyright (c) 2017 Datto Inc.
  */
 
 /*
@@ -3095,6 +3096,8 @@ spa_load_best(spa_t *spa, spa_load_state_t state, int mosconfig,
 
 	if (config && (rewind_error || state != SPA_LOAD_RECOVER))
 		spa_config_set(spa, config);
+	else
+		nvlist_free(config);
 
 	if (state == SPA_LOAD_RECOVER) {
 		ASSERT3P(loadinfo, ==, NULL);
@@ -4269,6 +4272,16 @@ spa_import_rootpool(const char *name)
 		    == 0);
 
 		if ((spa = spa_lookup(pname)) != NULL) {
+			/*
+			 * The pool could already be imported,
+			 * e.g., after reboot -r.
+			 */
+			if (spa->spa_state == POOL_STATE_ACTIVE) {
+				mutex_exit(&spa_namespace_lock);
+				nvlist_free(config);
+				return (0);
+			}
+
 			/*
 			 * Remove the existing root pool from the namespace so
 			 * that we can replace it with the correct config
@@ -6038,6 +6051,16 @@ spa_vdev_setfru(spa_t *spa, uint64_t guid, const char *newfru)
  * SPA Scanning
  * ==========================================================================
  */
+int
+spa_scrub_pause_resume(spa_t *spa, pool_scrub_cmd_t cmd)
+{
+	ASSERT(spa_config_held(spa, SCL_ALL, RW_WRITER) == 0);
+
+	if (dsl_scan_resilvering(spa->spa_dsl_pool))
+		return (SET_ERROR(EBUSY));
+
+	return (dsl_scrub_set_pause_resume(spa->spa_dsl_pool, cmd));
+}
 
 int
 spa_scan_stop(spa_t *spa)
@@ -6223,8 +6246,6 @@ spa_async_thread_vd(void *arg)
 {
 	spa_t *spa = arg;
 	int tasks;
-
-	ASSERT(spa->spa_sync_on);
 
 	mutex_enter(&spa->spa_async_lock);
 	tasks = spa->spa_async_tasks;

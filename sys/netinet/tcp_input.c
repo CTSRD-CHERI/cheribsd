@@ -145,7 +145,6 @@ SYSCTL_INT(_net_inet_tcp, OID_AUTO, delayed_ack, CTLFLAG_VNET | CTLFLAG_RW,
     "Delay ACK to try and piggyback it onto a data packet");
 
 VNET_DEFINE(int, drop_synfin) = 0;
-#define	V_drop_synfin		VNET(drop_synfin)
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, drop_synfin, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(drop_synfin), 0,
     "Drop TCP packets with SYN+FIN set");
@@ -156,7 +155,6 @@ SYSCTL_INT(_net_inet_tcp, OID_AUTO, rfc6675_pipe, CTLFLAG_VNET | CTLFLAG_RW,
     "Use calculated pipe/in-flight bytes per RFC 6675");
 
 VNET_DEFINE(int, tcp_do_rfc3042) = 1;
-#define	V_tcp_do_rfc3042	VNET(tcp_do_rfc3042)
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, rfc3042, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(tcp_do_rfc3042), 0,
     "Enable RFC 3042 (Limited Transmit)");
@@ -194,13 +192,11 @@ SYSCTL_INT(_net_inet_tcp_ecn, OID_AUTO, maxretries, CTLFLAG_VNET | CTLFLAG_RW,
     "Max retries before giving up on ECN");
 
 VNET_DEFINE(int, tcp_insecure_syn) = 0;
-#define	V_tcp_insecure_syn	VNET(tcp_insecure_syn)
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, insecure_syn, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(tcp_insecure_syn), 0,
     "Follow RFC793 instead of RFC5961 criteria for accepting SYN packets");
 
 VNET_DEFINE(int, tcp_insecure_rst) = 0;
-#define	V_tcp_insecure_rst	VNET(tcp_insecure_rst)
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, insecure_rst, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(tcp_insecure_rst), 0,
     "Follow RFC793 instead of RFC5961 criteria for accepting RST packets");
@@ -211,19 +207,16 @@ SYSCTL_INT(_net_inet_tcp, TCPCTL_RECVSPACE, recvspace, CTLFLAG_VNET | CTLFLAG_RW
     &VNET_NAME(tcp_recvspace), 0, "Initial receive socket buffer size");
 
 VNET_DEFINE(int, tcp_do_autorcvbuf) = 1;
-#define	V_tcp_do_autorcvbuf	VNET(tcp_do_autorcvbuf)
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, recvbuf_auto, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(tcp_do_autorcvbuf), 0,
     "Enable automatic receive buffer sizing");
 
 VNET_DEFINE(int, tcp_autorcvbuf_inc) = 16*1024;
-#define	V_tcp_autorcvbuf_inc	VNET(tcp_autorcvbuf_inc)
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, recvbuf_inc, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(tcp_autorcvbuf_inc), 0,
     "Incrementor step size of automatic receive buffer");
 
 VNET_DEFINE(int, tcp_autorcvbuf_max) = 2*1024*1024;
-#define	V_tcp_autorcvbuf_max	VNET(tcp_autorcvbuf_max)
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, recvbuf_max, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(tcp_autorcvbuf_max), 0,
     "Max size of automatic receive buffer");
@@ -435,16 +428,9 @@ cc_cong_signal(struct tcpcb *tp, struct tcphdr *th, uint32_t type)
 		tp->t_dupacks = 0;
 		tp->t_bytes_acked = 0;
 		EXIT_RECOVERY(tp->t_flags);
-		if (CC_ALGO(tp)->cong_signal == NULL) {
-			/*
-			 * RFC5681 Section 3.1 
-			 * ssthresh = max (FlightSize / 2, 2*SMSS) eq (4)
-			 */
-			tp->snd_ssthresh =
-			    max((tp->snd_max - tp->snd_una) / 2 / maxseg, 2)
-				* maxseg;
-			tp->snd_cwnd = maxseg;
-		}
+		tp->snd_ssthresh = max(2, min(tp->snd_wnd, tp->snd_cwnd) / 2 /
+		    maxseg) * maxseg;
+		tp->snd_cwnd = maxseg;
 		break;
 	case CC_RTO_ERR:
 		TCPSTAT_INC(tcps_sndrexmitbad);
@@ -1701,25 +1687,6 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 			to.to_tsecr = 0;
 	}
 	/*
-	 * If timestamps were negotiated during SYN/ACK they should
-	 * appear on every segment during this session and vice versa.
-	 */
-	if ((tp->t_flags & TF_RCVD_TSTMP) && !(to.to_flags & TOF_TS)) {
-		if ((s = tcp_log_addrs(inc, th, NULL, NULL))) {
-			log(LOG_DEBUG, "%s; %s: Timestamp missing, "
-			    "no action\n", s, __func__);
-			free(s, M_TCPLOG);
-		}
-	}
-	if (!(tp->t_flags & TF_RCVD_TSTMP) && (to.to_flags & TOF_TS)) {
-		if ((s = tcp_log_addrs(inc, th, NULL, NULL))) {
-			log(LOG_DEBUG, "%s; %s: Timestamp not expected, "
-			    "no action\n", s, __func__);
-			free(s, M_TCPLOG);
-		}
-	}
-
-	/*
 	 * Process options only when we get SYN/ACK back. The SYN case
 	 * for incoming connections is handled in tcp_syncache.
 	 * According to RFC1323 the window field in a SYN (i.e., a <SYN>
@@ -1747,6 +1714,25 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		if ((tp->t_flags & TF_SACK_PERMIT) &&
 		    (to.to_flags & TOF_SACKPERM) == 0)
 			tp->t_flags &= ~TF_SACK_PERMIT;
+	}
+
+	/*
+	 * If timestamps were negotiated during SYN/ACK they should
+	 * appear on every segment during this session and vice versa.
+	 */
+	if ((tp->t_flags & TF_RCVD_TSTMP) && !(to.to_flags & TOF_TS)) {
+		if ((s = tcp_log_addrs(inc, th, NULL, NULL))) {
+			log(LOG_DEBUG, "%s; %s: Timestamp missing, "
+			    "no action\n", s, __func__);
+			free(s, M_TCPLOG);
+		}
+	}
+	if (!(tp->t_flags & TF_RCVD_TSTMP) && (to.to_flags & TOF_TS)) {
+		if ((s = tcp_log_addrs(inc, th, NULL, NULL))) {
+			log(LOG_DEBUG, "%s; %s: Timestamp not expected, "
+			    "no action\n", s, __func__);
+			free(s, M_TCPLOG);
+		}
 	}
 
 	/*
@@ -2613,15 +2599,6 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 
 						if (awnd < tp->snd_ssthresh) {
 							tp->snd_cwnd += maxseg;
-							/*
-							 * RFC5681 Section 3.2 talks about cwnd
-							 * inflation on additional dupacks and
-							 * deflation on recovering from loss.
-							 *
-							 * We keep cwnd into check so that
-							 * we don't have to 'deflate' it when we
-							 * get out of recovery.
-							 */
 							if (tp->snd_cwnd > tp->snd_ssthresh)
 								tp->snd_cwnd = tp->snd_ssthresh;
 						}
@@ -2661,22 +2638,19 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 						TCPSTAT_INC(
 						    tcps_sack_recovery_episode);
 						tp->sack_newdata = tp->snd_nxt;
-						if (CC_ALGO(tp)->cong_signal == NULL)
-							tp->snd_cwnd = maxseg;
+						tp->snd_cwnd = maxseg;
 						(void) tp->t_fb->tfb_tcp_output(tp);
 						goto drop;
 					}
 					tp->snd_nxt = th->th_ack;
-					if (CC_ALGO(tp)->cong_signal == NULL)
-						tp->snd_cwnd = maxseg;
+					tp->snd_cwnd = maxseg;
 					(void) tp->t_fb->tfb_tcp_output(tp);
 					KASSERT(tp->snd_limited <= 2,
 					    ("%s: tp->snd_limited too big",
 					    __func__));
-					if (CC_ALGO(tp)->cong_signal == NULL)
-						tp->snd_cwnd = tp->snd_ssthresh +
-						    maxseg *
-						    (tp->t_dupacks - tp->snd_limited);
+					tp->snd_cwnd = tp->snd_ssthresh +
+					     maxseg *
+					     (tp->t_dupacks - tp->snd_limited);
 					if (SEQ_GT(onxt, tp->snd_nxt))
 						tp->snd_nxt = onxt;
 					goto drop;

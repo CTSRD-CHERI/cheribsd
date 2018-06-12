@@ -46,6 +46,7 @@ MAN=	aac.4 \
 	amdpm.4 \
 	${_amdsbwd.4} \
 	${_amdsmb.4} \
+	${_amdsmn.4} \
 	${_amdtemp.4} \
 	${_bxe.4} \
 	amr.4 \
@@ -253,6 +254,7 @@ MAN=	aac.4 \
 	led.4 \
 	lge.4 \
 	${_linux.4} \
+	liquidio.4 \
 	lm75.4 \
 	lmc.4 \
 	lo.4 \
@@ -374,7 +376,9 @@ MAN=	aac.4 \
 	ng_vlan.4 \
 	nmdm.4 \
 	nsp.4 \
-	${_ntb_hw.4} \
+	${_ntb.4} \
+	${_ntb_hw_intel.4} \
+	${_ntb_hw_plx.4} \
 	${_ntb_transport.4} \
 	${_if_ntb.4} \
 	null.4 \
@@ -564,6 +568,7 @@ MAN=	aac.4 \
 	wlan_tkip.4 \
 	wlan_wep.4 \
 	wlan_xauth.4 \
+	wmt.4 \
 	${_wpi.4} \
 	wsp.4 \
 	xe.4 \
@@ -687,7 +692,6 @@ MLINKS+=netintro.4 net.4 \
 	netintro.4 networking.4
 MLINKS+=${_nfe.4} ${_if_nfe.4}
 MLINKS+=nge.4 if_nge.4
-MLINKS+=${_ntb_hw.4} ${_ntb.4}
 MLINKS+=${_nxge.4} ${_if_nxge.4}
 MLINKS+=ow.4 onewire.4
 MLINKS+=pccbb.4 cbb.4
@@ -770,6 +774,7 @@ _attimer.4=	attimer.4
 _aibs.4=	aibs.4
 _amdsbwd.4=	amdsbwd.4
 _amdsmb.4=	amdsmb.4
+_amdsmn.4=	amdsmn.4
 _amdtemp.4=	amdtemp.4
 _asmc.4=	asmc.4
 _bxe.4=		bxe.4
@@ -836,7 +841,8 @@ _xnb.4=		xnb.4
 _if_ntb.4=	if_ntb.4
 _ioat.4=	ioat.4
 _ntb.4=		ntb.4
-_ntb_hw.4=	ntb_hw.4
+_ntb_hw_intel.4=	ntb_hw_intel.4
+_ntb_hw_plx.4=	ntb_hw_plx.4
 _ntb_transport.4=ntb_transport.4
 _qlxge.4=	qlxge.4
 _qlxgb.4=	qlxgb.4
@@ -890,6 +896,7 @@ MAN+=		iser.4
 
 .if ${MK_OFED} != "no"
 MAN+=		mlx4ib.4
+MAN+=		mlx5ib.4
 .endif
 
 .if ${MK_TESTS} != "no"

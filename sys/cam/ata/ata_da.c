@@ -637,6 +637,14 @@ static struct ada_quirk_entry ada_quirk_table[] =
 	},
 	{
 		/*
+		 * Samsung 750 SSDs
+		 * 4k optimised, NCQ TRIM seems to work
+		 */
+		{ T_DIRECT, SIP_MEDIA_FIXED, "*", "Samsung SSD 750*", "*" },
+		/*quirks*/ADA_Q_4K
+	},
+	{
+		/*
 		 * Samsung 830 Series SSDs
 		 * 4k optimised, NCQ TRIM Broken (normal TRIM is fine)
 		 */
@@ -649,6 +657,14 @@ static struct ada_quirk_entry ada_quirk_table[] =
 		 * 4k optimised, NCQ TRIM Broken (normal TRIM is fine)
 		 */
 		{ T_DIRECT, SIP_MEDIA_FIXED, "*", "Samsung SSD 840*", "*" },
+		/*quirks*/ADA_Q_4K | ADA_Q_NCQ_TRIM_BROKEN
+	},
+	{
+		/*
+		 * Samsung 845 SSDs
+		 * 4k optimised, NCQ TRIM Broken (normal TRIM is fine)
+		 */
+		{ T_DIRECT, SIP_MEDIA_FIXED, "*", "Samsung SSD 845*", "*" },
 		/*quirks*/ADA_Q_4K | ADA_Q_NCQ_TRIM_BROKEN
 	},
 	{
@@ -1041,6 +1057,7 @@ adadump(void *arg, void *virtual, vm_offset_t physical, off_t offset, size_t len
 		return (ENXIO);
 	}
 
+	memset(&ccb, 0, sizeof(ccb));
 	if (length > 0) {
 		xpt_setup_ccb(&ccb.ccb_h, periph->path, CAM_PRIORITY_NORMAL);
 		ccb.ccb_h.ccb_state = ADA_CCB_DUMP;
@@ -1063,8 +1080,8 @@ adadump(void *arg, void *virtual, vm_offset_t physical, off_t offset, size_t len
 		}
 		xpt_polled_action(&ccb);
 
-		error = cam_periph_error(&ccb,
-		    0, SF_NO_RECOVERY | SF_NO_RETRY, NULL);
+		error = adaerror(&ccb,
+		    0, SF_NO_RECOVERY | SF_NO_RETRY);
 		if ((ccb.ccb_h.status & CAM_DEV_QFRZN) != 0)
 			cam_release_devq(ccb.ccb_h.path, /*relsim_flags*/0,
 			    /*reduction*/0, /*timeout*/0, /*getcount_only*/0);
@@ -1099,8 +1116,8 @@ adadump(void *arg, void *virtual, vm_offset_t physical, off_t offset, size_t len
 			ata_28bit_cmd(&ccb.ataio, ATA_FLUSHCACHE, 0, 0, 0);
 		xpt_polled_action(&ccb);
 
-		error = cam_periph_error(&ccb,
-		    0, SF_NO_RECOVERY | SF_NO_RETRY, NULL);
+		error = adaerror(&ccb,
+		    0, SF_NO_RECOVERY | SF_NO_RETRY);
 		if ((ccb.ccb_h.status & CAM_DEV_QFRZN) != 0)
 			cam_release_devq(ccb.ccb_h.path, /*relsim_flags*/0,
 			    /*reduction*/0, /*timeout*/0, /*getcount_only*/0);
@@ -1304,7 +1321,7 @@ adaasync(void *callback_arg, u_int32_t code,
 		xpt_action((union ccb *)&cgd);
 		if (ADA_RA >= 0 && softc->flags & ADA_FLAG_CAN_RAHEAD)
 			softc->state = ADA_STATE_RAHEAD;
-		else if (ADA_WC >= 0 && softc->flags & ADA_FLAG_CAN_RAHEAD)
+		else if (ADA_WC >= 0 && softc->flags & ADA_FLAG_CAN_WCACHE)
 			softc->state = ADA_STATE_WCACHE;
 		else if ((softc->flags & ADA_FLAG_CAN_LOG)
 		      && (softc->zone_mode != ADA_ZONE_NONE))
@@ -2837,6 +2854,12 @@ adadone(struct cam_periph *periph, union ccb *done_ccb)
 		if (softc->outstanding_cmds == 0)
 			softc->flags |= ADA_FLAG_WAS_OTAG;
 
+		/*
+		 * We need to call cam_iosched before we call biodone so that we
+		 * don't measure any activity that happens in the completion
+		 * routine, which in the case of sendfile can be quite
+		 * extensive.
+		 */
 		cam_iosched_bio_complete(softc->cam_iosched, bp, done_ccb);
 		xpt_release_ccb(done_ccb);
 		if (state == ADA_CCB_TRIM) {
@@ -3443,7 +3466,7 @@ adaspindown(uint8_t cmd, int flags)
 {
 	struct cam_periph *periph;
 	struct ada_softc *softc;
-	union ccb *ccb;
+	struct ccb_ataio local_ccb;
 	int error;
 
 	CAM_PERIPH_FOREACH(periph, &adadriver) {
@@ -3463,8 +3486,11 @@ adaspindown(uint8_t cmd, int flags)
 		if (bootverbose)
 			xpt_print(periph->path, "spin-down\n");
 
-		ccb = cam_periph_getccb(periph, CAM_PRIORITY_NORMAL);
-		cam_fill_ataio(&ccb->ataio,
+		memset(&local_ccb, 0, sizeof(local_ccb));
+		xpt_setup_ccb(&local_ccb.ccb_h, periph->path, CAM_PRIORITY_NORMAL);
+		local_ccb.ccb_h.ccb_state = ADA_CCB_DUMP;
+
+		cam_fill_ataio(&local_ccb,
 				    0,
 				    adadone,
 				    CAM_DIR_NONE | flags,
@@ -3472,14 +3498,35 @@ adaspindown(uint8_t cmd, int flags)
 				    NULL,
 				    0,
 				    ada_default_timeout*1000);
-		ata_28bit_cmd(&ccb->ataio, cmd, 0, 0, 0);
+		ata_28bit_cmd(&local_ccb, cmd, 0, 0, 0);
 
-		error = cam_periph_runccb(ccb, adaerror, /*cam_flags*/0,
-		    /*sense_flags*/ SF_NO_RECOVERY | SF_NO_RETRY,
-		    softc->disk->d_devstat);
+		if (!SCHEDULER_STOPPED()) {
+			/*
+			 * Not panicing, can just do the normal runccb
+			 * XXX should make cam_periph_runccb work while
+			 * XXX panicing... later
+			 */
+			error = cam_periph_runccb((union ccb *)&local_ccb, adaerror,
+			    /*cam_flags*/0, /*sense_flags*/ SF_NO_RECOVERY | SF_NO_RETRY,
+			    softc->disk->d_devstat);
+		} else {
+			/*
+			 * Panicing, so we have to do this by hand: do
+			 * xpt_polled_action to run the request through the SIM,
+			 * extract the error, and if the queue was frozen,
+			 * unfreeze it. cam_periph_runccb takes care of these
+			 * details, but xpt_polled_action doesn't.
+			 */
+			xpt_polled_action((union ccb *)&local_ccb);
+			error = adaerror((union ccb *)&local_ccb, 0,
+			    SF_NO_RECOVERY | SF_NO_RETRY);
+			if ((local_ccb.ccb_h.status & CAM_DEV_QFRZN) != 0)
+				cam_release_devq(local_ccb.ccb_h.path,
+				    /*relsim_flags*/0, /*reduction*/0,
+				    /*timeout*/0, /*getcount_only*/0);
+		}
 		if (error != 0)
 			xpt_print(periph->path, "Spin-down disk failed\n");
-		xpt_release_ccb(ccb);
 		cam_periph_unlock(periph);
 	}
 }
@@ -3489,8 +3536,14 @@ adashutdown(void *arg, int howto)
 {
 
 	adaflush();
-	if (ada_spindown_shutdown != 0 &&
-	    (howto & (RB_HALT | RB_POWEROFF)) != 0)
+
+	/*
+	 * STANDBY IMMEDIATE flushes any volatile data to the drive so
+	 * do this always to ensure we flush a cosnsistent state to
+	 * the drive. adaspindown will ensure that we don't send this
+	 * to a drive that doesn't support it.
+	 */
+	if (ada_spindown_shutdown != 0)
 		adaspindown(ATA_STANDBY_IMMEDIATE, 0);
 }
 
@@ -3499,6 +3552,10 @@ adasuspend(void *arg)
 {
 
 	adaflush();
+	/*
+	 * SLEEP also fushes any volatile data, like STANDBY IMEDIATE,
+	 * so we don't need to send it as well.
+	 */
 	if (ada_spindown_suspend != 0)
 		adaspindown(ATA_SLEEP, CAM_DEV_QFREEZE);
 }

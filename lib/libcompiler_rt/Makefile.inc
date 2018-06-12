@@ -39,8 +39,8 @@ SRCF+=		divxc3
 SRCF+=		enable_execute_stack
 SRCF+=		eprintf
 SRCF+=		extendhfsf2
-SRCF+=		ffssi2
 SRCF+=		ffsdi2
+SRCF+=		ffssi2
 SRCF+=		ffsti2
 SRCF+=		fixdfdi
 SRCF+=		fixdfti
@@ -57,18 +57,12 @@ SRCF+=		fixunsxfsi
 SRCF+=		fixunsxfti
 SRCF+=		fixxfdi
 SRCF+=		fixxfti
-SRCF+=		floatdidf
-SRCF+=		floatdisf
 SRCF+=		floatditf
-SRCF+=		floatdixf
 SRCF+=		floatsitf
 SRCF+=		floattidf
 SRCF+=		floattisf
 SRCF+=		floattixf
-SRCF+=		floatundidf
-SRCF+=		floatundisf
 SRCF+=		floatunditf
-SRCF+=		floatundixf
 SRCF+=		floatunsidf
 SRCF+=		floatunsisf
 SRCF+=		floatuntidf
@@ -128,6 +122,23 @@ SRCF+=		umoddi3
 SRCF+=		umodsi3
 SRCF+=		umodti3
 
+# Avoid using SSE2 instructions on i386, if unsupported.
+.if ${MACHINE_CPUARCH} == "i386" && empty(MACHINE_CPU:Msse2)
+SRCS+=		floatdidf.c
+SRCS+=		floatdisf.c
+SRCS+=		floatdixf.c
+SRCS+=		floatundidf.c
+SRCS+=		floatundisf.c
+SRCS+=		floatundixf.c
+.else
+SRCF+=		floatdidf
+SRCF+=		floatdisf
+SRCF+=		floatdixf
+SRCF+=		floatundidf
+SRCF+=		floatundisf
+SRCF+=		floatundixf
+.endif
+
 # __cpu_model support, only used on x86
 .if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386"
 SRCF+=		cpu_model
@@ -180,11 +191,8 @@ SRCF+=		comparedf2
 SRCF+=		comparesf2
 .endif
 
-.if ${MACHINE_CPUARCH} != "mips"
-.endif
-
 # FreeBSD-specific atomic intrinsics.
-.if ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "armv6"
+.if ${MACHINE_CPUARCH} == "arm"
 .PATH:		${SRCTOP}/sys/arm/arm
 
 SRCF+=		stdatomic
@@ -206,7 +214,7 @@ SRCF+=		atomic
 
 
 .for file in ${SRCF}
-.if ${MACHINE_ARCH:Marmv6*} && (!defined(CPUTYPE) || ${CPUTYPE:M*soft*} == "") \
+.if ${MACHINE_ARCH:Marmv[67]*} && (!defined(CPUTYPE) || ${CPUTYPE:M*soft*} == "") \
     && exists(${CRTSRC}/${CRTARCH}/${file}vfp.S)
 SRCS+=		${file}vfp.S
 . elif exists(${CRTSRC}/${CRTARCH}/${file}.S)

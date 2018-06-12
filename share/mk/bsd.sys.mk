@@ -131,11 +131,6 @@ CWARNFLAGS+=	-Wno-error=address			\
 		-Wno-error=unused-value
 .endif
 
-# GCC 5.3.0
-.if ${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} >= 50300
-CWARNFLAGS+=	-Wno-error=strict-overflow
-.endif
-
 # GCC 6.1.0
 .if ${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} >= 60100
 CWARNFLAGS+=	-Wno-error=misleading-indentation	\
@@ -143,6 +138,23 @@ CWARNFLAGS+=	-Wno-error=misleading-indentation	\
 		-Wno-error=shift-negative-value		\
 		-Wno-error=tautological-compare		\
 		-Wno-error=unused-const-variable
+.endif
+
+# GCC 7.1.0
+.if ${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} >= 70100
+CWARNFLAGS+=	-Wno-error=deprecated			\
+		-Wno-error=pointer-compare		\
+		-Wno-error=format-truncation		\
+		-Wno-error=implicit-fallthrough		\
+		-Wno-error=expansion-to-defined		\
+		-Wno-error=int-in-bool-context		\
+		-Wno-error=bool-operation		\
+		-Wno-error=format-overflow		\
+		-Wno-error=stringop-overflow		\
+		-Wno-error=memset-elt-size		\
+		-Wno-error=int-in-bool-context		\
+		-Wno-error=unused-const-variable	\
+		-Wno-error=nonnull
 .endif
 
 # How to handle FreeBSD custom printf format specifiers.
@@ -194,6 +206,10 @@ SSP_CFLAGS?=	-fstack-protector
 .endif
 CFLAGS+=	${SSP_CFLAGS}
 .endif # SSP && !ARM && !MIPS
+
+# Additional flags passed in CFLAGS and CXXFLAGS when MK_DEBUG_FILES is
+# enabled.
+DEBUG_FILES_CFLAGS?= -g
 
 # Allow user-specified additional warning flags, plus compiler and file
 # specific flag overrides, unless we've overriden this...

@@ -1,7 +1,7 @@
 # $FreeBSD$
 #
 
-.include	"${.CURDIR}/../Makefile.ficl"
+.include	"../ficl.mk"
 
 BASE_SRCS=	dict.c ficl.c fileaccess.c float.c loader.c math64.c \
 		prefix.c search.c stack.c tools.c vm.c words.c
@@ -28,12 +28,12 @@ INTERNALLIB=
 .endif
 
 # Standard softwords
-.PATH: ${FICLDIR}/softwords
+.PATH: ${FICLSRC}/softwords
 SOFTWORDS=	softcore.fr jhlocal.fr marker.fr freebsd.fr ficllocal.fr \
 		ifbrack.fr
 # Optional OO extension softwords
 #SOFTWORDS+=	oo.fr classes.fr
 
 softcore.c: ${SOFTWORDS} softcore.awk
-	(cd ${FICLDIR}/softwords; cat ${SOFTWORDS} \
+	(cd ${FICLSRC}/softwords; cat ${SOFTWORDS} \
 	    | awk -f softcore.awk -v datestamp="`LC_ALL=C date`") > ${.TARGET}

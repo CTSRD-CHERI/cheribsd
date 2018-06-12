@@ -19,6 +19,16 @@
  * CDDL HEADER END
  */
 /*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
+/*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */

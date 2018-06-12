@@ -61,7 +61,7 @@ __FBSDID("$FreeBSD$");
 #elif defined(__powerpc__)
 #define	BREAKPOINT_INSTR	0x7fe00008	/* trap */
 #define	BREAKPOINT_INSTR_SZ	4
-#elif defined(__riscv__)
+#elif defined(__riscv)
 #define	BREAKPOINT_INSTR	0x00100073	/* sbreak */
 #define	BREAKPOINT_INSTR_SZ	4
 #else
@@ -100,7 +100,6 @@ proc_bkptset(struct proc_handle *phdl, uintptr_t address,
     unsigned long *saved)
 {
 	struct ptrace_io_desc piod;
-	uintptr_t caddr;
 	int ret = 0, stopped;
 	instr_t instr;
 
@@ -123,10 +122,9 @@ proc_bkptset(struct proc_handle *phdl, uintptr_t address,
 	/*
 	 * Read the original instruction.
 	 */
-	caddr = address;
 	instr = 0;
 	piod.piod_op = PIOD_READ_I;
-	piod.piod_offs = (void *)caddr;
+	piod.piod_offs = (void *)address;
 	piod.piod_addr = &instr;
 	piod.piod_len  = BREAKPOINT_INSTR_SZ;
 	if (ptrace(PT_IO, proc_getpid(phdl), (caddr_t)&piod, 0) < 0) {
@@ -139,10 +137,9 @@ proc_bkptset(struct proc_handle *phdl, uintptr_t address,
 	/*
 	 * Write a breakpoint instruction to that address.
 	 */
-	caddr = address;
 	instr = BREAKPOINT_INSTR;
 	piod.piod_op = PIOD_WRITE_I;
-	piod.piod_offs = (void *)caddr;
+	piod.piod_offs = (void *)address;
 	piod.piod_addr = &instr;
 	piod.piod_len  = BREAKPOINT_INSTR_SZ;
 	if (ptrace(PT_IO, proc_getpid(phdl), (caddr_t)&piod, 0) < 0) {
@@ -165,7 +162,6 @@ proc_bkptdel(struct proc_handle *phdl, uintptr_t address,
     unsigned long saved)
 {
 	struct ptrace_io_desc piod;
-	uintptr_t caddr;
 	int ret = 0, stopped;
 	instr_t instr;
 
@@ -187,10 +183,9 @@ proc_bkptdel(struct proc_handle *phdl, uintptr_t address,
 	/*
 	 * Overwrite the breakpoint instruction that we setup previously.
 	 */
-	caddr = address;
 	instr = saved;
 	piod.piod_op = PIOD_WRITE_I;
-	piod.piod_offs = (void *)caddr;
+	piod.piod_offs = (void *)address;
 	piod.piod_addr = &instr;
 	piod.piod_len  = BREAKPOINT_INSTR_SZ;
 	if (ptrace(PT_IO, proc_getpid(phdl), (caddr_t)&piod, 0) < 0) {

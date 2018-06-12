@@ -185,6 +185,57 @@ struct mps_table_lookup mps_sasdev_reason[] = {
 	{"Unknown",			0x00}
 };
 
+struct mps_table_lookup mps_iocstatus_string[] = {
+	{"success",			MPI2_IOCSTATUS_SUCCESS},
+	{"invalid function",		MPI2_IOCSTATUS_INVALID_FUNCTION},
+	{"scsi recovered error",	MPI2_IOCSTATUS_SCSI_RECOVERED_ERROR},
+	{"scsi invalid dev handle",	MPI2_IOCSTATUS_SCSI_INVALID_DEVHANDLE},
+	{"scsi device not there",	MPI2_IOCSTATUS_SCSI_DEVICE_NOT_THERE},
+	{"scsi data overrun",		MPI2_IOCSTATUS_SCSI_DATA_OVERRUN},
+	{"scsi data underrun",		MPI2_IOCSTATUS_SCSI_DATA_UNDERRUN},
+	{"scsi io data error",		MPI2_IOCSTATUS_SCSI_IO_DATA_ERROR},
+	{"scsi protocol error",		MPI2_IOCSTATUS_SCSI_PROTOCOL_ERROR},
+	{"scsi task terminated",	MPI2_IOCSTATUS_SCSI_TASK_TERMINATED},
+	{"scsi residual mismatch",	MPI2_IOCSTATUS_SCSI_RESIDUAL_MISMATCH},
+	{"scsi task mgmt failed",	MPI2_IOCSTATUS_SCSI_TASK_MGMT_FAILED},
+	{"scsi ioc terminated",		MPI2_IOCSTATUS_SCSI_IOC_TERMINATED},
+	{"scsi ext terminated",		MPI2_IOCSTATUS_SCSI_EXT_TERMINATED},
+	{"eedp guard error",		MPI2_IOCSTATUS_EEDP_GUARD_ERROR},
+	{"eedp ref tag error",		MPI2_IOCSTATUS_EEDP_REF_TAG_ERROR},
+	{"eedp app tag error",		MPI2_IOCSTATUS_EEDP_APP_TAG_ERROR},
+	{NULL, 0},
+	{"unknown",			0x00}
+};
+
+struct mps_table_lookup mps_scsi_status_string[] = {
+	{"good",			MPI2_SCSI_STATUS_GOOD},
+	{"check condition",		MPI2_SCSI_STATUS_CHECK_CONDITION},
+	{"condition met",		MPI2_SCSI_STATUS_CONDITION_MET},
+	{"busy",			MPI2_SCSI_STATUS_BUSY},
+	{"intermediate",		MPI2_SCSI_STATUS_INTERMEDIATE},
+	{"intermediate condmet",	MPI2_SCSI_STATUS_INTERMEDIATE_CONDMET},
+	{"reservation conflict",	MPI2_SCSI_STATUS_RESERVATION_CONFLICT},
+	{"command terminated",		MPI2_SCSI_STATUS_COMMAND_TERMINATED},
+	{"task set full",		MPI2_SCSI_STATUS_TASK_SET_FULL},
+	{"aca active",			MPI2_SCSI_STATUS_ACA_ACTIVE},
+	{"task aborted",		MPI2_SCSI_STATUS_TASK_ABORTED},
+	{NULL, 0},
+	{"unknown",			0x00}
+};
+
+struct mps_table_lookup mps_scsi_taskmgmt_string[] = {
+	{"task mgmt request completed",	MPI2_SCSITASKMGMT_RSP_TM_COMPLETE},
+	{"invalid frame",		MPI2_SCSITASKMGMT_RSP_INVALID_FRAME},
+	{"task mgmt request not supp",	MPI2_SCSITASKMGMT_RSP_TM_NOT_SUPPORTED},
+	{"task mgmt request failed",	MPI2_SCSITASKMGMT_RSP_TM_FAILED},
+	{"task mgmt request_succeeded",	MPI2_SCSITASKMGMT_RSP_TM_SUCCEEDED},
+	{"invalid lun",			MPI2_SCSITASKMGMT_RSP_TM_INVALID_LUN},
+	{"overlapped tag attempt",	0xA},
+	{"task queued on IOC",		MPI2_SCSITASKMGMT_RSP_IO_QUEUED_ON_IOC},
+	{NULL, 0},
+	{"unknown",			0x00}
+};
+
 void
 mps_describe_devinfo(uint32_t devinfo, char *string, int len)
 {
@@ -196,7 +247,7 @@ mps_describe_devinfo(uint32_t devinfo, char *string, int len)
 }
 
 void
-_mps_print_iocfacts(struct mps_softc *sc, MPI2_IOC_FACTS_REPLY *facts)
+mps_print_iocfacts(struct mps_softc *sc, MPI2_IOC_FACTS_REPLY *facts)
 {
 
 	MPS_PRINTFIELD_START(sc, "IOCFacts");
@@ -237,7 +288,7 @@ _mps_print_iocfacts(struct mps_softc *sc, MPI2_IOC_FACTS_REPLY *facts)
 }
 
 void
-_mps_print_portfacts(struct mps_softc *sc, MPI2_PORT_FACTS_REPLY *facts)
+mps_print_portfacts(struct mps_softc *sc, MPI2_PORT_FACTS_REPLY *facts)
 {
 
 	MPS_PRINTFIELD_START(sc, "PortFacts");
@@ -247,7 +298,7 @@ _mps_print_portfacts(struct mps_softc *sc, MPI2_PORT_FACTS_REPLY *facts)
 }
 
 void
-_mps_print_event(struct mps_softc *sc, MPI2_EVENT_NOTIFICATION_REPLY *event)
+mps_print_evt_generic(struct mps_softc *sc, MPI2_EVENT_NOTIFICATION_REPLY *event)
 {
 
 	MPS_PRINTFIELD_START(sc, "EventReply");
@@ -259,7 +310,7 @@ _mps_print_event(struct mps_softc *sc, MPI2_EVENT_NOTIFICATION_REPLY *event)
 }
 
 void
-_mps_print_sasdev0(struct mps_softc *sc, MPI2_CONFIG_PAGE_SAS_DEV_0 *buf)
+mps_print_sasdev0(struct mps_softc *sc, MPI2_CONFIG_PAGE_SAS_DEV_0 *buf)
 {
 	MPS_PRINTFIELD_START(sc, "SAS Device Page 0");
 	MPS_PRINTFIELD(sc, buf, Slot, %d);
@@ -288,10 +339,10 @@ _mps_print_sasdev0(struct mps_softc *sc, MPI2_CONFIG_PAGE_SAS_DEV_0 *buf)
 }
 
 void
-_mps_print_evt_sas(struct mps_softc *sc, MPI2_EVENT_NOTIFICATION_REPLY *event)
+mps_print_evt_sas(struct mps_softc *sc, MPI2_EVENT_NOTIFICATION_REPLY *event)
 {
 
-	_mps_print_event(sc, event);
+	mps_print_evt_generic(sc, event);
 
 	switch(event->Event) {
 	case MPI2_EVENT_SAS_DISCOVERY:
@@ -384,7 +435,7 @@ _mps_print_evt_sas(struct mps_softc *sc, MPI2_EVENT_NOTIFICATION_REPLY *event)
 }
 
 void
-_mps_print_expander1(struct mps_softc *sc, MPI2_CONFIG_PAGE_EXPANDER_1 *buf)
+mps_print_expander1(struct mps_softc *sc, MPI2_CONFIG_PAGE_EXPANDER_1 *buf)
 {
 	MPS_PRINTFIELD_START(sc, "SAS Expander Page 1 #%d", buf->Phy);
 	MPS_PRINTFIELD(sc, buf, PhysicalPort, %d);
@@ -424,7 +475,7 @@ _mps_print_expander1(struct mps_softc *sc, MPI2_CONFIG_PAGE_EXPANDER_1 *buf)
 }
 
 void
-_mps_print_sasphy0(struct mps_softc *sc, MPI2_CONFIG_PAGE_SAS_PHY_0 *buf)
+mps_print_sasphy0(struct mps_softc *sc, MPI2_CONFIG_PAGE_SAS_PHY_0 *buf)
 {
 	MPS_PRINTFIELD_START(sc, "SAS PHY Page 0");
 	MPS_PRINTFIELD(sc, buf, OwnerDevHandle, 0x%04x);

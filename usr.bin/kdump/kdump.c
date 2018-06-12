@@ -61,7 +61,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/un.h>
 #include <sys/queue.h>
 #include <sys/wait.h>
-#ifdef HAVE_LIBCASPER
+#ifdef WITH_CASPER
 #include <sys/nv.h>
 #endif
 #include <arpa/inet.h>
@@ -85,7 +85,7 @@ __FBSDID("$FreeBSD$");
 #include <vis.h>
 #include "ktrace.h"
 
-#ifdef HAVE_LIBCASPER
+#ifdef WITH_CASPER
 #include <libcasper.h>
 
 #include <casper/cap_grp.h>
@@ -172,7 +172,7 @@ struct proc_info
 
 static TAILQ_HEAD(trace_procs, proc_info) trace_procs;
 
-#ifdef HAVE_LIBCASPER
+#ifdef WITH_CASPER
 static cap_channel_t *cappwd, *capgrp;
 #endif
 
@@ -201,7 +201,7 @@ localtime_init(void)
 	(void)localtime(&ltime);
 }
 
-#ifdef HAVE_LIBCASPER
+#ifdef WITH_CASPER
 static int
 cappwdgrp_setup(cap_channel_t **cappwdp, cap_channel_t **capgrpp)
 {
@@ -243,7 +243,7 @@ cappwdgrp_setup(cap_channel_t **cappwdp, cap_channel_t **capgrpp)
 	*capgrpp = capgrploc;
 	return (0);
 }
-#endif	/* HAVE_LIBCASPER */
+#endif	/* WITH_CASPER */
 
 static void
 print_integer_arg(const char *(*decoder)(int), int value)
@@ -451,7 +451,7 @@ main(int argc, char *argv[])
 
 	strerror_init();
 	localtime_init();
-#ifdef HAVE_LIBCASPER
+#ifdef WITH_CASPER
 	if (resolv != 0) {
 		if (cappwdgrp_setup(&cappwd, &capgrp) < 0) {
 			cappwd = NULL;
@@ -1087,6 +1087,15 @@ ktrsyscall(struct ktr_syscall *ktr, u_int sv_flags)
 				ip++;
 				narg--;
 				break;
+			case SYS_pathconf:
+			case SYS_lpathconf:
+			case SYS_fpathconf:
+				print_number(ip, narg, c);
+				putchar(',');
+				print_integer_arg(sysdecode_pathconf_name, *ip);
+				ip++;
+				narg--;
+				break;
 			case SYS_getpriority:
 			case SYS_setpriority:
 				putchar('(');
@@ -1446,6 +1455,7 @@ ktrsyscall(struct ktr_syscall *ktr, u_int sv_flags)
 				print_integer_arg_valid(sysdecode_atfd, *ip);
 				ip++;
 				narg--;
+				print_number(ip, narg, c);
 				break;
 			case SYS_cap_fcntls_limit:
 				print_number(ip, narg, c);
@@ -1503,6 +1513,41 @@ ktrsyscall(struct ktr_syscall *ktr, u_int sv_flags)
 			case SYS_truncate:
 				print_number(ip, narg, c);
 				print_number64(first, ip, narg, c);
+				break;
+			case SYS_fchownat:
+				print_number(ip, narg, c);
+				print_number(ip, narg, c);
+				print_number(ip, narg, c);
+				break;
+			case SYS_fstatat:
+			case SYS_utimensat:
+				print_number(ip, narg, c);
+				print_number(ip, narg, c);
+				break;
+			case SYS_unlinkat:
+				print_number(ip, narg, c);
+				break;
+			case SYS_sysarch:
+				putchar('(');
+				print_integer_arg(sysdecode_sysarch_number, *ip);
+				ip++;
+				narg--;
+				c = ',';
+				break;
+			}
+			switch (ktr->ktr_code) {
+			case SYS_chflagsat:
+			case SYS_fchownat:
+			case SYS_faccessat:
+			case SYS_fchmodat:
+			case SYS_fstatat:
+			case SYS_linkat:
+			case SYS_unlinkat:
+			case SYS_utimensat:
+				putchar(',');
+				print_mask_arg0(sysdecode_atflags, *ip);
+				ip++;
+				narg--;
 				break;
 			}
 		}
@@ -1856,7 +1901,7 @@ ktrstat(struct stat *statp)
 	if (resolv == 0) {
 		pwd = NULL;
 	} else {
-#ifdef HAVE_LIBCASPER
+#ifdef WITH_CASPER
 		if (cappwd != NULL)
 			pwd = cap_getpwuid(cappwd, statp->st_uid);
 		else
@@ -1870,7 +1915,7 @@ ktrstat(struct stat *statp)
 	if (resolv == 0) {
 		grp = NULL;
 	} else {
-#ifdef HAVE_LIBCASPER
+#ifdef WITH_CASPER
 		if (capgrp != NULL)
 			grp = cap_getgrgid(capgrp, statp->st_gid);
 		else

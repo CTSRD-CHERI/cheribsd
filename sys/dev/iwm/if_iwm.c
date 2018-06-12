@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_iwm.c,v 1.42 2015/05/30 02:49:23 deraadt Exp $	*/
+/*	$OpenBSD: if_iwm.c,v 1.167 2017/04/04 00:40:52 claudio Exp $	*/
 
 /*
  * Copyright (c) 2014 genua mbh <info@genua.de>
@@ -325,8 +325,10 @@ static int	iwm_mvm_get_signal_strength(struct iwm_softc *,
 					    struct iwm_rx_phy_info *);
 static void	iwm_mvm_rx_rx_phy_cmd(struct iwm_softc *,
                                       struct iwm_rx_packet *);
-static int	iwm_get_noise(struct iwm_softc *sc,
+static int	iwm_get_noise(struct iwm_softc *,
 		    const struct iwm_mvm_statistics_rx_non_phy *);
+static void	iwm_mvm_handle_rx_statistics(struct iwm_softc *,
+		    struct iwm_rx_packet *);
 static boolean_t iwm_mvm_rx_rx_mpdu(struct iwm_softc *, struct mbuf *,
 				    uint32_t, boolean_t);
 static int	iwm_mvm_rx_tx_cmd_single(struct iwm_softc *,
@@ -388,6 +390,7 @@ static struct ieee80211vap *
 		               const uint8_t [IEEE80211_ADDR_LEN],
 		               const uint8_t [IEEE80211_ADDR_LEN]);
 static void	iwm_vap_delete(struct ieee80211vap *);
+static void	iwm_xmit_queue_drain(struct iwm_softc *);
 static void	iwm_scan_start(struct ieee80211com *);
 static void	iwm_scan_end(struct ieee80211com *);
 static void	iwm_update_mcast(struct ieee80211com *);
@@ -3158,6 +3161,15 @@ iwm_get_noise(struct iwm_softc *sc,
 #endif
 }
 
+static void
+iwm_mvm_handle_rx_statistics(struct iwm_softc *sc, struct iwm_rx_packet *pkt)
+{
+	struct iwm_notif_statistics_v10 *stats = (void *)&pkt->data;
+
+	memcpy(&sc->sc_stats, stats, sizeof(sc->sc_stats));
+	sc->sc_noise = iwm_get_noise(sc, &stats->rx.general);
+}
+
 /*
  * iwm_mvm_rx_rx_mpdu - IWM_REPLY_RX_MPDU_CMD handler
  *
@@ -4103,7 +4115,7 @@ iwm_release(struct iwm_softc *sc, struct iwm_node *in)
 	 * get here from RUN state.
 	 */
 	tfd_msk = 0xf;
-	mbufq_drain(&sc->sc_snd);
+	iwm_xmit_queue_drain(sc);
 	iwm_mvm_flush_tx_path(sc, tfd_msk, IWM_CMD_SYNC);
 	/*
 	 * We seem to get away with just synchronously sending the
@@ -4439,13 +4451,6 @@ iwm_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		break;
 
 	case IEEE80211_S_RUN:
-	{
-		struct iwm_host_cmd cmd = {
-			.id = IWM_LQ_CMD,
-			.len = { sizeof(in->in_lq), },
-			.flags = IWM_CMD_SYNC,
-		};
-
 		in = IWM_NODE(vap->iv_bss);
 		/* Update the association state, now we have it all */
 		/* (eg associd comes in at this point */
@@ -4470,15 +4475,13 @@ iwm_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		iwm_mvm_update_quotas(sc, ivp);
 		iwm_setrates(sc, in);
 
-		cmd.data[0] = &in->in_lq;
-		if ((error = iwm_send_cmd(sc, &cmd)) != 0) {
+		if ((error = iwm_mvm_send_lq_cmd(sc, &in->in_lq, TRUE)) != 0) {
 			device_printf(sc->sc_dev,
-			    "%s: IWM_LQ_CMD failed\n", __func__);
+			    "%s: IWM_LQ_CMD failed: %d\n", __func__, error);
 		}
 
 		iwm_mvm_led_enable(sc);
 		break;
-	}
 
 	default:
 		break;
@@ -5291,13 +5294,9 @@ iwm_handle_rxb(struct iwm_softc *sc, struct mbuf *m)
 		case IWM_CALIB_RES_NOTIF_PHY_DB:
 			break;
 
-		case IWM_STATISTICS_NOTIFICATION: {
-			struct iwm_notif_statistics *stats;
-			stats = (void *)pkt->data;
-			memcpy(&sc->sc_stats, stats, sizeof(sc->sc_stats));
-			sc->sc_noise = iwm_get_noise(sc, &stats->rx.general);
+		case IWM_STATISTICS_NOTIFICATION:
+			iwm_mvm_handle_rx_statistics(sc, pkt);
 			break;
-		}
 
 		case IWM_NVM_ACCESS_CMD:
 		case IWM_MCC_UPDATE_CMD:
@@ -5691,6 +5690,7 @@ iwm_intr(void *arg)
 #define	PCI_PRODUCT_INTEL_WL_7265_2	0x095b
 #define	PCI_PRODUCT_INTEL_WL_8260_1	0x24f3
 #define	PCI_PRODUCT_INTEL_WL_8260_2	0x24f4
+#define	PCI_PRODUCT_INTEL_WL_8265_1	0x24fd
 
 static const struct iwm_devices {
 	uint16_t		device;
@@ -5706,6 +5706,7 @@ static const struct iwm_devices {
 	{ PCI_PRODUCT_INTEL_WL_7265_2, &iwm7265_cfg },
 	{ PCI_PRODUCT_INTEL_WL_8260_1, &iwm8260_cfg },
 	{ PCI_PRODUCT_INTEL_WL_8260_2, &iwm8260_cfg },
+	{ PCI_PRODUCT_INTEL_WL_8265_1, &iwm8265_cfg },
 };
 
 static int
@@ -6214,6 +6215,19 @@ iwm_vap_delete(struct ieee80211vap *vap)
 }
 
 static void
+iwm_xmit_queue_drain(struct iwm_softc *sc)
+{
+	struct mbuf *m;
+	struct ieee80211_node *ni;
+
+	while ((m = mbufq_dequeue(&sc->sc_snd)) != NULL) {
+		ni = (struct ieee80211_node *)m->m_pkthdr.rcvif;
+		ieee80211_free_node(ni);
+		m_freem(m);
+	}
+}
+
+static void
 iwm_scan_start(struct ieee80211com *ic)
 {
 	struct ieee80211vap *vap = TAILQ_FIRST(&ic->ic_vaps);
@@ -6372,6 +6386,9 @@ iwm_detach_local(struct iwm_softc *sc, int do_net80211)
 	callout_drain(&sc->sc_watchdog_to);
 	iwm_stop_device(sc);
 	if (do_net80211) {
+		IWM_LOCK(sc);
+		iwm_xmit_queue_drain(sc);
+		IWM_UNLOCK(sc);
 		ieee80211_ifdetach(&sc->sc_ic);
 	}
 
@@ -6405,7 +6422,6 @@ iwm_detach_local(struct iwm_softc *sc, int do_net80211)
 		sc->sc_notif_wait = NULL;
 	}
 
-	mbufq_drain(&sc->sc_snd);
 	IWM_LOCK_DESTROY(sc);
 
 	return (0);

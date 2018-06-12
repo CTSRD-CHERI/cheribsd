@@ -25,6 +25,17 @@ ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 THIS SOFTWARE.
 
 ****************************************************************/
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_size"
+ *   ],
+ *   "change_comment": "static array size"
+ * }
+ * CHERI CHANGES END
+ */
 
 /* $FreeBSD$ */
 

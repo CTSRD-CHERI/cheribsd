@@ -50,7 +50,7 @@ struct vnode;
 /*
  * Limits and constants
  */
-#define PFS_NAMELEN		24
+#define PFS_NAMELEN		48
 #define PFS_FSNAMELEN		16	/* equal to MFSNAMELEN */
 #define PFS_DELEN		(offsetof(struct dirent, d_name) + PFS_NAMELEN)
 
@@ -81,7 +81,6 @@ typedef enum {
  */
 struct pfs_info;
 struct pfs_node;
-struct pfs_bitmap;
 
 /*
  * Init / uninit callback
@@ -120,8 +119,6 @@ struct vattr;
 #define PFS_ATTR_PROTO(name) \
 	int name(PFS_ATTR_ARGS);
 typedef int (*pfs_attr_t)(PFS_ATTR_ARGS);
-
-struct pfs_bitmap;		/* opaque */
 
 /*
  * Visibility callback

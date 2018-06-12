@@ -8,6 +8,18 @@
  * ===----------------------------------------------------------------------===
  *
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ],
+ *   "change_comment": "encoded virtual address to pointer",
+ *   "hybrid_specific": false
+ * }
+ * CHERI CHANGES END
+ */
 
 #include "int_lib.h"
 

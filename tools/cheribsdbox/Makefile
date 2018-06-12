@@ -11,7 +11,9 @@ CHERIBSDBOX_DIR?=	/bin
 BINDIR?=${CHERIBSDBOX_DIR}
 # We want to build all these tools as statically linked MIPS binaries to save size
 WANT_CHERI=		none
-CRUNCH_BUILDOPTS+=	WANT_CHERI=none
+CRUNCH_BUILDOPTS+=	WANT_CHERI=none -DWITHOUT_TESTS MK_TESTS=no
+# Avoid linking against libcasper for tcpdump/traceroute/kdump:
+CRUNCH_BUILDOPTS+=	-DWITHOUT_CASPER MK_CASPER=no
 
 # Do not do hardlinks as part of the install since we want to be able to install
 # this without conflicting with the real binaries and instead do some mtree
@@ -63,14 +65,9 @@ CRUNCH_SHLIBS+=	-lz
 
 # grep/tar/xz
 CRUNCH_LIBS+=	-llzma
+CRUNCH_LIBS+=	-larchive
 # ktrace:
 CRUNCH_LIBS+=	-lsysdecode
-
-# Avoid linking against libcasper for tcpdump/traceroute/kdump:
-CRUNCH_BUILDOPTS_tcpdump= -DWITHOUT_CASPER MK_CASPER=no
-CRUNCH_BUILDOPTS_traceroute= -DWITHOUT_CASPER MK_CASPER=no
-CRUNCH_BUILDOPTS_traceroute6= -DWITHOUT_CASPER MK_CASPER=no
-CRUNCH_BUILDOPTS_kdump= -DWITHOUT_CASPER MK_CASPER=no
 
 # login/su (could theoretically use static_libpam but that will probably not work)
 CRUNCH_SHLIBS+= -lpam -lbsm
@@ -101,24 +98,42 @@ CRUNCH_PROGS_bin+=	cat \
 		chflags \
 		chmod \
 		cp \
+		date \
 		dd \
 		df \
+		echo \
 		expr \
 		hostname \
 		kenv \
+		kill \
 		ln \
 		ls \
 		mkdir \
 		mv \
 		ps \
+		pwd \
 		realpath \
 		rm \
 		rmdir \
 		sleep \
 		stty \
-		test
+		test \
+		uuidgen
 
 CRUNCH_ALIAS_test=	[
+
+# Su doesn't work with cheribsdbox bin/sh and bin/csh because it sets argv[0]
+# and then cheribsdbox thinks it should execute _su
+CRUNCH_SUPPRESS_LINK_sh=	1
+CRUNCH_BUILDTOOLS+=	bin/sh
+CRUNCH_PROGS_bin+=	sh
+# For now don't include csh
+.if 0
+CRUNCH_ALIAS_sh=	-sh
+CRUNCH_BUILDTOOLS+=	bin/csh
+CRUNCH_ALIAS_csh=	-csh tcsh -tcsh
+.endif
+
 
 ###################################################################
 # Programs from standard /sbin
@@ -187,6 +202,7 @@ CRUNCH_LIBS+=	-lbz2
 CRUNCH_PROGS_usr.bin+= \
 		basename \
 		bzip2 \
+		diff \
 		dirname \
 		fetch \
 		find \
@@ -209,6 +225,7 @@ CRUNCH_PROGS_usr.bin+= \
 		seq \
 		sockstat \
 		tail \
+		tar \
 		tee \
 		tftp \
 		time \
@@ -223,20 +240,11 @@ CRUNCH_PROGS_usr.bin+= \
 		which \
 		xargs
 
-CRUNCH_ALIAS_bzip2= bunzip2
-CRUNCH_ALIAS_hexdump= hd od
-CRUNCH_ALIAS_w= uptime
-
-# Su breaks bin/sh and bin/csh because it sets argv[0] and then cheribsdbox
-# thinks it should execute _su
+CRUNCH_ALIAS_bzip2=	bunzip2
+CRUNCH_ALIAS_tar=	bsdtar
+CRUNCH_ALIAS_hexdump=	hd od
+CRUNCH_ALIAS_w=	uptime
 CRUNCH_PROGS_usr.bin+=su
-.if 0
-CRUNCH_BUILDTOOLS+=	bin/sh
-CRUNCH_ALIAS_sh=	-sh
-CRUNCH_BUILDTOOLS+=	bin/csh
-CRUNCH_ALIAS_csh=	-csh tcsh -tcsh
-.endif
-
 
 # FIXME: wait -> usr.bin/alias (but that is just a script so how to add
 .if 0
@@ -289,13 +297,18 @@ CRUNCH_PROGS_usr.sbin+= \
 		usbconfig \
 		watch
 
-# TODO: (not sure how to make this work because -lnetbsd is marked as internallib
-# so it will give a linker error
-# TODO: maybe just add the c files needed from libnetbsd?
-# Or maybe we don't actually need mtree which would be even better
-# CRUNCH_SRCDIRS+=nmtree
-# CRUNCH_ALIAS_nmtree= mtree
-# CRUNCH_LIBS+= -lnetbsd
+
+# Also build mount_smb for QEMU user-mode smb shares:
+CRUNCH_PROGS_usr.sbin+=	mount_smbfs
+CRUNCH_LIBS+=	-lsmb
+
+# Build mtree as well:
+CRUNCH_PROGS_usr.sbin+=	nmtree
+CRUNCH_ALIAS_nmtree= mtree
+# TODO: Not sure what the correct way of doing this is because -lnetbsd is
+# marked as internallib so -lnetbsd will give a linker error
+# It seems like ${LIBNETBSD} works:
+CRUNCH_LIBS+=	${LIBNETBSD}
 
 # usr/sbin/de4ctl
 # usr/sbin/flashit
@@ -306,6 +319,9 @@ CRUNCH_PROGS_usr.sbin+= \
 # TODO: do we need ctsrd/bin/wr?
 
 
+
+
+
 ##################################################################
 
 CRUNCH_SRCDIRS+= libexec
@@ -313,6 +329,47 @@ CRUNCH_PROGS_libexec+=	getty
 # from sshd: usr/libexec/sftp-server
 
 
+##### sshd, ssh, scp: #####
+# TODO: should we build a separate binary for these programs?
+
+CRUNCH_SRCDIRS+= secure/usr.sbin
+CRUNCH_PROGS_secure/usr.sbin+=	sshd
+# TODO: should we link libssh static and use ${LIBSSH}?
+CRUNCH_SHLIBS+=	-lpam -lutil
+
+# Build ssh deps static?
+CRUNCH_LIBS+=	${LIBSSH}
+.if ${MK_LDNS} != "no"
+# needed by LIBSSH
+CRUNCH_LIBS+=	${LIBLDNS}
+.endif
+
+
+CRUNCH_SRCDIRS+= secure/usr.bin
+CRUNCH_PROGS_secure/usr.bin+=	scp sftp ssh ssh-keygen
+
+CRUNCH_SRCDIRS+= secure/libexec
+CRUNCH_PROGS_secure/libexec+=	sftp-server
+
+# Disable all optional SSH features to make sshd,scp,ssh as small as possible
+DISABLE_OPTIONAL_SSH_FEATURES+=	\
+	MK_AUDIT=no \
+	MK_BLACKLIST_SUPPORT=no \
+	MK_TCP_WRAPPERS=no
+# Kerberos support uses up way too much space on our minimal images:
+# so let's build sshd without it
+DISABLE_OPTIONAL_SSH_FEATURES+=MK_KERBEROS_SUPPORT=no
+# TODO: would be nice to add CRUNCH_BUILDOPTS+=	MK_LDNS=no
+# However, libprivatessh links against ldns so we can't skip it
+
+CRUNCH_BUILDOPTS_sshd+=${DISABLE_OPTIONAL_SSH_FEATURES}
+CRUNCH_BUILDOPTS_scp+=${DISABLE_OPTIONAL_SSH_FEATURES}
+CRUNCH_BUILDOPTS_ssh+=${DISABLE_OPTIONAL_SSH_FEATURES}
+CRUNCH_BUILDOPTS_ssh-keygen+=${DISABLE_OPTIONAL_SSH_FEATURES}
+CRUNCH_BUILDOPTS_sftp-server+=${DISABLE_OPTIONAL_SSH_FEATURES}
+
+
+### END programs ####
 
 # Generate an mtree file to be used when building the FPGA images
 # I'm not sure how to add hardlinks to makefs without actually writing the
@@ -337,6 +394,12 @@ INSTALLDIR_usr.sbin=/usr/sbin
 LINKPATH_usr.sbin:=../../${PROG}
 INSTALLDIR_libexec=/usr/libexec
 LINKPATH_libexec:=../../${PROG}
+INSTALLDIR_secure/usr.sbin=/usr/sbin
+LINKPATH_secure/usr.sbin:=../../${PROG}
+INSTALLDIR_secure/usr.bin=/usr/bin
+LINKPATH_secure/usr.bin:=../../${PROG}
+INSTALLDIR_secure/libexec=/usr/libexec
+LINKPATH_secure/libexec:=../../${PROG}
 
 cheribsdbox.mtree: Makefile
 	echo '#mtree 2.0' > ${.TARGET}

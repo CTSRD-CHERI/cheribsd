@@ -1,5 +1,15 @@
 #ifndef JEMALLOC_INTERNAL_ARENA_INLINES_B_H
 #define JEMALLOC_INTERNAL_ARENA_INLINES_B_H
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "virtual_address"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include "jemalloc/internal/jemalloc_internal_types.h"
 #include "jemalloc/internal/mutex.h"

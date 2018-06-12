@@ -28,6 +28,18 @@
  *
  * $FreeBSD$
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ],
+ *   "change_comment": "capabilities from integer strings",
+ *   "hybrid_specific": false
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <stdio.h>
 #include <inttypes.h>

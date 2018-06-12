@@ -1,0 +1,95 @@
+CHERI change annotations
+========================
+
+Files changed for CHERI (either CHERI support of CheriABI,
+pure-capability programs) in CheriBSD are annotated with JSON in
+comments.  The following example shows all the current annotations.
+
+```
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi",
+ *     "hashing",
+ *     "monotonicity",
+ *     "pointer_alignment",
+ *     "pointer_as_integer",
+ *     "pointer_bit_flags",
+ *     "pointer_integrity",
+ *     "pointer_provenance",
+ *     "pointer_size",
+ *     "support",
+ *     "unsupported",
+ *     "virtual_address",
+ *     "other"
+ *   ],
+ *   "change_comment": "",
+ *   "hybrid_specific": false
+ * }
+ * CHERI CHANGES END
+ */
+```
+
+## Fields
+
+`updated`: Date in YYYYMMDD the comment was updated in UTC.  Intended
+for used by validation tools.
+
+`changes`: Zero or more tags indicating the types of changes.  Current
+values are:
+
+ * `function_abi` - Changes required by the CHERI-MIPS calling
+   convention such as declaring arguments in prototypes and va_args and
+   non-va_args functions having different register use.
+ * `hashing` - Use of pointer addresses in a hash.  In practice, a subset
+   of `virtual address, but common enough to call out.
+ * `monotonicity` - Need to retrieve a capability with greater range or
+   permissions from a lesser capability.
+ * `pointer_alignment` - Aligning (or checking the alignment of) the
+   virtual address pointed to by a capability.
+ * `pointer_as_integer` - Storing integers in pointer types or
+   fabricating pointers from integers (often without any intent to use said
+   pointers).
+ * `pointer_bit_flags` - Storing and retrieving flags from the lower
+   bits of strongly-aligned pointers.
+ * `pointer_integrity` - Avoiding casts or misaligned storage that does
+   not preserve tags.
+ * `pointer_provenance` - Deriving pointers from the wrong source.  A
+   common(ish) optimization in updating pointers from `realloc()` by
+   incrementing the old pointer by the difference of the old and new
+   pointers.
+ * `pointer_size` - Working around issues caused by larger pointers
+   such as increased alignment.  Also dealing with conflation of the
+   size of pointers and the size of the virtual address space.
+ * `support` - Adding support for CHERI.
+ * `unsupported` - Working around unsupported features such as combining
+   adjacent `mmap()` allocations, fixed `mmap()` allocations, or `sbrk()`.
+ * `virtual_address` - Need to work with the virtual address (not the
+   offset) of capabilities.
+ * `other` - Other unrelated changes.
+
+`change_comment`: Optional comment describing changes.
+
+`hybrid_specific`: Defined to `true` if the change only applies to the
+hybrid ABI.  Set to `false` or not present otherwise.
+
+## Conventions
+
+All lines of the annotation have the same prefix as is before `CHERI CHANGES
+START` e.g.:
+
+```
+ * CHERI CHANGES START
+ * { ... }
+ * CHERI CHANGES END
+```
+or
+```
+# CHERI CHANGES START
+# { ... }
+# CHERI CHANGES END
+```
+This facilitates stripping local comment characters regardless of the
+file type.

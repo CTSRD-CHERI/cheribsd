@@ -100,13 +100,15 @@ extern vm_offset_t kernel_vm_end;
 /*
  * Flags for pmap_enter().  The bits in the low-order byte are reserved
  * for the protection code (vm_prot_t) that describes the fault type.
+ * Bits 24 through 31 are reserved for the pmap's internal use.
  */
-#define	PMAP_ENTER_NOSLEEP	0x0100
-#define	PMAP_ENTER_WIRED	0x0200
+#define	PMAP_ENTER_NOSLEEP	0x00000100
+#define	PMAP_ENTER_WIRED	0x00000200
 #ifdef CPU_CHERI
-#define	PMAP_ENTER_NOLOADTAGS	0x0400
-#define	PMAP_ENTER_NOSTORETAGS	0x0800
+#define	PMAP_ENTER_NOLOADTAGS	0x00000400
+#define	PMAP_ENTER_NOSTORETAGS	0x00000800
 #endif
+#define	PMAP_ENTER_RESERVED	0xFF000000
 
 /*
  * Define the maximum number of machine-dependent reference bits that are
