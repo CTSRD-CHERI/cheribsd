@@ -972,6 +972,12 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "test multiply-mapped SHM_ANON objects",
 	  .ct_func = cheritest_vm_tag_shm_open_anon_shared2x, },
 
+	{ .ct_name = "cheritest_vm_shm_open_anon_unix_surprise",
+	  .ct_desc = "test SHM_ANON vs SCM_RIGHTS",
+	  .ct_func = cheritest_vm_shm_open_anon_unix_surprise,
+	  .ct_xfail_reason =
+	    "Tags currently survive cross-AS aliasing of SHM_ANON objects", },
+
 	{ .ct_name = "cheritest_vm_tag_dev_zero_shared",
 	  .ct_desc = "check tags are stored for /dev/zero MAP_SHARED pages",
 	  .ct_func = cheritest_vm_tag_dev_zero_shared, },
