@@ -339,17 +339,17 @@ static void
 dtrace_nullop(void)
 {}
 
-static dtrace_pops_t	dtrace_provider_ops = {
-	(void (*)(void *, dtrace_probedesc_t *))dtrace_nullop,
-	(void (*)(void *, modctl_t *))dtrace_nullop,
-	(void (*)(void *, dtrace_id_t, void *))dtrace_nullop,
-	(void (*)(void *, dtrace_id_t, void *))dtrace_nullop,
-	(void (*)(void *, dtrace_id_t, void *))dtrace_nullop,
-	(void (*)(void *, dtrace_id_t, void *))dtrace_nullop,
-	NULL,
-	NULL,
-	NULL,
-	(void (*)(void *, dtrace_id_t, void *))dtrace_nullop
+static dtrace_pops_t dtrace_provider_ops = {
+	.dtps_provide =	(void (*)(void *, dtrace_probedesc_t *))dtrace_nullop,
+	.dtps_provide_module =	(void (*)(void *, modctl_t *))dtrace_nullop,
+	.dtps_enable =	(void (*)(void *, dtrace_id_t, void *))dtrace_nullop,
+	.dtps_disable =	(void (*)(void *, dtrace_id_t, void *))dtrace_nullop,
+	.dtps_suspend =	(void (*)(void *, dtrace_id_t, void *))dtrace_nullop,
+	.dtps_resume =	(void (*)(void *, dtrace_id_t, void *))dtrace_nullop,
+	.dtps_getargdesc =	NULL,
+	.dtps_getargval =	NULL,
+	.dtps_usermode =	NULL,
+	.dtps_destroy =	(void (*)(void *, dtrace_id_t, void *))dtrace_nullop,
 };
 
 static dtrace_id_t	dtrace_probeid_begin;	/* special BEGIN probe */
@@ -12120,7 +12120,7 @@ err:
 
 	*factor = 1;
 #if defined(__aarch64__) || defined(__amd64__) || defined(__arm__) || \
-    defined(__mips__) || defined(__powerpc__) || defined(__riscv__)
+    defined(__mips__) || defined(__powerpc__) || defined(__riscv)
 	/*
 	 * FreeBSD isn't good at limiting the amount of memory we
 	 * ask to malloc, so let's place a limit here before trying

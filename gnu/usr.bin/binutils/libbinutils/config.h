@@ -1,4 +1,14 @@
 /* $FreeBSD$ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "unsupported"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 /* FreeBSD isn't any form of AIX. */
 #define bin_dummy_emulation bin_vanilla_emulation

@@ -18,6 +18,16 @@
  *
  * CDDL HEADER END
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_alignment"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
@@ -1160,7 +1170,7 @@ dt_module_update(dtrace_hdl_t *dtp, struct kld_file_stat *k_stat)
 	GElf_Phdr ph;
 	char name[MAXPATHLEN];
 	uintptr_t mapbase;
-#ifndef __CHERI__
+#if !__has_builtin(__builtin_align_up)
 	uintptr_t alignmask;
 #endif
 	int i = 0;

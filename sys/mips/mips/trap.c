@@ -76,6 +76,7 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/trap.h>
 #include <machine/cpu.h>
+#include <machine/cpuinfo.h>
 #include <machine/pte.h>
 #include <machine/pmap.h>
 #include <machine/md_var.h>
@@ -381,6 +382,13 @@ char *access_name[] = {
 #include <machine/octeon_cop2.h>
 #endif
 
+/*
+ * Unaligned access handling is completely broken if the trap happens in a
+ * CHERI instructions. Since we are now running lots of CHERI purecap code and
+ * the LLVM branch delay slot filler actually fills CHERI delay slots, having
+ * this on by default makes it really hard to debug where something is going
+ * wrong since we will just die with a completely unrelated exception later.
+ */
 static int allow_unaligned_acc = 1;
 
 SYSCTL_INT(_vm, OID_AUTO, allow_unaligned_acc, CTLFLAG_RW,
@@ -1139,12 +1147,13 @@ dofault:
 			    "T_COP_UNUSABLE + T_USER exception");
 #endif
 		if (cop == 1) {
-#if !defined(CPU_HAVEFPU)
-		/* FP (COP1) instruction */
-			log_illegal_instruction("COP1_UNUSABLE", trapframe);
-			i = SIGILL;
-			break;
-#else
+			/* FP (COP1) instruction */
+			if (cpuinfo.fpu_id == 0) {
+				log_illegal_instruction("COP1_UNUSABLE",
+				    trapframe);
+				i = SIGILL;
+				break;
+			}
 			addr = trapframe->pc;
 			MipsSwitchFPState(PCPU_GET(fpcurthread), td->td_frame);
 			PCPU_SET(fpcurthread, td);
@@ -1155,7 +1164,6 @@ dofault:
 #endif
 			td->td_md.md_flags |= MDTD_FPUSED;
 			goto out;
-#endif
 		}
 #ifdef	CPU_CNMIPS
 		else  if (cop == 2) {
@@ -1338,6 +1346,7 @@ trapDump(char *msg)
  * Return the resulting PC as if the branch was executed.
  *
  * XXXRW: What about CHERI branch instructions?
+ * XXXAR: This needs to be fixed for cbez/cbnz/cbtu/cbts/cjalr/cjr/ccall_fast
  */
 uintptr_t
 MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
@@ -1485,7 +1494,10 @@ MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
 		break;
 
 	default:
-		retAddr = instPC + 4;
+		printf("Unhandled opcode in %s: 0x%x\n", __func__, inst.word);
+		/* retAddr = instPC + 4;  */
+		/* Return to NULL to force a crash in the user program */
+		retAddr = 0;
 	}
 	return (retAddr);
 }

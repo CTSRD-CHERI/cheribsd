@@ -1,3 +1,15 @@
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_bit_flags"
+ *   ],
+ *   "change_comment": "",
+ *   "hybrid_specific": false
+ * }
+ * CHERI CHANGES END
+ */
 
 /**
  * \file enumeration.c

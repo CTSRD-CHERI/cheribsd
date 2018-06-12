@@ -1,3 +1,14 @@
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "other"
+ *   ],
+ *   "change_comment": "libc syscall split"
+ * }
+ * CHERI CHANGES END
+ */
 #define JEMALLOC_MALLOC_IO_C_
 #include "jemalloc/internal/jemalloc_preamble.h"
 #include "jemalloc/internal/jemalloc_internal_includes.h"

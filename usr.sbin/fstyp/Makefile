@@ -15,8 +15,9 @@ WARNS?=	2
 
 .include <bsd.endian.mk>
 
-.if ${MK_TESTS} != "no" && ${TARGET_ENDIANNESS} == 1234
-SUBDIR+=	tests
+.if ${TARGET_ENDIANNESS} == 1234
+HAS_TESTS=
+SUBDIR.${MK_TESTS}+= tests
 .endif
 
 .if ${MK_ZFS} != "no"

@@ -64,7 +64,6 @@ SUBDIR.${MK_CHERI}+=	cheri_minimal_dynamic_exe
 SUBDIR.${MK_CHERI}+=	cheri_minimal_pie_exe
 .endif
 
-
 .include <bsd.arch.inc.mk>
 
 SUBDIR_PARALLEL=

@@ -123,6 +123,7 @@ static ufs2_daddr_t ffs_nodealloccg(struct inode *, u_int, ufs2_daddr_t, int,
 static ufs1_daddr_t ffs_mapsearch(struct fs *, struct cg *, ufs2_daddr_t, int);
 static int	ffs_reallocblks_ufs1(struct vop_reallocblks_args *);
 static int	ffs_reallocblks_ufs2(struct vop_reallocblks_args *);
+static void	ffs_ckhash_cg(struct buf *);
 
 /*
  * Allocate a block in the filesystem.
@@ -2130,7 +2131,6 @@ ffs_blkfree_cg(ump, fs, devvp, bno, size, inum, dephd)
 	struct cg *cgp;
 	struct buf *bp;
 	ufs1_daddr_t fragno, cgbno;
-	ufs2_daddr_t cgblkno;
 	int i, blk, frags, bbase, error;
 	u_int cg;
 	u_int8_t *blksfree;
@@ -2141,11 +2141,9 @@ ffs_blkfree_cg(ump, fs, devvp, bno, size, inum, dephd)
 		/* devvp is a snapshot */
 		MPASS(devvp->v_mount->mnt_data == ump);
 		dev = ump->um_devvp->v_rdev;
-		cgblkno = fragstoblks(fs, cgtod(fs, cg));
 	} else if (devvp->v_type == VCHR) {
 		/* devvp is a normal disk device */
 		dev = devvp->v_rdev;
-		cgblkno = fsbtodb(fs, cgtod(fs, cg));
 		ASSERT_VOP_LOCKED(devvp, "ffs_blkfree_cg");
 	} else
 		return;
@@ -2599,24 +2597,53 @@ ffs_getcg(fs, devvp, cg, bpp, cgpp)
 {
 	struct buf *bp;
 	struct cg *cgp;
-	int error;
+	int flags, error;
 
 	*bpp = NULL;
 	*cgpp = NULL;
-	error = bread(devvp, fsbtodb(fs, cgtod(fs, cg)),
-	    (int)fs->fs_cgsize, NOCRED, &bp);
+	flags = 0;
+	if ((fs->fs_metackhash & CK_CYLGRP) != 0)
+		flags |= GB_CKHASH;
+	error = breadn_flags(devvp, devvp->v_type == VREG ?
+	    fragstoblks(fs, cgtod(fs, cg)) : fsbtodb(fs, cgtod(fs, cg)),
+	    (int)fs->fs_cgsize, NULL, NULL, 0, NOCRED, flags,
+	    ffs_ckhash_cg, &bp);
 	if (error != 0)
 		return (error);
 	cgp = (struct cg *)bp->b_data;
-	if (!cg_chkmagic(cgp) || cgp->cg_cgx != cg) {
+	if (((fs->fs_metackhash & CK_CYLGRP) != 0 &&
+	    (bp->b_flags & B_CKHASH) != 0 &&
+	    cgp->cg_ckhash != bp->b_ckhash) ||
+	    !cg_chkmagic(cgp) || cgp->cg_cgx != cg) {
+		printf("checksum failed: cg %u, cgp: 0x%x != bp: 0x%jx\n",
+		    cg, cgp->cg_ckhash, (uintmax_t)bp->b_ckhash);
+		bp->b_flags &= ~B_CKHASH;
+		bp->b_flags |= B_INVAL | B_NOCACHE;
 		brelse(bp);
 		return (EIO);
 	}
+	bp->b_flags &= ~B_CKHASH;
 	bp->b_xflags |= BX_BKGRDWRITE;
+	if ((fs->fs_metackhash & CK_CYLGRP) != 0)
+		bp->b_xflags |= BX_CYLGRP;
 	cgp->cg_old_time = cgp->cg_time = time_second;
 	*bpp = bp;
 	*cgpp = cgp;
 	return (0);
+}
+
+static void
+ffs_ckhash_cg(bp)
+	struct buf *bp;
+{
+	uint32_t ckhash;
+	struct cg *cgp;
+
+	cgp = (struct cg *)bp->b_data;
+	ckhash = cgp->cg_ckhash;
+	cgp->cg_ckhash = 0;
+	bp->b_ckhash = calculate_crc32c(~0L, bp->b_data, bp->b_bcount);
+	cgp->cg_ckhash = ckhash;
 }
 
 /*

@@ -86,9 +86,9 @@ cam/cam_xpt.c			optional scbus
 cam/ata/ata_all.c		optional scbus
 cam/ata/ata_xpt.c		optional scbus
 cam/ata/ata_pmp.c		optional scbus
-cam/nvme/nvme_all.c		optional scbus nvme !nvd
-cam/nvme/nvme_da.c		optional scbus nvme da !nvd
-cam/nvme/nvme_xpt.c		optional scbus nvme !nvd
+cam/nvme/nvme_all.c		optional scbus nvme
+cam/nvme/nvme_da.c		optional scbus nvme da
+cam/nvme/nvme_xpt.c		optional scbus nvme
 cam/scsi/scsi_xpt.c		optional scbus
 cam/scsi/scsi_all.c		optional scbus
 cam/scsi/scsi_cd.c		optional cd
@@ -110,6 +110,8 @@ cam/ctl/ctl_tpc_local.c		optional ctl
 cam/ctl/ctl_error.c		optional ctl
 cam/ctl/ctl_util.c		optional ctl
 cam/ctl/scsi_ctl.c		optional ctl
+cam/mmc/mmc_xpt.c		optional scbus mmccam
+cam/mmc/mmc_da.c		optional scbus mmccam da
 cam/scsi/scsi_da.c		optional da
 cam/scsi/scsi_low.c		optional ncv | nsp | stg
 cam/scsi/scsi_pass.c		optional pass
@@ -226,6 +228,11 @@ cddl/contrib/opensolaris/uts/common/fs/zfs/vdev_root.c			optional zfs compile-wi
 cddl/contrib/opensolaris/uts/common/fs/zfs/zap.c			optional zfs compile-with "${ZFS_C}"
 cddl/contrib/opensolaris/uts/common/fs/zfs/zap_leaf.c			optional zfs compile-with "${ZFS_C}"
 cddl/contrib/opensolaris/uts/common/fs/zfs/zap_micro.c			optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/zcp.c			optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/zcp_get.c			optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/zcp_global.c			optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/zcp_iter.c			optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/zcp_synctask.c		optional zfs compile-with "${ZFS_C}"
 cddl/contrib/opensolaris/uts/common/fs/zfs/zfeature.c			optional zfs compile-with "${ZFS_C}"
 cddl/contrib/opensolaris/uts/common/fs/zfs/zfs_acl.c			optional zfs compile-with "${ZFS_C}"
 cddl/contrib/opensolaris/uts/common/fs/zfs/zfs_byteswap.c		optional zfs compile-with "${ZFS_C}"
@@ -265,6 +272,35 @@ cddl/contrib/opensolaris/uts/common/zmod/trees.c			optional zfs compile-with "${
 cddl/contrib/opensolaris/uts/common/zmod/zmod.c				optional zfs compile-with "${ZFS_C}"
 cddl/contrib/opensolaris/uts/common/zmod/zmod_subr.c			optional zfs compile-with "${ZFS_C}"
 cddl/contrib/opensolaris/uts/common/zmod/zutil.c			optional zfs compile-with "${ZFS_C}"
+
+# zfs lua support
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lapi.c			optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lauxlib.c		optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lbaselib.c		optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lbitlib.c		optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lcode.c			optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lcompat.c		optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lcorolib.c		optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lctype.c			optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/ldebug.c			optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/ldo.c			optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/ldump.c			optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lfunc.c			optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lgc.c			optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/llex.c			optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lmem.c			optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lobject.c		optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lopcodes.c		optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lparser.c		optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lstate.c			optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lstring.c		optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lstrlib.c		optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/ltable.c			optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/ltablib.c		optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/ltm.c			optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lundump.c		optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lvm.c			optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lzio.c			optional zfs compile-with "${ZFS_C}"
 
 # CHERI and CHERI-compat related files
 cheri/cheri_asserts.c			optional cpu_cheri
@@ -370,6 +406,7 @@ contrib/dev/acpica/components/dispatcher/dsmethod.c	optional acpi
 contrib/dev/acpica/components/dispatcher/dsmthdat.c	optional acpi
 contrib/dev/acpica/components/dispatcher/dsobject.c	optional acpi
 contrib/dev/acpica/components/dispatcher/dsopcode.c	optional acpi
+contrib/dev/acpica/components/dispatcher/dspkginit.c	optional acpi
 contrib/dev/acpica/components/dispatcher/dsutils.c	optional acpi
 contrib/dev/acpica/components/dispatcher/dswexec.c	optional acpi
 contrib/dev/acpica/components/dispatcher/dswload.c	optional acpi
@@ -511,6 +548,7 @@ contrib/dev/acpica/components/utilities/utresdecode.c	optional acpi acpi_debug
 contrib/dev/acpica/components/utilities/utresrc.c	optional acpi
 contrib/dev/acpica/components/utilities/utstate.c	optional acpi
 contrib/dev/acpica/components/utilities/utstring.c	optional acpi
+contrib/dev/acpica/components/utilities/utstrsuppt.c	optional acpi
 contrib/dev/acpica/components/utilities/utstrtoul64.c	optional acpi
 contrib/dev/acpica/components/utilities/utuuid.c	optional acpi acpi_debug
 contrib/dev/acpica/components/utilities/utxface.c	optional acpi
@@ -1368,6 +1406,18 @@ dev/cxgbe/common/t4_hw.c	optional cxgbe pci \
 	compile-with "${NORMAL_C} -I$S/dev/cxgbe"
 dev/cxgbe/common/t4vf_hw.c	optional cxgbev pci \
 	compile-with "${NORMAL_C} -I$S/dev/cxgbe"
+dev/cxgbe/cudbg/cudbg_common.c	optional cxgbe \
+	compile-with "${NORMAL_C} -I$S/dev/cxgbe"
+dev/cxgbe/cudbg/cudbg_flash_utils.c	optional cxgbe \
+	compile-with "${NORMAL_C} -I$S/dev/cxgbe"
+dev/cxgbe/cudbg/cudbg_lib.c	optional cxgbe \
+	compile-with "${NORMAL_C} -I$S/dev/cxgbe"
+dev/cxgbe/cudbg/cudbg_wtp.c	optional cxgbe \
+	compile-with "${NORMAL_C} -I$S/dev/cxgbe"
+dev/cxgbe/cudbg/fastlz.c	optional cxgbe \
+	compile-with "${NORMAL_C} -I$S/dev/cxgbe"
+dev/cxgbe/cudbg/fastlz_api.c	optional cxgbe \
+	compile-with "${NORMAL_C} -I$S/dev/cxgbe"
 t4fw_cfg.c		optional cxgbe					\
 	compile-with	"${AWK} -f $S/tools/fw_stub.awk t4fw_cfg.fw:t4fw_cfg t4fw_cfg_uwire.fw:t4fw_cfg_uwire t4fw.fw:t4fw -mt4fw_cfg -c${.TARGET}" \
 	no-implicit-rule before-depend local				\
@@ -1398,12 +1448,12 @@ t4fw.fwo		optional cxgbe					\
 	no-implicit-rule						\
 	clean		"t4fw.fwo"
 t4fw.fw			optional cxgbe					\
-	dependency	"$S/dev/cxgbe/firmware/t4fw-1.16.45.0.bin.uu"	\
+	dependency	"$S/dev/cxgbe/firmware/t4fw-1.16.63.0.bin.uu"	\
 	compile-with	"${NORMAL_FW}"					\
 	no-obj no-implicit-rule						\
 	clean		"t4fw.fw"
 t5fw_cfg.c		optional cxgbe					\
-	compile-with	"${AWK} -f $S/tools/fw_stub.awk t5fw_cfg.fw:t5fw_cfg t5fw.fw:t5fw -mt5fw_cfg -c${.TARGET}" \
+	compile-with	"${AWK} -f $S/tools/fw_stub.awk t5fw_cfg.fw:t5fw_cfg t5fw_cfg_uwire.fw:t5fw_cfg_uwire t5fw.fw:t5fw -mt5fw_cfg -c${.TARGET}" \
 	no-implicit-rule before-depend local				\
 	clean		"t5fw_cfg.c"
 t5fw_cfg.fwo		optional cxgbe					\
@@ -1416,18 +1466,28 @@ t5fw_cfg.fw		optional cxgbe					\
 	compile-with	"${CP} ${.ALLSRC} ${.TARGET}"			\
 	no-obj no-implicit-rule						\
 	clean		"t5fw_cfg.fw"
+t5fw_cfg_uwire.fwo	optional cxgbe					\
+	dependency	"t5fw_cfg_uwire.fw"				\
+	compile-with	"${NORMAL_FWO}"					\
+	no-implicit-rule						\
+	clean		"t5fw_cfg_uwire.fwo"
+t5fw_cfg_uwire.fw	optional cxgbe					\
+	dependency	"$S/dev/cxgbe/firmware/t5fw_cfg_uwire.txt"	\
+	compile-with	"${CP} ${.ALLSRC} ${.TARGET}"			\
+	no-obj no-implicit-rule						\
+	clean		"t5fw_cfg_uwire.fw"
 t5fw.fwo		optional cxgbe					\
 	dependency	"t5fw.fw"					\
 	compile-with	"${NORMAL_FWO}"					\
 	no-implicit-rule						\
 	clean		"t5fw.fwo"
 t5fw.fw			optional cxgbe					\
-	dependency	"$S/dev/cxgbe/firmware/t5fw-1.16.45.0.bin.uu"	\
+	dependency	"$S/dev/cxgbe/firmware/t5fw-1.16.63.0.bin.uu"	\
 	compile-with	"${NORMAL_FW}"					\
 	no-obj no-implicit-rule						\
 	clean		"t5fw.fw"
 t6fw_cfg.c		optional cxgbe					\
-	compile-with	"${AWK} -f $S/tools/fw_stub.awk t6fw_cfg.fw:t6fw_cfg t6fw.fw:t6fw -mt6fw_cfg -c${.TARGET}" \
+	compile-with	"${AWK} -f $S/tools/fw_stub.awk t6fw_cfg.fw:t6fw_cfg t6fw_cfg_uwire.fw:t6fw_cfg_uwire t6fw.fw:t6fw -mt6fw_cfg -c${.TARGET}" \
 	no-implicit-rule before-depend local				\
 	clean		"t6fw_cfg.c"
 t6fw_cfg.fwo		optional cxgbe					\
@@ -1440,13 +1500,23 @@ t6fw_cfg.fw		optional cxgbe					\
 	compile-with	"${CP} ${.ALLSRC} ${.TARGET}"			\
 	no-obj no-implicit-rule						\
 	clean		"t6fw_cfg.fw"
+t6fw_cfg_uwire.fwo	optional cxgbe					\
+	dependency	"t6fw_cfg_uwire.fw"				\
+	compile-with	"${NORMAL_FWO}"					\
+	no-implicit-rule						\
+	clean		"t6fw_cfg_uwire.fwo"
+t6fw_cfg_uwire.fw	optional cxgbe					\
+	dependency	"$S/dev/cxgbe/firmware/t6fw_cfg_uwire.txt"	\
+	compile-with	"${CP} ${.ALLSRC} ${.TARGET}"			\
+	no-obj no-implicit-rule						\
+	clean		"t6fw_cfg_uwire.fw"
 t6fw.fwo		optional cxgbe					\
 	dependency	"t6fw.fw"					\
 	compile-with	"${NORMAL_FWO}"					\
 	no-implicit-rule						\
 	clean		"t6fw.fwo"
 t6fw.fw			optional cxgbe					\
-	dependency	"$S/dev/cxgbe/firmware/t6fw-1.16.45.0.bin.uu"	\
+	dependency	"$S/dev/cxgbe/firmware/t6fw-1.16.63.0.bin.uu"	\
 	compile-with	"${NORMAL_FW}"					\
 	no-obj no-implicit-rule						\
 	clean		"t6fw.fw"
@@ -1565,6 +1635,7 @@ dev/ed/if_ed_rtl80x9.c		optional ed
 dev/ed/if_ed_pccard.c		optional ed pccard
 dev/ed/if_ed_pci.c		optional ed pci
 dev/efidev/efidev.c		optional efirt
+dev/efidev/efirt.c		optional efirt
 dev/e1000/if_em.c		optional em \
 	compile-with "${NORMAL_C} -I$S/dev/e1000"
 dev/e1000/em_txrx.c		optional em \
@@ -1736,8 +1807,7 @@ dev/ida/ida_disk.c		optional ida
 dev/ida/ida_pci.c		optional ida pci
 dev/iicbus/ad7418.c		optional ad7418
 dev/iicbus/ds1307.c		optional ds1307
-dev/iicbus/ds133x.c		optional ds133x
-dev/iicbus/ds1374.c		optional ds1374
+dev/iicbus/ds13rtc.c		optional ds13rtc | ds133x | ds1374
 dev/iicbus/ds1672.c		optional ds1672
 dev/iicbus/ds3231.c		optional ds3231
 dev/iicbus/icee.c		optional icee
@@ -1752,9 +1822,10 @@ dev/iicbus/iiconf.c		optional iicbus
 dev/iicbus/iicsmb.c		optional iicsmb				\
 	dependency	"iicbus_if.h"
 dev/iicbus/iicoc.c		optional iicoc
+dev/iicbus/isl12xx.c		optional isl12xx
 dev/iicbus/lm75.c		optional lm75
+dev/iicbus/nxprtc.c		optional nxprtc | pcf8563
 dev/iicbus/ofw_iicbus.c		optional fdt iicbus
-dev/iicbus/pcf8563.c		optional pcf8563
 dev/iicbus/s35390a.c		optional s35390a
 dev/iir/iir.c			optional iir
 dev/iir/iir_ctrl.c		optional iir
@@ -2199,6 +2270,62 @@ dev/le/if_le_pci.c		optional le pci
 dev/le/lance.c			optional le
 dev/led/led.c			standard
 dev/lge/if_lge.c		optional lge
+dev/liquidio/base/cn23xx_pf_device.c		optional lio	\
+	compile-with "${NORMAL_C}				\
+	-I$S/dev/liquidio -I$S/dev/liquidio/base -DSMP"
+dev/liquidio/base/lio_console.c			optional lio	\
+	compile-with "${NORMAL_C}				\
+	-I$S/dev/liquidio -I$S/dev/liquidio/base -DSMP"
+dev/liquidio/base/lio_ctrl.c			optional lio	\
+	compile-with "${NORMAL_C} 				\
+	-I$S/dev/liquidio -I$S/dev/liquidio/base -DSMP"
+dev/liquidio/base/lio_device.c			optional lio	\
+	compile-with "${NORMAL_C} 				\
+	-I$S/dev/liquidio -I$S/dev/liquidio/base -DSMP"
+dev/liquidio/base/lio_droq.c			optional lio	\
+	compile-with "${NORMAL_C} 				\
+	-I$S/dev/liquidio -I$S/dev/liquidio/base -DSMP"
+dev/liquidio/base/lio_mem_ops.c			optional lio	\
+	compile-with "${NORMAL_C} 				\
+	-I$S/dev/liquidio -I$S/dev/liquidio/base -DSMP"
+dev/liquidio/base/lio_request_manager.c		optional lio	\
+	compile-with "${NORMAL_C} 				\
+	-I$S/dev/liquidio -I$S/dev/liquidio/base -DSMP"
+dev/liquidio/base/lio_response_manager.c	optional lio	\
+	compile-with "${NORMAL_C} 				\
+	-I$S/dev/liquidio -I$S/dev/liquidio/base -DSMP"
+dev/liquidio/lio_core.c				optional lio	\
+	compile-with "${NORMAL_C} 				\
+	-I$S/dev/liquidio -I$S/dev/liquidio/base -DSMP"
+dev/liquidio/lio_ioctl.c			optional lio	\
+	compile-with "${NORMAL_C} 				\
+	-I$S/dev/liquidio -I$S/dev/liquidio/base -DSMP"
+dev/liquidio/lio_main.c				optional lio	\
+	compile-with "${NORMAL_C} 				\
+	-I$S/dev/liquidio -I$S/dev/liquidio/base -DSMP"
+dev/liquidio/lio_rss.c				optional lio	\
+	compile-with "${NORMAL_C} 				\
+	-I$S/dev/liquidio -I$S/dev/liquidio/base -DSMP"
+dev/liquidio/lio_rxtx.c				optional lio	\
+	compile-with "${NORMAL_C} 				\
+	-I$S/dev/liquidio -I$S/dev/liquidio/base -DSMP"
+dev/liquidio/lio_sysctl.c			optional lio	\
+	compile-with "${NORMAL_C} 				\
+	-I$S/dev/liquidio -I$S/dev/liquidio/base -DSMP"
+lio.c	optional lio						\
+	compile-with	"${AWK} -f $S/tools/fw_stub.awk lio_23xx_nic.bin.fw:lio_23xx_nic.bin -mlio_23xx_nic.bin -c${.TARGET}" \
+	no-implicit-rule before-depend local			\
+	clean		"lio.c"
+lio_23xx_nic.bin.fw.fwo optional lio				\
+	dependency	"lio_23xx_nic.bin.fw"			\
+	compile-with	"${NORMAL_FWO}"				\
+	no-implicit-rule					\
+	clean		"lio_23xx_nic.bin.fw.fwo"
+lio_23xx_nic.bin.fw	optional lio					\
+	dependency	"$S/contrib/dev/liquidio/lio_23xx_nic.bin.uu"	\
+	compile-with	"${NORMAL_FW}"					\
+	no-obj no-implicit-rule						\
+	clean		"lio_23xx_nic.bin.fw"
 dev/lmc/if_lmc.c		optional lmc
 dev/malo/if_malo.c		optional malo
 dev/malo/if_malohal.c		optional malo
@@ -2260,11 +2387,12 @@ dev/mlx/mlx.c			optional mlx
 dev/mlx/mlx_disk.c		optional mlx
 dev/mlx/mlx_pci.c		optional mlx pci
 dev/mly/mly.c			optional mly
-dev/mmc/mmc_subr.c		optional mmc | mmcsd
-dev/mmc/mmc.c			optional mmc
+dev/mmc/mmc_subr.c		optional mmc | mmcsd !mmccam
+dev/mmc/mmc.c			optional mmc !mmccam
 dev/mmc/mmcbr_if.m		standard
 dev/mmc/mmcbus_if.m		standard
-dev/mmc/mmcsd.c			optional mmcsd
+dev/mmc/mmcsd.c			optional mmcsd !mmccam
+dev/mmcnull/mmcnull.c		optional mmcnull
 dev/mn/if_mn.c			optional mn pci
 dev/mpr/mpr.c			optional mpr
 dev/mpr/mpr_config.c		optional mpr
@@ -3035,6 +3163,7 @@ dev/uart/uart_bus_puc.c		optional uart puc
 dev/uart/uart_bus_scc.c		optional uart scc
 dev/uart/uart_core.c		optional uart
 dev/uart/uart_dbg.c		optional uart gdb
+dev/uart/uart_dev_mvebu.c	optional uart uart_mvebu
 dev/uart/uart_dev_ns8250.c	optional uart uart_ns8250 | uart uart_snps
 dev/uart/uart_dev_pl011.c	optional uart pl011
 dev/uart/uart_dev_quicc.c	optional uart quicc
@@ -3203,6 +3332,7 @@ dev/usb/input/uep.c		optional uep
 dev/usb/input/uhid.c		optional uhid
 dev/usb/input/ukbd.c		optional ukbd
 dev/usb/input/ums.c		optional ums
+dev/usb/input/wmt.c		optional wmt
 dev/usb/input/wsp.c		optional wsp
 #
 # USB quirks
@@ -3707,7 +3837,6 @@ kern/subr_kdb.c			standard
 kern/subr_kobj.c		standard
 kern/subr_lock.c		standard
 kern/subr_log.c			standard
-kern/subr_mbpool.c		optional libmbpool
 kern/subr_mchain.c		optional libmchain
 kern/subr_module.c		standard
 kern/subr_msgbuf.c		standard
@@ -4491,6 +4620,27 @@ dev/mlx4/mlx4_en/mlx4_en_rx.c			optional mlx4en pci inet inet6	\
 dev/mlx4/mlx4_en/mlx4_en_tx.c			optional mlx4en pci inet inet6	\
 	compile-with "${OFED_C}"
 
+dev/mlx5/mlx5_ib/mlx5_ib_ah.c			optional mlx5ib pci ofed \
+	compile-with "${OFED_C}"
+dev/mlx5/mlx5_ib/mlx5_ib_cq.c			optional mlx5ib pci ofed \
+	compile-with "${OFED_C}"
+dev/mlx5/mlx5_ib/mlx5_ib_doorbell.c		optional mlx5ib pci ofed \
+	compile-with "${OFED_C}"
+dev/mlx5/mlx5_ib/mlx5_ib_mad.c			optional mlx5ib pci ofed \
+	compile-with "${OFED_C}"
+dev/mlx5/mlx5_ib/mlx5_ib_main.c			optional mlx5ib pci ofed \
+	compile-with "${OFED_C}"
+dev/mlx5/mlx5_ib/mlx5_ib_mem.c			optional mlx5ib pci ofed \
+	compile-with "${OFED_C}"
+dev/mlx5/mlx5_ib/mlx5_ib_mr.c			optional mlx5ib pci ofed \
+	compile-with "${OFED_C}"
+dev/mlx5/mlx5_ib/mlx5_ib_qp.c			optional mlx5ib pci ofed \
+	compile-with "${OFED_C}"
+dev/mlx5/mlx5_ib/mlx5_ib_roce.c			optional mlx5ib pci ofed \
+	compile-with "${OFED_C}"
+dev/mlx5/mlx5_ib/mlx5_ib_srq.c			optional mlx5ib pci ofed \
+	compile-with "${OFED_C}"
+
 dev/mlx5/mlx5_core/mlx5_alloc.c			optional mlx5 pci	\
 	compile-with "${OFED_C}"
 dev/mlx5/mlx5_core/mlx5_cmd.c			optional mlx5 pci	\
@@ -4700,6 +4850,7 @@ vm/swap_pager.c			standard
 vm/uma_core.c			standard
 vm/uma_dbg.c			standard
 vm/memguard.c			optional DEBUG_MEMGUARD
+vm/vm_domain.c			standard
 vm/vm_fault.c			standard
 vm/vm_glue.c			standard
 vm/vm_init.c			standard
@@ -4714,7 +4865,8 @@ vm/vm_pager.c			standard
 vm/vm_phys.c			standard
 vm/vm_radix.c			standard
 vm/vm_reserv.c			standard
-vm/vm_domain.c			standard
+vm/vm_swapout.c			optional !NO_SWAPPING
+vm/vm_swapout_dummy.c		optional NO_SWAPPING
 vm/vm_unix.c			standard
 vm/vnode_pager.c		standard
 xen/features.c			optional xenhvm

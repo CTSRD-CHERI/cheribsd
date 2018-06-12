@@ -305,7 +305,7 @@ sctp6_ctlinput(int cmd, struct sockaddr *pktdst, void *d)
 			return;
 		}
 		/* Copy out the port numbers and the verification tag. */
-		bzero(&sh, sizeof(sh));
+		memset(&sh, 0, sizeof(sh));
 		m_copydata(ip6cp->ip6c_m,
 		    ip6cp->ip6c_off,
 		    sizeof(uint16_t) + sizeof(uint16_t) + sizeof(uint32_t),
@@ -879,7 +879,7 @@ sctp6_connect(struct socket *so, struct sockaddr *addr, struct thread *p)
 	if (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED) {
 		stcb = LIST_FIRST(&inp->sctp_asoc_list);
 		if (stcb) {
-			SCTP_TCB_UNLOCK(stcb);
+			SCTP_TCB_LOCK(stcb);
 		}
 		SCTP_INP_RUNLOCK(inp);
 	} else {

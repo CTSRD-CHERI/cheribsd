@@ -65,6 +65,16 @@
  *
  *	from: @(#)SYS.h	8.1 (Berkeley) 6/4/93
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "support"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sys/syscall.h>
 

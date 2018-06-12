@@ -487,6 +487,26 @@ AcpiPsCreateOp (
     {
         Status = AcpiPsBuildNamedOp (WalkState, AmlOpStart, Op, &NamedOp);
         AcpiPsFreeOp (Op);
+
+#ifdef ACPI_ASL_COMPILER
+        if (AcpiGbl_DisasmFlag && WalkState->Opcode == AML_EXTERNAL_OP &&
+            Status == AE_NOT_FOUND)
+        {
+            /*
+             * If parsing of AML_EXTERNAL_OP's name path fails, then skip
+             * past this opcode and keep parsing. This is a much better
+             * alternative than to abort the entire disassembler. At this
+             * point, the ParserState is at the end of the namepath of the
+             * external declaration opcode. Setting WalkState->Aml to
+             * WalkState->ParserState.Aml + 2 moves increments the
+             * WalkState->Aml past the object type and the paramcount of the
+             * external opcode.
+             */
+            WalkState->Aml = WalkState->ParserState.Aml + 2;
+            WalkState->ParserState.Aml = WalkState->Aml;
+            return_ACPI_STATUS (AE_CTRL_PARSE_CONTINUE);
+        }
+#endif
         if (ACPI_FAILURE (Status))
         {
             return_ACPI_STATUS (Status);

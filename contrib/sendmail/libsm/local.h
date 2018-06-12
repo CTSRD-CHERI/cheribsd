@@ -13,6 +13,16 @@
  *
  *	$Id: local.h,v 1.59 2013-11-22 20:51:43 ca Exp $
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_alignment"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 /*
 **  Information local to this implementation of stdio,

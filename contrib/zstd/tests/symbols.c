@@ -1,3 +1,13 @@
+/*
+ * Copyright (c) 2016-present, Yann Collet, Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under both the BSD-style license (found in the
+ * LICENSE file in the root directory of this source tree) and the GPLv2 (found
+ * in the COPYING file in the root directory of this source tree).
+ */
+
+
 #include <stdio.h>
 #include "zstd_errors.h"
 #define ZSTD_STATIC_LINKING_ONLY
@@ -88,14 +98,14 @@ static const void *symbols[] = {
   &ZSTD_copyCCtx,
   &ZSTD_compressContinue,
   &ZSTD_compressEnd,
-  &ZSTD_getFrameParams,
+  &ZSTD_getFrameHeader,
   &ZSTD_decompressBegin,
   &ZSTD_decompressBegin_usingDict,
   &ZSTD_copyDCtx,
   &ZSTD_nextSrcSizeToDecompress,
   &ZSTD_decompressContinue,
   &ZSTD_nextInputType,
-  &ZSTD_getBlockSizeMax,
+  &ZSTD_getBlockSize,
   &ZSTD_compressBlock,
   &ZSTD_decompressBlock,
   &ZSTD_insertBlock,
@@ -131,7 +141,10 @@ static const void *symbols[] = {
   &ZDICT_isError,
   &ZDICT_getErrorName,
 /* zdict.h: advanced functions */
-  &ZDICT_trainFromBuffer_advanced,
+  &ZDICT_trainFromBuffer_cover,
+  &ZDICT_optimizeTrainFromBuffer_cover,
+  &ZDICT_finalizeDictionary,
+  &ZDICT_trainFromBuffer_legacy,
   &ZDICT_addEntropyTablesFromBuffer,
   NULL,
 };

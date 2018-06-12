@@ -36,6 +36,16 @@
  *
  * $FreeBSD$
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "support"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 /*
  * This file defines common routines used by both printf and wprintf.

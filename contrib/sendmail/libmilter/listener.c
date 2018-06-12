@@ -7,6 +7,16 @@
  * the sendmail distribution.
  *
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sm/gen.h>
 SM_RCSID("@(#)$Id: listener.c,v 8.127 2013-11-22 20:51:36 ca Exp $")
@@ -575,8 +585,7 @@ mi_thread_handle_wrapper(arg)
 	**  You can safely ignore this warning as the result of this function
 	**  is not used anywhere.
 	*/
-	(void)mi_handle_session(arg);
-	return NULL;
+	return (void *)(uintptr_t)mi_handle_session(arg);
 }
 #endif /* _FFR_WORKERS_POOL */
 

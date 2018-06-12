@@ -4,7 +4,7 @@
 #
 # Users define WITH_FOO and WITHOUT_FOO on the command line or in /etc/src.conf
 # and /etc/make.conf files. These translate in the build system to MK_FOO={yes,no}
-# with sensible (usually) defaults.
+# with (usually) sensible defaults.
 #
 # Makefiles must include bsd.opts.mk after defining specific MK_FOO options that
 # are applicable for that Makefile (typically there are none, but sometimes there
@@ -41,7 +41,7 @@ __<bsd.opts.mk>__:
 #
 
 # Only these options are used by bsd.*.mk. KERBEROS and OPENSSH are
-# unforutnately needed to support statically linking the entire
+# unfortunately needed to support statically linking the entire
 # tree. su(1) wouldn't link since it depends on PAM which depends on
 # ssh libraries when building with OPENSSH, and likewise for KERBEROS.
 
@@ -55,6 +55,7 @@ __DEFAULT_YES_OPTIONS = \
     INCLUDES \
     INSTALLLIB \
     KERBEROS \
+    MAKE_CHECK_USE_SANDBOX \
     MAN \
     MANCOMPRESS \
     NIS \
@@ -64,6 +65,7 @@ __DEFAULT_YES_OPTIONS = \
     PROFILE \
     SSP \
     SYMVER \
+    TESTS \
     TOOLCHAIN \
     WARNS
 
@@ -72,7 +74,6 @@ __DEFAULT_YES_OPTIONS+= \
 
 __DEFAULT_NO_OPTIONS = \
     CCACHE_BUILD \
-    CHERIBSDBOX \
     CTF \
     INSTALL_AS_USER \
     STALE_STAGED
@@ -83,12 +84,14 @@ __DEFAULT_NO_OPTIONS+= \
     CHERI_SHARED_PROG \
     CHERI128 \
     CHERI256 \
+    CHERIBSDBOX \
     DEMO_VULNERABILITIES
 
-# meta mode related
 __DEFAULT_DEPENDENT_OPTIONS = \
+    MAKE_CHECK_USE_SANDBOX/TESTS \
     STAGING_MAN/STAGING \
     STAGING_PROG/STAGING \
+    STALE_STAGED/STAGING \
 
 .if defined(WITH_CHERI)
 .warning WITH_CHERI should not be set directly.
@@ -115,6 +118,9 @@ MK_LLVM_LIBUNWIND:=	yes
 # GROFF is broken when building WITH_CHERI_PURE and it will be removed
 # soon anyway
 MK_GROFF:=	no
+# Build cheribsdbox by default so that we have a emergency MIPS tool if the
+# CHERI world is broken
+#MK_CHERIBSDBOX:=	yes
 .else
 MK_CHERI:=	no
 .endif
@@ -141,10 +147,6 @@ MK_CHERI_SHARED_PROG:=	no
 MK_${var}:=no
 .endif
 .endfor
-
-.if ${MK_STAGING} == "no"
-MK_STALE_STAGED= no
-.endif
 
 .include <bsd.cpu.mk>
 

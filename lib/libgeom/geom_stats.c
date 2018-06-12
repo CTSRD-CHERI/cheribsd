@@ -28,6 +28,17 @@
  *
  * $FreeBSD$
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "unsupported"
+ *   ],
+ *   "change_comment": "pointless hint to mmap"
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sys/types.h>
 #include <sys/devicestat.h>

@@ -1,6 +1,16 @@
 /*
  * work_thread.c - threads implementation for blocking worker child.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 #include <config.h>
 #include "ntp_workimpl.h"
 

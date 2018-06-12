@@ -18,6 +18,16 @@
  *
  * CDDL HEADER END
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_bit_flags"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.

@@ -236,14 +236,15 @@ vm_fault_dirty(vm_map_entry_t entry, vm_page_t m, vm_prot_t prot,
 	 * written NOW so dirty it explicitly to save on
 	 * pmap_is_modified() calls later.
 	 *
-	 * Also tell the backing pager, if any, that it should remove
-	 * any swap backing since the page is now dirty.
+	 * Also, since the page is now dirty, we can possibly tell
+	 * the pager to release any swap backing the page.  Calling
+	 * the pager requires a write lock on the object.
 	 */
 	if (need_dirty)
 		vm_page_dirty(m);
 	if (!set_wd)
 		vm_page_unlock(m);
-	if (need_dirty)
+	else if (need_dirty)
 		vm_pager_page_unswapped(m);
 }
 
@@ -266,8 +267,12 @@ static int
 vm_fault_soft_fast(struct faultstate *fs, vm_offset_t vaddr, vm_prot_t prot,
     int fault_type, int fault_flags, boolean_t wired, vm_page_t *m_hold)
 {
-	vm_page_t m;
-	int rv;
+	vm_page_t m, m_map;
+#if defined(__amd64__) && VM_NRESERVLEVEL > 0
+	vm_page_t m_super;
+	int flags;
+#endif
+	int psind, rv;
 
 	MPASS(fs->vp == NULL);
 	m = vm_page_lookup(fs->first_object, fs->first_pindex);
@@ -275,20 +280,52 @@ vm_fault_soft_fast(struct faultstate *fs, vm_offset_t vaddr, vm_prot_t prot,
 	if (m == NULL || ((prot & VM_PROT_WRITE) != 0 &&
 	    vm_page_busied(m)) || m->valid != VM_PAGE_BITS_ALL)
 		return (KERN_FAILURE);
+	m_map = m;
+	psind = 0;
+#if defined(__amd64__) && VM_NRESERVLEVEL > 0
+	if ((m->flags & PG_FICTITIOUS) == 0 &&
+	    (m_super = vm_reserv_to_superpage(m)) != NULL &&
+	    rounddown2(vaddr, pagesizes[m_super->psind]) >= fs->entry->start &&
+	    roundup2(vaddr + 1, pagesizes[m_super->psind]) <= fs->entry->end &&
+	    (vaddr & (pagesizes[m_super->psind] - 1)) == (VM_PAGE_TO_PHYS(m) &
+	    (pagesizes[m_super->psind] - 1)) &&
+	    pmap_ps_enabled(fs->map->pmap)) {
+		flags = PS_ALL_VALID;
+		if ((prot & VM_PROT_WRITE) != 0) {
+			/*
+			 * Create a superpage mapping allowing write access
+			 * only if none of the constituent pages are busy and
+			 * all of them are already dirty (except possibly for
+			 * the page that was faulted on).
+			 */
+			flags |= PS_NONE_BUSY;
+			if ((fs->first_object->flags & OBJ_UNMANAGED) == 0)
+				flags |= PS_ALL_DIRTY;
+		}
+		if (vm_page_ps_test(m_super, flags, m)) {
+			m_map = m_super;
+			psind = m_super->psind;
+			vaddr = rounddown2(vaddr, pagesizes[psind]);
+			/* Preset the modified bit for dirty superpages. */
+			if ((flags & PS_ALL_DIRTY) != 0)
+				fault_type |= VM_PROT_WRITE;
+		}
+	}
+#endif
 #ifdef CPU_CHERI
 	if (fs->first_object->flags & OBJ_NOLOADTAGS)
 		fault_type |= PMAP_ENTER_NOLOADTAGS;
 	if (fs->first_object->flags & OBJ_NOSTORETAGS)
 		fault_type |= PMAP_ENTER_NOSTORETAGS;
 #endif
-	rv = pmap_enter(fs->map->pmap, vaddr, m, prot, fault_type |
-	    PMAP_ENTER_NOSLEEP | (wired ? PMAP_ENTER_WIRED : 0), 0);
+	rv = pmap_enter(fs->map->pmap, vaddr, m_map, prot, fault_type |
+	    PMAP_ENTER_NOSLEEP | (wired ? PMAP_ENTER_WIRED : 0), psind);
 	if (rv != KERN_SUCCESS)
 		return (rv);
 	vm_fault_fill_hold(m_hold, m);
 	vm_fault_dirty(fs->entry, m, prot, fault_type, fault_flags, false);
 	VM_OBJECT_RUNLOCK(fs->first_object);
-	if (!wired)
+	if (psind == 0 && !wired)
 		vm_fault_prefault(fs, vaddr, PFBAK, PFFOR);
 	vm_map_lookup_done(fs->map, fs->entry);
 	curthread->td_ru.ru_minflt++;

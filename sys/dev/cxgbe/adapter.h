@@ -151,7 +151,7 @@ enum {
 	/* adapter flags */
 	FULL_INIT_DONE	= (1 << 0),
 	FW_OK		= (1 << 1),
-	/* INTR_DIRECT	= (1 << 2),	No longer used. */
+	CHK_MBOX_ACCESS	= (1 << 2),
 	MASTER_PF	= (1 << 3),
 	ADAP_SYSCTL_CTX	= (1 << 4),
 	/* TOM_INIT_DONE= (1 << 5),	No longer used */
@@ -172,7 +172,9 @@ enum {
 	INTR_ALL	= (INTR_RXQ | INTR_OFLD_RXQ),
 
 	/* adapter debug_flags */
-	DF_DUMP_MBOX	= (1 << 0),
+	DF_DUMP_MBOX		= (1 << 0),	/* Log all mbox cmd/rpl. */
+	DF_LOAD_FW_ANYTIME	= (1 << 1),	/* Allow LOAD_FW after init */
+	DF_DISABLE_TCB_CACHE	= (1 << 2),	/* Disable TCB cache (T6+) */
 };
 
 #define IS_DOOMED(vi)	((vi)->flags & DOOMED)
@@ -186,7 +188,6 @@ struct vi_info {
 	struct port_info *pi;
 
 	struct ifnet *ifp;
-	struct ifmedia media;
 
 	unsigned long flags;
 	int if_flags;
@@ -218,7 +219,9 @@ struct vi_info {
 	int nnmrxq;
 	int first_nm_rxq;
 	int tmr_idx;
+	int ofld_tmr_idx;
 	int pktc_idx;
+	int ofld_pktc_idx;
 	int qsize_rxq;
 	int qsize_txq;
 
@@ -284,9 +287,12 @@ struct port_info {
 	uint8_t  mod_type;
 	uint8_t  port_id;
 	uint8_t  tx_chan;
-	uint8_t  rx_chan_map;	/* rx MPS channel bitmap */
+	uint8_t  mps_bg_map;	/* rx MPS buffer group bitmap */
+	uint8_t  rx_e_chan_map;	/* rx TP e-channel bitmap */
 
 	struct link_config link_cfg;
+	struct link_config old_link_cfg;
+	struct ifmedia media;
 
 	struct timeval last_refreshed;
  	struct port_stats stats;
@@ -791,7 +797,7 @@ struct adapter {
 
 	struct taskqueue *tq[MAX_NCHAN];	/* General purpose taskqueues */
 	struct port_info *port[MAX_NPORTS];
-	uint8_t chan_map[MAX_NCHAN];
+	uint8_t chan_map[MAX_NCHAN];		/* channel -> port */
 
 	void *tom_softc;	/* (struct tom_data *) */
 	struct tom_tunables tt;
@@ -1036,10 +1042,10 @@ adap2pinfo(struct adapter *sc, int idx)
 }
 
 static inline void
-t4_os_set_hw_addr(struct adapter *sc, int idx, uint8_t hw_addr[])
+t4_os_set_hw_addr(struct port_info *pi, uint8_t hw_addr[])
 {
 
-	bcopy(hw_addr, sc->port[idx]->vi[0].hw_addr, ETHER_ADDR_LEN);
+	bcopy(hw_addr, pi->vi[0].hw_addr, ETHER_ADDR_LEN);
 }
 
 static inline bool
@@ -1089,24 +1095,6 @@ port_top_speed(const struct port_info *pi)
 }
 
 static inline int
-port_top_speed_raw(const struct port_info *pi)
-{
-
-	if (pi->link_cfg.supported & FW_PORT_CAP_SPEED_100G)
-		return (FW_PORT_CAP_SPEED_100G);
-	if (pi->link_cfg.supported & FW_PORT_CAP_SPEED_40G)
-		return (FW_PORT_CAP_SPEED_40G);
-	if (pi->link_cfg.supported & FW_PORT_CAP_SPEED_25G)
-		return (FW_PORT_CAP_SPEED_25G);
-	if (pi->link_cfg.supported & FW_PORT_CAP_SPEED_10G)
-		return (FW_PORT_CAP_SPEED_10G);
-	if (pi->link_cfg.supported & FW_PORT_CAP_SPEED_1G)
-		return (FW_PORT_CAP_SPEED_1G);
-
-	return (0);
-}
-
-static inline int
 tx_resume_threshold(struct sge_eq *eq)
 {
 
@@ -1142,8 +1130,8 @@ extern device_method_t cxgbe_methods[];
 int t4_os_find_pci_capability(struct adapter *, int);
 int t4_os_pci_save_state(struct adapter *);
 int t4_os_pci_restore_state(struct adapter *);
-void t4_os_portmod_changed(const struct adapter *, int);
-void t4_os_link_changed(struct adapter *, int, int);
+void t4_os_portmod_changed(struct port_info *);
+void t4_os_link_changed(struct port_info *);
 void t4_iterate(void (*)(struct adapter *, void *), void *);
 void t4_init_devnames(struct adapter *);
 void t4_add_adapter(struct adapter *);

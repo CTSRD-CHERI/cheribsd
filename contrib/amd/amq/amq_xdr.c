@@ -36,6 +36,17 @@
  * File: am-utils/amq/amq_xdr.c
  *
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "SunRPC"
+ * }
+ * CHERI CHANGES END
+ */
 
 #ifdef HAVE_CONFIG_H
 # include <config.h>

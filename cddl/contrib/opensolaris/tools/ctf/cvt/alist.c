@@ -20,6 +20,16 @@
  * CDDL HEADER END
  */
 /*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "hashing"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
+/*
  * Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -55,7 +65,7 @@ static int
 alist_hash(int nbuckets, void *arg)
 {
 	alist_el_t *el = arg;
-	int num = (int)(uintptr_t)el->ale_name;
+	size_t num = (size_t)el->ale_name;
 
 	return (num % nbuckets);
 }
@@ -65,7 +75,7 @@ alist_cmp(void *arg1, void *arg2)
 {
 	alist_el_t *el1 = arg1;
 	alist_el_t *el2 = arg2;
-	return ((uintptr_t)el1->ale_name != (uintptr_t)el2->ale_name);
+	return (el1->ale_name != el2->ale_name);
 }
 
 alist_t *

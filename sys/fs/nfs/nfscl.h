@@ -49,7 +49,8 @@ struct nfsv4node {
  */
 #define	NFSCL_REQSTART(n, p, v) 					\
 	nfscl_reqstart((n), (p), VFSTONFS((v)->v_mount), 		\
-	    VTONFS(v)->n_fhp->nfh_fh, VTONFS(v)->n_fhp->nfh_len, NULL, NULL)
+	    VTONFS(v)->n_fhp->nfh_fh, VTONFS(v)->n_fhp->nfh_len, NULL,	\
+	    NULL, 0, 0)
 
 /*
  * These two macros convert between a lease duration and renew interval.
@@ -58,6 +59,10 @@ struct nfsv4node {
  */
 #define	NFSCL_RENEW(l)	(((l) < 2) ? 1 : ((l) / 2))
 #define	NFSCL_LEASE(r)	((r) * 2)
+
+/* This macro checks to see if a forced dismount is about to occur. */
+#define	NFSCL_FORCEDISM(m)	(((m)->mnt_kern_flag & MNTK_UNMOUNTF) != 0 || \
+    (VFSTONFS(m)->nm_privflag & NFSMNTP_FORCEDISM) != 0)
 
 /*
  * These flag bits are used for the argument to nfscl_fillsattr() to

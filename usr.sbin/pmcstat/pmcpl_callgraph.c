@@ -27,6 +27,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 /*
  * Transform a hwpmc(4) log into human readable form, and into
@@ -72,6 +82,9 @@ __FBSDID("$FreeBSD$");
 #include "pmcstat_log.h"
 #include "pmcstat_top.h"
 #include "pmcpl_callgraph.h"
+
+#define	min(A,B)		((A) < (B) ? (A) : (B))
+#define	max(A,B)		((A) > (B) ? (A) : (B))
 
 /* Get the sample value in percent related to nsamples. */
 #define PMCPL_CG_COUNTP(a) \
@@ -638,8 +651,11 @@ pmcpl_cg_topdisplay(void)
  */
 
 int
-pmcpl_cg_topkeypress(int c, WINDOW *w)
+pmcpl_cg_topkeypress(int c, void *arg)
 {
+	WINDOW *w;
+
+	w = (WINDOW *)arg;
 
 	(void) c; (void) w;
 

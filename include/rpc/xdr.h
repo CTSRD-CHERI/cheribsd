@@ -31,6 +31,17 @@
  *	from: @(#)xdr.h	2.2 88/07/29 4.0 RPCSRC
  * $FreeBSD$
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "sunrpc"
+ * }
+ * CHERI CHANGES END
+ */
 
 /*
  * xdr.h, External Data Representation Serialization Routines.

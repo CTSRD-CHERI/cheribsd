@@ -54,6 +54,19 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "unsupported",
+ *     "other"
+ *   ],
+ *   "change_comment": "SIGPROT",
+ *   "hybrid_specific": false
+ * }
+ * CHERI CHANGES END
+ */
 #include <sys/cdefs.h>
 __RCSID("$NetBSD: t_mmap.c,v 1.12 2017/01/16 16:31:05 christos Exp $");
 

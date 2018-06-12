@@ -173,6 +173,7 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
  * Align variables.
  */
 #define	__read_mostly		__section(".data.read_mostly")
+#define	__read_frequently	__section(".data.read_frequently")
 #define	__exclusive_cache_line	__aligned(CACHE_LINE_SIZE) \
 				    __section(".data.exclusive_cache_line")
 /*
@@ -303,6 +304,12 @@ void	cheri_bcopy(const void *src, void *dst, size_t len);
 #define	cheri_bcopy	bcopy
 #endif
 void	bzero(void * _Nonnull buf, size_t len);
+#define bzero(buf, len) ({				\
+	if (__builtin_constant_p(len) && (len) <= 64)	\
+		__builtin_memset((buf), 0, (len));	\
+	else						\
+		bzero((buf), (len));			\
+})
 void	explicit_bzero(void * _Nonnull, size_t);
 
 void	*memcpy(void * _Nonnull to, const void * _Nonnull from, size_t len);
@@ -602,6 +609,7 @@ struct unrhdr;
 struct unrhdr *new_unrhdr(int low, int high, struct mtx *mutex);
 void init_unrhdr(struct unrhdr *uh, int low, int high, struct mtx *mutex);
 void delete_unrhdr(struct unrhdr *uh);
+void clear_unrhdr(struct unrhdr *uh);
 void clean_unrhdr(struct unrhdr *uh);
 void clean_unrhdrl(struct unrhdr *uh);
 int alloc_unr(struct unrhdr *uh);

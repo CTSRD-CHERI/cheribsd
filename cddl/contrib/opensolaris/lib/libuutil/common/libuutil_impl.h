@@ -20,6 +20,17 @@
  * CDDL HEADER END
  */
 /*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "unsupported"
+ *   ],
+ *   "change_comment": "Hiding pointers from leak checkers"
+ * }
+ * CHERI CHANGES END
+ */
+/*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */

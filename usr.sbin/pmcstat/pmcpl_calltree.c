@@ -23,6 +23,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 /*
  * Process hwpmc(4) samples as calltree.
@@ -57,6 +67,9 @@ __FBSDID("$FreeBSD$");
 #include "pmcstat_log.h"
 #include "pmcstat_top.h"
 #include "pmcpl_calltree.h"
+
+#define	min(A,B)		((A) < (B) ? (A) : (B))
+#define	max(A,B)		((A) > (B) ? (A) : (B))
 
 #define	PMCPL_CT_GROWSIZE	4
 
@@ -581,8 +594,11 @@ pmcpl_ct_topdisplay(void)
  */
 
 int
-pmcpl_ct_topkeypress(int c, WINDOW *w)
+pmcpl_ct_topkeypress(int c, void *arg)
 {
+	WINDOW *w;
+
+	w = (WINDOW *)arg;
 
 	switch (c) {
 	case 'f':

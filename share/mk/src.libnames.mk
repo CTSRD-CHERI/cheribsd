@@ -20,6 +20,7 @@ _PRIVATELIBS=	\
 		event \
 		heimipcc \
 		heimipcs \
+		ifconfig \
 		ldns \
 		sqlite3 \
 		ssh \
@@ -49,6 +50,7 @@ _INTERNALLIBS=	\
 		opts \
 		parse \
 		pe \
+		pmcstat \
 		readline \
 		sl \
 		sm \
@@ -103,6 +105,7 @@ _LIBRARIES=	\
 		devstat \
 		dialog \
 		dom \
+		dl \
 		dpv \
 		dtrace \
 		dwarf \
@@ -124,7 +127,6 @@ _LIBRARIES=	\
 		heimsqlite \
 		hubbub \
 		hx509 \
-		ifconfig \
 		ipsec \
 		jail \
 		jpeg \
@@ -500,6 +502,9 @@ LIBBSNMPTOOLS?=	${LIBBSNMPTOOLSDIR}/libbsnmptools.a
 
 LIBAMUDIR=	${_LIB_OBJTOP}/usr.sbin/amd/libamu
 LIBAMU?=	${LIBAMUDIR}/libamu.a
+
+LIBPMCSTATDIR=	${_LIB_OBJTOP}/lib/libpmcstat
+LIBPMCSTAT?=	${LIBPMCSTATDIR}/libpmcstat.a
 
 LIBBFDDIR=	${_LIB_OBJTOP}/gnu/usr.bin/binutils/libbfd
 LIBBFD?=	${LIBBFDDIR}/libbfd.a

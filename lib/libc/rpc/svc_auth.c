@@ -30,6 +30,17 @@
 /*
  * Copyright (c) 1986-1991 by Sun Microsystems Inc. 
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "sunrpc"
+ * }
+ * CHERI CHANGES END
+ */
 
 #if defined(LIBC_SCCS) && !defined(lint)
 #ident	"@(#)svc_auth.c	1.16	94/04/24 SMI"

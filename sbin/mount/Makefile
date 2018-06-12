@@ -9,6 +9,4 @@ MAN=	mount.8
 
 LIBADD=	util
 
-WANT_DUMP=	yes
-
 .include <bsd.prog.mk>

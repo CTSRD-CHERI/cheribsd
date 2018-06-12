@@ -28,6 +28,16 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_alignment"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -74,13 +84,14 @@ __makecontext(ucontext_t *ucp, void (*func)(void), int argc, ...)
 #if defined(__mips_o32) || defined(__mips_o64)
 	sp -= (argc >= 4 ? argc : 4);	/* Make room for >=4 arguments. */
 	sp  = (register_t *)
-	    ((uintptr_t)sp & (uintptr_t)~0x7);	/* Align on double-word boundary. */
+	    ((uintptr_t)sp & ~0x7);	/* Align on double-word boundary. */
 #elif defined(__mips_n32) || defined(__mips_n64)
 	sp -= (argc > 8 ? argc - 8 : 0); /* Make room for > 8 arguments. */
 #if !__has_feature(capabilities)
 	sp  = (register_t *)
-	    ((uintptr_t)sp & (uintptr_t)~0xf);	/* Align on quad-word boundary. */
+	    ((uintptr_t)sp & ~0xf);	/* Align on quad-word boundary. */
 #else
+	/* XXX-BD: sufficent for CHERI256? */
 	sp  = (register_t *)
 	    __builtin_align_up(sp, 16);	/* Align on quad-word boundary. */
 #endif

@@ -30,6 +30,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "other"
+ *   ],
+ *   "change_comment": "workaround for aligning array on stack"
+ * }
+ * CHERI CHANGES END
+ */
 
 #if 0
 #ifndef lint

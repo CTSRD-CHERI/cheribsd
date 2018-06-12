@@ -1,10 +1,10 @@
-/**
+/*
  * Copyright (c) 2016-present, Yann Collet, Facebook, Inc.
  * All rights reserved.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under both the BSD-style license (found in the
+ * LICENSE file in the root directory of this source tree) and the GPLv2 (found
+ * in the COPYING file in the root directory of this source tree).
  */
 
 
@@ -70,6 +70,7 @@ int FIO_compressFilename (const char* outfilename, const char* infilename, const
     @return : 0 == ok;  1 == pb with src file. */
 int FIO_decompressFilename (const char* outfilename, const char* infilename, const char* dictFileName);
 
+int FIO_listMultipleFiles(unsigned numFiles, const char** filenameTable, int displayLevel);
 
 /*-*************************************
 *  Multiple File functions

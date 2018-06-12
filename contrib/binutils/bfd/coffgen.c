@@ -36,6 +36,16 @@
    Some of these functions are also called by the ECOFF routines.
    Those functions may not use any COFF specific information, such as
    coff_data (abfd).  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include "sysdep.h"
 #include "bfd.h"
