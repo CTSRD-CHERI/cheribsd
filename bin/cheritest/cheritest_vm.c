@@ -41,6 +41,7 @@
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
+#include <sys/socket.h>
 #include <sys/sysctl.h>
 #include <sys/time.h>
 #include <sys/ucontext.h>
@@ -151,6 +152,118 @@ cheritest_vm_tag_shm_open_anon_shared2x(const struct cheri_test *ctp __unused)
 	cheritest_success();
 }
 
+void
+cheritest_vm_shm_open_anon_unix_surprise(const struct cheri_test *ctp __unused)
+{
+	int sv[2];
+	int pid;
+
+	CHERITEST_CHECK_SYSCALL(socketpair(AF_UNIX, SOCK_DGRAM, 0, sv) != 0);
+
+	pid = fork();
+	if (pid == -1)
+		cheritest_failure_errx("Fork failed; errno=%d", errno);
+
+	if (pid == 0) {
+		void * __capability * map;
+		void * __capability c;
+		int fd, tag;
+		struct msghdr msg = { 0 };
+		struct cmsghdr * cmsg;
+		char cmsgbuf[CMSG_SPACE(sizeof(fd))] = { 0 } ;
+		char iovbuf[16];
+		struct iovec iov = { .iov_base = iovbuf, .iov_len = sizeof(iovbuf) };
+
+		close(sv[1]);
+
+		/* Read from socket */
+		msg.msg_iov = &iov;
+		msg.msg_iovlen = 1;
+		msg.msg_control = cmsgbuf;
+		msg.msg_controllen = sizeof(cmsgbuf);
+		CHERITEST_CHECK_SYSCALL(recvmsg(sv[0], &msg, 0));
+
+		/* Deconstruct cmsg */
+		/* XXX Doesn't compile: cmsg = CMSG_FIRSTHDR(&msg); */
+		cmsg = msg.msg_control;
+		memmove(&fd, CMSG_DATA(cmsg), sizeof(fd));
+
+		CHERITEST_VERIFY2(fd >= 0, "fd read OK");
+
+		map = CHERITEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
+						PROT_READ, MAP_SHARED, fd,
+						0));
+		c = *map;
+
+		fprintf(stderr, "rx cap: v:%lu b:%016jx l:%016zx o:%jx\n",
+			cheri_gettag(c), cheri_getbase(c), cheri_getlen(c),
+			cheri_getoffset(c));
+
+		tag = cheri_gettag(c);
+		CHERITEST_VERIFY2(tag == 0, "tag read");
+
+		CHERITEST_CHECK_SYSCALL(munmap(map, getpagesize()));
+		close(sv[0]);
+		close(fd);
+
+		exit(tag);
+	} else {
+		void * __capability * map;
+		void * __capability c;
+		int fd, res;
+		struct msghdr msg = { 0 };
+		struct cmsghdr * cmsg;
+		char cmsgbuf[CMSG_SPACE(sizeof(fd))] = { 0 };
+		char iovbuf[16] = { 0 };
+		struct iovec iov = { .iov_base = iovbuf, .iov_len = sizeof(iovbuf) };
+
+		close(sv[0]);
+
+		fd = CHERITEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR, 0600));
+		CHERITEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
+
+		map = CHERITEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
+						PROT_READ | PROT_WRITE,
+						MAP_SHARED, fd, 0));
+
+		/* Just some pointer */
+		*map = &fd;
+		c = *map;
+		CHERITEST_VERIFY2(cheri_gettag(c) != 0, "tag written");
+
+		fprintf(stderr, "tx cap: v:%lu b:%016jx l:%016zx o:%jx\n",
+			cheri_gettag(c), cheri_getbase(c), cheri_getlen(c),
+			cheri_getoffset(c));
+
+		CHERITEST_CHECK_SYSCALL(munmap(map, getpagesize()));
+
+		/* Construct control message */
+		msg.msg_iov = &iov;
+		msg.msg_iovlen = 1;
+		msg.msg_control = cmsgbuf;
+		msg.msg_controllen = sizeof(cmsgbuf);
+		/* XXX cmsg = CMSG_FIRSTHDR(&msg); */
+		cmsg = msg.msg_control;
+		cmsg->cmsg_level = SOL_SOCKET;
+		cmsg->cmsg_type = SCM_RIGHTS;
+		cmsg->cmsg_len = CMSG_LEN(sizeof fd);
+		memmove(CMSG_DATA(cmsg), &fd, sizeof(fd));
+		msg.msg_controllen = cmsg->cmsg_len;
+
+		/* Send! */
+		CHERITEST_CHECK_SYSCALL(sendmsg(sv[1], &msg, 0));
+
+		close(sv[1]);
+		close(fd);
+
+		waitpid(pid, &res, 0);
+		if (res == 0) {
+			cheritest_success();
+		} else {
+			cheritest_failure_errx("tag transfer succeeded");
+		}
+	}
+}
 
 void
 cheritest_vm_tag_dev_zero_shared(const struct cheri_test *ctp __unused)
