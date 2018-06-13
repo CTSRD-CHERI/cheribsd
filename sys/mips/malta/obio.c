@@ -83,7 +83,10 @@ obio_attach(device_t dev)
 	struct obio_softc *sc = device_get_softc(dev);
 
 	sc->oba_st = mips_bus_space_generic;
-	sc->oba_addr = MIPS_PHYS_TO_KSEG1(MALTA_UART0ADR);
+	if (bus_space_map(sc->oba_st, MALTA_UART0ADR, MALTA_PCIMEM3_SIZE,
+	    0, &sc->oba_addr) != 0)
+		panic("obio_attach: failed to map OBIO I/O region");
+
 	sc->oba_size = MALTA_PCIMEM3_SIZE;
 	sc->oba_rman.rm_type = RMAN_ARRAY;
 	sc->oba_rman.rm_descr = "OBIO I/O";
