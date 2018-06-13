@@ -233,10 +233,17 @@
 /*
  * Mach derived conversion macros
  */
+#ifdef CHERI_KERNEL
+#define	round_page(x)		__builtin_align_down(((x) + PAGE_MASK), PAGE_SIZE)
+#define	trunc_page(x)		__builtin_align_down((x), PAGE_SIZE)
+#define	round_2mpage(x)		__builtin_align_down(((x) + PDRMASK), PDRSIZE)
+#define	trunc_2mpage(x)		__builtin_align_down((x), PDRSIZE)
+#else /* ! CHERI_KERNEL */
 #define	round_page(x)		(((x) + PAGE_MASK) & ~PAGE_MASK)
 #define	trunc_page(x)		((x) & ~PAGE_MASK)
 #define	round_2mpage(x)		(((x) + PDRMASK) & ~PDRMASK)
 #define	trunc_2mpage(x)		((x) & ~PDRMASK)
+#endif /* ! CHERI_KERNEL */
 
 #define	atop(x)			((x) >> PAGE_SHIFT)
 #define	ptoa(x)			((x) << PAGE_SHIFT)

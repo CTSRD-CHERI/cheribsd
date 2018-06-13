@@ -81,9 +81,9 @@ struct bounce_zone;
 struct bus_dma_tag {
 	bus_dma_tag_t		parent;
 	bus_size_t		alignment;
-	bus_addr_t		boundary;
-	bus_addr_t		lowaddr;
-	bus_addr_t		highaddr;
+	bus_offset_t		boundary;
+	bus_offset_t		lowaddr;
+	bus_offset_t		highaddr;
 	bus_dma_filter_t	*filter;
 	void			*filterarg;
 	bus_size_t		maxsize;
@@ -99,17 +99,17 @@ struct bus_dma_tag {
 };
 
 struct bounce_page {
-	vm_offset_t	vaddr;		/* kva of bounce buffer */
-	vm_offset_t	vaddr_nocache;	/* kva of bounce buffer uncached */
+	vm_ptr_t	vaddr;		/* kva of bounce buffer */
+	vm_ptr_t	vaddr_nocache;	/* kva of bounce buffer uncached */
 	bus_addr_t	busaddr;	/* Physical address */
-	vm_offset_t	datavaddr;	/* kva of client data */
+	vm_ptr_t	datavaddr;	/* kva of client data */
 	bus_addr_t	dataaddr;	/* client physical address */
 	bus_size_t	datacount;	/* client data count */
 	STAILQ_ENTRY(bounce_page) links;
 };
 
 struct sync_list {
-	vm_offset_t	vaddr;		/* kva of bounce buffer */
+	vm_ptr_t	vaddr;		/* kva of bounce buffer */
 	bus_addr_t	busaddr;	/* Physical address */
 	bus_size_t	datacount;	/* client data count */
 };
@@ -127,7 +127,7 @@ struct bounce_zone {
 	int		total_deferred;
 	int		map_count;
 	size_t		alignment;
-	bus_addr_t	lowaddr;
+	bus_offset_t	lowaddr;
 	char		zoneid[8];
 	char		lowaddrid[20];
 	struct sysctl_ctx_list sysctl_tree;
@@ -172,7 +172,7 @@ static int alloc_bounce_pages(bus_dma_tag_t dmat, u_int numpages);
 static int reserve_bounce_pages(bus_dma_tag_t dmat, bus_dmamap_t map,
 				int commit);
 static bus_addr_t add_bounce_page(bus_dma_tag_t dmat, bus_dmamap_t map,
-				  vm_offset_t vaddr, bus_addr_t addr,
+				  vm_ptr_t vaddr, bus_addr_t addr,
 				  bus_size_t size);
 static void free_bounce_page(bus_dma_tag_t dmat, struct bounce_page *bpage);
 
@@ -265,12 +265,13 @@ static int
 run_filter(bus_dma_tag_t dmat, bus_addr_t paddr)
 {
 	int retval;
+	bus_offset_t poff = ptr_to_va(paddr);
 
 	retval = 0;
 
 	do {
-		if (((paddr > dmat->lowaddr && paddr <= dmat->highaddr)
-		 || ((paddr & (dmat->alignment - 1)) != 0))
+		if (((poff > dmat->lowaddr && poff <= dmat->highaddr)
+		  || (!is_aligned(paddr, dmat->alignment)))
 		 && (dmat->filter == NULL
 		  || (*dmat->filter)(dmat->filterarg, paddr) != 0))
 			retval = 1;
@@ -285,7 +286,7 @@ run_filter(bus_dma_tag_t dmat, bus_addr_t paddr)
  */
 
 static __inline int
-_bus_dma_can_bounce(vm_offset_t lowaddr, vm_offset_t highaddr)
+_bus_dma_can_bounce(bus_offset_t lowaddr, bus_offset_t highaddr)
 {
 	int i;
 	for (i = 0; phys_avail[i] && phys_avail[i + 1]; i += 2) {
@@ -388,6 +389,7 @@ bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 		    __func__, newtag, 0, error);
 		return (ENOMEM);
 	}
+	KASSERT(powerof2(boundary), ("DMA tag boundary must be a power of 2."));
 
 	newtag->parent = parent;
 	newtag->alignment = alignment;
@@ -806,7 +808,7 @@ _bus_dmamap_count_pages(bus_dma_tag_t dmat, bus_dmamap_t map, pmap_t pmap,
 			bus_size_t sg_len;
 
 			KASSERT(kernel_pmap == pmap, ("pmap is not kernel pmap"));
-			sg_len = PAGE_SIZE - ((vm_offset_t)vaddr & PAGE_MASK);
+			sg_len = PAGE_SIZE - (vaddr & PAGE_MASK);
 			paddr = pmap_kextract(vaddr);
 			if (((dmat->flags & BUS_DMA_COULD_BOUNCE) != 0) &&
 			    run_filter(dmat, paddr) != 0) {
@@ -851,15 +853,14 @@ static int
 _bus_dmamap_addseg(bus_dma_tag_t dmat, bus_dmamap_t map, bus_addr_t curaddr,
     bus_size_t sgsize, bus_dma_segment_t *segs, int *segp)
 {
-	bus_addr_t baddr, bmask;
+	bus_addr_t baddr;
 	int seg;
 
 	/*
 	 * Make sure we don't cross any boundaries.
 	 */
-	bmask = ~(dmat->boundary - 1);
 	if (dmat->boundary > 0) {
-		baddr = (curaddr + dmat->boundary) & bmask;
+		baddr = rounddown2(curaddr + dmat->boundary, dmat->boundary);
 		if (sgsize > (baddr - curaddr))
 			sgsize = (baddr - curaddr);
 	}
@@ -872,7 +873,8 @@ _bus_dmamap_addseg(bus_dma_tag_t dmat, bus_dmamap_t map, bus_addr_t curaddr,
 	    curaddr == segs[seg].ds_addr + segs[seg].ds_len &&
 	    (segs[seg].ds_len + sgsize) <= dmat->maxsegsz &&
 	    (dmat->boundary == 0 ||
-	     (segs[seg].ds_addr & bmask) == (curaddr & bmask))) {
+	     (rounddown2(segs[seg].ds_addr, dmat->boundary) ==
+	      rounddown2(curaddr, dmat->boundary)))) {
 		segs[seg].ds_len += sgsize;
 	} else {
 		if (++seg >= dmat->nsegments)
@@ -959,7 +961,7 @@ _bus_dmamap_load_buffer(bus_dma_tag_t dmat, bus_dmamap_t map, void *buf,
 	bus_size_t sgsize;
 	bus_addr_t curaddr;
 	struct sync_list *sl;
-	vm_offset_t vaddr = (vm_offset_t)buf;
+	vm_ptr_t vaddr = (vm_ptr_t)buf;
 	int error = 0;
 
 
@@ -987,12 +989,12 @@ _bus_dmamap_load_buffer(bus_dma_tag_t dmat, bus_dmamap_t map, void *buf,
 		 * XXX in user address space.
 		 */
 		KASSERT(kernel_pmap == pmap, ("pmap is not kernel pmap"));
-		curaddr = pmap_kextract(vaddr);
+		curaddr = pmap_kextract(ptr_to_va(vaddr));
 
 		/*
 		 * Compute the segment size, and adjust counts.
 		 */
-		sgsize = PAGE_SIZE - ((u_long)curaddr & PAGE_MASK);
+		sgsize = PAGE_SIZE - ((vm_offset_t)curaddr & PAGE_MASK);
 		if (sgsize > dmat->maxsegsz)
 			sgsize = dmat->maxsegsz;
 		if (buflen < sgsize)
@@ -1073,10 +1075,10 @@ _bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map)
 }
 
 static void
-bus_dmamap_sync_buf(vm_offset_t buf, int len, bus_dmasync_op_t op, int aligned)
+bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
 {
 	char tmp_cl[mips_dcache_max_linesize], tmp_clend[mips_dcache_max_linesize];
-	vm_offset_t buf_cl, buf_clend;
+	vm_ptr_t buf_cl, buf_clend;
 	vm_size_t size_cl, size_clend;
 	int cache_linesize_mask = mips_dcache_max_linesize - 1;
 
@@ -1102,11 +1104,11 @@ bus_dmamap_sync_buf(vm_offset_t buf, int len, bus_dmasync_op_t op, int aligned)
 		size_cl = 0;
 		size_clend = 0;
 	} else {
-		buf_cl = buf & ~cache_linesize_mask;
-		size_cl = buf & cache_linesize_mask;
+		buf_cl = rounddown2(buf, mips_dcache_max_linesize);
+		size_cl = ptr_to_va(buf) & cache_linesize_mask;
 		buf_clend = buf + len;
 		size_clend = (mips_dcache_max_linesize -
-		    (buf_clend & cache_linesize_mask)) & cache_linesize_mask;
+		    (ptr_to_va(buf_clend) & cache_linesize_mask)) & cache_linesize_mask;
 	}
 
 	switch (op) {
@@ -1120,7 +1122,7 @@ bus_dmamap_sync_buf(vm_offset_t buf, int len, bus_dmasync_op_t op, int aligned)
 			memcpy (tmp_cl, (void*)buf_cl, size_cl);
 		if (size_clend)
 			memcpy (tmp_clend, (void*)buf_clend, size_clend);
-		mips_dcache_inv_range(buf, len);
+		mips_dcache_inv_range(ptr_to_va(buf), len);
 		/*
 		 * Restore them
 		 */
@@ -1135,14 +1137,14 @@ bus_dmamap_sync_buf(vm_offset_t buf, int len, bus_dmasync_op_t op, int aligned)
 		 * necessary.
 		 */
 		if (size_cl)
-			mips_dcache_wbinv_range(buf_cl, size_cl);
+			mips_dcache_wbinv_range(ptr_to_va(buf_cl), size_cl);
 		if (size_clend && (size_cl == 0 ||
                     buf_clend - buf_cl > mips_dcache_max_linesize))
-			mips_dcache_wbinv_range(buf_clend, size_clend);
+			mips_dcache_wbinv_range(ptr_to_va(buf_clend), size_clend);
 		break;
 
 	case BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE:
-		mips_dcache_wbinv_range(buf, len);
+		mips_dcache_wbinv_range(ptr_to_va(buf), len);
 		break;
 
 	case BUS_DMASYNC_PREREAD:
@@ -1153,7 +1155,7 @@ bus_dmamap_sync_buf(vm_offset_t buf, int len, bus_dmasync_op_t op, int aligned)
 			memcpy (tmp_cl, (void *)buf_cl, size_cl);
 		if (size_clend)
 			memcpy (tmp_clend, (void *)buf_clend, size_clend);
-		mips_dcache_inv_range(buf, len);
+		mips_dcache_inv_range(ptr_to_va(buf), len);
 		/*
 		 * Restore them
 		 */
@@ -1168,17 +1170,17 @@ bus_dmamap_sync_buf(vm_offset_t buf, int len, bus_dmasync_op_t op, int aligned)
 		 * necessary.
 		 */
 		if (size_cl)
-			mips_dcache_wbinv_range(buf_cl, size_cl);
+			mips_dcache_wbinv_range(ptr_to_va(buf_cl), size_cl);
 		if (size_clend && (size_cl == 0 ||
                     buf_clend - buf_cl > mips_dcache_max_linesize))
-			mips_dcache_wbinv_range(buf_clend, size_clend);
+			mips_dcache_wbinv_range(ptr_to_va(buf_clend), size_clend);
 		break;
 
 	case BUS_DMASYNC_PREWRITE:
 #ifdef BUS_DMA_FORCE_WBINV
-		mips_dcache_wbinv_range(buf, len);
+		mips_dcache_wbinv_range(ptr_to_va(buf), len);
 #else
-		mips_dcache_wb_range(buf, len);
+		mips_dcache_wb_range(ptr_to_va(buf), len);
 #endif
 		break;
 	}
@@ -1205,10 +1207,10 @@ _bus_dmamap_sync_bp(bus_dma_tag_t dmat, bus_dmamap_t map, bus_dmasync_op_t op)
 				    bpage->datacount);
 			if (bpage->vaddr_nocache == 0) {
 #ifdef BUS_DMA_FORCE_WBINV
-				mips_dcache_wbinv_range(bpage->vaddr,
+				mips_dcache_wbinv_range(ptr_to_va(bpage->vaddr),
 				    bpage->datacount);
 #else
-				mips_dcache_wb_range(bpage->vaddr,
+				mips_dcache_wb_range(ptr_to_va(bpage->vaddr),
 				    bpage->datacount);
 #endif
 			}
@@ -1216,7 +1218,7 @@ _bus_dmamap_sync_bp(bus_dma_tag_t dmat, bus_dmamap_t map, bus_dmasync_op_t op)
 		}
 		if (op & BUS_DMASYNC_POSTREAD) {
 			if (bpage->vaddr_nocache == 0) {
-				mips_dcache_inv_range(bpage->vaddr,
+				mips_dcache_inv_range(ptr_to_va(bpage->vaddr),
 				    bpage->datacount);
 			}
 			if (bpage->datavaddr != 0)
@@ -1375,18 +1377,18 @@ alloc_bounce_pages(bus_dma_tag_t dmat, u_int numpages)
 
 		if (bpage == NULL)
 			break;
-		bpage->vaddr = (vm_offset_t)contigmalloc(PAGE_SIZE, M_BOUNCE,
-							 M_NOWAIT, 0ul,
-							 bz->lowaddr,
-							 PAGE_SIZE,
-							 0);
+		bpage->vaddr = (vm_ptr_t)contigmalloc(PAGE_SIZE, M_BOUNCE,
+						      M_NOWAIT, 0ul,
+						      bz->lowaddr,
+						      PAGE_SIZE,
+						      0);
 		if (bpage->vaddr == 0) {
 			free(bpage, M_BUSDMA);
 			break;
 		}
-		bpage->busaddr = pmap_kextract(bpage->vaddr);
+		bpage->busaddr = pmap_kextract(ptr_to_va(bpage->vaddr));
 		bpage->vaddr_nocache = 
-		    (vm_offset_t)pmap_mapdev(bpage->busaddr, PAGE_SIZE);
+		    (vm_ptr_t)pmap_mapdev(bpage->busaddr, PAGE_SIZE);
 		mtx_lock(&bounce_lock);
 		STAILQ_INSERT_TAIL(&bz->bounce_page_list, bpage, links);
 		total_bpages++;
@@ -1419,7 +1421,7 @@ reserve_bounce_pages(bus_dma_tag_t dmat, bus_dmamap_t map, int commit)
 }
 
 static bus_addr_t
-add_bounce_page(bus_dma_tag_t dmat, bus_dmamap_t map, vm_offset_t vaddr,
+add_bounce_page(bus_dma_tag_t dmat, bus_dmamap_t map, vm_ptr_t vaddr,
 		bus_addr_t addr, bus_size_t size)
 {
 	struct bounce_zone *bz;
@@ -1474,8 +1476,8 @@ free_bounce_page(bus_dma_tag_t dmat, struct bounce_page *bpage)
 		 * of this bounce page may need to store a full page of
 		 * data and/or assume it starts on a page boundary.
 		 */
-		bpage->vaddr &= ~PAGE_MASK;
-		bpage->busaddr &= ~PAGE_MASK;
+		bpage->vaddr = trunc_page(bpage->vaddr);
+		bpage->busaddr = trunc_page(bpage->busaddr);
 	}
 
 	mtx_lock(&bounce_lock);

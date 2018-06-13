@@ -249,8 +249,8 @@ extern caddr_t cheri_kall_capability;
 #define	MIPS_PHYS_TO_KSEG0(x)	MIPS_KSEG0((uintptr_t)(x) | MIPS_KSEG0_START)
 #define	MIPS_PHYS_TO_KSEG1(x)	MIPS_KSEG1((uintptr_t)(x) | MIPS_KSEG1_START)
 
-#define	MIPS_KSEG0_TO_PHYS(x)		((uintptr_t)(x) & MIPS_KSEG0_PHYS_MASK)
-#define	MIPS_KSEG1_TO_PHYS(x)		((uintptr_t)(x) & MIPS_KSEG0_PHYS_MASK)
+#define	MIPS_KSEG0_TO_PHYS(x)		(ptr_to_va(x) & MIPS_KSEG0_PHYS_MASK)
+#define	MIPS_KSEG1_TO_PHYS(x)		(ptr_to_va(x) & MIPS_KSEG0_PHYS_MASK)
 
 #define	MIPS_IS_KSEG0_ADDR(x)					\
 	(((vm_offset_t)(x) >= MIPS_KSEG0_START) &&		\
@@ -268,7 +268,7 @@ extern caddr_t cheri_kall_capability;
 #define	MIPS_PHYS_TO_XKPHYS_UNCACHED(x) \
 	MIPS_PHYS_TO_XKPHYS(MIPS_CCA_UNCACHED, (x))
 
-#define	MIPS_XKPHYS_TO_PHYS(x)		((uintptr_t)(x) & MIPS_XKPHYS_PHYS_MASK)
+#define	MIPS_XKPHYS_TO_PHYS(x)		(ptr_to_va(x) & MIPS_XKPHYS_PHYS_MASK)
 
 #define	MIPS_XKSEG_TO_COMPAT32(va)	((va) & 0xffffffff)
 

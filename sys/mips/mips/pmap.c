@@ -98,6 +98,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/tlb.h>
 
 #ifdef CHERI_KERNEL
+#include <machine/cherireg.h>
 #include <cheri/cheric.h>
 #endif
 
@@ -3297,14 +3298,23 @@ pmap_is_referenced(vm_page_t m)
 void *
 pmap_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t ma)
 {
-        vm_ptr_t va, tmpva, offset;
+	vm_offset_t offset;
+	void *va, *tmpva;
 
 	/*
 	 * KSEG1 maps only first 512M of phys address space. For
 	 * pa > 0x20000000 we should make proper mapping * using pmap_kenter.
 	 */
-	if (MIPS_DIRECT_MAPPABLE(pa + size - 1) && ma == VM_MEMATTR_UNCACHEABLE)
-		return ((void *)MIPS_PHYS_TO_DIRECT_UNCACHED(pa));
+	if (MIPS_DIRECT_MAPPABLE(pa + size - 1) && ma == VM_MEMATTR_UNCACHEABLE) {
+		va = MIPS_PHYS_TO_DIRECT_UNCACHED(pa);
+#ifdef CHERI_KERNEL
+		/* Device memory should never contain capabilities (for now) */
+		va = cheri_csetbounds(va, size);
+		va = cheri_andperm(va, ~(CHERI_PERM_LOAD_CAP |
+		    CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP));
+#endif
+		return va;
+	}
 	else {
 		offset = pa & PAGE_MASK;
 		size = roundup(size + offset, PAGE_SIZE);
@@ -3314,7 +3324,7 @@ pmap_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t ma)
 			panic("pmap_mapdev: Couldn't alloc kernel virtual memory");
 		pa = trunc_page(pa);
 		for (tmpva = va; size > 0;) {
-			pmap_kenter_attr(tmpva, pa, ma);
+			pmap_kenter_attr((vm_offset_t)tmpva, pa, ma);
 			size -= PAGE_SIZE;
 			tmpva += PAGE_SIZE;
 			pa += PAGE_SIZE;
