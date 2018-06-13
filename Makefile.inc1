@@ -1164,8 +1164,15 @@ buildcheri:
 .endfor
 .endif
 
+_installcheri_libs=cddl/lib/libctf gnu/lib secure/lib
+.if ${MK_CDDL} != "no"
+	_installcheri_libs+=cddl/lib
+.endif
+.if ${MK_KERBEROS} != "no"
+	_installcheri_libs+=kerberos5/lib
+.endif
 distributecheri installcheri:
-.for _lib in lib ${LOCAL_LIB_DIRS} cddl/lib gnu/lib secure/lib kerberos5/lib
+.for _lib in lib ${LOCAL_LIB_DIRS} ${_installcheri_libs}
 	cd ${.CURDIR}/${_lib}; ${LIBCHERIIMAKE} ${.TARGET:S/cheri$//}
 .endfor
 .endif
