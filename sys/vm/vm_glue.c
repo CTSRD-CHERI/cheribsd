@@ -607,7 +607,7 @@ vm_thread_stack_lowmem(void *nulll)
 		ks_ce1 = ks_ce;
 		ks_ce = ks_ce->next_ks_entry;
 
-		vm_thread_stack_dispose(ks_ce1->ksobj, (vm_offset_t)ks_ce1,
+		vm_thread_stack_dispose(ks_ce1->ksobj, (vm_ptr_t)ks_ce1,
 		    kstack_pages);
 	}
 }
