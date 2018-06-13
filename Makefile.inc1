@@ -764,7 +764,7 @@ WMAKE=		${WMAKEENV} ${MAKE} ${WORLD_FLAGS} -f Makefile.inc1 \
 
 .if ${MK_CHERI} != "no"
 # cheri world
-LIBCHERI_OBJTREE=	${OBJTREE}${.CURDIR}/worldcheri
+LIBCHERI_OBJTREE=	${OBJTREE}${.CURDIR}/obj-libcheri
 LIBCHERI_TESTSBASE=	${TESTSBASE}/cheri
 
 # Yes, the flags are redundant.
