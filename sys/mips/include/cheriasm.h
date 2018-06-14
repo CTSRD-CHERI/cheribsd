@@ -301,14 +301,6 @@
 	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C24,			\
 	    CHERIKFRAME_OFF_C24, base)
 
-/* This macro is just until assembler supports clearregs */
-#define CHERI_CLEARREGS(regset, mask) \
-  .word (0x12 << 26) | (0xf << 21) | (regset << 16) | (mask)
-#define CHERI_CLEAR_GPLO16(mask)  CHERI_CLEARREGS(0, mask);
-#define CHERI_CLEAR_GPHI16(mask)  CHERI_CLEARREGS(1, mask);
-#define CHERI_CLEAR_CAPLO16(mask) CHERI_CLEARREGS(2, mask);
-#define CHERI_CLEAR_CAPHI16(mask) CHERI_CLEARREGS(3, mask);
-
 #define CHERI_CLEAR_GPLO_ZR    (1 << 0)
 #define CHERI_CLEAR_GPLO_AT    (1 << 1)
 #define CHERI_CLEAR_GPLO_V0    (1 << 2)
