@@ -619,8 +619,10 @@ unborrow_curthread(struct thread *td, struct trapframe **trapframep)
 	KASSERT(peertd != td, ("%s: peertd %p == td %p\n", __func__, peertd, td));
 
 #if 0
-	printf("%s: replacing current td %p, md_tls %p, md_tls_tcb_offset %zd, with %p, md_tls %p, md_tls_tcb_offset %zd\n",
-	    __func__, td, td->td_md.md_tls, td->td_md.md_tls_tcb_offset, peertd, peertd->td_md.md_tls, peertd->td_md.md_tls_tcb_offset);
+	printf("%s: replacing current td %p, switcher_context %#lx, md_tls %p, md_tls_tcb_offset %zd, "
+	    "with td %p, switcher_context %#lx, md_tls %p, md_tls_tcb_offset %zd\n", __func__,
+	    td, td->td_md.md_switcher_context, (__cheri_fromcap void *)td->td_md.md_tls, td->td_md.md_tls_tcb_offset,
+	    peertd, peertd->td_md.md_switcher_context, (__cheri_fromcap void *)peertd->td_md.md_tls, peertd->td_md.md_tls_tcb_offset);
 #endif
 
 	/*
