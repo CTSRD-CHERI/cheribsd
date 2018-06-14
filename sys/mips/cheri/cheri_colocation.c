@@ -81,6 +81,59 @@ colocation_startup(void)
 SYSINIT(colocation_startup, SI_SUB_CPU, SI_ORDER_FIRST, colocation_startup,
     NULL);
 
+void
+colocation_thread_exit(struct thread *td)
+{
+	struct switcher_context sc, *peersc;
+	vaddr_t addr;
+	int error;
+
+	addr = td->td_md.md_switcher_context;
+	if (addr == 0)
+		return;
+
+	error = copyincap_c(__USER_CAP((void *)addr, sizeof(sc)), &sc, sizeof(sc));
+	if (error != 0) {
+		printf("%s: copyincap_c from %p failed with error %d\n",
+		    __func__, (void *)addr, error);
+		return;
+	}
+
+	peersc = (__cheri_fromcap struct switcher_context *)sc.sc_peer_context;
+	//printf("%s: terminating thread %p, peer context %p\n", __func__, td, peersc);
+
+	sc.sc_td = NULL;
+	sc.sc_borrower_td = NULL;
+	sc.sc_peer_context = NULL;
+
+	error = copyoutcap_c(&sc, __USER_CAP((void *)addr, sizeof(sc)), sizeof(sc));
+	if (error != 0) {
+		printf("%s: copyoutcap_c to %p failed with error %d\n",
+		    __func__, (void *)addr, error);
+		return;
+	}
+
+	if (peersc == NULL)
+		return;
+
+	error = copyincap_c(__USER_CAP((void *)peersc, sizeof(sc)), &sc, sizeof(sc));
+	if (error != 0) {
+		printf("%s: peer copyincap_c from %p failed with error %d\n",
+		    __func__, (void *)peersc, error);
+		return;
+	}
+
+	sc.sc_peer_context = NULL;
+	sc.sc_borrower_td = NULL;
+
+	error = copyoutcap_c(&sc, __USER_CAP((void *)peersc, sizeof(sc)), sizeof(sc));
+	if (error != 0) {
+		printf("%s: peer copyoutcap_c to %p failed with error %d\n",
+		    __func__, (void *)peersc, error);
+		return;
+	}
+}
+
 static int
 cosetup(struct thread *td)
 {

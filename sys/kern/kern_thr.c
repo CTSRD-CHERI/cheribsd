@@ -61,6 +61,10 @@ __FBSDID("$FreeBSD$");
 
 #include <security/audit/audit.h>
 
+#ifdef CPU_CHERI
+#include <cheri/cheri.h>
+#endif
+
 static SYSCTL_NODE(_kern, OID_AUTO, threads, CTLFLAG_RW, 0,
     "thread allocation");
 
@@ -359,6 +363,9 @@ kern_thr_exit(struct thread *td)
 	if (p->p_ptevents & PTRACE_LWP)
 		ptracestop(td, SIGTRAP, NULL);
 	PROC_UNLOCK(p);
+#ifdef CPU_CHERI
+	colocation_thread_exit(td);
+#endif
 	tidhash_remove(td);
 	PROC_LOCK(p);
 	p->p_pendingexits--;

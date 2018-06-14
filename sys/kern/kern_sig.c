@@ -2049,7 +2049,6 @@ postsig_done(int sig, struct thread *td, struct sigacts *ps)
 		sigdflt(ps, sig);
 }
 
-
 /*
  * Send a signal caused by a trap to the current thread.  If it will be
  * caught immediately, deliver it with correct code.  Otherwise, post it
