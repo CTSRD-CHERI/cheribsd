@@ -127,6 +127,7 @@
 	nop;								\
 	/* Save user $ddc; install kernel $ddc. */			\
 	cgetdefault	CHERI_REG_SEC0;					\
+	cgetkdc		CHERI_REG_KDC;					\
 	csetdefault	CHERI_REG_KDC;					\
 64:
 
@@ -147,7 +148,12 @@
 	mfc0	reg, MIPS_COP_0_STATUS;					\
 	andi	reg, reg, MIPS_SR_KSU_USER;				\
 	beq	reg, $0, 65f;						\
-	nop;								\
+	/* Clear KR1C and KR2C in the branch delay slot */		\
+	CClearHi (CHERI_CLEAR_CAPHI_KR1C | CHERI_CLEAR_CAPHI_KR2C);	\
+	/* TODO: Once we depend on no mirroring also clear the		\
+	 * registers that were previously kernel-only:			\
+	 * CClearHi (CHERI_CLEAR_CAPHI_KCC | CHERI_CLEAR_CAPHI_KDC	\
+	 * 	CHERI_CLEAR_CAPHI_EPCC) */				\
 	b	66f;							\
 	/* If returning to userspace, restore saved user $ddc. */	\
 	csetdefault	CHERI_REG_SEC0; 	/* Branch-delay. */	\
@@ -162,7 +168,6 @@
 	CGetKCC		CHERI_REG_KR1C;					\
 	CSetOffset	CHERI_REG_KR1C, CHERI_REG_KR1C, reg;		\
 	CSetEPCC	CHERI_REG_KR1C;					\
-	CGetNull	CHERI_REG_KR1C; /* Clear KR1C before return */	\
 66:
 
 /*
