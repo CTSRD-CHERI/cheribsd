@@ -1,5 +1,7 @@
 # $FreeBSD$
 
+.include <src.opts.mk>
+
 # Requires CAMIOCOMMAND (uses union ccb)
 WANT_CHERI=	none
 
@@ -11,11 +13,13 @@ SRCS+=	attrib.c epc.c fwdownload.c modeedit.c persist.c progress.c timestamp.c z
 .else
 CFLAGS+= -DMINIMALISTIC
 .endif
+.if ${MK_NVME} != "no"
 .PATH:	${SRCTOP}/sbin/nvmecontrol
-CFLAGS+= -I${SRCTOP}/sbin/nvmecontrol
+CFLAGS+= -I${SRCTOP}/sbin/nvmecontrol -DWITH_NVME
 SRCS+=	identify_ext.c nc_util.c
 .PATH:	${SRCTOP}/sys/dev/nvme
 SRCS+=	nvme_util.c
+.endif
 # This is verboten
 .if ${MACHINE_CPUARCH} == "arm"
 WARNS?= 3
