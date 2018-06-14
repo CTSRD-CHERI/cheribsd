@@ -172,6 +172,7 @@ struct thr_param_c;
 void	cheriabi_thr_new_md(struct thread *parent_td,
 	    struct thr_param_c *param);
 void	colocation_thread_exit(struct thread *td);
+int	colocation_unborrow(struct thread *td, struct trapframe **trapframep);
 void	ktrccall_mdfill(struct pcb *pcb, struct ktr_ccall *kc);
 void	ktrcreturn_mdfill(struct pcb *pcb, struct ktr_creturn *kr);
 void	ktrcexception_mdfill(struct trapframe *frame,
