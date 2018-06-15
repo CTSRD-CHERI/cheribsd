@@ -148,15 +148,14 @@
 	mfc0	reg, MIPS_COP_0_STATUS;					\
 	andi	reg, reg, MIPS_SR_KSU_USER;				\
 	beq	reg, $0, 65f;						\
-	/* Clear KR1C and KR2C in the branch delay slot */		\
-	CClearHi (CHERI_CLEAR_CAPHI_KR1C | CHERI_CLEAR_CAPHI_KR2C);	\
-	/* TODO: Once we depend on no mirroring also clear the		\
-	 * registers that were previously kernel-only:			\
-	 * CClearHi (CHERI_CLEAR_CAPHI_KCC | CHERI_CLEAR_CAPHI_KDC	\
-	 * 	CHERI_CLEAR_CAPHI_EPCC) */				\
-	b	66f;							\
+	nop;								\
 	/* If returning to userspace, restore saved user $ddc. */	\
-	csetdefault	CHERI_REG_SEC0; 	/* Branch-delay. */	\
+	csetdefault	CHERI_REG_SEC0; 				\
+	b	66f;							\
+	/* TODO: clear c29-31 when returning to userspace		\
+	 * CClearHi (CHERI_CLEAR_CAPHI_KCC | CHERI_CLEAR_CAPHI_KDC	\
+	 * 	CHERI_CLEAR_CAPHI_EPCC); */				\
+	nop;								\
 65:									\
 	/* If returning to kernelspace, reinstall kernel code $pcc. */	\
 	/*								\
@@ -168,7 +167,9 @@
 	CGetKCC		CHERI_REG_KR1C;					\
 	CSetOffset	CHERI_REG_KR1C, CHERI_REG_KR1C, reg;		\
 	CSetEPCC	CHERI_REG_KR1C;					\
-66:
+66:									\
+	/* Clear C27 and C28 before returning */			\
+	CClearHi (CHERI_CLEAR_CAPHI_KR1C | CHERI_CLEAR_CAPHI_KR2C);
 
 /*
  * Save and restore user CHERI state on an exception.  Assumes that $ddc has
