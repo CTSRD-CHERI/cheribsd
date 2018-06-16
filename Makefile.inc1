@@ -89,6 +89,9 @@ MK_GCC_BOOTSTRAP=	no
 .if make(installworld) || make(installsysroot) || make(install) || \
     make(distributeworld) || make(stageworld) || make(distribution)
 .-include "${OBJTOP}/compiler-metadata.mk"
+.if !defined(_LOADED_COMPILER_METADATA)
+.error A build is required first.  You may have the wrong MAKEOBJDIRPREFIX set.
+.endif
 _TOOLCHAIN_VARS_SHOULD_BE_SET=yes
 .else
 # Computing the variables is fine in the toplevel makefile:
@@ -229,6 +232,7 @@ compiler-metadata.mk: .PHONY .META
 	@: > ${.TARGET}
 	@echo ".info Using cached compiler metadata from build at $$(hostname) on $$(date)" \
 	    > ${.TARGET}
+	@echo "_LOADED_COMPILER_METADATA=t" >> ${.TARGET}
 .for v in ${_COMPILER_METADATA_VARS}
 	@echo "${v}=${${v}}" >> ${.TARGET}
 .endfor
