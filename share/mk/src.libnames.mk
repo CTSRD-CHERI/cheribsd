@@ -557,18 +557,18 @@ LIBRDMACMDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/librdmacm
 LIBIBSDPDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libsdp
 
 # OFED support
-LIBCXGB4DIR=	${_LIB_OBJTOP}/contrib/ofed/libcxgb4
-LIBIBCMDIR=	${_LIB_OBJTOP}/contrib/ofed/libibcm
-LIBIBMADDIR=	${_LIB_OBJTOP}/contrib/ofed/libibmad
-LIBIBNETDISCDIR=${_LIB_OBJTOP}/contrib/ofed/libibnetdisc
-LIBIBUMADDIR=	${_LIB_OBJTOP}/contrib/ofed/libibumad
-LIBIBVERBSDIR=	${_LIB_OBJTOP}/contrib/ofed/libibverbs
-LIBMLX4DIR=	${_LIB_OBJTOP}/contrib/ofed/libmlx4
-LIBMLX5DIR=	${_LIB_OBJTOP}/contrib/ofed/libmlx5
-LIBRDMACMDIR=	${_LIB_OBJTOP}/contrib/ofed/librdmacm
-LIBOSMCOMPDIR=	${_LIB_OBJTOP}/contrib/ofed/opensm/complib
-LIBOPENSMDIR=	${_LIB_OBJTOP}/contrib/ofed/opensm/libopensm
-LIBOSMVENDORDIR=${_LIB_OBJTOP}/contrib/ofed/opensm/libvendor
+LIBCXGB4DIR=	${_LIB_OBJTOP}/lib/ofed/libcxgb4
+LIBIBCMDIR=	${_LIB_OBJTOP}/lib/ofed/libibcm
+LIBIBMADDIR=	${_LIB_OBJTOP}/lib/ofed/libibmad
+LIBIBNETDISCDIR=${_LIB_OBJTOP}/lib/ofed/libibnetdisc
+LIBIBUMADDIR=	${_LIB_OBJTOP}/lib/ofed/libibumad
+LIBIBVERBSDIR=	${_LIB_OBJTOP}/lib/ofed/libibverbs
+LIBMLX4DIR=	${_LIB_OBJTOP}/lib/ofed/libmlx4
+LIBMLX5DIR=	${_LIB_OBJTOP}/lib/ofed/libmlx5
+LIBRDMACMDIR=	${_LIB_OBJTOP}/lib/ofed/librdmacm
+LIBOSMCOMPDIR=	${_LIB_OBJTOP}/lib/ofed/complib
+LIBOPENSMDIR=	${_LIB_OBJTOP}/lib/ofed/libopensm
+LIBOSMVENDORDIR=${_LIB_OBJTOP}/lib/ofed/libvendor
 
 LIBDIALOGDIR=	${_LIB_OBJTOP}/gnu/lib/libdialog
 LIBGCOVDIR=	${_LIB_OBJTOP}/gnu/lib/libgcov
