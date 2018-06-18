@@ -200,13 +200,16 @@ nvpair_remove_nvlist(nvpair_t *nvp)
 static void
 nvpair_remove_nvlist_array(nvpair_t *nvp)
 {
-	const nvlist_t * const *nvlarray;
+	nvlist_t **nvlarray;
 	size_t count, i;
 
-	nvlarray = nvpair_get_nvlist_array(nvp, &count);
-	for (i = 0; i < count; i++)
-		/* XXX: DECONST is bad, mkay? */
-		nvlist_set_array_next(__DECONST(nvlist_t*, nvlarray[i]), NULL);
+	/* XXX: DECONST is bad, mkay? */
+	nvlarray = __DECONST(nvlist_t **,
+	    nvpair_get_nvlist_array(nvp, &count));
+	for (i = 0; i < count; i++) {
+		nvlist_set_array_next(nvlarray[i], NULL);
+		nvlist_set_parent(nvlarray[i], NULL);
+	}
 }
 
 void
