@@ -55,7 +55,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/bootinfo.h>
 #include <machine/elf.h>
 
-#include <contrib/libfdt/fdt.h>
+#include <fdt.h>
 
 #include <stand.h>
 #include <stdarg.h>
