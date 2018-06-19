@@ -13,9 +13,9 @@ WANT_CHERI=	pure
 PROG=	objdump
 SRCS=	objdump.c prdbg.c
 CFLAGS+= -D_GNU_SOURCE
-CFLAGS+= -I${.CURDIR}/${RELTOP}/libbinutils
+CFLAGS+= -I${.CURDIR}/${GNURELTOP}/libbinutils
 CFLAGS+= -I${SRCDIR}/binutils
 CFLAGS+= -DBFD_VERSION_STRING=\"${VERSION}\"
-LIBADD=	binutils opcodes bfd iberty
+LIBADD+=	binutils opcodes bfd iberty
 
 .include <bsd.prog.mk>

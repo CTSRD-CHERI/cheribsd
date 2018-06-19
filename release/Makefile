@@ -138,7 +138,8 @@ base.txz:
 .ifndef NO_MERGEMASTER
 # Set up mergemaster root database
 	sh ${.CURDIR}/scripts/mm-mtree.sh -m ${WORLDDIR} -F \
-	    "TARGET_ARCH=${TARGET_ARCH} TARGET=${TARGET}" -D "${.OBJDIR}/${DISTDIR}/base"
+	    "TARGET_ARCH=${TARGET_ARCH} TARGET=${TARGET} ${.MAKE.JOBS:D-j${.MAKE.JOBS}}" \
+	    -D "${.OBJDIR}/${DISTDIR}/base"
 .endif
 .ifndef NO_ETCUPDATE
 	etcupdate extract -B -M "TARGET_ARCH=${TARGET_ARCH} TARGET=${TARGET}" \

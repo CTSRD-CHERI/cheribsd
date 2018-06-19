@@ -29,7 +29,15 @@
 #
 # $FreeBSD$
 
-.include <src.opts.mk>
+LOADER_MSDOS_SUPPORT?=	yes
+LOADER_UFS_SUPPORT?=	yes
+LOADER_CD9660_SUPPORT?=	no
+LOADER_EXT2FS_SUPPORT?=	no
+LOADER_GZIP_SUPPORT?=	yes
+LOADER_BZIP2_SUPPORT?=	yes
+
+.include <bsd.init.mk>
+
 MK_SSP=		no
 MAN=
 
@@ -60,24 +68,17 @@ SRCS+=		altera_jtag_uart.c				\
 # Since we don't have a backward compatibility issue, default to this on BERI.
 CFLAGS+=	-DBOOT_PROMPT_123
 
-LOADER_MSDOS_SUPPORT?=	yes
-LOADER_UFS_SUPPORT?=	yes
-LOADER_CD9660_SUPPORT?=	no
-LOADER_EXT2FS_SUPPORT?=	no
-LOADER_GZIP_SUPPORT?= yes
-LOADER_BZIP2_SUPPORT?= yes
+HELP_FILES+=	help.mips
 
 # Always add MI sources
-.include	"../../../loader.mk"
+.include	"${BOOTSRC}/loader.mk"
 
 # BERI files common to boot2 and loader
-.PATH:		${.CURDIR}/../common
-CFLAGS+=	-I${.CURDIR}/../common
+.PATH:		${BOOTSRC}/mips/beri/common
+CFLAGS+=	-I${BOOTSRC}/mips/beri/common
 
 # Loader-specific MD headers
 CFLAGS+=	-I${.CURDIR}
-
-CLEANFILES+=	loader.help
 
 # Generate code appropriate for the loader environment
 CFLAGS+=	-G0					\
@@ -95,23 +96,13 @@ LDFLAGS=	-nostdlib				\
 DPADD=		${LIBFICL} ${LIBSA}
 LDADD=		${LIBFICL} ${LIBSA}
 
-loader.help: help.common help.mips
-	cat ${.ALLSRC} | \
-	    awk -f ${LDRSRC}/merge_help.awk > ${.TARGET}
-
-.PATH: ${.CURDIR}/../../../forth
-.include	"${.CURDIR}/../../../forth/Makefile.inc"
-
-FILES+= loader.rc menu.rc
-
 .if defined(LOADER_USB_SUPPORT)
 # Do garbage collection
 CFLAGS+= -ffunction-sections -fdata-sections
 CFLAGS+= -Wl,--gc-sections
-HAVE_UMASS_LOADER=	1
-HAVE_SAF1761OTG=	1
-.include "../../../usb/usbcore.mk"
-CFLAGS+= -I${.CURDIR}/../../../usb
+# Link USB BOOT library
+LDADD+= ${BOOTOBJ}/usb/libusbboot.a
+CFLAGS+= -I${BOOTSRC}/usb
 # Define USB SUPPORT
 CFLAGS+= -DLOADER_USB_SUPPORT
 .endif

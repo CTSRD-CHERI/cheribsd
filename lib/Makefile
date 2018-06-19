@@ -39,6 +39,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libcalendar \
 	libcam \
 	libcapsicum \
+	libcasper \
 	libcompat \
 	libcrypt \
 	libdevctl \
@@ -68,6 +69,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libopenbsd \
 	libopie \
 	libpam \
+	libpathconv \
 	libpcap \
 	libpjdlog \
 	libpng \
@@ -132,7 +134,6 @@ SUBDIR.${MK_ATM}+=	libngatm
 SUBDIR.${MK_BLACKLIST}+=libblacklist
 SUBDIR.${MK_BLUETOOTH}+=libbluetooth libsdp
 SUBDIR.${MK_BSNMP}+=	libbsnmp
-SUBDIR.${MK_CASPER}+=	libcasper
 
 SUBDIR.${MK_CHERI}+=	libhelloworld
 SUBDIR.${MK_CHERI}+=	libsyscalls

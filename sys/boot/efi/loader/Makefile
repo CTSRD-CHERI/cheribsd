@@ -2,19 +2,19 @@
 
 MAN=
 
-.include <src.opts.mk>
+LOADER_NET_SUPPORT?=	yes
+LOADER_MSDOS_SUPPORT?=	yes
+LOADER_UFS_SUPPORT?=	yes
+LOADER_CD9660_SUPPORT?=	no
+LOADER_EXT2FS_SUPPORT?=	no
+
+.include <bsd.init.mk>
 
 MK_SSP=		no
 
 PROG=		loader.sym
 INTERNALPROG=
 WARNS?=		3
-LOADER_NET_SUPPORT?=	yes
-
-LOADER_MSDOS_SUPPORT?=	yes
-LOADER_UFS_SUPPORT?=	yes
-LOADER_CD9660_SUPPORT?=	no
-LOADER_EXT2FS_SUPPORT?=	no
 
 # architecture-specific loader code
 SRCS=	autoload.c \
@@ -29,17 +29,9 @@ SRCS=	autoload.c \
 	vers.c
 
 .if ${MK_ZFS} != "no"
-SRCS+=		zfs.c
-.PATH:		${.CURDIR}/../../zfs
-SRCS+=		skein.c skein_block.c
-# Do not unroll skein loops, reduce code size
-CFLAGS+=	-DSKEIN_LOOP=111
-.PATH:		${.CURDIR}/../../../crypto/skein
-
-# Disable warnings that are currently incompatible with the zfs boot code
-CWARNFLAGS.zfs.c+=	-Wno-sign-compare
-CWARNFLAGS.zfs.c+=	-Wno-array-bounds
-CWARNFLAGS.zfs.c+=	-Wno-missing-prototypes
+LIBZFSBOOT=	${BOOTOBJ}/zfs/libzfsboot.a
+CFLAGS+=	-I${ZFSSRC}
+CFLAGS+=	-DEFI_ZFS_BOOT
 .endif
 
 .if ${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} > 40201
@@ -55,22 +47,15 @@ CWARNFLAGS.main.c+=	-Wno-format
 
 .PATH: ${.CURDIR}/arch/${MACHINE}
 # For smbios.c
-.PATH: ${.CURDIR}/../../i386/libi386
+.PATH: ${BOOTSRC}/i386/libi386
 .include "${.CURDIR}/arch/${MACHINE}/Makefile.inc"
 
 CFLAGS+=	-I${.CURDIR}
 CFLAGS+=	-I${.CURDIR}/arch/${MACHINE}
-CFLAGS+=	-I${.CURDIR}/../include
-CFLAGS+=	-I${.CURDIR}/../include/${MACHINE}
-CFLAGS+=	-I${.CURDIR}/../../../contrib/dev/acpica/include
-CFLAGS+=	-I${.CURDIR}/../../..
-CFLAGS+=	-I${.CURDIR}/../../i386/libi386
-.if ${MK_ZFS} != "no"
-CFLAGS+=	-I${.CURDIR}/../../zfs
-CFLAGS+=	-I${.CURDIR}/../../../cddl/boot/zfs
-CFLAGS+=	-I${.CURDIR}/../../../crypto/skein
-CFLAGS+=	-DEFI_ZFS_BOOT
-.endif
+CFLAGS+=	-I${EFISRC}/include
+CFLAGS+=	-I${EFISRC}/include/${MACHINE}
+CFLAGS+=	-I${SYSDIR}/contrib/dev/acpica/include
+CFLAGS+=	-I${BOOTSRC}/i386/libi386
 CFLAGS+=	-DNO_PCI -DEFI
 
 .if !defined(BOOT_HIDE_SERIAL_NUMBERS)
@@ -85,13 +70,9 @@ CFLAGS+= -DSMBIOS_NETWORK_ENDIAN_UUID
 .endif
 .endif
 
-LOADER_FDT_SUPPORT?=	no
-.if ${MK_FDT} != "no" && ${LOADER_FDT_SUPPORT} != "no"
-CFLAGS+=	-I${.CURDIR}/../../fdt
-CFLAGS+=	-I${.OBJDIR}/../../fdt
-CFLAGS+=	-DLOADER_FDT_SUPPORT
-LIBEFI_FDT=	${.OBJDIR}/../../efi/fdt/libefi_fdt.a
-LIBFDT=		${.OBJDIR}/../../fdt/libfdt.a
+.if defined(HAVE_FDT) && ${MK_FDT} != "no"
+.include	"${BOOTSRC}/fdt.mk"
+LIBEFI_FDT=	${BOOTOBJ}/efi/fdt/libefi_fdt.a
 .endif
 
 # Include bcache code.
@@ -102,7 +83,8 @@ CFLAGS+=	-DEFI_STAGING_SIZE=${EFI_STAGING_SIZE}
 .endif
 
 # Always add MI sources
-.include	"../../loader.mk"
+HELP_FILES=
+.include	"${BOOTSRC}/loader.mk"
 
 FILES+=	loader.efi
 FILESMODE_loader.efi=	${BINMODE}
@@ -140,25 +122,10 @@ loader.efi: ${PROG}
 		-j set_Xficl_compile_set \
 		--output-target=${EFI_TARGET} ${.ALLSRC} ${.TARGET}
 
-LIBEFI=		${.OBJDIR}/../libefi/libefi.a
+LIBEFI=		${BOOTOBJ}/efi/libefi/libefi.a
 
-DPADD=		${LIBFICL} ${LIBEFI} ${LIBFDT} ${LIBEFI_FDT} ${LIBSA} \
+DPADD=		${LIBFICL} ${LIBEFI} ${LIBFDT} ${LIBEFI_FDT} ${LIBZFSBOOT} ${LIBSA} \
 		${LDSCRIPT}
-LDADD=		${LIBFICL} ${LIBEFI} ${LIBFDT} ${LIBEFI_FDT} ${LIBSA}
+LDADD=		${LIBFICL} ${LIBEFI} ${LIBFDT} ${LIBEFI_FDT} ${LIBZFSBOOT} ${LIBSA}
 
 .include <bsd.prog.mk>
-
-beforedepend ${OBJS}: machine
-
-CLEANFILES+=   machine
-
-machine: .NOMETA
-	ln -sf ${.CURDIR}/../../../${MACHINE}/include machine
-
-.if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386"
-beforedepend ${OBJS}: x86
-CLEANFILES+=   x86
-
-x86: .NOMETA
-	ln -sf ${.CURDIR}/../../../x86/include x86
-.endif
