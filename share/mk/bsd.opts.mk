@@ -127,6 +127,9 @@ MK_CHERI:=	no
 .if ${MK_CHERI_SHARED} == no
 MK_CHERI_SHARED_PROG:=	no
 .endif
+.if ${MK_CHERI_SHARED_PROG} == no
+MK_CASPER:=	no
+.endif
 
 #
 # Supported NO_* options (if defined, MK_* will be forced to "no",
