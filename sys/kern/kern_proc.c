@@ -156,6 +156,17 @@ const int thread_off_td_oncpu = offsetof(struct thread, td_oncpu);
 const int thread_off_td_pcb = offsetof(struct thread, td_pcb);
 const int thread_off_td_plist = offsetof(struct thread, td_plist);
 
+EVENTHANDLER_LIST_DEFINE(process_ctor);
+EVENTHANDLER_LIST_DEFINE(process_dtor);
+EVENTHANDLER_LIST_DEFINE(process_init);
+EVENTHANDLER_LIST_DEFINE(process_fini);
+EVENTHANDLER_LIST_DEFINE(process_exit);
+EVENTHANDLER_LIST_DEFINE(process_fork);
+EVENTHANDLER_LIST_DEFINE(process_exec);
+
+EVENTHANDLER_LIST_DECLARE(thread_ctor);
+EVENTHANDLER_LIST_DECLARE(thread_dtor);
+
 int kstack_pages = KSTACK_PAGES;
 SYSCTL_INT(_kern, OID_AUTO, kstack_pages, CTLFLAG_RD, &kstack_pages, 0,
     "Kernel stack size in pages");
@@ -205,12 +216,12 @@ proc_ctor(void *mem, int size, void *arg, int flags)
 
 	p = (struct proc *)mem;
 	SDT_PROBE4(proc, , ctor , entry, p, size, arg, flags);
-	EVENTHANDLER_INVOKE(process_ctor, p);
+	EVENTHANDLER_DIRECT_INVOKE(process_ctor, p);
 	SDT_PROBE4(proc, , ctor , return, p, size, arg, flags);
 	td = FIRST_THREAD_IN_PROC(p);
 	if (td != NULL) {
 		/* Make sure all thread constructors are executed */
-		EVENTHANDLER_INVOKE(thread_ctor, td);
+		EVENTHANDLER_DIRECT_INVOKE(thread_ctor, td);
 	}
 	return (0);
 }
@@ -240,9 +251,9 @@ proc_dtor(void *mem, int size, void *arg)
 		MPASS(td->td_su == NULL);
 
 		/* Make sure all thread destructors are executed */
-		EVENTHANDLER_INVOKE(thread_dtor, td);
+		EVENTHANDLER_DIRECT_INVOKE(thread_dtor, td);
 	}
-	EVENTHANDLER_INVOKE(process_dtor, p);
+	EVENTHANDLER_DIRECT_INVOKE(process_dtor, p);
 	if (p->p_ksi != NULL)
 		KASSERT(! KSI_ONQ(p->p_ksi), ("SIGCHLD queue"));
 	SDT_PROBE3(proc, , dtor, return, p, size, arg);
@@ -266,7 +277,7 @@ proc_init(void *mem, int size, int flags)
 	cv_init(&p->p_pwait, "ppwait");
 	cv_init(&p->p_dbgwait, "dbgwait");
 	TAILQ_INIT(&p->p_threads);	     /* all threads in proc */
-	EVENTHANDLER_INVOKE(process_init, p);
+	EVENTHANDLER_DIRECT_INVOKE(process_init, p);
 	p->p_stats = pstats_alloc();
 	p->p_pgrp = NULL;
 	SDT_PROBE3(proc, , init, return, p, size, flags);
@@ -284,7 +295,7 @@ proc_fini(void *mem, int size)
 	struct proc *p;
 
 	p = (struct proc *)mem;
-	EVENTHANDLER_INVOKE(process_fini, p);
+	EVENTHANDLER_DIRECT_INVOKE(process_fini, p);
 	pstats_free(p->p_stats);
 	thread_free(FIRST_THREAD_IN_PROC(p));
 	mtx_destroy(&p->p_mtx);
@@ -399,23 +410,28 @@ pget(pid_t pid, int flags, struct proc **pp)
 	struct proc *p;
 	int error;
 
-	sx_slock(&allproc_lock);
-	if (pid <= PID_MAX) {
-		p = pfind_locked(pid);
-		if (p == NULL && (flags & PGET_NOTWEXIT) == 0)
-			p = zpfind_locked(pid);
-	} else if ((flags & PGET_NOTID) == 0) {
-		p = pfind_tid_locked(pid);
+	p = curproc;
+	if (p->p_pid == pid) {
+		PROC_LOCK(p);
 	} else {
-		p = NULL;
-	}
-	sx_sunlock(&allproc_lock);
-	if (p == NULL)
-		return (ESRCH);
-	if ((flags & PGET_CANSEE) != 0) {
-		error = p_cansee(curthread, p);
-		if (error != 0)
-			goto errout;
+		sx_slock(&allproc_lock);
+		if (pid <= PID_MAX) {
+			p = pfind_locked(pid);
+			if (p == NULL && (flags & PGET_NOTWEXIT) == 0)
+				p = zpfind_locked(pid);
+		} else if ((flags & PGET_NOTID) == 0) {
+			p = pfind_tid_locked(pid);
+		} else {
+			p = NULL;
+		}
+		sx_sunlock(&allproc_lock);
+		if (p == NULL)
+			return (ESRCH);
+		if ((flags & PGET_CANSEE) != 0) {
+			error = p_cansee(curthread, p);
+			if (error != 0)
+				goto errout;
+		}
 	}
 	if ((flags & PGET_CANDEBUG) != 0) {
 		error = p_candebug(curthread, p);
@@ -2996,18 +3012,25 @@ sysctl_kern_proc_umask(SYSCTL_HANDLER_ARGS)
 	struct proc *p;
 	int error;
 	u_short fd_cmask;
+	pid_t pid;
 
 	if (namelen != 1)
 		return (EINVAL);
 
-	error = pget((pid_t)name[0], PGET_WANTREAD, &p);
+	pid = (pid_t)name[0];
+	p = curproc;
+	if (pid == p->p_pid || pid == 0) {
+		fd_cmask = p->p_fd->fd_cmask;
+		goto out;
+	}
+
+	error = pget(pid, PGET_WANTREAD, &p);
 	if (error != 0)
 		return (error);
 
-	FILEDESC_SLOCK(p->p_fd);
 	fd_cmask = p->p_fd->fd_cmask;
-	FILEDESC_SUNLOCK(p->p_fd);
 	PRELE(p);
+out:
 	error = SYSCTL_OUT(req, &fd_cmask, sizeof(fd_cmask));
 	return (error);
 }

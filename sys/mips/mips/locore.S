@@ -153,9 +153,15 @@ VECTOR(_locore, unknown)
 	 *
 	 * XXXRW: Do we want to rely on default initialisation of all CP2
 	 * registers here?
+	 *
+	 * XXXAR: Recent versions of CHERI no longer mirror the special
+	 * registers to the general purpose register file so for now set up
+	 * this mirroring now and assume only DDC and PCC are ambient caps
 	 */
-	cgetdefault	CHERI_REG_KCC	# Preserve $kcc
+	cgetpcc	CHERI_REG_KCC		# Preserve $kcc
+	csetkcc	CHERI_REG_KCC
 	cgetdefault	CHERI_REG_KDC	# Preserve $kdc
+	csetkdc	CHERI_REG_KDC
 #endif
 
 #if defined(CPU_BERI)

@@ -50,7 +50,7 @@ CFLAGS+=	-Wno-cheri-bitwise-operations
 .if ${MK_SHARED_TOOLCHAIN} == "no"
 NO_SHARED?= yes
 .endif
-LIBADD=		bfd iberty
+LIBADD+=	bfd iberty
 CLEANDIRS+=	ldscripts
 CLEANFILES+=	ldemul-list.h stringify.sed
 

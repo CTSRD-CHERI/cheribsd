@@ -2,7 +2,7 @@
 
 MAN=
 
-.include "../Makefile.inc"
+.include <bsd.init.mk>
 
 MK_SSP=		no
 MK_FORTH=	no
@@ -26,54 +26,39 @@ CWARNFLAGS.zfs_module.c += -Wno-missing-prototypes
 CWARNFLAGS.zfs_module.c += -Wno-sign-compare
 CWARNFLAGS.zfs_module.c += -Wno-unused-parameter
 CWARNFLAGS.zfs_module.c += -Wno-unused-function
-CWARNFLAGS.skein.c += -Wno-cast-align
-.if ${COMPILER_TYPE} == "clang"
-CWARNFLAGS.skein.c += -Wno-missing-variable-declarations
-.else if ${COMPILER_TYPE} == "gcc"
-CWARNFLAGS.skein.c += -Wno-missing-declarations
-.endif
 
 # architecture-specific loader code
 SRCS=	boot1.c self_reloc.c start.S ufs_module.c
 .if ${MK_ZFS} != "no"
 SRCS+=		zfs_module.c
-SRCS+=		skein.c skein_block.c
-# Do not unroll skein loops, reduce code size
-CFLAGS+=	-DSKEIN_LOOP=111
-.PATH:		${.CURDIR}/../../../crypto/skein
+CFLAGS+=	-I${ZFSSRC}
+CFLAGS+=	-I${SYSDIR}/cddl/boot/zfs
+CFLAGS+=	-DEFI_ZFS_BOOT
+LIBZFSBOOT=	${BOOTOBJ}/zfs/libzfsboot.a
 .endif
 
 .if ${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} > 40201
 CWARNFLAGS.self_reloc.c+=	-Wno-error=maybe-uninitialized
 .endif
 
-CFLAGS+=	-I.
-CFLAGS+=	-I${.CURDIR}/../include
-CFLAGS+=	-I${.CURDIR}/../include/${MACHINE}
-CFLAGS+=	-I${.CURDIR}/../../../contrib/dev/acpica/include
-CFLAGS+=	-I${.CURDIR}/../../..
+CFLAGS+=	-I${EFIINC}
+CFLAGS+=	-I${EFIINCMD}
+CFLAGS+=	-I${SYSDIR}/contrib/dev/acpica/include
 CFLAGS+=	-DEFI_UFS_BOOT
 .ifdef(EFI_DEBUG)
 CFLAGS+=	-DEFI_DEBUG
 .endif
 
-.if ${MK_ZFS} != "no"
-CFLAGS+=	-I${.CURDIR}/../../zfs/
-CFLAGS+=	-I${.CURDIR}/../../../cddl/boot/zfs/
-CFLAGS+=	-I${.CURDIR}/../../../crypto/skein
-CFLAGS+=	-DEFI_ZFS_BOOT
-.endif
-
 # Always add MI sources and REGULAR efi loader bits
-.PATH:		${.CURDIR}/../loader/arch/${MACHINE}
-.PATH:		${.CURDIR}/../loader
-.PATH:		${.CURDIR}/../../common
-CFLAGS+=	-I${.CURDIR}/../../common
+.PATH:		${EFISRC}/loader/arch/${MACHINE}
+.PATH:		${EFISRC}/loader
+.PATH:		${LDRSRC}
+CFLAGS+=	-I${LDRSRC}
 
 FILES=	boot1.efi boot1.efifat
 FILESMODE_boot1.efi=	${BINMODE}
 
-LDSCRIPT=	${.CURDIR}/../loader/arch/${MACHINE}/ldscript.${MACHINE}
+LDSCRIPT=	${EFISRC}/loader/arch/${MACHINE}/ldscript.${MACHINE}
 LDFLAGS+=	-Wl,-T${LDSCRIPT},-Bsymbolic,-znotext -shared
 
 .if ${MACHINE_CPUARCH} == "aarch64"
@@ -84,15 +69,15 @@ CFLAGS+=	-fPIC
 LDFLAGS+=	-Wl,-znocombreloc
 .endif
 
-LIBEFI=		${.OBJDIR}/../libefi/libefi.a
+LIBEFI=		${BOOTOBJ}/efi/libefi/libefi.a
 
 #
 # Add libstand for the runtime functions used by the compiler - for example
 # __aeabi_* (arm) or __divdi3 (i386).
 # as well as required string and memory functions for all platforms.
 #
-DPADD+=		${LIBEFI} ${LIBSA}
-LDADD+=		${LIBEFI} ${LIBSA}
+DPADD+=		${LIBEFI} ${LIBZFSBOOT} ${LIBSA}
+LDADD+=		${LIBEFI} ${LIBZFSBOOT} ${LIBSA}
 
 DPADD+=		${LDSCRIPT}
 
@@ -139,21 +124,6 @@ boot1.efifat: boot1.efi
 	xz -d -c ${.CURDIR}/fat-${MACHINE}.tmpl.xz > ${.TARGET}
 	${DD} if=${.ALLSRC} of=${.TARGET} seek=${BOOT1_OFFSET} conv=notrunc
 
-CLEANFILES= boot1.efi boot1.efifat
+CLEANFILES+= boot1.efi boot1.efifat
 
 .include <bsd.prog.mk>
-
-beforedepend ${OBJS}: machine
-
-CLEANFILES+=   machine
-
-machine: .NOMETA
-	ln -sf ${.CURDIR}/../../../${MACHINE}/include machine
-
-.if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386"
-beforedepend ${OBJS}: x86
-CLEANFILES+=   x86
-
-x86: .NOMETA
-	ln -sf ${.CURDIR}/../../../x86/include x86
-.endif

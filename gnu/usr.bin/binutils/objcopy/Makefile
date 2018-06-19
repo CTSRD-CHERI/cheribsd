@@ -13,8 +13,8 @@ WANT_CHERI=	pure
 PROG=	objcopy
 SRCS=	objcopy.c not-strip.c
 CFLAGS+= -D_GNU_SOURCE
-CFLAGS+= -I${.CURDIR}/${RELTOP}/libbinutils
+CFLAGS+= -I${.CURDIR}/${GNURELTOP}/libbinutils
 CFLAGS+= -I${SRCDIR}/binutils -I${SRCDIR}/bfd
-LIBADD=	binutils bfd iberty
+LIBADD+=	binutils bfd iberty
 
 .include <bsd.prog.mk>
