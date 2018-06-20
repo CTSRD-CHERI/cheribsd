@@ -63,7 +63,7 @@
 			 /* $s8 is loaded from the caller's context */
 			 /* $ra is loaded from the caller's context */ 
 
-// XXX: $c0?
+// XXX: $c0 (DDC)?
 #define	CCLEARLO_BITS	(1 << 1  /* PCC */ | \
 			 1 << 2  /* IDC */ | \
 			 1 << 3  /* $c3 */ | \

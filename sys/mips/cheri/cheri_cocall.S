@@ -56,7 +56,7 @@
 			 /* $s8 is loaded from the callee context */
 			 /* $ra is loaded from the callee context */ 
 
-// XXX: $c0?
+// XXX: $c0 (DDC)?
 #define	CCLEARLO_BITS	(1 << 1  /* PCC */ | \
 			 1 << 2  /* IDC */ | \
 			 1 << 3  /* $c3, containing the sealed code capability */ | \
