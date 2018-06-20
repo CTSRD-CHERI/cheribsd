@@ -215,7 +215,7 @@ start_keyboard_shell(void)
     }
 
     if ((pwd = getpwuid(getuid())) == NULL)
-      err(1, "getpwuid: %s", getuid());
+      err(1, "getpwuid: %d", getuid());
     if ((lcap = login_getpwclass(pwd)) == NULL)
       err(1, "login_getpwclass");
     if (setusercontext(lcap, pwd, pwd->pw_uid,
