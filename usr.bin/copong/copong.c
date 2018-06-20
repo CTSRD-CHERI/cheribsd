@@ -94,9 +94,10 @@ main(int argc, char **argv)
 	for (;;) {
 		error = coaccept(switcher_code, switcher_data, buf, sizeof(buf));
 		if (error != 0)
-			err(1, "coaccept");
+			warn("coaccept");
 		if (vflag)
 			printf("pong, pid %d, error %d, buf[0] is %d\n", getpid(), error, buf[0]);
+		buf[0]++;
 	}
 
 	err(1, "we're not supposed to be here, pid %d\n", getpid());
