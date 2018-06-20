@@ -218,7 +218,7 @@ _C_LABEL(switcher_cocall):
 	nop
 
 	clearlo		CLEARLO_BITS
-	//clearhi		CLEARHI_BITS
+	clearhi		CLEARHI_BITS
 	cclearlo	CCLEARLO_BITS
 	cclearhi	CCLEARHI_BITS
 
