@@ -41,7 +41,8 @@
 .set noat
 
 #define	CLEARLO_BITS	(1 << 1  /* $at */ | \
-			 /* $v0 and $v1 are preserved and passed to the caller */ \
+			 1 << 2  /* $v0 */ | \
+			 1 << 3  /* $v1 */ | \
 			 1 << 4  /* $a0 */ | \
 			 1 << 5  /* $a1 */ | \
 			 1 << 6  /* $a2 */ | \
