@@ -40,7 +40,7 @@
 .set noat
 
 #define	CLEARLO_BITS	(1 << 1  /* $at */ | \
-			/* XXX: clearing $v0 leads to something quite strange */ \
+			 1 << 2  /* $v0 */ | \
 			 1 << 3  /* $v1 */ | \
 			 /* $a0-$a7 are preserved and passed to the callee */ \
 			 1 << 12 /* $t4 */ | \
@@ -217,7 +217,7 @@ _C_LABEL(switcher_cocall):
 	bgtz	t1, 2b
 	nop
 
-	//clearlo		CLEARLO_BITS
+	clearlo		CLEARLO_BITS
 	//clearhi		CLEARHI_BITS
 	cclearlo	CCLEARLO_BITS
 	cclearhi	CCLEARHI_BITS
