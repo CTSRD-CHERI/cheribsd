@@ -232,8 +232,8 @@ _C_LABEL(switcher_coaccept):
 	bgtz	t1, 2b
 	nop
 
-	//clearlo		CLEARLO_BITS
-	//clearhi		CLEARHI_BITS
+	clearlo		CLEARLO_BITS
+	clearhi		CLEARHI_BITS
 	cclearlo	CCLEARLO_BITS
 	cclearhi	CCLEARHI_BITS
 
