@@ -37,11 +37,13 @@ __FBSDID("$FreeBSD$");
 #include <sys/wait.h>
 #include <ctype.h>
 #include <err.h>
+#include <errno.h>
 #include <pthread.h>
 #include <pthread_np.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 pthread_t	service_thread;
@@ -142,6 +144,8 @@ call(void)
 	fprintf(stderr, "%s: code %p, data %p, calling %p, buf %p, we are thread %d...\n",
 	    __func__, (__cheri_fromcap void *)switcher_code, (__cheri_fromcap void *)switcher_data, (__cheri_fromcap void *)lookedup, buf, pthread_getthreadid_np());
 	error = cocall(switcher_code, switcher_data, lookedup, buf, sizeof(buf));
+	if (error != 0)
+		fprintf(stderr, "%s: cocall: %s\n", __func__, strerror(errno));
 	fprintf(stderr, "%s: done, cocall returned %d, we are thread %d, buf %p contains %d\n",
 	    __func__, error, pthread_getthreadid_np(), buf, buf[0]);
 }
@@ -166,13 +170,14 @@ service_proc(void *dummy __unused)
 
 	fprintf(stderr, "%s: code %p, data %p, buf %p, we are thread %d, accepting...\n",
 	    __func__, (__cheri_fromcap void *)switcher_code, (__cheri_fromcap void *)switcher_data, buf, pthread_getthreadid_np());
-	while (coaccept(switcher_code, switcher_data, buf, sizeof(buf))) {
-		fprintf(stderr, "%s: accepted, we are thread %d, buf %p contains %d, looping...\n",
-		    __func__, pthread_getthreadid_np(), buf, buf[0]);
+	for (;;) {
+		error = coaccept(switcher_code, switcher_data, buf, sizeof(buf));
+		if (error != 0)
+			fprintf(stderr, "%s: coaccept: %s\n", __func__, strerror(errno));
+		fprintf(stderr, "%s: accepted, error %d, we are thread %d, buf %p contains %d, looping...\n",
+		    __func__, error, pthread_getthreadid_np(), buf, buf[0]);
 		buf[0]++;
 	}
-	fprintf(stderr, "%s: we're not supposed to be here\n", __func__);
-	return (NULL);
 }
 
 int
