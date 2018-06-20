@@ -38,35 +38,55 @@ __FBSDID("$FreeBSD$");
 #include <ctype.h>
 #include <err.h>
 #include <errno.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+
+static char buf[1000000];
 
 static void
 usage(void)
 {
 
-	fprintf(stderr, "usage: coping service-name\n");
+	fprintf(stderr, "usage: coping [-v] service-name\n");
 	exit(0);
 }
 
 int
 main(int argc, char **argv)
 {
-	char buf[10000];
 	void * __capability switcher_code;
 	void * __capability switcher_data;
 	void * __capability lookedup;
-	int error;
+	bool vflag = false;
+	int ch, error;
 
-	if (argc != 2)
+	while ((ch = getopt(argc, argv, "v")) != -1) {
+		switch (ch) {
+		case 'v':
+			vflag = true;
+			break;
+		case '?':
+		default:
+			usage();
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+	if (argc != 1)
 		usage();
 
+	if (vflag)
+		fprintf(stderr, "%s: setting up...\n", getprogname());
 	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
 	if (error != 0)
 		err(1, "cosetup");
 
-	error = colookup(argv[1], &lookedup);
+	if (vflag)
+		fprintf(stderr, "%s: colooking up \"%s\"...\n", getprogname(), argv[0]);
+	error = colookup(argv[0], &lookedup);
 	if (error != 0) {
 		if (errno == ESRCH) {
 			warnx("received ESRCH; this usually means there's nothing coregistered for \"%s\"", argv[1]);
@@ -75,10 +95,16 @@ main(int argc, char **argv)
 		err(1, "colookup");
 	}
 
+	if (vflag)
+		fprintf(stderr, "%s: cocalling...\n", getprogname());
+
 	buf[0] = 42;
 	error = cocall(switcher_code, switcher_data, lookedup, buf, sizeof(buf));
 	if (error != 0)
-		err(1, "cocall");
+		warn("cocall");
+
+	if (vflag)
+		printf("done, pid %d, error %d, buf[0] is %d\n", getpid(), error, buf[0]);
 
 	return (0);
 }
