@@ -2822,22 +2822,22 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 		/* Halt filling and truncate rather than exceeding maxlen */
 		if (maxlen != -1 && maxlen < kve->kve_structsize) {
 			error = 0;
-			vm_map_lock_read(map);
-			break;
+			goto out_nolock;
 		} else if (maxlen != -1)
 			maxlen -= kve->kve_structsize;
 
 		if (sbuf_bcat(sb, kve, kve->kve_structsize) != 0)
 			error = ENOMEM;
-		vm_map_lock_read(map);
 		if (error != 0)
-			break;
+			goto out_nolock;
+		vm_map_lock_read(map);
 		if (last_timestamp != map->timestamp) {
 			vm_map_lookup_entry(map, addr - 1, &tmp_entry);
 			entry = tmp_entry;
 		}
 	}
 	vm_map_unlock_read(map);
+out_nolock:
 	vmspace_free(vm);
 	PRELE(p);
 	free(kve, M_TEMP);
