@@ -35,7 +35,7 @@
 
 #include "ip6.h"
 
-int
+void
 rt6_print(netdissect_options *ndo, register const u_char *bp, const u_char *bp2 _U_)
 {
 	INVOKE_DISSECTOR(_rt6_print, ndo, bp, bp2);

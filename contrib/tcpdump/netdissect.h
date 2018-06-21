@@ -783,7 +783,7 @@ extern void _isakmp_print(netdissect_options *, const u_char *, u_int, const u_c
 CHERI_TCPDUMP_CCALL
 extern void _isakmp_rfc3948_print(netdissect_options *, const u_char *, u_int, const u_char *);
 CHERI_TCPDUMP_CCALL
-extern void _isoclns_print(netdissect_options *, const u_char *, u_int, u_int);
+extern void _isoclns_print(netdissect_options *, const u_char *, u_int);
 CHERI_TCPDUMP_CCALL
 extern void _krb_print(netdissect_options *, const u_char *);
 CHERI_TCPDUMP_CCALL
