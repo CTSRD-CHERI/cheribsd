@@ -33,9 +33,7 @@
 #include <sys/types.h>
 #include <sys/endian.h>
 
-#include <inttypes.h>
 #include <stdio.h>
-
 
 /*
  * Altera University Program SD Card micro-driver for boot2 and loader.

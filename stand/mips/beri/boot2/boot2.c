@@ -122,8 +122,6 @@ static const unsigned char flags[NOPT] = {
 static const char *const dev_nm[] = {"dram", "cfi", "sdcard"};
 static const u_int dev_nm_count = nitems(dev_nm);
 
-static struct dmadat __dmadat;
-
 static struct dsk {
     unsigned type;		/* BOOTINFO_DEV_TYPE_x object type. */
     uintptr_t unitptr;		/* Unit number or pointer to object. */
@@ -153,9 +151,10 @@ static int dskread(void *, unsigned, unsigned);
 static int xputc(int);
 static int xgetc(int);
 
-
 #define	UFS_SMALL_CGBASE
 #include "ufsread.c"
+
+static struct dmadat __dmadat;
 
 static inline int
 xfsread(ufs_ino_t inode, void *buf, size_t nbyte)
@@ -330,16 +329,16 @@ boot(void *entryp, int argc, const char *argv[], const char *envv[])
 	dtb_size = bswap32(dtb_rom->totalsize);
     }
     if (dtb_size != 0) {
-	printf("Found device tree blob of length %u at %p\n", dtb_size, dtb);
         dtb = (void*)(intptr_t)(0x9000000000020000 -
 				roundup2(dtb_size, PAGE_SIZE));
+	printf("Found device tree blob of length %zu at %p\n", dtb_size, dtb);
         printf("Relocating device tree blob to %p\n", dtb);
         if (dtb_size < 0x20000 - PAGE_SIZE) {
 	    memcpy(dtb, dtb_rom, dtb_size);
 	    if (dtb_needs_swap) {
 	        printf("Swapping bytes of device tree blob\n");
 	        for (swapptr = (uint32_t *)dtb;
-		     swapptr < dtb + (dtb_size/sizeof(*dtb));
+		     (uintptr_t)swapptr < (uintptr_t)dtb + dtb_size;
 		     swapptr++)
 		    *swapptr = bswap32(*swapptr);
 	    }
