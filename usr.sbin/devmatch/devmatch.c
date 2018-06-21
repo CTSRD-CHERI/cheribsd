@@ -117,7 +117,11 @@ getint(void **ptr)
 	int *p = *ptr;
 	int rv;
 
+#if __has_builtin(__builtin_align_up)
+	p = (int *)__builtin_align_up(p, sizeof(int));
+#else
 	p = (int *)roundup2((intptr_t)p, sizeof(int));
+#endif
 	rv = *p++;
 	*ptr = p;
 	return rv;
