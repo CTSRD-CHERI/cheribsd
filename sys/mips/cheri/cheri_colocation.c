@@ -103,9 +103,14 @@ colocation_thread_exit(struct thread *td)
 	peersc = (__cheri_fromcap struct switcher_context *)sc.sc_peer_context;
 	//printf("%s: terminating thread %p, peer context %p\n", __func__, td, peersc);
 
+
+	/*
+	 * Set sc_peer_context to a special "null" capability, so that cocall(2)
+	 * can see the callee thread is dead.
+	 */
+	cheri_capability_set((void * __capability *)&sc.sc_peer_context, 0, 0, 0, 0);
 	sc.sc_td = NULL;
 	sc.sc_borrower_td = NULL;
-	sc.sc_peer_context = NULL;
 
 	error = copyoutcap_c(&sc, __USER_CAP((void *)addr, sizeof(sc)), sizeof(sc));
 	if (error != 0) {

@@ -50,7 +50,8 @@
 struct switcher_context {
 	/*
 	 * Peer context - callee in caller's context, caller in callee's.
-	 * Must be first, the cllc instruction doesn't take an offset.
+	 * This also serves as the callee's spinlock.  Must be first,
+	 * as the cllc instruction doesn't take an offset.
 	 */
 	struct switcher_context * __capability	sc_peer_context;
 

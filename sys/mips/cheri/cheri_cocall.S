@@ -30,6 +30,7 @@
 
 #include "opt_compat.h"
 #include <machine/asm.h>
+#include <sys/errno.h>
 
 #ifdef CPU_CHERI
 #include <machine/cheriasm.h>
@@ -146,7 +147,7 @@ _C_LABEL(switcher_cocall):
 	 * context.  This also serves as the callee's spinlock.
 	 */
 	cllc	$c12, $c5
-	cbts	$c12, 1b
+	cbts	$c12, 10f
 	nop
 	cscc	t8, $idc, $c5
 	beq	t8, zero, 1b
@@ -232,6 +233,23 @@ _C_LABEL(switcher_cocall):
 	 */
 	cjr	$c11
 	nop
+10:
+	/*
+	 * The spinlock is already taken.  Or is it?
+	 */
+	cgetlen	t8, $c12
+
+	/*
+	 * It is, go around.
+	 */
+	bne	t8, zero, 1b
+	nop
+
+	/*
+	 * Nope - length zero means the callee is dead.
+	 */
+	cjr	$c11
+	li	v0, EPIPE
 
 .globl _C_LABEL(eswitcher_cocall)
 _C_LABEL(eswitcher_cocall):
