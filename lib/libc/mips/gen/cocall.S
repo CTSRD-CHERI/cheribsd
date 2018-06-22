@@ -40,9 +40,11 @@ LEAF(cocall)
 
 	ccall	$c3, $c4, 1
 	cgetpcc $c11
-//	bnez	v0, 1f
+	bnez	v0, 1f
 	nop
 	PIC_RETURN()
+	nop
 1:
 	PIC_TAILCALL(__cerror)
+	nop
 END(cocall)
