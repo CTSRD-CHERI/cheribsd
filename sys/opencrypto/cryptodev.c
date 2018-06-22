@@ -955,14 +955,14 @@ cryptodev_aead(
 	}
 
 	if ((error = copyin_c(__USER_CAP(caead->aad, caead->aadlen),
-	    cse->uio.uio_iov[0].iov_base, caead->aadlen)))
+	    cse->uio.uio_iov[0].iov_base, caead->aadlen))) {
 		SDT_PROBE1(opencrypto, dev, ioctl, error, __LINE__);
 		goto bail;
 	}
 
 	if ((error = copyin_c(__USER_CAP(caead->src, caead->len),
 	    (char * __capability)cse->uio.uio_iov[0].iov_base + caead->aadlen,
-	    caead->len)))
+	    caead->len))) {
 		SDT_PROBE1(opencrypto, dev, ioctl, error, __LINE__);
 		goto bail;
 	}
@@ -1023,7 +1023,7 @@ cryptodev_aead(
 
 	if ((error = copyin_c(__USER_CAP(caead->tag, cse->thash->hashsize),
 	    (char * __capability)cse->uio.uio_iov[0].iov_base +
-	    caead->len + caead->aadlen, cse->thash->hashsize)))
+	    caead->len + caead->aadlen, cse->thash->hashsize))) {
 		SDT_PROBE1(opencrypto, dev, ioctl, error, __LINE__);
 		goto bail;
 	}
@@ -1066,7 +1066,7 @@ again:
 
 	if (caead->dst && (error = copyout_c(
 	    (char * __capability)cse->uio.uio_iov[0].iov_base + caead->aadlen,
-	    __USER_CAP(caead->dst, cse->thash->hashsize), caead->len)))
+	    __USER_CAP(caead->dst, cse->thash->hashsize), caead->len))) {
 		SDT_PROBE1(opencrypto, dev, ioctl, error, __LINE__);
 		goto bail;
 	}
@@ -1075,7 +1075,7 @@ again:
 	    (char * __capability)cse->uio.uio_iov[0].iov_base +
 	    caead->aadlen + caead->len,
 	    __USER_CAP(caead->tag, cse->thash->hashsize),
-	    cse->thash->hashsize)))
+	    cse->thash->hashsize))) {
 		SDT_PROBE1(opencrypto, dev, ioctl, error, __LINE__);
 		goto bail;
 	}
