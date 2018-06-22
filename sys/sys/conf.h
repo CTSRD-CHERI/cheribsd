@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  * Copyright (c) 2000
@@ -17,7 +19,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -138,7 +140,7 @@ typedef int dumper_t(
 #define	D_TAPE	0x0001
 #define	D_DISK	0x0002
 #define	D_TTY	0x0004
-#define	D_MEM	0x0008
+#define	D_MEM	0x0008	/* /dev/(k)mem */
 
 #ifdef _KERNEL
 
@@ -285,7 +287,6 @@ int	make_dev_physpath_alias(int _flags, struct cdev **_cdev,
 		const char *_physpath);
 void	dev_lock(void);
 void	dev_unlock(void);
-void	setconf(void);
 
 #ifdef KLD_MODULE
 #define	MAKEDEV_ETERNAL_KLD	0
@@ -316,6 +317,7 @@ void	devfs_free_cdp_inode(ino_t ino);
 #define		GID_GAMES	13
 #define		GID_VIDEO	44
 #define		GID_DIALER	68
+#define		GID_NOGROUP	65533
 #define		GID_NOBODY	65534
 
 typedef void (*dev_clone_fn)(void *arg, struct ucred *cred, char *name,
@@ -325,20 +327,35 @@ int dev_stdclone(char *_name, char **_namep, const char *_stem, int *_unit);
 EVENTHANDLER_DECLARE(dev_clone, dev_clone_fn);
 
 /* Stuff relating to kernel-dump */
+struct kerneldumpcrypto;
+struct kerneldumpheader;
 
 struct dumperinfo {
 	dumper_t *dumper;	/* Dumping function. */
-	void    *priv;		/* Private parts. */
-	u_int   blocksize;	/* Size of block in bytes. */
+	void	*priv;		/* Private parts. */
+	u_int	blocksize;	/* Size of block in bytes. */
 	u_int	maxiosize;	/* Max size allowed for an individual I/O */
-	off_t   mediaoffset;	/* Initial offset in bytes. */
-	off_t   mediasize;	/* Space available in bytes. */
+	off_t	mediaoffset;	/* Initial offset in bytes. */
+	off_t	mediasize;	/* Space available in bytes. */
+	void	*blockbuf;	/* Buffer for padding shorter dump blocks */
+	off_t	dumpoff;	/* Offset of ongoing kernel dump. */
+	struct kerneldumpcrypto	*kdc; /* Kernel dump crypto. */
+	struct kerneldumpgz *kdgz; /* Kernel dump compression. */
 };
 
-int set_dumper(struct dumperinfo *, const char *_devname, struct thread *td);
-int dump_write(struct dumperinfo *, void *, vm_offset_t, off_t, size_t);
-int doadump(boolean_t);
 extern int dumping;		/* system is dumping */
+
+int doadump(boolean_t);
+int set_dumper(struct dumperinfo *di, const char *devname, struct thread *td,
+    uint8_t compression, uint8_t encryption, const uint8_t *key,
+    uint32_t encryptedkeysize, const uint8_t *encryptedkey);
+
+int dump_start(struct dumperinfo *di, struct kerneldumpheader *kdh);
+int dump_append(struct dumperinfo *, void *, vm_offset_t, size_t);
+int dump_write(struct dumperinfo *, void *, vm_offset_t, off_t, size_t);
+int dump_finish(struct dumperinfo *di, struct kerneldumpheader *kdh);
+void dump_init_header(const struct dumperinfo *di, struct kerneldumpheader *kdh,
+    char *magic, uint32_t archver, uint64_t dumplen);
 
 #endif /* _KERNEL */
 

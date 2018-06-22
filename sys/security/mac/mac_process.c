@@ -133,29 +133,25 @@ mac_thread_userret(struct thread *td)
 }
 
 int
-mac_execve_enter(struct image_params *imgp, struct mac *mac_p)
+mac_execve_enter(struct image_params *imgp, kmac_t *mac)
 {
 	struct label *label;
-	struct mac mac;
 	char *buffer;
 	int error;
 
-	if (mac_p == NULL)
+	if (mac == NULL)
 		return (0);
 
 	if (!(mac_labeled & MPC_OBJECT_CRED))
 		return (EINVAL);
 
-	error = copyin(mac_p, &mac, sizeof(mac));
+	error = mac_check_structmac_consistent(mac);
 	if (error)
 		return (error);
 
-	error = mac_check_structmac_consistent(&mac);
-	if (error)
-		return (error);
-
-	buffer = malloc(mac.m_buflen, M_MACTEMP, M_WAITOK);
-	error = copyinstr(mac.m_string, buffer, mac.m_buflen, NULL);
+	buffer = malloc(mac->m_buflen, M_MACTEMP, M_WAITOK);
+	error = copyinstr_c(mac->m_string,
+	    (__cheri_tocap char * __capability)buffer, mac->m_buflen, NULL);
 	if (error) {
 		free(buffer, M_MACTEMP);
 		return (error);

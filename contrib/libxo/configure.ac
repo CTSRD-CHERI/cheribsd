@@ -12,7 +12,7 @@
 #
 
 AC_PREREQ(2.2)
-AC_INIT([libxo], [0.4.5], [phil@juniper.net])
+AC_INIT([libxo], [0.8.4], [phil@juniper.net])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign -Wno-portability])
 
 # Support silent build rules.  Requires at least automake-1.11.
@@ -20,7 +20,6 @@ AM_INIT_AUTOMAKE([-Wall -Werror foreign -Wno-portability])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 AC_PROG_CC
-AM_PROG_AR
 AC_PROG_INSTALL
 AC_CONFIG_MACRO_DIR([m4])
 AC_PROG_LN_S
@@ -74,6 +73,7 @@ AC_CHECK_HEADERS([ctype.h errno.h stdio.h stdlib.h])
 AC_CHECK_HEADERS([string.h sys/param.h unistd.h ])
 AC_CHECK_HEADERS([sys/sysctl.h])
 AC_CHECK_HEADERS([threads.h])
+AC_CHECK_HEADERS([monitor.h])
 
 dnl humanize_number(3) is a great function, but it's not standard.
 dnl Note Macosx has the function in libutil.a but doesn't ship the
@@ -134,6 +134,21 @@ if test "$GETTEXT_ENABLE" != "no"; then
 
       AC_MSG_RESULT([$HAVE_GETTEXT])
   fi
+
+  if test "$HAVE_GETTEXT" != "yes"; then
+      GETTEXT_PREFIX=/usr/local
+      AC_MSG_CHECKING([gettext in ${GETTEXT_PREFIX}])
+
+      _save_cflags="$CFLAGS"
+      CFLAGS="$CFLAGS -I${GETTEXT_PREFIX}/include -L${GETTEXT_PREFIX}/lib -Werror -lintl"
+      AC_LINK_IFELSE([AC_LANG_SOURCE([[#include <libintl.h>]
+                 [int main() {char *cp = dgettext(NULL, "xx"); return 0; }]])],
+                 [HAVE_GETTEXT=yes],
+                 [HAVE_GETTEXT=no])
+      CFLAGS="$_save_cflags"
+
+      AC_MSG_RESULT([$HAVE_GETTEXT])
+  fi
 fi
 
 if test "$HAVE_GETTEXT" = "yes"; then
@@ -148,10 +163,18 @@ fi
 AC_SUBST(GETTEXT_CFLAGS)
 AC_SUBST(GETTEXT_LIBS)
 
-GETTEXT_BINDIR=${GETTEXT_PREFIX}/bin
-AC_SUBST(GETTEXT_BINDIR)
 GETTEXT_LIBDIR=${GETTEXT_PREFIX}/lib
 AC_SUBST(GETTEXT_LIBDIR)
+if test -x ${GETTEXT_PREFIX}/bin/msgfmt ; then
+    GETTEXT_BINDIR=${GETTEXT_PREFIX}/bin
+elif test -x ${GETTEXT_PREFIX}/local/bin/msgfmt ; then
+    GETTEXT_BINDIR=${GETTEXT_PREFIX}/local/bin
+else
+    AC_MSG_NOTICE("could not find msgfmt tool")
+    # Use a (bad) fall back value
+    GETTEXT_BINDIR=${GETTEXT_PREFIX}/bin
+fi
+AC_SUBST(GETTEXT_BINDIR)
 
 AM_CONDITIONAL([HAVE_GETTEXT], [test "$HAVE_GETTEXT" = "yes"])
 
@@ -269,6 +292,13 @@ AC_ARG_ENABLE([debug],
 AC_MSG_RESULT([$LIBXO_DEBUG])
 AM_CONDITIONAL([LIBXO_DEBUG], [test "$LIBXO_DEBUG" != "no"])
 
+AC_MSG_CHECKING([whether to use int return codes])
+AC_ARG_ENABLE([int-return-codes],
+    [  --enable-int-return-codes    Use int return codes (instead of ssize_t)],
+    [USE_INT_RETURN_CODES=yes; AC_DEFINE([USE_INT_RETURN_CODES], [1], [Use int return codes])],
+    [USE_INT_RETURN_CODES=no])
+AC_MSG_RESULT([$USE_INT_RETURN_CODES])
+
 AC_MSG_CHECKING([whether to build with text-only rendering])
 AC_ARG_ENABLE([text-only],
     [  --enable-text-only    Turn on text-only rendering],
@@ -285,6 +315,18 @@ AC_ARG_ENABLE([wcwidth],
 AC_MSG_RESULT([$LIBXO_WCWIDTH])
 if test "${LIBXO_WCWIDTH}" != "no"; then
   AC_DEFINE([LIBXO_WCWIDTH], [1], [Enable local wcwidth implementation])
+fi
+
+AC_MSG_CHECKING([retain hash bucket size])
+AC_ARG_WITH(retain-size,
+        [  --with-retain-size=[DIR]           Specify retain hash bucket size (in bits)],
+        [XO_RETAIN_SIZE=$withval],
+        [XO_RETAIN_SIZE=default]
+)
+
+AC_MSG_RESULT([$XO_RETAIN_SIZE])
+if test "${XO_RETAIN_SIZE}" != "default"; then
+  AC_DEFINE_UNQUOTED([XO_RETAIN_SIZE], ${XO_RETAIN_SIZE}, [Retain hash bucket size])
 fi
 
 AC_CHECK_LIB([m], [lrint])
@@ -347,12 +389,15 @@ XO_SRCDIR=${srcdir}
 XO_LIBDIR=${libdir}
 XO_BINDIR=${bindir}
 XO_INCLUDEDIR=${includedir}
+XO_CFLAGS="${CFLAGS}"
 
+AC_SUBST(XO_LIBS)
 AC_SUBST(XO_SRCDIR)
 AC_SUBST(XO_LIBDIR)
 AC_SUBST(XO_BINDIR)
 AC_SUBST(XO_INCLUDEDIR)
 AC_SUBST(XO_LIBEXT)
+AC_SUBST(XO_CFLAGS)
 
 AC_ARG_WITH(encoder-dir,
         [  --with-encoder-dir=[DIR]           Specify location of encoder libraries],
@@ -449,4 +494,5 @@ AC_MSG_NOTICE([summary of build options:
   isthreaded:       ${HAVE_ISTHREADED:-no}
   thread-local:     ${THREAD_LOCAL:-no}
   local wcwidth:    ${LIBXO_WCWIDTH:-no}
+  retain size:      ${XO_RETAIN_SIZE:-no}
 ])

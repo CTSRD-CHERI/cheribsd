@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2010 Chelsio Communications, Inc.
  * All rights reserved.
  * Written by: Navdeep Parhar <np@FreeBSD.org>
@@ -87,7 +89,7 @@ struct tid_info {
 	u_int nstids;
 	u_int stid_base;
 	u_int stids_in_use;
-	u_int nstids_free_head;	/* # of available stids at the begining */
+	u_int nstids_free_head;	/* # of available stids at the beginning */
 	struct stid_head stids;
 
 	struct mtx atid_lock __aligned(CACHE_LINE_SIZE);
@@ -121,11 +123,11 @@ struct t4_virt_res {                      /* virtualized HW resources */
 	struct t4_range pbl;
 	struct t4_range qp;
 	struct t4_range cq;
+	struct t4_range srq;
 	struct t4_range ocq;
 	struct t4_range l2t;
 };
 
-#ifdef TCP_OFFLOAD
 enum {
 	ULD_TOM = 0,
 	ULD_IWARP,
@@ -144,19 +146,22 @@ struct uld_info {
 };
 
 struct tom_tunables {
+	int cong_algorithm;
 	int sndbuf;
 	int ddp;
-	int indsz;
-	int ddp_thres;
 	int rx_coalesce;
 	int tx_align;
+	int tx_zcopy;
 };
-
+/* iWARP driver tunables */
+struct iw_tunables {
+	int wc_en;
+};
+#ifdef TCP_OFFLOAD
 int t4_register_uld(struct uld_info *);
 int t4_unregister_uld(struct uld_info *);
 int t4_activate_uld(struct adapter *, int);
 int t4_deactivate_uld(struct adapter *, int);
-void t4_iscsi_init(struct adapter *, u_int, const u_int *);
 int uld_active(struct adapter *, int);
 #endif
 #endif

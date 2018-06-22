@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2006 Kevin Lo.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -78,5 +80,5 @@ uart_ixp425_probe(device_t dev)
 	if (bootverbose)
 		device_printf(dev, "rclk %u\n", rclk);
 
-	return uart_bus_probe(dev, 0, rclk, 0, 0);
+	return uart_bus_probe(dev, 0, 0, rclk, 0, 0);
 }

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2008, Pyun YongHyeon <yongari@FreeBSD.org>
  * All rights reserved.
  *
@@ -337,8 +339,7 @@ jme_probe(device_t dev)
 	vendor = pci_get_vendor(dev);
 	devid = pci_get_device(dev);
 	sp = jme_devs;
-	for (i = 0; i < sizeof(jme_devs) / sizeof(jme_devs[0]);
-	    i++, sp++) {
+	for (i = 0; i < nitems(jme_devs); i++, sp++) {
 		if (vendor == sp->jme_vendorid &&
 		    devid == sp->jme_deviceid) {
 			device_set_desc(dev, sp->jme_name);
@@ -558,7 +559,7 @@ jme_map_intr_vector(struct jme_softc *sc)
 	bzero(map, sizeof(map));
 
 	/* Map Tx interrupts source to MSI/MSIX vector 2. */
-	map[MSINUM_REG_INDEX(N_INTR_TXQ0_COMP)] =
+	map[MSINUM_REG_INDEX(N_INTR_TXQ0_COMP)] |=
 	    MSINUM_INTR_SOURCE(2, N_INTR_TXQ0_COMP);
 	map[MSINUM_REG_INDEX(N_INTR_TXQ1_COMP)] |=
 	    MSINUM_INTR_SOURCE(2, N_INTR_TXQ1_COMP);
@@ -580,37 +581,37 @@ jme_map_intr_vector(struct jme_softc *sc)
 	    MSINUM_INTR_SOURCE(2, N_INTR_TXQ_COAL_TO);
 
 	/* Map Rx interrupts source to MSI/MSIX vector 1. */
-	map[MSINUM_REG_INDEX(N_INTR_RXQ0_COMP)] =
+	map[MSINUM_REG_INDEX(N_INTR_RXQ0_COMP)] |=
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ0_COMP);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ1_COMP)] =
+	map[MSINUM_REG_INDEX(N_INTR_RXQ1_COMP)] |=
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ1_COMP);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ2_COMP)] =
+	map[MSINUM_REG_INDEX(N_INTR_RXQ2_COMP)] |=
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ2_COMP);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ3_COMP)] =
+	map[MSINUM_REG_INDEX(N_INTR_RXQ3_COMP)] |=
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ3_COMP);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ0_DESC_EMPTY)] =
+	map[MSINUM_REG_INDEX(N_INTR_RXQ0_DESC_EMPTY)] |=
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ0_DESC_EMPTY);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ1_DESC_EMPTY)] =
+	map[MSINUM_REG_INDEX(N_INTR_RXQ1_DESC_EMPTY)] |=
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ1_DESC_EMPTY);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ2_DESC_EMPTY)] =
+	map[MSINUM_REG_INDEX(N_INTR_RXQ2_DESC_EMPTY)] |=
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ2_DESC_EMPTY);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ3_DESC_EMPTY)] =
+	map[MSINUM_REG_INDEX(N_INTR_RXQ3_DESC_EMPTY)] |=
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ3_DESC_EMPTY);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ0_COAL)] =
+	map[MSINUM_REG_INDEX(N_INTR_RXQ0_COAL)] |=
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ0_COAL);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ1_COAL)] =
+	map[MSINUM_REG_INDEX(N_INTR_RXQ1_COAL)] |=
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ1_COAL);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ2_COAL)] =
+	map[MSINUM_REG_INDEX(N_INTR_RXQ2_COAL)] |=
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ2_COAL);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ3_COAL)] =
+	map[MSINUM_REG_INDEX(N_INTR_RXQ3_COAL)] |=
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ3_COAL);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ0_COAL_TO)] =
+	map[MSINUM_REG_INDEX(N_INTR_RXQ0_COAL_TO)] |=
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ0_COAL_TO);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ1_COAL_TO)] =
+	map[MSINUM_REG_INDEX(N_INTR_RXQ1_COAL_TO)] |=
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ1_COAL_TO);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ2_COAL_TO)] =
+	map[MSINUM_REG_INDEX(N_INTR_RXQ2_COAL_TO)] |=
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ2_COAL_TO);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ3_COAL_TO)] =
+	map[MSINUM_REG_INDEX(N_INTR_RXQ3_COAL_TO)] |=
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ3_COAL_TO);
 
 	/* Map all other interrupts source to MSI/MSIX vector 0. */
@@ -804,7 +805,7 @@ jme_attach(device_t dev)
 	}
 	/* Create coalescing sysctl node. */
 	jme_sysctl_node(sc);
-	if ((error = jme_dma_alloc(sc) != 0))
+	if ((error = jme_dma_alloc(sc)) != 0)
 		goto fail;
 
 	ifp = sc->jme_ifp = if_alloc(IFT_ETHER);
@@ -1982,15 +1983,15 @@ jme_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ifr = (struct ifreq *)data;
 	error = 0;
 	switch (cmd) {
-	case SIOCSIFMTU:
-		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > JME_JUMBO_MTU ||
+	CASE_IOC_IFREQ(SIOCSIFMTU):
+		if (ifr_mtu_get(ifr) < ETHERMIN || ifr_mtu_get(ifr) > JME_JUMBO_MTU ||
 		    ((sc->jme_flags & JME_FLAG_NOJUMBO) != 0 &&
-		    ifr->ifr_mtu > JME_MAX_MTU)) {
+		    ifr_mtu_get(ifr) > JME_MAX_MTU)) {
 			error = EINVAL;
 			break;
 		}
 
-		if (ifp->if_mtu != ifr->ifr_mtu) {
+		if (ifp->if_mtu != ifr_mtu_get(ifr)) {
 			/*
 			 * No special configuration is required when interface
 			 * MTU is changed but availability of TSO/Tx checksum
@@ -1998,14 +1999,14 @@ jme_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			 * FIFO size is just 2K.
 			 */
 			JME_LOCK(sc);
-			if (ifr->ifr_mtu >= JME_TX_FIFO_SIZE) {
+			if (ifr_mtu_get(ifr) >= JME_TX_FIFO_SIZE) {
 				ifp->if_capenable &=
 				    ~(IFCAP_TXCSUM | IFCAP_TSO4);
 				ifp->if_hwassist &=
 				    ~(JME_CSUM_FEATURES | CSUM_TSO);
 				VLAN_CAPABILITIES(ifp);
 			}
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
 				ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 				jme_init_locked(sc);
@@ -2013,7 +2014,7 @@ jme_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			JME_UNLOCK(sc);
 		}
 		break;
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		JME_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
@@ -2031,21 +2032,21 @@ jme_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->jme_if_flags = ifp->if_flags;
 		JME_UNLOCK(sc);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		JME_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			jme_set_filter(sc);
 		JME_UNLOCK(sc);
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->jme_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		JME_LOCK(sc);
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&
 		    ifp->if_mtu < JME_TX_FIFO_SIZE) {
 			if ((IFCAP_TXCSUM & ifp->if_capabilities) != 0) {
@@ -2665,7 +2666,7 @@ jme_rxintr(struct jme_softc *sc, int count)
 		 * sure whether this check is needed.
 		 */
 		pktlen = JME_RX_BYTES(le32toh(desc->buflen));
-		if (nsegs != ((pktlen + (MCLBYTES - 1)) / MCLBYTES))
+		if (nsegs != howmany(pktlen, MCLBYTES))
 			break;
 		prog++;
 		/* Received a frame. */

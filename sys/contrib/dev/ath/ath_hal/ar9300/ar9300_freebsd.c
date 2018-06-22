@@ -109,6 +109,201 @@ ar9300_freebsd_set_tsf64(struct ath_hal *ah, uint64_t tsf64)
 	OS_REG_WRITE(ah, AR_TSF_U32, (tsf64 >> 32) & 0xffffffff);
 }
 
+/* Flags for pulse_bw_info */
+#define	PRI_CH_RADAR_FOUND		0x01
+#define	EXT_CH_RADAR_FOUND		0x02
+#define	EXT_CH_RADAR_EARLY_FOUND	0x04
+
+static HAL_BOOL
+ar9300_freebsd_proc_radar_event(struct ath_hal *ah, struct ath_rx_status *rxs,
+    uint64_t fulltsf, const char *buf, HAL_DFS_EVENT *event)
+{
+	HAL_BOOL doDfsExtCh;
+	HAL_BOOL doDfsEnhanced;
+	HAL_BOOL doDfsCombinedRssi;
+
+	uint8_t rssi = 0, ext_rssi = 0;
+	uint8_t pulse_bw_info = 0, pulse_length_ext = 0, pulse_length_pri = 0;
+	uint32_t dur = 0;
+	int pri_found = 1, ext_found = 0;
+	int early_ext = 0;
+	int is_dc = 0;
+	uint16_t datalen;		/* length from the RX status field */
+
+	/* Check whether the given phy error is a radar event */
+	if ((rxs->rs_phyerr != HAL_PHYERR_RADAR) &&
+	    (rxs->rs_phyerr != HAL_PHYERR_FALSE_RADAR_EXT)) {
+		return AH_FALSE;
+	}
+
+	/* Grab copies of the capabilities; just to make the code clearer */
+	doDfsExtCh = AH_PRIVATE(ah)->ah_caps.halExtChanDfsSupport;
+	doDfsEnhanced = AH_PRIVATE(ah)->ah_caps.halEnhancedDfsSupport;
+	doDfsCombinedRssi = AH_PRIVATE(ah)->ah_caps.halUseCombinedRadarRssi;
+
+	datalen = rxs->rs_datalen;
+
+	/* If hardware supports it, use combined RSSI, else use chain 0 RSSI */
+	if (doDfsCombinedRssi)
+		rssi = (uint8_t) rxs->rs_rssi;
+	else		
+		rssi = (uint8_t) rxs->rs_rssi_ctl[0];
+
+	/* Set this; but only use it if doDfsExtCh is set */
+	ext_rssi = (uint8_t) rxs->rs_rssi_ext[0];
+
+	/* Cap it at 0 if the RSSI is a negative number */
+	if (rssi & 0x80)
+		rssi = 0;
+
+	if (ext_rssi & 0x80)
+		ext_rssi = 0;
+
+	/*
+	 * Fetch the relevant data from the frame
+	 */
+	if (doDfsExtCh) {
+		if (datalen < 3)
+			return AH_FALSE;
+
+		/* Last three bytes of the frame are of interest */
+		pulse_length_pri = *(buf + datalen - 3);
+		pulse_length_ext = *(buf + datalen - 2);
+		pulse_bw_info = *(buf + datalen - 1);
+		HALDEBUG(ah, HAL_DEBUG_DFS, "%s: rssi=%d, ext_rssi=%d, pulse_length_pri=%d,"
+		    " pulse_length_ext=%d, pulse_bw_info=%x\n",
+		    __func__, rssi, ext_rssi, pulse_length_pri, pulse_length_ext,
+		    pulse_bw_info);
+	} else {
+		/* The pulse width is byte 0 of the data */
+		if (datalen >= 1)
+			dur = ((uint8_t) buf[0]) & 0xff;
+		else
+			dur = 0;
+
+		if (dur == 0 && rssi == 0) {
+			HALDEBUG(ah, HAL_DEBUG_DFS, "%s: dur and rssi are 0\n", __func__);
+			return AH_FALSE;
+		}
+
+		HALDEBUG(ah, HAL_DEBUG_DFS, "%s: rssi=%d, dur=%d\n", __func__, rssi, dur);
+
+		/* Single-channel only */
+		pri_found = 1;
+		ext_found = 0;
+	}
+
+	/*
+	 * If doing extended channel data, pulse_bw_info must
+	 * have one of the flags set.
+	 */
+	if (doDfsExtCh && pulse_bw_info == 0x0)
+		return AH_FALSE;
+		
+	/*
+	 * If the extended channel data is available, calculate
+	 * which to pay attention to.
+	 */
+	if (doDfsExtCh) {
+		/* If pulse is on DC, take the larger duration of the two */
+		if ((pulse_bw_info & EXT_CH_RADAR_FOUND) &&
+		    (pulse_bw_info & PRI_CH_RADAR_FOUND)) {
+			is_dc = 1;
+			if (pulse_length_ext > pulse_length_pri) {
+				dur = pulse_length_ext;
+				pri_found = 0;
+				ext_found = 1;
+			} else {
+				dur = pulse_length_pri;
+				pri_found = 1;
+				ext_found = 0;
+			}
+		} else if (pulse_bw_info & EXT_CH_RADAR_EARLY_FOUND) {
+			dur = pulse_length_ext;
+			pri_found = 0;
+			ext_found = 1;
+			early_ext = 1;
+		} else if (pulse_bw_info & PRI_CH_RADAR_FOUND) {
+			dur = pulse_length_pri;
+			pri_found = 1;
+			ext_found = 0;
+		} else if (pulse_bw_info & EXT_CH_RADAR_FOUND) {
+			dur = pulse_length_ext;
+			pri_found = 0;
+			ext_found = 1;
+		}
+		
+	}
+
+	/*
+	 * For enhanced DFS (Merlin and later), pulse_bw_info has
+	 * implications for selecting the correct RSSI value.
+	 */
+	if (doDfsEnhanced) {
+		switch (pulse_bw_info & 0x03) {
+		case 0:
+			/* No radar? */
+			rssi = 0;
+			break;
+		case PRI_CH_RADAR_FOUND:
+			/* Radar in primary channel */
+			/* Cannot use ctrl channel RSSI if ext channel is stronger */
+			if (ext_rssi >= (rssi + 3)) {
+				rssi = 0;
+			}
+			break;
+		case EXT_CH_RADAR_FOUND:
+			/* Radar in extended channel */
+			/* Cannot use ext channel RSSI if ctrl channel is stronger */
+			if (rssi >= (ext_rssi + 12)) {
+				rssi = 0;
+			} else {
+				rssi = ext_rssi;
+			}
+			break;
+		case (PRI_CH_RADAR_FOUND | EXT_CH_RADAR_FOUND):
+			/* When both are present, use stronger one */
+			if (rssi < ext_rssi)
+				rssi = ext_rssi;
+			break;
+		}
+	}
+
+	/*
+	 * If not doing enhanced DFS, choose the ext channel if
+	 * it is stronger than the main channel
+	 */
+	if (doDfsExtCh && !doDfsEnhanced) {
+		if ((ext_rssi > rssi) && (ext_rssi < 128))
+			rssi = ext_rssi;
+	}
+
+	/*
+	 * XXX what happens if the above code decides the RSSI
+	 * XXX wasn't valid, an sets it to 0?
+	 */
+
+	/*
+	 * Fill out dfs_event structure.
+	 */
+	event->re_full_ts = fulltsf;
+	event->re_ts = rxs->rs_tstamp;
+	event->re_rssi = rssi;
+	event->re_dur = dur;
+
+	event->re_flags = 0;
+	if (pri_found)
+		event->re_flags |= HAL_DFS_EVENT_PRICH;
+	if (ext_found)
+		event->re_flags |= HAL_DFS_EVENT_EXTCH;
+	if (early_ext)
+		event->re_flags |= HAL_DFS_EVENT_EXTEARLY;
+	if (is_dc)
+		event->re_flags |= HAL_DFS_EVENT_ISDC;
+
+	return AH_TRUE;
+}
+
 void
 ar9300_attach_freebsd_ops(struct ath_hal *ah)
 {
@@ -219,10 +414,11 @@ ar9300_attach_freebsd_ops(struct ath_hal *ah)
 	/* DFS functions */
 	ah->ah_enableDfs		= ar9300_enable_dfs;
 	ah->ah_getDfsThresh		= ar9300_get_dfs_thresh;
-	ah->ah_getDfsDefaultThresh	= ar9300_freebsd_get_dfs_default_thresh;
-	// procradarevent
+	ah->ah_getDfsDefaultThresh	= ar9300_get_default_dfs_thresh;
+	ah->ah_procRadarEvent		= ar9300_freebsd_proc_radar_event;
 	ah->ah_isFastClockEnabled	= ar9300_is_fast_clock_enabled;
-	ah->ah_get11nExtBusy	= ar9300_get_11n_ext_busy;
+	ah->ah_get11nExtBusy		= ar9300_get_11n_ext_busy;
+	ah->ah_setDfsCacTxQuiet		= ar9300_cac_tx_quiet;
 
 	/* Spectral Scan Functions */
 	ah->ah_spectralConfigure	= ar9300_configure_spectral_scan;
@@ -303,6 +499,15 @@ ar9300_attach_freebsd_ops(struct ath_hal *ah)
 
 	/* MCI bluetooth functions */
 	if (AR_SREV_JUPITER(ah) || AR_SREV_APHRODITE(ah)) {
+		/*
+		 * Note: these are done in attach too for now, because
+		 * at this point we haven't yet setup the mac/bb revision
+		 * values, so this code is effectively NULL.
+		 * However, I'm leaving this here so people digging
+		 * into the code (a) see the MCI bits here, and (b)
+		 * are now told they should look elsewhere for
+		 * these methods.
+		 */
 		ah->ah_btCoexSetWeights = ar9300_mci_bt_coex_set_weights;
 		ah->ah_btCoexDisable = ar9300_mci_bt_coex_disable;
 		ah->ah_btCoexEnable = ar9300_mci_bt_coex_enable;
@@ -310,7 +515,7 @@ ar9300_attach_freebsd_ops(struct ath_hal *ah)
 	ah->ah_btMciSetup		= ar9300_mci_setup;
 	ah->ah_btMciSendMessage		= ar9300_mci_send_message;
 	ah->ah_btMciGetInterrupt	= ar9300_mci_get_interrupt;
-	ah->ah_btMciGetState		= ar9300_mci_state;
+	ah->ah_btMciState		= ar9300_mci_state;
 	ah->ah_btMciDetach		= ar9300_mci_detach;
 
 	/* LNA diversity functions */
@@ -687,16 +892,6 @@ ar9300_freebsd_get_mib_cycle_counts(struct ath_hal *ah,
 	return (AH_FALSE);
 }
 
-HAL_BOOL
-ar9300_freebsd_get_dfs_default_thresh(struct ath_hal *ah,
-    HAL_PHYERR_PARAM *pe)
-{
-
-	/* XXX not yet */
-
-	return (AH_FALSE);
-}
-
 /*
  * Clear multicast filter by index - from FreeBSD ar5212_recv.c
  */
@@ -765,8 +960,7 @@ ar9300_beacon_set_beacon_timers(struct ath_hal *ah,
 	OS_REG_WRITE(ah, AR_NEXT_NDP_TIMER, TU_TO_USEC(bt->bt_nextatim));
 
 	bperiod = TU_TO_USEC(bt->bt_intval & HAL_BEACON_PERIOD);
-	/* XXX TODO! */
-//        ahp->ah_beaconInterval = bt->bt_intval & HAL_BEACON_PERIOD;
+	AH9300(ah)->ah_beaconInterval = bt->bt_intval & HAL_BEACON_PERIOD;
 	OS_REG_WRITE(ah, AR_BEACON_PERIOD, bperiod);
 	OS_REG_WRITE(ah, AR_DMA_BEACON_PERIOD, bperiod);
 	OS_REG_WRITE(ah, AR_SWBA_PERIOD, bperiod);

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -33,6 +35,16 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "support"
+ *   ]
+ * }
+ * CHERI CHANGES END
  */
 
 #if defined(LIBC_SCCS) && !defined(lint)
@@ -444,9 +456,9 @@ __vfscanf(FILE *fp, char const *fmt0, va_list ap)
 {
 	int ret;
 
-	FLOCKFILE(fp);
+	FLOCKFILE_CANCELSAFE(fp);
 	ret = __svfscanf(fp, __get_locale(), fmt0, ap);
-	FUNLOCKFILE(fp);
+	FUNLOCKFILE_CANCELSAFE();
 	return (ret);
 }
 int
@@ -455,9 +467,9 @@ vfscanf_l(FILE *fp, locale_t locale, char const *fmt0, va_list ap)
 	int ret;
 	FIX_LOCALE(locale);
 
-	FLOCKFILE(fp);
+	FLOCKFILE_CANCELSAFE(fp);
 	ret = __svfscanf(fp, locale, fmt0, ap);
-	FUNLOCKFILE(fp);
+	FUNLOCKFILE_CANCELSAFE();
 	return (ret);
 }
 
@@ -872,7 +884,7 @@ doswitch:
 			 * z', but treats `a-a' as `the letter a, the
 			 * character -, and the letter a'.
 			 *
-			 * For compatibility, the `-' is not considerd
+			 * For compatibility, the `-' is not considered
 			 * to define a range if the character following
 			 * it is either a close bracket (required by ANSI)
 			 * or is not numerically greater than the character
@@ -881,7 +893,7 @@ doswitch:
 			n = *fmt;
 			if (n == ']'
 			    || (table->__collate_load_error ? n < c :
-				__collate_range_cmp (table, n, c) < 0
+				__collate_range_cmp(n, c) < 0
 			       )
 			   ) {
 				c = '-';
@@ -895,8 +907,8 @@ doswitch:
 				} while (c < n);
 			} else {
 				for (i = 0; i < 256; i ++)
-					if (   __collate_range_cmp (table, c, i) < 0
-					    && __collate_range_cmp (table, i, n) <= 0
+					if (__collate_range_cmp(c, i) <= 0 &&
+					    __collate_range_cmp(i, n) <= 0
 					   )
 						tab[i] = v;
 			}

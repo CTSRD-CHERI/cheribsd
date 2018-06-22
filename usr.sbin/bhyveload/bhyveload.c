@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD AND BSD-2-Clause
+ *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
  *
@@ -152,7 +154,6 @@ struct cb_file {
 static int
 cb_open(void *arg, const char *filename, void **hp)
 {
-	struct stat st;
 	struct cb_file *cf;
 	char path[PATH_MAX];
 
@@ -169,7 +170,7 @@ cb_open(void *arg, const char *filename, void **hp)
 		return (errno);
 	}
 
-	cf->cf_size = st.st_size;
+	cf->cf_size = cf->cf_stat.st_size;
 	if (S_ISDIR(cf->cf_stat.st_mode)) {
 		cf->cf_isdir = 1;
 		cf->cf_u.dir = opendir(path);
@@ -312,10 +313,12 @@ cb_diskioctl(void *arg, int unit, u_long cmd, void *data)
 		*(u_int *)data = 512;
 		break;
 	case DIOCGMEDIASIZE:
-		if (fstat(disk_fd[unit], &sb) == 0)
-			*(off_t *)data = sb.st_size;
-		else
+		if (fstat(disk_fd[unit], &sb) != 0)
 			return (ENOTTY);
+		if (S_ISCHR(sb.st_mode) &&
+		    ioctl(disk_fd[unit], DIOCGMEDIASIZE, &sb.st_size) != 0)
+				return (ENOTTY);
+		*(off_t *)data = sb.st_size;
 		break;
 	default:
 		return (ENOTTY);
@@ -510,14 +513,14 @@ cb_getmem(void *arg, uint64_t *ret_lowmem, uint64_t *ret_highmem)
 }
 
 struct env {
-	const char *str;	/* name=value */
+	char *str;	/* name=value */
 	SLIST_ENTRY(env) next;
 };
 
 static SLIST_HEAD(envhead, env) envhead;
 
 static void
-addenv(const char *str)
+addenv(char *str)
 {
 	struct env *env;
 
@@ -526,7 +529,7 @@ addenv(const char *str)
 	SLIST_INSERT_HEAD(&envhead, env, next);
 }
 
-static const char *
+static char *
 cb_getenv(void *arg, int num)
 {
 	int i;
@@ -540,6 +543,21 @@ cb_getenv(void *arg, int num)
 	}
 
 	return (NULL);
+}
+
+static int
+cb_vm_set_register(void *arg, int vcpu, int reg, uint64_t val)
+{
+
+	return (vm_set_register(ctx, vcpu, reg, val));
+}
+
+static int
+cb_vm_set_desc(void *arg, int vcpu, int reg, uint64_t base, u_int limit,
+    u_int access)
+{
+
+	return (vm_set_desc(ctx, vcpu, reg, base, limit, access));
 }
 
 static struct loader_callbacks cb = {
@@ -571,6 +589,10 @@ static struct loader_callbacks cb = {
 	.getmem = cb_getmem,
 
 	.getenv = cb_getenv,
+
+	/* Version 4 additions */
+	.vm_set_register = cb_vm_set_register,
+	.vm_set_desc = cb_vm_set_desc,
 };
 
 static int
@@ -630,7 +652,7 @@ usage(void)
 
 	fprintf(stderr,
 	    "usage: %s [-S][-c <console-device>] [-d <disk-path>] [-e <name=value>]\n"
-	    "       %*s [-h <host-path>] [-m mem-size] <vmname>\n",
+	    "       %*s [-h <host-path>] [-m memsize[K|k|M|m|G|g|T|t]] <vmname>\n",
 	    progname,
 	    (int)strlen(progname), "");
 	exit(1);
@@ -655,7 +677,7 @@ main(int argc, char** argv)
 	consin_fd = STDIN_FILENO;
 	consout_fd = STDOUT_FILENO;
 
-	while ((opt = getopt(argc, argv, "Sc:d:e:h:l:m:")) != -1) {
+	while ((opt = getopt(argc, argv, "CSc:d:e:h:l:m:")) != -1) {
 		switch (opt) {
 		case 'c':
 			error = altcons_open(optarg);
@@ -689,6 +711,9 @@ main(int argc, char** argv)
 			error = vm_parse_memsize(optarg, &mem_size);
 			if (error != 0)
 				errx(EX_USAGE, "Invalid memsize '%s'", optarg);
+			break;
+		case 'C':
+			memflags |= VM_MEM_F_INCORE;
 			break;
 		case 'S':
 			memflags |= VM_MEM_F_WIRED;
@@ -765,7 +790,7 @@ main(int argc, char** argv)
 	addenv("smbios.bios.vendor=BHYVE");
 	addenv("boot_serial=1");
 
-	func(&cb, NULL, USERBOOT_VERSION_3, ndisks);
+	func(&cb, NULL, USERBOOT_VERSION_4, ndisks);
 
 	free(loader);
 	return (0);

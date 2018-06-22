@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright(c) 2002-2011 Exar Corp.
  * All rights reserved.
  *
@@ -3395,7 +3397,7 @@ vxge_hal_device_trace_dump(vxge_hal_device_h devh)
  * @read_length: Size of the valid data in the buffer.
  *
  * Read  HAL trace buffer contents starting from the offset
- * upto the size of the buffer or till EOF is reached.
+ * up to the size of the buffer or till EOF is reached.
  *
  * Returns: VXGE_HAL_OK - success.
  * VXGE_HAL_EOF_TRACE_BUF - No more data in the trace buffer.

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2010 Alexander Motin <mav@FreeBSD.org>
  * All rights reserved.
  *
@@ -475,7 +477,7 @@ mvs_setup_edma_queues(device_t dev)
 	ATA_OUTL(ch->r_mem, EDMA_REQQOP, work & 0xffffffff);
 	bus_dmamap_sync(ch->dma.workrq_tag, ch->dma.workrq_map,
 	    BUS_DMASYNC_PREWRITE);
-	/* Reponses queue. */
+	/* Responses queue. */
 	memset(ch->dma.workrp, 0xff, MVS_WORKRP_SIZE);
 	work = ch->dma.workrp_bus;
 	ATA_OUTL(ch->r_mem, EDMA_RESQBAH, work >> 32);
@@ -506,7 +508,7 @@ mvs_set_edma_mode(device_t dev, enum mvs_edma_mode mode)
 				device_printf(dev, "stopping EDMA engine failed\n");
 				break;
 			}
-		};
+		}
 	}
 	ch->curr_mode = mode;
 	ch->fbs_enabled = 0;
@@ -1042,7 +1044,7 @@ mvs_crbq_intr(device_t dev)
 		slot = le16toh(crpb->id) & MVS_CRPB_TAG_MASK;
 		flags = le16toh(crpb->rspflg);
 		/*
-		 * Handle only successfull completions here.
+		 * Handle only successful completions here.
 		 * Errors will be handled by main intr handler.
 		 */
 #if defined(__i386__) || defined(__amd64__)
@@ -2245,6 +2247,12 @@ mvs_check_ids(device_t dev, union ccb *ccb)
 		xpt_done(ccb);
 		return (-1);
 	}
+	/*
+	 * It's a programming error to see AUXILIARY register requests.
+	 */
+	KASSERT(ccb->ccb_h.func_code != XPT_ATA_IO ||
+	    ((ccb->ataio.ata_flags & ATA_FLAG_AUX) == 0),
+	    ("AUX register unsupported"));
 	return (0);
 }
 
@@ -2282,10 +2290,6 @@ mvsaction(struct cam_sim *sim, union ccb *ccb)
 		}
 		mvs_begin_transaction(dev, ccb);
 		return;
-	case XPT_EN_LUN:		/* Enable LUN as a target */
-	case XPT_TARGET_IO:		/* Execute target I/O request */
-	case XPT_ACCEPT_TARGET_IO:	/* Accept Host Target Mode CDB */
-	case XPT_CONT_TARGET_IO:	/* Continue Host Target I/O Connection*/
 	case XPT_ABORT:			/* Abort the specified CCB */
 		/* XXX Implement */
 		ccb->ccb_h.status = CAM_REQ_INVALID;
@@ -2411,9 +2415,9 @@ mvsaction(struct cam_sim *sim, union ccb *ccb)
 		cpi->initiator_id = 0;
 		cpi->bus_id = cam_sim_bus(sim);
 		cpi->base_transfer_speed = 150000;
-		strncpy(cpi->sim_vid, "FreeBSD", SIM_IDLEN);
-		strncpy(cpi->hba_vid, "Marvell", HBA_IDLEN);
-		strncpy(cpi->dev_name, cam_sim_name(sim), DEV_IDLEN);
+		strlcpy(cpi->sim_vid, "FreeBSD", SIM_IDLEN);
+		strlcpy(cpi->hba_vid, "Marvell", HBA_IDLEN);
+		strlcpy(cpi->dev_name, cam_sim_name(sim), DEV_IDLEN);
 		cpi->unit_number = cam_sim_unit(sim);
 		cpi->transport = XPORT_SATA;
 		cpi->transport_version = XPORT_VERSION_UNSPECIFIED;

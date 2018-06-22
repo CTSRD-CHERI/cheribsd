@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2006 Raza Microelectronics
  * All rights reserved.
  *
@@ -74,7 +76,7 @@ uart_iodi_probe(device_t dev)
 	sc->sc_bas.bst = rmi_bus_space;
 	sc->sc_bas.bsh = MIPS_PHYS_TO_KSEG1(XLR_UART0ADDR);
 	/* regshft = 2, rclk = 66000000, rid = 0, chan = 0 */
-	return (uart_bus_probe(dev, 2, 66000000, 0, 0));
+	return (uart_bus_probe(dev, 2, 0, 66000000, 0, 0));
 }
 
 DRIVER_MODULE(uart, iodi, uart_iodi_driver, uart_devclass, 0, 0);

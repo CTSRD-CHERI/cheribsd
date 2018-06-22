@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2009, Sun Microsystems, Inc.
  * All rights reserved.
  *
@@ -30,6 +32,17 @@
  * Allows for gathering of registrations from an earlier dumped file.
  *
  * Copyright (c) 1990 by Sun Microsystems, Inc.
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "sunrpc"
+ * }
+ * CHERI CHANGES END
  */
 
 /*
@@ -90,7 +103,7 @@ write_struct(char *filename, xdrproc_t structproc, void *list)
 	(void) umask(omask);
 	xdrstdio_create(&xdrs, fp, XDR_ENCODE);
 
-	if (structproc(&xdrs, list) == FALSE) {
+	if (structproc(&xdrs, list, 0) == FALSE) {
 		syslog(LOG_ERR, "rpcbind: xdr_%s: failed", filename);
 		fclose(fp);
 		return (FALSE);
@@ -127,7 +140,7 @@ read_struct(char *filename, xdrproc_t structproc, void *list)
 	}
 	xdrstdio_create(&xdrs, fp, XDR_DECODE);
 
-	if (structproc(&xdrs, list) == FALSE) {
+	if (structproc(&xdrs, list, 0) == FALSE) {
 		fprintf(stderr, "rpcbind: xdr_%s: failed\n", filename);
 		fclose(fp);
 		goto error;

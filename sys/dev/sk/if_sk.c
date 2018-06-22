@@ -1,6 +1,8 @@
 /*	$OpenBSD: if_sk.c,v 2.33 2003/08/12 05:23:06 nate Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1997, 1998, 1999, 2000
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -55,7 +57,7 @@ __FBSDID("$FreeBSD$");
  * the SK-984x series adapters, both single port and dual port.
  * References:
  * 	The XaQti XMAC II datasheet,
- *  http://www.freebsd.org/~wpaul/SysKonnect/xmacii_datasheet_rev_c_9-29.pdf
+ *  https://www.freebsd.org/~wpaul/SysKonnect/xmacii_datasheet_rev_c_9-29.pdf
  *	The SysKonnect GEnesis manual, http://www.syskonnect.com
  *
  * Note: XaQti has been acquired by Vitesse, and Vitesse does not have the
@@ -1099,16 +1101,17 @@ sk_ioctl(ifp, command, data)
 
 	error = 0;
 	switch(command) {
-	case SIOCSIFMTU:
-		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > SK_JUMBO_MTU)
+	CASE_IOC_IFREQ(SIOCSIFMTU):
+		if (ifr_mtu_get(ifr) < ETHERMIN ||
+		    ifr_mtu_get(ifr) > SK_JUMBO_MTU)
 			error = EINVAL;
-		else if (ifp->if_mtu != ifr->ifr_mtu) {
+		else if (ifp->if_mtu != ifr_mtu_get(ifr)) {
 			if (sc_if->sk_jumbo_disable != 0 &&
-			    ifr->ifr_mtu > SK_MAX_FRAMELEN)
+			    ifr_mtu_get(ifr) > SK_MAX_FRAMELEN)
 				error = EINVAL;
 			else {
 				SK_IF_LOCK(sc_if);
-				ifp->if_mtu = ifr->ifr_mtu;
+				ifp->if_mtu = ifr_mtu_get(ifr);
 				if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 					ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 					sk_init_locked(sc_if);
@@ -1117,7 +1120,7 @@ sk_ioctl(ifp, command, data)
 			}
 		}
 		break;
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		SK_IF_LOCK(sc_if);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -1133,25 +1136,25 @@ sk_ioctl(ifp, command, data)
 		sc_if->sk_if_flags = ifp->if_flags;
 		SK_IF_UNLOCK(sc_if);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		SK_IF_LOCK(sc_if);
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 			sk_rxfilter(sc_if);
 		SK_IF_UNLOCK(sc_if);
 		break;
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		mii = device_get_softc(sc_if->sk_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		SK_IF_LOCK(sc_if);
 		if (sc_if->sk_softc->sk_type == SK_GENESIS) {
 			SK_IF_UNLOCK(sc_if);
 			break;
 		}
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&
 		    (IFCAP_TXCSUM & ifp->if_capabilities) != 0) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;
@@ -1833,8 +1836,6 @@ sk_detach(dev)
 		ether_ifdetach(ifp);
 		SK_IF_LOCK(sc_if);
 	}
-	if (ifp)
-		if_free(ifp);
 	/*
 	 * We're generally called from skc_detach() which is using
 	 * device_delete_child() to get to here. It's already trashed
@@ -1848,6 +1849,8 @@ sk_detach(dev)
 	sk_dma_jumbo_free(sc_if);
 	sk_dma_free(sc_if);
 	SK_IF_UNLOCK(sc_if);
+	if (ifp)
+		if_free(ifp);
 
 	return(0);
 }
@@ -3275,7 +3278,7 @@ sk_init_xmac(sc_if)
 	 * that jumbo frames larger than 8192 bytes will be
 	 * truncated. Disabling all bad frame filtering causes
 	 * the RX FIFO to operate in streaming mode, in which
-	 * case the XMAC will start transfering frames out of the
+	 * case the XMAC will start transferring frames out of the
 	 * RX FIFO as soon as the FIFO threshold is reached.
 	 */
 	if (ifp->if_mtu > SK_MAX_FRAMELEN) {

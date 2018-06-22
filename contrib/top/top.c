@@ -34,15 +34,20 @@ char *copyright =
  */
 
 #include "os.h"
-#include <errno.h>
-#include <signal.h>
-#include <setjmp.h>
-#include <ctype.h>
+
 #include <sys/jail.h>
 #include <sys/time.h>
+
+#include <ctype.h>
+#include <errno.h>
 #include <jail.h>
+#include <setjmp.h>
+#include <signal.h>
+#include <time.h>
+#include <unistd.h>
 
 /* includes specific to top */
+#include "commands.h"
 #include "display.h"		/* interface to display package */
 #include "screen.h"		/* interface to screen package */
 #include "top.h"
@@ -50,6 +55,7 @@ char *copyright =
 #include "boolean.h"
 #include "machine.h"
 #include "utils.h"
+#include "username.h"
 
 /* Size of the stdio buffer given to stdout */
 #define Buffersize	2048
@@ -71,10 +77,10 @@ static int fmt_flags = 0;
 int pcpu_stats = No;
 
 /* signal handling routines */
-sigret_t leave();
-sigret_t tstop();
+sigret_t leave(int i);
+sigret_t tstop(int i);
 #ifdef SIGWINCH
-sigret_t winch();
+sigret_t winch(int i);
 #endif
 
 volatile sig_atomic_t leaveflag;
@@ -82,7 +88,7 @@ volatile sig_atomic_t tstopflag;
 volatile sig_atomic_t winchflag;
 
 /* internal routines */
-void quit();
+void quit(int status);
 
 /* values which need to be accessed by signal handlers */
 static int max_topn;		/* maximum displayable processes */
@@ -92,60 +98,137 @@ struct process_select ps;
 char *myname = "top";
 jmp_buf jmp_int;
 
-/* routines that don't return int */
-
-char *username();
-char *ctime();
-char *kill_procs();
-char *renice_procs();
-
 #ifdef ORDER
 extern int (*compares[])();
 #else
-extern int proc_compare();
-extern int io_compare();
+extern int proc_compare(void *arg1, void *arg2);
+extern int io_compare(void *arg1, void *arg2);
 #endif
-time_t time();
 
-caddr_t get_process_info();
+caddr_t get_process_info(struct system_info *si, struct process_select *sel,
+    int (*compare)(const void *, const void *));
 
 /* different routines for displaying the user's identification */
 /* (values assigned to get_userid) */
-char *username();
-char *itoa7();
-
-/* display routines that need to be predeclared */
-int i_loadave();
-int u_loadave();
-int i_procstates();
-int u_procstates();
-int i_cpustates();
-int u_cpustates();
-int i_memory();
-int u_memory();
-int i_arc();
-int u_arc();
-int i_swap();
-int u_swap();
-int i_message();
-int u_message();
-int i_header();
-int u_header();
-int i_process();
-int u_process();
-
 /* pointers to display routines */
-int (*d_loadave)() = i_loadave;
-int (*d_procstates)() = i_procstates;
-int (*d_cpustates)() = i_cpustates;
-int (*d_memory)() = i_memory;
-int (*d_arc)() = i_arc;
-int (*d_swap)() = i_swap;
-int (*d_message)() = i_message;
-int (*d_header)() = i_header;
-int (*d_process)() = i_process;
+void (*d_loadave)(int mpid, double *avenrun) = i_loadave;
+void (*d_procstates)(int total, int *brkdn) = i_procstates;
+void (*d_cpustates)(int *states) = i_cpustates;
+void (*d_memory)(int *stats) = i_memory;
+void (*d_arc)(int *stats) = i_arc;
+void (*d_carc)(int *stats) = i_carc;
+void (*d_swap)(int *stats) = i_swap;
+void (*d_message)(void) = i_message;
+void (*d_header)(char *text) = i_header;
+void (*d_process)(int line, char *thisline) = i_process;
 
+void reset_display(void);
 
+static void
+reset_uids()
+{
+    for (size_t i = 0; i < TOP_MAX_UIDS; ++i)
+	ps.uid[i] = -1;
+}
+
+static int
+add_uid(int uid)
+{
+    size_t i = 0;
+
+    /* Add the uid if there's room */
+    for (; i < TOP_MAX_UIDS; ++i)
+    {
+	if (ps.uid[i] == -1 || ps.uid[i] == uid)
+	{
+	    ps.uid[i] = uid;
+	    break;
+	}
+    }
+
+    return (i == TOP_MAX_UIDS);
+}
+
+static void
+rem_uid(int uid)
+{
+    size_t i = 0;
+    size_t where = TOP_MAX_UIDS;
+
+    /* Look for the user to remove - no problem if it's not there */
+    for (; i < TOP_MAX_UIDS; ++i)
+    {
+	if (ps.uid[i] == -1)
+	    break;
+	if (ps.uid[i] == uid)
+	    where = i;
+    }
+
+    /* Make sure we don't leave a hole in the middle */
+    if (where != TOP_MAX_UIDS)
+    {
+	ps.uid[where] = ps.uid[i-1];
+	ps.uid[i-1] = -1;
+    }
+}
+
+static int
+handle_user(char *buf, size_t buflen)
+{
+    int rc = 0;
+    int uid = -1;
+    char *buf2 = buf;
+
+    new_message(MT_standout, "Username to show (+ for all): ");
+    if (readline(buf, buflen, No) <= 0)
+    {
+	clear_message();
+	return rc;
+    }
+
+    if (buf[0] == '+' || buf[0] == '-')
+    {
+	if (buf[1] == '\0')
+	{
+	    reset_uids();
+	    goto end;
+	}
+	else
+	    ++buf2;
+    }
+
+    if ((uid = userid(buf2)) == -1)
+    {
+	new_message(MT_standout, " %s: unknown user", buf2);
+	rc = 1;
+	goto end;
+    }
+
+    if (buf2 == buf)
+    {
+	reset_uids();
+	ps.uid[0] = uid;
+	goto end;
+    }
+
+    if (buf[0] == '+')
+    {
+	if (add_uid(uid))
+	{
+	    new_message(MT_standout, " too many users, reset with '+'");
+	    rc = 1;
+	    goto end;
+	}
+    }
+    else
+	rem_uid(uid);
+
+end:
+    putchar('\r');
+    return rc;
+}
+
+int
 main(argc, argv)
 
 int  argc;
@@ -200,9 +283,9 @@ char *argv[];
     fd_set readfds;
 
 #ifdef ORDER
-    static char command_chars[] = "\f qh?en#sdkriIutHmSCajzPJo";
+    static char command_chars[] = "\f qh?en#sdkriIutHmSCajzPJwo";
 #else
-    static char command_chars[] = "\f qh?en#sdkriIutHmSCajzPJ";
+    static char command_chars[] = "\f qh?en#sdkriIutHmSCajzPJw";
 #endif
 /* these defines enumerate the "strchr"s of the commands in command_chars */
 #define CMD_redraw	0
@@ -231,8 +314,9 @@ char *argv[];
 #define CMD_kidletog	22
 #define CMD_pcputog	23
 #define CMD_jail	24
+#define CMD_swaptog	25
 #ifdef ORDER
-#define CMD_order       25
+#define CMD_order       26
 #endif
 
     /* set the buffer for stdout */
@@ -261,11 +345,12 @@ char *argv[];
     ps.idle    = Yes;
     ps.self    = -1;
     ps.system  = No;
-    ps.uid     = -1;
+    reset_uids();
     ps.thread  = No;
     ps.wcpu    = 1;
     ps.jid     = -1;
     ps.jail    = No;
+    ps.swap    = No;
     ps.kidle   = Yes;
     ps.command = NULL;
 
@@ -292,7 +377,7 @@ char *argv[];
 	    optind = 1;
 	}
 
-	while ((i = getopt(ac, av, "CSIHPabijJ:nquvzs:d:U:m:o:t")) != EOF)
+	while ((i = getopt(ac, av, "CSIHPabijJ:nquvzs:d:U:m:o:tw")) != EOF)
 	{
 	    switch(i)
 	    {
@@ -307,7 +392,7 @@ char *argv[];
 		break;
 
 	      case 'U':			/* display only username's processes */
-		if ((ps.uid = userid(optarg)) == -1)
+		if ((ps.uid[0] = userid(optarg)) == -1)
 		{
 		    fprintf(stderr, "%s: unknown user\n", optarg);
 		    exit(1);
@@ -430,6 +515,10 @@ char *argv[];
 		pcpu_stats = !pcpu_stats;
 		break;
 
+	      case 'w':
+		ps.swap = 1;
+		break;
+
 	      case 'z':
 		ps.kidle = !ps.kidle;
 		break;
@@ -437,7 +526,7 @@ char *argv[];
 	      default:
 		fprintf(stderr,
 "Top version %s\n"
-"Usage: %s [-abCHIijnPqStuvz] [-d count] [-m io | cpu] [-o field] [-s time]\n"
+"Usage: %s [-abCHIijnPqStuvwz] [-d count] [-m io | cpu] [-o field] [-s time]\n"
 "       [-J jail] [-U username] [number]\n",
 			version_string(), myname);
 		exit(1);
@@ -664,6 +753,7 @@ restart:
 	/* display memory stats */
 	(*d_memory)(system_info.memory);
 	(*d_arc)(system_info.arc);
+	(*d_carc)(system_info.carc);
 
 	/* display swap stats */
 	(*d_swap)(system_info.swap);
@@ -730,6 +820,7 @@ restart:
 		    d_cpustates = u_cpustates;
 		    d_memory = u_memory;
 		    d_arc = u_arc;
+		    d_carc = u_carc;
 		    d_swap = u_swap;
 		    d_message = u_message;
 		    d_header = u_header;
@@ -1006,31 +1097,8 @@ restart:
 				break;
 
 			    case CMD_user:
-				new_message(MT_standout,
-				    "Username to show (+ for all): ");
-				if (readline(tempbuf2, sizeof(tempbuf2), No) > 0)
-				{
-				    if (tempbuf2[0] == '+' &&
-					tempbuf2[1] == '\0')
-				    {
-					ps.uid = -1;
-				    }
-				    else if ((i = userid(tempbuf2)) == -1)
-				    {
-					new_message(MT_standout,
-					    " %s: unknown user", tempbuf2);
-					no_command = Yes;
-				    }
-				    else
-				    {
-					ps.uid = i;
-				    }
-				    putchar('\r');
-				}
-				else
-				{
-				    clear_message();
-				}
+				if (handle_user(tempbuf2, sizeof(tempbuf2)))
+				    no_command = Yes;
 				break;
 	    
 			    case CMD_thrtog:
@@ -1153,6 +1221,15 @@ restart:
 				reset_display();
 				putchar('\r');
 				break;
+			    case CMD_swaptog:
+				ps.swap = !ps.swap;
+				new_message(MT_standout | MT_delayed,
+				    " %sisplaying per-process swap usage.",
+				    ps.swap ? "D" : "Not d");
+				header_text = format_header(uname_field);
+				reset_display();
+				putchar('\r');
+				break;
 			    default:
 				new_message(MT_standout, " BAD CASE IN SWITCH!");
 				putchar('\r');
@@ -1178,7 +1255,8 @@ restart:
  *	screen will get redrawn.
  */
 
-reset_display()
+void
+reset_display(void)
 
 {
     d_loadave    = i_loadave;
@@ -1186,6 +1264,7 @@ reset_display()
     d_cpustates  = i_cpustates;
     d_memory     = i_memory;
     d_arc        = i_arc;
+    d_carc       = i_carc;
     d_swap       = i_swap;
     d_message	 = i_message;
     d_header	 = i_header;
@@ -1196,7 +1275,9 @@ reset_display()
  *  signal handlers
  */
 
-sigret_t leave()	/* exit under normal conditions -- INT handler */
+sigret_t leave(i)	/* exit under normal conditions -- INT handler */
+
+int i;
 
 {
     leaveflag = 1;

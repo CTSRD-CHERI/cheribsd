@@ -2,13 +2,13 @@
 <data>
 <languages>
 	<!-- Attributes known:
-		name = langugage name - only one
-		encoding = encodings to be done - seperated by space
-		countries = countries to create - seperated by space
+		name = language name - only one
+		encoding = encodings to be done - separated by space
+		countries = countries to create - separated by space
 		family = which font family - only one
 		countryname_link = only with family, link this original file \
 			too - only one
-		encoding_link = link this original encoding too - seperated \
+		encoding_link = link this original encoding too - separated \
 			by space
 		fallback = read this file if name_countries doesn't exist - \
 			only one
@@ -117,7 +117,6 @@
 		encoding="SJIS eucJP"
 		countries="JP" />
 	<language name="kk"
-		family="Cyrl"
 		countries="KZ" />  <!-- PT154 not available, UTF-8 -->
 	<language name="ko"
 		encoding="eucKR"
@@ -130,7 +129,6 @@
 		encoding="ISO8859-13"
 		countries="LV" />
 	<language name="mn"
-		family="Cyrl"
 		countries="MN" />
 	<language name="nb"
 		encoding="ISO8859-1 ISO8859-15"
@@ -187,7 +185,6 @@
 		countries="CN" />
 	<language name="zh"
 		family="Hant"
-		encoding="Big5HKSCS"
 		countries="HK" />
 	<language name="zh"
 		family="Hant"
@@ -203,7 +200,7 @@
 	<translation encoding="ISO8859-13" cldr="EURO SIGN" string="Eu" />
 
 	<!-- Minus and dashes -->
-	<translation encoding="ISO8859-1 ISO8859-4 ISO8859-13 ISO8859-15"
+	<translation encoding="ISO8859-1 ISO8859-2 ISO8859-4 ISO8859-13 ISO8859-15"
 	    cldr="MINUS SIGN" unicode="HYPHEN-MINUS" />
 	<translation encoding="ISO8859-2"
 	    cldr="EN DASH" unicode="HYPHEN-MINUS" />
@@ -394,6 +391,10 @@
 	<translation encoding="CP1251" cldr="HRYVNIA SIGN" hex="E3F0ED" />
 	<translation encoding="ISO8859-5" cldr="HRYVNIA SIGN" hex="D3E0DD" />
 	<translation encoding="KOI8-U" cldr="HRYVNIA SIGN" hex="C7D2CE" />
+	<translation encoding="CP866" cldr="RUBLE SIGN" hex="E0E3A1" />
+	<translation encoding="ISO8859-5" cldr="RUBLE SIGN" hex="E0E3D1" />
+	<translation encoding="CP1251" cldr="RUBLE SIGN" hex="E0E3D1" />
+	<translation encoding="KOI8-R" cldr="RUBLE SIGN" hex="D2D5C2" />
 
 	<!-- These don't have a special Kow sign so just use KRW for it -->
 	<translation encoding="CP949" cldr="WON SIGN" hex="5C" />
@@ -444,69 +445,69 @@
 	    unicode="FULLWIDTH HYPHEN-MINUS" />
 	<translation encoding="Big5" cldr="DOLLAR SIGN"
 	    unicode="FULLWIDTH DOLLAR SIGN" />
-	<translation encoding="GB2312 GB18030 GBK Big5 Big5HKSCS eucCN"
+	<translation encoding="GB2312 GB18030 GBK Big5 eucCN"
 	    cldr="CJK UNIFIED IDEOGRAPH-4E00" ucc="4E00" />
-	<translation encoding="GB2312 GB18030 GBK Big5 Big5HKSCS eucCN"
+	<translation encoding="GB2312 GB18030 GBK Big5 eucCN"
 	    cldr="CJK UNIFIED IDEOGRAPH-4E03" ucc="4E03" />
-	<translation encoding="GB2312 GB18030 GBK Big5 Big5HKSCS eucCN"
+	<translation encoding="GB2312 GB18030 GBK Big5 eucCN"
 	    cldr="CJK UNIFIED IDEOGRAPH-4E09" ucc="4E09" />
-	<translation encoding="GB2312 GB18030 GBK Big5 Big5HKSCS eucCN"
+	<translation encoding="GB2312 GB18030 GBK Big5 eucCN"
 	    cldr="CJK UNIFIED IDEOGRAPH-4E0A" ucc="4E0A" />
-	<translation encoding="GB2312 GB18030 GBK Big5 Big5HKSCS eucCN"
+	<translation encoding="GB2312 GB18030 GBK Big5 eucCN"
 	    cldr="CJK UNIFIED IDEOGRAPH-4E0B" ucc="4E0B" />
-	<translation encoding="GB2312 GB18030 GBK Big5 Big5HKSCS eucCN"
+	<translation encoding="GB2312 GB18030 GBK Big5 eucCN"
 	    cldr="CJK UNIFIED IDEOGRAPH-4E0D" ucc="4E0D" />
-	<translation encoding="GB2312 GB18030 GBK Big5 Big5HKSCS eucCN"
+	<translation encoding="GB2312 GB18030 GBK Big5 eucCN"
 	    cldr="CJK UNIFIED IDEOGRAPH-4E5D" ucc="4E5D" />
-	<translation encoding="GB2312 GB18030 GBK Big5 Big5HKSCS eucCN"
+	<translation encoding="GB2312 GB18030 GBK Big5 eucCN"
 	    cldr="CJK UNIFIED IDEOGRAPH-4E8C" ucc="4E8C" />
-	<translation encoding="GB2312 GB18030 GBK Big5 Big5HKSCS eucCN"
+	<translation encoding="GB2312 GB18030 GBK Big5 eucCN"
 	    cldr="CJK UNIFIED IDEOGRAPH-4E94" ucc="4E94" />
-	<translation encoding="GB2312 GB18030 GBK Big5 Big5HKSCS eucCN"
+	<translation encoding="GB2312 GB18030 GBK Big5 eucCN"
 	    cldr="CJK UNIFIED IDEOGRAPH-516B" ucc="516B" />
-	<translation encoding="GB2312 GB18030 GBK Big5 Big5HKSCS eucCN"
+	<translation encoding="GB2312 GB18030 GBK Big5 eucCN"
 	    cldr="CJK UNIFIED IDEOGRAPH-516D" ucc="516D" />
-	<translation encoding="GB2312 GB18030 GBK Big5 Big5HKSCS eucCN"
+	<translation encoding="GB2312 GB18030 GBK Big5 eucCN"
 	    cldr="CJK UNIFIED IDEOGRAPH-5206" ucc="5206" />
 	<translation encoding="eucJP SJIS"
 	    cldr="CJK UNIFIED IDEOGRAPH-524D" ucc="524D" />
-	<translation encoding="GB2312 GB18030 GBK Big5 Big5HKSCS eucCN"
+	<translation encoding="GB2312 GB18030 GBK Big5 eucCN"
 	    cldr="CJK UNIFIED IDEOGRAPH-5341" ucc="5341" />
 	<translation
-	    encoding="GB2312 GB18030 GBK Big5 Big5HKSCS eucCN eucJP SJIS"
+	    encoding="GB2312 GB18030 GBK Big5 eucCN eucJP SJIS"
 	    cldr="CJK UNIFIED IDEOGRAPH-5348" ucc="5348" />
-	<translation encoding="GB2312 GB18030 GBK Big5 Big5HKSCS eucCN"
+	<translation encoding="GB2312 GB18030 GBK Big5 eucCN"
 	    cldr="CJK UNIFIED IDEOGRAPH-5426" ucc="5426" />
 	<translation encoding="GB2312 GB18030 GBK eucCN"
 	    cldr="CJK UNIFIED IDEOGRAPH-5468" ucc="5468" />
-	<translation encoding="GB2312 GB18030 GBK Big5 Big5HKSCS eucCN"
+	<translation encoding="GB2312 GB18030 GBK Big5 eucCN"
 	    cldr="CJK UNIFIED IDEOGRAPH-56DB" ucc="56DB" />
 	<translation encoding="eucJP SJIS"
 	    cldr="CJK UNIFIED IDEOGRAPH-571F" ucc="571F" />
-	<translation encoding="GB2312 GB18030 GBK Big5 Big5HKSCS eucCN"
+	<translation encoding="GB2312 GB18030 GBK Big5 eucCN"
 	    cldr="CJK UNIFIED IDEOGRAPH-5B9A" ucc="5B9A" />
 	<translation
-	    encoding="GB2312 GB18030 GBK Big5 Big5HKSCS eucCN eucJP SJIS"
+	    encoding="GB2312 GB18030 GBK Big5 eucCN eucJP SJIS"
 	    cldr="CJK UNIFIED IDEOGRAPH-5E74" ucc="5E74" />
 	<translation encoding="eucJP SJIS"
 	    cldr="CJK UNIFIED IDEOGRAPH-5F8C" ucc="5F8C" />
 	<translation
-	    encoding="GB2312 GB18030 GBK Big5 Big5HKSCS eucCN eucJP SJIS"
+	    encoding="GB2312 GB18030 GBK Big5 eucCN eucJP SJIS"
 	    cldr="CJK UNIFIED IDEOGRAPH-65E5" ucc="65E5" />
 	<translation encoding="GB2312 GB18030 GBK eucCN"
 	    cldr="CJK UNIFIED IDEOGRAPH-65F6" ucc="65F6" />
-	<translation encoding="GB2312 GB18030 GBK Big5 Big5HKSCS eucCN"
+	<translation encoding="GB2312 GB18030 GBK Big5 eucCN"
 	    cldr="CJK UNIFIED IDEOGRAPH-661F" ucc="661F" />
-	<translation encoding="GB2312 GB18030 GBK Big5 Big5HKSCS eucCN"
+	<translation encoding="GB2312 GB18030 GBK Big5 eucCN"
 	    cldr="CJK UNIFIED IDEOGRAPH-662F" ucc="662F" />
-	<translation encoding="Big5 Big5HKSCS"
+	<translation encoding="Big5 "
 	    cldr="CJK UNIFIED IDEOGRAPH-6642" ucc="6642" />
 	<translation encoding="eucJP SJIS"
 	    cldr="CJK UNIFIED IDEOGRAPH-66DC" ucc="66DC" />
 	<translation
-	    encoding="GB2312 GB18030 GBK Big5 Big5HKSCS eucCN eucJP SJIS"
+	    encoding="GB2312 GB18030 GBK Big5 eucCN eucJP SJIS"
 	    cldr="CJK UNIFIED IDEOGRAPH-6708" ucc="6708" />
-	<translation encoding="GB2312 GB18030 GBK Big5 Big5HKSCS eucCN"
+	<translation encoding="GB2312 GB18030 GBK Big5 eucCN"
 	    cldr="CJK UNIFIED IDEOGRAPH-671F" ucc="671F" />
 	<translation encoding="eucJP SJIS"
 	    cldr="CJK UNIFIED IDEOGRAPH-6728" ucc="6728" />
@@ -516,11 +517,11 @@
 	    cldr="CJK UNIFIED IDEOGRAPH-706B" ucc="706B" />
 	<translation encoding="GB2312 GB18030 GBK eucCN"
 	    cldr="CJK UNIFIED IDEOGRAPH-786E" ucc="786E" />
-	<translation encoding="Big5 Big5HKSCS"
+	<translation encoding="Big5 "
 	    cldr="CJK UNIFIED IDEOGRAPH-78BA" ucc="78BA" />
-	<translation encoding="GB2312 GB18030 GBK Big5 Big5HKSCS eucCN"
+	<translation encoding="GB2312 GB18030 GBK Big5 eucCN"
 	    cldr="CJK UNIFIED IDEOGRAPH-79D2" ucc="79D2" />
-	<translation encoding="Big5 Big5HKSCS"
+	<translation encoding="Big5 "
 	    cldr="CJK UNIFIED IDEOGRAPH-9031" ucc="9031" />
 	<translation encoding="eucJP SJIS"
 	    cldr="CJK UNIFIED IDEOGRAPH-91D1" ucc="91D1" />

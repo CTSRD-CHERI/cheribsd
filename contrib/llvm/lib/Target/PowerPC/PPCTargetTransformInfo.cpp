@@ -21,6 +21,12 @@ using namespace llvm;
 static cl::opt<bool> DisablePPCConstHoist("disable-ppc-constant-hoisting",
 cl::desc("disable constant hoisting on PPC"), cl::init(false), cl::Hidden);
 
+// This is currently only used for the data prefetch pass which is only enabled
+// for BG/Q by default.
+static cl::opt<unsigned>
+CacheLineSize("ppc-loop-prefetch-cache-line", cl::Hidden, cl::init(64),
+              cl::desc("The loop prefetch cache line size"));
+
 //===----------------------------------------------------------------------===//
 //
 // PPC cost model.
@@ -30,12 +36,13 @@ cl::desc("disable constant hoisting on PPC"), cl::init(false), cl::Hidden);
 TargetTransformInfo::PopcntSupportKind
 PPCTTIImpl::getPopcntSupport(unsigned TyWidth) {
   assert(isPowerOf2_32(TyWidth) && "Ty width must be power of 2");
-  if (ST->hasPOPCNTD() && TyWidth <= 64)
-    return TTI::PSK_FastHardware;
+  if (ST->hasPOPCNTD() != PPCSubtarget::POPCNTD_Unavailable && TyWidth <= 64)
+    return ST->hasPOPCNTD() == PPCSubtarget::POPCNTD_Slow ?
+             TTI::PSK_SlowHardware : TTI::PSK_FastHardware;
   return TTI::PSK_Software;
 }
 
-unsigned PPCTTIImpl::getIntImmCost(const APInt &Imm, Type *Ty) {
+int PPCTTIImpl::getIntImmCost(const APInt &Imm, Type *Ty) {
   if (DisablePPCConstHoist)
     return BaseT::getIntImmCost(Imm, Ty);
 
@@ -64,8 +71,8 @@ unsigned PPCTTIImpl::getIntImmCost(const APInt &Imm, Type *Ty) {
   return 4 * TTI::TCC_Basic;
 }
 
-unsigned PPCTTIImpl::getIntImmCost(Intrinsic::ID IID, unsigned Idx,
-                                   const APInt &Imm, Type *Ty) {
+int PPCTTIImpl::getIntImmCost(Intrinsic::ID IID, unsigned Idx, const APInt &Imm,
+                              Type *Ty) {
   if (DisablePPCConstHoist)
     return BaseT::getIntImmCost(IID, Idx, Imm, Ty);
 
@@ -98,8 +105,8 @@ unsigned PPCTTIImpl::getIntImmCost(Intrinsic::ID IID, unsigned Idx,
   return PPCTTIImpl::getIntImmCost(Imm, Ty);
 }
 
-unsigned PPCTTIImpl::getIntImmCost(unsigned Opcode, unsigned Idx,
-                                   const APInt &Imm, Type *Ty) {
+int PPCTTIImpl::getIntImmCost(unsigned Opcode, unsigned Idx, const APInt &Imm,
+                              Type *Ty) {
   if (DisablePPCConstHoist)
     return BaseT::getIntImmCost(Opcode, Idx, Imm, Ty);
 
@@ -124,12 +131,12 @@ unsigned PPCTTIImpl::getIntImmCost(unsigned Opcode, unsigned Idx,
     return TTI::TCC_Free;
   case Instruction::And:
     RunFree = true; // (for the rotate-and-mask instructions)
-    // Fallthrough...
+    LLVM_FALLTHROUGH;
   case Instruction::Add:
   case Instruction::Or:
   case Instruction::Xor:
     ShiftedFree = true;
-    // Fallthrough...
+    LLVM_FALLTHROUGH;
   case Instruction::Sub:
   case Instruction::Mul:
   case Instruction::Shl:
@@ -140,7 +147,8 @@ unsigned PPCTTIImpl::getIntImmCost(unsigned Opcode, unsigned Idx,
   case Instruction::ICmp:
     UnsignedFree = true;
     ImmIdx = 1;
-    // Fallthrough... (zero comparisons can use record-form instructions)
+    // Zero comparisons can use record-form instructions.
+    LLVM_FALLTHROUGH;
   case Instruction::Select:
     ZeroFree = true;
     break;
@@ -181,7 +189,7 @@ unsigned PPCTTIImpl::getIntImmCost(unsigned Opcode, unsigned Idx,
   return PPCTTIImpl::getIntImmCost(Imm, Ty);
 }
 
-void PPCTTIImpl::getUnrollingPreferences(Loop *L,
+void PPCTTIImpl::getUnrollingPreferences(Loop *L, ScalarEvolution &SE,
                                          TTI::UnrollingPreferences &UP) {
   if (ST->getDarwinDirective() == PPC::DIR_A2) {
     // The A2 is in-order with a deep pipeline, and concatenation unrolling
@@ -193,11 +201,27 @@ void PPCTTIImpl::getUnrollingPreferences(Loop *L,
     UP.AllowExpensiveTripCount = true;
   }
 
-  BaseT::getUnrollingPreferences(L, UP);
+  BaseT::getUnrollingPreferences(L, SE, UP);
 }
 
 bool PPCTTIImpl::enableAggressiveInterleaving(bool LoopHasReductions) {
+  // On the A2, always unroll aggressively. For QPX unaligned loads, we depend
+  // on combining the loads generated for consecutive accesses, and failure to
+  // do so is particularly expensive. This makes it much more likely (compared
+  // to only using concatenation unrolling).
+  if (ST->getDarwinDirective() == PPC::DIR_A2)
+    return true;
+
   return LoopHasReductions;
+}
+
+bool PPCTTIImpl::expandMemCmp(Instruction *I, unsigned &MaxLoadSize) {
+  MaxLoadSize = 8;
+  return true;
+}
+
+bool PPCTTIImpl::enableInterleavedAccessVectorization() {
+  return true;
 }
 
 unsigned PPCTTIImpl::getNumberOfRegisters(bool Vector) {
@@ -206,7 +230,7 @@ unsigned PPCTTIImpl::getNumberOfRegisters(bool Vector) {
   return ST->hasVSX() ? 64 : 32;
 }
 
-unsigned PPCTTIImpl::getRegisterBitWidth(bool Vector) {
+unsigned PPCTTIImpl::getRegisterBitWidth(bool Vector) const {
   if (Vector) {
     if (ST->hasQPX()) return 256;
     if (ST->hasAltivec()) return 128;
@@ -217,6 +241,27 @@ unsigned PPCTTIImpl::getRegisterBitWidth(bool Vector) {
     return 64;
   return 32;
 
+}
+
+unsigned PPCTTIImpl::getCacheLineSize() {
+  // Check first if the user specified a custom line size.
+  if (CacheLineSize.getNumOccurrences() > 0)
+    return CacheLineSize;
+
+  // On P7, P8 or P9 we have a cache line size of 128.
+  unsigned Directive = ST->getDarwinDirective();
+  if (Directive == PPC::DIR_PWR7 || Directive == PPC::DIR_PWR8 ||
+      Directive == PPC::DIR_PWR9)
+    return 128;
+
+  // On other processors return a default of 64 bytes.
+  return 64;
+}
+
+unsigned PPCTTIImpl::getPrefetchDistance() {
+  // This seems like a reasonable default for the BG/Q (this pass is enabled, by
+  // default, only on the BG/Q).
+  return 300;
 }
 
 unsigned PPCTTIImpl::getMaxInterleaveFactor(unsigned VF) {
@@ -237,8 +282,9 @@ unsigned PPCTTIImpl::getMaxInterleaveFactor(unsigned VF) {
 
   // For P7 and P8, floating-point instructions have a 6-cycle latency and
   // there are two execution units, so unroll by 12x for latency hiding.
-  if (Directive == PPC::DIR_PWR7 ||
-      Directive == PPC::DIR_PWR8)
+  // FIXME: the same for P9 as previous gen until POWER9 scheduling is ready
+  if (Directive == PPC::DIR_PWR7 || Directive == PPC::DIR_PWR8 ||
+      Directive == PPC::DIR_PWR9)
     return 12;
 
   // For most things, modern systems have two execution units (and
@@ -246,10 +292,10 @@ unsigned PPCTTIImpl::getMaxInterleaveFactor(unsigned VF) {
   return 2;
 }
 
-unsigned PPCTTIImpl::getArithmeticInstrCost(
+int PPCTTIImpl::getArithmeticInstrCost(
     unsigned Opcode, Type *Ty, TTI::OperandValueKind Op1Info,
     TTI::OperandValueKind Op2Info, TTI::OperandValueProperties Opd1PropInfo,
-    TTI::OperandValueProperties Opd2PropInfo) {
+    TTI::OperandValueProperties Opd2PropInfo, ArrayRef<const Value *> Args) {
   assert(TLI->InstructionOpcodeToISD(Opcode) && "Invalid opcode");
 
   // Fallback to the default implementation.
@@ -257,24 +303,32 @@ unsigned PPCTTIImpl::getArithmeticInstrCost(
                                        Opd1PropInfo, Opd2PropInfo);
 }
 
-unsigned PPCTTIImpl::getShuffleCost(TTI::ShuffleKind Kind, Type *Tp, int Index,
-                                    Type *SubTp) {
-  return BaseT::getShuffleCost(Kind, Tp, Index, SubTp);
+int PPCTTIImpl::getShuffleCost(TTI::ShuffleKind Kind, Type *Tp, int Index,
+                               Type *SubTp) {
+  // Legalize the type.
+  std::pair<int, MVT> LT = TLI->getTypeLegalizationCost(DL, Tp);
+
+  // PPC, for both Altivec/VSX and QPX, support cheap arbitrary permutations
+  // (at least in the sense that there need only be one non-loop-invariant
+  // instruction). We need one such shuffle instruction for each actual
+  // register (this is not true for arbitrary shuffles, but is true for the
+  // structured types of shuffles covered by TTI::ShuffleKind).
+  return LT.first;
 }
 
-unsigned PPCTTIImpl::getCastInstrCost(unsigned Opcode, Type *Dst, Type *Src) {
+int PPCTTIImpl::getCastInstrCost(unsigned Opcode, Type *Dst, Type *Src,
+                                 const Instruction *I) {
   assert(TLI->InstructionOpcodeToISD(Opcode) && "Invalid opcode");
 
   return BaseT::getCastInstrCost(Opcode, Dst, Src);
 }
 
-unsigned PPCTTIImpl::getCmpSelInstrCost(unsigned Opcode, Type *ValTy,
-                                        Type *CondTy) {
-  return BaseT::getCmpSelInstrCost(Opcode, ValTy, CondTy);
+int PPCTTIImpl::getCmpSelInstrCost(unsigned Opcode, Type *ValTy, Type *CondTy,
+                                   const Instruction *I) {
+  return BaseT::getCmpSelInstrCost(Opcode, ValTy, CondTy, I);
 }
 
-unsigned PPCTTIImpl::getVectorInstrCost(unsigned Opcode, Type *Val,
-                                        unsigned Index) {
+int PPCTTIImpl::getVectorInstrCost(unsigned Opcode, Type *Val, unsigned Index) {
   assert(Val->isVectorTy() && "This must be a vector type");
 
   int ISD = TLI->InstructionOpcodeToISD(Opcode);
@@ -313,41 +367,96 @@ unsigned PPCTTIImpl::getVectorInstrCost(unsigned Opcode, Type *Val,
   return BaseT::getVectorInstrCost(Opcode, Val, Index);
 }
 
-unsigned PPCTTIImpl::getMemoryOpCost(unsigned Opcode, Type *Src,
-                                     unsigned Alignment,
-                                     unsigned AddressSpace) {
+int PPCTTIImpl::getMemoryOpCost(unsigned Opcode, Type *Src, unsigned Alignment,
+                                unsigned AddressSpace, const Instruction *I) {
   // Legalize the type.
-  std::pair<unsigned, MVT> LT = TLI->getTypeLegalizationCost(DL, Src);
+  std::pair<int, MVT> LT = TLI->getTypeLegalizationCost(DL, Src);
   assert((Opcode == Instruction::Load || Opcode == Instruction::Store) &&
          "Invalid Opcode");
 
-  unsigned Cost = BaseT::getMemoryOpCost(Opcode, Src, Alignment, AddressSpace);
+  int Cost = BaseT::getMemoryOpCost(Opcode, Src, Alignment, AddressSpace);
 
-  // VSX loads/stores support unaligned access.
-  if (ST->hasVSX()) {
-    if (LT.second == MVT::v2f64 || LT.second == MVT::v2i64)
-      return Cost;
-  }
+  bool IsAltivecType = ST->hasAltivec() &&
+                       (LT.second == MVT::v16i8 || LT.second == MVT::v8i16 ||
+                        LT.second == MVT::v4i32 || LT.second == MVT::v4f32);
+  bool IsVSXType = ST->hasVSX() &&
+                   (LT.second == MVT::v2f64 || LT.second == MVT::v2i64);
+  bool IsQPXType = ST->hasQPX() &&
+                   (LT.second == MVT::v4f64 || LT.second == MVT::v4f32);
 
-  bool UnalignedAltivec =
-    Src->isVectorTy() &&
-    Src->getPrimitiveSizeInBits() >= LT.second.getSizeInBits() &&
-    LT.second.getSizeInBits() == 128 &&
-    Opcode == Instruction::Load;
+  // VSX has 32b/64b load instructions. Legalization can handle loading of
+  // 32b/64b to VSR correctly and cheaply. But BaseT::getMemoryOpCost and
+  // PPCTargetLowering can't compute the cost appropriately. So here we
+  // explicitly check this case.
+  unsigned MemBytes = Src->getPrimitiveSizeInBits();
+  if (Opcode == Instruction::Load && ST->hasVSX() && IsAltivecType &&
+      (MemBytes == 64 || (ST->hasP8Vector() && MemBytes == 32)))
+    return 1;
+
+  // Aligned loads and stores are easy.
+  unsigned SrcBytes = LT.second.getStoreSize();
+  if (!SrcBytes || !Alignment || Alignment >= SrcBytes)
+    return Cost;
+
+  // If we can use the permutation-based load sequence, then this is also
+  // relatively cheap (not counting loop-invariant instructions): one load plus
+  // one permute (the last load in a series has extra cost, but we're
+  // neglecting that here). Note that on the P7, we could do unaligned loads
+  // for Altivec types using the VSX instructions, but that's more expensive
+  // than using the permutation-based load sequence. On the P8, that's no
+  // longer true.
+  if (Opcode == Instruction::Load &&
+      ((!ST->hasP8Vector() && IsAltivecType) || IsQPXType) &&
+      Alignment >= LT.second.getScalarType().getStoreSize())
+    return Cost + LT.first; // Add the cost of the permutations.
+
+  // For VSX, we can do unaligned loads and stores on Altivec/VSX types. On the
+  // P7, unaligned vector loads are more expensive than the permutation-based
+  // load sequence, so that might be used instead, but regardless, the net cost
+  // is about the same (not counting loop-invariant instructions).
+  if (IsVSXType || (ST->hasVSX() && IsAltivecType))
+    return Cost;
+
+  // Newer PPC supports unaligned memory access.
+  if (TLI->allowsMisalignedMemoryAccesses(LT.second, 0))
+    return Cost;
 
   // PPC in general does not support unaligned loads and stores. They'll need
   // to be decomposed based on the alignment factor.
-  unsigned SrcBytes = LT.second.getStoreSize();
-  if (SrcBytes && Alignment && Alignment < SrcBytes && !UnalignedAltivec) {
-    Cost += LT.first*(SrcBytes/Alignment-1);
 
-    // For a vector type, there is also scalarization overhead (only for
-    // stores, loads are expanded using the vector-load + permutation sequence,
-    // which is much less expensive).
-    if (Src->isVectorTy() && Opcode == Instruction::Store)
-      for (int i = 0, e = Src->getVectorNumElements(); i < e; ++i)
-        Cost += getVectorInstrCost(Instruction::ExtractElement, Src, i);
-  }
+  // Add the cost of each scalar load or store.
+  Cost += LT.first*(SrcBytes/Alignment-1);
+
+  // For a vector type, there is also scalarization overhead (only for
+  // stores, loads are expanded using the vector-load + permutation sequence,
+  // which is much less expensive).
+  if (Src->isVectorTy() && Opcode == Instruction::Store)
+    for (int i = 0, e = Src->getVectorNumElements(); i < e; ++i)
+      Cost += getVectorInstrCost(Instruction::ExtractElement, Src, i);
+
+  return Cost;
+}
+
+int PPCTTIImpl::getInterleavedMemoryOpCost(unsigned Opcode, Type *VecTy,
+                                           unsigned Factor,
+                                           ArrayRef<unsigned> Indices,
+                                           unsigned Alignment,
+                                           unsigned AddressSpace) {
+  assert(isa<VectorType>(VecTy) &&
+         "Expect a vector type for interleaved memory op");
+
+  // Legalize the type.
+  std::pair<int, MVT> LT = TLI->getTypeLegalizationCost(DL, VecTy);
+
+  // Firstly, the cost of load/store operation.
+  int Cost = getMemoryOpCost(Opcode, VecTy, Alignment, AddressSpace);
+
+  // PPC, for both Altivec/VSX and QPX, support cheap arbitrary permutations
+  // (at least in the sense that there need only be one non-loop-invariant
+  // instruction). For each result vector, we need one shuffle per incoming
+  // vector (except that the first shuffle can take two incoming vectors
+  // because it does not need to take itself).
+  Cost += Factor*(LT.first-1);
 
   return Cost;
 }

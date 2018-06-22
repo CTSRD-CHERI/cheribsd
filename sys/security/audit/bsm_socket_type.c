@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2008 Apple Inc.
  * All rights reserved.
  *
@@ -52,8 +54,7 @@ static const struct bsm_socket_type bsm_socket_types[] = {
 	{ BSM_SOCK_RDM, SOCK_RDM },
 	{ BSM_SOCK_SEQPACKET, SOCK_SEQPACKET },
 };
-static const int bsm_socket_types_count = sizeof(bsm_socket_types) /
-	    sizeof(bsm_socket_types[0]);
+static const int bsm_socket_types_count = nitems(bsm_socket_types);
 
 static const struct bsm_socket_type *
 bsm_lookup_local_socket_type(int local_socket_type)

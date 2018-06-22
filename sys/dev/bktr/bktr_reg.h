@@ -1,6 +1,8 @@
 /*-
  * $FreeBSD$
  *
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1999 Roger Hardiman
  * Copyright (c) 1998 Amancio Hasty
  * Copyright (c) 1995 Mark Tinguely and Jim Lowe
@@ -35,7 +37,7 @@
  */
 
 #ifdef __NetBSD__
-#include <machine/bus.h>		/* struct device */
+#include <machine/bus.h>		/* device_t */
 #include <sys/device.h>
 #include <sys/select.h>			/* struct selinfo */
 # ifdef DEBUG

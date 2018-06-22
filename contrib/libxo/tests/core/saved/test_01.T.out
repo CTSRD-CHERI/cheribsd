@@ -1,3 +1,11 @@
+anchor             0x0..1
+anchor             0x0..1
+anchor             0x0..1
+df    12%
+testing argument modifier my-box.example.com...
+testing argument modifier with encoding to .example.com...
+Label text value
+  very  4242
 Connecting to my-box.example.com...
 Item        Total Sold    In Stock    On Order  SKU
 gum               1412          54          10  GRO-000-415
@@ -45,3 +53,6 @@ Item: water
 XXXXXXXX
 X        XCost: 425
 X                              XCost: 455
+ links user  group  
+3       this    
+/some/file        1 user        group         

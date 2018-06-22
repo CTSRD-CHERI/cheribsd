@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2001 Networks Associates Technology, Inc.
  * All rights reserved.
  *
@@ -57,7 +59,7 @@ maclabel_status(int s)
 	char *label_text;
 
 	memset(&ifr, 0, sizeof(ifr));
-	strncpy(ifr.ifr_name, name, sizeof(ifr.ifr_name));
+	strlcpy(ifr.ifr_name, name, sizeof(ifr.ifr_name));
 
 	if (mac_prepare_ifnet_label(&label) == -1)
 		return;
@@ -90,7 +92,7 @@ setifmaclabel(const char *val, int d, int s, const struct afswtch *rafp)
 	}
 
 	memset(&ifr, 0, sizeof(ifr));
-	strncpy(ifr.ifr_name, name, sizeof(ifr.ifr_name));
+	strlcpy(ifr.ifr_name, name, sizeof(ifr.ifr_name));
 	ifr.ifr_ifru.ifru_data = (void *)label;
 
 	error = ioctl(s, SIOCSIFMAC, &ifr);

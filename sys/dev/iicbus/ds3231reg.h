@@ -38,7 +38,10 @@
 #define	DS3231_MINS		0x01
 #define	DS3231_MINS_MASK		0x7f
 #define	DS3231_HOUR		0x02
-#define	DS3231_HOUR_MASK		0x3f
+#define	DS3231_HOUR_MASK_12HR		0x3f
+#define	DS3231_HOUR_MASK_24HR		0x1f
+#define	DS3231_HOUR_IS_PM		0x20
+#define	DS3231_HOUR_USE_AMPM		0x40
 #define	DS3231_WEEKDAY		0x03
 #define	DS3231_WEEKDAY_MASK		0x07
 #define	DS3231_DATE		0x04
@@ -73,6 +76,6 @@
 #define	DS3231_0250C			0x40
 #define	DS3231_MSB			0x8000
 #define	DS3231_NEG_BIT			DS3231_MSB
-#define	TZ_ZEROC			2732
+#define	TZ_ZEROC			2731
 
 #endif	/* _DS3231REG_H_ */

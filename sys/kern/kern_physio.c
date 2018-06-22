@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1994 John S. Dyson
  * All rights reserved.
  *
@@ -27,6 +29,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/conf.h>
 #include <sys/malloc.h>
 #include <sys/proc.h>
+#include <sys/racct.h>
 #include <sys/uio.h>
 #include <geom/geom.h>
 
@@ -109,8 +112,24 @@ physio(struct cdev *dev, struct uio *uio, int ioflag)
 		prot |= VM_PROT_WRITE;	/* Less backwards than it looks */
 	error = 0;
 	for (i = 0; i < uio->uio_iovcnt; i++) {
+#ifdef RACCT
+		if (racct_enable) {
+			PROC_LOCK(curproc);
+			if (uio->uio_rw == UIO_READ) {
+				racct_add_force(curproc, RACCT_READBPS,
+				    uio->uio_iov[i].iov_len);
+				racct_add_force(curproc, RACCT_READIOPS, 1);
+			} else {
+				racct_add_force(curproc, RACCT_WRITEBPS,
+				    uio->uio_iov[i].iov_len);
+				racct_add_force(curproc, RACCT_WRITEIOPS, 1);
+			}
+			PROC_UNLOCK(curproc);
+		}
+#endif /* RACCT */
+
 		while (uio->uio_iov[i].iov_len) {
-			bzero(bp, sizeof(*bp));
+			g_reset_bio(bp);
 			if (uio->uio_rw == UIO_READ) {
 				bp->bio_cmd = BIO_READ;
 				curthread->td_ru.ru_inblock++;
@@ -119,7 +138,8 @@ physio(struct cdev *dev, struct uio *uio, int ioflag)
 				curthread->td_ru.ru_oublock++;
 			}
 			bp->bio_offset = uio->uio_offset;
-			bp->bio_data = uio->uio_iov[i].iov_base;
+			bp->bio_data = __DECAP_CHECK(uio->uio_iov[i].iov_base,
+			    uio->uio_iov[i].iov_len);
 			bp->bio_length = uio->uio_iov[i].iov_len;
 			if (bp->bio_length > dev->si_iosize_max)
 				bp->bio_length = dev->si_iosize_max;
@@ -186,9 +206,7 @@ physio(struct cdev *dev, struct uio *uio, int ioflag)
 			iolen = bp->bio_length - bp->bio_resid;
 			if (iolen == 0 && !(bp->bio_flags & BIO_ERROR))
 				goto doerror;	/* EOF */
-			uio->uio_iov[i].iov_len -= iolen;
-			uio->uio_iov[i].iov_base =
-			    (char *)uio->uio_iov[i].iov_base + iolen;
+			IOVEC_ADVANCE(&uio->uio_iov[i], iolen);
 			uio->uio_resid -= iolen;
 			uio->uio_offset += iolen;
 			if (bp->bio_flags & BIO_ERROR) {

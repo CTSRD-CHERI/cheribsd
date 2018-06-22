@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2006, David Xu <davidxu@freebsd.org>
  * All rights reserved.
  *
@@ -22,10 +24,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
  /*
   * A lockless rwlock for rtld.
@@ -192,7 +194,12 @@ _thr_rtld_init(void)
 	curthread = _get_curthread();
 
 	/* force to resolve _umtx_op PLT */
-	_umtx_op_err((struct umtx *)&dummy, UMTX_OP_WAKE, 1, 0, 0);
+	/*
+	 * XXXAR: this line here hangs when running Qt unit tests, let's just
+	 * use an invalid opcode to get EINVAL
+	 */
+	/* _umtx_op_err((struct umtx *)&dummy, UMTX_OP_WAKE, 1, 0, 0); */
+	_umtx_op_err((struct umtx *)&dummy, INT_MAX, 1, 0, 0);
 	
 	/* force to resolve errno() PLT */
 	__error();
@@ -227,6 +234,7 @@ _thr_rtld_init(void)
 	_rtld_atfork_post(NULL);
 	_malloc_prefork();
 	_malloc_postfork();
+	getpid();
 	syscall(SYS_getpid);
 
 	/* mask signals, also force to resolve __sys_sigprocmask PLT */

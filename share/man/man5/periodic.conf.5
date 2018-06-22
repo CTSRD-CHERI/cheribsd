@@ -25,7 +25,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd March 26, 2015
+.Dd March 31, 2017
 .Dt PERIODIC.CONF 5
 .Os
 .Sh NAME
@@ -133,6 +133,10 @@ respectively.
 Refer to the
 .Xr periodic 8
 manual page for how script return codes are interpreted.
+.It Va anticongestion_sleeptime
+.Pq Vt int
+The maximum number of seconds to randomly sleep in order to smooth bursty loads
+on a shared resource, such as a download mirror.
 .El
 .Pp
 The following variables are used by the standard scripts that reside in
@@ -395,6 +399,15 @@ if you want to run
 on your
 .Xr gconcat 8
 devices.
+.It Va daily_status_mfi_enable
+.Pq Vt bool
+Set to
+.Dq Li YES
+if you want to run
+.Nm mfiutil Cm status
+on your
+.Xr mfi 4
+devices.
 .It Va daily_status_network_enable
 .Pq Vt bool
 Set to
@@ -580,15 +593,6 @@ if you want to run
 This script regenerates the database used by the
 .Xr apropos 1
 command.
-.It Va weekly_catman_enable
-.Pq Vt bool
-Set to
-.Dq Li YES
-if you want to run
-.Pa /usr/libexec/catman.local .
-This script processes all out of date manual pages, speeding up the
-.Xr man 1
-command at the expense of disk space.
 .It Va weekly_noid_enable
 .Pq Vt bool
 Set to
@@ -617,7 +621,7 @@ Weekly counterpart of
 Set to
 .Dq Li YES
 if you want to use
-.Xr pkg_version 1
+.Xr pkg-version 8
 to list installed packages which are out of date.
 .It Va pkg_version
 .Pq Vt str
@@ -628,7 +632,7 @@ is set to
 this variable specifies the program that is used to determine the out of
 date packages.
 If unset, the
-.Xr pkg_version 1
+.Xr pkg-version 8
 program is used.
 As an example, this variable might be set to
 .Dq Li portversion
@@ -642,7 +646,7 @@ This variable specifies the
 file from
 .Pa /usr/ports
 that should be used by
-.Xr pkg_version 1 .
+.Xr pkg-version 8 .
 Because the dependency tree may be substantially different between versions of
 .Fx ,
 there may be more than one
@@ -975,7 +979,6 @@ is shared or distributed.
 .Xr msgs 1 ,
 .Xr netstat 1 ,
 .Xr nice 1 ,
-.Xr pkg_version 1 ,
 .Xr login.conf 5 ,
 .Xr rc.conf 5 ,
 .Xr ac 8 ,
@@ -983,6 +986,7 @@ is shared or distributed.
 .Xr dump 8 ,
 .Xr newsyslog 8 ,
 .Xr periodic 8 ,
+.Xr pkg-version 8 ,
 .Xr sendmail 8
 .Sh HISTORY
 The

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1993, David Greenman
  * All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,8 +40,11 @@
 
 #define MAXSHELLCMDLEN	PAGE_SIZE
 
+struct ucred;
+
 struct image_args {
 	char *buf;		/* pointer to string buffer */
+	void *bufkva;		/* cookie for string buffer KVA */
 	char *begin_argv;	/* beginning of argv in buf */
 	char *begin_envv;	/* beginning of envv in buf */
 	char *endp;		/* current `end' pointer of arg & env strings */
@@ -47,7 +52,9 @@ struct image_args {
 	char *fname_buf;	/* pointer to optional malloc(M_TEMP) buffer */
 	int stringspace;	/* space left in arg & env buffer */
 	int argc;		/* count of argument strings */
+	char **argv;		/* pointer to argv (user space) */
 	int envc;		/* count of environment strings */
+	char **envv;		/* pointer to envv (user space) */
 	int fd;			/* file descriptor of the executable */
 	struct filedesc *fdp;	/* new file descriptor table */
 };
@@ -60,6 +67,7 @@ struct image_params {
 	struct vattr *attr;	/* attributes of file */
 	const char *image_header; /* head of file to exec */
 	unsigned long entry_addr; /* entry address of target executable */
+	unsigned long end_addr;   /* end of mapped image (including bss) */
 	unsigned long reloc_base; /* load address of image */
 	char vmspace_destroyed;	/* flag - we've blown away original vm space */
 #define IMGACT_SHELL	0x1
@@ -82,6 +90,8 @@ struct image_params {
 	int pagesizeslen;
 	vm_prot_t stack_prot;
 	u_long stack_sz;
+	struct ucred *newcred;		/* new credentials if changing */
+	bool credential_setid;		/* true if becoming setid */
 };
 
 #ifdef _KERNEL
@@ -92,6 +102,12 @@ struct vmspace;
 #define IMGACT_CORE_COMPRESS	0x01
 
 int	exec_alloc_args(struct image_args *);
+int	exec_args_add_arg_str(struct image_args *args, char *argp,
+	    enum uio_seg segflg);
+int	exec_args_add_env_str(struct image_args *args, char *envp,
+	    enum uio_seg segflg);
+int	exec_args_add_fname(struct image_args *args, char *fname,
+	    enum uio_seg segflg);
 int	exec_check_permissions(struct image_params *);
 register_t *exec_copyout_strings(struct image_params *);
 void	exec_free_args(struct image_args *);

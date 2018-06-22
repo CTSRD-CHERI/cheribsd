@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2006 Roman Divacky
  * Copyright (c) 2013 Dmitry Chagin
  * All rights reserved.
@@ -45,6 +47,7 @@ __FBSDID("$FreeBSD$");
 
 #include <compat/linux/linux_emul.h>
 #include <compat/linux/linux_misc.h>
+#include <compat/linux/linux_persona.h>
 #include <compat/linux/linux_util.h>
 
 
@@ -127,7 +130,7 @@ linux_proc_init(struct thread *td, struct thread *newtd, int flags)
 		 /* epoll should be destroyed in a case of exec. */
 		pem = pem_find(p);
 		KASSERT(pem != NULL, ("proc_exit: proc emuldata not found.\n"));
-
+		pem->persona = 0;
 		if (pem->epoll != NULL) {
 			emd = pem->epoll;
 			pem->epoll = NULL;
@@ -185,7 +188,7 @@ linux_common_execve(struct thread *td, struct image_args *eargs)
 
 	error = kern_execve(td, eargs, NULL);
 	post_execve(td, error, oldvmspace);
-	if (error != 0)
+	if (error != EJUSTRETURN)
 		return (error);
 
 	/*
@@ -212,7 +215,7 @@ linux_common_execve(struct thread *td, struct image_args *eargs)
 		free(em, M_TEMP);
 		free(pem, M_LINUX);
 	}
-	return (0);
+	return (EJUSTRETURN);
 }
 
 void 
@@ -220,6 +223,9 @@ linux_proc_exec(void *arg __unused, struct proc *p, struct image_params *imgp)
 {
 	struct thread *td = curthread;
 	struct thread *othertd;
+#if defined(__amd64__)
+	struct linux_pemuldata *pem;
+#endif
 
 	/*
 	 * In a case of execing from linux binary properly detach
@@ -243,6 +249,17 @@ linux_proc_exec(void *arg __unused, struct proc *p, struct image_params *imgp)
 			linux_proc_init(td, NULL, 0);
 		else
 			linux_proc_init(td, td, 0);
+#if defined(__amd64__)
+		/*
+		 * An IA32 executable which has executable stack will have the
+		 * READ_IMPLIES_EXEC personality flag set automatically.
+		 */
+		if (SV_PROC_FLAG(td->td_proc, SV_ILP32) &&
+		    imgp->stack_prot & VM_PROT_EXECUTE) {
+			pem = pem_find(p);
+			pem->persona |= LINUX_READ_IMPLIES_EXEC;
+		}
+#endif
 	}
 }
 

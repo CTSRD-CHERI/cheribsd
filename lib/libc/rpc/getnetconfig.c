@@ -1,6 +1,8 @@
 /*	$NetBSD: getnetconfig.c,v 1.3 2000/07/06 03:10:34 christos Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2009, Sun Microsystems, Inc.
  * All rights reserved.
  *
@@ -405,7 +407,7 @@ endnetconfig(void *handlep)
     }
 
     /*
-     * Noone needs these entries anymore, then frees them.
+     * No one needs these entries anymore, then frees them.
      * Make sure all info in netconfig_info structure has been reinitialized.
      */
     q = ni.head;
@@ -630,8 +632,8 @@ parse_ncp(char *stringp, struct netconfig *ncp)
 	ncp->nc_lookups = NULL;
 	ncp->nc_nlookups = 0;
 	while ((cp = tokenp) != NULL) {
-	    if ((nc_lookups = realloc(ncp->nc_lookups,
-		(ncp->nc_nlookups + 1) * sizeof *ncp->nc_lookups)) == NULL) {
+	    if ((nc_lookups = reallocarray(ncp->nc_lookups,
+		ncp->nc_nlookups + 1, sizeof(*ncp->nc_lookups))) == NULL) {
 		    free(ncp->nc_lookups);
 		    ncp->nc_lookups = NULL;
 		    return (-1);

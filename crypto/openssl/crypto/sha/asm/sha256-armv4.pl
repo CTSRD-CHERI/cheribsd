@@ -205,7 +205,7 @@ sha256_block_data_order:
 #if __ARM_ARCH__<7
 	sub	r3,pc,#8		@ sha256_block_data_order
 #else
-	adr	r3,sha256_block_data_order
+	adr	r3,.
 #endif
 #if __ARM_MAX_ARCH__>=7 && !defined(__KERNEL__)
 	ldr	r12,.LOPENSSL_armcap
@@ -595,7 +595,7 @@ sha256_block_data_order_armv8:
 	adr	$Ktbl,.LARMv8
 	sub	$Ktbl,$Ktbl,#.LARMv8-K256
 # else
-	adrl	$Ktbl,K256
+	sub	$Ktbl,$Ktbl,#256+32
 # endif
 	add	$len,$inp,$len,lsl#6	@ len to point at the end of inp
 

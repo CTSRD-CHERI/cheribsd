@@ -1,7 +1,9 @@
 /*
  * vim:sw=4 ts=8
  */
-/*
+/*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2009 David McCullough <david.mccullough@securecomputing.com>
  *
  * Copyright (c) 2003-2007 Cavium Networks (support@cavium.com). All rights
@@ -323,7 +325,7 @@ octo_calc_hash(uint8_t auth, unsigned char *key, uint64_t *inner, uint64_t *oute
 int
 octo_des_cbc_encrypt(
     struct octo_sess *od,
-    struct iovec *iov, size_t iovcnt, size_t iovlen,
+    kiovec_t *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
@@ -382,7 +384,7 @@ octo_des_cbc_encrypt(
 int
 octo_des_cbc_decrypt(
     struct octo_sess *od,
-    struct iovec *iov, size_t iovcnt, size_t iovlen,
+    kiovec_t *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
@@ -442,7 +444,7 @@ octo_des_cbc_decrypt(
 int
 octo_aes_cbc_encrypt(
     struct octo_sess *od,
-    struct iovec *iov, size_t iovcnt, size_t iovlen,
+    kiovec_t *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
@@ -511,7 +513,7 @@ octo_aes_cbc_encrypt(
 int
 octo_aes_cbc_decrypt(
     struct octo_sess *od,
-    struct iovec *iov, size_t iovcnt, size_t iovlen,
+    kiovec_t *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
@@ -582,12 +584,12 @@ octo_aes_cbc_decrypt(
 int
 octo_null_md5_encrypt(
     struct octo_sess *od,
-    struct iovec *iov, size_t iovcnt, size_t iovlen,
+    kiovec_t *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
 {
-    register int next = 0;
+    int next = 0;
     uint64_t *data;
     uint64_t tmp1, tmp2;
     int data_i, data_l, alen = auth_len;
@@ -684,12 +686,12 @@ octo_null_md5_encrypt(
 int
 octo_null_sha1_encrypt(
     struct octo_sess *od,
-    struct iovec *iov, size_t iovcnt, size_t iovlen,
+    kiovec_t *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
 {
-    register int next = 0;
+    int next = 0;
     uint64_t *data;
     uint64_t tmp1, tmp2, tmp3;
     int data_i, data_l, alen = auth_len;
@@ -789,12 +791,12 @@ octo_null_sha1_encrypt(
 int
 octo_des_cbc_md5_encrypt(
     struct octo_sess *od,
-    struct iovec *iov, size_t iovcnt, size_t iovlen,
+    kiovec_t *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
 {
-    register int next = 0;
+    int next = 0;
     union {
 	uint32_t data32[2];
 	uint64_t data64[1];
@@ -937,12 +939,12 @@ octo_des_cbc_md5_encrypt(
 int
 octo_des_cbc_md5_decrypt(
     struct octo_sess *od,
-    struct iovec *iov, size_t iovcnt, size_t iovlen,
+    kiovec_t *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
 {
-    register int next = 0;
+    int next = 0;
     union {
 	uint32_t data32[2];
 	uint64_t data64[1];
@@ -1088,12 +1090,12 @@ octo_des_cbc_md5_decrypt(
 int
 octo_des_cbc_sha1_encrypt(
     struct octo_sess *od,
-    struct iovec *iov, size_t iovcnt, size_t iovlen,
+    kiovec_t *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
 {
-    register int next = 0;
+    int next = 0;
     union {
 	uint32_t data32[2];
 	uint64_t data64[1];
@@ -1239,12 +1241,12 @@ octo_des_cbc_sha1_encrypt(
 int
 octo_des_cbc_sha1_decrypt(
     struct octo_sess *od,
-    struct iovec *iov, size_t iovcnt, size_t iovlen,
+    kiovec_t *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
 {
-    register int next = 0;
+    int next = 0;
     union {
 	uint32_t data32[2];
 	uint64_t data64[1];
@@ -1392,12 +1394,12 @@ octo_des_cbc_sha1_decrypt(
 int
 octo_aes_cbc_md5_encrypt(
     struct octo_sess *od,
-    struct iovec *iov, size_t iovcnt, size_t iovlen,
+    kiovec_t *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
 {
-    register int next = 0;
+    int next = 0;
     union {
 	uint32_t data32[2];
 	uint64_t data64[1];
@@ -1569,12 +1571,12 @@ octo_aes_cbc_md5_encrypt(
 int
 octo_aes_cbc_md5_decrypt(
     struct octo_sess *od,
-    struct iovec *iov, size_t iovcnt, size_t iovlen,
+    kiovec_t *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
 {
-    register int next = 0;
+    int next = 0;
     union {
 	uint32_t data32[2];
 	uint64_t data64[1];
@@ -1745,12 +1747,12 @@ octo_aes_cbc_md5_decrypt(
 int
 octo_aes_cbc_sha1_encrypt(
     struct octo_sess *od,
-    struct iovec *iov, size_t iovcnt, size_t iovlen,
+    kiovec_t *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
 {
-    register int next = 0;
+    int next = 0;
     union {
 	uint32_t data32[2];
 	uint64_t data64[1];
@@ -1941,12 +1943,12 @@ octo_aes_cbc_sha1_encrypt(
 int
 octo_aes_cbc_sha1_decrypt(
     struct octo_sess *od,
-    struct iovec *iov, size_t iovcnt, size_t iovlen,
+    kiovec_t *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
 {
-    register int next = 0;
+    int next = 0;
     union {
 	uint32_t data32[2];
 	uint64_t data64[1];

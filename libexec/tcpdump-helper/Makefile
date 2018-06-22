@@ -7,11 +7,12 @@ NEED_CHERI=	sandbox
 .include <src.opts.mk>
 
 PROG=	tcpdump-helper
-SRCS=	tcpdump-helper.c			\
+SRCS=	ascii_strcasecmp.c			\
+	netdissect.c				\
+	tcpdump-helper.c			\
 	pcap_datalink_val_to_name.c		\
 	pcap-eproto_db.c			\
-	stub.c					\
-	util.c
+	stub.c
 
 .include "${.CURDIR}/../../usr.sbin/tcpdump/tcpdump/Makefile.print"
 
@@ -26,11 +27,11 @@ CFLAGS+=	-DHAVE_CONFIG_H \
 		-I${.CURDIR}/../../lib/libcheri \
 		-I${.CURDIR}/../../usr.sbin/tcpdump/tcpdump \
 		-I${.CURDIR}/../../usr.sbin/tcpdump/cheri_tcpdump \
-		-mxgot
+		-mxgot -mllvm -mxmxgot
 .if ${MK_DEMO_VULNERABILITIES} != "no"
 CFLAGS+=	-DCHERI_TCPDUMP_VULNERABILITY
 .endif
-LDFLAGS+=	-Wl,--script=${.CURDIR}/../../lib/libc_cheri/sandbox.ld \
+LDFLAGS+=	-Wl,-T,${.CURDIR}/../../lib/libc_cheri/sandbox.ld \
 		-nostdlib
 WARNS=	3
 

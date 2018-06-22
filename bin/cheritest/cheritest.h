@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012-2016 Robert N. M. Watson
+ * Copyright (c) 2012-2018 Robert N. M. Watson
  * Copyright (c) 2014 SRI International
  * All rights reserved.
  *
@@ -67,6 +67,7 @@
 struct cheritest_child_state {
 	/* Fields filled in by the child signal handler. */
 	int		ccs_signum;
+	int		ccs_si_code;
 	register_t	ccs_mips_cause;
 	register_t	ccs_cp2_cause;
 	int		ccs_unwound;  /* If any trusted-stack frames unwound. */
@@ -94,7 +95,7 @@ extern struct cheritest_child_state *ccsp;
 #define	CT_FLAG_MIPS_EXCCODE	0x00000002  /* Check MIPS exception code. */
 #define	CT_FLAG_CP2_EXCCODE	0x00000004  /* Check CP2 exception code. */
 #define	CT_FLAG_STDOUT_STRING	0x00000008  /* Check stdout for a string. */
-#define	CT_FLAG_STDIN_STRING	0x00000010  /* Provide strong on stdin. */
+#define	CT_FLAG_STDIN_STRING	0x00000010  /* Provide string on stdin. */
 #define	CT_FLAG_STDOUT_IGNORE	0x00000020  /* Standard output produced,
 					       but not checkable */
 #define CT_FLAG_SLOW		0x00000040  /* Test is expected to take a 
@@ -102,6 +103,11 @@ extern struct cheritest_child_state *ccsp;
 #define	CT_FLAG_SIGNAL_UNWIND	0x00000080  /* Should fault and unwind
 					       trusted stack; checks signum
 					       and result. */
+#define	CT_FLAG_SANDBOX		0x00000100  /* Test requires that a libcheri
+					     * sandbox be created. */
+#define	CT_FLAG_SI_CODE		0x00000200  /* Check signal si_code. */
+#define	CT_FLAG_SIGEXIT		0x00000400  /* Exits with uncaught signal;
+					       checks status signum. */
 
 #define	CHERITEST_SANDBOX_UNWOUND	0x123456789ULL
 
@@ -114,6 +120,7 @@ struct cheri_test {
 	const char *	(*ct_check_xfail)(const char *);
 	u_int		 ct_flags;
 	int		 ct_signum;
+	int		 ct_si_code;
 	register_t	 ct_mips_exccode;
 	register_t	 ct_cp2_exccode;
 	const char	*ct_stdin_string;
@@ -125,226 +132,362 @@ struct cheri_test {
  * Useful APIs for tests.  These terminate the process returning either
  * success or failure with a test-defined, human-readable string describing
  * the error.
- *
- * XXXRW: It would be nice to also offer a cheritest_failure_err().
  */
-void	cheritest_failure_err(const char *msg, ...) __dead2;
-void	cheritest_failure_errx(const char *msg, ...) __dead2;
+void	cheritest_failure_err(const char *msg, ...) __dead2  __printflike(1, 2);
+void	cheritest_failure_errx(const char *msg, ...) __dead2  __printflike(1, 2);
 void	cheritest_success(void) __dead2;
 void	signal_handler_clear(int sig);
 
-/* cheritest_bounds.c */
-void	test_bounds_stack_static_uint8(const struct cheri_test *ctp);
-void	test_bounds_stack_static_uint16(const struct cheri_test *ctp);
-void	test_bounds_stack_static_uint32(const struct cheri_test *ctp);
-void	test_bounds_stack_static_uint64(const struct cheri_test *ctp);
-void	test_bounds_stack_static_cap(const struct cheri_test *ctp);
-void	test_bounds_stack_static_16(const struct cheri_test *ctp);
-void	test_bounds_stack_static_32(const struct cheri_test *ctp);
-void	test_bounds_stack_static_64(const struct cheri_test *ctp);
-void	test_bounds_stack_static_128(const struct cheri_test *ctp);
-void	test_bounds_stack_static_256(const struct cheri_test *ctp);
-void	test_bounds_stack_static_512(const struct cheri_test *ctp);
-void	test_bounds_stack_static_1024(const struct cheri_test *ctp);
-void	test_bounds_stack_static_2048(const struct cheri_test *ctp);
-void	test_bounds_stack_static_4096(const struct cheri_test *ctp);
-void	test_bounds_stack_static_8192(const struct cheri_test *ctp);
-void	test_bounds_stack_static_16384(const struct cheri_test *ctp);
-void	test_bounds_stack_static_32768(const struct cheri_test *ctp);
-void	test_bounds_stack_static_65536(const struct cheri_test *ctp);
-void	test_bounds_stack_static_131072(const struct cheri_test *ctp);
-void	test_bounds_stack_static_262144(const struct cheri_test *ctp);
-void	test_bounds_stack_static_524288(const struct cheri_test *ctp);
-void	test_bounds_stack_static_1048576(const struct cheri_test *ctp);
-void	test_bounds_stack_dynamic_uint8(const struct cheri_test *ctp);
-void	test_bounds_stack_dynamic_uint16(const struct cheri_test *ctp);
-void	test_bounds_stack_dynamic_uint32(const struct cheri_test *ctp);
-void	test_bounds_stack_dynamic_uint64(const struct cheri_test *ctp);
-void	test_bounds_stack_dynamic_cap(const struct cheri_test *ctp);
-void	test_bounds_stack_dynamic_16(const struct cheri_test *ctp);
-void	test_bounds_stack_dynamic_32(const struct cheri_test *ctp);
-void	test_bounds_stack_dynamic_64(const struct cheri_test *ctp);
-void	test_bounds_stack_dynamic_128(const struct cheri_test *ctp);
-void	test_bounds_stack_dynamic_256(const struct cheri_test *ctp);
-void	test_bounds_stack_dynamic_512(const struct cheri_test *ctp);
-void	test_bounds_stack_dynamic_1024(const struct cheri_test *ctp);
-void	test_bounds_stack_dynamic_2048(const struct cheri_test *ctp);
-void	test_bounds_stack_dynamic_4096(const struct cheri_test *ctp);
-void	test_bounds_stack_dynamic_8192(const struct cheri_test *ctp);
-void	test_bounds_stack_dynamic_16384(const struct cheri_test *ctp);
-void	test_bounds_stack_dynamic_32768(const struct cheri_test *ctp);
-void	test_bounds_stack_dynamic_65536(const struct cheri_test *ctp);
-void	test_bounds_stack_dynamic_131072(const struct cheri_test *ctp);
-void	test_bounds_stack_dynamic_262144(const struct cheri_test *ctp);
-void	test_bounds_stack_dynamic_524288(const struct cheri_test *ctp);
-void	test_bounds_stack_dynamic_1048576(const struct cheri_test *ctp);
+/**
+ * Like CHERITEST_VERIFY but instead of printing condition details prints
+ * the provided printf-like message @p fmtargs
+ */
+#define CHERITEST_VERIFY2(cond, fmtargs...)		\
+	do { if (!(cond)) { 				\
+		cheritest_failure_errx(fmtargs);	\
+	} } while(0)
+
+/** If @p cond is false fail the test and print the failed condition */
+#define CHERITEST_VERIFY(cond) \
+	CHERITEST_VERIFY2(cond, "%s", "\'" #cond "\' is FALSE!")
+
+/**
+ * Like CHERITEST_CHECK_SYSCALL but instead of printing call details prints
+ * the provided printf-like message @p fmtargs
+ */
+#define CHERITEST_CHECK_SYSCALL2(call, fmtargs...) __extension__({	\
+		__typeof(call) __result = call;				\
+		if (__result == ((__typeof(__result))-1)) {		\
+			cheritest_failure_err(fmtargs);			\
+		}							\
+		__result;						\
+	})
+/**
+ * If result of @p call is equal to -1 fail the test and print the failed call
+ * followed by the string representation of @c errno
+ */
+#define CHERITEST_CHECK_SYSCALL(call) \
+	CHERITEST_CHECK_SYSCALL2(call, "Call \'" #call "\' failed")
+
+#ifdef LIST_ONLY
+#define DECLARE_CHERI_TEST_IMPL(name, args...) \
+	static inline void name(args) {}
+#else
+#define DECLARE_CHERI_TEST_IMPL(name, args...) void name(args)
+#endif
+#define DECLARE_CHERI_TEST_WITH_ARGS(name, args...) \
+	DECLARE_CHERI_TEST_IMPL(name, const struct cheri_test *ctp, args)
+#define DECLARE_CHERI_TEST(name) \
+	DECLARE_CHERI_TEST_IMPL(name, const struct cheri_test *ctp)
+
+
+/* cheritest_bounds_globals.c */
+DECLARE_CHERI_TEST(test_bounds_global_static_uint8);
+DECLARE_CHERI_TEST(test_bounds_global_uint8);
+DECLARE_CHERI_TEST(test_bounds_global_static_uint16);
+DECLARE_CHERI_TEST(test_bounds_global_uint16);
+DECLARE_CHERI_TEST(test_bounds_global_static_uint32);
+DECLARE_CHERI_TEST(test_bounds_global_uint32);
+DECLARE_CHERI_TEST(test_bounds_global_static_uint64);
+DECLARE_CHERI_TEST(test_bounds_global_uint64);
+DECLARE_CHERI_TEST(test_bounds_global_static_uint8_array1);
+DECLARE_CHERI_TEST(test_bounds_global_uint8_array1);
+DECLARE_CHERI_TEST(test_bounds_global_static_uint8_array3);
+DECLARE_CHERI_TEST(test_bounds_global_uint8_array3);
+DECLARE_CHERI_TEST(test_bounds_global_static_uint8_array17);
+DECLARE_CHERI_TEST(test_bounds_global_uint8_array17);
+DECLARE_CHERI_TEST(test_bounds_global_static_uint8_array65537);
+DECLARE_CHERI_TEST(test_bounds_global_uint8_array65537);
+DECLARE_CHERI_TEST(test_bounds_global_static_uint8_array32);
+DECLARE_CHERI_TEST(test_bounds_global_uint8_array32);
+DECLARE_CHERI_TEST(test_bounds_global_static_uint8_array64);
+DECLARE_CHERI_TEST(test_bounds_global_uint8_array64);
+DECLARE_CHERI_TEST(test_bounds_global_static_uint8_array128);
+DECLARE_CHERI_TEST(test_bounds_global_uint8_array128);
+DECLARE_CHERI_TEST(test_bounds_global_static_uint8_array256);
+DECLARE_CHERI_TEST(test_bounds_global_uint8_array256);
+DECLARE_CHERI_TEST(test_bounds_global_static_uint8_array512);
+DECLARE_CHERI_TEST(test_bounds_global_uint8_array512);
+DECLARE_CHERI_TEST(test_bounds_global_static_uint8_array1024);
+DECLARE_CHERI_TEST(test_bounds_global_uint8_array1024);
+DECLARE_CHERI_TEST(test_bounds_global_static_uint8_array2048);
+DECLARE_CHERI_TEST(test_bounds_global_uint8_array2048);
+DECLARE_CHERI_TEST(test_bounds_global_static_uint8_array4096);
+DECLARE_CHERI_TEST(test_bounds_global_uint8_array4096);
+DECLARE_CHERI_TEST(test_bounds_global_static_uint8_array8192);
+DECLARE_CHERI_TEST(test_bounds_global_uint8_array8192);
+DECLARE_CHERI_TEST(test_bounds_global_static_uint8_array16384);
+DECLARE_CHERI_TEST(test_bounds_global_uint8_array16384);
+DECLARE_CHERI_TEST(test_bounds_global_static_uint8_array32768);
+DECLARE_CHERI_TEST(test_bounds_global_uint8_array32768);
+DECLARE_CHERI_TEST(test_bounds_global_static_uint8_array65536);
+DECLARE_CHERI_TEST(test_bounds_global_uint8_array65536);
+
+/* cheritest_bounds_global.c, but dependent on cheritest_bounds_global_x.c */
+DECLARE_CHERI_TEST(test_bounds_extern_global_uint8);
+DECLARE_CHERI_TEST(test_bounds_extern_global_uint16);
+DECLARE_CHERI_TEST(test_bounds_extern_global_uint32);
+DECLARE_CHERI_TEST(test_bounds_extern_global_uint64);
+DECLARE_CHERI_TEST(test_bounds_extern_global_array1);
+DECLARE_CHERI_TEST(test_bounds_extern_global_array7);
+DECLARE_CHERI_TEST(test_bounds_extern_global_array65537);
+DECLARE_CHERI_TEST(test_bounds_extern_global_array16);
+DECLARE_CHERI_TEST(test_bounds_extern_global_array256);
+DECLARE_CHERI_TEST(test_bounds_extern_global_array65536);
+
+/* cheritest_bounds_heap.c */
+DECLARE_CHERI_TEST(test_bounds_calloc);
+
+/* cheritest_bounds_stack.c */
+DECLARE_CHERI_TEST(test_bounds_stack_static_uint8);
+DECLARE_CHERI_TEST(test_bounds_stack_static_uint16);
+DECLARE_CHERI_TEST(test_bounds_stack_static_uint32);
+DECLARE_CHERI_TEST(test_bounds_stack_static_uint64);
+DECLARE_CHERI_TEST(test_bounds_stack_static_cap);
+DECLARE_CHERI_TEST(test_bounds_stack_static_16);
+DECLARE_CHERI_TEST(test_bounds_stack_static_32);
+DECLARE_CHERI_TEST(test_bounds_stack_static_64);
+DECLARE_CHERI_TEST(test_bounds_stack_static_128);
+DECLARE_CHERI_TEST(test_bounds_stack_static_256);
+DECLARE_CHERI_TEST(test_bounds_stack_static_512);
+DECLARE_CHERI_TEST(test_bounds_stack_static_1024);
+DECLARE_CHERI_TEST(test_bounds_stack_static_2048);
+DECLARE_CHERI_TEST(test_bounds_stack_static_4096);
+DECLARE_CHERI_TEST(test_bounds_stack_static_8192);
+DECLARE_CHERI_TEST(test_bounds_stack_static_16384);
+DECLARE_CHERI_TEST(test_bounds_stack_static_32768);
+DECLARE_CHERI_TEST(test_bounds_stack_static_65536);
+DECLARE_CHERI_TEST(test_bounds_stack_static_131072);
+DECLARE_CHERI_TEST(test_bounds_stack_static_262144);
+DECLARE_CHERI_TEST(test_bounds_stack_static_524288);
+DECLARE_CHERI_TEST(test_bounds_stack_static_1048576);
+DECLARE_CHERI_TEST(test_bounds_stack_dynamic_uint8);
+DECLARE_CHERI_TEST(test_bounds_stack_dynamic_uint16);
+DECLARE_CHERI_TEST(test_bounds_stack_dynamic_uint32);
+DECLARE_CHERI_TEST(test_bounds_stack_dynamic_uint64);
+DECLARE_CHERI_TEST(test_bounds_stack_dynamic_cap);
+DECLARE_CHERI_TEST(test_bounds_stack_dynamic_16);
+DECLARE_CHERI_TEST(test_bounds_stack_dynamic_32);
+DECLARE_CHERI_TEST(test_bounds_stack_dynamic_64);
+DECLARE_CHERI_TEST(test_bounds_stack_dynamic_128);
+DECLARE_CHERI_TEST(test_bounds_stack_dynamic_256);
+DECLARE_CHERI_TEST(test_bounds_stack_dynamic_512);
+DECLARE_CHERI_TEST(test_bounds_stack_dynamic_1024);
+DECLARE_CHERI_TEST(test_bounds_stack_dynamic_2048);
+DECLARE_CHERI_TEST(test_bounds_stack_dynamic_4096);
+DECLARE_CHERI_TEST(test_bounds_stack_dynamic_8192);
+DECLARE_CHERI_TEST(test_bounds_stack_dynamic_16384);
+DECLARE_CHERI_TEST(test_bounds_stack_dynamic_32768);
+DECLARE_CHERI_TEST(test_bounds_stack_dynamic_65536);
+DECLARE_CHERI_TEST(test_bounds_stack_dynamic_131072);
+DECLARE_CHERI_TEST(test_bounds_stack_dynamic_262144);
+DECLARE_CHERI_TEST(test_bounds_stack_dynamic_524288);
+DECLARE_CHERI_TEST(test_bounds_stack_dynamic_1048576);
 
 /* cheritest_ccall.c */
 void	cheritest_ccall_setup(void);
-void	test_nofault_ccall_creturn(const struct cheri_test *ctp);
-void	test_nofault_ccall_nop_creturn(const struct cheri_test *ctp);
-void	test_nofault_ccall_dli_creturn(const struct cheri_test *ctp);
-void	test_fault_creturn(const struct cheri_test *ctp);
-void	test_fault_ccall_code_untagged(const struct cheri_test *ctp);
-void	test_fault_ccall_data_untagged(const struct cheri_test *ctp);
-void	test_fault_ccall_code_unsealed(const struct cheri_test *ctp);
-void	test_fault_ccall_data_unsealed(const struct cheri_test *ctp);
-void	test_fault_ccall_typemismatch(const struct cheri_test *ctp);
-void	test_fault_ccall_code_noexecute(const struct cheri_test *ctp);
-void	test_fault_ccall_data_execute(const struct cheri_test *ctp);
+DECLARE_CHERI_TEST(test_nofault_ccall_creturn);
+DECLARE_CHERI_TEST(test_nofault_ccall_nop_creturn);
+DECLARE_CHERI_TEST(test_nofault_ccall_dli_creturn);
+DECLARE_CHERI_TEST(test_fault_creturn);
+DECLARE_CHERI_TEST(test_fault_ccall_code_untagged);
+DECLARE_CHERI_TEST(test_fault_ccall_data_untagged);
+DECLARE_CHERI_TEST(test_fault_ccall_code_unsealed);
+DECLARE_CHERI_TEST(test_fault_ccall_data_unsealed);
+DECLARE_CHERI_TEST(test_fault_ccall_typemismatch);
+DECLARE_CHERI_TEST(test_fault_ccall_code_noexecute);
+DECLARE_CHERI_TEST(test_fault_ccall_data_execute);
 
 /* cheritest_cheriabi.c */
-void	test_cheriabi_mmap_perms(const struct cheri_test *ctp);
+DECLARE_CHERI_TEST(test_cheriabi_mmap_nospace);
+DECLARE_CHERI_TEST(test_cheriabi_mmap_perms);
+DECLARE_CHERI_TEST(test_cheriabi_mmap_unrepresentable);
+DECLARE_CHERI_TEST(test_cheriabi_mmap_ddc);
+
+/* cheritest_cheriabi_open.c */
+DECLARE_CHERI_TEST(test_cheriabi_open_ordinary);
+DECLARE_CHERI_TEST(test_cheriabi_open_offset);
+DECLARE_CHERI_TEST(test_cheriabi_open_shortened);
+DECLARE_CHERI_TEST(test_cheriabi_open_bad_addr);
+DECLARE_CHERI_TEST(test_cheriabi_open_bad_addr_2);
+DECLARE_CHERI_TEST(test_cheriabi_open_bad_len);
+DECLARE_CHERI_TEST(test_cheriabi_open_bad_len_2);
+DECLARE_CHERI_TEST(test_cheriabi_open_bad_tag);
+DECLARE_CHERI_TEST(test_cheriabi_open_bad_perm);
+DECLARE_CHERI_TEST(test_cheriabi_open_sealed);
 
 /* cheritest_fault.c */
-void	test_fault_bounds(const struct cheri_test *ctp);
-void	test_fault_cgetcause(const struct cheri_test *ctp);
-void	test_nofault_cfromptr(const struct cheri_test *ctp);
-void	test_fault_perm_load(const struct cheri_test *ctp);
-void	test_nofault_perm_load(const struct cheri_test *ctp);
-void	test_fault_perm_store(const struct cheri_test *ctp);
-void	test_nofault_perm_store(const struct cheri_test *ctp);
-void	test_fault_tag(const struct cheri_test *ctp);
-void	test_fault_ccheck_user_fail(const struct cheri_test *ctp);
-void	test_fault_read_kr1c(const struct cheri_test *ctp);
-void	test_fault_read_kr2c(const struct cheri_test *ctp);
-void	test_fault_read_kcc(const struct cheri_test *ctp);
-void	test_fault_read_kdc(const struct cheri_test *ctp);
-void	test_fault_read_epcc(const struct cheri_test *ctp);
-void	test_nofault_ccheck_user_pass(const struct cheri_test *ctp);
-
-void	test_sandbox_cp2_bound_catch(const struct cheri_test *ctp);
-void	test_sandbox_cp2_bound_nocatch(const struct cheri_test *ctp);
-void	test_sandbox_cp2_perm_load_catch(const struct cheri_test *ctp);
-void	test_sandbox_cp2_perm_load_nocatch(const struct cheri_test *ctp);
-void	test_sandbox_cp2_perm_store_catch(const struct cheri_test *ctp);
-void	test_sandbox_cp2_perm_store_nocatch(const struct cheri_test *ctp);
-void	test_sandbox_cp2_tag_catch(const struct cheri_test *ctp);
-void	test_sandbox_cp2_tag_nocatch(const struct cheri_test *ctp);
-void	test_sandbox_cp2_seal_catch(const struct cheri_test *ctp);
-void	test_sandbox_cp2_seal_nocatch(const struct cheri_test *ctp);
-void	test_sandbox_divzero_catch(const struct cheri_test *ctp);
-void	test_sandbox_divzero_nocatch(const struct cheri_test *ctp);
-void	test_sandbox_vm_rfault_catch(const struct cheri_test *ctp);
-void	test_sandbox_vm_rfault_nocatch(const struct cheri_test *ctp);
-void	test_sandbox_vm_wfault_catch(const struct cheri_test *ctp);
-void	test_sandbox_vm_wfault_nocatch(const struct cheri_test *ctp);
-void	test_sandbox_vm_xfault_catch(const struct cheri_test *ctp);
-void	test_sandbox_vm_xfault_nocatch(const struct cheri_test *ctp);
+DECLARE_CHERI_TEST(test_fault_bounds);
+DECLARE_CHERI_TEST(test_fault_cgetcause);
+DECLARE_CHERI_TEST(test_nofault_cfromptr);
+DECLARE_CHERI_TEST(test_fault_perm_load);
+DECLARE_CHERI_TEST(test_nofault_perm_load);
+DECLARE_CHERI_TEST(test_fault_perm_seal);
+DECLARE_CHERI_TEST(test_fault_perm_store);
+DECLARE_CHERI_TEST(test_nofault_perm_store);
+DECLARE_CHERI_TEST(test_fault_perm_unseal);
+DECLARE_CHERI_TEST(test_fault_tag);
+DECLARE_CHERI_TEST(test_fault_ccheck_user_fail);
+DECLARE_CHERI_TEST(test_fault_read_kr1c);
+DECLARE_CHERI_TEST(test_fault_read_kr2c);
+DECLARE_CHERI_TEST(test_fault_read_kcc);
+DECLARE_CHERI_TEST(test_fault_read_kdc);
+DECLARE_CHERI_TEST(test_fault_read_epcc);
+DECLARE_CHERI_TEST(test_nofault_ccheck_user_pass);
 
 /* cheritest_fd.c */
 #define	CHERITEST_FD_READ_STR	"read123"
 #define	CHERITEST_FD_WRITE_STR	"write123"
 
 extern int			 zero_fd;
-extern struct cheri_object	 stdin_fd_object;
-extern struct cheri_object	 stdout_fd_object;
-extern struct cheri_object	 zero_fd_object;
 
-void	test_sandbox_fd_fstat(const struct cheri_test *ctp);
-void	test_sandbox_fd_lseek(const struct cheri_test *ctp);
-void	test_sandbox_fd_read(const struct cheri_test *ctp);
-void	test_sandbox_fd_read_revoke(const struct cheri_test *ctp);
-void	test_sandbox_fd_write(const struct cheri_test *ctp);
-void	test_sandbox_fd_write_revoke(const struct cheri_test *ctp);
+extern struct sandbox_object	*sbop_stdin;
+extern struct sandbox_object	*sbop_stdout;
+extern struct sandbox_object	*sbop_zero;
+
+DECLARE_CHERI_TEST(test_sandbox_fd_fstat);
+DECLARE_CHERI_TEST(test_sandbox_fd_lseek);
+DECLARE_CHERI_TEST(test_sandbox_fd_read);
+DECLARE_CHERI_TEST(test_sandbox_fd_read_revoke);
+DECLARE_CHERI_TEST(test_sandbox_fd_write);
+DECLARE_CHERI_TEST(test_sandbox_fd_write_revoke);
+
+/* cheritest_kbounce.c */
+DECLARE_CHERI_TEST(test_kbounce);
 
 /* cheritest_libcheri.c */
 extern struct sandbox_class	*cheritest_classp;
 extern struct sandbox_object	*cheritest_objectp;
 
-void	test_sandbox_abort(const struct cheri_test *ctp);
-void	test_sandbox_cs_calloc(const struct cheri_test *ctp);
-void	test_sandbox_cs_clock_gettime(const struct cheri_test *ctp);
-void	test_sandbox_cs_helloworld(const struct cheri_test *ctp);
-void	test_sandbox_cs_putchar(const struct cheri_test *ctp);
-void	test_sandbox_cs_puts(const struct cheri_test *ctp);
-void	test_sandbox_malloc(const struct cheri_test *ctp);
-void	test_sandbox_md5_ccall(const struct cheri_test *ctp, int class2);
-void	test_sandbox_printf(const struct cheri_test *ctp);
-void	test_sandbox_ptrdiff(const struct cheri_test *ctp);
-void	test_sandbox_varargs(const struct cheri_test *ctp);
-void	test_sandbox_va_copy(const struct cheri_test *ctp);
-void	test_sandbox_spin(const struct cheri_test *ctp);
-void	test_sandbox_userfn(const struct cheri_test *ctp);
-void	test_2sandbox_newdestroy(const struct cheri_test *ctp);
+DECLARE_CHERI_TEST(test_sandbox_abort);
+DECLARE_CHERI_TEST(test_sandbox_cs_calloc);
+DECLARE_CHERI_TEST(test_sandbox_cs_clock_gettime);
+DECLARE_CHERI_TEST(test_sandbox_cs_clock_gettime_default);
+DECLARE_CHERI_TEST(test_sandbox_cs_clock_gettime_deny);
+DECLARE_CHERI_TEST(test_sandbox_cs_helloworld);
+DECLARE_CHERI_TEST(test_sandbox_cs_putchar);
+DECLARE_CHERI_TEST(test_sandbox_cs_puts);
+DECLARE_CHERI_TEST(test_sandbox_cxx_exception);
+DECLARE_CHERI_TEST(test_sandbox_cxx_no_exception);
+DECLARE_CHERI_TEST(test_sandbox_malloc);
+DECLARE_CHERI_TEST_WITH_ARGS(test_sandbox_md5_ccall, int class2);
+DECLARE_CHERI_TEST(test_sandbox_printf);
+DECLARE_CHERI_TEST(test_sandbox_ptrdiff);
+DECLARE_CHERI_TEST(test_sandbox_varargs);
+DECLARE_CHERI_TEST(test_sandbox_va_copy);
+DECLARE_CHERI_TEST(test_sandbox_spin);
+DECLARE_CHERI_TEST(test_sandbox_userfn);
+DECLARE_CHERI_TEST(test_2sandbox_newdestroy);
 int	cheritest_libcheri_setup(void);
 void	cheritest_libcheri_destroy(void);
 
-/* cheritest_local.c */
-void	test_sandbox_store_global_capability_in_bss(
-	    const struct cheri_test *ctp);
-void	test_sandbox_store_local_capability_in_bss_catch(
-	    const struct cheri_test *ctp);
-void	test_sandbox_store_local_capability_in_bss_nocatch(
-	    const struct cheri_test *ctp);
-void	test_sandbox_store_global_capability_in_stack(
-	    const struct cheri_test *ctp);
-void	test_sandbox_store_local_capability_in_stack(
-	    const struct cheri_test *ctp);
-void	test_sandbox_return_global_capability(const struct cheri_test *ctp);
-void	test_sandbox_return_local_capability_catch(
-	    const struct cheri_test *ctp);
-void	test_sandbox_return_local_capability_nocatch(
-	    const struct cheri_test *ctp);
-void	test_sandbox_pass_local_capability_arg(const struct cheri_test *ctp);
+/* cheritest_libcheritest_fault.c */
+DECLARE_CHERI_TEST(test_sandbox_cp2_bound_catch);
+DECLARE_CHERI_TEST(test_sandbox_cp2_bound_nocatch);
+DECLARE_CHERI_TEST(test_sandbox_cp2_bound_nocatch_noaltstack);
+DECLARE_CHERI_TEST(test_sandbox_cp2_perm_load_catch);
+DECLARE_CHERI_TEST(test_sandbox_cp2_perm_load_nocatch);
+DECLARE_CHERI_TEST(test_sandbox_cp2_perm_store_catch);
+DECLARE_CHERI_TEST(test_sandbox_cp2_perm_store_nocatch);
+DECLARE_CHERI_TEST(test_sandbox_cp2_tag_catch);
+DECLARE_CHERI_TEST(test_sandbox_cp2_tag_nocatch);
+DECLARE_CHERI_TEST(test_sandbox_cp2_seal_catch);
+DECLARE_CHERI_TEST(test_sandbox_cp2_seal_nocatch);
+DECLARE_CHERI_TEST(test_sandbox_divzero_catch);
+DECLARE_CHERI_TEST(test_sandbox_divzero_nocatch);
+DECLARE_CHERI_TEST(test_sandbox_vm_rfault_catch);
+DECLARE_CHERI_TEST(test_sandbox_vm_rfault_nocatch);
+DECLARE_CHERI_TEST(test_sandbox_vm_wfault_catch);
+DECLARE_CHERI_TEST(test_sandbox_vm_wfault_nocatch);
+DECLARE_CHERI_TEST(test_sandbox_vm_xfault_catch);
+DECLARE_CHERI_TEST(test_sandbox_vm_xfault_nocatch);
 
-/* cheritest_stack.c */
+/* cheritest_libcheri_local.c */
+DECLARE_CHERI_TEST(test_sandbox_store_global_capability_in_bss);
+DECLARE_CHERI_TEST(test_sandbox_store_local_capability_in_bss_catch);
+DECLARE_CHERI_TEST(test_sandbox_store_local_capability_in_bss_nocatch);
+DECLARE_CHERI_TEST(test_sandbox_store_global_capability_in_stack);
+DECLARE_CHERI_TEST(test_sandbox_store_local_capability_in_stack);
+DECLARE_CHERI_TEST(test_sandbox_return_global_capability);
+DECLARE_CHERI_TEST(test_sandbox_return_local_capability);
+DECLARE_CHERI_TEST(test_sandbox_pass_local_capability_arg);
+
+/* cheritest_libcheri_pthreads.c */
+DECLARE_CHERI_TEST(test_sandbox_pthread_abort);
+DECLARE_CHERI_TEST(test_sandbox_pthread_cs_helloworld);
+
+/* cheritest_libcheri_trustedstack.c */
 register_t	cheritest_libcheri_userfn_getstack(void);
 register_t	cheritest_libcheri_userfn_setstack(register_t arg);
-void	test_sandbox_getstack(const struct cheri_test *ctp);
-void	test_sandbox_setstack(const struct cheri_test *ctp);
-void	test_sandbox_setstack_nop(const struct cheri_test *ctp);
+DECLARE_CHERI_TEST(test_sandbox_getstack);
+DECLARE_CHERI_TEST(test_sandbox_setstack);
+DECLARE_CHERI_TEST(test_sandbox_setstack_nop);
+DECLARE_CHERI_TEST(test_sandbox_trustedstack_underflow);
+
+/* cheritest_libcheri_var.c */
+DECLARE_CHERI_TEST(test_sandbox_var_bss);
+DECLARE_CHERI_TEST(test_sandbox_var_data);
+DECLARE_CHERI_TEST(test_sandbox_var_data_getset);
+DECLARE_CHERI_TEST(test_2sandbox_var_data_getset);
+DECLARE_CHERI_TEST(test_sandbox_var_constructor);
+
+/* cheritest_longjmp.c */
+DECLARE_CHERI_TEST(cheritest_setjmp);
+DECLARE_CHERI_TEST(cheritest_setjmp_longjmp);
+
+/* cheritest_sealcap.c */
+DECLARE_CHERI_TEST(test_sealcap_sysarch);
+DECLARE_CHERI_TEST(test_sealcap_seal);
+DECLARE_CHERI_TEST(test_sealcap_seal_unseal);
 
 /* cheritest_string.c */
-void	test_string_memcpy(const struct cheri_test *ctp);
-void	test_string_memcpy_c(const struct cheri_test *ctp);
-void	test_string_memmove(const struct cheri_test *ctp);
-void	test_string_memmove_c(const struct cheri_test *ctp);
+DECLARE_CHERI_TEST(test_string_kern_memcpy_c);
+DECLARE_CHERI_TEST(test_string_kern_memmove_c);
+DECLARE_CHERI_TEST(test_string_memcpy);
+DECLARE_CHERI_TEST(test_string_memcpy_c);
+DECLARE_CHERI_TEST(test_string_memmove);
+DECLARE_CHERI_TEST(test_string_memmove_c);
 
 /* cheritest_syscall.c */
-void	test_sandbox_syscall(const struct cheri_test *ctp);
+DECLARE_CHERI_TEST(test_sandbox_syscall);
 
 /* cheritest_registers.c */
-void	test_initregs_default(const struct cheri_test *ctp);
-void	test_initregs_stack(const struct cheri_test *ctp);
-void	test_initregs_idc(const struct cheri_test *ctp);
-void	test_initregs_pcc(const struct cheri_test *ctp);
-void	test_copyregs(const struct cheri_test *ctp);
-void	test_listregs(const struct cheri_test *ctp);
+DECLARE_CHERI_TEST(test_initregs_default);
+#ifdef __CHERI_PURE_CAPABILITY__
+DECLARE_CHERI_TEST(test_initregs_stack);
+#endif
+DECLARE_CHERI_TEST(test_initregs_idc);
+DECLARE_CHERI_TEST(test_initregs_pcc);
+DECLARE_CHERI_TEST(test_copyregs);
+DECLARE_CHERI_TEST(test_listregs);
 
-/* cheritest_var.c */
-void	test_sandbox_var_bss(const struct cheri_test *ctp);
-void	test_sandbox_var_data(const struct cheri_test *ctp);
-void	test_sandbox_var_data_getset(const struct cheri_test *ctp);
-void	test_2sandbox_var_data_getset(const struct cheri_test *ctp);
-void	test_sandbox_var_constructor(const struct cheri_test *ctp);
+/* cheritest_tls.c */
+DECLARE_CHERI_TEST(test_tls_align_4k);
+DECLARE_CHERI_TEST(test_tls_align_cap);
+DECLARE_CHERI_TEST(test_tls_align_ptr);
 
 /* cheritest_vm.c */
-void	cheritest_vm_tag_mmap_anon(const struct cheri_test *ctp __unused);
-void	cheritest_vm_tag_shm_open_anon_shared(const struct cheri_test *ctp
-	    __unused);
-void	cheritest_vm_tag_shm_open_anon_private(const struct cheri_test *ctp
-	    __unused);
-void	cheritest_vm_tag_dev_zero_shared(const struct cheri_test *ctp
-	    __unused);
-void	cheritest_vm_tag_dev_zero_private(const struct cheri_test *ctp
-	    __unused);
-void	cheritest_vm_notag_tmpfile_shared(const struct cheri_test *ctp __unused);
-void	cheritest_vm_tag_tmpfile_private(const struct cheri_test *ctp __unused);
-void	cheritest_vm_tag_tmpfile_private_prefault(const struct cheri_test *ctp
-	    __unused);
-void	cheritest_vm_cow_read(const struct cheri_test *ctp);
-void	cheritest_vm_cow_write(const struct cheri_test *ctp);
+DECLARE_CHERI_TEST(cheritest_vm_tag_mmap_anon);;
+DECLARE_CHERI_TEST(cheritest_vm_tag_shm_open_anon_shared);
+DECLARE_CHERI_TEST(cheritest_vm_tag_shm_open_anon_private);
+DECLARE_CHERI_TEST(cheritest_vm_tag_dev_zero_shared);
+DECLARE_CHERI_TEST(cheritest_vm_tag_dev_zero_private);
+DECLARE_CHERI_TEST(cheritest_vm_notag_tmpfile_shared);
+DECLARE_CHERI_TEST(cheritest_vm_tag_tmpfile_private);
+DECLARE_CHERI_TEST(cheritest_vm_tag_tmpfile_private_prefault);
+DECLARE_CHERI_TEST(cheritest_vm_cow_read);
+DECLARE_CHERI_TEST(cheritest_vm_cow_write);
 const char	*xfail_need_writable_tmp(const char *name);
+const char	*xfail_need_writable_non_tmpfs_tmp(const char *name);
 
 /* cheritest_vm_swap.c */
-void	cheritest_vm_swap(const struct cheri_test *ctp __unused);
+DECLARE_CHERI_TEST(cheritest_vm_swap);
 const char	*xfail_swap_required(const char *name);
 
 /* cheritest_zlib.c */
-void	test_deflate_zeroes(const struct cheri_test *ctp);
-void	test_inflate_zeroes(const struct cheri_test *ctp);
-void 	test_sandbox_inflate_zeroes(const struct cheri_test *ctp);
+DECLARE_CHERI_TEST(test_deflate_zeroes);
+DECLARE_CHERI_TEST(test_inflate_zeroes);
+DECLARE_CHERI_TEST(test_sandbox_inflate_zeroes);
 
 #ifdef CHERI_C_TESTS
 #define DECLARE_TEST(name, desc) \

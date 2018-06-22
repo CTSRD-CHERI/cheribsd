@@ -1,6 +1,8 @@
 /* $FreeBSD$ */
 /*	$NetBSD: hid.c,v 1.17 2001/11/13 06:24:53 lukem Exp $	*/
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ *
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -354,7 +356,8 @@ hid_get_item(struct hid_data *s, struct hid_item *h)
 					/* range check usage count */
 					if (c->loc.count > 255) {
 						DPRINTFN(0, "Number of "
-						    "items truncated to 255\n");
+						    "items(%u) truncated to 255\n",
+						    (unsigned)(c->loc.count));
 						s->ncount = 255;
 					} else
 						s->ncount = c->loc.count;
@@ -575,7 +578,7 @@ hid_report_size(const void *buf, usb_size_t len, enum hid_kind k, uint8_t *id)
 
 	for (d = hid_start_parse(buf, len, 1 << k); hid_get_item(d, &h);) {
 		if (h.kind == k) {
-			/* check for ID-byte presense */
+			/* check for ID-byte presence */
 			if ((h.report_ID != 0) && !any_id) {
 				if (id != NULL)
 					*id = h.report_ID;
@@ -845,6 +848,80 @@ usbd_req_get_hid_desc(struct usb_device *udev, struct mtx *mtx,
 		return (err);
 	}
 	return (USB_ERR_NORMAL_COMPLETION);
+}
+
+/*------------------------------------------------------------------------*
+ * calculate HID item resolution. unit/mm for distances, unit/rad for angles
+ *------------------------------------------------------------------------*/
+int32_t
+hid_item_resolution(struct hid_item *hi)
+{
+	/*
+	 * hid unit scaling table according to HID Usage Table Review
+	 * Request 39 Tbl 17 http://www.usb.org/developers/hidpage/HUTRR39b.pdf
+	 */
+	static const int64_t scale[0x10][2] = {
+	    [0x00] = { 1, 1 },
+	    [0x01] = { 1, 10 },
+	    [0x02] = { 1, 100 },
+	    [0x03] = { 1, 1000 },
+	    [0x04] = { 1, 10000 },
+	    [0x05] = { 1, 100000 },
+	    [0x06] = { 1, 1000000 },
+	    [0x07] = { 1, 10000000 },
+	    [0x08] = { 100000000, 1 },
+	    [0x09] = { 10000000, 1 },
+	    [0x0A] = { 1000000, 1 },
+	    [0x0B] = { 100000, 1 },
+	    [0x0C] = { 10000, 1 },
+	    [0x0D] = { 1000, 1 },
+	    [0x0E] = { 100, 1 },
+	    [0x0F] = { 10, 1 },
+	};
+	int64_t logical_size;
+	int64_t physical_size;
+	int64_t multiplier;
+	int64_t divisor;
+	int64_t resolution;
+
+	switch (hi->unit) {
+	case HUM_CENTIMETER:
+		multiplier = 1;
+		divisor = 10;
+		break;
+	case HUM_INCH:
+		multiplier = 10;
+		divisor = 254;
+		break;
+	case HUM_RADIAN:
+		multiplier = 1;
+		divisor = 1;
+		break;
+	case HUM_DEGREE:
+		multiplier = 573;
+		divisor = 10;
+		break;
+	default:
+		return (0);
+	}
+
+	if ((hi->logical_maximum <= hi->logical_minimum) ||
+	    (hi->physical_maximum <= hi->physical_minimum) ||
+	    (hi->unit_exponent < 0) || (hi->unit_exponent >= nitems(scale)))
+		return (0);
+
+	logical_size = (int64_t)hi->logical_maximum -
+	    (int64_t)hi->logical_minimum;
+	physical_size = (int64_t)hi->physical_maximum -
+	    (int64_t)hi->physical_minimum;
+	/* Round to ceiling */
+	resolution = logical_size * multiplier * scale[hi->unit_exponent][0] /
+	    (physical_size * divisor * scale[hi->unit_exponent][1]);
+
+	if (resolution > INT32_MAX)
+		return (0);
+
+	return (resolution);
 }
 
 /*------------------------------------------------------------------------*

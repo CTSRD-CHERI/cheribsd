@@ -11,6 +11,7 @@
 #define LLVM_CLANG_DRIVER_JOB_H
 
 #include "clang/Basic/LLVM.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/iterator.h"
 #include "llvm/Option/Option.h"
@@ -25,6 +26,7 @@ namespace driver {
 class Action;
 class Command;
 class Tool;
+class InputInfo;
 
 // Re-export this as clang::driver::ArgStringList.
 using llvm::opt::ArgStringList;
@@ -53,6 +55,9 @@ class Command {
   /// argument, which will be the executable).
   llvm::opt::ArgStringList Arguments;
 
+  /// The list of program arguments which are inputs.
+  llvm::opt::ArgStringList InputFilenames;
+
   /// Response file name, if this command is set to use one, or nullptr
   /// otherwise
   const char *ResponseFile;
@@ -64,6 +69,9 @@ class Command {
   /// String storage if we need to create a new argument to specify a response
   /// file
   std::string ResponseFileFlag;
+
+  /// See Command::setEnvironment
+  std::vector<const char *> Environment;
 
   /// When a response file is needed, we try to put most arguments in an
   /// exclusive file, while others remains as regular command line arguments.
@@ -79,7 +87,11 @@ class Command {
 
 public:
   Command(const Action &Source, const Tool &Creator, const char *Executable,
-          const llvm::opt::ArgStringList &Arguments);
+          const llvm::opt::ArgStringList &Arguments,
+          ArrayRef<InputInfo> Inputs);
+  // FIXME: This really shouldn't be copyable, but is currently copied in some
+  // error handling in Driver::generateCompilationDiagnostics.
+  Command(const Command &) = default;
   virtual ~Command() {}
 
   virtual void Print(llvm::raw_ostream &OS, const char *Terminator, bool Quote,
@@ -103,12 +115,18 @@ public:
     InputFileList = std::move(List);
   }
 
+  /// \brief Sets the environment to be used by the new process.
+  /// \param NewEnvironment An array of environment variables.
+  /// \remark If the environment remains unset, then the environment
+  ///         from the parent process will be used.
+  void setEnvironment(llvm::ArrayRef<const char *> NewEnvironment);
+
   const char *getExecutable() const { return Executable; }
 
   const llvm::opt::ArgStringList &getArguments() const { return Arguments; }
 
   /// Print a command argument, and optionally quote it.
-  static void printArg(llvm::raw_ostream &OS, const char *Arg, bool Quote);
+  static void printArg(llvm::raw_ostream &OS, StringRef Arg, bool Quote);
 };
 
 /// Like Command, but with a fallback which is executed in case
@@ -117,6 +135,7 @@ class FallbackCommand : public Command {
 public:
   FallbackCommand(const Action &Source_, const Tool &Creator_,
                   const char *Executable_, const ArgStringList &Arguments_,
+                  ArrayRef<InputInfo> Inputs,
                   std::unique_ptr<Command> Fallback_);
 
   void Print(llvm::raw_ostream &OS, const char *Terminator, bool Quote,
@@ -127,6 +146,20 @@ public:
 
 private:
   std::unique_ptr<Command> Fallback;
+};
+
+/// Like Command, but always pretends that the wrapped command succeeded.
+class ForceSuccessCommand : public Command {
+public:
+  ForceSuccessCommand(const Action &Source_, const Tool &Creator_,
+                      const char *Executable_, const ArgStringList &Arguments_,
+                      ArrayRef<InputInfo> Inputs);
+
+  void Print(llvm::raw_ostream &OS, const char *Terminator, bool Quote,
+             CrashReportInfo *CrashInfo = nullptr) const override;
+
+  int Execute(const StringRef **Redirects, std::string *ErrMsg,
+              bool *ExecutionFailed) const override;
 };
 
 /// JobList - A sequence of jobs to perform.
@@ -152,6 +185,7 @@ public:
 
   const list_type &getJobs() const { return Jobs; }
 
+  bool empty() const { return Jobs.empty(); }
   size_type size() const { return Jobs.size(); }
   iterator begin() { return Jobs.begin(); }
   const_iterator begin() const { return Jobs.begin(); }

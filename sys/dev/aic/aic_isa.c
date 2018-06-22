@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1999 Luoqi Chen.
  * All rights reserved.
  *
@@ -57,7 +59,8 @@ static int aic_isa_probe(device_t);
 static int aic_isa_attach(device_t);
 
 static u_int aic_isa_ports[] = { 0x340, 0x140 };
-#define	AIC_ISA_NUMPORTS (sizeof(aic_isa_ports) / sizeof(aic_isa_ports[0]))
+
+#define	AIC_ISA_NUMPORTS nitems(aic_isa_ports)
 #define	AIC_ISA_PORTSIZE 0x20
 
 static struct isa_pnp_id aic_ids[] = {
@@ -75,8 +78,8 @@ aic_isa_alloc_resources(device_t dev)
 	sc->sc_port = sc->sc_irq = sc->sc_drq = NULL;
 
 	rid = 0;
-	sc->sc_port = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
-					0ul, ~0ul, AIC_ISA_PORTSIZE, RF_ACTIVE);
+	sc->sc_port = bus_alloc_resource_anywhere(dev, SYS_RES_IOPORT, &rid,
+						AIC_ISA_PORTSIZE, RF_ACTIVE);
 	if (!sc->sc_port) {
 		device_printf(dev, "I/O port allocation failed\n");
 		return (ENOMEM);
@@ -239,3 +242,4 @@ extern devclass_t aic_devclass;
 
 MODULE_DEPEND(aic, cam, 1,1,1);
 DRIVER_MODULE(aic, isa, aic_isa_driver, aic_devclass, 0, 0);
+ISA_PNP_INFO(aic_ids);

@@ -63,7 +63,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/vmparam.h>
 #include <vm/vm.h>
 #include <vm/pmap.h>
-#include <machine/pmap.h>
 
 #include <machine/metadata.h>
 #include <machine/nexusvar.h>
@@ -76,11 +75,7 @@ __FBSDID("$FreeBSD$");
 
 #ifdef DEV_ISA
 #include <isa/isavar.h>
-#ifdef PC98
-#include <pc98/cbus/cbus.h>
-#else
 #include <isa/isareg.h>
-#endif
 #endif
 #include <sys/rtprio.h>
 
@@ -115,6 +110,12 @@ static	int nexus_activate_resource(device_t, device_t, int, int,
 				    struct resource *);
 static	int nexus_deactivate_resource(device_t, device_t, int, int,
 				      struct resource *);
+static	int nexus_map_resource(device_t bus, device_t child, int type,
+    			       struct resource *r,
+			       struct resource_map_request *argsp,
+			       struct resource_map *map);
+static	int nexus_unmap_resource(device_t bus, device_t child, int type,
+				 struct resource *r, struct resource_map *map);
 static	int nexus_release_resource(device_t, device_t, int, int,
 				   struct resource *);
 static	int nexus_setup_intr(device_t, device_t, struct resource *, int flags,
@@ -128,6 +129,8 @@ static	int nexus_set_resource(device_t, device_t, int, int,
 static	int nexus_get_resource(device_t, device_t, int, int,
 			       rman_res_t *, rman_res_t *);
 static void nexus_delete_resource(device_t, device_t, int, int);
+static	int nexus_get_cpus(device_t, device_t, enum cpu_sets, size_t,
+			   cpuset_t *);
 #ifdef DEV_APIC
 static	int nexus_alloc_msi(device_t pcib, device_t dev, int count, int maxcount, int *irqs);
 static	int nexus_release_msi(device_t pcib, device_t dev, int count, int *irqs);
@@ -153,6 +156,8 @@ static device_method_t nexus_methods[] = {
 	DEVMETHOD(bus_release_resource,	nexus_release_resource),
 	DEVMETHOD(bus_activate_resource, nexus_activate_resource),
 	DEVMETHOD(bus_deactivate_resource, nexus_deactivate_resource),
+	DEVMETHOD(bus_map_resource,	nexus_map_resource),
+	DEVMETHOD(bus_unmap_resource,	nexus_unmap_resource),
 	DEVMETHOD(bus_setup_intr,	nexus_setup_intr),
 	DEVMETHOD(bus_teardown_intr,	nexus_teardown_intr),
 #ifdef SMP
@@ -164,6 +169,7 @@ static device_method_t nexus_methods[] = {
 	DEVMETHOD(bus_set_resource,	nexus_set_resource),
 	DEVMETHOD(bus_get_resource,	nexus_get_resource),
 	DEVMETHOD(bus_delete_resource,	nexus_delete_resource),
+	DEVMETHOD(bus_get_cpus,		nexus_get_cpus),
 
 	/* pcib interface */
 #ifdef DEV_APIC
@@ -200,7 +206,7 @@ nexus_init_resources(void)
 	 *
 	 * - IRQ resource creation should be moved to the PIC/APIC driver.
 	 * - DRQ resource creation should be moved to the DMAC driver.
-	 * - The above should be sorted to probe earlier than any child busses.
+	 * - The above should be sorted to probe earlier than any child buses.
 	 *
 	 * - Leave I/O and memory creation here, as child probes may need them.
 	 *   (especially eg. ACPI)
@@ -235,11 +241,7 @@ nexus_init_resources(void)
 	 * multiple bridges.  (eg: laptops with docking stations)
 	 */
 	drq_rman.rm_start = 0;
-#ifdef PC98
-	drq_rman.rm_end = 3;
-#else
 	drq_rman.rm_end = 7;
-#endif
 	drq_rman.rm_type = RMAN_ARRAY;
 	drq_rman.rm_descr = "DMA request lines";
 	/* XXX drq 0 not available on some machines */
@@ -262,11 +264,15 @@ nexus_init_resources(void)
 		panic("nexus_init_resources port_rman");
 
 	mem_rman.rm_start = 0;
-	mem_rman.rm_end = ~0ul;
+#ifndef PAE
+	mem_rman.rm_end = BUS_SPACE_MAXADDR;
+#else
+	mem_rman.rm_end = ((1ULL << cpu_maxphyaddr) - 1);
+#endif
 	mem_rman.rm_type = RMAN_ARRAY;
 	mem_rman.rm_descr = "I/O memory addresses";
 	if (rman_init(&mem_rman)
-	    || rman_manage_region(&mem_rman, 0, ~0))
+	    || rman_manage_region(&mem_rman, 0, mem_rman.rm_end))
 		panic("nexus_init_resources mem_rman");
 }
 
@@ -298,9 +304,9 @@ nexus_print_all_resources(device_t dev)
 	if (STAILQ_FIRST(rl))
 		retval += printf(" at");
 
-	retval += resource_list_print_type(rl, "port", SYS_RES_IOPORT, "%#lx");
-	retval += resource_list_print_type(rl, "iomem", SYS_RES_MEMORY, "%#lx");
-	retval += resource_list_print_type(rl, "irq", SYS_RES_IRQ, "%ld");
+	retval += resource_list_print_type(rl, "port", SYS_RES_IOPORT, "%#jx");
+	retval += resource_list_print_type(rl, "iomem", SYS_RES_MEMORY, "%#jx");
+	retval += resource_list_print_type(rl, "irq", SYS_RES_IRQ, "%jd");
 
 	return retval;
 }
@@ -377,7 +383,7 @@ nexus_alloc_resource(device_t bus, device_t child, int type, int *rid,
 	 * (ie. they aren't maintained by a child bus), then work out
 	 * the start/end values.
 	 */
-	if ((start == 0UL) && (end == ~0UL) && (count == 1)) {
+	if (RMAN_IS_DEFAULT_RANGE(start, end) && (count == 1)) {
 		if (device_get_parent(child) != bus || ndev == NULL)
 			return(NULL);
 		rle = resource_list_find(&ndev->nx_resources, type, *rid);
@@ -394,7 +400,7 @@ nexus_alloc_resource(device_t bus, device_t child, int type, int *rid,
 		return (NULL);
 
 	rv = rman_reserve_resource(rm, start, end, count, flags, child);
-	if (rv == 0)
+	if (rv == NULL)
 		return 0;
 	rman_set_rid(rv, *rid);
 
@@ -426,71 +432,121 @@ static int
 nexus_activate_resource(device_t bus, device_t child, int type, int rid,
 			struct resource *r)
 {
-#ifdef PC98
-	bus_space_handle_t bh;
+	struct resource_map map;
 	int error;
-#endif
-	void *vaddr;
 
-	/*
-	 * If this is a memory resource, map it into the kernel.
-	 */
-	switch (type) {
-	case SYS_RES_IOPORT:
-#ifdef PC98
-		error = i386_bus_space_handle_alloc(X86_BUS_SPACE_IO,
-		    rman_get_start(r), rman_get_size(r), &bh);
-		if (error)
+	error = rman_activate_resource(r);
+	if (error != 0)
+		return (error);
+
+	if (!(rman_get_flags(r) & RF_UNMAPPED) &&
+	    (type == SYS_RES_MEMORY || type == SYS_RES_IOPORT)) {
+		error = nexus_map_resource(bus, child, type, r, NULL, &map);
+		if (error) {
+			rman_deactivate_resource(r);
 			return (error);
-		rman_set_bushandle(r, bh);
-#else
-		rman_set_bushandle(r, rman_get_start(r));
-#endif
-		rman_set_bustag(r, X86_BUS_SPACE_IO);
-		break;
-	case SYS_RES_MEMORY:
-#ifdef PC98
-		error = i386_bus_space_handle_alloc(X86_BUS_SPACE_MEM,
-		    rman_get_start(r), rman_get_size(r), &bh);
-		if (error)
-			return (error);
-#endif
-		vaddr = pmap_mapdev(rman_get_start(r), rman_get_size(r));
-		rman_set_virtual(r, vaddr);
-		rman_set_bustag(r, X86_BUS_SPACE_MEM);
-#ifdef PC98
-		/* PC-98: the type of bus_space_handle_t is the structure. */
-		bh->bsh_base = (bus_addr_t) vaddr;
-		rman_set_bushandle(r, bh);
-#else
-		/* IBM-PC: the type of bus_space_handle_t is u_int */
-		rman_set_bushandle(r, (bus_space_handle_t) vaddr);
-#endif
+		}
+
+		rman_set_mapping(r,&map);
 	}
-	return (rman_activate_resource(r));
+	return (0);
 }
 
 static int
 nexus_deactivate_resource(device_t bus, device_t child, int type, int rid,
 			  struct resource *r)
 {
+	struct resource_map map;
+	int error;
 
+	error = rman_deactivate_resource(r);
+	if (error)
+		return (error);
+
+	if (!(rman_get_flags(r) & RF_UNMAPPED) &&
+	    (type == SYS_RES_MEMORY || type == SYS_RES_IOPORT)) {
+		rman_get_mapping(r, &map);
+		nexus_unmap_resource(bus, child, type, r, &map);
+	}
+	return (0);
+}
+
+static int
+nexus_map_resource(device_t bus, device_t child, int type, struct resource *r,
+    struct resource_map_request *argsp, struct resource_map *map)
+{
+	struct resource_map_request args;
+	rman_res_t end, length, start;
+
+	/* Resources must be active to be mapped. */
+	if (!(rman_get_flags(r) & RF_ACTIVE))
+		return (ENXIO);
+
+	/* Mappings are only supported on I/O and memory resources. */
+	switch (type) {
+	case SYS_RES_IOPORT:
+	case SYS_RES_MEMORY:
+		break;
+	default:
+		return (EINVAL);
+	}
+
+	resource_init_map_request(&args);
+	if (argsp != NULL)
+		bcopy(argsp, &args, imin(argsp->size, args.size));
+	start = rman_get_start(r) + args.offset;
+	if (args.length == 0)
+		length = rman_get_size(r);
+	else
+		length = args.length;
+	end = start + length - 1;
+	if (start > rman_get_end(r) || start < rman_get_start(r))
+		return (EINVAL);
+	if (end > rman_get_end(r) || end < start)
+		return (EINVAL);
+
+	/*
+	 * If this is a memory resource, map it into the kernel.
+	 */
+	switch (type) {
+	case SYS_RES_IOPORT:
+		map->r_bushandle = start;
+		map->r_bustag = X86_BUS_SPACE_IO;
+		map->r_size = length;
+		map->r_vaddr = NULL;
+		break;
+	case SYS_RES_MEMORY:
+		map->r_vaddr = pmap_mapdev_attr(start, length, args.memattr);
+		map->r_bustag = X86_BUS_SPACE_MEM;
+		map->r_size = length;
+
+		/*
+		 * The handle is the virtual address.
+		 */
+		map->r_bushandle = (bus_space_handle_t)map->r_vaddr;
+		break;
+	}
+	return (0);
+}
+
+static int
+nexus_unmap_resource(device_t bus, device_t child, int type, struct resource *r,
+    struct resource_map *map)
+{
+	
 	/*
 	 * If this is a memory resource, unmap it.
 	 */
-	if (type == SYS_RES_MEMORY) {
-		pmap_unmapdev((vm_offset_t)rman_get_virtual(r),
-		    rman_get_size(r));
+	switch (type) {
+	case SYS_RES_MEMORY:
+		pmap_unmapdev((vm_offset_t)map->r_vaddr, map->r_size);
+		/* FALLTHROUGH */
+	case SYS_RES_IOPORT:
+		break;
+	default:
+		return (EINVAL);
 	}
-#ifdef PC98
-	if (type == SYS_RES_MEMORY || type == SYS_RES_IOPORT) {
-		bus_space_handle_t bh;
-
-		bh = rman_get_bushandle(r);
-		i386_bus_space_handle_free(rman_get_bustag(r), bh, bh->bsh_sz);
-	}
-#endif
-	return (rman_deactivate_resource(r));
+	return (0);
 }
 
 static int
@@ -523,7 +579,7 @@ nexus_setup_intr(device_t bus, device_t child, struct resource *irq,
 	if (irq == NULL)
 		panic("nexus_setup_intr: NULL irq resource!");
 
-	*cookiep = 0;
+	*cookiep = NULL;
 	if ((rman_get_flags(irq) & RF_SHAREABLE) == 0)
 		flags |= INTR_EXCL;
 
@@ -614,6 +670,24 @@ nexus_delete_resource(device_t dev, device_t child, int type, int rid)
 	struct resource_list	*rl = &ndev->nx_resources;
 
 	resource_list_delete(rl, type, rid);
+}
+
+static int
+nexus_get_cpus(device_t dev, device_t child, enum cpu_sets op, size_t setsize,
+    cpuset_t *cpuset)
+{
+
+	switch (op) {
+#ifdef SMP
+	case INTR_CPUS:
+		if (setsize != sizeof(cpuset_t))
+			return (EINVAL);
+		*cpuset = intr_cpus;
+		return (0);
+#endif
+	default:
+		return (bus_generic_get_cpus(dev, child, op, setsize, cpuset));
+	}
 }
 
 /* Called from the MSI code to add new IRQs to the IRQ rman. */

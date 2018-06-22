@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1982, 1986, 1988, 1990, 1993, 1994, 1995
  *	The Regents of the University of California.
  * Copyright (c) 2007-2008,2010
@@ -137,7 +139,8 @@ newreno_ack_received(struct cc_var *ccv, uint16_t type)
 			 */
 			if (CCV(ccv, snd_nxt) == CCV(ccv, snd_max))
 				incr = min(ccv->bytes_this_ack,
-				    V_tcp_abc_l_var * CCV(ccv, t_maxseg));
+				    ccv->nsegs * V_tcp_abc_l_var *
+				    CCV(ccv, t_maxseg));
 			else
 				incr = min(ccv->bytes_this_ack, CCV(ccv, t_maxseg));
 		}

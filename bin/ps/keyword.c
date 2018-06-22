@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1990, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -95,7 +97,7 @@ static VAR var[] = {
 	{"etimes", "ELAPSED", NULL, "elapsed-times", USER, elapseds, 0, CHAR,
 	    NULL, 0},
 	{"euid", "", "uid", NULL, 0, NULL, 0, CHAR, NULL, 0},
-	{"f", "F", NULL, "flags", 0, kvar, KOFF(ki_flag), INT, "x", 0},
+	{"f", "F", NULL, "flags", 0, kvar, KOFF(ki_flag), LONG, "lx", 0},
 	{"f2", "F2", NULL, "flags2", 0, kvar, KOFF(ki_flag2), INT, "08x", 0},
 	{"fib", "FIB", NULL, "fib", 0, kvar, KOFF(ki_fibnum), INT, "d", 0},
 	{"flags", "", "f", NULL, 0, NULL, 0, CHAR, NULL, 0},
@@ -199,7 +201,8 @@ static VAR var[] = {
 	{"tdaddr", "TDADDR", NULL, "thread-address", 0, kvar, KOFF(ki_tdaddr),
 	    KPTR, "lx", 0},
 	{"tdev", "TDEV", NULL, "terminal-device", 0, tdev, 0, CHAR, NULL, 0},
-	{"tdnam", "TDNAM", NULL, "terminal-device-name", LJUST, tdnam, 0, CHAR,
+	{"tdnam", "", "tdname", NULL, 0, NULL, 0, CHAR, NULL, 0},
+	{"tdname", "TDNAME", NULL, "thread-name", LJUST, tdnam, 0, CHAR,
 	    NULL, 0},
 	{"time", "TIME", NULL, "cpu-time", USER, cputime, 0, CHAR, NULL, 0},
 	{"tpgid", "TPGID", NULL, "terminal-process-gid", 0, kvar,
@@ -222,6 +225,8 @@ static VAR var[] = {
 	{"usertime", "USERTIME", NULL, "user-time", USER, usertime, 0, CHAR,
 	    NULL, 0},
 	{"usrpri", "", "upr", NULL, 0, NULL, 0, CHAR, NULL, 0},
+	{"vmaddr", "VMADDR", NULL, "vmspace-address", 0, kvar, KOFF(ki_vmspace),
+	    KPTR, "lx", 0},
 	{"vsize", "", "vsz", NULL, 0, NULL, 0, CHAR, NULL, 0},
 	{"vsz", "VSZ", NULL, "virtual-size", 0, vsize, 0, CHAR, NULL, 0},
 	{"wchan", "WCHAN", NULL, "wait-channel", LJUST, wchan, 0, CHAR, NULL,

@@ -34,6 +34,7 @@
 #include <sys/cdefs.h>
 #include <sys/exec.h>
 #include <sys/sysent.h>
+#include <sys/ucontext.h>
 #include <sys/uio.h>
 
 #include <vm/vm.h>
@@ -41,15 +42,15 @@
 #include <vm/pmap.h>
 
 struct cheriabi_ps_strings {
-	struct chericap	ps_argvstr;
+	void * __capability	ps_argvstr;
 	int		ps_nargvstr;
-	struct chericap	ps_envstr;
+	void * __capability	ps_envstr;
 	int		ps_nenvstr;
-	struct chericap	ps_sbclasses;
+	void * __capability	ps_sbclasses;
 	size_t		ps_sbclasseslen;
-	struct chericap	ps_sbmethods;
+	void * __capability	ps_sbmethods;
 	size_t		ps_sbmethodslen;
-	struct chericap	ps_sbobjects;
+	void * __capability	ps_sbobjects;
 	size_t		ps_sbobjectslen;
 };
 
@@ -61,83 +62,75 @@ typedef struct {	/* Auxiliary vector entry on initial stack */
 	/* long    pad[(CHERICAP_SIZE / 8) - 1]; */
 	union {
 		long	a_val;		/* Integer value. */
-		struct chericap	a_ptr;	/* Address. */
+		void * __capability	a_ptr;	/* Address. */
 		/* void	(*a_fcn)(void); */ /* Function pointer (not used). */
        } a_un;
 } ElfCheriABI_Auxinfo;
 
 extern struct sysent cheriabi_sysent[];
 
-#if 0
-#define SYSCALL32_MODULE(name, offset, new_sysent, evh, arg)   \
-static struct syscall_module_data name##_syscall32_mod = {     \
-       evh, arg, offset, new_sysent, { 0, NULL }               \
-};                                                             \
-                                                               \
-static moduledata_t name##32_mod = {                           \
-       "sys32/" #name,                                         \
-       syscall32_module_handler,                               \
-       &name##_syscall32_mod                                   \
-};                                                             \
-DECLARE_MODULE(name##32, name##32_mod, SI_SUB_SYSCALLS, SI_ORDER_MIDDLE)
-
-#define SYSCALL32_MODULE_HELPER(syscallname)            \
-static int syscallname##_syscall32 = CHERIABI_SYS_##syscallname; \
-static struct sysent syscallname##_sysent32 = {         \
-    (sizeof(struct syscallname ## _args )               \
-     / sizeof(register_t)),                             \
-    (sy_call_t *)& syscallname                          \
-};                                                      \
-SYSCALL32_MODULE(syscallname,                           \
-    & syscallname##_syscall32, & syscallname##_sysent32,\
-    NULL, NULL);
-
-#define SYSCALL32_INIT_HELPER(syscallname) {			\
-    .new_sysent = {						\
-	.sy_narg = (sizeof(struct syscallname ## _args )	\
-	    / sizeof(register_t)),				\
-	.sy_call = (sy_call_t *)& syscallname,			\
-    },								\
-    .syscall_no = CHERIABI_SYS_##syscallname			\
+#define CHERIABI_SYSCALL_INIT_HELPER(syscallname) {			\
+	.new_sysent = {							\
+	.sy_narg = (sizeof(struct syscallname ## _args )		\
+		/ sizeof(syscallarg_t)),				\
+	.sy_call = (sy_call_t *)& syscallname,				\
+	},								\
+	.syscall_no = CHERIABI_SYS_##syscallname			\
 }
 
-#define SYSCALL32_INIT_HELPER_COMPAT(syscallname) {		\
-    .new_sysent = {						\
-	.sy_narg = (sizeof(struct syscallname ## _args )	\
-	    / sizeof(register_t)),				\
-	.sy_call = (sy_call_t *)& sys_ ## syscallname,		\
-    },								\
-    .syscall_no = CHERIABI_SYS_##syscallname			\
+#define CHERIABI_SYSCALL_INIT_HELPER_COMPAT(syscallname) {		\
+	.new_sysent = {							\
+	.sy_narg = (sizeof(struct syscallname ## _args )		\
+		/ sizeof(syscallarg_t)),				\
+	.sy_call = (sy_call_t *)& sys_ ## syscallname,			\
+	},								\
+	.syscall_no = CHERIABI_SYS_##syscallname			\
 }
 
-int    syscallcheri_register(int *offset, struct sysent *new_sysent,
+#define CHERIABI_SYSCALL_NOT_PRESENT_GEN(SC)				\
+int cheriabi_ ## SC (struct thread *td,					\
+    struct cheriabi_##SC##_args *uap)					\
+{									\
+									\
+	return syscall_not_present(td, #SC , (struct nosys_args *)uap); \
+}
+
+int    cheriabi_syscall_register(int *offset, struct sysent *new_sysent,
 	    struct sysent *old_sysent, int flags);
-int    syscallcheri_deregister(int *offset, struct sysent *old_sysent);
-int    syscallcheri_module_handler(struct module *mod, int what, void *arg);
-int    syscallcheri_helper_register(struct syscall_helper_data *sd, int flags);
-int    syscallcheri_helper_unregister(struct syscall_helper_data *sd);
-#endif
+int    cheriabi_syscall_deregister(int *offset, struct sysent *old_sysent);
+int    cheriabi_syscall_helper_register(struct syscall_helper_data *sd, int flags);
+int    cheriabi_syscall_helper_unregister(struct syscall_helper_data *sd);
 
 struct iovec_c;
 register_t *cheriabi_copyout_strings(struct image_params *imgp);
-int	cheriabi_copyiniov(struct iovec_c *iovp, u_int iovcnt,
-	    struct iovec **iov, int error);
+int	cheriabi_copyiniov(struct iovec_c * __capability iovp, u_int iovcnt,
+	    kiovec_t **iov, int error);
 
 struct image_args;
-int	cheriabi_exec_copyin_args(struct image_args *args, char *fname,
-	    enum uio_seg segflg, struct chericap *argv, struct chericap *envv);
+int	cheriabi_exec_copyin_args(struct image_args *args,
+	    const char * __capability fname, enum uio_seg segflg,
+	    void * __capability * __capability argv,
+	    void * __capability * __capability envv);
 
 int	cheriabi_elf_fixup(register_t **stack_base, struct image_params *imgp);
 
 void	cheriabi_get_signal_stack_capability(struct thread *td,
-	    struct chericap *csig);
+	    void * __capability *csig);
 void	cheriabi_set_signal_stack_capability(struct thread *td,
-	    struct chericap *csig);
+	    void * __capability *csig);
 
-void	cheriabi_fetch_syscall_arg(struct thread *td, struct chericap *arg,
-	    int syscall_no, int argnum);
+void	cheriabi_fetch_syscall_arg(struct thread *td, void * __capability *arg,
+	    int argnum, int ptrmask);
 
-void	cheriabi_mmap_set_retcap(struct thread *td, struct chericap *retcap,
-	    struct chericap *addr, size_t len, int prot, int flags);
+int	cheriabi_mmap_set_retcap(struct thread *td, void * __capability *retcap,
+	    void * __capability *addrp, size_t len, int prot, int flags);
+
+int	cheriabi_get_mcontext(struct thread *td, mcontext_c_t *mcp, int flags);
+int	cheriabi_set_mcontext(struct thread *td, mcontext_c_t *mcp);
+void	cheriabi_set_threadregs(struct thread *td, struct thr_param_c *param);
+int	cheriabi_set_user_tls(struct thread *td, void * __capability tls_base);
+
+void	*cheriabi_build_kevent_udata(__intcap_t ident,
+	    void * __capability udata);
 
 #endif /* !_COMPAT_CHERIABI_CHERIABI_UTIL_H_ */

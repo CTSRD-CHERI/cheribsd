@@ -21,11 +21,12 @@
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Type.h"
 #include <algorithm>
+
 using namespace llvm;
 
 ValueSymbolTable *BasicBlock::getValueSymbolTable() {
   if (Function *F = getParent())
-    return &F->getValueSymbolTable();
+    return F->getValueSymbolTable();
   return nullptr;
 }
 
@@ -35,8 +36,7 @@ LLVMContext &BasicBlock::getContext() const {
 
 // Explicit instantiation of SymbolTableListTraits since some of the methods
 // are not in the public header file...
-template class llvm::SymbolTableListTraits<Instruction, BasicBlock>;
-
+template class llvm::SymbolTableListTraits<Instruction>;
 
 BasicBlock::BasicBlock(LLVMContext &C, const Twine &Name, Function *NewParent,
                        BasicBlock *InsertBefore)
@@ -56,7 +56,7 @@ void BasicBlock::insertInto(Function *NewParent, BasicBlock *InsertBefore) {
   assert(!Parent && "Already has a parent");
 
   if (InsertBefore)
-    NewParent->getBasicBlockList().insert(InsertBefore, this);
+    NewParent->getBasicBlockList().insert(InsertBefore->getIterator(), this);
   else
     NewParent->getBasicBlockList().push_back(this);
 }
@@ -91,39 +91,30 @@ void BasicBlock::setParent(Function *parent) {
 }
 
 void BasicBlock::removeFromParent() {
-  getParent()->getBasicBlockList().remove(this);
+  getParent()->getBasicBlockList().remove(getIterator());
 }
 
 iplist<BasicBlock>::iterator BasicBlock::eraseFromParent() {
-  return getParent()->getBasicBlockList().erase(this);
+  return getParent()->getBasicBlockList().erase(getIterator());
 }
 
 /// Unlink this basic block from its current function and
 /// insert it into the function that MovePos lives in, right before MovePos.
 void BasicBlock::moveBefore(BasicBlock *MovePos) {
-  MovePos->getParent()->getBasicBlockList().splice(MovePos,
-                       getParent()->getBasicBlockList(), this);
+  MovePos->getParent()->getBasicBlockList().splice(
+      MovePos->getIterator(), getParent()->getBasicBlockList(), getIterator());
 }
 
 /// Unlink this basic block from its current function and
 /// insert it into the function that MovePos lives in, right after MovePos.
 void BasicBlock::moveAfter(BasicBlock *MovePos) {
-  Function::iterator I = MovePos;
-  MovePos->getParent()->getBasicBlockList().splice(++I,
-                                       getParent()->getBasicBlockList(), this);
+  MovePos->getParent()->getBasicBlockList().splice(
+      ++MovePos->getIterator(), getParent()->getBasicBlockList(),
+      getIterator());
 }
 
 const Module *BasicBlock::getModule() const {
   return getParent()->getParent();
-}
-
-Module *BasicBlock::getModule() {
-  return getParent()->getParent();
-}
-
-TerminatorInst *BasicBlock::getTerminator() {
-  if (InstList.empty()) return nullptr;
-  return dyn_cast<TerminatorInst>(&InstList.back());
 }
 
 const TerminatorInst *BasicBlock::getTerminator() const {
@@ -131,14 +122,14 @@ const TerminatorInst *BasicBlock::getTerminator() const {
   return dyn_cast<TerminatorInst>(&InstList.back());
 }
 
-CallInst *BasicBlock::getTerminatingMustTailCall() {
+const CallInst *BasicBlock::getTerminatingMustTailCall() const {
   if (InstList.empty())
     return nullptr;
-  ReturnInst *RI = dyn_cast<ReturnInst>(&InstList.back());
+  const ReturnInst *RI = dyn_cast<ReturnInst>(&InstList.back());
   if (!RI || RI == &InstList.front())
     return nullptr;
 
-  Instruction *Prev = RI->getPrevNode();
+  const Instruction *Prev = RI->getPrevNode();
   if (!Prev)
     return nullptr;
 
@@ -162,22 +153,37 @@ CallInst *BasicBlock::getTerminatingMustTailCall() {
   return nullptr;
 }
 
-Instruction* BasicBlock::getFirstNonPHI() {
-  for (Instruction &I : *this)
+const CallInst *BasicBlock::getTerminatingDeoptimizeCall() const {
+  if (InstList.empty())
+    return nullptr;
+  auto *RI = dyn_cast<ReturnInst>(&InstList.back());
+  if (!RI || RI == &InstList.front())
+    return nullptr;
+
+  if (auto *CI = dyn_cast_or_null<CallInst>(RI->getPrevNode()))
+    if (Function *F = CI->getCalledFunction())
+      if (F->getIntrinsicID() == Intrinsic::experimental_deoptimize)
+        return CI;
+
+  return nullptr;
+}
+
+const Instruction* BasicBlock::getFirstNonPHI() const {
+  for (const Instruction &I : *this)
     if (!isa<PHINode>(I))
       return &I;
   return nullptr;
 }
 
-Instruction* BasicBlock::getFirstNonPHIOrDbg() {
-  for (Instruction &I : *this)
+const Instruction* BasicBlock::getFirstNonPHIOrDbg() const {
+  for (const Instruction &I : *this)
     if (!isa<PHINode>(I) && !isa<DbgInfoIntrinsic>(I))
       return &I;
   return nullptr;
 }
 
-Instruction* BasicBlock::getFirstNonPHIOrDbgOrLifetime() {
-  for (Instruction &I : *this) {
+const Instruction* BasicBlock::getFirstNonPHIOrDbgOrLifetime() const {
+  for (const Instruction &I : *this) {
     if (isa<PHINode>(I) || isa<DbgInfoIntrinsic>(I))
       continue;
 
@@ -191,27 +197,27 @@ Instruction* BasicBlock::getFirstNonPHIOrDbgOrLifetime() {
   return nullptr;
 }
 
-BasicBlock::iterator BasicBlock::getFirstInsertionPt() {
-  Instruction *FirstNonPHI = getFirstNonPHI();
+BasicBlock::const_iterator BasicBlock::getFirstInsertionPt() const {
+  const Instruction *FirstNonPHI = getFirstNonPHI();
   if (!FirstNonPHI)
     return end();
 
-  iterator InsertPt = FirstNonPHI;
-  if (isa<LandingPadInst>(InsertPt)) ++InsertPt;
+  const_iterator InsertPt = FirstNonPHI->getIterator();
+  if (InsertPt->isEHPad()) ++InsertPt;
   return InsertPt;
 }
 
 void BasicBlock::dropAllReferences() {
-  for(iterator I = begin(), E = end(); I != E; ++I)
-    I->dropAllReferences();
+  for (Instruction &I : *this)
+    I.dropAllReferences();
 }
 
 /// If this basic block has a single predecessor block,
 /// return the block, otherwise return a null pointer.
-BasicBlock *BasicBlock::getSinglePredecessor() {
-  pred_iterator PI = pred_begin(this), E = pred_end(this);
+const BasicBlock *BasicBlock::getSinglePredecessor() const {
+  const_pred_iterator PI = pred_begin(this), E = pred_end(this);
   if (PI == E) return nullptr;         // No preds.
-  BasicBlock *ThePred = *PI;
+  const BasicBlock *ThePred = *PI;
   ++PI;
   return (PI == E) ? ThePred : nullptr /*multiple preds*/;
 }
@@ -221,10 +227,10 @@ BasicBlock *BasicBlock::getSinglePredecessor() {
 /// Note that unique predecessor doesn't mean single edge, there can be
 /// multiple edges from the unique predecessor to this block (for example
 /// a switch statement with multiple cases having the same destination).
-BasicBlock *BasicBlock::getUniquePredecessor() {
-  pred_iterator PI = pred_begin(this), E = pred_end(this);
+const BasicBlock *BasicBlock::getUniquePredecessor() const {
+  const_pred_iterator PI = pred_begin(this), E = pred_end(this);
   if (PI == E) return nullptr; // No preds.
-  BasicBlock *PredBB = *PI;
+  const BasicBlock *PredBB = *PI;
   ++PI;
   for (;PI != E; ++PI) {
     if (*PI != PredBB)
@@ -235,26 +241,30 @@ BasicBlock *BasicBlock::getUniquePredecessor() {
   return PredBB;
 }
 
-BasicBlock *BasicBlock::getSingleSuccessor() {
-  succ_iterator SI = succ_begin(this), E = succ_end(this);
+const BasicBlock *BasicBlock::getSingleSuccessor() const {
+  succ_const_iterator SI = succ_begin(this), E = succ_end(this);
   if (SI == E) return nullptr; // no successors
-  BasicBlock *TheSucc = *SI;
+  const BasicBlock *TheSucc = *SI;
   ++SI;
   return (SI == E) ? TheSucc : nullptr /* multiple successors */;
 }
 
-BasicBlock *BasicBlock::getUniqueSuccessor() {
-  succ_iterator SI = succ_begin(this), E = succ_end(this);
-  if (SI == E) return NULL; // No successors
-  BasicBlock *SuccBB = *SI;
+const BasicBlock *BasicBlock::getUniqueSuccessor() const {
+  succ_const_iterator SI = succ_begin(this), E = succ_end(this);
+  if (SI == E) return nullptr; // No successors
+  const BasicBlock *SuccBB = *SI;
   ++SI;
   for (;SI != E; ++SI) {
     if (*SI != SuccBB)
-      return NULL;
+      return nullptr;
     // The same successor appears multiple times in the successor list.
     // This is OK.
   }
   return SuccBB;
+}
+
+iterator_range<BasicBlock::phi_iterator> BasicBlock::phis() {
+  return make_range<phi_iterator>(dyn_cast<PHINode>(&front()), nullptr);
 }
 
 /// This method is used to notify a BasicBlock that the
@@ -333,6 +343,30 @@ void BasicBlock::removePredecessor(BasicBlock *Pred,
   }
 }
 
+bool BasicBlock::canSplitPredecessors() const {
+  const Instruction *FirstNonPHI = getFirstNonPHI();
+  if (isa<LandingPadInst>(FirstNonPHI))
+    return true;
+  // This is perhaps a little conservative because constructs like
+  // CleanupBlockInst are pretty easy to split.  However, SplitBlockPredecessors
+  // cannot handle such things just yet.
+  if (FirstNonPHI->isEHPad())
+    return false;
+  return true;
+}
+
+bool BasicBlock::isLegalToHoistInto() const {
+  auto *Term = getTerminator();
+  // No terminator means the block is under construction.
+  if (!Term)
+    return true;
+
+  // If the block has no successors, there can be no instructions to hoist.
+  assert(Term->getNumSuccessors() > 0);
+
+  // Instructions should not be hoisted across exception handling boundaries.
+  return !Term->isExceptional();
+}
 
 /// This splits a basic block into two at the specified
 /// instruction.  Note that all instructions BEFORE the specified iterator stay
@@ -350,10 +384,8 @@ BasicBlock *BasicBlock::splitBasicBlock(iterator I, const Twine &BBName) {
   assert(I != InstList.end() &&
          "Trying to get me to create degenerate basic block!");
 
-  BasicBlock *InsertBefore = std::next(Function::iterator(this))
-                               .getNodePtrUnchecked();
-  BasicBlock *New = BasicBlock::Create(getContext(), BBName,
-                                       getParent(), InsertBefore);
+  BasicBlock *New = BasicBlock::Create(getContext(), BBName, getParent(),
+                                       this->getNextNode());
 
   // Save DebugLoc of split point before invalidating iterator.
   DebugLoc Loc = I->getDebugLoc();
@@ -374,13 +406,11 @@ BasicBlock *BasicBlock::splitBasicBlock(iterator I, const Twine &BBName) {
     // Loop over any phi nodes in the basic block, updating the BB field of
     // incoming values...
     BasicBlock *Successor = *I;
-    PHINode *PN;
-    for (BasicBlock::iterator II = Successor->begin();
-         (PN = dyn_cast<PHINode>(II)); ++II) {
-      int IDX = PN->getBasicBlockIndex(this);
-      while (IDX != -1) {
-        PN->setIncomingBlock((unsigned)IDX, New);
-        IDX = PN->getBasicBlockIndex(this);
+    for (auto &PN : Successor->phis()) {
+      int Idx = PN.getBasicBlockIndex(this);
+      while (Idx != -1) {
+        PN.setIncomingBlock((unsigned)Idx, New);
+        Idx = PN.getBasicBlockIndex(this);
       }
     }
   }
@@ -393,8 +423,7 @@ void BasicBlock::replaceSuccessorsPhiUsesWith(BasicBlock *New) {
     // Cope with being called on a BasicBlock that doesn't have a terminator
     // yet. Clang's CodeGenFunction::EmitReturnBlock() likes to do this.
     return;
-  for (unsigned i = 0, e = TI->getNumSuccessors(); i != e; ++i) {
-    BasicBlock *Succ = TI->getSuccessor(i);
+  for (BasicBlock *Succ : TI->successors()) {
     // N.B. Succ might not be a complete BasicBlock, so don't assume
     // that it ends with a non-phi instruction.
     for (iterator II = Succ->begin(), IE = Succ->end(); II != IE; ++II) {
@@ -415,9 +444,6 @@ bool BasicBlock::isLandingPad() const {
 }
 
 /// Return the landingpad instruction associated with the landing pad.
-LandingPadInst *BasicBlock::getLandingPadInst() {
-  return dyn_cast<LandingPadInst>(getFirstNonPHI());
-}
 const LandingPadInst *BasicBlock::getLandingPadInst() const {
   return dyn_cast<LandingPadInst>(getFirstNonPHI());
 }

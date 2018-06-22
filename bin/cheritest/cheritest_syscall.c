@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2013-2015 Robert N. M. Watson
+ * Copyright (c) 2013-2016 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -39,14 +39,14 @@
 #include <sys/sysctl.h>
 #include <sys/time.h>
 
-#include <machine/cheri.h>
-#include <machine/cheric.h>
 #include <machine/cpuregs.h>
 #include <machine/sysarch.h>
 
-#include <cheri/cheri_enter.h>
-#include <cheri/cheri_fd.h>
-#include <cheri/sandbox.h>
+#include <cheri/cheri.h>
+#include <cheri/cheric.h>
+#include <cheri/libcheri_enter.h>
+#include <cheri/libcheri_fd.h>
+#include <cheri/libcheri_sandbox.h>
 
 #include <cheritest-helper.h>
 #include <err.h>

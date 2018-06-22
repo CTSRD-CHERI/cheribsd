@@ -4,12 +4,13 @@
 #
 
 # PROVIDE: ldconfig
-# REQUIRE: mountcritremote FILESYSTEMS
+# REQUIRE: FILESYSTEMS
 # BEFORE:  DAEMON
 
 . /etc/rc.subr
 
 name="ldconfig"
+desc="Configure the shared library cache"
 ldconfig_command="/sbin/ldconfig"
 start_cmd="ldconfig_start"
 stop_cmd=":"
@@ -40,7 +41,7 @@ ldconfig_start()
 		${ldconfig} -elf ${_ins} ${_LDC}
 
 		case `sysctl -n hw.machine_arch` in
-		amd64)
+		amd64|powerpc64)
 			for i in ${ldconfig_local32_dirs}; do
 				if [ -d "${i}" ]; then
 					_files=`find ${i} -type f`
@@ -62,7 +63,7 @@ ldconfig_start()
 		esac
 
 		case `sysctl -n hw.machine_arch` in
-		armv6)
+		armv[67])
 			for i in ${ldconfig_localsoft_dirs}; do
 				if [ -d "${i}" ]; then
 					_files=`find ${i} -type f`

@@ -14,23 +14,26 @@
  * 3. Absolutely no warranty of function or purpose is made by the author
  *    Peter Wemm.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "unsupported"
+ *   ],
+ *   "change_comment": "ps_string not currently supported"
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
 #include "namespace.h"
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/exec.h>
 #include <sys/sysctl.h>
 
-#include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/pmap.h>
-
-#ifdef __CHERI_PURE_CAPABILITY__
-#include <assert.h>
-#endif
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -38,12 +41,6 @@ __FBSDID("$FreeBSD$");
 #include "un-namespace.h"
 
 #include "libc_private.h"
-
-/*
- * For compatibility with old versions of crt1 that didn't define __ps_strings,
- * define it as a common here.
- */
-struct ps_strings *__ps_strings;
 
 /*
  * Older FreeBSD 2.0, 2.1 and 2.2 had different ps_strings structures and
@@ -72,7 +69,9 @@ struct old_ps_strings {
 void
 setproctitle(const char *fmt, ...)
 {
+#ifndef __CHERI_PURE_CAPABILITY__
 	static struct ps_strings *ps_strings;
+#endif
 	static char *buf = NULL;
 	static char *obuf = NULL;
 	static char **oargv, *kbuf;
@@ -80,7 +79,9 @@ setproctitle(const char *fmt, ...)
 	static char *nargv[2] = { NULL, NULL };
 	char **nargvp;
 	int nargc;
+#ifndef __CHERI_PURE_CAPABILITY__
 	int i;
+#endif
 	va_list ap;
 	size_t len;
 #ifndef __CHERI_PURE_CAPABILITY__
@@ -141,20 +142,13 @@ setproctitle(const char *fmt, ...)
 	oid[3] = getpid();
 	sysctl(oid, 4, 0, 0, kbuf, strlen(kbuf) + 1);
 
-	if (ps_strings == NULL) {
-		if (__ps_strings != NULL) {
-			ps_strings = __ps_strings;
 #ifndef __CHERI_PURE_CAPABILITY__
-		} else {
-			len = sizeof(ul_ps_strings);
-			if (sysctlbyname("kern.ps_strings", &ul_ps_strings,
-			    &len, NULL, 0) == -1)
-				ul_ps_strings = PS_STRINGS;
-			ps_strings = (struct ps_strings *)ul_ps_strings;
-#else
-			assert(__ps_strings != NULL);
-#endif
-		}
+	if (ps_strings == NULL) {
+		len = sizeof(ul_ps_strings);
+		if (sysctlbyname("kern.ps_strings", &ul_ps_strings, &len, NULL,
+		    0) == -1)
+			return;
+		ps_strings = (struct ps_strings *)ul_ps_strings;
 	}
 
 	/*
@@ -191,4 +185,5 @@ setproctitle(const char *fmt, ...)
 	}
 	ps_strings->ps_nargvstr = nargc;
 	ps_strings->ps_argvstr = nargvp;
+#endif	/* !__CHERI_PURE_CAPABILITY__ */
 }

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011-2012 Stefan Bethke.
  * Copyright (c) 2014 Adrian Chadd.
  * All rights reserved.
@@ -74,6 +76,36 @@
  * which means both CPU ports can see each other and that will quickly
  * lead to traffic storms/loops.
  */
+
+/* Map port+led to register+shift */
+struct ar8327_led_mapping ar8327_led_mapping[AR8327_NUM_PHYS][ETHERSWITCH_PORT_MAX_LEDS] =
+{
+	{	/* PHY0 */
+		{AR8327_REG_LED_CTRL0, 14 },
+		{AR8327_REG_LED_CTRL1, 14 },
+		{AR8327_REG_LED_CTRL2, 14 }
+	},
+	{	/* PHY1 */
+		{AR8327_REG_LED_CTRL3, 8  },
+		{AR8327_REG_LED_CTRL3, 10 },
+		{AR8327_REG_LED_CTRL3, 12 }
+	},
+	{	/* PHY2 */
+		{AR8327_REG_LED_CTRL3, 14 },
+		{AR8327_REG_LED_CTRL3, 16 },
+		{AR8327_REG_LED_CTRL3, 18 }
+	},
+	{	/* PHY3 */
+		{AR8327_REG_LED_CTRL3, 20 },
+		{AR8327_REG_LED_CTRL3, 22 },
+		{AR8327_REG_LED_CTRL3, 24 }
+	},
+	{	/* PHY4 */
+		{AR8327_REG_LED_CTRL0, 30 },
+		{AR8327_REG_LED_CTRL1, 30 },
+		{AR8327_REG_LED_CTRL2, 30 }
+	}
+};
 
 static int
 ar8327_vlan_op(struct arswitch_softc *sc, uint32_t op, uint32_t vid,
@@ -662,7 +694,7 @@ ar8327_hw_setup(struct arswitch_softc *sc)
 		/* start PHY autonegotiation? */
 		/* XXX is this done as part of the normal PHY setup? */
 
-	};
+	}
 
 	/* Let things settle */
 	DELAY(1000);
@@ -677,6 +709,8 @@ static int
 ar8327_hw_global_setup(struct arswitch_softc *sc)
 {
 	uint32_t t;
+
+	ARSWITCH_LOCK(sc);
 
 	/* enable CPU port and disable mirror port */
 	t = AR8327_FWD_CTRL0_CPU_PORT_EN |
@@ -711,6 +745,7 @@ ar8327_hw_global_setup(struct arswitch_softc *sc)
 	/* GMAC0 (CPU), GMAC1..5 (PHYs), GMAC6 (CPU) */
 	sc->info.es_nports = 7;
 
+	ARSWITCH_UNLOCK(sc);
 	return (0);
 }
 
@@ -1056,7 +1091,7 @@ ar8327_get_dot1q_vlan(struct arswitch_softc *sc, uint32_t *ports,
 	}
 
 	reg = arswitch_readreg(sc->sc_dev, AR8327_REG_VTU_FUNC0);
-	DPRINTF(sc->sc_dev, "%s: %d: reg=0x%08x\n", __func__, vid, reg);
+	DPRINTF(sc, ARSWITCH_DBG_REGIO, "%s: %d: reg=0x%08x\n", __func__, vid, reg);
 
 	/*
 	 * If any of the bits are set, update the port mask.
@@ -1088,7 +1123,7 @@ ar8327_set_dot1q_vlan(struct arswitch_softc *sc, uint32_t ports,
 	op = AR8327_VTU_FUNC1_OP_LOAD;
 	vid &= 0xfff;
 
-	DPRINTF(sc->sc_dev,
+	DPRINTF(sc, ARSWITCH_DBG_VLAN,
 	    "%s: vid: %d, ports=0x%08x, untagged_ports=0x%08x\n",
 	    __func__,
 	    vid,

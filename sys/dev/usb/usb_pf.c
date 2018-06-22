@@ -1,5 +1,7 @@
 /* $FreeBSD$ */
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1990, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -16,7 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -68,7 +70,8 @@ static void usbpf_init(void *);
 static void usbpf_uninit(void *);
 static int usbpf_ioctl(struct ifnet *, u_long, caddr_t);
 static int usbpf_clone_match(struct if_clone *, const char *);
-static int usbpf_clone_create(struct if_clone *, char *, size_t, caddr_t);
+static int usbpf_clone_create(struct if_clone *, char *, size_t,
+    void * __capability);
 static int usbpf_clone_destroy(struct if_clone *, struct ifnet *);
 static struct usb_bus *usbpf_ifname2ubus(const char *);
 static uint32_t usbpf_aggregate_xferflags(struct usb_xfer_flags *);
@@ -162,7 +165,8 @@ usbpf_clone_match(struct if_clone *ifc, const char *name)
 }
 
 static int
-usbpf_clone_create(struct if_clone *ifc, char *name, size_t len, caddr_t params)
+usbpf_clone_create(struct if_clone *ifc, char *name, size_t len,
+    void * __capability params)
 {
 	int error;
 	int unit;

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2015 John Marino <draco@marino.st>
  *
@@ -324,7 +324,7 @@ add_charmap_char(const char *name, int val)
 
 /*
  * POSIX insists that certain entries be present, even when not in the
- * orginal charmap file.
+ * original charmap file.
  */
 void
 add_charmap_posix(void)

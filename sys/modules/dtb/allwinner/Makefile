@@ -1,8 +1,31 @@
 # $FreeBSD$
 # All the dts files for allwinner systems we support.
 DTS=	\
-	bananapi.dts \
-	cubieboard.dts \
-	cubieboard2.dts
+	sun4i-a10-cubieboard.dts \
+	sun4i-a10-olinuxino-lime.dts \
+	sun6i-a31s-sinovoip-bpi-m2.dts \
+	sun5i-a13-olinuxino.dts \
+	sun5i-r8-chip.dts \
+	sun7i-a20-bananapi.dts \
+	sun7i-a20-cubieboard2.dts \
+	sun7i-a20-olimex-som-evb.dts \
+	sun7i-a20-pcduino3.dts \
+	sun8i-a83t-bananapi-m3.dts \
+	sun8i-h2-plus-orangepi-zero.dts \
+	sun8i-h3-nanopi-m1.dts \
+	sun8i-h3-nanopi-neo.dts \
+	sun8i-h3-orangepi-one.dts \
+	sun8i-h3-orangepi-plus2e.dts
+
+LINKS= \
+	${DTBDIR}/sun4i-a10-cubieboard.dtb ${DTBDIR}/cubieboard.dtb \
+	${DTBDIR}/sun4i-a10-olinuxino-lime.dtb ${DTBDIR}/olinuxino-lime.dtb \
+	${DTBDIR}/sun6i-a31s-sinovoip-bpi-m2.dtb ${DTBDIR}/bananapim2.dtb \
+	${DTBDIR}/sun7i-a20-bananapi.dtb ${DTBDIR}/bananapi.dtb \
+	${DTBDIR}/sun7i-a20-cubieboard2.dtb ${DTBDIR}/cubieboard2.dtb \
+	${DTBDIR}/sun7i-a20-olimex-som-evb.dtb ${DTBDIR}/olimex-a20-som-evb.dtb \
+	${DTBDIR}/sun7i-a20-pcduino3.dtb ${DTBDIR}/pcduino3.dtb \
+	${DTBDIR}/sun8i-a83t-bananapi-m3.dtb ${DTBDIR}/sinovoip-bpi-m3.dtb \
+	${DTBDIR}/sun8i-a83t-bananapi-m3.dtb ${DTBDIR}/sun8i-a83t-sinovoip-bpi-m3.dtb
 
 .include <bsd.dtb.mk>

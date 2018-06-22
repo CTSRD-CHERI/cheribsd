@@ -23,14 +23,14 @@ Diagnostics::ArgStream Diagnostics::pushContextFrame(ContextType Type,
 
 Diagnostics::Context::Context(ConstructMatcherEnum, Diagnostics *Error,
                               StringRef MatcherName,
-                              const SourceRange &MatcherRange)
+                              SourceRange MatcherRange)
     : Error(Error) {
   Error->pushContextFrame(CT_MatcherConstruct, MatcherRange) << MatcherName;
 }
 
 Diagnostics::Context::Context(MatcherArgEnum, Diagnostics *Error,
                               StringRef MatcherName,
-                              const SourceRange &MatcherRange,
+                              SourceRange MatcherRange,
                               unsigned ArgNumber)
     : Error(Error) {
   Error->pushContextFrame(CT_MatcherArg, MatcherRange) << ArgNumber
@@ -63,7 +63,7 @@ Diagnostics::ArgStream &Diagnostics::ArgStream::operator<<(const Twine &Arg) {
   return *this;
 }
 
-Diagnostics::ArgStream Diagnostics::addError(const SourceRange &Range,
+Diagnostics::ArgStream Diagnostics::addError(SourceRange Range,
                                              ErrorType Error) {
   Errors.emplace_back();
   ErrorContent &Last = Errors.back();
@@ -118,8 +118,8 @@ static StringRef errorTypeToFormatString(Diagnostics::ErrorType Type) {
     return "Malformed bind() expression.";
   case Diagnostics::ET_ParserTrailingCode:
     return "Expected end of code.";
-  case Diagnostics::ET_ParserUnsignedError:
-    return "Error parsing unsigned token: <$0>";
+  case Diagnostics::ET_ParserNumberError:
+    return "Error parsing numeric literal: <$0>";
   case Diagnostics::ET_ParserOverloadedType:
     return "Input value has unresolved overloaded type: $0";
 
@@ -150,7 +150,7 @@ static void formatErrorString(StringRef FormatString,
   }
 }
 
-static void maybeAddLineAndColumn(const SourceRange &Range,
+static void maybeAddLineAndColumn(SourceRange Range,
                                   llvm::raw_ostream &OS) {
   if (Range.Start.Line > 0 && Range.Start.Column > 0) {
     OS << Range.Start.Line << ":" << Range.Start.Column << ": ";

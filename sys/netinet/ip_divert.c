@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1988, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -141,14 +143,6 @@ div_inpcb_init(void *mem, int size, int flags)
 }
 
 static void
-div_inpcb_fini(void *mem, int size)
-{
-	struct inpcb *inp = mem;
-
-	INP_LOCK_DESTROY(inp);
-}
-
-static void
 div_init(void)
 {
 
@@ -158,16 +152,17 @@ div_init(void)
 	 * place for hashbase == NULL.
 	 */
 	in_pcbinfo_init(&V_divcbinfo, "div", &V_divcb, 1, 1, "divcb",
-	    div_inpcb_init, div_inpcb_fini, UMA_ZONE_NOFREE,
-	    IPI_HASHFIELDS_NONE);
+	    div_inpcb_init, IPI_HASHFIELDS_NONE);
 }
 
 static void
-div_destroy(void)
+div_destroy(void *unused __unused)
 {
 
 	in_pcbinfo_destroy(&V_divcbinfo);
 }
+VNET_SYSUNINIT(divert, SI_SUB_PROTO_DOMAININIT, SI_ORDER_ANY,
+    div_destroy, NULL);
 
 /*
  * IPPROTO_DIVERT is not in the real IP protocol number space; this
@@ -206,7 +201,7 @@ divert_packet(struct mbuf *m, int incoming)
 	}
 	/* Assure header */
 	if (m->m_len < sizeof(struct ip) &&
-	    (m = m_pullup(m, sizeof(struct ip))) == 0)
+	    (m = m_pullup(m, sizeof(struct ip))) == NULL)
 		return;
 	ip = mtod(m, struct ip *);
 
@@ -488,6 +483,14 @@ div_output(struct socket *so, struct mbuf *m, struct sockaddr_in *sin,
 		/* Send packet to input processing via netisr */
 		switch (ip->ip_v) {
 		case IPVERSION:
+			/*
+			 * Restore M_BCAST flag when destination address is
+			 * broadcast. It is expected by ip_tryforward().
+			 */
+			if (IN_MULTICAST(ntohl(ip->ip_dst.s_addr)))
+				m->m_flags |= M_MCAST;
+			else if (in_broadcast(ip->ip_dst, m->m_pkthdr.rcvif))
+				m->m_flags |= M_BCAST;
 			netisr_queue_src(NETISR_IP, (uintptr_t)so, m);
 			break;
 #ifdef INET6
@@ -601,7 +604,7 @@ div_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 
 	/* Packet must have a header (but that's about it) */
 	if (m->m_len < sizeof (struct ip) &&
-	    (m = m_pullup(m, sizeof (struct ip))) == 0) {
+	    (m = m_pullup(m, sizeof (struct ip))) == NULL) {
 		KMOD_IPSTAT_INC(ips_toosmall);
 		m_freem(m);
 		return EINVAL;
@@ -667,7 +670,7 @@ div_pcblist(SYSCTL_HANDLER_ARGS)
 		return error;
 
 	inp_list = malloc(n * sizeof *inp_list, M_TEMP, M_WAITOK);
-	if (inp_list == 0)
+	if (inp_list == NULL)
 		return ENOMEM;
 	
 	INP_INFO_RLOCK(&V_divcbinfo);
@@ -690,12 +693,8 @@ div_pcblist(SYSCTL_HANDLER_ARGS)
 		INP_RLOCK(inp);
 		if (inp->inp_gencnt <= gencnt) {
 			struct xinpcb xi;
-			bzero(&xi, sizeof(xi));
-			xi.xi_len = sizeof xi;
-			/* XXX should avoid extra copy */
-			bcopy(inp, &xi.xi_inp, sizeof *inp);
-			if (inp->inp_socket)
-				sotoxsocket(inp->inp_socket, &xi.xi_socket);
+
+			in_pcbtoxinpcb(inp, &xi);
 			INP_RUNLOCK(inp);
 			error = SYSCTL_OUT(req, &xi, sizeof xi);
 		} else
@@ -756,9 +755,6 @@ struct protosw div_protosw = {
 	.pr_ctlinput =		div_ctlinput,
 	.pr_ctloutput =		ip_ctloutput,
 	.pr_init =		div_init,
-#ifdef VIMAGE
-	.pr_destroy =		div_destroy,
-#endif
 	.pr_usrreqs =		&div_usrreqs
 };
 
@@ -766,9 +762,6 @@ static int
 div_modevent(module_t mod, int type, void *unused)
 {
 	int err = 0;
-#ifndef VIMAGE
-	int n;
-#endif
 
 	switch (type) {
 	case MOD_LOAD:
@@ -793,10 +786,6 @@ div_modevent(module_t mod, int type, void *unused)
 		err = EPERM;
 		break;
 	case MOD_UNLOAD:
-#ifdef VIMAGE
-		err = EPERM;
-		break;
-#else
 		/*
 		 * Forced unload.
 		 *
@@ -809,8 +798,7 @@ div_modevent(module_t mod, int type, void *unused)
 		 * we destroy the lock.
 		 */
 		INP_INFO_WLOCK(&V_divcbinfo);
-		n = V_divcbinfo.ipi_count;
-		if (n != 0) {
+		if (V_divcbinfo.ipi_count != 0) {
 			err = EBUSY;
 			INP_INFO_WUNLOCK(&V_divcbinfo);
 			break;
@@ -818,10 +806,11 @@ div_modevent(module_t mod, int type, void *unused)
 		ip_divert_ptr = NULL;
 		err = pf_proto_unregister(PF_INET, IPPROTO_DIVERT, SOCK_RAW);
 		INP_INFO_WUNLOCK(&V_divcbinfo);
-		div_destroy();
+#ifndef VIMAGE
+		div_destroy(NULL);
+#endif
 		EVENTHANDLER_DEREGISTER(maxsockets_change, ip_divert_event_tag);
 		break;
-#endif /* !VIMAGE */
 	default:
 		err = EOPNOTSUPP;
 		break;
@@ -835,6 +824,6 @@ static moduledata_t ipdivertmod = {
         0
 };
 
-DECLARE_MODULE(ipdivert, ipdivertmod, SI_SUB_PROTO_IFATTACHDOMAIN, SI_ORDER_ANY);
+DECLARE_MODULE(ipdivert, ipdivertmod, SI_SUB_PROTO_FIREWALL, SI_ORDER_ANY);
 MODULE_DEPEND(ipdivert, ipfw, 3, 3, 3);
 MODULE_VERSION(ipdivert, 1);

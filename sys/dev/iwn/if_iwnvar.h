@@ -206,10 +206,10 @@ struct iwn_ops {
 			    uint16_t);
 	int		(*get_temperature)(struct iwn_softc *);
 	int		(*get_rssi)(struct iwn_softc *, struct iwn_rx_stat *);
-	int		(*set_txpower)(struct iwn_softc *,
-			    struct ieee80211_channel *, int);
+	int		(*set_txpower)(struct iwn_softc *, int);
 	int		(*init_gains)(struct iwn_softc *);
 	int		(*set_gains)(struct iwn_softc *);
+	int		(*rxon_assoc)(struct iwn_softc *, int);
 	int		(*add_node)(struct iwn_softc *, struct iwn_node_info *,
 			    int);
 	void		(*tx_done)(struct iwn_softc *, struct iwn_rx_desc *,
@@ -238,6 +238,7 @@ struct iwn_softc {
 	struct cdev		*sc_cdev;
 	struct mtx		sc_mtx;
 	struct ieee80211com	sc_ic;
+	struct ieee80211_ratectl_tx_status sc_txs;
 
 	u_int			sc_flags;
 #define IWN_FLAG_HAS_OTPROM	(1 << 1)
@@ -304,9 +305,7 @@ struct iwn_softc {
 	int			sc_cap_off;	/* PCIe Capabilities. */
 
 	/* Tasks used by the driver */
-	struct task		sc_reinit_task;
-	struct task		sc_radioon_task;
-	struct task		sc_radiooff_task;
+	struct task		sc_rftoggle_task;
 	struct task		sc_panic_task;
 	struct task		sc_xmit_task;
 
@@ -318,6 +317,7 @@ struct iwn_softc {
 	int			calib_cnt;
 	struct iwn_calib_state	calib;
 	int			last_calib_ticks;
+	struct callout		scan_timeout;
 	struct callout		watchdog_to;
 	struct iwn_fw_info	fw;
 	struct iwn_calib_info	calibcmd[IWN5000_PHY_CALIB_MAX_RESULT];
@@ -379,7 +379,6 @@ struct iwn_softc {
 	uint8_t			chainmask;
 
 	int			sc_tx_timer;
-	int			sc_scan_timer;
 
 	/* Are we doing a scan? */
 	int			sc_is_scanning;

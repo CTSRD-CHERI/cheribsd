@@ -1,7 +1,8 @@
 # $FreeBSD$
 # Copyright (c) David E. O'Brien, 2000-2004, 2006, 2009
 
-CONTRDIR=	${.CURDIR}/../../contrib/file
+PACKAGE=lib${LIB}
+CONTRDIR=	${SRCTOP}/contrib/file
 .PATH: ${CONTRDIR}/src
 .PATH: ${CONTRDIR}/doc
 
@@ -11,14 +12,16 @@ LIBADD=	z
 MAN=	libmagic.3 magic.5
 
 SRCS=	apprentice.c apptype.c ascmagic.c cdf.c cdf_time.c compress.c \
-	encoding.c fsmagic.c funcs.c \
+	der.c encoding.c fsmagic.c funcs.c \
 	is_tar.c magic.c print.c readcdf.c readelf.c softmagic.c
 INCS=	magic.h
 
 MAGICPATH?=	/usr/share/misc
 
-CFLAGS+= -DMAGIC='"${MAGICPATH}/magic"' -DHAVE_CONFIG_H
-CFLAGS+= -I${.CURDIR} -I${CONTRDIR}/src
+COMMON_CFLAGS+=	-DMAGIC='"${MAGICPATH}/magic"' -DHAVE_CONFIG_H
+COMMON_CFLAGS+=	-I${.CURDIR} -I${.OBJDIR} -I${CONTRDIR}/src
+BUILD_TOOLS_CFLAGS+=${COMMON_CFLAGS}
+CFLAGS+=	${COMMON_CFLAGS}
 
 WARNS?=		3
 
@@ -35,13 +38,13 @@ magic: ${MAGFILES}
 	cat ${.ALLSRC:O} > ${.TARGET}
 
 magic.mgc: mkmagic magic
-	./mkmagic magic
+	${BTOOLSPATH:U.}/mkmagic magic
 
 CLEANFILES+=	mkmagic
 build-tools: mkmagic
-mkmagic: apprentice.c cdf_time.c encoding.c funcs.c magic.c print.c
-	${CC} ${CFLAGS} -DCOMPILE_ONLY ${LDFLAGS} -o ${.TARGET} ${.ALLSRC} \
-	    ${LDADD}
+mkmagic: apprentice.c cdf_time.c encoding.c funcs.c magic.c print.c ${INCS} ${BUILD_TOOLS_META}
+	${BUILD_TOOLS_CC} ${BUILD_TOOLS_CFLAGS} -DCOMPILE_ONLY \
+	    ${BUILD_TOOLS_LDFLAGS} -o ${.TARGET} ${.ALLSRC:N*.h} ${LDADD}
 
 FILEVER!= awk '$$1 == "\#define" && $$2 == "VERSION" { print $$3; exit }' \
 			${.CURDIR}/config.h
@@ -51,6 +54,12 @@ ${mp}: ${mp:C/[0-9]/man/}
 	sed -e 's/__FSECTION__/5/g' -e 's/__CSECTION__/1/g' \
 		-e 's/__VERSION__/${FILEVER}/g' \
 		-e 's,__MAGIC__,${MAGICPATH}/magic,g' ${.ALLSRC} > ${.TARGET}
+.endfor
+
+CLEANFILES+=	${INCS}
+.for inc in ${INCS}
+${inc}: ${inc}.in
+	sed -e 's,X.YY,${FILEVER:S,",,g:S,.,,g},g' ${.ALLSRC} > ${.TARGET}
 .endfor
 
 .include <bsd.lib.mk>

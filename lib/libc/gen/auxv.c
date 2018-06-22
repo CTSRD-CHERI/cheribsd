@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright 2010, 2012 Konstantin Belousov <kib@FreeBSD.ORG>.
  * All rights reserved.
  *
@@ -23,6 +25,17 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "support"
+ *   ],
+ *   "change_comment": "find auxargs without walking off of envv"
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -33,6 +46,7 @@ __FBSDID("$FreeBSD$");
 #include <link.h>
 #include <pthread.h>
 #include <string.h>
+#include <sys/auxv.h>
 #include "un-namespace.h"
 #include "libc_private.h"
 
@@ -43,21 +57,31 @@ extern int _DYNAMIC;
 void *__elf_aux_vector;
 static pthread_once_t aux_vector_once = PTHREAD_ONCE_INIT;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+extern Elf_Auxinfo *__auxargs; /* This will be NULL when dynamically linked */
+#pragma weak __auxargs
+#endif
+
 static void
 init_aux_vector_once(void)
 {
+#if defined(__CHERI_PURE_CAPABILITY__)
+	__elf_aux_vector = __auxargs;
+#else
 	Elf_Addr *sp;
 
 	sp = (Elf_Addr *)environ;
 	while (*sp++ != 0)
 		;
 	__elf_aux_vector = (Elf_Auxinfo *)sp;
+#endif
 }
 
 void
 __init_elf_aux_vector(void)
 {
 
+	/* __elf_aux_vector should have been initialized by RTLD */
 	if (&_DYNAMIC != NULL)
 		return;
 	_once(&aux_vector_once, init_aux_vector_once);
@@ -65,8 +89,10 @@ __init_elf_aux_vector(void)
 
 static pthread_once_t aux_once = PTHREAD_ONCE_INIT;
 static int pagesize, osreldate, canary_len, ncpus, pagesizes_len;
+static int hwcap_present, hwcap2_present;
 static char *canary, *pagesizes;
 static void *timekeep;
+static u_long hwcap, hwcap2;
 
 static void
 init_aux(void)
@@ -81,6 +107,16 @@ init_aux(void)
 
 		case AT_CANARYLEN:
 			canary_len = aux->a_un.a_val;
+			break;
+
+		case AT_HWCAP:
+			hwcap_present = 1;
+			hwcap = (u_long)(aux->a_un.a_val);
+			break;
+
+		case AT_HWCAP2:
+			hwcap2_present = 1;
+			hwcap2 = (u_long)(aux->a_un.a_val);
 			break;
 
 		case AT_PAGESIZES:
@@ -110,6 +146,8 @@ init_aux(void)
 	}
 }
 
+__weak_reference(_elf_aux_info, elf_aux_info);
+
 int
 _elf_aux_info(int aux, void *buf, int buflen)
 {
@@ -130,6 +168,20 @@ _elf_aux_info(int aux, void *buf, int buflen)
 		} else
 			res = ENOENT;
 		break;
+	case AT_HWCAP:
+		if (hwcap_present && buflen == sizeof(u_long)) {
+			*(u_long *)buf = hwcap;
+			res = 0;
+		} else
+			res = ENOENT;
+		break;
+	case AT_HWCAP2:
+		if (hwcap2_present && buflen == sizeof(u_long)) {
+			*(u_long *)buf = hwcap2;
+			res = 0;
+		} else
+			res = ENOENT;
+		break;
 	case AT_PAGESIZES:
 		if (pagesizes != NULL && pagesizes_len >= buflen) {
 			memcpy(buf, pagesizes, buflen);
@@ -137,7 +189,6 @@ _elf_aux_info(int aux, void *buf, int buflen)
 		} else
 			res = ENOENT;
 		break;
-
 	case AT_PAGESZ:
 		if (buflen == sizeof(int)) {
 			if (pagesize != 0) {

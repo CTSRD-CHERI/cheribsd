@@ -2,7 +2,7 @@
  * Copyright (c) 2010 Isilon Systems, Inc.
  * Copyright (c) 2010 iX Systems, Inc.
  * Copyright (c) 2010 Panasas, Inc.
- * Copyright (c) 2013-2016 Mellanox Technologies, Ltd.
+ * Copyright (c) 2013-2017 Mellanox Technologies, Ltd.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,11 +40,22 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/stdarg.h>
 
-#include <linux/bitops.h>
+#include <linux/bitmap.h>
 #include <linux/kobject.h>
 #include <linux/slab.h>
 #include <linux/idr.h>
 #include <linux/err.h>
+
+#define	MAX_IDR_LEVEL	((MAX_IDR_SHIFT + IDR_BITS - 1) / IDR_BITS)
+#define	MAX_IDR_FREE	(MAX_IDR_LEVEL * 2)
+
+struct linux_idr_cache {
+	spinlock_t lock;
+	struct idr_layer *head;
+	unsigned count;
+};
+
+static DPCPU_DEFINE(struct linux_idr_cache, linux_idr_cache);
 
 /*
  * IDR Implementation.
@@ -54,6 +65,96 @@ __FBSDID("$FreeBSD$");
  * a builtin bitmap for allocation.
  */
 static MALLOC_DEFINE(M_IDR, "idr", "Linux IDR compat");
+
+static struct idr_layer *
+idr_preload_dequeue_locked(struct linux_idr_cache *lic)
+{
+	struct idr_layer *retval;
+
+	/* check if wrong thread is trying to dequeue */
+	if (mtx_owned(&lic->lock.m) == 0)
+		return (NULL);
+
+	retval = lic->head;
+	if (likely(retval != NULL)) {
+		lic->head = retval->ary[0];
+		lic->count--;
+		retval->ary[0] = NULL;
+	}
+	return (retval);
+}
+
+static void
+idr_preload_init(void *arg)
+{
+	int cpu;
+
+	CPU_FOREACH(cpu) {
+		struct linux_idr_cache *lic =
+		    DPCPU_ID_PTR(cpu, linux_idr_cache);
+
+		spin_lock_init(&lic->lock);
+	}
+}
+SYSINIT(idr_preload_init, SI_SUB_CPU, SI_ORDER_ANY, idr_preload_init, NULL);
+
+static void
+idr_preload_uninit(void *arg)
+{
+	int cpu;
+
+	CPU_FOREACH(cpu) {
+		struct idr_layer *cacheval;
+		struct linux_idr_cache *lic =
+		    DPCPU_ID_PTR(cpu, linux_idr_cache);
+
+		while (1) {
+			spin_lock(&lic->lock);
+			cacheval = idr_preload_dequeue_locked(lic);
+			spin_unlock(&lic->lock);
+
+			if (cacheval == NULL)
+				break;
+			free(cacheval, M_IDR);
+		}
+		spin_lock_destroy(&lic->lock);
+	}
+}
+SYSUNINIT(idr_preload_uninit, SI_SUB_LOCK, SI_ORDER_FIRST, idr_preload_uninit, NULL);
+
+void
+idr_preload(gfp_t gfp_mask)
+{
+	struct linux_idr_cache *lic;
+	struct idr_layer *cacheval;
+
+	sched_pin();
+
+	lic = &DPCPU_GET(linux_idr_cache);
+
+	/* fill up cache */
+	spin_lock(&lic->lock);
+	while (lic->count < MAX_IDR_FREE) {
+		spin_unlock(&lic->lock);
+		cacheval = malloc(sizeof(*cacheval), M_IDR, M_ZERO | gfp_mask);
+		spin_lock(&lic->lock);
+		if (cacheval == NULL)
+			break;
+		cacheval->ary[0] = lic->head;
+		lic->head = cacheval;
+		lic->count++;
+	}
+}
+
+void
+idr_preload_end(void)
+{
+	struct linux_idr_cache *lic;
+
+	lic = &DPCPU_GET(linux_idr_cache);
+	spin_unlock(&lic->lock);
+	sched_unpin();
+}
 
 static inline int
 idr_max(struct idr *idr)
@@ -87,6 +188,7 @@ idr_destroy(struct idr *idr)
 		free(il, M_IDR);
 	}
 	mtx_unlock(&idr->lock);
+	mtx_destroy(&idr->lock);
 }
 
 static void
@@ -159,34 +261,43 @@ idr_remove(struct idr *idr, int id)
 	mtx_unlock(&idr->lock);
 }
 
+
+static inline struct idr_layer *
+idr_find_layer_locked(struct idr *idr, int id)
+{
+	struct idr_layer *il;
+	int layer;
+
+	id &= MAX_ID_MASK;
+	il = idr->top;
+	layer = idr->layers - 1;
+	if (il == NULL || id > idr_max(idr))
+		return (NULL);
+	while (layer && il) {
+		il = il->ary[idr_pos(id, layer)];
+		layer--;
+	}
+	return (il);
+}
+
 void *
 idr_replace(struct idr *idr, void *ptr, int id)
 {
 	struct idr_layer *il;
 	void *res;
-	int layer;
 	int idx;
 
-	res = ERR_PTR(-EINVAL);
-	id &= MAX_ID_MASK;
 	mtx_lock(&idr->lock);
-	il = idr->top;
-	layer = idr->layers - 1;
-	if (il == NULL || id > idr_max(idr))
-		goto out;
-	while (layer && il) {
-		il = il->ary[idr_pos(id, layer)];
-		layer--;
-	}
+	il = idr_find_layer_locked(idr, id);
 	idx = id & IDR_MASK;
-	/*
-	 * Replace still returns an error if the item was not allocated.
-	 */
-	if (il != NULL && (il->bitmap & (1 << idx)) != 0) {
+
+	/* Replace still returns an error if the item was not allocated. */
+	if (il == NULL || (il->bitmap & (1 << idx))) {
+		res = ERR_PTR(-ENOENT);
+	} else {
 		res = il->ary[idx];
 		il->ary[idx] = ptr;
 	}
-out:
 	mtx_unlock(&idr->lock);
 	return (res);
 }
@@ -196,22 +307,13 @@ idr_find_locked(struct idr *idr, int id)
 {
 	struct idr_layer *il;
 	void *res;
-	int layer;
 
 	mtx_assert(&idr->lock, MA_OWNED);
-
-	id &= MAX_ID_MASK;
-	res = NULL;
-	il = idr->top;
-	layer = idr->layers - 1;
-	if (il == NULL || id > idr_max(idr))
-		return (NULL);
-	while (layer && il) {
-		il = il->ary[idr_pos(id, layer)];
-		layer--;
-	}
+	il = idr_find_layer_locked(idr, id);
 	if (il != NULL)
 		res = il->ary[id & IDR_MASK];
+	else
+		res = NULL;
 	return (res);
 }
 
@@ -222,6 +324,24 @@ idr_find(struct idr *idr, int id)
 
 	mtx_lock(&idr->lock);
 	res = idr_find_locked(idr, id);
+	mtx_unlock(&idr->lock);
+	return (res);
+}
+
+void *
+idr_get_next(struct idr *idr, int *nextidp)
+{
+	void *res = NULL;
+	int id = *nextidp;
+
+	mtx_lock(&idr->lock);
+	for (; id <= idr_max(idr); id++) {
+		res = idr_find_locked(idr, id);
+		if (res == NULL)
+			continue;
+		*nextidp = id;
+		break;
+	}
 	mtx_unlock(&idr->lock);
 	return (res);
 }
@@ -261,19 +381,32 @@ idr_pre_get(struct idr *idr, gfp_t gfp_mask)
 	return (1);
 }
 
-static inline struct idr_layer *
-idr_get(struct idr *idr)
+static struct idr_layer *
+idr_free_list_get(struct idr *idp)
 {
 	struct idr_layer *il;
 
-	il = idr->free;
-	if (il) {
-		idr->free = il->ary[0];
+	if ((il = idp->free) != NULL) {
+		idp->free = il->ary[0];
 		il->ary[0] = NULL;
-		return (il);
 	}
-	il = malloc(sizeof(*il), M_IDR, M_ZERO | M_NOWAIT);
-	bitmap_fill(&il->bitmap, IDR_SIZE);
+	return (il);
+}
+
+static inline struct idr_layer *
+idr_get(struct idr *idp)
+{
+	struct idr_layer *il;
+
+	if ((il = idr_free_list_get(idp)) != NULL) {
+		MPASS(il->bitmap != 0);
+	} else if ((il = malloc(sizeof(*il), M_IDR, M_ZERO | M_NOWAIT)) != NULL) {
+		bitmap_fill(&il->bitmap, IDR_SIZE);
+	} else if ((il = idr_preload_dequeue_locked(&DPCPU_GET(linux_idr_cache))) != NULL) {
+		bitmap_fill(&il->bitmap, IDR_SIZE);
+	} else {
+		return (NULL);
+	}
 	return (il);
 }
 
@@ -486,6 +619,12 @@ idr_get_new_above(struct idr *idr, void *ptr, int starting_id, int *idp)
 	return (retval);
 }
 
+int
+ida_get_new_above(struct ida *ida, int starting_id, int *p_id)
+{
+	return (idr_get_new_above(&ida->idr, NULL, starting_id, p_id));
+}
+
 static int
 idr_alloc_locked(struct idr *idr, void *ptr, int start, int end)
 {
@@ -538,4 +677,111 @@ idr_alloc_cyclic(struct idr *idr, void *ptr, int start, int end, gfp_t gfp_mask)
 		idr->next_cyclic_id = retval + 1;
 	mtx_unlock(&idr->lock);
 	return (retval);
+}
+
+static int
+idr_for_each_layer(struct idr_layer *il, int layer,
+    int (*f)(int id, void *p, void *data), void *data)
+{
+	int i, err;
+
+	if (il == NULL)
+		return (0);
+	if (layer == 0) {
+		for (i = 0; i < IDR_SIZE; i++) {
+			if (il->ary[i] == NULL)
+				continue;
+			err = f(i, il->ary[i],  data);
+			if (err)
+				return (err);
+		}
+		return (0);
+	}
+	for (i = 0; i < IDR_SIZE; i++) {
+		if (il->ary[i] == NULL)
+			continue;
+		err = idr_for_each_layer(il->ary[i], layer - 1, f, data);
+		if (err)
+			return (err);
+	}
+	return (0);
+}
+
+/* NOTE: It is not allowed to modify the IDR tree while it is being iterated */
+int
+idr_for_each(struct idr *idp, int (*f)(int id, void *p, void *data), void *data)
+{
+	return (idr_for_each_layer(idp->top, idp->layers - 1, f, data));
+}
+
+int
+ida_pre_get(struct ida *ida, gfp_t flags)
+{
+	if (idr_pre_get(&ida->idr, flags) == 0)
+		return (0);
+
+	if (ida->free_bitmap == NULL) {
+		ida->free_bitmap =
+		    malloc(sizeof(struct ida_bitmap), M_IDR, flags);
+	}
+	return (ida->free_bitmap != NULL);
+}
+
+int
+ida_simple_get(struct ida *ida, unsigned int start, unsigned int end,
+    gfp_t flags)
+{
+	int ret, id;
+	unsigned int max;
+
+	MPASS((int)start >= 0);
+	MPASS((int)end >= 0);
+
+	if (end == 0)
+		max = 0x80000000;
+	else {
+		MPASS(end > start);
+		max = end - 1;
+	}
+again:
+	if (!ida_pre_get(ida, flags))
+		return (-ENOMEM);
+
+	if ((ret = ida_get_new_above(ida, start, &id)) == 0) {
+		if (id > max) {
+			ida_remove(ida, id);
+			ret = -ENOSPC;
+		} else {
+			ret = id;
+		}
+	}
+	if (__predict_false(ret == -EAGAIN))
+		goto again;
+
+	return (ret);
+}
+
+void
+ida_simple_remove(struct ida *ida, unsigned int id)
+{
+	idr_remove(&ida->idr, id);
+}
+
+void
+ida_remove(struct ida *ida, int id)
+{	
+	idr_remove(&ida->idr, id);
+}
+
+void
+ida_init(struct ida *ida)
+{
+	idr_init(&ida->idr);
+}
+
+void
+ida_destroy(struct ida *ida)
+{
+	idr_destroy(&ida->idr);
+	free(ida->free_bitmap, M_IDR);
 }

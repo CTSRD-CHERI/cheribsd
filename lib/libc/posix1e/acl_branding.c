@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2008, 2009 Edward Tomasz Napierała <trasz@FreeBSD.org>
  * All rights reserved.
  *
@@ -22,6 +24,16 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_alignment"
+ *   ]
+ * }
+ * CHERI CHANGES END
  */
 
 #include <sys/cdefs.h>
@@ -51,8 +63,11 @@ entry2acl(acl_entry_t entry)
 {
 	acl_t aclp;
 
-	/* XXXCHERI: Had to replace (long) with (intptr_t). */
-	aclp = (acl_t)(((intptr_t)entry >> _ACL_T_ALIGNMENT_BITS) << _ACL_T_ALIGNMENT_BITS);
+#if __has_builtin(__builtin_align_down)
+	aclp = (acl_t)__builtin_align_down(entry, 1 << _ACL_T_ALIGNMENT_BITS);
+#else
+	aclp = (acl_t)(((long)entry >> _ACL_T_ALIGNMENT_BITS) << _ACL_T_ALIGNMENT_BITS);
+#endif
 
 	return (aclp);
 }

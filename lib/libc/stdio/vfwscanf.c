@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -33,6 +35,17 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "support"
+ *   ],
+ *   "change_comment: "PRIiPTR"
+ * }
+ * CHERI CHANGES END
  */
 
 #if 0
@@ -429,10 +442,10 @@ vfwscanf_l(FILE * __restrict fp, locale_t locale,
 	int ret;
 	FIX_LOCALE(locale);
 
-	FLOCKFILE(fp);
+	FLOCKFILE_CANCELSAFE(fp);
 	ORIENT(fp, 1);
 	ret = __vfwscanf(fp, locale, fmt, ap);
-	FUNLOCKFILE(fp);
+	FUNLOCKFILE_CANCELSAFE();
 	return (ret);
 }
 int
@@ -493,7 +506,7 @@ literal:
 				goto input_failure;
 			if (wi != c) {
 				__ungetwc(wi, fp, locale);
-				goto input_failure;
+				goto match_failure;
 			}
 			nread++;
 			continue;

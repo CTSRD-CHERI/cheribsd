@@ -19,7 +19,11 @@
 # include <osreldate.h>
 #endif
 #ifndef SOLARIS
-# define SOLARIS (defined(sun) && (defined(__svr4__) || defined(__SVR4)))
+# if defined(sun) && (defined(__svr4__) || defined(__SVR4))
+#  define	SOLARIS		1
+# else
+#  define	SOLARIS		0
+# endif
 #endif
 #include <sys/errno.h>
 #include <sys/types.h>
@@ -170,15 +174,15 @@ static int magic[IPL_LOGSIZE] = { IPL_MAGIC, IPL_MAGIC_NAT, IPL_MAGIC_STATE,
 
 static ipftuneable_t ipf_log_tuneables[] = {
 	/* log */
-	{ { (void *)offsetof(ipf_log_softc_t, ipl_suppress) },
+	{ { .ipftp_offset = offsetof(ipf_log_softc_t, ipl_suppress) },
 		"log_suppress",		0,	1,
 		stsizeof(ipf_log_softc_t, ipl_suppress),
 		0,			NULL,	NULL },
-	{ { (void *)offsetof(ipf_log_softc_t, ipl_logall) },
+	{ { .ipftp_offset = offsetof(ipf_log_softc_t, ipl_logall) },
 		"log_all",		0,	1,
 		stsizeof(ipf_log_softc_t, ipl_logall),
 		0,			NULL,	NULL },
-	{ { (void *)offsetof(ipf_log_softc_t, ipl_logsize) },
+	{ { .ipftp_offset = offsetof(ipf_log_softc_t, ipl_logsize) },
 		"log_size",		0,	0x80000,
 		stsizeof(ipf_log_softc_t, ipl_logsize),
 		0,			NULL,	NULL },

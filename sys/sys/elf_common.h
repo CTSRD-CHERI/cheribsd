@@ -1,4 +1,7 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
+ * Copyright (c) 2017 Dell EMC
  * Copyright (c) 2000, 2001, 2008, 2011, David E. O'Brien
  * Copyright (c) 1998 John D. Polstra.
  * All rights reserved.
@@ -171,6 +174,7 @@ typedef struct {
 #define	ELFOSABI_AROS		15	/* Amiga Research OS */
 #define	ELFOSABI_FENIXOS	16	/* FenixOS */
 #define	ELFOSABI_CLOUDABI	17	/* Nuxi CloudABI */
+#define	ELFOSABI_ARM_AEABI	64	/* ARM EABI */
 #define	ELFOSABI_ARM		97	/* ARM */
 #define	ELFOSABI_STANDALONE	255	/* Standalone (embedded) application */
 
@@ -304,7 +308,6 @@ typedef struct {
 #define	EM_MIPS_RS4_BE	10	/* MIPS R4000 Big-Endian */
 #define	EM_ALPHA_STD	41	/* Digital Alpha (standard value). */
 #define	EM_ALPHA	0x9026	/* Alpha (written in the absence of an ABI) */
-#define	EM_MIPS_CHERI	0xC256	/* MIPS with CheriABI. */
 
 /**
  * e_flags
@@ -416,7 +419,8 @@ typedef struct {
 #define	SHT_HISUNW		0x6fffffff
 #define	SHT_HIOS		0x6fffffff	/* Last of OS specific semantics */
 #define	SHT_LOPROC		0x70000000	/* reserved range for processor */
-#define	SHT_AMD64_UNWIND	0x70000001	/* unwind information */
+#define	SHT_X86_64_UNWIND	0x70000001	/* unwind information */
+#define	SHT_AMD64_UNWIND	SHT_X86_64_UNWIND 
 
 #define	SHT_ARM_EXIDX		0x70000001	/* Exception index table. */
 #define	SHT_ARM_PREEMPTMAP	0x70000002	/* BPABI DLL dynamic linking 
@@ -473,6 +477,7 @@ typedef struct {
 #define	SHF_OS_NONCONFORMING	0x100	/* OS-specific processing required. */
 #define	SHF_GROUP		0x200	/* Member of section group. */
 #define	SHF_TLS			0x400	/* Section contains TLS data. */
+#define	SHF_COMPRESSED		0x800	/* Section contains compressed data. */
 #define	SHF_MASKOS	0x0ff00000	/* OS-specific semantics. */
 #define	SHF_MASKPROC	0xf0000000	/* Processor-specific semantics. */
 
@@ -509,6 +514,8 @@ typedef struct {
 #define	PT_HISUNW	0x6fffffff
 #define	PT_HIOS		0x6fffffff	/* Last OS-specific. */
 #define	PT_LOPROC	0x70000000	/* First processor-specific type. */
+#define	PT_ARM_ARCHEXT	0x70000000	/* ARM arch compat information. */
+#define	PT_ARM_EXIDX	0x70000001	/* ARM exception unwind tables. */
 #define	PT_HIPROC	0x7fffffff	/* Last processor-specific type. */
 
 /* Values for p_flags. */
@@ -608,6 +615,8 @@ typedef struct {
  */
 #define	DT_ADDRRNGLO	0x6ffffe00
 #define	DT_GNU_HASH	0x6ffffef5	/* GNU-style hash table */
+#define	DT_TLSDESC_PLT	0x6ffffef6	/* loc. of PLT for tlsdesc resolver */
+#define	DT_TLSDESC_GOT	0x6ffffef7	/* loc. of GOT for tlsdesc resolver */
 #define	DT_GNU_CONFLICT	0x6ffffef8	/* address of conflict section */
 #define	DT_GNU_LIBLIST	0x6ffffef9	/* address of library list */
 #define	DT_CONFIG	0x6ffffefa	/* configuration information */
@@ -681,6 +690,9 @@ typedef struct {
 #define	DT_MIPS_RLD_OBJ_UPDATE		0x70000033
 #define	DT_MIPS_RWPLT			0x70000034
 
+#define	DT_CHERI___CAPRELOCS	0x7000c000 /* start of __cap_relocs section */
+#define	DT_CHERI___CAPRELOCSSZ	0x7000c001 /* size of __cap_relocs section */
+
 #define	DT_PPC_GOT			0x70000000
 #define	DT_PPC_TLSOPT			0x70000001
 
@@ -747,9 +759,11 @@ typedef struct {
 #define	NT_PROCSTAT_OSREL	14	/* Procstat osreldate data. */
 #define	NT_PROCSTAT_PSSTRINGS	15	/* Procstat ps_strings data. */
 #define	NT_PROCSTAT_AUXV	16	/* Procstat auxv data. */
+#define	NT_PTLWPINFO		17	/* Thread ptrace miscellaneous info. */
 #define	NT_CAPREGS		20	/* Capability registers. */
 #define	NT_PPC_VMX	0x100	/* PowerPC Altivec/VMX registers */
 #define	NT_X86_XSTATE	0x202	/* x86 XSAVE extended state. */
+#define	NT_ARM_VFP	0x400	/* ARM VFP registers */
 
 /* Symbol Binding - ELFNN_ST_BIND - st_info */
 #define	STB_LOCAL	0	/* Local symbol */
@@ -843,6 +857,13 @@ typedef struct {
 #define	SYMINFO_NONE		0	/* Syminfo version */
 #define	SYMINFO_CURRENT		1
 #define	SYMINFO_NUM		2
+
+/* Values for ch_type (compressed section headers). */
+#define	ELFCOMPRESS_ZLIB	1	/* ZLIB/DEFLATE */
+#define	ELFCOMPRESS_LOOS	0x60000000	/* OS-specific */
+#define	ELFCOMPRESS_HIOS	0x6fffffff
+#define	ELFCOMPRESS_LOPROC	0x70000000	/* Processor-specific */
+#define	ELFCOMPRESS_HIPROC	0x7fffffff
 
 /*
  * Relocation types.
@@ -1035,10 +1056,18 @@ typedef struct {
 #define	R_MIPS_CALL16	11	/* 16 bit GOT entry for function */
 #define	R_MIPS_GPREL32	12	/* GP relative 32 bit */
 #define	R_MIPS_64	18	/* Direct 64 bit */
-#define	R_MIPS_GOTHI16	21	/* GOT HI 16 bit */
-#define	R_MIPS_GOTLO16	22	/* GOT LO 16 bit */
+#define	R_MIPS_GOT_DISP	19
+#define	R_MIPS_GOT_PAGE	20
+#define	R_MIPS_GOT_OFST	21
+#define	R_MIPS_GOT_HI16	22	/* GOT HI 16 bit */
+#define	R_MIPS_GOT_LO16	23	/* GOT LO 16 bit */
+#define	R_MIPS_SUB	24
 #define	R_MIPS_CALLHI16 30	/* upper 16 bit GOT entry for function */
 #define	R_MIPS_CALLLO16 31	/* lower 16 bit GOT entry for function */
+#define	R_MIPS_JALR	37
+#define	R_MIPS_TLS_GD	42
+#define	R_MIPS_COPY	126
+#define	R_MIPS_JUMP_SLOT	127
 
 #define	R_PPC_NONE		0	/* No relocation. */
 #define	R_PPC_ADDR32		1

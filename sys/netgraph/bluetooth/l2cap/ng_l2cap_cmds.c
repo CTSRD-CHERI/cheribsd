@@ -3,6 +3,8 @@
  */
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
  *
@@ -332,7 +334,7 @@ ng_l2cap_con_fail(ng_l2cap_con_p con, u_int16_t result)
 
 /*
  * Process L2CAP command timeout. In general - notify upper layer and destroy
- * channel. Do not pay much attension to return code, just do our best.
+ * channel. Do not pay much attention to return code, just do our best.
  */
 
 void

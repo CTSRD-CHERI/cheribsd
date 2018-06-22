@@ -3,6 +3,8 @@
  */
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2001-2002 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
  *
@@ -615,8 +617,8 @@ bt3c_pccard_attach(device_t dev)
 
 	/* Allocate I/O ports */
 	sc->iobase_rid = 0;
-	sc->iobase = bus_alloc_resource(dev, SYS_RES_IOPORT, &sc->iobase_rid, 
-			0, ~0, 8, RF_ACTIVE);
+	sc->iobase = bus_alloc_resource_anywhere(dev, SYS_RES_IOPORT,
+			&sc->iobase_rid, 8, RF_ACTIVE);
 	if (sc->iobase == NULL) {
 		device_printf(dev, "Could not allocate I/O ports\n");
 		goto bad;

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1990, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -13,7 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -28,6 +30,16 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_bit_flags"
+ *   ]
+ * }
+ * CHERI CHANGES END
  */
 
 #if defined(LIBC_SCCS) && !defined(lint)
@@ -245,7 +257,7 @@ newbuf(HTAB *hashp, u_int32_t addr, BUFHEAD *prev_bp)
 			 */
 			for (xbp = bp; xbp->ovfl;) {
 				next_xbp = xbp->ovfl;
-				xbp->ovfl = 0;
+				xbp->ovfl = NULL;
 				xbp = next_xbp;
 
 				/* Check that ovfl pointer is up date. */
@@ -350,7 +362,7 @@ __buf_free(HTAB *hashp, int do_free, int to_disk)
 void
 __reclaim_buf(HTAB *hashp, BUFHEAD *bp)
 {
-	bp->ovfl = 0;
+	bp->ovfl = NULL;
 	bp->addr = 0;
 	bp->flags = 0;
 	BUF_REMOVE(bp);

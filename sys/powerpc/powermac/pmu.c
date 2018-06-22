@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2006 Michael Lorenz
  * Copyright 2008 by Nathan Whitehorn
  * All rights reserved.
@@ -1064,7 +1066,7 @@ pmu_battquery_sysctl(SYSCTL_HANDLER_ARGS)
 	default:
 		/* This should never happen */
 		result = -1;
-	};
+	}
 
 	error = sysctl_handle_int(oidp, &result, 0, req);
 

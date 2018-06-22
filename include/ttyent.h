@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -38,6 +40,7 @@
 #define	_TTYS_OFF	"off"
 #define	_TTYS_ON	"on"
 #define	_TTYS_ONIFCONSOLE "onifconsole"
+#define	_TTYS_ONIFEXISTS "onifexists"
 #define	_TTYS_SECURE	"secure"
 #define	_TTYS_INSECURE	"insecure"
 #define	_TTYS_WINDOW	"window"

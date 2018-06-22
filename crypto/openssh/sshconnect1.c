@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect1.c,v 1.77 2015/01/14 20:05:27 djm Exp $ */
+/* $OpenBSD: sshconnect1.c,v 1.80 2017/03/10 03:53:11 dtucker Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -221,7 +221,7 @@ try_rsa_authentication(int idx)
 {
 	BIGNUM *challenge;
 	Key *public, *private;
-	char buf[300], *passphrase, *comment, *authfile;
+	char buf[300], *passphrase = NULL, *comment, *authfile;
 	int i, perm_ok = 1, type, quit;
 
 	public = options.identity_keys[idx];
@@ -283,13 +283,20 @@ try_rsa_authentication(int idx)
 				debug2("no passphrase given, try next key");
 				quit = 1;
 			}
-			explicit_bzero(passphrase, strlen(passphrase));
-			free(passphrase);
 			if (private != NULL || quit)
 				break;
 			debug2("bad passphrase given, try again...");
 		}
 	}
+
+	if (private != NULL)
+		maybe_add_key_to_agent(authfile, private, comment, passphrase);
+
+	if (passphrase != NULL) {
+		explicit_bzero(passphrase, strlen(passphrase));
+		free(passphrase);
+	}
+
 	/* We no longer need the comment. */
 	free(comment);
 
@@ -502,7 +509,6 @@ ssh_kex(char *host, struct sockaddr *hostaddr)
 	u_char cookie[8];
 	u_int supported_ciphers;
 	u_int server_flags, client_flags;
-	u_int32_t rnd = 0;
 
 	debug("Waiting for server public key.");
 
@@ -514,7 +520,8 @@ ssh_kex(char *host, struct sockaddr *hostaddr)
 		cookie[i] = packet_get_char();
 
 	/* Get the public key. */
-	server_key = key_new(KEY_RSA1);
+	if ((server_key = key_new(KEY_RSA1)) == NULL)
+		fatal("%s: key_new(KEY_RSA1) failed", __func__);
 	bits = packet_get_int();
 	packet_get_bignum(server_key->rsa->e);
 	packet_get_bignum(server_key->rsa->n);
@@ -526,7 +533,8 @@ ssh_kex(char *host, struct sockaddr *hostaddr)
 		logit("Warning: This may be due to an old implementation of ssh.");
 	}
 	/* Get the host key. */
-	host_key = key_new(KEY_RSA1);
+	if ((host_key = key_new(KEY_RSA1)) == NULL)
+		fatal("%s: key_new(KEY_RSA1) failed", __func__);
 	bits = packet_get_int();
 	packet_get_bignum(host_key->rsa->e);
 	packet_get_bignum(host_key->rsa->n);
@@ -561,12 +569,7 @@ ssh_kex(char *host, struct sockaddr *hostaddr)
 	 * random number, interpreted as a 32-byte key, with the least
 	 * significant 8 bits being the first byte of the key.
 	 */
-	for (i = 0; i < 32; i++) {
-		if (i % 4 == 0)
-			rnd = arc4random();
-		session_key[i] = rnd & 0xff;
-		rnd >>= 8;
-	}
+	arc4random_buf(session_key, sizeof(session_key));
 
 	/*
 	 * According to the protocol spec, the first byte of the session key

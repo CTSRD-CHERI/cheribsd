@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2003 Poul-Henning Kamp.
  * Copyright (c) 1995 Jason R. Thorpe.
  * Copyright (c) 1990, 1993
@@ -271,7 +273,7 @@ ccdinit(struct gctl_req *req, struct ccd_s *cs)
 
 	/*
 	 * If uniform interleave is desired set all sizes to that of
-	 * the smallest component.  This will guarentee that a single
+	 * the smallest component.  This will guarantee that a single
 	 * interleave table is generated.
 	 *
 	 * Lost space must be taken into account when calculating the
@@ -291,7 +293,7 @@ ccdinit(struct gctl_req *req, struct ccd_s *cs)
 		 * Check to see if an even number of components
 		 * have been specified.  The interleave must also
 		 * be non-zero in order for us to be able to 
-		 * guarentee the topology.
+		 * guarantee the topology.
 		 */
 		if (cs->sc_ndisks % 2) {
 			gctl_error(req,

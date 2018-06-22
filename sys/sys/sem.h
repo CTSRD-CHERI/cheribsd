@@ -76,11 +76,37 @@ union semun_old {
 /*
  * semctl's arg parameter structure
  */
+#if !defined(_KERNEL) || defined(_WANT_SEMUN)
 union semun {
 	int		val;		/* value for SETVAL */
 	struct		semid_ds *buf;	/* buffer for IPC_STAT & IPC_SET */
 	unsigned short	*array;		/* array for GETALL & SETALL */
 };
+#else
+#if __has_feature(capabilities)
+/*
+ * XXX: We'd like to use semun_c here, but semid_ds currently contains
+ * kernel pointers for no good reason.  Because buf is copied in and
+ * translated in the syscall make it not be a capability for easy of use.
+ */
+union semun_kernel {
+	int			val;	/* value for SETVAL */
+	struct semid_ds		*buf;	/* buffer for IPC_STAT & IPC_SET */
+	unsigned short * __capability array;	/* array for GETALL & SETALL */
+};
+#endif
+union semun_native {
+	int		val;		/* value for SETVAL */
+	struct		semid_ds *buf;	/* buffer for IPC_STAT & IPC_SET */
+	unsigned short	*array;		/* array for GETALL & SETALL */
+};
+#if __has_feature(capabilities)
+typedef union semun_kernel	ksemun_t;
+#else
+typedef union semun_native	ksemun_t;
+#endif
+typedef union semun_native	usemun_t;
+#endif
 
 /*
  * commands for semctl

@@ -279,13 +279,13 @@ proto_busdma_md_load(struct proto_busdma *busdma, struct proto_md *md,
     struct proto_ioc_busdma *ioc, struct thread *td)
 {
 	struct proto_callback_bundle pcb;
-	struct iovec iov;
+	kiovec_t iov;
 	struct uio uio;
 	pmap_t pmap;
 	int error;
 
-	iov.iov_base = (void *)(uintptr_t)ioc->u.md.virt_addr;
-	iov.iov_len = ioc->u.md.virt_size;
+	IOVEC_INIT(&iov, (void *)(uintptr_t)ioc->u.md.virt_addr,
+	    ioc->u.md.virt_size);
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = 0;

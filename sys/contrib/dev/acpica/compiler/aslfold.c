@@ -4,9 +4,117 @@
  *
  *****************************************************************************/
 
-/*
- * Copyright (C) 2000 - 2015, Intel Corp.
+/******************************************************************************
+ *
+ * 1. Copyright Notice
+ *
+ * Some or all of this work - Copyright (c) 1999 - 2017, Intel Corp.
  * All rights reserved.
+ *
+ * 2. License
+ *
+ * 2.1. This is your license from Intel Corp. under its intellectual property
+ * rights. You may have additional license terms from the party that provided
+ * you this software, covering your right to use that party's intellectual
+ * property rights.
+ *
+ * 2.2. Intel grants, free of charge, to any person ("Licensee") obtaining a
+ * copy of the source code appearing in this file ("Covered Code") an
+ * irrevocable, perpetual, worldwide license under Intel's copyrights in the
+ * base code distributed originally by Intel ("Original Intel Code") to copy,
+ * make derivatives, distribute, use and display any portion of the Covered
+ * Code in any form, with the right to sublicense such rights; and
+ *
+ * 2.3. Intel grants Licensee a non-exclusive and non-transferable patent
+ * license (with the right to sublicense), under only those claims of Intel
+ * patents that are infringed by the Original Intel Code, to make, use, sell,
+ * offer to sell, and import the Covered Code and derivative works thereof
+ * solely to the minimum extent necessary to exercise the above copyright
+ * license, and in no event shall the patent license extend to any additions
+ * to or modifications of the Original Intel Code. No other license or right
+ * is granted directly or by implication, estoppel or otherwise;
+ *
+ * The above copyright and patent license is granted only if the following
+ * conditions are met:
+ *
+ * 3. Conditions
+ *
+ * 3.1. Redistribution of Source with Rights to Further Distribute Source.
+ * Redistribution of source code of any substantial portion of the Covered
+ * Code or modification with rights to further distribute source must include
+ * the above Copyright Notice, the above License, this list of Conditions,
+ * and the following Disclaimer and Export Compliance provision. In addition,
+ * Licensee must cause all Covered Code to which Licensee contributes to
+ * contain a file documenting the changes Licensee made to create that Covered
+ * Code and the date of any change. Licensee must include in that file the
+ * documentation of any changes made by any predecessor Licensee. Licensee
+ * must include a prominent statement that the modification is derived,
+ * directly or indirectly, from Original Intel Code.
+ *
+ * 3.2. Redistribution of Source with no Rights to Further Distribute Source.
+ * Redistribution of source code of any substantial portion of the Covered
+ * Code or modification without rights to further distribute source must
+ * include the following Disclaimer and Export Compliance provision in the
+ * documentation and/or other materials provided with distribution. In
+ * addition, Licensee may not authorize further sublicense of source of any
+ * portion of the Covered Code, and must include terms to the effect that the
+ * license from Licensee to its licensee is limited to the intellectual
+ * property embodied in the software Licensee provides to its licensee, and
+ * not to intellectual property embodied in modifications its licensee may
+ * make.
+ *
+ * 3.3. Redistribution of Executable. Redistribution in executable form of any
+ * substantial portion of the Covered Code or modification must reproduce the
+ * above Copyright Notice, and the following Disclaimer and Export Compliance
+ * provision in the documentation and/or other materials provided with the
+ * distribution.
+ *
+ * 3.4. Intel retains all right, title, and interest in and to the Original
+ * Intel Code.
+ *
+ * 3.5. Neither the name Intel nor any other trademark owned or controlled by
+ * Intel shall be used in advertising or otherwise to promote the sale, use or
+ * other dealings in products derived from or relating to the Covered Code
+ * without prior written authorization from Intel.
+ *
+ * 4. Disclaimer and Export Compliance
+ *
+ * 4.1. INTEL MAKES NO WARRANTY OF ANY KIND REGARDING ANY SOFTWARE PROVIDED
+ * HERE. ANY SOFTWARE ORIGINATING FROM INTEL OR DERIVED FROM INTEL SOFTWARE
+ * IS PROVIDED "AS IS," AND INTEL WILL NOT PROVIDE ANY SUPPORT, ASSISTANCE,
+ * INSTALLATION, TRAINING OR OTHER SERVICES. INTEL WILL NOT PROVIDE ANY
+ * UPDATES, ENHANCEMENTS OR EXTENSIONS. INTEL SPECIFICALLY DISCLAIMS ANY
+ * IMPLIED WARRANTIES OF MERCHANTABILITY, NONINFRINGEMENT AND FITNESS FOR A
+ * PARTICULAR PURPOSE.
+ *
+ * 4.2. IN NO EVENT SHALL INTEL HAVE ANY LIABILITY TO LICENSEE, ITS LICENSEES
+ * OR ANY OTHER THIRD PARTY, FOR ANY LOST PROFITS, LOST DATA, LOSS OF USE OR
+ * COSTS OF PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, OR FOR ANY INDIRECT,
+ * SPECIAL OR CONSEQUENTIAL DAMAGES ARISING OUT OF THIS AGREEMENT, UNDER ANY
+ * CAUSE OF ACTION OR THEORY OF LIABILITY, AND IRRESPECTIVE OF WHETHER INTEL
+ * HAS ADVANCE NOTICE OF THE POSSIBILITY OF SUCH DAMAGES. THESE LIMITATIONS
+ * SHALL APPLY NOTWITHSTANDING THE FAILURE OF THE ESSENTIAL PURPOSE OF ANY
+ * LIMITED REMEDY.
+ *
+ * 4.3. Licensee shall not export, either directly or indirectly, any of this
+ * software or system incorporating such software without first obtaining any
+ * required license or other approval from the U. S. Department of Commerce or
+ * any other agency or department of the United States Government. In the
+ * event Licensee exports any such software from the United States or
+ * re-exports any such software from a foreign destination, Licensee shall
+ * ensure that the distribution and export/re-export of the software is in
+ * compliance with all laws, regulations, orders, or other restrictions of the
+ * U.S. Export Administration Regulations. Licensee agrees that neither it nor
+ * any of its subsidiaries will export/re-export any technical data, process,
+ * software, or service, directly or indirectly, to any country for which the
+ * United States government or any agency thereof requires an export license,
+ * other governmental approval, or letter of assurance, without first obtaining
+ * such license, approval or letter.
+ *
+ *****************************************************************************
+ *
+ * Alternatively, you may choose to be licensed under the terms of the
+ * following license:
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,23 +131,23 @@
  *    of any contributors may be used to endorse or promote products derived
  *    from this software without specific prior written permission.
  *
- * Alternatively, this software may be distributed under the terms of the
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Alternatively, you may choose to be licensed under the terms of the
  * GNU General Public License ("GPL") version 2 as published by the Free
  * Software Foundation.
  *
- * NO WARRANTY
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * HOLDERS OR CONTRIBUTORS BE LIABLE FOR SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
- * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
- * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGES.
- */
+ *****************************************************************************/
 
 #include <contrib/dev/acpica/compiler/aslcompiler.h>
 #include "aslcompiler.y.h"
@@ -100,7 +208,8 @@ TrInstallReducedConstant (
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Reduce an Op and its subtree to a constant if possible
+ * DESCRIPTION: Reduce an Op and its subtree to a constant if possible.
+ *              Called during ascent of the parse tree.
  *
  ******************************************************************************/
 
@@ -123,8 +232,8 @@ OpcAmlConstantWalk (
      * Only interested in subtrees that could possibly contain
      * expressions that can be evaluated at this time
      */
-    if ((!(Op->Asl.CompileFlags & NODE_COMPILE_TIME_CONST)) ||
-          (Op->Asl.CompileFlags & NODE_IS_TARGET))
+    if ((!(Op->Asl.CompileFlags & OP_COMPILE_TIME_CONST)) ||
+          (Op->Asl.CompileFlags & OP_IS_TARGET))
     {
         return (AE_OK);
     }
@@ -192,9 +301,7 @@ OpcAmlConstantWalk (
         OpcUpdateIntegerNode (Op, 0);
     }
 
-    /* Abort the walk of this subtree, we are done with it */
-
-    return (AE_CTRL_DEPTH);
+    return (AE_OK);
 }
 
 
@@ -206,7 +313,8 @@ OpcAmlConstantWalk (
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Check one Op for a type 3/4/5 AML opcode
+ * DESCRIPTION: Check one Op for a reducible type 3/4/5 AML opcode.
+ *              This is performed via an upward walk of the parse subtree.
  *
  ******************************************************************************/
 
@@ -218,6 +326,8 @@ OpcAmlCheckForConstant (
 {
     ACPI_WALK_STATE         *WalkState = Context;
     ACPI_STATUS             Status = AE_OK;
+    ACPI_PARSE_OBJECT       *NextOp;
+    const ACPI_OPCODE_INFO  *OpInfo;
 
 
     WalkState->Op = Op;
@@ -226,21 +336,6 @@ OpcAmlCheckForConstant (
 
     DbgPrint (ASL_PARSE_OUTPUT, "[%.4d] Opcode: %12.12s ",
         Op->Asl.LogicalLineNumber, Op->Asl.ParseOpName);
-
-    /*
-     * TBD: Ignore buffer constants for now. The problem is that these
-     * constants have been transformed into RAW_DATA at this point, from
-     * the parse tree transform process which currently happens before
-     * the constant folding process. We may need to defer this transform
-     * for buffer until after the constant folding.
-     */
-    if (WalkState->Opcode == AML_BUFFER_OP)
-    {
-        DbgPrint (ASL_PARSE_OUTPUT,
-            "\nBuffer+Buffer->Buffer constant reduction is not supported yet");
-        Status = AE_TYPE;
-        goto CleanupAndExit;
-    }
 
     /*
      * These opcodes do not appear in the OpcodeInfo table, but
@@ -256,13 +351,97 @@ OpcAmlCheckForConstant (
         goto CleanupAndExit;
     }
 
+    /*
+     * Search upwards for a possible Name() operator. This is done
+     * because a type 3/4/5 opcode within a Name() expression
+     * MUST be reduced to a simple constant.
+     */
+    NextOp = Op->Asl.Parent;
+    while (NextOp)
+    {
+        /* Finished if we find a Name() opcode */
+
+        if (NextOp->Asl.AmlOpcode == AML_NAME_OP)
+        {
+            break;
+        }
+
+        /*
+         * Any "deferred" opcodes contain one or more TermArg parameters,
+         * and thus are not required to be folded to constants at compile
+         * time. This affects things like Buffer() and Package() objects.
+         * We just ignore them here. However, any sub-expressions can and
+         * will still be typechecked. Note: These are called the
+         * "deferred" opcodes in the AML interpreter.
+         */
+        OpInfo = AcpiPsGetOpcodeInfo (NextOp->Common.AmlOpcode);
+        if (OpInfo->Flags & AML_DEFER)
+        {
+            NextOp = NULL;
+            break;
+        }
+
+        NextOp = NextOp->Asl.Parent;
+    }
+
     /* Type 3/4/5 opcodes have the AML_CONSTANT flag set */
 
     if (!(WalkState->OpInfo->Flags & AML_CONSTANT))
     {
-        /* Not 3/4/5 opcode, but maybe can convert to STORE */
+        /*
+         * From the ACPI specification:
+         *
+         * "The Type 3/4/5 opcodes return a value and can be used in an
+         * expression that evaluates to a constant. These opcodes may be
+         * evaluated at ASL compile-time. To ensure that these opcodes
+         * will evaluate to a constant, the following rules apply: The
+         * term cannot have a destination (target) operand, and must have
+         * either a Type3Opcode, Type4Opcode, Type5Opcode, ConstExprTerm,
+         * Integer, BufferTerm, Package, or String for all arguments."
+         */
 
-        if (Op->Asl.CompileFlags & NODE_IS_TARGET)
+        /*
+         * The value (second) operand for the Name() operator MUST
+         * reduce to a single constant, as per the ACPI specification
+         * (the operand is a DataObject). This also implies that there
+         * can be no target operand. Name() is the only ASL operator
+         * with a "DataObject" as an operand and is thus special-
+         * cased here.
+         */
+        if (NextOp) /* Inspect a Name() operator */
+        {
+            /* Error if there is a target operand */
+
+            if (Op->Asl.CompileFlags & OP_IS_TARGET)
+            {
+                AslError (ASL_ERROR, ASL_MSG_INVALID_TARGET, Op, NULL);
+                Status = AE_TYPE;
+            }
+
+            /* Error if expression cannot be reduced (folded) */
+
+            if (!(NextOp->Asl.CompileFlags & OP_COULD_NOT_REDUCE))
+            {
+                /* Ensure only one error message per statement */
+
+                NextOp->Asl.CompileFlags |= OP_COULD_NOT_REDUCE;
+                DbgPrint (ASL_PARSE_OUTPUT,
+                    "**** Could not reduce operands for NAME opcode ****\n");
+
+                AslError (ASL_ERROR, ASL_MSG_CONSTANT_REQUIRED, Op,
+                    "Constant is required for Name operator");
+                Status = AE_TYPE;
+            }
+        }
+
+        if (ACPI_FAILURE (Status))
+        {
+            goto CleanupAndExit;
+        }
+
+        /* This is not a 3/4/5 opcode, but maybe can convert to STORE */
+
+        if (Op->Asl.CompileFlags & OP_IS_TARGET)
         {
             DbgPrint (ASL_PARSE_OUTPUT,
                 "**** Valid Target, transform to Store ****\n");
@@ -272,8 +451,30 @@ OpcAmlCheckForConstant (
         /* Expression cannot be reduced */
 
         DbgPrint (ASL_PARSE_OUTPUT,
-            "**** Not a Type 3/4/5 opcode (%s) ****",
+            "**** Not a Type 3/4/5 opcode or cannot reduce/fold (%s) ****\n",
              Op->Asl.ParseOpName);
+
+        Status = AE_TYPE;
+        goto CleanupAndExit;
+    }
+
+    /*
+     * TBD: Ignore buffer constants for now. The problem is that these
+     * constants have been transformed into RAW_DATA at this point, from
+     * the parse tree transform process which currently happens before
+     * the constant folding process. We may need to defer this transform
+     * for buffer until after the constant folding.
+     */
+    if (WalkState->Opcode == AML_BUFFER_OP)
+    {
+        DbgPrint (ASL_PARSE_OUTPUT,
+            "\nBuffer constant reduction is not supported yet\n");
+
+        if (NextOp) /* Found a Name() operator, error */
+        {
+            AslError (ASL_ERROR, ASL_MSG_UNSUPPORTED, Op,
+                "Buffer expression cannot be reduced");
+        }
 
         Status = AE_TYPE;
         goto CleanupAndExit;
@@ -283,7 +484,7 @@ OpcAmlCheckForConstant (
 
     DbgPrint (ASL_PARSE_OUTPUT, "TYPE_345");
 
-    if (Op->Asl.CompileFlags & NODE_IS_TARGET)
+    if (Op->Asl.CompileFlags & OP_IS_TARGET)
     {
         if (Op->Asl.ParseOpcode == PARSEOP_ZERO)
         {
@@ -294,7 +495,8 @@ OpcAmlCheckForConstant (
             DbgPrint (ASL_PARSE_OUTPUT, "%-16s", " VALID TARGET");
         }
     }
-    if (Op->Asl.CompileFlags & NODE_IS_TERM_ARG)
+
+    if (Op->Asl.CompileFlags & OP_IS_TERM_ARG)
     {
         DbgPrint (ASL_PARSE_OUTPUT, "%-16s", " TERMARG");
     }
@@ -303,7 +505,7 @@ CleanupAndExit:
 
     /* Dump the node compile flags also */
 
-    TrPrintNodeCompileFlags (Op->Asl.CompileFlags);
+    TrPrintOpFlags (Op->Asl.CompileFlags, ASL_PARSE_OUTPUT);
     DbgPrint (ASL_PARSE_OUTPUT, "\n");
     return (Status);
 }
@@ -341,7 +543,7 @@ TrSimpleConstantReduction (
 
     /* Allocate a new temporary root for this subtree */
 
-    RootOp = TrAllocateNode (PARSEOP_INTEGER);
+    RootOp = TrAllocateOp (PARSEOP_INTEGER);
     if (!RootOp)
     {
         return (AE_NO_MEMORY);
@@ -423,9 +625,6 @@ TrTransformToStoreOp (
     ACPI_STATUS             Status;
 
 
-    DbgPrint (ASL_PARSE_OUTPUT,
-        "Reduction/Transform to StoreOp: Store(Constant, Target)\n");
-
     /* Extract the operands */
 
     Child1 = Op->Asl.Child;
@@ -447,11 +646,15 @@ TrTransformToStoreOp (
         }
     }
 
+    DbgPrint (ASL_PARSE_OUTPUT,
+        "Reduction/Transform to StoreOp: Store(%s, %s)\n",
+        Child1->Asl.ParseOpName, Child2->Asl.ParseOpName);
+
     /*
      * Create a NULL (zero) target so that we can use the
      * interpreter to evaluate the expression.
      */
-    NewTarget = TrCreateNullTarget ();
+    NewTarget = TrCreateNullTargetOp ();
     NewTarget->Common.AmlOpcode = AML_INT_NAMEPATH_OP;
 
     /* Handle one-operand cases (NOT, TOBCD, etc.) */
@@ -467,7 +670,7 @@ TrTransformToStoreOp (
     Child2->Asl.Next = NewTarget;
     NewTarget->Asl.Parent = OriginalTarget->Asl.Parent;
 
-    NewParent = TrAllocateNode (PARSEOP_INTEGER);
+    NewParent = TrAllocateOp (PARSEOP_INTEGER);
     NewParent->Common.AmlOpcode = AML_INT_EVAL_SUBTREE_OP;
 
     OriginalParent = Op->Common.Parent;
@@ -596,12 +799,12 @@ TrInstallReducedConstant (
          */
         Op->Asl.ParseOpcode = PARSEOP_BUFFER;
         Op->Common.AmlOpcode = AML_BUFFER_OP;
-        Op->Asl.CompileFlags = NODE_AML_PACKAGE;
+        Op->Asl.CompileFlags = OP_AML_PACKAGE;
         UtSetParseOpName (Op);
 
         /* Child node is the buffer length */
 
-        LengthOp = TrAllocateNode (PARSEOP_INTEGER);
+        LengthOp = TrAllocateOp (PARSEOP_INTEGER);
 
         LengthOp->Asl.AmlOpcode = AML_DWORD_OP;
         LengthOp->Asl.Value.Integer = ObjDesc->Buffer.Length;
@@ -612,7 +815,7 @@ TrInstallReducedConstant (
 
         /* Next child is the raw buffer data */
 
-        DataOp = TrAllocateNode (PARSEOP_RAW_DATA);
+        DataOp = TrAllocateOp (PARSEOP_RAW_DATA);
         DataOp->Asl.AmlOpcode = AML_RAW_DATA_BUFFER;
         DataOp->Asl.AmlLength = ObjDesc->Buffer.Length;
         DataOp->Asl.Value.String = (char *) ObjDesc->Buffer.Pointer;
@@ -660,25 +863,25 @@ OpcUpdateIntegerNode (
     {
     case 1:
 
-        TrUpdateNode (PARSEOP_BYTECONST, Op);
+        TrSetOpIntegerValue (PARSEOP_BYTECONST, Op);
         Op->Asl.AmlOpcode = AML_RAW_DATA_BYTE;
         break;
 
     case 2:
 
-        TrUpdateNode (PARSEOP_WORDCONST, Op);
+        TrSetOpIntegerValue (PARSEOP_WORDCONST, Op);
         Op->Asl.AmlOpcode = AML_RAW_DATA_WORD;
         break;
 
     case 4:
 
-        TrUpdateNode (PARSEOP_DWORDCONST, Op);
+        TrSetOpIntegerValue (PARSEOP_DWORDCONST, Op);
         Op->Asl.AmlOpcode = AML_RAW_DATA_DWORD;
         break;
 
     case 8:
 
-        TrUpdateNode (PARSEOP_QWORDCONST, Op);
+        TrSetOpIntegerValue (PARSEOP_QWORDCONST, Op);
         Op->Asl.AmlOpcode = AML_RAW_DATA_QWORD;
         break;
 
@@ -686,7 +889,7 @@ OpcUpdateIntegerNode (
     default:
 
         OpcSetOptimalIntegerSize (Op);
-        TrUpdateNode (PARSEOP_INTEGER, Op);
+        TrSetOpIntegerValue (PARSEOP_INTEGER, Op);
         break;
     }
 

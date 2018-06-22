@@ -1,4 +1,4 @@
-/*
+/*-
  * $FreeBSD$
  *
  * Copyright (c) 2002-2004 David Boggs. <boggs@boggs.palo-alto.ca.us>
@@ -91,7 +91,11 @@
 # define  P2P 0		/* not in FreeBSD */
 # define NSPPP 1	/* No count devices in FreeBSD 5 */
 # include "opt_bpf.h"	/* DEV_BPF */
-# define NBPFILTER DEV_BPF
+# ifdef DEV_BPF
+#  define NBPFILTER 1
+# else
+#  define NBPFILTER 0
+# endif
 # define  GEN_HDLC 0	/* not in FreeBSD */
 #
 # include <sys/systm.h>
@@ -1268,7 +1272,7 @@ t3_send_dbl_feac(softc_t *sc, int feac1, int feac2)
   /* Flush received FEACS; don't respond to our own loop cmd! */
   while (read_framer(sc, T3CSR_FEAC_STK) & FEAC_STK_VALID) DELAY(1); /* XXX HANG */
   /* Restore previous state of the FEAC transmitter. */
-  /* If it was sending a continous FEAC, it will resume. */
+  /* If it was sending a continuous FEAC, it will resume. */
   write_framer(sc, T3CSR_TX_FEAC, tx_feac);
   }
 
@@ -3567,12 +3571,12 @@ lmc_raw_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
   switch (cmd)
     {
     case SIOCAIFADDR:
-    case SIOCSIFFLAGS:
-    case SIOCSIFADDR:
+    CASE_IOC_IFREQ(SIOCSIFFLAGS):
+    CASE_IOC_IFREQ(SIOCSIFADDR):
       ifp->if_flags |= IFF_UP;	/* a Unix tradition */
       break;
-    case SIOCSIFMTU:
-      ifp->if_mtu = ifr->ifr_mtu;
+    CASE_IOC_IFREQ(SIOCSIFMTU):
+      ifp->if_mtu = ifr_mtu_get(ifr);
       break;
     default:
       error = EINVAL;
@@ -3817,7 +3821,6 @@ setup_ifnet(struct ifnet *ifp)
 
 # if defined(DEVICE_POLLING)
   ifp->if_capabilities |= IFCAP_POLLING;
-  ifp->if_capenable    |= IFCAP_POLLING_NOCOUNT;
 # endif
 
   if_initname(ifp, device_get_name(sc->dev), device_get_unit(sc->dev));
@@ -4510,8 +4513,8 @@ fbsd_attach(device_t dev)
   sc->csr_res_id   = TLP_CBMA;
   sc->csr_res_type = SYS_RES_MEMORY;
 # endif
-  sc->csr_res = bus_alloc_resource(dev, sc->csr_res_type, &sc->csr_res_id,
-   0, ~0, 1, RF_ACTIVE);
+  sc->csr_res = bus_alloc_resource_any(dev, sc->csr_res_type, &sc->csr_res_id,
+   RF_ACTIVE);
   if (sc->csr_res == NULL)
     {
     printf("%s: bus_alloc_resource(csr) failed.\n", NAME_UNIT);
@@ -4522,8 +4525,8 @@ fbsd_attach(device_t dev)
 
   /* Allocate PCI interrupt resources for the card. */
   sc->irq_res_id = 0;
-  sc->irq_res = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irq_res_id,
-   0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
+  sc->irq_res = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->irq_res_id,
+   RF_ACTIVE | RF_SHAREABLE);
   if (sc->irq_res == NULL)
     {
     printf("%s: bus_alloc_resource(irq) failed.\n", NAME_UNIT);

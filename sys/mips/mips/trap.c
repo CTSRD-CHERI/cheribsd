@@ -1,6 +1,8 @@
 /*	$OpenBSD: trap.c,v 1.19 1998/09/30 12:40:41 pefo Exp $	*/
 /* tracked to 1.23 */
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -17,7 +19,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -75,8 +77,8 @@ __FBSDID("$FreeBSD$");
 #include <net/netisr.h>
 
 #include <machine/trap.h>
-#include <machine/cheri.h>
 #include <machine/cpu.h>
+#include <machine/cpuinfo.h>
 #include <machine/pte.h>
 #include <machine/pmap.h>
 #include <machine/md_var.h>
@@ -85,6 +87,11 @@ __FBSDID("$FreeBSD$");
 #include <machine/regnum.h>
 #include <machine/tlb.h>
 #include <machine/tls.h>
+
+#ifdef CPU_CHERI
+#include <cheri/cheri.h>
+#include <cheri/cheric.h>
+#endif
 
 #ifdef DDB
 #include <machine/db_machdep.h>
@@ -111,6 +118,10 @@ int trap_debug = 0;
 SYSCTL_INT(_machdep, OID_AUTO, trap_debug, CTLFLAG_RW,
     &trap_debug, 0, "Debug information on all traps");
 #endif
+int stop_vm_trace_on_fault = 0;
+SYSCTL_INT(_machdep, OID_AUTO, stop_vm_trace_on_fault, CTLFLAG_RW,
+    &stop_vm_trace_on_fault, 0,
+    "Disable VM instruction tracing when a fault is logged");
 #ifdef CPU_CHERI
 int log_cheri_exceptions = 1;
 SYSCTL_INT(_machdep, OID_AUTO, log_cheri_exceptions, CTLFLAG_RW,
@@ -183,6 +194,8 @@ static void log_c2e_exception(const char *, struct trapframe *, int);
 #endif
 static void log_frame_dump(struct trapframe *frame);
 static void get_mapping_info(vm_offset_t, pd_entry_t **, pt_entry_t **);
+
+int (*dtrace_invop_jump_addr)(struct trapframe *);
 
 #ifdef TRAP_DEBUG
 static void trap_frame_dump(struct trapframe *frame);
@@ -308,11 +321,6 @@ char *trap_type[] = {
 struct trapdebug trapdebug[TRAPSIZE], *trp = trapdebug;
 #endif
 
-#if defined(DDB) || defined(DEBUG)
-void stacktrace(struct trapframe *);
-void logstacktrace(struct trapframe *);
-#endif
-
 #define	KERNLAND(x)	((vm_offset_t)(x) >= VM_MIN_KERNEL_ADDRESS && (vm_offset_t)(x) < VM_MAX_KERNEL_ADDRESS)
 #define	DELAYBRANCH(x)	((int)(x) < 0)
 
@@ -376,6 +384,13 @@ char *access_name[] = {
 #include <machine/octeon_cop2.h>
 #endif
 
+/*
+ * Unaligned access handling is completely broken if the trap happens in a
+ * CHERI instructions. Since we are now running lots of CHERI purecap code and
+ * the LLVM branch delay slot filler actually fills CHERI delay slots, having
+ * this on by default makes it really hard to debug where something is going
+ * wrong since we will just die with a completely unrelated exception later.
+ */
 static int allow_unaligned_acc = 1;
 
 SYSCTL_INT(_vm, OID_AUTO, allow_unaligned_acc, CTLFLAG_RW,
@@ -400,12 +415,16 @@ static int emulate_unaligned_access(struct trapframe *frame, int mode);
 extern void fswintrberr(void); /* XXX */
 
 int
-cpu_fetch_syscall_args(struct thread *td, struct syscall_args *sa)
+cpu_fetch_syscall_args(struct thread *td)
 {
-	struct trapframe *locr0 = td->td_frame;
+	struct trapframe *locr0;
 	struct sysentvec *se;
+	struct syscall_args *sa;
 	int error, nsaved;
 
+	locr0 = td->td_frame;
+	sa = &td->td_sa;
+	
 	bzero(sa->args, sizeof(sa->args));
 
 	/* compute next PC after syscall instruction */
@@ -651,7 +670,8 @@ trap(struct trapframe *trapframe)
 			break;
 		}
 		if ((last_badvaddr == this_badvaddr) &&
-		    ((type & ~T_USER) != T_SYSCALL)) {
+		    ((type & ~T_USER) != T_SYSCALL) &&
+		    ((type & ~T_USER) != T_COP_UNUSABLE)) {
 			if (++count == 3) {
 				trap_frame_dump(trapframe);
 				panic("too many faults at %p\n", (void *)last_badvaddr);
@@ -770,14 +790,6 @@ trap(struct trapframe *trapframe)
 		if (td->td_pcb->pcb_onfault == NULL)
 			goto err;
 
-		/* check for fuswintr() or suswintr() getting a page fault */
-		/* XXX There must be a nicer way to do this.  */
-		if (td->td_pcb->pcb_onfault == fswintrberr) {
-			pc = (register_t)(intptr_t)td->td_pcb->pcb_onfault;
-			td->td_pcb->pcb_onfault = NULL;
-			return (pc);
-		}
-
 		goto dofault;
 
 	case T_TLB_LD_MISS + T_USER:
@@ -842,8 +854,11 @@ dofault:
 				}
 				goto err;
 			}
-			ucode = ftype;
-			i = ((rv == KERN_PROTECTION_FAILURE) ? SIGBUS : SIGSEGV);
+			i = SIGSEGV;
+			if (rv == KERN_PROTECTION_FAILURE)
+				ucode = SEGV_ACCERR;
+			else
+				ucode = SEGV_MAPERR;
 			addr = trapframe->pc;
 
 			msg = "BAD_PAGE_FAULT";
@@ -887,19 +902,18 @@ dofault:
 
 	case T_SYSCALL + T_USER:
 		{
-			struct syscall_args sa;
 			int error;
 
-			sa.trapframe = trapframe;
-			error = syscallenter(td, &sa);
+			td->td_sa.trapframe = trapframe;
+			error = syscallenter(td);
 
 #if !defined(SMP) && (defined(DDB) || defined(DEBUG))
 			if (trp == trapdebug)
-				trapdebug[TRAPSIZE - 1].code = sa.code;
+				trapdebug[TRAPSIZE - 1].code = td->td_sa.code;
 			else
-				trp[-1].code = sa.code;
+				trp[-1].code = td->td_sa.code;
 #endif
-			trapdebug_enter(td->td_frame, -sa.code);
+			trapdebug_enter(td->td_frame, -td->td_sa.code);
 
 			/*
 			 * The sync'ing of I & D caches for SYS_ptrace() is
@@ -907,14 +921,22 @@ dofault:
 			 * instead of being done here under a special check
 			 * for SYS_ptrace().
 			 */
-			syscallret(td, error, &sa);
+			syscallret(td, error);
 			return (trapframe->pc);
 		}
 
-#ifdef DDB
+#if defined(KDTRACE_HOOKS) || defined(DDB)
 	case T_BREAK:
+#ifdef KDTRACE_HOOKS
+		if (!usermode && dtrace_invop_jump_addr != 0) {
+			dtrace_invop_jump_addr(trapframe);
+			return (trapframe->pc);
+		}
+#endif
+#ifdef DDB
 		kdb_trap(type, 0, trapframe);
 		return (trapframe->pc);
+#endif
 #endif
 
 	case T_BREAK + T_USER:
@@ -942,7 +964,7 @@ dofault:
 			}
 			/*
 			 * The restoration of the original instruction and
-			 * the clearing of the berakpoint will be done later
+			 * the clearing of the breakpoint will be done later
 			 * by the call to ptrace_clear_single_step() in
 			 * issignal() when SIGTRAP is processed.
 			 */
@@ -996,26 +1018,17 @@ dofault:
 #ifdef CPU_CHERI
 
 			/*
-			 * XXXRW: We really need a cfuword(), and also to use
-			 * a frame-extracted EPCC rather than the live one, as
-			 * we may have taken a further exception if interrupts
-			 * are enabled.  However, this helps with debugging in
-			 * the mean time.
-			 *
-			 * XXXRW: Especially, we need to be prepared for the
+			 * XXXRW: Wwe need to be prepared for the
 			 * possibility that $pcc ($epcc) is not readable or
 			 * unaligned.
-			 *
-			 * XXXRW: Should just use the CP0 'faulting
-			 * instruction' register available in CHERI.
-			 *
-			 * XXXRW: As interrupts have been enabled at this
-			 * point, EPCC may not be the faulting one we would
-			 * like -- e.g., it could be for a kernel TLB miss.
-			 * We should be loading CTEMP0 from the saved EPCC
-			 * from the trap frame instead.
 			 */
-			CHERI_CLW(inst.word, 0, 0, CHERI_CR_EPCC);
+			if (fueword32_c(trapframe->pcc, &inst.word) != 0) {
+				printf("Reserved inst trap: Failed to fetch "
+				    "bad inst from epcc: ");
+				CHERI_PRINT_PTR(trapframe->pcc);
+				/* Ensure none of the switch cases match */
+				inst.word = 0;
+			}
 #else
 			inst = *(InstFmt *)(intptr_t)trapframe->pc;
 #endif
@@ -1026,7 +1039,7 @@ dofault:
 					/* Register 29 used for TLS */
 					if (inst.RType.rd == 29) {
 						frame_regs = &(trapframe->zero);
-						frame_regs[inst.RType.rt] = (register_t)(intptr_t)td->td_md.md_tls;
+						frame_regs[inst.RType.rt] = (register_t)(intptr_t)(__cheri_fromcap void *)td->td_md.md_tls;
 						frame_regs[inst.RType.rt] += td->td_md.md_tls_tcb_offset;
 						trapframe->pc += sizeof(int);
 						goto out;
@@ -1043,6 +1056,12 @@ dofault:
 		break;
 #ifdef CPU_CHERI
 	case T_C2E:
+		if (td->td_pcb->pcb_onfault != NULL) {
+			pc = (register_t)(intptr_t)td->td_pcb->pcb_onfault;
+			td->td_pcb->pcb_onfault = NULL;
+			return (pc);
+		}
+
 		goto err;
 		break;
 
@@ -1054,6 +1073,7 @@ dofault:
 #endif
 		log_c2e_exception(msg, trapframe, type);
 		i = SIGPROT;
+		ucode = cheri_capcause_to_sicode(trapframe->capcause);
 		addr = trapframe->pc;
 		break;
 
@@ -1129,19 +1149,23 @@ dofault:
 			    "T_COP_UNUSABLE + T_USER exception");
 #endif
 		if (cop == 1) {
-#if !defined(CPU_HAVEFPU)
-		/* FP (COP1) instruction */
-			log_illegal_instruction("COP1_UNUSABLE", trapframe);
-			i = SIGILL;
-			break;
-#else
+			/* FP (COP1) instruction */
+			if (cpuinfo.fpu_id == 0) {
+				log_illegal_instruction("COP1_UNUSABLE",
+				    trapframe);
+				i = SIGILL;
+				break;
+			}
 			addr = trapframe->pc;
 			MipsSwitchFPState(PCPU_GET(fpcurthread), td->td_frame);
 			PCPU_SET(fpcurthread, td);
+#if defined(__mips_n64)
+			td->td_frame->sr |= MIPS_SR_COP_1_BIT | MIPS_SR_FR;
+#else
 			td->td_frame->sr |= MIPS_SR_COP_1_BIT;
+#endif
 			td->td_md.md_flags |= MDTD_FPUSED;
 			goto out;
-#endif
 		}
 #ifdef	CPU_CNMIPS
 		else  if (cop == 2) {
@@ -1186,12 +1210,12 @@ dofault:
 
 	case T_FPE + T_USER:
 #if !defined(CPU_HAVEFPU)
-	  i = SIGILL;
-	  addr = trapframe->pc;
-	  break;
+		i = SIGILL;
+		addr = trapframe->pc;
+		break;
 #else
 		if (!emulate_fp) {
-			i = SIGILL;
+			i = SIGFPE;
 			addr = trapframe->pc;
 			break;
 		}
@@ -1241,7 +1265,6 @@ dofault:
 err:
 
 #if !defined(SMP) && defined(DEBUG)
-		stacktrace(!usermode ? trapframe : td->td_frame);
 		trapDump("trap");
 #endif
 #ifdef SMP
@@ -1275,7 +1298,8 @@ err:
 	ksiginfo_init_trap(&ksi);
 	ksi.ksi_signo = i;
 	ksi.ksi_code = ucode;
-	ksi.ksi_addr = (void *)addr;
+	/* XXXBD: probably not quite right for CheriABI */
+	ksi.ksi_addr = (void * __capability)(intcap_t)addr;
 	ksi.ksi_trapno = type;
 	trapsignal(td, &ksi);
 out:
@@ -1324,6 +1348,7 @@ trapDump(char *msg)
  * Return the resulting PC as if the branch was executed.
  *
  * XXXRW: What about CHERI branch instructions?
+ * XXXAR: This needs to be fixed for cbez/cbnz/cbtu/cbts/cjalr/cjr/ccall_fast
  */
 uintptr_t
 MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
@@ -1339,21 +1364,14 @@ MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
 
 #ifdef CPU_CHERI
 	/*
-	 * XXXRW: This isn't really right, as it doesn't properly implement
-	 * CHERI bounds checking for $epcc.  On the other hand, unlike some
-	 * other pc loads in trap.c, it actually uses fuword()!
+	 * XXXRW: This needs careful review.  We extract a suitable offset
+	 * from the executing $pcc, add it to $pcc's base, and use that for a
+	 * $kdc-relative load via fuword().  Is this safe with respect to
+	 * alignment on $pcc, etc?
 	 */
-	/*
-	 * XXXRW: TODO: Implement offsetting instptr or instPC by the thread's
-	 * $pcc.  Unfortuntely, we don't have a pointer to that here, only
-	 * having been passed 'trapframe', not 'cheriframe'.  We use the saved
-	 * $epcc, but it's not clear if that's safe.
-	 */
-	register_t pcc_base;
-	CHERI_CGETBASE(pcc_base, CHERI_CR_EPCC);
 	if (instptr)
-		instptr += pcc_base;
-	instPC += pcc_base;
+		instptr += cheri_getbase(framePtr->pcc);
+	instPC += cheri_getbase(framePtr->pcc);
 #endif
 	if (instptr) {
 		if (instptr < MIPS_KSEG0_START)
@@ -1367,6 +1385,9 @@ MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
 			inst = *(InstFmt *) instPC;
 	}
 
+	/*
+	 * XXXRW: CHERI branch instructions are not handled here.
+	 */
 	switch ((int)inst.JType.op) {
 	case OP_SPECIAL:
 		switch ((int)inst.RType.func) {
@@ -1475,69 +1496,61 @@ MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
 		break;
 
 	default:
-		retAddr = instPC + 4;
+		printf("Unhandled opcode in %s: 0x%x\n", __func__, inst.word);
+		/* retAddr = instPC + 4;  */
+		/* Return to NULL to force a crash in the user program */
+		retAddr = 0;
 	}
 	return (retAddr);
 }
 
-
-#if defined(DDB) || defined(DEBUG)
-/*
- * Print a stack backtrace.
- */
-void
-stacktrace(struct trapframe *regs)
-{
-	stacktrace_subr(regs->pc, regs->sp, regs->ra, printf);
-}
-#endif
-
 static void
 log_frame_dump(struct trapframe *frame)
 {
-	log(LOG_ERR, "Trapframe Register Dump:\n");
-	log(LOG_ERR, "\tzero: %#jx\tat: %#jx\tv0: %#jx\tv1: %#jx\n",
+
+	/*
+	 * Stop QEMU instruction tracing when we hit an exception
+	 */
+	if (stop_vm_trace_on_fault)
+		__asm__ __volatile__("li $0, 0xdead");
+
+	printf("Trapframe Register Dump:\n");
+	printf("$0: %#-18jx at: %#-18jx v0: %#-18jx v1: %#-18jx\n",
 	    (intmax_t)0, (intmax_t)frame->ast, (intmax_t)frame->v0, (intmax_t)frame->v1);
 
-	log(LOG_ERR, "\ta0: %#jx\ta1: %#jx\ta2: %#jx\ta3: %#jx\n",
+	printf("a0: %#-18jx a1: %#-18jx a2: %#-18jx a3: %#-18jx\n",
 	    (intmax_t)frame->a0, (intmax_t)frame->a1, (intmax_t)frame->a2, (intmax_t)frame->a3);
 
 #if defined(__mips_n32) || defined(__mips_n64)
-	log(LOG_ERR, "\ta4: %#jx\ta5: %#jx\ta6: %#jx\ta6: %#jx\n",
+	printf("a4: %#-18jx a5: %#-18jx a6: %#-18jx a7: %#-18jx\n",
 	    (intmax_t)frame->a4, (intmax_t)frame->a5, (intmax_t)frame->a6, (intmax_t)frame->a7);
 
-	log(LOG_ERR, "\tt0: %#jx\tt1: %#jx\tt2: %#jx\tt3: %#jx\n",
+	printf("t0: %#-18jx t1: %#-18jx t2: %#-18jx t3: %#-18jx\n",
 	    (intmax_t)frame->t0, (intmax_t)frame->t1, (intmax_t)frame->t2, (intmax_t)frame->t3);
 #else
-	log(LOG_ERR, "\tt0: %#jx\tt1: %#jx\tt2: %#jx\tt3: %#jx\n",
+	printf("t0: %#-18jx t1: %#-18jx t2: %#-18jx t3: %#-18jx\n",
 	    (intmax_t)frame->t0, (intmax_t)frame->t1, (intmax_t)frame->t2, (intmax_t)frame->t3);
 
-	log(LOG_ERR, "\tt4: %#jx\tt5: %#jx\tt6: %#jx\tt7: %#jx\n",
+	printf("t4: %#-18jx t5: %#-18jx t6: %#-18jx t7: %#-18jx\n",
 	    (intmax_t)frame->t4, (intmax_t)frame->t5, (intmax_t)frame->t6, (intmax_t)frame->t7);
 #endif
-	log(LOG_ERR, "\tt8: %#jx\tt9: %#jx\ts0: %#jx\ts1: %#jx\n",
-	    (intmax_t)frame->t8, (intmax_t)frame->t9, (intmax_t)frame->s0, (intmax_t)frame->s1);
+	printf("s0: %#-18jx s1: %#-18jx s2: %#-18jx s3: %#-18jx\n",
+	    (intmax_t)frame->s0, (intmax_t)frame->s1, (intmax_t)frame->s2, (intmax_t)frame->s3);
 
-	log(LOG_ERR, "\ts2: %#jx\ts3: %#jx\ts4: %#jx\ts5: %#jx\n",
-	    (intmax_t)frame->s2, (intmax_t)frame->s3, (intmax_t)frame->s4, (intmax_t)frame->s5);
+	printf("s4: %#-18jx s5: %#-18jx s6: %#-18jx s7: %#-18jx\n",
+	    (intmax_t)frame->s4, (intmax_t)frame->s5, (intmax_t)frame->s6, (intmax_t)frame->s7);
 
-	log(LOG_ERR, "\ts6: %#jx\ts7: %#jx\tk0: %#jx\tk1: %#jx\n",
-	    (intmax_t)frame->s6, (intmax_t)frame->s7, (intmax_t)frame->k0, (intmax_t)frame->k1);
+	printf("t8: %#-18jx t9: %#-18jx k0: %#-18jx k1: %#-18jx\n",
+	    (intmax_t)frame->t8, (intmax_t)frame->t9, (intmax_t)frame->k0, (intmax_t)frame->k1);
 
-	log(LOG_ERR, "\tgp: %#jx\tsp: %#jx\ts8: %#jx\tra: %#jx\n",
+	printf("gp: %#-18jx sp: %#-18jx s8: %#-18jx ra: %#-18jx\n",
 	    (intmax_t)frame->gp, (intmax_t)frame->sp, (intmax_t)frame->s8, (intmax_t)frame->ra);
 
-	log(LOG_ERR, "\tsr: %#jx\tmullo: %#jx\tmulhi: %#jx\tbadvaddr: %#jx\n",
+	printf("status: %#jx mullo: %#jx; mulhi: %#jx; badvaddr: %#jx\n",
 	    (intmax_t)frame->sr, (intmax_t)frame->mullo, (intmax_t)frame->mulhi, (intmax_t)frame->badvaddr);
 
-#ifdef IC_REG
-	log(LOG_ERR, "\tcause: %#jx\tpc: %#jx\tic: %#jx\n",
-	    (intmax_t)(uint32_t)frame->cause, (intmax_t)frame->pc,
-	    (intmax_t)frame->ic);
-#else
-	log(LOG_ERR, "\tcause: %#jx\tpc: %#jx\n",
+	printf("cause: %#jx; pc: %#jx\n",
 	    (intmax_t)(uint32_t)frame->cause, (intmax_t)frame->pc);
-#endif
 }
 
 #ifdef TRAP_DEBUG
@@ -1578,14 +1591,8 @@ trap_frame_dump(struct trapframe *frame)
 	printf("\tsr: %#jx\tmullo: %#jx\tmulhi: %#jx\tbadvaddr: %#jx\n",
 	    (intmax_t)frame->sr, (intmax_t)frame->mullo, (intmax_t)frame->mulhi, (intmax_t)frame->badvaddr);
 
-#ifdef IC_REG
-	printf("\tcause: %#jx\tpc: %#jx\tic: %#jx\n",
-	    (intmax_t)(uint32_t)frame->cause, (intmax_t)frame->pc,
-	    (intmax_t)frame->ic);
-#else
 	printf("\tcause: %#jx\tpc: %#jx\n",
 	    (intmax_t)(uint32_t)frame->cause, (intmax_t)frame->pc);
-#endif
 }
 
 #endif
@@ -1828,18 +1835,11 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, re
 	 * then substitute a different instruction...
 	 *
 	 * XXXRW: Should just use the CP0 'faulting instruction' register
-	 * available in CHERI.
-	 *
-	 * XXXRW: The below uses the saved $epcc for the user thread, but if
-	 * this is an emulated unaligned access for a kernel thread, then this
-	 * will not work.
+	 * available in CHERI (but not MIPS generally).
 	 */
-	CHERI_CLC(CHERI_CR_CTEMP0, CHERI_CR_KDC,
-	    &curthread->td_pcb->pcb_cheriframe.cf_pcc, 0);
-	CHERI_CLW(inst, 0, 0, CHERI_CR_CTEMP0);
-#else
-	inst = *((u_int32_t *)(intptr_t)pc);;
+	pc += cheri_getbase(frame->pcc);
 #endif
+	inst = *((u_int32_t *)(intptr_t)pc);;
 	src_regno = MIPS_INST_RT(inst);
 
 	/*
@@ -1947,7 +1947,7 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, re
 		kaddr += sizeof(register_t) - size;
 #endif
 		int err;
-		if ((err = copyout(kaddr, (void*)addr, size))) {
+		if ((err = copyout_implicit_cap(kaddr, (void*)addr, size))) {
 			return (0);
 		}
 		return (op_type);
@@ -1959,7 +1959,7 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, re
 		kaddr += sizeof(register_t) - size;
 #endif
 		int err;
-		if ((err = copyin((void*)addr, kaddr, size))) {
+		if ((err = copyin_implicit_cap((void*)addr, kaddr, size))) {
 			return (0);
 		}
 		/* If we need to sign extend it, then shift it so that the sign
@@ -1981,7 +1981,7 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, re
 static struct timeval unaligned_lasterr;
 static int unaligned_curerr;
 
-static int unaligned_pps_log_limit = 4;
+static int unaligned_pps_log_limit = 0;
 
 SYSCTL_INT(_machdep, OID_AUTO, unaligned_log_pps_limit, CTLFLAG_RWTUN,
     &unaligned_pps_log_limit, 0,

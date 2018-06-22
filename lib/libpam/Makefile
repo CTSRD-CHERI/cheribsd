@@ -24,8 +24,17 @@
 #
 # $FreeBSD$
 
-# The modules must be built first, because they are built into the
-# static version of libpam.
-SUBDIR+=	modules libpam static_modules
+# The modules link in libpam.  They build the static modules as well.
+SUBDIR+=	libpam modules
+SUBDIR_DEPEND_modules=	libpam
+.if defined(LIBCHERI)
+# XXX: hack to build some sort of libpam while we want for dynamic
+# cheriabi binaries to be realiably useful.
+SUBDIR+=	static_libpam
+.else
+SUBDIR.${MK_STATIC_LIBPAM}+=	static_libpam
+.endif
+SUBDIR_DEPEND_static_libpam= modules
+SUBDIR_PARALLEL=
 
 .include <bsd.subdir.mk>

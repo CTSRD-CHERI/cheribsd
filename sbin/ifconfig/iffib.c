@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011 Alexander V. Chernikov
  * Copyright (c) 2011 Christian S.J. Peron
  * Copyright (c) 2011 Bjoern A. Zeeb
@@ -49,13 +51,13 @@ fib_status(int s)
 	struct ifreq ifr;
 
 	memset(&ifr, 0, sizeof(ifr));
-	strncpy(ifr.ifr_name, name, sizeof(ifr.ifr_name));
+	strlcpy(ifr.ifr_name, name, sizeof(ifr.ifr_name));
 	if (ioctl(s, SIOCGIFFIB, (caddr_t)&ifr) == 0 &&
 	    ifr.ifr_fib != RT_DEFAULT_FIB)
 		printf("\tfib: %u\n", ifr.ifr_fib);
 
 	memset(&ifr, 0, sizeof(ifr));
-	strncpy(ifr.ifr_name, name, sizeof(ifr.ifr_name));
+	strlcpy(ifr.ifr_name, name, sizeof(ifr.ifr_name));
 	if (ioctl(s, SIOCGTUNFIB, (caddr_t)&ifr) == 0 &&
 	    ifr.ifr_fib != RT_DEFAULT_FIB)
 		printf("\ttunnelfib: %u\n", ifr.ifr_fib);
@@ -74,7 +76,7 @@ setiffib(const char *val, int dummy __unused, int s,
 		return;
 	}
 
-	strncpy(ifr.ifr_name, name, sizeof (ifr.ifr_name));
+	strlcpy(ifr.ifr_name, name, sizeof (ifr.ifr_name));
 	ifr.ifr_fib = fib;
 	if (ioctl(s, SIOCSIFFIB, (caddr_t)&ifr) < 0)
 		warn("ioctl (SIOCSIFFIB)");
@@ -93,7 +95,7 @@ settunfib(const char *val, int dummy __unused, int s,
 		return;
 	}
 
-	strncpy(ifr.ifr_name, name, sizeof (ifr.ifr_name));
+	strlcpy(ifr.ifr_name, name, sizeof (ifr.ifr_name));
 	ifr.ifr_fib = fib;
 	if (ioctl(s, SIOCSTUNFIB, (caddr_t)&ifr) < 0)
 		warn("ioctl (SIOCSTUNFIB)");

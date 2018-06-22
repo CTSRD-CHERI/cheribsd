@@ -1,4 +1,5 @@
 /*******************************************************************************
+SPDX-License-Identifier: BSD-3-Clause
 
 Copyright (c) 2001-2004, Intel Corporation
 All rights reserved.
@@ -277,7 +278,7 @@ struct adapter {
 
 	/* FreeBSD operating-system-specific structures */
 	struct ixgb_osdep osdep;
-	struct device  *dev;
+	device_t	dev;
 	struct resource *res_memory;
 	struct resource *res_ioport;
 	struct resource *res_interrupt;

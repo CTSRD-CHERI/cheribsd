@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -13,7 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -70,7 +72,7 @@ int (*nfsd_call_nfscl)(struct thread *, struct nfssvc_args *) = NULL;
 int (*nfsd_call_nfsd)(struct thread *, struct nfssvc_args *) = NULL;
 
 /*
- * Nfs server psuedo system call for the nfsd's
+ * Nfs server pseudo system call for the nfsd's
  */
 int
 sys_nfssvc(struct thread *td, struct nfssvc_args *uap)
@@ -92,7 +94,7 @@ sys_nfssvc(struct thread *td, struct nfssvc_args *uap)
 	    nfsd_call_nfsserver != NULL)
 		error = (*nfsd_call_nfsserver)(td, uap);
 	else if ((uap->flag & (NFSSVC_CBADDSOCK | NFSSVC_NFSCBD |
-	    NFSSVC_DUMPMNTOPTS)) && nfsd_call_nfscl != NULL)
+	    NFSSVC_DUMPMNTOPTS | NFSSVC_FORCEDISM)) && nfsd_call_nfscl != NULL)
 		error = (*nfsd_call_nfscl)(td, uap);
 	else if ((uap->flag & (NFSSVC_IDNAME | NFSSVC_GETSTATS |
 	    NFSSVC_GSSDADDPORT | NFSSVC_GSSDADDFIRST | NFSSVC_GSSDDELETEALL |

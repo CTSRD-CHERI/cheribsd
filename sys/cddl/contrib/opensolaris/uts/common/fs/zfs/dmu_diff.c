@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2015 by Delphix. All rights reserved.
  */
 
 #include <sys/dmu.h>
@@ -52,10 +52,9 @@ static int
 write_bytes(struct diffarg *da)
 {
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 
-	aiov.iov_base = (caddr_t)&da->da_ddr;
-	aiov.iov_len = sizeof (da->da_ddr);
+	IOVEC_INIT_OBJ(&aiov, da->da_ddr);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_resid = aiov.iov_len;
@@ -169,7 +168,7 @@ diff_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 			if (err)
 				break;
 		}
-		(void) arc_buf_remove_ref(abuf, &abuf);
+		arc_buf_destroy(abuf, &abuf);
 		if (err)
 			return (err);
 		/* Don't care about the data blocks */

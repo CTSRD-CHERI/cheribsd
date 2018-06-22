@@ -2,7 +2,7 @@
 
 .include <src.opts.mk>
 
-.PATH:	${.CURDIR}/../../../../sbin/hastd
+.PATH:	${SRCTOP}/sbin/hastd
 
 MOD=	hast
 SRCS=	ebuf.c
@@ -13,12 +13,14 @@ SRCS+=	parse.y pjdlog.c
 SRCS+=	proto.c proto_common.c proto_uds.c
 SRCS+=	token.l
 SRCS+=	y.tab.h
+# There are cap_relocs against the functions in hast_checksum.c
+SRCS+=	hast_checksum.c
 MAN=	snmp_hast.3
 
 NO_WFORMAT=
 NO_WCAST_ALIGN=
 NO_WMISSING_VARIABLE_DECLARATIONS=
-CFLAGS+=-I${.CURDIR}/../../../../sbin/hastd
+CFLAGS+=-I${SRCTOP}/sbin/hastd
 CFLAGS+=-DHAVE_CAPSICUM
 CFLAGS+=-DINET
 .if ${MK_INET6_SUPPORT} != "no"

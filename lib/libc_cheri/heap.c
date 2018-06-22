@@ -47,8 +47,8 @@ static char *rcsid = "$FreeBSD$";
 #include <sys/param.h>
 #include <sys/types.h>
 
-#include <machine/cheri.h>
-#include <machine/cheric.h>
+#include <cheri/cheri.h>
+#include <cheri/cheric.h>
 
 #include <assert.h>
 #include <stdlib.h>
@@ -101,7 +101,6 @@ __init_heap(size_t pagesz)
 void *
 __rederive_pointer(void *ptr)
 {
-	size_t i;
 	vm_offset_t addr;
 
 	addr = cheri_getbase(ptr) + cheri_getoffset(ptr);

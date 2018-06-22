@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2009 Bruce Simpson.
  * All rights reserved.
  *
@@ -574,7 +576,7 @@ in6m_clear_recorded(struct in6_multi *inm)
  *
  * Return 0 if the source didn't exist or was already marked as recorded.
  * Return 1 if the source was marked as recorded by this function.
- * Return <0 if any error occured (negated errno code).
+ * Return <0 if any error occurred (negated errno code).
  */
 int
 in6m_record_source(struct in6_multi *inm, const struct in6_addr *addr)
@@ -999,9 +1001,10 @@ in6m_merge(struct in6_multi *inm, /*const*/ struct in6_mfilter *imf)
 	/* Decrement ASM listener count on transition out of ASM mode. */
 	if (imf->im6f_st[0] == MCAST_EXCLUDE && nsrc0 == 0) {
 		if ((imf->im6f_st[1] != MCAST_EXCLUDE) ||
-		    (imf->im6f_st[1] == MCAST_EXCLUDE && nsrc1 > 0))
+		    (imf->im6f_st[1] == MCAST_EXCLUDE && nsrc1 > 0)) {
 			CTR1(KTR_MLD, "%s: --asm on inm at t1", __func__);
 			--inm->in6m_st[1].iss_asm;
+		}
 	}
 
 	/* Increment ASM listener count on transition to ASM mode. */
@@ -1235,10 +1238,7 @@ out_in6m_release:
 int
 in6_mc_leave(struct in6_multi *inm, /*const*/ struct in6_mfilter *imf)
 {
-	struct ifnet *ifp;
 	int error;
-
-	ifp = inm->in6m_ifp;
 
 	IN6_MULTI_LOCK();
 	error = in6_mc_leave_locked(inm, imf);

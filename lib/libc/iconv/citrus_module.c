@@ -2,6 +2,8 @@
 /* $NetBSD: citrus_module.c,v 1.9 2009/01/11 02:46:24 christos Exp $ */
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
  * Copyright (c)1999, 2000, 2001, 2002 Citrus Project,
  * All rights reserved.
  *
@@ -86,6 +88,17 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_provenance"
+ *   ],
+ *   "change_comment": "dlfunc() vs dlsym()"
+ * }
+ * CHERI CHANGES END
  */
 
 #include <sys/cdefs.h>
@@ -267,7 +280,7 @@ _citrus_find_getops(_citrus_module_t handle, const char *modname,
 
 	snprintf(name, sizeof(name), "_citrus_%s_%s_getops",
 	    modname, ifname);
-	p = dlsym((void *)handle, name);
+	p = dlfunc((void *)handle, name);
 	return (p);
 }
 

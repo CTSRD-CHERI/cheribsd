@@ -16,134 +16,175 @@ namespace lldb {
 
 class SBTarget;
 
-class LLDB_API SBAttachInfo
-{
+class LLDB_API SBAttachInfo {
 public:
-    SBAttachInfo ();
+  SBAttachInfo();
 
-    SBAttachInfo (lldb::pid_t pid);
+  SBAttachInfo(lldb::pid_t pid);
 
-    SBAttachInfo (const char *path, bool wait_for);
+  //------------------------------------------------------------------
+  /// Attach to a process by name.
+  ///
+  /// This function implies that a future call to SBTarget::Attach(...)
+  /// will be synchronous.
+  ///
+  /// @param[in] path
+  ///     A full or partial name for the process to attach to.
+  ///
+  /// @param[in] wait_for
+  ///     If \b false, attach to an existing process whose name matches.
+  ///     If \b true, then wait for the next process whose name matches.
+  //------------------------------------------------------------------
+  SBAttachInfo(const char *path, bool wait_for);
 
-    SBAttachInfo (const SBAttachInfo &rhs);
+  //------------------------------------------------------------------
+  /// Attach to a process by name.
+  ///
+  /// Future calls to SBTarget::Attach(...) will be synchronous or
+  /// asynchronous depending on the \a async argument.
+  ///
+  /// @param[in] path
+  ///     A full or partial name for the process to attach to.
+  ///
+  /// @param[in] wait_for
+  ///     If \b false, attach to an existing process whose name matches.
+  ///     If \b true, then wait for the next process whose name matches.
+  ///
+  /// @param[in] async
+  ///     If \b false, then the SBTarget::Attach(...) call will be a
+  ///     synchronous call with no way to cancel the attach in
+  ///     progress.
+  ///     If \b true, then the SBTarget::Attach(...) function will
+  ///     return immediately and clients are expected to wait for a
+  ///     process eStateStopped event if a suitable process is
+  ///     eventually found. If the client wants to cancel the event,
+  ///     SBProcess::Stop() can be called and an eStateExited process
+  ///     event will be delivered.
+  //------------------------------------------------------------------
+  SBAttachInfo(const char *path, bool wait_for, bool async);
 
-    ~SBAttachInfo();
+  SBAttachInfo(const SBAttachInfo &rhs);
 
-    SBAttachInfo &
-    operator = (const SBAttachInfo &rhs);
+  ~SBAttachInfo();
 
-    lldb::pid_t
-    GetProcessID ();
+  SBAttachInfo &operator=(const SBAttachInfo &rhs);
 
-    void
-    SetProcessID (lldb::pid_t pid);
+  lldb::pid_t GetProcessID();
 
-    void
-    SetExecutable (const char *path);
+  void SetProcessID(lldb::pid_t pid);
 
-    void
-    SetExecutable (lldb::SBFileSpec exe_file);
+  void SetExecutable(const char *path);
 
-    bool
-    GetWaitForLaunch ();
+  void SetExecutable(lldb::SBFileSpec exe_file);
 
-    void
-    SetWaitForLaunch (bool b);
+  bool GetWaitForLaunch();
 
-    bool
-    GetIgnoreExisting ();
+  //------------------------------------------------------------------
+  /// Set attach by process name settings.
+  ///
+  /// Designed to be used after a call to SBAttachInfo::SetExecutable().
+  /// This function implies that a call to SBTarget::Attach(...) will
+  /// be synchronous.
+  ///
+  /// @param[in] b
+  ///     If \b false, attach to an existing process whose name matches.
+  ///     If \b true, then wait for the next process whose name matches.
+  //------------------------------------------------------------------
+  void SetWaitForLaunch(bool b);
 
-    void
-    SetIgnoreExisting (bool b);
+  //------------------------------------------------------------------
+  /// Set attach by process name settings.
+  ///
+  /// Designed to be used after a call to SBAttachInfo::SetExecutable().
+  /// Future calls to SBTarget::Attach(...) will be synchronous or
+  /// asynchronous depending on the \a async argument.
+  ///
+  /// @param[in] b
+  ///     If \b false, attach to an existing process whose name matches.
+  ///     If \b true, then wait for the next process whose name matches.
+  ///
+  /// @param[in] async
+  ///     If \b false, then the SBTarget::Attach(...) call will be a
+  ///     synchronous call with no way to cancel the attach in
+  ///     progress.
+  ///     If \b true, then the SBTarget::Attach(...) function will
+  ///     return immediately and clients are expected to wait for a
+  ///     process eStateStopped event if a suitable process is
+  ///     eventually found. If the client wants to cancel the event,
+  ///     SBProcess::Stop() can be called and an eStateExited process
+  ///     event will be delivered.
+  //------------------------------------------------------------------
+  void SetWaitForLaunch(bool b, bool async);
 
-    uint32_t
-    GetResumeCount ();
+  bool GetIgnoreExisting();
 
-    void
-    SetResumeCount (uint32_t c);
+  void SetIgnoreExisting(bool b);
 
-    const char *
-    GetProcessPluginName ();
+  uint32_t GetResumeCount();
 
-    void
-    SetProcessPluginName (const char *plugin_name);
+  void SetResumeCount(uint32_t c);
 
-    uint32_t
-    GetUserID();
+  const char *GetProcessPluginName();
 
-    uint32_t
-    GetGroupID();
+  void SetProcessPluginName(const char *plugin_name);
 
-    bool
-    UserIDIsValid ();
+  uint32_t GetUserID();
 
-    bool
-    GroupIDIsValid ();
+  uint32_t GetGroupID();
 
-    void
-    SetUserID (uint32_t uid);
+  bool UserIDIsValid();
 
-    void
-    SetGroupID (uint32_t gid);
+  bool GroupIDIsValid();
 
-    uint32_t
-    GetEffectiveUserID();
+  void SetUserID(uint32_t uid);
 
-    uint32_t
-    GetEffectiveGroupID();
+  void SetGroupID(uint32_t gid);
 
-    bool
-    EffectiveUserIDIsValid ();
+  uint32_t GetEffectiveUserID();
 
-    bool
-    EffectiveGroupIDIsValid ();
+  uint32_t GetEffectiveGroupID();
 
-    void
-    SetEffectiveUserID (uint32_t uid);
+  bool EffectiveUserIDIsValid();
 
-    void
-    SetEffectiveGroupID (uint32_t gid);
+  bool EffectiveGroupIDIsValid();
 
-    lldb::pid_t
-    GetParentProcessID ();
+  void SetEffectiveUserID(uint32_t uid);
 
-    void
-    SetParentProcessID (lldb::pid_t pid);
+  void SetEffectiveGroupID(uint32_t gid);
 
-    bool
-    ParentProcessIDIsValid();
+  lldb::pid_t GetParentProcessID();
 
-    //----------------------------------------------------------------------
-    /// Get the listener that will be used to receive process events.
-    ///
-    /// If no listener has been set via a call to
-    /// SBLaunchInfo::SetListener(), then an invalid SBListener will be
-    /// returned (SBListener::IsValid() will return false). If a listener
-    /// has been set, then the valid listener object will be returned.
-    //----------------------------------------------------------------------
-    SBListener
-    GetListener ();
+  void SetParentProcessID(lldb::pid_t pid);
 
-    //----------------------------------------------------------------------
-    /// Set the listener that will be used to receive process events.
-    ///
-    /// By default the SBDebugger, which has a listener, that the SBTarget
-    /// belongs to will listen for the process events. Calling this function
-    /// allows a different listener to be used to listen for process events.
-    //----------------------------------------------------------------------
-    void
-    SetListener (SBListener &listener);
+  bool ParentProcessIDIsValid();
 
+  //----------------------------------------------------------------------
+  /// Get the listener that will be used to receive process events.
+  ///
+  /// If no listener has been set via a call to
+  /// SBAttachInfo::SetListener(), then an invalid SBListener will be
+  /// returned (SBListener::IsValid() will return false). If a listener
+  /// has been set, then the valid listener object will be returned.
+  //----------------------------------------------------------------------
+  SBListener GetListener();
+
+  //----------------------------------------------------------------------
+  /// Set the listener that will be used to receive process events.
+  ///
+  /// By default the SBDebugger, which has a listener, that the SBTarget
+  /// belongs to will listen for the process events. Calling this function
+  /// allows a different listener to be used to listen for process events.
+  //----------------------------------------------------------------------
+  void SetListener(SBListener &listener);
 
 protected:
-    friend class SBTarget;
+  friend class SBTarget;
 
-    lldb_private::ProcessAttachInfo &
-    ref ();
+  lldb_private::ProcessAttachInfo &ref();
 
-    ProcessAttachInfoSP m_opaque_sp;
+  ProcessAttachInfoSP m_opaque_sp;
 };
 
 } // namespace lldb
 
-#endif  // LLDB_SBAttachInfo_h_
+#endif // LLDB_SBAttachInfo_h_

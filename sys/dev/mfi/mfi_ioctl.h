@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2006 IronPort Systems
  * All rights reserved.
  *
@@ -58,7 +60,15 @@ union mfi_sense_ptr {
 		uint32_t	low;
 		uint32_t	high;
 	} addr;
-} __packed;
+}
+#ifndef __CHERI_PURE_CAPABILITY__
+/*
+ * XXX-BD: This __packed appears to be gratutious and won't whole thing
+ * is a bit absurd in CheriABI.
+ */
+__packed
+#endif
+;
 
 #define MAX_IOCTL_SGE	16
 
@@ -74,7 +84,7 @@ struct mfi_ioc_packet {
 		struct mfi_frame_header hdr;
 	} mfi_frame;
 
-	struct iovec mfi_sgl[MAX_IOCTL_SGE];
+	struct iovec_native mfi_sgl[MAX_IOCTL_SGE];
 } __packed;
 
 #ifdef COMPAT_FREEBSD32
@@ -124,7 +134,7 @@ struct mfi_linux_ioc_packet {
 #if defined(__amd64__) /* Assume amd64 wants 32 bit Linux */
 	struct iovec32 lioc_sgl[MAX_LINUX_IOCTL_SGE];
 #else
-	struct iovec lioc_sgl[MAX_LINUX_IOCTL_SGE];
+	struct iovec_native lioc_sgl[MAX_LINUX_IOCTL_SGE];
 #endif
 } __packed;
 
@@ -132,7 +142,15 @@ struct mfi_ioc_passthru {
 	struct mfi_dcmd_frame	ioc_frame;
 	uint32_t		buf_size;
 	uint8_t			*buf;
-} __packed;
+}
+#ifndef __CHERI_PURE_CAPABILITY__
+/*
+ * Packing is gratutious, but part of the ABI.  Don't pack in CheriABI
+ * where it won't work.
+ */
+__packed
+#endif
+;
 
 #ifdef COMPAT_FREEBSD32
 struct mfi_ioc_passthru32 {

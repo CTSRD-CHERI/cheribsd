@@ -1,5 +1,8 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2013 Mikolaj Golub <trociny@FreeBSD.org>
+ * Copyright (c) 2017 Dell EMC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,6 +26,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "support"
+ *   ],
+ *   "change_comment: ""
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -30,6 +44,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/elf.h>
 #include <sys/exec.h>
+#include <sys/ptrace.h>
 #include <sys/user.h>
 
 #include <assert.h>
@@ -45,6 +60,22 @@ __FBSDID("$FreeBSD$");
 #include <unistd.h>
 
 #include "core.h"
+
+#ifndef EF_MIPS_ABI
+#define	EF_MIPS_ABI		0x0000f000
+#endif
+#ifndef EF_MIPS_ABI_CHERIABI
+#define	EF_MIPS_ABI_CHERIABI	0x0000c000
+#endif
+#ifndef EF_MIPS_MACH_CHERI128
+#define	EF_MIPS_MACH_CHERI128	0x00C10000
+#endif
+#ifndef	EF_MIPS_MACH_CHERI256
+#define EF_MIPS_MACH_CHERI256	0x00C20000
+#endif
+#ifndef EF_MIPS_MACH
+#define	EF_MIPS_MACH		0x00FF0000
+#endif
 
 #define PROCSTAT_CORE_MAGIC	0x012DADB8
 struct procstat_core
@@ -123,6 +154,54 @@ struct _cap256_ps_strings {
 };
 typedef struct _cap256_ps_strings cap256_ps_strings_t;
 
+static struct psc_type_info {
+	unsigned int	n_type;
+	int		structsize;
+} default_type_info[PSC_TYPE_MAX] = {
+	{ .n_type  = NT_PROCSTAT_PROC, .structsize = sizeof(struct kinfo_proc) },
+	{ .n_type = NT_PROCSTAT_FILES, .structsize = sizeof(struct kinfo_file) },
+	{ .n_type = NT_PROCSTAT_VMMAP, .structsize = sizeof(struct kinfo_vmentry) },
+	{ .n_type = NT_PROCSTAT_GROUPS, .structsize = sizeof(gid_t) },
+	{ .n_type = NT_PROCSTAT_UMASK, .structsize = sizeof(u_short) },
+	{ .n_type = NT_PROCSTAT_RLIMIT, .structsize = sizeof(struct rlimit) * RLIM_NLIMITS },
+	{ .n_type = NT_PROCSTAT_OSREL, .structsize = sizeof(int) },
+	{ .n_type = NT_PROCSTAT_PSSTRINGS, .structsize = sizeof(vm_offset_t) },
+	{ .n_type = NT_PROCSTAT_PSSTRINGS, .structsize = sizeof(vm_offset_t) },
+	{ .n_type = NT_PROCSTAT_PSSTRINGS, .structsize = sizeof(vm_offset_t) },
+	{ .n_type = NT_PROCSTAT_AUXV, .structsize = sizeof(Elf_Auxinfo) },
+	{ .n_type = NT_PTLWPINFO, .structsize = sizeof(struct ptrace_lwpinfo) },
+};
+
+static struct psc_type_info cheri128_type_info[PSC_TYPE_MAX] = {
+	{ .n_type = NT_PROCSTAT_PROC, .structsize = sizeof(struct kinfo_proc) },
+	{ .n_type = NT_PROCSTAT_FILES, .structsize = sizeof(struct kinfo_file) },
+	{ .n_type = NT_PROCSTAT_VMMAP, .structsize = sizeof(struct kinfo_vmentry) },
+	{ .n_type = NT_PROCSTAT_GROUPS, .structsize = sizeof(gid_t) },
+	{ .n_type = NT_PROCSTAT_UMASK, .structsize = sizeof(u_short) },
+	{ .n_type = NT_PROCSTAT_RLIMIT, .structsize = sizeof(struct rlimit) * RLIM_NLIMITS },
+	{ .n_type = NT_PROCSTAT_OSREL, .structsize = sizeof(int) },
+	{ .n_type = NT_PROCSTAT_PSSTRINGS, .structsize = sizeof(vm_offset_t) },
+	{ .n_type = NT_PROCSTAT_PSSTRINGS, .structsize = sizeof(vm_offset_t) },
+	{ .n_type = NT_PROCSTAT_PSSTRINGS, .structsize = sizeof(vm_offset_t) },
+	{ .n_type = NT_PROCSTAT_AUXV, .structsize = sizeof(ElfCheriABI128_Auxinfo) },
+	{ .n_type = NT_PTLWPINFO, .structsize = sizeof(struct ptrace_lwpinfo) },
+};
+
+static struct psc_type_info cheri256_type_info[PSC_TYPE_MAX] = {
+	{ .n_type = NT_PROCSTAT_PROC, .structsize = sizeof(struct kinfo_proc) },
+	{ .n_type = NT_PROCSTAT_FILES, .structsize = sizeof(struct kinfo_file) },
+	{ .n_type = NT_PROCSTAT_VMMAP, .structsize = sizeof(struct kinfo_vmentry) },
+	{ .n_type = NT_PROCSTAT_GROUPS, .structsize = sizeof(gid_t) },
+	{ .n_type = NT_PROCSTAT_UMASK, .structsize = sizeof(u_short) },
+	{ .n_type = NT_PROCSTAT_RLIMIT, .structsize = sizeof(struct rlimit) * RLIM_NLIMITS },
+	{ .n_type = NT_PROCSTAT_OSREL, .structsize = sizeof(int) },
+	{ .n_type = NT_PROCSTAT_PSSTRINGS, .structsize = sizeof(vm_offset_t) },
+	{ .n_type = NT_PROCSTAT_PSSTRINGS, .structsize = sizeof(vm_offset_t) },
+	{ .n_type = NT_PROCSTAT_PSSTRINGS, .structsize = sizeof(vm_offset_t) },
+	{ .n_type = NT_PROCSTAT_AUXV, .structsize = sizeof(ElfCheriABI256_Auxinfo) },
+	{ .n_type = NT_PTLWPINFO, .structsize = sizeof(struct ptrace_lwpinfo) },
+};
+
 static bool	core_offset(struct procstat_core *core, off_t offset);
 static bool	core_read(struct procstat_core *core, void *buf, size_t len);
 static ssize_t	core_read_mem(struct procstat_core *core, void *buf,
@@ -130,6 +209,33 @@ static ssize_t	core_read_mem(struct procstat_core *core, void *buf,
 static void	*get_args(struct procstat_core *core, vm_offset_t psstrings,
     enum psc_type type, void *buf, size_t *lenp);
 static void	*get_auxv(struct procstat_core *core, void *buf, size_t *lenp);
+
+static bool
+core_is_cheri128(struct procstat_core *core)
+{
+
+	return ((core->pc_ehdr.e_flags & (EF_MIPS_ABI | EF_MIPS_MACH)) ==
+	    (EF_MIPS_ABI_CHERIABI | EF_MIPS_MACH_CHERI128));
+}
+
+static bool
+core_is_cheri256(struct procstat_core *core)
+{
+
+	return ((core->pc_ehdr.e_flags & (EF_MIPS_ABI | EF_MIPS_MACH)) ==
+	    (EF_MIPS_ABI_CHERIABI | EF_MIPS_MACH_CHERI256));
+}
+
+static struct psc_type_info *
+core_psc_type_info(struct procstat_core *core)
+{
+
+	if (core_is_cheri128(core))
+		return (cheri128_type_info);
+	if (core_is_cheri256(core))
+		return (cheri256_type_info);
+	return (default_type_info);
+}
 
 struct procstat_core *
 procstat_core_open(const char *filename)
@@ -218,73 +324,26 @@ void *
 procstat_core_get(struct procstat_core *core, enum psc_type type, void *buf,
     size_t *lenp)
 {
+	struct psc_type_info *psc_type_info;
 	Elf_Note nhdr;
 	off_t offset, eoffset;
 	vm_offset_t psstrings;
 	void *freebuf;
-	size_t len;
-	u_int32_t n_type;
-	int cstructsize, structsize;
+	size_t len, curlen;
+	int cstructsize;
 	char nbuf[8];
 
 	assert(core->pc_magic == PROCSTAT_CORE_MAGIC);
 
-	switch(type) {
-	case PSC_TYPE_PROC:
-		n_type = NT_PROCSTAT_PROC;
-		structsize = sizeof(struct kinfo_proc);
-		break;
-	case PSC_TYPE_FILES:
-		n_type = NT_PROCSTAT_FILES;
-		structsize = sizeof(struct kinfo_file);
-		break;
-	case PSC_TYPE_VMMAP:
-		n_type = NT_PROCSTAT_VMMAP;
-		structsize = sizeof(struct kinfo_vmentry);
-		break;
-	case PSC_TYPE_GROUPS:
-		n_type = NT_PROCSTAT_GROUPS;
-		structsize = sizeof(gid_t);
-		break;
-	case PSC_TYPE_UMASK:
-		n_type = NT_PROCSTAT_UMASK;
-		structsize = sizeof(u_short);
-		break;
-	case PSC_TYPE_RLIMIT:
-		n_type = NT_PROCSTAT_RLIMIT;
-		structsize = sizeof(struct rlimit) * RLIM_NLIMITS;
-		break;
-	case PSC_TYPE_OSREL:
-		n_type = NT_PROCSTAT_OSREL;
-		structsize = sizeof(int);
-		break;
-	case PSC_TYPE_PSSTRINGS:
-	case PSC_TYPE_ARGV:
-	case PSC_TYPE_ENVV:
-		n_type = NT_PROCSTAT_PSSTRINGS;
-		structsize = sizeof(vm_offset_t);
-		break;
-	case PSC_TYPE_AUXV:
-		n_type = NT_PROCSTAT_AUXV;
-		switch(core->pc_ehdr.e_machine) {
-		case 0xc128: /* XXXss */
-			structsize = sizeof(ElfCheriABI128_Auxinfo);
-			break;
-		case 0xc256: /* XXXss */
-			structsize = sizeof(ElfCheriABI256_Auxinfo);
-			break;
-		default:
-			structsize = sizeof(Elf_Auxinfo);
-			break;
-		}
-		break;
-	default:
+	if (type >= PSC_TYPE_MAX) {
 		warnx("unknown core stat type: %d", type);
 		return (NULL);
 	}
 
+	psc_type_info = core_psc_type_info(core);
 	offset = core->pc_phdr.p_offset;
 	eoffset = offset + core->pc_phdr.p_filesz;
+	curlen = 0;
 
 	while (offset < eoffset) {
 		if (!core_offset(core, offset))
@@ -298,7 +357,7 @@ procstat_core_get(struct procstat_core *core, enum psc_type type, void *buf,
 
 		if (nhdr.n_namesz == 0 && nhdr.n_descsz == 0)
 			break;
-		if (nhdr.n_type != n_type)
+		if (nhdr.n_type != psc_type_info[type].n_type)
 			continue;
 		if (nhdr.n_namesz != 8)
 			continue;
@@ -312,7 +371,7 @@ procstat_core_get(struct procstat_core *core, enum psc_type type, void *buf,
 		}
 		if (!core_read(core, &cstructsize, sizeof(cstructsize)))
 			return (NULL);
-		if (cstructsize != structsize) {
+		if (cstructsize != psc_type_info[type].structsize) {
 			warnx("version mismatch");
 			return (NULL);
 		}
@@ -329,7 +388,7 @@ procstat_core_get(struct procstat_core *core, enum psc_type type, void *buf,
 				return (NULL);
 			}
 		}
-		if (!core_read(core, buf, len)) {
+		if (!core_read(core, (char *)buf + curlen, len)) {
 			free(freebuf);
 			return (NULL);
 		}
@@ -349,10 +408,19 @@ procstat_core_get(struct procstat_core *core, enum psc_type type, void *buf,
 				buf = NULL;
 			free(freebuf);
 			buf = get_args(core, psstrings, type, buf, &len);
+		} else if (type == PSC_TYPE_PTLWPINFO) {
+			*lenp -= len;
+			curlen += len;
+			continue;
 		}
 		*lenp = len;
 		return (buf);
         }
+
+	if (curlen != 0) {
+		*lenp = curlen;
+		return (buf);
+	}
 
 	return (NULL);
 }
@@ -436,51 +504,39 @@ core_read_ps_strings(struct procstat_core *core, vm_offset_t psstrings,
 
 	assert(type == PSC_TYPE_ARGV || type == PSC_TYPE_ENVV);
 
-	switch(core->pc_ehdr.e_machine) {
-	case 0xc128: /* XXXss Shouldn't this mach type be defined in elf.h? */
-		{
-			cap128_ps_strings_t pss;
+	if (core_is_cheri128(core)) {
+		cap128_ps_strings_t pss;
 
-			if (core_read_mem(core, &pss, sizeof(pss), psstrings,
-			    true) == -1)
-				return ((vm_offset_t)0);
-			nargstr = pss.ps_nargvstr;
-			nenvstr = pss.ps_nenvstr;
-			argaddr = (vm_offset_t)pss.ps_argvstr.cursor;
-			envaddr = (vm_offset_t)pss.ps_envstr.cursor;
-			*size = sizeof(cap128_t);
-		}
-		break;
+		if (core_read_mem(core, &pss, sizeof(pss), psstrings, true) ==
+		    -1)
+			return ((vm_offset_t)0);
+		nargstr = pss.ps_nargvstr;
+		nenvstr = pss.ps_nenvstr;
+		argaddr = (vm_offset_t)pss.ps_argvstr.cursor;
+		envaddr = (vm_offset_t)pss.ps_envstr.cursor;
+		*size = sizeof(cap128_t);
+	} else if (core_is_cheri256(core)) {
+		cap256_ps_strings_t pss;
 
-	case 0xc256: /* XXXss Shouldn't this mach type be defined in elf.h? */
-		{
-			cap256_ps_strings_t pss;
+		if (core_read_mem(core, &pss, sizeof(pss), psstrings, true) ==
+		    -1)
+			return ((vm_offset_t)0);
+		nargstr = pss.ps_nargvstr;
+		nenvstr = pss.ps_nenvstr;
+		argaddr = (vm_offset_t)pss.ps_argvstr.cursor;
+		envaddr = (vm_offset_t)pss.ps_envstr.cursor;
+		*size = sizeof(cap256_t);
+	} else {
+		struct ps_strings pss;
 
-			if (core_read_mem(core, &pss, sizeof(pss), psstrings,
-			    true) == -1)
-				return ((vm_offset_t)0);
-			nargstr = pss.ps_nargvstr;
-			nenvstr = pss.ps_nenvstr;
-			argaddr = (vm_offset_t)pss.ps_argvstr.cursor;
-			envaddr = (vm_offset_t)pss.ps_envstr.cursor;
-			*size = sizeof(cap256_t);
-		}
-		break;
-
-	default:
-		{
-			struct ps_strings pss;
-
-			if (core_read_mem(core, &pss, sizeof(pss), psstrings,
-			    true) == -1)
-				return ((vm_offset_t)0);
-			nargstr = pss.ps_nargvstr;
-			nenvstr = pss.ps_nenvstr;
-			argaddr = (vm_offset_t)pss.ps_argvstr;
-			envaddr = (vm_offset_t)pss.ps_envstr;
-			*size = sizeof(char *);
-		}
-		break;
+		if (core_read_mem(core, &pss, sizeof(pss), psstrings, true) ==
+		    -1)
+			return ((vm_offset_t)0);
+		nargstr = pss.ps_nargvstr;
+		nenvstr = pss.ps_nenvstr;
+		argaddr = (vm_offset_t)pss.ps_argvstr;
+		envaddr = (vm_offset_t)pss.ps_envstr;
+		*size = sizeof(char *);
 	}
 
 	if (type == PSC_TYPE_ARGV) {
@@ -496,24 +552,16 @@ static inline vm_offset_t
 core_image_off(struct procstat_core *core, char **ptr, int i)
 {
 
-	switch(core->pc_ehdr.e_machine) {
-	case 0xc128: /* XXXss Shouldn't this mach type be defined in elf.h? */
-		{
-			cap128_t *cap = (cap128_t *)(ptr + (i * sizeof(cap128_t) / 8));
+	if (core_is_cheri128(core)) {
+		cap128_t *cap = (cap128_t *)(ptr + (i * sizeof(cap128_t) / 8));
 
-			return (cap->cursor);
-		}
+		return (cap->cursor);
+	} else if (core_is_cheri256(core)) {
+		cap256_t *cap = (cap256_t *)(ptr + (i * sizeof(cap256_t) / 8));
 
-	case 0xc256: /* XXXss Shouldn't this mach type be defined in elf.h? */
-		{
-			cap256_t *cap = (cap256_t *)(ptr + (i * sizeof(cap256_t) / 8));
-
-			return (cap->cursor);
-		}
-
-	default:
+		return (cap->cursor);
+	} else
 		return ((vm_offset_t)ptr[i]);
-	}
 }
 
 #define ARGS_CHUNK_SZ	256	/* Chunk size (bytes) for get_args operations. */
@@ -616,61 +664,106 @@ get_auxv(struct procstat_core *core, void *auxv, size_t *lenp)
 	Elf_Auxinfo *buf;
 	unsigned count, i;
 
-	switch(core->pc_ehdr.e_machine) {
-	case 0xc128: /* XXXss Shouldn't this mach type be defined in elf.h? */
-		{
-			ElfCheriABI128_Auxinfo *auxv_cheri =
-			    (ElfCheriABI128_Auxinfo *)auxv;
+	if (core_is_cheri128(core)) {
+		ElfCheriABI128_Auxinfo *auxv_cheri = auxv;
 
-			count = *lenp / sizeof(ElfCheriABI128_Auxinfo);
-			*lenp = count * sizeof(Elf_Auxinfo);
-			buf = (Elf_Auxinfo *)malloc(*lenp);
-			if (buf == NULL) {
-				free(auxv);
-				*lenp = 0;
-				return (NULL);
-			}
-			for (i = 0; i < count; i++) {
-				buf[i].a_type = auxv_cheri[i].a_type;
-				if (is_auxv_ptr(auxv_cheri[i].a_type))
-					buf[i].a_un.a_ptr = (void *)(uintptr_t)
-					    auxv_cheri[i].a_un.a_ptr.cursor;
-				else
-					buf[i].a_un.a_val =
-					    auxv_cheri[i].a_un.a_val;
-			}
+		count = *lenp / sizeof(ElfCheriABI128_Auxinfo);
+		*lenp = count * sizeof(Elf_Auxinfo);
+		buf = (Elf_Auxinfo *)malloc(*lenp);
+		if (buf == NULL) {
 			free(auxv);
-			return ((void *)buf);
+			*lenp = 0;
+			return (NULL);
 		}
+		for (i = 0; i < count; i++) {
+			buf[i].a_type = auxv_cheri[i].a_type;
+			if (is_auxv_ptr(auxv_cheri[i].a_type))
+				buf[i].a_un.a_ptr = (void *)(uintptr_t)
+				    auxv_cheri[i].a_un.a_ptr.cursor;
+			else
+				buf[i].a_un.a_val = auxv_cheri[i].a_un.a_val;
+		}
+		free(auxv);
+		return ((void *)buf);
+	} else if (core_is_cheri256(core)) {
+		ElfCheriABI256_Auxinfo *auxv_cheri = auxv;
 
-	case 0xc256: /* XXXss Shouldn't this mach type be defined in elf.h? */
-		{
-			ElfCheriABI256_Auxinfo *auxv_cheri =
-			    (ElfCheriABI256_Auxinfo *)auxv;
-
-			count = *lenp / sizeof(ElfCheriABI256_Auxinfo);
-			*lenp = count * sizeof(Elf_Auxinfo);
-			buf = (Elf_Auxinfo *)malloc(*lenp);
-			if (buf == NULL) {
-				free(auxv);
-				*lenp = 0;
-				return (NULL);
-			}
-			for (i = 0; i < count; i++) {
-				buf[i].a_type = auxv_cheri[i].a_type;
-				if (is_auxv_ptr(auxv_cheri[i].a_type))
-					buf[i].a_un.a_ptr = (void *)(uintptr_t)
-					    auxv_cheri[i].a_un.a_ptr.cursor;
-				else
-					buf[i].a_un.a_val =
-					    auxv_cheri[i].a_un.a_val;
-			}
+		count = *lenp / sizeof(ElfCheriABI256_Auxinfo);
+		*lenp = count * sizeof(Elf_Auxinfo);
+		buf = (Elf_Auxinfo *)malloc(*lenp);
+		if (buf == NULL) {
 			free(auxv);
-			return ((void *)buf);
+			*lenp = 0;
+			return (NULL);
 		}
-
-	default:
+		for (i = 0; i < count; i++) {
+			buf[i].a_type = auxv_cheri[i].a_type;
+			if (is_auxv_ptr(auxv_cheri[i].a_type))
+				buf[i].a_un.a_ptr = (void *)(uintptr_t)
+				    auxv_cheri[i].a_un.a_ptr.cursor;
+			else
+				buf[i].a_un.a_val = auxv_cheri[i].a_un.a_val;
+		}
+		free(auxv);
+		return ((void *)buf);
+	} else {
 		/* Nothing needs to be done so just pass the buffer back. */
 		return (auxv);
 	}
+}
+
+int
+procstat_core_note_count(struct procstat_core *core, enum psc_type type)
+{
+	struct psc_type_info *psc_type_info;
+	Elf_Note nhdr;
+	off_t offset, eoffset;
+	int cstructsize;
+	char nbuf[8];
+	int n;
+
+	if (type >= PSC_TYPE_MAX) {
+		warnx("unknown core stat type: %d", type);
+		return (0);
+	}
+
+	psc_type_info = core_psc_type_info(core);
+	offset = core->pc_phdr.p_offset;
+	eoffset = offset + core->pc_phdr.p_filesz;
+
+	for (n = 0; offset < eoffset; n++) {
+		if (!core_offset(core, offset))
+			return (0);
+		if (!core_read(core, &nhdr, sizeof(nhdr)))
+			return (0);
+
+		offset += sizeof(nhdr) +
+		    roundup2(nhdr.n_namesz, sizeof(Elf32_Size)) +
+		    roundup2(nhdr.n_descsz, sizeof(Elf32_Size));
+
+		if (nhdr.n_namesz == 0 && nhdr.n_descsz == 0)
+			break;
+		if (nhdr.n_type != psc_type_info[type].n_type)
+			continue;
+		if (nhdr.n_namesz != 8)
+			continue;
+		if (!core_read(core, nbuf, sizeof(nbuf)))
+			return (0);
+		if (strcmp(nbuf, "FreeBSD") != 0)
+			continue;
+		if (nhdr.n_descsz < sizeof(cstructsize)) {
+			warnx("corrupted core file");
+			return (0);
+		}
+		if (!core_read(core, &cstructsize, sizeof(cstructsize)))
+			return (0);
+		if (cstructsize != psc_type_info[type].structsize) {
+			warnx("version mismatch");
+			return (0);
+		}
+		if (nhdr.n_descsz - sizeof(cstructsize) == 0)
+			return (0);
+	}
+
+	return (n);
 }

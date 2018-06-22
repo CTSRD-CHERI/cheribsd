@@ -1,6 +1,7 @@
 # $FreeBSD$
 
-MAINSRC=${.CURDIR}/../../usr.bin/at
+PACKAGE=at
+MAINSRC=${SRCTOP}/usr.bin/at
 
 .include "${MAINSRC}/Makefile.inc"
 

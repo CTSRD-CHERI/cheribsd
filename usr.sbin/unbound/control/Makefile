@@ -1,15 +1,14 @@
 # $FreeBSD$
 
 # Vendor sources and generated files
-LDNSDIR= ${.CURDIR}/../../../contrib/ldns
-UNBOUNDDIR= ${.CURDIR}/../../../contrib/unbound
+LDNSDIR= ${SRCTOP}/contrib/ldns
+UNBOUNDDIR= ${SRCTOP}/contrib/unbound
 
-.PATH: ${UNBOUNDDIR} ${UNBOUNDDIR}/smallapp ${UNBOUNDDIR}/doc
+.PATH: ${UNBOUNDDIR} ${UNBOUNDDIR}/smallapp ${UNBOUNDDIR}/util ${UNBOUNDDIR}/doc
 
 PROG=	unbound-control
-SCRIPTS=	unbound-control-setup.sh
-SRCS=	unbound-control.c worker_cb.c
-CFLAGS=	-I${UNBOUNDDIR} -I${LDNSDIR}
+SRCS=	ub_event.c unbound-control.c worker_cb.c
+CFLAGS+=	-I${UNBOUNDDIR} -I${LDNSDIR}
 LIBADD=	unbound crypto ssl pthread
 MAN=	unbound-control.8
 

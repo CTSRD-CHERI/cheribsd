@@ -4,6 +4,15 @@
 
 .include <src.opts.mk>
 
+PACKAGE=examples
+FILESDIR=	${SHAREDIR}/examples
+
+.for _XFILE in ${XFILES}
+FILESGROUPS+=	${_XFILE}
+PACKAGE_${_XFILE}?=examples
+${_XFILE}DIR=	${SHAREDIR}/examples/${_XFILE:H}
+.endfor
+
 LDIRS=	BSD_daemon \
 	FreeBSD_version \
 	IPv6 \
@@ -28,7 +37,8 @@ LDIRS=	BSD_daemon \
 	ses \
 	scsi_target \
 	sunrpc \
-	uefisign
+	uefisign \
+	ypldap
 
 XFILES=	BSD_daemon/FreeBSD.pfa \
 	BSD_daemon/README \
@@ -126,7 +136,6 @@ XFILES=	BSD_daemon/FreeBSD.pfa \
 	ppp/ppp.secret.sample \
 	ppp/ppp.secret.span-isp \
 	ppp/ppp.secret.span-isp.working \
-	printing/README \
 	printing/diablo-if-net \
 	printing/hpdf \
 	printing/hpif \
@@ -183,7 +192,8 @@ XFILES=	BSD_daemon/FreeBSD.pfa \
 	sunrpc/sort/rsort.c \
 	sunrpc/sort/sort.x \
 	sunrpc/sort/sort_proc.c \
-	uefisign/uefikeys
+	uefisign/uefikeys \
+	ypldap/ypldap.conf
 
 BINDIR= ${SHAREDIR}/examples
 
@@ -210,6 +220,7 @@ XFILES+=	libusb20/Makefile \
 .if ${MK_BHYVE} != "no"
 LDIRS+=		bhyve
 XFILES+=	bhyve/vmrun.sh
+PACKAGE_bhyve/vmrun.sh=	bhyve
 .endif
 .endif
 
@@ -219,6 +230,7 @@ XFILES+=	bhyve/vmrun.sh
 SHARED?=	copies
 
 beforeinstall: ${SHARED} etc-examples
+META_TARGETS+=	copies symlinks
 .ORDER: ${SHARED} etc-examples
 
 copies:
@@ -227,22 +239,20 @@ copies:
 		rm -f ${DESTDIR}${BINDIR}/$i; \
 	fi
 .endfor
-	mtree -deU ${MTREE_FOLLOWS_SYMLINKS} \
-	    -f ${.CURDIR}/../../etc/mtree/BSD.usr.dist -p ${DESTDIR}/usr
 .for file in ${XFILES}
-	${INSTALL} -o ${SHAREOWN} -g ${SHAREGRP} -m ${SHAREMODE} \
+	${INSTALL} -T package=${PACKAGE_${file}:Uexamples} -o ${SHAREOWN} -g ${SHAREGRP} -m ${SHAREMODE} \
 		${.CURDIR}/${file} ${DESTDIR}${BINDIR}/${file}
 .endfor
 
 symlinks:
 .for i in ${LDIRS}
 	rm -rf ${DESTDIR}${BINDIR}/$i
-	ln -s ${.CURDIR}/$i ${DESTDIR}${BINDIR}/$i
+	${INSTALL} ${TAG_ARGS} -l s ${.CURDIR}/$i ${DESTDIR}${BINDIR}/$i
 .endfor
 
 etc-examples:
 .if ${SHARED} != "symlinks"
-	(cd ${.CURDIR}/../../etc; ${MAKE} etc-examples)
+	${_+_}(cd ${SRCTOP}/etc; ${MAKE} etc-examples)
 .endif
 
 .if ${SHARED} != "symlinks"
@@ -255,10 +265,9 @@ SUBDIR+=pf
 .endif
 .endif
 
-.if ${MK_TESTS} != "no"
-SUBDIR+=tests
-.endif
+HAS_TESTS=
+SUBDIR.${MK_TESTS}+= tests
 
 SUBDIR_PARALLEL=
 
-.include <bsd.subdir.mk>
+.include <bsd.prog.mk>

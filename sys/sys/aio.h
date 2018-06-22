@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1997 John S. Dyson.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,6 +23,11 @@
 
 #include <sys/types.h>
 #include <sys/signal.h>
+#ifdef _KERNEL
+#include <sys/queue.h>
+#include <sys/event.h>
+#include <sys/signalvar.h>
+#endif
 
 /*
  * Returned by aio_cancel:
@@ -51,16 +58,25 @@
  */
 #define	AIO_LISTIO_MAX		16
 
-/*
- * Private members for aiocb -- don't access
- * directly.
- */
-struct __aiocb_private {
-	long	status;
-	long	error;
-	void	*kernelinfo;
-};
+#ifdef _KERNEL
 
+/* Default values of tunables for the AIO worker pool. */
+
+#ifndef MAX_AIO_PROCS
+#define MAX_AIO_PROCS		32
+#endif
+
+#ifndef TARGET_AIO_PROCS
+#define TARGET_AIO_PROCS	4
+#endif
+
+#ifndef AIOD_LIFETIME_DEFAULT
+#define AIOD_LIFETIME_DEFAULT	(30 * hz)
+#endif
+
+#endif
+
+#ifndef _KERNEL
 /*
  * I/O control block
  */
@@ -73,11 +89,153 @@ typedef struct aiocb {
 	void	*__spare2__;
 	int	aio_lio_opcode;		/* LIO opcode */
 	int	aio_reqprio;		/* Request priority -- ignored */
-	struct	__aiocb_private	_aiocb_private;
+	struct {
+		long	status;
+		long	error;
+		void	*kernelinfo;
+	} _aiocb_private;
 	struct	sigevent aio_sigevent;	/* Signal to deliver */
 } aiocb_t;
+#endif
 
-#ifndef _KERNEL
+#ifdef _KERNEL
+
+struct aiocb_native {
+	int	aio_fildes;		/* File descriptor */
+	off_t	aio_offset;		/* File offset for I/O */
+	volatile void *aio_buf;         /* I/O buffer in process space */
+	size_t	aio_nbytes;		/* Number of bytes for I/O */
+	int	__spare__[2];
+	void	*__spare2__;
+	int	aio_lio_opcode;		/* LIO opcode */
+	int	aio_reqprio;		/* Request priority -- ignored */
+	struct {
+		long	status;
+		long	error;
+		void	*kernelinfo;
+	} _aiocb_private;
+	struct sigevent_native aio_sigevent;	/* Signal to deliver */
+};
+#if __has_feature(capabilities)
+struct aiocb_c {
+	int	aio_fildes;		/* File descriptor */
+	off_t	aio_offset;		/* File offset for I/O */
+	volatile void * __capability aio_buf; /* I/O buffer in process space */
+	size_t	aio_nbytes;		/* Number of bytes for I/O */
+	int	__spare__[2];
+	void * __capability __spare2__;
+	int	aio_lio_opcode;		/* LIO opcode */
+	int	aio_reqprio;		/* Request priority -- ignored */
+	struct {
+		long	status;
+		long	error;
+		void * __capability kernelinfo;
+	} _aiocb_private;
+	struct sigevent_c aio_sigevent;	/* Signal to deliver */
+};
+typedef	struct aiocb_c		kaiocb_t;
+#else
+typedef	struct aiocb_native	kaiocb_t;
+#endif
+
+typedef void aio_cancel_fn_t(struct kaiocb *);
+typedef void aio_handle_fn_t(struct kaiocb *);
+
+/*
+ * Kernel version of an I/O control block.
+ *
+ * Locking key:
+ * * - need not protected
+ * a - locked by kaioinfo lock
+ * b - locked by backend lock
+ * c - locked by aio_job_mtx
+ */
+struct kaiocb {
+	TAILQ_ENTRY(kaiocb) list;	/* (b) backend-specific list of jobs */
+	TAILQ_ENTRY(kaiocb) plist;	/* (a) lists of pending / done jobs */
+	TAILQ_ENTRY(kaiocb) allist;	/* (a) list of all jobs in proc */
+	int	jobflags;		/* (a) job flags */
+	int	inblock;		/* (*) input blocks */
+	int	outblock;		/* (*) output blocks */
+	int	msgsnd;			/* (*) messages sent */
+	int	msgrcv;			/* (*) messages received */
+	struct	proc *userproc;		/* (*) user process */
+	struct	ucred *cred;		/* (*) active credential when created */
+	struct	file *fd_file;		/* (*) pointer to file structure */
+	struct	aioliojob *lio;		/* (*) optional lio job */
+	void * __capability ujob;	/* (*) pointer to userspace aiocb */
+	intcap_t	ujobptr;
+	struct	knlist klist;		/* (a) list of knotes */
+	kaiocb_t uaiocb;		/* (*) copy of user I/O control block */
+	ksiginfo_t ksi;			/* (a) realtime signal info */
+	uint64_t seqno;			/* (*) job number */
+	aio_cancel_fn_t *cancel_fn;	/* (a) backend cancel function */
+	aio_handle_fn_t *handle_fn;	/* (c) backend handle function */
+	union {				/* Backend-specific data fields */
+		struct {		/* BIO backend */
+			struct bio *bp;	/* (*) BIO pointer */
+			struct buf *pbuf; /* (*) buffer pointer */
+			struct vm_page *pages[btoc(MAXPHYS)+1]; /* (*) */
+			int	npages;	/* (*) number of pages */
+		};
+		struct {		/* fsync() requests */
+			int	pending; /* (a) number of pending I/O */
+		};
+		struct {
+			void	*backend1;
+			void	*backend2;
+			long	backend3;
+			int	backend4;
+		};
+	};
+};
+
+struct socket;
+struct sockbuf;
+
+/*
+ * AIO backends should permit cancellation of queued requests waiting to
+ * be serviced by installing a cancel routine while the request is
+ * queued.  The cancellation routine should dequeue the request if
+ * necessary and cancel it.  Care must be used to handle races between
+ * queueing and dequeueing requests and cancellation.
+ *
+ * When queueing a request somewhere such that it can be cancelled, the
+ * caller should:
+ *
+ *  1) Acquire lock that protects the associated queue.
+ *  2) Call aio_set_cancel_function() to install the cancel routine.
+ *  3) If that fails, the request has a pending cancel and should be
+ *     cancelled via aio_cancel().
+ *  4) Queue the request.
+ *
+ * When dequeueing a request to service it or hand it off to somewhere else,
+ * the caller should:
+ *
+ *  1) Acquire the lock that protects the associated queue.
+ *  2) Dequeue the request.
+ *  3) Call aio_clear_cancel_function() to clear the cancel routine.
+ *  4) If that fails, the cancel routine is about to be called.  The
+ *     caller should ignore the request.
+ *
+ * The cancel routine should:
+ *
+ *  1) Acquire the lock that protects the associated queue.
+ *  2) Call aio_cancel_cleared() to determine if the request is already
+ *     dequeued due to a race with dequeueing thread.
+ *  3) If that fails, dequeue the request.
+ *  4) Cancel the request via aio_cancel().
+ */
+
+bool	aio_cancel_cleared(struct kaiocb *job);
+void	aio_cancel(struct kaiocb *job);
+bool	aio_clear_cancel_function(struct kaiocb *job);
+void	aio_complete(struct kaiocb *job, long status, int error);
+void	aio_schedule(struct kaiocb *job, aio_handle_fn_t *func);
+bool	aio_set_cancel_function(struct kaiocb *job, aio_cancel_fn_t *func);
+void	aio_switch_vmspace(struct kaiocb *job);
+
+#else /* !_KERNEL */
 
 struct timespec;
 
@@ -98,7 +256,8 @@ int	aio_write(struct aiocb *);
  *	"acb_list" is an array of "nacb_listent" I/O control blocks.
  *	when all I/Os are complete, the optional signal "sig" is sent.
  */
-int	lio_listio(int, struct aiocb * const [], int, struct sigevent *);
+int	lio_listio(int, struct aiocb *__restrict const *__restrict, int,
+    struct sigevent *);
 
 /*
  * Get completion status
@@ -130,21 +289,13 @@ int	aio_suspend(const struct aiocb * const[], int, const struct timespec *);
  */
 int	aio_mlock(struct aiocb *);
 
-#ifdef __BSD_VISIBLE
-int	aio_waitcomplete(struct aiocb **, struct timespec *);
+#if __BSD_VISIBLE
+ssize_t	aio_waitcomplete(struct aiocb **, struct timespec *);
 #endif
 
 int	aio_fsync(int op, struct aiocb *aiocbp);
 __END_DECLS
 
-#else
+#endif /* !_KERNEL */
 
-/* Forward declarations for prototypes below. */
-struct socket;
-struct sockbuf;
-
-extern void (*aio_swake)(struct socket *, struct sockbuf *);
-
-#endif
-
-#endif
+#endif /* !_SYS_AIO_H_ */

@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2002 Juli Mallett.  All rights reserved.
  *
  * This software was written by Juli Mallett <jmallett@FreeBSD.org> for the
@@ -25,6 +27,16 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_bit_flags"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -62,7 +74,7 @@ bread(struct uufsd *disk, ufs2_daddr_t blockno, void *data, size_t size)
 	 * XXX: Bounce the buffer if not 64 byte aligned.
 	 * XXX: this can be removed if/when the kernel is fixed
 	 */
-	if (((size_t)data) & 0x3f) {
+	if (((vaddr_t)data) & 0x3f) {
 		p2 = malloc(size);
 		if (p2 == NULL) {
 			ERROR(disk, "allocate bounce buffer");
@@ -115,7 +127,7 @@ bwrite(struct uufsd *disk, ufs2_daddr_t blockno, const void *data, size_t size)
 	 * XXX: Bounce the buffer if not 64 byte aligned.
 	 * XXX: this can be removed if/when the kernel is fixed
 	 */
-	if (((size_t)data) & 0x3f) {
+	if (((vaddr_t)data) & 0x3f) {
 		p2 = malloc(size);
 		if (p2 == NULL) {
 			ERROR(disk, "allocate bounce buffer");

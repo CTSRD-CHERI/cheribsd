@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1990, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -104,7 +106,6 @@ static const char *ufslike_filesystems[] = {
 	"ufs",
 	"zfs",
 	"nfs",
-	"nfs4",
 	"ext2fs",
 	0
 };
@@ -138,9 +139,6 @@ fts_open(char * const *argv, int options,
 	sp->fts_compar = compar;
 	sp->fts_options = options;
 
-	/* Shush, GCC. */
-	tmp = NULL;
-
 	/* Logical walks turn on NOCHDIR; symbolic links are too hard. */
 	if (ISSET(FTS_LOGICAL))
 		SET(FTS_NOCHDIR);
@@ -156,6 +154,9 @@ fts_open(char * const *argv, int options,
 	if ((parent = fts_alloc(sp, "", 0)) == NULL)
 		goto mem2;
 	parent->fts_level = FTS_ROOTPARENTLEVEL;
+
+	/* Shush, GCC. */
+	tmp = NULL;
 
 	/* Allocate/initialize root(s). */
 	for (root = NULL, nitems = 0; *argv != NULL; ++argv, ++nitems) {
@@ -851,6 +852,7 @@ mem1:				saved_errno = errno;
 	    (cur->fts_level == FTS_ROOTLEVEL ?
 	    FCHDIR(sp, sp->fts_rfd) :
 	    fts_safe_changedir(sp, cur->fts_parent, -1, ".."))) {
+		fts_lfree(head);
 		cur->fts_info = FTS_ERR;
 		SET(FTS_STOP);
 		return (NULL);

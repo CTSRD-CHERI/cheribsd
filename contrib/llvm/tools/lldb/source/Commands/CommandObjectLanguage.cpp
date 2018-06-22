@@ -14,31 +14,18 @@
 #include "lldb/Interpreter/CommandInterpreter.h"
 #include "lldb/Interpreter/CommandReturnObject.h"
 
+#include "lldb/Target/Language.h"
 #include "lldb/Target/LanguageRuntime.h"
 
 using namespace lldb;
 using namespace lldb_private;
 
-CommandObjectLanguage::CommandObjectLanguage (CommandInterpreter &interpreter) :
-CommandObjectMultiword (interpreter,
-                        "language",
-                        "A set of commands for managing language-specific functionality.'.",
-                        "language <language-name> <subcommand> [<subcommand-options>]"
-                        )
-{
-    //Let the LanguageRuntime populates this command with subcommands
-    LanguageRuntime::InitializeCommands(this);
+CommandObjectLanguage::CommandObjectLanguage(CommandInterpreter &interpreter)
+    : CommandObjectMultiword(
+          interpreter, "language", "Commands specific to a source language.",
+          "language <language-name> <subcommand> [<subcommand-options>]") {
+  // Let the LanguageRuntime populates this command with subcommands
+  LanguageRuntime::InitializeCommands(this);
 }
 
-void
-CommandObjectLanguage::GenerateHelpText (Stream &output_stream) {
-    CommandObjectMultiword::GenerateHelpText(output_stream);
-
-    output_stream << "\nlanguage name can be one of the following:\n";
-
-    LanguageRuntime::PrintAllLanguages(output_stream, "  ", "\n");
-}
-
-CommandObjectLanguage::~CommandObjectLanguage ()
-{
-}
+CommandObjectLanguage::~CommandObjectLanguage() {}

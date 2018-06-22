@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2009 Oleksandr Tymoshenko
  * All rights reserved.
  *
@@ -58,8 +60,6 @@ __FBSDID("$FreeBSD$");
 #include <mips/atheros/ar71xx_setup.h>
 #include <mips/atheros/ar71xx_cpudef.h>
 #include <mips/atheros/ar71xx_macaddr.h>
-
-#include <mips/sentry5/s5reg.h>
 
 extern char edata[], end[];
 
@@ -353,8 +353,8 @@ platform_start(__register_t a0 __unused, __register_t a1 __unused,
 	phys_avail[0] = MIPS_KSEG0_TO_PHYS(kernel_kseg0_end);
 	phys_avail[1] = ctob(realmem);
 
-	dump_avail[0] = phys_avail[0];
-	dump_avail[1] = phys_avail[1] - phys_avail[0];
+	dump_avail[0] = 0;
+	dump_avail[1] = phys_avail[1];
 
 	physmem = realmem;
 

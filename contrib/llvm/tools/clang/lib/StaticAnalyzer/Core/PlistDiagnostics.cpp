@@ -11,15 +11,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "clang/StaticAnalyzer/Core/AnalyzerOptions.h"
 #include "clang/Basic/FileManager.h"
 #include "clang/Basic/PlistSupport.h"
 #include "clang/Basic/SourceManager.h"
 #include "clang/Basic/Version.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/StaticAnalyzer/Core/BugReporter/PathDiagnostic.h"
+#include "clang/StaticAnalyzer/Core/IssueHash.h"
 #include "clang/StaticAnalyzer/Core/PathDiagnosticConsumers.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
 using namespace clang;
@@ -124,7 +123,7 @@ static void ReportControlFlow(raw_ostream &o,
   --indent;
 
   // Output any helper text.
-  const std::string& s = P.getString();
+  const auto &s = P.getString();
   if (!s.empty()) {
     Indent(o, indent) << "<key>alternate</key>";
     EmitString(o, s) << '\n';
@@ -171,7 +170,7 @@ static void ReportEvent(raw_ostream &o, const PathDiagnosticPiece& P,
     --indent;
     Indent(o, indent) << "</array>\n";
   }
-  
+
   // Output the call depth.
   Indent(o, indent) << "<key>depth</key>";
   EmitInteger(o, depth) << '\n';
@@ -187,7 +186,7 @@ static void ReportEvent(raw_ostream &o, const PathDiagnosticPiece& P,
   Indent(o, indent) << "<key>message</key>\n";
   Indent(o, indent);
   EmitString(o, P.getString()) << '\n';
-  
+
   // Finish up.
   --indent;
   Indent(o, indent); o << "</dict>\n";
@@ -208,32 +207,24 @@ static void ReportCall(raw_ostream &o,
                        const LangOptions &LangOpts,
                        unsigned indent,
                        unsigned depth) {
-  
-  IntrusiveRefCntPtr<PathDiagnosticEventPiece> callEnter =
-    P.getCallEnterEvent();  
 
-  if (callEnter)
+  if (auto callEnter = P.getCallEnterEvent())
     ReportPiece(o, *callEnter, FM, SM, LangOpts, indent, depth, true,
                 P.isLastInMainSourceFile());
 
-  IntrusiveRefCntPtr<PathDiagnosticEventPiece> callEnterWithinCaller =
-    P.getCallEnterWithinCallerEvent();
-  
+
   ++depth;
-  
-  if (callEnterWithinCaller)
+
+  if (auto callEnterWithinCaller = P.getCallEnterWithinCallerEvent())
     ReportPiece(o, *callEnterWithinCaller, FM, SM, LangOpts,
                 indent, depth, true);
-  
+
   for (PathPieces::const_iterator I = P.path.begin(), E = P.path.end();I!=E;++I)
     ReportPiece(o, **I, FM, SM, LangOpts, indent, depth, true);
 
   --depth;
-  
-  IntrusiveRefCntPtr<PathDiagnosticEventPiece> callExit =
-    P.getCallExitEvent();
 
-  if (callExit)
+  if (auto callExit = P.getCallExitEvent())
     ReportPiece(o, *callExit, FM, SM, LangOpts, indent, depth, true);
 }
 
@@ -282,6 +273,9 @@ static void ReportPiece(raw_ostream &o,
       ReportMacro(o, cast<PathDiagnosticMacroPiece>(P), FM, SM, LangOpts,
                   indent, depth);
       break;
+    case PathDiagnosticPiece::Note:
+      // FIXME: Extend the plist format to support those.
+      break;
   }
 }
 
@@ -295,43 +289,41 @@ void PlistDiagnostics::FlushDiagnosticsImpl(
   const SourceManager* SM = nullptr;
 
   if (!Diags.empty())
-    SM = &(*(*Diags.begin())->path.begin())->getLocation().getManager();
+    SM = &Diags.front()->path.front()->getLocation().getManager();
 
-  
-  for (std::vector<const PathDiagnostic*>::iterator DI = Diags.begin(),
-       DE = Diags.end(); DI != DE; ++DI) {
+  auto AddPieceFID = [&FM, &Fids, SM](const PathDiagnosticPiece &Piece) {
+    AddFID(FM, Fids, *SM, Piece.getLocation().asLocation());
+    ArrayRef<SourceRange> Ranges = Piece.getRanges();
+    for (const SourceRange &Range : Ranges) {
+      AddFID(FM, Fids, *SM, Range.getBegin());
+      AddFID(FM, Fids, *SM, Range.getEnd());
+    }
+  };
 
-    const PathDiagnostic *D = *DI;
+  for (const PathDiagnostic *D : Diags) {
 
     SmallVector<const PathPieces *, 5> WorkList;
     WorkList.push_back(&D->path);
 
     while (!WorkList.empty()) {
-      const PathPieces &path = *WorkList.pop_back_val();
+      const PathPieces &Path = *WorkList.pop_back_val();
 
-      for (PathPieces::const_iterator I = path.begin(), E = path.end(); I != E;
-           ++I) {
-        const PathDiagnosticPiece *piece = I->get();
-        AddFID(FM, Fids, *SM, piece->getLocation().asLocation());
-        ArrayRef<SourceRange> Ranges = piece->getRanges();
-        for (ArrayRef<SourceRange>::iterator I = Ranges.begin(),
-                                             E = Ranges.end(); I != E; ++I) {
-          AddFID(FM, Fids, *SM, I->getBegin());
-          AddFID(FM, Fids, *SM, I->getEnd());
-        }
+      for (const auto &Iter : Path) {
+        const PathDiagnosticPiece &Piece = *Iter;
+        AddPieceFID(Piece);
 
-        if (const PathDiagnosticCallPiece *call =
-            dyn_cast<PathDiagnosticCallPiece>(piece)) {
-          IntrusiveRefCntPtr<PathDiagnosticEventPiece>
-            callEnterWithin = call->getCallEnterWithinCallerEvent();
-          if (callEnterWithin)
-            AddFID(FM, Fids, *SM, callEnterWithin->getLocation().asLocation());
+        if (const PathDiagnosticCallPiece *Call =
+                dyn_cast<PathDiagnosticCallPiece>(&Piece)) {
+          if (auto CallEnterWithin = Call->getCallEnterWithinCallerEvent())
+            AddPieceFID(*CallEnterWithin);
 
-          WorkList.push_back(&call->path);
-        }
-        else if (const PathDiagnosticMacroPiece *macro =
-                 dyn_cast<PathDiagnosticMacroPiece>(piece)) {
-          WorkList.push_back(&macro->subPieces);
+          if (auto CallEnterEvent = Call->getCallEnterEvent())
+            AddPieceFID(*CallEnterEvent);
+
+          WorkList.push_back(&Call->path);
+        } else if (const PathDiagnosticMacroPiece *Macro =
+                       dyn_cast<PathDiagnosticMacroPiece>(&Piece)) {
+          WorkList.push_back(&Macro->subPieces);
         }
       }
     }
@@ -374,7 +366,7 @@ void PlistDiagnostics::FlushDiagnosticsImpl(
 
     o << "   <array>\n";
 
-    for (PathPieces::const_iterator I = D->path.begin(), E = D->path.end(); 
+    for (PathPieces::const_iterator I = D->path.begin(), E = D->path.end();
          I != E; ++I)
       ReportDiag(o, **I, FM, *SM, LangOpts);
 
@@ -389,7 +381,19 @@ void PlistDiagnostics::FlushDiagnosticsImpl(
     EmitString(o, D->getBugType()) << '\n';
     o << "   <key>check_name</key>";
     EmitString(o, D->getCheckName()) << '\n';
- 
+
+    o << "   <!-- This hash is experimental and going to change! -->\n";
+    o << "   <key>issue_hash_content_of_line_in_context</key>";
+    PathDiagnosticLocation UPDLoc = D->getUniqueingLoc();
+    FullSourceLoc L(SM->getExpansionLoc(UPDLoc.isValid()
+                                            ? UPDLoc.asLocation()
+                                            : D->getLocation().asLocation()),
+                    *SM);
+    const Decl *DeclWithIssue = D->getDeclWithIssue();
+    EmitString(o, GetIssueHash(*SM, L, D->getCheckName(), D->getBugType(),
+                               DeclWithIssue, LangOpts))
+        << '\n';
+
     // Output information about the semantic context where
     // the issue occurred.
     if (const Decl *DeclWithIssue = D->getDeclWithIssue()) {
@@ -423,28 +427,23 @@ void PlistDiagnostics::FlushDiagnosticsImpl(
         // Output the bug hash for issue unique-ing. Currently, it's just an
         // offset from the beginning of the function.
         if (const Stmt *Body = DeclWithIssue->getBody()) {
-          
+
           // If the bug uniqueing location exists, use it for the hash.
           // For example, this ensures that two leaks reported on the same line
           // will have different issue_hashes and that the hash will identify
           // the leak location even after code is added between the allocation
           // site and the end of scope (leak report location).
-          PathDiagnosticLocation UPDLoc = D->getUniqueingLoc();
           if (UPDLoc.isValid()) {
-            FullSourceLoc UL(SM->getExpansionLoc(UPDLoc.asLocation()),
-                             *SM);
             FullSourceLoc UFunL(SM->getExpansionLoc(
               D->getUniqueingDecl()->getBody()->getLocStart()), *SM);
-            o << "  <key>issue_hash</key><string>"
-              << UL.getExpansionLineNumber() - UFunL.getExpansionLineNumber()
+            o << "  <key>issue_hash_function_offset</key><string>"
+              << L.getExpansionLineNumber() - UFunL.getExpansionLineNumber()
               << "</string>\n";
 
           // Otherwise, use the location on which the bug is reported.
           } else {
-            FullSourceLoc L(SM->getExpansionLoc(D->getLocation().asLocation()),
-                            *SM);
             FullSourceLoc FunL(SM->getExpansionLoc(Body->getLocStart()), *SM);
-            o << "  <key>issue_hash</key><string>"
+            o << "  <key>issue_hash_function_offset</key><string>"
               << L.getExpansionLineNumber() - FunL.getExpansionLineNumber()
               << "</string>\n";
           }
@@ -486,5 +485,5 @@ void PlistDiagnostics::FlushDiagnosticsImpl(
   o << " </array>\n";
 
   // Finish.
-  o << "</dict>\n</plist>";  
+  o << "</dict>\n</plist>";
 }

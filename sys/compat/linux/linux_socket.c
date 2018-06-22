@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1995 Søren Schmidt
  * All rights reserved.
  *
@@ -289,6 +291,63 @@ linux_to_bsd_ip_sockopt(int opt)
 }
 
 static int
+linux_to_bsd_ip6_sockopt(int opt)
+{
+
+	switch (opt) {
+	case LINUX_IPV6_NEXTHOP:
+		return (IPV6_NEXTHOP);
+	case LINUX_IPV6_UNICAST_HOPS:
+		return (IPV6_UNICAST_HOPS);
+	case LINUX_IPV6_MULTICAST_IF:
+		return (IPV6_MULTICAST_IF);
+	case LINUX_IPV6_MULTICAST_HOPS:
+		return (IPV6_MULTICAST_HOPS);
+	case LINUX_IPV6_MULTICAST_LOOP:
+		return (IPV6_MULTICAST_LOOP);
+	case LINUX_IPV6_ADD_MEMBERSHIP:
+		return (IPV6_JOIN_GROUP);
+	case LINUX_IPV6_DROP_MEMBERSHIP:
+		return (IPV6_LEAVE_GROUP);
+	case LINUX_IPV6_V6ONLY:
+		return (IPV6_V6ONLY);
+	case LINUX_IPV6_DONTFRAG:
+		return (IPV6_DONTFRAG);
+#if 0
+	case LINUX_IPV6_CHECKSUM:
+		return (IPV6_CHECKSUM);
+	case LINUX_IPV6_RECVPKTINFO:
+		return (IPV6_RECVPKTINFO);
+	case LINUX_IPV6_PKTINFO:
+		return (IPV6_PKTINFO);
+	case LINUX_IPV6_RECVHOPLIMIT:
+		return (IPV6_RECVHOPLIMIT);
+	case LINUX_IPV6_HOPLIMIT:
+		return (IPV6_HOPLIMIT);
+	case LINUX_IPV6_RECVHOPOPTS:
+		return (IPV6_RECVHOPOPTS);
+	case LINUX_IPV6_HOPOPTS:
+		return (IPV6_HOPOPTS);
+	case LINUX_IPV6_RTHDRDSTOPTS:
+		return (IPV6_RTHDRDSTOPTS);
+	case LINUX_IPV6_RECVRTHDR:
+		return (IPV6_RECVRTHDR);
+	case LINUX_IPV6_RTHDR:
+		return (IPV6_RTHDR);
+	case LINUX_IPV6_RECVDSTOPTS:
+		return (IPV6_RECVDSTOPTS);
+	case LINUX_IPV6_DSTOPTS:
+		return (IPV6_DSTOPTS);
+	case LINUX_IPV6_RECVPATHMTU:
+		return (IPV6_RECVPATHMTU);
+	case LINUX_IPV6_PATHMTU:
+		return (IPV6_PATHMTU);
+#endif
+	}
+	return (-1);
+}
+
+static int
 linux_to_bsd_so_sockopt(int opt)
 {
 
@@ -391,7 +450,7 @@ linux_to_bsd_msg_flags(int flags)
 	if (flags & LINUX_MSG_ERRQUEUE)
 		;
 #endif
-	return ret_flags;
+	return (ret_flags);
 }
 
 /*
@@ -405,16 +464,17 @@ bsd_to_linux_sockaddr(struct sockaddr *arg)
 {
 	struct sockaddr sa;
 	size_t sa_len = sizeof(struct sockaddr);
-	int error;
-	
+	int error, bdom;
+
 	if ((error = copyin(arg, &sa, sa_len)))
 		return (error);
-	
-	*(u_short *)&sa = sa.sa_family;
-	
-	error = copyout(&sa, arg, sa_len);
-	
-	return (error);
+
+	bdom = bsd_to_linux_domain(sa.sa_family);
+	if (bdom == -1)
+		return (EAFNOSUPPORT);
+
+	*(u_short *)&sa = bdom;
+	return (copyout(&sa, arg, sa_len));
 }
 
 static int
@@ -422,17 +482,18 @@ linux_to_bsd_sockaddr(struct sockaddr *arg, int len)
 {
 	struct sockaddr sa;
 	size_t sa_len = sizeof(struct sockaddr);
-	int error;
+	int error, bdom;
 
 	if ((error = copyin(arg, &sa, sa_len)))
 		return (error);
 
-	sa.sa_family = *(sa_family_t *)&sa;
+	bdom = linux_to_bsd_domain(*(sa_family_t *)&sa);
+	if (bdom == -1)
+		return (EAFNOSUPPORT);
+
+	sa.sa_family = bdom;
 	sa.sa_len = len;
-
-	error = copyout(&sa, arg, sa_len);
-
-	return (error);
+	return (copyout(&sa, arg, sa_len));
 }
 
 static int
@@ -446,7 +507,7 @@ linux_sa_put(struct osockaddr *osa)
 	 * not changed.
 	 */
 	error = copyin(osa, &sa, sizeof(sa.sa_family));
-	if (error)
+	if (error != 0)
 		return (error);
 
 	bdom = bsd_to_linux_domain(sa.sa_family);
@@ -454,11 +515,7 @@ linux_sa_put(struct osockaddr *osa)
 		return (EINVAL);
 
 	sa.sa_family = bdom;
-	error = copyout(&sa, osa, sizeof(sa.sa_family));
-	if (error)
-		return (error);
-
-	return (0);
+	return (copyout(&sa, osa, sizeof(sa.sa_family)));
 }
 
 static int
@@ -558,7 +615,7 @@ linux_sendit(struct thread *td, int s, struct msghdr *mp, int flags,
 
 	if (mp->msg_name != NULL) {
 		error = linux_getsockaddr(&to, mp->msg_name, mp->msg_namelen);
-		if (error)
+		if (error != 0)
 			return (error);
 		mp->msg_name = to;
 	} else
@@ -582,7 +639,7 @@ linux_check_hdrincl(struct thread *td, int s)
 	size_val = sizeof(optval);
 	error = kern_getsockopt(td, s, IPPROTO_IP, IP_HDRINCL,
 	    &optval, UIO_SYSSPACE, &size_val);
-	if (error)
+	if (error != 0)
 		return (error);
 
 	return (optval == 0);
@@ -604,7 +661,7 @@ linux_sendto_hdrincl(struct thread *td, struct linux_sendto_args *linux_args)
 
 	struct ip *packet;
 	struct msghdr msg;
-	struct iovec aiov[1];
+	kiovec_t aiov[1];
 	int error;
 
 	/* Check that the packet isn't too big or too small. */
@@ -630,8 +687,7 @@ linux_sendto_hdrincl(struct thread *td, struct linux_sendto_args *linux_args)
 	msg.msg_iovlen = 1;
 	msg.msg_control = NULL;
 	msg.msg_flags = 0;
-	aiov[0].iov_base = (char *)packet;
-	aiov[0].iov_len = linux_args->len;
+	IOVEC_INIT(&aiov[0], packet, linux_args->len);
 	error = linux_sendit(td, linux_args->s, &msg, linux_args->flags,
 	    NULL, UIO_SYSSPACE);
 goout:
@@ -642,32 +698,26 @@ goout:
 int
 linux_socket(struct thread *td, struct linux_socket_args *args)
 {
-	struct socket_args /* {
-		int domain;
-		int type;
-		int protocol;
-	} */ bsd_args;
-	int retval_socket;
+	int domain, retval_socket, type;
 
-	bsd_args.protocol = args->protocol;
-	bsd_args.type = args->type & LINUX_SOCK_TYPE_MASK;
-	if (bsd_args.type < 0 || bsd_args.type > LINUX_SOCK_MAX)
+	type = args->type & LINUX_SOCK_TYPE_MASK;
+	if (type < 0 || type > LINUX_SOCK_MAX)
 		return (EINVAL);
 	retval_socket = linux_set_socket_flags(args->type & ~LINUX_SOCK_TYPE_MASK,
-		&bsd_args.type);
+		&type);
 	if (retval_socket != 0)
 		return (retval_socket);
-	bsd_args.domain = linux_to_bsd_domain(args->domain);
-	if (bsd_args.domain == -1)
+	domain = linux_to_bsd_domain(args->domain);
+	if (domain == -1)
 		return (EAFNOSUPPORT);
 
-	retval_socket = sys_socket(td, &bsd_args);
+	retval_socket = kern_socket(td, domain, type, args->protocol);
 	if (retval_socket)
 		return (retval_socket);
 
-	if (bsd_args.type == SOCK_RAW
-	    && (bsd_args.protocol == IPPROTO_RAW || bsd_args.protocol == 0)
-	    && bsd_args.domain == PF_INET) {
+	if (type == SOCK_RAW
+	    && (args->protocol == IPPROTO_RAW || args->protocol == 0)
+	    && domain == PF_INET) {
 		/* It's a raw IP socket: set the IP_HDRINCL option. */
 		int hdrincl;
 
@@ -683,7 +733,7 @@ linux_socket(struct thread *td, struct linux_socket_args *args)
 	 * For simplicity we do this unconditionally of the net.inet6.ip6.v6only
 	 * sysctl value.
 	 */
-	if (bsd_args.domain == PF_INET6) {
+	if (domain == PF_INET6) {
 		int v6only;
 
 		v6only = 0;
@@ -704,7 +754,7 @@ linux_bind(struct thread *td, struct linux_bind_args *args)
 
 	error = linux_getsockaddr(&sa, PTRIN(args->name),
 	    args->namelen);
-	if (error)
+	if (error != 0)
 		return (error);
 
 	error = kern_bindat(td, AT_FDCWD, args->s, sa);
@@ -720,12 +770,13 @@ linux_connect(struct thread *td, struct linux_connect_args *args)
 	cap_rights_t rights;
 	struct socket *so;
 	struct sockaddr *sa;
+	struct file *fp;
 	u_int fflag;
 	int error;
 
 	error = linux_getsockaddr(&sa, (struct osockaddr *)PTRIN(args->name),
 	    args->namelen);
-	if (error)
+	if (error != 0)
 		return (error);
 
 	error = kern_connectat(td, AT_FDCWD, args->s, sa);
@@ -737,38 +788,31 @@ linux_connect(struct thread *td, struct linux_connect_args *args)
 	 * Linux doesn't return EISCONN the first time it occurs,
 	 * when on a non-blocking socket. Instead it returns the
 	 * error getsockopt(SOL_SOCKET, SO_ERROR) would return on BSD.
-	 *
-	 * XXXRW: Instead of using fgetsock(), check that it is a
-	 * socket and use the file descriptor reference instead of
-	 * creating a new one.
 	 */
-	error = fgetsock(td, args->s, cap_rights_init(&rights, CAP_CONNECT),
-	    &so, &fflag);
-	if (error == 0) {
-		error = EISCONN;
-		if (fflag & FNONBLOCK) {
-			SOCK_LOCK(so);
-			if (so->so_emuldata == 0)
-				error = so->so_error;
-			so->so_emuldata = (void *)1;
-			SOCK_UNLOCK(so);
-		}
-		fputsock(so);
+	error = getsock_cap(td, args->s, cap_rights_init(&rights, CAP_CONNECT),
+	    &fp, &fflag, NULL);
+	if (error != 0)
+		return (error);
+
+	error = EISCONN;
+	so = fp->f_data;
+	if (fflag & FNONBLOCK) {
+		SOCK_LOCK(so);
+		if (so->so_emuldata == 0)
+			error = so->so_error;
+		so->so_emuldata = (void *)1;
+		SOCK_UNLOCK(so);
 	}
+	fdrop(fp, td);
+
 	return (error);
 }
 
 int
 linux_listen(struct thread *td, struct linux_listen_args *args)
 {
-	struct listen_args /* {
-		int s;
-		int backlog;
-	} */ bsd_args;
 
-	bsd_args.s = args->s;
-	bsd_args.backlog = args->backlog;
-	return (sys_listen(td, &bsd_args));
+	return (kern_listen(td, args->s, args->backlog));
 }
 
 static int
@@ -781,26 +825,40 @@ linux_accept_common(struct thread *td, int s, l_uintptr_t addr,
 		socklen_t * __restrict anamelen;
 		int	flags;
 	} */ bsd_args;
-	int error;
+	cap_rights_t rights;
+	struct socket *so;
+	struct file *fp;
+	int error, error1;
 
 	bsd_args.s = s;
-	/* XXX: */
 	bsd_args.name = (struct sockaddr * __restrict)PTRIN(addr);
-	bsd_args.anamelen = PTRIN(namelen);/* XXX */
+	bsd_args.anamelen = PTRIN(namelen);
 	bsd_args.flags = 0;
 	error = linux_set_socket_flags(flags, &bsd_args.flags);
 	if (error != 0)
 		return (error);
 	error = sys_accept4(td, &bsd_args);
 	bsd_to_linux_sockaddr((struct sockaddr *)bsd_args.name);
-	if (error) {
+	if (error != 0) {
 		if (error == EFAULT && namelen != sizeof(struct sockaddr_in))
 			return (EINVAL);
+		if (error == EINVAL) {
+			error1 = getsock_cap(td, s,
+			    cap_rights_init(&rights, CAP_ACCEPT), &fp, NULL, NULL);
+			if (error1 != 0)
+				return (error1);
+			so = fp->f_data;
+			if (so->so_type == SOCK_DGRAM) {
+				fdrop(fp, td);
+				return (EOPNOTSUPP);
+			}
+			fdrop(fp, td);
+		}
 		return (error);
 	}
 	if (addr)
 		error = linux_sa_put(PTRIN(addr));
-	if (error) {
+	if (error != 0) {
 		(void)kern_close(td, td->td_retval[0]);
 		td->td_retval[0] = 0;
 	}
@@ -834,17 +892,13 @@ linux_getsockname(struct thread *td, struct linux_getsockname_args *args)
 	int error;
 
 	bsd_args.fdes = args->s;
-	/* XXX: */
 	bsd_args.asa = (struct sockaddr * __restrict)PTRIN(args->addr);
-	bsd_args.alen = PTRIN(args->namelen);	/* XXX */
+	bsd_args.alen = PTRIN(args->namelen);
 	error = sys_getsockname(td, &bsd_args);
 	bsd_to_linux_sockaddr((struct sockaddr *)bsd_args.asa);
-	if (error)
+	if (error != 0)
 		return (error);
-	error = linux_sa_put(PTRIN(args->addr));
-	if (error)
-		return (error);
-	return (0);
+	return (linux_sa_put(PTRIN(args->addr)));
 }
 
 int
@@ -862,12 +916,9 @@ linux_getpeername(struct thread *td, struct linux_getpeername_args *args)
 	bsd_args.alen = (socklen_t *)PTRIN(args->namelen);
 	error = sys_getpeername(td, &bsd_args);
 	bsd_to_linux_sockaddr((struct sockaddr *)bsd_args.asa);
-	if (error)
+	if (error != 0)
 		return (error);
-	error = linux_sa_put(PTRIN(args->addr));
-	if (error)
-		return (error);
-	return (0);
+	return (linux_sa_put(PTRIN(args->addr)));
 }
 
 int
@@ -908,10 +959,10 @@ linux_socketpair(struct thread *td, struct linux_socketpair_args *args)
 
 #if defined(__i386__) || (defined(__amd64__) && defined(COMPAT_LINUX32))
 struct linux_send_args {
-	int s;
-	l_uintptr_t msg;
-	int len;
-	int flags;
+	register_t s;
+	register_t msg;
+	register_t len;
+	register_t flags;
 };
 
 static int
@@ -932,14 +983,14 @@ linux_send(struct thread *td, struct linux_send_args *args)
 	bsd_args.flags = args->flags;
 	bsd_args.to = NULL;
 	bsd_args.tolen = 0;
-	return sys_sendto(td, &bsd_args);
+	return (sys_sendto(td, &bsd_args));
 }
 
 struct linux_recv_args {
-	int s;
-	l_uintptr_t msg;
-	int len;
-	int flags;
+	register_t s;
+	register_t msg;
+	register_t len;
+	register_t flags;
 };
 
 static int
@@ -968,8 +1019,7 @@ int
 linux_sendto(struct thread *td, struct linux_sendto_args *args)
 {
 	struct msghdr msg;
-	struct iovec aiov;
-	int error;
+	kiovec_t aiov;
 
 	if (linux_check_hdrincl(td, args->s) == 0)
 		/* IP_HDRINCL set, tweak the packet before sending */
@@ -981,38 +1031,33 @@ linux_sendto(struct thread *td, struct linux_sendto_args *args)
 	msg.msg_iovlen = 1;
 	msg.msg_control = NULL;
 	msg.msg_flags = 0;
-	aiov.iov_base = PTRIN(args->msg);
-	aiov.iov_len = args->len;
-	error = linux_sendit(td, args->s, &msg, args->flags, NULL,
-	    UIO_USERSPACE);
-	return (error);
+	IOVEC_INIT(&aiov, PTRIN(args->msg), args->len);
+	return (linux_sendit(td, args->s, &msg, args->flags, NULL,
+	    UIO_USERSPACE));
 }
 
 int
 linux_recvfrom(struct thread *td, struct linux_recvfrom_args *args)
 {
 	struct msghdr msg;
-	struct iovec aiov;
-	int error;
+	kiovec_t aiov;
+	int error, fromlen;
 
 	if (PTRIN(args->fromlen) != NULL) {
-		error = copyin(PTRIN(args->fromlen), &msg.msg_namelen,
-		    sizeof(msg.msg_namelen));
+		error = copyin(PTRIN(args->fromlen), &fromlen,
+		    sizeof(fromlen));
 		if (error != 0)
 			return (error);
-
-		error = linux_to_bsd_sockaddr((struct sockaddr *)PTRIN(args->from),
-		    msg.msg_namelen);
-		if (error != 0)
-			return (error);
+		if (fromlen < 0)
+			return (EINVAL);
+		msg.msg_namelen = fromlen;
 	} else
 		msg.msg_namelen = 0;
 
 	msg.msg_name = (struct sockaddr * __restrict)PTRIN(args->from);
 	msg.msg_iov = &aiov;
 	msg.msg_iovlen = 1;
-	aiov.iov_base = PTRIN(args->buf);
-	aiov.iov_len = args->len;
+	IOVEC_INIT(&aiov, PTRIN(args->buf), args->len);
 	msg.msg_control = 0;
 	msg.msg_flags = linux_to_bsd_msg_flags(args->flags);
 
@@ -1048,7 +1093,7 @@ linux_sendmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 	struct l_cmsghdr linux_cmsg;
 	struct l_cmsghdr *ptr_cmsg;
 	struct l_msghdr linux_msg;
-	struct iovec *iov;
+	kiovec_t *iov;
 	socklen_t datalen;
 	struct sockaddr *sa;
 	sa_family_t sa_family;
@@ -1222,7 +1267,7 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 	struct l_ucred linux_ucred;
 	socklen_t datalen, outlen;
 	struct l_msghdr linux_msg;
-	struct iovec *iov, *uiov;
+	kiovec_t *iov, *uiov;
 	struct mbuf *control = NULL;
 	struct mbuf **controlp;
 	struct timeval *ftmvl;
@@ -1366,12 +1411,12 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 			linux_cmsg->cmsg_len = LINUX_CMSG_LEN(datalen);
 
 			error = copyout(linux_cmsg, outbuf, L_CMSG_HDRSZ);
-			if (error)
+			if (error != 0)
 				goto bad;
 			outbuf += L_CMSG_HDRSZ;
 
 			error = copyout(data, outbuf, datalen);
-			if (error)
+			if (error != 0)
 				goto bad;
 
 			outbuf += LINUX_CMSG_ALIGN(datalen);
@@ -1465,14 +1510,8 @@ linux_recvmmsg(struct thread *td, struct linux_recvmmsg_args *args)
 int
 linux_shutdown(struct thread *td, struct linux_shutdown_args *args)
 {
-	struct shutdown_args /* {
-		int s;
-		int how;
-	} */ bsd_args;
 
-	bsd_args.s = args->s;
-	bsd_args.how = args->how;
-	return (sys_shutdown(td, &bsd_args));
+	return (kern_shutdown(td, args->s, args->how));
 }
 
 int
@@ -1500,20 +1539,22 @@ linux_setsockopt(struct thread *td, struct linux_setsockopt_args *args)
 		case SO_SNDTIMEO:
 			error = copyin(PTRIN(args->optval), &linux_tv,
 			    sizeof(linux_tv));
-			if (error)
+			if (error != 0)
 				return (error);
 			tv.tv_sec = linux_tv.tv_sec;
 			tv.tv_usec = linux_tv.tv_usec;
 			return (kern_setsockopt(td, args->s, bsd_args.level,
 			    name, &tv, UIO_SYSSPACE, sizeof(tv)));
 			/* NOTREACHED */
-			break;
 		default:
 			break;
 		}
 		break;
 	case IPPROTO_IP:
 		name = linux_to_bsd_ip_sockopt(args->optname);
+		break;
+	case IPPROTO_IPV6:
+		name = linux_to_bsd_ip6_sockopt(args->optname);
 		break;
 	case IPPROTO_TCP:
 		name = linux_to_bsd_tcp_sockopt(args->optname);
@@ -1552,10 +1593,10 @@ linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args)
 	} */ bsd_args;
 	l_timeval linux_tv;
 	struct timeval tv;
-	socklen_t tv_len, xulen;
+	socklen_t tv_len, xulen, len;
 	struct xucred xu;
 	struct l_ucred lxu;
-	int error, name;
+	int error, name, newval;
 
 	bsd_args.s = args->s;
 	bsd_args.level = linux_to_bsd_sockopt_level(args->level);
@@ -1569,21 +1610,20 @@ linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args)
 			tv_len = sizeof(tv);
 			error = kern_getsockopt(td, args->s, bsd_args.level,
 			    name, &tv, UIO_SYSSPACE, &tv_len);
-			if (error)
+			if (error != 0)
 				return (error);
 			linux_tv.tv_sec = tv.tv_sec;
 			linux_tv.tv_usec = tv.tv_usec;
 			return (copyout(&linux_tv, PTRIN(args->optval),
 			    sizeof(linux_tv)));
 			/* NOTREACHED */
-			break;
 		case LOCAL_PEERCRED:
-			if (args->optlen != sizeof(lxu))
+			if (args->optlen < sizeof(lxu))
 				return (EINVAL);
 			xulen = sizeof(xu);
 			error = kern_getsockopt(td, args->s, bsd_args.level,
 			    name, &xu, UIO_SYSSPACE, &xulen);
-			if (error)
+			if (error != 0)
 				return (error);
 			/*
 			 * XXX Use 0 for pid as the FreeBSD does not cache peer pid.
@@ -1593,13 +1633,24 @@ linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args)
 			lxu.gid = xu.cr_gid;
 			return (copyout(&lxu, PTRIN(args->optval), sizeof(lxu)));
 			/* NOTREACHED */
-			break;
+		case SO_ERROR:
+			len = sizeof(newval);
+			error = kern_getsockopt(td, args->s, bsd_args.level,
+			    name, &newval, UIO_SYSSPACE, &len);
+			if (error != 0)
+				return (error);
+			newval = -SV_ABI_ERRNO(td->td_proc, newval);
+			return (copyout(&newval, PTRIN(args->optval), len));
+			/* NOTREACHED */
 		default:
 			break;
 		}
 		break;
 	case IPPROTO_IP:
 		name = linux_to_bsd_ip_sockopt(args->optname);
+		break;
+	case IPPROTO_IPV6:
+		name = linux_to_bsd_ip6_sockopt(args->optname);
 		break;
 	case IPPROTO_TCP:
 		name = linux_to_bsd_tcp_sockopt(args->optname);
@@ -1627,39 +1678,45 @@ linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args)
 #if defined(__i386__) || (defined(__amd64__) && defined(COMPAT_LINUX32))
 
 /* Argument list sizes for linux_socketcall */
-
-#define LINUX_AL(x) ((x) * sizeof(l_ulong))
-
-static const unsigned char lxs_args[] = {
-	LINUX_AL(0) /* unused*/,	LINUX_AL(3) /* socket */,
-	LINUX_AL(3) /* bind */,		LINUX_AL(3) /* connect */,
-	LINUX_AL(2) /* listen */,	LINUX_AL(3) /* accept */,
-	LINUX_AL(3) /* getsockname */,	LINUX_AL(3) /* getpeername */,
-	LINUX_AL(4) /* socketpair */,	LINUX_AL(4) /* send */,
-	LINUX_AL(4) /* recv */,		LINUX_AL(6) /* sendto */,
-	LINUX_AL(6) /* recvfrom */,	LINUX_AL(2) /* shutdown */,
-	LINUX_AL(5) /* setsockopt */,	LINUX_AL(5) /* getsockopt */,
-	LINUX_AL(3) /* sendmsg */,	LINUX_AL(3) /* recvmsg */,
-	LINUX_AL(4) /* accept4 */,	LINUX_AL(5) /* recvmmsg */,
-	LINUX_AL(4) /* sendmmsg */
+static const unsigned char lxs_args_cnt[] = {
+	0 /* unused*/,		3 /* socket */,
+	3 /* bind */,		3 /* connect */,
+	2 /* listen */,		3 /* accept */,
+	3 /* getsockname */,	3 /* getpeername */,
+	4 /* socketpair */,	4 /* send */,
+	4 /* recv */,		6 /* sendto */,
+	6 /* recvfrom */,	2 /* shutdown */,
+	5 /* setsockopt */,	5 /* getsockopt */,
+	3 /* sendmsg */,	3 /* recvmsg */,
+	4 /* accept4 */,	5 /* recvmmsg */,
+	4 /* sendmmsg */
 };
-
-#define	LINUX_AL_SIZE	sizeof(lxs_args) / sizeof(lxs_args[0]) - 1
+#define	LINUX_ARGS_CNT		(nitems(lxs_args_cnt) - 1)
+#define	LINUX_ARG_SIZE(x)	(lxs_args_cnt[x] * sizeof(l_ulong))
 
 int
 linux_socketcall(struct thread *td, struct linux_socketcall_args *args)
 {
 	l_ulong a[6];
+#if defined(__amd64__) && defined(COMPAT_LINUX32)
+	register_t l_args[6];
+#endif
 	void *arg;
 	int error;
 
-	if (args->what < LINUX_SOCKET || args->what > LINUX_AL_SIZE)
+	if (args->what < LINUX_SOCKET || args->what > LINUX_ARGS_CNT)
 		return (EINVAL);
-	error = copyin(PTRIN(args->args), a, lxs_args[args->what]);
-	if (error)
+	error = copyin(PTRIN(args->args), a, LINUX_ARG_SIZE(args->what));
+	if (error != 0)
 		return (error);
 
+#if defined(__amd64__) && defined(COMPAT_LINUX32)
+	for (int i = 0; i < lxs_args_cnt[args->what]; ++i)
+		l_args[i] = a[i];
+	arg = l_args;
+#else
 	arg = a;
+#endif
 	switch (args->what) {
 	case LINUX_SOCKET:
 		return (linux_socket(td, arg));

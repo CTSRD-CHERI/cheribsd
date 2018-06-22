@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2012 Oleksandr Tymoshenko <gonzo@freebsd.org>
  * All rights reserved.
  *
@@ -41,16 +43,18 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/bus.h>
 
-#include <dev/fdt/fdt_common.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
 #include <dev/mmc/bridge.h>
 #include <dev/mmc/mmcreg.h>
-#include <dev/mmc/mmcbrvar.h>
 
 #include <dev/sdhci/sdhci.h>
+
+#include "mmcbr_if.h"
 #include "sdhci_if.h"
+
+#include "opt_mmccam.h"
 
 #include "bcm2835_dma.h"
 #include <arm/broadcom/bcm2835/bcm2835_mbox_prop.h>
@@ -70,6 +74,12 @@ __FBSDID("$FreeBSD$");
 
 static int bcm2835_sdhci_hs = 1;
 static int bcm2835_sdhci_pio_mode = 0;
+
+static struct ofw_compat_data compat_data[] = {
+	{"broadcom,bcm2835-sdhci",	1},
+	{"brcm,bcm2835-mmc",		1},
+	{NULL,				0}
+};
 
 TUNABLE_INT("hw.bcm2835.sdhci.hs", &bcm2835_sdhci_hs);
 TUNABLE_INT("hw.bcm2835.sdhci.pio_mode", &bcm2835_sdhci_pio_mode);
@@ -126,10 +136,11 @@ bcm_sdhci_probe(device_t dev)
 	if (!ofw_bus_status_okay(dev))
 		return (ENXIO);
 
-	if (!ofw_bus_is_compatible(dev, "broadcom,bcm2835-sdhci"))
+	if (ofw_bus_search_compatible(dev, compat_data)->ocd_data == 0)
 		return (ENXIO);
 
 	device_set_desc(dev, "Broadcom 2708 SDHCI controller");
+
 	return (BUS_PROBE_DEFAULT);
 }
 
@@ -214,11 +225,7 @@ bcm_sdhci_attach(device_t dev)
  
 	sdhci_init_slot(dev, &sc->sc_slot, 0);
 
-	sc->sc_dma_ch = bcm_dma_allocate(BCM_DMA_CH_FAST1);
-	if (sc->sc_dma_ch == BCM_DMA_CH_INVALID)
-		sc->sc_dma_ch = bcm_dma_allocate(BCM_DMA_CH_FAST2);
-	if (sc->sc_dma_ch == BCM_DMA_CH_INVALID)
-		sc->sc_dma_ch = bcm_dma_allocate(BCM_DMA_CH_ANY);
+	sc->sc_dma_ch = bcm_dma_allocate(BCM_DMA_CH_ANY);
 	if (sc->sc_dma_ch == BCM_DMA_CH_INVALID)
 		goto fail;
 
@@ -243,8 +250,9 @@ bcm_sdhci_attach(device_t dev)
 		goto fail;
 	}
 
-	sc->sc_sdhci_buffer_phys = BUS_SPACE_PHYSADDR(sc->sc_mem_res, 
-	    SDHCI_BUFFER);
+	/* FIXME: Fix along with other BUS_SPACE_PHYSADDR instances */
+	sc->sc_sdhci_buffer_phys = rman_get_start(sc->sc_mem_res) +
+	    SDHCI_BUFFER;
 
 	bus_generic_probe(dev);
 	bus_generic_attach(dev);
@@ -549,7 +557,7 @@ bcm_sdhci_read_dma(device_t dev, struct sdhci_slot *slot)
 	    slot->curcmd->data->len - slot->offset);
 
 	KASSERT((left & 3) == 0,
-	    ("%s: len = %d, not word-aligned", __func__, left));
+	    ("%s: len = %zu, not word-aligned", __func__, left));
 
 	if (bus_dmamap_load(sc->sc_dma_tag, sc->sc_dma_map, 
 	    (uint8_t *)slot->curcmd->data->data + slot->offset, left, 
@@ -578,7 +586,7 @@ bcm_sdhci_write_dma(device_t dev, struct sdhci_slot *slot)
 	    slot->curcmd->data->len - slot->offset);
 
 	KASSERT((left & 3) == 0,
-	    ("%s: len = %d, not word-aligned", __func__, left));
+	    ("%s: len = %zu, not word-aligned", __func__, left));
 
 	if (bus_dmamap_load(sc->sc_dma_tag, sc->sc_dma_map,
 	    (uint8_t *)slot->curcmd->data->data + slot->offset, left, 
@@ -639,7 +647,6 @@ static device_method_t bcm_sdhci_methods[] = {
 	/* Bus interface */
 	DEVMETHOD(bus_read_ivar,	sdhci_generic_read_ivar),
 	DEVMETHOD(bus_write_ivar,	sdhci_generic_write_ivar),
-	DEVMETHOD(bus_print_child,	bus_generic_print_child),
 
 	/* MMC bridge interface */
 	DEVMETHOD(mmcbr_update_ios,	sdhci_generic_update_ios),
@@ -662,7 +669,7 @@ static device_method_t bcm_sdhci_methods[] = {
 	DEVMETHOD(sdhci_write_4,	bcm_sdhci_write_4),
 	DEVMETHOD(sdhci_write_multi_4,	bcm_sdhci_write_multi_4),
 
-	{ 0, 0 }
+	DEVMETHOD_END
 };
 
 static devclass_t bcm_sdhci_devclass;
@@ -673,6 +680,9 @@ static driver_t bcm_sdhci_driver = {
 	sizeof(struct bcm_sdhci_softc),
 };
 
-DRIVER_MODULE(sdhci_bcm, simplebus, bcm_sdhci_driver, bcm_sdhci_devclass, 0, 0);
+DRIVER_MODULE(sdhci_bcm, simplebus, bcm_sdhci_driver, bcm_sdhci_devclass,
+    NULL, NULL);
 MODULE_DEPEND(sdhci_bcm, sdhci, 1, 1, 1);
-DRIVER_MODULE(mmc, sdhci_bcm, mmc_driver, mmc_devclass, NULL, NULL);
+#ifndef MMCCAM
+MMC_DECLARE_BRIDGE(sdhci_bcm);
+#endif

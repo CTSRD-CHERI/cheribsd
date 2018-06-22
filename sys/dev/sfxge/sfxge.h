@@ -1,5 +1,7 @@
 /*-
- * Copyright (c) 2010-2015 Solarflare Communications Inc.
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
+ * Copyright (c) 2010-2016 Solarflare Communications Inc.
  * All rights reserved.
  *
  * This software was developed in part by Philip Paeps under contract for
@@ -113,6 +115,43 @@
 
 #define	SFXGE_ETHERTYPE_LOOPBACK	0x9000	/* Xerox loopback */
 
+
+#define	SFXGE_MAGIC_RESERVED		0x8000
+
+#define	SFXGE_MAGIC_DMAQ_LABEL_WIDTH	6
+#define	SFXGE_MAGIC_DMAQ_LABEL_MASK \
+	((1 << SFXGE_MAGIC_DMAQ_LABEL_WIDTH) - 1)
+
+enum sfxge_sw_ev {
+	SFXGE_SW_EV_RX_QFLUSH_DONE = 1,
+	SFXGE_SW_EV_RX_QFLUSH_FAILED,
+	SFXGE_SW_EV_RX_QREFILL,
+	SFXGE_SW_EV_TX_QFLUSH_DONE,
+};
+
+#define	SFXGE_SW_EV_MAGIC(_sw_ev) \
+	(SFXGE_MAGIC_RESERVED | ((_sw_ev) << SFXGE_MAGIC_DMAQ_LABEL_WIDTH))
+
+static inline uint16_t
+sfxge_sw_ev_mk_magic(enum sfxge_sw_ev sw_ev, unsigned int label)
+{
+	KASSERT((label & SFXGE_MAGIC_DMAQ_LABEL_MASK) == label,
+	    ("(label & SFXGE_MAGIC_DMAQ_LABEL_MASK) != label"));
+	return SFXGE_SW_EV_MAGIC(sw_ev) | label;
+}
+
+static inline uint16_t
+sfxge_sw_ev_rxq_magic(enum sfxge_sw_ev sw_ev, struct sfxge_rxq *rxq)
+{
+	return sfxge_sw_ev_mk_magic(sw_ev, 0);
+}
+
+static inline uint16_t
+sfxge_sw_ev_txq_magic(enum sfxge_sw_ev sw_ev, struct sfxge_txq *txq)
+{
+	return sfxge_sw_ev_mk_magic(sw_ev, txq->type);
+}
+
 enum sfxge_evq_state {
 	SFXGE_EVQ_UNINITIALIZED = 0,
 	SFXGE_EVQ_INITIALIZED,
@@ -121,6 +160,8 @@ enum sfxge_evq_state {
 };
 
 #define	SFXGE_EV_BATCH	16384
+
+#define	SFXGE_STATS_UPDATE_PERIOD_MS	1000
 
 struct sfxge_evq {
 	/* Structure members below are sorted by usage order */
@@ -209,6 +250,7 @@ struct sfxge_port {
 #endif
 	struct sfxge_hw_stats	phy_stats;
 	struct sfxge_hw_stats	mac_stats;
+	uint16_t		stats_update_period_ms;
 	efx_link_mode_t		link_mode;
 	uint8_t			mcast_addrs[EFX_MAC_MULTICAST_LIST_MAX *
 					    EFX_MAC_ADDR_LEN];
@@ -262,9 +304,8 @@ struct sfxge_softc {
 #endif
 
 	unsigned int			max_rss_channels;
-	uma_zone_t			rxq_cache;
 	struct sfxge_rxq		*rxq[SFXGE_RX_SCALE_MAX];
-	unsigned int			rx_indir_table[SFXGE_RX_SCALE_MAX];
+	unsigned int			rx_indir_table[EFX_RSS_TBL_SIZE];
 
 	struct sfxge_txq		*txq[SFXGE_TXQ_NTYPES + SFXGE_RX_SCALE_MAX];
 
@@ -289,7 +330,9 @@ struct sfxge_softc {
 #endif
 };
 
-#define	SFXGE_LINK_UP(sc) ((sc)->port.link_mode != EFX_LINK_DOWN)
+#define	SFXGE_LINK_UP(sc) \
+	((sc)->port.link_mode != EFX_LINK_DOWN && \
+	 (sc)->port.link_mode != EFX_LINK_UNKNOWN)
 #define	SFXGE_RUNNING(sc) ((sc)->ifnet->if_drv_flags & IFF_DRV_RUNNING)
 
 #define	SFXGE_PARAM(_name)	"hw.sfxge." #_name

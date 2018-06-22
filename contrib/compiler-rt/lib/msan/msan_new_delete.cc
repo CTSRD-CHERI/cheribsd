@@ -14,6 +14,7 @@
 
 #include "msan.h"
 #include "interception/interception.h"
+#include "sanitizer_common/sanitizer_allocator.h"
 
 #if MSAN_REPLACE_OPERATORS_NEW_AND_DELETE
 
@@ -27,27 +28,34 @@ namespace std {
 }  // namespace std
 
 
-#define OPERATOR_NEW_BODY \
+// TODO(alekseys): throw std::bad_alloc instead of dying on OOM.
+#define OPERATOR_NEW_BODY(nothrow) \
   GET_MALLOC_STACK_TRACE; \
-  return MsanReallocate(&stack, 0, size, sizeof(u64), false)
+  void *res = msan_malloc(size, &stack);\
+  if (!nothrow && UNLIKELY(!res)) DieOnFailure::OnOOM();\
+  return res
 
 INTERCEPTOR_ATTRIBUTE
-void *operator new(size_t size) { OPERATOR_NEW_BODY; }
+void *operator new(size_t size) { OPERATOR_NEW_BODY(false /*nothrow*/); }
 INTERCEPTOR_ATTRIBUTE
-void *operator new[](size_t size) { OPERATOR_NEW_BODY; }
+void *operator new[](size_t size) { OPERATOR_NEW_BODY(false /*nothrow*/); }
 INTERCEPTOR_ATTRIBUTE
-void *operator new(size_t size, std::nothrow_t const&) { OPERATOR_NEW_BODY; }
+void *operator new(size_t size, std::nothrow_t const&) {
+  OPERATOR_NEW_BODY(true /*nothrow*/);
+}
 INTERCEPTOR_ATTRIBUTE
-void *operator new[](size_t size, std::nothrow_t const&) { OPERATOR_NEW_BODY; }
+void *operator new[](size_t size, std::nothrow_t const&) {
+  OPERATOR_NEW_BODY(true /*nothrow*/);
+}
 
 #define OPERATOR_DELETE_BODY \
   GET_MALLOC_STACK_TRACE; \
   if (ptr) MsanDeallocate(&stack, ptr)
 
 INTERCEPTOR_ATTRIBUTE
-void operator delete(void *ptr) throw() { OPERATOR_DELETE_BODY; }
+void operator delete(void *ptr) NOEXCEPT { OPERATOR_DELETE_BODY; }
 INTERCEPTOR_ATTRIBUTE
-void operator delete[](void *ptr) throw() { OPERATOR_DELETE_BODY; }
+void operator delete[](void *ptr) NOEXCEPT { OPERATOR_DELETE_BODY; }
 INTERCEPTOR_ATTRIBUTE
 void operator delete(void *ptr, std::nothrow_t const&) { OPERATOR_DELETE_BODY; }
 INTERCEPTOR_ATTRIBUTE

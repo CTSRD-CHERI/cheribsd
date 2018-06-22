@@ -3,10 +3,20 @@
   * 
   * Author: Wietse Venema, Eindhoven University of Technology, The Netherlands.
   */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
-extern char *inet_cfg();		/* read inetd.conf file */
-extern void inet_set();			/* remember internet service */
-extern int inet_get();			/* look up internet service */
+extern char *inet_cfg(char *conf);		/* read inetd.conf file */
+extern void inet_set(char *name, int type);	/* remember internet service */
+extern int inet_get(char *name);		/* look up internet service */
 
 #define	WR_UNKNOWN	(-1)		/* service unknown */
 #define	WR_NOT		1		/* may not be wrapped */

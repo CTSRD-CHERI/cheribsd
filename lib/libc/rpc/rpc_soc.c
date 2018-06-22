@@ -1,6 +1,8 @@
 /*	$NetBSD: rpc_soc.c,v 1.6 2000/07/06 03:10:35 christos Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2009, Sun Microsystems, Inc.
  * All rights reserved.
  *
@@ -26,6 +28,17 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
  * POSSIBILITY OF SUCH DAMAGE.
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "sunrpc"
+ * }
+ * CHERI CHANGES END
  */
 
 /* #ident	"@(#)rpc_soc.c	1.17	94/04/24 SMI" */
@@ -349,7 +362,7 @@ rpc_wrap_bcast(char *resultp, struct netbuf *addr, struct netconfig *nconf)
 	else
 		clnt_broadcast_result = (resultproc_t)thr_getspecific(clnt_broadcast_key);
 	return (*clnt_broadcast_result)(resultp,
-				(struct sockaddr_in *)addr->buf);
+				(struct sockaddr_in *)addr->buf, NULL);
 }
 
 /*

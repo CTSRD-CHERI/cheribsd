@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2003-2008 Joseph Koshy
  * Copyright (c) 2007 The FreeBSD Foundation
  * All rights reserved.
@@ -108,7 +110,7 @@ static  struct amd_descr amd_pmcdesc[AMD_NPMCS] =
 
 struct amd_event_code_map {
 	enum pmc_event	pe_ev;	 /* enum value */
-	uint8_t		pe_code; /* encoded event mask */
+	uint16_t	pe_code; /* encoded event mask */
 	uint8_t		pe_mask; /* bits allowed in unit mask */
 };
 
@@ -241,8 +243,7 @@ const struct amd_event_code_map amd_event_codes[] = {
 
 };
 
-const int amd_event_codes_size =
-	sizeof(amd_event_codes) / sizeof(amd_event_codes[0]);
+const int amd_event_codes_size = nitems(amd_event_codes);
 
 /*
  * Per-processor information
@@ -690,12 +691,13 @@ amd_intr(int cpu, struct trapframe *tf)
 		error = pmc_process_interrupt(cpu, PMC_HR, pm, tf,
 		    TRAPF_USERMODE(tf));
 		if (error == 0)
-			wrmsr(evsel, config | AMD_PMC_ENABLE);
+			wrmsr(evsel, config);
 	}
 
 	atomic_add_int(retval ? &pmc_stats.pm_intr_processed :
 	    &pmc_stats.pm_intr_ignored, 1);
 
+	PMCDBG1(MDP,INT,2, "retval=%d", retval);
 	return (retval);
 }
 

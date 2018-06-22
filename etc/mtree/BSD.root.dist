@@ -30,7 +30,7 @@
         ..
         bluetooth
         ..
-        casper
+        cron.d
         ..
         defaults
         ..
@@ -76,22 +76,26 @@
         ..
         ssl
         ..
+        syslog.d
+        ..
         zfs
         ..
     ..
     lib
+        casper
+        ..
         geom
         ..
     ..
     libexec
-        casper
-        ..
         resolvconf
         ..
     ..
     media
     ..
     mnt
+    ..
+    net
     ..
     proc            mode=0555
     ..

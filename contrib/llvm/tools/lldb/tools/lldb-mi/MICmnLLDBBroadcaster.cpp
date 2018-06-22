@@ -10,31 +10,29 @@
 // In-house headers:
 #include "MICmnLLDBBroadcaster.h"
 
-//++ ------------------------------------------------------------------------------------
+//++
+//------------------------------------------------------------------------------------
 // Details: CMICmnLLDBBroadcaster constructor.
 // Type:    Method.
 // Args:    None.
 // Return:  None.
 // Throws:  None.
 //--
-CMICmnLLDBBroadcaster::CMICmnLLDBBroadcaster(void)
-    : lldb::SBBroadcaster("MI driver")
-{
-}
+CMICmnLLDBBroadcaster::CMICmnLLDBBroadcaster()
+    : lldb::SBBroadcaster("MI driver") {}
 
-//++ ------------------------------------------------------------------------------------
+//++
+//------------------------------------------------------------------------------------
 // Details: CMICmnLLDBBroadcaster destructor.
 // Type:    Overridable.
 // Args:    None.
 // Return:  None.
 // Throws:  None.
 //--
-CMICmnLLDBBroadcaster::~CMICmnLLDBBroadcaster(void)
-{
-    Shutdown();
-}
+CMICmnLLDBBroadcaster::~CMICmnLLDBBroadcaster() { Shutdown(); }
 
-//++ ------------------------------------------------------------------------------------
+//++
+//------------------------------------------------------------------------------------
 // Details: Initialize resources for *this broadcaster object.
 // Type:    Method.
 // Args:    None.
@@ -42,20 +40,19 @@ CMICmnLLDBBroadcaster::~CMICmnLLDBBroadcaster(void)
 //          MIstatus::failure - Functionality failed.
 // Throws:  None.
 //--
-bool
-CMICmnLLDBBroadcaster::Initialize(void)
-{
-    m_clientUsageRefCnt++;
+bool CMICmnLLDBBroadcaster::Initialize() {
+  m_clientUsageRefCnt++;
 
-    if (m_bInitialized)
-        return MIstatus::success;
+  if (m_bInitialized)
+    return MIstatus::success;
 
-    m_bInitialized = MIstatus::success;
+  m_bInitialized = MIstatus::success;
 
-    return m_bInitialized;
+  return m_bInitialized;
 }
 
-//++ ------------------------------------------------------------------------------------
+//++
+//------------------------------------------------------------------------------------
 // Details: Release resources for *this broadcaster object.
 // Type:    Method.
 // Args:    None.
@@ -63,16 +60,14 @@ CMICmnLLDBBroadcaster::Initialize(void)
 //          MIstatus::failure - Functionality failed.
 // Throws:  None.
 //--
-bool
-CMICmnLLDBBroadcaster::Shutdown(void)
-{
-    if (--m_clientUsageRefCnt > 0)
-        return MIstatus::success;
-
-    if (!m_bInitialized)
-        return MIstatus::success;
-
-    m_bInitialized = false;
-
+bool CMICmnLLDBBroadcaster::Shutdown() {
+  if (--m_clientUsageRefCnt > 0)
     return MIstatus::success;
+
+  if (!m_bInitialized)
+    return MIstatus::success;
+
+  m_bInitialized = false;
+
+  return MIstatus::success;
 }

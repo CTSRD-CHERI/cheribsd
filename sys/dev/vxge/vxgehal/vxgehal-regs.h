@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright(c) 2002-2011 Exar Corp.
  * All rights reserved.
  *
@@ -200,7 +202,7 @@ typedef struct vxge_hal_pm_capability_le_t {
 	u16	capabilities_reg;
 #define	VXGE_HAL_PCI_PM_CAP_VER_MASK	0x0007	/* Version */
 #define	VXGE_HAL_PCI_PM_CAP_PME_CLOCK	0x0008	/* PME clock required */
-#define	VXGE_HAL_PCI_PM_CAP_AUX_POWER	0x0010	/* Auxilliary power support */
+#define	VXGE_HAL_PCI_PM_CAP_AUX_POWER	0x0010	/* Auxiliary power support */
 #define	VXGE_HAL_PCI_PM_CAP_DSI		0x0020	/* Device specific init */
 #define	VXGE_HAL_PCI_PM_AUX_CURRENT	0x01C0	/* Auxiliary current reqs */
 #define	VXGE_HAL_PCI_PM_CAP_D1		0x0200	/* D1 power state support */
@@ -228,7 +230,7 @@ typedef struct vxge_hal_pm_capability_t {
 	u16	capabilities_reg;
 #define	VXGE_HAL_PCI_PM_CAP_VER_MASK	0x0007	/* Version */
 #define	VXGE_HAL_PCI_PM_CAP_PME_CLOCK   0x0008	/* PME clock required */
-#define	VXGE_HAL_PCI_PM_CAP_AUX_POWER   0x0010	/* Auxilliary power support */
+#define	VXGE_HAL_PCI_PM_CAP_AUX_POWER   0x0010	/* Auxiliary power support */
 #define	VXGE_HAL_PCI_PM_CAP_DSI		0x0020	/* Dev specific init */
 #define	VXGE_HAL_PCI_PM_AUX_CURRENT	0x01C0	/* Auxiliary current reqs */
 #define	VXGE_HAL_PCI_PM_CAP_D1		0x0200	/* D1 power state support */
@@ -257,7 +259,7 @@ typedef struct vxge_hal_pm_capability_t {
 	u16	capabilities_reg;
 #define	VXGE_HAL_PCI_PM_CAP_VER_MASK	0x0007	/* Version */
 #define	VXGE_HAL_PCI_PM_CAP_PME_CLOCK   0x0008	/* PME clock required */
-#define	VXGE_HAL_PCI_PM_CAP_AUX_POWER   0x0010	/* Auxilliary power support */
+#define	VXGE_HAL_PCI_PM_CAP_AUX_POWER   0x0010	/* Auxiliary power support */
 #define	VXGE_HAL_PCI_PM_CAP_DSI		0x0020	/* Dev specific init */
 #define	VXGE_HAL_PCI_PM_AUX_CURRENT	0x01C0	/* Auxiliary curr reqs */
 #define	VXGE_HAL_PCI_PM_CAP_D1		0x0200	/* D1 power state support */

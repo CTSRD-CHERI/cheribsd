@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2003-2007, Joseph Koshy
  * Copyright (c) 2007 The FreeBSD Foundation
  * All rights reserved.
@@ -173,6 +175,9 @@ extern const int pmc_kernel_version;
 
 /* PMC soft per cpu trapframe */
 extern struct trapframe pmc_tf[MAXCPU];
+
+/* Quick check if preparatory work is necessary */
+#define	PMC_HOOK_INSTALLED(cmd)	__predict_false(pmc_hook != NULL)
 
 /* Hook invocation; for use within the kernel */
 #define	PMC_CALL_HOOK(t, cmd, arg)		\

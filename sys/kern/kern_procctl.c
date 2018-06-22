@@ -1,6 +1,6 @@
 /*-
  * Copyright (c) 2014 John Baldwin
- * Copyright (c) 2014 The FreeBSD Foundation
+ * Copyright (c) 2014, 2016 The FreeBSD Foundation
  *
  * Portions of this software were developed by Konstantin Belousov
  * under sponsorship from the FreeBSD Foundation.
@@ -27,6 +27,8 @@
  * SUCH DAMAGE.
  */
 
+#include "opt_compat.h"
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -39,9 +41,20 @@ __FBSDID("$FreeBSD$");
 #include <sys/proc.h>
 #include <sys/procctl.h>
 #include <sys/sx.h>
+#include <sys/sysent.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysproto.h>
 #include <sys/wait.h>
+
+#ifdef COMPAT_FREEBSD32
+#include <compat/freebsd32/freebsd32.h>
+#endif
+
+struct procctl_reaper_pids_c {
+	u_int	rp_count;
+	u_int	rp_pad0[15];
+	struct procctl_reaper_pidinfo * __capability rp_pids;
+};
 
 static int
 protect_setchild(struct thread *td, struct proc *p, int flags)
@@ -192,10 +205,10 @@ reap_status(struct thread *td, struct proc *p,
 }
 
 static int
-reap_getpids(struct thread *td, struct proc *p, struct procctl_reaper_pids *rp)
+reap_getpids(struct thread *td, struct proc *p, struct procctl_reaper_pids_c *rp)
 {
 	struct proc *reap, *p2;
-	struct procctl_reaper_pidinfo *pi, *pip;
+	struct procctl_reaper_pidinfo * __capability pi;
 	u_int i, n;
 	int error;
 
@@ -209,26 +222,62 @@ reap_getpids(struct thread *td, struct proc *p, struct procctl_reaper_pids *rp)
 	sx_unlock(&proctree_lock);
 	if (rp->rp_count < n)
 		n = rp->rp_count;
-	pi = malloc(n * sizeof(*pi), M_TEMP, M_WAITOK);
+	pi = malloc_c(n * sizeof(*pi), M_TEMP, M_WAITOK | M_ZERO);
 	sx_slock(&proctree_lock);
 	LIST_FOREACH(p2, &reap->p_reaplist, p_reapsibling) {
 		if (i == n)
 			break;
-		pip = &pi[i];
-		bzero(pip, sizeof(*pip));
-		pip->pi_pid = p2->p_pid;
-		pip->pi_subtree = p2->p_reapsubtree;
-		pip->pi_flags = REAPER_PIDINFO_VALID;
+		pi[i].pi_pid = p2->p_pid;
+		pi[i].pi_subtree = p2->p_reapsubtree;
+		pi[i].pi_flags = REAPER_PIDINFO_VALID;
 		if (proc_realparent(p2) == reap)
-			pip->pi_flags |= REAPER_PIDINFO_CHILD;
+			pi[i].pi_flags |= REAPER_PIDINFO_CHILD;
+		if ((p2->p_treeflag & P_TREE_REAPER) != 0)
+			pi[i].pi_flags |= REAPER_PIDINFO_REAPER;
 		i++;
 	}
 	sx_sunlock(&proctree_lock);
-	error = copyout(pi, rp->rp_pids, i * sizeof(*pi));
-	free(pi, M_TEMP);
+	error = copyout_c(pi, rp->rp_pids, i * sizeof(*pi));
+	free_c(pi, M_TEMP);
 	sx_slock(&proctree_lock);
 	PROC_LOCK(p);
 	return (error);
+}
+
+static void
+reap_kill_proc(struct thread *td, struct proc *p2, ksiginfo_t *ksi,
+    struct procctl_reaper_kill *rk, int *error)
+{
+	int error1;
+
+	PROC_LOCK(p2);
+	error1 = p_cansignal(td, p2, rk->rk_sig);
+	if (error1 == 0) {
+		pksignal(p2, rk->rk_sig, ksi);
+		rk->rk_killed++;
+		*error = error1;
+	} else if (*error == ESRCH) {
+		rk->rk_fpid = p2->p_pid;
+		*error = error1;
+	}
+	PROC_UNLOCK(p2);
+}
+
+struct reap_kill_tracker {
+	struct proc *parent;
+	TAILQ_ENTRY(reap_kill_tracker) link;
+};
+
+TAILQ_HEAD(reap_kill_tracker_head, reap_kill_tracker);
+
+static void
+reap_kill_sched(struct reap_kill_tracker_head *tracker, struct proc *p2)
+{
+	struct reap_kill_tracker *t;
+
+	t = malloc(sizeof(struct reap_kill_tracker), M_TEMP, M_WAITOK);
+	t->parent = p2;
+	TAILQ_INSERT_TAIL(tracker, t, link);
 }
 
 static int
@@ -236,14 +285,18 @@ reap_kill(struct thread *td, struct proc *p, struct procctl_reaper_kill *rk)
 {
 	struct proc *reap, *p2;
 	ksiginfo_t ksi;
-	int error, error1;
+	struct reap_kill_tracker_head tracker;
+	struct reap_kill_tracker *t;
+	int error;
 
 	sx_assert(&proctree_lock, SX_LOCKED);
 	if (IN_CAPABILITY_MODE(td))
 		return (ECAPMODE);
-	if (rk->rk_sig <= 0 || rk->rk_sig > _SIG_MAXSIG)
-		return (EINVAL);
-	if ((rk->rk_flags & ~REAPER_KILL_CHILDREN) != 0)
+	if (rk->rk_sig <= 0 || rk->rk_sig > _SIG_MAXSIG ||
+	    (rk->rk_flags & ~(REAPER_KILL_CHILDREN |
+	    REAPER_KILL_SUBTREE)) != 0 || (rk->rk_flags &
+	    (REAPER_KILL_CHILDREN | REAPER_KILL_SUBTREE)) ==
+	    (REAPER_KILL_CHILDREN | REAPER_KILL_SUBTREE))
 		return (EINVAL);
 	PROC_UNLOCK(p);
 	reap = (p->p_treeflag & P_TREE_REAPER) == 0 ? p->p_reaper : p;
@@ -255,26 +308,33 @@ reap_kill(struct thread *td, struct proc *p, struct procctl_reaper_kill *rk)
 	error = ESRCH;
 	rk->rk_killed = 0;
 	rk->rk_fpid = -1;
-	for (p2 = (rk->rk_flags & REAPER_KILL_CHILDREN) != 0 ?
-	    LIST_FIRST(&reap->p_children) : LIST_FIRST(&reap->p_reaplist);
-	    p2 != NULL;
-	    p2 = (rk->rk_flags & REAPER_KILL_CHILDREN) != 0 ?
-	    LIST_NEXT(p2, p_sibling) : LIST_NEXT(p2, p_reapsibling)) {
-		if ((rk->rk_flags & REAPER_KILL_SUBTREE) != 0 &&
-		    p2->p_reapsubtree != rk->rk_subtree)
-			continue;
-		PROC_LOCK(p2);
-		error1 = p_cansignal(td, p2, rk->rk_sig);
-		if (error1 == 0) {
-			pksignal(p2, rk->rk_sig, &ksi);
-			rk->rk_killed++;
-			error = error1;
-		} else if (error == ESRCH) {
-			error = error1;
-			rk->rk_fpid = p2->p_pid;
+	if ((rk->rk_flags & REAPER_KILL_CHILDREN) != 0) {
+		for (p2 = LIST_FIRST(&reap->p_children); p2 != NULL;
+		    p2 = LIST_NEXT(p2, p_sibling)) {
+			reap_kill_proc(td, p2, &ksi, rk, &error);
+			/*
+			 * Do not end the loop on error, signal
+			 * everything we can.
+			 */
 		}
-		PROC_UNLOCK(p2);
-		/* Do not end the loop on error, signal everything we can. */
+	} else {
+		TAILQ_INIT(&tracker);
+		reap_kill_sched(&tracker, reap);
+		while ((t = TAILQ_FIRST(&tracker)) != NULL) {
+			MPASS((t->parent->p_treeflag & P_TREE_REAPER) != 0);
+			TAILQ_REMOVE(&tracker, t, link);
+			for (p2 = LIST_FIRST(&t->parent->p_reaplist); p2 != NULL;
+			    p2 = LIST_NEXT(p2, p_reapsibling)) {
+				if (t->parent == reap &&
+				    (rk->rk_flags & REAPER_KILL_SUBTREE) != 0 &&
+				    p2->p_reapsubtree != rk->rk_subtree)
+					continue;
+				if ((p2->p_treeflag & P_TREE_REAPER) != 0)
+					reap_kill_sched(&tracker, p2);
+				reap_kill_proc(td, p2, &ksi, rk, &error);
+			}
+			free(t, M_TEMP);
+		}
 	}
 	PROC_LOCK(p);
 	return (error);
@@ -336,6 +396,34 @@ trace_status(struct thread *td, struct proc *p, int *data)
 	return (0);
 }
 
+static int
+trapcap_ctl(struct thread *td, struct proc *p, int state)
+{
+
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+
+	switch (state) {
+	case PROC_TRAPCAP_CTL_ENABLE:
+		p->p_flag2 |= P2_TRAPCAP;
+		break;
+	case PROC_TRAPCAP_CTL_DISABLE:
+		p->p_flag2 &= ~P2_TRAPCAP;
+		break;
+	default:
+		return (EINVAL);
+	}
+	return (0);
+}
+
+static int
+trapcap_status(struct thread *td, struct proc *p, int *data)
+{
+
+	*data = (p->p_flag2 & P2_TRAPCAP) != 0 ? PROC_TRAPCAP_CTL_ENABLE :
+	    PROC_TRAPCAP_CTL_DISABLE;
+	return (0);
+}
+
 #ifndef _SYS_SYSPROTO_H_
 struct procctl_args {
 	idtype_t idtype;
@@ -348,25 +436,41 @@ struct procctl_args {
 int
 sys_procctl(struct thread *td, struct procctl_args *uap)
 {
+
+	return (user_procctl(td, uap->idtype, uap->id, uap->com,
+	    __USER_CAP_UNBOUND(uap->data)));
+}
+
+int
+user_procctl(struct thread *td, idtype_t idtype, id_t id, int com,
+    void * __capability udata)
+{
 	void *data;
 	union {
 		struct procctl_reaper_status rs;
-		struct procctl_reaper_pids rp;
+		struct procctl_reaper_pids_c rp;
 		struct procctl_reaper_kill rk;
 	} x;
+	union {
+		struct procctl_reaper_pids rp;
+#ifdef COMPAT_FREEBSD32
+		struct procctl_reaper_pids32 rp32;
+#endif
+	} xpids;
 	int error, error1, flags;
 
-	switch (uap->com) {
+	switch (com) {
 	case PROC_SPROTECT:
 	case PROC_TRACE_CTL:
-		error = copyin(uap->data, &flags, sizeof(flags));
+	case PROC_TRAPCAP_CTL:
+		error = copyin_c(udata, &flags, sizeof(flags));
 		if (error != 0)
 			return (error);
 		data = &flags;
 		break;
 	case PROC_REAP_ACQUIRE:
 	case PROC_REAP_RELEASE:
-		if (uap->data != NULL)
+		if (udata != NULL)
 			return (EINVAL);
 		data = NULL;
 		break;
@@ -374,37 +478,62 @@ sys_procctl(struct thread *td, struct procctl_args *uap)
 		data = &x.rs;
 		break;
 	case PROC_REAP_GETPIDS:
-		error = copyin(uap->data, &x.rp, sizeof(x.rp));
-		if (error != 0)
-			return (error);
+		/* XXX: fix for cheriabi and freebsd32 */
+#ifdef COMPAT_CHERI
+		if (SV_CURPROC_FLAG(SV_CHERI)) {
+			copyincap_c(udata, &x.rp, sizeof(x.rp));
+		} else
+#endif
+#ifdef COMPAT_FREEBSD32
+		if (SV_CURPROC_FLAG(SV_ILP32)) {
+			error = copyin_c(udata, &xpids.rp32,
+			    sizeof(xpids.rp32));
+			if (error != 0)
+				return (error);
+			x.rp.rp_count = xpids.rp32.rp_count;
+			x.rp.rp_pids = __USER_CAP_ARRAY(
+			    (void *)(uintptr_t)xpids.rp32.rp_pids,
+			    xpids.rp32.rp_count);
+		} else
+#endif
+		{
+			error = copyin_c(udata, &xpids.rp, sizeof(xpids.rp));
+			if (error != 0)
+				return (error);
+			x.rp.rp_count = xpids.rp.rp_count;
+			x.rp.rp_pids = __USER_CAP_ARRAY(xpids.rp.rp_pids,
+			    xpids.rp.rp_count);
+		}
 		data = &x.rp;
 		break;
 	case PROC_REAP_KILL:
-		error = copyin(uap->data, &x.rk, sizeof(x.rk));
+		error = copyin_c(udata, &x.rk, sizeof(x.rk));
 		if (error != 0)
 			return (error);
 		data = &x.rk;
 		break;
 	case PROC_TRACE_STATUS:
+	case PROC_TRAPCAP_STATUS:
 		data = &flags;
 		break;
 	default:
 		return (EINVAL);
 	}
-	error = kern_procctl(td, uap->idtype, uap->id, uap->com, data);
-	switch (uap->com) {
+	error = kern_procctl(td, idtype, id, com, data);
+	switch (com) {
 	case PROC_REAP_STATUS:
 		if (error == 0)
-			error = copyout(&x.rs, uap->data, sizeof(x.rs));
+			error = copyout_c(&x.rs, udata, sizeof(x.rs));
 		break;
 	case PROC_REAP_KILL:
-		error1 = copyout(&x.rk, uap->data, sizeof(x.rk));
+		error1 = copyout_c(&x.rk, udata, sizeof(x.rk));
 		if (error == 0)
 			error = error1;
 		break;
 	case PROC_TRACE_STATUS:
+	case PROC_TRAPCAP_STATUS:
 		if (error == 0)
-			error = copyout(&flags, uap->data, sizeof(flags));
+			error = copyout_c(&flags, udata, sizeof(flags));
 		break;
 	}
 	return (error);
@@ -432,6 +561,10 @@ kern_procctl_single(struct thread *td, struct proc *p, int com, void *data)
 		return (trace_ctl(td, p, *(int *)data));
 	case PROC_TRACE_STATUS:
 		return (trace_status(td, p, data));
+	case PROC_TRAPCAP_CTL:
+		return (trapcap_ctl(td, p, *(int *)data));
+	case PROC_TRAPCAP_STATUS:
+		return (trapcap_status(td, p, data));
 	default:
 		return (EINVAL);
 	}
@@ -452,6 +585,7 @@ kern_procctl(struct thread *td, idtype_t idtype, id_t id, int com, void *data)
 	case PROC_REAP_GETPIDS:
 	case PROC_REAP_KILL:
 	case PROC_TRACE_STATUS:
+	case PROC_TRAPCAP_STATUS:
 		if (idtype != P_PID)
 			return (EINVAL);
 	}
@@ -462,6 +596,7 @@ kern_procctl(struct thread *td, idtype_t idtype, id_t id, int com, void *data)
 	case PROC_REAP_GETPIDS:
 	case PROC_REAP_KILL:
 	case PROC_TRACE_CTL:
+	case PROC_TRAPCAP_CTL:
 		sx_slock(&proctree_lock);
 		tree_locked = true;
 		break;
@@ -471,6 +606,7 @@ kern_procctl(struct thread *td, idtype_t idtype, id_t id, int com, void *data)
 		tree_locked = true;
 		break;
 	case PROC_TRACE_STATUS:
+	case PROC_TRAPCAP_STATUS:
 		tree_locked = false;
 		break;
 	default:

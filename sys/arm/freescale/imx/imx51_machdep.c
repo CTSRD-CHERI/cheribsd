@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2013 Ian Lepore <ian@freebsd.org>
  * All rights reserved.
  *
@@ -33,11 +35,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/reboot.h>
+#include <sys/devmap.h>
 
 #include <vm/vm.h>
 
 #include <machine/bus.h>
-#include <machine/devmap.h>
 #include <machine/machdep.h>
 #include <machine/platformvar.h> 
 
@@ -45,12 +47,9 @@ __FBSDID("$FreeBSD$");
 
 #include "platform_if.h"
 
-static vm_offset_t
-imx51_lastaddr(platform_t plat)
-{
-
-	return (arm_devmap_lastaddr());
-}
+static platform_attach_t imx51_attach;
+static platform_devmap_init_t imx51_devmap_init;
+static platform_cpu_reset_t imx51_cpu_reset;
 
 static int
 imx51_attach(platform_t plat)
@@ -74,21 +73,22 @@ static int
 imx51_devmap_init(platform_t plat)
 {
 
-	arm_devmap_add_entry(0x70000000, 0x00100000);
-	arm_devmap_add_entry(0x73f00000, 0x00100000);
-	arm_devmap_add_entry(0x83f00000, 0x00100000);
+	devmap_add_entry(0x70000000, 0x00100000);
+	devmap_add_entry(0x73f00000, 0x00100000);
+	devmap_add_entry(0x83f00000, 0x00100000);
 
 	return (0);
 }
 
-void
-cpu_reset(void)
+static void
+imx51_cpu_reset(platform_t plat)
 {
 
 	imx_wdog_cpu_reset(0x73F98000);
 }
 
-u_int imx_soc_type()
+u_int
+imx_soc_type(void)
 {
 	return (IMXSOC_51);
 }
@@ -96,9 +96,9 @@ u_int imx_soc_type()
 static platform_method_t imx51_methods[] = {
 	PLATFORMMETHOD(platform_attach,		imx51_attach),
 	PLATFORMMETHOD(platform_devmap_init,	imx51_devmap_init),
-	PLATFORMMETHOD(platform_lastaddr,	imx51_lastaddr),
+	PLATFORMMETHOD(platform_cpu_reset,	imx51_cpu_reset),
 
 	PLATFORMMETHOD_END,
 };
 
-FDT_PLATFORM_DEF(imx51, "i.MX51", 0, "fsl,imx51");
+FDT_PLATFORM_DEF(imx51, "i.MX51", 0, "fsl,imx51", 100);

@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -53,7 +55,7 @@ __FBSDID("$FreeBSD$");
 int
 getpagesize(void)
 {
-	int mib[2]; 
+	int mib[2];
 	static int value;
 	size_t size;
 	int error;
@@ -68,8 +70,8 @@ getpagesize(void)
 	mib[0] = CTL_HW;
 	mib[1] = HW_PAGESIZE;
 	size = sizeof value;
-	if (sysctl(mib, 2, &value, &size, NULL, 0) == -1)
-		return (-1);
+	if (sysctl(mib, nitems(mib), &value, &size, NULL, 0) == -1)
+		return (PAGE_SIZE);
 
 	return (value);
 }

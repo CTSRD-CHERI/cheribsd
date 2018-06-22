@@ -18,6 +18,9 @@
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/BackendUtil.h"
 #include "clang/Frontend/CodeGenOptions.h"
+#include "clang/Frontend/CompilerInstance.h"
+#include "clang/Lex/HeaderSearch.h"
+#include "clang/Lex/Preprocessor.h"
 #include "clang/Serialization/ASTWriter.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Bitcode/BitstreamReader.h"
@@ -28,8 +31,11 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Object/COFF.h"
 #include "llvm/Object/ObjectFile.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/TargetRegistry.h"
 #include <memory>
+#include <utility>
+
 using namespace clang;
 
 #define DEBUG_TYPE "pchcontainer"
@@ -38,7 +44,9 @@ namespace {
 class PCHContainerGenerator : public ASTConsumer {
   DiagnosticsEngine &Diags;
   const std::string MainFileName;
+  const std::string OutputFileName;
   ASTContext *Ctx;
+  ModuleMap &MMap;
   const HeaderSearchOptions &HeaderSearchOpts;
   const PreprocessorOptions &PreprocessorOpts;
   CodeGenOptions CodeGenOpts;
@@ -47,37 +55,178 @@ class PCHContainerGenerator : public ASTConsumer {
   std::unique_ptr<llvm::LLVMContext> VMContext;
   std::unique_ptr<llvm::Module> M;
   std::unique_ptr<CodeGen::CodeGenModule> Builder;
-  raw_pwrite_stream *OS;
+  std::unique_ptr<raw_pwrite_stream> OS;
   std::shared_ptr<PCHBuffer> Buffer;
 
+  /// Visit every type and emit debug info for it.
+  struct DebugTypeVisitor : public RecursiveASTVisitor<DebugTypeVisitor> {
+    clang::CodeGen::CGDebugInfo &DI;
+    ASTContext &Ctx;
+    DebugTypeVisitor(clang::CodeGen::CGDebugInfo &DI, ASTContext &Ctx)
+        : DI(DI), Ctx(Ctx) {}
+
+    /// Determine whether this type can be represented in DWARF.
+    static bool CanRepresent(const Type *Ty) {
+      return !Ty->isDependentType() && !Ty->isUndeducedType();
+    }
+
+    bool VisitImportDecl(ImportDecl *D) {
+      auto *Import = cast<ImportDecl>(D);
+      if (!Import->getImportedOwningModule())
+        DI.EmitImportDecl(*Import);
+      return true;
+    }
+
+    bool VisitTypeDecl(TypeDecl *D) {
+      // TagDecls may be deferred until after all decls have been merged and we
+      // know the complete type. Pure forward declarations will be skipped, but
+      // they don't need to be emitted into the module anyway.
+      if (auto *TD = dyn_cast<TagDecl>(D))
+        if (!TD->isCompleteDefinition())
+          return true;
+
+      QualType QualTy = Ctx.getTypeDeclType(D);
+      if (!QualTy.isNull() && CanRepresent(QualTy.getTypePtr()))
+        DI.getOrCreateStandaloneType(QualTy, D->getLocation());
+      return true;
+    }
+
+    bool VisitObjCInterfaceDecl(ObjCInterfaceDecl *D) {
+      QualType QualTy(D->getTypeForDecl(), 0);
+      if (!QualTy.isNull() && CanRepresent(QualTy.getTypePtr()))
+        DI.getOrCreateStandaloneType(QualTy, D->getLocation());
+      return true;
+    }
+
+    bool VisitFunctionDecl(FunctionDecl *D) {
+      if (isa<CXXMethodDecl>(D))
+        // This is not yet supported. Constructing the `this' argument
+        // mandates a CodeGenFunction.
+        return true;
+
+      SmallVector<QualType, 16> ArgTypes;
+      for (auto i : D->parameters())
+        ArgTypes.push_back(i->getType());
+      QualType RetTy = D->getReturnType();
+      QualType FnTy = Ctx.getFunctionType(RetTy, ArgTypes,
+                                          FunctionProtoType::ExtProtoInfo());
+      if (CanRepresent(FnTy.getTypePtr()))
+        DI.EmitFunctionDecl(D, D->getLocation(), FnTy);
+      return true;
+    }
+
+    bool VisitObjCMethodDecl(ObjCMethodDecl *D) {
+      if (!D->getClassInterface())
+        return true;
+
+      bool selfIsPseudoStrong, selfIsConsumed;
+      SmallVector<QualType, 16> ArgTypes;
+      ArgTypes.push_back(D->getSelfType(Ctx, D->getClassInterface(),
+                                        selfIsPseudoStrong, selfIsConsumed));
+      ArgTypes.push_back(Ctx.getObjCSelType());
+      for (auto i : D->parameters())
+        ArgTypes.push_back(i->getType());
+      QualType RetTy = D->getReturnType();
+      QualType FnTy = Ctx.getFunctionType(RetTy, ArgTypes,
+                                          FunctionProtoType::ExtProtoInfo());
+      if (CanRepresent(FnTy.getTypePtr()))
+        DI.EmitFunctionDecl(D, D->getLocation(), FnTy);
+      return true;
+    }
+  };
+
 public:
-  PCHContainerGenerator(DiagnosticsEngine &diags,
-                        const HeaderSearchOptions &HSO,
-                        const PreprocessorOptions &PPO, const TargetOptions &TO,
-                        const LangOptions &LO, const std::string &MainFileName,
+  PCHContainerGenerator(CompilerInstance &CI, const std::string &MainFileName,
                         const std::string &OutputFileName,
-                        raw_pwrite_stream *OS,
+                        std::unique_ptr<raw_pwrite_stream> OS,
                         std::shared_ptr<PCHBuffer> Buffer)
-      : Diags(diags), HeaderSearchOpts(HSO), PreprocessorOpts(PPO),
-        TargetOpts(TO), LangOpts(LO), OS(OS), Buffer(Buffer) {
+      : Diags(CI.getDiagnostics()), MainFileName(MainFileName),
+        OutputFileName(OutputFileName), Ctx(nullptr),
+        MMap(CI.getPreprocessor().getHeaderSearchInfo().getModuleMap()),
+        HeaderSearchOpts(CI.getHeaderSearchOpts()),
+        PreprocessorOpts(CI.getPreprocessorOpts()),
+        TargetOpts(CI.getTargetOpts()), LangOpts(CI.getLangOpts()),
+        OS(std::move(OS)), Buffer(std::move(Buffer)) {
     // The debug info output isn't affected by CodeModel and
     // ThreadModel, but the backend expects them to be nonempty.
     CodeGenOpts.CodeModel = "default";
     CodeGenOpts.ThreadModel = "single";
-    CodeGenOpts.setDebugInfo(CodeGenOptions::FullDebugInfo);
-    CodeGenOpts.SplitDwarfFile = OutputFileName;
+    CodeGenOpts.DebugTypeExtRefs = true;
+    // When building a module MainFileName is the name of the modulemap file.
+    CodeGenOpts.MainFileName =
+        LangOpts.CurrentModule.empty() ? MainFileName : LangOpts.CurrentModule;
+    CodeGenOpts.setDebugInfo(codegenoptions::FullDebugInfo);
+    CodeGenOpts.setDebuggerTuning(CI.getCodeGenOpts().getDebuggerTuning());
   }
 
-  virtual ~PCHContainerGenerator() {}
+  ~PCHContainerGenerator() override = default;
 
   void Initialize(ASTContext &Context) override {
+    assert(!Ctx && "initialized multiple times");
+
     Ctx = &Context;
     VMContext.reset(new llvm::LLVMContext());
     M.reset(new llvm::Module(MainFileName, *VMContext));
-    M->setDataLayout(Ctx->getTargetInfo().getTargetDescription());
-    Builder.reset(new CodeGen::CodeGenModule(*Ctx, HeaderSearchOpts,
-                                             PreprocessorOpts, CodeGenOpts, *M,
-                                             M->getDataLayout(), Diags));
+    M->setDataLayout(Ctx->getTargetInfo().getDataLayout());
+    Builder.reset(new CodeGen::CodeGenModule(
+        *Ctx, HeaderSearchOpts, PreprocessorOpts, CodeGenOpts, *M, Diags));
+
+    // Prepare CGDebugInfo to emit debug info for a clang module.
+    auto *DI = Builder->getModuleDebugInfo();
+    StringRef ModuleName = llvm::sys::path::filename(MainFileName);
+    DI->setPCHDescriptor({ModuleName, "", OutputFileName,
+                          ASTFileSignature{{{~0U, ~0U, ~0U, ~0U, ~1U}}}});
+    DI->setModuleMap(MMap);
+  }
+
+  bool HandleTopLevelDecl(DeclGroupRef D) override {
+    if (Diags.hasErrorOccurred())
+      return true;
+
+    // Collect debug info for all decls in this group.
+    for (auto *I : D)
+      if (!I->isFromASTFile()) {
+        DebugTypeVisitor DTV(*Builder->getModuleDebugInfo(), *Ctx);
+        DTV.TraverseDecl(I);
+      }
+    return true;
+  }
+
+  void HandleTopLevelDeclInObjCContainer(DeclGroupRef D) override {
+    HandleTopLevelDecl(D);
+  }
+
+  void HandleTagDeclDefinition(TagDecl *D) override {
+    if (Diags.hasErrorOccurred())
+      return;
+
+    if (D->isFromASTFile())
+      return;
+
+    // Anonymous tag decls are deferred until we are building their declcontext.
+    if (D->getName().empty())
+      return;
+
+    // Defer tag decls until their declcontext is complete.
+    auto *DeclCtx = D->getDeclContext();
+    while (DeclCtx) {
+      if (auto *D = dyn_cast<TagDecl>(DeclCtx))
+        if (!D->isCompleteDefinition())
+          return;
+      DeclCtx = DeclCtx->getParent();
+    }
+
+    DebugTypeVisitor DTV(*Builder->getModuleDebugInfo(), *Ctx);
+    DTV.TraverseDecl(D);
+    Builder->UpdateCompletedType(D);
+  }
+
+  void HandleTagDeclRequiredDefinition(const TagDecl *D) override {
+    if (Diags.hasErrorOccurred())
+      return;
+
+    if (const RecordDecl *RD = dyn_cast<RecordDecl>(D))
+      Builder->getModuleDebugInfo()->completeRequiredType(RD);
   }
 
   /// Emit a container holding the serialized AST.
@@ -92,7 +241,16 @@ public:
       return;
 
     M->setTargetTriple(Ctx.getTargetInfo().getTriple().getTriple());
-    M->setDataLayout(Ctx.getTargetInfo().getTargetDescription());
+    M->setDataLayout(Ctx.getTargetInfo().getDataLayout());
+
+    // PCH files don't have a signature field in the control block,
+    // but LLVM detects DWO CUs by looking for a non-zero DWO id.
+    // We use the lower 64 bits for debug info.
+    uint64_t Signature =
+        Buffer->Signature
+            ? (uint64_t)Buffer->Signature[1] << 32 | Buffer->Signature[0]
+            : ~1ULL;
+    Builder->getModuleDebugInfo()->setDwoId(Signature);
 
     // Finalize the Builder.
     if (Builder)
@@ -131,21 +289,19 @@ public:
     DEBUG({
       // Print the IR for the PCH container to the debug output.
       llvm::SmallString<0> Buffer;
-      llvm::raw_svector_ostream OS(Buffer);
-      clang::EmitBackendOutput(Diags, CodeGenOpts, TargetOpts, LangOpts,
-                               Ctx.getTargetInfo().getTargetDescription(),
-                               M.get(), BackendAction::Backend_EmitLL, &OS);
-      OS.flush();
+      clang::EmitBackendOutput(
+          Diags, HeaderSearchOpts, CodeGenOpts, TargetOpts, LangOpts,
+          Ctx.getTargetInfo().getDataLayout(), M.get(),
+          BackendAction::Backend_EmitLL,
+          llvm::make_unique<llvm::raw_svector_ostream>(Buffer));
       llvm::dbgs() << Buffer;
     });
 
     // Use the LLVM backend to emit the pch container.
-    clang::EmitBackendOutput(Diags, CodeGenOpts, TargetOpts, LangOpts,
-                             Ctx.getTargetInfo().getTargetDescription(),
-                             M.get(), BackendAction::Backend_EmitObj, OS);
-
-    // Make sure the pch container hits disk.
-    OS->flush();
+    clang::EmitBackendOutput(Diags, HeaderSearchOpts, CodeGenOpts, TargetOpts,
+                             LangOpts, Ctx.getTargetInfo().getDataLayout(),
+                             M.get(), BackendAction::Backend_EmitObj,
+                             std::move(OS));
 
     // Free the memory for the temporary buffer.
     llvm::SmallVector<char, 0> Empty;
@@ -153,41 +309,42 @@ public:
   }
 };
 
-} // namespace
+} // anonymous namespace
 
 std::unique_ptr<ASTConsumer>
 ObjectFilePCHContainerWriter::CreatePCHContainerGenerator(
-    DiagnosticsEngine &Diags, const HeaderSearchOptions &HSO,
-    const PreprocessorOptions &PPO, const TargetOptions &TO,
-    const LangOptions &LO, const std::string &MainFileName,
-    const std::string &OutputFileName, llvm::raw_pwrite_stream *OS,
+    CompilerInstance &CI, const std::string &MainFileName,
+    const std::string &OutputFileName,
+    std::unique_ptr<llvm::raw_pwrite_stream> OS,
     std::shared_ptr<PCHBuffer> Buffer) const {
   return llvm::make_unique<PCHContainerGenerator>(
-      Diags, HSO, PPO, TO, LO, MainFileName, OutputFileName, OS, Buffer);
+      CI, MainFileName, OutputFileName, std::move(OS), Buffer);
 }
 
-void ObjectFilePCHContainerReader::ExtractPCH(
-    llvm::MemoryBufferRef Buffer, llvm::BitstreamReader &StreamFile) const {
-  if (auto OF = llvm::object::ObjectFile::createObjectFile(Buffer)) {
-    auto *Obj = OF.get().get();
-    bool IsCOFF = isa<llvm::object::COFFObjectFile>(Obj);
+StringRef
+ObjectFilePCHContainerReader::ExtractPCH(llvm::MemoryBufferRef Buffer) const {
+  StringRef PCH;
+  auto OFOrErr = llvm::object::ObjectFile::createObjectFile(Buffer);
+  if (OFOrErr) {
+    auto &OF = OFOrErr.get();
+    bool IsCOFF = isa<llvm::object::COFFObjectFile>(*OF);
     // Find the clang AST section in the container.
-    for (auto &Section : OF->get()->sections()) {
+    for (auto &Section : OF->sections()) {
       StringRef Name;
       Section.getName(Name);
-      if ((!IsCOFF && Name == "__clangast") ||
-          ( IsCOFF && Name ==   "clangast")) {
-        StringRef Buf;
-        Section.getContents(Buf);
-        StreamFile.init((const unsigned char *)Buf.begin(),
-                        (const unsigned char *)Buf.end());
-        return;
+      if ((!IsCOFF && Name == "__clangast") || (IsCOFF && Name == "clangast")) {
+        Section.getContents(PCH);
+        return PCH;
       }
     }
   }
-
-  // As a fallback, treat the buffer as a raw AST.
-  StreamFile.init((const unsigned char *)Buffer.getBufferStart(),
-                  (const unsigned char *)Buffer.getBufferEnd());
-  return;
+  handleAllErrors(OFOrErr.takeError(), [&](const llvm::ErrorInfoBase &EIB) {
+    if (EIB.convertToErrorCode() ==
+        llvm::object::object_error::invalid_file_type)
+      // As a fallback, treat the buffer as a raw AST.
+      PCH = Buffer.getBuffer();
+    else
+      EIB.log(llvm::errs());
+  });
+  return PCH;
 }

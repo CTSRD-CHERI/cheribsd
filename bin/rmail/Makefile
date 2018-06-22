@@ -1,7 +1,8 @@
 #	@(#)Makefile	8.1 (Berkeley) 5/31/93
 # $FreeBSD$
 
-SENDMAIL_DIR=${.CURDIR}/../../contrib/sendmail
+PACKAGE=sendmail
+SENDMAIL_DIR=${SRCTOP}/contrib/sendmail
 .PATH:	${SENDMAIL_DIR}/rmail
 
 # Not much point this being static. It calls a shared sendmail...

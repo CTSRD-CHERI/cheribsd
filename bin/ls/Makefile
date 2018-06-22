@@ -3,6 +3,7 @@
 
 .include <src.opts.mk>
 
+PACKAGE=runtime
 PROG=	ls
 SRCS=	cmp.c ls.c print.c util.c
 LIBADD=	xo util
@@ -13,8 +14,7 @@ CFLAGS+= -DCOLORLS
 LIBADD+=	termcapw
 .endif
 
-.if ${MK_TESTS} != "no"
-SUBDIR+=	tests
-.endif
+HAS_TESTS=
+SUBDIR.${MK_TESTS}+= tests
 
 .include <bsd.prog.mk>

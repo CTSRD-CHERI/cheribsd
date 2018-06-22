@@ -1,6 +1,9 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2001 Atsushi Onoe
  * Copyright (c) 2002-2008 Sam Leffler, Errno Consulting
+ * Copyright (c) 2012 IEEE
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,8 +38,9 @@ __FBSDID("$FreeBSD$");
 #include "opt_wlan.h"
 
 #include <sys/param.h>
-#include <sys/kernel.h>
 #include <sys/systm.h>
+#include <sys/kernel.h>
+#include <sys/malloc.h>
 
 #include <sys/socket.h>
 #include <sys/sockio.h>
@@ -61,16 +65,16 @@ __FBSDID("$FreeBSD$");
 #define	AGGRESSIVE_MODE_SWITCH_HYSTERESIS	3	/* pkts / 100ms */
 #define	HIGH_PRI_SWITCH_THRESH			10	/* pkts / 100ms */
 
-const char *ieee80211_mgt_subtype_name[] = {
+const char *mgt_subtype_name[] = {
 	"assoc_req",	"assoc_resp",	"reassoc_req",	"reassoc_resp",
-	"probe_req",	"probe_resp",	"reserved#6",	"reserved#7",
+	"probe_req",	"probe_resp",	"timing_adv",	"reserved#7",
 	"beacon",	"atim",		"disassoc",	"auth",
 	"deauth",	"action",	"action_noack",	"reserved#15"
 };
-const char *ieee80211_ctl_subtype_name[] = {
+const char *ctl_subtype_name[] = {
 	"reserved#0",	"reserved#1",	"reserved#2",	"reserved#3",
-	"reserved#3",	"reserved#5",	"reserved#6",	"reserved#7",
-	"reserved#8",	"reserved#9",	"ps_poll",	"rts",
+	"reserved#4",	"reserved#5",	"reserved#6",	"control_wrap",
+	"bar",		"ba",		"ps_poll",	"rts",
 	"cts",		"ack",		"cf_end",	"cf_end_ack"
 };
 const char *ieee80211_opmode_name[IEEE80211_OPMODE_MAX] = {
@@ -100,6 +104,138 @@ const char *ieee80211_wme_acnames[] = {
 	"WME_UPSD",
 };
 
+
+/*
+ * Reason code descriptions were (mostly) obtained from
+ * IEEE Std 802.11-2012, pp. 442-445 Table 8-36.
+ */
+const char *
+ieee80211_reason_to_string(uint16_t reason)
+{
+	switch (reason) {
+	case IEEE80211_REASON_UNSPECIFIED:
+		return ("unspecified");
+	case IEEE80211_REASON_AUTH_EXPIRE:
+		return ("previous authentication is expired");
+	case IEEE80211_REASON_AUTH_LEAVE:
+		return ("sending STA is leaving/has left IBSS or ESS");
+	case IEEE80211_REASON_ASSOC_EXPIRE:
+		return ("disassociated due to inactivity");
+	case IEEE80211_REASON_ASSOC_TOOMANY:
+		return ("too many associated STAs");
+	case IEEE80211_REASON_NOT_AUTHED:
+		return ("class 2 frame received from nonauthenticated STA");
+	case IEEE80211_REASON_NOT_ASSOCED:
+		return ("class 3 frame received from nonassociated STA");
+	case IEEE80211_REASON_ASSOC_LEAVE:
+		return ("sending STA is leaving/has left BSS");
+	case IEEE80211_REASON_ASSOC_NOT_AUTHED:
+		return ("STA requesting (re)association is not authenticated");
+	case IEEE80211_REASON_DISASSOC_PWRCAP_BAD:
+		return ("information in the Power Capability element is "
+			"unacceptable");
+	case IEEE80211_REASON_DISASSOC_SUPCHAN_BAD:
+		return ("information in the Supported Channels element is "
+			"unacceptable");
+	case IEEE80211_REASON_IE_INVALID:
+		return ("invalid element");
+	case IEEE80211_REASON_MIC_FAILURE:
+		return ("MIC failure");
+	case IEEE80211_REASON_4WAY_HANDSHAKE_TIMEOUT:
+		return ("4-Way handshake timeout");
+	case IEEE80211_REASON_GROUP_KEY_UPDATE_TIMEOUT:
+		return ("group key update timeout");
+	case IEEE80211_REASON_IE_IN_4WAY_DIFFERS:
+		return ("element in 4-Way handshake different from "
+			"(re)association request/probe response/beacon frame");
+	case IEEE80211_REASON_GROUP_CIPHER_INVALID:
+		return ("invalid group cipher");
+	case IEEE80211_REASON_PAIRWISE_CIPHER_INVALID:
+		return ("invalid pairwise cipher");
+	case IEEE80211_REASON_AKMP_INVALID:
+		return ("invalid AKMP");
+	case IEEE80211_REASON_UNSUPP_RSN_IE_VERSION:
+		return ("unsupported version in RSN IE");
+	case IEEE80211_REASON_INVALID_RSN_IE_CAP:
+		return ("invalid capabilities in RSN IE");
+	case IEEE80211_REASON_802_1X_AUTH_FAILED:
+		return ("IEEE 802.1X authentication failed");
+	case IEEE80211_REASON_CIPHER_SUITE_REJECTED:
+		return ("cipher suite rejected because of the security "
+			"policy");
+	case IEEE80211_REASON_UNSPECIFIED_QOS:
+		return ("unspecified (QoS-related)");
+	case IEEE80211_REASON_INSUFFICIENT_BW:
+		return ("QoS AP lacks sufficient bandwidth for this QoS STA");
+	case IEEE80211_REASON_TOOMANY_FRAMES:
+		return ("too many frames need to be acknowledged");
+	case IEEE80211_REASON_OUTSIDE_TXOP:
+		return ("STA is transmitting outside the limits of its TXOPs");
+	case IEEE80211_REASON_LEAVING_QBSS:
+		return ("requested from peer STA (the STA is "
+			"resetting/leaving the BSS)");
+	case IEEE80211_REASON_BAD_MECHANISM:
+		return ("requested from peer STA (it does not want to use "
+			"the mechanism)");
+	case IEEE80211_REASON_SETUP_NEEDED:
+		return ("requested from peer STA (setup is required for the "
+			"used mechanism)");
+	case IEEE80211_REASON_TIMEOUT:
+		return ("requested from peer STA (timeout)");
+	case IEEE80211_REASON_PEER_LINK_CANCELED:
+		return ("SME cancels the mesh peering instance (not related "
+			"to the maximum number of peer mesh STAs)");
+	case IEEE80211_REASON_MESH_MAX_PEERS:
+		return ("maximum number of peer mesh STAs was reached");
+	case IEEE80211_REASON_MESH_CPVIOLATION:
+		return ("the received information violates the Mesh "
+			"Configuration policy configured in the mesh STA "
+			"profile");
+	case IEEE80211_REASON_MESH_CLOSE_RCVD:
+		return ("the mesh STA has received a Mesh Peering Close "
+			"message requesting to close the mesh peering");
+	case IEEE80211_REASON_MESH_MAX_RETRIES:
+		return ("the mesh STA has resent dot11MeshMaxRetries Mesh "
+			"Peering Open messages, without receiving a Mesh "
+			"Peering Confirm message");
+	case IEEE80211_REASON_MESH_CONFIRM_TIMEOUT:
+		return ("the confirmTimer for the mesh peering instance times "
+			"out");
+	case IEEE80211_REASON_MESH_INVALID_GTK:
+		return ("the mesh STA fails to unwrap the GTK or the values "
+			"in the wrapped contents do not match");
+	case IEEE80211_REASON_MESH_INCONS_PARAMS:
+		return ("the mesh STA receives inconsistent information about "
+			"the mesh parameters between Mesh Peering Management "
+			"frames");
+	case IEEE80211_REASON_MESH_INVALID_SECURITY:
+		return ("the mesh STA fails the authenticated mesh peering "
+			"exchange because due to failure in selecting "
+			"pairwise/group ciphersuite");
+	case IEEE80211_REASON_MESH_PERR_NO_PROXY:
+		return ("the mesh STA does not have proxy information for "
+			"this external destination");
+	case IEEE80211_REASON_MESH_PERR_NO_FI:
+		return ("the mesh STA does not have forwarding information "
+			"for this destination");
+	case IEEE80211_REASON_MESH_PERR_DEST_UNREACH:
+		return ("the mesh STA determines that the link to the next "
+			"hop of an active path in its forwarding information "
+			"is no longer usable");
+	case IEEE80211_REASON_MESH_MAC_ALRDY_EXISTS_MBSS:
+		return ("the MAC address of the STA already exists in the "
+			"mesh BSS");
+	case IEEE80211_REASON_MESH_CHAN_SWITCH_REG:
+		return ("the mesh STA performs channel switch to meet "
+			"regulatory requirements");
+	case IEEE80211_REASON_MESH_CHAN_SWITCH_UNSPEC:
+		return ("the mesh STA performs channel switch with "
+			"unspecified reason");
+	default:
+		return ("reserved/unknown");
+	}
+}
+
 static void beacon_miss(void *, int);
 static void beacon_swmiss(void *, int);
 static void parent_updown(void *, int);
@@ -107,7 +243,7 @@ static void update_mcast(void *, int);
 static void update_promisc(void *, int);
 static void update_channel(void *, int);
 static void update_chw(void *, int);
-static void update_wme(void *, int);
+static void vap_update_wme(void *, int);
 static void restart_vaps(void *, int);
 static void ieee80211_newstate_cb(void *, int);
 
@@ -146,7 +282,6 @@ ieee80211_proto_attach(struct ieee80211com *ic)
 	TASK_INIT(&ic->ic_chan_task, 0, update_channel, ic);
 	TASK_INIT(&ic->ic_bmiss_task, 0, beacon_miss, ic);
 	TASK_INIT(&ic->ic_chw_task, 0, update_chw, ic);
-	TASK_INIT(&ic->ic_wme_task, 0, update_wme, ic);
 	TASK_INIT(&ic->ic_restart_task, 0, restart_vaps, ic);
 
 	ic->ic_wme.wme_hipri_switch_hysteresis =
@@ -204,6 +339,7 @@ ieee80211_proto_vattach(struct ieee80211vap *vap)
 	callout_init(&vap->iv_mgtsend, 1);
 	TASK_INIT(&vap->iv_nstate_task, 0, ieee80211_newstate_cb, vap);
 	TASK_INIT(&vap->iv_swbmiss_task, 0, beacon_swmiss, vap);
+	TASK_INIT(&vap->iv_wme_task, 0, vap_update_wme, vap);
 	/*
 	 * Install default tx rate handling: no fixed rate, lowest
 	 * supported rate for mgmt and multicast frames.  Default
@@ -440,9 +576,7 @@ ieee80211_dump_pkt(struct ieee80211com *ic,
 		printf(" data");
 		break;
 	case IEEE80211_FC0_TYPE_MGT:
-		printf(" %s", ieee80211_mgt_subtype_name[
-		    (wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK)
-		    >> IEEE80211_FC0_SUBTYPE_SHIFT]);
+		printf(" %s", ieee80211_mgt_subtype_name(wh->i_fc[0]));
 		break;
 	default:
 		printf(" type#%d", wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK);
@@ -710,6 +844,9 @@ setbasicrates(struct ieee80211_rateset *rs,
 	    [IEEE80211_MODE_11NA]	= { 3, { 12, 24, 48 } },
 					    /* NB: mixed b/g */
 	    [IEEE80211_MODE_11NG]	= { 4, { 2, 4, 11, 22 } },
+					    /* NB: mixed b/g */
+	    [IEEE80211_MODE_VHT_2GHZ]	= { 4, { 2, 4, 11, 22 } },
+	    [IEEE80211_MODE_VHT_5GHZ]	= { 3, { 12, 24, 48 } },
 	};
 	int i, j;
 
@@ -774,6 +911,8 @@ static const struct phyParamType phyParamForAC_BE[IEEE80211_MODE_MAX] = {
 	[IEEE80211_MODE_QUARTER]= { 3, 4,  6,  0, 0 },
 	[IEEE80211_MODE_11NA]	= { 3, 4,  6,  0, 0 },
 	[IEEE80211_MODE_11NG]	= { 3, 4,  6,  0, 0 },
+	[IEEE80211_MODE_VHT_2GHZ]	= { 3, 4,  6,  0, 0 },
+	[IEEE80211_MODE_VHT_5GHZ]	= { 3, 4,  6,  0, 0 },
 };
 static const struct phyParamType phyParamForAC_BK[IEEE80211_MODE_MAX] = {
 	[IEEE80211_MODE_AUTO]	= { 7, 4, 10,  0, 0 },
@@ -788,6 +927,8 @@ static const struct phyParamType phyParamForAC_BK[IEEE80211_MODE_MAX] = {
 	[IEEE80211_MODE_QUARTER]= { 7, 4, 10,  0, 0 },
 	[IEEE80211_MODE_11NA]	= { 7, 4, 10,  0, 0 },
 	[IEEE80211_MODE_11NG]	= { 7, 4, 10,  0, 0 },
+	[IEEE80211_MODE_VHT_2GHZ]	= { 7, 4, 10,  0, 0 },
+	[IEEE80211_MODE_VHT_5GHZ]	= { 7, 4, 10,  0, 0 },
 };
 static const struct phyParamType phyParamForAC_VI[IEEE80211_MODE_MAX] = {
 	[IEEE80211_MODE_AUTO]	= { 1, 3, 4,  94, 0 },
@@ -802,6 +943,8 @@ static const struct phyParamType phyParamForAC_VI[IEEE80211_MODE_MAX] = {
 	[IEEE80211_MODE_QUARTER]= { 1, 3, 4,  94, 0 },
 	[IEEE80211_MODE_11NA]	= { 1, 3, 4,  94, 0 },
 	[IEEE80211_MODE_11NG]	= { 1, 3, 4,  94, 0 },
+	[IEEE80211_MODE_VHT_2GHZ]	= { 1, 3, 4,  94, 0 },
+	[IEEE80211_MODE_VHT_5GHZ]	= { 1, 3, 4,  94, 0 },
 };
 static const struct phyParamType phyParamForAC_VO[IEEE80211_MODE_MAX] = {
 	[IEEE80211_MODE_AUTO]	= { 1, 2, 3,  47, 0 },
@@ -816,6 +959,8 @@ static const struct phyParamType phyParamForAC_VO[IEEE80211_MODE_MAX] = {
 	[IEEE80211_MODE_QUARTER]= { 1, 2, 3,  47, 0 },
 	[IEEE80211_MODE_11NA]	= { 1, 2, 3,  47, 0 },
 	[IEEE80211_MODE_11NG]	= { 1, 2, 3,  47, 0 },
+	[IEEE80211_MODE_VHT_2GHZ]	= { 1, 2, 3,  47, 0 },
+	[IEEE80211_MODE_VHT_5GHZ]	= { 1, 2, 3,  47, 0 },
 };
 
 static const struct phyParamType bssPhyParamForAC_BE[IEEE80211_MODE_MAX] = {
@@ -950,7 +1095,7 @@ ieee80211_wme_initparams_locked(struct ieee80211vap *vap)
 	/* NB: check ic_bss to avoid NULL deref on initial attach */
 	if (vap->iv_bss != NULL) {
 		/*
-		 * Calculate agressive mode switching threshold based
+		 * Calculate aggressive mode switching threshold based
 		 * on beacon interval.  This doesn't need locking since
 		 * we're only called before entering the RUN state at
 		 * which point we start sending beacon frames.
@@ -991,6 +1136,8 @@ ieee80211_wme_updateparams_locked(struct ieee80211vap *vap)
 	    [IEEE80211_MODE_QUARTER]	= { 2, 4, 10, 64, 0 },
 	    [IEEE80211_MODE_11NA]	= { 2, 4, 10, 64, 0 },	/* XXXcheck*/
 	    [IEEE80211_MODE_11NG]	= { 2, 4, 10, 64, 0 },	/* XXXcheck*/
+	    [IEEE80211_MODE_VHT_2GHZ]	= { 2, 4, 10, 64, 0 },	/* XXXcheck*/
+	    [IEEE80211_MODE_VHT_5GHZ]	= { 2, 4, 10, 64, 0 },	/* XXXcheck*/
 	};
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_wme_state *wme = &ic->ic_wme;
@@ -1032,11 +1179,11 @@ ieee80211_wme_updateparams_locked(struct ieee80211vap *vap)
 		mode = IEEE80211_MODE_AUTO;
 
 	/*
-	 * This implements agressive mode as found in certain
+	 * This implements aggressive mode as found in certain
 	 * vendors' AP's.  When there is significant high
 	 * priority (VI/VO) traffic in the BSS throttle back BE
 	 * traffic by using conservative parameters.  Otherwise
-	 * BE uses agressive params to optimize performance of
+	 * BE uses aggressive params to optimize performance of
 	 * legacy/non-QoS traffic.
 	 */
 
@@ -1111,6 +1258,8 @@ ieee80211_wme_updateparams_locked(struct ieee80211vap *vap)
 		    [IEEE80211_MODE_QUARTER]	= 3,
 		    [IEEE80211_MODE_11NA]	= 3,
 		    [IEEE80211_MODE_11NG]	= 3,
+		    [IEEE80211_MODE_VHT_2GHZ]	= 3,
+		    [IEEE80211_MODE_VHT_5GHZ]	= 3,
 		};
 		chanp = &wme->wme_chanParams.cap_wmeParams[WME_AC_BE];
 		bssp = &wme->wme_bssChanParams.cap_wmeParams[WME_AC_BE];
@@ -1138,7 +1287,7 @@ ieee80211_wme_updateparams_locked(struct ieee80211vap *vap)
 	}
 
 	/* schedule the deferred WME update */
-	ieee80211_runtask(ic, &ic->ic_wme_task);
+	ieee80211_runtask(ic, &vap->iv_wme_task);
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_WME,
 	    "%s: WME params updated, cap_info 0x%x\n", __func__,
@@ -1157,6 +1306,52 @@ ieee80211_wme_updateparams(struct ieee80211vap *vap)
 		ieee80211_wme_updateparams_locked(vap);
 		IEEE80211_UNLOCK(ic);
 	}
+}
+
+/*
+ * Fetch the WME parameters for the given VAP.
+ *
+ * When net80211 grows p2p, etc support, this may return different
+ * parameters for each VAP.
+ */
+void
+ieee80211_wme_vap_getparams(struct ieee80211vap *vap, struct chanAccParams *wp)
+{
+
+	memcpy(wp, &vap->iv_ic->ic_wme.wme_chanParams, sizeof(*wp));
+}
+
+/*
+ * For NICs which only support one set of WME paramaters (ie, softmac NICs)
+ * there may be different VAP WME parameters but only one is "active".
+ * This returns the "NIC" WME parameters for the currently active
+ * context.
+ */
+void
+ieee80211_wme_ic_getparams(struct ieee80211com *ic, struct chanAccParams *wp)
+{
+
+	memcpy(wp, &ic->ic_wme.wme_chanParams, sizeof(*wp));
+}
+
+/*
+ * Return whether to use QoS on a given WME queue.
+ *
+ * This is intended to be called from the transmit path of softmac drivers
+ * which are setting NoAck bits in transmit descriptors.
+ *
+ * Ideally this would be set in some transmit field before the packet is
+ * queued to the driver but net80211 isn't quite there yet.
+ */
+int
+ieee80211_wme_vap_ac_is_noack(struct ieee80211vap *vap, int ac)
+{
+	/* Bounds/sanity check */
+	if (ac < 0 || ac >= WME_NUM_AC)
+		return (0);
+
+	/* Again, there's only one global context for now */
+	return (!! vap->iv_ic->ic_wme.wme_chanParams.cap_wmeParams[ac].wmep_noackPolicy);
 }
 
 static void
@@ -1203,15 +1398,25 @@ update_chw(void *arg, int npending)
 	ic->ic_update_chw(ic);
 }
 
+/*
+ * Deferred WME update.
+ *
+ * In preparation for per-VAP WME configuration, call the VAP
+ * method if the VAP requires it.  Otherwise, just call the
+ * older global method.  There isn't a per-VAP WME configuration
+ * just yet so for now just use the global configuration.
+ */
 static void
-update_wme(void *arg, int npending)
+vap_update_wme(void *arg, int npending)
 {
-	struct ieee80211com *ic = arg;
+	struct ieee80211vap *vap = arg;
+	struct ieee80211com *ic = vap->iv_ic;
 
-	/*
-	 * XXX should we defer the WME configuration update until now?
-	 */
-	ic->ic_wme.wme_update(ic);
+	if (vap->iv_wme_update != NULL)
+		vap->iv_wme_update(vap,
+		    ic->ic_wme.wme_chanParams.cap_wmeParams);
+	else
+		ic->ic_wme.wme_update(ic);
 }
 
 static void
@@ -1238,7 +1443,6 @@ ieee80211_waitfor_parent(struct ieee80211com *ic)
 	ieee80211_draintask(ic, &ic->ic_chan_task);
 	ieee80211_draintask(ic, &ic->ic_bmiss_task);
 	ieee80211_draintask(ic, &ic->ic_chw_task);
-	ieee80211_draintask(ic, &ic->ic_wme_task);
 	taskqueue_unblock(ic->ic_tq);
 }
 
@@ -1530,7 +1734,7 @@ beacon_miss(void *arg, int npending)
 	IEEE80211_LOCK(ic);
 	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
 		/*
-		 * We only pass events through for sta vap's in RUN state;
+		 * We only pass events through for sta vap's in RUN+ state;
 		 * may be too restrictive but for now this saves all the
 		 * handlers duplicating these checks.
 		 */
@@ -1549,7 +1753,7 @@ beacon_swmiss(void *arg, int npending)
 	struct ieee80211com *ic = vap->iv_ic;
 
 	IEEE80211_LOCK(ic);
-	if (vap->iv_state == IEEE80211_S_RUN) {
+	if (vap->iv_state >= IEEE80211_S_RUN) {
 		/* XXX Call multiple times if npending > zero? */
 		vap->iv_bmiss(vap);
 	}
@@ -1569,8 +1773,7 @@ ieee80211_swbmiss(void *arg)
 
 	IEEE80211_LOCK_ASSERT(ic);
 
-	/* XXX sleep state? */
-	KASSERT(vap->iv_state == IEEE80211_S_RUN,
+	KASSERT(vap->iv_state >= IEEE80211_S_RUN,
 	    ("wrong state %d", vap->iv_state));
 
 	if (ic->ic_flags & IEEE80211_F_SCAN) {
@@ -1709,7 +1912,7 @@ ieee80211_cac_completeswitch(struct ieee80211vap *vap0)
 	ieee80211_new_state_locked(vap0, IEEE80211_S_RUN, 0);
 
 	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next)
-		if (vap->iv_state == IEEE80211_S_CAC)
+		if (vap->iv_state == IEEE80211_S_CAC && vap != vap0)
 			ieee80211_new_state_locked(vap, IEEE80211_S_RUN, 0);
 	IEEE80211_UNLOCK(ic);
 }
@@ -1799,13 +2002,19 @@ ieee80211_newstate_cb(void *xvap, int npending)
 		 * We have been requested to drop back to the INIT before
 		 * proceeding to the new state.
 		 */
+		/* Deny any state changes while we are here. */
+		vap->iv_nstate = IEEE80211_S_INIT;
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_STATE,
 		    "%s: %s -> %s arg %d\n", __func__,
 		    ieee80211_state_name[vap->iv_state],
-		    ieee80211_state_name[IEEE80211_S_INIT], arg);
-		vap->iv_newstate(vap, IEEE80211_S_INIT, arg);
+		    ieee80211_state_name[vap->iv_nstate], arg);
+		vap->iv_newstate(vap, vap->iv_nstate, 0);
 		IEEE80211_LOCK_ASSERT(ic);
-		vap->iv_flags_ext &= ~IEEE80211_FEXT_REINIT;
+		vap->iv_flags_ext &= ~(IEEE80211_FEXT_REINIT |
+		    IEEE80211_FEXT_STATEWAIT);
+		/* enqueue new state transition after cancel_scan() task */
+		ieee80211_new_state_locked(vap, nstate, arg);
+		goto done;
 	}
 
 	ostate = vap->iv_state;
@@ -1916,11 +2125,22 @@ ieee80211_new_state_locked(struct ieee80211vap *vap,
 	IEEE80211_LOCK_ASSERT(ic);
 
 	if (vap->iv_flags_ext & IEEE80211_FEXT_STATEWAIT) {
-		if (vap->iv_nstate == IEEE80211_S_INIT) {
+		if (vap->iv_nstate == IEEE80211_S_INIT ||
+		    ((vap->iv_state == IEEE80211_S_INIT ||
+		    (vap->iv_flags_ext & IEEE80211_FEXT_REINIT)) &&
+		    vap->iv_nstate == IEEE80211_S_SCAN &&
+		    nstate > IEEE80211_S_SCAN)) {
 			/*
-			 * XXX The vap is being stopped, do no allow any other
-			 * state changes until this is completed.
+			 * XXX The vap is being stopped/started,
+			 * do not allow any other state changes
+			 * until this is completed.
 			 */
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_STATE,
+			    "%s: %s -> %s (%s) transition discarded\n",
+			    __func__,
+			    ieee80211_state_name[vap->iv_state],
+			    ieee80211_state_name[nstate],
+			    ieee80211_state_name[vap->iv_nstate]);
 			return -1;
 		} else if (vap->iv_state != vap->iv_nstate) {
 #if 0

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2006 Sam Leffler.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,8 +40,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/watchdog.h>
 
 #include <machine/bus.h>
-#include <machine/cpu.h>
-#include <machine/cpufunc.h>
 #include <machine/resource.h>
 #include <machine/intr.h>
 

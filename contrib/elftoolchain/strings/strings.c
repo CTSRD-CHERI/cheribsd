@@ -37,6 +37,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sysexits.h>
 #include <unistd.h>
 
 #include <libelf.h>
@@ -45,13 +46,7 @@
 
 #include "_elftc.h"
 
-ELFTC_VCSID("$Id: strings.c 3174 2015-03-27 17:13:41Z emaste $");
-
-enum return_code {
-	RETURN_OK,
-	RETURN_NOINPUT,
-	RETURN_SOFTWARE
-};
+ELFTC_VCSID("$Id: strings.c 3498 2016-10-26 19:25:13Z emaste $");
 
 enum radix_style {
 	RADIX_DECIMAL,
@@ -73,10 +68,10 @@ enum encoding_style {
 	  ((c) == '\t' || isprint((c)) ||			\
 	      (encoding == ENCODING_8BIT && (c) > 127)))
 
-
-static int encoding_size, entire_file, min_len, show_filename, show_loc;
+static int encoding_size, entire_file, show_filename, show_loc;
 static enum encoding_style encoding;
 static enum radix_style radix;
+static intmax_t min_len;
 
 static struct option strings_longopts[] = {
 	{ "all",		no_argument,		NULL,	'a'},
@@ -106,7 +101,7 @@ main(int argc, char **argv)
 {
 	int ch, rc;
 
-	rc = RETURN_OK;
+	rc = 0;
 	min_len = 0;
 	encoding_size = 1;
 	if (elf_version(EV_CURRENT) == EV_NONE)
@@ -144,7 +139,10 @@ main(int argc, char **argv)
 			show_filename = 1;
 			break;
 		case 'n':
-			min_len = (int)strtoimax(optarg, (char**)NULL, 10);
+			min_len = strtoimax(optarg, (char**)NULL, 10);
+			if (min_len <= 0)
+				errx(EX_USAGE, "option -n should specify a "
+				    "positive decimal integer.");
 			break;
 		case 'o':
 			show_loc = 1;
@@ -191,9 +189,10 @@ main(int argc, char **argv)
 	if (!min_len)
 		min_len = 4;
 	if (!*argv)
-		rc = handle_file("{standard input}");
+		rc = find_strings("{standard input}", 0, 0);
 	else while (*argv) {
-		rc = handle_file(*argv);
+		if (handle_file(*argv) != 0)
+			rc = 1;
 		argv++;
 	}
 	return (rc);
@@ -205,19 +204,15 @@ handle_file(const char *name)
 	int fd, rt;
 
 	if (name == NULL)
-		return (RETURN_NOINPUT);
-	if (strcmp("{standard input}", name) != 0) {
-		if (freopen(name, "rb", stdin) == NULL) {
-			warnx("'%s': %s", name, strerror(errno));
-			return (RETURN_NOINPUT);
-		}
-	} else {
-		return (find_strings(name, (off_t)0, (off_t)0));
+		return (1);
+	if (freopen(name, "rb", stdin) == NULL) {
+		warnx("'%s': %s", name, strerror(errno));
+		return (1);
 	}
 
 	fd = fileno(stdin);
 	if (fd < 0)
-		return (RETURN_NOINPUT);
+		return (1);
 	rt = handle_elf(name, fd);
 	return (rt);
 }
@@ -235,7 +230,7 @@ handle_binary(const char *name, int fd)
 	(void) lseek(fd, (off_t)0, SEEK_SET);
 	if (!fstat(fd, &buf))
 		return (find_strings(name, (off_t)0, buf.st_size));
-	return (RETURN_SOFTWARE);
+	return (1);
 }
 
 /*
@@ -253,8 +248,8 @@ handle_elf(const char *name, int fd)
 	Elf_Scn *scn;
 	int rc;
 
-	rc = RETURN_OK;
-	/* If entire file is choosen, treat it as a binary file */
+	rc = 0;
+	/* If entire file is chosen, treat it as a binary file */
 	if (entire_file)
 		return (handle_binary(name, fd));
 
@@ -268,7 +263,7 @@ handle_elf(const char *name, int fd)
 	if (gelf_getehdr(elf, &elfhdr) == NULL) {
 		(void) elf_end(elf);
 		warnx("%s: ELF file could not be processed", name);
-		return (RETURN_SOFTWARE);
+		return (1);
 	}
 
 	if (elfhdr.e_shnum == 0 && elfhdr.e_type == ET_CORE) {
@@ -348,7 +343,7 @@ find_strings(const char *name, off_t offset, off_t size)
 	if ((obuf = (char*)calloc(1, min_len + 1)) == NULL) {
 		(void) fprintf(stderr, "Unable to allocate memory: %s\n",
 		     strerror(errno));
-		return (RETURN_SOFTWARE);
+		return (1);
 	}
 
 	(void) fseeko(stdin, offset, SEEK_SET);
@@ -422,7 +417,7 @@ find_strings(const char *name, off_t offset, off_t size)
 	}
 _exit1:
 	free(obuf);
-	return (RETURN_OK);
+	return (0);
 }
 
 #define	USAGE_MESSAGE	"\

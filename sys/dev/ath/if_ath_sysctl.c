@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2002-2009 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
@@ -709,7 +711,7 @@ ath_sysctl_forcebstuck(SYSCTL_HANDLER_ARGS)
 	if (val == 0)
 		return 0;
 
-	taskqueue_enqueue_fast(sc->sc_tq, &sc->sc_bstucktask);
+	taskqueue_enqueue(sc->sc_tq, &sc->sc_bstucktask);
 	val = 0;
 	return 0;
 }
@@ -1282,9 +1284,18 @@ ath_sysctl_stats_attach(struct ath_softc *sc)
 	    &sc->sc_stats.ast_rx_keymiss, 0, "");
 	SYSCTL_ADD_UINT(ctx, child, OID_AUTO, "ast_tx_swfiltered", CTLFLAG_RD,
 	    &sc->sc_stats.ast_tx_swfiltered, 0, "");
+	SYSCTL_ADD_UINT(ctx, child, OID_AUTO, "ast_tx_nodeq_overflow",
+	    CTLFLAG_RD, &sc->sc_stats.ast_tx_nodeq_overflow, 0,
+	    "tx dropped 'cuz nodeq overflow");
 	SYSCTL_ADD_UINT(ctx, child, OID_AUTO, "ast_rx_stbc",
 	    CTLFLAG_RD, &sc->sc_stats.ast_rx_stbc, 0,
 	    "Number of STBC frames received");
+	SYSCTL_ADD_UINT(ctx, child, OID_AUTO, "ast_tx_stbc",
+	    CTLFLAG_RD, &sc->sc_stats.ast_tx_stbc, 0,
+	    "Number of STBC frames transmitted");
+	SYSCTL_ADD_UINT(ctx, child, OID_AUTO, "ast_tx_ldpc",
+	    CTLFLAG_RD, &sc->sc_stats.ast_tx_ldpc, 0,
+	    "Number of LDPC frames transmitted");
 	
 	/* Attach the RX phy error array */
 	ath_sysctl_stats_attach_rxphyerr(sc, child);

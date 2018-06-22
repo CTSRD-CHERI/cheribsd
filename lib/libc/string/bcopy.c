@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -28,6 +30,16 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_integrity"
+ *   ]
+ * }
+ * CHERI CHANGES END
  */
 
 #if defined(LIBC_SCCS) && !defined(lint)
@@ -60,13 +72,13 @@ typedef	int word;		/* "word" used for optimal copy speed */
 #if defined(MEMCOPY) || defined(MEMMOVE)
 #include <string.h>
 
-__CAPABILITY void *
+__CAP void *
 #ifdef MEMCOPY
 __CAPSUFFIX(memcpy)
 #else
 __CAPSUFFIX(memmove)
 #endif
-(__CAPABILITY void *dst0, __CAPABILITY const void *src0, size_t length)
+(__CAP void *dst0, __CAP const void *src0, size_t length)
 #else
 #include <strings.h>
 
@@ -74,8 +86,8 @@ void
 bcopy(const void *src0, void *dst0, size_t length)
 #endif
 {
-	__CAPABILITY char *dst = dst0;
-	__CAPABILITY const char *src = src0;
+	__CAP char *dst = dst0;
+	__CAP const char *src = src0;
 	size_t t;
 
 	if (length == 0 || dst == src)		/* nothing to do */
@@ -108,7 +120,7 @@ bcopy(const void *src0, void *dst0, size_t length)
 		 * Copy whole words, then mop up any trailing bytes.
 		 */
 		t = length / wsize;
-		TLOOP(*(word *)dst = *(word *)src; src += wsize; dst += wsize);
+		TLOOP(*(word * __CAP)dst = *(const word * __CAP)src; src += wsize; dst += wsize);
 		t = length & wmask;
 		TLOOP(*dst++ = *src++);
 	} else {
@@ -129,7 +141,7 @@ bcopy(const void *src0, void *dst0, size_t length)
 			TLOOP1(*--dst = *--src);
 		}
 		t = length / wsize;
-		TLOOP(src -= wsize; dst -= wsize; *(word *)dst = *(word *)src);
+		TLOOP(src -= wsize; dst -= wsize; *(word * __CAP)dst = *(const word * __CAP)src);
 		t = length & wmask;
 		TLOOP(*--dst = *--src);
 	}

@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright © 2002, Jörg Wunsch
  *
  * Redistribution and use in source and binary forms, with or without
@@ -207,7 +209,7 @@ decolonify(char *s, ccharp **cppp, int *ip)
 			*cp = '\0';
 		if (strlen(s) && !contains(*cppp, s)) {
 			*cppp = realloc(*cppp, (*ip + 2) * sizeof(char *));
-			if (cppp == NULL)
+			if (*cppp == NULL)
 				abort();
 			(*cppp)[*ip] = s;
 			(*cppp)[*ip + 1] = NULL;
@@ -461,7 +463,7 @@ main(int argc, char **argv)
 						nlen = strlen(cp);
 						bin = realloc(bin, 
 							      olen + nlen + 2);
-						if (bin == 0)
+						if (bin == NULL)
 							abort();
 						strcat(bin, " ");
 						strcat(bin, cp);
@@ -505,7 +507,7 @@ main(int argc, char **argv)
 					    (rlen = matches[1].rm_eo - 
 					     matches[1].rm_so) > 0) {
 						/*
-						 * man -w found formated
+						 * man -w found formatted
 						 * page, need to pick up
 						 * source page name.
 						 */
@@ -535,7 +537,7 @@ main(int argc, char **argv)
 						nlen = strlen(cp2);
 						man = realloc(man, 
 							      olen + nlen + 2);
-						if (man == 0)
+						if (man == NULL)
 							abort();
 						strcat(man, " ");
 						strcat(man, cp2);
@@ -574,7 +576,7 @@ main(int argc, char **argv)
 						nlen = strlen(cp);
 						src = realloc(src, 
 							      olen + nlen + 2);
-						if (src == 0)
+						if (src == NULL)
 							abort();
 						strcat(src, " ");
 						strcat(src, cp);
@@ -643,7 +645,7 @@ main(int argc, char **argv)
 							src = realloc(src, 
 								      olen + 
 								      nlen + 2);
-							if (src == 0)
+							if (src == NULL)
 								abort();
 							strcat(src, " ");
 							strcat(src, buf);

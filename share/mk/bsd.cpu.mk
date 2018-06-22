@@ -108,21 +108,21 @@ _CPUCFLAGS = -march=${CPUTYPE}
 #XXX: gcc doesn't seem to like -mcpu=xscale, and dies while rebuilding itself
 #_CPUCFLAGS = -mcpu=xscale
 _CPUCFLAGS = -march=armv5te -D__XSCALE__
-. elif ${CPUTYPE} == "armv6"
-_CPUCFLAGS = -march=${CPUTYPE} -DARM_ARCH_6=1
-. elif ${CPUTYPE} == "cortexa"
-_CPUCFLAGS = -march=armv7 -DARM_ARCH_6=1 -mfpu=vfp
-. elif ${CPUTYPE:Marmv[4567]*} != ""
+.  elif ${CPUTYPE:M*soft*} != ""
+_CPUCFLAGS = -mfloat-abi=softfp
+.  elif ${CPUTYPE} == "cortexa"
+_CPUCFLAGS = -march=armv7 -mfpu=vfp
+.  elif ${CPUTYPE:Marmv[4567]*} != ""
 # Handle all the armvX types that FreeBSD runs:
 #	armv4, armv4t, armv5, armv5te, armv6, armv6t2, armv7, armv7-a, armv7ve
 # they require -march=. All the others require -mcpu=.
 _CPUCFLAGS = -march=${CPUTYPE}
-. else
+.  else
 # Common values for FreeBSD
-# arm:
+# arm: (any arm v4 or v5 processor you are targeting)
 #	arm920t, arm926ej-s, marvell-pj4, fa526, fa626,
 #	fa606te, fa626te, fa726te
-# armv6:
+# armv6: (any arm v7 or v8 processor you are targeting and the arm1176jzf-s)
 # 	arm1176jzf-s, generic-armv7-a, cortex-a5, cortex-a7, cortex-a8,
 #	cortex-a9, cortex-a12, cortex-a15, cortex-a17, cortex-a53, cortex-a57,
 #	cortex-a72, exynos-m1
@@ -134,6 +134,8 @@ _CPUCFLAGS = -Wa,-me500 -msoft-float
 .  else
 _CPUCFLAGS = -mcpu=${CPUTYPE} -mno-powerpc64
 .  endif
+. elif ${MACHINE_ARCH} == "powerpcspe"
+_CPUCFLAGS = -Wa,-me500 -mspe=yes -mabi=spe -mfloat-gprs=double
 . elif ${MACHINE_ARCH} == "powerpc64"
 _CPUCFLAGS = -mcpu=${CPUTYPE}
 . elif ${MACHINE_CPUARCH} == "mips"
@@ -150,8 +152,6 @@ _CPUCFLAGS = -march=${CPUTYPE}
 #	sb1, xlp, xlr
 _CPUCFLAGS = -march=${CPUTYPE:S/^mips//}
 . endif
-. elif ${MACHINE_CPUARCH} == "riscv"
-_CPUCFLAGS = -msoft-float # -march="RV64I" # RISCVTODO
 . elif ${MACHINE_ARCH} == "sparc64"
 .  if ${CPUTYPE} == "v9"
 _CPUCFLAGS = -mcpu=v9
@@ -170,7 +170,9 @@ _CPUCFLAGS = -mcpu=${CPUTYPE}
 
 ########## i386
 . if ${MACHINE_CPUARCH} == "i386"
-.  if ${CPUTYPE} == "bdver4"
+.  if ${CPUTYPE} == "znver1"
+MACHINE_CPU = avx2 avx sse42 sse41 ssse3 sse4a sse3 sse2 sse mmx k6 k5 i586
+.  elif ${CPUTYPE} == "bdver4"
 MACHINE_CPU = xop avx2 avx sse42 sse41 ssse3 sse4a sse3 sse2 sse mmx k6 k5 i586
 .  elif ${CPUTYPE} == "bdver3" || ${CPUTYPE} == "bdver2" || \
     ${CPUTYPE} == "bdver1"
@@ -239,7 +241,9 @@ MACHINE_CPU = mmx
 MACHINE_CPU += i486
 ########## amd64
 . elif ${MACHINE_CPUARCH} == "amd64"
-.  if ${CPUTYPE} == "bdver4"
+.  if ${CPUTYPE} == "znver1"
+MACHINE_CPU = avx2 avx sse42 sse41 ssse3 sse4a sse3
+.  elif ${CPUTYPE} == "bdver4"
 MACHINE_CPU = xop avx2 avx sse42 sse41 ssse3 sse4a sse3
 .  elif ${CPUTYPE} == "bdver3" || ${CPUTYPE} == "bdver2" || \
     ${CPUTYPE} == "bdver1"
@@ -298,6 +302,30 @@ MACHINE_CPU = v9 ultrasparc ultrasparc3
 
 .if ${MACHINE_CPUARCH} == "mips"
 CFLAGS += -G0
+. if ${MACHINE_ARCH:Mmips*el*} != ""
+AFLAGS += -EL
+CFLAGS += -EL
+LDFLAGS += -EL
+. else
+AFLAGS += -EB
+CFLAGS += -EB
+LDFLAGS += -EB
+. endif
+AFLAGS+= -mabi=${MIPS_ABI}
+CFLAGS+= -mabi=${MIPS_ABI}
+LDFLAGS+= -mabi=${MIPS_ABI}
+. if ${MACHINE_ARCH:Mmips64*} != ""
+MIPS_ABI?=	64
+. elif ${MACHINE_ARCH:Mmipsn32*} != ""
+MIPS_ABI?=	n32
+. else
+MIPS_ABI?=	32
+. endif
+. if ${MACHINE_ARCH:Mmips*hf}
+CFLAGS += -mhard-float
+. else
+CFLAGS += -msoft-float
+. endif
 .endif
 
 ########## arm
@@ -306,22 +334,38 @@ MACHINE_CPU += arm
 . if ${MACHINE_ARCH:Marmv6*} != ""
 MACHINE_CPU += armv6
 . endif
-# armv6 is a hybrid. It uses the softfp ABI, but doesn't emulate
-# floating point in the general case, so don't define softfp for
-# it at this time. arm and armeb are pure softfp, so define it
-# for them.
-. if ${MACHINE_ARCH:Marmv6*} == ""
+. if ${MACHINE_ARCH:Marmv7*} != ""
+MACHINE_CPU += armv7
+. endif
+# armv6 and armv7 are a hybrid. It can use the softfp ABI, but doesn't emulate
+# floating point in the general case, so don't define softfp for it at this
+# time. arm and armeb are pure softfp, so define it for them.
+. if ${MACHINE_ARCH:Marmv[67]*} == ""
 MACHINE_CPU += softfp
 . endif
-.if ${MACHINE_ARCH} == "armv6"
+# Normally armv6 and armv7 are hard float ABI from FreeBSD 11 onwards. However
+# when CPUTYPE has 'soft' in it, we use the soft-float ABI to allow building of
+# soft-float ABI libraries. In this case, we have to add the -mfloat-abi=softfp
+# to force that.
+.if ${MACHINE_ARCH:Marmv[67]*} && defined(CPUTYPE) && ${CPUTYPE:M*soft*} != ""
 # Needs to be CFLAGS not _CPUCFLAGS because it's needed for the ABI
 # not a nice optimization.
 CFLAGS += -mfloat-abi=softfp
 .endif
 .endif
 
+.if ${MACHINE_ARCH} == "powerpcspe"
+CFLAGS += -mcpu=8540 -Wa,-me500 -mspe=yes -mabi=spe -mfloat-gprs=double
+.endif
+
 .if ${MACHINE_CPUARCH} == "riscv"
-CFLAGS += -msoft-float
+.if ${TARGET_ARCH:Mriscv*sf}
+CFLAGS += -march=rv64imac -mabi=lp64
+ACFLAGS += -march=rv64imac -mabi=lp64
+.else
+CFLAGS += -march=rv64imafdc -mabi=lp64
+ACFLAGS += -march=rv64imafdc -mabi=lp64
+.endif
 .endif
 
 # NB: COPTFLAGS is handled in /usr/src/sys/conf/kern.pre.mk
@@ -346,12 +390,12 @@ CFLAGS += ${_CPUCFLAGS}
 # (-mfpmath= is not supported)
 #
 .if ${MACHINE_CPUARCH} == "i386" || ${MACHINE_CPUARCH} == "amd64"
-CFLAGS_NO_SIMD.clang= -mno-avx
+CFLAGS_NO_SIMD.clang= -mno-avx -mno-avx2
 CFLAGS_NO_SIMD= -mno-mmx -mno-sse
 .endif
 CFLAGS_NO_SIMD += ${CFLAGS_NO_SIMD.${COMPILER_TYPE}}
 
-# Add in any architecture-specific CFLAGS.  
+# Add in any architecture-specific CFLAGS.
 # These come from make.conf or the command line or the environment.
 CFLAGS += ${CFLAGS.${MACHINE_ARCH}}
 CXXFLAGS += ${CXXFLAGS.${MACHINE_ARCH}}

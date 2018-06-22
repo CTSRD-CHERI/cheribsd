@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (C) 2008 Semihalf, Rafal Jaworowski
  * All rights reserved.
  *
@@ -96,6 +98,10 @@ law_getmax(void)
 		break;
 	case SVR_P5020:
 	case SVR_P5020E:
+	case SVR_P5021:
+	case SVR_P5021E:
+	case SVR_P5040:
+	case SVR_P5040E:
 		law_max = 32;
 		break;
 	default:
@@ -108,13 +114,17 @@ law_getmax(void)
 static inline void
 law_write(uint32_t n, uint64_t bar, uint32_t sr)
 {
-#if defined(QORIQ_DPAA)
-	ccsr_write4(OCP85XX_LAWBARH(n), bar >> 32);
-	ccsr_write4(OCP85XX_LAWBARL(n), bar);
-#else
-	ccsr_write4(OCP85XX_LAWBAR(n), bar >> 12);
-#endif
-	ccsr_write4(OCP85XX_LAWSR(n), sr);
+
+	if (mpc85xx_is_qoriq()) {
+		ccsr_write4(OCP85XX_LAWBARH(n), bar >> 32);
+		ccsr_write4(OCP85XX_LAWBARL(n), bar);
+		ccsr_write4(OCP85XX_LAWSR_QORIQ(n), sr);
+		ccsr_read4(OCP85XX_LAWSR_QORIQ(n));
+	} else {
+		ccsr_write4(OCP85XX_LAWBAR(n), bar >> 12);
+		ccsr_write4(OCP85XX_LAWSR_85XX(n), sr);
+		ccsr_read4(OCP85XX_LAWSR_85XX(n));
+	}
 
 	/*
 	 * The last write to LAWAR should be followed by a read
@@ -123,20 +133,21 @@ law_write(uint32_t n, uint64_t bar, uint32_t sr)
 	 * instruction.
 	 */
 
-	ccsr_read4(OCP85XX_LAWSR(n));
 	isync();
 }
 
 static inline void
 law_read(uint32_t n, uint64_t *bar, uint32_t *sr)
 {
-#if defined(QORIQ_DPAA)
-	*bar = (uint64_t)ccsr_read4(OCP85XX_LAWBARH(n)) << 32 |
-	    ccsr_read4(OCP85XX_LAWBARL(n));
-#else
-	*bar = (uint64_t)ccsr_read4(OCP85XX_LAWBAR(n)) << 12;
-#endif
-	*sr = ccsr_read4(OCP85XX_LAWSR(n));
+
+	if (mpc85xx_is_qoriq()) {
+		*bar = (uint64_t)ccsr_read4(OCP85XX_LAWBARH(n)) << 32 |
+		    ccsr_read4(OCP85XX_LAWBARL(n));
+		*sr = ccsr_read4(OCP85XX_LAWSR_QORIQ(n));
+	} else {
+		*bar = (uint64_t)ccsr_read4(OCP85XX_LAWBAR(n)) << 12;
+		*sr = ccsr_read4(OCP85XX_LAWSR_85XX(n));
+	}
 }
 
 static int
@@ -157,7 +168,8 @@ law_find_free(void)
 	return (i);
 }
 
-#define	_LAW_SR(trgt,size)	(0x80000000 | (trgt << 20) | (ffsl(size) - 2))
+#define	_LAW_SR(trgt,size)	(0x80000000 | (trgt << 20) | \
+				(flsl(size + (size - 1)) - 2))
 
 int
 law_enable(int trgt, uint64_t bar, uint32_t size)
@@ -305,6 +317,18 @@ mpc85xx_enable_l3_cache(void)
 	}
 }
 
+int
+mpc85xx_is_qoriq(void)
+{
+	uint16_t pvr = mfpvr() >> 16;
+
+	/* QorIQ register set is only in e500mc and derivative core based SoCs. */
+	if (pvr == FSL_E500mc || pvr == FSL_E5500 || pvr == FSL_E6500)
+		return (1);
+
+	return (0);
+}
+
 static void
 mpc85xx_dataloss_erratum_spr976(void)
 {
@@ -340,20 +364,18 @@ mpc85xx_map_dcsr(void)
 	 * Find the node the long way.
 	 */
 	if ((node = OF_finddevice("/")) == -1)
-		return (ENXIO);
+		return (0);
 
 	if ((node = ofw_bus_find_compatible(node, "fsl,dcsr")) == 0)
-		return (ENXIO);
+		return (0);
 
 moveon:
 	err = fdt_get_range(node, 0, &b, &s);
 
 	if (err != 0)
-		return (err);
+		return (0);
 
-#ifdef QORIQ_DPAA
 	law_enable(OCP85XX_TGTIF_DCSR, b, 0x400000);
-#endif
 	return pmap_early_io_map(b, 0x400000);
 }
 
@@ -419,4 +441,31 @@ mpc85xx_fix_errata(vm_offset_t va_ccsr)
 
 err:
 	return;
+}
+
+uint32_t
+mpc85xx_get_platform_clock(void)
+{
+	phandle_t soc;
+	static uint32_t freq;
+
+	if (freq != 0)
+		return (freq);
+
+	soc = OF_finddevice("/soc");
+
+	/* freq isn't modified on error. */
+	OF_getencprop(soc, "bus-frequency", (void *)&freq, sizeof(freq));
+
+	return (freq);
+}
+
+uint32_t
+mpc85xx_get_system_clock(void)
+{
+	uint32_t freq;
+
+	freq = mpc85xx_get_platform_clock();
+
+	return (freq / 2);
 }

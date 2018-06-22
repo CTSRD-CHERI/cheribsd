@@ -1,16 +1,17 @@
 #	from: @(#)bsd.prog.mk	5.26 (Berkeley) 6/25/91
 # $FreeBSD$
 
-__BSD_PROG_MK:=yes
+__BSD_PROG_MK=yes
 
 .include <bsd.init.mk>
 .include <bsd.cheri.mk>
 .include <bsd.compiler.mk>
 
-.SUFFIXES: .out .o .c .cc .cpp .cxx .C .m .y .l .ln .s .S .asm
+.SUFFIXES: .out .o .bc .c .cc .cpp .cxx .C .m .y .l .ll .ln .s .S .asm
 
 # XXX The use of COPTS in modern makefiles is discouraged.
 .if defined(COPTS)
+.warning ${.CURDIR}: COPTS should be CFLAGS.
 CFLAGS+=${COPTS}
 .endif
 
@@ -41,7 +42,7 @@ CFLAGS+=${CRUNCH_CFLAGS}
 .else
 .if ${MK_DEBUG_FILES} != "no" && empty(DEBUG_FLAGS:M-g) && \
     empty(DEBUG_FLAGS:M-gdwarf-*)
-CFLAGS+= -g
+CFLAGS+= ${DEBUG_FILES_CFLAGS}
 CTFFLAGS+= -g
 .endif
 .endif
@@ -50,8 +51,20 @@ CTFFLAGS+= -g
 STRIP?=	-s
 .endif
 
+.if defined(NO_ROOT)
+.if !defined(TAGS) || ! ${TAGS:Mpackage=*}
+TAGS+=		package=${PACKAGE:Uruntime}
+.endif
+TAG_ARGS=	-T ${TAGS:[*]:S/ /,/g}
+.endif
+
 .if defined(NO_SHARED) && (${NO_SHARED} != "no" && ${NO_SHARED} != "NO")
 LDFLAGS+= -static
+.endif
+
+# clang currently defaults to dynamic TLS for binaries
+.if ${MACHINE:Mmips} && ${COMPILER_TYPE} == "clang"
+CFLAGS+= -ftls-model=initial-exec
 .endif
 
 .if ${MK_DEBUG_FILES} != "no"
@@ -61,11 +74,14 @@ PROG_FULL=${PROG}.full
     ${BINDIR} == "/bin" ||\
     ${BINDIR:C%/libexec(/.*)?%/libexec%} == "/libexec" ||\
     ${BINDIR} == "/sbin" ||\
-    ${BINDIR:C%/usr/(bin|bsdinstall|libcheri|libexec|lpr|sendmail|sm.bin|sbin|tests)(/.*)?%/usr/bin%} == "/usr/bin"\
+    ${BINDIR:C%/usr/(bin|bsdinstall|libcheri|libexec|lpr|sendmail|sm.bin|sbin|tests)(/.*)?%/usr/bin%} == "/usr/bin" ||\
+    ${BINDIR} == "/usr/lib" \
      )
 DEBUGFILEDIR=	${DEBUGDIR}${BINDIR}
 .else
 DEBUGFILEDIR?=	${BINDIR}/.debug
+.endif
+.if !exists(${DESTDIR}${DEBUGFILEDIR})
 DEBUGMKDIR=
 .endif
 .else
@@ -83,7 +99,11 @@ PROGNAME?=	${PROG}
 
 .if defined(SRCS)
 
-OBJS+=  ${SRCS:N*.h:R:S/$/.o/g}
+OBJS+=  ${SRCS:N*.h:${OBJS_SRCS_FILTER:ts:}:S/$/.o/g}
+
+# LLVM bitcode / textual IR representations of the program
+BCOBJS+=${SRCS:N*.[hsS]:N*.asm:${OBJS_SRCS_FILTER:ts:}:S/$/.bco/g}
+LLOBJS+=${SRCS:N*.[hsS]:N*.asm:${OBJS_SRCS_FILTER:ts:}:S/$/.llo/g}
 
 .if target(beforelinking)
 beforelinking: ${OBJS}
@@ -115,7 +135,10 @@ SRCS=	${PROG}.c
 # - the name of the object gets put into the executable symbol table instead of
 #   the name of a variable temporary object.
 # - it's useful to keep objects around for crunching.
-OBJS+=	${PROG}.o
+OBJS+=		${PROG}.o
+BCOBJS+=	${PROG}.bc
+LLOBJS+=	${PROG}.ll
+CLEANFILES+=	${PROG}.o ${PROG}.bc ${PROG}.ll
 
 .if target(beforelinking)
 beforelinking: ${OBJS}
@@ -150,10 +173,20 @@ ${PROG_INSTALL}: ${PROG}
 	strip -o ${.TARGET} ${STRIP_FLAGS} ${PROG}
 .endif
 
-.if defined(WANT_DUMP)
+.if defined(WANT_DUMP) && ${WANT_DUMP} != "no"
 ${PROGNAME}.dump: ${PROG_FULL}
-	${OBJDUMP} -xrsSD ${PROG_FULL} > ${.TARGET}
+	${OBJDUMP} ${OBJDUMP_FLAGS} ${PROG_FULL} > ${.TARGET}
 .endif
+
+.if defined(LLVM_LINK)
+${PROG_FULL}.bc: ${BCOBJS}
+	${LLVM_LINK} -o ${.TARGET} ${BCOBJS}
+
+${PROG_FULL}.ll: ${LLOBJS}
+	${LLVM_LINK} -S -o ${.TARGET} ${LLOBJS}
+
+CLEANFILES+=	${PROG_FULL}.bc ${PROG_FULL}.ll
+.endif # defined(LLVM_LINK)
 
 .if	${MK_MAN} != "no" && !defined(MAN) && \
 	!defined(MAN1) && !defined(MAN2) && !defined(MAN3) && \
@@ -167,30 +200,31 @@ MAN1=	${MAN}
 .if defined(_SKIP_BUILD)
 all:
 .else
-all: beforebuild .WAIT ${PROG_INSTALL} ${SCRIPTS}
-beforebuild: objwarn
+all: ${PROG_INSTALL} ${SCRIPTS}
 .if ${MK_MAN} != "no"
-all: _manpages
+all: all-man
 .endif
 .endif
 
 .if defined(PROG)
-CLEANFILES+= ${PROG} ${PROG}.stripped
+CLEANFILES+= ${PROG} ${PROG}.bc ${PROG}.ll
+CLEANFILES+= ${PROG}.stripped
 .if ${MK_DEBUG_FILES} != "no"
-CLEANFILES+=	${PROG_FULL} ${PROGNAME}.debug
+CLEANFILES+= ${PROG_FULL} ${PROGNAME}.debug
 .endif
-.if defined(WANT_DUMP)
+.if defined(WANT_DUMP) && ${WANT_DUMP} != "no"
 CLEANFILES+=	${PROGNAME}.dump
 .endif
 .endif
 
 .if defined(OBJS)
-CLEANFILES+= ${OBJS}
+CLEANFILES+= ${OBJS} ${BCOBJS} ${LLOBJS}
 .endif
 
 .include <bsd.libnames.mk>
 
 .if defined(PROG)
+.if !defined(NO_EXTRADEPEND)
 _EXTRADEPEND:
 .if defined(LDFLAGS) && !empty(LDFLAGS:M-nostdlib)
 .if defined(DPADD) && !empty(DPADD)
@@ -199,13 +233,15 @@ _EXTRADEPEND:
 .else
 	echo ${PROG_FULL}: ${LIBC} ${DPADD} >> ${DEPENDFILE}
 .if defined(PROG_CXX)
-.if ${COMPILER_TYPE} == "clang" && empty(CXXFLAGS:M-stdlib=libstdc++)
+.if (${COMPILER_TYPE} == "clang" && empty(CXXFLAGS:M-stdlib=libstdc++)) || \
+    !empty(CXXFLAGS:M-stdlib=libc++) || ${MK_CHERI} != "no"
 	echo ${PROG_FULL}: ${LIBCPLUSPLUS} >> ${DEPENDFILE}
 .else
 	echo ${PROG_FULL}: ${LIBSTDCPLUSPLUS} >> ${DEPENDFILE}
 .endif
 .endif
 .endif
+.endif	# !defined(NO_EXTRADEPEND)
 .endif
 
 .if !target(install)
@@ -227,19 +263,19 @@ realinstall: _proginstall
 .ORDER: beforeinstall _proginstall
 _proginstall:
 .if defined(PROG)
-	${INSTALL} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
-	    ${_INSTALLFLAGS} ${PROG_INSTALL} ${DESTDIR}${BINDIR}/${PROGNAME}
+	${INSTALL} ${TAG_ARGS} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
+	    ${_INSTALLFLAGS} ${PROG} ${DESTDIR}${BINDIR}/${PROGNAME}
 .if ${MK_DEBUG_FILES} != "no"
 .if defined(DEBUGMKDIR)
-	${INSTALL} -T debug -d ${DESTDIR}${DEBUGFILEDIR}/
+	${INSTALL} ${TAG_ARGS:D${TAG_ARGS},debug} -d ${DESTDIR}${DEBUGFILEDIR}/
 .endif
-	${INSTALL} -T debug -o ${BINOWN} -g ${BINGRP} -m ${DEBUGMODE} \
+	${INSTALL} ${TAG_ARGS:D${TAG_ARGS},debug} -o ${BINOWN} -g ${BINGRP} -m ${DEBUGMODE} \
 	    ${PROGNAME}.debug ${DESTDIR}${DEBUGFILEDIR}/${PROGNAME}.debug
 .endif
 .endif
 .endif	# !target(realinstall)
 
-.if defined(WANT_DUMP)
+.if defined(WANT_DUMP) && ${WANT_DUMP} != "no"
 FILES+=	${PROGNAME}.dump
 .endif
 
@@ -269,7 +305,7 @@ SCRIPTSMODE_${script:T}?=	${SCRIPTSMODE}
 STAGE_AS_${script:T}=		${SCRIPTSDIR_${script:T}}/${SCRIPTSNAME_${script:T}}
 _scriptsinstall: _SCRIPTSINS_${script:T}
 _SCRIPTSINS_${script:T}: ${script}
-	${INSTALL} -o ${SCRIPTSOWN_${.ALLSRC:T}} \
+	${INSTALL} ${TAG_ARGS} -o ${SCRIPTSOWN_${.ALLSRC:T}} \
 	    -g ${SCRIPTSGRP_${.ALLSRC:T}} -m ${SCRIPTSMODE_${.ALLSRC:T}} \
 	    ${.ALLSRC} \
 	    ${DESTDIR}${SCRIPTSDIR_${.ALLSRC:T}}/${SCRIPTSNAME_${.ALLSRC:T}}
@@ -282,32 +318,35 @@ NLSNAME?=	${PROG}
 .include <bsd.confs.mk>
 .include <bsd.files.mk>
 .include <bsd.incs.mk>
+
+LINKOWN?=	${BINOWN}
+LINKGRP?=	${BINGRP}
+LINKMODE?=	${BINMODE}
 .include <bsd.links.mk>
 
 .if ${MK_MAN} != "no"
-realinstall: _maninstall
-.ORDER: beforeinstall _maninstall
+realinstall: maninstall
+.ORDER: beforeinstall maninstall
 .endif
 
 .endif	# !target(install)
-
-.if !target(lint)
-lint: ${SRCS:M*.c}
-.if defined(PROG)
-	${LINT} ${LINTFLAGS} ${CFLAGS:M-[DIU]*} ${.ALLSRC}
-.endif
-.endif
 
 .if ${MK_MAN} != "no"
 .include <bsd.man.mk>
 .endif
 
-.include <bsd.dep.mk>
-
-.if defined(PROG) && !exists(${.OBJDIR}/${DEPENDFILE})
-${OBJS}: ${SRCS:M*.h}
+.if defined(HAS_TESTS)
+MAKE+=			MK_MAKE_CHECK_USE_SANDBOX=yes
+SUBDIR_TARGETS+=	check
+TESTS_LD_LIBRARY_PATH+=	${.OBJDIR}
+TESTS_PATH+=		${.OBJDIR}
 .endif
 
-.include <bsd.obj.mk>
+.if defined(PROG)
+OBJS_DEPEND_GUESS+= ${SRCS:M*.h}
+.endif
 
+.include <bsd.dep.mk>
+.include <bsd.clang-analyze.mk>
+.include <bsd.obj.mk>
 .include <bsd.sys.mk>

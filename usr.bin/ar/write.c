@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2007 Kai Wang
  * All rights reserved.
  *
@@ -124,6 +126,7 @@ create_obj_from_file(struct bsdar *bsdar, const char *name, time_t mtime)
 	struct ar_obj		*obj;
 	struct stat		 sb;
 	const char		*bname;
+	char			*tmpname;
 
 	if (name == NULL)
 		return (NULL);
@@ -137,7 +140,10 @@ create_obj_from_file(struct bsdar *bsdar, const char *name, time_t mtime)
 		return (NULL);
 	}
 
-	if ((bname = basename(name)) == NULL)
+	tmpname = strdup(name);
+	if (tmpname == NULL)
+		bsdar_errc(bsdar, EX_SOFTWARE, errno, "strdup failed");
+	if ((bname = basename(tmpname)) == NULL)
 		bsdar_errc(bsdar, EX_SOFTWARE, errno, "basename failed");
 	if (bsdar->options & AR_TR && strlen(bname) > _TRUNCATE_LEN) {
 		if ((obj->name = malloc(_TRUNCATE_LEN + 1)) == NULL)
@@ -147,6 +153,7 @@ create_obj_from_file(struct bsdar *bsdar, const char *name, time_t mtime)
 	} else
 		if ((obj->name = strdup(bname)) == NULL)
 		    bsdar_errc(bsdar, EX_SOFTWARE, errno, "strdup failed");
+	free(tmpname);
 
 	if (fstat(obj->fd, &sb) < 0) {
 		bsdar_warnc(bsdar, errno, "can't fstat file: %s", obj->name);
@@ -581,10 +588,17 @@ prefault_buffer(const char *buf, size_t s)
 static void
 write_data(struct bsdar *bsdar, struct archive *a, const void *buf, size_t s)
 {
+	ssize_t written;
+
 	prefault_buffer(buf, s);
-	if (archive_write_data(a, buf, s) != (ssize_t)s)
-		bsdar_errc(bsdar, EX_SOFTWARE, 0, "%s",
-		    archive_error_string(a));
+	while (s > 0) {
+		written = archive_write_data(a, buf, s);
+		if (written < 0)
+			bsdar_errc(bsdar, EX_SOFTWARE, 0, "%s",
+			    archive_error_string(a));
+		buf = (const char *)buf + written;
+		s -= written;
+	}
 }
 
 /*

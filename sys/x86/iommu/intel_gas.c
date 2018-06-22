@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2013 The FreeBSD Foundation
  * All rights reserved.
  *
@@ -198,7 +200,7 @@ dmar_gas_check_free(struct dmar_domain *domain)
 			    l->free_down));
 		} else {
 			v = MAX(entry->free_after, l->free_down);
-			v = MAX(entry->free_down, r->free_down);
+			v = MAX(v, r->free_down);
 			MPASS(entry->free_down == v);
 		}
 	}
@@ -327,8 +329,8 @@ dmar_gas_match_one(struct dmar_gas_match_args *a, struct dmar_map_entry *prev,
 	 * the boundary.  Check if there is enough space after the
 	 * next boundary after the prev->end.
 	 */
-	bs = (a->entry->start + a->offset + a->common->boundary) &
-	    ~(a->common->boundary - 1);
+	bs = rounddown2(a->entry->start + a->offset + a->common->boundary,
+	    a->common->boundary);
 	start = roundup2(bs, a->common->alignment);
 	/* DMAR_PAGE_SIZE to create gap after new entry. */
 	if (start + a->offset + a->size + DMAR_PAGE_SIZE <=

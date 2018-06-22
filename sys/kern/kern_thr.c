@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2003, Jeffrey Roberson <jeff@freebsd.org>
  * All rights reserved.
  *
@@ -36,6 +38,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/priv.h>
 #include <sys/proc.h>
 #include <sys/posix4.h>
+#include <sys/ptrace.h>
 #include <sys/racct.h>
 #include <sys/resourcevar.h>
 #include <sys/rwlock.h>
@@ -160,10 +163,10 @@ thr_new_initthr(struct thread *td, void *thunk)
 		return (EFAULT);
 
 	/* Set up our machine context. */
-	stack.ss_sp = param->stack_base;
+	stack.ss_sp = __USER_CAP_UNBOUND(param->stack_base);
 	stack.ss_size = param->stack_size;
 	/* Set upcall address to user thread entry function. */
-	cpu_set_upcall_kse(td, param->start_func, param->arg, &stack);
+	cpu_set_upcall(td, param->start_func, param->arg, &stack);
 	/* Setup user TLS address and TLS pointer register. */
 	return (cpu_set_user_tls(td, param->tls_base));
 }
@@ -227,13 +230,14 @@ thread_create(struct thread *td, struct rtprio *rtp,
 	if (error)
 		goto fail;
 
-	cpu_set_upcall(newtd, td);
+	cpu_copy_thread(newtd, td);
 
 	bzero(&newtd->td_startzero,
 	    __rangeof(struct thread, td_startzero, td_endzero));
 	bcopy(&td->td_startcopy, &newtd->td_startcopy,
 	    __rangeof(struct thread, td_startcopy, td_endcopy));
 	newtd->td_proc = td->td_proc;
+	newtd->td_rb_list = newtd->td_rbp_list = newtd->td_rb_inact = 0;
 	thread_cow_get(newtd, td);
 
 	error = initialize_thread(newtd, thunk);
@@ -253,7 +257,7 @@ thread_create(struct thread *td, struct rtprio *rtp,
 	thread_unlock(td);
 	if (P_SHOULDSTOP(p))
 		newtd->td_flags |= TDF_ASTPENDING | TDF_NEEDSUSPCHK;
-	if (p->p_flag2 & P2_LWP_EVENTS)
+	if (p->p_ptevents & PTRACE_LWP)
 		newtd->td_dbgflags |= TDB_BORN;
 
 	/*
@@ -308,10 +312,13 @@ sys_thr_exit(struct thread *td, struct thr_exit_args *uap)
     /* long *state */
 {
 
+	umtx_thread_exit(td);
+
 	/* Signal userland that it can free the stack. */
 	if ((void *)uap->state != NULL) {
 		suword_lwpid(uap->state, 1);
-		kern_umtx_wake(td, uap->state, INT_MAX, 0);
+		kern_umtx_wake(td,
+		    __USER_CAP(uap->state, sizeof(struct umutex)), INT_MAX, 0);
 	}
 
 	return (kern_thr_exit(td));
@@ -351,8 +358,8 @@ kern_thr_exit(struct thread *td)
 
 	p->p_pendingexits++;
 	td->td_dbgflags |= TDB_EXIT;
-	if (p->p_flag & P_TRACED && p->p_flag2 & P2_LWP_EVENTS)
-		ptracestop(td, SIGTRAP);
+	if (p->p_ptevents & PTRACE_LWP)
+		ptracestop(td, SIGTRAP, NULL);
 	PROC_UNLOCK(p);
 	tidhash_remove(td);
 	PROC_LOCK(p);
@@ -367,7 +374,6 @@ kern_thr_exit(struct thread *td)
 	KASSERT(p->p_numthreads > 1, ("too few threads"));
 	racct_sub(p, RACCT_NTHR, 1);
 	tdsigcleanup(td);
-	umtx_thread_exit(td);
 	PROC_SLOCK(p);
 	thread_stopped(p);
 	thread_exit();
@@ -487,7 +493,8 @@ sys_thr_suspend(struct thread *td, struct thr_suspend_args *uap)
 
 	tsp = NULL;
 	if (uap->timeout != NULL) {
-		error = umtx_copyin_timeout(uap->timeout, &ts);
+		error = umtx_copyin_timeout(
+		    __USER_CAP(uap->timeout, sizeof(struct timespec)), &ts);
 		if (error != 0)
 			return (error);
 		tsp = &ts;
@@ -567,6 +574,14 @@ sys_thr_wake(struct thread *td, struct thr_wake_args *uap)
 int
 sys_thr_set_name(struct thread *td, struct thr_set_name_args *uap)
 {
+
+	return (kern_thr_set_name(td, uap->id, __USER_CAP_STR(uap->name)));
+}
+
+int
+kern_thr_set_name(struct thread *td, lwpid_t id,
+    const char * __capability uname)
+{
 	struct proc *p;
 	char name[MAXCOMLEN + 1];
 	struct thread *ttd;
@@ -574,14 +589,18 @@ sys_thr_set_name(struct thread *td, struct thr_set_name_args *uap)
 
 	error = 0;
 	name[0] = '\0';
-	if (uap->name != NULL) {
-		error = copyinstr(uap->name, name, sizeof(name),
-			NULL);
+	if (uname != NULL) {
+		error = copyinstr_c(uname, &name[0], sizeof(name),
+		    NULL);
+		if (error == ENAMETOOLONG) {
+			error = copyin_c(uname, &name[0], sizeof(name) - 1);
+			name[sizeof(name) - 1] = '\0';
+		}
 		if (error)
 			return (error);
 	}
 	p = td->td_proc;
-	ttd = tdfind((lwpid_t)uap->id, p->p_pid);
+	ttd = tdfind(id, p->p_pid);
 	if (ttd == NULL)
 		return (ESRCH);
 	strcpy(ttd->td_name, name);

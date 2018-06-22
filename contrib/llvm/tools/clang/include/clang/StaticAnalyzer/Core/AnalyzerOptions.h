@@ -125,6 +125,9 @@ class AnalyzerOptions : public RefCountedBase<AnalyzerOptions> {
 public:
   typedef llvm::StringMap<std::string> ConfigTable;
 
+  static std::vector<StringRef>
+  getRegisteredCheckers(bool IncludeExperimental = false);
+
   /// \brief Pair of checker name and enable/disable.
   std::vector<std::pair<std::string, bool> > CheckersControlList;
   
@@ -149,6 +152,7 @@ public:
   unsigned DisableAllChecks : 1;
 
   unsigned ShowCheckerHelp : 1;
+  unsigned ShowEnabledCheckerList : 1;
   unsigned AnalyzeAll : 1;
   unsigned AnalyzerDisplayProgress : 1;
   unsigned AnalyzeNestedBlocks : 1;
@@ -201,9 +205,15 @@ private:
   /// Controls which C++ member functions will be considered for inlining.
   CXXInlineableMemberKind CXXMemberInliningMode;
   
+  /// \sa includeImplicitDtorsInCFG
+  Optional<bool> IncludeImplicitDtorsInCFG;
+
   /// \sa includeTemporaryDtorsInCFG
   Optional<bool> IncludeTemporaryDtorsInCFG;
-  
+
+  /// \sa IncludeLifetimeInCFG
+  Optional<bool> IncludeLifetimeInCFG;
+
   /// \sa mayInlineCXXStandardLibrary
   Optional<bool> InlineCXXStandardLibrary;
   
@@ -253,8 +263,20 @@ private:
   /// \sa getMaxTimesInlineLarge
   Optional<unsigned> MaxTimesInlineLarge;
 
+  /// \sa getMinCFGSizeTreatFunctionsAsLarge
+  Optional<unsigned> MinCFGSizeTreatFunctionsAsLarge;
+
   /// \sa getMaxNodesPerTopLevelFunction
   Optional<unsigned> MaxNodesPerTopLevelFunction;
+
+  /// \sa shouldInlineLambdas
+  Optional<bool> InlineLambdas;
+
+  /// \sa shouldWidenLoops
+  Optional<bool> WidenLoops;
+
+  /// \sa shouldDisplayNotesAsEvents
+  Optional<bool> DisplayNotesAsEvents;
 
   /// A helper function that retrieves option for a given full-qualified
   /// checker name.
@@ -379,6 +401,20 @@ public:
   /// accepts the values "true" and "false".
   bool includeTemporaryDtorsInCFG();
 
+  /// Returns whether or not implicit destructors for C++ objects should
+  /// be included in the CFG.
+  ///
+  /// This is controlled by the 'cfg-implicit-dtors' config option, which
+  /// accepts the values "true" and "false".
+  bool includeImplicitDtorsInCFG();
+
+  /// Returns whether or not end-of-lifetime information should be included in
+  /// the CFG.
+  ///
+  /// This is controlled by the 'cfg-lifetime' config option, which accepts
+  /// the values "true" and "false".
+  bool includeLifetimeInCFG();
+
   /// Returns whether or not C++ standard library functions may be considered
   /// for inlining.
   ///
@@ -502,12 +538,35 @@ public:
   /// This is controlled by the 'max-times-inline-large' config option.
   unsigned getMaxTimesInlineLarge();
 
+  /// Returns the number of basic blocks a function needs to have to be
+  /// considered large for the 'max-times-inline-large' config option.
+  ///
+  /// This is controlled by the 'min-cfg-size-treat-functions-as-large' config
+  /// option.
+  unsigned getMinCFGSizeTreatFunctionsAsLarge();
+
   /// Returns the maximum number of nodes the analyzer can generate while
   /// exploring a top level function (for each exploded graph).
   /// 150000 is default; 0 means no limit.
   ///
   /// This is controlled by the 'max-nodes' config option.
   unsigned getMaxNodesPerTopLevelFunction();
+
+  /// Returns true if lambdas should be inlined. Otherwise a sink node will be
+  /// generated each time a LambdaExpr is visited.
+  bool shouldInlineLambdas();
+
+  /// Returns true if the analysis should try to widen loops.
+  /// This is controlled by the 'widen-loops' config option.
+  bool shouldWidenLoops();
+
+  /// Returns true if the bug reporter should transparently treat extra note
+  /// diagnostic pieces as event diagnostic pieces. Useful when the diagnostic
+  /// consumer doesn't support the extra note pieces.
+  ///
+  /// This is controlled by the 'extra-notes-as-events' option, which defaults
+  /// to false when unset.
+  bool shouldDisplayNotesAsEvents();
 
 public:
   AnalyzerOptions() :
@@ -517,6 +576,7 @@ public:
     AnalysisPurgeOpt(PurgeStmt),
     DisableAllChecks(0),
     ShowCheckerHelp(0),
+    ShowEnabledCheckerList(0),
     AnalyzeAll(0),
     AnalyzerDisplayProgress(0),
     AnalyzeNestedBlocks(0),

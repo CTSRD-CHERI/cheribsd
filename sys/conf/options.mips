@@ -29,24 +29,35 @@
 # $FreeBSD$
 
 CPU_MIPS4KC	opt_global.h
-CPU_MIPS24KC	opt_global.h
-CPU_MIPS74KC	opt_global.h
-CPU_MIPS1004KC	opt_global.h
+CPU_MIPS24K	opt_global.h
+CPU_MIPS34K	opt_global.h
+CPU_MIPS74K	opt_global.h
+CPU_MIPS1004K	opt_global.h
+CPU_MIPS1074K	opt_global.h
+CPU_INTERAPTIV	opt_global.h
+CPU_PROAPTIV	opt_global.h
 CPU_MIPS32	opt_global.h
 CPU_MIPS64	opt_global.h
 CPU_SENTRY5	opt_global.h
-CPU_HAVEFPU	opt_global.h
 CPU_SB1 	opt_global.h
 CPU_CNMIPS	opt_global.h
 CPU_RMI		opt_global.h
 CPU_NLM		opt_global.h
 CPU_BERI	opt_global.h
+CPU_XBURST	opt_global.h
+CPU_MALTA	opt_global.h
+
+MIPS_SHAREDPAGE	opt_global.h
 
 # which MACHINE_ARCH architecture
 MIPS
+MIPSHF
 MIPSEL
+MIPSELHF
 MIPS64
+MIPS64HF
 MIPS64EL
+MIPS64ELHF
 MIPSN32
 
 COMPAT_FREEBSD32	opt_compat.h
@@ -94,6 +105,11 @@ OCTEON_VENDOR_GEFES		opt_cvmx.h
 OCTEON_BOARD_CAPK_0100ND	opt_cvmx.h
 
 #
+# Options relating to Qemu-CHERI.
+#
+CPU_QEMU_MALTA			opt_global.h
+
+#
 # Options specific to the BERI and CHERI platform.
 #
 BERI_LARGE_TLB			opt_global.h
@@ -106,30 +122,18 @@ FDT_DTB_STATIC_ONLY		opt_platform.h
 CPU_CHERI	opt_global.h
 
 #
+# Access user space through kernel DDC (via legacy load/store instructions)
+#
+CHERI_IMPLICIT_USER_DDC	opt_global.h
+
+#
 # Experimental support for 128-bit capabilities.
 #
 CPU_CHERI128			opt_global.h
 
 #
-# Variations on hardware optimisation of CCall/CReturn.
+# Disable system-call authorisation for compartmentalised user code.
 #
-CPU_CHERI_HW_RCLEAR	opt_global.h
-CPU_CHERI_HW_CCLEAR	opt_global.h
-CPU_CHERI_HW_CCALL_CHECKS	opt_global.h
-
-#
-# Restricted CHERI register set sizes: These tell context save/restore
-# and ccall only to save a subset of the capability registers -- those
-# corresponding to the -cheri8 and -cheri16 llvm options. Data
-# structure sizes are not affected (yet).  CHERI0 saves no cheri
-# registers on context save. This is obviously unsafe but OK if user
-# space does not use capabilities and potentially useful as a
-# baseline.
-#
-CPU_CHERI_CHERI0	opt_global.h
-CPU_CHERI_CHERI8	opt_global.h
-CPU_CHERI_CHERI16	opt_global.h
-
 CPU_CHERI_NO_SYSCALL_AUTHORIZE opt_global.h
 
 #
@@ -168,6 +172,17 @@ AR71XX_ENV_ROUTERBOOT		opt_ar71xx.h
 AR71XX_ATH_EEPROM		opt_ar71xx.h
 
 #
+# Options for AR531X SOC. AR531X_1ST_GENERATION is AR5311 to AR5314.
+#
+
+AR531X_1ST_GENERATION		opt_ar531x.h
+AR531X_REALMEM			opt_ar531x.h
+AR531X_ENV_UBOOT		opt_ar531x.h
+AR531X_APB_DEBUG		opt_ar531x.h
+ARE_MDIO			opt_ar531x.h
+ARE_MII				opt_ar531x.h
+
+#
 # Options that control the Ralink RT305xF Etherenet MAC.
 #
 IF_RT_DEBUG			opt_if_rt.h
@@ -185,8 +200,15 @@ RT3050F				opt_rt305x.h
 RT305X				opt_rt305x.h
 RT305X_UBOOT			opt_rt305x.h
 RT305X_USE_UART			opt_rt305x.h
+RT_MDIO				opt_rt305x.h
 
 #
 # Options that affect the pmap.
 #
 PV_STATS		opt_pmap.h
+
+#
+# Options to use INTRNG code
+#
+INTRNG			opt_global.h
+MIPS_NIRQ		opt_global.h

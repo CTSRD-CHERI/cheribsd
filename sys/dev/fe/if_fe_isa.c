@@ -68,9 +68,6 @@ static driver_t fe_isa_driver = {
 	sizeof (struct fe_softc)
 };
 
-DRIVER_MODULE(fe, isa, fe_isa_driver, fe_devclass, 0, 0);
-
-
 static int fe_probe_ssi(device_t);
 static int fe_probe_jli(device_t);
 static int fe_probe_fmv(device_t);
@@ -364,7 +361,7 @@ fe_probe_fmv(device_t dev)
  *	u_short const * func (struct fe_softc * sc, u_char const * eeprom);
  *
  * where eeprom is a pointer to an array of 32 byte data read from the
- * config EEPROM on the board.  It retuns an IRQ mapping table for the
+ * config EEPROM on the board.  It returns an IRQ mapping table for the
  * board, when the corresponding implementation is detected.  It
  * returns a NULL otherwise.
  * 
@@ -1062,3 +1059,5 @@ fe_probe_ubn(device_t dev)
 
 	return 0;
 }
+
+DRIVER_MODULE(fe, isa, fe_isa_driver, fe_devclass, 0, 0);

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1994, Garrett Wollman
  *
  * Redistribution and use in source and binary forms, with or without
@@ -46,7 +48,7 @@ __FBSDID("$FreeBSD$");
 #include "nscache.h"
 #endif
 
-/* Network lookup order if nsswitch.conf is broken or nonexistant */
+/* Network lookup order if nsswitch.conf is broken or nonexistent */
 static const ns_src default_src[] = {
 	{ NSSRC_FILES, NS_SUCCESS },
 	{ NSSRC_DNS, NS_SUCCESS },
@@ -250,9 +252,9 @@ net_unmarshal_func(char *buffer, size_t buffer_size, void *retval, va_list ap,
 
 	orig_buf = (char *)_ALIGN(orig_buf);
 	memcpy(orig_buf, buffer + sizeof(struct netent) + sizeof(char *) +
-	    _ALIGN(p) - (size_t)p,
+	    (vaddr_t)_ALIGN(p) - (vaddr_t)p,
 	    buffer_size - sizeof(struct netent) - sizeof(char *) -
-	    _ALIGN(p) + (size_t)p);
+	    (vaddr_t)_ALIGN(p) + (vaddr_t)p);
 	p = (char *)_ALIGN(p);
 
 	NS_APPLY_OFFSET(ne->n_name, orig_buf, p, char *);

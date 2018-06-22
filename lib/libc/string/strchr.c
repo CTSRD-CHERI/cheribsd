@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -37,15 +39,15 @@ __FBSDID("$FreeBSD$");
 #include <string.h>
 #include "cheri_private.h"
 
-__CAPABILITY char *
-__CAPSUFFIX(strchr)(__CAPABILITY const char *p, int ch)
+char * __CAP
+__CAPSUFFIX(strchr)(const char * __CAP p, int ch)
 {
 	char c;
 
 	c = ch;
 	for (;; ++p) {
 		if (*p == c)
-			return ((__CAPABILITY char *)p);
+			return ((char * __CAP)p);
 		if (*p == '\0')
 			return (NULL);
 	}

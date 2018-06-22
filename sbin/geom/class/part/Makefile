@@ -1,6 +1,7 @@
 # $FreeBSD$
 
-.PATH: ${.CURDIR}/../../misc
+PACKAGE=runtime
+.PATH: ${.CURDIR:H:H}/misc
 
 GEOM_CLASS=	part
 

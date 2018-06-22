@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2015 Adrian Chadd <adrian@FreeBSD.org>.
  * All rights reserved.
  *
@@ -39,7 +41,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
-#if MAXMEMDOM > 1
+#ifdef VM_NUMA_ALLOC
 #include <sys/proc.h>
 #endif
 #include <sys/queue.h>
@@ -61,10 +63,122 @@ __FBSDID("$FreeBSD$");
 
 #include <vm/vm_domain.h>
 
+/*
+ * Default to first-touch + round-robin.
+ */
+static struct mtx vm_default_policy_mtx;
+MTX_SYSINIT(vm_default_policy, &vm_default_policy_mtx, "default policy mutex",
+    MTX_DEF);
+#ifdef VM_NUMA_ALLOC
+static struct vm_domain_policy vm_default_policy =
+    VM_DOMAIN_POLICY_STATIC_INITIALISER(VM_POLICY_FIRST_TOUCH_ROUND_ROBIN, 0);
+#else
+/* Use round-robin so the domain policy code will only try once per allocation */
+static struct vm_domain_policy vm_default_policy =
+    VM_DOMAIN_POLICY_STATIC_INITIALISER(VM_POLICY_ROUND_ROBIN, 0);
+#endif
+
+static int
+sysctl_vm_default_policy(SYSCTL_HANDLER_ARGS)
+{
+	char policy_name[32];
+	int error;
+
+	mtx_lock(&vm_default_policy_mtx);
+
+	/* Map policy to output string */
+	switch (vm_default_policy.p.policy) {
+	case VM_POLICY_FIRST_TOUCH:
+		strcpy(policy_name, "first-touch");
+		break;
+	case VM_POLICY_FIRST_TOUCH_ROUND_ROBIN:
+		strcpy(policy_name, "first-touch-rr");
+		break;
+	case VM_POLICY_ROUND_ROBIN:
+	default:
+		strcpy(policy_name, "rr");
+		break;
+	}
+	mtx_unlock(&vm_default_policy_mtx);
+
+	error = sysctl_handle_string(oidp, &policy_name[0],
+	    sizeof(policy_name), req);
+	if (error != 0 || req->newptr == NULL)
+		return (error);
+
+	mtx_lock(&vm_default_policy_mtx);
+	/* Set: match on the subset of policies that make sense as a default */
+	if (strcmp("first-touch-rr", policy_name) == 0) {
+		vm_domain_policy_set(&vm_default_policy,
+		    VM_POLICY_FIRST_TOUCH_ROUND_ROBIN, 0);
+	} else if (strcmp("first-touch", policy_name) == 0) {
+		vm_domain_policy_set(&vm_default_policy,
+		    VM_POLICY_FIRST_TOUCH, 0);
+	} else if (strcmp("rr", policy_name) == 0) {
+		vm_domain_policy_set(&vm_default_policy,
+		    VM_POLICY_ROUND_ROBIN, 0);
+	} else {
+		error = EINVAL;
+		goto finish;
+	}
+
+	error = 0;
+finish:
+	mtx_unlock(&vm_default_policy_mtx);
+	return (error);
+}
+
+SYSCTL_PROC(_vm, OID_AUTO, default_policy, CTLTYPE_STRING | CTLFLAG_RW,
+    0, 0, sysctl_vm_default_policy, "A",
+    "Default policy (rr, first-touch, first-touch-rr");
+
+/*
+ * Initialise a VM domain iterator.
+ *
+ * Check the thread policy, then the proc policy,
+ * then default to the system policy.
+ */
+void
+vm_policy_iterator_init(struct vm_domain_iterator *vi)
+{
+#ifdef VM_NUMA_ALLOC
+	struct vm_domain_policy lcl;
+#endif
+
+	vm_domain_iterator_init(vi);
+
+#ifdef VM_NUMA_ALLOC
+	/* Copy out the thread policy */
+	vm_domain_policy_localcopy(&lcl, &curthread->td_vm_dom_policy);
+	if (lcl.p.policy != VM_POLICY_NONE) {
+		/* Thread policy is present; use it */
+		vm_domain_iterator_set_policy(vi, &lcl);
+		return;
+	}
+
+	vm_domain_policy_localcopy(&lcl,
+	    &curthread->td_proc->p_vm_dom_policy);
+	if (lcl.p.policy != VM_POLICY_NONE) {
+		/* Process policy is present; use it */
+		vm_domain_iterator_set_policy(vi, &lcl);
+		return;
+	}
+#endif
+	/* Use system default policy */
+	vm_domain_iterator_set_policy(vi, &vm_default_policy);
+}
+
+void
+vm_policy_iterator_finish(struct vm_domain_iterator *vi)
+{
+
+	vm_domain_iterator_cleanup(vi);
+}
+
+#ifdef VM_NUMA_ALLOC
 static __inline int
 vm_domain_rr_selectdomain(int skip_domain)
 {
-#if MAXMEMDOM > 1
 	struct thread *td;
 
 	td = curthread;
@@ -82,10 +196,8 @@ vm_domain_rr_selectdomain(int skip_domain)
 		td->td_dom_rr_idx %= vm_ndomains;
 	}
 	return (td->td_dom_rr_idx);
-#else
-	return (0);
-#endif
 }
+#endif
 
 /*
  * This implements a very simple set of VM domain memory allocation
@@ -142,7 +254,6 @@ vm_domain_policy_localcopy(struct vm_domain_policy *dst,
 		*dst = *src;
 		if (seq_consistent(&src->seq, seq))
 			return;
-		cpu_spinwait();
 	}
 }
 
@@ -170,7 +281,6 @@ vm_domain_policy_copy(struct vm_domain_policy *dst,
 			seq_write_end(&dst->seq);
 			return;
 		}
-		cpu_spinwait();
 	}
 }
 
@@ -188,8 +298,13 @@ vm_domain_policy_validate(const struct vm_domain_policy *vp)
 		return (-1);
 	case VM_POLICY_FIXED_DOMAIN:
 	case VM_POLICY_FIXED_DOMAIN_ROUND_ROBIN:
+#ifdef VM_NUMA_ALLOC
 		if (vp->p.domain >= 0 && vp->p.domain < vm_ndomains)
 			return (0);
+#else
+		if (vp->p.domain == 0)
+			return (0);
+#endif
 		return (-1);
 	default:
 		return (-1);
@@ -221,6 +336,7 @@ vm_domain_iterator_set(struct vm_domain_iterator *vi,
     vm_domain_policy_type_t vt, int domain)
 {
 
+#ifdef VM_NUMA_ALLOC
 	switch (vt) {
 	case VM_POLICY_FIXED_DOMAIN:
 		vi->policy = VM_POLICY_FIXED_DOMAIN;
@@ -249,6 +365,10 @@ vm_domain_iterator_set(struct vm_domain_iterator *vi,
 		vi->n = vm_ndomains;
 		break;
 	}
+#else
+	vi->domain = 0;
+	vi->n = 1;
+#endif
 	return (0);
 }
 
@@ -259,6 +379,8 @@ static inline void
 _vm_domain_iterator_set_policy(struct vm_domain_iterator *vi,
     const struct vm_domain_policy *vt)
 {
+
+#ifdef VM_NUMA_ALLOC
 	/*
 	 * Initialise the iterator.
 	 *
@@ -300,6 +422,10 @@ _vm_domain_iterator_set_policy(struct vm_domain_iterator *vi,
 		vi->n = vm_ndomains;
 		break;
 	}
+#else
+	vi->domain = 0;
+	vi->n = 1;
+#endif
 }
 
 void
@@ -316,7 +442,6 @@ vm_domain_iterator_set_policy(struct vm_domain_iterator *vi,
 			_vm_domain_iterator_set_policy(vi, &vt_lcl);
 			return;
 		}
-		cpu_spinwait();
 	}
 }
 
@@ -334,6 +459,7 @@ vm_domain_iterator_run(struct vm_domain_iterator *vi, int *domain)
 	if (vi->n <= 0)
 		return (-1);
 
+#ifdef VM_NUMA_ALLOC
 	switch (vi->policy) {
 	case VM_POLICY_FIXED_DOMAIN:
 	case VM_POLICY_FIRST_TOUCH:
@@ -358,6 +484,10 @@ vm_domain_iterator_run(struct vm_domain_iterator *vi, int *domain)
 		vi->n--;
 		break;
 	}
+#else
+	*domain = 0;
+	vi->n--;
+#endif
 
 	return (0);
 }

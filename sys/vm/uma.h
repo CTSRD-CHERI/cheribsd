@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2002, 2003, 2004, 2005 Jeffrey Roberson <jeff@FreeBSD.org>
  * Copyright (c) 2004, 2005 Bosko Milekic <bmilekic@FreeBSD.org>
  * All rights reserved.
@@ -38,8 +40,9 @@
 
 #include <sys/param.h>		/* For NULL */
 #include <sys/malloc.h>		/* For M_* */
+
 #ifdef CPU_CHERI
-#include <machine/cheri.h>
+#include <cheri/cheri.h>
 #endif
 
 /* User visible parameters */
@@ -245,7 +248,7 @@ uma_zone_t uma_zcache_create(char *name, int size, uma_ctor ctor, uma_dtor dtor,
  * Definitions for uma_zcreate flags
  *
  * These flags share space with UMA_ZFLAGs in uma_int.h.  Be careful not to
- * overlap when adding new features.  0xf0000000 is in use by uma_int.h.
+ * overlap when adding new features.  0xff000000 is in use by uma_int.h.
  */
 #define UMA_ZONE_PAGEABLE	0x0001	/* Return items not fully backed by
 					   physical memory XXX Not yet */
@@ -265,7 +268,7 @@ uma_zone_t uma_zcache_create(char *name, int size, uma_ctor ctor, uma_dtor dtor,
 					 * information in the vm_page.
 					 */
 #define	UMA_ZONE_SECONDARY	0x0200	/* Zone is a Secondary Zone */
-#define	UMA_ZONE_REFCNT		0x0400	/* Allocate refcnts in slabs */
+/*				0x0400	   Unused */
 #define	UMA_ZONE_MAXBUCKET	0x0800	/* Use largest buckets */
 #define	UMA_ZONE_CACHESPREAD	0x1000	/*
 					 * Spread memory start locations across
@@ -279,7 +282,7 @@ uma_zone_t uma_zcache_create(char *name, int size, uma_ctor ctor, uma_dtor dtor,
 					 * mini-dumps.
 					 */
 #define	UMA_ZONE_PCPU		0x8000	/*
-					 * Allocates mp_ncpus slabs sized to
+					 * Allocates mp_maxid + 1 slabs sized to
 					 * sizeof(struct pcpu).
 					 */
 
@@ -290,19 +293,20 @@ uma_zone_t uma_zcache_create(char *name, int size, uma_ctor ctor, uma_dtor dtor,
  */
 #define	UMA_ZONE_INHERIT						\
     (UMA_ZONE_OFFPAGE | UMA_ZONE_MALLOC | UMA_ZONE_NOFREE |		\
-    UMA_ZONE_HASH | UMA_ZONE_REFCNT | UMA_ZONE_VTOSLAB | UMA_ZONE_PCPU)
+    UMA_ZONE_HASH | UMA_ZONE_VTOSLAB | UMA_ZONE_PCPU)
 
 /* Definitions for align */
-#ifndef CPU_CHERI
+#if !__has_feature(capabilities)
 #define UMA_ALIGN_PTR	(sizeof(void *) - 1)	/* Alignment fit for ptr */
 #else
-#define	UMA_ALIGN_PTR	(CHERICAP_SIZE - 1)
+#define	UMA_ALIGN_PTR	(sizeof(void * __capability) - 1)
 #endif
 #define UMA_ALIGN_LONG	(sizeof(long) - 1)	/* "" long */
 #define UMA_ALIGN_INT	(sizeof(int) - 1)	/* "" int */
 #define UMA_ALIGN_SHORT	(sizeof(short) - 1)	/* "" short */
 #define UMA_ALIGN_CHAR	(sizeof(char) - 1)	/* "" char */
 #define UMA_ALIGN_CACHE	(0 - 1)			/* Cache line size align */
+#define	UMA_ALIGNOF(type) (_Alignof(type) - 1)	/* Alignment fit for 'type' */
 
 /*
  * Destroys an empty uma zone.  If the zone is not empty uma complains loudly.
@@ -370,6 +374,11 @@ uma_zfree(uma_zone_t zone, void *item)
 {
 	uma_zfree_arg(zone, item, NULL);
 }
+
+/*
+ * Wait until the specified zone can allocate an item.
+ */
+void uma_zwait(uma_zone_t zone);
 
 /*
  * XXX The rest of the prototypes in this header are h0h0 magic for the VM.
@@ -537,7 +546,7 @@ void uma_zone_set_warning(uma_zone_t zone, const char *warning);
  * Returns:
  *	Nothing
  */
-typedef void (*uma_maxaction_t)(uma_zone_t);
+typedef void (*uma_maxaction_t)(uma_zone_t, int);
 void uma_zone_set_maxaction(uma_zone_t zone, uma_maxaction_t);
 
 /*
@@ -608,12 +617,11 @@ void uma_zone_set_freef(uma_zone_t zone, uma_free freef);
  * These flags are setable in the allocf and visible in the freef.
  */
 #define UMA_SLAB_BOOT	0x01		/* Slab alloced from boot pages */
-#define UMA_SLAB_KMEM	0x02		/* Slab alloced from kmem_map */
 #define UMA_SLAB_KERNEL	0x04		/* Slab alloced from kernel_map */
 #define UMA_SLAB_PRIV	0x08		/* Slab alloced from priv allocator */
 #define UMA_SLAB_OFFP	0x10		/* Slab is managed separately  */
 #define UMA_SLAB_MALLOC	0x20		/* Slab is a large malloc slab */
-/* 0x40 and 0x80 are available */
+/* 0x02, 0x40 and 0x80 are available */
 
 /*
  * Used to pre-fill a zone with some number of items
@@ -628,21 +636,6 @@ void uma_zone_set_freef(uma_zone_t zone, uma_free freef);
  * NOTE: This is blocking and should only be done at startup
  */
 void uma_prealloc(uma_zone_t zone, int itemcnt);
-
-/*
- * Used to lookup the reference counter allocated for an item
- * from a UMA_ZONE_REFCNT zone.  For UMA_ZONE_REFCNT zones,
- * reference counters are allocated for items and stored in
- * the underlying slab header.
- *
- * Arguments:
- *	zone  The UMA_ZONE_REFCNT zone to which the item belongs.
- *	item  The address of the item for which we want a refcnt.
- *
- * Returns:
- *	A pointer to a uint32_t reference counter.
- */
-uint32_t *uma_find_refcnt(uma_zone_t zone, void *item);
 
 /*
  * Used to determine if a fixed-size zone is exhausted.

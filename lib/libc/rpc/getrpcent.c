@@ -1,6 +1,8 @@
 /*	$NetBSD: getrpcent.c,v 1.17 2000/01/22 22:19:17 mycroft Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2009, Sun Microsystems, Inc.
  * All rights reserved.
  *
@@ -39,7 +41,6 @@ __FBSDID("$FreeBSD$");
  */
 
 #include <sys/param.h>
-#include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <assert.h>
@@ -512,6 +513,7 @@ nis_rpcent(void *retval, void *mdata, va_list ap)
 		    sizeof(char *)) {
 			*errnop = ERANGE;
 			rv = NS_RETURN;
+			free(resultbuf);
 			break;
 		}
 
@@ -521,6 +523,7 @@ nis_rpcent(void *retval, void *mdata, va_list ap)
 		if (aliases_size < 1) {
 			*errnop = ERANGE;
 			rv = NS_RETURN;
+			free(resultbuf);
 			break;
 		}
 
@@ -773,9 +776,9 @@ rpc_unmarshal_func(char *buffer, size_t buffer_size, void *retval, va_list ap,
 
 	orig_buf = (char *)_ALIGN(orig_buf);
 	memcpy(orig_buf, buffer + sizeof(struct rpcent) + sizeof(char *) +
-	    _ALIGN(p) - (size_t)p,
+	    (vaddr_t)_ALIGN(p) - (vaddr_t)p,
 	    buffer_size - sizeof(struct rpcent) - sizeof(char *) -
-	    _ALIGN(p) + (size_t)p);
+	    (vaddr_t)_ALIGN(p) + (vaddr_t)p);
 	p = (char *)_ALIGN(p);
 
 	NS_APPLY_OFFSET(rpc->r_name, orig_buf, p, char *);
@@ -969,7 +972,7 @@ getrpc(int (*fn)(union key, struct rpcent *, char *, size_t, struct rpcent **),
 }
 
 struct rpcent *
-getrpcbyname(char *name)
+getrpcbyname(const char *name)
 {
 	union key key;
 

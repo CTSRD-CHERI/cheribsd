@@ -1,6 +1,8 @@
 /*	$OpenBSD: pio.h,v 1.2 1998/09/15 10:50:12 pefo Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD AND BSD-4-Clause
+ *
  * Copyright (c) 2002-2004 Juli Mallett.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -167,6 +169,9 @@ MIPS_RW64_COP0_SEL(cvmmemctl, MIPS_COP_0_COMPARE, 7);
 MIPS_RW64_COP0_SEL(icache_err, MIPS_COP_0_CACHE_ERR, 0);
 MIPS_RW64_COP0_SEL(dcache_err, MIPS_COP_0_CACHE_ERR, 1);
 #endif
+#ifdef CPU_QEMU_MALTA
+MIPS_RW64_COP0_SEL(qemurtc64, MIPS_COP_0_COUNT, 6);
+#endif
 #endif
 #if defined(__mips_n64) || defined(__mips_n32) /* PHYSADDR_64_BIT */
 MIPS_RW64_COP0(entrylo0, MIPS_COP_0_TLB_LO0);
@@ -249,7 +254,8 @@ MIPS_RW32_COP0_SEL(config5, MIPS_COP_0_CONFIG, 5);
 #if defined(CPU_NLM) || defined(BERI_LARGE_TLB)
 MIPS_RW32_COP0_SEL(config6, MIPS_COP_0_CONFIG, 6);
 #endif
-#if defined(CPU_NLM) || defined(CPU_MIPS1004KC)
+#if defined(CPU_NLM) || defined(CPU_MIPS1004K) || defined (CPU_MIPS74K) || \
+    defined(CPU_MIPS24K)
 MIPS_RW32_COP0_SEL(config7, MIPS_COP_0_CONFIG, 7);
 #endif
 MIPS_RW32_COP0(count, MIPS_COP_0_COUNT);
@@ -280,6 +286,22 @@ MIPS_RW32_COP0_SEL(cinfo, MIPS_COP_0_PRID, 6);
 MIPS_RW32_COP0_SEL(tinfo, MIPS_COP_0_PRID, 7);
 /* XXX 64-bit?  */
 MIPS_RW32_COP0_SEL(ebase, MIPS_COP_0_PRID, 1);
+
+#if defined(CPU_MIPS24K) || defined(CPU_MIPS34K) ||		\
+    defined(CPU_MIPS74K) || defined(CPU_MIPS1004K)  ||	\
+    defined(CPU_MIPS1074K) || defined(CPU_INTERAPTIV) ||	\
+    defined(CPU_PROAPTIV)
+/* MIPS32/64 r2 intctl */
+MIPS_RW32_COP0_SEL(intctl, MIPS_COP_0_INTCTL, 1);
+#endif
+
+#ifdef CPU_XBURST
+MIPS_RW32_COP0_SEL(xburst_mbox0, MIPS_COP_0_XBURST_MBOX, 0);
+MIPS_RW32_COP0_SEL(xburst_mbox1, MIPS_COP_0_XBURST_MBOX, 1);
+MIPS_RW32_COP0_SEL(xburst_core_ctl, MIPS_COP_0_XBURST_C12, 2);
+MIPS_RW32_COP0_SEL(xburst_core_sts, MIPS_COP_0_XBURST_C12, 3);
+MIPS_RW32_COP0_SEL(xburst_reim, MIPS_COP_0_XBURST_C12, 4);
+#endif
 MIPS_RW32_COP0(watchlo, MIPS_COP_0_WATCH_LO);
 MIPS_RW32_COP0_SEL(watchlo1, MIPS_COP_0_WATCH_LO, 1);
 MIPS_RW32_COP0_SEL(watchlo2, MIPS_COP_0_WATCH_LO, 2);

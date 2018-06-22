@@ -12,14 +12,14 @@
 
 # libcheri
 LIB=		c_cheri
-SRCS=		cheri_clock_gettime.c	\
-		cheri_invoke_cabi.S	\
+SRCS=		\
 		cheri_printf.c		\
 		cheri_put.c		\
 		cheri_raise.c		\
 		cheri_stdio.c		\
 		cheri_stub.c		\
 		heap.c			\
+		libcheri_invoke_cabi.S	\
 		malloc.c
 
 CFLAGS.malloc.c=	-Wno-cast-align
@@ -31,7 +31,7 @@ CFLAGS+=	-I${.CURDIR}/../libc/include \
 		-I${.CURDIR}/../libmalloc_simple \
 		-I${.CURDIR}/../../contrib/gdtoa \
 		-I${.CURDIR}/../../contrib/tzcode/stdtime \
-		-mxgot
+		-mxgot -mllvm -mxmxgot
 
 # libc/gdtoa
 CFLAGS.misc.c=	-Wno-sign-compare
@@ -44,6 +44,7 @@ SRCS+=		assert.c		\
 		getprogname.c		\
 		errlst.c		\
 		errno.c			\
+		sigsetops.c		\
 		setprogname.c		\
 		_once_stub.c		\
 		_pthread_stubs.c
@@ -107,6 +108,7 @@ SRCS+=		regcomp.c		\
 # libc/stdlib
 SRCS+=		atoi.c			\
 		abs.c			\
+		abort.c			\
 		llabs.c			\
 		heapsort.c		\
 		qsort.c 		\
@@ -127,7 +129,7 @@ SRCS+=		bcopy.S			\
 		memcmp.c		\
 		memcmp_c.c		\
 		memcpy.c		\
-		memcpy_c.S		\
+		memcpy_c.c		\
 		memcpy_c_tofrom.c	\
 		memset.c		\
 		memset_c.c		\
@@ -244,8 +246,8 @@ SRCS+=	gedf2.c				\
 CFLAGS.subr_scanf.c=	-Wno-sign-compare
 SRCS+=		subr_scanf.c
 
-# CHERI system classes
-SRCS+=		cheri_system_stub.c
+# libcheri system classes
+SRCS+=		libcheri_system_stub.c
 
 # Pull in ../Makefile.inc to define SHLIB_MAJOR so we can undef it.
 .include <bsd.init.mk>
@@ -259,7 +261,7 @@ WARNS?= 2
 
 NO_WERROR=	yes
 
-CLEANFILES=	cheri_invoke.o
+CLEANFILES=	libcheri_invoke.o
 
 LIBC_DIR=${.CURDIR}/../libc
 LIBCHERI_DIR=${.CURDIR}/../libcheri

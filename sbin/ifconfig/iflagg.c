@@ -200,23 +200,16 @@ static void
 lagg_status(int s)
 {
 	struct lagg_protos lpr[] = LAGG_PROTOS;
-	struct lagg_reqport rp, rpbuf[LAGG_MAX_PORTS];
+	struct lagg_reqport rpbuf[LAGG_MAX_PORTS];
 	struct lagg_reqall ra;
 	struct lagg_reqopts ro;
 	struct lagg_reqflags rf;
 	struct lacp_opreq *lp;
 	const char *proto = "<unknown>";
-	int i, isport = 0;
+	int i;
 
-	bzero(&rp, sizeof(rp));
 	bzero(&ra, sizeof(ra));
 	bzero(&ro, sizeof(ro));
-
-	strlcpy(rp.rp_ifname, name, sizeof(rp.rp_ifname));
-	strlcpy(rp.rp_portname, name, sizeof(rp.rp_portname));
-
-	if (ioctl(s, SIOCGLAGGPORT, &rp) == 0)
-		isport = 1;
 
 	strlcpy(ra.ra_ifname, name, sizeof(ra.ra_ifname));
 	ra.ra_size = sizeof(rpbuf);
@@ -257,8 +250,6 @@ lagg_status(int s)
 				sep = ",";
 			}
 		}
-		if (isport)
-			printf(" laggdev %s", rp.rp_ifname);
 		putchar('\n');
 		if (verbose) {
 			printf("\tlagg options:\n");
@@ -291,7 +282,7 @@ lagg_status(int s)
 
 		if (0 /* XXX */) {
 			printf("\tsupported aggregation protocols:\n");
-			for (i = 0; i < (sizeof(lpr) / sizeof(lpr[0])); i++)
+			for (i = 0; i < nitems(lpr); i++)
 				printf("\t\tlaggproto %s\n", lpr[i].lpr_name);
 		}
 	}

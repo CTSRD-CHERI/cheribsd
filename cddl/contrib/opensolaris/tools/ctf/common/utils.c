@@ -20,6 +20,15 @@
  * CDDL HEADER END
  */
 /*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [],
+ *   "change_comment": "duplicate definition of vwarn()"
+ * }
+ * CHERI CHANGES END
+ */
+/*
  * Copyright (c) 1998-2001 by Sun Microsystems, Inc.
  * All rights reserved.
  */
@@ -60,6 +69,7 @@ getpname(void)
 	return (pname);
 }
 
+#if 0
 void
 vwarn(const char *format, va_list alist)
 {
@@ -84,6 +94,7 @@ warn(const char *format, ...)
 	vwarn(format, alist);
 	va_end(alist);
 }
+#endif
 
 void
 vdie(const char *format, va_list alist)

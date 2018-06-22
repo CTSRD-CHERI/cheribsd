@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1980, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -111,11 +113,11 @@ open_makefile_template(void)
 
 	snprintf(line, sizeof(line), "../../conf/Makefile.%s", machinename);
 	ifp = fopen(line, "r");
-	if (ifp == 0) {
+	if (ifp == NULL) {
 		snprintf(line, sizeof(line), "Makefile.%s", machinename);
 		ifp = fopen(line, "r");
 	}
-	if (ifp == 0)
+	if (ifp == NULL)
 		err(1, "%s", line);
 	return (ifp);
 }
@@ -133,7 +135,7 @@ makefile(void)
 	read_files();
 	ifp = open_makefile_template();
 	ofp = fopen(path("Makefile.new"), "w");
-	if (ofp == 0)
+	if (ofp == NULL)
 		err(1, "%s", path("Makefile.new"));
 	fprintf(ofp, "KERN_IDENT=%s\n", ident);
 	fprintf(ofp, "MACHINE=%s\n", machinename);
@@ -313,7 +315,7 @@ read_file(char *fname)
 	    imp_rule, no_obj, before_depend, nowerror;
 
 	fp = fopen(fname, "r");
-	if (fp == 0)
+	if (fp == NULL)
 		err(1, "%s", fname);
 next:
 	/*
@@ -330,7 +332,7 @@ next:
 		(void) fclose(fp);
 		return;
 	} 
-	if (wd == 0)
+	if (wd == NULL)
 		goto next;
 	if (wd[0] == '#')
 	{
@@ -340,7 +342,7 @@ next:
 	}
 	if (eq(wd, "include")) {
 		wd = get_quoted_word(fp);
-		if (wd == (char *)EOF || wd == 0)
+		if (wd == (char *)EOF || wd == NULL)
 			errout("%s: missing include filename.\n", fname);
 		(void) snprintf(ifname, sizeof(ifname), "../../%s", wd);
 		read_file(ifname);
@@ -352,7 +354,7 @@ next:
 	wd = get_word(fp);
 	if (wd == (char *)EOF)
 		return;
-	if (wd == 0)
+	if (wd == NULL)
 		errout("%s: No type for %s.\n", fname, this);
 	tp = fl_lookup(this);
 	compile = 0;
@@ -396,7 +398,7 @@ next:
 			continue;
 		}
 		if (eq(wd, "no-implicit-rule")) {
-			if (compilewith == 0)
+			if (compilewith == NULL)
 				errout("%s: alternate rule required when "
 				       "\"no-implicit-rule\" is specified for"
 				       " %s.\n",
@@ -410,7 +412,7 @@ next:
 		}
 		if (eq(wd, "dependency")) {
 			wd = get_quoted_word(fp);
-			if (wd == (char *)EOF || wd == 0)
+			if (wd == (char *)EOF || wd == NULL)
 				errout("%s: %s missing dependency string.\n",
 				       fname, this);
 			depends = ns(wd);
@@ -418,7 +420,7 @@ next:
 		}
 		if (eq(wd, "clean")) {
 			wd = get_quoted_word(fp);
-			if (wd == (char *)EOF || wd == 0)
+			if (wd == (char *)EOF || wd == NULL)
 				errout("%s: %s missing clean file list.\n",
 				       fname, this);
 			clean = ns(wd);
@@ -426,7 +428,7 @@ next:
 		}
 		if (eq(wd, "compile-with")) {
 			wd = get_quoted_word(fp);
-			if (wd == (char *)EOF || wd == 0)
+			if (wd == (char *)EOF || wd == NULL)
 				errout("%s: %s missing compile command string.\n",
 				       fname, this);
 			compilewith = ns(wd);
@@ -434,7 +436,7 @@ next:
 		}
 		if (eq(wd, "warning")) {
 			wd = get_quoted_word(fp);
-			if (wd == (char *)EOF || wd == 0)
+			if (wd == (char *)EOF || wd == NULL)
 				errout("%s: %s missing warning text string.\n",
 				       fname, this);
 			warning = ns(wd);
@@ -442,7 +444,7 @@ next:
 		}
 		if (eq(wd, "obj-prefix")) {
 			wd = get_quoted_word(fp);
-			if (wd == (char *)EOF || wd == 0)
+			if (wd == (char *)EOF || wd == NULL)
 				errout("%s: %s missing object prefix string.\n",
 				       fname, this);
 			objprefix = ns(wd);
@@ -496,6 +498,10 @@ nextparam:;
 		tp = new_fent();
 		tp->f_fn = this;
 		tp->f_type = filetype;
+		if (filetype == LOCAL)
+			tp->f_srcprefix = "";
+		else
+			tp->f_srcprefix = "$S/";
 		if (imp_rule)
 			tp->f_flags |= NO_IMPLCT_RULE;
 		if (no_obj)
@@ -571,7 +577,8 @@ do_before_depend(FILE *fp)
 			if (tp->f_flags & NO_IMPLCT_RULE)
 				fprintf(fp, "%s ", tp->f_fn);
 			else
-				fprintf(fp, "$S/%s ", tp->f_fn);
+				fprintf(fp, "%s%s ", tp->f_srcprefix,
+				    tp->f_fn);
 			lpos += len + 1;
 		}
 	if (lpos != 8)
@@ -636,10 +643,7 @@ do_xxfiles(char *tag, FILE *fp)
 				lpos = 8;
 				fputs("\\\n\t", fp);
 			}
-			if (tp->f_type != LOCAL)
-				fprintf(fp, "$S/%s ", tp->f_fn);
-			else
-				fprintf(fp, "%s ", tp->f_fn);
+			fprintf(fp, "%s%s ", tp->f_srcprefix, tp->f_fn);
 			lpos += len + 1;
 		}
 	free(suff);
@@ -653,7 +657,7 @@ tail(char *fn)
 	char *cp;
 
 	cp = strrchr(fn, '/');
-	if (cp == 0)
+	if (cp == NULL)
 		return (fn);
 	return (cp+1);
 }
@@ -685,29 +689,25 @@ do_rules(FILE *f)
 		else {
 			*cp = '\0';
 			if (och == 'o') {
-				fprintf(f, "%s%so:\n\t-cp $S/%so .\n\n",
-					ftp->f_objprefix, tail(np), np);
+				fprintf(f, "%s%so:\n\t-cp %s%so .\n\n",
+					ftp->f_objprefix, tail(np),
+					ftp->f_srcprefix, np);
 				continue;
 			}
 			if (ftp->f_depends) {
-				fprintf(f, "%s%sln: $S/%s%c %s\n",
-					ftp->f_objprefix, tail(np), np, och,
-					ftp->f_depends);
-				fprintf(f, "\t${NORMAL_LINT}\n\n");
-				fprintf(f, "%s%so: $S/%s%c %s\n",
-					ftp->f_objprefix, tail(np), np, och,
+				fprintf(f, "%s%so: %s%s%c %s\n",
+					ftp->f_objprefix, tail(np),
+					ftp->f_srcprefix, np, och,
 					ftp->f_depends);
 			}
 			else {
-				fprintf(f, "%s%sln: $S/%s%c\n",
-					ftp->f_objprefix, tail(np), np, och);
-				fprintf(f, "\t${NORMAL_LINT}\n\n");
-				fprintf(f, "%s%so: $S/%s%c\n",
-					ftp->f_objprefix, tail(np), np, och);
+				fprintf(f, "%s%so: %s%s%c\n",
+					ftp->f_objprefix, tail(np),
+					ftp->f_srcprefix, np, och);
 			}
 		}
 		compilewith = ftp->f_compilewith;
-		if (compilewith == 0) {
+		if (compilewith == NULL) {
 			const char *ftype = NULL;
 
 			switch (ftp->f_type) {
@@ -732,7 +732,8 @@ do_rules(FILE *f)
 		}
 		*cp = och;
 		if (strlen(ftp->f_objprefix))
-			fprintf(f, "\t%s $S/%s\n", compilewith, np);
+			fprintf(f, "\t%s %s%s\n", compilewith,
+			    ftp->f_srcprefix, np);
 		else
 			fprintf(f, "\t%s\n", compilewith);
 

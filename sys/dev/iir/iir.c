@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  *       Copyright (c) 2000-04 ICP vortex GmbH
  *       Copyright (c) 2002-04 Intel Corporation
  *       Copyright (c) 2003-04 Adaptec Inc.
@@ -30,7 +32,7 @@
  */
 
 /*
- * iir.c: SCSI dependant code for the Intel Integrated RAID Controller driver
+ * iir.c: SCSI dependent code for the Intel Integrated RAID Controller driver
  *
  * Written by: Achim Leubner <achim_leubner@adaptec.com>
  * Fixes/Additions: Boji Tony Kannanthanam <boji.t.kannanthanam@intel.com>
@@ -744,9 +746,9 @@ gdt_next(struct gdt_softc *gdt)
                                   ccb->ccb_h.flags));
         csio = &ccb->csio;
         ccbh = &ccb->ccb_h;
-        cmd  = csio->cdb_io.cdb_bytes[0];
-        /* Max CDB length is 12 bytes */
-        if (csio->cdb_len > 12) { 
+        cmd  = scsiio_cdb_ptr(csio)[0];
+        /* Max CDB length is 12 bytes, can't be phys addr */
+        if (csio->cdb_len > 12 || (ccbh->flags & CAM_CDB_PHYS)) { 
             ccbh->status = CAM_REQ_INVALID;
             --gdt_stat.io_count_act;
             xpt_done(ccb);
@@ -1366,12 +1368,12 @@ iir_action( struct cam_sim *sim, union ccb *ccb )
               cpi->initiator_id = 
                   (bus == gdt->sc_virt_bus ? 127 : gdt->sc_bus_id[bus]);
               cpi->base_transfer_speed = 3300;
-              strncpy(cpi->sim_vid, "FreeBSD", SIM_IDLEN);
+              strlcpy(cpi->sim_vid, "FreeBSD", SIM_IDLEN);
               if (gdt->sc_vendor == INTEL_VENDOR_ID_IIR)
-                  strncpy(cpi->hba_vid, "Intel Corp.", HBA_IDLEN);
+                  strlcpy(cpi->hba_vid, "Intel Corp.", HBA_IDLEN);
               else
-                  strncpy(cpi->hba_vid, "ICP vortex ", HBA_IDLEN);
-              strncpy(cpi->dev_name, cam_sim_name(sim), DEV_IDLEN);
+                  strlcpy(cpi->hba_vid, "ICP vortex ", HBA_IDLEN);
+              strlcpy(cpi->dev_name, cam_sim_name(sim), DEV_IDLEN);
               cpi->transport = XPORT_SPI;
               cpi->transport_version = 2;
               cpi->protocol = PROTO_SCSI;

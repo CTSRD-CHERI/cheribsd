@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2012 Oleksandr Tymoshenko <gonzo@freebsd.org>
  * All rights reserved.
  *
@@ -41,7 +43,6 @@ __FBSDID("$FreeBSD$");
 #include <vm/pmap.h>
 
 #include <dev/fb/fbreg.h>
-#include <dev/fdt/fdt_common.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 #include <dev/syscons/syscons.h>
@@ -111,6 +112,12 @@ struct bcmsc_softc {
 
 static struct bcmsc_softc bcmsc;
 
+static struct ofw_compat_data compat_data[] = {
+	{"broadcom,bcm2835-fb",		1},
+	{"brcm,bcm2708-fb",		1},
+	{NULL,				0}
+};
+
 static int bcm_fb_probe(device_t);
 static int bcm_fb_attach(device_t);
 static void bcmfb_update_margins(video_adapter_t *adp);
@@ -121,8 +128,9 @@ bcm_fb_probe(device_t dev)
 {
 	int error;
 
-	if (!ofw_bus_is_compatible(dev, "broadcom,bcm2835-fb"))
+	if (ofw_bus_search_compatible(dev, compat_data)->ocd_data == 0)
 		return (ENXIO);
+
 	device_set_desc(dev, "BCM2835 framebuffer device");
 	error = sc_probe_unit(device_get_unit(dev), 
 	    device_get_flags(dev) | SC_AUTODETECT_KBD);
@@ -146,10 +154,13 @@ bcm_fb_attach(device_t dev)
 		sc = device_get_softc(dev);
 
 	memset(&fb, 0, sizeof(fb));
-	if (bcm2835_mbox_fb_get_w_h(dev, &fb) != 0)
+	if (bcm2835_mbox_fb_get_w_h(&fb) != 0)
 		return (ENXIO);
 	fb.bpp = FB_DEPTH;
-	if (bcm2835_mbox_fb_init(dev, &fb) != 0)
+	fb.vxres = fb.xres;
+	fb.vyres = fb.yres;
+	fb.xoffset = fb.yoffset = 0;
+	if (bcm2835_mbox_fb_init(&fb) != 0)
 		return (ENXIO);
 
 	sc->fb_addr = (intptr_t)pmap_mapdev(fb.base, fb.size);
@@ -193,6 +204,7 @@ static driver_t bcm_fb_driver = {
 };
 
 DRIVER_MODULE(bcm2835fb, ofwbus, bcm_fb_driver, bcm_fb_devclass, 0, 0);
+DRIVER_MODULE(bcm2835fb, simplebus, bcm_fb_driver, bcm_fb_devclass, 0, 0);
 
 /*
  * Video driver routines and glue.
@@ -463,15 +475,15 @@ bcmfb_configure(int flags)
 	if ((root != 0) && 
 	    (display = fdt_find_compatible(root, "broadcom,bcm2835-fb", 1))) {
 		if (sc->width == 0) {
-			if ((OF_getprop(display, "broadcom,width", 
+			if ((OF_getencprop(display, "broadcom,width",
 			    &cell, sizeof(cell))) > 0)
-				sc->width = (int)fdt32_to_cpu(cell);
+				sc->width = cell;
 		}
 
 		if (sc->height == 0) {
-			if ((OF_getprop(display, "broadcom,height", 
+			if ((OF_getencprop(display, "broadcom,height", 
 			    &cell, sizeof(cell))) > 0)
-				sc->height = (int)fdt32_to_cpu(cell);
+				sc->height = cell;
 		}
 	}
 

@@ -1,11 +1,9 @@
-#
 # $FreeBSD$
-#
-.PATH: ${.CURDIR}/../..
+
+.PATH: ${.CURDIR}/../.. ${.CURDIR}/../../../man
+
 PROG=	mckey
-MAN=
+MAN=	mckey.1
 SRCS=	mckey.c
-LDADD+= -libverbs -lrdmacm -lpthread
-LDADD+= -lmlx4
 
 .include <bsd.prog.mk>

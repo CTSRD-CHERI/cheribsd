@@ -1,4 +1,4 @@
-/*	$OpenBSD: bcode.c,v 1.45 2012/11/07 11:06:14 otto Exp $	*/
+/*	$OpenBSD: bcode.c,v 1.46 2014/10/08 03:59:56 doug Exp $	*/
 
 /*
  * Copyright (c) 2003, Otto Moerbeek <otto@drijf.net>
@@ -58,7 +58,6 @@ static __inline void	 unreadch(void);
 static __inline char	*readline(void);
 static __inline void	 src_free(void);
 
-static __inline u_int	 max(u_int, u_int);
 static u_long		 get_ulong(struct number *);
 
 static __inline void	 push_number(struct number *);
@@ -69,6 +68,7 @@ static __inline struct number	*pop_number(void);
 static __inline char	*pop_string(void);
 static __inline void	 clear_stack(void);
 static __inline void	 print_tos(void);
+static void		 print_err(void);
 static void		 pop_print(void);
 static void		 pop_printn(void);
 static __inline void	 print_stack(void);
@@ -198,6 +198,7 @@ static const struct jump_entry jump_table_data[] = {
 	{ 'a',	to_ascii	},
 	{ 'c',	clear_stack	},
 	{ 'd',	dup		},
+	{ 'e',	print_err	},
 	{ 'f',	print_stack	},
 	{ 'i',	set_ibase	},
 	{ 'k',	set_scale	},
@@ -324,18 +325,12 @@ pbn(const char *str, const BIGNUM *n)
 
 #endif
 
-static __inline u_int
-max(u_int a, u_int b)
-{
-
-	return (a > b ? a : b);
-}
-
 static unsigned long factors[] = {
 	0, 10, 100, 1000, 10000, 100000, 1000000, 10000000,
 	100000000, 1000000000
 };
 
+/* Multiply n by 10^s */
 void
 scale_number(BIGNUM *n, int s)
 {
@@ -409,6 +404,7 @@ split_number(const struct number *n, BIGNUM *i, BIGNUM *f)
 	}
 }
 
+/* Change the scale of n to s.  Reducing scale may truncate the mantissa */
 void
 normalize(struct number *n, u_int s)
 {
@@ -502,6 +498,18 @@ print_tos(void)
 	if (value != NULL) {
 		print_value(stdout, value, "", bmachine.obase);
 		putchar('\n');
+	}
+	else
+		warnx("stack empty");
+}
+
+static void
+print_err(void)
+{
+	struct value *value = tos();
+	if (value != NULL) {
+		print_value(stderr, value, "", bmachine.obase);
+		(void)putc('\n', stderr);
 	}
 	else
 		warnx("stack empty");
@@ -960,9 +968,8 @@ badd(void)
 	struct number	*a, *b, *r;
 
 	a = pop_number();
-	if (a == NULL) {
+	if (a == NULL)
 		return;
-	}
 	b = pop_number();
 	if (b == NULL) {
 		push_number(a);
@@ -987,9 +994,8 @@ bsub(void)
 	struct number	*a, *b, *r;
 
 	a = pop_number();
-	if (a == NULL) {
+	if (a == NULL)
 		return;
-	}
 	b = pop_number();
 	if (b == NULL) {
 		push_number(a);
@@ -1035,9 +1041,8 @@ bmul(void)
 	struct number *a, *b, *r;
 
 	a = pop_number();
-	if (a == NULL) {
+	if (a == NULL)
 		return;
-	}
 	b = pop_number();
 	if (b == NULL) {
 		push_number(a);
@@ -1056,34 +1061,18 @@ static void
 bdiv(void)
 {
 	struct number *a, *b, *r;
-	BN_CTX *ctx;
-	u_int scale;
 
 	a = pop_number();
-	if (a == NULL) {
+	if (a == NULL)
 		return;
-	}
 	b = pop_number();
 	if (b == NULL) {
 		push_number(a);
 		return;
 	}
 
-	r = new_number();
-	r->scale = bmachine.scale;
-	scale = max(a->scale, b->scale);
+	r = div_number(b, a, bmachine.scale);
 
-	if (BN_is_zero(a->number))
-		warnx("divide by zero");
-	else {
-		normalize(a, scale);
-		normalize(b, scale + r->scale);
-
-		ctx = BN_CTX_new();
-		bn_checkp(ctx);
-		bn_check(BN_div(r->number, NULL, b->number, a->number, ctx));
-		BN_CTX_free(ctx);
-	}
 	push_number(r);
 	free_number(a);
 	free_number(b);
@@ -1097,9 +1086,8 @@ bmod(void)
 	u_int scale;
 
 	a = pop_number();
-	if (a == NULL) {
+	if (a == NULL)
 		return;
-	}
 	b = pop_number();
 	if (b == NULL) {
 		push_number(a);
@@ -1108,13 +1096,13 @@ bmod(void)
 
 	r = new_number();
 	scale = max(a->scale, b->scale);
-	r->scale = max(b->scale, a->scale + bmachine.scale);
+	r->scale = scale;
 
 	if (BN_is_zero(a->number))
 		warnx("remainder by zero");
 	else {
 		normalize(a, scale);
-		normalize(b, scale + bmachine.scale);
+		normalize(b, scale);
 
 		ctx = BN_CTX_new();
 		bn_checkp(ctx);
@@ -1129,14 +1117,13 @@ bmod(void)
 static void
 bdivmod(void)
 {
-	struct number *a, *b, *rdiv, *rmod;
+	struct number *a, *b, *frac, *quotient, *rdiv, *remainder;
 	BN_CTX *ctx;
 	u_int scale;
 
 	a = pop_number();
-	if (a == NULL) {
+	if (a == NULL)
 		return;
-	}
 	b = pop_number();
 	if (b == NULL) {
 		push_number(a);
@@ -1144,25 +1131,44 @@ bdivmod(void)
 	}
 
 	rdiv = new_number();
-	rmod = new_number();
-	rdiv->scale = bmachine.scale;
-	rmod->scale = max(b->scale, a->scale + bmachine.scale);
+	quotient = new_number();
+	remainder = new_number();
+	scale = max(a->scale, b->scale);
+	rdiv->scale = 0;
+	remainder->scale = scale;
+	quotient->scale = bmachine.scale;
 	scale = max(a->scale, b->scale);
 
 	if (BN_is_zero(a->number))
 		warnx("divide by zero");
 	else {
 		normalize(a, scale);
-		normalize(b, scale + bmachine.scale);
+		normalize(b, scale);
 
 		ctx = BN_CTX_new();
 		bn_checkp(ctx);
-		bn_check(BN_div(rdiv->number, rmod->number,
+		/*
+		 * Unlike other languages' divmod operations, dc is specified
+		 * to return the remainder and the full quotient, rather than
+		 * the remainder and the floored quotient.  bn(3) has no
+		 * function to calculate both.  So we'll use BN_div to get the
+		 * remainder and floored quotient, then calculate the full
+		 * quotient from those.
+		 *
+		 * quotient = rdiv + remainder / divisor
+		 */
+		bn_check(BN_div(rdiv->number, remainder->number,
 		    b->number, a->number, ctx));
+		frac = div_number(remainder, a, bmachine.scale);
+		normalize(rdiv, bmachine.scale);
+		normalize(remainder, scale);
+		bn_check(BN_add(quotient->number, rdiv->number, frac->number));
+		free_number(frac);
 		BN_CTX_free(ctx);
 	}
-	push_number(rdiv);
-	push_number(rmod);
+	push_number(quotient);
+	push_number(remainder);
+	free_number(rdiv);
 	free_number(a);
 	free_number(b);
 }
@@ -1176,9 +1182,8 @@ bexp(void)
 	u_int		rscale;
 
 	p = pop_number();
-	if (p == NULL) {
+	if (p == NULL)
 		return;
-	}
 	a = pop_number();
 	if (a == NULL) {
 		push_number(p);
@@ -1299,9 +1304,8 @@ bsqrt(void)
 
 	onecount = 0;
 	n = pop_number();
-	if (n == NULL) {
+	if (n == NULL)
 		return;
-	}
 	if (BN_is_zero(n->number)) {
 		r = new_number();
 		push_number(r);
@@ -1342,9 +1346,8 @@ not(void)
 	struct number *a;
 
 	a = pop_number();
-	if (a == NULL) {
+	if (a == NULL)
 		return;
-	}
 	a->scale = 0;
 	bn_check(BN_set_word(a->number, BN_get_word(a->number) ? 0 : 1));
 	push_number(a);
@@ -1363,9 +1366,8 @@ equal_numbers(void)
 	struct number *a, *b, *r;
 
 	a = pop_number();
-	if (a == NULL) {
+	if (a == NULL)
 		return;
-	}
 	b = pop_number();
 	if (b == NULL) {
 		push_number(a);
@@ -1383,9 +1385,8 @@ less_numbers(void)
 	struct number *a, *b, *r;
 
 	a = pop_number();
-	if (a == NULL) {
+	if (a == NULL)
 		return;
-	}
 	b = pop_number();
 	if (b == NULL) {
 		push_number(a);
@@ -1403,9 +1404,8 @@ lesseq_numbers(void)
 	struct number *a, *b, *r;
 
 	a = pop_number();
-	if (a == NULL) {
+	if (a == NULL)
 		return;
-	}
 	b = pop_number();
 	if (b == NULL) {
 		push_number(a);
@@ -1679,7 +1679,7 @@ parse_number(void)
 
 	unreadch();
 	push_number(readnumber(&bmachine.readstack[bmachine.readsp],
-	    bmachine.ibase));
+	    bmachine.ibase, bmachine.scale));
 }
 
 static void
@@ -1707,7 +1707,7 @@ eval_string(char *p)
 	if (bmachine.readsp == bmachine.readstack_sz - 1) {
 		size_t newsz = bmachine.readstack_sz * 2;
 		struct source *stack;
-		stack = realloc(bmachine.readstack, newsz *
+		stack = reallocarray(bmachine.readstack, newsz,
 		    sizeof(struct source));
 		if (stack == NULL)
 			err(1, "recursion too deep");
@@ -1736,9 +1736,8 @@ eval_tos(void)
 	char *p;
 
 	p = pop_string();
-	if (p == NULL)
-		return;
-	eval_string(p);
+	if (p != NULL)
+		eval_string(p);
 }
 
 void

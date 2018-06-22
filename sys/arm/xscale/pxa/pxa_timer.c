@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2006 Benno Rice.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -235,7 +237,7 @@ pxa_timer_set_osmr(int which, uint32_t val)
 }
 
 uint32_t
-pxa_timer_get_oscr()
+pxa_timer_get_oscr(void)
 {
 
 	return (bus_space_read_4(timer_softc->pt_bst,
@@ -251,7 +253,7 @@ pxa_timer_set_oscr(uint32_t val)
 }
 
 uint32_t
-pxa_timer_get_ossr()
+pxa_timer_get_ossr(void)
 {
 
 	return (bus_space_read_4(timer_softc->pt_bst,
@@ -267,7 +269,7 @@ pxa_timer_clear_ossr(uint32_t val)
 }
 
 void
-pxa_timer_watchdog_enable()
+pxa_timer_watchdog_enable(void)
 {
 
 	bus_space_write_4(timer_softc->pt_bst,
@@ -275,7 +277,7 @@ pxa_timer_watchdog_enable()
 }
 
 void
-pxa_timer_watchdog_disable()	
+pxa_timer_watchdog_disable(void)
 {
 
 	bus_space_write_4(timer_softc->pt_bst,

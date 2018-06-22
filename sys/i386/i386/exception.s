@@ -15,7 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -37,7 +37,6 @@
 #include "opt_apic.h"
 #include "opt_atpic.h"
 #include "opt_hwpmc_hooks.h"
-#include "opt_npx.h"
 
 #include <machine/asmacros.h>
 #include <machine/psl.h>
@@ -184,21 +183,29 @@ calltrap:
 #ifdef KDTRACE_HOOKS
 	SUPERALIGN_TEXT
 IDTVEC(ill)
-	/* Check if there is no DTrace hook registered. */
-	cmpl	$0,dtrace_invop_jump_addr
+	/*
+	 * Check if a DTrace hook is registered.  The default (data) segment
+	 * cannot be used for this since %ds is not known good until we
+	 * verify that the entry was from kernel mode.
+	 */
+	cmpl	$0,%ss:dtrace_invop_jump_addr
 	je	norm_ill
 
-	/* Check if this is a user fault. */
-	cmpl	$GSEL_KPL, 4(%esp)	/* Check the code segment. */
-
-	/* If so, just handle it as a normal trap. */
+	/*
+	 * Check if this is a user fault.  If so, just handle it as a normal
+	 * trap.
+	 */
+	cmpl	$GSEL_KPL, 4(%esp)	/* Check the code segment */
 	jne	norm_ill
+	testl	$PSL_VM, 8(%esp)	/* and vm86 mode. */
+	jnz	norm_ill
 
 	/*
 	 * This is a kernel instruction fault that might have been caused
 	 * by a DTrace provider.
 	 */
-	pushal				/* Push all registers onto the stack. */
+	pushal
+	cld
 
 	/*
 	 * Set our jump address for the jump back in the event that
@@ -234,7 +241,7 @@ IDTVEC(lcall_syscall)
 	pushfl				/* save eflags */
 	popl	8(%esp)			/* shuffle into tf_eflags */
 	pushl	$7			/* sizeof "lcall 7,0" */
-	subl	$4,%esp			/* skip over tf_trapno */
+	pushl	$0			/* tf_trapno */
 	pushal
 	pushl	$0
 	movw	%ds,(%esp)
@@ -263,7 +270,7 @@ IDTVEC(lcall_syscall)
 	SUPERALIGN_TEXT
 IDTVEC(int0x80_syscall)
 	pushl	$2			/* sizeof "int 0x80" */
-	subl	$4,%esp			/* skip over tf_trapno */
+	pushl	$0			/* tf_trapno */
 	pushal
 	pushl	$0
 	movw	%ds,(%esp)
@@ -343,6 +350,7 @@ MCOUNT_LABEL(eintr)
 	.text
 	SUPERALIGN_TEXT
 	.type	doreti,@function
+	.globl	doreti
 doreti:
 	FAKE_MCOUNT($bintr)		/* init "from" bintr -> doreti */
 doreti_next:
@@ -417,8 +425,16 @@ doreti_iret:
 	 * doreti_iret_fault and friends.  Alternative return code for
 	 * the case where we get a fault in the doreti_exit code
 	 * above.  trap() (i386/i386/trap.c) catches this specific
-	 * case, sends the process a signal and continues in the
-	 * corresponding place in the code below.
+	 * case, and continues in the corresponding place in the code
+	 * below.
+	 *
+	 * If the fault occured during return to usermode, we recreate
+	 * the trap frame and call trap() to send a signal.  Otherwise
+	 * the kernel was tricked into fault by attempt to restore invalid
+	 * usermode segment selectors on return from nested fault or
+	 * interrupt, where interrupted kernel entry code not yet loaded
+	 * kernel selectors.  In the latter case, emulate iret and zero
+	 * the invalid selector.
 	 */
 	ALIGN_TEXT
 	.globl	doreti_iret_fault
@@ -429,18 +445,35 @@ doreti_iret_fault:
 	movw	%ds,(%esp)
 	.globl	doreti_popl_ds_fault
 doreti_popl_ds_fault:
+	testb	$SEL_RPL_MASK,TF_CS-TF_DS(%esp)
+	jz	doreti_popl_ds_kfault
 	pushl	$0
 	movw	%es,(%esp)
 	.globl	doreti_popl_es_fault
 doreti_popl_es_fault:
+	testb	$SEL_RPL_MASK,TF_CS-TF_ES(%esp)
+	jz	doreti_popl_es_kfault
 	pushl	$0
 	movw	%fs,(%esp)
 	.globl	doreti_popl_fs_fault
 doreti_popl_fs_fault:
+	testb	$SEL_RPL_MASK,TF_CS-TF_FS(%esp)
+	jz	doreti_popl_fs_kfault
 	sti
 	movl	$0,TF_ERR(%esp)	/* XXX should be the error code */
 	movl	$T_PROTFLT,TF_TRAPNO(%esp)
 	jmp	alltraps_with_regs_pushed
+
+doreti_popl_ds_kfault:
+	movl	$0,(%esp)
+	jmp	doreti_popl_ds
+doreti_popl_es_kfault:
+	movl	$0,(%esp)
+	jmp	doreti_popl_es
+doreti_popl_fs_kfault:
+	movl	$0,(%esp)
+	jmp	doreti_popl_fs
+	
 #ifdef HWPMC_HOOKS
 doreti_nmi:
 	/*

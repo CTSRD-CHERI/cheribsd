@@ -1,4 +1,5 @@
 /*******************************************************************************
+SPDX-License-Identifier: BSD-3-Clause
 
 Copyright (c) 2001-2004, Intel Corporation
 All rights reserved.
@@ -90,7 +91,7 @@ struct ixgb_osdep
 {
 	bus_space_tag_t    mem_bus_space_tag;
 	bus_space_handle_t mem_bus_space_handle;
-	struct device     *dev;
+	device_t dev;
 };
 
 #define IXGB_WRITE_FLUSH(a) IXGB_READ_REG(a, STATUS)

@@ -1,4 +1,6 @@
 #
+# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+#
 # Copyright (C) 2006 Daniel M. Eischen.  All rights reserved.
 # 
 # Redistribution and use in source and binary forms, with or without
@@ -141,7 +143,7 @@ BEGIN {
 	next;
 }
 
-/^[a-zA-Z0-9._]+[ \t]*;$/ {
+/^[a-zA-Z0-9._*]+[ \t]*;$/ {
 	# Strip semicolon.
 	sub(";", "", $1);
 	if (current_version != "") {

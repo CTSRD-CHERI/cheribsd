@@ -25,6 +25,8 @@
  * SUCH DAMAGE.
  */
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause AND BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1997, 1998, 1999, 2000
  *	Bill Paul <wpaul@ee.columbia.edu>.  All rights reserved.
  *
@@ -693,7 +695,7 @@ rue_bulk_read_callback(struct usb_xfer *xfer, usb_error_t error)
 		usbd_copy_out(pc, actlen - 4, &status, sizeof(status));
 		actlen -= 4;
 
-		/* check recieve packet was valid or not */
+		/* check receive packet was valid or not */
 		status = le16toh(status);
 		if ((status & RUE_RXSTAT_VALID) == 0) {
 			if_inc_counter(ifp, IFCOUNTER_IERRORS, 1);

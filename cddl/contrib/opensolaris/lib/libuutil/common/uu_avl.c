@@ -19,6 +19,16 @@
  * CDDL HEADER END
  */
 /*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_bit_flags"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
+/*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -44,10 +54,10 @@ static pthread_mutex_t	uu_apool_list_lock = PTHREAD_MUTEX_INITIALIZER;
 #define	INDEX_MAX		(sizeof (uintptr_t) - 2)
 #define	INDEX_NEXT(m)		(((m) == INDEX_MAX)? 2 : ((m) + 2) & INDEX_MAX)
 
-#define	INDEX_DECODE(i)		((i) & ~INDEX_MAX)
-#define	INDEX_ENCODE(p, n)	(((n) & ~INDEX_MAX) | (p)->ua_index)
-#define	INDEX_VALID(p, i)	(((i) & INDEX_MAX) == (p)->ua_index)
-#define	INDEX_CHECK(i)		(((i) & INDEX_MAX) != 0)
+#define	INDEX_DECODE(i)		(cheri_clear_low_ptr_bits(i, INDEX_MAX))
+#define	INDEX_ENCODE(p, n)	(cheri_set_low_ptr_bits(cheri_clear_low_ptr_bits(n, INDEX_MAX), (p)->ua_index))
+#define	INDEX_VALID(p, i)	(cheri_get_low_ptr_bits(i, INDEX_MAX) == (p)->ua_index)
+#define	INDEX_CHECK(i)		(cheri_get_low_ptr_bits(i, INDEX_MAX) != 0)
 
 /*
  * When an element is inactive (not in a tree), we keep a marked pointer to
@@ -58,7 +68,7 @@ static pthread_mutex_t	uu_apool_list_lock = PTHREAD_MUTEX_INITIALIZER;
 #define	NODE_ARRAY(p, n)	((uintptr_t *)((uintptr_t)(n) + \
 				    (pp)->uap_nodeoffset))
 
-#define	POOL_TO_MARKER(pp) (((uintptr_t)(pp) | 1))
+#define	POOL_TO_MARKER(pp) (((uintptr_t)(pp) | (uintptr_t)1))
 
 #define	DEAD_MARKER		0xc4
 

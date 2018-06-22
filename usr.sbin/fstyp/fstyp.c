@@ -57,6 +57,7 @@ static struct {
 	bool		unmountable;
 } fstypes[] = {
 	{ "cd9660", &fstyp_cd9660, false },
+	{ "exfat", &fstyp_exfat, false },
 	{ "ext2fs", &fstyp_ext2fs, false },
 	{ "geli", &fstyp_geli, true },
 	{ "msdosfs", &fstyp_msdosfs, false },
@@ -65,7 +66,7 @@ static struct {
 #ifdef HAVE_ZFS
 	{ "zfs", &fstyp_zfs, true },
 #endif
-	{ NULL, NULL, NULL }
+	{ NULL, NULL, false }
 };
 
 void *
@@ -82,7 +83,7 @@ read_buf(FILE *fp, off_t off, size_t len)
 	}
 
 	buf = malloc(len);
-	if (buf == 0) {
+	if (buf == NULL) {
 		warn("cannot malloc %zd bytes of memory", len);
 		return (NULL);
 	}

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (C) 2009-2012 Semihalf
  * All rights reserved.
  *
@@ -528,7 +530,7 @@ parse_config(char *cfgfname, const char *devfname)
 				error("Controller#%d already created\n",
 				    ctrls[i].num);
 			else if (err == EINVAL)
-				error("Incorrect controler number (%d)\n",
+				error("Incorrect controller number (%d)\n",
 				    ctrls[i].num);
 			else
 				error("Could not created controller#%d\n",

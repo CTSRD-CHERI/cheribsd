@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2013 Ian Lepore <ian@freebsd.org>
  * Copyright (c) 2014 Steven Lawrance <stl@koffein.net>
  * All rights reserved.
@@ -78,7 +80,6 @@ __FBSDID("$FreeBSD$");
 
 static struct resource_spec imx6_anatop_spec[] = {
 	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },
-	{ SYS_RES_IRQ,		0,	RF_ACTIVE },
 	{ -1, 0 }
 };
 #define	MEMRES	0
@@ -139,7 +140,7 @@ static struct oppt {
  */
 static uint32_t imx6_ocotp_mhz_tab[] = {792, 852, 996, 1200};
 
-#define	TZ_ZEROC	2732	/* deci-Kelvin <-> deci-Celcius offset. */
+#define	TZ_ZEROC	2731	/* deci-Kelvin <-> deci-Celcius offset. */
 
 uint32_t
 imx6_anatop_read_4(bus_size_t offset)
@@ -637,11 +638,20 @@ initialize_tempmon(struct imx6_anatop_softc *sc)
 static void
 intr_setup(void *arg)
 {
+	int rid;
 	struct imx6_anatop_softc *sc;
 
 	sc = arg;
-	bus_setup_intr(sc->dev, sc->res[IRQRES], INTR_TYPE_MISC | INTR_MPSAFE,
-	    tempmon_intr, NULL, sc, &sc->temp_intrhand);
+	rid = 0;
+	sc->res[IRQRES] = bus_alloc_resource_any(sc->dev, SYS_RES_IRQ, &rid,
+	    RF_ACTIVE);
+	if (sc->res[IRQRES] != NULL) {
+		bus_setup_intr(sc->dev, sc->res[IRQRES],
+		    INTR_TYPE_MISC | INTR_MPSAFE, tempmon_intr, NULL, sc,
+		    &sc->temp_intrhand);
+	} else {
+		device_printf(sc->dev, "Cannot allocate IRQ resource\n");
+	}
 	config_intrhook_disestablish(&sc->intr_setup_hook);
 }
 
@@ -768,7 +778,7 @@ imx6_anatop_probe(device_t dev)
 }
 
 uint32_t 
-imx6_get_cpu_clock()
+imx6_get_cpu_clock(void)
 {
 	uint32_t corediv, plldiv;
 

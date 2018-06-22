@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2000,2004
  *	Poul-Henning Kamp.  All rights reserved.
  *
@@ -27,6 +29,8 @@
  *
  * $FreeBSD$
  */
+
+#include "opt_compat.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -80,10 +84,20 @@ sysctl_devname(SYSCTL_HANDLER_ARGS)
 {
 	int error;
 	dev_t ud;
+#ifdef COMPAT_FREEBSD11
+	uint32_t ud_compat;
+#endif
 	struct cdev_priv *cdp;
 	struct cdev *dev;
 
-	error = SYSCTL_IN(req, &ud, sizeof (ud));
+#ifdef COMPAT_FREEBSD11
+	if (req->newlen == sizeof(ud_compat)) {
+		error = SYSCTL_IN(req, &ud_compat, sizeof(ud_compat));
+		if (error == 0)
+			ud = ud_compat == (uint32_t)NODEV ? NODEV : ud_compat;
+	} else
+#endif
+		error = SYSCTL_IN(req, &ud, sizeof (ud));
 	if (error)
 		return (error);
 	if (ud == NODEV)
@@ -127,16 +141,11 @@ devfs_alloc(int flags)
 		return (NULL);
 
 	cdp->cdp_dirents = &cdp->cdp_dirent0;
-	cdp->cdp_dirent0 = NULL;
-	cdp->cdp_maxdirent = 0;
-	cdp->cdp_inode = 0;
 
 	cdev = &cdp->cdp_c;
-
 	LIST_INIT(&cdev->si_children);
 	vfs_timestamp(&ts);
 	cdev->si_atime = cdev->si_mtime = cdev->si_ctime = ts;
-	cdev->si_cred = NULL;
 
 	return (cdev);
 }
@@ -213,7 +222,7 @@ devfs_newdirent(char *name, int namelen)
 	struct dirent d;
 
 	d.d_namlen = namelen;
-	i = sizeof (*de) + GENERIC_DIRSIZ(&d); 
+	i = sizeof(*de) + GENERIC_DIRSIZ(&d);
 	de = malloc(i, M_DEVFS3, M_WAITOK | M_ZERO);
 	de->de_dirent = (struct dirent *)(de + 1);
 	de->de_dirent->d_namlen = namelen;
@@ -251,7 +260,8 @@ devfs_parent_dirent(struct devfs_dirent *de)
 }
 
 struct devfs_dirent *
-devfs_vmkdir(struct devfs_mount *dmp, char *name, int namelen, struct devfs_dirent *dotdot, u_int inode)
+devfs_vmkdir(struct devfs_mount *dmp, char *name, int namelen,
+    struct devfs_dirent *dotdot, u_int inode)
 {
 	struct devfs_dirent *dd;
 	struct devfs_dirent *de;

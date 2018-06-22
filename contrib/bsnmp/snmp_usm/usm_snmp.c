@@ -167,10 +167,14 @@ op_usm_users(struct snmp_context *ctx, struct snmp_value *val,
 		if ((uuser = usm_get_user(&val->var, sub)) == NULL &&
 		    val->var.subs[sub - 1] != LEAF_usmUserStatus &&
 		    val->var.subs[sub - 1] != LEAF_usmUserCloneFrom)
-				return (SNMP_ERR_NOSUCHNAME);
+			return (SNMP_ERR_NOSUCHNAME);
 
+		/*
+		 * XXX (ngie): need to investigate the MIB to determine how
+		 * this is possible given some of the transitions below.
+		 */
 		if (community != COMM_INITIALIZE &&
-		    uuser->type == StorageType_readOnly)
+		    uuser != NULL && uuser->type == StorageType_readOnly)
 			return (SNMP_ERR_NOT_WRITEABLE);
 
 		switch (val->var.subs[sub - 1]) {
@@ -179,7 +183,7 @@ op_usm_users(struct snmp_context *ctx, struct snmp_value *val,
 
 		case LEAF_usmUserCloneFrom:
 			if (uuser != NULL || usm_user_index_decode(&val->var,
-			    sub, eid, &elen, uname) < 0 || 
+			    sub, eid, &elen, uname) < 0 ||
 			    !(asn_is_suboid(&oid_usmUserSecurityName, &val->v.oid)))
 				return (SNMP_ERR_WRONG_VALUE);
 			if ((clone = usm_get_user(&val->v.oid, sub)) == NULL)
@@ -262,7 +266,7 @@ op_usm_users(struct snmp_context *ctx, struct snmp_value *val,
 			if (ctx->scratch->ptr1 == NULL)
 				return (SNMP_ERR_GENERR);
 			memcpy(ctx->scratch->ptr1, uuser->suser.priv_key,
-			    SNMP_PRIV_KEY_SIZ);
+			    sizeof(uuser->suser.priv_key));
 			memcpy(uuser->suser.priv_key, val->v.octetstring.octets,
 			    val->v.octetstring.len);
 			break;
@@ -286,7 +290,7 @@ op_usm_users(struct snmp_context *ctx, struct snmp_value *val,
 				uuser->user_public_len = val->v.octetstring.len;
 			} else {
 				memset(uuser->user_public, 0,
-				    SNMP_ADM_STR32_SIZ);
+				    sizeof(uuser->user_public));
 				uuser->user_public_len = 0;
 			}
 			break;
@@ -311,7 +315,7 @@ op_usm_users(struct snmp_context *ctx, struct snmp_value *val,
 			} else if (val->v.integer != RowStatus_active &&
 			    val->v.integer != RowStatus_destroy)
 				return (SNMP_ERR_INCONS_VALUE);
-			
+
 			uuser->status = val->v.integer;
 			break;
 		}
@@ -351,7 +355,7 @@ op_usm_users(struct snmp_context *ctx, struct snmp_value *val,
 		case LEAF_usmUserAuthKeyChange:
 		case LEAF_usmUserOwnAuthKeyChange:
 			memcpy(uuser->suser.auth_key, ctx->scratch->ptr1,
-			    SNMP_AUTH_KEY_SIZ);
+			    sizeof(uuser->suser.auth_key));
 			free(ctx->scratch->ptr1);
 			break;
 		case LEAF_usmUserPrivProtocol:
@@ -360,7 +364,7 @@ op_usm_users(struct snmp_context *ctx, struct snmp_value *val,
 		case LEAF_usmUserPrivKeyChange:
 		case LEAF_usmUserOwnPrivKeyChange:
 			memcpy(uuser->suser.priv_key, ctx->scratch->ptr1,
-			    SNMP_AUTH_KEY_SIZ);
+			    sizeof(uuser->suser.priv_key));
 			free(ctx->scratch->ptr1);
 			break;
 		case LEAF_usmUserPublic:
@@ -371,7 +375,7 @@ op_usm_users(struct snmp_context *ctx, struct snmp_value *val,
 				free(ctx->scratch->ptr2);
 			} else {
 				memset(uuser->user_public, 0,
-				    SNMP_ADM_STR32_SIZ);
+				    sizeof(uuser->user_public));
 				uuser->user_public_len = 0;
 			}
 			break;
@@ -381,7 +385,7 @@ op_usm_users(struct snmp_context *ctx, struct snmp_value *val,
 				usm_delete_user(uuser);
 			break;
 		default:
-			break;	
+			break;
 		}
 		return (SNMP_ERR_NOERROR);
 

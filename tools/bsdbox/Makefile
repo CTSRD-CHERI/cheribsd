@@ -37,6 +37,9 @@ BINDIR?=/sbin
 # Define Makefile variable RESCUE
 CRUNCH_BUILDOPTS+= -DRESCUE
 
+# We want to build all these tools as statically linked MIPS binaries to save size
+WANT_CHERI=		none
+CRUNCH_BUILDOPTS+=	WANT_CHERI=none
 # Don't do symlinks as part of the install
 CRUNCH_GENERATE_LINKS= no
 
@@ -70,8 +73,9 @@ CRUNCH_LIBS+= -lcrypt -ledit -ll -ltermcapw
 #
 CRUNCH_SRCDIRS+= sbin
 
-CRUNCH_LIBS+= -lalias -lcam -lcursesw -ldevstat -lipsec
+CRUNCH_LIBS+= -l80211 -lalias -lcam -lcursesw -ldevstat -lipsec
 # Don't forget this - ifconfig, etc -adrian
+CRUNCH_LIBS+= ${LDADD_ifconfig}
 CRUNCH_LIBS+= -lgeom -lbsdxml -ljail -lkiconv -lmd -lsbuf -lufs
 
 ##################################################################

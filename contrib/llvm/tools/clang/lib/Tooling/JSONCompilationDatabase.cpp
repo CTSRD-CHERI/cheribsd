@@ -16,7 +16,10 @@
 #include "clang/Tooling/CompilationDatabasePluginRegistry.h"
 #include "clang/Tooling/Tooling.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/Allocator.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/StringSaver.h"
 #include <system_error>
 
 namespace clang {
@@ -111,8 +114,29 @@ class CommandLineArgumentParser {
   std::vector<std::string> CommandLine;
 };
 
-std::vector<std::string> unescapeCommandLine(
-    StringRef EscapedCommandLine) {
+std::vector<std::string> unescapeCommandLine(JSONCommandLineSyntax Syntax,
+                                             StringRef EscapedCommandLine) {
+  if (Syntax == JSONCommandLineSyntax::AutoDetect) {
+    Syntax = JSONCommandLineSyntax::Gnu;
+    llvm::Triple Triple(llvm::sys::getProcessTriple());
+    if (Triple.getOS() == llvm::Triple::OSType::Win32) {
+      // Assume Windows command line parsing on Win32 unless the triple
+      // explicitly tells us otherwise.
+      if (!Triple.hasEnvironment() ||
+          Triple.getEnvironment() == llvm::Triple::EnvironmentType::MSVC)
+        Syntax = JSONCommandLineSyntax::Windows;
+    }
+  }
+
+  if (Syntax == JSONCommandLineSyntax::Windows) {
+    llvm::BumpPtrAllocator Alloc;
+    llvm::StringSaver Saver(Alloc);
+    llvm::SmallVector<const char *, 64> T;
+    llvm::cl::TokenizeWindowsCommandLine(EscapedCommandLine, Saver, T);
+    std::vector<std::string> Result(T.begin(), T.end());
+    return Result;
+  }
+  assert(Syntax == JSONCommandLineSyntax::Gnu);
   CommandLineArgumentParser parser(EscapedCommandLine);
   return parser.parse();
 }
@@ -122,11 +146,8 @@ class JSONCompilationDatabasePlugin : public CompilationDatabasePlugin {
   loadFromDirectory(StringRef Directory, std::string &ErrorMessage) override {
     SmallString<1024> JSONDatabasePath(Directory);
     llvm::sys::path::append(JSONDatabasePath, "compile_commands.json");
-    std::unique_ptr<CompilationDatabase> Database(
-        JSONCompilationDatabase::loadFromFile(JSONDatabasePath, ErrorMessage));
-    if (!Database)
-      return nullptr;
-    return Database;
+    return JSONCompilationDatabase::loadFromFile(
+        JSONDatabasePath, ErrorMessage, JSONCommandLineSyntax::AutoDetect);
   }
 };
 
@@ -143,7 +164,8 @@ volatile int JSONAnchorSource = 0;
 
 std::unique_ptr<JSONCompilationDatabase>
 JSONCompilationDatabase::loadFromFile(StringRef FilePath,
-                                      std::string &ErrorMessage) {
+                                      std::string &ErrorMessage,
+                                      JSONCommandLineSyntax Syntax) {
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> DatabaseBuffer =
       llvm::MemoryBuffer::getFile(FilePath);
   if (std::error_code Result = DatabaseBuffer.getError()) {
@@ -151,7 +173,7 @@ JSONCompilationDatabase::loadFromFile(StringRef FilePath,
     return nullptr;
   }
   std::unique_ptr<JSONCompilationDatabase> Database(
-      new JSONCompilationDatabase(std::move(*DatabaseBuffer)));
+      new JSONCompilationDatabase(std::move(*DatabaseBuffer), Syntax));
   if (!Database->parse(ErrorMessage))
     return nullptr;
   return Database;
@@ -159,11 +181,12 @@ JSONCompilationDatabase::loadFromFile(StringRef FilePath,
 
 std::unique_ptr<JSONCompilationDatabase>
 JSONCompilationDatabase::loadFromBuffer(StringRef DatabaseString,
-                                        std::string &ErrorMessage) {
+                                        std::string &ErrorMessage,
+                                        JSONCommandLineSyntax Syntax) {
   std::unique_ptr<llvm::MemoryBuffer> DatabaseBuffer(
       llvm::MemoryBuffer::getMemBuffer(DatabaseString));
   std::unique_ptr<JSONCompilationDatabase> Database(
-      new JSONCompilationDatabase(std::move(DatabaseBuffer)));
+      new JSONCompilationDatabase(std::move(DatabaseBuffer), Syntax));
   if (!Database->parse(ErrorMessage))
     return nullptr;
   return Database;
@@ -206,24 +229,37 @@ JSONCompilationDatabase::getAllFiles() const {
 std::vector<CompileCommand>
 JSONCompilationDatabase::getAllCompileCommands() const {
   std::vector<CompileCommand> Commands;
-  for (llvm::StringMap< std::vector<CompileCommandRef> >::const_iterator
-        CommandsRefI = IndexByFile.begin(), CommandsRefEnd = IndexByFile.end();
-      CommandsRefI != CommandsRefEnd; ++CommandsRefI) {
-    getCommands(CommandsRefI->getValue(), Commands);
-  }
+  getCommands(AllCommands, Commands);
   return Commands;
 }
 
+static std::vector<std::string>
+nodeToCommandLine(JSONCommandLineSyntax Syntax,
+                  const std::vector<llvm::yaml::ScalarNode *> &Nodes) {
+  SmallString<1024> Storage;
+  if (Nodes.size() == 1) {
+    return unescapeCommandLine(Syntax, Nodes[0]->getValue(Storage));
+  }
+  std::vector<std::string> Arguments;
+  for (auto *Node : Nodes) {
+    Arguments.push_back(Node->getValue(Storage));
+  }
+  return Arguments;
+}
+
 void JSONCompilationDatabase::getCommands(
-                                  ArrayRef<CompileCommandRef> CommandsRef,
-                                  std::vector<CompileCommand> &Commands) const {
+    ArrayRef<CompileCommandRef> CommandsRef,
+    std::vector<CompileCommand> &Commands) const {
   for (int I = 0, E = CommandsRef.size(); I != E; ++I) {
     SmallString<8> DirectoryStorage;
-    SmallString<1024> CommandStorage;
+    SmallString<32> FilenameStorage;
+    SmallString<32> OutputStorage;
+    auto Output = std::get<3>(CommandsRef[I]);
     Commands.emplace_back(
-        // FIXME: Escape correctly:
-        CommandsRef[I].first->getValue(DirectoryStorage),
-        unescapeCommandLine(CommandsRef[I].second->getValue(CommandStorage)));
+        std::get<0>(CommandsRef[I])->getValue(DirectoryStorage),
+        std::get<1>(CommandsRef[I])->getValue(FilenameStorage),
+        nodeToCommandLine(Syntax, std::get<2>(CommandsRef[I])),
+        Output ? Output->getValue(OutputStorage) : "");
   }
 }
 
@@ -243,44 +279,60 @@ bool JSONCompilationDatabase::parse(std::string &ErrorMessage) {
     ErrorMessage = "Expected array.";
     return false;
   }
-  for (llvm::yaml::SequenceNode::iterator AI = Array->begin(),
-                                          AE = Array->end();
-       AI != AE; ++AI) {
-    llvm::yaml::MappingNode *Object = dyn_cast<llvm::yaml::MappingNode>(&*AI);
+  for (auto& NextObject : *Array) {
+    llvm::yaml::MappingNode *Object = dyn_cast<llvm::yaml::MappingNode>(&NextObject);
     if (!Object) {
       ErrorMessage = "Expected object.";
       return false;
     }
     llvm::yaml::ScalarNode *Directory = nullptr;
-    llvm::yaml::ScalarNode *Command = nullptr;
+    llvm::Optional<std::vector<llvm::yaml::ScalarNode *>> Command;
     llvm::yaml::ScalarNode *File = nullptr;
-    for (llvm::yaml::MappingNode::iterator KVI = Object->begin(),
-                                           KVE = Object->end();
-         KVI != KVE; ++KVI) {
-      llvm::yaml::Node *Value = (*KVI).getValue();
+    llvm::yaml::ScalarNode *Output = nullptr;
+    for (auto& NextKeyValue : *Object) {
+      llvm::yaml::ScalarNode *KeyString =
+          dyn_cast<llvm::yaml::ScalarNode>(NextKeyValue.getKey());
+      if (!KeyString) {
+        ErrorMessage = "Expected strings as key.";
+        return false;
+      }
+      SmallString<10> KeyStorage;
+      StringRef KeyValue = KeyString->getValue(KeyStorage);
+      llvm::yaml::Node *Value = NextKeyValue.getValue();
       if (!Value) {
         ErrorMessage = "Expected value.";
         return false;
       }
       llvm::yaml::ScalarNode *ValueString =
           dyn_cast<llvm::yaml::ScalarNode>(Value);
-      if (!ValueString) {
+      llvm::yaml::SequenceNode *SequenceString =
+          dyn_cast<llvm::yaml::SequenceNode>(Value);
+      if (KeyValue == "arguments" && !SequenceString) {
+        ErrorMessage = "Expected sequence as value.";
+        return false;
+      } else if (KeyValue != "arguments" && !ValueString) {
         ErrorMessage = "Expected string as value.";
         return false;
       }
-      llvm::yaml::ScalarNode *KeyString =
-          dyn_cast<llvm::yaml::ScalarNode>((*KVI).getKey());
-      if (!KeyString) {
-        ErrorMessage = "Expected strings as key.";
-        return false;
-      }
-      SmallString<8> KeyStorage;
-      if (KeyString->getValue(KeyStorage) == "directory") {
+      if (KeyValue == "directory") {
         Directory = ValueString;
-      } else if (KeyString->getValue(KeyStorage) == "command") {
-        Command = ValueString;
-      } else if (KeyString->getValue(KeyStorage) == "file") {
+      } else if (KeyValue == "arguments") {
+        Command = std::vector<llvm::yaml::ScalarNode *>();
+        for (auto &Argument : *SequenceString) {
+          auto Scalar = dyn_cast<llvm::yaml::ScalarNode>(&Argument);
+          if (!Scalar) {
+            ErrorMessage = "Only strings are allowed in 'arguments'.";
+            return false;
+          }
+          Command->push_back(Scalar);
+        }
+      } else if (KeyValue == "command") {
+        if (!Command)
+          Command = std::vector<llvm::yaml::ScalarNode *>(1, ValueString);
+      } else if (KeyValue == "file") {
         File = ValueString;
+      } else if (KeyValue == "output") {
+        Output = ValueString;
       } else {
         ErrorMessage = ("Unknown key: \"" +
                         KeyString->getRawValue() + "\"").str();
@@ -292,7 +344,7 @@ bool JSONCompilationDatabase::parse(std::string &ErrorMessage) {
       return false;
     }
     if (!Command) {
-      ErrorMessage = "Missing key: \"command\".";
+      ErrorMessage = "Missing key: \"command\" or \"arguments\".";
       return false;
     }
     if (!Directory) {
@@ -311,8 +363,9 @@ bool JSONCompilationDatabase::parse(std::string &ErrorMessage) {
     } else {
       llvm::sys::path::native(FileName, NativeFilePath);
     }
-    IndexByFile[NativeFilePath].push_back(
-        CompileCommandRef(Directory, Command));
+    auto Cmd = CompileCommandRef(Directory, File, *Command, Output);
+    IndexByFile[NativeFilePath].push_back(Cmd);
+    AllCommands.push_back(Cmd);
     MatchTrie.insert(NativeFilePath);
   }
   return true;

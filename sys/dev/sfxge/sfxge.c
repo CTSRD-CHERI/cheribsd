@@ -1,5 +1,7 @@
 /*-
- * Copyright (c) 2010-2015 Solarflare Communications Inc.
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
+ * Copyright (c) 2010-2016 Solarflare Communications Inc.
  * All rights reserved.
  *
  * This software was developed in part by Philip Paeps under contract for
@@ -34,6 +36,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include "opt_rss.h"
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/bus.h>
@@ -57,6 +61,10 @@ __FBSDID("$FreeBSD$");
 #include <net/if_var.h>
 #include <net/if_media.h>
 #include <net/if_types.h>
+
+#ifdef RSS
+#include <net/rss_config.h>
+#endif
 
 #include "common/efx.h"
 
@@ -127,7 +135,15 @@ sfxge_estimate_rsrc_limits(struct sfxge_softc *sc)
 	 *  - hardwire maximum RSS channels
 	 *  - administratively specified maximum RSS channels
 	 */
+#ifdef RSS
+	/*
+	 * Avoid extra limitations so that the number of queues
+	 * may be configured at administrator's will
+	 */
+	evq_max = MIN(MAX(rss_getnumbuckets(), 1), EFX_MAXRSS);
+#else
 	evq_max = MIN(mp_ncpus, EFX_MAXRSS);
+#endif
 	if (sc->max_rss_channels > 0)
 		evq_max = MIN(evq_max, sc->max_rss_channels);
 
@@ -162,6 +178,14 @@ sfxge_estimate_rsrc_limits(struct sfxge_softc *sc)
 
 	KASSERT(sc->evq_max <= evq_max,
 		("allocated more than maximum requested"));
+
+#ifdef RSS
+	if (sc->evq_max < rss_getnumbuckets())
+		device_printf(sc->dev, "The number of allocated queues (%u) "
+			      "is less than the number of RSS buckets (%u); "
+			      "performance degradation might be observed",
+			      sc->evq_max, rss_getnumbuckets());
+#endif
 
 	/*
 	 * NIC is kept initialized in the case of success to be able to
@@ -375,7 +399,7 @@ sfxge_if_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 	error = 0;
 
 	switch (command) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		SFXGE_ADAPTER_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -391,20 +415,20 @@ sfxge_if_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 		sc->if_flags = ifp->if_flags;
 		SFXGE_ADAPTER_UNLOCK(sc);
 		break;
-	case SIOCSIFMTU:
-		if (ifr->ifr_mtu == ifp->if_mtu) {
+	CASE_IOC_IFREQ(SIOCSIFMTU):
+		if (ifr_mtu_get(ifr) == ifp->if_mtu) {
 			/* Nothing to do */
 			error = 0;
-		} else if (ifr->ifr_mtu > SFXGE_MAX_MTU) {
+		} else if (ifr_mtu_get(ifr) > SFXGE_MAX_MTU) {
 			error = EINVAL;
 		} else if (!(ifp->if_drv_flags & IFF_DRV_RUNNING)) {
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			error = 0;
 		} else {
 			/* Restart required */
 			SFXGE_ADAPTER_LOCK(sc);
 			sfxge_stop(sc);
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			error = sfxge_start(sc);
 			SFXGE_ADAPTER_UNLOCK(sc);
 			if (error != 0) {
@@ -414,14 +438,14 @@ sfxge_if_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 			}
 		}
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 			sfxge_mac_filter_set(sc);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 	{
-		int reqcap = ifr->ifr_reqcap;
+		int reqcap = ifr_reqcap_get(ifr);
 		int capchg_mask;
 
 		SFXGE_ADAPTER_LOCK(sc);
@@ -496,23 +520,46 @@ sfxge_if_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 		SFXGE_ADAPTER_UNLOCK(sc);
 		break;
 	}
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->media, command);
 		break;
-	case SIOCGPRIVATE_0:
-#ifdef CPU_CHERI
-#error Unvalidatable ifr_data use.  Unsafe with CheriABI.
+#ifdef SIOCGI2C
+	CASE_IOC_IFREQ(SIOCGI2C):
+	{
+		struct ifi2creq i2c;
+
+		error = copyin_c(ifr_data_get_ptr(ifr), &i2c, sizeof(i2c));
+		if (error != 0)
+			break;
+
+		if (i2c.len > sizeof(i2c.data)) {
+			error = EINVAL;
+			break;
+		}
+
+		SFXGE_ADAPTER_LOCK(sc);
+		error = efx_phy_module_get_info(sc->enp, i2c.dev_addr,
+						i2c.offset, i2c.len,
+						&i2c.data[0]);
+		SFXGE_ADAPTER_UNLOCK(sc);
+		if (error == 0)
+			error = copyout_c(&i2c, ifr_data_get_ptr(ifr),
+			    sizeof(i2c));
+		break;
+	}
 #endif
+	CASE_IOC_IFREQ(SIOCGPRIVATE_0):
 		error = priv_check(curthread, PRIV_DRIVER);
 		if (error != 0)
 			break;
-		error = copyin(ifr->ifr_data, &ioc, sizeof(ioc));
+		error = copyin_c(ifr_data_get_ptr(ifr), &ioc, sizeof(ioc));
 		if (error != 0)
 			return (error);
 		error = sfxge_private_ioctl(sc, &ioc);
 		if (error == 0) {
-			error = copyout(&ioc, ifr->ifr_data, sizeof(ioc));
+			error = copyout_c(&ioc, ifr_data_get_ptr(ifr),
+			    sizeof(ioc));
 		}
 		break;
 	default:
@@ -694,6 +741,16 @@ sfxge_create(struct sfxge_softc *sc)
 		goto fail3;
 	sc->enp = enp;
 
+	/* Initialize MCDI to talk to the microcontroller. */
+	DBGPRINT(sc->dev, "mcdi_init...");
+	if ((error = sfxge_mcdi_init(sc)) != 0)
+		goto fail4;
+
+	/* Probe the NIC and build the configuration data area. */
+	DBGPRINT(sc->dev, "nic_probe...");
+	if ((error = efx_nic_probe(enp)) != 0)
+		goto fail5;
+
 	if (!ISP2(sfxge_rx_ring_entries) ||
 	    (sfxge_rx_ring_entries < EFX_RXQ_MINNDESCS) ||
 	    (sfxge_rx_ring_entries > EFX_RXQ_MAXNDESCS)) {
@@ -715,16 +772,6 @@ sfxge_create(struct sfxge_softc *sc)
 		goto fail_tx_ring_entries;
 	}
 	sc->txq_entries = sfxge_tx_ring_entries;
-
-	/* Initialize MCDI to talk to the microcontroller. */
-	DBGPRINT(sc->dev, "mcdi_init...");
-	if ((error = sfxge_mcdi_init(sc)) != 0)
-		goto fail4;
-
-	/* Probe the NIC and build the configuration data area. */
-	DBGPRINT(sc->dev, "nic_probe...");
-	if ((error = efx_nic_probe(enp)) != 0)
-		goto fail5;
 
 	SYSCTL_ADD_STRING(device_get_sysctl_ctx(dev),
 			  SYSCTL_CHILDREN(device_get_sysctl_tree(dev)),
@@ -818,14 +865,14 @@ fail7:
 	efx_nvram_fini(enp);
 
 fail6:
+fail_tx_ring_entries:
+fail_rx_ring_entries:
 	efx_nic_unprobe(enp);
 
 fail5:
 	sfxge_mcdi_fini(sc);
 
 fail4:
-fail_tx_ring_entries:
-fail_rx_ring_entries:
 	sc->enp = NULL;
 	efx_nic_destroy(enp);
 	SFXGE_EFSYS_LOCK_DESTROY(&sc->enp_lock);
@@ -1126,6 +1173,11 @@ sfxge_probe(device_t dev)
 
 	if (family == EFX_FAMILY_HUNTINGTON) {
 		device_set_desc(dev, "Solarflare SFC9100 family");
+		return (0);
+	}
+
+	if (family == EFX_FAMILY_MEDFORD) {
+		device_set_desc(dev, "Solarflare SFC9200 family");
 		return (0);
 	}
 

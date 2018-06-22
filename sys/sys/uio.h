@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -48,7 +50,10 @@ typedef	__off_t	off_t;
 #endif
 
 #if __BSD_VISIBLE
+#ifndef _UIO_RW_DECLARED
 enum	uio_rw { UIO_READ, UIO_WRITE };
+#define	_UIO_RW_DECLARED
+#endif
 
 /* Segment flag values. */
 enum uio_seg {
@@ -61,14 +66,14 @@ enum uio_seg {
 #ifdef _KERNEL
 
 struct uio {
-	struct	iovec *uio_iov;		/* scatter/gather list */
+	kiovec_t	*uio_iov;	/* scatter/gather list */
 	int	uio_iovcnt;		/* length of scatter/gather list */
 	off_t	uio_offset;		/* offset in target object */
 	ssize_t	uio_resid;		/* remaining bytes to process */
 	enum	uio_seg uio_segflg;	/* address space */
 	enum	uio_rw uio_rw;		/* operation */
 	struct	thread *uio_td;		/* owner */
-};
+} __aligned(sizeof(void * __capability));
 
 /*
  * Limits
@@ -90,11 +95,11 @@ struct bus_dma_segment;
 struct uio *cloneuio(struct uio *uiop);
 int	copyinfrom(const void * __restrict src, void * __restrict dst,
 	    size_t len, int seg);
-int	copyiniov(const struct iovec *iovp, u_int iovcnt, struct iovec **iov,
-	    int error);
+int	copyiniov(const uiovec_t * __capability iovp, u_int iovcnt,
+	    kiovec_t **iov, int error);
 int	copyinstrfrom(const void * __restrict src, void * __restrict dst,
 	    size_t len, size_t * __restrict copied, int seg);
-int	copyinuio(const struct iovec *iovp, u_int iovcnt, struct uio **uiop);
+int	copyinuio(const uiovec_t *iovp, u_int iovcnt, struct uio **uiop);
 int	copyout_map(struct thread *td, vm_offset_t *addr, size_t sz);
 int	copyout_unmap(struct thread *td, vm_offset_t addr, size_t sz);
 int	physcopyin(void *src, vm_paddr_t dst, size_t len);
@@ -109,6 +114,7 @@ int	uiomove_fromphys(struct vm_page *ma[], vm_offset_t offset, int n,
 	    struct uio *uio);
 int	uiomove_nofault(void *cp, int n, struct uio *uio);
 int	uiomove_object(struct vm_object *obj, off_t obj_size, struct uio *uio);
+int	updateiov(const struct uio *uiop, uiovec_t *iovp);
 
 #else /* !_KERNEL */
 

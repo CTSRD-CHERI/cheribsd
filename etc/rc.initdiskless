@@ -67,7 +67,7 @@
 # /conf/T/M/remount
 #		The contents of the file is a mount command. E.g. if
 # 		/conf/1.2.3.4/foo/remount contains "mount -o ro /dev/ad0s3",
-#		then /dev/ad0s3 will be be mounted on /conf/1.2.3.4/foo/
+#		then /dev/ad0s3 will be mounted on /conf/1.2.3.4/foo/
 #
 # /conf/T/M/remount_optional
 #		If this file exists, then failure to execute the mount
@@ -103,7 +103,7 @@
 #		will be created. In case of multiple entries for the same
 #		directory M, the last one in the scanning order is used.
 #		NOTE: If you only need to create a memory filesystem but not
-#		initialize it from a template, it is preferrable to specify
+#		initialize it from a template, it is preferable to specify
 #		it in fstab e.g. as  "md /tmp mfs -s=30m,rw 0 0"
 #
 # /conf/T/SUBDIR.cpio.gz
@@ -195,10 +195,11 @@ handle_remount() { # $1 = mount point
     to_umount="$b ${to_umount}"
 }
 
-# Create a generic memory disk
-#
+# Create a generic memory disk.
+# The 'auto' parameter will attempt to use tmpfs(5), falls back to md(4).
+# $1 is size in 512-byte sectors, $2 is the mount point.
 mount_md() {
-    /sbin/mdmfs -S -i 4096 -s $1 -M md $2
+    /sbin/mdmfs -s $1 auto $2
 }
 
 # Create the memory filesystem if it has not already been created

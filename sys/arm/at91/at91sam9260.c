@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2005 Olivier Houchard.  All rights reserved.
  * Copyright (c) 2010 Greg Ansley.  All rights reserved.
  *
@@ -188,12 +190,11 @@ at91_clock_init(void)
 	 * PMC alogrithm choose the divisor that causes the input clock
 	 * to be near the optimal 2 MHz per datasheet.  We know
 	 * we are going to be using this for the USB clock at 96 MHz.
-	 * Causes no extra frequency deviation for all recomended crystal
+	 * Causes no extra frequency deviation for all recommended crystal
 	 * values.  See Note 1, table 40-16 SAM9260 doc.
 	 */
 	clk = at91_pmc_clock_ref("pllb");
 	clk->pll_min_in    = SAM9260_PLL_B_MIN_IN_FREQ;		/*   1 MHz */
-	clk->pll_max_in    = SAM9260_PLL_B_MAX_IN_FREQ;		/*   5 MHz */
 	clk->pll_max_in    = 2999999;				/*  ~3 MHz */
 	clk->pll_min_out   = SAM9260_PLL_B_MIN_OUT_FREQ;	/*  70 MHz */
 	clk->pll_max_out   = SAM9260_PLL_B_MAX_OUT_FREQ;	/* 130 MHz */

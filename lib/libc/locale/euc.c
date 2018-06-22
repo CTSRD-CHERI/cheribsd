@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2002-2004 Tim J. Robbins. All rights reserved.
@@ -132,7 +134,7 @@ _EUC_CN_init(struct xlocale_ctype *l, _RuneLocale *rl)
 
 	l->runes = rl;
 	l->__mb_cur_max = 4;
-	l->__mb_sb_limit = 256;
+	l->__mb_sb_limit = 128;
 	return (0);
 }
 
@@ -226,7 +228,7 @@ _EUC_JP_init(struct xlocale_ctype *l, _RuneLocale *rl)
 
 	l->runes = rl;
 	l->__mb_cur_max = 3;
-	l->__mb_sb_limit = 196;
+	l->__mb_sb_limit = 128;
 	return (0);
 }
 
@@ -273,7 +275,7 @@ _EUC_TW_init(struct xlocale_ctype *l, _RuneLocale *rl)
 
 	l->runes = rl;
 	l->__mb_cur_max = 4;
-	l->__mb_sb_limit = 256;
+	l->__mb_sb_limit = 128;
 	return (0);
 }
 

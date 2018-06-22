@@ -16,29 +16,41 @@ _PRIVATELIBS=	\
 		atf_c \
 		atf_cxx \
 		bsdstat \
+		devdctl \
 		event \
 		heimipcc \
 		heimipcs \
+		ifconfig \
 		ldns \
 		sqlite3 \
 		ssh \
 		ucl \
-		unbound
+		unbound \
+		zstd
+
+_PRIVATELIBS+=	png
 
 _INTERNALLIBS=	\
 		amu \
+		bfd \
+		binutils \
 		bsnmptools \
 		cron \
 		elftc \
 		fifolog \
+		gdb \
+		iberty \
 		ipf \
 		lpr \
 		netbsd \
 		ntp \
 		ntpevent \
+		opcodes \
 		openbsd \
 		opts \
 		parse \
+		pe \
+		pmcstat \
 		readline \
 		sl \
 		sm \
@@ -65,12 +77,20 @@ _LIBRARIES=	\
 		bz2 \
 		c \
 		c_cheri \
+		c_nosyscalls \
 		c_pic \
 		calendar \
 		cam \
-		capsicum \
 		casper \
 		cheri \
+		cheri_support \
+		cheri_syscalls \
+		cap_dns \
+		cap_grp \
+		cap_pwd \
+		cap_random \
+		cap_sysctl \
+		cap_syslog \
 		com_err \
 		compiler_rt \
 		crypt \
@@ -81,14 +101,17 @@ _LIBRARIES=	\
 		cuse \
 		cxxrt \
 		devctl \
+		devdctl \
 		devinfo \
 		devstat \
 		dialog \
 		dom \
+		dl \
 		dpv \
 		dtrace \
 		dwarf \
 		edit \
+		efivar \
 		elf \
 		execinfo \
 		fetch \
@@ -143,7 +166,6 @@ _LIBRARIES=	\
 		pcsclite \
 		pjdlog \
 		pmc \
-		png \
 		png_sb \
 		proc \
 		procstat \
@@ -165,6 +187,7 @@ _LIBRARIES=	\
 		stdthreads \
 		supcplusplus \
 		svgtiny \
+		syscalls \
 		sysdecode \
 		tacplus \
 		termcap \
@@ -189,28 +212,36 @@ _LIBRARIES=	\
 		zfs \
 		zpool \
 
+.if ${MK_BLACKLIST} != "no"
+_LIBRARIES+= \
+		blacklist \
+
+.endif
+
 .if ${MK_OFED} != "no"
 _LIBRARIES+= \
 		cxgb4 \
 		ibcm \
-		ibcommon \
 		ibmad \
-		ibsdp \
+		ibnetdisc \
 		ibumad \
 		ibverbs \
 		mlx4 \
-		mthca \
-		opensm \
-		osmcomp \
-		osmvendor \
+		mlx5 \
 		rdmacm \
-
+		osmcomp \
+		opensm \
+		osmvendor
 .endif
 
 # Each library's LIBADD needs to be duplicated here for static linkage of
 # 2nd+ order consumers.  Auto-generating this would be better.
 _DP_80211=	sbuf bsdxml
 _DP_archive=	z bz2 lzma bsdxml
+_DP_zstd=	pthread
+.if ${MK_BLACKLIST} != "no"
+_DP_blacklist+=	pthread
+.endif
 .if ${MK_OPENSSL} != "no"
 _DP_archive+=	crypto
 .else
@@ -228,9 +259,14 @@ _DP_bsnmp=	crypto
 .endif
 _DP_geom=	bsdxml sbuf
 _DP_cam=	sbuf
-_DP_casper=	capsicum nv pjdlog
-_DP_capsicum=	nv
 _DP_kvm=	elf
+_DP_casper=	nv
+_DP_cap_dns=	nv
+_DP_cap_grp=	nv
+_DP_cap_pwd=	nv
+_DP_cap_random=	nv
+_DP_cap_sysctl=	nv
+_DP_cap_syslog=	nv
 _DP_pjdlog=	util
 _DP_png=	z
 _DP_opie=	md
@@ -242,6 +278,7 @@ _DP_radius=	md
 .else
 _DP_radius=	crypto
 .endif
+_DP_rtld_db=	elf procstat
 _DP_procstat=	kvm util elf
 .if ${MK_CXX} == "yes"
 .if ${MK_LIBCPLUSPLUS} != "no"
@@ -253,7 +290,7 @@ _DP_proc=	supcplusplus
 .if ${MK_CDDL} != "no"
 _DP_proc+=	ctf
 .endif
-_DP_proc+=	elf rtld_db util
+_DP_proc+=	elf procstat rtld_db util
 _DP_mp=	crypto
 _DP_memstat=	kvm
 _DP_magic=	z
@@ -306,8 +343,10 @@ _DP_xo=		util
 # The libc dependencies are not strictly needed but are defined to make the
 # assert happy.
 _DP_c=		compiler_rt
+_DP_c_nosyscalls=		compiler_rt
 .if ${MK_SSP} != "no"
 _DP_c+=		ssp_nonshared
+_DP_c_nosyscalls+=		ssp_nonshared
 .endif
 _DP_stdthreads=	pthread
 _DP_tacplus=	md
@@ -321,23 +360,41 @@ _DP_ipf=	kvm
 _DP_zfs=	md pthread umem util uutil m nvpair avl bsdxml geom nvpair z \
 		zfs_core
 _DP_zfs_core=	nvpair
+_DP_uutil=	nvpair
+_DP_avl=	nvpair
 _DP_zpool=	md pthread z nvpair avl umem
+
+# OFED support
+.if ${MK_OFED} != "no"
+_DP_cxgb4=	ibverbs pthread
+_DP_ibcm=	ibverbs
+_DP_ibmad=	ibumad
+_DP_ibnetdisc=	osmcomp ibmad ibumad
+_DP_ibumad=	
+_DP_ibverbs=
+_DP_mlx4=	ibverbs pthread
+_DP_mlx5=	ibverbs pthread
+_DP_rdmacm=	ibverbs
+_DP_osmcomp=	pthread
+_DP_opensm=	pthread
+_DP_osmvendor=	ibumad pthread
+.endif
 
 _DP_helloworld=	cheri
 
 # Define special cases
 LDADD_supcplusplus=	-lsupc++
-LIBATF_C=	${DESTDIR}${LIBDIR}/libprivateatf-c.a
-LIBATF_CXX=	${DESTDIR}${LIBDIR}/libprivateatf-c++.a
+LIBATF_C=	${LIBDESTDIR}${LIBDIR_BASE}/libprivateatf-c.a
+LIBATF_CXX=	${LIBDESTDIR}${LIBDIR_BASE}/libprivateatf-c++.a
 LDADD_atf_c=	-lprivateatf-c
 LDADD_atf_cxx=	-lprivateatf-c++
 
 .for _l in ${_PRIVATELIBS}
-LIB${_l:tu}?=	${DESTDIR}${LIBDIR}/libprivate${_l}.a
+LIB${_l:tu}?=	${LIBDESTDIR}${LIBDIR_BASE}/libprivate${_l}.a
 .endfor
 
 .for _l in ${_LIBRARIES}
-.if ${_INTERNALLIBS:M${_l}}
+.if ${_INTERNALLIBS:M${_l}} || !defined(SYSROOT)
 LDADD_${_l}_L+=		-L${LIB${_l:tu}DIR}
 .endif
 DPADD_${_l}?=	${LIB${_l:tu}}
@@ -384,150 +441,192 @@ DPADD+=		${DPADD_${_l}}
 LDADD+=		${LDADD_${_l}}
 .endfor
 
+_LIB_OBJTOP?=	${OBJTOP}
+
 # INTERNALLIB definitions.
-LIBELFTCDIR=	${OBJTOP}/lib/libelftc
+LIBELFTCDIR=	${_LIB_OBJTOP}/lib/libelftc
 LIBELFTC?=	${LIBELFTCDIR}/libelftc.a
 
-LIBREADLINEDIR=	${OBJTOP}/gnu/lib/libreadline/readline
+LIBPEDIR=	${_LIB_OBJTOP}/lib/libpe
+LIBPE?=		${LIBPEDIR}/libpe.a
+
+LIBREADLINEDIR=	${_LIB_OBJTOP}/gnu/lib/libreadline/readline
 LIBREADLINE?=	${LIBREADLINEDIR}/libreadline.a
 
-LIBOPENBSDDIR=	${OBJTOP}/lib/libopenbsd
+LIBOPENBSDDIR=	${_LIB_OBJTOP}/lib/libopenbsd
 LIBOPENBSD?=	${LIBOPENBSDDIR}/libopenbsd.a
 
-LIBSMDIR=	${OBJTOP}/lib/libsm
+LIBSMDIR=	${_LIB_OBJTOP}/lib/libsm
 LIBSM?=		${LIBSMDIR}/libsm.a
 
-LIBSMDBDIR=	${OBJTOP}/lib/libsmdb
+LIBSMDBDIR=	${_LIB_OBJTOP}/lib/libsmdb
 LIBSMDB?=	${LIBSMDBDIR}/libsmdb.a
 
-LIBSMUTILDIR=	${OBJTOP}/lib/libsmutil
-LIBSMUTIL?=	${LIBSMDBDIR}/libsmutil.a
+LIBSMUTILDIR=	${_LIB_OBJTOP}/lib/libsmutil
+LIBSMUTIL?=	${LIBSMUTILDIR}/libsmutil.a
 
-LIBNETBSDDIR?=	${OBJTOP}/lib/libnetbsd
+LIBNETBSDDIR?=	${_LIB_OBJTOP}/lib/libnetbsd
 LIBNETBSD?=	${LIBNETBSDDIR}/libnetbsd.a
 
-LIBVERSDIR?=	${OBJTOP}/kerberos5/lib/libvers
+LIBVERSDIR?=	${_LIB_OBJTOP}/kerberos5/lib/libvers
 LIBVERS?=	${LIBVERSDIR}/libvers.a
 
-LIBSLDIR=	${OBJTOP}/kerberos5/lib/libsl
+LIBSLDIR=	${_LIB_OBJTOP}/kerberos5/lib/libsl
 LIBSL?=		${LIBSLDIR}/libsl.a
 
-LIBIPFDIR=	${OBJTOP}/sbin/ipf/libipf
+LIBIPFDIR=	${_LIB_OBJTOP}/sbin/ipf/libipf
 LIBIPF?=	${LIBIPFDIR}/libipf.a
 
-LIBTELNETDIR=	${OBJTOP}/lib/libtelnet
+LIBTELNETDIR=	${_LIB_OBJTOP}/lib/libtelnet
 LIBTELNET?=	${LIBTELNETDIR}/libtelnet.a
 
-LIBCRONDIR=	${OBJTOP}/usr.sbin/cron/lib
+LIBCRONDIR=	${_LIB_OBJTOP}/usr.sbin/cron/lib
 LIBCRON?=	${LIBCRONDIR}/libcron.a
 
-LIBNTPDIR=	${OBJTOP}/usr.sbin/ntp/libntp
+LIBNTPDIR=	${_LIB_OBJTOP}/usr.sbin/ntp/libntp
 LIBNTP?=	${LIBNTPDIR}/libntp.a
 
-LIBNTPEVENTDIR=	${OBJTOP}/usr.sbin/ntp/libntpevent
+LIBNTPEVENTDIR=	${_LIB_OBJTOP}/usr.sbin/ntp/libntpevent
 LIBNTPEVENT?=	${LIBNTPEVENTDIR}/libntpevent.a
 
-LIBOPTSDIR=	${OBJTOP}/usr.sbin/ntp/libopts
+LIBOPTSDIR=	${_LIB_OBJTOP}/usr.sbin/ntp/libopts
 LIBOPTS?=	${LIBOPTSDIR}/libopts.a
 
-LIBPARSEDIR=	${OBJTOP}/usr.sbin/ntp/libparse
+LIBPARSEDIR=	${_LIB_OBJTOP}/usr.sbin/ntp/libparse
 LIBPARSE?=	${LIBPARSEDIR}/libparse.a
 
-LIBLPRDIR=	${OBJTOP}/usr.sbin/lpr/common_source
-LIBLPR?=	${LIBOPTSDIR}/liblpr.a
+LIBLPRDIR=	${_LIB_OBJTOP}/usr.sbin/lpr/common_source
+LIBLPR?=	${LIBLPRDIR}/liblpr.a
 
-LIBFIFOLOGDIR=	${OBJTOP}/usr.sbin/fifolog/lib
-LIBFIFOLOG?=	${LIBOPTSDIR}/libfifolog.a
+LIBFIFOLOGDIR=	${_LIB_OBJTOP}/usr.sbin/fifolog/lib
+LIBFIFOLOG?=	${LIBFIFOLOGDIR}/libfifolog.a
 
-LIBBSNMPTOOLSDIR=	${OBJTOP}/usr.sbin/bsnmpd/tools/libbsnmptools
+LIBBSNMPTOOLSDIR=	${_LIB_OBJTOP}/usr.sbin/bsnmpd/tools/libbsnmptools
 LIBBSNMPTOOLS?=	${LIBBSNMPTOOLSDIR}/libbsnmptools.a
 
-LIBAMUDIR=	${OBJTOP}/usr.sbin/amd/libamu
-LIBAMU?=	${LIBAMUDIR}/libamu/libamu.a
+LIBAMUDIR=	${_LIB_OBJTOP}/usr.sbin/amd/libamu
+LIBAMU?=	${LIBAMUDIR}/libamu.a
+
+LIBPMCSTATDIR=	${_LIB_OBJTOP}/lib/libpmcstat
+LIBPMCSTAT?=	${LIBPMCSTATDIR}/libpmcstat.a
+
+LIBBFDDIR=	${_LIB_OBJTOP}/gnu/usr.bin/binutils/libbfd
+LIBBFD?=	${LIBBFDDIR}/libbfd.a
+
+LIBBINUTILSDIR=	${_LIB_OBJTOP}/gnu/usr.bin/binutils/libbinutils
+LIBBINUTILS?=	${LIBBINUTILSDIR}/libbinutils.a
+
+LIBGDBDIR=	${_LIB_OBJTOP}/gnu/usr.bin/gdb/libgdb
+LIBGDB?=	${LIBGDBDIR}/libgdb.a
+
+LIBIBERTYDIR=	${_LIB_OBJTOP}/gnu/usr.bin/binutils/libiberty
+LIBIBERTY?=	${LIBIBERTYDIR}/libiberty.a
+
+LIBOPCODESDIR=	${_LIB_OBJTOP}/gnu/usr.bin/binutils/libopcodes
+LIBOPCODES?=	${LIBOPCODESDIR}/libopcodes.a
 
 # Define a directory for each library.  This is useful for adding -L in when
 # not using a --sysroot or for meta mode bootstrapping when there is no
 # Makefile.depend.  These are sorted by directory.
-LIBAVLDIR=	${OBJTOP}/cddl/lib/libavl
-LIBCTFDIR=	${OBJTOP}/cddl/lib/libctf
-LIBDTRACEDIR=	${OBJTOP}/cddl/lib/libdtrace
-LIBNVPAIRDIR=	${OBJTOP}/cddl/lib/libnvpair
-LIBUMEMDIR=	${OBJTOP}/cddl/lib/libumem
-LIBUUTILDIR=	${OBJTOP}/cddl/lib/libuutil
-LIBZFSDIR=	${OBJTOP}/cddl/lib/libzfs
-LIBZFS_COREDIR=	${OBJTOP}/cddl/lib/libzfs_core
-LIBZPOOLDIR=	${OBJTOP}/cddl/lib/libzpool
-LIBCXGB4DIR=	${OBJTOP}/contrib/ofed/usr.lib/libcxgb4
-LIBIBCMDIR=	${OBJTOP}/contrib/ofed/usr.lib/libibcm
-LIBIBCOMMONDIR=	${OBJTOP}/contrib/ofed/usr.lib/libibcommon
-LIBIBMADDIR=	${OBJTOP}/contrib/ofed/usr.lib/libibmad
-LIBIBUMADDIR=	${OBJTOP}/contrib/ofed/usr.lib/libibumad
-LIBIBVERBSDIR=	${OBJTOP}/contrib/ofed/usr.lib/libibverbs
-LIBMLX4DIR=	${OBJTOP}/contrib/ofed/usr.lib/libmlx4
-LIBMTHCADIR=	${OBJTOP}/contrib/ofed/usr.lib/libmthca
-LIBOPENSMDIR=	${OBJTOP}/contrib/ofed/usr.lib/libopensm
-LIBOSMCOMPDIR=	${OBJTOP}/contrib/ofed/usr.lib/libosmcomp
-LIBOSMVENDORDIR=	${OBJTOP}/contrib/ofed/usr.lib/libosmvendor
-LIBRDMACMDIR=	${OBJTOP}/contrib/ofed/usr.lib/librdmacm
-LIBIBSDPDIR=	${OBJTOP}/contrib/ofed/usr.lib/libsdp
-LIBDIALOGDIR=	${OBJTOP}/gnu/lib/libdialog
-LIBGCOVDIR=	${OBJTOP}/gnu/lib/libgcov
-LIBGOMPDIR=	${OBJTOP}/gnu/lib/libgomp
-LIBGNUREGEXDIR=	${OBJTOP}/gnu/lib/libregex
-LIBSSPDIR=	${OBJTOP}/gnu/lib/libssp
-LIBSSP_NONSHAREDDIR=	${OBJTOP}/gnu/lib/libssp/libssp_nonshared
-LIBSUPCPLUSPLUSDIR=	${OBJTOP}/gnu/lib/libsupc++
-LIBASN1DIR=	${OBJTOP}/kerberos5/lib/libasn1
-LIBGSSAPI_KRB5DIR=	${OBJTOP}/kerberos5/lib/libgssapi_krb5
-LIBGSSAPI_NTLMDIR=	${OBJTOP}/kerberos5/lib/libgssapi_ntlm
-LIBGSSAPI_SPNEGODIR=	${OBJTOP}/kerberos5/lib/libgssapi_spnego
-LIBHDBDIR=	${OBJTOP}/kerberos5/lib/libhdb
-LIBHEIMBASEDIR=	${OBJTOP}/kerberos5/lib/libheimbase
-LIBHEIMIPCCDIR=	${OBJTOP}/kerberos5/lib/libheimipcc
-LIBHEIMIPCSDIR=	${OBJTOP}/kerberos5/lib/libheimipcs
-LIBHEIMNTLMDIR=	${OBJTOP}/kerberos5/lib/libheimntlm
-LIBHX509DIR=	${OBJTOP}/kerberos5/lib/libhx509
-LIBKADM5CLNTDIR=	${OBJTOP}/kerberos5/lib/libkadm5clnt
-LIBKADM5SRVDIR=	${OBJTOP}/kerberos5/lib/libkadm5srv
-LIBKAFS5DIR=	${OBJTOP}/kerberos5/lib/libkafs5
-LIBKDCDIR=	${OBJTOP}/kerberos5/lib/libkdc
-LIBKRB5DIR=	${OBJTOP}/kerberos5/lib/libkrb5
-LIBROKENDIR=	${OBJTOP}/kerberos5/lib/libroken
-LIBWINDDIR=	${OBJTOP}/kerberos5/lib/libwind
-LIBALIASDIR=	${OBJTOP}/lib/libalias/libalias
-LIBBLOCKSRUNTIMEDIR=	${OBJTOP}/lib/libblocksruntime
-LIBBSNMPDIR=	${OBJTOP}/lib/libbsnmp/libbsnmp
-LIBBSDXMLDIR=	${OBJTOP}/lib/libexpat
-LIBKVMDIR=	${OBJTOP}/lib/libkvm
-LIBPTHREADDIR=	${OBJTOP}/lib/libthr
-LIBMDIR=	${OBJTOP}/lib/msun
-LIBFORMDIR=	${OBJTOP}/lib/ncurses/form
-LIBFORMLIBWDIR=	${OBJTOP}/lib/ncurses/formw
-LIBMENUDIR=	${OBJTOP}/lib/ncurses/menu
-LIBMENULIBWDIR=	${OBJTOP}/lib/ncurses/menuw
-LIBNCURSESDIR=	${OBJTOP}/lib/ncurses/ncurses
-LIBNCURSESWDIR=	${OBJTOP}/lib/ncurses/ncursesw
-LIBPANELDIR=	${OBJTOP}/lib/ncurses/panel
-LIBPANELWDIR=	${OBJTOP}/lib/ncurses/panelw
-LIBCRYPTODIR=	${OBJTOP}/secure/lib/libcrypto
-LIBSSHDIR=	${OBJTOP}/secure/lib/libssh
-LIBSSLDIR=	${OBJTOP}/secure/lib/libssl
-LIBTEKENDIR=	${OBJTOP}/sys/teken/libteken
-LIBEGACYDIR=	${OBJTOP}/tools/build
-LIBLNDIR=	${OBJTOP}/usr.bin/lex/lib
+LIBAVLDIR=	${_LIB_OBJTOP}/cddl/lib/libavl
+LIBCTFDIR=	${_LIB_OBJTOP}/cddl/lib/libctf
+LIBDTRACEDIR=	${_LIB_OBJTOP}/cddl/lib/libdtrace
+LIBNVPAIRDIR=	${_LIB_OBJTOP}/cddl/lib/libnvpair
+LIBUMEMDIR=	${_LIB_OBJTOP}/cddl/lib/libumem
+LIBUUTILDIR=	${_LIB_OBJTOP}/cddl/lib/libuutil
+LIBZFSDIR=	${_LIB_OBJTOP}/cddl/lib/libzfs
+LIBZFS_COREDIR=	${_LIB_OBJTOP}/cddl/lib/libzfs_core
+LIBZPOOLDIR=	${_LIB_OBJTOP}/cddl/lib/libzpool
+LIBCXGB4DIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libcxgb4
+LIBIBCMDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libibcm
+LIBIBCOMMONDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libibcommon
+LIBIBMADDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libibmad
+LIBIBUMADDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libibumad
+LIBIBVERBSDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libibverbs
+LIBMLX4DIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libmlx4
+LIBMTHCADIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libmthca
+LIBOPENSMDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libopensm
+LIBOSMCOMPDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libosmcomp
+LIBOSMVENDORDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libosmvendor
+LIBRDMACMDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/librdmacm
+LIBIBSDPDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libsdp
+
+# OFED support
+LIBCXGB4DIR=	${_LIB_OBJTOP}/contrib/ofed/libcxgb4
+LIBIBCMDIR=	${_LIB_OBJTOP}/contrib/ofed/libibcm
+LIBIBMADDIR=	${_LIB_OBJTOP}/contrib/ofed/libibmad
+LIBIBNETDISCDIR=${_LIB_OBJTOP}/contrib/ofed/libibnetdisc
+LIBIBUMADDIR=	${_LIB_OBJTOP}/contrib/ofed/libibumad
+LIBIBVERBSDIR=	${_LIB_OBJTOP}/contrib/ofed/libibverbs
+LIBMLX4DIR=	${_LIB_OBJTOP}/contrib/ofed/libmlx4
+LIBMLX5DIR=	${_LIB_OBJTOP}/contrib/ofed/libmlx5
+LIBRDMACMDIR=	${_LIB_OBJTOP}/contrib/ofed/librdmacm
+LIBOSMCOMPDIR=	${_LIB_OBJTOP}/contrib/ofed/opensm/complib
+LIBOPENSMDIR=	${_LIB_OBJTOP}/contrib/ofed/opensm/libopensm
+LIBOSMVENDORDIR=${_LIB_OBJTOP}/contrib/ofed/opensm/libvendor
+
+LIBDIALOGDIR=	${_LIB_OBJTOP}/gnu/lib/libdialog
+LIBGCOVDIR=	${_LIB_OBJTOP}/gnu/lib/libgcov
+LIBGOMPDIR=	${_LIB_OBJTOP}/gnu/lib/libgomp
+LIBGNUREGEXDIR=	${_LIB_OBJTOP}/gnu/lib/libregex
+LIBSSPDIR=	${_LIB_OBJTOP}/gnu/lib/libssp
+LIBSSP_NONSHAREDDIR=	${_LIB_OBJTOP}/gnu/lib/libssp/libssp_nonshared
+LIBSUPCPLUSPLUSDIR=	${_LIB_OBJTOP}/gnu/lib/libsupc++
+LIBASN1DIR=	${_LIB_OBJTOP}/kerberos5/lib/libasn1
+LIBGSSAPI_KRB5DIR=	${_LIB_OBJTOP}/kerberos5/lib/libgssapi_krb5
+LIBGSSAPI_NTLMDIR=	${_LIB_OBJTOP}/kerberos5/lib/libgssapi_ntlm
+LIBGSSAPI_SPNEGODIR=	${_LIB_OBJTOP}/kerberos5/lib/libgssapi_spnego
+LIBHDBDIR=	${_LIB_OBJTOP}/kerberos5/lib/libhdb
+LIBHEIMBASEDIR=	${_LIB_OBJTOP}/kerberos5/lib/libheimbase
+LIBHEIMIPCCDIR=	${_LIB_OBJTOP}/kerberos5/lib/libheimipcc
+LIBHEIMIPCSDIR=	${_LIB_OBJTOP}/kerberos5/lib/libheimipcs
+LIBHEIMNTLMDIR=	${_LIB_OBJTOP}/kerberos5/lib/libheimntlm
+LIBHX509DIR=	${_LIB_OBJTOP}/kerberos5/lib/libhx509
+LIBKADM5CLNTDIR=	${_LIB_OBJTOP}/kerberos5/lib/libkadm5clnt
+LIBKADM5SRVDIR=	${_LIB_OBJTOP}/kerberos5/lib/libkadm5srv
+LIBKAFS5DIR=	${_LIB_OBJTOP}/kerberos5/lib/libkafs5
+LIBKDCDIR=	${_LIB_OBJTOP}/kerberos5/lib/libkdc
+LIBKRB5DIR=	${_LIB_OBJTOP}/kerberos5/lib/libkrb5
+LIBROKENDIR=	${_LIB_OBJTOP}/kerberos5/lib/libroken
+LIBWINDDIR=	${_LIB_OBJTOP}/kerberos5/lib/libwind
+LIBATF_CDIR=	${_LIB_OBJTOP}/lib/atf/libatf-c
+LIBATF_CXXDIR=	${_LIB_OBJTOP}/lib/atf/libatf-c++
+LIBALIASDIR=	${_LIB_OBJTOP}/lib/libalias/libalias
+LIBBLACKLISTDIR=	${_LIB_OBJTOP}/lib/libblacklist
+LIBBLOCKSRUNTIMEDIR=	${_LIB_OBJTOP}/lib/libblocksruntime
+LIBBSNMPDIR=	${_LIB_OBJTOP}/lib/libbsnmp/libbsnmp
+LIBCASPERDIR=	${_LIB_OBJTOP}/lib/libcasper/libcasper
+LIBCAP_DNSDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_dns
+LIBCAP_GRPDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_grp
+LIBCAP_PWDDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_pwd
+LIBCAP_RANDOMDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_random
+LIBCAP_SYSCTLDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_sysctl
+LIBCAP_SYSLOGDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_syslog
+LIBBSDXMLDIR=	${_LIB_OBJTOP}/lib/libexpat
+LIBKVMDIR=	${_LIB_OBJTOP}/lib/libkvm
+LIBPTHREADDIR=	${_LIB_OBJTOP}/lib/libthr
+LIBMDIR=	${_LIB_OBJTOP}/lib/msun
+LIBFORMDIR=	${_LIB_OBJTOP}/lib/ncurses/form
+LIBFORMLIBWDIR=	${_LIB_OBJTOP}/lib/ncurses/formw
+LIBMENUDIR=	${_LIB_OBJTOP}/lib/ncurses/menu
+LIBMENULIBWDIR=	${_LIB_OBJTOP}/lib/ncurses/menuw
+LIBNCURSESDIR=	${_LIB_OBJTOP}/lib/ncurses/ncurses
+LIBNCURSESWDIR=	${_LIB_OBJTOP}/lib/ncurses/ncursesw
+LIBPANELDIR=	${_LIB_OBJTOP}/lib/ncurses/panel
+LIBPANELWDIR=	${_LIB_OBJTOP}/lib/ncurses/panelw
+LIBCRYPTODIR=	${_LIB_OBJTOP}/secure/lib/libcrypto
+LIBSSHDIR=	${_LIB_OBJTOP}/secure/lib/libssh
+LIBSSLDIR=	${_LIB_OBJTOP}/secure/lib/libssl
+LIBTEKENDIR=	${_LIB_OBJTOP}/sys/teken/libteken
+LIBEGACYDIR=	${_LIB_OBJTOP}/tools/build
+LIBLNDIR=	${_LIB_OBJTOP}/usr.bin/lex/lib
 
 LIBTERMCAPDIR=	${LIBNCURSESDIR}
 LIBTERMCAPWDIR=	${LIBNCURSESWDIR}
 
-_NETSURF_LIBS=	css dom hubbub nsbmp nsfb nsgif parserutils rosprite svgtiny wapcaplet
-.for lib in ${_NETSURF_LIBS}
-LIB${lib:tu}DIR?=	${OBJTOP}/lib/netsurf/lib${lib}
-LIB${lib:tu}?=		${DESTDIR}${LIBDIR}/lib${lib}.a
-.endfor
-
 # Default other library directories to lib/libNAME.
 .for lib in ${_LIBRARIES}
-LIB${lib:tu}DIR?=	${OBJTOP}/lib/lib${lib}
+LIB${lib:tu}DIR?=	${_LIB_OBJTOP}/lib/lib${lib}
 .endfor
 
 # Validate that listed LIBADD are valid.
@@ -548,8 +647,8 @@ _BADLIBADD+= ${_l}
 .endif
 # Note that OBJTOP is not yet defined here but for the purpose of the check
 # it is fine as it resolves to the SRC directory.
-.if !defined(LIB${LIB:tu}DIR) || !exists(${SRCTOP}/${LIB${LIB:tu}DIR:S,^${OBJTOP}/,,})
-.error ${.CURDIR}: Missing or incorrect value for LIB${LIB:tu}DIR in ${_this:T}: ${LIB${LIB:tu}DIR:S,^${OBJTOP}/,,}
+.if !defined(LIB${LIB:tu}DIR) || !exists(${SRCTOP}/${LIB${LIB:tu}DIR:S,^${_LIB_OBJTOP}/,,})
+.error ${.CURDIR}: Missing or incorrect value for LIB${LIB:tu}DIR in ${_this:T}: ${LIB${LIB:tu}DIR:S,^${_LIB_OBJTOP}/,,}
 .endif
 .if ${_INTERNALLIBS:M${LIB}} != "" && !defined(LIB${LIB:tu})
 .error ${.CURDIR}: Missing value for LIB${LIB:tu} in ${_this:T}.  Likely should be: LIB${LIB:tu}?= $${LIB${LIB:tu}DIR}/lib${LIB}.a

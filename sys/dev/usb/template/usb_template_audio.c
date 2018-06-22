@@ -1,5 +1,7 @@
 /* $FreeBSD$ */
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2010 Hans Petter Selasky. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -199,8 +201,8 @@ static const void *audio_raw_iface_0_desc[] = {
 static const struct usb_temp_interface_desc audio_iface_0 = {
 	.ppEndpoints = NULL,		/* no endpoints */
 	.ppRawDesc = audio_raw_iface_0_desc,
-	.bInterfaceClass = 1,
-	.bInterfaceSubClass = 1,
+	.bInterfaceClass = UICLASS_AUDIO,
+	.bInterfaceSubClass = UISUBCLASS_AUDIOCONTROL,
 	.bInterfaceProtocol = 0,
 	.iInterface = INDEX_AUDIO_MIXER,
 };
@@ -257,8 +259,8 @@ static const struct usb_temp_endpoint_desc *audio_iface_1_ep[] = {
 static const struct usb_temp_interface_desc audio_iface_1_alt_0 = {
 	.ppEndpoints = NULL,		/* no endpoints */
 	.ppRawDesc = NULL,		/* no raw descriptors */
-	.bInterfaceClass = 1,
-	.bInterfaceSubClass = 2,
+	.bInterfaceClass = UICLASS_AUDIO,
+	.bInterfaceSubClass = UISUBCLASS_AUDIOSTREAM,
 	.bInterfaceProtocol = 0,
 	.iInterface = INDEX_AUDIO_PLAYBACK,
 };
@@ -266,8 +268,8 @@ static const struct usb_temp_interface_desc audio_iface_1_alt_0 = {
 static const struct usb_temp_interface_desc audio_iface_1_alt_1 = {
 	.ppEndpoints = audio_iface_1_ep,
 	.ppRawDesc = audio_raw_iface_1_desc,
-	.bInterfaceClass = 1,
-	.bInterfaceSubClass = 2,
+	.bInterfaceClass = UICLASS_AUDIO,
+	.bInterfaceSubClass = UISUBCLASS_AUDIOSTREAM,
 	.bInterfaceProtocol = 0,
 	.iInterface = INDEX_AUDIO_PLAYBACK,
 	.isAltInterface = 1,		/* this is an alternate setting */
@@ -315,8 +317,8 @@ static const struct usb_temp_endpoint_desc *audio_iface_2_ep[] = {
 static const struct usb_temp_interface_desc audio_iface_2_alt_0 = {
 	.ppEndpoints = NULL,		/* no endpoints */
 	.ppRawDesc = NULL,		/* no raw descriptors */
-	.bInterfaceClass = 1,
-	.bInterfaceSubClass = 2,
+	.bInterfaceClass = UICLASS_AUDIO,
+	.bInterfaceSubClass = UISUBCLASS_AUDIOSTREAM,
 	.bInterfaceProtocol = 0,
 	.iInterface = INDEX_AUDIO_RECORD,
 };
@@ -324,8 +326,8 @@ static const struct usb_temp_interface_desc audio_iface_2_alt_0 = {
 static const struct usb_temp_interface_desc audio_iface_2_alt_1 = {
 	.ppEndpoints = audio_iface_2_ep,
 	.ppRawDesc = audio_raw_iface_2_desc,
-	.bInterfaceClass = 1,
-	.bInterfaceSubClass = 2,
+	.bInterfaceClass = UICLASS_AUDIO,
+	.bInterfaceSubClass = UISUBCLASS_AUDIOSTREAM,
 	.bInterfaceProtocol = 0,
 	.iInterface = INDEX_AUDIO_RECORD,
 	.isAltInterface = 1,		/* this is an alternate setting */

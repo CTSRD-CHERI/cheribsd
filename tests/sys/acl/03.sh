@@ -42,6 +42,10 @@ if [ $(id -u) -ne 0 ]; then
 	echo "1..0 # SKIP you must be root"
 	exit 0
 fi
+if [ -z "$(which perl)" ]; then
+	echo "1..0 # SKIP perl must be installed"
+	exit 0
+fi
 
 echo "1..5"
 
@@ -89,7 +93,7 @@ echo "ok 3"
 
 cd $MNTROOT
 
-perl $TESTDIR/run $TESTDIR/tools-crossfs.test > /dev/null
+perl $TESTDIR/run $TESTDIR/tools-crossfs.test >&2
 
 if [ $? -eq 0 ]; then
 	echo "ok 4"

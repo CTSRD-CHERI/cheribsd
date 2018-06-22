@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1988, 1990, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -47,6 +49,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/proc.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#ifndef INVARIANTS
+#include <sys/syslog.h>
+#endif
 #include <sys/protosw.h>
 #include <sys/random.h>
 
@@ -186,7 +191,7 @@ tcp_tw_init(void)
 {
 
 	V_tcptw_zone = uma_zcreate("tcptw", sizeof(struct tcptw),
-	    NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_NOFREE);
+	    NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, 0);
 	TUNABLE_INT_FETCH("net.inet.tcp.maxtcptw", &maxtcptw);
 	if (maxtcptw == 0)
 		uma_zone_set_max(V_tcptw_zone, tcptw_auto_size());
@@ -230,6 +235,10 @@ tcp_twstart(struct tcpcb *tp)
 
 	INP_INFO_RLOCK_ASSERT(&V_tcbinfo);
 	INP_WLOCK_ASSERT(inp);
+
+	/* A dropped inp should never transition to TIME_WAIT state. */
+	KASSERT((inp->inp_flags & INP_DROPPED) == 0, ("tcp_twstart: "
+	    "(inp->inp_flags & INP_DROPPED) != 0"));
 
 	if (V_nolocaltimewait) {
 		int error = 0;
@@ -336,6 +345,7 @@ tcp_twstart(struct tcpcb *tp)
 		tcp_twrespond(tw, TH_ACK);
 	inp->inp_ppcb = tw;
 	inp->inp_flags |= INP_TIMEWAIT;
+	TCPSTATES_INC(TCPS_TIME_WAIT);
 	tcp_tw_2msl_reset(tw, 0);
 
 	/*
@@ -347,7 +357,6 @@ tcp_twstart(struct tcpcb *tp)
 		    ("tcp_twstart: !SS_PROTOREF"));
 		inp->inp_flags &= ~INP_SOCKREF;
 		INP_WUNLOCK(inp);
-		ACCEPT_LOCK();
 		SOCK_LOCK(so);
 		so->so_state &= ~SS_PROTOREF;
 		sofree(so);
@@ -486,7 +495,6 @@ tcp_twclose(struct tcptw *tw, int reuse)
 		if (inp->inp_flags & INP_SOCKREF) {
 			inp->inp_flags &= ~INP_SOCKREF;
 			INP_WUNLOCK(inp);
-			ACCEPT_LOCK();
 			SOCK_LOCK(so);
 			KASSERT(so->so_state & SS_PROTOREF,
 			    ("tcp_twclose: INP_SOCKREF && !SS_PROTOREF"));
@@ -660,7 +668,7 @@ tcp_tw_2msl_stop(struct tcptw *tw, int reuse)
 
 	if (!reuse)
 		uma_zfree(V_tcptw_zone, tw);
-	TCPSTAT_DEC(tcps_states[TCPS_TIME_WAIT]);
+	TCPSTATES_DEC(TCPS_TIME_WAIT);
 }
 
 struct tcptw *
@@ -706,10 +714,29 @@ tcp_tw_2msl_scan(int reuse)
 			INP_WLOCK(inp);
 			tw = intotw(inp);
 			if (in_pcbrele_wlocked(inp)) {
-				KASSERT(tw == NULL, ("%s: held last inp "
-				    "reference but tw not NULL", __func__));
-				INP_INFO_RUNLOCK(&V_tcbinfo);
-				continue;
+				if (__predict_true(tw == NULL)) {
+					INP_INFO_RUNLOCK(&V_tcbinfo);
+					continue;
+				} else {
+					/* This should not happen as in TIMEWAIT
+					 * state the inp should not be destroyed
+					 * before its tcptw. If INVARIANTS is
+					 * defined panic.
+					 */
+#ifdef INVARIANTS
+					panic("%s: Panic before an infinite "
+					    "loop: INP_TIMEWAIT && (INP_FREED "
+					    "|| inp last reference) && tw != "
+					    "NULL", __func__);
+#else
+					log(LOG_ERR, "%s: Avoid an infinite "
+					    "loop: INP_TIMEWAIT && (INP_FREED "
+					    "|| inp last reference) && tw != "
+					    "NULL", __func__);
+#endif
+					INP_INFO_RUNLOCK(&V_tcbinfo);
+					break;
+				}
 			}
 
 			if (tw == NULL) {

@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (C) 2010 David Xu <davidxu@freebsd.org>.
  * Copyright (C) 2000 Jason Evans <jasone@freebsd.org>.
  * All rights reserved.
@@ -28,6 +30,16 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $FreeBSD$
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
  */
 
 /*
@@ -106,6 +118,7 @@ typedef struct sem* sem_t;
 static sem_t sem_alloc(unsigned int value, semid_t semid, int system_sem);
 static void  sem_free(sem_t sem);
 
+#ifndef __CHERI_PURE_CAPABILITY__
 static LIST_HEAD(, sem) named_sems = LIST_HEAD_INITIALIZER(named_sems);
 static pthread_mutex_t named_sems_mtx = PTHREAD_MUTEX_INITIALIZER;
 
@@ -119,6 +132,7 @@ FB10_COMPAT(_libc_sem_trywait_compat, sem_trywait);
 FB10_COMPAT(_libc_sem_timedwait_compat, sem_timedwait);
 FB10_COMPAT(_libc_sem_post_compat, sem_post);
 FB10_COMPAT(_libc_sem_getvalue_compat, sem_getvalue);
+#endif /* !__CHERI_PURE_CAPABILITY__ */
 
 static inline int
 sem_check_validity(sem_t *sem)
@@ -164,6 +178,7 @@ sem_alloc(unsigned int value, semid_t semid, int system_sem)
 	return (sem);
 }
 
+#ifndef __CHERI_PURE_CAPABILITY__
 int
 _libc_sem_init_compat(sem_t *sem, int pshared, unsigned int value)
 {
@@ -462,3 +477,4 @@ _libc_sem_getvalue_compat(sem_t * __restrict sem, int * __restrict sval)
 	}
 	return (retval);
 }
+#endif /* !__CHERI_PURE_CAPABILITY__ */

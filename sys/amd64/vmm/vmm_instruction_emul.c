@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2012 Sandvine, Inc.
  * Copyright (c) 2012 NetApp, Inc.
  * All rights reserved.
@@ -108,6 +110,10 @@ static const struct vie_op one_byte_opcodes[256] = {
 	[0x0F] = {
 		.op_byte = 0x0F,
 		.op_type = VIE_OP_TYPE_TWO_BYTE
+	},
+	[0x0B] = {
+		.op_byte = 0x0B,
+		.op_type = VIE_OP_TYPE_OR,
 	},
 	[0x2B] = {
 		.op_byte = 0x2B,
@@ -663,7 +669,7 @@ emulate_movs(void *vm, int vcpuid, uint64_t gpa, struct vie *vie,
 #ifdef _KERNEL
 	struct vm_copyinfo copyinfo[2];
 #else
-	struct iovec copyinfo[2];
+	kiovec_t copyinfo[2];
 #endif
 	uint64_t dstaddr, srcaddr, dstgpa, srcgpa, val;
 	uint64_t rcx, rdi, rsi, rflags;
@@ -992,12 +998,38 @@ emulate_or(void *vm, int vcpuid, uint64_t gpa, struct vie *vie,
 	    mem_region_read_t memread, mem_region_write_t memwrite, void *arg)
 {
 	int error, size;
-	uint64_t val1, result, rflags, rflags2;
+	enum vm_reg_name reg;
+	uint64_t result, rflags, rflags2, val1, val2;
 
 	size = vie->opsize;
 	error = EINVAL;
 
 	switch (vie->op.op_byte) {
+	case 0x0B:
+		/*
+		 * OR reg (ModRM:reg) and mem (ModRM:r/m) and store the
+		 * result in reg.
+		 *
+		 * 0b/r         or r16, r/m16
+		 * 0b/r         or r32, r/m32
+		 * REX.W + 0b/r or r64, r/m64
+		 */
+
+		/* get the first operand */
+		reg = gpr_map[vie->reg];
+		error = vie_read_register(vm, vcpuid, reg, &val1);
+		if (error)
+			break;
+		
+		/* get the second operand */
+		error = memread(vm, vcpuid, gpa, &val2, size, arg);
+		if (error)
+			break;
+
+		/* perform the operation and write the result */
+		result = val1 | val2;
+		error = vie_update_register(vm, vcpuid, reg, result, size);
+		break;
 	case 0x81:
 	case 0x83:
 		/*
@@ -1205,7 +1237,7 @@ emulate_stack_op(void *vm, int vcpuid, uint64_t mmio_gpa, struct vie *vie,
 #ifdef _KERNEL
 	struct vm_copyinfo copyinfo[2];
 #else
-	struct iovec copyinfo[2];
+	kiovec_t copyinfo[2];
 #endif
 	struct seg_desc ss_desc;
 	uint64_t cr0, rflags, rsp, stack_gla, val;
@@ -1232,7 +1264,7 @@ emulate_stack_op(void *vm, int vcpuid, uint64_t mmio_gpa, struct vie *vie,
 		size = vie->opsize_override ? 2 : 8;
 	} else {
 		/*
-		 * In protected or compability mode the 'B' flag in the
+		 * In protected or compatibility mode the 'B' flag in the
 		 * stack-segment descriptor determines the size of the
 		 * stack pointer.
 		 */

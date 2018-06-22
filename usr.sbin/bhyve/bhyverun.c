@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
  *
@@ -30,16 +32,23 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
+#ifndef WITHOUT_CAPSICUM
+#include <sys/capsicum.h>
+#endif
 #include <sys/mman.h>
 #include <sys/time.h>
 
 #include <machine/atomic.h>
 #include <machine/segments.h>
 
+#ifndef WITHOUT_CAPSICUM
+#include <capsicum_helpers.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <err.h>
+#include <errno.h>
 #include <libgen.h>
 #include <unistd.h>
 #include <assert.h>
@@ -50,10 +59,14 @@ __FBSDID("$FreeBSD$");
 #include <stdbool.h>
 
 #include <machine/vmm.h>
+#ifndef WITHOUT_CAPSICUM
+#include <machine/vmm_dev.h>
+#endif
 #include <vmmapi.h>
 
 #include "bhyverun.h"
 #include "acpi.h"
+#include "atkbdc.h"
 #include "inout.h"
 #include "dbgport.h"
 #include "fwctl.h"
@@ -387,13 +400,11 @@ vmexit_wrmsr(struct vmctx *ctx, struct vm_exit *vme, int *pvcpu)
 static int
 vmexit_spinup_ap(struct vmctx *ctx, struct vm_exit *vme, int *pvcpu)
 {
-	int newcpu;
-	int retval = VMEXIT_CONTINUE;
 
-	newcpu = spinup_ap(ctx, *pvcpu,
-			   vme->u.spinup_ap.vcpu, vme->u.spinup_ap.rip);
+	(void)spinup_ap(ctx, *pvcpu,
+		    vme->u.spinup_ap.vcpu, vme->u.spinup_ap.rip);
 
-	return (retval);
+	return (VMEXIT_CONTINUE);
 }
 
 #define	DEBUG_EPT_MISCONFIG
@@ -707,6 +718,11 @@ do_open(const char *vmname)
 	struct vmctx *ctx;
 	int error;
 	bool reinit, romboot;
+#ifndef WITHOUT_CAPSICUM
+	cap_rights_t rights;
+	const cap_ioctl_t *cmds;	
+	size_t ncmds;
+#endif
 
 	reinit = romboot = false;
 
@@ -745,6 +761,21 @@ do_open(const char *vmname)
 		exit(1);
 	}
 
+#ifndef WITHOUT_CAPSICUM
+	cap_rights_init(&rights, CAP_IOCTL, CAP_MMAP_RW);
+	if (cap_rights_limit(vm_get_device_fd(ctx), &rights) == -1 &&
+	    errno != ENOSYS)
+		errx(EX_OSERR, "Unable to apply rights for sandbox");
+	vm_get_ioctls(&ncmds);
+	cmds = vm_get_ioctls(NULL);
+	if (cmds == NULL)
+		errx(EX_OSERR, "out of memory");
+	if (cap_ioctls_limit(vm_get_device_fd(ctx), cmds, ncmds) == -1 &&
+	    errno != ENOSYS)
+		errx(EX_OSERR, "Unable to apply rights for sandbox");
+	free((cap_ioctl_t *)cmds);
+#endif
+ 
 	if (reinit) {
 		error = vm_reinit(ctx);
 		if (error) {
@@ -901,6 +932,7 @@ main(int argc, char *argv[])
 
 	init_mem();
 	init_inout();
+	atkbdc_init(ctx);
 	pci_irq_init(ctx);
 	ioapic_init(ctx);
 
@@ -908,7 +940,7 @@ main(int argc, char *argv[])
 	sci_init(ctx);
 
 	/*
-	 * Exit if a device emulation finds an error in it's initilization
+	 * Exit if a device emulation finds an error in its initilization
 	 */
 	if (init_pci(ctx) != 0)
 		exit(1);
@@ -951,6 +983,16 @@ main(int argc, char *argv[])
 
 	if (lpc_bootrom())
 		fwctl_init();
+
+#ifndef WITHOUT_CAPSICUM
+	caph_cache_catpages();
+
+	if (caph_limit_stdout() == -1 || caph_limit_stderr() == -1)
+		errx(EX_OSERR, "Unable to apply rights for sandbox");
+
+	if (cap_enter() == -1 && errno != ENOSYS)
+		errx(EX_OSERR, "cap_enter() failed");
+#endif
 
 	/*
 	 * Change the proc title to include the VM name.

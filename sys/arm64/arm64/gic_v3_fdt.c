@@ -32,18 +32,20 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/bitstring.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
 #include <sys/module.h>
+#include <sys/rman.h>
 
+#include <machine/intr.h>
 #include <machine/resource.h>
 
 #include <dev/ofw/openfirm.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
-#include "pic_if.h"
-
+#include <arm/arm/gic_common.h>
 #include "gic_v3_reg.h"
 #include "gic_v3_var.h"
 
@@ -52,6 +54,7 @@ __FBSDID("$FreeBSD$");
  */
 static int gic_v3_fdt_probe(device_t);
 static int gic_v3_fdt_attach(device_t);
+static int gic_v3_fdt_print_child(device_t, device_t);
 
 static struct resource *gic_v3_ofw_bus_alloc_res(device_t, device_t, int, int *,
     rman_res_t, rman_res_t, rman_res_t, u_int);
@@ -63,6 +66,7 @@ static device_method_t gic_v3_fdt_methods[] = {
 	DEVMETHOD(device_attach,	gic_v3_fdt_attach),
 
 	/* Bus interface */
+	DEVMETHOD(bus_print_child,		gic_v3_fdt_print_child),
 	DEVMETHOD(bus_alloc_resource,		gic_v3_ofw_bus_alloc_res),
 	DEVMETHOD(bus_activate_resource,	bus_generic_activate_resource),
 
@@ -115,10 +119,12 @@ gic_v3_fdt_attach(device_t dev)
 {
 	struct gic_v3_softc *sc;
 	pcell_t redist_regions;
+	intptr_t xref;
 	int err;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
+	sc->gic_bus = GIC_BUS_FDT;
 
 	/*
 	 * Recover number of the Re-Distributor regions.
@@ -130,8 +136,26 @@ gic_v3_fdt_attach(device_t dev)
 		sc->gic_redists.nregions = redist_regions;
 
 	err = gic_v3_attach(dev);
-	if (err)
+	if (err != 0)
 		goto error;
+
+	xref = OF_xref_from_node(ofw_bus_get_node(dev));
+	sc->gic_pic = intr_pic_register(dev, xref);
+	if (sc->gic_pic == NULL) {
+		device_printf(dev, "could not register PIC\n");
+		err = ENXIO;
+		goto error;
+	}
+
+	/* Register xref */
+	OF_device_register_xref(xref, dev);
+
+	if (intr_pic_claim_root(dev, xref, arm_gic_v3_intr, sc,
+	    GIC_LAST_SGI - GIC_FIRST_SGI + 1) != 0) {
+		err = ENXIO;
+		goto error;
+	}
+
 	/*
 	 * Try to register ITS to this GIC.
 	 * GIC will act as a bus in that case.
@@ -143,6 +167,9 @@ gic_v3_fdt_attach(device_t dev)
 			    "Failed to attach ITS to this GIC\n");
 		}
 	}
+
+	if (device_get_children(dev, &sc->gic_children, &sc->gic_nchildren) != 0)
+		sc->gic_nchildren = 0;
 
 	return (err);
 
@@ -159,9 +186,24 @@ error:
 
 /* OFW bus interface */
 struct gic_v3_ofw_devinfo {
+	struct gic_v3_devinfo	di_gic_dinfo;
 	struct ofw_bus_devinfo	di_dinfo;
 	struct resource_list	di_rl;
 };
+
+static int
+gic_v3_fdt_print_child(device_t bus, device_t child)
+{
+	struct gic_v3_ofw_devinfo *di = device_get_ivars(child);
+	struct resource_list *rl = &di->di_rl;
+	int retval = 0;
+
+	retval += bus_print_child_header(bus, child);
+	retval += resource_list_print_type(rl, "mem", SYS_RES_MEMORY, "%#jx");
+	retval += bus_print_child_footer(bus, child);
+
+	return (retval);
+}
 
 static const struct ofw_bus_devinfo *
 gic_v3_ofw_get_devinfo(device_t bus __unused, device_t child)
@@ -180,7 +222,7 @@ gic_v3_ofw_bus_alloc_res(device_t bus, device_t child, int type, int *rid,
 	struct resource_list_entry *rle;
 	int ranges_len;
 
-	if ((start == 0UL) && (end == ~0UL)) {
+	if (RMAN_IS_DEFAULT_RANGE(start, end)) {
 		if ((di = device_get_ivars(child)) == NULL)
 			return (NULL);
 		if (type != SYS_RES_MEMORY)
@@ -224,10 +266,12 @@ static int
 gic_v3_ofw_bus_attach(device_t dev)
 {
 	struct gic_v3_ofw_devinfo *di;
+	struct gic_v3_softc *sc;
 	device_t child;
 	phandle_t parent, node;
 	pcell_t addr_cells, size_cells;
 
+	sc = device_get_softc(dev);
 	parent = ofw_bus_get_node(dev);
 	if (parent > 0) {
 		addr_cells = 2;
@@ -240,6 +284,14 @@ gic_v3_ofw_bus_attach(device_t dev)
 		for (node = OF_child(parent); node > 0; node = OF_peer(node)) {
 			/* Allocate and populate devinfo. */
 			di = malloc(sizeof(*di), M_GIC_V3, M_WAITOK | M_ZERO);
+
+			/* Read the numa node, or -1 if there is none */
+			if (OF_getencprop(node, "numa-node-id",
+			    &di->di_gic_dinfo.gic_domain,
+			    sizeof(di->di_gic_dinfo.gic_domain)) <= 0) {
+				di->di_gic_dinfo.gic_domain = -1;
+			}
+
 			if (ofw_bus_gen_setup_devinfo(&di->di_dinfo, node)) {
 				if (bootverbose) {
 					device_printf(dev,
@@ -270,41 +322,10 @@ gic_v3_ofw_bus_attach(device_t dev)
 				continue;
 			}
 
+			sc->gic_nchildren++;
 			device_set_ivars(child, di);
 		}
 	}
 
 	return (bus_generic_attach(dev));
-}
-
-static int gic_v3_its_fdt_probe(device_t dev);
-
-static device_method_t gic_v3_its_fdt_methods[] = {
-	/* Device interface */
-	DEVMETHOD(device_probe,		gic_v3_its_fdt_probe),
-
-	/* End */
-	DEVMETHOD_END
-};
-
-DEFINE_CLASS_1(its, gic_v3_its_fdt_driver, gic_v3_its_fdt_methods,
-    sizeof(struct gic_v3_its_softc), gic_v3_its_driver);
-
-static devclass_t gic_v3_its_fdt_devclass;
-
-EARLY_DRIVER_MODULE(its, gic, gic_v3_its_fdt_driver,
-    gic_v3_its_fdt_devclass, 0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
-
-static int
-gic_v3_its_fdt_probe(device_t dev)
-{
-
-	if (!ofw_bus_status_okay(dev))
-		return (ENXIO);
-
-	if (!ofw_bus_is_compatible(dev, GIC_V3_ITS_COMPSTR))
-		return (ENXIO);
-
-	device_set_desc(dev, GIC_V3_ITS_DEVSTR);
-	return (BUS_PROBE_DEFAULT);
 }

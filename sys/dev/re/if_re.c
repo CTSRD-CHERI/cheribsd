@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1997, 1998-2003
  *	Bill Paul <wpaul@windriver.com>.  All rights reserved.
  *
@@ -183,6 +185,8 @@ static const struct rl_type re_devs[] = {
 	    "RealTek 810xE PCIe 10/100baseTX" },
 	{ RT_VENDORID, RT_DEVICEID_8168, 0,
 	    "RealTek 8168/8111 B/C/CP/D/DP/E/F/G PCIe Gigabit Ethernet" },
+	{ NCUBE_VENDORID, RT_DEVICEID_8168, 0,
+	    "TP-Link TG-3468 v2 (RTL8168) Gigabit Ethernet" },
 	{ RT_VENDORID, RT_DEVICEID_8169, 0,
 	    "RealTek 8169/8169S/8169SB(L)/8110S/8110SB(L) Gigabit Ethernet" },
 	{ RT_VENDORID, RT_DEVICEID_8169SC, 0,
@@ -953,7 +957,7 @@ re_probe(device_t dev)
 	}
 
 	t = re_devs;
-	for (i = 0; i < sizeof(re_devs) / sizeof(re_devs[0]); i++, t++) {
+	for (i = 0; i < nitems(re_devs); i++, t++) {
 		if (vendor == t->rl_vid && devid == t->rl_did) {
 			device_set_desc(dev, t->rl_name);
 			return (BUS_PROBE_DEFAULT);
@@ -1356,15 +1360,17 @@ re_attach(device_t dev)
 		CSR_WRITE_1(sc, RL_EECMD, RL_EEMODE_OFF);
 	}
 
-	/* Disable ASPM L0S/L1. */
+	/* Disable ASPM L0S/L1 and CLKREQ. */
 	if (sc->rl_expcap != 0) {
 		cap = pci_read_config(dev, sc->rl_expcap +
 		    PCIER_LINK_CAP, 2);
 		if ((cap & PCIEM_LINK_CAP_ASPM) != 0) {
 			ctl = pci_read_config(dev, sc->rl_expcap +
 			    PCIER_LINK_CTL, 2);
-			if ((ctl & PCIEM_LINK_CTL_ASPMC) != 0) {
-				ctl &= ~PCIEM_LINK_CTL_ASPMC;
+			if ((ctl & (PCIEM_LINK_CTL_ECPM |
+			    PCIEM_LINK_CTL_ASPMC))!= 0) {
+				ctl &= ~(PCIEM_LINK_CTL_ECPM |
+				    PCIEM_LINK_CTL_ASPMC);
 				pci_write_config(dev, sc->rl_expcap +
 				    PCIER_LINK_CTL, ctl, 2);
 				device_printf(dev, "ASPM disabled\n");
@@ -2553,7 +2559,7 @@ re_intr(void *arg)
                 return (FILTER_STRAY);
 	CSR_WRITE_2(sc, RL_IMR, 0);
 
-	taskqueue_enqueue_fast(taskqueue_fast, &sc->rl_inttask);
+	taskqueue_enqueue(taskqueue_fast, &sc->rl_inttask);
 
 	return (FILTER_HANDLED);
 }
@@ -2621,7 +2627,7 @@ re_int_task(void *arg, int npending)
 	RL_UNLOCK(sc);
 
         if ((CSR_READ_2(sc, RL_ISR) & RL_INTRS_CPLUS) || rval) {
-		taskqueue_enqueue_fast(taskqueue_fast, &sc->rl_inttask);
+		taskqueue_enqueue(taskqueue_fast, &sc->rl_inttask);
 		return;
 	}
 
@@ -3386,17 +3392,17 @@ re_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int			error = 0;
 
 	switch (command) {
-	case SIOCSIFMTU:
-		if (ifr->ifr_mtu < ETHERMIN ||
-		    ifr->ifr_mtu > sc->rl_hwrev->rl_max_mtu ||
+	CASE_IOC_IFREQ(SIOCSIFMTU):
+		if (ifr_mtu_get(ifr) < ETHERMIN ||
+		    ifr_mtu_get(ifr) > sc->rl_hwrev->rl_max_mtu ||
 		    ((sc->rl_flags & RL_FLAG_FASTETHER) != 0 &&
-		    ifr->ifr_mtu > RL_MTU)) {
+		    ifr_mtu_get(ifr) > RL_MTU)) {
 			error = EINVAL;
 			break;
 		}
 		RL_LOCK(sc);
-		if (ifp->if_mtu != ifr->ifr_mtu) {
-			ifp->if_mtu = ifr->ifr_mtu;
+		if (ifp->if_mtu != ifr_mtu_get(ifr)) {
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			if ((sc->rl_flags & RL_FLAG_JUMBOV2) != 0 &&
 			    (ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
 				ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
@@ -3412,7 +3418,7 @@ re_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		RL_UNLOCK(sc);
 		break;
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		RL_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
@@ -3428,27 +3434,27 @@ re_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->rl_if_flags = ifp->if_flags;
 		RL_UNLOCK(sc);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		RL_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			re_set_rxmode(sc);
 		RL_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		mii = device_get_softc(sc->rl_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 	    {
 		int mask, reinit;
 
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		reinit = 0;
 #ifdef DEVICE_POLLING
 		if (mask & IFCAP_POLLING) {
-			if (ifr->ifr_reqcap & IFCAP_POLLING) {
+			if (ifr_reqcap_get(ifr) & IFCAP_POLLING) {
 				error = ether_poll_register(re_poll, ifp);
 				if (error)
 					return (error);

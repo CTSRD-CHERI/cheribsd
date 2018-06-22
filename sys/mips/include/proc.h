@@ -1,6 +1,8 @@
 /*	$OpenBSD: proc.h,v 1.2 1998/09/15 10:50:12 pefo Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -15,7 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -40,7 +42,7 @@
 #define	_MACHINE_PROC_H_
 
 #ifdef	CPU_CHERI
-#include <machine/cheri.h>
+#include <cheri/cheri.h>
 #endif
 #ifdef	CPU_CNMIPS
 #include <machine/octeon_cop2.h>
@@ -64,7 +66,7 @@ struct mdthread {
 	int		md_pc_ctrl;	/* performance counter control */
 	int		md_pc_count;	/* performance counter */
 	int		md_pc_spill;	/* performance counter spill */
-	void		*md_tls;
+	void * __capability md_tls;
 	size_t		md_tls_tcb_offset;	/* TCB offset */
 #ifdef	CPU_CNMIPS
 	struct octeon_cop2_state	*md_cop2; /* kernel context */
@@ -74,31 +76,32 @@ struct mdthread {
 	int		md_cop2owner;
 #endif
 #ifdef CPU_CHERI
-	struct chericap	md_tls_cap;
+#ifdef COMPAT_CHERIABI
+	void * __capability	md_cheri_mmap_cap;
+#endif
 #endif
 };
 
 /* md_flags */
 #define	MDTD_FPUSED	0x0001		/* Process used the FPU */
 #define	MDTD_COP2USED	0x0002		/* Process used the COP2 */
+#ifdef CPU_QEMU_MALTA
+#define	MDTD_QTRACE	0x0004		/* Qemu-CHERI ISA-level tracing */
+#endif
 
 struct mdproc {
-#ifndef COMPAT_CHERIABI
-	/* empty */
-#else
-	u_int		md_cheri_mmap_perms;
+#ifdef CPU_CHERI
+	void * __capability md_cheri_sealcap;	/* Root of object-type tree. */
 #endif
 };
 
-#ifdef _KERNEL
 struct syscall_args {
 	u_int code;
 	struct sysent *callp;
-	register_t args[8];
+	syscallarg_t args[8];
 	int narg;
 	struct trapframe *trapframe;
 };
-#endif
 
 #ifdef __mips_n64
 #define	KINFO_PROC_SIZE 1088

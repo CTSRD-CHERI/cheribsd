@@ -108,6 +108,18 @@
  * Hudson (tjh@cryptsoft.com).
  *
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_integrity",
+ *     "unsupported"
+ *   ],
+ *   "change_comment": "xor for constant time conditional assignment"
+ * }
+ * CHERI CHANGES END
+ */
 
 /*
  * Details about Montgomery multiplication algorithms can be found at
@@ -395,6 +407,9 @@ int BN_MONT_CTX_set(BN_MONT_CTX *mont, const BIGNUM *mod, BN_CTX *ctx)
         tmod.d = buf;
         tmod.dmax = 2;
         tmod.neg = 0;
+
+        if (BN_get_flags(mod, BN_FLG_CONSTTIME) != 0)
+            BN_set_flags(&tmod, BN_FLG_CONSTTIME);
 
         mont->ri = (BN_num_bits(mod) + (BN_BITS2 - 1)) / BN_BITS2 * BN_BITS2;
 

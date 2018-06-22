@@ -166,6 +166,8 @@ static uint8_t		ural_bbp_read(struct ural_softc *, uint8_t);
 static void		ural_rf_write(struct ural_softc *, uint8_t, uint32_t);
 static void		ural_scan_start(struct ieee80211com *);
 static void		ural_scan_end(struct ieee80211com *);
+static void		ural_getradiocaps(struct ieee80211com *, int, int *,
+			    struct ieee80211_channel[]);
 static void		ural_set_channel(struct ieee80211com *);
 static void		ural_set_chan(struct ural_softc *,
 			    struct ieee80211_channel *);
@@ -357,6 +359,14 @@ static const struct {
 	{ 161, 0x08808, 0x0242f, 0x00281 }
 };
 
+static const uint8_t ural_chan_2ghz[] =
+	{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 };
+
+static const uint8_t ural_chan_5ghz[] =
+	{ 36, 40, 44, 48, 52, 56, 60, 64,
+	  100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140,
+	  149, 153, 157, 161 };
+
 static const struct usb_config ural_config[URAL_N_TRANSFER] = {
 	[URAL_BULK_WR] = {
 		.type = UE_BULK,
@@ -424,7 +434,6 @@ ural_attach(device_t self)
 	struct usb_attach_arg *uaa = device_get_ivars(self);
 	struct ural_softc *sc = device_get_softc(self);
 	struct ieee80211com *ic = &sc->sc_ic;
-	uint8_t bands[howmany(IEEE80211_MODE_MAX, 8)];
 	uint8_t iface_index;
 	int error;
 
@@ -474,18 +483,15 @@ ural_attach(device_t self)
 	    | IEEE80211_C_WPA		/* 802.11i */
 	    ;
 
-	memset(bands, 0, sizeof(bands));
-	setbit(bands, IEEE80211_MODE_11B);
-	setbit(bands, IEEE80211_MODE_11G);
-	if (sc->rf_rev == RAL_RF_5222)
-		setbit(bands, IEEE80211_MODE_11A);
-	ieee80211_init_channels(ic, NULL, bands);
+	ural_getradiocaps(ic, IEEE80211_CHAN_MAX, &ic->ic_nchans,
+	    ic->ic_channels);
 
 	ieee80211_ifattach(ic);
 	ic->ic_update_promisc = ural_update_promisc;
 	ic->ic_raw_xmit = ural_raw_xmit;
 	ic->ic_scan_start = ural_scan_start;
 	ic->ic_scan_end = ural_scan_end;
+	ic->ic_getradiocaps = ural_getradiocaps;
 	ic->ic_set_channel = ural_set_channel;
 	ic->ic_parent = ural_parent;
 	ic->ic_transmit = ural_transmit;
@@ -706,8 +712,8 @@ ural_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 			ural_update_slot(sc);
 			ural_set_txpreamble(sc);
 			ural_set_basicrates(sc, ic->ic_bsschan);
-			IEEE80211_ADDR_COPY(ic->ic_macaddr, ni->ni_bssid);
-			ural_set_bssid(sc, ic->ic_macaddr);
+			IEEE80211_ADDR_COPY(sc->sc_bssid, ni->ni_bssid);
+			ural_set_bssid(sc, sc->sc_bssid);
 		}
 
 		if (vap->iv_opmode == IEEE80211_M_HOSTAP ||
@@ -1002,7 +1008,7 @@ ural_setup_tx_desc(struct ural_softc *sc, struct ural_tx_desc *desc,
 	} else {
 		if (rate == 0)
 			rate = 2;	/* avoid division by zero */
-		plcp_length = (16 * len + rate - 1) / rate;
+		plcp_length = howmany(16 * len, rate);
 		if (rate == 22) {
 			remainder = (16 * len) % 22;
 			if (remainder != 0 && remainder < 7)
@@ -1064,9 +1070,8 @@ ural_tx_bcn(struct ural_softc *sc, struct mbuf *m0, struct ieee80211_node *ni)
 static int
 ural_tx_mgt(struct ural_softc *sc, struct mbuf *m0, struct ieee80211_node *ni)
 {
-	struct ieee80211vap *vap = ni->ni_vap;
+	const struct ieee80211_txparam *tp = ni->ni_txparms;
 	struct ieee80211com *ic = ni->ni_ic;
-	const struct ieee80211_txparam *tp;
 	struct ural_tx_data *data;
 	struct ieee80211_frame *wh;
 	struct ieee80211_key *k;
@@ -1078,8 +1083,6 @@ ural_tx_mgt(struct ural_softc *sc, struct mbuf *m0, struct ieee80211_node *ni)
 	data = STAILQ_FIRST(&sc->tx_free);
 	STAILQ_REMOVE_HEAD(&sc->tx_free, next);
 	sc->tx_nfree--;
-
-	tp = &vap->iv_txparms[ieee80211_chan2mode(ic->ic_curchan)];
 
 	wh = mtod(m0, struct ieee80211_frame *);
 	if (wh->i_fc[1] & IEEE80211_FC1_PROTECTED) {
@@ -1233,7 +1236,7 @@ ural_tx_data(struct ural_softc *sc, struct mbuf *m0, struct ieee80211_node *ni)
 	struct ieee80211com *ic = ni->ni_ic;
 	struct ural_tx_data *data;
 	struct ieee80211_frame *wh;
-	const struct ieee80211_txparam *tp;
+	const struct ieee80211_txparam *tp = ni->ni_txparms;
 	struct ieee80211_key *k;
 	uint32_t flags = 0;
 	uint16_t dur;
@@ -1243,13 +1246,16 @@ ural_tx_data(struct ural_softc *sc, struct mbuf *m0, struct ieee80211_node *ni)
 
 	wh = mtod(m0, struct ieee80211_frame *);
 
-	tp = &vap->iv_txparms[ieee80211_chan2mode(ni->ni_chan)];
-	if (IEEE80211_IS_MULTICAST(wh->i_addr1))
+	if (m0->m_flags & M_EAPOL)
+		rate = tp->mgmtrate;
+	else if (IEEE80211_IS_MULTICAST(wh->i_addr1))
 		rate = tp->mcastrate;
 	else if (tp->ucastrate != IEEE80211_FIXED_RATE_NONE)
 		rate = tp->ucastrate;
-	else
+	else {
+		(void) ieee80211_ratectl_rate(ni, NULL, 0);
 		rate = ni->ni_txrate;
+	}
 
 	if (wh->i_fc[1] & IEEE80211_FC1_PROTECTED) {
 		k = ieee80211_crypto_encap(ni, m0);
@@ -1582,9 +1588,29 @@ ural_scan_end(struct ieee80211com *ic)
 
 	RAL_LOCK(sc);
 	ural_enable_tsf_sync(sc);
-	ural_set_bssid(sc, ic->ic_macaddr);
+	ural_set_bssid(sc, sc->sc_bssid);
 	RAL_UNLOCK(sc);
 
+}
+
+static void
+ural_getradiocaps(struct ieee80211com *ic,
+    int maxchans, int *nchans, struct ieee80211_channel chans[])
+{
+	struct ural_softc *sc = ic->ic_softc;
+	uint8_t bands[IEEE80211_MODE_BYTES];
+
+	memset(bands, 0, sizeof(bands));
+	setbit(bands, IEEE80211_MODE_11B);
+	setbit(bands, IEEE80211_MODE_11G);
+	ieee80211_add_channel_list_2ghz(chans, maxchans, nchans,
+	    ural_chan_2ghz, nitems(ural_chan_2ghz), bands, 0);
+
+	if (sc->rf_rev == RAL_RF_5222) {
+		setbit(bands, IEEE80211_MODE_11A);
+		ieee80211_add_channel_list_5ghz(chans, maxchans, nchans,
+		    ural_chan_5ghz, nitems(ural_chan_5ghz), bands, 0);
+	}
 }
 
 static void
@@ -2182,32 +2208,29 @@ ural_ratectl_task(void *arg, int pending)
 {
 	struct ural_vap *uvp = arg;
 	struct ieee80211vap *vap = &uvp->vap;
-	struct ieee80211com *ic = vap->iv_ic;
-	struct ural_softc *sc = ic->ic_softc;
-	struct ieee80211_node *ni;
-	int ok, fail;
-	int sum, retrycnt;
+	struct ural_softc *sc = vap->iv_ic->ic_softc;
+	struct ieee80211_ratectl_tx_stats *txs = &sc->sc_txs;
+	int fail;
 
-	ni = ieee80211_ref_node(vap->iv_bss);
 	RAL_LOCK(sc);
 	/* read and clear statistic registers (STA_CSR0 to STA_CSR10) */
 	ural_read_multi(sc, RAL_STA_CSR0, sc->sta, sizeof(sc->sta));
 
-	ok = sc->sta[7] +		/* TX ok w/o retry */
-	     sc->sta[8];		/* TX ok w/ retry */
+	txs->flags = IEEE80211_RATECTL_TX_STATS_RETRIES;
+	txs->nsuccess = sc->sta[7] +	/* TX ok w/o retry */
+			sc->sta[8];	/* TX ok w/ retry */
 	fail = sc->sta[9];		/* TX retry-fail count */
-	sum = ok+fail;
-	retrycnt = sc->sta[8] + fail;
+	txs->nframes = txs->nsuccess + fail;
+	/* XXX fail * maxretry */
+	txs->nretries = sc->sta[8] + fail;
 
-	ieee80211_ratectl_tx_update(vap, ni, &sum, &ok, &retrycnt);
-	(void) ieee80211_ratectl_rate(ni, NULL, 0);
+	ieee80211_ratectl_tx_update(vap, txs);
 
 	/* count TX retry-fail as Tx errors */
-	if_inc_counter(ni->ni_vap->iv_ifp, IFCOUNTER_OERRORS, fail);
+	if_inc_counter(vap->iv_ifp, IFCOUNTER_OERRORS, fail);
 
 	usb_callout_reset(&uvp->ratectl_ch, hz, ural_ratectl_timeout, uvp);
 	RAL_UNLOCK(sc);
-	ieee80211_free_node(ni);
 }
 
 static int

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
  * Copyright (C) 1995, 1996 TooLs GmbH.
  * All rights reserved.
@@ -75,7 +77,11 @@
 #define	EXC_DSMISS	0x1200		/* Data store translation miss */
 
 /* Power ISA 2.06+: */
+#define	EXC_HEA		0x0e40		/* Hypervisor Emulation Assistance */
 #define	EXC_VSX		0x0f40		/* VSX Unavailable */
+
+/* Power ISA 2.07+: */
+#define	EXC_FAC		0x0f60		/* Facility Unavailable */
 
 /* The following are available on 4xx and 85xx */
 #define	EXC_CRIT	0x0100		/* Critical Input Interrupt */
@@ -112,6 +118,7 @@
 /* Macros to extract register information */
 #define EXC_ALI_RST(dsisr) ((dsisr >> 5) & 0x1f)   /* source or target */
 #define EXC_ALI_RA(dsisr) (dsisr & 0x1f)
+#define	EXC_ALI_SPE_REG(instr)	((instr >> 21) & 0x1f)
 
 /*
  * SRR1 bits for program exception traps. These identify what caused
@@ -125,7 +132,7 @@
 #define	EXC_PGM_TRAP		(1UL << 17)
 
 /* DTrace trap opcode. */
-#define EXC_DTRACE	0x7c810808
+#define EXC_DTRACE	0x7ffff808
 
 /* Magic pointer to store TOC base and other info for trap handlers on ppc64 */
 #define TRAP_GENTRAP	0x1f0

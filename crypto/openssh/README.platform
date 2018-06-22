@@ -36,6 +36,9 @@ loginrestrictions() function, in particular that the user has the
 "rlogin" attribute set.  This check is not done for the root account,
 instead the PermitRootLogin setting in sshd_config is used.
 
+If you are using the IBM compiler you probably want to use CC=xlc rather
+than the default of cc.
+
 
 Cygwin
 ------
@@ -91,6 +94,3 @@ added to sshd's session stack which will prevent users from starting shell
 sessions.  Alternatively, pam_nologin can be added to either the auth or
 account stacks which will prevent authentication entirely, but will still
 return the output from pam_nologin to the client.
-
-
-$Id: README.platform,v 1.10 2009/08/28 23:14:48 dtucker Exp $

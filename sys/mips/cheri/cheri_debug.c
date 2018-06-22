@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2011-2016 Robert N. M. Watson
+ * Copyright (c) 2011-2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -39,20 +39,44 @@
 #include <ddb/ddb.h>
 #include <sys/kdb.h>
 
+#include <cheri/cheri.h>
+#include <cheri/cheric.h>
+
 #include <machine/atomic.h>
-#include <machine/cheri.h>
 #include <machine/pcb.h>
 #include <machine/sysarch.h>
 
 #ifdef DDB
+
+#define	DB_CHERI_CAP_PRINT(crn) do {					\
+	uintmax_t c_perms, c_otype, c_base, c_length, c_offset;		\
+	u_int ctag, c_sealed;						\
+									\
+	CHERI_CGETTAG(ctag, (crn));					\
+	CHERI_CGETSEALED(c_sealed, (crn));				\
+	CHERI_CGETPERM(c_perms, (crn));					\
+	CHERI_CGETTYPE(c_otype, (crn));					\
+	CHERI_CGETBASE(c_base, (crn));					\
+	CHERI_CGETLEN(c_length, (crn));					\
+	CHERI_CGETOFFSET(c_offset, (crn));				\
+	db_printf("v:%u s:%u p:%08jx b:%016jx l:%016jx o:%jx t:%jx\n",	\
+	    ctag, c_sealed, c_perms, c_base, c_length, c_offset,	\
+	    c_otype);							\
+} while (0)
+
+#define	DB_CHERI_REG_PRINT(crn, num) do {				\
+	db_printf("$c%02u: ", num);					\
+	DB_CHERI_CAP_PRINT(crn);					\
+} while (0)
+
 /*
  * Variation that prints live register state from the capability coprocessor.
  *
  * NB: Over time we will shift towards special registers holding values such
- * as $c0.  As a result, we must move those values through a temporary
+ * as $ddc.  As a result, we must move those values through a temporary
  * register that is hence overwritten.
  */
-DB_SHOW_COMMAND(cheri, ddb_dump_cheri)
+DB_SHOW_COMMAND(cp2, ddb_dump_cp2)
 {
 	register_t cause;
 	uint8_t exccode, regnum;
@@ -65,14 +89,12 @@ DB_SHOW_COMMAND(cheri, ddb_dump_cheri)
 	if (regnum < 32)
 		db_printf("RegNum: $c%02d ", regnum);
 	else if (regnum == 255)
-		db_printf("RegNum: PCC ");
+		db_printf("RegNum: $pcc ");
 	else
 		db_printf("RegNum: invalid (%d) ", regnum);
 	db_printf("(%s)\n", cheri_exccode_string(exccode));
 
-	/* Shift $c0 into $ctemp for printing. */
-	CHERI_CGETDEFAULT(CHERI_CR_CTEMP0);
-	DB_CHERI_REG_PRINT(CHERI_CR_CTEMP0, 0);
+	/* DDC is printed later: DB_CHERI_REG_PRINT(0, 0); */
 	DB_CHERI_REG_PRINT(1, 1);
 	DB_CHERI_REG_PRINT(2, 2);
 	DB_CHERI_REG_PRINT(3, 3);
@@ -103,69 +125,81 @@ DB_SHOW_COMMAND(cheri, ddb_dump_cheri)
 	DB_CHERI_REG_PRINT(28, 28);
 	DB_CHERI_REG_PRINT(29, 29);
 	DB_CHERI_REG_PRINT(30, 30);
-	DB_CHERI_REG_PRINT(31, 31);
+	/* TODO: will be NULL reg soon: DB_CHERI_REG_PRINT(31, 31); */
+
+	/* Shift $ddc into $ctemp for printing. */
+	db_printf("$ddc: ");
+	CHERI_CGETDEFAULT(CHERI_CR_KR1C);
+	DB_CHERI_REG_PRINT(CHERI_CR_KR1C, 0);
+	/* Same again for $epcc */
+	db_printf("$epcc: ");
+	CHERI_CGETEPCC(CHERI_CR_KR1C);
+	DB_CHERI_CAP_PRINT(CHERI_CR_KR1C);
+}
+
+static void
+db_show_cheri_trapframe(struct trapframe *frame)
+{
+	register_t cause;
+	uint8_t exccode, regnum;
+	u_int i;
+
+	db_printf("Trapframe at %p\n", frame);
+	cause = frame->capcause;
+	exccode = (cause & CHERI_CAPCAUSE_EXCCODE_MASK) >>
+	    CHERI_CAPCAUSE_EXCCODE_SHIFT;
+	regnum = cause & CHERI_CAPCAUSE_REGNUM_MASK;
+	db_printf("CHERI cause: ExcCode: 0x%02x ", exccode);
+	if (regnum < 32)
+		db_printf("RegNum: $c%02d ", regnum);
+	else if (regnum == 255)
+		db_printf("RegNum: $pcc ");
+	else
+		db_printf("RegNum: invalid (%d) ", regnum);
+	db_printf("(%s)\n", cheri_exccode_string(exccode));
+
+	cheri_capability_load(CHERI_CR_CTEMP0, (struct chericap *)&frame->ddc);
+	db_printf("$ddc ");
+	DB_CHERI_CAP_PRINT(CHERI_CR_CTEMP0);
+	cheri_capability_load(CHERI_CR_CTEMP0, (struct chericap *)&frame->pcc);
+	db_printf("$pcc ");
+	DB_CHERI_CAP_PRINT(CHERI_CR_CTEMP0);
+	db_printf("\n");
+
+	/* Laboriously load and print each trapframe capability. */
+	for (i = 1; i < 27; i++) {
+		cheri_capability_load(CHERI_CR_CTEMP0,
+		    (struct chericap *)&frame->ddc + i);
+		DB_CHERI_REG_PRINT(CHERI_CR_CTEMP0, i);
+	}
+
+}
+
+/*
+ * Variation that prints register state from the trap frame provided by KDB.
+ */
+DB_SHOW_COMMAND(cheri, ddb_dump_cheri)
+{
+
+	db_show_cheri_trapframe(kdb_frame);
 }
 
 /*
  * Variation that prints the saved userspace CHERI register frame for a
  * thread.
  */
-DB_SHOW_COMMAND(cheriframe, ddb_dump_cheriframe)
+DB_SHOW_COMMAND(cheripcb, ddb_dump_cheripcb)
 {
 	struct thread *td;
-	struct cheri_frame *cfp;
-	u_int i;
+	struct trapframe *frame;
 
 	if (have_addr)
 		td = db_lookup_thread(addr, TRUE);
 	else
 		td = curthread;
 
-	cfp = &td->td_pcb->pcb_cheriframe;
+	frame = &td->td_pcb->pcb_regs;
 	db_printf("Thread %d at %p\n", td->td_tid, td);
-	db_printf("CHERI frame at %p\n", cfp);
-
-	/* Laboriously load and print each user capability. */
-	for (i = 0; i < 27; i++) {
-		cheri_capability_load(CHERI_CR_CTEMP0,
-		    (struct chericap *)&cfp->cf_c0 + i);
-		DB_CHERI_REG_PRINT(CHERI_CR_CTEMP0, i);
-	}
-	cheri_capability_load(CHERI_CR_CTEMP0,
-	    (struct chericap *)&cfp->cf_c0 + CHERIFRAME_OFF_PCC);
-	db_printf("PCC ");
-	DB_CHERI_CAP_PRINT(CHERI_CR_CTEMP0);
-}
-
-/*
- * Print out the trusted stack for the current thread, starting at the top.
- *
- * XXXRW: Would be nice to take a tid/pid argument rather than always use
- * curthread.
- */
-DB_SHOW_COMMAND(cheristack, ddb_dump_cheristack)
-{
-	struct cheri_stack_frame *csfp;
-	struct pcb *pcb = curthread->td_pcb;
-	int i;
-
-	db_printf("Trusted stack for TID %d; TSP 0x%016jx\n",
-	    curthread->td_tid, (uintmax_t)pcb->pcb_cheristack.cs_tsp);
-	for (i = CHERI_STACK_DEPTH - 1; i >= 0; i--) {
-	    /* i > (pcb->pcb_cheristack.cs_tsp / CHERI_FRAME_SIZE); i--) { */
-		csfp = &pcb->pcb_cheristack.cs_frames[i];
-
-		db_printf("Frame %d%c\n", i,
-		    (i >= (pcb->pcb_cheristack.cs_tsp / CHERI_FRAME_SIZE)) ?
-		    '*' : ' ');
-
-		CHERI_CLC(CHERI_CR_CTEMP0, CHERI_CR_KDC, &csfp->csf_idc, 0);
-		db_printf("  IDC ");
-		DB_CHERI_CAP_PRINT(CHERI_CR_CTEMP0);
-
-		CHERI_CLC(CHERI_CR_CTEMP0, CHERI_CR_KDC, &csfp->csf_pcc, 0);
-		db_printf("  PCC ");
-		DB_CHERI_CAP_PRINT(CHERI_CR_CTEMP0);
-	}
+	db_show_cheri_trapframe(frame);
 }
 #endif

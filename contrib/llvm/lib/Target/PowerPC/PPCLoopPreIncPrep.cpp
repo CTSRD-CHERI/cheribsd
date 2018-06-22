@@ -20,31 +20,39 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "ppc-loop-preinc-prep"
+
 #include "PPC.h"
+#include "PPCSubtarget.h"
 #include "PPCTargetMachine.h"
 #include "llvm/ADT/DepthFirstIterator.h"
-#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallSet.h"
-#include "llvm/ADT/Statistic.h"
-#include "llvm/Analysis/CodeMetrics.h"
-#include "llvm/Analysis/InstructionSimplify.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/ScalarEvolutionExpander.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
-#include "llvm/Analysis/ValueTracking.h"
+#include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/Dominators.h"
-#include "llvm/IR/Function.h"
+#include "llvm/IR/Instruction.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/Type.h"
+#include "llvm/IR/Value.h"
+#include "llvm/Pass.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/LoopUtils.h"
-#include "llvm/Transforms/Utils/ValueMapper.h"
+#include <cassert>
+#include <iterator>
+#include <utility>
+
 using namespace llvm;
 
 // By default, we limit this to creating 16 PHIs (which is a little over half
@@ -54,17 +62,21 @@ static cl::opt<unsigned> MaxVars("ppc-preinc-prep-max-vars",
   cl::desc("Potential PHI threshold for PPC preinc loop prep"));
 
 namespace llvm {
+
   void initializePPCLoopPreIncPrepPass(PassRegistry&);
-}
+
+} // end namespace llvm
 
 namespace {
 
   class PPCLoopPreIncPrep : public FunctionPass {
   public:
     static char ID; // Pass ID, replacement for typeid
-    PPCLoopPreIncPrep() : FunctionPass(ID), TM(nullptr) {
+
+    PPCLoopPreIncPrep() : FunctionPass(ID) {
       initializePPCLoopPreIncPrepPass(*PassRegistry::getPassRegistry());
     }
+
     PPCLoopPreIncPrep(PPCTargetMachine &TM) : FunctionPass(ID), TM(&TM) {
       initializePPCLoopPreIncPrepPass(*PassRegistry::getPassRegistry());
     }
@@ -73,7 +85,7 @@ namespace {
       AU.addPreserved<DominatorTreeWrapperPass>();
       AU.addRequired<LoopInfoWrapperPass>();
       AU.addPreserved<LoopInfoWrapperPass>();
-      AU.addRequired<ScalarEvolution>();
+      AU.addRequired<ScalarEvolutionWrapperPass>();
     }
 
     bool runOnFunction(Function &F) override;
@@ -83,17 +95,20 @@ namespace {
     bool rotateLoop(Loop *L);
 
   private:
-    PPCTargetMachine *TM;
+    PPCTargetMachine *TM = nullptr;
+    DominatorTree *DT;
     LoopInfo *LI;
     ScalarEvolution *SE;
+    bool PreserveLCSSA;
   };
-}
+
+} // end anonymous namespace
 
 char PPCLoopPreIncPrep::ID = 0;
 static const char *name = "Prepare loop for pre-inc. addressing modes";
 INITIALIZE_PASS_BEGIN(PPCLoopPreIncPrep, DEBUG_TYPE, name, false, false)
 INITIALIZE_PASS_DEPENDENCY(LoopInfoWrapperPass)
-INITIALIZE_PASS_DEPENDENCY(ScalarEvolution)
+INITIALIZE_PASS_DEPENDENCY(ScalarEvolutionWrapperPass)
 INITIALIZE_PASS_END(PPCLoopPreIncPrep, DEBUG_TYPE, name, false, false)
 
 FunctionPass *llvm::createPPCLoopPreIncPrepPass(PPCTargetMachine &TM) {
@@ -101,19 +116,24 @@ FunctionPass *llvm::createPPCLoopPreIncPrepPass(PPCTargetMachine &TM) {
 }
 
 namespace {
-  struct SCEVLess : std::binary_function<const SCEV *, const SCEV *, bool>
-  {
-    SCEVLess(ScalarEvolution *SE) : SE(SE) {}
 
-    bool operator() (const SCEV *X, const SCEV *Y) const {
-      const SCEV *Diff = SE->getMinusSCEV(X, Y);
-      return cast<SCEVConstant>(Diff)->getValue()->getSExtValue() < 0;
-    }
+  struct BucketElement {
+    BucketElement(const SCEVConstant *O, Instruction *I) : Offset(O), Instr(I) {}
+    BucketElement(Instruction *I) : Offset(nullptr), Instr(I) {}
 
-  protected:
-    ScalarEvolution *SE;
+    const SCEVConstant *Offset;
+    Instruction *Instr;
   };
-}
+
+  struct Bucket {
+    Bucket(const SCEV *B, Instruction *I) : BaseSCEV(B),
+                                            Elements(1, BucketElement(I)) {}
+
+    const SCEV *BaseSCEV;
+    SmallVector<BucketElement, 16> Elements;
+  };
+
+} // end anonymous namespace
 
 static bool IsPtrInBounds(Value *BasePtr) {
   Value *StrippedBasePtr = BasePtr;
@@ -135,12 +155,18 @@ static Value *GetPointerOperand(Value *MemI) {
       return IMemI->getArgOperand(0);
   }
 
-  return 0;
+  return nullptr;
 }
 
 bool PPCLoopPreIncPrep::runOnFunction(Function &F) {
+  if (skipFunction(F))
+    return false;
+
   LI = &getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
-  SE = &getAnalysis<ScalarEvolution>();
+  SE = &getAnalysis<ScalarEvolutionWrapperPass>().getSE();
+  auto *DTWP = getAnalysisIfAvailable<DominatorTreeWrapperPass>();
+  DT = DTWP ? &DTWP->getDomTree() : nullptr;
+  PreserveLCSSA = mustPreserveAnalysisID(LCSSAID);
 
   bool MadeChange = false;
 
@@ -169,7 +195,6 @@ bool PPCLoopPreIncPrep::runOnLoop(Loop *L) {
     std::distance(pred_begin(Header), pred_end(Header));
 
   // Collect buckets of comparable addresses used by loads and stores.
-  typedef std::multimap<const SCEV *, Instruction *, SCEVLess> Bucket;
   SmallVector<Bucket, 16> Buckets;
   for (Loop::block_iterator I = L->block_begin(), IE = L->block_end();
        I != IE; ++I) {
@@ -212,25 +237,24 @@ bool PPCLoopPreIncPrep::runOnLoop(Loop *L) {
       }
 
       bool FoundBucket = false;
-      for (unsigned i = 0, e = Buckets.size(); i != e; ++i)
-        for (Bucket::iterator K = Buckets[i].begin(), KE = Buckets[i].end();
-             K != KE; ++K) {
-          const SCEV *Diff = SE->getMinusSCEV(K->first, LSCEV);
-          if (isa<SCEVConstant>(Diff)) {
-            Buckets[i].insert(std::make_pair(LSCEV, MemI));
-            FoundBucket = true;
-            break;
-          }
+      for (auto &B : Buckets) {
+        const SCEV *Diff = SE->getMinusSCEV(LSCEV, B.BaseSCEV);
+        if (const auto *CDiff = dyn_cast<SCEVConstant>(Diff)) {
+          B.Elements.push_back(BucketElement(CDiff, MemI));
+          FoundBucket = true;
+          break;
         }
+      }
 
       if (!FoundBucket) {
-        Buckets.push_back(Bucket(SCEVLess(SE)));
-        Buckets[Buckets.size()-1].insert(std::make_pair(LSCEV, MemI));
+        if (Buckets.size() == MaxVars)
+          return MadeChange;
+        Buckets.push_back(Bucket(LSCEV, MemI));
       }
     }
   }
 
-  if (Buckets.empty() || Buckets.size() > MaxVars)
+  if (Buckets.empty())
     return MadeChange;
 
   BasicBlock *LoopPredecessor = L->getLoopPredecessor();
@@ -239,7 +263,7 @@ bool PPCLoopPreIncPrep::runOnLoop(Loop *L) {
   // iteration space), insert a new preheader for the loop.
   if (!LoopPredecessor ||
       !LoopPredecessor->getTerminator()->getType()->isVoidTy()) {
-    LoopPredecessor = InsertPreheaderForLoop(L, this);
+    LoopPredecessor = InsertPreheaderForLoop(L, DT, LI, PreserveLCSSA);
     if (LoopPredecessor)
       MadeChange = true;
   }
@@ -253,8 +277,45 @@ bool PPCLoopPreIncPrep::runOnLoop(Loop *L) {
     // The base address of each bucket is transformed into a phi and the others
     // are rewritten as offsets of that variable.
 
+    // We have a choice now of which instruction's memory operand we use as the
+    // base for the generated PHI. Always picking the first instruction in each
+    // bucket does not work well, specifically because that instruction might
+    // be a prefetch (and there are no pre-increment dcbt variants). Otherwise,
+    // the choice is somewhat arbitrary, because the backend will happily
+    // generate direct offsets from both the pre-incremented and
+    // post-incremented pointer values. Thus, we'll pick the first non-prefetch
+    // instruction in each bucket, and adjust the recurrence and other offsets
+    // accordingly. 
+    for (int j = 0, je = Buckets[i].Elements.size(); j != je; ++j) {
+      if (auto *II = dyn_cast<IntrinsicInst>(Buckets[i].Elements[j].Instr))
+        if (II->getIntrinsicID() == Intrinsic::prefetch)
+          continue;
+
+      // If we'd otherwise pick the first element anyway, there's nothing to do.
+      if (j == 0)
+        break;
+
+      // If our chosen element has no offset from the base pointer, there's
+      // nothing to do.
+      if (!Buckets[i].Elements[j].Offset ||
+          Buckets[i].Elements[j].Offset->isZero())
+        break;
+
+      const SCEV *Offset = Buckets[i].Elements[j].Offset;
+      Buckets[i].BaseSCEV = SE->getAddExpr(Buckets[i].BaseSCEV, Offset);
+      for (auto &E : Buckets[i].Elements) {
+        if (E.Offset)
+          E.Offset = cast<SCEVConstant>(SE->getMinusSCEV(E.Offset, Offset));
+        else
+          E.Offset = cast<SCEVConstant>(SE->getNegativeSCEV(Offset));
+      }
+
+      std::swap(Buckets[i].Elements[j], Buckets[i].Elements[0]);
+      break;
+    }
+
     const SCEVAddRecExpr *BasePtrSCEV =
-      cast<SCEVAddRecExpr>(Buckets[i].begin()->first);
+      cast<SCEVAddRecExpr>(Buckets[i].BaseSCEV);
     if (!BasePtrSCEV->isAffine())
       continue;
 
@@ -262,7 +323,9 @@ bool PPCLoopPreIncPrep::runOnLoop(Loop *L) {
     assert(BasePtrSCEV->getLoop() == L &&
            "AddRec for the wrong loop?");
 
-    Instruction *MemI = Buckets[i].begin()->second;
+    // The instruction corresponding to the Bucket's BaseSCEV must be the first
+    // in the vector of elements.
+    Instruction *MemI = Buckets[i].Elements.begin()->Instr;
     Value *BasePtr = GetPointerOperand(MemI);
     assert(BasePtr && "No pointer operand");
 
@@ -302,7 +365,7 @@ bool PPCLoopPreIncPrep::runOnLoop(Loop *L) {
       NewPHI->addIncoming(BasePtrStart, LoopPredecessor);
     }
 
-    Instruction *InsPoint = Header->getFirstInsertionPt();
+    Instruction *InsPoint = &*Header->getFirstInsertionPt();
     GetElementPtrInst *PtrInc = GetElementPtrInst::Create(
         I8Ty, NewPHI, BasePtrIncSCEV->getValue(),
         MemI->hasName() ? MemI->getName() + ".inc" : "", InsPoint);
@@ -327,32 +390,34 @@ bool PPCLoopPreIncPrep::runOnLoop(Loop *L) {
     BasePtr->replaceAllUsesWith(NewBasePtr);
     RecursivelyDeleteTriviallyDeadInstructions(BasePtr);
 
-    Value *LastNewPtr = NewBasePtr;
-    for (Bucket::iterator I = std::next(Buckets[i].begin()),
-         IE = Buckets[i].end(); I != IE; ++I) {
-      Value *Ptr = GetPointerOperand(I->second);
+    // Keep track of the replacement pointer values we've inserted so that we
+    // don't generate more pointer values than necessary.
+    SmallPtrSet<Value *, 16> NewPtrs;
+    NewPtrs.insert( NewBasePtr);
+
+    for (auto I = std::next(Buckets[i].Elements.begin()),
+         IE = Buckets[i].Elements.end(); I != IE; ++I) {
+      Value *Ptr = GetPointerOperand(I->Instr);
       assert(Ptr && "No pointer operand");
-      if (Ptr == LastNewPtr)
+      if (NewPtrs.count(Ptr))
         continue;
 
       Instruction *RealNewPtr;
-      const SCEVConstant *Diff =
-        cast<SCEVConstant>(SE->getMinusSCEV(I->first, BasePtrSCEV));
-      if (Diff->isZero()) {
+      if (!I->Offset || I->Offset->getValue()->isZero()) {
         RealNewPtr = NewBasePtr;
       } else {
         Instruction *PtrIP = dyn_cast<Instruction>(Ptr);
         if (PtrIP && isa<Instruction>(NewBasePtr) &&
             cast<Instruction>(NewBasePtr)->getParent() == PtrIP->getParent())
-          PtrIP = 0;
+          PtrIP = nullptr;
         else if (isa<PHINode>(PtrIP))
-          PtrIP = PtrIP->getParent()->getFirstInsertionPt();
+          PtrIP = &*PtrIP->getParent()->getFirstInsertionPt();
         else if (!PtrIP)
-          PtrIP = I->second;
+          PtrIP = I->Instr;
 
         GetElementPtrInst *NewPtr = GetElementPtrInst::Create(
-            I8Ty, PtrInc, Diff->getValue(),
-            I->second->hasName() ? I->second->getName() + ".off" : "", PtrIP);
+            I8Ty, PtrInc, I->Offset->getValue(),
+            I->Instr->hasName() ? I->Instr->getName() + ".off" : "", PtrIP);
         if (!PtrIP)
           NewPtr->insertAfter(cast<Instruction>(PtrInc));
         NewPtr->setIsInBounds(IsPtrInBounds(Ptr));
@@ -373,7 +438,7 @@ bool PPCLoopPreIncPrep::runOnLoop(Loop *L) {
       Ptr->replaceAllUsesWith(ReplNewPtr);
       RecursivelyDeleteTriviallyDeadInstructions(Ptr);
 
-      LastNewPtr = RealNewPtr;
+      NewPtrs.insert(RealNewPtr);
     }
 
     MadeChange = true;
@@ -387,4 +452,3 @@ bool PPCLoopPreIncPrep::runOnLoop(Loop *L) {
 
   return MadeChange;
 }
-

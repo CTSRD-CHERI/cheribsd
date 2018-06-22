@@ -15,42 +15,30 @@
 #ifndef LLVM_IR_USELISTORDER_H
 #define LLVM_IR_USELISTORDER_H
 
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/SmallVector.h"
+#include <cstddef>
 #include <vector>
 
 namespace llvm {
 
-class Module;
 class Function;
 class Value;
 
 /// \brief Structure to hold a use-list order.
 struct UseListOrder {
-  const Value *V;
-  const Function *F;
+  const Value *V = nullptr;
+  const Function *F = nullptr;
   std::vector<unsigned> Shuffle;
 
   UseListOrder(const Value *V, const Function *F, size_t ShuffleSize)
       : V(V), F(F), Shuffle(ShuffleSize) {}
 
-  UseListOrder() : V(0), F(0) {}
-  UseListOrder(UseListOrder &&X)
-      : V(X.V), F(X.F), Shuffle(std::move(X.Shuffle)) {}
-  UseListOrder &operator=(UseListOrder &&X) {
-    V = X.V;
-    F = X.F;
-    Shuffle = std::move(X.Shuffle);
-    return *this;
-  }
-
-private:
-  UseListOrder(const UseListOrder &X) = delete;
-  UseListOrder &operator=(const UseListOrder &X) = delete;
+  UseListOrder() = default;
+  UseListOrder(UseListOrder &&) = default;
+  UseListOrder &operator=(UseListOrder &&) = default;
 };
 
-typedef std::vector<UseListOrder> UseListOrderStack;
+using UseListOrderStack = std::vector<UseListOrder>;
 
 } // end namespace llvm
 
-#endif
+#endif // LLVM_IR_USELISTORDER_H

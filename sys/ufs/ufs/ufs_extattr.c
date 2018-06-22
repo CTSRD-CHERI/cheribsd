@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1999-2002 Robert N. M. Watson
  * Copyright (c) 2002-2003 Networks Associates Technology, Inc.
  * All rights reserved.
@@ -68,6 +70,8 @@ __FBSDID("$FreeBSD$");
 #include <ufs/ufs/ufs_extern.h>
 
 #ifdef UFS_EXTATTR
+
+FEATURE(ufs_extattr, "ufs extended attribute support");
 
 static MALLOC_DEFINE(M_UFS_EXTATTR, "ufs_extattr", "ufs extended attribute");
 
@@ -364,7 +368,7 @@ ufs_extattr_iterate_directory(struct ufsmount *ump, struct vnode *dvp,
 	struct dirent *dp, *edp;
 	struct vnode *attr_vp;
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	char *dirbuf;
 	int error, eofflag = 0;
 
@@ -390,8 +394,7 @@ ufs_extattr_iterate_directory(struct ufsmount *ump, struct vnode *dvp,
 
 	while (!eofflag) {
 		auio.uio_resid = DIRBLKSIZ;
-		aiov.iov_base = dirbuf;
-		aiov.iov_len = DIRBLKSIZ;
+		IOVEC_INIT(&aiov, dirbuf, DIRBLKSIZ);
 		error = ufs_readdir(&vargs);
 		if (error) {
 			printf("ufs_extattr_iterate_directory: ufs_readdir "
@@ -586,7 +589,7 @@ ufs_extattr_enable(struct ufsmount *ump, int attrnamespace,
     const char *attrname, struct vnode *backing_vnode, struct thread *td)
 {
 	struct ufs_extattr_list_entry *attribute;
-	struct iovec aiov;
+	kiovec_t aiov;
 	struct uio auio;
 	int error = 0;
 
@@ -597,8 +600,6 @@ ufs_extattr_enable(struct ufsmount *ump, int attrnamespace,
 
 	attribute = malloc(sizeof(struct ufs_extattr_list_entry),
 	    M_UFS_EXTATTR, M_WAITOK);
-	if (attribute == NULL)
-		return (ENOMEM);
 
 	if (!(ump->um_extattr.uepm_flags & UFS_EXTATTR_UEPM_STARTED)) {
 		error = EOPNOTSUPP;
@@ -620,8 +621,7 @@ ufs_extattr_enable(struct ufsmount *ump, int attrnamespace,
 
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
-	aiov.iov_base = (caddr_t) &attribute->uele_fileheader;
-	aiov.iov_len = sizeof(struct ufs_extattr_fileheader);
+	IOVEC_INIT_OBJ(&aiov, attribute->uele_fileheader);
 	auio.uio_resid = sizeof(struct ufs_extattr_fileheader);
 	auio.uio_offset = (off_t) 0;
 	auio.uio_segflg = UIO_SYSSPACE;
@@ -840,7 +840,7 @@ ufs_extattr_get(struct vnode *vp, int attrnamespace, const char *name,
 {
 	struct ufs_extattr_list_entry *attribute;
 	struct ufs_extattr_header ueh;
-	struct iovec local_aiov;
+	kiovec_t local_aiov;
 	struct uio local_aio;
 	struct mount *mp = vp->v_mount;
 	struct ufsmount *ump = VFSTOUFS(mp);
@@ -884,8 +884,7 @@ ufs_extattr_get(struct vnode *vp, int attrnamespace, const char *name,
 	 * how much.
 	 */
 	bzero(&ueh, sizeof(struct ufs_extattr_header));
-	local_aiov.iov_base = (caddr_t) &ueh;
-	local_aiov.iov_len = sizeof(struct ufs_extattr_header);
+	IOVEC_INIT_OBJ(&local_aiov, &ueh);
 	local_aio.uio_iov = &local_aiov;
 	local_aio.uio_iovcnt = 1;
 	local_aio.uio_rw = UIO_READ;
@@ -1047,7 +1046,7 @@ ufs_extattr_set(struct vnode *vp, int attrnamespace, const char *name,
 {
 	struct ufs_extattr_list_entry *attribute;
 	struct ufs_extattr_header ueh;
-	struct iovec local_aiov;
+	kiovec_t local_aiov;
 	struct uio local_aio;
 	struct mount *mp = vp->v_mount;
 	struct ufsmount *ump = VFSTOUFS(mp);
@@ -1093,8 +1092,7 @@ ufs_extattr_set(struct vnode *vp, int attrnamespace, const char *name,
 	ueh.ueh_len = uio->uio_resid;
 	ueh.ueh_flags = UFS_EXTATTR_ATTR_FLAG_INUSE;
 	ueh.ueh_i_gen = ip->i_gen;
-	local_aiov.iov_base = (caddr_t) &ueh;
-	local_aiov.iov_len = sizeof(struct ufs_extattr_header);
+	IOVEC_INIT_OBJ(&local_aiov, &ueh);
 	local_aio.uio_iov = &local_aiov;
 	local_aio.uio_iovcnt = 1;
 	local_aio.uio_rw = UIO_WRITE;
@@ -1155,7 +1153,7 @@ ufs_extattr_rm(struct vnode *vp, int attrnamespace, const char *name,
 {
 	struct ufs_extattr_list_entry *attribute;
 	struct ufs_extattr_header ueh;
-	struct iovec local_aiov;
+	kiovec_t local_aiov;
 	struct uio local_aio;
 	struct mount *mp = vp->v_mount;
 	struct ufsmount *ump = VFSTOUFS(mp);
@@ -1191,8 +1189,7 @@ ufs_extattr_rm(struct vnode *vp, int attrnamespace, const char *name,
 	 */
 	bzero(&ueh, sizeof(struct ufs_extattr_header));
 
-	local_aiov.iov_base = (caddr_t) &ueh;
-	local_aiov.iov_len = sizeof(struct ufs_extattr_header);
+	IOVEC_INIT_OBJ(&local_aiov, &ueh);
 	local_aio.uio_iov = &local_aiov;
 	local_aio.uio_iovcnt = 1;
 	local_aio.uio_rw = UIO_READ;
@@ -1237,8 +1234,7 @@ ufs_extattr_rm(struct vnode *vp, int attrnamespace, const char *name,
 	ueh.ueh_flags = 0;
 	ueh.ueh_len = 0;
 
-	local_aiov.iov_base = (caddr_t) &ueh;
-	local_aiov.iov_len = sizeof(struct ufs_extattr_header);
+	IOVEC_INIT_OBJ(&local_aiov, &ueh);
 	local_aio.uio_iov = &local_aiov;
 	local_aio.uio_iovcnt = 1;
 	local_aio.uio_rw = UIO_WRITE;

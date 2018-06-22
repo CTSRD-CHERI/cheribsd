@@ -17,6 +17,7 @@
 #ifndef LLVM_CLANG_SERIALIZATION_ASTBITCODES_H
 #define LLVM_CLANG_SERIALIZATION_ASTBITCODES_H
 
+#include "clang/AST/DeclarationName.h"
 #include "clang/AST/Type.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Bitcode/BitCodes.h"
@@ -60,9 +61,6 @@ namespace clang {
     /// At the start of a chain of precompiled headers, declaration ID 1 is 
     /// used for the translation unit declaration.
     typedef uint32_t DeclID;
-
-    /// \brief a Decl::Kind/DeclID pair.
-    typedef std::pair<uint32_t, DeclID> KindDeclIDPair;
 
     // FIXME: Turn these into classes so we can have some type safety when
     // we go from local ID to global and vice-versa.
@@ -177,6 +175,12 @@ namespace clang {
         : Begin(R.getBegin().getRawEncoding()),
           End(R.getEnd().getRawEncoding()),
           BitOffset(BitOffset) { }
+      SourceLocation getBegin() const {
+        return SourceLocation::getFromRawEncoding(Begin);
+      }
+      SourceLocation getEnd() const {
+        return SourceLocation::getFromRawEncoding(End);
+      }
     };
 
     /// \brief Source range/offset of a preprocessed entity.
@@ -192,6 +196,9 @@ namespace clang {
           BitOffset(BitOffset) { }
       void setLocation(SourceLocation L) {
         Loc = L.getRawEncoding();
+      }
+      SourceLocation getLocation() const {
+        return SourceLocation::getFromRawEncoding(Loc);
       }
     };
 
@@ -219,7 +226,7 @@ namespace clang {
 
       /// \brief The block containing the detailed preprocessing record.
       PREPROCESSOR_DETAIL_BLOCK_ID,
-      
+
       /// \brief The block containing the submodule structure.
       SUBMODULE_BLOCK_ID,
 
@@ -235,7 +242,23 @@ namespace clang {
       /// to create this AST file.
       ///
       /// This block is part of the control block.
-      INPUT_FILES_BLOCK_ID
+      INPUT_FILES_BLOCK_ID,
+
+      /// \brief The block of configuration options, used to check that
+      /// a module is being used in a configuration compatible with the
+      /// configuration in which it was built.
+      ///
+      /// This block is part of the control block.
+      OPTIONS_BLOCK_ID,
+
+      /// \brief A block containing a module file extension.
+      EXTENSION_BLOCK_ID,
+
+      /// A block with unhashed content.
+      ///
+      /// These records should not change the \a ASTFileSignature.  See \a
+      /// UnhashedControlBlockRecordTypes for the list of records.
+      UNHASHED_CONTROL_BLOCK_ID,
     };
 
     /// \brief Record types that occur within the control block.
@@ -246,63 +269,78 @@ namespace clang {
 
       /// \brief Record code for the list of other AST files imported by
       /// this AST file.
-      IMPORTS = 2,
+      IMPORTS,
 
+      /// \brief Record code for the original file that was used to
+      /// generate the AST file, including both its file ID and its
+      /// name.
+      ORIGINAL_FILE,
+      
+      /// \brief The directory that the PCH was originally created in.
+      ORIGINAL_PCH_DIR,
+
+      /// \brief Record code for file ID of the file or buffer that was used to
+      /// generate the AST file.
+      ORIGINAL_FILE_ID,
+
+      /// \brief Offsets into the input-files block where input files
+      /// reside.
+      INPUT_FILE_OFFSETS,
+
+      /// \brief Record code for the module name.
+      MODULE_NAME,
+
+      /// \brief Record code for the module map file that was used to build this
+      /// AST file.
+      MODULE_MAP_FILE,
+
+      /// \brief Record code for the module build directory.
+      MODULE_DIRECTORY,
+    };
+
+    /// \brief Record types that occur within the options block inside
+    /// the control block.
+    enum OptionsRecordTypes {
       /// \brief Record code for the language options table.
       ///
       /// The record with this code contains the contents of the
       /// LangOptions structure. We serialize the entire contents of
       /// the structure, and let the reader decide which options are
       /// actually important to check.
-      LANGUAGE_OPTIONS = 3,
+      LANGUAGE_OPTIONS = 1,
 
       /// \brief Record code for the target options table.
-      TARGET_OPTIONS = 4,
-
-      /// \brief Record code for the original file that was used to
-      /// generate the AST file, including both its file ID and its
-      /// name.
-      ORIGINAL_FILE = 5,
-      
-      /// \brief The directory that the PCH was originally created in.
-      ORIGINAL_PCH_DIR = 6,
-
-      /// \brief Record code for file ID of the file or buffer that was used to
-      /// generate the AST file.
-      ORIGINAL_FILE_ID = 7,
-
-      /// \brief Offsets into the input-files block where input files
-      /// reside.
-      INPUT_FILE_OFFSETS = 8,
-
-      /// \brief Record code for the diagnostic options table.
-      DIAGNOSTIC_OPTIONS = 9,
+      TARGET_OPTIONS,
 
       /// \brief Record code for the filesystem options table.
-      FILE_SYSTEM_OPTIONS = 10,
+      FILE_SYSTEM_OPTIONS,
 
       /// \brief Record code for the headers search options table.
-      HEADER_SEARCH_OPTIONS = 11,
+      HEADER_SEARCH_OPTIONS,
 
       /// \brief Record code for the preprocessor options table.
-      PREPROCESSOR_OPTIONS = 12,
+      PREPROCESSOR_OPTIONS,
+    };
 
-      /// \brief Record code for the module name.
-      MODULE_NAME = 13,
+    /// Record codes for the unhashed control block.
+    enum UnhashedControlBlockRecordTypes {
+      /// Record code for the signature that identifiers this AST file.
+      SIGNATURE = 1,
 
-      /// \brief Record code for the module map file that was used to build this
-      /// AST file.
-      MODULE_MAP_FILE = 14,
+      /// Record code for the diagnostic options table.
+      DIAGNOSTIC_OPTIONS,
 
-      /// \brief Record code for the signature that identifiers this AST file.
-      SIGNATURE = 15,
+      /// Record code for \#pragma diagnostic mappings.
+      DIAG_PRAGMA_MAPPINGS,
+    };
 
-      /// \brief Record code for the module build directory.
-      MODULE_DIRECTORY = 16,
+    /// \brief Record code for extension blocks.
+    enum ExtensionBlockRecordTypes {
+      /// Metadata describing this particular extension.
+      EXTENSION_METADATA = 1,
 
-      /// \brief Record code for the list of other AST files made available by
-      /// this AST file but not actually used by it.
-      KNOWN_MODULE_FILES = 17,
+      /// The first record ID allocated to the extensions themselves.
+      FIRST_EXTENSION_RECORD_ID = 4
     };
 
     /// \brief Record types that occur within the input-files block
@@ -318,7 +356,7 @@ namespace clang {
       ///
       /// The TYPE_OFFSET constant describes the record that occurs
       /// within the AST block. The record itself is an array of offsets that
-      /// point into the declarations and types block (identified by 
+      /// point into the declarations and types block (identified by
       /// DECLTYPES_BLOCK_ID). The index into the array is based on the ID
       /// of a type. For a given type ID @c T, the lower three bits of
       /// @c T are its qualifiers (const, volatile, restrict), as in
@@ -350,7 +388,7 @@ namespace clang {
 
       /// \brief This is so that older clang versions, before the introduction
       /// of the control block, can read and reject the newer PCH format.
-      /// *DON"T CHANGE THIS NUMBER*.
+      /// *DON'T CHANGE THIS NUMBER*.
       METADATA_OLD_FORMAT = 4,
 
       /// \brief Record code for the identifier table.
@@ -420,10 +458,10 @@ namespace clang {
 
       /// \brief Record code for the set of ext_vector type names.
       EXT_VECTOR_DECLS = 16,
-      
+
       /// \brief Record code for the array of unused file scoped decls.
       UNUSED_FILESCOPED_DECLS = 17,
-      
+
       /// \brief Record code for the table of offsets to entries in the
       /// preprocessing record.
       PPD_ENTITIES_OFFSETS = 18,
@@ -439,11 +477,8 @@ namespace clang {
       /// \brief Record code for an update to the TU's lexically contained
       /// declarations.
       TU_UPDATE_LEXICAL = 22,
-      
-      /// \brief Record code for the array describing the locations (in the
-      /// LOCAL_REDECLARATIONS record) of the redeclaration chains, indexed by
-      /// the first known ID.
-      LOCAL_REDECLARATIONS_MAP = 23,
+
+      // ID 23 used to be for a list of local redeclarations.
 
       /// \brief Record code for declarations that Sema keeps references of.
       SEMA_DECL_REFS = 24,
@@ -454,12 +489,7 @@ namespace clang {
       /// \brief Record code for pending implicit instantiations.
       PENDING_IMPLICIT_INSTANTIATIONS = 26,
 
-      /// \brief Record code for a decl replacement block.
-      ///
-      /// If a declaration is modified after having been deserialized, and then
-      /// written to a dependent AST file, its ID and offset must be added to
-      /// the replacement block.
-      DECL_REPLACEMENTS = 27,
+      // ID 27 used to be for a list of replacement decls.
 
       /// \brief Record code for an update to a decl context's lookup table.
       ///
@@ -470,20 +500,16 @@ namespace clang {
       /// that were modified after being deserialized and need updates.
       DECL_UPDATE_OFFSETS = 29,
 
-      /// \brief Record of updates for a declaration that was modified after
-      /// being deserialized.
-      DECL_UPDATES = 30,
-      
-      /// \brief Record code for the table of offsets to CXXBaseSpecifier
-      /// sets.
-      CXX_BASE_SPECIFIER_OFFSETS = 31,
+      // ID 30 used to be a decl update record. These are now in the DECLTYPES
+      // block.
 
-      /// \brief Record code for \#pragma diagnostic mappings.
-      DIAG_PRAGMA_MAPPINGS = 32,
+      // ID 31 used to be a list of offsets to DECL_CXX_BASE_SPECIFIERS records.
+
+      // ID 32 used to be the code for \#pragma diagnostic mappings.
 
       /// \brief Record code for special CUDA declarations.
       CUDA_SPECIAL_DECL_REFS = 33,
-      
+
       /// \brief Record code for header search information.
       HEADER_SEARCH_TABLE = 34,
 
@@ -501,7 +527,7 @@ namespace clang {
       KNOWN_NAMESPACES = 38,
 
       /// \brief Record code for the remapping information used to relate
-      /// loaded modules to the various offsets and IDs(e.g., source location 
+      /// loaded modules to the various offsets and IDs(e.g., source location
       /// offests, declaration and type IDs) that are used in that module to
       /// refer to other modules.
       MODULE_OFFSET_MAP = 39,
@@ -510,25 +536,20 @@ namespace clang {
       /// which stores information about \#line directives.
       SOURCE_MANAGER_LINE_TABLE = 40,
 
-      /// \brief Record code for map of Objective-C class definition IDs to the 
+      /// \brief Record code for map of Objective-C class definition IDs to the
       /// ObjC categories in a module that are attached to that class.
       OBJC_CATEGORIES_MAP = 41,
 
       /// \brief Record code for a file sorted array of DeclIDs in a module.
       FILE_SORTED_DECLS = 42,
-      
+
       /// \brief Record code for an array of all of the (sub)modules that were
       /// imported by the AST file.
       IMPORTED_MODULES = 43,
-      
-      // ID 40 used to be a table of merged canonical declarations.
-      
-      /// \brief Record code for the array of redeclaration chains.
-      ///
-      /// This array can only be interpreted properly using the local 
-      /// redeclarations map.
-      LOCAL_REDECLARATIONS = 45,
-      
+
+      // ID 44 used to be a table of merged canonical declarations.
+      // ID 45 used to be a list of declaration IDs of local redeclarations.
+
       /// \brief Record code for the array of Objective-C categories (including
       /// extensions).
       ///
@@ -543,7 +564,10 @@ namespace clang {
       /// macro definition.
       MACRO_OFFSET = 47,
 
-      // ID 48 used to be a table of macros.
+      /// \brief A list of "interesting" identifiers. Only used in C++ (where we
+      /// don't normally do lookups into the serialized identifier table). These
+      /// are eagerly deserialized.
+      INTERESTING_IDENTIFIERS = 48,
 
       /// \brief Record code for undefined but used functions and variables that
       /// need a definition in this TU.
@@ -558,12 +582,34 @@ namespace clang {
       /// \brief Record code for potentially unused local typedef names.
       UNUSED_LOCAL_TYPEDEF_NAME_CANDIDATES = 52,
 
-      /// \brief Record code for the table of offsets to CXXCtorInitializers
-      /// lists.
-      CXX_CTOR_INITIALIZERS_OFFSETS = 53,
+      // ID 53 used to be a table of constructor initializer records.
 
       /// \brief Delete expressions that will be analyzed later.
-      DELETE_EXPRS_TO_ANALYZE = 54
+      DELETE_EXPRS_TO_ANALYZE = 54,
+
+      /// \brief Record code for \#pragma ms_struct options.
+      MSSTRUCT_PRAGMA_OPTIONS = 55,
+
+      /// \brief Record code for \#pragma ms_struct options.
+      POINTERS_TO_MEMBERS_PRAGMA_OPTIONS = 56,
+
+      /// \brief Number of unmatched #pragma clang cuda_force_host_device begin
+      /// directives we've seen.
+      CUDA_PRAGMA_FORCE_HOST_DEVICE_DEPTH = 57,
+
+      /// \brief Record code for types associated with OpenCL extensions.
+      OPENCL_EXTENSION_TYPES = 58,
+
+      /// \brief Record code for declarations associated with OpenCL extensions.
+      OPENCL_EXTENSION_DECLS = 59,
+
+      MODULAR_CODEGEN_DECLS = 60,
+
+      /// \brief Record code for \#pragma pack options.
+      PACK_PRAGMA_OPTIONS = 61,
+
+      /// \brief The stack of open #ifs/#ifdefs recorded in a preamble.
+      PP_CONDITIONAL_STACK = 62,
     };
 
     /// \brief Record types used within a source manager block.
@@ -579,9 +625,12 @@ namespace clang {
       /// SM_SLOC_BUFFER_ENTRY record or a SM_SLOC_FILE_ENTRY with an
       /// overridden buffer.
       SM_SLOC_BUFFER_BLOB = 3,
+      /// \brief Describes a zlib-compressed blob that contains the data for
+      /// a buffer entry.
+      SM_SLOC_BUFFER_BLOB_COMPRESSED = 4,
       /// \brief Describes a source location entry (SLocEntry) for a
       /// macro expansion.
-      SM_SLOC_EXPANSION_ENTRY = 4
+      SM_SLOC_EXPANSION_ENTRY = 5
     };
 
     /// \brief Record types used within a preprocessor block.
@@ -664,6 +713,9 @@ namespace clang {
       /// \brief Specifies a header that is private to this submodule but
       /// must be textually included.
       SUBMODULE_PRIVATE_TEXTUAL_HEADER = 15,
+      /// \brief Specifies some declarations with initializers that must be
+      /// emitted to initialize the module.
+      SUBMODULE_INITIALIZERS = 16,
     };
 
     /// \brief Record types used within a comments block.
@@ -758,26 +810,26 @@ namespace clang {
       PREDEF_TYPE_ARC_UNBRIDGED_CAST = 34,
       /// \brief The pseudo-object placeholder type.
       PREDEF_TYPE_PSEUDO_OBJECT = 35,
-      /// \brief The __va_list_tag placeholder type.
-      PREDEF_TYPE_VA_LIST_TAG = 36,
       /// \brief The placeholder type for builtin functions.
-      PREDEF_TYPE_BUILTIN_FN = 37,
-      /// \brief OpenCL 1d image type.
-      PREDEF_TYPE_IMAGE1D_ID    = 38,
-      /// \brief OpenCL 1d image array type.
-      PREDEF_TYPE_IMAGE1D_ARR_ID = 39,
-      /// \brief OpenCL 1d image buffer type.
-      PREDEF_TYPE_IMAGE1D_BUFF_ID = 40,
-      /// \brief OpenCL 2d image type.
-      PREDEF_TYPE_IMAGE2D_ID    = 41,
-      /// \brief OpenCL 2d image array type.
-      PREDEF_TYPE_IMAGE2D_ARR_ID = 42,
-      /// \brief OpenCL 3d image type.
-      PREDEF_TYPE_IMAGE3D_ID    = 43,
+      PREDEF_TYPE_BUILTIN_FN = 36,
       /// \brief OpenCL event type.
-      PREDEF_TYPE_EVENT_ID      = 44,
+      PREDEF_TYPE_EVENT_ID      = 37,
+      /// \brief OpenCL clk event type.
+      PREDEF_TYPE_CLK_EVENT_ID  = 38,
       /// \brief OpenCL sampler type.
-      PREDEF_TYPE_SAMPLER_ID    = 45
+      PREDEF_TYPE_SAMPLER_ID    = 39,
+      /// \brief OpenCL queue type.
+      PREDEF_TYPE_QUEUE_ID      = 40,
+      /// \brief OpenCL reserve_id type.
+      PREDEF_TYPE_RESERVE_ID_ID = 41,
+      /// \brief The placeholder type for OpenMP array section.
+      PREDEF_TYPE_OMP_ARRAY_SECTION = 42,
+      /// \brief The '__float128' type
+      PREDEF_TYPE_FLOAT128_ID = 43,
+      /// \brief OpenCL image types with auto numeration
+#define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix) \
+      PREDEF_TYPE_##Id##_ID,
+#include "clang/Basic/OpenCLImageTypes.def"
     };
 
     /// \brief The number of predefined type IDs that are reserved for
@@ -792,7 +844,7 @@ namespace clang {
     /// These constants describe the type records that can occur within a
     /// block identified by DECLTYPES_BLOCK_ID in the AST file. Each
     /// constant describes a record for a specific type class in the
-    /// AST.
+    /// AST. Note that DeclCode values share this code space.
     enum TypeCode {
       /// \brief An ExtQualType record.
       TYPE_EXT_QUAL                 = 1,
@@ -875,7 +927,15 @@ namespace clang {
       /// \brief A DecayedType record.
       TYPE_DECAYED               = 41,
       /// \brief An AdjustedType record.
-      TYPE_ADJUSTED              = 42
+      TYPE_ADJUSTED              = 42,
+      /// \brief A PipeType record.
+      TYPE_PIPE                  = 43,
+      /// \brief An ObjCTypeParamType record.
+      TYPE_OBJC_TYPE_PARAM       = 44,
+      /// \brief A DeducedTemplateSpecializationType record.
+      TYPE_DEDUCED_TEMPLATE_SPECIALIZATION = 45,
+      /// \brief A DependentSizedExtVectorType record.
+      TYPE_DEPENDENT_SIZED_EXT_VECTOR = 46
     };
 
     /// \brief The type IDs for special types constructed by semantic
@@ -913,51 +973,77 @@ namespace clang {
     /// it is created.
     enum PredefinedDeclIDs {
       /// \brief The NULL declaration.
-      PREDEF_DECL_NULL_ID       = 0,
-      
+      PREDEF_DECL_NULL_ID = 0,
+
       /// \brief The translation unit.
       PREDEF_DECL_TRANSLATION_UNIT_ID = 1,
-      
+
       /// \brief The Objective-C 'id' type.
       PREDEF_DECL_OBJC_ID_ID = 2,
-      
+
       /// \brief The Objective-C 'SEL' type.
       PREDEF_DECL_OBJC_SEL_ID = 3,
-      
+
       /// \brief The Objective-C 'Class' type.
       PREDEF_DECL_OBJC_CLASS_ID = 4,
-            
+
       /// \brief The Objective-C 'Protocol' type.
       PREDEF_DECL_OBJC_PROTOCOL_ID = 5,
-      
+
       /// \brief The signed 128-bit integer type.
       PREDEF_DECL_INT_128_ID = 6,
 
       /// \brief The unsigned 128-bit integer type.
       PREDEF_DECL_UNSIGNED_INT_128_ID = 7,
-      
+
       /// \brief The internal 'instancetype' typedef.
       PREDEF_DECL_OBJC_INSTANCETYPE_ID = 8,
 
       /// \brief The internal '__builtin_va_list' typedef.
       PREDEF_DECL_BUILTIN_VA_LIST_ID = 9,
 
+      /// \brief The internal '__va_list_tag' struct, if any.
+      PREDEF_DECL_VA_LIST_TAG = 10,
+
+      /// \brief The internal '__builtin_ms_va_list' typedef.
+      PREDEF_DECL_BUILTIN_MS_VA_LIST_ID = 11,
+
       /// \brief The extern "C" context.
-      PREDEF_DECL_EXTERN_C_CONTEXT_ID = 10,
+      PREDEF_DECL_EXTERN_C_CONTEXT_ID = 12,
+
+      /// \brief The internal '__make_integer_seq' template.
+      PREDEF_DECL_MAKE_INTEGER_SEQ_ID = 13,
+
+      /// \brief The internal '__NSConstantString' typedef.
+      PREDEF_DECL_CF_CONSTANT_STRING_ID = 14,
+
+      /// \brief The internal '__NSConstantString' tag type.
+      PREDEF_DECL_CF_CONSTANT_STRING_TAG_ID = 15,
+
+      /// \brief The internal '__type_pack_element' template.
+      PREDEF_DECL_TYPE_PACK_ELEMENT_ID = 16,
     };
 
     /// \brief The number of declaration IDs that are predefined.
     ///
     /// For more information about predefined declarations, see the
     /// \c PredefinedDeclIDs type and the PREDEF_DECL_*_ID constants.
-    const unsigned int NUM_PREDEF_DECL_IDS = 11;
+    const unsigned int NUM_PREDEF_DECL_IDS = 17;
+
+    /// \brief Record of updates for a declaration that was modified after
+    /// being deserialized. This can occur within DECLTYPES_BLOCK_ID.
+    const unsigned int DECL_UPDATES = 49;
+
+    /// \brief Record code for a list of local redeclarations of a declaration.
+    /// This can occur within DECLTYPES_BLOCK_ID.
+    const unsigned int LOCAL_REDECLARATIONS = 50;
     
     /// \brief Record codes for each kind of declaration.
     ///
     /// These constants describe the declaration records that can occur within
-    /// a declarations block (identified by DECLS_BLOCK_ID). Each
+    /// a declarations block (identified by DECLTYPES_BLOCK_ID). Each
     /// constant describes a record for a specific declaration class
-    /// in the AST.
+    /// in the AST. Note that TypeCode values share this code space.
     enum DeclCode {
       /// \brief A TypedefDecl record.
       DECL_TYPEDEF = 51,
@@ -1003,6 +1089,10 @@ namespace clang {
       DECL_IMPLICIT_PARAM,
       /// \brief A ParmVarDecl record.
       DECL_PARM_VAR,
+      /// \brief A DecompositionDecl record.
+      DECL_DECOMPOSITION,
+      /// \brief A BindingDecl record.
+      DECL_BINDING,
       /// \brief A FileScopeAsmDecl record.
       DECL_FILE_SCOPE_ASM,
       /// \brief A BlockDecl record.
@@ -1034,8 +1124,12 @@ namespace clang {
       DECL_NAMESPACE_ALIAS,
       /// \brief A UsingDecl record.
       DECL_USING,
+      /// \brief A UsingPackDecl record.
+      DECL_USING_PACK,
       /// \brief A UsingShadowDecl record.
       DECL_USING_SHADOW,
+      /// \brief A ConstructorUsingShadowDecl record.
+      DECL_CONSTRUCTOR_USING_SHADOW,
       /// \brief A UsingDirecitveDecl record.
       DECL_USING_DIRECTIVE,
       /// \brief An UnresolvedUsingValueDecl record.
@@ -1044,12 +1138,18 @@ namespace clang {
       DECL_UNRESOLVED_USING_TYPENAME,
       /// \brief A LinkageSpecDecl record.
       DECL_LINKAGE_SPEC,
+      /// \brief An ExportDecl record.
+      DECL_EXPORT,
       /// \brief A CXXRecordDecl record.
       DECL_CXX_RECORD,
+      /// \brief A CXXDeductionGuideDecl record.
+      DECL_CXX_DEDUCTION_GUIDE,
       /// \brief A CXXMethodDecl record.
       DECL_CXX_METHOD,
       /// \brief A CXXConstructorDecl record.
       DECL_CXX_CONSTRUCTOR,
+      /// \brief A CXXConstructorDecl record for an inherited constructor.
+      DECL_CXX_INHERITED_CONSTRUCTOR,
       /// \brief A CXXDestructorDecl record.
       DECL_CXX_DESTRUCTOR,
       /// \brief A CXXConversionDecl record.
@@ -1108,6 +1208,14 @@ namespace clang {
       DECL_EMPTY,
       /// \brief An ObjCTypeParamDecl record.
       DECL_OBJC_TYPE_PARAM,
+      /// \brief An OMPCapturedExprDecl record.
+      DECL_OMP_CAPTUREDEXPR,
+      /// \brief A PragmaCommentDecl record.
+      DECL_PRAGMA_COMMENT,
+      /// \brief A PragmaDetectMismatchDecl record.
+      DECL_PRAGMA_DETECT_MISMATCH,
+      /// \brief An OMPDeclareReductionDecl record.
+      DECL_OMP_DECLARE_REDUCTION,
     };
 
     /// \brief Record codes for each kind of statement or expression.
@@ -1215,10 +1323,14 @@ namespace clang {
       EXPR_DESIGNATED_INIT,
       /// \brief A DesignatedInitUpdateExpr record.
       EXPR_DESIGNATED_INIT_UPDATE,
-      /// \brief An ImplicitValueInitExpr record.
-      EXPR_IMPLICIT_VALUE_INIT,
       /// \brief An NoInitExpr record.
       EXPR_NO_INIT,
+      /// \brief An ArrayInitLoopExpr record.
+      EXPR_ARRAY_INIT_LOOP,
+      /// \brief An ArrayInitIndexExpr record.
+      EXPR_ARRAY_INIT_INDEX,
+      /// \brief An ImplicitValueInitExpr record.
+      EXPR_IMPLICIT_VALUE_INIT,
       /// \brief A VAArgExpr record.
       EXPR_VA_ARG,
       /// \brief An AddrLabelExpr record.
@@ -1287,8 +1399,10 @@ namespace clang {
       STMT_OBJC_AT_THROW,
       /// \brief An ObjCAutoreleasePoolStmt record.
       STMT_OBJC_AUTORELEASE_POOL,
-      /// \brief A ObjCBoolLiteralExpr record.
+      /// \brief An ObjCBoolLiteralExpr record.
       EXPR_OBJC_BOOL_LITERAL,
+      /// \brief An ObjCAvailabilityCheckExpr record.
+      EXPR_OBJC_AVAILABILITY_CHECK,
 
       // C++
       
@@ -1305,6 +1419,8 @@ namespace clang {
       EXPR_CXX_MEMBER_CALL,
       /// \brief A CXXConstructExpr record.
       EXPR_CXX_CONSTRUCT,
+      /// \brief A CXXInheritedCtorInitExpr record.
+      EXPR_CXX_INHERITED_CTOR_INIT,
       /// \brief A CXXTemporaryObjectExpr record.
       EXPR_CXX_TEMPORARY_OBJECT,
       /// \brief A CXXStaticCastExpr record.
@@ -1369,6 +1485,7 @@ namespace clang {
 
       // Microsoft
       EXPR_CXX_PROPERTY_REF_EXPR, // MSPropertyRefExpr
+      EXPR_CXX_PROPERTY_SUBSCRIPT_EXPR, // MSPropertySubscriptExpr
       EXPR_CXX_UUIDOF_EXPR,       // CXXUuidofExpr (of expr).
       EXPR_CXX_UUIDOF_TYPE,       // CXXUuidofExpr (of type).
       STMT_SEH_LEAVE,             // SEHLeaveStmt
@@ -1397,16 +1514,45 @@ namespace clang {
       STMT_OMP_ORDERED_DIRECTIVE,
       STMT_OMP_ATOMIC_DIRECTIVE,
       STMT_OMP_TARGET_DIRECTIVE,
+      STMT_OMP_TARGET_DATA_DIRECTIVE,
+      STMT_OMP_TARGET_ENTER_DATA_DIRECTIVE,
+      STMT_OMP_TARGET_EXIT_DATA_DIRECTIVE,
+      STMT_OMP_TARGET_PARALLEL_DIRECTIVE,
+      STMT_OMP_TARGET_PARALLEL_FOR_DIRECTIVE,
       STMT_OMP_TEAMS_DIRECTIVE,
       STMT_OMP_TASKGROUP_DIRECTIVE,
       STMT_OMP_CANCELLATION_POINT_DIRECTIVE,
       STMT_OMP_CANCEL_DIRECTIVE,
+      STMT_OMP_TASKLOOP_DIRECTIVE,
+      STMT_OMP_TASKLOOP_SIMD_DIRECTIVE,
+      STMT_OMP_DISTRIBUTE_DIRECTIVE,
+      STMT_OMP_TARGET_UPDATE_DIRECTIVE,
+      STMT_OMP_DISTRIBUTE_PARALLEL_FOR_DIRECTIVE,
+      STMT_OMP_DISTRIBUTE_PARALLEL_FOR_SIMD_DIRECTIVE,
+      STMT_OMP_DISTRIBUTE_SIMD_DIRECTIVE,
+      STMT_OMP_TARGET_PARALLEL_FOR_SIMD_DIRECTIVE,
+      STMT_OMP_TARGET_SIMD_DIRECTIVE,
+      STMT_OMP_TEAMS_DISTRIBUTE_DIRECTIVE,
+      STMT_OMP_TEAMS_DISTRIBUTE_SIMD_DIRECTIVE,
+      STMT_OMP_TEAMS_DISTRIBUTE_PARALLEL_FOR_SIMD_DIRECTIVE,
+      STMT_OMP_TEAMS_DISTRIBUTE_PARALLEL_FOR_DIRECTIVE,
+      STMT_OMP_TARGET_TEAMS_DIRECTIVE,
+      STMT_OMP_TARGET_TEAMS_DISTRIBUTE_DIRECTIVE,
+      STMT_OMP_TARGET_TEAMS_DISTRIBUTE_PARALLEL_FOR_DIRECTIVE,
+      STMT_OMP_TARGET_TEAMS_DISTRIBUTE_PARALLEL_FOR_SIMD_DIRECTIVE,
+      STMT_OMP_TARGET_TEAMS_DISTRIBUTE_SIMD_DIRECTIVE,
+      EXPR_OMP_ARRAY_SECTION,
 
       // ARC
       EXPR_OBJC_BRIDGED_CAST,     // ObjCBridgedCastExpr
-      
+
       STMT_MS_DEPENDENT_EXISTS,   // MSDependentExistsStmt
-      EXPR_LAMBDA                 // LambdaExpr
+      EXPR_LAMBDA,                // LambdaExpr
+      STMT_COROUTINE_BODY,
+      STMT_CORETURN,
+      EXPR_COAWAIT,
+      EXPR_COYIELD,
+      EXPR_DEPENDENT_COAWAIT,
     };
 
     /// \brief The kinds of designators that can occur in a
@@ -1484,8 +1630,73 @@ namespace clang {
       }
     };
 
+    /// \brief A key used when looking up entities by \ref DeclarationName.
+    ///
+    /// Different \ref DeclarationNames are mapped to different keys, but the
+    /// same key can occasionally represent multiple names (for names that
+    /// contain types, in particular).
+    class DeclarationNameKey {
+      typedef unsigned NameKind;
+
+      NameKind Kind;
+      uint64_t Data;
+
+    public:
+      DeclarationNameKey() : Kind(), Data() {}
+      DeclarationNameKey(DeclarationName Name);
+
+      DeclarationNameKey(NameKind Kind, uint64_t Data)
+          : Kind(Kind), Data(Data) {}
+
+      NameKind getKind() const { return Kind; }
+
+      IdentifierInfo *getIdentifier() const {
+        assert(Kind == DeclarationName::Identifier ||
+               Kind == DeclarationName::CXXLiteralOperatorName ||
+               Kind == DeclarationName::CXXDeductionGuideName);
+        return (IdentifierInfo *)Data;
+      }
+      Selector getSelector() const {
+        assert(Kind == DeclarationName::ObjCZeroArgSelector ||
+               Kind == DeclarationName::ObjCOneArgSelector ||
+               Kind == DeclarationName::ObjCMultiArgSelector);
+        return Selector(Data);
+      }
+      OverloadedOperatorKind getOperatorKind() const {
+        assert(Kind == DeclarationName::CXXOperatorName);
+        return (OverloadedOperatorKind)Data;
+      }
+
+      /// Compute a fingerprint of this key for use in on-disk hash table.
+      unsigned getHash() const;
+
+      friend bool operator==(const DeclarationNameKey &A,
+                             const DeclarationNameKey &B) {
+        return A.Kind == B.Kind && A.Data == B.Data;
+      }
+    };
+
     /// @}
   }
 } // end namespace clang
+
+namespace llvm {
+  template <> struct DenseMapInfo<clang::serialization::DeclarationNameKey> {
+    static clang::serialization::DeclarationNameKey getEmptyKey() {
+      return clang::serialization::DeclarationNameKey(-1, 1);
+    }
+    static clang::serialization::DeclarationNameKey getTombstoneKey() {
+      return clang::serialization::DeclarationNameKey(-1, 2);
+    }
+    static unsigned
+    getHashValue(const clang::serialization::DeclarationNameKey &Key) {
+      return Key.getHash();
+    }
+    static bool isEqual(const clang::serialization::DeclarationNameKey &L,
+                        const clang::serialization::DeclarationNameKey &R) {
+      return L == R;
+    }
+  };
+}
 
 #endif

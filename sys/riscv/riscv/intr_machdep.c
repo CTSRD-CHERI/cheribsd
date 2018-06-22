@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2015 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2015-2017 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -38,20 +38,21 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
+#include <sys/cpuset.h>
 #include <sys/interrupt.h>
+#include <sys/smp.h>
+#include <sys/vmmeter.h>
 
 #include <machine/clock.h>
 #include <machine/cpu.h>
 #include <machine/cpufunc.h>
 #include <machine/frame.h>
 #include <machine/intr.h>
+#include <machine/sbi.h>
 
-enum {
-	IRQ_SOFTWARE,
-	IRQ_TIMER,
-	IRQ_HTIF,
-	NIRQS
-};
+#ifdef SMP
+#include <machine/smp.h>
+#endif
 
 u_long intrcnt[NIRQS];
 size_t sintrcnt = sizeof(intrcnt);
@@ -96,12 +97,20 @@ riscv_mask_irq(void *source)
 	irq = (uintptr_t)source;
 
 	switch (irq) {
-	case IRQ_TIMER:
+	case IRQ_TIMER_SUPERVISOR:
 		csr_clear(sie, SIE_STIE);
 		break;
-	case IRQ_SOFTWARE:
+	case IRQ_SOFTWARE_USER:
+		csr_clear(sie, SIE_USIE);
+	case IRQ_SOFTWARE_SUPERVISOR:
 		csr_clear(sie, SIE_SSIE);
 		break;
+#if 0
+	/* lowRISC TODO */
+	case IRQ_UART:
+		machine_command(ECALL_IO_IRQ_MASK, 0);
+		break;
+#endif
 	default:
 		panic("Unknown irq %d\n", irq);
 	}
@@ -115,12 +124,21 @@ riscv_unmask_irq(void *source)
 	irq = (uintptr_t)source;
 
 	switch (irq) {
-	case IRQ_TIMER:
+	case IRQ_TIMER_SUPERVISOR:
 		csr_set(sie, SIE_STIE);
 		break;
-	case IRQ_SOFTWARE:
+	case IRQ_SOFTWARE_USER:
+		csr_set(sie, SIE_USIE);
+		break;
+	case IRQ_SOFTWARE_SUPERVISOR:
 		csr_set(sie, SIE_SSIE);
 		break;
+#if 0
+	/* lowRISC TODO */
+	case IRQ_UART:
+		machine_command(ECALL_IO_IRQ_MASK, 1);
+		break;
+#endif
 	default:
 		panic("Unknown irq %d\n", irq);
 	}
@@ -159,8 +177,12 @@ riscv_setup_intr(const char *name, driver_filter_t *filt,
 		riscv_unmask_irq((void*)(uintptr_t)irq);
 	}
 
-	intr_event_add_handler(event, name, filt, handler, arg,
+	error = intr_event_add_handler(event, name, filt, handler, arg,
 	    intr_priority(flags), flags, cookiep);
+	if (error) {
+		printf("Failed to setup intr: %d\n", irq);
+		return (error);
+	}
 
 	riscv_intrcnt_setname(riscv_intr_counters[irq],
 			     event->ie_fullname);
@@ -200,16 +222,17 @@ riscv_cpu_intr(struct trapframe *frame)
 	active_irq = (frame->tf_scause & EXCP_MASK);
 
 	switch (active_irq) {
-	case IRQ_SOFTWARE:
-	case IRQ_TIMER:
+#if 0
+	/* lowRISC TODO */
+	case IRQ_UART:
+#endif
+	case IRQ_SOFTWARE_USER:
+	case IRQ_SOFTWARE_SUPERVISOR:
+	case IRQ_TIMER_SUPERVISOR:
 		event = intr_events[active_irq];
 		/* Update counters */
 		atomic_add_long(riscv_intr_counters[active_irq], 1);
-		PCPU_INC(cnt.v_intr);
-		break;
-	case IRQ_HTIF:
-		/* HTIF interrupts are only handled in machine mode */
-		panic("%s: HTIF interrupt", __func__);
+		VM_CNT_INC(v_intr);
 		break;
 	default:
 		event = NULL;
@@ -221,3 +244,81 @@ riscv_cpu_intr(struct trapframe *frame)
 
 	critical_exit();
 }
+
+#ifdef SMP
+void
+riscv_setup_ipihandler(driver_filter_t *filt)
+{
+
+	riscv_setup_intr("ipi", filt, NULL, NULL, IRQ_SOFTWARE_SUPERVISOR,
+	    INTR_TYPE_MISC, NULL);
+}
+
+void
+riscv_unmask_ipi(void)
+{
+
+	csr_set(sie, SIE_SSIE);
+}
+
+/* Sending IPI */
+static void
+ipi_send(struct pcpu *pc, int ipi)
+{
+	uintptr_t mask;
+
+	CTR3(KTR_SMP, "%s: cpu=%d, ipi=%x", __func__, pc->pc_cpuid, ipi);
+
+	atomic_set_32(&pc->pc_pending_ipis, ipi);
+	mask = (1 << (pc->pc_cpuid));
+
+	sbi_send_ipi(&mask);
+
+	CTR1(KTR_SMP, "%s: sent", __func__);
+}
+
+void
+ipi_all_but_self(u_int ipi)
+{
+	cpuset_t other_cpus;
+
+	other_cpus = all_cpus;
+	CPU_CLR(PCPU_GET(cpuid), &other_cpus);
+
+	CTR2(KTR_SMP, "%s: ipi: %x", __func__, ipi);
+	ipi_selected(other_cpus, ipi);
+}
+
+void
+ipi_cpu(int cpu, u_int ipi)
+{
+	cpuset_t cpus;
+
+	CPU_ZERO(&cpus);
+	CPU_SET(cpu, &cpus);
+
+	CTR3(KTR_SMP, "%s: cpu: %d, ipi: %x\n", __func__, cpu, ipi);
+	ipi_send(cpuid_to_pcpu[cpu], ipi);
+}
+
+void
+ipi_selected(cpuset_t cpus, u_int ipi)
+{
+	struct pcpu *pc;
+	uintptr_t mask;
+
+	CTR1(KTR_SMP, "ipi_selected: ipi: %x", ipi);
+
+	mask = 0;
+	STAILQ_FOREACH(pc, &cpuhead, pc_allcpu) {
+		if (CPU_ISSET(pc->pc_cpuid, &cpus)) {
+			CTR3(KTR_SMP, "%s: pc: %p, ipi: %x\n", __func__, pc,
+			    ipi);
+			atomic_set_32(&pc->pc_pending_ipis, ipi);
+			mask |= (1 << (pc->pc_cpuid));
+		}
+	}
+	sbi_send_ipi(&mask);
+}
+
+#endif

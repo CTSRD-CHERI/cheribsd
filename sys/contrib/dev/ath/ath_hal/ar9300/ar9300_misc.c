@@ -26,7 +26,9 @@
 #include "ar9300/ar9300.h"
 #include "ar9300/ar9300reg.h"
 #include "ar9300/ar9300phy.h"
+#include "ar9300/ar9300desc.h"
 
+static u_int32_t ar9300_read_loc_timer(struct ath_hal *ah);
 
 void
 ar9300_get_hw_hangs(struct ath_hal *ah, hal_hw_hangs_t *hangs)
@@ -647,11 +649,12 @@ ar9300_set_quiet(struct ath_hal *ah, u_int32_t period, u_int32_t duration,
     return status;
 #undef	TU_TO_USEC
 }
-#ifdef ATH_SUPPORT_DFS
+
+//#ifdef ATH_SUPPORT_DFS
 void
 ar9300_cac_tx_quiet(struct ath_hal *ah, HAL_BOOL enable)
 {
-    u32 reg1, reg2;
+    uint32_t reg1, reg2;
 
     reg1 = OS_REG_READ(ah, AR_MAC_PCU_OFFSET(MAC_PCU_MISC_MODE));
     reg2 = OS_REG_READ(ah, AR_MAC_PCU_OFFSET(MAC_PCU_QUIET_TIME_1));
@@ -669,7 +672,7 @@ ar9300_cac_tx_quiet(struct ath_hal *ah, HAL_BOOL enable)
                      reg2 | AR_QUIET1_QUIET_ACK_CTS_ENABLE);
     }
 }
-#endif /* ATH_SUPPORT_DFS */
+//#endif /* ATH_SUPPORT_DFS */
 
 void
 ar9300_set_pcu_config(struct ath_hal *ah)
@@ -947,6 +950,14 @@ ar9300_get_capability(struct ath_hal *ah, HAL_CAPABILITY_TYPE type,
             return (HAL_ENOTSUPP);
         (*result) = !! (ahp->ah_misc_mode & AR_PCU_TXOP_TBTT_LIMIT_ENA);
         return (HAL_OK);
+    case HAL_CAP_TOA_LOCATIONING:
+        if (capability == 0)
+            return HAL_OK;
+        if (capability == 2) {
+            *result = ar9300_read_loc_timer(ah);
+            return (HAL_OK);
+        }
+        return HAL_ENOTSUPP;
     default:
         return ath_hal_getcapability(ah, type, capability, result);
     }
@@ -1060,6 +1071,14 @@ ar9300_set_capability(struct ath_hal *ah, HAL_CAPABILITY_TYPE type,
         }
         return AH_TRUE;
 
+    case HAL_CAP_TOA_LOCATIONING:
+        if (capability == 0)
+            return AH_TRUE;
+        if (capability == 1) {
+            ar9300_update_loc_ctl_reg(ah, setting);
+            return AH_TRUE;
+        }
+        return AH_FALSE;
         /* fall thru... */
     default:
         return ath_hal_setcapability(ah, type, capability, setting, status);
@@ -2457,10 +2476,12 @@ static void
 ar9300_bt_coex_antenna_diversity(struct ath_hal *ah, u_int32_t value)
 {
     struct ath_hal_9300 *ahp = AH9300(ah);
-#if ATH_ANT_DIV_COMB    
+#if ATH_ANT_DIV_COMB
     //struct ath_hal_private *ahpriv = AH_PRIVATE(ah);
     const struct ieee80211_channel *chan = AH_PRIVATE(ah)->ah_curchan;
 #endif
+
+    HALDEBUG(ah, HAL_DEBUG_BT_COEX, "%s: called, value=%d\n", __func__, value);
 
     if (ahp->ah_bt_coex_flag & HAL_BT_COEX_FLAG_ANT_DIV_ALLOW)
     {
@@ -2494,7 +2515,7 @@ ar9300_bt_coex_set_parameter(struct ath_hal *ah, u_int32_t type,
             break;
 
         case HAL_BT_COEX_ANTENNA_DIVERSITY:
-            if (AR_SREV_POSEIDON(ah)) {
+            if (AR_SREV_POSEIDON(ah) || AR_SREV_APHRODITE(ah)) {
                 ahp->ah_bt_coex_flag |= HAL_BT_COEX_FLAG_ANT_DIV_ALLOW;
                 if (value) {
                     ahp->ah_bt_coex_flag |= HAL_BT_COEX_FLAG_ANT_DIV_ENABLE;
@@ -3851,6 +3872,13 @@ HAL_BOOL
 ar9300SetDfs3StreamFix(struct ath_hal *ah, u_int32_t val)
 {
    return AH_FALSE;
+}
+
+static u_int32_t
+ar9300_read_loc_timer(struct ath_hal *ah)
+{
+
+    return OS_REG_READ(ah, AR_LOC_TIMER_REG);
 }
 
 HAL_BOOL

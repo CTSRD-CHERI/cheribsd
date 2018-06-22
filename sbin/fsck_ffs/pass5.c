@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1980, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -35,6 +37,7 @@ static const char sccsid[] = "@(#)pass5.c	8.9 (Berkeley) 4/28/95";
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	IN_RTLD			/* So we pickup the P_OSREL defines */
 #include <sys/param.h>
 #include <sys/sysctl.h>
 
@@ -68,9 +71,17 @@ pass5(void)
 	struct cg *cg, *newcg = (struct cg *)buf;
 	struct bufarea *cgbp;
 
-	inoinfo(WINO)->ino_state = USTATE;
+	inoinfo(UFS_WINO)->ino_state = USTATE;
 	memset(newcg, 0, (size_t)fs->fs_cgsize);
 	newcg->cg_niblk = fs->fs_ipg;
+	if (preen == 0 && yflag == 0 && fs->fs_magic == FS_UFS2_MAGIC &&
+	    fswritefd != -1 && (fs->fs_metackhash & CK_CYLGRP) == 0 &&
+	    getosreldate() >= P_OSREL_CK_CYLGRP &&
+	    reply("ADD CYLINDER GROUP CHECKSUM PROTECTION") != 0) {
+		fs->fs_metackhash |= CK_CYLGRP;
+		rewritecg = 1;
+		sbdirty();
+	}
 	if (cvtlevel >= 3) {
 		if (fs->fs_maxcontig < 2 && fs->fs_contigsumsize > 0) {
 			if (preen)
@@ -82,7 +93,7 @@ pass5(void)
 			}
 		}
 		if (fs->fs_maxcontig > 1) {
-			const char *doit = 0;
+			const char *doit = NULL;
 
 			if (fs->fs_contigsumsize < 1) {
 				doit = "CREAT";
@@ -234,14 +245,14 @@ pass5(void)
 				break;
 
 			default:
-				if (j < (int)ROOTINO)
+				if (j < (int)UFS_ROOTINO)
 					break;
 				errx(EEXIT, "BAD STATE %d FOR INODE I=%d",
 				    inoinfo(j)->ino_state, j);
 			}
 		}
 		if (c == 0)
-			for (i = 0; i < (int)ROOTINO; i++) {
+			for (i = 0; i < (int)UFS_ROOTINO; i++) {
 				setbit(cg_inosused(newcg), i);
 				newcg->cg_cs.cs_nifree--;
 			}
@@ -305,6 +316,12 @@ pass5(void)
 				sump[run]++;
 			}
 		}
+		if ((fs->fs_metackhash & CK_CYLGRP) != 0) {
+			newcg->cg_ckhash = 0;
+			newcg->cg_ckhash =
+			    calculate_crc32c(~0L, (void *)newcg, fs->fs_cgsize);
+		}
+
 		if (bkgrdflag != 0) {
 			cstotal.cs_nffree += cg->cg_cs.cs_nffree;
 			cstotal.cs_nbfree += cg->cg_cs.cs_nbfree;

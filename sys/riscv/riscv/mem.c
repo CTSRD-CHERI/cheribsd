@@ -50,7 +50,7 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 {
 	ssize_t orig_resid;
 	vm_offset_t off, v;
-	struct iovec *iov;
+	kiovec_t *iov;
 	struct vm_page m;
 	vm_page_t marr;
 	u_int cnt;

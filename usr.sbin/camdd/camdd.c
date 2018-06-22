@@ -260,6 +260,7 @@ struct camdd_buf {
 
 struct camdd_dev_pass {
 	int			 scsi_dev_type;
+	int			 protocol;
 	struct cam_device	*dev;
 	uint64_t		 max_sector;
 	uint32_t		 block_len;
@@ -420,9 +421,9 @@ struct camdd_dev {
 };
 
 static sem_t camdd_sem;
-static int need_exit = 0;
-static int error_exit = 0;
-static int need_status = 0;
+static sig_atomic_t need_exit = 0;
+static sig_atomic_t error_exit = 0;
+static sig_atomic_t need_status = 0;
 
 #ifndef min
 #define	min(a, b) (a < b) ? a : b
@@ -446,7 +447,7 @@ static int need_status = 0;
 #endif
 
 
-/* Generically usefull offsets into the peripheral private area */
+/* Generically useful offsets into the peripheral private area */
 #define ppriv_ptr0 periph_priv.entries[0].ptr
 #define ppriv_ptr1 periph_priv.entries[1].ptr
 #define ppriv_field0 periph_priv.entries[0].field
@@ -477,6 +478,9 @@ uint32_t camdd_buf_get_len(struct camdd_buf *buf);
 void camdd_buf_add_child(struct camdd_buf *buf, struct camdd_buf *child_buf);
 int camdd_probe_tape(int fd, char *filename, uint64_t *max_iosize,
 		     uint64_t *max_blk, uint64_t *min_blk, uint64_t *blk_gran);
+int camdd_probe_pass_scsi(struct cam_device *cam_dev, union ccb *ccb,
+         camdd_argmask arglist, int probe_retry_count,
+         int probe_timeout, uint64_t *maxsector, uint32_t *block_len);
 struct camdd_dev *camdd_probe_file(int fd, struct camdd_io_opts *io_opts,
 				   int retry_count, int timeout);
 struct camdd_dev *camdd_probe_pass(struct cam_device *cam_dev,
@@ -485,7 +489,8 @@ struct camdd_dev *camdd_probe_pass(struct cam_device *cam_dev,
 				   int probe_timeout, int io_retry_count,
 				   int io_timeout);
 void *camdd_file_worker(void *arg);
-camdd_buf_status camdd_ccb_status(union ccb *ccb);
+camdd_buf_status camdd_ccb_status(union ccb *ccb, int protocol);
+int camdd_get_cgd(struct cam_device *device, struct ccb_getdev *cgd);
 int camdd_queue_peer_buf(struct camdd_dev *dev, struct camdd_buf *buf);
 int camdd_complete_peer_buf(struct camdd_dev *dev, struct camdd_buf *peer_buf);
 void camdd_peer_done(struct camdd_buf *buf);
@@ -712,11 +717,7 @@ camdd_alloc_buf(struct camdd_dev *dev, camdd_buf_type buf_type)
 	return (buf);
 
 bailout_error:
-	if (data_ptr != NULL)
-		free(data_ptr);
-
-	if (buf != NULL)
-		free(buf);
+	free(data_ptr);
 
 	return (NULL);
 }
@@ -823,6 +824,7 @@ camdd_buf_sg_create(struct camdd_buf *buf, int iovec, uint32_t sector_size,
 	struct camdd_buf_data *data;
 	uint8_t *extra_buf = NULL;
 	size_t extra_buf_len = 0;
+	int extra_buf_attached = 0;
 	int i, retval = 0;
 
 	data = &buf->buf_type_spec.data;
@@ -912,6 +914,7 @@ camdd_buf_sg_create(struct camdd_buf *buf, int iovec, uint32_t sector_size,
 			data->iovec[i].iov_base = extra_buf;
 			data->iovec[i].iov_len = extra_buf_len;
 		}
+		extra_buf_attached = 1;
 		i++;
 	}
 	if ((tmp_buf != NULL) || (i != data->sg_count)) {
@@ -925,6 +928,14 @@ bailout:
 	if (retval == 0) {
 		*num_sectors_used = (data->fill_len + extra_buf_len) /
 		    sector_size;
+	} else if (extra_buf_attached == 0) {
+		/*
+		 * If extra_buf isn't attached yet, we need to free it
+		 * to avoid leaking.
+		 */
+		free(extra_buf);
+		data->extra_buf = 0;
+		data->sg_count--;
 	}
 	return (retval);
 }
@@ -1008,8 +1019,7 @@ camdd_probe_tape(int fd, char *filename, uint64_t *max_iosize,
 		goto bailout;
 	}
 
-	for (i = 0; i < sizeof(req_status_items) /
-	     sizeof(req_status_items[0]); i++) {
+	for (i = 0; i < nitems(req_status_items); i++) {
                 char *name;
 
 		name = __DECONST(char *, req_status_items[i].name);
@@ -1079,9 +1089,7 @@ camdd_probe_file(int fd, struct camdd_io_opts *io_opts, int retry_count,
 		retval = fstat(fd, &file_dev->sb);
 		if (retval != 0) {
 			warn("Cannot stat %s", dev->device_name);
-			goto bailout;
-			camdd_free_dev(dev);
-			dev = NULL;
+			goto bailout_error;
 		}
 		if (S_ISREG(file_dev->sb.st_mode)) {
 			file_dev->file_type = CAMDD_FILE_REG;
@@ -1255,60 +1263,63 @@ bailout_error:
 }
 
 /*
- * Need to implement this.  Do a basic probe:
- * - Check the inquiry data, make sure we're talking to a device that we
- *   can reasonably expect to talk to -- direct, RBC, CD, WORM.
- * - Send a test unit ready, make sure the device is available.
- * - Get the capacity and block size.
+ * Get a get device CCB for the specified device.
  */
-struct camdd_dev *
-camdd_probe_pass(struct cam_device *cam_dev, struct camdd_io_opts *io_opts,
-		 camdd_argmask arglist, int probe_retry_count,
-		 int probe_timeout, int io_retry_count, int io_timeout)
+int
+camdd_get_cgd(struct cam_device *device, struct ccb_getdev *cgd)
 {
-	union ccb *ccb;
-	uint64_t maxsector;
-	uint32_t cpi_maxio, max_iosize, pass_numblocks;
-	uint32_t block_len;
-	struct scsi_read_capacity_data rcap;
-	struct scsi_read_capacity_data_long rcaplong;
-	struct camdd_dev *dev;
-	struct camdd_dev_pass *pass_dev;
-	struct kevent ke;
-	int scsi_dev_type;
+        union ccb *ccb;
+	int retval = 0;
 
-	dev = NULL;
-
-	scsi_dev_type = SID_TYPE(&cam_dev->inq_data);
-	maxsector = 0;
-	block_len = 0;
-
-	/*
-	 * For devices that support READ CAPACITY, we'll attempt to get the
-	 * capacity.  Otherwise, we really don't support tape or other
-	 * devices via SCSI passthrough, so just return an error in that case.
-	 */
-	switch (scsi_dev_type) {
-	case T_DIRECT:
-	case T_WORM:
-	case T_CDROM:
-	case T_OPTICAL:
-	case T_RBC:
-		break;
-	default:
-		errx(1, "Unsupported SCSI device type %d", scsi_dev_type);
-		break; /*NOTREACHED*/
+	ccb = cam_getccb(device);
+ 
+	if (ccb == NULL) {
+		warnx("%s: couldn't allocate CCB", __func__);
+		return -1;
 	}
 
-	ccb = cam_getccb(cam_dev);
+	CCB_CLEAR_ALL_EXCEPT_HDR(&ccb->cgd);
 
-	if (ccb == NULL) {
-		warnx("%s: error allocating ccb", __func__);
+	ccb->ccb_h.func_code = XPT_GDEV_TYPE;
+ 
+	if (cam_send_ccb(device, ccb) < 0) {
+		warn("%s: error sending Get Device Information CCB", __func__);
+			cam_error_print(device, ccb, CAM_ESF_ALL,
+					CAM_EPF_ALL, stderr);
+		retval = -1;
 		goto bailout;
 	}
 
-	bzero(&(&ccb->ccb_h)[1],
-	      sizeof(struct ccb_scsiio) - sizeof(struct ccb_hdr));
+	if ((ccb->ccb_h.status & CAM_STATUS_MASK) != CAM_REQ_CMP) {
+			cam_error_print(device, ccb, CAM_ESF_ALL,
+					CAM_EPF_ALL, stderr);
+		retval = -1;
+		goto bailout;
+	}
+
+	bcopy(&ccb->cgd, cgd, sizeof(struct ccb_getdev));
+
+bailout:
+	cam_freeccb(ccb);
+ 
+	return retval;
+}
+
+int
+camdd_probe_pass_scsi(struct cam_device *cam_dev, union ccb *ccb,
+		 camdd_argmask arglist, int probe_retry_count,
+		 int probe_timeout, uint64_t *maxsector, uint32_t *block_len)
+{
+	struct scsi_read_capacity_data rcap;
+	struct scsi_read_capacity_data_long rcaplong;
+	int retval = -1;
+
+	if (ccb == NULL) {
+		warnx("%s: error passed ccb is NULL", __func__);
+		goto bailout;
+	}
+
+	CCB_CLEAR_ALL_EXCEPT_HDR(&ccb->csio);
 
 	scsi_read_capacity(&ccb->csio,
 			   /*retries*/ probe_retry_count,
@@ -1338,16 +1349,18 @@ camdd_probe_pass(struct cam_device *cam_dev, struct camdd_io_opts *io_opts,
 		goto bailout;
 	}
 
-	maxsector = scsi_4btoul(rcap.addr);
-	block_len = scsi_4btoul(rcap.length);
+	*maxsector = scsi_4btoul(rcap.addr);
+	*block_len = scsi_4btoul(rcap.length);
 
 	/*
 	 * A last block of 2^32-1 means that the true capacity is over 2TB,
 	 * and we need to issue the long READ CAPACITY to get the real
 	 * capacity.  Otherwise, we're all set.
 	 */
-	if (maxsector != 0xffffffff)
-		goto rcap_done;
+	if (*maxsector != 0xffffffff) {
+		retval = 0;
+		goto bailout;
+	}
 
 	scsi_read_capacity_16(&ccb->csio,
 			      /*retries*/ probe_retry_count,
@@ -1379,13 +1392,90 @@ camdd_probe_pass(struct cam_device *cam_dev, struct camdd_io_opts *io_opts,
 		goto bailout;
 	}
 
-	maxsector = scsi_8btou64(rcaplong.addr);
-	block_len = scsi_4btoul(rcaplong.length);
+	*maxsector = scsi_8btou64(rcaplong.addr);
+	*block_len = scsi_4btoul(rcaplong.length);
 
-rcap_done:
+	retval = 0;
 
-	bzero(&(&ccb->ccb_h)[1],
-	      sizeof(struct ccb_scsiio) - sizeof(struct ccb_hdr));
+bailout:
+	return retval;
+}
+
+/*
+ * Need to implement this.  Do a basic probe:
+ * - Check the inquiry data, make sure we're talking to a device that we
+ *   can reasonably expect to talk to -- direct, RBC, CD, WORM.
+ * - Send a test unit ready, make sure the device is available.
+ * - Get the capacity and block size.
+ */
+struct camdd_dev *
+camdd_probe_pass(struct cam_device *cam_dev, struct camdd_io_opts *io_opts,
+		 camdd_argmask arglist, int probe_retry_count,
+		 int probe_timeout, int io_retry_count, int io_timeout)
+{
+	union ccb *ccb;
+	uint64_t maxsector = 0;
+	uint32_t cpi_maxio, max_iosize, pass_numblocks;
+	uint32_t block_len = 0;
+	struct camdd_dev *dev = NULL;
+	struct camdd_dev_pass *pass_dev;
+	struct kevent ke;
+	struct ccb_getdev cgd;
+	int retval;
+	int scsi_dev_type;
+
+	if ((retval = camdd_get_cgd(cam_dev, &cgd)) != 0) {
+		warnx("%s: error retrieving CGD", __func__);
+		return NULL;
+	}
+
+	ccb = cam_getccb(cam_dev);
+
+	if (ccb == NULL) {
+		warnx("%s: error allocating ccb", __func__);
+		goto bailout;
+	}
+
+	switch (cgd.protocol) {
+	case PROTO_SCSI:
+		scsi_dev_type = SID_TYPE(&cam_dev->inq_data);
+
+		/*
+		 * For devices that support READ CAPACITY, we'll attempt to get the
+		 * capacity.  Otherwise, we really don't support tape or other
+		 * devices via SCSI passthrough, so just return an error in that case.
+		 */
+		switch (scsi_dev_type) {
+		case T_DIRECT:
+		case T_WORM:
+		case T_CDROM:
+		case T_OPTICAL:
+		case T_RBC:
+		case T_ZBC_HM:
+			break;
+		default:
+			errx(1, "Unsupported SCSI device type %d", scsi_dev_type);
+			break; /*NOTREACHED*/
+		}
+
+		if ((retval = camdd_probe_pass_scsi(cam_dev, ccb, probe_retry_count,
+						arglist, probe_timeout, &maxsector,
+						&block_len))) {
+			goto bailout;
+		}
+		break;
+	default:
+		errx(1, "Unsupported PROTO type %d", cgd.protocol);
+		break; /*NOTREACHED*/
+	}
+
+	if (block_len == 0) {
+		warnx("Sector size for %s%u is 0, cannot continue",
+		    cam_dev->device_name, cam_dev->dev_unit_num);
+		goto bailout_error;
+	}
+
+	CCB_CLEAR_ALL_EXCEPT_HDR(&ccb->cpi);
 
 	ccb->ccb_h.func_code = XPT_PATH_INQ;
 	ccb->ccb_h.flags = CAM_DIR_NONE;
@@ -1408,6 +1498,7 @@ rcap_done:
 
 	pass_dev = &dev->dev_spec.pass;
 	pass_dev->scsi_dev_type = scsi_dev_type;
+	pass_dev->protocol = cgd.protocol;
 	pass_dev->dev = cam_dev;
 	pass_dev->max_sector = maxsector;
 	pass_dev->block_len = block_len;
@@ -1718,43 +1809,50 @@ bailout:
  * Simplistic translation of CCB status to our local status.
  */
 camdd_buf_status
-camdd_ccb_status(union ccb *ccb)
+camdd_ccb_status(union ccb *ccb, int protocol)
 {
 	camdd_buf_status status = CAMDD_STATUS_NONE;
 	cam_status ccb_status;
 
 	ccb_status = ccb->ccb_h.status & CAM_STATUS_MASK;
 
-	switch (ccb_status) {
-	case CAM_REQ_CMP: {
-		if (ccb->csio.resid == 0) {
-			status = CAMDD_STATUS_OK;
-		} else if (ccb->csio.dxfer_len > ccb->csio.resid) {
-			status = CAMDD_STATUS_SHORT_IO;
-		} else {
-			status = CAMDD_STATUS_EOF;
-		}
-		break;
-	}
-	case CAM_SCSI_STATUS_ERROR: {
-		switch (ccb->csio.scsi_status) {
-		case SCSI_STATUS_OK:
-		case SCSI_STATUS_COND_MET:
-		case SCSI_STATUS_INTERMED:
-		case SCSI_STATUS_INTERMED_COND_MET:
-			status = CAMDD_STATUS_OK;
+	switch (protocol) {
+	case PROTO_SCSI:
+		switch (ccb_status) {
+		case CAM_REQ_CMP: {
+			if (ccb->csio.resid == 0) {
+				status = CAMDD_STATUS_OK;
+			} else if (ccb->csio.dxfer_len > ccb->csio.resid) {
+				status = CAMDD_STATUS_SHORT_IO;
+			} else {
+				status = CAMDD_STATUS_EOF;
+			}
 			break;
-		case SCSI_STATUS_CMD_TERMINATED:
-		case SCSI_STATUS_CHECK_COND:
-		case SCSI_STATUS_QUEUE_FULL:
-		case SCSI_STATUS_BUSY:
-		case SCSI_STATUS_RESERV_CONFLICT:
+		}
+		case CAM_SCSI_STATUS_ERROR: {
+			switch (ccb->csio.scsi_status) {
+			case SCSI_STATUS_OK:
+			case SCSI_STATUS_COND_MET:
+			case SCSI_STATUS_INTERMED:
+			case SCSI_STATUS_INTERMED_COND_MET:
+				status = CAMDD_STATUS_OK;
+				break;
+			case SCSI_STATUS_CMD_TERMINATED:
+			case SCSI_STATUS_CHECK_COND:
+			case SCSI_STATUS_QUEUE_FULL:
+			case SCSI_STATUS_BUSY:
+			case SCSI_STATUS_RESERV_CONFLICT:
+			default:
+				status = CAMDD_STATUS_ERROR;
+				break;
+			}
+			break;
+		}
 		default:
 			status = CAMDD_STATUS_ERROR;
 			break;
 		}
 		break;
-	}
 	default:
 		status = CAMDD_STATUS_ERROR;
 		break;
@@ -2152,11 +2250,18 @@ camdd_pass_fetch(struct camdd_dev *dev)
 					CAM_EPF_ALL, stderr);
 		}
 
-		data->resid = ccb.csio.resid;
-		dev->bytes_transferred += (ccb.csio.dxfer_len - ccb.csio.resid);
+		switch (pass_dev->protocol) {
+		case PROTO_SCSI:
+			data->resid = ccb.csio.resid;
+			dev->bytes_transferred += (ccb.csio.dxfer_len - ccb.csio.resid);
+			break;
+		default:
+			return -1;
+			break;
+		}
 
 		if (buf->status == CAMDD_STATUS_NONE)
-			buf->status = camdd_ccb_status(&ccb);
+			buf->status = camdd_ccb_status(&ccb, pass_dev->protocol);
 		if (buf->status == CAMDD_STATUS_ERROR)
 			error_count++;
 		else if (buf->status == CAMDD_STATUS_EOF) {
@@ -2260,6 +2365,7 @@ camdd_file_run(struct camdd_dev *dev)
 		if (file_dev->tmp_buf == NULL) {
 			buf->status = CAMDD_STATUS_ERROR;
 			error_count++;
+			pthread_mutex_lock(&dev->mutex);
 			goto bailout;
 		}
 		for (i = 0, cur_offset = 0; i < data->sg_count; i++) {
@@ -2435,10 +2541,6 @@ camdd_pass_run(struct camdd_dev *dev)
 
 	data = &buf->buf_type_spec.data;
 
-	ccb = &data->ccb;
-	bzero(&(&ccb->ccb_h)[1],
-	      sizeof(struct ccb_scsiio) - sizeof(struct ccb_hdr));
-
 	/*
 	 * In almost every case the number of blocks should be the device
 	 * block size.  The exception may be at the end of an I/O stream
@@ -2449,21 +2551,36 @@ camdd_pass_run(struct camdd_dev *dev)
 	else
 		num_blocks = data->fill_len / pass_dev->block_len;
 
-	scsi_read_write(&ccb->csio,
-			/*retries*/ dev->retry_count,
-			/*cbfcnp*/ NULL,
-			/*tag_action*/ MSG_SIMPLE_Q_TAG,
-			/*readop*/ (dev->write_dev == 0) ? SCSI_RW_READ :
-				   SCSI_RW_WRITE,
-			/*byte2*/ 0,
-			/*minimum_cmd_size*/ dev->min_cmd_size,
-			/*lba*/ buf->lba,
-			/*block_count*/ num_blocks,
-			/*data_ptr*/ (data->sg_count != 0) ?
-				     (uint8_t *)data->segs : data->buf,
-			/*dxfer_len*/ (num_blocks * pass_dev->block_len),
-			/*sense_len*/ SSD_FULL_SIZE,
-			/*timeout*/ dev->io_timeout);
+	ccb = &data->ccb;
+
+	switch (pass_dev->protocol) {
+	case PROTO_SCSI:
+		CCB_CLEAR_ALL_EXCEPT_HDR(&ccb->csio);
+
+		scsi_read_write(&ccb->csio,
+				/*retries*/ dev->retry_count,
+				/*cbfcnp*/ NULL,
+				/*tag_action*/ MSG_SIMPLE_Q_TAG,
+				/*readop*/ (dev->write_dev == 0) ? SCSI_RW_READ :
+					   SCSI_RW_WRITE,
+				/*byte2*/ 0,
+				/*minimum_cmd_size*/ dev->min_cmd_size,
+				/*lba*/ buf->lba,
+				/*block_count*/ num_blocks,
+				/*data_ptr*/ (data->sg_count != 0) ?
+					     (uint8_t *)data->segs : data->buf,
+				/*dxfer_len*/ (num_blocks * pass_dev->block_len),
+				/*sense_len*/ SSD_FULL_SIZE,
+				/*timeout*/ dev->io_timeout);
+
+		if (data->sg_count != 0) {
+			ccb->csio.sglist_cnt = data->sg_count;
+		}
+		break;
+	default:
+		retval = -1;
+		goto bailout;
+	}
 
 	/* Disable freezing the device queue */
 	ccb->ccb_h.flags |= CAM_DEV_QFRZDIS;
@@ -2472,7 +2589,6 @@ camdd_pass_run(struct camdd_dev *dev)
 		ccb->ccb_h.flags |= CAM_PASS_ERR_RECOVER;
 
 	if (data->sg_count != 0) {
-		ccb->csio.sglist_cnt = data->sg_count;
 		ccb->ccb_h.flags |= CAM_DATA_SG;
 	}
 
@@ -2983,7 +3099,6 @@ int
 camdd_rw(struct camdd_io_opts *io_opts, int num_io_opts, uint64_t max_io,
 	 int retry_count, int timeout)
 {
-	char *device = NULL;
 	struct cam_device *new_cam_dev = NULL;
 	struct camdd_dev *devs[2];
 	struct timespec start_time;
@@ -3003,12 +3118,11 @@ camdd_rw(struct camdd_io_opts *io_opts, int num_io_opts, uint64_t max_io,
 	for (i = 0; i < num_io_opts; i++) {
 		switch (io_opts[i].dev_type) {
 		case CAMDD_DEV_PASS: {
-			camdd_argmask new_arglist = CAMDD_ARG_NONE;
-			int bus = 0, target = 0, lun = 0;
-			char name[30];
-			int rv;
-
 			if (isdigit(io_opts[i].dev_name[0])) {
+				camdd_argmask new_arglist = CAMDD_ARG_NONE;
+				int bus = 0, target = 0, lun = 0;
+				int rv;
+
 				/* device specified as bus:target[:lun] */
 				rv = parse_btl(io_opts[i].dev_name, &bus,
 				    &target, &lun, &new_arglist);
@@ -3024,23 +3138,21 @@ camdd_rw(struct camdd_io_opts *io_opts, int num_io_opts, uint64_t max_io,
 					lun = 0;
 					new_arglist |= CAMDD_ARG_LUN;
 				}
+				new_cam_dev = cam_open_btl(bus, target, lun,
+				    O_RDWR, NULL);
 			} else {
+				char name[30];
+
 				if (cam_get_device(io_opts[i].dev_name, name,
 						   sizeof name, &unit) == -1) {
 					warnx("%s", cam_errbuf);
 					error = 1;
 					goto bailout;
 				}
-				device = strdup(name);
-				new_arglist |= CAMDD_ARG_DEVICE |CAMDD_ARG_UNIT;
+				new_cam_dev = cam_open_spec_device(name, unit,
+				    O_RDWR, NULL);
 			}
 
-			if (new_arglist & (CAMDD_ARG_BUS | CAMDD_ARG_TARGET))
-				new_cam_dev = cam_open_btl(bus, target, lun,
-				    O_RDWR, NULL);
-			else
-				new_cam_dev = cam_open_spec_device(device, unit,
-				    O_RDWR, NULL);
 			if (new_cam_dev == NULL) {
 				warnx("%s", cam_errbuf);
 				error = 1;
@@ -3109,10 +3221,6 @@ camdd_rw(struct camdd_io_opts *io_opts, int num_io_opts, uint64_t max_io,
 		devs[i]->start_offset_bytes = io_opts[i].offset;
 
 		if (max_io != 0) {
-			devs[i]->sector_io_limit =
-			    (devs[i]->start_offset_bytes /
-			    devs[i]->sector_size) +
-			    (max_io / devs[i]->sector_size) - 1;
 			devs[i]->sector_io_limit =
 			    (devs[i]->start_offset_bytes /
 			    devs[i]->sector_size) +

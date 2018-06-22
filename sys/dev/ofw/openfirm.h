@@ -1,6 +1,8 @@
 /*	$NetBSD: openfirm.h,v 1.1 1998/05/15 10:16:00 tsubai Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
  * Copyright (C) 1995, 1996 TooLs GmbH.
  * All rights reserved.
@@ -117,6 +119,7 @@ ssize_t		OF_getprop_alloc(phandle_t node, const char *propname,
 		    int elsz, void **buf);
 ssize_t		OF_getencprop_alloc(phandle_t node, const char *propname,
 		    int elsz, void **buf);
+void		OF_prop_free(void *buf);
 int		OF_nextprop(phandle_t node, const char *propname, char *buf,
 		    size_t len);
 int		OF_setprop(phandle_t node, const char *name, const void *buf,
@@ -176,7 +179,7 @@ int		OF_interpret(const char *cmd, int nreturns, ...);
  */
 #ifndef __sparc64__
 int		OF_decode_addr(phandle_t dev, int regno, bus_space_tag_t *ptag,
-		    bus_space_handle_t *phandle);
+		    bus_space_handle_t *phandle, bus_size_t *sz);
 #endif
 
 #endif /* _KERNEL */

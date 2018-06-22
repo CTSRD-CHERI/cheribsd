@@ -71,7 +71,7 @@ private:
   /// \param Key unique key for option
   /// \param O option to map to \p Key
   ///
-  /// Allocated cl::Options are owened by the OptionRegistry and are deallocated
+  /// Allocated cl::Options are owned by the OptionRegistry and are deallocated
   /// on destruction or removal
   void addOption(void *Key, cl::Option *O);
 
@@ -91,9 +91,9 @@ public:
   /// Options are keyed off the template parameters to generate unique static
   /// characters. The template parameters are (1) the type of the data the
   /// option stores (\p ValT), the class that will read the option (\p Base),
-  /// and the memeber that the class will store the data into (\p Mem).
+  /// and the member that the class will store the data into (\p Mem).
   template <typename ValT, typename Base, ValT(Base::*Mem)>
-  static void registerOption(const char *ArgStr, const char *Desc,
+  static void registerOption(StringRef ArgStr, StringRef Desc,
                              const ValT &InitValue) {
     cl::opt<ValT> *Option = new cl::opt<ValT>(ArgStr, cl::desc(Desc),
                                               cl::Hidden, cl::init(InitValue));

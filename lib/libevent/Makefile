@@ -1,6 +1,7 @@
 # $FreeBSD$
 
-.PATH:	${.CURDIR}/../../contrib/pf/libevent
+PACKAGE=lib${LIB}
+.PATH:	${SRCTOP}/contrib/pf/libevent
 
 .include <src.opts.mk>
 
@@ -9,7 +10,7 @@ SHLIB_MAJOR=	1
 PRIVATELIB=
 
 SRCS=	buffer.c evbuffer.c event.c kqueue.c log.c poll.c select.c signal.c
-HDRS=	event.h
+INCS=	event.h
 
 CFLAGS+= -I${.CURDIR} \
 	-DHAVE_CLOCK_GETTIME \

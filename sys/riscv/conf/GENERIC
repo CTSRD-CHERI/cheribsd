@@ -4,11 +4,11 @@
 # For more information on this file, please read the config(5) manual page,
 # and/or the handbook section on Kernel Configuration Files:
 #
-#    http://www.FreeBSD.org/doc/en_US.ISO8859-1/books/handbook/kernelconfig-config.html
+#    https://www.FreeBSD.org/doc/en_US.ISO8859-1/books/handbook/kernelconfig-config.html
 #
 # The handbook is also available locally in /usr/share/doc/handbook
 # if you've installed the doc distribution, otherwise always see the
-# FreeBSD World Wide Web server (http://www.FreeBSD.org/) for the
+# FreeBSD World Wide Web server (https://www.FreeBSD.org/) for the
 # latest information.
 #
 # An exhaustive list of options and more detailed explanations of the
@@ -23,13 +23,19 @@ ident		GENERIC
 
 makeoptions	DEBUG=-g		# Build kernel with gdb(1) debug symbols
 # makeoptions	WITH_CTF=1		# Run ctfconvert(1) for DTrace support
-makeoptions	NO_MODULES=1		# We don't yet support modules on RISC-V
+
+# FIXME: linker error. "--relax and -r may not be used together"
+makeoptions	WITHOUT_MODULES="usb otusfw mwlfw ispfw mwlfw ralfw rtwnfw"
+# makeoptions	NO_MODULES
 
 options 	SCHED_ULE		# ULE scheduler
 options 	PREEMPTION		# Enable kernel thread preemption
+options 	VIMAGE			# Subsystem virtualization, e.g. VNET
 options 	INET			# InterNETworking
 options 	INET6			# IPv6 communications protocols
+options 	TCP_HHOOK		# hhook(9) framework for TCP
 options 	IPSEC			# IP (v4/v6) security
+options 	IPSEC_SUPPORT		# Allow kldload of ipsec and tcpmd5
 options 	TCP_OFFLOAD		# TCP offload
 options 	SCTP			# Stream Control Transmission Protocol
 options 	FFS			# Berkeley Fast Filesystem
@@ -38,7 +44,6 @@ options 	UFS_ACL			# Support for access control lists
 options 	UFS_DIRHASH		# Improve performance on big directories
 options 	UFS_GJOURNAL		# Enable gjournal-based UFS journaling
 options 	QUOTA			# Enable disk quotas for UFS
-options 	MD_ROOT			# MD is a potential root device
 options 	NFSCL			# Network Filesystem Client
 options 	NFSD			# Network Filesystem Server
 options 	NFSLOCKD		# Network Lock Manager
@@ -64,19 +69,28 @@ options 	AUDIT			# Security event auditing
 options 	CAPABILITY_MODE		# Capsicum capability mode
 options 	CAPABILITIES		# Capsicum capabilities
 options 	MAC			# TrustedBSD MAC Framework
-# options 	KDTRACE_FRAME		# Ensure frames are compiled in
-# options 	KDTRACE_HOOKS		# Kernel DTrace hooks
-# options 	VFP			# Floating-point support
+options 	KDTRACE_FRAME		# Ensure frames are compiled in
+options 	KDTRACE_HOOKS		# Kernel DTrace hooks
+options 	FPE			# Floating-point extension support
 options 	RACCT			# Resource accounting framework
 options 	RACCT_DEFAULT_TO_DISABLED # Set kern.racct.enable=0 by default
 options 	RCTL			# Resource limits
-# options 	SMP
+options 	SMP
+
+# RISC-V SBI console
+device		rcons
+
+# Uncomment for memory disk
+# options 	MD_ROOT
+# options 	MD_ROOT_SIZE=32768	# 32MB ram disk
+# makeoptions	MFS_IMAGE=/path/to/img
+# options 	ROOTDEVNAME=\"ufs:/dev/md0\"
 
 # Debugging support.  Always need this:
-# options 	KDB			# Enable kernel debugger support.
-# options 	KDB_TRACE		# Print a stack trace for a panic.
+options 	KDB			# Enable kernel debugger support.
+options 	KDB_TRACE		# Print a stack trace for a panic.
 # For full debugger support use (turn off in stable branch):
-# options 	DDB			# Support DDB.
+options 	DDB			# Support DDB.
 # options 	GDB			# Support remote GDB.
 options 	DEADLKRES		# Enable the deadlock resolver
 options 	INVARIANTS		# Enable calls of extra sanity checking
@@ -84,9 +98,8 @@ options 	INVARIANT_SUPPORT	# Extra sanity checks of internal structures, require
 # options 	WITNESS			# Enable checks to detect deadlocks and cycles
 # options 	WITNESS_SKIPSPIN	# Don't run witness on spinlocks for speed
 options 	MALLOC_DEBUG_MAXZONES=8	# Separate malloc(9) zones
-
-options 	ROOTDEVNAME=\"ufs:/dev/htif_blk0\"
 # options 	EARLY_PRINTF
+# options 	VERBOSE_SYSINIT
 
 # Pseudo devices.
 device		loop		# Network loopback
@@ -98,7 +111,9 @@ device		md		# Memory "disks"
 device		gif		# IPv6 and IPv4 tunneling
 device		firmware	# firmware assist module
 
-# RISCVTODO: This needs to be done via loader (when it's available).
+# The `bpf' device enables the Berkeley Packet Filter.
+# Be aware of the administrative consequences of enabling this!
+# Note that 'bpf' is required for DHCP.
+device		bpf		# Berkeley packet filter
+
 options 	FDT
-options 	FDT_DTB_STATIC
-makeoptions	FDT_DTS_FILE=spike.dts

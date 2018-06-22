@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright 2013 Philip Withnall
  * Copyright 1996-1998 John D. Polstra.
  * All rights reserved.
@@ -32,6 +34,17 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $FreeBSD: head/lib/csu/mips/crt1_c.c 245133 2013-01-07 17:58:27Z kib $
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_size",
+ *   ],
+ *   "change_comment": "stack alignment"
+ * }
+ * CHERI CHANGES END
  */
 
 #include <sys/cdefs.h>

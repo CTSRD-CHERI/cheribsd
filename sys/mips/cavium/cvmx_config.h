@@ -1,4 +1,6 @@
 /***********************license start***************
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2003-2008 Cavium Networks (support@cavium.com). All rights
  * reserved.
  *
@@ -50,7 +52,6 @@
 #include <vm/vm.h>
 #include <vm/pmap.h>
 
-#include <machine/pmap.h>
 #include <machine/stdarg.h>
 
 #define	asm		__asm

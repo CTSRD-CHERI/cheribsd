@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
  * Copyright (c) 2006-2014 QLogic Corporation
  *
  * Redistribution and use in source and binary forms, with or without
@@ -2361,7 +2363,7 @@ bce_nvram_erase_page(struct bce_softc *sc, u32 offset)
 	    BCE_NVM_COMMAND_DOIT;
 
 	/*
-	 * Clear the DONE bit separately, set the NVRAM adress to erase,
+	 * Clear the DONE bit separately, set the NVRAM address to erase,
 	 * and issue the erase command.
 	 */
 	REG_WR(sc, BCE_NVM_COMMAND, BCE_NVM_COMMAND_DONE);
@@ -2800,7 +2802,7 @@ bce_nvram_write(struct bce_softc *sc, u32 offset, u8 *data_buf,
 
 	if (align_start || align_end) {
 		buf = malloc(len32, M_DEVBUF, M_NOWAIT);
-		if (buf == 0) {
+		if (buf == NULL) {
 			rc = ENOMEM;
 			goto bce_nvram_write_exit;
 		}
@@ -3047,7 +3049,7 @@ bce_get_rx_buffer_sizes(struct bce_softc *sc, int mtu)
 		sc->rx_bd_mbuf_alloc_size = MHLEN;
 		/* Make sure offset is 16 byte aligned for hardware. */
 		sc->rx_bd_mbuf_align_pad =
-			roundup2((MSIZE - MHLEN), 16) - (MSIZE - MHLEN);
+			roundup2(MSIZE - MHLEN, 16) - (MSIZE - MHLEN);
 		sc->rx_bd_mbuf_data_len = sc->rx_bd_mbuf_alloc_size -
 			sc->rx_bd_mbuf_align_pad;
 	} else {
@@ -7690,20 +7692,20 @@ bce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	switch(command) {
 
 	/* Set the interface MTU. */
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		/* Check that the MTU setting is supported. */
-		if ((ifr->ifr_mtu < BCE_MIN_MTU) ||
-			(ifr->ifr_mtu > BCE_MAX_JUMBO_MTU)) {
+		if ((ifr_mtu_get(ifr) < BCE_MIN_MTU) ||
+			(ifr_mtu_get(ifr) > BCE_MAX_JUMBO_MTU)) {
 			error = EINVAL;
 			break;
 		}
 
 		DBPRINT(sc, BCE_INFO_MISC,
 		    "SIOCSIFMTU: Changing MTU from %d to %d\n",
-		    (int) ifp->if_mtu, (int) ifr->ifr_mtu);
+		    (int) ifp->if_mtu, (int) ifr_mtu_get(ifr));
 
 		BCE_LOCK(sc);
-		ifp->if_mtu = ifr->ifr_mtu;
+		ifp->if_mtu = ifr_mtu_get(ifr);
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 			ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 			bce_init_locked(sc);
@@ -7712,7 +7714,7 @@ bce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	/* Set interface flags. */
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		DBPRINT(sc, BCE_VERBOSE_SPECIAL, "Received SIOCSIFFLAGS\n");
 
 		BCE_LOCK(sc);
@@ -7744,8 +7746,8 @@ bce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	/* Add/Delete multicast address */
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		DBPRINT(sc, BCE_VERBOSE_MISC,
 		    "Received SIOCADDMULTI/SIOCDELMULTI\n");
 
@@ -7757,7 +7759,7 @@ bce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	/* Set/Get Interface media */
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		DBPRINT(sc, BCE_VERBOSE_MISC,
 		    "Received SIOCSIFMEDIA/SIOCGIFMEDIA\n");
@@ -7772,8 +7774,8 @@ bce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	/* Set interface capability */
-	case SIOCSIFCAP:
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+	CASE_IOC_IFREQ(SIOCSIFCAP):
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		DBPRINT(sc, BCE_INFO_MISC,
 		    "Received SIOCSIFCAP = 0x%08X\n", (u32) mask);
 
@@ -7957,7 +7959,7 @@ bce_intr(void *xsc)
 		goto bce_intr_exit;
 	}
 
-	/* Ack the interrupt and stop others from occuring. */
+	/* Ack the interrupt and stop others from occurring. */
 	REG_WR(sc, BCE_PCICFG_INT_ACK_CMD,
 	    BCE_PCICFG_INT_ACK_CMD_USE_INT_HC_PARAM |
 	    BCE_PCICFG_INT_ACK_CMD_MASK_INT);

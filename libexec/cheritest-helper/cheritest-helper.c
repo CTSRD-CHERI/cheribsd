@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012-2016 Robert N. M. Watson
+ * Copyright (c) 2012-2017 Robert N. M. Watson
  * Copyright (c) 2014-2015 SRI International
  * All rights reserved.
  *
@@ -32,14 +32,13 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include <machine/cheri.h>
-#include <machine/cheric.h>
-
-#include <cheri/cheri_enter.h>
-#include <cheri/cheri_fd.h>
-#include <cheri/cheri_invoke.h>
-#include <cheri/cheri_memcpy.h>
-#include <cheri/cheri_system.h>
+#include <cheri/cheri.h>
+#include <cheri/cheric.h>
+#include <cheri/libcheri_enter.h>
+#include <cheri/libcheri_fd.h>
+#include <cheri/libcheri_invoke.h>
+#include <cheri/libcheri_memcpy.h>
+#include <cheri/libcheri_system.h>
 
 #include <inttypes.h>
 #include <md5.h>
@@ -153,7 +152,7 @@ invoke_vm_fault(register_t op)
 		// higher precedence than the TLB faults.  We could map a
 		// non-executable page into PCC for this test, but it's easier to just
 		// do a MIPS jump.
-		__asm__ volatile ("jal 4" : : :"memory");
+		__asm__ volatile ("li $t9, 4; jal $t9" : : :"memory");
 		break;
 	}
 	return (0);
@@ -175,40 +174,40 @@ invoke_syscall(void)
 int
 invoke_fd_fstat_c(struct cheri_object fd_object)
 {
-	struct cheri_fd_ret ret;
+	struct libcheri_fd_ret ret;
 	struct stat *sbp;
 
 	sbp = malloc(sizeof(*sbp));
 	if (sbp == NULL)
 		return (-1);
-	ret = cheri_fd_fstat_c(fd_object, sbp);
+	ret = libcheri_fd_fstat_c(fd_object, sbp);
 	free(sbp);
-	return (ret.cfr_retval0);
+	return (ret.lcfr_retval0);
 }
 
 int
 invoke_fd_lseek_c(struct cheri_object fd_object)
 {
-	struct cheri_fd_ret ret;
+	struct libcheri_fd_ret ret;
 
-	ret = cheri_fd_lseek_c(fd_object, 0, SEEK_SET);
-	return (ret.cfr_retval0);
+	ret = libcheri_fd_lseek_c(fd_object, 0, SEEK_SET);
+	return (ret.lcfr_retval0);
 }
 
 int
 invoke_fd_read_c(struct cheri_object fd_object, void *buf, size_t nbytes)
 {
-	struct cheri_fd_ret ret;
+	struct libcheri_fd_ret ret;
 
-	ret = cheri_fd_read_c(fd_object, buf, nbytes);
-	return (ret.cfr_retval0);
+	ret = libcheri_fd_read_c(fd_object, buf, nbytes);
+	return (ret.lcfr_retval0);
 }
 
 int
 invoke_fd_write_c(struct cheri_object fd_object, char *arg, size_t nbytes)
 {
 
-	return (cheri_fd_write_c(fd_object, arg, nbytes).cfr_retval0);
+	return (libcheri_fd_write_c(fd_object, arg, nbytes).lcfr_retval0);
 }
 
 int
@@ -244,13 +243,16 @@ invoke_system_calloc(void)
 	const size_t sizes[] = {1, 2, 4, 8, 16, 32, 64, 128, 1024, 4096, 10000};
 
 	for (i = 0; i < sizeof(sizes) / sizeof(*sizes); i++) {
-		if (cheri_system_calloc(1, sizes[i], &calloc_allocation) != 0)
+		if (libcheri_system_calloc(1, sizes[i], &calloc_allocation)
+		    != 0)
 			return (-1);
 		if (calloc_allocation == NULL)
 			return (-1);
-		if (cheri_getlen(calloc_allocation) != sizes[i])
+		if (cheri_getoffset(calloc_allocation) != 0)
 			return (-1);
-		if (cheri_system_free(calloc_allocation) != 0)
+		if (cheri_getlen(calloc_allocation) < sizes[i])
+			return (-1);
+		if (libcheri_system_free(calloc_allocation) != 0)
 			return (-1);
 	}
 	return (0);
@@ -274,7 +276,7 @@ invoke_libcheri_userfn(register_t arg, size_t len)
 	 * Argument passed to the cheritest-helper method turns into the
 	 * method number for the underlying system class invocation.
 	 */
-	return (cheri_system_user_call_fn(arg,
+	return (libcheri_system_user_call_fn(arg,
 	    len, 0, 0, 0, 0, 0, 0,
 	    NULL, NULL, NULL, NULL, NULL));
 }
@@ -288,7 +290,7 @@ invoke_libcheri_userfn_setstack(register_t arg)
 	 * In the setstack test, ensure that execution of the return path via
 	 * the sandbox has a visible effect that can be tested for.
 	 */
-	v = (cheri_system_user_call_fn(CHERITEST_USERFN_SETSTACK,
+	v = (libcheri_system_user_call_fn(CHERITEST_USERFN_SETSTACK,
 	    arg, 0, 0, 0, 0, 0, 0,
 	    NULL, NULL, NULL, NULL, NULL));
 	v += 10;
@@ -419,32 +421,42 @@ invoke_get_var_constructor(void)
 register_t
 invoke_inflate(struct zstream_proxy *zspp)
 {
-	z_stream zs;
+	z_stream *zsp;
 
-	zs.zalloc = Z_NULL;
-	zs.zfree = Z_NULL;
-	zs.next_in = zspp->next_in;
-	zs.avail_in = zspp->avail_in;
-	zs.next_out = zspp->next_out;
-	zs.avail_out = zspp->avail_out;
-	if (inflateInit(&zs) != Z_OK) {
+	if ((zsp = calloc(1, sizeof(*zsp))) == NULL) {
+		printf("calloc\n");
+		abort();
+	}
+
+	zsp->zalloc = Z_NULL;
+	zsp->zfree = Z_NULL;
+	zsp->next_in = zspp->next_in;
+	zsp->avail_in = zspp->avail_in;
+	zsp->next_out = zspp->next_out;
+	zsp->avail_out = zspp->avail_out;
+	if (inflateInit(zsp) != Z_OK) {
 		printf("inflateInit");
+		free(zsp);
 		abort();
 	}
-	if (inflate(&zs, Z_FINISH) != Z_STREAM_END) {
+	if (inflate(zsp, Z_FINISH) != Z_STREAM_END) {
 		printf("inflate");
+		free(zsp);
 		abort();
 	}
-	if (inflateEnd(&zs) != Z_OK) {
+	if (inflateEnd(zsp) != Z_OK) {
 		printf("inflateEnd");
+		free(zsp);
 		abort();
 	}
-	zspp->next_in = zs.next_in;
-	zspp->avail_in = zs.avail_in;
-	zspp->next_out = zs.next_out;
-	zspp->avail_out = zs.avail_out;
-	zspp->total_in = zs.total_in;
-	zspp->total_out = zs.total_out;
+	zspp->next_in = zsp->next_in;
+	zspp->avail_in = zsp->avail_in;
+	zspp->next_out = zsp->next_out;
+	zspp->avail_out = zsp->avail_out;
+	zspp->total_in = zsp->total_in;
+	zspp->total_out = zsp->total_out;
+	free(zsp);
+
 	return (0);
 }
 
@@ -462,21 +474,21 @@ int
 invoke_cheri_system_helloworld(void)
 {
 
-	return (cheri_system_helloworld());
+	return (libcheri_system_helloworld());
 }
 
 int
 invoke_cheri_system_puts(void)
 {
 
-	return (cheri_system_puts("sandbox cs_puts"));
+	return (libcheri_system_puts("sandbox cs_puts"));
 }
 
 int
 invoke_cheri_system_putchar(void)
 {
 
-	return (cheri_system_putchar('C'));	/* Is for cookie. */
+	return (libcheri_system_putchar('C'));	/* Is for cookie. */
 }
 
 int

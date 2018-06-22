@@ -16,6 +16,7 @@
 
 #include "clang/AST/CharUnits.h"
 #include "clang/AST/DeclBase.h"
+#include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
 
 namespace clang {
@@ -32,20 +33,6 @@ class RecordDecl;
 class Selector;
 class Stmt;
 class TagDecl;
-
-/// \brief Enumeration describing the result of loading information from
-/// an external source.
-enum ExternalLoadResult {
-  /// \brief Loading the external information has succeeded.
-  ELR_Success,
-  
-  /// \brief Loading the external information has failed.
-  ELR_Failure,
-  
-  /// \brief The external information has already been loaded, and therefore
-  /// no additional processing is required.
-  ELR_AlreadyLoaded
-};
 
 /// \brief Abstract interface for external sources of AST nodes.
 ///
@@ -156,47 +143,54 @@ public:
   /// \brief Retrieve the module that corresponds to the given module ID.
   virtual Module *getModule(unsigned ID) { return nullptr; }
 
-  /// \brief Holds everything needed to generate debug info for an
-  /// imported module or precompiled header file.
-  struct ASTSourceDescriptor {
-    std::string ModuleName;
-    std::string Path;
-    std::string ASTFile;
-    uint64_t Signature;
+  /// Abstracts clang modules and precompiled header files and holds
+  /// everything needed to generate debug info for an imported module
+  /// or PCH.
+  class ASTSourceDescriptor {
+    StringRef PCHModuleName;
+    StringRef Path;
+    StringRef ASTFile;
+    ASTFileSignature Signature;
+    const Module *ClangModule = nullptr;
+
+  public:
+    ASTSourceDescriptor(){};
+    ASTSourceDescriptor(StringRef Name, StringRef Path, StringRef ASTFile,
+                        ASTFileSignature Signature)
+        : PCHModuleName(std::move(Name)), Path(std::move(Path)),
+          ASTFile(std::move(ASTFile)), Signature(Signature){};
+    ASTSourceDescriptor(const Module &M);
+    std::string getModuleName() const;
+    StringRef getPath() const { return Path; }
+    StringRef getASTFile() const { return ASTFile; }
+    ASTFileSignature getSignature() const { return Signature; }
+    const Module *getModuleOrNull() const { return ClangModule; }
   };
 
-  /// \brief Return a descriptor for the corresponding module, if one exists.
+  /// Return a descriptor for the corresponding module, if one exists.
   virtual llvm::Optional<ASTSourceDescriptor> getSourceDescriptor(unsigned ID);
-  /// \brief Return a descriptor for the module.
-  virtual ASTSourceDescriptor getSourceDescriptor(const Module &M);
+
+  enum ExtKind { EK_Always, EK_Never, EK_ReplyHazy };
+
+  virtual ExtKind hasExternalDefinitions(const Decl *D);
 
   /// \brief Finds all declarations lexically contained within the given
   /// DeclContext, after applying an optional filter predicate.
   ///
-  /// \param isKindWeWant a predicate function that returns true if the passed
-  /// declaration kind is one we are looking for. If NULL, all declarations
-  /// are returned.
-  ///
-  /// \return an indication of whether the load succeeded or failed.
+  /// \param IsKindWeWant a predicate function that returns true if the passed
+  /// declaration kind is one we are looking for.
   ///
   /// The default implementation of this method is a no-op.
-  virtual ExternalLoadResult FindExternalLexicalDecls(const DeclContext *DC,
-                                        bool (*isKindWeWant)(Decl::Kind),
-                                        SmallVectorImpl<Decl*> &Result);
+  virtual void
+  FindExternalLexicalDecls(const DeclContext *DC,
+                           llvm::function_ref<bool(Decl::Kind)> IsKindWeWant,
+                           SmallVectorImpl<Decl *> &Result);
 
   /// \brief Finds all declarations lexically contained within the given
   /// DeclContext.
-  ///
-  /// \return true if an error occurred
-  ExternalLoadResult FindExternalLexicalDecls(const DeclContext *DC,
-                                SmallVectorImpl<Decl*> &Result) {
-    return FindExternalLexicalDecls(DC, nullptr, Result);
-  }
-
-  template <typename DeclTy>
-  ExternalLoadResult FindExternalLexicalDeclsBy(const DeclContext *DC,
-                                  SmallVectorImpl<Decl*> &Result) {
-    return FindExternalLexicalDecls(DC, DeclTy::classofKind, Result);
+  void FindExternalLexicalDecls(const DeclContext *DC,
+                                SmallVectorImpl<Decl *> &Result) {
+    FindExternalLexicalDecls(DC, [](Decl::Kind) { return true; }, Result);
   }
 
   /// \brief Get the decls that are contained in a file in the Offset/Length
@@ -514,8 +508,9 @@ public:
   /// We define this as a wrapping iterator around an int. The
   /// iterator_adaptor_base class forwards the iterator methods to basic integer
   /// arithmetic.
-  class iterator : public llvm::iterator_adaptor_base<
-                       iterator, int, std::random_access_iterator_tag, T, int> {
+  class iterator
+      : public llvm::iterator_adaptor_base<
+            iterator, int, std::random_access_iterator_tag, T, int, T *, T &> {
     LazyVector *Self;
 
     iterator(LazyVector *Self, int Position)

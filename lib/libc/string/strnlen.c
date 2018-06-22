@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2009 David Schultz <das@FreeBSD.org>
  * All rights reserved.
  *
@@ -31,7 +33,7 @@ __FBSDID("$FreeBSD$");
 #include "cheri_private.h"
 
 size_t
-__CAPSUFFIX(strnlen)(__CAPABILITY const char *s, size_t maxlen)
+__CAPSUFFIX(strnlen)(const char * __CAP s, size_t maxlen)
 {
 	size_t len;
 

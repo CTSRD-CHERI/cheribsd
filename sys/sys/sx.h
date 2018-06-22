@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2007 Attilio Rao <attilio@freebsd.org>
  * Copyright (c) 2001 Jason Evans <jasone@freebsd.org>
  * All rights reserved.
@@ -88,6 +90,11 @@
 
 #define	sx_recurse	lock_object.lo_data
 
+#define	SX_READ_VALUE(sx)	((sx)->sx_lock)
+
+#define	lv_sx_owner(v) \
+	((v & SX_LOCK_SHARED) ? NULL : (struct thread *)SX_OWNER(v))
+
 /*
  * Function prototipes.  Routines that start with an underscore are not part
  * of the public interface and are wrappered with a macro.
@@ -96,20 +103,22 @@ void	sx_sysinit(void *arg);
 #define	sx_init(sx, desc)	sx_init_flags((sx), (desc), 0)
 void	sx_init_flags(struct sx *sx, const char *description, int opts);
 void	sx_destroy(struct sx *sx);
+int	sx_try_slock_int(struct sx *sx LOCK_FILE_LINE_ARG_DEF);
 int	sx_try_slock_(struct sx *sx, const char *file, int line);
+int	sx_try_xlock_int(struct sx *sx LOCK_FILE_LINE_ARG_DEF);
 int	sx_try_xlock_(struct sx *sx, const char *file, int line);
+int	sx_try_upgrade_int(struct sx *sx LOCK_FILE_LINE_ARG_DEF);
 int	sx_try_upgrade_(struct sx *sx, const char *file, int line);
+void	sx_downgrade_int(struct sx *sx LOCK_FILE_LINE_ARG_DEF);
 void	sx_downgrade_(struct sx *sx, const char *file, int line);
+int	_sx_slock_int(struct sx *sx, int opts LOCK_FILE_LINE_ARG_DEF);
 int	_sx_slock(struct sx *sx, int opts, const char *file, int line);
 int	_sx_xlock(struct sx *sx, int opts, const char *file, int line);
+void	_sx_sunlock_int(struct sx *sx LOCK_FILE_LINE_ARG_DEF);
 void	_sx_sunlock(struct sx *sx, const char *file, int line);
 void	_sx_xunlock(struct sx *sx, const char *file, int line);
-int	_sx_xlock_hard(struct sx *sx, uintptr_t tid, int opts,
-	    const char *file, int line);
-int	_sx_slock_hard(struct sx *sx, int opts, const char *file, int line);
-void	_sx_xunlock_hard(struct sx *sx, uintptr_t tid, const char *file, int
-	    line);
-void	_sx_sunlock_hard(struct sx *sx, const char *file, int line);
+int	_sx_xlock_hard(struct sx *sx, uintptr_t x, int opts LOCK_FILE_LINE_ARG_DEF);
+void	_sx_xunlock_hard(struct sx *sx, uintptr_t x LOCK_FILE_LINE_ARG_DEF);
 #if defined(INVARIANTS) || defined(INVARIANT_SUPPORT)
 void	_sx_assert(const struct sx *sx, int what, const char *file, int line);
 #endif
@@ -142,19 +151,19 @@ struct sx_args {
  * deferred to 'tougher' functions.
  */
 
+#if	(LOCK_DEBUG == 0)
 /* Acquire an exclusive lock. */
 static __inline int
 __sx_xlock(struct sx *sx, struct thread *td, int opts, const char *file,
     int line)
 {
 	uintptr_t tid = (uintptr_t)td;
+	uintptr_t v = SX_LOCK_UNLOCKED;
 	int error = 0;
 
-	if (!atomic_cmpset_acq_ptr(&sx->sx_lock, SX_LOCK_UNLOCKED, tid))
-		error = _sx_xlock_hard(sx, tid, opts, file, line);
-	else 
-		LOCKSTAT_PROFILE_OBTAIN_RWLOCK_SUCCESS(sx__acquire, sx,
-		    0, 0, file, line, LOCKSTAT_WRITER);
+	if (__predict_false(LOCKSTAT_PROFILE_ENABLED(sx__acquire) ||
+	    !atomic_fcmpset_acq_ptr(&sx->sx_lock, &v, tid)))
+		error = _sx_xlock_hard(sx, v, opts);
 
 	return (error);
 }
@@ -163,49 +172,13 @@ __sx_xlock(struct sx *sx, struct thread *td, int opts, const char *file,
 static __inline void
 __sx_xunlock(struct sx *sx, struct thread *td, const char *file, int line)
 {
-	uintptr_t tid = (uintptr_t)td;
+	uintptr_t x = (uintptr_t)td;
 
-	if (sx->sx_recurse == 0)
-		LOCKSTAT_PROFILE_RELEASE_RWLOCK(sx__release, sx,
-		    LOCKSTAT_WRITER);
-	if (!atomic_cmpset_rel_ptr(&sx->sx_lock, tid, SX_LOCK_UNLOCKED))
-		_sx_xunlock_hard(sx, tid, file, line);
+	if (__predict_false(LOCKSTAT_PROFILE_ENABLED(sx__release) ||
+	    !atomic_fcmpset_rel_ptr(&sx->sx_lock, &x, SX_LOCK_UNLOCKED)))
+		_sx_xunlock_hard(sx, x);
 }
-
-/* Acquire a shared lock. */
-static __inline int
-__sx_slock(struct sx *sx, int opts, const char *file, int line)
-{
-	uintptr_t x = sx->sx_lock;
-	int error = 0;
-
-	if (!(x & SX_LOCK_SHARED) ||
-	    !atomic_cmpset_acq_ptr(&sx->sx_lock, x, x + SX_ONE_SHARER))
-		error = _sx_slock_hard(sx, opts, file, line);
-	else
-		LOCKSTAT_PROFILE_OBTAIN_RWLOCK_SUCCESS(sx__acquire, sx,
-		    0, 0, file, line, LOCKSTAT_READER);
-
-	return (error);
-}
-
-/*
- * Release a shared lock.  We can just drop a single shared lock so
- * long as we aren't trying to drop the last shared lock when other
- * threads are waiting for an exclusive lock.  This takes advantage of
- * the fact that an unlocked lock is encoded as a shared lock with a
- * count of 0.
- */
-static __inline void
-__sx_sunlock(struct sx *sx, const char *file, int line)
-{
-	uintptr_t x = sx->sx_lock;
-
-	LOCKSTAT_PROFILE_RELEASE_RWLOCK(sx__release, sx, LOCKSTAT_READER);
-	if (x == (SX_SHARERS_LOCK(1) | SX_LOCK_EXCLUSIVE_WAITERS) ||
-	    !atomic_cmpset_rel_ptr(&sx->sx_lock, x, x - SX_ONE_SHARER))
-		_sx_sunlock_hard(sx, file, line);
-}
+#endif
 
 /*
  * Public interface for lock operations.
@@ -220,12 +193,6 @@ __sx_sunlock(struct sx *sx, const char *file, int line)
 	_sx_xlock((sx), SX_INTERRUPTIBLE, (file), (line))
 #define	sx_xunlock_(sx, file, line)					\
 	_sx_xunlock((sx), (file), (line))
-#define	sx_slock_(sx, file, line)					\
-	(void)_sx_slock((sx), 0, (file), (line))
-#define	sx_slock_sig_(sx, file, line)					\
-	_sx_slock((sx), SX_INTERRUPTIBLE, (file) , (line))
-#define	sx_sunlock_(sx, file, line)					\
-	_sx_sunlock((sx), (file), (line))
 #else
 #define	sx_xlock_(sx, file, line)					\
 	(void)__sx_xlock((sx), curthread, 0, (file), (line))
@@ -233,17 +200,30 @@ __sx_sunlock(struct sx *sx, const char *file, int line)
 	__sx_xlock((sx), curthread, SX_INTERRUPTIBLE, (file), (line))
 #define	sx_xunlock_(sx, file, line)					\
 	__sx_xunlock((sx), curthread, (file), (line))
-#define	sx_slock_(sx, file, line)					\
-	(void)__sx_slock((sx), 0, (file), (line))
-#define	sx_slock_sig_(sx, file, line)					\
-	__sx_slock((sx), SX_INTERRUPTIBLE, (file), (line))
-#define	sx_sunlock_(sx, file, line)					\
-	__sx_sunlock((sx), (file), (line))
 #endif	/* LOCK_DEBUG > 0 || SX_NOINLINE */
+#if	(LOCK_DEBUG > 0)
+#define	sx_slock_(sx, file, line)					\
+	(void)_sx_slock((sx), 0, (file), (line))
+#define	sx_slock_sig_(sx, file, line)					\
+	_sx_slock((sx), SX_INTERRUPTIBLE, (file) , (line))
+#define	sx_sunlock_(sx, file, line)					\
+	_sx_sunlock((sx), (file), (line))
 #define	sx_try_slock(sx)	sx_try_slock_((sx), LOCK_FILE, LOCK_LINE)
 #define	sx_try_xlock(sx)	sx_try_xlock_((sx), LOCK_FILE, LOCK_LINE)
 #define	sx_try_upgrade(sx)	sx_try_upgrade_((sx), LOCK_FILE, LOCK_LINE)
 #define	sx_downgrade(sx)	sx_downgrade_((sx), LOCK_FILE, LOCK_LINE)
+#else
+#define	sx_slock_(sx, file, line)					\
+	(void)_sx_slock_int((sx), 0)
+#define	sx_slock_sig_(sx, file, line)					\
+	_sx_slock_int((sx), SX_INTERRUPTIBLE)
+#define	sx_sunlock_(sx, file, line)					\
+	_sx_sunlock_int((sx))
+#define	sx_try_slock(sx)	sx_try_slock_int((sx))
+#define	sx_try_xlock(sx)	sx_try_xlock_int((sx))
+#define	sx_try_upgrade(sx)	sx_try_upgrade_int((sx))
+#define	sx_downgrade(sx)	sx_downgrade_int((sx))
+#endif
 #ifdef INVARIANTS
 #define	sx_assert_(sx, what, file, line)				\
 	_sx_assert((sx), (what), (file), (line))
@@ -308,7 +288,7 @@ __sx_sunlock(struct sx *sx, const char *file, int line)
 #define	SA_RECURSED		LA_RECURSED
 #define	SA_NOTRECURSED		LA_NOTRECURSED
 
-/* Backwards compatability. */
+/* Backwards compatibility. */
 #define	SX_LOCKED		LA_LOCKED
 #define	SX_SLOCKED		LA_SLOCKED
 #define	SX_XLOCKED		LA_XLOCKED

@@ -390,6 +390,9 @@ typedef uLong FAR uLongf;
    typedef Byte FAR   *voidpf;
    typedef Byte       *voidp;
 #endif
+#if __has_feature(capabilities)
+typedef voidpf __capability voidpf_c;
+#endif
 
 #if !defined(Z_U4) && !defined(Z_SOLO) && defined(STDC)
 #  include <limits.h>
@@ -519,8 +522,8 @@ typedef uLong FAR uLongf;
 #ifdef __FreeBSD__
 #include <sys/cdefs.h>
 #if __has_feature(capabilities)
-#include <machine/cheric.h>
-#include <machine/cherireg.h>
+#include <cheri/cheri.h>
+#include <cheri/cheric.h>
 #else
 #define __capability
 #define cheri_ptrperm(a, b)	(a)

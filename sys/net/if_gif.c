@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
  *
@@ -125,7 +127,7 @@ static void	gif_delete_tunnel(struct ifnet *);
 static int	gif_ioctl(struct ifnet *, u_long, caddr_t);
 static int	gif_transmit(struct ifnet *, struct mbuf *);
 static void	gif_qflush(struct ifnet *);
-static int	gif_clone_create(struct if_clone *, int, caddr_t);
+static int	gif_clone_create(struct if_clone *, int, void * __capability);
 static void	gif_clone_destroy(struct ifnet *);
 static VNET_DEFINE(struct if_clone *, gif_cloner);
 #define	V_gif_cloner	VNET(gif_cloner)
@@ -166,16 +168,8 @@ SYSCTL_INT(_net_link_gif, OID_AUTO, parallel_tunnels,
     CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(parallel_tunnels), 0,
     "Allow parallel tunnels?");
 
-/* copy from src/sys/net/if_ethersubr.c */
-static const u_char etherbroadcastaddr[ETHER_ADDR_LEN] =
-			{ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-#ifndef ETHER_IS_BROADCAST
-#define ETHER_IS_BROADCAST(addr) \
-	(bcmp(etherbroadcastaddr, (addr), ETHER_ADDR_LEN) == 0)
-#endif
-
 static int
-gif_clone_create(struct if_clone *ifc, int unit, caddr_t params)
+gif_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 {
 	struct gif_softc *sc;
 
@@ -526,7 +520,6 @@ gif_input(struct mbuf *m, struct ifnet *ifp, int proto, uint8_t ecn)
 	struct ip6_hdr *ip6;
 	uint32_t t;
 #endif
-	struct gif_softc *sc;
 	struct ether_header *eh;
 	struct ifnet *oldifp;
 	int isr, n, af;
@@ -536,7 +529,6 @@ gif_input(struct mbuf *m, struct ifnet *ifp, int proto, uint8_t ecn)
 		m_freem(m);
 		return;
 	}
-	sc = ifp->if_softc;
 	m->m_pkthdr.rcvif = ifp;
 	m_clrprotoflags(m);
 	switch (proto) {
@@ -700,19 +692,19 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error;
 
 	switch (cmd) {
-	case SIOCSIFADDR:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
 		ifp->if_flags |= IFF_UP;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
-	case SIOCGIFMTU:
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
+	CASE_IOC_IFREQ(SIOCGIFMTU):
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		return (0);
-	case SIOCSIFMTU:
-		if (ifr->ifr_mtu < GIF_MTU_MIN ||
-		    ifr->ifr_mtu > GIF_MTU_MAX)
+	CASE_IOC_IFREQ(SIOCSIFMTU):
+		if (ifr_mtu_get(ifr) < GIF_MTU_MIN ||
+		    ifr_mtu_get(ifr) > GIF_MTU_MAX)
 			return (EINVAL);
 		else
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 		return (0);
 	}
 	sx_xlock(&gif_ioctl_sx);
@@ -803,11 +795,11 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		error = gif_set_tunnel(ifp, src, dst);
 		break;
-	case SIOCDIFPHYADDR:
+	CASE_IOC_IFREQ(SIOCDIFPHYADDR):
 		gif_delete_tunnel(ifp);
 		break;
-	case SIOCGIFPSRCADDR:
-	case SIOCGIFPDSTADDR:
+	CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
+	CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
 #ifdef INET6
 	case SIOCGIFPSRCADDR_IN6:
 	case SIOCGIFPDSTADDR_IN6:
@@ -819,13 +811,13 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		GIF_RLOCK(sc);
 		switch (cmd) {
 #ifdef INET
-		case SIOCGIFPSRCADDR:
-		case SIOCGIFPDSTADDR:
+		CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
+		CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
 			if (sc->gif_family != AF_INET) {
 				error = EADDRNOTAVAIL;
 				break;
 			}
-			sin = (struct sockaddr_in *)&ifr->ifr_addr;
+			sin = (struct sockaddr_in *)ifr_addr_get_sa(ifr);
 			memset(sin, 0, sizeof(*sin));
 			sin->sin_family = AF_INET;
 			sin->sin_len = sizeof(*sin);
@@ -838,8 +830,7 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				error = EADDRNOTAVAIL;
 				break;
 			}
-			sin6 = (struct sockaddr_in6 *)
-				&(((struct in6_ifreq *)data)->ifr_addr);
+			sin6 = (struct sockaddr_in6 *)ifr_addr_get_sa(data);
 			memset(sin6, 0, sizeof(*sin6));
 			sin6->sin6_family = AF_INET6;
 			sin6->sin6_len = sizeof(*sin6);
@@ -851,10 +842,10 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		if (error == 0) {
 			switch (cmd) {
 #ifdef INET
-			case SIOCGIFPSRCADDR:
+			CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
 				sin->sin_addr = sc->gif_iphdr->ip_src;
 				break;
-			case SIOCGIFPDSTADDR:
+			CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
 				sin->sin_addr = sc->gif_iphdr->ip_dst;
 				break;
 #endif
@@ -873,8 +864,8 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		switch (cmd) {
 #ifdef INET
-		case SIOCGIFPSRCADDR:
-		case SIOCGIFPDSTADDR:
+		CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
+		CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
 			error = prison_if(curthread->td_ucred,
 			    (struct sockaddr *)sin);
 			if (error != 0)
@@ -893,25 +884,27 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #endif
 		}
 		break;
-	case SIOCGTUNFIB:
-		ifr->ifr_fib = sc->gif_fibnum;
+	CASE_IOC_IFREQ(SIOCGTUNFIB):
+		ifr_fib_set(ifr, sc->gif_fibnum);
 		break;
-	case SIOCSTUNFIB:
+	CASE_IOC_IFREQ(SIOCSTUNFIB):
 		if ((error = priv_check(curthread, PRIV_NET_GIF)) != 0)
 			break;
-		if (ifr->ifr_fib >= rt_numfibs)
+		if (ifr_fib_get(ifr) >= rt_numfibs)
 			error = EINVAL;
 		else
-			sc->gif_fibnum = ifr->ifr_fib;
+			sc->gif_fibnum = ifr_fib_get(ifr);
 		break;
-	case GIFGOPTS:
+	CASE_IOC_IFREQ(GIFGOPTS):
 		options = sc->gif_options;
-		error = copyout(&options, ifr->ifr_data, sizeof(options));
+		error = copyout_c(&options, ifr_data_get_ptr(ifr),
+		    sizeof(options));
 		break;
-	case GIFSOPTS:
+	CASE_IOC_IFREQ(GIFSOPTS):
 		if ((error = priv_check(curthread, PRIV_NET_GIF)) != 0)
 			break;
-		error = copyin(ifr->ifr_data, &options, sizeof(options));
+		error = copyin_c(ifr_data_get_ptr(ifr), &options,
+		    sizeof(options));
 		if (error)
 			break;
 		if (options & ~GIF_OPTMASK)
@@ -1023,7 +1016,7 @@ gif_set_tunnel(struct ifnet *ifp, struct sockaddr *src, struct sockaddr *dst)
 #endif
 	default:
 		return (EAFNOSUPPORT);
-	};
+	}
 
 	if (sc->gif_family != src->sa_family)
 		gif_detach(sc);

@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (C) 2005 David Xu <davidxu@freebsd.org>.
  * Copyright (C) 2000 Jason Evans <jasone@freebsd.org>.
  * All rights reserved.
@@ -26,9 +28,20 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "support"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
 #include "namespace.h"
 #include <sys/types.h>
@@ -43,6 +56,7 @@
 
 #include "thr_private.h"
 
+#ifndef __CHERI_PURE_CAPABILITY__
 FB10_COMPAT(_sem_init_compat, sem_init);
 FB10_COMPAT(_sem_destroy_compat, sem_destroy);
 FB10_COMPAT(_sem_getvalue_compat, sem_getvalue);
@@ -113,3 +127,4 @@ _sem_post_compat(sem_t *sem)
 {
 	return _libc_sem_post_compat(sem);
 }
+#endif /* !__CHERI_PURE_CAPABILITY__ */

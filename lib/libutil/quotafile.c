@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2008 Dag-Erling Coïdan Smørgrav
  * Copyright (c) 2008 Marshall Kirk McKusick
  * All rights reserved.
@@ -124,7 +126,7 @@ quota_open(struct fstab *fs, int quotatype, int openflags)
 		return (NULL);
 	qf->fd = -1;
 	qf->quotatype = quotatype;
-	strncpy(qf->fsname, fs->fs_file, sizeof(qf->fsname));
+	strlcpy(qf->fsname, fs->fs_file, sizeof(qf->fsname));
 	if (stat(qf->fsname, &st) != 0)
 		goto error;
 	qf->dev = st.st_dev;

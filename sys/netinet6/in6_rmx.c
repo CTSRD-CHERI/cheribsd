@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
  *
@@ -237,7 +239,9 @@ in6_detachhead(void **head, int off)
 {
 
 	callout_drain(&V_rtq_mtutimer);
-	return (rn_detachhead(head));
+	rt_table_destroy((struct rib_head *)(*head));
+
+	return (1);
 }
 #endif
 

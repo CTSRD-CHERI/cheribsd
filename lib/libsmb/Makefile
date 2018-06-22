@@ -2,7 +2,8 @@
 
 .include <src.opts.mk>
 
-CONTRIBDIR=	${.CURDIR}/../../contrib/smbfs
+PACKAGE=lib${LIB}
+CONTRIBDIR=	${SRCTOP}/contrib/smbfs
 .PATH: ${CONTRIBDIR}/lib/smb
 
 LIB=	smb

@@ -8,14 +8,13 @@
 //===----------------------------------------------------------------------===//
 //
 /// \file
-/// \brief Interface to describe a layout of a stack frame on a AMDIL target
-/// machine.
+/// \brief Interface to describe a layout of a stack frame on an AMDGPU target.
 //
 //===----------------------------------------------------------------------===//
-#ifndef LLVM_LIB_TARGET_R600_AMDGPUFRAMELOWERING_H
-#define LLVM_LIB_TARGET_R600_AMDGPUFRAMELOWERING_H
 
-#include "llvm/CodeGen/MachineFunction.h"
+#ifndef LLVM_LIB_TARGET_AMDGPU_AMDGPUFRAMELOWERING_H
+#define LLVM_LIB_TARGET_AMDGPU_AMDGPUFRAMELOWERING_H
+
 #include "llvm/Target/TargetFrameLowering.h"
 
 namespace llvm {
@@ -29,17 +28,17 @@ class AMDGPUFrameLowering : public TargetFrameLowering {
 public:
   AMDGPUFrameLowering(StackDirection D, unsigned StackAl, int LAO,
                       unsigned TransAl = 1);
-  virtual ~AMDGPUFrameLowering();
+  ~AMDGPUFrameLowering() override;
 
   /// \returns The number of 32-bit sub-registers that are used when storing
   /// values to the stack.
   unsigned getStackWidth(const MachineFunction &MF) const;
-  int getFrameIndexOffset(const MachineFunction &MF, int FI) const override;
-  const SpillSlot *
-    getCalleeSavedSpillSlots(unsigned &NumEntries) const override;
-  void emitPrologue(MachineFunction &MF, MachineBasicBlock &MBB) const override;
-  void emitEpilogue(MachineFunction &MF, MachineBasicBlock &MBB) const override;
-  bool hasFP(const MachineFunction &MF) const override;
+
+  bool hasFP(const MachineFunction &MF) const override {
+    return false;
+  }
 };
-} // namespace llvm
-#endif
+
+} // end namespace llvm
+
+#endif // LLVM_LIB_TARGET_AMDGPU_AMDGPUFRAMELOWERING_H

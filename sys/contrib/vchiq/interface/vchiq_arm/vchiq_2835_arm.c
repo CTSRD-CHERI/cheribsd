@@ -45,9 +45,9 @@
 #include <vm/vm_page.h>
 #include <vm/vm_pager.h>
 #include <vm/vm_param.h>
-#include <vm/vm_phys.h>
 
 #include <machine/bus.h>
+#include <machine/cpu.h>
 #include <arm/broadcom/bcm2835/bcm2835_mbox.h>
 #include <arm/broadcom/bcm2835/bcm2835_vcbus.h>
 
@@ -378,8 +378,7 @@ static void
 pagelist_page_free(vm_page_t pp)
 {
 	vm_page_lock(pp);
-	vm_page_unwire(pp, PQ_INACTIVE);
-	if (pp->wire_count == 0 && pp->object == NULL)
+	if (vm_page_unwire(pp, PQ_INACTIVE) && pp->object == NULL)
 		vm_page_free(pp);
 	vm_page_unlock(pp);
 }
@@ -411,6 +410,7 @@ create_pagelist(char __user *buf, size_t count, unsigned short type,
 	int run, addridx, actual_pages;
 	int err;
 	vm_paddr_t pagelist_phys;
+	vm_paddr_t pa;
 
 	offset = (vm_offset_t)buf & (PAGE_SIZE - 1);
 	num_pages = (count + offset + PAGE_SIZE - 1) / PAGE_SIZE;
@@ -533,7 +533,8 @@ create_pagelist(char __user *buf, size_t count, unsigned short type,
 			 (fragments - g_fragments_base)/g_fragment_size;
 	}
 
-	cpu_dcache_wbinv_range((vm_offset_t)buf, count);
+	pa = pmap_extract(PCPU_GET(curpmap), (vm_offset_t)buf);
+	dcache_wbinv_poc((vm_offset_t)buf, pa, count);
 
 	bus_dmamap_sync(bi->pagelist_dma_tag, bi->pagelist_dma_map, BUS_DMASYNC_PREWRITE);
 

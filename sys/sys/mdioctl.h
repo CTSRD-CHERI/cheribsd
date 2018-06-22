@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -15,7 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -49,7 +51,7 @@ enum md_types {MD_MALLOC, MD_PRELOAD, MD_VNODE, MD_SWAP, MD_NULL};
  * Ioctl definitions for memory disk pseudo-device.
  */
 
-#define MDNPAD		97
+#define MDNPAD		96
 struct md_ioctl {
 	unsigned	md_version;	/* Structure layout version */
 	unsigned	md_unit;	/* unit number */
@@ -61,6 +63,7 @@ struct md_ioctl {
 	u_int64_t	md_base;	/* base address */
 	int		md_fwheads;	/* firmware heads */
 	int		md_fwsectors;	/* firmware sectors */
+	char		*md_label;	/* label of the device */
 	int		md_pad[MDNPAD];	/* padding for future ideas */
 };
 
@@ -88,5 +91,26 @@ struct md_ioctl {
 #define MD_COMPRESS	0x10	/* Compression mode */
 #define MD_FORCE	0x20	/* Don't try to prevent foot-shooting */
 #define MD_ASYNC	0x40	/* Asynchronous mode */
+#define MD_VERIFY	0x80	/* Open file with O_VERIFY (vnode only) */
+
+#ifdef _KERNEL
+struct md_req {
+	unsigned	md_unit;	/* unit number */
+	enum md_types	md_type;	/* type of disk */
+	off_t		md_mediasize;	/* size of disk in bytes */
+	unsigned	md_sectorsize;	/* sectorsize */
+	unsigned	md_options;	/* options */
+	int		md_fwheads;	/* firmware heads */
+	int		md_fwsectors;	/* firmware sectors */
+	char * __capability md_file;	/* pathname of file to mount */
+	enum uio_seg	md_file_seg;	/* location of md_file */
+	char * __capability md_label;	/* label of the device (userspace) */
+	int		*md_units;	/* pointer to units array (kernel) */
+	size_t		md_units_nitems; /* items in md_units array */
+};
+
+extern int (*kern_mdattach_p)(struct thread *td, struct md_req *mdr);
+extern int (*kern_mddetach_p)(struct thread *td, struct md_req *mdr);
+#endif
 
 #endif	/* _SYS_MDIOCTL_H_*/

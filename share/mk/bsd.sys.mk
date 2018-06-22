@@ -69,7 +69,10 @@ CWARNFLAGS+=	-Wno-pointer-sign
 .if ${WARNS} <= 6
 CWARNFLAGS.clang+=	-Wno-empty-body -Wno-string-plus-int
 .if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 30400
-CWARNFLAGS.clang+= -Wno-unused-const-variable
+CWARNFLAGS.clang+=	-Wno-unused-const-variable
+.endif
+.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 60000
+CWARNFLAGS.clang+=	-Wno-error=tautological-constant-compare
 .endif
 .endif # WARNS <= 6
 .if ${WARNS} <= 3
@@ -77,6 +80,9 @@ CWARNFLAGS.clang+=	-Wno-tautological-compare -Wno-unused-value\
 		-Wno-parentheses-equality -Wno-unused-function -Wno-enum-conversion
 .if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 30600
 CWARNFLAGS.clang+=	-Wno-unused-local-typedef
+.endif
+.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 40000
+CWARNFLAGS.clang+=	-Wno-address-of-packed-member
 .endif
 .endif # WARNS <= 3
 .if ${WARNS} <= 2
@@ -111,7 +117,47 @@ CWARNFLAGS+=	-Wno-format
 
 # GCC 5.2.0
 .if ${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} >= 50200
-CWARNFLAGS+=	-Wno-error=unused-function -Wno-error=enum-compare -Wno-error=logical-not-parentheses -Wno-error=bool-compare -Wno-error=uninitialized -Wno-error=array-bounds -Wno-error=clobbered -Wno-error=cast-align -Wno-error=extra -Wno-error=attributes -Wno-error=inline -Wno-error=unused-but-set-variable -Wno-error=unused-value -Wno-error=strict-aliasing -Wno-error=address
+CWARNFLAGS+=	-Wno-error=address			\
+		-Wno-error=array-bounds			\
+		-Wno-error=attributes			\
+		-Wno-error=bool-compare			\
+		-Wno-error=cast-align			\
+		-Wno-error=clobbered			\
+		-Wno-error=enum-compare			\
+		-Wno-error=extra			\
+		-Wno-error=inline			\
+		-Wno-error=logical-not-parentheses	\
+		-Wno-error=strict-aliasing		\
+		-Wno-error=uninitialized		\
+		-Wno-error=unused-but-set-variable	\
+		-Wno-error=unused-function		\
+		-Wno-error=unused-value
+.endif
+
+# GCC 6.1.0
+.if ${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} >= 60100
+CWARNFLAGS+=	-Wno-error=misleading-indentation	\
+		-Wno-error=nonnull-compare		\
+		-Wno-error=shift-negative-value		\
+		-Wno-error=tautological-compare		\
+		-Wno-error=unused-const-variable
+.endif
+
+# GCC 7.1.0
+.if ${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} >= 70100
+CWARNFLAGS+=	-Wno-error=deprecated			\
+		-Wno-error=pointer-compare		\
+		-Wno-error=format-truncation		\
+		-Wno-error=implicit-fallthrough		\
+		-Wno-error=expansion-to-defined		\
+		-Wno-error=int-in-bool-context		\
+		-Wno-error=bool-operation		\
+		-Wno-error=format-overflow		\
+		-Wno-error=stringop-overflow		\
+		-Wno-error=memset-elt-size		\
+		-Wno-error=int-in-bool-context		\
+		-Wno-error=unused-const-variable	\
+		-Wno-error=nonnull
 .endif
 
 # How to handle FreeBSD custom printf format specifiers.
@@ -164,26 +210,41 @@ SSP_CFLAGS?=	-fstack-protector
 CFLAGS+=	${SSP_CFLAGS}
 .endif # SSP && !ARM && !MIPS
 
+# Additional flags passed in CFLAGS and CXXFLAGS when MK_DEBUG_FILES is
+# enabled.
+DEBUG_FILES_CFLAGS?= -g
+
 # Allow user-specified additional warning flags, plus compiler and file
 # specific flag overrides, unless we've overriden this...
 .if ${MK_WARNS} != "no"
-CFLAGS+=	${CWARNFLAGS} ${CWARNFLAGS.${COMPILER_TYPE}}
+CFLAGS+=	${CWARNFLAGS:M*} ${CWARNFLAGS.${COMPILER_TYPE}}
 CFLAGS+=	${CWARNFLAGS.${.IMPSRC:T}}
 .endif
 
 CFLAGS+=	 ${CFLAGS.${COMPILER_TYPE}}
 CXXFLAGS+=	 ${CXXFLAGS.${COMPILER_TYPE}}
 
+AFLAGS+=	${AFLAGS.${.IMPSRC:T}}
+ACFLAGS+=	${ACFLAGS.${.IMPSRC:T}}
+CFLAGS+=	${CFLAGS.${.IMPSRC:T}}
+CXXFLAGS+=	${CXXFLAGS.${.IMPSRC:T}}
+
+.if defined(SRCTOP)
+# Prevent rebuilding during install to support read-only objdirs.
+.if ${.TARGETS:M*install*} == ${.TARGETS} && empty(.MAKE.MODE:Mmeta)
+CFLAGS+=	ERROR-tried-to-rebuild-during-make-install
+.endif
+.endif
+
 # Tell bmake not to mistake standard targets for things to be searched for
 # or expect to ever be up-to-date.
-PHONY_NOTMAIN = afterdepend afterinstall all beforedepend beforeinstall \
+PHONY_NOTMAIN = analyze afterdepend afterinstall all beforedepend beforeinstall \
 		beforelinking build build-tools buildconfig buildfiles \
-		buildincludes checkdpadd clean cleandepend cleandir cleanobj \
-		configure depend dependall distclean distribute exe \
+		buildincludes check checkdpadd clean cleandepend cleandir \
+		cleanobj configure depend distclean distribute exe \
 		files html includes install installconfig installfiles \
-		installincludes lint obj objlink objs objwarn realall \
-		realdepend realinstall regress subdir-all subdir-depend \
-		subdir-install tags whereobj
+		installincludes lint obj objlink objs objwarn \
+		realinstall tags whereobj
 
 # we don't want ${PROG} to be PHONY
 .PHONY: ${PHONY_NOTMAIN:N${PROG:U}}
@@ -198,8 +259,9 @@ staging stage_libs stage_files stage_as stage_links stage_symlinks:
 .else
 # allow targets like beforeinstall to be leveraged
 DESTDIR= ${STAGE_OBJTOP}
+.export DESTDIR
 
-.if commands(beforeinstall)
+.if target(beforeinstall)
 .if !empty(_LIBS) || (${MK_STAGING_PROG} != "no" && !defined(INTERNALPROG))
 staging: beforeinstall
 .endif
@@ -209,7 +271,7 @@ staging: beforeinstall
 .if ${MK_STAGING_PROG} != "no" && !defined(INTERNALPROG)
 STAGE_DIR.prog= ${STAGE_OBJTOP}${BINDIR}
 
-.if !empty(PROG) || !empty(PROGS)
+.if !empty(PROG)
 .if defined(PROGNAME)
 STAGE_AS_SETS+= prog
 STAGE_AS_${PROG}= ${PROGNAME}
@@ -231,7 +293,6 @@ stage_files.shlib: ${_LIBS:M*.so.*}
 .endif
 
 .if defined(SHLIB_LINK) && commands(${SHLIB_LINK:R}.ld)
-_LDSCRIPTROOT?= ${STAGE_OBJTOP}
 STAGE_AS_SETS+= ldscript
 STAGE_AS.ldscript+= ${SHLIB_LINK:R}.ld
 stage_as.ldscript: ${SHLIB_LINK:R}.ld
@@ -294,3 +355,10 @@ STAGE_SYMLINKS.links= ${SYMLINKS}
 .endif
 .endif
 
+.if defined(META_TARGETS)
+.for _tgt in ${META_TARGETS}
+.if target(${_tgt})
+${_tgt}: ${META_DEPS}
+.endif
+.endfor
+.endif

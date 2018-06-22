@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2013 Peter Wemm
  * All rights reserved.
  *
@@ -27,7 +29,7 @@
  */
 
 /*
- * Interal prototypes for our back-end functions.
+ * Internal prototypes for our back-end functions.
  */
 size_t	__bsd___iconv(iconv_t, char **, size_t *, char **,
 		size_t *, __uint32_t, size_t *);

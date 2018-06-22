@@ -128,7 +128,8 @@ dt_create(const char *socket_path, unsigned num_workers)
 	struct fstrm_writer *fw;
 	struct fstrm_writer_options *fwopt;
 
-	verbose(VERB_OPS, "opening dnstap socket %s", socket_path);
+	verbose(VERB_OPS, "attempting to connect to dnstap socket %s",
+		socket_path);
 	log_assert(socket_path != NULL);
 	log_assert(num_workers > 0);
 
@@ -474,7 +475,7 @@ dt_msg_send_outside_response(struct dt_env *env,
 			return;
 		dt_msg_init(env, &dm, DNSTAP__MESSAGE__TYPE__FORWARDER_RESPONSE);
 	} else {
-		if (!env->log_resolver_query_messages)
+		if (!env->log_resolver_response_messages)
 			return;
 		dt_msg_init(env, &dm, DNSTAP__MESSAGE__TYPE__RESOLVER_RESPONSE);
 	}

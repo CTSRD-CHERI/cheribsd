@@ -11,8 +11,6 @@
 #define SINGLE_PRECISION
 #include "fp_lib.h"
 
-ARM_EABI_FNALIAS(f2ulz, fixunssfdi)
-
 #ifndef __SOFT_FP__
 /* Support for systems that have hardware floating-point; can set the invalid
  * flag as a side-effect of computation.
@@ -23,8 +21,8 @@ __fixunssfdi(float a)
 {
     if (a <= 0.0f) return 0;
     double da = a;
-    su_int high = da/0x1p32f;
-    su_int low = da - (double)high*0x1p32f;
+    su_int high = da / 4294967296.f;               /* da / 0x1p32f; */
+    su_int low = da - (double)high * 4294967296.f; /* high * 0x1p32f; */
     return ((du_int)high << 32) | low;
 }
 
@@ -43,3 +41,15 @@ __fixunssfdi(fp_t a) {
 }
 
 #endif
+
+#if defined(__ARM_EABI__)
+AEABI_RTABI du_int
+#if defined(__SOFT_FP__)
+__aeabi_f2ulz(fp_t a) {
+#else
+__aeabi_f2ulz(float a) {
+#endif
+  return __fixunssfdi(a);
+}
+#endif
+

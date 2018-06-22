@@ -1,6 +1,8 @@
 /*	$OpenBSD: dhclient.c,v 1.63 2005/02/06 17:10:13 krw Exp $	*/
 
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright 2004 Henning Brauer <henning@openbsd.org>
  * Copyright (c) 1995, 1996, 1997, 1998, 1999
  * The Internet Software Consortium.    All rights reserved.
@@ -60,6 +62,7 @@ __FBSDID("$FreeBSD$");
 #include "privsep.h"
 
 #include <sys/capsicum.h>
+#include <sys/endian.h>
 
 #include <net80211/ieee80211_freebsd.h>
 
@@ -82,6 +85,8 @@ __FBSDID("$FreeBSD$");
 #define	domainchar(c) ((c) > 0x20 && (c) < 0x7f)
 
 #define	CLIENT_PATH "PATH=/usr/bin:/usr/sbin:/bin:/sbin"
+
+cap_channel_t *capsyslog;
 
 time_t cur_time;
 time_t default_lease_time = 43200; /* 12 hours... */
@@ -107,7 +112,11 @@ struct pidfh *pidfile;
  */
 #define ASSERT_STATE(state_is, state_shouldbe) {}
 
-#define TIME_MAX 2147483647
+/*
+ * We need to check that the expiry, renewal and rebind times are not beyond
+ * the end of time (~2038 when a 32-bit time_t is being used).
+ */
+#define TIME_MAX        ((((time_t) 1 << (sizeof(time_t) * CHAR_BIT - 2)) - 1) * 2 + 1)
 
 int		log_priority;
 int		no_daemon;
@@ -132,13 +141,16 @@ int		 fork_privchld(int, int);
 	    ((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
 #define	ADVANCE(x, n) (x += ROUNDUP((n)->sa_len))
 
+/* Minimum MTU is 68 as per RFC791, p. 24 */
+#define MIN_MTU 68
+
 static time_t	scripttime;
 
 int
 findproto(char *cp, int n)
 {
 	struct sockaddr *sa;
-	int i;
+	unsigned i;
 
 	if (n == 0)
 		return -1;
@@ -168,7 +180,7 @@ struct sockaddr *
 get_ifa(char *cp, int n)
 {
 	struct sockaddr *sa;
-	int i;
+	unsigned i;
 
 	if (n == 0)
 		return (NULL);
@@ -183,7 +195,7 @@ get_ifa(char *cp, int n)
 	return (NULL);
 }
 
-struct iaddr defaddr = { 4 };
+struct iaddr defaddr = { .len = 4 };
 uint8_t curbssid[6];
 
 static void
@@ -225,7 +237,8 @@ routehandler(struct protocol *p)
 
 	n = read(routefd, &msg, sizeof(msg));
 	rtm = (struct rt_msghdr *)msg;
-	if (n < sizeof(rtm->rtm_msglen) || n < rtm->rtm_msglen ||
+	if (n < (ssize_t)sizeof(rtm->rtm_msglen) ||
+	    n < (ssize_t)rtm->rtm_msglen ||
 	    rtm->rtm_version != RTM_VERSION)
 		return;
 
@@ -337,6 +350,21 @@ die:
 	exit(1);
 }
 
+static void
+init_casper(void)
+{
+	cap_channel_t		*casper;
+
+	casper = cap_init();
+	if (casper == NULL)
+		error("unable to start casper");
+
+	capsyslog = cap_service_open(casper, "system.syslog");
+	cap_close(casper);
+	if (capsyslog == NULL)
+		error("unable to open system.syslog service");
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -348,9 +376,11 @@ main(int argc, char *argv[])
 	pid_t			 otherpid;
 	cap_rights_t		 rights;
 
+	init_casper();
+
 	/* Initially, log errors to stderr as well as to syslogd. */
-	openlog(__progname, LOG_PID | LOG_NDELAY, DHCPD_LOG_FACILITY);
-	setlogmask(LOG_UPTO(LOG_DEBUG));
+	cap_openlog(capsyslog, __progname, LOG_PID | LOG_NDELAY, DHCPD_LOG_FACILITY);
+	cap_setlogmask(capsyslog, LOG_UPTO(LOG_DEBUG));
 
 	while ((ch = getopt(argc, argv, "bc:dl:p:qu")) != -1)
 		switch (ch) {
@@ -510,7 +540,7 @@ main(int argc, char *argv[])
 
 	setproctitle("%s", ifi->name);
 
-	if (cap_enter() < 0 && errno != ENOSYS)
+	if (CASPER_SUPPORT && cap_enter() < 0 && errno != ENOSYS)
 		error("can't enter capability mode: %m");
 
 	if (immediate_daemon)
@@ -752,45 +782,60 @@ dhcpack(struct packet *packet)
 	cancel_timeout(send_request, ip);
 
 	/* Figure out the lease time. */
-	if (ip->client->new->options[DHO_DHCP_LEASE_TIME].data)
+        if (ip->client->config->default_actions[DHO_DHCP_LEASE_TIME] ==
+            ACTION_SUPERSEDE)
+		ip->client->new->expiry = getULong(
+		    ip->client->config->defaults[DHO_DHCP_LEASE_TIME].data);
+        else if (ip->client->new->options[DHO_DHCP_LEASE_TIME].data)
 		ip->client->new->expiry = getULong(
 		    ip->client->new->options[DHO_DHCP_LEASE_TIME].data);
 	else
 		ip->client->new->expiry = default_lease_time;
 	/* A number that looks negative here is really just very large,
-	   because the lease expiry offset is unsigned. */
-	if (ip->client->new->expiry < 0)
-		ip->client->new->expiry = TIME_MAX;
+	   because the lease expiry offset is unsigned. Also make sure that
+           the addition of cur_time below does not overflow (a 32 bit) time_t. */
+	if (ip->client->new->expiry < 0 ||
+            ip->client->new->expiry > TIME_MAX - cur_time)
+		ip->client->new->expiry = TIME_MAX - cur_time;
 	/* XXX should be fixed by resetting the client state */
 	if (ip->client->new->expiry < 60)
 		ip->client->new->expiry = 60;
 
-	/* Take the server-provided renewal time if there is one;
-	   otherwise figure it out according to the spec. */
-	if (ip->client->new->options[DHO_DHCP_RENEWAL_TIME].len)
+        /* Unless overridden in the config, take the server-provided renewal
+         * time if there is one. Otherwise figure it out according to the spec.
+         * Also make sure the renewal time does not exceed the expiry time.
+         */
+        if (ip->client->config->default_actions[DHO_DHCP_RENEWAL_TIME] ==
+            ACTION_SUPERSEDE)
+		ip->client->new->renewal = getULong(
+		    ip->client->config->defaults[DHO_DHCP_RENEWAL_TIME].data);
+        else if (ip->client->new->options[DHO_DHCP_RENEWAL_TIME].len)
 		ip->client->new->renewal = getULong(
 		    ip->client->new->options[DHO_DHCP_RENEWAL_TIME].data);
 	else
 		ip->client->new->renewal = ip->client->new->expiry / 2;
+        if (ip->client->new->renewal < 0 ||
+            ip->client->new->renewal > ip->client->new->expiry / 2)
+                ip->client->new->renewal = ip->client->new->expiry / 2;
 
 	/* Same deal with the rebind time. */
-	if (ip->client->new->options[DHO_DHCP_REBINDING_TIME].len)
+        if (ip->client->config->default_actions[DHO_DHCP_REBINDING_TIME] ==
+            ACTION_SUPERSEDE)
+		ip->client->new->rebind = getULong(
+		    ip->client->config->defaults[DHO_DHCP_REBINDING_TIME].data);
+        else if (ip->client->new->options[DHO_DHCP_REBINDING_TIME].len)
 		ip->client->new->rebind = getULong(
 		    ip->client->new->options[DHO_DHCP_REBINDING_TIME].data);
 	else
-		ip->client->new->rebind = ip->client->new->renewal +
-		    ip->client->new->renewal / 2 + ip->client->new->renewal / 4;
+		ip->client->new->rebind = ip->client->new->renewal / 4 * 7;
+	if (ip->client->new->rebind < 0 ||
+            ip->client->new->rebind > ip->client->new->renewal / 4 * 7)
+                ip->client->new->rebind = ip->client->new->renewal / 4 * 7;
 
-	ip->client->new->expiry += cur_time;
-	/* Lease lengths can never be negative. */
-	if (ip->client->new->expiry < cur_time)
-		ip->client->new->expiry = TIME_MAX;
-	ip->client->new->renewal += cur_time;
-	if (ip->client->new->renewal < cur_time)
-		ip->client->new->renewal = TIME_MAX;
-	ip->client->new->rebind += cur_time;
-	if (ip->client->new->rebind < cur_time)
-		ip->client->new->rebind = TIME_MAX;
+        /* Convert the time offsets into seconds-since-the-epoch */
+        ip->client->new->expiry += cur_time;
+        ip->client->new->renewal += cur_time;
+        ip->client->new->rebind += cur_time;
 
 	bind_lease(ip);
 }
@@ -798,8 +843,19 @@ dhcpack(struct packet *packet)
 void
 bind_lease(struct interface_info *ip)
 {
+	struct option_data *opt;
+
 	/* Remember the medium. */
 	ip->client->new->medium = ip->client->medium;
+
+	opt = &ip->client->new->options[DHO_INTERFACE_MTU];
+	if (opt->len == sizeof(u_int16_t)) {
+		u_int16_t mtu = be16dec(opt->data);
+		if (mtu < MIN_MTU)
+			warning("mtu size %u < %d: ignored", (unsigned)mtu, MIN_MTU);
+		else
+			interface_set_mtu_unpriv(privfd, mtu);
+	}
 
 	/* Write out the new lease. */
 	write_client_lease(ip, ip->client->new, 0);
@@ -1570,7 +1626,7 @@ make_discover(struct interface_info *ip, struct client_lease *lease)
 	}
 
 	/* set unique client identifier */
-	char client_ident[sizeof(struct hardware)];
+	char client_ident[sizeof(ip->hw_address.haddr) + 1];
 	if (!options[DHO_DHCP_CLIENT_IDENTIFIER]) {
 		int hwlen = (ip->hw_address.hlen < sizeof(client_ident)-1) ?
 				ip->hw_address.hlen : sizeof(client_ident)-1;
@@ -2004,7 +2060,8 @@ priv_script_write_params(char *prefix, struct client_lease *lease)
 {
 	struct interface_info *ip = ifi;
 	u_int8_t dbuf[1500], *dp = NULL;
-	int i, len;
+	int i;
+	size_t len;
 	char tbuf[128];
 
 	script_set_env(ip->client, prefix, "ip_address",
@@ -2154,12 +2211,14 @@ script_write_params(char *prefix, struct client_lease *lease)
 		pr_len = strlen(prefix);
 
 	hdr.code = IMSG_SCRIPT_WRITE_PARAMS;
-	hdr.len = sizeof(hdr) + sizeof(struct client_lease) +
-	    sizeof(size_t) + fn_len + sizeof(size_t) + sn_len +
-	    sizeof(size_t) + pr_len;
+	hdr.len = sizeof(hdr) + sizeof(*lease) +
+	    sizeof(fn_len) + fn_len + sizeof(sn_len) + sn_len +
+	    sizeof(pr_len) + pr_len;
 
-	for (i = 0; i < 256; i++)
-		hdr.len += sizeof(int) + lease->options[i].len;
+	for (i = 0; i < 256; i++) {
+		hdr.len += sizeof(lease->options[i].len);
+		hdr.len += lease->options[i].len;
+	}
 
 	scripttime = time(NULL);
 
@@ -2168,7 +2227,7 @@ script_write_params(char *prefix, struct client_lease *lease)
 
 	errs = 0;
 	errs += buf_add(buf, &hdr, sizeof(hdr));
-	errs += buf_add(buf, lease, sizeof(struct client_lease));
+	errs += buf_add(buf, lease, sizeof(*lease));
 	errs += buf_add(buf, &fn_len, sizeof(fn_len));
 	errs += buf_add(buf, lease->filename, fn_len);
 	errs += buf_add(buf, &sn_len, sizeof(sn_len));
@@ -2273,7 +2332,19 @@ void
 script_set_env(struct client_state *client, const char *prefix,
     const char *name, const char *value)
 {
-	int i, j, namelen;
+	int i, namelen;
+	size_t j;
+
+	/* No `` or $() command substitution allowed in environment values! */
+	for (j=0; j < strlen(value); j++)
+		switch (value[j]) {
+		case '`':
+		case '$':
+			warning("illegal character (%c) in value '%s'",
+			    value[j], value);
+			/* Ignore this option */
+			return;
+		}
 
 	namelen = strlen(name);
 
@@ -2311,16 +2382,6 @@ script_set_env(struct client_state *client, const char *prefix,
 	    strlen(value) + 1);
 	if (client->scriptEnv[i] == NULL)
 		error("script_set_env: no memory for variable assignment");
-
-	/* No `` or $() command substitution allowed in environment values! */
-	for (j=0; j < strlen(value); j++)
-		switch (value[j]) {
-		case '`':
-		case '$':
-			error("illegal character (%c) in value '%s'", value[j],
-			    value);
-			/* not reached */
-		}
 	snprintf(client->scriptEnv[i], strlen(prefix) + strlen(name) +
 	    1 + strlen(value) + 1, "%s%s=%s", prefix, name, value);
 }
@@ -2340,7 +2401,7 @@ script_flush_env(struct client_state *client)
 int
 dhcp_option_ev_name(char *buf, size_t buflen, struct option *option)
 {
-	int i;
+	size_t i;
 
 	for (i = 0; option->name[i]; i++) {
 		if (i + 1 == buflen)
@@ -2369,7 +2430,7 @@ go_daemon(void)
 	/* Stop logging to stderr... */
 	log_perror = 0;
 
-	if (daemon(1, 0) == -1)
+	if (daemon(1, 1) == -1)
 		error("daemon");
 
 	cap_rights_init(&rights);

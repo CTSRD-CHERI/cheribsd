@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2011-2016 Robert N. M. Watson
+ * Copyright (c) 2011-2018 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -41,8 +41,10 @@
 
 #if defined(CPU_CHERI128) || (defined(_MIPS_SZCAP) && (_MIPS_SZCAP == 128))
 #define	CHERICAP_SIZE   16
+#define	CHERICAP_SHIFT	4
 #else
 #define	CHERICAP_SIZE   32
+#define	CHERICAP_SHIFT	5
 #endif
 
 /*
@@ -60,121 +62,114 @@
 #define	CHERI_PERM_STORE_CAP			(1 << 5)	/* 0x00000020 */
 #define	CHERI_PERM_STORE_LOCAL_CAP		(1 << 6)	/* 0x00000040 */
 #define	CHERI_PERM_SEAL				(1 << 7)	/* 0x00000080 */
-#define	CHERI_PERM_RESERVED0			(1 << 8)	/* 0x00000100 */
-#define	CHERI_PERM_RESERVED1			(1 << 9)	/* 0x00000200 */
-
-/*
- * 256-bit CHERI has multiple exception-handling permissions, whereas 128-bit
- * CHERI has a single exception-handling permission.
- *
- * XXXRW: It would be nice to reconcile these lists in the future, as it's not
- * clear we need this level of granularity on 256-bit CHERI.
- */
-#define	CHERI256_PERM_ACCESS_EPCC		(1 << 10)	/* 0x00000400 */
-#define	CHERI256_PERM_ACCESS_KDC		(1 << 11)	/* 0x00000800 */
-#define	CHERI256_PERM_ACCESS_KCC		(1 << 12)	/* 0x00001000 */
-#define	CHERI256_PERM_ACCESS_KR1C		(1 << 13)	/* 0x00002000 */
-#define	CHERI256_PERM_ACCESS_KR2C		(1 << 14)	/* 0x00004000 */
-
-#define	CHERI128_PERM_ACCESS_SYSTEM_REGISTERS	(1 << 10)	/* 0x00000400 */
+#define	CHERI_PERM_CCALL			(1 << 8)	/* 0x00000100 */
+#define	CHERI_PERM_UNSEAL			(1 << 9)	/* 0x00000200 */
+#define	CHERI_PERM_SYSTEM_REGS			(1 << 10)	/* 0x00000400 */
 
 /*
  * User-defined permission bits.
  *
- * 256-bit CHERI has a substantially larger number of user-defined
+ * 256-bit CHERI has a substantially larger number of software-defined
  * permissions.
  */
-#define	CHERI256_PERM_USER0			(1 << 15)	/* 0x00008000 */
-#define	CHERI256_PERM_USER1			(1 << 16)	/* 0x00010000 */
-#define	CHERI256_PERM_USER2			(1 << 17)	/* 0x00020000 */
-#define	CHERI256_PERM_USER3			(1 << 18)	/* 0x00040000 */
-#define	CHERI256_PERM_USER4			(1 << 19)	/* 0x00080000 */
-#define	CHERI256_PERM_USER5			(1 << 20)	/* 0x00100000 */
-#define	CHERI256_PERM_USER6			(1 << 21)	/* 0x00200000 */
-#define	CHERI256_PERM_USER7			(1 << 22)	/* 0x00400000 */
-#define	CHERI256_PERM_USER8			(1 << 23)	/* 0x00800000 */
-#define	CHERI256_PERM_USER9			(1 << 24)	/* 0x01000000 */
-#define	CHERI256_PERM_USER10			(1 << 25)	/* 0x02000000 */
-#define	CHERI256_PERM_USER11			(1 << 26)	/* 0x04000000 */
-#define	CHERI256_PERM_USER12			(1 << 27)	/* 0x08000000 */
-#define	CHERI256_PERM_USER13			(1 << 28)	/* 0x10000000 */
-#define	CHERI256_PERM_USER14			(1 << 29)	/* 0x20000000 */
-#define	CHERI256_PERM_USER15			(1 << 30)	/* 0x40000000 */
+#define	CHERI256_PERM_SW0			(1 << 15)	/* 0x00008000 */
+#define	CHERI256_PERM_SW1			(1 << 16)	/* 0x00010000 */
+#define	CHERI256_PERM_SW2			(1 << 17)	/* 0x00020000 */
+#define	CHERI256_PERM_SW3			(1 << 18)	/* 0x00040000 */
+#define	CHERI256_PERM_SW4			(1 << 19)	/* 0x00080000 */
+#define	CHERI256_PERM_SW5			(1 << 20)	/* 0x00100000 */
+#define	CHERI256_PERM_SW6			(1 << 21)	/* 0x00200000 */
+#define	CHERI256_PERM_SW7			(1 << 22)	/* 0x00400000 */
+#define	CHERI256_PERM_SW8			(1 << 23)	/* 0x00800000 */
+#define	CHERI256_PERM_SW9			(1 << 24)	/* 0x01000000 */
+#define	CHERI256_PERM_SW10			(1 << 25)	/* 0x02000000 */
+#define	CHERI256_PERM_SW11			(1 << 26)	/* 0x04000000 */
+#define	CHERI256_PERM_SW12			(1 << 27)	/* 0x08000000 */
+#define	CHERI256_PERM_SW13			(1 << 28)	/* 0x10000000 */
+#define	CHERI256_PERM_SW14			(1 << 29)	/* 0x20000000 */
+#define	CHERI256_PERM_SW15			(1 << 30)	/* 0x40000000 */
 
-#define	CHERI128_PERM_USER0			(1 << 15)	/* 0x00008000 */
-#define	CHERI128_PERM_USER1			(1 << 16)	/* 0x00010000 */
-#define	CHERI128_PERM_USER2			(1 << 17)	/* 0x00020000 */
-#define	CHERI128_PERM_USER3			(1 << 18)	/* 0x00040000 */
+#define	CHERI128_PERM_SW0			(1 << 15)	/* 0x00008000 */
+#define	CHERI128_PERM_SW1			(1 << 16)	/* 0x00010000 */
+#define	CHERI128_PERM_SW2			(1 << 17)	/* 0x00020000 */
+#define	CHERI128_PERM_SW3			(1 << 18)	/* 0x00040000 */
 
 #if (CHERICAP_SIZE == 32)
-#define	CHERI_PERM_USER0	CHERI256_PERM_USER0
-#define	CHERI_PERM_USER1	CHERI256_PERM_USER1
-#define	CHERI_PERM_USER2	CHERI256_PERM_USER2
-#define	CHERI_PERM_USER3	CHERI256_PERM_USER3
-#define	CHERI_PERM_USER4	CHERI256_PERM_USER4
-#define	CHERI_PERM_USER5	CHERI256_PERM_USER5
-#define	CHERI_PERM_USER6	CHERI256_PERM_USER6
-#define	CHERI_PERM_USER7	CHERI256_PERM_USER7
-#define	CHERI_PERM_USER8	CHERI256_PERM_USER8
-#define	CHERI_PERM_USER9	CHERI256_PERM_USER9
-#define	CHERI_PERM_USER10	CHERI256_PERM_USER10
-#define	CHERI_PERM_USER11	CHERI256_PERM_USER11
-#define	CHERI_PERM_USER12	CHERI256_PERM_USER12
-#define	CHERI_PERM_USER13	CHERI256_PERM_USER13
-#define	CHERI_PERM_USER14	CHERI256_PERM_USER14
-#define	CHERI_PERM_USER15	CHERI256_PERM_USER15
+#define	CHERI_PERM_SW0		CHERI256_PERM_SW0
+#define	CHERI_PERM_SW1		CHERI256_PERM_SW1
+#define	CHERI_PERM_SW2		CHERI256_PERM_SW2
+#define	CHERI_PERM_SW3		CHERI256_PERM_SW3
+#define	CHERI_PERM_SW4		CHERI256_PERM_SW4
+#define	CHERI_PERM_SW5		CHERI256_PERM_SW5
+#define	CHERI_PERM_SW6		CHERI256_PERM_SW6
+#define	CHERI_PERM_SW7		CHERI256_PERM_SW7
+#define	CHERI_PERM_SW8		CHERI256_PERM_SW8
+#define	CHERI_PERM_SW9		CHERI256_PERM_SW9
+#define	CHERI_PERM_SW10		CHERI256_PERM_SW10
+#define	CHERI_PERM_SW11		CHERI256_PERM_SW11
+#define	CHERI_PERM_SW12		CHERI256_PERM_SW12
+#define	CHERI_PERM_SW13		CHERI256_PERM_SW13
+#define	CHERI_PERM_SW14		CHERI256_PERM_SW14
+#define	CHERI_PERM_SW15		CHERI256_PERM_SW15
 #else /* (!(CHERICAP_SIZE == 32)) */
-#define	CHERI_PERM_USER0	CHERI128_PERM_USER0
-#define	CHERI_PERM_USER1	CHERI128_PERM_USER1
-#define	CHERI_PERM_USER2	CHERI128_PERM_USER2
-#define	CHERI_PERM_USER3	CHERI128_PERM_USER3
+#define	CHERI_PERM_SW0		CHERI128_PERM_SW0
+#define	CHERI_PERM_SW1		CHERI128_PERM_SW1
+#define	CHERI_PERM_SW2		CHERI128_PERM_SW2
+#define	CHERI_PERM_SW3		CHERI128_PERM_SW3
 #endif /* (!(CHERICAP_SIZE == 32)) */
 
 /*
- * The kernel snags one for the user-defined permissions for the purposes of
- * authorising system calls from $pcc.  This is a bit of an oddity: normally,
- * we check permissions on data capabilities, not code capabilities, but
- * aligns with 'privilege' checks: e.g., $epcc access.  We may wish to switch
- * to another model, such as having userspace register one or more class
- * capabilities as suitable for privilege.
+ * The kernel snags one for the software-defined permissions for the purposes
+ * of authorising system calls from $pcc.  This is a bit of an oddity:
+ * normally, we check permissions on data capabilities, not code capabilities,
+ * but aligns with 'privilege' checks: e.g., $epcc access.  We may wish to
+ * switch to another model, such as having userspace register one or more
+ * class capabilities as suitable for system-call use.
  */
-#define	CHERI_PERM_SYSCALL			CHERI_PERM_USER0
+#define	CHERI_PERM_SYSCALL			CHERI_PERM_SW0
+
+/*
+ * Use another software-defined permission to restrict the ability to change
+ * the page mapping underlying a capability.  This can't be the same
+ * permission bit as CHERI_PERM_SYSCALL because $pcc should not confer the
+ * right rewrite or remap executable memory.
+ */
+#define	CHERI_PERM_CHERIABI_VMMAP		CHERI_PERM_SW1
 
 /*
  * Macros defining initial permission sets for various scenarios; details
  * depend on the permissions available on 256-bit or 128-bit CHERI:
  *
- * CHERI_PERM_USER_PRIVS: Mask of all available user-defined permissions
- * CHERI_PERM_PRIV: Mask of all available hardware-defined permissions
+ * CHERI_PERMS_SWALL: Mask of all available software-defined permissions
+ * CHERI_PERMS_HWALL: Mask of all available hardware-defined permissions
  */
 #if (CHERICAP_SIZE == 32)
-#define	CHERI_PERM_USER_PRIVS						\
-	(CHERI_PERM_USER0 | CHERI_PERM_USER1 | CHERI_PERM_USER2 |	\
-	CHERI_PERM_USER3 | CHERI_PERM_USER4 | CHERI_PERM_USER5 |	\
-	CHERI_PERM_USER6 | CHERI_PERM_USER7 | CHERI_PERM_USER8 |	\
-	CHERI_PERM_USER9 | CHERI_PERM_USER10 | CHERI_PERM_USER11 |	\
-	CHERI_PERM_USER12 | CHERI_PERM_USER13 | CHERI_PERM_USER14 |	\
-	CHERI_PERM_USER15)
-
-#define	CHERI_PERM_PRIV							\
-	(CHERI_PERM_GLOBAL | CHERI_PERM_EXECUTE |			\
-	CHERI_PERM_LOAD | CHERI_PERM_STORE | CHERI_PERM_LOAD_CAP |	\
-	CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP |		\
-	CHERI_PERM_SEAL | CHERI_PERM_RESERVED0 | CHERI_PERM_RESERVED1 |	\
-	CHERI_PERM_ACCESS_EPCC | CHERI_PERM_ACCESS_KDC |		\
-	CHERI_PERM_ACCESS_KCC | CHERI_PERM_ACCESS_KR1C |		\
-	CHERI_PERM_ACCESS_KR2C | CHERI_PERM_USER_PRIVS)
+#define	CHERI_PERMS_SWALL						\
+	(CHERI_PERM_SW0 | CHERI_PERM_SW1 | CHERI_PERM_SW2 |		\
+	CHERI_PERM_SW3 | CHERI_PERM_SW4 | CHERI_PERM_SW5 |		\
+	CHERI_PERM_SW6 | CHERI_PERM_SW7 | CHERI_PERM_SW8 |		\
+	CHERI_PERM_SW9 | CHERI_PERM_SW10 | CHERI_PERM_SW11 |		\
+	CHERI_PERM_SW12 | CHERI_PERM_SW13 | CHERI_PERM_SW14 |		\
+	CHERI_PERM_SW15)
 #else /* (!(CHERICAP_SIZE == 32)) */
-#define	CHERI_PERM_USER_PRIVS						\
-	(CHERI_PERM_USER0 | CHERI_PERM_USER1 | CHERI_PERM_USER2 |	\
-	CHERI_PERM_USER3)
+#define	CHERI_PERMS_SWALL						\
+	(CHERI_PERM_SW0 | CHERI_PERM_SW1 | CHERI_PERM_SW2 |		\
+	CHERI_PERM_SW3)
+#endif /* (!(CHERICAP_SIZE == 32)) */
 
-#define	CHERI_PERM_PRIV							\
+#define	CHERI_PERMS_HWALL						\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_EXECUTE |			\
 	CHERI_PERM_LOAD | CHERI_PERM_STORE | CHERI_PERM_LOAD_CAP |	\
 	CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP |		\
-	CHERI_PERM_SEAL | CHERI_PERM_RESERVED0 | CHERI_PERM_RESERVED1)
-#endif /* (!(CHERICAP_SIZE == 32)) */
+	CHERI_PERM_SEAL | CHERI_PERM_CCALL | CHERI_PERM_UNSEAL |	\
+	CHERI_PERM_SYSTEM_REGS)
+
+/*
+ * Root "object-type" capability for the kernel.  This can be used neither as
+ * a data nor code capability.
+ */
+#define	CHERI_PERM_KERN_TYPE	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL |	\
+	CHERI_PERM_UNSEAL)
 
 /*
  * Basic userspace permission mask; CHERI_PERM_EXECUTE will be added for
@@ -183,64 +178,133 @@
  *
  * No variation required between 256-bit and 128-bit CHERI.
  */
-#define	CHERI_PERM_USER							\
+#define	CHERI_PERMS_USERSPACE						\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |	\
-	CHERI_PERM_USER_PRIVS)
+	CHERI_PERM_CCALL | (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP))
 
-#define	CHERI_PERM_USER_CODE	(CHERI_PERM_USER | CHERI_PERM_EXECUTE)
-#define	CHERI_PERM_USER_DATA	(CHERI_PERM_USER | CHERI_PERM_STORE |	\
+#define	CHERI_PERMS_USERSPACE_CODE					\
+	(CHERI_PERMS_USERSPACE | CHERI_PERM_EXECUTE)
+
+#define	CHERI_PERMS_USERSPACE_SEALCAP					\
+	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL | CHERI_PERM_UNSEAL)
+
+/*
+ * _DATA includes _VMMAP to support MAP_CHERI_DDC.  This should be removed
+ * when all consumers are migrated.  Current consumers:
+ *  - TLS mini-allocator
+ */
+#define	CHERI_PERMS_USERSPACE_DATA					\
+				(CHERI_PERMS_USERSPACE |		\
+				CHERI_PERM_STORE |			\
 				CHERI_PERM_STORE_CAP |			\
-				CHERI_PERM_STORE_LOCAL_CAP)
+				CHERI_PERM_STORE_LOCAL_CAP |		\
+				CHERI_PERM_CHERIABI_VMMAP)
 
 /*
- * Root "object-type" capability -- queried via sysarch(2) when libcheri needs
- * to allocate types.  This can be used neither as a data nor code capability.
- *
- * No variation required between 256-bit and 128-bit CHERI.
+ * Corresponding permission masks for kernel code and data; these are
+ * currently a bit broad, and should be narrowed over time as the kernel
+ * becomes more capability-aware.
  */
-#define	CHERI_PERM_USER_TYPE	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL)
+#define	CHERI_PERMS_KERNEL						\
+	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)	\
+
+#define	CHERI_PERMS_KERNEL_CODE						\
+	(CHERI_PERMS_KERNEL | CHERI_PERM_EXECUTE)
+
+#define	CHERI_PERMS_KERNEL_DATA						\
+	(CHERI_PERMS_KERNEL | CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |	\
+	CHERI_PERM_STORE_LOCAL_CAP)
+
+#define	CHERI_PERMS_KERNEL_SEALCAP					\
+	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL | CHERI_PERM_UNSEAL)
 
 /*
- * Definition for kernel "privileged" capability able to name the entire
- * address space.
- *
- * No variation required between 256-bit and 128-bit CHERI.
+ * The CHERI object-type space is split between userspace and kernel,
+ * permitting kernel object references to be delegated to userspace (if
+ * desired).  Currently, we provide 23 bits of namespace to each, with the top
+ * bit set for kernel object types, but it is easy to imagine other splits.
+ * User and kernel software should be written so as to not place assumptions
+ * about the specific values used here, as they may change.
  */
-#define	CHERI_CAP_PRIV_PERMS		CHERI_PERM_PRIV
-#define	CHERI_CAP_PRIV_OTYPE		0x0
-#define	CHERI_CAP_PRIV_BASE		0x0
-#define	CHERI_CAP_PRIV_LENGTH		0xffffffffffffffff
-#define	CHERI_CAP_PRIV_OFFSET		0x0
+#define	CHERI_OTYPE_USER_MIN	(0)
+#define	CHERI_OTYPE_USER_MAX	((1 << 23) - 1)
+#define	CHERI_OTYPE_KERN_MIN	(1 << 23)
+#define	CHERI_OTYPE_KERN_MAX	((1 << 24) - 1)
+
+#define	CHERI_OTYPE_KERN_FLAG	(1 << 23)
+#define	CHERI_OTYPE_ISKERN(x)	(((x) & CHERI_OTYPE_KERN_FLAG) != 0)
+#define	CHERI_OTYPE_ISUSER(x)	(!(CHERI_OTYPE_ISKERN(x)))
+
+/*
+ * When performing a userspace-to-userspace CCall, capability flow-control
+ * checks normally prevent local capabilities from being delegated.  This can
+ * be disabled on call (but not return) by using an object type with the 22nd
+ * bit set -- combined with a suitable selector on the CCall instruction to
+ * ensure that this behaviour is intended.
+ */
+#define	CHERI_OTYPE_LOCALOK_SHIFT	(22)
+#define	CHERI_OTYPE_LOCALOK_FLAG	(1 << CHERI_OTYPE_LOCALOK_SHIFT
+#define	CHERI_OTYPE_IS_LOCALOK(x)	(((x) & CHERI_OTYPE_LOCALOK_FLAG) != 0)
+
+/*
+ * Definition for a highly privileged kernel capability able to name the
+ * entire address space, and suitable to derive all other kernel-related
+ * capabilities from, including sealing capabilities.
+ */
+#define	CHERI_CAP_KERN_PERMS						\
+	(CHERI_PERMS_SWALL | CHERI_PERMS_HWALL)
+#define	CHERI_CAP_KERN_BASE		0x0
+#define	CHERI_CAP_KERN_LENGTH		0xffffffffffffffff
+#define	CHERI_CAP_KERN_OFFSET		0x0
 
 /*
  * Definition for userspace "unprivileged" capability able to name the user
  * portion of the address space.
- *
- * No variation required between 256-bit and 128-bit CHERI.
  */
-#define	CHERI_CAP_USER_CODE_PERMS	CHERI_PERM_USER_CODE
-#define	CHERI_CAP_USER_CODE_OTYPE	0x0
-#define	CHERI_CAP_USER_CODE_BASE	MIPS_XUSEG_START
-#define	CHERI_CAP_USER_CODE_LENGTH	(MIPS_XUSEG_END - MIPS_XUSEG_START)
+#define	CHERI_CAP_USER_CODE_PERMS	CHERI_PERMS_USERSPACE_CODE
+#define	CHERI_CAP_USER_CODE_BASE	VM_MINUSER_ADDRESS
+#define	CHERI_CAP_USER_CODE_LENGTH	(VM_MAXUSER_ADDRESS - VM_MINUSER_ADDRESS)
 #define	CHERI_CAP_USER_CODE_OFFSET	0x0
 
-#define	CHERI_CAP_USER_DATA_PERMS	CHERI_PERM_USER_DATA
-#define	CHERI_CAP_USER_DATA_OTYPE	0x0
-#define	CHERI_CAP_USER_DATA_BASE	MIPS_XUSEG_START
-#define	CHERI_CAP_USER_DATA_LENGTH	(MIPS_XUSEG_END - MIPS_XUSEG_START)
+#define	CHERI_CAP_USER_DATA_PERMS	CHERI_PERMS_USERSPACE_DATA
+#define	CHERI_CAP_USER_DATA_BASE	VM_MINUSER_ADDRESS
+#define	CHERI_CAP_USER_DATA_LENGTH	(VM_MAXUSER_ADDRESS - VM_MINUSER_ADDRESS)
 #define	CHERI_CAP_USER_DATA_OFFSET	0x0
 
-#define	CHERI_CAP_USER_TYPE_PERMS	CHERI_PERM_USER_TYPE
-#define	CHERI_CAP_USER_TYPE_OTYPE	0x0
-#define	CHERI_CAP_USER_TYPE_BASE	MIPS_XUSEG_START
-#define	CHERI_CAP_USER_TYPE_LENGTH	(MIPS_XUSEG_END - MIPS_XUSEG_START)
-#define	CHERI_CAP_USER_TYPE_OFFSET	0x0
+#define	CHERI_CAP_USER_MMAP_PERMS					\
+	(CHERI_PERMS_USERSPACE_DATA | CHERI_PERMS_USERSPACE_CODE |	\
+	CHERI_PERM_CHERIABI_VMMAP)
+/* Start at 256MB to avoid low PC values in sandboxes */
+#define	CHERI_CAP_USER_MMAP_BASE	(VM_MINUSER_ADDRESS + 0x10000000)
+#define	CHERI_CAP_USER_MMAP_LENGTH					\
+    (VM_MAXUSER_ADDRESS + CHERI_CAP_USER_MMAP_BASE)
+#define	CHERI_CAP_USER_MMAP_OFFSET	0x0
+
+/*
+ * Root sealing capability for all userspace object capabilities.  This is
+ * made available to userspace via a sysarch(2).
+ */
+#define	CHERI_SEALCAP_USERSPACE_PERMS	CHERI_PERMS_USERSPACE_SEALCAP
+#define	CHERI_SEALCAP_USERSPACE_BASE	CHERI_OTYPE_USER_MIN
+#define	CHERI_SEALCAP_USERSPACE_LENGTH	\
+    (CHERI_OTYPE_USER_MAX - CHERI_OTYPE_USER_MIN + 1)
+#define	CHERI_SEALCAP_USERSPACE_OFFSET	0x0
+
+/*
+ * Root sealing capability for kernel managed objects.
+ */
+#define	CHERI_SEALCAP_KERNEL_PERMS	CHERI_PERMS_KERNEL_SEALCAP
+#define CHERI_SEALCAP_KERNEL_BASE	CHERI_OTYPE_KERN_MIN
+#define	CHERI_SEALCAP_KERNEL_LENGTH	\
+    (CHERI_OTYPE_KERN_MAX - CHERI_OTYPE_KERN_MIN + 1)
+#define	CHERI_SEALCAP_KERNEL_OFFSET	0x0
 
 /*
  * A blend of hardware and software allocation of capability registers.
  * Ideally, this list wouldn't exist here, but be purely in the assembler.
  */
 #define	CHERI_CR_C0	0	/*   MIPS fetch/load/store capability. */
+#define	CHERI_CR_DDC	CHERI_CR_C0
 #define	CHERI_CR_C1	1
 #define	CHERI_CR_C2	2
 #define	CHERI_CR_C3	3
@@ -252,6 +316,7 @@
 #define	CHERI_CR_C9	9
 #define	CHERI_CR_C10	10
 #define	CHERI_CR_C11	11
+#define	CHERI_CR_STC	CHERI_CR_C11
 #define	CHERI_CR_C12	12
 #define	CHERI_CR_C13	13
 #define	CHERI_CR_C14	14
@@ -266,57 +331,22 @@
 #define	CHERI_CR_C23	23
 #define	CHERI_CR_C24	24
 #define	CHERI_CR_C25	25
-#define	CHERI_CR_IDC	26
-#define	CHERI_CR_KR1C	27
-#define	CHERI_CR_KR2C	28
-#define	CHERI_CR_KCC	29
-#define	CHERI_CR_KDC	30
-#define	CHERI_CR_EPCC	31
+#define	CHERI_CR_C26	26
+#define	CHERI_CR_IDC	CHERI_CR_C26
+#define	CHERI_CR_C27	27
+#define	CHERI_CR_KR1C	CHERI_CR_C27
+#define	CHERI_CR_C28	28
+#define	CHERI_CR_KR2C	CHERI_CR_C28
+#define	CHERI_CR_C29	29
+#define	CHERI_CR_KCC	CHERI_CR_C29
+#define	CHERI_CR_C30	30
+#define	CHERI_CR_KDC	CHERI_CR_C30
+#define	CHERI_CR_C31	31
+#define	CHERI_CR_EPCC	CHERI_CR_C31
 
-#define	CHERI_CR_CTEMP0	CHERI_CR_C11	/* C capability manipulation. */
-#define	CHERI_CR_CTEMP1	CHERI_CR_C12	/* C capability manipulation. */
+#define	CHERI_CR_CTEMP0	CHERI_CR_C13	/* C capability manipulation. */
+#define	CHERI_CR_CTEMP1	CHERI_CR_C14	/* C capability manipulation. */
 #define	CHERI_CR_SEC0	CHERI_CR_KR2C	/* Saved $c0 in exception handler. */
-
-/*
- * Offsets of registers in struct cheri_frame when treated as an array of
- * capabilities -- must match the definition in cheri.h.
- */
-#define	CHERIFRAME_OFF_C0	0
-#define	CHERIFRAME_OFF_C1	1
-#define	CHERIFRAME_OFF_C2	2
-#define	CHERIFRAME_OFF_C3	3
-#define	CHERIFRAME_OFF_C4	4
-#define	CHERIFRAME_OFF_C5	5
-#define	CHERIFRAME_OFF_C6	6
-#define	CHERIFRAME_OFF_C7	7
-#define	CHERIFRAME_OFF_C8	8
-#define	CHERIFRAME_OFF_C9	9
-#define	CHERIFRAME_OFF_C10	10
-#define	CHERIFRAME_OFF_C11	11
-#define	CHERIFRAME_OFF_C12	12
-#define	CHERIFRAME_OFF_C13	13
-#define	CHERIFRAME_OFF_C14	14
-#define	CHERIFRAME_OFF_C15	15
-#define	CHERIFRAME_OFF_C16	16
-#define	CHERIFRAME_OFF_C17	17
-#define	CHERIFRAME_OFF_C18	18
-#define	CHERIFRAME_OFF_C19	19
-#define	CHERIFRAME_OFF_C20	20
-#define	CHERIFRAME_OFF_C21	21
-#define	CHERIFRAME_OFF_C22	22
-#define	CHERIFRAME_OFF_C23	23
-#define	CHERIFRAME_OFF_C24	24
-#define	CHERIFRAME_OFF_C25	25
-#define	CHERIFRAME_OFF_IDC	26
-#define	CHERIFRAME_OFF_PCC	27	/* NB: Not register $c27! */
-
-/*
- * Offset of the capability cause register in struct cheri_kframe -- must
- * match the definition in cheri.h.  Note that although this constant is sized
- * based on capabilities, in fact the cause register is 64-bit.  We may want
- * to revisit this if we add more 64-bit values.
- */
-#define	CHERIFRAME_OFF_CAPCAUSE	28
 
 /*
  * Offsets of registers in struct cheri_kframe -- must match the definition in
@@ -333,15 +363,7 @@
 
 /*
  * List of CHERI capability cause code constants, which are used to
- * disambiguate various CP2 exceptions.
- *
- * XXXRW: I wonder if we really need different permissions for each exception-
- * handling capability.
- *
- * XXXRW: Curiously non-contiguous.
- *
- * XXXRW: KDC is listed as 0x1a in the spec, which collides with EPCC.  Not
- * sure what is actually used.
+ * characterise various CP2 exceptions.
  */
 #define	CHERI_EXCCODE_NONE		0x00
 #define	CHERI_EXCCODE_LENGTH		0x01
@@ -352,6 +374,7 @@
 #define	CHERI_EXCCODE_RETURN		0x06
 #define	CHERI_EXCCODE_UNDERFLOW		0x07
 #define	CHERI_EXCCODE_USER_PERM		0x08
+#define	CHERI_EXCCODE_PERM_USER		CHERI_EXCCODE_USER_PERM
 #define	CHERI_EXCCODE_TLBSTORE		0x09
 #define	CHERI_EXCCODE_IMPRECISE		0x0a
 #define	_CHERI_EXCCODE_RESERVED0b	0x0b
@@ -367,13 +390,13 @@
 #define	CHERI_EXCCODE_PERM_STORECAP	0x15
 #define	CHERI_EXCCODE_STORE_LOCALCAP	0x16
 #define	CHERI_EXCCODE_PERM_SEAL		0x17
-#define	_CHERI_EXCCODE_RESERVED18	0x18
-#define	_CHERI_EXCCODE_RESERVED19	0x19
-#define	CHERI_EXCCODE_ACCESS_EPCC	0x1a
-#define	CHERI_EXCCODE_ACCESS_KDC	0x1b	/* XXXRW */
-#define	CHERI_EXCCODE_ACCESS_KCC	0x1c
-#define	CHERI_EXCCODE_ACCESS_KR1C	0x1d
-#define	CHERI_EXCCODE_ACCESS_KR2C	0x1e
+#define	CHERI_EXCCODE_SYSTEM_REGS	0x18
+#define	CHERI_EXCCODE_PERM_CCALL	0x19
+#define	CHERI_EXCCODE_CCALL_IDC		0x1a
+#define	CHERI_EXCCODE_PERM_UNSEAL	0x1b
+#define	_CHERI_EXCCODE_RESERVED1c	0x1c
+#define	_CHERI_EXCCODE_RESERVED1d	0x1d
+#define	_CHERI_EXCCODE_RESERVED1e	0x1e
 #define	_CHERI_EXCCODE_RESERVED1f	0x1f
 
 /*
@@ -383,6 +406,8 @@
 #define	CHERI_EXCCODE_SW_LOCALARG	0x80	/* Non-global CCall argument. */
 #define	CHERI_EXCCODE_SW_LOCALRET	0x81	/* Non-global CReturn value. */
 #define	CHERI_EXCCODE_SW_CCALLREGS	0x82	/* Incorrect CCall registers. */
+#define	CHERI_EXCCODE_SW_OVERFLOW	0x83	/* Trusted stack overflow. */
+#define	CHERI_EXCCODE_SW_UNDERFLOW	0x84	/* Trusted stack underflow. */
 
 /*
  * How to turn the cause register into an exception code and register number.
@@ -402,16 +427,29 @@
 #else /* (!(CHERICAP_SIZE == 32)) */
 
 #define	CHERI_BASELEN_BITS	20
-#define	CHERI_SEAL_BASELEN_BITS	10
+#define	CHERI_SEAL_BASELEN_BITS	5
 #define	CHERI_SLOP_BITS		2
 #define	CHERI_ADDR_BITS		64
+#define	CHERI_SEAL_MIN_ALIGN	12
 
+/*
+ * Use __builtin_clzll() to implement flsll() on clang where emission of
+ * DCLZ instructions is correctly conditionalized.
+ */
+#ifdef __clang__
+#define	_flsll(x)	(64 - __builtin_clzll(x))
+#else
+#define	_flsll(x)	flsll(x)
+#endif
 #define	CHERI_ALIGN_SHIFT(l)						\
-    ((flsll(l) <= (CHERI_BASELEN_BITS - CHERI_SLOP_BITS)) ? 0ULL :	\
-    (flsll(l) - (CHERI_BASELEN_BITS - CHERI_SLOP_BITS)))
-#define	CHERI_SEAL_ALIGN_SHIFT(l)					\
-    ((flsll(l) <= (CHERI_SEAL_BASELEN_BITS - CHERI_SLOP_BITS)) ? 0ULL :	\
-    (flsll(l) - (CHERI_SEAL_BASELEN_BITS - CHERI_SLOP_BITS)))
+    ((_flsll(l) <= (CHERI_BASELEN_BITS - CHERI_SLOP_BITS)) ? 0ULL :	\
+    (_flsll(l) - (CHERI_BASELEN_BITS - CHERI_SLOP_BITS)))
+#define	_CHERI_SEAL_ALIGN_SHIFT(l)					\
+    ((_flsll(l) <= (CHERI_SEAL_BASELEN_BITS)) ? 0ULL :	\
+    (_flsll(l) - (CHERI_SEAL_BASELEN_BITS)))
+#define CHERI_SEAL_ALIGN_SHIFT(l)					\
+    (_CHERI_SEAL_ALIGN_SHIFT(l) < CHERI_SEAL_MIN_ALIGN ?		\
+     CHERI_SEAL_MIN_ALIGN : _CHERI_SEAL_ALIGN_SHIFT(l))
 #endif /* (!(CHERICAP_SIZE == 32)) */
 
 #define	CHERI_ALIGN_MASK(l)		~(~0ULL << CHERI_ALIGN_SHIFT(l))

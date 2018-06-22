@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
  * Copyright (C) 1995, 1996 TooLs GmbH.
  * All rights reserved.
@@ -46,7 +48,11 @@
 #endif
 
 #ifndef	MAXDSIZ
+#ifdef __powerpc64__
+#define	MAXDSIZ		(32UL*1024*1024*1024)	/* max data size */
+#else
 #define	MAXDSIZ		(1*1024*1024*1024)	/* max data size */
+#endif
 #endif
 
 #ifndef	DFLSSIZ
@@ -69,7 +75,11 @@
 #if !defined(LOCORE)
 #ifdef __powerpc64__
 #define	VM_MIN_ADDRESS		(0x0000000000000000UL)
+#ifdef AIM
 #define	VM_MAXUSER_ADDRESS	(0xfffffffffffff000UL)
+#else
+#define	VM_MAXUSER_ADDRESS	(0x7ffffffffffff000UL)
+#endif
 #define	VM_MAX_ADDRESS		(0xffffffffffffffffUL)
 #else
 #define	VM_MIN_ADDRESS		((vm_offset_t)0)
@@ -78,23 +88,29 @@
 #endif
 #define	SHAREDPAGE		(VM_MAXUSER_ADDRESS - PAGE_SIZE)
 #else /* LOCORE */
-#if !defined(__powerpc64__) && defined(BOOKE)
+#ifdef BOOKE
 #define	VM_MIN_ADDRESS		0
+#ifdef __powerpc64__
+#define	VM_MAXUSER_ADDRESS	0x7ffffffffffff000
+#else
 #define	VM_MAXUSER_ADDRESS	0x7ffff000
+#endif
 #endif
 #endif /* LOCORE */
 
 #define	FREEBSD32_SHAREDPAGE	(VM_MAXUSER_ADDRESS32 - PAGE_SIZE)
 #define	FREEBSD32_USRSTACK	FREEBSD32_SHAREDPAGE
 
-#ifdef AIM
-#define	KERNBASE		0x00100000UL	/* start of kernel virtual */
-
 #ifdef __powerpc64__
 #define	VM_MIN_KERNEL_ADDRESS		0xc000000000000000UL
 #define	VM_MAX_KERNEL_ADDRESS		0xc0000001c7ffffffUL
 #define	VM_MAX_SAFE_KERNEL_ADDRESS	VM_MAX_KERNEL_ADDRESS
-#else
+#endif
+
+#ifdef AIM
+#define	KERNBASE		0x00100100UL	/* start of kernel virtual */
+
+#ifndef __powerpc64__
 #define	VM_MIN_KERNEL_ADDRESS	((vm_offset_t)KERNEL_SR << ADDR_SR_SHFT)
 #define	VM_MAX_SAFE_KERNEL_ADDRESS (VM_MIN_KERNEL_ADDRESS + 2*SEGMENT_LENGTH -1)
 #define	VM_MAX_KERNEL_ADDRESS	(VM_MIN_KERNEL_ADDRESS + 3*SEGMENT_LENGTH - 1)
@@ -108,11 +124,19 @@
 
 #else /* Book-E */
 
+#ifdef __powerpc64__
+#ifndef LOCORE
+#define	KERNBASE	0xc000000000000000UL	/* start of kernel virtual */
+#else
+#define	KERNBASE	0xc000000000000000	/* start of kernel virtual */
+#endif
+#else
 #define	KERNBASE		0xc0000000	/* start of kernel virtual */
 
 #define	VM_MIN_KERNEL_ADDRESS	KERNBASE
-#define	VM_MAX_KERNEL_ADDRESS	0xf7ffffff
+#define	VM_MAX_KERNEL_ADDRESS	0xffffefff
 #define	VM_MAX_SAFE_KERNEL_ADDRESS	VM_MAX_KERNEL_ADDRESS
+#endif
 
 #endif /* AIM/E500 */
 

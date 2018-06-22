@@ -1,6 +1,8 @@
 /*	$NetBSD: xdr_mem.c,v 1.15 2000/01/22 22:19:18 mycroft Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2010, Oracle America, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -215,7 +217,7 @@ xdrmem_setpos(XDR *xdrs, u_int pos)
 static int32_t *
 xdrmem_inline_aligned(XDR *xdrs, u_int len)
 {
-	int32_t *buf = 0;
+	int32_t *buf = NULL;
 
 	if (xdrs->x_handy >= len) {
 		xdrs->x_handy -= len;

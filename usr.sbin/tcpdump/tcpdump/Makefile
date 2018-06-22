@@ -2,18 +2,25 @@
 
 .include <src.opts.mk>
 
-TCPDUMP_DISTDIR?= ${.CURDIR}/../../../contrib/tcpdump
+.if ${MK_CHERI_PURE} == "yes"
+WANT_CHERI=pure
+.endif
+
+TCPDUMP_DISTDIR?= ${SRCTOP}/contrib/tcpdump
 .PATH: ${TCPDUMP_DISTDIR}
 
 PROG=	tcpdump
 
-SRCS=	gmt2local.c \
+SRCS=	\
+	ascii_strcasecmp.c \
+	gmt2local.c \
 	machdep.c \
+	netdissect.c \
 	setsignal.c \
+	strtoaddr.c \
 	tcpdump.c \
-	util.c \
 	version.c
-CLEANFILES+=	version.c
+CLEANFILES+=	version.c ${MAN}
 
 .include "Makefile.print"
 
@@ -27,12 +34,13 @@ CFLAGS+=	-DLBL_ALIGN
 
 LIBADD=	l pcap
 .if ${MK_CASPER} != "no"
-LIBADD+=	capsicum
-CFLAGS+=-DHAVE_CAPSICUM
+LIBADD+=	casper
+LIBADD+=	cap_dns
+CFLAGS+=-DHAVE_CASPER
 .endif
 .if ${MK_OPENSSL} != "no"
 LIBADD+=	crypto
-CFLAGS+= -I${DESTDIR}/usr/include/openssl
+CFLAGS+= -I${SYSROOT:U${DESTDIR}}/usr/include/openssl
 CFLAGS+= -DHAVE_LIBCRYPTO -DHAVE_OPENSSL_EVP_H
 .endif
 
@@ -46,3 +54,9 @@ version.c: ${TCPDUMP_DISTDIR}/VERSION
 		> version.c
 
 .include <bsd.prog.mk>
+
+.for mp in ${MAN}
+${mp}: ${mp}.in
+	sed -e 's/@MAN_MISC_INFO@/7/g' -e 's/@MAN_FILE_FORMATS@/5/g' \
+		${.ALLSRC} > ${.TARGET}
+.endfor

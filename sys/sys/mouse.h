@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-1-Clause
+ *
  * Copyright (c) 1992, 1993 Erik Forsberg.
  * Copyright (c) 1996, 1997 Kazutaka YOKOTA
  * All rights reserved.
@@ -170,6 +172,7 @@ typedef struct synapticshw {
 #define MOUSE_MODEL_4DPLUS		12
 #define MOUSE_MODEL_SYNAPTICS		13
 #define	MOUSE_MODEL_TRACKPOINT		14
+#define	MOUSE_MODEL_ELANTECH		15
 
 typedef struct mousemode {
 	int protocol;		/* MOUSE_PROTO_XXX */
@@ -239,6 +242,9 @@ typedef struct mousevar {
 
 /* Synaptics Touchpad */
 #define MOUSE_SYNAPTICS_PACKETSIZE	6	/* '3' works better */
+
+/* Elantech Touchpad */
+#define MOUSE_ELANTECH_PACKETSIZE	6
 
 /* Microsoft Serial mouse data packet */
 #define MOUSE_MSS_PACKETSIZE	3

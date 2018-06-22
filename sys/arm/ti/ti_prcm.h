@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2010
  *	Ben Gray <ben.r.gray@gmail.com>.
  * All rights reserved.
@@ -158,6 +160,10 @@ typedef enum {
 
 	/* RTC module */
 	RTC_CLK = 1900,
+
+	/* McSPI */
+	SPI0_CLK = 2000,
+	SPI1_CLK,
 } clk_ident_t;
 
 /*

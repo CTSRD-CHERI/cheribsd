@@ -1,4 +1,4 @@
-/* $OpenBSD: myproposal.h,v 1.47 2015/07/10 06:21:53 markus Exp $ */
+/* $OpenBSD: myproposal.h,v 1.54 2016/09/28 16:33:07 djm Exp $ */
 /* $FreeBSD$ */
 
 /*
@@ -68,55 +68,62 @@
 #endif
 
 #ifdef HAVE_EVP_SHA256
-# define KEX_SHA256_METHODS \
-	"diffie-hellman-group-exchange-sha256,"
+# define KEX_SHA2_METHODS \
+	"diffie-hellman-group-exchange-sha256," \
+	"diffie-hellman-group16-sha512," \
+	"diffie-hellman-group18-sha512,"
+# define KEX_SHA2_GROUP14 \
+	"diffie-hellman-group14-sha256,"
 #define	SHA2_HMAC_MODES \
 	"hmac-sha2-256," \
 	"hmac-sha2-512,"
 #else
-# define KEX_SHA256_METHODS
+# define KEX_SHA2_METHODS
+# define KEX_SHA2_GROUP14
 # define SHA2_HMAC_MODES
 #endif
 
 #ifdef WITH_OPENSSL
 # ifdef HAVE_EVP_SHA256
-#  define KEX_CURVE25519_METHODS "curve25519-sha256@libssh.org,"
+#  define KEX_CURVE25519_METHODS \
+	"curve25519-sha256," \
+	"curve25519-sha256@libssh.org,"
 # else
 #  define KEX_CURVE25519_METHODS ""
 # endif
 #define KEX_COMMON_KEX \
 	KEX_CURVE25519_METHODS \
 	KEX_ECDH_METHODS \
-	KEX_SHA256_METHODS
+	KEX_SHA2_METHODS
 
 #define KEX_SERVER_KEX KEX_COMMON_KEX \
+	KEX_SHA2_GROUP14 \
 	"diffie-hellman-group14-sha1" \
 
 #define KEX_CLIENT_KEX KEX_COMMON_KEX \
 	"diffie-hellman-group-exchange-sha1," \
+	KEX_SHA2_GROUP14 \
 	"diffie-hellman-group14-sha1"
 
 #define	KEX_DEFAULT_PK_ALG	\
 	HOSTKEY_ECDSA_CERT_METHODS \
 	"ssh-ed25519-cert-v01@openssh.com," \
 	"ssh-rsa-cert-v01@openssh.com," \
-	"ssh-dss-cert-v01@openssh.com," \
 	HOSTKEY_ECDSA_METHODS \
 	"ssh-ed25519," \
-	"ssh-rsa," \
-	"ssh-dss"
+	"rsa-sha2-512," \
+	"rsa-sha2-256," \
+	"ssh-rsa"
 
 /* the actual algorithms */
 
 #define KEX_SERVER_ENCRYPT \
 	"chacha20-poly1305@openssh.com," \
 	"aes128-ctr,aes192-ctr,aes256-ctr" \
-	AESGCM_CIPHER_MODES
+	AESGCM_CIPHER_MODES \
+	",aes128-cbc,aes192-cbc,aes256-cbc"
 
-#define KEX_CLIENT_ENCRYPT KEX_SERVER_ENCRYPT "," \
-	"arcfour256,arcfour128," \
-	"aes128-cbc,3des-cbc,blowfish-cbc,cast128-cbc," \
-	"aes192-cbc,aes256-cbc,arcfour,rijndael-cbc@lysator.liu.se"
+#define KEX_CLIENT_ENCRYPT KEX_SERVER_ENCRYPT
 
 #define KEX_SERVER_MAC \
 	"umac-64-etm@openssh.com," \
@@ -130,20 +137,12 @@
 	"hmac-sha2-512," \
 	"hmac-sha1"
 
-#define KEX_CLIENT_MAC KEX_SERVER_MAC "," \
-	"hmac-md5-etm@openssh.com," \
-	"hmac-ripemd160-etm@openssh.com," \
-	"hmac-sha1-96-etm@openssh.com," \
-	"hmac-md5-96-etm@openssh.com," \
-	"hmac-md5," \
-	"hmac-ripemd160," \
-	"hmac-ripemd160@openssh.com," \
-	"hmac-sha1-96," \
-	"hmac-md5-96"
+#define KEX_CLIENT_MAC KEX_SERVER_MAC
 
-#else
+#else /* WITH_OPENSSL */
 
 #define KEX_SERVER_KEX		\
+	"curve25519-sha256," \
 	"curve25519-sha256@libssh.org"
 #define	KEX_DEFAULT_PK_ALG	\
 	"ssh-ed25519-cert-v01@openssh.com," \
@@ -169,7 +168,7 @@
 
 #endif /* WITH_OPENSSL */
 
-#define	KEX_DEFAULT_COMP	"none,zlib@openssh.com,zlib"
+#define	KEX_DEFAULT_COMP	"none,zlib@openssh.com"
 #define	KEX_DEFAULT_LANG	""
 
 #define KEX_CLIENT \

@@ -39,6 +39,7 @@
  * 27 user-context registers -- with names where appropriate.
  */
 #define	CHERI_REG_C0	$c0	/* MIPS legacy load/store capability. */
+#define	CHERI_REG_DDC	CHERI_REG_C0
 #define	CHERI_REG_C1	$c1
 #define	CHERI_REG_C2	$c2
 #define	CHERI_REG_C3	$c3
@@ -49,7 +50,8 @@
 #define	CHERI_REG_C8	$c8
 #define	CHERI_REG_C9	$c9
 #define	CHERI_REG_C10	$c10
-#define	CHERI_REG_C11	$c11
+#define	CHERI_REG_C11	$c11	/* Stack capability. */
+#define	CHERI_REG_STC	CHERI_REG_C11
 #define	CHERI_REG_C12	$c12
 #define	CHERI_REG_C13	$c13
 #define	CHERI_REG_C14	$c14
@@ -63,8 +65,9 @@
 #define	CHERI_REG_C22	$c22
 #define	CHERI_REG_C23	$c23
 #define	CHERI_REG_C24	$c24
-#define	CHERI_REG_C25	$c25	/* Notionally reserved for exception-use. */
-#define	CHERI_REG_IDC	$c26	/* Invoked data capability. */
+#define	CHERI_REG_C25	$c25
+#define	CHERI_REG_C26	$c26	/* Invoked data capability. */
+#define	CHERI_REG_IDC	CHERI_REG_C26
 
 /* 5 exception-context registers -- with names where appropriate. */
 #define	CHERI_REG_KR1C	$c27	/* Kernel exception handling capability (1). */
@@ -74,19 +77,20 @@
 #define	CHERI_REG_EPCC	$c31	/* Exception program counter capability. */
 
 /*
- * The kernel maintains a CHERI micro-ABI preserving two registers, $c11 and
- * $c12, for use by kernel threads.  Label them here for consistency.
+ * In kernel inline assembly, employee these two caller-save registers.  This
+ * means that we don't need to worry about preserving prior values -- as long
+ * as there is no direct use of a capability register in a function.
  */
-#define	CHERI_REG_CTEMP0	CHERI_REG_C11	/* C capability manipulation. */
-#define	CHERI_REG_CTEMP1	CHERI_REG_C12	/* C capability manipulation. */
+#define	CHERI_REG_CTEMP0	CHERI_REG_C13	/* C capability manipulation. */
+#define	CHERI_REG_CTEMP1	CHERI_REG_C14	/* C capability manipulation. */
 
 /*
- * Where to save the user $c0 during low-level exception handling.  Possibly
+ * Where to save the user $ddc during low-level exception handling.  Possibly
  * this should be an argument to macros rather than hard-coded in the macros.
  *
  * Ensure this is kept in sync with CHERI_CLEAR_CAPHI_SEC0.
  */
-#define	CHERI_REG_SEC0	CHERI_REG_KR2C	/* Saved $c0 in exception handling. */
+#define	CHERI_REG_SEC0	CHERI_REG_KR2C	/* Saved $ddc in exception handling. */
 
 /*
  * (Possibly) temporary ABI in which $c1 is the code argument to CCall, and
@@ -121,11 +125,10 @@
 	andi	reg, reg, MIPS_SR_KSU_USER;				\
 	beq	reg, $0, 64f;						\
 	nop;								\
-	/* Save user $c0; install kernel $c0. */			\
-	CHERI_ASM_CMOVE(CHERI_REG_SEC0, CHERI_REG_C0);			\
-	CHERI_ASM_CMOVE(CHERI_REG_C0, CHERI_REG_KDC);			\
-	/* cgetdefault	CHERI_REG_SEC0; */				\
-	/* csetdefault	CHERI_REG_KDC; */				\
+	/* Save user $ddc; install kernel $ddc. */			\
+	cgetdefault	CHERI_REG_SEC0;					\
+	cgetkdc		CHERI_REG_KDC;					\
+	csetdefault	CHERI_REG_KDC;					\
 64:
 
 /*
@@ -134,11 +137,11 @@
  * purposes of querying CP0 SR to determine whether the target is userspace
  * or the kernel.
  *
- * XXXCHERI: We assume that the caller will install an appropriate PCC for a
+ * XXXCHERI: We assume that the caller will install an appropriate $pcc for a
  * return to userspace, but that in the kernel case, we need to install a
- * kernel EPCC, potentially overwriting a previously present user EPCC from
+ * kernel $epcc, potentially overwriting a previously present user $epcc from
  * exception entry.  Once the kernel does multiple security domains, the
- * caller should manage EPCC in that case as well, and we can remove EPCC
+ * caller should manage $epcc in that case as well, and we can remove $epcc
  * assignment here.
  */
 #define	CHERI_EXCEPTION_RETURN(reg)					\
@@ -146,271 +149,158 @@
 	andi	reg, reg, MIPS_SR_KSU_USER;				\
 	beq	reg, $0, 65f;						\
 	nop;								\
+	/* If returning to userspace, restore saved user $ddc. */	\
+	csetdefault	CHERI_REG_SEC0; 				\
 	b	66f;							\
-	/* If returning to userspace, restore saved user $c0. */	\
-	CHERI_ASM_CMOVE(CHERI_REG_C0, CHERI_REG_SEC0); /* Branch-delay. */ \
-	/* csetdefault	CHERI_REG_SEC0; */	/* Branch-delay. */	\
+	/* TODO: clear c29-31 when returning to userspace		\
+	 * CClearHi (CHERI_CLEAR_CAPHI_KCC | CHERI_CLEAR_CAPHI_KDC	\
+	 * 	CHERI_CLEAR_CAPHI_EPCC); */				\
+	nop;								\
 65:									\
-	/* If returning to kernelspace, reinstall kernel code PCC. */	\
+	/* If returning to kernelspace, reinstall kernel code $pcc. */	\
 	/*								\
 	 * XXXRW: If requested PC has been adjusted by stack, similarly	\
 	 * adjust $epcc.offset, which will overwrite an earlier $epc	\
 	 * assignment.							\
 	 */								\
-	CHERI_ASM_CMOVE(CHERI_REG_EPCC, CHERI_REG_KCC);			\
 	MFC0	reg, MIPS_COP_0_EXC_PC;					\
-	csetoffset	CHERI_REG_EPCC, CHERI_REG_EPCC, reg;		\
-66:
+	CGetKCC		CHERI_REG_KR1C;					\
+	CSetOffset	CHERI_REG_KR1C, CHERI_REG_KR1C, reg;		\
+	CSetEPCC	CHERI_REG_KR1C;					\
+66:									\
+	/* Clear C27 and C28 before returning */			\
+	CClearHi (CHERI_CLEAR_CAPHI_KR1C | CHERI_CLEAR_CAPHI_KR2C);
 
 /*
- * Macros to save and restore CHERI capability registers registers from
- * pcb.pcb_cheriframe, individually and in quantity.  Explicitly use $kdc
- * ($30), which U_PCB_CHERIFRAME is assumed to be valid for, but that the
- * userspace $c0 has been set aside in CHERI_REG_SEC0.  This assumes previous
- * or further calls to CHERI_EXECPTION_ENTER() and CHERI_EXCEPTION_RETURN() to
- * manage $c0.
+ * Save and restore user CHERI state on an exception.  Assumes that $ddc has
+ * already been moved to $sec0, and that if we write $sec0, it will get moved
+ * to $ddc later.  Unlike kernel context switches, we both save and restore
+ * the capability cause register.
+ *
+ * XXXRW: Note hard-coding of SEC0 here.
+ *
+ * XXXRW: We should in fact also do this for the kernel version?
  */
-#define	SAVE_U_PCB_CHERIFRAME_CREG(creg, offs, base)		\
-	csc		creg, base, (CHERICAP_SIZE * offs)(CHERI_REG_KDC)
+#define	SAVE_CREGS_TO_PCB(pcb, treg)					\
+	SAVE_U_PCB_CREG(CHERI_REG_SEC0, DDC, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C1, C1, pcb);				\
+	SAVE_U_PCB_CREG(CHERI_REG_C2, C2, pcb);				\
+	SAVE_U_PCB_CREG(CHERI_REG_C3, C3, pcb);				\
+	SAVE_U_PCB_CREG(CHERI_REG_C4, C4, pcb);				\
+	SAVE_U_PCB_CREG(CHERI_REG_C5, C5, pcb);				\
+	SAVE_U_PCB_CREG(CHERI_REG_C6, C6, pcb);				\
+	SAVE_U_PCB_CREG(CHERI_REG_C7, C7, pcb);				\
+	SAVE_U_PCB_CREG(CHERI_REG_C8, C8, pcb);				\
+	SAVE_U_PCB_CREG(CHERI_REG_C9, C9, pcb);				\
+	SAVE_U_PCB_CREG(CHERI_REG_C10, C10, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_STC, STC, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C12, C12, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C13, C13, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C14, C14, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C15, C15, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C16, C16, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C17, C17, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C18, C18, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C19, C19, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C20, C20, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C21, C21, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C22, C22, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C23, C23, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C24, C24, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C25, C25, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C26, IDC, pcb);			\
+	/* EPCC is no longer a GPR so load it into KR1C first */	\
+	CGetEPCC	CHERI_REG_KR1C;					\
+	SAVE_U_PCB_CREG(CHERI_REG_KR1C, PCC, pcb);			\
+	cgetcause	treg;						\
+	SAVE_U_PCB_REG(treg, CAPCAUSE, pcb)
 
-#define	RESTORE_U_PCB_CHERIFRAME_CREG(creg, offs, base)		\
-	clc		creg, base, (CHERICAP_SIZE * offs)(CHERI_REG_KDC)
-
-/*
- * Macro to save the capability-cause register; we will never restore it as
- * part of a context switch.
- *
- * XXXRW: Or should we?
- *
- * The immediate field in csd is only 8 bits (signed), wheres the immediate
- * field in [d]addiu is 16 bits (unsigned), so we do all of the offset
- * calculation in the daddiu.
- */
-#define	SAVE_U_PCB_CHERIFRAME_CAPCAUSE(cause, base, treg)		\
-	PTR_ADDIU	treg, base, (CHERICAP_SIZE * CHERIFRAME_OFF_CAPCAUSE) \
-			    + U_PCB_CHERIFRAME;				\
-	csd		cause, treg, 0					\
-			    (CHERI_REG_KDC);				\
-
-/*
- * XXXRW: Update once the assembler supports reserved CHERI register names to
- * avoid hard-coding here.
- *
- * XXXRW: It woudld be nice to make calls to these conditional on actual CHERI
- * coprocessor use, similar to on-demand context management for other MIPS
- * coprocessors (e.g., FP).
- *
- * XXXRW: Note hard-coding of UDC here.
- */
-#if defined(CPU_CHERI_CHERI0)
-
-#define	SAVE_U_PCB_CHERIFRAME(cause, base, treg)
-#define	RESTORE_U_PCB_CHERIFRAME(base, treg)
-
-#elif defined(CPU_CHERI_CHERI8)
-
-#define	SAVE_U_PCB_CHERIFRAME(cause, base, treg)			\
-	PTR_ADDIU	treg, base, U_PCB_CHERIFRAME;			\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_SEC0, CHERIFRAME_OFF_C0,  treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C1,   CHERIFRAME_OFF_C1,  treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C2,   CHERIFRAME_OFF_C2,  treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C3,   CHERIFRAME_OFF_C3,  treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C11,  CHERIFRAME_OFF_C11, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C12,  CHERIFRAME_OFF_C12, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C17,  CHERIFRAME_OFF_C17, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C18,  CHERIFRAME_OFF_C18, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C19,  CHERIFRAME_OFF_C19, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_EPCC, CHERIFRAME_OFF_PCC, treg);\
-	SAVE_U_PCB_CHERIFRAME_CAPCAUSE(cause, base, treg)
-
-#define	RESTORE_U_PCB_CHERIFRAME(base, treg)				\
-	PTR_ADDIU	treg, base, U_PCB_CHERIFRAME;			\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_SEC0, CHERIFRAME_OFF_C0,  treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C1,   CHERIFRAME_OFF_C1,  treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C2,   CHERIFRAME_OFF_C2,  treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C3,   CHERIFRAME_OFF_C3,  treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C11,  CHERIFRAME_OFF_C11, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C12,  CHERIFRAME_OFF_C12, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C17,  CHERIFRAME_OFF_C17, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C18,  CHERIFRAME_OFF_C18, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C19,  CHERIFRAME_OFF_C19, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_EPCC, CHERIFRAME_OFF_PCC, treg);
-
-#elif defined(CPU_CHERI_CHERI16)
-#define	SAVE_U_PCB_CHERIFRAME(cause, base, treg)			\
-	PTR_ADDIU	treg, base, U_PCB_CHERIFRAME;			\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_SEC0, CHERIFRAME_OFF_C0,  treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C1,   CHERIFRAME_OFF_C1,  treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C2,   CHERIFRAME_OFF_C2,  treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C3,   CHERIFRAME_OFF_C3,  treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C4,   CHERIFRAME_OFF_C4,  treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C5,   CHERIFRAME_OFF_C5,  treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C6,   CHERIFRAME_OFF_C6,  treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C7,   CHERIFRAME_OFF_C7,  treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C11,  CHERIFRAME_OFF_C11, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C12,  CHERIFRAME_OFF_C12, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C17,  CHERIFRAME_OFF_C17, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C18,  CHERIFRAME_OFF_C18, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C19,  CHERIFRAME_OFF_C19, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C20,  CHERIFRAME_OFF_C20, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C21,  CHERIFRAME_OFF_C21, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C22,  CHERIFRAME_OFF_C22, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C23,  CHERIFRAME_OFF_C23, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_EPCC, CHERIFRAME_OFF_PCC, treg);\
-	SAVE_U_PCB_CHERIFRAME_CAPCAUSE(cause, base, treg);
-
-#define	RESTORE_U_PCB_CHERIFRAME(base, treg)				\
-	PTR_ADDIU	treg, base, U_PCB_CHERIFRAME;			\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_SEC0, CHERIFRAME_OFF_C0,  treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C1,   CHERIFRAME_OFF_C1,  treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C2,   CHERIFRAME_OFF_C2,  treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C3,   CHERIFRAME_OFF_C3,  treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C4,   CHERIFRAME_OFF_C4,  treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C5,   CHERIFRAME_OFF_C5,  treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C6,   CHERIFRAME_OFF_C6,  treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C7,   CHERIFRAME_OFF_C7,  treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C11,  CHERIFRAME_OFF_C11, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C12,  CHERIFRAME_OFF_C12, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C17,  CHERIFRAME_OFF_C17, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C18,  CHERIFRAME_OFF_C18, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C19,  CHERIFRAME_OFF_C19, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C20,  CHERIFRAME_OFF_C20, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C21,  CHERIFRAME_OFF_C21, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C22,  CHERIFRAME_OFF_C22, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C23,  CHERIFRAME_OFF_C23, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_EPCC, CHERIFRAME_OFF_PCC, treg);
-
-#else
-
-#define	SAVE_U_PCB_CHERIFRAME(cause, base, treg)			\
-	PTR_ADDIU	treg, base, U_PCB_CHERIFRAME;			\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_SEC0, CHERIFRAME_OFF_C0,  treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C1,   CHERIFRAME_OFF_C1,  treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C2,   CHERIFRAME_OFF_C2,  treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C3,   CHERIFRAME_OFF_C3,  treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C4,   CHERIFRAME_OFF_C4,  treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C5,   CHERIFRAME_OFF_C5,  treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C6,   CHERIFRAME_OFF_C6,  treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C7,   CHERIFRAME_OFF_C7,  treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C8,   CHERIFRAME_OFF_C8,  treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C9,   CHERIFRAME_OFF_C9,  treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C10,  CHERIFRAME_OFF_C10, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C11,  CHERIFRAME_OFF_C11, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C12,  CHERIFRAME_OFF_C12, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C13,  CHERIFRAME_OFF_C13, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C14,  CHERIFRAME_OFF_C14, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C15,  CHERIFRAME_OFF_C15, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C16,  CHERIFRAME_OFF_C16, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C17,  CHERIFRAME_OFF_C17, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C18,  CHERIFRAME_OFF_C18, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C19,  CHERIFRAME_OFF_C19, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C20,  CHERIFRAME_OFF_C20, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C21,  CHERIFRAME_OFF_C21, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C22,  CHERIFRAME_OFF_C22, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C23,  CHERIFRAME_OFF_C23, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C24,  CHERIFRAME_OFF_C24, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C25,  CHERIFRAME_OFF_C25, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_IDC,  CHERIFRAME_OFF_IDC, treg);\
-	SAVE_U_PCB_CHERIFRAME_CREG(CHERI_REG_EPCC, CHERIFRAME_OFF_PCC, treg);\
-	SAVE_U_PCB_CHERIFRAME_CAPCAUSE(cause, base, treg)
-
-#define	RESTORE_U_PCB_CHERIFRAME(base, treg)				\
-	PTR_ADDIU	treg, base, U_PCB_CHERIFRAME;			\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_SEC0, CHERIFRAME_OFF_C0,  treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C1,   CHERIFRAME_OFF_C1,  treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C2,   CHERIFRAME_OFF_C2,  treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C3,   CHERIFRAME_OFF_C3,  treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C4,   CHERIFRAME_OFF_C4,  treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C5,   CHERIFRAME_OFF_C5,  treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C6,   CHERIFRAME_OFF_C6,  treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C7,   CHERIFRAME_OFF_C7,  treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C8,   CHERIFRAME_OFF_C8,  treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C9,   CHERIFRAME_OFF_C9,  treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C10,  CHERIFRAME_OFF_C10, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C11,  CHERIFRAME_OFF_C11, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C12,  CHERIFRAME_OFF_C12, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C13,  CHERIFRAME_OFF_C13, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C14,  CHERIFRAME_OFF_C14, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C15,  CHERIFRAME_OFF_C15, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C16,  CHERIFRAME_OFF_C16, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C17,  CHERIFRAME_OFF_C17, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C18,  CHERIFRAME_OFF_C18, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C19,  CHERIFRAME_OFF_C19, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C20,  CHERIFRAME_OFF_C20, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C21,  CHERIFRAME_OFF_C21, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C22,  CHERIFRAME_OFF_C22, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C23,  CHERIFRAME_OFF_C23, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C24,  CHERIFRAME_OFF_C24, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_C25,  CHERIFRAME_OFF_C25, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_IDC,  CHERIFRAME_OFF_IDC, treg);\
-	RESTORE_U_PCB_CHERIFRAME_CREG(CHERI_REG_EPCC, CHERIFRAME_OFF_PCC, treg)
-#endif
+#define	RESTORE_CREGS_FROM_PCB(pcb, treg)				\
+	RESTORE_U_PCB_CREG(CHERI_REG_SEC0, DDC, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C1, C1, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C2, C2, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C3, C3, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C4, C4, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C5, C5, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C6, C6, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C7, C7, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C8, C8, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C9, C9, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C10, C10, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_STC, STC, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C12, C12, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C13, C13, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C14, C14, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C15, C15, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C16, C16, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C17, C17, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C18, C18, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C19, C19, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C20, C20, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C21, C21, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C22, C22, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C23, C23, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C24, C24, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C25, C25, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C26, IDC, pcb);			\
+	/* EPCC is no longer a GPR so load it into KR1C first */	\
+	RESTORE_U_PCB_CREG(CHERI_REG_KR1C, PCC, pcb);			\
+	CSetEPCC	CHERI_REG_KR1C;					\
+	RESTORE_U_PCB_REG(treg, CAPCAUSE, pcb);				\
+	csetcause	treg
 
 /*
  * Macros saving capability state to, and restoring it from, voluntary kernel
  * context-switch storage in pcb.pcb_cherikframe.
  */
-#define	SAVE_U_PCB_CHERIKFRAME_CREG(creg, offs, base, treg)		\
-	PTR_ADDIU	treg, base, U_PCB_CHERIKFRAME;			\
-	csc		creg, treg, (CHERICAP_SIZE * offs)(CHERI_REG_KDC)
+#define	SAVE_U_PCB_CHERIKFRAME_CREG(creg, offs, base)			\
+	csc		creg, base, (U_PCB_CHERIKFRAME +		\
+			    CHERICAP_SIZE * offs)(CHERI_REG_KDC)
 
-#define	RESTORE_U_PCB_CHERIKFRAME_CREG(creg, offs, base, treg)		\
-	PTR_ADDIU	treg, base, U_PCB_CHERIKFRAME;			\
-	clc		creg, treg, (CHERICAP_SIZE * offs)(CHERI_REG_KDC)
+#define	RESTORE_U_PCB_CHERIKFRAME_CREG(creg, offs, base)		\
+	clc		creg, base, (U_PCB_CHERIKFRAME +		\
+			    CHERICAP_SIZE * offs)(CHERI_REG_KDC)
 
 /*
- * Macros saving a full voluntary kernel CHERI register frame.
+ * Macros to save (and restore) callee-save capability registers when
+ * performing a voluntary kernel context switch (the compiler will have saved,
+ * or will restore, caller-save registers).
  */
-#ifndef CPU_CHERI_CHERI0
-#define	SAVE_U_PCB_CHERIKFRAME(base, treg)				\
+#define	SAVE_U_PCB_CHERIKFRAME(base)					\
 	SAVE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C17, CHERIKFRAME_OFF_C17,	\
-	    base, treg);						\
+	    base);							\
 	SAVE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C18, CHERIKFRAME_OFF_C18,	\
-	    base, treg);						\
+	    base);							\
 	SAVE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C19, CHERIKFRAME_OFF_C19,	\
-	    base, treg);						\
+	    base);							\
 	SAVE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C20, CHERIKFRAME_OFF_C20,	\
-	    base, treg);						\
+	    base);							\
 	SAVE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C21, CHERIKFRAME_OFF_C21,	\
-	    base, treg);						\
+	    base);							\
 	SAVE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C22, CHERIKFRAME_OFF_C22,	\
-	    base, treg);						\
+	    base);							\
 	SAVE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C23, CHERIKFRAME_OFF_C23,	\
-	    base, treg);						\
+	    base);							\
 	SAVE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C24, CHERIKFRAME_OFF_C24,	\
-	    base, treg)
+	    base)
 
-#define	RESTORE_U_PCB_CHERIKFRAME(base, treg)				\
+#define	RESTORE_U_PCB_CHERIKFRAME(base)					\
 	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C17,			\
-	    CHERIKFRAME_OFF_C17, base, treg);				\
+	    CHERIKFRAME_OFF_C17, base);					\
 	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C18,			\
-	    CHERIKFRAME_OFF_C18, base, treg);				\
+	    CHERIKFRAME_OFF_C18, base);					\
 	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C19,			\
-	    CHERIKFRAME_OFF_C19, base, treg);				\
+	    CHERIKFRAME_OFF_C19, base);					\
 	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C20,			\
-	    CHERIKFRAME_OFF_C20, base, treg);				\
+	    CHERIKFRAME_OFF_C20, base);					\
 	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C21,			\
-	    CHERIKFRAME_OFF_C21, base, treg);				\
+	    CHERIKFRAME_OFF_C21, base);					\
 	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C22,			\
-	    CHERIKFRAME_OFF_C22, base, treg);				\
+	    CHERIKFRAME_OFF_C22, base);					\
 	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C23,			\
-	    CHERIKFRAME_OFF_C23, base, treg);				\
+	    CHERIKFRAME_OFF_C23, base);					\
 	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C24,			\
-	    CHERIKFRAME_OFF_C24, base, treg)
-#else
-#define	SAVE_U_PCB_CHERIKFRAME(base, treg)
-#define	RESTORE_U_PCB_CHERIKFRAME(base, treg)
-#endif
-
-#endif /* _MIPS_INCLUDE_CHERIASM_H_ */
-
-/* This macro is just until assembler supports clearregs */
-#define CHERI_CLEARREGS(regset, mask) \
-  .word (0x12 << 26) | (0xf << 21) | (regset << 16) | (mask)
-#define CHERI_CLEAR_GPLO16(mask)  CHERI_CLEARREGS(0, mask);
-#define CHERI_CLEAR_GPHI16(mask)  CHERI_CLEARREGS(1, mask);
-#define CHERI_CLEAR_CAPLO16(mask) CHERI_CLEARREGS(2, mask);
-#define CHERI_CLEAR_CAPHI16(mask) CHERI_CLEARREGS(3, mask);
+	    CHERIKFRAME_OFF_C24, base)
 
 #define CHERI_CLEAR_GPLO_ZR    (1 << 0)
 #define CHERI_CLEAR_GPLO_AT    (1 << 1)
@@ -480,3 +370,5 @@
 
 /* Ensure that this is kept in sync with CHERI_REG_SEC0. */
 #define	CHERI_CLEAR_CAPHI_SEC0	CHERI_CLEAR_CAPHI_KR2C
+
+#endif /* _MIPS_INCLUDE_CHERIASM_H_ */

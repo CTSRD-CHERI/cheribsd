@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2004 Olivier Houchard.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -74,8 +76,8 @@ uart_i81342_probe(device_t dev)
 		sc->sc_sysdev = SLIST_FIRST(&uart_sysdevs);
 		bcopy(&sc->sc_sysdev->bas, &sc->sc_bas, sizeof(sc->sc_bas));
 	}
-	sc->sc_rres = bus_alloc_resource(dev, SYS_RES_IOPORT, &sc->sc_rrid,
-            0, ~0, uart_getrange(sc->sc_class), RF_ACTIVE);
+	sc->sc_rres = bus_alloc_resource_anywhere(dev, SYS_RES_IOPORT,
+	    &sc->sc_rrid, uart_getrange(sc->sc_class), RF_ACTIVE);
 	
 	sc->sc_bas.bsh = rman_get_bushandle(sc->sc_rres);
 	sc->sc_bas.bst = rman_get_bustag(sc->sc_rres);
@@ -83,7 +85,7 @@ uart_i81342_probe(device_t dev)
 	    0x40 | 0x10);
         bus_release_resource(dev, sc->sc_rtype, sc->sc_rrid, sc->sc_rres);
 
-	err = uart_bus_probe(dev, 2, 33334000, 0, device_get_unit(dev));
+	err = uart_bus_probe(dev, 2, 0, 33334000, 0, device_get_unit(dev));
 	sc->sc_rxfifosz = sc->sc_txfifosz = 1;
 	return (err);
 }

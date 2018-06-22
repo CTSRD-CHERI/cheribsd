@@ -21,6 +21,7 @@
 # kernel-toolchains   - Build kernel-toolchain for all universe targets.
 # doxygen             - Build API documentation of the kernel, needs doxygen.
 # update              - Convenient way to update your source tree(s).
+# checkworld          - Run test suite on installed world.
 # check-old           - List obsolete directories/files/libraries.
 # check-old-dirs      - List obsolete directories.
 # check-old-files     - List obsolete files.
@@ -33,12 +34,19 @@
 #                       for world and kernel targets.
 # toolchains          - Build a toolchain for all world and kernel targets.
 # xdev                - xdev-build + xdev-install for the architecture
-#                       specified with XDEV and XDEV_ARCH.
+#                       specified with TARGET and TARGET_ARCH.
 # xdev-build          - Build cross-development tools.
 # xdev-install        - Install cross-development tools.
 # xdev-links          - Create traditional links in /usr/bin for cc, etc
 # native-xtools       - Create host binaries that produce target objects
-#                       for use in qemu user-mode jails.
+#                       for use in qemu user-mode jails.  TARGET and
+#                       TARGET_ARCH should be defined.
+# native-xtools-install
+#                     - Install the files to the given DESTDIR/NXTP where
+#                       NXTP defaults to /nxb-bin.
+# buildsysroot        - build all the boostrap tools and libraries needed for
+#                       a cross-compile sysroot
+# installsysroot      - install the sysroot created by buildsysroot
 # 
 # "quick" way to test all kernel builds:
 # 	_jflag=`sysctl -n hw.ncpu`
@@ -102,55 +110,97 @@
 
 # This is included so CC is set to ccache for -V, and COMPILER_TYPE/VERSION
 # can be cached for sub-makes.
+.if ${MAKE_VERSION} >= 20140620 && defined(.PARSEDIR)
 .include <bsd.compiler.mk>
+.endif
 
 # Note: we use this awkward construct to be compatible with FreeBSD's
 # old make used in 10.0 and 9.2 and earlier.
-.if defined(MK_DIRDEPS_BUILD) && ${MK_DIRDEPS_BUILD} == "yes" && !make(showconfig)
+.if defined(MK_DIRDEPS_BUILD) && ${MK_DIRDEPS_BUILD} == "yes" && \
+    !make(showconfig) && !make(print-dir)
 # targets/Makefile plays the role of top-level
 .include "targets/Makefile"
 .else
 
 TGTS=	all all-man buildenv buildenvvars buildkernel buildworld \
-	check-old check-old-dirs check-old-files check-old-libs \
-	checkdpadd clean cleandepend cleandir cleanworld \
+	check check-old check-old-dirs check-old-files check-old-libs \
+	checkdpadd checkworld clean cleandepend cleandir cleanworld \
+	cleanuniverse \
 	delete-old delete-old-dirs delete-old-files delete-old-libs \
 	depend distribute distributekernel distributekernel.debug \
 	distributeworld distrib-dirs distribution doxygen \
 	everything hier hierarchy install installcheck installkernel \
 	installkernel.debug packagekernel packageworld \
 	reinstallkernel reinstallkernel.debug \
-	installworld kernel-toolchain libraries lint maninstall \
-	obj objlink regress rerelease showconfig tags toolchain update \
+	installworld kernel-toolchain libraries maninstall \
+	obj objlink showconfig tags toolchain update \
 	_worldtmp _legacy _bootstrap-tools _cleanobj _obj \
-	_build-tools _cross-tools _includes _libraries _depend \
-	build32 buildcheri builddtb distribute32 distributecheri \
-	libcheribuildenv libcheribuildenvvars \
-	install32 installcheri xdev xdev-build xdev-install \
-	xdev-links native-xtools installconfig \
+	_build-tools _build-metadata _cross-tools _includes _libraries \
+	build32 distribute32 install32 buildsoft distributesoft installsoft \
+	buildcheri distributecheri libcheribuildenv libcheribuildenvvars \
+	builddtb xdev xdev-build xdev-install \
+	xdev-links native-xtools native-xtools-install stageworld stagekernel \
+	stage-packages \
+	create-packages-world create-packages-kernel create-packages \
+	packages installconfig real-packages sign-packages package-pkg \
+	print-dir test-system-compiler buildsysroot installsysroot
 
+# These targets require a TARGET and TARGET_ARCH be defined.
+XTGTS=	native-xtools native-xtools-install xdev xdev-build xdev-install \
+	xdev-links
+
+# XXX: r156740: This can't work since bsd.subdir.mk is not included ever.
+# It will only work for SUBDIR_TARGETS in make.conf.
 TGTS+=	${SUBDIR_TARGETS}
 
 BITGTS=	files includes
 BITGTS:=${BITGTS} ${BITGTS:S/^/build/} ${BITGTS:S/^/install/}
 TGTS+=	${BITGTS}
 
+# Only some targets are allowed to use meta mode.  Others get it
+# disabled.  In some cases, such as 'install', meta mode can be dangerous
+# as a cookie may be used to prevent redundant installations (such as
+# for WORLDTMP staging).  For DESTDIR=/ we always want to install though.
+# For other cases, such as delete-old-libs, meta mode may break
+# the interactive tty prompt.  The safest route is to just whitelist
+# the ones that benefit from it.
+META_TGT_WHITELIST+= \
+	_* build32 buildfiles buildincludes buildkernel buildsoft \
+	buildworld everything kernel-toolchain kernel-toolchains kernel \
+	kernels libraries native-xtools showconfig test-system-compiler \
+	tinderbox toolchain \
+	toolchains universe world worlds xdev xdev-build
+
 .ORDER: buildworld installworld
+.ORDER: buildworld distrib-dirs
+.ORDER: buildworld distribution
+.ORDER: buildworld distribute
 .ORDER: buildworld distributeworld
 .ORDER: buildworld buildkernel
+.ORDER: distrib-dirs distribute
+.ORDER: distrib-dirs distributeworld
+.ORDER: distrib-dirs installworld
+.ORDER: distribution distribute
+.ORDER: distributeworld distribute
+.ORDER: distributeworld distribution
+.ORDER: installworld distribute
+.ORDER: installworld distribution
+.ORDER: installworld installkernel
 .ORDER: buildkernel installkernel
 .ORDER: buildkernel installkernel.debug
 .ORDER: buildkernel reinstallkernel
 .ORDER: buildkernel reinstallkernel.debug
+.ORDER: buildsysroot installsysroot
 
 PATH=	/sbin:/bin:/usr/sbin:/usr/bin
 MAKEOBJDIRPREFIX?=	/usr/obj
-_MAKEOBJDIRPREFIX!= /usr/bin/env -i PATH=${PATH} ${MAKE} \
+_MAKEOBJDIRPREFIX!= /usr/bin/env -i PATH=${PATH} ${MAKE} MK_AUTO_OBJ=no \
     ${.MAKEFLAGS:MMAKEOBJDIRPREFIX=*} __MAKE_CONF=${__MAKE_CONF} \
+    SRCCONF=${SRCCONF} \
     -f /dev/null -V MAKEOBJDIRPREFIX dummy
 .if !empty(_MAKEOBJDIRPREFIX)
 .error MAKEOBJDIRPREFIX can only be set in environment, not as a global\
-	(in make.conf(5)) or command-line variable.
+	(in make.conf(5) or src.conf(5)) or command-line variable.
 .endif
 
 # We often need to use the tree's version of make to build it.
@@ -158,15 +208,27 @@ _MAKEOBJDIRPREFIX!= /usr/bin/env -i PATH=${PATH} ${MAKE} \
 # We cannot blindly use a make which may not be the one we want
 # so be exlicit - until all choice is removed.
 WANT_MAKE=	bmake
-MYMAKE=		${MAKEOBJDIRPREFIX}${.CURDIR}/make.${MACHINE}/${WANT_MAKE}
+.if !empty(.MAKE.MODE:Mmeta)
+# 20160604 - support missing-meta,missing-filemon and performance improvements
+WANT_MAKE_VERSION= 20160604
+.else
+# 20160220 - support .dinclude for FAST_DEPEND.
+WANT_MAKE_VERSION= 20160220
+.endif
+MYMAKE=		${OBJROOT}make.${MACHINE}/${WANT_MAKE}
 .if defined(.PARSEDIR)
 HAVE_MAKE=	bmake
 .else
 HAVE_MAKE=	fmake
 .endif
+.if defined(ALWAYS_BOOTSTRAP_MAKE) || \
+    ${HAVE_MAKE} != ${WANT_MAKE} || \
+    (defined(WANT_MAKE_VERSION) && ${MAKE_VERSION} < ${WANT_MAKE_VERSION})
+NEED_MAKE_UPGRADE= t
+.endif
 .if exists(${MYMAKE})
 SUB_MAKE:= ${MYMAKE} -m ${.CURDIR}/share/mk
-.elif ${WANT_MAKE} != ${HAVE_MAKE}
+.elif defined(NEED_MAKE_UPGRADE)
 # It may not exist yet but we may cause it to.
 # In the case of fmake, upgrade_checks may cause a newer version to be built.
 SUB_MAKE= `test -x ${MYMAKE} && echo ${MYMAKE} || echo ${MAKE}` \
@@ -183,24 +245,62 @@ CHERI_FLAGS=	-DDB_FROM_SRC \
 		LOCAL_DIRS="ctsrd tools/tools/atsectl" \
 		LOCAL_LIB_DIRS=ctsrd/lib \
 		LOCAL_MTREE=ctsrd/ctsrd.mtree
+.if !defined(CHERI_CC) && defined(XCC)
+CHERI_CC=	${XCC}
+.endif
 .if ${CHERI} == "128"
 CHERI_FLAGS+=	-DWITH_CHERI128
 .elif ${CHERI} == "256" || ${CHERI} == "1"
 CHERI_FLAGS+=	-DWITH_CHERI256
 .else
-.warning CHERI is an unexpected value '${CHERI}' defaulting to 256-bit
-CHERI_FLAGS+=	-DWITH_CHERI256
+.error CHERI is an unexpected value '${CHERI}' must be '128' or '256'
 .endif
 .endif
 
-_MAKE=	PATH=${PATH} ${SUB_MAKE} -f Makefile.inc1 ${CHERI_FLAGS} TARGET=${_TARGET} TARGET_ARCH=${_TARGET_ARCH}
+_MAKE=	PATH=${PATH} MAKE_CMD="${MAKE}" ${SUB_MAKE} -f Makefile.inc1 \
+	${CHERI_FLAGS} \
+	TARGET=${_TARGET} TARGET_ARCH=${_TARGET_ARCH} ${_MAKEARGS}
 
-# Guess machine architecture from machine type, and vice versa.
+.if defined(MK_META_MODE) && ${MK_META_MODE} == "yes"
+# Only allow meta mode for the whitelisted targets.  See META_TGT_WHITELIST
+# above.  If overridden as a make argument then don't bother trying to
+# disable it.
+.if empty(.MAKEOVERRIDES:MMK_META_MODE)
+.for _tgt in ${META_TGT_WHITELIST}
+.if make(${_tgt})
+_CAN_USE_META_MODE?= yes
+.endif
+.endfor
+.if !defined(_CAN_USE_META_MODE)
+_MAKE+=	MK_META_MODE=no
+MK_META_MODE= no
+.if defined(.PARSEDIR)
+.unexport META_MODE
+.endif
+.endif	# !defined(_CAN_USE_META_MODE)
+.endif	# empty(.MAKEOVERRIDES:MMK_META_MODE)
+
+.if ${MK_META_MODE} == "yes"
+.if !exists(/dev/filemon) && !defined(NO_FILEMON) && !make(showconfig)
+# Require filemon be loaded to provide a working incremental build
+.error ${.newline}ERROR: The filemon module (/dev/filemon) is not loaded. \
+    ${.newline}ERROR: WITH_META_MODE is enabled but requires filemon for an incremental build. \
+    ${.newline}ERROR: 'kldload filemon' or pass -DNO_FILEMON to suppress this error.
+.endif	# !exists(/dev/filemon) && !defined(NO_FILEMON)
+.endif	# ${MK_META_MODE} == yes
+.endif	# defined(MK_META_MODE) && ${MK_META_MODE} == yes
+
+# Guess target architecture from target type, and vice versa, based on
+# historic FreeBSD practice of tending to have TARGET == TARGET_ARCH
+# expanding to TARGET == TARGET_CPUARCH in recent times, with known
+# exceptions.
 .if !defined(TARGET_ARCH) && defined(TARGET)
-_TARGET_ARCH=	${TARGET:S/pc98/i386/:S/arm64/aarch64/}
+# T->TA mapping is usually TARGET with arm64 the odd man out
+_TARGET_ARCH=	${TARGET:S/arm64/aarch64/:S/riscv/riscv64/}
 .elif !defined(TARGET) && defined(TARGET_ARCH) && \
     ${TARGET_ARCH} != ${MACHINE_ARCH}
-_TARGET=		${TARGET_ARCH:C/mips(n32|64)?(el)?/mips/:C/arm(v6)?(eb|hf)?/arm/:C/aarch64/arm64/:C/powerpc64/powerpc/:C/riscv64/riscv/}
+# TA->T mapping is accidentally CPUARCH with aarch64 the odd man out
+_TARGET=	${TARGET_ARCH:${__TO_CPUARCH}:C/aarch64/arm64/}
 .endif
 .if defined(TARGET) && !defined(_TARGET)
 _TARGET=${TARGET}
@@ -215,9 +315,35 @@ _TARGET=	${XDEV}
 .if defined(XDEV_ARCH)
 _TARGET_ARCH=	${XDEV_ARCH}
 .endif
+# Some targets require a set TARGET/TARGET_ARCH, check before the default
+# MACHINE and after the compatibility handling.
+.if !defined(_TARGET) || !defined(_TARGET_ARCH)
+${XTGTS}: _assert_target
+.endif
 # Otherwise, default to current machine type and architecture.
 _TARGET?=	${MACHINE}
 _TARGET_ARCH?=	${MACHINE_ARCH}
+
+.if make(native-xtools*)
+NXB_TARGET:=		${_TARGET}
+NXB_TARGET_ARCH:=	${_TARGET_ARCH}
+_TARGET=		${MACHINE}
+_TARGET_ARCH=		${MACHINE_ARCH}
+_MAKE+=			NXB_TARGET=${NXB_TARGET} \
+			NXB_TARGET_ARCH=${NXB_TARGET_ARCH}
+.endif
+
+.if make(print-dir)
+.SILENT:
+.endif
+
+_assert_target: .PHONY .MAKE
+.for _tgt in ${XTGTS}
+.if make(${_tgt})
+	@echo "*** Error: Both TARGET and TARGET_ARCH must be defined for \"${_tgt}\" target"
+	@false
+.endif
+.endfor
 
 #
 # Make sure we have an up-to-date make(1). Only world and buildworld
@@ -266,7 +392,7 @@ CHECK_TIME!= find ${.CURDIR}/sys/sys/param.h -mtime -0s ; echo
 # not included. One can argue that this target doesn't build everything
 # then.
 #
-world: upgrade_checks
+world: upgrade_checks .PHONY
 	@echo "--------------------------------------------------------------"
 	@echo ">>> make world started on ${STARTTIME}"
 	@echo "--------------------------------------------------------------"
@@ -278,7 +404,7 @@ world: upgrade_checks
 	${_+_}@cd ${.CURDIR}; ${_MAKE} pre-world
 .endif
 	${_+_}@cd ${.CURDIR}; ${_MAKE} buildworld
-	${_+_}@cd ${.CURDIR}; ${_MAKE} -B installworld
+	${_+_}@cd ${.CURDIR}; ${_MAKE} installworld MK_META_MODE=no
 .if target(post-world)
 	@echo
 	@echo "--------------------------------------------------------------"
@@ -292,7 +418,7 @@ world: upgrade_checks
 	@echo "                   (started ${STARTTIME})"
 	@echo "--------------------------------------------------------------"
 .else
-world:
+world: .PHONY
 	@echo "WARNING: make world will overwrite your existing FreeBSD"
 	@echo "installation without also building and installing a new"
 	@echo "kernel.  This can be dangerous.  Please read the handbook,"
@@ -309,18 +435,15 @@ world:
 #
 # Short hand for `make buildkernel installkernel'
 #
-kernel: buildkernel installkernel
+kernel: buildkernel installkernel .PHONY
 
 #
 # Perform a few tests to determine if the installed tools are adequate
 # for building the world.
 #
-# Note: if we ever need to care about the version of bmake, simply testing
-# MAKE_VERSION against a required version should suffice.
-#
-upgrade_checks:
-.if ${HAVE_MAKE} != ${WANT_MAKE}
-	@(cd ${.CURDIR} && ${MAKE} ${WANT_MAKE:S,^f,,})
+upgrade_checks: .PHONY
+.if defined(NEED_MAKE_UPGRADE)
+	@${_+_}(cd ${.CURDIR} && ${MAKE} ${WANT_MAKE:S,^f,,})
 .endif
 
 #
@@ -328,14 +451,20 @@ upgrade_checks:
 # headers, libraries and tools.  Also, allow the location of
 # the system bsdmake-like utility to be overridden.
 #
-MMAKEENV=	MAKEOBJDIRPREFIX=${MYMAKE:H} \
+MMAKEENV=	\
 		DESTDIR= \
 		INSTALL="sh ${.CURDIR}/tools/install.sh"
 MMAKE=		${MMAKEENV} ${MAKE} \
-		-DNO_MAN -DNO_SHARED \
+		OBJTOP=${MYMAKE:H}/obj \
+		OBJROOT='$${OBJTOP}/' \
+		MAKEOBJDIRPREFIX= \
+		MAN= -DNO_SHARED \
 		-DNO_CPU_CFLAGS -DNO_WERROR \
-		MK_TESTS=no \
+		-DNO_SUBDIR \
 		DESTDIR= PROGNAME=${MYMAKE:T}
+
+# Hacks to bootstrap make
+MMAKE+=		MK_CHERI_PURE=no
 
 bmake: .PHONY
 	@echo
@@ -348,16 +477,26 @@ bmake: .PHONY
 		${MMAKE} all; \
 		${MMAKE} install DESTDIR=${MYMAKE:H} BINDIR=
 
-tinderbox toolchains kernel-toolchains: upgrade_checks
+regress: .PHONY
+	@echo "'make regress' has been renamed 'make check'" | /usr/bin/fmt
+	@false
 
-tinderbox:
+tinderbox toolchains kernel-toolchains kernels worlds: upgrade_checks
+
+tinderbox: .PHONY
 	@cd ${.CURDIR}; ${SUB_MAKE} DOING_TINDERBOX=YES universe
 
-toolchains:
+toolchains: .PHONY
 	@cd ${.CURDIR}; ${SUB_MAKE} UNIVERSE_TARGET=toolchain universe
 
-kernel-toolchains:
+kernel-toolchains: .PHONY
 	@cd ${.CURDIR}; ${SUB_MAKE} UNIVERSE_TARGET=kernel-toolchain universe
+
+kernels: .PHONY
+	@cd ${.CURDIR}; ${SUB_MAKE} UNIVERSE_TARGET=buildkernel universe
+
+worlds: .PHONY
+	@cd ${.CURDIR}; ${SUB_MAKE} UNIVERSE_TARGET=buildworld universe
 
 #
 # universe
@@ -367,26 +506,35 @@ kernel-toolchains:
 # existing system is.
 #
 .if make(universe) || make(universe_kernels) || make(tinderbox) || make(targets)
-TARGETS?=amd64 arm arm64 i386 mips pc98 powerpc sparc64
+TARGETS?=amd64 arm arm64 i386 mips powerpc riscv sparc64
 _UNIVERSE_TARGETS=	${TARGETS}
-TARGET_ARCHES_arm?=	arm armeb armv6 armv6hf
+TARGET_ARCHES_arm?=	arm armeb armv6 armv7
 TARGET_ARCHES_arm64?=	aarch64
-TARGET_ARCHES_mips?=	mipsel mips mips64el mips64 mipsn32
-TARGET_ARCHES_powerpc?=	powerpc powerpc64
-TARGET_ARCHES_pc98?=	i386
+TARGET_ARCHES_mips?=	mipsel mips mips64el mips64 mipsn32 mipselhf mipshf mips64elhf mips64hf
+TARGET_ARCHES_powerpc?=	powerpc powerpc64 powerpcspe
+TARGET_ARCHES_riscv?=	riscv64 riscv64sf
 .for target in ${TARGETS}
 TARGET_ARCHES_${target}?= ${target}
 .endfor
 
-# XXX Add arm64 to universe only if we have an external binutils installed.
-# It does not build with the in-tree linker.
-.if !exists(/usr/local/aarch64-freebsd/bin/ld) && empty(${TARGETS})
-_UNIVERSE_TARGETS:= ${_UNIVERSE_TARGETS:Narm64}
-universe: universe_arm64_skip
-universe_epilogue: universe_arm64_skip
-universe_arm64_skip: universe_prologue
-	@echo ">> arm64 skipped - install aarch64-binutils port or package to build"
+MAKE_PARAMS_riscv?=	CROSS_TOOLCHAIN=riscv64-gcc
+
+# XXX Remove architectures only supported by external toolchain from universe
+# if required toolchain packages are missing.
+TOOLCHAINS_riscv=	riscv64
+.for target in riscv
+.if ${_UNIVERSE_TARGETS:M${target}}
+.for toolchain in ${TOOLCHAINS_${target}}
+.if !exists(/usr/local/share/toolchains/${toolchain}-gcc.mk)
+_UNIVERSE_TARGETS:= ${_UNIVERSE_TARGETS:N${target}}
+universe: universe_${toolchain}_skip .PHONY
+universe_epilogue: universe_${toolchain}_skip .PHONY
+universe_${toolchain}_skip: universe_prologue .PHONY
+	@echo ">> ${target} skipped - install ${toolchain}-xtoolchain-gcc port or package to build"
 .endif
+.endfor
+.endif
+.endfor
 
 .if defined(UNIVERSE_TARGET)
 MAKE_JUST_WORLDS=	YES
@@ -412,7 +560,7 @@ MAKEFAIL=cat
 
 universe_prologue:  upgrade_checks
 universe: universe_prologue
-universe_prologue:
+universe_prologue: .PHONY
 	@echo "--------------------------------------------------------------"
 	@echo ">>> make universe started on ${STARTTIME}"
 	@echo "--------------------------------------------------------------"
@@ -422,21 +570,22 @@ universe_prologue:
 .for target in ${_UNIVERSE_TARGETS}
 universe: universe_${target}
 universe_epilogue: universe_${target}
-universe_${target}: universe_${target}_prologue
-universe_${target}_prologue: universe_prologue
+universe_${target}: universe_${target}_prologue .PHONY
+universe_${target}_prologue: universe_prologue .PHONY
 	@echo ">> ${target} started on `LC_ALL=C date`"
-universe_${target}_worlds:
+universe_${target}_worlds: .PHONY
 
 .if !defined(MAKE_JUST_KERNELS)
-universe_${target}_done: universe_${target}_worlds
+universe_${target}_done: universe_${target}_worlds .PHONY
 .for target_arch in ${TARGET_ARCHES_${target}}
-universe_${target}_worlds: universe_${target}_${target_arch}
-universe_${target}_${target_arch}: universe_${target}_prologue .MAKE
+universe_${target}_worlds: universe_${target}_${target_arch} .PHONY
+universe_${target}_${target_arch}: universe_${target}_prologue .MAKE .PHONY
 	@echo ">> ${target}.${target_arch} ${UNIVERSE_TARGET} started on `LC_ALL=C date`"
 	@(cd ${.CURDIR} && env __MAKE_CONF=/dev/null \
 	    ${SUB_MAKE} ${JFLAG} ${UNIVERSE_TARGET} \
 	    TARGET=${target} \
 	    TARGET_ARCH=${target_arch} \
+	    ${MAKE_PARAMS_${target}} \
 	    > _.${target}.${target_arch}.${UNIVERSE_TARGET} 2>&1 || \
 	    (echo "${target}.${target_arch} ${UNIVERSE_TARGET} failed," \
 	    "check _.${target}.${target_arch}.${UNIVERSE_TARGET} for details" | \
@@ -446,12 +595,13 @@ universe_${target}_${target_arch}: universe_${target}_prologue .MAKE
 .endif # !MAKE_JUST_KERNELS
 
 .if !defined(MAKE_JUST_WORLDS)
-universe_${target}_done: universe_${target}_kernels
-universe_${target}_kernels: universe_${target}_worlds
-universe_${target}_kernels: universe_${target}_prologue .MAKE
+universe_${target}_done: universe_${target}_kernels .PHONY
+universe_${target}_kernels: universe_${target}_worlds .PHONY
+universe_${target}_kernels: universe_${target}_prologue .MAKE .PHONY
 .if exists(${KERNSRCDIR}/${target}/conf/NOTES)
 	@(cd ${KERNSRCDIR}/${target}/conf && env __MAKE_CONF=/dev/null \
-	    ${SUB_MAKE} LINT > ${.CURDIR}/_.${target}.makeLINT 2>&1 || \
+	    ${SUB_MAKE} LINT \
+	    > ${.CURDIR}/_.${target}.makeLINT 2>&1 || \
 	    (echo "${target} 'make LINT' failed," \
 	    "check _.${target}.makeLINT for details"| ${MAKEFAIL}))
 .endif
@@ -464,20 +614,24 @@ universe_${target}: universe_${target}_done
 universe_${target}_done:
 	@echo ">> ${target} completed on `LC_ALL=C date`"
 .endfor
-universe_kernels: universe_kernconfs
+.if make(universe_kernconfs) || make(universe_kernels)
+universe_kernels: universe_kernconfs .PHONY
 .if !defined(TARGET)
 TARGET!=	uname -m
 .endif
 .if defined(MAKE_ALL_KERNELS)
 _THINNER=cat
+.elif defined(MAKE_LINT_KERNELS)
+_THINNER=grep 'LINT' || true
 .else
 _THINNER=xargs grep -L "^.NO_UNIVERSE" || true
 .endif
 KERNCONFS!=	cd ${KERNSRCDIR}/${TARGET}/conf && \
-		find [A-Z0-9]*[A-Z0-9] -type f -maxdepth 0 \
+		find [[:upper:][:digit:]]*[[:upper:][:digit:]] \
+		-type f -maxdepth 0 \
 		! -name DEFAULTS ! -name NOTES | \
 		${_THINNER}
-universe_kernconfs:
+universe_kernconfs: .PHONY
 .for kernel in ${KERNCONFS}
 TARGET_ARCH_${kernel}!=	cd ${KERNSRCDIR}/${TARGET}/conf && \
 	config -m ${KERNSRCDIR}/${TARGET}/conf/${kernel} 2> /dev/null | \
@@ -491,13 +645,15 @@ universe_kernconf_${TARGET}_${kernel}: .MAKE
 	    ${SUB_MAKE} ${JFLAG} buildkernel \
 	    TARGET=${TARGET} \
 	    TARGET_ARCH=${TARGET_ARCH_${kernel}} \
+	    ${MAKE_PARAMS_${TARGET}} \
 	    KERNCONF=${kernel} \
 	    > _.${TARGET}.${kernel} 2>&1 || \
 	    (echo "${TARGET} ${kernel} kernel failed," \
 	    "check _.${TARGET}.${kernel} for details"| ${MAKEFAIL}))
 .endfor
+.endif	# make(universe_kernels)
 universe: universe_epilogue
-universe_epilogue:
+universe_epilogue: .PHONY
 	@echo "--------------------------------------------------------------"
 	@echo ">>> make universe completed on `LC_ALL=C date`"
 	@echo "                      (started ${STARTTIME})"
@@ -511,7 +667,7 @@ universe_epilogue:
 .endif
 .endif
 
-buildLINT:
+buildLINT: .PHONY
 	${MAKE} -C ${.CURDIR}/sys/${_TARGET}/conf LINT
 
 .if defined(.PARSEDIR)

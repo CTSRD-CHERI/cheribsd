@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2009, Oleksandr Tymoshenko <gonzo@FreeBSD.org>
  * All rights reserved.
  *
@@ -45,6 +47,8 @@
 #define CMD_BULK_ERASE		0xC7
 #define	CMD_BLOCK_4K_ERASE	0x20
 #define	CMD_BLOCK_32K_ERASE	0x52
+#define	CMD_ENTER_4B_MODE	0xB7
+#define	CMD_EXIT_4B_MODE	0xE9
 
 /*
  * Status register flags

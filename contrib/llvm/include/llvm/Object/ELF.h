@@ -15,22 +15,16 @@
 #define LLVM_OBJECT_ELF_H
 
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/IntervalMap.h"
-#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringSwitch.h"
-#include "llvm/ADT/Triple.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/BinaryFormat/ELF.h"
 #include "llvm/Object/ELFTypes.h"
 #include "llvm/Object/Error.h"
-#include "llvm/Support/Casting.h"
-#include "llvm/Support/ELF.h"
 #include "llvm/Support/Endian.h"
-#include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/ErrorOr.h"
-#include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/raw_ostream.h"
-#include <algorithm>
+#include "llvm/Support/Error.h"
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <utility>
 
@@ -38,6 +32,7 @@ namespace llvm {
 namespace object {
 
 StringRef getELFRelocationTypeName(uint32_t Machine, uint32_t Type);
+StringRef getELFSectionTypeName(uint32_t Machine, uint32_t Type);
 
 // Subclasses of ELFFile may need this for template instantiation
 inline std::pair<unsigned char, unsigned char>
@@ -49,459 +44,246 @@ getElfArchType(StringRef Object) {
                         (uint8_t)Object[ELF::EI_DATA]);
 }
 
+static inline Error createError(StringRef Err) {
+  return make_error<StringError>(Err, object_error::parse_failed);
+}
+
 template <class ELFT>
 class ELFFile {
 public:
   LLVM_ELF_IMPORT_TYPES_ELFT(ELFT)
-  typedef typename std::conditional<ELFT::Is64Bits,
-                                    uint64_t, uint32_t>::type uintX_t;
-
-  /// \brief Iterate over constant sized entities.
-  template <class EntT>
-  class ELFEntityIterator {
-  public:
-    typedef ptrdiff_t difference_type;
-    typedef EntT value_type;
-    typedef std::forward_iterator_tag iterator_category;
-    typedef value_type &reference;
-    typedef value_type *pointer;
-
-    /// \brief Default construct iterator.
-    ELFEntityIterator() : EntitySize(0), Current(nullptr) {}
-    ELFEntityIterator(uintX_t EntSize, const char *Start)
-        : EntitySize(EntSize), Current(Start) {}
-
-    reference operator *() {
-      assert(Current && "Attempted to dereference an invalid iterator!");
-      return *reinterpret_cast<pointer>(Current);
-    }
-
-    pointer operator ->() {
-      assert(Current && "Attempted to dereference an invalid iterator!");
-      return reinterpret_cast<pointer>(Current);
-    }
-
-    bool operator ==(const ELFEntityIterator &Other) {
-      return Current == Other.Current;
-    }
-
-    bool operator !=(const ELFEntityIterator &Other) {
-      return !(*this == Other);
-    }
-
-    ELFEntityIterator &operator ++() {
-      assert(Current && "Attempted to increment an invalid iterator!");
-      Current += EntitySize;
-      return *this;
-    }
-
-    ELFEntityIterator &operator+(difference_type n) {
-      assert(Current && "Attempted to increment an invalid iterator!");
-      Current += (n * EntitySize);
-      return *this;
-    }
-
-    ELFEntityIterator &operator-(difference_type n) {
-      assert(Current && "Attempted to subtract an invalid iterator!");
-      Current -= (n * EntitySize);
-      return *this;
-    }
-
-    ELFEntityIterator operator ++(int) {
-      ELFEntityIterator Tmp = *this;
-      ++*this;
-      return Tmp;
-    }
-
-    difference_type operator -(const ELFEntityIterator &Other) const {
-      assert(EntitySize == Other.EntitySize &&
-             "Subtracting iterators of different EntitySize!");
-      return (Current - Other.Current) / EntitySize;
-    }
-
-    const char *get() const { return Current; }
-
-    uintX_t getEntSize() const { return EntitySize; }
-
-  private:
-    uintX_t EntitySize;
-    const char *Current;
-  };
-
-  typedef Elf_Ehdr_Impl<ELFT> Elf_Ehdr;
-  typedef Elf_Shdr_Impl<ELFT> Elf_Shdr;
-  typedef Elf_Sym_Impl<ELFT> Elf_Sym;
-  typedef Elf_Dyn_Impl<ELFT> Elf_Dyn;
-  typedef Elf_Phdr_Impl<ELFT> Elf_Phdr;
-  typedef Elf_Rel_Impl<ELFT, false> Elf_Rel;
-  typedef Elf_Rel_Impl<ELFT, true> Elf_Rela;
-  typedef Elf_Verdef_Impl<ELFT> Elf_Verdef;
-  typedef Elf_Verdaux_Impl<ELFT> Elf_Verdaux;
-  typedef Elf_Verneed_Impl<ELFT> Elf_Verneed;
-  typedef Elf_Vernaux_Impl<ELFT> Elf_Vernaux;
-  typedef Elf_Versym_Impl<ELFT> Elf_Versym;
-  typedef Elf_Hash_Impl<ELFT> Elf_Hash;
-  typedef ELFEntityIterator<const Elf_Dyn> Elf_Dyn_Iter;
-  typedef iterator_range<Elf_Dyn_Iter> Elf_Dyn_Range;
-  typedef ELFEntityIterator<const Elf_Rela> Elf_Rela_Iter;
-  typedef ELFEntityIterator<const Elf_Rel> Elf_Rel_Iter;
-  typedef iterator_range<const Elf_Shdr *> Elf_Shdr_Range;
-
-  /// \brief Archive files are 2 byte aligned, so we need this for
-  ///     PointerIntPair to work.
-  template <typename T>
-  class ArchivePointerTypeTraits {
-  public:
-    static inline const void *getAsVoidPointer(T *P) { return P; }
-    static inline T *getFromVoidPointer(const void *P) {
-      return static_cast<T *>(P);
-    }
-    enum { NumLowBitsAvailable = 1 };
-  };
-
-  typedef iterator_range<const Elf_Sym *> Elf_Sym_Range;
-
-private:
-  typedef SmallVector<const Elf_Shdr *, 2> Sections_t;
-  typedef DenseMap<unsigned, unsigned> IndexMap_t;
-
-  StringRef Buf;
+  using uintX_t = typename ELFT::uint;
+  using Elf_Ehdr = typename ELFT::Ehdr;
+  using Elf_Shdr = typename ELFT::Shdr;
+  using Elf_Sym = typename ELFT::Sym;
+  using Elf_Dyn = typename ELFT::Dyn;
+  using Elf_Phdr = typename ELFT::Phdr;
+  using Elf_Rel = typename ELFT::Rel;
+  using Elf_Rela = typename ELFT::Rela;
+  using Elf_Verdef = typename ELFT::Verdef;
+  using Elf_Verdaux = typename ELFT::Verdaux;
+  using Elf_Verneed = typename ELFT::Verneed;
+  using Elf_Vernaux = typename ELFT::Vernaux;
+  using Elf_Versym = typename ELFT::Versym;
+  using Elf_Hash = typename ELFT::Hash;
+  using Elf_GnuHash = typename ELFT::GnuHash;
+  using Elf_Dyn_Range = typename ELFT::DynRange;
+  using Elf_Shdr_Range = typename ELFT::ShdrRange;
+  using Elf_Sym_Range = typename ELFT::SymRange;
+  using Elf_Rel_Range = typename ELFT::RelRange;
+  using Elf_Rela_Range = typename ELFT::RelaRange;
+  using Elf_Phdr_Range = typename ELFT::PhdrRange;
 
   const uint8_t *base() const {
     return reinterpret_cast<const uint8_t *>(Buf.data());
   }
 
-  const Elf_Ehdr *Header;
-  const Elf_Shdr *SectionHeaderTable = nullptr;
-  StringRef DotShstrtab;                    // Section header string table.
-  StringRef DotStrtab;                      // Symbol header string table.
-  const Elf_Shdr *dot_symtab_sec = nullptr; // Symbol table section.
-  const Elf_Shdr *DotDynSymSec = nullptr;   // Dynamic symbol table section.
-  const Elf_Hash *HashTable = nullptr;
+  size_t getBufSize() const { return Buf.size(); }
 
-  const Elf_Shdr *SymbolTableSectionHeaderIndex = nullptr;
-  DenseMap<const Elf_Sym *, ELF::Elf64_Word> ExtendedSymbolTable;
-
-  const Elf_Shdr *dot_gnu_version_sec = nullptr;   // .gnu.version
-  const Elf_Shdr *dot_gnu_version_r_sec = nullptr; // .gnu.version_r
-  const Elf_Shdr *dot_gnu_version_d_sec = nullptr; // .gnu.version_d
-
-  /// \brief Represents a region described by entries in the .dynamic table.
-  struct DynRegionInfo {
-    DynRegionInfo() : Addr(nullptr), Size(0), EntSize(0) {}
-    /// \brief Address in current address space.
-    const void *Addr;
-    /// \brief Size in bytes of the region.
-    uintX_t Size;
-    /// \brief Size of each entity in the region.
-    uintX_t EntSize;
-  };
-
-  DynRegionInfo DynamicRegion;
-  DynRegionInfo DynHashRegion;
-  DynRegionInfo DynStrRegion;
-  DynRegionInfo DynRelaRegion;
-
-  // Pointer to SONAME entry in dynamic string table
-  // This is set the first time getLoadName is called.
-  mutable const char *dt_soname = nullptr;
-
-  // Records for each version index the corresponding Verdef or Vernaux entry.
-  // This is filled the first time LoadVersionMap() is called.
-  class VersionMapEntry : public PointerIntPair<const void*, 1> {
-    public:
-    // If the integer is 0, this is an Elf_Verdef*.
-    // If the integer is 1, this is an Elf_Vernaux*.
-    VersionMapEntry() : PointerIntPair<const void*, 1>(nullptr, 0) { }
-    VersionMapEntry(const Elf_Verdef *verdef)
-        : PointerIntPair<const void*, 1>(verdef, 0) { }
-    VersionMapEntry(const Elf_Vernaux *vernaux)
-        : PointerIntPair<const void*, 1>(vernaux, 1) { }
-    bool isNull() const { return getPointer() == nullptr; }
-    bool isVerdef() const { return !isNull() && getInt() == 0; }
-    bool isVernaux() const { return !isNull() && getInt() == 1; }
-    const Elf_Verdef *getVerdef() const {
-      return isVerdef() ? (const Elf_Verdef*)getPointer() : nullptr;
-    }
-    const Elf_Vernaux *getVernaux() const {
-      return isVernaux() ? (const Elf_Vernaux*)getPointer() : nullptr;
-    }
-  };
-  mutable SmallVector<VersionMapEntry, 16> VersionMap;
-  void LoadVersionDefs(const Elf_Shdr *sec) const;
-  void LoadVersionNeeds(const Elf_Shdr *ec) const;
-  void LoadVersionMap() const;
-
-  void scanDynamicTable();
+private:
+  StringRef Buf;
 
 public:
-  template<typename T>
-  const T        *getEntry(uint32_t Section, uint32_t Entry) const;
+  const Elf_Ehdr *getHeader() const {
+    return reinterpret_cast<const Elf_Ehdr *>(base());
+  }
+
   template <typename T>
-  const T *getEntry(const Elf_Shdr *Section, uint32_t Entry) const;
+  Expected<const T *> getEntry(uint32_t Section, uint32_t Entry) const;
+  template <typename T>
+  Expected<const T *> getEntry(const Elf_Shdr *Section, uint32_t Entry) const;
 
-  const Elf_Shdr *getDotSymtabSec() const { return dot_symtab_sec; }
-  const Elf_Shdr *getDotDynSymSec() const { return DotDynSymSec; }
-  const Elf_Hash *getHashTable() const { return HashTable; }
+  Expected<StringRef> getStringTable(const Elf_Shdr *Section) const;
+  Expected<StringRef> getStringTableForSymtab(const Elf_Shdr &Section) const;
+  Expected<StringRef> getStringTableForSymtab(const Elf_Shdr &Section,
+                                              Elf_Shdr_Range Sections) const;
 
-  ErrorOr<StringRef> getStringTable(const Elf_Shdr *Section) const;
-  const char *getDynamicString(uintX_t Offset) const;
-  ErrorOr<StringRef> getSymbolVersion(const Elf_Shdr *section,
-                                      const Elf_Sym *Symb,
-                                      bool &IsDefault) const;
+  Expected<ArrayRef<Elf_Word>> getSHNDXTable(const Elf_Shdr &Section) const;
+  Expected<ArrayRef<Elf_Word>> getSHNDXTable(const Elf_Shdr &Section,
+                                             Elf_Shdr_Range Sections) const;
+
   void VerifyStrTab(const Elf_Shdr *sh) const;
 
   StringRef getRelocationTypeName(uint32_t Type) const;
   void getRelocationTypeName(uint32_t Type,
                              SmallVectorImpl<char> &Result) const;
 
-  /// \brief Get the symbol table section and symbol for a given relocation.
-  template <class RelT>
-  std::pair<const Elf_Shdr *, const Elf_Sym *>
-  getRelocationSymbol(const Elf_Shdr *RelSec, const RelT *Rel) const;
+  /// \brief Get the symbol for a given relocation.
+  Expected<const Elf_Sym *> getRelocationSymbol(const Elf_Rel *Rel,
+                                                const Elf_Shdr *SymTab) const;
 
-  ELFFile(StringRef Object, std::error_code &EC);
+  ELFFile(StringRef Object);
 
   bool isMipsELF64() const {
-    return Header->e_machine == ELF::EM_MIPS &&
-      Header->getFileClass() == ELF::ELFCLASS64;
+    return getHeader()->e_machine == ELF::EM_MIPS &&
+           getHeader()->getFileClass() == ELF::ELFCLASS64;
   }
 
   bool isMips64EL() const {
-    return Header->e_machine == ELF::EM_MIPS &&
-      Header->getFileClass() == ELF::ELFCLASS64 &&
-      Header->getDataEncoding() == ELF::ELFDATA2LSB;
+    return isMipsELF64() &&
+           getHeader()->getDataEncoding() == ELF::ELFDATA2LSB;
   }
 
-  const Elf_Shdr *section_begin() const;
-  const Elf_Shdr *section_end() const;
-  Elf_Shdr_Range sections() const {
-    return make_range(section_begin(), section_end());
+  Expected<Elf_Shdr_Range> sections() const;
+
+  Expected<Elf_Sym_Range> symbols(const Elf_Shdr *Sec) const {
+    if (!Sec)
+      return makeArrayRef<Elf_Sym>(nullptr, nullptr);
+    return getSectionContentsAsArray<Elf_Sym>(Sec);
   }
 
-  const Elf_Sym *symbol_begin() const;
-  const Elf_Sym *symbol_end() const;
-  Elf_Sym_Range symbols() const {
-    return make_range(symbol_begin(), symbol_end());
+  Expected<Elf_Rela_Range> relas(const Elf_Shdr *Sec) const {
+    return getSectionContentsAsArray<Elf_Rela>(Sec);
   }
 
-  Elf_Dyn_Iter dynamic_table_begin() const;
-  /// \param NULLEnd use one past the first DT_NULL entry as the end instead of
-  /// the section size.
-  Elf_Dyn_Iter dynamic_table_end(bool NULLEnd = false) const;
-  Elf_Dyn_Range dynamic_table(bool NULLEnd = false) const {
-    return make_range(dynamic_table_begin(), dynamic_table_end(NULLEnd));
-  }
-
-  const Elf_Sym *dynamic_symbol_begin() const {
-    if (!DotDynSymSec)
-      return nullptr;
-    if (DotDynSymSec->sh_entsize != sizeof(Elf_Sym))
-      report_fatal_error("Invalid symbol size");
-    return reinterpret_cast<const Elf_Sym *>(base() + DotDynSymSec->sh_offset);
-  }
-
-  const Elf_Sym *dynamic_symbol_end() const {
-    if (!DotDynSymSec)
-      return nullptr;
-    return reinterpret_cast<const Elf_Sym *>(base() + DotDynSymSec->sh_offset +
-                                             DotDynSymSec->sh_size);
-  }
-
-  Elf_Sym_Range dynamic_symbols() const {
-    return make_range(dynamic_symbol_begin(), dynamic_symbol_end());
-  }
-
-  Elf_Rela_Iter dyn_rela_begin() const {
-    if (DynRelaRegion.Addr)
-      return Elf_Rela_Iter(DynRelaRegion.EntSize,
-        (const char *)DynRelaRegion.Addr);
-    return Elf_Rela_Iter(0, nullptr);
-  }
-
-  Elf_Rela_Iter dyn_rela_end() const {
-    if (DynRelaRegion.Addr)
-      return Elf_Rela_Iter(
-        DynRelaRegion.EntSize,
-        (const char *)DynRelaRegion.Addr + DynRelaRegion.Size);
-    return Elf_Rela_Iter(0, nullptr);
-  }
-
-  Elf_Rela_Iter rela_begin(const Elf_Shdr *sec) const {
-    return Elf_Rela_Iter(sec->sh_entsize,
-                         (const char *)(base() + sec->sh_offset));
-  }
-
-  Elf_Rela_Iter rela_end(const Elf_Shdr *sec) const {
-    return Elf_Rela_Iter(
-        sec->sh_entsize,
-        (const char *)(base() + sec->sh_offset + sec->sh_size));
-  }
-
-  Elf_Rel_Iter rel_begin(const Elf_Shdr *sec) const {
-    return Elf_Rel_Iter(sec->sh_entsize,
-                        (const char *)(base() + sec->sh_offset));
-  }
-
-  Elf_Rel_Iter rel_end(const Elf_Shdr *sec) const {
-    return Elf_Rel_Iter(sec->sh_entsize,
-                        (const char *)(base() + sec->sh_offset + sec->sh_size));
+  Expected<Elf_Rel_Range> rels(const Elf_Shdr *Sec) const {
+    return getSectionContentsAsArray<Elf_Rel>(Sec);
   }
 
   /// \brief Iterate over program header table.
-  typedef ELFEntityIterator<const Elf_Phdr> Elf_Phdr_Iter;
-
-  Elf_Phdr_Iter program_header_begin() const {
-    return Elf_Phdr_Iter(Header->e_phentsize,
-                         (const char*)base() + Header->e_phoff);
+  Expected<Elf_Phdr_Range> program_headers() const {
+    if (getHeader()->e_phnum && getHeader()->e_phentsize != sizeof(Elf_Phdr))
+      return createError("invalid e_phentsize");
+    auto *Begin =
+        reinterpret_cast<const Elf_Phdr *>(base() + getHeader()->e_phoff);
+    return makeArrayRef(Begin, Begin + getHeader()->e_phnum);
   }
 
-  Elf_Phdr_Iter program_header_end() const {
-    return Elf_Phdr_Iter(Header->e_phentsize,
-                         (const char*)base() +
-                           Header->e_phoff +
-                           (Header->e_phnum * Header->e_phentsize));
-  }
+  Expected<StringRef> getSectionStringTable(Elf_Shdr_Range Sections) const;
+  Expected<uint32_t> getSectionIndex(const Elf_Sym *Sym, Elf_Sym_Range Syms,
+                                     ArrayRef<Elf_Word> ShndxTable) const;
+  Expected<const Elf_Shdr *> getSection(const Elf_Sym *Sym,
+                                        const Elf_Shdr *SymTab,
+                                        ArrayRef<Elf_Word> ShndxTable) const;
+  Expected<const Elf_Shdr *> getSection(const Elf_Sym *Sym,
+                                        Elf_Sym_Range Symtab,
+                                        ArrayRef<Elf_Word> ShndxTable) const;
+  Expected<const Elf_Shdr *> getSection(uint32_t Index) const;
 
-  uint64_t getNumSections() const;
-  uintX_t getStringTableIndex() const;
-  ELF::Elf64_Word getExtendedSymbolTableIndex(const Elf_Sym *symb) const;
-  const Elf_Ehdr *getHeader() const { return Header; }
-  ErrorOr<const Elf_Shdr *> getSection(const Elf_Sym *symb) const;
-  ErrorOr<const Elf_Shdr *> getSection(uint32_t Index) const;
-  const Elf_Sym *getSymbol(uint32_t index) const;
+  Expected<const Elf_Sym *> getSymbol(const Elf_Shdr *Sec,
+                                      uint32_t Index) const;
 
-  ErrorOr<StringRef> getStaticSymbolName(const Elf_Sym *Symb) const;
-  ErrorOr<StringRef> getDynamicSymbolName(const Elf_Sym *Symb) const;
-  ErrorOr<StringRef> getSymbolName(const Elf_Sym *Symb, bool IsDynamic) const;
-
-  ErrorOr<StringRef> getSectionName(const Elf_Shdr *Section) const;
-  ErrorOr<ArrayRef<uint8_t> > getSectionContents(const Elf_Shdr *Sec) const;
-  StringRef getLoadName() const;
+  Expected<StringRef> getSectionName(const Elf_Shdr *Section) const;
+  Expected<StringRef> getSectionName(const Elf_Shdr *Section,
+                                     StringRef DotShstrtab) const;
+  template <typename T>
+  Expected<ArrayRef<T>> getSectionContentsAsArray(const Elf_Shdr *Sec) const;
+  Expected<ArrayRef<uint8_t>> getSectionContents(const Elf_Shdr *Sec) const;
 };
 
-typedef ELFFile<ELFType<support::little, false>> ELF32LEFile;
-typedef ELFFile<ELFType<support::little, true>> ELF64LEFile;
-typedef ELFFile<ELFType<support::big, false>> ELF32BEFile;
-typedef ELFFile<ELFType<support::big, true>> ELF64BEFile;
+using ELF32LEFile = ELFFile<ELFType<support::little, false>>;
+using ELF64LEFile = ELFFile<ELFType<support::little, true>>;
+using ELF32BEFile = ELFFile<ELFType<support::big, false>>;
+using ELF64BEFile = ELFFile<ELFType<support::big, true>>;
 
-// Iterate through the version definitions, and place each Elf_Verdef
-// in the VersionMap according to its index.
 template <class ELFT>
-void ELFFile<ELFT>::LoadVersionDefs(const Elf_Shdr *sec) const {
-  unsigned vd_size = sec->sh_size;  // Size of section in bytes
-  unsigned vd_count = sec->sh_info; // Number of Verdef entries
-  const char *sec_start = (const char*)base() + sec->sh_offset;
-  const char *sec_end = sec_start + vd_size;
-  // The first Verdef entry is at the start of the section.
-  const char *p = sec_start;
-  for (unsigned i = 0; i < vd_count; i++) {
-    if (p + sizeof(Elf_Verdef) > sec_end)
-      report_fatal_error("Section ended unexpectedly while scanning "
-                         "version definitions.");
-    const Elf_Verdef *vd = reinterpret_cast<const Elf_Verdef *>(p);
-    if (vd->vd_version != ELF::VER_DEF_CURRENT)
-      report_fatal_error("Unexpected verdef version");
-    size_t index = vd->vd_ndx & ELF::VERSYM_VERSION;
-    if (index >= VersionMap.size())
-      VersionMap.resize(index + 1);
-    VersionMap[index] = VersionMapEntry(vd);
-    p += vd->vd_next;
+inline Expected<const typename ELFT::Shdr *>
+getSection(typename ELFT::ShdrRange Sections, uint32_t Index) {
+  if (Index >= Sections.size())
+    return createError("invalid section index");
+  return &Sections[Index];
+}
+
+template <class ELFT>
+inline Expected<uint32_t>
+getExtendedSymbolTableIndex(const typename ELFT::Sym *Sym,
+                            const typename ELFT::Sym *FirstSym,
+                            ArrayRef<typename ELFT::Word> ShndxTable) {
+  assert(Sym->st_shndx == ELF::SHN_XINDEX);
+  unsigned Index = Sym - FirstSym;
+  if (Index >= ShndxTable.size())
+    return createError("index past the end of the symbol table");
+
+  // The size of the table was checked in getSHNDXTable.
+  return ShndxTable[Index];
+}
+
+template <class ELFT>
+Expected<uint32_t>
+ELFFile<ELFT>::getSectionIndex(const Elf_Sym *Sym, Elf_Sym_Range Syms,
+                               ArrayRef<Elf_Word> ShndxTable) const {
+  uint32_t Index = Sym->st_shndx;
+  if (Index == ELF::SHN_XINDEX) {
+    auto ErrorOrIndex = getExtendedSymbolTableIndex<ELFT>(
+        Sym, Syms.begin(), ShndxTable);
+    if (!ErrorOrIndex)
+      return ErrorOrIndex.takeError();
+    return *ErrorOrIndex;
   }
-}
-
-// Iterate through the versions needed section, and place each Elf_Vernaux
-// in the VersionMap according to its index.
-template <class ELFT>
-void ELFFile<ELFT>::LoadVersionNeeds(const Elf_Shdr *sec) const {
-  unsigned vn_size = sec->sh_size;  // Size of section in bytes
-  unsigned vn_count = sec->sh_info; // Number of Verneed entries
-  const char *sec_start = (const char *)base() + sec->sh_offset;
-  const char *sec_end = sec_start + vn_size;
-  // The first Verneed entry is at the start of the section.
-  const char *p = sec_start;
-  for (unsigned i = 0; i < vn_count; i++) {
-    if (p + sizeof(Elf_Verneed) > sec_end)
-      report_fatal_error("Section ended unexpectedly while scanning "
-                         "version needed records.");
-    const Elf_Verneed *vn = reinterpret_cast<const Elf_Verneed *>(p);
-    if (vn->vn_version != ELF::VER_NEED_CURRENT)
-      report_fatal_error("Unexpected verneed version");
-    // Iterate through the Vernaux entries
-    const char *paux = p + vn->vn_aux;
-    for (unsigned j = 0; j < vn->vn_cnt; j++) {
-      if (paux + sizeof(Elf_Vernaux) > sec_end)
-        report_fatal_error("Section ended unexpected while scanning auxiliary "
-                           "version needed records.");
-      const Elf_Vernaux *vna = reinterpret_cast<const Elf_Vernaux *>(paux);
-      size_t index = vna->vna_other & ELF::VERSYM_VERSION;
-      if (index >= VersionMap.size())
-        VersionMap.resize(index + 1);
-      VersionMap[index] = VersionMapEntry(vna);
-      paux += vna->vna_next;
-    }
-    p += vn->vn_next;
-  }
-}
-
-template <class ELFT>
-void ELFFile<ELFT>::LoadVersionMap() const {
-  // If there is no dynamic symtab or version table, there is nothing to do.
-  if (!DotDynSymSec || !dot_gnu_version_sec)
-    return;
-
-  // Has the VersionMap already been loaded?
-  if (VersionMap.size() > 0)
-    return;
-
-  // The first two version indexes are reserved.
-  // Index 0 is LOCAL, index 1 is GLOBAL.
-  VersionMap.push_back(VersionMapEntry());
-  VersionMap.push_back(VersionMapEntry());
-
-  if (dot_gnu_version_d_sec)
-    LoadVersionDefs(dot_gnu_version_d_sec);
-
-  if (dot_gnu_version_r_sec)
-    LoadVersionNeeds(dot_gnu_version_r_sec);
-}
-
-template <class ELFT>
-ELF::Elf64_Word
-ELFFile<ELFT>::getExtendedSymbolTableIndex(const Elf_Sym *symb) const {
-  assert(symb->st_shndx == ELF::SHN_XINDEX);
-  return ExtendedSymbolTable.lookup(symb);
-}
-
-template <class ELFT>
-ErrorOr<const typename ELFFile<ELFT>::Elf_Shdr *>
-ELFFile<ELFT>::getSection(const Elf_Sym *symb) const {
-  uint32_t Index = symb->st_shndx;
-  if (Index == ELF::SHN_XINDEX)
-    return getSection(ExtendedSymbolTable.lookup(symb));
   if (Index == ELF::SHN_UNDEF || Index >= ELF::SHN_LORESERVE)
+    return 0;
+  return Index;
+}
+
+template <class ELFT>
+Expected<const typename ELFT::Shdr *>
+ELFFile<ELFT>::getSection(const Elf_Sym *Sym, const Elf_Shdr *SymTab,
+                          ArrayRef<Elf_Word> ShndxTable) const {
+  auto SymsOrErr = symbols(SymTab);
+  if (!SymsOrErr)
+    return SymsOrErr.takeError();
+  return getSection(Sym, *SymsOrErr, ShndxTable);
+}
+
+template <class ELFT>
+Expected<const typename ELFT::Shdr *>
+ELFFile<ELFT>::getSection(const Elf_Sym *Sym, Elf_Sym_Range Symbols,
+                          ArrayRef<Elf_Word> ShndxTable) const {
+  auto IndexOrErr = getSectionIndex(Sym, Symbols, ShndxTable);
+  if (!IndexOrErr)
+    return IndexOrErr.takeError();
+  uint32_t Index = *IndexOrErr;
+  if (Index == 0)
     return nullptr;
-  return getSection(symb->st_shndx);
+  return getSection(Index);
 }
 
 template <class ELFT>
-const typename ELFFile<ELFT>::Elf_Sym *
-ELFFile<ELFT>::getSymbol(uint32_t Index) const {
-  return &*(symbol_begin() + Index);
+inline Expected<const typename ELFT::Sym *>
+getSymbol(typename ELFT::SymRange Symbols, uint32_t Index) {
+  if (Index >= Symbols.size())
+    return createError("invalid symbol index");
+  return &Symbols[Index];
 }
 
 template <class ELFT>
-ErrorOr<ArrayRef<uint8_t> >
+Expected<const typename ELFT::Sym *>
+ELFFile<ELFT>::getSymbol(const Elf_Shdr *Sec, uint32_t Index) const {
+  auto SymtabOrErr = symbols(Sec);
+  if (!SymtabOrErr)
+    return SymtabOrErr.takeError();
+  return object::getSymbol<ELFT>(*SymtabOrErr, Index);
+}
+
+template <class ELFT>
+template <typename T>
+Expected<ArrayRef<T>>
+ELFFile<ELFT>::getSectionContentsAsArray(const Elf_Shdr *Sec) const {
+  if (Sec->sh_entsize != sizeof(T) && sizeof(T) != 1)
+    return createError("invalid sh_entsize");
+
+  uintX_t Offset = Sec->sh_offset;
+  uintX_t Size = Sec->sh_size;
+
+  if (Size % sizeof(T))
+    return createError("size is not a multiple of sh_entsize");
+  if ((std::numeric_limits<uintX_t>::max() - Offset < Size) ||
+      Offset + Size > Buf.size())
+    return createError("invalid section offset");
+
+  const T *Start = reinterpret_cast<const T *>(base() + Offset);
+  return makeArrayRef(Start, Size / sizeof(T));
+}
+
+template <class ELFT>
+Expected<ArrayRef<uint8_t>>
 ELFFile<ELFT>::getSectionContents(const Elf_Shdr *Sec) const {
-  if (Sec->sh_offset + Sec->sh_size > Buf.size())
-    return object_error::parse_failed;
-  const uint8_t *Start = base() + Sec->sh_offset;
-  return makeArrayRef(Start, Sec->sh_size);
+  return getSectionContentsAsArray<uint8_t>(Sec);
 }
 
 template <class ELFT>
 StringRef ELFFile<ELFT>::getRelocationTypeName(uint32_t Type) const {
-  return getELFRelocationTypeName(Header->e_machine, Type);
+  return getELFRelocationTypeName(getHeader()->e_machine, Type);
 }
 
 template <class ELFT>
@@ -536,506 +318,207 @@ void ELFFile<ELFT>::getRelocationTypeName(uint32_t Type,
 }
 
 template <class ELFT>
-template <class RelT>
-std::pair<const typename ELFFile<ELFT>::Elf_Shdr *,
-          const typename ELFFile<ELFT>::Elf_Sym *>
-ELFFile<ELFT>::getRelocationSymbol(const Elf_Shdr *Sec, const RelT *Rel) const {
-  if (!Sec->sh_link)
-    return std::make_pair(nullptr, nullptr);
-  ErrorOr<const Elf_Shdr *> SymTableOrErr = getSection(Sec->sh_link);
-  if (std::error_code EC = SymTableOrErr.getError())
-    report_fatal_error(EC.message());
-  const Elf_Shdr *SymTable = *SymTableOrErr;
-  return std::make_pair(
-      SymTable, getEntry<Elf_Sym>(SymTable, Rel->getSymbol(isMips64EL())));
+Expected<const typename ELFT::Sym *>
+ELFFile<ELFT>::getRelocationSymbol(const Elf_Rel *Rel,
+                                   const Elf_Shdr *SymTab) const {
+  uint32_t Index = Rel->getSymbol(isMips64EL());
+  if (Index == 0)
+    return nullptr;
+  return getEntry<Elf_Sym>(SymTab, Index);
 }
 
 template <class ELFT>
-uint64_t ELFFile<ELFT>::getNumSections() const {
-  assert(Header && "Header not initialized!");
-  if (Header->e_shnum == ELF::SHN_UNDEF && Header->e_shoff > 0) {
-    assert(SectionHeaderTable && "SectionHeaderTable not initialized!");
-    return SectionHeaderTable->sh_size;
-  }
-  return Header->e_shnum;
+Expected<StringRef>
+ELFFile<ELFT>::getSectionStringTable(Elf_Shdr_Range Sections) const {
+  uint32_t Index = getHeader()->e_shstrndx;
+  if (Index == ELF::SHN_XINDEX)
+    Index = Sections[0].sh_link;
+
+  if (!Index) // no section string table.
+    return "";
+  if (Index >= Sections.size())
+    return createError("invalid section index");
+  return getStringTable(&Sections[Index]);
 }
 
 template <class ELFT>
-typename ELFFile<ELFT>::uintX_t ELFFile<ELFT>::getStringTableIndex() const {
-  if (Header->e_shnum == ELF::SHN_UNDEF) {
-    if (Header->e_shstrndx == ELF::SHN_HIRESERVE)
-      return SectionHeaderTable->sh_link;
-    if (Header->e_shstrndx >= getNumSections())
-      return 0;
-  }
-  return Header->e_shstrndx;
+ELFFile<ELFT>::ELFFile(StringRef Object) : Buf(Object) {
+  assert(sizeof(Elf_Ehdr) <= Buf.size() && "Invalid buffer");
 }
 
 template <class ELFT>
-ELFFile<ELFT>::ELFFile(StringRef Object, std::error_code &EC)
-    : Buf(Object) {
+bool compareAddr(uint64_t VAddr, const Elf_Phdr_Impl<ELFT> *Phdr) {
+  return VAddr < Phdr->p_vaddr;
+}
+
+template <class ELFT>
+Expected<typename ELFT::ShdrRange> ELFFile<ELFT>::sections() const {
+  const uintX_t SectionTableOffset = getHeader()->e_shoff;
+  if (SectionTableOffset == 0)
+    return ArrayRef<Elf_Shdr>();
+
+  if (getHeader()->e_shentsize != sizeof(Elf_Shdr))
+    return createError(
+        "invalid section header entry size (e_shentsize) in ELF header");
+
   const uint64_t FileSize = Buf.size();
 
-  if (sizeof(Elf_Ehdr) > FileSize) {
-    // File too short!
-    EC = object_error::parse_failed;
-    return;
-  }
+  if (SectionTableOffset + sizeof(Elf_Shdr) > FileSize)
+    return createError("section header table goes past the end of the file");
 
-  Header = reinterpret_cast<const Elf_Ehdr *>(base());
+  // Invalid address alignment of section headers
+  if (SectionTableOffset & (alignof(Elf_Shdr) - 1))
+    return createError("invalid alignment of section headers");
 
-  if (Header->e_shoff == 0) {
-    scanDynamicTable();
-    return;
-  }
+  const Elf_Shdr *First =
+      reinterpret_cast<const Elf_Shdr *>(base() + SectionTableOffset);
 
-  const uint64_t SectionTableOffset = Header->e_shoff;
+  uintX_t NumSections = getHeader()->e_shnum;
+  if (NumSections == 0)
+    NumSections = First->sh_size;
 
-  if (SectionTableOffset + sizeof(Elf_Shdr) > FileSize) {
-    // Section header table goes past end of file!
-    EC = object_error::parse_failed;
-    return;
-  }
+  if (NumSections > UINT64_MAX / sizeof(Elf_Shdr))
+    return createError("section table goes past the end of file");
 
-  // The getNumSections() call below depends on SectionHeaderTable being set.
-  SectionHeaderTable =
-    reinterpret_cast<const Elf_Shdr *>(base() + SectionTableOffset);
-  const uint64_t SectionTableSize = getNumSections() * Header->e_shentsize;
+  const uint64_t SectionTableSize = NumSections * sizeof(Elf_Shdr);
 
-  if (SectionTableOffset + SectionTableSize > FileSize) {
-    // Section table goes past end of file!
-    EC = object_error::parse_failed;
-    return;
-  }
+  // Section table goes past end of file!
+  if (SectionTableOffset + SectionTableSize > FileSize)
+    return createError("section table goes past the end of file");
 
-  // Scan sections for special sections.
-
-  for (const Elf_Shdr &Sec : sections()) {
-    switch (Sec.sh_type) {
-    case ELF::SHT_HASH:
-      if (HashTable) {
-        EC = object_error::parse_failed;
-        return;
-      }
-      HashTable = reinterpret_cast<const Elf_Hash *>(base() + Sec.sh_offset);
-      break;
-    case ELF::SHT_SYMTAB_SHNDX:
-      if (SymbolTableSectionHeaderIndex) {
-        // More than one .symtab_shndx!
-        EC = object_error::parse_failed;
-        return;
-      }
-      SymbolTableSectionHeaderIndex = &Sec;
-      break;
-    case ELF::SHT_SYMTAB: {
-      if (dot_symtab_sec) {
-        // More than one .symtab!
-        EC = object_error::parse_failed;
-        return;
-      }
-      dot_symtab_sec = &Sec;
-      ErrorOr<const Elf_Shdr *> SectionOrErr = getSection(Sec.sh_link);
-      if ((EC = SectionOrErr.getError()))
-        return;
-      ErrorOr<StringRef> SymtabOrErr = getStringTable(*SectionOrErr);
-      if ((EC = SymtabOrErr.getError()))
-        return;
-      DotStrtab = *SymtabOrErr;
-    } break;
-    case ELF::SHT_DYNSYM: {
-      if (DotDynSymSec) {
-        // More than one .dynsym!
-        EC = object_error::parse_failed;
-        return;
-      }
-      DotDynSymSec = &Sec;
-      ErrorOr<const Elf_Shdr *> SectionOrErr = getSection(Sec.sh_link);
-      if ((EC = SectionOrErr.getError()))
-        return;
-      ErrorOr<StringRef> SymtabOrErr = getStringTable(*SectionOrErr);
-      if ((EC = SymtabOrErr.getError()))
-        return;
-      DynStrRegion.Addr = SymtabOrErr->data();
-      DynStrRegion.Size = SymtabOrErr->size();
-      DynStrRegion.EntSize = 1;
-      break;
-    }
-    case ELF::SHT_DYNAMIC:
-      if (DynamicRegion.Addr) {
-        // More than one .dynamic!
-        EC = object_error::parse_failed;
-        return;
-      }
-      DynamicRegion.Addr = base() + Sec.sh_offset;
-      DynamicRegion.Size = Sec.sh_size;
-      DynamicRegion.EntSize = Sec.sh_entsize;
-      break;
-    case ELF::SHT_GNU_versym:
-      if (dot_gnu_version_sec != nullptr) {
-        // More than one .gnu.version section!
-        EC = object_error::parse_failed;
-        return;
-      }
-      dot_gnu_version_sec = &Sec;
-      break;
-    case ELF::SHT_GNU_verdef:
-      if (dot_gnu_version_d_sec != nullptr) {
-        // More than one .gnu.version_d section!
-        EC = object_error::parse_failed;
-        return;
-      }
-      dot_gnu_version_d_sec = &Sec;
-      break;
-    case ELF::SHT_GNU_verneed:
-      if (dot_gnu_version_r_sec != nullptr) {
-        // More than one .gnu.version_r section!
-        EC = object_error::parse_failed;
-        return;
-      }
-      dot_gnu_version_r_sec = &Sec;
-      break;
-    }
-  }
-
-  // Get string table sections.
-  ErrorOr<const Elf_Shdr *> StrTabSecOrErr = getSection(getStringTableIndex());
-  if ((EC = StrTabSecOrErr.getError()))
-    return;
-
-  ErrorOr<StringRef> SymtabOrErr = getStringTable(*StrTabSecOrErr);
-  if ((EC = SymtabOrErr.getError()))
-    return;
-  DotShstrtab = *SymtabOrErr;
-
-  // Build symbol name side-mapping if there is one.
-  if (SymbolTableSectionHeaderIndex) {
-    const Elf_Word *ShndxTable = reinterpret_cast<const Elf_Word*>(base() +
-                                      SymbolTableSectionHeaderIndex->sh_offset);
-    for (const Elf_Sym &S : symbols()) {
-      if (*ShndxTable != ELF::SHN_UNDEF)
-        ExtendedSymbolTable[&S] = *ShndxTable;
-      ++ShndxTable;
-    }
-  }
-
-  scanDynamicTable();
-
-  EC = std::error_code();
-}
-
-template <class ELFT>
-void ELFFile<ELFT>::scanDynamicTable() {
-  // Build load-address to file-offset map.
-  typedef IntervalMap<
-      uintX_t, uintptr_t,
-      IntervalMapImpl::NodeSizer<uintX_t, uintptr_t>::LeafSize,
-      IntervalMapHalfOpenInfo<uintX_t>> LoadMapT;
-  typename LoadMapT::Allocator Alloc;
-  // Allocate the IntervalMap on the heap to work around MSVC bug where the
-  // stack doesn't get realigned despite LoadMap having alignment 8 (PR24113).
-  std::unique_ptr<LoadMapT> LoadMap(new LoadMapT(Alloc));
-
-  for (Elf_Phdr_Iter PhdrI = program_header_begin(),
-                     PhdrE = program_header_end();
-       PhdrI != PhdrE; ++PhdrI) {
-    if (PhdrI->p_type == ELF::PT_DYNAMIC) {
-      DynamicRegion.Addr = base() + PhdrI->p_offset;
-      DynamicRegion.Size = PhdrI->p_filesz;
-      DynamicRegion.EntSize = sizeof(Elf_Dyn);
-      continue;
-    }
-    if (PhdrI->p_type != ELF::PT_LOAD)
-      continue;
-    if (PhdrI->p_filesz == 0)
-      continue;
-    LoadMap->insert(PhdrI->p_vaddr, PhdrI->p_vaddr + PhdrI->p_filesz,
-                    PhdrI->p_offset);
-  }
-
-  auto toMappedAddr = [&](uint64_t VAddr) -> const uint8_t * {
-    auto I = LoadMap->find(VAddr);
-    if (I == LoadMap->end())
-      return nullptr;
-    return this->base() + I.value() + (VAddr - I.start());
-  };
-
-  for (Elf_Dyn_Iter DynI = dynamic_table_begin(), DynE = dynamic_table_end();
-       DynI != DynE; ++DynI) {
-    switch (DynI->d_tag) {
-    case ELF::DT_HASH:
-      if (HashTable)
-        continue;
-      HashTable =
-          reinterpret_cast<const Elf_Hash *>(toMappedAddr(DynI->getPtr()));
-      break;
-    case ELF::DT_STRTAB:
-      if (!DynStrRegion.Addr)
-        DynStrRegion.Addr = toMappedAddr(DynI->getPtr());
-      break;
-    case ELF::DT_STRSZ:
-      if (!DynStrRegion.Size)
-        DynStrRegion.Size = DynI->getVal();
-      break;
-    case ELF::DT_RELA:
-      if (!DynRelaRegion.Addr)
-        DynRelaRegion.Addr = toMappedAddr(DynI->getPtr());
-      break;
-    case ELF::DT_RELASZ:
-      DynRelaRegion.Size = DynI->getVal();
-      break;
-    case ELF::DT_RELAENT:
-      DynRelaRegion.EntSize = DynI->getVal();
-    }
-  }
-}
-
-template <class ELFT>
-const typename ELFFile<ELFT>::Elf_Shdr *ELFFile<ELFT>::section_begin() const {
-  if (Header->e_shentsize != sizeof(Elf_Shdr))
-    report_fatal_error(
-        "Invalid section header entry size (e_shentsize) in ELF header");
-  return reinterpret_cast<const Elf_Shdr *>(base() + Header->e_shoff);
-}
-
-template <class ELFT>
-const typename ELFFile<ELFT>::Elf_Shdr *ELFFile<ELFT>::section_end() const {
-  return section_begin() + getNumSections();
-}
-
-template <class ELFT>
-const typename ELFFile<ELFT>::Elf_Sym *ELFFile<ELFT>::symbol_begin() const {
-  if (!dot_symtab_sec)
-    return nullptr;
-  if (dot_symtab_sec->sh_entsize != sizeof(Elf_Sym))
-    report_fatal_error("Invalid symbol size");
-  return reinterpret_cast<const Elf_Sym *>(base() + dot_symtab_sec->sh_offset);
-}
-
-template <class ELFT>
-const typename ELFFile<ELFT>::Elf_Sym *ELFFile<ELFT>::symbol_end() const {
-  if (!dot_symtab_sec)
-    return nullptr;
-  return reinterpret_cast<const Elf_Sym *>(base() + dot_symtab_sec->sh_offset +
-                                           dot_symtab_sec->sh_size);
-}
-
-template <class ELFT>
-typename ELFFile<ELFT>::Elf_Dyn_Iter
-ELFFile<ELFT>::dynamic_table_begin() const {
-  if (DynamicRegion.Addr)
-    return Elf_Dyn_Iter(DynamicRegion.EntSize,
-                        (const char *)DynamicRegion.Addr);
-  return Elf_Dyn_Iter(0, nullptr);
-}
-
-template <class ELFT>
-typename ELFFile<ELFT>::Elf_Dyn_Iter
-ELFFile<ELFT>::dynamic_table_end(bool NULLEnd) const {
-  if (!DynamicRegion.Addr)
-    return Elf_Dyn_Iter(0, nullptr);
-  Elf_Dyn_Iter Ret(DynamicRegion.EntSize,
-                    (const char *)DynamicRegion.Addr + DynamicRegion.Size);
-
-  if (NULLEnd) {
-    Elf_Dyn_Iter Start = dynamic_table_begin();
-    while (Start != Ret && Start->getTag() != ELF::DT_NULL)
-      ++Start;
-
-    // Include the DT_NULL.
-    if (Start != Ret)
-      ++Start;
-    Ret = Start;
-  }
-  return Ret;
-}
-
-template <class ELFT>
-StringRef ELFFile<ELFT>::getLoadName() const {
-  if (!dt_soname) {
-    dt_soname = "";
-    // Find the DT_SONAME entry
-    for (const auto &Entry : dynamic_table())
-      if (Entry.getTag() == ELF::DT_SONAME) {
-        dt_soname = getDynamicString(Entry.getVal());
-        break;
-      }
-  }
-  return dt_soname;
+  return makeArrayRef(First, NumSections);
 }
 
 template <class ELFT>
 template <typename T>
-const T *ELFFile<ELFT>::getEntry(uint32_t Section, uint32_t Entry) const {
-  ErrorOr<const Elf_Shdr *> Sec = getSection(Section);
-  if (std::error_code EC = Sec.getError())
-    report_fatal_error(EC.message());
-  return getEntry<T>(*Sec, Entry);
+Expected<const T *> ELFFile<ELFT>::getEntry(uint32_t Section,
+                                            uint32_t Entry) const {
+  auto SecOrErr = getSection(Section);
+  if (!SecOrErr)
+    return SecOrErr.takeError();
+  return getEntry<T>(*SecOrErr, Entry);
 }
 
 template <class ELFT>
 template <typename T>
-const T *ELFFile<ELFT>::getEntry(const Elf_Shdr *Section,
-                                 uint32_t Entry) const {
-  return reinterpret_cast<const T *>(base() + Section->sh_offset +
-                                     (Entry * Section->sh_entsize));
+Expected<const T *> ELFFile<ELFT>::getEntry(const Elf_Shdr *Section,
+                                            uint32_t Entry) const {
+  if (sizeof(T) != Section->sh_entsize)
+    return createError("invalid sh_entsize");
+  size_t Pos = Section->sh_offset + Entry * sizeof(T);
+  if (Pos + sizeof(T) > Buf.size())
+    return createError("invalid section offset");
+  return reinterpret_cast<const T *>(base() + Pos);
 }
 
 template <class ELFT>
-ErrorOr<const typename ELFFile<ELFT>::Elf_Shdr *>
+Expected<const typename ELFT::Shdr *>
 ELFFile<ELFT>::getSection(uint32_t Index) const {
-  assert(SectionHeaderTable && "SectionHeaderTable not initialized!");
-  if (Index >= getNumSections())
-    return object_error::invalid_section_index;
-
-  return reinterpret_cast<const Elf_Shdr *>(
-      reinterpret_cast<const char *>(SectionHeaderTable) +
-      (Index * Header->e_shentsize));
+  auto TableOrErr = sections();
+  if (!TableOrErr)
+    return TableOrErr.takeError();
+  return object::getSection<ELFT>(*TableOrErr, Index);
 }
 
 template <class ELFT>
-ErrorOr<StringRef>
+Expected<StringRef>
 ELFFile<ELFT>::getStringTable(const Elf_Shdr *Section) const {
   if (Section->sh_type != ELF::SHT_STRTAB)
-    return object_error::parse_failed;
-  uint64_t Offset = Section->sh_offset;
-  uint64_t Size = Section->sh_size;
-  if (Offset + Size > Buf.size())
-    return object_error::parse_failed;
-  StringRef Data((const char *)base() + Section->sh_offset, Size);
-  if (Data[Size - 1] != '\0')
-    return object_error::string_table_non_null_end;
-  return Data;
+    return createError("invalid sh_type for string table, expected SHT_STRTAB");
+  auto V = getSectionContentsAsArray<char>(Section);
+  if (!V)
+    return V.takeError();
+  ArrayRef<char> Data = *V;
+  if (Data.empty())
+    return createError("empty string table");
+  if (Data.back() != '\0')
+    return createError("string table non-null terminated");
+  return StringRef(Data.begin(), Data.size());
 }
 
 template <class ELFT>
-const char *ELFFile<ELFT>::getDynamicString(uintX_t Offset) const {
-  if (Offset >= DynStrRegion.Size)
-    return nullptr;
-  return (const char *)DynStrRegion.Addr + Offset;
+Expected<ArrayRef<typename ELFT::Word>>
+ELFFile<ELFT>::getSHNDXTable(const Elf_Shdr &Section) const {
+  auto SectionsOrErr = sections();
+  if (!SectionsOrErr)
+    return SectionsOrErr.takeError();
+  return getSHNDXTable(Section, *SectionsOrErr);
 }
 
 template <class ELFT>
-ErrorOr<StringRef>
-ELFFile<ELFT>::getStaticSymbolName(const Elf_Sym *Symb) const {
-  return Symb->getName(DotStrtab);
+Expected<ArrayRef<typename ELFT::Word>>
+ELFFile<ELFT>::getSHNDXTable(const Elf_Shdr &Section,
+                             Elf_Shdr_Range Sections) const {
+  assert(Section.sh_type == ELF::SHT_SYMTAB_SHNDX);
+  auto VOrErr = getSectionContentsAsArray<Elf_Word>(&Section);
+  if (!VOrErr)
+    return VOrErr.takeError();
+  ArrayRef<Elf_Word> V = *VOrErr;
+  auto SymTableOrErr = object::getSection<ELFT>(Sections, Section.sh_link);
+  if (!SymTableOrErr)
+    return SymTableOrErr.takeError();
+  const Elf_Shdr &SymTable = **SymTableOrErr;
+  if (SymTable.sh_type != ELF::SHT_SYMTAB &&
+      SymTable.sh_type != ELF::SHT_DYNSYM)
+    return createError("invalid sh_type");
+  if (V.size() != (SymTable.sh_size / sizeof(Elf_Sym)))
+    return createError("invalid section contents size");
+  return V;
 }
 
 template <class ELFT>
-ErrorOr<StringRef>
-ELFFile<ELFT>::getDynamicSymbolName(const Elf_Sym *Symb) const {
-  return StringRef(getDynamicString(Symb->st_name));
+Expected<StringRef>
+ELFFile<ELFT>::getStringTableForSymtab(const Elf_Shdr &Sec) const {
+  auto SectionsOrErr = sections();
+  if (!SectionsOrErr)
+    return SectionsOrErr.takeError();
+  return getStringTableForSymtab(Sec, *SectionsOrErr);
 }
 
 template <class ELFT>
-ErrorOr<StringRef> ELFFile<ELFT>::getSymbolName(const Elf_Sym *Symb,
-                                                bool IsDynamic) const {
-  if (IsDynamic)
-    return getDynamicSymbolName(Symb);
-  return getStaticSymbolName(Symb);
+Expected<StringRef>
+ELFFile<ELFT>::getStringTableForSymtab(const Elf_Shdr &Sec,
+                                       Elf_Shdr_Range Sections) const {
+
+  if (Sec.sh_type != ELF::SHT_SYMTAB && Sec.sh_type != ELF::SHT_DYNSYM)
+    return createError(
+        "invalid sh_type for symbol table, expected SHT_SYMTAB or SHT_DYNSYM");
+  auto SectionOrErr = object::getSection<ELFT>(Sections, Sec.sh_link);
+  if (!SectionOrErr)
+    return SectionOrErr.takeError();
+  return getStringTable(*SectionOrErr);
 }
 
 template <class ELFT>
-ErrorOr<StringRef>
+Expected<StringRef>
 ELFFile<ELFT>::getSectionName(const Elf_Shdr *Section) const {
-  uint32_t Offset = Section->sh_name;
-  if (Offset >= DotShstrtab.size())
-    return object_error::parse_failed;
-  return StringRef(DotShstrtab.data() + Offset);
+  auto SectionsOrErr = sections();
+  if (!SectionsOrErr)
+    return SectionsOrErr.takeError();
+  auto Table = getSectionStringTable(*SectionsOrErr);
+  if (!Table)
+    return Table.takeError();
+  return getSectionName(Section, *Table);
 }
 
 template <class ELFT>
-ErrorOr<StringRef> ELFFile<ELFT>::getSymbolVersion(const Elf_Shdr *section,
-                                                   const Elf_Sym *symb,
-                                                   bool &IsDefault) const {
-  StringRef StrTab;
-  if (section) {
-    ErrorOr<StringRef> StrTabOrErr = getStringTable(section);
-    if (std::error_code EC = StrTabOrErr.getError())
-      return EC;
-    StrTab = *StrTabOrErr;
-  }
-  // Handle non-dynamic symbols.
-  if (section != DotDynSymSec && section != nullptr) {
-    // Non-dynamic symbols can have versions in their names
-    // A name of the form 'foo@V1' indicates version 'V1', non-default.
-    // A name of the form 'foo@@V2' indicates version 'V2', default version.
-    ErrorOr<StringRef> SymName = symb->getName(StrTab);
-    if (!SymName)
-      return SymName;
-    StringRef Name = *SymName;
-    size_t atpos = Name.find('@');
-    if (atpos == StringRef::npos) {
-      IsDefault = false;
-      return StringRef("");
-    }
-    ++atpos;
-    if (atpos < Name.size() && Name[atpos] == '@') {
-      IsDefault = true;
-      ++atpos;
-    } else {
-      IsDefault = false;
-    }
-    return Name.substr(atpos);
-  }
-
-  // This is a dynamic symbol. Look in the GNU symbol version table.
-  if (!dot_gnu_version_sec) {
-    // No version table.
-    IsDefault = false;
-    return StringRef("");
-  }
-
-  // Determine the position in the symbol table of this entry.
-  size_t entry_index =
-      (reinterpret_cast<uintptr_t>(symb) - DotDynSymSec->sh_offset -
-       reinterpret_cast<uintptr_t>(base())) /
-      sizeof(Elf_Sym);
-
-  // Get the corresponding version index entry
-  const Elf_Versym *vs = getEntry<Elf_Versym>(dot_gnu_version_sec, entry_index);
-  size_t version_index = vs->vs_index & ELF::VERSYM_VERSION;
-
-  // Special markers for unversioned symbols.
-  if (version_index == ELF::VER_NDX_LOCAL ||
-      version_index == ELF::VER_NDX_GLOBAL) {
-    IsDefault = false;
-    return StringRef("");
-  }
-
-  // Lookup this symbol in the version table
-  LoadVersionMap();
-  if (version_index >= VersionMap.size() || VersionMap[version_index].isNull())
-    return object_error::parse_failed;
-  const VersionMapEntry &entry = VersionMap[version_index];
-
-  // Get the version name string
-  size_t name_offset;
-  if (entry.isVerdef()) {
-    // The first Verdaux entry holds the name.
-    name_offset = entry.getVerdef()->getAux()->vda_name;
-  } else {
-    name_offset = entry.getVernaux()->vna_name;
-  }
-
-  // Set IsDefault
-  if (entry.isVerdef()) {
-    IsDefault = !(vs->vs_index & ELF::VERSYM_HIDDEN);
-  } else {
-    IsDefault = false;
-  }
-
-  if (name_offset >= DynStrRegion.Size)
-    return object_error::parse_failed;
-  return StringRef(getDynamicString(name_offset));
+Expected<StringRef> ELFFile<ELFT>::getSectionName(const Elf_Shdr *Section,
+                                                  StringRef DotShstrtab) const {
+  uint32_t Offset = Section->sh_name;
+  if (Offset == 0)
+    return StringRef();
+  if (Offset >= DotShstrtab.size())
+    return createError("invalid string offset");
+  return StringRef(DotShstrtab.data() + Offset);
 }
 
 /// This function returns the hash value for a symbol in the .dynsym section
 /// Name of the API remains consistent as specified in the libelf
 /// REF : http://www.sco.com/developers/gabi/latest/ch5.dynamic.html#hash
-static inline unsigned elf_hash(StringRef &symbolName) {
+inline unsigned hashSysV(StringRef SymbolName) {
   unsigned h = 0, g;
-  for (unsigned i = 0, j = symbolName.size(); i < j; i++) {
-    h = (h << 4) + symbolName[i];
+  for (char C : SymbolName) {
+    h = (h << 4) + C;
     g = h & 0xf0000000L;
     if (g != 0)
       h ^= g >> 24;
@@ -1043,7 +526,8 @@ static inline unsigned elf_hash(StringRef &symbolName) {
   }
   return h;
 }
+
 } // end namespace object
 } // end namespace llvm
 
-#endif
+#endif // LLVM_OBJECT_ELF_H

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1999-2001 Robert N. M. Watson
  * All rights reserved.
  *
@@ -36,6 +38,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/mount.h>
 #include <sys/mutex.h>
 #include <sys/sysproto.h>
+#include <sys/syscallsubr.h>
 #include <sys/fcntl.h>
 #include <sys/namei.h>
 #include <sys/filedesc.h>
@@ -54,32 +57,45 @@ __FBSDID("$FreeBSD$");
  *
  * Currently this is used only by UFS1 extended attributes.
  */
+#ifndef _SYS_SYSPROTO_H_
+struct extattrctl_args {
+	const char *path;
+	int cmd;
+	const char *filename;
+	int attrnamespace;
+	const char *attrname;
+};
+#endif
 int
-sys_extattrctl(td, uap)
-	struct thread *td;
-	struct extattrctl_args /* {
-		const char *path;
-		int cmd;
-		const char *filename;
-		int attrnamespace;
-		const char *attrname;
-	} */ *uap;
+sys_extattrctl(struct thread *td, struct extattrctl_args *uap)
 {
+
+	return (kern_extattrctl(td, __USER_CAP_STR(uap->path), uap->cmd,
+	    __USER_CAP_STR(uap->filename), uap->attrnamespace,
+	    __USER_CAP_STR(uap->attrname)));
+}
+
+int
+kern_extattrctl(struct thread *td, const char * __capability path, int cmd,
+    const char * __capability filename, int attrnamespace,
+    const char * __capability uattrname)
+{
+
 	struct vnode *filename_vp;
 	struct nameidata nd;
 	struct mount *mp, *mp_writable;
 	char attrname[EXTATTR_MAXNAMELEN];
 	int error;
 
-	AUDIT_ARG_CMD(uap->cmd);
-	AUDIT_ARG_VALUE(uap->attrnamespace);
+	AUDIT_ARG_CMD(cmd);
+	AUDIT_ARG_VALUE(attrnamespace);
 	/*
-	 * uap->attrname is not always defined.  We check again later when we
+	 * uattrname is not always defined.  We check again later when we
 	 * invoke the VFS call so as to pass in NULL there if needed.
 	 */
-	if (uap->attrname != NULL) {
-		error = copyinstr(uap->attrname, attrname, EXTATTR_MAXNAMELEN,
-		    NULL);
+	if (uattrname != NULL) {
+		error = copyinstr_c(uattrname, &attrname[0],
+		    EXTATTR_MAXNAMELEN, NULL);
 		if (error)
 			return (error);
 	}
@@ -87,9 +103,9 @@ sys_extattrctl(td, uap)
 
 	mp = NULL;
 	filename_vp = NULL;
-	if (uap->filename != NULL) {
-		NDINIT(&nd, LOOKUP, FOLLOW | AUDITVNODE2,
-		    UIO_USERSPACE, uap->filename, td);
+	if (filename != NULL) {
+		NDINIT_C(&nd, LOOKUP, FOLLOW | AUDITVNODE2,
+		    UIO_USERSPACE, filename, td);
 		error = namei(&nd);
 		if (error)
 			return (error);
@@ -97,9 +113,9 @@ sys_extattrctl(td, uap)
 		NDFREE(&nd, NDF_NO_VP_RELE);
 	}
 
-	/* uap->path is always defined. */
-	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF | AUDITVNODE1,
-	    UIO_USERSPACE, uap->path, td);
+	/* path is always defined. */
+	NDINIT_C(&nd, LOOKUP, FOLLOW | LOCKLEAF | AUDITVNODE1,
+	    UIO_USERSPACE, path, td);
 	error = namei(&nd);
 	if (error)
 		goto out;
@@ -117,7 +133,7 @@ sys_extattrctl(td, uap)
 		goto out;
 	if (filename_vp != NULL) {
 		/*
-		 * uap->filename is not always defined.  If it is,
+		 * filename is not always defined.  If it is,
 		 * grab a vnode lock, which VFS_EXTATTRCTL() will
 		 * later release.
 		 */
@@ -128,8 +144,8 @@ sys_extattrctl(td, uap)
 		}
 	}
 
-	error = VFS_EXTATTRCTL(mp, uap->cmd, filename_vp, uap->attrnamespace,
-	    uap->attrname != NULL ? attrname : NULL);
+	error = VFS_EXTATTRCTL(mp, cmd, filename_vp, attrnamespace,
+	    uattrname != NULL ? attrname : NULL);
 
 	vn_finished_write(mp_writable);
 out:
@@ -157,28 +173,26 @@ out:
  */
 static int
 extattr_set_vp(struct vnode *vp, int attrnamespace, const char *attrname,
-    void *data, size_t nbytes, struct thread *td)
+    void * __capability data, size_t nbytes, struct thread *td)
 {
 	struct mount *mp;
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	ssize_t cnt;
 	int error;
+
+	if (nbytes > IOSIZE_MAX)
+		return (EINVAL);
 
 	error = vn_start_write(vp, &mp, V_WAIT | PCATCH);
 	if (error)
 		return (error);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 
-	aiov.iov_base = data;
-	aiov.iov_len = nbytes;
+	IOVEC_INIT_C(&aiov, data, nbytes);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_offset = 0;
-	if (nbytes > IOSIZE_MAX) {
-		error = EINVAL;
-		goto done;
-	}
 	auio.uio_resid = nbytes;
 	auio.uio_rw = UIO_WRITE;
 	auio.uio_segflg = UIO_USERSPACE;
@@ -197,112 +211,123 @@ extattr_set_vp(struct vnode *vp, int attrnamespace, const char *attrname,
 	cnt -= auio.uio_resid;
 	td->td_retval[0] = cnt;
 
+#ifdef MAC
 done:
+#endif
 	VOP_UNLOCK(vp, 0);
 	vn_finished_write(mp);
 	return (error);
 }
 
+#ifndef _SYS_SYSPROTO_H_
+struct extattr_set_fd_args {
+	int fd;
+	int attrnamespace;
+	const char *attrname;
+	void *data;
+	size_t nbytes;
+};
+#endif
 int
-sys_extattr_set_fd(td, uap)
-	struct thread *td;
-	struct extattr_set_fd_args /* {
-		int fd;
-		int attrnamespace;
-		const char *attrname;
-		void *data;
-		size_t nbytes;
-	} */ *uap;
+sys_extattr_set_fd(struct thread *td, struct extattr_set_fd_args *uap)
+{
+
+	return (kern_extattr_set_fd(td, uap->fd, uap->attrnamespace,
+	    __USER_CAP_STR(uap->attrname), __USER_CAP(uap->data, uap->nbytes),
+	    uap->nbytes));
+}
+
+int
+kern_extattr_set_fd(struct thread *td, int fd, int attrnamespace,
+    const char * __capability uattrname, void * __capability data,
+    size_t nbytes)
 {
 	struct file *fp;
 	char attrname[EXTATTR_MAXNAMELEN];
 	cap_rights_t rights;
 	int error;
 
-	AUDIT_ARG_FD(uap->fd);
-	AUDIT_ARG_VALUE(uap->attrnamespace);
-	error = copyinstr(uap->attrname, attrname, EXTATTR_MAXNAMELEN, NULL);
+	AUDIT_ARG_FD(fd);
+	AUDIT_ARG_VALUE(attrnamespace);
+	error = copyinstr_c(uattrname, &attrname[0], EXTATTR_MAXNAMELEN, NULL);
 	if (error)
 		return (error);
 	AUDIT_ARG_TEXT(attrname);
 
-	error = getvnode(td, uap->fd,
+	error = getvnode(td, fd,
 	    cap_rights_init(&rights, CAP_EXTATTR_SET), &fp);
 	if (error)
 		return (error);
 
-	error = extattr_set_vp(fp->f_vnode, uap->attrnamespace,
-	    attrname, uap->data, uap->nbytes, td);
+	error = extattr_set_vp(fp->f_vnode, attrnamespace,
+	    attrname, data, nbytes, td);
 	fdrop(fp, td);
 
 	return (error);
 }
 
+#ifndef _SYS_SYSPROTO_H_
+struct extattr_set_file_args {
+	const char *path;
+	int attrnamespace;
+	const char *attrname;
+	void *data;
+	size_t nbytes;
+};
+#endif
 int
-sys_extattr_set_file(td, uap)
-	struct thread *td;
-	struct extattr_set_file_args /* {
-		const char *path;
-		int attrnamespace;
-		const char *attrname;
-		void *data;
-		size_t nbytes;
-	} */ *uap;
+sys_extattr_set_file(struct thread *td, struct extattr_set_file_args *uap)
 {
-	struct nameidata nd;
-	char attrname[EXTATTR_MAXNAMELEN];
-	int error;
 
-	AUDIT_ARG_VALUE(uap->attrnamespace);
-	error = copyinstr(uap->attrname, attrname, EXTATTR_MAXNAMELEN, NULL);
-	if (error)
-		return (error);
-	AUDIT_ARG_TEXT(attrname);
+	return (kern_extattr_set_path(td, __USER_CAP_STR(uap->path),
+	    uap->attrnamespace, __USER_CAP_STR(uap->attrname),
+	    __USER_CAP(uap->data, uap->nbytes), uap->nbytes, FOLLOW));
+}
 
-	NDINIT(&nd, LOOKUP, FOLLOW | AUDITVNODE1, UIO_USERSPACE,
-	    uap->path, td);
-	error = namei(&nd);
-	if (error)
-		return (error);
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+#ifndef _SYS_SYSPROTO_H_
+struct extattr_set_link_args {
+	const char *path;
+	int attrnamespace;
+	const char *attrname;
+	void *data;
+	size_t nbytes;
+};
+#endif
+int
+sys_extattr_set_link(struct thread *td, struct extattr_set_link_args *uap)
+{
 
-	error = extattr_set_vp(nd.ni_vp, uap->attrnamespace, attrname,
-	    uap->data, uap->nbytes, td);
-
-	vrele(nd.ni_vp);
-	return (error);
+	return (kern_extattr_set_path(td, __USER_CAP_STR(uap->path),
+	    uap->attrnamespace,
+	    __USER_CAP_STR(uap->attrname),
+	    __USER_CAP(uap->data, uap->nbytes), uap->nbytes,
+	    NOFOLLOW));
 }
 
 int
-sys_extattr_set_link(td, uap)
-	struct thread *td;
-	struct extattr_set_link_args /* {
-		const char *path;
-		int attrnamespace;
-		const char *attrname;
-		void *data;
-		size_t nbytes;
-	} */ *uap;
+kern_extattr_set_path(struct thread *td,
+    const char * __capability path, int attrnamespace,
+    const char * __capability uattrname, void * __capability data,
+    size_t nbytes, int follow)
 {
 	struct nameidata nd;
 	char attrname[EXTATTR_MAXNAMELEN];
 	int error;
 
-	AUDIT_ARG_VALUE(uap->attrnamespace);
-	error = copyinstr(uap->attrname, attrname, EXTATTR_MAXNAMELEN, NULL);
+	AUDIT_ARG_VALUE(attrnamespace);
+	error = copyinstr_c(uattrname, &attrname[0], EXTATTR_MAXNAMELEN, NULL);
 	if (error)
 		return (error);
 	AUDIT_ARG_TEXT(attrname);
 
-	NDINIT(&nd, LOOKUP, NOFOLLOW | AUDITVNODE1, UIO_USERSPACE,
-	    uap->path, td);
+	NDINIT_C(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path, td);
 	error = namei(&nd);
 	if (error)
 		return (error);
 	NDFREE(&nd, NDF_ONLY_PNBUF);
 
-	error = extattr_set_vp(nd.ni_vp, uap->attrnamespace, attrname,
-	    uap->data, uap->nbytes, td);
+	error = extattr_set_vp(nd.ni_vp, attrnamespace, attrname, data,
+	    nbytes, td);
 
 	vrele(nd.ni_vp);
 	return (error);
@@ -320,13 +345,16 @@ sys_extattr_set_link(td, uap)
  */
 static int
 extattr_get_vp(struct vnode *vp, int attrnamespace, const char *attrname,
-    void *data, size_t nbytes, struct thread *td)
+    void * __capability data, size_t nbytes, struct thread *td)
 {
 	struct uio auio, *auiop;
-	struct iovec aiov;
+	kiovec_t aiov;
 	ssize_t cnt;
 	size_t size, *sizep;
 	int error;
+
+	if (nbytes > IOSIZE_MAX)
+		return (EINVAL);
 
 	vn_lock(vp, LK_SHARED | LK_RETRY);
 
@@ -339,15 +367,10 @@ extattr_get_vp(struct vnode *vp, int attrnamespace, const char *attrname,
 	sizep = NULL;
 	cnt = 0;
 	if (data != NULL) {
-		aiov.iov_base = data;
-		aiov.iov_len = nbytes;
+		IOVEC_INIT_C(&aiov, data, nbytes);
 		auio.uio_iov = &aiov;
 		auio.uio_iovcnt = 1;
 		auio.uio_offset = 0;
-		if (nbytes > IOSIZE_MAX) {
-			error = EINVAL;
-			goto done;
-		}
 		auio.uio_resid = nbytes;
 		auio.uio_rw = UIO_READ;
 		auio.uio_segflg = UIO_USERSPACE;
@@ -372,111 +395,117 @@ extattr_get_vp(struct vnode *vp, int attrnamespace, const char *attrname,
 		td->td_retval[0] = cnt;
 	} else
 		td->td_retval[0] = size;
-
+#ifdef MAC
 done:
+#endif
 	VOP_UNLOCK(vp, 0);
 	return (error);
 }
 
+#ifndef _SYS_SYSPROTO_H_
+struct extattr_get_fd_args {
+	int fd;
+	int attrnamespace;
+	const char *attrname;
+	void *data;
+	size_t nbytes;
+};
+#endif
 int
-sys_extattr_get_fd(td, uap)
-	struct thread *td;
-	struct extattr_get_fd_args /* {
-		int fd;
-		int attrnamespace;
-		const char *attrname;
-		void *data;
-		size_t nbytes;
-	} */ *uap;
+sys_extattr_get_fd(struct thread *td, struct extattr_get_fd_args *uap)
+{
+
+	return (kern_extattr_get_fd(td, uap->fd, uap->attrnamespace,
+	    __USER_CAP_STR(uap->attrname),
+	    __USER_CAP(uap->data, uap->nbytes), uap->nbytes));
+}
+
+int
+kern_extattr_get_fd(struct thread *td, int fd, int attrnamespace,
+    const char * __capability uattrname, void * __capability data,
+    size_t nbytes)
 {
 	struct file *fp;
 	char attrname[EXTATTR_MAXNAMELEN];
 	cap_rights_t rights;
 	int error;
 
-	AUDIT_ARG_FD(uap->fd);
-	AUDIT_ARG_VALUE(uap->attrnamespace);
-	error = copyinstr(uap->attrname, attrname, EXTATTR_MAXNAMELEN, NULL);
+	AUDIT_ARG_FD(fd);
+	AUDIT_ARG_VALUE(attrnamespace);
+	error = copyinstr_c(uattrname, &attrname[0], EXTATTR_MAXNAMELEN, NULL);
 	if (error)
 		return (error);
 	AUDIT_ARG_TEXT(attrname);
 
-	error = getvnode(td, uap->fd,
+	error = getvnode(td, fd,
 	    cap_rights_init(&rights, CAP_EXTATTR_GET), &fp);
 	if (error)
 		return (error);
 
-	error = extattr_get_vp(fp->f_vnode, uap->attrnamespace,
-	    attrname, uap->data, uap->nbytes, td);
+	error = extattr_get_vp(fp->f_vnode, attrnamespace,
+	    attrname, data, nbytes, td);
 
 	fdrop(fp, td);
 	return (error);
 }
 
+#ifndef _SYS_SYSPROTO_H_
+struct extattr_get_file_args {
+	const char *path;
+	int attrnamespace;
+	const char *attrname;
+	void *data;
+	size_t nbytes;
+};
+#endif
 int
-sys_extattr_get_file(td, uap)
-	struct thread *td;
-	struct extattr_get_file_args /* {
-		const char *path;
-		int attrnamespace;
-		const char *attrname;
-		void *data;
-		size_t nbytes;
-	} */ *uap;
+sys_extattr_get_file(struct thread *td, struct extattr_get_file_args *uap)
 {
-	struct nameidata nd;
-	char attrname[EXTATTR_MAXNAMELEN];
-	int error;
+	return (kern_extattr_get_path(td, __USER_CAP_STR(uap->path),
+	    uap->attrnamespace, __USER_CAP_STR(uap->attrname),
+	    __USER_CAP(uap->data, uap->nbytes), uap->nbytes, FOLLOW));
+}
 
-	AUDIT_ARG_VALUE(uap->attrnamespace);
-	error = copyinstr(uap->attrname, attrname, EXTATTR_MAXNAMELEN, NULL);
-	if (error)
-		return (error);
-	AUDIT_ARG_TEXT(attrname);
-
-	NDINIT(&nd, LOOKUP, FOLLOW | AUDITVNODE1, UIO_USERSPACE, uap->path, td);
-	error = namei(&nd);
-	if (error)
-		return (error);
-	NDFREE(&nd, NDF_ONLY_PNBUF);
-
-	error = extattr_get_vp(nd.ni_vp, uap->attrnamespace, attrname,
-	    uap->data, uap->nbytes, td);
-
-	vrele(nd.ni_vp);
-	return (error);
+#ifndef _SYS_SYSPROTO_H_
+struct extattr_get_link_args {
+	const char *path;
+	int attrnamespace;
+	const char *attrname;
+	void *data;
+	size_t nbytes;
+};
+#endif
+int
+sys_extattr_get_link(struct thread *td, struct extattr_get_link_args *uap)
+{
+	return (kern_extattr_get_path(td, __USER_CAP_STR(uap->path),
+	    uap->attrnamespace, __USER_CAP_STR(uap->attrname),
+	    __USER_CAP(uap->data, uap->nbytes), uap->nbytes, NOFOLLOW));
 }
 
 int
-sys_extattr_get_link(td, uap)
-	struct thread *td;
-	struct extattr_get_link_args /* {
-		const char *path;
-		int attrnamespace;
-		const char *attrname;
-		void *data;
-		size_t nbytes;
-	} */ *uap;
+kern_extattr_get_path(struct thread *td, const char * __capability path,
+    int attrnamespace, const char * __capability uattrname,
+    void * __capability data, size_t nbytes, int follow)
 {
 	struct nameidata nd;
 	char attrname[EXTATTR_MAXNAMELEN];
 	int error;
 
-	AUDIT_ARG_VALUE(uap->attrnamespace);
-	error = copyinstr(uap->attrname, attrname, EXTATTR_MAXNAMELEN, NULL);
+	AUDIT_ARG_VALUE(attrnamespace);
+	error = copyinstr_c(uattrname, &attrname[0], EXTATTR_MAXNAMELEN, NULL);
 	if (error)
 		return (error);
 	AUDIT_ARG_TEXT(attrname);
 
-	NDINIT(&nd, LOOKUP, NOFOLLOW | AUDITVNODE1, UIO_USERSPACE, uap->path,
-	    td);
+	NDINIT_C(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path, td);
 	error = namei(&nd);
 	if (error)
 		return (error);
 	NDFREE(&nd, NDF_ONLY_PNBUF);
 
-	error = extattr_get_vp(nd.ni_vp, uap->attrnamespace, attrname,
-	    uap->data, uap->nbytes, td);
+	error = extattr_get_vp(nd.ni_vp, attrnamespace, attrname, data,
+	    nbytes, td);
 
 	vrele(nd.ni_vp);
 	return (error);
@@ -524,94 +553,99 @@ done:
 	return (error);
 }
 
+#ifndef _SYS_SYSPROTO_H_
+struct extattr_delete_fd_args {
+	int fd;
+	int attrnamespace;
+	const char *attrname;
+};
+#endif
 int
-sys_extattr_delete_fd(td, uap)
-	struct thread *td;
-	struct extattr_delete_fd_args /* {
-		int fd;
-		int attrnamespace;
-		const char *attrname;
-	} */ *uap;
+sys_extattr_delete_fd(struct thread *td, struct extattr_delete_fd_args *uap)
+{
+
+	return (kern_extattr_delete_fd(td, uap->fd, uap->attrnamespace,
+	    __USER_CAP_STR(uap->attrname)));
+}
+
+int
+kern_extattr_delete_fd(struct thread *td, int fd, int attrnamespace,
+    const char * __capability uattrname)
 {
 	struct file *fp;
 	char attrname[EXTATTR_MAXNAMELEN];
 	cap_rights_t rights;
 	int error;
 
-	AUDIT_ARG_FD(uap->fd);
-	AUDIT_ARG_VALUE(uap->attrnamespace);
-	error = copyinstr(uap->attrname, attrname, EXTATTR_MAXNAMELEN, NULL);
+	AUDIT_ARG_FD(fd);
+	AUDIT_ARG_VALUE(attrnamespace);
+	error = copyinstr_c(uattrname, &attrname[0], EXTATTR_MAXNAMELEN, NULL);
 	if (error)
 		return (error);
 	AUDIT_ARG_TEXT(attrname);
 
-	error = getvnode(td, uap->fd,
+	error = getvnode(td, fd,
 	    cap_rights_init(&rights, CAP_EXTATTR_DELETE), &fp);
 	if (error)
 		return (error);
 
-	error = extattr_delete_vp(fp->f_vnode, uap->attrnamespace,
+	error = extattr_delete_vp(fp->f_vnode, attrnamespace,
 	    attrname, td);
 	fdrop(fp, td);
 	return (error);
 }
 
+#ifndef _SYS_SYSPROTO_H_
+struct extattr_delete_file_args {
+	const char *path;
+	int attrnamespace;
+	const char *attrname;
+};
+#endif
 int
-sys_extattr_delete_file(td, uap)
-	struct thread *td;
-	struct extattr_delete_file_args /* {
-		const char *path;
-		int attrnamespace;
-		const char *attrname;
-	} */ *uap;
+sys_extattr_delete_file(struct thread *td, struct extattr_delete_file_args *uap)
 {
-	struct nameidata nd;
-	char attrname[EXTATTR_MAXNAMELEN];
-	int error;
 
-	AUDIT_ARG_VALUE(uap->attrnamespace);
-	error = copyinstr(uap->attrname, attrname, EXTATTR_MAXNAMELEN, NULL);
-	if (error)
-		return(error);
-	AUDIT_ARG_TEXT(attrname);
+	return (kern_extattr_delete_path(td, __USER_CAP_STR(uap->path),
+	    uap->attrnamespace, __USER_CAP_STR(uap->attrname), FOLLOW));
+}
 
-	NDINIT(&nd, LOOKUP, FOLLOW | AUDITVNODE1, UIO_USERSPACE, uap->path, td);
-	error = namei(&nd);
-	if (error)
-		return(error);
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+#ifndef _SYS_SYSPROTO_H_
+struct extattr_delete_link_args {
+	const char *path;
+	int attrnamespace;
+	const char *attrname;
+};
+#endif
+int
+sys_extattr_delete_link(struct thread *td, struct extattr_delete_link_args *uap)
+{
 
-	error = extattr_delete_vp(nd.ni_vp, uap->attrnamespace, attrname, td);
-	vrele(nd.ni_vp);
-	return(error);
+	return (kern_extattr_delete_path(td, __USER_CAP_STR(uap->path),
+	    uap->attrnamespace, __USER_CAP_STR(uap->attrname), NOFOLLOW));
 }
 
 int
-sys_extattr_delete_link(td, uap)
-	struct thread *td;
-	struct extattr_delete_link_args /* {
-		const char *path;
-		int attrnamespace;
-		const char *attrname;
-	} */ *uap;
+kern_extattr_delete_path(struct thread *td, const char * __capability path,
+    int attrnamespace, const char * __capability uattrname, int follow)
 {
 	struct nameidata nd;
 	char attrname[EXTATTR_MAXNAMELEN];
 	int error;
 
-	AUDIT_ARG_VALUE(uap->attrnamespace);
-	error = copyinstr(uap->attrname, attrname, EXTATTR_MAXNAMELEN, NULL);
+	AUDIT_ARG_VALUE(attrnamespace);
+	error = copyinstr_c(uattrname, &attrname[0], EXTATTR_MAXNAMELEN, NULL);
 	if (error)
 		return(error);
 	AUDIT_ARG_TEXT(attrname);
 
-	NDINIT(&nd, LOOKUP, NOFOLLOW | AUDITVNODE1, UIO_USERSPACE, uap->path, td);
+	NDINIT_C(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path, td);
 	error = namei(&nd);
 	if (error)
 		return(error);
 	NDFREE(&nd, NDF_ONLY_PNBUF);
 
-	error = extattr_delete_vp(nd.ni_vp, uap->attrnamespace, attrname, td);
+	error = extattr_delete_vp(nd.ni_vp, attrnamespace, attrname, td);
 	vrele(nd.ni_vp);
 	return(error);
 }
@@ -627,14 +661,17 @@ sys_extattr_delete_link(td, uap)
  * References: vp must be a valid reference for the duration of the call
  */
 static int
-extattr_list_vp(struct vnode *vp, int attrnamespace, void *data,
+extattr_list_vp(struct vnode *vp, int attrnamespace, void * __capability data,
     size_t nbytes, struct thread *td)
 {
 	struct uio auio, *auiop;
 	size_t size, *sizep;
-	struct iovec aiov;
+	kiovec_t aiov;
 	ssize_t cnt;
 	int error;
+
+	if (nbytes > IOSIZE_MAX)
+		return (EINVAL);
 
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 
@@ -642,15 +679,10 @@ extattr_list_vp(struct vnode *vp, int attrnamespace, void *data,
 	sizep = NULL;
 	cnt = 0;
 	if (data != NULL) {
-		aiov.iov_base = data;
-		aiov.iov_len = nbytes;
+		IOVEC_INIT_C(&aiov, data, nbytes);
 		auio.uio_iov = &aiov;
 		auio.uio_iovcnt = 1;
 		auio.uio_offset = 0;
-		if (nbytes > IOSIZE_MAX) {
-			error = EINVAL;
-			goto done;
-		}
 		auio.uio_resid = nbytes;
 		auio.uio_rw = UIO_READ;
 		auio.uio_segflg = UIO_USERSPACE;
@@ -674,91 +706,100 @@ extattr_list_vp(struct vnode *vp, int attrnamespace, void *data,
 		td->td_retval[0] = cnt;
 	} else
 		td->td_retval[0] = size;
-
+#ifdef MAC
 done:
+#endif
 	VOP_UNLOCK(vp, 0);
 	return (error);
 }
 
 
+#ifndef _SYS_SYSPROTO_H_
+struct extattr_list_fd_args {
+	int fd;
+	int attrnamespace;
+	void *data;
+	size_t nbytes;
+};
+#endif
 int
-sys_extattr_list_fd(td, uap)
-	struct thread *td;
-	struct extattr_list_fd_args /* {
-		int fd;
-		int attrnamespace;
-		void *data;
-		size_t nbytes;
-	} */ *uap;
+sys_extattr_list_fd(struct thread *td, struct extattr_list_fd_args *uap)
+{
+
+	return (kern_extattr_list_fd(td, uap->fd, uap->attrnamespace,
+	    __USER_CAP(uap->data, uap->nbytes), uap->nbytes));
+}
+
+int
+kern_extattr_list_fd(struct thread *td, int fd, int attrnamespace,
+    void * __capability data, size_t nbytes)
 {
 	struct file *fp;
 	cap_rights_t rights;
 	int error;
 
-	AUDIT_ARG_FD(uap->fd);
-	AUDIT_ARG_VALUE(uap->attrnamespace);
-	error = getvnode(td, uap->fd,
+	AUDIT_ARG_FD(fd);
+	AUDIT_ARG_VALUE(attrnamespace);
+	error = getvnode(td, fd,
 	    cap_rights_init(&rights, CAP_EXTATTR_LIST), &fp);
 	if (error)
 		return (error);
 
-	error = extattr_list_vp(fp->f_vnode, uap->attrnamespace, uap->data,
-	    uap->nbytes, td);
+	error = extattr_list_vp(fp->f_vnode, attrnamespace, data, nbytes, td);
 
 	fdrop(fp, td);
 	return (error);
 }
 
+#ifndef _SYS_SYSPROTO_H_
+struct extattr_list_file_args {
+	const char *path;
+	int attrnamespace;
+	void *data;
+	size_t nbytes;
+}
+#endif
 int
-sys_extattr_list_file(td, uap)
-	struct thread*td;
-	struct extattr_list_file_args /* {
-		const char *path;
-		int attrnamespace;
-		void *data;
-		size_t nbytes;
-	} */ *uap;
+sys_extattr_list_file(struct thread *td, struct extattr_list_file_args *uap)
 {
-	struct nameidata nd;
-	int error;
 
-	AUDIT_ARG_VALUE(uap->attrnamespace);
-	NDINIT(&nd, LOOKUP, FOLLOW | AUDITVNODE1, UIO_USERSPACE, uap->path, td);
-	error = namei(&nd);
-	if (error)
-		return (error);
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+	return (kern_extattr_list_path(td, __USER_CAP_STR(uap->path),
+	    uap->attrnamespace, __USER_CAP(uap->data, uap->nbytes),
+	    uap->nbytes, FOLLOW));
+}
 
-	error = extattr_list_vp(nd.ni_vp, uap->attrnamespace, uap->data,
-	    uap->nbytes, td);
+#ifndef _SYS_SYSPROTO_H_
+struct extattr_list_link_args {
+	const char *path;
+	int attrnamespace;
+	void *data;
+	size_t nbytes;
+};
+#endif
+int
+sys_extattr_list_link(struct thread *td, struct extattr_list_link_args *uap)
+{
 
-	vrele(nd.ni_vp);
-	return (error);
+	return (kern_extattr_list_path(td, __USER_CAP_STR(uap->path),
+	    uap->attrnamespace, __USER_CAP(uap->data, uap->nbytes),
+	    uap->nbytes, NOFOLLOW));
 }
 
 int
-sys_extattr_list_link(td, uap)
-	struct thread*td;
-	struct extattr_list_link_args /* {
-		const char *path;
-		int attrnamespace;
-		void *data;
-		size_t nbytes;
-	} */ *uap;
+kern_extattr_list_path(struct thread *td, const char * __capability path,
+    int attrnamespace, void * __capability data, size_t nbytes, int follow)
 {
 	struct nameidata nd;
 	int error;
 
-	AUDIT_ARG_VALUE(uap->attrnamespace);
-	NDINIT(&nd, LOOKUP, NOFOLLOW | AUDITVNODE1, UIO_USERSPACE, uap->path,
-	    td);
+	AUDIT_ARG_VALUE(attrnamespace);
+	NDINIT_C(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path, td);
 	error = namei(&nd);
 	if (error)
 		return (error);
 	NDFREE(&nd, NDF_ONLY_PNBUF);
 
-	error = extattr_list_vp(nd.ni_vp, uap->attrnamespace, uap->data,
-	    uap->nbytes, td);
+	error = extattr_list_vp(nd.ni_vp, attrnamespace, data, nbytes, td);
 
 	vrele(nd.ni_vp);
 	return (error);

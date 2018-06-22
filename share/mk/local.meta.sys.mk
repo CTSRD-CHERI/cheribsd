@@ -7,55 +7,25 @@
 # we need this until there is an alternative
 MK_INSTALL_AS_USER= yes
 
-_default_makeobjdir=$${.CURDIR:S,^$${SRCTOP},$${OBJTOP},}
-
-.if empty(OBJROOT) || ${.MAKE.LEVEL} == 0
-.if defined(MAKEOBJDIRPREFIX)
-# put things approximately where they want
-OBJROOT:=${MAKEOBJDIRPREFIX}${SRCTOP}/
-MAKEOBJDIRPREFIX=
-.export MAKEOBJDIRPREFIX
-.endif
-.if empty(MAKEOBJDIR)
-# OBJTOP set below
-MAKEOBJDIR=${_default_makeobjdir}
-# export but do not track
-.export-env MAKEOBJDIR
-# Expand for our own use
-MAKEOBJDIR:= ${MAKEOBJDIR}
-.endif
-.if !empty(SB)
-SB_OBJROOT ?= ${SB}/obj/
-# this is what we use below
-OBJROOT ?= ${SB_OBJROOT}
-.endif
-OBJROOT ?= /usr/obj${SRCTOP}/
-.if ${OBJROOT:M*/} != ""
-OBJROOT:= ${OBJROOT:H:tA}/
-.else
-OBJROOT:= ${OBJROOT:H:tA}/${OBJROOT:T}
-.endif
-.export OBJROOT SRCTOP
-
+.if !defined(HOST_TARGET)
 # we need HOST_TARGET etc below.
 .include <host-target.mk>
 .export HOST_TARGET
 .endif
 
 # from src/Makefile (for universe)
-TARGET_ARCHES_arm?=     arm armeb armv6 armv6hf
+TARGET_ARCHES_arm?=     arm armeb armv6 armv7
 TARGET_ARCHES_arm64?=   aarch64
 TARGET_ARCHES_mips?=    mipsel mips mips64el mips64 mipsn32 mipsn32el
-TARGET_ARCHES_powerpc?= powerpc powerpc64
-TARGET_ARCHES_pc98?=    i386
-TARGET_ARCHES_riscv?=   riscv64
+TARGET_ARCHES_powerpc?= powerpc powerpc64 powerpcspe
+TARGET_ARCHES_riscv?=   riscv64 riscv64sf
 
 # some corner cases
 BOOT_MACHINE_DIR.amd64 = boot/i386
 MACHINE_ARCH.host = ${_HOST_ARCH}
 
 # the list of machines we support
-ALL_MACHINE_LIST?= amd64 arm arm64 i386 mips pc98 powerpc riscv sparc64
+ALL_MACHINE_LIST?= amd64 arm arm64 i386 mips powerpc riscv sparc64
 .for m in ${ALL_MACHINE_LIST:O:u}
 MACHINE_ARCH_LIST.$m?= ${TARGET_ARCHES_${m}:U$m}
 MACHINE_ARCH.$m?= ${MACHINE_ARCH_LIST.$m:[1]}
@@ -108,7 +78,7 @@ TARGET_OBJ_SPEC:= ${TARGET_SPEC:S;,;.;g}
 OBJTOP:= ${OBJROOT}${TARGET_OBJ_SPEC}
 
 .if defined(MAKEOBJDIR)
-.if ${MAKEOBJDIR:M*/*} == ""
+.if ${MAKEOBJDIR:M/*} == ""
 .error Cannot use MAKEOBJDIR=${MAKEOBJDIR}${.newline}Unset MAKEOBJDIR to get default:  MAKEOBJDIR='${_default_makeobjdir}'
 .endif
 .endif
@@ -131,6 +101,16 @@ PYTHON ?= /usr/local/bin/python
 .export PYTHON
 # this works best if share/mk is ready for it.
 BUILD_AT_LEVEL0= no
+# _SKIP_BUILD is not 100% as it requires wrapping all 'all:' targets to avoid
+# building in MAKELEVEL0.  Just prohibit 'all' entirely in this case to avoid
+# problems.
+.if ${MK_DIRDEPS_BUILD} == "yes" && \
+    ${.MAKE.LEVEL} == 0 && ${BUILD_AT_LEVEL0:Uyes:tl} == "no"
+.MAIN: dirdeps
+.if make(all)
+.error DIRDEPS_BUILD: Please run '${MAKE}' instead of '${MAKE} all'.
+.endif
+.endif
 
 # we want to end up with a singe stage tree for all machines
 .if ${MK_STAGING} == "yes"
@@ -169,7 +149,7 @@ STAGE_INCSDIR= ${STAGE_OBJTOP}${INCSDIR:U/include}
 # the target is usually an absolute path
 STAGE_SYMLINKS_DIR= ${STAGE_OBJTOP}
 
-LDFLAGS_LAST+= -Wl,-rpath-link -Wl,${STAGE_LIBDIR}
+LDFLAGS_LAST+= -Wl,-rpath-link,${STAGE_LIBDIR}
 .if ${MK_SYSROOT} == "yes"
 SYSROOT?= ${STAGE_OBJTOP}
 .else
@@ -204,20 +184,32 @@ CSU_DIR := ${CSU_DIR.${MACHINE_ARCH}}
 .if !empty(TIME_STAMP)
 TRACER= ${TIME_STAMP} ${:U}
 .endif
+.if !defined(_RECURSING_PROGS) && !defined(_RECURSING_CRUNCH) && \
+    !make(print-dir)
+WITH_META_STATS= t
+.endif
 
 # toolchains can be a pain - especially bootstrappping them
 .if ${MACHINE} == "host"
 MK_SHARED_TOOLCHAIN= no
 .endif
 TOOLCHAIN_VARS=	AS AR CC CLANG_TBLGEN CXX CPP LD NM OBJDUMP OBJCOPY RANLIB \
-		STRINGS SIZE TBLGEN
+		STRINGS SIZE LLVM_TBLGEN
 _toolchain_bin_CLANG_TBLGEN=	/usr/bin/clang-tblgen
+_toolchain_bin_LLVM_TBLGEN=	/usr/bin/llvm-tblgen
 _toolchain_bin_CXX=		/usr/bin/c++
 .ifdef WITH_TOOLSDIR
 TOOLSDIR?= ${HOST_OBJTOP}/tools
 .elif defined(STAGE_HOST_OBJTOP)
 TOOLSDIR?= ${STAGE_HOST_OBJTOP}
 .endif
+# Only define if it exists in case user didn't run bootstrap-tools.  Otherwise
+# the tool will be built during the build.  Building it assumes it is
+# TARGET==MACHINE.
+.if exists(${HOST_OBJTOP}/tools${.CURDIR})
+BTOOLSPATH= ${HOST_OBJTOP}/tools${.CURDIR}
+.endif
+
 # Don't use the bootstrap tools logic on itself.
 .if ${.TARGETS:Mbootstrap-tools} == "" && \
     !make(showconfig) && \
@@ -231,8 +223,7 @@ PATH:= ${TOOLSDIR}${dir}:${PATH}
 _toolchain_bin.${var}=	${TOOLSDIR}${_toolchain_bin_${var}:U/usr/bin/${var:tl}}
 .if exists(${_toolchain_bin.${var}})
 HOST_${var}?=	${_toolchain_bin.${var}}
-${var}?=	${HOST_${var}}
-.export		HOST_${var} ${var}
+.export		HOST_${var}
 .endif
 .endfor
 .endif
@@ -257,4 +248,9 @@ CROSS_TARGET_FLAGS= -target ${MACHINE_ARCH}-unknown-freebsd${FREEBSD_REVISION}
 CFLAGS+= ${CROSS_TARGET_FLAGS}
 ACFLAGS+= ${CROSS_TARGET_FLAGS}
 LDFLAGS+= -Wl,-m -Wl,elf_${MACHINE_ARCH}_fbsd
+.endif
+
+META_MODE+=	missing-meta=yes
+.if empty(META_MODE:Mnofilemon)
+META_MODE+=	missing-filemon=yes
 .endif

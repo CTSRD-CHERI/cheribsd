@@ -1,6 +1,8 @@
 /*	$NetBSD: pdq_ifsubr.c,v 1.38 2001/12/21 23:21:47 matt Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ *
  * Copyright (c) 1995, 1996 Matt Thomas <matt@3am-software.com>
  * All rights reserved.
  *
@@ -416,13 +418,13 @@ pdq_ifioctl(
     int error = 0;
 
     switch (cmd) {
-	case SIOCSIFFLAGS: {
+	CASE_IOC_IFREQ(SIOCSIFFLAGS): {
 	    pdq_ifinit(sc);
 	    break;
 	}
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI: {
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI): {
 	    PDQ_LOCK(sc);
 	    if (PDQ_IFNET(sc)->if_drv_flags & IFF_DRV_RUNNING) {
 		    pdq_run(sc->sc_pdq);
@@ -433,7 +435,7 @@ pdq_ifioctl(
 	}
 
 #if defined(IFM_FDDI) && defined(SIOCSIFMEDIA)
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA: {
 	    struct ifreq *ifr = (struct ifreq *)data;
 	    error = ifmedia_ioctl(ifp, ifr, &sc->sc_ifmedia, cmd);
@@ -458,6 +460,8 @@ int
 pdq_ifattach(pdq_softc_t *sc, const pdq_uint8_t *llc, pdq_type_t type)
 {
     struct ifnet *ifp;
+
+    KASSERT(type == PDQ_DEFPA, ("We only support PCI attachment."));
 
     ifp = PDQ_IFNET(sc) = if_alloc(IFT_FDDI);
     if (ifp == NULL) {

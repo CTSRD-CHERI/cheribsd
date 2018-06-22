@@ -1,4 +1,4 @@
-//===-- NVPTXAsmPrinter.h - NVPTX LLVM assembly writer --------------------===//
+//===-- NVPTXAsmPrinter.h - NVPTX LLVM assembly writer ----------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -18,17 +18,34 @@
 #include "NVPTX.h"
 #include "NVPTXSubtarget.h"
 #include "NVPTXTargetMachine.h"
-#include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/CodeGen/AsmPrinter.h"
+#include "llvm/CodeGen/MachineFunction.h"
+#include "llvm/CodeGen/MachineLoopInfo.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/DebugLoc.h"
+#include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
-#include "llvm/MC/MCAsmInfo.h"
+#include "llvm/IR/GlobalValue.h"
+#include "llvm/IR/Value.h"
 #include "llvm/MC/MCExpr.h"
+#include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSymbol.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/FormattedStream.h"
+#include "llvm/PassAnalysisSupport.h"
+#include "llvm/Support/Casting.h"
+#include "llvm/Support/Compiler.h"
+#include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
+#include <algorithm>
+#include <cassert>
 #include <fstream>
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
 
 // The ptx syntax and format is very different from that usually seem in a .s
 // file,
@@ -40,7 +57,8 @@
 // (subclass of MCStreamer).
 
 namespace llvm {
-  class MCOperand;
+
+class MCOperand;
 
 class LineReader {
 private:
@@ -49,14 +67,17 @@ private:
   char buff[512];
   std::string theFileName;
   SmallVector<unsigned, 32> lineOffset;
+
 public:
   LineReader(std::string filename) {
     theCurLine = 0;
     fstr.open(filename.c_str());
     theFileName = filename;
   }
-  std::string fileName() { return theFileName; }
+
   ~LineReader() { fstr.close(); }
+
+  std::string fileName() { return theFileName; }
   std::string readLine(unsigned line);
 };
 
@@ -107,6 +128,7 @@ class LLVM_LIBRARY_VISIBILITY NVPTXAsmPrinter : public AsmPrinter {
       numSymbols = 0;
       EmitGeneric = AP.EmitGeneric;
     }
+
     unsigned addBytes(unsigned char *Ptr, int Num, int Bytes) {
       assert((curpos + Num) <= size);
       assert((curpos + Bytes) <= size);
@@ -120,6 +142,7 @@ class LLVM_LIBRARY_VISIBILITY NVPTXAsmPrinter : public AsmPrinter {
       }
       return curpos;
     }
+
     unsigned addZeros(int Num) {
       assert((curpos + Num) <= size);
       for (int i = 0; i < Num; ++i) {
@@ -128,12 +151,14 @@ class LLVM_LIBRARY_VISIBILITY NVPTXAsmPrinter : public AsmPrinter {
       }
       return curpos;
     }
+
     void addSymbol(const Value *GVar, const Value *GVarBeforeStripping) {
       symbolPosInBuffer.push_back(curpos);
       Symbols.push_back(GVar);
       SymbolsBeforeStripping.push_back(GVarBeforeStripping);
       numSymbols++;
     }
+
     void print() {
       if (numSymbols == 0) {
         // print out in bytes
@@ -195,7 +220,7 @@ class LLVM_LIBRARY_VISIBILITY NVPTXAsmPrinter : public AsmPrinter {
   void emitSrcInText(StringRef filename, unsigned line);
 
 private:
-  const char *getPassName() const override { return "NVPTX Assembly Printer"; }
+  StringRef getPassName() const override { return "NVPTX Assembly Printer"; }
 
   const Function *F;
   std::string CurrentFnName;
@@ -212,28 +237,21 @@ private:
   MCOperand GetSymbolRef(const MCSymbol *Symbol);
   unsigned encodeVirtualRegister(unsigned Reg);
 
-  void EmitAlignment(unsigned NumBits, const GlobalValue *GV = nullptr) const {}
-
   void printVecModifiedImmediate(const MachineOperand &MO, const char *Modifier,
                                  raw_ostream &O);
   void printMemOperand(const MachineInstr *MI, int opNum, raw_ostream &O,
                        const char *Modifier = nullptr);
-  void printImplicitDef(const MachineInstr *MI, raw_ostream &O) const;
   void printModuleLevelGV(const GlobalVariable *GVar, raw_ostream &O,
                           bool = false);
-  void printParamName(int paramIndex, raw_ostream &O);
   void printParamName(Function::const_arg_iterator I, int paramIndex,
                       raw_ostream &O);
   void emitGlobals(const Module &M);
   void emitHeader(Module &M, raw_ostream &O, const NVPTXSubtarget &STI);
   void emitKernelFunctionDirectives(const Function &F, raw_ostream &O) const;
   void emitVirtualRegister(unsigned int vr, raw_ostream &);
-  void emitFunctionExternParamList(const MachineFunction &MF);
   void emitFunctionParamList(const Function *, raw_ostream &O);
   void emitFunctionParamList(const MachineFunction &MF, raw_ostream &O);
   void setAndEmitFunctionVirtualRegisters(const MachineFunction &MF);
-  void emitFunctionTempData(const MachineFunction &MF, unsigned &FrameSize);
-  bool isImageType(const Type *Ty);
   void printReturnValStr(const Function *, raw_ostream &O);
   void printReturnValStr(const MachineFunction &MF, raw_ostream &O);
   bool PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
@@ -271,10 +289,10 @@ private:
 
   // Build the map between type name and ID based on module's type
   // symbol table.
-  std::map<const Type *, std::string> TypeNameMap;
+  std::map<Type *, std::string> TypeNameMap;
 
   // List of variables demoted to a function scope.
-  std::map<const Function *, std::vector<const GlobalVariable *> > localDecls;
+  std::map<const Function *, std::vector<const GlobalVariable *>> localDecls;
 
   // To record filename to ID mapping
   std::map<std::string, unsigned> filenameMap;
@@ -282,19 +300,15 @@ private:
 
   void emitPTXGlobalVariable(const GlobalVariable *GVar, raw_ostream &O);
   void emitPTXAddressSpace(unsigned int AddressSpace, raw_ostream &O) const;
-  std::string getPTXFundamentalTypeStr(const Type *Ty, bool = true) const;
+  std::string getPTXFundamentalTypeStr(Type *Ty, bool = true) const;
   void printScalarConstant(const Constant *CPV, raw_ostream &O);
   void printFPConstant(const ConstantFP *Fp, raw_ostream &O);
   void bufferLEByte(const Constant *CPV, int Bytes, AggBuffer *aggBuffer);
   void bufferAggregateConstant(const Constant *CV, AggBuffer *aggBuffer);
 
-  void printOperandProper(const MachineOperand &MO);
-
   void emitLinkageDirective(const GlobalValue *V, raw_ostream &O);
   void emitDeclarations(const Module &, raw_ostream &O);
   void emitDeclaration(const Function *, raw_ostream &O);
-
-  static const char *getRegisterName(unsigned RegNo);
   void emitDemotedVars(const Function *, raw_ostream &);
 
   bool lowerImageHandleOperand(const MachineInstr *MI, unsigned OpNo,
@@ -303,8 +317,9 @@ private:
 
   bool isLoopHeaderOfNoUnroll(const MachineBasicBlock &MBB) const;
 
-  LineReader *reader;
-  LineReader *getReader(std::string);
+  LineReader *reader = nullptr;
+
+  LineReader *getReader(const std::string &);
 
   // Used to control the need to emit .generic() in the initializer of
   // module scope variables.
@@ -323,20 +338,17 @@ public:
   NVPTXAsmPrinter(TargetMachine &TM, std::unique_ptr<MCStreamer> Streamer)
       : AsmPrinter(TM, std::move(Streamer)),
         EmitGeneric(static_cast<NVPTXTargetMachine &>(TM).getDrvInterface() ==
-                    NVPTX::CUDA) {
-    CurrentBankselLabelInBasicBlock = "";
-    reader = nullptr;
-  }
+                    NVPTX::CUDA) {}
 
-  ~NVPTXAsmPrinter() {
-    if (!reader)
-      delete reader;
+  ~NVPTXAsmPrinter() override {
+    delete reader;
   }
 
   bool runOnMachineFunction(MachineFunction &F) override {
     nvptxSubtarget = &F.getSubtarget<NVPTXSubtarget>();
     return AsmPrinter::runOnMachineFunction(F);
   }
+
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<MachineLoopInfo>();
     AsmPrinter::getAnalysisUsage(AU);
@@ -349,6 +361,7 @@ public:
   DebugLoc prevDebugLoc;
   void emitLineNumberAsDotLoc(const MachineInstr &);
 };
-} // end of namespace
 
-#endif
+} // end namespace llvm
+
+#endif // LLVM_LIB_TARGET_NVPTX_NVPTXASMPRINTER_H

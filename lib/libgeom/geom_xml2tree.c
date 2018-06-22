@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2003 Poul-Henning Kamp
  * All rights reserved.
  *
@@ -27,6 +29,18 @@
  * SUCH DAMAGE.
  *
  * $FreeBSD$
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ],
+ *   "change_comment": "capabilities from integer strings",
+ *   "hybrid_specific": false
+ * }
+ * CHERI CHANGES END
  */
 
 #include <stdio.h>

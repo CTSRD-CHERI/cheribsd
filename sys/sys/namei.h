@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1985, 1989, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -53,9 +55,12 @@ struct componentname {
 	char	*cn_pnbuf;	/* pathname buffer */
 	char	*cn_nameptr;	/* pointer to looked up name */
 	long	cn_namelen;	/* length of looked up component */
-	long	cn_consume;	/* chars to consume in lookup() */
 };
 
+struct nameicap_tracker;
+TAILQ_HEAD(nameicap_tracker_head, nameicap_tracker);
+
+#ifdef _KERNEL
 /*
  * Encapsulation of namei parameters.
  */
@@ -63,7 +68,7 @@ struct nameidata {
 	/*
 	 * Arguments to namei/lookup.
 	 */
-	const	char *ni_dirp;		/* pathname pointer */
+	const char * __CAPABILITY	ni_dirp;	/* pathname pointer */
 	enum	uio_seg ni_segflg;	/* location of pathname */
 	cap_rights_t ni_rightsneeded;	/* rights required to look up vnode */
 	/*
@@ -73,7 +78,7 @@ struct nameidata {
 	struct	vnode *ni_rootdir;	/* logical root directory */
 	struct	vnode *ni_topdir;	/* logical top directory */
 	int	ni_dirfd;		/* starting directory for *at functions */
-	int	ni_strictrelative;	/* relative lookup only; no '..' */
+	int	ni_lcf;			/* local call flags */
 	/*
 	 * Results: returned from namei
 	 */
@@ -95,9 +100,9 @@ struct nameidata {
 	 * through the VOP interface.
 	 */
 	struct componentname ni_cnd;
+	struct nameicap_tracker_head ni_cap_tracker;
 };
 
-#ifdef _KERNEL
 /*
  * namei operations
  */
@@ -153,19 +158,34 @@ struct nameidata {
 #define	PARAMASK	0x3ffffe00 /* mask of parameter descriptors */
 
 /*
+ * Flags in ni_lcf, valid for the duration of the namei call.
+ */
+#define	NI_LCF_STRICTRELATIVE	0x0001	/* relative lookup only */
+#define	NI_LCF_CAP_DOTDOT	0x0002	/* ".." in strictrelative case */
+
+/*
  * Initialization of a nameidata structure.
  */
 #define	NDINIT(ndp, op, flags, segflg, namep, td)			\
 	NDINIT_ALL(ndp, op, flags, segflg, namep, AT_FDCWD, NULL, 0, td)
+#define	NDINIT_C(ndp, op, flags, segflg, namep, td)			\
+	NDINIT_ALL_C(ndp, op, flags, segflg, namep, AT_FDCWD, NULL, 0, td)
 #define	NDINIT_AT(ndp, op, flags, segflg, namep, dirfd, td)		\
 	NDINIT_ALL(ndp, op, flags, segflg, namep, dirfd, NULL, 0, td)
+#define	NDINIT_AT_C(ndp, op, flags, segflg, namep, dirfd, td)		\
+	NDINIT_ALL_C(ndp, op, flags, segflg, namep, dirfd, NULL, 0, td)
 #define	NDINIT_ATRIGHTS(ndp, op, flags, segflg, namep, dirfd, rightsp, td) \
 	NDINIT_ALL(ndp, op, flags, segflg, namep, dirfd, NULL, rightsp, td)
 #define	NDINIT_ATVP(ndp, op, flags, segflg, namep, vp, td)		\
 	NDINIT_ALL(ndp, op, flags, segflg, namep, AT_FDCWD, vp, 0, td)
+#define	NDINIT_ATRIGHTS_C(ndp, op, flags, segflg, namep, dirfd, rightsp, td) \
+	NDINIT_ALL_C(ndp, op, flags, segflg, namep, dirfd, NULL, rightsp, td)
 
 void NDINIT_ALL(struct nameidata *ndp, u_long op, u_long flags,
     enum uio_seg segflg, const char *namep, int dirfd, struct vnode *startdir,
+    cap_rights_t *rightsp, struct thread *td);
+void NDINIT_ALL_C(struct nameidata *ndp, u_long op, u_long flags,
+    enum uio_seg segflg, const char * __CAPABILITY namep, int dirfd, struct vnode *startdir,
     cap_rights_t *rightsp, struct thread *td);
 
 #define NDF_NO_DVP_RELE		0x00000001

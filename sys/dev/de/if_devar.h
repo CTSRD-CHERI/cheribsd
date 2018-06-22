@@ -3,6 +3,8 @@
 /* $FreeBSD$ */
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ *
  * Copyright (c) 1994-1997 Matt Thomas (matt@3am-software.com)
  * All rights reserved.
  *
@@ -842,7 +844,7 @@ static const struct {
 
 /*
  * This driver supports a maximum of 32 tulip boards.
- * This should be enough for the forseeable future.
+ * This should be enough for the foreseeable future.
  */
 #define	TULIP_MAX_DEVICES	32
 

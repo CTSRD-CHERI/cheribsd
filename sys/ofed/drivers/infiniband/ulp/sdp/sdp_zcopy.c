@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause OR GPL-2.0
+ *
  * Copyright (c) 2006 Mellanox Technologies Ltd.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -306,7 +308,7 @@ int sdp_post_sendsm(struct socket *sk)
 	return 0;
 }
 
-static int sdp_update_iov_used(struct socket *sk, struct iovec *iov, int len)
+static int sdp_update_iov_used(struct socket *sk, kiovec_t *iov, int len)
 {
 	sdp_dbg_data(sk, "updating consumed 0x%x bytes from iov\n", len);
 	while (len > 0) {
@@ -544,7 +546,7 @@ static int sdp_post_rdma_read(struct socket *sk, struct rx_srcavail_state *rx_sa
 	return ib_post_send(ssk->qp, &wr, &bad_wr);
 }
 
-int sdp_rdma_to_iovec(struct socket *sk, struct iovec *iov, struct mbuf *mb,
+int sdp_rdma_to_iovec(struct socket *sk, kiovec_t *iov, struct mbuf *mb,
 		unsigned long *used)
 {
 	struct sdp_sock *ssk = sdp_sk(sk);
@@ -639,7 +641,7 @@ static inline int wait_for_sndbuf(struct socket *sk, long *timeo_p)
 }
 
 static int do_sdp_sendmsg_zcopy(struct socket *sk, struct tx_srcavail_state *tx_sa,
-		struct iovec *iov, long *timeo)
+		kiovec_t *iov, long *timeo)
 {
 	struct sdp_sock *ssk = sdp_sk(sk);
 	int rc = 0;
@@ -708,7 +710,7 @@ err_alloc_fmr:
 	return rc;	
 }
 
-int sdp_sendmsg_zcopy(struct kiocb *iocb, struct socket *sk, struct iovec *iov)
+int sdp_sendmsg_zcopy(struct kiocb *iocb, struct socket *sk, kiovec_t *iov)
 {
 	struct sdp_sock *ssk = sdp_sk(sk);
 	int rc = 0;

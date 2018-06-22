@@ -16,33 +16,32 @@
 // Declarations:
 class CMICmnLog;
 
-//++ ============================================================================
+//++
+//============================================================================
 // Details: MI common code implementation base class.
-// Gotchas: None.
-// Authors: Illya Rudkin 28/01/2014.
-// Changes: None.
 //--
-class CMICmnBase
-{
-    // Methods:
-  public:
-    /* ctor */ CMICmnBase(void);
+class CMICmnBase {
+  // Methods:
+public:
+  /* ctor */ CMICmnBase();
 
-    bool HaveErrorDescription(void) const;
-    const CMIUtilString &GetErrorDescription(void) const;
-    void SetErrorDescription(const CMIUtilString &vrTxt) const;
-    void SetErrorDescriptionn(const CMIUtilString vFormat, ...) const;
-    void SetErrorDescriptionNoLog(const CMIUtilString &vrTxt) const;
-    void ClrErrorDescription(void) const;
+  bool HaveErrorDescription() const;
+  const CMIUtilString &GetErrorDescription() const;
+  void SetErrorDescription(const CMIUtilString &vrTxt) const;
+  void SetErrorDescriptionn(const char *vFormat, ...) const;
+  void SetErrorDescriptionNoLog(const CMIUtilString &vrTxt) const;
+  void ClrErrorDescription() const;
 
-    // Overrideable:
-  public:
-    /* dtor */ virtual ~CMICmnBase(void);
+  // Overrideable:
+public:
+  /* dtor */ virtual ~CMICmnBase();
 
-    // Attributes:
-  protected:
-    mutable CMIUtilString m_strMILastErrorDescription;
-    bool m_bInitialized;       // True = yes successfully initialized, false = no yet or failed
-    CMICmnLog *m_pLog;         // Allow all derived classes to use the logger
-    MIint m_clientUsageRefCnt; // Count of client using *this object so not shutdown() object to early
+  // Attributes:
+protected:
+  mutable CMIUtilString m_strMILastErrorDescription;
+  bool m_bInitialized; // True = yes successfully initialized, false = no yet or
+                       // failed
+  CMICmnLog *m_pLog;   // Allow all derived classes to use the logger
+  MIint m_clientUsageRefCnt; // Count of client using *this object so not
+                             // shutdown() object to early
 };

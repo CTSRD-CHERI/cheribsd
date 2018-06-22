@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (C) 2009 Gabor Kovesdan <gabor@FreeBSD.org>
  * Copyright (C) 2012 Oleg Moskalenko <mom040267@gmail.com>
  * All rights reserved.
@@ -631,7 +633,6 @@ file_reader_init(const char *fsrc)
 			int fd, flags;
 
 			flags = MAP_NOCORE | MAP_NOSYNC;
-			addr = MAP_FAILED;
 
 			fd = open(fsrc, O_RDONLY);
 			if (fd < 0)
@@ -1258,7 +1259,7 @@ sort_list_to_file(struct sort_list *list, const char *outfile)
 			break;
 		default:
 			errx(2, "%s", getstr(10));
-		};
+		}
 	}
 
 	if (sort_opts_vals.sort_method == SORT_DEFAULT)

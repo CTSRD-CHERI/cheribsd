@@ -1,6 +1,11 @@
 # $FreeBSD$
 
 .include <bsd.own.mk>
+.include <src.opts.mk>
+
+.if ${MK_CHERI_PURE} == "yes"
+WANT_CHERI=	pure
+.endif
 
 DTCDIR=	${.CURDIR}/../../../contrib/dtc
 _LIBFDTDIR= ${.CURDIR}/../../../sys/contrib/libfdt
@@ -34,7 +39,7 @@ OBJS+= dtc-parser.tab.o dtc-lexer.lex.o
 CLEANFILES+= dtc-parser.tab.o dtc-lexer.lex.o dtc-parser.tab.c \
 		dtc-parser.tab.h dtc-lexer.lex.c ${DTCVERSIONFILE}
 
-${DTCVERSIONFILE}:
+${DTCVERSIONFILE}: ${DTCDIR}/Makefile
 	@echo '#define DTC_VERSION "DTC ${DTCVERSION}"' > ${DTCVERSIONFILE}
 
 dtc-parser.tab.o:	dtc-parser.tab.c dtc-parser.tab.h

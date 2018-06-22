@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2002 Michael Shalayeff.
  * Copyright (c) 2003 Ryan McBride.
  * Copyright (c) 2011 Gleb Smirnoff <glebius@FreeBSD.org>
@@ -175,8 +177,8 @@ static int proto_reg[] = {-1, -1};
  * Each softc has a lock sc_mtx. It is used to synchronise carp_input_c(),
  * callout-driven events and ioctl()s.
  *
- * To traverse the list of softcs on an ifnet we use CIF_LOCK(), to
- * traverse the global list we use the mutex carp_mtx.
+ * To traverse the list of softcs on an ifnet we use CIF_LOCK() or carp_sx.
+ * To traverse the global list we use the mutex carp_mtx.
  *
  * Known issues with locking:
  *
@@ -286,7 +288,8 @@ SYSCTL_VNET_PCPUSTAT(_net_inet_carp, OID_AUTO, stats, struct carpstats,
 		++_i)
 
 #define	IFNET_FOREACH_CARP(ifp, sc)					\
-	CIF_LOCK_ASSERT(ifp->if_carp);					\
+	KASSERT(mtx_owned(&ifp->if_carp->cif_mtx) ||			\
+	    sx_xlocked(&carp_sx), ("cif_vrs not locked"));		\
 	TAILQ_FOREACH((sc), &(ifp)->if_carp->cif_vrs, sc_list)
 
 #define	DEMOTE_ADVSKEW(sc)					\
@@ -581,27 +584,96 @@ carp6_input(struct mbuf **mp, int *offp, int proto)
 }
 #endif /* INET6 */
 
+/*
+ * This routine should not be necessary at all, but some switches
+ * (VMWare ESX vswitches) can echo our own packets back at us,
+ * and we must ignore them or they will cause us to drop out of
+ * MASTER mode.
+ *
+ * We cannot catch all cases of network loops.  Instead, what we
+ * do here is catch any packet that arrives with a carp header
+ * with a VHID of 0, that comes from an address that is our own.
+ * These packets are by definition "from us" (even if they are from
+ * a misconfigured host that is pretending to be us).
+ *
+ * The VHID test is outside this mini-function.
+ */
+static int
+carp_source_is_self(struct mbuf *m, struct ifaddr *ifa, sa_family_t af)
+{
+#ifdef INET
+	struct ip *ip4;
+	struct in_addr in4;
+#endif
+#ifdef INET6
+	struct ip6_hdr *ip6;
+	struct in6_addr in6;
+#endif
+
+	switch (af) {
+#ifdef INET
+	case AF_INET:
+		ip4 = mtod(m, struct ip *);
+		in4 = ifatoia(ifa)->ia_addr.sin_addr;
+		return (in4.s_addr == ip4->ip_src.s_addr);
+#endif
+#ifdef INET6
+	case AF_INET6:
+		ip6 = mtod(m, struct ip6_hdr *);
+		in6 = ifatoia6(ifa)->ia_addr.sin6_addr;
+		return (memcmp(&in6, &ip6->ip6_src, sizeof(in6)) == 0);
+#endif
+	default:
+		break;
+	}
+	return (0);
+}
+
 static void
 carp_input_c(struct mbuf *m, struct carp_header *ch, sa_family_t af)
 {
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
-	struct ifaddr *ifa;
+	struct ifaddr *ifa, *match;
 	struct carp_softc *sc;
 	uint64_t tmp_counter;
 	struct timeval sc_tv, ch_tv;
+	int error;
 
-	/* verify that the VHID is valid on the receiving interface */
+	/*
+	 * Verify that the VHID is valid on the receiving interface.
+	 *
+	 * There should be just one match.  If there are none
+	 * the VHID is not valid and we drop the packet.  If
+	 * there are multiple VHID matches, take just the first
+	 * one, for compatibility with previous code.  While we're
+	 * scanning, check for obvious loops in the network topology
+	 * (these should never happen, and as noted above, we may
+	 * miss real loops; this is just a double-check).
+	 */
 	IF_ADDR_RLOCK(ifp);
-	IFNET_FOREACH_IFA(ifp, ifa)
-		if (ifa->ifa_addr->sa_family == af &&
-		    ifa->ifa_carp->sc_vhid == ch->carp_vhid) {
-			ifa_ref(ifa);
-			break;
-		}
+	error = 0;
+	match = NULL;
+	IFNET_FOREACH_IFA(ifp, ifa) {
+		if (match == NULL && ifa->ifa_carp != NULL &&
+		    ifa->ifa_addr->sa_family == af &&
+		    ifa->ifa_carp->sc_vhid == ch->carp_vhid)
+			match = ifa;
+		if (ch->carp_vhid == 0 && carp_source_is_self(m, ifa, af))
+			error = ELOOP;
+	}
+	ifa = error ? NULL : match;
+	if (ifa != NULL)
+		ifa_ref(ifa);
 	IF_ADDR_RUNLOCK(ifp);
 
 	if (ifa == NULL) {
-		CARPSTATS_INC(carps_badvhid);
+		if (error == ELOOP) {
+			CARP_DEBUG("dropping looped packet on interface %s\n",
+			    ifp->if_xname);
+			CARPSTATS_INC(carps_badif);	/* ??? */
+		} else {
+			CARPSTATS_INC(carps_badvhid);
+		}
 		m_freem(m);
 		return;
 	}
@@ -787,12 +859,41 @@ carp_send_ad_error(struct carp_softc *sc, int error)
 	}
 }
 
+/*
+ * Pick the best ifaddr on the given ifp for sending CARP
+ * advertisements.
+ *
+ * "Best" here is defined by ifa_preferred().  This function is much
+ * much like ifaof_ifpforaddr() except that we just use ifa_preferred().
+ *
+ * (This could be simplified to return the actual address, except that
+ * it has a different format in AF_INET and AF_INET6.)
+ */
+static struct ifaddr *
+carp_best_ifa(int af, struct ifnet *ifp)
+{
+	struct ifaddr *ifa, *best;
+
+	if (af >= AF_MAX)
+		return (NULL);
+	best = NULL;
+	IF_ADDR_RLOCK(ifp);
+	TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
+		if (ifa->ifa_addr->sa_family == af &&
+		    (best == NULL || ifa_preferred(best, ifa)))
+			best = ifa;
+	}
+	IF_ADDR_RUNLOCK(ifp);
+	if (best != NULL)
+		ifa_ref(best);
+	return (best);
+}
+
 static void
 carp_send_ad_locked(struct carp_softc *sc)
 {
 	struct carp_header ch;
 	struct timeval tv;
-	struct sockaddr sa;
 	struct ifaddr *ifa;
 	struct carp_header *ch_ptr;
 	struct mbuf *m;
@@ -841,9 +942,7 @@ carp_send_ad_locked(struct carp_softc *sc)
 		ip->ip_sum = 0;
 		ip_fillid(ip);
 
-		bzero(&sa, sizeof(sa));
-		sa.sa_family = AF_INET;
-		ifa = ifaof_ifpforaddr(&sa, sc->sc_carpdev);
+		ifa = carp_best_ifa(AF_INET, sc->sc_carpdev);
 		if (ifa != NULL) {
 			ip->ip_src.s_addr =
 			    ifatoia(ifa)->ia_addr.sin_addr.s_addr;
@@ -887,11 +986,9 @@ carp_send_ad_locked(struct carp_softc *sc)
 		ip6->ip6_vfc |= IPV6_VERSION;
 		ip6->ip6_hlim = CARP_DFLTTL;
 		ip6->ip6_nxt = IPPROTO_CARP;
-		bzero(&sa, sizeof(sa));
 
 		/* set the source address */
-		sa.sa_family = AF_INET6;
-		ifa = ifaof_ifpforaddr(&sa, sc->sc_carpdev);
+		ifa = carp_best_ifa(AF_INET6, sc->sc_carpdev);
 		if (ifa != NULL) {
 			bcopy(IFA_IN6(ifa), &ip6->ip6_src,
 			    sizeof(struct in6_addr));
@@ -1468,6 +1565,8 @@ carp_alloc(struct ifnet *ifp)
 	struct carp_softc *sc;
 	struct carp_if *cif;
 
+	sx_assert(&carp_sx, SA_XLOCKED);
+
 	if ((cif = ifp->if_carp) == NULL)
 		cif = carp_alloc_if(ifp);
 
@@ -1621,7 +1720,7 @@ carp_ioctl(struct ifreq *ifr, u_long cmd, struct thread *td)
 	struct carp_softc *sc = NULL;
 	int error = 0, locked = 0;
 
-	if ((error = copyin(ifr->ifr_data, &carpr, sizeof carpr)))
+	if ((error = copyin_c(ifr_data_get_ptr(ifr), &carpr, sizeof carpr)))
 		return (error);
 
 	ifp = ifunit_ref(ifr->ifr_name);
@@ -1647,7 +1746,7 @@ carp_ioctl(struct ifreq *ifr, u_long cmd, struct thread *td)
 
 	sx_xlock(&carp_sx);
 	switch (cmd) {
-	case SIOCSVH:
+	CASE_IOC_IFREQ(SIOCSVH):
 		if ((error = priv_check(td, PRIV_NETINET_CARP)))
 			break;
 		if (carpr.carpr_vhid <= 0 || carpr.carpr_vhid > CARP_MAXVHID ||
@@ -1657,11 +1756,9 @@ carp_ioctl(struct ifreq *ifr, u_long cmd, struct thread *td)
 		}
 
 		if (ifp->if_carp) {
-			CIF_LOCK(ifp->if_carp);
 			IFNET_FOREACH_CARP(ifp, sc)
 				if (sc->sc_vhid == carpr.carpr_vhid)
 					break;
-			CIF_UNLOCK(ifp->if_carp);
 		}
 		if (sc == NULL) {
 			sc = carp_alloc(ifp);
@@ -1713,7 +1810,7 @@ carp_ioctl(struct ifreq *ifr, u_long cmd, struct thread *td)
 		}
 		break;
 
-	case SIOCGVH:
+	CASE_IOC_IFREQ(SIOCGVH):
 	    {
 		int priveleged;
 
@@ -1732,22 +1829,20 @@ carp_ioctl(struct ifreq *ifr, u_long cmd, struct thread *td)
 
 		priveleged = (priv_check(td, PRIV_NETINET_CARP) == 0);
 		if (carpr.carpr_vhid != 0) {
-			CIF_LOCK(ifp->if_carp);
 			IFNET_FOREACH_CARP(ifp, sc)
 				if (sc->sc_vhid == carpr.carpr_vhid)
 					break;
-			CIF_UNLOCK(ifp->if_carp);
 			if (sc == NULL) {
 				error = ENOENT;
 				break;
 			}
 			carp_carprcp(&carpr, sc, priveleged);
-			error = copyout(&carpr, ifr->ifr_data, sizeof(carpr));
+			error = copyout_c(&carpr, ifr_data_get_ptr(ifr),
+			    sizeof(carpr));
 		} else  {
 			int i, count;
 
 			count = 0;
-			CIF_LOCK(ifp->if_carp);
 			IFNET_FOREACH_CARP(ifp, sc)
 				count++;
 
@@ -1761,7 +1856,8 @@ carp_ioctl(struct ifreq *ifr, u_long cmd, struct thread *td)
 			IFNET_FOREACH_CARP(ifp, sc) {
 				carp_carprcp(&carpr, sc, priveleged);
 				carpr.carpr_count = count;
-				error = copyout(&carpr, ifr->ifr_data +
+				error = copyout_c(&carpr,
+				    (char * __capability)ifr_data_get_ptr(ifr) +
 				    (i * sizeof(carpr)), sizeof(carpr));
 				if (error) {
 					CIF_UNLOCK(ifp->if_carp);
@@ -1769,7 +1865,6 @@ carp_ioctl(struct ifreq *ifr, u_long cmd, struct thread *td)
 				}
 				i++;
 			}
-			CIF_UNLOCK(ifp->if_carp);
 		}
 		break;
 	    }
@@ -1824,11 +1919,9 @@ carp_attach(struct ifaddr *ifa, int vhid)
 		return (ENOPROTOOPT);
 	}
 
-	CIF_LOCK(cif);
 	IFNET_FOREACH_CARP(ifp, sc)
 		if (sc->sc_vhid == vhid)
 			break;
-	CIF_UNLOCK(cif);
 	if (sc == NULL) {
 		sx_xunlock(&carp_sx);
 		return (ENOENT);
@@ -1875,7 +1968,7 @@ carp_attach(struct ifaddr *ifa, int vhid)
 }
 
 void
-carp_detach(struct ifaddr *ifa)
+carp_detach(struct ifaddr *ifa, bool keep_cif)
 {
 	struct ifnet *ifp = ifa->ifa_ifp;
 	struct carp_if *cif = ifp->if_carp;
@@ -1921,12 +2014,13 @@ carp_detach(struct ifaddr *ifa)
 	carp_hmac_prepare(sc);
 	carp_sc_state(sc);
 
-	if (sc->sc_naddrs == 0 && sc->sc_naddrs6 == 0)
+	if (!keep_cif && sc->sc_naddrs == 0 && sc->sc_naddrs6 == 0)
 		carp_destroy(sc);
 	else
 		CARP_UNLOCK(sc);
 
-	CIF_FREE(cif);
+	if (!keep_cif)
+		CIF_FREE(cif);
 
 	sx_xunlock(&carp_sx);
 }

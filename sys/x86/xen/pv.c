@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ *
  * Copyright (c) 2004 Christian Limpach.
  * Copyright (c) 2004-2006,2008 Kip Macy
  * Copyright (c) 2008 The NetBSD Foundation, Inc.
@@ -226,8 +228,6 @@ start_xen_ap(int cpu)
 	bootAP = cpu;
 
 	ctxt = malloc(sizeof(*ctxt), M_TEMP, M_WAITOK | M_ZERO);
-	if (ctxt == NULL)
-		panic("unable to allocate memory");
 
 	ctxt->flags = VGCF_IN_KERNEL;
 	ctxt->user_regs.rip = (unsigned long) init_secondary;

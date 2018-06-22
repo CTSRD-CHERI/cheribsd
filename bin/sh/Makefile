@@ -3,6 +3,7 @@
 
 .include <src.opts.mk>
 
+PACKAGE=runtime
 PROG=	sh
 INSTALLFLAGS= -S
 SHSRCS=	alias.c arith_yacc.c arith_yylex.c cd.c echo.c error.c eval.c \
@@ -27,9 +28,9 @@ WARNS?=	2
 WFORMAT=0
 
 .PATH:	${.CURDIR}/bltin \
-	${.CURDIR}/../kill \
-	${.CURDIR}/../test \
-	${.CURDIR}/../../usr.bin/printf
+	${.CURDIR:H}/kill \
+	${.CURDIR:H}/test \
+	${SRCTOP}/usr.bin/printf
 
 CLEANFILES+= mknodes mknodes.o \
 	mksyntax mksyntax.o
@@ -38,31 +39,32 @@ CLEANFILES+= ${GENSRCS} ${GENHDRS}
 build-tools: mknodes mksyntax
 
 .ORDER: builtins.c builtins.h
+builtins.h: .NOMETA
 builtins.c builtins.h: mkbuiltins builtins.def
 	sh ${.CURDIR}/mkbuiltins ${.CURDIR}
 
-# XXX this is just to stop the default .c rule being used, so that the
-# intermediate object has a fixed name.
-# XXX we have a default .c rule, but no default .o rule.
-.o:
-	${CC} ${CFLAGS} ${LDFLAGS} ${.IMPSRC} ${LDLIBS} -o ${.TARGET}
-mknodes: mknodes.o
-mksyntax: mksyntax.o
+mknodes: mknodes.c ${BUILD_TOOLS_META}
+	${BUILD_TOOLS_CC} ${BUILD_TOOLS_CFLAGS} ${BUILD_TOOLS_LDFLAGS} \
+	    ${.ALLSRC:[1]} -o ${.TARGET}
+mksyntax: mksyntax.c ${BUILD_TOOLS_META}
+	${BUILD_TOOLS_CC} ${BUILD_TOOLS_CFLAGS} ${BUILD_TOOLS_LDFLAGS} \
+	    ${.ALLSRC:[1]} -o ${.TARGET}
 
 .ORDER: nodes.c nodes.h
+nodes.h: .NOMETA
 nodes.c nodes.h: mknodes nodetypes nodes.c.pat
-	./mknodes ${.CURDIR}/nodetypes ${.CURDIR}/nodes.c.pat
+	${BTOOLSPATH:U.}/mknodes ${.CURDIR}/nodetypes ${.CURDIR}/nodes.c.pat
 
 .ORDER: syntax.c syntax.h
+syntax.h: .NOMETA
 syntax.c syntax.h: mksyntax
-	./mksyntax
+	${BTOOLSPATH:U.}/mksyntax
 
 token.h: mktokens
 	sh ${.CURDIR}/mktokens
 
-.if ${MK_TESTS} != "no"
-SUBDIR+=    tests
-.endif
+HAS_TESTS=
+SUBDIR.${MK_TESTS}+= tests
 
 WANT_DUMP=	yes
 

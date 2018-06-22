@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2010
  *	Ben Gray <ben.r.gray@gmail.com>.
  * All rights reserved.
@@ -31,7 +33,7 @@
  */
 
 /**
- * Power, Reset and Clock Managment Module
+ * Power, Reset and Clock Management Module
  *
  * This is a very simple driver wrapper around the PRCM set of registers in
  * the OMAP3 chip. It allows you to turn on and off things like the functional
@@ -52,8 +54,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/mutex.h>
 
 #include <machine/bus.h>
-#include <machine/cpu.h>
-#include <machine/cpufunc.h>
 #include <machine/resource.h>
 #include <machine/intr.h>
 

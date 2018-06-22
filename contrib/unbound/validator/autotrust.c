@@ -430,6 +430,8 @@ find_add_tp(struct val_anchors* anchors, uint8_t* rr, size_t rr_len,
 	}
 	tp = autr_tp_create(anchors, rr, dname_len, sldns_wirerr_get_class(rr,
 		rr_len, dname_len));
+	if(!tp)	
+		return NULL;
 	lock_basic_lock(&tp->lock);
 	return tp;
 }
@@ -1201,7 +1203,7 @@ void autr_write_file(struct module_env* env, struct trust_anchor* tp)
 	if(fsync(fileno(out)) != 0)
 		log_err("could not fsync(%s): %s", fname, strerror(errno));
 #else
-	FlushFileBuffers((HANDLE)_fileno(out));
+	FlushFileBuffers((HANDLE)_get_osfhandle(_fileno(out)));
 #endif
 	if(fclose(out) != 0) {
 		fatal_exit("could not complete write: %s: %s",
@@ -1569,6 +1571,11 @@ key_matches_a_ds(struct module_env* env, struct val_env* ve,
 			verbose(VERB_ALGO, "DS match attempt failed");
 			continue;
 		}
+		/* match of hash is sufficient for bootstrap of trust point */
+		(void)reason;
+		(void)ve;
+		return 1;
+		/* no need to check RRSIG, DS hash already matched with source
 		if(dnskey_verify_rrset(env, ve, dnskey_rrset, 
 			dnskey_rrset, key_idx, &reason) == sec_status_secure) {
 			return 1;
@@ -1576,6 +1583,7 @@ key_matches_a_ds(struct module_env* env, struct val_env* ve,
 			verbose(VERB_ALGO, "DS match failed because the key "
 				"does not verify the keyset: %s", reason);
 		}
+		*/
 	}
 	return 0;
 }
@@ -2333,6 +2341,7 @@ probe_anchor(struct module_env* env, struct trust_anchor* tp)
 	edns.ext_rcode = 0;
 	edns.edns_version = 0;
 	edns.bits = EDNS_DO;
+	edns.opt_list = NULL;
 	if(sldns_buffer_capacity(buf) < 65535)
 		edns.udp_size = (uint16_t)sldns_buffer_capacity(buf);
 	else	edns.udp_size = 65535;

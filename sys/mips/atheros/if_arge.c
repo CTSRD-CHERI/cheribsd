@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2009, Oleksandr Tymoshenko
  * All rights reserved.
  *
@@ -65,7 +67,6 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_param.h>
 #include <vm/vm.h>
 #include <vm/pmap.h>
-#include <machine/pmap.h>
 #include <sys/bus.h>
 #include <sys/rman.h>
 
@@ -109,6 +110,7 @@ typedef enum {
 	ARGE_DBG_ERR	=	0x00000010,
 	ARGE_DBG_RESET	=	0x00000020,
 	ARGE_DBG_PLL	=	0x00000040,
+	ARGE_DBG_ANY	=	0xffffffff,
 } arge_debug_flags;
 
 static const char * arge_miicfg_str[] = {
@@ -123,7 +125,7 @@ static const char * arge_miicfg_str[] = {
 #ifdef ARGE_DEBUG
 #define	ARGEDEBUG(_sc, _m, ...) 					\
 	do {								\
-		if ((_m) & (_sc)->arge_debug)				\
+		if (((_m) & (_sc)->arge_debug) || ((_m) == ARGE_DBG_ANY)) \
 			device_printf((_sc)->arge_dev, __VA_ARGS__);	\
 	} while (0)
 #else
@@ -1124,7 +1126,7 @@ arge_miibus_readreg(device_t dev, int phy, int reg)
 
 	if (arge_mdio_busy(sc) != 0) {
 		mtx_unlock(&miibus_mtx);
-		ARGEDEBUG(sc, ARGE_DBG_MII, "%s timedout\n", __func__);
+		ARGEDEBUG(sc, ARGE_DBG_ANY, "%s timedout\n", __func__);
 		/* XXX: return ERRNO istead? */
 		return (-1);
 	}
@@ -1161,7 +1163,7 @@ arge_miibus_writereg(device_t dev, int phy, int reg, int data)
 
 	if (arge_mdio_busy(sc) != 0) {
 		mtx_unlock(&miibus_mtx);
-		ARGEDEBUG(sc, ARGE_DBG_MII, "%s timedout\n", __func__);
+		ARGEDEBUG(sc, ARGE_DBG_ANY, "%s timedout\n", __func__);
 		/* XXX: return ERRNO istead? */
 		return (-1);
 	}
@@ -1516,6 +1518,7 @@ arge_encap(struct arge_softc *sc, struct mbuf **m_head)
 		sc->stats.tx_pkts_unaligned++;
 		m = m_defrag(*m_head, M_NOWAIT);
 		if (m == NULL) {
+			m_freem(*m_head);
 			*m_head = NULL;
 			return (ENOBUFS);
 		}
@@ -1727,7 +1730,7 @@ arge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 #endif
 
 	switch (command) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		ARGE_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
@@ -1748,13 +1751,13 @@ arge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		ARGE_UNLOCK(sc);
 		error = 0;
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		/* XXX: implement SIOCDELMULTI */
 		error = 0;
 		break;
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		if (sc->arge_miibus) {
 			mii = device_get_softc(sc->arge_miibus);
 			error = ifmedia_ioctl(ifp, ifr, &mii->mii_media,
@@ -1764,12 +1767,12 @@ arge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			error = ifmedia_ioctl(ifp, ifr, &sc->arge_ifmedia,
 			    command);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		/* XXX: Check other capabilities */
 #ifdef DEVICE_POLLING
-		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
+		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
 		if (mask & IFCAP_POLLING) {
-			if (ifr->ifr_reqcap & IFCAP_POLLING) {
+			if (ifr_reqcap_get(ifr) & IFCAP_POLLING) {
 				ARGE_WRITE(sc, AR71XX_DMA_INTR, 0);
 				error = ether_poll_register(arge_poll, ifp);
 				if (error)
@@ -2130,7 +2133,7 @@ arge_tx_ring_init(struct arge_softc *sc)
 	sc->arge_cdata.arge_tx_cnt = 0;
 
 	rd = &sc->arge_rdata;
-	bzero(rd->arge_tx_ring, sizeof(rd->arge_tx_ring));
+	bzero(rd->arge_tx_ring, sizeof(*rd->arge_tx_ring));
 	for (i = 0; i < ARGE_TX_RING_COUNT; i++) {
 		if (i == ARGE_TX_RING_COUNT - 1)
 			addr = ARGE_TX_RING_ADDR(sc, 0);
@@ -2189,7 +2192,7 @@ arge_rx_ring_init(struct arge_softc *sc)
 	sc->arge_cdata.arge_rx_cons = 0;
 
 	rd = &sc->arge_rdata;
-	bzero(rd->arge_rx_ring, sizeof(rd->arge_rx_ring));
+	bzero(rd->arge_rx_ring, sizeof(*rd->arge_rx_ring));
 	for (i = 0; i < ARGE_RX_RING_COUNT; i++) {
 		rxd = &sc->arge_cdata.arge_rxdesc[i];
 		if (rxd->rx_m != NULL) {
@@ -2691,7 +2694,10 @@ argemdio_attach(device_t dev)
 {
 	struct arge_softc	*sc;
 	int			error = 0;
-
+#ifdef	ARGE_DEBUG
+	struct sysctl_ctx_list *ctx;
+	struct sysctl_oid *tree;
+#endif
 	sc = device_get_softc(dev);
 	sc->arge_dev = dev;
 	sc->arge_mac_unit = device_get_unit(dev);
@@ -2703,6 +2709,14 @@ argemdio_attach(device_t dev)
 		error = ENXIO;
 		goto fail;
 	}
+
+#ifdef	ARGE_DEBUG
+	ctx = device_get_sysctl_ctx(dev);
+	tree = device_get_sysctl_tree(dev);
+	SYSCTL_ADD_INT(ctx, SYSCTL_CHILDREN(tree), OID_AUTO,
+		"debug", CTLFLAG_RW, &sc->arge_debug, 0,
+		"argemdio interface debugging flags");
+#endif
 
 	/* Reset MAC - required for AR71xx MDIO to successfully occur */
 	arge_reset_mac(sc);

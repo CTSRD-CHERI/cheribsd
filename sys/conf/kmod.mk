@@ -44,6 +44,10 @@
 #
 # DESTDIR	The tree where the module gets installed. [not set]
 #
+# KERNBUILDDIR
+#		Set to the location of the kernel build directory where
+#		the opt_*.h files, .o's and kernel winds up.
+#
 # +++ targets +++
 #
 # 	install:
@@ -75,6 +79,16 @@ OBJCOPY?=	objcopy
 .include "kern.opts.mk"
 .include <bsd.compiler.mk>
 .include "config.mk"
+
+# Search for kernel source tree in standard places.
+.for _dir in ${.CURDIR}/../.. ${.CURDIR}/../../.. /sys /usr/src/sys
+.if !defined(SYSDIR) && exists(${_dir}/kern/)
+SYSDIR=	${_dir:tA}
+.endif
+.endfor
+.if !defined(SYSDIR) || !exists(${SYSDIR}/kern/)
+.error "can't find kernel source tree"
+.endif
 
 .SUFFIXES: .out .o .c .cc .cxx .C .y .l .s .S .m
 
@@ -115,19 +129,27 @@ CFLAGS.gcc+= --param large-function-growth=1000
 CFLAGS+=	-fno-common
 LDFLAGS+=	-d -warn-common
 
+.if defined(LINKER_FEATURES) && ${LINKER_FEATURES:Mbuild-id}
+LDFLAGS+=	-Wl,--build-id=sha1
+.endif
+
 CFLAGS+=	${DEBUG_FLAGS}
 .if ${MACHINE_CPUARCH} == amd64
 CFLAGS+=	-fno-omit-frame-pointer -mno-omit-leaf-frame-pointer
 .endif
 
-.if ${MACHINE_CPUARCH} == "aarch64"
+.if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "riscv"
 CFLAGS+=	-fPIC
 .endif
 
 # Temporary workaround for PR 196407, which contains the fascinating details.
 # Don't allow clang to use fpu instructions or registers in kernel modules.
 .if ${MACHINE_CPUARCH} == arm
+.if ${COMPILER_VERSION} < 30800
 CFLAGS.clang+=	-mllvm -arm-use-movt=0
+.else
+CFLAGS.clang+=	-mno-movt
+.endif
 CFLAGS.clang+=	-mfpu=none
 CFLAGS+=	-funwind-tables
 .endif
@@ -137,7 +159,8 @@ CFLAGS+=	-mlongcall -fno-omit-frame-pointer
 .endif
 
 .if ${MACHINE_CPUARCH} == mips
-CFLAGS+=	-G0 -fno-pic -mno-abicalls -mlong-calls
+CFLAGS+=	-G0 -fno-pic -mno-abicalls
+CFLAGS.gcc+=	-mlong-calls
 .endif
 
 .if defined(DEBUG) || defined(DEBUG_FLAGS)
@@ -153,19 +176,21 @@ SRCS+=	${KMOD:S/$/.c/}
 CLEANFILES+=	${KMOD:S/$/.c/}
 
 .for _firmw in ${FIRMWS}
-${_firmw:C/\:.*$/.fwo/}:	${_firmw:C/\:.*$//}
+${_firmw:C/\:.*$/.fwo/:T}:	${_firmw:C/\:.*$//}
 	@${ECHO} ${_firmw:C/\:.*$//} ${.ALLSRC:M*${_firmw:C/\:.*$//}}
 	@if [ -e ${_firmw:C/\:.*$//} ]; then			\
 		${LD} -b binary --no-warn-mismatch ${_LDFLAGS}	\
-		    -r -d -o ${.TARGET}	${_firmw:C/\:.*$//};	\
+		    -m ${LD_EMULATION} -r -d			\
+		    -o ${.TARGET} ${_firmw:C/\:.*$//};		\
 	else							\
 		ln -s ${.ALLSRC:M*${_firmw:C/\:.*$//}} ${_firmw:C/\:.*$//}; \
 		${LD} -b binary --no-warn-mismatch ${_LDFLAGS}	\
-		    -r -d -o ${.TARGET}	${_firmw:C/\:.*$//};	\
+		    -m ${LD_EMULATION} -r -d			\
+		    -o ${.TARGET} ${_firmw:C/\:.*$//};		\
 		rm ${_firmw:C/\:.*$//};				\
 	fi
 
-OBJS+=	${_firmw:C/\:.*$/.fwo/}
+OBJS+=	${_firmw:C/\:.*$/.fwo/:T}
 .endfor
 .endif
 
@@ -193,17 +218,8 @@ ${PROG}.debug: ${FULLPROG}
 
 .if ${__KLD_SHARED} == yes
 ${FULLPROG}: ${KMOD}.kld
-.if ${MACHINE_CPUARCH} != "aarch64"
-	${LD} -Bshareable ${_LDFLAGS} -o ${.TARGET} ${KMOD}.kld
-.else
-#XXXKIB Relocatable linking in aarch64 ld from binutils 2.25.1 does
-#       not work.  The linker corrupts the references to the external
-#       symbols which are defined by other object in the linking set
-#       and should therefore loose the GOT entry.  The problem seems
-#       to be fixed in the binutils-gdb git HEAD as of 2015-10-04.  Hack
-#       below allows to get partially functioning modules for now.
-	${LD} -Bshareable ${_LDFLAGS} -o ${.TARGET} ${OBJS}
-.endif
+	${LD} -m ${LD_EMULATION} -Bshareable -znotext ${_LDFLAGS} \
+	    -o ${.TARGET} ${KMOD}.kld
 .if !defined(DEBUG_FLAGS)
 	${OBJCOPY} --strip-debug ${.TARGET}
 .endif
@@ -219,7 +235,7 @@ ${KMOD}.kld: ${OBJS}
 .else
 ${FULLPROG}: ${OBJS}
 .endif
-	${LD} ${_LDFLAGS} -r -d -o ${.TARGET} ${OBJS}
+	${LD} -m ${LD_EMULATION} ${_LDFLAGS} -r -d -o ${.TARGET} ${OBJS}
 .if ${MK_CTF} != "no"
 	${CTFMERGE} ${CTFFLAGS} -o ${.TARGET} ${OBJS}
 .endif
@@ -236,6 +252,10 @@ ${FULLPROG}: ${OBJS}
 	    export_syms | xargs -J% ${OBJCOPY} % ${.TARGET}
 .endif
 .endif
+.if defined(PREFIX_SYMS)
+	${AWK} -v prefix=${PREFIX_SYMS} -f ${SYSDIR}/conf/kmod_syms_prefix.awk \
+	    ${.TARGET} /dev/null | xargs -J% ${OBJCOPY} % ${.TARGET}
+.endif
 .if !defined(DEBUG_FLAGS) && ${__KLD_SHARED} == no
 	${OBJCOPY} --strip-debug ${.TARGET}
 .endif
@@ -249,27 +269,18 @@ _ILINKS+=x86
 .endif
 CLEANFILES+=${_ILINKS}
 
-all: objwarn ${PROG}
+all: ${PROG}
 
 beforedepend: ${_ILINKS}
+beforebuild: ${_ILINKS}
 
 # Ensure that the links exist without depending on it when it exists which
 # causes all the modules to be rebuilt when the directory pointed to changes.
 .for _link in ${_ILINKS}
 .if !exists(${.OBJDIR}/${_link})
-${OBJS}: ${_link}
+OBJS_DEPEND_GUESS+=	${_link}
 .endif
 .endfor
-
-# Search for kernel source tree in standard places.
-.for _dir in ${.CURDIR}/../.. ${.CURDIR}/../../.. /sys /usr/src/sys
-.if !defined(SYSDIR) && exists(${_dir}/kern/)
-SYSDIR=	${_dir}
-.endif
-.endfor
-.if !defined(SYSDIR) || !exists(${SYSDIR}/kern/)
-.error "can't find kernel source tree"
-.endif
 
 .NOPATH: ${_ILINKS}
 
@@ -282,7 +293,7 @@ ${_ILINKS}:
 	esac ; \
 	path=`(cd $$path && /bin/pwd)` ; \
 	${ECHO} ${.TARGET:T} "->" $$path ; \
-	ln -sf $$path ${.TARGET:T}
+	ln -fhs $$path ${.TARGET:T}
 
 CLEANFILES+= ${PROG} ${KMOD}.kld ${OBJS}
 
@@ -301,11 +312,11 @@ _INSTALLFLAGS:=	${_INSTALLFLAGS${ie}}
 KERN_DEBUGDIR?=	${DEBUGDIR}
 realinstall: _kmodinstall
 .ORDER: beforeinstall _kmodinstall
-_kmodinstall:
-	${INSTALL} -o ${KMODOWN} -g ${KMODGRP} -m ${KMODMODE} \
+_kmodinstall: .PHONY
+	${INSTALL} -T release -o ${KMODOWN} -g ${KMODGRP} -m ${KMODMODE} \
 	    ${_INSTALLFLAGS} ${PROG} ${DESTDIR}${KMODDIR}/
 .if defined(DEBUG_FLAGS) && !defined(INSTALL_NODEBUG) && ${MK_KERNEL_SYMBOLS} != "no"
-	${INSTALL} -o ${KMODOWN} -g ${KMODGRP} -m ${KMODMODE} \
+	${INSTALL} -T debug -o ${KMODOWN} -g ${KMODGRP} -m ${KMODMODE} \
 	    ${_INSTALLFLAGS} ${PROG}.debug ${DESTDIR}${KERN_DEBUGDIR}${KMODDIR}/
 .endif
 
@@ -315,7 +326,7 @@ _kmodinstall:
 afterinstall: _kldxref
 .ORDER: realinstall _kldxref
 .ORDER: _installlinks _kldxref
-_kldxref:
+_kldxref: .PHONY
 	@if type kldxref >/dev/null 2>&1; then \
 		${ECHO} kldxref ${DESTDIR}${KMODDIR}; \
 		kldxref ${DESTDIR}${KMODDIR}; \
@@ -326,17 +337,17 @@ _kldxref:
 .endif # !target(install)
 
 .if !target(load)
-load: ${PROG}
+load: ${PROG} .PHONY
 	${KMODLOAD} -v ${.OBJDIR}/${PROG}
 .endif
 
 .if !target(unload)
-unload:
+unload: .PHONY
 	if ${KMODISLOADED} ${PROG} ; then ${KMODUNLOAD} -v ${PROG} ; fi
 .endif
 
 .if !target(reload)
-reload: unload load
+reload: unload load .PHONY
 .endif
 
 .if defined(KERNBUILDDIR)
@@ -360,7 +371,7 @@ ${_src}:
 .endif
 
 # Respect configuration-specific C flags.
-CFLAGS+=	${CONF_CFLAGS}
+CFLAGS+=	${ARCH_FLAGS} ${CONF_CFLAGS}
 
 .if !empty(SRCS:Mvnode_if.c)
 CLEANFILES+=	vnode_if.c
@@ -381,11 +392,7 @@ vnode_if_typedef.h:
 .endif
 
 # Build _if.[ch] from _if.m, and clean them when we're done.
-# This is duplicated in sys/modules/Makefile.
-.if !defined(__MPATH)
-__MPATH!=find ${SYSDIR:tA}/ -name \*_if.m
-.export __MPATH
-.endif
+# __MPATH defined in config.mk
 _MFILES=${__MPATH:T:O}
 _MPATH=${__MPATH:H:O:u}
 .PATH.m: ${_MPATH}
@@ -410,6 +417,26 @@ ${_i}devs.h: ${SYSDIR}/tools/${_i}devs2h.awk ${SYSDIR}/dev/${_i}/${_i}devs
 .endif
 .endfor # _i
 
+.if !empty(SRCS:Mbhnd_nvram_map.h)
+CLEANFILES+=	bhnd_nvram_map.h
+bhnd_nvram_map.h: ${SYSDIR}/dev/bhnd/tools/nvram_map_gen.awk \
+    ${SYSDIR}/dev/bhnd/tools/nvram_map_gen.sh \
+    ${SYSDIR}/dev/bhnd/nvram/nvram_map
+bhnd_nvram_map.h:
+	sh ${SYSDIR}/dev/bhnd/tools/nvram_map_gen.sh \
+	    ${SYSDIR}/dev/bhnd/nvram/nvram_map -h
+.endif
+
+.if !empty(SRCS:Mbhnd_nvram_map_data.h)
+CLEANFILES+=	bhnd_nvram_map_data.h
+bhnd_nvram_map_data.h: ${SYSDIR}/dev/bhnd/tools/nvram_map_gen.awk \
+    ${SYSDIR}/dev/bhnd/tools/nvram_map_gen.sh \
+    ${SYSDIR}/dev/bhnd/nvram/nvram_map
+bhnd_nvram_map_data.h:
+	sh ${SYSDIR}/dev/bhnd/tools/nvram_map_gen.sh \
+	    ${SYSDIR}/dev/bhnd/nvram/nvram_map -d
+.endif
+
 .if !empty(SRCS:Musbdevs.h)
 CLEANFILES+=	usbdevs.h
 usbdevs.h: ${SYSDIR}/tools/usbdevs2h.awk ${SYSDIR}/dev/usb/usbdevs
@@ -428,8 +455,9 @@ acpi_quirks.h: ${SYSDIR}/tools/acpi_quirks2h.awk ${SYSDIR}/dev/acpica/acpi_quirk
 	${AWK} -f ${SYSDIR}/tools/acpi_quirks2h.awk ${SYSDIR}/dev/acpica/acpi_quirks
 .endif
 
-.if !empty(SRCS:Massym.s)
+.if !empty(SRCS:Massym.s) || !empty(DPSRCS:Massym.s)
 CLEANFILES+=	assym.s genassym.o
+DEPENDOBJS+=	genassym.o
 assym.s: genassym.o
 .if defined(KERNBUILDDIR)
 genassym.o: opt_global.h
@@ -438,27 +466,22 @@ assym.s: ${SYSDIR}/kern/genassym.sh
 	sh ${SYSDIR}/kern/genassym.sh genassym.o > ${.TARGET}
 genassym.o: ${SYSDIR}/${MACHINE}/${MACHINE}/genassym.c
 genassym.o: ${SRCS:Mopt_*.h}
-	${CC} -c ${CFLAGS:N-fno-common} \
+	${CC} -c ${CFLAGS:N-flto:N-fno-common} \
 	    ${SYSDIR}/${MACHINE}/${MACHINE}/genassym.c
 .endif
-
-lint: ${SRCS}
-	${LINT} ${LINTKERNFLAGS} ${CFLAGS:M-[DILU]*} ${.ALLSRC:M*.c}
 
 .if defined(KERNBUILDDIR)
 ${OBJS}: opt_global.h
 .endif
 
-.include <bsd.dep.mk>
-
-cleandepend: cleanilinks
+CLEANDEPENDFILES+=	${_ILINKS}
 # .depend needs include links so we remove them only together.
 cleanilinks:
 	rm -f ${_ILINKS}
 
-.if !exists(${.OBJDIR}/${DEPENDFILE})
-${OBJS}: ${SRCS:M*.h}
-.endif
+OBJS_DEPEND_GUESS+= ${SRCS:M*.h}
 
+.include <bsd.dep.mk>
+.include <bsd.clang-analyze.mk>
 .include <bsd.obj.mk>
 .include "kern.mk"

@@ -1,6 +1,8 @@
 /*	$NetBSD: pmap_rmt.c,v 1.29 2000/07/06 03:10:34 christos Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2009, Sun Microsystems, Inc.
  * All rights reserved.
  *
@@ -26,6 +28,17 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
  * POSSIBILITY OF SUCH DAMAGE.
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "sunrpc"
+ * }
+ * CHERI CHANGES END
  */
 
 #if defined(LIBC_SCCS) && !defined(lint)
@@ -131,7 +144,7 @@ xdr_rmtcall_args(XDR *xdrs, struct rmtcallargs *cap)
 		if (! xdr_u_long(xdrs, &(cap->arglen)))
 		    return (FALSE);
 		argposition = XDR_GETPOS(xdrs);
-		if (! (*(cap->xdr_args))(xdrs, cap->args_ptr))
+		if (! (*(cap->xdr_args))(xdrs, cap->args_ptr, 0))
 		    return (FALSE);
 		position = XDR_GETPOS(xdrs);
 		cap->arglen = (u_long)position - (u_long)argposition;
@@ -160,7 +173,7 @@ xdr_rmtcallres(XDR *xdrs, struct rmtcallres *crp)
 	if (xdr_reference(xdrs, &port_ptr, sizeof (u_long),
 	    (xdrproc_t)xdr_u_long) && xdr_u_long(xdrs, &crp->resultslen)) {
 		crp->port_ptr = (u_long *)(void *)port_ptr;
-		return ((*(crp->xdr_results))(xdrs, crp->results_ptr));
+		return ((*(crp->xdr_results))(xdrs, crp->results_ptr, 0));
 	}
 	return (FALSE);
 }

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011-2014 Nathan Whitehorn
  * All rights reserved.
  *
@@ -40,7 +42,6 @@ __FBSDID("$FreeBSD$");
 #include <vm/pmap.h>
 
 #include <machine/platform.h>
-#include <machine/pmap.h>
 
 #include <dev/ofw/openfirm.h>
 #include <dev/vt/vt.h>

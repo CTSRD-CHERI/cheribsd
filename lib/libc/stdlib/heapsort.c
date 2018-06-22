@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  * Copyright (c) 2014 David T. Chisnall
@@ -31,6 +33,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_integrity"
+ *   ],
+ *   "change_comment": "memswap",
+ * }
+ * CHERI CHANGES END
+ */
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)heapsort.c	8.1 (Berkeley) 6/4/93";
@@ -41,6 +54,13 @@ __FBSDID("$FreeBSD$");
 #include <errno.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
+
+#if __has_feature(capabilities)
+typedef __uintcap_t big_primitive_type;
+#else
+typedef long big_primitive_type;
+#endif
 
 #ifdef I_AM_HEAPSORT_B
 #include "block_abi.h"
@@ -51,29 +71,62 @@ typedef DECLARE_BLOCK(int, heapsort_block, const void *, const void *);
 #endif
 
 /*
- * Swap two areas of size number of bytes.  Although qsort(3) permits random
- * blocks of memory to be sorted, sorting pointers is almost certainly the
- * common case (and, were it not, could easily be made so).  Regardless, it
- * isn't worth optimizing; the SWAP's get sped up by the cache, and pointer
- * arithmetic gets lost in the time required for comparison function calls.
+ * Swap two areas of size number of bytes.
+ *
+ * Optimize the copying of large objects which are strictly aligned.  In
+ * particular, on CHERI systems, copy objects with pointer alignment via
+ * capability operations to avoid clearing tags.
+ *
+ * It is conceivable that an unaligned object could contain pointers, but
+ * it would not be a valid C object so we ignore that possibility because
+ * qsort() is defined to sort C objects and such under-aligned objects would
+ * not be valid C objects.
+ *
+ * We only test the alignment of one argument because one being aligned
+ * when the other is not would violate the invariants of the array.
  */
-#define	SWAP(a, b, count, size, tmp) { \
-	count = size; \
-	do { \
-		tmp = *a; \
-		*a++ = *b; \
-		*b++ = tmp; \
-	} while (--count); \
+#define	SWAP(a, b, size) { \
+	if ((size) % sizeof(big_primitive_type) == 0 && \
+	    (size_t)(a) % sizeof(big_primitive_type) == 0) { \
+		size_t count = (size) / sizeof(big_primitive_type); \
+		big_primitive_type tmp; \
+		big_primitive_type *ap, *bp; \
+		ap = (big_primitive_type *)(a); \
+		bp = (big_primitive_type *)(b); \
+		do { \
+			tmp = *ap; \
+			*ap++ = *bp; \
+			*bp++ = tmp; \
+		} while (--count); \
+	} else { \
+		size_t count = size; \
+		char tmp; \
+		do { \
+			tmp = *(a); \
+			*a++ = *(b); \
+			*b++ = tmp; \
+		} while (--count); \
+	} \
 }
 
 /* Copy one block of size size to another. */
-#define COPY(a, b, count, size, tmp1, tmp2) { \
-	count = size; \
-	tmp1 = a; \
-	tmp2 = b; \
-	do { \
-		*tmp1++ = *tmp2++; \
-	} while (--count); \
+#define COPY(a, b, size) { \
+	if ((size) % sizeof(big_primitive_type) == 0 && \
+	    (size_t)(a) % sizeof(big_primitive_type) == 0) { \
+		size_t count = size / sizeof(big_primitive_type); \
+		big_primitive_type *tmp1 = (big_primitive_type *)(a); \
+		big_primitive_type *tmp2 = (big_primitive_type *)(b); \
+		do { \
+			*tmp1++ = *tmp2++; \
+		} while (--count); \
+	} else { \
+		size_t count = size; \
+		char *tmp1 = (a); \
+		char *tmp2 = (b); \
+		do { \
+			*tmp1++ = *tmp2++; \
+		} while (--count); \
+	} \
 }
 
 /*
@@ -83,7 +136,7 @@ typedef DECLARE_BLOCK(int, heapsort_block, const void *, const void *);
  * There two cases.  If j == nmemb, select largest of Ki and Kj.  If
  * j < nmemb, select largest of Ki, Kj and Kj+1.
  */
-#define CREATE(initval, nmemb, par_i, child_i, par, child, size, count, tmp) { \
+#define CREATE(initval, nmemb, par_i, child_i, par, child, size) { \
 	for (par_i = initval; (child_i = par_i * 2) <= nmemb; \
 	    par_i = child_i) { \
 		child = base + child_i * size; \
@@ -94,7 +147,7 @@ typedef DECLARE_BLOCK(int, heapsort_block, const void *, const void *);
 		par = base + par_i * size; \
 		if (COMPAR(child, par) <= 0) \
 			break; \
-		SWAP(par, child, count, size, tmp); \
+		SWAP(par, child, size); \
 	} \
 }
 
@@ -102,7 +155,7 @@ typedef DECLARE_BLOCK(int, heapsort_block, const void *, const void *);
  * Select the top of the heap and 'heapify'.  Since by far the most expensive
  * action is the call to the compar function, a considerable optimization
  * in the average case can be achieved due to the fact that k, the displaced
- * elememt, is ususally quite small, so it would be preferable to first
+ * elememt, is usually quite small, so it would be preferable to first
  * heapify, always maintaining the invariant that the larger child is copied
  * over its parent's record.
  *
@@ -115,7 +168,7 @@ typedef DECLARE_BLOCK(int, heapsort_block, const void *, const void *);
  *
  * XXX Don't break the #define SELECT line, below.  Reiser cpp gets upset.
  */
-#define SELECT(par_i, child_i, nmemb, par, child, size, k, count, tmp1, tmp2) { \
+#define SELECT(par_i, child_i, nmemb, par, child, size, k) { \
 	for (par_i = 1; (child_i = par_i * 2) <= nmemb; par_i = child_i) { \
 		child = base + child_i * size; \
 		if (child_i < nmemb && COMPAR(child, child + size) < 0) { \
@@ -123,7 +176,7 @@ typedef DECLARE_BLOCK(int, heapsort_block, const void *, const void *);
 			++child_i; \
 		} \
 		par = base + par_i * size; \
-		COPY(par, child, count, size, tmp1, tmp2); \
+		COPY(par, child, size); \
 	} \
 	for (;;) { \
 		child_i = par_i; \
@@ -131,10 +184,10 @@ typedef DECLARE_BLOCK(int, heapsort_block, const void *, const void *);
 		child = base + child_i * size; \
 		par = base + par_i * size; \
 		if (child_i == 1 || COMPAR(k, par) < 0) { \
-			COPY(child, k, count, size, tmp1, tmp2); \
+			COPY(child, k, size); \
 			break; \
 		} \
-		COPY(child, par, count, size, tmp1, tmp2); \
+		COPY(child, par, size); \
 	} \
 }
 
@@ -160,8 +213,7 @@ heapsort(void *vbase, size_t nmemb, size_t size,
     int (*compar)(const void *, const void *))
 #endif
 {
-	size_t cnt, i, j, l;
-	char tmp, *tmp1, *tmp2;
+	size_t i, j, l;
 	char *base, *k, *p, *t;
 
 	if (nmemb <= 1)
@@ -182,7 +234,7 @@ heapsort(void *vbase, size_t nmemb, size_t size,
 	base = (char *)vbase - size;
 
 	for (l = nmemb / 2 + 1; --l;)
-		CREATE(l, nmemb, i, j, t, p, size, cnt, tmp);
+		CREATE(l, nmemb, i, j, t, p, size);
 
 	/*
 	 * For each element of the heap, save the largest element into its
@@ -190,10 +242,10 @@ heapsort(void *vbase, size_t nmemb, size_t size,
 	 * heap.
 	 */
 	while (nmemb > 1) {
-		COPY(k, base + nmemb * size, cnt, size, tmp1, tmp2);
-		COPY(base + nmemb * size, base + size, cnt, size, tmp1, tmp2);
+		COPY(k, base + nmemb * size, size);
+		COPY(base + nmemb * size, base + size, size);
 		--nmemb;
-		SELECT(i, j, nmemb, t, p, size, k, cnt, tmp1, tmp2);
+		SELECT(i, j, nmemb, t, p, size, k);
 	}
 	free(k);
 	return (0);

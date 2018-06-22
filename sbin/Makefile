@@ -6,7 +6,6 @@
 # XXX MISSING:		icheck ncheck
 
 SUBDIR=adjkerntz \
-	badsect \
 	camcontrol \
 	clri \
 	comcontrol \
@@ -70,8 +69,6 @@ SUBDIR=adjkerntz \
 	tunefs \
 	umount
 
-SUBDIR.${MK_ATM}+=	atm
-SUBDIR.${MK_CASPER}+=	casperd
 SUBDIR.${MK_CCD}+=	ccdconfig
 SUBDIR.${MK_CXX}+=	devd
 SUBDIR.${MK_HAST}+=	hastctl
@@ -84,16 +81,16 @@ SUBDIR.${MK_IPFW}+=	natd
 SUBDIR.${MK_ISCSI}+=	iscontrol
 SUBDIR.${MK_NAND}+=	nandfs
 SUBDIR.${MK_NAND}+=	newfs_nandfs
+SUBDIR.${MK_OPENSSL}+=	decryptcore
 SUBDIR.${MK_PF}+=	pfctl
 SUBDIR.${MK_PF}+=	pflogd
 SUBDIR.${MK_QUOTAS}+=	quotacheck
 SUBDIR.${MK_ROUTED}+=	routed
+SUBDIR.${MK_ZFS}+=	zfsbootcfg
 
 SUBDIR.${MK_TESTS}+=	tests
 
 .include <bsd.arch.inc.mk>
-
-SUBDIR:=	${SUBDIR:O}
 
 SUBDIR_PARALLEL=
 

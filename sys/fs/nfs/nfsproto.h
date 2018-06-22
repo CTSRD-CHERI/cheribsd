@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -13,7 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -56,8 +58,22 @@
 #define	NFS_MAXDGRAMDATA 16384
 #define	NFS_MAXPATHLEN	1024
 #define	NFS_MAXNAMLEN	255
+/*
+ * Calculating the maximum XDR overhead for an NFS RPC isn't easy.
+ * NFS_MAXPKTHDR is antiquated and assumes AUTH_SYS over UDP.
+ * NFS_MAXXDR should be sufficient for all NFS versions over TCP.
+ * It includes:
+ * - Maximum RPC message header. It can include 2 400byte authenticators plus
+ *   a machine name of unlimited length, although it is usually relatively
+ *   small.
+ * - XDR overheads for the NFSv4 compound. This can include Owner and
+ *   Owner_group strings, which are usually fairly small, but are allowed
+ *   to be up to 1024 bytes each.
+ * 4096 is overkill, but should always be sufficient.
+ */
 #define	NFS_MAXPKTHDR	404
-#define	NFS_MAXPACKET	(NFS_SRVMAXIO + 2048)
+#define	NFS_MAXXDR	4096
+#define	NFS_MAXPACKET	(NFS_SRVMAXIO + NFS_MAXXDR)
 #define	NFS_MINPACKET	20
 #define	NFS_FABLKSIZE	512	/* Size in bytes of a block wrt fa_blocks */
 #define	NFSV4_MINORVERSION	0	/* V4 Minor version */
@@ -328,11 +344,13 @@
 #define	NFSPROC_WRITEDS		51
 #define	NFSPROC_READDS		52
 #define	NFSPROC_COMMITDS	53
+#define	NFSPROC_OPENLAYGET	54
+#define	NFSPROC_CREATELAYGET	55
 
 /*
  * Must be defined as one higher than the last NFSv4.1 Proc# above.
  */
-#define	NFSV41_NPROCS		54
+#define	NFSV41_NPROCS		56
 
 #endif	/* NFS_V3NPROCS */
 
@@ -345,10 +363,10 @@
 
 /*
  * NFSPROC_NOOP is a fake op# that can't be the same as any V2/3/4 Procedure
- * or Operation#. Since the NFS V4 Op #s go higher, use NFSV41_NOPS, which
+ * or Operation#. Since the NFS V4 Op #s go higher, use NFSV42_NOPS, which
  * is one greater than the highest Op#.
  */
-#define	NFSPROC_NOOP		NFSV41_NOPS
+#define	NFSPROC_NOOP		NFSV42_NOPS
 
 /* Actual Version 2 procedure numbers */
 #define	NFSV2PROC_NULL		0
@@ -621,6 +639,7 @@
 #define	NFSLAYOUT_NFSV4_1_FILES		0x1
 #define	NFSLAYOUT_OSD2_OBJECTS		0x2
 #define	NFSLAYOUT_BLOCK_VOLUME		0x3
+#define	NFSLAYOUT_FLEXFILE		0x4
 
 #define	NFSLAYOUTIOMODE_READ		1
 #define	NFSLAYOUTIOMODE_RW		2
@@ -633,6 +652,12 @@
 /* Flags for File Layout. */
 #define	NFSFLAYUTIL_DENSE		0x1
 #define	NFSFLAYUTIL_COMMIT_THRU_MDS	0x2
+
+/* Flags for Flex File Layout. */
+#define	NFSFLEXFLAG_NO_LAYOUTCOMMIT	0x00000001
+#define	NFSFLEXFLAG_NOIO_MDS		0x00000002
+#define	NFSFLEXFLAG_NO_READIO		0x00000004
+#define	NFSFLEXFLAG_WRITE_ONEMIRROR	0x00000008
 
 /* Conversion macros */
 #define	vtonfsv2_mode(t,m) 						\
@@ -759,6 +784,8 @@ struct nfs_fattr {
 #define	fa3_atime		fa_un.fa_nfsv3.nfsv3fa_atime
 #define	fa3_mtime		fa_un.fa_nfsv3.nfsv3fa_mtime
 #define	fa3_ctime		fa_un.fa_nfsv3.nfsv3fa_ctime
+
+#define	NFS_LINK_MAX	UINT32_MAX
 
 struct nfsv2_sattr {
 	u_int32_t sa_mode;

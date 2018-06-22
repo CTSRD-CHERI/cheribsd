@@ -1383,10 +1383,10 @@ ipf_state_add(softc, fin, stsave, flags)
 	int out;
 
 	/*
-	 * If a packet that was created locally is trying to go out but we
-	 * do not match here here because of this lock, it is likely that
-	 * the policy will block it and return network unreachable back up
-	 * the stack. To mitigate this error, EAGAIN is returned instead,
+	 * If a locally created packet is trying to egress but it
+	 * does not match because of this lock, it is likely that
+	 * the policy will block it and return network unreachable further
+	 * up the stack. To mitigate this error, EAGAIN is returned instead,
 	 * telling the IP stack to try sending this packet again later.
 	 */
 	if (softs->ipf_state_lock) {
@@ -1449,7 +1449,7 @@ ipf_state_add(softc, fin, stsave, flags)
 	is->is_die = 1 + softc->ipf_ticks;
 	/*
 	 * We want to check everything that is a property of this packet,
-	 * but we don't (automatically) care about it's fragment status as
+	 * but we don't (automatically) care about its fragment status as
 	 * this may change.
 	 */
 	is->is_pass = pass;
@@ -1611,8 +1611,10 @@ ipf_state_add(softc, fin, stsave, flags)
 			    TH_SYN &&
 			    (TCP_OFF(tcp) > (sizeof(tcphdr_t) >> 2))) {
 				if (ipf_tcpoptions(softs, fin, tcp,
-					      &is->is_tcp.ts_data[0]) == -1)
+					      &is->is_tcp.ts_data[0]) == -1) {
 					fin->fin_flx |= FI_BAD;
+					DT1(ipf_fi_bad_tcpoptions_th_fin_ack_ecnall, fr_info_t *, fin);
+				}
 			}
 
 			if ((fin->fin_out != 0) && (pass & FR_NEWISN) != 0) {
@@ -2068,8 +2070,10 @@ ipf_state_tcp(softc, softs, fin, tcp, is)
 			is->is_s0[!source] = ntohl(tcp->th_seq) + 1;
 			if ((TCP_OFF(tcp) > (sizeof(tcphdr_t) >> 2))) {
 				if (ipf_tcpoptions(softs, fin, tcp,
-						   fdata) == -1)
+						   fdata) == -1) {
 					fin->fin_flx |= FI_BAD;
+					DT1(ipf_fi_bad_winscale_syn_ack, fr_info_t *, fin);
+				}
 			}
 			if ((fin->fin_out != 0) && (is->is_pass & FR_NEWISN))
 				ipf_checknewisn(fin, is);
@@ -2077,8 +2081,10 @@ ipf_state_tcp(softc, softs, fin, tcp, is)
 			is->is_s0[source] = ntohl(tcp->th_seq) + 1;
 			if ((TCP_OFF(tcp) > (sizeof(tcphdr_t) >> 2))) {
 				if (ipf_tcpoptions(softs, fin, tcp,
-						   fdata) == -1)
+						   fdata) == -1) {
 					fin->fin_flx |= FI_BAD;
+					DT1(ipf_fi_bad_winscale_syn, fr_info_t *, fin);
+				}
 			}
 
 			if ((fin->fin_out != 0) && (is->is_pass & FR_NEWISN))
@@ -3408,7 +3414,8 @@ ipf_state_check(fin, passp)
 	 * If this packet is a fragment and the rule says to track fragments,
 	 * then create a new fragment cache entry.
 	 */
-	if ((fin->fin_flx & FI_FRAG) && FR_ISPASS(is->is_pass))
+	if (fin->fin_flx & FI_FRAG && FR_ISPASS(is->is_pass) &&
+	   is->is_pass & FR_KEEPFRAG)
 		(void) ipf_frag_new(softc, fin, is->is_pass);
 
 	/*

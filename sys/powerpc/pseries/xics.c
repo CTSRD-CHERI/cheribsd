@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright 2011 Nathan Whitehorn
  *
  * Redistribution and use in source and binary forms, with or without
@@ -266,8 +268,8 @@ xicp_enable(device_t dev, u_int irq, u_int vector)
 
 	sc = device_get_softc(dev);
 
-	KASSERT(sc->nintvecs + 1 < sizeof(sc->intvecs)/sizeof(sc->intvecs[0]),
-	    ("Too many XICP interrupts"));
+	KASSERT(sc->nintvecs + 1 < nitems(sc->intvecs),
+		("Too many XICP interrupts"));
 
 	mtx_lock(&sc->sc_mtx);
 	sc->intvecs[sc->nintvecs].irq = irq;

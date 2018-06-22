@@ -36,6 +36,16 @@
    Some of these functions are also called by the ECOFF routines.
    Those functions may not use any COFF specific information, such as
    coff_data (abfd).  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include "sysdep.h"
 #include "bfd.h"
@@ -724,9 +734,10 @@ coff_mangle_symbols (bfd *bfd_ptr)
 	  if (s->fix_value)
 	    {
 	      /* FIXME: We should use a union here.  */
+	      /* XXX-CHERI: cast is insufficent */
 	      s->u.syment.n_value =
 		(bfd_vma)((combined_entry_type *)
-			  ((unsigned long) s->u.syment.n_value))->offset;
+			  ((uintptr_t) s->u.syment.n_value))->offset;
 	      s->fix_value = 0;
 	    }
 	  if (s->fix_line)

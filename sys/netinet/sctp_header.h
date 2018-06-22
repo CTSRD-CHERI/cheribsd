@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2001-2007, by Cisco Systems, Inc. All rights reserved.
  * Copyright (c) 2008-2012, by Randall Stewart. All rights reserved.
  * Copyright (c) 2008-2012, by Michael Tuexen. All rights reserved.
@@ -141,9 +143,9 @@ struct sctp_supported_chunk_types_param {
  */
 struct sctp_data {
 	uint32_t tsn;
-	uint16_t stream_id;
-	uint16_t stream_sequence;
-	uint32_t protocol_id;
+	uint16_t sid;
+	uint16_t ssn;
+	uint32_t ppid;
 	/* user data follows */
 }         SCTP_PACKED;
 
@@ -151,6 +153,23 @@ struct sctp_data_chunk {
 	struct sctp_chunkhdr ch;
 	struct sctp_data dp;
 }               SCTP_PACKED;
+
+struct sctp_idata {
+	uint32_t tsn;
+	uint16_t sid;
+	uint16_t reserved;	/* Where does the SSN go? */
+	uint32_t mid;
+	union {
+		uint32_t ppid;
+		uint32_t fsn;	/* Fragment Sequence Number */
+	}     ppid_fsn;
+	/* user data follows */
+}          SCTP_PACKED;
+
+struct sctp_idata_chunk {
+	struct sctp_chunkhdr ch;
+	struct sctp_idata dp;
+}                SCTP_PACKED;
 
 /*
  * Structures for the control chunks
@@ -165,7 +184,6 @@ struct sctp_init {
 	uint32_t initial_tsn;	/* I-TSN */
 	/* optional param's follow */
 }         SCTP_PACKED;
-
 #define SCTP_IDENTIFICATION_SIZE 16
 #define SCTP_ADDRESS_SIZE 4
 #define SCTP_RESERVE_SPACE 6
@@ -374,9 +392,15 @@ struct sctp_forward_tsn_chunk {
 }                      SCTP_PACKED;
 
 struct sctp_strseq {
-	uint16_t stream;
-	uint16_t sequence;
+	uint16_t sid;
+	uint16_t ssn;
 }           SCTP_PACKED;
+
+struct sctp_strseq_mid {
+	uint16_t sid;
+	uint16_t flags;
+	uint32_t mid;
+};
 
 struct sctp_forward_tsn_msg {
 	struct sctphdr sh;

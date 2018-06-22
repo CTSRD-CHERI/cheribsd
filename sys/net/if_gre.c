@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * Copyright (c) 2014 Andrey V. Elsukov <ae@FreeBSD.org>
  * All rights reserved.
@@ -88,7 +90,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/in_cksum.h>
 #include <security/mac/mac_framework.h>
 
-#define	GREMTU			1500
+#define	GREMTU			1476
 static const char grename[] = "gre";
 static MALLOC_DEFINE(M_GRE, grename, "Generic Routing Encapsulation");
 static VNET_DEFINE(struct mtx, gre_mtx);
@@ -104,7 +106,7 @@ static VNET_DEFINE(LIST_HEAD(, gre_softc), gre_softc_list);
 static struct sx gre_ioctl_sx;
 SX_SYSINIT(gre_ioctl_sx, &gre_ioctl_sx, "gre_ioctl");
 
-static int	gre_clone_create(struct if_clone *, int, caddr_t);
+static int	gre_clone_create(struct if_clone *, int, void * __capability);
 static void	gre_clone_destroy(struct ifnet *);
 static VNET_DEFINE(struct if_clone *, gre_cloner);
 #define	V_gre_cloner	VNET(gre_cloner)
@@ -162,7 +164,7 @@ VNET_SYSUNINIT(vnet_gre_uninit, SI_SUB_PROTO_IFATTACHDOMAIN, SI_ORDER_ANY,
     vnet_gre_uninit, NULL);
 
 static int
-gre_clone_create(struct if_clone *ifc, int unit, caddr_t params)
+gre_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 {
 	struct gre_softc *sc;
 
@@ -173,7 +175,7 @@ gre_clone_create(struct if_clone *ifc, int unit, caddr_t params)
 	GRE2IFP(sc)->if_softc = sc;
 	if_initname(GRE2IFP(sc), grename, unit);
 
-	GRE2IFP(sc)->if_mtu = sc->gre_mtu = GREMTU;
+	GRE2IFP(sc)->if_mtu = GREMTU;
 	GRE2IFP(sc)->if_flags = IFF_POINTOPOINT|IFF_MULTICAST;
 	GRE2IFP(sc)->if_output = gre_output;
 	GRE2IFP(sc)->if_ioctl = gre_ioctl;
@@ -227,23 +229,24 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error;
 
 	switch (cmd) {
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		 /* XXX: */
-		if (ifr->ifr_mtu < 576)
+		if (ifr_mtu_get(ifr) < 576)
 			return (EINVAL);
-		break;
-	case SIOCSIFADDR:
-		ifp->if_flags |= IFF_UP;
-	case SIOCSIFFLAGS:
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+		ifp->if_mtu = ifr_mtu_get(ifr);
 		return (0);
-	case GRESADDRS:
-	case GRESADDRD:
-	case GREGADDRS:
-	case GREGADDRD:
-	case GRESPROTO:
-	case GREGPROTO:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
+		ifp->if_flags |= IFF_UP;
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
+		return (0);
+	CASE_IOC_IFREQ(GRESADDRS):
+	CASE_IOC_IFREQ(GRESADDRD):
+	CASE_IOC_IFREQ(GREGADDRS):
+	CASE_IOC_IFREQ(GREGADDRD):
+	CASE_IOC_IFREQ(GRESPROTO):
+	CASE_IOC_IFREQ(GREGPROTO):
 		return (EOPNOTSUPP);
 	}
 	src = dst = NULL;
@@ -255,12 +258,6 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	}
 	error = 0;
 	switch (cmd) {
-	case SIOCSIFMTU:
-		GRE_WLOCK(sc);
-		sc->gre_mtu = ifr->ifr_mtu;
-		gre_updatehdr(sc);
-		GRE_WUNLOCK(sc);
-		goto end;
 	case SIOCSIFPHYADDR:
 #ifdef INET6
 	case SIOCSIFPHYADDR_IN6:
@@ -353,14 +350,14 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			if (error != 0)
 				goto end;
 #endif
-		};
+		}
 		error = gre_set_tunnel(ifp, src, dst);
 		break;
-	case SIOCDIFPHYADDR:
+	CASE_IOC_IFREQ(SIOCDIFPHYADDR):
 		gre_delete_tunnel(ifp);
 		break;
-	case SIOCGIFPSRCADDR:
-	case SIOCGIFPDSTADDR:
+	CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
+	CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
 #ifdef INET6
 	case SIOCGIFPSRCADDR_IN6:
 	case SIOCGIFPDSTADDR_IN6:
@@ -372,13 +369,13 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		GRE_RLOCK(sc);
 		switch (cmd) {
 #ifdef INET
-		case SIOCGIFPSRCADDR:
-		case SIOCGIFPDSTADDR:
+		CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
+		CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
 			if (sc->gre_family != AF_INET) {
 				error = EADDRNOTAVAIL;
 				break;
 			}
-			sin = (struct sockaddr_in *)&ifr->ifr_addr;
+			sin = (struct sockaddr_in *)ifr_addr_get_sa(ifr);
 			memset(sin, 0, sizeof(*sin));
 			sin->sin_family = AF_INET;
 			sin->sin_len = sizeof(*sin);
@@ -391,8 +388,7 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				error = EADDRNOTAVAIL;
 				break;
 			}
-			sin6 = (struct sockaddr_in6 *)
-				&(((struct in6_ifreq *)data)->ifr_addr);
+			sin6 = (struct sockaddr_in6 *)ifr_addr_get_sa(data);
 			memset(sin6, 0, sizeof(*sin6));
 			sin6->sin6_family = AF_INET6;
 			sin6->sin6_len = sizeof(*sin6);
@@ -402,10 +398,10 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		if (error == 0) {
 			switch (cmd) {
 #ifdef INET
-			case SIOCGIFPSRCADDR:
+			CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
 				sin->sin_addr = sc->gre_oip.ip_src;
 				break;
-			case SIOCGIFPDSTADDR:
+			CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
 				sin->sin_addr = sc->gre_oip.ip_dst;
 				break;
 #endif
@@ -424,8 +420,8 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		switch (cmd) {
 #ifdef INET
-		case SIOCGIFPSRCADDR:
-		case SIOCGIFPDSTADDR:
+		CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
+		CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
 			error = prison_if(curthread->td_ucred,
 			    (struct sockaddr *)sin);
 			if (error != 0)
@@ -444,21 +440,22 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #endif
 		}
 		break;
-	case SIOCGTUNFIB:
-		ifr->ifr_fib = sc->gre_fibnum;
+	CASE_IOC_IFREQ(SIOCGTUNFIB):
+		ifr_fib_set(ifr, sc->gre_fibnum);
 		break;
-	case SIOCSTUNFIB:
+	CASE_IOC_IFREQ(SIOCSTUNFIB):
 		if ((error = priv_check(curthread, PRIV_NET_GRE)) != 0)
 			break;
-		if (ifr->ifr_fib >= rt_numfibs)
+		if (ifr_fib_get(ifr) >= rt_numfibs)
 			error = EINVAL;
 		else
-			sc->gre_fibnum = ifr->ifr_fib;
+			sc->gre_fibnum = ifr_fib_get(ifr);
 		break;
-	case GRESKEY:
+	CASE_IOC_IFREQ(GRESKEY):
 		if ((error = priv_check(curthread, PRIV_NET_GRE)) != 0)
 			break;
-		if ((error = copyin(ifr->ifr_data, &opt, sizeof(opt))) != 0)
+		if ((error = copyin_c(ifr_data_get_ptr(ifr), &opt,
+		    sizeof(opt))) != 0)
 			break;
 		if (sc->gre_key != opt) {
 			GRE_WLOCK(sc);
@@ -467,14 +464,15 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			GRE_WUNLOCK(sc);
 		}
 		break;
-	case GREGKEY:
-		error = copyout(&sc->gre_key, ifr->ifr_data,
+	CASE_IOC_IFREQ(GREGKEY):
+		error = copyout_c(&sc->gre_key, ifr_data_get_ptr(ifr),
 		    sizeof(sc->gre_key));
 		break;
-	case GRESOPTS:
+	CASE_IOC_IFREQ(GRESOPTS):
 		if ((error = priv_check(curthread, PRIV_NET_GRE)) != 0)
 			break;
-		if ((error = copyin(ifr->ifr_data, &opt, sizeof(opt))) != 0)
+		if ((error = copyin_c(ifr_data_get_ptr(ifr), &opt,
+		    sizeof(opt))) != 0)
 			break;
 		if (opt & ~GRE_OPTMASK)
 			error = EINVAL;
@@ -488,8 +486,8 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case GREGOPTS:
-		error = copyout(&sc->gre_options, ifr->ifr_data,
+	CASE_IOC_IFREQ(GREGOPTS):
+		error = copyout_c(&sc->gre_options, ifr_data_get_ptr(ifr),
 		    sizeof(sc->gre_options));
 		break;
 	default:
@@ -549,7 +547,6 @@ gre_updatehdr(struct gre_softc *sc)
 	} else
 		sc->gre_oseq = 0;
 	gh->gre_flags = htons(flags);
-	GRE2IFP(sc)->if_mtu = sc->gre_mtu - sc->gre_hlen;
 }
 
 static void
@@ -960,7 +957,7 @@ gre_transmit(struct ifnet *ifp, struct mbuf *m)
 	default:
 		m_freem(m);
 		error = ENETDOWN;
-	};
+	}
 drop:
 	if (error)
 		if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1998 Doug Rabson.
  * Copyright (c) 2001 Jake Burkholder.
  * All rights reserved.
@@ -36,6 +38,8 @@
 #define	mb()	__asm__ __volatile__ ("membar #MemIssue": : :"memory")
 #define	wmb()	mb()
 #define	rmb()	mb()
+
+#include <sys/atomic_common.h>
 
 /* Userland needs different ASI's. */
 #ifdef _KERNEL
@@ -219,11 +223,40 @@ atomic_cmpset_rel_ ## name(volatile ptype p, vtype e, vtype s)		\
 	return (((vtype)atomic_cas_rel((p), (e), (s), sz)) == (e));	\
 }									\
 									\
-static __inline vtype							\
-atomic_load_ ## name(volatile ptype p)					\
+static __inline int							\
+atomic_fcmpset_ ## name(volatile ptype p, vtype *ep, vtype s)		\
 {									\
-	return ((vtype)atomic_cas((p), 0, 0, sz));			\
+	vtype t;							\
+									\
+	t = (vtype)atomic_cas((p), (*ep), (s), sz);			\
+	if (t == (*ep))	 						\
+		return (1);						\
+	*ep = t;							\
+	return (0);							\
 }									\
+static __inline int							\
+atomic_fcmpset_acq_ ## name(volatile ptype p, vtype *ep, vtype s)	\
+{									\
+	vtype t;							\
+									\
+	t = (vtype)atomic_cas_acq((p), (*ep), (s), sz);			\
+	if (t == (*ep))	 						\
+		return (1);						\
+	*ep = t;							\
+	return (0);							\
+}									\
+static __inline int							\
+atomic_fcmpset_rel_ ## name(volatile ptype p, vtype *ep, vtype s)	\
+{									\
+	vtype t;							\
+									\
+	t = (vtype)atomic_cas_rel((p), (*ep), (s), sz);			\
+	if (t == (*ep))	 						\
+		return (1);						\
+	*ep = t;							\
+	return (0);							\
+}									\
+									\
 static __inline vtype							\
 atomic_load_acq_ ## name(volatile ptype p)				\
 {									\

@@ -27,9 +27,10 @@ int ZEXPORT compress2 (dest, destLen, source, sourceLen, level)
     int level;
 {
     z_stream stream;
+    z_streamp stream_cap = cheri_ptr_to_bounded_cap(&stream);
     int err;
 
-    stream.next_in = cheri_csetbounds((__capability Bytef *)source, sourceLen);
+    stream.next_in = cheri_ptr(source, sourceLen);
     stream.avail_in = (uInt)sourceLen;
 #ifdef MAXSEG_64K
     /* Check for source > 64K on 16-bit machine: */
@@ -43,17 +44,17 @@ int ZEXPORT compress2 (dest, destLen, source, sourceLen, level)
     stream.zfree = (free_func)0;
     stream.opaque = (voidpf)0;
 
-    err = deflateInit((z_streamp)&stream, level); /* XXX CHERI cast */
+    err = deflateInit(stream_cap, level); /* XXX CHERI cast */
     if (err != Z_OK) return err;
 
-    err = deflate((z_streamp)&stream, Z_FINISH); /* XXX CHERI cast */
+    err = deflate(stream_cap, Z_FINISH); /* XXX CHERI cast */
     if (err != Z_STREAM_END) {
-        deflateEnd((z_streamp)&stream); /* XXX CHERI cast */
+        deflateEnd(stream_cap); /* XXX CHERI cast */
         return err == Z_OK ? Z_BUF_ERROR : err;
     }
     *destLen = stream.total_out;
 
-    err = deflateEnd((z_streamp)&stream); /* XXX CHERI case */
+    err = deflateEnd(stream_cap); /* XXX CHERI case */
     return err;
 }
 

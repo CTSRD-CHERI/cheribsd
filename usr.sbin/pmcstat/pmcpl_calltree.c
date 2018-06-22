@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2012, Fabien Thomas
  * All rights reserved.
  *
@@ -22,6 +24,16 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
  */
 
 /*
@@ -57,6 +69,9 @@ __FBSDID("$FreeBSD$");
 #include "pmcstat_log.h"
 #include "pmcstat_top.h"
 #include "pmcpl_calltree.h"
+
+#define	min(A,B)		((A) < (B) ? (A) : (B))
+#define	max(A,B)		((A) > (B) ? (A) : (B))
 
 #define	PMCPL_CT_GROWSIZE	4
 
@@ -185,7 +200,7 @@ pmcpl_ct_samples_free(struct pmcpl_ct_sample *samples)
 static void
 pmcpl_ct_samples_grow(struct pmcpl_ct_sample *samples)
 {
-	int npmcs;
+	unsigned int npmcs;
 
 	/* Enough storage. */
 	if (pmcstat_npmcs <= samples->npmcs)
@@ -193,7 +208,7 @@ pmcpl_ct_samples_grow(struct pmcpl_ct_sample *samples)
 
 	npmcs = samples->npmcs +
 	    max(pmcstat_npmcs - samples->npmcs, PMCPL_CT_GROWSIZE);
-	samples->sb = realloc(samples->sb, npmcs * sizeof(unsigned));
+	samples->sb = reallocarray(samples->sb, npmcs, sizeof(unsigned));
 	if (samples->sb == NULL)
 		errx(EX_SOFTWARE, "ERROR: out of memory");
 	bzero((char *)samples->sb + samples->npmcs * sizeof(unsigned),
@@ -226,13 +241,13 @@ pmcpl_ct_samples_root(struct pmcpl_ct_sample *samples)
 static void
 pmcpl_ct_arc_grow(int cursize, int *maxsize, struct pmcpl_ct_arc **items)
 {
-	int nmaxsize;
+	unsigned int nmaxsize;
 
 	if (cursize < *maxsize)
 		return;
 
 	nmaxsize = *maxsize + max(cursize + 1 - *maxsize, PMCPL_CT_GROWSIZE);
-	*items = realloc(*items, nmaxsize * sizeof(struct pmcpl_ct_arc));
+	*items = reallocarray(*items, nmaxsize, sizeof(struct pmcpl_ct_arc));
 	if (*items == NULL)
 		errx(EX_SOFTWARE, "ERROR: out of memory");
 	bzero((char *)*items + *maxsize * sizeof(struct pmcpl_ct_arc),
@@ -247,13 +262,13 @@ pmcpl_ct_arc_grow(int cursize, int *maxsize, struct pmcpl_ct_arc **items)
 static void
 pmcpl_ct_instr_grow(int cursize, int *maxsize, struct pmcpl_ct_instr **items)
 {
-	int nmaxsize;
+	unsigned int nmaxsize;
 
 	if (cursize < *maxsize)
 		return;
 
 	nmaxsize = *maxsize + max(cursize + 1 - *maxsize, PMCPL_CT_GROWSIZE);
-	*items = realloc(*items, nmaxsize * sizeof(struct pmcpl_ct_instr));
+	*items = reallocarray(*items, nmaxsize, sizeof(struct pmcpl_ct_instr));
 	if (*items == NULL)
 		errx(EX_SOFTWARE, "ERROR: out of memory");
 	bzero((char *)*items + *maxsize * sizeof(struct pmcpl_ct_instr),
@@ -522,7 +537,7 @@ pmcpl_ct_node_printtop(struct pmcpl_ct_sample *rsamples, int pmcin, int maxy)
 				    pmcstat_string_unintern(ct->pct_sym->ps_name));
 			} else
 				ns_len = snprintf(ns, sizeof(ns), "%p",
-				    (void *)ct->pct_func);
+				    (void *)(intptr_t)ct->pct_func);
 
 			/* Format image. */
 			if (x == 1 ||
@@ -581,8 +596,11 @@ pmcpl_ct_topdisplay(void)
  */
 
 int
-pmcpl_ct_topkeypress(int c, WINDOW *w)
+pmcpl_ct_topkeypress(int c, void *arg)
 {
+	WINDOW *w;
+
+	w = (WINDOW *)arg;
 
 	switch (c) {
 	case 'f':
@@ -830,7 +848,7 @@ pmcpl_ct_node_printchild(struct pmcpl_ct_node *ct, uintfptr_t paddr,
 
 	/*
 	 * Child cost.
-	 * TODO: attach child cost to the real position in the funtion.
+	 * TODO: attach child cost to the real position in the function.
 	 * TODO: cfn=<fn> / call <ncall> addr(<fn>) / addr(call <fn>) <arccost>
 	 */
 	for (i=0 ; i<ct->pct_narc; i++) {
@@ -859,18 +877,20 @@ pmcpl_ct_node_printchild(struct pmcpl_ct_node *ct, uintfptr_t paddr,
 				        child->pct_sym->ps_name));
 			else
 				fprintf(args.pa_graphfile,
-				    "cfi=???\ncfn=%p\n", (void *)addr);
+				    "cfi=???\ncfn=%p\n",
+				    (void *)(intptr_t)addr);
 		}
 
 		/* Child function address, line and call count. */
 		fprintf(args.pa_graphfile, "calls=%u %p %u\n",
-		    ct->pct_arc[i].pcta_call, (void *)addr, line);
+		    ct->pct_arc[i].pcta_call, (void *)(intptr_t)addr, line);
 
 		/*
 		 * Call address, line, sample.
 		 * TODO: Associate call address to the right location.
 		 */
-		fprintf(args.pa_graphfile, "%p %u", (void *)paddr, pline);
+		fprintf(args.pa_graphfile, "%p %u", (void *)(intptr_t)paddr,
+		    pline);
 		for (j = 0; j<pmcstat_npmcs; j++)
 			fprintf(args.pa_graphfile, " %u",
 			    PMCPL_CT_SAMPLE(j, &ct->pct_arc[i].pcta_samples));
@@ -916,7 +936,8 @@ pmcpl_ct_node_printself(struct pmcpl_ct_node *ct)
 			    pmcstat_string_unintern(ct->pct_sym->ps_name));
 		else
 			fprintf(args.pa_graphfile, "fl=???\nfn=%p\n",
-			    (void *)(ct->pct_image->pi_vaddr + ct->pct_func));
+			    (void *)(intptr_t)(ct->pct_image->pi_vaddr +
+			    ct->pct_func));
 	}
 
 	/*
@@ -934,7 +955,7 @@ pmcpl_ct_node_printself(struct pmcpl_ct_node *ct)
 			    sourcefile, sizeof(sourcefile), &line,
 			    funcname, sizeof(funcname));
 			fprintf(args.pa_graphfile, "%p %u",
-			    (void *)addr, line);
+			    (void *)(intptr_t)addr, line);
 			for (j = 0; j<pmcstat_npmcs; j++)
 				fprintf(args.pa_graphfile, " %u",
 				    PMCPL_CT_SAMPLE(j,
@@ -943,7 +964,8 @@ pmcpl_ct_node_printself(struct pmcpl_ct_node *ct)
 		}
 	} else {
 		/* Global cost function cost. */
-		fprintf(args.pa_graphfile, "%p %u", (void *)faddr, fline);
+		fprintf(args.pa_graphfile, "%p %u", (void *)(intptr_t)faddr,
+		    fline);
 		for (i = 0; i<pmcstat_npmcs ; i++)
 			fprintf(args.pa_graphfile, " %u",
 			    PMCPL_CT_SAMPLE(i, &ct->pct_samples));
@@ -1053,7 +1075,7 @@ _pmcpl_ct_expand_inline(struct pmcpl_ct_node *ct)
 		if (args.pa_verbosity >= 2)
 			fprintf(args.pa_printfile,
 			    "WARNING: inlined function at %p %s in %s\n",
-			    (void *)addr, funcname, ffuncname);
+			    (void *)(intptr_t)addr, funcname, ffuncname);
 
 		snprintf(buffer, sizeof(buffer), "%s@%s",
 			funcname, ffuncname);

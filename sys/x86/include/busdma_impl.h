@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2013 The FreeBSD Foundation
  * All rights reserved.
  *
@@ -70,7 +72,7 @@ struct bus_dma_impl {
 	    vm_paddr_t buf, bus_size_t buflen, int flags,
 	    bus_dma_segment_t *segs, int *segp);
 	int (*load_buffer)(bus_dma_tag_t dmat, bus_dmamap_t map,
-	    void *buf, bus_size_t buflen, pmap_t pmap, int flags,
+	    void *buf, bus_size_t buflen, struct pmap *pmap, int flags,
 	    bus_dma_segment_t *segs, int *segp);
 	void (*map_waitok)(bus_dma_tag_t dmat, bus_dmamap_t map,
 	    struct memdesc *mem, bus_dmamap_callback_t *callback,

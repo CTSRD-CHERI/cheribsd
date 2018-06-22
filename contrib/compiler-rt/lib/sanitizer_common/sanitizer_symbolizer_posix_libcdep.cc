@@ -20,12 +20,22 @@
 #include "sanitizer_internal_defs.h"
 #include "sanitizer_linux.h"
 #include "sanitizer_placement_new.h"
+#include "sanitizer_posix.h"
 #include "sanitizer_procmaps.h"
 #include "sanitizer_symbolizer_internal.h"
 #include "sanitizer_symbolizer_libbacktrace.h"
 #include "sanitizer_symbolizer_mac.h"
 
+#include <dlfcn.h>   // for dlsym()
+#include <errno.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <sys/wait.h>
 #include <unistd.h>
+
+#if SANITIZER_MAC
+#include <util.h>  // for forkpty()
+#endif  // SANITIZER_MAC
 
 // C++ demangling function, as required by Itanium C++ ABI. This is weak,
 // because we do not require a C++ ABI library to be linked to a program
@@ -45,7 +55,7 @@ const char *DemangleCXXABI(const char *name) {
   // own demangler (libc++abi's implementation could be adapted so that
   // it does not allocate). For now, we just call it anyway, and we leak
   // the returned value.
-  if (__cxxabiv1::__cxa_demangle)
+  if (&__cxxabiv1::__cxa_demangle)
     if (const char *demangled_name =
           __cxxabiv1::__cxa_demangle(name, 0, 0, 0))
       return demangled_name;
@@ -53,149 +63,191 @@ const char *DemangleCXXABI(const char *name) {
   return name;
 }
 
-// Parses one or more two-line strings in the following format:
-//   <function_name>
-//   <file_name>:<line_number>[:<column_number>]
-// Used by LLVMSymbolizer, Addr2LinePool and InternalSymbolizer, since all of
-// them use the same output format.
-static void ParseSymbolizePCOutput(const char *str, SymbolizedStack *res) {
-  bool top_frame = true;
-  SymbolizedStack *last = res;
-  while (true) {
-    char *function_name = 0;
-    str = ExtractToken(str, "\n", &function_name);
-    CHECK(function_name);
-    if (function_name[0] == '\0') {
-      // There are no more frames.
-      InternalFree(function_name);
-      break;
-    }
-    SymbolizedStack *cur;
-    if (top_frame) {
-      cur = res;
-      top_frame = false;
-    } else {
-      cur = SymbolizedStack::New(res->info.address);
-      cur->info.FillModuleInfo(res->info.module, res->info.module_offset);
-      last->next = cur;
-      last = cur;
-    }
+// As of now, there are no headers for the Swift runtime. Once they are
+// present, we will weakly link since we do not require Swift runtime to be
+// linked.
+typedef char *(*swift_demangle_ft)(const char *mangledName,
+                                   size_t mangledNameLength, char *outputBuffer,
+                                   size_t *outputBufferSize, uint32_t flags);
+static swift_demangle_ft swift_demangle_f;
 
-    AddressInfo *info = &cur->info;
-    info->function = function_name;
-    // Parse <file>:<line>:<column> buffer.
-    char *file_line_info = 0;
-    str = ExtractToken(str, "\n", &file_line_info);
-    CHECK(file_line_info);
-    const char *line_info = ExtractToken(file_line_info, ":", &info->file);
-    line_info = ExtractInt(line_info, ":", &info->line);
-    line_info = ExtractInt(line_info, "", &info->column);
-    InternalFree(file_line_info);
-
-    // Functions and filenames can be "??", in which case we write 0
-    // to address info to mark that names are unknown.
-    if (0 == internal_strcmp(info->function, "??")) {
-      InternalFree(info->function);
-      info->function = 0;
-    }
-    if (0 == internal_strcmp(info->file, "??")) {
-      InternalFree(info->file);
-      info->file = 0;
-    }
-  }
+// This must not happen lazily at symbolication time, because dlsym uses
+// malloc and thread-local storage, which is not a good thing to do during
+// symbolication.
+static void InitializeSwiftDemangler() {
+  swift_demangle_f = (swift_demangle_ft)dlsym(RTLD_DEFAULT, "swift_demangle");
 }
 
-// Parses a two-line string in the following format:
-//   <symbol_name>
-//   <start_address> <size>
-// Used by LLVMSymbolizer and InternalSymbolizer.
-static void ParseSymbolizeDataOutput(const char *str, DataInfo *info) {
-  str = ExtractToken(str, "\n", &info->name);
-  str = ExtractUptr(str, " ", &info->start);
-  str = ExtractUptr(str, "\n", &info->size);
+// Attempts to demangle a Swift name. The demangler will return nullptr if a
+// non-Swift name is passed in.
+const char *DemangleSwift(const char *name) {
+  if (!name) return nullptr;
+
+  // Check if we are dealing with a Swift mangled name first.
+  if (name[0] != '_' || name[1] != 'T') {
+    return nullptr;
+  }
+
+  if (swift_demangle_f)
+    return swift_demangle_f(name, internal_strlen(name), 0, 0, 0);
+
+  return nullptr;
 }
 
-// For now we assume the following protocol:
-// For each request of the form
-//   <module_name> <module_offset>
-// passed to STDIN, external symbolizer prints to STDOUT response:
-//   <function_name>
-//   <file_name>:<line_number>:<column_number>
-//   <function_name>
-//   <file_name>:<line_number>:<column_number>
-//   ...
-//   <empty line>
-class LLVMSymbolizerProcess : public SymbolizerProcess {
- public:
-  explicit LLVMSymbolizerProcess(const char *path) : SymbolizerProcess(path) {}
+const char *DemangleSwiftAndCXX(const char *name) {
+  if (!name) return nullptr;
+  if (const char *swift_demangled_name = DemangleSwift(name))
+    return swift_demangled_name;
+  return DemangleCXXABI(name);
+}
 
- private:
-  bool ReachedEndOfOutput(const char *buffer, uptr length) const override {
-    // Empty line marks the end of llvm-symbolizer output.
-    return length >= 2 && buffer[length - 1] == '\n' &&
-           buffer[length - 2] == '\n';
+static bool CreateTwoHighNumberedPipes(int *infd_, int *outfd_) {
+  int *infd = NULL;
+  int *outfd = NULL;
+  // The client program may close its stdin and/or stdout and/or stderr
+  // thus allowing socketpair to reuse file descriptors 0, 1 or 2.
+  // In this case the communication between the forked processes may be
+  // broken if either the parent or the child tries to close or duplicate
+  // these descriptors. The loop below produces two pairs of file
+  // descriptors, each greater than 2 (stderr).
+  int sock_pair[5][2];
+  for (int i = 0; i < 5; i++) {
+    if (pipe(sock_pair[i]) == -1) {
+      for (int j = 0; j < i; j++) {
+        internal_close(sock_pair[j][0]);
+        internal_close(sock_pair[j][1]);
+      }
+      return false;
+    } else if (sock_pair[i][0] > 2 && sock_pair[i][1] > 2) {
+      if (infd == NULL) {
+        infd = sock_pair[i];
+      } else {
+        outfd = sock_pair[i];
+        for (int j = 0; j < i; j++) {
+          if (sock_pair[j] == infd) continue;
+          internal_close(sock_pair[j][0]);
+          internal_close(sock_pair[j][1]);
+        }
+        break;
+      }
+    }
   }
+  CHECK(infd);
+  CHECK(outfd);
+  infd_[0] = infd[0];
+  infd_[1] = infd[1];
+  outfd_[0] = outfd[0];
+  outfd_[1] = outfd[1];
+  return true;
+}
 
-  void ExecuteWithDefaultArgs(const char *path_to_binary) const override {
-#if defined(__x86_64h__)
-    const char* const kSymbolizerArch = "--default-arch=x86_64h";
-#elif defined(__x86_64__)
-    const char* const kSymbolizerArch = "--default-arch=x86_64";
-#elif defined(__i386__)
-    const char* const kSymbolizerArch = "--default-arch=i386";
-#elif defined(__powerpc64__) && defined(__BIG_ENDIAN__)
-    const char* const kSymbolizerArch = "--default-arch=powerpc64";
-#elif defined(__powerpc64__) && defined(__LITTLE_ENDIAN__)
-    const char* const kSymbolizerArch = "--default-arch=powerpc64le";
-#else
-    const char* const kSymbolizerArch = "--default-arch=unknown";
-#endif
-
-    const char *const inline_flag = common_flags()->symbolize_inline_frames
-                                        ? "--inlining=true"
-                                        : "--inlining=false";
-    execl(path_to_binary, path_to_binary, inline_flag, kSymbolizerArch,
-          (char *)0);
-  }
-};
-
-class LLVMSymbolizer : public SymbolizerTool {
- public:
-  explicit LLVMSymbolizer(const char *path, LowLevelAllocator *allocator)
-      : symbolizer_process_(new(*allocator) LLVMSymbolizerProcess(path)) {}
-
-  bool SymbolizePC(uptr addr, SymbolizedStack *stack) override {
-    if (const char *buf = SendCommand(/*is_data*/ false, stack->info.module,
-                                      stack->info.module_offset)) {
-      ParseSymbolizePCOutput(buf, stack);
-      return true;
+bool SymbolizerProcess::StartSymbolizerSubprocess() {
+  if (!FileExists(path_)) {
+    if (!reported_invalid_path_) {
+      Report("WARNING: invalid path to external symbolizer!\n");
+      reported_invalid_path_ = true;
     }
     return false;
   }
 
-  bool SymbolizeData(uptr addr, DataInfo *info) override {
-    if (const char *buf =
-            SendCommand(/*is_data*/ true, info->module, info->module_offset)) {
-      ParseSymbolizeDataOutput(buf, info);
-      info->start += (addr - info->module_offset);  // Add the base address.
-      return true;
-    }
+  int pid = -1;
+
+  int infd[2];
+  internal_memset(&infd, 0, sizeof(infd));
+  int outfd[2];
+  internal_memset(&outfd, 0, sizeof(outfd));
+  if (!CreateTwoHighNumberedPipes(infd, outfd)) {
+    Report("WARNING: Can't create a socket pair to start "
+           "external symbolizer (errno: %d)\n", errno);
     return false;
   }
 
- private:
-  const char *SendCommand(bool is_data, const char *module_name,
-                          uptr module_offset) {
-    CHECK(module_name);
-    internal_snprintf(buffer_, kBufferSize, "%s\"%s\" 0x%zx\n",
-                      is_data ? "DATA " : "", module_name, module_offset);
-    return symbolizer_process_->SendCommand(buffer_);
+  if (use_forkpty_) {
+#if SANITIZER_MAC
+    fd_t fd = kInvalidFd;
+
+    // forkpty redirects stdout and stderr into a single stream, so we would
+    // receive error messages as standard replies. To avoid that, let's dup
+    // stderr and restore it in the child.
+    int saved_stderr = dup(STDERR_FILENO);
+    CHECK_GE(saved_stderr, 0);
+
+    // We only need one pipe, for stdin of the child.
+    close(outfd[0]);
+    close(outfd[1]);
+
+    // Use forkpty to disable buffering in the new terminal.
+    pid = internal_forkpty(&fd);
+    if (pid == -1) {
+      // forkpty() failed.
+      Report("WARNING: failed to fork external symbolizer (errno: %d)\n",
+             errno);
+      return false;
+    } else if (pid == 0) {
+      // Child subprocess.
+
+      // infd[0] is the child's reading end.
+      close(infd[1]);
+
+      // Set up stdin to read from the pipe.
+      CHECK_GE(dup2(infd[0], STDIN_FILENO), 0);
+      close(infd[0]);
+
+      // Restore stderr.
+      CHECK_GE(dup2(saved_stderr, STDERR_FILENO), 0);
+      close(saved_stderr);
+
+      const char *argv[kArgVMax];
+      GetArgV(path_, argv);
+      execv(path_, const_cast<char **>(&argv[0]));
+      internal__exit(1);
+    }
+
+    // Input for the child, infd[1] is our writing end.
+    output_fd_ = infd[1];
+    close(infd[0]);
+
+    // Continue execution in parent process.
+    input_fd_ = fd;
+
+    close(saved_stderr);
+
+    // Disable echo in the new terminal, disable CR.
+    struct termios termflags;
+    tcgetattr(fd, &termflags);
+    termflags.c_oflag &= ~ONLCR;
+    termflags.c_lflag &= ~ECHO;
+    tcsetattr(fd, TCSANOW, &termflags);
+#else  // SANITIZER_MAC
+    UNIMPLEMENTED();
+#endif  // SANITIZER_MAC
+  } else {
+    const char *argv[kArgVMax];
+    GetArgV(path_, argv);
+    pid = StartSubprocess(path_, argv, /* stdin */ outfd[0],
+                          /* stdout */ infd[1]);
+    if (pid < 0) {
+      internal_close(infd[0]);
+      internal_close(outfd[1]);
+      return false;
+    }
+
+    input_fd_ = infd[0];
+    output_fd_ = outfd[1];
   }
 
-  LLVMSymbolizerProcess *symbolizer_process_;
-  static const uptr kBufferSize = 16 * 1024;
-  char buffer_[kBufferSize];
-};
+  CHECK_GT(pid, 0);
+
+  // Check that symbolizer subprocess started successfully.
+  SleepForMillis(kSymbolizerStartupTimeMillis);
+  if (!IsProcessRunning(pid)) {
+    // Either waitpid failed, or child has already exited.
+    Report("WARNING: external symbolizer didn't start up correctly!\n");
+    return false;
+  }
+
+  return true;
+}
 
 class Addr2LineProcess : public SymbolizerProcess {
  public:
@@ -205,24 +257,53 @@ class Addr2LineProcess : public SymbolizerProcess {
   const char *module_name() const { return module_name_; }
 
  private:
-  bool ReachedEndOfOutput(const char *buffer, uptr length) const override {
-    // Output should consist of two lines.
-    int num_lines = 0;
-    for (uptr i = 0; i < length; ++i) {
-      if (buffer[i] == '\n')
-        num_lines++;
-      if (num_lines >= 2)
-        return true;
-    }
-    return false;
+  void GetArgV(const char *path_to_binary,
+               const char *(&argv)[kArgVMax]) const override {
+    int i = 0;
+    argv[i++] = path_to_binary;
+    argv[i++] = "-iCfe";
+    argv[i++] = module_name_;
+    argv[i++] = nullptr;
   }
 
-  void ExecuteWithDefaultArgs(const char *path_to_binary) const override {
-    execl(path_to_binary, path_to_binary, "-Cfe", module_name_, (char *)0);
+  bool ReachedEndOfOutput(const char *buffer, uptr length) const override;
+
+  bool ReadFromSymbolizer(char *buffer, uptr max_length) override {
+    if (!SymbolizerProcess::ReadFromSymbolizer(buffer, max_length))
+      return false;
+    // We should cut out output_terminator_ at the end of given buffer,
+    // appended by addr2line to mark the end of its meaningful output.
+    // We cannot scan buffer from it's beginning, because it is legal for it
+    // to start with output_terminator_ in case given offset is invalid. So,
+    // scanning from second character.
+    char *garbage = internal_strstr(buffer + 1, output_terminator_);
+    // This should never be NULL since buffer must end up with
+    // output_terminator_.
+    CHECK(garbage);
+    // Trim the buffer.
+    garbage[0] = '\0';
+    return true;
   }
 
   const char *module_name_;  // Owned, leaked.
+  static const char output_terminator_[];
 };
+
+const char Addr2LineProcess::output_terminator_[] = "??\n??:0\n";
+
+bool Addr2LineProcess::ReachedEndOfOutput(const char *buffer,
+                                          uptr length) const {
+  const size_t kTerminatorLen = sizeof(output_terminator_) - 1;
+  // Skip, if we read just kTerminatorLen bytes, because Addr2Line output
+  // should consist at least of two pairs of lines:
+  // 1. First one, corresponding to given offset to be symbolized
+  // (may be equal to output_terminator_, if offset is not valid).
+  // 2. Second one for output_terminator_, itself to mark the end of output.
+  if (length <= kTerminatorLen) return false;
+  // Addr2Line output should end up with output_terminator_.
+  return !internal_memcmp(buffer + length - kTerminatorLen,
+                          output_terminator_, kTerminatorLen);
+}
 
 class Addr2LinePool : public SymbolizerTool {
  public:
@@ -260,15 +341,18 @@ class Addr2LinePool : public SymbolizerTool {
       addr2line_pool_.push_back(addr2line);
     }
     CHECK_EQ(0, internal_strcmp(module_name, addr2line->module_name()));
-    char buffer_[kBufferSize];
-    internal_snprintf(buffer_, kBufferSize, "0x%zx\n", module_offset);
-    return addr2line->SendCommand(buffer_);
+    char buffer[kBufferSize];
+    internal_snprintf(buffer, kBufferSize, "0x%zx\n0x%zx\n",
+                      module_offset, dummy_address_);
+    return addr2line->SendCommand(buffer);
   }
 
-  static const uptr kBufferSize = 32;
+  static const uptr kBufferSize = 64;
   const char *addr2line_path_;
   LowLevelAllocator *allocator_;
   InternalMmapVector<Addr2LineProcess*> addr2line_pool_;
+  static const uptr dummy_address_ =
+      FIRST_32_SECOND_64(UINT32_MAX, UINT64_MAX);
 };
 
 #if SANITIZER_SUPPORTS_WEAK_HOOKS
@@ -340,7 +424,6 @@ class InternalSymbolizer : public SymbolizerTool {
   InternalSymbolizer() { }
 
   static const int kBufferSize = 16 * 1024;
-  static const int kMaxDemangledNameSize = 1024;
   char buffer_[kBufferSize];
 };
 #else  // SANITIZER_SUPPORTS_WEAK_HOOKS
@@ -353,7 +436,7 @@ class InternalSymbolizer : public SymbolizerTool {
 #endif  // SANITIZER_SUPPORTS_WEAK_HOOKS
 
 const char *Symbolizer::PlatformDemangle(const char *name) {
-  return DemangleCXXABI(name);
+  return DemangleSwiftAndCXX(name);
 }
 
 void Symbolizer::PlatformPrepareForSandboxing() {}
@@ -412,7 +495,9 @@ static void ChooseSymbolizerTools(IntrusiveList<SymbolizerTool> *list,
     VReport(2, "Symbolizer is disabled.\n");
     return;
   }
-  if (SymbolizerTool *tool = InternalSymbolizer::get(allocator)) {
+  if (IsAllocatorOutOfMemory()) {
+    VReport(2, "Cannot use internal symbolizer: out of memory\n");
+  } else if (SymbolizerTool *tool = InternalSymbolizer::get(allocator)) {
     VReport(2, "Using internal symbolizer.\n");
     list->push_back(tool);
     return;
@@ -425,8 +510,6 @@ static void ChooseSymbolizerTools(IntrusiveList<SymbolizerTool> *list,
 
   if (SymbolizerTool *tool = ChooseExternalSymbolizer(allocator)) {
     list->push_back(tool);
-  } else {
-    VReport(2, "No internal or external symbolizer found.\n");
   }
 
 #if SANITIZER_MAC
@@ -440,6 +523,11 @@ Symbolizer *Symbolizer::PlatformInit() {
   list.clear();
   ChooseSymbolizerTools(&list, &symbolizer_allocator_);
   return new(symbolizer_allocator_) Symbolizer(list);
+}
+
+void Symbolizer::LateInitialize() {
+  Symbolizer::GetOrInit();
+  InitializeSwiftDemangler();
 }
 
 }  // namespace __sanitizer

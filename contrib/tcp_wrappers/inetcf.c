@@ -5,6 +5,16 @@
   * 
   * Author: Wietse Venema, Eindhoven University of Technology, The Netherlands.
   */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #ifndef lint
 static char sccsid[] = "@(#) inetcf.c 1.7 97/02/12 02:13:23";
@@ -14,14 +24,12 @@ static char sccsid[] = "@(#) inetcf.c 1.7 97/02/12 02:13:23";
 #include <sys/stat.h>
 #include <stdio.h>
 #include <errno.h>
+#include <stdlib.h>
 #include <string.h>
-
-extern int errno;
-extern void exit();
-extern char *malloc();
 
 #include "tcpd.h"
 #include "inetcf.h"
+#include "scaffold.h"
 
  /*
   * Network configuration files may live in unusual places. Here are some
@@ -38,8 +46,9 @@ char   *inet_files[] = {
     0,
 };
 
-static void inet_chk();
-static char *base_name();
+static void inet_chk(char *protocol, char *path, char *arg0, char *arg1);
+static char *base_name(char *path);
+extern char *percent_m(char *obuf, char *ibuf);
 
  /*
   * Structure with everything we know about a service.
@@ -68,7 +77,6 @@ char   *conf;
     char   *arg0;
     char   *arg1;
     struct tcpd_context saved_context;
-    char   *percent_m();
     int     i;
     struct stat st;
 

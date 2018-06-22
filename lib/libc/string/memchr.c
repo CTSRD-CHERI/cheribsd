@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -39,19 +41,15 @@ __FBSDID("$FreeBSD$");
 #include <string.h>
 #include "cheri_private.h"
 
-/*
- * XXX-BD: The capability version renders all strings read-only which
- * likely isn't what the caller wanted.
- */
-__CAPABILITY void *
-__CAPSUFFIX(memchr)(__CAPABILITY const void *s, int c, size_t n)
+void * __CAP
+__CAPSUFFIX(memchr)(const void * __CAP s, int c, size_t n)
 {
 	if (n != 0) {
-		__CAPABILITY const unsigned char *p = s;
+		const unsigned char * __CAP p = s;
 
 		do {
 			if (*p == (unsigned char)c)
-				return ((__CAPABILITY void *)p);
+				return ((void * __CAP)p);
 			else
 				p++;
 		} while (--n != 0);

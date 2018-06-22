@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2005 David Xu <davidxu@freebsd.org>.
  * All rights reserved.
  *
@@ -26,6 +28,19 @@
  * from: src/lib/libthr/arch/arm/include/pthread_md.h,v 1.3 2005/10/29 13:40:31 davidxu
  * $FreeBSD$
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_size",
+ *     "unsupported"
+ *   ],
+ *   "change_comment": "TLS alignment, non-capability based TLS interface",
+ *   "hybrid_specific": false
+ * }
+ * CHERI CHANGES END
+ */
 
 /*
  * Machine-dependent thread prototypes/definitions.
@@ -35,7 +50,7 @@
 
 #include <sys/types.h>
 #ifdef __CHERI_PURE_CAPABILITY__
-#include <machine/cheric.h>
+#include <cheri/cheric.h>
 #endif
 #include <machine/sysarch.h>
 #include <machine/tls.h>
@@ -43,6 +58,12 @@
 
 #define	CPU_SPINWAIT
 #define	DTV_OFFSET		offsetof(struct tcb, tcb_dtv)
+#ifdef __CHERI_PURE_CAPABILITY__
+#define TCB_ALIGN (CHERICAP_SIZE)
+#else
+#define TCB_ALIGN (16)
+#endif
+
 
 /*
  * Variant I tcb. The structure layout is fixed, don't blindly
@@ -51,7 +72,7 @@
 struct tcb {
 	void			*tcb_dtv;
 	struct pthread		*tcb_thread;
-};
+} __packed __aligned(TCB_ALIGN);
 
 /* Called from the thread to set its private data. */
 static __inline void
@@ -123,12 +144,10 @@ _tcb_get(void)
 	 * pointer via sysarch() (in theory).  Of course, this may go away
 	 * once the TLS code is rewritten.
 	 */
-	return (struct tcb *)(_rv - TLS_TP_OFFSET - TLS_TCB_SIZE32);
+	return (struct tcb *)(_rv - TLS_TP_OFFSET - TLS_TCB_SIZE);
 }
 #  endif /* ! __mips_n64 */
 #endif /* ! TLS_USE_SYSARCH */
-
-extern struct pthread *_thr_initial;
 
 static __inline struct pthread *
 _get_curthread(void)

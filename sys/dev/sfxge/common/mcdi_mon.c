@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2009-2015 Solarflare Communications Inc.
+ * Copyright (c) 2009-2016 Solarflare Communications Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,8 +38,8 @@ __FBSDID("$FreeBSD$");
 
 #if EFSYS_OPT_MON_STATS
 
-#define	MCDI_MON_NEXT_PAGE  (uint16_t)0xfffe
-#define	MCDI_MON_INVALID_SENSOR (uint16_t)0xfffd
+#define	MCDI_MON_NEXT_PAGE  ((uint16_t)0xfffe)
+#define	MCDI_MON_INVALID_SENSOR ((uint16_t)0xfffd)
 #define	MCDI_MON_PAGE_SIZE 0x20
 
 /* Bitmasks of valid port(s) for each sensor */
@@ -49,6 +49,9 @@ __FBSDID("$FreeBSD$");
 #define	MCDI_MON_PORT_P3	(0x04)
 #define	MCDI_MON_PORT_P4	(0x08)
 #define	MCDI_MON_PORT_Px	(0xFFFF)
+
+/* Get port mask from one-based MCDI port number */
+#define	MCDI_MON_PORT_MASK(_emip) (1U << ((_emip)->emi_port - 1))
 
 /* Entry for MCDI sensor in sensor map */
 #define	STAT(portmask, stat)	\
@@ -155,6 +158,8 @@ static const struct mcdi_sensor_map_s {
 	STAT(Px, PHY0_VCC),		/* 0x4c PHY0_VCC */
 	STAT(Px, PHY1_VCC),		/* 0x4d PHY1_VCC */
 	STAT(Px, CONTROLLER_TDIODE_TEMP), /* 0x4e CONTROLLER_TDIODE_TEMP */
+	STAT(Px, BOARD_FRONT_TEMP),	/* 0x4f BOARD_FRONT_TEMP */
+	STAT(Px, BOARD_BACK_TEMP),	/* 0x50 BOARD_BACK_TEMP */
 };
 
 #define	MCDI_STATIC_SENSOR_ASSERT(_field)				\
@@ -164,10 +169,10 @@ static const struct mcdi_sensor_map_s {
 static						void
 mcdi_mon_decode_stats(
 	__in					efx_nic_t *enp,
-	__in_ecount(sensor_mask_size)		uint32_t *sensor_mask,
+	__in_bcount(sensor_mask_size)		uint32_t *sensor_mask,
 	__in					size_t sensor_mask_size,
 	__in_opt				efsys_mem_t *esmp,
-	__out_ecount_opt(sensor_mask_size)	uint32_t *stat_maskp,
+	__out_bcount_opt(sensor_mask_size)	uint32_t *stat_maskp,
 	__inout_ecount_opt(EFX_MON_NSTATS)	efx_mon_stat_value_t *stat)
 {
 	efx_mcdi_iface_t *emip = &(enp->en_mcdi.em_emip);
@@ -190,7 +195,8 @@ mcdi_mon_decode_stats(
 	sensor_max =
 	    MIN((8 * sensor_mask_size), EFX_ARRAY_SIZE(mcdi_sensor_map));
 
-	port_mask = 1U << emip->emi_port;
+	EFSYS_ASSERT(emip->emi_port > 0); /* MCDI port number is one-based */
+	port_mask = MCDI_MON_PORT_MASK(emip);
 
 	memset(stat_mask, 0, sizeof (stat_mask));
 
@@ -267,9 +273,8 @@ mcdi_mon_ev(
 	efx_mon_stat_t id;
 	efx_rc_t rc;
 
-	port_mask = (emip->emi_port == 1)
-	    ? MCDI_MON_PORT_P1
-	    : MCDI_MON_PORT_P2;
+	EFSYS_ASSERT(emip->emi_port > 0); /* MCDI port number is one-based */
+	port_mask = MCDI_MON_PORT_MASK(emip);
 
 	sensor = (uint16_t)MCDI_EV_FIELD(eqp, SENSOREVT_MONITOR);
 	state = (uint16_t)MCDI_EV_FIELD(eqp, SENSOREVT_STATE);
@@ -365,7 +370,7 @@ efx_mcdi_sensor_info_npages(
 			goto fail1;
 		}
 	} while (MCDI_OUT_DWORD(req, SENSOR_INFO_OUT_MASK) &
-	    (1 << MC_CMD_SENSOR_PAGE0_NEXT));
+	    (1U << MC_CMD_SENSOR_PAGE0_NEXT));
 
 	*npagesp = page;
 

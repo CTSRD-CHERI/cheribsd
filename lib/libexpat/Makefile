@@ -1,6 +1,7 @@
 # $FreeBSD$
 
-EXPAT=		${.CURDIR}/../../contrib/expat
+PACKAGE=lib${LIB}
+EXPAT=		${SRCTOP}/contrib/expat
 
 LIB=		bsdxml
 SHLIBDIR?=	/lib

@@ -1,6 +1,8 @@
 /*	$NetBSD: ucom.c,v 1.40 2001/11/13 06:24:54 lukem Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD AND BSD-2-Clause-NetBSD
+ *
  * Copyright (c) 2001-2003, 2005, 2008
  *	Shunsuke Akiyama <akiyama@jp.FreeBSD.org>.
  * All rights reserved.
@@ -79,7 +81,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/priv.h>
 #include <sys/cons.h>
-#include <sys/kdb.h>
 
 #include <dev/uart/uart_ppstypes.h>
 
@@ -162,6 +163,7 @@ static tsw_param_t ucom_param;
 static tsw_outwakeup_t ucom_outwakeup;
 static tsw_inwakeup_t ucom_inwakeup;
 static tsw_free_t ucom_free;
+static tsw_busy_t ucom_busy;
 
 static struct ttydevsw ucom_class = {
 	.tsw_flags = TF_INITLOCK | TF_CALLOUT,
@@ -173,6 +175,7 @@ static struct ttydevsw ucom_class = {
 	.tsw_param = ucom_param,
 	.tsw_modem = ucom_modem,
 	.tsw_free = ucom_free,
+	.tsw_busy = ucom_busy,
 };
 
 MODULE_DEPEND(ucom, usb, 1, 1, 1);
@@ -1295,6 +1298,27 @@ ucom_outwakeup(struct tty *tp)
 	ucom_start_transfers(sc);
 }
 
+static bool
+ucom_busy(struct tty *tp)
+{
+	struct ucom_softc *sc = tty_softc(tp);
+	const uint8_t txidle = ULSR_TXRDY | ULSR_TSRE;
+
+	UCOM_MTX_ASSERT(sc, MA_OWNED);
+
+	DPRINTFN(3, "sc = %p lsr 0x%02x\n", sc, sc->sc_lsr);
+
+	/*
+	 * If the driver maintains the txidle bits in LSR, we can use them to
+	 * determine whether the transmitter is busy or idle.  Otherwise we have
+	 * to assume it is idle to avoid hanging forever on tcdrain(3).
+	 */
+	if (sc->sc_flag & UCOM_FLAG_LSRTXIDLE)
+		return ((sc->sc_lsr & txidle) != txidle);
+	else
+		return (false);
+}
+
 /*------------------------------------------------------------------------*
  *	ucom_get_data
  *
@@ -1575,7 +1599,7 @@ ucom_cngetc(struct consdev *cd)
 	UCOM_MTX_UNLOCK(sc);
 
 	/* poll if necessary */
-	if (kdb_active && sc->sc_callback->ucom_poll)
+	if (USB_IN_POLLING_MODE_FUNC() && sc->sc_callback->ucom_poll)
 		(sc->sc_callback->ucom_poll) (sc);
 
 	return (c);
@@ -1611,7 +1635,7 @@ ucom_cnputc(struct consdev *cd, int c)
 	UCOM_MTX_UNLOCK(sc);
 
 	/* poll if necessary */
-	if (kdb_active && sc->sc_callback->ucom_poll) {
+	if (USB_IN_POLLING_MODE_FUNC() && sc->sc_callback->ucom_poll) {
 		(sc->sc_callback->ucom_poll) (sc);
 		/* simple flow control */
 		if (temp == 0)

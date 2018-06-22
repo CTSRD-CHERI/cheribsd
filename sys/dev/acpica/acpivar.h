@@ -85,6 +85,7 @@ struct acpi_device {
     ACPI_HANDLE			ad_handle;
     void			*ad_private;
     int				ad_flags;
+    int				ad_cls_class;
 
     /* Resources */
     struct resource_list	ad_rl;
@@ -300,6 +301,12 @@ void		acpi_EnterDebugger(void);
 	device_printf(dev, x);					\
 } while (0)
 
+/* Values for the first status word returned by _OSC. */
+#define	ACPI_OSC_FAILURE	(1 << 1)
+#define	ACPI_OSC_BAD_UUID	(1 << 2)
+#define	ACPI_OSC_BAD_REVISION	(1 << 3)
+#define	ACPI_OSC_CAPS_MASKED	(1 << 4)
+
 /* Values for the device _STA (status) method. */
 #define ACPI_STA_PRESENT	(1 << 0)
 #define ACPI_STA_ENABLED	(1 << 1)
@@ -335,6 +342,9 @@ ACPI_STATUS	acpi_FindIndexedResource(ACPI_BUFFER *buf, int index,
 		    ACPI_RESOURCE **resp);
 ACPI_STATUS	acpi_AppendBufferResource(ACPI_BUFFER *buf,
 		    ACPI_RESOURCE *res);
+ACPI_STATUS	acpi_EvaluateOSC(ACPI_HANDLE handle, uint8_t *uuid,
+		    int revision, int count, uint32_t *caps_in,
+		    uint32_t *caps_out, bool query);
 ACPI_STATUS	acpi_OverrideInterruptLevel(UINT32 InterruptNumber);
 ACPI_STATUS	acpi_SetIntrModel(int model);
 int		acpi_ReqSleepState(struct acpi_softc *sc, int state);
@@ -441,6 +451,8 @@ int		acpi_wakeup_machdep(struct acpi_softc *sc, int state,
 int		acpi_table_quirks(int *quirks);
 int		acpi_machdep_quirks(int *quirks);
 
+uint32_t	hpet_get_uid(device_t dev);
+
 /* Battery Abstraction. */
 struct acpi_battinfo;
 
@@ -500,11 +512,10 @@ SYSCTL_DECL(_debug_acpi);
  *
  * Returns the VM domain ID if found, or -1 if not found / invalid.
  */
-#if MAXMEMDOM > 1
-extern	int acpi_map_pxm_to_vm_domainid(int pxm);
-#endif
-extern	int acpi_get_domain(device_t dev, device_t child, int *domain);
-extern	int acpi_parse_pxm(device_t dev, int *domain);
+int		acpi_map_pxm_to_vm_domainid(int pxm);
+int		acpi_get_cpus(device_t dev, device_t child, enum cpu_sets op,
+		    size_t setsize, cpuset_t *cpuset);
+int		acpi_get_domain(device_t dev, device_t child, int *domain);
 
 #endif /* _KERNEL */
 #endif /* !_ACPIVAR_H_ */

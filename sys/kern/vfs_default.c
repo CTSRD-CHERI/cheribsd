@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -15,7 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -83,6 +85,7 @@ static int vop_stdset_text(struct vop_set_text_args *ap);
 static int vop_stdunset_text(struct vop_unset_text_args *ap);
 static int vop_stdget_writecount(struct vop_get_writecount_args *ap);
 static int vop_stdadd_writecount(struct vop_add_writecount_args *ap);
+static int vop_stdfdatasync(struct vop_fdatasync_args *ap);
 static int vop_stdgetpages_async(struct vop_getpages_async_args *ap);
 
 /*
@@ -111,6 +114,7 @@ struct vop_vector default_vnodeops = {
 	.vop_bmap =		vop_stdbmap,
 	.vop_close =		VOP_NULL,
 	.vop_fsync =		VOP_NULL,
+	.vop_fdatasync =	vop_stdfdatasync,
 	.vop_getpages =		vop_stdgetpages,
 	.vop_getpages_async =	vop_stdgetpages_async,
 	.vop_getwritemount = 	vop_stdgetwritemount,
@@ -256,7 +260,7 @@ static int
 vop_nostrategy (struct vop_strategy_args *ap)
 {
 	printf("No strategy for buffer at %p\n", ap->a_bp);
-	vprint("vnode", ap->a_vp);
+	vn_printf(ap->a_vp, "vnode ");
 	ap->a_bp->b_ioflags |= BIO_ERROR;
 	ap->a_bp->b_error = EOPNOTSUPP;
 	bufdone(ap->a_bp);
@@ -270,15 +274,14 @@ get_next_dirent(struct vnode *vp, struct dirent **dpp, char *dirbuf,
 {
 	int error, reclen;
 	struct uio uio;
-	struct iovec iov;
+	kiovec_t iov;
 	struct dirent *dp;
 
 	KASSERT(VOP_ISLOCKED(vp), ("vp %p is not locked", vp));
 	KASSERT(vp->v_type == VDIR, ("vp %p is not a directory", vp));
 
 	if (*len == 0) {
-		iov.iov_base = dirbuf;
-		iov.iov_len = dirbuflen;
+		IOVEC_INIT(&iov, dirbuf, dirbuflen);
 
 		uio.uio_iov = &iov;
 		uio.uio_iovcnt = 1;
@@ -472,29 +475,11 @@ vop_stdpathconf(ap)
 {
 
 	switch (ap->a_name) {
-		case _PC_NAME_MAX:
-			*ap->a_retval = NAME_MAX;
+		case _PC_ASYNC_IO:
+			*ap->a_retval = _POSIX_ASYNCHRONOUS_IO;
 			return (0);
 		case _PC_PATH_MAX:
 			*ap->a_retval = PATH_MAX;
-			return (0);
-		case _PC_LINK_MAX:
-			*ap->a_retval = LINK_MAX;
-			return (0);
-		case _PC_MAX_CANON:
-			*ap->a_retval = MAX_CANON;
-			return (0);
-		case _PC_MAX_INPUT:
-			*ap->a_retval = MAX_INPUT;
-			return (0);
-		case _PC_PIPE_BUF:
-			*ap->a_retval = PIPE_BUF;
-			return (0);
-		case _PC_CHOWN_RESTRICTED:
-			*ap->a_retval = 1;
-			return (0);
-		case _PC_VDISABLE:
-			*ap->a_retval = _POSIX_VDISABLE;
 			return (0);
 		default:
 			return (EINVAL);
@@ -515,10 +500,11 @@ vop_stdlock(ap)
 	} */ *ap;
 {
 	struct vnode *vp = ap->a_vp;
+	struct mtx *ilk;
 
-	return (_lockmgr_args(vp->v_vnlock, ap->a_flags, VI_MTX(vp),
-	    LK_WMESG_DEFAULT, LK_PRIO_DEFAULT, LK_TIMO_DEFAULT, ap->a_file,
-	    ap->a_line));
+	ilk = VI_MTX(vp);
+	return (lockmgr_lock_fast_path(vp->v_vnlock, ap->a_flags,
+	    (ilk != NULL) ? &ilk->lock_object : NULL, ap->a_file, ap->a_line));
 }
 
 /* See above. */
@@ -530,8 +516,11 @@ vop_stdunlock(ap)
 	} */ *ap;
 {
 	struct vnode *vp = ap->a_vp;
+	struct mtx *ilk;
 
-	return (lockmgr(vp->v_vnlock, ap->a_flags | LK_RELEASE, VI_MTX(vp)));
+	ilk = VI_MTX(vp);
+	return (lockmgr_unlock_fast_path(vp->v_vnlock, ap->a_flags,
+	    (ilk != NULL) ? &ilk->lock_object : NULL));
 }
 
 /* See above. */
@@ -637,7 +626,6 @@ int
 vop_stdfsync(ap)
 	struct vop_fsync_args /* {
 		struct vnode *a_vp;
-		struct ucred *a_cred;
 		int a_waitfor;
 		struct thread *a_td;
 	} */ *ap;
@@ -710,8 +698,8 @@ loop2:
 			 * to write them out.
 			 */
 			TAILQ_FOREACH(bp, &bo->bo_dirty.bv_hd, b_bobufs)
-				if ((error = bp->b_error) == 0)
-					continue;
+				if ((error = bp->b_error) != 0)
+					break;
 			if (error == 0 && --maxretry >= 0)
 				goto loop1;
 			error = EAGAIN;
@@ -719,9 +707,27 @@ loop2:
 	}
 	BO_UNLOCK(bo);
 	if (error == EAGAIN)
-		vprint("fsync: giving up on dirty", vp);
+		vn_printf(vp, "fsync: giving up on dirty ");
 
 	return (error);
+}
+
+static int
+vop_stdfdatasync(struct vop_fdatasync_args *ap)
+{
+
+	return (VOP_FSYNC(ap->a_vp, MNT_WAIT, ap->a_td));
+}
+
+int
+vop_stdfdatasync_buf(struct vop_fdatasync_args *ap)
+{
+	struct vop_fsync_args apf;
+
+	apf.a_vp = ap->a_vp;
+	apf.a_waitfor = MNT_WAIT;
+	apf.a_td = ap->a_td;
+	return (vop_stdfsync(&apf));
 }
 
 /* XXX Needs good comment and more info in the manpage (VOP_GETPAGES(9)). */
@@ -909,9 +915,10 @@ int
 vop_stdallocate(struct vop_allocate_args *ap)
 {
 #ifdef __notyet__
-	struct statfs sfs;
+	struct statfs *sfs;
+	off_t maxfilesize = 0;
 #endif
-	struct iovec aiov;
+	kiovec_t aiov;
 	struct vattr vattr, *vap;
 	struct uio auio;
 	off_t fsize, len, cur, offset;
@@ -945,12 +952,16 @@ vop_stdallocate(struct vop_allocate_args *ap)
 	 * Check if the filesystem sets f_maxfilesize; if not use
 	 * VOP_SETATTR to perform the check.
 	 */
-	error = VFS_STATFS(vp->v_mount, &sfs, td);
+	sfs = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
+	error = VFS_STATFS(vp->v_mount, sfs, td);
+	if (error == 0)
+		maxfilesize = sfs->f_maxfilesize;
+	free(sfs, M_STATFS);
 	if (error != 0)
 		goto out;
-	if (sfs.f_maxfilesize) {
-		if (offset > sfs.f_maxfilesize || len > sfs.f_maxfilesize ||
-		    offset + len > sfs.f_maxfilesize) {
+	if (maxfilesize) {
+		if (offset > maxfilesize || len > maxfilesize ||
+		    offset + len > maxfilesize) {
 			error = EFBIG;
 			goto out;
 		}
@@ -984,8 +995,7 @@ vop_stdallocate(struct vop_allocate_args *ap)
 		if (cur > len)
 			cur = len;
 		if (offset < fsize) {
-			aiov.iov_base = buf;
-			aiov.iov_len = cur;
+			IOVEC_INIT(&aiov, buf, cur);
 			auio.uio_iov = &aiov;
 			auio.uio_iovcnt = 1;
 			auio.uio_offset = offset;
@@ -1004,8 +1014,7 @@ vop_stdallocate(struct vop_allocate_args *ap)
 			bzero(buf, cur);
 		}
 
-		aiov.iov_base = buf;
-		aiov.iov_len = cur;
+		IOVEC_INIT(&aiov, buf, cur);
 		auio.uio_iov = &aiov;
 		auio.uio_iovcnt = 1;
 		auio.uio_offset = offset;
@@ -1069,10 +1078,10 @@ vop_stdadvise(struct vop_advise_args *ap)
 		if (vp->v_object != NULL) {
 			start = trunc_page(ap->a_start);
 			end = round_page(ap->a_end);
-			VM_OBJECT_WLOCK(vp->v_object);
+			VM_OBJECT_RLOCK(vp->v_object);
 			vm_object_page_noreuse(vp->v_object, OFF_TO_IDX(start),
 			    OFF_TO_IDX(end));
-			VM_OBJECT_WUNLOCK(vp->v_object);
+			VM_OBJECT_RUNLOCK(vp->v_object);
 		}
 
 		bo = &vp->v_bufobj;
@@ -1097,7 +1106,7 @@ int
 vop_stdunp_bind(struct vop_unp_bind_args *ap)
 {
 
-	ap->a_vp->v_socket = ap->a_socket;
+	ap->a_vp->v_unpcb = ap->a_unpcb;
 	return (0);
 }
 
@@ -1105,7 +1114,7 @@ int
 vop_stdunp_connect(struct vop_unp_connect_args *ap)
 {
 
-	*ap->a_socket = ap->a_vp->v_socket;
+	*ap->a_unpcb = ap->a_vp->v_unpcb;
 	return (0);
 }
 
@@ -1113,7 +1122,7 @@ int
 vop_stdunp_detach(struct vop_unp_detach_args *ap)
 {
 
-	ap->a_vp->v_socket = NULL;
+	ap->a_vp->v_unpcb = NULL;
 	return (0);
 }
 
@@ -1180,11 +1189,7 @@ vfs_stdstatfs (mp, sbp)
 }
 
 int
-vfs_stdquotactl (mp, cmds, uid, arg)
-	struct mount *mp;
-	int cmds;
-	uid_t uid;
-	void *arg;
+vfs_stdquotactl(struct mount *mp, int cmds, uid_t uid, void * __CAPABILITY arg)
 {
 
 	return (EOPNOTSUPP);

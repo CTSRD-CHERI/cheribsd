@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1994-1998 Mark Brinicombe.
  * Copyright (c) 1994 Brini.
  * All rights reserved.
@@ -45,21 +47,33 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
+#include <sys/devmap.h>
+#include <sys/kernel.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
 
+#include <arm/arm/mpcore_timervar.h>
+#include <arm/arm/nexusvar.h>
+
 #include <machine/bus.h>
-#include <machine/devmap.h>
 #include <machine/fdt.h>
 #include <machine/machdep.h>
 #include <machine/platform.h> 
+
+#if __ARM_ARCH < 6
+#include <machine/cpu-v4.h>
+#else
+#include <machine/cpu-v6.h>
+#include <machine/pte-v6.h>
+#endif
 
 #include <arm/mv/mvreg.h>	/* XXX */
 #include <arm/mv/mvvar.h>	/* XXX eventually this should be eliminated */
 #include <arm/mv/mvwin.h>
 
 #include <dev/fdt/fdt_common.h>
+#include <dev/ofw/ofw_bus_subr.h>
 
 static int platform_mpp_init(void);
 #if defined(SOC_MV_ARMADAXP)
@@ -70,6 +84,7 @@ void armadaxp_l2_init(void);
 int armada38x_win_set_iosync_barrier(void);
 int armada38x_scu_enable(void);
 int armada38x_open_bootrom_win(void);
+int armada38x_mbus_optimization(void);
 #endif
 
 #define MPP_PIN_MAX		68
@@ -77,6 +92,39 @@ int armada38x_open_bootrom_win(void);
 #define MPP_PINS_PER_REG	8
 #define MPP_SEL(pin,func)	(((func) & 0xf) <<		\
     (((pin) % MPP_PINS_PER_REG) * 4))
+
+static void
+mv_busdma_tag_init(void *arg __unused)
+{
+	phandle_t node;
+	bus_dma_tag_t dmat;
+
+	/*
+	 * If this platform has coherent DMA, create the parent DMA tag to pass
+	 * down the coherent flag to all busses and devices on the platform,
+	 * otherwise return without doing anything. By default create tag
+	 * for all A38x-based platforms only.
+	 */
+	if ((node = OF_finddevice("/")) == -1)
+		return;
+	if (ofw_bus_node_is_compatible(node, "marvell,armada380") == 0)
+		return;
+
+	bus_dma_tag_create(NULL,	/* No parent tag */
+	    1, 0,			/* alignment, bounds */
+	    BUS_SPACE_MAXADDR,		/* lowaddr */
+	    BUS_SPACE_MAXADDR,		/* highaddr */
+	    NULL, NULL,			/* filter, filterarg */
+	    BUS_SPACE_MAXSIZE,		/* maxsize */
+	    BUS_SPACE_UNRESTRICTED,	/* nsegments */
+	    BUS_SPACE_MAXSIZE,		/* maxsegsize */
+	    BUS_DMA_COHERENT,		/* flags */
+	    NULL, NULL,			/* lockfunc, lockarg */
+	    &dmat);
+
+	nexus_set_dma_tag(dmat);
+}
+SYSINIT(mv_busdma_tag, SI_SUB_DRIVERS, SI_ORDER_ANY, mv_busdma_tag_init, NULL);
 
 static int
 platform_mpp_init(void)
@@ -97,7 +145,7 @@ platform_mpp_init(void)
 	 * Try to access the MPP node directly i.e. through /aliases/mpp.
 	 */
 	if ((node = OF_finddevice("mpp")) != -1)
-		if (fdt_is_compatible(node, "mrvl,mpp"))
+		if (ofw_bus_node_is_compatible(node, "mrvl,mpp"))
 			goto moveon;
 	/*
 	 * Find the node the long way.
@@ -140,21 +188,19 @@ moveon:
 	/*
 	 * Process 'pin-count' and 'pin-map' props.
 	 */
-	if (OF_getprop(node, "pin-count", &pin_count, sizeof(pin_count)) <= 0)
+	if (OF_getencprop(node, "pin-count", &pin_count, sizeof(pin_count)) <= 0)
 		return (ENXIO);
-	pin_count = fdt32_to_cpu(pin_count);
 	if (pin_count > MPP_PIN_MAX)
 		return (ERANGE);
 
-	if (OF_getprop(node, "#pin-cells", &pin_cells, sizeof(pin_cells)) <= 0)
+	if (OF_getencprop(node, "#pin-cells", &pin_cells, sizeof(pin_cells)) <= 0)
 		pin_cells = MPP_PIN_CELLS;
-	pin_cells = fdt32_to_cpu(pin_cells);
 	if (pin_cells > MPP_PIN_CELLS)
 		return (ERANGE);
 	tuple_size = sizeof(pcell_t) * pin_cells;
 
 	bzero(pinmap, sizeof(pinmap));
-	len = OF_getprop(node, "pin-map", pinmap, sizeof(pinmap));
+	len = OF_getencprop(node, "pin-map", pinmap, sizeof(pinmap));
 	if (len <= 0)
 		return (ERANGE);
 	if (len % tuple_size)
@@ -169,8 +215,8 @@ moveon:
 	bzero(mpp, sizeof(mpp));
 	pinmap_ptr = pinmap;
 	for (i = 0; i < pins; i++) {
-		mpp_pin = fdt32_to_cpu(*pinmap_ptr);
-		mpp_function = fdt32_to_cpu(*(pinmap_ptr + 1));
+		mpp_pin = *pinmap_ptr;
+		mpp_function = *(pinmap_ptr + 1);
 		mpp[mpp_pin] = mpp_function;
 		pinmap_ptr += pin_cells;
 	}
@@ -239,14 +285,9 @@ platform_late_init(void)
 	/*
 	 * Re-initialise decode windows
 	 */
-#if !defined(SOC_MV_FREY)
 	if (soc_decode_win() != 0)
 		printf("WARNING: could not re-initialise decode windows! "
 		    "Running with existing settings...\n");
-#else
-	/* Disable watchdog and timers */
-	write_cpu_ctrl(CPU_TIMERS_BASE + CPU_TIMER_CONTROL, 0);
-#endif
 #if defined(SOC_MV_ARMADAXP)
 #if !defined(SMP)
 	/* For SMP case it should be initialized after APs are booted */
@@ -256,9 +297,23 @@ platform_late_init(void)
 #endif
 
 #if defined(SOC_MV_ARMADA38X)
+	/* Configure timers' base frequency */
+	arm_tmr_change_frequency(get_cpu_freq() / 2);
+
+	/*
+	 * Workaround for Marvell Armada38X family HW issue
+	 * between Cortex-A9 CPUs and on-chip devices that may
+	 * cause hang on heavy load.
+	 * To avoid that, map all registers including PCIe IO
+	 * as strongly ordered instead of device memory.
+	 */
+	pmap_remap_vm_attr(VM_MEMATTR_DEVICE, VM_MEMATTR_SO);
+
 	/* Set IO Sync Barrier bit for all Mbus devices */
 	if (armada38x_win_set_iosync_barrier() != 0)
 		printf("WARNING: could not map CPU Subsystem registers\n");
+	if (armada38x_mbus_optimization() != 0)
+		printf("WARNING: could not enable mbus optimization\n");
 	if (armada38x_scu_enable() != 0)
 		printf("WARNING: could not enable SCU\n");
 #ifdef SMP
@@ -270,22 +325,22 @@ platform_late_init(void)
 }
 
 #define FDT_DEVMAP_MAX	(MV_WIN_CPU_MAX + 2)
-static struct arm_devmap_entry fdt_devmap[FDT_DEVMAP_MAX] = {
-	{ 0, 0, 0, 0, 0, }
+static struct devmap_entry fdt_devmap[FDT_DEVMAP_MAX] = {
+	{ 0, 0, 0, }
 };
 
 static int
-platform_sram_devmap(struct arm_devmap_entry *map)
+platform_sram_devmap(struct devmap_entry *map)
 {
-#if !defined(SOC_MV_ARMADAXP)
+#if !defined(SOC_MV_ARMADAXP) && !defined(SOC_MV_ARMADA38X)
 	phandle_t child, root;
 	u_long base, size;
 	/*
 	 * SRAM range.
 	 */
 	if ((child = OF_finddevice("/sram")) != 0)
-		if (fdt_is_compatible(child, "mrvl,cesa-sram") ||
-		    fdt_is_compatible(child, "mrvl,scratchpad"))
+		if (ofw_bus_node_is_compatible(child, "mrvl,cesa-sram") ||
+		    ofw_bus_node_is_compatible(child, "mrvl,scratchpad"))
 			goto moveon;
 
 	if ((root = OF_finddevice("/")) == 0)
@@ -302,8 +357,6 @@ moveon:
 	map->pd_va = MV_CESA_SRAM_BASE; /* XXX */
 	map->pd_pa = base;
 	map->pd_size = size;
-	map->pd_prot = VM_PROT_READ | VM_PROT_WRITE;
-	map->pd_cache = PTE_DEVICE;
 
 	return (0);
 out:
@@ -320,10 +373,10 @@ out:
  * real implementation of this function in arm/mv/mv_pci.c overrides the weak
  * alias defined here.
  */
-int mv_default_fdt_pci_devmap(phandle_t node, struct arm_devmap_entry *devmap,
+int mv_default_fdt_pci_devmap(phandle_t node, struct devmap_entry *devmap,
     vm_offset_t io_va, vm_offset_t mem_va);
 int
-mv_default_fdt_pci_devmap(phandle_t node, struct arm_devmap_entry *devmap,
+mv_default_fdt_pci_devmap(phandle_t node, struct devmap_entry *devmap,
     vm_offset_t io_va, vm_offset_t mem_va)
 {
 
@@ -337,7 +390,7 @@ __weak_reference(mv_default_fdt_pci_devmap, mv_pci_devmap);
  */
 
 /*
- * Construct pmap_devmap[] with DT-derived config data.
+ * Construct devmap table with DT-derived config data.
  */
 int
 platform_devmap_init(void)
@@ -347,7 +400,7 @@ platform_devmap_init(void)
 	int i, num_mapped;
 
 	i = 0;
-	arm_devmap_register_table(&fdt_devmap[0]);
+	devmap_register_table(&fdt_devmap[0]);
 
 #ifdef SOC_MV_ARMADAXP
 	vm_paddr_t cur_immr_pa;
@@ -368,8 +421,6 @@ platform_devmap_init(void)
 	fdt_devmap[i].pd_va = fdt_immr_va;
 	fdt_devmap[i].pd_pa = fdt_immr_pa;
 	fdt_devmap[i].pd_size = fdt_immr_size;
-	fdt_devmap[i].pd_prot = VM_PROT_READ | VM_PROT_WRITE;
-	fdt_devmap[i].pd_cache = PTE_DEVICE;
 	i++;
 
 	/*
@@ -404,14 +455,12 @@ platform_devmap_init(void)
 			i += 2;
 		}
 
-		if (fdt_is_compatible(child, "mrvl,lbc")) {
+		if (ofw_bus_node_is_compatible(child, "mrvl,lbc")) {
 			/* Check available space */
-			if (OF_getprop(child, "bank-count", (void *)&bank_count,
+			if (OF_getencprop(child, "bank-count", &bank_count,
 			    sizeof(bank_count)) <= 0)
 				/* If no property, use default value */
 				bank_count = 1;
-			else
-				bank_count = fdt32_to_cpu(bank_count);
 
 			if ((i + bank_count) >= FDT_DEVMAP_MAX)
 				return (ENOMEM);
@@ -430,6 +479,7 @@ platform_devmap_init(void)
 	return (0);
 }
 
+#if __ARM_ARCH < 6
 struct arm32_dma_range *
 bus_dma_get_range(void)
 {
@@ -443,6 +493,7 @@ bus_dma_get_range_nb(void)
 
 	return (0);
 }
+#endif
 
 #if defined(CPU_MV_PJ4B)
 #ifdef DDB
@@ -457,9 +508,9 @@ DB_SHOW_COMMAND(cp15, db_show_cp15)
 	__asm __volatile("mrc p15, 0, %0, c0, c0, 1" : "=r" (reg));
 	db_printf("Current Cache Lvl ID: 0x%08x\n",reg);
 
-	__asm __volatile("mrc p15, 0, %0, c1, c0, 0" : "=r" (reg));
+	reg = cp15_sctlr_get();
 	db_printf("Ctrl: 0x%08x\n",reg);
-	__asm __volatile("mrc p15, 0, %0, c1, c0, 1" : "=r" (reg));
+	reg = cp15_actlr_get();
 	db_printf("Aux Ctrl: 0x%08x\n",reg);
 
 	__asm __volatile("mrc p15, 0, %0, c0, c1, 0" : "=r" (reg));

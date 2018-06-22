@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
  *
@@ -276,7 +278,6 @@ found:
 	case IFT_ISO88025:
 	case IFT_ATM:
 	case IFT_IEEE1394:
-	case IFT_IEEE80211:
 		/* IEEE802/EUI64 cases - what others? */
 		/* IEEE1394 uses 16byte length address starting with EUI64 */
 		if (addrlen > 8)
@@ -453,6 +454,7 @@ in6_ifattach_linklocal(struct ifnet *ifp, struct ifnet *altifp)
 	struct in6_ifaddr *ia;
 	struct in6_aliasreq ifra;
 	struct nd_prefixctl pr0;
+	struct nd_prefix *pr;
 	int error;
 
 	/*
@@ -535,10 +537,11 @@ in6_ifattach_linklocal(struct ifnet *ifp, struct ifnet *altifp)
 	 * address, and then reconfigure another one, the prefix is still
 	 * valid with referring to the old link-local address.
 	 */
-	if (nd6_prefix_lookup(&pr0) == NULL) {
+	if ((pr = nd6_prefix_lookup(&pr0)) == NULL) {
 		if ((error = nd6_prelist_add(&pr0, NULL, NULL)) != 0)
 			return (error);
-	}
+	} else
+		nd6_prefix_rele(pr);
 
 	return 0;
 }
@@ -761,19 +764,21 @@ in6_ifattach(struct ifnet *ifp, struct ifnet *altifp)
 
 /*
  * NOTE: in6_ifdetach() does not support loopback if at this moment.
- * We don't need this function in bsdi, because interfaces are never removed
- * from the ifnet list in bsdi.
+ *
+ * When shutting down a VNET we clean up layers top-down.  In that case
+ * upper layer protocols (ulp) are cleaned up already and locks are destroyed
+ * and we must not call into these cleanup functions anymore, thus purgeulp
+ * is set to 0 in that case by in6_ifdetach_destroy().
+ * The normal case of destroying a (cloned) interface still needs to cleanup
+ * everything related to the interface and will have purgeulp set to 1.
  */
-void
-in6_ifdetach(struct ifnet *ifp)
+static void
+_in6_ifdetach(struct ifnet *ifp, int purgeulp)
 {
 	struct ifaddr *ifa, *next;
 
 	if (ifp->if_afdata[AF_INET6] == NULL)
 		return;
-
-	/* remove neighbor management table */
-	nd6_purge(ifp);
 
 	/*
 	 * nuke any of IPv6 addresses we have
@@ -784,21 +789,36 @@ in6_ifdetach(struct ifnet *ifp)
 			continue;
 		in6_purgeaddr(ifa);
 	}
-	in6_pcbpurgeif0(&V_udbinfo, ifp);
-	in6_pcbpurgeif0(&V_ulitecbinfo, ifp);
-	in6_pcbpurgeif0(&V_ripcbinfo, ifp);
+	if (purgeulp) {
+		in6_pcbpurgeif0(&V_udbinfo, ifp);
+		in6_pcbpurgeif0(&V_ulitecbinfo, ifp);
+		in6_pcbpurgeif0(&V_ripcbinfo, ifp);
+	}
 	/* leave from all multicast groups joined */
 	in6_purgemaddrs(ifp);
 
 	/*
-	 * remove neighbor management table.  we call it twice just to make
-	 * sure we nuke everything.  maybe we need just one call.
-	 * XXX: since the first call did not release addresses, some prefixes
-	 * might remain.  We should call nd6_purge() again to release the
-	 * prefixes after removing all addresses above.
-	 * (Or can we just delay calling nd6_purge until at this point?)
+	 * Remove neighbor management table.
+	 * Enabling the nd6_purge will panic on vmove for interfaces on VNET
+	 * teardown as the IPv6 layer is cleaned up already and the locks
+	 * are destroyed.
 	 */
-	nd6_purge(ifp);
+	if (purgeulp)
+		nd6_purge(ifp);
+}
+
+void
+in6_ifdetach(struct ifnet *ifp)
+{
+
+	_in6_ifdetach(ifp, 1);
+}
+
+void
+in6_ifdetach_destroy(struct ifnet *ifp)
+{
+
+	_in6_ifdetach(ifp, 0);
 }
 
 int
@@ -890,3 +910,29 @@ in6_purgemaddrs(struct ifnet *ifp)
 
 	IN6_MULTI_UNLOCK();
 }
+
+void
+in6_ifattach_destroy(void)
+{
+
+	callout_drain(&V_in6_tmpaddrtimer_ch);
+}
+
+static void
+in6_ifattach_init(void *dummy)
+{
+
+	/* Timer for regeneranation of temporary addresses randomize ID. */
+	callout_init(&V_in6_tmpaddrtimer_ch, 0);
+	callout_reset(&V_in6_tmpaddrtimer_ch,
+	    (V_ip6_temp_preferred_lifetime - V_ip6_desync_factor -
+	    V_ip6_temp_regen_advance) * hz,
+	    in6_tmpaddrtimer, curvnet);
+}
+
+/*
+ * Cheat.
+ * This must be after route_init(), which is now SI_ORDER_THIRD.
+ */
+SYSINIT(in6_ifattach_init, SI_SUB_PROTO_DOMAIN, SI_ORDER_MIDDLE,
+    in6_ifattach_init, NULL);

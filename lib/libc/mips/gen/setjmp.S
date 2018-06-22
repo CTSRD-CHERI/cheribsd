@@ -31,6 +31,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "support"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <machine/asm.h>
 __FBSDID("$FreeBSD$");
@@ -106,7 +116,7 @@ NESTED(setjmp, SETJMP_FRAME_SIZE, ra)
 #if defined(__mips_n32) || defined(__mips_n64)
 	REG_S	gp, (_JB_REG_GP * SZREG)(a0)
 #endif
-#ifndef SOFTFLOAT
+#ifndef __mips_soft_float
 	/*
 	 * From "MIPSpro N32 ABI Handbook", Table 2-1:
 	 * In N32, FP registers F20, F22, F24, F26, F28, F30 are callee-saved.
@@ -135,35 +145,27 @@ NESTED(setjmp, SETJMP_FRAME_SIZE, ra)
 	FP_S	$f29, (_JB_FPREG_F29 * SZREG)(a0)
 	FP_S	$f31, (_JB_FPREG_F31 * SZREG)(a0)
 #endif
-#endif	/* ! SOFTFLOAT */
-#if defined(_MIPS_ARCH_CHERI)
-	/* jmp_buf is 64-bit aligned, so we need to round it up. */
-	cgetbase	t0, $c3
-	cgetoffset	t1, $c3
-	daddu		t1, t0, t1
-	daddiu		t0, t1, ((_JB_CHERI_START * SZREG) + _MIPS_SZCAP/8 - SZREG)
-	li		t2, _MIPS_CAP_ALIGN_MASK
-	and		t2, t2, t0
-	dsubu		t1, t2, t1
-
+#endif	/* ! __mips_soft_float */
+#if defined(__CHERI__)
 	/*
 	 * XXX-BD: Should we be saving $c0 and $pcc or just assuming they
 	 * are untouched?
 	 */
-	csc		$c11, zero, (_JB_CHERI_C11 * _MIPS_SZCAP/8)($c3)
-	csc		$c12, zero, (_JB_CHERI_C12 * _MIPS_SZCAP/8)($c3)
-	csc		$c13, zero, (_JB_CHERI_C13 * _MIPS_SZCAP/8)($c3)
-	csc		$c14, zero, (_JB_CHERI_C14 * _MIPS_SZCAP/8)($c3)
-	csc		$c15, zero, (_JB_CHERI_C15 * _MIPS_SZCAP/8)($c3)
-	csc		$c16, zero, (_JB_CHERI_C16 * _MIPS_SZCAP/8)($c3)
-	csc		$c17, zero, (_JB_CHERI_C17 * _MIPS_SZCAP/8)($c3)
-	csc		$c18, zero, (_JB_CHERI_C18 * _MIPS_SZCAP/8)($c3)
-	csc		$c19, zero, (_JB_CHERI_C19 * _MIPS_SZCAP/8)($c3)
-	csc		$c20, zero, (_JB_CHERI_C20 * _MIPS_SZCAP/8)($c3)
-	csc		$c21, zero, (_JB_CHERI_C21 * _MIPS_SZCAP/8)($c3)
-	csc		$c22, zero, (_JB_CHERI_C22 * _MIPS_SZCAP/8)($c3)
-	csc		$c23, zero, (_JB_CHERI_C23 * _MIPS_SZCAP/8)($c3)
-	csc		$c24, zero, (_JB_CHERI_C24 * _MIPS_SZCAP/8)($c3)
+	cgetdefault	$c4
+	csc		$c11, a0, _JB_CHERI_OFFSET(C11)($c4)
+	csc		$c12, a0, _JB_CHERI_OFFSET(C12)($c4)
+	csc		$c13, a0, _JB_CHERI_OFFSET(C13)($c4)
+	csc		$c14, a0, _JB_CHERI_OFFSET(C14)($c4)
+	csc		$c15, a0, _JB_CHERI_OFFSET(C15)($c4)
+	csc		$c16, a0, _JB_CHERI_OFFSET(C16)($c4)
+	csc		$c17, a0, _JB_CHERI_OFFSET(C17)($c4)
+	csc		$c18, a0, _JB_CHERI_OFFSET(C18)($c4)
+	csc		$c19, a0, _JB_CHERI_OFFSET(C19)($c4)
+	csc		$c20, a0, _JB_CHERI_OFFSET(C20)($c4)
+	csc		$c21, a0, _JB_CHERI_OFFSET(C21)($c4)
+	csc		$c22, a0, _JB_CHERI_OFFSET(C22)($c4)
+	csc		$c23, a0, _JB_CHERI_OFFSET(C23)($c4)
+	csc		$c24, a0, _JB_CHERI_OFFSET(C24)($c4)
 #endif
 
 	move	v0, zero
@@ -219,7 +221,7 @@ NESTED(longjmp, LONGJMP_FRAME_SIZE, ra)
 #if defined(__mips_n32) || defined(__mips_n64)
 	REG_L	gp, (_JB_REG_GP * SZREG)(a0)
 #endif
-#ifndef SOFTFLOAT
+#ifndef __mips_soft_float
 	/*
 	 * From "MIPSpro N32 ABI Handbook", Table 2-1:
 	 * In N32, FP registers F20, F22, F24, F26, F28, F30 are callee-saved.
@@ -248,31 +250,23 @@ NESTED(longjmp, LONGJMP_FRAME_SIZE, ra)
 	FP_L	$f29, (_JB_FPREG_F29 * SZREG)(a0)
 	FP_L	$f31, (_JB_FPREG_F31 * SZREG)(a0)
 #endif
-#endif	/* ! SOFTFLOAT */
-#if defined(_MIPS_ARCH_CHERI)
-	/* jmp_buf is 64-bit aligned, so we need to round it up. */
-	cgetbase	t0, $c3
-	cgetoffset	t1, $c3
-	daddu		t1, t0, t1
-	daddiu		t0, t1, ((_JB_CHERI_START * SZREG) + _MIPS_SZCAP/8 - SZREG)
-	li		t2, _MIPS_CAP_ALIGN_MASK
-	and		t2, t2, t0
-	dsubu		t1, t2, t1
-
-	clc		$c11, zero, (_JB_CHERI_C11 * _MIPS_SZCAP/8)($c3)
-	clc		$c12, zero, (_JB_CHERI_C12 * _MIPS_SZCAP/8)($c3)
-	clc		$c13, zero, (_JB_CHERI_C13 * _MIPS_SZCAP/8)($c3)
-	clc		$c14, zero, (_JB_CHERI_C14 * _MIPS_SZCAP/8)($c3)
-	clc		$c15, zero, (_JB_CHERI_C15 * _MIPS_SZCAP/8)($c3)
-	clc		$c16, zero, (_JB_CHERI_C16 * _MIPS_SZCAP/8)($c3)
-	clc		$c17, zero, (_JB_CHERI_C17 * _MIPS_SZCAP/8)($c3)
-	clc		$c18, zero, (_JB_CHERI_C18 * _MIPS_SZCAP/8)($c3)
-	clc		$c19, zero, (_JB_CHERI_C19 * _MIPS_SZCAP/8)($c3)
-	clc		$c20, zero, (_JB_CHERI_C20 * _MIPS_SZCAP/8)($c3)
-	clc		$c21, zero, (_JB_CHERI_C21 * _MIPS_SZCAP/8)($c3)
-	clc		$c22, zero, (_JB_CHERI_C22 * _MIPS_SZCAP/8)($c3)
-	clc		$c23, zero, (_JB_CHERI_C23 * _MIPS_SZCAP/8)($c3)
-	clc		$c24, zero, (_JB_CHERI_C24 * _MIPS_SZCAP/8)($c3)
+#endif	/* ! __mips_soft_float */
+#if defined(__CHERI__)
+	cgetdefault	$c4
+	clc		$c11, a0, _JB_CHERI_OFFSET(C11)($c4)
+	clc		$c12, a0, _JB_CHERI_OFFSET(C12)($c4)
+	clc		$c13, a0, _JB_CHERI_OFFSET(C13)($c4)
+	clc		$c14, a0, _JB_CHERI_OFFSET(C14)($c4)
+	clc		$c15, a0, _JB_CHERI_OFFSET(C15)($c4)
+	clc		$c16, a0, _JB_CHERI_OFFSET(C16)($c4)
+	clc		$c17, a0, _JB_CHERI_OFFSET(C17)($c4)
+	clc		$c18, a0, _JB_CHERI_OFFSET(C18)($c4)
+	clc		$c19, a0, _JB_CHERI_OFFSET(C19)($c4)
+	clc		$c20, a0, _JB_CHERI_OFFSET(C20)($c4)
+	clc		$c21, a0, _JB_CHERI_OFFSET(C21)($c4)
+	clc		$c22, a0, _JB_CHERI_OFFSET(C22)($c4)
+	clc		$c23, a0, _JB_CHERI_OFFSET(C23)($c4)
+	clc		$c24, a0, _JB_CHERI_OFFSET(C24)($c4)
 #endif
 
 	move	v0, a1

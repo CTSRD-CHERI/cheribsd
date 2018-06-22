@@ -7,6 +7,18 @@
  *
  * ===----------------------------------------------------------------------===
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "monotonicity",
+ *     "unsupported"
+ *   ],
+ *   "change_comment": "Attempts to make stack executable"
+ * }
+ * CHERI CHANGES END
+ */
 
 #include "int_lib.h"
 
@@ -21,8 +33,8 @@
 #define HAVE_SYSCONF 1
 
 #ifdef _WIN32
-#include <windef.h>
-#include <winbase.h>
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 #else
 #ifndef __APPLE__
 #include <unistd.h>

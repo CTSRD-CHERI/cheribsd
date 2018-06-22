@@ -2,6 +2,8 @@
 /* $FreeBSD$ */
 
 /*-
+ * SPDX-License-Identifier: (BSD-4-Clause AND BSD-3-Clause)
+ *
  * Copyright (c) 1996 Jonathan Stone
  * All rights reserved.
  *
@@ -65,6 +67,16 @@
  *
  *	from: @(#)SYS.h	8.1 (Berkeley) 6/4/93
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "support"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sys/syscall.h>
 
@@ -94,11 +106,33 @@
 # define PIC_TAILCALL(l)	j  _C_LABEL(l)
 # define PIC_RETURN()		j ra
 #endif /* __ABICALLS__ */
-#else /* !defined(__CHERI_PURE_CAPABILITY__) */
+#else /* defined(__CHERI_PURE_CAPABILITY__) */
+#ifdef __PIC__
 # define PIC_PROLOGUE(x)
-# define PIC_TAILCALL(l)	j  _C_LABEL(l)
+# define PIC_LOAD_CODE_PTR(capreg, gpr, l)		\
+	lui		gpr, %pcrel_hi(l - 8);		\
+	daddiu		gpr, gpr, %pcrel_lo(l - 4);	\
+	cgetpcc		capreg;				\
+	cincoffset	capreg, capreg, gpr;
+# define PIC_TAILCALL(l)				\
+	PIC_LOAD_CODE_PTR($c12, t9, _C_LABEL(l))	\
+	cjr $c12;
+# define PIC_CALL(l)					\
+	PIC_LOAD_CODE_PTR($c12, t9, _C_LABEL(l))	\
+	cjalr $c12, $c17;				\
+	nop;
 # define PIC_RETURN()		cjr $c17
-#endif /* !defined(__CHERI_PURE_CAPABILITY__) */
+#else
+# define PIC_PROLOGUE(x)
+# define PIC_TAILCALL(l)	j _C_LABEL(l)
+# define PIC_CALL(l)				\
+	dla			t9, l;		\
+	cgetpccsetoffset	$c12, t9;	\
+	cjalr			$c12, $c17;	\
+	nop
+# define PIC_RETURN()		cjr $c17
+#endif
+#endif /* defined(__CHERI_PURE_CAPABILITY__) */
 
 # define SYSTRAP(x)	li v0,SYS_ ## x; syscall;
 

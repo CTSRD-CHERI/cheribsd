@@ -124,6 +124,12 @@ CODE {
 	{
 		return;
 	}
+
+	static int mmu_null_change_attr(mmu_t mmu, vm_offset_t va,
+	    vm_size_t sz, vm_memattr_t mode)
+	{
+		return (0);
+	}
 };
 
 
@@ -653,18 +659,6 @@ METHOD void zero_page_area {
 
 
 /**
- * @brief Called from the idle loop to zero pages. XXX I think locking
- * constraints might be different here compared to zero_page.
- *
- * @param _pg		physical page
- */
-METHOD void zero_page_idle {
-	mmu_t		_mmu;
-	vm_page_t	_pg;
-};
-
-
-/**
  * @brief Extract mincore(2) information from a mapping.
  *
  * @param _pmap		physical map
@@ -731,7 +725,7 @@ METHOD void align_superpage {
 
 /**
  * @brief Bootstrap the VM system. At the completion of this routine, the
- * kernel will be running in it's own address space with full control over
+ * kernel will be running in its own address space with full control over
  * paging.
  *
  * @param _start	start of reserved memory (obsolete ???)
@@ -864,6 +858,16 @@ METHOD void kenter_attr {
 } DEFAULT mmu_null_kenter_attr;
 
 /**
+ * @brief Unmap a wired page from kernel virtual address space
+ *
+ * @param _va		mapped virtual address
+ */
+METHOD void kremove {
+	mmu_t		_mmu;
+	vm_offset_t	_va;
+};
+
+/**
  * @brief Determine if the given physical address range has been direct-mapped.
  *
  * @param _pa		physical address start
@@ -956,3 +960,20 @@ METHOD void quick_remove_page {
 	vm_offset_t	_va;
 };
 
+/**
+ * @brief Change the specified virtual address range's memory type.
+ *
+ * @param _va		The virtual base address to change
+ *
+ * @param _sz		Size of the region to change
+ *
+ * @param _mode		New mode to set on the VA range
+ *
+ * @retval error	0 on success, EINVAL or ENOMEM on error.
+ */
+METHOD int change_attr {
+	mmu_t		_mmu;
+	vm_offset_t	_va;
+	vm_size_t	_sz;
+	vm_memattr_t	_mode;
+} DEFAULT mmu_null_change_attr;

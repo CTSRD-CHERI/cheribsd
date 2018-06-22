@@ -282,8 +282,8 @@ DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind15Registers_arm646jumptoEv)
   ldp    x22,x23, [x0, #0x0B0]
   ldp    x24,x25, [x0, #0x0C0]
   ldp    x26,x27, [x0, #0x0D0]
-  ldp    x28,fp,  [x0, #0x0E0]
-  ldr    lr,      [x0, #0x100]  // restore pc into lr
+  ldp    x28,x29, [x0, #0x0E0]
+  ldr    x30,     [x0, #0x100]  // restore pc into lr
   ldr    x1,      [x0, #0x0F8]
   mov    sp,x1                  // restore sp
 
@@ -306,7 +306,7 @@ DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind15Registers_arm646jumptoEv)
   ldr    d31,     [x0, #0x208]
 
   ldp    x0, x1,  [x0, #0x000]  // restore x0,x1
-  ret    lr                     // jump to pc
+  ret    x30                    // jump to pc
 
 #elif defined(__arm__) && !defined(__APPLE__)
 
@@ -478,8 +478,55 @@ DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind14Registers_or1k6jumptoEv)
   l.jr     r9
    l.nop
 
-#elif defined(__riscv__)
+#elif defined(__riscv)
 
-/* RISCVTODO */
+//
+// void libunwind::Registers_riscv::jumpto()
+//
+// On entry:
+//  thread_state pointer is in a0
+//
+  .p2align 2
+DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind15Registers_riscv6jumptoEv)
+  // x0 is zero
+  ld    x1, (8 * 1)(a0)
+  ld    x2, (8 * 2)(a0)
+  ld    x3, (8 * 3)(a0)
+  ld    x4, (8 * 4)(a0)
+  ld    x5, (8 * 5)(a0)
+  ld    x6, (8 * 6)(a0)
+  ld    x7, (8 * 7)(a0)
+  ld    x8, (8 * 8)(a0)
+  ld    x9, (8 * 9)(a0)
+  // skip a0 for now
+  ld    x11, (8 * 11)(a0)
+  ld    x12, (8 * 12)(a0)
+  ld    x13, (8 * 13)(a0)
+  ld    x14, (8 * 14)(a0)
+  ld    x15, (8 * 15)(a0)
+  ld    x16, (8 * 16)(a0)
+  ld    x17, (8 * 17)(a0)
+  ld    x18, (8 * 18)(a0)
+  ld    x19, (8 * 19)(a0)
+  ld    x20, (8 * 20)(a0)
+  ld    x21, (8 * 21)(a0)
+  ld    x22, (8 * 22)(a0)
+  ld    x23, (8 * 23)(a0)
+  ld    x24, (8 * 24)(a0)
+  ld    x25, (8 * 25)(a0)
+  ld    x26, (8 * 26)(a0)
+  ld    x27, (8 * 27)(a0)
+  ld    x28, (8 * 28)(a0)
+  ld    x29, (8 * 29)(a0)
+  ld    x30, (8 * 30)(a0)
+  ld    x31, (8 * 31)(a0)
+  ld    x10, (8 * 10)(a0)   // restore a0
+
+  /* RISCVTODO: restore FPU registers */
+
+  ret                       // jump to ra
 
 #endif
+
+NO_EXEC_STACK_DIRECTIVE
+

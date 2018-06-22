@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ *
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -112,6 +114,8 @@ ehci_pci_match(device_t self)
 
 	case 0x20951022:
 		return ("AMD CS5536 (Geode) USB 2.0 controller");
+	case 0x78081022:
+		return ("AMD FCH USB 2.0 controller");
 
 	case 0x43451002:
 		return "ATI SB200 USB 2.0 controller";
@@ -122,6 +126,10 @@ ehci_pci_match(device_t self)
 
 	case 0x0f348086:
 		return ("Intel BayTrail USB 2.0 controller");
+	case 0x1c268086:
+		return ("Intel Cougar Point USB 2.0 controller");
+	case 0x1c2d8086:
+		return ("Intel Cougar Point USB 2.0 controller");
 	case 0x1d268086:
 		return ("Intel Patsburg USB 2.0 controller");
 	case 0x1d2d8086:
@@ -168,11 +176,15 @@ ehci_pci_match(device_t self)
 		return ("Intel Wildcat Point USB 2.0 controller USB-A");
 	case 0x8cad8086:
 		return ("Intel Wildcat Point USB 2.0 controller USB-B");
+	case 0x8d268086:
+		return ("Intel Wellsburg USB 2.0 controller");
+	case 0x8d2d8086:
+		return ("Intel Wellsburg USB 2.0 controller");
 	case 0x9c268086:
 		return ("Intel Lynx Point LP USB 2.0 controller USB");
 
 	case 0x00e01033:
-		return ("NEC uPD 720100 USB 2.0 controller");
+		return ("NEC uPD 72010x USB 2.0 controller");
 
 	case 0x006810de:
 		return "NVIDIA nForce2 USB 2.0 controller";
@@ -471,13 +483,7 @@ static int
 ehci_pci_detach(device_t self)
 {
 	ehci_softc_t *sc = device_get_softc(self);
-	device_t bdev;
 
-	if (sc->sc_bus.bdev) {
-		bdev = sc->sc_bus.bdev;
-		device_detach(bdev);
-		device_delete_child(self, bdev);
-	}
 	/* during module unload there are lots of children leftover */
 	device_delete_children(self);
 

@@ -2,22 +2,20 @@
 
 .include <src.opts.mk>
 
-SUBDIR= csu libgcc libdialog libregex
+SUBDIR=			csu
+SUBDIR.${MK_DIALOG}+=	libdialog
+SUBDIR.${MK_GCC}+=	libgcov libgomp
+SUBDIR.${MK_SSP}+=	libssp
+SUBDIR.${MK_TESTS}+=	tests
+SUBDIR.${MK_GDB}+=	libreadline
 
-.if ${MK_GCC} != "no"
-SUBDIR+= libgcov libgomp
+.if ${MK_GNU_GREP} != "no" || ${MK_GNU_GREP_COMPAT} != "no" || \
+    ${MK_GDB} != "no"
+SUBDIR+=		libregex
 .endif
 
-.if ${MK_SSP} != "no"
-SUBDIR+= libssp
-.endif
-
-.if ${MK_TESTS} != "no"
-SUBDIR+= tests
-.endif
-
-.if ${MK_BINUTILS} != "no" && ${MK_GDB} != "no"
-SUBDIR+=	libreadline
+.if ${MK_LLVM_LIBUNWIND} == "no"
+SUBDIR+=		libgcc
 .endif
 
 # libsupc++ uses libstdc++ headers, although 'make includes' should
@@ -28,23 +26,11 @@ SUBDIR_DEPENDS_libsupc++:= libstdc++
 .endif
 
 .if defined(LIBCHERI)
-.if ${MK_LIBCHERI_ALL} == "no"
-SUBDIR:=
-.else
-# No C++ support
-SUBDIR:=	${SUBDIR:Nlibstdc++:Nlibsupc++}
 # Don't use csu for CheriABI
 SUBDIR:=	${SUBDIR:Ncsu}
-
-.if ${MK_LIBCHERI_BROKEN} == "no"
-# CHERI-Clang #38
+# We'll be using the libunwind based libgcc_eh and libgcc_eh when the time
+# comes.
 SUBDIR:=	${SUBDIR:Nlibgcc}
-# Broken and heading for the dustbin of history
-SUBDIR:=	${SUBDIR:Nlibgomp}
-# Include issue
-SUBDIR:=	${SUBDIR:Nlibreadline}
-.endif
-.endif
 .endif
 
 SUBDIR_PARALLEL=

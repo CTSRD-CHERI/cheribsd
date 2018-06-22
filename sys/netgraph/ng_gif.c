@@ -3,6 +3,8 @@
  */
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause AND BSD-2-Clause
+ *
  * Copyright 2001 The Aerospace Corporation.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -491,7 +493,7 @@ ng_gif_shutdown(node_p node)
 	if (node->nd_flags & NGF_REALLY_DIE) {
 		/*
 		 * WE came here because the gif interface is being destroyed,
-		 * so stop being persistant.
+		 * so stop being persistent.
 		 * Actually undo all the things we did on creation.
 		 * Assume the ifp has already been freed.
 		 */

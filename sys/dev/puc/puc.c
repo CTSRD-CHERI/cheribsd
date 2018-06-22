@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2006 Marcel Moolenaar
  * All rights reserved.
  *
@@ -414,8 +416,7 @@ puc_bfe_detach(device_t dev)
 		port = &sc->sc_port[idx];
 		if (port->p_dev == NULL)
 			continue;
-		if (device_detach(port->p_dev) == 0) {
-			device_delete_child(dev, port->p_dev);
+		if (device_delete_child(dev, port->p_dev) == 0) {
 			if (port->p_rres != NULL)
 				rman_release_resource(port->p_rres);
 			if (port->p_ires != NULL)
@@ -495,7 +496,7 @@ puc_bus_alloc_resource(device_t dev, device_t child, int type, int *rid,
 		return (NULL);
 
 	/* We only support default allocations. */
-	if (start != 0UL || end != ~0UL)
+	if (!RMAN_IS_DEFAULT_RANGE(start, end))
 		return (NULL);
 
 	if (type == port->p_bar->b_type)

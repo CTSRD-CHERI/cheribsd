@@ -1,6 +1,8 @@
 /*	$NetBSD: asm.h,v 1.29 2000/12/14 21:29:51 jeffs Exp $	*/
 
 /*
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -15,7 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -138,6 +140,15 @@
 #define	ASM_ENTRY(sym)						\
 	.text; .globl sym; .type sym,@function; sym:
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define _FRAME_STACK_REG	$c11
+/* FIXME: uncomment this in a few days when everyone has updated clang:
+ * #define _FRAME_RETURN_REG	$c17 */
+#define _FRAME_RETURN_REG	ra
+#else
+#define _FRAME_STACK_REG	sp
+#define _FRAME_RETURN_REG	ra
+#endif
 /*
  * LEAF
  *	A leaf routine does
@@ -148,8 +159,9 @@
 #define	LEAF(x)			\
 	.globl	_C_LABEL(x);	\
 	.ent	_C_LABEL(x);	\
+	.type	_C_LABEL(x),@function;	\
 _C_LABEL(x): ;			\
-	.frame sp, 0, ra;	\
+	.frame _FRAME_STACK_REG, 0, _FRAME_RETURN_REG;	\
 	MCOUNT
 
 /*
@@ -159,8 +171,9 @@ _C_LABEL(x): ;			\
 #define	LEAF_NOPROFILE(x)	\
 	.globl	_C_LABEL(x);	\
 	.ent	_C_LABEL(x);	\
+	.type	_C_LABEL(x),@function;	\
 _C_LABEL(x): ;			\
-	.frame	sp, 0, ra
+	.frame	_FRAME_STACK_REG, 0, _FRAME_RETURN_REG
 
 /*
  * XLEAF
@@ -169,6 +182,7 @@ _C_LABEL(x): ;			\
 #define	XLEAF(x)		\
 	.globl	_C_LABEL(x);	\
 	AENT (_C_LABEL(x));	\
+	.type	_C_LABEL(x),@function;	\
 _C_LABEL(x):
 
 /*
@@ -179,8 +193,9 @@ _C_LABEL(x):
 #define	NESTED(x, fsize, retpc)		\
 	.globl	_C_LABEL(x);		\
 	.ent	_C_LABEL(x);		\
+	.type	_C_LABEL(x),@function;	\
 _C_LABEL(x): ;				\
-	.frame	sp, fsize, retpc;	\
+	.frame	_FRAME_STACK_REG, fsize, retpc;	\
 	MCOUNT
 
 /*
@@ -190,8 +205,9 @@ _C_LABEL(x): ;				\
 #define	NESTED_NOPROFILE(x, fsize, retpc)	\
 	.globl	_C_LABEL(x);			\
 	.ent	_C_LABEL(x);			\
+	.type	_C_LABEL(x),@function;	\
 _C_LABEL(x): ;					\
-	.frame	sp, fsize, retpc
+	.frame	_FRAME_STACK_REG, fsize, retpc
 
 /*
  * XNESTED
@@ -200,7 +216,9 @@ _C_LABEL(x): ;					\
 #define	XNESTED(x)		\
 	.globl	_C_LABEL(x);	\
 	AENT (_C_LABEL(x));	\
+	.type	_C_LABEL(x),@function;	\
 _C_LABEL(x):
+
 
 /*
  * END
@@ -208,6 +226,14 @@ _C_LABEL(x):
  */
 #define	END(x)			\
 	.end _C_LABEL(x)
+
+/*
+ * END
+ *	Mark end of an alternate entry point.
+ */
+#define	XEND(x)				\
+	.size _C_LABEL(x), . - _C_LABEL(x)
+
 
 /*
  * IMPORT -- import external symbol
@@ -308,22 +334,17 @@ _C_LABEL(x):
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
 /*
  *  cheriabi callframe {
- *	uint64_t	cf_ra;
- *	uint64_t	cf_fp;
- *	uint64_t	cf_gp;
- *	uint64_t	cf_s0;
- *	intcap_t	cf_c17;
- *	intcap_t	cf_something;	XXX-BD: What should go here?
+ *	intcap_t	cf_cgp;		global pointer
+ *	intcap_t	cf_csp;		frame pointer
+ *	intcap_t	cf_cra;		return address
+ *	int32_t		cf_s0;		misc.
  *  };
  *
  * XXX-BD: This is unstable and will certainly change.
  */
-#define CALLFRAME_SIZ	(SZREG * 4 + (_MIPS_SZCAP / 8) * 2)
-#define CALLFRAME_RA	(CALLFRAME_SIZ - 1 * SZREG)
-#define CALLFRAME_FP	(CALLFRAME_SIZ - 2 * SZREG)
-#define CALLFRAME_GP	(CALLFRAME_SIZ - 3 * SZREG)
-#define	CALLFRAME_S0	(CALLFRAME_SIZ - 4 * SZREG)
-#define	CALLFRAME_C17	(CALLFRAME_SIZ - 2 * _MIPS_SZCAP / 8)
+#define	CALLFRAME_SIZ	(2*(_MIPS_SZCAP / 8))
+#define	CALLFRAME_CRA	(0*(_MIPS_SZCAP / 8))
+#define	CALLFRAME_S0	(1*(_MIPS_SZCAP / 8))
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
 
 /*
@@ -477,6 +498,7 @@ _C_LABEL(x):
 #define	INT_SUBI	dsubi
 #define	INT_SUBU	dsubu
 #define	INT_SUBIU	dsubu
+/* FIXME: this seems wrong */
 #define	INT_L		ld
 #define	INT_LA		dla
 #define	INT_S		sd
@@ -743,7 +765,7 @@ _C_LABEL(x):
 #define _JB_FPREG_F31		26
 #define _JB_FPREG_FCSR		27
 
-#if defined(_MIPS_ARCH_CHERI) || defined(_MIPS_ARCH_CHERI128)
+#if defined(__CHERI__)
 /*
  * CHERI capabilities start here, but must be aligned so are may start up
  * to two slots later.
@@ -767,9 +789,11 @@ _C_LABEL(x):
 #define	_JB_CHERI_C22	11
 #define	_JB_CHERI_C23	12
 #define	_JB_CHERI_C24	13
+#define	_JB_CHERI_C25	14
 #ifdef __CHERI_PURE_CAPABILITY__
-#define	_JB_CHERI_DDC	14
+#define	_JB_CHERI_DDC	15
 #endif
+#define _JB_CHERI_OFFSET(gpr) ((_JB_CHERI_START * SZREG) + _JB_CHERI_##gpr * _MIPS_SZCAP/8)
 #endif
 
 /*
@@ -790,7 +814,7 @@ _C_LABEL(x):
 #elif defined(CPU_RMI)
 #define	HAZARD_DELAY
 #define	ITLBNOPFIX
-#elif defined(CPU_MIPS74KC)
+#elif defined(CPU_MIPS74K)
 #define	HAZARD_DELAY	sll $0,$0,3
 #define	ITLBNOPFIX	sll $0,$0,3
 #else

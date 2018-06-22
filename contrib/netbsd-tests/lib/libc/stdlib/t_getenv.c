@@ -1,4 +1,4 @@
-/*	$NetBSD: t_getenv.c,v 1.2 2011/07/15 13:54:31 jruoho Exp $ */
+/*	$NetBSD: t_getenv.c,v 1.3 2015/02/27 08:55:35 martin Exp $ */
 
 /*-
  * Copyright (c) 2010 The NetBSD Foundation, Inc.
@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__RCSID("$NetBSD: t_getenv.c,v 1.2 2011/07/15 13:54:31 jruoho Exp $");
+__RCSID("$NetBSD: t_getenv.c,v 1.3 2015/02/27 08:55:35 martin Exp $");
 
 #include <atf-c.h>
 #include <errno.h>
@@ -123,7 +123,7 @@ ATF_TC_HEAD(setenv_basic, tc)
 {
 	atf_tc_set_md_var(tc, "descr",
 	    "Test setenv(3), getenv(3), unsetenv(3)");
-	atf_tc_set_md_var(tc, "timeout", "300");
+	atf_tc_set_md_var(tc, "timeout", "600");
 }
 
 ATF_TC_BODY(setenv_basic, tc)
@@ -160,8 +160,13 @@ ATF_TC_BODY(setenv_basic, tc)
 	   Both FreeBSD and OS/X does not validate the second
 	   argument to setenv(3)
 	 */
+#ifndef __CHERI_PURE_CAPABILITY__
 	atf_tc_expect_signal(SIGSEGV, "FreeBSD does not validate the second "
 	    "argument to setenv(3); see bin/189805");
+#else
+	atf_tc_expect_signal(SIGPROT, "FreeBSD does not validate the second "
+	    "argument to setenv(3); see bin/189805");
+#endif
 #endif
 
 	ATF_CHECK_ERRNO(EINVAL, setenv("var", NULL, 1) == -1);

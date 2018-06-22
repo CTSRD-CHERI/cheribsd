@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2002 Poul-Henning Kamp
  * Copyright (c) 2002 Networks Associates Technology, Inc.
  * Copyright (c) 2013 The FreeBSD Foundation
@@ -69,7 +71,6 @@ static int	g_io_transient_map_bio(struct bio *bp);
 
 static struct g_bioq g_bio_run_down;
 static struct g_bioq g_bio_run_up;
-static struct g_bioq g_bio_run_task;
 
 /*
  * Pace is a hint that we've had some trouble recently allocating
@@ -218,9 +219,15 @@ g_clone_bio(struct bio *bp)
 		bp2->bio_ma_n = bp->bio_ma_n;
 		bp2->bio_ma_offset = bp->bio_ma_offset;
 		bp2->bio_attribute = bp->bio_attribute;
+		if (bp->bio_cmd == BIO_ZONE)
+			bcopy(&bp->bio_zone, &bp2->bio_zone,
+			    sizeof(bp->bio_zone));
 		/* Inherit classification info from the parent */
 		bp2->bio_classifier1 = bp->bio_classifier1;
 		bp2->bio_classifier2 = bp->bio_classifier2;
+#if defined(BUF_TRACKING) || defined(FULL_BUF_TRACKING)
+		bp2->bio_track_bp = bp->bio_track_bp;
+#endif
 		bp->bio_children++;
 	}
 #ifdef KTR
@@ -265,12 +272,18 @@ g_duplicate_bio(struct bio *bp)
 }
 
 void
+g_reset_bio(struct bio *bp)
+{
+
+	bzero(bp, sizeof(*bp));
+}
+
+void
 g_io_init()
 {
 
 	g_bioq_init(&g_bio_run_down);
 	g_bioq_init(&g_bio_run_up);
-	g_bioq_init(&g_bio_run_task);
 	biozone = uma_zcreate("g_bio", sizeof (struct bio),
 	    NULL, NULL,
 	    NULL, NULL,
@@ -293,6 +306,34 @@ g_io_getattr(const char *attr, struct g_consumer *cp, int *len, void *ptr)
 	g_io_request(bp, cp);
 	error = biowait(bp, "ggetattr");
 	*len = bp->bio_completed;
+	g_destroy_bio(bp);
+	return (error);
+}
+
+int
+g_io_zonecmd(struct disk_zone_args *zone_args, struct g_consumer *cp)
+{
+	struct bio *bp;
+	int error;
+	
+	g_trace(G_T_BIO, "bio_zone(%d)", zone_args->zone_cmd);
+	bp = g_alloc_bio();
+	bp->bio_cmd = BIO_ZONE;
+	bp->bio_done = NULL;
+	/*
+	 * XXX KDM need to handle report zone data.
+	 */
+	bcopy(zone_args, &bp->bio_zone, sizeof(*zone_args));
+	if (zone_args->zone_cmd == DISK_ZONE_REPORT_ZONES)
+		bp->bio_length =
+		    zone_args->zone_params.report.entries_allocated *
+		    sizeof(struct disk_zone_rep_entry);
+	else
+		bp->bio_length = 0;
+
+	g_io_request(bp, cp);
+	error = biowait(bp, "gzone");
+	bcopy(&bp->bio_zone, zone_args, sizeof(*zone_args));
 	g_destroy_bio(bp);
 	return (error);
 }
@@ -326,6 +367,8 @@ g_io_check(struct bio *bp)
 	off_t excess;
 	int error;
 
+	biotrack(bp, __func__);
+
 	cp = bp->bio_from;
 	pp = bp->bio_to;
 
@@ -340,6 +383,14 @@ g_io_check(struct bio *bp)
 	case BIO_DELETE:
 	case BIO_FLUSH:
 		if (cp->acw == 0)
+			return (EPERM);
+		break;
+	case BIO_ZONE:
+		if ((bp->bio_zone.zone_cmd == DISK_ZONE_REPORT_ZONES) ||
+		    (bp->bio_zone.zone_cmd == DISK_ZONE_GET_PARAMS)) {
+			if (cp->acr == 0)
+				return (EPERM);
+		} else if (cp->acw == 0)
 			return (EPERM);
 		break;
 	default:
@@ -459,6 +510,8 @@ g_run_classifiers(struct bio *bp)
 	struct g_classifier_hook *hook;
 	int classified = 0;
 
+	biotrack(bp, __func__);
+
 	TAILQ_FOREACH(hook, &g_classifier_tailq, link)
 		classified |= hook->func(hook->arg, bp);
 
@@ -472,6 +525,9 @@ g_io_request(struct bio *bp, struct g_consumer *cp)
 	struct g_provider *pp;
 	struct mtx *mtxp;
 	int direct, error, first;
+	uint8_t cmd;
+
+	biotrack(bp, __func__);
 
 	KASSERT(cp != NULL, ("NULL cp in g_io_request"));
 	KASSERT(bp != NULL, ("NULL bp in g_io_request"));
@@ -493,16 +549,17 @@ g_io_request(struct bio *bp, struct g_consumer *cp)
 	bp->_bio_cflags = bp->bio_cflags;
 #endif
 
-	if (bp->bio_cmd & (BIO_READ|BIO_WRITE|BIO_GETATTR)) {
+	cmd = bp->bio_cmd;
+	if (cmd == BIO_READ || cmd == BIO_WRITE || cmd == BIO_GETATTR) {
 		KASSERT(bp->bio_data != NULL,
-		    ("NULL bp->data in g_io_request(cmd=%hhu)", bp->bio_cmd));
+		    ("NULL bp->data in g_io_request(cmd=%hu)", bp->bio_cmd));
 	}
-	if (bp->bio_cmd & (BIO_DELETE|BIO_FLUSH)) {
+	if (cmd == BIO_DELETE || cmd == BIO_FLUSH) {
 		KASSERT(bp->bio_data == NULL,
-		    ("non-NULL bp->data in g_io_request(cmd=%hhu)",
+		    ("non-NULL bp->data in g_io_request(cmd=%hu)",
 		    bp->bio_cmd));
 	}
-	if (bp->bio_cmd & (BIO_READ|BIO_WRITE|BIO_DELETE)) {
+	if (cmd == BIO_READ || cmd == BIO_WRITE || cmd == BIO_DELETE) {
 		KASSERT(bp->bio_offset % cp->provider->sectorsize == 0,
 		    ("wrong offset %jd for sectorsize %u",
 		    bp->bio_offset, cp->provider->sectorsize));
@@ -597,6 +654,8 @@ g_io_deliver(struct bio *bp, int error)
 	struct g_provider *pp;
 	struct mtx *mtxp;
 	int direct, first;
+
+	biotrack(bp, __func__);
 
 	KASSERT(bp != NULL, ("NULL bp in g_io_deliver"));
 	pp = bp->bio_to;
@@ -789,6 +848,7 @@ g_io_schedule_down(struct thread *tp __unused)
 		}
 		CTR0(KTR_GEOM, "g_down has work to do");
 		g_bioq_unlock(&g_bio_run_down);
+		biotrack(bp, __func__);
 		if (pace != 0) {
 			/*
 			 * There has been at least one memory allocation
@@ -836,54 +896,26 @@ g_io_schedule_down(struct thread *tp __unused)
 }
 
 void
-bio_taskqueue(struct bio *bp, bio_task_t *func, void *arg)
-{
-	bp->bio_task = func;
-	bp->bio_task_arg = arg;
-	/*
-	 * The taskqueue is actually just a second queue off the "up"
-	 * queue, so we use the same lock.
-	 */
-	g_bioq_lock(&g_bio_run_up);
-	KASSERT(!(bp->bio_flags & BIO_ONQUEUE),
-	    ("Bio already on queue bp=%p target taskq", bp));
-	bp->bio_flags |= BIO_ONQUEUE;
-	TAILQ_INSERT_TAIL(&g_bio_run_task.bio_queue, bp, bio_queue);
-	g_bio_run_task.bio_queue_length++;
-	wakeup(&g_wait_up);
-	g_bioq_unlock(&g_bio_run_up);
-}
-
-
-void
 g_io_schedule_up(struct thread *tp __unused)
 {
 	struct bio *bp;
+
 	for(;;) {
 		g_bioq_lock(&g_bio_run_up);
-		bp = g_bioq_first(&g_bio_run_task);
-		if (bp != NULL) {
-			g_bioq_unlock(&g_bio_run_up);
-			THREAD_NO_SLEEPING();
-			CTR1(KTR_GEOM, "g_up processing task bp %p", bp);
-			bp->bio_task(bp->bio_task_arg);
-			THREAD_SLEEPING_OK();
-			continue;
-		}
 		bp = g_bioq_first(&g_bio_run_up);
-		if (bp != NULL) {
-			g_bioq_unlock(&g_bio_run_up);
-			THREAD_NO_SLEEPING();
-			CTR4(KTR_GEOM, "g_up biodone bp %p provider %s off "
-			    "%jd len %ld", bp, bp->bio_to->name,
-			    bp->bio_offset, bp->bio_length);
-			biodone(bp);
-			THREAD_SLEEPING_OK();
+		if (bp == NULL) {
+			CTR0(KTR_GEOM, "g_up going to sleep");
+			msleep(&g_wait_up, &g_bio_run_up.bio_queue_lock,
+			    PRIBIO | PDROP, "-", 0);
 			continue;
 		}
-		CTR0(KTR_GEOM, "g_up going to sleep");
-		msleep(&g_wait_up, &g_bio_run_up.bio_queue_lock,
-		    PRIBIO | PDROP, "-", 0);
+		g_bioq_unlock(&g_bio_run_up);
+		THREAD_NO_SLEEPING();
+		CTR4(KTR_GEOM, "g_up biodone bp %p provider %s off "
+		    "%jd len %ld", bp, bp->bio_to->name,
+		    bp->bio_offset, bp->bio_length);
+		biodone(bp);
+		THREAD_SLEEPING_OK();
 	}
 }
 
@@ -979,6 +1011,35 @@ g_print_bio(struct bio *bp)
 		cmd = "FLUSH";
 		printf("%s[%s]", pname, cmd);
 		return;
+	case BIO_ZONE: {
+		char *subcmd = NULL;
+		cmd = "ZONE";
+		switch (bp->bio_zone.zone_cmd) {
+		case DISK_ZONE_OPEN:
+			subcmd = "OPEN";
+			break;
+		case DISK_ZONE_CLOSE:
+			subcmd = "CLOSE";
+			break;
+		case DISK_ZONE_FINISH:
+			subcmd = "FINISH";
+			break;
+		case DISK_ZONE_RWP:
+			subcmd = "RWP";
+			break;
+		case DISK_ZONE_REPORT_ZONES:
+			subcmd = "REPORT ZONES";
+			break;
+		case DISK_ZONE_GET_PARAMS:
+			subcmd = "GET PARAMS";
+			break;
+		default:
+			subcmd = "UNKNOWN";
+			break;
+		}
+		printf("%s[%s,%s]", pname, cmd, subcmd);
+		return;
+	}
 	case BIO_READ:
 		cmd = "READ";
 		break;

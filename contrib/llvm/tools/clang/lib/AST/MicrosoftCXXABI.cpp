@@ -67,8 +67,11 @@ public:
 class MicrosoftCXXABI : public CXXABI {
   ASTContext &Context;
   llvm::SmallDenseMap<CXXRecordDecl *, CXXConstructorDecl *> RecordToCopyCtor;
-  llvm::SmallDenseMap<std::pair<const CXXConstructorDecl *, unsigned>, Expr *>
-      CtorToDefaultArgExpr;
+
+  llvm::SmallDenseMap<TagDecl *, DeclaratorDecl *>
+      UnnamedTagDeclToDeclaratorDecl;
+  llvm::SmallDenseMap<TagDecl *, TypedefNameDecl *>
+      UnnamedTagDeclToTypedefNameDecl;
 
 public:
   MicrosoftCXXABI(ASTContext &Ctx) : Context(Ctx) { }
@@ -84,27 +87,7 @@ public:
   }
 
   bool isNearlyEmpty(const CXXRecordDecl *RD) const override {
-    // FIXME: Audit the corners
-    if (!RD->isDynamicClass())
-      return false;
-
-    const ASTRecordLayout &Layout = Context.getASTRecordLayout(RD);
-
-    // In the Microsoft ABI, classes can have one or two vtable pointers.
-    CharUnits PointerSize =
-        Context.toCharUnitsFromBits(Context.getTargetInfo().getPointerWidth(0));
-    return Layout.getNonVirtualSize() == PointerSize ||
-      Layout.getNonVirtualSize() == PointerSize * 2;
-  }
-
-  void addDefaultArgExprForConstructor(const CXXConstructorDecl *CD,
-                                       unsigned ParmIdx, Expr *DAE) override {
-    CtorToDefaultArgExpr[std::make_pair(CD, ParmIdx)] = DAE;
-  }
-
-  Expr *getDefaultArgExprForConstructor(const CXXConstructorDecl *CD,
-                                        unsigned ParmIdx) override {
-    return CtorToDefaultArgExpr[std::make_pair(CD, ParmIdx)];
+    llvm_unreachable("unapplicable to the MS ABI");
   }
 
   const CXXConstructorDecl *
@@ -120,8 +103,37 @@ public:
     RecordToCopyCtor[RD] = CD;
   }
 
-  MangleNumberingContext *createMangleNumberingContext() const override {
-    return new MicrosoftNumberingContext();
+  void addTypedefNameForUnnamedTagDecl(TagDecl *TD,
+                                       TypedefNameDecl *DD) override {
+    TD = TD->getCanonicalDecl();
+    DD = cast<TypedefNameDecl>(DD->getCanonicalDecl());
+    TypedefNameDecl *&I = UnnamedTagDeclToTypedefNameDecl[TD];
+    if (!I)
+      I = DD;
+  }
+
+  TypedefNameDecl *getTypedefNameForUnnamedTagDecl(const TagDecl *TD) override {
+    return UnnamedTagDeclToTypedefNameDecl.lookup(
+        const_cast<TagDecl *>(TD->getCanonicalDecl()));
+  }
+
+  void addDeclaratorForUnnamedTagDecl(TagDecl *TD,
+                                      DeclaratorDecl *DD) override {
+    TD = TD->getCanonicalDecl();
+    DD = cast<DeclaratorDecl>(DD->getCanonicalDecl());
+    DeclaratorDecl *&I = UnnamedTagDeclToDeclaratorDecl[TD];
+    if (!I)
+      I = DD;
+  }
+
+  DeclaratorDecl *getDeclaratorForUnnamedTagDecl(const TagDecl *TD) override {
+    return UnnamedTagDeclToDeclaratorDecl.lookup(
+        const_cast<TagDecl *>(TD->getCanonicalDecl()));
+  }
+
+  std::unique_ptr<MangleNumberingContext>
+  createMangleNumberingContext() const override {
+    return llvm::make_unique<MicrosoftNumberingContext>();
   }
 };
 }
@@ -239,7 +251,7 @@ std::pair<uint64_t, unsigned> MicrosoftCXXABI::getMemberPointerWidthAndAlign(
     Align = Target.getIntAlign();
 
   if (Target.getTriple().isArch64Bit())
-    Width = llvm::RoundUpToAlignment(Width, Align);
+    Width = llvm::alignTo(Width, Align);
   return std::make_pair(Width, Align);
 }
 

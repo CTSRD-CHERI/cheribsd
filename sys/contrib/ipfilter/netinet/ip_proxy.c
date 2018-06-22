@@ -64,6 +64,15 @@ struct file;
 # include <sys/queue.h>
 #endif
 #include <net/if.h>
+#if defined(__FreeBSD_version) && (__FreeBSD_version >= 800000) && defined(_KERNEL)
+#include <net/vnet.h>
+#else
+#define CURVNET_SET(arg)
+#define CURVNET_RESTORE()
+#define	VNET_DEFINE(_t, _v)	_t _v
+#define	VNET_DECLARE(_t, _v)	extern _t _v
+#define	VNET(arg)	arg
+#endif
 #ifdef sun
 # include <net/af.h>
 #endif
@@ -120,7 +129,7 @@ typedef struct ipf_proxy_softc_s {
 } ipf_proxy_softc_t;
 
 static ipftuneable_t ipf_proxy_tuneables[] = {
-	{ { (void *)offsetof(ipf_proxy_softc_t, ips_proxy_debug) },
+	{ { .ipftp_offset = offsetof(ipf_proxy_softc_t, ips_proxy_debug) },
 		"proxy_debug",	0,	0x1f,
 		stsizeof(ipf_proxy_softc_t, ips_proxy_debug),
 		0,	NULL,	NULL },

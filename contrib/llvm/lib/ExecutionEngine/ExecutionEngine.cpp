@@ -18,6 +18,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
 #include "llvm/ExecutionEngine/JITEventListener.h"
+#include "llvm/ExecutionEngine/ObjectCache.h"
 #include "llvm/ExecutionEngine/RTDyldMemoryManager.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
@@ -48,12 +49,13 @@ STATISTIC(NumGlobals  , "Number of global vars initialized");
 ExecutionEngine *(*ExecutionEngine::MCJITCtor)(
     std::unique_ptr<Module> M, std::string *ErrorStr,
     std::shared_ptr<MCJITMemoryManager> MemMgr,
-    std::shared_ptr<RuntimeDyld::SymbolResolver> Resolver,
+
+    std::shared_ptr<JITSymbolResolver> Resolver,
     std::unique_ptr<TargetMachine> TM) = nullptr;
 
 ExecutionEngine *(*ExecutionEngine::OrcMCJITReplacementCtor)(
   std::string *ErrorStr, std::shared_ptr<MCJITMemoryManager> MemMgr,
-  std::shared_ptr<RuntimeDyld::SymbolResolver> Resolver,
+  std::shared_ptr<JITSymbolResolver> Resolver,
   std::unique_ptr<TargetMachine> TM) = nullptr;
 
 ExecutionEngine *(*ExecutionEngine::InterpCtor)(std::unique_ptr<Module> M,
@@ -61,8 +63,9 @@ ExecutionEngine *(*ExecutionEngine::InterpCtor)(std::unique_ptr<Module> M,
 
 void JITEventListener::anchor() {}
 
-ExecutionEngine::ExecutionEngine(std::unique_ptr<Module> M)
-  : LazyFunctionCreator(nullptr) {
+void ObjectCache::anchor() {}
+
+void ExecutionEngine::Init(std::unique_ptr<Module> M) {
   CompilingLazily         = false;
   GVCompilationDisabled   = false;
   SymbolSearchingDisabled = false;
@@ -79,6 +82,16 @@ ExecutionEngine::ExecutionEngine(std::unique_ptr<Module> M)
   Modules.push_back(std::move(M));
 }
 
+ExecutionEngine::ExecutionEngine(std::unique_ptr<Module> M)
+    : DL(M->getDataLayout()), LazyFunctionCreator(nullptr) {
+  Init(std::move(M));
+}
+
+ExecutionEngine::ExecutionEngine(DataLayout DL, std::unique_ptr<Module> M)
+    : DL(std::move(DL)), LazyFunctionCreator(nullptr) {
+  Init(std::move(M));
+}
+
 ExecutionEngine::~ExecutionEngine() {
   clearAllGlobalMappings();
 }
@@ -86,7 +99,7 @@ ExecutionEngine::~ExecutionEngine() {
 namespace {
 /// \brief Helper class which uses a value handler to automatically deletes the
 /// memory block when the GlobalVariable is destroyed.
-class GVMemoryBlock : public CallbackVH {
+class GVMemoryBlock final : public CallbackVH {
   GVMemoryBlock(const GlobalVariable *GV)
     : CallbackVH(const_cast<GlobalVariable*>(GV)) {}
 
@@ -94,12 +107,10 @@ public:
   /// \brief Returns the address the GlobalVariable should be written into.  The
   /// GVMemoryBlock object prefixes that.
   static char *Create(const GlobalVariable *GV, const DataLayout& TD) {
-    Type *ElTy = GV->getType()->getElementType();
+    Type *ElTy = GV->getValueType();
     size_t GVSize = (size_t)TD.getTypeAllocSize(ElTy);
     void *RawMemory = ::operator new(
-      RoundUpToAlignment(sizeof(GVMemoryBlock),
-                         TD.getPreferredAlignment(GV))
-      + GVSize);
+        alignTo(sizeof(GVMemoryBlock), TD.getPreferredAlignment(GV)) + GVSize);
     new(RawMemory) GVMemoryBlock(GV);
     return static_cast<char*>(RawMemory) + sizeof(GVMemoryBlock);
   }
@@ -115,7 +126,7 @@ public:
 }  // anonymous namespace
 
 char *ExecutionEngine::getMemoryForGV(const GlobalVariable *GV) {
-  return GVMemoryBlock::Create(GV, *getDataLayout());
+  return GVMemoryBlock::Create(GV, getDataLayout());
 }
 
 void ExecutionEngine::addObjectFile(std::unique_ptr<object::ObjectFile> O) {
@@ -144,7 +155,7 @@ bool ExecutionEngine::removeModule(Module *M) {
   return false;
 }
 
-Function *ExecutionEngine::FindFunctionNamed(const char *FnName) {
+Function *ExecutionEngine::FindFunctionNamed(StringRef FnName) {
   for (unsigned i = 0, e = Modules.size(); i != e; ++i) {
     Function *F = Modules[i]->getFunction(FnName);
     if (F && !F->isDeclaration())
@@ -153,7 +164,7 @@ Function *ExecutionEngine::FindFunctionNamed(const char *FnName) {
   return nullptr;
 }
 
-GlobalVariable *ExecutionEngine::FindGlobalVariableNamed(const char *Name, bool AllowInternal) {
+GlobalVariable *ExecutionEngine::FindGlobalVariableNamed(StringRef Name, bool AllowInternal) {
   for (unsigned i = 0, e = Modules.size(); i != e; ++i) {
     GlobalVariable *GV = Modules[i]->getGlobalVariable(Name,AllowInternal);
     if (GV && !GV->isDeclaration())
@@ -187,7 +198,7 @@ std::string ExecutionEngine::getMangledName(const GlobalValue *GV) {
 
   const DataLayout &DL =
     GV->getParent()->getDataLayout().isDefault()
-      ? *getDataLayout()
+      ? getDataLayout()
       : GV->getParent()->getDataLayout();
 
   Mangler::getNameWithPrefix(FullName, GV->getName(), DL);
@@ -228,11 +239,8 @@ void ExecutionEngine::clearAllGlobalMappings() {
 void ExecutionEngine::clearGlobalMappingsFromModule(Module *M) {
   MutexGuard locked(lock);
 
-  for (Module::iterator FI = M->begin(), FE = M->end(); FI != FE; ++FI)
-    EEState.RemoveMapping(getMangledName(FI));
-  for (Module::global_iterator GI = M->global_begin(), GE = M->global_end();
-       GI != GE; ++GI)
-    EEState.RemoveMapping(getMangledName(GI));
+  for (GlobalObject &GO : M->global_objects())
+    EEState.RemoveMapping(getMangledName(&GO));
 }
 
 uint64_t ExecutionEngine::updateGlobalMapping(const GlobalValue *GV,
@@ -333,7 +341,7 @@ void *ArgvArray::reset(LLVMContext &C, ExecutionEngine *EE,
                        const std::vector<std::string> &InputArgv) {
   Values.clear();  // Free the old contents.
   Values.reserve(InputArgv.size());
-  unsigned PtrSize = EE->getDataLayout()->getPointerSize();
+  unsigned PtrSize = EE->getDataLayout().getPointerSize();
   Array = make_unique<char[]>((InputArgv.size()+1)*PtrSize);
 
   DEBUG(dbgs() << "JIT: ARGV = " << (void*)Array.get() << "\n");
@@ -362,7 +370,7 @@ void *ArgvArray::reset(LLVMContext &C, ExecutionEngine *EE,
 
 void ExecutionEngine::runStaticConstructorsDestructors(Module &module,
                                                        bool isDtors) {
-  const char *Name = isDtors ? "llvm.global_dtors" : "llvm.global_ctors";
+  StringRef Name(isDtors ? "llvm.global_dtors" : "llvm.global_ctors");
   GlobalVariable *GV = module.getNamedGlobal(Name);
 
   // If this global has internal linkage, or if it has a use, then it must be
@@ -408,7 +416,7 @@ void ExecutionEngine::runStaticConstructorsDestructors(bool isDtors) {
 #ifndef NDEBUG
 /// isTargetNullPtr - Return whether the target pointer stored at Loc is null.
 static bool isTargetNullPtr(ExecutionEngine *EE, void *Loc) {
-  unsigned PtrSize = EE->getDataLayout()->getPointerSize();
+  unsigned PtrSize = EE->getDataLayout().getPointerSize();
   for (unsigned i = 0; i < PtrSize; ++i)
     if (*(i + (uint8_t*)Loc))
       return false;
@@ -468,8 +476,7 @@ EngineBuilder::EngineBuilder() : EngineBuilder(nullptr) {}
 EngineBuilder::EngineBuilder(std::unique_ptr<Module> M)
     : M(std::move(M)), WhichEngine(EngineKind::Either), ErrorStr(nullptr),
       OptLevel(CodeGenOpt::Default), MemMgr(nullptr), Resolver(nullptr),
-      RelocModel(Reloc::Default), CMModel(CodeModel::JITDefault),
-      UseOrcMCJITReplacement(false) {
+      CMModel(CodeModel::JITDefault), UseOrcMCJITReplacement(false) {
 // IR module verification is enabled by default in debug builds, and disabled
 // by default in release builds.
 #ifndef NDEBUG
@@ -496,8 +503,8 @@ EngineBuilder::setMemoryManager(std::unique_ptr<MCJITMemoryManager> MM) {
 }
 
 EngineBuilder&
-EngineBuilder::setSymbolResolver(std::unique_ptr<RuntimeDyld::SymbolResolver> SR) {
-  Resolver = std::shared_ptr<RuntimeDyld::SymbolResolver>(std::move(SR));
+EngineBuilder::setSymbolResolver(std::unique_ptr<JITSymbolResolver> SR) {
+  Resolver = std::shared_ptr<JITSymbolResolver>(std::move(SR));
   return *this;
 }
 
@@ -508,7 +515,7 @@ ExecutionEngine *EngineBuilder::create(TargetMachine *TM) {
   // to the function tells DynamicLibrary to load the program, not a library.
   if (sys::DynamicLibrary::LoadLibraryPermanently(nullptr, ErrorStr))
     return nullptr;
-  
+
   // If the user specified a memory manager but didn't specify which engine to
   // create, we assume they only want the JIT, and we fail if they only want
   // the interpreter.
@@ -609,7 +616,7 @@ GenericValue ExecutionEngine::getConstantValue(const Constant *C) {
         for (unsigned int i = 0; i < elemNum; ++i) {
           Type *ElemTy = STy->getElementType(i);
           if (ElemTy->isIntegerTy())
-            Result.AggregateVal[i].IntVal = 
+            Result.AggregateVal[i].IntVal =
               APInt(ElemTy->getPrimitiveSizeInBits(), 0);
           else if (ElemTy->isAggregateType()) {
               const Constant *ElemUndef = UndefValue::get(ElemTy);
@@ -621,8 +628,8 @@ GenericValue ExecutionEngine::getConstantValue(const Constant *C) {
       break;
     case Type::VectorTyID:
       // if the whole vector is 'undef' just reserve memory for the value.
-      const VectorType* VTy = dyn_cast<VectorType>(C->getType());
-      const Type *ElemTy = VTy->getElementType();
+      auto* VTy = dyn_cast<VectorType>(C->getType());
+      Type *ElemTy = VTy->getElementType();
       unsigned int elemNum = VTy->getNumElements();
       Result.AggregateVal.resize(elemNum);
       if (ElemTy->isIntegerTy())
@@ -641,8 +648,8 @@ GenericValue ExecutionEngine::getConstantValue(const Constant *C) {
     case Instruction::GetElementPtr: {
       // Compute the index
       GenericValue Result = getConstantValue(Op0);
-      APInt Offset(DL->getPointerSizeInBits(), 0);
-      cast<GEPOperator>(CE)->accumulateConstantOffset(*DL, Offset);
+      APInt Offset(DL.getPointerSizeInBits(), 0);
+      cast<GEPOperator>(CE)->accumulateConstantOffset(DL, Offset);
 
       char* tmp = (char*) Result.PointerVal;
       Result = PTOGV(tmp + Offset.getSExtValue());
@@ -685,7 +692,7 @@ GenericValue ExecutionEngine::getConstantValue(const Constant *C) {
       else if (CE->getType()->isDoubleTy())
         GV.DoubleVal = GV.IntVal.roundToDouble();
       else if (CE->getType()->isX86_FP80Ty()) {
-        APFloat apf = APFloat::getZero(APFloat::x87DoubleExtended);
+        APFloat apf = APFloat::getZero(APFloat::x87DoubleExtended());
         (void)apf.convertFromAPInt(GV.IntVal,
                                    false,
                                    APFloat::rmNearestTiesToEven);
@@ -700,7 +707,7 @@ GenericValue ExecutionEngine::getConstantValue(const Constant *C) {
       else if (CE->getType()->isDoubleTy())
         GV.DoubleVal = GV.IntVal.signedRoundToDouble();
       else if (CE->getType()->isX86_FP80Ty()) {
-        APFloat apf = APFloat::getZero(APFloat::x87DoubleExtended);
+        APFloat apf = APFloat::getZero(APFloat::x87DoubleExtended());
         (void)apf.convertFromAPInt(GV.IntVal,
                                    true,
                                    APFloat::rmNearestTiesToEven);
@@ -717,10 +724,10 @@ GenericValue ExecutionEngine::getConstantValue(const Constant *C) {
       else if (Op0->getType()->isDoubleTy())
         GV.IntVal = APIntOps::RoundDoubleToAPInt(GV.DoubleVal, BitWidth);
       else if (Op0->getType()->isX86_FP80Ty()) {
-        APFloat apf = APFloat(APFloat::x87DoubleExtended, GV.IntVal);
+        APFloat apf = APFloat(APFloat::x87DoubleExtended(), GV.IntVal);
         uint64_t v;
         bool ignored;
-        (void)apf.convertToInteger(&v, BitWidth,
+        (void)apf.convertToInteger(makeMutableArrayRef(v), BitWidth,
                                    CE->getOpcode()==Instruction::FPToSI,
                                    APFloat::rmTowardZero, &ignored);
         GV.IntVal = v; // endian?
@@ -729,16 +736,16 @@ GenericValue ExecutionEngine::getConstantValue(const Constant *C) {
     }
     case Instruction::PtrToInt: {
       GenericValue GV = getConstantValue(Op0);
-      uint32_t PtrWidth = DL->getTypeSizeInBits(Op0->getType());
+      uint32_t PtrWidth = DL.getTypeSizeInBits(Op0->getType());
       assert(PtrWidth <= 64 && "Bad pointer width");
       GV.IntVal = APInt(PtrWidth, uintptr_t(GV.PointerVal));
-      uint32_t IntWidth = DL->getTypeSizeInBits(CE->getType());
+      uint32_t IntWidth = DL.getTypeSizeInBits(CE->getType());
       GV.IntVal = GV.IntVal.zextOrTrunc(IntWidth);
       return GV;
     }
     case Instruction::IntToPtr: {
       GenericValue GV = getConstantValue(Op0);
-      uint32_t PtrWidth = DL->getTypeSizeInBits(CE->getType());
+      uint32_t PtrWidth = DL.getTypeSizeInBits(CE->getType());
       GV.IntVal = GV.IntVal.zextOrTrunc(PtrWidth);
       assert(GV.IntVal.getBitWidth() <= 64 && "Bad pointer width");
       GV.PointerVal = PointerTy(uintptr_t(GV.IntVal.getZExtValue()));
@@ -860,8 +867,7 @@ GenericValue ExecutionEngine::getConstantValue(const Constant *C) {
             GV.IntVal = apfLHS.bitcastToAPInt();
             break;
           case Instruction::FRem:
-            apfLHS.mod(APFloat(Sem, RHS.IntVal),
-                       APFloat::rmNearestTiesToEven);
+            apfLHS.mod(APFloat(Sem, RHS.IntVal));
             GV.IntVal = apfLHS.bitcastToAPInt();
             break;
           }
@@ -973,7 +979,7 @@ GenericValue ExecutionEngine::getConstantValue(const Constant *C) {
     // Check if vector holds integers.
     if (ElemTy->isIntegerTy()) {
       if (CAZ) {
-        GenericValue intZero;     
+        GenericValue intZero;
         intZero.IntVal = APInt(ElemTy->getScalarSizeInBits(), 0ull);
         std::fill(Result.AggregateVal.begin(), Result.AggregateVal.end(),
                   intZero);
@@ -1040,7 +1046,7 @@ static void StoreIntToMemory(const APInt &IntVal, uint8_t *Dst,
 
 void ExecutionEngine::StoreValueToMemory(const GenericValue &Val,
                                          GenericValue *Ptr, Type *Ty) {
-  const unsigned StoreBytes = getDataLayout()->getTypeStoreSize(Ty);
+  const unsigned StoreBytes = getDataLayout().getTypeStoreSize(Ty);
 
   switch (Ty->getTypeID()) {
   default:
@@ -1073,14 +1079,14 @@ void ExecutionEngine::StoreValueToMemory(const GenericValue &Val,
         *(((float*)Ptr)+i) = Val.AggregateVal[i].FloatVal;
       if (cast<VectorType>(Ty)->getElementType()->isIntegerTy()) {
         unsigned numOfBytes =(Val.AggregateVal[i].IntVal.getBitWidth()+7)/8;
-        StoreIntToMemory(Val.AggregateVal[i].IntVal, 
+        StoreIntToMemory(Val.AggregateVal[i].IntVal,
           (uint8_t*)Ptr + numOfBytes*i, numOfBytes);
       }
     }
     break;
   }
 
-  if (sys::IsLittleEndianHost != getDataLayout()->isLittleEndian())
+  if (sys::IsLittleEndianHost != getDataLayout().isLittleEndian())
     // Host and target are different endian - reverse the stored bytes.
     std::reverse((uint8_t*)Ptr, StoreBytes + (uint8_t*)Ptr);
 }
@@ -1117,7 +1123,7 @@ static void LoadIntFromMemory(APInt &IntVal, uint8_t *Src, unsigned LoadBytes) {
 void ExecutionEngine::LoadValueFromMemory(GenericValue &Result,
                                           GenericValue *Ptr,
                                           Type *Ty) {
-  const unsigned LoadBytes = getDataLayout()->getTypeStoreSize(Ty);
+  const unsigned LoadBytes = getDataLayout().getTypeStoreSize(Ty);
 
   switch (Ty->getTypeID()) {
   case Type::IntegerTyID:
@@ -1143,8 +1149,8 @@ void ExecutionEngine::LoadValueFromMemory(GenericValue &Result,
     break;
   }
   case Type::VectorTyID: {
-    const VectorType *VT = cast<VectorType>(Ty);
-    const Type *ElemT = VT->getElementType();
+    auto *VT = cast<VectorType>(Ty);
+    Type *ElemT = VT->getElementType();
     const unsigned numElems = VT->getNumElements();
     if (ElemT->isFloatTy()) {
       Result.AggregateVal.resize(numElems);
@@ -1180,31 +1186,31 @@ void ExecutionEngine::InitializeMemory(const Constant *Init, void *Addr) {
   DEBUG(Init->dump());
   if (isa<UndefValue>(Init))
     return;
-  
+
   if (const ConstantVector *CP = dyn_cast<ConstantVector>(Init)) {
     unsigned ElementSize =
-      getDataLayout()->getTypeAllocSize(CP->getType()->getElementType());
+        getDataLayout().getTypeAllocSize(CP->getType()->getElementType());
     for (unsigned i = 0, e = CP->getNumOperands(); i != e; ++i)
       InitializeMemory(CP->getOperand(i), (char*)Addr+i*ElementSize);
     return;
   }
-  
+
   if (isa<ConstantAggregateZero>(Init)) {
-    memset(Addr, 0, (size_t)getDataLayout()->getTypeAllocSize(Init->getType()));
+    memset(Addr, 0, (size_t)getDataLayout().getTypeAllocSize(Init->getType()));
     return;
   }
-  
+
   if (const ConstantArray *CPA = dyn_cast<ConstantArray>(Init)) {
     unsigned ElementSize =
-      getDataLayout()->getTypeAllocSize(CPA->getType()->getElementType());
+        getDataLayout().getTypeAllocSize(CPA->getType()->getElementType());
     for (unsigned i = 0, e = CPA->getNumOperands(); i != e; ++i)
       InitializeMemory(CPA->getOperand(i), (char*)Addr+i*ElementSize);
     return;
   }
-  
+
   if (const ConstantStruct *CPS = dyn_cast<ConstantStruct>(Init)) {
     const StructLayout *SL =
-      getDataLayout()->getStructLayout(cast<StructType>(CPS->getType()));
+        getDataLayout().getStructLayout(cast<StructType>(CPS->getType()));
     for (unsigned i = 0, e = CPS->getNumOperands(); i != e; ++i)
       InitializeMemory(CPS->getOperand(i), (char*)Addr+SL->getElementOffset(i));
     return;
@@ -1348,8 +1354,8 @@ void ExecutionEngine::EmitGlobalVariable(const GlobalVariable *GV) {
   if (!GV->isThreadLocal())
     InitializeMemory(GV->getInitializer(), GA);
 
-  Type *ElTy = GV->getType()->getElementType();
-  size_t GVSize = (size_t)getDataLayout()->getTypeAllocSize(ElTy);
+  Type *ElTy = GV->getValueType();
+  size_t GVSize = (size_t)getDataLayout().getTypeAllocSize(ElTy);
   NumInitBytes += (unsigned)GVSize;
   ++NumGlobals;
 }

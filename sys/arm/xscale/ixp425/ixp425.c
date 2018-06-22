@@ -1,6 +1,8 @@
-/*	$NetBSD: ixp425.c,v 1.10 2005/12/11 12:16:51 christos Exp $ */
+/*	$NetBSD: ixp425.c,v 1.13 2009/10/21 14:15:50 rmind Exp $ */
 
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ *
  * Copyright (c) 2003
  *	Ichiro FUKUHARA <ichiro@ichiro.org>.
  * All rights reserved.
@@ -13,12 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Ichiro FUKUHARA.
- * 4. The name of the company nor the name of the author may be used to
- *    endorse or promote products derived from this software without specific
- *    prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY ICHIRO FUKUHARA ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -473,7 +469,7 @@ gethwvtrans(uint32_t hwbase, uint32_t size)
 	};
 	int i;
 
-	for (i = 0; i < sizeof hwvtrans / sizeof *hwvtrans; i++) {
+	for (i = 0; i < nitems(hwvtrans); i++) {
 		if (hwbase >= hwvtrans[i].hwbase &&
 		    hwbase + size <= hwvtrans[i].hwbase + hwvtrans[i].size)
 			return &hwvtrans[i];
@@ -533,7 +529,7 @@ ixp425_alloc_resource(device_t dev, device_t child, int type, int *rid,
 				    (start - vtrans->hwbase);
 				if (bootverbose)
 					device_printf(child,
-					    "%s: assign 0x%lx:0x%lx%s\n",
+					    "%s: assign 0x%jx:0x%jx%s\n",
 					    __func__, start, end - start,
 					    vtrans->isa4x ? " A4X" :
 					    vtrans->isslow ? " SLOW" : "");
@@ -542,14 +538,14 @@ ixp425_alloc_resource(device_t dev, device_t child, int type, int *rid,
 			vtrans = gethwvtrans(start, end - start);
 		if (vtrans == NULL) {
 			/* likely means above table needs to be updated */
-			device_printf(child, "%s: no mapping for 0x%lx:0x%lx\n",
+			device_printf(child, "%s: no mapping for 0x%jx:0x%jx\n",
 			    __func__, start, end - start);
 			return NULL;
 		}
 		rv = rman_reserve_resource(&sc->sc_mem_rman, start, end,
 		    end - start, flags, child);
 		if (rv == NULL) {
-			device_printf(child, "%s: cannot reserve 0x%lx:0x%lx\n",
+			device_printf(child, "%s: cannot reserve 0x%jx:0x%jx\n",
 			    __func__, start, end - start);
 			return NULL;
 		}
@@ -586,7 +582,7 @@ ixp425_activate_resource(device_t dev, device_t child, int type, int rid,
 	if (type == SYS_RES_MEMORY) {
 		vtrans = gethwvtrans(rman_get_start(r), rman_get_size(r));
 		if (vtrans == NULL) {		/* NB: should not happen */
-			device_printf(child, "%s: no mapping for 0x%lx:0x%lx\n",
+			device_printf(child, "%s: no mapping for 0x%jx:0x%jx\n",
 			    __func__, rman_get_start(r), rman_get_size(r));
 			return (ENOENT);
 		}

@@ -56,7 +56,7 @@ __FBSDID("$FreeBSD$");
 #include <netinet/cc/cc.h>
 #include <netinet/cc/cc_module.h>
 
-#define	CAST_PTR_INT(X)	(*((int*)(X)))
+#define	CAST_PTR_INT(X)	(*((int * __capability)(X)))
 
 #define MAX_ALPHA_VALUE 1024
 static VNET_DEFINE(uint32_t, dctcp_alpha) = 0;
@@ -202,7 +202,7 @@ dctcp_cb_init(struct cc_var *ccv)
 	dctcp_data->bytes_ecn = 0;
 	dctcp_data->bytes_total = 0;
 	/*
-	 * When alpha is set to 0 in the beggining, DCTCP sender transfers as
+	 * When alpha is set to 0 in the beginning, DCTCP sender transfers as
 	 * much data as possible until the value converges which may expand the
 	 * queueing delay at the switch. When alpha is set to 1, queueing delay
 	 * is kept small.

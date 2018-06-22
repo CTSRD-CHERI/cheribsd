@@ -459,7 +459,7 @@ static int ct_probe (device_t dev)
 	}
 		
 	if (!ct_probe_board (iobase, -1, -1)) {
-		printf ("ct%d: probing for Tau-ISA at %lx faild\n", unit, iobase);
+		printf ("ct%d: probing for Tau-ISA at %jx faild\n", unit, iobase);
 		return ENXIO;
 	}
 	
@@ -632,7 +632,7 @@ static int ct_attach (device_t dev)
 	ct_ln[2] = '0' + unit;
 	mtx_init (&bd->ct_mtx, ct_ln, MTX_NETWORK_LOCK, MTX_DEF|MTX_RECURSE);
 	if (! probe_irq (b, irq)) {
-		printf ("ct%d: irq %ld not functional\n", unit, irq);
+		printf ("ct%d: irq %jd not functional\n", unit, irq);
 		bd->board = 0;
 		adapter [unit] = 0;
 		free (b, M_DEVBUF);
@@ -651,7 +651,7 @@ static int ct_attach (device_t dev)
 	if (bus_setup_intr (dev, bd->irq_res,
 			   INTR_TYPE_NET|INTR_MPSAFE,
 			   NULL, ct_intr, bd, &bd->intrhand)) {
-		printf ("ct%d: Can't setup irq %ld\n", unit, irq);
+		printf ("ct%d: Can't setup irq %jd\n", unit, irq);
 		bd->board = 0;
 		adapter [unit] = 0;
 		free (b, M_DEVBUF);
@@ -839,8 +839,8 @@ static int ct_detach (device_t dev)
 		/* Deallocate buffers. */
 		ct_bus_dma_mem_free (&d->dmamem);
 	}
-	bd->board = 0;
-	adapter [b->num] = 0;
+	bd->board = NULL;
+	adapter [b->num] = NULL;
 	free (b, M_DEVBUF);
 	
 	mtx_destroy (&bd->ct_mtx);
@@ -911,10 +911,10 @@ static int ct_sioctl (struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	switch (cmd) {
 	default:	   CT_DEBUG2 (d, ("ioctl 0x%lx\n", cmd)); return 0;
-	case SIOCADDMULTI: CT_DEBUG2 (d, ("SIOCADDMULTI\n"));     return 0;
-	case SIOCDELMULTI: CT_DEBUG2 (d, ("SIOCDELMULTI\n"));     return 0;
-	case SIOCSIFFLAGS: CT_DEBUG2 (d, ("SIOCSIFFLAGS\n"));     break;
-	case SIOCSIFADDR:  CT_DEBUG2 (d, ("SIOCSIFADDR\n"));      break;
+	CASE_IOC_IFREQ(SIOCADDMULTI): CT_DEBUG2 (d, ("SIOCADDMULTI\n"));     return 0;
+	CASE_IOC_IFREQ(SIOCDELMULTI): CT_DEBUG2 (d, ("SIOCDELMULTI\n"));     return 0;
+	CASE_IOC_IFREQ(SIOCSIFFLAGS): CT_DEBUG2 (d, ("SIOCSIFFLAGS\n"));     break;
+	CASE_IOC_IFREQ(SIOCSIFADDR):  CT_DEBUG2 (d, ("SIOCSIFADDR\n"));      break;
 	}
 
 	/* We get here only in case of SIFFLAGS or SIFADDR. */

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -41,6 +43,21 @@
 #endif
 
 /*
+ * NOTE: pr_base is the native pointer type in userspace and a
+ * capabililty in kernel unless they aren't supported.
+ */
+struct uprof {
+#ifdef _KERNEL
+	char * __capability	pr_base;	/* Buffer base. */
+#else
+	char *			pr_base;	/* Buffer base. */
+#endif
+	u_long			pr_size;	/* Buffer size. */
+	u_long			pr_off;		/* PC offset. */
+	u_long			pr_scale;	/* PC scaling. */
+};
+
+/*
  * Kernel per-process accounting / statistics
  * (not necessarily resident except when running).
  *
@@ -58,12 +75,7 @@ struct pstats {
 #define	pstat_endzero	pstat_startcopy
 
 #define	pstat_startcopy	p_prof
-	struct uprof {			/* Profile arguments. */
-		caddr_t	pr_base;	/* (c + w2) Buffer base. */
-		u_long	pr_size;	/* (c + w2) Buffer size. */
-		u_long	pr_off;		/* (c + w2) PC offset. */
-		u_long	pr_scale;	/* (c + w2) PC scaling. */
-	} p_prof;
+	struct	uprof p_prof;		/* (c + w2) Profile arguments. */
 #define	pstat_endcopy	p_start
 	struct	timeval p_start;	/* (b) Starting time. */
 };
@@ -101,6 +113,7 @@ struct uidinfo {
 	long	ui_proccnt;		/* (b) number of processes */
 	long	ui_ptscnt;		/* (b) number of pseudo-terminals */
 	long	ui_kqcnt;		/* (b) number of kqueues */
+	long	ui_umtxcnt;		/* (b) number of shared umtxs */
 	uid_t	ui_uid;			/* (a) uid */
 	u_int	ui_ref;			/* (b) reference count */
 #ifdef	RACCT
@@ -124,7 +137,7 @@ int	 chgproccnt(struct uidinfo *uip, int diff, rlim_t maxval);
 int	 chgsbsize(struct uidinfo *uip, u_int *hiwat, u_int to,
 	    rlim_t maxval);
 int	 chgptscnt(struct uidinfo *uip, int diff, rlim_t maxval);
-int	 fuswintr(void *base);
+int	 chgumtxcnt(struct uidinfo *uip, int diff, rlim_t maxval);
 int	 kern_proc_setrlimit(struct thread *td, struct proc *p, u_int which,
 	    struct rlimit *limp);
 struct plimit
@@ -148,7 +161,6 @@ void	 rufetchcalc(struct proc *p, struct rusage *ru, struct timeval *up,
 	    struct timeval *sp);
 void	 rufetchtd(struct thread *td, struct rusage *ru);
 void	 ruxagg(struct proc *p, struct thread *td);
-int	 suswintr(void *base, int word);
 struct uidinfo
 	*uifind(uid_t uid);
 void	 uifree(struct uidinfo *uip);

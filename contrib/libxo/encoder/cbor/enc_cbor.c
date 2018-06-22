@@ -135,7 +135,7 @@ cbor_encode_uint (xo_buffer_t *xbp, uint64_t minor, unsigned limit)
     char *bp = xbp->xb_curp;
     int i, m;
 
-    if (minor > (1UL<<32)) {
+    if (minor > (1ULL << 32)) {
 	*bp++ |= CBOR_LEN64;
 	m = 64;
 
@@ -249,7 +249,7 @@ cbor_handler (XO_ENCODER_HANDLER_ARGS)
 
     if (xo_get_flags(xop) & XOF_PRETTY) {
 	printf("%*sop %s: [%s] [%s]\n", cbor ? cbor->c_indent * 2 + 4 : 0, "",
-	       xo_encoder_op_name(op), name ?: "", value ?: "");
+	       xo_encoder_op_name(op), name, value);
 	fflush(stdout);
     }
 

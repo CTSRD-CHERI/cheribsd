@@ -1,4 +1,4 @@
-//===-- llvm/MC/MCMachObjectWriter.h - Mach Object Writer -------*- C++ -*-===//
+//===- llvm/MC/MCMachObjectWriter.h - Mach Object Writer --------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -11,12 +11,15 @@
 #define LLVM_MC_MCMACHOBJECTWRITER_H
 
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/BinaryFormat/MachO.h"
 #include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCObjectWriter.h"
+#include "llvm/MC/MCSection.h"
 #include "llvm/MC/StringTableBuilder.h"
-#include "llvm/Support/DataTypes.h"
-#include "llvm/Support/MachO.h"
+#include <cstdint>
+#include <memory>
+#include <string>
 #include <vector>
 
 namespace llvm {
@@ -95,8 +98,8 @@ class MachObjectWriter : public MCObjectWriter {
         : Sym(Sym), MRE(MRE) {}
   };
 
-  llvm::DenseMap<const MCSection *, std::vector<RelAndSymbol>> Relocations;
-  llvm::DenseMap<const MCSection *, unsigned> IndirectSymBase;
+  DenseMap<const MCSection *, std::vector<RelAndSymbol>> Relocations;
+  DenseMap<const MCSection *, unsigned> IndirectSymBase;
 
   SectionAddrMap SectionAddress;
 
@@ -104,7 +107,7 @@ class MachObjectWriter : public MCObjectWriter {
   /// \name Symbol Table Data
   /// @{
 
-  StringTableBuilder StringTable;
+  StringTableBuilder StringTable{StringTableBuilder::MachO};
   std::vector<MachSymbolData> LocalSymbolData;
   std::vector<MachSymbolData> ExternalSymbolData;
   std::vector<MachSymbolData> UndefinedSymbolData;
@@ -159,19 +162,21 @@ public:
 
   /// @}
 
-  void writeHeader(unsigned NumLoadCommands, unsigned LoadCommandsSize,
-                   bool SubsectionsViaSymbols);
+  void writeHeader(MachO::HeaderFileType Type, unsigned NumLoadCommands,
+                   unsigned LoadCommandsSize, bool SubsectionsViaSymbols);
 
   /// Write a segment load command.
   ///
   /// \param NumSections The number of sections in this segment.
   /// \param SectionDataSize The total size of the sections.
-  void writeSegmentLoadCommand(unsigned NumSections, uint64_t VMSize,
+  void writeSegmentLoadCommand(StringRef Name, unsigned NumSections,
+                               uint64_t VMAddr, uint64_t VMSize,
                                uint64_t SectionDataStartOffset,
-                               uint64_t SectionDataSize);
+                               uint64_t SectionDataSize, uint32_t MaxProt,
+                               uint32_t InitProt);
 
-  void writeSection(const MCAssembler &Asm, const MCAsmLayout &Layout,
-                    const MCSection &Sec, uint64_t FileOffset,
+  void writeSection(const MCAsmLayout &Layout, const MCSection &Sec,
+                    uint64_t VMAddr, uint64_t FileOffset, unsigned Flags,
                     uint64_t RelocationsStart, unsigned NumRelocations);
 
   void writeSymtabLoadCommand(uint32_t SymbolOffset, uint32_t NumSymbols,
@@ -228,8 +233,7 @@ public:
 
   void recordRelocation(MCAssembler &Asm, const MCAsmLayout &Layout,
                         const MCFragment *Fragment, const MCFixup &Fixup,
-                        MCValue Target, bool &IsPCRel,
-                        uint64_t &FixedValue) override;
+                        MCValue Target, uint64_t &FixedValue) override;
 
   void bindIndirectSymbols(MCAssembler &Asm);
 
@@ -244,6 +248,11 @@ public:
 
   void executePostLayoutBinding(MCAssembler &Asm,
                                 const MCAsmLayout &Layout) override;
+
+  bool isSymbolRefDifferenceFullyResolvedImpl(const MCAssembler &Asm,
+                                              const MCSymbol &A,
+                                              const MCSymbol &B,
+                                              bool InSet) const override;
 
   bool isSymbolRefDifferenceFullyResolvedImpl(const MCAssembler &Asm,
                                               const MCSymbol &SymA,
@@ -264,6 +273,6 @@ MCObjectWriter *createMachObjectWriter(MCMachObjectTargetWriter *MOTW,
                                        raw_pwrite_stream &OS,
                                        bool IsLittleEndian);
 
-} // End llvm namespace
+} // end namespace llvm
 
-#endif
+#endif // LLVM_MC_MCMACHOBJECTWRITER_H

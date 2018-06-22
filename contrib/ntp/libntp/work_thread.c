@@ -1,6 +1,16 @@
 /*
  * work_thread.c - threads implementation for blocking worker child.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 #include <config.h>
 #include "ntp_workimpl.h"
 
@@ -66,7 +76,7 @@ static BOOL	same_os_sema(const sem_ref obj, void * osobj);
 
 #else
 
-# define thread_exit(c)	pthread_exit((void*)(size_t)(c))
+# define thread_exit(c)	pthread_exit((void*)(uintptr_t)(c))
 # define tickle_sem	sem_post
 void *		blocking_thread(void *);
 static	void	block_thread_signals(sigset_t *);
@@ -88,7 +98,27 @@ static	int	ensure_workresp_empty_slot(blocking_child *);
 static	int	queue_req_pointer(blocking_child *, blocking_pipe_header *);
 static	void	cleanup_after_child(blocking_child *);
 
+static sema_type worker_mmutex;
+static sem_ref   worker_memlock;
 
+/* --------------------------------------------------------------------
+ * locking the global worker state table (and other global stuff)
+ */
+void
+worker_global_lock(
+	int inOrOut)
+{
+	if (worker_memlock) {
+		if (inOrOut)
+			wait_for_sem(worker_memlock, NULL);
+		else
+			tickle_sem(worker_memlock);
+	}
+}
+
+/* --------------------------------------------------------------------
+ * implementation isolation wrapper
+ */
 void
 exit_worker(
 	int	exitcode
@@ -724,6 +754,9 @@ prepare_child_sems(
 	blocking_child *c
 	)
 {
+	if (NULL == worker_memlock)
+		worker_memlock = create_sema(&worker_mmutex, 1, 1);
+	
 	c->accesslock           = create_sema(&c->sem_table[0], 1, 1);
 	c->workitems_pending    = create_sema(&c->sem_table[1], 0, 0);
 	c->wake_scheduled_sleep = create_sema(&c->sem_table[2], 0, 1);

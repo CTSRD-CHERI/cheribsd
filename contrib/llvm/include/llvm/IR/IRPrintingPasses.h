@@ -30,6 +30,7 @@ class Module;
 class ModulePass;
 class PreservedAnalyses;
 class raw_ostream;
+template <typename IRUnitT, typename... ExtraArgTs> class AnalysisManager;
 
 /// \brief Create and return a pass that writes the module to the specified
 /// \c raw_ostream.
@@ -47,6 +48,12 @@ FunctionPass *createPrintFunctionPass(raw_ostream &OS,
 BasicBlockPass *createPrintBasicBlockPass(raw_ostream &OS,
                                           const std::string &Banner = "");
 
+/// Print out a name of an LLVM value without any prefixes.
+///
+/// The name is surrounded with ""'s and escaped if it has any special or
+/// non-printable characters in it.
+void printLLVMNameWithoutPrefix(raw_ostream &OS, StringRef Name);
+
 /// \brief Pass for printing a Module as LLVM's text IR assembly.
 ///
 /// Note: This pass is for use with the new pass manager. Use the create...Pass
@@ -61,7 +68,7 @@ public:
   PrintModulePass(raw_ostream &OS, const std::string &Banner = "",
                   bool ShouldPreserveUseListOrder = false);
 
-  PreservedAnalyses run(Module &M);
+  PreservedAnalyses run(Module &M, AnalysisManager<Module> &);
 
   static StringRef name() { return "PrintModulePass"; }
 };
@@ -78,7 +85,7 @@ public:
   PrintFunctionPass();
   PrintFunctionPass(raw_ostream &OS, const std::string &Banner = "");
 
-  PreservedAnalyses run(Function &F);
+  PreservedAnalyses run(Function &F, AnalysisManager<Function> &);
 
   static StringRef name() { return "PrintFunctionPass"; }
 };

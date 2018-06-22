@@ -1,6 +1,8 @@
 /*	$NetBSD: svc_auth.c,v 1.12 2000/07/06 03:10:35 christos Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2009, Sun Microsystems, Inc.
  * All rights reserved.
  *
@@ -29,6 +31,17 @@
  */
 /*
  * Copyright (c) 1986-1991 by Sun Microsystems Inc. 
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "sunrpc"
+ * }
+ * CHERI CHANGES END
  */
 
 #if defined(LIBC_SCCS) && !defined(lint)
@@ -152,7 +165,7 @@ static bool_t
 svcauth_null_wrap(SVCAUTH *auth, XDR *xdrs, xdrproc_t xdr_func, caddr_t xdr_ptr)
 {
 
-	return (xdr_func(xdrs, xdr_ptr));
+	return (xdr_func(xdrs, xdr_ptr, 0));
 }
 
 struct svc_auth_ops svc_auth_null_ops = {

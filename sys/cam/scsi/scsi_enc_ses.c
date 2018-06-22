@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2000 Matthew Jacob
  * Copyright (c) 2010 Spectra Logic Corporation
  * All rights reserved.
@@ -550,6 +552,7 @@ static int ses_set_timed_completion(enc_softc_t *, uint8_t);
 static int ses_putstatus(enc_softc_t *, int, struct ses_comstat *);
 #endif
 
+static void ses_poll_status(enc_softc_t *);
 static void ses_print_addl_data(enc_softc_t *, enc_element_t *);
 
 /*=========================== SES cleanup routines ===========================*/
@@ -715,13 +718,15 @@ ses_cache_clone(enc_softc_t *enc, enc_cache_t *src, enc_cache_t *dst)
 	 * The element map is independent even though it starts out
 	 * pointing to the same constant page data.
 	 */
-	dst->elm_map = ENC_MALLOCZ(dst->nelms * sizeof(enc_element_t));
+	dst->elm_map = malloc(dst->nelms * sizeof(enc_element_t),
+	    M_SCSIENC, M_WAITOK);
 	memcpy(dst->elm_map, src->elm_map, dst->nelms * sizeof(enc_element_t));
 	for (dst_elm = dst->elm_map, src_elm = src->elm_map,
 	     last_elm = &src->elm_map[src->nelms];
 	     src_elm != last_elm; src_elm++, dst_elm++) {
 
-		dst_elm->elm_private = ENC_MALLOCZ(sizeof(ses_element_t));
+		dst_elm->elm_private = malloc(sizeof(ses_element_t),
+		    M_SCSIENC, M_WAITOK);
 		memcpy(dst_elm->elm_private, src_elm->elm_private,
 		       sizeof(ses_element_t));
 	}
@@ -1064,13 +1069,10 @@ ses_set_physpath(enc_softc_t *enc, enc_element_t *elm,
 	 */
 	xpt_setup_ccb(&cdai.ccb_h, enc->periph->path, CAM_PRIORITY_NORMAL);
 	cdai.ccb_h.func_code = XPT_DEV_ADVINFO;
+	cdai.flags = CDAI_FLAG_NONE;
 	cdai.buftype = CDAI_TYPE_SCSI_DEVID;
 	cdai.bufsiz = CAM_SCSI_DEVID_MAXLEN;
-	cdai.buf = devid = ENC_MALLOCZ(cdai.bufsiz);
-	if (devid == NULL) {
-		ret = ENOMEM;
-		goto out;
-	}
+	cdai.buf = devid = malloc(cdai.bufsiz, M_SCSIENC, M_WAITOK|M_ZERO);
 	cam_periph_lock(enc->periph);
 	xpt_action((union ccb *)&cdai);
 	if ((cdai.ccb_h.status & CAM_DEV_QFRZN) != 0)
@@ -1370,12 +1372,8 @@ ses_process_config(enc_softc_t *enc, struct enc_fsm_state *state,
 	 * Now waltz through all the subenclosures summing the number of
 	 * types available in each.
 	 */
-	subencs = ENC_MALLOCZ(ses_cfg_page_get_num_subenc(cfg_page)
-			    * sizeof(*subencs));
-	if (subencs == NULL) {
-		err = ENOMEM;
-		goto out;
-	}
+	subencs = malloc(ses_cfg_page_get_num_subenc(cfg_page)
+	    * sizeof(*subencs), M_SCSIENC, M_WAITOK|M_ZERO);
 	/*
 	 * Sub-enclosure data is const after construction (i.e. when
 	 * accessed via our cache object.
@@ -1413,11 +1411,8 @@ ses_process_config(enc_softc_t *enc, struct enc_fsm_state *state,
 	}
 
 	/* Process the type headers. */
-	ses_types = ENC_MALLOCZ(ntype * sizeof(*ses_types));
-	if (ses_types == NULL) {
-		err = ENOMEM;
-		goto out;
-	}
+	ses_types = malloc(ntype * sizeof(*ses_types),
+	    M_SCSIENC, M_WAITOK|M_ZERO);
 	/*
 	 * Type data is const after construction (i.e. when accessed via
 	 * our cache object.
@@ -1454,11 +1449,8 @@ ses_process_config(enc_softc_t *enc, struct enc_fsm_state *state,
 	}
 
 	/* Create the object map. */
-	enc_cache->elm_map = ENC_MALLOCZ(nelm * sizeof(enc_element_t));
-	if (enc_cache->elm_map == NULL) {
-		err = ENOMEM;
-		goto out;
-	}
+	enc_cache->elm_map = malloc(nelm * sizeof(enc_element_t),
+	    M_SCSIENC, M_WAITOK|M_ZERO);
 	enc_cache->nelms = nelm;
 
 	ses_iter_init(enc, enc_cache, &iter);
@@ -1472,11 +1464,8 @@ ses_process_config(enc_softc_t *enc, struct enc_fsm_state *state,
 		element->subenclosure = thdr->etype_subenc;
 		element->enctype = thdr->etype_elm_type;
 		element->overall_status_elem = iter.type_element_index == 0;
-		element->elm_private = ENC_MALLOCZ(sizeof(ses_element_t));
-		if (element->elm_private == NULL) {
-			err = ENOMEM;
-			goto out;
-		}
+		element->elm_private = malloc(sizeof(ses_element_t),
+		    M_SCSIENC, M_WAITOK|M_ZERO);
 		ENC_DLOG(enc, "%s: creating elmpriv %d(%d,%d) subenc %d "
 		    "type 0x%x\n", __func__, iter.global_element_index,
 		    iter.type_index, iter.type_element_index,
@@ -1489,11 +1478,7 @@ out:
 	if (err)
 		ses_cache_free(enc, enc_cache);
 	else {
-		enc_update_request(enc, SES_UPDATE_GETSTATUS);
-		if (ses->ses_flags & SES_FLAG_DESC)
-			enc_update_request(enc, SES_UPDATE_GETELMDESCS);
-		if (ses->ses_flags & SES_FLAG_ADDLSTATUS)
-			enc_update_request(enc, SES_UPDATE_GETELMADDLSTATUS);
+		ses_poll_status(enc);
 		enc_update_request(enc, SES_PUBLISH_CACHE);
 	}
 	ENC_DLOG(enc, "%s: exiting with err %d\n", __func__, err);
@@ -1773,14 +1758,20 @@ ses_process_elm_addlstatus(enc_softc_t *enc, struct enc_fsm_state *state,
 		eip = ses_elm_addlstatus_eip(elm_hdr);
 		if (eip && !ignore_index) {
 			struct ses_elm_addlstatus_eip_hdr *eip_hdr;
-			int expected_index;
+			int expected_index, index;
+			ses_elem_index_type_t index_type;
 
 			eip_hdr = (struct ses_elm_addlstatus_eip_hdr *)elm_hdr;
-			expected_index = iter.individual_element_index;
+			if (eip_hdr->byte2 & SES_ADDL_EIP_EIIOE) {
+				index_type = SES_ELEM_INDEX_GLOBAL;
+				expected_index = iter.global_element_index;
+			} else {
+				index_type = SES_ELEM_INDEX_INDIVIDUAL;
+				expected_index = iter.individual_element_index;
+			}
 			titer = iter;
 			telement = ses_iter_seek_to(&titer,
-						   eip_hdr->element_index,
-						   SES_ELEM_INDEX_INDIVIDUAL);
+			    eip_hdr->element_index, index_type);
 			if (telement != NULL &&
 			    (ses_typehasaddlstatus(enc, titer.type_index) !=
 			     TYPE_ADDLSTATUS_NONE ||
@@ -1790,13 +1781,18 @@ ses_process_elm_addlstatus(enc_softc_t *enc, struct enc_fsm_state *state,
 			} else
 				ignore_index = 1;
 
-			if (iter.individual_element_index > expected_index
+			if (eip_hdr->byte2 & SES_ADDL_EIP_EIIOE)
+				index = iter.global_element_index;
+			else
+				index = iter.individual_element_index;
+			if (index > expected_index
 			 && status_type == TYPE_ADDLSTATUS_MANDATORY) {
-				ENC_VLOG(enc, "%s: provided element "
+				ENC_VLOG(enc, "%s: provided %s element"
 					"index %d skips mandatory status "
 					" element at index %d\n",
-					__func__, eip_hdr->element_index,
-					expected_index);
+					__func__, (eip_hdr->byte2 &
+					SES_ADDL_EIP_EIIOE) ? "global " : "",
+					index, expected_index);
 			}
 		}
 		elmpriv = element->elm_private;
@@ -1872,7 +1868,7 @@ ses_process_control_request(enc_softc_t *enc, struct enc_fsm_state *state,
 	 *  o Some SCSI status error.
 	 */
 	ses_terminate_control_requests(&ses->ses_pending_requests, error);
-	enc_update_request(enc, SES_UPDATE_GETSTATUS);
+	ses_poll_status(enc);
 	return (0);
 }
 
@@ -2687,13 +2683,14 @@ ses_get_elm_devnames(enc_softc_t *enc, encioc_elm_devnames_t *elmdn)
 	if (len < 0)
 		return (EINVAL);
 
-	sbuf_new(&sb, elmdn->elm_devnames, len, 0);
-
 	cam_periph_unlock(enc->periph);
+	sbuf_new(&sb, NULL, len, SBUF_FIXEDLEN);
 	ses_paths_iter(enc, &enc->enc_cache.elm_map[elmdn->elm_idx],
-		       ses_elmdevname_callback, &sb);
+	    ses_elmdevname_callback, &sb);
 	sbuf_finish(&sb);
 	elmdn->elm_names_len = sbuf_len(&sb);
+	copyout(sbuf_data(&sb), elmdn->elm_devnames, elmdn->elm_names_len + 1);
+	sbuf_delete(&sb);
 	cam_periph_lock(enc->periph);
 	return (elmdn->elm_names_len > 0 ? 0 : ENODEV);
 }
@@ -2804,6 +2801,8 @@ ses_poll_status(enc_softc_t *enc)
 
 	ses = enc->enc_private;
 	enc_update_request(enc, SES_UPDATE_GETSTATUS);
+	if (ses->ses_flags & SES_FLAG_DESC)
+		enc_update_request(enc, SES_UPDATE_GETELMDESCS);
 	if (ses->ses_flags & SES_FLAG_ADDLSTATUS)
 		enc_update_request(enc, SES_UPDATE_GETELMADDLSTATUS);
 }

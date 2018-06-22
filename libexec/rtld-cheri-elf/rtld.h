@@ -39,7 +39,6 @@
 #include <stddef.h>
 
 #include "rtld_lock.h"
-#include "rtld_machdep.h"
 
 #define NEW(type)	((type *) xmalloc(sizeof(type)))
 #define CNEW(type)	((type *) xcalloc(1, sizeof(type)))
@@ -142,7 +141,8 @@ typedef struct Struct_Obj_Entry {
     TAILQ_ENTRY(Struct_Obj_Entry) next;
     char *path;			/* Pathname of underlying file (%) */
     char *origin_path;		/* Directory path of origin file */
-    int refcount;
+    int refcount;		/* DAG references */
+    int holdcount;		/* Count of transient references */
     int dl_refcount;		/* Number of times loaded by dlopen */
 
     /* These items are computed by map_object() or by digest_phdr(). */
@@ -182,6 +182,8 @@ typedef struct Struct_Obj_Entry {
     const Elf_Sym *symtab;	/* Symbol table */
     const char *strtab;		/* String table */
     unsigned long strsize;	/* Size in bytes of string table */
+    caddr_t cap_relocs;		/* start of the __cap_relocs section */
+    size_t cap_relocs_size;	/* size of the __cap_relocs section */
 #ifdef __mips__
     Elf_Word local_gotno;	/* Number of local GOT entries */
     Elf_Word symtabno;		/* Number of dynamic symbols */
@@ -222,11 +224,11 @@ typedef struct Struct_Obj_Entry {
     Ver_Entry *vertab;		/* Versions required /defined by this object */
     int vernum;			/* Number of entries in vertab */
 
-    Elf_Addr init;		/* Initialization function to call */
-    Elf_Addr fini;		/* Termination function to call */
-    Elf_Addr preinit_array;	/* Pre-initialization array of functions */
-    Elf_Addr init_array;	/* Initialization array of functions */
-    Elf_Addr fini_array;	/* Termination array of functions */
+    void* init_cap;		/* Initialization function to call */
+    void* fini_cap;		/* Termination function to call */
+    Elf_Addr* preinit_array_cap;	/* Pre-initialization array of functions */
+    Elf_Addr* init_array_cap;	/* Initialization array of functions */
+    Elf_Addr* fini_array_cap;	/* Termination array of functions */
     int preinit_array_num;	/* Number of entries in preinit_array */
     int init_array_num; 	/* Number of entries in init_array */
     int fini_array_num; 	/* Number of entries in fini_array */
@@ -265,6 +267,19 @@ typedef struct Struct_Obj_Entry {
     bool valid_hash_gnu : 1;	/* A valid GNU hash tag is available */
     bool dlopened : 1;		/* dlopen()-ed (vs. load statically) */
     bool marker : 1;		/* marker on the global obj list */
+    bool unholdfree : 1;	/* unmap upon last unhold */
+    bool doomed : 1;		/* Object cannot be referenced */
+    bool cap_relocs_processed : 1; /* __cap_relocs section has been processed */
+    /*
+     * If restrict_pcc_basic is true we can restricted $pcc to the object's
+     * executable segment, if restrict_pcc_strict is true we can restrict it
+     * to just the functions bounds in dlsym()/dlfunc(). Otherwise we need to
+     * fall back to giving the full address space bounds in $pcc.
+     *
+     * TODO: remove these options once we have decided on the correct ABI
+     */
+    bool restrict_pcc_basic : 1;
+    bool restrict_pcc_strict : 1;
 
     struct link_map linkmap;	/* For GDB and dlinfo() */
     Objlist dldags;		/* Object belongs to these dlopened DAGs (%) */
@@ -355,11 +370,16 @@ void *malloc_aligned(size_t size, size_t align);
 void free_aligned(void *ptr);
 extern Elf_Addr _GLOBAL_OFFSET_TABLE_[];
 extern Elf_Sym sym_zero;	/* For resolving undefined weak refs. */
+extern bool ld_bind_not;
 
 void dump_relocations(Obj_Entry *);
 void dump_obj_relocations(Obj_Entry *);
 void dump_Elf_Rel(Obj_Entry *, const Elf_Rel *, u_long);
 void dump_Elf_Rela(Obj_Entry *, const Elf_Rela *, u_long);
+
+
+// rtld_machdep.h depends on struct Obj_Entry and _rtld_error()
+#include "rtld_machdep.h"
 
 /*
  * Function declarations.
@@ -367,9 +387,10 @@ void dump_Elf_Rela(Obj_Entry *, const Elf_Rela *, u_long);
 unsigned long elf_hash(const char *);
 const Elf_Sym *find_symdef(unsigned long, const Obj_Entry *,
   const Obj_Entry **, int, SymCache *, struct Struct_RtldLockState *);
+void ifunc_init(Elf_Auxinfo[__min_size(AT_COUNT)]);
 void init_pltgot(Obj_Entry *);
 void lockdflt_init(void);
-void digest_notes(Obj_Entry *, Elf_Addr, Elf_Addr);
+void digest_notes(Obj_Entry *, caddr_t, caddr_t);
 Obj_Entry *globallist_curr(const Obj_Entry *obj);
 Obj_Entry *globallist_next(const Obj_Entry *obj);
 void obj_free(Obj_Entry *);
@@ -385,6 +406,7 @@ void *allocate_module_tls(int index);
 bool allocate_tls_offset(Obj_Entry *obj);
 void free_tls_offset(Obj_Entry *obj);
 const Ver_Entry *fetch_ventry(const Obj_Entry *obj, unsigned long);
+int convert_prot(int elfflags);
 
 /*
  * MD function declarations.
@@ -397,5 +419,7 @@ int reloc_jmpslots(Obj_Entry *, int flags, struct Struct_RtldLockState *);
 int reloc_iresolve(Obj_Entry *, struct Struct_RtldLockState *);
 int reloc_gnu_ifunc(Obj_Entry *, int flags, struct Struct_RtldLockState *);
 void allocate_initial_tls(Obj_Entry *);
+
+void process___cap_relocs(Obj_Entry*);
 
 #endif /* } */

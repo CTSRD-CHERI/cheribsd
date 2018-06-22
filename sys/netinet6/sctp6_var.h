@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2001-2007, by Cisco Systems, Inc. All rights reserved.
  * Copyright (c) 2008-2012, by Randall Stewart. All rights reserved.
  * Copyright (c) 2008-2012, by Michael Tuexen. All rights reserved.
@@ -47,10 +49,8 @@ int
 sctp6_output(struct sctp_inpcb *, struct mbuf *, struct sockaddr *,
     struct mbuf *, struct proc *);
 void sctp6_ctlinput(int, struct sockaddr *, void *);
-extern void 
-sctp6_notify(struct sctp_inpcb *, struct icmp6_hdr *,
-    struct sctphdr *, struct sockaddr *,
-    struct sctp_tcb *, struct sctp_nets *);
-
+void 
+sctp6_notify(struct sctp_inpcb *, struct sctp_tcb *, struct sctp_nets *,
+    uint8_t, uint8_t, uint32_t);
 #endif
 #endif

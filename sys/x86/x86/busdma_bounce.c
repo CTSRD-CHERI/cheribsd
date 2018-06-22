@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1997, 1998 Justin T. Gibbs.
  * All rights reserved.
  *
@@ -262,6 +264,8 @@ bounce_bus_dmamap_create(bus_dma_tag_t dmat, int flags, bus_dmamap_t *mapp)
 	struct bounce_zone *bz;
 	int error, maxpages, pages;
 
+	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL, "%s", __func__);
+
 	error = 0;
 
 	if (dmat->segments == NULL) {
@@ -371,6 +375,8 @@ bounce_bus_dmamem_alloc(bus_dma_tag_t dmat, void** vaddr, int flags,
 	vm_memattr_t attr;
 	int mflags;
 
+	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL, "%s", __func__);
+
 	if (flags & BUS_DMA_NOWAIT)
 		mflags = M_NOWAIT;
 	else
@@ -396,23 +402,36 @@ bounce_bus_dmamem_alloc(bus_dma_tag_t dmat, void** vaddr, int flags,
 	else
 		attr = VM_MEMATTR_DEFAULT;
 
-	/* 
-	 * XXX:
-	 * (dmat->alignment <= dmat->maxsize) is just a quick hack; the exact
-	 * alignment guarantees of malloc need to be nailed down, and the
-	 * code below should be rewritten to take that into account.
+	/*
+	 * Allocate the buffer from the malloc(9) allocator if...
+	 *  - It's small enough to fit into a single power of two sized bucket.
+	 *  - The alignment is less than or equal to the maximum size
+	 *  - The low address requirement is fulfilled.
+	 * else allocate non-contiguous pages if...
+	 *  - The page count that could get allocated doesn't exceed
+	 *    nsegments also when the maximum segment size is less
+	 *    than PAGE_SIZE.
+	 *  - The alignment constraint isn't larger than a page boundary.
+	 *  - There are no boundary-crossing constraints.
+	 * else allocate a block of contiguous pages because one or more of the
+	 * constraints is something that only the contig allocator can fulfill.
 	 *
-	 * In the meantime, we'll warn the user if malloc gets it wrong.
+	 * NOTE: The (dmat->common.alignment <= dmat->maxsize) check
+	 * below is just a quick hack. The exact alignment guarantees
+	 * of malloc(9) need to be nailed down, and the code below
+	 * should be rewritten to take that into account.
+	 *
+	 * In the meantime warn the user if malloc gets it wrong.
 	 */
 	if ((dmat->common.maxsize <= PAGE_SIZE) &&
 	   (dmat->common.alignment <= dmat->common.maxsize) &&
 	    dmat->common.lowaddr >= ptoa((vm_paddr_t)Maxmem) &&
 	    attr == VM_MEMATTR_DEFAULT) {
 		*vaddr = malloc(dmat->common.maxsize, M_DEVBUF, mflags);
-	} else if (dmat->common.nsegments >= btoc(dmat->common.maxsize) &&
+	} else if (dmat->common.nsegments >=
+	    howmany(dmat->common.maxsize, MIN(dmat->common.maxsegsz, PAGE_SIZE)) &&
 	    dmat->common.alignment <= PAGE_SIZE &&
-	    (dmat->common.boundary == 0 ||
-	    dmat->common.boundary >= dmat->common.lowaddr)) {
+	    (dmat->common.boundary % PAGE_SIZE) == 0) {
 		/* Page-based multi-segment allocations allowed */
 		*vaddr = (void *)kmem_alloc_attr(kernel_arena,
 		    dmat->common.maxsize, mflags, 0ul, dmat->common.lowaddr,
@@ -476,7 +495,8 @@ _bus_dmamap_count_phys(bus_dma_tag_t dmat, bus_dmamap_t map, vm_paddr_t buf,
 		while (buflen != 0) {
 			sgsize = MIN(buflen, dmat->common.maxsegsz);
 			if (bus_dma_run_filter(&dmat->common, curaddr)) {
-				sgsize = MIN(PAGE_SIZE, sgsize);
+				sgsize = MIN(sgsize,
+				    PAGE_SIZE - (curaddr & PAGE_MASK));
 				map->pagesneeded++;
 			}
 			curaddr += sgsize;
@@ -516,7 +536,8 @@ _bus_dmamap_count_pages(bus_dma_tag_t dmat, bus_dmamap_t map, pmap_t pmap,
 			else
 				paddr = pmap_extract(pmap, vaddr);
 			if (bus_dma_run_filter(&dmat->common, paddr) != 0) {
-				sg_len = PAGE_SIZE;
+				sg_len = roundup2(sg_len,
+				    dmat->common.alignment);
 				map->pagesneeded++;
 			}
 			vaddr += sg_len;
@@ -552,7 +573,9 @@ _bus_dmamap_count_ma(bus_dma_tag_t dmat, bus_dmamap_t map, struct vm_page **ma,
 			max_sgsize = MIN(buflen, dmat->common.maxsegsz);
 			sg_len = MIN(sg_len, max_sgsize);
 			if (bus_dma_run_filter(&dmat->common, paddr) != 0) {
-				sg_len = MIN(PAGE_SIZE, max_sgsize);
+				sg_len = roundup2(sg_len,
+				    dmat->common.alignment);
+				sg_len = MIN(sg_len, max_sgsize);
 				KASSERT((sg_len & (dmat->common.alignment - 1))
 				    == 0, ("Segment size is not aligned"));
 				map->pagesneeded++;
@@ -648,7 +671,7 @@ bounce_bus_dmamap_load_phys(bus_dma_tag_t dmat, bus_dmamap_t map,
     int *segp)
 {
 	bus_size_t sgsize;
-	bus_addr_t curaddr, nextaddr;
+	bus_addr_t curaddr;
 	int error;
 
 	if (map == NULL)
@@ -672,12 +695,9 @@ bounce_bus_dmamap_load_phys(bus_dma_tag_t dmat, bus_dmamap_t map,
 		if (((dmat->bounce_flags & BUS_DMA_COULD_BOUNCE) != 0) &&
 		    map->pagesneeded != 0 &&
 		    bus_dma_run_filter(&dmat->common, curaddr)) {
-			nextaddr = 0;
-			sgsize = MIN(PAGE_SIZE, sgsize);
-			if ((curaddr & PAGE_MASK) + sgsize > PAGE_SIZE)
-				nextaddr = roundup2(curaddr, PAGE_SIZE);
-			curaddr = add_bounce_page(dmat, map, 0, curaddr,
-			    nextaddr, sgsize);
+			sgsize = MIN(sgsize, PAGE_SIZE - (curaddr & PAGE_MASK));
+			curaddr = add_bounce_page(dmat, map, 0, curaddr, 0,
+			    sgsize);
 		}
 		sgsize = _bus_dmamap_addseg(dmat, map, curaddr, sgsize, segs,
 		    segp);
@@ -743,7 +763,8 @@ bounce_bus_dmamap_load_buffer(bus_dma_tag_t dmat, bus_dmamap_t map, void *buf,
 		if (((dmat->bounce_flags & BUS_DMA_COULD_BOUNCE) != 0) &&
 		    map->pagesneeded != 0 &&
 		    bus_dma_run_filter(&dmat->common, curaddr)) {
-			sgsize = MIN(PAGE_SIZE, max_sgsize);
+			sgsize = roundup2(sgsize, dmat->common.alignment);
+			sgsize = MIN(sgsize, max_sgsize);
 			curaddr = add_bounce_page(dmat, map, kvaddr, curaddr, 0,
 			    sgsize);
 		} else {
@@ -772,6 +793,17 @@ bounce_bus_dmamap_load_ma(bus_dma_tag_t dmat, bus_dmamap_t map,
 	int error, page_index;
 	bus_size_t sgsize, max_sgsize;
 
+	if (dmat->common.flags & BUS_DMA_KEEP_PG_OFFSET) {
+		/*
+		 * If we have to keep the offset of each page this function
+		 * is not suitable, switch back to bus_dmamap_load_ma_triv
+		 * which is going to do the right thing in this case.
+		 */
+		error = bus_dmamap_load_ma_triv(dmat, map, ma, buflen, ma_offs,
+		    flags, segs, segp);
+		return (error);
+	}
+
 	if (map == NULL)
 		map = &nobounce_dmamap;
 
@@ -798,7 +830,10 @@ bounce_bus_dmamap_load_ma(bus_dma_tag_t dmat, bus_dmamap_t map,
 		if (((dmat->bounce_flags & BUS_DMA_COULD_BOUNCE) != 0) &&
 		    map->pagesneeded != 0 &&
 		    bus_dma_run_filter(&dmat->common, paddr)) {
-			sgsize = MIN(PAGE_SIZE, max_sgsize);
+			sgsize = roundup2(sgsize, dmat->common.alignment);
+			sgsize = MIN(sgsize, max_sgsize);
+			KASSERT((sgsize & (dmat->common.alignment - 1)) == 0,
+			    ("Segment size is not aligned"));
 			/*
 			 * Check if two pages of the user provided buffer
 			 * are used.
@@ -1159,6 +1194,13 @@ add_bounce_page(bus_dma_tag_t dmat, bus_dmamap_t map, vm_offset_t vaddr,
 	bz->active_bpages++;
 	mtx_unlock(&bounce_lock);
 
+	if (dmat->common.flags & BUS_DMA_KEEP_PG_OFFSET) {
+		/* Page offset needs to be preserved. */
+		bpage->vaddr |= addr1 & PAGE_MASK;
+		bpage->busaddr |= addr1 & PAGE_MASK;
+		KASSERT(addr2 == 0,
+	("Trying to bounce multiple pages with BUS_DMA_KEEP_PG_OFFSET"));
+	}
 	bpage->datavaddr = vaddr;
 	bpage->datapage[0] = PHYS_TO_VM_PAGE(addr1);
 	KASSERT((addr2 & PAGE_MASK) == 0, ("Second page is not aligned"));
@@ -1178,6 +1220,15 @@ free_bounce_page(bus_dma_tag_t dmat, struct bounce_page *bpage)
 	bz = dmat->bounce_zone;
 	bpage->datavaddr = 0;
 	bpage->datacount = 0;
+	if (dmat->common.flags & BUS_DMA_KEEP_PG_OFFSET) {
+		/*
+		 * Reset the bounce page to start at offset 0.  Other uses
+		 * of this bounce page may need to store a full page of
+		 * data and/or assume it starts on a page boundary.
+		 */
+		bpage->vaddr &= ~PAGE_MASK;
+		bpage->busaddr &= ~PAGE_MASK;
+	}
 
 	mtx_lock(&bounce_lock);
 	STAILQ_INSERT_HEAD(&bz->bounce_page_list, bpage, links);

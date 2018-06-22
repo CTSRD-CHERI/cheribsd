@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2008 Poul-Henning Kamp
  * Copyright (c) 2010 Alexander Motin <mav@FreeBSD.org>
  * All rights reserved.
@@ -53,8 +55,16 @@ __FBSDID("$FreeBSD$");
 #include <machine/intr_machdep.h>
 #include "clock_if.h"
 
+/*
+ * clock_lock protects low-level access to individual hardware registers.
+ * atrtc_time_lock protects the entire sequence of accessing multiple registers
+ * to read or write the date and time.
+ */
 #define	RTC_LOCK	do { if (!kdb_active) mtx_lock_spin(&clock_lock); } while (0)
 #define	RTC_UNLOCK	do { if (!kdb_active) mtx_unlock_spin(&clock_lock); } while (0)
+
+struct mtx atrtc_time_lock;
+MTX_SYSINIT(atrtc_lock_init, &atrtc_time_lock, "atrtc", MTX_DEF);
 
 int	atrtcclock_disable = 0;
 
@@ -102,7 +112,12 @@ writertc(int reg, u_char val)
 static __inline int
 readrtc(int port)
 {
-	return(bcd2bin(rtcin(port)));
+	int readval;
+
+	readval = rtcin(port);
+	if (readval >= 0 && (readval & 0xf) < 0xa && (readval & 0xf0) < 0xa0)
+		return (bcd2bin(readval));
+	return (0);
 }
 
 static void
@@ -149,6 +164,37 @@ atrtc_restore(void)
 	writertc(RTC_STATUSA, rtc_statusa);
 	writertc(RTC_STATUSB, rtc_statusb);
 	rtcin(RTC_INTR);
+}
+
+static void
+atrtc_set(struct timespec *ts)
+{
+	struct clocktime ct;
+
+	clock_ts_to_ct(ts, &ct);
+
+	mtx_lock(&atrtc_time_lock);
+
+	/* Disable RTC updates and interrupts. */
+	writertc(RTC_STATUSB, RTCSB_HALT | RTCSB_24HR);
+
+	writertc(RTC_SEC, bin2bcd(ct.sec)); 		/* Write back Seconds */
+	writertc(RTC_MIN, bin2bcd(ct.min)); 		/* Write back Minutes */
+	writertc(RTC_HRS, bin2bcd(ct.hour));		/* Write back Hours   */
+
+	writertc(RTC_WDAY, ct.dow + 1);			/* Write back Weekday */
+	writertc(RTC_DAY, bin2bcd(ct.day));		/* Write back Day */
+	writertc(RTC_MONTH, bin2bcd(ct.mon));           /* Write back Month   */
+	writertc(RTC_YEAR, bin2bcd(ct.year % 100));	/* Write back Year    */
+#ifdef USE_RTC_CENTURY
+	writertc(RTC_CENTURY, bin2bcd(ct.year / 100));	/* ... and Century    */
+#endif
+
+	/* Re-enable RTC updates and interrupts. */
+	writertc(RTC_STATUSB, rtc_statusb);
+	rtcin(RTC_INTR);
+
+	mtx_unlock(&atrtc_time_lock);
 }
 
 /**********************************************************************
@@ -297,28 +343,8 @@ atrtc_resume(device_t dev)
 static int
 atrtc_settime(device_t dev __unused, struct timespec *ts)
 {
-	struct clocktime ct;
 
-	clock_ts_to_ct(ts, &ct);
-
-	/* Disable RTC updates and interrupts. */
-	writertc(RTC_STATUSB, RTCSB_HALT | RTCSB_24HR);
-
-	writertc(RTC_SEC, bin2bcd(ct.sec)); 		/* Write back Seconds */
-	writertc(RTC_MIN, bin2bcd(ct.min)); 		/* Write back Minutes */
-	writertc(RTC_HRS, bin2bcd(ct.hour));		/* Write back Hours   */
-
-	writertc(RTC_WDAY, ct.dow + 1);			/* Write back Weekday */
-	writertc(RTC_DAY, bin2bcd(ct.day));		/* Write back Day */
-	writertc(RTC_MONTH, bin2bcd(ct.mon));           /* Write back Month   */
-	writertc(RTC_YEAR, bin2bcd(ct.year % 100));	/* Write back Year    */
-#ifdef USE_RTC_CENTURY
-	writertc(RTC_CENTURY, bin2bcd(ct.year / 100));	/* ... and Century    */
-#endif
-
-	/* Reenable RTC updates and interrupts. */
-	writertc(RTC_STATUSB, rtc_statusb);
-	rtcin(RTC_INTR);
+	atrtc_set(ts);
 	return (0);
 }
 
@@ -340,6 +366,7 @@ atrtc_gettime(device_t dev, struct timespec *ts)
 	 * to make sure that no more than 240us pass after we start reading,
 	 * and try again if so.
 	 */
+	mtx_lock(&atrtc_time_lock);
 	while (rtcin(RTC_STATUSA) & RTCSA_TUP)
 		continue;
 	critical_enter();
@@ -357,6 +384,7 @@ atrtc_gettime(device_t dev, struct timespec *ts)
 	ct.year += (ct.year < 80 ? 2000 : 1900);
 #endif
 	critical_exit();
+	mtx_unlock(&atrtc_time_lock);
 	/* Set dow = -1 because some clocks don't set it correctly. */
 	ct.dow = -1;
 	return (clock_ct_to_ts(&ct, ts));

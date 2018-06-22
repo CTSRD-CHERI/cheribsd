@@ -30,14 +30,14 @@
  */
 
 #include <sys/types.h>
-#include <sys/capability.h>
+#include <sys/capsicum.h>
 #include <sys/mman.h>
 
-#include <machine/cheri.h>
 #include <machine/sysarch.h>
 
-#include <cheri/cheri_memcpy.h>
-#include <cheri/cheri_system.h>
+#include <cheri/cheri.h>
+#include <cheri/libcheri_memcpy.h>
+#include <cheri/libcheri_system.h>
 
 #include <errno.h>
 #include <png.h>

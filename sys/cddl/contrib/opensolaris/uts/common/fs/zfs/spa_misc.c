@@ -20,11 +20,13 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, 2015 by Delphix. All rights reserved.
+ * Copyright (c) 2011, 2017 by Delphix. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2013 Martin Matuska <mm@FreeBSD.org>. All rights reserved.
  * Copyright (c) 2014 Spectra Logic Corporation, All rights reserved.
  * Copyright 2013 Saso Kiselkov. All rights reserved.
+ * Copyright (c) 2014 Integros [integros.com]
+ * Copyright (c) 2017 Datto Inc.
  */
 
 #include <sys/zfs_context.h>
@@ -38,6 +40,7 @@
 #include <sys/zap.h>
 #include <sys/zil.h>
 #include <sys/vdev_impl.h>
+#include <sys/vdev_file.h>
 #include <sys/metaslab.h>
 #include <sys/uberblock_impl.h>
 #include <sys/txg.h>
@@ -53,6 +56,11 @@
 #include <sys/ddt.h>
 #include "zfs_prop.h"
 #include <sys/zfeature.h>
+
+#if defined(__FreeBSD__) && defined(_KERNEL)
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#endif
 
 /*
  * SPA locking
@@ -254,35 +262,6 @@ int zfs_flags = 0;
  * in leaked space, or worse.
  */
 boolean_t zfs_recover = B_FALSE;
-SYSCTL_DECL(_vfs_zfs);
-SYSCTL_INT(_vfs_zfs, OID_AUTO, recover, CTLFLAG_RWTUN, &zfs_recover, 0,
-    "Try to recover from otherwise-fatal errors.");
-
-static int
-sysctl_vfs_zfs_debug_flags(SYSCTL_HANDLER_ARGS)
-{
-	int err, val;
-
-	val = zfs_flags;
-	err = sysctl_handle_int(oidp, &val, 0, req);
-	if (err != 0 || req->newptr == NULL)
-		return (err);
-
-	/*
-	 * ZFS_DEBUG_MODIFY must be enabled prior to boot so all
-	 * arc buffers in the system have the necessary additional
-	 * checksum data.  However, it is safe to disable at any
-	 * time.
-	 */
-	if (!(zfs_flags & ZFS_DEBUG_MODIFY))
-		val &= ~ZFS_DEBUG_MODIFY;
-	zfs_flags = val;
-
-	return (0);
-}
-SYSCTL_PROC(_vfs_zfs, OID_AUTO, debug_flags,
-    CTLTYPE_UINT | CTLFLAG_MPSAFE | CTLFLAG_RWTUN, 0, sizeof(int),
-    sysctl_vfs_zfs_debug_flags, "IU", "Debug flags for ZFS testing.");
 
 /*
  * If destroy encounters an EIO while reading metadata (e.g. indirect
@@ -324,26 +303,18 @@ boolean_t zfs_free_leak_on_eio = B_FALSE;
  * in a system panic.
  */
 uint64_t zfs_deadman_synctime_ms = 1000000ULL;
-SYSCTL_UQUAD(_vfs_zfs, OID_AUTO, deadman_synctime_ms, CTLFLAG_RDTUN,
-    &zfs_deadman_synctime_ms, 0,
-    "Stalled ZFS I/O expiration time in milliseconds");
 
 /*
  * Check time in milliseconds. This defines the frequency at which we check
  * for hung I/O.
  */
 uint64_t zfs_deadman_checktime_ms = 5000ULL;
-SYSCTL_UQUAD(_vfs_zfs, OID_AUTO, deadman_checktime_ms, CTLFLAG_RDTUN,
-    &zfs_deadman_checktime_ms, 0,
-    "Period of checks for stalled ZFS I/O in milliseconds");
 
 /*
  * Default value of -1 for zfs_deadman_enabled is resolved in
  * zfs_deadman_init()
  */
 int zfs_deadman_enabled = -1;
-SYSCTL_INT(_vfs_zfs, OID_AUTO, deadman_enabled, CTLFLAG_RDTUN,
-    &zfs_deadman_enabled, 0, "Kernel panic on stalled ZFS I/O");
 
 /*
  * The worst case is single-sector max-parity RAID-Z blocks, in which
@@ -355,8 +326,50 @@ SYSCTL_INT(_vfs_zfs, OID_AUTO, deadman_enabled, CTLFLAG_RDTUN,
  *     (VDEV_RAIDZ_MAXPARITY + 1) * SPA_DVAS_PER_BP * 2 == 24
  */
 int spa_asize_inflation = 24;
+
+#if defined(__FreeBSD__) && defined(_KERNEL)
+SYSCTL_DECL(_vfs_zfs);
+SYSCTL_INT(_vfs_zfs, OID_AUTO, recover, CTLFLAG_RWTUN, &zfs_recover, 0,
+    "Try to recover from otherwise-fatal errors.");
+
+static int
+sysctl_vfs_zfs_debug_flags(SYSCTL_HANDLER_ARGS)
+{
+	int err, val;
+
+	val = zfs_flags;
+	err = sysctl_handle_int(oidp, &val, 0, req);
+	if (err != 0 || req->newptr == NULL)
+		return (err);
+
+	/*
+	 * ZFS_DEBUG_MODIFY must be enabled prior to boot so all
+	 * arc buffers in the system have the necessary additional
+	 * checksum data.  However, it is safe to disable at any
+	 * time.
+	 */
+	if (!(zfs_flags & ZFS_DEBUG_MODIFY))
+		val &= ~ZFS_DEBUG_MODIFY;
+	zfs_flags = val;
+
+	return (0);
+}
+
+SYSCTL_PROC(_vfs_zfs, OID_AUTO, debugflags,
+    CTLTYPE_UINT | CTLFLAG_MPSAFE | CTLFLAG_RWTUN, 0, sizeof(int),
+    sysctl_vfs_zfs_debug_flags, "IU", "Debug flags for ZFS testing.");
+
+SYSCTL_UQUAD(_vfs_zfs, OID_AUTO, deadman_synctime_ms, CTLFLAG_RDTUN,
+    &zfs_deadman_synctime_ms, 0,
+    "Stalled ZFS I/O expiration time in milliseconds");
+SYSCTL_UQUAD(_vfs_zfs, OID_AUTO, deadman_checktime_ms, CTLFLAG_RDTUN,
+    &zfs_deadman_checktime_ms, 0,
+    "Period of checks for stalled ZFS I/O in milliseconds");
+SYSCTL_INT(_vfs_zfs, OID_AUTO, deadman_enabled, CTLFLAG_RDTUN,
+    &zfs_deadman_enabled, 0, "Kernel panic on stalled ZFS I/O");
 SYSCTL_INT(_vfs_zfs, OID_AUTO, spa_asize_inflation, CTLFLAG_RWTUN,
     &spa_asize_inflation, 0, "Worst case inflation factor for single sector writes");
+#endif
 
 #ifndef illumos
 #ifdef _KERNEL
@@ -400,12 +413,20 @@ zfs_deadman_init()
  * it is possible to run the pool completely out of space, causing it to
  * be permanently read-only.
  *
+ * Note that on very small pools, the slop space will be larger than
+ * 3.2%, in an effort to have it be at least spa_min_slop (128MB),
+ * but we never allow it to be more than half the pool size.
+ *
  * See also the comments in zfs_space_check_t.
  */
 int spa_slop_shift = 5;
 SYSCTL_INT(_vfs_zfs, OID_AUTO, spa_slop_shift, CTLFLAG_RWTUN,
     &spa_slop_shift, 0,
     "Shift value of reserved space (1/(2^spa_slop_shift)).");
+uint64_t spa_min_slop = 128 * 1024 * 1024;
+SYSCTL_UQUAD(_vfs_zfs, OID_AUTO, spa_min_slop, CTLFLAG_RWTUN,
+    &spa_min_slop, 0,
+    "Minimal value of reserved space");
 
 /*
  * ==========================================================================
@@ -578,8 +599,8 @@ spa_lookup(const char *name)
  * If the zfs_deadman_enabled flag is set then it inspects all vdev queues
  * looking for potentially hung I/Os.
  */
-void
-spa_deadman(void *arg)
+static void
+spa_deadman(void *arg, int pending)
 {
 	spa_t *spa = arg;
 
@@ -607,6 +628,16 @@ spa_deadman(void *arg)
 #endif
 #endif
 }
+
+#if defined(__FreeBSD__) && defined(_KERNEL)
+static void
+spa_deadman_timeout(void *arg)
+{
+	spa_t *spa = arg;
+
+	taskqueue_enqueue(taskqueue_thread, &spa->spa_deadman_task);
+}
+#endif
 
 /*
  * Create an uninitialized spa_t with the given name.  Requires
@@ -638,6 +669,7 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 	mutex_init(&spa->spa_scrub_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_suspend_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_vdev_top_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&spa->spa_alloc_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	cv_init(&spa->spa_async_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&spa->spa_evicting_os_cv, NULL, CV_DEFAULT, NULL);
@@ -678,7 +710,23 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 	mutex_exit(&cpu_lock);
 #else	/* !illumos */
 #ifdef _KERNEL
+	/*
+	 * callout(9) does not provide a way to initialize a callout with
+	 * a function and an argument, so we use callout_reset() to schedule
+	 * the callout in the very distant future.  Even if that event ever
+	 * fires, it should be okayas we won't have any active zio-s.
+	 * But normally spa_sync() will reschedule the callout with a proper
+	 * timeout.
+	 * callout(9) does not allow the callback function to sleep but
+	 * vdev_deadman() needs to acquire vq_lock and illumos mutexes are
+	 * emulated using sx(9).  For this reason spa_deadman_timeout()
+	 * will schedule spa_deadman() as task on a taskqueue that allows
+	 * sleeping.
+	 */
+	TASK_INIT(&spa->spa_deadman_task, 0, spa_deadman, spa);
 	callout_init(&spa->spa_deadman_cycid, 1);
+	callout_reset_sbt(&spa->spa_deadman_cycid, SBT_MAX, 0,
+	    spa_deadman_timeout, spa, 0);
 #endif
 #endif
 	refcount_create(&spa->spa_refcount);
@@ -693,6 +741,9 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 		spa->spa_root = spa_strdup(altroot);
 		spa_active_count++;
 	}
+
+	avl_create(&spa->spa_alloc_tree, zio_bookmark_compare,
+	    sizeof (zio_t), offsetof(zio_t, io_alloc_node));
 
 	/*
 	 * Every pool starts with the default cachefile
@@ -772,6 +823,7 @@ spa_remove(spa_t *spa)
 		kmem_free(dp, sizeof (spa_config_dirent_t));
 	}
 
+	avl_destroy(&spa->spa_alloc_tree);
 	list_destroy(&spa->spa_config_list);
 
 	nvlist_free(spa->spa_label_features);
@@ -787,6 +839,7 @@ spa_remove(spa_t *spa)
 #else	/* !illumos */
 #ifdef _KERNEL
 	callout_drain(&spa->spa_deadman_cycid);
+	taskqueue_drain(taskqueue_thread, &spa->spa_deadman_task);
 #endif
 #endif
 
@@ -805,6 +858,7 @@ spa_remove(spa_t *spa)
 	cv_destroy(&spa->spa_scrub_io_cv);
 	cv_destroy(&spa->spa_suspend_cv);
 
+	mutex_destroy(&spa->spa_alloc_lock);
 	mutex_destroy(&spa->spa_async_lock);
 	mutex_destroy(&spa->spa_errlist_lock);
 	mutex_destroy(&spa->spa_errlog_lock);
@@ -1685,6 +1739,16 @@ spa_syncing_txg(spa_t *spa)
 	return (spa->spa_syncing_txg);
 }
 
+/*
+ * Return the last txg where data can be dirtied. The final txgs
+ * will be used to just clear out any deferred frees that remain.
+ */
+uint64_t
+spa_final_dirty_txg(spa_t *spa)
+{
+	return (spa->spa_final_txg - TXG_DEFER_SIZE);
+}
+
 pool_state_t
 spa_state(spa_t *spa)
 {
@@ -1705,21 +1769,23 @@ spa_freeze_txg(spa_t *spa)
 
 /* ARGSUSED */
 uint64_t
-spa_get_asize(spa_t *spa, uint64_t lsize)
+spa_get_worst_case_asize(spa_t *spa, uint64_t lsize)
 {
 	return (lsize * spa_asize_inflation);
 }
 
 /*
  * Return the amount of slop space in bytes.  It is 1/32 of the pool (3.2%),
- * or at least 32MB.
+ * or at least 128MB, unless that would cause it to be more than half the
+ * pool size.
  *
  * See the comment above spa_slop_shift for details.
  */
 uint64_t
-spa_get_slop_space(spa_t *spa) {
+spa_get_slop_space(spa_t *spa)
+{
 	uint64_t space = spa_get_dspace(spa);
-	return (MAX(space >> spa_slop_shift, SPA_MINDEVSIZE >> 1));
+	return (MAX(space >> spa_slop_shift, MIN(space >> 1, spa_min_slop)));
 }
 
 uint64_t
@@ -1950,11 +2016,13 @@ spa_init(int mode)
 	refcount_sysinit();
 	unique_init();
 	range_tree_init();
+	metaslab_alloc_trace_init();
 	zio_init();
 	lz4_init();
 	dmu_init();
 	zil_init();
 	vdev_cache_stat_init();
+	vdev_file_init();
 	zfs_prop_init();
 	zpool_prop_init();
 	zpool_feature_init();
@@ -1974,11 +2042,13 @@ spa_fini(void)
 
 	spa_evict_all();
 
+	vdev_file_fini();
 	vdev_cache_stat_fini();
 	zil_fini();
 	dmu_fini();
 	lz4_fini();
 	zio_fini();
+	metaslab_alloc_trace_fini();
 	range_tree_fini();
 	unique_fini();
 	refcount_fini();
@@ -2076,6 +2146,11 @@ spa_scan_stat_init(spa_t *spa)
 {
 	/* data not stored on disk */
 	spa->spa_scan_pass_start = gethrestime_sec();
+	if (dsl_scan_is_paused_scrub(spa->spa_dsl_pool->dp_scan))
+		spa->spa_scan_pass_scrub_pause = spa->spa_scan_pass_start;
+	else
+		spa->spa_scan_pass_scrub_pause = 0;
+	spa->spa_scan_pass_scrub_spent_paused = 0;
 	spa->spa_scan_pass_exam = 0;
 	vdev_scan_stat_init(spa->spa_root_vdev);
 }
@@ -2106,6 +2181,8 @@ spa_scan_get_stats(spa_t *spa, pool_scan_stat_t *ps)
 	/* data not stored on disk */
 	ps->pss_pass_start = spa->spa_scan_pass_start;
 	ps->pss_pass_exam = spa->spa_scan_pass_exam;
+	ps->pss_pass_scrub_pause = spa->spa_scan_pass_scrub_pause;
+	ps->pss_pass_scrub_spent_paused = spa->spa_scan_pass_scrub_spent_paused;
 
 	return (0);
 }

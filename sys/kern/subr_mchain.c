@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2000, 2001 Boris Popov
  * All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the author nor the names of any co-contributors
+ * 3. Neither the name of the author nor the names of any co-contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -35,6 +37,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 #include <sys/endian.h>
 #include <sys/errno.h>
+#include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/module.h>
 #include <sys/uio.h>
@@ -101,7 +104,7 @@ mb_fixhdr(struct mbchain *mbp)
 /*
  * Check if object of size 'size' fit to the current position and
  * allocate new mbuf if not. Advance pointers and increase length of mbuf(s).
- * Return pointer to the object placeholder or NULL if any error occured.
+ * Return pointer to the object placeholder or NULL if any error occurred.
  * Note: size should be <= MLEN 
  */
 caddr_t
@@ -286,14 +289,13 @@ mb_put_uio(struct mbchain *mbp, struct uio *uiop, int size)
 		}
 		if (left > size)
 			left = size;
-		error = mb_put_mem(mbp, uiop->uio_iov->iov_base, left, mtype);
+		error = mb_put_mem(mbp,
+		    __DECAP_CHECK(uiop->uio_iov->iov_base, left), left, mtype);
 		if (error)
 			return (error);
 		uiop->uio_offset += left;
 		uiop->uio_resid -= left;
-		uiop->uio_iov->iov_base =
-		    (char *)uiop->uio_iov->iov_base + left;
-		uiop->uio_iov->iov_len -= left;
+		IOVEC_ADVANCE(uiop->uio_iov, left);
 		size -= left;
 	}
 	return (0);
@@ -537,7 +539,7 @@ md_get_uio(struct mdchain *mdp, struct uio *uiop, int size)
 			uiop->uio_iovcnt--;
 			continue;
 		}
-		uiocp = uiop->uio_iov->iov_base;
+		uiocp = __DECAP_CHECK(uiop->uio_iov->iov_base, left);
 		if (left > size)
 			left = size;
 		error = md_get_mem(mdp, uiocp, left, mtype);
@@ -545,9 +547,7 @@ md_get_uio(struct mdchain *mdp, struct uio *uiop, int size)
 			return (error);
 		uiop->uio_offset += left;
 		uiop->uio_resid -= left;
-		uiop->uio_iov->iov_base =
-		    (char *)uiop->uio_iov->iov_base + left;
-		uiop->uio_iov->iov_len -= left;
+		IOVEC_ADVANCE(uiop->uio_iov, left);
 		size -= left;
 	}
 	return (0);

@@ -19,6 +19,7 @@ TESTS_SUBDIRS+= aggs \
 		drops \
 		dtraceUtil \
 		end \
+		env \
 		enum \
 		error \
 		exit \
@@ -69,6 +70,7 @@ TESTS_SUBDIRS+= aggs \
 		strlen \
 		strtoll \
 		struct \
+		sugar \
 		syscall \
 		tick-n \
 		trace \
@@ -85,7 +87,5 @@ TESTS_SUBDIRS+= aggs \
 
 .PATH:		${.CURDIR:H:H:H:H:H}/tests
 KYUAFILE=	YES
-
-SUBDIR_PARALLEL=
 
 .include <bsd.test.mk>

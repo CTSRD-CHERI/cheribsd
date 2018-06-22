@@ -266,10 +266,33 @@ fun:reflect.makeFuncStub=discard
 # Replaces __sanitizer_cov_trace_cmp with __dfsw___sanitizer_cov_trace_cmp
 fun:__sanitizer_cov_trace_cmp=custom
 fun:__sanitizer_cov_trace_cmp=uninstrumented
+fun:__sanitizer_cov_trace_cmp1=custom
+fun:__sanitizer_cov_trace_cmp1=uninstrumented
+fun:__sanitizer_cov_trace_cmp2=custom
+fun:__sanitizer_cov_trace_cmp2=uninstrumented
+fun:__sanitizer_cov_trace_cmp4=custom
+fun:__sanitizer_cov_trace_cmp4=uninstrumented
+fun:__sanitizer_cov_trace_cmp8=custom
+fun:__sanitizer_cov_trace_cmp8=uninstrumented
+# Similar for __sanitizer_cov_trace_switch
+fun:__sanitizer_cov_trace_switch=custom
+fun:__sanitizer_cov_trace_switch=uninstrumented
 
 # Ignores all other __sanitizer callbacks.
-fun:__sanitizer_*=uninstrumented
-fun:__sanitizer_*=discard
+fun:__sanitizer_cov=uninstrumented
+fun:__sanitizer_cov=discard
+fun:__sanitizer_cov_module_init=uninstrumented
+fun:__sanitizer_cov_module_init=discard
+fun:__sanitizer_cov_with_check=uninstrumented
+fun:__sanitizer_cov_with_check=discard
+fun:__sanitizer_set_death_callback=uninstrumented
+fun:__sanitizer_set_death_callback=discard
+fun:__sanitizer_update_counter_bitset_and_clear_counters=uninstrumented
+fun:__sanitizer_update_counter_bitset_and_clear_counters=discard
+
+# Ignores the dfsan wrappers.
+fun:__dfsw_*=uninstrumented
+fun:__dfsw_*=discard
 
 # Don't add extra parameters to the Fuzzer callback.
 fun:LLVMFuzzerTestOneInput=uninstrumented

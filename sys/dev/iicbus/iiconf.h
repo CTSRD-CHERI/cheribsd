@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1998, 2001 Nicolas Souchu
  * All rights reserved.
  *
@@ -82,7 +84,7 @@
 /*
  * adapter layer errors
  */
-#define IIC_NOERR	0x0	/* no error occured */
+#define	IIC_NOERR	0x0	/* no error occurred */
 #define IIC_EBUSERR	0x1	/* bus error (hardware not in expected state) */
 #define IIC_ENOACK	0x2	/* ack not received until timeout */
 #define IIC_ETIMEOUT	0x3	/* timeout */
@@ -132,6 +134,16 @@ int iicbus_transfer(device_t bus, struct iic_msg *msgs, uint32_t nmsgs);
 int iicbus_transfer_excl(device_t bus, struct iic_msg *msgs, uint32_t nmsgs,
     int how);
 int iicbus_transfer_gen(device_t bus, struct iic_msg *msgs, uint32_t nmsgs);
+
+/*
+ * Simple register read/write routines, but the "register" can be any size.
+ * The transfers are done with iicbus_transfer_excl().  Reads use a repeat-start
+ * between sending the address and reading; writes use a single start/stop.
+ */
+int iicdev_readfrom(device_t _slavedev, uint8_t _regaddr, void *_buffer,
+    uint16_t _buflen, int _waithow);
+int iicdev_writeto(device_t _slavedev, uint8_t _regaddr, void *_buffer,
+    uint16_t _buflen, int _waithow);
 
 #define IICBUS_MODVER	1
 #define IICBUS_MINVER	1

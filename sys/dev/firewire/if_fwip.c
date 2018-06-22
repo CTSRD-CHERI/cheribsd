@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2004
  *	Doug Rabson
  * Copyright (c) 2002-2003
@@ -381,7 +383,7 @@ fwip_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int s, error;
 
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		s = splimp();
 		if (ifp->if_flags & IFF_UP) {
 			if (!(ifp->if_drv_flags & IFF_DRV_RUNNING))
@@ -392,33 +394,31 @@ fwip_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		splx(s);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 #ifdef DEVICE_POLLING
 	    {
 		struct ifreq *ifr = (struct ifreq *) data;
 		struct firewire_comm *fc = fwip->fd.fc;
 
-		if (ifr->ifr_reqcap & IFCAP_POLLING &&
+		if (ifr_reqcap_get(ifr) & IFCAP_POLLING &&
 		    !(ifp->if_capenable & IFCAP_POLLING)) {
 			error = ether_poll_register(fwip_poll, ifp);
 			if (error)
 				return (error);
 			/* Disable interrupts */
 			fc->set_intr(fc, 0);
-			ifp->if_capenable |= IFCAP_POLLING |
-			    IFCAP_POLLING_NOCOUNT;
+			ifp->if_capenable |= IFCAP_POLLING;
 			return (error);
 		}
-		if (!(ifr->ifr_reqcap & IFCAP_POLLING) &&
+		if (!(ifr_reqcap_get(ifr) & IFCAP_POLLING) &&
 		    ifp->if_capenable & IFCAP_POLLING) {
 			error = ether_poll_deregister(ifp);
 			/* Enable interrupts. */
 			fc->set_intr(fc, 1);
 			ifp->if_capenable &= ~IFCAP_POLLING;
-			ifp->if_capenable &= ~IFCAP_POLLING_NOCOUNT;
 			return (error);
 		}
 	    }
@@ -575,7 +575,7 @@ fwip_async_output(struct fwip_softc *fwip, struct ifnet *ifp)
 		 */
 		mtag = m_tag_locate(m, MTAG_FIREWIRE, MTAG_FIREWIRE_HWADDR, 0);
 		if (mtag == NULL)
-			destfw = 0;
+			destfw = NULL;
 		else
 			destfw = (struct fw_hwaddr *) (mtag + 1);
 
@@ -739,7 +739,7 @@ fwip_stream_input(struct fw_xferq *xferq)
 		/*
 		 * We must have a GASP header - leave the
 		 * encapsulation sanity checks to the generic
-		 * code. Remeber that we also have the firewire async
+		 * code. Remember that we also have the firewire async
 		 * stream header even though that isn't accounted for
 		 * in mode.stream.len.
 		 */

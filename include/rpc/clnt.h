@@ -1,6 +1,8 @@
 /*	$NetBSD: clnt.h,v 1.14 2000/06/02 22:57:55 fvdl Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2010, Oracle America, Inc.
  * All rights reserved.
  *
@@ -30,6 +32,17 @@
  *	from: @(#)clnt.h 1.31 94/04/29 SMI
  *	from: @(#)clnt.h	2.1 88/07/29 4.0 RPCSRC
  * $FreeBSD$
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "sunrpc"
+ * }
+ * CHERI CHANGES END
  */
 
 /*
@@ -516,7 +529,7 @@ __END_DECLS
  *	const char		*nettype;	-- Transport type
  */
 
-typedef bool_t (*resultproc_t)(caddr_t, ...);
+typedef bool_t (*resultproc_t)(caddr_t, void *, void *);
 
 __BEGIN_DECLS
 extern enum clnt_stat rpc_broadcast(const rpcprog_t, const rpcvers_t,

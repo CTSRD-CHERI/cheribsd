@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause AND BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2002-2005 M Warner Losh.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -402,7 +404,7 @@ exca_mem_set_offset(struct exca_softc *sc, struct resource *res,
 		    "set_memory_offset: specified resource not active\n");
 		return (ENOENT);
 	}
-	sc->mem[win].cardaddr = cardaddr & ~(EXCA_MEM_PAGESIZE - 1);
+	sc->mem[win].cardaddr = rounddown2(cardaddr, EXCA_MEM_PAGESIZE);
 	delta = cardaddr % EXCA_MEM_PAGESIZE;
 	if (deltap)
 		*deltap = delta;

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright 2006-2007 by Juniper Networks.
  * Copyright 2008 Semihalf.
  * Copyright 2010 The FreeBSD Foundation
@@ -58,11 +60,10 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_pci.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
+#include <dev/ofw/ofwpci.h>
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcib_private.h>
-
-#include <powerpc/ofw/ofw_pci.h>
 
 #include "ofw_bus_if.h"
 #include "pcib_if.h"
@@ -656,7 +657,8 @@ fsl_pcib_inbound(struct fsl_pcib_softc *sc, int wnd, int tgt, uint64_t start,
 
 	switch (tgt) {
 	/* XXX OCP85XX_TGTIF_RAM2, OCP85XX_TGTIF_RAM_INTL should be handled */
-	case OCP85XX_TGTIF_RAM1:
+	case OCP85XX_TGTIF_RAM1_85XX:
+	case OCP85XX_TGTIF_RAM1_QORIQ:
 		attr = 0xa0f55000 | (ffsl(size) - 2);
 		break;
 	default:

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -29,13 +31,23 @@
  *	@(#)extern.h	8.2 (Berkeley) 4/28/95
  * $FreeBSD$
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_integrity"
+ *   ],
+ *   "change_comment": "BDB hashes don't preserve tags"
+ * }
+ * CHERI CHANGES END
+ */
 
 #ifndef	_EXTERN_H_
 #define	_EXTERN_H_
 
 extern char tbuf[1024];			/* Temp buffer for anybody. */
 extern int entries;			/* Number of people. */
-extern DB *db;				/* Database. */
 extern int d_first;
 extern sa_family_t family;
 extern int gflag;
@@ -44,6 +56,7 @@ extern time_t now;
 extern int oflag;
 extern int pplan;			/* don't show .plan/.project */
 extern int invoker_root;		/* Invoked by root */
+extern PERSON *people;
 
 void	 enter_lastlog(PERSON *);
 PERSON	*enter_person(struct passwd *);
@@ -54,6 +67,7 @@ void	 lflag_print(void);
 int	 match(struct passwd *, const char *);
 void	 netfinger(char *);
 PERSON	*palloc(void);
+int	 psort(PERSON *, PERSON *);
 char	*prphone(char *);
 void	 sflag_print(void);
 int	 show_text(const char *, const char *, const char *);

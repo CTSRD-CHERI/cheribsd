@@ -140,6 +140,8 @@ struct acpi_cpu_device {
 #define	CST_FFH_MWAIT_HW_COORD	0x0001
 #define	CST_FFH_MWAIT_BM_AVOID	0x0002
 
+#define	CPUDEV_DEVICE_ID	"ACPI0007"
+
 /* Allow users to ignore processor orders in MADT. */
 static int cpu_unordered;
 SYSCTL_INT(_debug_acpi, OID_AUTO, cpu_unordered, CTLFLAG_RDTUN,
@@ -236,14 +238,21 @@ MODULE_DEPEND(cpu, acpi, 1, 1, 1);
 static int
 acpi_cpu_probe(device_t dev)
 {
+    static char		   *cpudev_ids[] = { CPUDEV_DEVICE_ID, NULL };
     int			   acpi_id, cpu_id;
     ACPI_BUFFER		   buf;
     ACPI_HANDLE		   handle;
     ACPI_OBJECT		   *obj;
     ACPI_STATUS		   status;
+    ACPI_OBJECT_TYPE	   type;
 
-    if (acpi_disabled("cpu") || acpi_get_type(dev) != ACPI_TYPE_PROCESSOR ||
-	    acpi_cpu_disabled)
+    if (acpi_disabled("cpu") || acpi_cpu_disabled)
+	return (ENXIO);
+    type = acpi_get_type(dev);
+    if (type != ACPI_TYPE_PROCESSOR && type != ACPI_TYPE_DEVICE)
+	return (ENXIO);
+    if (type == ACPI_TYPE_DEVICE &&
+	ACPI_ID_PROBE(device_get_parent(dev), dev, cpudev_ids) == NULL)
 	return (ENXIO);
 
     handle = acpi_get_handle(dev);
@@ -251,29 +260,39 @@ acpi_cpu_probe(device_t dev)
 	cpu_softc = malloc(sizeof(struct acpi_cpu_softc *) *
 	    (mp_maxid + 1), M_TEMP /* XXX */, M_WAITOK | M_ZERO);
 
-    /* Get our Processor object. */
-    buf.Pointer = NULL;
-    buf.Length = ACPI_ALLOCATE_BUFFER;
-    status = AcpiEvaluateObject(handle, NULL, NULL, &buf);
-    if (ACPI_FAILURE(status)) {
-	device_printf(dev, "probe failed to get Processor obj - %s\n",
-		      AcpiFormatException(status));
-	return (ENXIO);
-    }
-    obj = (ACPI_OBJECT *)buf.Pointer;
-    if (obj->Type != ACPI_TYPE_PROCESSOR) {
-	device_printf(dev, "Processor object has bad type %d\n", obj->Type);
-	AcpiOsFree(obj);
-	return (ENXIO);
-    }
+    if (type == ACPI_TYPE_PROCESSOR) {
+	/* Get our Processor object. */
+	buf.Pointer = NULL;
+	buf.Length = ACPI_ALLOCATE_BUFFER;
+	status = AcpiEvaluateObject(handle, NULL, NULL, &buf);
+	if (ACPI_FAILURE(status)) {
+	    device_printf(dev, "probe failed to get Processor obj - %s\n",
+		AcpiFormatException(status));
+	    return (ENXIO);
+	}
+	obj = (ACPI_OBJECT *)buf.Pointer;
+	if (obj->Type != ACPI_TYPE_PROCESSOR) {
+	    device_printf(dev, "Processor object has bad type %d\n",
+		obj->Type);
+	    AcpiOsFree(obj);
+	    return (ENXIO);
+	}
 
-    /*
-     * Find the processor associated with our unit.  We could use the
-     * ProcId as a key, however, some boxes do not have the same values
-     * in their Processor object as the ProcId values in the MADT.
-     */
-    acpi_id = obj->Processor.ProcId;
-    AcpiOsFree(obj);
+	/*
+	 * Find the processor associated with our unit.  We could use the
+	 * ProcId as a key, however, some boxes do not have the same values
+	 * in their Processor object as the ProcId values in the MADT.
+	 */
+	acpi_id = obj->Processor.ProcId;
+	AcpiOsFree(obj);
+    } else {
+	status = acpi_GetInteger(handle, "_UID", &acpi_id);
+	if (ACPI_FAILURE(status)) {
+	    device_printf(dev, "Device object has bad value - %s\n",
+		AcpiFormatException(status));
+	    return (ENXIO);
+	}
+    }
     if (acpi_pcpu_get_id(dev, &acpi_id, &cpu_id) != 0)
 	return (ENXIO);
 
@@ -296,7 +315,7 @@ static int
 acpi_cpu_attach(device_t dev)
 {
     ACPI_BUFFER		   buf;
-    ACPI_OBJECT		   arg[4], *obj;
+    ACPI_OBJECT		   arg, *obj;
     ACPI_OBJECT_LIST	   arglist;
     struct pcpu		   *pcpu_data;
     struct acpi_cpu_softc *sc;
@@ -325,19 +344,32 @@ acpi_cpu_attach(device_t dev)
     cpu_smi_cmd = AcpiGbl_FADT.SmiCommand;
     cpu_cst_cnt = AcpiGbl_FADT.CstControl;
 
-    buf.Pointer = NULL;
-    buf.Length = ACPI_ALLOCATE_BUFFER;
-    status = AcpiEvaluateObject(sc->cpu_handle, NULL, NULL, &buf);
-    if (ACPI_FAILURE(status)) {
-	device_printf(dev, "attach failed to get Processor obj - %s\n",
-		      AcpiFormatException(status));
-	return (ENXIO);
+    if (acpi_get_type(dev) == ACPI_TYPE_PROCESSOR) {
+	buf.Pointer = NULL;
+	buf.Length = ACPI_ALLOCATE_BUFFER;
+	status = AcpiEvaluateObject(sc->cpu_handle, NULL, NULL, &buf);
+	if (ACPI_FAILURE(status)) {
+	    device_printf(dev, "attach failed to get Processor obj - %s\n",
+		AcpiFormatException(status));
+	    return (ENXIO);
+	}
+	obj = (ACPI_OBJECT *)buf.Pointer;
+	sc->cpu_p_blk = obj->Processor.PblkAddress;
+	sc->cpu_p_blk_len = obj->Processor.PblkLength;
+	sc->cpu_acpi_id = obj->Processor.ProcId;
+	AcpiOsFree(obj);
+    } else {
+	KASSERT(acpi_get_type(dev) == ACPI_TYPE_DEVICE,
+	    ("Unexpected ACPI object"));
+	status = acpi_GetInteger(sc->cpu_handle, "_UID", &sc->cpu_acpi_id);
+	if (ACPI_FAILURE(status)) {
+	    device_printf(dev, "Device object has bad value - %s\n",
+		AcpiFormatException(status));
+	    return (ENXIO);
+	}
+	sc->cpu_p_blk = 0;
+	sc->cpu_p_blk_len = 0;
     }
-    obj = (ACPI_OBJECT *)buf.Pointer;
-    sc->cpu_p_blk = obj->Processor.PblkAddress;
-    sc->cpu_p_blk_len = obj->Processor.PblkLength;
-    sc->cpu_acpi_id = obj->Processor.ProcId;
-    AcpiOsFree(obj);
     ACPI_DEBUG_PRINT((ACPI_DB_INFO, "acpi_cpu%d: P_BLK at %#x/%d\n",
 		     device_get_unit(dev), sc->cpu_p_blk, sc->cpu_p_blk_len));
 
@@ -355,9 +387,6 @@ acpi_cpu_attach(device_t dev)
 	cpu_sysctl_tree = SYSCTL_ADD_NODE(&cpu_sysctl_ctx,
 	    SYSCTL_CHILDREN(acpi_sc->acpi_sysctl_tree), OID_AUTO, "cpu",
 	    CTLFLAG_RD, 0, "node for CPU children");
-
-	/* Queue post cpu-probing task handler */
-	AcpiOsExecute(OSL_NOTIFY_HANDLER, acpi_cpu_startup, NULL);
     }
 
     /*
@@ -391,31 +420,19 @@ acpi_cpu_attach(device_t dev)
      * Intel Processor Vendor-Specific ACPI Interface Specification.
      */
     if (sc->cpu_features) {
-	arglist.Pointer = arg;
-	arglist.Count = 4;
-	arg[0].Type = ACPI_TYPE_BUFFER;
-	arg[0].Buffer.Length = sizeof(cpu_oscuuid);
-	arg[0].Buffer.Pointer = cpu_oscuuid;	/* UUID */
-	arg[1].Type = ACPI_TYPE_INTEGER;
-	arg[1].Integer.Value = 1;		/* revision */
-	arg[2].Type = ACPI_TYPE_INTEGER;
-	arg[2].Integer.Value = 1;		/* count */
-	arg[3].Type = ACPI_TYPE_BUFFER;
-	arg[3].Buffer.Length = sizeof(cap_set);	/* Capabilities buffer */
-	arg[3].Buffer.Pointer = (uint8_t *)cap_set;
-	cap_set[0] = 0;				/* status */
 	cap_set[1] = sc->cpu_features;
-	status = AcpiEvaluateObject(sc->cpu_handle, "_OSC", &arglist, NULL);
+	status = acpi_EvaluateOSC(sc->cpu_handle, cpu_oscuuid, 1, 2, cap_set,
+	    cap_set, false);
 	if (ACPI_SUCCESS(status)) {
 	    if (cap_set[0] != 0)
 		device_printf(dev, "_OSC returned status %#x\n", cap_set[0]);
 	}
 	else {
-	    arglist.Pointer = arg;
+	    arglist.Pointer = &arg;
 	    arglist.Count = 1;
-	    arg[0].Type = ACPI_TYPE_BUFFER;
-	    arg[0].Buffer.Length = sizeof(cap_set);
-	    arg[0].Buffer.Pointer = (uint8_t *)cap_set;
+	    arg.Type = ACPI_TYPE_BUFFER;
+	    arg.Buffer.Length = sizeof(cap_set);
+	    arg.Buffer.Pointer = (uint8_t *)cap_set;
 	    cap_set[0] = 1; /* revision */
 	    cap_set[1] = 1; /* number of capabilities integers */
 	    cap_set[2] = sc->cpu_features;
@@ -435,17 +452,32 @@ acpi_cpu_postattach(void *unused __unused)
     device_t *devices;
     int err;
     int i, n;
+    int attached;
 
     err = devclass_get_devices(acpi_cpu_devclass, &devices, &n);
     if (err != 0) {
 	printf("devclass_get_devices(acpi_cpu_devclass) failed\n");
 	return;
     }
+    attached = 0;
+    for (i = 0; i < n; i++)
+	if (device_is_attached(devices[i]) &&
+	    device_get_driver(devices[i]) == &acpi_cpu_driver)
+	    attached = 1;
     for (i = 0; i < n; i++)
 	bus_generic_probe(devices[i]);
     for (i = 0; i < n; i++)
 	bus_generic_attach(devices[i]);
     free(devices, M_TEMP);
+
+    if (attached) {
+#ifdef EARLY_AP_STARTUP
+	acpi_cpu_startup(NULL);
+#else
+	/* Queue post cpu-probing task handler */
+	AcpiOsExecute(OSL_NOTIFY_HANDLER, acpi_cpu_startup, NULL);
+#endif
+    }
 }
 
 SYSINIT(acpi_cpu, SI_SUB_CONFIGURE, SI_ORDER_MIDDLE,
@@ -466,8 +498,8 @@ disable_idle(struct acpi_cpu_softc *sc)
      * is called and executed in such a context with interrupts being re-enabled
      * right before return.
      */
-    smp_rendezvous_cpus(cpuset, smp_no_rendevous_barrier, NULL,
-	smp_no_rendevous_barrier, NULL);
+    smp_rendezvous_cpus(cpuset, smp_no_rendezvous_barrier, NULL,
+	smp_no_rendezvous_barrier, NULL);
 }
 
 static void
@@ -645,7 +677,7 @@ acpi_cpu_shutdown(device_t dev)
     disable_idle(device_get_softc(dev));
 
     /*
-     * CPU devices are not truely detached and remain referenced,
+     * CPU devices are not truly detached and remain referenced,
      * so their resources are not freed.
      */
 
@@ -703,7 +735,6 @@ acpi_cpu_generic_cx_probe(struct acpi_cpu_softc *sc)
     sc->cpu_non_c2 = sc->cpu_cx_count;
     sc->cpu_non_c3 = sc->cpu_cx_count;
     sc->cpu_cx_count++;
-    cpu_deepest_sleep = 1;
 
     /* 
      * The spec says P_BLK must be 6 bytes long.  However, some systems
@@ -729,7 +760,6 @@ acpi_cpu_generic_cx_probe(struct acpi_cpu_softc *sc)
 	    cx_ptr++;
 	    sc->cpu_non_c3 = sc->cpu_cx_count;
 	    sc->cpu_cx_count++;
-	    cpu_deepest_sleep = 2;
 	}
     }
     if (sc->cpu_p_blk_len < 6)
@@ -746,7 +776,6 @@ acpi_cpu_generic_cx_probe(struct acpi_cpu_softc *sc)
 	    cx_ptr->trans_lat = AcpiGbl_FADT.C3Latency;
 	    cx_ptr++;
 	    sc->cpu_cx_count++;
-	    cpu_deepest_sleep = 3;
 	}
     }
 }
@@ -831,7 +860,6 @@ acpi_cpu_cx_cst(struct acpi_cpu_softc *sc)
     cx_ptr->type = ACPI_STATE_C0;
     cx_ptr++;
     sc->cpu_cx_count++;
-    cpu_deepest_sleep = 1;
 
     /* Set up all valid states. */
     for (i = 0; i < count; i++) {
@@ -884,8 +912,6 @@ acpi_cpu_cx_cst(struct acpi_cpu_softc *sc)
 	    continue;
 	case ACPI_STATE_C2:
 	    sc->cpu_non_c3 = sc->cpu_cx_count;
-	    if (cpu_deepest_sleep < 2)
-		    cpu_deepest_sleep = 2;
 	    break;
 	case ACPI_STATE_C3:
 	default:
@@ -894,8 +920,7 @@ acpi_cpu_cx_cst(struct acpi_cpu_softc *sc)
 				 "acpi_cpu%d: C3[%d] not available.\n",
 				 device_get_unit(sc->cpu_dev), i));
 		continue;
-	    } else
-		cpu_deepest_sleep = 3;
+	    }
 	    break;
 	}
 
@@ -1158,6 +1183,9 @@ acpi_cpu_idle(sbintime_t sbt)
 	end_time = ((cpu_ticks() - cputicks) << 20) / cpu_tickrate();
 	if (curthread->td_critnest == 0)
 		end_time = min(end_time, 500000 / hz);
+	/* acpi_cpu_c1() returns with interrupts enabled. */
+	if (cx_next->do_mwait)
+	    ACPI_ENABLE_IRQS();
 	sc->cpu_prev_sleep = (sc->cpu_prev_sleep * 3 + end_time) / 4;
 	return;
     }
@@ -1181,7 +1209,7 @@ acpi_cpu_idle(sbintime_t sbt)
      * is the only reliable time source.
      */
     if (cx_next->type == ACPI_STATE_C3) {
-	AcpiHwRead(&start_time, &AcpiGbl_FADT.XPmTimerBlock);
+	AcpiGetTimer(&start_time);
 	cputicks = 0;
     } else {
 	start_time = 0;
@@ -1198,10 +1226,10 @@ acpi_cpu_idle(sbintime_t sbt)
      * the processor has stopped.  Doing it again provides enough
      * margin that we are certain to have a correct value.
      */
-    AcpiHwRead(&end_time, &AcpiGbl_FADT.XPmTimerBlock);
+    AcpiGetTimer(&end_time);
     if (cx_next->type == ACPI_STATE_C3) {
-	AcpiHwRead(&end_time, &AcpiGbl_FADT.XPmTimerBlock);
-	end_time = acpi_TimerDelta(end_time, start_time);
+	AcpiGetTimer(&end_time);
+	AcpiGetTimerDuration(start_time, end_time, &end_time);
     } else
 	end_time = ((cpu_ticks() - cputicks) << 20) / cpu_tickrate();
 

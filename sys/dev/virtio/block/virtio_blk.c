@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011, Bryan Venteicher <bryanv@FreeBSD.org>
  * All rights reserved.
  *
@@ -41,6 +43,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/mutex.h>
 #include <sys/queue.h>
 
+#include <geom/geom.h>
 #include <geom/geom_disk.h>
 
 #include <machine/bus.h>
@@ -1146,7 +1149,7 @@ vtblk_ident(struct vtblk_softc *sc)
 	req->vbr_hdr.sector = 0;
 
 	req->vbr_bp = &buf;
-	bzero(&buf, sizeof(struct bio));
+	g_reset_bio(&buf);
 
 	buf.bio_cmd = BIO_READ;
 	buf.bio_data = dp->d_ident;
@@ -1278,7 +1281,7 @@ vtblk_dump_write(struct vtblk_softc *sc, void *virtual, off_t offset,
 	req->vbr_hdr.sector = offset / 512;
 
 	req->vbr_bp = &buf;
-	bzero(&buf, sizeof(struct bio));
+	g_reset_bio(&buf);
 
 	buf.bio_cmd = BIO_WRITE;
 	buf.bio_data = virtual;
@@ -1300,7 +1303,7 @@ vtblk_dump_flush(struct vtblk_softc *sc)
 	req->vbr_hdr.sector = 0;
 
 	req->vbr_bp = &buf;
-	bzero(&buf, sizeof(struct bio));
+	g_reset_bio(&buf);
 
 	buf.bio_cmd = BIO_FLUSH;
 

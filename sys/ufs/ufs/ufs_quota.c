@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1990, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -13,7 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -232,13 +234,13 @@ chkdq(struct inode *ip, ufs2_daddr_t change, struct ucred *cred, int flags)
 		/* Reset timer when crossing soft limit */
 		if (dq->dq_curblocks + change >= dq->dq_bsoftlimit &&
 		    dq->dq_curblocks < dq->dq_bsoftlimit)
-			dq->dq_btime = time_second + ip->i_ump->um_btime[i];
+			dq->dq_btime = time_second + ITOUMP(ip)->um_btime[i];
 		dq->dq_curblocks += change;
 		dq->dq_flags |= DQ_MOD;
 		DQI_UNLOCK(dq);
 		if (warn)
 			uprintf("\n%s: warning, %s disk quota exceeded\n",
-			    ITOV(ip)->v_mount->mnt_stat.f_mntonname,
+			    ITOVFS(ip)->mnt_stat.f_mntonname,
 			    quotatypes[i]);
 	}
 	return (0);
@@ -264,7 +266,7 @@ chkdqchg(struct inode *ip, ufs2_daddr_t change, struct ucred *cred,
 			dq->dq_flags |= DQ_BLKS;
 			DQI_UNLOCK(dq);
 			uprintf("\n%s: write failed, %s disk limit reached\n",
-			    ITOV(ip)->v_mount->mnt_stat.f_mntonname,
+			    ITOVFS(ip)->mnt_stat.f_mntonname,
 			    quotatypes[type]);
 			return (EDQUOT);
 		}
@@ -277,7 +279,7 @@ chkdqchg(struct inode *ip, ufs2_daddr_t change, struct ucred *cred,
 	 */
 	if (ncurblocks >= dq->dq_bsoftlimit && dq->dq_bsoftlimit) {
 		if (dq->dq_curblocks < dq->dq_bsoftlimit) {
-			dq->dq_btime = time_second + ip->i_ump->um_btime[type];
+			dq->dq_btime = time_second + ITOUMP(ip)->um_btime[type];
 			if (ip->i_uid == cred->cr_uid)
 				*warn = 1;
 			return (0);
@@ -289,7 +291,7 @@ chkdqchg(struct inode *ip, ufs2_daddr_t change, struct ucred *cred,
 				DQI_UNLOCK(dq);
 				uprintf("\n%s: write failed, %s "
 				    "disk quota exceeded for too long\n",
-				    ITOV(ip)->v_mount->mnt_stat.f_mntonname,
+				    ITOVFS(ip)->mnt_stat.f_mntonname,
 				    quotatypes[type]);
 				return (EDQUOT);
 			}
@@ -370,13 +372,13 @@ chkiq(struct inode *ip, int change, struct ucred *cred, int flags)
 		/* Reset timer when crossing soft limit */
 		if (dq->dq_curinodes + change >= dq->dq_isoftlimit &&
 		    dq->dq_curinodes < dq->dq_isoftlimit)
-			dq->dq_itime = time_second + ip->i_ump->um_itime[i];
+			dq->dq_itime = time_second + ITOUMP(ip)->um_itime[i];
 		dq->dq_curinodes += change;
 		dq->dq_flags |= DQ_MOD;
 		DQI_UNLOCK(dq);
 		if (warn)
 			uprintf("\n%s: warning, %s inode quota exceeded\n",
-			    ITOV(ip)->v_mount->mnt_stat.f_mntonname,
+			    ITOVFS(ip)->mnt_stat.f_mntonname,
 			    quotatypes[i]);
 	}
 	return (0);
@@ -401,7 +403,7 @@ chkiqchg(struct inode *ip, int change, struct ucred *cred, int type, int *warn)
 			dq->dq_flags |= DQ_INODS;
 			DQI_UNLOCK(dq);
 			uprintf("\n%s: write failed, %s inode limit reached\n",
-			    ITOV(ip)->v_mount->mnt_stat.f_mntonname,
+			    ITOVFS(ip)->mnt_stat.f_mntonname,
 			    quotatypes[type]);
 			return (EDQUOT);
 		}
@@ -414,7 +416,7 @@ chkiqchg(struct inode *ip, int change, struct ucred *cred, int type, int *warn)
 	 */
 	if (ncurinodes >= dq->dq_isoftlimit && dq->dq_isoftlimit) {
 		if (dq->dq_curinodes < dq->dq_isoftlimit) {
-			dq->dq_itime = time_second + ip->i_ump->um_itime[type];
+			dq->dq_itime = time_second + ITOUMP(ip)->um_itime[type];
 			if (ip->i_uid == cred->cr_uid)
 				*warn = 1;
 			return (0);
@@ -426,7 +428,7 @@ chkiqchg(struct inode *ip, int change, struct ucred *cred, int type, int *warn)
 				DQI_UNLOCK(dq);
 				uprintf("\n%s: write failed, %s "
 				    "inode quota exceeded for too long\n",
-				    ITOV(ip)->v_mount->mnt_stat.f_mntonname,
+				    ITOVFS(ip)->mnt_stat.f_mntonname,
 				    quotatypes[type]);
 				return (EDQUOT);
 			}
@@ -445,9 +447,12 @@ chkiqchg(struct inode *ip, int change, struct ucred *cred, int type, int *warn)
 static void
 chkdquot(struct inode *ip)
 {
-	struct ufsmount *ump = ip->i_ump;
-	struct vnode *vp = ITOV(ip);
+	struct ufsmount *ump;
+	struct vnode *vp;
 	int i;
+
+	ump = ITOUMP(ip);
+	vp = ITOV(ip);
 
 	/*
 	 * Disk quotas must be turned off for system files.  Currently
@@ -469,7 +474,7 @@ chkdquot(struct inode *ip)
 			continue;
 		if (ip->i_dquot[i] == NODQUOT) {
 			UFS_UNLOCK(ump);
-			vprint("chkdquot: missing dquot", ITOV(ip));
+			vn_printf(ITOV(ip), "chkdquot: missing dquot ");
 			panic("chkdquot: missing dquot");
 		}
 	}
@@ -485,7 +490,7 @@ chkdquot(struct inode *ip)
  * Q_QUOTAON - set up a quota file for a particular filesystem.
  */
 int
-quotaon(struct thread *td, struct mount *mp, int type, void *fname)
+quotaon(struct thread *td, struct mount *mp, int type, void * __CAPABILITY fname)
 {
 	struct ufsmount *ump;
 	struct vnode *vp, **vpp;
@@ -508,7 +513,7 @@ quotaon(struct thread *td, struct mount *mp, int type, void *fname)
 	ump = VFSTOUFS(mp);
 	dq = NODQUOT;
 
-	NDINIT(&nd, LOOKUP, FOLLOW, UIO_USERSPACE, fname, td);
+	NDINIT_C(&nd, LOOKUP, FOLLOW, UIO_USERSPACE, fname, td);
 	flags = FREAD | FWRITE;
 	vfs_ref(mp);
 	vfs_unbusy(mp);
@@ -916,7 +921,8 @@ _setuse(struct thread *td, struct mount *mp, u_long id, int type,
 }
 
 int
-getquota32(struct thread *td, struct mount *mp, u_long id, int type, void *addr)
+getquota32(struct thread *td, struct mount *mp, u_long id, int type,
+    void * __capability addr)
 {
 	struct dqblk32 dqb32;
 	struct dqblk64 dqb64;
@@ -926,18 +932,19 @@ getquota32(struct thread *td, struct mount *mp, u_long id, int type, void *addr)
 	if (error)
 		return (error);
 	dqb64_dqb32(&dqb64, &dqb32);
-	error = copyout(&dqb32, addr, sizeof(dqb32));
+	error = copyout_c(&dqb32, addr, sizeof(dqb32));
 	return (error);
 }
 
 int
-setquota32(struct thread *td, struct mount *mp, u_long id, int type, void *addr)
+setquota32(struct thread *td, struct mount *mp, u_long id, int type,
+    void * __capability addr)
 {
 	struct dqblk32 dqb32;
 	struct dqblk64 dqb64;
 	int error;
 
-	error = copyin(addr, &dqb32, sizeof(dqb32));
+	error = copyin_c(addr, &dqb32, sizeof(dqb32));
 	if (error)
 		return (error);
 	dqb32_dqb64(&dqb32, &dqb64);
@@ -946,13 +953,14 @@ setquota32(struct thread *td, struct mount *mp, u_long id, int type, void *addr)
 }
 
 int
-setuse32(struct thread *td, struct mount *mp, u_long id, int type, void *addr)
+setuse32(struct thread *td, struct mount *mp, u_long id, int type,
+    void * __capability addr)
 {
 	struct dqblk32 dqb32;
 	struct dqblk64 dqb64;
 	int error;
 
-	error = copyin(addr, &dqb32, sizeof(dqb32));
+	error = copyin_c(addr, &dqb32, sizeof(dqb32));
 	if (error)
 		return (error);
 	dqb32_dqb64(&dqb32, &dqb64);
@@ -961,7 +969,8 @@ setuse32(struct thread *td, struct mount *mp, u_long id, int type, void *addr)
 }
 
 int
-getquota(struct thread *td, struct mount *mp, u_long id, int type, void *addr)
+getquota(struct thread *td, struct mount *mp, u_long id, int type,
+    void * __CAPABILITY addr)
 {
 	struct dqblk64 dqb64;
 	int error;
@@ -969,17 +978,18 @@ getquota(struct thread *td, struct mount *mp, u_long id, int type, void *addr)
 	error = _getquota(td, mp, id, type, &dqb64);
 	if (error)
 		return (error);
-	error = copyout(&dqb64, addr, sizeof(dqb64));
+	error = copyout_c(&dqb64, addr, sizeof(dqb64));
 	return (error);
 }
 
 int
-setquota(struct thread *td, struct mount *mp, u_long id, int type, void *addr)
+setquota(struct thread *td, struct mount *mp, u_long id, int type,
+    void * __CAPABILITY addr)
 {
 	struct dqblk64 dqb64;
 	int error;
 
-	error = copyin(addr, &dqb64, sizeof(dqb64));
+	error = copyin_c(addr, &dqb64, sizeof(dqb64));
 	if (error)
 		return (error);
 	error = _setquota(td, mp, id, type, &dqb64);
@@ -987,12 +997,13 @@ setquota(struct thread *td, struct mount *mp, u_long id, int type, void *addr)
 }
 
 int
-setuse(struct thread *td, struct mount *mp, u_long id, int type, void *addr)
+setuse(struct thread *td, struct mount *mp, u_long id, int type,
+    void * __CAPABILITY addr)
 {
 	struct dqblk64 dqb64;
 	int error;
 
-	error = copyin(addr, &dqb64, sizeof(dqb64));
+	error = copyin_c(addr, &dqb64, sizeof(dqb64));
 	if (error)
 		return (error);
 	error = _setuse(td, mp, id, type, &dqb64);
@@ -1004,7 +1015,7 @@ setuse(struct thread *td, struct mount *mp, u_long id, int type, void *addr)
  */
 int
 getquotasize(struct thread *td, struct mount *mp, u_long id, int type,
-    void *sizep)
+    void * __CAPABILITY sizep)
 {
 	struct ufsmount *ump = VFSTOUFS(mp);
 	int bitsize;
@@ -1020,7 +1031,7 @@ getquotasize(struct thread *td, struct mount *mp, u_long id, int type,
 	else
 		bitsize = 32;
 	UFS_UNLOCK(ump);
-	return (copyout(&bitsize, sizep, sizeof(int)));
+	return (copyout_c(&bitsize, sizep, sizeof(int)));
 }
 
 /*
@@ -1196,15 +1207,14 @@ static int
 dqopen(struct vnode *vp, struct ufsmount *ump, int type)
 {
 	struct dqhdr64 dqh;
-	struct iovec aiov;
+	kiovec_t aiov;
 	struct uio auio;
 	int error;
 
 	ASSERT_VOP_LOCKED(vp, "dqopen");
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
-	aiov.iov_base = &dqh;
-	aiov.iov_len = sizeof(dqh);
+	IOVEC_INIT_OBJ(&aiov, dqh);
 	auio.uio_resid = sizeof(dqh);
 	auio.uio_offset = 0;
 	auio.uio_segflg = UIO_SYSSPACE;
@@ -1247,7 +1257,7 @@ dqget(struct vnode *vp, u_long id, struct ufsmount *ump, int type,
 	struct dquot *dq, *dq1;
 	struct dqhash *dqh;
 	struct vnode *dqvp;
-	struct iovec aiov;
+	kiovec_t aiov;
 	struct uio auio;
 	int dqvplocked, error;
 
@@ -1389,8 +1399,8 @@ hfound:		DQI_LOCK(dq);
 	}
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
-	aiov.iov_base = buf;
-	aiov.iov_len = recsize;
+	/* XXXBD: CTSRD-CHERI/clang#179 */
+	IOVEC_INIT(&aiov, &buf[0], recsize);
 	auio.uio_resid = recsize;
 	auio.uio_offset = base + id * recsize;
 	auio.uio_segflg = UIO_SYSSPACE;
@@ -1520,7 +1530,7 @@ dqsync(struct vnode *vp, struct dquot *dq)
 	uint8_t buf[sizeof(struct dqblk64)];
 	off_t base, recsize;
 	struct vnode *dqvp;
-	struct iovec aiov;
+	kiovec_t aiov;
 	struct uio auio;
 	int error;
 	struct mount *mp;
@@ -1538,8 +1548,13 @@ dqsync(struct vnode *vp, struct dquot *dq)
 	if ((ump = dq->dq_ump) == NULL)
 		return (0);
 	UFS_LOCK(ump);
-	if ((dqvp = ump->um_quotas[dq->dq_type]) == NULLVP)
-		panic("dqsync: file");
+	if ((dqvp = ump->um_quotas[dq->dq_type]) == NULLVP) {
+		if (vp == NULL) {
+			UFS_UNLOCK(ump);
+			return (0);
+		} else
+			panic("dqsync: file");
+	}
 	vref(dqvp);
 	UFS_UNLOCK(ump);
 
@@ -1578,8 +1593,8 @@ dqsync(struct vnode *vp, struct dquot *dq)
 
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
-	aiov.iov_base = buf;
-	aiov.iov_len = recsize;
+	/* XXXBD: CTSRD-CHERI/clang#179 */
+	IOVEC_INIT(&aiov, &buf[0], recsize);
 	auio.uio_resid = recsize;
 	auio.uio_offset = base + dq->dq_id * recsize;
 	auio.uio_segflg = UIO_SYSSPACE;

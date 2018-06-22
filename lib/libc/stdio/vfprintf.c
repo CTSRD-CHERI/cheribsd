@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -34,6 +36,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "support"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)vfprintf.c	8.1 (Berkeley) 6/4/93";
@@ -51,8 +63,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/types.h>
 
 #ifdef __CHERI_PURE_CAPABILITY__
-#include <machine/cheri.h>
-#include <machine/cheric.h>
+#include <cheri/cheri.h>
+#include <cheri/cheric.h>
 #endif
 
 #include <ctype.h>
@@ -279,14 +291,14 @@ vfprintf_l(FILE * __restrict fp, locale_t locale, const char * __restrict fmt0,
 	int ret;
 	FIX_LOCALE(locale);
 
-	FLOCKFILE(fp);
+	FLOCKFILE_CANCELSAFE(fp);
 	/* optimise fprintf(stderr) (and other unbuffered Unix files) */
 	if ((fp->_flags & (__SNBF|__SWR|__SRW)) == (__SNBF|__SWR) &&
 	    fp->_file >= 0)
 		ret = __sbprintf(fp, locale, fmt0, ap);
 	else
 		ret = __vfprintf(fp, locale, fmt0, ap);
-	FUNLOCKFILE(fp);
+	FUNLOCKFILE_CANCELSAFE();
 	return (ret);
 }
 int
@@ -304,8 +316,12 @@ vfprintf(FILE * __restrict fp, const char * __restrict fmt0, va_list ap)
 #ifndef __CHERI_PURE_CAPABILITY__
 #define	BUF	32
 #else
-/* For the CHERI sandbox ABI we need enough space to print a capability dump */
-#define BUF	84
+/* For the CHERI sandbox ABI we need enough space to print a capability dump:
+ * v:1 s:0 p:0007807d b:00000001200ff73c l:0000000000000004 o:0123456789abcdef t:-1
+ * The current maximum length 80 chars but in case we decide to print more info
+ * in the future we just use 128 since we have enough stack space here anyway.
+*/
+#define BUF	128
 #endif
 #else
 #error "BUF must be large enough to format a uintmax_t"
@@ -374,6 +390,7 @@ __vfprintf(FILE *fp, locale_t locale, const char *fmt0, va_list ap)
 	int nextarg;            /* 1-based argument index */
 	va_list orgap;          /* original argument pointer */
 	char *convbuf;		/* wide to multibyte conversion result */
+	int savserr;
 #ifdef __CHERI_PURE_CAPABILITY__
 	void *pointer;
 #endif
@@ -474,6 +491,9 @@ __vfprintf(FILE *fp, locale_t locale, const char *fmt0, va_list ap)
 		errno = EBADF;
 		return (EOF);
 	}
+
+	savserr = fp->_flags & __SERR;
+	fp->_flags &= ~__SERR;
 
 	convbuf = NULL;
 	fmt = (char *)fmt0;
@@ -1063,6 +1083,8 @@ error:
 		free(convbuf);
 	if (__sferror(fp))
 		ret = EOF;
+	else
+		fp->_flags |= savserr;
 	if ((argtable != NULL) && (argtable != statargtable))
 		free (argtable);
 	return (ret);

@@ -89,13 +89,19 @@ enum CleanupKind : unsigned {
   InactiveCleanup = 0x4,
   InactiveEHCleanup = EHCleanup | InactiveCleanup,
   InactiveNormalCleanup = NormalCleanup | InactiveCleanup,
-  InactiveNormalAndEHCleanup = NormalAndEHCleanup | InactiveCleanup
+  InactiveNormalAndEHCleanup = NormalAndEHCleanup | InactiveCleanup,
+
+  LifetimeMarker = 0x8,
+  NormalEHLifetimeMarker = LifetimeMarker | NormalAndEHCleanup,
 };
 
 /// A stack of scopes which respond to exceptions, including cleanups
 /// and catch blocks.
 class EHScopeStack {
 public:
+  /* Should switch to alignof(uint64_t) instead of 8, when EHCleanupScope can */
+  enum { ScopeStackAlignment = 8 };
+
   /// A saved depth on the scope stack.  This is necessary because
   /// pushing scopes onto the stack invalidates iterators.
   class stable_iterator {
@@ -141,7 +147,15 @@ public:
   class Cleanup {
     // Anchor the construction vtable.
     virtual void anchor();
+
+  protected:
+    ~Cleanup() = default;
+
   public:
+    Cleanup(const Cleanup &) = default;
+    Cleanup(Cleanup &&) {}
+    Cleanup() = default;
+
     /// Generation flags.
     class Flags {
       enum {
@@ -168,10 +182,6 @@ public:
       void setIsEHCleanupKind() { flags |= F_IsEHCleanupKind; }
     };
 
-    // Provide a virtual destructor to suppress a very common warning
-    // that unfortunately cannot be suppressed without this.  Cleanups
-    // should not rely on this destructor ever being called.
-    virtual ~Cleanup() {}
 
     /// Emit the cleanup.  For normal cleanups, this is run in the
     /// same EH context as when the cleanup was pushed, i.e. the
@@ -184,14 +194,15 @@ public:
 
   /// ConditionalCleanup stores the saved form of its parameters,
   /// then restores them and performs the cleanup.
-  template <class T, class... As> class ConditionalCleanup : public Cleanup {
+  template <class T, class... As>
+  class ConditionalCleanup final : public Cleanup {
     typedef std::tuple<typename DominatingValue<As>::saved_type...> SavedTuple;
     SavedTuple Saved;
 
     template <std::size_t... Is>
     T restore(CodeGenFunction &CGF, llvm::index_sequence<Is...>) {
       // It's important that the restores are emitted in order. The braced init
-      // list guarentees that.
+      // list guarantees that.
       return T{DominatingValue<As>::restore(CGF, std::get<Is>(Saved))...};
     }
 
@@ -248,6 +259,7 @@ private:
   SmallVector<BranchFixup, 8> BranchFixups;
 
   char *allocate(size_t Size);
+  void deallocate(size_t Size);
 
   void *pushCleanup(CleanupKind K, size_t DataSize);
 
@@ -259,6 +271,8 @@ public:
 
   /// Push a lazily-created cleanup on the stack.
   template <class T, class... As> void pushCleanup(CleanupKind Kind, As... A) {
+    static_assert(alignof(T) <= ScopeStackAlignment,
+                  "Cleanup's alignment is too large.");
     void *Buffer = pushCleanup(Kind, sizeof(T));
     Cleanup *Obj = new (Buffer) T(A...);
     (void) Obj;
@@ -267,6 +281,8 @@ public:
   /// Push a lazily-created cleanup on the stack. Tuple version.
   template <class T, class... As>
   void pushCleanupTuple(CleanupKind Kind, std::tuple<As...> A) {
+    static_assert(alignof(T) <= ScopeStackAlignment,
+                  "Cleanup's alignment is too large.");
     void *Buffer = pushCleanup(Kind, sizeof(T));
     Cleanup *Obj = new (Buffer) T(std::move(A));
     (void) Obj;
@@ -287,6 +303,8 @@ public:
   /// stack is modified.
   template <class T, class... As>
   T *pushCleanupWithExtra(CleanupKind Kind, size_t N, As... A) {
+    static_assert(alignof(T) <= ScopeStackAlignment,
+                  "Cleanup's alignment is too large.");
     void *Buffer = pushCleanup(Kind, sizeof(T) + T::getExtraSize(N));
     return new (Buffer) T(N, A...);
   }
@@ -326,9 +344,7 @@ public:
   /// Determines whether the exception-scopes stack is empty.
   bool empty() const { return StartOfData == EndOfBuffer; }
 
-  bool requiresLandingPad() const {
-    return InnermostEHScope != stable_end();
-  }
+  bool requiresLandingPad() const;
 
   /// Determines whether there are any normal cleanups on the stack.
   bool hasNormalCleanups() const {
@@ -346,7 +362,6 @@ public:
     return InnermostEHScope;
   }
 
-  stable_iterator getInnermostActiveEHScope() const;
 
   /// An unstable reference to a scope-stack depth.  Invalidated by
   /// pushes but not pops.
@@ -376,9 +391,6 @@ public:
   /// Turn a stable reference to a scope depth into a unstable pointer
   /// to the EH stack.
   iterator find(stable_iterator save) const;
-
-  /// Removes the cleanup pointed to by the given stable_iterator.
-  void removeCleanup(stable_iterator save);
 
   /// Add a branch fixup to the current cleanup scope.
   BranchFixup &addBranchFixup() {

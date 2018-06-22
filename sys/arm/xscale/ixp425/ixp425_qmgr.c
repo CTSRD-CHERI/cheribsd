@@ -28,6 +28,8 @@
  */
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2001-2005, Intel Corporation.
  * All rights reserved.
  *
@@ -84,8 +86,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 
 #include <machine/bus.h>
-#include <machine/cpu.h>
-#include <machine/cpufunc.h>
 #include <machine/resource.h>
 #include <machine/intr.h>
 #include <arm/xscale/ixp425/ixp425reg.h>
@@ -355,7 +355,7 @@ ixpqmgr_qconfig(int qId, int qEntries, int ne, int nf, int srcSel,
 	if (cb == NULL) {
 	    /* Reset to dummy callback */
 	    qi->cb = dummyCallback;
-	    qi->cbarg = 0;
+	    qi->cbarg = NULL;
 	} else {
 	    qi->cb = cb;
 	    qi->cbarg = cbarg;
@@ -421,7 +421,7 @@ ixpqmgr_qwrite(int qId, uint32_t entry)
 		    return ENOSPC;
 		}
 		/*
-		 * No overflow occured : someone is draining the queue
+		 * No overflow occurred : someone is draining the queue
 		 * and the current counter needs to be
 		 * updated from the current number of entries in the queue
 		 */

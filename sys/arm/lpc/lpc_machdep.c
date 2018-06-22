@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1994-1998 Mark Brinicombe.
  * Copyright (c) 1994 Brini.
  * All rights reserved.
@@ -45,26 +47,24 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
+#include <sys/devmap.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
 
 #include <machine/bus.h>
 #include <machine/fdt.h>
-#include <machine/devmap.h>
 #include <machine/machdep.h>
 #include <machine/platform.h> 
 
 #include <arm/lpc/lpcreg.h>
 #include <arm/lpc/lpcvar.h>
 
-#include <dev/fdt/fdt_common.h>
-
 vm_offset_t
 platform_lastaddr(void)
 {
 
-	return (arm_devmap_lastaddr());
+	return (devmap_lastaddr());
 }
 
 void
@@ -90,13 +90,13 @@ platform_late_init(void)
 /*
  * Add a single static device mapping.
  * The values used were taken from the ranges property of the SoC node in the
- * dts file when this code was converted to arm_devmap_add_entry().
+ * dts file when this code was converted to devmap_add_entry().
  */
 int
 platform_devmap_init(void)
 {
 
-	arm_devmap_add_entry(LPC_DEV_PHYS_BASE, LPC_DEV_SIZE);
+	devmap_add_entry(LPC_DEV_PHYS_BASE, LPC_DEV_SIZE);
 	return (0);
 }
 

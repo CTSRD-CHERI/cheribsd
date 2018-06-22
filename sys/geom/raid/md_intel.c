@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2010 Alexander Motin <mav@FreeBSD.org>
  * Copyright (c) 2000 - 2008 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
@@ -773,7 +775,7 @@ intel_meta_write(struct g_consumer *cp, struct intel_raid_conf *meta)
 	meta->checksum = checksum;
 
 	/* Create and fill buffer. */
-	sectors = (meta->config_size + pp->sectorsize - 1) / pp->sectorsize;
+	sectors = howmany(meta->config_size, pp->sectorsize);
 	buf = malloc(sectors * pp->sectorsize, M_MD_INTEL, M_WAITOK | M_ZERO);
 	if (sectors > 1) {
 		memcpy(buf, ((char *)meta) + pp->sectorsize,
@@ -923,7 +925,7 @@ g_raid_md_intel_start_disk(struct g_raid_disk *disk)
 	pd = (struct g_raid_md_intel_perdisk *)disk->d_md_data;
 	olddisk = NULL;
 
-	/* Find disk position in metadata by it's serial. */
+	/* Find disk position in metadata by its serial. */
 	disk_pos = intel_meta_find_disk(meta, pd->pd_disk_meta.serial);
 	if (disk_pos < 0) {
 		G_RAID_DEBUG1(1, sc, "Unknown, probably new or stale disk");

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2002-2008 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
@@ -33,6 +35,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/kernel.h> 
+#include <sys/malloc.h> 
 #include <sys/systm.h> 
 #include <sys/mbuf.h>   
 #include <sys/module.h>
@@ -100,7 +103,6 @@ none_encap(struct ieee80211_key *k, struct mbuf *m)
 	struct ieee80211vap *vap = k->wk_private;
 #ifdef IEEE80211_DEBUG
 	struct ieee80211_frame *wh = mtod(m, struct ieee80211_frame *);
-#endif
 	uint8_t keyid;
 
 	keyid = ieee80211_crypto_get_keyid(vap, k);
@@ -111,6 +113,7 @@ none_encap(struct ieee80211_key *k, struct mbuf *m)
 	 */
 	IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_CRYPTO, wh->i_addr1,
 	    "key id %u is not set (encap)", keyid);
+#endif
 	vap->iv_stats.is_tx_badcipher++;
 	return 0;
 }

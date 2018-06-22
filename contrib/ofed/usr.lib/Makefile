@@ -1,6 +1,8 @@
-SUBDIR=	libibcommon libibmad libibumad libibverbs libmlx4 libmthca \
-	libopensm libosmcomp libosmvendor libibcm librdmacm libsdp libcxgb4
+# $FreeBSD$
 
-SUBDIR_PARALLEL=
+# NOTE: If building outside the buildworld target, install each subdirectory
+# before building the next one.
+
+SUBDIR=0 1 2 3
 
 .include <bsd.subdir.mk>

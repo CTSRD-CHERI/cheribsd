@@ -1,6 +1,8 @@
 /*	$OpenBSD: param.h,v 1.11 1998/08/30 22:05:35 millert Exp $ */
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -17,7 +19,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -47,10 +49,18 @@
  * data types (int, long, ...).	  The result is u_long and must be cast to
  * any desired pointer type.
  *
- * XXXCHERI: Changed '7' to 'sizeof(void *) - 1', but likely we also need
- * to change (u_long) below to (uintptr_t)?
+ * XXXCHERI: Changed '7' to 'sizeof(void *) - 1'.
+ *
+ * XXXBD: the builtin version is type-preserving.  This is an API
+ * change, but has uncovered subtle bugs libc so we're going with it.
+ * The regular macro could be made type-preserving with some gnu
+ * macro extentions...
  */
 #define	_ALIGNBYTES	(sizeof(void *) - 1)
+#if !__has_builtin(__builtin_align_up)
 #define	_ALIGN(p)	(((uintptr_t)(p) + _ALIGNBYTES) &~ (uintptr_t)_ALIGNBYTES)
+#else
+#define	_ALIGN(p)	__builtin_align_up((p), _ALIGNBYTES + 1)
+#endif
 
 #endif /* !_MIPS_INCLUDE__ALIGN_H_ */

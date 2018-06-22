@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -13,7 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -29,6 +31,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_integrity"
+ *   ],
+ *   "change_comment": "BDB hashes don't preserve tags"
+ * }
+ * CHERI CHANGES END
+ */
 
 #if 0
 #ifndef lint
@@ -43,7 +56,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <ctype.h>
-#include <db.h>
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -53,6 +65,7 @@ __FBSDID("$FreeBSD$");
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <uthash.h>
 #include <utmpx.h>
 #include "finger.h"
 #include "pathnames.h"
@@ -154,58 +167,35 @@ enter_where(struct utmpx *ut, PERSON *pn)
 PERSON *
 enter_person(struct passwd *pw)
 {
-	DBT data, key;
 	PERSON *pn;
 
-	if (db == NULL &&
-	    (db = dbopen(NULL, O_RDWR, 0, DB_BTREE, NULL)) == NULL)
-		err(1, NULL);
-
-	key.data = pw->pw_name;
-	key.size = strlen(pw->pw_name);
-
-	switch ((*db->get)(db, &key, &data, 0)) {
-	case 0:
-		memmove(&pn, data.data, sizeof pn);
+	HASH_FIND_STR(people, pw->pw_name, pn);
+	if (pn != NULL)
 		return (pn);
-	default:
-	case -1:
-		err(1, "db get");
-		/* NOTREACHED */
-	case 1:
-		++entries;
-		pn = palloc();
-		userinfo(pn, pw);
-		pn->whead = NULL;
 
-		data.size = sizeof(PERSON *);
-		data.data = &pn;
-		if ((*db->put)(db, &key, &data, 0))
-			err(1, "db put");
-		return (pn);
-	}
+	++entries;
+	pn = palloc();
+	userinfo(pn, pw);
+	pn->whead = NULL;
+	HASH_ADD_KEYPTR(hh, people, pn->name, strlen(pn->name), pn);
+
+	return (pn);
 }
 
 PERSON *
 find_person(char *name)
 {
 	struct passwd *pw;
-
-	DBT data, key;
 	PERSON *p;
 
-	if (!db)
+	if (people == NULL)
 		return(NULL);
 
 	if ((pw = getpwnam(name)) && hide(pw))
 		return(NULL);
 
-	key.data = name;
-	key.size = strlen(name);
+	HASH_FIND_STR(people, pw->pw_name, p);
 
-	if ((*db->get)(db, &key, &data, 0))
-		return (NULL);
-	memmove(&p, data.data, sizeof p);
 	return (p);
 }
 
@@ -217,6 +207,13 @@ palloc(void)
 	if ((p = malloc(sizeof(PERSON))) == NULL)
 		err(1, NULL);
 	return(p);
+}
+
+int
+psort(PERSON *a, PERSON *b)
+{
+
+	return (strcmp(a->name, b->name));
 }
 
 static WHERE *

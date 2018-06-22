@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2000-2001 Boris Popov
  * All rights reserved.
  *
@@ -306,14 +308,13 @@ nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thre
 	    case SMBIOC_READ: case SMBIOC_WRITE: {
 		struct smbioc_rw *rwrq = (struct smbioc_rw*)data;
 		struct uio auio;
-		struct iovec iov;
+		kiovec_t iov;
 	
 		if ((ssp = sdp->sd_share) == NULL) {
 			error = ENOTCONN;
 			goto out;
 	 	}
-		iov.iov_base = rwrq->ioc_base;
-		iov.iov_len = rwrq->ioc_cnt;
+		IOVEC_INIT(&iov, rwrq->ioc_base, rwrq->ioc_cnt);
 		auio.uio_iov = &iov;
 		auio.uio_iovcnt = 1;
 		auio.uio_offset = rwrq->ioc_offset;

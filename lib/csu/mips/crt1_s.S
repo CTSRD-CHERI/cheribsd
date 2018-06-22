@@ -30,7 +30,7 @@
 __FBSDID("$FreeBSD: head/lib/csu/mips/crt1_s.S 217383 2011-01-13 23:00:22Z kib $");
 
 	.text
-	.align	4
+	.balign	4
 	.globl	__start
 	.type	__start, @function
 __start:
@@ -76,7 +76,7 @@ __start:
 
 	/* Jump to the second part of __start(), implemented in C. */
 	dla	$25, _start1
-	jalr	$25
+	jr	$25
 	nop # delay slot
 
 	.set pop # restore assembler options

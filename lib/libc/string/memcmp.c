@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -43,11 +45,12 @@ __FBSDID("$FreeBSD$");
  * Compare memory regions.
  */
 int
-__CAPSUFFIX(memcmp)(__CAPABILITY const void *s1, __CAPABILITY const void *s2,
+__CAPSUFFIX(memcmp)(const void * __CAP s1, const void * __CAP s2,
     size_t n)
 {
 	if (n != 0) {
-		__CAPABILITY const unsigned char *p1 = s1, *p2 = s2;
+		const unsigned char * __CAP p1 = s1;
+		const unsigned char * __CAP p2 = s2;
 
 		do {
 			if (*p1++ != *p2++)

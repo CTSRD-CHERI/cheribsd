@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1980, 1989, 1993 The Regents of the University of California.
  * Copyright (c) 2000 Christoph Herrmann, Thomas-Henning von Kamptz
  * Copyright (c) 2012 The FreeBSD Foundation
@@ -78,6 +80,7 @@ __FBSDID("$FreeBSD$");
 #include <ufs/ufs/dinode.h>
 #include <ufs/ffs/fs.h>
 #include <libutil.h>
+#include <libufs.h>
 
 #include "debug.h"
 
@@ -121,6 +124,7 @@ static void	updcsloc(time_t, int, int, unsigned int);
 static void	frag_adjust(ufs2_daddr_t, int);
 static void	updclst(int);
 static void	mount_reload(const struct statfs *stfs);
+static void	cgckhash(struct cg *);
 
 /*
  * Here we actually start growing the file system. We basically read the
@@ -348,8 +352,7 @@ initcg(int cylno, time_t modtime, int fso, unsigned int Nflag)
 	acg.cg_magic = CG_MAGIC;
 	acg.cg_cgx = cylno;
 	acg.cg_niblk = sblock.fs_ipg;
-	acg.cg_initediblk = sblock.fs_ipg < 2 * INOPB(&sblock) ?
-	    sblock.fs_ipg : 2 * INOPB(&sblock);
+	acg.cg_initediblk = MIN(sblock.fs_ipg, 2 * INOPB(&sblock));
 	acg.cg_ndblk = dmax - cbase;
 	if (sblock.fs_contigsumsize > 0)
 		acg.cg_nclusterblks = acg.cg_ndblk / sblock.fs_frag;
@@ -389,7 +392,7 @@ initcg(int cylno, time_t modtime, int fso, unsigned int Nflag)
 	}
 	acg.cg_cs.cs_nifree += sblock.fs_ipg;
 	if (cylno == 0)
-		for (ino = 0; ino < ROOTINO; ino++) {
+		for (ino = 0; ino < UFS_ROOTINO; ino++) {
 			setbit(cg_inosused(&acg), ino);
 			acg.cg_cs.cs_nifree--;
 		}
@@ -481,6 +484,7 @@ initcg(int cylno, time_t modtime, int fso, unsigned int Nflag)
 	sblock.fs_cstotal.cs_nifree += acg.cg_cs.cs_nifree;
 	*cs = acg.cg_cs;
 
+	cgckhash(&acg);
 	memcpy(iobuf, &acg, sblock.fs_cgsize);
 	memset(iobuf + sblock.fs_cgsize, '\0',
 	    sblock.fs_bsize * 3 - sblock.fs_cgsize);
@@ -772,6 +776,7 @@ updjcg(int cylno, time_t modtime, int fsi, int fso, unsigned int Nflag)
 	/*
 	 * Write the updated "joining" cylinder group back to disk.
 	 */
+	cgckhash(&acg);
 	wtfs(fsbtodb(&sblock, cgtod(&sblock, cylno)), (size_t)sblock.fs_cgsize,
 	    (void *)&acg, fso, Nflag);
 	DBG_PRINT0("jcg written\n");
@@ -1331,7 +1336,7 @@ getdev(const char *name)
 		return (name);
 
 	cp = strrchr(name, '/');
-	if (cp == 0) {
+	if (cp == NULL) {
 		snprintf(device, sizeof(device), "%s%s", _PATH_DEV, name);
 		if (is_dev(device))
 			return (device);
@@ -1541,12 +1546,12 @@ main(int argc, char **argv)
 		humanize_number(newsizebuf, sizeof(newsizebuf),
 		    sblock.fs_size * sblock.fs_fsize,
 		    "B", HN_AUTOSCALE, HN_B | HN_NOSPACE | HN_DECIMAL);
-		printf(" from %s to %s? [Yes/No] ", oldsizebuf, newsizebuf);
+		printf(" from %s to %s? [yes/no] ", oldsizebuf, newsizebuf);
 		fflush(stdout);
 		fgets(reply, (int)sizeof(reply), stdin);
-		if (strcasecmp(reply, "Yes\n")){
-			printf("\nNothing done\n");
-			exit (0);
+		if (strcasecmp(reply, "yes\n")){
+			printf("Response other than \"yes\"; aborting\n");
+			exit(0);
 		}
 	}
 
@@ -1739,4 +1744,17 @@ mount_reload(const struct statfs *stfs)
 		err(9, "%s: cannot reload filesystem%s%s", stfs->f_mntonname,
 		    *errmsg != '\0' ? ": " : "", errmsg);
 	}
+}
+
+/*
+ * Calculate the check-hash of the cylinder group.
+ */
+static void
+cgckhash(struct cg *cgp)
+{
+
+	if ((sblock.fs_metackhash & CK_CYLGRP) == 0)
+		return;
+	cgp->cg_ckhash = 0;
+	cgp->cg_ckhash = calculate_crc32c(~0L, (void *)cgp, sblock.fs_cgsize);
 }

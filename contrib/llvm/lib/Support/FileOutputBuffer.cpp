@@ -15,6 +15,8 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Errc.h"
+#include "llvm/Support/Path.h"
+#include "llvm/Support/Signals.h"
 #include <system_error>
 
 #if !defined(_MSC_VER) && !defined(__MINGW32__)
@@ -27,20 +29,24 @@ using llvm::sys::fs::mapped_file_region;
 
 namespace llvm {
 FileOutputBuffer::FileOutputBuffer(std::unique_ptr<mapped_file_region> R,
-                                   StringRef Path, StringRef TmpPath)
-    : Region(std::move(R)), FinalPath(Path), TempPath(TmpPath) {}
+                                   StringRef Path, StringRef TmpPath,
+                                   bool IsRegular)
+    : Region(std::move(R)), FinalPath(Path), TempPath(TmpPath),
+      IsRegular(IsRegular) {}
 
 FileOutputBuffer::~FileOutputBuffer() {
+  // Close the mapping before deleting the temp file, so that the removal
+  // succeeds.
+  Region.reset();
   sys::fs::remove(Twine(TempPath));
 }
 
-std::error_code
-FileOutputBuffer::create(StringRef FilePath, size_t Size,
-                         std::unique_ptr<FileOutputBuffer> &Result,
-                         unsigned Flags) {
-  // If file already exists, it must be a regular file (to be mappable).
+ErrorOr<std::unique_ptr<FileOutputBuffer>>
+FileOutputBuffer::create(StringRef FilePath, size_t Size, unsigned Flags) {
+  // Check file is not a regular file, in which case we cannot remove it.
   sys::fs::file_status Stat;
   std::error_code EC = sys::fs::status(FilePath, Stat);
+  bool IsRegular = true;
   switch (Stat.type()) {
     case sys::fs::file_type::file_not_found:
       // If file does not exist, we'll create one.
@@ -51,30 +57,43 @@ FileOutputBuffer::create(StringRef FilePath, size_t Size,
         // FIXME: In posix, you use the access() call to check this.
       }
       break;
+    case sys::fs::file_type::directory_file:
+      return errc::is_a_directory;
     default:
       if (EC)
         return EC;
-      else
-        return make_error_code(errc::operation_not_permitted);
+      IsRegular = false;
   }
 
-  // Delete target file.
-  EC = sys::fs::remove(FilePath);
-  if (EC)
-    return EC;
+  if (IsRegular) {
+    // Delete target file.
+    EC = sys::fs::remove(FilePath);
+    if (EC)
+      return EC;
+  }
 
-  unsigned Mode = sys::fs::all_read | sys::fs::all_write;
-  // If requested, make the output file executable.
-  if (Flags & F_executable)
-    Mode |= sys::fs::all_exe;
-
-  // Create new file in same directory but with random name.
   SmallString<128> TempFilePath;
   int FD;
-  EC = sys::fs::createUniqueFile(Twine(FilePath) + ".tmp%%%%%%%", FD,
-                                 TempFilePath, Mode);
+  if (IsRegular) {
+    unsigned Mode = sys::fs::all_read | sys::fs::all_write;
+    // If requested, make the output file executable.
+    if (Flags & F_executable)
+      Mode |= sys::fs::all_exe;
+    // Create new file in same directory but with random name.
+    EC = sys::fs::createUniqueFile(Twine(FilePath) + ".tmp%%%%%%%", FD,
+                                   TempFilePath, Mode);
+  } else {
+    // Create a temporary file. Since this is a special file, we will not move
+    // it and the new file can be in another filesystem. This avoids trying to
+    // create a temporary file in /dev when outputting to /dev/null for example.
+    EC = sys::fs::createTemporaryFile(sys::path::filename(FilePath), "", FD,
+                                      TempFilePath);
+  }
+
   if (EC)
     return EC;
+
+  sys::RemoveFileOnSignal(TempFilePath);
 
 #ifndef LLVM_ON_WIN32
   // On Windows, CreateFileMapping (the mmap function on Windows)
@@ -95,18 +114,28 @@ FileOutputBuffer::create(StringRef FilePath, size_t Size,
   if (Ret)
     return std::error_code(errno, std::generic_category());
 
-  Result.reset(
-      new FileOutputBuffer(std::move(MappedFile), FilePath, TempFilePath));
-
-  return std::error_code();
+  std::unique_ptr<FileOutputBuffer> Buf(new FileOutputBuffer(
+      std::move(MappedFile), FilePath, TempFilePath, IsRegular));
+  return std::move(Buf);
 }
 
 std::error_code FileOutputBuffer::commit() {
   // Unmap buffer, letting OS flush dirty pages to file on disk.
   Region.reset();
 
+  std::error_code EC;
+  if (IsRegular) {
+    // Rename file to final name.
+    EC = sys::fs::rename(Twine(TempPath), Twine(FinalPath));
+    sys::DontRemoveFileOnSignal(TempPath);
+  } else {
+    EC = sys::fs::copy_file(TempPath, FinalPath);
+    std::error_code RMEC = sys::fs::remove(TempPath);
+    sys::DontRemoveFileOnSignal(TempPath);
+    if (RMEC)
+      return RMEC;
+  }
 
-  // Rename file to final name.
-  return sys::fs::rename(Twine(TempPath), Twine(FinalPath));
+  return EC;
 }
 } // namespace

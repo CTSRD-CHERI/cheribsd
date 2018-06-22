@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: Beerware
+ *
  * ----------------------------------------------------------------------------
  * "THE BEER-WARE LICENSE" (Revision 42):
  * <phk@FreeBSD.org> wrote this file.  As long as you retain this notice you
@@ -35,7 +37,7 @@ extern volatile int aps_ready;
 extern struct mtx ap_boot_mtx;
 extern int cpu_logical;
 extern int cpu_cores;
-extern volatile int smp_tlb_wait;
+extern volatile uint32_t smp_tlb_generation;
 extern struct pmap *smp_tlb_pmap;
 extern u_int xhits_gbl[];
 extern u_int xhits_pg[];
@@ -45,13 +47,16 @@ extern u_int ipi_page;
 extern u_int ipi_range;
 extern u_int ipi_range_size;
 
+extern int nmi_kdb_lock;
+extern int nmi_is_broadcast;
+
 struct cpu_info {
 	int	cpu_present:1;
 	int	cpu_bsp:1;
 	int	cpu_disabled:1;
 	int	cpu_hyperthread:1;
 };
-extern struct cpu_info cpu_info[];
+extern struct cpu_info *cpu_info;
 
 #ifdef COUNT_IPIS
 extern u_long *ipi_invltlb_counts[MAXCPU];

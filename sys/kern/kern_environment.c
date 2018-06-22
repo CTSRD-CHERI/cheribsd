@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1998 Michael Smith
  * All rights reserved.
  *
@@ -49,6 +51,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
+#include <sys/syscallsubr.h>
 #include <sys/libkern.h>
 #include <sys/kenv.h>
 
@@ -76,15 +79,26 @@ int	dynamic_kenv = 0;
 #define KENV_CHECK	if (!dynamic_kenv) \
 			    panic("%s: called before SI_SUB_KMEM", __func__)
 
+#ifndef _SYS_SYSPROTO_H_
+struct kenv_args {
+	int what;
+	const char *name;
+	char *value;
+	int len;
+};
+#endif
 int
-sys_kenv(td, uap)
-	struct thread *td;
-	struct kenv_args /* {
-		int what;
-		const char *name;
-		char *value;
-		int len;
-	} */ *uap;
+sys_kenv(struct thread *td, struct kenv_args *uap)
+{
+
+	return (kern_kenv(td, uap->what,
+	    (__cheri_tocap const char * __CAPABILITY)uap->name,
+	    (__cheri_tocap char * __CAPABILITY)uap->value, uap->len));
+}
+
+int
+kern_kenv(struct thread *td, int what, const char * __CAPABILITY namep,
+    char * __CAPABILITY val, int vallen)
 {
 	char *name, *value, *buffer = NULL;
 	size_t len, done, needed, buflen;
@@ -93,18 +107,18 @@ sys_kenv(td, uap)
 	KASSERT(dynamic_kenv, ("kenv: dynamic_kenv = 0"));
 
 	error = 0;
-	if (uap->what == KENV_DUMP) {
+	if (what == KENV_DUMP) {
 #ifdef MAC
 		error = mac_kenv_check_dump(td->td_ucred);
 		if (error)
 			return (error);
 #endif
 		done = needed = 0;
-		buflen = uap->len;
+		buflen = vallen;
 		if (buflen > KENV_SIZE * (KENV_MNAMELEN + KENV_MVALLEN + 2))
 			buflen = KENV_SIZE * (KENV_MNAMELEN +
 			    KENV_MVALLEN + 2);
-		if (uap->len > 0 && uap->value != NULL)
+		if (vallen > 0 && val != NULL)
 			buffer = malloc(buflen, M_TEMP, M_WAITOK|M_ZERO);
 		mtx_lock(&kenv_lock);
 		for (i = 0; kenvp[i] != NULL; i++) {
@@ -115,21 +129,22 @@ sys_kenv(td, uap)
 			 * If called with a NULL or insufficiently large
 			 * buffer, just keep computing the required size.
 			 */
-			if (uap->value != NULL && buffer != NULL && len > 0) {
+			if (val != NULL && buffer != NULL && len > 0) {
 				bcopy(kenvp[i], buffer + done, len);
 				done += len;
 			}
 		}
 		mtx_unlock(&kenv_lock);
 		if (buffer != NULL) {
-			error = copyout(buffer, uap->value, done);
+			error = copyout_c((__cheri_tocap char * __CAPABILITY)buffer,
+			    val, done);
 			free(buffer, M_TEMP);
 		}
 		td->td_retval[0] = ((done == needed) ? 0 : needed);
 		return (error);
 	}
 
-	switch (uap->what) {
+	switch (what) {
 	case KENV_SET:
 		error = priv_check(td, PRIV_KENV_SET);
 		if (error)
@@ -145,11 +160,12 @@ sys_kenv(td, uap)
 
 	name = malloc(KENV_MNAMELEN + 1, M_TEMP, M_WAITOK);
 
-	error = copyinstr(uap->name, name, KENV_MNAMELEN + 1, NULL);
+	error = copyinstr_c(namep, (__cheri_tocap char * __CAPABILITY)name,
+	    KENV_MNAMELEN + 1, NULL);
 	if (error)
 		goto done;
 
-	switch (uap->what) {
+	switch (what) {
 	case KENV_GET:
 #ifdef MAC
 		error = mac_kenv_check_get(td->td_ucred, name);
@@ -162,16 +178,17 @@ sys_kenv(td, uap)
 			goto done;
 		}
 		len = strlen(value) + 1;
-		if (len > uap->len)
-			len = uap->len;
-		error = copyout(value, uap->value, len);
+		if (len > vallen)
+			len = vallen;
+		error = copyout_c((__cheri_tocap char * __CAPABILITY)value, val,
+		    len);
 		freeenv(value);
 		if (error)
 			goto done;
 		td->td_retval[0] = len;
 		break;
 	case KENV_SET:
-		len = uap->len;
+		len = vallen;
 		if (len < 1) {
 			error = EINVAL;
 			goto done;
@@ -179,7 +196,8 @@ sys_kenv(td, uap)
 		if (len > KENV_MVALLEN + 1)
 			len = KENV_MVALLEN + 1;
 		value = malloc(len, M_TEMP, M_WAITOK);
-		error = copyinstr(uap->value, value, len, NULL);
+		error = copyinstr_c(val, (__cheri_tocap char * __CAPABILITY)value,
+		    len, NULL);
 		if (error) {
 			free(value, M_TEMP);
 			goto done;
@@ -217,6 +235,9 @@ done:
  * environment obtained from a boot loader, or to provide an empty buffer into
  * which MD code can store an initial environment using kern_setenv() calls.
  *
+ * When a copy of an initial environment is passed in, we start by scanning that
+ * env for overrides to the compiled-in envmode and hintmode variables.
+ *
  * If the global envmode is 1, the environment is initialized from the global
  * static_env[], regardless of the arguments passed.  This implements the env
  * keyword described in config(5).  In this case env_pos is set to env_len,
@@ -238,6 +259,14 @@ done:
 void
 init_static_kenv(char *buf, size_t len)
 {
+	char *cp;
+	
+	for (cp = buf; cp != NULL && cp[0] != '\0'; cp += strlen(cp) + 1) {
+		if (strcmp(cp, "static_env.disabled=1") == 0)
+			envmode = 0;
+		if (strcmp(cp, "static_hints.disabled=1") == 0)
+			hintmode = 0;
+	}
 
 	if (envmode == 1) {
 		kern_envp = static_env;
@@ -534,6 +563,36 @@ getenv_uint(const char *name, unsigned int *data)
 }
 
 /*
+ * Return an int64_t value from an environment variable.
+ */
+int
+getenv_int64(const char *name, int64_t *data)
+{
+	quad_t tmp;
+	int64_t rval;
+
+	rval = getenv_quad(name, &tmp);
+	if (rval)
+		*data = (int64_t) tmp;
+	return (rval);
+}
+
+/*
+ * Return an uint64_t value from an environment variable.
+ */
+int
+getenv_uint64(const char *name, uint64_t *data)
+{
+	quad_t tmp;
+	uint64_t rval;
+
+	rval = getenv_quad(name, &tmp);
+	if (rval)
+		*data = (uint64_t) tmp;
+	return (rval);
+}
+
+/*
  * Return a long value from an environment variable.
  */
 int
@@ -636,6 +695,22 @@ tunable_ulong_init(void *data)
 	struct tunable_ulong *d = (struct tunable_ulong *)data;
 
 	TUNABLE_ULONG_FETCH(d->path, d->var);
+}
+
+void
+tunable_int64_init(void *data)
+{
+	struct tunable_int64 *d = (struct tunable_int64 *)data;
+
+	TUNABLE_INT64_FETCH(d->path, d->var);
+}
+
+void
+tunable_uint64_init(void *data)
+{
+	struct tunable_uint64 *d = (struct tunable_uint64 *)data;
+
+	TUNABLE_UINT64_FETCH(d->path, d->var);
 }
 
 void

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2000, 2001 Michael Smith
  * Copyright (c) 2000 BSDi
  * All rights reserved.
@@ -1931,7 +1933,7 @@ mly_unmap_command(struct mly_command *mc)
  * the kernel environment variable "hw.mly.register_physical_channels" is set.
  *
  * When we refer to a "bus", we are referring to the bus number registered with
- * the SIM, wheras a "channel" is a channel number given to the adapter.  In order
+ * the SIM, whereas a "channel" is a channel number given to the adapter.  In order
  * to keep things simple, we map these 1:1, so "bus" and "channel" may be used
  * interchangeably.
  */
@@ -2109,11 +2111,11 @@ mly_cam_action(struct cam_sim *sim, union ccb *ccb)
 	cpi->max_target = MLY_MAX_TARGETS - 1;
 	cpi->max_lun = MLY_MAX_LUNS - 1;
 	cpi->initiator_id = sc->mly_controllerparam->initiator_id;
-	strncpy(cpi->sim_vid, "FreeBSD", SIM_IDLEN);
-        strncpy(cpi->hba_vid, "FreeBSD", HBA_IDLEN);
-        strncpy(cpi->dev_name, cam_sim_name(sim), DEV_IDLEN);
-        cpi->unit_number = cam_sim_unit(sim);
-        cpi->bus_id = cam_sim_bus(sim);
+	strlcpy(cpi->sim_vid, "FreeBSD", SIM_IDLEN);
+	strlcpy(cpi->hba_vid, "Mylex", HBA_IDLEN);
+	strlcpy(cpi->dev_name, cam_sim_name(sim), DEV_IDLEN);
+	cpi->unit_number = cam_sim_unit(sim);
+	cpi->bus_id = cam_sim_bus(sim);
 	cpi->base_transfer_speed = 132 * 1024;	/* XXX what to set this to? */
 	cpi->transport = XPORT_SPI;
 	cpi->transport_version = 2;
@@ -2892,8 +2894,7 @@ mly_user_command(struct mly_softc *sc, struct mly_user_command *uc)
     MLY_LOCK(sc);
     if (mly_alloc_command(sc, &mc)) {
 	MLY_UNLOCK(sc);
-	error = ENOMEM;
-	goto out;		/* XXX Linux version will wait for a command */
+	return (ENOMEM);	/* XXX Linux version will wait for a command */
     }
     MLY_UNLOCK(sc);
 
@@ -2952,11 +2953,9 @@ mly_user_command(struct mly_softc *sc, struct mly_user_command *uc)
  out:
     if (mc->mc_data != NULL)
 	free(mc->mc_data, M_DEVBUF);
-    if (mc != NULL) {
-	MLY_LOCK(sc);
-	mly_release_command(mc);
-	MLY_UNLOCK(sc);
-    }
+    MLY_LOCK(sc);
+    mly_release_command(mc);
+    MLY_UNLOCK(sc);
     return(error);
 }
 

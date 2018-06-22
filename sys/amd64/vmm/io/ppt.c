@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
  *
@@ -154,6 +156,7 @@ ppt_attach(device_t dev)
 
 	ppt = device_get_softc(dev);
 
+	iommu_remove_device(iommu_host_domain(), pci_get_rid(dev));
 	num_pptdevs++;
 	TAILQ_INSERT_TAIL(&pptdev_list, ppt, next);
 	ppt->dev = dev;
@@ -175,6 +178,8 @@ ppt_detach(device_t dev)
 		return (EBUSY);
 	num_pptdevs--;
 	TAILQ_REMOVE(&pptdev_list, ppt, next);
+	pci_disable_busmaster(dev);
+	iommu_add_device(iommu_host_domain(), pci_get_rid(dev));
 
 	return (0);
 }
@@ -362,6 +367,11 @@ ppt_assign_device(struct vm *vm, int bus, int slot, int func)
 		if (ppt->vm != NULL && ppt->vm != vm)
 			return (EBUSY);
 
+		pci_save_state(ppt->dev);
+		pcie_flr(ppt->dev,
+		    max(pcie_get_max_completion_timeout(ppt->dev) / 1000, 10),
+		    true);
+		pci_restore_state(ppt->dev);
 		ppt->vm = vm;
 		iommu_add_device(vm_iommu_domain(vm), pci_get_rid(ppt->dev));
 		return (0);
@@ -381,6 +391,12 @@ ppt_unassign_device(struct vm *vm, int bus, int slot, int func)
 		 */
 		if (ppt->vm != vm)
 			return (EBUSY);
+
+		pci_save_state(ppt->dev);
+		pcie_flr(ppt->dev,
+		    max(pcie_get_max_completion_timeout(ppt->dev) / 1000, 10),
+		    true);
+		pci_restore_state(ppt->dev);
 		ppt_unmap_mmio(vm, ppt);
 		ppt_teardown_msi(ppt);
 		ppt_teardown_msix(ppt);

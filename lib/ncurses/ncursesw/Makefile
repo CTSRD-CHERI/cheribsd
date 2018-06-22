@@ -2,8 +2,6 @@
 
 ENABLE_WIDEC=
 
-WANT_DUMP=yes
+.PATH: ${.CURDIR:H}/ncurses
 
-.PATH: ${.CURDIR}/../ncurses
-
-.include "${.CURDIR}/../ncurses/Makefile"
+.include "${.CURDIR:H}/ncurses/Makefile"

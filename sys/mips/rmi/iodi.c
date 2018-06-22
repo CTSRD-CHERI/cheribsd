@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2003-2009 RMI Corporation
  * All rights reserved.
  *
@@ -48,7 +50,6 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/cpu.h>
 #include <machine/bus.h>
-#include <machine/param.h>
 #include <machine/intr_machdep.h>
 #include <machine/clock.h>	/* for DELAY */
 #include <machine/resource.h>
@@ -135,17 +136,17 @@ iodi_alloc_resource(device_t bus, device_t child, int type, int *rid,
 #ifdef DEBUG
 	switch (type) {
 	case SYS_RES_IRQ:
-		device_printf(bus, "IRQ resource - for %s %lx-%lx\n",
+		device_printf(bus, "IRQ resource - for %s %jx-%jx\n",
 		    device_get_nameunit(child), start, end);
 		break;
 
 	case SYS_RES_IOPORT:
-		device_printf(bus, "IOPORT resource - for %s %lx-%lx\n",
+		device_printf(bus, "IOPORT resource - for %s %jx-%jx\n",
 		    device_get_nameunit(child), start, end);
 		break;
 
 	case SYS_RES_MEMORY:
-		device_printf(bus, "MEMORY resource - for %s %lx-%lx\n",
+		device_printf(bus, "MEMORY resource - for %s %jx-%jx\n",
 		    device_get_nameunit(child), start, end);
 		break;
 	}

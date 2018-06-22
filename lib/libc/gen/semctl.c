@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2002 Doug Rabson
  * All rights reserved.
  *
@@ -29,7 +31,9 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#ifndef NO_COMPAT7
 #define _WANT_SEMUN_OLD
+#endif
 
 #include <sys/types.h>
 #include <sys/ipc.h>
@@ -38,7 +42,7 @@ __FBSDID("$FreeBSD$");
 #include <stdlib.h>
 
 int	__semctl(int semid, int semnum, int cmd, union semun *arg);
-#ifndef __CHERI_PURE_CAPABILITY__
+#ifndef NO_COMPAT7
 int	freebsd7___semctl(int semid, int semnum, int cmd, union semun_old *arg);
 int	freebsd7_semctl(int semid, int semnum, int cmd, ...);
 #endif
@@ -63,7 +67,7 @@ semctl(int semid, int semnum, int cmd, ...)
 	return (__semctl(semid, semnum, cmd, semun_ptr));
 }
 
-#ifndef __CHERI_PURE_CAPABILITY__
+#ifndef NO_COMPAT7
 int
 freebsd7_semctl(int semid, int semnum, int cmd, ...)
 {

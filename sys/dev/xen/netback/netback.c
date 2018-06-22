@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2009-2011 Spectra Logic Corporation
  * All rights reserved.
  *
@@ -164,7 +166,7 @@ static void	xnb_txpkt2rsp(const struct xnb_pkt *pkt,
 			      netif_tx_back_ring_t *ring, int error);
 static struct mbuf *xnb_pkt2mbufc(const struct xnb_pkt *pkt, struct ifnet *ifp);
 static int	xnb_txpkt2gnttab(const struct xnb_pkt *pkt,
-				 const struct mbuf *mbufc,
+				 struct mbuf *mbufc,
 				 gnttab_copy_table gnttab,
 				 const netif_tx_back_ring_t *txb,
 				 domid_t otherend_id);
@@ -416,7 +418,7 @@ struct xnb_softc {
 	 * There are situations where the back and front ends can
 	 * have a different, native abi (e.g. intel x86_64 and
 	 * 32bit x86 domains on the same machine).  The back-end
-	 * always accomodates the front-end's native abi.  That
+	 * always accommodates the front-end's native abi.  That
 	 * value is pulled from the XenStore and recorded here.
 	 */
 	int			abi;
@@ -1101,14 +1103,13 @@ xnb_attach_failed(struct xnb_softc *xnb, int err, const char *fmt, ...)
 	xs_vprintf(XST_NIL, xenbus_get_node(xnb->dev),
 		  "hotplug-error", fmt, ap_hotplug);
 	va_end(ap_hotplug);
-	xs_printf(XST_NIL, xenbus_get_node(xnb->dev),
+	(void)xs_printf(XST_NIL, xenbus_get_node(xnb->dev),
 		  "hotplug-status", "error");
 
 	xenbus_dev_vfatal(xnb->dev, err, fmt, ap);
 	va_end(ap);
 
-	xs_printf(XST_NIL, xenbus_get_node(xnb->dev),
-		  "online", "0");
+	(void)xs_printf(XST_NIL, xenbus_get_node(xnb->dev), "online", "0");
 	xnb_detach(xnb->dev);
 }
 
@@ -1233,11 +1234,7 @@ create_netdev(device_t dev)
 		if_initname(ifp, xnb->if_name,  IF_DUNIT_NONE);
 		ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 		ifp->if_ioctl = xnb_ioctl;
-		ifp->if_output = ether_output;
 		ifp->if_start = xnb_start;
-#ifdef notyet
-		ifp->if_watchdog = xnb_watchdog;
-#endif
 		ifp->if_init = xnb_ifinit;
 		ifp->if_mtu = ETHERMTU;
 		ifp->if_snd.ifq_maxlen = NET_RX_RING_SIZE - 1;
@@ -1327,7 +1324,7 @@ xnb_attach(device_t dev)
  *
  * \note A net back device may be detached at any time in its life-cycle,
  *       including part way through the attach process.  For this reason,
- *       initialization order and the intialization state checks in this
+ *       initialization order and the initialization state checks in this
  *       routine must be carefully coupled so that attach time failures
  *       are gracefully handled.
  */
@@ -1709,12 +1706,12 @@ xnb_pkt2mbufc(const struct xnb_pkt *pkt, struct ifnet *ifp)
  * \return 		The number of gnttab entries filled
  */
 static int
-xnb_txpkt2gnttab(const struct xnb_pkt *pkt, const struct mbuf *mbufc,
+xnb_txpkt2gnttab(const struct xnb_pkt *pkt, struct mbuf *mbufc,
 		 gnttab_copy_table gnttab, const netif_tx_back_ring_t *txb,
 		 domid_t otherend_id)
 {
 
-	const struct mbuf *mbuf = mbufc;/* current mbuf within the chain */
+	struct mbuf *mbuf = mbufc;/* current mbuf within the chain */
 	int gnt_idx = 0;		/* index into grant table */
 	RING_IDX r_idx = pkt->car;	/* index into tx ring buffer */
 	int r_ofs = 0;	/* offset of next data within tx request's data area */
@@ -1931,7 +1928,7 @@ xnb_mbufc2pkt(const struct mbuf *mbufc, struct xnb_pkt *pkt,
 		 * into responses so that each response but the last uses all
 		 * PAGE_SIZE bytes.
 		 */
-		pkt->list_len = (pkt->size + PAGE_SIZE - 1) / PAGE_SIZE;
+		pkt->list_len = howmany(pkt->size, PAGE_SIZE);
 
 		if (pkt->list_len > 1) {
 			pkt->flags |= NETRXF_more_data;
@@ -2220,7 +2217,7 @@ xnb_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error = 0;
 
 	switch (cmd) {
-		case SIOCSIFFLAGS:
+		CASE_IOC_IFREQ(SIOCSIFFLAGS):
 			mtx_lock(&xnb->sc_lock);
 			if (ifp->if_flags & IFF_UP) {
 				xnb_ifinit_locked(xnb);
@@ -2235,7 +2232,7 @@ xnb_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			 */
 			mtx_unlock(&xnb->sc_lock);
 			break;
-		case SIOCSIFADDR:
+		CASE_IOC_IFREQ(SIOCSIFADDR):
 #ifdef INET
 			mtx_lock(&xnb->sc_lock);
 			if (ifa->ifa_addr->sa_family == AF_INET) {
@@ -2260,16 +2257,16 @@ xnb_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			}
 #endif
 			break;
-		case SIOCSIFCAP:
+		CASE_IOC_IFREQ(SIOCSIFCAP):
 			mtx_lock(&xnb->sc_lock);
-			if (ifr->ifr_reqcap & IFCAP_TXCSUM) {
+			if (ifr_reqcap_get(ifr) & IFCAP_TXCSUM) {
 				ifp->if_capenable |= IFCAP_TXCSUM;
 				ifp->if_hwassist |= XNB_CSUM_FEATURES;
 			} else {
 				ifp->if_capenable &= ~(IFCAP_TXCSUM);
 				ifp->if_hwassist &= ~(XNB_CSUM_FEATURES);
 			}
-			if ((ifr->ifr_reqcap & IFCAP_RXCSUM)) {
+			if ((ifr_reqcap_get(ifr) & IFCAP_RXCSUM)) {
 				ifp->if_capenable |= IFCAP_RXCSUM;
 			} else {
 				ifp->if_capenable &= ~(IFCAP_RXCSUM);
@@ -2301,14 +2298,14 @@ xnb_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #endif
 			mtx_unlock(&xnb->sc_lock);
 			break;
-		case SIOCSIFMTU:
-			ifp->if_mtu = ifr->ifr_mtu;
+		CASE_IOC_IFREQ(SIOCSIFMTU):
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 			xnb_ifinit(xnb);
 			break;
-		case SIOCADDMULTI:
-		case SIOCDELMULTI:
-		case SIOCSIFMEDIA:
+		CASE_IOC_IFREQ(SIOCADDMULTI):
+		CASE_IOC_IFREQ(SIOCDELMULTI):
+		CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		case SIOCGIFMEDIA:
 			error = ifmedia_ioctl(ifp, ifr, &xnb->sc_media, cmd);
 			break;

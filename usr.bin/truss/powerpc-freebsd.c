@@ -36,6 +36,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/reg.h>
 #include <machine/frame.h>
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <sysdecode.h>
 
@@ -112,9 +113,11 @@ powerpc_fetch_retval(struct trussinfo *trussinfo, long *retval, int *errorp)
 
 static struct procabi powerpc_freebsd = {
 	"FreeBSD ELF32",
-	FREEBSD,
+	SYSDECODE_ABI_FREEBSD,
 	powerpc_fetch_args,
-	powerpc_fetch_retval
+	powerpc_fetch_retval,
+	STAILQ_HEAD_INITIALIZER(powerpc_freebsd.extra_syscalls),
+	{ NULL }
 };
 
 PROCABI(powerpc_freebsd);

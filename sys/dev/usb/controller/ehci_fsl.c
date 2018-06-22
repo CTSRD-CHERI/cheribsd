@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2010-2012 Semihalf
  * All rights reserved.
  *
@@ -176,7 +178,7 @@ enable_usb(device_t dev, bus_space_tag_t iot, bus_space_handle_t ioh)
 	    (OF_getprop_alloc(node, "phy_type", 1, (void **)&phy_type) > 0)) {
 		if (strncasecmp(phy_type, "utmi", strlen("utmi")) == 0)
 			tmp |= UTMI_PHY_EN;
-		free(phy_type, M_OFWPROP);
+		OF_prop_free(phy_type);
 	}
 	bus_space_write_4(iot, ioh, CONTROL, tmp);
 }
@@ -294,7 +296,7 @@ fsl_ehci_attach(device_t self)
 	}
 
 	/* Setup interrupt handler */
-	err = bus_setup_intr(self, sc->sc_irq_res, INTR_TYPE_BIO,
+	err = bus_setup_intr(self, sc->sc_irq_res, INTR_TYPE_BIO | INTR_MPSAFE,
 	    NULL, (driver_intr_t *)ehci_interrupt, sc, &sc->sc_intr_hdl);
 	if (err) {
 		device_printf(self, "Could not setup irq, %d\n", err);

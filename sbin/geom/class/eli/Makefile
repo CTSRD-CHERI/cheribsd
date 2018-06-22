@@ -1,6 +1,7 @@
 # $FreeBSD$
 
-.PATH: ${.CURDIR}/../../misc ${.CURDIR}/../../../../sys/geom/eli ${.CURDIR}/../../../../sys/crypto/sha2
+PACKAGE=runtime
+.PATH: ${.CURDIR:H:H}/misc ${SRCTOP}/sys/geom/eli ${SRCTOP}/sys/crypto/sha2
 
 GEOM_CLASS=	eli
 SRCS=	g_eli_crypto.c
@@ -14,6 +15,6 @@ LIBADD=	md crypto
 
 WARNS?=	3
 
-CFLAGS+=-I${.CURDIR}/../../../../sys
+CFLAGS+=-I${SRCTOP}/sys
 
 .include <bsd.lib.mk>

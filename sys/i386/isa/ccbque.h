@@ -1,5 +1,7 @@
 /*	$NetBSD$	*/
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * [NetBSD for NEC PC98 series]
  *  Copyright (c) 1994, 1995, 1996 NetBSD/pc98 porting staff.
  *  All rights reserved.
@@ -51,7 +53,7 @@ struct CCBTYPE##que {							\
 									\
 void DEV##_init_ccbque(int);					\
 struct CCBTYPE *DEV##_get_ccb(void);				\
-void DEV##_free_ccb(register struct CCBTYPE *);
+void DEV##_free_ccb(struct CCBTYPE *);
 
 /* (II)  static allocated memory */
 #define GENERIC_CCB_STATIC_ALLOC(DEV, CCBTYPE)				\
@@ -72,7 +74,7 @@ DEV##_init_ccbque(count)						\
 struct CCBTYPE *							\
 DEV##_get_ccb()								\
 {									\
-	register struct CCBTYPE *cb;					\
+	struct CCBTYPE *cb;						\
 	int s = splcam();						\
 									\
 	if (CCBTYPE##que.count < CCBTYPE##que.maxccb)			\
@@ -105,7 +107,7 @@ out:									\
 									\
 void									\
 DEV##_free_ccb(cb)							\
-	register struct CCBTYPE *cb;					\
+	struct CCBTYPE *cb;						\
 {									\
 	int s = splcam();						\
 									\

@@ -1,6 +1,8 @@
 /*	$NetBSD: xdr.c,v 1.22 2000/07/06 03:10:35 christos Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2010, Oracle America, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,6 +32,17 @@
  *   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "sunrpc"
+ * }
+ * CHERI CHANGES END
+ */
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char *sccsid2 = "@(#)xdr.c 1.35 87/08/12";
@@ -52,6 +65,8 @@ __FBSDID("$FreeBSD$");
 #include <stdlib.h>
 #include <string.h>
 
+#include <rpc/rpc.h>
+#include <rpc/rpc_com.h>
 #include <rpc/types.h>
 #include <rpc/xdr.h>
 #include "un-namespace.h"
@@ -64,7 +79,6 @@ typedef u_quad_t        u_longlong_t;   /* ANSI unsigned long long type */
  */
 #define XDR_FALSE	((long) 0)
 #define XDR_TRUE	((long) 1)
-#define LASTUNSIGNED	((u_int) 0-1)
 
 /*
  * for unit alignment
@@ -81,7 +95,7 @@ xdr_free(xdrproc_t proc, void *objp)
 	XDR x;
 	
 	x.x_op = XDR_FREE;
-	(*proc)(&x, objp);
+	(*proc)(&x, objp, 0);
 }
 
 /*
@@ -561,6 +575,7 @@ xdr_bytes(XDR *xdrs, char **cpp, u_int *sizep, u_int maxsize)
 {
 	char *sp = *cpp;  /* sp is the actual string pointer */
 	u_int nodesize;
+	bool_t ret, allocated = FALSE;
 
 	/*
 	 * first deal with the length since xdr bytes are counted
@@ -584,6 +599,7 @@ xdr_bytes(XDR *xdrs, char **cpp, u_int *sizep, u_int maxsize)
 		}
 		if (sp == NULL) {
 			*cpp = sp = mem_alloc(nodesize);
+			allocated = TRUE;
 		}
 		if (sp == NULL) {
 			warnx("xdr_bytes: out of memory");
@@ -592,7 +608,14 @@ xdr_bytes(XDR *xdrs, char **cpp, u_int *sizep, u_int maxsize)
 		/* FALLTHROUGH */
 
 	case XDR_ENCODE:
-		return (xdr_opaque(xdrs, sp, nodesize));
+		ret = xdr_opaque(xdrs, sp, nodesize);
+		if ((xdrs->x_op == XDR_DECODE) && (ret == FALSE)) {
+			if (allocated == TRUE) {
+				free(sp);
+				*cpp = NULL;
+			}
+		}
+		return (ret);
 
 	case XDR_FREE:
 		if (sp != NULL) {
@@ -652,14 +675,14 @@ xdr_union(XDR *xdrs, enum_t *dscmp, char *unp, const struct xdr_discrim *choices
 	 */
 	for (; choices->proc != NULL_xdrproc_t; choices++) {
 		if (choices->value == dscm)
-			return ((*(choices->proc))(xdrs, unp));
+			return ((*(choices->proc))(xdrs, unp, 0));
 	}
 
 	/*
 	 * no match - execute the default xdr routine if there is one
 	 */
 	return ((dfault == NULL_xdrproc_t) ? FALSE :
-	    (*dfault)(xdrs, unp));
+	    (*dfault)(xdrs, unp, 0));
 }
 
 
@@ -683,6 +706,7 @@ xdr_string(XDR *xdrs, char **cpp, u_int maxsize)
 	char *sp = *cpp;  /* sp is the actual string pointer */
 	u_int size;
 	u_int nodesize;
+	bool_t ret, allocated = FALSE;
 
 	/*
 	 * first deal with the length since xdr strings are counted-strings
@@ -716,8 +740,10 @@ xdr_string(XDR *xdrs, char **cpp, u_int maxsize)
 		if (nodesize == 0) {
 			return (TRUE);
 		}
-		if (sp == NULL)
+		if (sp == NULL) {
 			*cpp = sp = mem_alloc(nodesize);
+			allocated = TRUE;
+		}
 		if (sp == NULL) {
 			warnx("xdr_string: out of memory");
 			return (FALSE);
@@ -726,7 +752,14 @@ xdr_string(XDR *xdrs, char **cpp, u_int maxsize)
 		/* FALLTHROUGH */
 
 	case XDR_ENCODE:
-		return (xdr_opaque(xdrs, sp, size));
+		ret = xdr_opaque(xdrs, sp, size);
+		if ((xdrs->x_op == XDR_DECODE) && (ret == FALSE)) {
+			if (allocated == TRUE) {
+				free(sp);
+				*cpp = NULL;
+			}
+		}
+		return (ret);
 
 	case XDR_FREE:
 		mem_free(sp, nodesize);
@@ -744,7 +777,7 @@ xdr_string(XDR *xdrs, char **cpp, u_int maxsize)
 bool_t
 xdr_wrapstring(XDR *xdrs, char **cpp)
 {
-	return xdr_string(xdrs, cpp, LASTUNSIGNED);
+	return xdr_string(xdrs, cpp, RPC_MAXDATASIZE);
 }
 
 /*

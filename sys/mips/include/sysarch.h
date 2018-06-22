@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1993 The Regents of the University of California.
  * All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -54,16 +56,33 @@
 #define	CHERI_SET_STACK		5	/* Set trusted stack. */
 
 /*
- * Query the root of the object-type capability provenance tree.  This allows
- * us to avoid setting CHERI_PERM_SEAL on data and code capabilities.
+ * Query the root of the object-type sealing capability provenance tree.  This
+ * allows us to avoid setting CHERI_PERM_SEAL and CHERI_PERM_UNSEAL on data
+ * and code capabilities.
  */
-#define	CHERI_GET_TYPECAP	6	/* Get root 'type' capability. */
+#define	CHERI_GET_SEALCAP	6	/* Get root sealing capability. */
 
 /*
- * Get or reduce the capabiltiy permissions allocated to new mmap() regions.
+ * Manipulate the mmap capability.
  */
 #define	CHERI_MMAP_GETPERM	7	/* Get permissions */
 #define	CHERI_MMAP_ANDPERM	8	/* Reduce permissions */
+#define	CHERI_MMAP_GETBASE	9	/* Get capability base. */
+#define	CHERI_MMAP_GETLEN	10	/* Get capability length. */
+/*
+ * XXX-BD: we may want to replaced these with a two argument atomic bounds
+ * setting operation and require zero offsets.
+ */
+#define	CHERI_MMAP_GETOFFSET	11	/* Get capability offset. */
+#define	CHERI_MMAP_SETOFFSET	12	/* Set capability offset. */
+#define	CHERI_MMAP_SETBOUNDS	13	/* Set capability bounds. */
+
+/*
+ * Query, enable, and disable Qemu ISA-level tracing on threads.  To use this
+ * feature, the sysctl hw.qemu_trace_perthread must be enabled.
+ */
+#define	QEMU_GET_QTRACE		100	/* Get Qemu tracing. */
+#define	QEMU_SET_QTRACE		101	/* Set (or clear) Qemu tracing. */
 
 #ifndef _KERNEL
 #include <sys/cdefs.h>

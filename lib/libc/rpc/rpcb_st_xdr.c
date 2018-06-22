@@ -1,6 +1,8 @@
 /*	$NetBSD: rpcb_st_xdr.c,v 1.3 2000/07/14 08:40:42 fvdl Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2009, Sun Microsystems, Inc.
  * All rights reserved.
  *
@@ -42,6 +44,7 @@ __FBSDID("$FreeBSD$");
 
 #include "namespace.h"
 #include <rpc/rpc.h>
+#include <rpc/rpc_com.h>
 #include "un-namespace.h"
 
 /* Link list of all the stats about getport and getaddr */
@@ -51,10 +54,10 @@ xdr_rpcbs_addrlist(XDR *xdrs, rpcbs_addrlist *objp)
 {
 	struct rpcbs_addrlist **pnext;
 
-	    if (!xdr_u_int32_t(xdrs, &objp->prog)) {
+	    if (!xdr_rpcprog(xdrs, &objp->prog)) {
 		return (FALSE);
 	    }
-	    if (!xdr_u_int32_t(xdrs, &objp->vers)) {
+	    if (!xdr_rpcvers(xdrs, &objp->vers)) {
 		return (FALSE);
 	    }
 	    if (!xdr_int(xdrs, &objp->success)) {
@@ -63,7 +66,7 @@ xdr_rpcbs_addrlist(XDR *xdrs, rpcbs_addrlist *objp)
 	    if (!xdr_int(xdrs, &objp->failure)) {
 		return (FALSE);
 	    }
-	    if (!xdr_string(xdrs, &objp->netid, (u_int)~0)) {
+	    if (!xdr_string(xdrs, &objp->netid, RPC_MAXDATASIZE)) {
 		return (FALSE);
 	    }
 
@@ -89,13 +92,13 @@ xdr_rpcbs_rmtcalllist(XDR *xdrs, rpcbs_rmtcalllist *objp)
 	if (xdrs->x_op == XDR_ENCODE) {
 	buf = XDR_INLINE(xdrs, 6 * BYTES_PER_XDR_UNIT);
 	if (buf == NULL) {
-		if (!xdr_u_int32_t(xdrs, &objp->prog)) {
+		if (!xdr_rpcprog(xdrs, &objp->prog)) {
 			return (FALSE);
 		}
-		if (!xdr_u_int32_t(xdrs, &objp->vers)) {
+		if (!xdr_rpcvers(xdrs, &objp->vers)) {
 			return (FALSE);
 		}
-		if (!xdr_u_int32_t(xdrs, &objp->proc)) {
+		if (!xdr_rpcproc(xdrs, &objp->proc)) {
 			return (FALSE);
 		}
 		if (!xdr_int(xdrs, &objp->success)) {
@@ -115,7 +118,7 @@ xdr_rpcbs_rmtcalllist(XDR *xdrs, rpcbs_rmtcalllist *objp)
 		IXDR_PUT_INT32(buf, objp->failure);
 		IXDR_PUT_INT32(buf, objp->indirect);
 	}
-	if (!xdr_string(xdrs, &objp->netid, (u_int)~0)) {
+	if (!xdr_string(xdrs, &objp->netid, RPC_MAXDATASIZE)) {
 		return (FALSE);
 	}
 	pnext = &objp->next;
@@ -128,13 +131,13 @@ xdr_rpcbs_rmtcalllist(XDR *xdrs, rpcbs_rmtcalllist *objp)
 	} else if (xdrs->x_op == XDR_DECODE) {
 	buf = XDR_INLINE(xdrs, 6 * BYTES_PER_XDR_UNIT);
 	if (buf == NULL) {
-		if (!xdr_u_int32_t(xdrs, &objp->prog)) {
+		if (!xdr_rpcprog(xdrs, &objp->prog)) {
 			return (FALSE);
 		}
-		if (!xdr_u_int32_t(xdrs, &objp->vers)) {
+		if (!xdr_rpcvers(xdrs, &objp->vers)) {
 			return (FALSE);
 		}
-		if (!xdr_u_int32_t(xdrs, &objp->proc)) {
+		if (!xdr_rpcproc(xdrs, &objp->proc)) {
 			return (FALSE);
 		}
 		if (!xdr_int(xdrs, &objp->success)) {
@@ -154,7 +157,7 @@ xdr_rpcbs_rmtcalllist(XDR *xdrs, rpcbs_rmtcalllist *objp)
 		objp->failure = (int)IXDR_GET_INT32(buf);
 		objp->indirect = (int)IXDR_GET_INT32(buf);
 	}
-	if (!xdr_string(xdrs, &objp->netid, (u_int)~0)) {
+	if (!xdr_string(xdrs, &objp->netid, RPC_MAXDATASIZE)) {
 		return (FALSE);
 	}
 	if (!xdr_pointer(xdrs, (char **) pnext,
@@ -164,13 +167,13 @@ xdr_rpcbs_rmtcalllist(XDR *xdrs, rpcbs_rmtcalllist *objp)
 	}
 	return (TRUE);
 	}
-	if (!xdr_u_int32_t(xdrs, &objp->prog)) {
+	if (!xdr_rpcprog(xdrs, &objp->prog)) {
 		return (FALSE);
 	}
-	if (!xdr_u_int32_t(xdrs, &objp->vers)) {
+	if (!xdr_rpcvers(xdrs, &objp->vers)) {
 		return (FALSE);
 	}
-	if (!xdr_u_int32_t(xdrs, &objp->proc)) {
+	if (!xdr_rpcproc(xdrs, &objp->proc)) {
 		return (FALSE);
 	}
 	if (!xdr_int(xdrs, &objp->success)) {
@@ -182,7 +185,7 @@ xdr_rpcbs_rmtcalllist(XDR *xdrs, rpcbs_rmtcalllist *objp)
 	if (!xdr_int(xdrs, &objp->indirect)) {
 		return (FALSE);
 	}
-	if (!xdr_string(xdrs, &objp->netid, (u_int)~0)) {
+	if (!xdr_string(xdrs, &objp->netid, RPC_MAXDATASIZE)) {
 		return (FALSE);
 	}
 	if (!xdr_pointer(xdrs, (char **) pnext,

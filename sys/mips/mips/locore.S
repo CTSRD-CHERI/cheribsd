@@ -14,7 +14,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -72,6 +72,7 @@
 
 #if defined(CPU_CHERI)
 #include <machine/cheriasm.h>
+.set cheri_sysregs_accessible	# Don't warn about uses of c27-c30
 #endif
 
 #include "assym.s"
@@ -126,7 +127,7 @@ VECTOR(_locore, unknown)
 	li	t1, MIPS_SR_COP_1_BIT
 #endif
 #ifdef __mips_n64
-	or	t1, MIPS_SR_KX | MIPS_SR_SX | MIPS_SR_UX
+	or	t1, MIPS_SR_KX | MIPS_SR_SX | MIPS_SR_UX | MIPS_SR_FR
 #endif
 #endif
 	/*
@@ -152,20 +153,26 @@ VECTOR(_locore, unknown)
 	 *
 	 * XXXRW: Do we want to rely on default initialisation of all CP2
 	 * registers here?
+	 *
+	 * XXXAR: Recent versions of CHERI no longer mirror the special
+	 * registers to the general purpose register file so for now set up
+	 * this mirroring now and assume only DDC and PCC are ambient caps
 	 */
-	CHERI_ASM_CMOVE(CHERI_REG_KDC, $c0)	# Preserve $kdc
-	CHERI_ASM_CMOVE(CHERI_REG_KCC, $c0)	# Preserve $kcc
-	/* cgetdefault	CHERI_REG_KCC	# Preserve $kcc */
-	/* cgetdefault	CHERI_REG_KDC	# Preserve $kdc */
+	cgetpcc	CHERI_REG_KCC		# Preserve $kcc
+	csetkcc	CHERI_REG_KCC
+	cgetdefault	CHERI_REG_KDC	# Preserve $kdc
+	csetkdc	CHERI_REG_KDC
 #endif
 
 #if defined(CPU_BERI)
 	/*
 	 * Enable userspace cycle-count, cycle-count resolution, and CPU
 	 * number registers available via rdhwr.
+	 * Also enable beri specific statcounters.
 	 */
 	MFC0	t0, MIPS_COP_0_HWRENA
-	or	t0, MIPS_HWRENA_CC | MIPS_HWRENA_CCRES | MIPS_HWRENA_CPUNUM | (7 << 4)
+	or	t0, MIPS_HWRENA_CC | MIPS_HWRENA_CCRES | MIPS_HWRENA_CPUNUM | \
+	    (7 << 4) | MIPS_HWRENA_BERI_STATCOUNTERS_MASK
 	MTC0	t0, MIPS_COP_0_HWRENA
 #endif
 
@@ -190,6 +197,21 @@ VECTOR(_locore, unknown)
 1:
 #endif
 
+#if defined(CPU_MALTA) && defined(SMP)
+	.set push
+	.set mips32r2
+	jal	malta_cpu_configure
+	nop
+	jal	platform_processor_id
+	nop
+	beqz	v0, 1f
+	nop
+	j	malta_ap_wait
+	nop
+	.set pop
+1:
+#endif
+
 	/*
 	 * Initialize stack and call machine startup.
 	 */
@@ -206,7 +228,7 @@ VECTOR(_locore, unknown)
 	jalr	t9
 	nop
 
-	PTR_LA	sp, _C_LABEL(thread0)
+	PTR_LA	sp, _C_LABEL(thread0_st)
 	PTR_L	a0, TD_PCB(sp)
 	REG_LI	t0, ~7
 	and	a0, a0, t0

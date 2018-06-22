@@ -164,6 +164,8 @@ static void	zyd_stop(struct zyd_softc *);
 static int	zyd_loadfirmware(struct zyd_softc *);
 static void	zyd_scan_start(struct ieee80211com *);
 static void	zyd_scan_end(struct ieee80211com *);
+static void	zyd_getradiocaps(struct ieee80211com *, int, int *,
+		    struct ieee80211_channel[]);
 static void	zyd_set_channel(struct ieee80211com *);
 static int	zyd_rfmd_init(struct zyd_rf *);
 static int	zyd_rfmd_switch_radio(struct zyd_rf *, int);
@@ -334,7 +336,6 @@ zyd_attach(device_t dev)
 	struct usb_attach_arg *uaa = device_get_ivars(dev);
 	struct zyd_softc *sc = device_get_softc(dev);
 	struct ieee80211com *ic = &sc->sc_ic;
-	uint8_t bands[howmany(IEEE80211_MODE_MAX, 8)];
 	uint8_t iface_index;
 	int error;
 
@@ -388,15 +389,14 @@ zyd_attach(device_t dev)
 	        | IEEE80211_C_WPA		/* 802.11i */
 		;
 
-	memset(bands, 0, sizeof(bands));
-	setbit(bands, IEEE80211_MODE_11B);
-	setbit(bands, IEEE80211_MODE_11G);
-	ieee80211_init_channels(ic, NULL, bands);
+	zyd_getradiocaps(ic, IEEE80211_CHAN_MAX, &ic->ic_nchans,
+	    ic->ic_channels);
 
 	ieee80211_ifattach(ic);
 	ic->ic_raw_xmit = zyd_raw_xmit;
 	ic->ic_scan_start = zyd_scan_start;
 	ic->ic_scan_end = zyd_scan_end;
+	ic->ic_getradiocaps = zyd_getradiocaps;
 	ic->ic_set_channel = zyd_set_channel;
 	ic->ic_vap_create = zyd_vap_create;
 	ic->ic_vap_delete = zyd_vap_delete;
@@ -609,8 +609,8 @@ zyd_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		/* make data LED blink upon Tx */
 		zyd_write32_m(sc, sc->sc_fwbase + ZYD_FW_LINK_STATUS, 1);
 
-		IEEE80211_ADDR_COPY(ic->ic_macaddr, vap->iv_bss->ni_bssid);
-		zyd_set_bssid(sc, ic->ic_macaddr);
+		IEEE80211_ADDR_COPY(sc->sc_bssid, vap->iv_bss->ni_bssid);
+		zyd_set_bssid(sc, sc->sc_bssid);
 		break;
 	default:
 		break;
@@ -648,11 +648,12 @@ zyd_intr_read_callback(struct usb_xfer *xfer, usb_error_t error)
 		{
 			struct zyd_notif_retry *retry =
 			    (struct zyd_notif_retry *)cmd->data;
+			uint16_t count = le16toh(retry->count);
 
 			DPRINTF(sc, ZYD_DEBUG_TX_PROC,
 			    "retry intr: rate=0x%x addr=%s count=%d (0x%x)\n",
 			    le16toh(retry->rate), ether_sprintf(retry->macaddr),
-			    le16toh(retry->count)&0xff, le16toh(retry->count));
+			    count & 0xff, count);
 
 			/*
 			 * Find the node to which the packet was sent and
@@ -662,15 +663,26 @@ zyd_intr_read_callback(struct usb_xfer *xfer, usb_error_t error)
 			 */
 			ni = ieee80211_find_txnode(vap, retry->macaddr);
 			if (ni != NULL) {
-				int retrycnt =
-				    (int)(le16toh(retry->count) & 0xff);
-				
-				ieee80211_ratectl_tx_complete(vap, ni,
-				    IEEE80211_RATECTL_TX_FAILURE,
-				    &retrycnt, NULL);
+				struct ieee80211_ratectl_tx_status *txs =
+				    &sc->sc_txs;
+				int retrycnt = count & 0xff;
+
+				txs->flags =
+				    IEEE80211_RATECTL_STATUS_LONG_RETRY;
+				txs->long_retries = retrycnt;
+				if (count & 0x100) {
+					txs->status =
+					    IEEE80211_RATECTL_TX_FAIL_LONG;
+				} else {
+					txs->status =
+					    IEEE80211_RATECTL_TX_SUCCESS;
+				}
+
+
+				ieee80211_ratectl_tx_complete(ni, txs);
 				ieee80211_free_node(ni);
 			}
-			if (le16toh(retry->count) & 0x100)
+			if (count & 0x100)
 				/* too many retries */
 				if_inc_counter(vap->iv_ifp, IFCOUNTER_OERRORS,
 				    1);
@@ -2427,7 +2439,7 @@ zyd_tx_start(struct zyd_softc *sc, struct mbuf *m0, struct ieee80211_node *ni)
 	struct zyd_tx_desc *desc;
 	struct zyd_tx_data *data;
 	struct ieee80211_frame *wh;
-	const struct ieee80211_txparam *tp;
+	const struct ieee80211_txparam *tp = ni->ni_txparms;
 	struct ieee80211_key *k;
 	int rate, totlen;
 	static const uint8_t ratediv[] = ZYD_TX_RATEDIV;
@@ -2441,11 +2453,10 @@ zyd_tx_start(struct zyd_softc *sc, struct mbuf *m0, struct ieee80211_node *ni)
 	sc->tx_nfree--;
 
 	if ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_MGT ||
-	    (wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_CTL) {
-		tp = &vap->iv_txparms[ieee80211_chan2mode(ic->ic_curchan)];
+	    (wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_CTL ||
+	    (m0->m_flags & M_EAPOL) != 0) {
 		rate = tp->mgmtrate;
 	} else {
-		tp = &vap->iv_txparms[ieee80211_chan2mode(ni->ni_chan)];
 		/* for data frames */
 		if (IEEE80211_IS_MULTICAST(wh->i_addr1))
 			rate = tp->mcastrate;
@@ -2570,10 +2581,10 @@ zyd_start(struct zyd_softc *sc)
 	while (sc->tx_nfree > 0 && (m = mbufq_dequeue(&sc->sc_snd)) != NULL) {
 		ni = (struct ieee80211_node *)m->m_pkthdr.rcvif;
 		if (zyd_tx_start(sc, m, ni) != 0) {
-			ieee80211_free_node(ni);
 			m_freem(m);
 			if_inc_counter(ni->ni_vap->iv_ifp,
 			    IFCOUNTER_OERRORS, 1);
+			ieee80211_free_node(ni);
 			break;
 		}
 	}
@@ -2860,8 +2871,21 @@ zyd_scan_end(struct ieee80211com *ic)
 
 	ZYD_LOCK(sc);
 	/* restore previous bssid */
-	zyd_set_bssid(sc, ic->ic_macaddr);
+	zyd_set_bssid(sc, sc->sc_bssid);
 	ZYD_UNLOCK(sc);
+}
+
+static void
+zyd_getradiocaps(struct ieee80211com *ic,
+    int maxchans, int *nchans, struct ieee80211_channel chans[])
+{
+	uint8_t bands[IEEE80211_MODE_BYTES];
+
+	memset(bands, 0, sizeof(bands));
+	setbit(bands, IEEE80211_MODE_11B);
+	setbit(bands, IEEE80211_MODE_11G);
+	ieee80211_add_channel_list_2ghz(chans, maxchans, nchans,
+	    zyd_chan_2ghz, nitems(zyd_chan_2ghz), bands, 0);
 }
 
 static void

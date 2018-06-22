@@ -15,24 +15,23 @@
 #define LLVM_MC_MCSECTIONMACHO_H
 
 #include "llvm/ADT/StringRef.h"
+#include "llvm/BinaryFormat/MachO.h"
 #include "llvm/MC/MCSection.h"
-#include "llvm/Support/MachO.h"
 
 namespace llvm {
 
-/// MCSectionMachO - This represents a section on a Mach-O system (used by
-/// Mac OS X).  On a Mac system, these are also described in
-/// /usr/include/mach-o/loader.h.
-class MCSectionMachO : public MCSection {
+/// This represents a section on a Mach-O system (used by Mac OS X).  On a Mac
+/// system, these are also described in /usr/include/mach-o/loader.h.
+class MCSectionMachO final : public MCSection {
   char SegmentName[16];  // Not necessarily null terminated!
   char SectionName[16];  // Not necessarily null terminated!
 
-  /// TypeAndAttributes - This is the SECTION_TYPE and SECTION_ATTRIBUTES
-  /// field of a section, drawn from the enums below.
+  /// This is the SECTION_TYPE and SECTION_ATTRIBUTES field of a section, drawn
+  /// from the enums below.
   unsigned TypeAndAttributes;
 
-  /// Reserved2 - The 'reserved2' field of a section, used to represent the
-  /// size of stubs, for example.
+  /// The 'reserved2' field of a section, used to represent the size of stubs,
+  /// for example.
   unsigned Reserved2;
 
   MCSectionMachO(StringRef Segment, StringRef Section, unsigned TAA,
@@ -64,12 +63,12 @@ public:
     return (TypeAndAttributes & Value) != 0;
   }
 
-  /// ParseSectionSpecifier - Parse the section specifier indicated by "Spec".
-  /// This is a string that can appear after a .section directive in a mach-o
-  /// flavored .s file.  If successful, this fills in the specified Out
-  /// parameters and returns an empty string.  When an invalid section
-  /// specifier is present, this returns a string indicating the problem.
-  /// If no TAA was parsed, TAA is not altered, and TAAWasSet becomes false.
+  /// Parse the section specifier indicated by "Spec". This is a string that can
+  /// appear after a .section directive in a mach-o flavored .s file.  If
+  /// successful, this fills in the specified Out parameters and returns an
+  /// empty string.  When an invalid section specifier is present, this returns
+  /// a string indicating the problem. If no TAA was parsed, TAA is not altered,
+  /// and TAAWasSet becomes false.
   static std::string ParseSectionSpecifier(StringRef Spec,       // In.
                                            StringRef &Segment,   // Out.
                                            StringRef &Section,   // Out.
@@ -77,7 +76,8 @@ public:
                                            bool      &TAAParsed, // Out.
                                            unsigned  &StubSize); // Out.
 
-  void PrintSwitchToSection(const MCAsmInfo &MAI, raw_ostream &OS,
+  void PrintSwitchToSection(const MCAsmInfo &MAI, const Triple &T,
+                            raw_ostream &OS,
                             const MCExpr *Subsection) const override;
   bool UseCodeAlign() const override;
   bool isVirtualSection() const override;

@@ -1,6 +1,6 @@
 # $FreeBSD$
 
-AWKSRC=	${.CURDIR}/../../contrib/one-true-awk
+AWKSRC=	${SRCTOP}/contrib/one-true-awk
 .PATH: ${AWKSRC}
 
 PROG=	awk
@@ -17,13 +17,17 @@ MLINKS=	awk.1 nawk.1
 
 CLEANFILES= maketab proctab.c ytab.h
 
-ytab.h: awkgram.h .NOMETA
-	ln -sf ${.ALLSRC} ${.TARGET}
+# XXX: awkgram.c isn't really needed here but it is added to keep
+# awkgram.h: .NOMETA respected.
+ytab.h: awkgram.c awkgram.h .NOMETA
+	ln -sf ${.ALLSRC:M*.h} ${.TARGET}
 
 proctab.c: maketab
-	./maketab > proctab.c
+	${BTOOLSPATH:U.}/maketab > proctab.c
 
 build-tools: maketab
-maketab: ytab.h ${AWKSRC}/maketab.c
+maketab: maketab.c ytab.h ${BUILD_TOOLS_META}
+	${BUILD_TOOLS_CC} ${BUILD_TOOLS_CFLAGS} -I. ${BUILD_TOOLS_LDFLAGS} \
+	    ${.ALLSRC:[1]} -o ${.TARGET}
 
 .include <bsd.prog.mk>

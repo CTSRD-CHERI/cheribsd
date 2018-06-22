@@ -48,7 +48,8 @@ local int gz_load(state, buf, len, have)
     *have = 0;
     do {
         /* XXX CHERI: Need cread() callgate in sandbox */
-        ret = read(state->fd, (unsigned char *)buf + *have, len - *have);
+        ret = read(state->fd, cheri_cap_to_ptr(buf, len - *have) + *have,
+                   len - *have);
         if (ret <= 0)
             break;
         *have += ret;
@@ -73,7 +74,7 @@ local int gz_avail(state)
     gz_statep state;
 {
     unsigned got;
-    z_streamp strm = (z_streamp)&(state->strm);
+    z_streamp strm = cheri_ptr_to_bounded_cap(&(state->strm));
 
     if (state->err != Z_OK && state->err != Z_BUF_ERROR)
         return -1;
@@ -107,18 +108,18 @@ local int gz_avail(state)
 local int gz_look(state)
     gz_statep state;
 {
-    z_streamp strm = (z_streamp)&(state->strm);
+    z_streamp strm = cheri_ptr_to_bounded_cap(&(state->strm));
 
     /* allocate read buffers and inflate memory */
     if (state->size == 0) {
         /* allocate buffers */
-        state->in = (__capability unsigned char *)malloc(state->want);
-        state->out = (__capability unsigned char *)malloc(state->want << 1);
+        state->in = malloc_c(state->want);
+        state->out = malloc_c(state->want << 1);
         if (state->in == NULL || state->out == NULL) {
             if (state->out != NULL)
-                free((void *)state->out);
+                free_c(state->out);
             if (state->in != NULL)
-                free((void *)state->in);
+                free_c(state->in);
             gz_error(state, Z_MEM_ERROR, "out of memory");
             return -1;
         }
@@ -130,9 +131,9 @@ local int gz_look(state)
         state->strm.opaque = Z_NULL;
         state->strm.avail_in = 0;
         state->strm.next_in = Z_NULL;
-        if (inflateInit2((z_streamp)&(state->strm), 15 + 16) != Z_OK) {    /* gunzip */
-            free((void *)state->out);
-            free((void *)state->in);
+        if (inflateInit2(cheri_ptr_to_bounded_cap(&(state->strm)), 15 + 16) != Z_OK) {    /* gunzip */
+            free_c(state->out);
+            free_c(state->in);
             state->size = 0;
             gz_error(state, Z_MEM_ERROR, "out of memory");
             return -1;
@@ -196,7 +197,7 @@ local int gz_decomp(state)
     int ret = Z_OK;
     unsigned had;
     __capability unsigned char *snext;
-    z_streamp strm = (z_streamp)&(state->strm);
+    z_streamp strm = cheri_ptr_to_bounded_cap(&(state->strm));
 
     /* fill output buffer up to end of deflate stream */
     had = strm->avail_out;
@@ -249,7 +250,7 @@ local int gz_decomp(state)
 local int gz_fetch(state)
     gz_statep state;
 {
-    z_streamp strm = (z_streamp)&(state->strm);
+    z_streamp strm = cheri_ptr_to_bounded_cap(&(state->strm));
 
     do {
         switch(state->how) {
@@ -321,7 +322,7 @@ int ZEXPORT gzread(file, buf, len)
     if (file == NULL)
         return -1;
     state = (gz_statep)file;
-    strm = (z_streamp)&(state->strm);
+    strm = cheri_ptr_to_bounded_cap(&(state->strm));
 
     /* check that we're reading and that there's no (serious) error */
     if (state->mode != GZ_READ ||
@@ -604,9 +605,9 @@ int ZEXPORT gzclose_r(file)
 
     /* free memory and close file */
     if (state->size) {
-        inflateEnd((z_streamp)&(state->strm));
-        free((void *)state->out);
-        free((void *)state->in);
+        inflateEnd(cheri_ptr_to_bounded_cap(&(state->strm)));
+        free_c(state->out);
+        free_c(state->in);
     }
     err = state->err == Z_BUF_ERROR ? Z_BUF_ERROR : Z_OK;
     gz_error(state, Z_OK, NULL);

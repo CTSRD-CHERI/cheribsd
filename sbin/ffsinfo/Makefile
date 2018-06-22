@@ -4,9 +4,10 @@
 # $FreeBSD$
 #
 
-GROWFS= ${.CURDIR}/../growfs
+GROWFS= ${.CURDIR:H}/growfs
 .PATH: ${GROWFS}
 
+PACKAGE=runtime
 PROG=	ffsinfo
 SRCS=	ffsinfo.c debug.c
 MAN=	ffsinfo.8

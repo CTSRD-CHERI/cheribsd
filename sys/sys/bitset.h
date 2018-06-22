@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2008, Jeffrey Roberson <jeff@freebsd.org>
  * All rights reserved.
  *
@@ -31,6 +33,13 @@
 
 #ifndef _SYS_BITSET_H_
 #define	_SYS_BITSET_H_
+
+#define	__bitset_mask(_s, n)						\
+	(1L << ((__bitset_words((_s)) == 1) ?				\
+	    (__size_t)(n) : ((n) % _BITSET_BITS)))
+
+#define	__bitset_word(_s, n)						\
+	((__bitset_words((_s)) == 1) ? 0 : ((n) / _BITSET_BITS))
 
 #define	BIT_CLR(_s, n, p)						\
 	((p)->__bits[__bitset_word(_s, n)] &= ~__bitset_mask((_s), (n)))
@@ -115,16 +124,46 @@
 		(d)->__bits[__i] |= (s)->__bits[__i];			\
 } while (0)
 
+#define	BIT_OR2(_s, d, s1, s2) do {					\
+	__size_t __i;							\
+	for (__i = 0; __i < __bitset_words((_s)); __i++)		\
+		(d)->__bits[__i] = (s1)->__bits[__i] | (s2)->__bits[__i];\
+} while (0)
+
 #define	BIT_AND(_s, d, s) do {						\
 	__size_t __i;							\
 	for (__i = 0; __i < __bitset_words((_s)); __i++)		\
 		(d)->__bits[__i] &= (s)->__bits[__i];			\
 } while (0)
 
+#define	BIT_AND2(_s, d, s1, s2) do {					\
+	__size_t __i;							\
+	for (__i = 0; __i < __bitset_words((_s)); __i++)		\
+		(d)->__bits[__i] = (s1)->__bits[__i] & (s2)->__bits[__i];\
+} while (0)
+
 #define	BIT_NAND(_s, d, s) do {						\
 	__size_t __i;							\
 	for (__i = 0; __i < __bitset_words((_s)); __i++)		\
 		(d)->__bits[__i] &= ~(s)->__bits[__i];			\
+} while (0)
+
+#define	BIT_NAND2(_s, d, s1, s2) do {					\
+	__size_t __i;							\
+	for (__i = 0; __i < __bitset_words((_s)); __i++)		\
+		(d)->__bits[__i] = (s1)->__bits[__i] & ~(s2)->__bits[__i];\
+} while (0)
+
+#define	BIT_XOR(_s, d, s) do {						\
+	__size_t __i;							\
+	for (__i = 0; __i < __bitset_words((_s)); __i++)		\
+		(d)->__bits[__i] ^= (s)->__bits[__i];			\
+} while (0)
+
+#define	BIT_XOR2(_s, d, s1, s2) do {					\
+	__size_t __i;							\
+	for (__i = 0; __i < __bitset_words((_s)); __i++)		\
+		(d)->__bits[__i] = (s1)->__bits[__i] ^ (s2)->__bits[__i];\
 } while (0)
 
 #define	BIT_CLR_ATOMIC(_s, n, p)					\
@@ -176,6 +215,21 @@
 	__bit;								\
 })
 
+#define	BIT_FLS(_s, p) __extension__ ({					\
+	__size_t __i;							\
+	int __bit;							\
+									\
+	__bit = 0;							\
+	for (__i = __bitset_words((_s)); __i > 0; __i--) {		\
+		if ((p)->__bits[__i - 1] != 0) {			\
+			__bit = flsl((p)->__bits[__i - 1]);		\
+			__bit += (__i - 1) * _BITSET_BITS;		\
+			break;						\
+		}							\
+	}								\
+	__bit;								\
+})
+
 #define	BIT_COUNT(_s, p) __extension__ ({				\
 	__size_t __i;							\
 	int __count;							\
@@ -185,5 +239,17 @@
 		__count += __bitcountl((p)->__bits[__i]);		\
 	__count;							\
 })
-	
+
+#define	BITSET_T_INITIALIZER(x)						\
+	{ .__bits = { x } }
+
+#define	BITSET_FSET(n)							\
+	[ 0 ... ((n) - 1) ] = (-1L)
+
+/*
+ * Dynamically allocate a bitset.
+ */
+#define BITSET_ALLOC(_s, mt, mf)					\
+	malloc(__bitset_words(_s) * sizeof(long), mt, (mf))
+
 #endif /* !_SYS_BITSET_H_ */

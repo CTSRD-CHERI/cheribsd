@@ -1,4 +1,4 @@
-# $Id: Makefile 2859 2013-01-05 09:21:54Z jkoshy $
+# $Id: Makefile 3489 2016-08-31 00:12:15Z emaste $
 
 TOP=	${.CURDIR}/..
 
@@ -7,8 +7,10 @@ LIB=	elftc
 SRCS=	elftc_bfdtarget.c			\
 	elftc_copyfile.c			\
 	elftc_demangle.c			\
+	elftc_reloc_type_str.c			\
 	elftc_set_timestamps.c			\
 	elftc_string_table.c			\
+	elftc_timestamp.c			\
 	elftc_version.c				\
 	libelftc_bfdtarget.c			\
 	libelftc_dem_arm.c			\
@@ -34,6 +36,7 @@ MAN=	elftc.3 \
 	elftc_bfd_find_target.3 \
 	elftc_copyfile.3 \
 	elftc_demangle.3 \
+	elftc_reloc_type_str.3 \
 	elftc_set_timestamps.3 \
 	elftc_string_table_create.3 \
 	elftc_version.3
@@ -45,16 +48,7 @@ MLINKS=	elftc_bfd_find_target.3 elftc_bfd_target_byteorder.3 \
 	elftc_string_table_create.3 elftc_string_table_destroy.3 \
 	elftc_string_table_create.3 elftc_string_table_image.3 \
 	elftc_string_table_create.3 elftc_string_table_insert.3 \
-	elftc_string_table_create.3 elftc_string_table_lookup.3 \
-	elftc_symbol_table_create.3 elftc_symbol_table_create_nested.3 \
-	elftc_symbol_table_create.3 elftc_symbol_table_delete_name.3 \
-	elftc_symbol_table_create.3 elftc_symbol_table_delete_entry.3 \
-	elftc_symbol_table_create.3 elftc_symbol_table_destroy.3 \
-	elftc_symbol_table_create.3 elftc_symbol_table_from_section.3 \
-	elftc_symbol_table_create.3 elftc_symbol_table_insert.3 \
-	elftc_symbol_table_create.3 elftc_symbol_table_iterate.3 \
-	elftc_symbol_table_create.3 elftc_symbol_table_lookup.3 \
-	elftc_symbol_table_create.3 elftc_symbol_table_to_image.3
+	elftc_string_table_create.3 elftc_string_table_lookup.3
 
 .if	!make(clean) && !make(clobber)
 .BEGIN:	.SILENT

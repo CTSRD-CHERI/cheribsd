@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Written by: David Jeffery
  * Copyright (c) 2002 Adaptec Inc.
  * All rights reserved.
@@ -107,7 +109,7 @@ static void ips_cmd_dmaload(void *cmdptr, bus_dma_segment_t *segments,int segnum
 
 }
 
-/* is locking needed? what locking guarentees are there on removal? */
+/* is locking needed? what locking guarantees are there on removal? */
 static int ips_cmdqueue_free(ips_softc_t *sc)
 {
 	int i, error = -1;

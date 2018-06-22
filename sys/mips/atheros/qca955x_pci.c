@@ -49,7 +49,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/bus.h>
 #include <machine/cpu.h>
 #include <machine/intr_machdep.h>
-#include <machine/pmap.h>
 
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcireg.h>
@@ -590,6 +589,7 @@ static device_method_t qca955x_pci_methods[] = {
 	DEVMETHOD(pcib_read_config,	qca955x_pci_read_config),
 	DEVMETHOD(pcib_write_config,	qca955x_pci_write_config),
 	DEVMETHOD(pcib_route_interrupt,	qca955x_pci_route_interrupt),
+	DEVMETHOD(pcib_request_feature,	pcib_request_feature_allow),
 
 	DEVMETHOD_END
 };

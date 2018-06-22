@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
  *
@@ -135,6 +137,10 @@ nd6_ns_input(struct mbuf *m, int off, int icmp6len)
 	struct sockaddr_dl proxydl;
 	char ip6bufs[INET6_ADDRSTRLEN], ip6bufd[INET6_ADDRSTRLEN];
 
+	/* RFC 6980: Nodes MUST silently ignore fragments */
+	if(m->m_flags & M_FRAGMENTED)
+		goto freeit;
+
 	rflag = (V_ip6_forwarding) ? ND_NA_FLAG_ROUTER : 0;
 	if (ND_IFINFO(ifp)->flags & ND6_IFF_ACCEPT_RTADV && V_ip6_norbit_raif)
 		rflag = 0;
@@ -262,8 +268,7 @@ nd6_ns_input(struct mbuf *m, int off, int icmp6len)
 		bzero(&info, sizeof(info));
 		info.rti_info[RTAX_GATEWAY] = (struct sockaddr *)&rt_gateway;
 
-		/* Always use the default FIB. */
-		if (rib_lookup_info(RT_DEFAULT_FIB, (struct sockaddr *)&dst6,
+		if (rib_lookup_info(ifp->if_fib, (struct sockaddr *)&dst6,
 		    0, 0, &info) == 0) {
 			if ((info.rti_flags & RTF_ANNOUNCE) != 0 &&
 			    rt_gateway.sdl_family == AF_LINK) {
@@ -485,7 +490,7 @@ nd6_ns_output_fib(struct ifnet *ifp, const struct in6_addr *saddr6,
 			uint32_t scopeid;
 
 			in6_splitscope(&ip6->ip6_dst, &dst6, &scopeid);
-			error = in6_selectsrc_addr(RT_DEFAULT_FIB, &dst6,
+			error = in6_selectsrc_addr(fibnum, &dst6,
 			    scopeid, ifp, &src6, NULL);
 			if (error) {
 				char ip6buf[INET6_ADDRSTRLEN];
@@ -584,7 +589,6 @@ nd6_ns_output_fib(struct ifnet *ifp, const struct in6_addr *saddr6,
 
   bad:
 	m_freem(m);
-	return;
 }
 
 #ifndef BURN_BRIDGES
@@ -630,6 +634,10 @@ nd6_na_input(struct mbuf *m, int off, int icmp6len)
 	size_t linkhdrsize;
 	int lladdr_off;
 	char ip6bufs[INET6_ADDRSTRLEN], ip6bufd[INET6_ADDRSTRLEN];
+
+	/* RFC 6980: Nodes MUST silently ignore fragments */
+	if(m->m_flags & M_FRAGMENTED)
+		goto freeit;
 
 	if (ip6->ip6_hlim != 255) {
 		nd6log((LOG_ERR,
@@ -858,33 +866,19 @@ nd6_na_input(struct mbuf *m, int off, int icmp6len)
 			 * Remove the sender from the Default Router List and
 			 * update the Destination Cache entries.
 			 */
-			struct nd_defrouter *dr;
-			struct in6_addr *in6;
 			struct ifnet *nd6_ifp;
 
-			in6 = &ln->r_l3addr.addr6;
-
-			/*
-			 * Lock to protect the default router list.
-			 * XXX: this might be unnecessary, since this function
-			 * is only called under the network software interrupt
-			 * context.  However, we keep it just for safety.
-			 */
 			nd6_ifp = lltable_get_ifp(ln->lle_tbl);
-			dr = defrouter_lookup(in6, nd6_ifp);
-			if (dr)
-				defrtrlist_del(dr);
-			else if (ND_IFINFO(nd6_ifp)->flags &
-			    ND6_IFF_ACCEPT_RTADV) {
+			if (!defrouter_remove(&ln->r_l3addr.addr6, nd6_ifp) &&
+			    (ND_IFINFO(nd6_ifp)->flags &
+			     ND6_IFF_ACCEPT_RTADV) != 0)
 				/*
 				 * Even if the neighbor is not in the default
-				 * router list, the neighbor may be used
-				 * as a next hop for some destinations
-				 * (e.g. redirect case). So we must
-				 * call rt6_flush explicitly.
+				 * router list, the neighbor may be used as a
+				 * next hop for some destinations (e.g. redirect
+				 * case). So we must call rt6_flush explicitly.
 				 */
 				rt6_flush(&ip6->ip6_src, ifp);
-			}
 		}
 		ln->ln_router = is_router;
 	}
@@ -900,7 +894,7 @@ nd6_na_input(struct mbuf *m, int off, int icmp6len)
 		LLE_WUNLOCK(ln);
 
 	if (chain != NULL)
-		nd6_flush_holdchain(ifp, ifp, chain, &sin6);
+		nd6_flush_holdchain(ifp, chain, &sin6);
 
 	if (checklink)
 		pfxlist_onlink_check();
@@ -997,7 +991,7 @@ nd6_na_output_fib(struct ifnet *ifp, const struct in6_addr *daddr6_0,
 	 * Select a source whose scope is the same as that of the dest.
 	 */
 	in6_splitscope(&daddr6, &dst6, &scopeid);
-	error = in6_selectsrc_addr(RT_DEFAULT_FIB, &dst6,
+	error = in6_selectsrc_addr(fibnum, &dst6,
 	    scopeid, ifp, &src6, NULL);
 	if (error) {
 		char ip6buf[INET6_ADDRSTRLEN];
@@ -1078,7 +1072,6 @@ nd6_na_output_fib(struct ifnet *ifp, const struct in6_addr *daddr6_0,
 
   bad:
 	m_freem(m);
-	return;
 }
 
 #ifndef BURN_BRIDGES
@@ -1102,7 +1095,6 @@ nd6_ifptomac(struct ifnet *ifp)
 	case IFT_FDDI:
 	case IFT_IEEE1394:
 	case IFT_L2VLAN:
-	case IFT_IEEE80211:
 	case IFT_INFINIBAND:
 	case IFT_BRIDGE:
 	case IFT_ISO88025:
@@ -1232,47 +1224,33 @@ nd6_dad_start(struct ifaddr *ifa, int delay)
 	struct in6_ifaddr *ia = (struct in6_ifaddr *)ifa;
 	struct dadq *dp;
 	char ip6buf[INET6_ADDRSTRLEN];
-	int send_ns;
+
+	KASSERT((ia->ia6_flags & IN6_IFF_TENTATIVE) != 0,
+	    ("starting DAD on non-tentative address %p", ifa));
 
 	/*
 	 * If we don't need DAD, don't do it.
 	 * There are several cases:
-	 * - DAD is disabled (ip6_dad_count == 0)
+	 * - DAD is disabled globally or on the interface
 	 * - the interface address is anycast
 	 */
-	if (!(ia->ia6_flags & IN6_IFF_TENTATIVE)) {
-		log(LOG_DEBUG,
-			"nd6_dad_start: called with non-tentative address "
-			"%s(%s)\n",
-			ip6_sprintf(ip6buf, &ia->ia_addr.sin6_addr),
-			ifa->ifa_ifp ? if_name(ifa->ifa_ifp) : "???");
-		return;
-	}
-	if (ia->ia6_flags & IN6_IFF_ANYCAST) {
+	if ((ia->ia6_flags & IN6_IFF_ANYCAST) != 0 ||
+	    V_ip6_dad_count == 0 ||
+	    (ND_IFINFO(ifa->ifa_ifp)->flags & ND6_IFF_NO_DAD) != 0) {
 		ia->ia6_flags &= ~IN6_IFF_TENTATIVE;
 		return;
 	}
-	if (!V_ip6_dad_count) {
-		ia->ia6_flags &= ~IN6_IFF_TENTATIVE;
+	if ((ifa->ifa_ifp->if_flags & IFF_UP) == 0 ||
+	    (ifa->ifa_ifp->if_drv_flags & IFF_DRV_RUNNING) == 0 ||
+	    (ND_IFINFO(ifa->ifa_ifp)->flags & ND6_IFF_IFDISABLED) != 0)
 		return;
-	}
-	if (ifa->ifa_ifp == NULL)
-		panic("nd6_dad_start: ifa->ifa_ifp == NULL");
-	if (ND_IFINFO(ifa->ifa_ifp)->flags & ND6_IFF_NO_DAD) {
-		ia->ia6_flags &= ~IN6_IFF_TENTATIVE;
-		return;
-	}
-	if (!(ifa->ifa_ifp->if_flags & IFF_UP) ||
-	    !(ifa->ifa_ifp->if_drv_flags & IFF_DRV_RUNNING) ||
-	    (ND_IFINFO(ifa->ifa_ifp)->flags & ND6_IFF_IFDISABLED)) {
-		ia->ia6_flags |= IN6_IFF_TENTATIVE;
-		return;
-	}
+
 	if ((dp = nd6_dad_find(ifa, NULL)) != NULL) {
 		/*
-		 * DAD already in progress.  Let the existing entry
-		 * to finish it.
+		 * DAD is already in progress.  Let the existing entry
+		 * finish it.
 		 */
+		nd6_dad_rele(dp);
 		return;
 	}
 
@@ -1305,12 +1283,7 @@ nd6_dad_start(struct ifaddr *ifa, int delay)
 	dp->dad_ns_lcount = dp->dad_loopbackprobe = 0;
 	refcount_init(&dp->dad_refcnt, 1);
 	nd6_dad_add(dp);
-	send_ns = 0;
-	if (delay == 0) {
-		send_ns = 1;
-		delay = (long)ND_IFINFO(ifa->ifa_ifp)->retrans * hz / 1000;
-	}
-	nd6_dad_starttimer(dp, delay, send_ns);
+	nd6_dad_starttimer(dp, delay, 0);
 }
 
 /*
@@ -1334,7 +1307,8 @@ nd6_dad_stop(struct ifaddr *ifa)
 	 * we were waiting for it to stop, so re-do the lookup.
 	 */
 	nd6_dad_rele(dp);
-	if (nd6_dad_find(ifa, NULL) == NULL)
+	dp = nd6_dad_find(ifa, NULL);
+	if (dp == NULL)
 		return;
 
 	nd6_dad_del(dp);
@@ -1350,11 +1324,8 @@ nd6_dad_timer(struct dadq *dp)
 	struct in6_ifaddr *ia = (struct in6_ifaddr *)ifa;
 	char ip6buf[INET6_ADDRSTRLEN];
 
-	/* Sanity check */
-	if (ia == NULL) {
-		log(LOG_ERR, "nd6_dad_timer: called with null parameter\n");
-		goto err;
-	}
+	KASSERT(ia != NULL, ("DAD entry %p with no address", dp));
+
 	if (ND_IFINFO(ifp)->flags & ND6_IFF_IFDISABLED) {
 		/* Do not need DAD for ifdisabled interface. */
 		log(LOG_ERR, "nd6_dad_timer: cancel DAD on %s because of "
@@ -1495,7 +1466,6 @@ nd6_dad_duplicated(struct ifaddr *ifa, struct dadq *dp)
 		case IFT_FDDI:
 		case IFT_ATM:
 		case IFT_IEEE1394:
-		case IFT_IEEE80211:
 		case IFT_INFINIBAND:
 			in6 = ia->ia_addr.sin6_addr;
 			if (in6_get_hw_ifid(ifp, &in6) == 0 &&
@@ -1545,17 +1515,11 @@ nd6_dad_ns_output(struct dadq *dp)
 static void
 nd6_dad_ns_input(struct ifaddr *ifa, struct nd_opt_nonce *ndopt_nonce)
 {
-	struct in6_ifaddr *ia;
-	struct ifnet *ifp;
-	const struct in6_addr *taddr6;
 	struct dadq *dp;
 
 	if (ifa == NULL)
 		panic("ifa == NULL in nd6_dad_ns_input");
 
-	ia = (struct in6_ifaddr *)ifa;
-	ifp = ifa->ifa_ifp;
-	taddr6 = &ia->ia_addr.sin6_addr;
 	/* Ignore Nonce option when Enhanced DAD is disabled. */
 	if (V_dad_enhanced == 0)
 		ndopt_nonce = NULL;

@@ -32,6 +32,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_bit_flags"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include "config.h"
 
@@ -59,6 +69,13 @@
 
 #ifdef HAVE_DISPATCH_DISPATCH_H
 #include <dispatch/dispatch.h>
+#endif
+
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheri/cheric.h>
+#define __get_bits(ptr, mask)	cheri_get_low_ptr_bits((ptr), (mask))
+#else
+#define __get_bits(ptr, mask)	((__intptr_t)(ptr) & (mask))
 #endif
 
 #if defined(__GNUC__) && defined(HAVE___SYNC_ADD_AND_FETCH)
@@ -111,13 +128,14 @@ heim_base_atomic_dec(heim_base_atomic_type *x)
 #endif
 
 /* tagged strings/object/XXX */
-#define heim_base_is_tagged(x) (((uintptr_t)(x)) & 0x3)
+#define heim_base_is_tagged(x) (__get_bits((x), 0x3) == 0x3)
 
-#define heim_base_is_tagged_object(x) ((((uintptr_t)(x)) & 0x3) == 1)
+#define heim_base_is_tagged_object(x) (__get_bits((x), 0x3) == 1)
+/* XXXAR: I hope x is never a valid pointer... */
 #define heim_base_make_tagged_object(x, tid) \
-    ((heim_object_t)((((uintptr_t)(x)) << 5) | ((tid) << 2) | 0x1))
-#define heim_base_tagged_object_tid(x) ((((uintptr_t)(x)) & 0x1f) >> 2)
-#define heim_base_tagged_object_value(x) (((uintptr_t)(x)) >> 5)
+    ((heim_object_t)((((vaddr_t)(x)) << 5) | ((tid) << 2) | 0x1))
+#define heim_base_tagged_object_tid(x) ((((vaddr_t)(x)) & 0x1f) >> 2)
+#define heim_base_tagged_object_value(x) (((vaddr_t)(x)) >> 5)
 
 /*
  *

@@ -62,6 +62,7 @@ StringRef AArch64MCExpr::getVariantKindName() const {
   case VK_TPREL_LO12_NC:       return ":tprel_lo12_nc:";
   case VK_TLSDESC_LO12:        return ":tlsdesc_lo12:";
   case VK_ABS_PAGE:            return "";
+  case VK_ABS_PAGE_NC:         return ":pg_hi21_nc:";
   case VK_GOT_PAGE:            return ":got:";
   case VK_GOT_LO12:            return ":got_lo12:";
   case VK_GOTTPREL_PAGE:       return ":gottprel:";
@@ -85,13 +86,13 @@ void AArch64MCExpr::visitUsedExpr(MCStreamer &Streamer) const {
   Streamer.visitUsedExpr(*getSubExpr());
 }
 
-MCSection *AArch64MCExpr::findAssociatedSection() const {
+MCFragment *AArch64MCExpr::findAssociatedFragment() const {
   llvm_unreachable("FIXME: what goes here?");
 }
 
 bool AArch64MCExpr::evaluateAsRelocatableImpl(MCValue &Res,
-                                            const MCAsmLayout *Layout,
-					    const MCFixup *Fixup) const {
+                                              const MCAsmLayout *Layout,
+                                              const MCFixup *Fixup) const {
   if (!getSubExpr()->evaluateAsRelocatable(Res, Layout, Fixup))
     return false;
 

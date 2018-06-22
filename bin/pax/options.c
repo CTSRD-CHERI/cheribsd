@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1992 Keith Muller.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -14,7 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -68,7 +70,7 @@ static int no_op(void);
 static void printflg(unsigned int);
 static int c_frmt(const void *, const void *);
 static off_t str_offt(char *);
-static char *getline(FILE *fp);
+static char *get_line(FILE *fp);
 static void pax_options(int, char **);
 static void pax_usage(void);
 static void tar_options(int, char **);
@@ -76,10 +78,10 @@ static void tar_usage(void);
 static void cpio_options(int, char **);
 static void cpio_usage(void);
 
-/* errors from getline */
+/* errors from get_line */
 #define GETLINE_FILE_CORRUPT 1
 #define GETLINE_OUT_OF_MEM 2
-static int getline_error;
+static int get_line_error;
 
 char *chdname;
 
@@ -873,14 +875,14 @@ tar_options(int argc, char **argv)
 						paxwarn(1, "Unable to open file '%s' for read", file);
 						tar_usage();
 					}
-					while ((str = getline(fp)) != NULL) {
+					while ((str = get_line(fp)) != NULL) {
 						if (pat_add(str, dir) < 0)
 							tar_usage();
 						sawpat = 1;
 					}
 					if (strcmp(file, "-") != 0)
 						fclose(fp);
-					if (getline_error) {
+					if (get_line_error) {
 						paxwarn(1, "Problem with file '%s'", file);
 						tar_usage();
 					}
@@ -946,13 +948,13 @@ tar_options(int argc, char **argv)
 					paxwarn(1, "Unable to open file '%s' for read", file);
 					tar_usage();
 				}
-				while ((str = getline(fp)) != NULL) {
+				while ((str = get_line(fp)) != NULL) {
 					if (ftree_add(str, 0) < 0)
 						tar_usage();
 				}
 				if (strcmp(file, "-") != 0)
 					fclose(fp);
-				if (getline_error) {
+				if (get_line_error) {
 					paxwarn(1, "Problem with file '%s'",
 					    file);
 					tar_usage();
@@ -1159,11 +1161,11 @@ cpio_options(int argc, char **argv)
 					paxwarn(1, "Unable to open file '%s' for read", optarg);
 					cpio_usage();
 				}
-				while ((str = getline(fp)) != NULL) {
+				while ((str = get_line(fp)) != NULL) {
 					pat_add(str, NULL);
 				}
 				fclose(fp);
-				if (getline_error) {
+				if (get_line_error) {
 					paxwarn(1, "Problem with file '%s'", optarg);
 					cpio_usage();
 				}
@@ -1258,10 +1260,10 @@ cpio_options(int argc, char **argv)
 			 * no read errors allowed on updates/append operation!
 			 */
 			maxflt = 0;
-			while ((str = getline(stdin)) != NULL) {
+			while ((str = get_line(stdin)) != NULL) {
 				ftree_add(str, 0);
 			}
-			if (getline_error) {
+			if (get_line_error) {
 				paxwarn(1, "Problem while reading stdin");
 				cpio_usage();
 			}
@@ -1489,21 +1491,21 @@ str_offt(char *val)
 }
 
 char *
-getline(FILE *f)
+get_line(FILE *f)
 {
 	char *name, *temp;
 	size_t len;
 
 	name = fgetln(f, &len);
 	if (!name) {
-		getline_error = ferror(f) ? GETLINE_FILE_CORRUPT : 0;
+		get_line_error = ferror(f) ? GETLINE_FILE_CORRUPT : 0;
 		return(0);
 	}
 	if (name[len-1] != '\n')
 		len++;
 	temp = malloc(len);
 	if (!temp) {
-		getline_error = GETLINE_OUT_OF_MEM;
+		get_line_error = GETLINE_OUT_OF_MEM;
 		return(0);
 	}
 	memcpy(temp, name, len-1);

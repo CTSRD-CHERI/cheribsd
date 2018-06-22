@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2004 Luigi Rizzo, Alessandro Cerri. All rights reserved.
  * Copyright (c) 2004-2008 Qing Li. All rights reserved.
  * Copyright (c) 2008 Kip Macy. All rights reserved.
@@ -37,16 +39,8 @@ struct ifnet;
 struct sysctl_req;
 struct rt_msghdr;
 struct rt_addrinfo;
-
 struct llentry;
 LIST_HEAD(llentries, llentry);
-
-extern struct rwlock lltable_rwlock;
-#define	LLTABLE_RLOCK()		rw_rlock(&lltable_rwlock)
-#define	LLTABLE_RUNLOCK()	rw_runlock(&lltable_rwlock)
-#define	LLTABLE_WLOCK()		rw_wlock(&lltable_rwlock)
-#define	LLTABLE_WUNLOCK()	rw_wunlock(&lltable_rwlock)
-#define	LLTABLE_LOCK_ASSERT()	rw_assert(&lltable_rwlock, RA_LOCKED)
 
 #define	LLE_MAX_LINKHDR		24	/* Full IB header */
 /*
@@ -137,7 +131,6 @@ struct llentry {
 	LLE_WLOCK(lle);						\
 	LLE_FREE_LOCKED(lle);					\
 } while (0)
-
 
 typedef	struct llentry *(llt_lookup_t)(struct lltable *, u_int flags,
     const struct sockaddr *l3addr);

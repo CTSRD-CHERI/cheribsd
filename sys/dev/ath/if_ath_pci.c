@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2002-2008 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
@@ -82,7 +84,7 @@ struct ath_pci_softc {
 
 /*
  * XXX eventually this should be some system level definition
- * so modules will hvae probe/attach information like USB.
+ * so modules will have probe/attach information like USB.
  * But for now..
  */
 struct pci_device_id {
@@ -463,7 +465,8 @@ static driver_t ath_pci_driver = {
 	sizeof (struct ath_pci_softc)
 };
 static	devclass_t ath_devclass;
-DRIVER_MODULE(ath_pci, pci, ath_pci_driver, ath_devclass, 0, 0);
-MODULE_VERSION(ath_pci, 1);
-MODULE_DEPEND(ath_pci, wlan, 1, 1, 1);		/* 802.11 media layer */
-MODULE_DEPEND(ath_pci, if_ath, 1, 1, 1);	/* if_ath driver */
+DRIVER_MODULE(if_ath_pci, pci, ath_pci_driver, ath_devclass, 0, 0);
+MODULE_VERSION(if_ath_pci, 1);
+MODULE_DEPEND(if_ath_pci, wlan, 1, 1, 1);		/* 802.11 media layer */
+MODULE_DEPEND(if_ath_pci, ath_main, 1, 1, 1);	/* if_ath driver */
+MODULE_DEPEND(if_ath_pci, ath_hal, 1, 1, 1);	/* ath HAL */

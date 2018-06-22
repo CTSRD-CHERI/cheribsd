@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1983 Regents of the University of California.
  * All rights reserved.
  *
@@ -62,7 +64,7 @@ static int findbucket(union overhead *, int);
 /*
  * Pre-allocate mmap'ed pages
  */
-#define	NPOOLPAGES	(32*1024/pagesz)
+#define	NPOOLPAGES	(128*1024/pagesz)
 static caddr_t		pagepool_start, pagepool_end;
 static int		morepages(int n);
 
@@ -223,7 +225,7 @@ malloc(size_t nbytes)
 	 * Record allocated size of block and
 	 * bound space with magic numbers.
 	 */
-	op->ov_size = (nbytes + RSLOP - 1) & ~(RSLOP - 1);
+	op->ov_size = roundup2(nbytes, RSLOP);
 	op->ov_rmagic = RMAGIC;
   	*(u_short *)((caddr_t)(op + 1) + op->ov_size) = RMAGIC;
 #endif
@@ -325,7 +327,7 @@ free(void *cp)
  * old malloc man page, it realloc's an already freed block.  Usually
  * this is the last block it freed; occasionally it might be farther
  * back.  We have to search all the free lists for the block in order
- * to determine its bucket: 1st we make one pass thru the lists
+ * to determine its bucket: 1st we make one pass through the lists
  * checking only the first block in each; if that fails we search
  * ``realloc_srchlen'' blocks in each list for a match (the variable
  * is extern so the caller can modify it).  If that fails we just copy
@@ -383,7 +385,7 @@ realloc(void *cp, size_t nbytes)
 		}
 		if (nbytes <= onb && nbytes > (size_t)i) {
 #ifdef RCHECK
-			op->ov_size = (nbytes + RSLOP - 1) & ~(RSLOP - 1);
+			op->ov_size = roundup2(nbytes, RSLOP);
 			*(u_short *)((caddr_t)(op + 1) + op->ov_size) = RMAGIC;
 #endif
 			return(cp);
@@ -470,7 +472,7 @@ morepages(int n)
 
 	if ((pagepool_start = mmap(0, n * pagesz,
 			PROT_READ|PROT_WRITE,
-			MAP_ANON|MAP_COPY, fd, 0)) == (caddr_t)-1) {
+			MAP_ANON|MAP_PRIVATE, fd, 0)) == (caddr_t)-1) {
 		rtld_printf("Cannot map anonymous memory\n");
 		return 0;
 	}

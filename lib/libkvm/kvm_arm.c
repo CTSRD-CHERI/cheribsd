@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2005 Olivier Houchard
  * Copyright (c) 1989, 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -15,7 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -117,7 +119,7 @@ _arm_initvtop(kvm_t *kd)
 	}
 
 	vm = _kvm_malloc(kd, sizeof(*vm));
-	if (vm == 0) {
+	if (vm == NULL) {
 		_kvm_err(kd, kd->program, "cannot allocate vm");
 		return (-1);
 	}
@@ -168,6 +170,10 @@ _arm_initvtop(kvm_t *kd)
 		return (-1);
 	}
 	l1pt = _kvm_malloc(kd, ARM_L1_TABLE_SIZE);
+	if (l1pt == NULL) {
+		_kvm_err(kd, kd->program, "cannot allocate l1pt");
+		return (-1);
+	}
 	if (kvm_read2(kd, pa, l1pt, ARM_L1_TABLE_SIZE) != ARM_L1_TABLE_SIZE) {
 		_kvm_err(kd, kd->program, "cannot read l1pt");
 		free(l1pt);
@@ -183,7 +189,7 @@ _arm_initvtop(kvm_t *kd)
 #define	l1pte_section_p(pde)	(((pde) & ARM_L1_TYPE_MASK) == ARM_L1_TYPE_S)
 #define	l1pte_valid(pde)	((pde) != 0)
 #define	l2pte_valid(pte)	((pte) != 0)
-#define l2pte_index(v)		(((v) & ARM_L2_ADDR_BITS) >> ARM_L2_S_SHIFT)
+#define l2pte_index(v)		(((v) & ARM_L1_S_OFFSET) >> ARM_L2_S_SHIFT)
 
 
 static int
@@ -245,7 +251,11 @@ _kvm_mdopen(kvm_t *kd)
 #endif
 
 int
+#ifdef __arm__
 _arm_native(kvm_t *kd)
+#else
+_arm_native(kvm_t *kd __unused)
+#endif
 {
 
 #ifdef __arm__
@@ -259,7 +269,7 @@ _arm_native(kvm_t *kd)
 #endif
 }
 
-struct kvm_arch kvm_arm = {
+static struct kvm_arch kvm_arm = {
 	.ka_probe = _arm_probe,
 	.ka_initvtop = _arm_initvtop,
 	.ka_freevtop = _arm_freevtop,

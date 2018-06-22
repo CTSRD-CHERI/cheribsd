@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1995 Scott Bartram
  * Copyright (c) 1995 Steven Wallace
  * All rights reserved.
@@ -307,7 +309,7 @@ struct ibcs2_semctl_args {
 	int semid;
 	int semnum;
 	int cmd;
-	union semun arg;
+	usemun_t arg;
 };
 
 static int
@@ -316,7 +318,7 @@ ibcs2_semctl(struct thread *td, void *v)
 	struct ibcs2_semctl_args *uap = v;
 	struct ibcs2_semid_ds is;
 	struct semid_ds bs;
-	union semun semun;
+	ksemun_t semun;
 	register_t rval;
 	int error;
 

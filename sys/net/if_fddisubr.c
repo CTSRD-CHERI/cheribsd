@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1995, 1996
  *	Matt Thomas <matt@3am-software.com>.  All rights reserved.
  * Copyright (c) 1982, 1989, 1993
@@ -126,7 +128,7 @@ fddi_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 	switch (dst->sa_family) {
 #ifdef INET
 	case AF_INET: {
-		error = arpresolve(ifp, is_gw, m, dst, edst, NULL);
+		error = arpresolve(ifp, is_gw, m, dst, edst, NULL, NULL);
 		if (error)
 			return (error == EWOULDBLOCK ? 0 : error);
 		type = htons(ETHERTYPE_IP);
@@ -162,7 +164,7 @@ fddi_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 #endif /* INET */
 #ifdef INET6
 	case AF_INET6:
-		error = nd6_resolve(ifp, is_gw, m, dst, edst, NULL);
+		error = nd6_resolve(ifp, is_gw, m, dst, edst, NULL, NULL);
 		if (error)
 			return (error == EWOULDBLOCK ? 0 : error);
 		type = htons(ETHERTYPE_IPV6);
@@ -235,7 +237,7 @@ fddi_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 	if (type != 0) {
 		struct llc *l;
 		M_PREPEND(m, LLC_SNAPFRAMELEN, M_NOWAIT);
-		if (m == 0)
+		if (m == NULL)
 			senderr(ENOBUFS);
 		l = mtod(m, struct llc *);
 		l->llc_control = LLC_UI;
@@ -251,7 +253,7 @@ fddi_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 	 * allocate another.
 	 */
 	M_PREPEND(m, FDDI_HDR_LEN, M_NOWAIT);
-	if (m == 0)
+	if (m == NULL)
 		senderr(ENOBUFS);
 	fh = mtod(m, struct fddi_header *);
 	fh->fddi_fc = FDDIFC_LLC_ASYNC|FDDIFC_LLC_PRIO4;
@@ -275,7 +277,7 @@ fddi_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 	if ((ifp->if_flags & IFF_SIMPLEX) && (loop_copy != -1)) {
 		if ((m->m_flags & M_BCAST) || (loop_copy > 0)) {
 			struct mbuf *n;
-			n = m_copy(m, 0, (int)M_COPYALL);
+			n = m_copym(m, 0, M_COPYALL, M_NOWAIT);
 			(void) if_simloop(ifp, n, dst->sa_family,
 					  FDDI_HDR_LEN);
 	     	} else if (bcmp(fh->fddi_dhost, fh->fddi_shost,
@@ -400,7 +402,7 @@ fddi_input(ifp, m)
 	m_adj(m, FDDI_HDR_LEN);
 
 	m = m_pullup(m, LLC_SNAPFRAMELEN);
-	if (m == 0) {
+	if (m == NULL) {
 		if_inc_counter(ifp, IFCOUNTER_IERRORS, 1);
 		goto dropanyway;
 	}
@@ -541,7 +543,7 @@ fddi_ioctl (ifp, command, data)
 	error = 0;
 
 	switch (command) {
-	case SIOCSIFADDR:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
 		ifp->if_flags |= IFF_UP;
 
 		switch (ifa->ifa_addr->sa_family) {
@@ -556,23 +558,17 @@ fddi_ioctl (ifp, command, data)
 			break;
 		}
 		break;
-	case SIOCGIFADDR: {
-			struct sockaddr *sa;
-
-			sa = (struct sockaddr *) & ifr->ifr_data;
-			bcopy(IF_LLADDR(ifp),
-			      (caddr_t) sa->sa_data, FDDI_ADDR_LEN);
-
-		}
+	CASE_IOC_IFREQ(SIOCGIFADDR):
+		bcopy(IF_LLADDR(ifp), ifr_addr_get_data(ifr), FDDI_ADDR_LEN);
 		break;
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		/*
 		 * Set the interface MTU.
 		 */
-		if (ifr->ifr_mtu > FDDIMTU) {
+		if (ifr_mtu_get(ifr) > FDDIMTU) {
 			error = EINVAL;
 		} else {
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 		}
 		break;
 	default:
@@ -607,7 +603,7 @@ fddi_resolvemulti(ifp, llsa, sa)
 		e_addr = LLADDR(sdl);
 		if ((e_addr[0] & 1) != 1)
 			return (EADDRNOTAVAIL);
-		*llsa = 0;
+		*llsa = NULL;
 		return (0);
 
 #ifdef INET
@@ -634,7 +630,7 @@ fddi_resolvemulti(ifp, llsa, sa)
 			 * (This is used for multicast routers.)
 			 */
 			ifp->if_flags |= IFF_ALLMULTI;
-			*llsa = 0;
+			*llsa = NULL;
 			return (0);
 		}
 		if (!IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr))

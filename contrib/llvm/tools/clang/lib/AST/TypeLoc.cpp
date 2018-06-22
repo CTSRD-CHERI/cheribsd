@@ -16,10 +16,9 @@
 #include "clang/AST/Expr.h"
 #include "clang/AST/TypeLocVisitor.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/raw_ostream.h"
 using namespace clang;
 
-static const unsigned TypeLocMaxDataAlign = llvm::alignOf<void *>();
+static const unsigned TypeLocMaxDataAlign = alignof(void *);
 
 //===----------------------------------------------------------------------===//
 // TypeLoc Implementation
@@ -80,11 +79,11 @@ unsigned TypeLoc::getFullDataSizeForType(QualType Ty) {
   while (!TyLoc.isNull()) {
     unsigned Align = getLocalAlignmentForType(TyLoc.getType());
     MaxAlign = std::max(Align, MaxAlign);
-    Total = llvm::RoundUpToAlignment(Total, Align);
+    Total = llvm::alignTo(Total, Align);
     Total += TypeSizer().Visit(TyLoc);
     TyLoc = TyLoc.getNextTypeLoc();
   }
-  Total = llvm::RoundUpToAlignment(Total, MaxAlign);
+  Total = llvm::alignTo(Total, MaxAlign);
   return Total;
 }
 
@@ -149,12 +148,12 @@ void TypeLoc::copy(TypeLoc other) {
   // If both data pointers are aligned to the maximum alignment, we
   // can memcpy because getFullDataSize() accurately reflects the
   // layout of the data.
-  if (reinterpret_cast<uintptr_t>(Data)
-        == llvm::RoundUpToAlignment(reinterpret_cast<uintptr_t>(Data),
-                                    TypeLocMaxDataAlign) &&
-      reinterpret_cast<uintptr_t>(other.Data)
-        == llvm::RoundUpToAlignment(reinterpret_cast<uintptr_t>(other.Data),
-                                    TypeLocMaxDataAlign)) {
+  if (reinterpret_cast<uintptr_t>(Data) ==
+          llvm::alignTo(reinterpret_cast<uintptr_t>(Data),
+                        TypeLocMaxDataAlign) &&
+      reinterpret_cast<uintptr_t>(other.Data) ==
+          llvm::alignTo(reinterpret_cast<uintptr_t>(other.Data),
+                        TypeLocMaxDataAlign)) {
     memcpy(Data, other.Data, getFullDataSize());
     return;
   }
@@ -192,7 +191,7 @@ SourceLocation TypeLoc::getBeginLoc() const {
       Cur = Cur.getNextTypeLoc();
       continue;
     default:
-      if (!Cur.getLocalSourceRange().getBegin().isInvalid())
+      if (Cur.getLocalSourceRange().getBegin().isValid())
         LeftMost = Cur;
       Cur = Cur.getNextTypeLoc();
       if (Cur.isNull())
@@ -211,7 +210,7 @@ SourceLocation TypeLoc::getEndLoc() const {
     switch (Cur.getTypeLocClass()) {
     default:
       if (!Last)
-	Last = Cur;
+        Last = Cur;
       return Last.getLocalSourceRange().getEnd();
     case Paren:
     case ConstantArray:
@@ -320,6 +319,7 @@ TypeSpecifierType BuiltinTypeLoc::getWrittenTypeSpec() const {
   case BuiltinType::Float:
   case BuiltinType::Double:
   case BuiltinType::LongDouble:
+  case BuiltinType::Float128:
     llvm_unreachable("Builtin type needs extra local data!");
     // Fall through, if the impossible happens.
       
@@ -333,15 +333,16 @@ TypeSpecifierType BuiltinTypeLoc::getWrittenTypeSpec() const {
   case BuiltinType::ObjCId:
   case BuiltinType::ObjCClass:
   case BuiltinType::ObjCSel:
-  case BuiltinType::OCLImage1d:
-  case BuiltinType::OCLImage1dArray:
-  case BuiltinType::OCLImage1dBuffer:
-  case BuiltinType::OCLImage2d:
-  case BuiltinType::OCLImage2dArray:
-  case BuiltinType::OCLImage3d:
+#define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix) \
+  case BuiltinType::Id:
+#include "clang/Basic/OpenCLImageTypes.def"
   case BuiltinType::OCLSampler:
   case BuiltinType::OCLEvent:
+  case BuiltinType::OCLClkEvent:
+  case BuiltinType::OCLQueue:
+  case BuiltinType::OCLReserveID:
   case BuiltinType::BuiltinFn:
+  case BuiltinType::OMPArraySection:
     return TST_unspecified;
   }
 
@@ -363,6 +364,38 @@ SourceLocation TypeLoc::findNullabilityLoc() const {
   }
 
   return SourceLocation();
+}
+
+TypeLoc TypeLoc::findExplicitQualifierLoc() const {
+  // Qualified types.
+  if (auto qual = getAs<QualifiedTypeLoc>())
+    return qual;
+
+  TypeLoc loc = IgnoreParens();
+
+  // Attributed types.
+  if (auto attr = loc.getAs<AttributedTypeLoc>()) {
+    if (attr.isQualifier()) return attr;
+    return attr.getModifiedLoc().findExplicitQualifierLoc();
+  }
+
+  // C11 _Atomic types.
+  if (auto atomic = loc.getAs<AtomicTypeLoc>()) {
+    return atomic;
+  }
+
+  return TypeLoc();
+}
+
+void ObjCTypeParamTypeLoc::initializeLocal(ASTContext &Context,
+                                           SourceLocation Loc) {
+  setNameLoc(Loc);
+  if (!getNumProtocols()) return;
+
+  setProtocolLAngleLoc(Loc);
+  setProtocolRAngleLoc(Loc);
+  for (unsigned i = 0, e = getNumProtocols(); i != e; ++i)
+    setProtocolLoc(i, Loc);
 }
 
 void ObjCObjectTypeLoc::initializeLocal(ASTContext &Context, 

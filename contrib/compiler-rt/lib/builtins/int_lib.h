@@ -20,35 +20,51 @@
 /* Assumption: Right shift of signed negative is arithmetic shift. */
 /* Assumption: Endianness is little or big (not mixed). */
 
+#if defined(__ELF__)
+#define FNALIAS(alias_name, original_name) \
+  void alias_name() __attribute__((alias(#original_name)))
+#else
+#define FNALIAS(alias, name) _Pragma("GCC error(\"alias unsupported on this file format\")")
+#endif
+
 /* ABI macro definitions */
 
 #if __ARM_EABI__
-# define ARM_EABI_FNALIAS(aeabi_name, name)         \
-  void __aeabi_##aeabi_name() __attribute__((alias("__" #name)));
-
-# if !defined(__clang__) && defined(__GNUC__) && \
-     (__GNUC__ < 4 || __GNUC__ == 4 && __GNUC_MINOR__ < 5)
+# if defined(COMPILER_RT_ARMHF_TARGET) || (!defined(__clang__) && \
+     defined(__GNUC__) && (__GNUC__ < 4 || __GNUC__ == 4 && __GNUC_MINOR__ < 5))
 /* The pcs attribute was introduced in GCC 4.5.0 */
-#  define COMPILER_RT_ABI
-# else
-#  define COMPILER_RT_ABI __attribute__((pcs("aapcs")))
-# endif
-
-#else
-# define ARM_EABI_FNALIAS(aeabi_name, name)
-# if defined(__arm__) && defined(_WIN32)
-#   define COMPILER_RT_ABI __attribute__((pcs("aapcs")))
-# else
 #   define COMPILER_RT_ABI
+# else
+#   define COMPILER_RT_ABI __attribute__((__pcs__("aapcs")))
 # endif
+#else
+# define COMPILER_RT_ABI
 #endif
 
-#if defined(__NetBSD__) && (defined(_KERNEL) || defined(_STANDALONE))
+#define AEABI_RTABI __attribute__((__pcs__("aapcs")))
+
+#ifdef _MSC_VER
+#define ALWAYS_INLINE __forceinline
+#define NOINLINE __declspec(noinline)
+#define NORETURN __declspec(noreturn)
+#define UNUSED
+#else
+#define ALWAYS_INLINE __attribute__((always_inline))
+#define NOINLINE __attribute__((noinline))
+#define NORETURN __attribute__((noreturn))
+#define UNUSED __attribute__((unused))
+#endif
+
+#if (defined(__FreeBSD__) || defined(__NetBSD__)) && (defined(_KERNEL) || defined(_STANDALONE))
 /*
  * Kernel and boot environment can't use normal headers,
  * so use the equivalent system headers.
  */
+#ifdef __FreeBSD__
+#  include <sys/limits.h>
+#else
 #  include <machine/limits.h>
+#endif
 #  include <sys/stdint.h>
 #  include <sys/types.h>
 #else
@@ -80,12 +96,13 @@
  * does not have dedicated bit counting instructions.
  */
 #if defined(__FreeBSD__) && (defined(__sparc64__) || \
-    defined(__mips_n64) || defined(__mips_o64) || defined(__riscv__))
+    defined(__mips_n32) || defined(__mips_n64) || defined(__mips_o64) || \
+    defined(__riscv))
 si_int __clzsi2(si_int);
 si_int __ctzsi2(si_int);
 #define	__builtin_clz __clzsi2
 #define	__builtin_ctz __ctzsi2
-#endif /* FreeBSD && (sparc64 || mips_n64 || mips_o64) */
+#endif /* FreeBSD && (sparc64 || mips_n32 || mips_n64 || mips_o64 || riscv) */
 
 COMPILER_RT_ABI si_int __paritysi2(si_int a);
 COMPILER_RT_ABI si_int __paritydi2(di_int a);
@@ -100,5 +117,45 @@ COMPILER_RT_ABI du_int __udivmoddi4(du_int a, du_int b, du_int* rem);
 COMPILER_RT_ABI si_int __clzti2(ti_int a);
 COMPILER_RT_ABI tu_int __udivmodti4(tu_int a, tu_int b, tu_int* rem);
 #endif
+
+/* Definitions for builtins unavailable on MSVC */
+#if defined(_MSC_VER) && !defined(__clang__)
+#include <intrin.h>
+
+uint32_t __inline __builtin_ctz(uint32_t value) {
+  unsigned long trailing_zero = 0;
+  if (_BitScanForward(&trailing_zero, value))
+    return trailing_zero;
+  return 32;
+}
+
+uint32_t __inline __builtin_clz(uint32_t value) {
+  unsigned long leading_zero = 0;
+  if (_BitScanReverse(&leading_zero, value))
+    return 31 - leading_zero;
+  return 32;
+}
+
+#if defined(_M_ARM) || defined(_M_X64)
+uint32_t __inline __builtin_clzll(uint64_t value) {
+  unsigned long leading_zero = 0;
+  if (_BitScanReverse64(&leading_zero, value))
+    return 63 - leading_zero;
+  return 64;
+}
+#else
+uint32_t __inline __builtin_clzll(uint64_t value) {
+  if (value == 0)
+    return 64;
+  uint32_t msh = (uint32_t)(value >> 32);
+  uint32_t lsh = (uint32_t)(value & 0xFFFFFFFF);
+  if (msh != 0)
+    return __builtin_clz(msh);
+  return 32 + __builtin_clz(lsh);
+}
+#endif
+
+#define __builtin_clzl __builtin_clzll
+#endif /* defined(_MSC_VER) && !defined(__clang__) */
 
 #endif /* INT_LIB_H */

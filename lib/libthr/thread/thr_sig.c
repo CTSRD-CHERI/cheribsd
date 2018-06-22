@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2005, David Xu <davidxu@freebsd.org>
  * All rights reserved.
  *
@@ -22,9 +24,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
 #include "namespace.h"
 #include <sys/param.h>
@@ -373,8 +376,7 @@ check_suspend(struct pthread *curthread)
 	 */
 	curthread->critical_count++;
 	THR_UMUTEX_LOCK(curthread, &(curthread)->lock);
-	while ((curthread->flags & (THR_FLAGS_NEED_SUSPEND |
-		THR_FLAGS_SUSPENDED)) == THR_FLAGS_NEED_SUSPEND) {
+	while ((curthread->flags & THR_FLAGS_NEED_SUSPEND) != 0) {
 		curthread->cycle++;
 		cycle = curthread->cycle;
 
@@ -391,7 +393,6 @@ check_suspend(struct pthread *curthread)
 		THR_UMUTEX_UNLOCK(curthread, &(curthread)->lock);
 		_thr_umtx_wait_uint(&curthread->cycle, cycle, NULL, 0);
 		THR_UMUTEX_LOCK(curthread, &(curthread)->lock);
-		curthread->flags &= ~THR_FLAGS_SUSPENDED;
 	}
 	THR_UMUTEX_UNLOCK(curthread, &(curthread)->lock);
 	curthread->critical_count--;
@@ -442,7 +443,7 @@ _thr_signal_init(int dlopened)
 }
 
 void
-_thr_sigact_unload(struct dl_phdr_info *phdr_info)
+_thr_sigact_unload(struct dl_phdr_info *phdr_info __unused)
 {
 #if 0
 	struct pthread *curthread = _get_curthread();
@@ -737,8 +738,8 @@ __thr_setcontext(const ucontext_t *ucp)
 		errno = EINVAL;
 		return (-1);
 	}
-	if (!SIGISMEMBER(uc.uc_sigmask, SIGCANCEL))
-		return __sys_setcontext(ucp);
+	if (!SIGISMEMBER(ucp->uc_sigmask, SIGCANCEL))
+		return (__sys_setcontext(ucp));
 	(void) memcpy(&uc, ucp, sizeof(uc));
 	SIGDELSET(uc.uc_sigmask, SIGCANCEL);
 	return (__sys_setcontext(&uc));

@@ -1,5 +1,7 @@
 /* $FreeBSD$ */
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2010 Hans Petter Selasky. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -128,9 +130,9 @@ static const void *mouse_iface_0_desc[] = {
 static const struct usb_temp_interface_desc mouse_iface_0 = {
 	.ppRawDesc = mouse_iface_0_desc,
 	.ppEndpoints = mouse_endpoints,
-	.bInterfaceClass = 3,
-	.bInterfaceSubClass = 1,
-	.bInterfaceProtocol = 2,
+	.bInterfaceClass = UICLASS_HID,
+	.bInterfaceSubClass = UISUBCLASS_BOOT,
+	.bInterfaceProtocol = UIPROTO_MOUSE,
 	.iInterface = INDEX_MOUSE,
 };
 

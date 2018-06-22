@@ -1,5 +1,10 @@
 # $FreeBSD$
 
+.include <src.opts.mk>
+
+.if ${MK_CHERI_PURE} == "yes"
+WANT_CHERI=pure
+.endif
 
 # BINDIR
 .include "${.CURDIR}/../../Makefile.inc"
@@ -46,8 +51,15 @@ SRCS+=	app.c \
 # DEO: why not used?
 #SRCS+=	itbl-ops.c
 
-.if ${TARGET_ARCH} == "armv6" || ${TARGET_ARCH} == "armv6eb"
+.if ${TARGET_ARCH:Marmv6*} != ""
 CFLAGS+=	-DCPU_DEFAULT=ARM_ARCH_V6K
+.endif
+.if ${TARGET_ARCH:Marmv7*} != ""
+CFLAGS+=	-DCPU_DEFAULT=ARM_ARCH_V7A
+.endif
+
+.if ${MK_CHERI} == yes
+CFLAGS+=        -Wno-cheri-bitwise-operations
 .endif
 
 .if ${TARGET_CPUARCH} == "mips"
@@ -88,13 +100,13 @@ CFLAGS+= -D_GNU_SOURCE
 CFLAGS+= -I${SRCDIR}/gas -I${SRCDIR}/bfd -I${SRCDIR}/gas/config -I${SRCDIR}
 CFLAGS+= -I${.CURDIR} -I${.CURDIR}/${TARGET_CPUARCH}-freebsd
 
+CFLAGS+= ${CFLAGS.${.IMPSRC:T}}
+CFLAGS.tc-mips.c=	-Wno-format-security
+
 .if ${MK_SHARED_TOOLCHAIN} == "no"
 NO_SHARED?=	yes
 .endif
 
-DPADD=	${RELTOP}/libbfd/libbfd.a
-DPADD+=	${RELTOP}/libiberty/libiberty.a
-DPADD+=	${RELTOP}/libopcodes/libopcodes.a
-LDADD=	${DPADD}
+LIBADD+=	bfd iberty opcodes
 
 .include <bsd.prog.mk>

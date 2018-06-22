@@ -635,6 +635,10 @@ struct ath_hal_9300 {
     struct ar9300_ini_array ah_ini_japan2484;
     struct ar9300_ini_array ah_ini_radio_post_sys2ant;
     struct ar9300_ini_array ah_ini_BTCOEX_MAX_TXPWR;
+    struct ar9300_ini_array ah_ini_modes_rxgain_xlna;
+    struct ar9300_ini_array ah_ini_modes_rxgain_bb_core;
+    struct ar9300_ini_array ah_ini_modes_rxgain_bb_postamble;
+
     /* 
      * New INI format starting with Osprey 2.0 INI.
      * Pre, core, post arrays for each sub-system (mac, bb, radio, soc)
@@ -894,6 +898,8 @@ struct ath_hal_9300 {
     struct ar9300NfLimits nf_2GHz;
     struct ar9300NfLimits nf_5GHz;
     struct ar9300NfLimits *nfp;
+
+    uint32_t ah_beaconInterval;
 };
 
 #define AH9300(_ah) ((struct ath_hal_9300 *)(_ah))
@@ -1483,6 +1489,7 @@ extern  HAL_BOOL ar9300_radar_wait(struct ath_hal *ah, struct ieee80211_channel 
 extern  struct dfs_pulse * ar9300_get_dfs_radars(struct ath_hal *ah,
         u_int32_t dfsdomain, int *numradars, struct dfs_bin5pulse **bin5pulses,
         int *numb5radars, HAL_PHYERR_PARAM *pe);
+extern HAL_BOOL ar9300_get_default_dfs_thresh(struct ath_hal *ah, HAL_PHYERR_PARAM *pe);
 extern  void ar9300_adjust_difs(struct ath_hal *ah, u_int32_t val);
 extern  u_int32_t ar9300_dfs_config_fft(struct ath_hal *ah, HAL_BOOL is_enable);
 extern  void ar9300_cac_tx_quiet(struct ath_hal *ah, HAL_BOOL enable);

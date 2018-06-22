@@ -6,6 +6,7 @@
  * Copyright (c) 1992 Terrence R. Lambert.
  * Copyright (c) 1994 John Dyson
  * Copyright (c) 2015 SRI International
+ * Copyright (c) 2016-2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
@@ -59,6 +60,7 @@
 #include <sys/syscallsubr.h>
 #include <sys/sysproto.h>
 #include <sys/ucontext.h>
+#include <sys/user.h>
 
 /* Required by cheriabi_fill_uap.h */
 #include <sys/capsicum.h>
@@ -79,7 +81,9 @@
 #include <sys/uuid.h>
 #include <netinet/sctp.h>
 
-#include <machine/cheri.h>
+#include <cheri/cheri.h>
+#include <cheri/cheric.h>
+
 #include <machine/cpuinfo.h>
 #include <machine/md_var.h>
 #include <machine/pcb.h>
@@ -97,9 +101,7 @@
 
 #include <compat/cheriabi/cheriabi_signal.h>
 #include <compat/cheriabi/cheriabi_aio.h>
-#include <compat/cheriabi/cheriabi_ioctl.h>
 #include <compat/cheriabi/cheriabi_fill_uap.h>
-#include <compat/cheriabi/cheriabi_fill_uap_manual.h>
 #include <compat/cheriabi/cheriabi_dispatch_fill_uap.h>
 
 #include <ddb/ddb.h>
@@ -108,12 +110,17 @@
 #define	DELAYBRANCH(x)	((int)(x) < 0)
 #define	UCONTEXT_MAGIC	0xACEDBADE
 
-static int	cheriabi_fetch_syscall_args(struct thread *td,
-		    struct syscall_args *sa);
+static void	cheriabi_capability_set_user_ddc(void * __capability *,
+		    size_t);
+static void	cheriabi_capability_set_user_entry(void * __capability *,
+		    unsigned long, size_t);
+static int	cheriabi_fetch_syscall_args(struct thread *td);
 static void	cheriabi_set_syscall_retval(struct thread *td, int error);
 static void	cheriabi_sendsig(sig_t, ksiginfo_t *, sigset_t *);
 static void	cheriabi_exec_setregs(struct thread *, struct image_params *,
 		    u_long);
+static __inline boolean_t cheriabi_check_cpu_compatible(uint32_t, const char *);
+static boolean_t cheriabi_elf_header_supported(struct image_params *);
 
 extern const char *cheriabi_syscallnames[];
 
@@ -127,7 +134,7 @@ struct sysentvec elf_freebsd_cheriabi_sysvec = {
 	.sv_sendsig	= cheriabi_sendsig,
 	.sv_sigcode	= cheri_sigcode,
 	.sv_szsigcode	= &szcheri_sigcode,
-	.sv_name	= "FreeBSD-CHERI ELF64",
+	.sv_name	= "CheriABI ELF64",
 	.sv_coredump	= __elfN(coredump),
 	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,	/* XXXBD: or something bigger? */
@@ -136,56 +143,84 @@ struct sysentvec elf_freebsd_cheriabi_sysvec = {
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
 	.sv_psstrings	= CHERIABI_PS_STRINGS,
-	.sv_stackprot	= VM_PROT_ALL,
+	.sv_stackprot	= VM_PROT_READ|VM_PROT_WRITE,
 	.sv_copyout_strings = cheriabi_copyout_strings,
 	.sv_setregs	= cheriabi_exec_setregs,
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
-	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_CHERI,
+	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_CHERI | SV_SHP,
 	.sv_set_syscall_retval = cheriabi_set_syscall_retval,
 	.sv_fetch_syscall_args = cheriabi_fetch_syscall_args,
 	.sv_syscallnames = cheriabi_syscallnames,
+	.sv_shared_page_base = SHAREDPAGE,
+	.sv_shared_page_len = PAGE_SIZE,
 	.sv_schedtail	= NULL,
 };
 INIT_SYSENTVEC(cheriabi_sysent, &elf_freebsd_cheriabi_sysvec);
 
 static Elf64_Brandinfo freebsd_cheriabi_brand_info = {
 	.brand		= ELFOSABI_FREEBSD,
-	.machine	= EM_MIPS_CHERI,
+	.machine	= EM_MIPS,
 	.compat_3_brand	= "FreeBSD",
 	.emul_path	= NULL,
-	.interp_path	= "/libexec/ld-elf.so.1",
+	.interp_path	= "/libexec/ld-cheri-elf.so.1",
 	.sysvec		= &elf_freebsd_cheriabi_sysvec,
 	.interp_newpath = NULL,
-	.flags		= 0
+	.flags		= BI_CAN_EXEC_DYN,
+	.header_supported = cheriabi_elf_header_supported
 };
 
 SYSINIT(cheriabi, SI_SUB_EXEC, SI_ORDER_ANY,
     (sysinit_cfunc_t) elf64_insert_brand_entry,
     &freebsd_cheriabi_brand_info);
 
-void
-cheriabi_fetch_syscall_arg(struct thread *td, struct chericap *arg,
-    int syscall_no, int argnum)
+
+static __inline boolean_t
+cheriabi_check_cpu_compatible(uint32_t bits, const char *execpath)
+{
+	static struct timeval lastfail;
+	static int curfail;
+	const uint32_t expected = CHERICAP_SIZE * 8;
+
+	if (bits == expected)
+		return TRUE;
+	if (ppsratecheck(&lastfail, &curfail, 1))
+		printf("warning: attempting to execute %d-bit CheriABI "
+		    "binary '%s' on a %d-bit kernel\n", bits, execpath,
+		    expected);
+	return FALSE;
+}
+
+static boolean_t
+cheriabi_elf_header_supported(struct image_params *imgp)
+{
+	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
+	const uint32_t machine = hdr->e_flags & EF_MIPS_MACH;
+
+	if ((hdr->e_flags & EF_MIPS_ABI) != EF_MIPS_ABI_CHERIABI)
+		return FALSE;
+
+	if (machine == EF_MIPS_MACH_CHERI128)
+		return cheriabi_check_cpu_compatible(128, imgp->execpath);
+	else if (machine == EF_MIPS_MACH_CHERI256)
+		return cheriabi_check_cpu_compatible(256, imgp->execpath);
+	return FALSE;
+}
+
+__attribute__((always_inline))
+inline void
+cheriabi_fetch_syscall_arg(struct thread *td, void * __capability *argp,
+    int argnum, int ptrmask)
 {
 	struct trapframe *locr0 = td->td_frame;	 /* aka td->td_pcb->pcv_regs */
-	struct cheri_frame *capreg = &td->td_pcb->pcb_cheriframe;
-	struct chericap *arg_capp;
 	struct sysentvec *se;
-	int i, intreg_offset, ptrreg_offset, ptrmask, is_ptr_arg;
-	register_t arg_reg;
+	int i, intreg_offset, ptrreg_offset, is_ptr_arg;
 
 	se = td->td_proc->p_sysent;
 
-	KASSERT(syscall_no >= 0, ("Negative syscall number %d\n", syscall_no));
-	KASSERT(syscall_no < se->sv_size,
-	    ("Syscall number too large %d >= %d\n", syscall_no, se->sv_size));
 	KASSERT(argnum >= 0, ("Negative argument number %d\n", argnum));
-	KASSERT(argnum <= se->sv_table[syscall_no].sy_narg,
-	    ("Argument number out of range %d > %d\n", argnum,
-	    se->sv_table[syscall_no].sy_narg));
+	KASSERT(argnum < 8, ("Argument number %d >= 8\n", argnum));
 
-	ptrmask = CHERIABI_SYS_argmap[syscall_no].sam_ptrmask;
 	/* XXX: O(1) possible with more bit twiddling. */
 	intreg_offset = ptrreg_offset = -1;
 	for (i = 0; i <= argnum; i++) {
@@ -200,54 +235,46 @@ cheriabi_fetch_syscall_arg(struct thread *td, struct chericap *arg,
 
 	if (is_ptr_arg) {
 		switch (ptrreg_offset) {
-		case 0:	arg_capp = &capreg->cf_c3;	break;
-		case 1:	arg_capp = &capreg->cf_c4;	break;
-		case 2:	arg_capp = &capreg->cf_c5;	break;
-		case 3:	arg_capp = &capreg->cf_c6;	break;
-		case 4:	arg_capp = &capreg->cf_c7;	break;
-		case 5:	arg_capp = &capreg->cf_c8;	break;
-		case 6:	arg_capp = &capreg->cf_c9;	break;
-		case 7:	arg_capp = &capreg->cf_c10;	break;
+		case 0:	*argp = *((void * __capability *)&locr0->c3);	break;
+		case 1:	*argp = *((void * __capability *)&locr0->c4);	break;
+		case 2:	*argp = *((void * __capability *)&locr0->c5);	break;
+		case 3:	*argp = *((void * __capability *)&locr0->c6);	break;
+		case 4:	*argp = *((void * __capability *)&locr0->c7);	break;
+		case 5:	*argp = *((void * __capability *)&locr0->c8);	break;
+		case 6:	*argp = *((void * __capability *)&locr0->c9);	break;
+		case 7:	*argp = *((void * __capability *)&locr0->c10);	break;
 		default:
 			panic("%s: pointer argument %d out of range",
 			    __func__, ptrreg_offset);
 		}
-		cheri_capability_copy(arg, arg_capp);
 	} else {
 		switch (intreg_offset) {
-		case 0:	arg_reg = locr0->a0;	break;
-		case 1:	arg_reg = locr0->a1;	break;
-		case 2:	arg_reg = locr0->a2;	break;
-		case 3:	arg_reg = locr0->a3;	break;
-		case 4:	arg_reg = locr0->a4;	break;
-		case 5:	arg_reg = locr0->a5;	break;
-		case 6:	arg_reg = locr0->a6;	break;
-		case 7:	arg_reg = locr0->a7;	break;
+		case 0:	*argp = (void * __capability)(__intcap_t)locr0->a0; break;
+		case 1:	*argp = (void * __capability)(__intcap_t)locr0->a1; break;
+		case 2:	*argp = (void * __capability)(__intcap_t)locr0->a2; break;
+		case 3:	*argp = (void * __capability)(__intcap_t)locr0->a3; break;
+		case 4:	*argp = (void * __capability)(__intcap_t)locr0->a4; break;
+		case 5:	*argp = (void * __capability)(__intcap_t)locr0->a5; break;
+		case 6:	*argp = (void * __capability)(__intcap_t)locr0->a6; break;
+		case 7:	*argp = (void * __capability)(__intcap_t)locr0->a7; break;
 		default:
 			panic("%s: integer argument %d out of range",
 			    __func__, intreg_offset);
 		}
-		cheri_capability_set_null(arg);
-		cheri_capability_setoffset(arg, arg_reg);
 	}
 }
 
 static int
-cheriabi_fetch_syscall_args(struct thread *td, struct syscall_args *sa)
+cheriabi_fetch_syscall_args(struct thread *td)
 {
 	struct trapframe *locr0 = td->td_frame;	 /* aka td->td_pcb->pcv_regs */
 	struct sysentvec *se;
-#ifdef OLD_ARG_HANDLING
-	struct cheri_frame *capreg = &td->td_pcb->pcb_cheriframe;
-	register_t intargs[8];
-	uintptr_t ptrargs[8];
-	u_int tag;
-	int i, isaved, psaved, curint, curptr, nintargs, nptrargs;
-#endif
+	struct syscall_args *sa;
 	int error;
 
 	error = 0;
 
+	sa = &td->td_sa;
 	bzero(sa->args, sizeof(sa->args));
 
 	/* compute next PC after syscall instruction */
@@ -269,110 +296,7 @@ cheriabi_fetch_syscall_args(struct thread *td, struct syscall_args *sa)
 
 	sa->narg = sa->callp->sy_narg;
 
-#ifndef OLD_ARG_HANDLING
 	error = cheriabi_dispatch_fill_uap(td, sa->code, sa->args);
-#else
-
-	intargs[0] = locr0->a0;
-	intargs[1] = locr0->a1;
-	intargs[2] = locr0->a2;
-	intargs[3] = locr0->a3;
-	intargs[4] = locr0->a4;
-	intargs[5] = locr0->a5;
-	intargs[6] = locr0->a6;
-	intargs[7] = locr0->a7;
-	isaved = 8;
-
-#if defined(CPU_CHERI_CHERI0) || defined (CPU_CHERI_CHERI8) || defined(CPU_CHERI_CHERI16)
-#error	CHERIABI does not support fewer than 8 argument registers
-#endif
-	/*
-	 * XXXBD: We should ideally use a user capability rather than KDC
-	 * to generate the pointers, but then we have to answer: which one?
-	 *
-	 * XXXRW: The kernel cannot distinguish between pointers with tags vs.
-	 * untagged (possible) integers, which is problematic when a
-	 * system-call argument is an intptr_t.  We used to just use CToPtr
-	 * here, but this caused untagged integer arguments to be lost.  Now
-	 * we pick one of CToPtr and CToInt based on the tag -- but this is
-	 * not really ideal.  Instead, we'd prefer that the kernel could
-	 * differentiate between the two explicitly using tagged capabilities,
-	 * which we're not yet ready to do.
-	 */
-	CHERI_CLC(CHERI_CR_CTEMP0, CHERI_CR_KDC, &capreg->cf_c3, 0);
-	CHERI_CGETTAG(tag, CHERI_CR_CTEMP0);
-	if (tag)
-		CHERI_CTOPTR(ptrargs[0], CHERI_CR_CTEMP0, CHERI_CR_KDC);
-	else
-		CHERI_CTOINT(ptrargs[0], CHERI_CR_CTEMP0);
-	CHERI_CLC(CHERI_CR_CTEMP0, CHERI_CR_KDC, &capreg->cf_c4, 0);
-	CHERI_CGETTAG(tag, CHERI_CR_CTEMP0);
-	if (tag)
-		CHERI_CTOPTR(ptrargs[1], CHERI_CR_CTEMP0, CHERI_CR_KDC);
-	else
-		CHERI_CTOINT(ptrargs[1], CHERI_CR_CTEMP0);
-	CHERI_CLC(CHERI_CR_CTEMP0, CHERI_CR_KDC, &capreg->cf_c5, 0);
-	CHERI_CGETTAG(tag, CHERI_CR_CTEMP0);
-	if (tag)
-		CHERI_CTOPTR(ptrargs[2], CHERI_CR_CTEMP0, CHERI_CR_KDC);
-	else
-		CHERI_CTOINT(ptrargs[2], CHERI_CR_CTEMP0);
-	CHERI_CLC(CHERI_CR_CTEMP0, CHERI_CR_KDC, &capreg->cf_c6, 0);
-	CHERI_CGETTAG(tag, CHERI_CR_CTEMP0);
-	if (tag)
-		CHERI_CTOPTR(ptrargs[3], CHERI_CR_CTEMP0, CHERI_CR_KDC);
-	else
-		CHERI_CTOINT(ptrargs[3], CHERI_CR_CTEMP0);
-	CHERI_CLC(CHERI_CR_CTEMP0, CHERI_CR_KDC, &capreg->cf_c7, 0);
-	CHERI_CGETTAG(tag, CHERI_CR_CTEMP0);
-	if (tag)
-		CHERI_CTOPTR(ptrargs[4], CHERI_CR_CTEMP0, CHERI_CR_KDC);
-	else
-		CHERI_CTOINT(ptrargs[4], CHERI_CR_CTEMP0);
-	CHERI_CLC(CHERI_CR_CTEMP0, CHERI_CR_KDC, &capreg->cf_c8, 0);
-	CHERI_CGETTAG(tag, CHERI_CR_CTEMP0);
-	if (tag)
-		CHERI_CTOPTR(ptrargs[5], CHERI_CR_CTEMP0, CHERI_CR_KDC);
-	else
-		CHERI_CTOINT(ptrargs[5], CHERI_CR_CTEMP0);
-	CHERI_CLC(CHERI_CR_CTEMP0, CHERI_CR_KDC, &capreg->cf_c9, 0);
-	CHERI_CGETTAG(tag, CHERI_CR_CTEMP0);
-	if (tag)
-		CHERI_CTOPTR(ptrargs[6], CHERI_CR_CTEMP0, CHERI_CR_KDC);
-	else
-		CHERI_CTOINT(ptrargs[6], CHERI_CR_CTEMP0);
-	CHERI_CLC(CHERI_CR_CTEMP0, CHERI_CR_KDC, &capreg->cf_c10, 0);
-	CHERI_CGETTAG(tag, CHERI_CR_CTEMP0);
-	if (tag)
-		CHERI_CTOPTR(ptrargs[7], CHERI_CR_CTEMP0, CHERI_CR_KDC);
-	else
-		CHERI_CTOINT(ptrargs[7], CHERI_CR_CTEMP0);
-	psaved = 8;
-
-#ifdef TRAP_DEBUG
-	if (trap_debug)
-		printf("SYSCALL #%d pid:%u\n", sa->code, td->td_proc->p_pid);
-#endif
-
-	nptrargs = bitcount(CHERIABI_SYS_argmap[sa->code].sam_ptrmask);
-	nintargs = sa->narg - nptrargs;
-	KASSERT(nintargs <= isaved,
-	    ("SYSCALL #%u pid:%u, nintargs (%u) > isaved (%u).\n",
-	     sa->code, td->td_proc->p_pid, nintargs, isaved));
-	KASSERT(nptrargs <= psaved,
-	    ("SYSCALL #%u pid:%u, nptrargs (%u) > psaved (%u).\n",
-	     sa->code, td->td_proc->p_pid, nptrargs, psaved));
-
-	/*
-	 * Check each argument to see if it is a pointer and pop an argument
-	 * off the appropriate list.
-	 */
-	curint = curptr = 0;
-	for (i = 0; i < sa->narg; i++)
-		sa->args[i] =
-		    (CHERIABI_SYS_argmap[sa->code].sam_ptrmask & 1 << i) ?
-		    ptrargs[curptr++] : intargs[curint++];
-#endif /* OLD_ARG_HANDLING */
 
 	td->td_retval[0] = 0;
 	td->td_retval[1] = locr0->v1;
@@ -384,7 +308,6 @@ static void
 cheriabi_set_syscall_retval(struct thread *td, int error)
 {
 	struct trapframe *locr0 = td->td_frame;
-	struct cheri_frame *capreg = &td->td_pcb->pcb_cheriframe;
 	register_t a0;
 	unsigned int code;
 	struct sysentvec *se;
@@ -407,18 +330,27 @@ cheriabi_set_syscall_retval(struct thread *td, int error)
 		locr0->v1 = td->td_retval[1];
 		locr0->a3 = 0;
 
-		if (!CHERIABI_SYS_argmap[code].sam_return_ptr)
-			break;
-
 		switch (code) {
 		case CHERIABI_SYS_cheriabi_mmap:
-			cheriabi_mmap_set_retcap(td, &capreg->cf_c3,
-			&capreg->cf_c3, locr0->a0, locr0->a1, locr0->a2);
+			error = cheriabi_mmap_set_retcap(td, &locr0->c3,
+			    &locr0->c3, locr0->a0, locr0->a1, locr0->a2);
+			if (error == 0) {
+				locr0->v0 = 0;
+				locr0->a3 = 0;
+			} else {
+				locr0->v0 = error;
+				locr0->a3 = 1;
+			}
+			break;
+
+		case CHERIABI_SYS_cheriabi_shmat:
+			locr0->c3 = td->td_retcap;
+			locr0->v0 = 0;
+			locr0->a3 = 0;
 			break;
 
 		default:
-			panic("%s: unsupported syscall (%u) returning pointer",
-			    __func__, code);
+			return;
 		}
 		break;
 	case ERESTART:
@@ -434,25 +366,55 @@ cheriabi_set_syscall_retval(struct thread *td, int error)
 	}
 }
 
-static int
+int
+cheriabi_get_mcontext(struct thread *td, mcontext_c_t *mcp, int flags)
+{
+	struct trapframe *tp;
+
+	tp = td->td_frame;
+	PROC_LOCK(curthread->td_proc);
+	mcp->mc_onstack = sigonstack((vaddr_t)tp->csp);
+	PROC_UNLOCK(curthread->td_proc);
+	bcopy((void *)&td->td_frame->zero, (void *)&mcp->mc_regs,
+	    sizeof(mcp->mc_regs));
+
+	mcp->mc_fpused = td->td_md.md_flags & MDTD_FPUSED;
+	if (mcp->mc_fpused) {
+		bcopy((void *)&td->td_frame->f0, (void *)&mcp->mc_fpregs,
+		    sizeof(mcp->mc_fpregs));
+	}
+	cheri_trapframe_to_cheriframe(&td->td_pcb->pcb_regs,
+	    &mcp->mc_cheriframe);
+	if (flags & GET_MC_CLEAR_RET) {
+		mcp->mc_regs[V0] = 0;
+		mcp->mc_regs[V1] = 0;
+		mcp->mc_regs[A3] = 0;
+		mcp->mc_cheriframe.cf_c3 = NULL;
+	}
+
+	mcp->mc_pc = td->td_frame->pc;
+	mcp->mullo = td->td_frame->mullo;
+	mcp->mulhi = td->td_frame->mulhi;
+	mcp->mc_tls = td->td_md.md_tls;
+
+	return (0);
+}
+
+int
 cheriabi_set_mcontext(struct thread *td, mcontext_c_t *mcp)
 {
 	struct trapframe *tp;
 	int tag;
 
-	if (mcp->mc_regs[0] != UCONTEXT_MAGIC) {
-		printf("mcp->mc_regs[0] != UCONTEXT_MAGIC\n");
-		return (EINVAL);
-	}
-
-	cheri_memcpy(&td->td_pcb->pcb_cheriframe, &mcp->mc_cheriframe,
-	    sizeof(td->td_pcb->pcb_cheriframe));
-
 	tp = td->td_frame;
+	cheri_trapframe_from_cheriframe(tp, &mcp->mc_cheriframe);
 	bcopy((void *)&mcp->mc_regs, (void *)&td->td_frame->zero,
 	    sizeof(mcp->mc_regs));
-
-	td->td_md.md_flags = mcp->mc_fpused & MDTD_FPUSED;
+	td->td_md.md_flags = (mcp->mc_fpused & MDTD_FPUSED)
+#ifdef CPU_QEMU_MALTA
+	    | (td->td_md.md_flags & MDTD_QTRACE)
+#endif
+	    ;
 	if (mcp->mc_fpused)
 		bcopy((void *)&mcp->mc_fpregs, (void *)&td->td_frame->f0,
 		    sizeof(mcp->mc_fpregs));
@@ -460,67 +422,23 @@ cheriabi_set_mcontext(struct thread *td, mcontext_c_t *mcp)
 	td->td_frame->mullo = mcp->mullo;
 	td->td_frame->mulhi = mcp->mulhi;
 
-	cheri_capability_copy(&td->td_md.md_tls_cap, &mcp->mc_tls);
-	CHERI_CLC(CHERI_CR_CTEMP0, CHERI_CR_KDC, &mcp->mc_tls, 0);
-	CHERI_CGETTAG(tag, CHERI_CR_CTEMP0);
-	if (tag)
-		CHERI_CTOPTR(td->td_md.md_tls, CHERI_CR_CTEMP0, CHERI_CR_KDC);
-	else
-		td->td_md.md_tls = NULL;
+	td->td_md.md_tls =  mcp->mc_tls;
+	tag = cheri_gettag(mcp->mc_tls);
 
 	/* Dont let user to set any bits in status and cause registers.  */
 
 	return (0);
 }
 
-int
-cheriabi_sigreturn(struct thread *td, struct cheriabi_sigreturn_args *uap)
-{
-	ucontext_c_t uc;
-	int error;
-
-	error = copyincap(uap->sigcntxp, &uc, sizeof(uc));
-	if (error != 0)
-		return (error);
-
-	error = cheriabi_set_mcontext(td, &uc.uc_mcontext);
-	if (error != 0)
-		return (error);
-
-	kern_sigprocmask(td, SIG_SETMASK, &uc.uc_sigmask, NULL, 0);
-
-	return (EJUSTRETURN);
-}
-
-int
-cheriabi_getcontext(struct thread *td, struct cheriabi_getcontext_args *uap)
-{
-
-	return (ENOSYS);
-}
-
-int
-cheriabi_setcontext(struct thread *td, struct cheriabi_setcontext_args *uap)
-{
-
-	return (ENOSYS);
-}
-
-int
-cheriabi_swapcontext(struct thread *td, struct cheriabi_swapcontext_args *uap)
-{
-
-	return (ENOSYS);
-}
-
 /*
  * The CheriABI version of sendsig(9) largely borrows from the MIPS version,
  * and it is important to keep them in sync.  It differs primarily in that it
  * must also be aware of user stack-handling ABIs, so is also sensitive to our
- * (fluctuating) design choices in how $c11 and $sp interact.  The current
- * design uses ($c11 + $sp) for stack-relative references, so early on we have
- * to calculate a 'relocated' version of $sp that we can then use for
- * MIPS-style access.
+ * (fluctuating) design choices in how $csp and $sp interact.  In the current
+ * model, $csp encapsulates the bounds and stack pointer itself, and the
+ * historic $sp register is simply a general-puprose register.  As such, there
+ * should be no mention of $sp (in its role as a stack pointer) in CheriABI
+ * code.
  *
  * This code, as with the CHERI-aware MIPS code, makes a privilege
  * determination in order to decide whether to trust the stack exposed by the
@@ -534,14 +452,15 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	struct proc *p;
 	struct thread *td;
 	struct trapframe *regs;
-	struct cheri_frame *capreg;
 	struct sigacts *psp;
-	struct sigframe_c sf, *sfp;
-	uintptr_t stackbase;
-	vm_offset_t sp;
+	struct sigframe_c sf, * __capability sfp;
+	struct cheri_signal *csigp;
+	char * __capability csp;
 	int cheri_is_sandboxed;
 	int sig;
 	int oonstack;
+
+	KASSERT(cheri_gettag(catcher), ("signal handler is untagged!"));
 
 	td = curthread;
 	p = td->td_proc;
@@ -549,25 +468,16 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	sig = ksi->ksi_signo;
 	psp = p->p_sigacts;
 	mtx_assert(&psp->ps_mtx, MA_OWNED);
-
-	regs = td->td_frame;
-	capreg = &td->td_pcb->pcb_cheriframe;
+	csigp = &td->td_pcb->pcb_cherisignal;
 
 	/*
-	 * In CheriABI, $sp is $c11 relative, so calculate a relocation base
-	 * that must be combined with regs->sp from this point onwards.
-	 * Unfortunately, we won't retain bounds and permissions information
-	 * (as is the case elsewhere in CheriABI).  While 'stackbase'
-	 * suggests that $c11's offset isn't included, in practice it will be,
-	 * although we may reasonably assume that it will be zero.
-	 *
-	 * If it turns out we will be delivering to the alternative signal
-	 * stack, we'll recalculate stackbase later.
+	 * XXXRW: We make an on-stack determination using the virtual address
+	 * associated with the stack pointer, rather than using the full
+	 * capability.  Should we compare the entire capability...?  Just
+	 * pointer and bounds...?
 	 */
-	CHERI_CLC(CHERI_CR_CTEMP0, CHERI_CR_KDC,
-	    &td->td_pcb->pcb_cheriframe.cf_c11, 0);
-	CHERI_CTOPTR(stackbase, CHERI_CR_CTEMP0, CHERI_CR_KDC);
-	oonstack = sigonstack(stackbase + regs->sp);
+	regs = td->td_frame;
+	oonstack = sigonstack((vaddr_t)regs->csp);
 
 	/*
 	 * CHERI affects signal delivery in the following ways:
@@ -605,7 +515,7 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 #endif
 
 	/*
-	 * If a thread is running sandboxed, we can't rely on $sp which may
+	 * If a thread is running sandboxed, we can't rely on $csp which may
 	 * not point at a valid stack in the ambient context, or even be
 	 * maliciously manipulated.  We must therefore always use the
 	 * alternative stack.  We are also therefore unable to tell whether we
@@ -633,8 +543,7 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	sf.sf_uc.uc_mcontext.mc_pc = regs->pc;
 	sf.sf_uc.uc_mcontext.mullo = regs->mullo;
 	sf.sf_uc.uc_mcontext.mulhi = regs->mulhi;
-	cheri_capability_copy(&sf.sf_uc.uc_mcontext.mc_tls,
-	    &td->td_md.md_tls_cap);
+	sf.sf_uc.uc_mcontext.mc_tls = td->td_md.md_tls;
 	sf.sf_uc.uc_mcontext.mc_regs[0] = UCONTEXT_MAGIC;  /* magic number */
 	bcopy((void *)&regs->ast, (void *)&sf.sf_uc.uc_mcontext.mc_regs[1],
 	    sizeof(sf.sf_uc.uc_mcontext.mc_regs) - sizeof(register_t));
@@ -651,16 +560,11 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 #endif
 	/* XXXRW: sf.sf_uc.uc_mcontext.sr seems never to be set? */
 	sf.sf_uc.uc_mcontext.cause = regs->cause;
-	cheri_memcpy(&sf.sf_uc.uc_mcontext.mc_cheriframe,
-	    &td->td_pcb->pcb_cheriframe,
-	    sizeof(struct cheri_frame));
+	cheri_trapframe_to_cheriframe(regs,
+	    &sf.sf_uc.uc_mcontext.mc_cheriframe);
 
 	/*
-	 * Allocate and validate space for the signal handler context.  For
-	 * CheriABI purposes, 'sp' from this point forward is relocated
-	 * relative to any pertinent stack capability.  For an alternative
-	 * signal context, we need to recalculate stackbase for later use in
-	 * calculating a new $sp for the signal-handling context.
+	 * Allocate and validate space for the signal handler context.
 	 *
 	 * XXXRW: It seems like it would be nice to both the regular and
 	 * alternative stack calculations in the same place.  However, we need
@@ -668,8 +572,7 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !oonstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		stackbase = (vm_offset_t)td->td_sigstk.ss_sp;
-		sp = (vm_offset_t)(stackbase + td->td_sigstk.ss_size);
+		csp = csigp->csig_csp;
 	} else {
 		/*
 		 * Signals delivered when a CHERI sandbox is present must be
@@ -686,12 +589,12 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 			sigexit(td, SIGILL);
 			/* NOTREACHED */
 		}
-		sp = (vm_offset_t)(stackbase + regs->sp);
+		csp = regs->csp;
 	}
-	sp -= sizeof(struct sigframe_c);
+	csp -= sizeof(struct sigframe_c);
 	/* For CHERI, keep the stack pointer capability aligned. */
-	sp &= ~(CHERICAP_SIZE - 1);
-	sfp = (void *)sp;
+	csp = __builtin_align_down(csp, CHERICAP_SIZE);
+	sfp = (struct sigframe_c * __capability)csp;
 
 	/* Build the argument list for the signal handler. */
 	regs->a0 = sig;
@@ -700,39 +603,40 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		 * Signal handler installed with SA_SIGINFO.
 		 *
 		 * XXXRW: We would ideally synthesise these from the
-		 * user-originated stack capability, rather than KDC, to be on
-		 * the safe side.
+		 * user-originated stack capability, rather than $kdc, to be
+		 * on the safe side.
 		 */
-		cheri_capability_set(&capreg->cf_c3, CHERI_CAP_USER_DATA_PERMS,
-		    CHERI_CAP_USER_DATA_OTYPE, (void *)(intptr_t)&sfp->sf_si,
+		regs->c3 = cheri_capability_build_user_data(
+		    CHERI_CAP_USER_DATA_PERMS, (vaddr_t)&sfp->sf_si,
 		    sizeof(sfp->sf_si), 0);
-		cheri_capability_set(&capreg->cf_c4, CHERI_CAP_USER_DATA_PERMS,
-		    CHERI_CAP_USER_DATA_OTYPE, (void *)(intptr_t)&sfp->sf_uc,
+		regs->c4 = cheri_capability_build_user_data(
+		    CHERI_CAP_USER_DATA_PERMS, (vaddr_t)&sfp->sf_uc,
 		    sizeof(sfp->sf_uc), 0);
 		/* sf.sf_ahu.sf_action = (__siginfohandler_t *)catcher; */
 
 		/* fill siginfo structure */
 		sf.sf_si.si_signo = sig;
 		sf.sf_si.si_code = ksi->ksi_code;
+		sf.sf_si.si_value.sival_int =
+		    ksi->ksi_info.si_value.sival_int;
 		/*
 		 * Write out badvaddr, but don't create a valid capability
 		 * since that might allow privilege amplification.
 		 *
-		 * XXX-BD: This probably isn't the right method.
-		 * XXX-BD: Do we want to set base or offset?
-		 *
 		 * XXXRW: I think there's some argument that anything
 		 * receiving this signal is fairly privileged.  But we could
-		 * generate a $c0-relative (or $pcc-relative) capability, if
-		 * possible.  (Using versions if $c0 and $pcc for the
+		 * generate a $ddc-relative (or $pcc-relative) capability, if
+		 * possible.  (Using versions if $ddc and $pcc for the
 		 * signal-handling context rather than that which caused the
 		 * signal).  I'd be tempted to deliver badvaddr as the offset
 		 * of that capability.  If badvaddr is not in range, then we
 		 * should just deliver an untagged NULL-derived version
 		 * (perhaps)?
+		 *
+		 * XXXBD: We really need a regs->badcap here.  There's no
+		 * sensable value to derive in the CheriABI context.
 		 */
-		*((uintptr_t *)&sf.sf_si.si_addr) =
-		    (uintptr_t)(void *)regs->badvaddr;
+		sf.sf_si.si_addr = (void * __capability)(intcap_t)regs->badvaddr;
 	}
 	/*
 	 * XXX: No support for undocumented arguments to old style handlers.
@@ -744,7 +648,7 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/*
 	 * Copy the sigframe out to the user's stack.
 	 */
-	if (copyoutcap(&sf, (void *)sfp, sizeof(sf)) != 0) {
+	if (copyoutcap_c(&sf, sfp, sizeof(sf)) != 0) {
 		/*
 		 * Something is wrong with the stack pointer.
 		 * ...Kill the process.
@@ -769,54 +673,222 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 * in.  As we don't install this in the CHERI frame on the user stack,
 	 * it will be (generally) be removed automatically on sigreturn().
 	 */
-	/* XXX-BD: this isn't quite right */
-	cheri_sendsig(td);
+	regs->pc = (register_t)(intptr_t)catcher;
+	regs->pcc = catcher;
+	regs->csp = sfp;
+	regs->c12 = catcher;
+	regs->c17 = td->td_pcb->pcb_cherisignal.csig_sigcode;
+	regs->ddc = csigp->csig_ddc;
+	/*
+	 * For now only change IDC if we were sandboxed. This makes cap-table
+	 * binaries work as expected (since they need cgp to remain the same).
+	 *
+	 * TODO: remove csigp->csig_idc
+	 */
+	if (cheri_is_sandboxed)
+		regs->idc = csigp->csig_idc;
+}
+
+static void
+cheriabi_capability_set_user_ddc(void * __capability *cp, size_t length)
+{
+
+	*cp = cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
+	    CHERI_CAP_USER_DATA_BASE, length, CHERI_CAP_USER_DATA_OFFSET);
+}
+
+static void
+cheriabi_capability_set_user_idc(void * __capability *cp, size_t length)
+{
 
 	/*
-	 * Note that $sp must be installed relative to $c11, so re-subtract
-	 * the stack base here.
+	 * The default invoked data capability is also identical to $ddc.
 	 */
-	regs->pc = (register_t)(intptr_t)catcher;
-	regs->sp = (register_t)((intptr_t)sfp - stackbase);
+	cheriabi_capability_set_user_ddc(cp, length);
+}
 
-	cheri_capability_copy(&capreg->cf_c12, &psp->ps_sigcap[_SIG_IDX(sig)]);
-	cheri_capability_copy(&capreg->cf_c17,
-	    &td->td_pcb->pcb_cherisignal.csig_sigcode);
+static void
+cheriabi_capability_set_user_entry(void * __capability *cp,
+    unsigned long entry_addr, size_t length)
+{
+
+	/*
+	 * Set the jump target regigster for the pure capability calling
+	 * convention.
+	 */
+	*cp = cheri_capability_build_user_code(CHERI_CAP_USER_CODE_PERMS,
+	    CHERI_CAP_USER_CODE_BASE, length, entry_addr);
+}
+
+/*
+ * Common per-thread CHERI state initialisation across execve(2) and
+ * additional thread creation.
+ */
+static void
+cheriabi_newthread_init(struct thread *td)
+{
+	struct cheri_signal *csigp;
+	struct trapframe *frame;
+
+	/*
+	 * We assume that the caller has initialised the trapframe to zeroes
+	 * and then set ddc, idc, and pcc appropriatly. We might want to
+	 * check this with a more thorough set of assertions in the future.
+
+	 */
+	frame = &td->td_pcb->pcb_regs;
+	KASSERT(frame->ddc != NULL, ("%s: NULL $ddc", __func__));
+	KASSERT(frame->pcc != NULL, ("%s: NULL $epcc", __func__));
+
+	/*
+	 * Initialise signal-handling state; this can't yet be modified
+	 * by userspace, but the principle is that signal handlers should run
+	 * with ambient authority unless given up by the userspace runtime
+	 * explicitly.  The caller will initialise the stack fields.
+	 *
+	 * XXXRW: In CheriABI, it could be that we should set more of these to
+	 * NULL capabilities rather than initialising to the full address
+	 * space.  Note that some fields are overwritten later in
+	 * cheriabi_exec_setregs() for the initial thread.
+	 */
+	csigp = &td->td_pcb->pcb_cherisignal;
+	bzero(csigp, sizeof(*csigp));
+	csigp->csig_ddc = frame->ddc;
+	csigp->csig_idc = frame->idc;
+	csigp->csig_pcc = cheri_setoffset(frame->pcc, 0);
+	cheri_capability_set_user_sigcode(&csigp->csig_sigcode,
+	    td->td_proc->p_sysent);
+
+	/*
+	 * Set up root for the userspace object-type sealing capability tree.
+	 * This can be queried using sysarch(2).
+	 */
+	cheri_capability_set_user_sealcap(&td->td_proc->p_md.md_cheri_sealcap);
 }
 
 static void
 cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack)
 {
-	struct cheri_frame *cfp;
 	struct cheri_signal *csigp;
-	u_long stackbase, stacklen;
+	struct trapframe *frame;
+	u_long auxv, stackbase, stacklen;
+	bool is_dynamic_binary;
+	size_t map_base, map_length, text_end, data_length, code_length;
+	struct rlimit rlim_stack;
 
 	bzero((caddr_t)td->td_frame, sizeof(struct trapframe));
 
-	KASSERT(stack % sizeof(struct chericap) == 0,
+	KASSERT(stack % sizeof(void * __capability) == 0,
 	    ("CheriABI stack pointer not properly aligned"));
 
-	td->td_proc->p_md.md_cheri_mmap_perms = CHERI_CAP_USER_DATA_PERMS |
-	    CHERI_CAP_USER_CODE_PERMS;
+	/*
+	 * Restrict the stack capability to the maximum region allowed for
+	 * this process and adjust csp accordingly.
+	 */
+	CTASSERT(CHERI_CAP_USER_DATA_BASE == 0);
+	PROC_LOCK(td->td_proc);
+	lim_rlimit_proc(td->td_proc, RLIMIT_STACK, &rlim_stack);
+	PROC_UNLOCK(td->td_proc);
+	stackbase = td->td_proc->p_sysent->sv_usrstack - rlim_stack.rlim_max;
+	KASSERT(stack > stackbase,
+	    ("top of stack 0x%lx is below stack base 0x%lx", stack, stackbase));
+	stacklen = stack - stackbase;
+	/*
+	 * Round the stack down as required to make it representable.
+	 *
+	 * XXX: should we make the stack sealable?
+	 */
+	stacklen = rounddown2(stacklen, 1ULL << CHERI_ALIGN_SHIFT(stacklen));
+	KASSERT(stackbase ==
+	    rounddown2(stackbase, 1ULL << CHERI_ALIGN_SHIFT(stacklen)),
+	    ("stackbase 0x%lx is not representable at length 0x%lx",
+	    stackbase, stacklen));
+	td->td_frame->csp = cheri_capability_build_user_data(
+	    CHERI_CAP_USER_DATA_PERMS, stackbase, stacklen, 0);
+	td->td_frame->sp = stacklen;
+
+	/* Using addr as length means ddc base must be 0. */
+	CTASSERT(CHERI_CAP_USER_DATA_BASE == 0);
+	if (imgp->end_addr != 0) {
+		text_end = roundup2(imgp->end_addr,
+		    1ULL << CHERI_SEAL_ALIGN_SHIFT(imgp->end_addr));
+		/*
+		 * Less confusing rounded up to a page and 256-bit
+		 * requires no other rounding.
+		 */
+		text_end = roundup2(text_end, PAGE_SIZE);
+	} else {
+		text_end = rounddown2(stackbase,
+		    1ULL << CHERI_SEAL_ALIGN_SHIFT(stackbase));
+	}
+	KASSERT(text_end <= stackbase,
+	    ("text_end 0x%zx > stackbase 0x%lx", text_end, stackbase));
+
+	map_base = (text_end == stackbase) ?
+	    CHERI_CAP_USER_MMAP_BASE : text_end;
+	KASSERT(map_base < stackbase,
+	    ("map_base 0x%zx >= stackbase 0x%lx", map_base, stackbase));
+	map_length = stackbase - map_base;
+	map_length = rounddown2(map_length,
+	    1ULL << CHERI_ALIGN_SHIFT(map_length));
+	/*
+	 * Use cheri_capability_build_user_rwx so mmap() can return
+	 * appropriate permissions derived from a single capability.
+	 */
+	td->td_md.md_cheri_mmap_cap = cheri_capability_build_user_rwx(
+	    CHERI_CAP_USER_MMAP_PERMS, map_base, map_length,
+	    CHERI_CAP_USER_MMAP_OFFSET);
 
 	td->td_frame->pc = imgp->entry_addr;
 	td->td_frame->sr = MIPS_SR_KSU_USER | MIPS_SR_EXL | MIPS_SR_INT_IE |
 	    (mips_rd_status() & MIPS_SR_INT_MASK) |
 	    MIPS_SR_PX | MIPS_SR_UX | MIPS_SR_KX | MIPS_SR_COP_2_BIT;
-	cheri_exec_setregs(td, imgp->entry_addr);
-	cheri_stack_init(td->td_pcb);
 
 	/*
-	 * Pass a pointer to the struct cheriabi_execdata at the top of the
-	 * stack.
-	 *
-	 * XXXBD: should likely be read only
+	 * XXXAR: For now, initialise $ddc and $idc to the full address space
+	 * for dynamically linked executables. In the future these will be
+	 * restricted (or not set at all).
 	 */
-	cfp = &td->td_pcb->pcb_cheriframe;
-	cheri_capability_set(&cfp->cf_c3, CHERI_CAP_USER_DATA_PERMS,
-	    CHERI_CAP_USER_DATA_OTYPE, (void *)stack,
-	    sizeof(struct cheriabi_execdata), 0);
+	/* XXXAR: is there a better way to check for dynamic binaries? */
+	is_dynamic_binary = imgp->end_addr == 0 && imgp->reloc_base != 0;
+	data_length = is_dynamic_binary ?
+	    CHERI_CAP_USER_DATA_LENGTH - imgp->reloc_base : text_end;
+	code_length = is_dynamic_binary ?
+	    CHERI_CAP_USER_CODE_LENGTH - imgp->reloc_base : text_end;
+	frame = &td->td_pcb->pcb_regs;
+	cheriabi_capability_set_user_ddc(&frame->ddc, data_length);
+	cheriabi_capability_set_user_idc(&frame->idc, data_length);
 
+	/*
+	 * XXXRW: Set $pcc and $c12 to the entry address -- for now, also with
+	 * broad bounds, but in the future, limited as appropriate to the
+	 * run-time linker or statically linked binary?
+	 */
+	cheriabi_capability_set_user_entry(&frame->pcc, imgp->entry_addr,
+	    code_length);
+	frame->c12 = frame->pcc;
+
+	/*
+	 * Set up CHERI-related state: most register state, signal delivery,
+	 * sealing capabilities, trusted stack.
+	 */
+	cheriabi_newthread_init(td);
+
+	/*
+	 * Pass a pointer to the ELF auxiliary argument vector.
+	 */
+	auxv = stack + (imgp->args->argc + 1 + imgp->args->envc + 1) *
+	    sizeof(void * __capability);
+	td->td_frame->c3 = cheri_capability_build_user_data(
+	    CHERI_CAP_USER_DATA_PERMS, auxv,
+	    AT_COUNT * 2 * sizeof(void * __capability), 0);
+	/*
+	 * Load relocbase into $c4 so that rtld has a capability with the
+	 * correct bounds available on startup
+	 */
+	if (imgp->reloc_base)
+		td->td_frame->c4 = cheri_capability_build_user_data(
+		   CHERI_CAP_USER_DATA_PERMS, imgp->reloc_base, data_length, 0);
 	/*
 	 * Restrict the stack capability to the maximum region allowed for
 	 * this process and adjust sp accordingly.
@@ -828,16 +900,19 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	KASSERT(stack > stackbase,
 	    ("top of stack 0x%lx is below stack base 0x%lx", stack, stackbase));
 	stacklen = stack - stackbase;
-	cheri_capability_set(&cfp->cf_c11, CHERI_CAP_USER_DATA_PERMS,
-	    CHERI_CAP_USER_DATA_OTYPE, (void *)stackbase, stacklen, 0);
-	td->td_frame->sp = stacklen;
+	td->td_frame->csp = cheri_capability_build_user_data(
+	    CHERI_CAP_USER_DATA_PERMS, stackbase, stacklen, stacklen);
+
 	/*
-	 * Also update the signal stack.  The default set in
-	 * cheri_exec_setregs() covers the whole address space.
+	 * Update privileged signal-delivery environment for actual stack.
+	 *
+	 * XXXRW: Not entirely clear whether we want an offset of 'stacklen'
+	 * for csig_csp here.  Maybe we don't want to use csig_csp at all?
+	 * Possibly csig_csp should default to NULL...?
 	 */
 	csigp = &td->td_pcb->pcb_cherisignal;
-	cheri_capability_set(&csigp->csig_c11, CHERI_CAP_USER_DATA_PERMS,
-	    CHERI_CAP_USER_DATA_OTYPE, (void *)stackbase, stacklen, 0);
+	csigp->csig_csp = td->td_frame->csp;
+	csigp->csig_default_stack = csigp->csig_csp;
 
 	td->td_md.md_flags &= ~MDTD_FPUSED;
 	if (PCPU_GET(fpcurthread) == td)
@@ -847,139 +922,261 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET + TLS_TCB_SIZE_C;
 }
 
+/*
+ * The CheriABI equivalent of cpu_set_upcall().
+ */
 void
-cheriabi_get_signal_stack_capability(struct thread *td, struct chericap *csig)
+cheriabi_set_threadregs(struct thread *td, struct thr_param_c *param)
 {
+	struct cheri_signal *csigp;
+	struct trapframe *frame;
 
-	cheri_capability_copy(csig, &td->td_pcb->pcb_cherisignal.csig_c11);
+	frame = td->td_frame;
+	bzero(frame, sizeof(*frame));
+
+	/*
+	 * Keep interrupt mask
+	 *
+	 * XXX-BD: See XXXRW comment in cpu_set_upcall().
+	 */
+	td->td_frame->sr = MIPS_SR_KSU_USER | MIPS_SR_EXL | MIPS_SR_INT_IE |
+	    (mips_rd_status() & MIPS_SR_INT_MASK) |
+	    MIPS_SR_PX | MIPS_SR_UX | MIPS_SR_KX | MIPS_SR_COP_2_BIT;
+
+	/*
+	 * XXX-BD: cpu_copy_thread() copies the cheri_signal struct.  Do we
+	 * want to point it at our stack instead?
+	 */
+	frame->pc = cheri_getoffset(param->start_func);
+	frame->ddc = param->ddc;
+	frame->pcc = param->start_func;
+	frame->c12 = param->start_func;
+	frame->c3 = param->arg;
+
+
+	/*
+	 * Copy the $cgp for the current thread to the new one. This will work
+	 * both if the target function is in the current shared object (so the
+	 * $cgp value will be the same) or in a different one (in which case it
+	 * will point to a PLT stub that loads $cgp).
+	 *
+	 * XXXAR: could this break anything if sandboxes create threads?
+	 */
+	frame->idc = curthread->td_frame->idc;
+
+	/*
+	 * Set up CHERI-related state: register state, signal delivery,
+	 * sealing capabilities, trusted stack.
+	 */
+	cheriabi_newthread_init(td);
+
+	/*
+	 * We don't perform validation on the new pcc or stack capabilities
+	 * and just let the caller fail on return if they are bogus.
+	 */
+	frame->csp = param->stack_base + param->stack_size;
+
+	/*
+	 * Update privileged signal-delivery environment for actual stack.
+	 *
+	 * XXXRW: Not entirely clear whether we want an offset of 'stacklen'
+	 * for csig_csp here.  Maybe we don't want to use csig_csp at all?
+	 * Possibly csig_csp should default to NULL...?
+	 */
+	csigp = &td->td_pcb->pcb_cherisignal;
+	csigp->csig_csp = td->td_frame->csp;
+	csigp->csig_default_stack = csigp->csig_csp;
 }
 
 /*
- * Set a thread's signal stack capability.  If NULL is passed, restore
- * the default stack capability.
+ * When thr_new() creates a new thread, we might need to lift properties from
+ * the capability state in the parent thread.  This is our opportunity to do
+ * so.
  */
 void
-cheriabi_set_signal_stack_capability(struct thread *td, struct chericap *csig)
+cheriabi_thr_new_md(struct thread *parent_td, struct thr_param_c *param)
+{
+	register_t tag_set;
+
+	/*
+	 * XXXRW: Currently, we'll install the parent's DDC in the child
+	 * thread if there is (effectively) a NULL capability in the param
+	 * structure for DDC.  Really, we should trigger this based on a flag
+	 * set in the param, so that the parent thread can request a NULL DDC
+	 * if it wants to.
+	 */
+	tag_set = cheri_gettag(param->ddc);
+	if (!tag_set)
+		param->ddc = parent_td->td_pcb->pcb_regs.ddc;
+}
+
+int
+cheriabi_set_user_tls(struct thread *td, void * __capability tls_base)
 {
 
-	cheri_capability_copy(&td->td_pcb->pcb_cherisignal.csig_c11,
-	    csig != NULL ? csig :
-	    &td->td_pcb->pcb_cherisignal.csig_default_stack);
+	td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET + TLS_TCB_SIZE_C;
+	/* XXX-AR: add a TLS alignment check here */
+	td->td_md.md_tls = tls_base;
+	/* XXX: should support a crdhwr version */
+	if (curthread == td && cpuinfo.userlocal_reg == true) {
+		/*
+		 * If there is an user local register implementation
+		 * (ULRI) update it as well.  Add the TLS and TCB
+		 * offsets so the value in this register is
+		 * adjusted like in the case of the rdhwr trap()
+		 * instruction handler.
+		 *
+		 * The user local register needs the TLS and TCB
+		 * offsets because the compiler simply generates a
+		 * 'rdhwr reg, $29' instruction to access thread local
+		 * storage (i.e., variables with the '_thread'
+		 * attribute).
+		 */
+		mips_wr_userlocal((__cheri_addr u_long)td->td_md.md_tls +
+		    td->td_md.md_tls_tcb_offset);
+	}
+
+	return (0);
 }
 
 int
 cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 {
-	struct cheri_frame *capreg = &td->td_pcb->pcb_cheriframe;
 	int error;
-	int parms_from_cap = 1;
-	uint64_t perms;
-	size_t reqsize;
-	register_t reqperms;
+#ifdef CPU_QEMU_MALTA
+	int intval;
+#endif
 
-	/*
-	 * The sysarch() fill_uap function is machine-independent so can not
-	 * check the validity of the capabilty which becomes uap->parms.  As
-	 * such, it makes no attempt to convert the result.  We need to
-	 * perform those checks here.
-	 */
 	switch (uap->op) {
+	/*
+	 * Operations shared with MIPS.
+	 */
 	case MIPS_SET_TLS:
-		/*
-		 * XXX-BD: not exactly clear what perms and size this
-		 * should have, presumably somewhat flexible, at least in
-		 * theory.
-		 */
-		reqsize = 0;
-		reqperms = 0;
-		break;
+		return (cheriabi_set_user_tls(td, uap->parms));
 
 	case MIPS_GET_TLS:
-	case CHERI_GET_STACK:
-	case CHERI_GET_TYPECAP:
-		reqsize = sizeof(struct chericap);
-		reqperms = CHERI_PERM_STORE|CHERI_PERM_STORE_CAP;
-		break;
-
-	case CHERI_SET_STACK:
-		reqsize = sizeof(struct chericap);
-		reqperms = CHERI_PERM_LOAD|CHERI_PERM_LOAD_CAP;
-		break;
-
-	case CHERI_MMAP_GETPERM:
-		reqsize = sizeof(uint64_t);
-		reqperms = CHERI_PERM_STORE;
-		break;
-
-	case CHERI_MMAP_ANDPERM:
-		reqsize = sizeof(uint64_t);
-		reqperms = CHERI_PERM_LOAD|CHERI_PERM_STORE;
-		break;
+		error = copyoutcap_c(
+		    (__cheri_tocap void * __capability)&td->td_md.md_tls,
+		    uap->parms, sizeof(void * __capability));
+		return (error);
 
 	case MIPS_GET_COUNT:
-		parms_from_cap = 0;
-		break;
+		td->td_retval[0] = mips_rd_count();
+		return (0);
+
+#ifdef CPU_QEMU_MALTA
+	case QEMU_GET_QTRACE:
+		intval = (td->td_md.md_flags & MDTD_QTRACE) ? 1 : 0;
+		error = copyout_c(&intval, uap->parms, sizeof(intval));
+		return (error);
+
+	case QEMU_SET_QTRACE:
+		error = copyin_c(uap->parms, &intval, sizeof(intval));
+		if (error)
+			return (error);
+		if (intval)
+			td->td_md.md_flags |= MDTD_QTRACE;
+		else
+			td->td_md.md_flags &= ~MDTD_QTRACE;
+		return (0);
+#endif
+
+	case CHERI_GET_SEALCAP:
+		return (cheri_sysarch_getsealcap(td, uap->parms));
+
+	/*
+	 * CheriABI specific operations.
+	 */
+	case CHERI_MMAP_GETBASE: {
+		size_t base;
+
+		base = cheri_getbase(td->td_md.md_cheri_mmap_cap);
+		if (suword_c(uap->parms, base) != 0)
+			return (EFAULT);
+		return (0);
+	}
+
+	case CHERI_MMAP_GETLEN: {
+		size_t len;
+
+		len = cheri_getlen(td->td_md.md_cheri_mmap_cap);
+		if (suword_c(uap->parms, len) != 0)
+			return (EFAULT);
+		return (0);
+	}
+
+	case CHERI_MMAP_GETOFFSET: {
+		ssize_t offset;
+
+		offset = cheri_getoffset(td->td_md.md_cheri_mmap_cap);
+		if (suword_c(uap->parms, offset) != 0)
+			return (EFAULT);
+		return (0);
+	}
+
+	case CHERI_MMAP_GETPERM: {
+		uint64_t perms;
+
+		perms = cheri_getperm(td->td_md.md_cheri_mmap_cap);
+		if (suword64_c(uap->parms, perms) != 0)
+			return (EFAULT);
+		return (0);
+	}
+
+	case CHERI_MMAP_ANDPERM: {
+		uint64_t perms;
+		perms = fuword64_c(uap->parms);
+
+		if (perms == -1)
+			return (EINVAL);
+		td->td_md.md_cheri_mmap_cap =
+		    cheri_andperm(td->td_md.md_cheri_mmap_cap, perms);
+		perms = cheri_getperm(td->td_md.md_cheri_mmap_cap);
+		if (suword64_c(uap->parms, perms) != 0)
+			return (EFAULT);
+		return (0);
+	}
+
+	case CHERI_MMAP_SETOFFSET: {
+		size_t len;
+		ssize_t offset;
+
+		offset = fuword_c(uap->parms);
+		/* Reject errors and misaligned offsets */
+		if (offset == -1 || (offset & PAGE_MASK) != 0)
+			return (EINVAL);
+		len = cheri_getlen(td->td_md.md_cheri_mmap_cap);
+		/* Don't allow out of bounds offsets, they aren't useful */
+		if (offset < 0 || offset > len) {
+			return (EINVAL);
+		}
+		td->td_md.md_cheri_mmap_cap =
+		    cheri_setoffset(td->td_md.md_cheri_mmap_cap,
+		    (register_t)offset);
+		return (0);
+	}
+
+	case CHERI_MMAP_SETBOUNDS: {
+		size_t len, olen;
+		ssize_t offset;
+
+		len = fuword_c(uap->parms);
+		/* Reject errors or misaligned lengths */
+		if (len == (size_t)-1 || (len & PAGE_MASK) != 0)
+			return (EINVAL);
+		olen = cheri_getlen(td->td_md.md_cheri_mmap_cap);
+		offset = cheri_getoffset(td->td_md.md_cheri_mmap_cap);
+		/* Don't try to set out of bounds lengths */
+		if (offset > olen || len > olen - offset) {
+			return (EINVAL);
+		}
+		td->td_md.md_cheri_mmap_cap =
+		    cheri_csetbounds(td->td_md.md_cheri_mmap_cap,
+		    (register_t)len);
+		return (0);
+	}
 
 	default:
 		return (EINVAL);
-	}
-	if (parms_from_cap) {
-		error = cheriabi_cap_to_ptr(&uap->parms, &capreg->cf_c3,
-		    reqsize, CHERI_PERM_GLOBAL | reqperms, 0);
-		if (error != 0)
-			return (error);
-	}
-
-	switch (uap->op) {
-	case MIPS_SET_TLS:
-		cheri_capability_copy(&td->td_md.md_tls_cap, &capreg->cf_c3);
-		td->td_md.md_tls = uap->parms;
-
-		/* XXX: should support a crdhwr version */
-		if (cpuinfo.userlocal_reg == true) {
-			/*
-			 * If there is an user local register implementation
-			 * (ULRI) update it as well.  Add the TLS and TCB
-			 * offsets so the value in this register is
-			 * adjusted like in the case of the rdhwr trap()
-			 * instruction handler.
-			 *
-			 * XXXSS For more information why this offset is
-			 * required see: 'git show \
-			 * c6be4f4d2d1b71c04de5d3bbb6933ce2dbcdb317'
-			 */
-			mips_wr_userlocal((unsigned long)(uap->parms +
-			    td->td_md.md_tls_tcb_offset));
-		}
-
-		return (0);
-
-	case MIPS_GET_TLS:
-		error = copyoutcap(&td->td_md.md_tls_cap, uap->parms,
-		    sizeof(struct chericap));
-		return (error);
-
-	case CHERI_MMAP_GETPERM:
-		PROC_LOCK(td->td_proc);
-		perms = td->td_proc->p_md.md_cheri_mmap_perms;
-		PROC_UNLOCK(td->td_proc);
-		if (suword64(uap->parms, perms) != 0)
-			return (EFAULT);
-		return (0);
-
-	case CHERI_MMAP_ANDPERM:
-		perms = fuword64(uap->parms);
-		if (perms == -1)
-			return (EINVAL);
-		PROC_LOCK(td->td_proc);
-		td->td_proc->p_md.md_cheri_mmap_perms &= perms;
-		perms = td->td_proc->p_md.md_cheri_mmap_perms;
-		PROC_UNLOCK(td->td_proc);
-		if (suword64(uap->parms, perms) != 0)
-			return (EFAULT);
-		return (0);
-
-	default:
-		return (sysarch(td, (struct sysarch_args*)uap));
 	}
 }

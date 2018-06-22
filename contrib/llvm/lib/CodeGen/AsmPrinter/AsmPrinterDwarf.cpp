@@ -15,6 +15,7 @@
 #include "DwarfDebug.h"
 #include "DwarfExpression.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/BinaryFormat/Dwarf.h"
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/DIE.h"
 #include "llvm/CodeGen/MachineFunction.h"
@@ -26,7 +27,6 @@
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSymbol.h"
 #include "llvm/MC/MachineLocation.h"
-#include "llvm/Support/Dwarf.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
 #include "llvm/Target/TargetMachine.h"
@@ -47,25 +47,13 @@ void AsmPrinter::EmitSLEB128(int64_t Value, const char *Desc) const {
   OutStreamer->EmitSLEB128IntValue(Value);
 }
 
-/// EmitULEB128 - emit the specified signed leb128 value.
+/// EmitULEB128 - emit the specified unsigned leb128 value.
 void AsmPrinter::EmitULEB128(uint64_t Value, const char *Desc,
                              unsigned PadTo) const {
   if (isVerbose() && Desc)
     OutStreamer->AddComment(Desc);
 
   OutStreamer->EmitULEB128IntValue(Value, PadTo);
-}
-
-/// EmitCFAByte - Emit a .byte 42 directive for a DW_CFA_xxx value.
-void AsmPrinter::EmitCFAByte(unsigned Val) const {
-  if (isVerbose()) {
-    if (Val >= dwarf::DW_CFA_offset && Val < dwarf::DW_CFA_offset + 64)
-      OutStreamer->AddComment("DW_CFA_offset + Reg (" +
-                              Twine(Val - dwarf::DW_CFA_offset) + ")");
-    else
-      OutStreamer->AddComment(dwarf::CallFrameString(Val));
-  }
-  OutStreamer->EmitIntValue(Val, 1);
 }
 
 static const char *DecodeDWARFEncoding(unsigned Encoding) {
@@ -134,7 +122,7 @@ unsigned AsmPrinter::GetSizeOfEncodedValue(unsigned Encoding) const {
   default:
     llvm_unreachable("Invalid encoded value.");
   case dwarf::DW_EH_PE_absptr:
-    return TM.getDataLayout()->getPointerSize();
+    return MF->getDataLayout().getPointerSize();
   case dwarf::DW_EH_PE_udata2:
     return 2;
   case dwarf::DW_EH_PE_udata4:
@@ -150,8 +138,7 @@ void AsmPrinter::EmitTTypeReference(const GlobalValue *GV,
     const TargetLoweringObjectFile &TLOF = getObjFileLowering();
 
     const MCExpr *Exp =
-        TLOF.getTTypeGlobalReference(GV, Encoding, *Mang, TM, MMI,
-                                     *OutStreamer);
+        TLOF.getTTypeGlobalReference(GV, Encoding, TM, MMI, *OutStreamer);
     OutStreamer->EmitValue(Exp, GetSizeOfEncodedValue(Encoding));
   } else
     OutStreamer->EmitIntValue(0, GetSizeOfEncodedValue(Encoding));
@@ -162,7 +149,7 @@ void AsmPrinter::emitDwarfSymbolReference(const MCSymbol *Label,
   if (!ForceOffset) {
     // On COFF targets, we have to emit the special .secrel32 directive.
     if (MAI->needsDwarfSectionOffsetDirective()) {
-      OutStreamer->EmitCOFFSecRel32(Label);
+      OutStreamer->EmitCOFFSecRel32(Label, /*Offset=*/0);
       return;
     }
 
@@ -187,36 +174,6 @@ void AsmPrinter::emitDwarfStringOffset(DwarfStringPoolEntryRef S) const {
   EmitInt32(S.getOffset());
 }
 
-/// EmitDwarfRegOp - Emit dwarf register operation.
-void AsmPrinter::EmitDwarfRegOp(ByteStreamer &Streamer,
-                                const MachineLocation &MLoc) const {
-  DebugLocDwarfExpression Expr(*MF->getSubtarget().getRegisterInfo(),
-                               getDwarfDebug()->getDwarfVersion(), Streamer);
-  const MCRegisterInfo *MRI = MMI->getContext().getRegisterInfo();
-  int Reg = MRI->getDwarfRegNum(MLoc.getReg(), false);
-  if (Reg < 0) {
-    // We assume that pointers are always in an addressable register.
-    if (MLoc.isIndirect())
-      // FIXME: We have no reasonable way of handling errors in here. The
-      // caller might be in the middle of a dwarf expression. We should
-      // probably assert that Reg >= 0 once debug info generation is more
-      // mature.
-      return Expr.EmitOp(dwarf::DW_OP_nop,
-                         "nop (could not find a dwarf register number)");
-
-    // Attempt to find a valid super- or sub-register.
-    if (!Expr.AddMachineRegPiece(MLoc.getReg()))
-      Expr.EmitOp(dwarf::DW_OP_nop,
-                  "nop (could not find a dwarf register number)");
-    return;
-  }
-
-  if (MLoc.isIndirect())
-    Expr.AddRegIndirect(Reg, MLoc.getOffset());
-  else
-    Expr.AddReg(Reg);
-}
-
 //===----------------------------------------------------------------------===//
 // Dwarf Lowering Routines
 //===----------------------------------------------------------------------===//
@@ -227,6 +184,9 @@ void AsmPrinter::emitCFIInstruction(const MCCFIInstruction &Inst) const {
     llvm_unreachable("Unexpected instruction");
   case MCCFIInstruction::OpDefCfaOffset:
     OutStreamer->EmitCFIDefCfaOffset(Inst.getOffset());
+    break;
+  case MCCFIInstruction::OpAdjustCfaOffset:
+    OutStreamer->EmitCFIAdjustCfaOffset(Inst.getOffset());
     break;
   case MCCFIInstruction::OpDefCfa:
     OutStreamer->EmitCFIDefCfa(Inst.getRegister(), Inst.getOffset());
@@ -245,6 +205,12 @@ void AsmPrinter::emitCFIInstruction(const MCCFIInstruction &Inst) const {
     break;
   case MCCFIInstruction::OpSameValue:
     OutStreamer->EmitCFISameValue(Inst.getRegister());
+    break;
+  case MCCFIInstruction::OpGnuArgsSize:
+    OutStreamer->EmitCFIGnuArgsSize(Inst.getOffset());
+    break;
+  case MCCFIInstruction::OpEscape:
+    OutStreamer->EmitCFIEscape(Inst.getValues());
     break;
   }
 }
@@ -284,17 +250,10 @@ void AsmPrinter::emitDwarfDIE(const DIE &Die) const {
   }
 }
 
-void
-AsmPrinter::emitDwarfAbbrevs(const std::vector<DIEAbbrev *>& Abbrevs) const {
-  // For each abbrevation.
-  for (const DIEAbbrev *Abbrev : Abbrevs) {
-    // Emit the abbrevations code (base 1 index.)
-    EmitULEB128(Abbrev->getNumber(), "Abbreviation Code");
+void AsmPrinter::emitDwarfAbbrev(const DIEAbbrev &Abbrev) const {
+  // Emit the abbreviations code (base 1 index.)
+  EmitULEB128(Abbrev.getNumber(), "Abbreviation Code");
 
-    // Emit the abbreviations data.
-    Abbrev->Emit(this);
-  }
-
-  // Mark end of abbreviations.
-  EmitULEB128(0, "EOM(3)");
+  // Emit the abbreviations data.
+  Abbrev.Emit(this);
 }

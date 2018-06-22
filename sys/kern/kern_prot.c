@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1989, 1990, 1991, 1993
  *	The Regents of the University of California.
  * (c) UNIX System Laboratories, Inc.
@@ -18,7 +20,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -74,11 +76,6 @@ __FBSDID("$FreeBSD$");
 #ifdef REGRESSION
 FEATURE(regression,
     "Kernel support for interfaces necessary for regression testing (SECURITY RISK!)");
-#endif
-
-#if defined(INET) || defined(INET6)
-#include <netinet/in.h>
-#include <netinet/in_pcb.h>
 #endif
 
 #include <security/audit/audit.h>
@@ -164,7 +161,7 @@ sys_getpgrp(struct thread *td, struct getpgrp_args *uap)
 	return (0);
 }
 
-/* Get an arbitary pid's process group id */
+/* Get an arbitrary pid's process group id */
 #ifndef _SYS_SYSPROTO_H_
 struct getpgid_args {
 	pid_t	pid;
@@ -195,7 +192,7 @@ sys_getpgid(struct thread *td, struct getpgid_args *uap)
 }
 
 /*
- * Get an arbitary pid's session id.
+ * Get an arbitrary pid's session id.
  */
 #ifndef _SYS_SYSPROTO_H_
 struct getsid_args {
@@ -300,7 +297,15 @@ struct getgroups_args {
 };
 #endif
 int
-sys_getgroups(struct thread *td, register struct getgroups_args *uap)
+sys_getgroups(struct thread *td, struct getgroups_args *uap)
+{
+
+	return (kern_getgroups(td, uap->gidsetsize,
+	    __USER_CAP_ARRAY(uap->gidset, uap->gidsetsize)));
+}
+
+int
+kern_getgroups(struct thread *td, u_int gidsetsize, gid_t * __capability gidset)
 {
 	struct ucred *cred;
 	u_int ngrp;
@@ -309,14 +314,15 @@ sys_getgroups(struct thread *td, register struct getgroups_args *uap)
 	cred = td->td_ucred;
 	ngrp = cred->cr_ngroups;
 
-	if (uap->gidsetsize == 0) {
+	if (gidsetsize == 0) {
 		error = 0;
 		goto out;
 	}
-	if (uap->gidsetsize < ngrp)
+	if (gidsetsize < ngrp)
 		return (EINVAL);
 
-	error = copyout(cred->cr_groups, uap->gidset, ngrp * sizeof(gid_t));
+	error = copyout_c((__cheri_tocap gid_t * __capability)cred->cr_groups,
+	    gidset, ngrp * sizeof(gid_t));
 out:
 	td->td_retval[0] = ngrp;
 	return (error);
@@ -329,7 +335,7 @@ struct setsid_args {
 #endif
 /* ARGSUSED */
 int
-sys_setsid(register struct thread *td, struct setsid_args *uap)
+sys_setsid(struct thread *td, struct setsid_args *uap)
 {
 	struct pgrp *pgrp;
 	int error;
@@ -387,11 +393,11 @@ struct setpgid_args {
 #endif
 /* ARGSUSED */
 int
-sys_setpgid(struct thread *td, register struct setpgid_args *uap)
+sys_setpgid(struct thread *td, struct setpgid_args *uap)
 {
 	struct proc *curp = td->td_proc;
-	register struct proc *targp;	/* target process */
-	register struct pgrp *pgrp;	/* target pgrp */
+	struct proc *targp;	/* target process */
+	struct pgrp *pgrp;	/* target pgrp */
 	int error;
 	struct pgrp *newpgrp;
 
@@ -882,7 +888,7 @@ struct setreuid_args {
 #endif
 /* ARGSUSED */
 int
-sys_setreuid(register struct thread *td, struct setreuid_args *uap)
+sys_setreuid(struct thread *td, struct setreuid_args *uap)
 {
 	struct proc *p = td->td_proc;
 	struct ucred *newcred, *oldcred;
@@ -952,7 +958,7 @@ struct setregid_args {
 #endif
 /* ARGSUSED */
 int
-sys_setregid(register struct thread *td, struct setregid_args *uap)
+sys_setregid(struct thread *td, struct setregid_args *uap)
 {
 	struct proc *p = td->td_proc;
 	struct ucred *newcred, *oldcred;
@@ -1017,7 +1023,7 @@ struct setresuid_args {
 #endif
 /* ARGSUSED */
 int
-sys_setresuid(register struct thread *td, struct setresuid_args *uap)
+sys_setresuid(struct thread *td, struct setresuid_args *uap)
 {
 	struct proc *p = td->td_proc;
 	struct ucred *newcred, *oldcred;
@@ -1099,7 +1105,7 @@ struct setresgid_args {
 #endif
 /* ARGSUSED */
 int
-sys_setresgid(register struct thread *td, struct setresgid_args *uap)
+sys_setresgid(struct thread *td, struct setresgid_args *uap)
 {
 	struct proc *p = td->td_proc;
 	struct ucred *newcred, *oldcred;
@@ -1166,21 +1172,33 @@ struct getresuid_args {
 #endif
 /* ARGSUSED */
 int
-sys_getresuid(register struct thread *td, struct getresuid_args *uap)
+sys_getresuid(struct thread *td, struct getresuid_args *uap)
+{
+
+	return (kern_getresuid(td, __USER_CAP_OBJ(uap->ruid),
+	    __USER_CAP_OBJ(uap->euid), __USER_CAP_OBJ(uap->suid)));
+}
+
+int
+kern_getresuid(struct thread *td, uid_t * __capability ruid,
+    uid_t * __capability euid, uid_t * __capability suid)
 {
 	struct ucred *cred;
 	int error1 = 0, error2 = 0, error3 = 0;
 
 	cred = td->td_ucred;
-	if (uap->ruid)
-		error1 = copyout(&cred->cr_ruid,
-		    uap->ruid, sizeof(cred->cr_ruid));
-	if (uap->euid)
-		error2 = copyout(&cred->cr_uid,
-		    uap->euid, sizeof(cred->cr_uid));
-	if (uap->suid)
-		error3 = copyout(&cred->cr_svuid,
-		    uap->suid, sizeof(cred->cr_svuid));
+	if (ruid)
+		error1 = copyout_c(
+		    (__cheri_tocap uid_t * __capability)&cred->cr_ruid,
+		    ruid, sizeof(cred->cr_ruid));
+	if (euid)
+		error2 = copyout_c(
+		    (__cheri_tocap uid_t * __capability)&cred->cr_uid,
+		    euid, sizeof(cred->cr_uid));
+	if (suid)
+		error3 = copyout_c(
+		    (__cheri_tocap uid_t * __capability)&cred->cr_svuid,
+		    suid, sizeof(cred->cr_svuid));
 	return (error1 ? error1 : error2 ? error2 : error3);
 }
 
@@ -1193,21 +1211,33 @@ struct getresgid_args {
 #endif
 /* ARGSUSED */
 int
-sys_getresgid(register struct thread *td, struct getresgid_args *uap)
+sys_getresgid(struct thread *td, struct getresgid_args *uap)
+{
+
+	return (kern_getresgid(td, __USER_CAP_OBJ(uap->rgid),
+	    __USER_CAP_OBJ(uap->egid), __USER_CAP_OBJ(uap->sgid)));
+}
+
+int
+kern_getresgid(struct thread *td, gid_t * __capability rgid,
+    gid_t * __capability egid, gid_t * __capability sgid)
 {
 	struct ucred *cred;
 	int error1 = 0, error2 = 0, error3 = 0;
 
 	cred = td->td_ucred;
-	if (uap->rgid)
-		error1 = copyout(&cred->cr_rgid,
-		    uap->rgid, sizeof(cred->cr_rgid));
-	if (uap->egid)
-		error2 = copyout(&cred->cr_groups[0],
-		    uap->egid, sizeof(cred->cr_groups[0]));
-	if (uap->sgid)
-		error3 = copyout(&cred->cr_svgid,
-		    uap->sgid, sizeof(cred->cr_svgid));
+	if (rgid)
+		error1 = copyout_c(
+		    (__cheri_tocap gid_t * __capability)&cred->cr_rgid,
+		    rgid, sizeof(cred->cr_rgid));
+	if (egid)
+		error2 = copyout_c(
+		    (__cheri_tocap gid_t * __capability)&cred->cr_groups[0],
+		    egid, sizeof(cred->cr_groups[0]));
+	if (sgid)
+		error3 = copyout_c(
+		    (__cheri_tocap gid_t * __capability)&cred->cr_svgid,
+		    sgid, sizeof(cred->cr_svgid));
 	return (error1 ? error1 : error2 ? error2 : error3);
 }
 
@@ -1218,7 +1248,7 @@ struct issetugid_args {
 #endif
 /* ARGSUSED */
 int
-sys_issetugid(register struct thread *td, struct issetugid_args *uap)
+sys_issetugid(struct thread *td, struct issetugid_args *uap)
 {
 	struct proc *p = td->td_proc;
 
@@ -1230,9 +1260,7 @@ sys_issetugid(register struct thread *td, struct issetugid_args *uap)
 	 * a user without an exec - programs cannot know *everything*
 	 * that libc *might* have put in their data segment.
 	 */
-	PROC_LOCK(p);
 	td->td_retval[0] = (p->p_flag & P_SUGID) ? 1 : 0;
-	PROC_UNLOCK(p);
 	return (0);
 }
 
@@ -1342,8 +1370,8 @@ SYSCTL_INT(_security_bsd, OID_AUTO, see_other_uids, CTLFLAG_RW,
  * References: *u1 and *u2 must not change during the call
  *             u1 may equal u2, in which case only one reference is required
  */
-static int
-cr_seeotheruids(struct ucred *u1, struct ucred *u2)
+int
+cr_canseeotheruids(struct ucred *u1, struct ucred *u2)
 {
 
 	if (!see_other_uids && u1->cr_ruid != u2->cr_ruid) {
@@ -1372,8 +1400,8 @@ SYSCTL_INT(_security_bsd, OID_AUTO, see_other_gids, CTLFLAG_RW,
  * References: *u1 and *u2 must not change during the call
  *             u1 may equal u2, in which case only one reference is required
  */
-static int
-cr_seeothergids(struct ucred *u1, struct ucred *u2)
+int
+cr_canseeothergids(struct ucred *u1, struct ucred *u2)
 {
 	int i, match;
 	
@@ -1391,6 +1419,35 @@ cr_seeothergids(struct ucred *u1, struct ucred *u2)
 		}
 	}
 	return (0);
+}
+
+/*
+ * 'see_jail_proc' determines whether or not visibility of processes and
+ * sockets with credentials holding different jail ids is possible using a
+ * variety of system MIBs.
+ *
+ * XXX: data declarations should be together near the beginning of the file.
+ */
+
+static int	see_jail_proc = 1;
+SYSCTL_INT(_security_bsd, OID_AUTO, see_jail_proc, CTLFLAG_RW,
+    &see_jail_proc, 0,
+    "Unprivileged processes may see subjects/objects with different jail ids");
+
+/*-
+ * Determine if u1 "can see" the subject specified by u2, according to the
+ * 'see_jail_proc' policy.
+ * Returns: 0 for permitted, ESRCH otherwise
+ * Locks: none
+ * References: *u1 and *u2 must not change during the call
+ *             u1 may equal u2, in which case only one reference is required
+ */
+int
+cr_canseejailproc(struct ucred *u1, struct ucred *u2)
+{
+	if (u1->cr_uid == 0)
+		return (0);
+	return (!see_jail_proc && u1->cr_prison != u2->cr_prison ? ESRCH : 0);
 }
 
 /*-
@@ -1411,9 +1468,11 @@ cr_cansee(struct ucred *u1, struct ucred *u2)
 	if ((error = mac_cred_check_visible(u1, u2)))
 		return (error);
 #endif
-	if ((error = cr_seeotheruids(u1, u2)))
+	if ((error = cr_canseeotheruids(u1, u2)))
 		return (error);
-	if ((error = cr_seeothergids(u1, u2)))
+	if ((error = cr_canseeothergids(u1, u2)))
+		return (error);
+	if ((error = cr_canseejailproc(u1, u2)))
 		return (error);
 	return (0);
 }
@@ -1472,9 +1531,9 @@ cr_cansignal(struct ucred *cred, struct proc *proc, int signum)
 	if ((error = mac_proc_check_signal(cred, proc, signum)))
 		return (error);
 #endif
-	if ((error = cr_seeotheruids(cred, proc->p_ucred)))
+	if ((error = cr_canseeotheruids(cred, proc->p_ucred)))
 		return (error);
-	if ((error = cr_seeothergids(cred, proc->p_ucred)))
+	if ((error = cr_canseeothergids(cred, proc->p_ucred)))
 		return (error);
 
 	/*
@@ -1589,9 +1648,9 @@ p_cansched(struct thread *td, struct proc *p)
 	if ((error = mac_proc_check_sched(td->td_ucred, p)))
 		return (error);
 #endif
-	if ((error = cr_seeotheruids(td->td_ucred, p->p_ucred)))
+	if ((error = cr_canseeotheruids(td->td_ucred, p->p_ucred)))
 		return (error);
-	if ((error = cr_seeothergids(td->td_ucred, p->p_ucred)))
+	if ((error = cr_canseeothergids(td->td_ucred, p->p_ucred)))
 		return (error);
 	if (td->td_ucred->cr_ruid != p->p_ucred->cr_ruid &&
 	    td->td_ucred->cr_uid != p->p_ucred->cr_ruid) {
@@ -1646,9 +1705,9 @@ p_candebug(struct thread *td, struct proc *p)
 	if ((error = mac_proc_check_debug(td->td_ucred, p)))
 		return (error);
 #endif
-	if ((error = cr_seeotheruids(td->td_ucred, p->p_ucred)))
+	if ((error = cr_canseeotheruids(td->td_ucred, p->p_ucred)))
 		return (error);
-	if ((error = cr_seeothergids(td->td_ucred, p->p_ucred)))
+	if ((error = cr_canseeothergids(td->td_ucred, p->p_ucred)))
 		return (error);
 
 	/*
@@ -1740,41 +1799,13 @@ cr_canseesocket(struct ucred *cred, struct socket *so)
 	if (error)
 		return (error);
 #endif
-	if (cr_seeotheruids(cred, so->so_cred))
+	if (cr_canseeotheruids(cred, so->so_cred))
 		return (ENOENT);
-	if (cr_seeothergids(cred, so->so_cred))
-		return (ENOENT);
-
-	return (0);
-}
-
-#if defined(INET) || defined(INET6)
-/*-
- * Determine whether the subject represented by cred can "see" a socket.
- * Returns: 0 for permitted, ENOENT otherwise.
- */
-int
-cr_canseeinpcb(struct ucred *cred, struct inpcb *inp)
-{
-	int error;
-
-	error = prison_check(cred, inp->inp_cred);
-	if (error)
-		return (ENOENT);
-#ifdef MAC
-	INP_LOCK_ASSERT(inp);
-	error = mac_inpcb_check_visible(cred, inp);
-	if (error)
-		return (error);
-#endif
-	if (cr_seeotheruids(cred, inp->inp_cred))
-		return (ENOENT);
-	if (cr_seeothergids(cred, inp->inp_cred))
+	if (cr_canseeothergids(cred, so->so_cred))
 		return (ENOENT);
 
 	return (0);
 }
-#endif
 
 /*-
  * Determine whether td can wait for the exit of p.
@@ -1800,7 +1831,7 @@ p_canwait(struct thread *td, struct proc *p)
 #endif
 #if 0
 	/* XXXMAC: This could have odd effects on some shells. */
-	if ((error = cr_seeotheruids(td->td_ucred, p->p_ucred)))
+	if ((error = cr_canseeotheruids(td->td_ucred, p->p_ucred)))
 		return (error);
 #endif
 
@@ -1813,7 +1844,7 @@ p_canwait(struct thread *td, struct proc *p)
 struct ucred *
 crget(void)
 {
-	register struct ucred *cr;
+	struct ucred *cr;
 
 	cr = malloc(sizeof(*cr), M_CRED, M_WAITOK | M_ZERO);
 	refcount_init(&cr->cr_ref, 1);
@@ -2095,20 +2126,29 @@ struct getlogin_args {
 int
 sys_getlogin(struct thread *td, struct getlogin_args *uap)
 {
+
+	return (kern_getlogin(td, __USER_CAP(uap->namebuf, uap->namelen),
+	    uap->namelen));
+}
+
+int
+kern_getlogin(struct thread *td, char * __capability namebuf, u_int namelen)
+{
 	char login[MAXLOGNAME];
 	struct proc *p = td->td_proc;
 	size_t len;
 
-	if (uap->namelen > MAXLOGNAME)
-		uap->namelen = MAXLOGNAME;
+	if (namelen > MAXLOGNAME)
+		namelen = MAXLOGNAME;
 	PROC_LOCK(p);
 	SESS_LOCK(p->p_session);
-	len = strlcpy(login, p->p_session->s_login, uap->namelen) + 1;
+	len = strlcpy(login, p->p_session->s_login, namelen) + 1;
 	SESS_UNLOCK(p->p_session);
 	PROC_UNLOCK(p);
-	if (len > uap->namelen)
+	if (len > namelen)
 		return (ERANGE);
-	return (copyout(login, uap->namebuf, len));
+	/* XXX: CTSRD-CHERI/clang#179 */
+	return (copyout_c(&login[0], namebuf, len));
 }
 
 /*
@@ -2123,6 +2163,13 @@ struct setlogin_args {
 int
 sys_setlogin(struct thread *td, struct setlogin_args *uap)
 {
+
+	return (kern_setlogin(td, __USER_CAP_STR(uap->namebuf)));
+}
+
+int
+kern_setlogin(struct thread *td, const char * __capability namebuf)
+{
 	struct proc *p = td->td_proc;
 	int error;
 	char logintmp[MAXLOGNAME];
@@ -2132,12 +2179,13 @@ sys_setlogin(struct thread *td, struct setlogin_args *uap)
 	error = priv_check(td, PRIV_PROC_SETLOGIN);
 	if (error)
 		return (error);
-	error = copyinstr(uap->namebuf, logintmp, sizeof(logintmp), NULL);
+	error = copyinstr_c(namebuf, &logintmp[0], sizeof(logintmp), NULL);
 	if (error != 0) {
 		if (error == ENAMETOOLONG)
 			error = EINVAL;
 		return (error);
 	}
+	AUDIT_ARG_LOGIN(logintmp);
 	PROC_LOCK(p);
 	SESS_LOCK(p->p_session);
 	strcpy(p->p_session->s_login, logintmp);

@@ -2,6 +2,8 @@
 /*	$FreeBSD$ */
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ *
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -95,6 +97,7 @@ __FBSDID("$FreeBSD$");
 static int uaudio_default_rate = 0;		/* use rate list */
 static int uaudio_default_bits = 32;
 static int uaudio_default_channels = 0;		/* use default */
+static int uaudio_buffer_ms = 8;
 
 #ifdef USB_DEBUG
 static int uaudio_debug = 0;
@@ -109,9 +112,32 @@ SYSCTL_INT(_hw_usb_uaudio, OID_AUTO, default_bits, CTLFLAG_RWTUN,
     &uaudio_default_bits, 0, "uaudio default sample bits");
 SYSCTL_INT(_hw_usb_uaudio, OID_AUTO, default_channels, CTLFLAG_RWTUN,
     &uaudio_default_channels, 0, "uaudio default sample channels");
+
+static int
+uaudio_buffer_ms_sysctl(SYSCTL_HANDLER_ARGS)
+{
+	int err, val;
+
+	val = uaudio_buffer_ms;
+	err = sysctl_handle_int(oidp, &val, 0, req);
+
+	if (err != 0 || req->newptr == NULL || val == uaudio_buffer_ms)
+		return (err);
+
+	if (val > 8)
+		val = 8;
+	else if (val < 2)
+		val = 2;
+
+	uaudio_buffer_ms = val;
+
+	return (0);
+}
+SYSCTL_PROC(_hw_usb_uaudio, OID_AUTO, buffer_ms, CTLTYPE_INT | CTLFLAG_RWTUN,
+    0, sizeof(int), uaudio_buffer_ms_sysctl, "I",
+    "uaudio buffering delay from 2ms to 8ms");
 #endif
 
-#define	UAUDIO_IRQS	(8000 / UAUDIO_NFRAMES)	/* interrupts per second */
 #define	UAUDIO_NFRAMES		64	/* must be factor of 8 due HS-USB */
 #define	UAUDIO_NCHANBUFS	2	/* number of outstanding request */
 #define	UAUDIO_RECURSE_LIMIT	255	/* rounds */
@@ -313,6 +339,11 @@ struct uaudio_hid {
 	uint8_t mute_id;
 };
 
+#define	UAUDIO_SPDIF_OUT	0x01	/* Enable S/PDIF output */
+#define	UAUDIO_SPDIF_OUT_48K	0x02	/* Out sample rate = 48K */
+#define	UAUDIO_SPDIF_OUT_96K	0x04	/* Out sample rate = 96K */
+#define	UAUDIO_SPDIF_IN_MIX	0x10	/* Input mix enable */
+
 struct uaudio_softc {
 	struct sbuf sc_sndstat;
 	struct sndcard_func sc_sndcard_func;
@@ -330,6 +361,7 @@ struct uaudio_softc {
 	struct usb_xfer *sc_mixer_xfer[1];
 	struct uaudio_mixer_node *sc_mixer_root;
 	struct uaudio_mixer_node *sc_mixer_curr;
+	int     (*sc_set_spdif_fn) (struct uaudio_softc *, int);
 
 	uint32_t sc_mix_info;
 	uint32_t sc_recsrc_info;
@@ -657,6 +689,7 @@ static const struct usb_config
 		.endpoint = UE_ADDR_ANY,
 		.direction = UE_DIR_OUT,
 		.bufsize = UMIDI_TX_BUFFER,
+		.flags = {.no_pipe_ok = 1},
 		.callback = &umidi_bulk_write_callback,
 	},
 
@@ -665,7 +698,7 @@ static const struct usb_config
 		.endpoint = UE_ADDR_ANY,
 		.direction = UE_DIR_IN,
 		.bufsize = 4,	/* bytes */
-		.flags = {.short_xfer_ok = 1,.proxy_buffer = 1,},
+		.flags = {.short_xfer_ok = 1,.proxy_buffer = 1,.no_pipe_ok = 1},
 		.callback = &umidi_bulk_read_callback,
 	},
 };
@@ -860,6 +893,46 @@ uaudio_probe(device_t dev)
 	return (ENXIO);
 }
 
+/*
+ * Set Cmedia CM6206 S/PDIF settings
+ * Source: CM6206 Datasheet v2.3.
+ */
+static int
+uaudio_set_spdif_cm6206(struct uaudio_softc *sc, int flags)
+{
+	uint8_t cmd[2][4] = {
+		{0x20, 0x20, 0x00, 0},
+		{0x20, 0x30, 0x02, 1}
+	};
+	int i;
+
+	if (flags & UAUDIO_SPDIF_OUT)
+		cmd[1][1] = 0x00;
+	else
+		cmd[1][1] = 0x02;
+
+	if (flags & UAUDIO_SPDIF_OUT_96K)
+		cmd[0][1] = 0x60;	/* 96K: 3'b110 */
+
+	if (flags & UAUDIO_SPDIF_IN_MIX)
+		cmd[1][1] = 0x03;	/* SPDIFMIX */
+
+	for (i = 0; i < 2; i++) {
+		if (usbd_req_set_report(sc->sc_udev, NULL,
+		    cmd[i], sizeof(cmd[0]),
+		    sc->sc_mixer_iface_index, UHID_OUTPUT_REPORT, 0) != 0) {
+			return (ENXIO);
+		}
+	}
+	return (0);
+}
+
+static int
+uaudio_set_spdif_dummy(struct uaudio_softc *sc, int flags)
+{
+	return (0);
+}
+
 static int
 uaudio_attach(device_t dev)
 {
@@ -893,6 +966,12 @@ uaudio_attach(device_t dev)
 
 	if (usb_test_quirk(uaa, UQ_AU_VENDOR_CLASS))
 		sc->sc_uq_au_vendor_class = 1;
+
+	/* set S/PDIF function */
+	if (usb_test_quirk(uaa, UQ_AU_SET_SPDIF_CM6206))
+		sc->sc_set_spdif_fn = uaudio_set_spdif_cm6206;
+	else
+		sc->sc_set_spdif_fn = uaudio_set_spdif_dummy;
 
 	umidi_init(dev);
 
@@ -1030,6 +1109,11 @@ uaudio_attach(device_t dev)
 	/* reload all mixer settings */
 	uaudio_mixer_reload_all(sc);
 
+	/* enable S/PDIF output, if any */
+	if (sc->sc_set_spdif_fn(sc,
+	    UAUDIO_SPDIF_OUT | UAUDIO_SPDIF_OUT_48K) != 0) {
+		device_printf(dev, "Failed to enable S/PDIF at 48K\n");
+	}
 	return (0);			/* success */
 
 detach:
@@ -1114,6 +1198,9 @@ uaudio_detach_sub(device_t dev)
 	struct uaudio_softc *sc = device_get_softc(device_get_parent(dev));
 	int error = 0;
 
+	/* disable S/PDIF output, if any */
+	(void) sc->sc_set_spdif_fn(sc, 0);
+
 repeat:
 	if (sc->sc_pcm_registered) {
 		error = pcm_unregister(dev);
@@ -1173,8 +1260,8 @@ uaudio_get_buffer_size(struct uaudio_chan *ch, uint8_t alt)
 {
 	struct uaudio_chan_alt *chan_alt = &ch->usb_alt[alt];
 	/* We use 2 times 8ms of buffer */
-	uint32_t buf_size = (((chan_alt->sample_rate * (UAUDIO_NFRAMES / 8)) +
-	    1000 - 1) / 1000) * chan_alt->sample_size;
+	uint32_t buf_size = chan_alt->sample_size *
+	    howmany(chan_alt->sample_rate * (UAUDIO_NFRAMES / 8), 1000);
 	return (buf_size);
 }
 
@@ -1277,10 +1364,10 @@ uaudio_configure_msg_sub(struct uaudio_softc *sc,
 
 	if (fps < 8000) {
 		/* FULL speed USB */
-		frames = 8;
+		frames = uaudio_buffer_ms;
 	} else {
 		/* HIGH speed USB */
-		frames = UAUDIO_NFRAMES;
+		frames = uaudio_buffer_ms * 8;
 	}
 
 	fps_shift = usbd_xfer_get_fps_shift(chan->xfer[0]);
@@ -1292,8 +1379,8 @@ uaudio_configure_msg_sub(struct uaudio_softc *sc,
 	/* bytes per frame should not be zero */
 	chan->bytes_per_frame[0] =
 	    ((chan_alt->sample_rate / fps) * chan_alt->sample_size);
-	chan->bytes_per_frame[1] =
-	    (((chan_alt->sample_rate + fps - 1) / fps) * chan_alt->sample_size);
+	chan->bytes_per_frame[1] = howmany(chan_alt->sample_rate, fps) *
+	    chan_alt->sample_size;
 
 	/* setup data rate dithering, if any */
 	chan->frames_per_second = fps;
@@ -2053,9 +2140,23 @@ uaudio_chan_play_sync_callback(struct usb_xfer *xfer, usb_error_t error)
 		 * Use feedback value as fallback when there is no
 		 * recording channel:
 		 */
-		if (ch->priv_sc->sc_rec_chan.num_alt == 0)
-			ch->jitter_curr = temp - sample_rate;
+		if (ch->priv_sc->sc_rec_chan.num_alt == 0) {
+			int32_t jitter_max = howmany(sample_rate, 16000);
 
+			/*
+			 * Range check the jitter values to avoid
+			 * bogus sample rate adjustments. The expected
+			 * deviation should not be more than 1Hz per
+			 * second. The USB v2.0 specification also
+			 * mandates this requirement. Refer to chapter
+			 * 5.12.4.2 about feedback.
+			 */
+			ch->jitter_curr = temp - sample_rate;
+			if (ch->jitter_curr > jitter_max)
+				ch->jitter_curr = jitter_max;
+			else if (ch->jitter_curr < -jitter_max)
+				ch->jitter_curr = -jitter_max;
+		}
 		ch->feedback_rate = temp;
 		break;
 
@@ -2157,8 +2258,9 @@ tr_setup:
 		}
 
 		/* start the SYNC transfer one time per second, if any */
-		if (++(ch->intr_counter) >= UAUDIO_IRQS) {
-			ch->intr_counter = 0;
+		ch->intr_counter += ch->intr_frames;
+		if (ch->intr_counter >= ch->frames_per_second) {
+			ch->intr_counter -= ch->frames_per_second;
 			usbd_transfer_start(ch->xfer[UAUDIO_NCHANBUFS]);
 		}
 
@@ -5754,7 +5856,16 @@ umidi_start_write(struct usb_fifo *fifo)
 {
 	struct umidi_chan *chan = usb_fifo_softc(fifo);
 
-	usbd_transfer_start(chan->xfer[UMIDI_TX_TRANSFER]);
+	if (chan->xfer[UMIDI_TX_TRANSFER] == NULL) {
+		uint8_t buf[1];
+		int actlen;
+		do {
+			/* dump data */
+			usb_fifo_get_data_linear(fifo, buf, 1, &actlen, 0);
+		} while (actlen > 0);
+	} else {
+		usbd_transfer_start(chan->xfer[UMIDI_TX_TRANSFER]);
+	}
 }
 
 static void
@@ -5872,6 +5983,11 @@ umidi_probe(device_t dev)
 		DPRINTF("error=%s\n", usbd_errstr(error));
 		goto detach;
 	}
+	if (chan->xfer[UMIDI_TX_TRANSFER] == NULL &&
+	    chan->xfer[UMIDI_RX_TRANSFER] == NULL) {
+		DPRINTF("no BULK or INTERRUPT MIDI endpoint(s) found\n");
+		goto detach;
+	}
 
 	/*
 	 * Some USB MIDI device makers couldn't resist using
@@ -5885,7 +6001,8 @@ umidi_probe(device_t dev)
 	 * and 64-byte maximum packet sizes for full-speed bulk
 	 * endpoints and 512 bytes for high-speed bulk endpoints."
 	 */
-	if (usbd_xfer_maxp_was_clamped(chan->xfer[UMIDI_TX_TRANSFER]))
+	if (chan->xfer[UMIDI_TX_TRANSFER] != NULL &&
+	    usbd_xfer_maxp_was_clamped(chan->xfer[UMIDI_TX_TRANSFER]))
 		chan->single_command = 1;
 
 	if (chan->single_command != 0)

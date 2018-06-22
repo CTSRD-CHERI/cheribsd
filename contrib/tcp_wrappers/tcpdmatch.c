@@ -14,6 +14,16 @@
   *
   * $FreeBSD$
   */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #ifndef lint
 static char sccsid[] = "@(#) tcpdmatch.c 1.5 96/02/11 17:01:36";
@@ -30,11 +40,9 @@ static char sccsid[] = "@(#) tcpdmatch.c 1.5 96/02/11 17:01:36";
 #include <stdio.h>
 #include <syslog.h>
 #include <setjmp.h>
+#include <stdlib.h>
 #include <string.h>
-
-extern void exit();
-extern int optind;
-extern char *optarg;
+#include <unistd.h>
 
 #ifndef	INADDR_NONE
 #define	INADDR_NONE	(-1)		/* XXX should be 0xffffffff */
@@ -50,8 +58,8 @@ extern char *optarg;
 #include "inetcf.h"
 #include "scaffold.h"
 
-static void usage();
-static void tcpdmatch();
+static void usage(char *myname);
+static void tcpdmatch(struct request_info *request);
 
 /* The main program */
 

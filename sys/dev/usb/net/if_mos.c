@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: (BSD-1-Clause AND BSD-4-Clause)
+ *
  * Copyright (c) 2011 Rick van der Zwet <info@rickvanderzwet.nl>
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -418,7 +420,7 @@ mos_write_mcast(struct mos_softc *sc, u_char *hashtbl)
 }
 
 static int
-mos_miibus_readreg(struct device *dev, int phy, int reg)
+mos_miibus_readreg(device_t dev, int phy, int reg)
 {
 	struct mos_softc *sc = device_get_softc(dev);
 	uWord val;
@@ -608,7 +610,7 @@ mos_setmulti(struct usb_ether *ue)
 		if (ifma->ifma_addr->sa_family != AF_LINK) {
 			allmulti = 1;
 			continue;
-		};
+		}
 		h = ether_crc32_be(LLADDR((struct sockaddr_dl *)
 		    ifma->ifma_addr), ETHER_ADDR_LEN) >> 26;
 		hashtbl[h / 8] |= 1 << (h % 8);

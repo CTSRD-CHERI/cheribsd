@@ -90,6 +90,29 @@ do { \
 #define WAR_USB_DISABLE_PLL_LOCK_DETECT(__ah)
 #endif
 
+/*
+ * Note: the below is the version that ships with ath9k.
+ * The original HAL version is above.
+ */
+
+static void
+ar9300_disable_pll_lock_detect(struct ath_hal *ah)
+{
+	/*
+	 * On AR9330 and AR9340 devices, some PHY registers must be
+	 * tuned to gain better stability/performance. These registers
+	 * might be changed while doing wlan reset so the registers must
+	 * be reprogrammed after each reset.
+	 */
+	if (AR_SREV_HORNET(ah) || AR_SREV_WASP(ah)) {
+		HALDEBUG(ah, HAL_DEBUG_RESET, "%s: called\n", __func__);
+		OS_REG_CLR_BIT(ah, AR_PHY_USB_CTRL1, (1 << 20));
+		OS_REG_RMW(ah, AR_PHY_USB_CTRL2,
+		    (1 << 21) | (0xf << 22),
+		    (1 << 21) | (0x3 << 22));
+	}
+}
+
 static inline void
 ar9300_attach_hw_platform(struct ath_hal *ah)
 {
@@ -1850,6 +1873,7 @@ ar9300_set_reset(struct ath_hal *ah, int type)
 
     /* Clear AHB reset */
     OS_REG_WRITE(ah, AR_HOSTIF_REG(ah, AR_RC), 0);
+    ar9300_disable_pll_lock_detect(ah);
 
     ar9300_attach_hw_platform(ah);
 
@@ -1984,6 +2008,7 @@ ar9300_phy_disable(struct ath_hal *ah)
 
 
     ar9300_init_pll(ah, AH_NULL);
+    ar9300_disable_pll_lock_detect(ah);
 
     return AH_TRUE;
 }
@@ -3000,7 +3025,7 @@ ar9300_process_ini(struct ath_hal *ah, struct ieee80211_channel *chan,
         ar9300_prog_ini(ah, &ahp->ah_ini_mac[i], modes_index);
         ar9300_prog_ini(ah, &ahp->ah_ini_bb[i], modes_index);
         ar9300_prog_ini(ah, &ahp->ah_ini_radio[i], modes_index);
-        if ((i == ATH_INI_POST) && (AR_SREV_JUPITER_20(ah) || AR_SREV_APHRODITE(ah))) {
+        if ((i == ATH_INI_POST) && (AR_SREV_JUPITER_20_OR_LATER(ah) || AR_SREV_APHRODITE(ah))) {
             ar9300_prog_ini(ah, &ahp->ah_ini_radio_post_sys2ant, modes_index);
         }
 
@@ -3052,6 +3077,26 @@ ar9300_process_ini(struct ath_hal *ah, struct ieee80211_channel *chan,
     /* Write rxgain Array Parameters */
     REG_WRITE_ARRAY(&ahp->ah_ini_modes_rxgain, 1, reg_writes);
     HALDEBUG(ah, HAL_DEBUG_RESET, "ar9300_process_ini: Rx Gain programming\n");
+
+    if (AR_SREV_JUPITER_20_OR_LATER(ah)) {
+        /*
+         * CUS217 mix LNA mode.
+         */
+        if (ar9300_rx_gain_index_get(ah) == 2) {
+            REG_WRITE_ARRAY(&ahp->ah_ini_modes_rxgain_bb_core, 1, reg_writes);
+            REG_WRITE_ARRAY(&ahp->ah_ini_modes_rxgain_bb_postamble,
+                modes_index, reg_writes);
+        }
+
+        /*
+         * 5G-XLNA
+         */
+        if ((ar9300_rx_gain_index_get(ah) == 2) ||
+            (ar9300_rx_gain_index_get(ah) == 3)) {
+            REG_WRITE_ARRAY(&ahp->ah_ini_modes_rxgain_xlna, modes_index,
+              reg_writes);
+        }
+    }
 
     if (AR_SREV_SCORPION(ah)) {
         /* Write rxgain bounds Array */
@@ -3118,7 +3163,8 @@ ar9300_process_ini(struct ath_hal *ah, struct ieee80211_channel *chan,
     }
 
 #if 0
-    if (AR_SREV_JUPITER_20(ah) || AR_SREV_APHRODITE(ah)) {
+    /* XXX TODO! */
+    if (AR_SREV_JUPITER_20_OR_LATER(ah) || AR_SREV_APHRODITE(ah)) {
         ar9300_prog_ini(ah, &ahp->ah_ini_BTCOEX_MAX_TXPWR, 1);
     }
 #endif
@@ -4242,11 +4288,11 @@ ar9300_init_user_settings(struct ath_hal *ah)
     if (ahp->ah_beacon_rssi_threshold != 0) {
         ar9300_set_hw_beacon_rssi_threshold(ah, ahp->ah_beacon_rssi_threshold);
     }
-#ifdef ATH_SUPPORT_DFS
+//#ifdef ATH_SUPPORT_DFS
     if (ahp->ah_cac_quiet_enabled) {
         ar9300_cac_tx_quiet(ah, 1);
     }
-#endif /* ATH_SUPPORT_DFS */
+//#endif /* ATH_SUPPORT_DFS */
 }
 
 int
@@ -4497,7 +4543,7 @@ ar9300_reset(struct ath_hal *ah, HAL_OPMODE opmode, struct ieee80211_channel *ch
 
 #if ATH_SUPPORT_MCI
     if (AH_PRIVATE(ah)->ah_caps.halMciSupport &&
-        (AR_SREV_JUPITER_20(ah) || AR_SREV_APHRODITE(ah)))
+        (AR_SREV_JUPITER_20_OR_LATER(ah) || AR_SREV_APHRODITE(ah)))
     {
         ar9300_mci_2g5g_changed(ah, IEEE80211_IS_CHAN_2GHZ(chan));
     }
@@ -4753,7 +4799,7 @@ ar9300_reset(struct ath_hal *ah, HAL_OPMODE opmode, struct ieee80211_channel *ch
              * successfully - skip the rest of reset
              */
             if (AH9300(ah)->ah_dma_stuck != AH_TRUE) {
-                WAR_USB_DISABLE_PLL_LOCK_DETECT(ah);
+                ar9300_disable_pll_lock_detect(ah);
 #if ATH_SUPPORT_MCI
                 if (AH_PRIVATE(ah)->ah_caps.halMciSupport && ahp->ah_mci_ready)
                 {
@@ -5329,7 +5375,7 @@ ar9300_reset(struct ath_hal *ah, HAL_OPMODE opmode, struct ieee80211_channel *ch
 #undef REG_WRITE
 #endif  /* ATH_LOW_POWER_ENABLE */
 
-    WAR_USB_DISABLE_PLL_LOCK_DETECT(ah);
+    ar9300_disable_pll_lock_detect(ah);
 
     /* H/W Green TX */
     ar9300_control_signals_for_green_tx_mode(ah);
@@ -5339,6 +5385,9 @@ ar9300_reset(struct ath_hal *ah, HAL_OPMODE opmode, struct ieee80211_channel *ch
     }
 
     ar9300_set_smart_antenna(ah, ahp->ah_smartantenna_enable);
+
+    if (AR_SREV_APHRODITE(ah) && ahp->ah_lna_div_use_bt_ant_enable)
+        OS_REG_SET_BIT(ah, AR_BTCOEX_WL_LNADIV, AR_BTCOEX_WL_LNADIV_FORCE_ON);
 
     if (ahp->ah_skip_rx_iq_cal && !is_scan) {
         /* restore RX Cal result if existing */
@@ -6385,6 +6434,9 @@ ar9300_ant_ctrl_set_lna_div_use_bt_ant(struct ath_hal *ah, HAL_BOOL enable, cons
     struct ath_hal_private *ahpriv = AH_PRIVATE(ah);
     HAL_CAPABILITIES *pcap = &ahpriv->ah_caps;
 
+    HALDEBUG(ah, HAL_DEBUG_RESET | HAL_DEBUG_BT_COEX,
+      "%s: called; enable=%d\n", __func__, enable);
+
     if (AR_SREV_POSEIDON(ah)) {
         // Make sure this scheme is only used for WB225(Astra)
         ahp->ah_lna_div_use_bt_ant_enable = enable;
@@ -6454,10 +6506,35 @@ ar9300_ant_ctrl_set_lna_div_use_bt_ant(struct ath_hal *ah, HAL_BOOL enable, cons
         }
 
         return AH_TRUE;
-    } else {
+    } else if (AR_SREV_APHRODITE(ah)) {
+        ahp->ah_lna_div_use_bt_ant_enable = enable;
+        if (enable) {
+                OS_REG_SET_BIT(ah, AR_PHY_MC_GAIN_CTRL, ANT_DIV_ENABLE);
+                OS_REG_SET_BIT(ah, AR_PHY_MC_GAIN_CTRL, (1 << MULTICHAIN_GAIN_CTRL__ENABLE_ANT_SW_RX_PROT__SHIFT));
+                OS_REG_SET_BIT(ah, AR_PHY_CCK_DETECT, AR_PHY_CCK_DETECT_BB_ENABLE_ANT_FAST_DIV);
+                OS_REG_SET_BIT(ah, AR_PHY_RESTART, RESTART__ENABLE_ANT_FAST_DIV_M2FLAG__MASK);
+                OS_REG_SET_BIT(ah, AR_BTCOEX_WL_LNADIV, AR_BTCOEX_WL_LNADIV_FORCE_ON);
+        } else {
+                OS_REG_CLR_BIT(ah, AR_PHY_MC_GAIN_CTRL, ANT_DIV_ENABLE);
+                OS_REG_CLR_BIT(ah, AR_PHY_MC_GAIN_CTRL, (1 << MULTICHAIN_GAIN_CTRL__ENABLE_ANT_SW_RX_PROT__SHIFT));
+                OS_REG_CLR_BIT(ah, AR_PHY_CCK_DETECT, AR_PHY_CCK_DETECT_BB_ENABLE_ANT_FAST_DIV);
+                OS_REG_CLR_BIT(ah, AR_PHY_RESTART, RESTART__ENABLE_ANT_FAST_DIV_M2FLAG__MASK);
+                OS_REG_CLR_BIT(ah, AR_BTCOEX_WL_LNADIV, AR_BTCOEX_WL_LNADIV_FORCE_ON);
+
+                regval = OS_REG_READ(ah, AR_PHY_MC_GAIN_CTRL);
+                regval &= (~(MULTICHAIN_GAIN_CTRL__ANT_DIV_MAIN_LNACONF__MASK |
+                             MULTICHAIN_GAIN_CTRL__ANT_DIV_ALT_LNACONF__MASK |
+                             MULTICHAIN_GAIN_CTRL__ANT_DIV_ALT_GAINTB__MASK |
+                             MULTICHAIN_GAIN_CTRL__ANT_DIV_MAIN_GAINTB__MASK));
+                regval |= (HAL_ANT_DIV_COMB_LNA1 <<
+                           MULTICHAIN_GAIN_CTRL__ANT_DIV_MAIN_LNACONF__SHIFT);
+                regval |= (HAL_ANT_DIV_COMB_LNA2 <<
+                           MULTICHAIN_GAIN_CTRL__ANT_DIV_ALT_LNACONF__SHIFT);
+ 
+                OS_REG_WRITE(ah, AR_PHY_MC_GAIN_CTRL, regval);
+        }
         return AH_TRUE;
     }
-
-    /* XXX TODO: Add AR9565 support? */
+    return AH_TRUE;
 }
 #endif /* ATH_ANT_DIV_COMB */

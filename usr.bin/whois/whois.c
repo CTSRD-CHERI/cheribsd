@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1980, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -101,6 +103,7 @@ static struct {
 	{ "-RIPE", RNICHOST },
 	/* Nominet's whois server doesn't return referrals to JANET */
 	{ ".ac.uk", "ac.uk" QNICHOST_TAIL },
+	{ ".gov.uk", "ac.uk" QNICHOST_TAIL },
 	{ "", IANAHOST }, /* default */
 	{ NULL, NULL } /* safety belt */
 };
@@ -114,8 +117,41 @@ static struct {
 	WHOIS_REFERRAL("Whois Server:"),
 	WHOIS_REFERRAL("Registrar WHOIS Server:"), /* corporatedomains.com */
 	WHOIS_REFERRAL("ReferralServer:  whois://"), /* ARIN */
+	WHOIS_REFERRAL("descr:          region. Please query"), /* AfriNIC */
 	{ NULL, 0 }
 };
+
+/*
+ * We have a list of patterns for RIRs that assert ignorance rather than
+ * providing referrals. If that happens, we guess that ARIN will be more
+ * helpful. But, before following a referral to an RIR, we check if we have
+ * asked that RIR already, and if so we make another guess.
+ */
+static const char *actually_arin[] = {
+	"netname:        ERX-NETBLOCK\n", /* APNIC */
+	"netname:        NON-RIPE-NCC-MANAGED-ADDRESS-BLOCK\n",
+	NULL
+};
+
+static struct {
+	int loop;
+	const char *host;
+} try_rir[] = {
+	{ 0, ANICHOST },
+	{ 0, RNICHOST },
+	{ 0, PNICHOST },
+	{ 0, FNICHOST },
+	{ 0, LNICHOST },
+	{ 0, NULL }
+};
+
+static void
+reset_rir(void) {
+	int i;
+
+	for (i = 0; try_rir[i].host != NULL; i++)
+		try_rir[i].loop = 0;
+}
 
 static const char *port = DEFAULT_PORT;
 
@@ -224,6 +260,7 @@ main(int argc, char *argv[])
 		} else
 			whois(*argv, host != NULL ? host :
 			      choose_server(*argv), flags);
+		reset_rir();
 		argv++;
 	}
 	exit(0);
@@ -278,19 +315,15 @@ s_asprintf(char **ret, const char *format, ...)
 	va_end(ap);
 }
 
-static void
-whois(const char *query, const char *hostname, int flags)
+static int
+connect_to_any_host(struct addrinfo *hostres)
 {
-	FILE *fp;
-	struct addrinfo *hostres, *res;
-	char *buf, *host, *nhost, *p;
-	int s = -1, f;
+	struct addrinfo *res;
 	nfds_t i, j;
-	size_t len, count;
+	size_t count;
 	struct pollfd *fds;
-	int timeout = 180;
+	int timeout = 180, s = -1;
 
-	hostres = gethostinfo(hostname, 1);
 	for (res = hostres, count = 0; res; res = res->ai_next)
 		count++;
 	fds = calloc(count, sizeof(*fds));
@@ -313,6 +346,11 @@ whois(const char *query, const char *hostname, int flags)
 				fds[i].fd = s;
 				fds[i].events = POLLERR | POLLHUP |
 						POLLIN | POLLOUT;
+				/*
+				 * From here until a socket connects, the
+				 * socket fd is owned by the fds[] poll array.
+				 */
+				s = -1;
 				count++;
 				i++;
 			} else {
@@ -354,7 +392,7 @@ whois(const char *query, const char *hostname, int flags)
 				 * after a new host have been added.
 				 */
 				if (timeout >= 3)
-					timeout <<= 1;
+					timeout >>= 1;
 
 				break;
 			} else if (n < 0) {
@@ -374,7 +412,7 @@ whois(const char *query, const char *hostname, int flags)
 				    fds[j].revents == 0)
 					continue;
 				if (fds[j].revents & ~(POLLIN | POLLOUT)) {
-					close(s);
+					close(fds[j].fd);
 					fds[j].fd = -1;
 					fds[j].events = 0;
 					count--;
@@ -382,6 +420,7 @@ whois(const char *query, const char *hostname, int flags)
 				} else if (fds[j].revents & (POLLIN | POLLOUT)) {
 					/* Connect succeeded. */
 					s = fds[j].fd;
+					fds[j].fd = -1;
 
 					goto done;
 				}
@@ -394,15 +433,29 @@ whois(const char *query, const char *hostname, int flags)
 	s = -1;
 	if (count == 0)
 		errno = ETIMEDOUT;
-done:
-	if (s == -1)
-		err(EX_OSERR, "connect()");
 
+done:
 	/* Close all watched fds except the succeeded one */
 	for (j = 0; j < i; j++)
-		if (fds[j].fd != s && fds[j].fd != -1)
+		if (fds[j].fd != -1)
 			close(fds[j].fd);
 	free(fds);
+	return (s);
+}
+
+static void
+whois(const char *query, const char *hostname, int flags)
+{
+	FILE *fp;
+	struct addrinfo *hostres;
+	char *buf, *host, *nhost, *p;
+	int comment, s, f;
+	size_t len, i;
+
+	hostres = gethostinfo(hostname, 1);
+	s = connect_to_any_host(hostres);
+	if (s == -1)
+		err(EX_OSERR, "connect()");
 
 	/* Restore default blocking behavior.  */
 	if ((f = fcntl(s, F_GETFL)) == -1)
@@ -431,13 +484,24 @@ done:
 	else if ((flags & WHOIS_SPAM_ME) ||
 		 strchr(query, ' ') != NULL)
 		fprintf(fp, "%s\r\n", query);
-	else if (strcasecmp(hostname, ANICHOST) == 0)
-		fprintf(fp, "+ %s\r\n", query);
-	else if (strcasecmp(hostres->ai_canonname, VNICHOST) == 0)
+	else if (strcasecmp(hostname, ANICHOST) == 0) {
+		if (strncasecmp(query, "AS", 2) == 0 &&
+		    strspn(query+2, "0123456789") == strlen(query+2))
+			fprintf(fp, "+ a %s\r\n", query+2);
+		else
+			fprintf(fp, "+ %s\r\n", query);
+	} else if (strcasecmp(hostres->ai_canonname, VNICHOST) == 0)
 		fprintf(fp, "domain %s\r\n", query);
 	else
 		fprintf(fp, "%s\r\n", query);
 	fflush(fp);
+
+	comment = 0;
+	if (!(flags & WHOIS_SPAM_ME) &&
+	    (strcasecmp(hostname, ANICHOST) == 0 ||
+	     strcasecmp(hostname, RNICHOST) == 0)) {
+		comment = 2;
+	}
 
 	nhost = NULL;
 	while ((buf = fgetln(fp, &len)) != NULL) {
@@ -445,6 +509,15 @@ done:
 		if (!(flags & WHOIS_SPAM_ME) &&
 		    len == 5 && strncmp(buf, "-- \r\n", 5) == 0)
 			break;
+		/* RIRs */
+		if (comment == 1 && buf[0] == '#')
+			break;
+		else if (comment == 2) {
+			if (strchr("#%\r\n", buf[0]) != NULL)
+				continue;
+			else
+				comment = 1;
+		}
 
 		printf("%.*s", (int)len, buf);
 
@@ -459,11 +532,16 @@ done:
 				SCAN(p, buf+len, *p == ' ');
 				host = p;
 				SCAN(p, buf+len, ishost(*p));
-				/* avoid loops */
-				if (strncmp(hostname, host, p - host) != 0)
+				if (p > host)
 					s_asprintf(&nhost, "%.*s",
 						   (int)(p - host), host);
 				break;
+			}
+			for (i = 0; actually_arin[i] != NULL; i++) {
+				if (strncmp(buf, actually_arin[i], len) == 0) {
+					s_asprintf(&nhost, "%s", ANICHOST);
+					break;
+				}
 			}
 		}
 		/* Verisign etc. */
@@ -477,8 +555,37 @@ done:
 	}
 	fclose(fp);
 	freeaddrinfo(hostres);
+
+	f = 0;
+	for (i = 0; try_rir[i].host != NULL; i++) {
+		/* Remember visits to RIRs */
+		if (try_rir[i].loop == 0 &&
+		    strcasecmp(try_rir[i].host, hostname) == 0)
+			try_rir[i].loop = 1;
+		/* Do we need to find an alternative RIR? */
+		if (try_rir[i].loop != 0 && nhost != NULL &&
+		    strcasecmp(try_rir[i].host, nhost) == 0) {
+			    free(nhost);
+			    nhost = NULL;
+			    f = 1;
+		}
+	}
+	if (f) {
+		/* Find a replacement RIR */
+		for (i = 0; try_rir[i].host != NULL; i++) {
+			if (try_rir[i].loop == 0) {
+				s_asprintf(&nhost, "%s",
+					try_rir[i].host);
+				break;
+			}
+		}
+	}
 	if (nhost != NULL) {
-		whois(query, nhost, flags);
+		/* Ignore self-referrals */
+		if (strcasecmp(hostname, nhost) != 0) {
+			printf("# %s\n\n", nhost);
+			whois(query, nhost, flags);
+		}
 		free(nhost);
 	}
 }

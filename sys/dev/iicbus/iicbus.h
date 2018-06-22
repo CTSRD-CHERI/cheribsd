@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1998 Nicolas Souchu
  * All rights reserved.
  *
@@ -39,6 +41,7 @@ struct iicbus_softc
 {
 	device_t dev;		/* Myself */
 	device_t owner;		/* iicbus owner device structure */
+	u_int owncount;		/* iicbus ownership nesting count */
 	u_char started;		/* address of the 'started' slave
 				 * 0 if no start condition succeeded */
 	u_char strict;		/* deny operations that violate the

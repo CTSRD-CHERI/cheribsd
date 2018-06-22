@@ -1,5 +1,7 @@
 /* $FreeBSD$ */
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2008 Hans Petter Selasky. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,7 +35,6 @@
  * This file contains the driver for the Mentor Graphics Inventra USB
  * 2.0 High Speed Dual-Role controller.
  *
- * NOTE: The current implementation only supports Device Side Mode!
  */
 
 #ifdef USB_GLOBAL_INCLUDE_FILE

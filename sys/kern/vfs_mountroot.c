@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2010 Marcel Moolenaar
  * Copyright (c) 1999-2004 Poul-Henning Kamp
  * Copyright (c) 1999 Michael Smith
@@ -18,7 +20,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -47,6 +49,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/jail.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/uio.h>	/* required by mdioctl.h */
 #include <sys/mdioctl.h>
 #include <sys/mount.h>
 #include <sys/mutex.h>
@@ -79,7 +82,7 @@ __FBSDID("$FreeBSD$");
  *
  * If the environment variable vfs.root.mountfrom is a space separated list,
  * each list element is tried in turn and the root filesystem will be mounted
- * from the first one that suceeds.
+ * from the first one that succeeds.
  *
  * The environment variable vfs.root.mountfrom.options is a comma delimited
  * set of string mount options.  These mount options must be parseable
@@ -89,6 +92,7 @@ __FBSDID("$FreeBSD$");
 static int parse_mount(char **);
 static struct mntarg *parse_mountroot_options(struct mntarg *, const char *);
 static int sysctl_vfs_root_mount_hold(SYSCTL_HANDLER_ARGS);
+static void vfs_mountroot_wait(void);
 static int vfs_mountroot_wait_if_neccessary(const char *fs, const char *dev);
 
 /*
@@ -103,6 +107,15 @@ struct vnode *rootvnode;
 struct mount *rootdevmp;
 
 char *rootdevnames[2] = {NULL, NULL};
+
+/*
+ * Hooks into md(4) for mount.conf(8)'s .md support.  Stored here as
+ * this is the only place they are used.  Great care should be taken
+ * when expanding use as crashes may occur if md(4) is unloaded during
+ * calls.
+ */
+int (*kern_mdattach_p)(struct thread *td, struct md_req *mdr);
+int (*kern_mddetach_p)(struct thread *td, struct md_req *mdr);
 
 struct mtx root_holds_mtx;
 MTX_SYSINIT(root_holds, &root_holds_mtx, "root_holds", MTX_DEF);
@@ -130,6 +143,11 @@ static int root_mount_complete;
 /* By default wait up to 3 seconds for devices to appear. */
 static int root_mount_timeout = 3;
 TUNABLE_INT("vfs.mountroot.timeout", &root_mount_timeout);
+
+static int root_mount_always_wait = 0;
+SYSCTL_INT(_vfs, OID_AUTO, root_mount_always_wait, CTLFLAG_RDTUN,
+    &root_mount_always_wait, 0,
+    "Wait for root mount holds even if the root device already exists");
 
 SYSCTL_PROC(_vfs, OID_AUTO, root_mount_hold,
     CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE,
@@ -165,9 +183,6 @@ root_mount_hold(const char *identifier)
 {
 	struct root_hold_token *h;
 
-	if (root_mounted())
-		return (NULL);
-
 	h = malloc(sizeof *h, M_DEVBUF, M_ZERO | M_WAITOK);
 	h->who = identifier;
 	mtx_lock(&root_holds_mtx);
@@ -182,6 +197,7 @@ root_mount_rel(struct root_hold_token *h)
 
 	if (h == NULL)
 		return;
+
 	mtx_lock(&root_holds_mtx);
 	LIST_REMOVE(h, list);
 	wakeup(&root_holds);
@@ -297,9 +313,9 @@ vfs_mountroot_shuffle(struct thread *td, struct mount *mpdevfs)
 	TAILQ_INSERT_TAIL(&mountlist, mpdevfs, mnt_list);
 	mtx_unlock(&mountlist_mtx);
 
-	cache_purgevfs(mporoot);
+	cache_purgevfs(mporoot, true);
 	if (mporoot != mpdevfs)
-		cache_purgevfs(mpdevfs);
+		cache_purgevfs(mpdevfs, true);
 
 	VFS_ROOT(mporoot, LK_EXCLUSIVE, &vporoot);
 
@@ -314,7 +330,7 @@ vfs_mountroot_shuffle(struct thread *td, struct mount *mpdevfs)
 	/* Set up the new rootvnode, and purge the cache */
 	mpnroot->mnt_vnodecovered = NULL;
 	set_rootvnode();
-	cache_purgevfs(rootvnode->v_mount);
+	cache_purgevfs(rootvnode->v_mount, true);
 
 	if (mporoot != mpdevfs) {
 		/* Remount old root under /.mount or /mnt */
@@ -346,9 +362,9 @@ vfs_mountroot_shuffle(struct thread *td, struct mount *mpdevfs)
 		}
 		NDFREE(&nd, NDF_ONLY_PNBUF);
 
-		if (error && bootverbose)
+		if (error)
 			printf("mountroot: unable to remount previous root "
-			    "under /.mount or /mnt (error %d).\n", error);
+			    "under /.mount or /mnt (error %d)\n", error);
 	}
 
 	/* Remount devfs under /dev */
@@ -372,9 +388,9 @@ vfs_mountroot_shuffle(struct thread *td, struct mount *mpdevfs)
 		} else
 			vput(vp);
 	}
-	if (error && bootverbose)
+	if (error)
 		printf("mountroot: unable to remount devfs under /dev "
-		    "(error %d).\n", error);
+		    "(error %d)\n", error);
 	NDFREE(&nd, NDF_ONLY_PNBUF);
 
 	if (mporoot == mpdevfs) {
@@ -382,7 +398,7 @@ vfs_mountroot_shuffle(struct thread *td, struct mount *mpdevfs)
 		/* Unlink the no longer needed /dev/dev -> / symlink */
 		error = kern_unlinkat(td, AT_FDCWD, "/dev/dev",
 		    UIO_SYSSPACE, 0);
-		if (error && bootverbose)
+		if (error)
 			printf("mountroot: unable to unlink /dev/dev "
 			    "(error %d)\n", error);
 	}
@@ -488,6 +504,8 @@ parse_dir_ask(char **conf)
 	char *mnt;
 	int error;
 
+	vfs_mountroot_wait();
+
 	printf("\nLoader variables:\n");
 	parse_dir_ask_printenv("vfs.root.mountfrom");
 	parse_dir_ask_printenv("vfs.root.mountfrom.options");
@@ -536,76 +554,65 @@ parse_dir_md(char **conf)
 {
 	struct stat sb;
 	struct thread *td;
-	struct md_ioctl *mdio;
-	char *path, *tok;
-	int error, fd, len;
+	struct md_req mdr;
+	char *path;
+	int error;
+
+	if (kern_mdattach_p == NULL || kern_mddetach_p == NULL)
+		return (ENOENT);
 
 	td = curthread;
 
-	error = parse_token(conf, &tok);
+	error = parse_token(conf, &path);
 	if (error)
 		return (error);
 
-	len = strlen(tok);
-	mdio = malloc(sizeof(*mdio) + len + 1, M_TEMP, M_WAITOK | M_ZERO);
-	path = (void *)(mdio + 1);
-	bcopy(tok, path, len);
-	free(tok, M_TEMP);
-
 	/* Get file status. */
-	error = kern_statat(td, 0, AT_FDCWD, path, UIO_SYSSPACE, &sb, NULL);
+	error = kern_statat(td, 0, AT_FDCWD,
+	    (__cheri_tocap char * __capability)path, UIO_SYSSPACE, &sb, NULL);
 	if (error)
 		goto out;
 
-	/* Open /dev/mdctl so that we can attach/detach. */
-	error = kern_openat(td, AT_FDCWD, "/dev/" MDCTL_NAME, UIO_SYSSPACE,
-	    O_RDWR, 0);
-	if (error)
-		goto out;
-
-	fd = td->td_retval[0];
-	mdio->md_version = MDIOVERSION;
-	mdio->md_type = MD_VNODE;
+	mdr.md_type = MD_VNODE;
 
 	if (root_mount_mddev != -1) {
-		mdio->md_unit = root_mount_mddev;
+		mdr.md_unit = root_mount_mddev;
 		DROP_GIANT();
-		error = kern_ioctl(td, fd, MDIOCDETACH, (void *)mdio);
+		error = kern_mddetach_p(td, &mdr);
 		PICKUP_GIANT();
 		/* Ignore errors. We don't care. */
 		root_mount_mddev = -1;
 	}
 
-	mdio->md_file = (void *)(mdio + 1);
-	mdio->md_options = MD_AUTOUNIT | MD_READONLY;
-	mdio->md_mediasize = sb.st_size;
-	mdio->md_unit = 0;
+	mdr.md_file = (__cheri_tocap char * __capability)path;
+	mdr.md_file_seg = UIO_SYSSPACE;
+	mdr.md_options = MD_AUTOUNIT | MD_READONLY;
+	mdr.md_mediasize = sb.st_size;
+	mdr.md_unit = 0;
 	DROP_GIANT();
-	error = kern_ioctl(td, fd, MDIOCATTACH, (void *)mdio);
+	error = kern_mdattach_p(td, &mdr);
 	PICKUP_GIANT();
 	if (error)
 		goto out;
 
-	if (mdio->md_unit > 9) {
+	if (mdr.md_unit > 9) {
 		printf("rootmount: too many md units\n");
-		mdio->md_file = NULL;
-		mdio->md_options = 0;
-		mdio->md_mediasize = 0;
+		mdr.md_file = NULL;
+		mdr.md_options = 0;
+		mdr.md_mediasize = 0;
 		DROP_GIANT();
-		error = kern_ioctl(td, fd, MDIOCDETACH, (void *)mdio);
+		error = kern_mddetach_p(td, &mdr);
 		PICKUP_GIANT();
 		/* Ignore errors. We don't care. */
 		error = ERANGE;
 		goto out;
 	}
 
-	root_mount_mddev = mdio->md_unit;
-	printf(MD_NAME "%u attached to %s\n", root_mount_mddev, mdio->md_file);
-
-	error = kern_close(td, fd);
+	root_mount_mddev = mdr.md_unit;
+	printf(MD_NAME "%u attached to %s\n", root_mount_mddev, path);
 
  out:
-	free(mdio, M_TEMP);
+	free(path, M_TEMP);
 	return (error);
 }
 
@@ -958,10 +965,11 @@ vfs_mountroot_wait_if_neccessary(const char *fs, const char *dev)
 
 	/*
 	 * In case of ZFS and NFS we don't have a way to wait for
-	 * specific device.
+	 * specific device.  Also do the wait if the user forced that
+	 * behaviour by setting vfs.root_mount_always_wait=1.
 	 */
 	if (strcmp(fs, "zfs") == 0 || strstr(fs, "nfs") != NULL ||
-	    dev[0] == '\0') {
+	    dev[0] == '\0' || root_mount_always_wait != 0) {
 		vfs_mountroot_wait();
 		return (0);
 	}

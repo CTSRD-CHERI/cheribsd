@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2002-2008 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
@@ -35,6 +37,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h> 
 #include <sys/proc.h>
 #include <sys/kernel.h>
+#include <sys/malloc.h>
 #include <sys/condvar.h>
  
 #include <sys/socket.h>
@@ -67,6 +70,7 @@ __FBSDID("$FreeBSD$");
 #define	ROAM_RATE_HALF_DEFAULT		2*6	/* half-width 11a/g bss */
 #define	ROAM_RATE_QUARTER_DEFAULT	2*3	/* quarter-width 11a/g bss */
 #define	ROAM_MCS_11N_DEFAULT		(1 | IEEE80211_RATE_MCS) /* 11n bss */
+#define	ROAM_MCS_11AC_DEFAULT		(1 | IEEE80211_RATE_MCS) /* 11ac bss; XXX not used yet */
 
 void
 ieee80211_scan_attach(struct ieee80211com *ic)
@@ -115,6 +119,11 @@ static const struct ieee80211_roamparam defroam[IEEE80211_MODE_MAX] = {
 				    .rate = ROAM_MCS_11N_DEFAULT },
 	[IEEE80211_MODE_11NG]	= { .rssi = ROAM_RSSI_11B_DEFAULT,
 				    .rate = ROAM_MCS_11N_DEFAULT },
+	[IEEE80211_MODE_VHT_2GHZ]	= { .rssi = ROAM_RSSI_11B_DEFAULT,
+				    .rate = ROAM_MCS_11AC_DEFAULT },
+	[IEEE80211_MODE_VHT_5GHZ]	= { .rssi = ROAM_RSSI_11A_DEFAULT,
+				    .rate = ROAM_MCS_11AC_DEFAULT },
+
 };
 
 void
@@ -442,6 +451,9 @@ ieee80211_cancel_scan(struct ieee80211vap *vap)
 
 /*
  * Cancel any scan currently going on.
+ *
+ * This is called during normal 802.11 data path to cancel
+ * a scan so a newly arrived normal data packet can be sent.
  */
 void
 ieee80211_cancel_anyscan(struct ieee80211vap *vap)
@@ -452,8 +464,9 @@ ieee80211_cancel_anyscan(struct ieee80211vap *vap)
 }
 
 /*
- * Public access to scan_next for drivers that manage
- * scanning themselves (e.g. for firmware-based devices).
+ * Manually switch to the next channel in the channel list.
+ * Provided for drivers that manage scanning themselves
+ * (e.g. for firmware-based devices).
  */
 void
 ieee80211_scan_next(struct ieee80211vap *vap)
@@ -464,8 +477,9 @@ ieee80211_scan_next(struct ieee80211vap *vap)
 }
 
 /*
- * Public access to scan_next for drivers that are not able to scan single
- * channels (e.g. for firmware-based devices).
+ * Manually stop a scan that is currently running.
+ * Provided for drivers that are not able to scan single channels
+ * (e.g. for firmware-based devices).
  */
 void
 ieee80211_scan_done(struct ieee80211vap *vap)
@@ -485,7 +499,7 @@ ieee80211_scan_done(struct ieee80211vap *vap)
 }
 
 /*
- * Probe the curent channel, if allowed, while scanning.
+ * Probe the current channel, if allowed, while scanning.
  * If the channel is not marked passive-only then send
  * a probe request immediately.  Otherwise mark state and
  * listen for beacons on the channel; if we receive something
@@ -538,8 +552,7 @@ ieee80211_scan_dump_probe_beacon(uint8_t subtype, int isnew,
 
 	printf("[%s] %s%s on chan %u (bss chan %u) ",
 	    ether_sprintf(mac), isnew ? "new " : "",
-	    ieee80211_mgt_subtype_name[subtype >> IEEE80211_FC0_SUBTYPE_SHIFT],
-	    sp->chan, sp->bchan);
+	    ieee80211_mgt_subtype_name(subtype), sp->chan, sp->bchan);
 	ieee80211_print_essid(sp->ssid + 2, sp->ssid[1]);
 	printf(" rssi %d\n", rssi);
 

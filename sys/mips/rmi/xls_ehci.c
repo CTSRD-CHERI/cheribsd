@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ *
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -130,7 +132,7 @@ ehci_xls_attach(device_t self)
 	device_set_ivars(sc->sc_bus.bdev, &sc->sc_bus);
 	device_set_desc(sc->sc_bus.bdev, xlr_usb_dev_desc);
 
-	sprintf(sc->sc_vendor, xlr_vendor_desc);
+	strlcpy(sc->sc_vendor, xlr_vendor_desc, sizeof(sc->sc_vendor));
 
 	err = bus_setup_intr(self, sc->sc_irq_res,
 	    INTR_TYPE_BIO | INTR_MPSAFE, NULL,
@@ -164,14 +166,8 @@ static int
 ehci_xls_detach(device_t self)
 {
 	ehci_softc_t *sc = device_get_softc(self);
-	device_t bdev;
 	int err;
 
- 	if (sc->sc_bus.bdev) {
-		bdev = sc->sc_bus.bdev;
-		device_detach(bdev);
-		device_delete_child(self, bdev);
-	}
 	/* during module unload there are lots of children leftover */
 	device_delete_children(self);
 

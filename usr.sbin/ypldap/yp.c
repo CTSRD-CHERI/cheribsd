@@ -216,12 +216,16 @@ yp_dispatch(struct svc_req *req, SVCXPRT *trans)
 		return;
 	case YPPROC_ALL:
 		log_debug("ypproc_all");
+		xdr_argument = (xdrproc_t) xdr_ypreq_nokey;
+		xdr_result = (xdrproc_t) xdr_ypresp_all;
 		if (yp_check(req) == -1)
 			return;
 		cb = (void *)ypproc_all_2_svc;
 		break;
 	case YPPROC_MASTER:
 		log_debug("ypproc_master");
+		xdr_argument = (xdrproc_t) xdr_ypreq_nokey;
+		xdr_result = (xdrproc_t) xdr_ypresp_master;
 		if (yp_check(req) == -1)
 			return;
 		cb = (void *)ypproc_master_2_svc;
@@ -234,6 +238,8 @@ yp_dispatch(struct svc_req *req, SVCXPRT *trans)
 		return;
 	case YPPROC_MAPLIST:
 		log_debug("ypproc_maplist");
+		xdr_argument = (xdrproc_t) xdr_domainname;
+		xdr_result = (xdrproc_t) xdr_ypresp_maplist;
 		if (yp_check(req) == -1)
 			return;
 		cb = (void *)ypproc_maplist_2_svc;
@@ -336,7 +342,7 @@ ypproc_match_2_svc(ypreq_key *arg, struct svc_req *req)
 		log_debug("argument too long");
 		return (NULL);
 	}
-	bzero(key, sizeof(key));
+	memset(key, 0, sizeof(key));
 	(void)strncpy(key, arg->key.keydat_val, arg->key.keydat_len);
 
 	if (strcmp(arg->map, "passwd.byname") == 0 ||
@@ -480,7 +486,7 @@ ypproc_next_2_svc(ypreq_key *arg, struct svc_req *req)
 
 	if (strcmp(arg->map, "passwd.byname") == 0 ||
 	    strcmp(arg->map, "master.passwd.byname") == 0) {
-		bzero(key, sizeof(key));
+		memset(key, 0, sizeof(key));
 		(void)strncpy(key, arg->key.keydat_val,
 		    arg->key.keydat_len);
 		ukey.ue_line = key;
@@ -511,7 +517,7 @@ ypproc_next_2_svc(ypreq_key *arg, struct svc_req *req)
 
 
 	} else if (strcmp(arg->map, "group.byname") == 0) {
-		bzero(key, sizeof(key));
+		memset(key, 0, sizeof(key));
 		(void)strncpy(key, arg->key.keydat_val,
 		    arg->key.keydat_len);
 		
@@ -559,11 +565,18 @@ ypresp_master *
 ypproc_master_2_svc(ypreq_nokey *arg, struct svc_req *req)
 {
 	static struct ypresp_master	 res;
+	static char master[YPMAXPEER + 1];
 
+	memset(&res, 0, sizeof(res));
 	if (yp_valid_domain(arg->domain, (struct ypresp_val *)&res) == -1)
 		return (&res);
+	
+	if (gethostname(master, sizeof(master)) == 0) {
+		res.peer = (peername)master;
+		res.stat = YP_TRUE;
+	} else
+		res.stat = YP_NOKEY;
 
-	res.stat = YP_YPERR;
 	return (&res);
 }
 
@@ -584,14 +597,14 @@ ypproc_maplist_2_svc(domainname *arg, struct svc_req *req)
 		{ "netid.byname",		YPMAP_NETID_BYNAME },
 	};
 	static ypresp_maplist	 res;
-	static struct ypmaplist	 maps[sizeof(mapnames) / sizeof(mapnames[0])];
+	static struct ypmaplist	 maps[nitems(mapnames)];
 	
 	if (yp_valid_domain(*arg, (struct ypresp_val *)&res) == -1)
 		return (&res);
 
 	res.stat = YP_TRUE;
 	res.maps = NULL;
-	for (i = 0; i < sizeof(mapnames) / sizeof(mapnames[0]); i++) {
+	for (i = 0; i < nitems(mapnames); i++) {
 		if (!(env->sc_flags & mapnames[i].cond))
 			continue;
 		maps[i].map = mapnames[i].name;
@@ -607,7 +620,7 @@ yp_make_val(struct ypresp_val *res, char *line, int replacecolon)
 {
 	static char		 buf[LINE_WIDTH];
 
-	bzero(buf, sizeof(buf));
+	memset(buf, 0, sizeof(buf));
 
 	if (replacecolon)
 		line[strlen(line)] = ':';
@@ -627,8 +640,8 @@ yp_make_keyval(struct ypresp_key_val *res, char *key, char *line)
 	static char	keybuf[YPMAXRECORD+1];
 	static char	buf[LINE_WIDTH];
 
-	bzero(keybuf, sizeof(keybuf));
-	bzero(buf, sizeof(buf));
+	memset(keybuf, 0, sizeof(keybuf));
+	memset(buf, 0, sizeof(buf));
 	
 	(void)strlcpy(keybuf, key, sizeof(keybuf));
 	res->key.keydat_len = strlen(keybuf);

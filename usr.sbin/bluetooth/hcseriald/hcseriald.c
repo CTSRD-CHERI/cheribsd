@@ -1,5 +1,7 @@
-/*
+/*-
  * hcseriald.c
+ *
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2001-2002 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
@@ -83,18 +85,18 @@ main(int argc, char *argv[])
 		case 's':
 			speed = atoi(optarg);
 			if (speed < 0)
-				usage(argv[0]);
+				usage();
 			break;
 
 		case 'h':
 		default:
-			usage(argv[0]);
+			usage();
 			break;
 		}
 	}
 
 	if (device == NULL || name == NULL)
-		usage(argv[0]);
+		usage();
 
 	openlog(hcseriald, LOG_PID | LOG_NDELAY, LOG_USER);
 

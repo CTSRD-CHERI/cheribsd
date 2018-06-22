@@ -22,15 +22,13 @@ namespace lldb_private {
 // CommandObjectMultiwordBugreport
 //-------------------------------------------------------------------------
 
-class CommandObjectMultiwordBugreport : public CommandObjectMultiword
-{
+class CommandObjectMultiwordBugreport : public CommandObjectMultiword {
 public:
-    CommandObjectMultiwordBugreport(CommandInterpreter &interpreter);
+  CommandObjectMultiwordBugreport(CommandInterpreter &interpreter);
 
-    virtual
-    ~CommandObjectMultiwordBugreport();
+  ~CommandObjectMultiwordBugreport() override;
 };
 
 } // namespace lldb_private
 
-#endif  // liblldb_CommandObjectBugreport_h_
+#endif // liblldb_CommandObjectBugreport_h_

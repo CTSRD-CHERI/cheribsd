@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1999,2000,2001 Jonathan Lemon <jlemon@FreeBSD.org>
  * Copyright 2004 John-Mark Gurney <jmg@FreeBSD.org>
  * Copyright (c) 2009 Apple, Inc.
@@ -29,8 +31,13 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include "opt_compat.h"
 #include "opt_ktrace.h"
 #include "opt_kqueue.h"
+
+#ifdef COMPAT_FREEBSD11
+#define	_WANT_FREEBSD11_KEVENT
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -48,7 +55,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/fcntl.h>
 #include <sys/kthread.h>
 #include <sys/selinfo.h>
-#include <sys/stdatomic.h>
 #include <sys/queue.h>
 #include <sys/event.h>
 #include <sys/eventvar.h>
@@ -61,6 +67,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/socketvar.h>
 #include <sys/stat.h>
 #include <sys/sysctl.h>
+#include <sys/sysent.h>
 #include <sys/sysproto.h>
 #include <sys/syscallsubr.h>
 #include <sys/taskqueue.h>
@@ -69,6 +76,7 @@ __FBSDID("$FreeBSD$");
 #ifdef KTRACE
 #include <sys/ktrace.h>
 #endif
+#include <machine/atomic.h>
 
 #include <vm/uma.h>
 
@@ -91,11 +99,11 @@ MTX_SYSINIT(kq_global, &kq_global, "kqueue order", MTX_DEF);
 	haslck = 0;				\
 } while (0)
 
-TASKQUEUE_DEFINE_THREAD(kqueue);
+TASKQUEUE_DEFINE_THREAD(kqueue_ctx);
 
-static int	kevent_copyout(void *arg, struct kevent *kevp, int count);
-static int	kevent_copyin(void *arg, struct kevent *kevp, int count);
-static int	kqueue_register(struct kqueue *kq, struct kevent *kev,
+static int	kevent_copyout(void *arg, kkevent_t *kevp, int count);
+static int	kevent_copyin(void *arg, kkevent_t *kevp, int count);
+static int	kqueue_register(struct kqueue *kq, kkevent_t *kev,
 		    struct thread *td, int waitok);
 static int	kqueue_acquire(struct file *fp, struct kqueue **kqp);
 static void	kqueue_release(struct kqueue *kq, int locked);
@@ -107,10 +115,14 @@ static void	kqueue_task(void *arg, int pending);
 static int	kqueue_scan(struct kqueue *kq, int maxevents,
 		    struct kevent_copyops *k_ops,
 		    const struct timespec *timeout,
-		    struct kevent *keva, struct thread *td);
+		    kkevent_t *keva, struct thread *td);
 static void 	kqueue_wakeup(struct kqueue *kq);
 static struct filterops *kqueue_fo_find(int filt);
 static void	kqueue_fo_release(int filt);
+struct g_kevent_args;
+static int	kern_kevent_generic(struct thread *td,
+		    struct g_kevent_args *uap,
+		    struct kevent_copyops *k_ops, const char *struct_name);
 
 static fo_ioctl_t	kqueue_ioctl;
 static fo_poll_t	kqueue_poll;
@@ -136,6 +148,7 @@ static struct fileops kqueueops = {
 
 static int 	knote_attach(struct knote *kn, struct kqueue *kq);
 static void 	knote_drop(struct knote *kn, struct thread *td);
+static void 	knote_drop_detached(struct knote *kn, struct thread *td);
 static void 	knote_enqueue(struct knote *kn);
 static void 	knote_dequeue(struct knote *kn);
 static void 	knote_init(void);
@@ -155,7 +168,7 @@ static int	filt_timer(struct knote *kn, long hint);
 static int	filt_userattach(struct knote *kn);
 static void	filt_userdetach(struct knote *kn);
 static int	filt_user(struct knote *kn, long hint);
-static void	filt_usertouch(struct knote *kn, struct kevent *kev,
+static void	filt_usertouch(struct knote *kn, kkevent_t *kev,
 		    u_long type);
 
 static struct filterops file_filtops = {
@@ -188,12 +201,12 @@ static struct filterops user_filtops = {
 };
 
 static uma_zone_t	knote_zone;
-static atomic_uint	kq_ncallouts = ATOMIC_VAR_INIT(0);
+static unsigned int	kq_ncallouts = 0;
 static unsigned int 	kq_calloutmax = 4 * 1024;
 SYSCTL_UINT(_kern, OID_AUTO, kq_calloutmax, CTLFLAG_RW,
     &kq_calloutmax, 0, "Maximum number of callouts allocated for kqueue");
 
-/* XXX - ensure not KN_INFLUX?? */
+/* XXX - ensure not influx ? */
 #define KNOTE_ACTIVATE(kn, islock) do { 				\
 	if ((islock))							\
 		mtx_assert(&(kn)->kn_kq->kq_lock, MA_OWNED);		\
@@ -227,14 +240,59 @@ SYSCTL_UINT(_kern, OID_AUTO, kq_calloutmax, CTLFLAG_RW,
 #define KQ_NOTOWNED(kq) do {						\
 	mtx_assert(&(kq)->kq_lock, MA_NOTOWNED);			\
 } while (0)
-#define KN_LIST_LOCK(kn) do {						\
-	if (kn->kn_knlist != NULL)					\
-		kn->kn_knlist->kl_lock(kn->kn_knlist->kl_lockarg);	\
-} while (0)
-#define KN_LIST_UNLOCK(kn) do {						\
-	if (kn->kn_knlist != NULL) 					\
-		kn->kn_knlist->kl_unlock(kn->kn_knlist->kl_lockarg);	\
-} while (0)
+
+static struct knlist *
+kn_list_lock(struct knote *kn)
+{
+	struct knlist *knl;
+
+	knl = kn->kn_knlist;
+	if (knl != NULL)
+		knl->kl_lock(knl->kl_lockarg);
+	return (knl);
+}
+
+static void
+kn_list_unlock(struct knlist *knl)
+{
+	bool do_free;
+
+	if (knl == NULL)
+		return;
+	do_free = knl->kl_autodestroy && knlist_empty(knl);
+	knl->kl_unlock(knl->kl_lockarg);
+	if (do_free) {
+		knlist_destroy(knl);
+		free(knl, M_KQUEUE);
+	}
+}
+
+static bool
+kn_in_flux(struct knote *kn)
+{
+
+	return (kn->kn_influx > 0);
+}
+
+static void
+kn_enter_flux(struct knote *kn)
+{
+
+	KQ_OWNED(kn->kn_kq);
+	MPASS(kn->kn_influx < INT_MAX);
+	kn->kn_influx++;
+}
+
+static bool
+kn_leave_flux(struct knote *kn)
+{
+
+	KQ_OWNED(kn->kn_kq);
+	MPASS(kn->kn_influx > 0);
+	kn->kn_influx--;
+	return (kn->kn_influx == 0);
+}
+
 #define	KNL_ASSERT_LOCK(knl, islocked) do {				\
 	if (islocked)							\
 		KNL_ASSERT_LOCKED(knl);				\
@@ -257,7 +315,7 @@ SYSCTL_UINT(_kern, OID_AUTO, kq_calloutmax, CTLFLAG_RW,
 #define	KN_HASHSIZE		64		/* XXX should be tunable */
 #endif
 
-#define KN_HASH(val, mask)	(((val) ^ (val >> 8)) & (mask))
+#define KN_HASH(val, mask)	((((u_long)val) ^ ((u_long)val >> 8)) & (mask))
 
 static int
 filt_nullattach(struct knote *kn)
@@ -298,6 +356,7 @@ static struct {
 	{ &null_filtops },			/* EVFILT_LIO */
 	{ &user_filtops, 1 },			/* EVFILT_USER */
 	{ &null_filtops },			/* EVFILT_SENDFILE */
+	{ &file_filtops, 1 },                   /* EVFILT_EMPTY */
 };
 
 /*
@@ -350,20 +409,19 @@ static int
 filt_procattach(struct knote *kn)
 {
 	struct proc *p;
-	int immediate;
 	int error;
+	bool exiting, immediate;
 
-	immediate = 0;
-	p = pfind(kn->kn_id);
-	if (p == NULL && (kn->kn_sfflags & NOTE_EXIT)) {
-		p = zpfind(kn->kn_id);
-		immediate = 1;
-	} else if (p != NULL && (p->p_flag & P_WEXIT)) {
-		immediate = 1;
-	}
-
+	exiting = immediate = false;
+	if (kn->kn_sfflags & NOTE_EXIT)
+		p = pfind_any(kn->kn_id);
+	else
+		p = pfind(kn->kn_id);
 	if (p == NULL)
 		return (ESRCH);
+	if (p->p_flag & P_WEXIT)
+		exiting = true;
+
 	if ((error = p_cansee(curthread, p))) {
 		PROC_UNLOCK(p);
 		return (error);
@@ -380,8 +438,8 @@ filt_procattach(struct knote *kn)
 		kn->kn_flags &= ~EV_FLAG2;
 		kn->kn_data = kn->kn_sdata;		/* ppid */
 		kn->kn_fflags = NOTE_CHILD;
-                kn->kn_sfflags &= ~NOTE_EXIT;
-		immediate = 1; /* Force immediate activation of child note. */
+		kn->kn_sfflags &= ~(NOTE_EXIT | NOTE_EXEC | NOTE_FORK);
+		immediate = true; /* Force immediate activation of child note. */
 	}
 	/*
 	 * Internal flag indicating registration done by kernel (for other than
@@ -391,8 +449,7 @@ filt_procattach(struct knote *kn)
 		kn->kn_flags &= ~EV_FLAG1;
 	}
 
-	if (immediate == 0)
-		knlist_add(&p->p_klist, kn, 1);
+	knlist_add(p->p_klist, kn, 1);
 
 	/*
 	 * Immediately activate any child notes or, in the case of a zombie
@@ -400,7 +457,7 @@ filt_procattach(struct knote *kn)
 	 * case where the target process, e.g. a child, dies before the kevent
 	 * is registered.
 	 */
-	if (immediate && filt_proc(kn, NOTE_EXIT))
+	if (immediate || (exiting && filt_proc(kn, NOTE_EXIT)))
 		KNOTE_ACTIVATE(kn, 0);
 
 	PROC_UNLOCK(p);
@@ -420,10 +477,8 @@ filt_procattach(struct knote *kn)
 static void
 filt_procdetach(struct knote *kn)
 {
-	struct proc *p;
 
-	p = kn->kn_ptr.p_proc;
-	knlist_remove(&p->p_klist, kn, 0);
+	knlist_remove(kn->kn_knlist, kn, 0);
 	kn->kn_ptr.p_proc = NULL;
 }
 
@@ -435,6 +490,9 @@ filt_proc(struct knote *kn, long hint)
 	u_int event;
 
 	p = kn->kn_ptr.p_proc;
+	if (p == NULL) /* already activated, from attach filter */
+		return (0);
+
 	/* Mask off extra data. */
 	event = (u_int)hint & NOTE_PCTRLMASK;
 
@@ -444,8 +502,6 @@ filt_proc(struct knote *kn, long hint)
 
 	/* Process is gone, so flag the event as finished. */
 	if (event == NOTE_EXIT) {
-		if (!(kn->kn_status & KN_DETACHED))
-			knlist_remove_inevent(&p->p_klist, kn);
 		kn->kn_flags |= EV_EOF | EV_ONESHOT;
 		kn->kn_ptr.p_proc = NULL;
 		if (kn->kn_fflags & NOTE_EXIT)
@@ -471,7 +527,7 @@ knote_fork(struct knlist *list, int pid)
 {
 	struct kqueue *kq;
 	struct knote *kn;
-	struct kevent kev;
+	kkevent_t kev;
 	int error;
 
 	if (list == NULL)
@@ -479,15 +535,9 @@ knote_fork(struct knlist *list, int pid)
 	list->kl_lock(list->kl_lockarg);
 
 	SLIST_FOREACH(kn, &list->kl_list, kn_selnext) {
-		/*
-		 * XXX - Why do we skip the kn if it is _INFLUX?  Does this
-		 * mean we will not properly wake up some notes?
-		 */
-		if ((kn->kn_status & KN_INFLUX) == KN_INFLUX)
-			continue;
 		kq = kn->kn_kq;
 		KQ_LOCK(kq);
-		if ((kn->kn_status & (KN_INFLUX | KN_SCAN)) == KN_INFLUX) {
+		if (kn_in_flux(kn) && (kn->kn_status & KN_SCAN) == 0) {
 			KQ_UNLOCK(kq);
 			continue;
 		}
@@ -510,7 +560,7 @@ knote_fork(struct knlist *list, int pid)
 		 * track the child. Drop the locks in preparation for
 		 * the call to kqueue_register().
 		 */
-		kn->kn_status |= KN_INFLUX;
+		kn_enter_flux(kn);
 		KQ_UNLOCK(kq);
 		list->kl_unlock(list->kl_lockarg);
 
@@ -525,7 +575,8 @@ knote_fork(struct knlist *list, int pid)
 		 */
 		kev.ident = pid;
 		kev.filter = kn->kn_filter;
-		kev.flags = kn->kn_flags | EV_ADD | EV_ENABLE | EV_ONESHOT | EV_FLAG2;
+		kev.flags = kn->kn_flags | EV_ADD | EV_ENABLE | EV_ONESHOT |
+		    EV_FLAG2;
 		kev.fflags = kn->kn_sfflags;
 		kev.data = kn->kn_id;		/* parent */
 		kev.udata = kn->kn_kevent.udata;/* preserve udata */
@@ -542,29 +593,15 @@ knote_fork(struct knlist *list, int pid)
 		kev.flags = kn->kn_flags | EV_ADD | EV_ENABLE | EV_FLAG1;
 		kev.fflags = kn->kn_sfflags;
 		kev.data = kn->kn_id;		/* parent */
-		/* preserve udata */
-#ifdef CPU_CHERI
-		if (kn->kn_flags & EV_FREEUDATA) {
-			kev.udata = malloc(sizeof(struct chericap), M_KQUEUE,
-			    M_WAITOK);
-			cheri_capability_load(CHERI_CR_CTEMP0,
-			    kn->kn_kevent.udata);
-			cheri_capability_store(CHERI_CR_CTEMP0, kev.udata);
-		} else
-#endif
-			kev.udata = kn->kn_kevent.udata;
+		kev.udata = kn->kn_kevent.udata;
 		error = kqueue_register(kq, &kev, NULL, 0);
 		if (error) {
 			kn->kn_fflags |= NOTE_TRACKERR;
-#ifdef CPU_CHERI
-			if (kn->kn_flags & EV_FREEUDATA)
-				free(kev.udata, M_KQUEUE);
-#endif
 		}
 		if (kn->kn_fop->f_event(kn, NOTE_FORK))
 			KNOTE_ACTIVATE(kn, 0);
 		KQ_LOCK(kq);
-		kn->kn_status &= ~KN_INFLUX;
+		kn_leave_flux(kn);
 		KQ_UNLOCK_FLUX(kq);
 		list->kl_lock(list->kl_lockarg);
 	}
@@ -576,56 +613,89 @@ knote_fork(struct knlist *list, int pid)
  * interval timer support code.
  */
 
-#define NOTE_TIMER_PRECMASK	(NOTE_SECONDS|NOTE_MSECONDS|NOTE_USECONDS| \
-				NOTE_NSECONDS)
+#define NOTE_TIMER_PRECMASK						\
+    (NOTE_SECONDS | NOTE_MSECONDS | NOTE_USECONDS | NOTE_NSECONDS)
 
-static __inline sbintime_t
+static sbintime_t
 timer2sbintime(intptr_t data, int flags)
 {
-	sbintime_t modifier;
+	int64_t secs;
 
+        /*
+         * Macros for converting to the fractional second portion of an
+         * sbintime_t using 64bit multiplication to improve precision.
+         */
+#define NS_TO_SBT(ns) (((ns) * (((uint64_t)1 << 63) / 500000000)) >> 32)
+#define US_TO_SBT(us) (((us) * (((uint64_t)1 << 63) / 500000)) >> 32)
+#define MS_TO_SBT(ms) (((ms) * (((uint64_t)1 << 63) / 500)) >> 32)
 	switch (flags & NOTE_TIMER_PRECMASK) {
 	case NOTE_SECONDS:
-		modifier = SBT_1S;
-		break;
+#ifdef __LP64__
+		if (data > (SBT_MAX / SBT_1S))
+			return (SBT_MAX);
+#endif
+		return ((sbintime_t)data << 32);
 	case NOTE_MSECONDS: /* FALLTHROUGH */
 	case 0:
-		modifier = SBT_1MS;
-		break;
-	case NOTE_USECONDS:
-		modifier = SBT_1US;
-		break;
-	case NOTE_NSECONDS:
-		modifier = SBT_1NS;
-		break;
-	default:
-		return (-1);
-	}
-
+		if (data >= 1000) {
+			secs = data / 1000;
 #ifdef __LP64__
-	if (data > SBT_MAX / modifier)
-		return (SBT_MAX);
+			if (secs > (SBT_MAX / SBT_1S))
+				return (SBT_MAX);
 #endif
-	return (modifier * data);
+			return (secs << 32 | MS_TO_SBT(data % 1000));
+		}
+		return (MS_TO_SBT(data));
+	case NOTE_USECONDS:
+		if (data >= 1000000) {
+			secs = data / 1000000;
+#ifdef __LP64__
+			if (secs > (SBT_MAX / SBT_1S))
+				return (SBT_MAX);
+#endif
+			return (secs << 32 | US_TO_SBT(data % 1000000));
+		}
+		return (US_TO_SBT(data));
+	case NOTE_NSECONDS:
+		if (data >= 1000000000) {
+			secs = data / 1000000000;
+#ifdef __LP64__
+			if (secs > (SBT_MAX / SBT_1S))
+				return (SBT_MAX);
+#endif
+			return (secs << 32 | US_TO_SBT(data % 1000000000));
+		}
+		return (NS_TO_SBT(data));
+	default:
+		break;
+	}
+	return (-1);
 }
+
+struct kq_timer_cb_data {
+	struct callout c;
+	sbintime_t next;	/* next timer event fires at */
+	sbintime_t to;		/* precalculated timer period, 0 for abs */
+};
 
 static void
 filt_timerexpire(void *knx)
 {
-	struct callout *calloutp;
 	struct knote *kn;
+	struct kq_timer_cb_data *kc;
 
 	kn = knx;
 	kn->kn_data++;
 	KNOTE_ACTIVATE(kn, 0);	/* XXX - handle locking */
 
-	if ((kn->kn_flags & EV_ONESHOT) != EV_ONESHOT) {
-		calloutp = (struct callout *)kn->kn_hook;
-		*kn->kn_ptr.p_nexttime += timer2sbintime(kn->kn_sdata, 
-		    kn->kn_sfflags);
-		callout_reset_sbt_on(calloutp, *kn->kn_ptr.p_nexttime, 0,
-		    filt_timerexpire, kn, PCPU_GET(cpuid), C_ABSOLUTE);
-	}
+	if ((kn->kn_flags & EV_ONESHOT) != 0)
+		return;
+	kc = kn->kn_ptr.p_v;
+	if (kc->to == 0)
+		return;
+	kc->next += kc->to;
+	callout_reset_sbt_on(&kc->c, kc->next, 0, filt_timerexpire, kn,
+	    PCPU_GET(cpuid), C_ABSOLUTE);
 }
 
 /*
@@ -634,39 +704,48 @@ filt_timerexpire(void *knx)
 static int
 filt_timerattach(struct knote *kn)
 {
-	struct callout *calloutp;
-	sbintime_t to;
+	struct kq_timer_cb_data *kc;
+	struct bintime bt;
+	sbintime_t to, sbt;
 	unsigned int ncallouts;
 
-	if ((intptr_t)kn->kn_sdata < 0)
+	if (kn->kn_sdata < 0)
 		return (EINVAL);
-	if ((intptr_t)kn->kn_sdata == 0 && (kn->kn_flags & EV_ONESHOT) == 0)
+	if (kn->kn_sdata == 0 && (kn->kn_flags & EV_ONESHOT) == 0)
 		kn->kn_sdata = 1;
 	/* Only precision unit are supported in flags so far */
-	if (kn->kn_sfflags & ~NOTE_TIMER_PRECMASK)
+	if ((kn->kn_sfflags & ~(NOTE_TIMER_PRECMASK | NOTE_ABSTIME)) != 0)
 		return (EINVAL);
 
 	to = timer2sbintime(kn->kn_sdata, kn->kn_sfflags);
+	if ((kn->kn_sfflags & NOTE_ABSTIME) != 0) {
+		getboottimebin(&bt);
+		sbt = bttosbt(bt);
+		to -= sbt;
+	}
 	if (to < 0)
 		return (EINVAL);
 
-	ncallouts = atomic_load_explicit(&kq_ncallouts, memory_order_relaxed);
 	do {
+		ncallouts = kq_ncallouts;
 		if (ncallouts >= kq_calloutmax)
 			return (ENOMEM);
-	} while (!atomic_compare_exchange_weak_explicit(&kq_ncallouts,
-	    &ncallouts, ncallouts + 1, memory_order_relaxed,
-	    memory_order_relaxed));
+	} while (!atomic_cmpset_int(&kq_ncallouts, ncallouts, ncallouts + 1));
 
-	kn->kn_flags |= EV_CLEAR;		/* automatically set */
+	if ((kn->kn_sfflags & NOTE_ABSTIME) == 0)
+		kn->kn_flags |= EV_CLEAR;	/* automatically set */
 	kn->kn_status &= ~KN_DETACHED;		/* knlist_add clears it */
-	kn->kn_ptr.p_nexttime = malloc(sizeof(sbintime_t), M_KQUEUE, M_WAITOK);
-	calloutp = malloc(sizeof(*calloutp), M_KQUEUE, M_WAITOK);
-	callout_init(calloutp, 1);
-	kn->kn_hook = calloutp;
-	*kn->kn_ptr.p_nexttime = to + sbinuptime();
-	callout_reset_sbt_on(calloutp, *kn->kn_ptr.p_nexttime, 0,
-	    filt_timerexpire, kn, PCPU_GET(cpuid), C_ABSOLUTE);
+	kn->kn_ptr.p_v = kc = malloc(sizeof(*kc), M_KQUEUE, M_WAITOK);
+	callout_init(&kc->c, 1);
+	if ((kn->kn_sfflags & NOTE_ABSTIME) != 0) {
+		kc->next = to;
+		kc->to = 0;
+	} else {
+		kc->next = to + sbinuptime();
+		kc->to = to;
+	}
+	callout_reset_sbt_on(&kc->c, kc->next, 0, filt_timerexpire, kn,
+	    PCPU_GET(cpuid), C_ABSOLUTE);
 
 	return (0);
 }
@@ -674,14 +753,13 @@ filt_timerattach(struct knote *kn)
 static void
 filt_timerdetach(struct knote *kn)
 {
-	struct callout *calloutp;
+	struct kq_timer_cb_data *kc;
 	unsigned int old;
 
-	calloutp = (struct callout *)kn->kn_hook;
-	callout_drain(calloutp);
-	free(calloutp, M_KQUEUE);
-	free(kn->kn_ptr.p_nexttime, M_KQUEUE);
-	old = atomic_fetch_sub_explicit(&kq_ncallouts, 1, memory_order_relaxed);
+	kc = kn->kn_ptr.p_v;
+	callout_drain(&kc->c);
+	free(kc, M_KQUEUE);
+	old = atomic_fetchadd_int(&kq_ncallouts, -1);
 	KASSERT(old > 0, ("Number of callouts cannot become negative"));
 	kn->kn_status |= KN_DETACHED;	/* knlist_remove sets it */
 }
@@ -725,7 +803,7 @@ filt_user(struct knote *kn, __unused long hint)
 }
 
 static void
-filt_usertouch(struct knote *kn, struct kevent *kev, u_long type)
+filt_usertouch(struct knote *kn, kkevent_t *kev, u_long type)
 {
 	u_int ffctrl;
 
@@ -835,30 +913,45 @@ kern_kqueue(struct thread *td, int flags, struct filecaps *fcaps)
 	return (0);
 }
 
-#ifndef _SYS_SYSPROTO_H_
-struct kevent_args {
+struct g_kevent_args {
 	int	fd;
-	const struct kevent *changelist;
+	void	*changelist;
 	int	nchanges;
-	struct	kevent *eventlist;
+	void	*eventlist;
 	int	nevents;
 	const struct timespec *timeout;
 };
-#endif
+
 int
 sys_kevent(struct thread *td, struct kevent_args *uap)
 {
+	struct kevent_copyops k_ops = {
+		.arg = uap,
+		.k_copyout = kevent_copyout,
+		.k_copyin = kevent_copyin,
+		.kevent_size = sizeof(struct kevent_native),
+	};
+	struct g_kevent_args gk_args = {
+		.fd = uap->fd,
+		.changelist = uap->changelist,
+		.nchanges = uap->nchanges,
+		.eventlist = uap->eventlist,
+		.nevents = uap->nevents,
+		.timeout = uap->timeout,
+	};
+
+	return (kern_kevent_generic(td, &gk_args, &k_ops, "kevent"));
+}
+
+static int
+kern_kevent_generic(struct thread *td, struct g_kevent_args *uap,
+    struct kevent_copyops *k_ops, const char *struct_name)
+{
 	struct timespec ts, *tsp;
-	struct kevent_copyops k_ops = { uap,
-					kevent_copyout,
-					kevent_copyin};
-	int error;
 #ifdef KTRACE
-	struct uio ktruio;
-	struct iovec ktriov;
-	struct uio *ktruioin = NULL;
-	struct uio *ktruioout = NULL;
+	struct kevent *eventlist = uap->eventlist;
 #endif
+	int error;
 
 	if (uap->timeout != NULL) {
 		error = copyin(uap->timeout, &ts, sizeof(ts));
@@ -869,47 +962,54 @@ sys_kevent(struct thread *td, struct kevent_args *uap)
 		tsp = NULL;
 
 #ifdef KTRACE
-	if (KTRPOINT(td, KTR_GENIO)) {
-		ktriov.iov_base = uap->changelist;
-		ktriov.iov_len = uap->nchanges * sizeof(struct kevent);
-		ktruio = (struct uio){ .uio_iov = &ktriov, .uio_iovcnt = 1,
-		    .uio_segflg = UIO_USERSPACE, .uio_rw = UIO_READ,
-		    .uio_td = td };
-		ktruioin = cloneuio(&ktruio);
-		ktriov.iov_base = uap->eventlist;
-		ktriov.iov_len = uap->nevents * sizeof(struct kevent);
-		ktruioout = cloneuio(&ktruio);
-	}
+	if (KTRPOINT(td, KTR_STRUCT_ARRAY))
+		ktrstructarray(struct_name, UIO_USERSPACE, uap->changelist,
+		    uap->nchanges, k_ops->kevent_size);
 #endif
 
 	error = kern_kevent(td, uap->fd, uap->nchanges, uap->nevents,
-	    &k_ops, tsp);
+	    k_ops, tsp);
 
 #ifdef KTRACE
-	if (ktruioin != NULL) {
-		ktruioin->uio_resid = uap->nchanges * sizeof(struct kevent);
-		ktrgenio(uap->fd, UIO_WRITE, ktruioin, 0);
-		ktruioout->uio_resid = td->td_retval[0] * sizeof(struct kevent);
-		ktrgenio(uap->fd, UIO_READ, ktruioout, error);
-	}
+	if (error == 0 && KTRPOINT(td, KTR_STRUCT_ARRAY))
+		ktrstructarray(struct_name, UIO_USERSPACE, eventlist,
+		    td->td_retval[0], k_ops->kevent_size);
 #endif
 
 	return (error);
 }
+	struct kevent_native kev_n[KQ_NEVENTS];
 
 /*
  * Copy 'count' items into the destination list pointed to by uap->eventlist.
  */
 static int
-kevent_copyout(void *arg, struct kevent *kevp, int count)
+kevent_copyout(void *arg, kkevent_t *kevp, int count)
 {
 	struct kevent_args *uap;
+#if __has_feature(capabilities)
+	struct kevent_native ks_n[KQ_NEVENTS];
+	int i;
+#endif
 	int error;
 
 	KASSERT(count <= KQ_NEVENTS, ("count (%d) > KQ_NEVENTS", count));
 	uap = (struct kevent_args *)arg;
 
+#if !__has_feature(capabilities)
 	error = copyout(kevp, uap->eventlist, count * sizeof *kevp);
+#else
+	for (i = 0; i < count; i++) {
+		ks_n[i].ident = kevp[i].ident;
+		ks_n[i].filter = kevp[i].filter;
+		ks_n[i].flags = kevp[i].flags;
+		ks_n[i].fflags = kevp[i].fflags;
+		ks_n[i].data = kevp[i].data;
+		ks_n[i].udata = (void *)(uintptr_t)kevp[i].udata;
+		memcpy(&ks_n[i].ext[0], &kevp->ext[0], sizeof(kevp->ext));
+	}
+	error = copyout(ks_n, uap->eventlist, count * sizeof(*ks_n));
+#endif
 	if (error == 0)
 		uap->eventlist += count;
 	return (error);
@@ -919,19 +1019,118 @@ kevent_copyout(void *arg, struct kevent *kevp, int count)
  * Copy 'count' items from the list pointed to by uap->changelist.
  */
 static int
-kevent_copyin(void *arg, struct kevent *kevp, int count)
+kevent_copyin(void *arg, kkevent_t *kevp, int count)
 {
 	struct kevent_args *uap;
+#if __has_feature(capabilities)
+	struct kevent_native ks_n[KQ_NEVENTS];
+	int i;
+#endif
 	int error;
 
 	KASSERT(count <= KQ_NEVENTS, ("count (%d) > KQ_NEVENTS", count));
 	uap = (struct kevent_args *)arg;
 
+#if !__has_feature(capabilities)
 	error = copyin(uap->changelist, kevp, count * sizeof *kevp);
+#else
+	error = copyin(uap->changelist, ks_n, count * sizeof(*ks_n));
+	if (error != 0)
+		return (error);
+	for (i = 0; i < count; i++) {
+		kevp[i].ident = ks_n[i].ident;
+		kevp[i].filter = ks_n[i].filter;
+		kevp[i].flags = ks_n[i].flags;
+		kevp[i].fflags = ks_n[i].fflags;
+		kevp[i].data = ks_n[i].data;
+		/* Store untagged. */
+		kevp[i].udata = (void * __capability)(intcap_t)ks_n[i].udata;
+		memcpy(&kevp[i].ext[0], &ks_n->ext[0], sizeof(ks_n->ext));
+	}
+#endif
 	if (error == 0)
 		uap->changelist += count;
 	return (error);
 }
+
+#ifdef COMPAT_FREEBSD11
+static int
+kevent11_copyout(void *arg, kkevent_t *kevp, int count)
+{
+	struct freebsd11_kevent_args *uap;
+	struct kevent_freebsd11 kev11;
+	int error, i;
+
+	KASSERT(count <= KQ_NEVENTS, ("count (%d) > KQ_NEVENTS", count));
+	uap = (struct freebsd11_kevent_args *)arg;
+
+	for (i = 0; i < count; i++) {
+		kev11.ident = kevp->ident;
+		kev11.filter = kevp->filter;
+		kev11.flags = kevp->flags;
+		kev11.fflags = kevp->fflags;
+		kev11.data = kevp->data;
+		kev11.udata = (void *)(uintptr_t)kevp->udata;
+		error = copyout(&kev11, uap->eventlist, sizeof(kev11));
+		if (error != 0)
+			break;
+		uap->eventlist++;
+		kevp++;
+	}
+	return (error);
+}
+
+/*
+ * Copy 'count' items from the list pointed to by uap->changelist.
+ */
+static int
+kevent11_copyin(void *arg, kkevent_t *kevp, int count)
+{
+	struct freebsd11_kevent_args *uap;
+	struct kevent_freebsd11 kev11;
+	int error, i;
+
+	KASSERT(count <= KQ_NEVENTS, ("count (%d) > KQ_NEVENTS", count));
+	uap = (struct freebsd11_kevent_args *)arg;
+
+	for (i = 0; i < count; i++) {
+		error = copyin(uap->changelist, &kev11, sizeof(kev11));
+		if (error != 0)
+			break;
+		kevp->ident = kev11.ident;
+		kevp->filter = kev11.filter;
+		kevp->flags = kev11.flags;
+		kevp->fflags = kev11.fflags;
+		kevp->data = (uintptr_t)kev11.data;
+		kevp->udata = (void * __capability)(uintcap_t)kev11.udata;
+		bzero(&kevp->ext, sizeof(kevp->ext));
+		uap->changelist++;
+		kevp++;
+	}
+	return (error);
+}
+
+int
+freebsd11_kevent(struct thread *td, struct freebsd11_kevent_args *uap)
+{
+	struct kevent_copyops k_ops = {
+		.arg = uap,
+		.k_copyout = kevent11_copyout,
+		.k_copyin = kevent11_copyin,
+		.kevent_size = sizeof(struct kevent_freebsd11),
+	};
+	struct g_kevent_args gk_args = {
+		.fd = uap->fd,
+		.changelist = uap->changelist,
+		.nchanges = uap->nchanges,
+		.eventlist = uap->eventlist,
+		.nevents = uap->nevents,
+		.timeout = uap->timeout,
+	};
+
+	return (kern_kevent_generic(td, &gk_args, &k_ops, "kevent_freebsd11"));
+}
+#endif
 
 int
 kern_kevent(struct thread *td, int fd, int nchanges, int nevents,
@@ -960,8 +1159,8 @@ static int
 kqueue_kevent(struct kqueue *kq, struct thread *td, int nchanges, int nevents,
     struct kevent_copyops *k_ops, const struct timespec *timeout)
 {
-	struct kevent keva[KQ_NEVENTS];
-	struct kevent *kevp, *changes;
+	kkevent_t keva[KQ_NEVENTS];
+	kkevent_t *kevp, *changes;
 	int i, n, nerrors, error;
 
 	nerrors = 0;
@@ -1122,17 +1321,22 @@ kqueue_fo_release(int filt)
  * hold any mutexes.
  */
 static int
-kqueue_register(struct kqueue *kq, struct kevent *kev, struct thread *td, int waitok)
+kqueue_register(struct kqueue *kq, kkevent_t *kev, struct thread *td, int waitok)
 {
 	struct filterops *fops;
 	struct file *fp;
 	struct knote *kn, *tkn;
+	struct knlist *knl;
 	cap_rights_t rights;
 	int error, filt, event;
 	int haskqglobal, filedesc_unlock;
 
+	if ((kev->flags & (EV_ENABLE | EV_DISABLE)) == (EV_ENABLE | EV_DISABLE))
+		return (EINVAL);
+
 	fp = NULL;
 	kn = NULL;
+	knl = NULL;
 	error = 0;
 	haskqglobal = 0;
 	filedesc_unlock = 0;
@@ -1156,8 +1360,11 @@ kqueue_register(struct kqueue *kq, struct kevent *kev, struct thread *td, int wa
 findkn:
 	if (fops->f_isfd) {
 		KASSERT(td != NULL, ("td is NULL"));
-		error = fget(td, kev->ident,
-		    cap_rights_init(&rights, CAP_EVENT), &fp);
+		if (kev->ident > INT_MAX)
+			error = EBADF;
+		else
+			error = fget(td, kev->ident,
+			    cap_rights_init(&rights, CAP_EVENT), &fp);
 		if (error)
 			goto done;
 
@@ -1230,7 +1437,7 @@ findkn:
 	}
 
 	/* knote is in the process of changing, wait for it to stabilize. */
-	if (kn != NULL && (kn->kn_status & KN_INFLUX) == KN_INFLUX) {
+	if (kn != NULL && kn_in_flux(kn)) {
 		KQ_GLOBAL_UNLOCK(&kq_global, haskqglobal);
 		if (filedesc_unlock) {
 			FILEDESC_XUNLOCK(td->td_proc->p_fd);
@@ -1274,7 +1481,8 @@ findkn:
 			kn->kn_kevent = *kev;
 			kn->kn_kevent.flags &= ~(EV_ADD | EV_DELETE |
 			    EV_ENABLE | EV_DISABLE | EV_FORCEONESHOT);
-			kn->kn_status = KN_INFLUX|KN_DETACHED;
+			kn->kn_status = KN_DETACHED;
+			kn_enter_flux(kn);
 
 			error = knote_attach(kn, kq);
 			KQ_UNLOCK(kq);
@@ -1284,10 +1492,10 @@ findkn:
 			}
 
 			if ((error = kn->kn_fop->f_attach(kn)) != 0) {
-				knote_drop(kn, td);
+				knote_drop_detached(kn, td);
 				goto done;
 			}
-			KN_LIST_LOCK(kn);
+			knl = kn_list_lock(kn);
 			goto done_ev_add;
 		} else {
 			/* No matching knote and the EV_ADD flag is not set. */
@@ -1298,10 +1506,8 @@ findkn:
 	}
 	
 	if (kev->flags & EV_DELETE) {
-		kn->kn_status |= KN_INFLUX;
+		kn_enter_flux(kn);
 		KQ_UNLOCK(kq);
-		if (!(kn->kn_status & KN_DETACHED))
-			kn->kn_fop->f_detach(kn);
 		knote_drop(kn, td);
 		goto done;
 	}
@@ -1316,13 +1522,10 @@ findkn:
 	 * but doing so will not reset any filter which has already been
 	 * triggered.
 	 */
-	kn->kn_status |= KN_INFLUX | KN_SCAN;
+	kn->kn_status |= KN_SCAN;
+	kn_enter_flux(kn);
 	KQ_UNLOCK(kq);
-	KN_LIST_LOCK(kn);
-#ifdef CPU_CHERI
-	if (kn->kn_kevent.flags & EV_FREEUDATA)
-		free(kn->kn_kevent.udata, M_KQUEUE);
-#endif
+	knl = kn_list_lock(kn);
 	kn->kn_kevent.udata = kev->udata;
 	if (!fops->f_isfd && fops->f_touch != NULL) {
 		fops->f_touch(kn, kev, EVENT_REGISTER);
@@ -1339,27 +1542,25 @@ findkn:
 	 * kn_knlist.
 	 */
 done_ev_add:
-	if ((kev->flags & EV_DISABLE) &&
-	    ((kn->kn_status & KN_DISABLED) == 0)) {
+	if ((kev->flags & EV_ENABLE) != 0)
+		kn->kn_status &= ~KN_DISABLED;
+	else if ((kev->flags & EV_DISABLE) != 0)
 		kn->kn_status |= KN_DISABLED;
-	}
 
 	if ((kn->kn_status & KN_DISABLED) == 0)
 		event = kn->kn_fop->f_event(kn, 0);
 	else
 		event = 0;
+
 	KQ_LOCK(kq);
 	if (event)
-		KNOTE_ACTIVATE(kn, 1);
-	kn->kn_status &= ~(KN_INFLUX | KN_SCAN);
-	KN_LIST_UNLOCK(kn);
-
-	if ((kev->flags & EV_ENABLE) && (kn->kn_status & KN_DISABLED)) {
-		kn->kn_status &= ~KN_DISABLED;
-		if ((kn->kn_status & KN_ACTIVE) &&
-		    ((kn->kn_status & KN_QUEUED) == 0))
-			knote_enqueue(kn);
-	}
+		kn->kn_status |= KN_ACTIVE;
+	if ((kn->kn_status & (KN_ACTIVE | KN_DISABLED | KN_QUEUED)) ==
+	    KN_ACTIVE)
+		knote_enqueue(kn);
+	kn->kn_status &= ~KN_SCAN;
+	kn_leave_flux(kn);
+	kn_list_unlock(knl);
 	KQ_UNLOCK_FLUX(kq);
 
 done:
@@ -1420,7 +1621,7 @@ kqueue_schedtask(struct kqueue *kq)
 	    ("scheduling kqueue task while draining"));
 
 	if ((kq->kq_state & KQ_TASKSCHED) != KQ_TASKSCHED) {
-		taskqueue_enqueue(taskqueue_kqueue, &kq->kq_task);
+		taskqueue_enqueue(taskqueue_kqueue_ctx, &kq->kq_task);
 		kq->kq_state |= KQ_TASKSCHED;
 	}
 }
@@ -1521,14 +1722,15 @@ kqueue_task(void *arg, int pending)
 
 /*
  * Scan, update kn_data (if not ONESHOT), and copyout triggered events.
- * We treat KN_MARKER knotes as if they are INFLUX.
+ * We treat KN_MARKER knotes as if they are in flux.
  */
 static int
 kqueue_scan(struct kqueue *kq, int maxevents, struct kevent_copyops *k_ops,
-    const struct timespec *tsp, struct kevent *keva, struct thread *td)
+    const struct timespec *tsp, kkevent_t *keva, struct thread *td)
 {
-	struct kevent *kevp;
+	kkevent_t *kevp;
 	struct knote *kn, *marker;
+	struct knlist *knl;
 	sbintime_t asbt, rsbt;
 	int count, error, haskqglobal, influx, nkev, touch;
 
@@ -1594,7 +1796,7 @@ retry:
 		kn = TAILQ_FIRST(&kq->kq_head);
 
 		if ((kn->kn_status == KN_MARKER && kn != marker) ||
-		    (kn->kn_status & KN_INFLUX) == KN_INFLUX) {
+		    kn_in_flux(kn)) {
 			if (influx) {
 				influx = 0;
 				KQ_FLUX_WAKEUP(kq);
@@ -1617,52 +1819,49 @@ retry:
 				goto retry;
 			goto done;
 		}
-		KASSERT((kn->kn_status & KN_INFLUX) == 0,
-		    ("KN_INFLUX set when not suppose to be"));
+		KASSERT(!kn_in_flux(kn),
+		    ("knote %p is unexpectedly in flux", kn));
 
 		if ((kn->kn_flags & EV_DROP) == EV_DROP) {
 			kn->kn_status &= ~KN_QUEUED;
-			kn->kn_status |= KN_INFLUX;
+			kn_enter_flux(kn);
 			kq->kq_count--;
 			KQ_UNLOCK(kq);
 			/*
-			 * We don't need to lock the list since we've marked
-			 * it _INFLUX.
+			 * We don't need to lock the list since we've
+			 * marked it as in flux.
 			 */
-			if (!(kn->kn_status & KN_DETACHED))
-				kn->kn_fop->f_detach(kn);
 			knote_drop(kn, td);
 			KQ_LOCK(kq);
 			continue;
 		} else if ((kn->kn_flags & EV_ONESHOT) == EV_ONESHOT) {
 			kn->kn_status &= ~KN_QUEUED;
-			kn->kn_status |= KN_INFLUX;
+			kn_enter_flux(kn);
 			kq->kq_count--;
 			KQ_UNLOCK(kq);
 			/*
-			 * We don't need to lock the list since we've marked
-			 * it _INFLUX.
+			 * We don't need to lock the list since we've
+			 * marked the knote as being in flux.
 			 */
 			*kevp = kn->kn_kevent;
-			if (!(kn->kn_status & KN_DETACHED))
-				kn->kn_fop->f_detach(kn);
 			knote_drop(kn, td);
 			KQ_LOCK(kq);
 			kn = NULL;
 		} else {
-			kn->kn_status |= KN_INFLUX | KN_SCAN;
+			kn->kn_status |= KN_SCAN;
+			kn_enter_flux(kn);
 			KQ_UNLOCK(kq);
 			if ((kn->kn_status & KN_KQUEUE) == KN_KQUEUE)
 				KQ_GLOBAL_LOCK(&kq_global, haskqglobal);
-			KN_LIST_LOCK(kn);
+			knl = kn_list_lock(kn);
 			if (kn->kn_fop->f_event(kn, 0) == 0) {
 				KQ_LOCK(kq);
 				KQ_GLOBAL_UNLOCK(&kq_global, haskqglobal);
-				kn->kn_status &=
-				    ~(KN_QUEUED | KN_ACTIVE | KN_INFLUX |
+				kn->kn_status &= ~(KN_QUEUED | KN_ACTIVE |
 				    KN_SCAN);
+				kn_leave_flux(kn);
 				kq->kq_count--;
-				KN_LIST_UNLOCK(kn);
+				kn_list_unlock(knl);
 				influx = 1;
 				continue;
 			}
@@ -1690,8 +1889,9 @@ retry:
 			} else
 				TAILQ_INSERT_TAIL(&kq->kq_head, kn, kn_tqe);
 			
-			kn->kn_status &= ~(KN_INFLUX | KN_SCAN);
-			KN_LIST_UNLOCK(kn);
+			kn->kn_status &= ~KN_SCAN;
+			kn_leave_flux(kn);
+			kn_list_unlock(knl);
 			influx = 1;
 		}
 
@@ -1838,15 +2038,13 @@ kqueue_drain(struct kqueue *kq, struct thread *td)
 
 	for (i = 0; i < kq->kq_knlistsize; i++) {
 		while ((kn = SLIST_FIRST(&kq->kq_knlist[i])) != NULL) {
-			if ((kn->kn_status & KN_INFLUX) == KN_INFLUX) {
+			if (kn_in_flux(kn)) {
 				kq->kq_state |= KQ_FLUXWAIT;
 				msleep(kq, &kq->kq_lock, PSOCK, "kqclo1", 0);
 				continue;
 			}
-			kn->kn_status |= KN_INFLUX;
+			kn_enter_flux(kn);
 			KQ_UNLOCK(kq);
-			if (!(kn->kn_status & KN_DETACHED))
-				kn->kn_fop->f_detach(kn);
 			knote_drop(kn, td);
 			KQ_LOCK(kq);
 		}
@@ -1854,16 +2052,14 @@ kqueue_drain(struct kqueue *kq, struct thread *td)
 	if (kq->kq_knhashmask != 0) {
 		for (i = 0; i <= kq->kq_knhashmask; i++) {
 			while ((kn = SLIST_FIRST(&kq->kq_knhash[i])) != NULL) {
-				if ((kn->kn_status & KN_INFLUX) == KN_INFLUX) {
+				if (kn_in_flux(kn)) {
 					kq->kq_state |= KQ_FLUXWAIT;
 					msleep(kq, &kq->kq_lock, PSOCK,
 					       "kqclo2", 0);
 					continue;
 				}
-				kn->kn_status |= KN_INFLUX;
+				kn_enter_flux(kn);
 				KQ_UNLOCK(kq);
-				if (!(kn->kn_status & KN_DETACHED))
-					kn->kn_fop->f_detach(kn);
 				knote_drop(kn, td);
 				KQ_LOCK(kq);
 			}
@@ -1994,7 +2190,7 @@ knote(struct knlist *list, long hint, int lockflags)
 		list->kl_lock(list->kl_lockarg); 
 
 	/*
-	 * If we unlock the list lock (and set KN_INFLUX), we can
+	 * If we unlock the list lock (and enter influx), we can
 	 * eliminate the kqueue scheduling, but this will introduce
 	 * four lock/unlock's for each knote to test.  Also, marker
 	 * would be needed to keep iteration position, since filters
@@ -2003,7 +2199,7 @@ knote(struct knlist *list, long hint, int lockflags)
 	SLIST_FOREACH_SAFE(kn, &list->kl_list, kn_selnext, tkn) {
 		kq = kn->kn_kq;
 		KQ_LOCK(kq);
-		if ((kn->kn_status & (KN_INFLUX | KN_SCAN)) == KN_INFLUX) {
+		if (kn_in_flux(kn) && (kn->kn_status & KN_SCAN) == 0) {
 			/*
 			 * Do not process the influx notes, except for
 			 * the influx coming from the kq unlock in the
@@ -2014,11 +2210,11 @@ knote(struct knlist *list, long hint, int lockflags)
 			 */
 			KQ_UNLOCK(kq);
 		} else if ((lockflags & KNF_NOKQLOCK) != 0) {
-			kn->kn_status |= KN_INFLUX;
+			kn_enter_flux(kn);
 			KQ_UNLOCK(kq);
 			error = kn->kn_fop->f_event(kn, hint);
 			KQ_LOCK(kq);
-			kn->kn_status &= ~KN_INFLUX;
+			kn_leave_flux(kn);
 			if (error)
 				KNOTE_ACTIVATE(kn, 1);
 			KQ_UNLOCK_FLUX(kq);
@@ -2040,10 +2236,12 @@ knote(struct knlist *list, long hint, int lockflags)
 void
 knlist_add(struct knlist *knl, struct knote *kn, int islocked)
 {
+
 	KNL_ASSERT_LOCK(knl, islocked);
 	KQ_NOTOWNED(kn->kn_kq);
-	KASSERT((kn->kn_status & (KN_INFLUX|KN_DETACHED)) ==
-	    (KN_INFLUX|KN_DETACHED), ("knote not KN_INFLUX and KN_DETACHED"));
+	KASSERT(kn_in_flux(kn), ("knote %p not in flux", kn));
+	KASSERT((kn->kn_status & KN_DETACHED) != 0,
+	    ("knote %p was not detached", kn));
 	if (!islocked)
 		knl->kl_lock(knl->kl_lockarg);
 	SLIST_INSERT_HEAD(&knl->kl_list, kn, kn_selnext);
@@ -2056,20 +2254,22 @@ knlist_add(struct knlist *knl, struct knote *kn, int islocked)
 }
 
 static void
-knlist_remove_kq(struct knlist *knl, struct knote *kn, int knlislocked, int kqislocked)
+knlist_remove_kq(struct knlist *knl, struct knote *kn, int knlislocked,
+    int kqislocked)
 {
-	KASSERT(!(!!kqislocked && !knlislocked), ("kq locked w/o knl locked"));
+
+	KASSERT(!kqislocked || knlislocked, ("kq locked w/o knl locked"));
 	KNL_ASSERT_LOCK(knl, knlislocked);
 	mtx_assert(&kn->kn_kq->kq_lock, kqislocked ? MA_OWNED : MA_NOTOWNED);
-	if (!kqislocked)
-		KASSERT((kn->kn_status & (KN_INFLUX|KN_DETACHED)) == KN_INFLUX,
-    ("knlist_remove called w/o knote being KN_INFLUX or already removed"));
+	KASSERT(kqislocked || kn_in_flux(kn), ("knote %p not in flux", kn));
+	KASSERT((kn->kn_status & KN_DETACHED) == 0,
+	    ("knote %p was already detached", kn));
 	if (!knlislocked)
 		knl->kl_lock(knl->kl_lockarg);
 	SLIST_REMOVE(&knl->kl_list, kn, knote, kn_selnext);
 	kn->kn_knlist = NULL;
 	if (!knlislocked)
-		knl->kl_unlock(knl->kl_lockarg);
+		kn_list_unlock(knl);
 	if (!kqislocked)
 		KQ_LOCK(kn->kn_kq);
 	kn->kn_status |= KN_DETACHED;
@@ -2087,28 +2287,17 @@ knlist_remove(struct knlist *knl, struct knote *kn, int islocked)
 	knlist_remove_kq(knl, kn, islocked, 0);
 }
 
-/*
- * remove knote from the specified knlist while in f_event handler.
- */
-void
-knlist_remove_inevent(struct knlist *knl, struct knote *kn)
-{
-
-	knlist_remove_kq(knl, kn, 1,
-	    (kn->kn_status & KN_HASKQLOCK) == KN_HASKQLOCK);
-}
-
 int
 knlist_empty(struct knlist *knl)
 {
 
 	KNL_ASSERT_LOCKED(knl);
-	return SLIST_EMPTY(&knl->kl_list);
+	return (SLIST_EMPTY(&knl->kl_list));
 }
 
-static struct mtx	knlist_lock;
+static struct mtx knlist_lock;
 MTX_SYSINIT(knlist_lock, &knlist_lock, "knlist lock for lockless objects",
-	MTX_DEF);
+    MTX_DEF);
 static void knlist_mtx_lock(void *arg);
 static void knlist_mtx_unlock(void *arg);
 
@@ -2196,6 +2385,7 @@ knlist_init(struct knlist *knl, void *lock, void (*kl_lock)(void *),
 	else
 		knl->kl_assert_unlocked = kl_assert_unlocked;
 
+	knl->kl_autodestroy = 0;
 	SLIST_INIT(&knl->kl_list);
 }
 
@@ -2204,6 +2394,16 @@ knlist_init_mtx(struct knlist *knl, struct mtx *lock)
 {
 
 	knlist_init(knl, lock, NULL, NULL, NULL, NULL);
+}
+
+struct knlist *
+knlist_alloc(struct mtx *lock)
+{
+	struct knlist *knl;
+
+	knl = malloc(sizeof(struct knlist), M_KQUEUE, M_WAITOK);
+	knlist_init_mtx(knl, lock);
+	return (knl);
 }
 
 void
@@ -2218,17 +2418,20 @@ void
 knlist_destroy(struct knlist *knl)
 {
 
-#ifdef INVARIANTS
-	/*
-	 * if we run across this error, we need to find the offending
-	 * driver and have it call knlist_clear or knlist_delete.
-	 */
-	if (!SLIST_EMPTY(&knl->kl_list))
-		printf("WARNING: destroying knlist w/ knotes on it!\n");
-#endif
+	KASSERT(KNLIST_EMPTY(knl),
+	    ("destroying knlist %p with knotes on it", knl));
+}
 
-	knl->kl_lockarg = knl->kl_lock = knl->kl_unlock = NULL;
-	SLIST_INIT(&knl->kl_list);
+void
+knlist_detach(struct knlist *knl)
+{
+
+	KNL_ASSERT_LOCKED(knl);
+	knl->kl_autodestroy = 1;
+	if (knlist_empty(knl)) {
+		knlist_destroy(knl);
+		free(knl, M_KQUEUE);
+	}
 }
 
 /*
@@ -2241,6 +2444,7 @@ knlist_cleardel(struct knlist *knl, struct thread *td, int islocked, int killkn)
 	struct knote *kn, *kn2;
 	struct kqueue *kq;
 
+	KASSERT(!knl->kl_autodestroy, ("cleardel for autodestroy %p", knl));
 	if (islocked)
 		KNL_ASSERT_LOCKED(knl);
 	else {
@@ -2252,30 +2456,29 @@ again:		/* need to reacquire lock since we have dropped it */
 	SLIST_FOREACH_SAFE(kn, &knl->kl_list, kn_selnext, kn2) {
 		kq = kn->kn_kq;
 		KQ_LOCK(kq);
-		if ((kn->kn_status & KN_INFLUX)) {
+		if (kn_in_flux(kn)) {
 			KQ_UNLOCK(kq);
 			continue;
 		}
 		knlist_remove_kq(knl, kn, 1, 1);
 		if (killkn) {
-			kn->kn_status |= KN_INFLUX | KN_DETACHED;
+			kn_enter_flux(kn);
 			KQ_UNLOCK(kq);
-			knote_drop(kn, td);
+			knote_drop_detached(kn, td);
 		} else {
 			/* Make sure cleared knotes disappear soon */
-			kn->kn_flags |= (EV_EOF | EV_ONESHOT);
+			kn->kn_flags |= EV_EOF | EV_ONESHOT;
 			KQ_UNLOCK(kq);
 		}
 		kq = NULL;
 	}
 
 	if (!SLIST_EMPTY(&knl->kl_list)) {
-		/* there are still KN_INFLUX remaining */
+		/* there are still in flux knotes remaining */
 		kn = SLIST_FIRST(&knl->kl_list);
 		kq = kn->kn_kq;
 		KQ_LOCK(kq);
-		KASSERT(kn->kn_status & KN_INFLUX,
-		    ("knote removed w/o list lock"));
+		KASSERT(kn_in_flux(kn), ("knote removed w/o list lock"));
 		knl->kl_unlock(knl->kl_lockarg);
 		kq->kq_state |= KQ_FLUXWAIT;
 		msleep(kq, &kq->kq_lock, PSOCK | PDROP, "kqkclr", 0);
@@ -2317,7 +2520,7 @@ again:
 		influx = 0;
 		while (kq->kq_knlistsize > fd &&
 		    (kn = SLIST_FIRST(&kq->kq_knlist[fd])) != NULL) {
-			if (kn->kn_status & KN_INFLUX) {
+			if (kn_in_flux(kn)) {
 				/* someone else might be waiting on our knote */
 				if (influx)
 					wakeup(kq);
@@ -2325,12 +2528,10 @@ again:
 				msleep(kq, &kq->kq_lock, PSOCK, "kqflxwt", 0);
 				goto again;
 			}
-			kn->kn_status |= KN_INFLUX;
+			kn_enter_flux(kn);
 			KQ_UNLOCK(kq);
-			if (!(kn->kn_status & KN_DETACHED))
-				kn->kn_fop->f_detach(kn);
-			knote_drop(kn, td);
 			influx = 1;
+			knote_drop(kn, td);
 			KQ_LOCK(kq);
 		}
 		KQ_UNLOCK_FLUX(kq);
@@ -2342,42 +2543,47 @@ knote_attach(struct knote *kn, struct kqueue *kq)
 {
 	struct klist *list;
 
-	KASSERT(kn->kn_status & KN_INFLUX, ("knote not marked INFLUX"));
+	KASSERT(kn_in_flux(kn), ("knote %p not marked influx", kn));
 	KQ_OWNED(kq);
 
 	if (kn->kn_fop->f_isfd) {
 		if (kn->kn_id >= kq->kq_knlistsize)
-			return ENOMEM;
+			return (ENOMEM);
 		list = &kq->kq_knlist[kn->kn_id];
 	} else {
 		if (kq->kq_knhash == NULL)
-			return ENOMEM;
+			return (ENOMEM);
 		list = &kq->kq_knhash[KN_HASH(kn->kn_id, kq->kq_knhashmask)];
 	}
-
 	SLIST_INSERT_HEAD(list, kn, kn_link);
-
-	return 0;
+	return (0);
 }
 
-/*
- * knote must already have been detached using the f_detach method.
- * no lock need to be held, it is assumed that the KN_INFLUX flag is set
- * to prevent other removal.
- */
 static void
 knote_drop(struct knote *kn, struct thread *td)
+{
+
+	if ((kn->kn_status & KN_DETACHED) == 0)
+		kn->kn_fop->f_detach(kn);
+	knote_drop_detached(kn, td);
+}
+
+static void
+knote_drop_detached(struct knote *kn, struct thread *td)
 {
 	struct kqueue *kq;
 	struct klist *list;
 
 	kq = kn->kn_kq;
 
+	KASSERT((kn->kn_status & KN_DETACHED) != 0,
+	    ("knote %p still attached", kn));
 	KQ_NOTOWNED(kq);
-	KASSERT((kn->kn_status & KN_INFLUX) == KN_INFLUX,
-	    ("knote_drop called without KN_INFLUX set in kn_status"));
 
 	KQ_LOCK(kq);
+	KASSERT(kn->kn_influx == 1,
+	    ("knote_drop called on %p with influx %d", kn, kn->kn_influx));
+
 	if (kn->kn_fop->f_isfd)
 		list = &kq->kq_knlist[kn->kn_id];
 	else
@@ -2446,10 +2652,6 @@ static void
 knote_free(struct knote *kn)
 {
 
-#ifdef CPU_CHERI
-	if (kn && (kn->kn_kevent.flags & EV_FREEUDATA))
-		free(kn->kn_kevent.udata, M_KQUEUE);
-#endif
 	uma_zfree(knote_zone, kn);
 }
 
@@ -2457,7 +2659,7 @@ knote_free(struct knote *kn)
  * Register the kev w/ the kq specified by fd.
  */
 int 
-kqfd_register(int fd, struct kevent *kev, struct thread *td, int waitok)
+kqfd_register(int fd, kkevent_t *kev, struct thread *td, int waitok)
 {
 	struct kqueue *kq;
 	struct file *fp;
@@ -2471,11 +2673,9 @@ kqfd_register(int fd, struct kevent *kev, struct thread *td, int waitok)
 		goto noacquire;
 
 	error = kqueue_register(kq, kev, td, waitok);
-
 	kqueue_release(kq, 0);
 
 noacquire:
 	fdrop(fp, td);
-
-	return error;
+	return (error);
 }

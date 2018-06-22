@@ -21,10 +21,10 @@ using namespace llvm::opt;
 #undef PREFIX
 
 static const OptTable::Info InfoTable[] = {
-#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM, \
-               HELPTEXT, METAVAR)   \
-  { PREFIX, NAME, HELPTEXT, METAVAR, OPT_##ID, Option::KIND##Class, PARAM, \
-    FLAGS, OPT_##GROUP, OPT_##ALIAS, ALIASARGS },
+#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
+               HELPTEXT, METAVAR, VALUES)                                      \
+  {PREFIX, NAME,  HELPTEXT,    METAVAR,     OPT_##ID,  Option::KIND##Class,    \
+   PARAM,  FLAGS, OPT_##GROUP, OPT_##ALIAS, ALIASARGS, VALUES},
 #include "clang/Driver/Options.inc"
 #undef OPTION
 };
@@ -34,11 +34,11 @@ namespace {
 class DriverOptTable : public OptTable {
 public:
   DriverOptTable()
-    : OptTable(InfoTable, llvm::array_lengthof(InfoTable)) {}
+    : OptTable(InfoTable) {}
 };
 
 }
 
-OptTable *clang::driver::createDriverOptTable() {
-  return new DriverOptTable();
+std::unique_ptr<OptTable> clang::driver::createDriverOptTable() {
+  return llvm::make_unique<DriverOptTable>();
 }

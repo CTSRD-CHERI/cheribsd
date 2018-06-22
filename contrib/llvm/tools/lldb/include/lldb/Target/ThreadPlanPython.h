@@ -1,4 +1,5 @@
-//===-- ThreadPlanPython.h --------------------------------------------*- C++ -*-===//
+//===-- ThreadPlanPython.h --------------------------------------------*- C++
+//-*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -13,18 +14,18 @@
 // C Includes
 // C++ Includes
 #include <string>
+
 // Other libraries and framework includes
 // Project includes
-#include "lldb/lldb-private.h"
-#include "lldb/Core/StructuredData.h"
-#include "lldb/Core/UserID.h"
-#include "lldb/Host/Mutex.h"
 #include "lldb/Target/Process.h"
+#include "lldb/Target/StopInfo.h"
 #include "lldb/Target/Target.h"
 #include "lldb/Target/Thread.h"
 #include "lldb/Target/ThreadPlan.h"
 #include "lldb/Target/ThreadPlanTracer.h"
-#include "lldb/Target/StopInfo.h"
+#include "lldb/Utility/StructuredData.h"
+#include "lldb/Utility/UserID.h"
+#include "lldb/lldb-private.h"
 
 namespace lldb_private {
 
@@ -33,49 +34,39 @@ namespace lldb_private {
 //
 //------------------------------------------------------------------
 
-class ThreadPlanPython : public ThreadPlan
-{
+class ThreadPlanPython : public ThreadPlan {
 public:
-    ThreadPlanPython (Thread &thread, const char *class_name);
-    virtual ~ThreadPlanPython ();
-    
-    virtual void
-    GetDescription (Stream *s,
-                    lldb::DescriptionLevel level);
+  ThreadPlanPython(Thread &thread, const char *class_name);
+  ~ThreadPlanPython() override;
 
-    virtual bool
-    ValidatePlan (Stream *error);
+  void GetDescription(Stream *s, lldb::DescriptionLevel level) override;
 
-    virtual bool
-    ShouldStop (Event *event_ptr);
+  bool ValidatePlan(Stream *error) override;
 
-    virtual bool
-    MischiefManaged ();
+  bool ShouldStop(Event *event_ptr) override;
 
-    virtual bool
-    WillStop ();
+  bool MischiefManaged() override;
 
-    virtual bool
-    StopOthers ();
+  bool WillStop() override;
 
-    virtual void
-    DidPush ();
+  bool StopOthers() override;
+
+  void DidPush() override;
+
+  bool IsPlanStale() override;
 
 protected:
-    virtual bool
-    DoPlanExplainsStop (Event *event_ptr);
-    
-    virtual lldb::StateType
-    GetPlanRunState ();
+  bool DoPlanExplainsStop(Event *event_ptr) override;
+
+  lldb::StateType GetPlanRunState() override;
 
 private:
   std::string m_class_name;
   StructuredData::ObjectSP m_implementation_sp;
 
-    DISALLOW_COPY_AND_ASSIGN(ThreadPlanPython);
+  DISALLOW_COPY_AND_ASSIGN(ThreadPlanPython);
 };
-
 
 } // namespace lldb_private
 
-#endif  // liblldb_ThreadPlan_Python_h_
+#endif // liblldb_ThreadPlan_Python_h_

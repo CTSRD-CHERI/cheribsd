@@ -30,7 +30,7 @@
 
 #include "_libelftc.h"
 
-ELFTC_VCSID("$Id: libelftc_bfdtarget.c 3174 2015-03-27 17:13:41Z emaste $");
+ELFTC_VCSID("$Id: libelftc_bfdtarget.c 3516 2017-02-10 02:33:08Z emaste $");
 
 struct _Elftc_Bfd_Target _libelftc_targets[] = {
 
@@ -127,6 +127,15 @@ struct _Elftc_Bfd_Target _libelftc_targets[] = {
 	},
 
 	{
+		.bt_name      = "elf32-powerpc-freebsd",
+		.bt_type      = ETF_ELF,
+		.bt_byteorder = ELFDATA2MSB,
+		.bt_elfclass  = ELFCLASS32,
+		.bt_machine   = EM_PPC,
+		.bt_osabi     = ELFOSABI_FREEBSD,
+	},
+
+	{
 		.bt_name      = "elf32-powerpcle",
 		.bt_type      = ETF_ELF,
 		.bt_byteorder = ELFDATA2LSB,
@@ -195,6 +204,22 @@ struct _Elftc_Bfd_Target _libelftc_targets[] = {
 	},
 
 	{
+		.bt_name      = "elf32-tradbigmips",
+		.bt_type      = ETF_ELF,
+		.bt_byteorder = ELFDATA2MSB,
+		.bt_elfclass  = ELFCLASS32,
+		.bt_machine   = EM_MIPS,
+	},
+
+	{
+		.bt_name      = "elf32-tradlittlemips",
+		.bt_type      = ETF_ELF,
+		.bt_byteorder = ELFDATA2LSB,
+		.bt_elfclass  = ELFCLASS32,
+		.bt_machine   = EM_MIPS,
+	},
+
+	{
 		.bt_name      = "elf64-alpha",
 		.bt_type      = ETF_ELF,
 		.bt_byteorder = ELFDATA2LSB,
@@ -250,6 +275,14 @@ struct _Elftc_Bfd_Target _libelftc_targets[] = {
 	},
 
 	{
+		.bt_name      = "elf64-littleaarch64",
+		.bt_type      = ETF_ELF,
+		.bt_byteorder = ELFDATA2LSB,
+		.bt_elfclass  = ELFCLASS64,
+		.bt_machine   = EM_AARCH64,
+	},
+
+	{
 		.bt_name      = "elf64-littlemips",
 		.bt_type      = ETF_ELF,
 		.bt_byteorder = ELFDATA2LSB,
@@ -263,6 +296,15 @@ struct _Elftc_Bfd_Target _libelftc_targets[] = {
 		.bt_byteorder = ELFDATA2MSB,
 		.bt_elfclass  = ELFCLASS64,
 		.bt_machine   = EM_PPC64,
+	},
+
+	{
+		.bt_name      = "elf64-powerpc-freebsd",
+		.bt_type      = ETF_ELF,
+		.bt_byteorder = ELFDATA2MSB,
+		.bt_elfclass  = ELFCLASS64,
+		.bt_machine   = EM_PPC64,
+		.bt_osabi     = ELFOSABI_FREEBSD,
 	},
 
 	{
@@ -343,6 +385,22 @@ struct _Elftc_Bfd_Target _libelftc_targets[] = {
 	},
 
 	{
+		.bt_name      = "elf64-tradbigmips",
+		.bt_type      = ETF_ELF,
+		.bt_byteorder = ELFDATA2MSB,
+		.bt_elfclass  = ELFCLASS64,
+		.bt_machine   = EM_MIPS,
+	},
+
+	{
+		.bt_name      = "elf64-tradlittlemips",
+		.bt_type      = ETF_ELF,
+		.bt_byteorder = ELFDATA2LSB,
+		.bt_elfclass  = ELFCLASS64,
+		.bt_machine   = EM_MIPS,
+	},
+
+	{
 		.bt_name      = "elf64-x86-64",
 		.bt_type      = ETF_ELF,
 		.bt_byteorder =	ELFDATA2LSB,
@@ -372,6 +430,30 @@ struct _Elftc_Bfd_Target _libelftc_targets[] = {
 	{
 		.bt_name = "symbolsrec",
 		.bt_type = ETF_SREC,
+	},
+
+	{
+		.bt_name    = "efi-app-ia32",
+		.bt_type    = ETF_EFI,
+		.bt_machine = EM_386,
+	},
+
+	{
+		.bt_name    = "efi-app-x86_64",
+		.bt_type    = ETF_EFI,
+		.bt_machine = EM_X86_64,
+	},
+
+	{
+		.bt_name    = "pei-i386",
+		.bt_type    = ETF_PE,
+		.bt_machine = EM_386,
+	},
+
+	{
+		.bt_name    = "pei-x86-64",
+		.bt_type    = ETF_PE,
+		.bt_machine = EM_X86_64,
 	},
 
 	{

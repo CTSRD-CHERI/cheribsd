@@ -1,71 +1,65 @@
-//===-- RegisterContextCorePOSIX_powerpc.h ----------------------*- C++ -*-===//
+//===-- RegisterContextPOSIXCore_powerpc.h ----------------------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
 // This file is distributed under the University of Illinois Open Source
 // License. See LICENSE.TXT for details.
 //
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
-#ifndef liblldb_RegisterContextCorePOSIX_powerpc_H_
-#define liblldb_RegisterContextCorePOSIX_powerpc_H_
+#ifndef liblldb_RegisterContextCorePOSIX_powerpc_h_
+#define liblldb_RegisterContextCorePOSIX_powerpc_h_
 
-#include "lldb/Core/DataBufferHeap.h"
+// C Includes
+// C++ Includes
+// Other libraries and framework includes
+// Project includes
 #include "Plugins/Process/Utility/RegisterContextPOSIX_powerpc.h"
+#include "lldb/Utility/DataExtractor.h"
 
-class RegisterContextCorePOSIX_powerpc :
-    public RegisterContextPOSIX_powerpc
-{
+class RegisterContextCorePOSIX_powerpc : public RegisterContextPOSIX_powerpc {
 public:
-    RegisterContextCorePOSIX_powerpc (lldb_private::Thread &thread,
-                                     lldb_private::RegisterInfoInterface *register_info,
-                                     const lldb_private::DataExtractor &gpregset,
-                                     const lldb_private::DataExtractor &fpregset,
-                                     const lldb_private::DataExtractor &vregset);
+  RegisterContextCorePOSIX_powerpc(
+      lldb_private::Thread &thread,
+      lldb_private::RegisterInfoInterface *register_info,
+      const lldb_private::DataExtractor &gpregset,
+      const lldb_private::DataExtractor &fpregset,
+      const lldb_private::DataExtractor &vregset);
 
-    ~RegisterContextCorePOSIX_powerpc();
+  ~RegisterContextCorePOSIX_powerpc() override;
 
-    virtual bool
-    ReadRegister(const lldb_private::RegisterInfo *reg_info, lldb_private::RegisterValue &value);
+  bool ReadRegister(const lldb_private::RegisterInfo *reg_info,
+                    lldb_private::RegisterValue &value) override;
 
-    virtual bool
-    WriteRegister(const lldb_private::RegisterInfo *reg_info, const lldb_private::RegisterValue &value);
+  bool WriteRegister(const lldb_private::RegisterInfo *reg_info,
+                     const lldb_private::RegisterValue &value) override;
 
-    bool
-    ReadAllRegisterValues(lldb::DataBufferSP &data_sp);
+  bool ReadAllRegisterValues(lldb::DataBufferSP &data_sp) override;
 
-    bool
-    WriteAllRegisterValues(const lldb::DataBufferSP &data_sp);
+  bool WriteAllRegisterValues(const lldb::DataBufferSP &data_sp) override;
 
-    bool
-    HardwareSingleStep(bool enable);
+  bool HardwareSingleStep(bool enable) override;
 
 protected:
-    bool
-    ReadGPR();
+  bool ReadGPR() override;
 
-    bool
-    ReadFPR();
+  bool ReadFPR() override;
 
-    bool
-    ReadVMX();
+  bool ReadVMX() override;
 
-    bool
-    WriteGPR();
+  bool WriteGPR() override;
 
-    bool
-    WriteFPR();
+  bool WriteFPR() override;
 
-    bool
-    WriteVMX();
+  bool WriteVMX() override;
 
 private:
-    lldb::DataBufferSP m_gpr_buffer;
-    lldb::DataBufferSP m_fpr_buffer;
-    lldb::DataBufferSP m_vec_buffer;
-    lldb_private::DataExtractor m_gpr;
-    lldb_private::DataExtractor m_fpr;
-    lldb_private::DataExtractor m_vec;
+  lldb::DataBufferSP m_gpr_buffer;
+  lldb::DataBufferSP m_fpr_buffer;
+  lldb::DataBufferSP m_vec_buffer;
+  lldb_private::DataExtractor m_gpr;
+  lldb_private::DataExtractor m_fpr;
+  lldb_private::DataExtractor m_vec;
 };
 
-#endif // #ifndef liblldb_RegisterContextCorePOSIX_powerpc_H_
+#endif // liblldb_RegisterContextCorePOSIX_powerpc_h_

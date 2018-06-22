@@ -82,10 +82,7 @@ static bool evenFlexibleArraySize(ASTContext &Ctx, CharUnits RegionSize,
   if (Left.isNegative())
     return false;
 
-  if (Left % FlexSize == 0)
-    return true;
-
-  return false;
+  return Left % FlexSize == 0;
 }
 
 void CastSizeChecker::checkPreStmt(const CastExpr *CE,CheckerContext &C) const {
@@ -131,7 +128,7 @@ void CastSizeChecker::checkPreStmt(const CastExpr *CE,CheckerContext &C) const {
   if (evenFlexibleArraySize(Ctx, regionSize, typeSize, ToPointeeTy))
     return;
 
-  if (ExplodedNode *errorNode = C.generateSink()) {
+  if (ExplodedNode *errorNode = C.generateErrorNode()) {
     if (!BT)
       BT.reset(new BuiltinBug(this, "Cast region with wrong size.",
                                     "Cast a region whose size is not a multiple"
@@ -143,5 +140,10 @@ void CastSizeChecker::checkPreStmt(const CastExpr *CE,CheckerContext &C) const {
 }
 
 void ento::registerCastSizeChecker(CheckerManager &mgr) {
-  mgr.registerChecker<CastSizeChecker>();
+  // PR31226: C++ is more complicated than what this checker currently supports.
+  // There are derived-to-base casts, there are different rules for 0-size
+  // structures, no flexible arrays, etc.
+  // FIXME: Disabled on C++ for now.
+  if (!mgr.getLangOpts().CPlusPlus)
+    mgr.registerChecker<CastSizeChecker>();
 }

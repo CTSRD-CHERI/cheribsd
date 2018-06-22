@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2000 Assar Westerlund
  * All rights reserved.
  *
@@ -79,7 +81,7 @@ struct l_cmsghdr {
 	l_int		cmsg_type;
 };
 
-/* Ancilliary data object information macros */
+/* Ancillary data object information macros */
 
 #define LINUX_CMSG_ALIGN(len)	roundup2(len, sizeof(l_ulong))
 #define LINUX_CMSG_DATA(cmsg)	((void *)((char *)(cmsg) + \
@@ -141,134 +143,15 @@ struct l_ucred {
 };
 
 #if defined(__i386__) || (defined(__amd64__) && defined(COMPAT_LINUX32))
-
-struct linux_sendto_args {
-	int s;
-	l_uintptr_t msg;
-	int len;
-	int flags;
-	l_uintptr_t to;
-	int tolen;
-};
-
-struct linux_socket_args {
-	int domain;
-	int type;
-	int protocol;
-};
-
-struct linux_bind_args {
-	int s;
-	l_uintptr_t name;
-	int namelen;
-};
-
-struct linux_connect_args {
-	int s;
-	l_uintptr_t name;
-	int namelen;
-};
-
-struct linux_listen_args {
-	int s;
-	int backlog;
-};
-
 struct linux_accept_args {
-	int s;
-	l_uintptr_t addr;
-	l_uintptr_t namelen;
+	register_t s;
+	register_t addr;
+	register_t namelen;
 };
 
-struct linux_accept4_args {
-	int s;
-	l_uintptr_t addr;
-	l_uintptr_t namelen;
-	int flags;
-};
-
-struct linux_getsockname_args {
-	int s;
-	l_uintptr_t addr;
-	l_uintptr_t namelen;
-};
-
-struct linux_getpeername_args {
-	int s;
-	l_uintptr_t addr;
-	l_uintptr_t namelen;
-};
-
-struct linux_socketpair_args {
-	int domain;
-	int type;
-	int protocol;
-	l_uintptr_t rsv;
-};
-
-struct linux_recvfrom_args {
-	int s;
-	l_uintptr_t buf;
-	int len;
-	int flags;
-	l_uintptr_t from;
-	l_uintptr_t fromlen;
-};
-
-struct linux_sendmsg_args {
-	int s;
-	l_uintptr_t msg;
-	int flags;
-};
-
-struct linux_recvmsg_args {
-	int s;
-	l_uintptr_t msg;
-	int flags;
-};
-
-struct linux_shutdown_args {
-	int s;
-	int how;
-};
-
-struct linux_setsockopt_args {
-	int s;
-	int level;
-	int optname;
-	l_uintptr_t optval;
-	int optlen;
-};
-
-struct linux_getsockopt_args {
-	int s;
-	int level;
-	int optname;
-	l_uintptr_t optval;
-	l_uintptr_t optlen;
-};
-
-int linux_socket(struct thread *td, struct linux_socket_args *args);
-int linux_bind(struct thread *td, struct linux_bind_args *args);
-int linux_connect(struct thread *, struct linux_connect_args *);
-int linux_listen(struct thread *td, struct linux_listen_args *args);
 int linux_accept(struct thread *td, struct linux_accept_args *args);
-int linux_accept4(struct thread *td, struct linux_accept4_args *args);
-int linux_getsockname(struct thread *td, struct linux_getsockname_args *args);
-int linux_getpeername(struct thread *td, struct linux_getpeername_args *args);
-int linux_socketpair(struct thread *td, struct linux_socketpair_args *args);
-int linux_sendto(struct thread *td, struct linux_sendto_args *args);
-int linux_recvfrom(struct thread *td, struct linux_recvfrom_args *args);
-int linux_sendmsg(struct thread *td, struct linux_sendmsg_args *args);
-int linux_recvmsg(struct thread *td, struct linux_recvmsg_args *args);
-int linux_shutdown(struct thread *td, struct linux_shutdown_args *args);
-int linux_setsockopt(struct thread *td, struct linux_setsockopt_args *args);
-int linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args);
-
-#endif /* __i386__ || (__amd64__ && COMPAT_LINUX32) */
 
 /* Operations for socketcall */
-
 #define	LINUX_SOCKET 		1
 #define	LINUX_BIND		2
 #define	LINUX_CONNECT 		3
@@ -289,6 +172,40 @@ int linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args);
 #define	LINUX_ACCEPT4		18
 #define	LINUX_RECVMMSG		19
 #define	LINUX_SENDMMSG		20
+#endif /* __i386__ || (__amd64__ && COMPAT_LINUX32) */
+
+/* Socket defines */
+#define	LINUX_SOL_SOCKET	1
+#define	LINUX_SOL_IP		0
+#define	LINUX_SOL_TCP		6
+#define	LINUX_SOL_UDP		17
+#define	LINUX_SOL_IPV6		41
+#define	LINUX_SOL_IPX		256
+#define	LINUX_SOL_AX25		257
+
+#define	LINUX_SO_DEBUG		1
+#define	LINUX_SO_REUSEADDR	2
+#define	LINUX_SO_TYPE		3
+#define	LINUX_SO_ERROR		4
+#define	LINUX_SO_DONTROUTE	5
+#define	LINUX_SO_BROADCAST	6
+#define	LINUX_SO_SNDBUF		7
+#define	LINUX_SO_RCVBUF		8
+#define	LINUX_SO_KEEPALIVE	9
+#define	LINUX_SO_OOBINLINE	10
+#define	LINUX_SO_NO_CHECK	11
+#define	LINUX_SO_PRIORITY	12
+#define	LINUX_SO_LINGER		13
+#ifndef LINUX_SO_PASSCRED	/* powerpc differs */
+#define	LINUX_SO_PASSCRED	16
+#define	LINUX_SO_PEERCRED	17
+#define	LINUX_SO_RCVLOWAT	18
+#define	LINUX_SO_SNDLOWAT	19
+#define	LINUX_SO_RCVTIMEO	20
+#define	LINUX_SO_SNDTIMEO	21
+#endif
+#define	LINUX_SO_TIMESTAMP	29
+#define	LINUX_SO_ACCEPTCONN	30
 
 /* Socket options */
 #define	LINUX_IP_TOS		1
@@ -301,6 +218,31 @@ int linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args);
 #define	LINUX_IP_MULTICAST_LOOP		34
 #define	LINUX_IP_ADD_MEMBERSHIP		35
 #define	LINUX_IP_DROP_MEMBERSHIP	36
+
+#define	LINUX_IPV6_CHECKSUM		7
+#define	LINUX_IPV6_NEXTHOP		9
+#define	LINUX_IPV6_UNICAST_HOPS		16
+#define	LINUX_IPV6_MULTICAST_IF		17
+#define	LINUX_IPV6_MULTICAST_HOPS	18
+#define	LINUX_IPV6_MULTICAST_LOOP	19
+#define	LINUX_IPV6_ADD_MEMBERSHIP	20
+#define	LINUX_IPV6_DROP_MEMBERSHIP	21
+#define	LINUX_IPV6_V6ONLY		26
+
+#define	LINUX_IPV6_RECVPKTINFO		49
+#define	LINUX_IPV6_PKTINFO		50
+#define	LINUX_IPV6_RECVHOPLIMIT		51
+#define	LINUX_IPV6_HOPLIMIT		52
+#define	LINUX_IPV6_RECVHOPOPTS		53
+#define	LINUX_IPV6_HOPOPTS		54
+#define	LINUX_IPV6_RTHDRDSTOPTS		55
+#define	LINUX_IPV6_RECVRTHDR		56
+#define	LINUX_IPV6_RTHDR		57
+#define	LINUX_IPV6_RECVDSTOPTS		58
+#define	LINUX_IPV6_DSTOPTS		59
+#define	LINUX_IPV6_RECVPATHMTU		60
+#define	LINUX_IPV6_PATHMTU		61
+#define	LINUX_IPV6_DONTFRAG		62
 
 #define	LINUX_TCP_NODELAY	1
 #define	LINUX_TCP_MAXSEG	2

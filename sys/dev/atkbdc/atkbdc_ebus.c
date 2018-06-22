@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1999 Kazutaka YOKOTA <yokota@zodiac.mech.utsunomiya-u.ac.jp>
  * Copyright (c) 2005 Marius Strobl <marius@FreeBSD.org>
  * All rights reserved.
@@ -242,14 +244,14 @@ atkbdc_ebus_attach(device_t dev)
 			device_printf(dev,
 			    "<%s>: only two children per 8042 supported\n",
 			    cname);
-			free(cname, M_OFWPROP);
+			OF_prop_free(cname);
 			continue;
 		}
 		adi = malloc(sizeof(struct atkbdc_device), M_ATKBDDEV,
 		    M_NOWAIT | M_ZERO);
 		if (adi == NULL) {
 			device_printf(dev, "<%s>: malloc failed\n", cname);
-			free(cname, M_OFWPROP);
+			OF_prop_free(cname);
 			continue;
 		}
 		if (strcmp(cname, "kb_ps2") == 0) {
@@ -261,7 +263,7 @@ atkbdc_ebus_attach(device_t dev)
 		} else {
 			device_printf(dev, "<%s>: unknown device\n", cname);
 			free(adi, M_ATKBDDEV);
-			free(cname, M_OFWPROP);
+			OF_prop_free(cname);
 			continue;
 		}
 		intr = bus_get_resource_start(dev, SYS_RES_IRQ, adi->rid);
@@ -270,7 +272,7 @@ atkbdc_ebus_attach(device_t dev)
 			    "<%s>: cannot determine interrupt resource\n",
 			    cname);
 			free(adi, M_ATKBDDEV);
-			free(cname, M_OFWPROP);
+			OF_prop_free(cname);
 			continue;
 		}
 		resource_list_init(&adi->resources);
@@ -281,7 +283,7 @@ atkbdc_ebus_attach(device_t dev)
 			    cname);
 			resource_list_free(&adi->resources);
 			free(adi, M_ATKBDDEV);
-			free(cname, M_OFWPROP);
+			OF_prop_free(cname);
 			continue;
 		}
 		device_set_ivars(cdev, adi);

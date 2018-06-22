@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2004-2009 Pawel Jakub Dawidek <pjd@FreeBSD.org>
  * All rights reserved.
  *
@@ -635,8 +637,7 @@ get_class(int *argc, char ***argv)
 	} else if (!strcasecmp(class_name, "label")) {
 		version = &glabel_version;
 		class_commands = glabel_class_commands;
-	} else
-		errx(EXIT_FAILURE, "Invalid class name.");
+	}
 #endif /* !STATIC_GEOM_CLASSES */
 
 	set_class_name();

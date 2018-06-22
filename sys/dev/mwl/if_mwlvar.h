@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2007-2009 Sam Leffler, Errno Consulting
  * Copyright (c) 2007-2009 Marvell Semiconductor, Inc.
  * All rights reserved.
@@ -37,6 +39,7 @@
 #define _DEV_MWL_MVVAR_H
 
 #include <sys/endian.h>
+#include <sys/bus.h>
 #include <net80211/ieee80211_radiotap.h>
 #include <dev/mwl/mwlhal.h>
 #include <dev/mwl/mwlreg.h>
@@ -64,7 +67,7 @@
 #define	MWL_TXDESC	1		/* max tx descriptors/segments */
 #endif
 #ifndef MWL_AGGR_SIZE
-#define MWL_AGGR_SIZE	3839		/* max tx agregation size */
+#define	MWL_AGGR_SIZE	3839		/* max tx aggregation size */
 #endif
 #define	MWL_AGEINTERVAL	1		/* poke f/w every sec to age q's */ 
 #define	MWL_MAXSTAID	64		/* max of 64 stations */

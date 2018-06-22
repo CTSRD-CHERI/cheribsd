@@ -13,7 +13,6 @@
 
 #include "MipsRegisterInfo.h"
 #include "Mips.h"
-#include "MipsAnalyzeImmediate.h"
 #include "MipsInstrInfo.h"
 #include "MipsMachineFunction.h"
 #include "MipsSubtarget.h"
@@ -21,14 +20,13 @@
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
-#include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
+#include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Type.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
@@ -52,7 +50,21 @@ const TargetRegisterClass *
 MipsRegisterInfo::getPointerRegClass(const MachineFunction &MF,
                                      unsigned Kind) const {
   MipsABIInfo ABI = MF.getSubtarget<MipsSubtarget>().getABI();
-  return ABI.ArePtrs64bit() ? &Mips::GPR64RegClass : &Mips::GPR32RegClass;
+  MipsPtrClass PtrClassKind = static_cast<MipsPtrClass>(Kind);
+
+  switch (PtrClassKind) {
+  case MipsPtrClass::Default:
+    return ABI.ArePtrs64bit() ? &Mips::GPR64RegClass : &Mips::GPR32RegClass;
+  case MipsPtrClass::GPR16MM:
+    return ABI.ArePtrs64bit() ? &Mips::GPRMM16_64RegClass
+                              : &Mips::GPRMM16RegClass;
+  case MipsPtrClass::StackPointer:
+    return ABI.ArePtrs64bit() ? &Mips::SP64RegClass : &Mips::SP32RegClass;
+  case MipsPtrClass::GlobalPointer:                              
+    return ABI.ArePtrs64bit() ? &Mips::GP64RegClass : &Mips::GP32RegClass;
+  }
+
+  llvm_unreachable("Unknown pointer kind");
 }
 
 unsigned
@@ -84,6 +96,16 @@ MipsRegisterInfo::getRegPressureLimit(const TargetRegisterClass *RC,
 const MCPhysReg *
 MipsRegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
   const MipsSubtarget &Subtarget = MF->getSubtarget<MipsSubtarget>();
+  const Function *F = MF->getFunction();
+  if (F->hasFnAttribute("interrupt")) {
+    if (Subtarget.hasMips64())
+      return Subtarget.hasMips64r6() ? CSR_Interrupt_64R6_SaveList
+                                     : CSR_Interrupt_64_SaveList;
+    else
+      return Subtarget.hasMips32r6() ? CSR_Interrupt_32R6_SaveList
+                                     : CSR_Interrupt_32_SaveList;
+  }
+
   if (Subtarget.isSingleFloat())
     return CSR_SingleFloatOnly_SaveList;
 
@@ -184,7 +206,7 @@ getReservedRegs(const MachineFunction &MF) const {
       // allocate variable-sized objects at runtime. This should test the
       // same conditions as MipsFrameLowering::hasBP().
       if (needsStackRealignment(MF) &&
-          MF.getFrameInfo()->hasVarSizedObjects()) {
+          MF.getFrameInfo().hasVarSizedObjects()) {
         Reserved.set(Mips::S7);
         Reserved.set(Mips::S7_64);
       }
@@ -259,12 +281,14 @@ eliminateFrameIndex(MachineBasicBlock::iterator II, int SPAdj,
         errs() << "<--------->\n" << MI);
 
   int FrameIndex = MI.getOperand(FIOperandNum).getIndex();
-  uint64_t stackSize = MF.getFrameInfo()->getStackSize();
-  int64_t spOffset = MF.getFrameInfo()->getObjectOffset(FrameIndex);
+  uint64_t stackSize = MF.getFrameInfo().getStackSize();
+  int64_t spOffset = MF.getFrameInfo().getObjectOffset(FrameIndex);
 
   DEBUG(errs() << "FrameIndex : " << FrameIndex << "\n"
                << "spOffset   : " << spOffset << "\n"
-               << "stackSize  : " << stackSize << "\n");
+               << "stackSize  : " << stackSize << "\n"
+               << "alignment  : "
+               << MF.getFrameInfo().getObjectAlignment(FrameIndex) << "\n");
 
   eliminateFI(MI, FIOperandNum, FrameIndex, stackSize, spOffset);
 }
@@ -284,6 +308,16 @@ getFrameRegister(const MachineFunction &MF) const {
 }
 
 bool MipsRegisterInfo::canRealignStack(const MachineFunction &MF) const {
+  // Avoid realigning functions that explicitly do not want to be realigned.
+  // Normally, we should report an error when a function should be dynamically
+  // realigned but also has the attribute no-realign-stack. Unfortunately,
+  // with this attribute, MachineFrameInfo clamps each new object's alignment
+  // to that of the stack's alignment as specified by the ABI. As a result,
+  // the information of whether we have objects with larger alignment
+  // requirement than the stack's alignment is already lost at this point.
+  if (!TargetRegisterInfo::canRealignStack(MF))
+    return false;
+
   const MipsSubtarget &Subtarget = MF.getSubtarget<MipsSubtarget>();
   unsigned FP = Subtarget.isGP32bit() ? Mips::FP : Mips::FP_64;
   unsigned BP = Subtarget.isGP32bit() ? Mips::S7 : Mips::S7_64;
@@ -305,43 +339,4 @@ bool MipsRegisterInfo::canRealignStack(const MachineFunction &MF) const {
   // We have to reserve the base pointer register in the presence of variable
   // sized objects.
   return MF.getRegInfo().canReserveReg(BP);
-}
-
-bool MipsRegisterInfo::needsStackRealignment(const MachineFunction &MF) const {
-  const MipsSubtarget &Subtarget = MF.getSubtarget<MipsSubtarget>();
-  const MachineFrameInfo *MFI = MF.getFrameInfo();
-
-  bool CanRealign = canRealignStack(MF);
-
-  // Avoid realigning functions that explicitly do not want to be realigned.
-  // Normally, we should report an error when a function should be dynamically
-  // realigned but also has the attribute no-realign-stack. Unfortunately,
-  // with this attribute, MachineFrameInfo clamps each new object's alignment
-  // to that of the stack's alignment as specified by the ABI. As a result,
-  // the information of whether we have objects with larger alignment
-  // requirement than the stack's alignment is already lost at this point.
-  if (MF.getFunction()->hasFnAttribute("no-realign-stack"))
-    return false;
-
-  const Function *F = MF.getFunction();
-  if (F->hasFnAttribute(Attribute::StackAlignment)) {
-#ifdef DEBUG
-    if (!CanRealign)
-      DEBUG(dbgs() << "It's not possible to realign the stack of the function: "
-            << F->getName() << "\n");
-#endif
-    return CanRealign;
-  }
-
-  unsigned StackAlignment = Subtarget.getFrameLowering()->getStackAlignment();
-  if (MFI->getMaxAlignment() > StackAlignment) {
-#ifdef DEBUG
-    if (!CanRealign)
-      DEBUG(dbgs() << "It's not possible to realign the stack of the function: "
-            << F->getName() << "\n");
-#endif
-    return CanRealign;
-  }
-
-  return false;
 }

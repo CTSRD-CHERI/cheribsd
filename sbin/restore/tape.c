@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1983, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -15,7 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -104,10 +106,8 @@ static int	 checksum(int *);
 static void	 findinode(struct s_spcl *);
 static void	 findtapeblksize(void);
 static char	*setupextattr(int);
-static void	 xtrattr(char *, long);
-static void	 set_extattr_link(char *, void *, int);
-static void	 set_extattr_fd(int, char *, void *, int);
-static void	 skiphole(void (*)(char *, long), long *);
+static void	 xtrattr(char *, size_t);
+static void	 skiphole(void (*)(char *, size_t), size_t *);
 static int	 gethead(struct s_spcl *);
 static void	 readtape(char *);
 static void	 setdumpnum(void);
@@ -115,12 +115,12 @@ static u_long	 swabl(u_long);
 static u_char	*swablong(u_char *, int);
 static u_char	*swabshort(u_char *, int);
 static void	 terminateinput(void);
-static void	 xtrfile(char *, long);
-static void	 xtrlnkfile(char *, long);
-static void	 xtrlnkskip(char *, long);
-static void	 xtrmap(char *, long);
-static void	 xtrmapskip(char *, long);
-static void	 xtrskip(char *, long);
+static void	 xtrfile(char *, size_t);
+static void	 xtrlnkfile(char *, size_t);
+static void	 xtrlnkskip(char *, size_t);
+static void	 xtrmap(char *, size_t);
+static void	 xtrmapskip(char *, size_t);
+static void	 xtrskip(char *, size_t);
 
 /*
  * Set up an input source
@@ -132,7 +132,7 @@ setinput(char *source, int ispipecommand)
 	if (bflag)
 		newtapebuf(ntrec);
 	else
-		newtapebuf(NTREC > HIGHDENSITYTREC ? NTREC : HIGHDENSITYTREC);
+		newtapebuf(MAX(NTREC, HIGHDENSITYTREC));
 	terminal = stdin;
 
 	if (ispipecommand)
@@ -303,7 +303,7 @@ setup(void)
 	 * whiteout inode exists, so that the whiteout entries can be
 	 * extracted.
 	 */
-	SETINO(WINO, dumpmap);
+	SETINO(UFS_WINO, dumpmap);
 	/* 'r' restores don't call getvol() for tape 1, so mark it as read. */
 	if (command == 'r')
 		tapesread = 1;
@@ -340,6 +340,7 @@ getvol(long nextvol)
 		}
 		if (volno == 1)
 			return;
+		newvol = 0;
 		goto gethdr;
 	}
 again:
@@ -565,7 +566,7 @@ printdumpinfo(void)
 int
 extractfile(char *name)
 {
-	int flags;
+	u_int flags;
 	uid_t uid;
 	gid_t gid;
 	mode_t mode;
@@ -626,7 +627,7 @@ extractfile(char *name)
 		}
 		if (linkit(lnkbuf, name, SYMLINK) == GOOD) {
 			if (extsize > 0)
-				set_extattr_link(name, buf, extsize);
+				set_extattr(-1, name, buf, extsize, SXA_LINK);
 			(void) lchown(name, uid, gid);
 			(void) lchmod(name, mode);
 			(void) utimensat(AT_FDCWD, name, ctimep,
@@ -657,7 +658,7 @@ extractfile(char *name)
 		} else {
 			buf = setupextattr(extsize);
 			getfile(xtrnull, xtrattr, xtrnull);
-			set_extattr_file(name, buf, extsize);
+			set_extattr(-1, name, buf, extsize, SXA_FILE);
 		}
 		(void) chown(name, uid, gid);
 		(void) chmod(name, mode);
@@ -687,7 +688,7 @@ extractfile(char *name)
 		} else {
 			buf = setupextattr(extsize);
 			getfile(xtrnull, xtrattr, xtrnull);
-			set_extattr_file(name, buf, extsize);
+			set_extattr(-1, name, buf, extsize, SXA_FILE);
 		}
 		(void) chown(name, uid, gid);
 		(void) chmod(name, mode);
@@ -714,7 +715,7 @@ extractfile(char *name)
 		buf = setupextattr(extsize);
 		getfile(xtrfile, xtrattr, xtrskip);
 		if (extsize > 0)
-			set_extattr_fd(ofile, name, buf, extsize);
+			set_extattr(ofile, name, buf, extsize, SXA_FD);
 		(void) fchown(ofile, uid, gid);
 		(void) fchmod(ofile, mode);
 		(void) futimens(ofile, ctimep);
@@ -727,12 +728,16 @@ extractfile(char *name)
 }
 
 /*
- * Set attributes for a file.
+ * Set attributes on a file descriptor, link, or file.
  */
 void
-set_extattr_file(char *name, void *buf, int size)
+set_extattr(int fd, char *name, void *buf, int size, enum set_extattr_mode mode)
 {
 	struct extattr *eap, *eaend;
+	const char *method;
+	ssize_t res;
+	int error;
+	char eaname[EXTATTR_MAXNAMELEN + 1];
 
 	vprintf(stdout, "Set attributes for %s:", name);
 	eaend = buf + size;
@@ -747,17 +752,34 @@ set_extattr_file(char *name, void *buf, int size)
 		}
 		if (eap->ea_namespace == EXTATTR_NAMESPACE_EMPTY)
 			continue;
-		vprintf(stdout, "\n\t%s, (%d bytes), %*s",
+		snprintf(eaname, sizeof(eaname), "%.*s",
+		    (int)eap->ea_namelength, eap->ea_name);
+		vprintf(stdout, "\n\t%s, (%d bytes), %s",
 			namespace_names[eap->ea_namespace], eap->ea_length,
-			eap->ea_namelength, eap->ea_name);
+			eaname);
 		/*
 		 * First we try the general attribute setting interface.
 		 * However, some attributes can only be set by root or
 		 * by using special interfaces (for example, ACLs).
 		 */
-		if (extattr_set_file(name, eap->ea_namespace, eap->ea_name,
-		    EXTATTR_CONTENT(eap), EXTATTR_CONTENT_SIZE(eap)) != -1) {
-			dprintf(stdout, " (set using extattr_set_file)");
+		if (mode == SXA_FD) {
+			res = extattr_set_fd(fd, eap->ea_namespace,
+			    eaname, EXTATTR_CONTENT(eap),
+			    EXTATTR_CONTENT_SIZE(eap));
+			method = "extattr_set_fd";
+		} else if (mode == SXA_LINK) {
+			res = extattr_set_link(name, eap->ea_namespace,
+			    eaname, EXTATTR_CONTENT(eap),
+			    EXTATTR_CONTENT_SIZE(eap));
+			method = "extattr_set_link";
+		} else if (mode == SXA_FILE) {
+			res = extattr_set_file(name, eap->ea_namespace,
+			    eaname, EXTATTR_CONTENT(eap),
+			    EXTATTR_CONTENT_SIZE(eap));
+			method = "extattr_set_file";
+		}
+		if (res != -1) {
+			dprintf(stdout, " (set using %s)", method);
 			continue;
 		}
 		/*
@@ -766,137 +788,37 @@ set_extattr_file(char *name, void *buf, int size)
 		 * know about.
 		 */
 		if (eap->ea_namespace == EXTATTR_NAMESPACE_SYSTEM &&
-		    !strcmp(eap->ea_name, POSIX1E_ACL_ACCESS_EXTATTR_NAME)) {
-			if (acl_set_file(name, ACL_TYPE_ACCESS,
-			    EXTATTR_CONTENT(eap)) != -1) {
-				dprintf(stdout, " (set using acl_set_file)");
+		    strcmp(eaname, POSIX1E_ACL_ACCESS_EXTATTR_NAME) == 0) {
+			if (mode == SXA_FD) {
+				error = acl_set_fd(fd, EXTATTR_CONTENT(eap));
+				method = "acl_set_fd";
+			} else if (mode == SXA_LINK) {
+				error = acl_set_link_np(name, ACL_TYPE_ACCESS,
+				    EXTATTR_CONTENT(eap));
+				method = "acl_set_link_np";
+			} else if (mode == SXA_FILE) {
+				error = acl_set_file(name, ACL_TYPE_ACCESS,
+				    EXTATTR_CONTENT(eap));
+				method = "acl_set_file";
+			}
+			if (error != -1) {
+				dprintf(stdout, " (set using %s)", method);
 				continue;
 			}
 		}
 		if (eap->ea_namespace == EXTATTR_NAMESPACE_SYSTEM &&
-		    !strcmp(eap->ea_name, POSIX1E_ACL_DEFAULT_EXTATTR_NAME)) {
-			if (acl_set_file(name, ACL_TYPE_DEFAULT,
-			    EXTATTR_CONTENT(eap)) != -1) {
-				dprintf(stdout, " (set using acl_set_file)");
-				continue;
+		    strcmp(eaname, POSIX1E_ACL_DEFAULT_EXTATTR_NAME) == 0) {
+			if (mode == SXA_LINK) {
+				error = acl_set_link_np(name, ACL_TYPE_DEFAULT,
+				    EXTATTR_CONTENT(eap));
+				method = "acl_set_link_np";
+			} else {
+				error = acl_set_file(name, ACL_TYPE_DEFAULT,
+				    EXTATTR_CONTENT(eap));
+				method = "acl_set_file";
 			}
-		}
-		vprintf(stdout, " (unable to set)");
-	}
-	vprintf(stdout, "\n");
-}
-
-/*
- * Set attributes for a symbolic link.
- */
-static void
-set_extattr_link(char *name, void *buf, int size)
-{
-	struct extattr *eap, *eaend;
-
-	vprintf(stdout, "Set attributes for %s:", name);
-	eaend = buf + size;
-	for (eap = buf; eap < eaend; eap = EXTATTR_NEXT(eap)) {
-		/*
-		 * Make sure this entry is complete.
-		 */
-		if (EXTATTR_NEXT(eap) > eaend || eap->ea_length <= 0) {
-			dprintf(stdout, "\n\t%scorrupted",
-				eap == buf ? "" : "remainder ");
-			break;
-		}
-		if (eap->ea_namespace == EXTATTR_NAMESPACE_EMPTY)
-			continue;
-		vprintf(stdout, "\n\t%s, (%d bytes), %*s",
-			namespace_names[eap->ea_namespace], eap->ea_length,
-			eap->ea_namelength, eap->ea_name);
-		/*
-		 * First we try the general attribute setting interface.
-		 * However, some attributes can only be set by root or
-		 * by using special interfaces (for example, ACLs).
-		 */
-		if (extattr_set_link(name, eap->ea_namespace, eap->ea_name,
-		    EXTATTR_CONTENT(eap), EXTATTR_CONTENT_SIZE(eap)) != -1) {
-			dprintf(stdout, " (set using extattr_set_link)");
-			continue;
-		}
-		/*
-		 * If the general interface refuses to set the attribute,
-		 * then we try all the specialized interfaces that we
-		 * know about.
-		 */
-		if (eap->ea_namespace == EXTATTR_NAMESPACE_SYSTEM &&
-		    !strcmp(eap->ea_name, POSIX1E_ACL_ACCESS_EXTATTR_NAME)) {
-			if (acl_set_link_np(name, ACL_TYPE_ACCESS,
-			    EXTATTR_CONTENT(eap)) != -1) {
-				dprintf(stdout, " (set using acl_set_link_np)");
-				continue;
-			}
-		}
-		if (eap->ea_namespace == EXTATTR_NAMESPACE_SYSTEM &&
-		    !strcmp(eap->ea_name, POSIX1E_ACL_DEFAULT_EXTATTR_NAME)) {
-			if (acl_set_link_np(name, ACL_TYPE_DEFAULT,
-			    EXTATTR_CONTENT(eap)) != -1) {
-				dprintf(stdout, " (set using acl_set_link_np)");
-				continue;
-			}
-		}
-		vprintf(stdout, " (unable to set)");
-	}
-	vprintf(stdout, "\n");
-}
-
-/*
- * Set attributes on a file descriptor.
- */
-static void
-set_extattr_fd(int fd, char *name, void *buf, int size)
-{
-	struct extattr *eap, *eaend;
-
-	vprintf(stdout, "Set attributes for %s:", name);
-	eaend = buf + size;
-	for (eap = buf; eap < eaend; eap = EXTATTR_NEXT(eap)) {
-		/*
-		 * Make sure this entry is complete.
-		 */
-		if (EXTATTR_NEXT(eap) > eaend || eap->ea_length <= 0) {
-			dprintf(stdout, "\n\t%scorrupted",
-				eap == buf ? "" : "remainder ");
-			break;
-		}
-		if (eap->ea_namespace == EXTATTR_NAMESPACE_EMPTY)
-			continue;
-		vprintf(stdout, "\n\t%s, (%d bytes), %*s",
-			namespace_names[eap->ea_namespace], eap->ea_length,
-			eap->ea_namelength, eap->ea_name);
-		/*
-		 * First we try the general attribute setting interface.
-		 * However, some attributes can only be set by root or
-		 * by using special interfaces (for example, ACLs).
-		 */
-		if (extattr_set_fd(fd, eap->ea_namespace, eap->ea_name,
-		    EXTATTR_CONTENT(eap), EXTATTR_CONTENT_SIZE(eap)) != -1) {
-			dprintf(stdout, " (set using extattr_set_fd)");
-			continue;
-		}
-		/*
-		 * If the general interface refuses to set the attribute,
-		 * then we try all the specialized interfaces that we
-		 * know about.
-		 */
-		if (eap->ea_namespace == EXTATTR_NAMESPACE_SYSTEM &&
-		    !strcmp(eap->ea_name, POSIX1E_ACL_ACCESS_EXTATTR_NAME)) {
-			if (acl_set_fd(fd, EXTATTR_CONTENT(eap)) != -1) {
-				dprintf(stdout, " (set using acl_set_fd)");
-				continue;
-			}
-		}
-		if (eap->ea_namespace == EXTATTR_NAMESPACE_SYSTEM &&
-		    !strcmp(eap->ea_name, POSIX1E_ACL_DEFAULT_EXTATTR_NAME)) {
-			if (acl_set_file(name, ACL_TYPE_DEFAULT,
-			    EXTATTR_CONTENT(eap)) != -1) {
-				dprintf(stdout, " (set using acl_set_file)");
+			if (error != -1) {
+				dprintf(stdout, " (set using %s)", method);
 				continue;
 			}
 		}
@@ -931,7 +853,7 @@ skipfile(void)
  * Skip a hole in an output file
  */
 static void
-skiphole(void (*skip)(char *, long), long *seekpos)
+skiphole(void (*skip)(char *, size_t), size_t *seekpos)
 {
 	char buf[MAXBSIZE];
 
@@ -948,14 +870,14 @@ skiphole(void (*skip)(char *, long), long *seekpos)
  * to the skip function.
  */
 void
-getfile(void (*datafill)(char *, long), void (*attrfill)(char *, long),
-	void (*skip)(char *, long))
+getfile(void (*datafill)(char *, size_t), void (*attrfill)(char *, size_t),
+	void (*skip)(char *, size_t))
 {
 	int i;
-	off_t size;
-	long seekpos;
+	volatile off_t size;
+	size_t seekpos;
 	int curblk, attrsize;
-	void (*fillit)(char *, long);
+	void (*fillit)(char *, size_t);
 	char buf[MAXBSIZE / TP_BSIZE][TP_BSIZE];
 	char junk[TP_BSIZE];
 
@@ -1009,7 +931,7 @@ loop:
 			 * block of the hole in the file. Postpone the
 			 * seek until next file write.
 			 */
-			seekpos += (long)(size > TP_BSIZE ? TP_BSIZE : size);
+			seekpos += (long)MIN(TP_BSIZE, size);
 		}
 		if ((size -= TP_BSIZE) <= 0) {
 			if (size > -TP_BSIZE && curblk > 0) {
@@ -1092,7 +1014,7 @@ setupextattr(int extsize)
  * Extract the next block of extended attributes.
  */
 static void
-xtrattr(char *buf, long size)
+xtrattr(char *buf, size_t size)
 {
 
 	if (extloc + size > extbufsize)
@@ -1105,7 +1027,7 @@ xtrattr(char *buf, long size)
  * Write out the next block of a file.
  */
 static void
-xtrfile(char *buf, long	size)
+xtrfile(char *buf, size_t size)
 {
 
 	if (Nflag)
@@ -1122,7 +1044,7 @@ xtrfile(char *buf, long	size)
  */
 /* ARGSUSED */
 static void
-xtrskip(char *buf, long size)
+xtrskip(char *buf, size_t size)
 {
 
 	if (lseek(ofile, size, SEEK_CUR) == -1) {
@@ -1137,7 +1059,7 @@ xtrskip(char *buf, long size)
  * Collect the next block of a symbolic link.
  */
 static void
-xtrlnkfile(char *buf, long size)
+xtrlnkfile(char *buf, size_t size)
 {
 
 	pathlen += size;
@@ -1154,7 +1076,7 @@ xtrlnkfile(char *buf, long size)
  */
 /* ARGSUSED */
 static void
-xtrlnkskip(char *buf, long size)
+xtrlnkskip(char *buf, size_t size)
 {
 
 	fprintf(stderr, "unallocated block in symbolic link %s\n",
@@ -1166,7 +1088,7 @@ xtrlnkskip(char *buf, long size)
  * Collect the next block of a bit map.
  */
 static void
-xtrmap(char *buf, long size)
+xtrmap(char *buf, size_t size)
 {
 
 	memmove(map, buf, size);
@@ -1178,7 +1100,7 @@ xtrmap(char *buf, long size)
  */
 /* ARGSUSED */
 static void
-xtrmapskip(char *buf, long size)
+xtrmapskip(char *buf, size_t size)
 {
 
 	panic("hole in map\n");
@@ -1190,7 +1112,7 @@ xtrmapskip(char *buf, long size)
  */
 /* ARGSUSED */
 void
-xtrnull(char *buf, long size)
+xtrnull(char *buf, size_t size)
 {
 
 	return;

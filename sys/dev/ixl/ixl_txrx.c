@@ -35,7 +35,7 @@
 /*
 **	IXL driver TX/RX Routines:
 **	    This was seperated to allow usage by
-** 	    both the BASE and the VF drivers.
+** 	    both the PF and VF drivers.
 */
 
 #ifndef IXL_STANDALONE_BUILD
@@ -58,13 +58,34 @@ static int	ixl_tx_setup_offload(struct ixl_queue *,
 		    struct mbuf *, u32 *, u32 *);
 static bool	ixl_tso_setup(struct ixl_queue *, struct mbuf *);
 
-static __inline void ixl_rx_discard(struct rx_ring *, int);
-static __inline void ixl_rx_input(struct rx_ring *, struct ifnet *,
+static inline void ixl_rx_discard(struct rx_ring *, int);
+static inline void ixl_rx_input(struct rx_ring *, struct ifnet *,
 		    struct mbuf *, u8);
+
+static inline bool ixl_tso_detect_sparse(struct mbuf *mp);
+static inline u32 ixl_get_tx_head(struct ixl_queue *que);
 
 #ifdef DEV_NETMAP
 #include <dev/netmap/if_ixl_netmap.h>
+int ixl_rx_miss, ixl_rx_miss_bufs, ixl_crcstrip = 1;
 #endif /* DEV_NETMAP */
+
+/*
+ * @key key is saved into this parameter
+ */
+void
+ixl_get_default_rss_key(u32 *key)
+{
+	MPASS(key != NULL);
+
+	u32 rss_seed[IXL_RSS_KEY_SIZE_REG] = {0x41b01687,
+	    0x183cfd8c, 0xce880440, 0x580cbc3c,
+	    0x35897377, 0x328b25e1, 0x4fa98922,
+	    0xb7d90c14, 0xd5bad70d, 0xcd15a2c1,
+	    0x0, 0x0, 0x0};
+
+	bcopy(rss_seed, key, IXL_RSS_KEY_SIZE);
+}
 
 /*
 ** Multiqueue Transmit driver
@@ -98,13 +119,6 @@ ixl_mq_start(struct ifnet *ifp, struct mbuf *m)
                         i = m->m_pkthdr.flowid % vsi->num_queues;
         } else
 		i = curcpu % vsi->num_queues;
-	/*
-	** This may not be perfect, but until something
-	** better comes along it will keep from scheduling
-	** on stalled queues.
-	*/
-	if (((1 << i) & vsi->active_queues) == 0)
-		i = ffsl(vsi->active_queues);
 
 	que = &vsi->queues[i];
 	txr = &que->txr;
@@ -202,22 +216,27 @@ static inline bool
 ixl_tso_detect_sparse(struct mbuf *mp)
 {
 	struct mbuf	*m;
-	int		num = 0, mss;
-	bool		ret = FALSE;
+	int		num, mss;
 
+	num = 0;
 	mss = mp->m_pkthdr.tso_segsz;
-	for (m = mp->m_next; m != NULL; m = m->m_next) {
-		num++;
-		mss -= m->m_len;
-		if (mss < 1)
-			break;
-		if (m->m_next == NULL)
-			break;
-	}
-	if (num > IXL_SPARSE_CHAIN)
-		ret = TRUE;
 
-	return (ret);
+	/* Exclude first mbuf; assume it contains all headers */
+	for (m = mp->m_next; m != NULL; m = m->m_next) {
+		if (m == NULL)
+			break;
+		num++;
+		mss -= m->m_len % mp->m_pkthdr.tso_segsz;
+
+		if (mss < 1) {
+			if (num > IXL_SPARSE_CHAIN)
+				return (true);
+			num = (mss == 0) ? 0 : 1;
+			mss += mp->m_pkthdr.tso_segsz;
+		}
+	}
+
+	return (false);
 }
 
 
@@ -239,14 +258,13 @@ ixl_xmit(struct ixl_queue *que, struct mbuf **m_headp)
 	struct ixl_tx_buf	*buf;
 	struct i40e_tx_desc	*txd = NULL;
 	struct mbuf		*m_head, *m;
-	int             	i, j, error, nsegs, maxsegs;
+	int             	i, j, error, nsegs;
 	int			first, last = 0;
 	u16			vtag = 0;
 	u32			cmd, off;
 	bus_dmamap_t		map;
 	bus_dma_tag_t		tag;
 	bus_dma_segment_t	segs[IXL_MAX_TSO_SEGS];
-
 
 	cmd = off = 0;
 	m_head = *m_headp;
@@ -260,12 +278,10 @@ ixl_xmit(struct ixl_queue *que, struct mbuf **m_headp)
 	buf = &txr->buffers[first];
 	map = buf->map;
 	tag = txr->tx_tag;
-	maxsegs = IXL_MAX_TX_SEGS;
 
 	if (m_head->m_pkthdr.csum_flags & CSUM_TSO) {
 		/* Use larger mapping for TSO */
 		tag = txr->tso_tag;
-		maxsegs = IXL_MAX_TSO_SEGS;
 		if (ixl_tso_detect_sparse(m_head)) {
 			m = m_defrag(m_head, M_NOWAIT);
 			if (m == NULL) {
@@ -286,7 +302,7 @@ ixl_xmit(struct ixl_queue *que, struct mbuf **m_headp)
 	if (error == EFBIG) {
 		struct mbuf *m;
 
-		m = m_collapse(*m_headp, M_NOWAIT, maxsegs);
+		m = m_defrag(*m_headp, M_NOWAIT);
 		if (m == NULL) {
 			que->mbuf_defrag_failed++;
 			m_freem(*m_headp);
@@ -299,20 +315,14 @@ ixl_xmit(struct ixl_queue *que, struct mbuf **m_headp)
 		error = bus_dmamap_load_mbuf_sg(tag, map,
 		    *m_headp, segs, &nsegs, BUS_DMA_NOWAIT);
 
-		if (error == ENOMEM) {
-			que->tx_dma_setup++;
-			return (error);
-		} else if (error != 0) {
-			que->tx_dma_setup++;
+		if (error != 0) {
+			que->tx_dmamap_failed++;
 			m_freem(*m_headp);
 			*m_headp = NULL;
 			return (error);
 		}
-	} else if (error == ENOMEM) {
-		que->tx_dma_setup++;
-		return (error);
 	} else if (error != 0) {
-		que->tx_dma_setup++;
+		que->tx_dmamap_failed++;
 		m_freem(*m_headp);
 		*m_headp = NULL;
 		return (error);
@@ -390,10 +400,8 @@ ixl_xmit(struct ixl_queue *que, struct mbuf **m_headp)
 	++txr->total_packets;
 	wr32(hw, txr->tail, i);
 
-	ixl_flush(hw);
 	/* Mark outstanding work */
-	if (que->busy == 0)
-		que->busy = 1;
+	atomic_store_rel_32(&txr->watchdog_timer, IXL_WATCHDOG);
 	return (0);
 
 xmit_fail:
@@ -421,7 +429,7 @@ ixl_allocate_tx_data(struct ixl_queue *que)
 	/*
 	 * Setup DMA descriptor areas.
 	 */
-	if ((error = bus_dma_tag_create(NULL,		/* parent */
+	if ((error = bus_dma_tag_create(bus_get_dma_tag(dev),		/* parent */
 			       1, 0,			/* alignment, bounds */
 			       BUS_SPACE_MAXADDR,	/* lowaddr */
 			       BUS_SPACE_MAXADDR,	/* highaddr */
@@ -438,7 +446,7 @@ ixl_allocate_tx_data(struct ixl_queue *que)
 	}
 
 	/* Make a special tag for TSO */
-	if ((error = bus_dma_tag_create(NULL,		/* parent */
+	if ((error = bus_dma_tag_create(bus_get_dma_tag(dev),		/* parent */
 			       1, 0,			/* alignment, bounds */
 			       BUS_SPACE_MAXADDR,	/* lowaddr */
 			       BUS_SPACE_MAXADDR,	/* highaddr */
@@ -512,12 +520,14 @@ ixl_init_tx_ring(struct ixl_queue *que)
 	txr->next_avail = 0;
 	txr->next_to_clean = 0;
 
+	/* Reset watchdog status */
+	txr->watchdog_timer = 0;
+
 #ifdef IXL_FDIR
 	/* Initialize flow director */
 	txr->atr_rate = ixl_atr_rate;
 	txr->atr_count = 0;
 #endif
-
 	/* Free any existing tx mbufs. */
         buf = txr->buffers;
 	for (int i = 0; i < que->num_desc; i++, buf++) {
@@ -630,7 +640,6 @@ ixl_tx_setup_offload(struct ixl_queue *que,
 	u16				etype;
 	u8				ipproto = 0;
 	bool				tso = FALSE;
-
 
 	/* Set up the TSO context descriptor if required */
 	if (mp->m_pkthdr.csum_flags & CSUM_TSO) {
@@ -769,6 +778,12 @@ ixl_tso_setup(struct ixl_queue *que, struct mbuf *mp)
 		th = (struct tcphdr *)((caddr_t)ip6 + ip_hlen);
 		th->th_sum = in6_cksum_pseudo(ip6, 0, IPPROTO_TCP, 0);
 		tcp_hlen = th->th_off << 2;
+		/*
+		 * The corresponding flag is set by the stack in the IPv4
+		 * TSO case, but not in IPv6 (at least in FreeBSD 10.2).
+		 * So, set it here because the rest of the flow requires it.
+		 */
+		mp->m_pkthdr.csum_flags |= CSUM_TCP_IPV6;
 		break;
 #endif
 #ifdef INET
@@ -801,6 +816,11 @@ ixl_tso_setup(struct ixl_queue *que, struct mbuf *mp)
 
 	type = I40E_TX_DESC_DTYPE_CONTEXT;
 	cmd = I40E_TX_CTX_DESC_TSO;
+	/* TSO MSS must not be less than 64 */
+	if (mp->m_pkthdr.tso_segsz < IXL_MIN_TSO_MSS) {
+		que->mss_too_small++;
+		mp->m_pkthdr.tso_segsz = IXL_MIN_TSO_MSS;
+	}
 	mss = mp->m_pkthdr.tso_segsz;
 
 	type_cmd_tso_mss = ((u64)type << I40E_TXD_CTX_QW1_DTYPE_SHIFT) |
@@ -860,7 +880,7 @@ ixl_txeof(struct ixl_queue *que)
 
 	/* These are not the descriptors you seek, move along :) */
 	if (txr->avail == que->num_desc) {
-		que->busy = 0;
+		atomic_store_rel_32(&txr->watchdog_timer, 0);
 		return FALSE;
 	}
 
@@ -911,7 +931,6 @@ ixl_txeof(struct ixl_queue *que)
 				    buf->map);
 				m_freem(buf->m_head);
 				buf->m_head = NULL;
-				buf->map = NULL;
 			}
 			buf->eop_index = -1;
 
@@ -939,25 +958,10 @@ ixl_txeof(struct ixl_queue *que)
 
 
 	/*
-	** Hang detection, we know there's
-	** work outstanding or the first return
-	** would have been taken, so indicate an
-	** unsuccessful pass, in local_timer if
-	** the value is too great the queue will
-	** be considered hung. If anything has been
-	** cleaned then reset the state.
-	*/
-	if ((processed == 0) && (que->busy != IXL_QUEUE_HUNG))
-		++que->busy;
-
-	if (processed)
-		que->busy = 1; /* Note this turns off HUNG */
-
-	/*
 	 * If there are no pending descriptors, clear the timeout.
 	 */
 	if (txr->avail == que->num_desc) {
-		que->busy = 0;
+		atomic_store_rel_32(&txr->watchdog_timer, 0);
 		return FALSE;
 	}
 
@@ -1089,7 +1093,7 @@ ixl_allocate_rx_data(struct ixl_queue *que)
 		return (error);
 	}
 
-	if ((error = bus_dma_tag_create(NULL,	/* parent */
+	if ((error = bus_dma_tag_create(bus_get_dma_tag(dev),	/* parent */
 				   1, 0,	/* alignment, bounds */
 				   BUS_SPACE_MAXADDR,	/* lowaddr */
 				   BUS_SPACE_MAXADDR,	/* highaddr */
@@ -1105,7 +1109,7 @@ ixl_allocate_rx_data(struct ixl_queue *que)
 		return (error);
 	}
 
-	if ((error = bus_dma_tag_create(NULL,	/* parent */
+	if ((error = bus_dma_tag_create(bus_get_dma_tag(dev),	/* parent */
 				   1, 0,	/* alignment, bounds */
 				   BUS_SPACE_MAXADDR,	/* lowaddr */
 				   BUS_SPACE_MAXADDR,	/* highaddr */
@@ -1371,7 +1375,7 @@ ixl_free_que_rx(struct ixl_queue *que)
 	return;
 }
 
-static __inline void
+static inline void
 ixl_rx_input(struct rx_ring *rxr, struct ifnet *ifp, struct mbuf *m, u8 ptype)
 {
 
@@ -1396,13 +1400,11 @@ ixl_rx_input(struct rx_ring *rxr, struct ifnet *ifp, struct mbuf *m, u8 ptype)
                                 return;
         }
 #endif
-	IXL_RX_UNLOCK(rxr);
         (*ifp->if_input)(ifp, m);
-	IXL_RX_LOCK(rxr);
 }
 
 
-static __inline void
+static inline void
 ixl_rx_discard(struct rx_ring *rxr, int i)
 {
 	struct ixl_rx_buf	*rbuf;
@@ -1444,52 +1446,38 @@ static inline int
 ixl_ptype_to_hash(u8 ptype)
 {
         struct i40e_rx_ptype_decoded	decoded;
-	u8				ex = 0;
 
 	decoded = decode_rx_desc_ptype(ptype);
-	ex = decoded.outer_frag;
 
 	if (!decoded.known)
-		return M_HASHTYPE_OPAQUE;
+		return M_HASHTYPE_OPAQUE_HASH;
 
 	if (decoded.outer_ip == I40E_RX_PTYPE_OUTER_L2) 
-		return M_HASHTYPE_OPAQUE;
+		return M_HASHTYPE_OPAQUE_HASH;
 
 	/* Note: anything that gets to this point is IP */
         if (decoded.outer_ip_ver == I40E_RX_PTYPE_OUTER_IPV6) { 
 		switch (decoded.inner_prot) {
-			case I40E_RX_PTYPE_INNER_PROT_TCP:
-				if (ex)
-					return M_HASHTYPE_RSS_TCP_IPV6_EX;
-				else
-					return M_HASHTYPE_RSS_TCP_IPV6;
-			case I40E_RX_PTYPE_INNER_PROT_UDP:
-				if (ex)
-					return M_HASHTYPE_RSS_UDP_IPV6_EX;
-				else
-					return M_HASHTYPE_RSS_UDP_IPV6;
-			default:
-				if (ex)
-					return M_HASHTYPE_RSS_IPV6_EX;
-				else
-					return M_HASHTYPE_RSS_IPV6;
+		case I40E_RX_PTYPE_INNER_PROT_TCP:
+			return M_HASHTYPE_RSS_TCP_IPV6;
+		case I40E_RX_PTYPE_INNER_PROT_UDP:
+			return M_HASHTYPE_RSS_UDP_IPV6;
+		default:
+			return M_HASHTYPE_RSS_IPV6;
 		}
 	}
         if (decoded.outer_ip_ver == I40E_RX_PTYPE_OUTER_IPV4) { 
 		switch (decoded.inner_prot) {
-			case I40E_RX_PTYPE_INNER_PROT_TCP:
-					return M_HASHTYPE_RSS_TCP_IPV4;
-			case I40E_RX_PTYPE_INNER_PROT_UDP:
-				if (ex)
-					return M_HASHTYPE_RSS_UDP_IPV4_EX;
-				else
-					return M_HASHTYPE_RSS_UDP_IPV4;
-			default:
-					return M_HASHTYPE_RSS_IPV4;
+		case I40E_RX_PTYPE_INNER_PROT_TCP:
+			return M_HASHTYPE_RSS_TCP_IPV4;
+		case I40E_RX_PTYPE_INNER_PROT_UDP:
+			return M_HASHTYPE_RSS_UDP_IPV4;
+		default:
+			return M_HASHTYPE_RSS_IPV4;
 		}
 	}
 	/* We should never get here!! */
-	return M_HASHTYPE_OPAQUE;
+	return M_HASHTYPE_OPAQUE_HASH;
 }
 #endif /* RSS */
 
@@ -1512,7 +1500,6 @@ ixl_rxeof(struct ixl_queue *que, int count)
 	struct ifnet		*ifp = vsi->ifp;
 #if defined(INET6) || defined(INET)
 	struct lro_ctrl		*lro = &rxr->lro;
-	struct lro_entry	*queued;
 #endif
 	int			i, nextp, processed = 0;
 	union i40e_rx_desc	*cur;
@@ -1530,7 +1517,7 @@ ixl_rxeof(struct ixl_queue *que, int count)
 
 	for (i = rxr->next_check; count != 0;) {
 		struct mbuf	*sendmp, *mh, *mp;
-		u32		rsc, status, error;
+		u32		status, error;
 		u16		hlen, plen, vtag;
 		u64		qword;
 		u8		ptype;
@@ -1563,7 +1550,6 @@ ixl_rxeof(struct ixl_queue *que, int count)
 		count--;
 		sendmp = NULL;
 		nbuf = NULL;
-		rsc = 0;
 		cur->wb.qword1.status_error_len = 0;
 		rbuf = &rxr->buffers[i];
 		mh = rbuf->m_head;
@@ -1574,13 +1560,25 @@ ixl_rxeof(struct ixl_queue *que, int count)
 		else
 			vtag = 0;
 
+		/* Remove device access to the rx buffers. */
+		if (rbuf->m_head != NULL) {
+			bus_dmamap_sync(rxr->htag, rbuf->hmap,
+			    BUS_DMASYNC_POSTREAD);
+			bus_dmamap_unload(rxr->htag, rbuf->hmap);
+		}
+		if (rbuf->m_pack != NULL) {
+			bus_dmamap_sync(rxr->ptag, rbuf->pmap,
+			    BUS_DMASYNC_POSTREAD);
+			bus_dmamap_unload(rxr->ptag, rbuf->pmap);
+		}
+
 		/*
 		** Make sure bad packets are discarded,
 		** note that only EOP descriptor has valid
 		** error results.
 		*/
                 if (eop && (error & (1 << I40E_RX_DESC_ERROR_RXE_SHIFT))) {
-			rxr->discarded++;
+			rxr->desc_errs++;
 			ixl_rx_discard(rxr, i);
 			goto next_desc;
 		}
@@ -1671,10 +1669,6 @@ ixl_rxeof(struct ixl_queue *que, int count)
 				sendmp = mp;
 				sendmp->m_flags |= M_PKTHDR;
 				sendmp->m_pkthdr.len = mp->m_len;
-				if (vtag) {
-					sendmp->m_pkthdr.ether_vtag = vtag;
-					sendmp->m_flags |= M_VLANTAG;
-				}
                         }
 			/* Pass the head pointer on */
 			if (eop == 0) {
@@ -1693,6 +1687,11 @@ ixl_rxeof(struct ixl_queue *que, int count)
 			/* capture data for dynamic ITR adjustment */
 			rxr->packets++;
 			rxr->bytes += sendmp->m_pkthdr.len;
+			/* Set VLAN tag (field only valid in eop desc) */
+			if (vtag) {
+				sendmp->m_pkthdr.ether_vtag = vtag;
+				sendmp->m_flags |= M_VLANTAG;
+			}
 			if ((ifp->if_capenable & IFCAP_RXCSUM) != 0)
 				ixl_rx_checksum(sendmp, status, error, ptype);
 #ifdef RSS
@@ -1715,7 +1714,9 @@ next_desc:
 		/* Now send to the stack or do LRO */
 		if (sendmp != NULL) {
 			rxr->next_check = i;
+			IXL_RX_UNLOCK(rxr);
 			ixl_rx_input(rxr, ifp, sendmp, ptype);
+			IXL_RX_LOCK(rxr);
 			i = rxr->next_check;
 		}
 
@@ -1732,17 +1733,23 @@ next_desc:
 
 	rxr->next_check = i;
 
+	IXL_RX_UNLOCK(rxr);
+
 #if defined(INET6) || defined(INET)
 	/*
 	 * Flush any outstanding LRO work
 	 */
+#if __FreeBSD_version >= 1100105
+	tcp_lro_flush_all(lro);
+#else
+	struct lro_entry *queued;
 	while ((queued = SLIST_FIRST(&lro->lro_active)) != NULL) {
 		SLIST_REMOVE_HEAD(&lro->lro_active, next);
 		tcp_lro_flush(lro, queued);
 	}
 #endif
+#endif /* defined(INET6) || defined(INET) */
 
-	IXL_RX_UNLOCK(rxr);
 	return (FALSE);
 }
 

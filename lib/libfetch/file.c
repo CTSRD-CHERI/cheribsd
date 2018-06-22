@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1998-2011 Dag-Erling Smørgrav
  * All rights reserved.
  *
@@ -149,5 +151,6 @@ fetchListFile(struct url *u, const char *flags __unused)
 		fetch_add_entry(&ue, &size, &len, de->d_name, &us);
 	}
 
+	closedir(dir);
 	return (ue);
 }

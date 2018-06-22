@@ -2,6 +2,36 @@
 /*	$OpenBSD: pcb.h,v 1.3 1998/09/15 10:50:12 pefo Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause AND BSD-2-Clause
+ *
+ * Copyright (c) 2017 Robert N. M. Watson
+ * All rights reserved.
+ *
+ * This software was developed by SRI International and the University of
+ * Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
+ * ("CTSRD"), as part of the DARPA CRASH research programme.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
  * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -18,7 +48,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -98,6 +128,14 @@
 #define	RESTORE_U_PCB_REG(reg, offs, base) \
 	REG_L	reg, (U_PCB_REGS + (SZREG * offs)) (base)
 
+#ifdef CPU_CHERI
+#define	SAVE_U_PCB_CREG(creg, offs, base) \
+	csc	creg, base, (U_PCB_REGS + (SZREG * offs)) (CHERI_REG_KDC)
+
+#define	RESTORE_U_PCB_CREG(creg, offs, base) \
+	clc	creg, base, (U_PCB_REGS + (SZREG * offs)) (CHERI_REG_KDC)
+#endif
+
 #define	SAVE_U_PCB_FPREG(reg, offs, base) \
 	FP_S	reg, (U_PCB_FPREGS + (SZFPREG * offs)) (base)
 
@@ -119,7 +157,7 @@
 #ifndef LOCORE
 #include <machine/frame.h>
 #ifdef CPU_CHERI
-#include <machine/cheri.h>
+#include <cheri/cheri.h>
 #endif
 
 /*
@@ -128,18 +166,13 @@
 struct pcb
 {
 	struct trapframe pcb_regs;	/* saved CPU and registers */
-#ifdef CPU_CHERI
-	struct cheri_frame pcb_cheriframe;	/* Userspace capabilities. */
-	struct cheri_stack pcb_cheristack;	/* CCall/CReturn stack. */
-	struct cheri_signal pcb_cherisignal;	/* CHERI signal-related state. */
-	struct chericap pcb_typecap;		/* Root of object-type tree. */
-#endif
 	__register_t pcb_context[14];	/* kernel context for resume */
-#ifdef CPU_CHERI
-	struct cheri_kframe pcb_cherikframe;	/* kernel caller-save state. */
-#endif
 	void *pcb_onfault;		/* for copyin/copyout faults */
 	register_t pcb_tpc;
+#ifdef CPU_CHERI
+	struct cheri_signal pcb_cherisignal;	/* CHERI signal-related state. */
+	struct cheri_kframe pcb_cherikframe;	/* kernel caller-save state. */
+#endif
 };
 
 #ifdef _KERNEL

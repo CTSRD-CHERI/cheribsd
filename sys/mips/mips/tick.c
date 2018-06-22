@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2006-2007 Bruce M. Simpson.
  * Copyright (c) 2003-2004 Juli Mallett.
  * All rights reserved.
@@ -51,12 +53,17 @@ __FBSDID("$FreeBSD$");
 #include <machine/locore.h>
 #include <machine/md_var.h>
 
+#ifdef INTRNG
+#include <machine/intr.h>
+#endif
+
 uint64_t counter_freq;
 
 struct timecounter *platform_timecounter;
 
 static DPCPU_DEFINE(uint32_t, cycles_per_tick);
 static uint32_t cycles_per_usec;
+static unsigned int counter_ccres;
 
 static DPCPU_DEFINE(volatile uint32_t, counter_upper);
 static DPCPU_DEFINE(volatile uint32_t, counter_lower_last);
@@ -133,6 +140,20 @@ tick_ticker(void)
 	return (ret);
 }
 
+static unsigned int
+mips_get_ccres(void)
+{
+	uint64_t ccres;
+
+	__asm__ __volatile__ (
+	    ".set push\n"
+	    ".set noreorder\n"
+	    "rdhwr %0, $3\n"
+	   ".set pop\n"
+	    : "=r" (ccres));
+	return ((unsigned int)ccres);
+}
+
 void
 mips_timer_init_params(uint64_t platform_counter_freq, int double_count)
 {
@@ -147,8 +168,12 @@ mips_timer_init_params(uint64_t platform_counter_freq, int double_count)
 	 * pipeline cycles.
 	 * We know this because of status registers in CP0, make it automatic.
 	 */
-	if (double_count)
+	if (double_count == -1) {
+		counter_ccres = mips_get_ccres();
+		counter_freq /= counter_ccres;
+	} else if (double_count != 0) {
 		counter_freq /= 2;
+	}
 
 	cycles_per_usec = counter_freq / (1 * 1000 * 1000);
 	set_cputicker(tick_ticker, counter_freq, 1);
@@ -175,6 +200,9 @@ sysctl_machdep_counter_freq(SYSCTL_HANDLER_ARGS)
 SYSCTL_PROC(_machdep, OID_AUTO, counter_freq, CTLTYPE_U64 | CTLFLAG_RW,
     NULL, 0, sysctl_machdep_counter_freq, "QU",
     "Timecounter frequency in Hz");
+SYSCTL_UINT(_machdep, OID_AUTO, counter_ccres, CTLFLAG_RD,
+    &counter_ccres, 0,
+    "Number of clock cycles per cycle counter increment, 0 if unknown");
 
 static unsigned
 counter_get_timecount(struct timecounter *tc)
@@ -324,12 +352,18 @@ static int
 clock_attach(device_t dev)
 {
 	struct clock_softc *sc;
+#ifndef INTRNG
 	int error;
+#endif
 
 	if (device_get_unit(dev) != 0)
 		panic("can't attach more clocks");
 
 	softc = sc = device_get_softc(dev);
+#ifdef INTRNG
+	cpu_establish_hardintr("clock", clock_intr, NULL, sc, 5, INTR_TYPE_CLK,
+	    NULL);
+#else
 	sc->intr_rid = 0;
 	sc->intr_res = bus_alloc_resource(dev,
 	    SYS_RES_IRQ, &sc->intr_rid, 5, 5, 1, RF_ACTIVE);
@@ -343,6 +377,7 @@ clock_attach(device_t dev)
 		device_printf(dev, "bus_setup_intr returned %d\n", error);
 		return (error);
 	}
+#endif
 
 	sc->tc.tc_get_timecount = counter_get_timecount;
 	sc->tc.tc_counter_mask = 0xffffffff;

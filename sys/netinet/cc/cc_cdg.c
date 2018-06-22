@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2009-2013
  * 	Swinburne University of Technology, Melbourne, Australia
  * All rights reserved.
@@ -78,7 +80,7 @@ __FBSDID("$FreeBSD$");
 
 #define	CDG_VERSION "0.1"
 
-#define	CAST_PTR_INT(X) (*((int*)(X)))
+#define	CAST_PTR_INT(X) (*((int * __capability)(X)))
 
 /* Private delay-gradient induced congestion control signal. */
 #define	CC_CDG_DELAY 0x01000000
@@ -374,7 +376,7 @@ cdg_exp_backoff_scale_handler(SYSCTL_HANDLER_ARGS)
 	return (sysctl_handle_int(oidp, arg1, arg2, req));
 }
 
-static inline unsigned long
+static inline uint32_t
 cdg_window_decrease(struct cc_var *ccv, unsigned long owin, unsigned int beta)
 {
 
@@ -460,7 +462,7 @@ cdg_cong_signal(struct cc_var *ccv, uint32_t signal_type)
 				cdg_data->shadow_w = cdg_window_decrease(ccv,
 				    cdg_data->shadow_w, RENO_BETA);
 
-			CCV(ccv, snd_ssthresh) = ulmax(cdg_data->shadow_w,
+			CCV(ccv, snd_ssthresh) = max(cdg_data->shadow_w,
 			    cdg_window_decrease(ccv, CCV(ccv, snd_cwnd),
 			    V_cdg_beta_loss));
 

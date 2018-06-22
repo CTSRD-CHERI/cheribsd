@@ -1,4 +1,4 @@
-//===-- llvm/InlineAsm.h - Class to represent inline asm strings-*- C++ -*-===//
+//===- llvm/InlineAsm.h - Class to represent inline asm strings -*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -18,18 +18,17 @@
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Value.h"
+#include <cassert>
+#include <string>
 #include <vector>
 
 namespace llvm {
 
-class PointerType;
 class FunctionType;
-class Module;
-
-struct InlineAsmKeyType;
+class PointerType;
 template <class ConstantClass> class ConstantUniqueMap;
 
-class InlineAsm : public Value {
+class InlineAsm final : public Value {
 public:
   enum AsmDialect {
     AD_ATT,
@@ -40,23 +39,23 @@ private:
   friend struct InlineAsmKeyType;
   friend class ConstantUniqueMap<InlineAsm>;
 
-  InlineAsm(const InlineAsm &) = delete;
-  void operator=(const InlineAsm&) = delete;
-
   std::string AsmString, Constraints;
+  FunctionType *FTy;
   bool HasSideEffects;
   bool IsAlignStack;
   AsmDialect Dialect;
 
-  InlineAsm(PointerType *Ty, const std::string &AsmString,
+  InlineAsm(FunctionType *Ty, const std::string &AsmString,
             const std::string &Constraints, bool hasSideEffects,
             bool isAlignStack, AsmDialect asmDialect);
-  ~InlineAsm() override;
 
   /// When the ConstantUniqueMap merges two types and makes two InlineAsms
   /// identical, it destroys one of them with this method.
   void destroyConstant();
+
 public:
+  InlineAsm(const InlineAsm &) = delete;
+  InlineAsm &operator=(const InlineAsm &) = delete;
 
   /// InlineAsm::get - Return the specified uniqued inline asm string.
   ///
@@ -64,7 +63,7 @@ public:
                         StringRef Constraints, bool hasSideEffects,
                         bool isAlignStack = false,
                         AsmDialect asmDialect = AD_ATT);
-  
+
   bool hasSideEffects() const { return HasSideEffects; }
   bool isAlignStack() const { return IsAlignStack; }
   AsmDialect getDialect() const { return Dialect; }
@@ -74,11 +73,11 @@ public:
   PointerType *getType() const {
     return reinterpret_cast<PointerType*>(Value::getType());
   }
-  
+
   /// getFunctionType - InlineAsm's are always pointers to functions.
   ///
   FunctionType *getFunctionType() const;
-  
+
   const std::string &getAsmString() const { return AsmString; }
   const std::string &getConstraintString() const { return Constraints; }
 
@@ -88,105 +87,106 @@ public:
   ///
   static bool Verify(FunctionType *Ty, StringRef Constraints);
 
-  // Constraint String Parsing 
+  // Constraint String Parsing
   enum ConstraintPrefix {
     isInput,            // 'x'
     isOutput,           // '=x'
     isClobber           // '~x'
   };
-  
-  typedef std::vector<std::string> ConstraintCodeVector;
-  
+
+  using ConstraintCodeVector = std::vector<std::string>;
+
   struct SubConstraintInfo {
     /// MatchingInput - If this is not -1, this is an output constraint where an
     /// input constraint is required to match it (e.g. "0").  The value is the
     /// constraint number that matches this one (for example, if this is
     /// constraint #0 and constraint #4 has the value "0", this will be 4).
-    signed char MatchingInput;
+    signed char MatchingInput = -1;
+
     /// Code - The constraint code, either the register name (in braces) or the
     /// constraint letter/number.
     ConstraintCodeVector Codes;
+
     /// Default constructor.
-    SubConstraintInfo() : MatchingInput(-1) {}
+    SubConstraintInfo() = default;
   };
 
-  typedef std::vector<SubConstraintInfo> SubConstraintInfoVector;
+  using SubConstraintInfoVector = std::vector<SubConstraintInfo>;
   struct ConstraintInfo;
-  typedef std::vector<ConstraintInfo> ConstraintInfoVector;
-  
+  using ConstraintInfoVector = std::vector<ConstraintInfo>;
+
   struct ConstraintInfo {
     /// Type - The basic type of the constraint: input/output/clobber
     ///
-    ConstraintPrefix Type;
-    
+    ConstraintPrefix Type = isInput;
+
     /// isEarlyClobber - "&": output operand writes result before inputs are all
     /// read.  This is only ever set for an output operand.
-    bool isEarlyClobber; 
-    
+    bool isEarlyClobber = false;
+
     /// MatchingInput - If this is not -1, this is an output constraint where an
     /// input constraint is required to match it (e.g. "0").  The value is the
     /// constraint number that matches this one (for example, if this is
     /// constraint #0 and constraint #4 has the value "0", this will be 4).
-    signed char MatchingInput;
-    
+    signed char MatchingInput = -1;
+
     /// hasMatchingInput - Return true if this is an output constraint that has
     /// a matching input constraint.
     bool hasMatchingInput() const { return MatchingInput != -1; }
-    
+
     /// isCommutative - This is set to true for a constraint that is commutative
     /// with the next operand.
-    bool isCommutative;
-    
+    bool isCommutative = false;
+
     /// isIndirect - True if this operand is an indirect operand.  This means
     /// that the address of the source or destination is present in the call
     /// instruction, instead of it being returned or passed in explicitly.  This
     /// is represented with a '*' in the asm string.
-    bool isIndirect;
-    
+    bool isIndirect = false;
+
     /// Code - The constraint code, either the register name (in braces) or the
     /// constraint letter/number.
     ConstraintCodeVector Codes;
-    
+
     /// isMultipleAlternative - '|': has multiple-alternative constraints.
-    bool isMultipleAlternative;
-    
+    bool isMultipleAlternative = false;
+
     /// multipleAlternatives - If there are multiple alternative constraints,
     /// this array will contain them.  Otherwise it will be empty.
     SubConstraintInfoVector multipleAlternatives;
-    
+
     /// The currently selected alternative constraint index.
-    unsigned currentAlternativeIndex;
-    
-    ///Default constructor.
-    ConstraintInfo();
-    
+    unsigned currentAlternativeIndex = 0;
+
+    /// Default constructor.
+    ConstraintInfo() = default;
+
     /// Parse - Analyze the specified string (e.g. "=*&{eax}") and fill in the
     /// fields in this structure.  If the constraint string is not understood,
     /// return true, otherwise return false.
     bool Parse(StringRef Str, ConstraintInfoVector &ConstraintsSoFar);
-               
+
     /// selectAlternative - Point this constraint to the alternative constraint
     /// indicated by the index.
     void selectAlternative(unsigned index);
   };
-  
+
   /// ParseConstraints - Split up the constraint string into the specific
   /// constraints and their prefixes.  If this returns an empty vector, and if
   /// the constraint string itself isn't empty, there was an error parsing.
   static ConstraintInfoVector ParseConstraints(StringRef ConstraintString);
-  
-  /// ParseConstraints - Parse the constraints of this inlineasm object, 
+
+  /// ParseConstraints - Parse the constraints of this inlineasm object,
   /// returning them the same way that ParseConstraints(str) does.
   ConstraintInfoVector ParseConstraints() const {
     return ParseConstraints(Constraints);
   }
-  
+
   // Methods for support type inquiry through isa, cast, and dyn_cast:
-  static inline bool classof(const Value *V) {
+  static bool classof(const Value *V) {
     return V->getValueID() == Value::InlineAsmVal;
   }
 
-  
   // These are helper methods for dealing with flags in the INLINEASM SDNode
   // in the backend.
   //
@@ -203,7 +203,7 @@ public:
   //                 code.
   //   Else:
   //     Bit 30-16 - The register class ID to use for the operand.
-  
+
   enum : uint32_t {
     // Fixed operands on an INLINEASM SDNode.
     Op_InputChain = 0,
@@ -223,6 +223,7 @@ public:
     Extra_AsmDialect = 4,
     Extra_MayLoad = 8,
     Extra_MayStore = 16,
+    Extra_IsConvergent = 32,
 
     // Inline asm operands map to multiple SDNode / MachineInstr operands.
     // The first operand is an immediate describing the asm operand, the low
@@ -264,15 +265,25 @@ public:
 
     Flag_MatchingOperand = 0x80000000
   };
-  
+
   static unsigned getFlagWord(unsigned Kind, unsigned NumOps) {
     assert(((NumOps << 3) & ~0xffff) == 0 && "Too many inline asm operands!");
     assert(Kind >= Kind_RegUse && Kind <= Kind_Mem && "Invalid Kind");
     return Kind | (NumOps << 3);
   }
-  
+
+  static bool isRegDefKind(unsigned Flag){ return getKind(Flag) == Kind_RegDef;}
+  static bool isImmKind(unsigned Flag) { return getKind(Flag) == Kind_Imm; }
+  static bool isMemKind(unsigned Flag) { return getKind(Flag) == Kind_Mem; }
+  static bool isRegDefEarlyClobberKind(unsigned Flag) {
+    return getKind(Flag) == Kind_RegDefEarlyClobber;
+  }
+  static bool isClobberKind(unsigned Flag) {
+    return getKind(Flag) == Kind_Clobber;
+  }
+
   /// getFlagWordForMatchingOp - Augment an existing flag word returned by
-  /// getFlagWord with information indicating that this input operand is tied 
+  /// getFlagWord with information indicating that this input operand is tied
   /// to a previous output operand.
   static unsigned getFlagWordForMatchingOp(unsigned InputFlag,
                                            unsigned MatchedOperandNo) {
@@ -289,6 +300,8 @@ public:
   static unsigned getFlagWordForRegClass(unsigned InputFlag, unsigned RC) {
     // Store RC + 1, reserve the value 0 to mean 'no register class'.
     ++RC;
+    assert(!isImmKind(InputFlag) && "Immediates cannot have a register class");
+    assert(!isMemKind(InputFlag) && "Memory operand cannot have a register class");
     assert(RC <= 0x7fff && "Too large register class ID");
     assert((InputFlag & ~0xffff) == 0 && "High bits already contain data");
     return InputFlag | (RC << 16);
@@ -297,6 +310,7 @@ public:
   /// Augment an existing flag word returned by getFlagWord with the constraint
   /// code for a memory constraint.
   static unsigned getFlagWordForMem(unsigned InputFlag, unsigned Constraint) {
+    assert(isMemKind(InputFlag) && "InputFlag is not a memory constraint!");
     assert(Constraint <= 0x7fff && "Too large a memory constraint ID");
     assert(Constraint <= Constraints_Max && "Unknown constraint ID");
     assert((InputFlag & ~0xffff) == 0 && "High bits already contain data");
@@ -310,16 +324,6 @@ public:
 
   static unsigned getKind(unsigned Flags) {
     return Flags & 7;
-  }
-
-  static bool isRegDefKind(unsigned Flag){ return getKind(Flag) == Kind_RegDef;}
-  static bool isImmKind(unsigned Flag) { return getKind(Flag) == Kind_Imm; }
-  static bool isMemKind(unsigned Flag) { return getKind(Flag) == Kind_Mem; }
-  static bool isRegDefEarlyClobberKind(unsigned Flag) {
-    return getKind(Flag) == Kind_RegDefEarlyClobber;
-  }
-  static bool isClobberKind(unsigned Flag) {
-    return getKind(Flag) == Kind_Clobber;
   }
 
   static unsigned getMemoryConstraintID(unsigned Flag) {
@@ -355,9 +359,8 @@ public:
     RC = High - 1;
     return true;
   }
-
 };
 
-} // End llvm namespace
+} // end namespace llvm
 
-#endif
+#endif // LLVM_IR_INLINEASM_H

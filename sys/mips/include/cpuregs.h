@@ -1,6 +1,8 @@
 /*	$NetBSD: cpuregs.h,v 1.70 2006/05/15 02:26:54 simonb Exp $	*/
 
 /*
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -110,6 +112,7 @@
  *	C:	Cacheable, coherency unspecified.
  *	CNC:	Cacheable non-coherent.
  *	CC:	Cacheable coherent.
+ *	CCS:	Cacheable coherent, shared read.
  *	CCE:	Cacheable coherent, exclusive read.
  *	CCEW:	Cacheable coherent, exclusive write.
  *	CCUOW:	Cacheable coherent, update on write.
@@ -149,14 +152,30 @@
 #define	MIPS_CCA_CC	0x05	/* Cacheable Coherent. */
 #endif
 
-#if defined(CPU_MIPS74KC)
+#if defined(CPU_MIPS74K)
 #define	MIPS_CCA_UNCACHED	0x02
 #define	MIPS_CCA_CACHED		0x03
 #endif
 
-#if defined(CPU_MIPS1004KC)
-#define	MIPS_CCA_UNCACHED	0x02
-#define	MIPS_CCA_CACHED		0x05
+/*
+ * 1004K and 1074K cores, as well as interAptiv and proAptiv cores, support
+ * Cacheable Coherent CCAs 0x04 and 0x05, as well as Cacheable non-Coherent
+ * CCA 0x03 and Uncached Accelerated CCA 0x07
+ */
+#if defined(CPU_MIPS1004K) || defined(CPU_MIPS1074K) ||	\
+    defined(CPU_INTERAPTIV) || defined(CPU_PROAPTIV)
+#define	MIPS_CCA_CNC		0x03
+#define	MIPS_CCA_CCE		0x04
+#define	MIPS_CCA_CCS		0x05
+#define	MIPS_CCA_UA		0x07
+
+/* We use shared read CCA for CACHED CCA */
+#define	MIPS_CCA_CACHED		MIPS_CCA_CCS
+#endif
+
+#if defined(CPU_XBURST)
+#define	MIPS_CCA_UA		0x01
+#define	MIPS_CCA_WC		MIPS_CCA_UA
 #endif
 
 #ifndef	MIPS_CCA_UNCACHED
@@ -214,8 +233,18 @@
 #define	COP0_SYNC	.word 0xc0	/* ehb */
 #elif defined(CPU_SB1)
 #define COP0_SYNC  ssnop; ssnop; ssnop; ssnop; ssnop; ssnop; ssnop; ssnop; ssnop
-#elif defined(CPU_MIPS74KC) || defined(CPU_MIPS1004KC)
-#define	COP0_SYNC	 .word 0xc0	/* ehb */
+#elif defined(CPU_MIPS24K) || defined(CPU_MIPS34K) ||		\
+      defined(CPU_MIPS74K) || defined(CPU_MIPS1004K)  ||	\
+      defined(CPU_MIPS1074K) || defined(CPU_INTERAPTIV) ||	\
+      defined(CPU_PROAPTIV)
+/*
+ * According to MIPS32tm Architecture for Programmers, Vol.II, rev. 2.00:
+ * "As EHB becomes standard in MIPS implementations, the previous SSNOPs can be
+ *  removed, leaving only the EHB".
+ * Also, all MIPS32 Release 2 implementations have the EHB instruction, which
+ * resolves all execution hazards. The same goes for MIPS32 Release 3.
+ */
+#define	COP0_SYNC	.word 0xc0	/* ehb */
 #else
 /*
  * Pick a reasonable default based on the "typical" spacing described in the
@@ -243,6 +272,7 @@
 #define	MIPS_CR_COP_ERR		0x30000000
 #define	MIPS_CR_EXC_CODE	0x0000007C	/* five bits */
 #define	MIPS_CR_IP		0x0000FF00
+#define	MIPS_CR_DC		(1 << 27)	/* Count register disable */
 #define	MIPS_CR_EXC_CODE_SHIFT	2
 #define	MIPS_CR_COP_ERR_SHIFT	28
 
@@ -441,6 +471,7 @@
  * 10	MIPS_COP_0_TLB_HI	3636 TLB entry high.
  * 11	MIPS_COP_0_COMPARE	.333 Compare (against Count).
  * 12	MIPS_COP_0_STATUS	3333 Status register.
+ * 12/1	MIPS_COP_0_INTCTL	..33 Interrupt setup (MIPS32/64 r2).
  * 13	MIPS_COP_0_CAUSE	3333 Exception cause register.
  * 14	MIPS_COP_0_EXC_PC	3636 Exception PC.
  * 15	MIPS_COP_0_PRID		3333 Processor revision identifier.
@@ -504,12 +535,18 @@
 
 #define	MIPS_COP_0_COUNT	_(9)
 #define	MIPS_COP_0_COMPARE	_(11)
-
+#ifdef CPU_XBURST
+#define	MIPS_COP_0_XBURST_C12	_(12)
+#endif
 #define	MIPS_COP_0_CONFIG	_(16)
 #define	MIPS_COP_0_LLADDR	_(17)
 #define	MIPS_COP_0_WATCH_LO	_(18)
 #define	MIPS_COP_0_WATCH_HI	_(19)
 #define	MIPS_COP_0_TLB_XCONTEXT _(20)
+#ifdef CPU_XBURST
+#define	MIPS_COP_0_XBURST_MBOX	_(20)
+#endif
+
 #define	MIPS_COP_0_ECC		_(26)
 #define	MIPS_COP_0_CACHE_ERR	_(27)
 #define	MIPS_COP_0_TAG_LO	_(28)
@@ -519,6 +556,7 @@
 /* MIPS32/64 */
 #define	MIPS_COP_0_USERLOCAL	_(4)	/* sel 2 is userlevel register */
 #define	MIPS_COP_0_HWRENA	_(7)
+#define	MIPS_COP_0_INTCTL	_(12)
 #define	MIPS_COP_0_DEBUG	_(23)
 #define	MIPS_COP_0_DEPC		_(24)
 #define	MIPS_COP_0_PERFCNT	_(25)
@@ -526,8 +564,8 @@
 #define	MIPS_COP_0_DATA_HI	_(29)
 #define	MIPS_COP_0_DESAVE	_(31)
 
-/* BERI */
-#if defined(CPU_BERI)
+/* BERI (and CHERI_MALTA) */
+#if defined(CPU_BERI) || defined(CPU_CHERI)
 #define	MIPS_COP_0_EXC_INS	_(8)	/* sel 1 encoding of instruction causing exception */
 #endif
 
@@ -538,15 +576,25 @@
 #define MIPS_MMU_FIXED			0x03		/* Standard fixed mapping */
 
 /*
+ * IntCtl Register Fields
+ */
+#define	MIPS_INTCTL_IPTI_MASK	0xE0000000	/* bits 31..29 timer intr # */
+#define	MIPS_INTCTL_IPTI_SHIFT	29
+#define	MIPS_INTCTL_IPPCI_MASK	0x1C000000	/* bits 26..29 perf counter intr # */
+#define	MIPS_INTCTL_IPPCI_SHIFT	26
+#define	MIPS_INTCTL_VS_MASK	0x000001F0	/* bits 5..9 vector spacing */
+#define	MIPS_INTCTL_VS_SHIFT	4
+
+/*
  * Config Register Fields
  * (See "MIPS Architecture for Programmers Volume III", MD00091, Table 9.39)
  */
-#define	MIPS_CONFIG0_M			0x80000000 	/* Flag: Config1 is present. */
-#define MIPS_CONFIG0_MT_MASK		0x00000380	/* bits 9..7 MMU Type */
-#define MIPS_CONFIG0_MT_SHIFT		7
-#define MIPS_CONFIG0_BE			0x00008000	/* data is big-endian */
-#define MIPS_CONFIG0_VI			0x00000008	/* instruction cache is virtual */
-
+#define	MIPS_CONFIG0_M		0x80000000 	/* Flag: Config1 is present. */
+#define	MIPS_CONFIG0_MT_MASK	0x00000380	/* bits 9..7 MMU Type */
+#define	MIPS_CONFIG0_MT_SHIFT	7
+#define	MIPS_CONFIG0_BE		0x00008000	/* data is big-endian */
+#define	MIPS_CONFIG0_VI		0x00000008	/* inst cache is virtual */
+ 
 /*
  * Config1 Register Fields
  * (See "MIPS Architecture for Programmers Volume III", MD00091, Table 9-1)
@@ -594,6 +642,19 @@
  */
 #define	MIPS_CONFIG3_M		0x80000000	/* Flag: Config4 is present */
 #define MIPS_CONFIG3_CMGCR_MASK	0x20000000	/* Coherence manager present */
+#define	MIPS_CONFIG3_ULR	0x00002000	/* UserLocal reg implemented */
+
+/*
+ * Config2 Register Fields
+ * (See "MIPS Architecture for Programmers Volume III", MD00091, Table 9.40)
+ */
+#define	MIPS_CONFIG2_M		0x80000000	/* Flag: Config3 is present. */
+
+/*
+ * Config3 Register Fields
+ * (See "MIPS Architecture for Programmers Volume III", MD00091, Table 9.41)
+ */
+#define	MIPS_CONFIG3_M		0x80000000	/* Flag: Config4 is present */
 #define	MIPS_CONFIG3_ULR	0x00002000	/* UserLocal reg implemented */
 
 #define MIPS_CONFIG4_MMUSIZEEXT		0x000000FF	/* bits 7.. 0 MMU Size Extension */
@@ -674,6 +735,53 @@
 #define	MIPS_OPCODE_C1		0x11
 
 /*
+ * Bits defined for the HWREna (CP0 register 7, select 0).
+ */
+#define	MIPS_HWRENA_CPUNUM	(1<<0)	/* CPU number program is running on */
+#define	MIPS_HWRENA_SYNCI_STEP 	(1<<1)	/* Address step sized used with SYNCI */
+#define	MIPS_HWRENA_CC		(1<<2)	/* Hi Res cycle counter */
+#define	MIPS_HWRENA_CCRES	(1<<3)	/* Cycle counter resolution */
+/* BERI specific statcounters */
+#if defined(CPU_BERI)
+/*
+ * XXXAR: the first three don't use the selector field so waste opcode space.
+ * We should probably move them further back and use the selector. This would
+ * also simplify the QEMU implementation since MIPSR6 uses rdhwr 4 and 5
+ */
+#define	MIPS_HWRENA_BERI_ICOUNT_STATCOUNTERS	(1<<4)	/* instruction count */
+#define	MIPS_HWRENA_BERI_ITLB_MISS_STATCOUNTERS	(1<<5)	/* itlb misses */
+#define	MIPS_HWRENA_BERI_DTLB_MISS_STATCOUNTERS	(1<<6)	/* dtlb misses */
+#define	MIPS_HWRENA_BERI_RESET_STATCOUNTERS	(1<<7)	/* counters reseting */
+#define	MIPS_HWRENA_BERI_ICACHE_STATCOUNTERS	(1<<8)	/* ICACHE counters */
+#define	MIPS_HWRENA_BERI_DCACHE_STATCOUNTERS	(1<<9)	/* DCACHE counters */
+#define	MIPS_HWRENA_BERI_L2CACHE_STATCOUNTERS	(1<<10)	/* L2CACHE counters */
+#define	MIPS_HWRENA_BERI_MEM_STATCOUNTERS	(1<<11)	/* memory counters */
+#define	MIPS_HWRENA_BERI_TAGCACHE_STATCOUNTERS	(1<<12)	/* tag cache counters */
+#define	MIPS_HWRENA_BERI_L2MASTER_STATCOUNTERS	(1<<13)	/* L2 cache counters */
+#define	MIPS_HWRENA_BERI_TAGMASTER_STATCOUNTERS	(1<<14)	/* tag cache counters */
+/* mask of all statcounters */
+#define	MIPS_HWRENA_BERI_STATCOUNTERS_MASK		\
+	(MIPS_HWRENA_BERI_ICOUNT_STATCOUNTERS |		\
+	 MIPS_HWRENA_BERI_ITLB_MISS_STATCOUNTERS |	\
+	 MIPS_HWRENA_BERI_DTLB_MISS_STATCOUNTERS |	\
+	 MIPS_HWRENA_BERI_RESET_STATCOUNTERS |		\
+	 MIPS_HWRENA_BERI_ICACHE_STATCOUNTERS |		\
+	 MIPS_HWRENA_BERI_DCACHE_STATCOUNTERS |		\
+	 MIPS_HWRENA_BERI_L2CACHE_STATCOUNTERS |	\
+	 MIPS_HWRENA_BERI_MEM_STATCOUNTERS |		\
+	 MIPS_HWRENA_BERI_TAGCACHE_STATCOUNTERS |	\
+	 MIPS_HWRENA_BERI_L2MASTER_STATCOUNTERS |	\
+	 MIPS_HWRENA_BERI_TAGMASTER_STATCOUNTERS)
+#endif
+#define	MIPS_HWRENA_UL		(1<<29)	/* UserLocal Register */
+#define	MIPS_HWRENA_IMPL30	(1<<30)	/* Implementation-dependent 30 */
+#define	MIPS_HWRENA_IMPL31	(1<<31)	/* Implementation-dependent 31 */
+
+/* Coherence manager constants */
+#define	MIPS_CMGCRB_BASE	11
+#define	MIPS_CMGCRF_BASE	(~((1 << MIPS_CMGCRB_BASE) - 1))
+
+/*
  * Bits defined for for the HWREna (CP0 register 7, select 0).
  */
 #define	MIPS_HWRENA_CPUNUM	(1<<0)	/* CPU number program is running on */
@@ -683,9 +791,5 @@
 #define	MIPS_HWRENA_UL		(1<<29)	/* UserLocal Register */
 #define	MIPS_HWRENA_IMPL30	(1<<30)	/* Implementation-dependent 30 */
 #define	MIPS_HWRENA_IMPL31	(1<<31)	/* Implementation-dependent 31 */
-
-/* Coherence manager constants */
-#define	MIPS_CMGCRB_BASE	11
-#define	MIPS_CMGCRF_BASE	(~((1 << MIPS_CMGCRB_BASE) - 1))
 
 #endif /* _MIPS_CPUREGS_H_ */

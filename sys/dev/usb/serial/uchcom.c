@@ -1,6 +1,8 @@
 /*	$NetBSD: uchcom.c,v 1.1 2007/09/03 17:57:37 tshiozak Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD AND BSD-2-Clause-NetBSD
+ *
  * Copyright (c) 2007, Takanori Watanabe
  * All rights reserved.
  *
@@ -195,7 +197,7 @@ static const struct uchcom_divider_record dividers[] =
 	{367, 1, 11719, {0, 0, 0}},
 };
 
-#define	NUM_DIVIDERS	(sizeof (dividers) / sizeof (dividers[0]))
+#define	NUM_DIVIDERS	nitems(dividers)
 
 static const STRUCT_USB_HOST_ID uchcom_devs[] = {
 	{USB_VPI(USB_VENDOR_WCH, USB_PRODUCT_WCH_CH341SER, 0)},
@@ -625,6 +627,7 @@ uchcom_cfg_get_status(struct ucom_softc *ucom, uint8_t *lsr, uint8_t *msr)
 
 	DPRINTF("\n");
 
+	/* XXX Note: sc_lsr is always zero */
 	*lsr = sc->sc_lsr;
 	*msr = sc->sc_msr;
 }

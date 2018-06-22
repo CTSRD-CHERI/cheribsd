@@ -42,7 +42,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -61,7 +61,7 @@
  */
 
 #include <sys/cdefs.h>
- __FBSDID("$FreeBSD$");
+__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -77,6 +77,7 @@
 #include <sys/sysctl.h>
 #include <sys/syscallsubr.h>
 #include <sys/taskqueue.h>
+#include <sys/tree.h>
 #include <sys/vnode.h>
 #include <machine/atomic.h>
 #include <vm/uma.h>
@@ -148,6 +149,15 @@ int autofs_interruptible = 1;
 TUNABLE_INT("vfs.autofs.interruptible", &autofs_interruptible);
 SYSCTL_INT(_vfs_autofs, OID_AUTO, interruptible, CTLFLAG_RWTUN,
     &autofs_interruptible, 1, "Allow requests to be interrupted by signal");
+
+static int
+autofs_node_cmp(const struct autofs_node *a, const struct autofs_node *b)
+{
+
+	return (strcmp(a->an_name, b->an_name));
+}
+
+RB_GENERATE(autofs_node_tree, autofs_node, an_link, autofs_node_cmp);
 
 int
 autofs_init(struct vfsconf *vfsp)
@@ -344,7 +354,7 @@ autofs_set_sigmask(sigset_t *oldset)
 	/* Remove the autofs set of signals from newset */
 	PROC_LOCK(curproc);
 	mtx_lock(&curproc->p_sigacts->ps_mtx);
-	for (i = 0 ; i < sizeof(autofs_sig_set)/sizeof(int) ; i++) {
+	for (i = 0 ; i < nitems(autofs_sig_set); i++) {
 		/*
 		 * But make sure we leave the ones already masked
 		 * by the process, i.e. remove the signal from the
@@ -432,12 +442,8 @@ autofs_trigger_one(struct autofs_node *anp,
 
 		TIMEOUT_TASK_INIT(taskqueue_thread, &ar->ar_task, 0,
 		    autofs_task, ar);
-		error = taskqueue_enqueue_timeout(taskqueue_thread,
-		    &ar->ar_task, autofs_timeout * hz);
-		if (error != 0) {
-			AUTOFS_WARN("taskqueue_enqueue_timeout() failed "
-			    "with error %d", error);
-		}
+		taskqueue_enqueue_timeout(taskqueue_thread, &ar->ar_task,
+		    autofs_timeout * hz);
 		refcount_init(&ar->ar_refcount, 1);
 		TAILQ_INSERT_TAIL(&autofs_softc->sc_requests, ar, ar_next);
 	}

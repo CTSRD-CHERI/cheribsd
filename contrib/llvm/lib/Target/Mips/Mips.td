@@ -24,6 +24,8 @@ class PredicateControl {
   list<Predicate> EncodingPredicates = [];
   // Predicates for the GPR size such as IsGP64bit
   list<Predicate> GPRPredicates = [];
+  // Predicates for the PTR size such as IsPTR64bit
+  list<Predicate> PTRPredicates = [];
   // Predicates for the FGR size and layout such as IsFP64bit
   list<Predicate> FGRPredicates = [];
   // Predicates for the instruction group membership such as ISA's and ASE's
@@ -34,6 +36,7 @@ class PredicateControl {
   list<Predicate> AdditionalPredicates = [];
   list<Predicate> Predicates = !listconcat(EncodingPredicates,
                                            GPRPredicates,
+                                           PTRPredicates,
                                            FGRPredicates,
                                            InsnPredicates,
                                            HardFloatPredicate,
@@ -54,6 +57,10 @@ include "MipsSchedule.td"
 include "MipsInstrInfo.td"
 include "MipsCallingConv.td"
 
+// Avoid forward declaration issues.
+include "MipsScheduleP5600.td"
+include "MipsScheduleGeneric.td"
+
 def MipsInstrInfo : InstrInfo;
 
 //===----------------------------------------------------------------------===//
@@ -62,6 +69,8 @@ def MipsInstrInfo : InstrInfo;
 
 def FeatureNoABICalls  : SubtargetFeature<"noabicalls", "NoABICalls", "true",
                                 "Disable SVR4-style position-independent code">;
+def FeaturePTR64Bit    : SubtargetFeature<"ptr64", "IsPTR64bit", "true",
+                                "Pointers are 64-bit wide">;
 def FeatureGP64Bit     : SubtargetFeature<"gp64", "IsGP64bit", "true",
                                 "General Purpose Registers are 64-bit wide">;
 def FeatureFP64Bit     : SubtargetFeature<"fp64", "IsFP64bit", "true",
@@ -147,6 +156,8 @@ def FeatureMips64r6    : SubtargetFeature<"mips64r6", "MipsArchVersion",
                                 "Mips64r6 ISA Support [experimental]",
                                 [FeatureMips32r6, FeatureMips64r5,
                                  FeatureNaN2008]>;
+def FeatureSym32       : SubtargetFeature<"sym32", "HasSym32", "true",
+                                          "Symbols are 32 bit on Mips64">;
 
 def FeatureMips16  : SubtargetFeature<"mips16", "InMips16Mode", "true",
                                       "Mips16 mode">;
@@ -154,8 +165,13 @@ def FeatureMips16  : SubtargetFeature<"mips16", "InMips16Mode", "true",
 def FeatureDSP : SubtargetFeature<"dsp", "HasDSP", "true", "Mips DSP ASE">;
 def FeatureDSPR2 : SubtargetFeature<"dspr2", "HasDSPR2", "true",
                                     "Mips DSP-R2 ASE", [FeatureDSP]>;
+def FeatureDSPR3
+    : SubtargetFeature<"dspr3", "HasDSPR3", "true", "Mips DSP-R3 ASE",
+                       [ FeatureDSP, FeatureDSPR2 ]>;
 
 def FeatureMSA : SubtargetFeature<"msa", "HasMSA", "true", "Mips MSA ASE">;
+
+def FeatureEVA : SubtargetFeature<"eva", "HasEVA", "true", "Mips EVA ASE">;
 
 def FeatureMicroMips  : SubtargetFeature<"micromips", "InMicroMipsMode", "true",
                                          "microMips mode">;
@@ -164,12 +180,29 @@ def FeatureCnMips     : SubtargetFeature<"cnmips", "HasCnMips",
                                 "true", "Octeon cnMIPS Support",
                                 [FeatureMips64r2]>;
 
+def FeatureUseTCCInDIV : SubtargetFeature<
+                               "use-tcc-in-div",
+                               "UseTCCInDIV", "false",
+                               "Force the assembler to use trapping">;
+
+def FeatureMadd4 : SubtargetFeature<"nomadd4", "DisableMadd4", "true",
+                                    "Disable 4-operand madd.fmt and related instructions">;
+
+def FeatureMT : SubtargetFeature<"mt", "HasMT", "true", "Mips MT ASE">;
+
+def FeatureLongCalls : SubtargetFeature<"long-calls", "UseLongCalls", "true",
+                                        "Disable use of the jal instruction">;
+
 //===----------------------------------------------------------------------===//
 // Mips processors supported.
 //===----------------------------------------------------------------------===//
 
+def ImplP5600 : SubtargetFeature<"p5600", "ProcImpl",
+                                 "MipsSubtarget::CPU::P5600",
+                                 "The P5600 Processor", [FeatureMips32r5]>;
+
 class Proc<string Name, list<SubtargetFeature> Features>
- : Processor<Name, MipsGenericItineraries, Features>;
+ : ProcessorModel<Name, MipsGenericModel, Features>;
 
 def : Proc<"mips1", [FeatureMips1]>;
 def : Proc<"mips2", [FeatureMips2]>;
@@ -187,12 +220,11 @@ def : Proc<"mips64r2", [FeatureMips64r2]>;
 def : Proc<"mips64r3", [FeatureMips64r3]>;
 def : Proc<"mips64r5", [FeatureMips64r5]>;
 def : Proc<"mips64r6", [FeatureMips64r6]>;
-def : Proc<"mips16", [FeatureMips16]>;
 def : Proc<"octeon", [FeatureMips64r2, FeatureCnMips]>;
+def : ProcessorModel<"p5600", MipsP5600Model, [ImplP5600]>;
 
 def MipsAsmParser : AsmParser {
   let ShouldEmitMatchRegisterName = 0;
-  let MnemonicContainsDot = 1;
 }
 
 def MipsAsmParserVariant : AsmParserVariant {

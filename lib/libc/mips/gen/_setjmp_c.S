@@ -1,7 +1,8 @@
 /*-
- * Copyright (c) 2015 SRI International
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.
+ * Copyright (c) 2015 SRI International
+ * Copyright (c) 2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -57,21 +58,30 @@ __FBSDID("$FreeBSD$");
  * and a struct sigcontext, see <signal.h>
  */
 
+/* Stack space required to save original $c3. */
 #define SETJMP_FRAME_SIZE	(CALLFRAME_SIZ + _MIPS_SZCAP/8)
 
-
-NESTED(_setjmp, SETJMP_FRAME_SIZE, ra)
+NESTED(_setjmp, SETJMP_FRAME_SIZE, _FRAME_RETURN_REG)
+	.protected _C_LABEL(_setjmp)
 	.set	noreorder
+	/* XXXRW: CFI annotations for debugger. */
 
-	li		v0, _JB_MAGIC__SETJMP
+	REG_LI		v0, _JB_MAGIC__SETJMP
 	csd		v0, zero, (_JB_MAGIC  * SZREG)($c3)
-	csd		ra, zero, (_JB_REG_RA * SZREG)($c3)
+
 	/*
 	 * From "MIPSpro N32 ABI Handbook", Table 2-1:
 	 * Registers s0..s7 are callee-saved.
 	 * The sp register is callee-saved.
 	 * The fp (or s8) register is callee-saved.
 	 * The gp register is callee-saved (for n32/n64).
+	 *
+	 * NB: The pure-capability ABI roughly retains the n32/n64 MIPS ABI in
+	 * terms of caller/callee-save registers, despite some registers
+	 * seeing different use.
+	 *
+	 * NB: In the pure-capability ABI, we need to neither save nore restore
+	 * $ra and $sp, which are caller-save and not used for control flow.
 	 */
 	csd		s0, zero, (_JB_REG_S0 * SZREG)($c3)
 	csd		s1, zero, (_JB_REG_S1 * SZREG)($c3)
@@ -81,10 +91,9 @@ NESTED(_setjmp, SETJMP_FRAME_SIZE, ra)
 	csd		s5, zero, (_JB_REG_S5 * SZREG)($c3)
 	csd		s6, zero, (_JB_REG_S6 * SZREG)($c3)
 	csd		s7, zero, (_JB_REG_S7 * SZREG)($c3)
-	csd		sp, zero, (_JB_REG_SP * SZREG)($c3)
 	csd		s8, zero, (_JB_REG_S8 * SZREG)($c3)
 	csd		gp, zero, (_JB_REG_GP * SZREG)($c3)
-#ifndef SOFTFLOAT
+#ifndef __mips_soft_float
 	/*
 	 * From "MIPSpro N32 ABI Handbook", Table 2-1:
 	 * In N64, FP registers F24 .. F31 are callee-saved.
@@ -99,64 +108,71 @@ NESTED(_setjmp, SETJMP_FRAME_SIZE, ra)
 	csdc1	$f29, zero, (_JB_FPREG_F29 * SZREG)($c3)
 	csdc1	$f30, zero, (_JB_FPREG_F30 * SZREG)($c3)
 	csdc1	$f31, zero, (_JB_FPREG_F31 * SZREG)($c3)
-#endif	/* ! SOFTFLOAT */
-	/* jmp_buf is 64-bit aligned, so we need to round it up. */
-	cgetbase	t0, $c3
-	cgetoffset	t1, $c3
-	daddu		t1, t0, t1
-	daddiu		t0, t1, ((_JB_CHERI_START * SZREG) + _MIPS_SZCAP/8 - SZREG)
-	li		t2, _MIPS_CAP_ALIGN_MASK
-	and		t2, t2, t0
-	dsubu		t1, t2, t1
-
-	csc		$c11, t1, (_JB_CHERI_C11 * _MIPS_SZCAP/8)($c3)
-	csc		$c12, t1, (_JB_CHERI_C12 * _MIPS_SZCAP/8)($c3)
-	csc		$c13, t1, (_JB_CHERI_C13 * _MIPS_SZCAP/8)($c3)
-	csc		$c14, t1, (_JB_CHERI_C14 * _MIPS_SZCAP/8)($c3)
-	csc		$c15, t1, (_JB_CHERI_C15 * _MIPS_SZCAP/8)($c3)
-	csc		$c16, t1, (_JB_CHERI_C16 * _MIPS_SZCAP/8)($c3)
-	csc		$c17, t1, (_JB_CHERI_C17 * _MIPS_SZCAP/8)($c3)
-	csc		$c18, t1, (_JB_CHERI_C18 * _MIPS_SZCAP/8)($c3)
-	csc		$c19, t1, (_JB_CHERI_C19 * _MIPS_SZCAP/8)($c3)
-	csc		$c20, t1, (_JB_CHERI_C20 * _MIPS_SZCAP/8)($c3)
-	csc		$c21, t1, (_JB_CHERI_C21 * _MIPS_SZCAP/8)($c3)
-	csc		$c22, t1, (_JB_CHERI_C22 * _MIPS_SZCAP/8)($c3)
-	csc		$c23, t1, (_JB_CHERI_C23 * _MIPS_SZCAP/8)($c3)
-	csc		$c24, t1, (_JB_CHERI_C24 * _MIPS_SZCAP/8)($c3)
+#endif	/* ! __mips_soft_float */
+	csc		$c11, zero, _JB_CHERI_OFFSET(C11)($c3)
+	csc		$c12, zero, _JB_CHERI_OFFSET(C12)($c3)
+	csc		$c13, zero, _JB_CHERI_OFFSET(C13)($c3)
+	csc		$c14, zero, _JB_CHERI_OFFSET(C14)($c3)
+	csc		$c15, zero, _JB_CHERI_OFFSET(C15)($c3)
+	csc		$c16, zero, _JB_CHERI_OFFSET(C16)($c3)
+	csc		$c17, zero, _JB_CHERI_OFFSET(C17)($c3)
+	csc		$c18, zero, _JB_CHERI_OFFSET(C18)($c3)
+	csc		$c19, zero, _JB_CHERI_OFFSET(C19)($c3)
+	csc		$c20, zero, _JB_CHERI_OFFSET(C20)($c3)
+	csc		$c21, zero, _JB_CHERI_OFFSET(C21)($c3)
+	csc		$c22, zero, _JB_CHERI_OFFSET(C22)($c3)
+	csc		$c23, zero, _JB_CHERI_OFFSET(C23)($c3)
+	csc		$c24, zero, _JB_CHERI_OFFSET(C24)($c3)
+	csc		$c25, zero, _JB_CHERI_OFFSET(C25)($c3)
 	cgetdefault	$c4
-	csc		$c4, t1, (_JB_CHERI_DDC * _MIPS_SZCAP/8)($c3)
+	csc		$c4, zero, _JB_CHERI_OFFSET(DDC)($c3)
 
-	move		v0, zero
 	cjr		$c17
+	move		v0, zero
 END(_setjmp)
 
 #define LONGJMP_FRAME_SIZE	(CALLFRAME_SIZ + _MIPS_SZCAP/8)
+NESTED(_longjmp, LONGJMP_FRAME_SIZE, _FRAME_RETURN_REG)
+	.protected _C_LABEL(_longjmp)
+	/* XXXRW: CFI annotations for debugger. */
 
-NESTED(_longjmp, LONGJMP_FRAME_SIZE, ra)
-	.mask	0xc0000000, (CALLFRAME_RA - CALLFRAME_SIZ)
-	PTR_SUBU	sp, sp, LONGJMP_FRAME_SIZE	# allocate stack frame
+	dli		t0, -LONGJMP_FRAME_SIZE		# allocate stack frame
+	cincoffset	$csp, $csp, t0
 
-	csd		ra, sp, CALLFRAME_RA($c11)
-	csd		s8, sp, CALLFRAME_FP($c11)
-	csd		a0, sp, CALLFRAME_S0($c11)	# save return value
-	csc		$c17, sp, CALLFRAME_C17($c11)
-	csc		$c3, sp, CALLFRAME_SIZ($c11)
+	/*
+	 * Prepare a proper stack frame so that we can call
+	 * __cheriabi_longjmperror() before a tail call into
+	 * __cheriabi_abort().
+	 *
+	 * Note that $a0 is saved as the return value, and $c3 as the jmp_buf
+	 * pointer, in the pure-capability ABI, unlike in the MIPS ABI where
+	 * they are in $a1 and $a0 respectively.
+	 */
+	csc		$c17, zero, CALLFRAME_CRA($csp)
+	csd		a0, zero, CALLFRAME_S0($csp)	# save return value
+	csc		$c3, zero, CALLFRAME_SIZ($csp)
 
 	cld		v0, zero, (_JB_MAGIC  * SZREG)($c3)
-	li		t0, _JB_MAGIC__SETJMP
+	REG_LI		t0, _JB_MAGIC__SETJMP
 	bne		v0, t0, botch			# jump if error
 	nop
 
-	clc		$c3, sp, CALLFRAME_SIZ($c11)
-	cld		a0, sp, CALLFRAME_S0($c11)	# restore return value
+	/*
+	 * XXXRW: Should signal mask be restored here, as in MIPS?  That is
+	 * presumably the reason for saving/restoring $c3/$a0 around this gap.
+	 */
+	clc		$c3, zero, CALLFRAME_SIZ($csp)
+	cld		a0, zero, CALLFRAME_S0($csp)	# restore return value
 
-	cld		ra, zero, (_JB_REG_RA * SZREG)($c3)
 	/*
 	 * From "MIPSpro N32 ABI Handbook", Table 2-1:
 	 * Registers s0..s7 are callee-saved.
 	 * The sp register is callee-saved.
 	 * The fp (or s8) register is callee-saved.
 	 * The gp register is callee-saved (for n32/n64).
+	 *
+	 * NB: In the pure-capability ABI, we need to neither save nore restore
+	 * $ra and $sp, which are caller-save and not used for control flow.
 	 */
 	cld		s0, zero, (_JB_REG_S0 * SZREG)($c3)
 	cld		s1, zero, (_JB_REG_S1 * SZREG)($c3)
@@ -166,10 +182,9 @@ NESTED(_longjmp, LONGJMP_FRAME_SIZE, ra)
 	cld		s5, zero, (_JB_REG_S5 * SZREG)($c3)
 	cld		s6, zero, (_JB_REG_S6 * SZREG)($c3)
 	cld		s7, zero, (_JB_REG_S7 * SZREG)($c3)
-	cld		sp, zero, (_JB_REG_SP * SZREG)($c3)
 	cld		s8, zero, (_JB_REG_S8 * SZREG)($c3)
 	cld		gp, zero, (_JB_REG_GP * SZREG)($c3)
-#ifndef SOFTFLOAT
+#ifndef __mips_soft_float
 	/*
 	 * From "MIPSpro N32 ABI Handbook", Table 2-1:
 	 * In N32, FP registers F20, F22, F24, F26, F28, F30 are callee-saved.
@@ -186,32 +201,27 @@ NESTED(_longjmp, LONGJMP_FRAME_SIZE, ra)
 	cldc1		$f29, zero, (_JB_FPREG_F29 * SZREG)($c3)
 	cldc1		$f30, zero, (_JB_FPREG_F30 * SZREG)($c3)
 	cldc1		$f31, zero, (_JB_FPREG_F31 * SZREG)($c3)
-#endif	/* ! SOFTFLOAT */
-	/* jmp_buf is 64-bit aligned, so we need to round it up. */
-	cgetbase	t0, $c3
-	cgetoffset	t1, $c3
-	daddu		t1, t0, t1
-	daddiu		t0, t1, ((_JB_CHERI_START * SZREG) + _MIPS_SZCAP/8 - SZREG)
-	li		t2, _MIPS_CAP_ALIGN_MASK
-	and		t2, t2, t0
-	dsubu		t1, t2, t1
+#endif	/* ! __mips_soft_float */
+	clc		$c11, zero, _JB_CHERI_OFFSET(C11)($c3)
+	clc		$c12, zero, _JB_CHERI_OFFSET(C12)($c3)
+	clc		$c13, zero, _JB_CHERI_OFFSET(C13)($c3)
+	clc		$c14, zero, _JB_CHERI_OFFSET(C14)($c3)
+	clc		$c15, zero, _JB_CHERI_OFFSET(C15)($c3)
+	clc		$c16, zero, _JB_CHERI_OFFSET(C16)($c3)
+	clc		$c17, zero, _JB_CHERI_OFFSET(C17)($c3)
+	clc		$c18, zero, _JB_CHERI_OFFSET(C18)($c3)
+	clc		$c19, zero, _JB_CHERI_OFFSET(C19)($c3)
+	clc		$c20, zero, _JB_CHERI_OFFSET(C20)($c3)
+	clc		$c21, zero, _JB_CHERI_OFFSET(C21)($c3)
+	clc		$c22, zero, _JB_CHERI_OFFSET(C22)($c3)
+	clc		$c23, zero, _JB_CHERI_OFFSET(C23)($c3)
+	clc		$c24, zero, _JB_CHERI_OFFSET(C24)($c3)
+	clc		$c25, zero, _JB_CHERI_OFFSET(C25)($c3)
+	clc		$c4, zero, _JB_CHERI_OFFSET(DDC)($c3)
+	csetdefault	$c4
 
-	clc		$c11, t1, (_JB_CHERI_C11 * _MIPS_SZCAP/8)($c3)
-	clc		$c12, t1, (_JB_CHERI_C12 * _MIPS_SZCAP/8)($c3)
-	clc		$c13, t1, (_JB_CHERI_C13 * _MIPS_SZCAP/8)($c3)
-	clc		$c14, t1, (_JB_CHERI_C14 * _MIPS_SZCAP/8)($c3)
-	clc		$c15, t1, (_JB_CHERI_C15 * _MIPS_SZCAP/8)($c3)
-	clc		$c16, t1, (_JB_CHERI_C16 * _MIPS_SZCAP/8)($c3)
-	clc		$c17, t1, (_JB_CHERI_C17 * _MIPS_SZCAP/8)($c3)
-	clc		$c18, t1, (_JB_CHERI_C18 * _MIPS_SZCAP/8)($c3)
-	clc		$c19, t1, (_JB_CHERI_C19 * _MIPS_SZCAP/8)($c3)
-	clc		$c20, t1, (_JB_CHERI_C20 * _MIPS_SZCAP/8)($c3)
-	clc		$c21, t1, (_JB_CHERI_C21 * _MIPS_SZCAP/8)($c3)
-	clc		$c22, t1, (_JB_CHERI_C22 * _MIPS_SZCAP/8)($c3)
-	clc		$c23, t1, (_JB_CHERI_C23 * _MIPS_SZCAP/8)($c3)
-	clc		$c24, t1, (_JB_CHERI_C24 * _MIPS_SZCAP/8)($c3)
-
-	move		v0, a1
+	/* Install $a0 as the return value from setjmp(). */
+	move		v0, a0
 	cjr		$c17
 	nop
 
@@ -221,11 +231,6 @@ botch:
 	 * our caller's GP.
 	 */
 	ld		v1, 0(zero)
-	PTR_LA		t9, _C_LABEL(longjmperror)
-	cgetpcc		$c12
-	csetoffset	$c12, $c12, t9
-	cjalr		$c17, $c12
-	nop
-
-	PIC_TAILCALL(abort)
+	PIC_CALL(__cheriabi_longjmperror)
+	PIC_TAILCALL(__cheriabi_abort)
 END(_longjmp)

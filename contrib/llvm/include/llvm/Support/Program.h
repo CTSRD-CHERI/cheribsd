@@ -44,6 +44,8 @@ struct ProcessInfo {
 #error "ProcessInfo is not defined for this platform!"
 #endif
 
+  enum : ProcessId { InvalidPid = 0 };
+
   /// The process identifier.
   ProcessId Pid;
 
@@ -67,8 +69,7 @@ struct ProcessInfo {
   /// \returns The fully qualified path to the first \p Name in \p Paths if it
   ///   exists. \p Name if \p Name has slashes in it. Otherwise an error.
   ErrorOr<std::string>
-  findProgramByName(StringRef Name,
-                    ArrayRef<StringRef> Paths = ArrayRef<StringRef>());
+  findProgramByName(StringRef Name, ArrayRef<StringRef> Paths = None);
 
   // These functions change the specified standard stream (stdin or stdout) to
   // binary mode. They return errc::success if the specified stream
@@ -89,7 +90,7 @@ struct ProcessInfo {
   /// -2 indicates a crash during execution or timeout
   int ExecuteAndWait(
       StringRef Program, ///< Path of the program to be executed. It is
-      /// presumed this is the result of the findProgramByName method.
+      ///< presumed this is the result of the findProgramByName method.
       const char **args, ///< A vector of strings that are passed to the
       ///< program.  The first element should be the name of the program.
       ///< The list *must* be terminated by a null char* entry.
@@ -131,7 +132,7 @@ struct ProcessInfo {
 
   /// Return true if the given arguments fit within system-specific
   /// argument length limits.
-  bool argumentsFitWithinSystemLimits(ArrayRef<const char*> Args);
+  bool commandLineFitsWithinSystemLimits(StringRef Program, ArrayRef<const char*> Args);
 
   /// File encoding options when writing contents that a non-UTF8 tool will
   /// read (on Windows systems). For UNIX, we always use UTF-8.

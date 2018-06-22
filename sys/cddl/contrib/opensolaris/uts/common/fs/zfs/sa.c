@@ -22,8 +22,9 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Portions Copyright 2011 iXsystems, Inc
- * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2013, 2017 by Delphix. All rights reserved.
  * Copyright (c) 2014 Spectra Logic Corporation, All rights reserved.
+ * Copyright (c) 2014 Integros [integros.com]
  */
 
 #include <sys/zfs_context.h>
@@ -130,8 +131,8 @@ typedef void (sa_iterfunc_t)(void *hdr, void *addr, sa_attr_type_t,
 
 static int sa_build_index(sa_handle_t *hdl, sa_buf_type_t buftype);
 static void sa_idx_tab_hold(objset_t *os, sa_idx_tab_t *idx_tab);
-static void *sa_find_idx_tab(objset_t *os, dmu_object_type_t bonustype,
-    void *data);
+static sa_idx_tab_t *sa_find_idx_tab(objset_t *os, dmu_object_type_t bonustype,
+    sa_hdr_phys_t *hdr);
 static void sa_idx_tab_rele(objset_t *os, void *arg);
 static void sa_copy_data(sa_data_locator_t *func, void *start, void *target,
     int buflen);
@@ -758,7 +759,7 @@ sa_build_layouts(sa_handle_t *hdl, sa_bulk_attr_t *attr_desc, int attr_count,
 		if (sa->sa_attr_table[attrs[i]].sa_length == 0) {
 			sahdr->sa_lengths[len_idx++] = length;
 		}
-		VERIFY((uintptr_t)data_start % 8 == 0);
+		VERIFY(__builtin_is_aligned(data_start, 8));
 		data_start = (void *)P2ROUNDUP(((uintptr_t)data_start +
 		    length), 8);
 		buf_space -= P2ROUNDUP(length, 8);
@@ -1298,7 +1299,7 @@ sa_build_index(sa_handle_t *hdl, sa_buf_type_t buftype)
 
 /*ARGSUSED*/
 static void
-sa_evict(void *dbu)
+sa_evict_sync(void *dbu)
 {
 	panic("evicting sa dbuf\n");
 }
@@ -1382,7 +1383,8 @@ sa_handle_get_from_db(objset_t *os, dmu_buf_t *db, void *userp,
 		sa_handle_t *winner = NULL;
 
 		handle = kmem_cache_alloc(sa_cache, KM_SLEEP);
-		handle->sa_dbu.dbu_evict_func = NULL;
+		handle->sa_dbu.dbu_evict_func_sync = NULL;
+		handle->sa_dbu.dbu_evict_func_async = NULL;
 		handle->sa_userp = userp;
 		handle->sa_bonus = db;
 		handle->sa_os = os;
@@ -1393,7 +1395,8 @@ sa_handle_get_from_db(objset_t *os, dmu_buf_t *db, void *userp,
 		error = sa_build_index(handle, SA_BONUS);
 
 		if (hdl_type == SA_HDL_SHARED) {
-			dmu_buf_init_user(&handle->sa_dbu, sa_evict, NULL);
+			dmu_buf_init_user(&handle->sa_dbu, sa_evict_sync, NULL,
+			    NULL);
 			winner = dmu_buf_set_user_ie(db, &handle->sa_dbu);
 		}
 
@@ -1483,11 +1486,10 @@ sa_lookup_uio(sa_handle_t *hdl, sa_attr_type_t attr, uio_t *uio)
 }
 #endif
 
-void *
-sa_find_idx_tab(objset_t *os, dmu_object_type_t bonustype, void *data)
+static sa_idx_tab_t *
+sa_find_idx_tab(objset_t *os, dmu_object_type_t bonustype, sa_hdr_phys_t *hdr)
 {
 	sa_idx_tab_t *idx_tab;
-	sa_hdr_phys_t *hdr = (sa_hdr_phys_t *)data;
 	sa_os_t *sa = os->os_sa;
 	sa_lot_t *tb, search;
 	avl_index_t loc;
@@ -1652,7 +1654,7 @@ sa_modify_attrs(sa_handle_t *hdl, sa_attr_type_t newattr,
 	int spill_data_size = 0;
 	int spill_attr_count = 0;
 	int error;
-	uint16_t length;
+	uint16_t length, reg_length;
 	int i, j, k, length_idx;
 	sa_hdr_phys_t *hdr;
 	sa_idx_tab_t *idx_tab;
@@ -1712,34 +1714,50 @@ sa_modify_attrs(sa_handle_t *hdl, sa_attr_type_t newattr,
 	hdr = SA_GET_HDR(hdl, SA_BONUS);
 	idx_tab = SA_IDX_TAB_GET(hdl, SA_BONUS);
 	for (; k != 2; k++) {
-		/* iterate over each attribute in layout */
+		/*
+		 * Iterate over each attribute in layout.  Fetch the
+		 * size of variable-length attributes needing rewrite
+		 * from sa_lengths[].
+		 */
 		for (i = 0, length_idx = 0; i != count; i++) {
 			sa_attr_type_t attr;
 
 			attr = idx_tab->sa_layout->lot_attrs[i];
-			if (attr == newattr) {
-				/* duplicate attributes are not allowed */
-				ASSERT(action == SA_REPLACE ||
-				    action == SA_REMOVE);
-				/* must be variable-sized to be replaced here */
-				if (action == SA_REPLACE) {
-					ASSERT(SA_REGISTERED_LEN(sa, attr) == 0);
-					SA_ADD_BULK_ATTR(attr_desc, j, attr,
-					    locator, datastart, buflen);
-				}
+			reg_length = SA_REGISTERED_LEN(sa, attr);
+			if (reg_length == 0) {
+				length = hdr->sa_lengths[length_idx];
+				length_idx++;
 			} else {
-				length = SA_REGISTERED_LEN(sa, attr);
-				if (length == 0) {
-					length = hdr->sa_lengths[length_idx];
-				}
+				length = reg_length;
+			}
+			if (attr == newattr) {
+				/*
+				 * There is nothing to do for SA_REMOVE,
+				 * so it is just skipped.
+				 */
+				if (action == SA_REMOVE)
+					continue;
 
+				/*
+				 * Duplicate attributes are not allowed, so the
+				 * action can not be SA_ADD here.
+				 */
+				ASSERT3S(action, ==, SA_REPLACE);
+
+				/*
+				 * Only a variable-sized attribute can be
+				 * replaced here, and its size must be changing.
+				 */
+				ASSERT3U(reg_length, ==, 0);
+				ASSERT3U(length, !=, buflen);
+				SA_ADD_BULK_ATTR(attr_desc, j, attr,
+				    locator, datastart, buflen);
+			} else {
 				SA_ADD_BULK_ATTR(attr_desc, j, attr,
 				    NULL, (void *)
 				    (TOC_OFF(idx_tab->sa_idx_tab[attr]) +
 				    (uintptr_t)old_data[k]), length);
 			}
-			if (SA_REGISTERED_LEN(sa, attr) == 0)
-				length_idx++;
 		}
 		if (k == 0 && hdl->sa_spill) {
 			hdr = SA_GET_HDR(hdl, SA_SPILL);
@@ -1750,10 +1768,8 @@ sa_modify_attrs(sa_handle_t *hdl, sa_attr_type_t newattr,
 		}
 	}
 	if (action == SA_ADD) {
-		length = SA_REGISTERED_LEN(sa, newattr);
-		if (length == 0) {
-			length = buflen;
-		}
+		reg_length = SA_REGISTERED_LEN(sa, newattr);
+		IMPLY(reg_length != 0, reg_length == buflen);
 		SA_ADD_BULK_ATTR(attr_desc, j, newattr, locator,
 		    datastart, buflen);
 	}

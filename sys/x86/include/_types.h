@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2002 Mike Barcroft <mike@FreeBSD.org>
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -43,6 +45,8 @@
 #error this file needs sys/cdefs.h as a prerequisite
 #endif
 
+#include <machine/_limits.h>
+
 #define __NO_STRICT_ALIGNMENT
 
 /*
@@ -58,15 +62,9 @@ typedef	unsigned int		__uint32_t;
 typedef	long			__int64_t;
 typedef	unsigned long		__uint64_t;
 #else
-#ifndef lint
 __extension__
-#endif
-/* LONGLONG */
 typedef	long long		__int64_t;
-#ifndef lint
 __extension__
-#endif
-/* LONGLONG */
 typedef	unsigned long long	__uint64_t;
 #endif
 
@@ -140,8 +138,6 @@ typedef	__uint32_t	__vm_paddr_t;
 #endif
 typedef	__uint32_t	__vm_size_t;
 #endif
-typedef	__int64_t	__vm_ooffset_t;
-typedef	__uint64_t	__vm_pindex_t;
 typedef	int		___wchar_t;
 
 #define	__WCHAR_MIN	__INT_MIN	/* min value for a wchar_t */

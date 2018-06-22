@@ -1,4 +1,4 @@
-//===-- MemoryHistoryASan.h ----------------------------------------*- C++ -*-===//
+//===-- MemoryHistoryASan.h -------------------------------------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -14,49 +14,40 @@
 // C++ Includes
 // Other libraries and framework includes
 // Project includes
-#include "lldb/lldb-private.h"
 #include "lldb/Target/ABI.h"
 #include "lldb/Target/MemoryHistory.h"
 #include "lldb/Target/Process.h"
+#include "lldb/lldb-private.h"
 
 namespace lldb_private {
 
-class MemoryHistoryASan : public lldb_private::MemoryHistory
-{
+class MemoryHistoryASan : public lldb_private::MemoryHistory {
 public:
-    
-    static lldb::MemoryHistorySP
-    CreateInstance (const lldb::ProcessSP &process_sp);
-    
-    static void
-    Initialize();
-    
-    static void
-    Terminate();
-    
-    static lldb_private::ConstString
-    GetPluginNameStatic();
-    
-    virtual
-    ~MemoryHistoryASan () {}
-    
-    virtual lldb_private::ConstString
-    GetPluginName() { return GetPluginNameStatic(); }
-    
-    virtual uint32_t
-    GetPluginVersion() { return 1; }
-    
-    virtual lldb_private::HistoryThreads
-    GetHistoryThreads(lldb::addr_t address);
-    
+  ~MemoryHistoryASan() override = default;
+
+  static lldb::MemoryHistorySP
+  CreateInstance(const lldb::ProcessSP &process_sp);
+
+  static void Initialize();
+
+  static void Terminate();
+
+  static lldb_private::ConstString GetPluginNameStatic();
+
+  lldb_private::ConstString GetPluginName() override {
+    return GetPluginNameStatic();
+  }
+
+  uint32_t GetPluginVersion() override { return 1; }
+
+  lldb_private::HistoryThreads GetHistoryThreads(lldb::addr_t address) override;
+
 private:
-    
-    MemoryHistoryASan(const lldb::ProcessSP &process_sp);
-    
-    lldb::ProcessSP m_process_sp;
-    
+  MemoryHistoryASan(const lldb::ProcessSP &process_sp);
+
+  lldb::ProcessWP m_process_wp;
 };
 
 } // namespace lldb_private
-    
-#endif  // liblldb_MemoryHistoryASan_h_
+
+#endif // liblldb_MemoryHistoryASan_h_

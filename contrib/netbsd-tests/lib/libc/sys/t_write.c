@@ -1,4 +1,4 @@
-/* $NetBSD: t_write.c,v 1.2 2011/10/19 16:19:30 jruoho Exp $ */
+/* $NetBSD: t_write.c,v 1.3 2017/01/13 19:27:23 christos Exp $ */
 
 /*-
  * Copyright (c) 2001, 2008 The NetBSD Foundation, Inc.
@@ -29,25 +29,19 @@
 #include <sys/cdefs.h>
 __COPYRIGHT("@(#) Copyright (c) 2008\
  The NetBSD Foundation, inc. All rights reserved.");
-__RCSID("$NetBSD: t_write.c,v 1.2 2011/10/19 16:19:30 jruoho Exp $");
+__RCSID("$NetBSD: t_write.c,v 1.3 2017/01/13 19:27:23 christos Exp $");
 
 #include <sys/uio.h>
-#ifdef __NetBSD__
-#include <sys/syslimits.h>
-#endif
 
 #include <atf-c.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
 #include <unistd.h>
-
-#ifdef __FreeBSD__
-#include <limits.h>
-#endif
 
 static void		 sighandler(int);
 
@@ -55,11 +49,7 @@ static bool		 fail = false;
 static const char	*path = "write";
 
 static void
-#ifdef __FreeBSD__
 sighandler(int signo __unused)
-#else
-sighandler(int signo)
-#endif
 {
 	fail = false;
 }
@@ -87,7 +77,15 @@ ATF_TC_BODY(write_err, tc)
 		ATF_REQUIRE_ERRNO(0, write(fd, wbuf, 3) == 3);
 
 		errno = 0;
+#ifndef __CHERI_PURE_CAPABILITY__
 		ATF_REQUIRE_ERRNO(EINVAL, write(fd, wbuf, SIZE_MAX) == -1);
+#else
+		/*
+		 * XXX: True in argument translation implementation, but
+		 * probably false with capabilities in the kernel.
+		 */
+		ATF_REQUIRE_ERRNO(EPROT, write(fd, wbuf, SIZE_MAX) == -1);
+#endif
 
 		errno = 0;
 		ATF_REQUIRE_ERRNO(EFAULT, write(fd, (void *)-1, 1) == -1);

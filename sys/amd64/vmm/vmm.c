@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
  *
@@ -53,12 +55,10 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_param.h>
 
 #include <machine/cpu.h>
-#include <machine/vm.h>
 #include <machine/pcb.h>
 #include <machine/smp.h>
 #include <x86/psl.h>
 #include <x86/apicreg.h>
-#include <machine/vmparam.h>
 
 #include <machine/vmm.h>
 #include <machine/vmm_dev.h>
@@ -123,7 +123,7 @@ struct mem_seg {
 	bool	sysmem;
 	struct vm_object *object;
 };
-#define	VM_MAX_MEMSEGS	2
+#define	VM_MAX_MEMSEGS	3
 
 struct mem_map {
 	vm_paddr_t	gpa;
@@ -225,11 +225,6 @@ static int trace_guest_exceptions;
 SYSCTL_INT(_hw_vmm, OID_AUTO, trace_guest_exceptions, CTLFLAG_RDTUN,
     &trace_guest_exceptions, 0,
     "Trap into hypervisor on all guest exceptions and reflect them back");
-
-static int vmm_force_iommu = 0;
-TUNABLE_INT("hw.vmm.force_iommu", &vmm_force_iommu);
-SYSCTL_INT(_hw_vmm, OID_AUTO, force_iommu, CTLFLAG_RDTUN, &vmm_force_iommu, 0,
-    "Force use of I/O MMU even if no passthrough devices were found.");
 
 static void vm_free_memmap(struct vm *vm, int ident);
 static bool sysmem_mapping(struct vm *vm, struct mem_map *mm);
@@ -360,8 +355,6 @@ vmm_handler(module_t mod, int what, void *arg)
 	switch (what) {
 	case MOD_LOAD:
 		vmmdev_init();
-		if (vmm_force_iommu || ppt_avail_devices() > 0)
-			iommu_init();
 		error = vmm_init();
 		if (error == 0)
 			vmm_initialized = 1;
@@ -397,9 +390,6 @@ static moduledata_t vmm_kmod = {
 
 /*
  * vmm initialization has the following dependencies:
- *
- * - iommu initialization must happen after the pci passthru driver has had
- *   a chance to attach to any passthru devices (after SI_SUB_CONFIGURE).
  *
  * - VT-x initialization requires smp_rendezvous() and therefore must happen
  *   after SMP is fully functional (after SI_SUB_SMP).
@@ -895,6 +885,8 @@ vm_assign_pptdev(struct vm *vm, int bus, int slot, int func)
 		    ("vm_assign_pptdev: iommu must be NULL"));
 		maxaddr = sysmem_maxaddr(vm);
 		vm->iommu = iommu_create_domain(maxaddr);
+		if (vm->iommu == NULL)
+			return (ENXIO);
 		vm_iommu_map(vm);
 	}
 
@@ -916,7 +908,7 @@ vm_gpa_hold(struct vm *vm, int vcpuid, vm_paddr_t gpa, size_t len, int reqprot,
 	 * guaranteed if at least one vcpu is in the VCPU_FROZEN state.
 	 */
 	int state;
-	KASSERT(vcpuid >= -1 || vcpuid < VM_MAXCPU, ("%s: invalid vcpuid %d",
+	KASSERT(vcpuid >= -1 && vcpuid < VM_MAXCPU, ("%s: invalid vcpuid %d",
 	    __func__, vcpuid));
 	for (i = 0; i < VM_MAXCPU; i++) {
 		if (vcpuid != -1 && vcpuid != i)

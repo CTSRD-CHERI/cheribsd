@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011 Jakub Wojciech Klama <jceel@FreeBSD.org>
  * All rights reserved.
  *
@@ -172,7 +174,7 @@ static void lpe_ifmedia_sts(struct ifnet *, struct ifmediareq *);
 
 #define	lpe_lock(_sc)		mtx_lock(&(_sc)->lpe_mtx)
 #define	lpe_unlock(_sc)		mtx_unlock(&(_sc)->lpe_mtx)
-#define	lpe_lock_assert(sc)	mtx_assert(&(_sc)->lpe_mtx, MA_OWNED)
+#define	lpe_lock_assert(_sc)	mtx_assert(&(_sc)->lpe_mtx, MA_OWNED)
 
 #define	lpe_read_4(_sc, _reg)		\
     bus_space_read_4((_sc)->lpe_bst, (_sc)->lpe_bsh, (_reg))
@@ -627,7 +629,7 @@ lpe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int err = 0;
 
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		lpe_lock(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -639,8 +641,8 @@ lpe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			lpe_stop(sc);
 		lpe_unlock(sc);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 			lpe_lock(sc);
 			lpe_set_rxfilter(sc);
@@ -648,7 +650,7 @@ lpe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		err = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
 	default:

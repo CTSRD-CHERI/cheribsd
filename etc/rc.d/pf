@@ -6,11 +6,12 @@
 # PROVIDE: pf
 # REQUIRE: FILESYSTEMS netif pflog pfsync
 # BEFORE:  routing
-# KEYWORD: nojail
+# KEYWORD: nojailvnet
 
 . /etc/rc.subr
 
 name="pf"
+desc="Packet filter"
 rcvar="pf_enable"
 load_rc_config $name
 start_cmd="pf_start"
@@ -66,7 +67,11 @@ pf_resync()
 
 pf_status()
 {
-	$pf_program -s info
+	if ! [ -c /dev/pf ] ; then
+		echo "pf.ko is not loaded"
+	else
+		$pf_program -s info
+	fi
 }
 
 run_rc_command "$1"

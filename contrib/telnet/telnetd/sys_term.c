@@ -30,6 +30,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #if 0
 #ifndef lint
@@ -1159,23 +1169,25 @@ addarg(char **argv, const char *val)
 		 */
 		argv = (char **)malloc(sizeof(*argv) * 12);
 		if (argv == NULL)
-			return(NULL);
+			fatal(net, "failure allocating argument space");
 		*argv++ = (char *)10;
-		*argv = (char *)0;
+		*argv = NULL;
 	}
-	for (cpp = argv; *cpp; cpp++)
+	for (cpp = argv; *cpp != NULL; cpp++)
 		;
-	if (cpp == &argv[(long)argv[-1]]) {
+	if (cpp == &argv[(intptr_t)argv[-1]]) {
 		--argv;
-		*argv = (char *)((long)(*argv) + 10);
-		argv = (char **)realloc(argv, sizeof(*argv)*((long)(*argv) + 2));
+		*argv = (char *)((intptr_t)(*argv) + 10);
+		argv = (char **)realloc(argv,
+		    sizeof(*argv)*((intptr_t)(*argv) + 2));
 		if (argv == NULL)
-			return(NULL);
+			fatal(net, "failure allocating argument space");
 		argv++;
-		cpp = &argv[(long)argv[-1] - 10];
+		cpp = &argv[(intptr_t)argv[-1] - 10];
 	}
-	*cpp++ = strdup(val);
-	*cpp = 0;
+	if ((*cpp++ = strdup(val)) == NULL)
+		fatal(net, "failure allocating argument space");
+	*cpp = NULL;
 	return(argv);
 }
 

@@ -1,5 +1,7 @@
 %{
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011 James Gritton
  * All rights reserved.
  *
@@ -60,7 +62,7 @@ __FBSDID("$FreeBSD$");
 
 /*
  * A config file is a series of jails (containing parameters) and jail-less
- * parameters which realy belong to a global pseudo-jail.
+ * parameters which really belong to a global pseudo-jail.
  */
 conf	:
 	;

@@ -25,7 +25,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd November 29, 2015
+.Dd May 28, 2017
 .Dt RCTL 8
 .Os
 .Sh NAME
@@ -51,13 +51,6 @@
 .Fl u
 .Op Fl h
 .Ar filter Ar ...
-.Pp
-.Nm
-requires the kernel to be compiled with:
-.Bd -ragged -offset indent
-.Cd "options RACCT"
-.Cd "options RCTL"
-.Ed
 .Sh DESCRIPTION
 When called without options, the
 .Nm
@@ -84,7 +77,7 @@ Remove rules matching
 .Ar filter
 from the RCTL database.
 .It Fl u Ar filter
-Display resource usage for a subject
+Display resource utilization for a subject
 .Po
 .Sy process ,
 .Sy user ,
@@ -173,7 +166,6 @@ resource would be
 "::maxproc".
 .Sh SUBJECTS
 .Bl -column -offset 3n "pseudoterminals" ".Sy username or numerical User ID"
-.It Em subject Ta Em subject-id
 .It Sy process Ta numerical Process ID
 .It Sy user Ta user name or numerical User ID
 .It Sy loginclass Ta login class from
@@ -182,7 +174,6 @@ resource would be
 .El
 .Sh RESOURCES
 .Bl -column -offset 3n "pseudoterminals"
-.It Em resource
 .It Sy cputime Ta "CPU time, in seconds"
 .It Sy datasize Ta "data size, in bytes"
 .It Sy stacksize Ta "stack size, in bytes"
@@ -204,14 +195,21 @@ resource would be
 .It Sy shmsize Ta "SysV shared memory size, in bytes"
 .It Sy wallclock Ta "wallclock time, in seconds"
 .It Sy pcpu Ta "%CPU, in percents of a single CPU core"
+.It Sy readbps Ta "filesystem reads, in bytes per second"
+.It Sy writebps Ta "filesystem writes, in bytes per second"
+.It Sy readiops Ta "filesystem reads, in operations per second"
+.It Sy writeiops Ta "filesystem writes, in operations per second"
 .El
 .Sh ACTIONS
 .Bl -column -offset 3n "pseudoterminals"
-.It Em action
 .It Sy deny Ta deny the allocation; not supported for
-.Sy cputime
+.Sy cputime ,
+.Sy wallclock ,
+.Sy readbps ,
+.Sy writebps ,
+.Sy readiops ,
 and
-.Sy wallclock
+.Sy writeiops
 .It Sy log Ta "log a warning to the console"
 .It Sy devctl Ta "send notification to"
 .Xr devd 8
@@ -228,24 +226,17 @@ send a signal to the offending process.
 See
 .Xr signal 3
 for a list of supported signals
+.It Sy throttle Ta "slow down process execution"; only supported for
+.Sy readbps ,
+.Sy writebps ,
+.Sy readiops ,
+and
+.Sy writeiops .
 .El
 .Pp
 Not all actions are supported for all resources.
 Attempting to add a rule with an action not supported by a given resource will
 result in error.
-.Sh LOADER TUNABLES
-Tunables can be set at the
-.Xr loader 8
-prompt, or
-.Xr loader.conf 5 .
-.Bl -tag -width indent
-.It Va kern.racct.enable: No 1
-Enable
-.Nm .
-This defaults to 1, unless
-.Cd "options RACCT_DEFAULT_TO_DISABLED"
-is set in the kernel configuration file.
-.El
 .Sh EXIT STATUS
 .Ex -std
 .Sh EXAMPLES
@@ -255,7 +246,7 @@ Prevent user "joe" from allocating more than 1GB of virtual memory:
 Remove all RCTL rules:
 .Dl Nm Fl r Ar \&:
 .Pp
-Display resource usage information for jail named "www":
+Display resource utilization information for jail named "www":
 .Dl Nm Fl hu Ar jail:www
 .Pp
 Display all the rules applicable to process with PID 512:
@@ -270,6 +261,7 @@ Display all rules matching user "joe":
 Display all rules matching login classes:
 .Dl Nm Ar loginclass:
 .Sh SEE ALSO
+.Xr rctl 4 ,
 .Xr rctl.conf 5
 .Sh HISTORY
 The
@@ -287,3 +279,22 @@ under sponsorship from the FreeBSD Foundation.
 Limiting
 .Sy memoryuse
 may kill the machine due to thrashing.
+.Pp
+The
+.Sy readiops
+and
+.Sy writeiops
+counters are only approximations.
+Like
+.Sy readbps
+and
+.Sy writebps ,
+they are calculated in the filesystem layer, where it is difficult
+or even impossible to observe actual disk device operations.
+.Pp
+The
+.Sy writebps
+and
+.Sy writeiops
+resources generally account for writes to the filesystem cache,
+not to actual devices.

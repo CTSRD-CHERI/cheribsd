@@ -20,6 +20,16 @@
  * CDDL HEADER END
  */
 /*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "hashing"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
+/*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -60,7 +70,7 @@ struct hash_data {
 static int
 hash_def_hash(int nbuckets, void *arg)
 {
-	uintptr_t data = (uintptr_t) arg;
+	size_t data = (size_t) arg;
 	return (data % nbuckets);
 }
 

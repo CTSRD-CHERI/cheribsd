@@ -36,6 +36,7 @@ libisc_SRCS =								\
 	$(srcdir)/../lib/isc/unix/time.c				\
 	$(srcdir)/../lib/isc/sha1.c					\
 	$(srcdir)/../lib/isc/sockaddr.c					\
+	$(srcdir)/../lib/isc/tsmemcmp.c					\
 	$(NULL)
 
 if PTHREADS
@@ -72,6 +73,7 @@ libntp_a_SRCS =						\
 	iosignal.c					\
 	is_ip_address.c					\
 	lib_strbuf.c					\
+	libssl_compat.c					\
 	machines.c					\
 	mktime.c					\
 	modetoa.c					\
@@ -117,10 +119,14 @@ libntpsim_a_SOURCES = systime_s.c $(libntp_a_SRCS)
 EXTRA_libntp_a_SOURCES = adjtimex.c
 
 AM_CFLAGS = $(CFLAGS_NTP)
+AM_CFLAGS += $(NTP_HARD_CFLAGS)
 
 AM_CPPFLAGS  = $(NTP_INCS)
 AM_CPPFLAGS += $(LIBOPTS_CFLAGS)
 AM_CPPFLAGS += $(CPPFLAGS_NTP)
+AM_CPPFLAGS += $(NTP_HARD_CPPFLAGS)
+
+AM_LDFLAGS = $(NTP_HARD_LDFLAGS)
 
 EXTRA_DIST = README
 

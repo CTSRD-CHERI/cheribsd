@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2002 John Baldwin <jhb@FreeBSD.org>
  * All rights reserved.
  *
@@ -33,7 +35,7 @@
  * Turnstile interface.  Non-sleepable locks use a turnstile for the
  * queue of threads blocked on them when they are contested.  Each
  * turnstile contains two sub-queues: one for threads waiting for a
- * shared, or eread, lock, and one for threads waiting for an
+ * shared, or read, lock, and one for threads waiting for an
  * exclusive, or write, lock.
  *
  * A thread calls turnstile_chain_lock() to lock the turnstile chain

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1998-2000 Doug Rabson
  * All rights reserved.
  *
@@ -765,10 +767,8 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	Elf_Phdr *segs[MAXSEGS];
 	int nsegs;
 	Elf_Phdr *phdyn;
-	Elf_Phdr *phphdr;
 	caddr_t mapbase;
 	size_t mapsize;
-	Elf_Off base_offset;
 	Elf_Addr base_vaddr;
 	Elf_Addr base_vlimit;
 	int error = 0;
@@ -867,7 +867,6 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	phlimit = phdr + hdr->e_phnum;
 	nsegs = 0;
 	phdyn = NULL;
-	phphdr = NULL;
 	while (phdr < phlimit) {
 		switch (phdr->p_type) {
 		case PT_LOAD:
@@ -881,10 +880,6 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 			 */
 			segs[nsegs] = phdr;
 			++nsegs;
-			break;
-
-		case PT_PHDR:
-			phphdr = phdr;
 			break;
 
 		case PT_DYNAMIC:
@@ -914,7 +909,6 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	 * out our contiguous region, and to establish the base
 	 * address for relocation.
 	 */
-	base_offset = trunc_page(segs[0]->p_offset);
 	base_vaddr = trunc_page(segs[0]->p_vaddr);
 	base_vlimit = round_page(segs[nsegs - 1]->p_vaddr +
 	    segs[nsegs - 1]->p_memsz);
@@ -1090,12 +1084,9 @@ out:
 	vn_close(nd.ni_vp, FREAD, td->td_ucred, td);
 	if (error != 0 && lf != NULL)
 		linker_file_unload(lf, LINKER_UNLOAD_FORCE);
-	if (shdr != NULL)
-		free(shdr, M_LINKER);
-	if (firstpage != NULL)
-		free(firstpage, M_LINKER);
-	if (shstrs != NULL)
-		free(shstrs, M_LINKER);
+	free(shdr, M_LINKER);
+	free(firstpage, M_LINKER);
+	free(shstrs, M_LINKER);
 
 	return (error);
 }
@@ -1157,19 +1148,13 @@ link_elf_unload_file(linker_file_t file)
 		    + (ef->object->size << PAGE_SHIFT));
 	}
 #else
-	if (ef->address != NULL)
-		free(ef->address, M_LINKER);
+	free(ef->address, M_LINKER);
 #endif
-	if (ef->symbase != NULL)
-		free(ef->symbase, M_LINKER);
-	if (ef->strbase != NULL)
-		free(ef->strbase, M_LINKER);
-	if (ef->ctftab != NULL)
-		free(ef->ctftab, M_LINKER);
-	if (ef->ctfoff != NULL)
-		free(ef->ctfoff, M_LINKER);
-	if (ef->typoff != NULL)
-		free(ef->typoff, M_LINKER);
+	free(ef->symbase, M_LINKER);
+	free(ef->strbase, M_LINKER);
+	free(ef->ctftab, M_LINKER);
+	free(ef->ctfoff, M_LINKER);
+	free(ef->typoff, M_LINKER);
 }
 
 static void
@@ -1391,7 +1376,7 @@ link_elf_search_symbol(linker_file_t lf, caddr_t value,
 	u_long diff = off;
 	u_long st_value;
 	const Elf_Sym* es;
-	const Elf_Sym* best = 0;
+	const Elf_Sym* best = NULL;
 	int i;
 
 	for (i = 0, es = ef->ddbsymtab; i < ef->ddbsymcnt; i++, es++) {
@@ -1409,7 +1394,7 @@ link_elf_search_symbol(linker_file_t lf, caddr_t value,
 			}
 		}
 	}
-	if (best == 0)
+	if (best == NULL)
 		*diffp = off;
 	else
 		*diffp = diff;

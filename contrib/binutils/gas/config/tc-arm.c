@@ -2284,6 +2284,37 @@ s_unreq (int a ATTRIBUTE_UNUSED)
   demand_empty_rest_of_line ();
 }
 
+static void
+s_inst(int unused ATTRIBUTE_UNUSED)
+{
+	expressionS exp;
+
+	if (thumb_mode) {
+		as_bad(".inst not implemented for Thumb mode");
+		ignore_rest_of_line();
+		return;
+	}
+
+	if (is_it_end_of_statement()) {
+		demand_empty_rest_of_line();
+		return;
+	}
+
+	do {
+		expression(&exp);
+
+		if (exp.X_op != O_constant)
+			as_bad("constant expression required");
+		else
+			emit_expr(&exp, 4);
+
+	} while (*input_line_pointer++ == ',');
+
+	/* Put terminator back into stream. */
+	input_line_pointer--;
+	demand_empty_rest_of_line();
+}
+
 /* Directives: Instruction set selection.  */
 
 #ifdef OBJ_ELF
@@ -3837,10 +3868,10 @@ s_arm_eabi_attribute (int ignored ATTRIBUTE_UNUSED)
 #endif /* OBJ_ELF */
 
 static void s_arm_arch (int);
-static void s_arm_arch_extension (int);
 static void s_arm_object_arch (int);
 static void s_arm_cpu (int);
 static void s_arm_fpu (int);
+static void s_arm_arch_extension (int);
 
 #ifdef TE_PE
 
@@ -3892,9 +3923,10 @@ const pseudo_typeS md_pseudo_table[] =
   { "syntax",	   s_syntax,	  0 },
   { "cpu",	   s_arm_cpu,	  0 },
   { "arch",	   s_arm_arch,	  0 },
-  { "arch_extension",	   s_arm_arch_extension,	  0 },
   { "object_arch", s_arm_object_arch,	0 },
   { "fpu",	   s_arm_fpu,	  0 },
+  { "arch_extension",	   s_arm_arch_extension,	  0 },
+  { "inst",	   s_inst,	  0 },
 #ifdef OBJ_ELF
   { "word",	   s_arm_elf_cons, 4 },
   { "long",	   s_arm_elf_cons, 4 },
@@ -5179,12 +5211,6 @@ parse_neon_mov (char **str, int *which_operand)
               inst.operands[i].present = 1;
             }
         }
-      else if (parse_qfloat_immediate (&ptr, &inst.operands[i].imm) == SUCCESS)
-          /* Case 2: VMOV<c><q>.<dt> <Qd>, #<float-imm>
-             Case 3: VMOV<c><q>.<dt> <Dd>, #<float-imm>
-             Case 10: VMOV.F32 <Sd>, #<imm>
-             Case 11: VMOV.F64 <Dd>, #<imm>  */
-        inst.operands[i].immisfloat = 1;
       else if ((val = arm_typed_reg_parse (&ptr, REG_TYPE_NSDQ, &rtype,
                                            &optype)) != FAIL)
         {
@@ -5221,9 +5247,15 @@ parse_neon_mov (char **str, int *which_operand)
               
               inst.operands[i].reg = val;
               inst.operands[i].isreg = 1;
-              inst.operands[i++].present = 1;
+              inst.operands[i].present = 1;
             }
         }
+      else if (parse_qfloat_immediate (&ptr, &inst.operands[i].imm) == SUCCESS)
+          /* Case 2: VMOV<c><q>.<dt> <Qd>, #<float-imm>
+             Case 3: VMOV<c><q>.<dt> <Dd>, #<float-imm>
+             Case 10: VMOV.F32 <Sd>, #<imm>
+             Case 11: VMOV.F64 <Dd>, #<imm>  */
+        inst.operands[i].immisfloat = 1;
       else if (parse_big_immediate (&ptr, i) == SUCCESS)
           /* Case 2: VMOV<c><q>.<dt> <Qd>, #<imm>
              Case 3: VMOV<c><q>.<dt> <Dd>, #<imm>  */
@@ -5305,7 +5337,7 @@ parse_neon_mov (char **str, int *which_operand)
           inst.operands[i].isvec = 1;
           inst.operands[i].issingle = 1;
           inst.operands[i].vectype = optype;
-          inst.operands[i++].present = 1;
+          inst.operands[i].present = 1;
         }
     }
   else

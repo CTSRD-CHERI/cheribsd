@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2004 Alan L. Cox <alc@cs.rice.edu>
  * Copyright (c) 1982, 1986, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -60,7 +62,7 @@ int
 uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 {
 	struct thread *td = curthread;
-	struct iovec *iov;
+	kiovec_t *iov;
 	void *cp;
 	vm_offset_t page_offset;
 	size_t cnt;
@@ -110,8 +112,7 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 			break;
 		}
 		sf_buf_free(sf);
-		iov->iov_base = (char *)iov->iov_base + cnt;
-		iov->iov_len -= cnt;
+		IOVEC_ADVANCE(iov, cnt);
 		uio->uio_resid -= cnt;
 		uio->uio_offset += cnt;
 		offset += cnt;

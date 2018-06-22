@@ -21,14 +21,12 @@ static char sccs_id[] = "@(#) scaffold.c 1.6 97/03/21 19:27:24";
 #include <stdio.h>
 #include <syslog.h>
 #include <setjmp.h>
+#include <stdlib.h>
 #include <string.h>
+#include <stdlib.h>
 
 #ifndef INADDR_NONE
 #define	INADDR_NONE	(-1)		/* XXX should be 0xffffffff */
-#endif
-
-#ifndef INET6
-extern char *malloc();
 #endif
 
 /* Application-specific. */
@@ -41,7 +39,6 @@ extern char *malloc();
   */
 int     allow_severity = SEVERITY;
 int     deny_severity = LOG_WARNING;
-int     rfc931_timeout = RFC931_TIMEOUT;
 
 #ifndef INET6
 /* dup_hostent - create hostent in one memory block */
@@ -233,16 +230,6 @@ void    clean_exit(request)
 struct request_info *request;
 {
     exit(0);
-}
-
-/* dummy function  to intercept the real rfc931() */
-
-/* ARGSUSED */
-
-void    rfc931(request)
-struct request_info *request;
-{
-    strcpy(request->user, unknown);
 }
 
 /* check_path - examine accessibility */

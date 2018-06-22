@@ -108,21 +108,21 @@ paddr_unmap(void *phys, uint32_t size)
 
 static inline void
 _vq_record(uint32_t offs, int i, volatile struct vring_desc *vd,
-	struct iovec *iov, int n_iov, uint16_t *flags) {
+	kiovec_t *iov, int n_iov, uint16_t *flags) {
 
 	if (i >= n_iov)
 		return;
 
-	iov[i].iov_base = paddr_map(offs, be64toh(vd->addr),
-				be32toh(vd->len));
-	iov[i].iov_len = be32toh(vd->len);
+	IOVEC_INIT(&iov[i],
+	    paddr_map(offs, be64toh(vd->addr), be32toh(vd->len)),
+	    be32toh(vd->len));
 	if (flags != NULL)
 		flags[i] = be16toh(vd->flags);
 }
 
 int
 vq_getchain(uint32_t offs, struct vqueue_info *vq,
-	struct iovec *iov, int n_iov, uint16_t *flags)
+	kiovec_t *iov, int n_iov, uint16_t *flags)
 {
 	volatile struct vring_desc *vdir, *vindir, *vp;
 	int idx, ndesc, n_indir;
@@ -167,7 +167,7 @@ vq_getchain(uint32_t offs, struct vqueue_info *vq,
 }
 
 void
-vq_relchain(struct vqueue_info *vq, struct iovec *iov, int n, uint32_t iolen)
+vq_relchain(struct vqueue_info *vq, kiovec_t *iov, int n, uint32_t iolen)
 {
 	volatile struct vring_used_elem *vue;
 	volatile struct vring_used *vu;
@@ -244,16 +244,15 @@ setup_offset(device_t dev, uint32_t *offset)
 	return (0);
 }
 
-struct iovec *
-getcopy(struct iovec *iov, int n)
+kiovec_t *
+getcopy(kiovec_t *iov, int n)
 {
-	struct iovec *tiov;
+	kiovec_t *tiov;
 	int i;
 
-	tiov = malloc(n * sizeof(struct iovec), M_DEVBUF, M_NOWAIT);
+	tiov = malloc(n * sizeof(kiovec_t), M_DEVBUF, M_NOWAIT);
 	for (i = 0; i < n; i++) {
-		tiov[i].iov_base = iov[i].iov_base;
-		tiov[i].iov_len = iov[i].iov_len;
+		IOVEC_INIT(&tiov[i], iov[i].iov_base, iov[i].iov_len);
 	}
 
 	return (tiov);

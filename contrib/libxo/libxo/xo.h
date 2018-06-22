@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <stdarg.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <errno.h>
 
@@ -39,7 +40,10 @@
  * coward's path, we'll turn it on inside a #if that allows
  * others to turn it off where needed.  Not ideal, but functional.
  */
-#if !defined(NO_PRINTFLIKE) && !defined(__linux__)
+#if !defined(NO_PRINTFLIKE)
+#if defined(__linux) && !defined(__printflike)
+#define __printflike(_x, _y) __attribute__((__format__ (__printf__, _x, _y)))
+#endif
 #define PRINTFLIKE(_x, _y) __printflike(_x, _y)
 #else
 #define PRINTFLIKE(_x, _y)
@@ -94,6 +98,13 @@ typedef unsigned long long xo_xof_flags_t;
 
 #define XOF_LOG_GETTEXT	XOF_BIT(28) /** Log (stderr) gettext lookup strings */
 #define XOF_UTF8	XOF_BIT(29) /** Force text output to be UTF8 */
+#define XOF_RETAIN_ALL	XOF_BIT(30) /** Force use of XOEF_RETAIN */
+#define XOF_RETAIN_NONE	XOF_BIT(31) /** Prevent use of XOEF_RETAIN */
+
+#define XOF_COLOR_MAP	XOF_BIT(32) /** Color map has been initialized */
+
+typedef unsigned xo_emit_flags_t; /* Flags to xo_emit() and friends */
+#define XOEF_RETAIN	(1<<0)	  /* Retain parsed formatting information */
 
 /*
  * The xo_info_t structure provides a mapping between names and
@@ -110,7 +121,18 @@ typedef struct xo_info_s {
 struct xo_handle_s;		/* Opaque structure forward */
 typedef struct xo_handle_s xo_handle_t; /* Handle for XO output */
 
-typedef int (*xo_write_func_t)(void *, const char *);
+/*
+ * Early versions of the API used "int" instead of "size_t" for buffer
+ * sizes.  We want to fix this but allow for backwards compatibility
+ * where needed.
+ */
+#ifdef USE_INT_RETURN_CODES
+typedef int xo_ssize_t;		/* Buffer size */
+#else /* USE_INT_RETURN_CODES */
+typedef ssize_t xo_ssize_t;	/* Buffer size */
+#endif /* USE_INT_RETURN_CODES */
+
+typedef xo_ssize_t (*xo_write_func_t)(void *, const char *);
 typedef void (*xo_close_func_t)(void *);
 typedef int (*xo_flush_func_t)(void *);
 typedef void *(*xo_realloc_func_t)(void *, size_t);
@@ -121,7 +143,7 @@ typedef void (*xo_free_func_t)(void *);
  * of the xo handle.  The caller should return the number of bytes _needed_
  * to fit the data, even if this exceeds 'len'.
  */
-typedef int (*xo_formatter_t)(xo_handle_t *, char *, int,
+typedef xo_ssize_t (*xo_formatter_t)(xo_handle_t *, char *, xo_ssize_t,
 				const char *, va_list);
 typedef void (*xo_checkpointer_t)(xo_handle_t *, va_list, int);
 
@@ -162,6 +184,12 @@ xo_set_flags (xo_handle_t *xop, xo_xof_flags_t flags);
 void
 xo_clear_flags (xo_handle_t *xop, xo_xof_flags_t flags);
 
+int
+xo_set_file_h (xo_handle_t *xop, FILE *fp);
+
+int
+xo_set_file (FILE *fp);
+
 void
 xo_set_info (xo_handle_t *xop, xo_info_t *infop, int count);
 
@@ -171,14 +199,24 @@ xo_set_formatter (xo_handle_t *xop, xo_formatter_t func, xo_checkpointer_t);
 void
 xo_set_depth (xo_handle_t *xop, int depth);
 
-int
+xo_ssize_t
 xo_emit_hv (xo_handle_t *xop, const char *fmt, va_list vap);
 
-int
+xo_ssize_t
 xo_emit_h (xo_handle_t *xop, const char *fmt, ...);
 
-int
+xo_ssize_t
 xo_emit (const char *fmt, ...);
+
+xo_ssize_t
+xo_emit_hvf (xo_handle_t *xop, xo_emit_flags_t flags,
+	     const char *fmt, va_list vap);
+
+xo_ssize_t
+xo_emit_hf (xo_handle_t *xop, xo_emit_flags_t flags, const char *fmt, ...);
+
+xo_ssize_t
+xo_emit_f (xo_emit_flags_t flags, const char *fmt, ...);
 
 PRINTFLIKE(2, 0)
 static inline int
@@ -209,97 +247,127 @@ xo_emit_p (const char *fmt, ...)
     return rc;
 }
 
-int
+PRINTFLIKE(3, 0)
+static inline int
+xo_emit_hvfp (xo_handle_t *xop, xo_emit_flags_t flags,
+	      const char *fmt, va_list vap)
+{
+    return xo_emit_hvf(xop, flags, fmt, vap);
+}
+
+PRINTFLIKE(3, 4)
+static inline int
+xo_emit_hfp (xo_handle_t *xop, xo_emit_flags_t flags, const char *fmt, ...)
+{
+    va_list vap;
+    va_start(vap, fmt);
+    int rc = xo_emit_hvf(xop, flags, fmt, vap);
+    va_end(vap);
+    return rc;
+}
+
+PRINTFLIKE(2, 3)
+static inline int
+xo_emit_fp (xo_emit_flags_t flags, const char *fmt, ...)
+{
+    va_list vap;
+    va_start(vap, fmt);
+    int rc = xo_emit_hvf(NULL, flags, fmt, vap);
+    va_end(vap);
+    return rc;
+}
+
+xo_ssize_t
 xo_open_container_h (xo_handle_t *xop, const char *name);
 
-int
+xo_ssize_t
 xo_open_container (const char *name);
 
-int
+xo_ssize_t
 xo_open_container_hd (xo_handle_t *xop, const char *name);
 
-int
+xo_ssize_t
 xo_open_container_d (const char *name);
 
-int
+xo_ssize_t
 xo_close_container_h (xo_handle_t *xop, const char *name);
 
-int
+xo_ssize_t
 xo_close_container (const char *name);
 
-int
+xo_ssize_t
 xo_close_container_hd (xo_handle_t *xop);
 
-int
+xo_ssize_t
 xo_close_container_d (void);
 
-int
+xo_ssize_t
 xo_open_list_h (xo_handle_t *xop, const char *name);
 
-int
+xo_ssize_t
 xo_open_list (const char *name);
 
-int
+xo_ssize_t
 xo_open_list_hd (xo_handle_t *xop, const char *name);
 
-int
+xo_ssize_t
 xo_open_list_d (const char *name);
 
-int
+xo_ssize_t
 xo_close_list_h (xo_handle_t *xop, const char *name);
 
-int
+xo_ssize_t
 xo_close_list (const char *name);
 
-int
+xo_ssize_t
 xo_close_list_hd (xo_handle_t *xop);
 
-int
+xo_ssize_t
 xo_close_list_d (void);
 
-int
+xo_ssize_t
 xo_open_instance_h (xo_handle_t *xop, const char *name);
 
-int
+xo_ssize_t
 xo_open_instance (const char *name);
 
-int
+xo_ssize_t
 xo_open_instance_hd (xo_handle_t *xop, const char *name);
 
-int
+xo_ssize_t
 xo_open_instance_d (const char *name);
 
-int
+xo_ssize_t
 xo_close_instance_h (xo_handle_t *xop, const char *name);
 
-int
+xo_ssize_t
 xo_close_instance (const char *name);
 
-int
+xo_ssize_t
 xo_close_instance_hd (xo_handle_t *xop);
 
-int
+xo_ssize_t
 xo_close_instance_d (void);
 
-int
+xo_ssize_t
 xo_open_marker_h (xo_handle_t *xop, const char *name);
 
-int
+xo_ssize_t
 xo_open_marker (const char *name);
 
-int
+xo_ssize_t
 xo_close_marker_h (xo_handle_t *xop, const char *name);
 
-int
+xo_ssize_t
 xo_close_marker (const char *name);
 
-int
+xo_ssize_t
 xo_attr_h (xo_handle_t *xop, const char *name, const char *fmt, ...);
 
-int
+xo_ssize_t
 xo_attr_hv (xo_handle_t *xop, const char *name, const char *fmt, va_list vap);
 
-int
+xo_ssize_t
 xo_attr (const char *name, const char *fmt, ...);
 
 void
@@ -311,16 +379,16 @@ xo_error_h (xo_handle_t *xop, const char *fmt, ...);
 void
 xo_error (const char *fmt, ...);
 
-int
+xo_ssize_t
 xo_flush_h (xo_handle_t *xop);
 
-int
+xo_ssize_t
 xo_flush (void);
 
-int
+xo_ssize_t
 xo_finish_h (xo_handle_t *xop);
 
-int
+xo_ssize_t
 xo_finish (void);
 
 void
@@ -592,5 +660,24 @@ typedef void (*xo_simplify_field_func_t)(const char *, unsigned, int);
 char *
 xo_simplify_format (xo_handle_t *xop, const char *fmt, int with_numbers,
 		    xo_simplify_field_func_t field_cb);
+
+xo_ssize_t
+xo_emit_field_hv (xo_handle_t *xop, const char *rolmod, const char *contents,
+		  const char *fmt, const char *efmt,
+		  va_list vap);
+
+xo_ssize_t
+xo_emit_field_h (xo_handle_t *xop, const char *rolmod, const char *contents,
+		 const char *fmt, const char *efmt, ...);
+
+xo_ssize_t
+xo_emit_field (const char *rolmod, const char *contents,
+	       const char *fmt, const char *efmt, ...);
+
+void
+xo_retain_clear_all (void);
+
+void
+xo_retain_clear (const char *fmt);
 
 #endif /* INCLUDE_XO_H */

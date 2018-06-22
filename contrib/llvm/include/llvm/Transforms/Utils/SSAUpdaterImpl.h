@@ -17,13 +17,14 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Debug.h"
 
-namespace llvm {
-
 #define DEBUG_TYPE "ssaupdater"
+
+namespace llvm {
 
 class CastInst;
 class PHINode;
@@ -119,9 +120,8 @@ public:
       if (Info->NumPreds == 0)
         Info->Preds = nullptr;
       else
-        Info->Preds = static_cast<BBInfo**>
-          (Allocator.Allocate(Info->NumPreds * sizeof(BBInfo*),
-                              AlignOf<BBInfo*>::Alignment));
+        Info->Preds = static_cast<BBInfo **>(Allocator.Allocate(
+            Info->NumPreds * sizeof(BBInfo *), alignof(BBInfo *)));
 
       for (unsigned p = 0; p != Info->NumPreds; ++p) {
         BlkT *Pred = Preds[p];
@@ -378,7 +378,7 @@ public:
   void FindExistingPHI(BlkT *BB, BlockListTy *BlockList) {
     for (typename BlkT::iterator BBI = BB->begin(), BBE = BB->end();
          BBI != BBE; ++BBI) {
-      PhiT *SomePHI = Traits::InstrIsPHI(BBI);
+      PhiT *SomePHI = Traits::InstrIsPHI(&*BBI);
       if (!SomePHI)
         break;
       if (CheckIfPHIMatches(SomePHI)) {
@@ -453,8 +453,8 @@ public:
   }
 };
 
+} // end llvm namespace
+
 #undef DEBUG_TYPE // "ssaupdater"
 
-} // End llvm namespace
-
-#endif
+#endif // LLVM_TRANSFORMS_UTILS_SSAUPDATERIMPL_H

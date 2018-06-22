@@ -21,6 +21,8 @@ using namespace llvm;
 
 // Ordering on Info. The logic should match with the consumer-side function in
 // llvm/Option/OptTable.h.
+// FIXME: Mmake this take StringRefs instead of null terminated strings to
+// simplify callers.
 static int StrCmpOptionName(const char *A, const char *B) {
   const char *X = A, *Y = B;
   char a = tolower(*A), b = tolower(*B);
@@ -53,22 +55,22 @@ static int CompareOptionRecords(Record *const *Av, Record *const *Bv) {
 
   // Compare options by name, unless they are sentinels.
   if (!ASent)
-    if (int Cmp = StrCmpOptionName(A->getValueAsString("Name").c_str(),
-                                   B->getValueAsString("Name").c_str()))
+    if (int Cmp = StrCmpOptionName(A->getValueAsString("Name").str().c_str(),
+                                   B->getValueAsString("Name").str().c_str()))
       return Cmp;
 
   if (!ASent) {
-    std::vector<std::string> APrefixes = A->getValueAsListOfStrings("Prefixes");
-    std::vector<std::string> BPrefixes = B->getValueAsListOfStrings("Prefixes");
+    std::vector<StringRef> APrefixes = A->getValueAsListOfStrings("Prefixes");
+    std::vector<StringRef> BPrefixes = B->getValueAsListOfStrings("Prefixes");
 
-    for (std::vector<std::string>::const_iterator APre = APrefixes.begin(),
-                                                  AEPre = APrefixes.end(),
-                                                  BPre = BPrefixes.begin(),
-                                                  BEPre = BPrefixes.end();
-                                                  APre != AEPre &&
-                                                  BPre != BEPre;
-                                                  ++APre, ++BPre) {
-      if (int Cmp = StrCmpOptionName(APre->c_str(), BPre->c_str()))
+    for (std::vector<StringRef>::const_iterator APre = APrefixes.begin(),
+                                                AEPre = APrefixes.end(),
+                                                BPre = BPrefixes.begin(),
+                                                BEPre = BPrefixes.end();
+                                                APre != AEPre &&
+                                                BPre != BEPre;
+                                                ++APre, ++BPre) {
+      if (int Cmp = StrCmpOptionName(APre->str().c_str(), BPre->str().c_str()))
         return Cmp;
     }
   }
@@ -122,7 +124,7 @@ void EmitOptParser(RecordKeeper &Records, raw_ostream &OS) {
   unsigned CurPrefix = 0;
   for (unsigned i = 0, e = Opts.size(); i != e; ++i) {
     const Record &R = *Opts[i];
-    std::vector<std::string> prf = R.getValueAsListOfStrings("Prefixes");
+    std::vector<StringRef> prf = R.getValueAsListOfStrings("Prefixes");
     PrefixKeyT prfkey(prf.begin(), prf.end());
     unsigned NewPrefix = CurPrefix + 1;
     if (Prefixes.insert(std::make_pair(prfkey, (Twine("prefix_") +
@@ -149,10 +151,10 @@ void EmitOptParser(RecordKeeper &Records, raw_ostream &OS) {
                                     PE = I->first.end(); PI != PE; ++PI) {
       OS << "\"" << *PI << "\" COMMA ";
     }
-    OS << "0})\n";
+    OS << "nullptr})\n";
   }
   OS << "#undef COMMA\n";
-  OS << "#endif\n\n";
+  OS << "#endif // PREFIX\n\n";
 
   OS << "/////////\n";
   OS << "// Groups\n\n";
@@ -164,7 +166,7 @@ void EmitOptParser(RecordKeeper &Records, raw_ostream &OS) {
     OS << "OPTION(";
 
     // The option prefix;
-    OS << "0";
+    OS << "nullptr";
 
     // The option string.
     OS << ", \"" << R.getValueAsString("Name") << '"';
@@ -183,7 +185,7 @@ void EmitOptParser(RecordKeeper &Records, raw_ostream &OS) {
       OS << "INVALID";
 
     // The other option arguments (unused for groups).
-    OS << ", INVALID, 0, 0, 0";
+    OS << ", INVALID, nullptr, 0, 0";
 
     // The option help text.
     if (!isa<UnsetInit>(R.getValueInit("HelpText"))) {
@@ -191,10 +193,13 @@ void EmitOptParser(RecordKeeper &Records, raw_ostream &OS) {
       OS << "       ";
       write_cstring(OS, R.getValueAsString("HelpText"));
     } else
-      OS << ", 0";
+      OS << ", nullptr";
 
     // The option meta-variable name (unused).
-    OS << ", 0)\n";
+    OS << ", nullptr";
+
+    // The option Values (unused for groups).
+    OS << ", nullptr)\n";
   }
   OS << "\n";
 
@@ -207,7 +212,7 @@ void EmitOptParser(RecordKeeper &Records, raw_ostream &OS) {
     OS << "OPTION(";
 
     // The option prefix;
-    std::vector<std::string> prf = R.getValueAsListOfStrings("Prefixes");
+    std::vector<StringRef> prf = R.getValueAsListOfStrings("Prefixes");
     OS << Prefixes[PrefixKeyT(prf.begin(), prf.end())] << ", ";
 
     // The option string.
@@ -240,9 +245,9 @@ void EmitOptParser(RecordKeeper &Records, raw_ostream &OS) {
     // would become "foo\0bar\0". Note that the compiler adds an implicit
     // terminating \0 at the end.
     OS << ", ";
-    std::vector<std::string> AliasArgs = R.getValueAsListOfStrings("AliasArgs");
+    std::vector<StringRef> AliasArgs = R.getValueAsListOfStrings("AliasArgs");
     if (AliasArgs.size() == 0) {
-      OS << "0";
+      OS << "nullptr";
     } else {
       OS << "\"";
       for (size_t i = 0, e = AliasArgs.size(); i != e; ++i)
@@ -274,17 +279,24 @@ void EmitOptParser(RecordKeeper &Records, raw_ostream &OS) {
       OS << "       ";
       write_cstring(OS, R.getValueAsString("HelpText"));
     } else
-      OS << ", 0";
+      OS << ", nullptr";
 
     // The option meta-variable name.
     OS << ", ";
     if (!isa<UnsetInit>(R.getValueInit("MetaVarName")))
       write_cstring(OS, R.getValueAsString("MetaVarName"));
     else
-      OS << "0";
+      OS << "nullptr";
+
+    // The option Values. Used for shell autocompletion.
+    OS << ", ";
+    if (!isa<UnsetInit>(R.getValueInit("Values")))
+      write_cstring(OS, R.getValueAsString("Values"));
+    else
+      OS << "nullptr";
 
     OS << ")\n";
   }
-  OS << "#endif\n";
+  OS << "#endif // OPTION\n";
 }
 } // end namespace llvm

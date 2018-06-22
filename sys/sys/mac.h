@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1999-2002 Robert N. M. Watson
  * Copyright (c) 2001-2005 Networks Associates Technology, Inc.
  * Copyright (c) 2005-2006 SPARTA, Inc.
@@ -63,14 +65,14 @@
  * struct mac is the data structure used to carry MAC labels in system calls
  * and ioctls between userspace and the kernel.
  */
+
+#ifndef _KERNEL
 struct mac {
 	size_t		 m_buflen;
 	char		*m_string;
 };
 
 typedef struct mac	*mac_t;
-
-#ifndef _KERNEL
 
 /*
  * Location of the userland MAC framework configuration file.  mac.conf

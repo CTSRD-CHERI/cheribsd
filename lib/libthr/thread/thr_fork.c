@@ -23,11 +23,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1995-1998 John Birrell <jb@cimlogic.com.au>
  * All rights reserved.
  *
@@ -56,6 +56,9 @@
  * SUCH DAMAGE.
  *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
 #include <sys/syscall.h>
 #include "namespace.h"
@@ -168,6 +171,7 @@ __thr_fork(void)
 	if (_thr_isthreaded() != 0) {
 		was_threaded = 1;
 		_malloc_prefork();
+		__thr_pshared_atfork_pre();
 		_rtld_atfork_pre(rtld_locks);
 	} else {
 		was_threaded = 0;
@@ -202,8 +206,10 @@ __thr_fork(void)
 
 		_thr_signal_postfork_child();
 
-		if (was_threaded)
+		if (was_threaded) {
 			_rtld_atfork_post(rtld_locks);
+			__thr_pshared_atfork_post();
+		}
 		_thr_setthreaded(0);
 
 		/* reinitalize library. */
@@ -236,6 +242,7 @@ __thr_fork(void)
 
 		if (was_threaded) {
 			_rtld_atfork_post(rtld_locks);
+			__thr_pshared_atfork_post();
 			_malloc_postfork();
 		}
 

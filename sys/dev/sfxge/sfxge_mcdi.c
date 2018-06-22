@@ -1,5 +1,7 @@
 /*-
- * Copyright (c) 2010-2015 Solarflare Communications Inc.
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
+ * Copyright (c) 2010-2016 Solarflare Communications Inc.
  * All rights reserved.
  *
  * This software was developed in part by Philip Paeps under contract for
@@ -55,7 +57,6 @@ __FBSDID("$FreeBSD$");
 
 #define	SFXGE_MCDI_POLL_INTERVAL_MIN 10		/* 10us in 1us units */
 #define	SFXGE_MCDI_POLL_INTERVAL_MAX 100000	/* 100ms in 1us units */
-#define	SFXGE_MCDI_WATCHDOG_INTERVAL 10000000	/* 10s in 1us units */
 
 static void
 sfxge_mcdi_timeout(struct sfxge_softc *sc)
@@ -70,7 +71,7 @@ sfxge_mcdi_timeout(struct sfxge_softc *sc)
 }
 
 static void
-sfxge_mcdi_poll(struct sfxge_softc *sc)
+sfxge_mcdi_poll(struct sfxge_softc *sc, uint32_t timeout_us)
 {
 	efx_nic_t *enp;
 	clock_t delay_total;
@@ -87,7 +88,7 @@ sfxge_mcdi_poll(struct sfxge_softc *sc)
 			return;
 		}
 
-		if (delay_total > SFXGE_MCDI_WATCHDOG_INTERVAL) {
+		if (delay_total > timeout_us) {
 			aborted = efx_mcdi_request_abort(enp);
 			KASSERT(aborted, ("abort failed"));
 			sfxge_mcdi_timeout(sc);
@@ -115,6 +116,7 @@ sfxge_mcdi_execute(void *arg, efx_mcdi_req_t *emrp)
 {
 	struct sfxge_softc *sc;
 	struct sfxge_mcdi *mcdi;
+	uint32_t timeout_us = 0;
 
 	sc = (struct sfxge_softc *)arg;
 	mcdi = &sc->mcdi;
@@ -125,8 +127,11 @@ sfxge_mcdi_execute(void *arg, efx_mcdi_req_t *emrp)
 	    ("MCDI not initialized"));
 
 	/* Issue request and poll for completion. */
+	efx_mcdi_get_timeout(sc->enp, emrp, &timeout_us);
+	KASSERT(timeout_us > 0, ("MCDI timeout not initialized"));
+
 	efx_mcdi_request_start(sc->enp, emrp, B_FALSE);
-	sfxge_mcdi_poll(sc);
+	sfxge_mcdi_poll(sc, timeout_us);
 
 	SFXGE_MCDI_UNLOCK(mcdi);
 }
@@ -250,10 +255,6 @@ sfxge_mcdi_ioctl(struct sfxge_softc *sc, sfxge_ioc_t *ip)
 	}
 
 	mcdibuf = malloc(SFXGE_MCDI_MAX_PAYLOAD, M_TEMP, M_WAITOK | M_ZERO);
-	if (mcdibuf == NULL) {
-		rc = ENOMEM;
-		goto fail4;
-	}
 	if ((rc = copyin(ip->u.mcdi.payload, mcdibuf, ip->u.mcdi.len)) != 0) {
 		goto fail5;
 	}
@@ -292,7 +293,6 @@ sfxge_mcdi_ioctl(struct sfxge_softc *sc, sfxge_ioc_t *ip)
 fail6:
 fail5:
 	free(mcdibuf, M_TEMP);
-fail4:
 fail3:
 fail2:
 fail1:

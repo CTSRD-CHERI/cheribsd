@@ -22,7 +22,6 @@
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetInstrInfo.h"
@@ -83,11 +82,18 @@ class AArch64A53Fix835769 : public MachineFunctionPass {
 
 public:
   static char ID;
-  explicit AArch64A53Fix835769() : MachineFunctionPass(ID) {}
+  explicit AArch64A53Fix835769() : MachineFunctionPass(ID) {
+    initializeAArch64A53Fix835769Pass(*PassRegistry::getPassRegistry());
+  }
 
   bool runOnMachineFunction(MachineFunction &F) override;
 
-  const char *getPassName() const override {
+  MachineFunctionProperties getRequiredProperties() const override {
+    return MachineFunctionProperties().set(
+        MachineFunctionProperties::Property::NoVRegs);
+  }
+
+  StringRef getPassName() const override {
     return "Workaround A53 erratum 835769 pass";
   }
 
@@ -102,6 +108,9 @@ private:
 char AArch64A53Fix835769::ID = 0;
 
 } // end anonymous namespace
+
+INITIALIZE_PASS(AArch64A53Fix835769, "aarch64-fix-cortex-a53-835769-pass",
+                "AArch64 fix for A53 erratum 835769", false, false)
 
 //===----------------------------------------------------------------------===//
 
@@ -122,7 +131,7 @@ AArch64A53Fix835769::runOnMachineFunction(MachineFunction &F) {
 static MachineBasicBlock *getBBFallenThrough(MachineBasicBlock *MBB,
                                              const TargetInstrInfo *TII) {
   // Get the previous machine basic block in the function.
-  MachineFunction::iterator MBBI = *MBB;
+  MachineFunction::iterator MBBI(MBB);
 
   // Can't go off top of function.
   if (MBBI == MBB->getParent()->begin())
@@ -131,10 +140,10 @@ static MachineBasicBlock *getBBFallenThrough(MachineBasicBlock *MBB,
   MachineBasicBlock *TBB = nullptr, *FBB = nullptr;
   SmallVector<MachineOperand, 2> Cond;
 
-  MachineBasicBlock *PrevBB = std::prev(MBBI);
+  MachineBasicBlock *PrevBB = &*std::prev(MBBI);
   for (MachineBasicBlock *S : MBB->predecessors())
-    if (S == PrevBB && !TII->AnalyzeBranch(*PrevBB, TBB, FBB, Cond) &&
-        !TBB && !FBB)
+    if (S == PrevBB && !TII->analyzeBranch(*PrevBB, TBB, FBB, Cond) && !TBB &&
+        !FBB)
       return S;
 
   return nullptr;
@@ -151,10 +160,9 @@ static MachineInstr *getLastNonPseudo(MachineBasicBlock &MBB,
   // If there is no non-pseudo in the current block, loop back around and try
   // the previous block (if there is one).
   while ((FMBB = getBBFallenThrough(FMBB, TII))) {
-    for (auto I = FMBB->rbegin(), E = FMBB->rend(); I != E; ++I) {
-      if (!I->isPseudo())
-        return &*I;
-    }
+    for (MachineInstr &I : make_range(FMBB->rbegin(), FMBB->rend()))
+      if (!I.isPseudo())
+        return &I;
   }
 
   // There was no previous non-pseudo in the fallen through blocks
@@ -217,8 +225,8 @@ AArch64A53Fix835769::runOnBasicBlock(MachineBasicBlock &MBB) {
     ++Idx;
   }
 
-  DEBUG(dbgs() << "Scan complete, "<< Sequences.size()
-               << " occurences of pattern found.\n");
+  DEBUG(dbgs() << "Scan complete, " << Sequences.size()
+               << " occurrences of pattern found.\n");
 
   // Then update the basic block, inserting nops between the detected sequences.
   for (auto &MI : Sequences) {

@@ -205,7 +205,7 @@ struct _7zip {
 	/*
 	 * The list of the file entries which has its contents is used to
 	 * manage struct file objects.
-	 * We use 'next' a menber of struct file to chain.
+	 * We use 'next' (a member of struct file) to chain.
 	 */
 	struct {
 		struct file	*first;
@@ -1358,7 +1358,7 @@ make_header(struct archive_write *a, uint64_t offset, uint64_t pack_size,
 	if (r < 0)
 		return (r);
 
-	/* Write Nume size. */
+	/* Write Name size. */
 	r = enc_uint64(a, zip->total_bytes_entry_name+1);
 	if (r < 0)
 		return (r);
@@ -1449,6 +1449,10 @@ static int
 _7z_free(struct archive_write *a)
 {
 	struct _7zip *zip = (struct _7zip *)a->format_data;
+
+	/* Close the temporary file. */
+	if (zip->temp_fd >= 0)
+		close(zip->temp_fd);
 
 	file_free_register(zip);
 	compression_end(&(a->archive), &(zip->stream));

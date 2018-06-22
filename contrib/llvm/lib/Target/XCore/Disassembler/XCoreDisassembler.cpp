@@ -15,7 +15,7 @@
 #include "XCore.h"
 #include "XCoreRegisterInfo.h"
 #include "llvm/MC/MCContext.h"
-#include "llvm/MC/MCDisassembler.h"
+#include "llvm/MC/MCDisassembler/MCDisassembler.h"
 #include "llvm/MC/MCFixedLenDisassembler.h"
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCSubtargetInfo.h"
@@ -224,7 +224,7 @@ static DecodeStatus DecodeBitpOperand(MCInst &Inst, unsigned Val,
                                       uint64_t Address, const void *Decoder) {
   if (Val > 11)
     return MCDisassembler::Fail;
-  static unsigned Values[] = {
+  static const unsigned Values[] = {
     32 /*bpw*/, 1, 2, 3, 4, 5, 6, 7, 8, 16, 24, 32
   };
   Inst.addOperand(MCOperand::createImm(Values[Val]));
@@ -769,7 +769,7 @@ MCDisassembler::DecodeStatus XCoreDisassembler::getInstruction(
 }
 
 namespace llvm {
-  extern Target TheXCoreTarget;
+  Target &getTheXCoreTarget();
 }
 
 static MCDisassembler *createXCoreDisassembler(const Target &T,
@@ -780,6 +780,6 @@ static MCDisassembler *createXCoreDisassembler(const Target &T,
 
 extern "C" void LLVMInitializeXCoreDisassembler() {
   // Register the disassembler.
-  TargetRegistry::RegisterMCDisassembler(TheXCoreTarget,
+  TargetRegistry::RegisterMCDisassembler(getTheXCoreTarget(),
                                          createXCoreDisassembler);
 }

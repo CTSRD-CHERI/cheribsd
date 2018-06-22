@@ -1,9 +1,14 @@
 # $FreeBSD$
 
+.include <bsd.own.mk>
+
 TESTSRC=	${SRCTOP}/contrib/netbsd-tests/lib/libm
 
 # All architectures on FreeBSD have fenv.h
 CFLAGS+=	-DHAVE_FENV_H
+
+# For isqemu.h
+CFLAGS+=	-I${TESTSRC:H}/libc/gen
 
 # Not sure why this isn't defined for all architectures, since most
 # have long double.
@@ -18,12 +23,15 @@ NETBSD_ATF_TESTS_C+=	asin_test
 NETBSD_ATF_TESTS_C+=	atan_test
 NETBSD_ATF_TESTS_C+=	cbrt_test
 NETBSD_ATF_TESTS_C+=	ceil_test
+NETBSD_ATF_TESTS_C+=	casinh_test
 NETBSD_ATF_TESTS_C+=	cos_test
 NETBSD_ATF_TESTS_C+=	cosh_test
 NETBSD_ATF_TESTS_C+=	erf_test
 NETBSD_ATF_TESTS_C+=	exp_test
 NETBSD_ATF_TESTS_C+=	fmod_test
+NETBSD_ATF_TESTS_C+=	fe_round_test
 NETBSD_ATF_TESTS_C+=	infinity_test
+NETBSD_ATF_TESTS_C+=	ilogb_test
 NETBSD_ATF_TESTS_C+=	ldexp_test
 NETBSD_ATF_TESTS_C+=	log_test
 NETBSD_ATF_TESTS_C+=	pow_test
@@ -36,15 +44,25 @@ NETBSD_ATF_TESTS_C+=	sqrt_test
 NETBSD_ATF_TESTS_C+=	tan_test
 NETBSD_ATF_TESTS_C+=	tanh_test
 
+# Most tests fail ungracefully on mips64 so don't bother running them.
+.if ${MACHINE_CPUARCH} != "mips"
 TAP_TESTS_C+=	cexp_test
+.endif
 TAP_TESTS_C+=	conj_test
+.if ${MACHINE_ARCH} != "aarch64"
+# Hits an assert in llvm when building for arm64:
+# https://llvm.org/bugs/show_bug.cgi?id=26081
 TAP_TESTS_C+=	csqrt_test
-TAP_TESTS_C+=	ctrig_test
+.endif
+.if ${MACHINE_CPUARCH} != "mips"
+ATF_TESTS_C+=	ctrig_test
 TAP_TESTS_C+=	exponential_test
 TAP_TESTS_C+=	fenv_test
 TAP_TESTS_C+=	fma_test
+.endif
 TAP_TESTS_C+=	fmaxmin_test
-TAP_TESTS_C+=	ilogb_test
+TAP_TESTS_C+=	ilogb2_test
+.if ${MACHINE_CPUARCH} != "mips"
 TAP_TESTS_C+=	invtrig_test
 TAP_TESTS_C+=	invctrig_test
 TAP_TESTS_C+=	logarithm_test
@@ -56,11 +74,12 @@ TAP_TESTS_C+=	nan_test
 TAP_TESTS_C+=	nearbyint_test
 TAP_TESTS_C+=	next_test
 TAP_TESTS_C+=	rem_test
-TAP_TESTS_C+=	trig_test
+.endif
+ATF_TESTS_C+=	trig_test
 
-.for t in ${TAP_TESTS_C}
-CFLAGS.$t+=	-O0
-.endfor
+.if !empty(PROG) && !empty(TAP_TESTS_C:M${PROG})
+CFLAGS+=	-O0
+.endif
 
 CSTD=		c99
 
@@ -68,7 +87,15 @@ CSTD=		c99
 
 IGNORE_PRAGMA=
 
+SRCS.ilogb2_test=	ilogb_test.c
+
 LIBADD+=	m
+
+.if ${MACHINE_CPUARCH} == "i386"
+# XXX: __fldcw macro mismatch between fenv.h and ieeefp.h .
+CWARNFLAGS.clang+=	-Wno-error=macro-redefined
+.endif
+WARNS?=		1
 
 # Copied from lib/msun/Makefile
 .if ${MACHINE_CPUARCH} == "i386"

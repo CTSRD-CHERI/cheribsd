@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1997 Jonathan Lemon
  * All rights reserved.
  *
@@ -171,7 +173,7 @@ vm86_emulate(vmf)
 					PUSHL((vmf->vmf_eflags & PUSH_MASK)
 					    | PSL_IOPL, vmf);
 				vmf->vmf_ip += inc_ip;
-				return (0);
+				return (retcode);
 
 			case POPF:
 				temp_flags = POPL(vmf) & POP_MASK;
@@ -185,7 +187,7 @@ vm86_emulate(vmf)
 				} else {
 					vmf->vmf_eflags &= ~PSL_VIF;
 				}
-				return (0);
+				return (retcode);
 			}
 			break;
 
@@ -203,7 +205,7 @@ vm86_emulate(vmf)
 		case INTn:
 			break;
 
-		/* VME if trying to set PSL_TF, or PSL_I when VIP is set */
+		/* VME if trying to set PSL_T, or PSL_I when VIP is set */
 		case POPF:
 			temp_flags = POP(vmf) & POP_MASK;
 			vmf->vmf_flags = (vmf->vmf_flags & ~POP_MASK)
@@ -218,7 +220,7 @@ vm86_emulate(vmf)
 			}
 			return (retcode);
 
-		/* VME if trying to set PSL_TF, or PSL_I when VIP is set */
+		/* VME if trying to set PSL_T, or PSL_I when VIP is set */
 		case IRET:
 			vmf->vmf_ip = POP(vmf);
 			vmf->vmf_cs = POP(vmf);

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2003-2009 RMI Corporation
  * All rights reserved.
  *
@@ -94,7 +96,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/mips_opcode.h>
 #include <machine/asm.h>
 #include <machine/cpuregs.h>
-#include <machine/param.h>
 #include <machine/intr_machdep.h>
 #include <machine/clock.h>	/* for DELAY */
 #include <machine/bus.h>
@@ -141,8 +142,8 @@ static int	nlge_ioctl(struct ifnet *, u_long, caddr_t);
 static int	nlge_tx(struct ifnet *ifp, struct mbuf *m);
 static void 	nlge_rx(struct nlge_softc *sc, vm_paddr_t paddr, int len);
 
-static int	nlge_mii_write(struct device *, int, int, int);
-static int	nlge_mii_read(struct device *, int, int);
+static int	nlge_mii_write(device_t, int, int, int);
+static int	nlge_mii_read(device_t, int, int);
 static void	nlge_mac_mii_statchg(device_t);
 static int	nlge_mediachange(struct ifnet *ifp);
 static void	nlge_mediastatus(struct ifnet *ifp, struct ifmediareq *ifmr);
@@ -591,7 +592,7 @@ nlge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	ifr = (struct ifreq *)data;
 
 	switch(command) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		NLGE_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0) {
@@ -616,7 +617,7 @@ nlge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		error = 0;
 		break;
 		
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		if (sc->mii_bus != NULL) {
 			mii = (struct mii_data *)device_get_softc(sc->mii_bus);
@@ -832,7 +833,7 @@ nlge_rx(struct nlge_softc *sc, vm_paddr_t paddr, int len)
 }
 
 static int
-nlge_mii_write(struct device *dev, int phyaddr, int regidx, int regval)
+nlge_mii_write(device_t dev, int phyaddr, int regidx, int regval)
 {
 	struct nlge_softc *sc;
 
@@ -844,7 +845,7 @@ nlge_mii_write(struct device *dev, int phyaddr, int regidx, int regval)
 }
 
 static int
-nlge_mii_read(struct device *dev, int phyaddr, int regidx)
+nlge_mii_read(device_t dev, int phyaddr, int regidx)
 {
 	struct nlge_softc *sc;
 	int val;
@@ -2405,7 +2406,7 @@ dump_fmn_cpu_credits_for_gmac(struct xlr_board_info *board, int gmac_id)
 	int j, k, r, c;
 	int n_gmac_buckets;
 
-	n_gmac_buckets = sizeof (gmac_bucket_ids) / sizeof (gmac_bucket_ids[0]);
+	n_gmac_buckets = nitems(gmac_bucket_ids);
 	for (j = 0; j < 8; j++) { 		// for each cpu
 		cc = board->credit_configs[j];
 		printf("Credits for Station CPU_%d ---> GMAC buckets (tx path)\n", j);
@@ -2519,7 +2520,7 @@ dump_mii_regs(struct nlge_softc *sc)
 	if (sc->mii_base == NULL || sc->mii_bus == NULL)
 		return;
 
-	n_regs = sizeof (mii_regs) / sizeof (mii_regs[0]);
+	n_regs = nitems(mii_regs);
 	for (i = 0; i < n_regs; i++) {
 		printf("[mii_0x%x] = %x\n", mii_regs[i],
 		    nlge_mii_read_internal(sc->mii_base, sc->phy_addr,

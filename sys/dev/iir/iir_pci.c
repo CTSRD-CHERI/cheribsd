@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  *       Copyright (c) 2000-03 ICP vortex GmbH
  *       Copyright (c) 2002-03 Intel Corporation
  *       Copyright (c) 2003    Adaptec Inc.
@@ -228,7 +230,7 @@ iir_pci_attach(device_t dev)
     /* check and reset interface area */
     bus_write_4(gdt->sc_dpmem, GDT_MPR_IC, htole32(GDT_MPR_MAGIC));
     if (bus_read_4(gdt->sc_dpmem, GDT_MPR_IC) != htole32(GDT_MPR_MAGIC)) {
-	device_printf(dev, "cannot access DPMEM at 0x%lx (shadowed?)\n",
+	device_printf(dev, "cannot access DPMEM at 0x%jx (shadowed?)\n",
 	    rman_get_start(gdt->sc_dpmem));
         error = ENXIO;
         goto err;

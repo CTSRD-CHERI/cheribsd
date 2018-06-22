@@ -421,6 +421,10 @@
 #define ZYD_CR254		0x93f8
 #define ZYD_CR255		0x93fc
 
+/* nitems(ZYD_*_CHANTABLE) */
+static const uint8_t zyd_chan_2ghz[] =
+	{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 };
+
 /* copied nearly verbatim from the Linux driver rewrite */
 #define	ZYD_DEF_PHY							\
 {									\
@@ -1250,6 +1254,7 @@ enum {
 
 struct zyd_softc {
 	struct ieee80211com	sc_ic;
+	struct ieee80211_ratectl_tx_status sc_txs;
 	struct mbufq		sc_snd;
 	device_t		sc_dev;
 	struct usb_device	*sc_udev;
@@ -1291,6 +1296,7 @@ struct zyd_softc {
 	uint8_t			sc_ofdm36_cal[14];
 	uint8_t			sc_ofdm48_cal[14];
 	uint8_t			sc_ofdm54_cal[14];
+	uint8_t			sc_bssid[IEEE80211_ADDR_LEN];
 
 	struct mtx		sc_mtx;
 	struct zyd_tx_data	tx_data[ZYD_TX_LIST_CNT];

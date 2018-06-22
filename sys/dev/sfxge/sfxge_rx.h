@@ -1,5 +1,7 @@
 /*-
- * Copyright (c) 2010-2015 Solarflare Communications Inc.
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
+ * Copyright (c) 2010-2016 Solarflare Communications Inc.
  * All rights reserved.
  *
  * This software was developed in part by Philip Paeps under contract for
@@ -42,24 +44,6 @@
 #if defined(INET) || defined(INET6)
 #define	SFXGE_LRO	1
 #endif
-
-#define	SFXGE_MAGIC_RESERVED		0x8000
-
-#define	SFXGE_MAGIC_DMAQ_LABEL_WIDTH	6
-#define	SFXGE_MAGIC_DMAQ_LABEL_MASK \
-	((1 << SFXGE_MAGIC_DMAQ_LABEL_WIDTH) - 1)
-
-#define	SFXGE_MAGIC_RX_QFLUSH_DONE \
-	(SFXGE_MAGIC_RESERVED | (1 << SFXGE_MAGIC_DMAQ_LABEL_WIDTH))
-
-#define	SFXGE_MAGIC_RX_QFLUSH_FAILED \
-	(SFXGE_MAGIC_RESERVED | (2 << SFXGE_MAGIC_DMAQ_LABEL_WIDTH))
-
-#define	SFXGE_MAGIC_RX_QREFILL \
-	(SFXGE_MAGIC_RESERVED | (3 << SFXGE_MAGIC_DMAQ_LABEL_WIDTH))
-
-#define	SFXGE_MAGIC_TX_QFLUSH_DONE \
-	(SFXGE_MAGIC_RESERVED | (4 << SFXGE_MAGIC_DMAQ_LABEL_WIDTH))
 
 #define	SFXGE_RX_SCALE_MAX	EFX_MAXRSS
 
@@ -173,10 +157,10 @@ struct sfxge_rxq {
 	struct sfxge_softc		*sc __aligned(CACHE_LINE_SIZE);
 	unsigned int			index;
 	efsys_mem_t			mem;
-	unsigned int			buf_base_id;
 	enum sfxge_rxq_state		init_state;
 	unsigned int			entries;
 	unsigned int			ptr_mask;
+	efx_rxq_t			*common;
 
 	struct sfxge_rx_sw_desc		*queue __aligned(CACHE_LINE_SIZE);
 	unsigned int			added;
@@ -191,8 +175,8 @@ struct sfxge_rxq {
 	struct callout			refill_callout;
 	unsigned int			refill_delay;
 
-	efx_rxq_t			*common __aligned(CACHE_LINE_SIZE);
-	volatile enum sfxge_flush_state	flush_state;
+	volatile enum sfxge_flush_state	flush_state __aligned(CACHE_LINE_SIZE);
+	unsigned int			buf_base_id;
 };
 
 /*

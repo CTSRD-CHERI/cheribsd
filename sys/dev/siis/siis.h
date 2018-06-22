@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2009 Alexander Motin <mav@FreeBSD.org>
  * All rights reserved.
  *
@@ -389,7 +391,7 @@ struct siis_channel {
 	int			numtslots[SIIS_MAX_SLOTS]; /* Number of tagged slots */
 	int			numhslots;	/* Number of held slots */
 	int			recoverycmd;	/* Our READ LOG active */
-	int			fatalerr;	/* Fatal error happend */
+	int			fatalerr;	/* Fatal error happened */
 	int			recovery;	/* Some slots are in error */
 	union ccb		*frozen;	/* Frozen command */
 

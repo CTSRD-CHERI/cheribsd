@@ -2,6 +2,8 @@
  * Definitions for low level routines and data structures
  * for the Advanced Systems Inc. SCSI controllers chips.
  *
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1996-1997, 1999-2000 Justin T. Gibbs.
  * All rights reserved.
  *
@@ -66,9 +68,7 @@ typedef enum {
 	ADV_ISA		= 0x001,
 	ADV_ISAPNP	= 0x003,
 	ADV_VL		= 0x004,
-	ADV_EISA	= 0x008,
 	ADV_PCI		= 0x010,
-	ADV_MCA		= 0x020,
 	ADV_PCMCIA	= 0x040,
 	ADV_ULTRA	= 0x100,
 	ADV_WIDE	= 0x200,
@@ -170,9 +170,6 @@ struct adv_ccb_info {
 #define		ADV_CHIP_VER_ISA_BIT     	0x30
 #define		ADV_CHIP_VER_ISAPNP_BIT  	0x20
 #define		ADV_CHIP_VER_ASYN_BUG	 	0x21
-#define		ADV_CHIP_MIN_VER_EISA 	 	0x41
-#define		ADV_CHIP_MAX_VER_EISA	 	0x47
-#define		ADV_CHIP_VER_EISA_BIT		0x40
 
 #define ADV_CONFIG_MSW				0x0004
 #define		ADV_CFG_MSW_SCSI_TARGET_ON	0x0080
@@ -228,7 +225,7 @@ struct adv_ccb_info {
 #define		ADV_CSW_SCSI_RESET_LATCH	0x0002
 #define		ADV_CSW_INT_PENDING		0x0001
 /*
- * XXX I don't understand the relevence of the naming
+ * XXX I don't understand the relevance of the naming
  * convention change here.  What does CIW stand for?
  * Perhaps this is to differentiate read and write
  * values?
@@ -590,7 +587,7 @@ struct adv_scsiq_1 {
 	u_int8_t		target_lun;	/* LUN - taken from our xs */
 
 	u_int32_t		data_addr;	/*
-						 * physical addres of first
+						 * physical address of first
 						 * (possibly only) segment
 						 * to transfer.
 						 */
@@ -793,7 +790,7 @@ u_int16_t adv_read_lram_16(struct adv_softc *adv, u_int16_t addr);
 void	  adv_write_lram_16(struct adv_softc *adv, u_int16_t addr,
 			    u_int16_t value);
 
-/* Intialization */
+/* Initialization */
 int	  adv_find_signature(struct resource *res);
 void	  adv_lib_init(struct adv_softc *adv);
 

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1994 Herb Peyerl <hpeyerl@novatel.ca>
  * All rights reserved.
  *
@@ -251,7 +253,7 @@ vx_init_locked(struct vx_softc *sc)
 	    S_RX_COMPLETE | S_TX_COMPLETE | S_TX_AVAIL);
 
 	/*
-         * Attempt to get rid of any stray interrupts that occured during
+         * Attempt to get rid of any stray interrupts that occurred during
          * configuration.  On the i386 this isn't possible because one may
          * already be queued.  However, a single stray interrupt is
          * unimportant.
@@ -350,7 +352,7 @@ vx_setlink(struct vx_softc *sc)
          */
 	i = sc->vx_connector;	/* default in EEPROM */
 	reason = "default";
-	warning = 0;
+	warning = NULL;
 
 	if (ifp->if_flags & IFF_LINK0) {
 		if (sc->vx_connectors & conn_tab[CONNECTOR_AUI].bit) {
@@ -729,7 +731,7 @@ again:
 
 	/* Pull packet off interface. */
 	m = vx_get(sc, len);
-	if (m == 0) {
+	if (m == NULL) {
 		if_inc_counter(ifp, IFCOUNTER_IERRORS, 1);
 		goto abort;
 	}
@@ -752,7 +754,7 @@ again:
 	eh = mtod(m, struct ether_header *);
 
 	/*
-         * XXX: Some cards seem to be in promiscous mode all the time.
+         * XXX: Some cards seem to be in promiscuous mode all the time.
          * we need to make sure we only get our own stuff always.
          * bleah!
          */
@@ -897,7 +899,7 @@ vx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error = 0;
 
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		VX_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) == 0 &&
 		    (ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
@@ -926,21 +928,21 @@ vx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		VX_UNLOCK(sc);
 		break;
 
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		/*
 	         * Set the interface MTU.
 	         */
 		VX_LOCK(sc);
-		if (ifr->ifr_mtu > ETHERMTU) {
+		if (ifr_mtu_get(ifr) > ETHERMTU) {
 			error = EINVAL;
 		} else {
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 		}
 		VX_UNLOCK(sc);
 		break;
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		/*
 		 * Multicast list has changed; set the hardware filter
 		 * accordingly.

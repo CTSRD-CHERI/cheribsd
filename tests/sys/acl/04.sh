@@ -39,6 +39,10 @@ if [ $(id -u) -ne 0 ]; then
 	echo "1..0 # SKIP you must be root"
 	exit 0
 fi
+if [ -z "$(which perl)" ]; then
+	echo "1..0 # SKIP perl must be installed"
+	exit 0
+fi
 
 echo "1..3"
 
@@ -50,6 +54,7 @@ MNT=`mktemp -dt acltools`
 zpool create -m $MNT acltools /dev/$MD
 if [ $? -ne 0 ]; then
 	echo "not ok 1 - 'zpool create' failed."
+	echo 'Bail out!'
 	exit 1
 fi
 
@@ -57,7 +62,7 @@ echo "ok 1"
 
 cd $MNT
 
-perl $TESTDIR/run $TESTDIR/tools-nfs4-trivial.test > /dev/null
+perl $TESTDIR/run $TESTDIR/tools-nfs4-trivial.test >&2
 
 if [ $? -eq 0 ]; then
 	echo "ok 2"

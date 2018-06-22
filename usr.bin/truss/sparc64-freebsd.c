@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright 1998 Sean Eric Fagan
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,6 +43,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/reg.h>
 #include <machine/tstate.h>
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <sysdecode.h>
@@ -115,9 +118,11 @@ sparc64_fetch_retval(struct trussinfo *trussinfo, long *retval, int *errorp)
 
 static struct procabi sparc64_freebsd = {
 	"FreeBSD ELF64",
-	FREEBSD,
+	SYSDECODE_ABI_FREEBSD,
 	sparc64_fetch_args,
-	sparc64_fetch_retval
+	sparc64_fetch_retval,
+	STAILQ_HEAD_INITIALIZER(sparc64_freebsd.extra_syscalls),
+	{ NULL }
 };
 
 PROCABI(sparc64_freebsd);

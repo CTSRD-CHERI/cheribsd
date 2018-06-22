@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -61,11 +63,7 @@ __FBSDID("$FreeBSD$");
  * remaining space in the directory.
  */
 int
-ffs_blkatoff(vp, offset, res, bpp)
-	struct vnode *vp;
-	off_t offset;
-	char **res;
-	struct buf **bpp;
+ffs_blkatoff(struct vnode *vp, off_t offset, char **res, struct buf **bpp)
 {
 	struct inode *ip;
 	struct fs *fs;
@@ -74,7 +72,7 @@ ffs_blkatoff(vp, offset, res, bpp)
 	int bsize, error;
 
 	ip = VTOI(vp);
-	fs = ip->i_fs;
+	fs = ITOFS(ip);
 	lbn = lblkno(fs, offset);
 	bsize = blksize(fs, ip, lbn);
 
@@ -95,14 +93,10 @@ ffs_blkatoff(vp, offset, res, bpp)
  * to the incore copy.
  */
 void
-ffs_load_inode(bp, ip, fs, ino)
-	struct buf *bp;
-	struct inode *ip;
-	struct fs *fs;
-	ino_t ino;
+ffs_load_inode(struct buf *bp, struct inode *ip, struct fs *fs, ino_t ino)
 {
 
-	if (ip->i_ump->um_fstype == UFS1) {
+	if (I_IS_UFS1(ip)) {
 		*ip->i_din1 =
 		    *((struct ufs1_dinode *)bp->b_data + ino_to_fsbo(fs, ino));
 		ip->i_mode = ip->i_din1->di_mode;
@@ -131,11 +125,7 @@ ffs_load_inode(bp, ip, fs, ino)
  * of some frags.
  */
 void
-ffs_fragacct(fs, fragmap, fraglist, cnt)
-	struct fs *fs;
-	int fragmap;
-	int32_t fraglist[];
-	int cnt;
+ffs_fragacct(struct fs *fs, int fragmap, int32_t fraglist[], int cnt)
 {
 	int inblk;
 	int field, subfield;
@@ -167,10 +157,7 @@ ffs_fragacct(fs, fragmap, fraglist, cnt)
  * check if a block is available
  */
 int
-ffs_isblock(fs, cp, h)
-	struct fs *fs;
-	unsigned char *cp;
-	ufs1_daddr_t h;
+ffs_isblock(struct fs *fs, unsigned char *cp, ufs1_daddr_t h)
 {
 	unsigned char mask;
 
@@ -199,10 +186,7 @@ ffs_isblock(fs, cp, h)
  * check if a block is free
  */
 int
-ffs_isfreeblock(fs, cp, h)
-	struct fs *fs;
-	u_char *cp;
-	ufs1_daddr_t h;
+ffs_isfreeblock(struct fs *fs, u_char *cp, ufs1_daddr_t h)
 {
  
 	switch ((int)fs->fs_frag) {
@@ -227,10 +211,7 @@ ffs_isfreeblock(fs, cp, h)
  * take a block out of the map
  */
 void
-ffs_clrblock(fs, cp, h)
-	struct fs *fs;
-	u_char *cp;
-	ufs1_daddr_t h;
+ffs_clrblock(struct fs *fs, u_char *cp, ufs1_daddr_t h)
 {
 
 	switch ((int)fs->fs_frag) {
@@ -258,10 +239,7 @@ ffs_clrblock(fs, cp, h)
  * put a block into the map
  */
 void
-ffs_setblock(fs, cp, h)
-	struct fs *fs;
-	unsigned char *cp;
-	ufs1_daddr_t h;
+ffs_setblock(struct fs *fs, unsigned char *cp, ufs1_daddr_t h)
 {
 
 	switch ((int)fs->fs_frag) {
@@ -292,11 +270,7 @@ ffs_setblock(fs, cp, h)
  * Cnt == 1 means free; cnt == -1 means allocating.
  */
 void
-ffs_clusteracct(fs, cgp, blkno, cnt)
-	struct fs *fs;
-	struct cg *cgp;
-	ufs1_daddr_t blkno;
-	int cnt;
+ffs_clusteracct(struct fs *fs, struct cg *cgp, ufs1_daddr_t blkno, int cnt)
 {
 	int32_t *sump;
 	int32_t *lp;

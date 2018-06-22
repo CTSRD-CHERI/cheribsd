@@ -16,27 +16,17 @@
 
 namespace llvm {
 
-/// \brief Saves strings in the inheritor's stable storage and returns a stable
-/// raw character pointer.
-class StringSaver {
-protected:
-  ~StringSaver() {}
-  virtual const char *saveImpl(StringRef S);
+/// \brief Saves strings in the inheritor's stable storage and returns a
+/// StringRef with a stable character pointer.
+class StringSaver final {
+  BumpPtrAllocator &Alloc;
 
 public:
   StringSaver(BumpPtrAllocator &Alloc) : Alloc(Alloc) {}
-  const char *save(const char *S) { return save(StringRef(S)); }
-  const char *save(StringRef S) { return saveImpl(S); }
-  const char *save(const Twine &S) { return save(StringRef(S.str())); }
-  const char *save(std::string &S) { return save(StringRef(S)); }
-
-private:
-  BumpPtrAllocator &Alloc;
-};
-
-class BumpPtrStringSaver final : public StringSaver {
-public:
-  BumpPtrStringSaver(BumpPtrAllocator &Alloc) : StringSaver(Alloc) {}
+  StringRef save(const char *S) { return save(StringRef(S)); }
+  StringRef save(StringRef S);
+  StringRef save(const Twine &S) { return save(StringRef(S.str())); }
+  StringRef save(const std::string &S) { return save(StringRef(S)); }
 };
 }
 #endif

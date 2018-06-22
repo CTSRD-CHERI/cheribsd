@@ -175,6 +175,7 @@ typedef struct interface endpt;
 struct interface {
 	endpt *		elink;		/* endpt list link */
 	endpt *		mclink;		/* per-AF_* multicast list */
+	void *		ioreg_ctx;	/* IO registration context */
 	SOCKET		fd;		/* socket descriptor */
 	SOCKET		bfd;		/* for receiving broadcasts */
 	u_int32		ifnum;		/* endpt instance count */
@@ -240,6 +241,13 @@ struct interface {
 #define TEST12		0x0800	/* peer synchronization loop */
 #define TEST13		0x1000	/* peer unreacable */
 #define	PEER_TEST_MASK	(TEST10 | TEST11 | TEST12 | TEST13)
+
+/*
+ * Unused flags
+ */
+#define TEST14		0x2000
+#define TEST15		0x4000
+#define TEST16		0x8000
 
 /*
  * The peer structure. Holds state information relating to the guys
@@ -383,7 +391,7 @@ struct peer {
 	 * Statistic counters
 	 */
 	u_long	timereset;	/* time stat counters were reset */
-	u_long	timelastrec;	/* last packet received time */
+	u_long	timelastrec;	/* last packet received time, incl. trash */
 	u_long	timereceived;	/* last (clean) packet received time */
 	u_long	timereachable;	/* last reachable/unreachable time */
 
@@ -391,6 +399,7 @@ struct peer {
 	u_long	received;	/* packets received */
 	u_long	processed;	/* packets processed */
 	u_long	badauth;	/* bad authentication (TEST5) */
+	u_long	badNAK;		/* invalid crypto-NAK */
 	u_long	bogusorg;	/* bogus origin (TEST2, TEST3) */
 	u_long	oldpkt;		/* old duplicate (TEST1) */
 	u_long	seldisptoolarge; /* bad header (TEST6, TEST7) */
@@ -410,8 +419,7 @@ struct peer {
  * MODE_BROADCAST and MODE_BCLIENT appear in the transition
  * function. MODE_CONTROL and MODE_PRIVATE can appear in packets,
  * but those never survive to the transition function.
- * is a
-/ */
+ */
 #define	MODE_UNSPEC	0	/* unspecified (old version) */
 #define	MODE_ACTIVE	1	/* symmetric active mode */
 #define	MODE_PASSIVE	2	/* symmetric passive mode */
@@ -424,7 +432,7 @@ struct peer {
 #define	MODE_CONTROL	6	/* control mode */
 #define	MODE_PRIVATE	7	/* private mode */
 /*
- * This is a madeup mode for broadcast client.
+ * This is a made-up mode for broadcast client.
  */
 #define	MODE_BCLIENT	6	/* broadcast client mode */
 
@@ -545,6 +553,7 @@ struct pkt {
 	l_fp	rec;		/* receive time stamp */
 	l_fp	xmt;		/* transmit time stamp */
 
+#define	MIN_V4_PKT_LEN	(12 * sizeof(u_int32)) /* min header length */
 #define	LEN_PKT_NOMAC	(12 * sizeof(u_int32)) /* min header length */
 #define MIN_MAC_LEN	(1 * sizeof(u_int32))	/* crypto_NAK */
 #define MAX_MD5_LEN	(5 * sizeof(u_int32))	/* MD5 */
@@ -713,6 +722,8 @@ struct pkt {
 #define	PROTO_UECRYPTO		29
 #define	PROTO_UECRYPTONAK	30
 #define	PROTO_UEDIGEST		31
+#define	PROTO_PCEDIGEST		32
+#define	PROTO_BCPOLLBSTEP	33
 
 /*
  * Configuration items for the loop filter
@@ -720,7 +731,7 @@ struct pkt {
 #define	LOOP_DRIFTINIT		1	/* iniitialize frequency */
 #define	LOOP_KERN_CLEAR		2	/* set initial frequency offset */
 #define LOOP_MAX		3	/* set both step offsets */
-#define LOOP_MAX_BACK		4	/* set bacward-step offset */
+#define LOOP_MAX_BACK		4	/* set backward-step offset */
 #define LOOP_MAX_FWD		5	/* set forward-step offset */
 #define LOOP_PANIC		6	/* set panic offseet */
 #define LOOP_PHI		7	/* set dispersion rate */

@@ -33,7 +33,6 @@
 #include <machine/frame.h>
 #include <machine/trap.h>
 #include <machine/armreg.h>
-#include <machine/acle-compat.h>
 
 #define T_BREAKPOINT	(1)
 #define T_WATCHPOINT	(2)
@@ -89,9 +88,6 @@ typedef int		db_expr_t;
 #define	inst_store(ins)		(0)
 
 #define next_instr_address(pc, bd)	((bd) ? (pc) : ((pc) + INSN_SIZE))
-
-#define	DB_SMALL_VALUE_MAX	(0x7fffffff)
-#define	DB_SMALL_VALUE_MIN	(-0x40001)
 
 #define	DB_ELFSIZE		32
 

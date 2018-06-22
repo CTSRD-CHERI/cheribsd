@@ -2,6 +2,8 @@
 /*	$NetBSD$	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * [Ported for FreeBSD]
  *  Copyright (c) 2000
  *      Noriaki Mitsunaga, Mitsuru Iwasaki and Takanori Watanabe.
@@ -124,8 +126,9 @@ nsp_alloc_resource(device_t dev)
 
 	mtx_init(&sc->sc_sclow.sl_lock, "nsp", NULL, MTX_DEF);
 	sc->port_rid = 0;
-	sc->port_res = bus_alloc_resource(dev, SYS_RES_IOPORT, &sc->port_rid,
-					  0, ~0, NSP_IOSIZE, RF_ACTIVE);
+	sc->port_res = bus_alloc_resource_anywhere(dev, SYS_RES_IOPORT,
+						   &sc->port_rid, NSP_IOSIZE,
+						   RF_ACTIVE);
 	if (sc->port_res == NULL) {
 		nsp_release_resource(dev);
 		return(ENOMEM);

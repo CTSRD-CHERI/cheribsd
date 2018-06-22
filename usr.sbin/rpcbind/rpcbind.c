@@ -2,6 +2,8 @@
 /*	$FreeBSD$ */
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2009, Sun Microsystems, Inc.
  * All rights reserved.
  *
@@ -85,7 +87,7 @@ rpcblist_ptr list_rbl;	/* A list of version 3/4 rpcbind services */
 
 #define RPCBINDDLOCK "/var/run/rpcbind.lock"
 
-int runasdaemon = 0;
+static int runasdaemon = 0;
 int insecure = 0;
 int oldstyle_local = 0;
 #ifdef LIBWRAP
@@ -93,12 +95,12 @@ int libwrap = 0;
 #endif
 int verboselog = 0;
 
-char **hosts = NULL;
-struct sockaddr **bound_sa;
-int ipv6_only = 0;
-int nhosts = 0;
-int on = 1;
-int rpcbindlockfd;
+static char **hosts = NULL;
+static struct sockaddr **bound_sa;
+static int ipv6_only = 0;
+static int nhosts = 0;
+static int on = 1;
+static int rpcbindlockfd;
 
 #ifdef WARMSTART
 /* Local Variable */
@@ -757,12 +759,13 @@ rbllist_add(rpcprog_t prog, rpcvers_t vers, struct netconfig *nconf,
  * Catch the signal and die
  */
 static void
-terminate(int dummy __unused)
+terminate(int signum __unused)
 {
 	close(rpcbindlockfd);
 #ifdef WARMSTART
 	syslog(LOG_ERR,
-		"rpcbind terminating on signal. Restart with \"rpcbind -w\"");
+	    "rpcbind terminating on signal %d. Restart with \"rpcbind -w\"",
+	    signum);
 	write_warmstart();	/* Dump yourself */
 #endif
 	exit(2);

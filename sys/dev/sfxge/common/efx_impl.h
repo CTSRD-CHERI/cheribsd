@@ -1,5 +1,7 @@
 /*-
- * Copyright (c) 2007-2015 Solarflare Communications Inc.
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
+ * Copyright (c) 2007-2016 Solarflare Communications Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,7 +35,6 @@
 #ifndef	_SYS_EFX_IMPL_H
 #define	_SYS_EFX_IMPL_H
 
-#include "efsys.h"
 #include "efx.h"
 #include "efx_regs.h"
 #include "efx_regs_ef10.h"
@@ -43,12 +44,6 @@
 #define	ESE_DZ_EV_CODE_DRV_GEN_EV FSE_AZ_EV_CODE_DRV_GEN_EV
 #endif
 
-#include "efx_check.h"
-
-
-#if EFSYS_OPT_FALCON
-#include "falcon_impl.h"
-#endif	/* EFSYS_OPT_FALCON */
 
 #if EFSYS_OPT_SIENA
 #include "siena_impl.h"
@@ -81,20 +76,15 @@ extern "C" {
 #define	EFX_MOD_TX		0x00000100
 #define	EFX_MOD_PORT		0x00000200
 #define	EFX_MOD_MON		0x00000400
-#define	EFX_MOD_WOL		0x00000800
 #define	EFX_MOD_FILTER		0x00001000
-#define	EFX_MOD_PKTFILTER	0x00002000
-#define	EFX_MOD_LIC		0x00004000
+#define	EFX_MOD_LIC		0x00002000
 
-#define	EFX_RESET_MAC		0x00000001
-#define	EFX_RESET_PHY		0x00000002
-#define	EFX_RESET_RXQ_ERR	0x00000004
-#define	EFX_RESET_TXQ_ERR	0x00000008
+#define	EFX_RESET_PHY		0x00000001
+#define	EFX_RESET_RXQ_ERR	0x00000002
+#define	EFX_RESET_TXQ_ERR	0x00000004
 
 typedef enum efx_mac_type_e {
 	EFX_MAC_INVALID = 0,
-	EFX_MAC_FALCON_GMAC,
-	EFX_MAC_FALCON_XMAC,
 	EFX_MAC_SIENA,
 	EFX_MAC_HUNTINGTON,
 	EFX_MAC_MEDFORD,
@@ -106,7 +96,7 @@ typedef struct efx_ev_ops_s {
 	void		(*eevo_fini)(efx_nic_t *);
 	efx_rc_t	(*eevo_qcreate)(efx_nic_t *, unsigned int,
 					  efsys_mem_t *, size_t, uint32_t,
-					  efx_evq_t *);
+					  uint32_t, uint32_t, efx_evq_t *);
 	void		(*eevo_qdestroy)(efx_evq_t *);
 	efx_rc_t	(*eevo_qprime)(efx_evq_t *, unsigned int);
 	void		(*eevo_qpost)(efx_evq_t *, uint16_t);
@@ -135,7 +125,7 @@ typedef struct efx_tx_ops_s {
 	void		(*etxo_qenable)(efx_txq_t *);
 	efx_rc_t	(*etxo_qpio_enable)(efx_txq_t *);
 	void		(*etxo_qpio_disable)(efx_txq_t *);
-	efx_rc_t	(*etxo_qpio_write)(efx_txq_t *,uint8_t *, size_t,
+	efx_rc_t	(*etxo_qpio_write)(efx_txq_t *, uint8_t *, size_t,
 					   size_t);
 	efx_rc_t	(*etxo_qpio_post)(efx_txq_t *, size_t, unsigned int,
 					   unsigned int *);
@@ -190,11 +180,11 @@ typedef struct efx_rx_ops_s {
 } efx_rx_ops_t;
 
 typedef struct efx_mac_ops_s {
-	efx_rc_t	(*emo_reset)(efx_nic_t *); /* optional */
 	efx_rc_t	(*emo_poll)(efx_nic_t *, efx_link_mode_t *);
 	efx_rc_t	(*emo_up)(efx_nic_t *, boolean_t *);
 	efx_rc_t	(*emo_addr_set)(efx_nic_t *);
 	efx_rc_t	(*emo_pdu_set)(efx_nic_t *);
+	efx_rc_t	(*emo_pdu_get)(efx_nic_t *, size_t *);
 	efx_rc_t	(*emo_reconfigure)(efx_nic_t *);
 	efx_rc_t	(*emo_multicast_list_set)(efx_nic_t *);
 	efx_rc_t	(*emo_filter_default_rxq_set)(efx_nic_t *,
@@ -205,6 +195,7 @@ typedef struct efx_mac_ops_s {
 					    efx_loopback_type_t);
 #endif	/* EFSYS_OPT_LOOPBACK */
 #if EFSYS_OPT_MAC_STATS
+	efx_rc_t	(*emo_stats_get_mask)(efx_nic_t *, uint32_t *, size_t);
 	efx_rc_t	(*emo_stats_upload)(efx_nic_t *, efsys_mem_t *);
 	efx_rc_t	(*emo_stats_periodic)(efx_nic_t *, efsys_mem_t *,
 					      uint16_t, boolean_t);
@@ -218,23 +209,11 @@ typedef struct efx_phy_ops_s {
 	efx_rc_t	(*epo_reset)(efx_nic_t *);
 	efx_rc_t	(*epo_reconfigure)(efx_nic_t *);
 	efx_rc_t	(*epo_verify)(efx_nic_t *);
-	efx_rc_t	(*epo_uplink_check)(efx_nic_t *,
-					    boolean_t *); /* optional */
-	efx_rc_t	(*epo_downlink_check)(efx_nic_t *, efx_link_mode_t *,
-					      unsigned int *, uint32_t *);
 	efx_rc_t	(*epo_oui_get)(efx_nic_t *, uint32_t *);
 #if EFSYS_OPT_PHY_STATS
 	efx_rc_t	(*epo_stats_update)(efx_nic_t *, efsys_mem_t *,
 					    uint32_t *);
 #endif	/* EFSYS_OPT_PHY_STATS */
-#if EFSYS_OPT_PHY_PROPS
-#if EFSYS_OPT_NAMES
-	const char	*(*epo_prop_name)(efx_nic_t *, unsigned int);
-#endif	/* EFSYS_OPT_PHY_PROPS */
-	efx_rc_t	(*epo_prop_get)(efx_nic_t *, unsigned int, uint32_t,
-					uint32_t *);
-	efx_rc_t	(*epo_prop_set)(efx_nic_t *, unsigned int, uint32_t);
-#endif	/* EFSYS_OPT_PHY_PROPS */
 #if EFSYS_OPT_BIST
 	efx_rc_t	(*epo_bist_enable_offline)(efx_nic_t *);
 	efx_rc_t	(*epo_bist_start)(efx_nic_t *, efx_bist_type_t);
@@ -253,10 +232,11 @@ typedef struct efx_filter_ops_s {
 	efx_rc_t	(*efo_add)(efx_nic_t *, efx_filter_spec_t *,
 				   boolean_t may_replace);
 	efx_rc_t	(*efo_delete)(efx_nic_t *, efx_filter_spec_t *);
-	efx_rc_t	(*efo_supported_filters)(efx_nic_t *, uint32_t *, size_t *);
+	efx_rc_t	(*efo_supported_filters)(efx_nic_t *, uint32_t *,
+				   size_t, size_t *);
 	efx_rc_t	(*efo_reconfigure)(efx_nic_t *, uint8_t const *, boolean_t,
 				   boolean_t, boolean_t, boolean_t,
-				   uint8_t const *, int);
+				   uint8_t const *, uint32_t);
 } efx_filter_ops_t;
 
 extern	__checkReturn	efx_rc_t
@@ -268,14 +248,14 @@ efx_filter_reconfigure(
 	__in				boolean_t all_mulcst,
 	__in				boolean_t brdcst,
 	__in_ecount(6*count)		uint8_t const *addrs,
-	__in				int count);
+	__in				uint32_t count);
 
 #endif /* EFSYS_OPT_FILTER */
 
 
 typedef struct efx_port_s {
 	efx_mac_type_t		ep_mac_type;
-	uint32_t  		ep_phy_type;
+	uint32_t		ep_phy_type;
 	uint8_t			ep_port;
 	uint32_t		ep_mac_pdu;
 	uint8_t			ep_mac_addr[6];
@@ -306,31 +286,16 @@ typedef struct efx_port_s {
 	uint32_t		ep_lp_cap_mask;
 	uint32_t		ep_default_adv_cap_mask;
 	uint32_t		ep_phy_cap_mask;
-#if EFSYS_OPT_PHY_TXC43128 || EFSYS_OPT_PHY_QT2025C
-	union {
-		struct {
-			unsigned int	bug10934_count;
-		} ep_txc43128;
-		struct {
-			unsigned int	bug17190_count;
-		} ep_qt2025c;
-	};
-#endif
-	boolean_t		ep_mac_poll_needed; /* falcon only */
-	boolean_t		ep_mac_up; /* falcon only */
-	uint32_t		ep_fwver; /* falcon only */
 	boolean_t		ep_mac_drain;
 	boolean_t		ep_mac_stats_pending;
 #if EFSYS_OPT_BIST
 	efx_bist_type_t		ep_current_bist;
 #endif
-	efx_mac_ops_t		*ep_emop;
-	efx_phy_ops_t		*ep_epop;
+	const efx_mac_ops_t	*ep_emop;
+	const efx_phy_ops_t	*ep_epop;
 } efx_port_t;
 
 typedef struct efx_mon_ops_s {
-	efx_rc_t	(*emo_reset)(efx_nic_t *);
-	efx_rc_t	(*emo_reconfigure)(efx_nic_t *);
 #if EFSYS_OPT_MON_STATS
 	efx_rc_t	(*emo_stats_update)(efx_nic_t *, efsys_mem_t *,
 					    efx_mon_stat_value_t *);
@@ -338,8 +303,8 @@ typedef struct efx_mon_ops_s {
 } efx_mon_ops_t;
 
 typedef struct efx_mon_s {
-	efx_mon_type_t	em_type;
-	efx_mon_ops_t	*em_emop;
+	efx_mon_type_t		em_type;
+	const efx_mon_ops_t	*em_emop;
 } efx_mon_t;
 
 typedef struct efx_intr_ops_s {
@@ -356,10 +321,10 @@ typedef struct efx_intr_ops_s {
 } efx_intr_ops_t;
 
 typedef struct efx_intr_s {
-	efx_intr_ops_t	*ei_eiop;
-	efsys_mem_t	*ei_esmp;
-	efx_intr_type_t	ei_type;
-	unsigned int	ei_level;
+	const efx_intr_ops_t	*ei_eiop;
+	efsys_mem_t		*ei_esmp;
+	efx_intr_type_t		ei_type;
+	unsigned int		ei_level;
 } efx_intr_t;
 
 typedef struct efx_nic_ops_s {
@@ -372,7 +337,6 @@ typedef struct efx_nic_ops_s {
 	efx_rc_t	(*eno_get_bar_region)(efx_nic_t *, efx_nic_region_t,
 					uint32_t *, size_t *);
 #if EFSYS_OPT_DIAG
-	efx_rc_t	(*eno_sram_test)(efx_nic_t *, efx_sram_pattern_fn_t);
 	efx_rc_t	(*eno_register_test)(efx_nic_t *);
 #endif	/* EFSYS_OPT_DIAG */
 	void		(*eno_fini)(efx_nic_t *);
@@ -394,68 +358,64 @@ typedef struct efx_nic_ops_s {
 
 #if EFSYS_OPT_FILTER
 
-typedef struct falconsiena_filter_spec_s {
-	uint8_t		fsfs_type;
-	uint32_t	fsfs_flags;
-	uint32_t	fsfs_dmaq_id;
-	uint32_t	fsfs_dword[3];
-} falconsiena_filter_spec_t;
+typedef struct siena_filter_spec_s {
+	uint8_t		sfs_type;
+	uint32_t	sfs_flags;
+	uint32_t	sfs_dmaq_id;
+	uint32_t	sfs_dword[3];
+} siena_filter_spec_t;
 
-typedef enum falconsiena_filter_type_e {
-	EFX_FS_FILTER_RX_TCP_FULL,	/* TCP/IPv4 4-tuple {dIP,dTCP,sIP,sTCP} */
-	EFX_FS_FILTER_RX_TCP_WILD,	/* TCP/IPv4 dest    {dIP,dTCP,  -,   -} */
-	EFX_FS_FILTER_RX_UDP_FULL,	/* UDP/IPv4 4-tuple {dIP,dUDP,sIP,sUDP} */
-	EFX_FS_FILTER_RX_UDP_WILD,	/* UDP/IPv4 dest    {dIP,dUDP,  -,   -} */
+typedef enum siena_filter_type_e {
+	EFX_SIENA_FILTER_RX_TCP_FULL,	/* TCP/IPv4 {dIP,dTCP,sIP,sTCP} */
+	EFX_SIENA_FILTER_RX_TCP_WILD,	/* TCP/IPv4 {dIP,dTCP,  -,   -} */
+	EFX_SIENA_FILTER_RX_UDP_FULL,	/* UDP/IPv4 {dIP,dUDP,sIP,sUDP} */
+	EFX_SIENA_FILTER_RX_UDP_WILD,	/* UDP/IPv4 {dIP,dUDP,  -,   -} */
+	EFX_SIENA_FILTER_RX_MAC_FULL,	/* Ethernet {dMAC,VLAN} */
+	EFX_SIENA_FILTER_RX_MAC_WILD,	/* Ethernet {dMAC,   -} */
 
-#if EFSYS_OPT_SIENA
-	EFX_FS_FILTER_RX_MAC_FULL,	/* Ethernet {dMAC,VLAN} */
-	EFX_FS_FILTER_RX_MAC_WILD,	/* Ethernet {dMAC,   -} */
+	EFX_SIENA_FILTER_TX_TCP_FULL,	/* TCP/IPv4 {dIP,dTCP,sIP,sTCP} */
+	EFX_SIENA_FILTER_TX_TCP_WILD,	/* TCP/IPv4 {  -,   -,sIP,sTCP} */
+	EFX_SIENA_FILTER_TX_UDP_FULL,	/* UDP/IPv4 {dIP,dTCP,sIP,sTCP} */
+	EFX_SIENA_FILTER_TX_UDP_WILD,	/* UDP/IPv4 {  -,   -,sIP,sUDP} */
+	EFX_SIENA_FILTER_TX_MAC_FULL,	/* Ethernet {sMAC,VLAN} */
+	EFX_SIENA_FILTER_TX_MAC_WILD,	/* Ethernet {sMAC,   -} */
 
-	EFX_FS_FILTER_TX_TCP_FULL,		/* TCP/IPv4 {dIP,dTCP,sIP,sTCP} */
-	EFX_FS_FILTER_TX_TCP_WILD,		/* TCP/IPv4 {  -,   -,sIP,sTCP} */
-	EFX_FS_FILTER_TX_UDP_FULL,		/* UDP/IPv4 {dIP,dTCP,sIP,sTCP} */
-	EFX_FS_FILTER_TX_UDP_WILD,		/* UDP/IPv4 source (host, port) */
+	EFX_SIENA_FILTER_NTYPES
+} siena_filter_type_t;
 
-	EFX_FS_FILTER_TX_MAC_FULL,		/* Ethernet source (MAC address, VLAN ID) */
-	EFX_FS_FILTER_TX_MAC_WILD,		/* Ethernet source (MAC address) */
-#endif /* EFSYS_OPT_SIENA */
+typedef enum siena_filter_tbl_id_e {
+	EFX_SIENA_FILTER_TBL_RX_IP = 0,
+	EFX_SIENA_FILTER_TBL_RX_MAC,
+	EFX_SIENA_FILTER_TBL_TX_IP,
+	EFX_SIENA_FILTER_TBL_TX_MAC,
+	EFX_SIENA_FILTER_NTBLS
+} siena_filter_tbl_id_t;
 
-	EFX_FS_FILTER_NTYPES
-} falconsiena_filter_type_t;
+typedef struct siena_filter_tbl_s {
+	int			sft_size;	/* number of entries */
+	int			sft_used;	/* active count */
+	uint32_t		*sft_bitmap;	/* active bitmap */
+	siena_filter_spec_t	*sft_spec;	/* array of saved specs */
+} siena_filter_tbl_t;
 
-typedef enum falconsiena_filter_tbl_id_e {
-	EFX_FS_FILTER_TBL_RX_IP = 0,
-	EFX_FS_FILTER_TBL_RX_MAC,
-	EFX_FS_FILTER_TBL_TX_IP,
-	EFX_FS_FILTER_TBL_TX_MAC,
-	EFX_FS_FILTER_NTBLS
-} falconsiena_filter_tbl_id_t;
-
-typedef struct falconsiena_filter_tbl_s {
-	int				fsft_size;	/* number of entries */
-	int				fsft_used;	/* active count */
-	uint32_t			*fsft_bitmap;	/* active bitmap */
-	falconsiena_filter_spec_t	*fsft_spec;	/* array of saved specs */
-} falconsiena_filter_tbl_t;
-
-typedef struct falconsiena_filter_s {
-	falconsiena_filter_tbl_t	fsf_tbl[EFX_FS_FILTER_NTBLS];
-	unsigned int			fsf_depth[EFX_FS_FILTER_NTYPES];
-} falconsiena_filter_t;
+typedef struct siena_filter_s {
+	siena_filter_tbl_t	sf_tbl[EFX_SIENA_FILTER_NTBLS];
+	unsigned int		sf_depth[EFX_SIENA_FILTER_NTYPES];
+} siena_filter_t;
 
 typedef struct efx_filter_s {
-#if EFSYS_OPT_FALCON || EFSYS_OPT_SIENA
-	falconsiena_filter_t	*ef_falconsiena_filter;
-#endif /* EFSYS_OPT_FALCON || EFSYS_OPT_SIENA */
+#if EFSYS_OPT_SIENA
+	siena_filter_t		*ef_siena_filter;
+#endif /* EFSYS_OPT_SIENA */
 #if EFSYS_OPT_HUNTINGTON || EFSYS_OPT_MEDFORD
 	ef10_filter_table_t	*ef_ef10_filter_table;
 #endif /* EFSYS_OPT_HUNTINGTON || EFSYS_OPT_MEDFORD */
 } efx_filter_t;
 
 extern			void
-falconsiena_filter_tbl_clear(
+siena_filter_tbl_clear(
 	__in		efx_nic_t *enp,
-	__in		falconsiena_filter_tbl_id_t tbl);
+	__in		siena_filter_tbl_id_t tbl);
 
 #endif	/* EFSYS_OPT_FILTER */
 
@@ -469,11 +429,14 @@ typedef struct efx_mcdi_ops_s {
 	boolean_t	(*emco_poll_response)(efx_nic_t *);
 	void		(*emco_read_response)(efx_nic_t *, void *, size_t, size_t);
 	void		(*emco_fini)(efx_nic_t *);
-	efx_rc_t	(*emco_feature_supported)(efx_nic_t *, efx_mcdi_feature_id_t, boolean_t *);
+	efx_rc_t	(*emco_feature_supported)(efx_nic_t *,
+					    efx_mcdi_feature_id_t, boolean_t *);
+	void		(*emco_get_timeout)(efx_nic_t *, efx_mcdi_req_t *,
+					    uint32_t *);
 } efx_mcdi_ops_t;
 
 typedef struct efx_mcdi_s {
-	efx_mcdi_ops_t			*em_emcop;
+	const efx_mcdi_ops_t		*em_emcop;
 	const efx_mcdi_transport_t	*em_emtp;
 	efx_mcdi_iface_t		em_emip;
 } efx_mcdi_t;
@@ -495,11 +458,13 @@ typedef struct efx_nvram_ops_s {
 					    unsigned int, size_t);
 	efx_rc_t	(*envo_partn_write)(efx_nic_t *, uint32_t,
 					    unsigned int, caddr_t, size_t);
-	void		(*envo_partn_rw_finish)(efx_nic_t *, uint32_t);
+	efx_rc_t	(*envo_partn_rw_finish)(efx_nic_t *, uint32_t);
 	efx_rc_t	(*envo_partn_get_version)(efx_nic_t *, uint32_t,
 					    uint32_t *, uint16_t *);
 	efx_rc_t	(*envo_partn_set_version)(efx_nic_t *, uint32_t,
 					    uint16_t *);
+	efx_rc_t	(*envo_buffer_validate)(efx_nic_t *, uint32_t,
+					    caddr_t, size_t);
 } efx_nvram_ops_t;
 #endif /* EFSYS_OPT_NVRAM */
 
@@ -581,7 +546,8 @@ efx_mcdi_nvram_write(
 efx_mcdi_nvram_update_finish(
 	__in			efx_nic_t *enp,
 	__in			uint32_t partn,
-	__in			boolean_t reboot);
+	__in			boolean_t reboot,
+	__out_opt		uint32_t *resultp);
 
 #if EFSYS_OPT_DIAG
 
@@ -602,6 +568,27 @@ typedef struct efx_lic_ops_s {
 	efx_rc_t	(*elo_app_state)(efx_nic_t *, uint64_t, boolean_t *);
 	efx_rc_t	(*elo_get_id)(efx_nic_t *, size_t, uint32_t *,
 				      size_t *, uint8_t *);
+	efx_rc_t	(*elo_find_start)
+				(efx_nic_t *, caddr_t, size_t, uint32_t *);
+	efx_rc_t	(*elo_find_end)(efx_nic_t *, caddr_t, size_t,
+				uint32_t, uint32_t *);
+	boolean_t	(*elo_find_key)(efx_nic_t *, caddr_t, size_t,
+				uint32_t, uint32_t *, uint32_t *);
+	boolean_t	(*elo_validate_key)(efx_nic_t *,
+				caddr_t, uint32_t);
+	efx_rc_t	(*elo_read_key)(efx_nic_t *,
+				caddr_t, size_t, uint32_t, uint32_t,
+				caddr_t, size_t, uint32_t *);
+	efx_rc_t	(*elo_write_key)(efx_nic_t *,
+				caddr_t, size_t, uint32_t,
+				caddr_t, uint32_t, uint32_t *);
+	efx_rc_t	(*elo_delete_key)(efx_nic_t *,
+				caddr_t, size_t, uint32_t,
+				uint32_t, uint32_t, uint32_t *);
+	efx_rc_t	(*elo_create_partition)(efx_nic_t *,
+				caddr_t, size_t);
+	efx_rc_t	(*elo_finish_partition)(efx_nic_t *,
+				caddr_t, size_t);
 } efx_lic_ops_t;
 
 #endif
@@ -620,7 +607,7 @@ struct efx_nic_s {
 	uint32_t		en_features;
 	efsys_identifier_t	*en_esip;
 	efsys_lock_t		*en_eslp;
-	efsys_bar_t 		*en_esbp;
+	efsys_bar_t		*en_esbp;
 	unsigned int		en_mod_flags;
 	unsigned int		en_reset_flags;
 	efx_nic_cfg_t		en_nic_cfg;
@@ -631,23 +618,23 @@ struct efx_nic_s {
 	uint32_t		en_ev_qcount;
 	uint32_t		en_rx_qcount;
 	uint32_t		en_tx_qcount;
-	efx_nic_ops_t		*en_enop;
-	efx_ev_ops_t		*en_eevop;
-	efx_tx_ops_t		*en_etxop;
-	efx_rx_ops_t		*en_erxop;
+	const efx_nic_ops_t	*en_enop;
+	const efx_ev_ops_t	*en_eevop;
+	const efx_tx_ops_t	*en_etxop;
+	const efx_rx_ops_t	*en_erxop;
 #if EFSYS_OPT_FILTER
 	efx_filter_t		en_filter;
-	efx_filter_ops_t	*en_efop;
+	const efx_filter_ops_t	*en_efop;
 #endif	/* EFSYS_OPT_FILTER */
 #if EFSYS_OPT_MCDI
 	efx_mcdi_t		en_mcdi;
 #endif	/* EFSYS_OPT_MCDI */
 #if EFSYS_OPT_NVRAM
 	efx_nvram_type_t	en_nvram_locked;
-	efx_nvram_ops_t		*en_envop;
+	const efx_nvram_ops_t	*en_envop;
 #endif	/* EFSYS_OPT_NVRAM */
 #if EFSYS_OPT_VPD
-	efx_vpd_ops_t		*en_evpdop;
+	const efx_vpd_ops_t	*en_evpdop;
 #endif	/* EFSYS_OPT_VPD */
 #if EFSYS_OPT_RX_SCALE
 	efx_rx_hash_support_t	en_hash_support;
@@ -656,27 +643,10 @@ struct efx_nic_s {
 #endif	/* EFSYS_OPT_RX_SCALE */
 	uint32_t		en_vport_id;
 #if EFSYS_OPT_LICENSING
-	efx_lic_ops_t		*en_elop;
+	const efx_lic_ops_t	*en_elop;
+	boolean_t		en_licensing_supported;
 #endif
 	union {
-#if EFSYS_OPT_FALCON
-		struct {
-			falcon_spi_dev_t	enu_fsd[FALCON_SPI_NTYPES];
-			falcon_i2c_t		enu_fip;
-			boolean_t		enu_i2c_locked;
-#if EFSYS_OPT_FALCON_NIC_CFG_OVERRIDE
-			const uint8_t		*enu_forced_cfg;
-#endif	/* EFSYS_OPT_FALCON_NIC_CFG_OVERRIDE */
-			uint8_t			enu_mon_devid;
-#if EFSYS_OPT_PCIE_TUNE
-			unsigned int 		enu_nlanes;
-#endif	/* EFSYS_OPT_PCIE_TUNE */
-			uint16_t		enu_board_rev;
-			boolean_t		enu_internal_sram;
-			uint8_t			enu_sram_num_bank;
-			uint8_t			enu_sram_bank_size;
-		} falcon;
-#endif	/* EFSYS_OPT_FALCON */
 #if EFSYS_OPT_SIENA
 		struct {
 #if EFSYS_OPT_NVRAM || EFSYS_OPT_VPD
@@ -746,11 +716,12 @@ struct efx_evq_s {
 #endif	/* EFSYS_OPT_MCDI */
 
 	efx_evq_rxq_state_t		ee_rxq_state[EFX_EV_RX_NLABELS];
+
+	uint32_t			ee_flags;
 };
 
 #define	EFX_EVQ_MAGIC	0x08081997
 
-#define	EFX_EVQ_FALCON_TIMER_QUANTUM_NS	4968 /* 621 cycles */
 #define	EFX_EVQ_SIENA_TIMER_QUANTUM_NS	6144 /* 768 cycles */
 
 struct efx_rxq_s {
@@ -814,10 +785,6 @@ struct efx_txq_s {
 		char rev;						\
 									\
 		switch ((_enp)->en_family) {				\
-		case EFX_FAMILY_FALCON:					\
-			rev = 'B';					\
-			break;						\
-									\
 		case EFX_FAMILY_SIENA:					\
 			rev = 'C';					\
 			break;						\
@@ -843,7 +810,7 @@ struct efx_txq_s {
 #else
 #define	EFX_CHECK_REG(_enp, _reg) do {					\
 	_NOTE(CONSTANTCONDITION)					\
-	} while(B_FALSE)
+	} while (B_FALSE)
 #endif
 
 #define	EFX_BAR_READD(_enp, _reg, _edp, _lock)				\
@@ -955,7 +922,7 @@ struct efx_txq_s {
 		    uint32_t, (_edp)->ed_u32[0]);			\
 		EFSYS_BAR_WRITED((_enp)->en_esbp,			\
 		    (_reg ## _OFST +					\
-		    (2 * sizeof (efx_dword_t)) + 			\
+		    (2 * sizeof (efx_dword_t)) +			\
 		    ((_index) * _reg ## _STEP)),			\
 		    (_edp), (_lock));					\
 	_NOTE(CONSTANTCONDITION)					\
@@ -970,7 +937,7 @@ struct efx_txq_s {
 		    uint32_t, (_edp)->ed_u32[0]);			\
 		EFSYS_BAR_WRITED((_enp)->en_esbp,			\
 		    (_reg ## _OFST +					\
-		    (3 * sizeof (efx_dword_t)) + 			\
+		    (3 * sizeof (efx_dword_t)) +			\
 		    ((_index) * _reg ## _STEP)),			\
 		    (_edp), (_lock));					\
 	_NOTE(CONSTANTCONDITION)					\
@@ -1196,6 +1163,27 @@ efx_mcdi_get_workarounds(
 	__out_opt		uint32_t *enabledp);
 
 #endif /* EFSYS_OPT_MCDI */
+
+#if EFSYS_OPT_MAC_STATS
+
+/*
+ * Closed range of stats (i.e. the first and the last are included).
+ * The last must be greater or equal (if the range is one item only) to
+ * the first.
+ */
+struct efx_mac_stats_range {
+	efx_mac_stat_t		first;
+	efx_mac_stat_t		last;
+};
+
+extern					efx_rc_t
+efx_mac_stats_mask_add_ranges(
+	__inout_bcount(mask_size)	uint32_t *maskp,
+	__in				size_t mask_size,
+	__in_ecount(rng_count)		const struct efx_mac_stats_range *rngp,
+	__in				unsigned int rng_count);
+
+#endif	/* EFSYS_OPT_MAC_STATS */
 
 #ifdef	__cplusplus
 }

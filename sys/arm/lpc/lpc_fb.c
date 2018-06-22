@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011 Jakub Wojciech Klama <jceel@FreeBSD.org>
  * All rights reserved.
  *
@@ -49,12 +51,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/kdb.h>
 
 #include <machine/bus.h>
-#include <machine/cpu.h>
-#include <machine/cpufunc.h>
 #include <machine/resource.h>
 #include <machine/intr.h>
 
-#include <dev/fdt/fdt_common.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
@@ -282,10 +281,9 @@ lpc_fb_intr(void *arg)
 static int
 lpc_fb_fdt_read(phandle_t node, const char *name, uint32_t *ret)
 {
-	if (OF_getprop(node, name, ret, sizeof(uint32_t)) <= 0)
+	if (OF_getencprop(node, name, ret, sizeof(uint32_t)) <= 0)
 		return (ENOENT);
 
-	*ret = fdt32_to_cpu(*ret);
 	return (0);
 }
 

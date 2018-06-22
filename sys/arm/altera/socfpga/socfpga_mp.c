@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2014-2017 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -28,6 +28,8 @@
  * SUCH DAMAGE.
  */
 
+#include "opt_platform.h"
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 #include <sys/param.h>
@@ -41,11 +43,17 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm.h>
 #include <vm/pmap.h>
 
+#include <machine/cpu.h>
 #include <machine/smp.h>
 #include <machine/fdt.h>
 #include <machine/intr.h>
+#include <machine/platformvar.h>
+
+#include <arm/altera/socfpga/socfpga_mp.h>
+#include <arm/altera/socfpga/socfpga_rstmgr.h>
 
 #define	SCU_PHYSBASE			0xFFFEC000
+#define	SCU_PHYSBASE_A10		0xFFFFC000
 #define	SCU_SIZE			0x100
 
 #define	SCU_CONTROL_REG			0x00
@@ -63,11 +71,12 @@ __FBSDID("$FreeBSD$");
 
 #define	RSTMGR_PHYSBASE			0xFFD05000
 #define	RSTMGR_SIZE			0x100
-#define	MPUMODRST			0x10
-#define	 MPUMODRST_CPU1			(1 << 1)
 
 #define	RAM_PHYSBASE			0x0
-#define	 RAM_SIZE			0x1000
+#define	RAM_SIZE			0x1000
+
+#define	SOCFPGA_ARRIA10			1
+#define	SOCFPGA_CYCLONE5		2
 
 extern char	*mpentry_addr;
 static void	socfpga_trampoline(void);
@@ -84,14 +93,7 @@ socfpga_trampoline(void)
 }
 
 void
-platform_mp_init_secondary(void)
-{
-
-	intr_pic_init_secondary();
-}
-
-void
-platform_mp_setmaxid(void)
+socfpga_mp_setmaxid(platform_t plat)
 {
 	int hwcpu, ncpu;
 
@@ -110,25 +112,31 @@ platform_mp_setmaxid(void)
 	mp_maxid = ncpu - 1;
 }
 
-int
-platform_mp_probe(void)
-{
-
-	if (mp_ncpus == 0)
-		platform_mp_setmaxid();
-
-	return (mp_ncpus > 1);
-}
-
-void
-platform_mp_start_ap(void)
+static void
+_socfpga_mp_start_ap(uint32_t platid)
 {
 	bus_space_handle_t scu, rst, ram;
 	int reg;
 
-	if (bus_space_map(fdtbus_bs_tag, SCU_PHYSBASE,
-					SCU_SIZE, 0, &scu) != 0)
-		panic("Couldn't map the SCU\n");
+	switch (platid) {
+#if defined(SOC_ALTERA_ARRIA10)
+	case SOCFPGA_ARRIA10:
+		if (bus_space_map(fdtbus_bs_tag, SCU_PHYSBASE_A10,
+		    SCU_SIZE, 0, &scu) != 0)
+			panic("Couldn't map the SCU\n");
+		break;
+#endif
+#if defined(SOC_ALTERA_CYCLONE5)
+	case SOCFPGA_CYCLONE5:
+		if (bus_space_map(fdtbus_bs_tag, SCU_PHYSBASE,
+		    SCU_SIZE, 0, &scu) != 0)
+			panic("Couldn't map the SCU\n");
+		break;
+#endif
+	default:
+		panic("Unknown platform id %d\n", platid);
+	}
+
 	if (bus_space_map(fdtbus_bs_tag, RSTMGR_PHYSBASE,
 					RSTMGR_SIZE, 0, &rst) != 0)
 		panic("Couldn't map the reset manager (RSTMGR)\n");
@@ -150,7 +158,22 @@ platform_mp_start_ap(void)
 	bus_space_write_4(fdtbus_bs_tag, scu, SCU_DIAG_CONTROL, reg);
 
 	/* Put CPU1 to reset state */
-	bus_space_write_4(fdtbus_bs_tag, rst, MPUMODRST, MPUMODRST_CPU1);
+	switch (platid) {
+#if defined(SOC_ALTERA_ARRIA10)
+	case SOCFPGA_ARRIA10:
+		bus_space_write_4(fdtbus_bs_tag, rst,
+		    RSTMGR_A10_MPUMODRST, MPUMODRST_CPU1);
+		break;
+#endif
+#if defined(SOC_ALTERA_CYCLONE5)
+	case SOCFPGA_CYCLONE5:
+		bus_space_write_4(fdtbus_bs_tag, rst,
+		    RSTMGR_MPUMODRST, MPUMODRST_CPU1);
+		break;
+#endif
+	default:
+		panic("Unknown platform id %d\n", platid);
+	}
 
 	/* Enable the SCU, then clean the cache on this core */
 	reg = bus_space_read_4(fdtbus_bs_tag, scu, SCU_CONTROL_REG);
@@ -162,22 +185,48 @@ platform_mp_start_ap(void)
 	bus_space_write_region_4(fdtbus_bs_tag, ram, 0,
 	    (uint32_t *)&socfpga_trampoline, 8);
 
-	cpu_idcache_wbinv_all();
-	cpu_l2cache_wbinv_all();
+	dcache_wbinv_poc_all();
 
 	/* Put CPU1 out from reset */
-	bus_space_write_4(fdtbus_bs_tag, rst, MPUMODRST, 0);
+	switch (platid) {
+#if defined(SOC_ALTERA_ARRIA10)
+	case SOCFPGA_ARRIA10:
+		bus_space_write_4(fdtbus_bs_tag, rst,
+		    RSTMGR_A10_MPUMODRST, 0);
+		break;
+#endif
+#if defined(SOC_ALTERA_CYCLONE5)
+	case SOCFPGA_CYCLONE5:
+		bus_space_write_4(fdtbus_bs_tag, rst,
+		    RSTMGR_MPUMODRST, 0);
+		break;
+#endif
+	default:
+		panic("Unknown platform id %d\n", platid);
+	}
 
-	armv7_sev();
+	dsb();
+	sev();
 
 	bus_space_unmap(fdtbus_bs_tag, scu, SCU_SIZE);
 	bus_space_unmap(fdtbus_bs_tag, rst, RSTMGR_SIZE);
 	bus_space_unmap(fdtbus_bs_tag, ram, RAM_SIZE);
 }
 
+#if defined(SOC_ALTERA_ARRIA10)
 void
-platform_ipi_send(cpuset_t cpus, u_int ipi)
+socfpga_a10_mp_start_ap(platform_t plat)
 {
 
-	pic_ipi_send(cpus, ipi);
+	_socfpga_mp_start_ap(SOCFPGA_ARRIA10);
 }
+#endif
+
+#if defined(SOC_ALTERA_CYCLONE5)
+void
+socfpga_mp_start_ap(platform_t plat)
+{
+
+	_socfpga_mp_start_ap(SOCFPGA_CYCLONE5);
+}
+#endif

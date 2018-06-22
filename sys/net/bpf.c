@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1990, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -15,7 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -39,6 +41,7 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_bpf.h"
 #include "opt_compat.h"
+#include "opt_ddb.h"
 #include "opt_netgraph.h"
 
 #include <sys/types.h>
@@ -57,6 +60,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/signalvar.h>
 #include <sys/filio.h>
 #include <sys/sockio.h>
+#include <sys/sysent.h>
 #include <sys/ttycom.h>
 #include <sys/uio.h>
 
@@ -66,6 +70,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/proc.h>
 
 #include <sys/socket.h>
+
+#ifdef DDB
+#include <ddb/ddb.h>
+#endif
 
 #include <net/if.h>
 #include <net/if_var.h>
@@ -101,6 +109,7 @@ struct bpf_if {
 	struct rwlock	bif_lock;	/* interface lock */
 	LIST_HEAD(, bpf_d) bif_wlist;	/* writer-only list */
 	int		bif_flags;	/* Interface flags */
+	struct bpf_if	**bif_bpf;	/* Pointer to pointer to us */
 };
 
 CTASSERT(offsetof(struct bpf_if, bif_ext) == 0);
@@ -112,13 +121,32 @@ CTASSERT(offsetof(struct bpf_if, bif_ext) == 0);
 #define	SIZEOF_BPF_HDR(type)	\
     (offsetof(type, bh_hdrlen) + sizeof(((type *)0)->bh_hdrlen))
 
+#ifdef COMPAT_CHERIABI
+
+struct bpf_program_c {
+	u_int bf_len;
+	struct bpf_insn * __capability bf_insns;
+};
+struct bpf_dltlist_c {
+	u_int bfl_len;
+	u_int * __capability bfl_list;
+};
+
+#define	_CASE_IOC_BPF_DLTLIST_C(cmd)				\
+    case _IOC_NEWTYPE((cmd), struct bpf_dltlist_c):
+#define	_CASE_IOC_BPF_PROGRAM_C(cmd)				\
+    case _IOC_NEWTYPE((cmd), struct bpf_program_c):
+#else /* !COMPAT_CHERIABI */
+#define	_CASE_IOC_BPF_DLTLIST_C(cmd)
+#define	_CASE_IOC_BPF_PROGRAM_C(cmd)
+#endif /* !COMPAT_CHERIABI */
+
 #ifdef COMPAT_FREEBSD32
 #include <sys/mount.h>
 #include <compat/freebsd32/freebsd32.h>
 #define BPF_ALIGNMENT32 sizeof(int32_t)
-#define BPF_WORDALIGN32(x) (((x)+(BPF_ALIGNMENT32-1))&~(BPF_ALIGNMENT32-1))
+#define	BPF_WORDALIGN32(x) roundup2(x, BPF_ALIGNMENT32)
 
-#ifndef BURN_BRIDGES
 /*
  * 32-bit version of structure prepended to each packet.  We use this header
  * instead of the standard one for 32-bit streams.  We mark the a stream as
@@ -131,25 +159,37 @@ struct bpf_hdr32 {
 	uint16_t	bh_hdrlen;	/* length of bpf header (this struct
 					   plus alignment padding) */
 };
-#endif
 
 struct bpf_program32 {
 	u_int bf_len;
-	uint32_t bf_insns;
+	uint32_t bf_insns;		/* (struct bpf_insn *) */
 };
 
 struct bpf_dltlist32 {
-	u_int	bfl_len;
-	u_int	bfl_list;
+	u_int		bfl_len;
+	uint32_t	bfl_list;	/* (u_int *) */
 };
 
-#define	BIOCSETF32	_IOW('B', 103, struct bpf_program32)
 #define	BIOCSRTIMEOUT32	_IOW('B', 109, struct timeval32)
 #define	BIOCGRTIMEOUT32	_IOR('B', 110, struct timeval32)
-#define	BIOCGDLTLIST32	_IOWR('B', 121, struct bpf_dltlist32)
-#define	BIOCSETWF32	_IOW('B', 123, struct bpf_program32)
-#define	BIOCSETFNR32	_IOW('B', 130, struct bpf_program32)
-#endif
+
+#define	_CASE_IOC_BPF_DLTLIST32(cmd)				\
+    case _IOC_NEWTYPE((cmd), struct bpf_dltlist32):
+#define	_CASE_IOC_BPF_PROGRAM32(cmd)				\
+    case _IOC_NEWTYPE((cmd), struct bpf_program32):
+#else /* !COMPAT_FREEBSD32 */
+#define	_CASE_IOC_BPF_DLTLIST32(cmd)
+#define	_CASE_IOC_BPF_PROGRAM32(cmd)
+#endif /* !COMPAT_FREEBSD32 */
+
+#define	CASE_IOC_BPF_DLTLIST(cmd)				\
+    _CASE_IOC_BPF_DLTLIST_C(cmd)				\
+    _CASE_IOC_BPF_DLTLIST32(cmd)				\
+    case (cmd)
+#define	CASE_IOC_BPF_PROGRAM(cmd)				\
+    _CASE_IOC_BPF_PROGRAM_C(cmd)				\
+    _CASE_IOC_BPF_PROGRAM32(cmd)				\
+    case (cmd)
 
 /*
  * bpf_iflist is a list of BPF interface structures, each corresponding to a
@@ -681,7 +721,7 @@ bpf_check_upgrade(u_long cmd, struct bpf_d *d, struct bpf_insn *fcode, int flen)
 	 * Check if cmd looks like snaplen setting from
 	 * pcap_bpf.c:pcap_open_live().
 	 * Note we're not checking .k value here:
-	 * while pcap_open_live() definitely sets to to non-zero value,
+	 * while pcap_open_live() definitely sets to non-zero value,
 	 * we'd prefer to treat k=0 (deny ALL) case the same way: e.g.
 	 * do not consider upgrading immediately
 	 */
@@ -1272,13 +1312,10 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		case BIOCGBLEN:
 		case BIOCFLUSH:
 		case BIOCGDLT:
-		case BIOCGDLTLIST:
-#ifdef COMPAT_FREEBSD32
-		case BIOCGDLTLIST32:
-#endif
-		case BIOCGETIF:
+		CASE_IOC_BPF_DLTLIST(BIOCGDLTLIST):
+		CASE_IOC_IFREQ(BIOCGETIF):
 		case BIOCGRTIMEOUT:
-#if defined(COMPAT_FREEBSD32) && !defined(__mips__)
+#if defined(COMPAT_FREEBSD32) && defined(__amd64__)
 		case BIOCGRTIMEOUT32:
 #endif
 		case BIOCGSTATS:
@@ -1290,7 +1327,7 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		case FIONREAD:
 		case BIOCLOCK:
 		case BIOCSRTIMEOUT:
-#if defined(COMPAT_FREEBSD32) && !defined(__mips__)
+#if defined(COMPAT_FREEBSD32) && defined(__amd64__)
 		case BIOCSRTIMEOUT32:
 #endif
 		case BIOCIMMEDIATE:
@@ -1303,16 +1340,10 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	}
 #ifdef COMPAT_FREEBSD32
 	/*
-	 * If we see a 32-bit compat ioctl, mark the stream as 32-bit so
-	 * that it will get 32-bit packet headers.
+	 * If we're called from a 32-bit process, mark the stream as 32-bit
+	 * so that it will get 32-bit packet headers.
 	 */
-	switch (cmd) {
-	case BIOCSETF32:
-	case BIOCSETFNR32:
-	case BIOCSETWF32:
-	case BIOCGDLTLIST32:
-	case BIOCGRTIMEOUT32:
-	case BIOCSRTIMEOUT32:
+	if (SV_CURPROC_FLAG(SV_ILP32)) {
 		BPFD_LOCK(d);
 		d->bd_compat32 = 1;
 		BPFD_UNLOCK(d);
@@ -1365,14 +1396,9 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	/*
 	 * Set link layer read filter.
 	 */
-	case BIOCSETF:
-	case BIOCSETFNR:
-	case BIOCSETWF:
-#ifdef COMPAT_FREEBSD32
-	case BIOCSETF32:
-	case BIOCSETFNR32:
-	case BIOCSETWF32:
-#endif
+	CASE_IOC_BPF_PROGRAM(BIOCSETF):
+	CASE_IOC_BPF_PROGRAM(BIOCSETFNR):
+	CASE_IOC_BPF_PROGRAM(BIOCSETWF):
 		error = bpf_setf(d, (struct bpf_program *)addr, cmd);
 		break;
 
@@ -1418,29 +1444,7 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	/*
 	 * Get a list of supported data link types.
 	 */
-#ifdef COMPAT_FREEBSD32
-	case BIOCGDLTLIST32:
-		{
-			struct bpf_dltlist32 *list32;
-			struct bpf_dltlist dltlist;
-
-			list32 = (struct bpf_dltlist32 *)addr;
-			dltlist.bfl_len = list32->bfl_len;
-			dltlist.bfl_list = PTRIN(list32->bfl_list);
-			BPF_LOCK();
-			if (d->bd_bif == NULL)
-				error = EINVAL;
-			else {
-				error = bpf_getdltlist(d, &dltlist);
-				if (error == 0)
-					list32->bfl_len = dltlist.bfl_len;
-			}
-			BPF_UNLOCK();
-			break;
-		}
-#endif
-
-	case BIOCGDLTLIST:
+	CASE_IOC_BPF_DLTLIST(BIOCGDLTLIST):
 		BPF_LOCK();
 		if (d->bd_bif == NULL)
 			error = EINVAL;
@@ -1464,7 +1468,7 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	/*
 	 * Get interface name.
 	 */
-	case BIOCGETIF:
+	CASE_IOC_IFREQ(BIOCGETIF):
 		BPF_LOCK();
 		if (d->bd_bif == NULL)
 			error = EINVAL;
@@ -1481,7 +1485,7 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	/*
 	 * Set interface.
 	 */
-	case BIOCSETIF:
+	CASE_IOC_IFREQ(BIOCSETIF):
 		{
 			int alloc_buf, size;
 
@@ -1514,7 +1518,7 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	 * Set read timeout.
 	 */
 	case BIOCSRTIMEOUT:
-#if defined(COMPAT_FREEBSD32) && !defined(__mips__)
+#if defined(COMPAT_FREEBSD32) && defined(__amd64__)
 	case BIOCSRTIMEOUT32:
 #endif
 		{
@@ -1545,12 +1549,12 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	 * Get read timeout.
 	 */
 	case BIOCGRTIMEOUT:
-#if defined(COMPAT_FREEBSD32) && !defined(__mips__)
+#if defined(COMPAT_FREEBSD32) && defined(__amd64__)
 	case BIOCGRTIMEOUT32:
 #endif
 		{
 			struct timeval *tv;
-#if defined(COMPAT_FREEBSD32) && !defined(__mips__)
+#if defined(COMPAT_FREEBSD32) && defined(__amd64__)
 			struct timeval32 *tv32;
 			struct timeval tv64;
 
@@ -1562,7 +1566,7 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 			tv->tv_sec = d->bd_rtout / hz;
 			tv->tv_usec = (d->bd_rtout % hz) * tick;
-#if defined(COMPAT_FREEBSD32) && !defined(__mips__)
+#if defined(COMPAT_FREEBSD32) && defined(__amd64__)
 			if (cmd == BIOCGRTIMEOUT32) {
 				tv32 = (struct timeval32 *)addr;
 				tv32->tv_sec = tv->tv_sec;
@@ -1798,6 +1802,34 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	return (error);
 }
 
+static struct bpf_insn * __capability
+bf_insns_get_ptr(void *fpp)
+{
+	union {
+		struct bpf_program fp;
+#ifdef COMPAT_CHERIABI
+		struct bpf_program_c fp_c;
+#endif
+#ifdef COMPAT_FREEBSD32
+		struct bpf_program32 fp32;
+#endif
+	} *fpup;
+
+	fpup = fpp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		return (fpup->fp_c.bf_insns);
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		return (__USER_CAP(
+		    (struct bpf_insn *)(uintptr_t)fpup->fp32.bf_insns,
+		    fpup->fp32.bf_len * sizeof(bpf_insn)));
+#endif
+	return (__USER_CAP(fpup->fp.bf_insns,
+	    fpup->fp.bf_len * sizeof(bpf_insn)));
+}
+
 /*
  * Set d's packet filter program to fp.  If this file already has a filter,
  * free it and replace it.  Returns EINVAL for bogus requests.
@@ -1813,10 +1845,6 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 static int
 bpf_setf(struct bpf_d *d, struct bpf_program *fp, u_long cmd)
 {
-#ifdef COMPAT_FREEBSD32
-	struct bpf_program fp_swab;
-	struct bpf_program32 *fp32;
-#endif
 	struct bpf_insn *fcode, *old;
 #ifdef BPF_JITTER
 	bpf_jit_filter *jfunc, *ofunc;
@@ -1826,24 +1854,8 @@ bpf_setf(struct bpf_d *d, struct bpf_program *fp, u_long cmd)
 	int need_upgrade;
 
 #ifdef COMPAT_FREEBSD32
-	switch (cmd) {
-	case BIOCSETF32:
-	case BIOCSETWF32:
-	case BIOCSETFNR32:
-		fp32 = (struct bpf_program32 *)fp;
-		fp_swab.bf_len = fp32->bf_len;
-		fp_swab.bf_insns = (struct bpf_insn *)(uintptr_t)fp32->bf_insns;
-		fp = &fp_swab;
-		switch (cmd) {
-		case BIOCSETF32:
-			cmd = BIOCSETF;
-			break;
-		case BIOCSETWF32:
-			cmd = BIOCSETWF;
-			break;
-		}
-		break;
-	}
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		cmd = _IOC_NEWTYPE(cmd, struct bpf_program);
 #endif
 
 	fcode = NULL;
@@ -1857,13 +1869,14 @@ bpf_setf(struct bpf_d *d, struct bpf_program *fp, u_long cmd)
 	 * Allocate memory for new filter, if needed.
 	 */
 	flen = fp->bf_len;
-	if (flen > bpf_maxinsns || (fp->bf_insns == NULL && flen != 0))
+	if (flen > bpf_maxinsns || (bf_insns_get_ptr(fp) == NULL && flen != 0))
 		return (EINVAL);
 	size = flen * sizeof(*fp->bf_insns);
 	if (size > 0) {
 		/* We're setting up new filter.  Copy and check actual data. */
 		fcode = malloc(size, M_BPF, M_WAITOK);
-		if (copyin(fp->bf_insns, fcode, size) != 0 ||
+		if (copyin_c(bf_insns_get_ptr(fp),
+		    (__cheri_tocap struct bpf_insn * __capability)fcode, size) != 0 ||
 		    !bpf_validate(fcode, flen)) {
 			free(fcode, M_BPF);
 			return (EINVAL);
@@ -2298,7 +2311,6 @@ bpf_hdrlen(struct bpf_d *d)
 	int hdrlen;
 
 	hdrlen = d->bd_bif->bif_hdrlen;
-#ifndef BURN_BRIDGES
 	if (d->bd_tstamp == BPF_T_NONE ||
 	    BPF_T_FORMAT(d->bd_tstamp) == BPF_T_MICROTIME)
 #ifdef COMPAT_FREEBSD32
@@ -2308,7 +2320,6 @@ bpf_hdrlen(struct bpf_d *d)
 #endif
 			hdrlen += SIZEOF_BPF_HDR(struct bpf_hdr);
 	else
-#endif
 		hdrlen += SIZEOF_BPF_HDR(struct bpf_xhdr);
 #ifdef COMPAT_FREEBSD32
 	if (d->bd_compat32)
@@ -2323,12 +2334,13 @@ bpf_hdrlen(struct bpf_d *d)
 static void
 bpf_bintime2ts(struct bintime *bt, struct bpf_ts *ts, int tstype)
 {
-	struct bintime bt2;
+	struct bintime bt2, boottimebin;
 	struct timeval tsm;
 	struct timespec tsn;
 
 	if ((tstype & BPF_T_MONOTONIC) == 0) {
 		bt2 = *bt;
+		getboottimebin(&boottimebin);
 		bintime_add(&bt2, &boottimebin);
 		bt = &bt2;
 	}
@@ -2363,11 +2375,9 @@ catchpacket(struct bpf_d *d, u_char *pkt, u_int pktlen, u_int snaplen,
     struct bintime *bt)
 {
 	struct bpf_xhdr hdr;
-#ifndef BURN_BRIDGES
 	struct bpf_hdr hdr_old;
 #ifdef COMPAT_FREEBSD32
 	struct bpf_hdr32 hdr32_old;
-#endif
 #endif
 	int caplen, curlen, hdrlen, totlen;
 	int do_wakeup = 0;
@@ -2440,7 +2450,6 @@ catchpacket(struct bpf_d *d, u_char *pkt, u_int pktlen, u_int snaplen,
 	caplen = totlen - hdrlen;
 	tstype = d->bd_tstamp;
 	do_timestamp = tstype != BPF_T_NONE;
-#ifndef BURN_BRIDGES
 	if (tstype == BPF_T_NONE || BPF_T_FORMAT(tstype) == BPF_T_MICROTIME) {
 		struct bpf_ts ts;
 		if (do_timestamp)
@@ -2472,7 +2481,6 @@ catchpacket(struct bpf_d *d, u_char *pkt, u_int pktlen, u_int snaplen,
 		    sizeof(hdr_old));
 		goto copy;
 	}
-#endif
 
 	/*
 	 * Append the bpf header.  Note we append the actual header size, but
@@ -2489,9 +2497,7 @@ catchpacket(struct bpf_d *d, u_char *pkt, u_int pktlen, u_int snaplen,
 	/*
 	 * Copy the packet data into the store buffer and update its length.
 	 */
-#ifndef BURN_BRIDGES
 copy:
-#endif
 	(*cpfn)(d, d->bd_sbuf, curlen + hdrlen, pkt, caplen);
 	d->bd_slen = curlen + totlen;
 
@@ -2557,6 +2563,7 @@ bpfattach2(struct ifnet *ifp, u_int dlt, u_int hdrlen, struct bpf_if **driverp)
 	bp->bif_dlt = dlt;
 	rw_init(&bp->bif_lock, "bpf interface lock");
 	KASSERT(*driverp == NULL, ("bpfattach2: driverp already initialized"));
+	bp->bif_bpf = driverp;
 	*driverp = bp;
 
 	BPF_LOCK();
@@ -2568,6 +2575,32 @@ bpfattach2(struct ifnet *ifp, u_int dlt, u_int hdrlen, struct bpf_if **driverp)
 	if (bootverbose && IS_DEFAULT_VNET(curvnet))
 		if_printf(ifp, "bpf attached\n");
 }
+
+#ifdef VIMAGE
+/*
+ * When moving interfaces between vnet instances we need a way to
+ * query the dlt and hdrlen before detach so we can re-attch the if_bpf
+ * after the vmove.  We unfortunately have no device driver infrastructure
+ * to query the interface for these values after creation/attach, thus
+ * add this as a workaround.
+ */
+int
+bpf_get_bp_params(struct bpf_if *bp, u_int *bif_dlt, u_int *bif_hdrlen)
+{
+
+	if (bp == NULL)
+		return (ENXIO);
+	if (bif_dlt == NULL && bif_hdrlen == NULL)
+		return (0);
+
+	if (bif_dlt != NULL)
+		*bif_dlt = bp->bif_dlt;
+	if (bif_hdrlen != NULL)
+		*bif_hdrlen = bp->bif_hdrlen;
+
+	return (0);
+}
+#endif
 
 /*
  * Detach bpf from an interface. This involves detaching each descriptor
@@ -2601,6 +2634,7 @@ bpfdetach(struct ifnet *ifp)
 		 */
 		BPFIF_WLOCK(bp);
 		bp->bif_flags |= BPFIF_FLAG_DYING;
+		*bp->bif_bpf = NULL;
 		BPFIF_WUNLOCK(bp);
 
 		CTR4(KTR_NET, "%s: sheduling free for encap %d (%p) for if %p",
@@ -2646,6 +2680,10 @@ bpf_ifdetach(void *arg __unused, struct ifnet *ifp)
 	struct bpf_if *bp, *bp_temp;
 	int nmatched = 0;
 
+	/* Ignore ifnet renaming. */
+	if (ifp->if_flags & IFF_RENAMING)
+		return;
+
 	BPF_LOCK();
 	/*
 	 * Find matching entries in free list.
@@ -2666,13 +2704,33 @@ bpf_ifdetach(void *arg __unused, struct ifnet *ifp)
 		nmatched++;
 	}
 	BPF_UNLOCK();
+}
 
-	/*
-	 * Note that we cannot zero other pointers to
-	 * custom DLTs possibly used by given interface.
-	 */
-	if (nmatched != 0)
-		ifp->if_bpf = NULL;
+static u_int * __capability
+bfl_list_get_ptr(void *bflp)
+{
+	union {
+		struct bpf_dltlist bfl;
+#ifdef COMPAT_CHERIABI
+		struct bpf_dltlist_c bfl_c;
+#endif
+#ifdef COMPAT_FREEBSD32
+		struct bpf_dltlist32 bfl32;
+#endif
+	} *bflup;
+
+	bflup = bflp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		return (bflup->bfl_c.bfl_list);
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		return (__USER_CAP((u_int *)(uintptr_t)bflup->bfl32.bfl_list,
+		    bflup->bfl32.bfl_len * sizeof(u_int)));
+#endif
+	return (__USER_CAP(bflup->bfl.bfl_list,
+	    bflup->bfl.bfl_len * sizeof(u_int)));
 }
 
 /*
@@ -2681,26 +2739,46 @@ bpf_ifdetach(void *arg __unused, struct ifnet *ifp)
 static int
 bpf_getdltlist(struct bpf_d *d, struct bpf_dltlist *bfl)
 {
-	int n, error;
 	struct ifnet *ifp;
 	struct bpf_if *bp;
+	u_int *lst;
+	int error, n, n1;
 
 	BPF_LOCK_ASSERT();
 
 	ifp = d->bd_bif->bif_ifp;
+again:
+	n1 = 0;
+	LIST_FOREACH(bp, &bpf_iflist, bif_next) {
+		if (bp->bif_ifp == ifp)
+			n1++;
+	}
+	if (bfl_list_get_ptr(bfl) == NULL) {
+		bfl->bfl_len = n1;
+		return (0);
+	}
+	if (n1 > bfl->bfl_len)
+		return (ENOMEM);
+	BPF_UNLOCK();
+	lst = malloc(n1 * sizeof(u_int), M_TEMP, M_WAITOK);
 	n = 0;
-	error = 0;
+	BPF_LOCK();
 	LIST_FOREACH(bp, &bpf_iflist, bif_next) {
 		if (bp->bif_ifp != ifp)
 			continue;
-		if (bfl->bfl_list != NULL) {
-			if (n >= bfl->bfl_len)
-				return (ENOMEM);
-			error = copyout(&bp->bif_dlt,
-			    bfl->bfl_list + n, sizeof(u_int));
+		if (n >= n1) {
+			free(lst, M_TEMP);
+			goto again;
 		}
+		lst[n] = bp->bif_dlt;
 		n++;
 	}
+	BPF_UNLOCK();
+	error = copyout_c(
+	    (__cheri_tocap u_int * __capability)lst, bfl_list_get_ptr(bfl),
+	    sizeof(u_int) * n);
+	free(lst, M_TEMP);
+	BPF_LOCK();
 	bfl->bfl_len = n;
 	return (error);
 }
@@ -2959,3 +3037,34 @@ bpf_validate(const struct bpf_insn *f, int len)
 }
 
 #endif /* !DEV_BPF && !NETGRAPH_BPF */
+
+#ifdef DDB
+static void
+bpf_show_bpf_if(struct bpf_if *bpf_if)
+{
+
+	if (bpf_if == NULL)
+		return;
+	db_printf("%p:\n", bpf_if);
+#define	BPF_DB_PRINTF(f, e)	db_printf("   %s = " f "\n", #e, bpf_if->e);
+	/* bif_ext.bif_next */
+	/* bif_ext.bif_dlist */
+	BPF_DB_PRINTF("%#x", bif_dlt);
+	BPF_DB_PRINTF("%u", bif_hdrlen);
+	BPF_DB_PRINTF("%p", bif_ifp);
+	/* bif_lock */
+	/* bif_wlist */
+	BPF_DB_PRINTF("%#x", bif_flags);
+}
+
+DB_SHOW_COMMAND(bpf_if, db_show_bpf_if)
+{
+
+	if (!have_addr) {
+		db_printf("usage: show bpf_if <struct bpf_if *>\n");
+		return;
+	}
+
+	bpf_show_bpf_if((struct bpf_if *)addr);
+}
+#endif

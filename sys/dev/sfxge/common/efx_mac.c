@@ -1,5 +1,7 @@
 /*-
- * Copyright (c) 2007-2015 Solarflare Communications Inc.
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
+ * Copyright (c) 2007-2016 Solarflare Communications Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,81 +36,30 @@ __FBSDID("$FreeBSD$");
 #include "efx.h"
 #include "efx_impl.h"
 
-#if EFSYS_OPT_MAC_FALCON_GMAC
-#include "falcon_gmac.h"
-#endif
-
-#if EFSYS_OPT_MAC_FALCON_XMAC
-#include "falcon_xmac.h"
-#endif
-
-#if EFSYS_OPT_FALCON || EFSYS_OPT_SIENA
+#if EFSYS_OPT_SIENA
 
 static	__checkReturn	efx_rc_t
-falconsiena_mac_multicast_list_set(
+siena_mac_multicast_list_set(
 	__in		efx_nic_t *enp);
 
-#endif /* EFSYS_OPT_FALCON || EFSYS_OPT_SIENA */
-
-#if EFSYS_OPT_MAC_FALCON_GMAC
-static efx_mac_ops_t	__efx_falcon_gmac_ops = {
-	falcon_gmac_reset,			/* emo_reset */
-	falcon_mac_poll,			/* emo_poll */
-	falcon_mac_up,				/* emo_up */
-	falcon_gmac_reconfigure,		/* emo_addr_set */
-	falcon_gmac_reconfigure,		/* emo_pdu_set */
-	falcon_gmac_reconfigure,		/* emo_reconfigure */
-	falconsiena_mac_multicast_list_set,	/* emo_multicast_list_set */
-	NULL,					/* emo_filter_set_default_rxq */
-	NULL,				/* emo_filter_default_rxq_clear */
-#if EFSYS_OPT_LOOPBACK
-	falcon_mac_loopback_set,		/* emo_loopback_set */
-#endif	/* EFSYS_OPT_LOOPBACK */
-#if EFSYS_OPT_MAC_STATS
-	falcon_mac_stats_upload,		/* emo_stats_upload */
-	NULL,					/* emo_stats_periodic */
-	falcon_gmac_stats_update		/* emo_stats_update */
-#endif	/* EFSYS_OPT_MAC_STATS */
-};
-#endif	/* EFSYS_OPT_MAC_FALCON_GMAC */
-
-#if EFSYS_OPT_MAC_FALCON_XMAC
-static efx_mac_ops_t	__efx_falcon_xmac_ops = {
-	falcon_xmac_reset,			/* emo_reset */
-	falcon_mac_poll,			/* emo_poll */
-	falcon_mac_up,				/* emo_up */
-	falcon_xmac_reconfigure,		/* emo_addr_set */
-	falcon_xmac_reconfigure,		/* emo_pdu_set */
-	falcon_xmac_reconfigure,		/* emo_reconfigure */
-	falconsiena_mac_multicast_list_set,	/* emo_multicast_list_set */
-	NULL,					/* emo_filter_set_default_rxq */
-	NULL,				/* emo_filter_default_rxq_clear */
-#if EFSYS_OPT_LOOPBACK
-	falcon_mac_loopback_set,		/* emo_loopback_set */
-#endif	/* EFSYS_OPT_LOOPBACK */
-#if EFSYS_OPT_MAC_STATS
-	falcon_mac_stats_upload,		/* emo_stats_upload */
-	NULL,					/* emo_stats_periodic */
-	falcon_xmac_stats_update		/* emo_stats_update */
-#endif	/* EFSYS_OPT_MAC_STATS */
-};
-#endif	/* EFSYS_OPT_MAC_FALCON_XMAC */
+#endif /* EFSYS_OPT_SIENA */
 
 #if EFSYS_OPT_SIENA
-static efx_mac_ops_t	__efx_siena_mac_ops = {
-	NULL,					/* emo_reset */
+static const efx_mac_ops_t	__efx_siena_mac_ops = {
 	siena_mac_poll,				/* emo_poll */
 	siena_mac_up,				/* emo_up */
 	siena_mac_reconfigure,			/* emo_addr_set */
 	siena_mac_reconfigure,			/* emo_pdu_set */
+	siena_mac_pdu_get,			/* emo_pdu_get */
 	siena_mac_reconfigure,			/* emo_reconfigure */
-	falconsiena_mac_multicast_list_set,	/* emo_multicast_list_set */
+	siena_mac_multicast_list_set,		/* emo_multicast_list_set */
 	NULL,					/* emo_filter_set_default_rxq */
 	NULL,				/* emo_filter_default_rxq_clear */
 #if EFSYS_OPT_LOOPBACK
 	siena_mac_loopback_set,			/* emo_loopback_set */
 #endif	/* EFSYS_OPT_LOOPBACK */
 #if EFSYS_OPT_MAC_STATS
+	siena_mac_stats_get_mask,		/* emo_stats_get_mask */
 	efx_mcdi_mac_stats_upload,		/* emo_stats_upload */
 	efx_mcdi_mac_stats_periodic,		/* emo_stats_periodic */
 	siena_mac_stats_update			/* emo_stats_update */
@@ -117,12 +68,12 @@ static efx_mac_ops_t	__efx_siena_mac_ops = {
 #endif	/* EFSYS_OPT_SIENA */
 
 #if EFSYS_OPT_HUNTINGTON || EFSYS_OPT_MEDFORD
-static efx_mac_ops_t	__efx_ef10_mac_ops = {
-	NULL,					/* emo_reset */
+static const efx_mac_ops_t	__efx_ef10_mac_ops = {
 	ef10_mac_poll,				/* emo_poll */
 	ef10_mac_up,				/* emo_up */
 	ef10_mac_addr_set,			/* emo_addr_set */
 	ef10_mac_pdu_set,			/* emo_pdu_set */
+	ef10_mac_pdu_get,			/* emo_pdu_get */
 	ef10_mac_reconfigure,			/* emo_reconfigure */
 	ef10_mac_multicast_list_set,		/* emo_multicast_list_set */
 	ef10_mac_filter_default_rxq_set,	/* emo_filter_default_rxq_set */
@@ -132,6 +83,7 @@ static efx_mac_ops_t	__efx_ef10_mac_ops = {
 	ef10_mac_loopback_set,			/* emo_loopback_set */
 #endif	/* EFSYS_OPT_LOOPBACK */
 #if EFSYS_OPT_MAC_STATS
+	ef10_mac_stats_get_mask,		/* emo_stats_get_mask */
 	efx_mcdi_mac_stats_upload,		/* emo_stats_upload */
 	efx_mcdi_mac_stats_periodic,		/* emo_stats_periodic */
 	ef10_mac_stats_update			/* emo_stats_update */
@@ -139,48 +91,13 @@ static efx_mac_ops_t	__efx_ef10_mac_ops = {
 };
 #endif	/* EFSYS_OPT_HUNTINGTON || EFSYS_OPT_MEDFORD */
 
-static efx_mac_ops_t	*__efx_mac_ops[] = {
-	/* [EFX_MAC_INVALID] */
-	NULL,
-	/* [EFX_MAC_FALCON_GMAC] */
-#if EFSYS_OPT_MAC_FALCON_GMAC
-	&__efx_falcon_gmac_ops,
-#else
-	NULL,
-#endif
-	/* [EFX_MAC_FALCON_XMAC] */
-#if EFSYS_OPT_MAC_FALCON_XMAC
-	&__efx_falcon_xmac_ops,
-#else
-	NULL,
-#endif
-	/* [EFX_MAC_SIENA] */
-#if EFSYS_OPT_SIENA
-	&__efx_siena_mac_ops,
-#else
-	NULL,
-#endif
-	/* [EFX_MAC_HUNTINGTON] */
-#if EFSYS_OPT_HUNTINGTON
-	&__efx_ef10_mac_ops,
-#else
-	NULL,
-#endif
-	/* [EFX_MAC_MEDFORD] */
-#if EFSYS_OPT_MEDFORD
-	&__efx_ef10_mac_ops,
-#else
-	NULL,
-#endif
-};
-
 	__checkReturn			efx_rc_t
 efx_mac_pdu_set(
 	__in				efx_nic_t *enp,
 	__in				size_t pdu)
 {
 	efx_port_t *epp = &(enp->en_port);
-	efx_mac_ops_t *emop = epp->ep_emop;
+	const efx_mac_ops_t *emop = epp->ep_emop;
 	uint32_t old_pdu;
 	efx_rc_t rc;
 
@@ -218,13 +135,33 @@ fail1:
 	return (rc);
 }
 
+	__checkReturn	efx_rc_t
+efx_mac_pdu_get(
+	__in		efx_nic_t *enp,
+	__out		size_t *pdu)
+{
+	efx_port_t *epp = &(enp->en_port);
+	const efx_mac_ops_t *emop = epp->ep_emop;
+	efx_rc_t rc;
+
+	if ((rc = emop->emo_pdu_get(enp, pdu)) != 0)
+		goto fail1;
+
+	return (0);
+
+fail1:
+	EFSYS_PROBE1(fail1, efx_rc_t, rc);
+
+	return (rc);
+}
+
 	__checkReturn			efx_rc_t
 efx_mac_addr_set(
 	__in				efx_nic_t *enp,
 	__in				uint8_t *addr)
 {
 	efx_port_t *epp = &(enp->en_port);
-	efx_mac_ops_t *emop = epp->ep_emop;
+	const efx_mac_ops_t *emop = epp->ep_emop;
 	uint8_t old_addr[6];
 	uint32_t oui;
 	efx_rc_t rc;
@@ -272,7 +209,7 @@ efx_mac_filter_set(
 	__in				boolean_t brdcst)
 {
 	efx_port_t *epp = &(enp->en_port);
-	efx_mac_ops_t *emop = epp->ep_emop;
+	const efx_mac_ops_t *emop = epp->ep_emop;
 	boolean_t old_all_unicst;
 	boolean_t old_mulcst;
 	boolean_t old_all_mulcst;
@@ -314,7 +251,7 @@ efx_mac_drain(
 	__in				boolean_t enabled)
 {
 	efx_port_t *epp = &(enp->en_port);
-	efx_mac_ops_t *emop = epp->ep_emop;
+	const efx_mac_ops_t *emop = epp->ep_emop;
 	efx_rc_t rc;
 
 	EFSYS_ASSERT3U(enp->en_magic, ==, EFX_NIC_MAGIC);
@@ -326,21 +263,11 @@ efx_mac_drain(
 
 	epp->ep_mac_drain = enabled;
 
-	if (enabled && emop->emo_reset != NULL) {
-		if ((rc = emop->emo_reset(enp)) != 0)
-			goto fail1;
-
-		EFSYS_ASSERT(enp->en_reset_flags & EFX_RESET_MAC);
-		enp->en_reset_flags &= ~EFX_RESET_PHY;
-	}
-
 	if ((rc = emop->emo_reconfigure(enp)) != 0)
-		goto fail2;
+		goto fail1;
 
 	return (0);
 
-fail2:
-	EFSYS_PROBE(fail2);
 fail1:
 	EFSYS_PROBE1(fail1, efx_rc_t, rc);
 
@@ -353,7 +280,7 @@ efx_mac_up(
 	__out		boolean_t *mac_upp)
 {
 	efx_port_t *epp = &(enp->en_port);
-	efx_mac_ops_t *emop = epp->ep_emop;
+	const efx_mac_ops_t *emop = epp->ep_emop;
 	efx_rc_t rc;
 
 	EFSYS_ASSERT3U(enp->en_magic, ==, EFX_NIC_MAGIC);
@@ -377,8 +304,8 @@ efx_mac_fcntl_set(
 	__in				boolean_t autoneg)
 {
 	efx_port_t *epp = &(enp->en_port);
-	efx_mac_ops_t *emop = epp->ep_emop;
-	efx_phy_ops_t *epop = epp->ep_epop;
+	const efx_mac_ops_t *emop = epp->ep_emop;
+	const efx_phy_ops_t *epop = epp->ep_epop;
 	unsigned int old_fcntl;
 	boolean_t old_autoneg;
 	unsigned int old_adv_cap;
@@ -477,7 +404,7 @@ efx_mac_multicast_list_set(
 	__in				int count)
 {
 	efx_port_t *epp = &(enp->en_port);
-	efx_mac_ops_t *emop = epp->ep_emop;
+	const efx_mac_ops_t *emop = epp->ep_emop;
 	uint8_t	*old_mulcst_addr_list = NULL;
 	uint32_t old_mulcst_addr_count;
 	efx_rc_t rc;
@@ -553,7 +480,7 @@ efx_mac_filter_default_rxq_set(
 	__in		boolean_t using_rss)
 {
 	efx_port_t *epp = &(enp->en_port);
-	efx_mac_ops_t *emop = epp->ep_emop;
+	const efx_mac_ops_t *emop = epp->ep_emop;
 	efx_rc_t rc;
 
 	EFSYS_ASSERT3U(enp->en_magic, ==, EFX_NIC_MAGIC);
@@ -578,7 +505,7 @@ efx_mac_filter_default_rxq_clear(
 	__in		efx_nic_t *enp)
 {
 	efx_port_t *epp = &(enp->en_port);
-	efx_mac_ops_t *emop = epp->ep_emop;
+	const efx_mac_ops_t *emop = epp->ep_emop;
 
 	EFSYS_ASSERT3U(enp->en_magic, ==, EFX_NIC_MAGIC);
 	EFSYS_ASSERT3U(enp->en_mod_flags, &, EFX_MOD_PORT);
@@ -592,8 +519,8 @@ efx_mac_filter_default_rxq_clear(
 
 #if EFSYS_OPT_NAMES
 
-/* START MKCONFIG GENERATED EfxMacStatNamesBlock 054d43a31d2d7a45 */
-static const char 	*__efx_mac_stat_name[] = {
+/* START MKCONFIG GENERATED EfxMacStatNamesBlock c11b91b42f922516 */
+static const char * const __efx_mac_stat_name[] = {
 	"rx_octets",
 	"rx_pkts",
 	"rx_unicst_pkts",
@@ -692,13 +619,112 @@ efx_mac_stat_name(
 
 #endif	/* EFSYS_OPT_NAMES */
 
+static					efx_rc_t
+efx_mac_stats_mask_add_range(
+	__inout_bcount(mask_size)	uint32_t *maskp,
+	__in				size_t mask_size,
+	__in				const struct efx_mac_stats_range *rngp)
+{
+	unsigned int mask_npages = mask_size / sizeof (*maskp);
+	unsigned int el;
+	unsigned int el_min;
+	unsigned int el_max;
+	unsigned int low;
+	unsigned int high;
+	unsigned int width;
+	efx_rc_t rc;
+
+	if ((mask_npages * EFX_MAC_STATS_MASK_BITS_PER_PAGE) <=
+	    (unsigned int)rngp->last) {
+		rc = EINVAL;
+		goto fail1;
+	}
+
+	EFSYS_ASSERT3U(rngp->first, <=, rngp->last);
+	EFSYS_ASSERT3U(rngp->last, <, EFX_MAC_NSTATS);
+
+	for (el = 0; el < mask_npages; ++el) {
+		el_min = el * EFX_MAC_STATS_MASK_BITS_PER_PAGE;
+		el_max =
+		    el_min + (EFX_MAC_STATS_MASK_BITS_PER_PAGE - 1);
+		if ((unsigned int)rngp->first > el_max ||
+		    (unsigned int)rngp->last < el_min)
+			continue;
+		low = MAX((unsigned int)rngp->first, el_min);
+		high = MIN((unsigned int)rngp->last, el_max);
+		width = high - low + 1;
+		maskp[el] |=
+		    (width == EFX_MAC_STATS_MASK_BITS_PER_PAGE) ?
+		    (~0ULL) : (((1ULL << width) - 1) << (low - el_min));
+	}
+
+	return (0);
+
+fail1:
+	EFSYS_PROBE1(fail1, efx_rc_t, rc);
+
+	return (rc);
+}
+
+					efx_rc_t
+efx_mac_stats_mask_add_ranges(
+	__inout_bcount(mask_size)	uint32_t *maskp,
+	__in				size_t mask_size,
+	__in_ecount(rng_count)		const struct efx_mac_stats_range *rngp,
+	__in				unsigned int rng_count)
+{
+	unsigned int i;
+	efx_rc_t rc;
+
+	for (i = 0; i < rng_count; ++i) {
+		if ((rc = efx_mac_stats_mask_add_range(maskp, mask_size,
+		    &rngp[i])) != 0)
+			goto fail1;
+	}
+
+	return (0);
+
+fail1:
+	EFSYS_PROBE1(fail1, efx_rc_t, rc);
+
+	return (rc);
+}
+
+	__checkReturn			efx_rc_t
+efx_mac_stats_get_mask(
+	__in				efx_nic_t *enp,
+	__out_bcount(mask_size)		uint32_t *maskp,
+	__in				size_t mask_size)
+{
+	efx_port_t *epp = &(enp->en_port);
+	const efx_mac_ops_t *emop = epp->ep_emop;
+	efx_rc_t rc;
+
+	EFSYS_ASSERT3U(enp->en_magic, ==, EFX_NIC_MAGIC);
+	EFSYS_ASSERT3U(enp->en_mod_flags, &, EFX_MOD_PROBE);
+	EFSYS_ASSERT(maskp != NULL);
+	EFSYS_ASSERT(mask_size % sizeof (maskp[0]) == 0);
+
+	(void) memset(maskp, 0, mask_size);
+
+	if ((rc = emop->emo_stats_get_mask(enp, maskp, mask_size)) != 0)
+		goto fail1;
+
+	return (0);
+
+fail1:
+	EFSYS_PROBE1(fail1, efx_rc_t, rc);
+
+	return (rc);
+}
+
 	__checkReturn			efx_rc_t
 efx_mac_stats_upload(
 	__in				efx_nic_t *enp,
 	__in				efsys_mem_t *esmp)
 {
 	efx_port_t *epp = &(enp->en_port);
-	efx_mac_ops_t *emop = epp->ep_emop;
+	const efx_mac_ops_t *emop = epp->ep_emop;
 	efx_rc_t rc;
 
 	EFSYS_ASSERT3U(enp->en_magic, ==, EFX_NIC_MAGIC);
@@ -731,7 +757,7 @@ efx_mac_stats_periodic(
 	__in				boolean_t events)
 {
 	efx_port_t *epp = &(enp->en_port);
-	efx_mac_ops_t *emop = epp->ep_emop;
+	const efx_mac_ops_t *emop = epp->ep_emop;
 	efx_rc_t rc;
 
 	EFSYS_ASSERT3U(enp->en_magic, ==, EFX_NIC_MAGIC);
@@ -766,7 +792,7 @@ efx_mac_stats_update(
 	__inout_opt			uint32_t *generationp)
 {
 	efx_port_t *epp = &(enp->en_port);
-	efx_mac_ops_t *emop = epp->ep_emop;
+	const efx_mac_ops_t *emop = epp->ep_emop;
 	efx_rc_t rc;
 
 	EFSYS_ASSERT3U(enp->en_magic, ==, EFX_NIC_MAGIC);
@@ -788,84 +814,42 @@ efx_mac_select(
 {
 	efx_port_t *epp = &(enp->en_port);
 	efx_mac_type_t type = EFX_MAC_INVALID;
-	efx_mac_ops_t *emop;
+	const efx_mac_ops_t *emop;
 	int rc = EINVAL;
 
+	switch (enp->en_family) {
 #if EFSYS_OPT_SIENA
-	if (enp->en_family == EFX_FAMILY_SIENA) {
+	case EFX_FAMILY_SIENA:
+		emop = &__efx_siena_mac_ops;
 		type = EFX_MAC_SIENA;
-		goto chosen;
-	}
-#endif
+		break;
+#endif /* EFSYS_OPT_SIENA */
 
 #if EFSYS_OPT_HUNTINGTON
-	if (enp->en_family == EFX_FAMILY_HUNTINGTON) {
+	case EFX_FAMILY_HUNTINGTON:
+		emop = &__efx_ef10_mac_ops;
 		type = EFX_MAC_HUNTINGTON;
-		goto chosen;
-	}
-#endif
+		break;
+#endif /* EFSYS_OPT_HUNTINGTON */
 
 #if EFSYS_OPT_MEDFORD
-	if (enp->en_family == EFX_FAMILY_MEDFORD) {
+	case EFX_FAMILY_MEDFORD:
+		emop = &__efx_ef10_mac_ops;
 		type = EFX_MAC_MEDFORD;
-		goto chosen;
-	}
-#endif
-
-#if EFSYS_OPT_FALCON
-	switch (epp->ep_link_mode) {
-#if EFSYS_OPT_MAC_FALCON_GMAC
-	case EFX_LINK_100HDX:
-	case EFX_LINK_100FDX:
-	case EFX_LINK_1000HDX:
-	case EFX_LINK_1000FDX:
-		type = EFX_MAC_FALCON_GMAC;
-		goto chosen;
-#endif	/* EFSYS_OPT_FALCON_GMAC */
-
-#if EFSYS_OPT_MAC_FALCON_XMAC
-	case EFX_LINK_10000FDX:
-		type = EFX_MAC_FALCON_XMAC;
-		goto chosen;
-#endif	/* EFSYS_OPT_FALCON_XMAC */
+		break;
+#endif /* EFSYS_OPT_MEDFORD */
 
 	default:
-#if EFSYS_OPT_MAC_FALCON_GMAC && EFSYS_OPT_MAC_FALCON_XMAC
-		/* Only initialise a MAC supported by the PHY */
-		if (epp->ep_phy_cap_mask &
-		    ((1 << EFX_PHY_CAP_1000FDX) |
-		    (1 << EFX_PHY_CAP_1000HDX) |
-		    (1 << EFX_PHY_CAP_100FDX) |
-		    (1 << EFX_PHY_CAP_100HDX) |
-		    (1 << EFX_PHY_CAP_10FDX) |
-		    (1 << EFX_PHY_CAP_10FDX)))
-			type = EFX_MAC_FALCON_GMAC;
-		else
-			type = EFX_MAC_FALCON_XMAC;
-#elif EFSYS_OPT_MAC_FALCON_GMAC
-		type = EFX_MAC_FALCON_GMAC;
-#else
-		type = EFX_MAC_FALCON_XMAC;
-#endif
-		goto chosen;
+		rc = EINVAL;
+		goto fail1;
 	}
-#endif	/* EFSYS_OPT_FALCON */
 
-chosen:
 	EFSYS_ASSERT(type != EFX_MAC_INVALID);
 	EFSYS_ASSERT3U(type, <, EFX_MAC_NTYPES);
-	emop = epp->ep_emop = (efx_mac_ops_t *)__efx_mac_ops[type];
 	EFSYS_ASSERT(emop != NULL);
 
+	epp->ep_emop = emop;
 	epp->ep_mac_type = type;
-
-	if (emop->emo_reset != NULL) {
-		if ((rc = emop->emo_reset(enp)) != 0)
-			goto fail1;
-
-		EFSYS_ASSERT(enp->en_reset_flags & EFX_RESET_MAC);
-		enp->en_reset_flags &= ~EFX_RESET_MAC;
-	}
 
 	return (0);
 
@@ -876,13 +860,13 @@ fail1:
 }
 
 
-#if EFSYS_OPT_FALCON || EFSYS_OPT_SIENA
+#if EFSYS_OPT_SIENA
 
 #define	EFX_MAC_HASH_BITS	(1 << 8)
 
 /* Compute the multicast hash as used on Falcon and Siena. */
 static	void
-falconsiena_mac_multicast_hash_compute(
+siena_mac_multicast_hash_compute(
 	__in_ecount(6*count)		uint8_t const *addrs,
 	__in				int count,
 	__out				efx_oword_t *hash_low,
@@ -912,11 +896,11 @@ falconsiena_mac_multicast_hash_compute(
 }
 
 static	__checkReturn	efx_rc_t
-falconsiena_mac_multicast_list_set(
+siena_mac_multicast_list_set(
 	__in		efx_nic_t *enp)
 {
 	efx_port_t *epp = &(enp->en_port);
-	efx_mac_ops_t *emop = epp->ep_emop;
+	const efx_mac_ops_t *emop = epp->ep_emop;
 	efx_oword_t old_hash[2];
 	efx_rc_t rc;
 
@@ -925,10 +909,11 @@ falconsiena_mac_multicast_list_set(
 
 	memcpy(old_hash, epp->ep_multicst_hash, sizeof (old_hash));
 
-	falconsiena_mac_multicast_hash_compute(epp->ep_mulcst_addr_list,
-				epp->ep_mulcst_addr_count,
-				&epp->ep_multicst_hash[0],
-				&epp->ep_multicst_hash[1]);
+	siena_mac_multicast_hash_compute(
+	    epp->ep_mulcst_addr_list,
+	    epp->ep_mulcst_addr_count,
+	    &epp->ep_multicst_hash[0],
+	    &epp->ep_multicst_hash[1]);
 
 	if ((rc = emop->emo_reconfigure(enp)) != 0)
 		goto fail1;
@@ -943,4 +928,4 @@ fail1:
 	return (rc);
 }
 
-#endif /* EFSYS_OPT_FALCON || EFSYS_OPT_SIENA */
+#endif /* EFSYS_OPT_SIENA */

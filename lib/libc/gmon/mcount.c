@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1983, 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -25,6 +27,17 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "unsupported"
+ *   ],
+ *   "change_comment": "profiling not yet supported (also on mips64)"
+ * }
+ * CHERI CHANGES END
  */
 
 #if !defined(_KERNEL) && defined(LIBC_SCCS) && !defined(lint)
@@ -46,6 +59,7 @@ void	eintr(void);
 void	user(void);
 #endif
 #include <machine/atomic.h>
+#include <stdlib.h>
 
 /*
  * mcount is called on entry to each function compiled with the profiling
@@ -269,11 +283,7 @@ overflow:
 	return;
 }
 
-/*
- * XXXBD: clang is currently missing .cprestore on MIPS
- * https://llvm.org/bugs/show_bug.cgi?id=23660
- */
-#if !__has_feature(capabilities)
+#if !defined(__CHERI_PURE_CAPABILITY__)
 /*
  * Actual definition of mcount function.  Defined in <machine/profile.h>,
  * which is included by <sys/gmon.h>.
@@ -325,3 +335,5 @@ mexitcount(selfpc)
 	}
 }
 #endif /* GUPROF */
+
+// void _mcount(uintfptr_t frompc, uintfptr_t selfpc) {}

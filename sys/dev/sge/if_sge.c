@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2008-2010 Nikolay Denev <ndenev@gmail.com>
  * Copyright (c) 2007-2008 Alexander Pohoyda <alexander.pohoyda@gmx.net>
  * Copyright (c) 1997, 1998, 1999
@@ -276,9 +278,8 @@ sge_get_mac_addr_apc(struct sge_softc *sc, uint8_t *dest)
 		{ SIS_VENDORID, 0x0968 }
 	};
 	uint8_t reg;
-	int busnum, cnt, i, j, numkids;
+	int busnum, i, j, numkids;
 
-	cnt = sizeof(apc_tbls) / sizeof(apc_tbls[0]);
 	pci = devclass_find("pci");
 	for (busnum = 0; busnum < devclass_get_maxunit(pci); busnum++) {
 		bus = devclass_get_device(pci, busnum);
@@ -291,7 +292,7 @@ sge_get_mac_addr_apc(struct sge_softc *sc, uint8_t *dest)
 			if (pci_get_class(dev) == PCIC_BRIDGE &&
 			    pci_get_subclass(dev) == PCIS_BRIDGE_ISA) {
 				tp = apc_tbls;
-				for (j = 0; j < cnt; j++) {
+				for (j = 0; j < nitems(apc_tbls); j++) {
 					if (pci_get_vendor(dev) == tp->vid &&
 					    pci_get_device(dev) == tp->did) {
 						free(kids, M_TEMP);
@@ -1760,7 +1761,7 @@ sge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	ifr = (struct ifreq *)data;
 
 	switch(command) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		SGE_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
@@ -1774,10 +1775,10 @@ sge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->sge_if_flags = ifp->if_flags;
 		SGE_UNLOCK(sc);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		SGE_LOCK(sc);
 		reinit = 0;
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&
 		    (ifp->if_capabilities & IFCAP_TXCSUM) != 0) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;
@@ -1822,15 +1823,15 @@ sge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		SGE_UNLOCK(sc);
 		VLAN_CAPABILITIES(ifp);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		SGE_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			sge_rxfilter(sc);
 		SGE_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		mii = device_get_softc(sc->sge_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;

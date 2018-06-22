@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2003-2009 RMI Corporation
  * All rights reserved.
  *
@@ -53,7 +55,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/hwfunc.h>
 #include <machine/mips_opcode.h>
 
-#include <machine/param.h>
 #include <machine/intr_machdep.h>
 #include <mips/rmi/interrupt.h>
 #include <mips/rmi/msgring.h>

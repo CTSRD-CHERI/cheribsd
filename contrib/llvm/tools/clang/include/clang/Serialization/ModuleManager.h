@@ -19,10 +19,12 @@
 #include "clang/Serialization/Module.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/iterator.h"
 
 namespace clang { 
 
 class GlobalModuleIndex;
+class MemoryBufferCache;
 class ModuleMap;
 class PCHContainerReader;
 
@@ -30,26 +32,28 @@ namespace serialization {
 
 /// \brief Manages the set of modules loaded by an AST reader.
 class ModuleManager {
-  /// \brief The chain of AST files. The first entry is the one named by the
-  /// user, the last one is the one that doesn't depend on anything further.
-  SmallVector<ModuleFile *, 2> Chain;
+  /// \brief The chain of AST files, in the order in which we started to load
+  /// them (this order isn't really useful for anything).
+  SmallVector<std::unique_ptr<ModuleFile>, 2> Chain;
+
+  /// \brief The chain of non-module PCH files. The first entry is the one named
+  /// by the user, the last one is the one that doesn't depend on anything
+  /// further.
+  SmallVector<ModuleFile *, 2> PCHChain;
 
   // \brief The roots of the dependency DAG of AST files. This is used
   // to implement short-circuiting logic when running DFS over the dependencies.
   SmallVector<ModuleFile *, 2> Roots;
-  
+
   /// \brief All loaded modules, indexed by name.
   llvm::DenseMap<const FileEntry *, ModuleFile *> Modules;
-
-  typedef llvm::SetVector<const FileEntry *> AdditionalKnownModuleFileSet;
-
-  /// \brief Additional module files that are known but not loaded. Tracked
-  /// here so that we can re-export them if necessary.
-  AdditionalKnownModuleFileSet AdditionalKnownModuleFiles;
 
   /// \brief FileManager that handles translating between filenames and
   /// FileEntry *.
   FileManager &FileMgr;
+
+  /// Cache of PCM files.
+  IntrusiveRefCntPtr<MemoryBufferCache> PCMCache;
 
   /// \brief Knows how to unwrap module containers.
   const PCHContainerReader &PCHContainerRdr;
@@ -112,33 +116,42 @@ class ModuleManager {
   void returnVisitState(VisitState *State);
 
 public:
-  typedef SmallVectorImpl<ModuleFile*>::iterator ModuleIterator;
-  typedef SmallVectorImpl<ModuleFile*>::const_iterator ModuleConstIterator;
-  typedef SmallVectorImpl<ModuleFile*>::reverse_iterator ModuleReverseIterator;
+  typedef llvm::pointee_iterator<
+      SmallVectorImpl<std::unique_ptr<ModuleFile>>::iterator>
+      ModuleIterator;
+  typedef llvm::pointee_iterator<
+      SmallVectorImpl<std::unique_ptr<ModuleFile>>::const_iterator>
+      ModuleConstIterator;
+  typedef llvm::pointee_iterator<
+      SmallVectorImpl<std::unique_ptr<ModuleFile>>::reverse_iterator>
+      ModuleReverseIterator;
   typedef std::pair<uint32_t, StringRef> ModuleOffset;
 
-  explicit ModuleManager(FileManager &FileMgr,
+  explicit ModuleManager(FileManager &FileMgr, MemoryBufferCache &PCMCache,
                          const PCHContainerReader &PCHContainerRdr);
   ~ModuleManager();
 
-  /// \brief Forward iterator to traverse all loaded modules.  This is reverse
-  /// source-order.
+  /// \brief Forward iterator to traverse all loaded modules.
   ModuleIterator begin() { return Chain.begin(); }
   /// \brief Forward iterator end-point to traverse all loaded modules
   ModuleIterator end() { return Chain.end(); }
   
-  /// \brief Const forward iterator to traverse all loaded modules.  This is 
-  /// in reverse source-order.
+  /// \brief Const forward iterator to traverse all loaded modules.
   ModuleConstIterator begin() const { return Chain.begin(); }
   /// \brief Const forward iterator end-point to traverse all loaded modules
   ModuleConstIterator end() const { return Chain.end(); }
   
-  /// \brief Reverse iterator to traverse all loaded modules.  This is in 
-  /// source order.
+  /// \brief Reverse iterator to traverse all loaded modules.
   ModuleReverseIterator rbegin() { return Chain.rbegin(); }
   /// \brief Reverse iterator end-point to traverse all loaded modules.
   ModuleReverseIterator rend() { return Chain.rend(); }
-  
+
+  /// \brief A range covering the PCH and preamble module files loaded.
+  llvm::iterator_range<SmallVectorImpl<ModuleFile *>::const_iterator>
+  pch_modules() const {
+    return llvm::make_range(PCHChain.begin(), PCHChain.end());
+  }
+
   /// \brief Returns the primary module associated with the manager, that is,
   /// the first module loaded
   ModuleFile &getPrimaryModule() { return *Chain[0]; }
@@ -151,10 +164,10 @@ public:
   ModuleFile &operator[](unsigned Index) const { return *Chain[Index]; }
   
   /// \brief Returns the module associated with the given name
-  ModuleFile *lookup(StringRef Name);
+  ModuleFile *lookup(StringRef Name) const;
 
   /// \brief Returns the module associated with the given module file.
-  ModuleFile *lookup(const FileEntry *File);
+  ModuleFile *lookup(const FileEntry *File) const;
 
   /// \brief Returns the in-memory (virtual file) buffer with the given name
   std::unique_ptr<llvm::MemoryBuffer> lookupBuffer(StringRef Name);
@@ -174,7 +187,7 @@ public:
     OutOfDate
   };
 
-  typedef ASTFileSignature(*ASTFileSignatureReader)(llvm::BitstreamReader &);
+  typedef ASTFileSignature(*ASTFileSignatureReader)(StringRef);
 
   /// \brief Attempts to create a new module and add it to the list of known
   /// modules.
@@ -219,8 +232,8 @@ public:
                             ModuleFile *&Module,
                             std::string &ErrorStr);
 
-  /// \brief Remove the given set of modules.
-  void removeModules(ModuleIterator first, ModuleIterator last,
+  /// \brief Remove the modules starting from First (to the end).
+  void removeModules(ModuleIterator First,
                      llvm::SmallPtrSetImpl<ModuleFile *> &LoadedSuccessfully,
                      ModuleMap *modMap);
 
@@ -235,19 +248,6 @@ public:
   /// has been "accepted", and will not (can not) be unloaded.
   void moduleFileAccepted(ModuleFile *MF);
 
-  /// \brief Notification from the frontend that the given module file is
-  /// part of this compilation (even if not imported) and, if this compilation
-  /// is exported, should be made available to importers of it.
-  bool addKnownModuleFile(StringRef FileName);
-
-  /// \brief Get a list of additional module files that are not currently
-  /// loaded but are considered to be part of the current compilation.
-  llvm::iterator_range<AdditionalKnownModuleFileSet::const_iterator>
-  getAdditionalKnownModuleFiles() {
-    return llvm::make_range(AdditionalKnownModuleFiles.begin(),
-                            AdditionalKnownModuleFiles.end());
-  }
-
   /// \brief Visit each of the modules.
   ///
   /// This routine visits each of the modules, starting with the
@@ -259,50 +259,16 @@ public:
   /// operations that can find data in any of the loaded modules.
   ///
   /// \param Visitor A visitor function that will be invoked with each
-  /// module and the given user data pointer. The return value must be
-  /// convertible to bool; when false, the visitation continues to
-  /// modules that the current module depends on. When true, the
-  /// visitation skips any modules that the current module depends on.
-  ///
-  /// \param UserData User data associated with the visitor object, which
-  /// will be passed along to the visitor.
+  /// module. The return value must be convertible to bool; when false, the
+  /// visitation continues to modules that the current module depends on. When
+  /// true, the visitation skips any modules that the current module depends on.
   ///
   /// \param ModuleFilesHit If non-NULL, contains the set of module files
   /// that we know we need to visit because the global module index told us to.
   /// Any module that is known to both the global module index and the module
   /// manager that is *not* in this set can be skipped.
-  void visit(bool (*Visitor)(ModuleFile &M, void *UserData), void *UserData,
+  void visit(llvm::function_ref<bool(ModuleFile &M)> Visitor,
              llvm::SmallPtrSetImpl<ModuleFile *> *ModuleFilesHit = nullptr);
-
-  /// \brief Control DFS behavior during preorder visitation.
-  enum DFSPreorderControl {
-    Continue,    /// Continue visiting all nodes.
-    Abort,       /// Stop the visitation immediately.
-    SkipImports, /// Do not visit imports of the current node.
-  };
-
-  /// \brief Visit each of the modules with a depth-first traversal.
-  ///
-  /// This routine visits each of the modules known to the module
-  /// manager using a depth-first search, starting with the first
-  /// loaded module. The traversal invokes one callback before
-  /// traversing the imports (preorder traversal) and one after
-  /// traversing the imports (postorder traversal).
-  ///
-  /// \param PreorderVisitor A visitor function that will be invoked with each
-  /// module before visiting its imports. The visitor can control how to
-  /// continue the visitation through its return value.
-  ///
-  /// \param PostorderVisitor A visitor function taht will be invoked with each
-  /// module after visiting its imports. The visitor may return true at any time
-  /// to abort the depth-first visitation.
-  ///
-  /// \param UserData User data ssociated with the visitor object,
-  /// which will be passed along to the user.
-  void visitDepthFirst(DFSPreorderControl (*PreorderVisitor)(ModuleFile &M,
-                                                             void *UserData),
-                       bool (*PostorderVisitor)(ModuleFile &M, void *UserData),
-                       void *UserData);
 
   /// \brief Attempt to resolve the given module file name to a file entry.
   ///
@@ -328,6 +294,8 @@ public:
 
   /// \brief View the graphviz representation of the module graph.
   void viewGraph();
+
+  MemoryBufferCache &getPCMCache() const { return *PCMCache; }
 };
 
 } } // end namespace clang::serialization

@@ -469,11 +469,18 @@ void CRYPTO_THREADID_set_pointer(CRYPTO_THREADID *id, void *ptr)
     }
 }
 
+#ifdef OPENSSL_FIPS
+extern int FIPS_crypto_threadid_set_callback(void (*func) (CRYPTO_THREADID *));
+#endif
+
 int CRYPTO_THREADID_set_callback(void (*func) (CRYPTO_THREADID *))
 {
     if (threadid_callback)
         return 0;
     threadid_callback = func;
+#ifdef OPENSSL_FIPS
+    FIPS_crypto_threadid_set_callback(func);
+#endif
     return 1;
 }
 
@@ -1016,11 +1023,11 @@ void *OPENSSL_stderr(void)
     return stderr;
 }
 
-int CRYPTO_memcmp(const void *in_a, const void *in_b, size_t len)
+int CRYPTO_memcmp(const volatile void *in_a, const volatile void *in_b, size_t len)
 {
     size_t i;
-    const unsigned char *a = in_a;
-    const unsigned char *b = in_b;
+    const volatile unsigned char *a = in_a;
+    const volatile unsigned char *b = in_b;
     unsigned char x = 0;
 
     for (i = 0; i < len; i++)

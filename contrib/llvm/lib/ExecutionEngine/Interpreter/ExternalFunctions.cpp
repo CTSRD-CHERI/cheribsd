@@ -20,20 +20,31 @@
 //===----------------------------------------------------------------------===//
 
 #include "Interpreter.h"
-#include "llvm/Config/config.h"     // Detect libffi
+#include "llvm/ADT/APInt.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/Config/config.h" // Detect libffi
+#include "llvm/ExecutionEngine/GenericValue.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/Module.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/Type.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/UniqueLock.h"
+#include "llvm/Support/raw_ostream.h"
+#include <cassert>
 #include <cmath>
 #include <csignal>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <map>
+#include <string>
+#include <utility>
+#include <vector>
 
 #ifdef HAVE_FFI_CALL
 #ifdef HAVE_FFI_H
@@ -178,7 +189,7 @@ static void *ffiValueFor(Type *Ty, const GenericValue &AV,
 }
 
 static bool ffiInvoke(RawFunc Fn, Function *F, ArrayRef<GenericValue> ArgVals,
-                      const DataLayout *TD, GenericValue &Result) {
+                      const DataLayout &TD, GenericValue &Result) {
   ffi_cif cif;
   FunctionType *FTy = F->getFunctionType();
   const unsigned NumArgs = F->arg_size();
@@ -198,7 +209,7 @@ static bool ffiInvoke(RawFunc Fn, Function *F, ArrayRef<GenericValue> ArgVals,
     const unsigned ArgNo = A->getArgNo();
     Type *ArgTy = FTy->getParamType(ArgNo);
     args[ArgNo] = ffiTypeFor(ArgTy);
-    ArgBytes += TD->getTypeStoreSize(ArgTy);
+    ArgBytes += TD.getTypeStoreSize(ArgTy);
   }
 
   SmallVector<uint8_t, 128> ArgData;
@@ -210,7 +221,7 @@ static bool ffiInvoke(RawFunc Fn, Function *F, ArrayRef<GenericValue> ArgVals,
     const unsigned ArgNo = A->getArgNo();
     Type *ArgTy = FTy->getParamType(ArgNo);
     values[ArgNo] = ffiValueFor(ArgTy, ArgVals[ArgNo], ArgDataPtr);
-    ArgDataPtr += TD->getTypeStoreSize(ArgTy);
+    ArgDataPtr += TD.getTypeStoreSize(ArgTy);
   }
 
   Type *RetTy = FTy->getReturnType();
@@ -219,7 +230,7 @@ static bool ffiInvoke(RawFunc Fn, Function *F, ArrayRef<GenericValue> ArgVals,
   if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, NumArgs, rtype, &args[0]) == FFI_OK) {
     SmallVector<uint8_t, 128> ret;
     if (RetTy->getTypeID() != Type::VoidTyID)
-      ret.resize(TD->getTypeStoreSize(RetTy));
+      ret.resize(TD.getTypeStoreSize(RetTy));
     ffi_call(&cif, Fn, ret.data(), values.data());
     switch (RetTy->getTypeID()) {
       case Type::IntegerTyID:
@@ -290,7 +301,6 @@ GenericValue Interpreter::callExternalFunction(Function *F,
   return GenericValue();
 }
 
-
 //===----------------------------------------------------------------------===//
 //  Functions "exported" to the running application...
 //
@@ -331,7 +341,7 @@ static GenericValue lle_X_sprintf(FunctionType *FT,
   // close enough for now.
   GenericValue GV;
   GV.IntVal = APInt(32, strlen(FmtStr));
-  while (1) {
+  while (true) {
     switch (*FmtStr) {
     case 0: return GV;             // Null terminator...
     default:                       // Normal nonspecial character
@@ -368,7 +378,7 @@ static GenericValue lle_X_sprintf(FunctionType *FT,
       case 'x': case 'X':
         if (HowLong >= 1) {
           if (HowLong == 1 &&
-              TheInterpreter->getDataLayout()->getPointerSizeInBits() == 64 &&
+              TheInterpreter->getDataLayout().getPointerSizeInBits() == 64 &&
               sizeof(long) < sizeof(int64_t)) {
             // Make sure we use %lld with a 64 bit argument because we might be
             // compiling LLI on a 32 bit compiler.

@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2003 Daniel M. Eischen <deischen@freebsd.org>
  * Copyright (c) 1995-1998 John Birrell <jb@cimlogic.com.au>
  * All rights reserved.
@@ -29,9 +31,21 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "unsupported"
+ *   ],
+ *   "change_comment": "Don't expose main thread stack pointer, don't make redzones"
+ * }
+ * CHERI CHANGES END
+ */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
 #include "namespace.h"
 #include <sys/types.h>
@@ -58,7 +72,15 @@
 #include "libc_private.h"
 #include "thr_private.h"
 
-char		*_usrstack;
+/*
+ * The variable _usrstack is the address of the main thread's stack. It
+ * is not a valid pointer on CHERIABI, as sysctl kern.usrstack returns a
+ * virtual address and not a capability. However, we don't need to use
+ * it as a pointer anyway as there is no need to group stacks together
+ * and add guard pages on CHERABI. In CHERIABI _usrstack is only used to
+ * initialize stackaddr_attr for the main thread.
+ */
+vaddr_t		_usrstack;
 struct pthread	*_thr_initial;
 int		_libthr_debug;
 int		_thread_event_mask;
@@ -91,13 +113,17 @@ struct pthread_attr _pthread_attr_default = {
 struct pthread_mutex_attr _pthread_mutexattr_default = {
 	.m_type = PTHREAD_MUTEX_DEFAULT,
 	.m_protocol = PTHREAD_PRIO_NONE,
-	.m_ceiling = 0
+	.m_ceiling = 0,
+	.m_pshared = PTHREAD_PROCESS_PRIVATE,
+	.m_robust = PTHREAD_MUTEX_STALLED,
 };
 
 struct pthread_mutex_attr _pthread_mutexattr_adaptive_default = {
 	.m_type = PTHREAD_MUTEX_ADAPTIVE_NP,
 	.m_protocol = PTHREAD_PRIO_NONE,
-	.m_ceiling = 0
+	.m_ceiling = 0,
+	.m_pshared = PTHREAD_PROCESS_PRIVATE,
+	.m_robust = PTHREAD_MUTEX_STALLED,
 };
 
 /* Default condition variable attributes: */
@@ -106,7 +132,6 @@ struct pthread_cond_attr _pthread_condattr_default = {
 	.c_clockid = CLOCK_REALTIME
 };
 
-pid_t		_thr_pid;
 int		_thr_is_smp = 0;
 size_t		_thr_guard_default;
 size_t		_thr_stack_default = THR_STACK_DEFAULT;
@@ -169,7 +194,6 @@ STATIC_LIB_REQUIRE(_sigtimedwait);
 STATIC_LIB_REQUIRE(_sigwait);
 STATIC_LIB_REQUIRE(_sigwaitinfo);
 STATIC_LIB_REQUIRE(_spinlock);
-STATIC_LIB_REQUIRE(_spinlock_debug);
 STATIC_LIB_REQUIRE(_spinunlock);
 STATIC_LIB_REQUIRE(_thread_init_hack);
 
@@ -263,7 +287,10 @@ static pthread_func_t jmp_table[][2] = {
 	{DUAL_ENTRY(__pthread_cleanup_pop_imp)},/* PJT_CLEANUP_POP_IMP */
 	{DUAL_ENTRY(__pthread_cleanup_push_imp)},/* PJT_CLEANUP_PUSH_IMP */
 	{DUAL_ENTRY(_pthread_cancel_enter)},	/* PJT_CANCEL_ENTER */
-	{DUAL_ENTRY(_pthread_cancel_leave)}		/* PJT_CANCEL_LEAVE */
+	{DUAL_ENTRY(_pthread_cancel_leave)},	/* PJT_CANCEL_LEAVE */
+	{DUAL_ENTRY(_pthread_mutex_consistent)},/* PJT_MUTEX_CONSISTENT */
+	{DUAL_ENTRY(_pthread_mutexattr_getrobust)},/* PJT_MUTEXATTR_GETROBUST */
+	{DUAL_ENTRY(_pthread_mutexattr_setrobust)},/* PJT_MUTEXATTR_SETROBUST */
 };
 
 static int init_once = 0;
@@ -303,10 +330,10 @@ _thread_init_hack(void)
 void
 _libpthread_init(struct pthread *curthread)
 {
-	int fd, first, dlopened;
+	int first, dlopened;
 
 	/* Check if this function has already been called: */
-	if ((_thr_initial != NULL) && (curthread == NULL))
+	if (_thr_initial != NULL && curthread == NULL)
 		/* Only initialize the threaded application once. */
 		return;
 
@@ -314,31 +341,10 @@ _libpthread_init(struct pthread *curthread)
 	 * Check the size of the jump table to make sure it is preset
 	 * with the correct number of entries.
 	 */
-	if (sizeof(jmp_table) != (sizeof(pthread_func_t) * PJT_MAX * 2))
+	if (sizeof(jmp_table) != sizeof(pthread_func_t) * PJT_MAX * 2)
 		PANIC("Thread jump table not properly initialized");
 	memcpy(__thr_jtable, jmp_table, sizeof(jmp_table));
 	__thr_interpose_libc();
-
-	/*
-	 * Check for the special case of this process running as
-	 * or in place of init as pid = 1:
-	 */
-	if ((_thr_pid = getpid()) == 1) {
-		/*
-		 * Setup a new session for this process which is
-		 * assumed to be running as root.
-		 */
-		if (setsid() == -1)
-			PANIC("Can't set session ID");
-		if (revoke(_PATH_CONSOLE) != 0)
-			PANIC("Can't revoke console");
-		if ((fd = __sys_openat(AT_FDCWD, _PATH_CONSOLE, O_RDWR, 0)) < 0)
-			PANIC("Can't open console");
-		if (setlogin("root") == -1)
-			PANIC("Can't set login to root");
-		if (_ioctl(fd, TIOCSCTTY, (char *) NULL) == -1)
-			PANIC("Can't set controlling terminal");
-	}
 
 	/* Initialize pthread private data. */
 	init_private();
@@ -387,10 +393,20 @@ static void
 init_main_thread(struct pthread *thread)
 {
 	struct sched_param sched_param;
+	int i;
 
 	/* Setup the thread attributes. */
 	thr_self(&thread->tid);
 	thread->attr = _pthread_attr_default;
+	/*
+	 * There is no need to allocate a red zone in CHERIABI as we are
+	 * protected through the use of capabilities.
+	 *
+	 * XXX-AR: If we decide to add it we will need to derive the correct
+	 * capability from somewhere else because _usrstack not a valid
+	 * capability.
+	 */
+#ifndef __CHERI_PURE_CAPABILITY__
 	/*
 	 * Set up the thread stack.
 	 *
@@ -400,10 +416,12 @@ init_main_thread(struct pthread *thread)
 	 * resource limits, so this stack needs an explicitly mapped
 	 * red zone to protect the thread stack that is just beyond.
 	 */
-	if (mmap(_usrstack - _thr_stack_initial -
-	    _thr_guard_default, _thr_guard_default, 0, MAP_ANON,
+	/* XXX-AR: use PROT_NONE here */
+	if (mmap((void*)(_usrstack - _thr_stack_initial -
+	    _thr_guard_default), _thr_guard_default, 0, MAP_ANON,
 	    -1, 0) == MAP_FAILED)
 		PANIC("Cannot allocate red zone for initial thread");
+#endif
 
 	/*
 	 * Mark the stack as an application supplied stack so that it
@@ -414,7 +432,14 @@ init_main_thread(struct pthread *thread)
 	 *       actually free() it; it just puts it in the free
 	 *       stack queue for later reuse.
 	 */
-	thread->attr.stackaddr_attr = _usrstack - _thr_stack_initial;
+
+	thread->attr.stackaddr_attr = (void*)(uintptr_t)(_usrstack -
+	    _thr_stack_initial);
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* In CHERIABI stackaddr_attr can't be dereferenced */
+	THR_ASSERT(cheri_gettag(thread->attr.stackaddr_attr) == 0,
+	    "thread->attr.stackaddr_attr should not be a capability");
+#endif
 	thread->attr.stacksize_attr = _thr_stack_initial;
 	thread->attr.guardsize_attr = _thr_guard_default;
 	thread->attr.flags |= THR_STACK_USER;
@@ -428,9 +453,9 @@ init_main_thread(struct pthread *thread)
 	thread->cancel_enable = 1;
 	thread->cancel_async = 0;
 
-	/* Initialize the mutex queue: */
-	TAILQ_INIT(&thread->mutexq);
-	TAILQ_INIT(&thread->pp_mutexq);
+	/* Initialize the mutex queues */
+	for (i = 0; i < TMQ_NITEMS; i++)
+		TAILQ_INIT(&thread->mq[i]);
 
 	thread->state = PS_RUNNING;
 
@@ -439,7 +464,7 @@ init_main_thread(struct pthread *thread)
 	thread->attr.prio = sched_param.sched_priority;
 
 #ifdef _PTHREAD_FORCED_UNWIND
-	thread->unwind_stackend = _usrstack;
+	thread->unwind_stackend = (void*)(uintptr_t)_usrstack;
 #endif
 
 	/* Others cleared to zero by thr_alloc() */
@@ -460,7 +485,6 @@ init_private(void)
 	_thr_urwlock_init(&_thr_atfork_lock);
 	_thr_umutex_init(&_thr_event_lock);
 	_thr_umutex_init(&_suspend_all_lock);
-	_thr_once_init();
 	_thr_spinlock_init();
 	_thr_list_init();
 	_thr_wake_addr_init();
@@ -473,9 +497,14 @@ init_private(void)
 	 * e.g. after a fork().
 	 */
 	if (init_once == 0) {
+		__thr_pshared_init();
 		/* Find the stack top */
 		mib[0] = CTL_KERN;
 		mib[1] = KERN_USRSTACK;
+		/*
+		 * The sysctl returns a vaddr_t and not a pointer so _usrstack
+		 * must not be a pointer on CHERIABI
+		 */
 		len = sizeof (_usrstack);
 		if (sysctl(mib, 2, &_usrstack, &len, NULL, 0) == -1)
 			PANIC("Cannot get kern.usrstack from sysctl");
@@ -490,7 +519,11 @@ init_private(void)
 		sysctlbyname("kern.smp.cpus", &_thr_is_smp, &len, NULL, 0);
 		_thr_is_smp = (_thr_is_smp > 1);
 		_thr_page_size = getpagesize();
+#ifndef __CHERI_PURE_CAPABILITY__
 		_thr_guard_default = _thr_page_size;
+#else
+		_thr_guard_default = 0; /* no need for red zone in CHERIABI */
+#endif
 		_pthread_attr_default.guardsize_attr = _thr_guard_default;
 		_pthread_attr_default.stacksize_attr = _thr_stack_default;
 		env = getenv("LIBPTHREAD_SPINLOOPS");

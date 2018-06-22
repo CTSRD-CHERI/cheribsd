@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: (BSD-3-Clause AND ISC)
+ *
  * Copyright (c) 1980, 1983, 1988, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -59,6 +61,16 @@
 
 #include <sys/cdefs.h>
 #include <sys/_types.h>
+
+#ifndef _IN_ADDR_T_DECLARED
+typedef	__uint32_t	in_addr_t;
+#define	_IN_ADDR_T_DECLARED
+#endif
+
+#ifndef _IN_PORT_T_DECLARED
+typedef	__uint16_t	in_port_t;
+#define	_IN_PORT_T_DECLARED
+#endif
 
 #ifndef _SIZE_T_DECLARED
 typedef	__size_t	size_t;
@@ -131,6 +143,8 @@ struct addrinfo {
 	struct	addrinfo *ai_next;	/* next structure in linked list */
 };
 
+#define	IPPORT_RESERVED	1024
+
 /*
  * Error return codes from gethostbyname() and gethostbyaddr()
  * (left in h_errno).
@@ -202,9 +216,7 @@ struct addrinfo {
 #define	NI_NAMEREQD	0x00000004
 #define	NI_NUMERICSERV	0x00000008
 #define	NI_DGRAM	0x00000010
-#if 0 /* obsolete */
-#define NI_WITHSCOPEID	0x00000020
-#endif
+#define	NI_NUMERICSCOPE	0x00000020
 
 /*
  * Scope delimit character
@@ -263,6 +275,7 @@ int		getnetbyname_r(const char *, struct netent *, char *, size_t,
 int		getnetent_r(struct netent *, char *, size_t, struct netent **,
     int *);
 int		getnetgrent(char **, char **, char **);
+int		getnetgrent_r(char **, char **, char **, char *, size_t);
 int		getprotobyname_r(const char *, struct protoent *, char *,
     size_t, struct protoent **);
 int		getprotobynumber_r(int, struct protoent *, char *, size_t,

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1999 Luoqi Chen.
  * All rights reserved.
  *
@@ -280,10 +282,10 @@ aic_action(struct cam_sim *sim, union ccb *ccb)
                 cpi->max_lun = 7;
                 cpi->initiator_id = aic->initiator;
                 cpi->bus_id = cam_sim_bus(sim);
-		cpi->base_transfer_speed = 3300;
-                strncpy(cpi->sim_vid, "FreeBSD", SIM_IDLEN);
-                strncpy(cpi->hba_vid, "Adaptec", HBA_IDLEN);
-                strncpy(cpi->dev_name, cam_sim_name(sim), DEV_IDLEN);
+                cpi->base_transfer_speed = 3300;
+                strlcpy(cpi->sim_vid, "FreeBSD", SIM_IDLEN);
+                strlcpy(cpi->hba_vid, "Adaptec", HBA_IDLEN);
+                strlcpy(cpi->dev_name, cam_sim_name(sim), DEV_IDLEN);
                 cpi->unit_number = cam_sim_unit(sim);
                 cpi->transport = XPORT_SPI;
                 cpi->transport_version = 2;
@@ -1443,7 +1445,7 @@ aic_init(struct aic_softc *aic)
 	aic->chip_type = AIC6260;
 	aic_insb(aic, ID, chip_id, sizeof(chip_id) - 1);
 	chip_id[sizeof(chip_id) - 1] = '\0';
-	for (i = 0; i < sizeof(aic_chip_ids) / sizeof(aic_chip_ids[0]); i++) {
+	for (i = 0; i < nitems(aic_chip_ids); i++) {
 		if (!strcmp(chip_id, aic_chip_ids[i].idstring)) {
 			aic->chip_type = aic_chip_ids[i].type;
 			break;

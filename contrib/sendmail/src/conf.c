@@ -10,6 +10,17 @@
  * the sendmail distribution.
  *
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "unsupported"
+ *   ],
+ *   "change_comment": "relies on stack ABI details"
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sendmail.h>
 
@@ -2437,9 +2448,9 @@ typedef unsigned int	*pt_entry_t;
 **	This allows "ps" listings to give more useful information.
 */
 
+#if SPT_TYPE != SPT_BUILTIN
 static char	**Argv = NULL;		/* pointer to argument vector */
 static char	*LastArgv = NULL;	/* end of argv */
-#if SPT_TYPE != SPT_BUILTIN
 static void	setproctitle __P((const char *, ...));
 #endif /* SPT_TYPE != SPT_BUILTIN */
 
@@ -2449,6 +2460,7 @@ initsetproctitle(argc, argv, envp)
 	char **argv;
 	char **envp;
 {
+#if SPT_TYPE != SPT_BUILTIN
 	register int i;
 	int align;
 	extern char **environ;
@@ -2497,6 +2509,7 @@ initsetproctitle(argc, argv, envp)
 		if (LastArgv + 1 == envp[i])
 			LastArgv = envp[i] + SPT_ALIGN(strlen(envp[i]), align);
 	}
+#endif /* SPT_TYPE != SPT_BUILTIN */
 }
 
 #if SPT_TYPE != SPT_BUILTIN

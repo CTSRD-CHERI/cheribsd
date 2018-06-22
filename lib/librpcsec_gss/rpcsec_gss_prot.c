@@ -1,4 +1,6 @@
 /*
+  SPDX-License-Identifier: BSD-3-Clause
+
   rpcsec_gss_prot.c
   
   Copyright (c) 2000 The Regents of the University of Michigan.
@@ -34,6 +36,17 @@
 
   $Id: authgss_prot.c,v 1.18 2000/09/01 04:14:03 dugsong Exp $
 */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "sunrpc"
+ * }
+ * CHERI CHANGES END
+ */
 /* $FreeBSD$ */
 
 #include <stdio.h>
@@ -108,7 +121,7 @@ xdr_rpc_gss_wrap_data(XDR *xdrs, xdrproc_t xdr_func, caddr_t xdr_ptr,
 	XDR_SETPOS(xdrs, start + 4);
 	
 	/* Marshal rpc_gss_data_t (sequence number + arguments). */
-	if (!xdr_u_int(xdrs, &seq) || !xdr_func(xdrs, xdr_ptr))
+	if (!xdr_u_int(xdrs, &seq) || !xdr_func(xdrs, xdr_ptr, 0))
 		return (FALSE);
 	end = XDR_GETPOS(xdrs);
 
@@ -216,7 +229,7 @@ xdr_rpc_gss_unwrap_data(XDR *xdrs, xdrproc_t xdr_func, caddr_t xdr_ptr,
 	/* Decode rpc_gss_data_t (sequence number + arguments). */
 	xdrmem_create(&tmpxdrs, databuf.value, databuf.length, XDR_DECODE);
 	xdr_stat = (xdr_u_int(&tmpxdrs, &seq_num) &&
-	    xdr_func(&tmpxdrs, xdr_ptr));
+	    xdr_func(&tmpxdrs, xdr_ptr, 0));
 	XDR_DESTROY(&tmpxdrs);
 
 	/*

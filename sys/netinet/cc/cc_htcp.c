@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2007-2008
  * 	Swinburne University of Technology, Melbourne, Australia
  * Copyright (c) 2009-2010 Lawrence Stewart <lstewart@freebsd.org>
@@ -346,8 +348,10 @@ htcp_mod_init(void)
 static void
 htcp_post_recovery(struct cc_var *ccv)
 {
+	int pipe;
 	struct htcp *htcp_data;
 
+	pipe = 0;
 	htcp_data = ccv->cc_data;
 
 	if (IN_FASTRECOVERY(CCV(ccv, t_flags))) {
@@ -358,10 +362,13 @@ htcp_post_recovery(struct cc_var *ccv)
 		 *
 		 * XXXLAS: Find a way to do this without needing curack
 		 */
-		if (SEQ_GT(ccv->curack + CCV(ccv, snd_ssthresh),
-		    CCV(ccv, snd_max)))
-			CCV(ccv, snd_cwnd) = CCV(ccv, snd_max) - ccv->curack +
-			    CCV(ccv, t_maxseg);
+		if (V_tcp_do_rfc6675_pipe)
+			pipe = tcp_compute_pipe(ccv->ccvc.tcp);
+		else
+			pipe = CCV(ccv, snd_max) - ccv->curack;
+		
+		if (pipe < CCV(ccv, snd_ssthresh))
+			CCV(ccv, snd_cwnd) = pipe + CCV(ccv, t_maxseg);
 		else
 			CCV(ccv, snd_cwnd) = max(1, ((htcp_data->beta *
 			    htcp_data->prev_cwnd / CCV(ccv, t_maxseg))
@@ -440,7 +447,7 @@ htcp_recalc_beta(struct cc_var *ccv)
 	/*
 	 * TCPTV_SRTTBASE is the initialised value of each connection's SRTT, so
 	 * we only calc beta if the connection's SRTT has been changed from its
-	 * inital value. beta is bounded to ensure it is always between
+	 * initial value. beta is bounded to ensure it is always between
 	 * HTCP_MINBETA and HTCP_MAXBETA.
 	 */
 	if (V_htcp_adaptive_backoff && htcp_data->minrtt != TCPTV_SRTTBASE &&
@@ -499,12 +506,12 @@ htcp_ssthresh_update(struct cc_var *ccv)
 	 * subsequent congestion events, set it to cwnd * beta.
 	 */
 	if (CCV(ccv, snd_ssthresh) == TCP_MAXWIN << TCP_MAX_WINSHIFT)
-		CCV(ccv, snd_ssthresh) = (CCV(ccv, snd_cwnd) * HTCP_MINBETA)
-		    >> HTCP_SHIFT;
+		CCV(ccv, snd_ssthresh) = ((u_long)CCV(ccv, snd_cwnd) *
+		    HTCP_MINBETA) >> HTCP_SHIFT;
 	else {
 		htcp_recalc_beta(ccv);
-		CCV(ccv, snd_ssthresh) = (CCV(ccv, snd_cwnd) * htcp_data->beta)
-		    >> HTCP_SHIFT;
+		CCV(ccv, snd_ssthresh) = ((u_long)CCV(ccv, snd_cwnd) *
+		    htcp_data->beta) >> HTCP_SHIFT;
 	}
 }
 

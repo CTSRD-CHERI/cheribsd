@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -13,7 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -62,6 +64,7 @@ extern struct nfsclienthashhead *nfsclienthash;
 extern struct nfslockhashhead *nfslockhash;
 extern struct nfssessionhash *nfssessionhash;
 extern int nfsrv_sessionhashsize;
+extern struct nfsstatsv1 nfsstatsv1;
 struct vfsoptlist nfsv4root_opt, nfsv4root_newopt;
 NFSDLOCKMUTEX;
 struct nfsrchash_bucket nfsrchash_table[NFSRVCACHE_HASHSIZE];
@@ -341,15 +344,15 @@ nfsvno_namei(struct nfsrv_descript *nd, struct nameidata *ndp,
 {
 	struct componentname *cnp = &ndp->ni_cnd;
 	int i;
-	struct iovec aiov;
+	kiovec_t aiov;
 	struct uio auio;
 	int lockleaf = (cnp->cn_flags & LOCKLEAF) != 0, linklen;
-	int error = 0, crossmnt;
+	int error = 0;
 	char *cp;
 
 	*retdirp = NULL;
 	cnp->cn_nameptr = cnp->cn_pnbuf;
-	ndp->ni_strictrelative = 0;
+	ndp->ni_lcf = 0;
 	/*
 	 * Extract and set starting directory.
 	 */
@@ -369,7 +372,6 @@ nfsvno_namei(struct nfsrv_descript *nd, struct nameidata *ndp,
 	if (NFSVNO_EXRDONLY(exp))
 		cnp->cn_flags |= RDONLY;
 	ndp->ni_segflg = UIO_SYSSPACE;
-	crossmnt = 1;
 
 	if (nd->nd_flag & ND_PUBLOOKUP) {
 		ndp->ni_loopcnt = 0;
@@ -397,7 +399,6 @@ nfsvno_namei(struct nfsrv_descript *nd, struct nameidata *ndp,
 		 * the mount point, unless nfsrv_enable_crossmntpt is set.
 		 */
 		cnp->cn_flags |= NOCROSSMOUNT;
-		crossmnt = 0;
 	}
 
 	/*
@@ -455,8 +456,7 @@ nfsvno_namei(struct nfsrv_descript *nd, struct nameidata *ndp,
 			cp = uma_zalloc(namei_zone, M_WAITOK);
 		else
 			cp = cnp->cn_pnbuf;
-		aiov.iov_base = cp;
-		aiov.iov_len = MAXPATHLEN;
+		IOVEC_INIT(&aiov, cp, MAXPATHLEN);
 		auio.uio_iov = &aiov;
 		auio.uio_iovcnt = 1;
 		auio.uio_offset = 0;
@@ -567,8 +567,8 @@ int
 nfsvno_readlink(struct vnode *vp, struct ucred *cred, struct thread *p,
     struct mbuf **mpp, struct mbuf **mpendp, int *lenp)
 {
-	struct iovec iv[(NFS_MAXPATHLEN+MLEN-1)/MLEN];
-	struct iovec *ivp = iv;
+	kiovec_t iv[(NFS_MAXPATHLEN+MLEN-1)/MLEN];
+	kiovec_t *ivp = iv;
 	struct uio io, *uiop = &io;
 	struct mbuf *mp, *mp2 = NULL, *mp3 = NULL;
 	int i, len, tlen, error = 0;
@@ -591,8 +591,7 @@ nfsvno_readlink(struct vnode *vp, struct ucred *cred, struct thread *p,
 		} else {
 			len += mp->m_len;
 		}
-		ivp->iov_base = mtod(mp, caddr_t);
-		ivp->iov_len = mp->m_len;
+		IOVEC_INIT(ivp, mtod(mp, caddr_t), mp->m_len);
 		i++;
 		ivp++;
 	}
@@ -632,8 +631,8 @@ nfsvno_read(struct vnode *vp, off_t off, int cnt, struct ucred *cred,
 {
 	struct mbuf *m;
 	int i;
-	struct iovec *iv;
-	struct iovec *iv2;
+	kiovec_t *iv;
+	kiovec_t *iv2;
 	int error = 0, len, left, siz, tlen, ioflag = 0;
 	struct mbuf *m2 = NULL, *m3;
 	struct uio io, *uiop = &io;
@@ -658,7 +657,7 @@ nfsvno_read(struct vnode *vp, off_t off, int cnt, struct ucred *cred,
 			m3 = m;
 		m2 = m;
 	}
-	MALLOC(iv, struct iovec *, i * sizeof (struct iovec),
+	MALLOC(iv, kiovec_t *, i * sizeof (kiovec_t),
 	    M_TEMP, M_WAITOK);
 	uiop->uio_iov = iv2 = iv;
 	m = m3;
@@ -669,8 +668,7 @@ nfsvno_read(struct vnode *vp, off_t off, int cnt, struct ucred *cred,
 			panic("nfsvno_read iov");
 		siz = min(M_TRAILINGSPACE(m), left);
 		if (siz > 0) {
-			iv->iov_base = mtod(m, caddr_t) + m->m_len;
-			iv->iov_len = siz;
+			IOVEC_INIT(iv, mtod(m, caddr_t) + m->m_len, siz);
 			m->m_len += siz;
 			left -= siz;
 			iv++;
@@ -686,6 +684,8 @@ nfsvno_read(struct vnode *vp, off_t off, int cnt, struct ucred *cred,
 	uiop->uio_td = NULL;
 	nh = nfsrv_sequential_heuristic(uiop, vp);
 	ioflag |= nh->nh_seqcount << IO_SEQSHIFT;
+	/* XXX KDM make this more systematic? */
+	nfsstatsv1.srvbytes[NFSV4OP_READ] += uiop->uio_resid;
 	error = VOP_READ(vp, uiop, IO_NODELOCKED | ioflag, cred);
 	FREE((caddr_t)iv2, M_TEMP);
 	if (error) {
@@ -717,14 +717,14 @@ int
 nfsvno_write(struct vnode *vp, off_t off, int retlen, int cnt, int stable,
     struct mbuf *mp, char *cp, struct ucred *cred, struct thread *p)
 {
-	struct iovec *ivp;
+	kiovec_t *ivp;
 	int i, len;
-	struct iovec *iv;
+	kiovec_t *iv;
 	int ioflags, error;
 	struct uio io, *uiop = &io;
 	struct nfsheur *nh;
 
-	MALLOC(ivp, struct iovec *, cnt * sizeof (struct iovec), M_TEMP,
+	MALLOC(ivp, kiovec_t *, cnt * sizeof (kiovec_t), M_TEMP,
 	    M_WAITOK);
 	uiop->uio_iov = iv = ivp;
 	uiop->uio_iovcnt = cnt;
@@ -735,8 +735,7 @@ nfsvno_write(struct vnode *vp, off_t off, int retlen, int cnt, int stable,
 			panic("nfsvno_write");
 		if (i > 0) {
 			i = min(i, len);
-			ivp->iov_base = cp;
-			ivp->iov_len = i;
+			IOVEC_INIT(ivp, cp, i);
 			ivp++;
 			len -= i;
 		}
@@ -758,6 +757,8 @@ nfsvno_write(struct vnode *vp, off_t off, int retlen, int cnt, int stable,
 	uiop->uio_offset = off;
 	nh = nfsrv_sequential_heuristic(uiop, vp);
 	ioflags |= nh->nh_seqcount << IO_SEQSHIFT;
+	/* XXX KDM make this more systematic? */
+	nfsstatsv1.srvbytes[NFSV4OP_WRITE] += uiop->uio_resid;
 	error = VOP_WRITE(vp, uiop, ioflags, cred);
 	if (error == 0)
 		nh->nh_nextoff = uiop->uio_offset;
@@ -794,6 +795,11 @@ nfsvno_createsub(struct nfsrv_descript *nd, struct nameidata *ndp,
 					nvap->na_atime.tv_nsec = cverf[1];
 					error = VOP_SETATTR(ndp->ni_vp,
 					    &nvap->na_vattr, nd->nd_cred);
+					if (error != 0) {
+						vput(ndp->ni_vp);
+						ndp->ni_vp = NULL;
+						error = NFSERR_NOTSUPP;
+					}
 				}
 			}
 		/*
@@ -1300,7 +1306,7 @@ nfsvno_fsync(struct vnode *vp, u_int64_t off, int cnt, struct ucred *cred,
 		daddr_t lblkno;
 
 		/*
-		 * Align to iosize boundry, super-align to page boundry.
+		 * Align to iosize boundary, super-align to page boundary.
 		 */
 		if (off & iomask) {
 			cnt += off & iomask;
@@ -1422,6 +1428,13 @@ nfsvno_open(struct nfsrv_descript *nd, struct nameidata *ndp,
 					nvap->na_atime.tv_nsec = cverf[1];
 					nd->nd_repstat = VOP_SETATTR(ndp->ni_vp,
 					    &nvap->na_vattr, cred);
+					if (nd->nd_repstat != 0) {
+						vput(ndp->ni_vp);
+						ndp->ni_vp = NULL;
+						nd->nd_repstat = NFSERR_NOTSUPP;
+					} else
+						NFSSETBIT_ATTRBIT(attrbitp,
+						    NFSATTRBIT_TIMEACCESS);
 				} else {
 					nfsrv_fixattr(nd, ndp->ni_vp, nvap,
 					    aclp, p, attrbitp, exp);
@@ -1560,7 +1573,7 @@ nfsrvd_readdir(struct nfsrv_descript *nd, int isdgram,
 	u_int64_t off, toff, verf;
 	u_long *cookies = NULL, *cookiep;
 	struct uio io;
-	struct iovec iv;
+	kiovec_t iv;
 	int is_ufs;
 
 	if (nd->nd_repstat) {
@@ -1625,8 +1638,7 @@ again:
 		cookies = NULL;
 	}
 
-	iv.iov_base = rbuf;
-	iv.iov_len = siz;
+	IOVEC_INIT(&iv, rbuf, siz);
 	io.uio_iov = &iv;
 	io.uio_iovcnt = 1;
 	io.uio_offset = (off_t)off;
@@ -1810,7 +1822,7 @@ nfsrvd_readdirplus(struct nfsrv_descript *nd, int isdgram,
 	u_long *cookies = NULL, *cookiep;
 	nfsattrbit_t attrbits, rderrbits, savbits;
 	struct uio io;
-	struct iovec iv;
+	kiovec_t iv;
 	struct componentname cn;
 	int at_root, is_ufs, is_zfs, needs_unbusy, supports_nfsv4acls;
 	struct mount *mp, *new_mp;
@@ -1903,8 +1915,7 @@ again:
 		cookies = NULL;
 	}
 
-	iv.iov_base = rbuf;
-	iv.iov_len = siz;
+	IOVEC_INIT(&iv, rbuf, siz);
 	io.uio_iov = &iv;
 	io.uio_iovcnt = 1;
 	io.uio_offset = (off_t)off;
@@ -2370,7 +2381,7 @@ nfsrv_sattr(struct nfsrv_descript *nd, vnode_t vp, struct nfsvattr *nvap,
 			vfs_timestamp(&nvap->na_atime);
 			nvap->na_vaflags |= VA_UTIMES_NULL;
 			break;
-		};
+		}
 		NFSM_DISSECT(tl, u_int32_t *, NFSX_UNSIGNED);
 		switch (fxdr_unsigned(int, *tl)) {
 		case NFSV3SATTRTIME_TOCLIENT:
@@ -2383,11 +2394,11 @@ nfsrv_sattr(struct nfsrv_descript *nd, vnode_t vp, struct nfsvattr *nvap,
 			if (!toclient)
 				nvap->na_vaflags |= VA_UTIMES_NULL;
 			break;
-		};
+		}
 		break;
 	case ND_NFSV4:
 		error = nfsv4_sattr(nd, vp, nvap, attrbitp, aclp, p);
-	};
+	}
 nfsmout:
 	NFSEXITCODE2(error, nd);
 	return (error);
@@ -2585,7 +2596,7 @@ nfsv4_sattr(struct nfsrv_descript *nd, vnode_t vp, struct nfsvattr *nvap,
 			 */
 			bitpos = NFSATTRBIT_MAX;
 			break;
-		};
+		}
 	}
 
 	/*
@@ -2790,7 +2801,7 @@ nfsd_fhtovp(struct nfsrv_descript *nd, struct nfsrvfh *nfp, int lktype,
 	/*
 	 * Personally, I've never seen any point in requiring a
 	 * reserved port#, since only in the rare case where the
-	 * clients are all boxes with secure system priviledges,
+	 * clients are all boxes with secure system privileges,
 	 * does it provide any enhanced security, but... some people
 	 * believe it to be useful and keep putting this code back in.
 	 * (There is also some "security checker" out there that
@@ -3056,7 +3067,7 @@ out:
 }
 
 /*
- * Nfs server psuedo system call for the nfsd's
+ * Nfs server pseudo system call for the nfsd's
  */
 /*
  * MPSAFE

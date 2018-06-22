@@ -1,6 +1,8 @@
 /*	$OpenBSD: reg.h,v 1.1 1998/01/28 11:14:53 pefo Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -17,7 +19,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -70,6 +72,12 @@ struct dbreg {
 	unsigned long junk;
 };
 
+#ifdef CPU_CHERI
+struct capreg {
+	struct chericap r_regs[NUMCHERISAVEREGS];
+};
+#endif
+
 #ifdef __LP64__
 /* Must match struct trapframe */
 struct reg32 {
@@ -95,8 +103,8 @@ int	set_regs(struct thread *, struct reg *);
 int	fill_dbregs(struct thread *, struct dbreg *);
 int	set_dbregs(struct thread *, struct dbreg *);
 #ifdef CPU_CHERI
-int	fill_capregs(struct thread *, void *);
-int	set_capregs(struct thread *, void *);
+int	fill_capregs(struct thread *, struct capreg *);
+int	set_capregs(struct thread *, struct capreg *);
 #endif
 #endif
 

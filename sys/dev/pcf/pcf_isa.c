@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2004 Joerg Wunsch
  *
  * derived from sys/i386/isa/pcf.c which is:
@@ -112,7 +114,7 @@ pcf_isa_probe(device_t dev)
 	if ((error = resource_int_value(PCF_NAME, 0, "port", &port) != 0))
 		return (error);
 
-	/* Probe is only successfull for the specified base io */
+	/* Probe is only successful for the specified base io */
 	if (port != (u_int)start)
 		return (ENXIO);
 

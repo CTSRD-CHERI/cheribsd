@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2001 Dag-Erling Coïdan Smørgrav
  * All rights reserved.
  *
@@ -50,9 +52,9 @@ struct vnode;
 /*
  * Limits and constants
  */
-#define PFS_NAMELEN		24
+#define PFS_NAMELEN		48
 #define PFS_FSNAMELEN		16	/* equal to MFSNAMELEN */
-#define PFS_DELEN		(8 + PFS_NAMELEN)
+#define PFS_DELEN		(offsetof(struct dirent, d_name) + PFS_NAMELEN)
 
 typedef enum {
 	pfstype_none = 0,
@@ -81,7 +83,6 @@ typedef enum {
  */
 struct pfs_info;
 struct pfs_node;
-struct pfs_bitmap;
 
 /*
  * Init / uninit callback
@@ -120,8 +121,6 @@ struct vattr;
 #define PFS_ATTR_PROTO(name) \
 	int name(PFS_ATTR_ARGS);
 typedef int (*pfs_attr_t)(PFS_ATTR_ARGS);
-
-struct pfs_bitmap;		/* opaque */
 
 /*
  * Visibility callback
@@ -189,16 +188,16 @@ typedef int (*pfs_destroy_t)(PFS_DESTROY_ARGS);
 /*
  * pfs_info: describes a pseudofs instance
  *
- * The pi_mutex is only used to avoid using the global subr_unit lock for
- * unrhdr.  The rest of struct pfs_info is only modified while Giant is
- * held (during vfs_init() and vfs_uninit()).
+ * The pi_mutex is only used to avoid using the global subr_unit lock
+ * for unrhdr.  The rest of struct pfs_info is only modified during
+ * vfs_init() and vfs_uninit() of the consumer filesystem.
  */
 struct pfs_info {
 	char			 pi_name[PFS_FSNAMELEN];
 	pfs_init_t		 pi_init;
 	pfs_init_t		 pi_uninit;
 
-	/* members below this line are initialized at run time*/
+	/* members below this line are initialized at run time */
 	struct pfs_node		*pi_root;
 	struct mtx		 pi_mutex;
 	struct unrhdr		*pi_unrhdr;
@@ -285,17 +284,17 @@ static int								\
 _##name##_mount(struct mount *mp) {					\
         if (jflag && !prison_allow(curthread->td_ucred, jflag))		\
                 return (EPERM);						\
-	return pfs_mount(&name##_info, mp);				\
+	return (pfs_mount(&name##_info, mp));				\
 }									\
 									\
 static int								\
 _##name##_init(struct vfsconf *vfc) {					\
-	return pfs_init(&name##_info, vfc);				\
+	return (pfs_init(&name##_info, vfc));				\
 }									\
 									\
 static int								\
 _##name##_uninit(struct vfsconf *vfc) {					\
-	return pfs_uninit(&name##_info, vfc);				\
+	return (pfs_uninit(&name##_info, vfc));				\
 }									\
 									\
 static struct vfsops name##_vfsops = {					\

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1990, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -120,11 +122,12 @@ command(KINFO *k, VARENT *ve)
 	if (cflag) {
 		/* If it is the last field, then don't pad */
 		if (STAILQ_NEXT(ve, next_ve) == NULL) {
-			asprintf(&str, "%s%s%s%s",
+			asprintf(&str, "%s%s%s%s%s",
 			    k->ki_d.prefix ? k->ki_d.prefix : "",
 			    k->ki_p->ki_comm,
 			    (showthreads && k->ki_p->ki_numthreads > 1) ? "/" : "",
-			    (showthreads && k->ki_p->ki_numthreads > 1) ? k->ki_p->ki_tdname : "");
+			    (showthreads && k->ki_p->ki_numthreads > 1) ? k->ki_p->ki_tdname : "",
+			    (showthreads && k->ki_p->ki_numthreads > 1) ? k->ki_p->ki_moretdname : "");
 		} else
 			str = strdup(k->ki_p->ki_comm);
 
@@ -172,14 +175,16 @@ ucomm(KINFO *k, VARENT *ve)
 	char *str;
 
 	if (STAILQ_NEXT(ve, next_ve) == NULL) {	/* last field, don't pad */
-		asprintf(&str, "%s%s%s%s",
+		asprintf(&str, "%s%s%s%s%s",
 		    k->ki_d.prefix ? k->ki_d.prefix : "",
 		    k->ki_p->ki_comm,
 		    (showthreads && k->ki_p->ki_numthreads > 1) ? "/" : "",
-		    (showthreads && k->ki_p->ki_numthreads > 1) ? k->ki_p->ki_tdname : "");
+		    (showthreads && k->ki_p->ki_numthreads > 1) ? k->ki_p->ki_tdname : "",
+		    (showthreads && k->ki_p->ki_numthreads > 1) ? k->ki_p->ki_moretdname : "");
 	} else {
 		if (showthreads && k->ki_p->ki_numthreads > 1)
-			asprintf(&str, "%s/%s", k->ki_p->ki_comm, k->ki_p->ki_tdname);
+			asprintf(&str, "%s/%s%s", k->ki_p->ki_comm,
+			    k->ki_p->ki_tdname, k->ki_p->ki_moretdname);
 		else
 			str = strdup(k->ki_p->ki_comm);
 	}
@@ -192,7 +197,8 @@ tdnam(KINFO *k, VARENT *ve __unused)
 	char *str;
 
 	if (showthreads && k->ki_p->ki_numthreads > 1)
-		str = strdup(k->ki_p->ki_tdname);
+		asprintf(&str, "%s%s", k->ki_p->ki_tdname,
+		    k->ki_p->ki_moretdname);
 	else
 		str = strdup("      ");
 
@@ -211,7 +217,7 @@ logname(KINFO *k, VARENT *ve __unused)
 char *
 state(KINFO *k, VARENT *ve __unused)
 {
-	int flag, tdflags;
+	long flag, tdflags;
 	char *cp, *buf;
 
 	buf = malloc(16);
@@ -258,9 +264,9 @@ state(KINFO *k, VARENT *ve __unused)
 	cp++;
 	if (!(flag & P_INMEM))
 		*cp++ = 'W';
-	if (k->ki_p->ki_nice < NZERO)
+	if (k->ki_p->ki_nice < NZERO || k->ki_p->ki_pri.pri_class == PRI_REALTIME)
 		*cp++ = '<';
-	else if (k->ki_p->ki_nice > NZERO)
+	else if (k->ki_p->ki_nice > NZERO || k->ki_p->ki_pri.pri_class == PRI_IDLE)
 		*cp++ = 'N';
 	if (flag & P_TRACED)
 		*cp++ = 'X';
@@ -270,6 +276,8 @@ state(KINFO *k, VARENT *ve __unused)
 		*cp++ = 'V';
 	if ((flag & P_SYSTEM) || k->ki_p->ki_lock > 0)
 		*cp++ = 'L';
+	if ((k->ki_p->ki_cr_flags & CRED_FLAG_CAPMODE) != 0)
+		*cp++ = 'C';
 	if (k->ki_p->ki_kiflag & KI_SLEADER)
 		*cp++ = 's';
 	if ((flag & P_CONTROLT) && k->ki_p->ki_pgid == k->ki_p->ki_tpgid)

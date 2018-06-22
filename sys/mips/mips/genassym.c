@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1990 The Regents of the University of California.
  * All rights reserved.
  *
@@ -13,7 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -93,10 +95,6 @@ ASSYM(PC_CPUID, offsetof(struct pcpu, pc_cpuid));
 ASSYM(PC_TLB_MISS_CNT, offsetof(struct pcpu, pc_tlb_miss_cnt));
 ASSYM(PC_TLB_INVALID_CNT, offsetof(struct pcpu, pc_tlb_invalid_cnt));
 ASSYM(PC_TLB_MOD_CNT, offsetof(struct pcpu, pc_tlb_mod_cnt));
-#ifdef CPU_CHERI
-ASSYM(PC_CHERI_CCALL_CNT, offsetof(struct pcpu, pc_cheri_ccall_cnt));
-ASSYM(PC_CHERI_CRETURN_CNT, offsetof(struct pcpu, pc_cheri_creturn_cnt));
-#endif /* CPU_CHERI */
 #endif /* defined(MIPS_EXC_CNTRS) */
 
 ASSYM(VM_MAX_KERNEL_ADDRESS, VM_MAX_KERNEL_ADDRESS);
@@ -117,6 +115,9 @@ ASSYM(TDF_NEEDRESCHED, TDF_NEEDRESCHED);
 ASSYM(TDF_ASTPENDING, TDF_ASTPENDING);
 ASSYM(MAXCOMLEN, MAXCOMLEN);
 ASSYM(MDTD_COP2USED, MDTD_COP2USED);
+#ifdef CPU_QEMU_MALTA
+ASSYM(MDTD_QTRACE, MDTD_QTRACE);
+#endif
 #ifdef KSTACK_LARGE_PAGE
 ASSYM(KSTACK_TLBMASK_MASK, KSTACK_TLBMASK_MASK);
 #endif
@@ -127,15 +128,7 @@ ASSYM(MIPS_KSEG2_START, MIPS_KSEG2_START);
 ASSYM(MIPS_XKSEG_START, MIPS_XKSEG_START);
 
 #ifdef	CPU_CHERI
-ASSYM(CHERI_FRAME_SIZE, sizeof(struct cheri_stack_frame));
-ASSYM(CHERI_STACK_SIZE, sizeof(struct cheri_stack_frame) * CHERI_STACK_DEPTH);
-ASSYM(U_PCB_CHERIFRAME, offsetof(struct pcb, pcb_cheriframe));
 ASSYM(U_PCB_CHERIKFRAME, offsetof(struct pcb, pcb_cherikframe));
-ASSYM(U_PCB_CHERISTACK_TSP, offsetof(struct pcb, pcb_cheristack.cs_tsp));
-ASSYM(U_PCB_CHERISTACK_TSIZE, offsetof(struct pcb, pcb_cheristack.cs_tsize));
-ASSYM(U_PCB_CHERISTACK_FRAMES, offsetof(struct pcb, pcb_cheristack.cs_frames));
-ASSYM(CHERI_STACKFRAME_PCC, offsetof(struct cheri_stack_frame, csf_pcc));
-ASSYM(CHERI_STACKFRAME_IDC, offsetof(struct cheri_stack_frame, csf_idc));
 #endif
 
 #ifdef	CPU_CNMIPS

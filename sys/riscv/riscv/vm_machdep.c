@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2015 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2015-2017 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -53,6 +53,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpu.h>
 #include <machine/pcb.h>
 #include <machine/frame.h>
+#include <machine/sbi.h>
 
 /*
  * Finish a fork operation, with process p2 nearly set up.
@@ -64,15 +65,9 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 {
 	struct pcb *pcb2;
 	struct trapframe *tf;
-	uint64_t val;
 
 	if ((flags & RFPROC) == 0)
 		return;
-
-	if (td1 == curthread) {
-		__asm __volatile("mv	%0, tp" : "=&r"(val));
-		td1->td_pcb->pcb_tp = val;
-	}
 
 	pcb2 = (struct pcb *)(td2->td_kstack +
 	    td2->td_kstack_pages * PAGE_SIZE) - 1;
@@ -92,28 +87,30 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	/* Arguments for child */
 	tf->tf_a[0] = 0;
 	tf->tf_a[1] = 0;
-	tf->tf_sstatus = SSTATUS_PIE;
+	tf->tf_sstatus |= (SSTATUS_SPIE); /* Enable interrupts. */
+	tf->tf_sstatus |= (SSTATUS_SUM); /* Supervisor can access userspace. */
+	tf->tf_sstatus &= ~(SSTATUS_SPP); /* User mode. */
 
 	td2->td_frame = tf;
 
 	/* Set the return value registers for fork() */
-	td2->td_pcb->pcb_t[0] = (uintptr_t)fork_return;
-	td2->td_pcb->pcb_t[1] = (uintptr_t)td2;
+	td2->td_pcb->pcb_s[0] = (uintptr_t)fork_return;
+	td2->td_pcb->pcb_s[1] = (uintptr_t)td2;
 	td2->td_pcb->pcb_ra = (uintptr_t)fork_trampoline;
 	td2->td_pcb->pcb_sp = (uintptr_t)td2->td_frame;
 
 	/* Setup to release spin count in fork_exit(). */
 	td2->td_md.md_spinlock_count = 1;
-	td2->td_md.md_saved_sstatus_ie = 1;
+	td2->td_md.md_saved_sstatus_ie = (SSTATUS_SIE);
 }
 
 void
 cpu_reset(void)
 {
 
-	printf("cpu_reset");
-	while(1)
-		__asm volatile("wfi" ::: "memory");
+	sbi_shutdown();
+
+	while(1);
 }
 
 void
@@ -152,39 +149,40 @@ cpu_set_syscall_retval(struct thread *td, int error)
 }
 
 /*
- * Initialize machine state (pcb and trap frame) for a new thread about to
- * upcall. Put enough state in the new thread's PCB to get it to go back
- * userret(), where we can intercept it again to set the return (upcall)
- * Address and stack, along with those from upcals that are from other sources
- * such as those generated in thread_userret() itself.
+ * Initialize machine state, mostly pcb and trap frame for a new
+ * thread, about to return to userspace.  Put enough state in the new
+ * thread's PCB to get it to go back to the fork_return(), which
+ * finalizes the thread state and handles peculiarities of the first
+ * return to userspace for the new thread.
  */
 void
-cpu_set_upcall(struct thread *td, struct thread *td0)
+cpu_copy_thread(struct thread *td, struct thread *td0)
 {
 
 	bcopy(td0->td_frame, td->td_frame, sizeof(struct trapframe));
 	bcopy(td0->td_pcb, td->td_pcb, sizeof(struct pcb));
 
-	td->td_pcb->pcb_t[0] = (uintptr_t)fork_return;
-	td->td_pcb->pcb_t[1] = (uintptr_t)td;
+	td->td_pcb->pcb_s[0] = (uintptr_t)fork_return;
+	td->td_pcb->pcb_s[1] = (uintptr_t)td;
 	td->td_pcb->pcb_ra = (uintptr_t)fork_trampoline;
 	td->td_pcb->pcb_sp = (uintptr_t)td->td_frame;
 
 	/* Setup to release spin count in fork_exit(). */
 	td->td_md.md_spinlock_count = 1;
-	td->td_md.md_saved_sstatus_ie = 1;
+	td->td_md.md_saved_sstatus_ie = (SSTATUS_SIE);
 }
 
 /*
- * Set that machine state for performing an upcall that has to
- * be done in thread_userret() so that those upcalls generated
- * in thread_userret() itself can be done as well.
+ * Set that machine state for performing an upcall that starts
+ * the entry function with the given argument.
  */
 void
-cpu_set_upcall_kse(struct thread *td, void (*entry)(void *), void *arg,
+cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
 	stack_t *stack)
 {
-	struct trapframe *tf = td->td_frame;
+	struct trapframe *tf;
+
+	tf = td->td_frame;
 
 	tf->tf_sp = STACKALIGN((uintptr_t)stack->ss_sp + stack->ss_size);
 	tf->tf_sepc = (register_t)entry;
@@ -217,7 +215,7 @@ cpu_thread_alloc(struct thread *td)
 	td->td_pcb = (struct pcb *)(td->td_kstack +
 	    td->td_kstack_pages * PAGE_SIZE) - 1;
 	td->td_frame = (struct trapframe *)STACKALIGN(
-	    td->td_pcb - 1);
+	    (caddr_t)td->td_pcb - 8 - sizeof(struct trapframe));
 }
 
 void
@@ -237,11 +235,11 @@ cpu_thread_clean(struct thread *td)
  * This is needed to make kernel threads stay in kernel mode.
  */
 void
-cpu_set_fork_handler(struct thread *td, void (*func)(void *), void *arg)
+cpu_fork_kthread_handler(struct thread *td, void (*func)(void *), void *arg)
 {
 
-	td->td_pcb->pcb_t[0] = (uintptr_t)func;
-	td->td_pcb->pcb_t[1] = (uintptr_t)arg;
+	td->td_pcb->pcb_s[0] = (uintptr_t)func;
+	td->td_pcb->pcb_s[1] = (uintptr_t)arg;
 	td->td_pcb->pcb_ra = (uintptr_t)fork_trampoline;
 	td->td_pcb->pcb_sp = (uintptr_t)td->td_frame;
 }

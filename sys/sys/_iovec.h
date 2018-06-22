@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -40,9 +42,58 @@ typedef	__size_t	size_t;
 #define	_SIZE_T_DECLARED
 #endif
 
+#ifndef _KERNEL
 struct iovec {
-	void	*iov_base;	/* Base address. */
-	size_t	 iov_len;	/* Length. */
+	void *	iov_base;	/* Base address. */
+	size_t			iov_len;	/* Length. */
 };
+#endif
+#if __has_feature(capabilities)
+struct iovec_c {
+	void * __capability	iov_base;	/* Base address. */
+	size_t			iov_len;	/* Length. */
+};
+#endif
+struct iovec_native {
+	void *	iov_base;	/* Base address. */
+	size_t			iov_len;	/* Length. */
+};
+/* XXX: need some ifdefs */
+#if __has_feature(capabilities)
+typedef struct iovec_c		kiovec_t;
+#else
+typedef	struct iovec_native	kiovec_t;
+#endif
+typedef struct iovec_native	uiovec_t;
+
+#if defined(_KERNEL)
+#define	IOVEC_INIT(iovp, base, len)	do {				\
+	(iovp)->iov_base = (__cheri_tocap void * __capability)(base);	\
+	(iovp)->iov_len = (len);					\
+} while(0)
+#define IOVEC_INIT_C(iovp, base, len)	do {				\
+	(iovp)->iov_base = (base);					\
+	(iovp)->iov_len = (len);					\
+} while(0)
+#else
+#define IOVEC_INIT(iovp, base, len)	do {				\
+	(iovp)->iov_base = (base);					\
+	(iovp)->iov_len = (len);					\
+} while(0)
+#define	IOVEC_INIT_C IOVEC_INIT
+#endif
+
+#define	IOVEC_INIT_STR(iovp, str)					\
+	IOVEC_INIT(iovp, str, strlen(str) + 1)
+#define	IOVEC_INIT_OBJ(iovp, obj)					\
+	IOVEC_INIT(iovp, &(obj), sizeof(obj))
+
+#define	IOVEC_ADVANCE(iovp, amt)	do {				\
+	size_t amount = (amt);						\
+	KASSERT(amount <= (iovp)->iov_len, ("%s: amount %zu > iov_len	\
+	    %zu", __func__, amount, (iovp)->iov_len));			\
+	(iovp)->iov_base = (char * __capability)((iovp)->iov_base) + amount; \
+	(iovp)->iov_len -= amount;					\
+} while(0)
 
 #endif /* !_SYS__IOVEC_H_ */

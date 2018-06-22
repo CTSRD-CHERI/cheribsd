@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2003 Networks Associates Technology, Inc.
  * Copyright (c) 2004-2011 Dag-Erling Smørgrav
  * All rights reserved.
@@ -57,6 +59,7 @@ __FBSDID("$FreeBSD$");
 
 #include <openssl/evp.h>
 
+#define __bounded__(x, y, z)
 #include "key.h"
 #include "buffer.h"
 #include "authfd.h"
@@ -76,15 +79,17 @@ static const char *pam_ssh_prompt = "SSH passphrase: ";
 static const char *pam_ssh_have_keys = "pam_ssh_have_keys";
 
 static const char *pam_ssh_keyfiles[] = {
-	".ssh/identity",	/* SSH1 RSA key */
 	".ssh/id_rsa",		/* SSH2 RSA key */
 	".ssh/id_dsa",		/* SSH2 DSA key */
 	".ssh/id_ecdsa",	/* SSH2 ECDSA key */
+	".ssh/id_ed25519",	/* SSH2 Ed25519 key */
 	NULL
 };
 
 static const char *pam_ssh_agent = "/usr/bin/ssh-agent";
-static char *const pam_ssh_agent_argv[] = { "ssh_agent", "-s", NULL };
+static char str_ssh_agent[] = "ssh-agent";
+static char str_dash_s[] = "-s";
+static char *const pam_ssh_agent_argv[] = { str_ssh_agent, str_dash_s, NULL };
 static char *const pam_ssh_agent_envp[] = { NULL };
 
 /*

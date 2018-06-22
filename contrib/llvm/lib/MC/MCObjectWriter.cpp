@@ -7,15 +7,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/MC/MCObjectWriter.h"
 #include "llvm/MC/MCAssembler.h"
 #include "llvm/MC/MCExpr.h"
-#include "llvm/MC/MCObjectWriter.h"
+#include "llvm/MC/MCFragment.h"
 #include "llvm/MC/MCSymbol.h"
 
 using namespace llvm;
 
-MCObjectWriter::~MCObjectWriter() {
-}
+MCObjectWriter::~MCObjectWriter() = default;
 
 bool MCObjectWriter::isSymbolRefDifferenceFullyResolved(
     const MCAssembler &Asm, const MCSymbolRefExpr *A, const MCSymbolRefExpr *B,
@@ -33,8 +33,14 @@ bool MCObjectWriter::isSymbolRefDifferenceFullyResolved(
   if (!SA.getFragment() || !SB.getFragment())
     return false;
 
-  return isSymbolRefDifferenceFullyResolvedImpl(Asm, SA, *SB.getFragment(),
-                                                InSet, false);
+  return isSymbolRefDifferenceFullyResolvedImpl(Asm, SA, SB, InSet);
+}
+
+bool MCObjectWriter::isSymbolRefDifferenceFullyResolvedImpl(
+    const MCAssembler &Asm, const MCSymbol &A, const MCSymbol &B,
+    bool InSet) const {
+  return isSymbolRefDifferenceFullyResolvedImpl(Asm, A, *B.getFragment(), InSet,
+                                                false);
 }
 
 bool MCObjectWriter::isSymbolRefDifferenceFullyResolvedImpl(
@@ -45,5 +51,3 @@ bool MCObjectWriter::isSymbolRefDifferenceFullyResolvedImpl(
   // On ELF and COFF  A - B is absolute if A and B are in the same section.
   return &SecA == &SecB;
 }
-
-bool MCObjectWriter::isWeak(const MCSymbol &) const { return false; }

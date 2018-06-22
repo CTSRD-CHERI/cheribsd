@@ -1,6 +1,8 @@
 /*      $NetBSD: ppc_reloc.c,v 1.10 2001/09/10 06:09:41 mycroft Exp $   */
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ *
  * Copyright (C) 1998   Tsubai Masanari
  * All rights reserved.
  *
@@ -126,7 +128,7 @@ do_copy_relocations(Obj_Entry *dstobj)
 void
 reloc_non_plt_self(Elf_Dyn *dynp, Elf_Addr relocbase)
 {
-	const Elf_Rela *rela = 0, *relalim;
+	const Elf_Rela *rela = NULL, *relalim;
 	Elf_Addr relasz = 0;
 	Elf_Addr *where;
 
@@ -468,13 +470,16 @@ reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
  */
 Elf_Addr
 reloc_jmpslot(Elf_Addr *wherep, Elf_Addr target, const Obj_Entry *defobj,
-	      const Obj_Entry *obj, const Elf_Rel *rel)
+    const Obj_Entry *obj, const Elf_Rel *rel)
 {
 	Elf_Addr offset;
 	const Elf_Rela *rela = (const Elf_Rela *) rel;
 
 	dbg(" reloc_jmpslot: where=%p, target=%p",
 	    (void *)wherep, (void *)target);
+
+	if (ld_bind_not)
+		goto out;
 
 	/*
 	 * At the PLT entry pointed at by `wherep', construct
@@ -519,6 +524,7 @@ reloc_jmpslot(Elf_Addr *wherep, Elf_Addr target, const Obj_Entry *defobj,
 		}
 	}
 
+out:
 	return (target);
 }
 
@@ -617,6 +623,11 @@ init_pltgot(Obj_Entry *obj)
 	 * The icache will be sync'd in reloc_plt, which is called
 	 * after all the slots have been updated
 	 */
+}
+
+void
+ifunc_init(Elf_Auxinfo aux_info[__min_size(AT_COUNT)] __unused)
+{
 }
 
 void

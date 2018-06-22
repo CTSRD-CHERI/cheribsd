@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2004 Juli Mallett.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -51,6 +53,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/tlb.h>
 #include <machine/hwfunc.h>
 #include <machine/mips_opcode.h>
+#include <machine/regnum.h>
 #include <machine/tls.h>
 
 #if defined(CPU_CNMIPS)
@@ -65,43 +68,45 @@ struct mips_cpuinfo cpuinfo;
 #define _ENCODE_INSN(a,b,c,d,e) \
     ((uint32_t)(((a) << 26)|((b) << 21)|((c) << 16)|((d) << 11)|(e)))
 
-/* Register numbers */
-#define	_V0	2
-#define	_A1	5
-#define	_T0	12
-#define	_T1	13
-#define	_RA	31
-
 #if defined(__mips_n64)
 
 #   define	_LOAD_T0_MDTLS_A1 \
-    _ENCODE_INSN(OP_LD, _A1, _T0, 0, offsetof(struct thread, td_md.md_tls))
+    _ENCODE_INSN(OP_LD, A1, T0, 0, offsetof(struct thread, td_md.md_tls))
 
 #   define	_LOAD_T0_MDTLS_TCV_OFFSET_A1 \
-    _ENCODE_INSN(OP_LD, _A1, _T1, 0, \
+    _ENCODE_INSN(OP_LD, A1, T1, 0, \
     offsetof(struct thread, td_md.md_tls_tcb_offset))
 
 #   define	_ADDU_V0_T0_T1 \
-    _ENCODE_INSN(OP_DADDU, _T0, _T1, _V0, 0)
-
-#   define _MTC0_V0_USERLOCAL \
-    _ENCODE_INSN(OP_COP0, OP_DMT, _V0, 4, 2)
+    _ENCODE_INSN(0, T0, T1, V0, OP_DADDU)
 
 #else /* mips 32 */
 
 #   define	_LOAD_T0_MDTLS_A1 \
-    _ENCODE_INSN(OP_LW, _A1, _T0, 0, offsetof(struct thread, td_md.md_tls))
+    _ENCODE_INSN(OP_LW, A1, T0, 0, offsetof(struct thread, td_md.md_tls))
+
 #   define	_LOAD_T0_MDTLS_TCV_OFFSET_A1 \
-    _ENCODE_INSN(OP_LW, _A1, _T1, 0, \
+    _ENCODE_INSN(OP_LW, A1, T1, 0, \
     offsetof(struct thread, td_md.md_tls_tcb_offset))
+
 #   define	_ADDU_V0_T0_T1 \
-    _ENCODE_INSN(OP_ADDU, _T0, _T1, _V0, 0)
-#   define _MTC0_V0_USERLOCAL \
-    _ENCODE_INSN(OP_COP0, OP_MT, _V0, 4, 2)
+    _ENCODE_INSN(0, T0, T1, V0, OP_ADDU)
 
 #endif /* ! __mips_n64 */
 
-#define	_JR_RA	_ENCODE_INSN(OP_SPECIAL, _RA, 0, 0, OP_JR)
+#if defined(__mips_n64) || defined(__mips_n32)
+
+#   define _MTC0_V0_USERLOCAL \
+    _ENCODE_INSN(OP_COP0, OP_DMT, V0, 4, 2)
+
+#else /* mips o32 */
+
+#   define _MTC0_V0_USERLOCAL \
+    _ENCODE_INSN(OP_COP0, OP_MT, V0, 4, 2)
+
+#endif /* ! (__mips_n64 || __mipsn32) */
+
+#define	_JR_RA	_ENCODE_INSN(OP_SPECIAL, RA, 0, 0, OP_JR)
 #define	_NOP	0
 
 /*
@@ -141,7 +146,10 @@ static void
 mips_get_identity(struct mips_cpuinfo *cpuinfo)
 {
 	u_int32_t prid;
-	u_int32_t cfg0, cfg1, cfg2 = 0, cfg3 = 0;
+	u_int32_t cfg0;
+	u_int32_t cfg1;
+	u_int32_t cfg2;
+	u_int32_t cfg3;
 #if defined(CPU_CNMIPS)
 	u_int32_t cfg4;
 #endif
@@ -170,11 +178,17 @@ mips_get_identity(struct mips_cpuinfo *cpuinfo)
 	cfg1 = mips_rd_config1();
 
 	/* Get the Config2 and Config3 registers as well. */
+	cfg2 = 0;
+	cfg3 = 0;
 	if (cfg1 & MIPS_CONFIG1_M) {
 		cfg2 = mips_rd_config2();
 		if (cfg2 & MIPS_CONFIG2_M)
 			cfg3 = mips_rd_config3();
 	}
+
+	/* Save FP implementation revision if FP is present. */
+	if (cfg1 & MIPS_CONFIG1_FP)
+		cpuinfo->fpu_id = MipsFPID();
 
 	/* Check to see if UserLocal register is implemented. */
 	if (cfg3 & MIPS_CONFIG3_ULR) {
@@ -346,6 +360,9 @@ static void
 cpu_identify(void)
 {
 	uint32_t cfg0, cfg1, cfg2, cfg3;
+#if defined(CPU_MIPS1004K) || defined (CPU_MIPS74K) || defined (CPU_MIPS24K)
+	uint32_t cfg7;
+#endif
 	printf("cpu%d: ", 0);   /* XXX per-cpu */
 	switch (cpuinfo.cpu_vendor) {
 	case MIPS_PRID_CID_MTI:
@@ -378,6 +395,10 @@ cpu_identify(void)
 		break;
 	case MIPS_PRID_CID_CAVIUM:
 		printf("Cavium");
+		break;
+	case MIPS_PRID_CID_INGENIC:
+	case MIPS_PRID_CID_INGENIC2:
+		printf("Ingenic XBurst");
 		break;
 	case MIPS_PRID_CID_PREHISTORIC:
 	default:
@@ -470,6 +491,19 @@ cpu_identify(void)
 	printf("  Config1=0x%b\n", cfg1, 
 	    "\20\7COP2\6MDMX\5PerfCount\4WatchRegs\3MIPS16\2EJTAG\1FPU");
 
+	if (cpuinfo.fpu_id != 0)
+		printf("  FPU ID=0x%b\n", cpuinfo.fpu_id,
+		    "\020"
+		    "\020S"
+		    "\021D"
+		    "\022PS"
+		    "\0233D"
+		    "\024W"
+		    "\025L"
+		    "\026F64"
+		    "\0272008"
+		    "\034UFRP");
+
 	/* If config register selection 2 does not exist, exit. */
 	if (!(cfg1 & MIPS_CONFIG_CM))
 		return;
@@ -487,7 +521,12 @@ cpu_identify(void)
 
 	/* Print Config3 if it contains any useful info */
 	if (cfg3 & ~(0x80000000))
-		printf("  Config3=0x%b\n", cfg3, "\20\14ULRI\2SmartMIPS\1TraceLogic");
+		printf("  Config3=0x%b\n", cfg3, "\20\16ULRI\2SmartMIPS\1TraceLogic");
+
+#if defined(CPU_MIPS1004K) || defined (CPU_MIPS74K) || defined (CPU_MIPS24K)
+	cfg7 = mips_rd_config7();
+	printf("  Config7=0x%b\n", cfg7, "\20\40WII\21AR");
+#endif
 }
 
 static struct rman cpu_hardirq_rman;

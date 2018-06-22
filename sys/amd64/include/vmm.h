@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
  *
@@ -377,7 +379,7 @@ struct vm_copyinfo {
  * at 'gla' and 'len' bytes long. The 'prot' should be set to PROT_READ for
  * a copyin or PROT_WRITE for a copyout. 
  *
- * retval	is_fault	Intepretation
+ * retval	is_fault	Interpretation
  *   0		   0		Success
  *   0		   1		An exception was injected into the guest
  * EFAULT	  N/A		Unrecoverable error

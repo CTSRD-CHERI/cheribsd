@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2009, 2013 The FreeBSD Foundation
  * All rights reserved.
  *
@@ -181,8 +183,8 @@ static void vt_resume_handler(void *priv);
 
 SET_DECLARE(vt_drv_set, struct vt_driver);
 
-#define	_VTDEFH	MAX(100, PIXEL_HEIGHT(VT_FB_DEFAULT_HEIGHT))
-#define	_VTDEFW	MAX(200, PIXEL_WIDTH(VT_FB_DEFAULT_WIDTH))
+#define	_VTDEFH	MAX(100, PIXEL_HEIGHT(VT_FB_MAX_HEIGHT))
+#define	_VTDEFW	MAX(200, PIXEL_WIDTH(VT_FB_MAX_WIDTH))
 
 struct terminal	vt_consterm;
 static struct vt_window	vt_conswindow;
@@ -640,9 +642,9 @@ vt_compute_drawable_area(struct vt_window *vw)
 	if (vt_draw_logo_cpus)
 		vw->vw_draw_area.tr_begin.tp_row += vt_logo_sprite_height;
 	vw->vw_draw_area.tr_end.tp_col = vw->vw_draw_area.tr_begin.tp_col +
-	    vd->vd_width / vf->vf_width * vf->vf_width;
+	    rounddown(vd->vd_width, vf->vf_width);
 	vw->vw_draw_area.tr_end.tp_row = vw->vw_draw_area.tr_begin.tp_row +
-	    height / vf->vf_height * vf->vf_height;
+	    rounddown(height, vf->vf_height);
 }
 
 static void
@@ -709,7 +711,7 @@ vt_machine_kbdevent(int c)
 		/* Suspend machine. */
 		power_pm_suspend(POWER_SLEEP_STATE_SUSPEND);
 		return (1);
-	};
+	}
 
 	return (0);
 }
@@ -1052,6 +1054,15 @@ vtterm_param(struct terminal *tm, int cmd, unsigned int arg)
 	struct vt_window *vw = tm->tm_softc;
 
 	switch (cmd) {
+	case TP_SETLOCALCURSOR:
+		/*
+		 * 0 means normal (usually block), 1 means hidden, and
+		 * 2 means blinking (always block) for compatibility with
+		 * syscons.  We don't support any changes except hiding,
+		 * so must map 2 to 0.
+		 */
+		arg = (arg == 1) ? 0 : 1;
+		/* FALLTHROUGH */
 	case TP_SHOWCURSOR:
 		vtbuf_cursor_visibility(&vw->vw_buf, arg);
 		vt_resume_flush_timer(vw->vw_device, 0);
@@ -1075,6 +1086,8 @@ vt_determine_colors(term_char_t c, int cursor,
 	if (TCHAR_FORMAT(c) & TF_BOLD)
 		*fg = TCOLOR_LIGHT(*fg);
 	*bg = TCHAR_BGCOLOR(c);
+	if (TCHAR_FORMAT(c) & TF_BLINK)
+		*bg = TCOLOR_LIGHT(*bg);
 
 	if (TCHAR_FORMAT(c) & TF_REVERSE)
 		invert ^= 1;
@@ -1147,6 +1160,36 @@ vt_mark_mouse_position_as_dirty(struct vt_device *vd)
 }
 #endif
 
+static void
+vt_set_border(struct vt_device *vd, const term_rect_t *area,
+    const term_color_t c)
+{
+	vd_drawrect_t *drawrect = vd->vd_driver->vd_drawrect;
+
+	if (drawrect == NULL)
+		return;
+
+	/* Top bar */
+	if (area->tr_begin.tp_row > 0)
+		drawrect(vd, 0, 0, vd->vd_width - 1,
+		    area->tr_begin.tp_row - 1, 1, c);
+
+	/* Left bar */
+	if (area->tr_begin.tp_col > 0)
+		drawrect(vd, 0, area->tr_begin.tp_row,
+		    area->tr_begin.tp_col - 1, area->tr_end.tp_row - 1, 1, c);
+
+	/* Right bar */
+	if (area->tr_end.tp_col < vd->vd_width)
+		drawrect(vd, area->tr_end.tp_col, area->tr_begin.tp_row,
+		    vd->vd_width - 1, area->tr_end.tp_row - 1, 1, c);
+
+	/* Bottom bar */
+	if (area->tr_end.tp_row < vd->vd_height)
+		drawrect(vd, 0, area->tr_end.tp_row, vd->vd_width - 1,
+		    vd->vd_height - 1, 1, c);
+}
+
 static int
 vt_flush(struct vt_device *vd)
 {
@@ -1212,6 +1255,7 @@ vt_flush(struct vt_device *vd)
 	if (vd->vd_flags & VDF_INVALID) {
 		vd->vd_flags &= ~VDF_INVALID;
 
+		vt_set_border(vd, &vw->vw_draw_area, TC_BLACK);
 		vt_termrect(vd, vf, &tarea);
 		if (vt_draw_logo_cpus)
 			vtterm_draw_cpu_logos(vd);
@@ -1527,45 +1571,6 @@ vtterm_opened(struct terminal *tm, int opened)
 }
 
 static int
-vt_set_border(struct vt_window *vw, term_color_t c)
-{
-	struct vt_device *vd = vw->vw_device;
-
-	if (vd->vd_driver->vd_drawrect == NULL)
-		return (ENOTSUP);
-
-	/* Top bar. */
-	if (vw->vw_draw_area.tr_begin.tp_row > 0)
-		vd->vd_driver->vd_drawrect(vd,
-		    0, 0,
-		    vd->vd_width - 1, vw->vw_draw_area.tr_begin.tp_row - 1,
-		    1, c);
-
-	/* Left bar. */
-	if (vw->vw_draw_area.tr_begin.tp_col > 0)
-		vd->vd_driver->vd_drawrect(vd,
-		    0, 0,
-		    vw->vw_draw_area.tr_begin.tp_col - 1, vd->vd_height - 1,
-		    1, c);
-
-	/* Right bar. */
-	if (vw->vw_draw_area.tr_end.tp_col < vd->vd_width)
-		vd->vd_driver->vd_drawrect(vd,
-		    vw->vw_draw_area.tr_end.tp_col - 1, 0,
-		    vd->vd_width - 1, vd->vd_height - 1,
-		    1, c);
-
-	/* Bottom bar. */
-	if (vw->vw_draw_area.tr_end.tp_row < vd->vd_height)
-		vd->vd_driver->vd_drawrect(vd,
-		    0, vw->vw_draw_area.tr_end.tp_row - 1,
-		    vd->vd_width - 1, vd->vd_height - 1,
-		    1, c);
-
-	return (0);
-}
-
-static int
 vt_change_font(struct vt_window *vw, struct vt_font *vf)
 {
 	struct vt_device *vd = vw->vw_device;
@@ -1630,7 +1635,6 @@ vt_change_font(struct vt_window *vw, struct vt_font *vf)
 
 	/* Force a full redraw the next timer tick. */
 	if (vd->vd_curwindow == vw) {
-		vt_set_border(vw, TC_BLACK);
 		vd->vd_flags |= VDF_INVALID;
 		vt_resume_flush_timer(vw->vw_device, 0);
 	}
@@ -2159,6 +2163,10 @@ skip_thunk:
 
 		return (error);
 	}
+	case KDGETMODE:
+		*(int *)data = (vw->vw_flags & VWF_GRAPHICS) ?
+		    KD_GRAPHICS : KD_TEXT;
+		return (0);
 	case KDGKBMODE: {
 		error = 0;
 
@@ -2212,6 +2220,13 @@ skip_thunk:
 	case CONS_BLANKTIME:
 		/* XXX */
 		return (0);
+	case CONS_HISTORY:
+		if (*(int *)data < 0)
+			return EINVAL;
+		if (*(int *)data != vd->vd_curwindow->vw_buf.vb_history_size)
+			vtbuf_sethistory_size(&vd->vd_curwindow->vw_buf,
+			    *(int *)data);
+		return 0;
 	case CONS_GET:
 		/* XXX */
 		*(int *)data = M_CG640x480;
@@ -2228,9 +2243,11 @@ skip_thunk:
 			return (EINVAL);
 
 		if (vw == vd->vd_curwindow) {
+			mtx_lock(&Giant);
 			kbd = kbd_get_keyboard(vd->vd_keyboard);
 			if (kbd != NULL)
 				vt_save_kbd_state(vw, kbd);
+			mtx_unlock(&Giant);
 		}
 
 		vi->m_num = vd->vd_curwindow->vw_number + 1;
@@ -2357,6 +2374,7 @@ skip_thunk:
 			    (void *)vd, vt_kbdevent, vd);
 			if (i >= 0) {
 				if (vd->vd_keyboard != -1) {
+					kbd = kbd_get_keyboard(vd->vd_keyboard);
 					vt_save_kbd_state(vd->vd_curwindow, kbd);
 					kbd_release(kbd, (void *)vd);
 				}
@@ -2614,10 +2632,17 @@ vt_upgrade(struct vt_device *vd)
 		/* Init 25 Hz timer. */
 		callout_init_mtx(&vd->vd_timer, &vd->vd_lock, 0);
 
-		/* Start timer when everything ready. */
+		/*
+		 * Start timer when everything ready.
+		 * Note that the operations here are purposefully ordered.
+		 * We need to ensure vd_timer_armed is non-zero before we set
+		 * the VDF_ASYNC flag. That prevents this function from
+		 * racing with vt_resume_flush_timer() to update the
+		 * callout structure.
+		 */
+		atomic_add_acq_int(&vd->vd_timer_armed, 1);
 		vd->vd_flags |= VDF_ASYNC;
 		callout_reset(&vd->vd_timer, hz / VT_TIMERFREQ, vt_timer, vd);
-		vd->vd_timer_armed = 1;
 		register_handlers = 1;
 	}
 

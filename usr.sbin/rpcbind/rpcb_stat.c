@@ -3,6 +3,8 @@
  * $FreeBSD$
  */
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2009, Sun Microsystems, Inc.
  * All rights reserved.
  *
@@ -151,7 +153,7 @@ rpcbs_rmtcall(rpcvers_t rtype, rpcproc_t rpcbproc, rpcprog_t prog,
 	rpcbs_rmtcalllist *rl;
 	struct netconfig *nconf;
 
-	if (rtype > RPCBVERS_STAT)
+	if (rtype >= RPCBVERS_STAT)
 		return;
 	for (rl = inf[rtype].rmtinfo; rl; rl = rl->next) {
 

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2005, M. Warner Losh
  * All rights reserved.
  * Copyright (c) 1995, David Greenman 
@@ -214,7 +216,7 @@ ed_probe_HP_pclanp(device_t dev, int port_rid, int flags)
  	 * Check for impossible IRQ.
 	 */
 
-	if (irq >= (sizeof(ed_hpp_intr_val) / sizeof(ed_hpp_intr_val[0])))
+	if (irq >= nitems(ed_hpp_intr_val))
 		return (ENXIO);
 
 	/* 

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2010 Jakub Wojciech Klama <jceel@FreeBSD.org>
  * All rights reserved.
  *
@@ -227,15 +229,12 @@ lpc_intc_eoi(void *data)
 
 }
 
-struct fdt_fixup_entry fdt_fixup_table[] = {
-	{ NULL, NULL }
-};
-
+#ifndef INTRNG
 static int
 fdt_pic_decode_ic(phandle_t node, pcell_t *intr, int *interrupt, int *trig,
     int *pol)
 {
-	if (!fdt_is_compatible(node, "lpc,pic"))
+	if (!ofw_bus_node_is_compatible(node, "lpc,pic"))
 		return (ENXIO);
 
 	*interrupt = fdt32_to_cpu(intr[0]);
@@ -248,3 +247,4 @@ fdt_pic_decode_t fdt_pic_table[] = {
 	&fdt_pic_decode_ic,
 	NULL
 };
+#endif

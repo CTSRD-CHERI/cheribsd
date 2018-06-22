@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2007 The DragonFly Project.  All rights reserved.
  * 
  * This code is derived from software contributed to The DragonFly Project
@@ -110,6 +112,8 @@ static int	bwi_raw_xmit(struct ieee80211_node *, struct mbuf *,
 			const struct ieee80211_bpf_params *);
 static void	bwi_watchdog(void *);
 static void	bwi_scan_start(struct ieee80211com *);
+static void	bwi_getradiocaps(struct ieee80211com *, int, int *,
+		    struct ieee80211_channel[]);
 static void	bwi_set_channel(struct ieee80211com *);
 static void	bwi_scan_end(struct ieee80211com *);
 static int	bwi_newstate(struct ieee80211vap *, enum ieee80211_state, int);
@@ -303,6 +307,9 @@ static const struct {
 	[108]	= { 7, 3 }
 };
 
+static const uint8_t bwi_chan_2ghz[] =
+	{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 };
+
 #ifdef BWI_DEBUG
 #ifdef BWI_DEBUG_VERBOSE
 static uint32_t bwi_debug = BWI_DBG_ATTACH | BWI_DBG_INIT | BWI_DBG_TXPOWER;
@@ -356,7 +363,6 @@ bwi_attach(struct bwi_softc *sc)
 	device_t dev = sc->sc_dev;
 	struct bwi_mac *mac;
 	struct bwi_phy *phy;
-	uint8_t bands[howmany(IEEE80211_MODE_MAX, 8)];
 	int i, error;
 
 	BWI_LOCK_INIT(sc);
@@ -377,6 +383,7 @@ bwi_attach(struct bwi_softc *sc)
 	 */
 	sc->sc_fw_version = BWI_FW_VERSION3;
 	sc->sc_led_idle = (2350 * hz) / 1000;
+	sc->sc_led_ticks = ticks - sc->sc_led_idle;
 	sc->sc_led_blink = 1;
 	sc->sc_txpwr_calib = 1;
 #ifdef BWI_DEBUG
@@ -453,15 +460,12 @@ bwi_attach(struct bwi_softc *sc)
 	/*
 	 * Setup ratesets, phytype, channels and get MAC address
 	 */
-	memset(bands, 0, sizeof(bands));
 	if (phy->phy_mode == IEEE80211_MODE_11B ||
 	    phy->phy_mode == IEEE80211_MODE_11G) {
-		setbit(bands, IEEE80211_MODE_11B);
 		if (phy->phy_mode == IEEE80211_MODE_11B) {
 			ic->ic_phytype = IEEE80211_T_DS;
 		} else {
 			ic->ic_phytype = IEEE80211_T_OFDM;
-			setbit(bands, IEEE80211_MODE_11G);
 		}
 
 		bwi_get_eaddr(sc, BWI_SPROM_11BG_EADDR, ic->ic_macaddr);
@@ -475,7 +479,6 @@ bwi_attach(struct bwi_softc *sc)
 		}
 	} else if (phy->phy_mode == IEEE80211_MODE_11A) {
 		/* TODO:11A */
-		setbit(bands, IEEE80211_MODE_11A);
 		error = ENXIO;
 		goto fail;
 	} else {
@@ -487,7 +490,8 @@ bwi_attach(struct bwi_softc *sc)
 				   BWI_SPROM_CARD_INFO_LOCALE);
 	DPRINTF(sc, BWI_DBG_ATTACH, "locale: %d\n", sc->sc_locale);
 	/* XXX use locale */
-	ieee80211_init_channels(ic, NULL, bands);
+	bwi_getradiocaps(ic, IEEE80211_CHAN_MAX, &ic->ic_nchans,
+	    ic->ic_channels);
 
 	ic->ic_softc = sc;
 	ic->ic_name = device_get_nameunit(dev);
@@ -509,6 +513,7 @@ bwi_attach(struct bwi_softc *sc)
 	ic->ic_updateslot = bwi_updateslot;
 	ic->ic_scan_start = bwi_scan_start;
 	ic->ic_scan_end = bwi_scan_end;
+	ic->ic_getradiocaps = bwi_getradiocaps;
 	ic->ic_set_channel = bwi_set_channel;
 	ic->ic_transmit = bwi_transmit;
 	ic->ic_parent = bwi_parent;
@@ -1673,6 +1678,43 @@ bwi_scan_start(struct ieee80211com *ic)
 	/* Enable MAC beacon promiscuity */
 	CSR_SETBITS_4(sc, BWI_MAC_STATUS, BWI_MAC_STATUS_PASS_BCN);
 	BWI_UNLOCK(sc);
+}
+
+static void
+bwi_getradiocaps(struct ieee80211com *ic,
+    int maxchans, int *nchans, struct ieee80211_channel chans[])
+{
+	struct bwi_softc *sc = ic->ic_softc;
+	struct bwi_mac *mac;
+	struct bwi_phy *phy;
+	uint8_t bands[IEEE80211_MODE_BYTES];
+
+	/*
+	 * XXX First MAC is known to exist
+	 * TODO2
+	 */
+	mac = &sc->sc_mac[0];
+	phy = &mac->mac_phy;
+
+	memset(bands, 0, sizeof(bands));
+	switch (phy->phy_mode) {
+	case IEEE80211_MODE_11G:
+		setbit(bands, IEEE80211_MODE_11G);
+		/* FALLTHROUGH */
+	case IEEE80211_MODE_11B:
+		setbit(bands, IEEE80211_MODE_11B);
+		break;
+	case IEEE80211_MODE_11A:
+		/* TODO:11A */
+		setbit(bands, IEEE80211_MODE_11A);
+		device_printf(sc->sc_dev, "no 11a support\n");
+		return;
+	default:
+		panic("unknown phymode %d\n", phy->phy_mode);
+	}
+
+	ieee80211_add_channel_list_2ghz(chans, maxchans, nchans,
+	    bwi_chan_2ghz, nitems(bwi_chan_2ghz), bands, 0);
 }
 
 static void
@@ -2891,7 +2933,7 @@ bwi_encap(struct bwi_softc *sc, int idx, struct mbuf *m,
 	struct bwi_mac *mac;
 	struct bwi_txbuf_hdr *hdr;
 	struct ieee80211_frame *wh;
-	const struct ieee80211_txparam *tp;
+	const struct ieee80211_txparam *tp = ni->ni_txparms;
 	uint8_t rate, rate_fb;
 	uint32_t mac_ctrl;
 	uint16_t phy_ctrl;
@@ -2916,7 +2958,6 @@ bwi_encap(struct bwi_softc *sc, int idx, struct mbuf *m,
 	/*
 	 * Find TX rate
 	 */
-	tp = &vap->iv_txparms[ieee80211_chan2mode(ic->ic_curchan)];
 	if (type != IEEE80211_FC0_TYPE_DATA || (m->m_flags & M_EAPOL)) {
 		rate = rate_fb = tp->mgmtrate;
 	} else if (ismcast) {
@@ -3282,7 +3323,6 @@ _bwi_txeof(struct bwi_softc *sc, uint16_t tx_id, int acked, int data_txcnt)
 	struct bwi_txbuf *tb;
 	int ring_idx, buf_idx;
 	struct ieee80211_node *ni;
-	struct ieee80211vap *vap;
 
 	if (tx_id == 0) {
 		device_printf(sc->sc_dev, "%s: zero tx id\n", __func__);
@@ -3309,7 +3349,7 @@ _bwi_txeof(struct bwi_softc *sc, uint16_t tx_id, int acked, int data_txcnt)
 	if ((ni = tb->tb_ni) != NULL) {
 		const struct bwi_txbuf_hdr *hdr =
 		    mtod(tb->tb_mbuf, const struct bwi_txbuf_hdr *);
-		vap = ni->ni_vap;
+		struct ieee80211_ratectl_tx_status txs;
 
 		/* NB: update rate control only for unicast frames */
 		if (hdr->txh_mac_ctrl & htole32(BWI_TXH_MAC_C_ACK)) {
@@ -3320,9 +3360,15 @@ _bwi_txeof(struct bwi_softc *sc, uint16_t tx_id, int acked, int data_txcnt)
 			 * well so to avoid over-aggressive downshifting we
 			 * treat any number of retries as "1".
 			 */
-			ieee80211_ratectl_tx_complete(vap, ni,
-			    (data_txcnt > 1) ? IEEE80211_RATECTL_TX_SUCCESS :
-			        IEEE80211_RATECTL_TX_FAILURE, &acked, NULL);
+			txs.flags = IEEE80211_RATECTL_STATUS_LONG_RETRY;
+			txs.long_retries = acked;
+			if (data_txcnt > 1)
+				txs.status = IEEE80211_RATECTL_TX_SUCCESS;
+			else {
+				txs.status =
+				    IEEE80211_RATECTL_TX_FAIL_UNSPECIFIED;
+			}
+			ieee80211_ratectl_tx_complete(ni, &txs);
 		}
 		ieee80211_tx_complete(ni, tb->tb_mbuf, !acked);
 		tb->tb_ni = NULL;
@@ -3747,7 +3793,7 @@ bwi_rx_radiotap(struct bwi_softc *sc, struct mbuf *m,
 	if (wh->i_fc[1] & IEEE80211_FC1_PROTECTED)
 		sc->sc_rx_th.wr_flags |= IEEE80211_RADIOTAP_F_WEP;
 
-	sc->sc_rx_th.wr_tsf = hdr->rxh_tsf; /* No endian convertion */
+	sc->sc_rx_th.wr_tsf = hdr->rxh_tsf; /* No endian conversion */
 	sc->sc_rx_th.wr_rate = rate;
 	sc->sc_rx_th.wr_antsignal = rssi;
 	sc->sc_rx_th.wr_antnoise = noise;

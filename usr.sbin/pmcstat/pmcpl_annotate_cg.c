@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2005-2007, Joseph Koshy
  * Copyright (c) 2007 The FreeBSD Foundation
  * Copyright (c) 2014, Adrian Chadd, Netflix Inc.
@@ -27,6 +29,16 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
  */
 
 /*
@@ -114,13 +126,13 @@ pmcpl_annotate_cg_process(struct pmcstat_process *pp, struct pmcstat_pmcrecord *
 
 		if (map != NULL && sym != NULL) {
 			fprintf(args.pa_graphfile, "%p %s %s:%d\n",
-			    (void *)cc[i],
+			    (void *)(intptr_t)cc[i],
 			    funcname,
 			    filename,
 			    sline);
 		} else {
 			fprintf(args.pa_graphfile, "%p <unknown> ??:0\n",
-			    (void *) cc[i]);
+			    (void *)(intptr_t)cc[i]);
 		}
 	}
 	fprintf(args.pa_graphfile, "--\n");

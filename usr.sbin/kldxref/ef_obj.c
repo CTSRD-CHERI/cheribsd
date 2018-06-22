@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2000, Boris Popov
  * Copyright (c) 1998-2000 Doug Rabson
  * Copyright (c) 2004 Peter Wemm
@@ -32,6 +34,16 @@
  * SUCH DAMAGE.
  *
  * $FreeBSD$
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_alignment"
+ *   ]
+ * }
+ * CHERI CHANGES END
  */
 
 #include <sys/param.h>
@@ -502,9 +514,14 @@ ef_obj_open(const char *filename, struct elf_file *efile, int verbose)
 		switch (shdr[i].sh_type) {
 		case SHT_PROGBITS:
 		case SHT_NOBITS:
+#if __has_builtin(__builtin_align_up)
+			mapbase = __builtin_align_up(mapbase,
+			    shdr[i].sh_addralign);
+#else
 			alignmask = shdr[i].sh_addralign - 1;
 			mapbase += alignmask;
 			mapbase  = (char *)((uintptr_t)mapbase & ~alignmask);
+#endif
 			ef->progtab[pb].addr = (void *)(uintptr_t)mapbase;
 			if (shdr[i].sh_type == SHT_PROGBITS) {
 				ef->progtab[pb].name = "<<PROGBITS>>";

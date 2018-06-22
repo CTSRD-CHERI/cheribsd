@@ -2,7 +2,8 @@
 # $FreeBSD$
 #
 
-OPENBSMDIR=		${.CURDIR}/../../contrib/openbsm
+PACKAGE=lib${LIB}
+OPENBSMDIR=		${SRCTOP}/contrib/openbsm
 _LIBAUDITDDIR=		${OPENBSMDIR}/libauditd
 _LIBBSMDIR=		${OPENBSMDIR}/libbsm
 

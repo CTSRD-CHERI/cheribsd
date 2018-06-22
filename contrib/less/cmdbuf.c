@@ -1,10 +1,20 @@
 /*
- * Copyright (C) 1984-2015  Mark Nudelman
+ * Copyright (C) 1984-2017  Mark Nudelman
  *
  * You may distribute under the terms of either the GNU General Public
  * License or the Less License, as specified in the README file.
  *
  * For more information, see the README file.
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ]
+ * }
+ * CHERI CHANGES END
  */
 
 
@@ -32,7 +42,7 @@ static int literal;		/* Next input char should not be interpreted */
 static int updown_match = -1;	/* Prefix length in up/down movement */
 
 #if TAB_COMPLETE_FILENAME
-static int cmd_complete();
+static int cmd_complete(int action);
 /*
  * These variables are statics used by cmd_complete.
  */
@@ -40,7 +50,7 @@ static int in_completion = 0;
 static char *tk_text;
 static char *tk_original;
 static char *tk_ipoint;
-static char *tk_trial;
+static char *tk_trial = NULL;
 static struct textlist tk_tlist;
 #endif
 
@@ -76,25 +86,25 @@ struct mlist
  */
 struct mlist mlist_search =  
 	{ &mlist_search,  &mlist_search,  &mlist_search,  NULL, 0 };
-public void * constant ml_search = (void *) &mlist_search;
+public void *ml_search = (void *) &mlist_search;
 
 struct mlist mlist_examine = 
 	{ &mlist_examine, &mlist_examine, &mlist_examine, NULL, 0 };
-public void * constant ml_examine = (void *) &mlist_examine;
+public void *ml_examine = (void *) &mlist_examine;
 
 #if SHELL_ESCAPE || PIPEC
 struct mlist mlist_shell =   
 	{ &mlist_shell,   &mlist_shell,   &mlist_shell,   NULL, 0 };
-public void * constant ml_shell = (void *) &mlist_shell;
+public void *ml_shell = (void *) &mlist_shell;
 #endif
 
 #else /* CMD_HISTORY */
 
 /* If CMD_HISTORY is off, these are just flags. */
-public void * constant ml_search = (void *)1;
-public void * constant ml_examine = (void *)2;
+public void *ml_search = (void *)1;
+public void *ml_examine = (void *)2;
 #if SHELL_ESCAPE || PIPEC
-public void * constant ml_shell = (void *)3;
+public void *ml_shell = (void *)3;
 #endif
 
 #endif /* CMD_HISTORY */
@@ -141,28 +151,26 @@ clear_cmd()
  */
 	public void
 cmd_putstr(s)
-	char *s;
+	constant char *s;
 {
 	LWCHAR prev_ch = 0;
 	LWCHAR ch;
-	char *endline = s + strlen(s);
+	constant char *endline = s + strlen(s);
 	while (*s != '\0')
 	{
-		char *ns = s;
+		char *ns = (char *) s;
+		int width;
 		ch = step_char(&ns, +1, endline);
 		while (s < ns)
 			putchr(*s++);
 		if (!utf_mode)
-		{
-			cmd_col++;
-			prompt_col++;
-		} else if (!is_composing_char(ch) &&
-		           !is_combining_char(prev_ch, ch))
-		{
-			int width = is_wide_char(ch) ? 2 : 1;
-			cmd_col += width;
-			prompt_col += width;
-		}
+			width = 1;
+		else if (is_composing_char(ch) || is_combining_char(prev_ch, ch))
+			width = 0;
+		else
+			width = is_wide_char(ch) ? 2 : 1;
+		cmd_col += width;
+		prompt_col += width;
 		prev_ch = ch;
 	}
 }
@@ -187,6 +195,8 @@ len_cmdbuf()
 
 /*
  * Common part of cmd_step_right() and cmd_step_left().
+ * {{ Returning pwidth and bswidth separately is a historical artifact
+ *    since they're always the same. Maybe clean this up someday. }}
  */
 	static char *
 cmd_step_common(p, ch, len, pwidth, bswidth)
@@ -197,58 +207,32 @@ cmd_step_common(p, ch, len, pwidth, bswidth)
 	int *bswidth;
 {
 	char *pr;
+	int width;
 
 	if (len == 1)
 	{
 		pr = prchar((int) ch);
-		if (pwidth != NULL || bswidth != NULL)
-		{
-			int len = (int) strlen(pr);
-			if (pwidth != NULL)
-				*pwidth = len;
-			if (bswidth != NULL)
-				*bswidth = len;
-		}
+		width = (int) strlen(pr);
 	} else
 	{
 		pr = prutfchar(ch);
-		if (pwidth != NULL || bswidth != NULL)
+		if (is_composing_char(ch))
+			width = 0;
+		else if (is_ubin_char(ch))
+			width = (int) strlen(pr);
+		else
 		{
-			if (is_composing_char(ch))
-			{
-				if (pwidth != NULL)
-					*pwidth = 0;
-				if (bswidth != NULL)
-					*bswidth = 0;
-			} else if (is_ubin_char(ch))
-			{
-				int len = (int) strlen(pr);
-				if (pwidth != NULL)
-					*pwidth = len;
-				if (bswidth != NULL)
-					*bswidth = len;
-			} else
-			{
-				LWCHAR prev_ch = step_char(&p, -1, cmdbuf);
-				if (is_combining_char(prev_ch, ch))
-				{
-					if (pwidth != NULL)
-						*pwidth = 0;
-					if (bswidth != NULL)
-						*bswidth = 0;
-				} else
-				{
-					if (pwidth != NULL)
-						*pwidth	= is_wide_char(ch)
-							?	2
-							:	1;
-					if (bswidth != NULL)
-						*bswidth = 1;
-				}
-			}
+			LWCHAR prev_ch = step_char(&p, -1, cmdbuf);
+			if (is_combining_char(prev_ch, ch))
+				width = 0;
+			else
+				width = is_wide_char(ch) ? 2 : 1;
 		}
 	}
-
+	if (pwidth != NULL)
+		*pwidth	= width;
+	if (bswidth != NULL)
+		*bswidth = width;
 	return (pr);
 }
 
@@ -288,7 +272,7 @@ cmd_step_left(pp, pwidth, bswidth)
  */
 	static void
 cmd_repaint(old_cp)
-	char *old_cp;
+	constant char *old_cp;
 {
 	/*
 	 * Repaint the line from the current position.
@@ -453,8 +437,9 @@ cmd_right()
 cmd_left()
 {
 	char *ncp;
-	int width, bswidth;
-	
+	int width = 0;
+	int bswidth = 0;
+
 	if (cp <= cmdbuf)
 	{
 		/* Already at the beginning of the line */
@@ -519,7 +504,7 @@ cmd_ichar(cs, clen)
 	static int
 cmd_erase()
 {
-	register char *s;
+	char *s;
 	int clen;
 
 	if (cp == cmdbuf)
@@ -687,7 +672,7 @@ set_mlist(mlist, cmdflags)
 cmd_updown(action)
 	int action;
 {
-	char *s;
+	constant char *s;
 	struct mlist *ml;
 	
 	if (curr_mlist == NULL)
@@ -749,7 +734,7 @@ cmd_updown(action)
 	public void
 cmd_addhist(mlist, cmd, modified)
 	struct mlist *mlist;
-	char *cmd;
+	constant char *cmd;
 	int modified;
 {
 #if CMD_HISTORY
@@ -966,7 +951,7 @@ delimit_word()
 	char *p;
 	int delim_quoted = 0;
 	int meta_quoted = 0;
-	char *esc = get_meta_escape();
+	constant char *esc = get_meta_escape();
 	int esclen = (int) strlen(esc);
 #endif
 	
@@ -1249,6 +1234,13 @@ cmd_char(c)
 			*cmd_mbc_buf = c;
 			if (IS_ASCII_OCTET(c))
 				cmd_mbc_buf_len = 1;
+#if MSDOS_COMPILER || OS2
+			else if (c == (unsigned char) '\340' && IS_ASCII_OCTET(peekcc()))
+			{
+				/* Assume a special key. */
+				cmd_mbc_buf_len = 1;
+			}
+#endif
 			else if (IS_UTF8_LEAD(c))
 			{
 				cmd_mbc_buf_len = utf_len(c);

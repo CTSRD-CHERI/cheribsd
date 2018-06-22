@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2010, LSI Corp.
  * All rights reserved.
  * Author : Manjunath Ranganathaiah
@@ -245,8 +247,8 @@ tws_attach(device_t dev)
 
     /* allocate MMIO register space */ 
     sc->reg_res_id = TWS_PCI_BAR1; /* BAR1 offset */
-    if ((sc->reg_res = bus_alloc_resource(dev, SYS_RES_MEMORY,
-                                &(sc->reg_res_id), 0, ~0, 1, RF_ACTIVE))
+    if ((sc->reg_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY,
+                                &(sc->reg_res_id), RF_ACTIVE))
                                 == NULL) {
         tws_log(sc, ALLOC_MEMORY_RES);
         goto attach_fail_1;
@@ -257,8 +259,8 @@ tws_attach(device_t dev)
 #ifndef TWS_PULL_MODE_ENABLE
     /* Allocate bus space for inbound mfa */ 
     sc->mfa_res_id = TWS_PCI_BAR2; /* BAR2 offset */
-    if ((sc->mfa_res = bus_alloc_resource(dev, SYS_RES_MEMORY,
-                          &(sc->mfa_res_id), 0, ~0, 0x100000, RF_ACTIVE))
+    if ((sc->mfa_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY,
+                          &(sc->mfa_res_id), RF_ACTIVE))
                                 == NULL) {
         tws_log(sc, ALLOC_MEMORY_RES);
         goto attach_fail_2;
@@ -606,21 +608,9 @@ tws_init(struct tws_softc *sc)
 
     sc->reqs = malloc(sizeof(struct tws_request) * tws_queue_depth, M_TWS,
                       M_WAITOK | M_ZERO);
-    if ( sc->reqs == NULL ) {
-        TWS_TRACE_DEBUG(sc, "malloc failed", 0, sc->is64bit);
-        return(ENOMEM);
-    }
     sc->sense_bufs = malloc(sizeof(struct tws_sense) * tws_queue_depth, M_TWS,
                       M_WAITOK | M_ZERO);
-    if ( sc->sense_bufs == NULL ) {
-        TWS_TRACE_DEBUG(sc, "sense malloc failed", 0, sc->is64bit);
-        return(ENOMEM);
-    }
     sc->scan_ccb = malloc(sizeof(union ccb), M_TWS, M_WAITOK | M_ZERO);
-    if ( sc->scan_ccb == NULL ) {
-        TWS_TRACE_DEBUG(sc, "ccb malloc failed", 0, sc->is64bit);
-        return(ENOMEM);
-    }
     if (bus_dmamem_alloc(sc->data_tag, (void **)&sc->ioctl_data_mem,
             (BUS_DMA_NOWAIT | BUS_DMA_ZERO), &sc->ioctl_data_map)) {
         device_printf(sc->tws_dev, "Cannot allocate ioctl data mem\n");
@@ -668,8 +658,6 @@ tws_init_aen_q(struct tws_softc *sc)
     sc->aen_q.overflow=0;
     sc->aen_q.q = malloc(sizeof(struct tws_event_packet)*sc->aen_q.depth, 
                               M_TWS, M_WAITOK | M_ZERO);
-    if ( ! sc->aen_q.q )
-        return(FAILURE);
     return(SUCCESS);
 }
 
@@ -682,8 +670,6 @@ tws_init_trace_q(struct tws_softc *sc)
     sc->trace_q.overflow=0;
     sc->trace_q.q = malloc(sizeof(struct tws_trace_rec)*sc->trace_q.depth,
                               M_TWS, M_WAITOK | M_ZERO);
-    if ( ! sc->trace_q.q )
-        return(FAILURE);
     return(SUCCESS);
 }
 

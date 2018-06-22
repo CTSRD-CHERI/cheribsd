@@ -28,13 +28,24 @@ void FunctionScopeInfo::Clear() {
   HasBranchIntoScope = false;
   HasIndirectGoto = false;
   HasDroppedStmt = false;
+  HasOMPDeclareReductionCombiner = false;
+  HasFallthroughStmt = false;
+  HasPotentialAvailabilityViolations = false;
   ObjCShouldCallSuper = false;
   ObjCIsDesignatedInit = false;
   ObjCWarnForNoDesignatedInitChain = false;
   ObjCIsSecondaryInit = false;
   ObjCWarnForNoInitDelegation = false;
+  FirstReturnLoc = SourceLocation();
   FirstCXXTryLoc = SourceLocation();
   FirstSEHTryLoc = SourceLocation();
+
+  // Coroutine state
+  FirstCoroutineStmtLoc = SourceLocation();
+  CoroutinePromise = nullptr;
+  NeedsCoroutineSuspends = true;
+  CoroutineSuspends.first = nullptr;
+  CoroutineSuspends.second = nullptr;
 
   SwitchStack.clear();
   Returns.clear();
@@ -82,11 +93,13 @@ FunctionScopeInfo::WeakObjectProfileTy::getBaseInfo(const Expr *E) {
     if (BaseProp) {
       D = getBestPropertyDecl(BaseProp);
 
-      const Expr *DoubleBase = BaseProp->getBase();
-      if (const OpaqueValueExpr *OVE = dyn_cast<OpaqueValueExpr>(DoubleBase))
-        DoubleBase = OVE->getSourceExpr();
+      if (BaseProp->isObjectReceiver()) {
+        const Expr *DoubleBase = BaseProp->getBase();
+        if (const OpaqueValueExpr *OVE = dyn_cast<OpaqueValueExpr>(DoubleBase))
+          DoubleBase = OVE->getSourceExpr();
 
-      IsExact = DoubleBase->isObjCSelfExpr();
+        IsExact = DoubleBase->isObjCSelfExpr();
+      }
     }
     break;
   }
@@ -176,7 +189,7 @@ void FunctionScopeInfo::markSafeWeakUse(const Expr *E) {
   }
 
   // Has this weak object been seen before?
-  FunctionScopeInfo::WeakObjectUseMap::iterator Uses;
+  FunctionScopeInfo::WeakObjectUseMap::iterator Uses = WeakObjectUses.end();
   if (const ObjCPropertyRefExpr *RefExpr = dyn_cast<ObjCPropertyRefExpr>(E)) {
     if (!RefExpr->isObjectReceiver())
       return;
@@ -189,10 +202,10 @@ void FunctionScopeInfo::markSafeWeakUse(const Expr *E) {
   }
   else if (const ObjCIvarRefExpr *IvarE = dyn_cast<ObjCIvarRefExpr>(E))
     Uses = WeakObjectUses.find(WeakObjectProfileTy(IvarE));
-  else if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E))
-    Uses = WeakObjectUses.find(WeakObjectProfileTy(DRE));
-  else if (const ObjCMessageExpr *MsgE = dyn_cast<ObjCMessageExpr>(E)) {
-    Uses = WeakObjectUses.end();
+  else if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
+    if (isa<VarDecl>(DRE->getDecl()))
+      Uses = WeakObjectUses.find(WeakObjectProfileTy(DRE));
+  } else if (const ObjCMessageExpr *MsgE = dyn_cast<ObjCMessageExpr>(E)) {
     if (const ObjCMethodDecl *MD = MsgE->getMethodDecl()) {
       if (const ObjCPropertyDecl *Prop = MD->findPropertyDecl()) {
         Uses =
@@ -209,7 +222,7 @@ void FunctionScopeInfo::markSafeWeakUse(const Expr *E) {
 
   // Has there been a read from the object using this Expr?
   FunctionScopeInfo::WeakUseVector::reverse_iterator ThisUse =
-    std::find(Uses->second.rbegin(), Uses->second.rend(), WeakUseTy(E, true));
+      llvm::find(llvm::reverse(Uses->second), WeakUseTy(E, true));
   if (ThisUse == Uses->second.rend())
     return;
 
@@ -234,5 +247,4 @@ void LambdaScopeInfo::getPotentialVariableCapture(unsigned Idx, VarDecl *&VD,
 
 FunctionScopeInfo::~FunctionScopeInfo() { }
 BlockScopeInfo::~BlockScopeInfo() { }
-LambdaScopeInfo::~LambdaScopeInfo() { }
 CapturedRegionScopeInfo::~CapturedRegionScopeInfo() { }

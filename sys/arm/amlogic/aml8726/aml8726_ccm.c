@@ -45,7 +45,6 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/bus.h>
 
-#include <dev/fdt/fdt_common.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
@@ -141,7 +140,7 @@ aml8726_ccm_configure_gates(struct aml8726_ccm_softc *sc)
 		AML_CCM_UNLOCK(sc);
 	}
 
-	free(functions, M_OFWPROP);
+	OF_prop_free(functions);
 
 	return (0);
 }

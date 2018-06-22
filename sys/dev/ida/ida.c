@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1999,2000 Jonathan Lemon
  * All rights reserved.
  *
@@ -193,7 +195,7 @@ ida_alloc_qcbs(struct ida_softc *ida)
 }
 
 int
-ida_init(struct ida_softc *ida)
+ida_setup(struct ida_softc *ida)
 {
 	struct ida_controller_info cinfo;
 	device_t child;

@@ -181,7 +181,7 @@ __FBSDID("$FreeBSD$");
  *  OPTIONAL, locked (UH). (M_NOWAIT). Returns 0 on success.
  *
  *  Finds entry specified by given key.
- *  * Caller is requred to do the following:
+ *  * Caller is required to do the following:
  *    entry found: returns 0, export entry to @tent
  *    entry not found: returns ENOENT
  *
@@ -263,7 +263,7 @@ __FBSDID("$FreeBSD$");
  * Dumps entry @e to @tent.
  *
  *
- * -print_config: prints custom algoritm options into buffer.
+ * -print_config: prints custom algorithm options into buffer.
  *  typedef void (ta_print_config)(void *ta_state, struct table_info *ti,
  *      char *buf, size_t bufsize);
  * OPTIONAL. locked(UH). (M_NOWAIT).
@@ -526,7 +526,8 @@ ta_dump_radix_tentry(void *ta_state, struct table_info *ti, void *e,
 #ifdef INET6
 	} else {
 		xn = (struct radix_addr_xentry *)e;
-		memcpy(&tent->k, &xn->addr6.sin6_addr, sizeof(struct in6_addr));
+		memcpy(&tent->k.addr6, &xn->addr6.sin6_addr,
+		    sizeof(struct in6_addr));
 		tent->masklen = xn->masklen;
 		tent->subtype = AF_INET6;
 		tent->v.kidx = xn->value;
@@ -590,7 +591,8 @@ ipv6_writemask(struct in6_addr *addr6, uint8_t mask)
 
 	for (cp = (uint32_t *)addr6; mask >= 32; mask -= 32)
 		*cp++ = 0xFFFFFFFF;
-	*cp = htonl(mask ? ~((1 << (32 - mask)) - 1) : 0);
+	if (mask > 0)
+		*cp = htonl(mask ? ~((1 << (32 - mask)) - 1) : 0);
 }
 #endif
 
@@ -1380,7 +1382,7 @@ ta_dump_chash_tentry(void *ta_state, struct table_info *ti, void *e,
 		tent->v.kidx = ent->value;
 #ifdef INET6
 	} else {
-		memcpy(&tent->k, &ent->a.a6, sizeof(struct in6_addr));
+		memcpy(&tent->k.addr6, &ent->a.a6, sizeof(struct in6_addr));
 		tent->masklen = cfg->mask6;
 		tent->subtype = AF_INET6;
 		tent->v.kidx = ent->value;
@@ -1941,7 +1943,7 @@ static int ta_lookup_ifidx(struct table_info *ti, void *key, uint32_t keylen,
 static int ta_init_ifidx(struct ip_fw_chain *ch, void **ta_state,
     struct table_info *ti, char *data, uint8_t tflags);
 static void ta_change_ti_ifidx(void *ta_state, struct table_info *ti);
-static void destroy_ifidx_locked(struct namedobj_instance *ii,
+static int destroy_ifidx_locked(struct namedobj_instance *ii,
     struct named_object *no, void *arg);
 static void ta_destroy_ifidx(void *ta_state, struct table_info *ti);
 static void ta_dump_ifidx_tinfo(void *ta_state, struct table_info *ti,
@@ -1969,7 +1971,7 @@ static int ta_dump_ifidx_tentry(void *ta_state, struct table_info *ti, void *e,
     ipfw_obj_tentry *tent);
 static int ta_find_ifidx_tentry(void *ta_state, struct table_info *ti,
     ipfw_obj_tentry *tent);
-static void foreach_ifidx(struct namedobj_instance *ii, struct named_object *no,
+static int foreach_ifidx(struct namedobj_instance *ii, struct named_object *no,
     void *arg);
 static void ta_foreach_ifidx(void *ta_state, struct table_info *ti,
     ta_foreach_f *f, void *arg);
@@ -2126,7 +2128,7 @@ ta_change_ti_ifidx(void *ta_state, struct table_info *ti)
 	icfg->ti = ti;
 }
 
-static void
+static int
 destroy_ifidx_locked(struct namedobj_instance *ii, struct named_object *no,
     void *arg)
 {
@@ -2139,6 +2141,7 @@ destroy_ifidx_locked(struct namedobj_instance *ii, struct named_object *no,
 	ipfw_iface_del_notify(ch, &ife->ic);
 	ipfw_iface_unref(ch, &ife->ic);
 	free(ife, M_IPFW_TBL);
+	return (0);
 }
 
 
@@ -2317,7 +2320,6 @@ ta_del_ifidx(void *ta_state, struct table_info *ti, struct tentry_info *tei,
 	tb = (struct ta_buf_ifidx *)ta_buf;
 	ifname = (char *)tei->paddr;
 	icfg = (struct iftable_cfg *)ta_state;
-	ife = tb->ife;
 
 	ife = (struct ifentry *)ipfw_objhash_lookup_name(icfg->ii, 0, ifname);
 
@@ -2560,7 +2562,7 @@ struct wa_ifidx {
 	void		*arg;
 };
 
-static void
+static int
 foreach_ifidx(struct namedobj_instance *ii, struct named_object *no,
     void *arg)
 {
@@ -2571,6 +2573,7 @@ foreach_ifidx(struct namedobj_instance *ii, struct named_object *no,
 	wa = (struct wa_ifidx *)arg;
 
 	wa->f(ife, wa->arg);
+	return (0);
 }
 
 static void
@@ -3981,7 +3984,8 @@ ta_dump_kfib_tentry_int(struct sockaddr *paddr, struct sockaddr *pmask,
 	if (paddr->sa_family == AF_INET6) {
 		addr6 = (struct sockaddr_in6 *)paddr;
 		mask6 = (struct sockaddr_in6 *)pmask;
-		memcpy(&tent->k, &addr6->sin6_addr, sizeof(struct in6_addr));
+		memcpy(&tent->k.addr6, &addr6->sin6_addr,
+		    sizeof(struct in6_addr));
 		len = 128;
 		if (mask6 != NULL)
 			len = contigmask((uint8_t *)&mask6->sin6_addr, 128);

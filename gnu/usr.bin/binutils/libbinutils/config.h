@@ -1,4 +1,14 @@
 /* $FreeBSD$ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "unsupported"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 /* FreeBSD isn't any form of AIX. */
 #define bin_dummy_emulation bin_vanilla_emulation
@@ -104,7 +114,6 @@
 #define HAVE_MKSTEMP 1
 
 /* Define to 1 if you have the `sbrk' function. */
-#define HAVE_SBRK 1
 
 /* Define to 1 if you have the `setmode' function. */
 #define HAVE_SETMODE 1

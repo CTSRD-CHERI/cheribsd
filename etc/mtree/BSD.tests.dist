@@ -8,21 +8,33 @@
     bin
         cat
         ..
-        chown
+        chflags
+        ..
+        chmod
         ..
         date
         ..
         dd
         ..
+        echo
+        ..
         expr
         ..
+        ln
+        ..
         ls
+        ..
+        mkdir
         ..
         mv
         ..
         pax
         ..
         pkill
+        ..
+        pwait
+        ..
+        rmdir
         ..
         sh
             builtins
@@ -32,6 +44,8 @@
             execution
             ..
             expansion
+            ..
+            invocation
             ..
             parameters
             ..
@@ -51,6 +65,8 @@
         sbin
         ..
         usr.bin
+            ctfconvert
+            ..
         ..
         usr.sbin
             dtrace
@@ -84,6 +100,8 @@
                     dtraceUtil
                     ..
                     end
+                    ..
+                    env
                     ..
                     enum
                     ..
@@ -185,6 +203,8 @@
                     ..
                     struct
                     ..
+                    sugar
+                    ..
                     syscall
                     ..
                     sysevent
@@ -214,6 +234,8 @@
                     version
                     ..
                 ..
+            ..
+            zfsd
             ..
         ..
     ..
@@ -261,6 +283,8 @@
                 data
                 ..
             ..
+            iconv
+            ..
             inet
             ..
             locale
@@ -283,6 +307,8 @@
             ..
             ssp
             ..
+            setjmp
+            ..
             stdio
             ..
             stdlib
@@ -302,17 +328,35 @@
             ttyio
             ..
         ..
+        libcam
+        ..
+        libcasper
+            services
+                cap_dns
+                ..
+                cap_grp
+                ..
+                cap_pwd
+                ..
+                cap_sysctl
+                ..
+            ..
+        ..
         libcrypt
+        ..
+        libdevdctl
+        ..
+        libkvm
         ..
         libmp
         ..
         libnv
         ..
-        libpam
-        ..
         libproc
         ..
         librt
+        ..
+        libsbuf
         ..
         libthr
             dlopen
@@ -346,6 +390,10 @@
         ..
         mdconfig
         ..
+        pfctl
+            files
+            ..
+        ..
     ..
     secure
         lib
@@ -364,7 +412,11 @@
                 ..
                 plain
                 ..
+                tap
+                ..
             ..
+        ..
+        zoneinfo
         ..
     ..
     sys
@@ -375,6 +427,10 @@
         fifo
         ..
         file
+        ..
+        fs
+            tmpfs
+            ..
         ..
         geom
             class
@@ -411,6 +467,8 @@
             ..
         ..
         kqueue
+            libkqueue
+            ..
         ..
         mac
             bsdextended
@@ -421,6 +479,14 @@
         mqueue
         ..
         netinet
+        ..
+        netipsec
+            tunnel
+            ..
+        ..
+        netpfil
+            pf
+            ..
         ..
         opencrypto
         ..
@@ -455,8 +521,12 @@
             ..
             unlink
             ..
+            utimensat
+            ..
         ..
         posixshm
+        ..
+        sys
         ..
         vfs
         ..
@@ -566,9 +636,13 @@
                 ..
             ..
         ..
+        bsdcat
+        ..
         calendar
         ..
         cmp
+        ..
+        compress
         ..
         cpio
         ..
@@ -576,17 +650,35 @@
         ..
         comm
         ..
+        csplit
+        ..
         cut
+        ..
+        dc
+        ..
+        diff
         ..
         dirname
         ..
+        du
+        ..
         file2c
+        ..
+        fold
+        ..
+        getconf
         ..
         grep
         ..
         gzip
         ..
+        head
+        ..
+        hexdump
+        ..
         ident
+        ..
+        indent
         ..
         join
         ..
@@ -604,13 +696,25 @@
         ..
         opensm
         ..
+        pr
+        ..
         printf
+        ..
+        procstat
+        ..
+        rs
+        ..
+        sdiff
         ..
         sed
             regress.multitest.out
             ..
         ..
         soelim
+        ..
+        stat
+        ..
+        tail
         ..
         tar
         ..
@@ -626,7 +730,11 @@
         ..
         uuencode
         ..
+        uniq
+        ..
         xargs
+        ..
+        xinstall
         ..
         xo
         ..
@@ -636,7 +744,11 @@
         ..
     ..
     usr.sbin
+        chown
+        ..
         etcupdate
+        ..
+        extattr
         ..
         fstyp
         ..

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2012 The FreeBSD Foundation
  * All rights reserved.
  *
@@ -34,6 +36,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -65,7 +68,7 @@ static void
 usage(void)
 {
 
-	fprintf(stderr, "usage: ctld [-d][-f config-file]\n");
+	fprintf(stderr, "usage: ctld [-d][-u][-f config-file]\n");
 	exit(1);
 }
 
@@ -197,7 +200,7 @@ auth_check_secret_length(struct auth *auth)
 			    auth->a_auth_group->ag_name);
 		else
 			log_warnx("secret for user \"%s\", target \"%s\", "
-			    "is too short; it should be at least 16 characters "
+			    "is too short; it should be at least 12 characters "
 			    "long", auth->a_user,
 			    auth->a_auth_group->ag_target->t_name);
 	}
@@ -226,7 +229,7 @@ auth_check_secret_length(struct auth *auth)
 			else
 				log_warnx("mutual secret for user \"%s\", "
 				    "target \"%s\", is too short; it should be "
-				    "at least 16 characters long",
+				    "at least 12 characters long",
 				    auth->a_user,
 				    auth->a_auth_group->ag_target->t_name);
 		}
@@ -400,8 +403,9 @@ auth_portal_new(struct auth_group *ag, const char *portal)
 	return (ap);
 
 error:
+	free(str);
 	free(ap);
-	log_errx(1, "Incorrect initiator portal '%s'", portal);
+	log_warnx("incorrect initiator portal \"%s\"", portal);
 	return (NULL);
 }
 
@@ -674,8 +678,10 @@ parse_addr_port(char *arg, const char *def_port, struct addrinfo **ai)
 		 */
 		arg++;
 		addr = strsep(&arg, "]");
-		if (arg == NULL)
+		if (arg == NULL) {
+			free(str);
 			return (1);
+		}
 		if (arg[0] == '\0') {
 			port = def_port;
 		} else if (arg[0] == ':') {
@@ -1233,7 +1239,6 @@ port_new(struct conf *conf, struct target *target, struct portal_group *pg)
 	port->p_target = target;
 	TAILQ_INSERT_TAIL(&pg->pg_ports, port, p_pgs);
 	port->p_portal_group = pg;
-	port->p_foreign = pg->pg_foreign;
 	return (port);
 }
 
@@ -1304,6 +1309,19 @@ port_delete(struct port *port)
 	TAILQ_REMOVE(&port->p_conf->conf_ports, port, p_next);
 	free(port->p_name);
 	free(port);
+}
+
+int
+port_is_dummy(struct port *port)
+{
+
+	if (port->p_portal_group) {
+		if (port->p_portal_group->pg_foreign)
+			return (1);
+		if (TAILQ_EMPTY(&port->p_portal_group->pg_portals))
+			return (1);
+	}
+	return (0);
 }
 
 struct target *
@@ -1577,8 +1595,10 @@ connection_new(struct portal *portal, int fd, const char *host,
 	/*
 	 * Default values, from RFC 3720, section 12.
 	 */
-	conn->conn_max_data_segment_length = 8192;
+	conn->conn_max_recv_data_segment_length = 8192;
+	conn->conn_max_send_data_segment_length = 8192;
 	conn->conn_max_burst_length = 262144;
+	conn->conn_first_burst_length = 65536;
 	conn->conn_immediate_data = true;
 
 	return (conn);
@@ -1881,10 +1901,10 @@ conf_apply(struct conf *oldconf, struct conf *newconf)
 	 * and missing in the new one.
 	 */
 	TAILQ_FOREACH_SAFE(oldport, &oldconf->conf_ports, p_next, tmpport) {
-		if (oldport->p_foreign)
+		if (port_is_dummy(oldport))
 			continue;
 		newport = port_find(newconf, oldport->p_name);
-		if (newport != NULL && !newport->p_foreign)
+		if (newport != NULL && !port_is_dummy(newport))
 			continue;
 		log_debugx("removing port \"%s\"", oldport->p_name);
 		error = kernel_port_remove(oldport);
@@ -2004,11 +2024,11 @@ conf_apply(struct conf *oldconf, struct conf *newconf)
 	 * Now add new ports or modify existing ones.
 	 */
 	TAILQ_FOREACH(newport, &newconf->conf_ports, p_next) {
-		if (newport->p_foreign)
+		if (port_is_dummy(newport))
 			continue;
 		oldport = port_find(oldconf, newport->p_name);
 
-		if (oldport == NULL || oldport->p_foreign) {
+		if (oldport == NULL || port_is_dummy(oldport)) {
 			log_debugx("adding port \"%s\"", newport->p_name);
 			error = kernel_port_add(newport);
 		} else {
@@ -2491,6 +2511,104 @@ register_signals(void)
 		log_err(1, "sigaction");
 }
 
+static void
+check_perms(const char *path)
+{
+	struct stat sb;
+	int error;
+
+	error = stat(path, &sb);
+	if (error != 0) {
+		log_warn("stat");
+		return;
+	}
+	if (sb.st_mode & S_IWOTH) {
+		log_warnx("%s is world-writable", path);
+	} else if (sb.st_mode & S_IROTH) {
+		log_warnx("%s is world-readable", path);
+	} else if (sb.st_mode & S_IXOTH) {
+		/*
+		 * Ok, this one doesn't matter, but still do it,
+		 * just for consistency.
+		 */
+		log_warnx("%s is world-executable", path);
+	}
+
+	/*
+	 * XXX: Should we also check for owner != 0?
+	 */
+}
+
+static struct conf *
+conf_new_from_file(const char *path, struct conf *oldconf, bool ucl)
+{
+	struct conf *conf;
+	struct auth_group *ag;
+	struct portal_group *pg;
+	struct pport *pp;
+	int error;
+
+	log_debugx("obtaining configuration from %s", path);
+
+	conf = conf_new();
+
+	TAILQ_FOREACH(pp, &oldconf->conf_pports, pp_next)
+		pport_copy(pp, conf);
+
+	ag = auth_group_new(conf, "default");
+	assert(ag != NULL);
+
+	ag = auth_group_new(conf, "no-authentication");
+	assert(ag != NULL);
+	ag->ag_type = AG_TYPE_NO_AUTHENTICATION;
+
+	ag = auth_group_new(conf, "no-access");
+	assert(ag != NULL);
+	ag->ag_type = AG_TYPE_DENY;
+
+	pg = portal_group_new(conf, "default");
+	assert(pg != NULL);
+
+	if (ucl)
+		error = uclparse_conf(conf, path);
+	else
+		error = parse_conf(conf, path);
+
+	if (error != 0) {
+		conf_delete(conf);
+		return (NULL);
+	}
+
+	check_perms(path);
+
+	if (conf->conf_default_ag_defined == false) {
+		log_debugx("auth-group \"default\" not defined; "
+		    "going with defaults");
+		ag = auth_group_find(conf, "default");
+		assert(ag != NULL);
+		ag->ag_type = AG_TYPE_DENY;
+	}
+
+	if (conf->conf_default_pg_defined == false) {
+		log_debugx("portal-group \"default\" not defined; "
+		    "going with defaults");
+		pg = portal_group_find(conf, "default");
+		assert(pg != NULL);
+		portal_group_add_listen(pg, "0.0.0.0:3260", false);
+		portal_group_add_listen(pg, "[::]:3260", false);
+	}
+
+	conf->conf_kernel_port_on = true;
+
+	error = conf_verify(conf);
+	if (error != 0) {
+		conf_delete(conf);
+		return (NULL);
+	}
+
+	return (conf);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -2499,12 +2617,16 @@ main(int argc, char **argv)
 	const char *config_path = DEFAULT_CONFIG_PATH;
 	int debug = 0, ch, error;
 	bool dont_daemonize = false;
+	bool use_ucl = false;
 
-	while ((ch = getopt(argc, argv, "df:R")) != -1) {
+	while ((ch = getopt(argc, argv, "duf:R")) != -1) {
 		switch (ch) {
 		case 'd':
 			dont_daemonize = true;
 			debug++;
+			break;
+		case 'u':
+			use_ucl = true;
 			break;
 		case 'f':
 			config_path = optarg;
@@ -2529,7 +2651,8 @@ main(int argc, char **argv)
 	kernel_init();
 
 	oldconf = conf_new_from_kernel();
-	newconf = conf_new_from_file(config_path, oldconf);
+	newconf = conf_new_from_file(config_path, oldconf, use_ucl);
+
 	if (newconf == NULL)
 		log_errx(1, "configuration error; exiting");
 	if (debug > 0) {
@@ -2564,7 +2687,9 @@ main(int argc, char **argv)
 		if (sighup_received) {
 			sighup_received = false;
 			log_debugx("received SIGHUP, reloading configuration");
-			tmpconf = conf_new_from_file(config_path, newconf);
+			tmpconf = conf_new_from_file(config_path, newconf,
+			    use_ucl);
+
 			if (tmpconf == NULL) {
 				log_warnx("configuration error, "
 				    "continuing with old configuration");

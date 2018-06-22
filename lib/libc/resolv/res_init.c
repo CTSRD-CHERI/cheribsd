@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: (BSD-3-Clause AND ISC)
+ *
  * Copyright (c) 1985, 1989, 1993
  *    The Regents of the University of California.  All rights reserved.
  * 
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  * 
@@ -75,7 +77,6 @@ __FBSDID("$FreeBSD$");
 
 #include "namespace.h"
 
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -145,7 +146,7 @@ static u_int32_t net_mask(struct in_addr);
  * there will have precedence.  Otherwise, the server address is set to
  * INADDR_ANY and the default domain name comes from the gethostname().
  *
- * An interrim version of this code (BIND 4.9, pre-4.4BSD) used 127.0.0.1
+ * An interim version of this code (BIND 4.9, pre-4.4BSD) used 127.0.0.1
  * rather than INADDR_ANY ("0.0.0.0") as the default name server address
  * since it was noted that INADDR_ANY actually meant ``the first interface
  * you "ifconfig"'d at boot time'' and if this was a SLIP or PPP interface,
@@ -168,7 +169,7 @@ res_ninit(res_state statp) {
 	return (__res_vinit(statp, 0));
 }
 
-/*% This function has to be reachable by res_data.c but not publically. */
+/*% This function has to be reachable by res_data.c but not publicly. */
 int
 __res_vinit(res_state statp, int preinit) {
 	FILE *fp;
@@ -315,7 +316,7 @@ __res_vinit(res_state statp, int preinit) {
 		while (*cp != '\0' && *cp != ' ' && *cp != '\t' && *cp != '\n')
 			cp++;
 		*cp = '\0';
-		*pp++ = 0;
+		*pp++ = NULL;
 	}
 
 #define	MATCH(line, name) \
@@ -391,7 +392,7 @@ __res_vinit(res_state statp, int preinit) {
 		    while (*cp != '\0' && *cp != ' ' && *cp != '\t')
 			    cp++;
 		    *cp = '\0';
-		    *pp++ = 0;
+		    *pp++ = NULL;
 		    havesearch = 1;
 		    continue;
 		}
@@ -412,20 +413,21 @@ __res_vinit(res_state statp, int preinit) {
 			hints.ai_socktype = SOCK_DGRAM;	/*dummy*/
 			hints.ai_flags = AI_NUMERICHOST;
 			sprintf(sbuf, "%u", NAMESERVER_PORT);
-			if (getaddrinfo(cp, sbuf, &hints, &ai) == 0 &&
-			    ai->ai_addrlen <= minsiz) {
-			    if (statp->_u._ext.ext != NULL) {
-				memcpy(&statp->_u._ext.ext->nsaddrs[nserv],
-				    ai->ai_addr, ai->ai_addrlen);
+			if (getaddrinfo(cp, sbuf, &hints, &ai) == 0) {
+			    if (ai->ai_addrlen <= minsiz) {
+				if (statp->_u._ext.ext != NULL) {
+				    memcpy(&statp->_u._ext.ext->nsaddrs[nserv],
+					ai->ai_addr, ai->ai_addrlen);
+				}
+				if (ai->ai_addrlen <=
+				    sizeof(statp->nsaddr_list[nserv])) {
+				    memcpy(&statp->nsaddr_list[nserv],
+					ai->ai_addr, ai->ai_addrlen);
+				} else
+				    statp->nsaddr_list[nserv].sin_family = 0;
+				nserv++;
 			    }
-			    if (ai->ai_addrlen <=
-			        sizeof(statp->nsaddr_list[nserv])) {
-				memcpy(&statp->nsaddr_list[nserv],
-				    ai->ai_addr, ai->ai_addrlen);
-			    } else
-				statp->nsaddr_list[nserv].sin_family = 0;
 			    freeaddrinfo(ai);
-			    nserv++;
 			}
 		    }
 		    continue;

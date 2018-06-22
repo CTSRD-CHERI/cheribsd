@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2012
  *	Ben Gray <bgray@freebsd.org>.
  * All rights reserved.
@@ -152,7 +154,7 @@ static const struct usb_device_id smsc_devs[] = {
 			device_printf((sc)->sc_ue.ue_dev, "debug: " fmt, ##args); \
 	} while(0)
 #else
-#define smsc_dbg_printf(sc, fmt, args...)
+#define smsc_dbg_printf(sc, fmt, args...) do { } while (0)
 #endif
 
 #define smsc_warn_printf(sc, fmt, args...) \
@@ -822,7 +824,6 @@ static int smsc_sethwcsum(struct smsc_softc *sc)
 	return (0);
 }
 
-
 /**
  *	smsc_setmacaddress - Sets the mac address in the device
  *	@sc: driver soft context
@@ -904,6 +905,9 @@ smsc_init(struct usb_ether *ue)
 	struct ifnet *ifp = uether_getifp(ue);
 
 	SMSC_LOCK_ASSERT(sc, MA_OWNED);
+
+	if (smsc_setmacaddress(sc, IF_LLADDR(ifp)))
+		smsc_dbg_printf(sc, "setting MAC address failed\n");
 
 	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 		return;
@@ -1362,7 +1366,7 @@ smsc_chip_init(struct smsc_softc *sc)
 	/* Reset the PHY */
 	smsc_write_reg(sc, SMSC_PM_CTRL, SMSC_PM_CTRL_PHY_RST);
 
-	if ((err = smsc_wait_for_bits(sc, SMSC_PM_CTRL, SMSC_PM_CTRL_PHY_RST) != 0)) {
+	if ((err = smsc_wait_for_bits(sc, SMSC_PM_CTRL, SMSC_PM_CTRL_PHY_RST)) != 0) {
 		smsc_warn_printf(sc, "timed-out waiting for phy reset to complete\n");
 		goto init_failed;
 	}
@@ -1517,8 +1521,8 @@ smsc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int mask;
 	int reinit;
 	
-	if (cmd == SIOCSIFCAP) {
-
+	switch (cmd) {
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		sc = uether_getsc(ue);
 		ifr = (struct ifreq *)data;
 
@@ -1527,7 +1531,7 @@ smsc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		rc = 0;
 		reinit = 0;
 
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 
 		/* Modify the RX CSUM enable bits */
 		if ((mask & IFCAP_RXCSUM) != 0 &&
@@ -1547,15 +1551,19 @@ smsc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #else
 			ifp->if_init(ue);
 #endif
-
-	} else {
+		break;
+	default:
 		rc = uether_ioctl(ifp, cmd, data);
+		break;
 	}
 
 	return (rc);
 }
 
 #ifdef FDT
+/*
+ * This is FreeBSD-specific compatibility strings for RPi/RPi2
+ */
 static phandle_t
 smsc_fdt_find_eth_node(phandle_t start)
 {
@@ -1563,15 +1571,104 @@ smsc_fdt_find_eth_node(phandle_t start)
 
 	/* Traverse through entire tree to find usb ethernet nodes. */
 	for (node = OF_child(start); node != 0; node = OF_peer(node)) {
-		if (fdt_is_compatible(node, "net,ethernet") &&
-		    fdt_is_compatible(node, "usb,device"))
+		if ((ofw_bus_node_is_compatible(node, "net,ethernet") &&
+		    ofw_bus_node_is_compatible(node, "usb,device")) ||
+		    ofw_bus_node_is_compatible(node, "usb424,ec00"))
 			return (node);
 		child = smsc_fdt_find_eth_node(node);
-		if (child != 0)
+		if (child != -1)
 			return (child);
 	}
 
-	return (0);
+	return (-1);
+}
+
+/*
+ * Check if node's path is <*>/usb/hub/ethernet
+ */
+static int
+smsc_fdt_is_usb_eth(phandle_t node)
+{
+	char name[16];
+	int len;
+
+	memset(name, 0, sizeof(name));
+	len = OF_getprop(node, "name", name, sizeof(name));
+	if (len <= 0)
+		return (0);
+
+	if (strcmp(name, "ethernet"))
+		return (0);
+
+	node = OF_parent(node);
+	if (node == -1)
+		return (0);
+	len = OF_getprop(node, "name", name, sizeof(name));
+	if (len <= 0)
+		return (0);
+
+	if (strcmp(name, "hub"))
+		return (0);
+
+	node = OF_parent(node);
+	if (node == -1)
+		return (0);
+	len = OF_getprop(node, "name", name, sizeof(name));
+	if (len <= 0)
+		return (0);
+
+	if (strcmp(name, "usb"))
+		return (0);
+
+	return (1);
+}
+
+static phandle_t
+smsc_fdt_find_eth_node_by_path(phandle_t start)
+{
+	phandle_t child, node;
+
+	/* Traverse through entire tree to find usb ethernet nodes. */
+	for (node = OF_child(start); node != 0; node = OF_peer(node)) {
+		if (smsc_fdt_is_usb_eth(node))
+			return (node);
+		child = smsc_fdt_find_eth_node_by_path(node);
+		if (child != -1)
+			return (child);
+	}
+
+	return (-1);
+}
+
+/*
+ * Look through known names that can contain mac address
+ * return 0 if valid MAC address has been found
+ */
+static int
+smsc_fdt_read_mac_property(phandle_t node, unsigned char *mac)
+{
+	int len;
+
+	/* Check if there is property */
+	if ((len = OF_getproplen(node, "local-mac-address")) > 0) {
+		if (len != ETHER_ADDR_LEN)
+			return (EINVAL);
+
+		OF_getprop(node, "local-mac-address", mac,
+		    ETHER_ADDR_LEN);
+		return (0);
+	}
+
+	if ((len = OF_getproplen(node, "mac-address")) > 0) {
+		if (len != ETHER_ADDR_LEN)
+			return (EINVAL);
+
+		OF_getprop(node, "mac-address", mac,
+		    ETHER_ADDR_LEN);
+		return (0);
+	}
+
+	return (ENXIO);
 }
 
 /**
@@ -1583,31 +1680,22 @@ static int
 smsc_fdt_find_mac(unsigned char *mac)
 {
 	phandle_t node, root;
-	int len;
 
 	root = OF_finddevice("/");
 	node = smsc_fdt_find_eth_node(root);
-	if (node != 0) {
-
-		/* Check if there is property */
-		if ((len = OF_getproplen(node, "local-mac-address")) > 0) {
-			if (len != ETHER_ADDR_LEN)
-				return (EINVAL);
-
-			OF_getprop(node, "local-mac-address", mac,
-			    ETHER_ADDR_LEN);
+	if (node != -1) {
+		if (smsc_fdt_read_mac_property(node, mac) == 0)
 			return (0);
-		}
-
-		if ((len = OF_getproplen(node, "mac-address")) > 0) {
-			if (len != ETHER_ADDR_LEN)
-				return (EINVAL);
-
-			OF_getprop(node, "mac-address", mac,
-			    ETHER_ADDR_LEN);
-			return (0);
-		}
 	}
+
+	/*
+	 * If it's not FreeBSD FDT blob for RPi, try more
+	 *     generic .../usb/hub/ethernet
+	 */
+	node = smsc_fdt_find_eth_node_by_path(root);
+
+	if (node != -1)
+		return smsc_fdt_read_mac_property(node, mac);
 
 	return (ENXIO);
 }

@@ -1,5 +1,7 @@
 %{
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2012 The FreeBSD Foundation
  * All rights reserved.
  *
@@ -62,6 +64,7 @@ tgtChapName		{ return MUTUAL_USER; }
 tgtChapSecret		{ return MUTUAL_SECRET; }
 AuthMethod		{ return AUTH_METHOD; }
 SessionType		{ return SESSION_TYPE; }
+enable			{ return ENABLE; }
 protocol		{ return PROTOCOL; }
 offload			{ return OFFLOAD; }
 port			{ return IGNORED; }

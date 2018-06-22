@@ -26,6 +26,10 @@
 # absoulte path to what we are reading.
 _PARSEDIR = ${.PARSEDIR:tA}
 
+.if !defined(SYS_MK_DIR)
+SYS_MK_DIR := ${_PARSEDIR}
+.endif
+
 META_MODE += meta verbose
 .MAKE.MODE ?= ${META_MODE}
 
@@ -111,8 +115,21 @@ _metaError: .NOMETA .NOTMAIN
 .endif
 
 # Are we, after all, in meta mode?
-.if ${.MAKE.MODE:Mmeta*} != ""
+.if ${.MAKE.MODE:Uno:Mmeta*} != ""
 MKDEP_MK = meta.autodep.mk
+
+# we can afford to use cookies to prevent some targets
+# re-running needlessly
+META_COOKIE_TOUCH?= touch ${COOKIE.${.TARGET}:U${.OBJDIR}/${.TARGET:T}}
+META_NOPHONY=
+
+# some targets involve old pre-built targets
+# ignore mtime of shell
+# and mtime of makefiles does not matter in meta mode
+.MAKE.META.IGNORE_PATHS += \
+        ${MAKEFILE} \
+        ${SHELL} \
+        ${SYS_MK_DIR}
 
 # if we think we are updating dependencies, 
 # then filemon had better be present
@@ -139,5 +156,9 @@ BUILD_AT_LEVEL0 ?= no
 .endif
 
 .endif
+.else
+META_COOKIE_TOUCH=
+# some targets need to be .PHONY in non-meta mode
+META_NOPHONY= .PHONY
 .endif
 .endif

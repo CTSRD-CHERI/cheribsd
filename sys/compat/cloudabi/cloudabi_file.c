@@ -39,8 +39,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/uio.h>
 #include <sys/vnode.h>
 
+#include <contrib/cloudabi/cloudabi_types_common.h>
+
 #include <compat/cloudabi/cloudabi_proto.h>
-#include <compat/cloudabi/cloudabi_syscalldefs.h>
 #include <compat/cloudabi/cloudabi_util.h>
 
 #include <security/mac/mac_framework.h>
@@ -145,7 +146,7 @@ cloudabi_sys_file_create(struct thread *td,
 	char *path;
 	int error;
 
-	error = copyin_path(uap->path, uap->pathlen, &path);
+	error = copyin_path(uap->path, uap->path_len, &path);
 	if (error != 0)
 		return (error);
 
@@ -156,10 +157,9 @@ cloudabi_sys_file_create(struct thread *td,
 	 */
 	switch (uap->type) {
 	case CLOUDABI_FILETYPE_DIRECTORY:
-		error = kern_mkdirat(td, uap->fd, path, UIO_SYSSPACE, 0777);
-		break;
-	case CLOUDABI_FILETYPE_FIFO:
-		error = kern_mkfifoat(td, uap->fd, path, UIO_SYSSPACE, 0666);
+		error = kern_mkdirat(td, uap->fd,
+		    (__cheri_tocap char * __capability)path, UIO_SYSSPACE,
+		    0777);
 		break;
 	default:
 		error = EINVAL;
@@ -176,17 +176,19 @@ cloudabi_sys_file_link(struct thread *td,
 	char *path1, *path2;
 	int error;
 
-	error = copyin_path(uap->path1, uap->path1len, &path1);
+	error = copyin_path(uap->path1, uap->path1_len, &path1);
 	if (error != 0)
 		return (error);
-	error = copyin_path(uap->path2, uap->path2len, &path2);
+	error = copyin_path(uap->path2, uap->path2_len, &path2);
 	if (error != 0) {
 		cloudabi_freestr(path1);
 		return (error);
 	}
 
-	error = kern_linkat(td, uap->fd1, uap->fd2, path1, path2,
-	    UIO_SYSSPACE, (uap->fd1 & CLOUDABI_LOOKUP_SYMLINK_FOLLOW) != 0 ?
+	error = kern_linkat(td, uap->fd1.fd, uap->fd2,
+	    (__cheri_tocap const char * __capability)path1,
+	    (__cheri_tocap const char * __capability)path2,
+	    UIO_SYSSPACE, (uap->fd1.flags & CLOUDABI_LOOKUP_SYMLINK_FOLLOW) ?
 	    FOLLOW : NOFOLLOW);
 	cloudabi_freestr(path1);
 	cloudabi_freestr(path2);
@@ -248,7 +250,7 @@ cloudabi_sys_file_open(struct thread *td,
 		fflags |= O_SYNC;
 		cap_rights_set(&rights, CAP_FSYNC);
 	}
-	if ((uap->fd & CLOUDABI_LOOKUP_SYMLINK_FOLLOW) == 0)
+	if ((uap->dirfd.flags & CLOUDABI_LOOKUP_SYMLINK_FOLLOW) == 0)
 		fflags |= O_NOFOLLOW;
 	if (write && (fflags & (O_APPEND | O_TRUNC)) == 0)
 		cap_rights_set(&rights, CAP_SEEK);
@@ -260,12 +262,12 @@ cloudabi_sys_file_open(struct thread *td,
 	fp->f_flag = fflags & FMASK;
 
 	/* Open path. */
-	error = copyin_path(uap->path, uap->pathlen, &path);
+	error = copyin_path(uap->path, uap->path_len, &path);
 	if (error != 0) {
 		fdrop(fp, td);
 		return (error);
 	}
-	NDINIT_ATRIGHTS(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, path, uap->fd,
+	NDINIT_ATRIGHTS(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, path, uap->dirfd.fd,
 	    &rights, td);
 	error = vn_open(&nd, &fflags, 0777 & ~td->td_proc->p_fd->fd_cmask, fp);
 	cloudabi_freestr(path);
@@ -345,7 +347,7 @@ write_dirent(struct dirent *bde, cloudabi_dircookie_t cookie, struct uio *uio)
 		cde.d_type = CLOUDABI_FILETYPE_DIRECTORY;
 		break;
 	case DT_FIFO:
-		cde.d_type = CLOUDABI_FILETYPE_FIFO;
+		cde.d_type = CLOUDABI_FILETYPE_SOCKET_STREAM;
 		break;
 	case DT_LNK:
 		cde.d_type = CLOUDABI_FILETYPE_SYMBOLIC_LINK;
@@ -377,10 +379,8 @@ int
 cloudabi_sys_file_readdir(struct thread *td,
     struct cloudabi_sys_file_readdir_args *uap)
 {
-	struct iovec iov = {
-		.iov_base = uap->buf,
-		.iov_len = uap->nbyte
-	};
+	kiovec_t iov;
+	IOVEC_INIT(&iov, uap->buf, uap->buf_len);
 	struct uio uio = {
 		.uio_iov = &iov,
 		.uio_iovcnt = 1,
@@ -416,10 +416,8 @@ cloudabi_sys_file_readdir(struct thread *td,
 	offset = uap->cookie;
 	vp = fp->f_vnode;
 	while (uio.uio_resid > 0) {
-		struct iovec readiov = {
-			.iov_base = readbuf,
-			.iov_len = MAXBSIZE
-		};
+		kiovec_t readiov;
+		IOVEC_INIT(&readiov, readbuf, MAXBSIZE);
 		struct uio readuio = {
 			.uio_iov = &readiov,
 			.uio_iovcnt = 1,
@@ -493,7 +491,7 @@ done:
 		return (error);
 
 	/* Return number of bytes copied to userspace. */
-	td->td_retval[0] = uap->nbyte - uio.uio_resid;
+	td->td_retval[0] = uap->buf_len - uio.uio_resid;
 	return (0);
 }
 
@@ -504,12 +502,13 @@ cloudabi_sys_file_readlink(struct thread *td,
 	char *path;
 	int error;
 
-	error = copyin_path(uap->path, uap->pathlen, &path);
+	error = copyin_path(uap->path, uap->path_len, &path);
 	if (error != 0)
 		return (error);
 
-	error = kern_readlinkat(td, uap->fd, path, UIO_SYSSPACE,
-	    uap->buf, UIO_USERSPACE, uap->bufsize);
+	error = kern_readlinkat(td, uap->fd,
+	    (__cheri_tocap char * __capability)path, UIO_SYSSPACE,
+	    __USER_CAP(uap->buf, uap->buf_len), UIO_USERSPACE, uap->buf_len);
 	cloudabi_freestr(path);
 	return (error);
 }
@@ -521,17 +520,18 @@ cloudabi_sys_file_rename(struct thread *td,
 	char *old, *new;
 	int error;
 
-	error = copyin_path(uap->old, uap->oldlen, &old);
+	error = copyin_path(uap->path1, uap->path1_len, &old);
 	if (error != 0)
 		return (error);
-	error = copyin_path(uap->new, uap->newlen, &new);
+	error = copyin_path(uap->path2, uap->path2_len, &new);
 	if (error != 0) {
 		cloudabi_freestr(old);
 		return (error);
 	}
 
-	error = kern_renameat(td, uap->oldfd, old, uap->newfd, new,
-	    UIO_SYSSPACE);
+	error = kern_renameat(td, uap->fd1,
+	    (__cheri_tocap char * __capability)old, uap->fd2,
+	    (__cheri_tocap char * __capability)new, UIO_SYSSPACE);
 	cloudabi_freestr(old);
 	cloudabi_freestr(new);
 	return (error);
@@ -638,7 +638,7 @@ cloudabi_sys_file_stat_fput(struct thread *td,
 		    CLOUDABI_FILESTAT_MTIM_NOW)) != 0)
 			return (EINVAL);
 		convert_utimens_arguments(&fs, uap->flags, ts);
-		return (kern_futimens(td, uap->fd, ts, UIO_SYSSPACE));
+		return (kern_futimens(td, uap->fd, &ts[0], UIO_SYSSPACE));
 	}
 	return (EINVAL);
 }
@@ -652,13 +652,14 @@ cloudabi_sys_file_stat_get(struct thread *td,
 	char *path;
 	int error;
 
-	error = copyin_path(uap->path, uap->pathlen, &path);
+	error = copyin_path(uap->path, uap->path_len, &path);
 	if (error != 0)
 		return (error);
 
 	error = kern_statat(td,
-	    (uap->fd & CLOUDABI_LOOKUP_SYMLINK_FOLLOW) != 0 ? 0 :
-	    AT_SYMLINK_NOFOLLOW, uap->fd, path, UIO_SYSSPACE, &sb, NULL);
+	    (uap->fd.flags & CLOUDABI_LOOKUP_SYMLINK_FOLLOW) != 0 ? 0 :
+	    AT_SYMLINK_NOFOLLOW, uap->fd.fd,
+	    (__cheri_tocap char * __capability)path, UIO_SYSSPACE, &sb, NULL);
 	cloudabi_freestr(path);
 	if (error != 0)
 		return (error);
@@ -672,7 +673,7 @@ cloudabi_sys_file_stat_get(struct thread *td,
 	else if (S_ISDIR(sb.st_mode))
 		csb.st_filetype = CLOUDABI_FILETYPE_DIRECTORY;
 	else if (S_ISFIFO(sb.st_mode))
-		csb.st_filetype = CLOUDABI_FILETYPE_FIFO;
+		csb.st_filetype = CLOUDABI_FILETYPE_SOCKET_STREAM;
 	else if (S_ISREG(sb.st_mode))
 		csb.st_filetype = CLOUDABI_FILETYPE_REGULAR_FILE;
 	else if (S_ISSOCK(sb.st_mode)) {
@@ -706,13 +707,15 @@ cloudabi_sys_file_stat_put(struct thread *td,
 	error = copyin(uap->buf, &fs, sizeof(fs));
 	if (error != 0)
 		return (error);
-	error = copyin_path(uap->path, uap->pathlen, &path);
+	error = copyin_path(uap->path, uap->path_len, &path);
 	if (error != 0)
 		return (error);
 
 	convert_utimens_arguments(&fs, uap->flags, ts);
-	error = kern_utimensat(td, uap->fd, path, UIO_SYSSPACE, ts,
-	    UIO_SYSSPACE, (uap->fd & CLOUDABI_LOOKUP_SYMLINK_FOLLOW) != 0 ?
+	error = kern_utimensat(td, uap->fd.fd,
+	    (__cheri_tocap char * __capability)path, UIO_SYSSPACE,
+	    &ts[0], UIO_SYSSPACE,
+	    (uap->fd.flags & CLOUDABI_LOOKUP_SYMLINK_FOLLOW) ?
 	    0 : AT_SYMLINK_NOFOLLOW);
 	cloudabi_freestr(path);
 	return (error);
@@ -725,16 +728,18 @@ cloudabi_sys_file_symlink(struct thread *td,
 	char *path1, *path2;
 	int error;
 
-	error = copyin_path(uap->path1, uap->path1len, &path1);
+	error = copyin_path(uap->path1, uap->path1_len, &path1);
 	if (error != 0)
 		return (error);
-	error = copyin_path(uap->path2, uap->path2len, &path2);
+	error = copyin_path(uap->path2, uap->path2_len, &path2);
 	if (error != 0) {
 		cloudabi_freestr(path1);
 		return (error);
 	}
 
-	error = kern_symlinkat(td, path1, uap->fd, path2, UIO_SYSSPACE);
+	error = kern_symlinkat(td,
+	    (__cheri_tocap char * __capability)path1, uap->fd,
+	    (__cheri_tocap char * __capability)path2, UIO_SYSSPACE);
 	cloudabi_freestr(path1);
 	cloudabi_freestr(path2);
 	return (error);
@@ -747,14 +752,16 @@ cloudabi_sys_file_unlink(struct thread *td,
 	char *path;
 	int error;
 
-	error = copyin_path(uap->path, uap->pathlen, &path);
+	error = copyin_path(uap->path, uap->path_len, &path);
 	if (error != 0)
 		return (error);
 
-	if (uap->flag & CLOUDABI_UNLINK_REMOVEDIR)
-		error = kern_rmdirat(td, uap->fd, path, UIO_SYSSPACE);
+	if (uap->flags & CLOUDABI_UNLINK_REMOVEDIR)
+		error = kern_rmdirat(td, uap->fd,
+		    (__cheri_tocap char * __capability)path, UIO_SYSSPACE);
 	else
-		error = kern_unlinkat(td, uap->fd, path, UIO_SYSSPACE, 0);
+		error = kern_unlinkat(td, uap->fd,
+		    (__cheri_tocap char * __capability)path, UIO_SYSSPACE, 0);
 	cloudabi_freestr(path);
 	return (error);
 }

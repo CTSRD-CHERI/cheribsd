@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1985, 1986, 1988, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -111,7 +113,15 @@ typedef	__uintptr_t	uintptr_t;
  */
 #define	SOCK_CLOEXEC	0x10000000
 #define	SOCK_NONBLOCK	0x20000000
-#endif
+#ifdef _KERNEL
+/*
+ * Flags for accept1(), kern_accept4() and solisten_dequeue, in addition
+ * to SOCK_CLOEXEC and SOCK_NONBLOCK.
+ */
+#define ACCEPT4_INHERIT 0x1
+#define ACCEPT4_COMPAT  0x2
+#endif	/* _KERNEL */
+#endif	/* __BSD_VISIBLE */
 
 /*
  * Option flags per-socket.
@@ -158,6 +168,17 @@ typedef	__uintptr_t	uintptr_t;
 #define	SO_USER_COOKIE	0x1015		/* user cookie (dummynet etc.) */
 #define	SO_PROTOCOL	0x1016		/* get socket protocol (Linux name) */
 #define	SO_PROTOTYPE	SO_PROTOCOL	/* alias for SO_PROTOCOL (SunOS name) */
+#define	SO_TS_CLOCK	0x1017		/* clock type used for SO_TIMESTAMP */
+#define	SO_MAX_PACING_RATE	0x1018	/* socket's max TX pacing rate (Linux name) */
+#endif
+
+#if __BSD_VISIBLE
+#define	SO_TS_REALTIME_MICRO	0	/* microsecond resolution, realtime */
+#define	SO_TS_BINTIME		1	/* sub-nanosecond resolution, realtime */
+#define	SO_TS_REALTIME		2	/* nanosecond resolution, realtime */
+#define	SO_TS_MONOTONIC		3	/* nanosecond resolution, monotonic */
+#define	SO_TS_DEFAULT		SO_TS_REALTIME_MICRO
+#define	SO_TS_CLOCK_MAX		SO_TS_MONOTONIC
 #endif
 
 /*
@@ -404,6 +425,7 @@ struct sockproto {
  * Message header for recvmsg and sendmsg calls.
  * Used value-result for recvmsg, value only for sendmsg.
  */
+#ifndef _KERNEL
 struct msghdr {
 	void		*msg_name;		/* optional address */
 	socklen_t	 msg_namelen;		/* size of address */
@@ -413,28 +435,63 @@ struct msghdr {
 	socklen_t	 msg_controllen;	/* ancillary data buffer len */
 	int		 msg_flags;		/* flags on received message */
 };
-
-#define	MSG_OOB		0x1		/* process out-of-band data */
-#define	MSG_PEEK	0x2		/* peek at incoming message */
-#define	MSG_DONTROUTE	0x4		/* send without using routing tables */
-#define	MSG_EOR		0x8		/* data completes record */
-#define	MSG_TRUNC	0x10		/* data discarded before delivery */
-#define	MSG_CTRUNC	0x20		/* control data lost before delivery */
-#define	MSG_WAITALL	0x40		/* wait for full request or error */
-#if __POSIX_VISIBLE >= 200809
-#define	MSG_NOSIGNAL	0x20000		/* do not generate SIGPIPE on EOF */
+#else /* _KERNEL */
+struct msghdr_c {
+	void		* __capability msg_name;		/* optional address */
+	socklen_t	 msg_namelen;		/* size of address */
+	struct iovec_c	* __capability msg_iov;		/* scatter/gather array */
+	int		 msg_iovlen;		/* # elements in msg_iov */
+	void		* __capability msg_control;		/* ancillary data, see below */
+	socklen_t	 msg_controllen;	/* ancillary data buffer len */
+	int		 msg_flags;		/* flags on received message */
+};
+struct msghdr_native {
+	void		*msg_name;		/* optional address */
+	socklen_t	 msg_namelen;		/* size of address */
+	struct iovec_native	*msg_iov;	/* scatter/gather array */
+	int		 msg_iovlen;		/* # elements in msg_iov */
+	void		*msg_control;		/* ancillary data, see below */
+	socklen_t	 msg_controllen;	/* ancillary data buffer len */
+	int		 msg_flags;		/* flags on received message */
+}; /* _KERNEL */
+#if __has_feature(capabilities)
+typedef	struct msghdr_c		kmsghdr_t;
+#else
+typedef	struct msghdr_native	kmsghdr_t;
 #endif
+typedef	struct msghdr_native	umsghdr_t;
+#endif
+
+#define	MSG_OOB		 0x00000001	/* process out-of-band data */
+#define	MSG_PEEK	 0x00000002	/* peek at incoming message */
+#define	MSG_DONTROUTE	 0x00000004	/* send without using routing tables */
+#define	MSG_EOR		 0x00000008	/* data completes record */
+#define	MSG_TRUNC	 0x00000010	/* data discarded before delivery */
+#define	MSG_CTRUNC	 0x00000020	/* control data lost before delivery */
+#define	MSG_WAITALL	 0x00000040	/* wait for full request or error */
 #if __BSD_VISIBLE
-#define	MSG_DONTWAIT	0x80		/* this message should be nonblocking */
-#define	MSG_EOF		0x100		/* data completes connection */
-#define	MSG_NOTIFICATION 0x2000         /* SCTP notification */
-#define	MSG_NBIO	0x4000		/* FIONBIO mode, used by fifofs */
-#define	MSG_COMPAT      0x8000		/* used in sendit() */
-#define	MSG_CMSG_CLOEXEC 0x40000	/* make received fds close-on-exec */
-#define	MSG_WAITFORONE	0x80000		/* for recvmmsg() */
+#define	MSG_DONTWAIT	 0x00000080	/* this message should be nonblocking */
+#define	MSG_EOF		 0x00000100	/* data completes connection */
+/*			 0x00000200	   unused */
+/*			 0x00000400	   unused */
+/*			 0x00000800	   unused */
+/*			 0x00001000	   unused */
+#define	MSG_NOTIFICATION 0x00002000	/* SCTP notification */
+#define	MSG_NBIO	 0x00004000	/* FIONBIO mode, used by fifofs */
+#define	MSG_COMPAT       0x00008000		/* used in sendit() */
 #endif
 #ifdef _KERNEL
-#define	MSG_SOCALLBCK   0x10000		/* for use by socket callbacks - soreceive (TCP) */
+#define	MSG_SOCALLBCK    0x00010000	/* for use by socket callbacks - soreceive (TCP) */
+#endif
+#if __POSIX_VISIBLE >= 200809
+#define	MSG_NOSIGNAL	 0x00020000	/* do not generate SIGPIPE on EOF */
+#endif
+#if __BSD_VISIBLE
+#define	MSG_CMSG_CLOEXEC 0x00040000	/* make received fds close-on-exec */
+#define	MSG_WAITFORONE	 0x00080000	/* for recvmmsg() */
+#endif
+#ifdef _KERNEL
+#define	MSG_MORETOCOME	 0x00100000	/* additional data pending */
 #endif
 
 /*
@@ -501,8 +558,7 @@ struct sockcred {
  * Don't align for capabilities in CheriABI.  Sending them makes little
  * sense and would be a major potential security hole.
  */
-#define	_CMSG_ALIGNBYTES	(sizeof(u_long) - 1)
-#define	_CMSG_ALIGN(n)	(((uintptr_t)(n) + _CMSG_ALIGNBYTES) &~ (uintptr_t)_CMSG_ALIGNBYTES)
+#define	_CMSG_ALIGN(n)	__builtin_align_up((n), sizeof(u_long))
 #endif
 
 /* given pointer to struct cmsghdr, return pointer to data */
@@ -511,11 +567,11 @@ struct sockcred {
 
 /* given pointer to struct cmsghdr, return pointer to next cmsghdr */
 #define	CMSG_NXTHDR(mhdr, cmsg)	\
-	((char *)(cmsg) == NULL ? CMSG_FIRSTHDR(mhdr) : \
+	((char *)(cmsg) == (char *)0 ? CMSG_FIRSTHDR(mhdr) : \
 	    ((char *)(cmsg) + \
 	    _CMSG_ALIGN(((struct cmsghdr *)(cmsg))->cmsg_len) + \
 	    _CMSG_ALIGN(sizeof(struct cmsghdr)) > \
-	    (char *)(mhdr)->msg_control + (mhdr)->msg_controllen) ? \
+	    (__cheri_fromcap char *)(mhdr)->msg_control + (mhdr)->msg_controllen) ? \
 	    (struct cmsghdr *)0 : \
 	    (struct cmsghdr *)(void *)((char *)(cmsg) + \
 	    _CMSG_ALIGN(((struct cmsghdr *)(cmsg))->cmsg_len)))
@@ -526,8 +582,8 @@ struct sockcred {
  */
 #define	CMSG_FIRSTHDR(mhdr) \
 	((mhdr)->msg_controllen >= sizeof(struct cmsghdr) ? \
-	 (struct cmsghdr *)(mhdr)->msg_control : \
-	 (struct cmsghdr *)NULL)
+	 (__cheri_fromcap struct cmsghdr *)(mhdr)->msg_control : \
+	 (struct cmsghdr *)0)
 
 #if __BSD_VISIBLE
 /* RFC 2292 additions */
@@ -545,6 +601,19 @@ struct sockcred {
 #define	SCM_TIMESTAMP	0x02		/* timestamp (struct timeval) */
 #define	SCM_CREDS	0x03		/* process creds (struct cmsgcred) */
 #define	SCM_BINTIME	0x04		/* timestamp (struct bintime) */
+#define	SCM_REALTIME	0x05		/* timestamp (struct timespec) */
+#define	SCM_MONOTONIC	0x06		/* timestamp (struct timespec) */
+#define	SCM_TIME_INFO	0x07		/* timestamp info */
+
+struct sock_timestamp_info {
+	__uint32_t	st_info_flags;
+	__uint32_t	st_info_pad0;
+	__uint64_t	st_info_rsv[7];
+};
+
+#define	ST_INFO_HW		0x0001		/* SCM_TIMESTAMP was hw */
+#define	ST_INFO_HW_HPREC	0x0002		/* SCM_TIMESTAMP was hw-assisted
+						   on entrance */
 #endif
 
 #if __BSD_VISIBLE
@@ -555,14 +624,16 @@ struct osockaddr {
 	unsigned short sa_family;	/* address family */
 	char	sa_data[14];		/* up to 14 bytes of direct address */
 };
+#endif
 
+#ifdef _KERNEL
 /*
  * 4.3-compat message header (move to compat file later).
  */
 struct omsghdr {
 	char	*msg_name;		/* optional address */
 	int	msg_namelen;		/* size of address */
-	struct	iovec *msg_iov;		/* scatter/gather array */
+	struct	iovec_native *msg_iov;		/* scatter/gather array */
 	int	msg_iovlen;		/* # elements in msg_iov */
 	char	*msg_accrights;		/* access rights sent/received */
 	int	msg_accrightslen;
@@ -589,12 +660,29 @@ struct omsghdr {
 /*
  * sendfile(2) header/trailer struct
  */
+#ifndef _KERNEL
 struct sf_hdtr {
 	struct iovec *headers;	/* pointer to an array of header struct iovec's */
 	int hdr_cnt;		/* number of header iovec's */
 	struct iovec *trailers;	/* pointer to an array of trailer struct iovec's */
 	int trl_cnt;		/* number of trailer iovec's */
 };
+#else /* _KERNEL */
+struct sf_hdtr_c {
+	struct iovec_c * __capability headers;	/* pointer to an array of header struct iovec's */
+	int hdr_cnt;		/* number of header iovec's */
+	struct iovec_c * __capability trailers;	/* pointer to an array of trailer struct iovec's */
+	int trl_cnt;		/* number of trailer iovec's */
+};
+struct sf_hdtr_native {
+	struct iovec_native *headers;	/* pointer to an array of header struct iovec's */
+	int hdr_cnt;		/* number of header iovec's */
+	struct iovec_native *trailers;	/* pointer to an array of trailer struct iovec's */
+	int trl_cnt;		/* number of trailer iovec's */
+};
+typedef	struct sf_hdtr_c	ksf_hdtr_t;
+typedef	struct sf_hdtr_native	usf_hdtr_t;
+#endif /* _KERNEL */
 
 /*
  * Sendfile-specific flag(s)
@@ -602,21 +690,35 @@ struct sf_hdtr {
 #define	SF_NODISKIO     0x00000001
 #define	SF_MNOWAIT	0x00000002	/* obsolete */
 #define	SF_SYNC		0x00000004
+#define	SF_USER_READAHEAD	0x00000008
 #define	SF_NOCACHE	0x00000010
 #define	SF_FLAGS(rh, flags)	(((rh) << 16) | (flags))
 
 #ifdef _KERNEL
-#define	SFK_COMPAT	0x00000001
 #define	SF_READAHEAD(flags)	((flags) >> 16)
 #endif /* _KERNEL */
 
 /*
  * Sendmmsg/recvmmsg specific structure(s)
  */
+
+#ifndef _KERNEL
 struct mmsghdr {
 	struct msghdr	msg_hdr;		/* message header */
 	ssize_t		msg_len;		/* message length */
 };
+#else /* _KERNEL */
+struct mmsghdr_c {
+	struct msghdr_c	msg_hdr;		/* message header */
+	ssize_t		msg_len;		/* message length */
+};
+struct mmsghdr_native {
+	struct msghdr_native	msg_hdr;		/* message header */
+	ssize_t		msg_len;		/* message length */
+};
+typedef	struct mmsghdr_c	kmmsghdr_t;
+typedef	struct mmsghdr_native	ummsghdr_t;
+#endif /* _KERNEL */
 #endif /* __BSD_VISIBLE */
 
 #ifndef	_KERNEL
@@ -694,9 +796,5 @@ void so_sowwakeup(struct socket *so);
 void so_lock(struct socket *so);
 void so_unlock(struct socket *so);
 
-void so_listeners_apply_all(struct socket *so, void (*func)(struct socket *, void *), void *arg);
-
-#endif
-
-
+#endif /* _KERNEL */
 #endif /* !_SYS_SOCKET_H_ */

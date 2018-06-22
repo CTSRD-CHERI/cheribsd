@@ -241,7 +241,7 @@ xo_encoder_discover (const char *name)
 	    bzero(&xei, sizeof(xei));
 
 	    xei.xei_version = XO_ENCODER_VERSION;
-	    int rc = func(&xei);
+	    ssize_t rc = func(&xei);
 	    if (rc == 0 && xei.xei_handler) {
 		xep = xo_encoder_list_add(name);
 		if (xep) {
@@ -308,12 +308,12 @@ xo_encoder_init (xo_handle_t *xop, const char *name)
 
     xo_set_encoder(xop, xep->xe_handler);
 
-    return xo_encoder_handle(xop, XO_OP_CREATE, NULL, NULL);
+    return xo_encoder_handle(xop, XO_OP_CREATE, NULL, NULL, 0);
 }
 
 /*
  * A couple of function varieties here, to allow for multiple
- * use cases.  This varient is for when the main program knows
+ * use cases.  This variant is for when the main program knows
  * its own encoder needs.
  */
 xo_handle_t *
@@ -334,7 +334,7 @@ xo_encoder_create (const char *name, xo_xof_flags_t flags)
 
 int
 xo_encoder_handle (xo_handle_t *xop, xo_encoder_op_t op,
-		  const char *name, const char *value)
+		   const char *name, const char *value, xo_xof_flags_t flags)
 {
     void *private = xo_get_private(xop);
     xo_encoder_func_t func = xo_get_encoder(xop);
@@ -342,7 +342,7 @@ xo_encoder_handle (xo_handle_t *xop, xo_encoder_op_t op,
     if (func == NULL)
 	return -1;
 
-    return func(xop, op, name, value, private);
+    return func(xop, op, name, value, private, flags);
 }
 
 const char *

@@ -14,7 +14,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -67,6 +67,7 @@
 #ifdef CPU_CHERI
 #include <machine/cheriasm.h>
 #include <machine/cherireg.h>
+.set cheri_sysregs_accessible
 #endif
 
 #include "assym.s"
@@ -102,7 +103,7 @@ LEAF(fork_trampoline)
 	/*
 	 * Note: This restores EPCC, matching the explicit EPC restore below.
 	 */
-	RESTORE_U_PCB_CHERIFRAME(k1, t0)
+	RESTORE_CREGS_FROM_PCB(k1, t0)
 #endif
 	RESTORE_U_PCB_REG(t0, MULLO, k1)
 	RESTORE_U_PCB_REG(t1, MULHI, k1)
@@ -180,7 +181,7 @@ LEAF(savectx)
 	SAVE_U_PCB_CONTEXT(gp, PCB_REG_GP, a0)
 
 #ifdef CPU_CHERI
-	SAVE_U_PCB_CHERIKFRAME(a0, t0);
+	SAVE_U_PCB_CHERIKFRAME(a0);
 #endif
 
 	move	v0, ra			/* save 'ra' before we trash it */
@@ -246,7 +247,7 @@ getpc:
 	SAVE_U_PCB_CONTEXT(ra, PCB_REG_PC, a0)		# save return address
 
 #ifdef CPU_CHERI
-	SAVE_U_PCB_CHERIKFRAME(a0, t0);
+	SAVE_U_PCB_CHERIKFRAME(a0);
 #endif
 
 #ifdef CPU_CNMIPS
@@ -308,6 +309,38 @@ cop2_untouched:
 	PTR_S	a2, TD_LOCK(a3)			# Switchout td_lock 
 
 mips_sw1:
+#ifdef CPU_QEMU_MALTA
+	/*
+	 * If per-thread tracing is disabled, skip this block and don't muck
+	 * with emulator state.
+	 */
+	PTR_LA	t2, _C_LABEL(qemu_trace_perthread)	# Load address of var
+	lw	t2, 0(t2)				# Load var value
+	beqz	t2, done_qemu_tracing			# Skip if value is 0
+	nop
+
+	/*
+	 * If per-thread tracing is enabled, update Qemu-internal state to
+	 * reflect the thread we are switching to.  Don't disable before
+	 * checking, so we can ensure that we get a full trace if both the
+	 * 'old' and 'new' threads have tracing enabled.
+	 */
+	lw	t2, TD_MDFLAGS(a1)			# Get new->md_flags
+	andi	t2, t2, MDTD_QTRACE			# Mask Qemu trace bit
+	beqz	t2, disable_qemu_tracing		# Branch if not set
+	nop
+
+enable_qemu_tracing:
+	li	$0, 0xbeef
+	b	done_qemu_tracing
+	nop
+
+disable_qemu_tracing:
+	li	$0, 0xdead
+
+done_qemu_tracing:
+#endif
+
 #if defined(SMP) && defined(SCHED_ULE)
 	PTR_LA	t0, _C_LABEL(blocked_lock)
 blocked_loop:
@@ -436,7 +469,7 @@ sw2:
  * Restore registers and return.
  */
 	move	a0, s0
-	move	a1, s7				# restore newthread
+	move	a1, s7
 	RESTORE_U_PCB_CONTEXT(gp, PCB_REG_GP, a0)
 	RESTORE_U_PCB_CONTEXT(v0, PCB_REG_SR, a0)	# restore kernel context
 	RESTORE_U_PCB_CONTEXT(ra, PCB_REG_RA, a0)
@@ -451,7 +484,7 @@ sw2:
 	RESTORE_U_PCB_CONTEXT(s8, PCB_REG_S8, a0)
 
 #ifdef CPU_CHERI
-	RESTORE_U_PCB_CHERIKFRAME(a0, t0);
+	RESTORE_U_PCB_CHERIKFRAME(a0);
 #endif
 
 	mfc0	t0, MIPS_COP_0_STATUS
@@ -460,15 +493,21 @@ sw2:
 	or	v0, v0, t0
 	mtc0	v0, MIPS_COP_0_STATUS
 	ITLBNOPFIX
-
 /*
- * Check if the UserLocal Register is Implemented (ULRI flag set).
- * If so, set the new thread's TLS pointer.
+ * Set the new thread's TLS pointer.
  *
  * Note that this code is removed if the CPU doesn't support ULRI by
  * remove_userlocal_code() in cpu.c.
  */
+#ifdef CPU_CHERI
+	# Get TLS address
+	clc	$c3, a1, TD_MDTLS(CHERI_REG_KDC)
+	cgetoffset t0, $c3
+	cgetbase t1, $c3
+	PTR_ADDU t0, t0, t1
+#else
 	PTR_L	t0, TD_MDTLS(a1)		# Get TLS pointer
+#endif
 	PTR_L	t1, TD_MDTLS_TCB_OFFSET(a1)	# Get TLS/TCB offset
 	PTR_ADDU v0, t0, t1
 	MTC0	v0, MIPS_COP_0_USERLOCAL, 2	# write it to ULR for rdhwr
@@ -495,11 +534,18 @@ END(cpu_switch)
  *
  *----------------------------------------------------------------------------
  */
-#if defined(CPU_HAVEFPU)
 LEAF(MipsSwitchFPState)
+	.set push
+	.set hardfloat
 	mfc0	t1, MIPS_COP_0_STATUS	# Save old SR
-	li	t0, MIPS_SR_COP_1_BIT	# enable the coprocessor
+	HAZARD_DELAY
+#if defined(__mips_n64)
+	or	t0, t1, MIPS_SR_COP_1_BIT | MIPS_SR_FR	# enable the coprocessor
+#else
+	or	t0, t1, MIPS_SR_COP_1_BIT 		# enable the coprocessor
+#endif
 	mtc0	t0, MIPS_COP_0_STATUS
+	HAZARD_DELAY
 	ITLBNOPFIX
 
 	beq	a0, zero, 1f		# skip save if NULL pointer
@@ -598,8 +644,46 @@ LEAF(MipsSwitchFPState)
 	ITLBNOPFIX
 	j	ra
 	nop
+	.set pop
 END(MipsSwitchFPState)
-#endif /* CPU_HAVEFPU */
+
+/*----------------------------------------------------------------------------
+ *
+ * MipsFPID --
+ *
+ *	Read and return the floating point implementation register.
+ *
+ *	uint32_t
+ *	MipsFPID(void)
+ *
+ * Results:
+ *	Floating point implementation register.
+ *
+ * Side effects:
+ *	None.
+ *
+ *----------------------------------------------------------------------------
+ */
+LEAF(MipsFPID)
+	.set push
+	.set hardfloat
+	mfc0	t1, MIPS_COP_0_STATUS		# Save the status register.
+	HAZARD_DELAY
+#if defined(__mips_n64)
+	or	t0, t1, MIPS_SR_COP_1_BIT | MIPS_SR_FR
+#else
+	or	t0, t1, MIPS_SR_COP_1_BIT
+#endif
+	mtc0	t0, MIPS_COP_0_STATUS 		# Enable the coprocessor
+	HAZARD_DELAY
+	ITLBNOPFIX
+	cfc1	v0, MIPS_FPU_ID
+	mtc0	t1, MIPS_COP_0_STATUS		# Restore the status register.
+	ITLBNOPFIX
+	j	ra
+	nop
+	.set pop
+END(MipsFPID)
 
 /*----------------------------------------------------------------------------
  *
@@ -620,10 +704,18 @@ END(MipsSwitchFPState)
  */
 #if defined(CPU_HAVEFPU)
 LEAF(MipsSaveCurFPState)
+	.set push
+	.set hardfloat
 	PTR_L	a0, TD_PCB(a0)			# get pointer to pcb for thread
 	mfc0	t1, MIPS_COP_0_STATUS		# Disable interrupts and
-	li	t0, MIPS_SR_COP_1_BIT		#  enable the coprocessor
+	HAZARD_DELAY
+#if defined(__mips_n64)
+	or	t0, t1, MIPS_SR_COP_1_BIT | MIPS_SR_FR		#  enable the coprocessor
+#else
+	or	t0, t1, MIPS_SR_COP_1_BIT 			#  enable the coprocessor
+#endif
 	mtc0	t0, MIPS_COP_0_STATUS
+	HAZARD_DELAY
 	ITLBNOPFIX
 	GET_CPU_PCPU(a1)
 	PTR_S	zero, PC_FPCURTHREAD(a1)	# indicate state has been saved
@@ -678,6 +770,7 @@ LEAF(MipsSaveCurFPState)
 	ITLBNOPFIX
 	j	ra
 	nop
+	.set pop
 END(MipsSaveCurFPState)
 #endif /* CPU_HAVEFPU */
 
@@ -723,9 +816,9 @@ szsigcode32:
 #ifdef COMPAT_CHERIABI
 	.globl	_C_LABEL(cheri_sigcode)
 _C_LABEL(cheri_sigcode):
-	PTR_ADDU	a0, sp, SIGF_C_UC	# address of ucontext
-	csetoffset	$c3, $c11, a0
-	li		v0, SYS_sigreturn
+	dli		t0, SIGF_C_UC
+	cincoffset	$c3, $c11, t0		# In the hybrid ABI named $c11,
+	li		v0, SYS_sigreturn	# but we really mean $csp.
 # sigreturn (ucp)
 	syscall
 	break	0				# just in case sigreturn fails

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2013 Mark Johnston <markj@FreeBSD.org>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -65,6 +67,7 @@ SDT_PROBE_DECLARE(tcp, , , debug__input);
 SDT_PROBE_DECLARE(tcp, , , debug__output);
 SDT_PROBE_DECLARE(tcp, , , debug__user);
 SDT_PROBE_DECLARE(tcp, , , debug__drop);
+SDT_PROBE_DECLARE(tcp, , , receive__autoresize);
 
 SDT_PROBE_DECLARE(udp, , , receive);
 SDT_PROBE_DECLARE(udp, , , send);

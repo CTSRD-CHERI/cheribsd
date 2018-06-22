@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2011
  *	Ben Gray <ben.r.gray@gmail.com>.
  * All rights reserved.
@@ -41,8 +43,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 
 #include <machine/bus.h>
-#include <machine/cpu.h>
-#include <machine/cpufunc.h>
 #include <machine/resource.h>
 #include <machine/intr.h>
 
@@ -51,7 +51,6 @@ __FBSDID("$FreeBSD$");
 #include <arm/ti/ti_prcm.h>
 #include <arm/ti/omap4/omap4_reg.h>
 
-#include <dev/fdt/fdt_common.h>
 #include <dev/ofw/openfirm.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
@@ -366,9 +365,9 @@ static struct omap4_clk_details g_omap4_clk_details[] = {
 	OMAP4_GENERIC_CLOCK_DETAILS(UART2_CLK, FREQ_48MHZ, CM2_INSTANCE,
 		(L4PER_CM2_OFFSET + 0x0148), CLKCTRL_MODULEMODE_ENABLE),
 	OMAP4_GENERIC_CLOCK_DETAILS(UART3_CLK, FREQ_48MHZ, CM2_INSTANCE,
-		(L4PER_CM2_OFFSET + 0x0140), CLKCTRL_MODULEMODE_ENABLE),
+		(L4PER_CM2_OFFSET + 0x0150), CLKCTRL_MODULEMODE_ENABLE),
 	OMAP4_GENERIC_CLOCK_DETAILS(UART4_CLK, FREQ_48MHZ, CM2_INSTANCE,
-		(L4PER_CM2_OFFSET + 0x0148), CLKCTRL_MODULEMODE_ENABLE),
+		(L4PER_CM2_OFFSET + 0x0158), CLKCTRL_MODULEMODE_ENABLE),
 
 	/* General purpose timers */
 	OMAP4_GENERIC_CLOCK_DETAILS(TIMER1_CLK,  -1, PRM_INSTANCE,
@@ -1035,7 +1034,7 @@ omap4_clk_get_arm_fclk_freq(struct ti_clock_dev *clkdev,
  *	The USB clocking setup seems to be a bit more tricky than the other modules,
  *	to start with the clocking diagram for the HS host module shows 13 different
  *	clocks.  So to try and make it easier to follow the clocking activation
- *	and deactivation is handled in it's own set of callbacks.
+ *	and deactivation is handled in its own set of callbacks.
  *
  *	LOCKING:
  *	Inherits the locks from the omap_prcm driver, no internal locking.
@@ -1329,7 +1328,7 @@ omap4_clk_hsusbhost_accessible(struct ti_clock_dev *clkdev)
  *	Inherits the locks from the omap_prcm driver, no internal locking.
  *
  *	RETURNS:
- *	Returns 0 if sucessful otherwise a negative error code on failure.
+ *	Returns 0 if successful otherwise a negative error code on failure.
  */
 static int
 omap4_clk_hsusbhost_set_source(struct ti_clock_dev *clkdev,

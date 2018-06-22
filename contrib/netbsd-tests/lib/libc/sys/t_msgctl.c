@@ -1,4 +1,4 @@
-/* $NetBSD: t_msgctl.c,v 1.4 2014/02/27 00:59:50 joerg Exp $ */
+/* $NetBSD: t_msgctl.c,v 1.5 2017/01/13 20:44:45 christos Exp $ */
 
 /*-
  * Copyright (c) 2011 The NetBSD Foundation, Inc.
@@ -29,7 +29,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 #include <sys/cdefs.h>
-__RCSID("$NetBSD: t_msgctl.c,v 1.4 2014/02/27 00:59:50 joerg Exp $");
+__RCSID("$NetBSD: t_msgctl.c,v 1.5 2017/01/13 20:44:45 christos Exp $");
 
 #include <sys/msg.h>
 #include <sys/stat.h>
@@ -38,6 +38,7 @@ __RCSID("$NetBSD: t_msgctl.c,v 1.4 2014/02/27 00:59:50 joerg Exp $");
 
 #include <atf-c.h>
 #include <errno.h>
+#include <limits.h>
 #include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,10 +46,6 @@ __RCSID("$NetBSD: t_msgctl.c,v 1.4 2014/02/27 00:59:50 joerg Exp $");
 #include <sysexits.h>
 #include <time.h>
 #include <unistd.h>
-
-#ifdef __FreeBSD__
-#include <limits.h>
-#endif
 
 #define MSG_KEY		12345689
 #define MSG_MTYPE_1	0x41
@@ -85,6 +82,9 @@ ATF_TC_BODY(msgctl_err, tc)
 	(void)memset(&msgds, 0, sizeof(struct msqid_ds));
 
 	id = msgget(MSG_KEY, IPC_CREAT | 0600);
+	if (id == -1 && errno == ENOSYS)
+		atf_tc_skip("%s: msgctl not supported", __func__);
+
 	ATF_REQUIRE(id != -1);
 
 	errno = 0;
@@ -125,6 +125,8 @@ ATF_TC_BODY(msgctl_perm, tc)
 
 	pw = getpwnam("nobody");
 	id = msgget(MSG_KEY, IPC_CREAT | 0600);
+	if (id == -1 && errno == ENOSYS)
+		atf_tc_skip("%s: msgctl not supported", __func__);
 
 	ATF_REQUIRE(id != -1);
 	ATF_REQUIRE(pw != NULL);
@@ -199,6 +201,9 @@ ATF_TC_BODY(msgctl_pid, tc)
 	pid_t pid;
 
 	id = msgget(MSG_KEY, IPC_CREAT | 0600);
+	if (id == -1 && errno == ENOSYS)
+		atf_tc_skip("%s: msgctl not supported", __func__);
+
 	ATF_REQUIRE(id != -1);
 
 	pid = fork();
@@ -206,7 +211,11 @@ ATF_TC_BODY(msgctl_pid, tc)
 
 	if (pid == 0) {
 
+#ifdef	__FreeBSD__
+		(void)msgsnd(id, &msg, sizeof(msg.buf), IPC_NOWAIT);
+#else
 		(void)msgsnd(id, &msg, sizeof(struct msg), IPC_NOWAIT);
+#endif
 
 		_exit(EXIT_SUCCESS);
 	}
@@ -265,6 +274,8 @@ ATF_TC_BODY(msgctl_set, tc)
 
 	pw = getpwnam("nobody");
 	id = msgget(MSG_KEY, IPC_CREAT | 0600);
+	if (id == -1 && errno == ENOSYS)
+		atf_tc_skip("%s: msgctl not supported", __func__);
 
 	ATF_REQUIRE(id != -1);
 	ATF_REQUIRE(pw != NULL);
@@ -312,12 +323,19 @@ ATF_TC_BODY(msgctl_time, tc)
 	int id;
 
 	id = msgget(MSG_KEY, IPC_CREAT | 0600);
+	if (id == -1 && errno == ENOSYS)
+		atf_tc_skip("%s: msgctl not supported", __func__);
+
 	ATF_REQUIRE(id != -1);
 
 	t = time(NULL);
 
 	(void)memset(&msgds, 0, sizeof(struct msqid_ds));
+#ifdef	__FreeBSD__
+	(void)msgsnd(id, &msg, sizeof(msg.buf), IPC_NOWAIT);
+#else
 	(void)msgsnd(id, &msg, sizeof(struct msg), IPC_NOWAIT);
+#endif
 	(void)msgctl(id, IPC_STAT, &msgds);
 
 	if (llabs(t - msgds.msg_stime) > 1)

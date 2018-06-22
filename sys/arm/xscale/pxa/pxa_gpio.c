@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2006 Benno Rice.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -331,7 +333,7 @@ pxa_gpio_unmask_irq(int irq)
 }
 
 int
-pxa_gpio_get_next_irq()
+pxa_gpio_get_next_irq(void)
 {
 	struct  pxa_gpio_softc *sc;
 	int     gpio;

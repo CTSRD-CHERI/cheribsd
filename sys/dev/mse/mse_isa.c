@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2004 M. Warner Losh
  * All rights reserved.
  *
@@ -105,8 +107,6 @@ static	driver_t	mse_driver = {
 	sizeof(mse_softc_t),
 };
 
-DRIVER_MODULE(mse, isa, mse_driver, mse_devclass, 0, 0);
-
 static struct isa_pnp_id mse_ids[] = {
 	{ 0x000fd041, "Bus mouse" },			/* PNP0F00 */
 	{ 0x020fd041, "InPort mouse" },			/* PNP0F02 */
@@ -206,8 +206,8 @@ mse_isa_probe(device_t dev)
 
 	sc = device_get_softc(dev);
 	rid = 0;
-	sc->sc_port = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0,
-					 MSE_IOSIZE, RF_ACTIVE);
+	sc->sc_port = bus_alloc_resource_anywhere(dev, SYS_RES_IOPORT, &rid,
+						  MSE_IOSIZE, RF_ACTIVE);
 	if (sc->sc_port == NULL)
 		return ENXIO;
 
@@ -243,8 +243,8 @@ mse_isa_attach(device_t dev)
 	sc = device_get_softc(dev);
 
 	rid = 0;
-	sc->sc_port = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0,
-					 MSE_IOSIZE, RF_ACTIVE);
+	sc->sc_port = bus_alloc_resource_anywhere(dev, SYS_RES_IOPORT, &rid,
+						  MSE_IOSIZE, RF_ACTIVE);
 	if (sc->sc_port == NULL)
 		return ENXIO;
 
@@ -309,7 +309,7 @@ mse_disablelogi(struct resource *port)
 static void
 mse_getlogi(struct resource *port, int *dx, int *dy, int *but)
 {
-	register char x, y;
+	char x, y;
 
 	bus_write_1(port, MSE_PORTC, MSE_HOLD | MSE_RXLOW);
 	x = bus_read_1(port, MSE_PORTA);
@@ -388,3 +388,6 @@ mse_getati(struct resource *port, int *dx, int *dy, int *but)
 	bus_write_1(port, MSE_PORTA, MSE_INPORT_MODE);
 	bus_write_1(port, MSE_PORTB, MSE_INPORT_INTREN);
 }
+
+DRIVER_MODULE(mse, isa, mse_driver, mse_devclass, 0, 0);
+ISA_PNP_INFO(mse_ids);

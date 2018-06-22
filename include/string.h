@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -167,19 +169,32 @@ int	 strncmp_c(__capability const char *, __capability const char *,
 __capability char
 *strncpy_c(__capability char * __restrict, __capability const char * __restrict,
 	    size_t);
-char	 *strncpy_c_fromcap(char * __restrict,
-	    __capability const char * __restrict, size_t);
-__capability char
-	*strncpy_c_tocap(__capability char * __restrict,
-	    const char * __restrict, size_t);
 size_t	 strnlen_c(__capability const char *, size_t) __pure;
 #endif
 
+int	 timingsafe_bcmp(const void *, const void *, size_t);
+int	 timingsafe_memcmp(const void *, const void *, size_t);
 #endif /* __BSD_VISIBLE */
 
 #if __POSIX_VISIBLE >= 200809 || defined(_XLOCALE_H_)
 #include <xlocale/_string.h>
 #endif
+
+#if __EXT1_VISIBLE
+
+#ifndef _RSIZE_T_DEFINED
+#define _RSIZE_T_DEFINED
+typedef size_t rsize_t;
+#endif
+
+#ifndef _ERRNO_T_DEFINED
+#define _ERRNO_T_DEFINED
+typedef int errno_t;
+#endif
+
+/* ISO/IEC 9899:2011 K.3.7.4.1.1 */
+errno_t memset_s(void *, rsize_t, int, rsize_t);
+#endif /* __EXT1_VISIBLE */
 __END_DECLS
 
 #endif /* _STRING_H_ */

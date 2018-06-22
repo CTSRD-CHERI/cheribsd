@@ -2,9 +2,12 @@
 
 .include <src.opts.mk>
 
+FILESGROUPS=FILES
+
 FILES=	100.clean-disks \
 	110.clean-tmps \
 	120.clean-preserve \
+	140.clean-rwho \
 	200.backup-passwd \
 	210.backup-aliases \
 	330.news \
@@ -14,6 +17,7 @@ FILES=	100.clean-disks \
 	407.status-graid3 \
 	408.status-gstripe \
 	409.status-gconcat \
+	410.status-mfi \
 	420.status-network \
 	430.status-uptime \
 	450.status-security \
@@ -23,8 +27,12 @@ FILES=	100.clean-disks \
 # NB: keep these sorted by MK_* knobs
 
 .if ${MK_ACCT} != "no"
-FILES+=	310.accounting
+FILESGROUPS+=	ACCT
+ACCT+=		310.accounting
 .endif
+ACCTDIR=	/etc/periodic/daily
+ACCTMODE=	${BINMODE}
+ACCTPACKAGE=	acct
 
 .if ${MK_CALENDAR} != "no"
 FILES+=	300.calendar
@@ -37,10 +45,6 @@ FILES+=	130.clean-msgs
 .if ${MK_NTP} != "no"
 FILES+=	480.status-ntpd \
 	480.leapfile-ntpd
-.endif
-
-.if ${MK_RCMDS} != "no"
-FILES+=	140.clean-rwho
 .endif
 
 .if ${MK_SENDMAIL} != "no"

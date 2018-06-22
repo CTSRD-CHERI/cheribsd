@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2004 Alan L. Cox <alc@cs.rice.edu>
  * Copyright (c) 1982, 1986, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -53,6 +55,10 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/cache.h>
 
+#ifdef CPU_CHERI
+#define	CAP_ALIGNED(x)	((x) % CHERICAP_SIZE == 0)
+#endif
+
 /*
  * Implement uiomove(9) from physical memory using a combination
  * of the direct mapping and sf_bufs to reduce the creation and
@@ -63,7 +69,7 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 {
 	struct sf_buf *sf;
 	struct thread *td = curthread;
-	struct iovec *iov;
+	kiovec_t *iov;
 	void *cp;
 	vm_offset_t page_offset;
 	vm_paddr_t pa;
@@ -109,9 +115,12 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 		case UIO_USERSPACE:
 			maybe_yield();
 			if (uio->uio_rw == UIO_READ)
-				error = copyout(cp, iov->iov_base, cnt);
+				error = copyout_c(
+				    (__cheri_tocap void * __capability)cp,
+				    iov->iov_base, cnt);
 			else
-				error = copyin(iov->iov_base, cp, cnt);
+				error = copyin_c(iov->iov_base,
+				    (__cheri_tocap void * __capability)cp, cnt);
 			if (error) {
 				if (sf != NULL)
 					sf_buf_free(sf);
@@ -119,10 +128,27 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 			}
 			break;
 		case UIO_SYSSPACE:
+#ifdef CPU_CHERI
+			if (CAP_ALIGNED((uintptr_t)cp) &&
+			    CAP_ALIGNED((uintptr_t)iov->iov_base) &&
+			    CAP_ALIGNED(cnt)) {
+				if (uio->uio_rw == UIO_READ)
+					cheri_bcopy(cp,
+					    (__cheri_fromcap void *)
+					    iov->iov_base, cnt);
+				else
+					cheri_bcopy(
+					    (__cheri_fromcap void *)
+					    iov->iov_base, cp, cnt);
+			} else
+#endif
 			if (uio->uio_rw == UIO_READ)
-				bcopy(cp, iov->iov_base, cnt);
+				bcopy(cp,
+				    (__cheri_fromcap void *)iov->iov_base,
+				    cnt);
 			else
-				bcopy(iov->iov_base, cp, cnt);
+				bcopy((__cheri_fromcap void *)iov->iov_base,
+				    cp, cnt);
 			break;
 		case UIO_NOCOPY:
 			break;
@@ -131,8 +157,7 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 			sf_buf_free(sf);
 		else
 			mips_dcache_wbinv_range((vm_offset_t)cp, cnt);
-		iov->iov_base = (char *)iov->iov_base + cnt;
-		iov->iov_len -= cnt;
+		IOVEC_ADVANCE(iov, cnt);
 		uio->uio_resid -= cnt;
 		uio->uio_offset += cnt;
 		offset += cnt;

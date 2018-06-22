@@ -34,10 +34,6 @@
 #include <sys/sysctl.h>
 #include <sys/wait.h>
 
-#include <machine/cheri.h>
-
-#include <cheri/sandbox.h>
-
 #include <terasic_mtl.h>
 #ifdef INPUT_DEBUG
 #include <ctype.h>
@@ -104,22 +100,22 @@ struct image {
         uint32_t        *i_image;
 };
 
-int bleed_edges = 1;
-int caching = 0;
-int preload = 0;
-int verbose = 0;
-int sb_vis = 0;
-uint32_t bgcolor;
-uint32_t header_height;
+static int bleed_edges = 1;
+static int caching = 0;
+static int preload = 0;
+static int verbose = 0;
+static int sb_vis = 0;
+static uint32_t bgcolor;
+static uint32_t header_height;
 #ifdef HOURGLASS
-uint32_t *busyarea, *hourglass;
+static uint32_t *busyarea, *hourglass;
 #endif
-struct image header, sri_logo, cam_logo;
-enum sbtype sb = SB_CHERI;
-enum mtl_display_mode res = MTL_DM_800x480;
+static struct image header, sri_logo, cam_logo;
+static enum sbtype sb = SB_CHERI;
+static enum mtl_display_mode res = MTL_DM_800x480;
 static int zombies_waiting = 0;
 
-int *slidep;
+static int *slidep;
 
 static uint32_t slide_fcol;
 static uint32_t slide_width;

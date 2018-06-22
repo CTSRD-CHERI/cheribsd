@@ -1,6 +1,6 @@
 # Chelsio T5 Factory Default configuration file.
 #
-# Copyright (C) 2010-2015 Chelsio Communications.  All rights reserved.
+# Copyright (C) 2010-2017 Chelsio Communications.  All rights reserved.
 #
 #   DO NOT MODIFY THIS FILE UNDER ANY CIRCUMSTANCES.  MODIFICATION OF THIS FILE
 #   WILL RESULT IN A NON-FUNCTIONAL ADAPTER AND MAY RESULT IN PHYSICAL DAMAGE
@@ -91,7 +91,8 @@
 	reg[0x105c] = 128		# SGE_FL_BUFFER_SIZE6
 	reg[0x1060] = 8192		# SGE_FL_BUFFER_SIZE7
 	reg[0x1064] = 16384		# SGE_FL_BUFFER_SIZE8
-	reg[0x10a4] = 0xa000a000/0xf000f000 # SGE_DBFIFO_STATUS
+	reg[0x10a4] = 0x00280000/0x3ffc0000 # SGE_DBFIFO_STATUS
+	reg[0x1118] = 0x00002800/0x00003c00 # SGE_DBFIFO_STATUS2
 	reg[0x10a8] = 0x402000/0x402000	# SGE_DOORBELL_CONTROL
 
 	# SGE_THROTTLE_CONTROL
@@ -120,6 +121,12 @@
 
 	# enable TP_OUT_CONFIG.IPIDSPLITMODE
 	reg[0x7d04] = 0x00010000/0x00010000
+
+	# disable TP_PARA_REG3.RxFragEn
+	reg[0x7d6c] = 0x00000000/0x00007000
+
+	# enable TP_PARA_REG6.EnableCSnd
+	reg[0x7d78] = 0x00000400/0x00000000
 
 	reg[0x7dc0] = 0x0e2f8849	# TP_SHIFT_CNT
 
@@ -175,6 +182,10 @@
 	# MC configuration
 	mc_mode_brc[0] = 1		# mc0 - 1: enable BRC, 0: enable RBC
 	mc_mode_brc[1] = 1		# mc1 - 1: enable BRC, 0: enable RBC
+
+	# ULP_TX_CONFIG
+	reg[0x8dc0] = 0x00000004/0x00000004 # Enable more error msg for ...
+					    # TPT error.
 
 # Some "definitions" to make the rest of this a bit more readable.  We support
 # 4 ports, 3 functions (NIC, FCoE and iSCSI), scaling up to 8 "CPU Queue Sets"
@@ -457,7 +468,6 @@
 	fcoe_nfcf = 16
 	fcoe_nvnp = 32
 	fcoe_nssn = 1024
-	fcoe_nfcb = 256
 
 
 # The following function, 1023, is not an actual PCIE function but is used to
@@ -484,9 +494,9 @@
 	wx_caps = 0x82		# DMAQ | VF
 	r_caps = 0x86		# DMAQ | VF | PORT
 	nvi = 1			# 1 port
-	niqflint = 4		# 2 "Queue Sets" + NXIQ
-	nethctrl = 2		# 2 "Queue Sets"
-	neq = 4			# 2 "Queue Sets" * 2
+	niqflint = 6		# 2 "Queue Sets" + NXIQ
+	nethctrl = 4		# 2 "Queue Sets"
+	neq = 8			# 2 "Queue Sets" * 2
 	nexactf = 4
 	cmask = all		# access to all channels
 	pmask = 0x1		# access to only one port ...
@@ -496,9 +506,9 @@
 	wx_caps = 0x82		# DMAQ | VF
 	r_caps = 0x86		# DMAQ | VF | PORT
 	nvi = 1			# 1 port
-	niqflint = 4		# 2 "Queue Sets" + NXIQ
-	nethctrl = 2		# 2 "Queue Sets"
-	neq = 4			# 2 "Queue Sets" * 2
+	niqflint = 6		# 2 "Queue Sets" + NXIQ
+	nethctrl = 4		# 2 "Queue Sets"
+	neq = 8			# 2 "Queue Sets" * 2
 	nexactf = 4
 	cmask = all		# access to all channels
 	pmask = 0x2		# access to only one port ...
@@ -508,9 +518,9 @@
 	wx_caps = 0x82		# DMAQ | VF
 	r_caps = 0x86		# DMAQ | VF | PORT
 	nvi = 1			# 1 port
-	niqflint = 4		# 2 "Queue Sets" + NXIQ
-	nethctrl = 2		# 2 "Queue Sets"
-	neq = 4			# 2 "Queue Sets" * 2
+	niqflint = 6		# 2 "Queue Sets" + NXIQ
+	nethctrl = 4		# 2 "Queue Sets"
+	neq = 8			# 2 "Queue Sets" * 2
 	nexactf = 4
 	cmask = all		# access to all channels
 	pmask = 0x4		# access to only one port ...
@@ -520,9 +530,9 @@
 	wx_caps = 0x82		# DMAQ | VF
 	r_caps = 0x86		# DMAQ | VF | PORT
 	nvi = 1			# 1 port
-	niqflint = 4		# 2 "Queue Sets" + NXIQ
-	nethctrl = 2		# 2 "Queue Sets"
-	neq = 4			# 2 "Queue Sets" * 2
+	niqflint = 6		# 2 "Queue Sets" + NXIQ
+	nethctrl = 4		# 2 "Queue Sets"
+	neq = 8			# 2 "Queue Sets" * 2
 	nexactf = 4
 	cmask = all		# access to all channels
 	pmask = 0x8		# access to only one port ...
@@ -591,8 +601,8 @@
 
 
 [fini]
-	version = 0x1425001c
-	checksum = 0xb1c3ae38
+	version = 0x01000028
+	checksum = 0x36228c7d
 
 # Total resources used by above allocations:
 #   Virtual Interfaces: 104

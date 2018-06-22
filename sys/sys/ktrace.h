@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1988, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -57,7 +59,7 @@ struct ktr_header {
 	pid_t	ktr_pid;		/* process id */
 	char	ktr_comm[MAXCOMLEN + 1];/* command name */
 	struct	timeval ktr_time;	/* timestamp */
-	intptr_t	ktr_tid;	/* was ktr_buffer */
+	long	ktr_tid;		/* thread being traced */
 };
 
 /*
@@ -114,6 +116,10 @@ struct ktr_sysret {
 /*
  * KTR_GENIO - trace generic process i/o
  */
+#ifndef _UIO_RW_DECLARED
+enum	uio_rw { UIO_READ, UIO_WRITE };
+#define	_UIO_RW_DECLARED
+#endif
 #define KTR_GENIO	4
 struct ktr_genio {
 	int	ktr_fd;
@@ -220,9 +226,21 @@ struct ktr_faultend {
 };
 
 /*
+ * KTR_STRUCT_ARRAY - array of misc. structs
+ */
+#define	KTR_STRUCT_ARRAY 15
+struct ktr_struct_array {
+	size_t struct_size;
+	/*
+	 * Followed by null-terminated structure name and then payload
+	 * contents.
+	 */
+};
+
+/*
  * KTR_CCALL - CHERI CCall
  */
-#define KTR_CCALL	15
+#define KTR_CCALL	16
 struct ktr_ccall {
 	struct cheri_serial		ktr_pcc;
 	struct cheri_serial		ktr_idc;
@@ -233,7 +251,7 @@ struct ktr_ccall {
 /*
  * KTR_CRETURN - CHERI CReturn (return from CCall)
  */
-#define KTR_CRETURN	16
+#define KTR_CRETURN	17
 struct ktr_creturn {
 	/* XXXBD: restored PCC/IDC? */
 	struct cheri_serial		ktr_cret;
@@ -243,7 +261,7 @@ struct ktr_creturn {
 /*
  * KTR_CEXCEPTION - CHERI Capability exception
  */
-#define KTR_CEXCEPTION	17
+#define KTR_CEXCEPTION	18
 struct ktr_cexception {
 	struct cheri_serial	ktr_cap;
 	uint8_t			ktr_exccode;
@@ -253,7 +271,7 @@ struct ktr_cexception {
 /*
  * KTR_SYSERRCAUSE - String detailing cause of next syscall error
  */
-#define	KTR_SYSERRCAUSE	18
+#define	KTR_SYSERRCAUSE	19
 	/* record contains error message */
 
 /*
@@ -280,6 +298,7 @@ struct ktr_cexception {
 #define KTRFAC_CAPFAIL	(1<<KTR_CAPFAIL)
 #define KTRFAC_FAULT	(1<<KTR_FAULT)
 #define KTRFAC_FAULTEND	(1<<KTR_FAULTEND)
+#define	KTRFAC_STRUCT_ARRAY (1<<KTR_STRUCT_ARRAY)
 #define KTRFAC_CCALL	(1<<KTR_CCALL)
 #define KTRFAC_CRETURN	(1<<KTR_CRETURN)
 #define KTRFAC_CEXCEPTION	(1<<KTR_CEXCEPTION)
@@ -293,13 +312,16 @@ struct ktr_cexception {
 #define	KTRFAC_DROP	0x20000000	/* last event was dropped */
 
 #ifdef	_KERNEL
+struct uio;
+struct vnode;
+
 void	ktrnamei(char *);
 void	ktrcsw(int, int, const char *);
 void	ktrpsig(int, sig_t, sigset_t *, int);
 void	ktrfault(vm_offset_t, int);
 void	ktrfaultend(int);
 void	ktrgenio(int, enum uio_rw, struct uio *, int);
-void	ktrsyscall(int, int narg, register_t args[]);
+void	ktrsyscall(int, int narg, syscallarg_t args[]);
 void	ktrsysctl(int *name, u_int namelen);
 void	ktrsysret(int, int, register_t);
 void	ktrprocctor(struct proc *);
@@ -307,11 +329,14 @@ void	ktrprocexec(struct proc *, struct ucred **, struct vnode **);
 void	ktrprocexit(struct thread *);
 void	ktrprocfork(struct proc *, struct proc *);
 void	ktruserret(struct thread *);
-void	ktrstruct(const char *, void *, size_t);
+void	ktrstruct(const char *, const void *, size_t);
+void	ktrstructarray(const char *, enum uio_seg, const void *, int, size_t);
 void	ktrcapfail(enum ktr_cap_fail_type, const cap_rights_t *,
 	    const cap_rights_t *);
 #define ktrcaprights(s) \
 	ktrstruct("caprights", (s), sizeof(cap_rights_t))
+#define	ktritimerval(s) \
+	ktrstruct("itimerval", (s), sizeof(struct itimerval))
 #define ktrsockaddr(s) \
 	ktrstruct("sockaddr", (s), ((struct sockaddr *)(s))->sa_len)
 #define ktrstat(s) \
@@ -319,7 +344,17 @@ void	ktrcapfail(enum ktr_cap_fail_type, const cap_rights_t *,
 void	ktrccall(struct pcb *);
 void	ktrcreturn(struct pcb *);
 void	ktrcexception(struct trapframe *);
-void	ktrsyserrcause(const char *format, ...);
+void	ktrsyserrcause(const char *format, ...) __printflike(1, 2);
+
+extern u_int ktr_geniosize;
+
+#ifdef KTRACE
+#define SYSERRCAUSE(fmt, ...) \
+        if (KTRPOINT(curthread, KTR_SYSERRCAUSE)) \
+                ktrsyserrcause("%s: " fmt, __func__, ##__VA_ARGS__);
+#else
+#define SYSERRCAUSE(fmt, ...)
+#endif
 
 #else
 

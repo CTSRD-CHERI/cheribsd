@@ -50,7 +50,6 @@
 
 extern char *myname;
 
-int putstdout();
 
 int  overstrike;
 int  screen_length;
@@ -59,8 +58,6 @@ char ch_erase;
 char ch_kill;
 char smart_terminal;
 char PC;
-char *tgetstr();
-char *tgoto();
 char termcap_buf[1024];
 char string_buffer[1024];
 char home[15];
@@ -236,6 +233,7 @@ int interactive;
 #endif
 }
 
+void
 init_screen()
 
 {
@@ -326,6 +324,7 @@ init_screen()
     }
 }
 
+void
 end_screen()
 
 {
@@ -356,6 +355,7 @@ end_screen()
     }
 }
 
+void
 reinit_screen()
 
 {
@@ -383,6 +383,7 @@ reinit_screen()
     }
 }
 
+void
 get_screensize()
 
 {
@@ -428,6 +429,7 @@ get_screensize()
     lower_left[sizeof(lower_left) - 1] = '\0';
 }
 
+void
 standout(msg)
 
 char *msg;
@@ -445,6 +447,7 @@ char *msg;
     }
 }
 
+void
 clear()
 
 {
@@ -454,6 +457,7 @@ clear()
     }
 }
 
+int
 clear_eol(len)
 
 int len;
@@ -478,6 +482,7 @@ int len;
     return(-1);
 }
 
+void
 go_home()
 
 {
@@ -489,11 +494,12 @@ go_home()
 
 /* This has to be defined as a subroutine for tputs (instead of a macro) */
 
+int
 putstdout(ch)
 
 char ch;
 
 {
-    putchar(ch);
+    return putchar(ch);
 }
 

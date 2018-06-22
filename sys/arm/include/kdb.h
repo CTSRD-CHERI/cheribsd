@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2004 Marcel Moolenaar
  * All rights reserved.
  *
@@ -29,10 +31,10 @@
 #ifndef _MACHINE_KDB_H_
 #define _MACHINE_KDB_H_
 
+#include <machine/cpu.h>
+#include <machine/db_machdep.h>
 #include <machine/frame.h>
 #include <machine/psl.h>
-#include <machine/cpufunc.h>
-#include <machine/db_machdep.h>
 
 #define	KDB_STOPPEDPCB(pc)	&stoppcbs[pc->pc_cpuid]
 
@@ -56,7 +58,7 @@ static __inline void
 kdb_cpu_sync_icache(unsigned char *addr, size_t size)
 {
 
-	cpu_icache_sync_range((vm_offset_t)addr, size);
+	icache_sync((vm_offset_t)addr, size);
 }
 
 static __inline void

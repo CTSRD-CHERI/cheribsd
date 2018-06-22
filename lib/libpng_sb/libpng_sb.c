@@ -30,12 +30,11 @@
 
 #include <sys/types.h>
 
-#include <machine/cheri.h>
-#include <machine/cheric.h>
-
-#include <cheri/cheri_enter.h>
-#include <cheri/cheri_fd.h>
-#include <cheri/sandbox.h>
+#include <cheri/cheri.h>
+#include <cheri/cheric.h>
+#include <cheri/libcheri_enter.h>
+#include <cheri/libcheri_fd.h>
+#include <cheri/libcheri_sandbox.h>
 
 #include <assert.h>
 #include <err.h>
@@ -69,7 +68,7 @@ struct sb_png_struct {
 };
 
 struct sb_info_struct {
-	__capability void *info_cap;
+	void * __capability info_cap;
 };
 
 #define DPRINTF printf
@@ -96,8 +95,9 @@ libpng_sb_userfn_handler(struct cheri_object system_object __unused,
     __capability void *c5 __unused, __capability void *c6 __unused,
     __capability void *c7 __unused)
 {
-	struct sb_png_struct *psp = (struct sb_png_struct *)void_cpsp;
-
+	struct sb_png_struct *psp = cheri_cap_to_typed_ptr(void_cpsp,
+		    struct sb_png_struct);
+	void* c4_ptr = cheri_cap_to_ptr(c4, 0); /* XXXAR: what is min_size? */
 #if 0
 	printf("%s:  with method %ju\n", __func__, (intmax_t)methodnum);
 	printf("%s: psp at %p\n", __func__, psp);
@@ -114,17 +114,17 @@ libpng_sb_userfn_handler(struct cheri_object system_object __unused,
 		    cheri_getbase(c4), cheri_getoffset(c4), cheri_getlen(c4),
 		    (size_t)a0);
 #endif
-		psp->read_data_fn((png_structp)psp, (png_bytep)c4, a0);
+		psp->read_data_fn((png_structp)psp, (png_bytep)c4_ptr, a0);
 		printf("callback complete\n");
 		break;
 	case LIBPNG_SB_USERFN_INFO_CALLBACK:
-		psp->info_fn((png_structp)psp, (png_infop)c4);
+		psp->info_fn((png_structp)psp, (png_infop)c4_ptr);
 		break;
 	case LIBPNG_SB_USERFN_ROW_CALLBACK:
-		psp->row_fn((png_structp)psp, (png_bytep)c4, a0, a1);
+		psp->row_fn((png_structp)psp, (png_bytep)c4_ptr, a0, a1);
 		break;
 	case LIBPNG_SB_USERFN_END_CALLBACK:
-		psp->end_fn((png_structp)psp, (png_infop)c4);
+		psp->end_fn((png_structp)psp, (png_infop)c4_ptr);
 		break;
 	default:
 		warnx("unknown user function %jd", methodnum);
@@ -137,6 +137,8 @@ libpng_sb_userfn_handler(struct cheri_object system_object __unused,
 static void
 init_sb_class()
 {
+
+	libcheri_init();
 
 	/* XXX: wrong error handling for library code */
 	if (sandbox_class_new("/usr/libexec/libpng_sb-helper",
@@ -198,7 +200,7 @@ init_sb_class()
 	    LIBPNG_SB_HELPER_OP_GET_INTERLACE_TYPE,
 	    "png_get_interlace_type");
 
-	cheri_system_user_register_fn(&libpng_sb_userfn_handler);
+	libcheri_system_user_register_fn(&libpng_sb_userfn_handler);
 
 	DPRINTF("sandbox class created\n");
 }
@@ -212,7 +214,7 @@ sb_cinvoke(struct sandbox_object *objectp, register_t methodnum,
     __capability void *c9, __capability void *c10)
 {
 
-	return (sandbox_object_cinvoke(objectp,
+	return (sandbox_object_invoke(objectp,
 	    methodnum,
 	    a1, a2, a3, a4, a5, a6, a7,
 	    sandbox_object_getsystemobject(objectp).co_codecap,
@@ -282,7 +284,7 @@ png_set_longjmp_fn(png_structp png_ptr,
 }
 
 png_infop
-png_create_info_struct(png_structp png_ptr __unused)
+png_create_info_struct(png_structp png_ptr)
 {
 	register_t v;
 	struct sb_png_struct *psp = (struct sb_png_struct *)png_ptr;
@@ -294,14 +296,14 @@ png_create_info_struct(png_structp png_ptr __unused)
 
 	v = sb_cinvoke(psp->objectp, LIBPNG_SB_HELPER_OP_CREATE_INFO_STRUCT,
 	    0, 0, 0, 0, 0, 0, 0,
-	    cheri_csetbounds((__capability void *)&pip->info_cap, sizeof(__capability void *)),
+	    cheri_ptr_to_bounded_cap(&pip->info_cap),
 	    cheri_zerocap(), cheri_zerocap(), cheri_zerocap());
 	if (v != 0) {
 		warnx("%s: sb_cinvoke() returned %jx", __func__, (uintmax_t)v);
 		psp->error_fn(png_ptr, "png_create_read_info failed in sandbox");
 		errx(1, "%s: error_fn returned", __func__);
 	}
-	if (pip->info_cap == NULL) {
+	if (!pip->info_cap) {
 		free(pip);
 		return (NULL);
 	}
@@ -447,7 +449,7 @@ png_read_image(png_structp png_ptr, png_bytepp image)
 	register_t v;
 	uint32_t height, i, rowbytes;
 	struct sb_png_struct *psp = (struct sb_png_struct *)png_ptr;
-	__capability void **row_pointer; /* XXX-BD was __capability png_bytepp */
+	void * __capability *row_pointer; /* XXX-BD was __capability png_bytepp */
 
 #if 0
 	printf("%s: psp at %p\n", __func__, psp);
@@ -470,7 +472,7 @@ png_read_image(png_structp png_ptr, png_bytepp image)
 	
 	v = sb_cinvoke(psp->objectp, LIBPNG_SB_HELPER_OP_READ_IMAGE,
 	    0, 0, 0, 0, 0, 0, 0,
-	    (__capability void *)row_pointer,
+	    cheri_ptr(row_pointer, height * sizeof(void * __capability)),
 	    cheri_zerocap(), cheri_zerocap(), cheri_zerocap());
 	if (v != 0) {
 		warnx("%s: sb_cinvoke() returned %jx", __func__, (uintmax_t)v);

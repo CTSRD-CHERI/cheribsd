@@ -18,29 +18,32 @@ class MipsTargetMachine;
     MCSection *SmallDataSection;
     MCSection *SmallBSSSection;
     const MipsTargetMachine *TM;
+
+    bool IsGlobalInSmallSection(const GlobalObject *GO, const TargetMachine &TM,
+                                SectionKind Kind) const;
+    bool IsGlobalInSmallSectionImpl(const GlobalObject *GO,
+                                    const TargetMachine &TM) const;
   public:
 
     void Initialize(MCContext &Ctx, const TargetMachine &TM) override;
 
     /// Return true if this global address should be placed into small data/bss
     /// section.
-    bool IsGlobalInSmallSection(const GlobalValue *GV, const TargetMachine &TM,
-                                SectionKind Kind) const;
-    bool IsGlobalInSmallSection(const GlobalValue *GV,
+    bool IsGlobalInSmallSection(const GlobalObject *GO,
                                 const TargetMachine &TM) const;
-    bool IsGlobalInSmallSectionImpl(const GlobalValue *GV,
-                                    const TargetMachine &TM) const;
 
-    MCSection *SelectSectionForGlobal(const GlobalValue *GV, SectionKind Kind,
-                                      Mangler &Mang,
+    MCSection *SelectSectionForGlobal(const GlobalObject *GO, SectionKind Kind,
                                       const TargetMachine &TM) const override;
 
     /// Return true if this constant should be placed into small data section.
-    bool IsConstantInSmallSection(const Constant *CN,
+    bool IsConstantInSmallSection(const DataLayout &DL, const Constant *CN,
                                   const TargetMachine &TM) const;
 
-    MCSection *getSectionForConstant(SectionKind Kind,
-                                     const Constant *C) const override;
+    MCSection *getSectionForConstant(const DataLayout &DL, SectionKind Kind,
+                                     const Constant *C,
+                                     unsigned &Align) const override;
+    /// Describe a TLS variable address within debug info.
+    const MCExpr *getDebugThreadLocalSymbol(const MCSymbol *Sym) const override;
   };
 } // end namespace llvm
 

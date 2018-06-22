@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (C) 1996 Wolfgang Solfrank.
  * Copyright (C) 1996 TooLs GmbH.
  * All rights reserved.
@@ -65,6 +67,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/ofw_machdep.h>
 #include <machine/trap.h>
 
+#include <contrib/libfdt/libfdt.h>
+
 static void	*fdt;
 int		ofw_real_mode;
 
@@ -111,6 +115,15 @@ ofw_sprg_prepare(void)
 	 * Assume that interrupt are disabled at this point, or
 	 * SPRG1-3 could be trashed
 	 */
+#ifdef __powerpc64__
+	__asm __volatile("mtsprg1 %0\n\t"
+	    		 "mtsprg2 %1\n\t"
+			 "mtsprg3 %2\n\t"
+			 :
+			 : "r"(ofmsr[2]),
+			 "r"(ofmsr[3]),
+			 "r"(ofmsr[4]));
+#else
 	__asm __volatile("mfsprg0 %0\n\t"
 			 "mtsprg0 %1\n\t"
 	    		 "mtsprg1 %2\n\t"
@@ -121,6 +134,7 @@ ofw_sprg_prepare(void)
 			 "r"(ofmsr[2]),
 			 "r"(ofmsr[3]),
 			 "r"(ofmsr[4]));
+#endif
 }
 
 static __inline void
@@ -136,7 +150,9 @@ ofw_sprg_restore(void)
 	 *
 	 * PCPU data cannot be used until this routine is called !
 	 */
+#ifndef __powerpc64__
 	__asm __volatile("mtsprg0 %0" :: "r"(ofw_sprg0_save));
+#endif
 }
 #endif
 
@@ -172,14 +188,6 @@ parse_ofw_memory(phandle_t node, const char *prop, struct mem_region *output)
 	i = 0;
 	j = 0;
 	while (i < sz/sizeof(cell_t)) {
-	      #if !defined(__powerpc64__) && !defined(BOOKE)
-		/* On 32-bit PPC (OEA), ignore regions starting above 4 GB */
-		if (address_cells > 1 && OFmem[i] > 0) {
-			i += address_cells + size_cells;
-			continue;
-		}
-	      #endif
-
 		output[j].mr_start = OFmem[i++];
 		if (address_cells == 2) {
 			output[j].mr_start <<= 32;
@@ -192,19 +200,20 @@ parse_ofw_memory(phandle_t node, const char *prop, struct mem_region *output)
 			output[j].mr_size += OFmem[i++];
 		}
 
-	      #if !defined(__powerpc64__) && !defined(BOOKE)
-		/* Book-E can support 36-bit addresses. */
+		if (output[j].mr_start > BUS_SPACE_MAXADDR)
+			continue;
+
 		/*
-		 * Check for memory regions extending above 32-bit
-		 * memory space, and restrict them to stay there.
+		 * Constrain memory to that which we can access.
+		 * 32-bit AIM can only reference 32 bits of address currently,
+		 * but Book-E can access 36 bits.
 		 */
 		if (((uint64_t)output[j].mr_start +
-		    (uint64_t)output[j].mr_size) >
-		    BUS_SPACE_MAXADDR_32BIT) {
-			output[j].mr_size = BUS_SPACE_MAXADDR_32BIT -
-			    output[j].mr_start;
+		    (uint64_t)output[j].mr_size - 1) >
+		    BUS_SPACE_MAXADDR) {
+			output[j].mr_size = BUS_SPACE_MAXADDR -
+			    output[j].mr_start + 1;
 		}
-	      #endif
 
 		j++;
 	}
@@ -228,8 +237,17 @@ excise_fdt_reserved(struct mem_region *avail, int asz)
 	fdtmapsize = OF_getprop(chosen, "fdtmemreserv", fdtmap, sizeof(fdtmap));
 
 	for (j = 0; j < fdtmapsize/sizeof(fdtmap[0]); j++) {
-		fdtmap[j].address = be64toh(fdtmap[j].address);
-		fdtmap[j].size = be64toh(fdtmap[j].size);
+		fdtmap[j].address = be64toh(fdtmap[j].address) & ~PAGE_MASK;
+		fdtmap[j].size = round_page(be64toh(fdtmap[j].size));
+	}
+
+	KASSERT(j*sizeof(fdtmap[0]) < sizeof(fdtmap),
+	    ("Exceeded number of FDT reservations"));
+	/* Add a virtual entry for the FDT itself */
+	if (fdt != NULL) {
+		fdtmap[j].address = (vm_offset_t)fdt & ~PAGE_MASK;
+		fdtmap[j].size = round_page(fdt_totalsize(fdt));
+		fdtmapsize += sizeof(fdtmap[0]);
 	}
 
 	for (i = 0; i < asz; i++) {
@@ -344,8 +362,9 @@ OF_initial_setup(void *fdt_ptr, void *junk, int (*openfirm)(void *))
 	ofmsr[0] = mfmsr();
 	#ifdef __powerpc64__
 	ofmsr[0] &= ~PSL_SF;
-	#endif
+	#else
 	__asm __volatile("mfsprg0 %0" : "=&r"(ofmsr[1]));
+	#endif
 	__asm __volatile("mfsprg1 %0" : "=&r"(ofmsr[2]));
 	__asm __volatile("mfsprg2 %0" : "=&r"(ofmsr[3]));
 	__asm __volatile("mfsprg3 %0" : "=&r"(ofmsr[4]));
@@ -374,6 +393,7 @@ boolean_t
 OF_bootstrap()
 {
 	boolean_t status = FALSE;
+	int err = 0;
 
 #ifdef AIM
 	if (openfirmware_entry != NULL) {
@@ -390,7 +410,7 @@ OF_bootstrap()
 		if (status != TRUE)
 			return status;
 
-		OF_init(openfirmware);
+		err = OF_init(openfirmware);
 	} else
 #endif
 	if (fdt != NULL) {
@@ -399,9 +419,15 @@ OF_bootstrap()
 		if (status != TRUE)
 			return status;
 
-		OF_init(fdt);
-		OF_interpret("perform-fixup", 0);
+		err = OF_init(fdt);
+		if (err == 0)
+			OF_interpret("perform-fixup", 0);
 	} 
+
+	if (err != 0) {
+		OF_install(NULL, 0);
+		status = FALSE;
+	}
 
 	return (status);
 }
@@ -448,7 +474,7 @@ openfirmware_core(void *args)
 	/* Restore initially saved trap vectors */
 	ofw_restore_trap_vec(save_trap_init);
 
-#if defined(AIM) && !defined(__powerpc64__)
+#ifndef __powerpc64__
 	/*
 	 * Clear battable[] translations
 	 */
@@ -513,11 +539,16 @@ openfirmware(void *args)
 		return (-1);
 
 	#ifdef SMP
-	rv_args.args = args;
-	rv_args.in_progress = 1;
-	smp_rendezvous(smp_no_rendevous_barrier, ofw_rendezvous_dispatch,
-	    smp_no_rendevous_barrier, &rv_args);
-	result = rv_args.retval;
+	if (cold) {
+		result = openfirmware_core(args);
+	} else {
+		rv_args.args = args;
+		rv_args.in_progress = 1;
+		smp_rendezvous(smp_no_rendezvous_barrier,
+		    ofw_rendezvous_dispatch, smp_no_rendezvous_barrier,
+		    &rv_args);
+		result = rv_args.retval;
+	}
 	#else
 	result = openfirmware_core(args);
 	#endif
@@ -565,7 +596,7 @@ OF_getetheraddr(device_t dev, u_char *addr)
  */
 int
 OF_decode_addr(phandle_t dev, int regno, bus_space_tag_t *tag,
-    bus_space_handle_t *handle)
+    bus_space_handle_t *handle, bus_size_t *sz)
 {
 	bus_addr_t addr;
 	bus_size_t size;
@@ -584,6 +615,9 @@ OF_decode_addr(phandle_t dev, int regno, bus_space_tag_t *tag,
 		flags = (pci_hi & OFW_PCI_PHYS_HI_PREFETCHABLE) ? 
 		    BUS_SPACE_MAP_PREFETCHABLE: 0;
 	}
+
+	if (sz != NULL)
+		*sz = size;
 
 	return (bus_space_map(*tag, addr, size, flags, handle));
 }

@@ -43,19 +43,19 @@
  * Virtual memory related constants, all in bytes
  */
 #ifndef MAXTSIZ
-#define	MAXTSIZ		(32*1024*1024)	/* max text size */
+#define	MAXTSIZ		(1*1024*1024*1024)	/* max text size */
 #endif
 #ifndef DFLDSIZ
 #define	DFLDSIZ		(128*1024*1024)		/* initial data size limit */
 #endif
 #ifndef MAXDSIZ
-#define	MAXDSIZ		(128*1024*1024)	/* max data size */
+#define	MAXDSIZ		(1*1024*1024*1024)	/* max data size */
 #endif
 #ifndef DFLSSIZ
-#define	DFLSSIZ		(2*1024*1024)		/* initial stack size limit */
+#define	DFLSSIZ		(128*1024*1024)		/* initial stack size limit */
 #endif
 #ifndef MAXSSIZ
-#define	MAXSSIZ		(8*1024*1024)	/* max stack size */
+#define	MAXSSIZ		(1*1024*1024*1024)	/* max stack size */
 #endif
 #ifndef SGROWSIZ
 #define	SGROWSIZ	(128*1024)		/* amount to grow stack */
@@ -105,10 +105,10 @@
 #define	VM_NFREEORDER		12
 
 /*
- * Enable superpage reservations: 1 level.
+ * Disable superpage reservations.
  */
 #ifndef	VM_NRESERVLEVEL
-#define	VM_NRESERVLEVEL		1
+#define	VM_NRESERVLEVEL		0
 #endif
 
 /*
@@ -128,12 +128,12 @@
  * We limit the size of the two spaces to 39 bits each.
  *
  * Upper region:	0xffffffffffffffff
- *			0xffffffffc0000000
+ *			0xffffff8000000000
  *
- * Hole:		0xffffffffbfffffff
- *			0x0000000080000000
+ * Hole:		0xffffff7fffffffff
+ *			0x0000008000000000
  *
- * Lower region:	0x000000007fffffff
+ * Lower region:	0x0000007fffffffff
  *			0x0000000000000000
  *
  * We use the upper region for the kernel, and the lower region for userland.
@@ -152,29 +152,30 @@
 #define	VM_MIN_ADDRESS		(0x0000000000000000UL)
 #define	VM_MAX_ADDRESS		(0xffffffffffffffffUL)
 
-/* 256 MiB of kernel addresses */
-#define	VM_MIN_KERNEL_ADDRESS	(0xffffffffc0000000UL)
-#define	VM_MAX_KERNEL_ADDRESS	(0xffffffffcfffffffUL)
+/* 32 GiB of kernel addresses */
+#define	VM_MIN_KERNEL_ADDRESS	(0xffffffc000000000UL)
+#define	VM_MAX_KERNEL_ADDRESS	(0xffffffc800000000UL)
 
-/* Direct Map for 512 MiB of PA: 0x0 - 0x1fffffff */
-#define	DMAP_MIN_ADDRESS	(0xffffffffd0000000UL)
-#define	DMAP_MAX_ADDRESS	(0xffffffffefffffffUL)
+/* 128 GiB maximum for the direct map region */
+#define	DMAP_MIN_ADDRESS	(0xffffffd000000000UL)
+#define	DMAP_MAX_ADDRESS	(0xfffffff000000000UL)
 
-#define	DMAP_MIN_PHYSADDR	(0x0000000000000000UL)
-#define	DMAP_MAX_PHYSADDR	(DMAP_MAX_ADDRESS - DMAP_MIN_ADDRESS)
+#define	DMAP_MIN_PHYSADDR	(dmap_phys_base)
+#define	DMAP_MAX_PHYSADDR	(dmap_phys_max)
 
 /* True if pa is in the dmap range */
-#define	PHYS_IN_DMAP(pa)	((pa) <= DMAP_MAX_PHYSADDR)
+#define	PHYS_IN_DMAP(pa)	((pa) >= DMAP_MIN_PHYSADDR && \
+    (pa) < DMAP_MAX_PHYSADDR)
 /* True if va is in the dmap range */
 #define	VIRT_IN_DMAP(va)	((va) >= DMAP_MIN_ADDRESS && \
-    (va) <= DMAP_MAX_ADDRESS)
+    (va) < (dmap_max_addr))
 
 #define	PHYS_TO_DMAP(pa)						\
 ({									\
 	KASSERT(PHYS_IN_DMAP(pa),					\
 	    ("%s: PA out of range, PA: 0x%lx", __func__,		\
 	    (vm_paddr_t)(pa)));						\
-	(pa) | DMAP_MIN_ADDRESS;					\
+	((pa) - dmap_phys_base) + DMAP_MIN_ADDRESS;			\
 })
 
 #define	DMAP_TO_PHYS(va)						\
@@ -182,18 +183,20 @@
 	KASSERT(VIRT_IN_DMAP(va),					\
 	    ("%s: VA out of range, VA: 0x%lx", __func__,		\
 	    (vm_offset_t)(va)));					\
-	(va) & ~DMAP_MIN_ADDRESS;					\
+	((va) - DMAP_MIN_ADDRESS) + dmap_phys_base;			\
 })
 
 #define	VM_MIN_USER_ADDRESS	(0x0000000000000000UL)
-#define	VM_MAX_USER_ADDRESS	(0x0000000080000000UL)
+#define	VM_MAX_USER_ADDRESS	(0x0000004000000000UL)
 
 #define	VM_MINUSER_ADDRESS	(VM_MIN_USER_ADDRESS)
 #define	VM_MAXUSER_ADDRESS	(VM_MAX_USER_ADDRESS)
 
 #define	KERNBASE		(VM_MIN_KERNEL_ADDRESS)
-#define	USRSTACK		(VM_MAX_USER_ADDRESS)
-#define	KERNENTRY		(0x200)
+#define	SHAREDPAGE		(VM_MAXUSER_ADDRESS - PAGE_SIZE)
+#define	USRSTACK		SHAREDPAGE
+
+#define	KERNENTRY		(0)
 
 /*
  * How many physical pages per kmem arena virtual page.
@@ -230,10 +233,17 @@
  * #define	UMA_MD_SMALL_ALLOC
  */
 
+#ifndef LOCORE
+extern vm_paddr_t dmap_phys_base;
+extern vm_paddr_t dmap_phys_max;
+extern vm_offset_t dmap_max_addr;
 extern u_int tsb_kernel_ldd_phys;
 extern vm_offset_t vm_max_kernel_address;
 extern vm_offset_t init_pt_va;
+#endif
 
 #define	ZERO_REGION_SIZE	(64 * 1024)	/* 64KB */
+
+#define	DEVMAP_MAX_VADDR	VM_MAX_KERNEL_ADDRESS
 
 #endif /* !_MACHINE_VMPARAM_H_ */

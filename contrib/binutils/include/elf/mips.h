@@ -88,7 +88,12 @@ START_RELOC_NUMBERS (elf_mips_reloc_type)
   RELOC_NUMBER (R_MIPS_TLS_TPREL_HI16, 49)
   RELOC_NUMBER (R_MIPS_TLS_TPREL_LO16, 50)
   RELOC_NUMBER (R_MIPS_GLOB_DAT, 51)
-  FAKE_RELOC (R_MIPS_max, 52)
+
+  /* PC relative relocations */
+  RELOC_NUMBER (R_MIPS_PCHI16, 64)
+  RELOC_NUMBER (R_MIPS_PCLO16, 65)
+
+  FAKE_RELOC (R_MIPS_max, 66)
   /* These relocs are used for the mips16.  */
   FAKE_RELOC (R_MIPS16_min, 100)
   RELOC_NUMBER (R_MIPS16_26, 100)
@@ -195,6 +200,9 @@ END_RELOC_NUMBERS (R_MIPS_maxext)
 /* EABI in 64 bit mode */
 #define E_MIPS_ABI_EABI64       0x00004000
 
+/* CheriABI */
+#define E_MIPS_ABI_CHERIABI     0x0000c000
+
 
 /* Machine variant if we know it.  This field was invented at Cygnus,
    but it is hoped that other vendors will adopt it.  If some standard
@@ -217,6 +225,8 @@ END_RELOC_NUMBERS (R_MIPS_maxext)
 #define E_MIPS_MACH_5400	0x00910000
 #define E_MIPS_MACH_5500	0x00980000
 #define E_MIPS_MACH_9000	0x00990000
+#define E_MIPS_MACH_CHERI128	0x00c10000
+#define E_MIPS_MACH_CHERI256	0x00c20000
 
 /* Processor specific section indices.  These sections do not actually
    exist.  Symbols with a st_shndx field corresponding to one of these

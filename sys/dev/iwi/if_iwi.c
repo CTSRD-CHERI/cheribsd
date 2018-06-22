@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2004, 2005
  *      Damien Bergamini <damien.bergamini@free.fr>. All rights reserved.
  * Copyright (c) 2005-2006 Sam Leffler, Errno Consulting
@@ -130,6 +132,15 @@ static const struct iwi_ident iwi_ident_table[] = {
 	{ 0, 0, NULL }
 };
 
+static const uint8_t def_chan_2ghz[] =
+	{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 };
+static const uint8_t def_chan_5ghz_band1[] =
+	{ 36, 40, 44, 48, 52, 56, 60, 64 };
+static const uint8_t def_chan_5ghz_band2[] =
+	{ 100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140 };
+static const uint8_t def_chan_5ghz_band3[] =
+	{ 149, 153, 157, 161, 165 };
+
 static struct ieee80211vap *iwi_vap_create(struct ieee80211com *,
 		    const char [IFNAMSIZ], int, enum ieee80211_opmode, int,
 		    const uint8_t [IEEE80211_ADDR_LEN],
@@ -204,6 +215,9 @@ static void	iwi_radio_off(void *, int);
 static void	iwi_sysctlattach(struct iwi_softc *);
 static void	iwi_led_event(struct iwi_softc *, int);
 static void	iwi_ledattach(struct iwi_softc *);
+static void	iwi_collect_bands(struct ieee80211com *, uint8_t [], size_t);
+static void	iwi_getradiocaps(struct ieee80211com *, int, int *,
+		    struct ieee80211_channel []);
 
 static int iwi_probe(device_t);
 static int iwi_attach(device_t);
@@ -271,10 +285,10 @@ iwi_attach(device_t dev)
 	struct iwi_softc *sc = device_get_softc(dev);
 	struct ieee80211com *ic = &sc->sc_ic;
 	uint16_t val;
-	uint8_t bands[howmany(IEEE80211_MODE_MAX, 8)];
 	int i, error;
 
 	sc->sc_dev = dev;
+	sc->sc_ledevent = ticks;
 
 	IWI_LOCK_INIT(sc);
 	mbufq_init(&sc->sc_snd, ifqmaxlen);
@@ -374,12 +388,8 @@ iwi_attach(device_t dev)
 	ic->ic_macaddr[4] = val & 0xff;
 	ic->ic_macaddr[5] = val >> 8;
 
-	memset(bands, 0, sizeof(bands));
-	setbit(bands, IEEE80211_MODE_11B);
-	setbit(bands, IEEE80211_MODE_11G);
-	if (pci_get_device(dev) >= 0x4223) 
-		setbit(bands, IEEE80211_MODE_11A);
-	ieee80211_init_channels(ic, NULL, bands);
+	iwi_getradiocaps(ic, IEEE80211_CHAN_MAX, &ic->ic_nchans,
+	    ic->ic_channels);
 
 	ieee80211_ifattach(ic);
 	/* override default methods */
@@ -399,6 +409,7 @@ iwi_attach(device_t dev)
 	ic->ic_ioctl = iwi_ioctl;
 	ic->ic_transmit = iwi_transmit;
 	ic->ic_parent = iwi_parent;
+	ic->ic_getradiocaps = iwi_getradiocaps;
 
 	ieee80211_radiotap_attach(ic,
 	    &sc->sc_txtap.wt_ihdr, sizeof(sc->sc_txtap),
@@ -1971,9 +1982,9 @@ iwi_start(struct iwi_softc *sc)
 		}
 		ni = (struct ieee80211_node *) m->m_pkthdr.rcvif;
 		if (iwi_tx_start(sc, m, ni, ac) != 0) {
-			ieee80211_free_node(ni);
 			if_inc_counter(ni->ni_vap->iv_ifp,
 			    IFCOUNTER_OERRORS, 1);
+			ieee80211_free_node(ni);
 			break;
 		}
 		sc->sc_tx_timer = 5;
@@ -2046,12 +2057,14 @@ iwi_ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 
 	IWI_LOCK(sc);
 	switch (cmd) {
-	case SIOCGIWISTATS:
+	CASE_IOC_IFREQ(SIOCGIWISTATS):
 		/* XXX validate permissions/memory/etc? */
-		error = copyout(&sc->sc_linkqual, ifr->ifr_data,
+		error = copyout_c(
+		    (__cheri_tocap struct iwi_notif_link_quality * __capability)
+		    &sc->sc_linkqual, ifr_data_get_ptr(ifr),
 		    sizeof(struct iwi_notif_link_quality));
 		break;
-	case SIOCZIWISTATS:
+	CASE_IOC_IFREQ(SIOCZIWISTATS):
 		memset(&sc->sc_linkqual, 0,
 		    sizeof(struct iwi_notif_link_quality));
 		error = 0;
@@ -3568,4 +3581,41 @@ iwi_scan_end(struct ieee80211com *ic)
 	if (sc->fw_state == IWI_FW_SCANNING)
 		iwi_cmd(sc, IWI_CMD_ABORT_SCAN, NULL, 0);
 	IWI_UNLOCK(sc);
+}
+
+static void
+iwi_collect_bands(struct ieee80211com *ic, uint8_t bands[], size_t bands_sz)
+{
+	struct iwi_softc *sc = ic->ic_softc;
+	device_t dev = sc->sc_dev;
+
+	memset(bands, 0, bands_sz);
+	setbit(bands, IEEE80211_MODE_11B);
+	setbit(bands, IEEE80211_MODE_11G);
+	if (pci_get_device(dev) >= 0x4223)
+		setbit(bands, IEEE80211_MODE_11A);
+}
+
+static void
+iwi_getradiocaps(struct ieee80211com *ic,
+    int maxchans, int *nchans, struct ieee80211_channel chans[])
+{
+	uint8_t bands[IEEE80211_MODE_BYTES];
+
+	iwi_collect_bands(ic, bands, sizeof(bands));
+	*nchans = 0;
+	if (isset(bands, IEEE80211_MODE_11B) || isset(bands, IEEE80211_MODE_11G))
+		ieee80211_add_channel_list_2ghz(chans, maxchans, nchans,
+		    def_chan_2ghz, nitems(def_chan_2ghz), bands, 0);
+	if (isset(bands, IEEE80211_MODE_11A)) {
+		ieee80211_add_channel_list_5ghz(chans, maxchans, nchans,
+		    def_chan_5ghz_band1, nitems(def_chan_5ghz_band1),
+		    bands, 0);
+		ieee80211_add_channel_list_5ghz(chans, maxchans, nchans,
+		    def_chan_5ghz_band2, nitems(def_chan_5ghz_band2),
+		    bands, 0);
+		ieee80211_add_channel_list_5ghz(chans, maxchans, nchans,
+		    def_chan_5ghz_band3, nitems(def_chan_5ghz_band3),
+		    bands, 0);
+	}
 }

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2014 Warner Losh.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,8 +40,6 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/armreg.h>
 #include <machine/bus.h>
-#include <machine/cpu.h>
-#include <machine/cpufunc.h>
 #include <machine/frame.h>
 #include <machine/intr.h>
 #include <machine/resource.h>
@@ -48,7 +48,6 @@ __FBSDID("$FreeBSD$");
 #include <arm/at91/at91_aicreg.h>
 
 #ifdef FDT
-#include <dev/fdt/fdt_common.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 #endif

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2013-2015, Mellanox Technologies, Ltd.  All rights reserved.
+ * Copyright (c) 2013-2017, Mellanox Technologies, Ltd.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -103,6 +103,18 @@ void mlx5_core_destroy_rq(struct mlx5_core_dev *dev, u32 rqn)
 	mlx5_cmd_exec_check_status(dev, in, sizeof(in), out, sizeof(out));
 }
 
+int mlx5_core_query_rq(struct mlx5_core_dev *dev, u32 rqn, u32 *out)
+{
+	u32 in[MLX5_ST_SZ_DW(query_rq_in)];
+	int outlen = MLX5_ST_SZ_BYTES(query_rq_out);
+
+	memset(in, 0, sizeof(in));
+	MLX5_SET(query_rq_in, in, opcode, MLX5_CMD_OP_QUERY_RQ);
+	MLX5_SET(query_rq_in, in, rqn, rqn);
+
+	return mlx5_cmd_exec_check_status(dev, in, sizeof(in), out, outlen);
+}
+
 int mlx5_core_create_sq(struct mlx5_core_dev *dev, u32 *in, int inlen, u32 *sqn)
 {
 	u32 out[MLX5_ST_SZ_DW(create_sq_out)];
@@ -139,6 +151,18 @@ void mlx5_core_destroy_sq(struct mlx5_core_dev *dev, u32 sqn)
 	MLX5_SET(destroy_sq_in, in, sqn, sqn);
 
 	mlx5_cmd_exec_check_status(dev, in, sizeof(in), out, sizeof(out));
+}
+
+int mlx5_core_query_sq(struct mlx5_core_dev *dev, u32 sqn, u32 *out)
+{
+	u32 in[MLX5_ST_SZ_DW(query_sq_in)];
+	int outlen = MLX5_ST_SZ_BYTES(query_sq_out);
+
+	memset(in, 0, sizeof(in));
+	MLX5_SET(query_sq_in, in, opcode, MLX5_CMD_OP_QUERY_SQ);
+	MLX5_SET(query_sq_in, in, sqn, sqn);
+
+	return mlx5_cmd_exec_check_status(dev, in, sizeof(in), out, outlen);
 }
 
 int mlx5_core_create_tir(struct mlx5_core_dev *dev, u32 *in, int inlen,
@@ -184,6 +208,17 @@ int mlx5_core_create_tis(struct mlx5_core_dev *dev, u32 *in, int inlen,
 		*tisn = MLX5_GET(create_tis_out, out, tisn);
 
 	return err;
+}
+
+int mlx5_core_modify_tis(struct mlx5_core_dev *dev, u32 tisn, u32 *in,
+			 int inlen)
+{
+	u32 out[MLX5_ST_SZ_DW(modify_tis_out)] = {0};
+
+	MLX5_SET(modify_tis_in, in, tisn, tisn);
+	MLX5_SET(modify_tis_in, in, opcode, MLX5_CMD_OP_MODIFY_TIS);
+
+	return mlx5_cmd_exec(dev, in, inlen, out, sizeof(out));
 }
 
 void mlx5_core_destroy_tis(struct mlx5_core_dev *dev, u32 tisn)

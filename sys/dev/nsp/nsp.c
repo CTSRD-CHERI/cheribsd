@@ -9,6 +9,8 @@
 	 NSP_USE_MEMIO | NSP_WAIT_FOR_SELECT)
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  *  Copyright (c) 1998, 1999, 2000, 2001
  *	NetBSD/pc98 porting staff. All rights reserved.
  *
@@ -1069,7 +1071,7 @@ WriteLoop:
 				 * (not scsi bus!), we should check
 				 * the scsi device sends us request
 				 * signals, which means the scsi device
-				 * is ready to recieve data without
+				 * is ready to receive data without
 				 * heavy delays. 
 				 */
 				if ((slp->sl_scp.scp_datalen % suspendio) == 0)

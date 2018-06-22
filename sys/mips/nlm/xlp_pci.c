@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2003-2012 Broadcom Corporation
  * All Rights Reserved
  *
@@ -40,6 +42,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/rman.h>
 #include <sys/pciio.h>
 
+#include <machine/bus.h>
+#include <machine/md_var.h>
+#include <machine/intr_machdep.h>
+#include <machine/cpuregs.h>
+
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/pmap.h>
@@ -56,11 +63,6 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
-#include <machine/bus.h>
-#include <machine/md_var.h>
-#include <machine/intr_machdep.h>
-#include <machine/cpuregs.h>
-
 #include <mips/nlm/hal/haldefs.h>
 #include <mips/nlm/interrupt.h>
 #include <mips/nlm/hal/iomap.h>
@@ -73,6 +75,7 @@ __FBSDID("$FreeBSD$");
 #include <mips/nlm/xlp.h>
 
 #include "pcib_if.h"
+#include <dev/pci/pcib_private.h>
 #include "pci_if.h"
 
 static int
@@ -125,8 +128,8 @@ xlp_pci_attach(device_t dev)
 				    XLP_PCI_DEVSCRATCH_REG0 << 2,
 				    (1 << 8) | irq, 4);
 			}
-			dinfo = pci_read_device(pcib, pcib_get_domain(dev),
-			    busno, s, f, sizeof(*dinfo));
+			dinfo = pci_read_device(pcib, dev, pcib_get_domain(dev),
+			    busno, s, f);
 			pci_add_child(dev, dinfo);
 		}
 	}
@@ -154,6 +157,7 @@ static device_method_t xlp_pci_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		xlp_pci_probe),
 	DEVMETHOD(device_attach,	xlp_pci_attach),
+	DEVMETHOD(bus_rescan,		bus_null_rescan),
 	DEVMETHOD_END
 };
 
@@ -433,7 +437,7 @@ mips_platform_pcib_setup_intr(device_t dev, device_t child,
 	if (error)
 		return error;
 	if (rman_get_start(irq) != rman_get_end(irq)) {
-		device_printf(dev, "Interrupt allocation %lu != %lu\n",
+		device_printf(dev, "Interrupt allocation %ju != %ju\n",
 		    rman_get_start(irq), rman_get_end(irq));
 		return (EINVAL);
 	}
@@ -556,6 +560,7 @@ static device_method_t xlp_pcib_methods[] = {
 	DEVMETHOD(pcib_read_config, xlp_pcib_read_config),
 	DEVMETHOD(pcib_write_config, xlp_pcib_write_config),
 	DEVMETHOD(pcib_route_interrupt, mips_pcib_route_interrupt),
+	DEVMETHOD(pcib_request_feature,	pcib_request_feature_allow),
 
 	DEVMETHOD(pcib_alloc_msi, xlp_alloc_msi),
 	DEVMETHOD(pcib_release_msi, xlp_release_msi),

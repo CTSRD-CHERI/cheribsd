@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2007-2009 Bruce Simpson.
  * Copyright (c) 1988 Stephen Deering.
  * Copyright (c) 1992, 1993
@@ -15,7 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -50,6 +52,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include "opt_ddb.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/module.h>
@@ -63,6 +67,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 #include <sys/ktr.h>
 #include <sys/condvar.h>
+
+#ifdef DDB
+#include <ddb/ddb.h>
+#endif
 
 #include <net/if.h>
 #include <net/if_var.h>
@@ -221,7 +229,8 @@ static VNET_DEFINE(int, current_state_timers_running);	/* IGMPv1/v2 host
 #define	V_state_change_timers_running	VNET(state_change_timers_running)
 #define	V_current_state_timers_running	VNET(current_state_timers_running)
 
-static VNET_DEFINE(LIST_HEAD(, igmp_ifsoftc), igi_head);
+static VNET_DEFINE(LIST_HEAD(, igmp_ifsoftc), igi_head) =
+    LIST_HEAD_INITIALIZER(igi_head);
 static VNET_DEFINE(struct igmpstat, igmpstat) = {
 	.igps_version = IGPS_VERSION_3,
 	.igps_len = sizeof(struct igmpstat),
@@ -304,17 +313,6 @@ igmp_scrub_context(struct mbuf *m)
 	m->m_pkthdr.PH_loc.ptr = NULL;
 	m->m_pkthdr.flowid = 0;
 }
-
-#ifdef KTR
-static __inline char *
-inet_ntoa_haddr(in_addr_t haddr)
-{
-	struct in_addr ia;
-
-	ia.s_addr = htonl(haddr);
-	return (inet_ntoa(ia));
-}
-#endif
 
 /*
  * Restore context from a queued IGMP output chain.
@@ -536,10 +534,10 @@ igmp_ra_alloc(void)
 	m = m_get(M_WAITOK, MT_DATA);
 	p = mtod(m, struct ipoption *);
 	p->ipopt_dst.s_addr = INADDR_ANY;
-	p->ipopt_list[0] = IPOPT_RA;	/* Router Alert Option */
-	p->ipopt_list[1] = 0x04;	/* 4 bytes long */
-	p->ipopt_list[2] = IPOPT_EOL;	/* End of IP option list */
-	p->ipopt_list[3] = 0x00;	/* pad byte */
+	p->ipopt_list[0] = (char)IPOPT_RA;	/* Router Alert Option */
+	p->ipopt_list[1] = 0x04;		/* 4 bytes long */
+	p->ipopt_list[2] = IPOPT_EOL;		/* End of IP option list */
+	p->ipopt_list[3] = 0x00;		/* pad byte */
 	m->m_len = sizeof(p->ipopt_dst) + p->ipopt_list[1];
 
 	return (m);
@@ -695,10 +693,6 @@ igi_delete_locked(const struct ifnet *ifp)
 			return;
 		}
 	}
-
-#ifdef INVARIANTS
-	panic("%s: igmp_ifsoftc not found for ifp %p\n", __func__,  ifp);
-#endif
 }
 
 /*
@@ -869,8 +863,9 @@ igmp_input_v2_query(struct ifnet *ifp, const struct ip *ip,
 		 */
 		inm = inm_lookup(ifp, igmp->igmp_group);
 		if (inm != NULL) {
-			CTR3(KTR_IGMPV3, "process v2 query %s on ifp %p(%s)",
-			    inet_ntoa(igmp->igmp_group), ifp, ifp->if_xname);
+			CTR3(KTR_IGMPV3,
+			    "process v2 query 0x%08x on ifp %p(%s)",
+			    ntohl(igmp->igmp_group.s_addr), ifp, ifp->if_xname);
 			igmp_v2_update_group(inm, timer);
 		}
 	}
@@ -901,8 +896,8 @@ static void
 igmp_v2_update_group(struct in_multi *inm, const int timer)
 {
 
-	CTR4(KTR_IGMPV3, "%s: %s/%s timer=%d", __func__,
-	    inet_ntoa(inm->inm_addr), inm->inm_ifp->if_xname, timer);
+	CTR4(KTR_IGMPV3, "0x%08x: %s/%s timer=%d", __func__,
+	    ntohl(inm->inm_addr.s_addr), inm->inm_ifp->if_xname, timer);
 
 	IN_MULTI_LOCK_ASSERT();
 
@@ -1082,8 +1077,8 @@ igmp_input_v3_query(struct ifnet *ifp, const struct ip *ip,
 				goto out_locked;
 			}
 		}
-		CTR3(KTR_IGMPV3, "process v3 %s query on ifp %p(%s)",
-		     inet_ntoa(igmpv3->igmp_group), ifp, ifp->if_xname);
+		CTR3(KTR_IGMPV3, "process v3 0x%08x query on ifp %p(%s)",
+		     ntohl(igmpv3->igmp_group.s_addr), ifp, ifp->if_xname);
 		/*
 		 * If there is a pending General Query response
 		 * scheduled sooner than the selected delay, no
@@ -1103,9 +1098,9 @@ out_locked:
 }
 
 /*
- * Process a recieved IGMPv3 group-specific or group-and-source-specific
+ * Process a received IGMPv3 group-specific or group-and-source-specific
  * query.
- * Return <0 if any error occured. Currently this is ignored.
+ * Return <0 if any error occurred. Currently this is ignored.
  */
 static int
 igmp_input_v3_group_query(struct in_multi *inm, struct igmp_ifsoftc *igi,
@@ -1243,8 +1238,8 @@ igmp_input_v1_report(struct ifnet *ifp, /*const*/ struct ip *ip,
 		}
 	}
 
-	CTR3(KTR_IGMPV3, "process v1 report %s on ifp %p(%s)",
-	     inet_ntoa(igmp->igmp_group), ifp, ifp->if_xname);
+	CTR3(KTR_IGMPV3, "process v1 report 0x%08x on ifp %p(%s)",
+	     ntohl(igmp->igmp_group.s_addr), ifp, ifp->if_xname);
 
 	/*
 	 * IGMPv1 report suppression.
@@ -1286,15 +1281,17 @@ igmp_input_v1_report(struct ifnet *ifp, /*const*/ struct ip *ip,
 		case IGMP_LAZY_MEMBER:
 		case IGMP_AWAKENING_MEMBER:
 			CTR3(KTR_IGMPV3,
-			    "report suppressed for %s on ifp %p(%s)",
-			    inet_ntoa(igmp->igmp_group), ifp, ifp->if_xname);
+			    "report suppressed for 0x%08x on ifp %p(%s)",
+			    ntohl(igmp->igmp_group.s_addr), ifp,
+			    ifp->if_xname);
 		case IGMP_SLEEPING_MEMBER:
 			inm->inm_state = IGMP_SLEEPING_MEMBER;
 			break;
 		case IGMP_REPORTING_MEMBER:
 			CTR3(KTR_IGMPV3,
-			    "report suppressed for %s on ifp %p(%s)",
-			    inet_ntoa(igmp->igmp_group), ifp, ifp->if_xname);
+			    "report suppressed for 0x%08x on ifp %p(%s)",
+			    ntohl(igmp->igmp_group.s_addr), ifp,
+			    ifp->if_xname);
 			if (igi->igi_version == IGMP_VERSION_1)
 				inm->inm_state = IGMP_LAZY_MEMBER;
 			else if (igi->igi_version == IGMP_VERSION_2)
@@ -1367,8 +1364,8 @@ igmp_input_v2_report(struct ifnet *ifp, /*const*/ struct ip *ip,
 	if (ia != NULL)
 		ifa_free(&ia->ia_ifa);
 
-	CTR3(KTR_IGMPV3, "process v2 report %s on ifp %p(%s)",
-	     inet_ntoa(igmp->igmp_group), ifp, ifp->if_xname);
+	CTR3(KTR_IGMPV3, "process v2 report 0x%08x on ifp %p(%s)",
+	     ntohl(igmp->igmp_group.s_addr), ifp, ifp->if_xname);
 
 	/*
 	 * IGMPv2 report suppression.
@@ -1408,8 +1405,8 @@ igmp_input_v2_report(struct ifnet *ifp, /*const*/ struct ip *ip,
 		case IGMP_IDLE_MEMBER:
 		case IGMP_AWAKENING_MEMBER:
 			CTR3(KTR_IGMPV3,
-			    "report suppressed for %s on ifp %p(%s)",
-			    inet_ntoa(igmp->igmp_group), ifp, ifp->if_xname);
+			    "report suppressed for 0x%08x on ifp %p(%s)",
+			    ntohl(igmp->igmp_group.s_addr), ifp, ifp->if_xname);
 		case IGMP_LAZY_MEMBER:
 			inm->inm_state = IGMP_LAZY_MEMBER;
 			break;
@@ -1469,7 +1466,7 @@ igmp_input(struct mbuf **mp, int *offp, int proto)
 	else
 		minlen += IGMP_MINLEN;
 	if ((!M_WRITABLE(m) || m->m_len < minlen) &&
-	    (m = m_pullup(m, minlen)) == 0) {
+	    (m = m_pullup(m, minlen)) == NULL) {
 		IGMPSTAT_INC(igps_rcv_tooshort);
 		return (IPPROTO_DONE);
 	}
@@ -1896,8 +1893,9 @@ igmp_v3_process_group_timers(struct igmp_ifsoftc *igi,
 			(void)igmp_v3_merge_state_changes(inm, scq);
 
 			inm_commit(inm);
-			CTR3(KTR_IGMPV3, "%s: T1 -> T0 for %s/%s", __func__,
-			    inet_ntoa(inm->inm_addr), inm->inm_ifp->if_xname);
+			CTR3(KTR_IGMPV3, "%s: T1 -> T0 for 0x%08x/%s", __func__,
+			    ntohl(inm->inm_addr.s_addr),
+			    inm->inm_ifp->if_xname);
 
 			/*
 			 * If we are leaving the group for good, make sure
@@ -2343,10 +2341,9 @@ igmp_initial_join(struct in_multi *inm, struct igmp_ifsoftc *igi)
 	struct ifnet		*ifp;
 	struct mbufq		*mq;
 	int			 error, retval, syncstates;
-
-	CTR4(KTR_IGMPV3, "%s: initial join %s on ifp %p(%s)",
-	    __func__, inet_ntoa(inm->inm_addr), inm->inm_ifp,
-	    inm->inm_ifp->if_xname);
+ 
+	CTR4(KTR_IGMPV3, "%s: initial join 0x%08x on ifp %p(%s)", __func__,
+	    ntohl(inm->inm_addr.s_addr), inm->inm_ifp, inm->inm_ifp->if_xname);
 
 	error = 0;
 	syncstates = 1;
@@ -2455,8 +2452,8 @@ igmp_initial_join(struct in_multi *inm, struct igmp_ifsoftc *igi)
 	 */
 	if (syncstates) {
 		inm_commit(inm);
-		CTR3(KTR_IGMPV3, "%s: T1 -> T0 for %s/%s", __func__,
-		    inet_ntoa(inm->inm_addr), inm->inm_ifp->if_xname);
+		CTR3(KTR_IGMPV3, "%s: T1 -> T0 for 0x%08x/%s", __func__,
+		    ntohl(inm->inm_addr.s_addr), inm->inm_ifp->if_xname);
 	}
 
 	return (error);
@@ -2471,9 +2468,8 @@ igmp_handle_state_change(struct in_multi *inm, struct igmp_ifsoftc *igi)
 	struct ifnet		*ifp;
 	int			 retval;
 
-	CTR4(KTR_IGMPV3, "%s: state change for %s on ifp %p(%s)",
-	    __func__, inet_ntoa(inm->inm_addr), inm->inm_ifp,
-	    inm->inm_ifp->if_xname);
+	CTR4(KTR_IGMPV3, "%s: state change for 0x%08x on ifp %p(%s)", __func__,
+	    ntohl(inm->inm_addr.s_addr), inm->inm_ifp, inm->inm_ifp->if_xname);
 
 	ifp = inm->inm_ifp;
 
@@ -2492,8 +2488,8 @@ igmp_handle_state_change(struct in_multi *inm, struct igmp_ifsoftc *igi)
 		}
 		CTR1(KTR_IGMPV3, "%s: nothing to do", __func__);
 		inm_commit(inm);
-		CTR3(KTR_IGMPV3, "%s: T1 -> T0 for %s/%s", __func__,
-		    inet_ntoa(inm->inm_addr), inm->inm_ifp->if_xname);
+		CTR3(KTR_IGMPV3, "%s: T1 -> T0 for 0x%08x/%s", __func__,
+		    ntohl(inm->inm_addr.s_addr), inm->inm_ifp->if_xname);
 		return (0);
 	}
 
@@ -2531,8 +2527,8 @@ igmp_final_leave(struct in_multi *inm, struct igmp_ifsoftc *igi)
 
 	syncstates = 1;
 
-	CTR4(KTR_IGMPV3, "%s: final leave %s on ifp %p(%s)",
-	    __func__, inet_ntoa(inm->inm_addr), inm->inm_ifp,
+	CTR4(KTR_IGMPV3, "%s: final leave 0x%08x on ifp %p(%s)",
+	    __func__, ntohl(inm->inm_addr.s_addr), inm->inm_ifp,
 	    inm->inm_ifp->if_xname);
 
 	IN_MULTI_LOCK_ASSERT();
@@ -2573,9 +2569,9 @@ igmp_final_leave(struct in_multi *inm, struct igmp_ifsoftc *igi)
 			} else {
 				inm->inm_scrv = igi->igi_rv;
 			}
-			CTR4(KTR_IGMPV3, "%s: Leaving %s/%s with %d "
+			CTR4(KTR_IGMPV3, "%s: Leaving 0x%08x/%s with %d "
 			    "pending retransmissions.", __func__,
-			    inet_ntoa(inm->inm_addr),
+			    ntohl(inm->inm_addr.s_addr),
 			    inm->inm_ifp->if_xname, inm->inm_scrv);
 			if (inm->inm_scrv == 0) {
 				inm->inm_state = IGMP_NOT_MEMBER;
@@ -2608,11 +2604,12 @@ igmp_final_leave(struct in_multi *inm, struct igmp_ifsoftc *igi)
 
 	if (syncstates) {
 		inm_commit(inm);
-		CTR3(KTR_IGMPV3, "%s: T1 -> T0 for %s/%s", __func__,
-		    inet_ntoa(inm->inm_addr), inm->inm_ifp->if_xname);
+		CTR3(KTR_IGMPV3, "%s: T1 -> T0 for 0x%08x/%s", __func__,
+		    ntohl(inm->inm_addr.s_addr), inm->inm_ifp->if_xname);
 		inm->inm_st[1].iss_fmode = MCAST_UNDEFINED;
-		CTR3(KTR_IGMPV3, "%s: T1 now MCAST_UNDEFINED for %s/%s",
-		    __func__, inet_ntoa(inm->inm_addr), inm->inm_ifp->if_xname);
+		CTR3(KTR_IGMPV3, "%s: T1 now MCAST_UNDEFINED for 0x%08x/%s",
+		    __func__, ntohl(inm->inm_addr.s_addr),
+		    inm->inm_ifp->if_xname);
 	}
 }
 
@@ -2737,9 +2734,8 @@ igmp_v3_enqueue_group_record(struct mbufq *mq, struct in_multi *inm,
 		return (igmp_v3_enqueue_filter_change(mq, inm));
 
 	if (type == IGMP_DO_NOTHING) {
-		CTR3(KTR_IGMPV3, "%s: nothing to do for %s/%s",
-		    __func__, inet_ntoa(inm->inm_addr),
-		    inm->inm_ifp->if_xname);
+		CTR3(KTR_IGMPV3, "%s: nothing to do for 0x%08x/%s", __func__,
+		    ntohl(inm->inm_addr.s_addr), inm->inm_ifp->if_xname);
 		return (0);
 	}
 
@@ -2752,8 +2748,8 @@ igmp_v3_enqueue_group_record(struct mbufq *mq, struct in_multi *inm,
 	if (record_has_sources)
 		minrec0len += sizeof(in_addr_t);
 
-	CTR4(KTR_IGMPV3, "%s: queueing %s for %s/%s", __func__,
-	    igmp_rec_type_to_str(type), inet_ntoa(inm->inm_addr),
+	CTR4(KTR_IGMPV3, "%s: queueing %s for 0x%08x/%s", __func__,
+	    igmp_rec_type_to_str(type), ntohl(inm->inm_addr.s_addr),
 	    inm->inm_ifp->if_xname);
 
 	/*
@@ -2841,8 +2837,8 @@ igmp_v3_enqueue_group_record(struct mbufq *mq, struct in_multi *inm,
 		}
 		msrcs = 0;
 		RB_FOREACH_SAFE(ims, ip_msource_tree, &inm->inm_srcs, nims) {
-			CTR2(KTR_IGMPV3, "%s: visit node %s", __func__,
-			    inet_ntoa_haddr(ims->ims_haddr));
+			CTR2(KTR_IGMPV3, "%s: visit node 0x%08x", __func__,
+			    ims->ims_haddr);
 			now = ims_get_mode(inm, ims, 1);
 			CTR2(KTR_IGMPV3, "%s: node is %d", __func__, now);
 			if ((now != mode) ||
@@ -2937,8 +2933,8 @@ igmp_v3_enqueue_group_record(struct mbufq *mq, struct in_multi *inm,
 
 		msrcs = 0;
 		RB_FOREACH_FROM(ims, ip_msource_tree, nims) {
-			CTR2(KTR_IGMPV3, "%s: visit node %s", __func__,
-			    inet_ntoa_haddr(ims->ims_haddr));
+			CTR2(KTR_IGMPV3, "%s: visit node 0x%08x", __func__,
+			    ims->ims_haddr);
 			now = ims_get_mode(inm, ims, 1);
 			if ((now != mode) ||
 			    (now == mode && mode == MCAST_UNDEFINED)) {
@@ -3129,8 +3125,8 @@ igmp_v3_enqueue_filter_change(struct mbufq *mq, struct in_multi *inm)
 			if (nims == NULL)
 				nims = RB_MIN(ip_msource_tree, &inm->inm_srcs);
 			RB_FOREACH_FROM(ims, ip_msource_tree, nims) {
-				CTR2(KTR_IGMPV3, "%s: visit node %s",
-				    __func__, inet_ntoa_haddr(ims->ims_haddr));
+				CTR2(KTR_IGMPV3, "%s: visit node 0x%08x",
+				    __func__, ims->ims_haddr);
 				now = ims_get_mode(inm, ims, 1);
 				then = ims_get_mode(inm, ims, 0);
 				CTR3(KTR_IGMPV3, "%s: mode: t0 %d, t1 %d",
@@ -3589,70 +3585,82 @@ igmp_rec_type_to_str(const int type)
 }
 #endif
 
-static void
-igmp_init(void *unused __unused)
-{
-
-	CTR1(KTR_IGMPV3, "%s: initializing", __func__);
-
-	IGMP_LOCK_INIT();
-
-	m_raopt = igmp_ra_alloc();
-
-	netisr_register(&igmp_nh);
-}
-SYSINIT(igmp_init, SI_SUB_PSEUDO, SI_ORDER_MIDDLE, igmp_init, NULL);
-
-static void
-igmp_uninit(void *unused __unused)
-{
-
-	CTR1(KTR_IGMPV3, "%s: tearing down", __func__);
-
-	netisr_unregister(&igmp_nh);
-
-	m_free(m_raopt);
-	m_raopt = NULL;
-
-	IGMP_LOCK_DESTROY();
-}
-SYSUNINIT(igmp_uninit, SI_SUB_PSEUDO, SI_ORDER_MIDDLE, igmp_uninit, NULL);
-
+#ifdef VIMAGE
 static void
 vnet_igmp_init(const void *unused __unused)
 {
 
-	CTR1(KTR_IGMPV3, "%s: initializing", __func__);
-
-	LIST_INIT(&V_igi_head);
+	netisr_register_vnet(&igmp_nh);
 }
-VNET_SYSINIT(vnet_igmp_init, SI_SUB_PSEUDO, SI_ORDER_ANY, vnet_igmp_init,
-    NULL);
+VNET_SYSINIT(vnet_igmp_init, SI_SUB_PROTO_MC, SI_ORDER_ANY,
+    vnet_igmp_init, NULL);
 
 static void
 vnet_igmp_uninit(const void *unused __unused)
 {
 
+	/* This can happen when we shutdown the entire network stack. */
 	CTR1(KTR_IGMPV3, "%s: tearing down", __func__);
 
-	KASSERT(LIST_EMPTY(&V_igi_head),
-	    ("%s: igi list not empty; ifnets not detached?", __func__));
+	netisr_unregister_vnet(&igmp_nh);
 }
-VNET_SYSUNINIT(vnet_igmp_uninit, SI_SUB_PSEUDO, SI_ORDER_ANY,
+VNET_SYSUNINIT(vnet_igmp_uninit, SI_SUB_PROTO_MC, SI_ORDER_ANY,
     vnet_igmp_uninit, NULL);
+#endif
+
+#ifdef DDB
+DB_SHOW_COMMAND(igi_list, db_show_igi_list)
+{
+	struct igmp_ifsoftc *igi, *tigi;
+	LIST_HEAD(_igi_list, igmp_ifsoftc) *igi_head;
+
+	if (!have_addr) {
+		db_printf("usage: show igi_list <addr>\n");
+		return;
+	}
+	igi_head = (struct _igi_list *)addr;
+
+	LIST_FOREACH_SAFE(igi, igi_head, igi_link, tigi) {
+		db_printf("igmp_ifsoftc %p:\n", igi);
+		db_printf("    ifp %p\n", igi->igi_ifp);
+		db_printf("    version %u\n", igi->igi_version);
+		db_printf("    v1_timer %u\n", igi->igi_v1_timer);
+		db_printf("    v2_timer %u\n", igi->igi_v2_timer);
+		db_printf("    v3_timer %u\n", igi->igi_v3_timer);
+		db_printf("    flags %#x\n", igi->igi_flags);
+		db_printf("    rv %u\n", igi->igi_rv);
+		db_printf("    qi %u\n", igi->igi_qi);
+		db_printf("    qri %u\n", igi->igi_qri);
+		db_printf("    uri %u\n", igi->igi_uri);
+		/* SLIST_HEAD(,in_multi)   igi_relinmhead */
+		/* struct mbufq    igi_gq; */
+		db_printf("\n");
+	}
+}
+#endif
 
 static int
 igmp_modevent(module_t mod, int type, void *unused __unused)
 {
 
-    switch (type) {
-    case MOD_LOAD:
-    case MOD_UNLOAD:
-	break;
-    default:
-	return (EOPNOTSUPP);
-    }
-    return (0);
+	switch (type) {
+	case MOD_LOAD:
+		CTR1(KTR_IGMPV3, "%s: initializing", __func__);
+		IGMP_LOCK_INIT();
+		m_raopt = igmp_ra_alloc();
+		netisr_register(&igmp_nh);
+		break;
+	case MOD_UNLOAD:
+		CTR1(KTR_IGMPV3, "%s: tearing down", __func__);
+		netisr_unregister(&igmp_nh);
+		m_free(m_raopt);
+		m_raopt = NULL;
+		IGMP_LOCK_DESTROY();
+		break;
+	default:
+		return (EOPNOTSUPP);
+	}
+	return (0);
 }
 
 static moduledata_t igmp_mod = {
@@ -3660,4 +3668,4 @@ static moduledata_t igmp_mod = {
     igmp_modevent,
     0
 };
-DECLARE_MODULE(igmp, igmp_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
+DECLARE_MODULE(igmp, igmp_mod, SI_SUB_PROTO_MC, SI_ORDER_MIDDLE);

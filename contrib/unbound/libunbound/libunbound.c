@@ -57,6 +57,7 @@
 #include "util/random.h"
 #include "util/net_help.h"
 #include "util/tube.h"
+#include "util/ub_event.h"
 #include "services/modstack.h"
 #include "services/localzone.h"
 #include "services/cache/infra.h"
@@ -170,6 +171,20 @@ ub_ctx_create(void)
 }
 
 struct ub_ctx* 
+ub_ctx_create_ub_event(struct ub_event_base* ueb)
+{
+	struct ub_ctx* ctx = ub_ctx_create_nopipe();
+	if(!ctx)
+		return NULL;
+	/* no pipes, but we have the locks to make sure everything works */
+	ctx->created_bg = 0;
+	ctx->dothread = 1; /* the processing is in the same process,
+		makes ub_cancel and ub_ctx_delete do the right thing */
+	ctx->event_base = ueb;
+	return ctx;
+}
+
+struct ub_ctx* 
 ub_ctx_create_event(struct event_base* eb)
 {
 	struct ub_ctx* ctx = ub_ctx_create_nopipe();
@@ -179,7 +194,11 @@ ub_ctx_create_event(struct event_base* eb)
 	ctx->created_bg = 0;
 	ctx->dothread = 1; /* the processing is in the same process,
 		makes ub_cancel and ub_ctx_delete do the right thing */
-	ctx->event_base = eb;
+	ctx->event_base = ub_libevent_event_base(eb);
+	if (!ctx->event_base) {
+		ub_ctx_delete(ctx);
+		return NULL;
+	}
 	return ctx;
 }
 	
@@ -698,6 +717,9 @@ ub_resolve_event(struct ub_ctx* ctx, const char* name, int rrtype,
 		}
 	}
 
+	/* set time in case answer comes from cache */
+	ub_comm_base_now(ctx->event_worker->base);
+
 	/* create new ctx_query and attempt to add to the list */
 	q = context_new(ctx, name, rrtype, rrclass, (ub_callback_t)callback,
 		mydata);
@@ -918,6 +940,88 @@ ub_ctx_set_fwd(struct ub_ctx* ctx, const char* addr)
 		free(dupl);
 		lock_basic_unlock(&ctx->cfglock);
 		errno=ENOMEM;
+		return UB_NOMEM;
+	}
+	lock_basic_unlock(&ctx->cfglock);
+	return UB_NOERROR;
+}
+
+int ub_ctx_set_stub(struct ub_ctx* ctx, const char* zone, const char* addr,
+	int isprime)
+{
+	char* a;
+	struct config_stub **prev, *elem;
+
+	/* check syntax for zone name */
+	if(zone) {
+		uint8_t* nm;
+		int nmlabs;
+		size_t nmlen;
+		if(!parse_dname(zone, &nm, &nmlen, &nmlabs)) {
+			errno=EINVAL;
+			return UB_SYNTAX;
+		}
+		free(nm);
+	} else {
+		zone = ".";
+	}
+
+	/* check syntax for addr (if not NULL) */
+	if(addr) {
+		struct sockaddr_storage storage;
+		socklen_t stlen;
+		if(!extstrtoaddr(addr, &storage, &stlen)) {
+			errno=EINVAL;
+			return UB_SYNTAX;
+		}
+	}
+
+	lock_basic_lock(&ctx->cfglock);
+	if(ctx->finalized) {
+		lock_basic_unlock(&ctx->cfglock);
+		errno=EINVAL;
+		return UB_AFTERFINAL;
+	}
+
+	/* arguments all right, now find or add the stub */
+	prev = &ctx->env->cfg->stubs;
+	elem = cfg_stub_find(&prev, zone);
+	if(!elem && !addr) {
+		/* not found and we want to delete, nothing to do */
+		lock_basic_unlock(&ctx->cfglock);
+		return UB_NOERROR;
+	} else if(elem && !addr) {
+		/* found, and we want to delete */
+		*prev = elem->next;
+		config_delstub(elem);
+		lock_basic_unlock(&ctx->cfglock);
+		return UB_NOERROR;
+	} else if(!elem) {
+		/* not found, create the stub entry */
+		elem=(struct config_stub*)calloc(1, sizeof(struct config_stub));
+		if(elem) elem->name = strdup(zone);
+		if(!elem || !elem->name) {
+			free(elem);
+			lock_basic_unlock(&ctx->cfglock);
+			errno = ENOMEM;
+			return UB_NOMEM;
+		}
+		elem->next = ctx->env->cfg->stubs;
+		ctx->env->cfg->stubs = elem;
+	}
+
+	/* add the address to the list and set settings */
+	elem->isprime = isprime;
+	a = strdup(addr);
+	if(!a) {
+		lock_basic_unlock(&ctx->cfglock);
+		errno = ENOMEM;
+		return UB_NOMEM;
+	}
+	if(!cfg_strlist_insert(&elem->addrs, a)) {
+		lock_basic_unlock(&ctx->cfglock);
+		free(a);
+		errno = ENOMEM;
 		return UB_NOMEM;
 	}
 	lock_basic_unlock(&ctx->cfglock);
@@ -1241,10 +1345,12 @@ const char* ub_version(void)
 
 int 
 ub_ctx_set_event(struct ub_ctx* ctx, struct event_base* base) {
+	struct ub_event_base* new_base;
+
 	if (!ctx || !ctx->event_base || !base) {
 		return UB_INITFAIL;
 	}
-	if (ctx->event_base == base) {
+	if (ub_libevent_get_event_base(ctx->event_base) == base) {
 		/* already set */
 		return UB_NOERROR;
 	}
@@ -1253,9 +1359,11 @@ ub_ctx_set_event(struct ub_ctx* ctx, struct event_base* base) {
 	/* destroy the current worker - safe to pass in NULL */
 	libworker_delete_event(ctx->event_worker);
 	ctx->event_worker = NULL;
-	ctx->event_base = base;	
+	new_base = ub_libevent_event_base(base);
+	if (new_base)
+		ctx->event_base = new_base;	
 	ctx->created_bg = 0;
 	ctx->dothread = 1;
 	lock_basic_unlock(&ctx->cfglock);
-	return UB_NOERROR;
+	return new_base ? UB_NOERROR : UB_INITFAIL;
 }

@@ -1,4 +1,4 @@
-//===-- LLVMContextImpl.cpp - Implement LLVMContextImpl -------------------===//
+//===- LLVMContextImpl.cpp - Implement LLVMContextImpl --------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -12,21 +12,23 @@
 //===----------------------------------------------------------------------===//
 
 #include "LLVMContextImpl.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/IR/Attributes.h"
-#include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/Module.h"
-#include <algorithm>
+#include "llvm/IR/OptBisect.h"
+#include "llvm/IR/Type.h"
+#include "llvm/Support/ManagedStatic.h"
+#include <cassert>
+#include <utility>
+
 using namespace llvm;
 
 LLVMContextImpl::LLVMContextImpl(LLVMContext &C)
-  : TheTrueVal(nullptr), TheFalseVal(nullptr),
-    VoidTy(C, Type::VoidTyID),
+  : VoidTy(C, Type::VoidTyID),
     LabelTy(C, Type::LabelTyID),
     HalfTy(C, Type::HalfTyID),
     FloatTy(C, Type::FloatTyID),
     DoubleTy(C, Type::DoubleTyID),
     MetadataTy(C, Type::MetadataTyID),
+    TokenTy(C, Type::TokenTyID),
     X86_FP80Ty(C, Type::X86_FP80TyID),
     FP128Ty(C, Type::FP128TyID),
     PPC_FP128Ty(C, Type::PPC_FP128TyID),
@@ -36,36 +38,7 @@ LLVMContextImpl::LLVMContextImpl(LLVMContext &C)
     Int16Ty(C, 16),
     Int32Ty(C, 32),
     Int64Ty(C, 64),
-    Int128Ty(C, 128) {
-  InlineAsmDiagHandler = nullptr;
-  InlineAsmDiagContext = nullptr;
-  DiagnosticHandler = nullptr;
-  DiagnosticContext = nullptr;
-  RespectDiagnosticFilters = false;
-  YieldCallback = nullptr;
-  YieldOpaqueHandle = nullptr;
-  NamedStructTypesUniqueID = 0;
-}
-
-namespace {
-struct DropReferences {
-  // Takes the value_type of a ConstantUniqueMap's internal map, whose 'second'
-  // is a Constant*.
-  template <typename PairT> void operator()(const PairT &P) {
-    P.second->dropAllReferences();
-  }
-};
-
-// Temporary - drops pair.first instead of second.
-struct DropFirst {
-  // Takes the value_type of a ConstantUniqueMap's internal map, whose 'second'
-  // is a Constant*.
-  template<typename PairT>
-  void operator()(const PairT &P) {
-    P.first->dropAllReferences();
-  }
-};
-}
+    Int128Ty(C, 128) {}
 
 LLVMContextImpl::~LLVMContextImpl() {
   // NOTE: We need to delete the contents of OwnedModules, but Module's dtor
@@ -78,7 +51,7 @@ LLVMContextImpl::~LLVMContextImpl() {
   // unnecessary RAUW when nodes are still unresolved.
   for (auto *I : DistinctMDNodes)
     I->dropAllReferences();
-#define HANDLE_MDNODE_LEAF(CLASS)                                              \
+#define HANDLE_MDNODE_LEAF_UNIQUABLE(CLASS)                                    \
   for (auto *I : CLASS##s)                                                     \
     I->dropAllReferences();
 #include "llvm/IR/Metadata.def"
@@ -92,34 +65,34 @@ LLVMContextImpl::~LLVMContextImpl() {
   // Destroy MDNodes.
   for (MDNode *I : DistinctMDNodes)
     I->deleteAsSubclass();
-#define HANDLE_MDNODE_LEAF(CLASS)                                              \
-  for (CLASS *I : CLASS##s)                                                    \
+#define HANDLE_MDNODE_LEAF_UNIQUABLE(CLASS)                                    \
+  for (CLASS * I : CLASS##s)                                                   \
     delete I;
 #include "llvm/IR/Metadata.def"
 
   // Free the constants.
-  std::for_each(ExprConstants.map_begin(), ExprConstants.map_end(),
-                DropFirst());
-  std::for_each(ArrayConstants.map_begin(), ArrayConstants.map_end(),
-                DropFirst());
-  std::for_each(StructConstants.map_begin(), StructConstants.map_end(),
-                DropFirst());
-  std::for_each(VectorConstants.map_begin(), VectorConstants.map_end(),
-                DropFirst());
+  for (auto *I : ExprConstants)
+    I->dropAllReferences();
+  for (auto *I : ArrayConstants)
+    I->dropAllReferences();
+  for (auto *I : StructConstants)
+    I->dropAllReferences();
+  for (auto *I : VectorConstants)
+    I->dropAllReferences();
   ExprConstants.freeConstants();
   ArrayConstants.freeConstants();
   StructConstants.freeConstants();
   VectorConstants.freeConstants();
-  DeleteContainerSeconds(CAZConstants);
-  DeleteContainerSeconds(CPNConstants);
-  DeleteContainerSeconds(UVConstants);
   InlineAsms.freeConstants();
-  DeleteContainerSeconds(IntConstants);
-  DeleteContainerSeconds(FPConstants);
-  
-  for (StringMap<ConstantDataSequential*>::iterator I = CDSConstants.begin(),
-       E = CDSConstants.end(); I != E; ++I)
-    delete I->second;
+
+  CAZConstants.clear();
+  CPNConstants.clear();
+  UVConstants.clear();
+  IntConstants.clear();
+  FPConstants.clear();
+
+  for (auto &CDSConstant : CDSConstants)
+    delete CDSConstant.second;
   CDSConstants.clear();
 
   // Destroy attributes.
@@ -130,9 +103,10 @@ LLVMContextImpl::~LLVMContextImpl() {
   }
 
   // Destroy attribute lists.
-  for (FoldingSetIterator<AttributeSetImpl> I = AttrsLists.begin(),
-         E = AttrsLists.end(); I != E; ) {
-    FoldingSetIterator<AttributeSetImpl> Elem = I++;
+  for (FoldingSetIterator<AttributeListImpl> I = AttrsLists.begin(),
+                                             E = AttrsLists.end();
+       I != E;) {
+    FoldingSetIterator<AttributeListImpl> Elem = I++;
     delete &*Elem;
   }
 
@@ -157,9 +131,6 @@ LLVMContextImpl::~LLVMContextImpl() {
   // Destroy ValuesAsMetadata.
   for (auto &Pair : ValuesAsMetadata)
     delete Pair.second;
-
-  // Destroy MDStrings.
-  MDStringCache.clear();
 }
 
 void LLVMContextImpl::dropTriviallyDeadConstantArrays() {
@@ -167,16 +138,13 @@ void LLVMContextImpl::dropTriviallyDeadConstantArrays() {
   do {
     Changed = false;
 
-    for (auto I = ArrayConstants.map_begin(), E = ArrayConstants.map_end();
-         I != E; ) {
-      auto *C = I->first;
-      I++;
+    for (auto I = ArrayConstants.begin(), E = ArrayConstants.end(); I != E;) {
+      auto *C = *I++;
       if (C->use_empty()) {
         Changed = true;
         C->destroyConstant();
       }
     }
-
   } while (Changed);
 }
 
@@ -185,6 +153,7 @@ void Module::dropTriviallyDeadConstantArrays() {
 }
 
 namespace llvm {
+
 /// \brief Make MDOperand transparent for hashing.
 ///
 /// This overload of an implementation detail of the hashing library makes
@@ -199,7 +168,8 @@ namespace llvm {
 /// does not cause MDOperand to be transparent.  In particular, a bare pointer
 /// doesn't get hashed before it's combined, whereas \a MDOperand would.
 static const Metadata *get_hashable_data(const MDOperand &X) { return X.get(); }
-}
+
+} // end namespace llvm
 
 unsigned MDNodeOpsKey::calculateHash(MDNode *N, unsigned Offset) {
   unsigned Hash = hash_combine_range(N->op_begin() + Offset, N->op_end());
@@ -218,24 +188,50 @@ unsigned MDNodeOpsKey::calculateHash(ArrayRef<Metadata *> Ops) {
   return hash_combine_range(Ops.begin(), Ops.end());
 }
 
-// ConstantsContext anchors
-void UnaryConstantExpr::anchor() { }
+StringMapEntry<uint32_t> *LLVMContextImpl::getOrInsertBundleTag(StringRef Tag) {
+  uint32_t NewIdx = BundleTagCache.size();
+  return &*(BundleTagCache.insert(std::make_pair(Tag, NewIdx)).first);
+}
 
-void BinaryConstantExpr::anchor() { }
+void LLVMContextImpl::getOperandBundleTags(SmallVectorImpl<StringRef> &Tags) const {
+  Tags.resize(BundleTagCache.size());
+  for (const auto &T : BundleTagCache)
+    Tags[T.second] = T.first();
+}
 
-void SelectConstantExpr::anchor() { }
+uint32_t LLVMContextImpl::getOperandBundleTagID(StringRef Tag) const {
+  auto I = BundleTagCache.find(Tag);
+  assert(I != BundleTagCache.end() && "Unknown tag!");
+  return I->second;
+}
 
-void ExtractElementConstantExpr::anchor() { }
+SyncScope::ID LLVMContextImpl::getOrInsertSyncScopeID(StringRef SSN) {
+  auto NewSSID = SSC.size();
+  assert(NewSSID < std::numeric_limits<SyncScope::ID>::max() &&
+         "Hit the maximum number of synchronization scopes allowed!");
+  return SSC.insert(std::make_pair(SSN, SyncScope::ID(NewSSID))).first->second;
+}
 
-void InsertElementConstantExpr::anchor() { }
+void LLVMContextImpl::getSyncScopeNames(
+    SmallVectorImpl<StringRef> &SSNs) const {
+  SSNs.resize(SSC.size());
+  for (const auto &SSE : SSC)
+    SSNs[SSE.second] = SSE.first();
+}
 
-void ShuffleVectorConstantExpr::anchor() { }
+/// Singleton instance of the OptBisect class.
+///
+/// This singleton is accessed via the LLVMContext::getOptBisect() function.  It
+/// provides a mechanism to disable passes and individual optimizations at
+/// compile time based on a command line option (-opt-bisect-limit) in order to
+/// perform a bisecting search for optimization-related problems.
+///
+/// Even if multiple LLVMContext objects are created, they will all return the
+/// same instance of OptBisect in order to provide a single bisect count.  Any
+/// code that uses the OptBisect object should be serialized when bisection is
+/// enabled in order to enable a consistent bisect count.
+static ManagedStatic<OptBisect> OptBisector;
 
-void ExtractValueConstantExpr::anchor() { }
-
-void InsertValueConstantExpr::anchor() { }
-
-void GetElementPtrConstantExpr::anchor() { }
-
-void CompareConstantExpr::anchor() { }
-
+OptBisect &LLVMContextImpl::getOptBisect() {
+  return *OptBisector;
+}

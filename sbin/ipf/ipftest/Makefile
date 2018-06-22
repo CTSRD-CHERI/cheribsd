@@ -1,5 +1,6 @@
 #	$FreeBSD$
 
+PACKAGE=	ipf
 PROG=		ipftest
 SRCS=		${GENHDRS} ipftest.c fil.c ip_frag.c ip_state.c ip_nat.c \
 		ip_nat6.c \
@@ -19,11 +20,11 @@ CFLAGS+=	-DIPFILTER_LOG -DIPFILTER_COMPILED -DIPFILTER_LOOKUP \
 # XXX CFLAGS+=		-DIPFILTER_SCAN
 
 
-.PATH:		${.CURDIR}/../../../sys/contrib/ipfilter/netinet
+.PATH:		${SRCTOP}/sys/contrib/ipfilter/netinet
 
 GENHDRS=	ipnat_l.h ipnat_y.h ippool_l.h ippool_y.h ipf_l.h ipf_y.h
 
-CLEANFILES+=	${GENHDRS} 
+CLEANFILES+=	${GENHDRS}
 CLEANFILES+=	ipf_y.c ipf_l.c
 CLEANFILES+=	ipf.tab.c ipf.tab.h
 CLEANFILES+=	ipnat_y.c ipnat_l.c
@@ -104,5 +105,11 @@ ipf_l.c: lexer.c
 ipf_l.h: lexer.h
 	sed -e 's/yy/ipf_yy/g' \
 	    ${.ALLSRC} > ${.TARGET}
+
+.include <bsd.compiler.mk>
+
+.if ${COMPILER_TYPE} == "clang"
+CFLAGS+=	-Wno-address-of-packed-member
+.endif
 
 .include <bsd.prog.mk>

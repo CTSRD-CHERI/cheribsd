@@ -1,6 +1,37 @@
 /*	$OpenBSD: regnum.h,v 1.3 1999/01/27 04:46:06 imp Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause AND BSD-2-Clause
+ *
+ * Copyright (c) 2011-2016 Robert N. M. Watson
+ * Copyright (c) 2015 SRI International
+ * All rights reserved.
+ *
+ * This software was developed by SRI International and the University of
+ * Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
+ * ("CTSRD"), as part of the DARPA CRASH research programme.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
  * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -17,7 +48,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -121,12 +152,60 @@
 #define	TA3	15
 #endif
 
+#ifdef CPU_CHERI
+/*
+ * Load/store offsets for saved registers are with respect to the basic
+ * register size (8 bytes on CHERI), not the CHERI capability register size
+ * (16 or 32 bytes).  Adjust all values by CHERIREGOFFSIZE so that SZREG can
+ * be used in all such calculations.
+ */
+#define	CHERIREGOFFSIZE	(CHERICAP_SIZE / SZREG)	/* Capability / register_t */
+#define	CHERIBASE	NUMSAVEREGS
+
+#define	DDC		(CHERIBASE + 0)
+#define	C1		(CHERIBASE + 1 * CHERIREGOFFSIZE)
+#define	C2		(CHERIBASE + 2 * CHERIREGOFFSIZE)
+#define	C3		(CHERIBASE + 3 * CHERIREGOFFSIZE)
+#define	C4		(CHERIBASE + 4 * CHERIREGOFFSIZE)
+#define	C5		(CHERIBASE + 5 * CHERIREGOFFSIZE)
+#define	C6		(CHERIBASE + 6 * CHERIREGOFFSIZE)
+#define	C7		(CHERIBASE + 7 * CHERIREGOFFSIZE)
+#define	C8		(CHERIBASE + 8 * CHERIREGOFFSIZE)
+#define	C9		(CHERIBASE + 9 * CHERIREGOFFSIZE)
+#define	C10		(CHERIBASE + 10 * CHERIREGOFFSIZE)
+#define	STC		(CHERIBASE + 11 * CHERIREGOFFSIZE)
+#define	C12		(CHERIBASE + 12 * CHERIREGOFFSIZE)
+#define	C13		(CHERIBASE + 13 * CHERIREGOFFSIZE)
+#define	C14		(CHERIBASE + 14 * CHERIREGOFFSIZE)
+#define	C15		(CHERIBASE + 15 * CHERIREGOFFSIZE)
+#define	C16		(CHERIBASE + 16 * CHERIREGOFFSIZE)
+#define	C17		(CHERIBASE + 17 * CHERIREGOFFSIZE)
+#define	C18		(CHERIBASE + 18 * CHERIREGOFFSIZE)
+#define	C19		(CHERIBASE + 19 * CHERIREGOFFSIZE)
+#define	C20		(CHERIBASE + 20 * CHERIREGOFFSIZE)
+#define	C21		(CHERIBASE + 21 * CHERIREGOFFSIZE)
+#define	C22		(CHERIBASE + 22 * CHERIREGOFFSIZE)
+#define	C23		(CHERIBASE + 23 * CHERIREGOFFSIZE)
+#define	C24		(CHERIBASE + 24 * CHERIREGOFFSIZE)
+#define	C25		(CHERIBASE + 25 * CHERIREGOFFSIZE)
+#define	IDC		(CHERIBASE + 26 * CHERIREGOFFSIZE)
+#define	PCC		(CHERIBASE + 27 * CHERIREGOFFSIZE)
+#define	CAPCAUSE	(CHERIBASE + 28 * CHERIREGOFFSIZE)
+
+#define	NUMCHERISAVEREGS	29	/* Plenty of alignment already. */
+#endif
 
 /*
  * Index of FP registers in 'struct frame', counting from the beginning
  * of the frame (i.e., including the general registers).
  */
+#ifdef CPU_CHERI
+/* NB: rounded up to nearest capability size over capcause; see frame.h. */
+#define	FPBASE	(NUMSAVEREGS + NUMCHERISAVEREGS * CHERIREGOFFSIZE)
+#else
 #define	FPBASE	NUMSAVEREGS
+#endif
+
 #define	F0	(FPBASE+0)
 #define	F1	(FPBASE+1)
 #define	F2	(FPBASE+2)
@@ -160,7 +239,7 @@
 #define	F30	(FPBASE+30)
 #define	F31	(FPBASE+31)
 #define	FSR	(FPBASE+32)
-#define FSR_DUMMY (FPBASE+33) /* For 8 byte alignment */
+#define FIR	(FPBASE+33)
 
 #define	NUMFPREGS	34
 
@@ -204,5 +283,6 @@
 #define	F30_NUM	(30)
 #define	F31_NUM	(31)
 #define	FSR_NUM	(32)
+#define	FIR_NUM	(33)
 
 #endif /* !_MACHINE_REGNUM_H_ */

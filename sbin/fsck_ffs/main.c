@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1980, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -57,6 +59,7 @@ __FBSDID("$FreeBSD$");
 #include <errno.h>
 #include <fstab.h>
 #include <grp.h>
+#include <inttypes.h>
 #include <mntopts.h>
 #include <paths.h>
 #include <stdint.h>
@@ -68,7 +71,7 @@ __FBSDID("$FreeBSD$");
 int	restarts;
 
 static void usage(void) __dead2;
-static int argtoi(int flag, const char *req, const char *str, int base);
+static intmax_t argtoimax(int flag, const char *req, const char *str, int base);
 static int checkfilesys(char *filesys);
 static int chkdoreload(struct statfs *mntp);
 static struct statfs *getmntpt(const char *);
@@ -88,8 +91,8 @@ main(int argc, char *argv[])
 		switch (ch) {
 		case 'b':
 			skipclean = 0;
-			bflag = argtoi('b', "number", optarg, 10);
-			printf("Alternate super block location: %d\n", bflag);
+			bflag = argtoimax('b', "number", optarg, 10);
+			printf("Alternate super block location: %jd\n", bflag);
 			break;
 
 		case 'B':
@@ -98,7 +101,8 @@ main(int argc, char *argv[])
 
 		case 'c':
 			skipclean = 0;
-			cvtlevel = argtoi('c', "conversion level", optarg, 10);
+			cvtlevel = argtoimax('c', "conversion level", optarg,
+			    10);
 			if (cvtlevel < 3)
 				errx(EEXIT, "cannot do level %d conversion",
 				    cvtlevel);
@@ -121,7 +125,7 @@ main(int argc, char *argv[])
 			break;
 
 		case 'm':
-			lfmode = argtoi('m', "mode", optarg, 8);
+			lfmode = argtoimax('m', "mode", optarg, 8);
 			if (lfmode &~ 07777)
 				errx(EEXIT, "bad mode to -m: %o", lfmode);
 			printf("** lost+found creation mode %o\n", lfmode);
@@ -203,13 +207,13 @@ main(int argc, char *argv[])
 	exit(ret);
 }
 
-static int
-argtoi(int flag, const char *req, const char *str, int base)
+static intmax_t
+argtoimax(int flag, const char *req, const char *str, int base)
 {
 	char *cp;
-	int ret;
+	intmax_t ret;
 
-	ret = (int)strtol(str, &cp, base);
+	ret = strtoimax(str, &cp, base);
 	if (cp == str || *cp)
 		errx(EEXIT, "-%c flag requires a %s", flag, req);
 	return (ret);
@@ -229,6 +233,7 @@ checkfilesys(char *filesys)
 	struct group *grp;
 	struct iovec *iov;
 	char errmsg[255];
+	int ofsmodified;
 	int iovlen;
 	int cylno;
 	intmax_t blks, files;
@@ -349,10 +354,10 @@ checkfilesys(char *filesys)
 					pfatal(
 	"CANNOT FIND SNAPSHOT DIRECTORY %s: %s, CANNOT RUN IN BACKGROUND\n",
 					    snapname, strerror(errno));
-				} else if ((grp = getgrnam("operator")) == 0 ||
-				    mkdir(snapname, 0770) < 0 ||
-				    chown(snapname, -1, grp->gr_gid) < 0 ||
-				    chmod(snapname, 0770) < 0) {
+				} else if ((grp = getgrnam("operator")) == NULL ||
+					   mkdir(snapname, 0770) < 0 ||
+					   chown(snapname, -1, grp->gr_gid) < 0 ||
+					   chmod(snapname, 0770) < 0) {
 					bkgrdflag = 0;
 					pfatal(
 	"CANNOT CREATE SNAPSHOT DIRECTORY %s: %s, CANNOT RUN IN BACKGROUND\n",
@@ -423,10 +428,15 @@ checkfilesys(char *filesys)
 		}
 		/*
 		 * Write the superblock so we don't try to recover the
-		 * journal on another pass.
+		 * journal on another pass. If this is the only change
+		 * to the filesystem, we do not want it to be called
+		 * out as modified.
 		 */
 		sblock.fs_mtime = time(NULL);
 		sbdirty();
+		ofsmodified = fsmodified;
+		flush(fswritefd, &sblk);
+		fsmodified = ofsmodified;
 	}
 
 	/*
@@ -498,7 +508,7 @@ checkfilesys(char *filesys)
 	 */
 	n_ffree = sblock.fs_cstotal.cs_nffree;
 	n_bfree = sblock.fs_cstotal.cs_nbfree;
-	files = maxino - ROOTINO - sblock.fs_cstotal.cs_nifree - n_files;
+	files = maxino - UFS_ROOTINO - sblock.fs_cstotal.cs_nifree - n_files;
 	blks = n_blks +
 	    sblock.fs_ncg * (cgdmin(&sblock, 0) - cgsblock(&sblock, 0));
 	blks += cgsblock(&sblock, 0) - cgbase(&sblock, 0);
@@ -644,6 +654,9 @@ getmntpt(const char *name)
 		statfsp = &mntbuf[i];
 		ddevname = statfsp->f_mntfromname;
 		if (*ddevname != '/') {
+			if (strlen(_PATH_DEV) + strlen(ddevname) + 1 >
+			    sizeof(statfsp->f_mntfromname))
+				continue;
 			strcpy(device, _PATH_DEV);
 			strcat(device, ddevname);
 			strcpy(statfsp->f_mntfromname, device);
@@ -665,7 +678,7 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr,
-"usage: %s [-BEFfnpry] [-b block] [-c level] [-m mode] filesystem ...\n",
+"usage: %s [-BCdEFfnpRrSyZ] [-b block] [-c level] [-m mode] filesystem ...\n",
 	    getprogname());
 	exit(1);
 }

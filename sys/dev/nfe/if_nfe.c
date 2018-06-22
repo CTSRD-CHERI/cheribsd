@@ -843,7 +843,7 @@ nfe_can_use_msix(struct nfe_softc *sc)
 	product = kern_getenv("smbios.planar.product");
 	use_msix = 1;
 	if (maker != NULL && product != NULL) {
-		count = sizeof(msix_blacklists) / sizeof(msix_blacklists[0]);
+		count = nitems(msix_blacklists);
 		mblp = msix_blacklists;
 		for (n = 0; n < count; n++) {
 			if (strcmp(maker, mblp->maker) == 0 &&
@@ -1722,17 +1722,18 @@ nfe_ioctl(if_t ifp, u_long cmd, caddr_t data)
 	error = 0;
 	init = 0;
 	switch (cmd) {
-	case SIOCSIFMTU:
-		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > NFE_JUMBO_MTU)
+	CASE_IOC_IFREQ(SIOCSIFMTU):
+		if (ifr_mtu_get(ifr) < ETHERMIN ||
+		    ifr_mtu_get(ifr) > NFE_JUMBO_MTU)
 			error = EINVAL;
-		else if (if_getmtu(ifp) != ifr->ifr_mtu) {
+		else if (if_getmtu(ifp) != ifr_mtu_get(ifr)) {
 			if ((((sc->nfe_flags & NFE_JUMBO_SUP) == 0) ||
 			    (sc->nfe_jumbo_disable != 0)) &&
-			    ifr->ifr_mtu > ETHERMTU)
+			    ifr_mtu_get(ifr) > ETHERMTU)
 				error = EINVAL;
 			else {
 				NFE_LOCK(sc);
-				if_setmtu(ifp, ifr->ifr_mtu);
+				if_setmtu(ifp, ifr_mtu_get(ifr));
 				if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
 					if_setdrvflagbits(ifp, 0, IFF_DRV_RUNNING);
 					nfe_init_locked(sc);
@@ -1741,7 +1742,7 @@ nfe_ioctl(if_t ifp, u_long cmd, caddr_t data)
 			}
 		}
 		break;
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		NFE_LOCK(sc);
 		if (if_getflags(ifp) & IFF_UP) {
 			/*
@@ -1763,8 +1764,8 @@ nfe_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		NFE_UNLOCK(sc);
 		error = 0;
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0) {
 			NFE_LOCK(sc);
 			nfe_setmulti(sc);
@@ -1772,16 +1773,16 @@ nfe_ioctl(if_t ifp, u_long cmd, caddr_t data)
 			error = 0;
 		}
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->nfe_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
-	case SIOCSIFCAP:
-		mask = ifr->ifr_reqcap ^ if_getcapenable(ifp);
+	CASE_IOC_IFREQ(SIOCSIFCAP):
+		mask = ifr_reqcap_get(ifr) ^ if_getcapenable(ifp);
 #ifdef DEVICE_POLLING
 		if ((mask & IFCAP_POLLING) != 0) {
-			if ((ifr->ifr_reqcap & IFCAP_POLLING) != 0) {
+			if ((ifr_reqcap_get(ifr) & IFCAP_POLLING) != 0) {
 				error = ether_poll_register(nfe_poll, ifp);
 				if (error)
 					break;
@@ -1873,7 +1874,7 @@ nfe_intr(void *arg)
 	if (status == 0 || status == 0xffffffff)
 		return (FILTER_STRAY);
 	nfe_disable_intr(sc);
-	taskqueue_enqueue_fast(sc->nfe_tq, &sc->nfe_int_task);
+	taskqueue_enqueue(sc->nfe_tq, &sc->nfe_int_task);
 
 	return (FILTER_HANDLED);
 }
@@ -1932,7 +1933,7 @@ nfe_int_task(void *arg, int pending)
 	NFE_UNLOCK(sc);
 
 	if (domore || (NFE_READ(sc, sc->nfe_irq_status) != 0)) {
-		taskqueue_enqueue_fast(sc->nfe_tq, &sc->nfe_int_task);
+		taskqueue_enqueue(sc->nfe_tq, &sc->nfe_int_task);
 		return;
 	}
 
@@ -2590,7 +2591,7 @@ nfe_setmulti(struct nfe_softc *sc)
 		bzero(addr, ETHER_ADDR_LEN);
 		bzero(mask, ETHER_ADDR_LEN);
 		goto done;
-	};
+	}
 
 	if_multiaddr_array(ifp, mta, &mcnt, mc_count);
 

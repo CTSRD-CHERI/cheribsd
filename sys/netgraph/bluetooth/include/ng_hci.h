@@ -3,6 +3,8 @@
  */
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2001 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
  *
@@ -80,6 +82,7 @@
 #define NG_HCI_FEATURES_SIZE			8   /* LMP features */
 #define NG_HCI_UNIT_NAME_SIZE			248 /* unit name size */
 #define NG_HCI_COMMANDS_SIZE			64  /*Command list BMP size*/
+#define NG_HCI_EXTINQ_MAX			240 /**/
 /* HCI specification */
 #define NG_HCI_SPEC_V10				0x00 /* v1.0 */
 #define NG_HCI_SPEC_V11				0x01 /* v1.1 */
@@ -561,6 +564,9 @@ typedef struct {
 	u_int16_t	clock_offset;                   /* clock offset */
 	bdaddr_t	bdaddr;                         /* bdaddr */
 	u_int8_t	features[NG_HCI_FEATURES_SIZE]; /* features */
+	uint8_t 	addrtype;
+	uint8_t		extinq_size; /* MAX 240*/
+	uint8_t		extinq_data[NG_HCI_EXTINQ_MAX];
 } ng_hci_node_neighbor_cache_entry_ep;
 
 #define NG_HCI_MAX_NEIGHBOR_NUM \
@@ -1560,7 +1566,7 @@ typedef struct {
 	u_int16_t min_ce_length;
 	u_int16_t max_ce_length;
 }__attribute__((packed)) ng_hci_le_create_connection_cp;
-/* no return paramters*/
+/* No return parameters. */
 #define NG_HCI_OCF_LE_CREATE_CONNECTION_CANCEL		0x000e
 /*No command parameter*/	
 typedef ng_hci_status_rp	ng_hci_le_create_connection_cancel_rp;	
@@ -1572,7 +1578,7 @@ typedef struct {
 } __attribute__ ((packed)) ng_hci_le_read_white_list_size_rp;
 	
 #define NG_HCI_OCF_LE_CLEAR_WHITE_LIST			0x0010
-/*No command paramters*/
+/* No command parameters. */
 typedef ng_hci_status_rp	ng_hci_le_clear_white_list_rp;	
 #define NG_HCI_OCF_LE_ADD_DEVICE_TO_WHITE_LIST		0x0011
 typedef struct {
@@ -1689,7 +1695,7 @@ typedef struct{
 typedef ng_hci_status_rp	ng_hci_le_transmitter_test_rp;
 
 #define NG_HCI_OCF_LE_TEST_END				0x001f
-/*No command paramter*/
+/* No command parameter. */
 typedef struct {
 	u_int8_t status;
 	u_int16_t number_of_packets;

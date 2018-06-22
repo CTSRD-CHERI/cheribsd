@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1980, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -187,7 +189,7 @@ next:
 
 		case LOGIN:
 			if (token())
-				if (*aname == 0) {
+				if (*aname == NULL) {
 					*aname = malloc((unsigned) strlen(tokval) + 1);
 					(void) strcpy(*aname, tokval);
 				} else {
@@ -196,14 +198,14 @@ next:
 				}
 			break;
 		case PASSWD:
-			if ((*aname == 0 || strcmp(*aname, "anonymous")) &&
+			if ((*aname == NULL || strcmp(*aname, "anonymous")) &&
 			    fstat(fileno(cfile), &stb) >= 0 &&
 			    (stb.st_mode & 077) != 0) {
 	warnx("Error: .netrc file is readable by others.");
 	warnx("Remove password or make file unreadable by others.");
 				goto bad;
 			}
-			if (token() && *apass == 0) {
+			if (token() && *apass == NULL) {
 				*apass = malloc((unsigned) strlen(tokval) + 1);
 				(void) strcpy(*apass, tokval);
 			}
@@ -215,7 +217,7 @@ next:
 	warnx("Remove account or make file unreadable by others.");
 				goto bad;
 			}
-			if (token() && *aacct == 0) {
+			if (token() && *aacct == NULL) {
 				*aacct = malloc((unsigned) strlen(tokval) + 1);
 				(void) strcpy(*aacct, tokval);
 			}
@@ -305,7 +307,7 @@ rexec(ahost, rport, name, pass, cmd, fd2p)
 	char c, *acct;
 
 	hp = gethostbyname(*ahost);
-	if (hp == 0) {
+	if (hp == NULL) {
 		herror(*ahost);
 		return (-1);
 	}
@@ -330,6 +332,7 @@ retry:
 			goto retry;
 		}
 		perror(hp->h_name);
+		(void) close(s);
 		return (-1);
 	}
 	port = 0;

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1994,1995 Stefan Esser, Wolfgang StanglMeier
  * Copyright (c) 2000 Michael Smith <msmith@freebsd.org>
  * Copyright (c) 2000 BSDi
@@ -92,6 +94,7 @@ static device_method_t apb_methods[] = {
 
 	/* pcib interface */
 	DEVMETHOD(pcib_route_interrupt,	ofw_pcib_gen_route_interrupt),
+	DEVMETHOD(pcib_request_feature,	pcib_request_feature_allow),
 
 	/* ofw_bus interface */
 	DEVMETHOD(ofw_bus_get_node,	ofw_pcib_gen_get_node),
@@ -136,7 +139,7 @@ apb_map_print(uint8_t map, rman_res_t scale)
 
 	for (first = 1, i = 0; i < 8; i++) {
 		if ((map & (1 << i)) != 0) {
-			printf("%s0x%lx-0x%lx", first ? "" : ", ",
+			printf("%s0x%jx-0x%jx", first ? "" : ", ",
 			    i * scale, (i + 1) * scale - 1);
 			first = 0;
 		}
@@ -238,7 +241,7 @@ apb_alloc_resource(device_t dev, device_t child, int type, int *rid,
 	 * out where it's coming from (we should actually never see these) so
 	 * we just have to punt.
 	 */
-	if (start == 0 && end == ~0) {
+	if (RMAN_IS_DEFAULT_RANGE(start, end)) {
 		device_printf(dev, "can't decode default resource id %d for "
 		    "%s, bypassing\n", *rid, device_get_nameunit(child));
 		goto passup;
@@ -253,26 +256,26 @@ apb_alloc_resource(device_t dev, device_t child, int type, int *rid,
 	case SYS_RES_IOPORT:
 		if (!apb_checkrange(sc->sc_iomap, APB_IO_SCALE, start, end)) {
 			device_printf(dev, "device %s requested unsupported "
-			    "I/O range 0x%lx-0x%lx\n",
+			    "I/O range 0x%jx-0x%jx\n",
 			    device_get_nameunit(child), start, end);
 			return (NULL);
 		}
 		if (bootverbose)
 			device_printf(sc->sc_bsc.ops_pcib_sc.dev, "device "
-			    "%s requested decoded I/O range 0x%lx-0x%lx\n",
+			    "%s requested decoded I/O range 0x%jx-0x%jx\n",
 			    device_get_nameunit(child), start, end);
 		break;
 	case SYS_RES_MEMORY:
 		if (!apb_checkrange(sc->sc_memmap, APB_MEM_SCALE, start,
 		    end)) {
 			device_printf(dev, "device %s requested unsupported "
-			    "memory range 0x%lx-0x%lx\n",
+			    "memory range 0x%jx-0x%jx\n",
 			    device_get_nameunit(child), start, end);
 			return (NULL);
 		}
 		if (bootverbose)
 			device_printf(sc->sc_bsc.ops_pcib_sc.dev, "device "
-			    "%s requested decoded memory range 0x%lx-0x%lx\n",
+			    "%s requested decoded memory range 0x%jx-0x%jx\n",
 			    device_get_nameunit(child), start, end);
 		break;
 	}

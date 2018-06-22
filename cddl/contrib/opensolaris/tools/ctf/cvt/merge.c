@@ -19,6 +19,16 @@
  * CDDL HEADER END
  */
 /*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
+/*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -338,7 +348,8 @@ fwd_equiv(tdesc_t *ctdp, tdesc_t *mtdp)
 {
 	tdesc_t *defn = (ctdp->t_type == FORWARD ? mtdp : ctdp);
 
-	return (defn->t_type == STRUCT || defn->t_type == UNION);
+	return (defn->t_type == STRUCT || defn->t_type == UNION ||
+	    defn->t_type == ENUM);
 }
 
 static int
@@ -453,8 +464,8 @@ map_td_tree_post(tdesc_t *ctdp, tdesc_t **ctdpp __unused, void *private)
 
 			debug(3, "Creating new defn type %d <%x>\n", id, id);
 			add_mapping(mcd->md_ta, ctdp->t_id, id);
-			alist_add(mcd->md_fdida, (void *)(ulong_t)ed.ed_tgt,
-			    (void *)(ulong_t)id);
+			alist_add(mcd->md_fdida, (void *)ed.ed_tgt,
+			    (void *)(uintptr_t)id);
 			hash_add(mcd->md_tdtba, ctdp);
 		} else
 			add_mapping(mcd->md_ta, ctdp->t_id, ed.ed_tgt->t_id);

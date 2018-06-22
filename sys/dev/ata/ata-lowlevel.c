@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1998 - 2008 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
@@ -851,7 +853,7 @@ ata_pio_read(struct ata_request *request, int length)
 			panic("ata_pio_read: Unsupported CAM data type %x\n",
 			    (request->ccb->ccb_h.flags & CAM_DATA_MASK));
 
-		/* We may have extra byte already red but not stored. */
+		/* We may have extra byte already read but not stored. */
 		if (resid) {
 			addr[0] = buf[1];
 			addr++;

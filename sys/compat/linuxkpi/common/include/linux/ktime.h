@@ -26,8 +26,9 @@
  *
  * $FreeBSD$
  */
+
 #ifndef _LINUX_KTIME_H
-#define _LINUX_KTIME_H
+#define	_LINUX_KTIME_H
 
 #include <linux/types.h>
 #include <linux/time.h>
@@ -49,6 +50,33 @@ static inline int64_t
 ktime_to_ns(ktime_t kt)
 {
 	return kt.tv64;
+}
+
+static inline ktime_t
+ns_to_ktime(uint64_t nsec)
+{
+	ktime_t kt;
+
+	kt.tv64 = nsec;
+	return (kt);
+}
+
+static inline int64_t
+ktime_divns(const ktime_t kt, int64_t div)
+{
+	return kt.tv64 / div;
+}
+
+static inline int64_t
+ktime_to_us(ktime_t kt)
+{
+        return ktime_divns(kt, NSEC_PER_USEC);
+}
+
+static inline int64_t
+ktime_to_ms(ktime_t kt)
+{
+        return ktime_divns(kt, NSEC_PER_MSEC);
 }
 
 static inline struct timeval
@@ -89,6 +117,20 @@ ktime_sub(ktime_t lhs, ktime_t rhs)
 	return (lhs);
 }
 
+static inline int64_t
+ktime_us_delta(ktime_t later, ktime_t earlier)
+{
+        ktime_t diff = ktime_sub(later, earlier);
+        return ktime_to_us(diff);
+}
+
+static inline int64_t
+ktime_ms_delta(ktime_t later, ktime_t earlier)
+{
+        ktime_t diff = ktime_sub(later, earlier);
+        return ktime_to_ms(diff);
+}
+
 static inline ktime_t
 ktime_add(ktime_t lhs, ktime_t rhs)
 {
@@ -112,7 +154,7 @@ timeval_to_ktime(struct timeval tv)
 #define ktime_to_timeval(kt)		ns_to_timeval((kt).tv64)
 #define ktime_to_ns(kt)			((kt).tv64)
 
-static inline s64
+static inline int64_t
 ktime_get_ns(void)
 {
 	struct timespec ts;
@@ -123,6 +165,8 @@ ktime_get_ns(void)
 	return (ktime_to_ns(kt));
 }
 
+#define	ktime_get_raw_ns()	ktime_get_ns()
+
 static inline ktime_t
 ktime_get(void)
 {
@@ -132,4 +176,22 @@ ktime_get(void)
 	return (timespec_to_ktime(ts));
 }
 
-#endif	/* _LINUX_KTIME_H */
+static inline ktime_t
+ktime_get_boottime(void)
+{
+	struct timespec ts;
+
+	nanouptime(&ts);
+	return (timespec_to_ktime(ts));
+}
+
+static inline ktime_t
+ktime_get_real(void)
+{
+	struct timespec ts;
+
+	nanotime(&ts);
+	return (timespec_to_ktime(ts));
+}
+
+#endif /* _LINUX_KTIME_H */

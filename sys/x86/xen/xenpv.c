@@ -36,6 +36,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/rman.h>
 #include <sys/smp.h>
 #include <sys/limits.h>
+#include <sys/vmmeter.h>
 
 #include <vm/vm.h>
 #include <vm/vm_page.h>
@@ -120,7 +121,7 @@ xenpv_alloc_physmem(device_t dev, device_t child, int *res_id, size_t size)
 	int error;
 
 	res = bus_alloc_resource(child, SYS_RES_MEMORY, res_id, LOW_MEM_LIMIT,
-	    ~0ul, size, RF_ACTIVE);
+	    ~0, size, RF_ACTIVE);
 	if (res == NULL)
 		return (NULL);
 

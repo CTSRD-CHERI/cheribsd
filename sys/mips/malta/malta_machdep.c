@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2006 Wojciech A. Koszek <wkoszek@FreeBSD.org>
  * All rights reserved.
  *
@@ -102,6 +104,24 @@ static int malta_lcd_offs[] = {
 	MALTA_ASCIIPOS7
 };
 
+/*
+ * When emulating MALTA under Qemu, ISA-level tracing can be enabled and
+ * disabled using special NOP instructions.  By default, this is simple a
+ * global setting that the kernel doesn't interfere with, allowing usersapce
+ * to turn on and off tracing as it sees fit.  If this sysctl is set, then the
+ * kernel will instead use a per-thread flag (td->td_mdflags & MDTD_QTRACE) to
+ * turn tracing on and off during context switching to reflect the thread's
+ * tracing state.  That state can be get/set/cleared using sysarch system
+ * calls.
+ *
+ * NB: This is a Qemu-CHERI feature.
+ */
+#ifdef CPU_QEMU_MALTA
+u_int	qemu_trace_perthread;
+SYSCTL_UINT(_hw, OID_AUTO, qemu_trace_perthread, CTLFLAG_RW,
+    &qemu_trace_perthread, 0, "Per-thread Qemu ISA-level tracing configured");
+#endif
+
 void
 platform_cpu_init()
 {
@@ -192,7 +212,7 @@ mips_init(unsigned long memsize, uint64_t ememsize)
 	/* phys_avail regions are in bytes */
 	phys_avail[0] = MIPS_KSEG0_TO_PHYS(kernel_kseg0_end);
 	phys_avail[1] = memsize;
-	dump_avail[0] = phys_avail[0];
+	dump_avail[0] = 0;
 	dump_avail[1] = phys_avail[1];
 
 	/* Only specify the extended region if it's set */
@@ -231,6 +251,21 @@ platform_reset(void)
 	c = (char *)MIPS_PHYS_TO_KSEG0(MALTA_SOFTRES);
 	*c = MALTA_GORESET;
 }
+
+#ifdef CPU_QEMU_MALTA
+static void
+malta_poweroff(void *arg, int howto)
+{
+	char *c;
+
+	if ((howto & RB_POWEROFF) != 0) {
+		c = (char *)MIPS_PHYS_TO_KSEG0(MALTA_SOFTRES);
+		*c = MALTA_GORESET + 2;
+	}
+}
+
+EVENTHANDLER_DEFINE(shutdown_final, malta_poweroff, NULL, SHUTDOWN_PRI_LAST);
+#endif
 
 static uint64_t
 malta_cpu_freq(void)
@@ -364,5 +399,5 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 	realmem = btoc(ememsize);
 	mips_init(memsize, ememsize);
 
-	mips_timer_init_params(platform_counter_freq, 0);
+	mips_timer_init_params(platform_counter_freq, -1);
 }

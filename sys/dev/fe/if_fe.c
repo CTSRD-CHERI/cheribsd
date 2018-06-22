@@ -37,14 +37,6 @@ __FBSDID("$FreeBSD$");
  * other types of Ethernet cards, but the author is not sure whether
  * they are useful.
  *
- * This version also includes some alignments to support RE1000,
- * C-NET(98)P2 and so on. These cards are not for AT-compatibles,
- * but for NEC PC-98 bus -- a proprietary bus architecture available
- * only in Japan. Confusingly, it is different from the Microsoft's
- * PC98 architecture. :-{
- * Further work for PC-98 version will be available as a part of
- * FreeBSD(98) project.
- *
  * This software is a derivative work of if_ed.c version 1.56 by David
  * Greenman available as a part of FreeBSD 2.0 RELEASE source distribution.
  *
@@ -61,7 +53,6 @@ __FBSDID("$FreeBSD$");
 /*
  * TODO:
  *  o   To support ISA PnP auto configuration for FMV-183/184.
- *  o   To support REX-9886/87(PC-98 only).
  *  o   To reconsider mbuf usage.
  *  o   To reconsider transmission buffer usage, including
  *      transmission buffer size (currently 4KB x 2) and pros-and-
@@ -72,6 +63,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
+#include <sys/malloc.h>
 #include <sys/systm.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
@@ -880,8 +872,8 @@ fe_alloc_port(device_t dev, int size)
 	int rid;
 
 	rid = 0;
-	res = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
-				 0ul, ~0ul, size, RF_ACTIVE);
+	res = bus_alloc_resource_anywhere(dev, SYS_RES_IOPORT, &rid,
+					  size, RF_ACTIVE);
 	if (res) {
 		sc->port_used = size;
 		sc->port_res = res;
@@ -1778,7 +1770,7 @@ fe_ioctl (struct ifnet * ifp, u_long command, caddr_t data)
 
 	switch (command) {
 
-	  case SIOCSIFFLAGS:
+	  CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		/*
 		 * Switch interface state between "running" and
 		 * "stopped", reflecting the UP flag.
@@ -1802,8 +1794,8 @@ fe_ioctl (struct ifnet * ifp, u_long command, caddr_t data)
 		/* Done.  */
 		break;
 
-	  case SIOCADDMULTI:
-	  case SIOCDELMULTI:
+	  CASE_IOC_IFREQ(SIOCADDMULTI):
+	  CASE_IOC_IFREQ(SIOCDELMULTI):
 		/*
 		 * Multicast list has changed; set the hardware filter
 		 * accordingly.
@@ -1813,7 +1805,7 @@ fe_ioctl (struct ifnet * ifp, u_long command, caddr_t data)
 		FE_UNLOCK(sc);
 		break;
 
-	  case SIOCSIFMEDIA:
+	  CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	  case SIOCGIFMEDIA:
 		/* Let if_media to handle these commands and to call
 		   us back.  */
@@ -2010,7 +2002,7 @@ fe_write_mbufs (struct fe_softc *sc, struct mbuf *m)
 	if ((sc->proto_dlcr6 & FE_D6_SBW) == FE_D6_SBW_BYTE)
 	{
 		/* 8-bit cards are easy.  */
-		for (mp = m; mp != 0; mp = mp->m_next) {
+		for (mp = m; mp != NULL; mp = mp->m_next) {
 			if (mp->m_len)
 				fe_outsb(sc, FE_BMPR8, mtod(mp, caddr_t),
 					 mp->m_len);
@@ -2020,7 +2012,7 @@ fe_write_mbufs (struct fe_softc *sc, struct mbuf *m)
 	{
 		/* 16-bit cards are a pain.  */
 		savebyte = NO_PENDING_BYTE;
-		for (mp = m; mp != 0; mp = mp->m_next) {
+		for (mp = m; mp != NULL; mp = mp->m_next) {
 
 			/* Ignore empty mbuf.  */
 			len = mp->m_len;

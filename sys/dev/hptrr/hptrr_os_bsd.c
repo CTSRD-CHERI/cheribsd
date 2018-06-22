@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) HighPoint Technologies, Inc.
  * All rights reserved.
  *
@@ -98,8 +100,8 @@ void *os_map_pci_bar(
     else
     	hba->pcibar[index].type = SYS_RES_MEMORY;
 
-    hba->pcibar[index].res = bus_alloc_resource(hba->pcidev,
-		hba->pcibar[index].type, &hba->pcibar[index].rid, 0, ~0, length, RF_ACTIVE);
+    hba->pcibar[index].res = bus_alloc_resource_any(hba->pcidev,
+		hba->pcibar[index].type, &hba->pcibar[index].rid, RF_ACTIVE);
 	
 	hba->pcibar[index].base = (char *)rman_get_virtual(hba->pcibar[index].res) + offset;
 	return hba->pcibar[index].base;

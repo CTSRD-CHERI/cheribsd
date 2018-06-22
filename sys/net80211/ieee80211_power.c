@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2002-2008 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
@@ -34,6 +36,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h> 
 #include <sys/kernel.h>
+#include <sys/malloc.h>
  
 #include <sys/socket.h>
 
@@ -622,7 +625,7 @@ ieee80211_sta_ps_timer_check(struct ieee80211vap *vap)
 
 	/* If we've done any data within our idle interval, bail */
 	/* XXX hard-coded to one second for now, ew! */
-	if (time_after(ic->ic_lastdata + 500, ticks))
+	if (ieee80211_time_after(ic->ic_lastdata + 500, ticks))
 		goto out;
 
 	/*

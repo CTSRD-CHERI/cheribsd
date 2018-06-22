@@ -37,30 +37,23 @@ class PPCTTIImpl : public BasicTTIImplBase<PPCTTIImpl> {
   const PPCTargetLowering *getTLI() const { return TLI; }
 
 public:
-  explicit PPCTTIImpl(const PPCTargetMachine *TM, Function &F)
+  explicit PPCTTIImpl(const PPCTargetMachine *TM, const Function &F)
       : BaseT(TM, F.getParent()->getDataLayout()), ST(TM->getSubtargetImpl(F)),
         TLI(ST->getTargetLowering()) {}
-
-  // Provide value semantics. MSVC requires that we spell all of these out.
-  PPCTTIImpl(const PPCTTIImpl &Arg)
-      : BaseT(static_cast<const BaseT &>(Arg)), ST(Arg.ST), TLI(Arg.TLI) {}
-  PPCTTIImpl(PPCTTIImpl &&Arg)
-      : BaseT(std::move(static_cast<BaseT &>(Arg))), ST(std::move(Arg.ST)),
-        TLI(std::move(Arg.TLI)) {}
 
   /// \name Scalar TTI Implementations
   /// @{
 
   using BaseT::getIntImmCost;
-  unsigned getIntImmCost(const APInt &Imm, Type *Ty);
+  int getIntImmCost(const APInt &Imm, Type *Ty);
 
-  unsigned getIntImmCost(unsigned Opcode, unsigned Idx, const APInt &Imm,
-                         Type *Ty);
-  unsigned getIntImmCost(Intrinsic::ID IID, unsigned Idx, const APInt &Imm,
-                         Type *Ty);
+  int getIntImmCost(unsigned Opcode, unsigned Idx, const APInt &Imm, Type *Ty);
+  int getIntImmCost(Intrinsic::ID IID, unsigned Idx, const APInt &Imm,
+                    Type *Ty);
 
   TTI::PopcntSupportKind getPopcntSupport(unsigned TyWidth);
-  void getUnrollingPreferences(Loop *L, TTI::UnrollingPreferences &UP);
+  void getUnrollingPreferences(Loop *L, ScalarEvolution &SE,
+                               TTI::UnrollingPreferences &UP);
 
   /// @}
 
@@ -68,22 +61,33 @@ public:
   /// @{
 
   bool enableAggressiveInterleaving(bool LoopHasReductions);
+  bool expandMemCmp(Instruction *I, unsigned &MaxLoadSize);
+  bool enableInterleavedAccessVectorization();
   unsigned getNumberOfRegisters(bool Vector);
-  unsigned getRegisterBitWidth(bool Vector);
+  unsigned getRegisterBitWidth(bool Vector) const;
+  unsigned getCacheLineSize();
+  unsigned getPrefetchDistance();
   unsigned getMaxInterleaveFactor(unsigned VF);
-  unsigned getArithmeticInstrCost(
+  int getArithmeticInstrCost(
       unsigned Opcode, Type *Ty,
       TTI::OperandValueKind Opd1Info = TTI::OK_AnyValue,
       TTI::OperandValueKind Opd2Info = TTI::OK_AnyValue,
       TTI::OperandValueProperties Opd1PropInfo = TTI::OP_None,
-      TTI::OperandValueProperties Opd2PropInfo = TTI::OP_None);
-  unsigned getShuffleCost(TTI::ShuffleKind Kind, Type *Tp, int Index,
-                          Type *SubTp);
-  unsigned getCastInstrCost(unsigned Opcode, Type *Dst, Type *Src);
-  unsigned getCmpSelInstrCost(unsigned Opcode, Type *ValTy, Type *CondTy);
-  unsigned getVectorInstrCost(unsigned Opcode, Type *Val, unsigned Index);
-  unsigned getMemoryOpCost(unsigned Opcode, Type *Src, unsigned Alignment,
-                           unsigned AddressSpace);
+      TTI::OperandValueProperties Opd2PropInfo = TTI::OP_None,
+      ArrayRef<const Value *> Args = ArrayRef<const Value *>());
+  int getShuffleCost(TTI::ShuffleKind Kind, Type *Tp, int Index, Type *SubTp);
+  int getCastInstrCost(unsigned Opcode, Type *Dst, Type *Src,
+                       const Instruction *I = nullptr);
+  int getCmpSelInstrCost(unsigned Opcode, Type *ValTy, Type *CondTy,
+                         const Instruction *I = nullptr);
+  int getVectorInstrCost(unsigned Opcode, Type *Val, unsigned Index);
+  int getMemoryOpCost(unsigned Opcode, Type *Src, unsigned Alignment,
+                      unsigned AddressSpace, const Instruction *I = nullptr);
+  int getInterleavedMemoryOpCost(unsigned Opcode, Type *VecTy,
+                                 unsigned Factor,
+                                 ArrayRef<unsigned> Indices,
+                                 unsigned Alignment,
+                                 unsigned AddressSpace);
 
   /// @}
 };

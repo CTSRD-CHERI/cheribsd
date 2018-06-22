@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011 David E. O'Brien <obrien@FreeBSD.org>
  * Copyright (c) 2001 Mike Barcroft <mike@FreeBSD.org>
  * All rights reserved.
@@ -70,6 +72,20 @@ typedef	__uint64_t		uint64_t;
 #define	_UINT64_T_DECLARED
 #endif
 
+#ifndef _INTCAP_T_DECLARED
+#if __has_feature(capabilities)
+typedef	__intcap_t		intcap_t;
+#else
+typedef	__intptr_t		intcap_t;
+#endif
+#endif
+#ifndef _UINTCAP_T_DECLARED
+#if __has_feature(capabilities)
+typedef	__uintcap_t		uintcap_t;
+#else
+typedef	__uintptr_t		uintcap_t;
+#endif
+#endif
 #ifndef _INTPTR_T_DECLARED
 typedef	__intptr_t		intptr_t;
 #define	_INTPTR_T_DECLARED
@@ -87,10 +103,13 @@ typedef	__uintmax_t		uintmax_t;
 #define	_UINTMAX_T_DECLARED
 #endif
 
+#ifndef _VADDR_T_DECLARED
 #ifndef __CHERI_PURE_CAPABILITY__
 typedef	__uintptr_t		vaddr_t;
 #else
 typedef	__uint64_t		vaddr_t;
+#endif
+#define _VADDR_T_DECLARED
 #endif
 
 #endif /* !_SYS__STDINT_H_ */

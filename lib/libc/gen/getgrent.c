@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2003 Networks Associates Technology, Inc.
  * All rights reserved.
  *
@@ -29,6 +31,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
  */
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -343,9 +355,9 @@ grp_unmarshal_func(char *buffer, size_t buffer_size, void *retval, va_list ap,
 
 	orig_buf = (char *)_ALIGN(orig_buf);
 	memcpy(orig_buf, buffer + sizeof(struct group) + sizeof(char *) +
-	    _ALIGN(p) - (size_t)p,
+	    (vaddr_t)_ALIGN(p) - (vaddr_t)p,
 	    buffer_size - sizeof(struct group) - sizeof(char *) -
-	    _ALIGN(p) + (size_t)p);
+	    (vaddr_t)_ALIGN(p) + (vaddr_t)p);
 	p = (char *)_ALIGN(p);
 
 	NS_APPLY_OFFSET(grp->gr_name, orig_buf, p, char *);
@@ -533,12 +545,10 @@ out:
 	return (rv);
 }
 
-/* XXX IEEE Std 1003.1, 2003 specifies `void setgrent(void)' */
-int				
+void
 setgrent(void)
 {
 	(void)_nsdispatch(NULL, setgrent_dtab, NSDB_GROUP, "setgrent", defaultsrc, 0);
-	return (1);
 }
 
 

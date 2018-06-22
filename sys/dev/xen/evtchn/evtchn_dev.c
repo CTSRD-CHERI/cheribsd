@@ -325,8 +325,6 @@ evtchn_write(struct cdev *dev, struct uio *uio, int ioflag)
 		return (EINVAL);
 
 	kbuf = malloc(PAGE_SIZE, M_EVTCHN, M_WAITOK);
-	if (kbuf == NULL)
-		return (ENOMEM);
 
 	count = uio->uio_resid;
 	/* Whole number of ports. */
@@ -375,9 +373,9 @@ evtchn_bind_user_port(struct per_user_data *u, struct user_evtchn *evtchn)
 	mtx_lock(&u->bind_mutex);
 	RB_INSERT(evtchn_tree, &u->evtchns, evtchn);
 	mtx_unlock(&u->bind_mutex);
-	error = xen_intr_add_handler(evtchn_dev, evtchn_filter,
-	    evtchn_interrupt, evtchn, INTR_TYPE_MISC | INTR_MPSAFE,
-	    evtchn->handle);
+	error = xen_intr_add_handler(device_get_nameunit(evtchn_dev),
+	    evtchn_filter, evtchn_interrupt, evtchn,
+	    INTR_TYPE_MISC | INTR_MPSAFE, evtchn->handle);
 	if (error != 0) {
 		xen_intr_unbind(&evtchn->handle);
 		mtx_lock(&u->bind_mutex);

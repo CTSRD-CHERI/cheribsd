@@ -46,6 +46,7 @@
 #include "svn_props.h"
 #include "svn_mergeinfo.h"
 #include "svn_version.h"
+#include "svn_ctype.h"
 
 #include "svn_private_config.h"
 
@@ -396,7 +397,7 @@ static svn_error_t *find_tunnel_agent(const char *tunnel,
        * versions have it too. If the user is using some other ssh
        * implementation that doesn't accept it, they can override it
        * in the [tunnels] section of the config. */
-      val = "$SVN_SSH ssh -q";
+      val = "$SVN_SSH ssh -q --";
     }
 
   if (!val || !*val)
@@ -441,7 +442,7 @@ static svn_error_t *find_tunnel_agent(const char *tunnel,
   for (n = 0; cmd_argv[n] != NULL; n++)
     argv[n] = cmd_argv[n];
 
-  argv[n++] = svn_path_uri_decode(hostinfo, pool);
+  argv[n++] = hostinfo;
   argv[n++] = "svnserve";
   argv[n++] = "-t";
   argv[n] = NULL;
@@ -802,6 +803,32 @@ ra_svn_get_schemes(apr_pool_t *pool)
 }
 
 
+/* A simple whitelist to ensure the following are valid:
+ *   user@server
+ *   [::1]:22
+ *   server-name
+ *   server_name
+ *   127.0.0.1
+ * with an extra restriction that a leading '-' is invalid.
+ */
+static svn_boolean_t
+is_valid_hostinfo(const char *hostinfo)
+{
+  const char *p = hostinfo;
+
+  if (p[0] == '-')
+    return FALSE;
+
+  while (*p)
+    {
+      if (!svn_ctype_isalnum(*p) && !strchr(":.-_[]@", *p))
+        return FALSE;
+
+      ++p;
+    }
+
+  return TRUE;
+}
 
 static svn_error_t *ra_svn_open(svn_ra_session_t *session,
                                 const char **corrected_url,
@@ -835,8 +862,18 @@ static svn_error_t *ra_svn_open(svn_ra_session_t *session,
           || (callbacks->check_tunnel_func && callbacks->open_tunnel_func
               && !callbacks->check_tunnel_func(callbacks->tunnel_baton,
                                                tunnel))))
-    SVN_ERR(find_tunnel_agent(tunnel, uri.hostinfo, &tunnel_argv, config,
-                              result_pool));
+    {
+      const char *decoded_hostinfo;
+
+      decoded_hostinfo = svn_path_uri_decode(uri.hostinfo, result_pool);
+
+      if (!is_valid_hostinfo(decoded_hostinfo))
+        return svn_error_createf(SVN_ERR_BAD_URL, NULL, _("Invalid host '%s'"),
+                                 uri.hostinfo);
+
+      SVN_ERR(find_tunnel_agent(tunnel, decoded_hostinfo, &tunnel_argv,
+                                config, result_pool));
+    }
   else
     tunnel_argv = NULL;
 
@@ -1191,7 +1228,6 @@ parse_iproplist(apr_array_header_t **inherited_props,
 
 {
   int i;
-  const char *repos_root_url;
   apr_pool_t *iterpool;
 
   if (iproplist == NULL)
@@ -1203,8 +1239,6 @@ parse_iproplist(apr_array_header_t **inherited_props,
       *inherited_props = NULL;
       return SVN_NO_ERROR;
     }
-
-  SVN_ERR(ra_svn_get_repos_root(session, &repos_root_url, scratch_pool));
 
   *inherited_props = apr_array_make(
     result_pool, iproplist->nelts, sizeof(svn_prop_inherited_item_t *));
@@ -1231,9 +1265,7 @@ parse_iproplist(apr_array_header_t **inherited_props,
       SVN_ERR(svn_ra_svn__parse_tuple(elt->u.list, iterpool, "cl",
                                       &parent_rel_path, &iprop_list));
       SVN_ERR(svn_ra_svn__parse_proplist(iprop_list, iterpool, &iprops));
-      new_iprop->path_or_url = svn_path_url_add_component2(repos_root_url,
-                                                           parent_rel_path,
-                                                           result_pool);
+      new_iprop->path_or_url = apr_pstrdup(result_pool, parent_rel_path);
       new_iprop->prop_hash = svn_hash__make(result_pool);
       for (hi = apr_hash_first(iterpool, iprops);
            hi;

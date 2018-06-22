@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2002 Networks Associates Technologies, Inc.
  * All rights reserved.
  *
@@ -138,7 +140,8 @@ main(int argc, char *argv[])
 
 	/* initialize PAM */
 	pam_err = pam_start("passwd", pwd->pw_name, &pamc, &pamh);
-	pam_check("pam_start");
+	if (pam_err != PAM_SUCCESS)
+		errx(1, "pam_start: %s", pam_strerror(NULL, pam_err));
 
 	pam_err = pam_set_item(pamh, PAM_TTY, ttyname(STDERR_FILENO));
 	pam_check("pam_set_item");

@@ -1,7 +1,9 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.
- * Copyright (c) 2005 Robert N. M. Watson
+ * Copyright (c) 2005, 2016 Robert N. M. Watson
  * Copyright (c) 2015-2016 SRI International
  * All rights reserved.
  *
@@ -17,7 +19,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -57,6 +59,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/unistd.h>
 #include <sys/vnode.h>
 #include <sys/socket.h>
+#include <sys/syscallsubr.h>
 #include <sys/stat.h>
 #include <sys/ktrace.h>
 #include <sys/sx.h>
@@ -115,6 +118,7 @@ struct ktr_request {
 		struct	ktr_csw ktr_csw;
 		struct	ktr_fault ktr_fault;
 		struct	ktr_faultend ktr_faultend;
+		struct  ktr_struct_array ktr_struct_array;
 #ifdef CPU_CHERI
 		struct	ktr_ccall ktr_ccall;
 		struct	ktr_creturn ktr_creturn;
@@ -139,6 +143,7 @@ static int data_lengths[] = {
 	[KTR_CAPFAIL] = sizeof(struct ktr_cap_fail),
 	[KTR_FAULT] = sizeof(struct ktr_fault),
 	[KTR_FAULTEND] = sizeof(struct ktr_faultend),
+	[KTR_STRUCT_ARRAY] = sizeof(struct ktr_struct_array),
 #ifdef CPU_CHERI
 	[KTR_CCALL] = sizeof(struct ktr_ccall),
 	[KTR_CRETURN] = sizeof(struct ktr_creturn),
@@ -154,7 +159,7 @@ static SYSCTL_NODE(_kern, OID_AUTO, ktrace, CTLFLAG_RD, 0, "KTRACE options");
 static u_int ktr_requestpool = KTRACE_REQUEST_POOL;
 TUNABLE_INT("kern.ktrace.request_pool", &ktr_requestpool);
 
-static u_int ktr_geniosize = PAGE_SIZE;
+u_int ktr_geniosize = PAGE_SIZE;
 SYSCTL_UINT(_kern_ktrace, OID_AUTO, genio_size, CTLFLAG_RWTUN, &ktr_geniosize,
     0, "Maximum size of genio event payload");
 
@@ -459,19 +464,22 @@ ktr_freeproc(struct proc *p, struct ucred **uc, struct vnode **vp)
 }
 
 void
-ktrsyscall(code, narg, args)
-	int code, narg;
-	register_t args[];
+ktrsyscall(int code, int narg, syscallarg_t args[])
 {
 	struct ktr_request *req;
 	struct ktr_syscall *ktp;
 	size_t buflen;
-	char *buf = NULL;
+	register_t *buf = NULL;
 
 	buflen = sizeof(register_t) * narg;
 	if (buflen > 0) {
 		buf = malloc(buflen, M_KTRACE, M_WAITOK);
+#ifdef CPU_CHERI
+		for (int i = 0; i < narg; i++)
+			buf[i] = (register_t)args[i];
+#else
 		bcopy(args, buf, buflen);
+#endif
 	}
 	req = ktr_getrequest(KTR_SYSCALL);
 	if (req == NULL) {
@@ -490,9 +498,7 @@ ktrsyscall(code, narg, args)
 }
 
 void
-ktrsysret(code, error, retval)
-	int code, error;
-	register_t retval;
+ktrsysret(int code, int error, register_t retval)
 {
 	struct ktr_request *req;
 	struct ktr_sysret *ktp;
@@ -594,9 +600,14 @@ void
 ktrprocfork(struct proc *p1, struct proc *p2)
 {
 
+	MPASS(p2->p_tracevp == NULL);
+	MPASS(p2->p_traceflag == 0);
+
+	if (p1->p_traceflag == 0)
+		return;
+
 	PROC_LOCK(p1);
 	mtx_lock(&ktrace_mtx);
-	KASSERT(p2->p_tracevp == NULL, ("new process has a ktrace vnode"));
 	if (p1->p_traceflag & KTRFAC_INHERIT) {
 		p2->p_traceflag = p1->p_traceflag;
 		if ((p2->p_tracevp = p1->p_tracevp) != NULL) {
@@ -654,9 +665,7 @@ ktrnamei(path)
 }
 
 void
-ktrsysctl(name, namelen)
-	int *name;
-	u_int namelen;
+ktrsysctl(int *name, u_int namelen)
 {
 	struct ktr_request *req;
 	u_int mib[CTL_MAXNAME + 2];
@@ -688,11 +697,7 @@ ktrsysctl(name, namelen)
 }
 
 void
-ktrgenio(fd, rw, uio, error)
-	int fd;
-	enum uio_rw rw;
-	struct uio *uio;
-	int error;
+ktrgenio(int fd, enum uio_rw rw, struct uio *uio, int error)
 {
 	struct ktr_request *req;
 	struct ktr_genio *ktg;
@@ -727,11 +732,7 @@ ktrgenio(fd, rw, uio, error)
 }
 
 void
-ktrpsig(sig, action, mask, code)
-	int sig;
-	sig_t action;
-	sigset_t *mask;
-	int code;
+ktrpsig(int sig, sig_t action, sigset_t *mask, int code)
 {
 	struct thread *td = curthread;
 	struct ktr_request *req;
@@ -750,9 +751,7 @@ ktrpsig(sig, action, mask, code)
 }
 
 void
-ktrcsw(out, user, wmesg)
-	int out, user;
-	const char *wmesg;
+ktrcsw(int out, int user, const char *wmesg)
 {
 	struct thread *td = curthread;
 	struct ktr_request *req;
@@ -773,10 +772,7 @@ ktrcsw(out, user, wmesg)
 }
 
 void
-ktrstruct(name, data, datalen)
-	const char *name;
-	void *data;
-	size_t datalen;
+ktrstruct(const char *name, const void *data, size_t datalen)
 {
 	struct ktr_request *req;
 	char *buf;
@@ -799,10 +795,54 @@ ktrstruct(name, data, datalen)
 }
 
 void
-ktrcapfail(type, needed, held)
-	enum ktr_cap_fail_type type;
-	const cap_rights_t *needed;
-	const cap_rights_t *held;
+ktrstructarray(const char *name, enum uio_seg seg, const void *data,
+    int num_items, size_t struct_size)
+{
+	struct ktr_request *req;
+	struct ktr_struct_array *ksa;
+	char *buf;
+	size_t buflen, datalen, namelen;
+	int max_items;
+
+	/* Trim array length to genio size. */
+	max_items = ktr_geniosize / struct_size;
+	if (num_items > max_items) {
+		if (max_items == 0)
+			num_items = 1;
+		else
+			num_items = max_items;
+	}
+	datalen = num_items * struct_size;
+
+	if (data == NULL)
+		datalen = 0;
+
+	namelen = strlen(name) + 1;
+	buflen = namelen + datalen;
+	buf = malloc(buflen, M_KTRACE, M_WAITOK);
+	strcpy(buf, name);
+	if (seg == UIO_SYSSPACE)
+		bcopy(data, buf + namelen, datalen);
+	else {
+		if (copyin(data, buf + namelen, datalen) != 0) {
+			free(buf, M_KTRACE);
+			return;
+		}
+	}
+	if ((req = ktr_getrequest(KTR_STRUCT_ARRAY)) == NULL) {
+		free(buf, M_KTRACE);
+		return;
+	}
+	ksa = &req->ktr_data.ktr_struct_array;
+	ksa->struct_size = struct_size;
+	req->ktr_buffer = buf;
+	req->ktr_header.ktr_len = buflen;
+	ktr_submitrequest(curthread, req);
+}
+
+void
+ktrcapfail(enum ktr_cap_fail_type type, const cap_rights_t *needed,
+    const cap_rights_t *held)
 {
 	struct thread *td = curthread;
 	struct ktr_request *req;
@@ -826,9 +866,7 @@ ktrcapfail(type, needed, held)
 }
 
 void
-ktrfault(vaddr, type)
-	vm_offset_t vaddr;
-	int type;
+ktrfault(vm_offset_t vaddr, int type)
 {
 	struct thread *td = curthread;
 	struct ktr_request *req;
@@ -845,8 +883,7 @@ ktrfault(vaddr, type)
 }
 
 void
-ktrfaultend(result)
-	int result;
+ktrfaultend(int result)
 {
 	struct thread *td = curthread;
 	struct ktr_request *req;
@@ -875,9 +912,7 @@ ktrccall(struct pcb *pcb)
 	if (req == NULL)
 		return;
 	kc = &req->ktr_data.ktr_ccall;
-	cheri_serialize(&kc->ktr_pcc, &pcb->pcb_cheriframe.cf_c1);
-	cheri_serialize(&kc->ktr_idc, &pcb->pcb_cheriframe.cf_c2);
-	kc->ktr_method = pcb->pcb_regs.v0;
+	ktrccall_mdfill(pcb, kc);
 	ktr_enqueuerequest(td, req);
 	ktrace_exit(td);
 }
@@ -895,8 +930,7 @@ ktrcreturn(struct pcb *pcb)
 	if (req == NULL)
 		return;
 	kr = &req->ktr_data.ktr_creturn;
-	cheri_serialize(&kr->ktr_cret, &pcb->pcb_cheriframe.cf_c3);
-	kr->ktr_iret = pcb->pcb_regs.v0;
+	ktrcreturn_mdfill(pcb, kr);
 	ktr_enqueuerequest(td, req);
 	ktrace_exit(td);
 }
@@ -904,54 +938,15 @@ ktrcreturn(struct pcb *pcb)
 void
 ktrcexception(struct trapframe *frame)
 {
-	struct cheri_frame *cheriframe;
 	struct thread *td = curthread;
 	struct ktr_request *req;
 	struct ktr_cexception *ke;
-	register_t cause;
-
-	/* XXXRW: awkward and unmaintainable pointer construction. */
-	cheriframe = &(((struct pcb *)frame)->pcb_cheriframe);
-
-	cause = cheriframe->cf_capcause;
 
 	req = ktr_getrequest(KTR_CEXCEPTION);
 	if (req == NULL)
 		return;
 	ke = &req->ktr_data.ktr_cexception;
-	ke->ktr_exccode = (cause & CHERI_CAPCAUSE_EXCCODE_MASK) >>
-	    CHERI_CAPCAUSE_EXCCODE_SHIFT;
-	ke->ktr_regnum = cause & CHERI_CAPCAUSE_REGNUM_MASK;
-	cheri_serialize(&ke->ktr_cap,
-	    ke->ktr_regnum == CHERI_CR_C0 ? &cheriframe->cf_c0 :
-	    ke->ktr_regnum == CHERI_CR_C1 ? &cheriframe->cf_c1 :
-	    ke->ktr_regnum == CHERI_CR_C2 ? &cheriframe->cf_c2 :
-	    ke->ktr_regnum == CHERI_CR_C3 ? &cheriframe->cf_c3 :
-	    ke->ktr_regnum == CHERI_CR_C4 ? &cheriframe->cf_c4 :
-	    ke->ktr_regnum == CHERI_CR_C5 ? &cheriframe->cf_c5 :
-	    ke->ktr_regnum == CHERI_CR_C6 ? &cheriframe->cf_c6 :
-	    ke->ktr_regnum == CHERI_CR_C7 ? &cheriframe->cf_c7 :
-	    ke->ktr_regnum == CHERI_CR_C8 ? &cheriframe->cf_c8 :
-	    ke->ktr_regnum == CHERI_CR_C9 ? &cheriframe->cf_c9 :
-	    ke->ktr_regnum == CHERI_CR_C10 ? &cheriframe->cf_c10 :
-	    ke->ktr_regnum == CHERI_CR_C11 ? &cheriframe->cf_c11 :
-	    ke->ktr_regnum == CHERI_CR_C12 ? &cheriframe->cf_c12 :
-	    ke->ktr_regnum == CHERI_CR_C13 ? &cheriframe->cf_c13 :
-	    ke->ktr_regnum == CHERI_CR_C14 ? &cheriframe->cf_c14 :
-	    ke->ktr_regnum == CHERI_CR_C15 ? &cheriframe->cf_c15 :
-	    ke->ktr_regnum == CHERI_CR_C16 ? &cheriframe->cf_c16 :
-	    ke->ktr_regnum == CHERI_CR_C17 ? &cheriframe->cf_c17 :
-	    ke->ktr_regnum == CHERI_CR_C18 ? &cheriframe->cf_c18 :
-	    ke->ktr_regnum == CHERI_CR_C19 ? &cheriframe->cf_c19 :
-	    ke->ktr_regnum == CHERI_CR_C20 ? &cheriframe->cf_c20 :
-	    ke->ktr_regnum == CHERI_CR_C21 ? &cheriframe->cf_c21 :
-	    ke->ktr_regnum == CHERI_CR_C22 ? &cheriframe->cf_c22 :
-	    ke->ktr_regnum == CHERI_CR_C23 ? &cheriframe->cf_c23 :
-	    ke->ktr_regnum == CHERI_CR_C24 ? &cheriframe->cf_c24 :
-	    ke->ktr_regnum == CHERI_CR_C25 ? &cheriframe->cf_c25 :
-	    ke->ktr_regnum == CHERI_CR_IDC ? &cheriframe->cf_idc :
-	    NULL);
-
+	ktrcexception_mdfill(frame, ke);
 	ktr_enqueuerequest(td, req);
 	ktrace_exit(td);
 }
@@ -1001,22 +996,28 @@ struct ktrace_args {
 #endif
 /* ARGSUSED */
 int
-sys_ktrace(td, uap)
-	struct thread *td;
-	register struct ktrace_args *uap;
+sys_ktrace(struct thread *td, struct ktrace_args *uap)
+{
+
+	return (kern_ktrace(td, __USER_CAP_STR(uap->fname), uap->ops,
+	    uap->facs, uap->pid));
+}
+
+int
+kern_ktrace(struct thread *td, const char * __capability fname, int uops,
+    int ufacs, int pid)
 {
 #ifdef KTRACE
-	register struct vnode *vp = NULL;
-	register struct proc *p;
+	struct vnode *vp = NULL;
+	struct proc *p;
 	struct pgrp *pg;
-	int facs = uap->facs & ~KTRFAC_ROOT;
-	int ops = KTROP(uap->ops);
-	int descend = uap->ops & KTRFLAG_DESCEND;
+	int facs = ufacs & ~KTRFAC_ROOT;
+	int ops = KTROP(uops);
+	int descend = uops & KTRFLAG_DESCEND;
 	int nfound, ret = 0;
 	int flags, error = 0;
 	struct nameidata nd;
 	struct ucred *cred;
-
 	/*
 	 * Need something to (un)trace.
 	 */
@@ -1028,7 +1029,7 @@ sys_ktrace(td, uap)
 		/*
 		 * an operation which requires a file argument.
 		 */
-		NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_USERSPACE, uap->fname, td);
+		NDINIT_C(&nd, LOOKUP, NOFOLLOW, UIO_USERSPACE, fname, td);
 		flags = FREAD | FWRITE | O_NOFOLLOW;
 		error = vn_open(&nd, &flags, 0, NULL);
 		if (error) {
@@ -1077,11 +1078,11 @@ sys_ktrace(td, uap)
 	 * do it
 	 */
 	sx_slock(&proctree_lock);
-	if (uap->pid < 0) {
+	if (pid < 0) {
 		/*
 		 * by process group
 		 */
-		pg = pgfind(-uap->pid);
+		pg = pgfind(-pid);
 		if (pg == NULL) {
 			sx_sunlock(&proctree_lock);
 			error = ESRCH;
@@ -1115,7 +1116,7 @@ sys_ktrace(td, uap)
 		/*
 		 * by pid
 		 */
-		p = pfind(uap->pid);
+		p = pfind(pid);
 		if (p == NULL)
 			error = ESRCH;
 		else
@@ -1146,33 +1147,38 @@ done:
 
 /* ARGSUSED */
 int
-sys_utrace(td, uap)
-	struct thread *td;
-	register struct utrace_args *uap;
+sys_utrace(struct thread *td, struct utrace_args *uap)
 {
 
+	return (kern_utrace(td, __USER_CAP(uap->addr, uap->len),
+	    uap->len));
+}
+
+int
+kern_utrace(struct thread *td, const void * __capability addr, size_t len)
+{
 #ifdef KTRACE
 	struct ktr_request *req;
-	void *cp;
+	void * __capability cp;
 	int error;
 
 	if (!KTRPOINT(td, KTR_USER))
 		return (0);
-	if (uap->len > KTR_USER_MAXLEN)
+	if (len > KTR_USER_MAXLEN)
 		return (EINVAL);
-	cp = malloc(uap->len, M_KTRACE, M_WAITOK);
-	error = copyin(uap->addr, cp, uap->len);
+	cp = malloc_c(len, M_KTRACE, M_WAITOK);
+	error = copyin_c(addr, cp, len);
 	if (error) {
-		free(cp, M_KTRACE);
+		free_c(cp, M_KTRACE);
 		return (error);
 	}
 	req = ktr_getrequest(KTR_USER);
 	if (req == NULL) {
-		free(cp, M_KTRACE);
+		free_c(cp, M_KTRACE);
 		return (ENOMEM);
 	}
-	req->ktr_buffer = cp;
-	req->ktr_header.ktr_len = uap->len;
+	req->ktr_buffer = (__cheri_fromcap void *)cp;
+	req->ktr_header.ktr_len = len;
 	ktr_submitrequest(td, req);
 	return (0);
 #else /* !KTRACE */
@@ -1182,11 +1188,7 @@ sys_utrace(td, uap)
 
 #ifdef KTRACE
 static int
-ktrops(td, p, ops, facs, vp)
-	struct thread *td;
-	struct proc *p;
-	int ops, facs;
-	struct vnode *vp;
+ktrops(struct thread *td, struct proc *p, int ops, int facs, struct vnode *vp)
 {
 	struct vnode *tracevp = NULL;
 	struct ucred *tracecred = NULL;
@@ -1237,14 +1239,11 @@ ktrops(td, p, ops, facs, vp)
 }
 
 static int
-ktrsetchildren(td, top, ops, facs, vp)
-	struct thread *td;
-	struct proc *top;
-	int ops, facs;
-	struct vnode *vp;
+ktrsetchildren(struct thread *td, struct proc *top, int ops, int facs,
+    struct vnode *vp)
 {
-	register struct proc *p;
-	register int ret = 0;
+	struct proc *p;
+	int ret = 0;
 
 	p = top;
 	PROC_LOCK_ASSERT(p, MA_OWNED);
@@ -1280,7 +1279,7 @@ ktr_writerequest(struct thread *td, struct ktr_request *req)
 	struct proc *p;
 	struct ucred *cred;
 	struct uio auio;
-	struct iovec aiov[3];
+	kiovec_t aiov[3];
 	struct mount *mp;
 	int datalen, buflen, vrele_count;
 	int error;
@@ -1312,8 +1311,7 @@ ktr_writerequest(struct thread *td, struct ktr_request *req)
 	mtx_unlock(&ktrace_mtx);
 
 	kth = &req->ktr_header;
-	KASSERT(((u_short)kth->ktr_type & ~KTR_DROP) <
-	    sizeof(data_lengths) / sizeof(data_lengths[0]),
+	KASSERT(((u_short)kth->ktr_type & ~KTR_DROP) < nitems(data_lengths),
 	    ("data_lengths array overflow"));
 	datalen = data_lengths[(u_short)kth->ktr_type & ~KTR_DROP];
 	buflen = kth->ktr_len;
@@ -1321,22 +1319,19 @@ ktr_writerequest(struct thread *td, struct ktr_request *req)
 	auio.uio_offset = 0;
 	auio.uio_segflg = UIO_SYSSPACE;
 	auio.uio_rw = UIO_WRITE;
-	aiov[0].iov_base = (caddr_t)kth;
-	aiov[0].iov_len = sizeof(struct ktr_header);
+	IOVEC_INIT(&aiov[0], kth, sizeof(struct ktr_header));
 	auio.uio_resid = sizeof(struct ktr_header);
 	auio.uio_iovcnt = 1;
 	auio.uio_td = td;
 	if (datalen != 0) {
-		aiov[1].iov_base = (caddr_t)&req->ktr_data;
-		aiov[1].iov_len = datalen;
+		IOVEC_INIT(&aiov[1], &req->ktr_data, datalen);
 		auio.uio_resid += datalen;
 		auio.uio_iovcnt++;
 		kth->ktr_len += datalen;
 	}
 	if (buflen != 0) {
 		KASSERT(req->ktr_buffer != NULL, ("ktrace: nothing to write"));
-		aiov[auio.uio_iovcnt].iov_base = req->ktr_buffer;
-		aiov[auio.uio_iovcnt].iov_len = buflen;
+		IOVEC_INIT(&aiov[auio.uio_iovcnt], req->ktr_buffer, buflen);
 		auio.uio_resid += buflen;
 		auio.uio_iovcnt++;
 	}
@@ -1405,9 +1400,7 @@ ktr_writerequest(struct thread *td, struct ktr_request *req)
  * so, only root may further change it.
  */
 static int
-ktrcanset(td, targetp)
-	struct thread *td;
-	struct proc *targetp;
+ktrcanset(struct thread *td, struct proc *targetp)
 {
 
 	PROC_LOCK_ASSERT(targetp, MA_OWNED);

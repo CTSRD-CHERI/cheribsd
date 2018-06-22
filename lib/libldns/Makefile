@@ -1,8 +1,9 @@
 # $FreeBSD$
 
 # Vendor sources and generated files
-LDNSDIR = ${.CURDIR}/../../contrib/ldns
+LDNSDIR = ${SRCTOP}/contrib/ldns
 
+PACKAGE=lib${LIB}
 .PATH: ${LDNSDIR} ${LDNSDIR}/compat
 
 LIB=	ldns

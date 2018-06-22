@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -32,15 +34,9 @@
  */
 #ifndef _SYS_SOCKBUF_H_
 #define _SYS_SOCKBUF_H_
-#include <sys/selinfo.h>		/* for struct selinfo */
-#include <sys/_lock.h>
-#include <sys/_mutex.h>
-#include <sys/_sx.h>
-
-#define	SB_MAX		(2*1024*1024)	/* default for max chars in sockbuf */
 
 /*
- * Constants for sb_flags field of struct sockbuf.
+ * Constants for sb_flags field of struct sockbuf/xsockbuf.
  */
 #define	SB_WAIT		0x04		/* someone is waiting for data/space */
 #define	SB_SEL		0x08		/* someone is selecting */
@@ -53,59 +49,63 @@
 #define	SB_IN_TOE	0x400		/* socket buffer is in the middle of an operation */
 #define	SB_AUTOSIZE	0x800		/* automatically size socket buffer */
 #define	SB_STOP		0x1000		/* backpressure indicator */
+#define	SB_AIO_RUNNING	0x2000		/* AIO operation running */
 
 #define	SBS_CANTSENDMORE	0x0010	/* can't send more data to peer */
 #define	SBS_CANTRCVMORE		0x0020	/* can't receive more data from peer */
 #define	SBS_RCVATMARK		0x0040	/* at mark on input */
 
+#if defined(_KERNEL) || defined(_WANT_SOCKET)
+#include <sys/_lock.h>
+#include <sys/_mutex.h>
+#include <sys/_sx.h>
+#include <sys/_task.h>
+
+#define	SB_MAX		(2*1024*1024)	/* default for max chars in sockbuf */
+
 struct mbuf;
 struct sockaddr;
 struct socket;
 struct thread;
-
-struct	xsockbuf {
-	u_int	sb_cc;
-	u_int	sb_hiwat;
-	u_int	sb_mbcnt;
-	u_int   sb_mcnt;
-	u_int   sb_ccnt;
-	u_int	sb_mbmax;
-	int	sb_lowat;
-	int	sb_timeo;
-	short	sb_flags;
-};
+struct selinfo;
 
 /*
  * Variables for socket buffering.
+ *
+ * Locking key to struct sockbuf:
+ * (a) locked by SOCKBUF_LOCK().
  */
 struct	sockbuf {
-	struct	selinfo sb_sel;	/* process selecting read/write */
-	struct	mtx sb_mtx;	/* sockbuf lock */
-	struct	sx sb_sx;	/* prevent I/O interlacing */
-	short	sb_state;	/* (c/d) socket state on sockbuf */
+	struct	mtx sb_mtx;		/* sockbuf lock */
+	struct	sx sb_sx;		/* prevent I/O interlacing */
+	struct	selinfo *sb_sel;	/* process selecting read/write */
+	short	sb_state;	/* (a) socket state on sockbuf */
 #define	sb_startzero	sb_mb
-	struct	mbuf *sb_mb;	/* (c/d) the mbuf chain */
-	struct	mbuf *sb_mbtail; /* (c/d) the last mbuf in the chain */
-	struct	mbuf *sb_lastrecord;	/* (c/d) first mbuf of last
+	struct	mbuf *sb_mb;	/* (a) the mbuf chain */
+	struct	mbuf *sb_mbtail; /* (a) the last mbuf in the chain */
+	struct	mbuf *sb_lastrecord;	/* (a) first mbuf of last
 					 * record in socket buffer */
-	struct	mbuf *sb_sndptr; /* (c/d) pointer into mbuf chain */
-	struct	mbuf *sb_fnrdy;	/* (c/d) pointer to first not ready buffer */
-	u_int	sb_sndptroff;	/* (c/d) byte offset of ptr into chain */
-	u_int	sb_acc;		/* (c/d) available chars in buffer */
-	u_int	sb_ccc;		/* (c/d) claimed chars in buffer */
-	u_int	sb_hiwat;	/* (c/d) max actual char count */
-	u_int	sb_mbcnt;	/* (c/d) chars of mbufs used */
-	u_int   sb_mcnt;        /* (c/d) number of mbufs in buffer */
-	u_int   sb_ccnt;        /* (c/d) number of clusters in buffer */
-	u_int	sb_mbmax;	/* (c/d) max chars of mbufs to use */
-	u_int	sb_ctl;		/* (c/d) non-data chars in buffer */
-	int	sb_lowat;	/* (c/d) low water mark */
-	sbintime_t	sb_timeo;	/* (c/d) timeout for read/write */
-	short	sb_flags;	/* (c/d) flags, see below */
-	int	(*sb_upcall)(struct socket *, void *, int); /* (c/d) */
-	void	*sb_upcallarg;	/* (c/d) */
+	struct	mbuf *sb_sndptr; /* (a) pointer into mbuf chain */
+	struct	mbuf *sb_fnrdy;	/* (a) pointer to first not ready buffer */
+	u_int	sb_sndptroff;	/* (a) byte offset of ptr into chain */
+	u_int	sb_acc;		/* (a) available chars in buffer */
+	u_int	sb_ccc;		/* (a) claimed chars in buffer */
+	u_int	sb_hiwat;	/* (a) max actual char count */
+	u_int	sb_mbcnt;	/* (a) chars of mbufs used */
+	u_int   sb_mcnt;        /* (a) number of mbufs in buffer */
+	u_int   sb_ccnt;        /* (a) number of clusters in buffer */
+	u_int	sb_mbmax;	/* (a) max chars of mbufs to use */
+	u_int	sb_ctl;		/* (a) non-data chars in buffer */
+	int	sb_lowat;	/* (a) low water mark */
+	sbintime_t	sb_timeo;	/* (a) timeout for read/write */
+	short	sb_flags;	/* (a) flags, see below */
+	int	(*sb_upcall)(struct socket *, void *, int); /* (a) */
+	void	*sb_upcallarg;	/* (a) */
+	TAILQ_HEAD(, kaiocb) sb_aiojobq; /* (a) pending AIO ops */
+	struct	task sb_aiotask; /* AIO task */
 };
 
+#endif	/* defined(_KERNEL) || defined(_WANT_SOCKET) */
 #ifdef _KERNEL
 
 /*
@@ -160,15 +160,13 @@ void	sbflush_locked(struct sockbuf *sb);
 void	sbrelease(struct sockbuf *sb, struct socket *so);
 void	sbrelease_internal(struct sockbuf *sb, struct socket *so);
 void	sbrelease_locked(struct sockbuf *sb, struct socket *so);
-int	sbreserve(struct sockbuf *sb, u_long cc, struct socket *so,
-	    struct thread *td);
+int	sbsetopt(struct socket *so, int cmd, u_long cc);
 int	sbreserve_locked(struct sockbuf *sb, u_long cc, struct socket *so,
 	    struct thread *td);
 struct mbuf *
 	sbsndptr(struct sockbuf *sb, u_int off, u_int len, u_int *moff);
 struct mbuf *
 	sbsndmbuf(struct sockbuf *sb, u_int off, u_int *moff);
-void	sbtoxsockbuf(struct sockbuf *sb, struct xsockbuf *xsb);
 int	sbwait(struct sockbuf *sb);
 int	sblock(struct sockbuf *sb, int flags);
 void	sbunlock(struct sockbuf *sb);

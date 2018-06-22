@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2004-2007 Nate Lawson (SDG)
  * All rights reserved.
  *
@@ -259,6 +261,9 @@ cf_set_method(device_t dev, const struct cf_level *level, int priority)
 	CF_MTX_LOCK(&sc->lock);
 
 #ifdef SMP
+#ifdef EARLY_AP_STARTUP
+	MPASS(mp_ncpus == 1 || smp_started);
+#else
 	/*
 	 * If still booting and secondary CPUs not started yet, don't allow
 	 * changing the frequency until they're online.  This is because we
@@ -271,6 +276,7 @@ cf_set_method(device_t dev, const struct cf_level *level, int priority)
 		error = ENXIO;
 		goto out;
 	}
+#endif
 #endif /* SMP */
 
 	/*

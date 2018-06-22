@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2013 Robert N. M. Watson
+ * Copyright (c) 2013, 2016-2017 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -32,8 +32,8 @@
 #include <sys/exec.h>
 #include <sys/sysctl.h>
 
-#include <machine/cheri.h>
-#include <machine/cheric.h>
+#include <cheri/cheri.h>
+#include <cheri/cheric.h>
 
 #include <err.h>
 #include <errno.h>
@@ -43,9 +43,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "cheri_invoke.h"
+#include "libcheri_invoke.h"
+#include "libcheri_init.h"
 #include "libcheri_stat.h"
-#include "sandbox.h"
+#include "libcheri_sandbox.h"
 
 /*
  * The sandbox statistic mechanism tracks active sandbox classes, methods, and
@@ -127,7 +128,7 @@ static struct sandbox_method_stat
 static struct sandbox_object_stat
     sandbox_object_stats[SANDBOX_OBJECT_STAT_MAX];
 
-__attribute__ ((constructor)) static void
+void
 sandbox_stat_init(void)
 {
 	struct ps_strings *ps_strings;

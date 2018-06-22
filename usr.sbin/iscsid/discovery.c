@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2012 The FreeBSD Foundation
  * All rights reserved.
  *
@@ -205,6 +207,18 @@ discovery(struct connection *conn)
 
 	log_debugx("removing temporary discovery session");
 	kernel_remove(conn);
+
+#ifdef ICL_KERNEL_PROXY
+	if (conn->conn_conf.isc_iser == 1) {
+		/*
+		 * If we're going through the proxy, the kernel already
+		 * sent Logout PDU for us and destroyed the session,
+		 * so we can't send anything anymore.
+		 */
+		log_debugx("discovery session done");
+		return;
+	}
+#endif
 
 	log_debugx("discovery done; logging out");
 	request = logout_new_request(conn);

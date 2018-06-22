@@ -127,21 +127,7 @@ platform_mp_setmaxid(void)
 
 	/* Armada38x family supports maximum 2 cores */
 	mp_ncpus = platform_cnt_cpus();
-	mp_maxid = 1;
-}
-
-int
-platform_mp_probe(void)
-{
-
-	return (mp_ncpus > 1);
-}
-
-void
-platform_mp_init_secondary(void)
-{
-
-	intr_pic_init_secondary();
+	mp_maxid = mp_ncpus - 1;
 }
 
 void
@@ -156,11 +142,4 @@ platform_mp_start_ap(void)
 
 	/* Release CPU1 from reset */
 	cpu_reset_deassert();
-}
-
-void
-platform_ipi_send(cpuset_t cpus, u_int ipi)
-{
-
-	pic_ipi_send(cpus, ipi);
 }

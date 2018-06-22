@@ -12,22 +12,29 @@
 //
 //===----------------------------------------------------------------------===//
 
-
 #ifndef LLVM_CLANG_LEX_MODULEMAP_H
 #define LLVM_CLANG_LEX_MODULEMAP_H
 
 #include "clang/Basic/LangOptions.h"
 #include "clang/Basic/Module.h"
+#include "clang/Basic/SourceLocation.h"
 #include "clang/Basic/SourceManager.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/PointerIntPair.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/ADT/Twine.h"
+#include <algorithm>
+#include <memory>
 #include <string>
+#include <utility>
 
 namespace clang {
-  
+
 class DirectoryEntry;
 class FileEntry;
 class FileManager;
@@ -35,6 +42,34 @@ class DiagnosticConsumer;
 class DiagnosticsEngine;
 class HeaderSearch;
 class ModuleMapParser;
+
+/// \brief A mechanism to observe the actions of the module map parser as it
+/// reads module map files.
+class ModuleMapCallbacks {
+public:
+  virtual ~ModuleMapCallbacks() = default;
+
+  /// \brief Called when a module map file has been read.
+  ///
+  /// \param FileStart A SourceLocation referring to the start of the file's
+  /// contents.
+  /// \param File The file itself.
+  /// \param IsSystem Whether this is a module map from a system include path.
+  virtual void moduleMapFileRead(SourceLocation FileStart,
+                                 const FileEntry &File, bool IsSystem) {}
+
+  /// \brief Called when a header is added during module map parsing.
+  ///
+  /// \param Filename The header file itself.
+  virtual void moduleMapAddHeader(StringRef Filename) {}
+
+  /// \brief Called when an umbrella header is added during module map parsing.
+  ///
+  /// \param FileMgr FileManager instance
+  /// \param Header The umbrella header to collect.
+  virtual void moduleMapAddUmbrellaHeader(FileManager *FileMgr,
+                                          const FileEntry *Header) {}
+};
   
 class ModuleMap {
   SourceManager &SourceMgr;
@@ -42,6 +77,8 @@ class ModuleMap {
   const LangOptions &LangOpts;
   const TargetInfo *Target;
   HeaderSearch &HeaderInfo;
+
+  llvm::SmallVector<std::unique_ptr<ModuleMapCallbacks>, 1> Callbacks;
   
   /// \brief The directory used for Clang-supplied, builtin include headers,
   /// such as "stdint.h".
@@ -52,15 +89,10 @@ class ModuleMap {
   /// These are always simple C language options.
   LangOptions MMapLangOpts;
 
-  // The module that we are building; related to \c LangOptions::CurrentModule.
-  Module *CompilingModule;
-
-public:
-  // The module that the .cc source file is associated with.
+  // The module that the main source file is associated with (the module
+  // named LangOpts::CurrentModule, if we've loaded it).
   Module *SourceModule;
-  std::string SourceModuleName;
 
-private:
   /// \brief The top-level modules that are known.
   llvm::StringMap<Module *> Modules;
 
@@ -85,6 +117,11 @@ public:
     // Adjust ModuleMap::addHeader.
   };
 
+  /// Convert a header kind to a role. Requires Kind to not be HK_Excluded.
+  static ModuleHeaderRole headerKindToRole(Module::HeaderKind Kind);
+  /// Convert a header role to a kind.
+  static Module::HeaderKind headerRoleToKind(ModuleHeaderRole Role);
+
   /// \brief A header that is known to reside within a given module,
   /// whether it was included or excluded.
   class KnownHeader {
@@ -93,6 +130,13 @@ public:
   public:
     KnownHeader() : Storage(nullptr, NormalHeader) { }
     KnownHeader(Module *M, ModuleHeaderRole Role) : Storage(M, Role) { }
+
+    friend bool operator==(const KnownHeader &A, const KnownHeader &B) {
+      return A.Storage == B.Storage;
+    }
+    friend bool operator!=(const KnownHeader &A, const KnownHeader &B) {
+      return A.Storage != B.Storage;
+    }
 
     /// \brief Retrieve the module the header is stored in.
     Module *getModule() const { return Storage.getPointer(); }
@@ -105,6 +149,12 @@ public:
       return getModule()->isAvailable();
     }
 
+    /// \brief Whether this header is accessible from the specified module.
+    bool isAccessibleFrom(Module *M) const {
+      return !(getRole() & PrivateHeader) ||
+             (M && M->getTopLevelModule() == getModule()->getTopLevelModule());
+    }
+
     // \brief Whether this known header is valid (i.e., it has an
     // associated module).
     explicit operator bool() const {
@@ -115,13 +165,19 @@ public:
   typedef llvm::SmallPtrSet<const FileEntry *, 1> AdditionalModMapsSet;
 
 private:
-  typedef llvm::DenseMap<const FileEntry *, SmallVector<KnownHeader, 1> >
+  typedef llvm::DenseMap<const FileEntry *, SmallVector<KnownHeader, 1>>
   HeadersMap;
 
   /// \brief Mapping from each header to the module that owns the contents of
   /// that header.
   HeadersMap Headers;
-  
+
+  /// Map from file sizes to modules with lazy header directives of that size.
+  mutable llvm::DenseMap<off_t, llvm::TinyPtrVector<Module*>> LazyHeadersBySize;
+  /// Map from mtimes to modules with lazy header directives with those mtimes.
+  mutable llvm::DenseMap<time_t, llvm::TinyPtrVector<Module*>>
+              LazyHeadersByModTime;
+
   /// \brief Mapping from directories with umbrella headers to the module
   /// that is generated from the umbrella header.
   ///
@@ -132,7 +188,8 @@ private:
 
   /// \brief The set of attributes that can be attached to a module.
   struct Attributes {
-    Attributes() : IsSystem(), IsExternC(), IsExhaustive() {}
+    Attributes()
+        : IsSystem(), IsExternC(), IsExhaustive(), NoUndeclaredIncludes() {}
 
     /// \brief Whether this is a system module.
     unsigned IsSystem : 1;
@@ -142,6 +199,10 @@ private:
 
     /// \brief Whether this is an exhaustive set of configuration macros.
     unsigned IsExhaustive : 1;
+
+    /// \brief Whether files in this module can only include non-modular headers
+    /// and headers from used modules.
+    unsigned NoUndeclaredIncludes : 1;
   };
 
   /// \brief A directory for which framework modules can be inferred.
@@ -208,6 +269,31 @@ private:
   /// resolved.
   Module *resolveModuleId(const ModuleId &Id, Module *Mod, bool Complain) const;
 
+  /// Add an unresolved header to a module.
+  void addUnresolvedHeader(Module *Mod,
+                           Module::UnresolvedHeaderDirective Header);
+
+  /// Look up the given header directive to find an actual header file.
+  ///
+  /// \param M The module in which we're resolving the header directive.
+  /// \param Header The header directive to resolve.
+  /// \param RelativePathName Filled in with the relative path name from the
+  ///        module to the resolved header.
+  /// \return The resolved file, if any.
+  const FileEntry *findHeader(Module *M,
+                              const Module::UnresolvedHeaderDirective &Header,
+                              SmallVectorImpl<char> &RelativePathName);
+
+  /// Resolve the given header directive.
+  void resolveHeader(Module *M,
+                     const Module::UnresolvedHeaderDirective &Header);
+
+  /// Attempt to resolve the specified header directive as naming a builtin
+  /// header.
+  /// \return \c true if a corresponding builtin header was found.
+  bool resolveAsBuiltinHeader(Module *M,
+                              const Module::UnresolvedHeaderDirective &Header);
+
   /// \brief Looks up the modules that \p File corresponds to.
   ///
   /// If \p File represents a builtin header within Clang's builtin include
@@ -223,6 +309,10 @@ private:
   /// searched before finding \p File.
   KnownHeader findHeaderInUmbrellaDirs(const FileEntry *File,
                     SmallVectorImpl<const DirectoryEntry *> &IntermediateDirs);
+
+  /// \brief Given that \p File is not in the Headers map, look it up within
+  /// umbrella directories and find or create a module for it.
+  KnownHeader findOrCreateModuleForHeaderInUmbrellaDir(const FileEntry *File);
 
   /// \brief A convenience method to determine if \p File is (possibly nested)
   /// in an umbrella directory.
@@ -263,18 +353,58 @@ public:
     BuiltinIncludeDir = Dir;
   }
 
+  /// \brief Get the directory that contains Clang-supplied include files.
+  const DirectoryEntry *getBuiltinDir() const {
+    return BuiltinIncludeDir;
+  }
+
+  /// \brief Is this a compiler builtin header?
+  static bool isBuiltinHeader(StringRef FileName);
+
+  /// \brief Add a module map callback.
+  void addModuleMapCallbacks(std::unique_ptr<ModuleMapCallbacks> Callback) {
+    Callbacks.push_back(std::move(Callback));
+  }
+
   /// \brief Retrieve the module that owns the given header file, if any.
   ///
   /// \param File The header file that is likely to be included.
   ///
+  /// \param AllowTextual If \c true and \p File is a textual header, return
+  /// its owning module. Otherwise, no KnownHeader will be returned if the
+  /// file is only known as a textual header.
+  ///
   /// \returns The module KnownHeader, which provides the module that owns the
   /// given header file.  The KnownHeader is default constructed to indicate
   /// that no module owns this header file.
-  KnownHeader findModuleForHeader(const FileEntry *File);
+  KnownHeader findModuleForHeader(const FileEntry *File,
+                                  bool AllowTextual = false);
+
+  /// \brief Retrieve all the modules that contain the given header file. This
+  /// may not include umbrella modules, nor information from external sources,
+  /// if they have not yet been inferred / loaded.
+  ///
+  /// Typically, \ref findModuleForHeader should be used instead, as it picks
+  /// the preferred module for the header.
+  ArrayRef<KnownHeader> findAllModulesForHeader(const FileEntry *File) const;
+
+  /// Resolve all lazy header directives for the specified file.
+  ///
+  /// This ensures that the HeaderFileInfo on HeaderSearch is up to date. This
+  /// is effectively internal, but is exposed so HeaderSearch can call it.
+  void resolveHeaderDirectives(const FileEntry *File) const;
+
+  /// Resolve all lazy header directives for the specified module.
+  void resolveHeaderDirectives(Module *Mod) const;
 
   /// \brief Reports errors if a module must not include a specific file.
   ///
   /// \param RequestingModule The module including a file.
+  ///
+  /// \param RequestingModuleIsModuleInterface \c true if the inclusion is in
+  ///        the interface of RequestingModule, \c false if it's in the
+  ///        implementation of RequestingModule. Value is ignored and
+  ///        meaningless if RequestingModule is nullptr.
   ///
   /// \param FilenameLoc The location of the inclusion's filename.
   ///
@@ -282,6 +412,7 @@ public:
   ///
   /// \param File The included file.
   void diagnoseHeaderInclusion(Module *RequestingModule,
+                               bool RequestingModuleIsModuleInterface,
                                SourceLocation FilenameLoc, StringRef Filename,
                                const FileEntry *File);
 
@@ -340,6 +471,15 @@ public:
   std::pair<Module *, bool> findOrCreateModule(StringRef Name, Module *Parent,
                                                bool IsFramework,
                                                bool IsExplicit);
+
+  /// \brief Create a new module for a C++ Modules TS module interface unit.
+  /// The module must not already exist, and will be configured for the current
+  /// compilation.
+  ///
+  /// Note that this also sets the current module to the newly-created module.
+  ///
+  /// \returns The newly-created module.
+  Module *createModuleForInterfaceUnit(SourceLocation Loc, StringRef Name);
 
   /// \brief Infer the contents of a framework module map from the given
   /// framework directory.
@@ -413,16 +553,6 @@ public:
   /// false otherwise.
   bool resolveConflicts(Module *Mod, bool Complain);
 
-  /// \brief Infers the (sub)module based on the given source location and
-  /// source manager.
-  ///
-  /// \param Loc The location within the source that we are querying, along
-  /// with its source manager.
-  ///
-  /// \returns The module that owns this source location, or null if no
-  /// module owns this source location.
-  Module *inferModuleFromLocation(FullSourceLoc Loc);
-  
   /// \brief Sets the umbrella header of the given module to the given
   /// header.
   void setUmbrellaHeader(Module *Mod, const FileEntry *UmbrellaHeader,
@@ -436,7 +566,7 @@ public:
   /// \brief Adds this header to the given module.
   /// \param Role The role of the header wrt the module.
   void addHeader(Module *Mod, Module::Header Header,
-                 ModuleHeaderRole Role);
+                 ModuleHeaderRole Role, bool Imported = false);
 
   /// \brief Marks this header as being excluded from the given module.
   void excludeHeader(Module *Mod, Module::Header Header);
@@ -452,14 +582,20 @@ public:
   /// \param HomeDir The directory in which relative paths within this module
   ///        map file will be resolved.
   ///
+  /// \param ID The FileID of the file to process, if we've already entered it.
+  ///
+  /// \param Offset [inout] On input the offset at which to start parsing. On
+  ///        output, the offset at which the module map terminated.
+  ///
   /// \param ExternModuleLoc The location of the "extern module" declaration
   ///        that caused us to load this module map file, if any.
   ///
   /// \returns true if an error occurred, false otherwise.
   bool parseModuleMapFile(const FileEntry *File, bool IsSystem,
-                          const DirectoryEntry *HomeDir,
+                          const DirectoryEntry *HomeDir, FileID ID = FileID(),
+                          unsigned *Offset = nullptr,
                           SourceLocation ExternModuleLoc = SourceLocation());
-    
+
   /// \brief Dump the contents of the module map, for debugging purposes.
   void dump();
   
@@ -468,5 +604,6 @@ public:
   module_iterator module_end()   const { return Modules.end(); }
 };
   
-}
-#endif
+} // end namespace clang
+
+#endif // LLVM_CLANG_LEX_MODULEMAP_H

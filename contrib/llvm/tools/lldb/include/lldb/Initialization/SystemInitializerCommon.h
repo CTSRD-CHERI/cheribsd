@@ -12,8 +12,7 @@
 
 #include "SystemInitializer.h"
 
-namespace lldb_private
-{
+namespace lldb_private {
 //------------------------------------------------------------------
 /// Initializes common lldb functionality.
 ///
@@ -24,15 +23,15 @@ namespace lldb_private
 /// an instance of SystemLifetimeManager with this class passed to
 /// the constructor.
 //------------------------------------------------------------------
-class SystemInitializerCommon : public SystemInitializer
-{
-  public:
-    SystemInitializerCommon();
-    virtual ~SystemInitializerCommon();
+class SystemInitializerCommon : public SystemInitializer {
+public:
+  SystemInitializerCommon();
+  ~SystemInitializerCommon() override;
 
-    void Initialize() override;
-    void Terminate() override;
+  void Initialize() override;
+  void Terminate() override;
 };
-}
 
-#endif
+} // namespace lldb_private
+
+#endif // LLDB_INITIALIZATION_SYSTEM_INITIALIZER_COMMON_H

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011 Jakub Wojciech Klama <jceel@FreeBSD.org>
  * All rights reserved.
  *
@@ -73,8 +75,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/gpio.h>
 
 #include <machine/bus.h>
-#include <machine/cpu.h>
-#include <machine/cpufunc.h>
 #include <machine/resource.h>
 #include <machine/intr.h>
 #include <machine/fdt.h>
@@ -520,7 +520,7 @@ lpc_gpio_get_state(device_t dev, int pin, int *state)
 }
 
 void
-lpc_gpio_init()
+lpc_gpio_init(void)
 {
 	bus_space_tag_t bst;
 	bus_space_handle_t bsh;

@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1980, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -58,6 +60,7 @@ __FBSDID("$FreeBSD$");
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
+#include <libufs.h>
 
 #include "fsck.h"
 
@@ -184,7 +187,7 @@ bufinit(void)
 
 	pbp = pdirbp = (struct bufarea *)0;
 	bufp = Malloc((unsigned int)sblock.fs_bsize);
-	if (bufp == 0)
+	if (bufp == NULL)
 		errx(EEXIT, "cannot allocate buffer pool");
 	cgblk.b_un.b_buf = bufp;
 	initbarea(&cgblk, BT_CYLGRP);
@@ -349,6 +352,20 @@ flush(int fd, struct bufarea *bp)
 
 	if (!bp->b_dirty)
 		return;
+	/*
+	 * Calculate any needed check hashes.
+	 */
+	switch (bp->b_type) {
+	case BT_CYLGRP:
+		if ((sblock.fs_metackhash & CK_CYLGRP) == 0)
+			break;
+		bp->b_un.b_cg->cg_ckhash = 0;
+		bp->b_un.b_cg->cg_ckhash =
+		    calculate_crc32c(~0L, bp->b_un.b_buf, bp->b_size);
+		break;
+	default:
+		break;
+	}
 	bp->b_dirty = 0;
 	if (fswritefd < 0) {
 		pfatal("WRITING IN READ_ONLY MODE.\n");
@@ -365,8 +382,7 @@ flush(int fd, struct bufarea *bp)
 	for (i = 0, j = 0; i < sblock.fs_cssize; i += sblock.fs_bsize, j++) {
 		blwrite(fswritefd, (char *)sblock.fs_csp + i,
 		    fsbtodb(&sblock, sblock.fs_csaddr + j * sblock.fs_frag),
-		    sblock.fs_cssize - i < sblock.fs_bsize ?
-		    sblock.fs_cssize - i : sblock.fs_bsize);
+		    MIN(sblock.fs_cssize - i, sblock.fs_bsize));
 	}
 }
 
@@ -673,7 +689,7 @@ blzero(int fd, ufs2_daddr_t blk, long size)
 	if (lseek(fd, offset, 0) < 0)
 		rwerror("SEEK BLK", blk);
 	while (size > 0) {
-		len = size > ZEROBUFSIZE ? ZEROBUFSIZE : size;
+		len = MIN(ZEROBUFSIZE, size);
 		if (write(fd, zero, len) != len)
 			rwerror("WRITE BLK", blk);
 		blk += len / dev_bsize;
@@ -718,8 +734,7 @@ check_cgmagic(int cg, struct bufarea *cgbp)
 	cgp->cg_magic = CG_MAGIC;
 	cgp->cg_cgx = cg;
 	cgp->cg_niblk = sblock.fs_ipg;
-	cgp->cg_initediblk = sblock.fs_ipg < 2 * INOPB(&sblock) ?
-	    sblock.fs_ipg : 2 * INOPB(&sblock);
+	cgp->cg_initediblk = MIN(sblock.fs_ipg, 2 * INOPB(&sblock));
 	if (cgbase(&sblock, cg) + sblock.fs_fpg < sblock.fs_size)
 		cgp->cg_ndblk = sblock.fs_fpg;
 	else
@@ -856,7 +871,7 @@ getpathname(char *namebuf, ino_t curdir, ino_t ino)
 	struct inodesc idesc;
 	static int busy = 0;
 
-	if (curdir == ino && ino == ROOTINO) {
+	if (curdir == ino && ino == UFS_ROOTINO) {
 		(void)strcpy(namebuf, "/");
 		return;
 	}
@@ -874,7 +889,7 @@ getpathname(char *namebuf, ino_t curdir, ino_t ino)
 		idesc.id_parent = curdir;
 		goto namelookup;
 	}
-	while (ino != ROOTINO) {
+	while (ino != UFS_ROOTINO) {
 		idesc.id_number = ino;
 		idesc.id_func = findino;
 		idesc.id_name = strdup("..");
@@ -891,12 +906,12 @@ getpathname(char *namebuf, ino_t curdir, ino_t ino)
 		cp -= len;
 		memmove(cp, namebuf, (size_t)len);
 		*--cp = '/';
-		if (cp < &namebuf[MAXNAMLEN])
+		if (cp < &namebuf[UFS_MAXNAMLEN])
 			break;
 		ino = idesc.id_number;
 	}
 	busy = 0;
-	if (ino != ROOTINO)
+	if (ino != UFS_ROOTINO)
 		*--cp = '?';
 	memmove(namebuf, cp, (size_t)(&namebuf[MAXPATHLEN] - cp));
 }

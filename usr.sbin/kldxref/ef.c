@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2000, Boris Popov
  * All rights reserved.
  *
@@ -47,7 +49,7 @@
 
 #include "ef.h"
 
-#define	MAXSEGS 2
+#define	MAXSEGS 3
 struct ef_file {
 	char*		ef_name;
 	struct elf_file *ef_efile;
@@ -600,7 +602,7 @@ ef_open(const char *filename, struct elf_file *efile, int verbose)
 			    filename);
 			break;
 		} else if (nsegs > MAXSEGS) {
-			warnx("%s: too many sections", filename);
+			warnx("%s: too many segments", filename);
 			break;
 		}
 		ef->ef_nsegs = nsegs;

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2002-2003
  * 	Hidetoshi Shimokawa. All rights reserved.
  *
@@ -307,10 +309,6 @@ fwe_init(void *arg)
 		xferq->bulkxfer = (struct fw_bulkxfer *) malloc(
 			sizeof(struct fw_bulkxfer) * xferq->bnchunk,
 							M_FWE, M_WAITOK);
-		if (xferq->bulkxfer == NULL) {
-			printf("if_fwe: malloc failed\n");
-			return;
-		}
 		STAILQ_INIT(&xferq->stvalid);
 		STAILQ_INIT(&xferq->stfree);
 		STAILQ_INIT(&xferq->stdma);
@@ -359,7 +357,7 @@ fwe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int s, error;
 
 	switch (cmd) {
-		case SIOCSIFFLAGS:
+		CASE_IOC_IFREQ(SIOCSIFFLAGS):
 			s = splimp();
 			if (ifp->if_flags & IFF_UP) {
 				if (!(ifp->if_drv_flags & IFF_DRV_RUNNING))
@@ -372,8 +370,8 @@ fwe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ifp->if_flags |= IFF_PROMISC;
 			splx(s);
 			break;
-		case SIOCADDMULTI:
-		case SIOCDELMULTI:
+		CASE_IOC_IFREQ(SIOCADDMULTI):
+		CASE_IOC_IFREQ(SIOCDELMULTI):
 			break;
 
 		case SIOCGIFSTATUS:
@@ -383,13 +381,13 @@ fwe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			    "\tch %d dma %d\n",	fwe->stream_ch, fwe->dma_ch);
 			splx(s);
 			break;
-		case SIOCSIFCAP:
+		CASE_IOC_IFREQ(SIOCSIFCAP):
 #ifdef DEVICE_POLLING
 		    {
 			struct ifreq *ifr = (struct ifreq *) data;
 			struct firewire_comm *fc = fwe->fd.fc;
 
-			if (ifr->ifr_reqcap & IFCAP_POLLING &&
+			if (ifr_reqcap_get(ifr) & IFCAP_POLLING &&
 			    !(ifp->if_capenable & IFCAP_POLLING)) {
 				error = ether_poll_register(fwe_poll, ifp);
 				if (error)
@@ -397,16 +395,14 @@ fwe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				/* Disable interrupts */
 				fc->set_intr(fc, 0);
 				ifp->if_capenable |= IFCAP_POLLING;
-				ifp->if_capenable |= IFCAP_POLLING_NOCOUNT;
 				return (error);
 			}
-			if (!(ifr->ifr_reqcap & IFCAP_POLLING) &&
+			if (!(ifr_reqcap_get(ifr) & IFCAP_POLLING) &&
 			    ifp->if_capenable & IFCAP_POLLING) {
 				error = ether_poll_deregister(ifp);
 				/* Enable interrupts. */
 				fc->set_intr(fc, 1);
 				ifp->if_capenable &= ~IFCAP_POLLING;
-				ifp->if_capenable &= ~IFCAP_POLLING_NOCOUNT;
 				return (error);
 			}
 		    }

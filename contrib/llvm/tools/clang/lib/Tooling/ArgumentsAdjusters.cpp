@@ -13,15 +13,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/Tooling/ArgumentsAdjusters.h"
-#include "clang/Basic/LLVM.h"
-#include "llvm/ADT/StringRef.h"
 
 namespace clang {
 namespace tooling {
 
-/// Add -fsyntax-only option to the commnand line arguments.
+/// Add -fsyntax-only option to the command line arguments.
 ArgumentsAdjuster getClangSyntaxOnlyAdjuster() {
-  return [](const CommandLineArguments &Args) {
+  return [](const CommandLineArguments &Args, StringRef /*unused*/) {
     CommandLineArguments AdjustedArgs;
     for (size_t i = 0, e = Args.size(); i != e; ++i) {
       StringRef Arg = Args[i];
@@ -36,7 +34,7 @@ ArgumentsAdjuster getClangSyntaxOnlyAdjuster() {
 }
 
 ArgumentsAdjuster getClangStripOutputAdjuster() {
-  return [](const CommandLineArguments &Args) {
+  return [](const CommandLineArguments &Args, StringRef /*unused*/) {
     CommandLineArguments AdjustedArgs;
     for (size_t i = 0, e = Args.size(); i < e; ++i) {
       StringRef Arg = Args[i];
@@ -44,7 +42,7 @@ ArgumentsAdjuster getClangStripOutputAdjuster() {
         AdjustedArgs.push_back(Args[i]);
 
       if (Arg == "-o") {
-        // Output is specified as -o foo. Skip the next argument also.
+        // Output is specified as -o foo. Skip the next argument too.
         ++i;
       }
       // Else, the output is specified as -ofoo. Just do nothing.
@@ -53,9 +51,29 @@ ArgumentsAdjuster getClangStripOutputAdjuster() {
   };
 }
 
+ArgumentsAdjuster getClangStripDependencyFileAdjuster() {
+  return [](const CommandLineArguments &Args, StringRef /*unused*/) {
+    CommandLineArguments AdjustedArgs;
+    for (size_t i = 0, e = Args.size(); i < e; ++i) {
+      StringRef Arg = Args[i];
+      // All dependency-file options begin with -M. These include -MM,
+      // -MF, -MG, -MP, -MT, -MQ, -MD, and -MMD.
+      if (!Arg.startswith("-M"))
+        AdjustedArgs.push_back(Args[i]);
+
+      if ((Arg == "-MF") || (Arg == "-MT") || (Arg == "-MQ") ||
+          (Arg == "-MD") || (Arg == "-MMD")) {
+        // Output is specified as -MX foo. Skip the next argument also.
+        ++i;
+      }
+    }
+    return AdjustedArgs;
+  };
+}
+
 ArgumentsAdjuster getInsertArgumentAdjuster(const CommandLineArguments &Extra,
                                             ArgumentInsertPosition Pos) {
-  return [Extra, Pos](const CommandLineArguments &Args) {
+  return [Extra, Pos](const CommandLineArguments &Args, StringRef /*unused*/) {
     CommandLineArguments Return(Args);
 
     CommandLineArguments::iterator I;
@@ -78,11 +96,10 @@ ArgumentsAdjuster getInsertArgumentAdjuster(const char *Extra,
 
 ArgumentsAdjuster combineAdjusters(ArgumentsAdjuster First,
                                    ArgumentsAdjuster Second) {
-  return [First, Second](const CommandLineArguments &Args) {
-    return Second(First(Args));
+  return [First, Second](const CommandLineArguments &Args, StringRef File) {
+    return Second(First(Args, File), File);
   };
 }
 
 } // end namespace tooling
 } // end namespace clang
-

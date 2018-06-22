@@ -19,6 +19,16 @@
  * $FreeBSD$
  *
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sys/param.h>
 #include <netinet/in.h>
@@ -102,9 +112,6 @@
 #include "ether.h"
 #include "netgraph.h"
 #endif
-#ifndef NOATM
-#include "atm.h"
-#endif
 #include "tcpmss.h"
 
 static int physical_DescriptorWrite(struct fdescriptor *, struct bundle *,
@@ -132,10 +139,6 @@ struct {
 #ifdef EXPERIMENTAL_NETGRAPH
   { ng_Create, ng_iov2device, ng_DeviceSize },
 #endif
-#endif
-#ifndef NOATM
-  /* Ditto for ATM devices */
-  { atm_Create, atm_iov2device, atm_DeviceSize },
 #endif
   { tcp_Create, tcp_iov2device, tcp_DeviceSize },
   { udp_Create, udp_iov2device, udp_DeviceSize },
@@ -691,7 +694,7 @@ physical2iov(struct physical *p, struct iovec *iov, int *niov, int maxiov,
     timer_Stop(&p->link.ccp.fsm.StoppedTimer);
     if (p->handler) {
       h = p->handler;
-      p->handler = (struct device *)(long)p->handler->type;
+      p->handler = (struct device *)(intptr_t)p->handler->type;
     }
 
     if (Enabled(p->dl->bundle, OPT_KEEPSESSION) ||

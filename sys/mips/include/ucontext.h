@@ -1,4 +1,6 @@
 /*
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -13,7 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -44,7 +46,7 @@
 #endif
 
 #if defined(COMPAT_CHERIABI) || defined(__CHERI_PURE_CAPABILITY__)
-#include <machine/cheri.h>
+#include <cheri/cheri.h>
 #endif
 
 typedef struct	__mcontext {
@@ -54,13 +56,13 @@ typedef struct	__mcontext {
 	 * struct sigcontext and ucontext_t at the same time.
 	 */
 	int		mc_onstack;	/* sigstack state to restore */
-	register_t	mc_pc;		/* pc at time of signal */
-	register_t	mc_regs[32];	/* processor regs 0 to 31 */
-	register_t	sr;		/* status register */
-	register_t	mullo, mulhi;	/* mullo and mulhi registers... */
+	__register_t	mc_pc;		/* pc at time of signal */
+	__register_t	mc_regs[32];	/* processor regs 0 to 31 */
+	__register_t	sr;		/* status register */
+	__register_t	mullo, mulhi;	/* mullo and mulhi registers... */
 	int		mc_fpused;	/* fp has been used */
 	f_register_t	mc_fpregs[33];	/* fp regs 0 to 31 and csr */
-	register_t	mc_fpc_eir;	/* fp exception instruction reg */
+	__register_t	mc_fpc_eir;	/* fp exception instruction reg */
 	void		*mc_tls;	/* pointer to TLS area */
 	__register_t	cause;		/* cause register */
 
@@ -132,16 +134,16 @@ typedef struct	__mcontext_c {
 	int		mc_fpused;	/* fp has been used */
 	f_register_t	mc_fpregs[33];	/* fp regs 0 to 31 and csr */
 	register_t	mc_fpc_eir;	/* fp exception instruction reg */
-	struct chericap	mc_tls;		/* pointer to TLS area */
+	void * __capability	mc_tls;		/* pointer to TLS area */
 	__register_t	cause;		/* cause register */
 	struct cheri_frame	mc_cheriframe;	/* capability registers */
-	struct chericap	__spare__[8];
+	void * __capability	__spare__[8];
 } mcontext_c_t;
 
 typedef struct __ucontext_c {
 	sigset_t		uc_sigmask;
 	mcontext_c_t		uc_mcontext;
-	struct chericap		uc_link;
+	void * __capability	uc_link;
 	cheriabi_stack_t	uc_stack;
 	int			uc_flags;
 	int			__spare__[4];

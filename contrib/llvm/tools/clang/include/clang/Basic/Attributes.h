@@ -11,7 +11,7 @@
 #define LLVM_CLANG_BASIC_ATTRIBUTES_H
 
 #include "clang/Basic/LangOptions.h"
-#include "llvm/ADT/Triple.h"
+#include "clang/Basic/TargetInfo.h"
 
 namespace clang {
 
@@ -22,6 +22,8 @@ enum class AttrSyntax {
   GNU,
   /// Is the identifier known as a __declspec-style attribute?
   Declspec,
+  /// Is the identifier known as a [] Microsoft-style attribute?
+  Microsoft,
   // Is the identifier known as a C++-style attribute?
   CXX,
   // Is the identifier known as a pragma attribute?
@@ -31,7 +33,7 @@ enum class AttrSyntax {
 /// \brief Return the version number associated with the attribute if we
 /// recognize and implement the attribute specified by the given information.
 int hasAttribute(AttrSyntax Syntax, const IdentifierInfo *Scope,
-                 const IdentifierInfo *Attr, const llvm::Triple &T,
+                 const IdentifierInfo *Attr, const TargetInfo &Target,
                  const LangOptions &LangOpts);
 
 } // end namespace clang

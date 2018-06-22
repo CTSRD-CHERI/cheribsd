@@ -33,6 +33,8 @@
 
 #include <machine/armreg.h>
 
+void pan_enable(void);
+
 static __inline void
 breakpoint(void)
 {
@@ -119,12 +121,16 @@ clrex(void)
 	__asm __volatile("clrex" : : : "memory");
 }
 
+extern int64_t dcache_line_size;
+extern int64_t icache_line_size;
+extern int64_t idcache_line_size;
+extern int64_t dczva_line_size;
+
 #define	cpu_nullop()			arm64_nullop()
 #define	cpufunc_nullop()		arm64_nullop()
 #define	cpu_setttb(a)			arm64_setttb(a)
 
 #define	cpu_tlb_flushID()		arm64_tlb_flushID()
-#define	cpu_tlb_flushID_SE(e)		arm64_tlb_flushID_SE(e)
 
 #define	cpu_dcache_wbinv_range(a, s)	arm64_dcache_wbinv_range((a), (s))
 #define	cpu_dcache_inv_range(a, s)	arm64_dcache_inv_range((a), (s))

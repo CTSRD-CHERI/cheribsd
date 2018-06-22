@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1997,1998 Maxim Bolotin and Oleg Sharoiko.
  * All rights reserved.
  *
@@ -180,7 +182,7 @@ wait_eeprom_ready(struct cs_softc *sc)
 	 *
 	 * Before we issue the command, we should be !busy, so that will
 	 * be fast.  The datasheet suggests that clock out from the part
-	 * per word will be on the order of 25us, which is consistant with
+	 * per word will be on the order of 25us, which is consistent with
 	 * the 1MHz serial clock and 16bits...  We should never hit 100,
 	 * let alone 15,000 here.  The original code did an unconditional
 	 * 30ms DELAY here.  Bad Kharma.  cs_readreg takes ~2us.
@@ -406,8 +408,8 @@ cs_alloc_port(device_t dev, int rid, int size)
 	struct cs_softc *sc = device_get_softc(dev);
 	struct resource *res;
 
-	res = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
-	    0ul, ~0ul, size, RF_ACTIVE);
+	res = bus_alloc_resource_anywhere(dev, SYS_RES_IOPORT, &rid,
+	    size, RF_ACTIVE);
 	if (res == NULL)
 		return (ENOENT);
 	sc->port_rid = rid;
@@ -1038,7 +1040,7 @@ cs_setmode(struct cs_softc *sc)
 }
 
 static int
-cs_ioctl(register struct ifnet *ifp, u_long command, caddr_t data)
+cs_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 {
 	struct cs_softc *sc=ifp->if_softc;
 	struct ifreq *ifr = (struct ifreq *)data;
@@ -1049,7 +1051,7 @@ cs_ioctl(register struct ifnet *ifp, u_long command, caddr_t data)
 #endif
 
 	switch (command) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		/*
 		 * Switch interface state between "running" and
 		 * "stopped", reflecting the UP flag.
@@ -1074,8 +1076,8 @@ cs_ioctl(register struct ifnet *ifp, u_long command, caddr_t data)
 		CS_UNLOCK(sc);
 		break;
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 	    /*
 	     * Multicast list has changed; set the hardware filter
 	     * accordingly.
@@ -1088,7 +1090,7 @@ cs_ioctl(register struct ifnet *ifp, u_long command, caddr_t data)
 	    error = 0;
 	    break;
 
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->media, command);
 		break;

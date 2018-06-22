@@ -38,41 +38,16 @@ __FBSDID("$FreeBSD$");
 #include <vm/pmap.h>
 
 #include <machine/intr.h>
+#include <machine/platformvar.h>
 #include <machine/smp.h>
 
 #include <dev/ofw/openfirm.h>
 #include <dev/ofw/ofw_cpu.h>
 #include <dev/psci/psci.h>
 
+#include <arm/qemu/virt_mp.h>
+
 static int running_cpus;
-
-int
-platform_mp_probe(void)
-{
-
-	return (mp_ncpus > 1);
-}
-
-static boolean_t
-virt_maxid(u_int id, phandle_t node, u_int addr_cells, pcell_t *reg)
-{
-
-	if (mp_maxid < id)
-		mp_maxid = id;
-
-	return (true);
-}
-
-void
-platform_mp_setmaxid(void)
-{
-
-	mp_maxid = PCPU_GET(cpuid);
-	mp_ncpus = ofw_cpu_early_foreach(virt_maxid, true);
-	if (mp_ncpus < 1)
-		mp_ncpus = 1;
-	mp_ncpus = MIN(mp_ncpus, MAXCPU);
-}
 
 static boolean_t
 virt_start_ap(u_int id, phandle_t node, u_int addr_cells, pcell_t *reg)
@@ -92,22 +67,8 @@ virt_start_ap(u_int id, phandle_t node, u_int addr_cells, pcell_t *reg)
 }
 
 void
-platform_mp_start_ap(void)
+virt_mp_start_ap(platform_t plat)
 {
 
 	ofw_cpu_early_foreach(virt_start_ap, true);
-}
-
-void
-platform_mp_init_secondary(void)
-{
-
-	intr_pic_init_secondary();
-}
-
-void
-platform_ipi_send(cpuset_t cpus, u_int ipi)
-{
-
-	pic_ipi_send(cpus, ipi);
 }

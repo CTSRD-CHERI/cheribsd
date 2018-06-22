@@ -29,6 +29,8 @@
 __FBSDID("$FreeBSD$");
 
 #include "opt_acpi.h"
+#include "opt_pci.h"
+
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -59,6 +61,7 @@ struct acpi_hpcib_softc {
     device_t		ap_dev;
     ACPI_HANDLE		ap_handle;
     int			ap_flags;
+    uint32_t		ap_osc_ctl;
 
     int			ap_segment;	/* PCI domain */
     int			ap_bus;		/* bios-assigned bus number */
@@ -103,6 +106,8 @@ static int		acpi_pcib_acpi_release_resource(device_t dev,
 			    struct resource *r);
 #endif
 #endif
+static int		acpi_pcib_request_feature(device_t pcib, device_t dev,
+			    enum pci_feature feature);
 
 static device_method_t acpi_pcib_acpi_methods[] = {
     /* Device interface */
@@ -130,6 +135,7 @@ static device_method_t acpi_pcib_acpi_methods[] = {
     DEVMETHOD(bus_deactivate_resource,	bus_generic_deactivate_resource),
     DEVMETHOD(bus_setup_intr,		bus_generic_setup_intr),
     DEVMETHOD(bus_teardown_intr,	bus_generic_teardown_intr),
+    DEVMETHOD(bus_get_cpus,		acpi_pcib_get_cpus),
 
     /* pcib interface */
     DEVMETHOD(pcib_maxslots,		pcib_maxslots),
@@ -142,6 +148,7 @@ static device_method_t acpi_pcib_acpi_methods[] = {
     DEVMETHOD(pcib_release_msix,	pcib_release_msix),
     DEVMETHOD(pcib_map_msi,		acpi_pcib_map_msi),
     DEVMETHOD(pcib_power_for_sleep,	acpi_pcib_power_for_sleep),
+    DEVMETHOD(pcib_request_feature,	acpi_pcib_request_feature),
 
     DEVMETHOD_END
 };
@@ -296,6 +303,58 @@ first_decoded_bus(struct acpi_hpcib_softc *sc, rman_res_t *startp)
 #endif
 
 static int
+acpi_pcib_osc(struct acpi_hpcib_softc *sc, uint32_t osc_ctl)
+{
+	ACPI_STATUS status;
+	uint32_t cap_set[3];
+
+	static uint8_t pci_host_bridge_uuid[ACPI_UUID_LENGTH] = {
+		0x5b, 0x4d, 0xdb, 0x33, 0xf7, 0x1f, 0x1c, 0x40,
+		0x96, 0x57, 0x74, 0x41, 0xc0, 0x3d, 0xd7, 0x66
+	};
+
+	/*
+	 * Don't invoke _OSC if a control is already granted.
+	 * However, always invoke _OSC during attach when 0 is passed.
+	 */
+	if (osc_ctl != 0 && (sc->ap_osc_ctl & osc_ctl) == osc_ctl)
+		return (0);
+
+	/* Support Field: Extended PCI Config Space, MSI */
+	cap_set[PCI_OSC_SUPPORT] = PCIM_OSC_SUPPORT_EXT_PCI_CONF |
+	    PCIM_OSC_SUPPORT_MSI;
+
+	/* Control Field */
+	cap_set[PCI_OSC_CTL] = sc->ap_osc_ctl | osc_ctl;
+
+	status = acpi_EvaluateOSC(sc->ap_handle, pci_host_bridge_uuid, 1,
+	    nitems(cap_set), cap_set, cap_set, false);
+	if (ACPI_FAILURE(status)) {
+		if (status == AE_NOT_FOUND) {
+			sc->ap_osc_ctl |= osc_ctl;
+			return (0);
+		}
+		device_printf(sc->ap_dev, "_OSC failed: %s\n",
+		    AcpiFormatException(status));
+		return (EIO);
+	}
+
+	/*
+	 * _OSC may return an error in the status word, but will
+	 * update the control mask always.  _OSC should not revoke
+	 * previously-granted controls.
+	 */
+	if ((cap_set[PCI_OSC_CTL] & sc->ap_osc_ctl) != sc->ap_osc_ctl)
+		device_printf(sc->ap_dev, "_OSC revoked %#x\n",
+		    (cap_set[PCI_OSC_CTL] & sc->ap_osc_ctl) ^ sc->ap_osc_ctl);
+	sc->ap_osc_ctl = cap_set[PCI_OSC_CTL];
+	if ((sc->ap_osc_ctl & osc_ctl) != osc_ctl)
+		return (EIO);
+
+	return (0);
+}
+
+static int
 acpi_pcib_acpi_attach(device_t dev)
 {
     struct acpi_hpcib_softc	*sc;
@@ -320,6 +379,8 @@ acpi_pcib_acpi_attach(device_t dev)
      */
     if (!acpi_DeviceIsPresent(dev))
 	return (ENXIO);
+
+    acpi_pcib_osc(sc, 0);
 
     /*
      * Get our segment number by evaluating _SEG.
@@ -445,10 +506,17 @@ acpi_pcib_acpi_attach(device_t dev)
 		    pci_domain_release_bus(sc->ap_segment, dev, rid, bus_res);
 	    }
     } else {
-#ifdef INVARIANTS
-	    if (first_decoded_bus(sc, &start) == 0)
-		    KASSERT(start == sc->ap_bus, ("bus number mismatch"));
-#endif
+	    /*
+	     * Require the bus number from _BBN to match the start of any
+	     * decoded range.
+	     */
+	    if (first_decoded_bus(sc, &start) == 0 && sc->ap_bus != start) {
+		    device_printf(dev,
+		"bus number %d does not match start of decoded range %ju\n",
+			sc->ap_bus, (uintmax_t)start);
+		    pcib_host_res_free(dev, &sc->ap_host_res);
+		    return (ENXIO);
+	    }
     }
 #else
     /*
@@ -467,7 +535,17 @@ acpi_pcib_acpi_attach(device_t dev)
     if (sc->ap_segment == 0 && sc->ap_bus == 0)
 	    bus0_seen = 1;
 
-    return (acpi_pcib_attach(dev, &sc->ap_prt, sc->ap_bus));
+    acpi_pcib_fetch_prt(dev, &sc->ap_prt);
+
+    bus_generic_probe(dev);
+    if (device_add_child(dev, "pci", -1) == NULL) {
+	device_printf(device_get_parent(dev), "couldn't attach pci bus\n");
+#if defined(NEW_PCIB) && defined(PCI_RES_BUS)
+	pcib_host_res_free(dev, &sc->ap_host_res);
+#endif
+	return (ENXIO);
+    }
+    return (bus_generic_attach(dev));
 }
 
 /*
@@ -653,3 +731,25 @@ acpi_pcib_acpi_release_resource(device_t dev, device_t child, int type, int rid,
 }
 #endif
 #endif
+
+static int
+acpi_pcib_request_feature(device_t pcib, device_t dev, enum pci_feature feature)
+{
+	uint32_t osc_ctl;
+	struct acpi_hpcib_softc *sc;
+
+	sc = device_get_softc(pcib);
+
+	switch (feature) {
+	case PCI_FEATURE_HP:
+		osc_ctl = PCIM_OSC_CTL_PCIE_HP;
+		break;
+	case PCI_FEATURE_AER:
+		osc_ctl = PCIM_OSC_CTL_PCIE_AER;
+		break;
+	default:
+		return (EINVAL);
+	}
+
+	return (acpi_pcib_osc(sc, osc_ctl));
+}

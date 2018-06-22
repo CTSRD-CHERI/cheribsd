@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011 Mikolaj Golub
  * Copyright (c) 2015 Allan Jude <allanjude@freebsd.org>
  * All rights reserved.
@@ -47,7 +49,7 @@
 static struct {
 	const char *name;
 	const char *suffix;
-} rlimit_param[14] = {
+} rlimit_param[15] = {
 	{"cputime",          "sec"},
 	{"filesize",         "B  "},
 	{"datasize",         "B  "},
@@ -62,9 +64,10 @@ static struct {
 	{"pseudo-terminals", "   "},
 	{"swapuse",          "B  "},
 	{"kqueues",          "   "},
+	{"umtxp",            "   "},
 };
 
-#if RLIM_NLIMITS > 14
+#if RLIM_NLIMITS > 15
 #error "Resource limits have grown. Add new entries to rlimit_param[]."
 #endif
 
@@ -93,7 +96,7 @@ procstat_rlimit(struct procstat *prstat, struct kinfo_proc *kipp)
 	struct rlimit rlimit;
 	int i;
 
-	if (!hflag) {
+	if ((procstat_opts & PS_OPT_NOHEADER) == 0) {
 		xo_emit("{T:/%5s %-16s %-16s %16s %16s}\n",
 		    "PID", "COMM", "RLIMIT", "SOFT     ", "HARD     ");
 	}

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1999, 2000, 2001 Robert N. M. Watson
  * All rights reserved.
  *
@@ -31,9 +33,6 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
-#ifdef __CHERI_PURE_CAPABILITY__
-#include <sys/mman.h>
-#endif
 #include "namespace.h"
 #include <sys/acl.h>
 #include "un-namespace.h"
@@ -49,11 +48,7 @@ acl_free(void *obj_p)
 {
 
 	if (obj_p) {
-#ifndef __CHERI_PURE_CAPABILITY__
 		free(obj_p);
-#else
-		munmap(obj_p, sizeof(struct acl_t_struct));
-#endif
 		obj_p = NULL;
 	}
 

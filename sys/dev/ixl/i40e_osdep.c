@@ -1,6 +1,6 @@
 /******************************************************************************
 
-  Copyright (c) 2013-2014, Intel Corporation 
+  Copyright (c) 2013-2015, Intel Corporation 
   All rights reserved.
   
   Redistribution and use in source and binary forms, with or without 
@@ -32,7 +32,7 @@
 ******************************************************************************/
 /*$FreeBSD$*/
 
-#include <machine/stdarg.h>
+#include <sys/limits.h>
 
 #include "ixl.h"
 
@@ -137,7 +137,7 @@ void
 i40e_init_spinlock(struct i40e_spinlock *lock)
 {
 	mtx_init(&lock->mutex, "mutex",
-	    MTX_NETWORK_LOCK, MTX_DEF | MTX_DUPOK);
+	    "ixl spinlock", MTX_DEF | MTX_DUPOK);
 }
 
 void
@@ -155,26 +155,103 @@ i40e_release_spinlock(struct i40e_spinlock *lock)
 void
 i40e_destroy_spinlock(struct i40e_spinlock *lock)
 {
-	mtx_destroy(&lock->mutex);
+	if (mtx_initialized(&lock->mutex))
+		mtx_destroy(&lock->mutex);
+}
+
+void
+i40e_msec_pause(int msecs)
+{
+	int ticks_to_pause = (msecs * hz) / 1000;
+	int start_ticks = ticks;
+
+	if (cold || SCHEDULER_STOPPED()) {
+		i40e_msec_delay(msecs);
+		return;
+	}
+
+	while (1) {
+		kern_yield(PRI_USER);
+		int yielded_ticks = ticks - start_ticks;
+		if (yielded_ticks > ticks_to_pause)
+			break;
+		else if (yielded_ticks < 0
+		    && (yielded_ticks + INT_MAX + 1 > ticks_to_pause)) {
+			break;
+		}
+	}
 }
 
 /*
-** i40e_debug_d - OS dependent version of shared code debug printing
-*/
-void i40e_debug_d(void *hw, u32 mask, char *fmt, ...)
+ * Helper function for debug statement printing
+ */
+void
+i40e_debug_shared(struct i40e_hw *hw, enum i40e_debug_mask mask, char *fmt, ...)
 {
-        char buf[512];
-        va_list args;
+	va_list args;
+	device_t dev;
 
-        if (!(mask & ((struct i40e_hw *)hw)->debug_mask))
-                return;
+	if (!(mask & ((struct i40e_hw *)hw)->debug_mask))
+		return;
 
+	dev = ((struct i40e_osdep *)hw->back)->dev;
+
+	/* Re-implement device_printf() */
+	device_print_prettyname(dev);
 	va_start(args, fmt);
-        vsnprintf(buf, sizeof(buf), fmt, args);
+	vprintf(fmt, args);
 	va_end(args);
+}
 
-        /* the debug string is already formatted with a newline */
-        printf("%s", buf);
+const char *
+ixl_vc_opcode_str(uint16_t op)
+{
+	switch (op) {
+	case I40E_VIRTCHNL_OP_VERSION:
+		return ("VERSION");
+	case I40E_VIRTCHNL_OP_RESET_VF:
+		return ("RESET_VF");
+	case I40E_VIRTCHNL_OP_GET_VF_RESOURCES:
+		return ("GET_VF_RESOURCES");
+	case I40E_VIRTCHNL_OP_CONFIG_TX_QUEUE:
+		return ("CONFIG_TX_QUEUE");
+	case I40E_VIRTCHNL_OP_CONFIG_RX_QUEUE:
+		return ("CONFIG_RX_QUEUE");
+	case I40E_VIRTCHNL_OP_CONFIG_VSI_QUEUES:
+		return ("CONFIG_VSI_QUEUES");
+	case I40E_VIRTCHNL_OP_CONFIG_IRQ_MAP:
+		return ("CONFIG_IRQ_MAP");
+	case I40E_VIRTCHNL_OP_ENABLE_QUEUES:
+		return ("ENABLE_QUEUES");
+	case I40E_VIRTCHNL_OP_DISABLE_QUEUES:
+		return ("DISABLE_QUEUES");
+	case I40E_VIRTCHNL_OP_ADD_ETHER_ADDRESS:
+		return ("ADD_ETHER_ADDRESS");
+	case I40E_VIRTCHNL_OP_DEL_ETHER_ADDRESS:
+		return ("DEL_ETHER_ADDRESS");
+	case I40E_VIRTCHNL_OP_ADD_VLAN:
+		return ("ADD_VLAN");
+	case I40E_VIRTCHNL_OP_DEL_VLAN:
+		return ("DEL_VLAN");
+	case I40E_VIRTCHNL_OP_CONFIG_PROMISCUOUS_MODE:
+		return ("CONFIG_PROMISCUOUS_MODE");
+	case I40E_VIRTCHNL_OP_GET_STATS:
+		return ("GET_STATS");
+	case I40E_VIRTCHNL_OP_FCOE:
+		return ("FCOE");
+	case I40E_VIRTCHNL_OP_EVENT:
+		return ("EVENT");
+	case I40E_VIRTCHNL_OP_CONFIG_RSS_KEY:
+		return ("CONFIG_RSS_KEY");
+	case I40E_VIRTCHNL_OP_CONFIG_RSS_LUT:
+		return ("CONFIG_RSS_LUT");
+	case I40E_VIRTCHNL_OP_GET_RSS_HENA_CAPS:
+		return ("GET_RSS_HENA_CAPS");
+	case I40E_VIRTCHNL_OP_SET_RSS_HENA:
+		return ("SET_RSS_HENA");
+	default:
+		return ("UNKNOWN");
+	}
 }
 
 u16

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2010-2012 Semihalf
  * Copyright (c) 2008, 2009 Reinoud Zandijk
  * All rights reserved.
@@ -129,8 +131,8 @@ nandfs_reclaim(struct vop_reclaim_args *ap)
 static int
 nandfs_read(struct vop_read_args *ap)
 {
-	register struct vnode *vp = ap->a_vp;
-	register struct nandfs_node *node = VTON(vp);
+	struct vnode *vp = ap->a_vp;
+	struct nandfs_node *node = VTON(vp);
 	struct nandfs_device *nandfsdev = node->nn_nandfsdev;
 	struct uio *uio = ap->a_uio;
 	struct buf *bp;
@@ -1251,12 +1253,12 @@ nandfs_readdir(struct vop_readdir_args *ap)
 			diroffset += ndirent->rec_len;
 			blkoff += ndirent->rec_len;
 
-			/* Remember the last entry we transfered */
+			/* Remember the last entry we transferred */
 			transoffset = diroffset;
 		}
 		brelse(bp);
 
-		/* Pass on last transfered offset */
+		/* Pass on last transferred offset */
 		uio->uio_offset = transoffset;
 	}
 
@@ -1352,7 +1354,7 @@ nandfs_link(struct vop_link_args *ap)
 	struct nandfs_inode *inode = &node->nn_inode;
 	int error;
 
-	if (inode->i_links_count >= LINK_MAX)
+	if (inode->i_links_count >= NANDFS_LINK_MAX)
 		return (EMLINK);
 
 	if (inode->i_flags & (IMMUTABLE | APPEND))
@@ -1574,7 +1576,7 @@ abortit:
 	fdnode = VTON(fdvp);
 	fnode = VTON(fvp);
 
-	if (fnode->nn_inode.i_links_count >= LINK_MAX) {
+	if (fnode->nn_inode.i_links_count >= NANDFS_LINK_MAX) {
 		VOP_UNLOCK(fvp, 0);
 		error = EMLINK;
 		goto abortit;
@@ -1837,7 +1839,7 @@ nandfs_mkdir(struct vop_mkdir_args *ap)
 	if (nandfs_fs_full(dir_node->nn_nandfsdev))
 		return (ENOSPC);
 
-	if (dir_inode->i_links_count >= LINK_MAX)
+	if (dir_inode->i_links_count >= NANDFS_LINK_MAX)
 		return (EMLINK);
 
 	error = nandfs_node_create(nmp, &node, mode);
@@ -2211,7 +2213,7 @@ nandfs_whiteout(struct vop_whiteout_args *ap)
 		/* Create a new directory whiteout */
 #ifdef INVARIANTS
 		if ((cnp->cn_flags & SAVENAME) == 0)
-			panic("ufs_whiteout: missing name");
+			panic("nandfs_whiteout: missing name");
 #endif
 		error = nandfs_add_dirent(dvp, NANDFS_WHT_INO, cnp->cn_nameptr,
 		    cnp->cn_namelen, DT_WHT);
@@ -2237,16 +2239,16 @@ nandfs_pathconf(struct vop_pathconf_args *ap)
 	error = 0;
 	switch (ap->a_name) {
 	case _PC_LINK_MAX:
-		*ap->a_retval = LINK_MAX;
+		*ap->a_retval = NANDFS_LINK_MAX;
 		break;
 	case _PC_NAME_MAX:
-		*ap->a_retval = NAME_MAX;
-		break;
-	case _PC_PATH_MAX:
-		*ap->a_retval = PATH_MAX;
+		*ap->a_retval = NANDFS_NAME_LEN;
 		break;
 	case _PC_PIPE_BUF:
-		*ap->a_retval = PIPE_BUF;
+		if (ap->a_vp->v_type == VDIR || ap->a_vp->v_type == VFIFO)
+			*ap->a_retval = PIPE_BUF;
+		else
+			error = EINVAL;
 		break;
 	case _PC_CHOWN_RESTRICTED:
 		*ap->a_retval = 1;
@@ -2273,7 +2275,7 @@ nandfs_pathconf(struct vop_pathconf_args *ap)
 		*ap->a_retval = ap->a_vp->v_mount->mnt_stat.f_iosize;
 		break;
 	default:
-		error = EINVAL;
+		error = vop_stdpathconf(ap);
 		break;
 	}
 	return (error);
@@ -2418,6 +2420,7 @@ struct vop_vector nandfs_fifoops = {
 	.vop_close =		nandfsfifo_close,
 	.vop_getattr =		nandfs_getattr,
 	.vop_inactive =		nandfs_inactive,
+	.vop_pathconf =		nandfs_pathconf,
 	.vop_print =		nandfs_print,
 	.vop_read =		VOP_PANIC,
 	.vop_reclaim =		nandfs_reclaim,

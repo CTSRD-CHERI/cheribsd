@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1992, 1993
  *	Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -63,8 +65,10 @@ extern int	unit;	/* unit number for above */
 
 extern int	live;	/* true if we are examining a live system */
 
-int	fetch_stats(const char *sysctlname, u_long addr, void *stats,
-	    size_t len, int (*kreadfn)(u_long, void *, size_t));
+typedef	int kreadfn_t(u_long, void *, size_t);
+int	fetch_stats(const char *, u_long, void *, size_t, kreadfn_t);
+int	fetch_stats_ro(const char *, u_long, void *, size_t, kreadfn_t);
+
 int	kread(u_long addr, void *buf, size_t size);
 uint64_t kread_counter(u_long addr);
 int	kread_counters(u_long addr, void *buf, size_t size);
@@ -98,7 +102,16 @@ void	ah_stats(u_long, const char *, int, int);
 void	ipcomp_stats(u_long, const char *, int, int);
 #endif
 
+#ifdef INET
+struct in_addr;
+
+char	*inetname(struct in_addr *);
+#endif
+
 #ifdef INET6
+struct in6_addr;
+
+char	*inet6name(struct in6_addr *);
 void	ip6_stats(u_long, const char *, int, int);
 void	ip6_ifstats(char *);
 void	icmp6_stats(u_long, const char *, int, int);
@@ -129,7 +142,6 @@ void	intpr(void (*)(char *), int);
 
 void	pr_family(int);
 void	rt_stats(void);
-void	flowtable_stats(void);
 
 char	*routename(struct sockaddr *, int);
 const char *netname(struct sockaddr *, struct sockaddr *);

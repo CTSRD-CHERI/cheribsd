@@ -1,4 +1,4 @@
-/* $OpenBSD: auth.h,v 1.84 2015/05/08 06:41:56 djm Exp $ */
+/* $OpenBSD: auth.h,v 1.89 2016/08/13 17:47:41 markus Exp $ */
 
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
@@ -112,19 +112,11 @@ struct KbdintDevice
 	void	(*free_ctx)(void *ctx);
 };
 
-int      auth_rhosts(struct passwd *, const char *);
 int
 auth_rhosts2(struct passwd *, const char *, const char *, const char *);
 
-int	 auth_rhosts_rsa(Authctxt *, char *, Key *);
 int      auth_password(Authctxt *, const char *);
-int      auth_rsa(Authctxt *, BIGNUM *);
-int      auth_rsa_challenge_dialog(Key *);
-BIGNUM	*auth_rsa_generate_challenge(Key *);
-int	 auth_rsa_verify_response(Key *, BIGNUM *, u_char[]);
-int	 auth_rsa_key_allowed(struct passwd *, BIGNUM *, Key **);
 
-int	 auth_rhosts_rsa_key_allowed(struct passwd *, char *, char *, Key *);
 int	 hostbased_key_allowed(struct passwd *, const char *, char *, Key *);
 int	 user_key_allowed(struct passwd *, Key *, int);
 void	 pubkey_auth_info(Authctxt *, const Key *, const char *, ...)
@@ -155,7 +147,6 @@ void remove_kbdint_device(const char *);
 
 void disable_forwarding(void);
 
-void	do_authentication(Authctxt *);
 void	do_authentication2(Authctxt *);
 
 void	auth_info(Authctxt *authctxt, const char *, ...)
@@ -186,16 +177,14 @@ int	skey_respond(void *, u_int, char **);
 int	allowed_user(struct passwd *);
 struct passwd * getpwnamallow(const char *user);
 
-char	*get_challenge(Authctxt *);
-int	verify_response(Authctxt *, const char *);
-void	abandon_challenge_response(Authctxt *);
-
 char	*expand_authorized_keys(const char *, struct passwd *pw);
 char	*authorized_principals_file(struct passwd *);
 
 FILE	*auth_openkeyfile(const char *, struct passwd *, int);
 FILE	*auth_openprincipals(const char *, struct passwd *, int);
 int	 auth_key_is_revoked(Key *);
+
+const char	*auth_get_canonical_hostname(struct ssh *, int);
 
 HostStatus
 check_key_in_hostfiles(struct passwd *, Key *, const char *,
@@ -207,9 +196,8 @@ Key	*get_hostkey_public_by_index(int, struct ssh *);
 Key	*get_hostkey_public_by_type(int, int, struct ssh *);
 Key	*get_hostkey_private_by_type(int, int, struct ssh *);
 int	 get_hostkey_index(Key *, int, struct ssh *);
-int	 ssh1_session_key(BIGNUM *);
 int	 sshd_hostkey_sign(Key *, Key *, u_char **, size_t *,
-	     const u_char *, size_t, u_int);
+	     const u_char *, size_t, const char *, u_int);
 
 /* debug messages during authentication */
 void	 auth_debug_add(const char *fmt,...) __attribute__((format(printf, 1, 2)));

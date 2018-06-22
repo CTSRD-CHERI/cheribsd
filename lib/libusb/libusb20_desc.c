@@ -1,5 +1,7 @@
 /* $FreeBSD$ */
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2008 Hans Petter Selasky. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -135,7 +137,7 @@ libusb20_parse_config_desc(const void *config_desc)
 
 	/*
 	 * Make a copy of the config descriptor, so that the caller can free
-	 * the inital config descriptor pointer!
+	 * the initial config descriptor pointer!
 	 */
 	memcpy((void *)(lub_endpoint + nendpoint), config_desc, pcdesc.len);
 

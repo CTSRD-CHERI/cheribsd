@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1996-2000 Whistle Communications, Inc.
  * All rights reserved.
  *
@@ -259,10 +261,12 @@ static driver_t udbp_driver = {
 };
 
 static const STRUCT_USB_HOST_ID udbp_devs[] = {
+	{USB_VPI(USB_VENDOR_BELKIN, USB_PRODUCT_BELKIN_F5U258, 0)},
 	{USB_VPI(USB_VENDOR_NETCHIP, USB_PRODUCT_NETCHIP_TURBOCONNECT, 0)},
 	{USB_VPI(USB_VENDOR_NETCHIP, USB_PRODUCT_NETCHIP_GADGETZERO, 0)},
 	{USB_VPI(USB_VENDOR_PROLIFIC, USB_PRODUCT_PROLIFIC_PL2301, 0)},
 	{USB_VPI(USB_VENDOR_PROLIFIC, USB_PRODUCT_PROLIFIC_PL2302, 0)},
+	{USB_VPI(USB_VENDOR_PROLIFIC, USB_PRODUCT_PROLIFIC_PL27A1, 0)},
 	{USB_VPI(USB_VENDOR_ANCHOR, USB_PRODUCT_ANCHOR_EZLINK, 0)},
 	{USB_VPI(USB_VENDOR_GENESYS, USB_PRODUCT_GENESYS_GL620USB, 0)},
 };
@@ -744,7 +748,7 @@ ng_udbp_rcvdata(hook_p hook, item_p item)
 
 /*
  * Do local shutdown processing..
- * We are a persistant device, we refuse to go away, and
+ * We are a persistent device, we refuse to go away, and
  * only remove our links and reset ourself.
  */
 static int

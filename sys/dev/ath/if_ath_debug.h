@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2002-2009 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
@@ -69,6 +71,8 @@ enum {
 	ATH_DEBUG_NODE_PWRSAVE	= 0x800000000ULL,	/* node powersave */
 	ATH_DEBUG_DIVERSITY	= 0x1000000000ULL,	/* Diversity logic */
 	ATH_DEBUG_PWRSAVE	= 0x2000000000ULL,
+	ATH_DEBUG_BTCOEX	= 0x4000000000ULL,	/* BT Coex */
+	ATH_DEBUG_QUIETIE	= 0x8000000000ULL,	/* Quiet time handling */
 
 	ATH_DEBUG_ANY		= 0xffffffffffffffffULL
 };
@@ -92,9 +96,9 @@ enum {
 extern uint64_t ath_debug;
 
 #define	IFF_DUMPPKTS(sc, m)	(sc->sc_debug & (m))
-#define	DPRINTF(sc, m, fmt, ...) do {				\
+#define	DPRINTF(sc, m, ...) do {				\
 	if (sc->sc_debug & (m))					\
-		device_printf(sc->sc_dev, fmt, __VA_ARGS__);		\
+		device_printf(sc->sc_dev, __VA_ARGS__);		\
 } while (0)
 #define	KEYPRINTF(sc, ix, hk, mac) do {				\
 	if (sc->sc_debug & ATH_DEBUG_KEYCACHE)			\

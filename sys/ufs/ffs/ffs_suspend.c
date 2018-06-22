@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2012 The FreeBSD Foundation
  * All rights reserved.
  *
@@ -97,7 +99,7 @@ ffs_susp_rdwr(struct cdev *dev, struct uio *uio, int ioflag)
 	struct mount *mp;
 	struct ufsmount *ump;
 	struct buf *bp;
-	void *base;
+	void * __capability base;
 	size_t len;
 	ssize_t cnt;
 	struct fs *fs;
@@ -142,7 +144,9 @@ ffs_susp_rdwr(struct cdev *dev, struct uio *uio, int ioflag)
 			if (error != 0)
 				goto out;
 			if (uio->uio_rw == UIO_WRITE) {
-				error = copyin(base, bp->b_data, len);
+				error = copyin_c(base,
+				    (__cheri_tocap char * __capability)
+				    bp->b_data, len);
 				if (error != 0) {
 					bp->b_flags |= B_INVAL | B_NOCACHE;
 					brelse(bp);
@@ -152,14 +156,14 @@ ffs_susp_rdwr(struct cdev *dev, struct uio *uio, int ioflag)
 				if (error != 0)
 					goto out;
 			} else {
-				error = copyout(bp->b_data, base, len);
+				error = copyout_c(
+				    (__cheri_tocap char * __capability)
+				    bp->b_data, base, len);
 				brelse(bp);
 				if (error != 0)
 					goto out;
 			}
-			uio->uio_iov[i].iov_base =
-			    (char *)uio->uio_iov[i].iov_base + len;
-			uio->uio_iov[i].iov_len -= len;
+			IOVEC_ADVANCE(&uio->uio_iov[i], len);
 			uio->uio_resid -= len;
 			uio->uio_offset += len;
 		}
@@ -235,7 +239,7 @@ ffs_susp_dtor(void *data)
 	KASSERT((mp->mnt_kern_flag & MNTK_SUSPEND) != 0,
 	    ("MNTK_SUSPEND not set"));
 
-	error = ffs_reload(mp, curthread, 1);
+	error = ffs_reload(mp, curthread, FFSR_FORCE | FFSR_UNSUSPEND);
 	if (error != 0)
 		panic("failed to unsuspend writes on %s", fs->fs_fsmnt);
 

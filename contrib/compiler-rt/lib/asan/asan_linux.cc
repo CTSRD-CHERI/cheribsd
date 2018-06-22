@@ -69,18 +69,21 @@ asan_rt_version_t  __asan_rt_version;
 namespace __asan {
 
 void InitializePlatformInterceptors() {}
-
-void DisableReexec() {
-  // No need to re-exec on Linux.
-}
-
-void MaybeReexec() {
-  // No need to re-exec on Linux.
-}
+void InitializePlatformExceptionHandlers() {}
+bool IsSystemHeapAddress (uptr addr) { return false; }
 
 void *AsanDoesNotSupportStaticLinkage() {
   // This will fail to link with -static.
   return &_DYNAMIC;  // defined in link.h
+}
+
+uptr FindDynamicShadowStart() {
+  UNREACHABLE("FindDynamicShadowStart is not available");
+  return 0;
+}
+
+void AsanApplyToGlobals(globals_op_fptr op, const void *needle) {
+  UNIMPLEMENTED();
 }
 
 #if SANITIZER_ANDROID
@@ -113,11 +116,11 @@ static void ReportIncompatibleRT() {
 }
 
 void AsanCheckDynamicRTPrereqs() {
-  if (!ASAN_DYNAMIC)
+  if (!ASAN_DYNAMIC || !flags()->verify_asan_link_order)
     return;
 
   // Ensure that dynamic RT is the first DSO in the list
-  const char *first_dso_name = 0;
+  const char *first_dso_name = nullptr;
   dl_iterate_phdr(FindFirstDSOCallback, &first_dso_name);
   if (first_dso_name && !IsDynamicRTName(first_dso_name)) {
     Report("ASan runtime does not come first in initial library list; "
@@ -142,8 +145,9 @@ void AsanCheckIncompatibleRT() {
       // system libraries, causing crashes later in ASan initialization.
       MemoryMappingLayout proc_maps(/*cache_enabled*/true);
       char filename[128];
-      while (proc_maps.Next(0, 0, 0, filename, sizeof(filename), 0)) {
-        if (IsDynamicRTName(filename)) {
+      MemoryMappedSegment segment(filename, sizeof(filename));
+      while (proc_maps.Next(&segment)) {
+        if (IsDynamicRTName(segment.filename)) {
           Report("Your application is linked against "
                  "incompatible ASan runtimes.\n");
           Die();
@@ -155,11 +159,7 @@ void AsanCheckIncompatibleRT() {
     }
   }
 }
-#endif  // SANITIZER_ANDROID
-
-void AsanPlatformThreadInit() {
-  // Nothing here for now.
-}
+#endif // SANITIZER_ANDROID
 
 #if !SANITIZER_ANDROID
 void ReadContextStack(void *context, uptr *stack, uptr *ssize) {
@@ -177,6 +177,6 @@ void *AsanDlSymNext(const char *sym) {
   return dlsym(RTLD_NEXT, sym);
 }
 
-}  // namespace __asan
+} // namespace __asan
 
-#endif  // SANITIZER_FREEBSD || SANITIZER_LINUX
+#endif // SANITIZER_FREEBSD || SANITIZER_LINUX

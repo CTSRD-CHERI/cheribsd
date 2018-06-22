@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (C) 1996
  *	David L. Nugent.  All rights reserved.
  *
@@ -37,7 +39,6 @@ static const char rcsid[] =
 #include <unistd.h>
 
 #include "pw.h"
-#include "pwupd.h"
 
 void
 copymkdir(int rootfd, char const * dir, int skelfd, mode_t mode, uid_t uid,

@@ -243,9 +243,8 @@ main_create_user_groups(struct env *env)
 			if ((ue = RB_FIND(user_name_tree, env->sc_user_names_t,
 			    &ukey)) == NULL) {
 				/* User not found */
-				log_warnx("main: user: %s is referenced as a "
-					"group member, but can't be found in the "
-					"users map.\n", ukey.ue_line);
+				log_warnx("main: unknown user %s in group %s\n",
+				   ukey.ue_line, ge->ge_line);
 				if (bp != NULL)
 					*(bp-1) = ',';
 				continue;
@@ -610,7 +609,7 @@ main(int argc, char *argv[])
 #warning disabling privilege revocation in debug mode
 #endif
 
-	bzero(&tv, sizeof(tv));
+	memset(&tv, 0, sizeof(tv));
 	evtimer_set(&ev_timer, main_init_timer, &env);
 	evtimer_add(&ev_timer, &tv);
 

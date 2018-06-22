@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (C) 1994, David Greenman
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -105,16 +107,18 @@ ia32_set_syscall_retval(struct thread *td, int error)
 }
 
 int
-ia32_fetch_syscall_args(struct thread *td, struct syscall_args *sa)
+ia32_fetch_syscall_args(struct thread *td)
 {
 	struct proc *p;
 	struct trapframe *frame;
+	struct syscall_args *sa;
 	caddr_t params;
 	u_int32_t args[8], tmp;
 	int error, i;
 
 	p = td->td_proc;
 	frame = td->td_frame;
+	sa = &td->td_sa;
 
 	params = (caddr_t)frame->tf_rsp + sizeof(u_int32_t);
 	sa->code = frame->tf_rax;
@@ -175,7 +179,6 @@ void
 ia32_syscall(struct trapframe *frame)
 {
 	struct thread *td;
-	struct syscall_args sa;
 	register_t orig_tf_rflags;
 	int error;
 	ksiginfo_t ksi;
@@ -184,7 +187,7 @@ ia32_syscall(struct trapframe *frame)
 	td = curthread;
 	td->td_frame = frame;
 
-	error = syscallenter(td, &sa);
+	error = syscallenter(td);
 
 	/*
 	 * Traced syscall.
@@ -198,7 +201,7 @@ ia32_syscall(struct trapframe *frame)
 		trapsignal(td, &ksi);
 	}
 
-	syscallret(td, error, &sa);
+	syscallret(td, error);
 }
 
 static void

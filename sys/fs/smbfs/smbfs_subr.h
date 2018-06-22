@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2000-2001 Boris Popov
  * All rights reserved.
  *
@@ -107,7 +109,7 @@ struct smbfs_fctx {
 		struct smb_t2rq * uf_t2;
 	} f_urq;
 	int		f_left;		/* entries left */
-	int		f_ecnt;		/* entries left in the current reponse */
+	int		f_ecnt;		/* entries left in the current response */
 	int		f_eofs;		/* entry offset in the parameter block */
 	u_char 		f_skey[SMB_SKEYLEN]; /* server side search context */
 	u_char		f_fname[8 + 1 + 3 + 1]; /* common case for 8.3 filenames */

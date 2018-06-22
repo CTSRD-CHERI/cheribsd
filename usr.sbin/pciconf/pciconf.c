@@ -67,7 +67,7 @@ struct pci_vendor_info
     char				*desc;
 };
 
-TAILQ_HEAD(,pci_vendor_info)	pci_vendors;
+static TAILQ_HEAD(,pci_vendor_info)	pci_vendors;
 
 static struct pcisel getsel(const char *str);
 static void list_bridge(int fd, struct pci_conf *p);
@@ -697,6 +697,12 @@ static struct
 	{PCIC_CRYPTO,		PCIS_CRYPTO_NETCOMP,	"entertainment crypto"},
 	{PCIC_DASP,		-1,			"dasp"},
 	{PCIC_DASP,		PCIS_DASP_DPIO,		"DPIO module"},
+	{PCIC_DASP,		PCIS_DASP_PERFCNTRS,	"performance counters"},
+	{PCIC_DASP,		PCIS_DASP_COMM_SYNC,	"communication synchronizer"},
+	{PCIC_DASP,		PCIS_DASP_MGMT_CARD,	"signal processing management"},
+	{PCIC_ACCEL,		-1,			"processing accelerators"},
+	{PCIC_ACCEL,		PCIS_ACCEL_PROCESSING,	"processing accelerators"},
+	{PCIC_INSTRUMENT,	-1,			"non-essential instrumentation"},
 	{0, 0,		NULL}
 };
 
@@ -876,7 +882,8 @@ getdevice(const char *name)
 		errx(1, "Device name is too long");
 	memcpy(patterns[0].pd_name, name, cp - name);
 	patterns[0].pd_unit = strtol(cp, &cp, 10);
-	assert(*cp == '\0');
+	if (*cp != '\0')
+		errx(1, "Invalid device name");
 	patterns[0].flags = PCI_GETCONF_MATCH_NAME | PCI_GETCONF_MATCH_UNIT;
 	pc.num_patterns = 1;
 	pc.pat_buf_len = sizeof(patterns);
@@ -896,40 +903,36 @@ getdevice(const char *name)
 static struct pcisel
 parsesel(const char *str)
 {
-	char *ep = strchr(str, '@');
-	char *epbase;
+	const char *ep;
+	char *eppos;
 	struct pcisel sel;
 	unsigned long selarr[4];
 	int i;
 
-	if (ep == NULL)
-		ep = (char *)str;
-	else
+	ep = strchr(str, '@');
+	if (ep != NULL)
 		ep++;
-
-	epbase = ep;
+	else
+		ep = str;
 
 	if (strncmp(ep, "pci", 3) == 0) {
 		ep += 3;
 		i = 0;
-		do {
-			selarr[i++] = strtoul(ep, &ep, 10);
-		} while ((*ep == ':' || *ep == '.') && *++ep != '\0' && i < 4);
-
-		if (i > 2)
-			sel.pc_func = selarr[--i];
-		else
-			sel.pc_func = 0;
-		sel.pc_dev = selarr[--i];
-		sel.pc_bus = selarr[--i];
-		if (i > 0)
-			sel.pc_domain = selarr[--i];
-		else
-			sel.pc_domain = 0;
+		while (isdigit(*ep) && i < 4) {
+			selarr[i++] = strtoul(ep, &eppos, 10);
+			ep = eppos;
+			if (*ep == ':')
+				ep++;
+		}
+		if (i > 0 && *ep == '\0') {
+			sel.pc_func = (i > 2) ? selarr[--i] : 0;
+			sel.pc_dev = (i > 0) ? selarr[--i] : 0;
+			sel.pc_bus = (i > 0) ? selarr[--i] : 0;
+			sel.pc_domain = (i > 0) ? selarr[--i] : 0;
+			return (sel);
+		}
 	}
-	if (*ep != '\x0' || ep == epbase)
-		errx(1, "cannot parse selector %s", str);
-	return sel;
+	errx(1, "cannot parse selector %s", str);
 }
 
 static struct pcisel

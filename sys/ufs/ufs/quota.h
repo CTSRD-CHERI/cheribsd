@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -13,7 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -230,14 +232,21 @@ int	getinoquota(struct inode *);
 int	qsync(struct mount *);
 int	qsyncvp(struct vnode *);
 int	quotaoff(struct thread *, struct mount *, int);
-int	quotaon(struct thread *, struct mount *, int, void *);
-int	getquota32(struct thread *, struct mount *, u_long, int, void *);
-int	setquota32(struct thread *, struct mount *, u_long, int, void *);
-int	setuse32(struct thread *, struct mount *, u_long, int, void *);
-int	getquota(struct thread *, struct mount *, u_long, int, void *);
-int	setquota(struct thread *, struct mount *, u_long, int, void *);
-int	setuse(struct thread *, struct mount *, u_long, int, void *);
-int	getquotasize(struct thread *, struct mount *, u_long, int, void *);
+int	quotaon(struct thread *, struct mount *, int, void * __CAPABILITY);
+int	getquota32(struct thread *, struct mount *, u_long, int,
+	    void * __CAPABILITY);
+int	setquota32(struct thread *, struct mount *, u_long, int,
+	    void * __CAPABILITY);
+int	setuse32(struct thread *, struct mount *, u_long, int,
+	    void * __CAPABILITY);
+int	getquota(struct thread *, struct mount *, u_long, int,
+	    void * __CAPABILITY);
+int	setquota(struct thread *, struct mount *, u_long, int,
+	    void * __CAPABILITY);
+int	setuse(struct thread *, struct mount *, u_long, int,
+	    void * __CAPABILITY);
+int	getquotasize(struct thread *, struct mount *, u_long, int,
+	    void * __CAPABILITY);
 vfs_quotactl_t ufs_quotactl;
 
 #ifdef SOFTUPDATES

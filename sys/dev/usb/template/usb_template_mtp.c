@@ -1,5 +1,7 @@
 /* $FreeBSD$ */
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2008 Hans Petter Selasky <hselasky@FreeBSD.org>
  * All rights reserved.
  *
@@ -26,7 +28,7 @@
  */
 
 /*
- * This file contains the USB templates for an USB Message Transfer
+ * This file contains the USB templates for an USB Media Transfer
  * Protocol device.
  *
  * NOTE: It is common practice that MTP devices use some dummy

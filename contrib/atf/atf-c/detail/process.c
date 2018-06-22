@@ -22,8 +22,21 @@
  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_integrity"
+ *   ],
+ *   "hybrid_specific": true
+ * }
+ * CHERI CHANGES END
+ */
 
 #include "atf-c/detail/process.h"
+
+#include <sys/cdefs.h>
 
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -552,7 +565,11 @@ static
 int
 const_execvp(const char *file, const char *const *argv)
 {
-#define UNCONST(a) ((void *)(unsigned long)(const void *)(a))
+#if !__has_feature(capabilities)
+#define UNCONST(a) ((void *)(__uintptr_t)(const void *)(a))
+#else
+#define UNCONST(a) ((void *)(__uintcap_t)(const void *)(a))
+#endif
     return execvp(file, UNCONST(argv));
 #undef UNCONST
 }

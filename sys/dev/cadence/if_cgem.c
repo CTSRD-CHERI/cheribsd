@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2012-2014 Thomas Skibo <thomasskibo@yahoo.com>
  * All rights reserved.
  *
@@ -809,7 +811,7 @@ cgem_start_locked(if_t ifp)
 		WR4(sc, CGEM_NET_CTRL, sc->net_ctl_shadow |
 		    CGEM_NET_CTRL_START_TX);
 
-		/* If there is a BPF listener, bounce a copy to to him. */
+		/* If there is a BPF listener, bounce a copy to him. */
 		ETHER_BPF_MTAP(ifp, m);
 	}
 }
@@ -1168,7 +1170,7 @@ cgem_ioctl(if_t ifp, u_long cmd, caddr_t data)
 	int error = 0, mask;
 
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		CGEM_LOCK(sc);
 		if ((if_getflags(ifp) & IFF_UP) != 0) {
 			if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0) {
@@ -1187,8 +1189,8 @@ cgem_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		CGEM_UNLOCK(sc);
 		break;
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		/* Set up multi-cast filters. */
 		if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0) {
 			CGEM_LOCK(sc);
@@ -1197,18 +1199,18 @@ cgem_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
 
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		CGEM_LOCK(sc);
-		mask = if_getcapenable(ifp) ^ ifr->ifr_reqcap;
+		mask = if_getcapenable(ifp) ^ ifr_reqcap_get(ifr);
 
 		if ((mask & IFCAP_TXCSUM) != 0) {
-			if ((ifr->ifr_reqcap & IFCAP_TXCSUM) != 0) {
+			if ((ifr_reqcap_get(ifr) & IFCAP_TXCSUM) != 0) {
 				/* Turn on TX checksumming. */
 				if_setcapenablebit(ifp, IFCAP_TXCSUM |
 						   IFCAP_TXCSUM_IPV6, 0);
@@ -1229,7 +1231,7 @@ cgem_ioctl(if_t ifp, u_long cmd, caddr_t data)
 			}
 		}
 		if ((mask & IFCAP_RXCSUM) != 0) {
-			if ((ifr->ifr_reqcap & IFCAP_RXCSUM) != 0) {
+			if ((ifr_reqcap_get(ifr) & IFCAP_RXCSUM) != 0) {
 				/* Turn on RX checksumming. */
 				if_setcapenablebit(ifp, IFCAP_RXCSUM |
 						   IFCAP_RXCSUM_IPV6, 0);
@@ -1629,6 +1631,9 @@ cgem_add_sysctls(device_t dev)
 static int
 cgem_probe(device_t dev)
 {
+
+	if (!ofw_bus_status_okay(dev))
+		return (ENXIO);
 
 	if (!ofw_bus_is_compatible(dev, "cadence,gem"))
 		return (ENXIO);

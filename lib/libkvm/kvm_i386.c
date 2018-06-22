@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -14,7 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -51,6 +53,7 @@ static char sccsid[] = "@(#)kvm_hp300.c	8.1 (Berkeley) 6/4/93";
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <vm/vm.h>
 #include <kvm.h>
 
 #ifdef __i386__
@@ -162,6 +165,10 @@ _i386_initvtop(kvm_t *kd)
 		}
 		pa = le32toh(pa);
 		PTD = _kvm_malloc(kd, 4 * I386_PAGE_SIZE);
+		if (PTD == NULL) {
+			_kvm_err(kd, kd->program, "cannot allocate PTD");
+			return (-1);
+		}
 		for (i = 0; i < 4; i++) {
 			if (kvm_read2(kd, pa + (i * sizeof(pa64)), &pa64,
 			    sizeof(pa64)) != sizeof(pa64)) {
@@ -195,6 +202,10 @@ _i386_initvtop(kvm_t *kd)
 		}
 		pa = le32toh(pa);
 		PTD = _kvm_malloc(kd, I386_PAGE_SIZE);
+		if (PTD == NULL) {
+			_kvm_err(kd, kd->program, "cannot allocate PTD");
+			return (-1);
+		}
 		if (kvm_read2(kd, pa, PTD, I386_PAGE_SIZE) != I386_PAGE_SIZE) {
 			_kvm_err(kd, kd->program, "cannot read PTD");
 			return (-1);
@@ -228,7 +239,7 @@ _i386_vatop(kvm_t *kd, kvaddr_t va, off_t *pa)
 	 * If we are initializing (kernel page table descriptor pointer
 	 * not yet set) then return pa == va to avoid infinite recursion.
 	 */
-	if (PTD == 0) {
+	if (PTD == NULL) {
 		s = _kvm_pa2off(kd, va, pa);
 		if (s == 0) {
 			_kvm_err(kd, kd->program,
@@ -318,7 +329,7 @@ _i386_vatop_pae(kvm_t *kd, kvaddr_t va, off_t *pa)
 	 * If we are initializing (kernel page table descriptor pointer
 	 * not yet set) then return pa == va to avoid infinite recursion.
 	 */
-	if (PTD == 0) {
+	if (PTD == NULL) {
 		s = _kvm_pa2off(kd, va, pa);
 		if (s == 0) {
 			_kvm_err(kd, kd->program,
@@ -401,7 +412,7 @@ _i386_kvatop(kvm_t *kd, kvaddr_t va, off_t *pa)
 }
 
 int
-_i386_native(kvm_t *kd)
+_i386_native(kvm_t *kd __unused)
 {
 
 #ifdef __i386__
@@ -411,7 +422,7 @@ _i386_native(kvm_t *kd)
 #endif
 }
 
-struct kvm_arch kvm_i386 = {
+static struct kvm_arch kvm_i386 = {
 	.ka_probe = _i386_probe,
 	.ka_initvtop = _i386_initvtop,
 	.ka_freevtop = _i386_freevtop,

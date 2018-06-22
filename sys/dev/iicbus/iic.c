@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1998, 2001 Nicolas Souchu
  * All rights reserved.
  *
@@ -293,15 +295,23 @@ iicrdwr(struct iic_cdevpriv *priv, struct iic_rdwr_data *d, int flags)
 	struct iic_msg *buf, *m;
 	void **usrbufs;
 	device_t iicdev, parent;
-	int error, i;
+	int error;
+	uint32_t i;
 
 	iicdev = priv->sc->sc_dev;
 	parent = device_get_parent(iicdev);
 	error = 0;
 
+	if (d->nmsgs > IIC_RDRW_MAX_MSGS)
+		return (EINVAL);
+
 	buf = malloc(sizeof(*d->msgs) * d->nmsgs, M_IIC, M_WAITOK);
 
 	error = copyin(d->msgs, buf, sizeof(*d->msgs) * d->nmsgs);
+	if (error != 0) {
+		free(buf, M_IIC);
+		return (error);
+	}
 
 	/* Alloc kernel buffers for userland data, copyin write data */
 	usrbufs = malloc(sizeof(void *) * d->nmsgs, M_IIC, M_WAITOK | M_ZERO);
@@ -317,6 +327,8 @@ iicrdwr(struct iic_cdevpriv *priv, struct iic_rdwr_data *d, int flags)
 		m->buf = NULL;
 		if (error != 0)
 			continue;
+
+		/* m->len is uint16_t, so allocation size is capped at 64K. */
 		m->buf = malloc(m->len, M_IIC, M_WAITOK);
 		if (!(m->flags & IIC_M_RD))
 			error = copyin(usrbufs[i], m->buf, m->len);
@@ -350,7 +362,7 @@ iicioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags, struct thread *t
 	device_t parent, iicdev;
 	struct iiccmd *s;
 	struct uio ubuf;
-	struct iovec uvec;
+	kiovec_t uvec;
 	struct iic_cdevpriv *priv;
 	int error;
 
@@ -424,8 +436,7 @@ iicioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags, struct thread *t
 			error = EINVAL;
 			break;
 		}
-		uvec.iov_base = s->buf;
-		uvec.iov_len = s->count;
+		IOVEC_INIT(&uvec, s->buf, s->count);
 		ubuf.uio_iov = &uvec;
 		ubuf.uio_iovcnt = 1;
 		ubuf.uio_segflg = UIO_USERSPACE;
@@ -441,8 +452,7 @@ iicioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags, struct thread *t
 			error = EINVAL;
 			break;
 		}
-		uvec.iov_base = s->buf;
-		uvec.iov_len = s->count;
+		IOVEC_INIT(&uvec, s->buf, s->count);
 		ubuf.uio_iov = &uvec;
 		ubuf.uio_iovcnt = 1;
 		ubuf.uio_segflg = UIO_USERSPACE;

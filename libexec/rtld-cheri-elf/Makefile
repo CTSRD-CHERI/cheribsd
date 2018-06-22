@@ -2,92 +2,76 @@
 
 # Use the following command to build local debug version of dynamic
 # linker:
-# make DEBUG_FLAGS=-g DEBUG=-DDEBUG MK_TESTS=no all
+# make DEBUG_FLAGS=-g DEBUG=-DDEBUG WITHOUT_TESTS=yes all
 
 .include <src.opts.mk>
 MK_SSP=		no
+MK_CHERI_SHARED_PROG:=yes
 
 .PATH: ${.CURDIR}/../../lib/libmalloc_simple
-.PATH: ${.CURDIR}/../rtld-elf
+
+# TODO: disable this once we believe RTLD works reliably
+DEBUG=-DDEBUG
 
 PROG?=		ld-cheri-elf.so.1
 SRCS=		rtld_start.S \
-		reloc.c rtld.c rtld_lock.c rtld_printf.c map_object.c \
+		reloc.c rtld.c rtld_lock.c map_object.c \
 		heap.c malloc.c xmalloc.c debug.c libmap.c
 MAN=
 NEED_CHERI=	pure
+WANT_DUMP=yes
 MK_CHERI_SHARED=yes
 CSTD?=		gnu99
 CFLAGS+=	-Wall -DFREEBSD_ELF -DIN_RTLD -ffreestanding
-CFLAGS+=	-I${SRCTOP}/lib/csu/common
+CFLAGS+=	-I${SRCTOP}/lib/csu/common \
+		-I${SRCTOP}/lib/libc/${RTLD_ARCH}
 .if exists(${.CURDIR}/${MACHINE_ARCH})
 RTLD_ARCH=	${MACHINE_ARCH}
 .else
 RTLD_ARCH=	${MACHINE_CPUARCH}
 .endif
-CFLAGS+=	-I${.CURDIR}/${RTLD_ARCH} -I${.CURDIR} \
-		-I${.CURDIR}/../rtld-elf/${RTLD_ARCH} -I${.CURDIR}/../rtld-elf
-.if ${MACHINE_ARCH} == "powerpc64"
-LDFLAGS+=	-nostdlib -e _rtld_start
-.else
-LDFLAGS+=	-nostdlib -e .rtld_start
-.endif
+CFLAGS+=	-I${.CURDIR}/${RTLD_ARCH} -I${.CURDIR}
+LDFLAGS+=	-nostdlib -e rtld_start
 WARNS?=		2
 INSTALLFLAGS=	-C -b
 PRECIOUSPROG=
 BINDIR=		/libexec
 #SYMLINKS=	${BINDIR}/${PROG} ${LIBEXECDIR}/${PROG}
 
-.if ${MACHINE_CPUARCH} == "sparc64"
-CFLAGS+=	-fPIC
-.else
 CFLAGS+=	-fpic
-.endif
 CFLAGS+=	-DPIC $(DEBUG)
-.if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386"
-CFLAGS+=	-fvisibility=hidden
-.endif
-LDFLAGS+=	-shared -Wl,-Bsymbolic
+CFLAGS.reloc.c+=-fno-jump-tables
+LDFLAGS+=	-shared -Wl,-Bsymbolic -Wl,-z,defs
+# avoid accidentally depending on non-existent symbols
+LDFLAGS+=	-Wl,-no-undefined
 LIBADD=		c_pic
 
-.if ${MACHINE_CPUARCH} == "arm"
-# Some of the required math functions (div & mod) are implemented in
-# libcompiler_rt on ARM. The library also needs to be placed first to be
-# correctly linked. As some of the functions are used before we have
-# shared libraries.
+# For floating-point functions used by gdtoa.
 LIBADD+=	compiler_rt
-.endif
 
-
+# for the rtld_printf functions:
+SIMPLE_PRINTF_PREFIX=rtld
+.include "${SRCTOP}/lib/libsimple_printf/Makefile.inc"
 
 .if ${MK_SYMVER} == "yes"
+# LIBCSRCDIR does not appear to be set correctly for libcheribuildenv
+LIBCSRCDIR=	${SRCTOP}/lib/libc
 VERSION_DEF=	${LIBCSRCDIR}/Versions.def
 SYMBOL_MAPS=	${.CURDIR}/../rtld-elf/Symbol.map
 VERSION_MAP=	Version.map
 LDFLAGS+=	-Wl,--version-script=${VERSION_MAP}
-
-${PROG}:	${VERSION_MAP}
 
 .if exists(${.CURDIR}/${RTLD_ARCH}/Symbol.map)
 SYMBOL_MAPS+=	${.CURDIR}/${RTLD_ARCH}/Symbol.map
 .endif
 .endif
 
-.sinclude "${.CURDIR}/${RTLD_ARCH}/Makefile.inc"
+#.sinclude "${.CURDIR}/${RTLD_ARCH}/Makefile.inc"
 
-# Since moving rtld-elf to /libexec, we need to create a symlink.
-# Fixup the existing binary that's there so we can symlink over it.
-beforeinstall:
-.if exists(${DESTDIR}/usr/libexec/${PROG}) && ${MK_STAGING} == "no"
-	-chflags -h noschg ${DESTDIR}/usr/libexec/${PROG}
-.endif
-
-.PATH: ${.CURDIR}${RTLD_ARCH}
-.PATH: ${.CURDIR}/../rtld-elf/${RTLD_ARCH}
-
-.if ${MK_TESTS} != "no"
-#SUBDIR+=	tests
-.endif
+.PATH: ${.CURDIR}/${RTLD_ARCH}
 
 .include <bsd.prog.mk>
+${PROG_FULL}:	${VERSION_MAP}
 .include <bsd.symver.mk>
+
+#CFLAGS:=	${CFLAGS} -O0

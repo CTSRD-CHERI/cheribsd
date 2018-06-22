@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2000-2001 Boris Popov
  * All rights reserved.
  *
@@ -309,7 +311,7 @@ smbfs_doio(struct vnode *vp, struct buf *bp, struct ucred *cr, struct thread *td
 	struct smbmount *smp = VFSTOSMBFS(vp->v_mount);
 	struct smbnode *np = VTOSMB(vp);
 	struct uio *uiop;
-	struct iovec io;
+	kiovec_t io;
 	struct smb_cred *scred;
 	int error = 0;
 
@@ -323,8 +325,8 @@ smbfs_doio(struct vnode *vp, struct buf *bp, struct ucred *cr, struct thread *td
 	smb_makescred(scred, td, cr);
 
 	if (bp->b_iocmd == BIO_READ) {
-	    io.iov_len = uiop->uio_resid = bp->b_bcount;
-	    io.iov_base = bp->b_data;
+	    IOVEC_INIT(&io, bp->b_data, bp->b_bcount);
+	    uiop->uio_resid = bp->b_bcount;
 	    uiop->uio_rw = UIO_READ;
 	    switch (vp->v_type) {
 	      case VREG:
@@ -342,7 +344,7 @@ smbfs_doio(struct vnode *vp, struct buf *bp, struct ucred *cr, struct thread *td
 	    default:
 		printf("smbfs_doio:  type %x unexpected\n",vp->v_type);
 		break;
-	    };
+	    }
 	    if (error) {
 		bp->b_error = error;
 		bp->b_ioflags |= BIO_ERROR;
@@ -352,9 +354,9 @@ smbfs_doio(struct vnode *vp, struct buf *bp, struct ucred *cr, struct thread *td
 		bp->b_dirtyend = np->n_size - (bp->b_blkno * DEV_BSIZE);
 
 	    if (bp->b_dirtyend > bp->b_dirtyoff) {
-		io.iov_len = uiop->uio_resid = bp->b_dirtyend - bp->b_dirtyoff;
+		uiop->uio_resid = bp->b_dirtyend - bp->b_dirtyoff;
 		uiop->uio_offset = ((off_t)bp->b_blkno) * DEV_BSIZE + bp->b_dirtyoff;
-		io.iov_base = (char *)bp->b_data + bp->b_dirtyoff;
+		IOVEC_INIT(&io, (char *)bp->b_data + bp->b_dirtyoff, uiop->uio_resid);
 		uiop->uio_rw = UIO_WRITE;
 		error = smb_write(smp->sm_share, np->n_fid, uiop, scred);
 
@@ -426,7 +428,7 @@ smbfs_getpages(ap)
 #else
 	int i, error, nextoff, size, toff, npages, count;
 	struct uio uio;
-	struct iovec iov;
+	kiovec_t iov;
 	vm_offset_t kva;
 	struct buf *bp;
 	struct vnode *vp;
@@ -470,12 +472,11 @@ smbfs_getpages(ap)
 
 	kva = (vm_offset_t) bp->b_data;
 	pmap_qenter(kva, pages, npages);
-	PCPU_INC(cnt.v_vnodein);
-	PCPU_ADD(cnt.v_vnodepgsin, npages);
+	VM_CNT_INC(v_vnodein);
+	VM_CNT_ADD(v_vnodepgsin, npages);
 
 	count = npages << PAGE_SHIFT;
-	iov.iov_base = (caddr_t) kva;
-	iov.iov_len = count;
+	IOVEC_INIT(&iov, bp->b_data, count);
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = IDX_TO_OFF(pages[0]->pindex);
@@ -520,7 +521,7 @@ smbfs_getpages(ap)
 			    ("smbfs_getpages: page %p is dirty", m));
 		} else {
 			/*
-			 * Read operation was short.  If no error occured
+			 * Read operation was short.  If no error occurred
 			 * we may have hit a zero-fill section.   We simply
 			 * leave valid set to 0.
 			 */
@@ -567,7 +568,7 @@ smbfs_putpages(ap)
 	return error;
 #else
 	struct uio uio;
-	struct iovec iov;
+	kiovec_t iov;
 	vm_offset_t kva;
 	struct buf *bp;
 	int i, npages, count;
@@ -595,11 +596,10 @@ smbfs_putpages(ap)
 
 	kva = (vm_offset_t) bp->b_data;
 	pmap_qenter(kva, pages, npages);
-	PCPU_INC(cnt.v_vnodeout);
-	PCPU_ADD(cnt.v_vnodepgsout, count);
+	VM_CNT_INC(v_vnodeout);
+	VM_CNT_ADD(v_vnodepgsout, count);
 
-	iov.iov_base = (caddr_t) kva;
-	iov.iov_len = count;
+	IOVEC_INIT(&iov, bp->b_data, count);
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = IDX_TO_OFF(pages[0]->pindex);
@@ -621,9 +621,11 @@ smbfs_putpages(ap)
 
 	relpbuf(bp, &smbfs_pbuf_freecnt);
 
-	if (!error)
-		vnode_pager_undirty_pages(pages, rtvals, count - uio.uio_resid);
-	return rtvals[0];
+	if (error == 0) {
+		vnode_pager_undirty_pages(pages, rtvals, count - uio.uio_resid,
+		    npages * PAGE_SIZE, npages * PAGE_SIZE);
+	}
+	return (rtvals[0]);
 #endif /* SMBFS_RWGENERIC */
 }
 

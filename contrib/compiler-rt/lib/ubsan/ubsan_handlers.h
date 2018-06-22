@@ -20,7 +20,7 @@ namespace __ubsan {
 struct TypeMismatchData {
   SourceLocation Loc;
   const TypeDescriptor &Type;
-  uptr Alignment;
+  unsigned char LogAlignment;
   unsigned char TypeCheckKind;
 };
 
@@ -37,7 +37,7 @@ struct TypeMismatchData {
 /// \brief Handle a runtime type check failure, caused by either a misaligned
 /// pointer, a null pointer, or a pointer to insufficient storage for the
 /// type.
-RECOVERABLE(type_mismatch, TypeMismatchData *Data, ValueHandle Pointer)
+RECOVERABLE(type_mismatch_v1, TypeMismatchData *Data, ValueHandle Pointer)
 
 struct OverflowData {
   SourceLocation Loc;
@@ -97,14 +97,22 @@ struct VLABoundData {
 /// \brief Handle a VLA with a non-positive bound.
 RECOVERABLE(vla_bound_not_positive, VLABoundData *Data, ValueHandle Bound)
 
+// Keeping this around for binary compatibility with (sanitized) programs
+// compiled with older compilers.
 struct FloatCastOverflowData {
-  // FIXME: SourceLocation Loc;
   const TypeDescriptor &FromType;
   const TypeDescriptor &ToType;
 };
 
-/// \brief Handle overflow in a conversion to or from a floating-point type.
-RECOVERABLE(float_cast_overflow, FloatCastOverflowData *Data, ValueHandle From)
+struct FloatCastOverflowDataV2 {
+  SourceLocation Loc;
+  const TypeDescriptor &FromType;
+  const TypeDescriptor &ToType;
+};
+
+/// Handle overflow in a conversion to or from a floating-point type.
+/// void *Data is one of FloatCastOverflowData* or FloatCastOverflowDataV2*
+RECOVERABLE(float_cast_overflow, void *Data, ValueHandle From)
 
 struct InvalidValueData {
   SourceLocation Loc;
@@ -124,12 +132,13 @@ RECOVERABLE(function_type_mismatch,
             ValueHandle Val)
 
 struct NonNullReturnData {
-  SourceLocation Loc;
   SourceLocation AttrLoc;
 };
 
-/// \brief Handle returning null from function with returns_nonnull attribute.
-RECOVERABLE(nonnull_return, NonNullReturnData *Data)
+/// \brief Handle returning null from function with the returns_nonnull
+/// attribute, or a return type annotated with _Nonnull.
+RECOVERABLE(nonnull_return_v1, NonNullReturnData *Data, SourceLocation *Loc)
+RECOVERABLE(nullability_return_v1, NonNullReturnData *Data, SourceLocation *Loc)
 
 struct NonNullArgData {
   SourceLocation Loc;
@@ -137,9 +146,37 @@ struct NonNullArgData {
   int ArgIndex;
 };
 
-/// \brief Handle passing null pointer to function with nonnull attribute.
+/// \brief Handle passing null pointer to a function parameter with the nonnull
+/// attribute, or a _Nonnull type annotation.
 RECOVERABLE(nonnull_arg, NonNullArgData *Data)
+RECOVERABLE(nullability_arg, NonNullArgData *Data)
 
+struct PointerOverflowData {
+  SourceLocation Loc;
+};
+
+RECOVERABLE(pointer_overflow, PointerOverflowData *Data, ValueHandle Base,
+            ValueHandle Result)
+
+/// \brief Known CFI check kinds.
+/// Keep in sync with the enum of the same name in CodeGenFunction.h
+enum CFITypeCheckKind : unsigned char {
+  CFITCK_VCall,
+  CFITCK_NVCall,
+  CFITCK_DerivedCast,
+  CFITCK_UnrelatedCast,
+  CFITCK_ICall,
+};
+
+struct CFICheckFailData {
+  CFITypeCheckKind CheckKind;
+  SourceLocation Loc;
+  const TypeDescriptor &Type;
+};
+
+/// \brief Handle control flow integrity failures.
+RECOVERABLE(cfi_check_fail, CFICheckFailData *Data, ValueHandle Function,
+            uptr VtableIsValid)
 }
 
 #endif // UBSAN_HANDLERS_H

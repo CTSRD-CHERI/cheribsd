@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2005 Ivan Voras <ivoras@freebsd.org>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -140,61 +142,6 @@ virstor_main(struct gctl_req *req, unsigned flags)
 	*/
 }
 
-static void
-pathgen(const char *name, char *path, size_t size)
-{
-
-	if (strncmp(name, _PATH_DEV, sizeof(_PATH_DEV) - 1) != 0)
-		snprintf(path, size, "%s%s", _PATH_DEV, name);
-	else
-		strlcpy(path, name, size);
-}
-
-static int
-my_g_metadata_store(const char *name, u_char *md, size_t size)
-{
-	char path[MAXPATHLEN];
-	unsigned sectorsize;
-	off_t mediasize;
-	u_char *sector;
-	int error, fd;
-
-	pathgen(name, path, sizeof(path));
-	sector = NULL;
-	error = 0;
-
-	fd = open(path, O_RDWR);
-	if (fd == -1)
-		return (errno);
-	mediasize = g_get_mediasize(name);
-	if (mediasize == 0) {
-		error = errno;
-		goto out;
-	}
-	sectorsize = g_get_sectorsize(name);
-	if (sectorsize == 0) {
-		error = errno;
-		goto out;
-	}
-	assert(sectorsize >= size);
-	sector = malloc(sectorsize);
-	if (sector == NULL) {
-		error = ENOMEM;
-		goto out;
-	}
-	bcopy(md, sector, size);
-	if (pwrite(fd, sector, sectorsize, mediasize - sectorsize) !=
-	    (ssize_t)sectorsize) {
-		error = errno;
-		goto out;
-	}
-out:
-	if (sector != NULL)
-		free(sector);
-	close(fd);
-	return (error);
-}
-
 /*
  * Labels a new geom Meaning: parses and checks the parameters, calculates &
  * writes metadata to the relevant providers so when the next round of
@@ -255,7 +202,7 @@ virstor_label(struct gctl_req *req)
 	if (md.md_chunk_size % MAXPHYS != 0) {
 		/* XXX: This is not strictly needed, but it's convenient to
 		 * impose some limitations on it, so why not MAXPHYS. */
-		size_t new_size = (md.md_chunk_size / MAXPHYS) * MAXPHYS;
+		size_t new_size = rounddown(md.md_chunk_size, MAXPHYS);
 		if (new_size < md.md_chunk_size)
 			new_size += MAXPHYS;
 		fprintf(stderr, "Resizing chunk size to be a multiple of "
@@ -464,7 +411,7 @@ virstor_label(struct gctl_req *req)
 			err(1, "Cannot allocate sector of %zu bytes", ssize);
 		bzero(sect, ssize);
 		virstor_metadata_encode(&md, sect);
-		error = my_g_metadata_store(name, sect, ssize);
+		error = g_metadata_store(name, sect, ssize);
 		free(sect);
 		if (error != 0) {
 			if (verbose)

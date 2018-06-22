@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2001 Alexander Kabaev
  * All rights reserved.
  *
@@ -47,10 +49,6 @@ __FBSDID("$FreeBSD$");
 #include <i386/linux/linux_proto.h>
 #include <compat/linux/linux_signal.h>
 
-#if !defined(CPU_DISABLE_SSE) && defined(I686_CPU)
-#define CPU_ENABLE_SSE
-#endif
-
 /*
  *   Linux ptrace requests numbers. Mostly identical to FreeBSD,
  *   except for MD ones and PT_ATTACH/PT_DETACH.
@@ -69,7 +67,7 @@ __FBSDID("$FreeBSD$");
 #define PTRACE_ATTACH		16
 #define PTRACE_DETACH		17
 
-#define	PTRACE_SYSCALL		24
+#define	LINUX_PTRACE_SYSCALL	24
 
 #define PTRACE_GETREGS		12
 #define PTRACE_SETREGS		13
@@ -216,7 +214,6 @@ struct linux_pt_fpxreg {
 	l_long		padding[56];
 };
 
-#ifdef CPU_ENABLE_SSE
 static int
 linux_proc_read_fpxregs(struct thread *td, struct linux_pt_fpxreg *fpxregs)
 {
@@ -238,7 +235,6 @@ linux_proc_write_fpxregs(struct thread *td, struct linux_pt_fpxreg *fpxregs)
 	bcopy(fpxregs, &get_pcb_user_save_td(td)->sv_xmm, sizeof(*fpxregs));
 	return (0);
 }
-#endif
 
 int
 linux_ptrace(struct thread *td, struct linux_ptrace_args *uap)
@@ -330,14 +326,11 @@ linux_ptrace(struct thread *td, struct linux_ptrace_args *uap)
 		}
 		break;
 	case PTRACE_SETFPXREGS:
-#ifdef CPU_ENABLE_SSE
 		error = copyin((void *)uap->data, &r.fpxreg, sizeof(r.fpxreg));
 		if (error)
 			break;
-#endif
 		/* FALL THROUGH */
 	case PTRACE_GETFPXREGS: {
-#ifdef CPU_ENABLE_SSE
 		struct proc *p;
 		struct thread *td2;
 
@@ -411,9 +404,6 @@ linux_ptrace(struct thread *td, struct linux_ptrace_args *uap)
 
 	fail:
 		PROC_UNLOCK(p);
-#else
-		error = EIO;
-#endif
 		break;
 	}
 	case PTRACE_PEEKUSR:
@@ -473,7 +463,7 @@ linux_ptrace(struct thread *td, struct linux_ptrace_args *uap)
 
 		break;
 	}
-	case PTRACE_SYSCALL:
+	case LINUX_PTRACE_SYSCALL:
 		/* fall through */
 	default:
 		printf("linux: ptrace(%u, ...) not implemented\n",

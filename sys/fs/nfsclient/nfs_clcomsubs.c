@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -13,7 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -42,7 +44,7 @@ __FBSDID("$FreeBSD$");
 #ifndef APPLEKEXT
 #include <fs/nfs/nfsport.h>
 
-extern struct nfsstats newnfsstats;
+extern struct nfsstatsv1 nfsstatsv1;
 extern struct nfsv4_opflag nfsv4_opflag[NFSV41_NOPS];
 extern int ncl_mbuf_mlen;
 extern enum vtype newnv2tov_type[8];
@@ -112,6 +114,8 @@ static struct {
 	{ NFSV4OP_WRITE, 1, "WriteDS", 7, },
 	{ NFSV4OP_READ, 1, "ReadDS", 6, },
 	{ NFSV4OP_COMMIT, 1, "CommitDS", 8, },
+	{ NFSV4OP_OPEN, 3, "OpenLayoutGet", 13, },
+	{ NFSV4OP_OPEN, 8, "CreateLayGet", 12, },
 };
 
 /*
@@ -120,7 +124,7 @@ static struct {
 static int nfs_bigrequest[NFSV41_NPROCS] = {
 	0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 1, 0, 0
+	0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0
 };
 
 /*
@@ -129,7 +133,8 @@ static int nfs_bigrequest[NFSV41_NPROCS] = {
  */
 APPLESTATIC void
 nfscl_reqstart(struct nfsrv_descript *nd, int procnum, struct nfsmount *nmp,
-    u_int8_t *nfhp, int fhlen, u_int32_t **opcntpp, struct nfsclsession *sep)
+    u_int8_t *nfhp, int fhlen, u_int32_t **opcntpp, struct nfsclsession *sep,
+    int vers, int minorvers)
 {
 	struct mbuf *mb;
 	u_int32_t *tl;
@@ -140,14 +145,22 @@ nfscl_reqstart(struct nfsrv_descript *nd, int procnum, struct nfsmount *nmp,
 	 * First, fill in some of the fields of nd.
 	 */
 	nd->nd_slotseq = NULL;
-	if (NFSHASNFSV4(nmp)) {
+	if (vers == NFS_VER4) {
 		nd->nd_flag = ND_NFSV4 | ND_NFSCL;
-		if (NFSHASNFSV4N(nmp))
+		if (minorvers == NFSV41_MINORVERSION)
 			nd->nd_flag |= ND_NFSV41;
-	} else if (NFSHASNFSV3(nmp))
+	} else if (vers == NFS_VER3)
 		nd->nd_flag = ND_NFSV3 | ND_NFSCL;
-	else
-		nd->nd_flag = ND_NFSV2 | ND_NFSCL;
+	else {
+		if (NFSHASNFSV4(nmp)) {
+			nd->nd_flag = ND_NFSV4 | ND_NFSCL;
+			if (NFSHASNFSV4N(nmp))
+				nd->nd_flag |= ND_NFSV41;
+		} else if (NFSHASNFSV3(nmp))
+			nd->nd_flag = ND_NFSV3 | ND_NFSCL;
+		else
+			nd->nd_flag = ND_NFSV2 | ND_NFSCL;
+	}
 	nd->nd_procnum = procnum;
 	nd->nd_repstat = 0;
 
@@ -200,13 +213,16 @@ nfscl_reqstart(struct nfsrv_descript *nd, int procnum, struct nfsmount *nmp,
 		*tl = txdr_unsigned(opcnt);
 		if ((nd->nd_flag & ND_NFSV41) != 0 &&
 		    nfsv4_opflag[nfsv4_opmap[procnum].op].needsseq > 0) {
+			if (nfsv4_opflag[nfsv4_opmap[procnum].op].loopbadsess >
+			    0)
+				nd->nd_flag |= ND_LOOPBADSESS;
 			NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
 			*tl = txdr_unsigned(NFSV4OP_SEQUENCE);
-			if (sep == NULL)
-				nfsv4_setsequence(nmp, nd,
-				    NFSMNT_MDSSESSION(nmp),
+			if (sep == NULL) {
+				sep = nfsmnt_mdssession(nmp);
+				nfsv4_setsequence(nmp, nd, sep,
 				    nfs_bigreply[procnum]);
-			else
+			} else
 				nfsv4_setsequence(nmp, nd, sep,
 				    nfs_bigreply[procnum]);
 		}
@@ -241,11 +257,10 @@ nfscl_reqstart(struct nfsrv_descript *nd, int procnum, struct nfsmount *nmp,
 	} else {
 		(void) nfsm_fhtom(nd, nfhp, fhlen, 0);
 	}
-	if (procnum < NFSV4_NPROCS)
-		NFSINCRGLOBAL(newnfsstats.rpccnt[procnum]);
+	if (procnum < NFSV41_NPROCS)
+		NFSINCRGLOBAL(nfsstatsv1.rpccnt[procnum]);
 }
 
-#ifndef APPLE
 /*
  * copies a uio scatter/gather list to an mbuf chain.
  * NOTE: can ony handle iovcnt == 1
@@ -253,11 +268,11 @@ nfscl_reqstart(struct nfsrv_descript *nd, int procnum, struct nfsmount *nmp,
 APPLESTATIC void
 nfsm_uiombuf(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 {
-	char *uiocp;
+	char * __capability uiocp;
 	struct mbuf *mp, *mp2;
 	int xfer, left, mlen;
 	int uiosiz, clflg, rem;
-	char *cp, *tcp;
+	char *cp;
 
 	KASSERT(uiop->uio_iovcnt == 1, ("nfsm_uiotombuf: iovcnt != 1"));
 
@@ -295,21 +310,19 @@ nfsm_uiombuf(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 			else
 #endif
 			if (uiop->uio_segflg == UIO_SYSSPACE)
-			    NFSBCOPY(uiocp, NFSMTOD(mp, caddr_t) + mbuf_len(mp),
-				xfer);
+			    NFSBCOPY((__cheri_fromcap char *)uiocp,
+				NFSMTOD(mp, caddr_t) + mbuf_len(mp), xfer);
 			else
-			    copyin(CAST_USER_ADDR_T(uiocp), NFSMTOD(mp, caddr_t)
-				+ mbuf_len(mp), xfer);
+			    copyin_c(CAST_USER_ADDR_T(uiocp),
+				(__cheri_tocap char * __capability)
+				NFSMTOD(mp, caddr_t) + mbuf_len(mp), xfer);
 			mbuf_setlen(mp, mbuf_len(mp) + xfer);
 			left -= xfer;
 			uiocp += xfer;
 			uiop->uio_offset += xfer;
 			uiop->uio_resid -= xfer;
 		}
-		tcp = (char *)uiop->uio_iov->iov_base;
-		tcp += uiosiz;
-		uiop->uio_iov->iov_base = (void *)tcp;
-		uiop->uio_iov->iov_len -= uiosiz;
+		IOVEC_ADVANCE(uiop->uio_iov, uiosiz);
 		siz -= uiosiz;
 	}
 	if (rem > 0) {
@@ -327,7 +340,74 @@ nfsm_uiombuf(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 		nd->nd_bpos = NFSMTOD(mp, caddr_t) + mbuf_len(mp);
 	nd->nd_mb = mp;
 }
-#endif	/* !APPLE */
+
+/*
+ * copies a uio scatter/gather list to an mbuf chain.
+ * This version returns the mbuf list and does not use "nd".
+ * NOTE: can ony handle iovcnt == 1
+ */
+struct mbuf *
+nfsm_uiombuflist(struct uio *uiop, int siz, struct mbuf **mbp, char **cpp)
+{
+	char * __capability uiocp;
+	struct mbuf *mp, *mp2, *firstmp;
+	int xfer, left, mlen;
+	int uiosiz, clflg, rem;
+
+	KASSERT(uiop->uio_iovcnt == 1, ("nfsm_uiotombuf: iovcnt != 1"));
+
+	if (siz > ncl_mbuf_mlen)	/* or should it >= MCLBYTES ?? */
+		clflg = 1;
+	else
+		clflg = 0;
+	rem = NFSM_RNDUP(siz) - siz;
+	if (clflg != 0)
+		NFSMCLGET(mp, M_WAITOK);
+	else
+		NFSMGET(mp);
+	mbuf_setlen(mp, 0);
+	firstmp = mp2 = mp;
+	while (siz > 0) {
+		left = uiop->uio_iov->iov_len;
+		uiocp = uiop->uio_iov->iov_base;
+		if (left > siz)
+			left = siz;
+		uiosiz = left;
+		while (left > 0) {
+			mlen = M_TRAILINGSPACE(mp);
+			if (mlen == 0) {
+				if (clflg)
+					NFSMCLGET(mp, M_WAITOK);
+				else
+					NFSMGET(mp);
+				mbuf_setlen(mp, 0);
+				mbuf_setnext(mp2, mp);
+				mp2 = mp;
+				mlen = M_TRAILINGSPACE(mp);
+			}
+			xfer = (left > mlen) ? mlen : left;
+			if (uiop->uio_segflg == UIO_SYSSPACE)
+				NFSBCOPY((__cheri_fromcap char *)uiocp,
+				    NFSMTOD(mp, caddr_t) + mbuf_len(mp), xfer);
+			else
+				copyin_c(uiocp,
+				    (__cheri_tocap char * __capability)NFSMTOD(mp, caddr_t) +
+				    mbuf_len(mp), xfer);
+			mbuf_setlen(mp, mbuf_len(mp) + xfer);
+			left -= xfer;
+			uiocp += xfer;
+			uiop->uio_offset += xfer;
+			uiop->uio_resid -= xfer;
+		}
+		IOVEC_ADVANCE(uiop->uio_iov, uiosiz);
+		siz -= uiosiz;
+	}
+	if (cpp != NULL)
+		*cpp = NFSMTOD(mp, caddr_t) + mbuf_len(mp);
+	if (mbp != NULL)
+		*mbp = mp;
+	return (firstmp);
+}
 
 /*
  * Load vnode attributes from the xdr file attributes.
@@ -348,7 +428,7 @@ nfsm_loadattr(struct nfsrv_descript *nd, struct nfsvattr *nap)
 		nap->na_mode = fxdr_unsigned(u_short, fp->fa_mode);
 		nap->na_rdev = makedev(fxdr_unsigned(u_char, fp->fa3_rdev.specdata1),
 			fxdr_unsigned(u_char, fp->fa3_rdev.specdata2));
-		nap->na_nlink = fxdr_unsigned(u_short, fp->fa_nlink);
+		nap->na_nlink = fxdr_unsigned(uint32_t, fp->fa_nlink);
 		nap->na_uid = fxdr_unsigned(uid_t, fp->fa_uid);
 		nap->na_gid = fxdr_unsigned(gid_t, fp->fa_gid);
 		nap->na_size = fxdr_hyper(&fp->fa3_size);
@@ -468,6 +548,12 @@ nfscl_mtofh(struct nfsrv_descript *nd, struct nfsfh **nfhpp,
 		flag = fxdr_unsigned(int, *tl);
 	} else if (nd->nd_flag & ND_NFSV4) {
 		NFSM_DISSECT(tl, u_int32_t *, 2 * NFSX_UNSIGNED);
+		/* If the GetFH failed, clear flag. */
+		if (*++tl != 0) {
+			nd->nd_flag |= ND_NOMOREDATA;
+			flag = 0;
+			error = ENXIO;	/* Return ENXIO so *nfhpp isn't used. */
+		}
 	}
 	if (flag) {
 		error = nfsm_getfh(nd, nfhpp);
@@ -478,8 +564,12 @@ nfscl_mtofh(struct nfsrv_descript *nd, struct nfsfh **nfhpp,
 	/*
 	 * Now, get the attributes.
 	 */
-	if (nd->nd_flag & ND_NFSV4) {
+	if (flag != 0 && (nd->nd_flag & ND_NFSV4) != 0) {
 		NFSM_DISSECT(tl, u_int32_t *, 2 * NFSX_UNSIGNED);
+		if (*++tl != 0) {
+			nd->nd_flag |= ND_NOMOREDATA;
+			flag = 0;
+		}
 	} else if (nd->nd_flag & ND_NFSV3) {
 		NFSM_DISSECT(tl, u_int32_t *, NFSX_UNSIGNED);
 		if (flag) {

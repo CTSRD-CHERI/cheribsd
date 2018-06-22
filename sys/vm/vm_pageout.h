@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: (BSD-3-Clause AND MIT-CMU)
+ *
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -13,7 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -72,18 +74,18 @@
  */
 
 extern int vm_page_max_wired;
-extern int vm_pages_needed;	/* should be some "event" structure */
 extern int vm_pageout_deficit;
 extern int vm_pageout_page_count;
-
-/*
- * Swap out requests
- */
-#define VM_SWAP_NORMAL 1
-#define VM_SWAP_IDLE 2
+extern bool vm_pages_needed;
 
 #define	VM_OOM_MEM	1
 #define	VM_OOM_SWAPZ	2
+
+/*
+ * vm_lowmem flags.
+ */
+#define	VM_LOW_KMEM	0x01
+#define	VM_LOW_PAGES	0x02
 
 /*
  *	Exported routines.
@@ -93,14 +95,18 @@ extern int vm_pageout_page_count;
  *	Signal pageout-daemon and wait for it.
  */
 
-extern void pagedaemon_wakeup(void);
+void pagedaemon_wait(int pri, const char *wmesg);
+void pagedaemon_wakeup(void);
 #define VM_WAIT vm_wait()
 #define VM_WAITPFAULT vm_waitpfault()
-extern void vm_wait(void);
-extern void vm_waitpfault(void);
+void vm_wait(void);
+void vm_waitpfault(void);
 
 #ifdef _KERNEL
 int vm_pageout_flush(vm_page_t *, int, int, int, int *, boolean_t *);
 void vm_pageout_oom(int shortage);
+
+void vm_swapout_run(void);
+void vm_swapout_run_idle(void);
 #endif
 #endif	/* _VM_VM_PAGEOUT_H_ */

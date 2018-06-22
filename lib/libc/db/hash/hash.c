@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1990, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -13,7 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -160,8 +162,7 @@ __hash_open(const char *file, int flags, int mode,
 		 * maximum bucket number, so the number of buckets is
 		 * max_bucket + 1.
 		 */
-		nsegs = (hashp->MAX_BUCKET + 1 + hashp->SGSIZE - 1) /
-			 hashp->SGSIZE;
+		nsegs = howmany(hashp->MAX_BUCKET + 1, hashp->SGSIZE);
 		if (alloc_segs(hashp, nsegs))
 			/*
 			 * If alloc_segs fails, table will have been destroyed
@@ -422,8 +423,11 @@ hdestroy(HTAB *hashp)
 	if (hashp->tmp_buf)
 		free(hashp->tmp_buf);
 
-	if (hashp->fp != -1)
+	if (hashp->fp != -1) {
+		if (hashp->save_file)
+			(void)_fsync(hashp->fp);
 		(void)_close(hashp->fp);
+	}
 
 	free(hashp);
 
@@ -457,6 +461,8 @@ hash_sync(const DB *dbp, u_int32_t flags)
 	if (!hashp->save_file)
 		return (0);
 	if (__buf_free(hashp, 0, 1) || flush_meta(hashp))
+		return (ERROR);
+	if (hashp->fp != -1 && _fsync(hashp->fp) != 0)
 		return (ERROR);
 	hashp->new_file = 0;
 	return (0);
@@ -766,7 +772,7 @@ next_bucket:
 		if (__big_keydata(hashp, bufp, key, data, 1))
 			return (ERROR);
 	} else {
-		if (hashp->cpage == 0)
+		if (hashp->cpage == NULL)
 			return (ERROR);
 		key->data = (u_char *)hashp->cpage->page + bp[ndx];
 		key->size = (ndx > 1 ? bp[ndx - 1] : hashp->BSIZE) - bp[ndx];

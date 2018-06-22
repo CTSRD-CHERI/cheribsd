@@ -56,6 +56,8 @@ extern char *console_page;
 extern int xen_disable_pv_disks;
 extern int xen_disable_pv_nics;
 
+extern bool xen_suspend_cancelled;
+
 enum xen_domain_type {
 	XEN_NATIVE,             /* running on bare hardware    */
 	XEN_PV_DOMAIN,          /* running in a PV domain      */
@@ -118,7 +120,7 @@ xen_clear_bit(int bit, volatile long *addr)
 	atomic_clear_long(&addr[bit / NBPL], 1UL << (bit % NBPL));
 }
 
-#undef NPBL
+#undef NBPL
 
 /*
  * Functions to allocate/free unused memory in order

@@ -1,6 +1,8 @@
 /*	$NetBSD: vmparam.h,v 1.26 2003/08/07 16:27:47 agc Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1988 The Regents of the University of California.
  * All rights reserved.
  *
@@ -42,7 +44,7 @@
  * Virtual memory related constants, all in bytes
  */
 #ifndef	MAXTSIZ
-#define	MAXTSIZ		(64UL*1024*1024)	/* max text size */
+#define	MAXTSIZ		(256UL*1024*1024)	/* max text size */
 #endif
 #ifndef	DFLDSIZ
 #define	DFLDSIZ		(128UL*1024*1024)	/* initial data size limit */
@@ -171,5 +173,7 @@ extern vm_offset_t vm_max_kernel_address;
 
 #define	SFBUF
 #define	SFBUF_MAP
+
+#define	DEVMAP_MAX_VADDR	ARM_VECTORS_HIGH
 
 #endif	/* _MACHINE_VMPARAM_H_ */

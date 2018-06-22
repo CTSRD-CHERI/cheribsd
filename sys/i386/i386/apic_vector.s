@@ -11,7 +11,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -181,25 +181,6 @@ IDTVEC(xen_intr_upcall)
 	jmp	doreti
 #endif
 
-#ifdef HYPERV
-/*
- * This is the Hyper-V vmbus channel direct callback interrupt.
- * Only used when it is running on Hyper-V.
- */
-	.text
-	SUPERALIGN_TEXT
-IDTVEC(hv_vmbus_callback)
-	PUSH_FRAME
-	SET_KERNEL_SREGS
-	cld
-	FAKE_MCOUNT(TF_EIP(%esp))
-	pushl	%esp
-	call	hv_vector_handler
-	add	$4, %esp
-	MEXITCOUNT
-	jmp	doreti
-#endif
-
 #ifdef SMP
 /*
  * Global address space TLB shootdown.
@@ -208,8 +189,7 @@ IDTVEC(hv_vmbus_callback)
 	SUPERALIGN_TEXT
 invltlb_ret:
 	call	as_lapic_eoi
-	POP_FRAME
-	iret
+	jmp	doreti
 
 	SUPERALIGN_TEXT
 IDTVEC(invltlb)
@@ -293,9 +273,7 @@ IDTVEC(cpustop)
 
 	call	as_lapic_eoi
 	call	cpustop_handler
-
-	POP_FRAME
-	iret
+	jmp	doreti
 
 /*
  * Executed by a CPU when it receives an IPI_SUSPEND from another CPU.
@@ -309,9 +287,7 @@ IDTVEC(cpususpend)
 
 	call	as_lapic_eoi
 	call	cpususpend_handler
-
-	POP_FRAME
-	jmp	doreti_iret
+	jmp	doreti
 
 /*
  * Executed by a CPU when it receives a RENDEZVOUS IPI from another CPU.
@@ -333,7 +309,6 @@ IDTVEC(rendezvous)
 	call	smp_rendezvous_action
 
 	call	as_lapic_eoi
-	POP_FRAME
-	iret
+	jmp	doreti
 	
 #endif /* SMP */

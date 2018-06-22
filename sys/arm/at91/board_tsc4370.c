@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2005-2008 Olivier Houchard.  All rights reserved.
  * Copyright (c) 2005-2012 Warner Losh.  All rights reserved.
  * Copyright (c) 2007-2014 Ian Lepore.  All rights reserved.
@@ -601,7 +603,7 @@ parse_boot_param(struct arm_boot_params *abp)
 		inkernel_bootinfo = *(struct tsc_bootinfo *)(abp->abp_r1);
 	}
 
-	return fake_preload_metadata(abp);
+	return fake_preload_metadata(abp, NULL, 0);
 }
 
 ARM_BOARD(NONE, "TSC4370 Controller Board");

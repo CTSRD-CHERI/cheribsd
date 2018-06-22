@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2006 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
@@ -53,8 +55,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/endian.h>
 
 #include <machine/bus.h>
-#include <machine/cpu.h>
-#include <machine/cpufunc.h>
 #include <machine/resource.h>
 #include <machine/intr.h>
 #include <arm/xscale/ixp425/ixp425reg.h>
@@ -202,17 +202,17 @@ ata_avila_attach(device_t dev)
 		 */
 		sc->sc_expbus_tag.bs_privdata = sc;	/* NB: backpointer */
 		/* read single */
-		sc->sc_expbus_tag.bs_r_1	= ata_bs_r_1,
-		sc->sc_expbus_tag.bs_r_2	= ata_bs_r_2,
+		sc->sc_expbus_tag.bs_r_1	= ata_bs_r_1;
+		sc->sc_expbus_tag.bs_r_2	= ata_bs_r_2;
 		/* read multiple */
-		sc->sc_expbus_tag.bs_rm_2	= ata_bs_rm_2,
-		sc->sc_expbus_tag.bs_rm_2_s	= ata_bs_rm_2_s,
+		sc->sc_expbus_tag.bs_rm_2	= ata_bs_rm_2;
+		sc->sc_expbus_tag.bs_rm_2_s	= ata_bs_rm_2_s;
 		/* write (single) */
-		sc->sc_expbus_tag.bs_w_1	= ata_bs_w_1,
-		sc->sc_expbus_tag.bs_w_2	= ata_bs_w_2,
+		sc->sc_expbus_tag.bs_w_1	= ata_bs_w_1;
+		sc->sc_expbus_tag.bs_w_2	= ata_bs_w_2;
 		/* write multiple */
-		sc->sc_expbus_tag.bs_wm_2	= ata_bs_wm_2,
-		sc->sc_expbus_tag.bs_wm_2_s	= ata_bs_wm_2_s,
+		sc->sc_expbus_tag.bs_wm_2	= ata_bs_wm_2;
+		sc->sc_expbus_tag.bs_wm_2_s	= ata_bs_wm_2_s;
 
 		rman_set_bustag(&sc->sc_ata, &sc->sc_expbus_tag);
 		rman_set_bustag(&sc->sc_alt_ata, &sc->sc_expbus_tag);
@@ -287,7 +287,7 @@ ata_avila_alloc_resource(device_t dev, device_t child, int type, int *rid,
 	struct ata_avila_softc *sc = device_get_softc(dev);
 
 	KASSERT(type == SYS_RES_IRQ && *rid == ATA_IRQ_RID,
-	    ("type %u rid %u start %lu end %lu count %lu flags %u",
+	    ("type %u rid %u start %ju end %ju count %ju flags %u",
 	     type, *rid, start, end, count, flags));
 
 	/* doesn't matter what we return so reuse the real thing */

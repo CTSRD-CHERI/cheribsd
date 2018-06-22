@@ -117,6 +117,8 @@ static void		rt2560_beacon_expire(struct rt2560_softc *);
 static void		rt2560_wakeup_expire(struct rt2560_softc *);
 static void		rt2560_scan_start(struct ieee80211com *);
 static void		rt2560_scan_end(struct ieee80211com *);
+static void		rt2560_getradiocaps(struct ieee80211com *, int, int *,
+			    struct ieee80211_channel[]);
 static void		rt2560_set_channel(struct ieee80211com *);
 static void		rt2560_setup_tx_desc(struct rt2560_softc *,
 			    struct rt2560_tx_desc *, uint32_t, int, int, int,
@@ -187,6 +189,14 @@ static const uint32_t rt2560_rf2525e_r2[]   = RT2560_RF2525E_R2;
 static const uint32_t rt2560_rf2526_r2[]    = RT2560_RF2526_R2;
 static const uint32_t rt2560_rf2526_hi_r2[] = RT2560_RF2526_HI_R2;
 
+static const uint8_t rt2560_chan_2ghz[] =
+	{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 };
+
+static const uint8_t rt2560_chan_5ghz[] =
+	{ 36, 40, 44, 48, 52, 56, 60, 64,
+	  100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140,
+	  149, 153, 157, 161 };
+
 static const struct {
 	uint8_t		chan;
 	uint32_t	r1, r2, r4;
@@ -199,7 +209,6 @@ rt2560_attach(device_t dev, int id)
 {
 	struct rt2560_softc *sc = device_get_softc(dev);
 	struct ieee80211com *ic = &sc->sc_ic;
-	uint8_t bands[howmany(IEEE80211_MODE_MAX, 8)];
 	int error;
 
 	sc->sc_dev = dev;
@@ -278,12 +287,8 @@ rt2560_attach(device_t dev, int id)
 #endif
 		;
 
-	memset(bands, 0, sizeof(bands));
-	setbit(bands, IEEE80211_MODE_11B);
-	setbit(bands, IEEE80211_MODE_11G);
-	if (sc->rf_rev == RT2560_RF_5222)
-		setbit(bands, IEEE80211_MODE_11A);
-	ieee80211_init_channels(ic, NULL, bands);
+	rt2560_getradiocaps(ic, IEEE80211_CHAN_MAX, &ic->ic_nchans,
+	    ic->ic_channels);
 
 	ieee80211_ifattach(ic);
 	ic->ic_raw_xmit = rt2560_raw_xmit;
@@ -291,6 +296,7 @@ rt2560_attach(device_t dev, int id)
 	ic->ic_update_promisc = rt2560_update_promisc;
 	ic->ic_scan_start = rt2560_scan_start;
 	ic->ic_scan_end = rt2560_scan_end;
+	ic->ic_getradiocaps = rt2560_getradiocaps;
 	ic->ic_set_channel = rt2560_set_channel;
 
 	ic->ic_vap_create = rt2560_vap_create;
@@ -780,7 +786,7 @@ rt2560_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 				return error;
 		}
 
-		/* turn assocation led on */
+		/* turn association led on */
 		rt2560_update_led(sc, 1, 0);
 
 		if (vap->iv_opmode != IEEE80211_M_MONITOR)
@@ -905,17 +911,18 @@ rt2560_encryption_intr(struct rt2560_softc *sc)
 static void
 rt2560_tx_intr(struct rt2560_softc *sc)
 {
+	struct ieee80211_ratectl_tx_status *txs = &sc->sc_txs;
 	struct rt2560_tx_desc *desc;
 	struct rt2560_tx_data *data;
 	struct mbuf *m;
-	struct ieee80211vap *vap;
 	struct ieee80211_node *ni;
 	uint32_t flags;
-	int retrycnt, status;
+	int status;
 
 	bus_dmamap_sync(sc->txq.desc_dmat, sc->txq.desc_map,
 	    BUS_DMASYNC_POSTREAD);
 
+	txs->flags = IEEE80211_RATECTL_STATUS_LONG_RETRY;
 	for (;;) {
 		desc = &sc->txq.desc[sc->txq.next];
 		data = &sc->txq.data[sc->txq.next];
@@ -928,41 +935,37 @@ rt2560_tx_intr(struct rt2560_softc *sc)
 
 		m = data->m;
 		ni = data->ni;
-		vap = ni->ni_vap;
 
 		switch (flags & RT2560_TX_RESULT_MASK) {
 		case RT2560_TX_SUCCESS:
-			retrycnt = 0;
+			txs->status = IEEE80211_RATECTL_TX_SUCCESS;
+			txs->long_retries = 0;
 
 			DPRINTFN(sc, 10, "%s\n", "data frame sent successfully");
 			if (data->rix != IEEE80211_FIXED_RATE_NONE)
-				ieee80211_ratectl_tx_complete(vap, ni,
-				    IEEE80211_RATECTL_TX_SUCCESS,
-				    &retrycnt, NULL);
+				ieee80211_ratectl_tx_complete(ni, txs);
 			status = 0;
 			break;
 
 		case RT2560_TX_SUCCESS_RETRY:
-			retrycnt = RT2560_TX_RETRYCNT(flags);
+			txs->status = IEEE80211_RATECTL_TX_SUCCESS;
+			txs->long_retries = RT2560_TX_RETRYCNT(flags);
 
 			DPRINTFN(sc, 9, "data frame sent after %u retries\n",
-			    retrycnt);
+			    txs->long_retries);
 			if (data->rix != IEEE80211_FIXED_RATE_NONE)
-				ieee80211_ratectl_tx_complete(vap, ni,
-				    IEEE80211_RATECTL_TX_SUCCESS,
-				    &retrycnt, NULL);
+				ieee80211_ratectl_tx_complete(ni, txs);
 			status = 0;
 			break;
 
 		case RT2560_TX_FAIL_RETRY:
-			retrycnt = RT2560_TX_RETRYCNT(flags);
+			txs->status = IEEE80211_RATECTL_TX_FAIL_LONG;
+			txs->long_retries = RT2560_TX_RETRYCNT(flags);
 
 			DPRINTFN(sc, 9, "data frame failed after %d retries\n",
-			    retrycnt);
+			    txs->long_retries);
 			if (data->rix != IEEE80211_FIXED_RATE_NONE)
-				ieee80211_ratectl_tx_complete(vap, ni,
-				    IEEE80211_RATECTL_TX_FAILURE,
-				    &retrycnt, NULL);
+				ieee80211_ratectl_tx_complete(ni, txs);
 			status = 1;
 			break;
 
@@ -1096,7 +1099,7 @@ rt2560_decryption_intr(struct rt2560_softc *sc)
 	int hw, error;
 	int8_t rssi, nf;
 
-	/* retrieve last decriptor index processed by cipher engine */
+	/* retrieve last descriptor index processed by cipher engine */
 	hw = RAL_READ(sc, RT2560_SECCSR0) - sc->rxq.physaddr;
 	hw /= RT2560_RX_DESC_SIZE;
 
@@ -1425,7 +1428,7 @@ rt2560_setup_tx_desc(struct rt2560_softc *sc, struct rt2560_tx_desc *desc,
 		desc->plcp_length_hi = plcp_length >> 6;
 		desc->plcp_length_lo = plcp_length & 0x3f;
 	} else {
-		plcp_length = (16 * len + rate - 1) / rate;
+		plcp_length = howmany(16 * len, rate);
 		if (rate == 22) {
 			remainder = (16 * len) % 22;
 			if (remainder != 0 && remainder < 7)
@@ -1515,7 +1518,7 @@ rt2560_tx_mgt(struct rt2560_softc *sc, struct mbuf *m0,
 	desc = &sc->prioq.desc[sc->prioq.cur];
 	data = &sc->prioq.data[sc->prioq.cur];
 
-	rate = vap->iv_txparms[ieee80211_chan2mode(ic->ic_curchan)].mgmtrate;
+	rate = ni->ni_txparms->mgmtrate;
 
 	wh = mtod(m0, struct ieee80211_frame *);
 
@@ -1743,7 +1746,7 @@ rt2560_tx_data(struct rt2560_softc *sc, struct mbuf *m0,
 	struct rt2560_tx_desc *desc;
 	struct rt2560_tx_data *data;
 	struct ieee80211_frame *wh;
-	const struct ieee80211_txparam *tp;
+	const struct ieee80211_txparam *tp = ni->ni_txparms;
 	struct ieee80211_key *k;
 	struct mbuf *mnew;
 	bus_dma_segment_t segs[RT2560_MAX_SCATTER];
@@ -1753,11 +1756,10 @@ rt2560_tx_data(struct rt2560_softc *sc, struct mbuf *m0,
 
 	wh = mtod(m0, struct ieee80211_frame *);
 
-	tp = &vap->iv_txparms[ieee80211_chan2mode(ni->ni_chan)];
-	if (IEEE80211_IS_MULTICAST(wh->i_addr1)) {
-		rate = tp->mcastrate;
-	} else if (m0->m_flags & M_EAPOL) {
+	if (m0->m_flags & M_EAPOL) {
 		rate = tp->mgmtrate;
+	} else if (IEEE80211_IS_MULTICAST(wh->i_addr1)) {
+		rate = tp->mcastrate;
 	} else if (tp->ucastrate != IEEE80211_FIXED_RATE_NONE) {
 		rate = tp->ucastrate;
 	} else {
@@ -2137,6 +2139,26 @@ rt2560_set_chan(struct rt2560_softc *sc, struct ieee80211_channel *c)
 
 		/* clear CRC errors */
 		RAL_READ(sc, RT2560_CNT0);
+	}
+}
+
+static void
+rt2560_getradiocaps(struct ieee80211com *ic,
+    int maxchans, int *nchans, struct ieee80211_channel chans[])
+{
+	struct rt2560_softc *sc = ic->ic_softc;
+	uint8_t bands[IEEE80211_MODE_BYTES];
+
+	memset(bands, 0, sizeof(bands));
+	setbit(bands, IEEE80211_MODE_11B);
+	setbit(bands, IEEE80211_MODE_11G);
+	ieee80211_add_channel_list_2ghz(chans, maxchans, nchans,
+	    rt2560_chan_2ghz, nitems(rt2560_chan_2ghz), bands, 0);
+
+	if (sc->rf_rev == RT2560_RF_5222) {
+		setbit(bands, IEEE80211_MODE_11A);
+		ieee80211_add_channel_list_5ghz(chans, maxchans, nchans,
+		    rt2560_chan_5ghz, nitems(rt2560_chan_5ghz), bands, 0);
 	}
 }
 

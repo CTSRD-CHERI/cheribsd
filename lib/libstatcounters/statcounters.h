@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2016 Alexandre Joannou
+ * Copyright (c) 2016-2017 Alexandre Joannou
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -31,48 +31,77 @@
 #ifndef STATCOUNTERS_H
 #define STATCOUNTERS_H
 
-// available modules
-#define ICACHE  8   //CacheCore
-#define DCACHE  9   //CacheCore
-#define L2CACHE 10  //CacheCore
-#define MIPSMEM 11  //MIPSMem
+#ifndef __has_extension
+#define __has_extension(x) 0
+#endif
+#if __has_extension(attribute_deprecated_with_message)
+#define DEPRECATED(x) __attribute__((deprecated(x)))
+#else
+#define DEPRECATED(x) __attribute__((deprecated))
+#endif
 
-// CacheCore counters
-#define WRITE_HIT   0
-#define WRITE_MISS  1
-#define READ_HIT    2
-#define READ_MISS   3
-#define PFTCH_HIT   4
-#define PFTCH_MISS  5
-#define EVICT       6
-#define PFTCH_EVICT 7
+#include <stdio.h>
+#include <stdint.h>
 
-// MIPSMem counters
-#define BYTE_READ   0
-#define BYTE_WRITE  1
-#define HWORD_READ  2
-#define HWORD_WRITE 3
-#define WORD_READ   4
-#define WORD_WRITE  5
-#define DWORD_READ  6
-#define DWORD_WRITE 7
-#define CAP_READ    8
-#define CAP_WRITE   9
-
-#define eval(X) X
-
-static inline void resetStatCounters (void)
+// counters bank
+#define STATCOUNTERS_MAX_MOD_CNT 12
+typedef struct statcounters_bank
 {
-  __asm __volatile(".word (0x1F << 26) | (0x0 << 21) | (0x0 << 16) | (0x7 << 11) | (0x0 << 6) | (0x3B)");
-}
+    uint64_t itlb_miss;
+    uint64_t dtlb_miss;
+    uint64_t cycle;
+    uint64_t inst;
+    uint64_t icache[STATCOUNTERS_MAX_MOD_CNT];
+    uint64_t dcache[STATCOUNTERS_MAX_MOD_CNT];
+    uint64_t l2cache[STATCOUNTERS_MAX_MOD_CNT];
+    uint64_t mipsmem[STATCOUNTERS_MAX_MOD_CNT];
+    uint64_t tagcache[STATCOUNTERS_MAX_MOD_CNT];
+    uint64_t l2cachemaster[STATCOUNTERS_MAX_MOD_CNT];
+    uint64_t tagcachemaster[STATCOUNTERS_MAX_MOD_CNT];
+} statcounters_bank_t;
 
-#include <inttypes.h>
-#define DEFINE_GET_STAT_COUNTER(name,X,Y)       \
-static inline uint64_t get_##name##_count (void) \
-{                                               \
-  uint64_t ret;                                  \
-  __asm __volatile(".word (0x1f << 26) | (0x0 << 21) | (12 << 16) | ("#X" << 11) | ( "#Y"  << 6) | 0x3b\n\tmove %0,$12" : "=r" (ret) :: "$12"); \
-  return ret;                                   \
-}
+// format flags
+typedef enum
+{
+    HUMAN_READABLE,
+    CSV_HEADER,
+    CSV_NOHEADER
+} statcounters_fmt_flag_t;
+
+// reset statcounters XXX this literally resets the hardware counters (allowed
+// from user space for convenience but need not to be abused to be usefull)
+void reset_statcounters (void) DEPRECATED("use statcounters_reset instead");
+void statcounters_reset (void);
+// zero a statcounters_bank
+void zero_statcounters (statcounters_bank_t * const cnt_bank) DEPRECATED("use statcounters_zero instead");
+int statcounters_zero (statcounters_bank_t * const cnt_bank);
+// sample hardware counters in a statcounters_bank
+void sample_statcounters (statcounters_bank_t * const cnt_bank) DEPRECATED("use statcounters_sample instead");
+int statcounters_sample (statcounters_bank_t * const cnt_bank);
+// diff two statcounters_banks into a third one
+void diff_statcounters (
+    const statcounters_bank_t * const be,
+    const statcounters_bank_t * const bs,
+    statcounters_bank_t * const bd) DEPRECATED("use statcounters_diff instead -- arguments order changed");
+int statcounters_diff (
+    statcounters_bank_t * const bd,
+    const statcounters_bank_t * const be,
+    const statcounters_bank_t * const bs);
+// dump a statcounters_bank in a file (csv or human readable)
+void dump_statcounters (
+    const statcounters_bank_t * const b,
+    const char * const fname,
+    const char * const fmt) DEPRECATED("use statcounters_dump instead -- arguments changed");
+int statcounters_dump (const statcounters_bank_t * const b);
+int statcounters_dump_with_phase (
+    const statcounters_bank_t * const b,
+    const char * phase);
+int statcounters_dump_with_args (
+    const statcounters_bank_t * const b,
+    const char * progname,
+    const char * phase,
+    const char * archname,
+    FILE * const fp,
+    const statcounters_fmt_flag_t fmt_flg);
 
 #endif

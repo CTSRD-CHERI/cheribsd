@@ -4,9 +4,117 @@
  *
  *****************************************************************************/
 
-/*
- * Copyright (C) 2000 - 2015, Intel Corp.
+/******************************************************************************
+ *
+ * 1. Copyright Notice
+ *
+ * Some or all of this work - Copyright (c) 1999 - 2017, Intel Corp.
  * All rights reserved.
+ *
+ * 2. License
+ *
+ * 2.1. This is your license from Intel Corp. under its intellectual property
+ * rights. You may have additional license terms from the party that provided
+ * you this software, covering your right to use that party's intellectual
+ * property rights.
+ *
+ * 2.2. Intel grants, free of charge, to any person ("Licensee") obtaining a
+ * copy of the source code appearing in this file ("Covered Code") an
+ * irrevocable, perpetual, worldwide license under Intel's copyrights in the
+ * base code distributed originally by Intel ("Original Intel Code") to copy,
+ * make derivatives, distribute, use and display any portion of the Covered
+ * Code in any form, with the right to sublicense such rights; and
+ *
+ * 2.3. Intel grants Licensee a non-exclusive and non-transferable patent
+ * license (with the right to sublicense), under only those claims of Intel
+ * patents that are infringed by the Original Intel Code, to make, use, sell,
+ * offer to sell, and import the Covered Code and derivative works thereof
+ * solely to the minimum extent necessary to exercise the above copyright
+ * license, and in no event shall the patent license extend to any additions
+ * to or modifications of the Original Intel Code. No other license or right
+ * is granted directly or by implication, estoppel or otherwise;
+ *
+ * The above copyright and patent license is granted only if the following
+ * conditions are met:
+ *
+ * 3. Conditions
+ *
+ * 3.1. Redistribution of Source with Rights to Further Distribute Source.
+ * Redistribution of source code of any substantial portion of the Covered
+ * Code or modification with rights to further distribute source must include
+ * the above Copyright Notice, the above License, this list of Conditions,
+ * and the following Disclaimer and Export Compliance provision. In addition,
+ * Licensee must cause all Covered Code to which Licensee contributes to
+ * contain a file documenting the changes Licensee made to create that Covered
+ * Code and the date of any change. Licensee must include in that file the
+ * documentation of any changes made by any predecessor Licensee. Licensee
+ * must include a prominent statement that the modification is derived,
+ * directly or indirectly, from Original Intel Code.
+ *
+ * 3.2. Redistribution of Source with no Rights to Further Distribute Source.
+ * Redistribution of source code of any substantial portion of the Covered
+ * Code or modification without rights to further distribute source must
+ * include the following Disclaimer and Export Compliance provision in the
+ * documentation and/or other materials provided with distribution. In
+ * addition, Licensee may not authorize further sublicense of source of any
+ * portion of the Covered Code, and must include terms to the effect that the
+ * license from Licensee to its licensee is limited to the intellectual
+ * property embodied in the software Licensee provides to its licensee, and
+ * not to intellectual property embodied in modifications its licensee may
+ * make.
+ *
+ * 3.3. Redistribution of Executable. Redistribution in executable form of any
+ * substantial portion of the Covered Code or modification must reproduce the
+ * above Copyright Notice, and the following Disclaimer and Export Compliance
+ * provision in the documentation and/or other materials provided with the
+ * distribution.
+ *
+ * 3.4. Intel retains all right, title, and interest in and to the Original
+ * Intel Code.
+ *
+ * 3.5. Neither the name Intel nor any other trademark owned or controlled by
+ * Intel shall be used in advertising or otherwise to promote the sale, use or
+ * other dealings in products derived from or relating to the Covered Code
+ * without prior written authorization from Intel.
+ *
+ * 4. Disclaimer and Export Compliance
+ *
+ * 4.1. INTEL MAKES NO WARRANTY OF ANY KIND REGARDING ANY SOFTWARE PROVIDED
+ * HERE. ANY SOFTWARE ORIGINATING FROM INTEL OR DERIVED FROM INTEL SOFTWARE
+ * IS PROVIDED "AS IS," AND INTEL WILL NOT PROVIDE ANY SUPPORT, ASSISTANCE,
+ * INSTALLATION, TRAINING OR OTHER SERVICES. INTEL WILL NOT PROVIDE ANY
+ * UPDATES, ENHANCEMENTS OR EXTENSIONS. INTEL SPECIFICALLY DISCLAIMS ANY
+ * IMPLIED WARRANTIES OF MERCHANTABILITY, NONINFRINGEMENT AND FITNESS FOR A
+ * PARTICULAR PURPOSE.
+ *
+ * 4.2. IN NO EVENT SHALL INTEL HAVE ANY LIABILITY TO LICENSEE, ITS LICENSEES
+ * OR ANY OTHER THIRD PARTY, FOR ANY LOST PROFITS, LOST DATA, LOSS OF USE OR
+ * COSTS OF PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, OR FOR ANY INDIRECT,
+ * SPECIAL OR CONSEQUENTIAL DAMAGES ARISING OUT OF THIS AGREEMENT, UNDER ANY
+ * CAUSE OF ACTION OR THEORY OF LIABILITY, AND IRRESPECTIVE OF WHETHER INTEL
+ * HAS ADVANCE NOTICE OF THE POSSIBILITY OF SUCH DAMAGES. THESE LIMITATIONS
+ * SHALL APPLY NOTWITHSTANDING THE FAILURE OF THE ESSENTIAL PURPOSE OF ANY
+ * LIMITED REMEDY.
+ *
+ * 4.3. Licensee shall not export, either directly or indirectly, any of this
+ * software or system incorporating such software without first obtaining any
+ * required license or other approval from the U. S. Department of Commerce or
+ * any other agency or department of the United States Government. In the
+ * event Licensee exports any such software from the United States or
+ * re-exports any such software from a foreign destination, Licensee shall
+ * ensure that the distribution and export/re-export of the software is in
+ * compliance with all laws, regulations, orders, or other restrictions of the
+ * U.S. Export Administration Regulations. Licensee agrees that neither it nor
+ * any of its subsidiaries will export/re-export any technical data, process,
+ * software, or service, directly or indirectly, to any country for which the
+ * United States government or any agency thereof requires an export license,
+ * other governmental approval, or letter of assurance, without first obtaining
+ * such license, approval or letter.
+ *
+ *****************************************************************************
+ *
+ * Alternatively, you may choose to be licensed under the terms of the
+ * following license:
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,26 +131,25 @@
  *    of any contributors may be used to endorse or promote products derived
  *    from this software without specific prior written permission.
  *
- * Alternatively, this software may be distributed under the terms of the
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Alternatively, you may choose to be licensed under the terms of the
  * GNU General Public License ("GPL") version 2 as published by the Free
  * Software Foundation.
  *
- * NO WARRANTY
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * HOLDERS OR CONTRIBUTORS BE LIABLE FOR SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
- * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
- * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGES.
- */
+ *****************************************************************************/
 
 #include <contrib/dev/acpica/compiler/aslcompiler.h>
-#include <contrib/dev/acpica/compiler/dtcompiler.h>
 #include <contrib/dev/acpica/include/acnamesp.h>
 
 #include <stdio.h>
@@ -130,14 +237,15 @@ CmDoCompile (
 
     if (Gbl_SyntaxError)
     {
-        fprintf (stderr, "Compiler aborting due to parser-detected syntax error(s)\n");
+        fprintf (stderr,
+            "Compiler aborting due to parser-detected syntax error(s)\n");
         LsDumpParseTree ();
         goto ErrorExit;
     }
 
     /* Did the parse tree get successfully constructed? */
 
-    if (!RootNode)
+    if (!Gbl_ParseTreeRoot)
     {
         /*
          * If there are no errors, then we have some sort of
@@ -165,29 +273,29 @@ CmDoCompile (
 
     LsDumpParseTree ();
 
-    OpcGetIntegerWidth (RootNode);
+    OpcGetIntegerWidth (Gbl_ParseTreeRoot->Asl.Child);
     UtEndEvent (Event);
 
     /* Pre-process parse tree for any operator transforms */
 
     Event = UtBeginEvent ("Parse tree transforms");
     DbgPrint (ASL_DEBUG_OUTPUT, "\nParse tree transforms\n\n");
-    TrWalkParseTree (RootNode, ASL_WALK_VISIT_DOWNWARD,
-        TrAmlTransformWalk, NULL, NULL);
+    TrWalkParseTree (Gbl_ParseTreeRoot, ASL_WALK_VISIT_TWICE,
+        TrAmlTransformWalkBegin, TrAmlTransformWalkEnd, NULL);
     UtEndEvent (Event);
 
     /* Generate AML opcodes corresponding to the parse tokens */
 
     Event = UtBeginEvent ("Generate AML opcodes");
-    DbgPrint (ASL_DEBUG_OUTPUT, "\nGenerating AML opcodes\n\n");
-    TrWalkParseTree (RootNode, ASL_WALK_VISIT_UPWARD, NULL,
+    DbgPrint (ASL_DEBUG_OUTPUT, "Generating AML opcodes\n\n");
+    TrWalkParseTree (Gbl_ParseTreeRoot, ASL_WALK_VISIT_UPWARD, NULL,
         OpcAmlOpcodeWalk, NULL);
     UtEndEvent (Event);
 
     /*
      * Now that the input is parsed, we can open the AML output file.
-     * Note: by default, the name of this file comes from the table descriptor
-     * within the input file.
+     * Note: by default, the name of this file comes from the table
+     * descriptor within the input file.
      */
     Event = UtBeginEvent ("Open AML output file");
     Status = FlOpenAmlOutputFile (Gbl_OutputFilenamePrefix);
@@ -202,12 +310,12 @@ CmDoCompile (
 
     Event = UtBeginEvent ("Constant folding via AML interpreter");
     DbgPrint (ASL_DEBUG_OUTPUT,
-        "\nInterpreting compile-time constant expressions\n\n");
+        "Interpreting compile-time constant expressions\n\n");
 
     if (Gbl_FoldConstants)
     {
-        TrWalkParseTree (RootNode, ASL_WALK_VISIT_DOWNWARD,
-            OpcAmlConstantWalk, NULL, NULL);
+        TrWalkParseTree (Gbl_ParseTreeRoot, ASL_WALK_VISIT_UPWARD,
+            NULL, OpcAmlConstantWalk, NULL);
     }
     else
     {
@@ -219,16 +327,16 @@ CmDoCompile (
 
     Event = UtBeginEvent ("Updating AML opcodes after constant folding");
     DbgPrint (ASL_DEBUG_OUTPUT,
-        "\nUpdating AML opcodes after constant folding\n\n");
-    TrWalkParseTree (RootNode, ASL_WALK_VISIT_UPWARD,
+        "Updating AML opcodes after constant folding\n\n");
+    TrWalkParseTree (Gbl_ParseTreeRoot, ASL_WALK_VISIT_UPWARD,
         NULL, OpcAmlOpcodeUpdateWalk, NULL);
     UtEndEvent (Event);
 
     /* Calculate all AML package lengths */
 
     Event = UtBeginEvent ("Generate AML package lengths");
-    DbgPrint (ASL_DEBUG_OUTPUT, "\nGenerating Package lengths\n\n");
-    TrWalkParseTree (RootNode, ASL_WALK_VISIT_UPWARD, NULL,
+    DbgPrint (ASL_DEBUG_OUTPUT, "Generating Package lengths\n\n");
+    TrWalkParseTree (Gbl_ParseTreeRoot, ASL_WALK_VISIT_UPWARD, NULL,
         LnPackageLengthWalk, NULL);
     UtEndEvent (Event);
 
@@ -254,7 +362,8 @@ CmDoCompile (
     /* Namespace loading */
 
     Event = UtBeginEvent ("Create ACPI Namespace");
-    Status = LdLoadNamespace (RootNode);
+    DbgPrint (ASL_DEBUG_OUTPUT, "Creating ACPI Namespace\n\n");
+    Status = LdLoadNamespace (Gbl_ParseTreeRoot);
     UtEndEvent (Event);
     if (ACPI_FAILURE (Status))
     {
@@ -263,7 +372,9 @@ CmDoCompile (
 
     /* Namespace cross-reference */
 
-    AslGbl_NamespaceEvent = UtBeginEvent ("Cross reference parse tree and Namespace");
+    AslGbl_NamespaceEvent = UtBeginEvent (
+        "Cross reference parse tree and Namespace");
+    DbgPrint (ASL_DEBUG_OUTPUT, "Cross referencing namespace\n\n");
     Status = XfCrossReferenceNamespace ();
     if (ACPI_FAILURE (Status))
     {
@@ -275,6 +386,26 @@ CmDoCompile (
     LkFindUnreferencedObjects ();
     UtEndEvent (AslGbl_NamespaceEvent);
 
+    /* Resolve External Declarations */
+
+    if (Gbl_DoExternals)
+    {
+        Event = UtBeginEvent ("Resolve all Externals");
+        DbgPrint (ASL_DEBUG_OUTPUT, "\nResolve Externals\n\n");
+
+        if (Gbl_DoExternalsInPlace)
+        {
+            TrWalkParseTree (Gbl_ParseTreeRoot, ASL_WALK_VISIT_DOWNWARD,
+                ExAmlExternalWalkBegin, NULL, NULL);
+        }
+        else
+        {
+            TrWalkParseTree (Gbl_ParseTreeRoot, ASL_WALK_VISIT_TWICE,
+                ExAmlExternalWalkBegin, ExAmlExternalWalkEnd, NULL);
+        }
+        UtEndEvent (Event);
+    }
+
     /*
      * Semantic analysis. This can happen only after the
      * namespace has been loaded and cross-referenced.
@@ -284,50 +415,80 @@ CmDoCompile (
     Event = UtBeginEvent ("Analyze control method return types");
     AnalysisWalkInfo.MethodStack = NULL;
 
-    DbgPrint (ASL_DEBUG_OUTPUT, "\nSemantic analysis - Method analysis\n\n");
-    TrWalkParseTree (RootNode, ASL_WALK_VISIT_TWICE,
+    DbgPrint (ASL_DEBUG_OUTPUT, "Semantic analysis - Method analysis\n\n");
+
+    if (Gbl_CrossReferenceOutput)
+    {
+        OtPrintHeaders ("Part 1: Object Reference Map "
+            "(Object references from within each control method)");
+    }
+
+    TrWalkParseTree (Gbl_ParseTreeRoot, ASL_WALK_VISIT_TWICE,
         MtMethodAnalysisWalkBegin,
         MtMethodAnalysisWalkEnd, &AnalysisWalkInfo);
+    UtEndEvent (Event);
+
+    /* Generate the object cross-reference file if requested */
+
+    Event = UtBeginEvent ("Generate cross-reference file");
+    OtCreateXrefFile ();
     UtEndEvent (Event);
 
     /* Semantic error checking part two - typing of method returns */
 
     Event = UtBeginEvent ("Determine object types returned by methods");
-    DbgPrint (ASL_DEBUG_OUTPUT, "\nSemantic analysis - Method typing\n\n");
-    TrWalkParseTree (RootNode, ASL_WALK_VISIT_UPWARD,
+    DbgPrint (ASL_DEBUG_OUTPUT, "Semantic analysis - Method typing\n\n");
+    TrWalkParseTree (Gbl_ParseTreeRoot, ASL_WALK_VISIT_UPWARD,
         NULL, AnMethodTypingWalkEnd, NULL);
     UtEndEvent (Event);
 
     /* Semantic error checking part three - operand type checking */
 
     Event = UtBeginEvent ("Analyze AML operand types");
-    DbgPrint (ASL_DEBUG_OUTPUT, "\nSemantic analysis - Operand type checking\n\n");
-    TrWalkParseTree (RootNode, ASL_WALK_VISIT_UPWARD,
-        NULL, AnOperandTypecheckWalkEnd, &AnalysisWalkInfo);
+    DbgPrint (ASL_DEBUG_OUTPUT,
+        "Semantic analysis - Operand type checking\n\n");
+    if (Gbl_DoTypechecking)
+    {
+        TrWalkParseTree (Gbl_ParseTreeRoot, ASL_WALK_VISIT_UPWARD,
+            NULL, AnOperandTypecheckWalkEnd, &AnalysisWalkInfo);
+    }
     UtEndEvent (Event);
 
     /* Semantic error checking part four - other miscellaneous checks */
 
     Event = UtBeginEvent ("Miscellaneous analysis");
-    DbgPrint (ASL_DEBUG_OUTPUT, "\nSemantic analysis - miscellaneous\n\n");
-    TrWalkParseTree (RootNode, ASL_WALK_VISIT_DOWNWARD,
+    DbgPrint (ASL_DEBUG_OUTPUT, "Semantic analysis - miscellaneous\n\n");
+    TrWalkParseTree (Gbl_ParseTreeRoot, ASL_WALK_VISIT_DOWNWARD,
         AnOtherSemanticAnalysisWalkBegin,
         NULL, &AnalysisWalkInfo);
     UtEndEvent (Event);
 
+    /*
+     * ASL-/ASL+ converter: Gbl_ParseTreeRoot->CommentList contains the
+     * very last comment of a given ASL file because it's the last constructed
+     * node during compilation. We take the very last comment and save it in a
+     * global for it to be used by the disassembler.
+     */
+    if (AcpiGbl_CaptureComments)
+    {
+        AcpiGbl_LastListHead = Gbl_ParseTreeRoot->Asl.CommentList;
+        Gbl_ParseTreeRoot->Asl.CommentList = NULL;
+    }
+
     /* Calculate all AML package lengths */
 
     Event = UtBeginEvent ("Finish AML package length generation");
-    DbgPrint (ASL_DEBUG_OUTPUT, "\nGenerating Package lengths\n\n");
-    TrWalkParseTree (RootNode, ASL_WALK_VISIT_UPWARD, NULL,
+    DbgPrint (ASL_DEBUG_OUTPUT, "Generating Package lengths\n\n");
+    TrWalkParseTree (Gbl_ParseTreeRoot, ASL_WALK_VISIT_UPWARD, NULL,
         LnInitLengthsWalk, NULL);
-    TrWalkParseTree (RootNode, ASL_WALK_VISIT_UPWARD, NULL,
+    TrWalkParseTree (Gbl_ParseTreeRoot, ASL_WALK_VISIT_UPWARD, NULL,
         LnPackageLengthWalk, NULL);
     UtEndEvent (Event);
 
     /* Code generation - emit the AML */
 
     Event = UtBeginEvent ("Generate AML code and write output files");
+    DbgPrint (ASL_DEBUG_OUTPUT, "Writing AML byte code\n\n");
     CgGenerateAmlOutput ();
     UtEndEvent (Event);
 
@@ -406,7 +567,7 @@ AslCompilerSignon (
 
     /* Running compiler or disassembler? */
 
-    if (Gbl_DisasmFlag)
+    if (AcpiGbl_DisasmFlag)
     {
         UtilityName = AML_DISASSEMBLER_NAME;
     }
@@ -587,8 +748,8 @@ CmDumpAllEvents (
 {
     ASL_EVENT_INFO          *Event;
     UINT32                  Delta;
-    UINT32                  USec;
-    UINT32                  MSec;
+    UINT32                  MicroSeconds;
+    UINT32                  MilliSeconds;
     UINT32                  i;
 
 
@@ -608,23 +769,23 @@ CmDumpAllEvents (
 
             Delta = (UINT32) (Event->EndTime - Event->StartTime);
 
-            USec = Delta / ACPI_100NSEC_PER_USEC;
-            MSec = Delta / ACPI_100NSEC_PER_MSEC;
+            MicroSeconds = Delta / ACPI_100NSEC_PER_USEC;
+            MilliSeconds = Delta / ACPI_100NSEC_PER_MSEC;
 
             /* Round milliseconds up */
 
-            if ((USec - (MSec * ACPI_USEC_PER_MSEC)) >= 500)
+            if ((MicroSeconds - (MilliSeconds * ACPI_USEC_PER_MSEC)) >= 500)
             {
-                MSec++;
+                MilliSeconds++;
             }
 
             DbgPrint (ASL_DEBUG_OUTPUT, "%8u usec %8u msec - %s\n",
-                USec, MSec, Event->EventName);
+                MicroSeconds, MilliSeconds, Event->EventName);
 
             if (Gbl_CompileTimesFlag)
             {
                 printf ("%8u usec %8u msec - %s\n",
-                    USec, MSec, Event->EventName);
+                    MicroSeconds, MilliSeconds, Event->EventName);
             }
         }
 
@@ -653,6 +814,7 @@ CmCleanupAndExit (
     BOOLEAN                 DeleteAmlFile = FALSE;
 
 
+    AslCheckExpectedExceptions ();
     AePrintErrorLog (ASL_FILE_STDERR);
     if (Gbl_DebugFlag)
     {
@@ -767,68 +929,9 @@ CmCleanupAndExit (
 
     /* Final cleanup after compiling one file */
 
-    CmDeleteCaches ();
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    CmDeleteCaches
- *
- * PARAMETERS:  None
- *
- * RETURN:      None
- *
- * DESCRIPTION: Delete all local cache buffer blocks
- *
- ******************************************************************************/
-
-void
-CmDeleteCaches (
-    void)
-{
-    UINT32                  BufferCount;
-    ASL_CACHE_INFO          *Next;
-
-
-    /* Parse Op cache */
-
-    BufferCount = 0;
-    while (Gbl_ParseOpCacheList)
+    if (!Gbl_DoAslConversion)
     {
-        Next = Gbl_ParseOpCacheList->Next;
-        ACPI_FREE (Gbl_ParseOpCacheList);
-        Gbl_ParseOpCacheList = Next;
-        BufferCount++;
+        UtDeleteLocalCaches ();
     }
 
-    DbgPrint (ASL_DEBUG_OUTPUT,
-        "%u ParseOps, Buffer size: %u ops (%u bytes), %u Buffers\n",
-        Gbl_ParseOpCount, ASL_PARSEOP_CACHE_SIZE,
-        (sizeof (ACPI_PARSE_OBJECT) * ASL_PARSEOP_CACHE_SIZE), BufferCount);
-
-    Gbl_ParseOpCount = 0;
-    Gbl_ParseOpCacheNext = NULL;
-    Gbl_ParseOpCacheLast = NULL;
-    RootNode = NULL;
-
-    /* Generic string cache */
-
-    BufferCount = 0;
-    while (Gbl_StringCacheList)
-    {
-        Next = Gbl_StringCacheList->Next;
-        ACPI_FREE (Gbl_StringCacheList);
-        Gbl_StringCacheList = Next;
-        BufferCount++;
-    }
-
-    DbgPrint (ASL_DEBUG_OUTPUT,
-        "%u Strings (%u bytes), Buffer size: %u bytes, %u Buffers\n",
-        Gbl_StringCount, Gbl_StringSize, ASL_STRING_CACHE_SIZE, BufferCount);
-
-    Gbl_StringSize = 0;
-    Gbl_StringCount = 0;
-    Gbl_StringCacheNext = NULL;
-    Gbl_StringCacheLast = NULL;
 }

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1997, 1998
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -143,7 +145,7 @@ static int wb_probe(device_t);
 static int wb_attach(device_t);
 static int wb_detach(device_t);
 
-static void wb_bfree(struct mbuf *, void *addr, void *args);
+static void wb_bfree(struct mbuf *);
 static int wb_newbuf(struct wb_softc *, struct wb_chain_onefrag *,
 		struct mbuf *);
 static int wb_encap(struct wb_softc *, struct wb_chain *, struct mbuf *);
@@ -256,7 +258,7 @@ wb_eeprom_putbyte(sc, addr)
 	struct wb_softc		*sc;
 	int			addr;
 {
-	register int		d, i;
+	int			d, i;
 
 	d = addr | WB_EECMD_READ;
 
@@ -286,7 +288,7 @@ wb_eeprom_getword(sc, addr, dest)
 	int			addr;
 	u_int16_t		*dest;
 {
-	register int		i;
+	int			i;
 	u_int16_t		word = 0;
 
 	/* Enter EEPROM access mode. */
@@ -507,7 +509,7 @@ static void
 wb_reset(sc)
 	struct wb_softc		*sc;
 {
-	register int		i;
+	int			i;
 	struct mii_data		*mii;
 	struct mii_softc	*miisc;
 
@@ -824,7 +826,7 @@ wb_list_rx_init(sc)
 }
 
 static void
-wb_bfree(struct mbuf *m, void *buf, void *args)
+wb_bfree(struct mbuf *m)
 {
 }
 
@@ -843,10 +845,9 @@ wb_newbuf(sc, c, m)
 		MGETHDR(m_new, M_NOWAIT, MT_DATA);
 		if (m_new == NULL)
 			return(ENOBUFS);
-		m_new->m_data = c->wb_buf;
 		m_new->m_pkthdr.len = m_new->m_len = WB_BUFBYTES;
-		MEXTADD(m_new, c->wb_buf, WB_BUFBYTES, wb_bfree, c->wb_buf,
-		    NULL, 0, EXT_NET_DRV);
+		m_extadd(m_new, c->wb_buf, WB_BUFBYTES, wb_bfree, NULL, NULL,
+		    0, EXT_NET_DRV);
 	} else {
 		m_new = m;
 		m_new->m_len = m_new->m_pkthdr.len = WB_BUFBYTES;
@@ -1513,7 +1514,7 @@ wb_ioctl(ifp, command, data)
 	int			error = 0;
 
 	switch(command) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		WB_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			wb_init_locked(sc);
@@ -1524,15 +1525,15 @@ wb_ioctl(ifp, command, data)
 		WB_UNLOCK(sc);
 		error = 0;
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		WB_LOCK(sc);
 		wb_setmulti(sc);
 		WB_UNLOCK(sc);
 		error = 0;
 		break;
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		mii = device_get_softc(sc->wb_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;
@@ -1574,7 +1575,7 @@ static void
 wb_stop(sc)
 	struct wb_softc		*sc;
 {
-	register int		i;
+	int			i;
 	struct ifnet		*ifp;
 
 	WB_LOCK_ASSERT(sc);

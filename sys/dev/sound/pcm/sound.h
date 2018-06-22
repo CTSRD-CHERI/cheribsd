@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2005-2009 Ariff Abdullah <ariff@FreeBSD.org>
  * Copyright (c) 1999 Cameron Grant <cg@FreeBSD.org>
  * Copyright (c) 1995 Hannu Savolainen
@@ -350,8 +352,6 @@ void snd_mtxassert(void *m);
 #define	snd_mtxunlock(m) mtx_unlock(m)
 
 typedef int (*sndstat_handler)(struct sbuf *s, device_t dev, int verbose);
-int sndstat_acquire(struct thread *td);
-int sndstat_release(struct thread *td);
 int sndstat_register(device_t dev, char *str, sndstat_handler handler);
 int sndstat_registerfile(char *str);
 int sndstat_unregister(device_t dev);

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1994 Herb Peyerl <hpeyerl@novatel.ca>
  * All rights reserved.
  *
@@ -63,6 +65,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
@@ -529,31 +532,17 @@ startagain:
 		CSR_WRITE_2(sc, EP_COMMAND,
 		    SET_TX_AVAIL_THRESH | EP_THRESH_DISABLE);
 
-	/* XXX 4.x and earlier would splhigh here */
-
 	CSR_WRITE_2(sc, EP_W1_TX_PIO_WR_1, len);
 	/* Second dword meaningless */
 	CSR_WRITE_2(sc, EP_W1_TX_PIO_WR_1, 0x0);
 
-	if (EP_FTST(sc, F_ACCESS_32_BITS)) {
-		for (m = m0; m != NULL; m = m->m_next) {
-			if (m->m_len > 3)
-				CSR_WRITE_MULTI_4(sc, EP_W1_TX_PIO_WR_1,
-				    mtod(m, uint32_t *), m->m_len / 4);
-			if (m->m_len & 3)
-				CSR_WRITE_MULTI_1(sc, EP_W1_TX_PIO_WR_1,
-				    mtod(m, uint8_t *)+(m->m_len & (~3)),
-				    m->m_len & 3);
-		}
-	} else {
-		for (m = m0; m != NULL; m = m->m_next) {
-			if (m->m_len > 1)
-				CSR_WRITE_MULTI_2(sc, EP_W1_TX_PIO_WR_1,
-				    mtod(m, uint16_t *), m->m_len / 2);
-			if (m->m_len & 1)
-				CSR_WRITE_1(sc, EP_W1_TX_PIO_WR_1,
-				    *(mtod(m, uint8_t *)+m->m_len - 1));
-		}
+	for (m = m0; m != NULL; m = m->m_next) {
+		if (m->m_len > 1)
+			CSR_WRITE_MULTI_2(sc, EP_W1_TX_PIO_WR_1,
+			    mtod(m, uint16_t *), m->m_len / 2);
+		if (m->m_len & 1)
+			CSR_WRITE_1(sc, EP_W1_TX_PIO_WR_1,
+			    *(mtod(m, uint8_t *)+m->m_len - 1));
 	}
 
 	while (pad--)
@@ -787,25 +776,13 @@ read_again:
 			mcur->m_next = m;
 			lenthisone = min(rx_fifo, M_TRAILINGSPACE(m));
 		}
-		if (EP_FTST(sc, F_ACCESS_32_BITS)) {
-			/* default for EISA configured cards */
-			CSR_READ_MULTI_4(sc, EP_W1_RX_PIO_RD_1,
-			    (uint32_t *)(mtod(m, caddr_t)+m->m_len),
-			    lenthisone / 4);
-			m->m_len += (lenthisone & ~3);
-			if (lenthisone & 3)
-				CSR_READ_MULTI_1(sc, EP_W1_RX_PIO_RD_1,
-				    mtod(m, caddr_t)+m->m_len, lenthisone & 3);
-			m->m_len += (lenthisone & 3);
-		} else {
-			CSR_READ_MULTI_2(sc, EP_W1_RX_PIO_RD_1,
-			    (uint16_t *)(mtod(m, caddr_t)+m->m_len),
-			    lenthisone / 2);
-			m->m_len += lenthisone;
-			if (lenthisone & 1)
-				*(mtod(m, caddr_t)+m->m_len - 1) =
-				    CSR_READ_1(sc, EP_W1_RX_PIO_RD_1);
-		}
+		CSR_READ_MULTI_2(sc, EP_W1_RX_PIO_RD_1,
+		    (uint16_t *)(mtod(m, caddr_t)+m->m_len),
+		    lenthisone / 2);
+		m->m_len += lenthisone;
+		if (lenthisone & 1)
+			*(mtod(m, caddr_t)+m->m_len - 1) =
+			    CSR_READ_1(sc, EP_W1_RX_PIO_RD_1);
 		rx_fifo -= lenthisone;
 	}
 
@@ -941,7 +918,7 @@ epioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error = 0;
 
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		EP_LOCK(sc);
 		if (((ifp->if_flags & IFF_UP) == 0) &&
 		    (ifp->if_drv_flags & IFF_DRV_RUNNING)) {
@@ -951,8 +928,8 @@ epioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			epinit_locked(sc);
 		EP_UNLOCK(sc);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		/*
 		 * The Etherlink III has no programmable multicast
 		 * filter.  We always initialize the card to be
@@ -962,7 +939,7 @@ epioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		 */
 		error = 0;
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		if (!sc->epb.mii_trans)
 			error = ifmedia_ioctl(ifp, ifr, &sc->ifmedia, cmd);

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -434,7 +436,7 @@ ti_mem_read(struct ti_softc *sc, uint32_t addr, uint32_t len, void *buf)
 			segsize = cnt;
 		else
 			segsize = TI_WINLEN - (segptr % TI_WINLEN);
-		CSR_WRITE_4(sc, TI_WINBASE, (segptr & ~(TI_WINLEN - 1)));
+		CSR_WRITE_4(sc, TI_WINBASE, rounddown2(segptr, TI_WINLEN));
 		bus_space_read_region_4(sc->ti_btag, sc->ti_bhandle,
 		    TI_WINDOW + (segptr & (TI_WINLEN - 1)), (uint32_t *)ptr,
 		    segsize / 4);
@@ -464,7 +466,7 @@ ti_mem_write(struct ti_softc *sc, uint32_t addr, uint32_t len, void *buf)
 			segsize = cnt;
 		else
 			segsize = TI_WINLEN - (segptr % TI_WINLEN);
-		CSR_WRITE_4(sc, TI_WINBASE, (segptr & ~(TI_WINLEN - 1)));
+		CSR_WRITE_4(sc, TI_WINBASE, rounddown2(segptr, TI_WINLEN));
 		bus_space_write_region_4(sc->ti_btag, sc->ti_bhandle,
 		    TI_WINDOW + (segptr & (TI_WINLEN - 1)), (uint32_t *)ptr,
 		    segsize / 4);
@@ -491,7 +493,7 @@ ti_mem_zero(struct ti_softc *sc, uint32_t addr, uint32_t len)
 			segsize = cnt;
 		else
 			segsize = TI_WINLEN - (segptr % TI_WINLEN);
-		CSR_WRITE_4(sc, TI_WINBASE, (segptr & ~(TI_WINLEN - 1)));
+		CSR_WRITE_4(sc, TI_WINBASE, rounddown2(segptr, TI_WINLEN));
 		bus_space_set_region_4(sc->ti_btag, sc->ti_bhandle,
 		    TI_WINDOW + (segptr & (TI_WINLEN - 1)), 0, segsize / 4);
 		segptr += segsize;
@@ -559,7 +561,7 @@ ti_copy_mem(struct ti_softc *sc, uint32_t tigon_addr, uint32_t len,
 			segsize = cnt;
 		else
 			segsize = TI_WINLEN - (segptr % TI_WINLEN);
-		CSR_WRITE_4(sc, TI_WINBASE, (segptr & ~(TI_WINLEN - 1)));
+		CSR_WRITE_4(sc, TI_WINBASE, rounddown2(segptr, TI_WINLEN));
 
 		ti_offset = TI_WINDOW + (segptr & (TI_WINLEN -1));
 
@@ -628,7 +630,7 @@ ti_copy_mem(struct ti_softc *sc, uint32_t tigon_addr, uint32_t len,
 		/*
 		 * Set the segment pointer.
 		 */
-		CSR_WRITE_4(sc, TI_WINBASE, (segptr & ~(TI_WINLEN - 1)));
+		CSR_WRITE_4(sc, TI_WINBASE, rounddown2(segptr, TI_WINLEN));
 
 		ti_offset = TI_WINDOW + (segptr & (TI_WINLEN - 1));
 
@@ -1621,7 +1623,7 @@ ti_newbuf_jumbo(struct ti_softc *sc, int idx, struct mbuf *m_old)
 			}
 			sf[i] = sf_buf_alloc(frame, SFB_NOWAIT);
 			if (sf[i] == NULL) {
-				vm_page_unwire(frame, PQ_INACTIVE);
+				vm_page_unwire(frame, PQ_NONE);
 				vm_page_free(frame);
 				device_printf(sc->ti_dev, "buffer allocation "
 				    "failed -- packet dropped!\n");
@@ -1720,7 +1722,7 @@ ti_init_rx_ring_std(struct ti_softc *sc)
 	for (i = 0; i < TI_STD_RX_RING_CNT; i++) {
 		if (ti_newbuf_std(sc, i) != 0)
 			return (ENOBUFS);
-	};
+	}
 
 	sc->ti_std = TI_STD_RX_RING_CNT - 1;
 	TI_UPDATE_STDPROD(sc, TI_STD_RX_RING_CNT - 1);
@@ -1758,7 +1760,7 @@ ti_init_rx_ring_jumbo(struct ti_softc *sc)
 	for (i = 0; i < TI_JUMBO_RX_RING_CNT; i++) {
 		if (ti_newbuf_jumbo(sc, i, NULL) != 0)
 			return (ENOBUFS);
-	};
+	}
 
 	sc->ti_jumbo = TI_JUMBO_RX_RING_CNT - 1;
 	TI_UPDATE_JUMBOPROD(sc, TI_JUMBO_RX_RING_CNT - 1);
@@ -1795,7 +1797,7 @@ ti_init_rx_ring_mini(struct ti_softc *sc)
 	for (i = 0; i < TI_MINI_RX_RING_CNT; i++) {
 		if (ti_newbuf_mini(sc, i) != 0)
 			return (ENOBUFS);
-	};
+	}
 
 	sc->ti_mini = TI_MINI_RX_RING_CNT - 1;
 	TI_UPDATE_MINIPROD(sc, TI_MINI_RX_RING_CNT - 1);
@@ -2513,7 +2515,7 @@ ti_attach(device_t dev)
 		/*
 		 * Copper cards allow manual 10/100 mode selection,
 		 * but not manual 1000baseTX mode selection. Why?
-		 * Becuase currently there's no way to specify the
+		 * Because currently there's no way to specify the
 		 * master/slave setting through the firmware interface,
 		 * so Alteon decided to just bag it and handle it
 		 * via autonegotiation.
@@ -2747,7 +2749,7 @@ ti_discard_jumbo(struct ti_softc *sc, int i)
  * Note: we have to be able to handle three possibilities here:
  * 1) the frame is from the mini receive ring (can only happen)
  *    on Tigon 2 boards)
- * 2) the frame is from the jumbo recieve ring
+ * 2) the frame is from the jumbo receive ring
  * 3) the frame is from the standard receive ring
  */
 
@@ -2987,7 +2989,7 @@ ti_intr(void *xsc)
 		return;
 	}
 
-	/* Ack interrupt and stop others from occuring. */
+	/* Ack interrupt and stop others from occurring. */
 	CSR_WRITE_4(sc, TI_MB_HOSTINTR, 1);
 
 	if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -3379,7 +3381,7 @@ ti_ifmedia_upd_locked(struct ti_softc *sc)
 
 		/*
 		 * Transmit flow control can also cause problems on the
-		 * Tigon 2, apparantly with both the copper and fiber
+		 * Tigon 2, apparently with both the copper and fiber
 		 * boards.  The symptom is that the interface will just
 		 * hang.  This was reproduced with Alteon 180 switches.
 		 */
@@ -3515,12 +3517,13 @@ ti_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int mask, error = 0;
 
 	switch (command) {
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		TI_LOCK(sc);
-		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > TI_JUMBO_MTU)
+		if (ifr_mtu_get(ifr) < ETHERMIN ||
+		    ifr_mtu_get(ifr) > TI_JUMBO_MTU)
 			error = EINVAL;
 		else {
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 				ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 				ti_init_locked(sc);
@@ -3528,7 +3531,7 @@ ti_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		TI_UNLOCK(sc);
 		break;
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		TI_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			/*
@@ -3559,20 +3562,20 @@ ti_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->ti_if_flags = ifp->if_flags;
 		TI_UNLOCK(sc);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		TI_LOCK(sc);
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 			ti_setmulti(sc);
 		TI_UNLOCK(sc);
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->ifmedia, command);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		TI_LOCK(sc);
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&
 		    (ifp->if_capabilities & IFCAP_TXCSUM) != 0) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;

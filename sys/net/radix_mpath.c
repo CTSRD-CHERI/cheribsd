@@ -1,6 +1,8 @@
 /*	$KAME: radix_mpath.c,v 1.17 2004/11/08 10:29:39 itojun Exp $	*/
 
 /*
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (C) 2001 WIDE Project.
  * All rights reserved.
  *
@@ -223,7 +225,7 @@ rt_mpath_selectrte(struct rtentry *rte, uint32_t hash)
 	hash %= total_weight;
 	for (weight = abs((int32_t)hash);
 	     rt != NULL && weight >= rt->rt_weight; 
-	     weight -= rt->rt_weight) {
+	     weight -= (rt == NULL) ? 0 : rt->rt_weight) {
 		
 		/* stay within the multipath routes */
 		if (rn->rn_dupedkey && rn->rn_mask != rn->rn_dupedkey->rn_mask)

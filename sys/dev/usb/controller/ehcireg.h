@@ -1,5 +1,7 @@
 /* $FreeBSD$ */
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ *
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -167,7 +169,7 @@
  * bits are equal
  */
 #define	EHCI_USBMODE_NOLPM	0x68	/* RW USB Device mode reg (no LPM) */
-#define	EHCI_USBMODE_LPM	0xA8	/* RW USB Device mode reg (LPM) */
+#define	EHCI_USBMODE_LPM	0xC8	/* RW USB Device mode reg (LPM) */
 #define	EHCI_UM_CM		0x00000003	/* R/WO Controller Mode */
 #define	EHCI_UM_CM_IDLE		0x0	/* Idle */
 #define	EHCI_UM_CM_HOST		0x3	/* Host Controller */

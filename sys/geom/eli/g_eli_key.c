@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2005-2011 Pawel Jakub Dawidek <pawel@dawidek.net>
  * All rights reserved.
  *
@@ -69,7 +71,7 @@ g_eli_mkey_verify(const unsigned char *mkey, const unsigned char *key)
 	g_eli_crypto_hmac(hmkey, sizeof(hmkey), mkey, G_ELI_DATAIVKEYLEN,
 	    chmac, 0);
 
-	bzero(hmkey, sizeof(hmkey));
+	explicit_bzero(hmkey, sizeof(hmkey));
 
 	/*
 	 * Compare calculated HMAC with HMAC from metadata.
@@ -97,7 +99,7 @@ g_eli_mkey_hmac(unsigned char *mkey, const unsigned char *key)
 	g_eli_crypto_hmac(hmkey, sizeof(hmkey), mkey, G_ELI_DATAIVKEYLEN,
 	    odhmac, 0);
 
-	bzero(hmkey, sizeof(hmkey));
+	explicit_bzero(hmkey, sizeof(hmkey));
 }
 
 /*
@@ -131,21 +133,21 @@ g_eli_mkey_decrypt(const struct g_eli_metadata *md, const unsigned char *key,
 		error = g_eli_crypto_decrypt(md->md_ealgo, tmpmkey,
 		    G_ELI_MKEYLEN, enckey, md->md_keylen);
 		if (error != 0) {
-			bzero(tmpmkey, sizeof(tmpmkey));
-			bzero(enckey, sizeof(enckey));
+			explicit_bzero(tmpmkey, sizeof(tmpmkey));
+			explicit_bzero(enckey, sizeof(enckey));
 			return (error);
 		}
 		if (g_eli_mkey_verify(tmpmkey, key)) {
 			bcopy(tmpmkey, mkey, G_ELI_DATAIVKEYLEN);
-			bzero(tmpmkey, sizeof(tmpmkey));
-			bzero(enckey, sizeof(enckey));
+			explicit_bzero(tmpmkey, sizeof(tmpmkey));
+			explicit_bzero(enckey, sizeof(enckey));
 			if (nkeyp != NULL)
 				*nkeyp = nkey;
 			return (0);
 		}
 	}
-	bzero(enckey, sizeof(enckey));
-	bzero(tmpmkey, sizeof(tmpmkey));
+	explicit_bzero(enckey, sizeof(enckey));
+	explicit_bzero(tmpmkey, sizeof(tmpmkey));
 	return (-1);
 }
 
@@ -175,7 +177,7 @@ g_eli_mkey_encrypt(unsigned algo, const unsigned char *key, unsigned keylen,
 	 */
 	error = g_eli_crypto_encrypt(algo, mkey, G_ELI_MKEYLEN, enckey, keylen);
 
-	bzero(enckey, sizeof(enckey));
+	explicit_bzero(enckey, sizeof(enckey));
 
 	return (error);
 }

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2002 Tim J. Robbins.
  * All rights reserved.
  *
@@ -22,6 +24,17 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_provenance"
+ *   ],
+ *   "change_comment": "adjusting pointers to realloc()d buffer"
+ * }
+ * CHERI CHANGES END
  */
 
 #include "namespace.h"
@@ -234,8 +247,8 @@ we_askshell(const char *words, wordexp_t *we, int flags)
 		vofs += we->we_offs;
 	we->we_wordc += nwords;
 	we->we_nbytes += nbytes;
-	if ((nwv = realloc(we->we_wordv, (we->we_wordc + 1 +
-	    (flags & WRDE_DOOFFS ?  we->we_offs : 0)) *
+	if ((nwv = reallocarray(we->we_wordv, (we->we_wordc + 1 +
+	    (flags & WRDE_DOOFFS ? we->we_offs : 0)),
 	    sizeof(char *))) == NULL) {
 		error = WRDE_NOSPACE;
 		goto cleanup;
@@ -246,8 +259,10 @@ we_askshell(const char *words, wordexp_t *we, int flags)
 		goto cleanup;
 	}
 	for (i = 0; i < vofs; i++)
-		if (we->we_wordv[i] != NULL)
-			we->we_wordv[i] += nstrings - we->we_strings;
+		if (we->we_wordv[i] != NULL) {
+			we->we_wordv[i] = nstrings +
+			    (we->we_wordv[i] - we->we_strings);
+		}
 	we->we_strings = nstrings;
 
 	if (we_read_fully(pdes[0], we->we_strings + sofs, nbytes) != nbytes) {

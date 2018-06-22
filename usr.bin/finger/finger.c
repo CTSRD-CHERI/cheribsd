@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -13,7 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -28,6 +30,17 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_integrity"
+ *   ],
+ *   "change_comment": "BDB hashes don't preserve tags"
+ * }
+ * CHERI CHANGES END
  */
 
 /*
@@ -71,21 +84,21 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <db.h>
 #include <err.h>
+#include <limits.h>
 #include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <uthash.h>
 #include <utmpx.h>
 #include <locale.h>
 
 #include "finger.h"
 #include "pathnames.h"
 
-DB *db;
 time_t now;
 static int kflag, mflag, sflag;
 int entries, gflag, lflag, pplan, oflag;
@@ -93,6 +106,7 @@ sa_family_t family = PF_UNSPEC;
 int d_first = -1;
 char tbuf[1024];
 int invoker_root = 0;
+PERSON *people = NULL;
 
 static void loginlist(void);
 static int option(int, char **);
@@ -232,10 +246,8 @@ static void
 loginlist(void)
 {
 	PERSON *pn;
-	DBT data, key;
 	struct passwd *pw;
 	struct utmpx *user;
-	int r, sflag1;
 
 	if (kflag)
 		errx(1, "can't list logins without reading utmp");
@@ -254,28 +266,20 @@ loginlist(void)
 		enter_where(user, pn);
 	}
 	endutxent();
-	if (db && lflag)
-		for (sflag1 = R_FIRST;; sflag1 = R_NEXT) {
-			PERSON *tmp;
-
-			r = (*db->seq)(db, &key, &data, sflag1);
-			if (r == -1)
-				err(1, "db seq");
-			if (r == 1)
-				break;
-			memmove(&tmp, data.data, sizeof tmp);
-			enter_lastlog(tmp);
-		}
+	if (people != NULL && lflag) {
+		HASH_SORT(people, psort);
+		for (PERSON *p = people; p != NULL; p = p->hh.next)
+			enter_lastlog(p);
+	}
 }
 
 static void
 userlist(int argc, char **argv)
 {
 	PERSON *pn;
-	DBT data, key;
 	struct utmpx *user;
 	struct passwd *pw;
-	int r, sflag1, *used, *ip;
+	int *used, *ip;
 	char **ap, **nargv, **np, **p;
 	FILE *conf_fp;
 	char conf_alias[LINE_MAX];
@@ -371,6 +375,7 @@ net:	for (p = nargv; *p;) {
 		    printf("\n");
 	}
 
+	free(nargv);
 	free(used);
 	if (entries == 0)
 		return;
@@ -391,16 +396,9 @@ net:	for (p = nargv; *p;) {
 		enter_where(user, pn);
 	}
 	endutxent();
-	if (db)
-		for (sflag1 = R_FIRST;; sflag1 = R_NEXT) {
-			PERSON *tmp;
-
-			r = (*db->seq)(db, &key, &data, sflag1);
-			if (r == -1)
-				err(1, "db seq");
-			if (r == 1)
-				break;
-			memmove(&tmp, data.data, sizeof tmp);
-			enter_lastlog(tmp);
-		}
+	if (people != NULL) {
+		HASH_SORT(people, psort);
+		for (pn = people; pn != NULL; pn = pn->hh.next)
+			enter_lastlog(pn);
+	}
 }

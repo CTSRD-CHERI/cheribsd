@@ -49,7 +49,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/resource.h>
 #include <machine/intr_machdep.h>
 #include <machine/vmparam.h>
-#include <sys/bus_dma.h>
 
 #include <xen/xen-os.h>
 #include <xen/hypervisor.h>
@@ -571,7 +570,7 @@ xbd_quiesce(struct xbd_softc *sc)
 	while (xbd_queue_length(sc, XBD_Q_BUSY) != 0) {
 		RING_FINAL_CHECK_FOR_RESPONSES(&sc->xbd_ring, mtd);
 		if (mtd) {
-			/* Recieved request completions, update queue. */
+			/* Received request completions, update queue. */
 			xbd_int(sc);
 		}
 		if (xbd_queue_length(sc, XBD_Q_BUSY) != 0) {
@@ -674,7 +673,7 @@ xbd_open(struct disk *dp)
 	struct xbd_softc *sc = dp->d_drv1;
 
 	if (sc == NULL) {
-		printf("xb%d: not found", sc->xbd_unit);
+		printf("xbd%d: not found", dp->d_unit);
 		return (ENXIO);
 	}
 
@@ -855,6 +854,20 @@ xbd_feature_string(struct xbd_softc *sc, char *features, size_t len)
 		feature_cnt++;
 	}
 
+	if ((sc->xbd_flags & XBDF_DISCARD) != 0) {
+		if (feature_cnt != 0)
+			sbuf_printf(&sb, ", ");
+		sbuf_printf(&sb, "discard");
+		feature_cnt++;
+	}
+
+	if ((sc->xbd_flags & XBDF_PERSISTENT) != 0) {
+		if (feature_cnt != 0)
+			sbuf_printf(&sb, ", ");
+		sbuf_printf(&sb, "persistent_grants");
+		feature_cnt++;
+	}
+
 	(void) sbuf_finish(&sb);
 	return (sbuf_len(&sb));
 }
@@ -985,7 +998,8 @@ xbd_vdevice_to_unit(uint32_t vdevice, int *unit, const char **name)
 
 int
 xbd_instance_create(struct xbd_softc *sc, blkif_sector_t sectors,
-    int vdevice, uint16_t vdisk_info, unsigned long sector_size)
+    int vdevice, uint16_t vdisk_info, unsigned long sector_size,
+    unsigned long phys_sector_size)
 {
 	char features[80];
 	int unit, error = 0;
@@ -1013,6 +1027,8 @@ xbd_instance_create(struct xbd_softc *sc, blkif_sector_t sectors,
 	sc->xbd_disk->d_name = name;
 	sc->xbd_disk->d_drv1 = sc;
 	sc->xbd_disk->d_sectorsize = sector_size;
+	sc->xbd_disk->d_stripesize = phys_sector_size;
+	sc->xbd_disk->d_stripeoffset = 0;
 
 	sc->xbd_disk->d_mediasize = sectors * sector_size;
 	sc->xbd_disk->d_maxsize = sc->xbd_max_request_size;
@@ -1101,7 +1117,7 @@ xbd_initialize(struct xbd_softc *sc)
 	 * Protocol negotiation.
 	 *
 	 * \note xs_gather() returns on the first encountered error, so
-	 *       we must use independant calls in order to guarantee
+	 *       we must use independent calls in order to guarantee
 	 *       we don't miss information in a sparsly populated back-end
 	 *       tree.
 	 *
@@ -1206,7 +1222,7 @@ static void
 xbd_connect(struct xbd_softc *sc)
 {
 	device_t dev = sc->xbd_dev;
-	unsigned long sectors, sector_size;
+	unsigned long sectors, sector_size, phys_sector_size;
 	unsigned int binfo;
 	int err, feature_barrier, feature_flush;
 	int i, j;
@@ -1228,14 +1244,27 @@ xbd_connect(struct xbd_softc *sc)
 		    xenbus_get_otherend_path(dev));
 		return;
 	}
+	if ((sectors == 0) || (sector_size == 0)) {
+		xenbus_dev_fatal(dev, 0,
+		    "invalid parameters from %s:"
+		    " sectors = %lu, sector_size = %lu",
+		    xenbus_get_otherend_path(dev),
+		    sectors, sector_size);
+		return;
+	}
 	err = xs_gather(XST_NIL, xenbus_get_otherend_path(dev),
-	     "feature-barrier", "%lu", &feature_barrier,
+	     "physical-sector-size", "%lu", &phys_sector_size,
+	     NULL);
+	if (err || phys_sector_size <= sector_size)
+		phys_sector_size = 0;
+	err = xs_gather(XST_NIL, xenbus_get_otherend_path(dev),
+	     "feature-barrier", "%d", &feature_barrier,
 	     NULL);
 	if (err == 0 && feature_barrier != 0)
 		sc->xbd_flags |= XBDF_BARRIER;
 
 	err = xs_gather(XST_NIL, xenbus_get_otherend_path(dev),
-	     "feature-flush-cache", "%lu", &feature_flush,
+	     "feature-flush-cache", "%d", &feature_flush,
 	     NULL);
 	if (err == 0 && feature_flush != 0)
 		sc->xbd_flags |= XBDF_FLUSH;
@@ -1330,7 +1359,7 @@ xbd_connect(struct xbd_softc *sc)
 		bus_print_child_footer(device_get_parent(dev), dev);
 
 		xbd_instance_create(sc, sectors, sc->xbd_vdevice, binfo,
-		    sector_size);
+		    sector_size, phys_sector_size);
 	}
 
 	(void)xenbus_set_state(dev, XenbusStateConnected); 
@@ -1507,6 +1536,11 @@ xbd_resume(device_t dev)
 {
 	struct xbd_softc *sc = device_get_softc(dev);
 
+	if (xen_suspend_cancelled) {
+		sc->xbd_state = XBD_STATE_CONNECTED;
+		return (0);
+	}
+
 	DPRINTK("xbd_resume: %s\n", xenbus_get_node(dev));
 
 	xbd_free(sc);
@@ -1543,11 +1577,14 @@ xbd_backend_changed(device_t dev, XenbusState backend_state)
 		break;
 
 	case XenbusStateClosing:
-		if (sc->xbd_users > 0)
-			xenbus_dev_error(dev, -EBUSY,
-			    "Device in use; refusing to close");
-		else
+		if (sc->xbd_users > 0) {
+			device_printf(dev, "detaching with pending users\n");
+			KASSERT(sc->xbd_disk != NULL,
+			    ("NULL disk with pending users\n"));
+			disk_gone(sc->xbd_disk);
+		} else {
 			xbd_closing(dev);
+		}
 		break;	
 	}
 }

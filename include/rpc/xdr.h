@@ -1,6 +1,8 @@
 /*	$NetBSD: xdr.h,v 1.19 2000/07/17 05:00:45 matt Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2009, Sun Microsystems, Inc.
  * All rights reserved.
  *
@@ -30,6 +32,17 @@
  *	from: @(#)xdr.h 1.19 87/04/22 SMI
  *	from: @(#)xdr.h	2.2 88/07/29 4.0 RPCSRC
  * $FreeBSD$
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "sunrpc"
+ * }
+ * CHERI CHANGES END
  */
 
 /*
@@ -131,14 +144,7 @@ typedef struct XDR {
  * to be decoded.  If this pointer is 0, then the type routines should
  * allocate dynamic storage of the appropriate size and return it.
  */
-#ifdef _KERNEL
 typedef	bool_t (*xdrproc_t)(XDR *, void *, u_int);
-#else
-/*
- * XXX can't actually prototype it, because some take three args!!!
- */
-typedef	bool_t (*xdrproc_t)(XDR *, ...);
-#endif
 
 /*
  * Operations defined on a XDR handle
@@ -219,15 +225,11 @@ xdr_putint32(XDR *xdrs, int32_t *ip)
 		(*(xdrs)->x_ops->x_control)(xdrs, req, op)
 #define xdr_control(xdrs, req, op) XDR_CONTROL(xdrs, req, op)
 
-/*
- * Solaris strips the '_t' from these types -- not sure why.
- * But, let's be compatible.
- */
-#define xdr_rpcvers(xdrs, versp) xdr_u_int32(xdrs, versp)
-#define xdr_rpcprog(xdrs, progp) xdr_u_int32(xdrs, progp)
-#define xdr_rpcproc(xdrs, procp) xdr_u_int32(xdrs, procp)
-#define xdr_rpcprot(xdrs, protp) xdr_u_int32(xdrs, protp)
-#define xdr_rpcport(xdrs, portp) xdr_u_int32(xdrs, portp)
+#define xdr_rpcvers(xdrs, versp) xdr_u_int32_t(xdrs, versp)
+#define xdr_rpcprog(xdrs, progp) xdr_u_int32_t(xdrs, progp)
+#define xdr_rpcproc(xdrs, procp) xdr_u_int32_t(xdrs, procp)
+#define xdr_rpcprot(xdrs, protp) xdr_u_int32_t(xdrs, protp)
+#define xdr_rpcport(xdrs, portp) xdr_u_int32_t(xdrs, portp)
 
 /*
  * Support struct for discriminated unions.

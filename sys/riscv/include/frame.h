@@ -59,6 +59,11 @@ struct trapframe {
 	uint64_t tf_scause;
 };
 
+struct riscv_frame {
+	struct riscv_frame	*f_frame;
+	u_long			f_retaddr;
+};
+
 /*
  * Signal frame. Pushed onto user stack before calling sigcode.
  */
@@ -68,5 +73,8 @@ struct sigframe {
 };
 
 #endif /* !LOCORE */
+
+/* Definitions for syscalls */
+#define	NARGREG		8				/* 8 args in regs */
 
 #endif /* !_MACHINE_FRAME_H_ */

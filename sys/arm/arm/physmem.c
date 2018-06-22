@@ -1,6 +1,8 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2014 Ian Lepore <ian@freebsd.org>
- * All rights excluded.
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -145,7 +147,7 @@ physmem_dump_tables(int (*prfunc)(const char *, ...))
  * Print the contents of the static mapping table.  Used for bootverbose.
  */
 void
-arm_physmem_print_tables()
+arm_physmem_print_tables(void)
 {
 
 	physmem_dump_tables(printf);

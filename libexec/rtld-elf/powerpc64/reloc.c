@@ -1,6 +1,8 @@
 /*      $NetBSD: ppc_reloc.c,v 1.10 2001/09/10 06:09:41 mycroft Exp $   */
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ *
  * Copyright (C) 1998   Tsubai Masanari
  * All rights reserved.
  *
@@ -122,7 +124,7 @@ do_copy_relocations(Obj_Entry *dstobj)
 void
 reloc_non_plt_self(Elf_Dyn *dynp, Elf_Addr relocbase)
 {
-	const Elf_Rela *rela = 0, *relalim;
+	const Elf_Rela *rela = NULL, *relalim;
 	Elf_Addr relasz = 0;
 	Elf_Addr *where;
 
@@ -433,7 +435,7 @@ reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
  */
 Elf_Addr
 reloc_jmpslot(Elf_Addr *wherep, Elf_Addr target, const Obj_Entry *defobj,
-	      const Obj_Entry *obj, const Elf_Rel *rel)
+    const Obj_Entry *obj, const Elf_Rel *rel)
 {
 
 	/*
@@ -446,6 +448,9 @@ reloc_jmpslot(Elf_Addr *wherep, Elf_Addr target, const Obj_Entry *defobj,
 	dbg(" reloc_jmpslot: where=%p, target=%p (%#lx + %#lx)",
 	    (void *)wherep, (void *)target, *(Elf_Addr *)target,
 	    (Elf_Addr)defobj->relocbase);
+
+	if (ld_bind_not)
+		goto out;
 
 	/*
 	 * For the trampoline, the second two elements of the function
@@ -476,11 +481,13 @@ reloc_jmpslot(Elf_Addr *wherep, Elf_Addr target, const Obj_Entry *defobj,
 		((struct funcdesc *)(wherep))->toc +=
 		    (Elf_Addr)defobj->relocbase;
 	}
+out:
 #else
 	dbg(" reloc_jmpslot: where=%p, target=%p", (void *)wherep,
 	    (void *)target);
 
-	*wherep = target;
+	if (!ld_bind_not)
+		*wherep = target;
 #endif
 
 	return (target);
@@ -521,6 +528,11 @@ init_pltgot(Obj_Entry *obj)
 	memcpy(pltcall, _rtld_bind_start, sizeof(struct funcdesc));
 	pltcall[2] = (Elf_Addr)obj;
 #endif
+}
+
+void
+ifunc_init(Elf_Auxinfo aux_info[__min_size(AT_COUNT)] __unused)
+{
 }
 
 void

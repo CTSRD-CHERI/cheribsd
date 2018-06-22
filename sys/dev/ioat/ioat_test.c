@@ -79,7 +79,7 @@ static int g_thread_index = 1;
 static struct cdev *g_ioat_cdev = NULL;
 
 #define	ioat_test_log(v, ...)	_ioat_test_log((v), "ioat_test: " __VA_ARGS__)
-static inline void _ioat_test_log(int verbosity, const char *fmt, ...);
+static void _ioat_test_log(int verbosity, const char *fmt, ...);
 
 static void
 ioat_test_transaction_destroy(struct test_transaction *tx)
@@ -388,7 +388,7 @@ ioat_dma_test(void *arg)
 		return;
 	}
 
-	dmaengine = ioat_get_dmaengine(test->channel_index);
+	dmaengine = ioat_get_dmaengine(test->channel_index, M_NOWAIT);
 	if (dmaengine == NULL) {
 		ioat_test_log(0, "Couldn't acquire dmaengine\n");
 		test->status[IOAT_TEST_NO_DMA_ENGINE]++;
@@ -579,7 +579,7 @@ ioat_test_detach(void)
 	mtx_unlock(&Giant);
 }
 
-static inline void
+static void
 _ioat_test_log(int verbosity, const char *fmt, ...)
 {
 	va_list argp;

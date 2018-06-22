@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1997 Poul-Henning Kamp
  * All rights reserved.
  *
@@ -245,7 +247,7 @@ lp_attach(device_t dev)
 	 */
 	lp->res_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
 	    RF_SHAREABLE);
-	if (lp->res_irq == 0) {
+	if (lp->res_irq == NULL) {
 		device_printf(dev, "cannot reserve interrupt, failed.\n");
 		return (ENXIO);
 	}
@@ -412,13 +414,13 @@ lpioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	switch (cmd) {
 	case SIOCAIFADDR:
-	case SIOCSIFADDR:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
 		if (ifa->ifa_addr->sa_family != AF_INET)
 			return (EAFNOSUPPORT);
 
 		ifp->if_flags |= IFF_UP;
 		/* FALLTHROUGH */
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		error = 0;
 		ppb_lock(ppbus);
 		if ((!(ifp->if_flags & IFF_UP)) &&
@@ -430,10 +432,10 @@ lpioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ppb_unlock(ppbus);
 		return (error);
 
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		ppb_lock(ppbus);
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
-			ptr = malloc(ifr->ifr_mtu + MLPIPHDRLEN, M_DEVBUF,
+			ptr = malloc(ifr_mtu_get(ifr) + MLPIPHDRLEN, M_DEVBUF,
 			    M_NOWAIT);
 			if (ptr == NULL) {
 				ppb_unlock(ppbus);
@@ -443,20 +445,20 @@ lpioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				free(sc->sc_ifbuf, M_DEVBUF);
 			sc->sc_ifbuf = ptr;
 		}
-		sc->sc_ifp->if_mtu = ifr->ifr_mtu;
+		sc->sc_ifp->if_mtu = ifr_mtu_get(ifr);
 		ppb_unlock(ppbus);
 		break;
 
-	case SIOCGIFMTU:
-		ifr->ifr_mtu = sc->sc_ifp->if_mtu;
+	CASE_IOC_IFREQ(SIOCGIFMTU):
+		ifr_mtu_set(ifr, sc->sc_ifp->if_mtu);
 		break;
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
-		if (ifr == 0) {
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
+		if (ifr == NULL) {
 			return (EAFNOSUPPORT);		/* XXX */
 		}
-		switch (ifr->ifr_addr.sa_family) {
+		switch (ifr_addr_get_family(ifr)) {
 		case AF_INET:
 			break;
 		default:

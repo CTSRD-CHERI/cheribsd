@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2008 Isilon Inc http://www.isilon.com/
  * Authors: Doug Rabson <dfr@rabson.org>
  * Developed with Red Inc: Alfred Perlstein <alfred@freebsd.org>
@@ -30,6 +32,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -45,6 +57,7 @@ __FBSDID("$FreeBSD$");
 int
 fcntl(int fd, int cmd, ...)
 #else
+int _fcntl(int fd, int cmd, ...);
 __weak_reference(_fcntl, fcntl);
 #pragma weak _fcntl
 int
@@ -69,7 +82,7 @@ _fcntl(int fd, int cmd, ...)
 		break;
 
 	default:
-		arg = va_arg(args, long);
+		arg = va_arg(args, int);
 		break;
 	}
 	va_end(args);

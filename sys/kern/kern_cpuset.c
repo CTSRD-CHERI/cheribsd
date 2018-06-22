@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2008,  Jeffrey Roberson <jeff@freebsd.org>
  * All rights reserved.
  * 
@@ -47,6 +49,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sched.h>
 #include <sys/smp.h>
 #include <sys/syscallsubr.h>
+#include <sys/capsicum.h>
 #include <sys/cpuset.h>
 #include <sys/sx.h>
 #include <sys/queue.h>
@@ -59,7 +62,6 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm.h>
 #include <vm/vm_page.h>
 #include <vm/vm_param.h>
-#include <vm/vm_phys.h>
 
 #ifdef DDB
 #include <ddb/ddb.h>
@@ -523,6 +525,7 @@ cpuset_setproc(pid_t pid, struct cpuset *set, cpuset_t *mask)
 	int threads;
 	int nfree;
 	int error;
+
 	/*
 	 * The algorithm requires two passes due to locking considerations.
 	 * 
@@ -831,7 +834,7 @@ struct cpuset *
 cpuset_thread0(void)
 {
 	struct cpuset *set;
-	int error;
+	int error, i;
 
 	cpuset_zone = uma_zcreate("cpuset", sizeof(struct cpuset), NULL, NULL,
 	    NULL, NULL, UMA_ALIGN_PTR, 0);
@@ -863,9 +866,15 @@ cpuset_thread0(void)
 	 */
 	cpuset_unr = new_unrhdr(2, INT_MAX, NULL);
 
-	/* MD Code is responsible for initializing sets if vm_ndomains > 1. */
-	if (vm_ndomains == 1)
-		CPU_COPY(&all_cpus, &cpuset_domain[0]);
+	/*
+	 * If MD code has not initialized per-domain cpusets, place all
+	 * CPUs in domain 0.
+	 */
+	for (i = 0; i < MAXMEMDOM; i++)
+		if (!CPU_EMPTY(&cpuset_domain[i]))
+			goto domains_set;
+	CPU_COPY(&all_cpus, &cpuset_domain[0]);
+domains_set:
 
 	return (set);
 }
@@ -942,6 +951,13 @@ struct cpuset_args {
 int
 sys_cpuset(struct thread *td, struct cpuset_args *uap)
 {
+
+	return (kern_cpuset(td, __USER_CAP_OBJ(uap->setid)));
+}
+
+int
+kern_cpuset(struct thread *td, cpusetid_t * __capability setid)
+{
 	struct cpuset *root;
 	struct cpuset *set;
 	int error;
@@ -953,7 +969,8 @@ sys_cpuset(struct thread *td, struct cpuset_args *uap)
 	cpuset_rel(root);
 	if (error)
 		return (error);
-	error = copyout(&set->cs_id, uap->setid, sizeof(set->cs_id));
+	error = copyout_c((__cheri_tocap cpusetid_t * __capability)&set->cs_id,
+	    setid, sizeof(set->cs_id));
 	if (error == 0)
 		error = cpuset_setproc(-1, set, NULL);
 	cpuset_rel(set);
@@ -970,18 +987,26 @@ struct cpuset_setid_args {
 int
 sys_cpuset_setid(struct thread *td, struct cpuset_setid_args *uap)
 {
+
+	return (kern_cpuset_setid(td, uap->which, uap->id, uap->setid));
+}
+
+int
+kern_cpuset_setid(struct thread *td, cpuwhich_t which,
+    id_t id, cpusetid_t setid)
+{
 	struct cpuset *set;
 	int error;
 
 	/*
 	 * Presently we only support per-process sets.
 	 */
-	if (uap->which != CPU_WHICH_PID)
+	if (which != CPU_WHICH_PID)
 		return (EINVAL);
-	set = cpuset_lookup(uap->setid, td);
+	set = cpuset_lookup(setid, td);
 	if (set == NULL)
 		return (ESRCH);
-	error = cpuset_setproc(uap->id, set, NULL);
+	error = cpuset_setproc(id, set, NULL);
 	cpuset_rel(set);
 	return (error);
 }
@@ -997,19 +1022,28 @@ struct cpuset_getid_args {
 int
 sys_cpuset_getid(struct thread *td, struct cpuset_getid_args *uap)
 {
+
+	return (kern_cpuset_getid(td, uap->level, uap->which, uap->id,
+	    __USER_CAP_OBJ(uap->setid)));
+}
+
+int
+kern_cpuset_getid(struct thread *td, cpulevel_t level, cpuwhich_t which,
+    id_t id, cpusetid_t * __capability setid)
+{
 	struct cpuset *nset;
 	struct cpuset *set;
 	struct thread *ttd;
 	struct proc *p;
-	cpusetid_t id;
+	cpusetid_t tmpid;
 	int error;
 
-	if (uap->level == CPU_LEVEL_WHICH && uap->which != CPU_WHICH_CPUSET)
+	if (level == CPU_LEVEL_WHICH && which != CPU_WHICH_CPUSET)
 		return (EINVAL);
-	error = cpuset_which(uap->which, uap->id, &p, &ttd, &set);
+	error = cpuset_which(which, id, &p, &ttd, &set);
 	if (error)
 		return (error);
-	switch (uap->which) {
+	switch (which) {
 	case CPU_WHICH_TID:
 	case CPU_WHICH_PID:
 		thread_lock(ttd);
@@ -1024,7 +1058,7 @@ sys_cpuset_getid(struct thread *td, struct cpuset_getid_args *uap)
 	case CPU_WHICH_DOMAIN:
 		return (EINVAL);
 	}
-	switch (uap->level) {
+	switch (level) {
 	case CPU_LEVEL_ROOT:
 		nset = cpuset_refroot(set);
 		cpuset_rel(set);
@@ -1035,10 +1069,10 @@ sys_cpuset_getid(struct thread *td, struct cpuset_getid_args *uap)
 	case CPU_LEVEL_WHICH:
 		break;
 	}
-	id = set->cs_id;
+	tmpid = set->cs_id;
 	cpuset_rel(set);
 	if (error == 0)
-		error = copyout(&id, uap->setid, sizeof(id));
+		error = copyout_c(&tmpid, setid, sizeof(tmpid));
 
 	return (error);
 }
@@ -1055,6 +1089,15 @@ struct cpuset_getaffinity_args {
 int
 sys_cpuset_getaffinity(struct thread *td, struct cpuset_getaffinity_args *uap)
 {
+
+	return (kern_cpuset_getaffinity(td, uap->level, uap->which,
+	    uap->id, uap->cpusetsize, __USER_CAP(uap->mask, uap->cpusetsize)));
+}
+
+int
+kern_cpuset_getaffinity(struct thread *td, cpulevel_t level, cpuwhich_t which,
+    id_t id, size_t cpusetsize, cpuset_t * __capability maskp)
+{
 	struct thread *ttd;
 	struct cpuset *nset;
 	struct cpuset *set;
@@ -1063,18 +1106,26 @@ sys_cpuset_getaffinity(struct thread *td, struct cpuset_getaffinity_args *uap)
 	int error;
 	size_t size;
 
-	if (uap->cpusetsize < sizeof(cpuset_t) ||
-	    uap->cpusetsize > CPU_MAXSIZE / NBBY)
+	if (cpusetsize < sizeof(cpuset_t) || cpusetsize > CPU_MAXSIZE / NBBY)
 		return (ERANGE);
-	size = uap->cpusetsize;
+	/* In Capability mode, you can only get your own CPU set. */
+	if (IN_CAPABILITY_MODE(td)) {
+	    if (level != CPU_LEVEL_WHICH)
+		return (ECAPMODE);
+	    if (which != CPU_WHICH_TID && which != CPU_WHICH_PID)
+		return (ECAPMODE);
+	    if (id != -1)
+		return (ECAPMODE);
+	}
+	size = cpusetsize;
 	mask = malloc(size, M_TEMP, M_WAITOK | M_ZERO);
-	error = cpuset_which(uap->which, uap->id, &p, &ttd, &set);
+	error = cpuset_which(which, id, &p, &ttd, &set);
 	if (error)
 		goto out;
-	switch (uap->level) {
+	switch (level) {
 	case CPU_LEVEL_ROOT:
 	case CPU_LEVEL_CPUSET:
-		switch (uap->which) {
+		switch (which) {
 		case CPU_WHICH_TID:
 		case CPU_WHICH_PID:
 			thread_lock(ttd);
@@ -1085,11 +1136,13 @@ sys_cpuset_getaffinity(struct thread *td, struct cpuset_getaffinity_args *uap)
 		case CPU_WHICH_JAIL:
 			break;
 		case CPU_WHICH_IRQ:
+		case CPU_WHICH_INTRHANDLER:
+		case CPU_WHICH_ITHREAD:
 		case CPU_WHICH_DOMAIN:
 			error = EINVAL;
 			goto out;
 		}
-		if (uap->level == CPU_LEVEL_ROOT)
+		if (level == CPU_LEVEL_ROOT)
 			nset = cpuset_refroot(set);
 		else
 			nset = cpuset_refbase(set);
@@ -1097,7 +1150,7 @@ sys_cpuset_getaffinity(struct thread *td, struct cpuset_getaffinity_args *uap)
 		cpuset_rel(nset);
 		break;
 	case CPU_LEVEL_WHICH:
-		switch (uap->which) {
+		switch (which) {
 		case CPU_WHICH_TID:
 			thread_lock(ttd);
 			CPU_COPY(&ttd->td_cpuset->cs_mask, mask);
@@ -1115,13 +1168,15 @@ sys_cpuset_getaffinity(struct thread *td, struct cpuset_getaffinity_args *uap)
 			CPU_COPY(&set->cs_mask, mask);
 			break;
 		case CPU_WHICH_IRQ:
-			error = intr_getaffinity(uap->id, mask);
+		case CPU_WHICH_INTRHANDLER:
+		case CPU_WHICH_ITHREAD:
+			error = intr_getaffinity(id, which, mask);
 			break;
 		case CPU_WHICH_DOMAIN:
-			if (uap->id < 0 || uap->id >= vm_ndomains)
+			if (id < 0 || id >= MAXMEMDOM)
 				error = ESRCH;
 			else
-				CPU_COPY(&cpuset_domain[uap->id], mask);
+				CPU_COPY(&cpuset_domain[id], mask);
 			break;
 		}
 		break;
@@ -1134,7 +1189,8 @@ sys_cpuset_getaffinity(struct thread *td, struct cpuset_getaffinity_args *uap)
 	if (p)
 		PROC_UNLOCK(p);
 	if (error == 0)
-		error = copyout(mask, uap->mask, size);
+		error = copyout_c((__cheri_tocap cpuset_t * __capability)mask,
+		    maskp, size);
 out:
 	free(mask, M_TEMP);
 	return (error);
@@ -1152,6 +1208,15 @@ struct cpuset_setaffinity_args {
 int
 sys_cpuset_setaffinity(struct thread *td, struct cpuset_setaffinity_args *uap)
 {
+
+	return (kern_cpuset_setaffinity(td, uap->level, uap->which,
+	    uap->id, uap->cpusetsize, __USER_CAP(uap->mask, uap->cpusetsize)));
+}
+
+int
+kern_cpuset_setaffinity(struct thread *td, cpulevel_t level, cpuwhich_t which,
+    id_t id, size_t cpusetsize, const cpuset_t * __capability maskp)
+{
 	struct cpuset *nset;
 	struct cpuset *set;
 	struct thread *ttd;
@@ -1159,22 +1224,31 @@ sys_cpuset_setaffinity(struct thread *td, struct cpuset_setaffinity_args *uap)
 	cpuset_t *mask;
 	int error;
 
-	if (uap->cpusetsize < sizeof(cpuset_t) ||
-	    uap->cpusetsize > CPU_MAXSIZE / NBBY)
+	if (cpusetsize < sizeof(cpuset_t) || cpusetsize > CPU_MAXSIZE / NBBY)
 		return (ERANGE);
-	mask = malloc(uap->cpusetsize, M_TEMP, M_WAITOK | M_ZERO);
-	error = copyin(uap->mask, mask, uap->cpusetsize);
+	/* In Capability mode, you can only set your own CPU set. */
+	if (IN_CAPABILITY_MODE(td)) {
+	    if (level != CPU_LEVEL_WHICH)
+		return (ECAPMODE);
+	    if (which != CPU_WHICH_TID && which != CPU_WHICH_PID)
+		return (ECAPMODE);
+	    if (id != -1)
+		return (ECAPMODE);
+	}
+	mask = malloc(cpusetsize, M_TEMP, M_WAITOK | M_ZERO);
+	error = copyin_c(maskp, (__cheri_tocap cpuset_t * __capability)mask,
+	    cpusetsize);
 	if (error)
 		goto out;
 	/*
 	 * Verify that no high bits are set.
 	 */
-	if (uap->cpusetsize > sizeof(cpuset_t)) {
+	if (cpusetsize > sizeof(cpuset_t)) {
 		char *end;
 		char *cp;
 
 		end = cp = (char *)&mask->__bits;
-		end += uap->cpusetsize;
+		end += cpusetsize;
 		cp += sizeof(cpuset_t);
 		while (cp != end)
 			if (*cp++ != 0) {
@@ -1183,13 +1257,13 @@ sys_cpuset_setaffinity(struct thread *td, struct cpuset_setaffinity_args *uap)
 			}
 
 	}
-	switch (uap->level) {
+	switch (level) {
 	case CPU_LEVEL_ROOT:
 	case CPU_LEVEL_CPUSET:
-		error = cpuset_which(uap->which, uap->id, &p, &ttd, &set);
+		error = cpuset_which(which, id, &p, &ttd, &set);
 		if (error)
 			break;
-		switch (uap->which) {
+		switch (which) {
 		case CPU_WHICH_TID:
 		case CPU_WHICH_PID:
 			thread_lock(ttd);
@@ -1201,11 +1275,13 @@ sys_cpuset_setaffinity(struct thread *td, struct cpuset_setaffinity_args *uap)
 		case CPU_WHICH_JAIL:
 			break;
 		case CPU_WHICH_IRQ:
+		case CPU_WHICH_INTRHANDLER:
+		case CPU_WHICH_ITHREAD:
 		case CPU_WHICH_DOMAIN:
 			error = EINVAL;
 			goto out;
 		}
-		if (uap->level == CPU_LEVEL_ROOT)
+		if (level == CPU_LEVEL_ROOT)
 			nset = cpuset_refroot(set);
 		else
 			nset = cpuset_refbase(set);
@@ -1214,24 +1290,25 @@ sys_cpuset_setaffinity(struct thread *td, struct cpuset_setaffinity_args *uap)
 		cpuset_rel(set);
 		break;
 	case CPU_LEVEL_WHICH:
-		switch (uap->which) {
+		switch (which) {
 		case CPU_WHICH_TID:
-			error = cpuset_setthread(uap->id, mask);
+			error = cpuset_setthread(id, mask);
 			break;
 		case CPU_WHICH_PID:
-			error = cpuset_setproc(uap->id, NULL, mask);
+			error = cpuset_setproc(id, NULL, mask);
 			break;
 		case CPU_WHICH_CPUSET:
 		case CPU_WHICH_JAIL:
-			error = cpuset_which(uap->which, uap->id, &p,
-			    &ttd, &set);
+			error = cpuset_which(which, id, &p, &ttd, &set);
 			if (error == 0) {
 				error = cpuset_modify(set, mask);
 				cpuset_rel(set);
 			}
 			break;
 		case CPU_WHICH_IRQ:
-			error = intr_setaffinity(uap->id, mask);
+		case CPU_WHICH_INTRHANDLER:
+		case CPU_WHICH_ITHREAD:
+			error = intr_setaffinity(id, which, mask);
 			break;
 		default:
 			error = EINVAL;

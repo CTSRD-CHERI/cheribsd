@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (C) 1996
  *	David L. Nugent.  All rights reserved.
  *
@@ -33,11 +35,9 @@ static const char rcsid[] =
 #include <pwd.h>
 #include <grp.h>
 #include <libutil.h>
-#define _WITH_GETLINE
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <sys/param.h>
 #include <err.h>
 
 #include "pwupd.h"
@@ -132,13 +132,10 @@ vendgrent(void)
 	}
 }
 
-RET_SETGRENT
+void
 vsetgrent(void)
 {
 	vendgrent();
-#if defined(__FreeBSD__)
-	return 0;
-#endif
 }
 
 static struct group *

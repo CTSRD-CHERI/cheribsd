@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011 Alexander Motin <mav@FreeBSD.org>
  * Copyright (c) 2000 - 2008 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
@@ -489,7 +491,7 @@ g_raid_md_sii_start_disk(struct g_raid_disk *disk)
 	pd = (struct g_raid_md_sii_perdisk *)disk->d_md_data;
 	olddisk = NULL;
 
-	/* Find disk position in metadata by it's serial. */
+	/* Find disk position in metadata by its serial. */
 	if (pd->pd_meta != NULL)
 		disk_pos = sii_meta_disk_pos(meta, pd->pd_meta);
 	else
@@ -1482,7 +1484,7 @@ g_raid_md_write_sii(struct g_raid_md_object *md, struct g_raid_volume *tvol,
 	struct g_raid_md_sii_object *mdi;
 	struct g_raid_md_sii_perdisk *pd;
 	struct sii_raid_conf *meta;
-	int i;
+	u_int i;
 
 	sc = md->mdo_softc;
 	mdi = (struct g_raid_md_sii_object *)md;

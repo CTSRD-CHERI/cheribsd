@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: (BSD-2-Clause-FreeBSD AND BSD-3-Clause)
+ *
  * Copyright (c) 2006 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
@@ -125,7 +127,7 @@
 
 /*
  * Reset value for Mailbox (MBST) register
- * NOTE that if used, it should be complemented with an NPE intruction
+ * NOTE that if used, it should be complemented with an NPE instruction
  * to clear the Mailbox at the NPE side as well
  */
 #define IX_NPEDL_REG_RESET_MBST              0x0000F0F0

@@ -11,7 +11,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -64,9 +64,26 @@ END(bzero)
 /* Address: %rdi */
 ENTRY(pagezero)
 	PUSH_FRAME_POINTER
+	movq	$PAGE_SIZE/8,%rcx
+	xorl	%eax,%eax
+	rep
+	stosq
+	POP_FRAME_POINTER
+	ret
+END(pagezero)
+
+/* Address: %rdi */
+ENTRY(sse2_pagezero)
+	PUSH_FRAME_POINTER
 	movq	$-PAGE_SIZE,%rdx
 	subq	%rdx,%rdi
 	xorl	%eax,%eax
+	jmp	1f
+	/*
+	 * The loop takes 29 bytes.  Ensure that it doesn't cross a 32-byte
+	 * cache line.
+	 */
+	.p2align 5,0x90
 1:
 	movnti	%rax,(%rdi,%rdx)
 	movnti	%rax,8(%rdi,%rdx)
@@ -77,7 +94,7 @@ ENTRY(pagezero)
 	sfence
 	POP_FRAME_POINTER
 	ret
-END(pagezero)
+END(sse2_pagezero)
 
 ENTRY(bcmp)
 	PUSH_FRAME_POINTER
@@ -151,6 +168,7 @@ END(bcopy)
  */
 ENTRY(memcpy)
 	PUSH_FRAME_POINTER
+	movq	%rdi,%rax
 	movq	%rdx,%rcx
 	shrq	$3,%rcx				/* copy by 64-bit words */
 	cld					/* copy forwards */
@@ -445,20 +463,6 @@ ENTRY(fueword32)
 	ret
 END(fueword32)
 
-/*
- * fuswintr() and suswintr() are specialized variants of fuword16() and
- * suword16(), respectively.  They are called from the profiling code,
- * potentially at interrupt time.  If they fail, that's okay; good things
- * will happen later.  They always fail for now, until the trap code is
- * able to deal with this.
- */
-ALTENTRY(suswintr)
-ENTRY(fuswintr)
-	movq	$-1,%rax
-	ret
-END(suswintr)
-END(fuswintr)
-
 ENTRY(fuword16)
 	PUSH_FRAME_POINTER
 	movq	PCPU(CURPCB),%rcx
@@ -578,7 +582,7 @@ END(subyte)
  * copyinstr(from, to, maxlen, int *lencopied) - MP SAFE
  *           %rdi, %rsi, %rdx, %rcx
  *
- *	copy a string from from to to, stop when a 0 character is reached.
+ *	copy a string from 'from' to 'to', stop when a 0 character is reached.
  *	return ENAMETOOLONG if string is longer than maxlen, and
  *	EFAULT on protection violations. If lencopied is non-zero,
  *	return the actual length in *lencopied.

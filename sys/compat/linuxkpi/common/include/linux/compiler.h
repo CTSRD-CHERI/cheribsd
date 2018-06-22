@@ -2,7 +2,7 @@
  * Copyright (c) 2010 Isilon Systems, Inc.
  * Copyright (c) 2010 iX Systems, Inc.
  * Copyright (c) 2010 Panasas, Inc.
- * Copyright (c) 2013-2015 Mellanox Technologies, Ltd.
+ * Copyright (c) 2013-2016 Mellanox Technologies, Ltd.
  * Copyright (c) 2015 François Tigeot
  * All rights reserved.
  *
@@ -40,37 +40,44 @@
 #define __force
 #define __nocast
 #define __iomem
-#define __chk_user_ptr(x)		0
-#define __chk_io_ptr(x)			0
+#define __chk_user_ptr(x)		((void)0)
+#define __chk_io_ptr(x)			((void)0)
 #define __builtin_warning(x, y...)	(1)
 #define __acquires(x)
 #define __releases(x)
-#define __acquire(x)			0
-#define __release(x)			0
+#define __acquire(x)			do { } while (0)
+#define __release(x)			do { } while (0)
 #define __cond_lock(x,c)		(c)
 #define	__bitwise
 #define __devinitdata
+#define	__deprecated
 #define __init
 #define	__devinit
 #define	__devexit
 #define __exit
-#define	__stringify(x)			#x
+#define	__rcu
+#define	__malloc
+#define	___stringify(...)		#__VA_ARGS__
+#define	__stringify(...)		___stringify(__VA_ARGS__)
 #define	__attribute_const__		__attribute__((__const__))
 #undef __always_inline
 #define	__always_inline			inline
+#define	____cacheline_aligned		__aligned(CACHE_LINE_SIZE)
 
 #define	likely(x)			__builtin_expect(!!(x), 1)
 #define	unlikely(x)			__builtin_expect(!!(x), 0)
 #define typeof(x)			__typeof(x)
 
 #define	uninitialized_var(x)		x = x
-#define	__read_mostly __attribute__((__section__(".data.read_mostly")))
 #define	__always_unused			__unused
 #define	__must_check			__result_use_check
 
 #define	__printf(a,b)			__printflike(a,b)
 
 #define	barrier()			__asm__ __volatile__("": : :"memory")
+
+#define	___PASTE(a,b) a##b
+#define	__PASTE(a,b) ___PASTE(a,b)
 
 #define	ACCESS_ONCE(x)			(*(volatile __typeof(x) *)&(x))
   
@@ -81,11 +88,16 @@
 } while (0)
 
 #define	READ_ONCE(x) ({			\
-	__typeof(x) __var;		\
-	barrier();			\
-	__var = ACCESS_ONCE(x);		\
+	__typeof(x) __var = ({		\
+		barrier();		\
+		ACCESS_ONCE(x);		\
+	});				\
 	barrier();			\
 	__var;				\
 })
-  
+
+#define	lockless_dereference(p) READ_ONCE(p)
+
+#define	_AT(T,X)	((T)(X))
+
 #endif	/* _LINUX_COMPILER_H_ */

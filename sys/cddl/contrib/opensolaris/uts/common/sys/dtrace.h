@@ -32,8 +32,6 @@
 #ifndef _SYS_DTRACE_H
 #define	_SYS_DTRACE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -87,7 +85,7 @@ typedef int model_t;
 
 #define	DTRACE_PROVNAMELEN	64
 #define	DTRACE_MODNAMELEN	64
-#define	DTRACE_FUNCNAMELEN	128
+#define	DTRACE_FUNCNAMELEN	192
 #define	DTRACE_NAMELEN		64
 #define	DTRACE_FULLNAMELEN	(DTRACE_PROVNAMELEN + DTRACE_MODNAMELEN + \
 				DTRACE_FUNCNAMELEN + DTRACE_NAMELEN + 4)
@@ -308,15 +306,14 @@ typedef enum dtrace_probespec {
 #define	DIF_SUBR_TOUPPER		44
 #define	DIF_SUBR_TOLOWER		45
 #define	DIF_SUBR_MEMREF			46
-#define	DIF_SUBR_TYPEREF		47
-#define	DIF_SUBR_SX_SHARED_HELD		48
-#define	DIF_SUBR_SX_EXCLUSIVE_HELD	49
-#define	DIF_SUBR_SX_ISEXCLUSIVE		50
-#define	DIF_SUBR_MEMSTR			51
-#define	DIF_SUBR_GETF			52
-#define	DIF_SUBR_JSON			53
-#define	DIF_SUBR_STRTOLL		54
-#define	DIF_SUBR_MAX			54	/* max subroutine value */
+#define	DIF_SUBR_SX_SHARED_HELD		47
+#define	DIF_SUBR_SX_EXCLUSIVE_HELD	48
+#define	DIF_SUBR_SX_ISEXCLUSIVE		49
+#define	DIF_SUBR_MEMSTR			50
+#define	DIF_SUBR_GETF			51
+#define	DIF_SUBR_JSON			52
+#define	DIF_SUBR_STRTOLL		53
+#define	DIF_SUBR_MAX			53	/* max subroutine value */
 
 typedef uint32_t dif_instr_t;
 
@@ -429,7 +426,6 @@ typedef struct dtrace_difv {
 #define	DTRACEACT_TRACEMEM		6	/* tracemem() action */
 #define	DTRACEACT_TRACEMEM_DYNSIZE	7	/* dynamic tracemem() size */
 #define	DTRACEACT_PRINTM		8	/* printm() action (BSD) */
-#define	DTRACEACT_PRINTT		9	/* printt() action (BSD) */
 
 #define	DTRACEACT_PROC			0x0100
 #define	DTRACEACT_USTACK		(DTRACEACT_PROC + 1)
@@ -739,8 +735,8 @@ typedef struct dof_sec {
 	((x) == DOF_SECT_PRARGS) || ((x) == DOF_SECT_PROFFS) ||		\
 	((x) == DOF_SECT_INTTAB) || ((x) == DOF_SECT_XLTAB) ||		\
 	((x) == DOF_SECT_XLMEMBERS) || ((x) == DOF_SECT_XLIMPORT) ||	\
-	((x) == DOF_SECT_XLIMPORT) || ((x) == DOF_SECT_XLEXPORT) ||	\
-	((x) == DOF_SECT_PREXPORT) || ((x) == DOF_SECT_PRENOFFS))
+	((x) == DOF_SECT_XLEXPORT) ||  ((x) == DOF_SECT_PREXPORT) || 	\
+	((x) == DOF_SECT_PRENOFFS))
 
 typedef struct dof_ecbdesc {
 	dof_secidx_t dofe_probes;	/* link to DOF_SECT_PROBEDESC */
@@ -788,6 +784,7 @@ typedef struct dof_relodesc {
 
 #define	DOF_RELO_NONE	0		/* empty relocation entry */
 #define	DOF_RELO_SETX	1		/* relocate setx value */
+#define	DOF_RELO_DOFREL	2		/* relocate DOF-relative value */
 
 typedef struct dof_optdesc {
 	uint32_t dofo_option;		/* option identifier */
@@ -1414,7 +1411,6 @@ typedef struct {
 #define	DTRACEHIOC_REMOVE	(DTRACEHIOC | 2)	/* remove helper */
 #define	DTRACEHIOC_ADDDOF	(DTRACEHIOC | 3)	/* add helper DOF */
 #else
-#define	DTRACEHIOC_ADD		_IOWR('z', 1, dof_hdr_t)/* add helper */
 #define	DTRACEHIOC_REMOVE	_IOW('z', 2, int)	/* remove helper */
 #define	DTRACEHIOC_ADDDOF	_IOWR('z', 3, dof_helper_t)/* add helper DOF */
 #endif
@@ -2398,8 +2394,9 @@ extern int dtrace_instr_size(uchar_t *instr);
 extern int dtrace_instr_size_isa(uchar_t *, model_t, int *);
 extern void dtrace_invop_callsite(void);
 #endif
-extern void dtrace_invop_add(int (*)(uintptr_t, uintptr_t *, uintptr_t));
-extern void dtrace_invop_remove(int (*)(uintptr_t, uintptr_t *, uintptr_t));
+extern void dtrace_invop_add(int (*)(uintptr_t, struct trapframe *, uintptr_t));
+extern void dtrace_invop_remove(int (*)(uintptr_t, struct trapframe *,
+    uintptr_t));
 
 #ifdef __sparc
 extern int dtrace_blksuword32(uintptr_t, uint32_t *, int);
@@ -2427,7 +2424,9 @@ extern void dtrace_helpers_destroy(proc_t *);
 #if defined(__i386) || defined(__amd64)
 
 #define	DTRACE_INVOP_PUSHL_EBP		1
+#define	DTRACE_INVOP_PUSHQ_RBP		DTRACE_INVOP_PUSHL_EBP
 #define	DTRACE_INVOP_POPL_EBP		2
+#define	DTRACE_INVOP_POPQ_RBP		DTRACE_INVOP_POPL_EBP
 #define	DTRACE_INVOP_LEAVE		3
 #define	DTRACE_INVOP_NOP		4
 #define	DTRACE_INVOP_RET		5
@@ -2479,6 +2478,28 @@ extern void dtrace_helpers_destroy(proc_t *);
 #define	DTRACE_INVOP_PUSHM	1
 #define	DTRACE_INVOP_RET	2
 #define	DTRACE_INVOP_B		3
+
+#elif defined(__mips__)
+
+#define	INSN_SIZE		4
+
+/* Load/Store double RA to/from SP */
+#define	LDSD_RA_SP_MASK		0xffff0000
+#define	LDSD_DATA_MASK		0x0000ffff
+#define	SD_RA_SP		0xffbf0000
+#define	LD_RA_SP		0xdfbf0000
+
+#define	DTRACE_INVOP_SD		1
+#define	DTRACE_INVOP_LD		2
+
+#elif defined(__riscv)
+
+#define	SD_RA_SP_MASK		0x01fff07f
+#define	SD_RA_SP		0x00113023
+
+#define	DTRACE_INVOP_SD		1
+#define	DTRACE_INVOP_RET	2
+#define	DTRACE_INVOP_NOP	3
 
 #endif
 

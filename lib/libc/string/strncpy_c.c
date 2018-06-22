@@ -30,25 +30,3 @@
 
 #define CAPABILITY_VERSION
 #include "strncpy.c"
-
-#include <sys/types.h>
-#include <machine/cheric.h>
-
-char *
-strncpy_c_fromcap(char *dst, __CAPABILITY const char *src, size_t n)
-{
-
-	/* XXX: restrict perms */
-	/* XXX: Edge case: should truncate created cap to end of C0? */
-	strncpy_c(cheri_ptr(dst, n), src, n);
-	return (dst);
-}
-
-__CAPABILITY char *
-strncpy_c_tocap(__CAPABILITY char *dst, const char *src, size_t n)
-{
-
-	/* XXX: restrict perms */
-	/* XXX: Edge case: should truncate created cap to end of C0? */
-	return (strncpy_c(dst, cheri_ptr((char *)src, n), n));
-}

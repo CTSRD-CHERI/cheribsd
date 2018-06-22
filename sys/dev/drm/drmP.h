@@ -65,6 +65,7 @@ struct drm_file;
 #include <sys/poll.h>
 #include <sys/taskqueue.h>
 #include <sys/tree.h>
+#include <sys/vmmeter.h>
 #include <vm/vm.h>
 #include <vm/pmap.h>
 #include <vm/vm_extern.h>
@@ -75,8 +76,6 @@ struct drm_file;
 #include <vm/vm_pager.h>
 #include <vm/vm_param.h>
 #include <vm/vm_phys.h>
-#include <machine/param.h>
-#include <machine/pmap.h>
 #include <machine/bus.h>
 #include <machine/resource.h>
 #if defined(__i386__) || defined(__amd64__)
@@ -105,7 +104,7 @@ struct drm_file;
 #include "dev/drm/drm_internal.h"
 #include "dev/drm/drm_linux_list.h"
 
-#include <opt_drm.h>
+#include "opt_drm.h"
 #ifdef DRM_DEBUG
 #undef DRM_DEBUG
 #define DRM_DEBUG_DEFAULT_ON 1
@@ -221,7 +220,7 @@ enum {
 
 #define PAGE_ALIGN(addr) round_page(addr)
 /* DRM_SUSER returns true if the user is superuser */
-#define DRM_SUSER(p)		(priv_check(p, PRIV_DRIVER) == 0)
+#define DRM_SUSER(p)		(priv_check(p, PRIV_KMEM_WRITE) == 0)
 #define DRM_AGP_FIND_DEVICE()	agp_find_device()
 #define DRM_MTRR_WC		MDF_WRITECOMBINE
 #define jiffies			ticks
@@ -322,7 +321,7 @@ typedef struct drm_pci_id_list
 {
 	int vendor;
 	int device;
-	long driver_private;
+	intptr_t driver_private;
 	char *name;
 } drm_pci_id_list_t;
 

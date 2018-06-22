@@ -58,6 +58,7 @@ struct port_if;
 struct sldns_buffer;
 struct serviced_query;
 struct dt_env;
+struct edns_option;
 
 /**
  * Send queries to outside servers and wait for answers from servers.
@@ -132,6 +133,8 @@ struct outside_network {
 	/** dnstap environment */
 	struct dt_env* dtenv;
 #endif
+	/** maximum segment size of tcp socket */
+	int tcp_mss;
 
 	/**
 	 * Array of tcp pending used for outgoing TCP connections.
@@ -161,6 +164,10 @@ struct port_if {
 	struct sockaddr_storage addr;
 	/** length of addr field */
 	socklen_t addrlen;
+
+	/** prefix length of network address (in bits), for randomisation.
+	 * if 0, no randomisation. */
+	int pfxlen;
 
 	/** the available ports array. These are unused.
 	 * Only the first total-inuse part is filled. */
@@ -365,6 +372,8 @@ struct serviced_query {
 	int last_rtt;
 	/** do we know edns probe status already, for UDP_EDNS queries */
 	int edns_lame_known;
+	/** edns options to use for sending upstream packet */
+	struct edns_option* opt_list;
 	/** outside network this is part of */
 	struct outside_network* outnet;
 	/** list of interested parties that need callback on results. */
@@ -392,6 +401,7 @@ struct serviced_query {
  * @param unwanted_threshold: when to take defensive action.
  * @param unwanted_action: the action to take.
  * @param unwanted_param: user parameter to action.
+ * @param tcp_mss: maximum segment size of tcp socket.
  * @param do_udp: if udp is done.
  * @param sslctx: context to create outgoing connections with (if enabled).
  * @param delayclose: if not 0, udp sockets are delayed before timeout closure.
@@ -403,7 +413,7 @@ struct outside_network* outside_network_create(struct comm_base* base,
 	size_t bufsize, size_t num_ports, char** ifs, int num_ifs,
 	int do_ip4, int do_ip6, size_t num_tcp, struct infra_cache* infra, 
 	struct ub_randstate* rnd, int use_caps_for_id, int* availports, 
-	int numavailports, size_t unwanted_threshold,
+	int numavailports, size_t unwanted_threshold, int tcp_mss,
 	void (*unwanted_action)(void*), void* unwanted_param, int do_udp,
 	void* sslctx, int delayclose, struct dt_env *dtenv);
 
@@ -474,6 +484,8 @@ void pending_delete(struct outside_network* outnet, struct pending* p);
  * @param nocaps: ignore use_caps_for_id and use unperturbed qname.
  * @param tcp_upstream: use TCP for upstream queries.
  * @param ssl_upstream: use SSL for upstream queries.
+ * @param opt_list: pass edns option list (deep copied into serviced query)
+ *	these options are set on the outgoing packets.
  * @param callback: callback function.
  * @param callback_arg: user argument to callback function.
  * @param addr: to which server to send the query.
@@ -489,9 +501,9 @@ void pending_delete(struct outside_network* outnet, struct pending* p);
 struct serviced_query* outnet_serviced_query(struct outside_network* outnet,
 	uint8_t* qname, size_t qnamelen, uint16_t qtype, uint16_t qclass,
 	uint16_t flags, int dnssec, int want_dnssec, int nocaps,
-	int tcp_upstream, int ssl_upstream, struct sockaddr_storage* addr,
-	socklen_t addrlen, uint8_t* zone, size_t zonelen,
-	comm_point_callback_t* callback, void* callback_arg,
+	int tcp_upstream, int ssl_upstream, struct edns_option* opt_list,
+	struct sockaddr_storage* addr, socklen_t addrlen, uint8_t* zone,
+	size_t zonelen, comm_point_callback_t* callback, void* callback_arg,
 	struct sldns_buffer* buff);
 
 /**

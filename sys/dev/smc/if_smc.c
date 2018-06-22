@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2008 Benno Rice.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -234,7 +236,7 @@ smc_probe(device_t dev)
 	if (sc->smc_usemem)
 		type = SYS_RES_MEMORY;
 
-	reg = bus_alloc_resource(dev, type, &rid, 0, ~0, 16, RF_ACTIVE);
+	reg = bus_alloc_resource_anywhere(dev, type, &rid, 16, RF_ACTIVE);
 	if (reg == NULL) {
 		if (bootverbose)
 			device_printf(dev,
@@ -328,15 +330,15 @@ smc_attach(device_t dev)
 		type = SYS_RES_MEMORY;
 
 	sc->smc_reg_rid = 0;
-	sc->smc_reg = bus_alloc_resource(dev, type, &sc->smc_reg_rid, 0, ~0,
+	sc->smc_reg = bus_alloc_resource_anywhere(dev, type, &sc->smc_reg_rid,
 	    16, RF_ACTIVE);
 	if (sc->smc_reg == NULL) {
 		error = ENXIO;
 		goto done;
 	}
 
-	sc->smc_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->smc_irq_rid, 0,
-	    ~0, 1, RF_ACTIVE | RF_SHAREABLE);
+	sc->smc_irq = bus_alloc_resource_anywhere(dev, SYS_RES_IRQ,
+	    &sc->smc_irq_rid, 1, RF_ACTIVE | RF_SHAREABLE);
 	if (sc->smc_irq == NULL) {
 		error = ENXIO;
 		goto done;
@@ -560,7 +562,7 @@ smc_start_locked(struct ifnet *ifp)
 		return;
 	}
 
-	taskqueue_enqueue_fast(sc->smc_tq, &sc->smc_tx);
+	taskqueue_enqueue(sc->smc_tq, &sc->smc_tx);
 }
 
 static void
@@ -782,7 +784,7 @@ smc_task_rx(void *context, int pending)
 }
 
 #ifdef DEVICE_POLLING
-static void
+static int
 smc_poll(struct ifnet *ifp, enum poll_cmd cmd, int count)
 {
 	struct smc_softc	*sc;
@@ -792,12 +794,13 @@ smc_poll(struct ifnet *ifp, enum poll_cmd cmd, int count)
 	SMC_LOCK(sc);
 	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0) {
 		SMC_UNLOCK(sc);
-		return;
+		return (0);
 	}
 	SMC_UNLOCK(sc);
 
 	if (cmd == POLL_AND_CHECK_STATUS)
-		taskqueue_enqueue_fast(sc->smc_tq, &sc->smc_intr);
+		taskqueue_enqueue(sc->smc_tq, &sc->smc_intr);
+        return (0);
 }
 #endif
 
@@ -823,7 +826,7 @@ smc_intr(void *context)
 	/* Restore bank */
 	smc_select_bank(sc, curbank);
 
-	taskqueue_enqueue_fast(sc->smc_tq, &sc->smc_intr);
+	taskqueue_enqueue(sc->smc_tq, &sc->smc_intr);
 	return (FILTER_HANDLED);
 }
 
@@ -877,7 +880,7 @@ smc_task_intr(void *context, int pending)
 			tcr |= TCR_TXENA | TCR_PAD_EN;
 			smc_write_2(sc, TCR, tcr);
 			smc_select_bank(sc, 2);
-			taskqueue_enqueue_fast(sc->smc_tq, &sc->smc_tx);
+			taskqueue_enqueue(sc->smc_tq, &sc->smc_tx);
 		}
 
 		/*
@@ -892,7 +895,7 @@ smc_task_intr(void *context, int pending)
 	if (status & RCV_INT) {
 		smc_write_1(sc, ACK, RCV_INT);
 		sc->smc_mask &= ~RCV_INT;
-		taskqueue_enqueue_fast(sc->smc_tq, &sc->smc_rx);
+		taskqueue_enqueue(sc->smc_tq, &sc->smc_rx);
 	}
 
 	/*
@@ -901,7 +904,7 @@ smc_task_intr(void *context, int pending)
 	if (status & ALLOC_INT) {
 		smc_write_1(sc, ACK, ALLOC_INT);
 		sc->smc_mask &= ~ALLOC_INT;
-		taskqueue_enqueue_fast(sc->smc_tq, &sc->smc_tx);
+		taskqueue_enqueue(sc->smc_tq, &sc->smc_tx);
 	}
 
 	/*
@@ -933,7 +936,7 @@ smc_task_intr(void *context, int pending)
 		/*
 		 * See if there are any packets to transmit.
 		 */
-		taskqueue_enqueue_fast(sc->smc_tq, &sc->smc_tx);
+		taskqueue_enqueue(sc->smc_tq, &sc->smc_tx);
 	}
 
 	/*
@@ -1213,7 +1216,6 @@ smc_stop(struct smc_softc *sc)
 #ifdef DEVICE_POLLING
 	ether_poll_deregister(sc->smc_ifp);
 	sc->smc_ifp->if_capenable &= ~IFCAP_POLLING;
-	sc->smc_ifp->if_capenable &= ~IFCAP_POLLING_NOCOUNT;
 #endif
 
 	/*
@@ -1233,7 +1235,7 @@ smc_watchdog(void *arg)
 	
 	sc = (struct smc_softc *)arg;
 	device_printf(sc->smc_dev, "watchdog timeout\n");
-	taskqueue_enqueue_fast(sc->smc_tq, &sc->smc_intr);
+	taskqueue_enqueue(sc->smc_tq, &sc->smc_intr);
 }
 
 static void
@@ -1273,7 +1275,6 @@ smc_init_locked(struct smc_softc *sc)
 	ether_poll_register(smc_poll, ifp);
 	SMC_LOCK(sc);
 	ifp->if_capenable |= IFCAP_POLLING;
-	ifp->if_capenable |= IFCAP_POLLING_NOCOUNT;
 #endif
 }
 
@@ -1287,7 +1288,7 @@ smc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	error = 0;
 
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		if ((ifp->if_flags & IFF_UP) == 0 &&
 		    (ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
 			SMC_LOCK(sc);
@@ -1300,8 +1301,8 @@ smc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		/* XXX
 		SMC_LOCK(sc);
 		smc_setmcast(sc);
@@ -1311,7 +1312,7 @@ smc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		if (sc->smc_mii_mediaioctl == NULL) {
 			error = EINVAL;
 			break;

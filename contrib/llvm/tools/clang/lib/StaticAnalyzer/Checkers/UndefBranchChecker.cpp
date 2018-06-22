@@ -17,6 +17,7 @@
 #include "clang/StaticAnalyzer/Core/Checker.h"
 #include "clang/StaticAnalyzer/Core/CheckerManager.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CheckerContext.h"
+#include <utility>
 
 using namespace clang;
 using namespace ento;
@@ -30,8 +31,8 @@ class UndefBranchChecker : public Checker<check::BranchCondition> {
     ProgramStateRef St;
     const LocationContext *LCtx;
 
-    FindUndefExpr(ProgramStateRef S, const LocationContext *L) 
-      : St(S), LCtx(L) {}
+    FindUndefExpr(ProgramStateRef S, const LocationContext *L)
+        : St(std::move(S)), LCtx(L) {}
 
     const Expr *FindExpr(const Expr *Ex) {
       if (!MatchesCriteria(Ex))
@@ -45,7 +46,7 @@ class UndefBranchChecker : public Checker<check::BranchCondition> {
       return Ex;
     }
 
-    bool MatchesCriteria(const Expr *Ex) { 
+    bool MatchesCriteria(const Expr *Ex) {
       return St->getSVal(Ex, LCtx).isUndef();
     }
   };
@@ -62,7 +63,7 @@ void UndefBranchChecker::checkBranchCondition(const Stmt *Condition,
   if (X.isUndef()) {
     // Generate a sink node, which implicitly marks both outgoing branches as
     // infeasible.
-    ExplodedNode *N = Ctx.generateSink();
+    ExplodedNode *N = Ctx.generateErrorNode();
     if (N) {
       if (!BT)
         BT.reset(new BuiltinBug(

@@ -5,11 +5,12 @@
 
 # PROVIDE: bsnmpd
 # REQUIRE: NETWORKING syslogd
-# KEYWORD: nojail shutdown
+# KEYWORD: nojailvnet shutdown
 
 . /etc/rc.subr
 
 name="bsnmpd"
+desc="Simple and extensible SNMP daemon"
 rcvar="bsnmpd_enable"
 command="/usr/sbin/${name}"
 

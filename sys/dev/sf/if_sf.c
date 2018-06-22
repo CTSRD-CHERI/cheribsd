@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -574,7 +576,7 @@ sf_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	error = 0;
 
 	switch (command) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		SF_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
@@ -592,23 +594,23 @@ sf_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->sf_if_flags = ifp->if_flags;
 		SF_UNLOCK(sc);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		SF_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			sf_rxfilter(sc);
 		SF_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		mii = device_get_softc(sc->sf_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;
-	case SIOCSIFCAP:
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+	CASE_IOC_IFREQ(SIOCSIFCAP):
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 #ifdef DEVICE_POLLING
 		if ((mask & IFCAP_POLLING) != 0) {
-			if ((ifr->ifr_reqcap & IFCAP_POLLING) != 0) {
+			if ((ifr_reqcap_get(ifr) & IFCAP_POLLING) != 0) {
 				error = ether_poll_register(sf_poll, ifp);
 				if (error != 0)
 					break;
@@ -710,7 +712,7 @@ sf_probe(device_t dev)
 	sdid = pci_get_subdevice(dev);
 
 	t = sf_devs;
-	for (i = 0; i < sizeof(sf_devs) / sizeof(sf_devs[0]); i++, t++) {
+	for (i = 0; i < nitems(sf_devs); i++, t++) {
 		if (vid == t->sf_vid && did == t->sf_did) {
 			if (sdid == t->sf_sdid) {
 				device_set_desc(dev, t->sf_sname);
@@ -720,7 +722,7 @@ sf_probe(device_t dev)
 	}
 
 	if (vid == AD_VENDORID && did == AD_DEVICEID_STARFIRE) {
-		/* unkown subdevice */
+		/* unknown subdevice */
 		device_set_desc(dev, sf_devs[0].sf_name);
 		return (BUS_PROBE_DEFAULT);
 	}
@@ -1515,7 +1517,7 @@ sf_fixup_rx(struct mbuf *m)
  * it is marred by one truly stupid design flaw, which is that receive
  * buffer addresses must be aligned on a longword boundary. This forces
  * the packet payload to be unaligned, which is suboptimal on the x86 and
- * completely unuseable on the Alpha. Our only recourse is to copy received
+ * completely unusable on the Alpha. Our only recourse is to copy received
  * packets into properly aligned buffers before handing them off.
  */
 static int

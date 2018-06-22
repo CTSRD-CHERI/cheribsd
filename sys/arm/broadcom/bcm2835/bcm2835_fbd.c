@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2012 Oleksandr Tymoshenko <gonzo@freebsd.org>
  * Copyright (c) 2012, 2013 The FreeBSD Foundation
  * All rights reserved.
@@ -43,7 +45,6 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm.h>
 #include <vm/pmap.h>
 
-#include <dev/fdt/fdt_common.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
@@ -65,6 +66,12 @@ struct bcmsc_softc {
 	device_t			dev;
 };
 
+static struct ofw_compat_data compat_data[] = {
+	{"broadcom,bcm2835-fb",		1},
+	{"brcm,bcm2708-fb",		1},
+	{NULL,				0}
+};
+
 static int bcm_fb_probe(device_t);
 static int bcm_fb_attach(device_t);
 
@@ -79,6 +86,10 @@ bcm_fb_init(struct bcmsc_softc *sc, struct bcm2835_fb_config *fb)
 	if (bcm2835_mbox_fb_get_w_h(fb) != 0)
 		return (ENXIO);
 	fb->bpp = FB_DEPTH;
+
+	fb->vxres = fb->xres;
+	fb->vyres = fb->yres;
+	fb->xoffset = fb->yoffset = 0;
 
 	if ((err = bcm2835_mbox_fb_init(fb)) != 0) {
 		device_printf(sc->dev, "bcm2835_mbox_fb_init failed, err=%d\n", err);
@@ -109,6 +120,10 @@ bcm_fb_setup_fbd(struct bcmsc_softc *sc)
 	sc->info.fb_stride = fb.pitch;
 	sc->info.fb_width = fb.xres;
 	sc->info.fb_height = fb.yres;
+#ifdef VM_MEMATTR_WRITE_COMBINING
+	sc->info.fb_flags = FB_FLAG_MEMATTR;
+	sc->info.fb_memattr = VM_MEMATTR_WRITE_COMBINING;
+#endif
 
 	if (sc->fbswap) {
 		switch (sc->info.fb_bpp) {
@@ -185,7 +200,8 @@ bcm_fb_sysctl_init(struct bcmsc_softc *sc)
 static int
 bcm_fb_probe(device_t dev)
 {
-	if (!ofw_bus_is_compatible(dev, "broadcom,bcm2835-fb"))
+
+	if (ofw_bus_search_compatible(dev, compat_data)->ocd_data == 0)
 		return (ENXIO);
 
 	device_set_desc(dev, "BCM2835 VT framebuffer driver");
@@ -259,3 +275,4 @@ static driver_t bcm_fb_driver = {
 };
 
 DRIVER_MODULE(bcm2835fb, ofwbus, bcm_fb_driver, bcm_fb_devclass, 0, 0);
+DRIVER_MODULE(bcm2835fb, simplebus, bcm_fb_driver, bcm_fb_devclass, 0, 0);

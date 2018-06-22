@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2003 Hidetoshi Shimokawa
  * Copyright (c) 1998-2002 Katsushi Kobayashi and Hidetoshi Shimokawa
  * All rights reserved.
@@ -252,7 +254,7 @@ struct fw_xfer {
 struct fw_rcv_buf {
 	struct firewire_comm *fc;
 	struct fw_xfer *xfer;
-	struct iovec *vec;
+	kiovec_t *vec;
 	u_int nvec;
 	uint8_t spd;
 };

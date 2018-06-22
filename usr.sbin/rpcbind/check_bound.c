@@ -2,6 +2,8 @@
 /*	$FreeBSD$ */
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2009, Sun Microsystems, Inc.
  * All rights reserved.
  *
@@ -219,8 +221,7 @@ mergeaddr(SVCXPRT *xprt, char *netid, char *uaddr, char *saddr)
 		fprintf(stderr, "mergeaddr: uaddr = %s, merged uaddr = %s\n",
 				uaddr, m_uaddr);
 #endif
-	if (allocated_uaddr != NULL)
-		free(allocated_uaddr);
+	free(allocated_uaddr);
 	return (m_uaddr);
 }
 

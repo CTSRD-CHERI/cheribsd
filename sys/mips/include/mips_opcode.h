@@ -1,6 +1,8 @@
 /*	$OpenBSD: mips_opcode.h,v 1.2 1999/01/27 04:46:05 imp Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -15,7 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -110,6 +112,14 @@ typedef union {
 		unsigned r3: 5;
 		unsigned unused: 3;
 		unsigned fmt2: 3;
+	} CTypeOld;
+	struct {
+		unsigned op: 6;
+		unsigned fmt: 5;
+		unsigned r1: 5;
+		unsigned r2: 5;
+		unsigned r3: 5;
+		unsigned func: 6;
 	} CType;
 	/* BC2F format */
 	struct {
@@ -462,8 +472,8 @@ typedef union {
  * Some CHERI opcodes are known to the disassembler as they are exceptions to
  * the normal (if any) formatting rules.
  */
-#define	OP_CHERI_CGETCAUSE	0x04	/* CGetCause - 0x12 0x00 .. 0x04 */
-#define	OP_CHERI_CGETPCC	0x07	/* CGetPCC - 0x12 0x00 .. 0x07 */
+#define	OP_CHERI_CGETCAUSE_OLD	0x04	/* CGetCause - 0x12 0x00 .. 0x04 */
+#define	OP_CHERI_CGETPCC_OLD	0x07	/* CGetPCC - 0x12 0x00 .. 0x07 */
 #endif
 
 #endif /* !_MACHINE_MIPS_OPCODE_H_ */

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2008 Marcel Moolenaar
  * Copyright (c) 2009 Nathan Whitehorn
  * All rights reserved.
@@ -34,6 +36,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/bus.h>
 #include <sys/pcpu.h>
 #include <sys/proc.h>
+#include <sys/sched.h>
 #include <sys/smp.h>
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -42,7 +45,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpu.h>
 #include <machine/hid.h>
 #include <machine/platformvar.h>
-#include <machine/pmap.h>
 #include <machine/rtas.h>
 #include <machine/smp.h>
 #include <machine/spr.h>
@@ -111,6 +113,8 @@ static platform_def_t chrp_platform = {
 };
 
 PLATFORM_DEF(chrp_platform);
+
+#define BSP_MUST_BE_CPU_ZERO
 
 static int
 chrp_probe(platform_t plat)
@@ -277,12 +281,30 @@ chrp_real_maxaddr(platform_t plat)
 static u_long
 chrp_timebase_freq(platform_t plat, struct cpuref *cpuref)
 {
-	phandle_t phandle;
+	char buf[8];
+	phandle_t cpu, dev, root;
+	int res;
 	int32_t ticks = -1;
 
-	phandle = cpuref->cr_hwref;
+	root = OF_peer(0);
 
-	OF_getencprop(phandle, "timebase-frequency", &ticks, sizeof(ticks));
+	dev = OF_child(root);
+	while (dev != 0) {
+		res = OF_getprop(dev, "name", buf, sizeof(buf));
+		if (res > 0 && strcmp(buf, "cpus") == 0)
+			break;
+		dev = OF_peer(dev);
+	}
+
+	for (cpu = OF_child(dev); cpu != 0; cpu = OF_peer(cpu)) {
+		res = OF_getprop(cpu, "device_type", buf, sizeof(buf));
+		if (res > 0 && strcmp(buf, "cpu") == 0)
+			break;
+	}
+	if (cpu == 0)
+		return (512000000);
+
+	OF_getencprop(cpu, "timebase-frequency", &ticks, sizeof(ticks));
 
 	if (ticks <= 0)
 		panic("Unable to determine timebase frequency!");
@@ -291,11 +313,11 @@ chrp_timebase_freq(platform_t plat, struct cpuref *cpuref)
 }
 
 static int
-chrp_smp_first_cpu(platform_t plat, struct cpuref *cpuref)
+chrp_cpuref_for_server(struct cpuref *cpuref, int cpu_n, int server)
 {
 	char buf[8];
 	phandle_t cpu, dev, root;
-	int res, cpuid;
+	int res, cpuid, i, j;
 
 	root = OF_peer(0);
 
@@ -316,71 +338,84 @@ chrp_smp_first_cpu(platform_t plat, struct cpuref *cpuref)
 			return (ENOENT);
 	}
 
-	cpu = OF_child(dev);
-
-	while (cpu != 0) {
+	i = 0;
+	for (cpu = OF_child(dev); cpu != 0; cpu = OF_peer(cpu)) {
 		res = OF_getprop(cpu, "device_type", buf, sizeof(buf));
-		if (res > 0 && strcmp(buf, "cpu") == 0)
-			break;
-		cpu = OF_peer(cpu);
+		if (res <= 0 || strcmp(buf, "cpu") != 0)
+			continue;
+
+		res = OF_getproplen(cpu, "ibm,ppc-interrupt-server#s");
+		if (res > 0) {
+			cell_t interrupt_servers[res/sizeof(cell_t)];
+			OF_getencprop(cpu, "ibm,ppc-interrupt-server#s",
+			    interrupt_servers, res);
+			for (j = 0; j < res/sizeof(cell_t); j++) {
+				cpuid = interrupt_servers[j];
+				if (server != -1 && cpuid == server)
+					break;
+				if (cpu_n != -1 && cpu_n == i)
+					break;
+				i++;
+			}
+
+			if (j != res/sizeof(cell_t))
+				break;
+		} else {
+			res = OF_getencprop(cpu, "reg", &cpuid, sizeof(cpuid));
+			if (res <= 0)
+				cpuid = 0;
+			if (server != -1 && cpuid == server)
+				break;
+			if (cpu_n != -1 && cpu_n == i)
+				break;
+			i++;
+		}
 	}
+
 	if (cpu == 0)
 		return (ENOENT);
 
-	cpuref->cr_hwref = cpu;
-	res = OF_getencprop(cpu, "ibm,ppc-interrupt-server#s", &cpuid,
-	    sizeof(cpuid));
-	if (res <= 0)
-		res = OF_getencprop(cpu, "reg", &cpuid, sizeof(cpuid));
-	if (res <= 0)
-		cpuid = 0;
-	cpuref->cr_cpuid = cpuid;
+	cpuref->cr_hwref = cpuid;
+	cpuref->cr_cpuid = i;
 
 	return (0);
 }
 
 static int
+chrp_smp_first_cpu(platform_t plat, struct cpuref *cpuref)
+{
+#ifdef BSP_MUST_BE_CPU_ZERO
+	return (chrp_smp_get_bsp(plat, cpuref));
+#else
+	return (chrp_cpuref_for_server(cpuref, 0, -1));
+#endif
+}
+
+static int
 chrp_smp_next_cpu(platform_t plat, struct cpuref *cpuref)
 {
-	char buf[8];
-	phandle_t cpu;
-	int i, res, cpuid;
+#ifdef BSP_MUST_BE_CPU_ZERO
+	int bsp, ncpus, err;
+	struct cpuref scratch;
 
-	/* Check for whether it should be the next thread */
-	res = OF_getproplen(cpuref->cr_hwref, "ibm,ppc-interrupt-server#s");
-	if (res > 0) {
-		cell_t interrupt_servers[res/sizeof(cell_t)];
-		OF_getencprop(cpuref->cr_hwref, "ibm,ppc-interrupt-server#s",
-		    interrupt_servers, res);
-		for (i = 0; i < res/sizeof(cell_t) - 1; i++) {
-			if (interrupt_servers[i] == cpuref->cr_cpuid) {
-				cpuref->cr_cpuid = interrupt_servers[i+1];
-				return (0);
-			}
-		}
-	}
+	chrp_smp_get_bsp(plat, &scratch);
+	chrp_cpuref_for_server(&scratch, -1, scratch.cr_hwref);
+	bsp = scratch.cr_cpuid;
 
-	/* Next CPU core/package */
-	cpu = OF_peer(cpuref->cr_hwref);
-	while (cpu != 0) {
-		res = OF_getprop(cpu, "device_type", buf, sizeof(buf));
-		if (res > 0 && strcmp(buf, "cpu") == 0)
-			break;
-		cpu = OF_peer(cpu);
-	}
-	if (cpu == 0)
+	for (ncpus = bsp; chrp_cpuref_for_server(&scratch, ncpus, -1) !=
+	    ENOENT; ncpus++) {}
+	if (cpuref->cr_cpuid + 1 == ncpus)
 		return (ENOENT);
-
-	cpuref->cr_hwref = cpu;
-	res = OF_getencprop(cpu, "ibm,ppc-interrupt-server#s", &cpuid,
-	    sizeof(cpuid));
-	if (res <= 0)
-		res = OF_getencprop(cpu, "reg", &cpuid, sizeof(cpuid));
-	if (res <= 0)
-		cpuid = 0;
-	cpuref->cr_cpuid = cpuid;
-
-	return (0);
+	err = chrp_cpuref_for_server(cpuref,
+	    (cpuref->cr_cpuid + bsp + 1) % ncpus, -1);
+	if (cpuref->cr_cpuid >= bsp)
+		cpuref->cr_cpuid -= bsp;
+	else
+		cpuref->cr_cpuid = ncpus - (bsp - cpuref->cr_cpuid);
+	return (err);
+#else
+	return (chrp_cpuref_for_server(cpuref, cpuref->cr_cpuid+1, -1));
+#endif
 }
 
 static int
@@ -401,14 +436,17 @@ chrp_smp_get_bsp(platform_t plat, struct cpuref *cpuref)
 	bsp = OF_instance_to_package(inst);
 
 	/* Pick the primary thread. Can it be any other? */
-	cpuref->cr_hwref = bsp;
 	res = OF_getencprop(bsp, "ibm,ppc-interrupt-server#s", &cpuid,
 	    sizeof(cpuid));
 	if (res <= 0)
 		res = OF_getencprop(bsp, "reg", &cpuid, sizeof(cpuid));
 	if (res <= 0)
 		cpuid = 0;
+
+	chrp_cpuref_for_server(cpuref, -1, cpuid);
+#ifdef BSP_MUST_BE_CPU_ZERO
 	cpuref->cr_cpuid = cpuid;
+#endif
 
 	return (0);
 }
@@ -436,7 +474,7 @@ chrp_smp_start_cpu(platform_t plat, struct pcpu *pc)
 	ap_pcpu = pc;
 	powerpc_sync();
 
-	result = rtas_call_method(start_cpu, 3, 1, pc->pc_cpuid, EXC_RST, pc,
+	result = rtas_call_method(start_cpu, 3, 1, pc->pc_hwref, EXC_RST, pc,
 	    &err);
 	if (result < 0 || err != 0) {
 		printf("RTAS error (%d/%d): unable to start AP %d\n",
@@ -454,46 +492,80 @@ chrp_smp_start_cpu(platform_t plat, struct pcpu *pc)
 static struct cpu_group *
 chrp_smp_topo(platform_t plat)
 {
-	struct pcpu *pc, *last_pc;
-	int i, ncores, ncpus;
+	char buf[8];
+	phandle_t cpu, dev, root;
+	int res, nthreads;
 
-	ncores = ncpus = 0;
-	last_pc = NULL;
-	for (i = 0; i <= mp_maxid; i++) {
-		pc = pcpu_find(i);
-		if (pc == NULL)
-			continue;
-		if (last_pc == NULL || pc->pc_hwref != last_pc->pc_hwref)
-			ncores++;
-		last_pc = pc;
-		ncpus++;
+	root = OF_peer(0);
+
+	dev = OF_child(root);
+	while (dev != 0) {
+		res = OF_getprop(dev, "name", buf, sizeof(buf));
+		if (res > 0 && strcmp(buf, "cpus") == 0)
+			break;
+		dev = OF_peer(dev);
 	}
 
-	if (ncpus % ncores != 0) {
+	nthreads = 1;
+	for (cpu = OF_child(dev); cpu != 0; cpu = OF_peer(cpu)) {
+		res = OF_getprop(cpu, "device_type", buf, sizeof(buf));
+		if (res <= 0 || strcmp(buf, "cpu") != 0)
+			continue;
+
+		res = OF_getproplen(cpu, "ibm,ppc-interrupt-server#s");
+
+		if (res >= 0)
+			nthreads = res / sizeof(cell_t);
+		else
+			nthreads = 1;
+		break;
+	}
+
+	if (mp_ncpus % nthreads != 0) {
 		printf("WARNING: Irregular SMP topology. Performance may be "
-		     "suboptimal (%d CPUS, %d cores)\n", ncpus, ncores);
+		     "suboptimal (%d threads, %d on first core)\n",
+		     mp_ncpus, nthreads);
 		return (smp_topo_none());
 	}
 
 	/* Don't do anything fancier for non-threaded SMP */
-	if (ncpus == ncores)
+	if (nthreads == 1)
 		return (smp_topo_none());
 
-	return (smp_topo_1level(CG_SHARE_L1, ncpus / ncores, CG_FLAG_SMT));
+	return (smp_topo_1level(CG_SHARE_L1, nthreads, CG_FLAG_SMT));
 }
 #endif
 
 static void
 chrp_reset(platform_t platform)
 {
-	OF_reboot();
+	cell_t token, status;
+
+	if (rtas_exists()) {
+		token = rtas_token_lookup("system-reboot");
+		if (token != -1)
+			rtas_call_method(token, 0, 1, &status);
+	} else {
+		OF_reboot();
+	}
 }
 
 #ifdef __powerpc64__
 static void
 phyp_cpu_idle(sbintime_t sbt)
 {
-	phyp_hcall(H_CEDE);
+	register_t msr;
+
+	msr = mfmsr();
+
+	mtmsr(msr & ~PSL_EE);
+	if (sched_runnable()) {
+		mtmsr(msr);
+		return;
+	}
+
+	phyp_hcall(H_CEDE); /* Re-enables interrupts internally */
+	mtmsr(msr);
 }
 
 static void

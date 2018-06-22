@@ -69,7 +69,7 @@ struct _nv {
 const char *find_value(struct _nv *x, int value);
 const char *find_zero_bit(struct _nv *x, int value, int sz);
 
-/* SFF-8472 Rev. 11.4 table 3.4: Connector values */
+/* SFF-8024 Rev. 4.1 Table 4-3: Connector Types */
 static struct _nv conn[] = {
 	{ 0x00, "Unknown" },
 	{ 0x01, "SC" },
@@ -87,7 +87,8 @@ static struct _nv conn[] = {
 	{ 0x20, "HSSDC II" },
 	{ 0x21, "Copper pigtail" },
 	{ 0x22, "RJ45" },
-	{ 0x23, "No separate connector" }, /* SFF-8436 */
+	{ 0x23, "No separable connector" },
+	{ 0x24, "MXC 2x16" },
 	{ 0, NULL }
 };
 
@@ -183,10 +184,17 @@ static struct _nv eth_1040g[] = {
 };
 #define	SFF_8636_EXT_COMPLIANCE	0x80
 
-/* SFF-8024 Rev. 3.4 table 4.4: Extended Specification Compliance */
+/* SFF-8024 Rev. 4.2 table 4-4: Extended Specification Compliance */
 static struct _nv eth_extended_comp[] = {
 	{ 0xFF, "Reserved" },
-	{ 0x1A, "2 lambda DWDM 100G" },
+	{ 0x21, "100G PAM4 BiDi" },
+	{ 0x20, "100G SWDM4" },
+	{ 0x1F, "40G SWDM4" },
+	{ 0x1E, "2.5GBASE-T" },
+	{ 0x1D, "5GBASE-T" },
+	{ 0x1C, "10GBASE-T Short Reach" },
+	{ 0x1B, "100G 1550nm WDM" },
+	{ 0x1A, "100GE-DWDM2" },
 	{ 0x19, "100G ACC or 25GAUI C2M ACC" },
 	{ 0x18, "100G AOC or 25GAUI C2M AOC" },
 	{ 0x17, "100G CLR4" },
@@ -198,23 +206,24 @@ static struct _nv eth_extended_comp[] = {
 	{ 0x11, "4 x 10GBASE-SR" },
 	{ 0x10, "40GBASE-ER4" },
 	{ 0x0F, "Reserved" },
+	{ 0x0E, "Reserved" },
 	{ 0x0D, "25GBASE-CR CA-N" },
 	{ 0x0C, "25GBASE-CR CA-S" },
 	{ 0x0B, "100GBASE-CR4 or 25GBASE-CR CA-L" },
 	{ 0x0A, "Reserved" },
-	{ 0x09, "100G CWDM4 MSA without FEC" },
-	{ 0x08, "100G ACC (Active Copper Cable)" },
+	{ 0x09, "Obsolete" },
+	{ 0x08, "100G ACC (Active Copper Cable) or 25GAUI C2M ACC" },
 	{ 0x07, "100G PSM4 Parallel SMF" },
-	{ 0x06, "100G CWDM4 MSA with FEC" },
+	{ 0x06, "100G CWDM4" },
 	{ 0x05, "100GBASE-SR10" },
-	{ 0x04, "100GBASE-ER4" },
-	{ 0x03, "100GBASE-LR4" },
-	{ 0x02, "100GBASE-SR4" },
-	{ 0x01, "100G AOC (Active Optical Cable) or 25GAUI C2M ACC" },
+	{ 0x04, "100GBASE-ER4 or 25GBASE-ER" },
+	{ 0x03, "100GBASE-LR4 or 25GBASE-LR" },
+	{ 0x02, "100GBASE-SR4 or 25GBASE-SR" },
+	{ 0x01, "100G AOC (Active Optical Cable) or 25GAUI C2M AOC" },
 	{ 0x00, "Unspecified" }
 };
 
-/* SFF-8636 Rev. 2.5 table 6.3: Revision compliance */
+/* SFF-8636 Rev. 2.9 table 6.3: Revision compliance */
 static struct _nv rev_compl[] = {
 	{ 0x1, "SFF-8436 rev <=4.8" },
 	{ 0x2, "SFF-8436 rev <=4.8" },
@@ -222,7 +231,8 @@ static struct _nv rev_compl[] = {
 	{ 0x4, "SFF-8636 rev <=1.4" },
 	{ 0x5, "SFF-8636 rev <=1.5" },
 	{ 0x6, "SFF-8636 rev <=2.0" },
-	{ 0x7, "SFF-8636 rev <=2.5" },
+	{ 0x7, "SFF-8636 rev <=2.7" },
+	{ 0x8, "SFF-8636 rev >=2.8" },
 	{ 0x0, "Unspecified" }
 };
 
@@ -378,17 +388,20 @@ get_sfp_transceiver_class(struct i2c_info *ii, char *buf, size_t size)
 	const char *tech_class;
 	uint8_t code;
 
-	unsigned char qbuf[8];
-	read_i2c(ii, SFF_8472_BASE, SFF_8472_TRANS_START, 8, (uint8_t *)qbuf);
-
-	/* Check 10G Ethernet/IB first */
-	read_i2c(ii, SFF_8472_BASE, SFF_8472_TRANS_START, 1, &code);
-	tech_class = find_zero_bit(eth_10g, code, 1);
-	if (tech_class == NULL) {
-		/* No match. Try Ethernet 1G */
-		read_i2c(ii, SFF_8472_BASE, SFF_8472_TRANS_START + 3,
-		    1, (caddr_t)&code);
-		tech_class = find_zero_bit(eth_compat, code, 1);
+	/* Use extended compliance code if it's valid */
+	read_i2c(ii, SFF_8472_BASE, SFF_8472_TRANS, 1, &code);
+	if (code != 0)
+		tech_class = find_value(eth_extended_comp, code);
+	else {
+		/* Next, check 10G Ethernet/IB CCs */
+		read_i2c(ii, SFF_8472_BASE, SFF_8472_TRANS_START, 1, &code);
+		tech_class = find_zero_bit(eth_10g, code, 1);
+		if (tech_class == NULL) {
+			/* No match. Try Ethernet 1G */
+			read_i2c(ii, SFF_8472_BASE, SFF_8472_TRANS_START + 3,
+			    1, (caddr_t)&code);
+			tech_class = find_zero_bit(eth_compat, code, 1);
+		}
 	}
 
 	if (tech_class == NULL)
@@ -625,14 +638,17 @@ get_sfp_voltage(struct i2c_info *ii, char *buf, size_t size)
 	convert_sff_voltage(buf, size, xbuf);
 }
 
-static void
+static int
 get_qsfp_temp(struct i2c_info *ii, char *buf, size_t size)
 {
 	uint8_t xbuf[2];
 
 	memset(xbuf, 0, sizeof(xbuf));
 	read_i2c(ii, SFF_8436_BASE, SFF_8436_TEMP, 2, xbuf);
+	if ((xbuf[0] == 0xFF && xbuf[1] == 0xFF) || (xbuf[0] == 0 && xbuf[1] == 0))
+		return (-1);
 	convert_sff_temp(buf, size, xbuf);
+	return (0);
 }
 
 static void
@@ -735,7 +751,7 @@ read_i2c(struct i2c_info *ii, uint8_t addr, uint8_t off, uint8_t len,
 	req.len = len;
 
 	while (len > 0) {
-		l = (len > sizeof(req.data)) ? sizeof(req.data) : len;
+		l = MIN(sizeof(req.data), len);
 		req.len = l;
 		if (ioctl(ii->fd, SIOCGI2C, ii->ifr) != 0) {
 			ii->error = errno;
@@ -759,7 +775,7 @@ dump_i2c_data(struct i2c_info *ii, uint8_t addr, uint8_t off, uint8_t len)
 
 	while (len > 0) {
 		memset(buf, 0, sizeof(buf));
-		read = (len > sizeof(buf)) ? sizeof(buf) : len;
+		read = MIN(sizeof(buf), len);
 		read_i2c(ii, addr, off, read, buf);
 		if (ii->error != 0) {
 			fprintf(stderr, "Error reading i2c info\n");
@@ -779,22 +795,9 @@ static void
 print_qsfp_status(struct i2c_info *ii, int verbose)
 {
 	char buf[80], buf2[40], buf3[40];
-	uint8_t diag_type;
 	uint32_t bitrate;
 	int i;
 
-	/* Read diagnostic monitoring type */
-	read_i2c(ii, SFF_8436_BASE, SFF_8436_DIAG_TYPE, 1, (caddr_t)&diag_type);
-	if (ii->error != 0)
-		return;
-
-	/*
-	 * Read monitoring data it is supplied.
-	 * XXX: It is not exactly clear from standard
-	 * how one can specify lack of measurements (passive cables case).
-	 */
-	if (diag_type != 0)
-		ii->do_diag = 1;
 	ii->qsfp = 1;
 
 	/* Transceiver type */
@@ -817,9 +820,13 @@ print_qsfp_status(struct i2c_info *ii, int verbose)
 			printf("\tnominal bitrate: %u Mbps\n", bitrate);
 	}
 
-	/* Request current measurements if they are provided: */
-	if (ii->do_diag != 0) {
-		get_qsfp_temp(ii, buf, sizeof(buf));
+	/*
+	 * The standards in this area are not clear when the
+	 * additional measurements are present or not. Use a valid
+	 * temperature reading as an indicator for the presence of
+	 * voltage and TX/RX power measurements.
+	 */
+	if (get_qsfp_temp(ii, buf, sizeof(buf)) == 0) {
 		get_qsfp_voltage(ii, buf2, sizeof(buf2));
 		printf("\tmodule temperature: %s voltage: %s\n", buf, buf2);
 		for (i = 1; i <= 4; i++) {
@@ -917,6 +924,6 @@ sfp_status(int s, struct ifreq *ifr, int verbose)
 		break;
 	default:
 		print_sfp_status(&ii, verbose);
-	};
+	}
 }
 

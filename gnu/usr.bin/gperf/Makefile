@@ -1,7 +1,10 @@
 # $FreeBSD$
 
 .include <bsd.own.mk>
-GPERFDIR=	${.CURDIR}/../../../contrib/gperf
+
+WANT_CHERI=pure
+
+GPERFDIR=	${SRCTOP}/contrib/gperf
 
 .PATH: ${GPERFDIR}/src ${GPERFDIR}/lib ${GPERFDIR}/doc
 

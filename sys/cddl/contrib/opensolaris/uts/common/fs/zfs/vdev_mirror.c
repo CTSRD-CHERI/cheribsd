@@ -24,13 +24,17 @@
  */
 
 /*
- * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2015 by Delphix. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
 #include <sys/spa.h>
+#include <sys/spa_impl.h>
+#include <sys/dsl_pool.h>
+#include <sys/dsl_scan.h>
 #include <sys/vdev_impl.h>
 #include <sys/zio.h>
+#include <sys/abd.h>
 #include <sys/fs/zfs.h>
 
 /*
@@ -51,16 +55,18 @@ typedef struct mirror_map {
 	int		*mm_preferred;
 	int		mm_preferred_cnt;
 	int		mm_children;
-	boolean_t	mm_replacing;
+	boolean_t	mm_resilvering;
 	boolean_t	mm_root;
 	mirror_child_t	mm_child[];
 } mirror_map_t;
 
 static int vdev_mirror_shift = 21;
 
+#ifdef _KERNEL
 SYSCTL_DECL(_vfs_zfs_vdev);
 static SYSCTL_NODE(_vfs_zfs_vdev, OID_AUTO, mirror, CTLFLAG_RD, 0,
     "ZFS VDEV Mirror");
+#endif
 
 /*
  * The load configuration settings below are tuned by default for
@@ -74,28 +80,38 @@ static SYSCTL_NODE(_vfs_zfs_vdev, OID_AUTO, mirror, CTLFLAG_RD, 0,
 
 /* Rotating media load calculation configuration. */
 static int rotating_inc = 0;
+#ifdef _KERNEL
 SYSCTL_INT(_vfs_zfs_vdev_mirror, OID_AUTO, rotating_inc, CTLFLAG_RWTUN,
     &rotating_inc, 0, "Rotating media load increment for non-seeking I/O's");
+#endif
 
 static int rotating_seek_inc = 5;
+#ifdef _KERNEL
 SYSCTL_INT(_vfs_zfs_vdev_mirror, OID_AUTO, rotating_seek_inc, CTLFLAG_RWTUN,
     &rotating_seek_inc, 0, "Rotating media load increment for seeking I/O's");
+#endif
 
 static int rotating_seek_offset = 1 * 1024 * 1024;
+#ifdef _KERNEL
 SYSCTL_INT(_vfs_zfs_vdev_mirror, OID_AUTO, rotating_seek_offset, CTLFLAG_RWTUN,
     &rotating_seek_offset, 0, "Offset in bytes from the last I/O which "
     "triggers a reduced rotating media seek increment");
+#endif
 
 /* Non-rotating media load calculation configuration. */
 static int non_rotating_inc = 0;
+#ifdef _KERNEL
 SYSCTL_INT(_vfs_zfs_vdev_mirror, OID_AUTO, non_rotating_inc, CTLFLAG_RWTUN,
     &non_rotating_inc, 0,
     "Non-rotating media load increment for non-seeking I/O's");
+#endif
 
 static int non_rotating_seek_inc = 1;
+#ifdef _KERNEL
 SYSCTL_INT(_vfs_zfs_vdev_mirror, OID_AUTO, non_rotating_seek_inc, CTLFLAG_RWTUN,
     &non_rotating_seek_inc, 0,
     "Non-rotating media load increment for seeking I/O's");
+#endif
 
 
 static inline size_t
@@ -106,13 +122,13 @@ vdev_mirror_map_size(int children)
 }
 
 static inline mirror_map_t *
-vdev_mirror_map_alloc(int children, boolean_t replacing, boolean_t root)
+vdev_mirror_map_alloc(int children, boolean_t resilvering, boolean_t root)
 {
 	mirror_map_t *mm;
 
 	mm = kmem_zalloc(vdev_mirror_map_size(children), KM_SLEEP);
 	mm->mm_children = children;
-	mm->mm_replacing = replacing;
+	mm->mm_resilvering = resilvering;
 	mm->mm_root = root;
 	mm->mm_preferred = (int *)((uintptr_t)mm + 
 	    offsetof(mirror_map_t, mm_child[children]));
@@ -204,9 +220,39 @@ vdev_mirror_map_init(zio_t *zio)
 			mc->mc_offset = DVA_GET_OFFSET(&dva[c]);
 		}
 	} else {
-		mm = vdev_mirror_map_alloc(vd->vdev_children,
-		    (vd->vdev_ops == &vdev_replacing_ops ||
-                    vd->vdev_ops == &vdev_spare_ops), B_FALSE);
+		/*
+		 * If we are resilvering, then we should handle scrub reads
+		 * differently; we shouldn't issue them to the resilvering
+		 * device because it might not have those blocks.
+		 *
+		 * We are resilvering iff:
+		 * 1) We are a replacing vdev (ie our name is "replacing-1" or
+		 *    "spare-1" or something like that), and
+		 * 2) The pool is currently being resilvered.
+		 *
+		 * We cannot simply check vd->vdev_resilver_txg, because it's
+		 * not set in this path.
+		 *
+		 * Nor can we just check our vdev_ops; there are cases (such as
+		 * when a user types "zpool replace pool odev spare_dev" and
+		 * spare_dev is in the spare list, or when a spare device is
+		 * automatically used to replace a DEGRADED device) when
+		 * resilvering is complete but both the original vdev and the
+		 * spare vdev remain in the pool.  That behavior is intentional.
+		 * It helps implement the policy that a spare should be
+		 * automatically removed from the pool after the user replaces
+		 * the device that originally failed.
+		 *
+		 * If a spa load is in progress, then spa_dsl_pool may be
+		 * uninitialized.  But we shouldn't be resilvering during a spa
+		 * load anyway.
+		 */
+		boolean_t replacing = (vd->vdev_ops == &vdev_replacing_ops ||
+		    vd->vdev_ops == &vdev_spare_ops) &&
+		    spa_load_state(vd->vdev_spa) == SPA_LOAD_NONE &&
+		    dsl_scan_resilvering(vd->vdev_spa->spa_dsl_pool);		
+		mm = vdev_mirror_map_alloc(vd->vdev_children, replacing,
+		    B_FALSE);
 		for (c = 0; c < mm->mm_children; c++) {
 			mc = &mm->mm_child[c];
 			mc->mc_vd = vd->vdev_child[c];
@@ -281,18 +327,18 @@ vdev_mirror_scrub_done(zio_t *zio)
 
 	if (zio->io_error == 0) {
 		zio_t *pio;
+		zio_link_t *zl = NULL;
 
 		mutex_enter(&zio->io_lock);
-		while ((pio = zio_walk_parents(zio)) != NULL) {
+		while ((pio = zio_walk_parents(zio, &zl)) != NULL) {
 			mutex_enter(&pio->io_lock);
 			ASSERT3U(zio->io_size, >=, pio->io_size);
-			bcopy(zio->io_data, pio->io_data, pio->io_size);
+			abd_copy(pio->io_abd, zio->io_abd, pio->io_size);
 			mutex_exit(&pio->io_lock);
 		}
 		mutex_exit(&zio->io_lock);
 	}
-
-	zio_buf_free(zio->io_data, zio->io_size);
+	abd_free(zio->io_abd);
 
 	mc->mc_error = zio->io_error;
 	mc->mc_tried = 1;
@@ -435,7 +481,7 @@ vdev_mirror_io_start(zio_t *zio)
 	mm = vdev_mirror_map_init(zio);
 
 	if (zio->io_type == ZIO_TYPE_READ) {
-		if ((zio->io_flags & ZIO_FLAG_SCRUB) && !mm->mm_replacing &&
+		if ((zio->io_flags & ZIO_FLAG_SCRUB) && !mm->mm_resilvering &&
 		    mm->mm_children > 1) {
 			/*
 			 * For scrubbing reads we need to allocate a read
@@ -447,7 +493,8 @@ vdev_mirror_io_start(zio_t *zio)
 				mc = &mm->mm_child[c];
 				zio_nowait(zio_vdev_child_io(zio, zio->io_bp,
 				    mc->mc_vd, mc->mc_offset,
-				    zio_buf_alloc(zio->io_size), zio->io_size,
+				    abd_alloc_sametype(zio->io_abd,
+				    zio->io_size), zio->io_size,
 				    zio->io_type, zio->io_priority, 0,
 				    vdev_mirror_scrub_done, mc));
 			}
@@ -473,7 +520,7 @@ vdev_mirror_io_start(zio_t *zio)
 	while (children--) {
 		mc = &mm->mm_child[c];
 		zio_nowait(zio_vdev_child_io(zio, zio->io_bp,
-		    mc->mc_vd, mc->mc_offset, zio->io_data, zio->io_size,
+		    mc->mc_vd, mc->mc_offset, zio->io_abd, zio->io_size,
 		    zio->io_type, zio->io_priority, 0,
 		    vdev_mirror_child_done, mc));
 		c++;
@@ -560,7 +607,7 @@ vdev_mirror_io_done(zio_t *zio)
 		mc = &mm->mm_child[c];
 		zio_vdev_io_redone(zio);
 		zio_nowait(zio_vdev_child_io(zio, zio->io_bp,
-		    mc->mc_vd, mc->mc_offset, zio->io_data, zio->io_size,
+		    mc->mc_vd, mc->mc_offset, zio->io_abd, zio->io_size,
 		    ZIO_TYPE_READ, zio->io_priority, 0,
 		    vdev_mirror_child_done, mc));
 		return;
@@ -575,7 +622,7 @@ vdev_mirror_io_done(zio_t *zio)
 	if (good_copies && spa_writeable(zio->io_spa) &&
 	    (unexpected_errors ||
 	    (zio->io_flags & ZIO_FLAG_RESILVER) ||
-	    ((zio->io_flags & ZIO_FLAG_SCRUB) && mm->mm_replacing))) {
+	    ((zio->io_flags & ZIO_FLAG_SCRUB) && mm->mm_resilvering))) {
 		/*
 		 * Use the good data we have in hand to repair damaged children.
 		 */
@@ -601,7 +648,7 @@ vdev_mirror_io_done(zio_t *zio)
 
 			zio_nowait(zio_vdev_child_io(zio, zio->io_bp,
 			    mc->mc_vd, mc->mc_offset,
-			    zio->io_data, zio->io_size,
+			    zio->io_abd, zio->io_size,
 			    ZIO_TYPE_WRITE, ZIO_PRIORITY_ASYNC_WRITE,
 			    ZIO_FLAG_IO_REPAIR | (unexpected_errors ?
 			    ZIO_FLAG_SELF_HEAL : 0), NULL, NULL));

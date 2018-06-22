@@ -7,12 +7,13 @@
 
 # PROVIDE: defaultroute
 # REQUIRE: devd netif stf
-# KEYWORD: nojail
+# KEYWORD: nojailvnet
 
 . /etc/rc.subr
 . /etc/network.subr
 
 name="defaultroute"
+desc="Setup default router"
 start_cmd="defaultroute_start"
 stop_cmd=":"
 

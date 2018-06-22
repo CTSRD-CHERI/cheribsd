@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2008, 2009 Edward Tomasz Napierała <trasz@FreeBSD.org>
  * All rights reserved.
  *
@@ -81,7 +83,7 @@ static const char *
 format_flag(uint32_t *var, const struct flagnames_struct *flags)
 {
 
-	for (; flags->name != 0; flags++) {
+	for (; flags->name != NULL; flags++) {
 		if ((flags->flag & *var) == 0)
 			continue;
 

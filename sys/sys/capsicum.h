@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2008-2010, 2015 Robert N. M. Watson
  * Copyright (c) 2012 FreeBSD Foundation
  * All rights reserved.
@@ -367,6 +369,8 @@ cap_rights_t	*cap_rights(struct filedesc *fdp, int fd);
 int	cap_ioctl_check(struct filedesc *fdp, int fd, u_long cmd);
 int	cap_fcntl_check_fde(struct filedescent *fde, int cmd);
 int	cap_fcntl_check(struct filedesc *fdp, int fd, int cmd);
+
+extern int trap_enotcap;
 
 #else /* !_KERNEL */
 

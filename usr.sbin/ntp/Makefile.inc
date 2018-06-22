@@ -2,6 +2,10 @@
 
 .include <src.opts.mk>
 
+.if ${MK_CHERI_PURE} == "yes"
+WANT_CHERI?=pure
+.endif
+
 DEFS_LOCAL= -DPARSE -DHAVE_CONFIG_H
 NTPDEFS=   -DSYS_FREEBSD
 # CLOCKDEFS=

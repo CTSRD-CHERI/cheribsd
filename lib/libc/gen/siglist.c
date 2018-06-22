@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1983, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -26,6 +28,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "support"
+ *   ],
+ *   "change_comment": "SIGPORT"
+ * }
+ * CHERI CHANGES END
+ */
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)siglist.c	8.1 (Berkeley) 6/4/93";
@@ -36,78 +49,78 @@ __FBSDID("$FreeBSD$");
 #include <signal.h>
 
 const char *const sys_signame[NSIG] = {
-	"Signal 0",
-	"HUP",				/* SIGHUP */
-	"INT",				/* SIGINT */
-	"QUIT",				/* SIGQUIT */
-	"ILL",				/* SIGILL */
-	"TRAP",				/* SIGTRAP */
-	"ABRT",				/* SIGABRT */
-	"EMT",				/* SIGEMT */
-	"FPE",				/* SIGFPE */
-	"KILL",				/* SIGKILL */
-	"BUS",				/* SIGBUS */
-	"SEGV",				/* SIGSEGV */
-	"SYS",				/* SIGSYS */
-	"PIPE",				/* SIGPIPE */
-	"ALRM",				/* SIGALRM */
-	"TERM",				/* SIGTERM */
-	"URG",				/* SIGURG */
-	"STOP",				/* SIGSTOP */
-	"TSTP",				/* SIGTSTP */
-	"CONT",				/* SIGCONT */
-	"CHLD",				/* SIGCHLD */
-	"TTIN",				/* SIGTTIN */
-	"TTOU",				/* SIGTTOU */
-	"IO",				/* SIGIO */
-	"XCPU",				/* SIGXCPU */
-	"XFSZ",				/* SIGXFSZ */
-	"VTALRM",			/* SIGVTALRM */
-	"PROF",				/* SIGPROF */
-	"WINCH",			/* SIGWINCH */
-	"INFO",				/* SIGINFO */
-	"USR1",				/* SIGUSR1 */
-	"USR2",				/* SIGUSR2 */
-	"THR",				/* SIGTHR */
-	"LIBRT",			/* SIGLIBRT */
-	"PROT"				/* SIGPROT */
+	[0] =		"Signal 0",
+	[SIGHUP] =	"HUP",
+	[SIGINT] =	"INT",
+	[SIGQUIT] =	"QUIT",
+	[SIGILL] =	"ILL",
+	[SIGTRAP] =	"TRAP",
+	[SIGABRT] =	"ABRT",
+	[SIGEMT] =	"EMT",
+	[SIGFPE] =	"FPE",
+	[SIGKILL] =	"KILL",
+	[SIGBUS] =	"BUS",
+	[SIGSEGV] =	"SEGV",
+	[SIGSYS] =	"SYS",
+	[SIGPIPE] =	"PIPE",
+	[SIGALRM] =	"ALRM",
+	[SIGTERM] =	"TERM",
+	[SIGURG] =	"URG",
+	[SIGSTOP] =	"STOP",
+	[SIGTSTP] =	"TSTP",
+	[SIGCONT] =	"CONT",
+	[SIGCHLD] =	"CHLD",
+	[SIGTTIN] =	"TTIN",
+	[SIGTTOU] =	"TTOU",
+	[SIGIO] =	"IO",
+	[SIGXCPU] =	"XCPU",
+	[SIGXFSZ] =	"XFSZ",
+	[SIGVTALRM] =	"VTALRM",
+	[SIGPROF] =	"PROF",
+	[SIGWINCH] =	"WINCH",
+	[SIGINFO] =	"INFO",
+	[SIGUSR1] =	"USR1",
+	[SIGUSR2] =	"USR2",
+	[SIGTHR] =	"THR",
+	[SIGLIBRT] =	"LIBRT",
+	[SIGPROT] =	"PROT",
 };
 
 const char *const sys_siglist[NSIG] = {
-	"Signal 0",
-	"Hangup",			/* SIGHUP */
-	"Interrupt",			/* SIGINT */
-	"Quit",				/* SIGQUIT */
-	"Illegal instruction",		/* SIGILL */
-	"Trace/BPT trap",		/* SIGTRAP */
-	"Abort trap",			/* SIGABRT */
-	"EMT trap",			/* SIGEMT */
-	"Floating point exception",	/* SIGFPE */
-	"Killed",			/* SIGKILL */
-	"Bus error",			/* SIGBUS */
-	"Segmentation fault",		/* SIGSEGV */
-	"Bad system call",		/* SIGSYS */
-	"Broken pipe",			/* SIGPIPE */
-	"Alarm clock",			/* SIGALRM */
-	"Terminated",			/* SIGTERM */
-	"Urgent I/O condition",		/* SIGURG */
-	"Suspended (signal)",		/* SIGSTOP */
-	"Suspended",			/* SIGTSTP */
-	"Continued",			/* SIGCONT */
-	"Child exited",			/* SIGCHLD */
-	"Stopped (tty input)",		/* SIGTTIN */
-	"Stopped (tty output)",		/* SIGTTOU */
-	"I/O possible",			/* SIGIO */
-	"Cputime limit exceeded",	/* SIGXCPU */
-	"Filesize limit exceeded",	/* SIGXFSZ */
-	"Virtual timer expired",	/* SIGVTALRM */
-	"Profiling timer expired",	/* SIGPROF */
-	"Window size changes",		/* SIGWINCH */
-	"Information request",		/* SIGINFO */
-	"User defined signal 1",	/* SIGUSR1 */
-	"User defined signal 2",	/* SIGUSR2 */
-	"Reserved by thread library",		/* SIGTHR */
-	"Reserved by real-time library",	/* SIGLIBRT */
-	"In-address space security exception",	/* SIGPROT */
+	[0] =		"Signal 0",
+	[SIGHUP] =	"Hangup",
+	[SIGINT] =	"Interrupt",
+	[SIGQUIT] =	"Quit",
+	[SIGILL] =	"Illegal instruction",
+	[SIGTRAP] =	"Trace/BPT trap",
+	[SIGABRT] =	"Abort trap",
+	[SIGEMT] =	"EMT trap",
+	[SIGFPE] =	"Floating point exception",
+	[SIGKILL] =	"Killed",
+	[SIGBUS] =	"Bus error",
+	[SIGSEGV] =	"Segmentation fault",
+	[SIGSYS] =	"Bad system call",
+	[SIGPIPE] =	"Broken pipe",
+	[SIGALRM] =	"Alarm clock",
+	[SIGTERM] =	"Terminated",
+	[SIGURG] =	"Urgent I/O condition",
+	[SIGSTOP] =	"Suspended (signal)",
+	[SIGTSTP] =	"Suspended",
+	[SIGCONT] =	"Continued",
+	[SIGCHLD] =	"Child exited",
+	[SIGTTIN] =	"Stopped (tty input)",
+	[SIGTTOU] =	"Stopped (tty output)",
+	[SIGIO] =	"I/O possible",
+	[SIGXCPU] =	"Cputime limit exceeded",
+	[SIGXFSZ] =	"Filesize limit exceeded",
+	[SIGVTALRM] =	"Virtual timer expired",
+	[SIGPROF] =	"Profiling timer expired",
+	[SIGWINCH] =	"Window size changes",
+	[SIGINFO] =	"Information request",
+	[SIGUSR1] =	"User defined signal 1",
+	[SIGUSR2] =	"User defined signal 2",
+	[SIGTHR] =	"Reserved by thread library",
+	[SIGLIBRT] =	"reserved by real-time library",
+	[SIGPROT] =	"In-address space security exception",
 };
 const int sys_nsig = sizeof(sys_siglist) / sizeof(sys_siglist[0]);

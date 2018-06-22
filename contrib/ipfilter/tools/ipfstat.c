@@ -5,6 +5,16 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 #ifdef __FreeBSD__
 # ifndef __FreeBSD_cc_version
 #  include <osreldate.h>
@@ -1422,8 +1432,8 @@ static void topipstates(saddr, daddr, sport, dport, protocol, ver,
 			tsentry++;
 			if (!maxtsentries || tsentry == maxtsentries) {
 				maxtsentries += STGROWSIZE;
-				tstable = realloc(tstable,
-				    maxtsentries * sizeof(statetop_t));
+				tstable = reallocarray(tstable, maxtsentries,
+				    sizeof(statetop_t));
 				if (tstable == NULL) {
 					perror("realloc");
 					exit(-1);

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2012-2014 Baptiste Daroussin <bapt@FreeBSD.org>
  * Copyright (c) 2013 Bryan Drewery <bdrewery@FreeBSD.org>
  * All rights reserved.
@@ -34,7 +36,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/sbuf.h>
 #include <sys/wait.h>
 
-#define _WITH_GETLINE
 #include <archive.h>
 #include <archive_entry.h>
 #include <dirent.h>
@@ -947,6 +948,7 @@ pkg_query_yes_no(void)
 {
 	int ret, c;
 
+	fflush(stdout);
 	c = getchar();
 
 	if (c == 'y' || c == 'Y')

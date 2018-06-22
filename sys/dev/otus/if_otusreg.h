@@ -348,8 +348,8 @@ struct ar_evt_tx_comp {
 /* List of supported channels. */
 static const uint8_t ar_chans[] = {
 	1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
-	36, 40, 44, 48, 52, 56, 60, 64, 100, 104, 108, 112, 116, 120, 124,
-	128, 132, 136, 140, 149, 153, 157, 161, 165, 34, 38, 42, 46
+	34, 36, 38, 40, 42, 44, 46, 48, 52, 56, 60, 64, 100, 104, 108,
+	112, 116, 120, 124, 128, 132, 136, 140, 149, 153, 157, 161, 165
 };
 
 /*
@@ -997,6 +997,7 @@ struct otus_vap {
 
 struct otus_softc {
 	struct ieee80211com		sc_ic;
+	struct ieee80211_ratectl_tx_stats sc_txs;
 	struct mbufq			sc_snd;
 	device_t			sc_dev;
 	struct usb_device		*sc_udev;

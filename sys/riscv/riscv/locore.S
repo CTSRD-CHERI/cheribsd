@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2015 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2015-2017 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -43,104 +43,78 @@
 #include <machine/riscvreg.h>
 #include <machine/pte.h>
 
-#define	HTIF_RING_SIZE	(64)
-#define	HTIF_RING_LAST	(24 * (HTIF_RING_SIZE - 1))
-
 	.globl	kernbase
 	.set	kernbase, KERNBASE
 
 	/* Trap entries */
 	.text
 
-mentry:
-	/* User mode entry point (mtvec + 0x000) */
-	.align 6
-	j	user_trap
-
-	/* Supervisor mode entry point (mtvec + 0x040) */
-	.align 6
-	j	supervisor_trap
-
-	/* Hypervisor mode entry point (mtvec + 0x080) */
-	.align 6
-	j	bad_trap
-
-	/* Machine mode entry point (mtvec + 0x0C0) */
-	.align 6
-	j	bad_trap
-
 	/* Reset vector */
 	.text
-	.align 8
 	.globl _start
 _start:
-	li	s11, KERNBASE
+	/* Get the physical address kernel loaded to */
+	la	t0, virt_map
+	ld	t1, 0(t0)
+	sub	t1, t1, t0
+	li	t2, KERNBASE
+	sub	s9, t2, t1	/* s9 = physmem base */
+	mv	s10, a0		/* s10 = hart id */
+	mv	s11, a1		/* s11 = dtbp */
 
-	/* Build ring */
-	la	t0, htif_ring
-	li	t1, 0
-	sd	t1, 0(t0)	/* zero data */
-	sd	t1, 8(t0)	/* zero used */
-	mv	t2, t0
-	mv	t3, t0
-	li	t5, HTIF_RING_LAST
-	li	t6, 0
-	add	t4, t0, t5
-1:
-	addi	t3, t3, 24	/* pointer to next */
-	beq	t3, t4, 2f	/* finish */
-	sd	t3, 16(t2)	/* store pointer */
-	addi	t2, t2, 24	/* next entry */
-	addi	t6, t6, 1	/* counter */
-	j	1b
-2:
-	sd	t0, 16(t3)	/* last -> first */
-	la	t1, htif_ring_cursor
-	sd	t0, 0(t1)
-	la	t1, htif_ring_last
-	sd	t0, 0(t1)
-	/* finish building ring */
+	li	t0, SSTATUS_SUM
+	csrs	sstatus, t0
 
-	la	t0, hardstack_end
-	sub	t0, t0, s11
-	csrw	mscratch, t0
+	/* Direct secondary cores to mpentry */
+	bnez	s10, mpentry
 
-	la	t0, mentry
-	csrw	mtvec, t0
+	/*
+	 * Page tables
+	 */
 
-	li	t0, 0
-	csrw	sscratch, t0
-
-	li	s10, PAGE_SIZE
-	li	s9, (PAGE_SIZE * KSTACK_PAGES)
-
-	/* Page tables */
-
-	/* Level 0 */
-	la	s1, pagetable_l0
-	la	s2, pagetable_l1	/* Link to next level PN */
-	srli	s2, s2, PAGE_SHIFT
-
-	li	t4, (PTE_VALID | (PTE_TYPE_PTR << PTE_TYPE_S))
-	slli	t5, s2, PTE_PPN0_S	/* (s2 << PTE_PPN0_S) */
-	or	t6, t4, t5
-
-	/* Store single level0 PTE entry to position */
-	li	a5, 0x1ff
-	li	a6, PTE_SIZE
-	mulw	a5, a5, a6
-	add	t0, s1, a5
-	sd	t6, 0(t0)
-
-	/* Level 1 */
+	/* Add L1 entry for kernel */
 	la	s1, pagetable_l1
 	la	s2, pagetable_l2	/* Link to next level PN */
 	srli	s2, s2, PAGE_SHIFT
 
 	li	a5, KERNBASE
-	srli	a5, a5, 0x1e		/* >> 30 */
+	srli	a5, a5, L1_SHIFT	/* >> L1_SHIFT */
 	andi	a5, a5, 0x1ff		/* & 0x1ff */
-	li	t4, (PTE_VALID | (PTE_TYPE_PTR << PTE_TYPE_S))
+	li	t4, PTE_V
+	slli	t5, s2, PTE_PPN0_S	/* (s2 << PTE_PPN0_S) */
+	or	t6, t4, t5
+
+	/* Store L1 PTE entry to position */
+	li	a6, PTE_SIZE
+	mulw	a5, a5, a6
+	add	t0, s1, a5
+	sd	t6, (t0)
+
+	/* Level 2 superpages (512 x 2MiB) */
+	la	s1, pagetable_l2
+	srli	t4, s9, 21		/* Div physmem base by 2 MiB */
+	li	t2, 512			/* Build 512 entries */
+	add	t3, t4, t2
+	li	t5, 0
+2:
+	li	t0, (PTE_V | PTE_RWX | PTE_D)
+	slli	t2, t4, PTE_PPN1_S	/* << PTE_PPN1_S */
+	or	t5, t0, t2
+	sd	t5, (s1)		/* Store PTE entry to position */
+	addi	s1, s1, PTE_SIZE
+
+	addi	t4, t4, 1
+	bltu	t4, t3, 2b
+
+	/* Create an L1 page for early devmap */
+	la	s1, pagetable_l1
+	la	s2, pagetable_l2_devmap	/* Link to next level PN */
+	srli	s2, s2, PAGE_SHIFT
+
+	li	a5, (VM_MAX_KERNEL_ADDRESS - L2_SIZE)
+	srli	a5, a5, L1_SHIFT	/* >> L1_SHIFT */
+	andi	a5, a5, 0x1ff		/* & 0x1ff */
+	li	t4, PTE_V
 	slli	t5, s2, PTE_PPN0_S	/* (s2 << PTE_PPN0_S) */
 	or	t6, t4, t5
 
@@ -150,41 +124,48 @@ _start:
 	add	t0, s1, a5
 	sd	t6, (t0)
 
-	/* Level 2 superpages (512 x 2MiB) */
-	la	s1, pagetable_l2
-	li	t3, 512			/* Build 512 entries */
-	li	t4, 0			/* Counter */
-	li	t5, 0
-2:
-	li	t0, (PTE_VALID | (PTE_TYPE_SRWX << PTE_TYPE_S))
-	slli	t2, t4, PTE_PPN1_S	/* << PTE_PPN1_S */
-	or	t5, t0, t2
-	sd	t5, (s1)		/* Store PTE entry to position */
-	addi	s1, s1, PTE_SIZE
+	/* Create an L2 page superpage for DTB */
+	la	s1, pagetable_l2_devmap
+	mv	s2, s11
+	srli	s2, s2, PAGE_SHIFT
 
-	addi	t4, t4, 1
-	bltu	t4, t3, 2b
+	li	t0, (PTE_V | PTE_RWX | PTE_D)
+	slli	t2, s2, PTE_PPN0_S	/* << PTE_PPN0_S */
+	or	t0, t0, t2
 
-	/* Set page tables base register */
-	la	s1, pagetable_l0
-	csrw	sptbr, s1
+	/* Store PTE entry to position */
+	li	a6, PTE_SIZE
+	li	a5, 510
+	mulw	a5, a5, a6
+	add	t1, s1, a5
+	sd	t0, (t1)
 
 	/* Page tables END */
 
-	/* Enter supervisor mode */
-	li	s0, ((MSTATUS_VM_SV48 << MSTATUS_VM_SHIFT) | \
-		     (MSTATUS_PRV_M << MSTATUS_PRV_SHIFT) | \
-		     (MSTATUS_PRV_S << MSTATUS_PRV1_SHIFT) | \
-		     (MSTATUS_PRV_U << MSTATUS_PRV2_SHIFT));
-	csrw	mstatus, s0
+	/* Setup supervisor trap vector */
+	la	t0, va
+	sub	t0, t0, s9
+	li	t1, KERNBASE
+	add	t0, t0, t1
+	csrw	stvec, t0
 
-	/* Exit from machine mode */
-	la	t0, .Lmmu_on
-	add	t0, t0, s11
-	csrw	mepc, t0
-	eret
+	/* Set page tables base register */
+	la	s2, pagetable_l1
+	srli	s2, s2, PAGE_SHIFT
+	li	t0, SATP_MODE_SV39
+	or	s2, s2, t0
+	sfence.vma
+	csrw	sptbr, s2
+va:
 
-.Lmmu_on:
+	/* Setup supervisor trap vector */
+	la	t0, cpu_exception_handler
+	csrw	stvec, t0
+
+	/* Ensure sscratch is zero */
+	li	t0, 0
+	csrw	sscratch, t0
+
 	/* Initialize stack pointer */
 	la	s3, initstack_end
 	mv	sp, s3
@@ -199,11 +180,18 @@ _start:
 	bltu	a0, s1, 1b
 
 	/* Fill riscv_bootparams */
-	addi	sp, sp, -16
+	addi	sp, sp, -40
+
 	la	t0, pagetable_l1
 	sd	t0, 0(sp) /* kern_l1pt */
+	sd	s9, 8(sp) /* kern_phys */
+
 	la	t0, initstack_end
-	sd	t0, 8(sp) /* kern_stack */
+	sd	t0, 16(sp) /* kern_stack */
+
+	li	t0, (VM_MAX_KERNEL_ADDRESS - 2 * L2_SIZE)
+	sd	t0, 24(sp) /* dtbp_virt */
+	sd	s11, 32(sp) /* dtbp_phys */
 
 	mv	a0, sp
 	call	_C_LABEL(initriscv)	/* Off we go */
@@ -213,25 +201,6 @@ _start:
 initstack:
 	.space  (PAGE_SIZE * KSTACK_PAGES)
 initstack_end:
-hardstack:
-	.space  (PAGE_SIZE)
-hardstack_end:
-
-	.globl htif_ring
-htif_ring:
-	.space  (24 * 1024)
-
-	.globl htif_ring_cursor
-htif_ring_cursor:
-	.space  (8)
-
-	.globl htif_ring_last
-htif_ring_last:
-	.space  (8)
-
-	.globl console_intr
-console_intr:
-	.space  (8)
 
 ENTRY(sigcode)
 	mv	a0, sp
@@ -258,17 +227,86 @@ szsigcode:
 	.quad	esigcode - sigcode
 
 	.align	12
-	.globl pagetable_l0
-pagetable_l0:
-	.space	PAGE_SIZE
 pagetable_l1:
 	.space	PAGE_SIZE
 pagetable_l2:
 	.space	PAGE_SIZE
-pagetable_end:
+pagetable_l2_devmap:
+	.space	PAGE_SIZE
+
+        .align 3
+virt_map:
+        .quad   virt_map
+
+	/* Not in use, but required for linking. */
+	.align 3
+	.globl __global_pointer$
+__global_pointer$:
+	.space	8
 
 	.globl init_pt_va
 init_pt_va:
 	.quad pagetable_l2	/* XXX: Keep page tables VA */
 
-#include "exception.S"
+#ifndef SMP
+ENTRY(mpentry)
+1:
+	wfi
+	j	1b
+END(mpentry)
+#else
+/*
+ * mpentry(unsigned long)
+ *
+ * Called by a core when it is being brought online.
+ */
+ENTRY(mpentry)
+	/* Setup stack pointer */
+	la	t0, secondary_stacks
+	li	t1, (PAGE_SIZE * KSTACK_PAGES)
+	mulw	t1, t1, s10
+	add	t0, t0, t1
+	sub	t0, t0, s9
+	li	t1, KERNBASE
+	add	sp, t0, t1
+
+	/* Setup supervisor trap vector */
+	la	t0, mpva
+	sub	t0, t0, s9
+	li	t1, KERNBASE
+	add	t0, t0, t1
+	csrw	stvec, t0
+
+	/* Set page tables base register */
+	la	s2, pagetable_l1
+	srli	s2, s2, PAGE_SHIFT
+	li	t0, SATP_MODE_SV39
+	or	s2, s2, t0
+	sfence.vma
+	csrw	sptbr, s2
+mpva:
+	/* Setup supervisor trap vector */
+	la	t0, cpu_exception_handler
+	csrw	stvec, t0
+
+	/* Ensure sscratch is zero */
+	li	t0, 0
+	csrw	sscratch, t0
+	/*
+	 * Calculate the offset to __riscv_boot_ap
+	 * for current core, cpuid in a0.
+	 */
+	li	t1, 4
+	mulw	t1, t1, a0
+	/* Get pointer */
+	la	t0, __riscv_boot_ap
+	add	t0, t0, t1
+
+1:
+	/* Wait the kernel to be ready */
+	lw	t1, 0(t0)
+	beqz	t1, 1b
+
+	call	init_secondary
+END(mpentry)
+#endif

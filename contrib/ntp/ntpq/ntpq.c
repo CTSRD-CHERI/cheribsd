@@ -34,11 +34,11 @@
 #include "openssl/evp.h"
 #include "openssl/objects.h"
 #include "openssl/err.h"
+#include "libssl_compat.h"
 #endif
 #include <ssl_applink.c>
 
 #include "ntp_libopts.h"
-#include "ntpq-opts.h"
 #include "safecast.h"
 
 #ifdef SYS_VXWORKS		/* vxWorks needs mode flag -casey*/
@@ -67,6 +67,11 @@ const char *prompt = "ntpq> ";	/* prompt to ask him about */
  */
 int	old_rv = 1;
 
+/*
+ * How should we display the refid?
+ * REFID_HASH, REFID_IPV4
+ */
+te_Refid drefid = -1;
 
 /*
  * for get_systime()
@@ -198,6 +203,7 @@ static	void	passwd		(struct parse *, FILE *);
 static	void	hostnames	(struct parse *, FILE *);
 static	void	setdebug	(struct parse *, FILE *);
 static	void	quit		(struct parse *, FILE *);
+static	void	showdrefid	(struct parse *, FILE *);
 static	void	version		(struct parse *, FILE *);
 static	void	raw		(struct parse *, FILE *);
 static	void	cooked		(struct parse *, FILE *);
@@ -269,6 +275,9 @@ struct xcmd builtins[] = {
 	{ "keyid",	keyid,		{ OPT|NTP_UINT, NO, NO, NO },
 	  { "key#", "", "", "" },
 	  "set keyid to use for authenticated requests" },
+	{ "drefid",	showdrefid,	{ OPT|NTP_STR, NO, NO, NO },
+	  { "hash|ipv4", "", "", "" },
+	  "display refid's as IPv4 or hash" },
 	{ "version",	version,	{ NO, NO, NO, NO },
 	  { "", "", "", "" },
 	  "print version number" },
@@ -365,7 +374,7 @@ u_int numassoc;		/* number of cached associations */
 /*
  * For commands typed on the command line (with the -c option)
  */
-int numcmds = 0;
+size_t numcmds = 0;
 const char *ccmds[MAXCMDS];
 #define	ADDCMD(cp)	if (numcmds < MAXCMDS) ccmds[numcmds++] = (cp)
 
@@ -449,7 +458,7 @@ ntpqmain(
 	)
 {
 	u_int ihost;
-	int icmd;
+	size_t icmd;
 
 
 #ifdef SYS_VXWORKS
@@ -531,6 +540,8 @@ ntpqmain(
 		wideremote = 1;
 
 	old_rv = HAVE_OPT(OLD_RV);
+
+	drefid = OPT_VALUE_REFID;
 
 	if (0 == argc) {
 		ADDHOST(DEFHOST);
@@ -765,31 +776,42 @@ dump_hex_printable(
 	size_t		len
 	)
 {
-	const char *	cdata;
-	const char *	rowstart;
-	size_t		idx;
-	size_t		rowlen;
-	u_char		uch;
+	/* every line shows at most 16 bytes, so we need a buffer of
+	 *   4 * 16 (2 xdigits, 1 char, one sep for xdigits)
+	 * + 2 * 1  (block separators)
+	 * + <LF> + <NUL>
+	 *---------------
+	 *  68 bytes
+	 */
+	static const char s_xdig[16] = "0123456789ABCDEF";
 
-	cdata = data;
-	while (len > 0) {
-		rowstart = cdata;
-		rowlen = min(16, len);
-		for (idx = 0; idx < rowlen; idx++) {
-			uch = *(cdata++);
-			printf("%02x ", uch);
-		}
-		for ( ; idx < 16 ; idx++)
-			printf("   ");
-		cdata = rowstart;
-		for (idx = 0; idx < rowlen; idx++) {
-			uch = *(cdata++);
-			printf("%c", (isprint(uch))
-					 ? uch
-					 : '.');
-		}
-		printf("\n");
+	char lbuf[68];
+	int  ch, rowlen;
+	const u_char * cdata = data;
+	char *xptr, *pptr;
+
+	while (len) {
+		memset(lbuf, ' ', sizeof(lbuf));
+		xptr = lbuf;
+		pptr = lbuf + 3*16 + 2;
+
+		rowlen = (len > 16) ? 16 : (int)len;
 		len -= rowlen;
+		
+		do {
+			ch = *cdata++;
+			
+			*xptr++ = s_xdig[ch >> 4  ];
+			*xptr++ = s_xdig[ch & 0x0F];
+			if (++xptr == lbuf + 3*8)
+				++xptr;
+
+			*pptr++ = isprint(ch) ? (char)ch : '.';
+		} while (--rowlen);
+
+		*pptr++ = '\n';
+		*pptr   = '\0';
+		fputs(lbuf, stdout);
 	}
 }
 
@@ -851,6 +873,9 @@ getresponse(
 	uint32_t tospan;	/* timeout span (max delay) */
 	uint32_t todiff;	/* current delay */
 
+	memset(offsets, 0, sizeof(offsets));
+	memset(counts , 0, sizeof(counts ));
+	
 	/*
 	 * This is pretty tricky.  We may get between 1 and MAXFRAG packets
 	 * back in response to the request.  We peel the data out of
@@ -911,10 +936,12 @@ getresponse(
 		todiff = (((uint32_t)time(NULL)) - tobase) & 0x7FFFFFFFu;
 		if ((n > 0) && (todiff > tospan)) {
 			n = recv(sockfd, (char *)&rpkt, sizeof(rpkt), 0);
-			n = 0; /* faked timeout return from 'select()'*/
+			n -= n; /* faked timeout return from 'select()',
+				 * execute RMW cycle on 'n'
+				 */
 		}
 		
-		if (n == 0) {
+		if (n <= 0) {
 			/*
 			 * Timed out.  Return what we have
 			 */
@@ -949,7 +976,7 @@ getresponse(
 		}
 
 		n = recv(sockfd, (char *)&rpkt, sizeof(rpkt), 0);
-		if (n == -1) {
+		if (n < 0) {
 			warning("read");
 			return -1;
 		}
@@ -1053,7 +1080,7 @@ getresponse(
 
 		if (n < shouldbesize) {
 			printf("Response packet claims %u octets payload, above %ld received\n",
-			       count, (long)n - CTL_HEADER_LEN);
+			       count, (long)(n - CTL_HEADER_LEN));
 			return ERR_INCOMPLETE;
 		}
 
@@ -1186,7 +1213,10 @@ getresponse(
 		 * If we've seen the last fragment, look for holes in the sequence.
 		 * If there aren't any, we're done.
 		 */
-	  maybe_final:
+#if !defined(SYS_WINNT) && defined(EINTR)
+		maybe_final:
+#endif
+
 		if (seenlastfrag && offsets[0] == 0) {
 			for (f = 1; f < numfrags; f++)
 				if (offsets[f-1] + counts[f-1] !=
@@ -1327,7 +1357,7 @@ show_error_msg(
 	if (numhosts > 1)
 		fprintf(stderr, "server=%s ", currenthost);
 
-	switch(m6resp) {
+	switch (m6resp) {
 
 	case CERR_BADFMT:
 		fprintf(stderr,
@@ -2441,6 +2471,47 @@ ntp_poll(
 
 
 /*
+ * showdrefid2str - return a string explanation of the value of drefid
+ */
+static char *
+showdrefid2str(void)
+{
+	switch (drefid) {
+	    case REFID_HASH:
+	    	return "hash";
+	    case REFID_IPV4:
+	    	return "ipv4";
+	    default:
+	    	return "Unknown";
+	}
+}
+
+
+/*
+ * drefid - display/change "display hash" 
+ */
+static void
+showdrefid(
+	struct parse *pcmd,
+	FILE *fp
+	)
+{
+	if (pcmd->nargs == 0) {
+		(void) fprintf(fp, "drefid value is %s\n", showdrefid2str());
+		return;
+	} else if (STREQ(pcmd->argval[0].string, "hash")) {
+		drefid = REFID_HASH;
+	} else if (STREQ(pcmd->argval[0].string, "ipv4")) {
+		drefid = REFID_IPV4;
+	} else {
+		(void) fprintf(fp, "What?\n");
+		return;
+	}
+	(void) fprintf(fp, "drefid value set to %s\n", showdrefid2str());
+}
+
+
+/*
  * keyid - get a keyid to use for authenticating requests
  */
 static void
@@ -3528,7 +3599,7 @@ static void list_md_fn(const EVP_MD *m, const char *from, const char *to, void *
     size_t len, n;
     const char *name, *cp, **seen;
     struct hstate *hstate = arg;
-    EVP_MD_CTX ctx;
+    EVP_MD_CTX *ctx;
     u_int digest_len;
     u_char digest[EVP_MAX_MD_SIZE];
 
@@ -3540,7 +3611,7 @@ static void list_md_fn(const EVP_MD *m, const char *from, const char *to, void *
     /* Lowercase names aren't accepted by keytype_from_text in ssl_init.c */
 
     for( cp = name; *cp; cp++ ) {
-	if( islower(*cp) )
+	if( islower((unsigned char)*cp) )
 	    return;
     }
     len = (cp - name) + 1;
@@ -3559,8 +3630,10 @@ static void list_md_fn(const EVP_MD *m, const char *from, const char *to, void *
      * Keep this consistent with keytype_from_text() in ssl_init.c.
      */
 
-    EVP_DigestInit(&ctx, EVP_get_digestbyname(name));
-    EVP_DigestFinal(&ctx, digest, &digest_len);
+    ctx = EVP_MD_CTX_new();
+    EVP_DigestInit(ctx, EVP_get_digestbyname(name));
+    EVP_DigestFinal(ctx, digest, &digest_len);
+    EVP_MD_CTX_free(ctx);
     if (digest_len > (MAX_MAC_LEN - sizeof(keyid_t)))
         return;
 

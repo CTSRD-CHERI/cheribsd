@@ -10,11 +10,15 @@
 #ifndef liblldb_ThreadGDBRemote_h_
 #define liblldb_ThreadGDBRemote_h_
 
+// C Includes
+// C++ Includes
 #include <string>
 
-#include "lldb/Core/StructuredData.h"
+// Other libraries and framework includes
+// Project includes
 #include "lldb/Target/Process.h"
 #include "lldb/Target/Thread.h"
+#include "lldb/Utility/StructuredData.h"
 
 class StringExtractor;
 
@@ -23,116 +27,97 @@ namespace process_gdb_remote {
 
 class ProcessGDBRemote;
 
-class ThreadGDBRemote : public Thread
-{
+class ThreadGDBRemote : public Thread {
 public:
-    ThreadGDBRemote (Process &process, lldb::tid_t tid);
+  ThreadGDBRemote(Process &process, lldb::tid_t tid);
 
-    virtual
-    ~ThreadGDBRemote ();
+  ~ThreadGDBRemote() override;
 
-    void
-    WillResume (lldb::StateType resume_state) override;
+  void WillResume(lldb::StateType resume_state) override;
 
-    void
-    RefreshStateAfterStop() override;
+  void RefreshStateAfterStop() override;
 
-    const char *
-    GetName () override;
+  const char *GetName() override;
 
-    const char *
-    GetQueueName () override;
+  const char *GetQueueName() override;
 
-    lldb::queue_id_t
-    GetQueueID () override;
+  lldb::QueueKind GetQueueKind() override;
 
-    lldb::QueueSP
-    GetQueue () override;
+  lldb::queue_id_t GetQueueID() override;
 
-    lldb::addr_t
-    GetQueueLibdispatchQueueAddress () override;
+  lldb::QueueSP GetQueue() override;
 
-    lldb::RegisterContextSP
-    GetRegisterContext () override;
+  lldb::addr_t GetQueueLibdispatchQueueAddress() override;
 
-    lldb::RegisterContextSP
-    CreateRegisterContextForFrame (StackFrame *frame) override;
+  void SetQueueLibdispatchQueueAddress(lldb::addr_t dispatch_queue_t) override;
 
-    void
-    Dump (Log *log, uint32_t index);
+  bool ThreadHasQueueInformation() const override;
 
-    static bool
-    ThreadIDIsValid (lldb::tid_t thread);
+  lldb::RegisterContextSP GetRegisterContext() override;
 
-    bool
-    ShouldStop (bool &step_more);
+  lldb::RegisterContextSP
+  CreateRegisterContextForFrame(StackFrame *frame) override;
 
-    const char *
-    GetBasicInfoAsString ();
+  void Dump(Log *log, uint32_t index);
 
-    void
-    SetName (const char *name) override
-    {
-        if (name && name[0])
-            m_thread_name.assign (name);
-        else
-            m_thread_name.clear();
-    }
+  static bool ThreadIDIsValid(lldb::tid_t thread);
 
-    lldb::addr_t
-    GetThreadDispatchQAddr ()
-    {
-        return m_thread_dispatch_qaddr;
-    }
+  bool ShouldStop(bool &step_more);
 
-    void
-    SetThreadDispatchQAddr (lldb::addr_t thread_dispatch_qaddr)
-    {
-        m_thread_dispatch_qaddr = thread_dispatch_qaddr;
-    }
+  const char *GetBasicInfoAsString();
 
-    void
-    ClearQueueInfo ();
-    
-    void
-    SetQueueInfo (std::string &&queue_name, lldb::QueueKind queue_kind, uint64_t queue_serial);
+  void SetName(const char *name) override {
+    if (name && name[0])
+      m_thread_name.assign(name);
+    else
+      m_thread_name.clear();
+  }
 
-    StructuredData::ObjectSP
-    FetchThreadExtendedInfo () override;
+  lldb::addr_t GetThreadDispatchQAddr() { return m_thread_dispatch_qaddr; }
+
+  void SetThreadDispatchQAddr(lldb::addr_t thread_dispatch_qaddr) {
+    m_thread_dispatch_qaddr = thread_dispatch_qaddr;
+  }
+
+  void ClearQueueInfo();
+
+  void SetQueueInfo(std::string &&queue_name, lldb::QueueKind queue_kind,
+                    uint64_t queue_serial, lldb::addr_t dispatch_queue_t,
+                    lldb_private::LazyBool associated_with_libdispatch_queue);
+
+  lldb_private::LazyBool GetAssociatedWithLibdispatchQueue() override;
+
+  void SetAssociatedWithLibdispatchQueue(
+      lldb_private::LazyBool associated_with_libdispatch_queue) override;
+
+  StructuredData::ObjectSP FetchThreadExtendedInfo() override;
 
 protected:
-    
-    friend class ProcessGDBRemote;
+  friend class ProcessGDBRemote;
 
-    bool
-    PrivateSetRegisterValue (uint32_t reg, 
-                             StringExtractor &response);
+  std::string m_thread_name;
+  std::string m_dispatch_queue_name;
+  lldb::addr_t m_thread_dispatch_qaddr;
+  lldb::addr_t m_dispatch_queue_t;
+  lldb::QueueKind
+      m_queue_kind; // Queue info from stop reply/stop info for thread
+  uint64_t
+      m_queue_serial_number; // Queue info from stop reply/stop info for thread
+  lldb_private::LazyBool m_associated_with_libdispatch_queue;
 
-    bool
-    CachedQueueInfoIsValid() const
-    {
-        return m_queue_kind != lldb::eQueueKindUnknown;
-    }
-    //------------------------------------------------------------------
-    // Member variables.
-    //------------------------------------------------------------------
-    std::string m_thread_name;
-    std::string m_dispatch_queue_name;
-    lldb::addr_t m_thread_dispatch_qaddr;
-    lldb::QueueKind m_queue_kind;     // Queue info from stop reply/stop info for thread
-    uint64_t m_queue_serial;    // Queue info from stop reply/stop info for thread
-    //------------------------------------------------------------------
-    // Member variables.
-    //------------------------------------------------------------------
+  bool PrivateSetRegisterValue(uint32_t reg, llvm::ArrayRef<uint8_t> data);
 
-    void
-    SetStopInfoFromPacket (StringExtractor &stop_packet, uint32_t stop_id);
+  bool PrivateSetRegisterValue(uint32_t reg, uint64_t regval);
 
-    bool
-    CalculateStopInfo () override;
+  bool CachedQueueInfoIsValid() const {
+    return m_queue_kind != lldb::eQueueKindUnknown;
+  }
+  void SetStopInfoFromPacket(StringExtractor &stop_packet, uint32_t stop_id);
+
+  bool CalculateStopInfo() override;
 };
 
 } // namespace process_gdb_remote
 } // namespace lldb_private
 
-#endif  // liblldb_ThreadGDBRemote_h_
+#endif // liblldb_ThreadGDBRemote_h_

@@ -6,11 +6,12 @@
 # PROVIDE: rtsold
 # REQUIRE: netif
 # BEFORE: NETWORKING
-# KEYWORD: nojail shutdown
+# KEYWORD: nojailvnet shutdown
 
 . /etc/rc.subr
 
 name="rtsold"
+desc="Router solicitation daemon"
 rcvar="rtsold_enable"
 command="/usr/sbin/${name}"
 pidfile="/var/run/${name}.pid"

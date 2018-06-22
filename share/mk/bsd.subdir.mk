@@ -16,7 +16,7 @@
 #
 # SUBDIR	A list of subdirectories that should be built as well.
 #		Each of the targets will execute the same target in the
-#		subdirectories. SUBDIR.yes is automatically appeneded
+#		subdirectories. SUBDIR.yes is automatically appended
 #		to this list.
 #
 # +++ targets +++
@@ -38,22 +38,50 @@
 .if !target(__<bsd.subdir.mk>__)
 __<bsd.subdir.mk>__:
 
+.if ${MK_AUTO_OBJ} == "no"
+_obj=	obj
+.endif
+
 SUBDIR_TARGETS+= \
-		all all-man buildconfig buildfiles buildincludes \
+		all all-man analyze buildconfig buildfiles buildincludes \
 		checkdpadd clean cleandepend cleandir cleanilinks \
 		cleanobj depend distribute files includes installconfig \
-		installfiles installincludes realinstall lint maninstall \
-		manlint obj objlink regress tags \
+		installfiles installincludes print-dir realinstall \
+		maninstall manlint ${_obj} objlink tags \
 
 # Described above.
 STANDALONE_SUBDIR_TARGETS+= \
-		obj checkdpadd clean cleandepend cleandir \
-		cleanilinks cleanobj installconfig \
+		all-man buildconfig buildfiles buildincludes check checkdpadd \
+		clean cleandepend cleandir cleanilinks cleanobj files includes \
+		installconfig installincludes installfiles print-dir \
+		maninstall manlint obj objlink
+
+# It is safe to install in parallel when staging.
+.if defined(NO_ROOT) || !empty(SYSROOT)
+STANDALONE_SUBDIR_TARGETS+= realinstall
+.endif
 
 .include <bsd.init.mk>
 
+.if make(print-dir)
+NEED_SUBDIR=	1
+ECHODIR=	:
+.SILENT:
+.if ${RELDIR:U.} != "."
+print-dir:	.PHONY
+	@echo ${RELDIR}
+.endif
+.endif
+
+.if ${MK_AUTO_OBJ} == "yes" && !target(obj)
+obj: .PHONY
+.endif
+
 .if !defined(NEED_SUBDIR)
-.if ${.MAKE.LEVEL} == 0 && ${MK_DIRDEPS_BUILD} == "yes" && !empty(SUBDIR) && !(make(clean*) || make(destroy*))
+# .MAKE.DEPENDFILE==/dev/null is set by bsd.dep.mk to avoid reading
+# Makefile.depend
+.if ${.MAKE.LEVEL} == 0 && ${MK_DIRDEPS_BUILD} == "yes" && !empty(SUBDIR) && \
+    ${.MAKE.DEPENDFILE} != "/dev/null"
 .include <meta.subdir.mk>
 # ignore this
 _SUBDIR:
@@ -65,10 +93,9 @@ DISTRIBUTION?=	base
 distribute: .MAKE
 .for dist in ${DISTRIBUTION}
 	${_+_}cd ${.CURDIR}; \
-	    ${MAKE} install -DNO_SUBDIR DESTDIR=${DISTDIR}/${dist} SHARED=copies
+	    ${MAKE} install installconfig -DNO_SUBDIR DESTDIR=${DISTDIR}/${dist} SHARED=copies
 .endfor
 .endif
-
 # Convenience targets to run 'build${target}' and 'install${target}' when
 # calling 'make ${target}'.
 .for __target in files includes
@@ -89,11 +116,12 @@ ${__stage}install:
 install:	beforeinstall realinstall afterinstall
 .ORDER:		beforeinstall realinstall afterinstall
 .endif
+.ORDER: all install
 
 # SUBDIR recursing may be disabled for MK_DIRDEPS_BUILD
 .if !target(_SUBDIR)
 
-.if defined(SUBDIR)
+.if defined(SUBDIR) || defined(SUBDIR.yes)
 SUBDIR:=${SUBDIR} ${SUBDIR.yes}
 SUBDIR:=${SUBDIR:u}
 .endif
@@ -107,55 +135,61 @@ _SUBDIR_SH=	\
 		cd ${.CURDIR}/$${dir}; \
 		${MAKE} $${target} DIRPRFX=${DIRPRFX}$${dir}/
 
+# This is kept for compatibility only.  The normal handling of attaching to
+# SUBDIR_TARGETS will create a target for each directory.
 _SUBDIR: .USEBEFORE
 .if defined(SUBDIR) && !empty(SUBDIR) && !defined(NO_SUBDIR)
 	@${_+_}target=${.TARGET:realinstall=install}; \
 	    for dir in ${SUBDIR:N.WAIT}; do ( ${_SUBDIR_SH} ); done
 .endif
 
-${SUBDIR:N.WAIT}: .PHONY .MAKE
-	${_+_}@target=all; \
-	    dir=${.TARGET}; \
-	    ${_SUBDIR_SH};
+# Create 'make subdir' targets to run the real 'all' target.
+.for __dir in ${SUBDIR:N.WAIT}
+${__dir}: all_subdir_${DIRPRFX}${__dir} .PHONY
+.endfor
 
 .for __target in ${SUBDIR_TARGETS}
+# Can ordering be skipped for this and SUBDIR_PARALLEL forced?
+.if ${STANDALONE_SUBDIR_TARGETS:M${__target}}
+_is_standalone_target=	1
+_subdir_filter=	N.WAIT
+.else
+_is_standalone_target=	0
+_subdir_filter=
+.endif
+__subdir_targets=
+.for __dir in ${SUBDIR:${_subdir_filter}}
+.if ${__dir} == .WAIT
+__subdir_targets+= .WAIT
+.else
+__deps=
+.if ${_is_standalone_target} == 0
+.if defined(SUBDIR_PARALLEL)
+# Apply SUBDIR_DEPEND dependencies for SUBDIR_PARALLEL.
+.for __dep in ${SUBDIR_DEPEND_${__dir}}
+__deps+= ${__target}_subdir_${DIRPRFX}${__dep}
+.endfor
+.else
+# For non-parallel builds, directories depend on all targets before them.
+__deps:= ${__subdir_targets}
+.endif	# defined(SUBDIR_PARALLEL)
+.endif	# ${_is_standalone_target} == 0
+${__target}_subdir_${DIRPRFX}${__dir}: .PHONY .MAKE .SILENT ${__deps}
+	@${_+_}target=${__target:realinstall=install}; \
+	    dir=${__dir}; \
+	    ${_SUBDIR_SH};
+__subdir_targets+= ${__target}_subdir_${DIRPRFX}${__dir}
+.endif	# ${__dir} == .WAIT
+.endfor	# __dir in ${SUBDIR}
+
+# Attach the subdir targets to the real target.
 # Only recurse on directly-called targets.  I.e., don't recurse on dependencies
 # such as 'install' becoming {before,real,after}install, just recurse
 # 'install'.  Despite that, 'realinstall' is special due to ordering issues
 # with 'afterinstall'.
-.if make(${__target}) || (${__target} == realinstall && make(install))
-# Can ordering be skipped for this and SUBDIR_PARALLEL forced?
-.if ${STANDALONE_SUBDIR_TARGETS:M${__target}}
-_is_standalone_target=	1
-SUBDIR:=	${SUBDIR:N.WAIT}
-.else
-_is_standalone_target=	0
-.endif
-.if defined(SUBDIR_PARALLEL) || ${_is_standalone_target} == 1
-__subdir_targets=
-.for __dir in ${SUBDIR}
-.if ${__dir} == .WAIT
-__subdir_targets+= .WAIT
-.else
-__subdir_targets+= ${__target}_subdir_${__dir}
-__deps=
-.if ${_is_standalone_target} == 0
-.for __dep in ${SUBDIR_DEPEND_${__dir}}
-__deps+= ${__target}_subdir_${__dep}
-.endfor
-.endif
-${__target}_subdir_${__dir}: .PHONY .MAKE ${__deps}
-.if !defined(NO_SUBDIR)
-	@${_+_}target=${__target:realinstall=install}; \
-	    dir=${__dir}; \
-	    ${_SUBDIR_SH};
-.endif
-.endif
-.endfor	# __dir in ${SUBDIR}
-${__target}: ${__subdir_targets}
-.else
-${__target}: _SUBDIR
-.endif	# SUBDIR_PARALLEL || _is_standalone_target
+.if !defined(NO_SUBDIR) && (make(${__target}) || \
+    (${__target} == realinstall && make(install)))
+${__target}: ${__subdir_targets} .PHONY
 .endif	# make(${__target})
 .endfor	# __target in ${SUBDIR_TARGETS}
 

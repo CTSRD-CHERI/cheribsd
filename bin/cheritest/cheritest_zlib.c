@@ -44,8 +44,8 @@
 #include <machine/cpuregs.h>
 #include <machine/sysarch.h>
 
-#include <cheri/cheri_enter.h>
-#include <cheri/cheri_fd.h>
+#include <cheri/libcheri_enter.h>
+#include <cheri/libcheri_fd.h>
 
 #include <err.h>
 #include <errno.h>
@@ -55,11 +55,9 @@
 #include <unistd.h>
 #endif
 
-#include <machine/cheri.h>
-#include <machine/cheric.h>
-
-#include <cheri/sandbox.h>
-
+#include <cheri/cheri.h>
+#include <cheri/cheric.h>
+#include <cheri/libcheri_sandbox.h>
 #include <cheritest-helper.h>
 #include <cheritest-helper-internal.h>
 #include <stdio.h>
@@ -77,7 +75,7 @@
  */
 #define INFLATE_BUFSIZE	(size_t)10*1024
 
-static char uncompressed_zeroes[INFLATE_BUFSIZE];
+static uint8_t uncompressed_zeroes[INFLATE_BUFSIZE];
 static const size_t uncompressed_zeroes_len =
 	    sizeof(uncompressed_zeroes) / sizeof(uncompressed_zeroes[0]);
 
@@ -98,26 +96,26 @@ check_compressed_data(const uint8_t *data, size_t datalen)
 
 	if (datalen != compressed_zeroes_len)
 		cheritest_failure_errx("compressed data length wrong ("
-		    "expected %u, got %u)", compressed_zeroes_len, datalen);
+		    "expected %zu, got %zu)", compressed_zeroes_len, datalen);
 	for (i = 0; i < compressed_zeroes_len; i++) {
 		if (data[i] != compressed_zeroes[i])
 			cheritest_failure_errx("compressed data wrong at "
-			    "byte %u", i);
+			    "byte %zu", i);
 	}
 }
 
 static void
-check_uncompressed_data(const char *data, size_t datalen)
+check_uncompressed_data(const uint8_t *data, size_t datalen)
 {
 	size_t i;
 
 	if (datalen != uncompressed_zeroes_len)
 		cheritest_failure_errx("uncompressed data length wrong ("
-		    "expected %u, got %u)", uncompressed_zeroes_len, datalen);
+		    "expected %zu, got %zu)", uncompressed_zeroes_len, datalen);
 	for (i = 0; i < uncompressed_zeroes_len; i++) {
 		if (data[i] != uncompressed_zeroes[i])
 			cheritest_failure_errx("uncompressed data wrong at "
-			    "byte %u", i);
+			    "byte %zu", i);
 	}
 }
 

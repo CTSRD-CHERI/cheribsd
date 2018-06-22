@@ -1,6 +1,8 @@
 /*-
  * Low level routines for the Advanced Systems Inc. SCSI controllers chips
  *
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1996-1997, 1999-2000 Justin Gibbs.
  * All rights reserved.
  *
@@ -316,7 +318,7 @@ advasync(void *callback_arg, u_int32_t code, struct cam_path *path, void *arg)
 
 		target_mask = ADV_TID_TO_TARGET_MASK(cgd->ccb_h.target_id);
 
-		num_entries = sizeof(adv_quirk_table)/sizeof(*adv_quirk_table);
+		num_entries = nitems(adv_quirk_table);
 		match = cam_quirkmatch((caddr_t)&cgd->inq_data,
 				       (caddr_t)adv_quirk_table,
 				       num_entries, sizeof(*adv_quirk_table),
@@ -729,7 +731,7 @@ adv_execute_scsi_queue(struct adv_softc *adv, struct adv_scsi_q *scsiq,
 			panic("adv_execute_scsi_queue: "
 			      "Queue with too many segs.");
 
-		if ((adv->type & (ADV_ISA | ADV_VL | ADV_EISA)) != 0) {
+		if ((adv->type & (ADV_ISA | ADV_VL)) != 0) {
 			int i;
 
 			for (i = 0; i < sg_entry_cnt_minus_one; i++) {
@@ -2060,7 +2062,7 @@ adv_reset_bus(struct adv_softc *adv, int initiate_bus_reset)
 				 /*offset*/0, ADV_TRANS_CUR);
 	ADV_OUTW(adv, ADV_REG_PROG_COUNTER, ADV_MCODE_START_ADDR);
 
-	/* Tell the XPT layer that a bus reset occured */
+	/* Tell the XPT layer that a bus reset occurred */
 	if (adv->path != NULL)
 		xpt_async(AC_BUS_RESET, adv->path, NULL);
 

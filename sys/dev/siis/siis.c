@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2009 Alexander Motin <mav@FreeBSD.org>
  * All rights reserved.
  *
@@ -320,7 +322,7 @@ siis_alloc_resource(device_t dev, device_t child, int type, int *rid,
 	int unit = ((struct siis_channel *)device_get_softc(child))->unit;
 	struct resource *res = NULL;
 	int offset = unit << 13;
-	long st;
+	rman_res_t st;
 
 	switch (type) {
 	case SYS_RES_MEMORY:
@@ -856,7 +858,7 @@ siis_ch_intr(void *data)
 	/* Read command statuses. */
 	sstatus = ATA_INL(ch->r_mem, SIIS_P_SS);
 	ok = ch->rslots & ~sstatus;
-	/* Complete all successfull commands. */
+	/* Complete all successful commands. */
 	for (i = 0; i < SIIS_MAX_SLOTS; i++) {
 		if ((ok >> i) & 1)
 			siis_end_transaction(&ch->slot[i], SIIS_ERR_NONE);
@@ -1728,6 +1730,12 @@ siis_setup_fis(device_t dev, struct siis_cmd *ctp, union ccb *ccb, int tag)
 			fis[13] = ccb->ataio.cmd.sector_count_exp;
 		}
 		fis[15] = ATA_A_4BIT;
+		if (ccb->ataio.ata_flags & ATA_FLAG_AUX) {
+			fis[16] =  ccb->ataio.aux        & 0xff;
+			fis[17] = (ccb->ataio.aux >>  8) & 0xff;
+			fis[18] = (ccb->ataio.aux >> 16) & 0xff;
+			fis[19] = (ccb->ataio.aux >> 24) & 0xff;
+		}
 	} else {
 		/* Soft reset. */
 	}
@@ -1829,10 +1837,6 @@ siisaction(struct cam_sim *sim, union ccb *ccb)
 		}
 		siis_begin_transaction(dev, ccb);
 		return;
-	case XPT_EN_LUN:		/* Enable LUN as a target */
-	case XPT_TARGET_IO:		/* Execute target I/O request */
-	case XPT_ACCEPT_TARGET_IO:	/* Accept Host Target Mode CDB */
-	case XPT_CONT_TARGET_IO:	/* Continue Host Target I/O Connection*/
 	case XPT_ABORT:			/* Abort the specified CCB */
 		/* XXX Implement */
 		ccb->ccb_h.status = CAM_REQ_INVALID;
@@ -1946,16 +1950,16 @@ siisaction(struct cam_sim *sim, union ccb *ccb)
 		cpi->hba_inquiry = PI_SDTR_ABLE | PI_TAG_ABLE;
 		cpi->hba_inquiry |= PI_SATAPM;
 		cpi->target_sprt = 0;
-		cpi->hba_misc = PIM_SEQSCAN | PIM_UNMAPPED;
+		cpi->hba_misc = PIM_SEQSCAN | PIM_UNMAPPED | PIM_ATA_EXT;
 		cpi->hba_eng_cnt = 0;
 		cpi->max_target = 15;
 		cpi->max_lun = 0;
 		cpi->initiator_id = 0;
 		cpi->bus_id = cam_sim_bus(sim);
 		cpi->base_transfer_speed = 150000;
-		strncpy(cpi->sim_vid, "FreeBSD", SIM_IDLEN);
-		strncpy(cpi->hba_vid, "SIIS", HBA_IDLEN);
-		strncpy(cpi->dev_name, cam_sim_name(sim), DEV_IDLEN);
+		strlcpy(cpi->sim_vid, "FreeBSD", SIM_IDLEN);
+		strlcpy(cpi->hba_vid, "SIIS", HBA_IDLEN);
+		strlcpy(cpi->dev_name, cam_sim_name(sim), DEV_IDLEN);
 		cpi->unit_number = cam_sim_unit(sim);
 		cpi->transport = XPORT_SATA;
 		cpi->transport_version = XPORT_VERSION_UNSPECIFIED;

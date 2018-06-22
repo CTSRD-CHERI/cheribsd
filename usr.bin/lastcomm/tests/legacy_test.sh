@@ -14,13 +14,18 @@ check()
 	shift
 	# Remove tty field, which varies between systems.
 	awk '{$4 = ""; print}' |
-	if diff -q - $1
+	if diff -a - $1 >&2
 	then
 		echo "ok $NUM"
 	else
 		echo "not ok $NUM"
 	fi
 }
+
+if [ ! -e $DIR/v1-$ARCH-acct.in ]; then
+	echo 0..1 # SKIP missing data files for $ARCH
+	exit 0
+fi
 
 
 cat $DIR/v1-$ARCH-acct.in $DIR/v2-$ARCH-acct.in >v1v2-$ARCH-acct.in

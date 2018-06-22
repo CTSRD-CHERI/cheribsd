@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -13,7 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -29,6 +31,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_integrity"
+ *   ],
+ *   "change_comment": "BDB hashes don't preserve tags"
+ * }
+ * CHERI CHANGES END
+ */
 
 #if 0
 #ifndef lint
@@ -42,13 +55,13 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <db.h>
 #include <err.h>
 #include <langinfo.h>
 #include <pwd.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <uthash.h>
 #include <utmpx.h>
 #include "finger.h"
 
@@ -59,10 +72,8 @@ sflag_print(void)
 {
 	PERSON *pn;
 	WHERE *w;
-	int sflag, r, namelen;
+	int namelen;
 	char p[80];
-	PERSON *tmp;
-	DBT data, key;
 	struct tm *lc;
 
 	if (d_first < 0)
@@ -89,15 +100,8 @@ sflag_print(void)
 	    "Name", " TTY      Idle  Login  Time  ", (gflag) ? "" :
 	    oflag ? "Office  Phone" : "Where");
 
-	for (sflag = R_FIRST;; sflag = R_NEXT) {
-		r = (*db->seq)(db, &key, &data, sflag);
-		if (r == -1)
-			err(1, "db seq");
-		if (r == 1)
-			break;
-		memmove(&tmp, data.data, sizeof tmp);
-		pn = tmp;
-
+	HASH_SORT(people, psort);
+	for (pn = people; pn != NULL; pn = pn->hh.next) {
 		for (w = pn->whead; w != NULL; w = w->next) {
 			namelen = MAXREALNAME;
 			if (w->info == LOGGEDIN && !w->writable)
@@ -149,7 +153,7 @@ office:
 				else if (pn->officephone)
 					(void)printf(" %-7.7s", " ");
 				if (pn->officephone)
-					(void)printf(" %-.9s",
+					(void)printf(" %-.15s",
 					    prphone(pn->officephone));
 			} else
 				(void)printf(" %.*s", MAXHOSTNAME, w->host);

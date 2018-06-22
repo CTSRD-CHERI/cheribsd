@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1980, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -176,6 +178,10 @@ main(int argc, char **argv)
 				    strstr(fsp->fs_mntops, "late") &&
 				    late == 0)
 					continue;
+				if (which_prog == SWAPOFF &&
+				    strstr(fsp->fs_mntops, "late") == NULL &&
+				    late != 0)
+					continue;
 				swfile = swap_on_off(fsp->fs_spec, 1,
 				    fsp->fs_mntops);
 				if (swfile == NULL) {
@@ -216,7 +222,7 @@ main(int argc, char **argv)
 static const char *
 swap_on_off(const char *name, int doingall, char *mntops)
 {
-	char base[PATH_MAX];
+	char *base, *basebuf;
 
 	/* Swap on vnode-backed md(4) device. */
 	if (mntops != NULL &&
@@ -227,17 +233,23 @@ swap_on_off(const char *name, int doingall, char *mntops)
 	     strncmp(MD_NAME, name, sizeof(MD_NAME)) == 0))
 		return (swap_on_off_md(name, mntops, doingall));
 
-	basename_r(name, base);
+	basebuf = strdup(name);
+	base = basename(basebuf);
 
 	/* Swap on encrypted device by GEOM_BDE. */
-	if (fnmatch("*.bde", base, 0) == 0)
+	if (fnmatch("*.bde", base, 0) == 0) {
+		free(basebuf);
 		return (swap_on_off_gbde(name, doingall));
+	}
 
 	/* Swap on encrypted device by GEOM_ELI. */
-	if (fnmatch("*.eli", base, 0) == 0)
+	if (fnmatch("*.eli", base, 0) == 0) {
+		free(basebuf);
 		return (swap_on_off_geli(name, mntops, doingall));
+	}
 
 	/* Swap on special file. */
+	free(basebuf);
 	return (swap_on_off_sfile(name, doingall));
 }
 
@@ -315,7 +327,7 @@ swap_on_geli_args(const char *mntops)
 	const char *aalgo, *ealgo, *keylen_str, *sectorsize_str;
 	const char *aflag, *eflag, *lflag, *Tflag, *sflag;
 	char *p, *args, *token, *string, *ops;
-	int argsize, pagesize;
+	int pagesize;
 	size_t pagesize_len;
 	u_long ul;
 
@@ -365,8 +377,12 @@ swap_on_geli_args(const char *mntops)
 					free(ops);
 					return (NULL);
 				}
-			} else if ((p = strstr(token, "notrim")) == token) {
+			} else if (strcmp(token, "notrim") == 0) {
 				Tflag = " -T ";
+			} else if (strcmp(token, "late") == 0) {
+				/* ignore known option */
+			} else if (strcmp(token, "noauto") == 0) {
+				/* ignore known option */
 			} else if (strcmp(token, "sw") != 0) {
 				warnx("Invalid option: %s", token);
 				free(ops);
@@ -389,7 +405,7 @@ swap_on_geli_args(const char *mntops)
 		sectorsize_str = p;
 	}
 
-	argsize = asprintf(&args, "%s%s%s%s%s%s%s%s%s -d",
+	(void)asprintf(&args, "%s%s%s%s%s%s%s%s%s -d",
 	    aflag, aalgo, eflag, ealgo, lflag, keylen_str, Tflag,
 	    sflag, sectorsize_str);
 
@@ -428,7 +444,7 @@ swap_on_off_geli(const char *name, char *mntops, int doingall)
 		free(args);
 
 		if (error) {
-			/* error occured during creation. */
+			/* error occurred during creation. */
 			if (qflag == 0)
 				warnx("%s: Invalid parameters", name);
 			return (NULL);

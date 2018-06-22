@@ -18,6 +18,17 @@
    License along with the GNU C Library; see the file COPYING.LIB.  If not,
    write to the Free Software Foundation, Inc., 59 Temple Place - Suite 330,
    Boston, MA 02111-1307, USA.  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_alignment",
+ *     "pointer_integrity"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 /* Summary:
 
@@ -111,6 +122,7 @@ Summary:
 extern "C" {
 #endif
 
+#ifndef __CHERI_PURE_CAPABILITY__
 /* We use subtraction of (char *) 0 instead of casting to int
    because on word-addressable machines a simple cast to int
    may ignore the byte-within-word field of the pointer.  */
@@ -139,6 +151,17 @@ extern "C" {
 #  define PTR_INT_TYPE long
 # endif
 #endif
+
+#else /* __CHERI_PURE_CAPABILITY__ */
+/*
+ * CHERI code requires a modern C environment so assume the correct
+ * bits are available.
+ */
+#include <stdint.h>
+#define __PTR_TO_INT(P) ((intptr_t)(P))
+#define __INT_TO_PTR(P) ((void *)(intptr_t)(P))
+#define PTR_INT_TYPE intptr_t
+#endif /* __CHERI_PURE_CAPABILITY__ */
 
 #if defined _LIBC || defined HAVE_STRING_H
 # include <string.h>
@@ -458,6 +481,14 @@ __extension__								\
    obstack_grow0 (__h, (where), (length));				\
    obstack_finish (__h); })
 
+#if __has_builtin(__builtin_align_down)
+#define obstack_align_down_mask(ptr, align_mask) \
+	__builtin_align_down(ptr, align_mask + 1)
+#else
+#define obstack_align_down_mask(ptr, align_mask) \
+	((__PTR_TO_INT (ptr)) & ~(PTR_INT_TYPE)(align_mask))
+#endif
+
 /* The local variable is named __o1 to avoid a name conflict
    when obstack_blank is called.  */
 # define obstack_finish(OBSTACK)  					\
@@ -468,8 +499,9 @@ __extension__								\
    if (__o1->next_free == value)					\
      __o1->maybe_empty_object = 1;					\
    __o1->next_free							\
-     = __INT_TO_PTR ((__PTR_TO_INT (__o1->next_free)+__o1->alignment_mask)\
-		     & ~ (__o1->alignment_mask));			\
+     = __INT_TO_PTR (obstack_align_down_mask(				\
+		    __PTR_TO_INT(__o1->next_free)+__o1->alignment_mask,	\
+		    __o1->alignment_mask));				\
    if (__o1->next_free - (char *)__o1->chunk				\
        > __o1->chunk_limit - (char *)__o1->chunk)			\
      __o1->next_free = __o1->chunk_limit;				\

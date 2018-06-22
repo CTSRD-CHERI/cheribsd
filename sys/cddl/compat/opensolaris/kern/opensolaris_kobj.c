@@ -155,14 +155,13 @@ kobj_read_file_vnode(struct _buf *file, char *buf, unsigned size, unsigned off)
 	struct vnode *vp = file->ptr;
 	struct thread *td = curthread;
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	int error;
 
 	bzero(&aiov, sizeof(aiov));
 	bzero(&auio, sizeof(auio));
 
-	aiov.iov_base = buf;
-	aiov.iov_len = size;
+	IOVEC_INIT(&aiov, buf, size);
 
 	auio.uio_iov = &aiov;
 	auio.uio_offset = (off_t)off;

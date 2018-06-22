@@ -435,7 +435,7 @@ tbr_timeout(arg)
 	VNET_FOREACH(vnet_iter) {
 		CURVNET_SET(vnet_iter);
 		for (ifp = TAILQ_FIRST(&V_ifnet); ifp;
-		    ifp = TAILQ_NEXT(ifp, if_list)) {
+		    ifp = TAILQ_NEXT(ifp, if_link)) {
 			/* read from if_snd unlocked */
 			if (!TBR_IS_ENABLED(&ifp->if_snd))
 				continue;
@@ -1027,9 +1027,10 @@ read_machclk(void)
 		panic("read_machclk");
 #endif
 	} else {
-		struct timeval tv;
+		struct timeval tv, boottime;
 
 		microtime(&tv);
+		getboottime(&boottime);
 		val = (((u_int64_t)(tv.tv_sec - boottime.tv_sec) * 1000000
 		    + tv.tv_usec) << MACHCLK_SHIFT);
 	}

@@ -1,6 +1,8 @@
 /*	$NetBSD: xdr_float.c,v 1.23 2000/07/17 04:59:51 matt Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2010, Oracle America, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -47,7 +49,6 @@ __FBSDID("$FreeBSD$");
  */
 
 #include "namespace.h"
-#include <sys/types.h>
 #include <sys/param.h>
 
 #include <stdio.h>
@@ -102,7 +103,7 @@ xdr_float(XDR *xdrs, float *fp)
 	struct ieee_single is;
 	struct vax_single vs, *vsp;
 	struct sgl_limits *lim;
-	int i;
+	u_int i;
 #endif
 	switch (xdrs->x_op) {
 
@@ -111,9 +112,8 @@ xdr_float(XDR *xdrs, float *fp)
 		return (XDR_PUTINT32(xdrs, (int32_t *)fp));
 #else
 		vs = *((struct vax_single *)fp);
-		for (i = 0, lim = sgl_limits;
-			i < sizeof(sgl_limits)/sizeof(struct sgl_limits);
-			i++, lim++) {
+		for (i = 0, lim = sgl_limits; i < nitems(sgl_limits);
+		    i++, lim++) {
 			if ((vs.mantissa2 == lim->s.mantissa2) &&
 				(vs.exp == lim->s.exp) &&
 				(vs.mantissa1 == lim->s.mantissa1)) {
@@ -135,9 +135,8 @@ xdr_float(XDR *xdrs, float *fp)
 		vsp = (struct vax_single *)fp;
 		if (!XDR_GETINT32(xdrs, (int32_t *)&is))
 			return (FALSE);
-		for (i = 0, lim = sgl_limits;
-			i < sizeof(sgl_limits)/sizeof(struct sgl_limits);
-			i++, lim++) {
+		for (i = 0, lim = sgl_limits; i < nitems(sgl_limits);
+		    i++, lim++) {
 			if ((is.exp == lim->ieee.exp) &&
 				(is.mantissa == lim->ieee.mantissa)) {
 				*vsp = lim->s;
@@ -206,7 +205,7 @@ xdr_double(XDR *xdrs, double *dp)
 	struct	ieee_double id;
 	struct	vax_double vd;
 	struct dbl_limits *lim;
-	int i;
+	u_int i;
 #endif
 
 	switch (xdrs->x_op) {
@@ -228,9 +227,8 @@ xdr_double(XDR *xdrs, double *dp)
 		return (rv);
 #else
 		vd = *((struct vax_double *)dp);
-		for (i = 0, lim = dbl_limits;
-			i < sizeof(dbl_limits)/sizeof(struct dbl_limits);
-			i++, lim++) {
+		for (i = 0, lim = dbl_limits; i < nitems(dbl_limits);
+		    i++, lim++) {
 			if ((vd.mantissa4 == lim->d.mantissa4) &&
 				(vd.mantissa3 == lim->d.mantissa3) &&
 				(vd.mantissa2 == lim->d.mantissa2) &&
@@ -270,9 +268,8 @@ xdr_double(XDR *xdrs, double *dp)
 		lp = (int32_t *)&id;
 		if (!XDR_GETINT32(xdrs, lp++) || !XDR_GETINT32(xdrs, lp))
 			return (FALSE);
-		for (i = 0, lim = dbl_limits;
-			i < sizeof(dbl_limits)/sizeof(struct dbl_limits);
-			i++, lim++) {
+		for (i = 0, lim = dbl_limits; i < nitems(dbl_limits);
+		    i++, lim++) {
 			if ((id.mantissa2 == lim->ieee.mantissa2) &&
 				(id.mantissa1 == lim->ieee.mantissa1) &&
 				(id.exp == lim->ieee.exp)) {

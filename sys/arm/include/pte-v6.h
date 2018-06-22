@@ -27,8 +27,8 @@
  * $FreeBSD$
  */
 
-#ifndef _MACHINE_PTE_H_
-#define	_MACHINE_PTE_H_
+#ifndef _MACHINE_PTE_V6_H_
+#define _MACHINE_PTE_V6_H_
 
 /*
  * Domain Types	for the	Domain Access Control Register.
@@ -149,10 +149,12 @@
 #define	L2_NX		0x00000001	/* Not executable */
 #define	L2_B		0x00000004	/* Bufferable page */
 #define	L2_C		0x00000008	/* Cacheable page */
+#define	L2_CB_SHIFT		2	/* C,B bit field shift */
 #define	L2_AP(x)	((x) <<	4)
 #define	L2_AP0		0x00000010	/* access permissions bit 0*/
 #define	L2_AP1		0x00000020	/* access permissions bit 1*/
-#define	L2_TEX(x)	((x) <<	6)	/* type	extension */
+#define	L2_TEX_SHIFT		6	/* type extension field shift */
+#define	L2_TEX(x)	((x) <<	L2_TEX_SHIFT)	/* type	extension */
 #define	L2_TEX0		0x00000040	/* type	extension bit 0	*/
 #define	L2_TEX1		0x00000080	/* type	extension bit 1	*/
 #define	L2_TEX2		0x00000100	/* type	extension bit 2	*/
@@ -271,6 +273,10 @@
 #define	PTE2_FRAME	L2_S_FRAME
 
 #define	PTE2_ATTR_MASK		(L2_TEX0 | L2_C | L2_B)
+/* PTE2 attributes to TEX class index: (TEX0 C B)  */
+#define	PTE2_ATTR2IDX(attr)					\
+    ((((attr) & (L2_C | L2_B)) >> L2_CB_SHIFT) |		\
+    (((attr) & L2_TEX0) >> (L2_TEX_SHIFT - L2_CB_SHIFT)))
 
 #define	PTE2_AP_KR	(PTE2_RO | PTE2_NM)
 #define	PTE2_AP_KRW	0
@@ -288,41 +294,4 @@
 #define	PTE2_KERN(pa, ap, attr)		PTE2(pa, (ap) |	PTE2_A | PTE2_G, attr)
 #define	PTE2_KERN_NG(pa, ap, attr)	PTE2(pa, (ap) |	PTE2_A | PTE2_NG, attr)
 
-
-// ----------------- TO BE DELETED ---------------------------------------------
-
-/*
- * sys/arm/arm/elf_trampoline.c
- */
-#define	AP_KRW		0x01		/* kernel read/write */
-
-/*
- * lib/libkvm/kvm_arm.c
- */
-#define	L1_ADDR_MASK	0xfffffc00
-
-/*
- * lib/libkvm/kvm_arm.c
- */
-#define	L2_ADDR_BITS	0x000ff000	/* L2 PTE address bits */
-
-#ifndef LOCORE
-/*
- * sys/arm/arm/minidump_machdep.c
- * sys/arm/arm/pmap.c
- * sys/arm/arm/pmap.h (hack for our hack in pmap.h )
- * lib/libkvm/kvm_arm.c
- */
-typedef	uint32_t	pd_entry_t;		/* page directory entry */
-
-/*
- * sys/arm/arm/minidump_machdep.c
- * sys/arm/arm/pmap.c
- * sys/arm/arm/pmap.h (hack for our hack in pmap.h )
- * sys/arm/include/param.h
- */
-typedef	uint32_t	pt_entry_t;		/* page table entry */
-#endif
-// -----------------------------------------------------------------------------
-
-#endif /* !_MACHINE_PTE_H_ */
+#endif /* !_MACHINE_PTE_V6_H_ */

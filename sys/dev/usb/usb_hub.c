@@ -1,5 +1,7 @@
 /* $FreeBSD$ */
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ *
  * Copyright (c) 1998 The NetBSD Foundation, Inc. All rights reserved.
  * Copyright (c) 1998 Lennart Augustsson. All rights reserved.
  * Copyright (c) 2008-2010 Hans Petter Selasky. All rights reserved.
@@ -100,7 +102,9 @@ SYSCTL_INT(_hw_usb, OID_AUTO, power_timeout, CTLFLAG_RWTUN,
 #if USB_HAVE_DISABLE_ENUM
 static int usb_disable_enumeration = 0;
 SYSCTL_INT(_hw_usb, OID_AUTO, disable_enumeration, CTLFLAG_RWTUN,
-    &usb_disable_enumeration, 0, "Set to disable all USB device enumeration.");
+    &usb_disable_enumeration, 0, "Set to disable all USB device enumeration. "
+	"This can secure against USB devices turning evil, "
+	"for example a USB memory stick becoming a USB keyboard.");
 
 static int usb_disable_port_power = 0;
 SYSCTL_INT(_hw_usb, OID_AUTO, disable_port_power, CTLFLAG_RWTUN,
@@ -270,11 +274,11 @@ uhub_reset_tt_proc(struct usb_proc_msg *_pm)
 
 	/* Change lock */
 	USB_BUS_UNLOCK(udev->bus);
-	mtx_lock(&sc->sc_mtx);
+	USB_MTX_LOCK(&sc->sc_mtx);
 	/* Start transfer */
 	usbd_transfer_start(sc->sc_xfer[UHUB_RESET_TT_TRANSFER]);
 	/* Change lock */
-	mtx_unlock(&sc->sc_mtx);
+	USB_MTX_UNLOCK(&sc->sc_mtx);
 	USB_BUS_LOCK(udev->bus);
 }
 #endif
@@ -1519,9 +1523,9 @@ uhub_attach(device_t dev)
 
 	/* Start the interrupt endpoint, if any */
 
-	mtx_lock(&sc->sc_mtx);
+	USB_MTX_LOCK(&sc->sc_mtx);
 	usbd_transfer_start(sc->sc_xfer[UHUB_INTR_TRANSFER]);
-	mtx_unlock(&sc->sc_mtx);
+	USB_MTX_UNLOCK(&sc->sc_mtx);
 
 	/* Enable automatic power save on all USB HUBs */
 
@@ -1766,7 +1770,7 @@ done:
  * The USB Transaction Translator:
  * ===============================
  *
- * When doing LOW- and FULL-speed USB transfers accross a HIGH-speed
+ * When doing LOW- and FULL-speed USB transfers across a HIGH-speed
  * USB HUB, bandwidth must be allocated for ISOCHRONOUS and INTERRUPT
  * USB transfers. To utilize bandwidth dynamically the "scatter and
  * gather" principle must be applied. This means that bandwidth must
@@ -1838,7 +1842,7 @@ usb_intr_find_best_slot(usb_size_t *ptr, uint8_t start,
 /*------------------------------------------------------------------------*
  *	usb_hs_bandwidth_adjust
  *
- * This function will update the bandwith usage for the microframe
+ * This function will update the bandwidth usage for the microframe
  * having index "slot" by "len" bytes. "len" can be negative.  If the
  * "slot" argument is greater or equal to "USB_HS_MICRO_FRAMES_MAX"
  * the "slot" argument will be replaced by the slot having least used
@@ -2261,6 +2265,11 @@ usb_needs_explore(struct usb_bus *bus, uint8_t do_probe)
 
 	DPRINTF("\n");
 
+	if (cold != 0) {
+		DPRINTF("Cold\n");
+		return;
+	}
+
 	if (bus == NULL) {
 		DPRINTF("No bus pointer!\n");
 		return;
@@ -2292,7 +2301,7 @@ usb_needs_explore(struct usb_bus *bus, uint8_t do_probe)
  *	usb_needs_explore_all
  *
  * This function is called whenever a new driver is loaded and will
- * cause that all USB busses are re-explored.
+ * cause that all USB buses are re-explored.
  *------------------------------------------------------------------------*/
 void
 usb_needs_explore_all(void)
@@ -2310,7 +2319,7 @@ usb_needs_explore_all(void)
 		return;
 	}
 	/*
-	 * Explore all USB busses in parallell.
+	 * Explore all USB buses in parallel.
 	 */
 	max = devclass_get_maxunit(dc);
 	while (max >= 0) {
@@ -2324,6 +2333,26 @@ usb_needs_explore_all(void)
 		max--;
 	}
 }
+
+/*------------------------------------------------------------------------*
+ *	usb_needs_explore_init
+ *
+ * This function will ensure that the USB controllers are not enumerated
+ * until the "cold" variable is cleared.
+ *------------------------------------------------------------------------*/
+static void
+usb_needs_explore_init(void *arg)
+{
+	/*
+	 * The cold variable should be cleared prior to this function
+	 * being called:
+	 */
+	if (cold == 0)
+		usb_needs_explore_all();
+	else
+		DPRINTFN(-1, "Cold variable is still set!\n");
+}
+SYSINIT(usb_needs_explore_init, SI_SUB_KICK_SCHEDULER, SI_ORDER_SECOND, usb_needs_explore_init, NULL);
 
 /*------------------------------------------------------------------------*
  *	usb_bus_power_update

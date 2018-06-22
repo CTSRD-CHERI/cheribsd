@@ -1,4 +1,5 @@
-//===-- RegisterContextFreeBSD_powerpc.h -------------------------*- C++ -*-===//
+//===-- RegisterContextFreeBSD_powerpc.h -------------------------*- C++
+//-*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,60 +8,50 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef liblldb_RegisterContextFreeBSD_powerpc_H_
-#define liblldb_RegisterContextFreeBSD_powerpc_H_
+#ifndef liblldb_RegisterContextFreeBSD_powerpc_h_
+#define liblldb_RegisterContextFreeBSD_powerpc_h_
 
-#include "RegisterContextPOSIX.h"
+// C Includes
+// C++ Includes
+// Other libraries and framework includes
+// Project includes
+#include "RegisterInfoInterface.h"
 
-class RegisterContextFreeBSD_powerpc:
-    public lldb_private::RegisterInfoInterface
-{
+class RegisterContextFreeBSD_powerpc
+    : public lldb_private::RegisterInfoInterface {
 public:
-    RegisterContextFreeBSD_powerpc(const lldb_private::ArchSpec &target_arch);
-    virtual ~RegisterContextFreeBSD_powerpc();
+  RegisterContextFreeBSD_powerpc(const lldb_private::ArchSpec &target_arch);
+  ~RegisterContextFreeBSD_powerpc() override;
 
-    size_t
-    GetGPRSize() const override;
+  size_t GetGPRSize() const override;
 
-    const lldb_private::RegisterInfo *
-    GetRegisterInfo() const override;
+  const lldb_private::RegisterInfo *GetRegisterInfo() const override;
 
-    uint32_t
-    GetRegisterCount() const override;
+  uint32_t GetRegisterCount() const override;
 };
 
-class RegisterContextFreeBSD_powerpc32:
-    public RegisterContextFreeBSD_powerpc
-{
+class RegisterContextFreeBSD_powerpc32 : public RegisterContextFreeBSD_powerpc {
 public:
-    RegisterContextFreeBSD_powerpc32(const lldb_private::ArchSpec &target_arch);
-    virtual ~RegisterContextFreeBSD_powerpc32();
+  RegisterContextFreeBSD_powerpc32(const lldb_private::ArchSpec &target_arch);
+  ~RegisterContextFreeBSD_powerpc32() override;
 
-    size_t
-    GetGPRSize() const override;
+  size_t GetGPRSize() const override;
 
-    const lldb_private::RegisterInfo *
-    GetRegisterInfo() const override;
+  const lldb_private::RegisterInfo *GetRegisterInfo() const override;
 
-    uint32_t
-    GetRegisterCount() const override;
+  uint32_t GetRegisterCount() const override;
 };
 
-class RegisterContextFreeBSD_powerpc64:
-    public RegisterContextFreeBSD_powerpc
-{
+class RegisterContextFreeBSD_powerpc64 : public RegisterContextFreeBSD_powerpc {
 public:
-    RegisterContextFreeBSD_powerpc64(const lldb_private::ArchSpec &target_arch);
-    virtual ~RegisterContextFreeBSD_powerpc64();
+  RegisterContextFreeBSD_powerpc64(const lldb_private::ArchSpec &target_arch);
+  ~RegisterContextFreeBSD_powerpc64() override;
 
-    size_t
-    GetGPRSize() const override;
+  size_t GetGPRSize() const override;
 
-    const lldb_private::RegisterInfo *
-    GetRegisterInfo() const override;
+  const lldb_private::RegisterInfo *GetRegisterInfo() const override;
 
-    uint32_t
-    GetRegisterCount() const override;
+  uint32_t GetRegisterCount() const override;
 };
 
-#endif
+#endif // liblldb_RegisterContextFreeBSD_powerpc_h_

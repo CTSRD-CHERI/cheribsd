@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2004 Luigi Rizzo, Alessandro Cerri. All rights reserved.
  * Copyright (c) 2004-2008 Qing Li. All rights reserved.
  * Copyright (c) 2008 Kip Macy. All rights reserved.
@@ -66,8 +68,13 @@ static VNET_DEFINE(SLIST_HEAD(, lltable), lltables) =
     SLIST_HEAD_INITIALIZER(lltables);
 #define	V_lltables	VNET(lltables)
 
-struct rwlock lltable_rwlock;
-RW_SYSINIT(lltable_rwlock, &lltable_rwlock, "lltable_rwlock");
+static struct rwlock lltable_list_lock;
+RW_SYSINIT(lltable_list_lock, &lltable_list_lock, "lltable_list_lock");
+#define	LLTABLE_LIST_RLOCK()		rw_rlock(&lltable_list_lock)
+#define	LLTABLE_LIST_RUNLOCK()		rw_runlock(&lltable_list_lock)
+#define	LLTABLE_LIST_WLOCK()		rw_wlock(&lltable_list_lock)
+#define	LLTABLE_LIST_WUNLOCK()		rw_wunlock(&lltable_list_lock)
+#define	LLTABLE_LIST_LOCK_ASSERT()	rw_assert(&lltable_list_lock, RA_LOCKED)
 
 static void lltable_unlink(struct lltable *llt);
 static void llentries_unlink(struct lltable *llt, struct llentries *head);
@@ -85,7 +92,7 @@ lltable_dump_af(struct lltable *llt, struct sysctl_req *wr)
 {
 	int error;
 
-	LLTABLE_LOCK_ASSERT();
+	LLTABLE_LIST_LOCK_ASSERT();
 
 	if (llt->llt_ifp->if_flags & IFF_LOOPBACK)
 		return (0);
@@ -108,7 +115,7 @@ lltable_sysctl_dumparp(int af, struct sysctl_req *wr)
 	struct lltable *llt;
 	int error = 0;
 
-	LLTABLE_RLOCK();
+	LLTABLE_LIST_RLOCK();
 	SLIST_FOREACH(llt, &V_lltables, llt_link) {
 		if (llt->llt_af == af) {
 			error = lltable_dump_af(llt, wr);
@@ -117,7 +124,7 @@ lltable_sysctl_dumparp(int af, struct sysctl_req *wr)
 		}
 	}
 done:
-	LLTABLE_RUNLOCK();
+	LLTABLE_LIST_RUNLOCK();
 	return (error);
 }
 
@@ -409,7 +416,7 @@ lltable_update_ifaddr(struct lltable *llt)
 
 /*
  *
- * Performes generic cleanup routines and frees lle.
+ * Performs generic cleanup routines and frees lle.
  *
  * Called for non-linked entries, with callouts and
  * other AF-specific cleanups performed.
@@ -529,9 +536,9 @@ lltable_drain(int af)
 {
 	struct lltable	*llt;
 	struct llentry	*lle;
-	register int i;
+	int i;
 
-	LLTABLE_RLOCK();
+	LLTABLE_LIST_RLOCK();
 	SLIST_FOREACH(llt, &V_lltables, llt_link) {
 		if (llt->llt_af != af)
 			continue;
@@ -547,7 +554,7 @@ lltable_drain(int af)
 			}
 		}
 	}
-	LLTABLE_RUNLOCK();
+	LLTABLE_LIST_RUNLOCK();
 }
 #endif
 
@@ -591,14 +598,14 @@ lltable_prefix_free(int af, struct sockaddr *addr, struct sockaddr *mask,
 {
 	struct lltable *llt;
 
-	LLTABLE_RLOCK();
+	LLTABLE_LIST_RLOCK();
 	SLIST_FOREACH(llt, &V_lltables, llt_link) {
 		if (llt->llt_af != af)
 			continue;
 
 		llt->llt_prefix_free(llt, addr, mask, flags);
 	}
-	LLTABLE_RUNLOCK();
+	LLTABLE_LIST_RUNLOCK();
 }
 
 struct lltable *
@@ -632,18 +639,18 @@ void
 lltable_link(struct lltable *llt)
 {
 
-	LLTABLE_WLOCK();
+	LLTABLE_LIST_WLOCK();
 	SLIST_INSERT_HEAD(&V_lltables, llt, llt_link);
-	LLTABLE_WUNLOCK();
+	LLTABLE_LIST_WUNLOCK();
 }
 
 static void
 lltable_unlink(struct lltable *llt)
 {
 
-	LLTABLE_WLOCK();
+	LLTABLE_LIST_WLOCK();
 	SLIST_REMOVE(&V_lltables, llt, lltable, llt_link);
-	LLTABLE_WUNLOCK();
+	LLTABLE_LIST_WUNLOCK();
 
 }
 
@@ -739,13 +746,13 @@ lla_rt_output(struct rt_msghdr *rtm, struct rt_addrinfo *info)
 	}
 
 	/* XXX linked list may be too expensive */
-	LLTABLE_RLOCK();
+	LLTABLE_LIST_RLOCK();
 	SLIST_FOREACH(llt, &V_lltables, llt_link) {
 		if (llt->llt_af == dst->sa_family &&
 		    llt->llt_ifp == ifp)
 			break;
 	}
-	LLTABLE_RUNLOCK();
+	LLTABLE_LIST_RUNLOCK();
 	KASSERT(llt != NULL, ("Yep, ugly hacks are bad\n"));
 
 	error = 0;

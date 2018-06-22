@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2013 The FreeBSD Foundation
  * All rights reserved.
  *
@@ -141,8 +143,11 @@ vt_fb_mmap(struct vt_device *vd, vm_ooffset_t offset, vm_paddr_t *paddr,
 			*paddr = vtophys((uint8_t *)info->fb_vbase + offset);
 		} else {
 			*paddr = info->fb_pbase + offset;
+			if (info->fb_flags & FB_FLAG_MEMATTR)
+				*memattr = info->fb_memattr;
 #ifdef VM_MEMATTR_WRITE_COMBINING
-			*memattr = VM_MEMATTR_WRITE_COMBINING;
+			else
+				*memattr = VM_MEMATTR_WRITE_COMBINING;
 #endif
 		}
 		return (0);
@@ -416,10 +421,10 @@ vt_fb_init(struct vt_device *vd)
 	int err;
 
 	info = vd->vd_softc;
-	vd->vd_height = MIN(VT_FB_DEFAULT_HEIGHT, info->fb_height);
+	vd->vd_height = MIN(VT_FB_MAX_HEIGHT, info->fb_height);
 	margin = (info->fb_height - vd->vd_height) >> 1;
 	vd->vd_transpose = margin * info->fb_stride;
-	vd->vd_width = MIN(VT_FB_DEFAULT_WIDTH, info->fb_width);
+	vd->vd_width = MIN(VT_FB_MAX_WIDTH, info->fb_width);
 	margin = (info->fb_width - vd->vd_width) >> 1;
 	vd->vd_transpose += margin * (info->fb_bpp / NBBY);
 	vd->vd_video_dev = info->fb_video_dev;

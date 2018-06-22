@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1990, 1993
  *	The Regents of the University of California.
  * Copyright (c) 2010-2011 Juniper Networks, Inc.
@@ -15,7 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -42,6 +44,7 @@
 #include <sys/_lock.h>
 #include <sys/_mutex.h>
 #include <sys/_rwlock.h>
+#include <net/route.h>
 
 #ifdef _KERNEL
 #include <sys/lock.h>
@@ -52,7 +55,6 @@
 
 #define	in6pcb		inpcb	/* for KAME src sync over BSD*'s */
 #define	in6p_sp		inp_sp	/* for KAME src sync over BSD*'s */
-struct inpcbpolicy;
 
 /*
  * struct inpcb is the common protocol control block structure used in most
@@ -64,7 +66,7 @@ struct inpcbpolicy;
  */
 LIST_HEAD(inpcbhead, inpcb);
 LIST_HEAD(inpcbporthead, inpcbport);
-typedef	u_quad_t	inp_gen_t;
+typedef	uint64_t	inp_gen_t;
 
 /*
  * PCB with AF_INET6 null bind'ed laddr can receive AF_INET input packet.
@@ -120,7 +122,7 @@ struct in_conninfo {
  */
 #define	INC_ISIPV6	0x01
 
-#define inc_isipv6	inc_flags	/* temp compatability */
+#define	inc_isipv6	inc_flags	/* temp compatibility */
 #define	inc_fport	inc_ie.ie_fport
 #define	inc_lport	inc_ie.ie_lport
 #define	inc_faddr	inc_ie.ie_faddr
@@ -129,9 +131,8 @@ struct in_conninfo {
 #define	inc6_laddr	inc_ie.ie6_laddr
 #define	inc6_zoneid	inc_ie.ie6_zoneid
 
-struct	icmp6_filter;
-
-/*-
+#if defined(_KERNEL) || defined(_WANT_INPCB)
+/*
  * struct inpcb captures the network layer state for TCP, UDP, and raw IPv4 and
  * IPv6 sockets.  In the case of TCP and UDP, further per-connection state is
  * hung off of inp_ppcb most of the time.  Almost all fields of struct inpcb
@@ -180,32 +181,36 @@ struct	icmp6_filter;
  * read-lock usage during modification, this model can be applied to other
  * protocols (especially SCTP).
  */
+struct icmp6_filter;
+struct inpcbpolicy;
+struct m_snd_tag;
 struct inpcb {
+	/* Cache line #1 (amd64) */
 	LIST_ENTRY(inpcb) inp_hash;	/* (h/i) hash list */
 	LIST_ENTRY(inpcb) inp_pcbgrouphash;	/* (g/i) hash list */
-	LIST_ENTRY(inpcb) inp_list;	/* (p/l) list for all PCBs for proto */
-	                                /* (p[w]) for list iteration */
-	                                /* (p[r]/l) for addition/removal */
+	struct rwlock	inp_lock;
+	/* Cache line #2 (amd64) */
+#define	inp_start_zero	inp_refcount
+#define	inp_zero_size	(sizeof(struct inpcb) - \
+			    offsetof(struct inpcb, inp_start_zero))
+	u_int	inp_refcount;		/* (i) refcount */
+	int	inp_flags;		/* (i) generic IP/datagram flags */
+	int	inp_flags2;		/* (i) generic IP/datagram flags #2*/
 	void	*inp_ppcb;		/* (i) pointer to per-protocol pcb */
+	struct	socket *inp_socket;	/* (i) back pointer to socket */
 	struct	inpcbinfo *inp_pcbinfo;	/* (c) PCB list info */
 	struct	inpcbgroup *inp_pcbgroup; /* (g/i) PCB group list */
 	LIST_ENTRY(inpcb) inp_pcbgroup_wild; /* (g/i/h) group wildcard entry */
-	struct	socket *inp_socket;	/* (i) back pointer to socket */
 	struct	ucred	*inp_cred;	/* (c) cache of socket cred */
 	u_int32_t inp_flow;		/* (i) IPv6 flow information */
-	int	inp_flags;		/* (i) generic IP/datagram flags */
-	int	inp_flags2;		/* (i) generic IP/datagram flags #2*/
 	u_char	inp_vflag;		/* (i) IP version flag (v4/v6) */
 	u_char	inp_ip_ttl;		/* (i) time to live proto */
 	u_char	inp_ip_p;		/* (c) protocol proto */
 	u_char	inp_ip_minttl;		/* (i) minimum TTL or drop */
 	uint32_t inp_flowid;		/* (x) flow id / queue id */
-	u_int	inp_refcount;		/* (i) refcount */
-	void	*inp_pspare[5];		/* (x) route caching / general use */
+	struct m_snd_tag *inp_snd_tag;	/* (i) send tag for outgoing mbufs */
 	uint32_t inp_flowtype;		/* (x) M_HASHTYPE value */
 	uint32_t inp_rss_listen_bucket;	/* (x) overridden RSS listen bucket */
-	u_int	inp_ispare[4];		/* (x) route caching / user cookie /
-					 *     general use */
 
 	/* Local and foreign ports, local and foreign addr. */
 	struct	in_conninfo inp_inc;	/* (i) list for PCB's local port */
@@ -216,49 +221,47 @@ struct inpcb {
 
 	/* Protocol-dependent part; options. */
 	struct {
-		u_char	inp4_ip_tos;		/* (i) type of service proto */
-		struct	mbuf *inp4_options;	/* (i) IP options */
-		struct	ip_moptions *inp4_moptions; /* (i) IP mcast options */
-	} inp_depend4;
+		u_char	inp_ip_tos;		/* (i) type of service proto */
+		struct mbuf		*inp_options;	/* (i) IP options */
+		struct ip_moptions	*inp_moptions;	/* (i) mcast options */
+	};
 	struct {
 		/* (i) IP options */
-		struct	mbuf *inp6_options;
+		struct mbuf		*in6p_options;
 		/* (i) IP6 options for outgoing packets */
-		struct	ip6_pktopts *inp6_outputopts;
+		struct ip6_pktopts	*in6p_outputopts;
 		/* (i) IP multicast options */
-		struct	ip6_moptions *inp6_moptions;
+		struct ip6_moptions	*in6p_moptions;
 		/* (i) ICMPv6 code type filter */
-		struct	icmp6_filter *inp6_icmp6filt;
+		struct icmp6_filter	*in6p_icmp6filt;
 		/* (i) IPV6_CHECKSUM setsockopt */
-		int	inp6_cksum;
-		short	inp6_hops;
-	} inp_depend6;
+		int	in6p_cksum;
+		short	in6p_hops;
+	};
 	LIST_ENTRY(inpcb) inp_portlist;	/* (i/h) */
 	struct	inpcbport *inp_phd;	/* (i/h) head of this list */
-#define inp_zero_size offsetof(struct inpcb, inp_gencnt)
 	inp_gen_t	inp_gencnt;	/* (c) generation count */
 	struct llentry	*inp_lle;	/* cached L2 information */
-	struct rtentry	*inp_rt;	/* cached L3 information */
-	struct rwlock	inp_lock;
+	rt_gen_t	inp_rt_cookie;	/* generation for route entry */
+	union {				/* cached L3 information */
+		struct route inp_route;
+		struct route_in6 inp_route6;
+	};
+	LIST_ENTRY(inpcb) inp_list;	/* (p/l) list for all PCBs for proto */
+	                                /* (p[w]) for list iteration */
+	                                /* (p[r]/l) for addition/removal */
 };
+#endif	/* _KERNEL */
+
 #define	inp_fport	inp_inc.inc_fport
 #define	inp_lport	inp_inc.inc_lport
 #define	inp_faddr	inp_inc.inc_faddr
 #define	inp_laddr	inp_inc.inc_laddr
-#define	inp_ip_tos	inp_depend4.inp4_ip_tos
-#define	inp_options	inp_depend4.inp4_options
-#define	inp_moptions	inp_depend4.inp4_moptions
 
 #define	in6p_faddr	inp_inc.inc6_faddr
 #define	in6p_laddr	inp_inc.inc6_laddr
 #define	in6p_zoneid	inp_inc.inc6_zoneid
-#define	in6p_hops	inp_depend6.inp6_hops	/* default hop limit */
 #define	in6p_flowinfo	inp_flow
-#define	in6p_options	inp_depend6.inp6_options
-#define	in6p_outputopts	inp_depend6.inp6_outputopts
-#define	in6p_moptions	inp_depend6.inp6_moptions
-#define	in6p_icmp6filt	inp_depend6.inp6_icmp6filt
-#define	in6p_cksum	inp_depend6.inp6_cksum
 
 #define	inp_vnet	inp_pcbinfo->ipi_vnet
 
@@ -272,21 +275,53 @@ struct inpcb {
 /*
  * Interface exported to userland by various protocols which use inpcbs.  Hack
  * alert -- only define if struct xsocket is in scope.
+ * Fields prefixed with "xi_" are unique to this structure, and the rest
+ * match fields in the struct inpcb, to ease coding and porting.
+ *
+ * Legend:
+ * (s) - used by userland utilities in src
+ * (p) - used by utilities in ports
+ * (3) - is known to be used by third party software not in ports
+ * (n) - no known usage
  */
 #ifdef _SYS_SOCKETVAR_H_
-struct	xinpcb {
-	size_t	xi_len;		/* length of this structure */
-	struct	inpcb xi_inp;
-	struct	xsocket xi_socket;
-	u_quad_t	xi_alignment_hack;
+struct xinpcb {
+	size_t		xi_len;		/* length of this structure */
+	struct xsocket	xi_socket;		/* (s,p) */
+	struct in_conninfo inp_inc;		/* (s,p) */
+	uint64_t	inp_gencnt;		/* (s,p) */
+	union {
+		void	*inp_ppcb;		/* (s) netstat(1) */
+		int64_t	ph_ppcb;
+	};
+	int64_t		inp_spare64[4];
+	uint32_t	inp_flow;		/* (s) */
+	uint32_t	inp_flowid;		/* (s) */
+	uint32_t	inp_flowtype;		/* (s) */
+	int32_t		inp_flags;		/* (s,p) */
+	int32_t		inp_flags2;		/* (s) */
+	int32_t		inp_rss_listen_bucket;	/* (n) */
+	int32_t		in6p_cksum;		/* (n) */
+	int32_t		inp_spare32[4];
+	uint16_t	in6p_hops;		/* (n) */
+	uint8_t		inp_ip_tos;		/* (n) */
+	int8_t		pad8;
+	uint8_t		inp_vflag;		/* (s,p) */
+	uint8_t		inp_ip_ttl;		/* (n) */
+	uint8_t		inp_ip_p;		/* (n) */
+	uint8_t		inp_ip_minttl;		/* (n) */
+	int8_t		inp_spare8[4];
 };
 
-struct	xinpgen {
-	size_t	xig_len;	/* length of this structure */
-	u_int	xig_count;	/* number of PCBs at this time */
-	inp_gen_t xig_gen;	/* generation count at this time */
-	so_gen_t xig_sogen;	/* socket generation count at this time */
-};
+struct xinpgen {
+	size_t		xig_len;	/* length of this structure */
+	u_int		xig_count;	/* number of PCBs at this time */
+	inp_gen_t	xig_gen;	/* generation count at this time */
+	so_gen_t	xig_sogen;	/* socket generation count this time */
+} __aligned(sizeof(void *));
+#ifdef	_KERNEL
+void	in_pcbtoxinpcb(const struct inpcb *, struct xinpcb *);
+#endif
 #endif /* _SYS_SOCKETVAR_H_ */
 
 struct inpcbport {
@@ -456,20 +491,12 @@ void inp_wunlock(struct inpcb *);
 void inp_rlock(struct inpcb *);
 void inp_runlock(struct inpcb *);
 
-#ifdef INVARIANTS
+#ifdef INVARIANT_SUPPORT
 void inp_lock_assert(struct inpcb *);
 void inp_unlock_assert(struct inpcb *);
 #else
-static __inline void
-inp_lock_assert(struct inpcb *inp __unused)
-{
-}
-
-static __inline void
-inp_unlock_assert(struct inpcb *inp __unused)
-{
-}
-
+#define	inp_lock_assert(inp)	do {} while (0)
+#define	inp_unlock_assert(inp)	do {} while (0)
 #endif
 
 void	inp_apply_all(void (*func)(struct inpcb *, void *), void *arg);
@@ -609,6 +636,8 @@ short	inp_so_options(const struct inpcb *inp);
 #define	INP_RSS_BUCKET_SET	0x00000080 /* IP_RSS_LISTEN_BUCKET is set */
 #define	INP_RECVFLOWID		0x00000100 /* populate recv datagram with flow info */
 #define	INP_RECVRSSBUCKETID	0x00000200 /* populate recv datagram with bucket id */
+#define	INP_RATE_LIMIT_CHANGED	0x00000400 /* rate limit needs attention */
+#define	INP_ORIGDSTADDR		0x00000800 /* receive IP dst address/port */
 
 /*
  * Flags passed to in_pcblookup*() functions.
@@ -665,7 +694,7 @@ VNET_DECLARE(int, ipport_tcpallocs);
 
 void	in_pcbinfo_destroy(struct inpcbinfo *);
 void	in_pcbinfo_init(struct inpcbinfo *, const char *, struct inpcbhead *,
-	    int, int, char *, uma_init, uma_fini, uint32_t, u_int);
+	    int, int, char *, uma_init, u_int);
 
 int	in_pcbbind_check_bindmulti(const struct inpcb *ni,
 	    const struct inpcb *oi);
@@ -722,12 +751,22 @@ void	in_pcbrehash_mbuf(struct inpcb *, struct mbuf *);
 int	in_pcbrele(struct inpcb *);
 int	in_pcbrele_rlocked(struct inpcb *);
 int	in_pcbrele_wlocked(struct inpcb *);
+void	in_losing(struct inpcb *);
 void	in_pcbsetsolabel(struct socket *so);
 int	in_getpeeraddr(struct socket *so, struct sockaddr **nam);
 int	in_getsockaddr(struct socket *so, struct sockaddr **nam);
 struct sockaddr *
 	in_sockaddr(in_port_t port, struct in_addr *addr);
 void	in_pcbsosetlabel(struct socket *so);
+#ifdef RATELIMIT
+int	in_pcbattach_txrtlmt(struct inpcb *, struct ifnet *, uint32_t, uint32_t, uint32_t);
+void	in_pcbdetach_txrtlmt(struct inpcb *);
+int	in_pcbmodify_txrtlmt(struct inpcb *, uint32_t);
+int	in_pcbquery_txrtlmt(struct inpcb *, uint32_t *);
+int	in_pcbquery_txrlevel(struct inpcb *, uint32_t *);
+void	in_pcboutput_txrtlmt(struct inpcb *, struct ifnet *, struct mbuf *);
+void	in_pcboutput_eagain(struct inpcb *);
+#endif
 #endif /* _KERNEL */
 
 #endif /* !_NETINET_IN_PCB_H_ */

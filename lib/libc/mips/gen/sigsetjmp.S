@@ -31,6 +31,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "support"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <machine/asm.h>
 __FBSDID("$FreeBSD$");
@@ -60,8 +70,12 @@ __FBSDID("$FreeBSD$");
 
 LEAF(sigsetjmp)
 	PIC_PROLOGUE(sigsetjmp)
-
+#ifndef __CHERI_PURE_CAPABILITY__
 	bne	a1, zero, 1f			# do saving of signal mask?
+#else
+	/* The first argument is a capability so v is passed in a0 instead */
+	bne	a0, zero, 1f
+#endif
 	PIC_TAILCALL(_setjmp)
 
 1:	PIC_TAILCALL(setjmp)
@@ -69,7 +83,11 @@ END(sigsetjmp)
 
 LEAF(siglongjmp)
 	PIC_PROLOGUE(siglongjmp)
+#ifndef __CHERI_PURE_CAPABILITY__
 	REG_L	t0, (_JB_MAGIC  * SZREG)(a0)
+#else
+	cld	t0, zero, (_JB_MAGIC  * SZREG)($c3)
+#endif
 	REG_LI	t1, _JB_MAGIC__SETJMP
 	bne	t0, t1, 1f			# setjmp or _setjmp magic?
 	PIC_TAILCALL(_longjmp)

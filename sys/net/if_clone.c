@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2012 Gleb Smirnoff <glebius@FreeBSD.org>
  * Copyright (c) 1980, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -11,7 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -97,10 +99,11 @@ struct if_clone {
 
 static void	if_clone_free(struct if_clone *ifc);
 static int	if_clone_createif(struct if_clone *ifc, char *name, size_t len,
-		    caddr_t params);
+		    void * __capability params);
 
 static int     ifc_simple_match(struct if_clone *, const char *);
-static int     ifc_simple_create(struct if_clone *, char *, size_t, caddr_t);
+static int     ifc_simple_create(struct if_clone *, char *, size_t,
+		    void * __capability);
 static int     ifc_simple_destroy(struct if_clone *, struct ifnet *);
 
 static struct mtx if_cloners_mtx;
@@ -172,7 +175,7 @@ vnet_if_clone_init(void)
  * Lookup and create a clone network interface.
  */
 int
-if_clone_create(char *name, size_t len, caddr_t params)
+if_clone_create(char *name, size_t len, void * __capability params)
 {
 	struct if_clone *ifc;
 
@@ -212,7 +215,8 @@ if_clone_create(char *name, size_t len, caddr_t params)
  * Create a clone network interface.
  */
 static int
-if_clone_createif(struct if_clone *ifc, char *name, size_t len, caddr_t params)
+if_clone_createif(struct if_clone *ifc, char *name, size_t len,
+   void * __capability params)
 {
 	int err;
 	struct ifnet *ifp;
@@ -353,7 +357,7 @@ if_clone_alloc(const char *name, int maxunit)
 
 	return (ifc);
 }
-	
+
 static int
 if_clone_attach(struct if_clone *ifc)
 {
@@ -385,10 +389,8 @@ if_clone_advanced(const char *name, u_int maxunit, ifc_match_t match,
 	ifc->ifc_create = create;
 	ifc->ifc_destroy = destroy;
 
-	if (if_clone_attach(ifc) != 0) {
-		if_clone_free(ifc);
+	if (if_clone_attach(ifc) != 0)
 		return (NULL);
-	}
 
 	EVENTHANDLER_INVOKE(if_clone_event, ifc);
 
@@ -408,10 +410,8 @@ if_clone_simple(const char *name, ifcs_create_t create, ifcs_destroy_t destroy,
 	ifc->ifcs_destroy = destroy;
 	ifc->ifcs_minifs = minifs;
 
-	if (if_clone_attach(ifc) != 0) {
-		if_clone_free(ifc);
+	if (if_clone_attach(ifc) != 0)
 		return (NULL);
-	}
 
 	for (unit = 0; unit < minifs; unit++) {
 		char name[IFNAMSIZ];
@@ -448,7 +448,7 @@ if_clone_detach(struct if_clone *ifc)
 	/* destroy all interfaces for this cloner */
 	while (!LIST_EMPTY(&ifc->ifc_iflist))
 		if_clone_destroyif(ifc, LIST_FIRST(&ifc->ifc_iflist));
-	
+
 	IF_CLONE_REMREF(ifc);
 }
 
@@ -484,7 +484,7 @@ if_clone_list(struct if_clonereq *ifcr)
 	 * below, but that's not a major problem.  Not caping our
 	 * allocation to the number of cloners actually in the system
 	 * could be because that would let arbitrary users cause us to
-	 * allocate abritrary amounts of kernel memory.
+	 * allocate arbitrary amounts of kernel memory.
 	 */
 	buf_count = (V_if_cloners_count < ifcr->ifcr_count) ?
 	    V_if_cloners_count : ifcr->ifcr_count;
@@ -510,7 +510,7 @@ if_clone_list(struct if_clonereq *ifcr)
 
 done:
 	IF_CLONERS_UNLOCK();
-	if (err == 0)
+	if (err == 0 && dst != NULL)
 		err = copyout(outbuf, dst, buf_count*IFNAMSIZ);
 	if (outbuf != NULL)
 		free(outbuf, M_CLONE);
@@ -595,44 +595,56 @@ ifc_name2unit(const char *name, int *unit)
 	return (0);
 }
 
-int
-ifc_alloc_unit(struct if_clone *ifc, int *unit)
+static int
+ifc_alloc_unit_specific(struct if_clone *ifc, int *unit)
 {
 	char name[IFNAMSIZ];
-	int wildcard;
 
-	wildcard = (*unit < 0);
-retry:
 	if (*unit > ifc->ifc_maxunit)
 		return (ENOSPC);
-	if (*unit < 0) {
-		*unit = alloc_unr(ifc->ifc_unrhdr);
-		if (*unit == -1)
-			return (ENOSPC);
-	} else {
-		*unit = alloc_unr_specific(ifc->ifc_unrhdr, *unit);
-		if (*unit == -1) {
-			if (wildcard) {
-				(*unit)++;
-				goto retry;
-			} else
-				return (EEXIST);
-		}
-	}
+
+	if (alloc_unr_specific(ifc->ifc_unrhdr, *unit) == -1)
+		return (EEXIST);
 
 	snprintf(name, IFNAMSIZ, "%s%d", ifc->ifc_name, *unit);
 	if (ifunit(name) != NULL) {
 		free_unr(ifc->ifc_unrhdr, *unit);
-		if (wildcard) {
-			(*unit)++;
-			goto retry;
-		} else
-			return (EEXIST);
+		return (EEXIST);
 	}
 
 	IF_CLONE_ADDREF(ifc);
 
 	return (0);
+}
+
+static int
+ifc_alloc_unit_next(struct if_clone *ifc, int *unit)
+{
+	int error;
+
+	*unit = alloc_unr(ifc->ifc_unrhdr);
+	if (*unit == -1)
+		return (ENOSPC);
+
+	free_unr(ifc->ifc_unrhdr, *unit);
+	for (;;) {
+		error = ifc_alloc_unit_specific(ifc, unit);
+		if (error != EEXIST)
+			break;
+
+		(*unit)++;
+	}
+
+	return (error);
+}
+
+int
+ifc_alloc_unit(struct if_clone *ifc, int *unit)
+{
+	if (*unit < 0)
+		return (ifc_alloc_unit_next(ifc, unit));
+	else
+		return (ifc_alloc_unit_specific(ifc, unit));
 }
 
 void
@@ -665,7 +677,8 @@ ifc_simple_match(struct if_clone *ifc, const char *name)
 }
 
 static int
-ifc_simple_create(struct if_clone *ifc, char *name, size_t len, caddr_t params)
+ifc_simple_create(struct if_clone *ifc, char *name, size_t len,
+    void * __capability params)
 {
 	char *dp;
 	int wildcard;

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2003 Marcel Moolenaar
  * All rights reserved.
  *
@@ -198,6 +200,9 @@ ns8250_flush(struct uart_bas *bas, int what)
 	uint8_t fcr;
 
 	fcr = FCR_ENABLE;
+#ifdef CPU_XBURST
+	fcr |= FCR_UART_ON;
+#endif
 	if (what & UART_FLUSH_TRANSMITTER)
 		fcr |= FCR_XMT_RST;
 	if (what & UART_FLUSH_RECEIVER)
@@ -268,6 +273,10 @@ ns8250_probe(struct uart_bas *bas)
 {
 	u_char val;
 
+#ifdef CPU_XBURST
+	uart_setreg(bas, REG_FCR, FCR_UART_ON);
+#endif
+
 	/* Check known 0 bits that don't depend on DLAB. */
 	val = uart_getreg(bas, REG_IIR);
 	if (val & 0x30)
@@ -289,7 +298,7 @@ static void
 ns8250_init(struct uart_bas *bas, int baudrate, int databits, int stopbits,
     int parity)
 {
-	u_char	ier;
+	u_char ier, val;
 
 	if (bas->rclk == 0)
 		bas->rclk = DEFAULT_RCLK;
@@ -306,7 +315,11 @@ ns8250_init(struct uart_bas *bas, int baudrate, int databits, int stopbits,
 	uart_barrier(bas);
 
 	/* Disable the FIFO (if present). */
-	uart_setreg(bas, REG_FCR, 0);
+	val = 0;
+#ifdef CPU_XBURST
+	val |= FCR_UART_ON;
+#endif
+	uart_setreg(bas, REG_FCR, val);
 	uart_barrier(bas);
 
 	/* Set RTS & DTR. */
@@ -335,9 +348,6 @@ ns8250_putc(struct uart_bas *bas, int c)
 		DELAY(4);
 	uart_setreg(bas, REG_DATA, c);
 	uart_barrier(bas);
-	limit = 250000;
-	while ((uart_getreg(bas, REG_LSR) & LSR_TEMT) == 0 && --limit)
-		DELAY(4);
 }
 
 static int
@@ -397,7 +407,7 @@ struct uart_class uart_ns8250_class = {
 #ifdef FDT
 static struct ofw_compat_data compat_data[] = {
 	{"ns16550",		(uintptr_t)&uart_ns8250_class},
-	{"snps,dw-apb-uart",	(uintptr_t)&uart_ns8250_class},
+	{"ns16550a",		(uintptr_t)&uart_ns8250_class},
 	{NULL,			(uintptr_t)NULL},
 };
 UART_FDT_CLASS_AND_DEVICE(compat_data);
@@ -450,19 +460,9 @@ ns8250_bus_attach(struct uart_softc *sc)
 	pcell_t cell;
 #endif
 
-	ns8250->busy_detect = 0;
-
 #ifdef FDT
-	/* 
-	 * Check whether uart requires to read USR reg when IIR_BUSY and 
-	 * has broken txfifo. 
-	 */
-	ns8250->busy_detect = ofw_bus_is_compatible(sc->sc_dev, "snps,dw-apb-uart");
+	/* Check whether uart has a broken txfifo. */
 	node = ofw_bus_get_node(sc->sc_dev);
-	/* XXX: This is kept for a short time for compatibility with older device trees */
-	if ((OF_getencprop(node, "busy-detect", &cell, sizeof(cell))) > 0
-	    && cell != 0)
-		ns8250->busy_detect = 1;
 	if ((OF_getencprop(node, "broken-txfifo", &cell, sizeof(cell))) > 0)
 		broken_txfifo =  cell ? 1 : 0;
 #endif
@@ -471,6 +471,9 @@ ns8250_bus_attach(struct uart_softc *sc)
 
 	ns8250->mcr = uart_getreg(bas, REG_MCR);
 	ns8250->fcr = FCR_ENABLE;
+#ifdef CPU_XBURST
+	ns8250->fcr |= FCR_UART_ON;
+#endif
 	if (!resource_int_value("uart", device_get_unit(sc->sc_dev), "flags",
 	    &ivar)) {
 		if (UART_FLAGS_FCR_RX_LOW(ivar)) 
@@ -575,7 +578,7 @@ ns8250_bus_getsig(struct uart_softc *sc)
 	 * when capturing PPS pulses which are too narrow for software detection
 	 * to see the edges.  Hardware delta for RI doesn't work like the
 	 * others, so always use software for it.  Other threads may be changing
-	 * other (non-MSR) bits in sc_hwsig, so loop until it can succesfully
+	 * other (non-MSR) bits in sc_hwsig, so loop until it can successfully
 	 * update without other changes happening.  Note that the SIGCHGxx()
 	 * macros carefully preserve the delta bits when we have to loop several
 	 * times and a signal transitions between iterations.
@@ -708,6 +711,7 @@ ns8250_bus_ipend(struct uart_softc *sc)
 		if (iir & IIR_TXRDY) {
 			ipend |= SER_INT_TXIDLE;
 			uart_setreg(bas, REG_IER, ns8250->ier);
+			uart_barrier(bas);
 		} else
 			ipend |= SER_INT_SIGCHG;
 	}
@@ -762,6 +766,7 @@ ns8250_bus_probe(struct uart_softc *sc)
 	struct uart_bas *bas;
 	int count, delay, error, limit;
 	uint8_t lsr, mcr, ier;
+	uint8_t val;
 
 	ns8250 = (struct ns8250_softc *)sc;
 	bas = &sc->sc_bas;
@@ -795,7 +800,11 @@ ns8250_bus_probe(struct uart_softc *sc)
 	 * done. Since this is the first time we enable the FIFOs, we reset
 	 * them.
 	 */
-	uart_setreg(bas, REG_FCR, FCR_ENABLE);
+	val = FCR_ENABLE;
+#ifdef CPU_XBURST
+	val |= FCR_UART_ON;
+#endif
+	uart_setreg(bas, REG_FCR, val);
 	uart_barrier(bas);
 	if (!(uart_getreg(bas, REG_IIR) & IIR_FIFO_MASK)) {
 		/*
@@ -809,7 +818,11 @@ ns8250_bus_probe(struct uart_softc *sc)
 		return (0);
 	}
 
-	uart_setreg(bas, REG_FCR, FCR_ENABLE | FCR_XMT_RST | FCR_RCV_RST);
+	val = FCR_ENABLE | FCR_XMT_RST | FCR_RCV_RST;
+#ifdef CPU_XBURST
+	val |= FCR_UART_ON;
+#endif
+	uart_setreg(bas, REG_FCR, val);
 	uart_barrier(bas);
 
 	count = 0;
@@ -819,7 +832,11 @@ ns8250_bus_probe(struct uart_softc *sc)
 	error = ns8250_drain(bas, UART_DRAIN_RECEIVER|UART_DRAIN_TRANSMITTER);
 	if (error) {
 		uart_setreg(bas, REG_MCR, mcr);
-		uart_setreg(bas, REG_FCR, 0);
+		val = 0;
+#ifdef CPU_XBURST
+		val |= FCR_UART_ON;
+#endif
+		uart_setreg(bas, REG_FCR, val);
 		uart_barrier(bas);
 		goto describe;
 	}
@@ -849,12 +866,16 @@ ns8250_bus_probe(struct uart_softc *sc)
 			ier = uart_getreg(bas, REG_IER) & ns8250->ier_mask;
 			uart_setreg(bas, REG_IER, ier);
 			uart_setreg(bas, REG_MCR, mcr);
-			uart_setreg(bas, REG_FCR, 0);
+			val = 0;
+#ifdef CPU_XBURST
+			val |= FCR_UART_ON;
+#endif
+			uart_setreg(bas, REG_FCR, val);
 			uart_barrier(bas);
 			count = 0;
 			goto describe;
 		}
-	} while ((lsr & LSR_OE) == 0 && count < 130);
+	} while ((lsr & LSR_OE) == 0 && count < 260);
 	count--;
 
 	uart_setreg(bas, REG_MCR, mcr);
@@ -875,6 +896,9 @@ ns8250_bus_probe(struct uart_softc *sc)
 	} else if (count >= 112 && count <= 128) {
 		sc->sc_rxfifosz = 128;
 		device_set_desc(sc->sc_dev, "16950 or compatible");
+	} else if (count >= 224 && count <= 256) {
+		sc->sc_rxfifosz = 256;
+		device_set_desc(sc->sc_dev, "16x50 with 256 byte FIFO");
 	} else {
 		sc->sc_rxfifosz = 16;
 		device_set_desc(sc->sc_dev,
@@ -891,7 +915,7 @@ ns8250_bus_probe(struct uart_softc *sc)
 #if 0
 	/*
 	 * XXX there are some issues related to hardware flow control and
-	 * it's likely that uart(4) is the cause. This basicly needs more
+	 * it's likely that uart(4) is the cause. This basically needs more
 	 * investigation, but we avoid using for hardware flow control
 	 * until then.
 	 */
@@ -977,14 +1001,19 @@ ns8250_bus_transmit(struct uart_softc *sc)
 
 	bas = &sc->sc_bas;
 	uart_lock(sc->sc_hwmtx);
-	while ((uart_getreg(bas, REG_LSR) & LSR_THRE) == 0)
-		;
-	uart_setreg(bas, REG_IER, ns8250->ier | IER_ETXRDY);
-	uart_barrier(bas);
+	if (sc->sc_txdatasz > 1) {
+		if ((uart_getreg(bas, REG_LSR) & LSR_TEMT) == 0)
+			ns8250_drain(bas, UART_DRAIN_TRANSMITTER);
+	} else {
+		while ((uart_getreg(bas, REG_LSR) & LSR_THRE) == 0)
+			DELAY(4);
+	}
 	for (i = 0; i < sc->sc_txdatasz; i++) {
 		uart_setreg(bas, REG_DATA, sc->sc_txbuf[i]);
 		uart_barrier(bas);
 	}
+	uart_setreg(bas, REG_IER, ns8250->ier | IER_ETXRDY);
+	uart_barrier(bas);
 	if (broken_txfifo)
 		ns8250_drain(bas, UART_DRAIN_TRANSMITTER);
 	else
@@ -1005,7 +1034,7 @@ ns8250_bus_grab(struct uart_softc *sc)
 	/*
 	 * turn off all interrupts to enter polling mode. Leave the
 	 * saved mask alone. We'll restore whatever it was in ungrab.
-	 * All pending interupt signals are reset when IER is set to 0.
+	 * All pending interrupt signals are reset when IER is set to 0.
 	 */
 	uart_lock(sc->sc_hwmtx);
 	ier = uart_getreg(bas, REG_IER);

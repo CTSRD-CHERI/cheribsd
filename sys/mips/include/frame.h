@@ -1,6 +1,37 @@
 /*	$OpenBSD: frame.h,v 1.3 1998/09/15 10:50:12 pefo Exp $ */
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause AND BSD-4-Clause
+ *
+ * Copyright (c) 2011-2016 Robert N. M. Watson
+ * Copyright (c) 2015 SRI International
+ * All rights reserved.
+ *
+ * This software was developed by SRI International and the University of
+ * Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
+ * ("CTSRD"), as part of the DARPA CRASH research programme.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
  * Copyright (c) 1998 Per Fogelstrom, Opsycon AB
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,6 +67,10 @@
  */
 #ifndef _MACHINE_FRAME_H_
 #define	_MACHINE_FRAME_H_
+
+#ifdef CPU_CHERI
+#include <cheri/cheri.h>
+#endif
 
 /* Note: This must also match regnum.h and regdef.h */
 
@@ -99,8 +134,59 @@ struct trapframe {
 	register_t	ic;	/* RM7k and RM9k specific */
 	register_t	dummy;	/* Alignment for 32-bit case */
 
-/* From here and on, only saved user processes. */
+	/*
+	 * CHERI registers are saved for both user and kernel processes -- but
+	 * are defined only on supporting CPUs.  This need not be binary
+	 * compatible with struct cheri_frame, but should contain the same
+	 * fields.
+	 *
+	 * NB: 40x 64-bit registers above, which is (conveniently) aligned to
+	 * 16 (or 32) bytes with respect to the capabilities that follow.  See
+	 * also compile-time assertions in cheri.c.
+	 *
+	 * NB: We round the size up to an even multiple of capability size;
+	 * this assumption can also be found in regnum.h.
+	 */
+#ifdef CPU_CHERI
+	void * __capability	ddc;
+	void * __capability	c1;
+	void * __capability	c2;
+	void * __capability	c3;
+	void * __capability	c4;
+	void * __capability	c5;
+	void * __capability	c6;
+	void * __capability	c7;
+	void * __capability	c8;
+	void * __capability	c9;
+	void * __capability	c10;
+	void * __capability	csp;
+	void * __capability	c12;
+	void * __capability	c13;
+	void * __capability	c14;
+	void * __capability	c15;
+	void * __capability	c16;
+	void * __capability	c17;
+	void * __capability	c18;
+	void * __capability	c19;
+	void * __capability	c20;
+	void * __capability	c21;
+	void * __capability	c22;
+	void * __capability	c23;
+	void * __capability	c24;
+	void * __capability	c25;
+	void * __capability	idc;
+	void * __capability	pcc;
+	register_t		capcause;  /* NB: Saved but not restored. */
+	register_t		_pad0;
+#if (CHERICAP_SIZE == 32)
+	register_t		_pad1;
+	register_t		_pad2;
+#endif
+#endif
 
+	/*
+	 * Floating-point registers are preserved only for user processes.
+	 */
 	f_register_t	f0;
 	f_register_t	f1;
 	f_register_t	f2;
@@ -134,7 +220,7 @@ struct trapframe {
 	f_register_t	f30;
 	f_register_t	f31;
 	register_t	fsr;
-        register_t   fdummy;
+        register_t	fir;
 };
 
 #endif	/* !_MACHINE_FRAME_H_ */

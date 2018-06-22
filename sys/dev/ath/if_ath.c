@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2002-2009 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
@@ -113,6 +115,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/ath/if_ath_tx_edma.h>
 #include <dev/ath/if_ath_beacon.h>
 #include <dev/ath/if_ath_btcoex.h>
+#include <dev/ath/if_ath_btcoex_mci.h>
 #include <dev/ath/if_ath_spectral.h>
 #include <dev/ath/if_ath_lna_div.h>
 #include <dev/ath/if_athdfs.h>
@@ -198,6 +201,7 @@ static void	ath_set_channel(struct ieee80211com *);
 #ifdef	ATH_ENABLE_11N
 static void	ath_update_chw(struct ieee80211com *);
 #endif	/* ATH_ENABLE_11N */
+static int	ath_set_quiet_ie(struct ieee80211_node *, uint8_t *);
 static void	ath_calibrate(void *);
 static int	ath_newstate(struct ieee80211vap *, enum ieee80211_state, int);
 static void	ath_setup_stationkey(struct ieee80211_node *);
@@ -284,22 +288,40 @@ ath_legacy_attach_comp_func(struct ath_softc *sc)
  * the hardware is being programmed elsewhere, it will
  * simply store it away and update it when all current
  * uses of the hardware are completed.
+ *
+ * If the chip is going into network sleep or power off, then
+ * we will wait until all uses of the chip are done before
+ * going into network sleep or power off.
+ *
+ * If the chip is being programmed full-awake, then immediately
+ * program it full-awake so we can actually stay awake rather than
+ * the chip potentially going to sleep underneath us.
  */
 void
-_ath_power_setpower(struct ath_softc *sc, int power_state, const char *file, int line)
+_ath_power_setpower(struct ath_softc *sc, int power_state, int selfgen,
+    const char *file, int line)
 {
 	ATH_LOCK_ASSERT(sc);
 
-	sc->sc_target_powerstate = power_state;
-
-	DPRINTF(sc, ATH_DEBUG_PWRSAVE, "%s: (%s:%d) state=%d, refcnt=%d\n",
+	DPRINTF(sc, ATH_DEBUG_PWRSAVE, "%s: (%s:%d) state=%d, refcnt=%d, target=%d, cur=%d\n",
 	    __func__,
 	    file,
 	    line,
 	    power_state,
-	    sc->sc_powersave_refcnt);
+	    sc->sc_powersave_refcnt,
+	    sc->sc_target_powerstate,
+	    sc->sc_cur_powerstate);
 
-	if (sc->sc_powersave_refcnt == 0 &&
+	sc->sc_target_powerstate = power_state;
+
+	/*
+	 * Don't program the chip into network sleep if the chip
+	 * is being programmed elsewhere.
+	 *
+	 * However, if the chip is being programmed /awake/, force
+	 * the chip awake so we stay awake.
+	 */
+	if ((sc->sc_powersave_refcnt == 0 || power_state == HAL_PM_AWAKE) &&
 	    power_state != sc->sc_cur_powerstate) {
 		sc->sc_cur_powerstate = power_state;
 		ath_hal_setpower(sc->sc_ah, power_state);
@@ -312,7 +334,8 @@ _ath_power_setpower(struct ath_softc *sc, int power_state, const char *file, int
 		 * we let the above call leave the self-gen
 		 * state as "sleep".
 		 */
-		if (sc->sc_cur_powerstate == HAL_PM_AWAKE &&
+		if (selfgen &&
+		    sc->sc_cur_powerstate == HAL_PM_AWAKE &&
 		    sc->sc_target_selfgen_state != HAL_PM_AWAKE) {
 			ath_hal_setselfgenpower(sc->sc_ah,
 			    sc->sc_target_selfgen_state);
@@ -378,10 +401,13 @@ _ath_power_set_power_state(struct ath_softc *sc, int power_state, const char *fi
 
 	sc->sc_powersave_refcnt++;
 
+	/*
+	 * Only do the power state change if we're not programming
+	 * it elsewhere.
+	 */
 	if (power_state != sc->sc_cur_powerstate) {
 		ath_hal_setpower(sc->sc_ah, power_state);
 		sc->sc_cur_powerstate = power_state;
-
 		/*
 		 * Adjust the self-gen powerstate if appropriate.
 		 */
@@ -390,7 +416,6 @@ _ath_power_set_power_state(struct ath_softc *sc, int power_state, const char *fi
 			ath_hal_setselfgenpower(sc->sc_ah,
 			    sc->sc_target_selfgen_state);
 		}
-
 	}
 }
 
@@ -474,6 +499,10 @@ ath_setup_hal_config(struct ath_softc *sc, HAL_OPS_CONFIG *ah_config)
 
 	if (sc->sc_pci_devinfo & ATH_PCI_AR9565_2ANT)
 		device_printf(sc->sc_dev, "WB335 2-ANT card detected\n");
+
+	if (sc->sc_pci_devinfo & ATH_PCI_BT_ANT_DIV)
+		device_printf(sc->sc_dev,
+		    "Bluetooth Antenna Diversity card detected\n");
 
 	if (sc->sc_pci_devinfo & ATH_PCI_KILLER)
 		device_printf(sc->sc_dev, "Killer Wireless card detected\n");
@@ -606,6 +635,17 @@ ath_attach(u_int16_t devid, struct ath_softc *sc)
 #ifdef	ATH_DEBUG
 	sc->sc_debug = ath_debug;
 #endif
+
+	/*
+	 * Force the chip awake during setup, just to keep
+	 * the HAL/driver power tracking happy.
+	 *
+	 * There are some methods (eg ath_hal_setmac())
+	 * that poke the hardware.
+	 */
+	ATH_LOCK(sc);
+	ath_power_setpower(sc, HAL_PM_AWAKE, 1);
+	ATH_UNLOCK(sc);
 
 	/*
 	 * Setup the DMA/EDMA functions based on the current
@@ -966,10 +1006,45 @@ ath_attach(u_int16_t devid, struct ath_softc *sc)
 	sc->sc_hasbmatch = ath_hal_hasbssidmatch(ah);
 	sc->sc_hastsfadd = ath_hal_hastsfadjust(ah);
 	sc->sc_rxslink = ath_hal_self_linked_final_rxdesc(ah);
-	sc->sc_rxtsf32 = ath_hal_has_long_rxdesc_tsf(ah);
+
+	/* XXX TODO: just make this a "store tx/rx timestamp length" operation */
+	if (ath_hal_get_rx_tsf_prec(ah, &i)) {
+		if (i == 32) {
+			sc->sc_rxtsf32 = 1;
+		}
+		if (bootverbose)
+			device_printf(sc->sc_dev, "RX timestamp: %d bits\n", i);
+	}
+	if (ath_hal_get_tx_tsf_prec(ah, &i)) {
+		if (bootverbose)
+			device_printf(sc->sc_dev, "TX timestamp: %d bits\n", i);
+	}
+
 	sc->sc_hasenforcetxop = ath_hal_hasenforcetxop(ah);
 	sc->sc_rx_lnamixer = ath_hal_hasrxlnamixer(ah);
 	sc->sc_hasdivcomb = ath_hal_hasdivantcomb(ah);
+
+	/*
+	 * Some WB335 cards do not support antenna diversity. Since
+	 * we use a hardcoded value for AR9565 instead of using the
+	 * EEPROM/OTP data, remove the combining feature from
+	 * the HW capabilities bitmap.
+	 */
+	/*
+	 * XXX TODO: check reference driver and ath9k for what to do
+	 * here for WB335.  I think we have to actually disable the
+	 * LNA div processing in the HAL and instead use the hard
+	 * coded values; and then use BT diversity.
+	 *
+	 * .. but also need to setup MCI too for WB335..
+	 */
+#if 0
+	if (sc->sc_pci_devinfo & (ATH9K_PCI_AR9565_1ANT | ATH9K_PCI_AR9565_2ANT)) {
+		device_printf(sc->sc_dev, "%s: WB335: disabling LNA mixer diversity\n",
+		    __func__);
+		sc->sc_dolnadiv = 0;
+	}
+#endif
 
 	if (ath_hal_hasfastframes(ah))
 		ic->ic_caps |= IEEE80211_C_FF;
@@ -989,12 +1064,16 @@ ath_attach(u_int16_t devid, struct ath_softc *sc)
 	 * otherwise) to be transmitted.
 	 */
 	sc->sc_txq_data_minfree = 10;
+
 	/*
-	 * Leave this as default to maintain legacy behaviour.
-	 * Shortening the cabq/mcastq may end up causing some
-	 * undesirable behaviour.
+	 * Shorten this to 64 packets, or 1/4 ath_txbuf, whichever
+	 * is smaller.
+	 *
+	 * Anything bigger can potentially see the cabq consume
+	 * almost all buffers, starving everything else, only to
+	 * see most fail to transmit in the given beacon interval.
 	 */
-	sc->sc_txq_mcastq_maxdepth = ath_txbuf;
+	sc->sc_txq_mcastq_maxdepth = MIN(64, ath_txbuf / 4);
 
 	/*
 	 * How deep can the node software TX queue get whilst it's asleep.
@@ -1002,11 +1081,10 @@ ath_attach(u_int16_t devid, struct ath_softc *sc)
 	sc->sc_txq_node_psq_maxdepth = 16;
 
 	/*
-	 * Default the maximum queue depth for a given node
-	 * to 1/4'th the TX buffers, or 64, whichever
-	 * is larger.
+	 * Default the maximum queue to 1/4'th the TX buffers, or
+	 * 64, whichever is smaller.
 	 */
-	sc->sc_txq_node_maxdepth = MAX(64, ath_txbuf / 4);
+	sc->sc_txq_node_maxdepth = MIN(64, ath_txbuf / 4);
 
 	/* Enable CABQ by default */
 	sc->sc_cabq_enable = 1;
@@ -1062,6 +1140,7 @@ ath_attach(u_int16_t devid, struct ath_softc *sc)
 	if (ath_hal_getcapability(ah, HAL_CAP_HT, 0, NULL) == HAL_OK &&
 	    (wmodes & (HAL_MODE_HT20 | HAL_MODE_HT40))) {
 		uint32_t rxs, txs;
+		uint32_t ldpc;
 
 		device_printf(sc->sc_dev, "[HT] enabling HT modes\n");
 
@@ -1073,7 +1152,6 @@ ath_attach(u_int16_t devid, struct ath_softc *sc)
 			    | IEEE80211_HTCAP_MAXAMSDU_3839
 			    				/* max A-MSDU length */
 			    | IEEE80211_HTCAP_SMPS_OFF;	/* SM power save off */
-			;
 
 		/*
 		 * Enable short-GI for HT20 only if the hardware
@@ -1130,6 +1208,19 @@ ath_attach(u_int16_t devid, struct ath_softc *sc)
 			device_printf(sc->sc_dev,
 			    "[HT] RTS aggregates limited to %d KiB\n",
 			    sc->sc_rts_aggr_limit / 1024);
+
+		/*
+		 * LDPC
+		 */
+		if ((ath_hal_getcapability(ah, HAL_CAP_LDPC, 0, &ldpc))
+		    == HAL_OK && (ldpc == 1)) {
+			sc->sc_has_ldpc = 1;
+			device_printf(sc->sc_dev,
+			    "[HT] LDPC transmit/receive enabled\n");
+			ic->ic_htcaps |= IEEE80211_HTCAP_LDPC |
+					 IEEE80211_HTC_TXLDPC;
+		}
+
 
 		device_printf(sc->sc_dev,
 		    "[HT] %d RX streams; %d TX streams\n", rxs, txs);
@@ -1237,6 +1328,7 @@ ath_attach(u_int16_t devid, struct ath_softc *sc)
 
 	ic->ic_update_chw = ath_update_chw;
 #endif	/* ATH_ENABLE_11N */
+	ic->ic_set_quiet = ath_set_quiet_ie;
 
 #ifdef	ATH_ENABLE_RADIOTAP_VENDOR_EXT
 	/*
@@ -1287,7 +1379,7 @@ ath_attach(u_int16_t devid, struct ath_softc *sc)
 	 * Put it to sleep for now.
 	 */
 	ATH_LOCK(sc);
-	ath_power_setpower(sc, HAL_PM_FULL_SLEEP);
+	ath_power_setpower(sc, HAL_PM_FULL_SLEEP, 1);
 	ATH_UNLOCK(sc);
 
 	return 0;
@@ -1296,6 +1388,7 @@ bad2:
 	ath_desc_free(sc);
 	ath_txdma_teardown(sc);
 	ath_rxdma_teardown(sc);
+
 bad:
 	if (ah)
 		ath_hal_detach(ah);
@@ -1329,7 +1422,7 @@ ath_detach(struct ath_softc *sc)
 	 */
 	ATH_LOCK(sc);
 	ath_power_set_power_state(sc, HAL_PM_AWAKE);
-	ath_power_setpower(sc, HAL_PM_AWAKE);
+	ath_power_setpower(sc, HAL_PM_AWAKE, 1);
 
 	/*
 	 * Stop things cleanly.
@@ -1587,6 +1680,7 @@ ath_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	 * However, for now that's enforced by the TX path.
 	 */
 	vap->iv_ampdu_rxmax = IEEE80211_HTCAP_MAXRXAMPDU_64K;
+	vap->iv_ampdu_limit = IEEE80211_HTCAP_MAXRXAMPDU_64K;
 
 	avp->av_bslot = -1;
 	if (needbeacon) {
@@ -1912,7 +2006,7 @@ ath_resume(struct ath_softc *sc)
 	ATH_LOCK(sc);
 	ath_power_setselfgen(sc, HAL_PM_AWAKE);
 	ath_power_set_power_state(sc, HAL_PM_AWAKE);
-	ath_power_setpower(sc, HAL_PM_AWAKE);
+	ath_power_setpower(sc, HAL_PM_AWAKE, 1);
 	ATH_UNLOCK(sc);
 
 	ath_hal_reset(ah, sc->sc_opmode,
@@ -2239,8 +2333,16 @@ ath_intr(void *arg)
 			sc->sc_stats.ast_rxorn++;
 		}
 		if (status & HAL_INT_TSFOOR) {
+			/* out of range beacon - wake the chip up,
+			 * but don't modify self-gen frame config */
 			device_printf(sc->sc_dev, "%s: TSFOOR\n", __func__);
 			sc->sc_syncbeacon = 1;
+			ATH_LOCK(sc);
+			ath_power_setpower(sc, HAL_PM_AWAKE, 0);
+			ATH_UNLOCK(sc);
+		}
+		if (status & HAL_INT_MCI) {
+			ath_btcoex_mci_intr(sc);
 		}
 	}
 	ATH_PCU_LOCK(sc);
@@ -2327,12 +2429,22 @@ ath_bmiss_vap(struct ieee80211vap *vap)
 	}
 
 	/*
-	 * There's no need to keep the hardware awake during the call
-	 * to av_bmiss().
+	 * Keep the hardware awake if it's asleep (and leave self-gen
+	 * frame config alone) until the next beacon, so we can resync
+	 * against the next beacon.
+	 *
+	 * This handles three common beacon miss cases in STA powersave mode -
+	 * (a) the beacon TBTT isnt a multiple of bintval;
+	 * (b) the beacon was missed; and
+	 * (c) the beacons are being delayed because the AP is busy and
+	 *     isn't reliably able to meet its TBTT.
 	 */
 	ATH_LOCK(sc);
+	ath_power_setpower(sc, HAL_PM_AWAKE, 0);
 	ath_power_restore_power_state(sc);
 	ATH_UNLOCK(sc);
+	DPRINTF(sc, ATH_DEBUG_BEACON,
+	    "%s: forced awake; force syncbeacon=1\n", __func__);
 
 	/*
 	 * Attempt to force a beacon resync.
@@ -2415,6 +2527,20 @@ ath_settkipmic(struct ath_softc *sc)
 	}
 }
 
+static void
+ath_vap_clear_quiet_ie(struct ath_softc *sc)
+{
+	struct ieee80211com *ic = &sc->sc_ic;
+	struct ieee80211vap *vap;
+	struct ath_vap *avp;
+
+	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
+		avp = ATH_VAP(vap);
+		/* Quiet time handling - ensure we resync */
+		memset(&avp->quiet_ie, 0, sizeof(avp->quiet_ie));
+	}
+}
+
 static int
 ath_init(struct ath_softc *sc)
 {
@@ -2429,7 +2555,7 @@ ath_init(struct ath_softc *sc)
 	 */
 	ath_power_setselfgen(sc, HAL_PM_AWAKE);
 	ath_power_set_power_state(sc, HAL_PM_AWAKE);
-	ath_power_setpower(sc, HAL_PM_AWAKE);
+	ath_power_setpower(sc, HAL_PM_AWAKE, 1);
 
 	/*
 	 * Stop anything previously setup.  This is safe
@@ -2460,6 +2586,9 @@ ath_init(struct ath_softc *sc)
 	sc->sc_rx_stopped = 1;
 	sc->sc_rx_resetted = 1;
 	ATH_RX_UNLOCK(sc);
+
+	/* Clear quiet IE state for each VAP */
+	ath_vap_clear_quiet_ie(sc);
 
 	ath_chan_change(sc, ic->ic_curchan);
 
@@ -2535,6 +2664,12 @@ ath_init(struct ath_softc *sc)
 	 */
 	if (! sc->sc_isedma)
 		sc->sc_imask |= HAL_INT_RXEOL;
+
+	/*
+	 * Enable MCI interrupt for MCI devices.
+	 */
+	if (sc->sc_btcoex_mci)
+		sc->sc_imask |= HAL_INT_MCI;
 
 	/*
 	 * Enable MIB interrupts when there are hardware phy counters.
@@ -2686,7 +2821,7 @@ ath_txrx_start(struct ath_softc *sc)
 }
 
 /*
- * Grab the reset lock, and wait around until noone else
+ * Grab the reset lock, and wait around until no one else
  * is trying to do anything with it.
  *
  * This is totally horrible but we can't hold this lock for
@@ -2770,7 +2905,7 @@ ath_reset(struct ath_softc *sc, ATH_RESET_TYPE reset_type)
 	ATH_PCU_UNLOCK_ASSERT(sc);
 	ATH_UNLOCK_ASSERT(sc);
 
-	/* Try to (stop any further TX/RX from occuring */
+	/* Try to (stop any further TX/RX from occurring */
 	taskqueue_block(sc->sc_tq);
 
 	/*
@@ -2814,7 +2949,7 @@ ath_reset(struct ath_softc *sc, ATH_RESET_TYPE reset_type)
 
 	/*
 	 * Should now wait for pending TX/RX to complete
-	 * and block future ones from occuring. This needs to be
+	 * and block future ones from occurring. This needs to be
 	 * done before the TX queue is drained.
 	 */
 	ath_draintxq(sc, reset_type);	/* stop xmit side */
@@ -2835,6 +2970,9 @@ ath_reset(struct ath_softc *sc, ATH_RESET_TYPE reset_type)
 	sc->sc_rx_stopped = 1;
 	sc->sc_rx_resetted = 1;
 	ATH_RX_UNLOCK(sc);
+
+	/* Quiet time handling - ensure we resync */
+	ath_vap_clear_quiet_ie(sc);
 
 	/* Let DFS at it in case it's a DFS channel */
 	ath_dfs_radar_enable(sc, ic->ic_curchan);
@@ -3484,10 +3622,10 @@ ath_update_mcast_hw(struct ath_softc *sc)
 				/* calculate XOR of eight 6bit values */
 				dl = LLADDR((struct sockaddr_dl *)
 				    ifma->ifma_addr);
-				val = LE_READ_4(dl + 0);
+				val = le32dec(dl + 0);
 				pos = (val >> 18) ^ (val >> 12) ^ (val >> 6) ^
 				    val;
-				val = LE_READ_4(dl + 3);
+				val = le32dec(dl + 3);
 				pos ^= (val >> 18) ^ (val >> 12) ^ (val >> 6) ^
 				    val;
 				pos &= 0x3f;
@@ -3530,6 +3668,8 @@ ath_mode_init(struct ath_softc *sc)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc->sc_ah;
 	u_int32_t rfilt;
+
+	/* XXX power state? */
 
 	/* configure rx filter */
 	rfilt = ath_calcrxfilter(sc);
@@ -3664,7 +3804,7 @@ ath_bstuck_proc(void *arg, int pending)
 	sc->sc_stats.ast_bstuck++;
 	/*
 	 * This assumes that there's no simultaneous channel mode change
-	 * occuring.
+	 * occurring.
 	 */
 	ath_reset(sc, ATH_RESET_NOLOSS);
 }
@@ -3911,9 +4051,13 @@ ath_txq_update(struct ath_softc *sc, int ac)
 #define	ATH_EXPONENT_TO_VALUE(v)	((1<<v)-1)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_txq *txq = sc->sc_ac2q[ac];
-	struct wmeParams *wmep = &ic->ic_wme.wme_chanParams.cap_wmeParams[ac];
+	struct chanAccParams chp;
+	struct wmeParams *wmep;
 	struct ath_hal *ah = sc->sc_ah;
 	HAL_TXQ_INFO qi;
+
+	ieee80211_wme_ic_getparams(ic, &chp);
+	wmep = &chp.cap_wmeParams[ac];
 
 	ath_hal_gettxqueueprops(ah, txq->axq_qnum, &qi);
 #ifdef IEEE80211_SUPPORT_TDMA
@@ -4041,9 +4185,12 @@ ath_tx_update_stats(struct ath_softc *sc, struct ath_tx_status *ts,
 		sc->sc_ant_tx[txant]++;
 		if (ts->ts_finaltsi != 0)
 			sc->sc_stats.ast_tx_altrate++;
+
+		/* XXX TODO: should do per-pri conuters */
 		pri = M_WME_GETAC(bf->bf_m);
 		if (pri >= WME_AC_VO)
 			ic->ic_wme.wme_hipri_traffic++;
+
 		if ((bf->bf_state.bfs_txflags & HAL_TXDESC_NOACK) == 0)
 			ni->ni_inact = ni->ni_inact_reload;
 	} else {
@@ -4725,7 +4872,7 @@ ath_tx_freebuf(struct ath_softc *sc, struct ath_buf *bf, int status)
 	/*
 	 * Make sure that we only sync/unload if there's an mbuf.
 	 * If not (eg we cloned a buffer), the unload will have already
-	 * occured.
+	 * occurred.
 	 */
 	if (bf->bf_m != NULL) {
 		bus_dmamap_sync(sc->sc_dmat, bf->bf_dmamap,
@@ -5064,7 +5211,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 	ATH_PCU_UNLOCK_ASSERT(sc);
 	ATH_UNLOCK_ASSERT(sc);
 
-	/* (Try to) stop TX/RX from occuring */
+	/* (Try to) stop TX/RX from occurring */
 	taskqueue_block(sc->sc_tq);
 
 	ATH_PCU_LOCK(sc);
@@ -5126,6 +5273,9 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		sc->sc_rx_stopped = 1;
 		sc->sc_rx_resetted = 1;
 		ATH_RX_UNLOCK(sc);
+
+		/* Quiet time handling - ensure we resync */
+		ath_vap_clear_quiet_ie(sc);
 
 		/* Let DFS at it in case it's a DFS channel */
 		ath_dfs_radar_enable(sc, chan);
@@ -5400,10 +5550,153 @@ ath_update_chw(struct ieee80211com *ic)
 {
 	struct ath_softc *sc = ic->ic_softc;
 
-	DPRINTF(sc, ATH_DEBUG_STATE, "%s: called\n", __func__);
+	//DPRINTF(sc, ATH_DEBUG_STATE, "%s: called\n", __func__);
+	device_printf(sc->sc_dev, "%s: called\n", __func__);
+
+	/*
+	 * XXX TODO: schedule a tasklet that stops things without freeing,
+	 * walks the now stopped TX queue(s) looking for frames to retry
+	 * as if we TX filtered them (whch may mean dropping non-ampdu frames!)
+	 * but okay) then place them back on the software queue so they
+	 * can have the rate control lookup done again.
+	 */
 	ath_set_channel(ic);
 }
 #endif	/* ATH_ENABLE_11N */
+
+/*
+ * This is called by the beacon parsing routine in the receive
+ * path to update the current quiet time information provided by
+ * an AP.
+ *
+ * This is STA specific, it doesn't take the AP TBTT/beacon slot
+ * offset into account.
+ *
+ * The quiet IE doesn't control the /now/ beacon interval - it
+ * controls the upcoming beacon interval.  So, when tbtt=1,
+ * the quiet element programming shall be for the next beacon
+ * interval.  There's no tbtt=0 behaviour defined, so don't.
+ *
+ * Since we're programming the next quiet interval, we have
+ * to keep in mind what we will see when the next beacon
+ * is received with potentially a quiet IE.  For example, if
+ * quiet_period is 1, then we are always getting a quiet interval
+ * each TBTT - so if we just program it in upon each beacon received,
+ * it will constantly reflect the "next" TBTT and we will never
+ * let the counter stay programmed correctly.
+ *
+ * So:
+ * + the first time we see the quiet IE, program it and store
+ *   the details somewhere;
+ * + if the quiet parameters don't change (ie, period/duration/offset)
+ *   then just leave the programming enabled;
+ * + (we can "skip" beacons, so don't try to enforce tbttcount unless
+ *   you're willing to also do the skipped beacon math);
+ * + if the quiet IE is removed, then halt quiet time.
+ */
+static int
+ath_set_quiet_ie(struct ieee80211_node *ni, uint8_t *ie)
+{
+	struct ieee80211_quiet_ie *q;
+	struct ieee80211vap *vap = ni->ni_vap;
+	struct ath_vap *avp = ATH_VAP(vap);
+	struct ieee80211com *ic = vap->iv_ic;
+	struct ath_softc *sc = ic->ic_softc;
+
+	if (vap->iv_opmode != IEEE80211_M_STA)
+		return (0);
+
+	/* Verify we have a quiet time IE */
+	if (ie == NULL) {
+		DPRINTF(sc, ATH_DEBUG_QUIETIE,
+		    "%s: called; NULL IE, disabling\n", __func__);
+
+		ath_hal_set_quiet(sc->sc_ah, 0, 0, 0, HAL_QUIET_DISABLE);
+		memset(&avp->quiet_ie, 0, sizeof(avp->quiet_ie));
+		return (0);
+	}
+
+	/* If we do, verify it's actually legit */
+	if (ie[0] != IEEE80211_ELEMID_QUIET)
+		return 0;
+	if (ie[1] != 6)
+		return 0;
+
+	/* Note: this belongs in net80211, parsed out and everything */
+	q = (void *) ie;
+
+	/*
+	 * Compare what we have stored to what we last saw.
+	 * If they're the same then don't program in anything.
+	 */
+	if ((q->period == avp->quiet_ie.period) &&
+	    (le16dec(&q->duration) == le16dec(&avp->quiet_ie.duration)) &&
+	    (le16dec(&q->offset) == le16dec(&avp->quiet_ie.offset)))
+		return (0);
+
+	DPRINTF(sc, ATH_DEBUG_QUIETIE,
+	    "%s: called; tbttcount=%d, period=%d, duration=%d, offset=%d\n",
+	    __func__,
+	    (int) q->tbttcount,
+	    (int) q->period,
+	    (int) le16dec(&q->duration),
+	    (int) le16dec(&q->offset));
+
+	/*
+	 * Don't program in garbage values.
+	 */
+	if ((le16dec(&q->duration) == 0) ||
+	    (le16dec(&q->duration) >= ni->ni_intval)) {
+		DPRINTF(sc, ATH_DEBUG_QUIETIE,
+		    "%s: invalid duration (%d)\n", __func__,
+		    le16dec(&q->duration));
+		    return (0);
+	}
+	/*
+	 * Can have a 0 offset, but not a duration - so just check
+	 * they don't exceed the intval.
+	 */
+	if (le16dec(&q->duration) + le16dec(&q->offset) >= ni->ni_intval) {
+		DPRINTF(sc, ATH_DEBUG_QUIETIE,
+		    "%s: invalid duration + offset (%d+%d)\n", __func__,
+		    le16dec(&q->duration),
+		    le16dec(&q->offset));
+		    return (0);
+	}
+	if (q->tbttcount == 0) {
+		DPRINTF(sc, ATH_DEBUG_QUIETIE,
+		    "%s: invalid tbttcount (0)\n", __func__);
+		    return (0);
+	}
+	if (q->period == 0) {
+		DPRINTF(sc, ATH_DEBUG_QUIETIE,
+		    "%s: invalid period (0)\n", __func__);
+		    return (0);
+	}
+
+	/*
+	 * This is a new quiet time IE config, so wait until tbttcount
+	 * is equal to 1, and program it in.
+	 */
+	if (q->tbttcount == 1) {
+		DPRINTF(sc, ATH_DEBUG_QUIETIE,
+		    "%s: programming\n", __func__);
+		ath_hal_set_quiet(sc->sc_ah,
+		    q->period * ni->ni_intval,	/* convert to TU */
+		    le16dec(&q->duration),	/* already in TU */
+		    le16dec(&q->offset) + ni->ni_intval,
+		    HAL_QUIET_ENABLE | HAL_QUIET_ADD_CURRENT_TSF);
+		/*
+		 * Note: no HAL_QUIET_ADD_SWBA_RESP_TIME; as this is for
+		 * STA mode
+		 */
+
+		/* Update local state */
+		memcpy(&avp->quiet_ie, ie, sizeof(struct ieee80211_quiet_ie));
+	}
+
+	return (0);
+}
 
 static void
 ath_set_channel(struct ieee80211com *ic)
@@ -5524,7 +5817,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		/* Ensure we stay awake during scan */
 		ATH_LOCK(sc);
 		ath_power_setselfgen(sc, HAL_PM_AWAKE);
-		ath_power_setpower(sc, HAL_PM_AWAKE);
+		ath_power_setpower(sc, HAL_PM_AWAKE, 1);
 		ATH_UNLOCK(sc);
 
 		ath_hal_intrset(ah,
@@ -5574,6 +5867,56 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 	 */
 	IEEE80211_LOCK_ASSERT(ic);
 
+	/*
+	 * XXX TODO: if nstate is _S_CAC, then we should disable
+	 * ACK processing until CAC is completed.
+	 */
+
+	/*
+	 * XXX TODO: if we're on a passive channel, then we should
+	 * not allow any ACKs or self-generated frames until we hear
+	 * a beacon.  Unfortunately there isn't a notification from
+	 * net80211 so perhaps we could slot that particular check
+	 * into the mgmt receive path and just ensure that we clear
+	 * it on RX of beacons in passive mode (and only clear it
+	 * once, obviously.)
+	 */
+
+	/*
+	 * XXX TODO: net80211 should be tracking whether channels
+	 * have heard beacons and are thus considered "OK" for
+	 * transmitting - and then inform the driver about this
+	 * state change.  That way if we hear an AP go quiet
+	 * (and nothing else is beaconing on a channel) the
+	 * channel can go back to being passive until another
+	 * beacon is heard.
+	 */
+
+	/*
+	 * XXX TODO: if nstate is _S_CAC, then we should disable
+	 * ACK processing until CAC is completed.
+	 */
+
+	/*
+	 * XXX TODO: if we're on a passive channel, then we should
+	 * not allow any ACKs or self-generated frames until we hear
+	 * a beacon.  Unfortunately there isn't a notification from
+	 * net80211 so perhaps we could slot that particular check
+	 * into the mgmt receive path and just ensure that we clear
+	 * it on RX of beacons in passive mode (and only clear it
+	 * once, obviously.)
+	 */
+
+	/*
+	 * XXX TODO: net80211 should be tracking whether channels
+	 * have heard beacons and are thus considered "OK" for
+	 * transmitting - and then inform the driver about this
+	 * state change.  That way if we hear an AP go quiet
+	 * (and nothing else is beaconing on a channel) the
+	 * channel can go back to being passive until another
+	 * beacon is heard.
+	 */
+
 	if (nstate == IEEE80211_S_RUN) {
 		/* NB: collect bss node again, it may have changed */
 		ieee80211_free_node(ni);
@@ -5595,6 +5938,14 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		case IEEE80211_M_HOSTAP:
 		case IEEE80211_M_IBSS:
 		case IEEE80211_M_MBSS:
+
+			/*
+			 * TODO: Enable ACK processing (ie, clear AR_DIAG_ACK_DIS.)
+			 * For channels that are in CAC, we may have disabled
+			 * this during CAC to ensure we don't ACK frames
+			 * sent to us.
+			 */
+
 			/*
 			 * Allocate and setup the beacon frame.
 			 *
@@ -5652,6 +6003,9 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 				    "%s: STA; syncbeacon=1\n", __func__);
 				sc->sc_syncbeacon = 1;
 
+				/* Quiet time handling - ensure we resync */
+				memset(&avp->quiet_ie, 0, sizeof(avp->quiet_ie));
+
 				if (csa_run_transition)
 					ath_beacon_config(sc, vap);
 
@@ -5700,7 +6054,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		 */
 		ATH_LOCK(sc);
 		ath_power_setselfgen(sc, HAL_PM_AWAKE);
-		ath_power_setpower(sc, HAL_PM_AWAKE);
+		ath_power_setpower(sc, HAL_PM_AWAKE, 1);
 
 		/*
 		 * Finally, start any timers and the task q thread
@@ -5717,6 +6071,10 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 
 		taskqueue_unblock(sc->sc_tq);
 	} else if (nstate == IEEE80211_S_INIT) {
+
+		/* Quiet time handling - ensure we resync */
+		memset(&avp->quiet_ie, 0, sizeof(avp->quiet_ie));
+
 		/*
 		 * If there are no vaps left in RUN state then
 		 * shutdown host/driver operation:
@@ -5756,10 +6114,13 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 			 * our beacon timer config may be wrong.
 			 */
 			if (sc->sc_syncbeacon == 0) {
-				ath_power_setpower(sc, HAL_PM_NETWORK_SLEEP);
+				ath_power_setpower(sc, HAL_PM_NETWORK_SLEEP, 1);
 			}
 			ATH_UNLOCK(sc);
 		}
+	} else if (nstate == IEEE80211_S_SCAN) {
+		/* Quiet time handling - ensure we resync */
+		memset(&avp->quiet_ie, 0, sizeof(avp->quiet_ie));
 	}
 bad:
 	ieee80211_free_node(ni);
@@ -5845,7 +6206,7 @@ ath_newassoc(struct ieee80211_node *ni, int isnew)
 	 * If we're reassociating, make sure that any paused queues
 	 * get unpaused.
 	 *
-	 * Now, we may hvae frames in the hardware queue for this node.
+	 * Now, we may have frames in the hardware queue for this node.
 	 * So if we are reassociating and there are frames in the queue,
 	 * we need to go through the cleanup path to ensure that they're
 	 * marked as non-aggregate.
@@ -6056,7 +6417,7 @@ ath_setcurmode(struct ath_softc *sc, enum ieee80211_phymode mode)
 	sc->sc_currates = rt;
 	sc->sc_curmode = mode;
 	/*
-	 * All protection frames are transmited at 2Mb/s for
+	 * All protection frames are transmitted at 2Mb/s for
 	 * 11g, otherwise at 1Mb/s.
 	 */
 	if (mode == IEEE80211_MODE_11G)
@@ -6138,7 +6499,7 @@ ath_parent(struct ieee80211com *ic)
 	} else {
 		ath_stop(sc);
 		if (!sc->sc_invalid)
-			ath_power_setpower(sc, HAL_PM_FULL_SLEEP);
+			ath_power_setpower(sc, HAL_PM_FULL_SLEEP, 1);
 	}
 	ATH_UNLOCK(sc);
 
@@ -6160,7 +6521,7 @@ ath_announce(struct ath_softc *sc)
 {
 	struct ath_hal *ah = sc->sc_ah;
 
-	device_printf(sc->sc_dev, "AR%s mac %d.%d RF%s phy %d.%d\n",
+	device_printf(sc->sc_dev, "%s mac %d.%d RF%s phy %d.%d\n",
 		ath_hal_mac_name(ah), ah->ah_macVersion, ah->ah_macRev,
 		ath_hal_rf_name(ah), ah->ah_phyRev >> 4, ah->ah_phyRev & 0xf);
 	device_printf(sc->sc_dev, "2GHz radio: 0x%.4x; 5GHz radio: 0x%.4x\n",
@@ -6199,6 +6560,15 @@ ath_dfs_tasklet(void *p, int npending)
 	 */
 	if (ath_dfs_process_radar_event(sc, sc->sc_curchan)) {
 		/* DFS event found, initiate channel change */
+
+		/*
+		 * XXX TODO: immediately disable ACK processing
+		 * on the current channel.  This would be done
+		 * by setting AR_DIAG_ACK_DIS (AR5212; may be
+		 * different for others) until we are out of
+		 * CAC.
+		 */
+
 		/*
 		 * XXX doesn't currently tell us whether the event
 		 * XXX was found in the primary or extension
@@ -6625,8 +6995,11 @@ ath_node_recv_pspoll(struct ieee80211_node *ni, struct mbuf *m)
 #endif	/* ATH_SW_PSQ */
 }
 
-MODULE_VERSION(if_ath, 1);
-MODULE_DEPEND(if_ath, wlan, 1, 1, 1);          /* 802.11 media layer */
+MODULE_VERSION(ath_main, 1);
+MODULE_DEPEND(ath_main, wlan, 1, 1, 1);          /* 802.11 media layer */
+MODULE_DEPEND(ath_main, ath_rate, 1, 1, 1);
+MODULE_DEPEND(ath_main, ath_dfs, 1, 1, 1);
+MODULE_DEPEND(ath_main, ath_hal, 1, 1, 1);
 #if	defined(IEEE80211_ALQ) || defined(AH_DEBUG_ALQ) || defined(ATH_DEBUG_ALQ)
-MODULE_DEPEND(if_ath, alq, 1, 1, 1);
+MODULE_DEPEND(ath_main, alq, 1, 1, 1);
 #endif

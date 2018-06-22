@@ -10,27 +10,19 @@
 /dts-v1/;
 
 #include "bcm4708.dtsi"
+#include "bcm5301x-nand-cs0-bch8.dtsi"
 
 / {
 	compatible = "netgear,r6250v1", "brcm,bcm4708";
 	model = "Netgear R6250 V1 (BCM4708)";
 
 	chosen {
-		bootargs = "console=ttyS0,115200";
+		bootargs = "console=ttyS0,115200 earlycon";
 	};
 
 	memory {
-		reg = <0x00000000 0x08000000>;
-	};
-
-	chipcommonA {
-		uart0: serial@0300 {
-			status = "okay";
-		};
-
-		uart1: serial@0400 {
-			status = "okay";
-		};
+		reg = <0x00000000 0x08000000
+		       0x88000000 0x08000000>;
 	};
 
 	leds {
@@ -45,25 +37,25 @@
 		power0 {
 			label = "bcm53xx:green:power";
 			gpios = <&chipcommon 2 GPIO_ACTIVE_LOW>;
-			linux,default-trigger = "default-off";
+			linux,default-trigger = "default-on";
 		};
 
 		power1 {
 			label = "bcm53xx:amber:power";
 			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
-			linux,default-trigger = "default-on";
 		};
 
 		usb {
 			label = "bcm53xx:blue:usb";
 			gpios = <&chipcommon 8 GPIO_ACTIVE_LOW>;
-			linux,default-trigger = "default-off";
+			trigger-sources = <&ohci_port1>, <&ehci_port1>,
+					  <&xhci_port1>;
+			linux,default-trigger = "usbport";
 		};
 
 		wireless {
 			label = "bcm53xx:blue:wireless";
 			gpios = <&chipcommon 11 GPIO_ACTIVE_LOW>;
-			linux,default-trigger = "default-off";
 		};
 	};
 
@@ -90,4 +82,12 @@
 			gpios = <&chipcommon 6 GPIO_ACTIVE_LOW>;
 		};
 	};
+};
+
+&usb3 {
+	vcc-gpio = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
+};
+
+&spi_nor {
+	status = "okay";
 };

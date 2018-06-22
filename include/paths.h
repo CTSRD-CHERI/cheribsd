@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -56,12 +58,15 @@
 #define	_PATH_DRUM	"/dev/drum"
 #define	_PATH_ESDB	"/usr/share/i18n/esdb"
 #define	_PATH_ETC	"/etc"
+#define	_PATH_FIRMWARE	"/usr/share/firmware"
 #define	_PATH_FTPUSERS	"/etc/ftpusers"
 #define	_PATH_FWMEM	"/dev/fwmem"
 #define	_PATH_GBDE	"/sbin/gbde"
 #define	_PATH_GELI	"/sbin/geli"
 #define	_PATH_HALT	"/sbin/halt"
-#ifdef COMPAT_32BIT
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define	_PATH_I18NMODULE	"/usr/libcheri/i18n"
+#elif defined(COMPAT_32BIT)
 #define	_PATH_I18NMODULE	"/usr/lib32/i18n"
 #else
 #define	_PATH_I18NMODULE	"/usr/lib/i18n"
@@ -98,6 +103,7 @@
 #define	_PATH_VARDB	"/var/db/"
 #define	_PATH_VARRUN	"/var/run/"
 #define	_PATH_VARTMP	"/var/tmp/"
+#define	_PATH_DEVVMM	"/dev/vmm/"
 #define	_PATH_YP	"/var/yp/"
 #define	_PATH_UUCPLOCK	"/var/spool/lock/"
 

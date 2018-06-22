@@ -25,7 +25,9 @@
  *
  *	$FreeBSD$
  */
-/*
+/*-
+ SPDX-License-Identifier: BSD-3-Clause
+
   svc_rpcsec_gss.c
   
   Copyright (c) 2000 The Regents of the University of Michigan.
@@ -60,6 +62,17 @@
   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
   $Id: svc_auth_gss.c,v 1.27 2002/01/15 15:43:00 andros Exp $
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "sunrpc"
+ * }
+ * CHERI CHANGES END
  */
 
 #include <stdio.h>
@@ -631,11 +644,6 @@ svc_rpc_gss_accept_sec_context(struct svc_rpc_gss_client *client,
 					&ret_flags,
 					&cred_lifetime,
 					&client->cl_creds);
-				if (gr->gr_major == GSS_S_COMPLETE
-				    || gr->gr_major == GSS_S_CONTINUE_NEEDED) {
-					client->cl_sname = sname;
-					break;
-				}
 				client->cl_sname = sname;
 				break;
 			}
@@ -918,7 +926,9 @@ svc_rpc_gss_update_seq(struct svc_rpc_gss_client *client, uint32_t seq)
 {
 	int offset, i, word, bit;
 	uint32_t carry, newcarry;
+	uint32_t* maskp;
 
+	maskp = client->cl_seqmask;
 	if (seq > client->cl_seqlast) {
 		/*
 		 * This request has a sequence number greater
@@ -928,28 +938,29 @@ svc_rpc_gss_update_seq(struct svc_rpc_gss_client *client, uint32_t seq)
 		 * number)
 		 */
 		offset = seq - client->cl_seqlast;
-		while (offset > 32) {
+		while (offset >= 32) {
 			for (i = (SVC_RPC_GSS_SEQWINDOW / 32) - 1;
 			     i > 0; i--) {
-				client->cl_seqmask[i] = client->cl_seqmask[i-1];
+				maskp[i] = maskp[i-1];
 			}
-			client->cl_seqmask[0] = 0;
+			maskp[0] = 0;
 			offset -= 32;
 		}
-		carry = 0;
-		for (i = 0; i < SVC_RPC_GSS_SEQWINDOW / 32; i++) {
-			newcarry = client->cl_seqmask[i] >> (32 - offset);
-			client->cl_seqmask[i] =
-				(client->cl_seqmask[i] << offset) | carry;
-			carry = newcarry;
+		if (offset > 0) {
+			carry = 0;
+			for (i = 0; i < SVC_RPC_GSS_SEQWINDOW / 32; i++) {
+				newcarry = maskp[i] >> (32 - offset);
+				maskp[i] = (maskp[i] << offset) | carry;
+				carry = newcarry;
+			}
 		}
-		client->cl_seqmask[0] |= 1;
+		maskp[0] |= 1;
 		client->cl_seqlast = seq;
 	} else {
 		offset = client->cl_seqlast - seq;
 		word = offset / 32;
 		bit = offset % 32;
-		client->cl_seqmask[word] |= (1 << bit);
+		maskp[word] |= (1 << bit);
 	}
 
 }
@@ -1208,7 +1219,7 @@ svc_rpc_gss_wrap(SVCAUTH *auth, XDR *xdrs, xdrproc_t xdr_func, caddr_t xdr_ptr)
 	client = (struct svc_rpc_gss_client *) auth->svc_ah_private;
 	if (client->cl_state != CLIENT_ESTABLISHED
 	    || client->cl_rawcred.service == rpc_gss_svc_none) {
-		return xdr_func(xdrs, xdr_ptr);
+		return xdr_func(xdrs, xdr_ptr, 0);
 	}
 	return (xdr_rpc_gss_wrap_data(xdrs, xdr_func, xdr_ptr,
 		client->cl_ctx, client->cl_qop,
@@ -1225,7 +1236,7 @@ svc_rpc_gss_unwrap(SVCAUTH *auth, XDR *xdrs, xdrproc_t xdr_func, caddr_t xdr_ptr
 	client = (struct svc_rpc_gss_client *) auth->svc_ah_private;
 	if (client->cl_state != CLIENT_ESTABLISHED
 	    || client->cl_rawcred.service == rpc_gss_svc_none) {
-		return xdr_func(xdrs, xdr_ptr);
+		return xdr_func(xdrs, xdr_ptr, 0);
 	}
 	return (xdr_rpc_gss_unwrap_data(xdrs, xdr_func, xdr_ptr,
 		client->cl_ctx, client->cl_qop,

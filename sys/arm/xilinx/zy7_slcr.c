@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2013 Thomas Skibo
  * All rights reserved.
  *
@@ -52,7 +54,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/resource.h>
 #include <machine/stdarg.h>
 
-#include <dev/fdt/fdt_common.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
@@ -177,7 +178,7 @@ zy7_slcr_preload_pl(void)
 /* After PL configuration, enable level shifters and deassert top-level
  * PL resets.  Called from zy7_devcfg.c.  Optionally, the level shifters
  * can be left disabled but that's rare of an FPGA application. That option
- * is controled by a sysctl in the devcfg driver.
+ * is controlled by a sysctl in the devcfg driver.
  */
 void
 zy7_slcr_postload_pl(int en_level_shifters)
@@ -497,7 +498,7 @@ zy7_pl_fclk_enabled(int unit)
 }
 
 int
-zy7_pl_level_shifters_enabled()
+zy7_pl_level_shifters_enabled(void)
 {
 	struct zy7_slcr_softc *sc = zy7_slcr_softc_p;
 
@@ -514,7 +515,7 @@ zy7_pl_level_shifters_enabled()
 }
 
 void
-zy7_pl_level_shifters_enable()
+zy7_pl_level_shifters_enable(void)
 {
 	struct zy7_slcr_softc *sc = zy7_slcr_softc_p;
 
@@ -529,7 +530,7 @@ zy7_pl_level_shifters_enable()
 }
 
 void
-zy7_pl_level_shifters_disable()
+zy7_pl_level_shifters_disable(void)
 {
 	struct zy7_slcr_softc *sc = zy7_slcr_softc_p;
 
@@ -621,8 +622,8 @@ zy7_slcr_attach(device_t dev)
 
 	/* Derive PLL frequencies from PS_CLK. */
 	node = ofw_bus_get_node(dev);
-	if (OF_getprop(node, "clock-frequency", &cell, sizeof(cell)) > 0)
-		ps_clk_frequency = fdt32_to_cpu(cell);
+	if (OF_getencprop(node, "clock-frequency", &cell, sizeof(cell)) > 0)
+		ps_clk_frequency = cell;
 	else
 		ps_clk_frequency = ZYNQ_DEFAULT_PS_CLK_FREQUENCY;
 

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following edsclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -72,7 +74,7 @@ struct edsc_softc {
  */
 static VNET_DEFINE(struct if_clone *, edsc_cloner);
 #define	V_edsc_cloner	VNET(edsc_cloner)
-static int	edsc_clone_create(struct if_clone *, int, caddr_t);
+static int	edsc_clone_create(struct if_clone *, int, void * __capability);
 static void	edsc_clone_destroy(struct ifnet *);
 
 /*
@@ -92,7 +94,7 @@ static		MALLOC_DEFINE(M_EDSC, edscname, "Ethernet discard interface");
  * Create an interface instance.
  */
 static int
-edsc_clone_create(struct if_clone *ifc, int unit, caddr_t params)
+edsc_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 {
 	struct edsc_softc	*sc;
 	struct ifnet		*ifp;
@@ -206,20 +208,20 @@ edsc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	struct ifreq		*ifr = (struct ifreq *)data;
 
 	switch (cmd) {
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 #if 1
 		/*
 		 * Just turn on any capabilities requested.
 		 * The generic ifioctl() function has already made sure
 		 * that they are supported, i.e., set in if_capabilities.
 		 */
-		ifp->if_capenable = ifr->ifr_reqcap;
+		ifp->if_capenable = ifr_reqcap_get(ifr);
 #else
 		/*
 		 * A h/w driver would need to analyze the requested
 		 * bits and program the hardware, e.g.:
 		 */
-		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
+		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
 
 		if (mask & IFCAP_VLAN_HWTAGGING) {
 			ifp->if_capenable ^= IFCAP_VLAN_HWTAGGING;
@@ -336,7 +338,7 @@ vnet_edsc_uninit(const void *unused __unused)
 	 */
 	if_clone_detach(V_edsc_cloner);
 }
-VNET_SYSUNINIT(vnet_edsc_uninit, SI_SUB_PROTO_IFATTACHDOMAIN, SI_ORDER_ANY,
+VNET_SYSUNINIT(vnet_edsc_uninit, SI_SUB_INIT_IF, SI_ORDER_ANY,
     vnet_edsc_uninit, NULL);
 
 /*

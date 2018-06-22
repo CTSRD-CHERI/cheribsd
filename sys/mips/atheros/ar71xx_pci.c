@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2009, Oleksandr Tymoshenko <gonzo@FreeBSD.org>
  * All rights reserved.
  *
@@ -49,7 +51,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/bus.h>
 #include <machine/cpu.h>
 #include <machine/intr_machdep.h>
-#include <machine/pmap.h>
 
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcireg.h>
@@ -690,6 +691,7 @@ static device_method_t ar71xx_pci_methods[] = {
 	DEVMETHOD(pcib_read_config,	ar71xx_pci_read_config),
 	DEVMETHOD(pcib_write_config,	ar71xx_pci_write_config),
 	DEVMETHOD(pcib_route_interrupt,	ar71xx_pci_route_interrupt),
+	DEVMETHOD(pcib_request_feature,	pcib_request_feature_allow),
 
 	DEVMETHOD_END
 };

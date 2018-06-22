@@ -15,12 +15,13 @@ FILESDIR= ${SHAREDIR}/syscons/scrnmaps
 build-tools: ${SCRMAPS_MK}
 
 ${SCRMAPS}: ${.TARGET:R}.mk
-	./${.TARGET:R}.mk ${.TARGET:R}.tmp
+	${BTOOLSPATH:U.}/${.TARGET:R}.mk ${.TARGET:R}.tmp
 	uuencode ${.TARGET:R}.tmp ${.TARGET:R} > ${.TARGET}
 	rm -f ${.TARGET:R}.tmp
 
-${SCRMAPS_MK}: ${.TARGET:R} mkscrfil.c
-	${CC} ${CFLAGS} -I${.CURDIR} -DFIL=\"${.TARGET:R}\" ${LDFLAGS} \
+${SCRMAPS_MK}: ${.TARGET:R} mkscrfil.c ${BUILD_TOOLS_META}
+	${BUILD_TOOLS_CC} ${BUILD_TOOLS_CFLAGS} -I${.CURDIR} \
+	    -DFIL=\"${.TARGET:R}\" ${BUILD_TOOLS_LDFLAGS} \
 	    -o ${.TARGET} ${.CURDIR}/mkscrfil.c
 
 .include <bsd.prog.mk>

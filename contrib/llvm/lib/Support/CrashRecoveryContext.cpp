@@ -24,8 +24,13 @@ static ManagedStatic<
     sys::ThreadLocal<const CrashRecoveryContextImpl> > CurrentContext;
 
 struct CrashRecoveryContextImpl {
+  // When threads are disabled, this links up all active
+  // CrashRecoveryContextImpls.  When threads are enabled there's one thread
+  // per CrashRecoveryContext and CurrentContext is a thread-local, so only one
+  // CrashRecoveryContextImpl is active per thread and this is always null.
+  const CrashRecoveryContextImpl *Next;
+
   CrashRecoveryContext *CRC;
-  std::string Backtrace;
   ::jmp_buf JumpBuffer;
   volatile unsigned Failed : 1;
   unsigned SwitchedThread : 1;
@@ -34,21 +39,26 @@ public:
   CrashRecoveryContextImpl(CrashRecoveryContext *CRC) : CRC(CRC),
                                                         Failed(false),
                                                         SwitchedThread(false) {
+    Next = CurrentContext->get();
     CurrentContext->set(this);
   }
   ~CrashRecoveryContextImpl() {
     if (!SwitchedThread)
-      CurrentContext->erase();
+      CurrentContext->set(Next);
   }
 
   /// \brief Called when the separate crash-recovery thread was finished, to
   /// indicate that we don't need to clear the thread-local CurrentContext.
-  void setSwitchedThread() { SwitchedThread = true; }
+  void setSwitchedThread() { 
+#if defined(LLVM_ENABLE_THREADS) && LLVM_ENABLE_THREADS != 0
+    SwitchedThread = true;
+#endif
+  }
 
   void HandleCrash() {
     // Eliminate the current context entry, to avoid re-entering in case the
     // cleanup code crashes.
-    CurrentContext->erase();
+    CurrentContext->set(Next);
 
     assert(!Failed && "Crash recovery context already failed!");
     Failed = true;
@@ -65,15 +75,19 @@ public:
 static ManagedStatic<sys::Mutex> gCrashRecoveryContextMutex;
 static bool gCrashRecoveryEnabled = false;
 
-static ManagedStatic<sys::ThreadLocal<const CrashRecoveryContextCleanup> >
+static ManagedStatic<sys::ThreadLocal<const CrashRecoveryContext>>
        tlIsRecoveringFromCrash;
+
+static void installExceptionOrSignalHandlers();
+static void uninstallExceptionOrSignalHandlers();
 
 CrashRecoveryContextCleanup::~CrashRecoveryContextCleanup() {}
 
 CrashRecoveryContext::~CrashRecoveryContext() {
   // Reclaim registered resources.
   CrashRecoveryContextCleanup *i = head;
-  tlIsRecoveringFromCrash->set(head);
+  const CrashRecoveryContext *PC = tlIsRecoveringFromCrash->get();
+  tlIsRecoveringFromCrash->set(this);
   while (i) {
     CrashRecoveryContextCleanup *tmp = i;
     i = tmp->next;
@@ -81,7 +95,7 @@ CrashRecoveryContext::~CrashRecoveryContext() {
     tmp->recoverResources();
     delete tmp;
   }
-  tlIsRecoveringFromCrash->erase();
+  tlIsRecoveringFromCrash->set(PC);
   
   CrashRecoveryContextImpl *CRCI = (CrashRecoveryContextImpl *) Impl;
   delete CRCI;
@@ -100,6 +114,23 @@ CrashRecoveryContext *CrashRecoveryContext::GetCurrent() {
     return nullptr;
 
   return CRCI->CRC;
+}
+
+void CrashRecoveryContext::Enable() {
+  sys::ScopedLock L(*gCrashRecoveryContextMutex);
+  // FIXME: Shouldn't this be a refcount or something?
+  if (gCrashRecoveryEnabled)
+    return;
+  gCrashRecoveryEnabled = true;
+  installExceptionOrSignalHandlers();
+}
+
+void CrashRecoveryContext::Disable() {
+  sys::ScopedLock L(*gCrashRecoveryContextMutex);
+  if (!gCrashRecoveryEnabled)
+    return;
+  gCrashRecoveryEnabled = false;
+  uninstallExceptionOrSignalHandlers();
 }
 
 void CrashRecoveryContext::registerCleanup(CrashRecoveryContextCleanup *cleanup)
@@ -129,30 +160,70 @@ CrashRecoveryContext::unregisterCleanup(CrashRecoveryContextCleanup *cleanup) {
   delete cleanup;
 }
 
-#ifdef LLVM_ON_WIN32
+#if defined(_MSC_VER)
+// If _MSC_VER is defined, we must have SEH. Use it if it's available. It's way
+// better than VEH. Vectored exception handling catches all exceptions happening
+// on the thread with installed exception handlers, so it can interfere with
+// internal exception handling of other libraries on that thread. SEH works
+// exactly as you would expect normal exception handling to work: it only
+// catches exceptions if they would bubble out from the stack frame with __try /
+// __except.
 
-#include "Windows/WindowsSupport.h"
+static void installExceptionOrSignalHandlers() {}
+static void uninstallExceptionOrSignalHandlers() {}
 
-// On Windows, we can make use of vectored exception handling to
-// catch most crashing situations.  Note that this does mean
-// we will be alerted of exceptions *before* structured exception
-// handling has the opportunity to catch it.  But that isn't likely
-// to cause problems because nowhere in the project is SEH being
-// used.
+bool CrashRecoveryContext::RunSafely(function_ref<void()> Fn) {
+  if (!gCrashRecoveryEnabled) {
+    Fn();
+    return true;
+  }
+
+  bool Result = true;
+  __try {
+    Fn();
+  } __except (1) { // Catch any exception.
+    Result = false;
+  }
+  return Result;
+}
+
+#else // !_MSC_VER
+
+#if defined(LLVM_ON_WIN32)
+// This is a non-MSVC compiler, probably mingw gcc or clang without
+// -fms-extensions. Use vectored exception handling (VEH).
 //
-// Vectored exception handling is built on top of SEH, and so it
-// works on a per-thread basis.
+// On Windows, we can make use of vectored exception handling to catch most
+// crashing situations.  Note that this does mean we will be alerted of
+// exceptions *before* structured exception handling has the opportunity to
+// catch it. Unfortunately, this causes problems in practice with other code
+// running on threads with LLVM crash recovery contexts, so we would like to
+// eventually move away from VEH.
+//
+// Vectored works on a per-thread basis, which is an advantage over
+// SetUnhandledExceptionFilter. SetUnhandledExceptionFilter also doesn't have
+// any native support for chaining exception handlers, but VEH allows more than
+// one.
 //
 // The vectored exception handler functionality was added in Windows
 // XP, so if support for older versions of Windows is required,
 // it will have to be added.
-//
-// If we want to support as far back as Win2k, we could use the
-// SetUnhandledExceptionFilter API, but there's a risk of that
-// being entirely overwritten (it's not a chain).
+
+#include "Windows/WindowsSupport.h"
 
 static LONG CALLBACK ExceptionHandler(PEXCEPTION_POINTERS ExceptionInfo)
 {
+  // DBG_PRINTEXCEPTION_WIDE_C is not properly defined on all supported
+  // compilers and platforms, so we define it manually.
+  constexpr ULONG DbgPrintExceptionWideC = 0x4001000AL;
+  switch (ExceptionInfo->ExceptionRecord->ExceptionCode)
+  {
+  case DBG_PRINTEXCEPTION_C:
+  case DbgPrintExceptionWideC:
+  case 0x406D1388:  // set debugger thread name
+    return EXCEPTION_CONTINUE_EXECUTION;
+  }
+
   // Lookup the current thread local recovery object.
   const CrashRecoveryContextImpl *CRCI = CurrentContext->get();
 
@@ -181,14 +252,7 @@ static LONG CALLBACK ExceptionHandler(PEXCEPTION_POINTERS ExceptionInfo)
 // non-NULL, valid VEH handles, or NULL.
 static sys::ThreadLocal<const void> sCurrentExceptionHandle;
 
-void CrashRecoveryContext::Enable() {
-  sys::ScopedLock L(*gCrashRecoveryContextMutex);
-
-  if (gCrashRecoveryEnabled)
-    return;
-
-  gCrashRecoveryEnabled = true;
-
+static void installExceptionOrSignalHandlers() {
   // We can set up vectored exception handling now.  We will install our
   // handler as the front of the list, though there's no assurances that
   // it will remain at the front (another call could install itself before
@@ -197,14 +261,7 @@ void CrashRecoveryContext::Enable() {
   sCurrentExceptionHandle.set(handle);
 }
 
-void CrashRecoveryContext::Disable() {
-  sys::ScopedLock L(*gCrashRecoveryContextMutex);
-
-  if (!gCrashRecoveryEnabled)
-    return;
-
-  gCrashRecoveryEnabled = false;
-
+static void uninstallExceptionOrSignalHandlers() {
   PVOID currentHandle = const_cast<PVOID>(sCurrentExceptionHandle.get());
   if (currentHandle) {
     // Now we can remove the vectored exception handler from the chain
@@ -215,7 +272,7 @@ void CrashRecoveryContext::Disable() {
   }
 }
 
-#else
+#else // !LLVM_ON_WIN32
 
 // Generic POSIX implementation.
 //
@@ -232,7 +289,7 @@ void CrashRecoveryContext::Disable() {
 
 static const int Signals[] =
     { SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGSEGV, SIGTRAP };
-static const unsigned NumSignals = sizeof(Signals) / sizeof(Signals[0]);
+static const unsigned NumSignals = array_lengthof(Signals);
 static struct sigaction PrevActions[NumSignals];
 
 static void CrashRecoverySignalHandler(int Signal) {
@@ -267,14 +324,7 @@ static void CrashRecoverySignalHandler(int Signal) {
     const_cast<CrashRecoveryContextImpl*>(CRCI)->HandleCrash();
 }
 
-void CrashRecoveryContext::Enable() {
-  sys::ScopedLock L(*gCrashRecoveryContextMutex);
-
-  if (gCrashRecoveryEnabled)
-    return;
-
-  gCrashRecoveryEnabled = true;
-
+static void installExceptionOrSignalHandlers() {
   // Setup the signal handler.
   struct sigaction Handler;
   Handler.sa_handler = CrashRecoverySignalHandler;
@@ -286,20 +336,13 @@ void CrashRecoveryContext::Enable() {
   }
 }
 
-void CrashRecoveryContext::Disable() {
-  sys::ScopedLock L(*gCrashRecoveryContextMutex);
-
-  if (!gCrashRecoveryEnabled)
-    return;
-
-  gCrashRecoveryEnabled = false;
-
+static void uninstallExceptionOrSignalHandlers() {
   // Restore the previous signal handlers.
   for (unsigned i = 0; i != NumSignals; ++i)
     sigaction(Signals[i], &PrevActions[i], nullptr);
 }
 
-#endif
+#endif // !LLVM_ON_WIN32
 
 bool CrashRecoveryContext::RunSafely(function_ref<void()> Fn) {
   // If crash recovery is disabled, do nothing.
@@ -317,17 +360,12 @@ bool CrashRecoveryContext::RunSafely(function_ref<void()> Fn) {
   return true;
 }
 
+#endif // !_MSC_VER
+
 void CrashRecoveryContext::HandleCrash() {
   CrashRecoveryContextImpl *CRCI = (CrashRecoveryContextImpl *) Impl;
   assert(CRCI && "Crash recovery context never initialized!");
   CRCI->HandleCrash();
-}
-
-const std::string &CrashRecoveryContext::getBacktrace() const {
-  CrashRecoveryContextImpl *CRC = (CrashRecoveryContextImpl *) Impl;
-  assert(CRC && "Crash recovery context never initialized!");
-  assert(CRC->Failed && "No crash was detected!");
-  return CRC->Backtrace;
 }
 
 // FIXME: Portability.

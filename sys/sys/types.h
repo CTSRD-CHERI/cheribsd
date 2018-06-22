@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1991, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -15,7 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -174,6 +176,11 @@ typedef	__off_t		off_t;		/* file offset */
 #define	_OFF_T_DECLARED
 #endif
 
+#ifndef _OFF64_T_DECLARED
+typedef	__off64_t	off64_t;	/* file offset (alias) */
+#define	_OFF64_T_DECLARED
+#endif
+
 #ifndef _PID_T_DECLARED
 typedef	__pid_t		pid_t;		/* process id */
 #define	_PID_T_DECLARED
@@ -245,12 +252,18 @@ typedef	struct cap_rights	cap_rights_t;
 #endif
 
 typedef	__vm_offset_t	vm_offset_t;
-typedef	__vm_ooffset_t	vm_ooffset_t;
+typedef	__int64_t	vm_ooffset_t;
 typedef	__vm_paddr_t	vm_paddr_t;
-typedef	__vm_pindex_t	vm_pindex_t;
+typedef	__uint64_t	vm_pindex_t;
 typedef	__vm_size_t	vm_size_t;
 
 typedef __rman_res_t    rman_res_t;
+
+#if __has_feature(capabilities)
+typedef __intcap_t	syscallarg_t;
+#else
+typedef register_t	syscallarg_t;
+#endif
 
 #ifdef _KERNEL
 typedef	int		boolean_t;
@@ -359,14 +372,9 @@ __bitcount64(__uint64_t _x)
 
 #include <sys/select.h>
 
-/*
- * minor() gives a cookie instead of an index since we don't want to
- * change the meanings of bits 0-15 or waste time and space shifting
- * bits 16-31 for devices that don't use them.
- */
-#define	major(x)	((int)(((u_int)(x) >> 8)&0xff))	/* major number */
-#define	minor(x)	((int)((x)&0xffff00ff))		/* minor number */
-#define	makedev(x,y)	((dev_t)(((x) << 8) | (y)))	/* create dev_t */
+#define	major(x)	((int)((dev_t)(x) >> 32))
+#define	minor(x)	((int)(x))
+#define	makedev(x, y)	(((dev_t)(x) << 32) | (unsigned)(y))
 
 /*
  * These declarations belong elsewhere, but are repeated here and in
@@ -393,6 +401,10 @@ int	 truncate(const char *, off_t);
 #endif
 __END_DECLS
 #endif /* !_KERNEL */
+
+#if __has_feature(capabilities)
+typedef	void * __capability	otype_t;
+#endif
 
 #endif /* __BSD_VISIBLE */
 

@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2004-2005 HighPoint Technologies, Inc.
  * All rights reserved.
  *
@@ -308,7 +310,9 @@ hpt_set_info(int length)
 			/*
         	 	 * map buffer to kernel.
         	 	 */
-        		if (piop->nInBufferSize+piop->nOutBufferSize > PAGE_SIZE) {
+        		if (piop->nInBufferSize > PAGE_SIZE ||
+        			piop->nOutBufferSize > PAGE_SIZE ||
+        			piop->nInBufferSize+piop->nOutBufferSize > PAGE_SIZE) {
         			KdPrintE(("User buffer too large\n"));
         			return -EINVAL;
         		}
@@ -319,8 +323,13 @@ hpt_set_info(int length)
 					return -EINVAL;
 				}
 
-			if (piop->nInBufferSize)
-				copyin((void*)(ULONG_PTR)piop->lpInBuffer, ke_area, piop->nInBufferSize);
+			if (piop->nInBufferSize) {
+				if (copyin((void*)(ULONG_PTR)piop->lpInBuffer, ke_area, piop->nInBufferSize) != 0) {
+					KdPrintE(("Failed to copyin from lpInBuffer\n"));
+					free(ke_area, M_DEVBUF);
+					return -EFAULT;
+				}
+			}
 
 			/*
 			  * call kernel handler.
@@ -342,7 +351,7 @@ hpt_set_info(int length)
 			else  KdPrintW(("Kernel_ioctl(): return %d\n", err));
 
 			free(ke_area, M_DEVBUF);
-            		return -EINVAL;
+			return -EINVAL;
 		} else 	{
     		KdPrintW(("Wrong signature: %x\n", piop->Magic));
     		return -EINVAL;
@@ -420,7 +429,7 @@ static void
 hpt_copy_array_info(HPT_GET_INFO *pinfo, int nld, PVDevice pArray)
 {
 	int i;
-	char *sType=0, *sStatus=0;
+	char *sType = NULL, *sStatus = NULL;
 	char buf[32];
     PVDevice pTmpArray;
 

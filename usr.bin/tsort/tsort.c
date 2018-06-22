@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -13,7 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -28,6 +30,17 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_integrity"
+ *   ],
+ *   "change_comment": "DBD hashes don't preserve pointers"
+ * }
+ * CHERI CHANGES END
  */
 
 #ifndef lint
@@ -46,7 +59,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/types.h>
 
 #include <ctype.h>
-#include <db.h>
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -54,6 +66,7 @@ __FBSDID("$FreeBSD$");
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <uthash.h>
 
 /*
  *  Topological sort.  Input is a list of pairs of strings separated by
@@ -88,15 +101,17 @@ struct node_str {
 	int n_arcsize;			/* size of n_arcs[] array */
 	int n_refcnt;			/* # of arcs pointing to this node */
 	int n_flags;			/* NF_* */
-	char n_name[1];			/* name of this node */
+	UT_hash_handle hh;		/* Make this hashable */
+	char n_name[];			/* name of this node */
 };
+
+static NODE *nodes = NULL;			/* Hash table */
 
 typedef struct _buf {
 	char *b_buf;
 	int b_bsize;
 } BUF;
 
-static DB *db;
 static NODE *graph, **cycle_buf, **longest_cycle;
 static int debug, longest, quiet;
 
@@ -235,28 +250,13 @@ add_arc(char *s1, char *s2)
 static NODE *
 get_node(char *name)
 {
-	DBT data, key;
 	NODE *n;
 
-	if (db == NULL &&
-	    (db = dbopen(NULL, O_RDWR, 0, DB_HASH, NULL)) == NULL)
-		err(1, "db: %s", name);
-
-	key.data = name;
-	key.size = strlen(name) + 1;
-
-	switch ((*db->get)(db, &key, &data, 0)) {
-	case 0:
-		bcopy(data.data, &n, sizeof(n));
+	HASH_FIND_STR(nodes, name, n);
+	if (n != NULL)
 		return (n);
-	case 1:
-		break;
-	default:
-	case -1:
-		err(1, "db: %s", name);
-	}
 
-	if ((n = malloc(sizeof(NODE) + key.size)) == NULL)
+	if ((n = malloc(sizeof(NODE) + strlen(name) + 1)) == NULL)
 		err(1, NULL);
 
 	n->n_narcs = 0;
@@ -264,7 +264,7 @@ get_node(char *name)
 	n->n_arcs = NULL;
 	n->n_refcnt = 0;
 	n->n_flags = 0;
-	bcopy(name, n->n_name, key.size);
+	bcopy(name, n->n_name, strlen(name) + 1);
 
 	/* Add to linked list. */
 	if ((n->n_next = graph) != NULL)
@@ -273,10 +273,8 @@ get_node(char *name)
 	graph = n;
 
 	/* Add to hash table. */
-	data.data = &n;
-	data.size = sizeof(n);
-	if ((*db->put)(db, &key, &data, 0))
-		err(1, "db: %s", name);
+	HASH_ADD_KEYPTR(hh, nodes, n->n_name, strlen(n->n_name), n);
+
 	return (n);
 }
 

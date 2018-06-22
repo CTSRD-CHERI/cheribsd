@@ -103,6 +103,40 @@ escape_blanks(char *str)
   return str;
 }
 
+#define is_hex(c) (((c) >= '0' && (c) <= '9') || ((c) >= 'A' && (c) <= 'F'))
+#define hex_to_int(c) ((c) < '9' ? (c) - '0' : (c) - 'A' + 10)
+ 
+/* Modify STR in-place.  '%', CR and LF are always percent escaped,
+   other characters may be percent escaped, always using uppercase
+   hex, see https://www.gnupg.org/documentation/manuals/assuan.pdf */
+static char *
+unescape_assuan(char *str)
+{
+  char *s = str;
+
+  while (s[0])
+    {
+      if (s[0] == '%' && is_hex(s[1]) && is_hex(s[2]))
+        {
+          char *s2 = s;
+          char val = hex_to_int(s[1]) * 16 + hex_to_int(s[2]);
+
+          s2[0] = val;
+          ++s2;
+
+          while (s2[2])
+            {
+              s2[0] = s2[2];
+              ++s2;
+            }
+          s2[0] = '\0';
+        }
+      ++s;
+    }
+
+  return str;
+}
+
 /* Generate the string CACHE_ID_P based on the REALMSTRING allocated in
  * RESULT_POOL using SCRATCH_POOL for temporary allocations.  This is similar
  * to other password caching mechanisms. */
@@ -199,6 +233,7 @@ find_running_gpg_agent(int *new_sd, apr_pool_t *pool)
 {
   char *buffer;
   char *gpg_agent_info = NULL;
+  char *gnupghome = NULL;
   const char *socket_name = NULL;
   const char *request = NULL;
   const char *p = NULL;
@@ -209,10 +244,9 @@ find_running_gpg_agent(int *new_sd, apr_pool_t *pool)
 
   /* This implements the method of finding the socket as described in
    * the gpg-agent man page under the --use-standard-socket option.
-   * The manage page misleadingly says the standard socket is
-   * "named 'S.gpg-agent' located in the home directory."  The standard
-   * socket path is actually in the .gnupg directory in the home directory,
-   * i.e. ~/.gnupg/S.gpg-agent */
+   * The manage page says the standard socket is "named 'S.gpg-agent' located
+   * in the home directory."  GPG's home directory is either the directory
+   * specified by $GNUPGHOME or ~/.gnupg. */
   gpg_agent_info = getenv("GPG_AGENT_INFO");
   if (gpg_agent_info != NULL)
     {
@@ -224,6 +258,11 @@ find_running_gpg_agent(int *new_sd, apr_pool_t *pool)
       socket_details = svn_cstring_split(gpg_agent_info, ":", TRUE,
                                          pool);
       socket_name = APR_ARRAY_IDX(socket_details, 0, const char *);
+    }
+  else if ((gnupghome = getenv("GNUPGHOME")) != NULL)
+    {
+      const char *homedir = svn_dirent_canonicalize(gnupghome, pool);
+      socket_name = svn_dirent_join(homedir, "S.gpg-agent", pool);
     }
   else
     {
@@ -379,7 +418,7 @@ password_get_gpg_agent(svn_boolean_t *done,
                        apr_pool_t *pool)
 {
   int sd;
-  const char *p = NULL;
+  char *p = NULL;
   char *ep = NULL;
   char *buffer;
   const char *request = NULL;
@@ -452,7 +491,7 @@ password_get_gpg_agent(svn_boolean_t *done,
   if (ep != NULL)
     *ep = '\0';
 
-  *password = p;
+  *password = unescape_assuan(p);
 
   *done = TRUE;
   return SVN_NO_ERROR;
@@ -577,11 +616,10 @@ simple_gpg_agent_next_creds(void **credentials,
       return SVN_NO_ERROR;
     }
 
+  bye_gpg_agent(sd);
+
   if (strncmp(buffer, "OK\n", 3) != 0)
-    {
-      bye_gpg_agent(sd);
-      return SVN_NO_ERROR;
-    }
+    return SVN_NO_ERROR;
 
   /* TODO: This attempt limit hard codes it at 3 attempts (or 2 retries)
    * which matches svn command line client's retry_limit as set in

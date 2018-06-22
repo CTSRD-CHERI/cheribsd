@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1980, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -25,6 +27,16 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_alignment"
+ *   ]
+ * }
+ * CHERI CHANGES END
  */
 
 #ifndef lint
@@ -143,8 +155,13 @@ alloctape(void)
 		    malloc((unsigned)(reqsiz + writesize + pgoff + TP_BSIZE));
 		if (buf == NULL)
 			return(0);
+#if __has_builtin(__builtin_align_up)
+		slaves[i].tblock = (char (*)[TP_BSIZE])
+		    __builtin_align_up(&buf[ntrec + 1], pgoff + 1);
+#else
 		slaves[i].tblock = (char (*)[TP_BSIZE])
 		    (((intptr_t)&buf[ntrec + 1] + pgoff) &~ (intptr_t)pgoff);
+#endif
 		slaves[i].req = (struct req *)slaves[i].tblock - ntrec - 1;
 	}
 	slp = &slaves[0];
@@ -784,7 +801,7 @@ doslave(int cmd, int slave_number)
 		for (trecno = 0; trecno < ntrec;
 		     trecno += p->count, p += p->count) {
 			if (p->dblk) {
-				bread(p->dblk, slp->tblock[trecno],
+				blkread(p->dblk, slp->tblock[trecno],
 					p->count * TP_BSIZE);
 			} else {
 				if (p->count != 1 || atomic(read, cmd,

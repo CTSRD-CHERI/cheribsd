@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -43,7 +45,7 @@ __FBSDID("$FreeBSD$");
  * Compare strings.
  */
 int
-__CAPSUFFIX(strcmp)(__CAPABILITY const char *s1, __CAPABILITY const char *s2)
+__CAPSUFFIX(strcmp)(const char * __CAP s1, const char * __CAP s2)
 {
 
 	while (*s1 == *s2) {
@@ -51,6 +53,6 @@ __CAPSUFFIX(strcmp)(__CAPABILITY const char *s1, __CAPABILITY const char *s2)
 		if (*s1++ == '\0')
 			return (0);
 	}
-	return (*(__CAPABILITY const unsigned char *)s1 -
-	    *(__CAPABILITY const unsigned char *)s2);
+	return (*(const unsigned char * __CAP)s1 -
+	    *(const unsigned char * __CAP)s2);
 }

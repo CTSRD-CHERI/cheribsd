@@ -1,5 +1,6 @@
 #	$FreeBSD$
 
+PACKAGE=	ipf
 PROG=		ipmon
 SRCS=		${GENHDRS} ipmon.c ipmon_y.c ipmon_l.c
 MAN=		ipmon.8
@@ -30,3 +31,9 @@ ipmon_l.h: lexer.h
 	    ${.ALLSRC} > ${.TARGET}
 
 .include <bsd.prog.mk>
+
+.include <bsd.compiler.mk>
+
+.if ${COMPILER_TYPE} == "clang"
+CFLAGS+=	-Wno-address-of-packed-member
+.endif

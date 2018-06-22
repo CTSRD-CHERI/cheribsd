@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD AND BSD-2-Clause-NetBSD
+ *
  * Copyright (c) 2013 M. Warner Losh. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -144,8 +146,15 @@ __ElfType(Auxinfo);
 #define	AT_PAGESIZESLEN	21	/* Number of pagesizes. */
 #define	AT_TIMEKEEP	22	/* Pointer to timehands. */
 #define	AT_STACKPROT	23	/* Initial stack protection. */
+#define	AT_EHDRFLAGS	24	/* e_flags field from elf hdr */
+#define	AT_HWCAP	25	/* CPU feature flags. */
+#define	AT_HWCAP2	26	/* CPU feature flags 2. */
+#define	AT_ARGC		27	/* Argument count */
+#define	AT_ARGV		28	/* Argument vector */
+#define	AT_ENVC		29	/* Environment count */
+#define	AT_ENVV		30	/* Environment vector */
 
-#define	AT_COUNT	24	/* Count of defined aux entry types. */
+#define	AT_COUNT	31	/* Count of defined aux entry types. */
 
 #define	ET_DYN_LOAD_ADDR 0x0120000
 
@@ -224,6 +233,11 @@ __ElfType(Auxinfo);
 
 #define	R_MIPS_max		51
 
+#define	R_MIPS_CHERI_ABSPTR	70
+#define	R_MIPS_CHERI_SIZE	71
+
+#define	R_MIPS_CHERI_CAPABILITY	90
+
 #define	R_TYPE(name)		__CONCAT(R_MIPS_,name)
 
 #define	R_MIPS16_min		100
@@ -257,5 +271,10 @@ __ElfType(Auxinfo);
 #define	EF_MIPS_ABI_O64		0x00002000
 #define	EF_MIPS_ABI_EABI32	0x00003000
 #define	EF_MIPS_ABI_EABI64	0x00004000
+#define	EF_MIPS_ABI_CHERIABI	0x0000c000
+
+#define	EF_MIPS_MACH_CHERI128	0x00C10000	/* 128 bit CHERI */
+#define	EF_MIPS_MACH_CHERI256	0x00C20000	/* 256 bit CHERI */
+#define	EF_MIPS_MACH		0x00FF0000	/* Machine */
 
 #endif /* __MIPS_ELF_H */

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2009-2010
  *	Swinburne University of Technology, Melbourne, Australia
  * Copyright (c) 2010-2011 The FreeBSD Foundation
@@ -76,7 +78,7 @@ __FBSDID("$FreeBSD$");
 
 #include <netinet/khelp/h_ertt.h>
 
-#define	CAST_PTR_INT(X)	(*((int*)(X)))
+#define	CAST_PTR_INT(X)	(*((int * __capability)(X)))
 
 /*
  * Private signal type for rate based congestion signal.

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2006 Shteryana Shopova <syrinx@FreeBSD.org>
  * All rights reserved.
  *
@@ -330,7 +332,7 @@ bridge_addrs_dump(struct bridge_if *bif)
  */
 
 /*
- * Construct the SNMP index from the address DST Mac. 
+ * Construct the SNMP index from the address DST Mac.
  */
 static void
 bridge_addrs_index_append(struct asn_oid *oid, uint sub,
@@ -449,7 +451,7 @@ get:
 
 /*
  * Construct the SNMP index from the bridge interface name
- * and the address DST Mac. 
+ * and the address DST Mac.
  */
 static int
 bridge_addrs_begemot_index_append(struct asn_oid *oid, uint sub,
@@ -477,7 +479,7 @@ bridge_addrs_begemot_index_append(struct asn_oid *oid, uint sub,
 
 /*
  * Find a bridge address entry by the bridge interface name
- * and the address DST Mac. 
+ * and the address DST Mac.
  */
 static struct tp_entry *
 bridge_addrs_begemot_get(const struct asn_oid *oid, uint sub)
@@ -507,7 +509,7 @@ bridge_addrs_begemot_get(const struct asn_oid *oid, uint sub)
 
 /*
  * Find the next bridge address entry by the bridge interface name
- * and the address DST Mac. 
+ * and the address DST Mac.
  */
 static struct tp_entry *
 bridge_addrs_begemot_getnext(const struct asn_oid *oid, uint sub)

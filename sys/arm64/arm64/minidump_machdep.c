@@ -44,6 +44,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/kerneldump.h>
 #include <sys/msgbuf.h>
 #include <sys/watchdog.h>
+#include <sys/vmmeter.h>
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
@@ -52,24 +53,15 @@ __FBSDID("$FreeBSD$");
 #include <vm/pmap.h>
 
 #include <machine/md_var.h>
-#include <machine/pmap.h>
 #include <machine/pte.h>
-#include <machine/vmparam.h>
 #include <machine/minidump.h>
 
 CTASSERT(sizeof(struct kerneldumpheader) == 512);
-
-/*
- * Don't touch the first SIZEOF_METADATA bytes on the dump device. This
- * is to protect us from metadata and to protect metadata from us.
- */
-#define	SIZEOF_METADATA		(64*1024)
 
 uint64_t *vm_page_dump;
 int vm_page_dump_size;
 
 static struct kerneldumpheader kdh;
-static off_t dumplo;
 
 /* Handle chunked writes. */
 static size_t fragsz;
@@ -103,8 +95,7 @@ blk_flush(struct dumperinfo *di)
 	if (fragsz == 0)
 		return (0);
 
-	error = dump_write(di, dump_va, 0, dumplo, fragsz);
-	dumplo += fragsz;
+	error = dump_append(di, dump_va, 0, fragsz);
 	fragsz = 0;
 	return (error);
 }
@@ -190,10 +181,9 @@ blk_write(struct dumperinfo *di, char *ptr, vm_paddr_t pa, size_t sz)
 		wdog_kern_pat(WD_LASTVAL);
 
 		if (ptr) {
-			error = dump_write(di, ptr, 0, dumplo, len);
+			error = dump_append(di, ptr, 0, len);
 			if (error)
 				return (error);
-			dumplo += len;
 			ptr += len;
 			sz -= len;
 		} else {
@@ -220,7 +210,7 @@ blk_write(struct dumperinfo *di, char *ptr, vm_paddr_t pa, size_t sz)
 int
 minidumpsys(struct dumperinfo *di)
 {
-	pd_entry_t *l1, *l2;
+	pd_entry_t *l0, *l1, *l2;
 	pt_entry_t *l3;
 	uint32_t pmapsize;
 	vm_offset_t va;
@@ -238,7 +228,7 @@ minidumpsys(struct dumperinfo *di)
 	pmapsize = 0;
 	for (va = VM_MIN_KERNEL_ADDRESS; va < kernel_vm_end; va += L2_SIZE) {
 		pmapsize += PAGE_SIZE;
-		if (!pmap_get_tables(pmap_kernel(), va, &l1, &l2, &l3))
+		if (!pmap_get_tables(pmap_kernel(), va, &l0, &l1, &l2, &l3))
 			continue;
 
 		/* We should always be using the l2 table for kvm */
@@ -282,13 +272,6 @@ minidumpsys(struct dumperinfo *di)
 	}
 	dumpsize += PAGE_SIZE;
 
-	/* Determine dump offset on device. */
-	if (di->mediasize < SIZEOF_METADATA + dumpsize + sizeof(kdh) * 2) {
-		error = E2BIG;
-		goto fail;
-	}
-	dumplo = di->mediaoffset + di->mediasize - dumpsize;
-	dumplo -= sizeof(kdh) * 2;
 	progress = dumpsize;
 
 	/* Initialize mdhdr */
@@ -303,17 +286,15 @@ minidumpsys(struct dumperinfo *di)
 	mdhdr.dmapbase = DMAP_MIN_ADDRESS;
 	mdhdr.dmapend = DMAP_MAX_ADDRESS;
 
-	mkdumpheader(&kdh, KERNELDUMPMAGIC, KERNELDUMP_AARCH64_VERSION,
-	    dumpsize, di->blocksize);
+	dump_init_header(di, &kdh, KERNELDUMPMAGIC, KERNELDUMP_AARCH64_VERSION,
+	    dumpsize);
 
 	printf("Dumping %llu out of %ju MB:", (long long)dumpsize >> 20,
 	    ptoa((uintmax_t)physmem) / 1048576);
 
-	/* Dump leader */
-	error = dump_write(di, &kdh, 0, dumplo, sizeof(kdh));
-	if (error)
+	error = dump_start(di, &kdh);
+	if (error != 0)
 		goto fail;
-	dumplo += sizeof(kdh);
 
 	/* Dump my header */
 	bzero(&tmpbuffer, sizeof(tmpbuffer));
@@ -337,7 +318,7 @@ minidumpsys(struct dumperinfo *di)
 	/* Dump kernel page directory pages */
 	bzero(&tmpbuffer, sizeof(tmpbuffer));
 	for (va = VM_MIN_KERNEL_ADDRESS; va < kernel_vm_end; va += L2_SIZE) {
-		if (!pmap_get_tables(pmap_kernel(), va, &l1, &l2, &l3)) {
+		if (!pmap_get_tables(pmap_kernel(), va, &l0, &l1, &l2, &l3)) {
 			/* We always write a page, even if it is zero */
 			error = blk_write(di, (char *)&tmpbuffer, 0, PAGE_SIZE);
 			if (error)
@@ -411,18 +392,14 @@ minidumpsys(struct dumperinfo *di)
 	if (error)
 		goto fail;
 
-	/* Dump trailer */
-	error = dump_write(di, &kdh, 0, dumplo, sizeof(kdh));
-	if (error)
+	error = dump_finish(di, &kdh);
+	if (error != 0)
 		goto fail;
-	dumplo += sizeof(kdh);
 
-	/* Signal completion, signoff and exit stage left. */
-	dump_write(di, NULL, 0, 0, 0);
 	printf("\nDump complete\n");
 	return (0);
 
- fail:
+fail:
 	if (error < 0)
 		error = -error;
 

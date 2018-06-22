@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2012 Oleksandr Tymoshenko <gonzo@freebsd.org>
  * All rights reserved.
  *
@@ -92,17 +94,27 @@ struct bcm_mbox_softc {
 #define	mbox_write_4(sc, reg, val)		\
     bus_space_write_4((sc)->bst, (sc)->bsh, reg, val)
 
+static struct ofw_compat_data compat_data[] = {
+	{"broadcom,bcm2835-mbox",	1},
+	{"brcm,bcm2835-mbox",		1},
+	{NULL,				0}
+};
+
 static int
 bcm_mbox_read_msg(struct bcm_mbox_softc *sc, int *ochan)
 {
+#ifdef DEBUG
 	uint32_t data;
+#endif
 	uint32_t msg;
 	int chan;
 
 	msg = mbox_read_4(sc, REG_READ);
 	dprintf("bcm_mbox_intr: raw data %08x\n", msg);
 	chan = MBOX_CHAN(msg);
+#ifdef DEBUG
 	data = MBOX_DATA(msg);
+#endif
 	if (sc->msg[chan]) {
 		printf("bcm_mbox_intr: channel %d oveflow\n", chan);
 		return (1);
@@ -138,12 +150,12 @@ bcm_mbox_probe(device_t dev)
 	if (!ofw_bus_status_okay(dev))
 		return (ENXIO);
 
-	if (ofw_bus_is_compatible(dev, "broadcom,bcm2835-mbox")) {
-		device_set_desc(dev, "BCM2835 VideoCore Mailbox");
-		return(BUS_PROBE_DEFAULT);
-	}
+	if (ofw_bus_search_compatible(dev, compat_data)->ocd_data == 0)
+		return (ENXIO);
 
-	return (ENXIO);
+	device_set_desc(dev, "BCM2835 VideoCore Mailbox");
+
+	return (BUS_PROBE_DEFAULT);
 }
 
 static int
@@ -475,20 +487,12 @@ bcm2835_mbox_fb_get_w_h(struct bcm2835_fb_config *fb)
 	msg.hdr.code = BCM2835_MBOX_CODE_REQ;
 	BCM2835_MBOX_INIT_TAG(&msg.physical_w_h, GET_PHYSICAL_W_H);
 	msg.physical_w_h.tag_hdr.val_len = 0;
-	BCM2835_MBOX_INIT_TAG(&msg.virtual_w_h, GET_VIRTUAL_W_H);
-	msg.virtual_w_h.tag_hdr.val_len = 0;
-	BCM2835_MBOX_INIT_TAG(&msg.offset, GET_VIRTUAL_OFFSET);
-	msg.offset.tag_hdr.val_len = 0;
 	msg.end_tag = 0;
 
 	err = bcm2835_mbox_property(&msg, sizeof(msg));
 	if (err == 0) {
 		fb->xres = msg.physical_w_h.body.resp.width;
 		fb->yres = msg.physical_w_h.body.resp.height;
-		fb->vxres = msg.virtual_w_h.body.resp.width;
-		fb->vyres = msg.virtual_w_h.body.resp.height;
-		fb->xoffset = msg.offset.body.resp.x;
-		fb->yoffset = msg.offset.body.resp.y;
 	}
 
 	return (err);
@@ -509,7 +513,7 @@ bcm2835_mbox_fb_init(struct bcm2835_fb_config *fb)
 	BCM2835_MBOX_INIT_TAG(&msg.virtual_w_h, SET_VIRTUAL_W_H);
 	msg.virtual_w_h.body.req.width = fb->vxres;
 	msg.virtual_w_h.body.req.height = fb->vyres;
-	BCM2835_MBOX_INIT_TAG(&msg.offset, GET_VIRTUAL_OFFSET);
+	BCM2835_MBOX_INIT_TAG(&msg.offset, SET_VIRTUAL_OFFSET);
 	msg.offset.body.req.x = fb->xoffset;
 	msg.offset.body.req.y = fb->yoffset;
 	BCM2835_MBOX_INIT_TAG(&msg.depth, SET_DEPTH);

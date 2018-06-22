@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011 Nathan Whitehorn
  * All rights reserved.
  *
@@ -32,11 +34,13 @@ __FBSDID("$FreeBSD$");
 #include <sys/bus.h>
 #include <sys/conf.h>
 #include <sys/kernel.h>
+#include <sys/rman.h>
 
 #include <dev/ofw/openfirm.h>
 #include <dev/ofw/ofw_pci.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
+#include <dev/ofw/ofwpci.h>
 
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcireg.h>
@@ -48,12 +52,9 @@ __FBSDID("$FreeBSD$");
 #include <machine/resource.h>
 #include <machine/rtas.h>
 
-#include <sys/rman.h>
-
 #include <vm/vm.h>
 #include <vm/pmap.h>
 
-#include <powerpc/ofw/ofw_pci.h>
 #include <powerpc/pseries/plpar_iommu.h>
 
 #include "pcib_if.h"

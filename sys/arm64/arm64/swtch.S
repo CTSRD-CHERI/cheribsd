@@ -37,10 +37,37 @@
 
 __FBSDID("$FreeBSD$");
 
+.macro clear_step_flag pcbflags, tmp
+	tbz	\pcbflags, #PCB_SINGLE_STEP_SHIFT, 999f
+	mrs	\tmp, mdscr_el1
+	bic	\tmp, \tmp, #1
+	msr	mdscr_el1, \tmp
+	isb
+999:
+.endm
+
+.macro set_step_flag pcbflags, tmp
+	tbz	\pcbflags, #PCB_SINGLE_STEP_SHIFT, 999f
+	mrs	\tmp, mdscr_el1
+	orr	\tmp, \tmp, #1
+	msr	mdscr_el1, \tmp
+	isb
+999:
+.endm
+
 /*
  * void cpu_throw(struct thread *old, struct thread *new)
  */
 ENTRY(cpu_throw)
+	/* Of old == NULL skip disabling stepping */
+	cbz	x0, 1f
+
+	/* If we were single stepping, disable it */
+	ldr	x4, [x0, #TD_PCB]
+	ldr	w5, [x4, #PCB_FLAGS]
+	clear_step_flag w5, x6
+1:
+
 #ifdef VFP
 	/* Backup the new thread pointer around a call to C code */
 	mov	x19, x1
@@ -59,20 +86,27 @@ ENTRY(cpu_throw)
 	 */
 
 	/* Switch to the new pmap */
-	ldr	x5, [x4, #PCB_L1ADDR]
+	ldr	x28, [x1, #TD_PROC]
+	ldr	x5, [x28, #(P_MD + MD_L0ADDR)]
 	msr	ttbr0_el1, x5
 	isb
 
 	/* Invalidate the TLB */
-	dsb	sy
-	tlbi	vmalle1is
-	dsb	sy
+	dsb	ishst
+	tlbi	vmalle1
+	dsb	ish
 	isb
+
+	/* If we are single stepping, enable it */
+	ldr	w5, [x4, #PCB_FLAGS]
+	set_step_flag w5, x6
 
 	/* Restore the registers */
 	ldp	x5, x6, [x4, #PCB_SP]
 	mov	sp, x5
 	msr	tpidr_el0, x6
+	ldr	x6, [x4, #PCB_TPIDRRO]
+	msr	tpidrro_el0, x6
 	ldp	x8, x9, [x4, #PCB_REGS + 8 * 8]
 	ldp	x10, x11, [x4, #PCB_REGS + 10 * 8]
 	ldp	x12, x13, [x4, #PCB_REGS + 12 * 8]
@@ -98,12 +132,6 @@ END(cpu_throw)
  * x3 to x7, x16 and x17 are caller saved
  */
 ENTRY(cpu_switch)
-	/* Store the new curthread */
-	str	x1, [x18, #PC_CURTHREAD]
-	/* And the new pcb */
-	ldr	x4, [x1, #TD_PCB]
-	str	x4, [x18, #PC_CURPCB]
-
 	/*
 	 * Save the old context.
 	 */
@@ -124,8 +152,14 @@ ENTRY(cpu_switch)
 	str	x30, [x4, #PCB_REGS + 30 * 8]
 	/* And the old stack pointer */
 	mov	x5, sp
+	mrs	x6, tpidrro_el0
+	str	x6, [x4, #PCB_TPIDRRO]
 	mrs	x6, tpidr_el0
 	stp	x5, x6, [x4, #PCB_SP]
+
+	/* If we were single stepping, disable it */
+	ldr	w5, [x4, #PCB_FLAGS]
+	clear_step_flag w5, x6
 
 #ifdef VFP
 	mov	x19, x0
@@ -139,25 +173,32 @@ ENTRY(cpu_switch)
 	mov	x0, x19
 #endif
 
+	/* Store the new curthread */
+	str	x1, [x18, #PC_CURTHREAD]
+
 	/*
-	 * Restore the saved context.
+	 * Restore the saved context and set it as curpcb.
 	 */
 	ldr	x4, [x1, #TD_PCB]
+	str	x4, [x18, #PC_CURPCB]
 
 	/*
 	 * TODO: We may need to flush the cache here if switching
 	 * to a user process.
 	 */
 
+	/* Load the new proc address */
+	ldr	x28, [x1, #TD_PROC]
+
 	/* Switch to the new pmap */
-	ldr	x5, [x4, #PCB_L1ADDR]
+	ldr	x5, [x28, #(P_MD + MD_L0ADDR)]
 	msr	ttbr0_el1, x5
 	isb
 
 	/* Invalidate the TLB */
-	dsb	sy
-	tlbi	vmalle1is
-	dsb	sy
+	dsb	ishst
+	tlbi	vmalle1
+	dsb	ish
 	isb
 
 	/*
@@ -174,10 +215,16 @@ ENTRY(cpu_switch)
 	b.eq	1b
 #endif
 
+	/* If we are single stepping, enable it */
+	ldr	w5, [x4, #PCB_FLAGS]
+	set_step_flag w5, x6
+
 	/* Restore the registers */
 	ldp	x5, x6, [x4, #PCB_SP]
 	mov	sp, x5
 	msr	tpidr_el0, x6
+	ldr	x6, [x4, #PCB_TPIDRRO]
+	msr	tpidrro_el0, x6
 	ldp	x8, x9, [x4, #PCB_REGS + 8 * 8]
 	ldp	x10, x11, [x4, #PCB_REGS + 10 * 8]
 	ldp	x12, x13, [x4, #PCB_REGS + 12 * 8]
@@ -204,11 +251,6 @@ ENTRY(fork_trampoline)
 	mov	fp, #0	/* Stack traceback stops here. */
 	bl	_C_LABEL(fork_exit)
 
-	/* Restore sp and lr */
-	ldp	x0, x1, [sp]
-	msr	sp_el0, x0
-	mov	lr, x1
-
 	/* Restore the registers other than x0 and x1 */
 	ldp	x2, x3, [sp, #TF_X + 2 * 8]
 	ldp	x4, x5, [sp, #TF_X + 4 * 8]
@@ -224,13 +266,17 @@ ENTRY(fork_trampoline)
 	ldp	x24, x25, [sp, #TF_X + 24 * 8]
 	ldp	x26, x27, [sp, #TF_X + 26 * 8]
 	ldp	x28, x29, [sp, #TF_X + 28 * 8]
-	/* Skip x30 as it was restored above as lr */
 
 	/*
 	 * Disable interrupts to avoid
-	 * overwriting spsr_el1 by an IRQ exception.
+	 * overwriting spsr_el1 and sp_el0 by an IRQ exception.
 	 */
 	msr	daifset, #2
+
+	/* Restore sp and lr */
+	ldp	x0, x1, [sp]
+	msr	sp_el0, x0
+	mov	lr, x1
 
 	/* Restore elr and spsr */
 	ldp	x0, x1, [sp, #16]
@@ -265,6 +311,8 @@ ENTRY(savectx)
 	str	x30, [x0, #PCB_REGS + 30 * 8]
 	/* And the old stack pointer */
 	mov	x5, sp
+	mrs	x6, tpidrro_el0
+	str	x6, [x0, #PCB_TPIDRRO]
 	mrs	x6, tpidr_el0
 	stp	x5, x6, [x0, #PCB_SP]
 

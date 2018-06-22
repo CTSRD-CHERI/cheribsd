@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -13,7 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -29,6 +31,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_integrity"
+ *   ],
+ *   "change_comment": "BDB hashes don't preserve tags"
+ * }
+ * CHERI CHANGES END
+ */
 
 #if 0
 #ifndef lint
@@ -43,14 +56,15 @@ __FBSDID("$FreeBSD$");
 #include <sys/socket.h>
 #include <sys/uio.h>
 #include <wctype.h>
-#include <db.h>
 #include <err.h>
+#include <limits.h>
 #include <netdb.h>
 #include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <uthash.h>
 #include <utmpx.h>
 #include <wchar.h>
 #include "finger.h"
@@ -68,7 +82,7 @@ netfinger(char *name)
 	static struct addrinfo hint;
 
 	host = strrchr(name, '@');
-	if (host == 0)
+	if (host == NULL)
 		return;
 	*host++ = '\0';
 	signal(SIGALRM, cleanup);
@@ -92,7 +106,7 @@ netfinger(char *name)
 	else
 		printf("[%s]\n", ai0->ai_canonname);
 
-	for (ai = ai0; ai != 0; ai = ai->ai_next) {
+	for (ai = ai0; ai != NULL; ai = ai->ai_next) {
 		if (multi)
 			trying(ai);
 

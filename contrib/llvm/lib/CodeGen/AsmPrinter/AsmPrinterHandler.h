@@ -19,9 +19,13 @@
 
 namespace llvm {
 
+class AsmPrinter;
+class MachineBasicBlock;
 class MachineFunction;
 class MachineInstr;
 class MCSymbol;
+
+typedef MCSymbol *ExceptionSymbolProvider(AsmPrinter *Asm);
 
 /// \brief Collects and handles AsmPrinter objects required to build debug
 /// or EH information.
@@ -49,6 +53,15 @@ public:
   /// Please note that some AsmPrinter implementations may not call
   /// beginFunction at all.
   virtual void endFunction(const MachineFunction *MF) = 0;
+
+  virtual void beginFragment(const MachineBasicBlock *MBB,
+                             ExceptionSymbolProvider ESP) {}
+  virtual void endFragment() {}
+
+  /// \brief Emit target-specific EH funclet machinery.
+  virtual void beginFunclet(const MachineBasicBlock &MBB,
+                            MCSymbol *Sym = nullptr) {}
+  virtual void endFunclet() {}
 
   /// \brief Process beginning of an instruction.
   virtual void beginInstruction(const MachineInstr *MI) = 0;

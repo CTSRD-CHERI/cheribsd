@@ -1,6 +1,6 @@
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
- * Copyright (c) 2014 The FreeBSD Foundation
+ * Copyright (c) 2014-2016 The FreeBSD Foundation
  * All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
@@ -46,11 +46,11 @@
 #include <machine/armreg.h>
 
 #define	TRAPF_PC(tfp)		((tfp)->tf_lr)
-#define	TRAPF_USERMODE(tfp)	(((tfp)->tf_elr & (1ul << 63)) == 0)
+#define	TRAPF_USERMODE(tfp)	(((tfp)->tf_spsr & PSR_M_MASK) == PSR_M_EL0t)
 
 #define	cpu_getstack(td)	((td)->td_frame->tf_sp)
 #define	cpu_setstack(td, sp)	((td)->td_frame->tf_sp = (sp))
-#define	cpu_spinwait()		/* nothing */
+#define	cpu_spinwait()		__asm __volatile("yield" ::: "memory")
 
 /* Extract CPU affinity levels 0-3 */
 #define	CPU_AFF0(mpidr)	(u_int)(((mpidr) >> 0) & 0xff)
@@ -80,8 +80,13 @@
 
 #define	CPU_PART_THUNDER	0x0A1
 #define	CPU_PART_FOUNDATION	0xD00
+#define	CPU_PART_CORTEX_A35	0xD04
 #define	CPU_PART_CORTEX_A53	0xD03
+#define	CPU_PART_CORTEX_A55	0xD05
 #define	CPU_PART_CORTEX_A57	0xD07
+#define	CPU_PART_CORTEX_A72	0xD08
+#define	CPU_PART_CORTEX_A73	0xD09
+#define	CPU_PART_CORTEX_A75	0xD0A
 
 #define	CPU_REV_THUNDER_1_0	0x00
 #define	CPU_REV_THUNDER_1_1	0x01

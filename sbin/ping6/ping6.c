@@ -1,6 +1,8 @@
 /*	$KAME: ping6.c,v 1.169 2003/07/25 06:01:47 itojun Exp $	*/
 
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
  *
@@ -46,7 +48,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -515,7 +517,6 @@ main(int argc, char *argv[])
 			memcpy(&src, res->ai_addr, res->ai_addrlen);
 			srclen = res->ai_addrlen;
 			freeaddrinfo(res);
-			res = NULL;
 			options |= F_SRCADDR;
 			break;
 		case 's':		/* size of packet to send */
@@ -631,7 +632,7 @@ main(int argc, char *argv[])
 	if (error)
 		errx(1, "%s", gai_strerror(error));
 	if (res->ai_canonname)
-		hostname = res->ai_canonname;
+		hostname = strdup(res->ai_canonname);
 	else
 		hostname = target;
 
@@ -643,6 +644,7 @@ main(int argc, char *argv[])
 	if ((s = socket(res->ai_family, res->ai_socktype,
 	    res->ai_protocol)) < 0)
 		err(1, "socket");
+	freeaddrinfo(res);
 
 	/* set the source address if specified. */
 	if ((options & F_SRCADDR) != 0) {
@@ -863,7 +865,7 @@ main(int argc, char *argv[])
 
 	/* set IP6 packet options */
 	if (ip6optlen) {
-		if ((scmsg = (char *)malloc(ip6optlen)) == 0)
+		if ((scmsg = (char *)malloc(ip6optlen)) == NULL)
 			errx(1, "can't allocate enough memory");
 		smsghdr.msg_control = (caddr_t)scmsg;
 		smsghdr.msg_controllen = ip6optlen;
@@ -916,7 +918,7 @@ main(int argc, char *argv[])
 			errx(1, "can't initialize rthdr");
 #else  /* old advanced API */
 		if ((scmsgp = (struct cmsghdr *)inet6_rthdr_init(scmsgp,
-		    IPV6_RTHDR_TYPE_0)) == 0)
+		    IPV6_RTHDR_TYPE_0)) == NULL)
 			errx(1, "can't initialize rthdr");
 #endif /* USE_RFC2292BIS */
 
@@ -1207,9 +1209,6 @@ main(int argc, char *argv[])
 	sigaction(SIGINT, &si_sa, 0);
 	sigaction(SIGALRM, &si_sa, 0);
 	summary();
-
-	if (res != NULL)
-		freeaddrinfo(res);
 
         if(packet != NULL)
                 free(packet);
@@ -2495,7 +2494,7 @@ pr_icmph(struct icmp6_hdr *icp, u_char *end)
 			break;
 		}
 		if (options & F_VERBOSE) {
-			if (ni->ni_code > sizeof(nircode) / sizeof(nircode[0]))
+			if (ni->ni_code > nitems(nircode))
 				printf(", invalid");
 			else
 				printf(", %s", nircode[ni->ni_code]);

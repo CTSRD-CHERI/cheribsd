@@ -41,7 +41,7 @@ void DwarfAccelTable::AddName(DwarfStringPoolEntryRef Name, const DIE *die,
   DIEs.Values.push_back(new (Allocator) HashDataContents(die, Flags));
 }
 
-void DwarfAccelTable::ComputeBucketCount(void) {
+void DwarfAccelTable::ComputeBucketCount() {
   // First get the number of unique hashes.
   std::vector<uint32_t> uniques(Data.size());
   for (size_t i = 0, e = Data.size(); i < e; ++i)
@@ -221,9 +221,7 @@ void DwarfAccelTable::EmitData(AsmPrinter *Asm, DwarfDebug *D) {
       Asm->EmitInt32((*HI)->Data.Values.size());
       for (HashDataContents *HD : (*HI)->Data.Values) {
         // Emit the DIE offset
-        DwarfCompileUnit *CU = D->lookupUnit(HD->Die->getUnit());
-        assert(CU && "Accelerated DIE should belong to a CU.");
-        Asm->EmitInt32(HD->Die->getOffset() + CU->getDebugInfoOffset());
+        Asm->EmitInt32(HD->Die->getDebugSectionOffset());
         // If we have multiple Atoms emit that info too.
         // FIXME: A bit of a hack, we either emit only one atom or all info.
         if (HeaderData.Atoms.size() > 1) {

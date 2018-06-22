@@ -1,9 +1,9 @@
 # $FreeBSD$
 
-.PATH: ${.CURDIR}/../../compat/linux
+.PATH: ${SRCTOP}/sys/compat/linux
 
 KMOD=	linux_common
-SRCS=	linux_common.c linux_mib.c linux_util.c linux_emul.c \
+SRCS=	linux_common.c linux_mib.c linux_mmap.c linux_util.c linux_emul.c \
 	linux.c opt_compat.h device_if.h vnode_if.h bus_if.h
 
 EXPORT_SYMS=

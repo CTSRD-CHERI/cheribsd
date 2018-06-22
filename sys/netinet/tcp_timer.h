@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -119,6 +121,13 @@
 
 #define	TCPTV_DELACK	( hz/10 )		/* 100ms timeout */
 
+/*
+ * If we exceed this number of retransmits for a single segment, we'll consider
+ * the current srtt measurement no longer valid and will recalculate from
+ * scratch starting with the next ACK.
+ */
+#define TCP_RTT_INVALIDATE (TCP_MAXRXTSHIFT / 4)
+
 #ifdef	TCPTIMERS
 static const char *tcptimers[] =
     { "REXMT", "PERSIST", "KEEP", "2MSL", "DELACK" };
@@ -146,7 +155,7 @@ struct tcp_timer {
 	struct	callout tt_2msl;	/* 2*msl TIME_WAIT timer */
 	struct	callout tt_delack;	/* delayed ACK timer */
 	uint32_t	tt_flags;	/* Timers flags */
-	uint32_t	tt_spare;	/* TDB */
+	uint32_t	tt_draincnt;	/* Count being drained */
 };
 
 /*
@@ -191,21 +200,25 @@ extern int tcp_syn_backoff[];
 extern int tcp_finwait2_timeout;
 extern int tcp_fast_finwait2_recycle;
 
+VNET_DECLARE(int, tcp_pmtud_blackhole_detect);
+#define V_tcp_pmtud_blackhole_detect	VNET(tcp_pmtud_blackhole_detect)
+VNET_DECLARE(int, tcp_pmtud_blackhole_mss);
+#define	V_tcp_pmtud_blackhole_mss	VNET(tcp_pmtud_blackhole_mss)
+VNET_DECLARE(int, tcp_v6pmtud_blackhole_mss);
+#define V_tcp_v6pmtud_blackhole_mss	VNET(tcp_v6pmtud_blackhole_mss)
+
+int tcp_inpinfo_lock_add(struct inpcb *inp);
+void tcp_inpinfo_lock_del(struct inpcb *inp, struct tcpcb *tp);
+
 void	tcp_timer_init(void);
 void	tcp_timer_2msl(void *xtp);
+void	tcp_timer_discard(void *);
 struct tcptw *
 	tcp_tw_2msl_scan(int reuse);	/* XXX temporary? */
 void	tcp_timer_keep(void *xtp);
 void	tcp_timer_persist(void *xtp);
 void	tcp_timer_rexmt(void *xtp);
 void	tcp_timer_delack(void *xtp);
-void	tcp_timer_2msl_discard(void *xtp);
-void	tcp_timer_keep_discard(void *xtp);
-void	tcp_timer_persist_discard(void *xtp);
-void	tcp_timer_rexmt_discard(void *xtp);
-void	tcp_timer_delack_discard(void *xtp);
-void	tcp_timer_to_xtimer(struct tcpcb *tp, struct tcp_timer *timer,
-	struct xtcp_timer *xtimer);
 
 #endif /* _KERNEL */
 

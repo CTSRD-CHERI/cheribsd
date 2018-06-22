@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: ISC
+ *
  * Copyright (c) 2002-2009 Sam Leffler, Errno Consulting
  * Copyright (c) 2002-2008 Atheros Communications, Inc.
  *
@@ -772,7 +774,7 @@ ar5416SanitizeNF(struct ath_hal *ah, int16_t *nf)
 
 
 /*
- * Read the NF and check it against the noise floor threshhold
+ * Read the NF and check it against the noise floor threshold
  *
  * Return 0 if the NF calibration hadn't finished, 0 if it was
  * invalid, or > 0 for a valid NF reading.

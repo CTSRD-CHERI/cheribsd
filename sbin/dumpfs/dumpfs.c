@@ -1,4 +1,6 @@
 /*
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2009 Robert N. M. Watson
  * All rights reserved.
  *
@@ -25,7 +27,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -276,6 +278,24 @@ dumpfs(const char *name)
 	if (fsflags != 0)
 		printf("unknown flags (%#x)", fsflags);
 	putchar('\n');
+	printf("check hashes\t");
+	fsflags = afs.fs_metackhash;
+	if (fsflags == 0)
+		printf("none");
+	if (fsflags & CK_SUPERBLOCK)
+		printf("superblock ");
+	if (fsflags & CK_CYLGRP)
+		printf("cylinder-groups ");
+	if (fsflags & CK_INODE)
+		printf("inodes ");
+	if (fsflags & CK_INDIR)
+		printf("indirect-blocks ");
+	if (fsflags & CK_DIR)
+		printf("directories ");
+	fsflags &= ~(CK_SUPERBLOCK | CK_CYLGRP | CK_INODE | CK_INDIR | CK_DIR);
+	if (fsflags != 0)
+		printf("unknown flags (%#x)", fsflags);
+	putchar('\n');
 	printf("fsmnt\t%s\n", afs.fs_fsmnt);
 	printf("volname\t%s\tswuid\t%ju\tprovidersize\t%ju\n",
 		afs.fs_volname, (uintmax_t)afs.fs_swuid,
@@ -353,8 +373,7 @@ dumpcg(void)
 		for (i = 1; i < afs.fs_contigsumsize; i++) {
 			if ((i - 1) % 8 == 0)
 				printf("\nclusters %d-%d:", i,
-				    afs.fs_contigsumsize - 1 < i + 7 ?
-				    afs.fs_contigsumsize - 1 : i + 7);
+				    MIN(afs.fs_contigsumsize - 1, i + 7));
 			printf("\t%d", cg_clustersum(&acg)[i]);
 		}
 		printf("\nclusters size %d and over: %d\n",

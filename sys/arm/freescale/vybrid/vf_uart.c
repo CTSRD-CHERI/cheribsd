@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2013 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
  *
@@ -205,7 +207,7 @@ uart_reinit(struct uart_softc *sc, int clkspeed, int baud)
 
 	bas = &sc->sc_bas;
 	if (!bas) {
-		printf("Error: cant reconfigure bas\n");
+		printf("Error: can't reconfigure bas\n");
 		return;
 	}
 

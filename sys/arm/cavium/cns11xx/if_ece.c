@@ -1064,8 +1064,8 @@ clear_mac_entries(struct ece_softc *ec, int include_this_mac)
 	struct mac_list * current;
 	char mac[ETHER_ADDR_LEN];
 
-	current = 0;
-	mac_list_header = 0;
+	current = NULL;
+	mac_list_header = NULL;
 
 	table_end = read_mac_entry(ec, mac, 1);
 	while (!table_end) {
@@ -1608,7 +1608,7 @@ ece_encap(struct ece_softc *sc, struct mbuf *m0)
 	struct ifnet *ifp;
 	bus_dma_segment_t segs[MAX_FRAGMENT];
 	bus_dmamap_t mapp;
-	eth_tx_desc_t *desc = 0;
+	eth_tx_desc_t *desc = NULL;
 	int csum_flags;
 	int desc_no;
 	int error;
@@ -1685,7 +1685,7 @@ ece_encap(struct ece_softc *sc, struct mbuf *m0)
 
 	/*
 	 * After all descriptors are set, we set the flags to start the
-	 * sending proces.
+	 * sending process.
 	 */
 	for (seg = 0; seg < nsegs; seg++) {
 		desc->cown = 0;
@@ -1857,7 +1857,7 @@ eceioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int mask, error = 0;
 
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		ECE_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) == 0 &&
 		    ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -1872,20 +1872,20 @@ eceioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ECE_UNLOCK(sc);
 		break;
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		ECE_LOCK(sc);
 		set_filter(sc);
 		ECE_UNLOCK(sc);
 		break;
 
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
-	case SIOCSIFCAP:
-		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
+	CASE_IOC_IFREQ(SIOCSIFCAP):
+		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
 		if (mask & IFCAP_VLAN_MTU) {
 			ECE_LOCK(sc);
 			ECE_UNLOCK(sc);

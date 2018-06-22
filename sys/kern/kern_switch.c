@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2001 Jake Burkholder <jake@FreeBSD.org>
  * All rights reserved.
  *
@@ -150,24 +152,37 @@ SYSCTL_PROC(_kern_sched_stats, OID_AUTO, reset, CTLTYPE_INT | CTLFLAG_WR, NULL,
 /*
  * Select the thread that will be run next.
  */
-struct thread *
-choosethread(void)
-{
-	struct thread *td;
 
-retry:
-	td = sched_choose();
+static __noinline struct thread *
+choosethread_panic(struct thread *td)
+{
 
 	/*
 	 * If we are in panic, only allow system threads,
 	 * plus the one we are running in, to be run.
 	 */
-	if (panicstr && ((td->td_proc->p_flag & P_SYSTEM) == 0 &&
+retry:
+	if (((td->td_proc->p_flag & P_SYSTEM) == 0 &&
 	    (td->td_flags & TDF_INPANIC) == 0)) {
 		/* note that it is no longer on the run queue */
 		TD_SET_CAN_RUN(td);
+		td = sched_choose();
 		goto retry;
 	}
+
+	TD_SET_RUNNING(td);
+	return (td);
+}
+
+struct thread *
+choosethread(void)
+{
+	struct thread *td;
+
+	td = sched_choose();
+
+	if (__predict_false(panicstr != NULL))
+		return (choosethread_panic(td));
 
 	TD_SET_RUNNING(td);
 	return (td);
@@ -206,7 +221,22 @@ critical_exit(void)
 
 	if (td->td_critnest == 1) {
 		td->td_critnest = 0;
+
+		/*
+		 * Interrupt handlers execute critical_exit() on
+		 * leave, and td_owepreempt may be left set by an
+		 * interrupt handler only when td_critnest > 0.  If we
+		 * are decrementing td_critnest from 1 to 0, read
+		 * td_owepreempt after decrementing, to not miss the
+		 * preempt.  Disallow compiler to reorder operations.
+		 */
+		__compiler_membar();
 		if (td->td_owepreempt && !kdb_active) {
+			/*
+			 * Microoptimization: we committed to switch,
+			 * disable preemption in interrupt handlers
+			 * while spinning for the thread lock.
+			 */
 			td->td_critnest = 1;
 			thread_lock(td);
 			td->td_critnest--;

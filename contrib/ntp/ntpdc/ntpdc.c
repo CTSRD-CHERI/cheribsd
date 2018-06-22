@@ -649,7 +649,7 @@ getresponse(
 	todiff = (((uint32_t)time(NULL)) - tobase) & 0x7FFFFFFFu;
 	if ((n > 0) && (todiff > tospan)) {
 		n = recv(sockfd, (char *)&rpkt, sizeof(rpkt), 0);
-		n = 0; /* faked timeout return from 'select()'*/
+		n -= n; /* faked timeout return from 'select()'*/
 	}
 	
 	if (n == 0) {
@@ -669,7 +669,7 @@ getresponse(
 				printf("Received sequence numbers");
 				for (n = 0; n <= MAXSEQ; n++)
 				    if (haveseq[n])
-					printf(" %zd,", n);
+					printf(" %zd,", (size_t)n);
 				if (lastseq != 999)
 				    printf(" last frame received\n");
 				else
@@ -691,7 +691,7 @@ getresponse(
 	 */
 	if (n < (ssize_t)RESP_HEADER_SIZE) {
 		if (debug)
-			printf("Short (%zd byte) packet received\n", n);
+			printf("Short (%zd byte) packet received\n", (size_t)n);
 		goto again;
 	}
 	if (INFO_VERSION(rpkt.rm_vn_mode) > NTP_VERSION ||

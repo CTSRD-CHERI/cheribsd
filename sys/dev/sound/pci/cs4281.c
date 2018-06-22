@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2000 Orion Hodson <O.Hodson@cs.ucl.ac.uk>
  * All rights reserved.
  *
@@ -778,12 +780,11 @@ cs4281_pci_attach(device_t dev)
 
     sc->regid   = PCIR_BAR(0);
     sc->regtype = SYS_RES_MEMORY;
-    sc->reg = bus_alloc_resource(dev, sc->regtype, &sc->regid,
-				 0, ~0, CS4281PCI_BA0_SIZE, RF_ACTIVE);
+    sc->reg = bus_alloc_resource_any(dev, sc->regtype, &sc->regid, RF_ACTIVE);
     if (!sc->reg) {
 	sc->regtype = SYS_RES_IOPORT;
-	sc->reg = bus_alloc_resource(dev, sc->regtype, &sc->regid,
-				     0, ~0, CS4281PCI_BA0_SIZE, RF_ACTIVE);
+	sc->reg = bus_alloc_resource_any(dev, sc->regtype, &sc->regid,
+					 RF_ACTIVE);
 	if (!sc->reg) {
 	    device_printf(dev, "unable to allocate register space\n");
 	    goto bad;
@@ -793,8 +794,8 @@ cs4281_pci_attach(device_t dev)
     sc->sh = rman_get_bushandle(sc->reg);
 
     sc->memid = PCIR_BAR(1);
-    sc->mem = bus_alloc_resource(dev, SYS_RES_MEMORY, &sc->memid, 0,
-				 ~0, CS4281PCI_BA1_SIZE, RF_ACTIVE);
+    sc->mem = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &sc->memid,
+				     RF_ACTIVE);
     if (sc->mem == NULL) {
 	device_printf(dev, "unable to allocate fifo space\n");
 	goto bad;
@@ -850,7 +851,7 @@ cs4281_pci_attach(device_t dev)
     pcm_addchan(dev, PCMDIR_PLAY, &cs4281chan_class, sc);
     pcm_addchan(dev, PCMDIR_REC, &cs4281chan_class, sc);
 
-    snprintf(status, SND_STATUSLEN, "at %s 0x%lx irq %ld %s",
+    snprintf(status, SND_STATUSLEN, "at %s 0x%jx irq %jd %s",
 	     (sc->regtype == SYS_RES_IOPORT)? "io" : "memory",
 	     rman_get_start(sc->reg), rman_get_start(sc->irq),PCM_KLDSTRING(snd_cs4281));
     pcm_setstatus(dev, status);

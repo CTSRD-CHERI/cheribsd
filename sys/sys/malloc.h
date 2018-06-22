@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1987, 1993
  *	The Regents of the University of California.
  * Copyright (c) 2005, 2009 Robert N. M. Watson
@@ -12,7 +14,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -146,9 +148,6 @@ MALLOC_DECLARE(M_CACHE);
 MALLOC_DECLARE(M_DEVBUF);
 MALLOC_DECLARE(M_TEMP);
 
-MALLOC_DECLARE(M_IP6OPT); /* for INET6 */
-MALLOC_DECLARE(M_IP6NDP); /* for INET6 */
-
 /*
  * Deprecated macro versions of not-quite-malloc() and free().
  */
@@ -188,6 +187,20 @@ void	*realloc(void *addr, unsigned long size, struct malloc_type *type,
 	    int flags) __result_use_check __alloc_size(2);
 void	*reallocf(void *addr, unsigned long size, struct malloc_type *type,
 	    int flags) __alloc_size(2);
+
+static inline void
+free_c(void * __capability addr, struct malloc_type *type)
+{
+
+	free((__cheri_fromcap void *)addr, M_IOV);
+}
+
+static inline void * __capability
+malloc_c(unsigned long size, struct malloc_type *type, int flags)
+{
+
+	return ((__cheri_tocap void * __capability)malloc(size, type, flags));
+}
 
 struct malloc_type *malloc_desc2type(const char *desc);
 #endif /* _KERNEL */

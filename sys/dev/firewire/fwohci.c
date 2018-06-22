@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2003 Hidetoshi Shimokawa
  * Copyright (c) 1998-2002 Katsushi Kobayashi and Hidetoshi Shimokawa
  * All rights reserved.
@@ -511,7 +513,7 @@ fwohci_reset(struct fwohci_softc *sc, device_t dev)
 		OWRITE(sc, OHCI_ITCTLCLR(i), OHCI_CNTL_DMA_RUN);
 	}
 
-	/* FLUSH FIFO and reset Transmitter/Reciever */
+	/* FLUSH FIFO and reset Transmitter/Receiver */
 	OWRITE(sc, OHCI_HCCCTL, OHCI_HCC_RESET);
 	if (firewire_debug)
 		device_printf(dev, "resetting OHCI...");
@@ -692,7 +694,7 @@ fwohci_init(struct fwohci_softc *sc, device_t dev)
 	sc->fc.config_rom[0] |= fw_crc16(&sc->fc.config_rom[1], 5*4);
 #endif
 
-/* SID recieve buffer must align 2^11 */
+/* SID receive buffer must align 2^11 */
 #define	OHCI_SIDSIZE	(1 << 11)
 	sc->sid_buf = fwdma_malloc(&sc->fc, OHCI_SIDSIZE, OHCI_SIDSIZE,
 	    &sc->sid_dma, BUS_DMA_WAITOK | BUS_DMA_COHERENT);
@@ -929,7 +931,7 @@ txloop:
 			OHCI_OUTPUT_MORE | OHCI_KEY_ST2 | hdr_len);
  	FWOHCI_DMA_WRITE(db->db.desc.addr, 0);
  	FWOHCI_DMA_WRITE(db->db.desc.res, 0);
-/* Specify bound timer of asy. responce */
+/* Specify bound timer of asy. response */
 	if (&sc->atrs == dbch) {
  		FWOHCI_DMA_WRITE(db->db.desc.res,
 			 (OREAD(sc, OHCI_CYCLETIMER) >> 12) + (1 << 13));
@@ -1247,10 +1249,6 @@ fwohci_db_init(struct fwohci_softc *sc, struct fwohci_dbch *dbch)
 	db_tr = (struct fwohcidb_tr *)
 		malloc(sizeof(struct fwohcidb_tr) * dbch->ndb,
 		M_FW, M_WAITOK | M_ZERO);
-	if (db_tr == NULL) {
-		printf("fwohci_db_init: malloc(1) failed\n");
-		return;
-	}
 
 #define DB_SIZE(x) (sizeof(struct fwohcidb) * (x)->ndesc)
 	dbch->am = fwdma_malloc_multiseg(&sc->fc, sizeof(struct fwohcidb),
@@ -1748,7 +1746,7 @@ fwohci_stop(struct fwohci_softc *sc, device_t dev)
 			| OHCI_INT_DMA_ARRQ | OHCI_INT_DMA_ARRS
 			| OHCI_INT_PHY_BUS_R);
 
-/* FLUSH FIFO and reset Transmitter/Reciever */
+/* FLUSH FIFO and reset Transmitter/Receiver */
 	OWRITE(sc, OHCI_HCCCTL, OHCI_HCC_RESET);
 #endif
 
@@ -1864,6 +1862,16 @@ fwohci_intr_core(struct fwohci_softc *sc, uint32_t stat, int count)
 				prequpper = OHCI_PREQUPPER_MAX;
 			}
 			OWRITE(sc, OHCI_PREQUPPER, prequpper & 0xffffffff);
+			if (OREAD(sc, OHCI_PREQUPPER) !=
+			    (prequpper & 0xffffffff)) {
+				device_printf(fc->dev,
+				   "PhysicalUpperBound register is not "
+				   "implemented.  Physical memory access "
+				   "is limited to the first 4GB\n");
+				device_printf(fc->dev,
+				   "PhysicalUpperBound = 0x%08x\n",
+				    OREAD(sc, OHCI_PREQUPPER));
+			}
 		}
 		/* Set ATRetries register */
 		OWRITE(sc, OHCI_ATRETRY, 1<<(13 + 16) | 0xfff);
@@ -2208,7 +2216,7 @@ fwohci_rbuf_update(struct fwohci_softc *sc, int dmach)
 				ir->bnpacket, BUS_DMASYNC_POSTREAD);
 		} else {
 			/* XXX */
-			printf("fwohci_rbuf_update: this shouldn't happend\n");
+			printf("fwohci_rbuf_update: this shouldn't happened\n");
 		}
 
 		STAILQ_REMOVE_HEAD(&ir->stdma, link);
@@ -2725,7 +2733,7 @@ static void
 fwohci_arcv(struct fwohci_softc *sc, struct fwohci_dbch *dbch, int count)
 {
 	struct fwohcidb_tr *db_tr;
-	struct iovec vec[2];
+	kiovec_t vec[2];
 	struct fw_pkt pktbuf;
 	int nvec;
 	struct fw_pkt *fp;
@@ -2804,15 +2812,13 @@ fwohci_arcv(struct fwohci_softc *sc, struct fwohci_dbch *dbch, int count)
 						goto err;
 					}
 					offset = sizeof(pktbuf);
-					vec[0].iov_base = (char *)&pktbuf;
-					vec[0].iov_len = offset;
+					IOVEC_INIT(&vec[0], &pktbuf, offset);
 				} else {
 					/* splitted in payload */
 					offset = rlen;
-					vec[0].iov_base = buf;
-					vec[0].iov_len = rlen;
+					IOVEC_INIT(&vec[0], buf, rlen);
 				}
-				fp=(struct fw_pkt *)vec[0].iov_base;
+				fp=(__cheri_fromcap struct fw_pkt *)vec[0].iov_base;
 				nvec = 1;
 			} else {
 				/* no fragment in previous buffer */
@@ -2857,8 +2863,7 @@ fwohci_arcv(struct fwohci_softc *sc, struct fwohci_dbch *dbch, int count)
 					}
 					goto out;
 				}
-				vec[nvec].iov_base = ld;
-				vec[nvec].iov_len = plen;
+				IOVEC_INIT(&vec[nvec], ld, plen);
 				nvec++;
 				ld += plen;
 			}

@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2013-2016 Qlogic Corporation
  * All rights reserved.
  *
@@ -148,12 +150,9 @@ MALLOC_DECLARE(M_QLA83XXBUF);
 /*
  * Locks
  */
-#define QLA_LOCK(ha, str, no_delay) qla_lock(ha, str, no_delay)
-#define QLA_UNLOCK(ha, str) qla_unlock(ha, str)
+#define QLA_LOCK(ha, str, to_ms, no_sleep)	qla_lock(ha, str, to_ms, no_sleep)
+#define QLA_UNLOCK(ha, str)			qla_unlock(ha, str)
  
-#define QLA_TX_LOCK(ha)		mtx_lock(&ha->tx_lock);
-#define QLA_TX_UNLOCK(ha)	mtx_unlock(&ha->tx_lock);
-
 /*
  * structure encapsulating a DMA buffer
  */

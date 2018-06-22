@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2010 Fredrik Lindberg <fli@shapeshifter.se>
  * All rights reserved.
  *
@@ -1225,6 +1227,7 @@ uhso_mux_write_callback(struct usb_xfer *xfer, usb_error_t error)
 		    ht->ht_muxport);
 		/* FALLTHROUGH */
 	case USB_ST_SETUP:
+tr_setup:
 		pc = usbd_xfer_get_frame(xfer, 1);
 		if (ucom_get_data(&sc->sc_ucom[ht->ht_muxport], pc,
 		    0, 32, &actlen)) {
@@ -1255,7 +1258,8 @@ uhso_mux_write_callback(struct usb_xfer *xfer, usb_error_t error)
 		UHSO_DPRINTF(0, "error: %s\n", usbd_errstr(error));
 		if (error == USB_ERR_CANCELLED)
 			break;
-		break;
+		usbd_xfer_set_stall(xfer);
+		goto tr_setup;
 	}
 }
 
@@ -1666,7 +1670,7 @@ uhso_if_rxflush(void *arg)
 	struct ip6_hdr *ip6;
 #endif
 	uint16_t iplen;
-	int len, isr;
+	int isr;
 
 	m = NULL;
 	mwait = sc->sc_mwait;
@@ -1686,13 +1690,8 @@ uhso_if_rxflush(void *arg)
 
 			UHSO_DPRINTF(3, "partial m0=%p(%d), concat w/ m=%p(%d)\n",
 			    m0, m0->m_len, m, m->m_len);
-			len = m->m_len + m0->m_len;
 
-			/* Concat mbufs and fix headers */
-			m_cat(m0, m);
-			m0->m_pkthdr.len = len;
-			m->m_flags &= ~M_PKTHDR;
-
+			m_catpkt(m0, m);
 			m = m_pullup(m0, sizeof(struct ip));
 			if (m == NULL) {
 				if_inc_counter(ifp, IFCOUNTER_IERRORS, 1);
@@ -1755,7 +1754,7 @@ uhso_if_rxflush(void *arg)
 			 * Allocate a new mbuf for this IP packet and
 			 * copy the IP-packet into it.
 			 */
-			m = m_getcl(M_NOWAIT, MT_DATA, M_PKTHDR);
+			m = m_getcl(M_WAITOK, MT_DATA, M_PKTHDR);
 			memcpy(mtod(m, uint8_t *), mtod(m0, uint8_t *), iplen);
 			m->m_pkthdr.len = m->m_len = iplen;
 
@@ -1842,7 +1841,7 @@ uhso_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	sc = ifp->if_softc;
 
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		if (ifp->if_flags & IFF_UP) {
 			if (!(ifp->if_drv_flags & IFF_DRV_RUNNING)) {
 				uhso_if_init(sc);
@@ -1856,9 +1855,9 @@ uhso_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			}
 		}
 		break;
-	case SIOCSIFADDR:
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		break;
 	default:
 		return (EINVAL);

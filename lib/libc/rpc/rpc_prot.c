@@ -1,6 +1,8 @@
 /*	$NetBSD: rpc_prot.c,v 1.16 2000/06/02 23:11:13 fvdl Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2009, Sun Microsystems, Inc.
  * All rights reserved.
  *
@@ -26,6 +28,17 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
  * POSSIBILITY OF SUCH DAMAGE.
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "sunrpc"
+ * }
+ * CHERI CHANGES END
  */
 
 #if defined(LIBC_SCCS) && !defined(lint)
@@ -116,12 +129,13 @@ xdr_accepted_reply(XDR *xdrs, struct accepted_reply *ar)
 	switch (ar->ar_stat) {
 
 	case SUCCESS:
-		return ((*(ar->ar_results.proc))(xdrs, ar->ar_results.where));
+		return ((*(ar->ar_results.proc))(xdrs, ar->ar_results.where,
+		    0));
 
 	case PROG_MISMATCH:
-		if (! xdr_u_int32_t(xdrs, &(ar->ar_vers.low)))
+		if (!xdr_rpcvers(xdrs, &(ar->ar_vers.low)))
 			return (FALSE);
-		return (xdr_u_int32_t(xdrs, &(ar->ar_vers.high)));
+		return (xdr_rpcvers(xdrs, &(ar->ar_vers.high)));
 
 	case GARBAGE_ARGS:
 	case SYSTEM_ERR:
@@ -152,9 +166,9 @@ xdr_rejected_reply(XDR *xdrs, struct rejected_reply *rr)
 	switch (rr->rj_stat) {
 
 	case RPC_MISMATCH:
-		if (! xdr_u_int32_t(xdrs, &(rr->rj_vers.low)))
+		if (! xdr_rpcvers(xdrs, &(rr->rj_vers.low)))
 			return (FALSE);
-		return (xdr_u_int32_t(xdrs, &(rr->rj_vers.high)));
+		return (xdr_rpcvers(xdrs, &(rr->rj_vers.high)));
 
 	case AUTH_ERROR:
 		prj_why = &rr->rj_why;
@@ -217,8 +231,8 @@ xdr_callhdr(XDR *xdrs, struct rpc_msg *cmsg)
 	    (xdrs->x_op == XDR_ENCODE) &&
 	    xdr_u_int32_t(xdrs, &(cmsg->rm_xid)) &&
 	    xdr_enum(xdrs, (enum_t *) prm_direction) &&
-	    xdr_u_int32_t(xdrs, &(cmsg->rm_call.cb_rpcvers)) &&
-	    xdr_u_int32_t(xdrs, &(cmsg->rm_call.cb_prog)) )
+	    xdr_rpcvers(xdrs, &(cmsg->rm_call.cb_rpcvers)) &&
+	    xdr_rpcprog(xdrs, &(cmsg->rm_call.cb_prog)) )
 		return (xdr_u_int32_t(xdrs, &(cmsg->rm_call.cb_vers)));
 	return (FALSE);
 }

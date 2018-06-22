@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2004 Doug Rabson
  * Copyright (c) 1982, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -11,7 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -132,7 +134,7 @@ firewire_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 		}
 		destfw = (struct fw_hwaddr *)(mtag + 1);
 	} else {
-		destfw = 0;
+		destfw = NULL;
 	}
 
 	switch (dst->sa_family) {
@@ -144,7 +146,8 @@ firewire_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 		 * doesn't fit into the arp model.
 		 */
 		if (unicast) {
-			error = arpresolve(ifp, is_gw, m, dst, (u_char *) destfw, NULL);
+			error = arpresolve(ifp, is_gw, m, dst,
+			    (u_char *) destfw, NULL, NULL);
 			if (error)
 				return (error == EWOULDBLOCK ? 0 : error);
 		}
@@ -174,7 +177,7 @@ firewire_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 	case AF_INET6:
 		if (unicast) {
 			error = nd6_resolve(fc->fc_ifp, is_gw, m, dst,
-			    (u_char *) destfw, NULL);
+			    (u_char *) destfw, NULL, NULL);
 			if (error)
 				return (error == EWOULDBLOCK ? 0 : error);
 		}
@@ -269,7 +272,7 @@ firewire_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 				mtail = m_split(m, fsize, M_NOWAIT);
 				m_tag_copy_chain(mtail, m, M_NOWAIT);
 			} else {
-				mtail = 0;
+				mtail = NULL;
 			}
 
 			/*
@@ -642,7 +645,7 @@ firewire_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int error = 0;
 
 	switch (command) {
-	case SIOCSIFADDR:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
 		ifp->if_flags |= IFF_UP;
 
 		switch (ifa->ifa_addr->sa_family) {
@@ -658,24 +661,19 @@ firewire_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		break;
 
-	case SIOCGIFADDR:
-		{
-			struct sockaddr *sa;
-
-			sa = (struct sockaddr *) & ifr->ifr_data;
-			bcopy(&IFP2FWC(ifp)->fc_hwaddr,
-			    (caddr_t) sa->sa_data, sizeof(struct fw_hwaddr));
-		}
+	CASE_IOC_IFREQ(SIOCGIFADDR):
+		bcopy(&IFP2FWC(ifp)->fc_hwaddr, ifr_addr_get_data(ifr),
+		    sizeof(struct fw_hwaddr));
 		break;
 
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		/*
 		 * Set the interface MTU.
 		 */
-		if (ifr->ifr_mtu > 1500) {
+		if (ifr_mtu_get(ifr) > 1500) {
 			error = EINVAL;
 		} else {
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 		}
 		break;
 	default:
@@ -701,7 +699,7 @@ firewire_resolvemulti(struct ifnet *ifp, struct sockaddr **llsa,
 		/*
 		 * No mapping needed.
 		 */
-		*llsa = 0;
+		*llsa = NULL;
 		return 0;
 
 #ifdef INET
@@ -709,7 +707,7 @@ firewire_resolvemulti(struct ifnet *ifp, struct sockaddr **llsa,
 		sin = (struct sockaddr_in *)sa;
 		if (!IN_MULTICAST(ntohl(sin->sin_addr.s_addr)))
 			return EADDRNOTAVAIL;
-		*llsa = 0;
+		*llsa = NULL;
 		return 0;
 #endif
 #ifdef INET6
@@ -722,12 +720,12 @@ firewire_resolvemulti(struct ifnet *ifp, struct sockaddr **llsa,
 			 * (This is used for multicast routers.)
 			 */
 			ifp->if_flags |= IFF_ALLMULTI;
-			*llsa = 0;
+			*llsa = NULL;
 			return 0;
 		}
 		if (!IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr))
 			return EADDRNOTAVAIL;
-		*llsa = 0;
+		*llsa = NULL;
 		return 0;
 #endif
 

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -29,6 +31,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_integrity"
+ *   ],
+ *   "change_comment": "replace with call to timsort"
+ * }
+ * CHERI CHANGES END
+ */
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)merge.c	8.2 (Berkeley) 2/14/94";
@@ -58,7 +71,6 @@ __FBSDID("$FreeBSD$");
 
 #ifdef I_AM_MERGESORT_B
 #include "block_abi.h"
-#define	DECLARE_CMP	DECLARE_BLOCK(int, cmp, const void *, const void *)
 typedef DECLARE_BLOCK(int, cmp_t, const void *, const void *);
 #define	CMP(x, y)	CALL_BLOCK(cmp, x, y)
 #else
@@ -115,6 +127,7 @@ mergesort_b(void *base, size_t nmemb, size_t size, cmp_t cmp)
 mergesort(void *base, size_t nmemb, size_t size, cmp_t cmp)
 #endif
 {
+#ifndef __CHERI_PURE_CAPABILITY__
 	size_t i;
 	int sense;
 	int big, iflag;
@@ -245,6 +258,13 @@ COPY:	    			b = t;
 	}
 	free(list2);
 	return (0);
+#else /* __CHERI_PURE_CAPABILITY__ */
+#ifdef I_AM_MERGESORT_B
+	return (EINVAL);
+#else
+	return (timsort(base, nmemb, size, cmp));
+#endif
+#endif /* __CHERI_PURE_CAPABILITY__ */
 }
 
 #define	swap(a, b) {					\

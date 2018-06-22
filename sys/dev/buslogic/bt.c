@@ -3,8 +3,9 @@
  * Product specific probe and attach routines can be found in:
  * sys/dev/buslogic/bt_isa.c	BT-54X, BT-445 cards
  * sys/dev/buslogic/bt_mca.c	BT-64X, SDC3211B, SDC3211F
- * sys/dev/buslogic/bt_eisa.c	BT-74X, BT-75x cards, SDC3222F
  * sys/dev/buslogic/bt_pci.c	BT-946, BT-948, BT-956, BT-958 cards
+ *
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 1998, 1999 Justin T. Gibbs.
  * All rights reserved.
@@ -169,7 +170,7 @@ static void	bttimeout(void *arg);
  * XXX
  * Do our own re-probe protection until a configuration
  * manager can do it for us.  This ensures that we don't
- * reprobe a card already found by the EISA or PCI probes.
+ * reprobe a card already found by the PCI probes.
  */
 struct bt_isa_port bt_isa_ports[] =
 {
@@ -313,7 +314,6 @@ bt_port_probe(device_t dev, struct bt_probe_info *info)
 			return (1);
 		}
 	} else {
-		/* VL/EISA/PCI DMA */
 		info->drq = -1;
 	}
 	switch (config_data.irq) {
@@ -482,7 +482,6 @@ bt_fetch_adapter_info(device_t dev)
 	 *		BT-542B/742A (revision H)
 	 *	2.xx	BusLogic "A" Series Host Adapters:
 	 *		BT-542B/742A (revision G and below)
-	 *	0.xx	AMI FastDisk VLB/EISA BusLogic Clone Host Adapter
 	 */
 	length_param = sizeof(esetup_info);
 	error = bt_cmd(bt, BOP_INQUIRE_ESETUP_INFO, &length_param, /*parmlen*/1,
@@ -499,19 +498,6 @@ bt_fetch_adapter_info(device_t dev)
 	if (esetup_info.bus_type == 'A'
 	 && bt->firmware_ver[0] == '2') {
 		snprintf(bt->model, sizeof(bt->model), "542B");
-	} else if (esetup_info.bus_type == 'E'
-	 	&& bt->firmware_ver[0] == '2') {
-
-		/*
-		 * The 742A seems to object if its mailboxes are
-		 * allocated above the 16MB mark.
-		 */
-		bt->mailbox_addrlimit = BUS_SPACE_MAXADDR_24BIT;
-		snprintf(bt->model, sizeof(bt->model), "742A");
-	} else if (esetup_info.bus_type == 'E'
-		&& bt->firmware_ver[0] == '0') {
-		/* AMI FastDisk EISA Series 441 0.x */
-		snprintf(bt->model, sizeof(bt->model), "747A");
 	} else {
 		ha_model_data_t model_data;
 		int i;
@@ -1233,10 +1219,6 @@ btaction(struct cam_sim *sim, union ccb *ccb)
 		}
 		break;
 	}
-	case XPT_EN_LUN:		/* Enable LUN as a target */
-	case XPT_TARGET_IO:		/* Execute target I/O request */
-	case XPT_ACCEPT_TARGET_IO:	/* Accept Host Target Mode CDB */
-	case XPT_CONT_TARGET_IO:	/* Continue Host Target I/O Connection*/
 	case XPT_ABORT:			/* Abort the specified CCB */
 		/* XXX Implement */
 		ccb->ccb_h.status = CAM_REQ_INVALID;
@@ -1367,9 +1349,9 @@ btaction(struct cam_sim *sim, union ccb *ccb)
 		cpi->initiator_id = bt->scsi_id;
 		cpi->bus_id = cam_sim_bus(sim);
 		cpi->base_transfer_speed = 3300;
-		strncpy(cpi->sim_vid, "FreeBSD", SIM_IDLEN);
-		strncpy(cpi->hba_vid, "BusLogic", HBA_IDLEN);
-		strncpy(cpi->dev_name, cam_sim_name(sim), DEV_IDLEN);
+		strlcpy(cpi->sim_vid, "FreeBSD", SIM_IDLEN);
+		strlcpy(cpi->hba_vid, "BusLogic", HBA_IDLEN);
+		strlcpy(cpi->dev_name, cam_sim_name(sim), DEV_IDLEN);
 		cpi->unit_number = cam_sim_unit(sim);
 		cpi->ccb_h.status = CAM_REQ_CMP;
 		cpi->transport = XPORT_SPI;
@@ -1578,7 +1560,7 @@ btdone(struct bt_softc *bt, struct bt_ccb *bccb, bt_mbi_comp_code_t comp_code)
 		struct ccb_hdr *ccb_h;
 		cam_status error;
 
-		/* Notify all clients that a BDR occured */
+		/* Notify all clients that a BDR occurred */
 		error = xpt_create_path(&path, /*periph*/NULL,
 					cam_sim_path(bt->sim),
 					bccb->hccb.target_id,
@@ -1624,12 +1606,12 @@ btdone(struct bt_softc *bt, struct bt_ccb *bccb, bt_mbi_comp_code_t comp_code)
 	case BMBI_ABORT:
 	case BMBI_ERROR:
 		if (bootverbose) {
-			printf("bt: ccb %p - error %x occured.  "
+			printf("bt: ccb %p - error %x occurred.  "
 			       "btstat = %x, sdstat = %x\n",
 			       (void *)bccb, comp_code, bccb->hccb.btstat,
 			       bccb->hccb.sdstat);
 		}
-		/* An error occured */
+		/* An error occurred */
 		switch(bccb->hccb.btstat) {
 		case BTSTAT_DATARUN_ERROR:
 			if (bccb->hccb.data_len == 0) {
@@ -2317,7 +2299,7 @@ bttimeout(void *arg)
 	 * means that the driver attempts to clear only one error
 	 * condition at a time.  In general, timeouts that occur
 	 * close together are related anyway, so there is no benefit
-	 * in attempting to handle errors in parrallel.  Timeouts will
+	 * in attempting to handle errors in parallel.  Timeouts will
 	 * be reinstated when the recovery process ends.
 	 */
 	if ((bccb->flags & BCCB_DEVICE_RESET) == 0) {

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2005 John Baldwin <jhb@FreeBSD.org>
  * All rights reserved.
  *
@@ -164,8 +166,8 @@ vga_pci_map_bios(device_t dev, size_t *size)
 #endif
 
 	rid = PCIR_BIOS;
-	res = vga_pci_alloc_resource(dev, NULL, SYS_RES_MEMORY, &rid, 0ul,
-	    ~0ul, 1, RF_ACTIVE);
+	res = vga_pci_alloc_resource(dev, NULL, SYS_RES_MEMORY, &rid, 0,
+	    ~0, 1, RF_ACTIVE);
 	if (res == NULL) {
 		return (NULL);
 	}
@@ -207,7 +209,7 @@ vga_pci_unmap_bios(device_t dev, void *bios)
 int
 vga_pci_repost(device_t dev)
 {
-#if defined(__amd64__) || (defined(__i386__) && !defined(PC98))
+#if defined(__amd64__) || defined(__i386__)
 	x86regs_t regs;
 
 	if (!vga_pci_is_boot_display(dev))

@@ -94,10 +94,22 @@ class MipsInst<dag outs, dag ins, string asmstr, list<dag> pattern,
   //
   // Attributes specific to Mips instructions...
   //
-  bits<4> FormBits = Form.Value;
+  bits<4> FormBits     = Form.Value;
+  bit isCTI            = 0; // Any form of Control Transfer Instruction.
+                            // Required for MIPSR6
+  bit hasForbiddenSlot = 0; // Instruction has a forbidden slot.
+  bit IsPCRelativeLoad = 0; // Load instruction with implicit source register
+                            // ($pc) and with explicit offset and destination
+                            // register
+  bit hasFCCRegOperand = 0; // Instruction uses $fcc<X> register and is
+                            // present in MIPS-I to MIPS-III.
 
-  // TSFlags layout should be kept in sync with MipsInstrInfo.h.
+  // TSFlags layout should be kept in sync with MCTargetDesc/MipsBaseInfo.h.
   let TSFlags{3-0}   = FormBits;
+  let TSFlags{4}     = isCTI;
+  let TSFlags{5}     = hasForbiddenSlot;
+  let TSFlags{6}     = IsPCRelativeLoad;
+  let TSFlags{7}     = hasFCCRegOperand;
 
   let DecoderNamespace = "Mips";
 
@@ -132,7 +144,7 @@ class PseudoSE<dag outs, dag ins, list<dag> pattern,
 // These are aliases that require C++ handling to convert to the target
 // instruction, while InstAliases can be handled directly by tblgen.
 class MipsAsmPseudoInst<dag outs, dag ins, string asmstr>:
-  MipsInst<outs, ins, asmstr, [], IIPseudo, Pseudo> {
+  MipsInst<outs, ins, asmstr, [], IIPseudo, Pseudo>, PredicateControl {
   let isPseudo = 1;
   let Pattern = [];
 }
@@ -644,15 +656,15 @@ class BRK_FM<bits<6> funct> : StdArch
 //  Exception return format <Cop0|1|0|funct>
 //===----------------------------------------------------------------------===//
 
-class ER_FM<bits<6> funct> : StdArch
+class ER_FM<bits<6> funct, bit LLBit> : StdArch
 {
   bits<32> Inst;
   let Inst{31-26} = 0x10;
   let Inst{25}    = 1;
-  let Inst{24-6}  = 0;
+  let Inst{24-7}  = 0;
+  let Inst{6} = LLBit;
   let Inst{5-0}   = funct;
 }
-
 
 //===----------------------------------------------------------------------===//
 //  Enable/disable interrupt instruction format <Cop0|MFMC0|rt|12|0|sc|0|0>
@@ -820,6 +832,7 @@ class BC1F_FM<bit nd, bit tf> : StdArch {
 class CEQS_FM<bits<5> fmt> : StdArch {
   bits<5> fs;
   bits<5> ft;
+  bits<3> fcc;
   bits<4> cond;
 
   bits<32> Inst;
@@ -828,7 +841,7 @@ class CEQS_FM<bits<5> fmt> : StdArch {
   let Inst{25-21} = fmt;
   let Inst{20-16} = ft;
   let Inst{15-11} = fs;
-  let Inst{10-8} = 0; // cc
+  let Inst{10-8} = fcc;
   let Inst{7-4} = 0x3;
   let Inst{3-0} = cond;
 }

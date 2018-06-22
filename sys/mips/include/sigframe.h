@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1999 Marcel Moolenaar
  * All rights reserved.
  *
@@ -46,7 +48,11 @@ struct sigframe {
 	register_t	sf_ucontext;	/* points to sf_uc */
 	register_t	sf_addr;	/* undocumented 4th arg */
 	ucontext_t	sf_uc;		/* = *sf_ucontext */
+#ifdef _KERNEL
+	struct siginfo_native sf_si;	/* = *sf_siginfo (SA_SIGINFO case) */
+#else
 	siginfo_t	sf_si;		/* = *sf_siginfo (SA_SIGINFO case) */
+#endif
 	unsigned long	__spare__[2];
 };
 

@@ -2,6 +2,8 @@
 __FBSDID("$FreeBSD$");
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2015 Stanislav Galabov. All rights reserved.
  * Copyright (c) 2010,2011 Aleksandr Rybalko. All rights reserved.
  * Copyright (c) 2007-2008 Hans Petter Selasky. All rights reserved.
@@ -173,14 +175,8 @@ static int
 dotg_obio_detach(device_t dev)
 {
 	struct dwc_otg_softc *sc = device_get_softc(dev);
-	device_t bdev;
 	int err;
 
-	if (sc->sc_bus.bdev) {
-		bdev = sc->sc_bus.bdev;
-		device_detach(bdev);
-		device_delete_child(dev, bdev);
-	}
 	/* during module unload there are lots of children leftover */
 	device_delete_children(dev);
 

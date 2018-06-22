@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright 2003-2011 Netlogic Microsystems (Netlogic). All rights
  * reserved.
  *
@@ -53,7 +55,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpu.h>
 #include <machine/hwfunc.h>
 #include <machine/mips_opcode.h>
-#include <machine/param.h>
 #include <machine/intr_machdep.h>
 
 #include <mips/nlm/hal/mips-extns.h>

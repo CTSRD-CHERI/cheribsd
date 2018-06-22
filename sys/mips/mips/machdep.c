@@ -1,6 +1,8 @@
     /*	$OpenBSD: machdep.c,v 1.33 1998/09/15 10:58:54 pefo Exp $	*/
 /* tracked to 1.38 */
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -18,7 +20,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -81,9 +83,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/asm.h>
 #include <machine/bootinfo.h>
 #include <machine/cache.h>
-#ifdef CPU_CHERI
-#include <machine/cheri.h>
-#endif
 #include <machine/clock.h>
 #include <machine/cpu.h>
 #include <machine/cpuregs.h>
@@ -95,6 +94,10 @@ __FBSDID("$FreeBSD$");
 #ifdef DDB
 #include <sys/kdb.h>
 #include <ddb/ddb.h>
+#endif
+
+#ifdef CPU_CHERI
+#include <cheri/cheri.h>
 #endif
 
 #include <sys/random.h>
@@ -168,9 +171,6 @@ extern char MipsCache[], MipsCacheEnd[];
 
 /* MIPS wait skip region */
 extern char MipsWaitStart[], MipsWaitEnd[];
-
-/* CHERI CCall/CReturn software path */
-extern char CHERICCallVector[], CHERICCallVectorEnd[];
 
 extern char edata[], end[];
 
@@ -292,7 +292,16 @@ mips_proc0_init(void)
 	KASSERT((kstack0 & ((KSTACK_PAGE_SIZE * 2) - 1)) == 0,
 		("kstack0 is not aligned on a page (0x%0lx) boundary: 0x%0lx",
 		(long)(KSTACK_PAGE_SIZE * 2), (long)kstack0));
+#ifdef KSTACK_LARGE_PAGE
+	/*
+	 * For 16K page size the stack uses the odd page
+	 * and kstack0 was allocated on the 32K boundary.
+	 * So we bump up the address to the odd page boundary.
+	 */
+	thread0.td_kstack = kstack0 + KSTACK_PAGE_SIZE;
+#else
 	thread0.td_kstack = kstack0;
+#endif
 	thread0.td_kstack_pages = KSTACK_PAGES;
 	/* 
 	 * Do not use cpu_thread_alloc to initialize these fields 
@@ -321,8 +330,6 @@ cpu_initclocks(void)
 	platform_initclocks();
 	cpu_initclocks_bsp();
 }
-
-struct msgbuf *msgbufp=0;
 
 /*
  * Initialize the hardware exception vectors, and the jump table used to
@@ -367,8 +374,13 @@ mips_vector_init(void)
 	      MipsCacheEnd - MipsCache);
 
 #ifdef CPU_CHERI
-	bcopy(CHERICCallVector, (void *)CHERI_CCALL_EXC_VEC,
-	      CHERICCallVectorEnd - CHERICCallVector);
+	/*
+	 * XXXRW: Install ordinary MIPS exception vector in the CCall
+	 * exception vector, as we don't currently have another.  But it could
+	 * be that we do want a specialised vector here at some point.
+	 */
+	bcopy(MipsException, (void *)CHERI_CCALL_EXC_VEC,
+	      MipsCacheEnd - MipsCache);
 #endif
 
 	/*
@@ -486,14 +498,12 @@ cpu_pcpu_init(struct pcpu *pcpu, int cpuid, size_t size)
 
 	pcpu->pc_next_asid = 1;
 	pcpu->pc_asid_generation = 1;
+	pcpu->pc_self = pcpu;
+
 #if defined(MIPS_EXC_CNTRS)
 	pcpu->pc_tlb_miss_cnt = 0;
 	pcpu->pc_tlb_invalid_cnt = 0;
 	pcpu->pc_tlb_mod_cnt = 0;
-#ifdef CPU_CHERI
-	pcpu->pc_cheri_ccall_cnt = 0;
-	pcpu->pc_cheri_creturn_cnt = 0;
-#endif /* CPU_CHERI */
 #endif /* defined(MIPS_EXC_CNTRS) */
 
 #ifdef SMP
@@ -671,14 +681,6 @@ mips_exc_cntrs_sysctl_register(void *arg)
 		SYSCTL_ADD_CNTR(&pcpupg->pc_tlb_mod_cnt, cpu,
 			"tlb_mod_cnt",
 			"TLB modification exception count for cpu N");
-#ifdef CPU_CHERI
-		SYSCTL_ADD_CNTR(&pcpupg->pc_cheri_ccall_cnt, cpu,
-			"cheri_ccall_cnt",
-			"Cheri ccall exception count for cpu N");
-		SYSCTL_ADD_CNTR(&pcpupg->pc_cheri_creturn_cnt, cpu,
-			"cheri_creturn_cnt",
-			"Cheri creturn exception count for cpu N");
-#endif /* CPU_CHERI */
 	}
 }
 

@@ -1,5 +1,6 @@
 # $FreeBSD$
 
+PACKAGE=lib${LIB}
 SHLIBDIR?=      /lib
 
 .include <src.opts.mk>
@@ -13,7 +14,7 @@ SHLIB_MAJOR=0
 
 SRCS=	libxo.c xo_encoder.c xo_syslog.c
 
-CFLAGS+=-I${LIBXOSRC}/libxo
+CFLAGS+=-I${LIBXOSRC}/libxo -I${.CURDIR}
 CFLAGS+=-DXO_ENCODERDIR=\"/usr/lib/libxo/encoder\"
 
 INCS=	xo.h xo_encoder.h
@@ -47,7 +48,10 @@ MAN+=	xo_attr.3 \
 	xo_set_version.3 \
 	xo_set_writer.3 \
 	xo_syslog.3
+
 MAN+=	xo_format.5
+
+MAN+=	xo_options.7
 
 MLINKS=	xo_attr.3 xo_attr_h.3 \
 	xo_attr.3 xo_attr_hv.3 \
@@ -106,8 +110,7 @@ MLINKS=	xo_attr.3 xo_attr_h.3 \
 	xo_syslog.3 xo_set_logmask.3 \
 	xo_syslog.3 xo_vsyslog.3
 
-.if ${MK_TESTS} != "no"
-SUBDIR+=	tests
-.endif
+HAS_TESTS=
+SUBDIR.${MK_TESTS}+= tests
 
 .include <bsd.lib.mk>

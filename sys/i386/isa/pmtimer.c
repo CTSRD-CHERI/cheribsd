@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2000 Mitsuru IWASAKI <iwasaki@FreeBSD.org>
  * All rights reserved.
  *
@@ -37,6 +39,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/bus.h>
 #include <sys/kernel.h>
 #include <sys/module.h>
+#include <sys/power.h>
 #include <sys/syslog.h>
 #include <machine/clock.h>
 
@@ -83,6 +86,9 @@ static int
 pmtimer_suspend(device_t dev)
 {
 
+	if (power_pm_get_type() == POWER_PM_TYPE_ACPI)
+		return (0);
+
 	microtime(&diff_time);
 	inittodr(0);
 	microtime(&suspend_time);
@@ -95,6 +101,9 @@ pmtimer_resume(device_t dev)
 {
 	u_int second, minute, hour;
 	struct timeval resume_time, tmp_time;
+
+	if (power_pm_get_type() == POWER_PM_TYPE_ACPI)
+		return (0);
 
 	/* modified for adjkerntz */
 	timer_restore();		/* restore the all timers */

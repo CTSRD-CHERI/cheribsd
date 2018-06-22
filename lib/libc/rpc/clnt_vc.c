@@ -1,6 +1,8 @@
 /*	$NetBSD: clnt_vc.c,v 1.4 2000/07/14 08:40:42 fvdl Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2009, Sun Microsystems, Inc.
  * All rights reserved.
  *
@@ -26,6 +28,17 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
  * POSSIBILITY OF SUCH DAMAGE.
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "sunrpc"
+ * }
+ * CHERI CHANGES END
  */
 
 #if defined(LIBC_SCCS) && !defined(lint)
@@ -359,7 +372,7 @@ call_again:
 		if ((! XDR_PUTBYTES(xdrs, ct->ct_u.ct_mcallc, ct->ct_mpos)) ||
 		    (! XDR_PUTINT32(xdrs, &proc)) ||
 		    (! AUTH_MARSHALL(cl->cl_auth, xdrs)) ||
-		    (! (*xdr_args)(xdrs, args_ptr))) {
+		    (! (*xdr_args)(xdrs, args_ptr, 0))) {
 			if (ct->ct_error.re_status == RPC_SUCCESS)
 				ct->ct_error.re_status = RPC_CANTENCODEARGS;
 			(void)xdrrec_endofrecord(xdrs, TRUE);
@@ -429,7 +442,8 @@ call_again:
 			ct->ct_error.re_why = AUTH_INVALIDRESP;
 		} else {
 			if (cl->cl_auth->ah_cred.oa_flavor != RPCSEC_GSS) {
-				reply_stat = (*xdr_results)(xdrs, results_ptr);
+				reply_stat = (*xdr_results)(xdrs, results_ptr,
+				    0);
 			} else {
 				reply_stat = __rpc_gss_unwrap(cl->cl_auth,
 				    xdrs, xdr_results, results_ptr);
@@ -488,7 +502,7 @@ clnt_vc_freeres(CLIENT *cl, xdrproc_t xdr_res, void *res_ptr)
 	while (vc_fd_locks[ct->ct_fd])
 		cond_wait(&vc_cv[ct->ct_fd], &clnt_fd_lock);
 	xdrs->x_op = XDR_FREE;
-	dummy = (*xdr_res)(xdrs, res_ptr);
+	dummy = (*xdr_res)(xdrs, res_ptr, 0);
 	mutex_unlock(&clnt_fd_lock);
 	thr_sigsetmask(SIG_SETMASK, &(mask), NULL);
 	cond_signal(&vc_cv[ct->ct_fd]);
@@ -500,6 +514,20 @@ clnt_vc_freeres(CLIENT *cl, xdrproc_t xdr_res, void *res_ptr)
 static void
 clnt_vc_abort(CLIENT *cl)
 {
+}
+
+static __inline void
+htonlp(void *dst, const void *src, uint32_t incr)
+{
+	/* We are aligned, so we think */
+	*(uint32_t *)dst = htonl(*(const uint32_t *)src + incr);
+}
+
+static __inline void
+ntohlp(void *dst, const void *src)
+{
+	/* We are aligned, so we think */
+	*(uint32_t *)dst = htonl(*(const uint32_t *)src);
 }
 
 static bool_t
@@ -576,49 +604,39 @@ clnt_vc_control(CLIENT *cl, u_int request, void *info)
 		 * first element in the call structure
 		 * This will get the xid of the PREVIOUS call
 		 */
-		*(u_int32_t *)info =
-		    ntohl(*(u_int32_t *)(void *)&ct->ct_u.ct_mcalli);
+		ntohlp(info, &ct->ct_u.ct_mcalli);
 		break;
 	case CLSET_XID:
 		/* This will set the xid of the NEXT call */
-		*(u_int32_t *)(void *)&ct->ct_u.ct_mcalli =
-		    htonl(*((u_int32_t *)info) + 1);
 		/* increment by 1 as clnt_vc_call() decrements once */
+		htonlp(&ct->ct_u.ct_mcalli, info, 1);
 		break;
 	case CLGET_VERS:
 		/*
 		 * This RELIES on the information that, in the call body,
 		 * the version number field is the fifth field from the
-		 * begining of the RPC header. MUST be changed if the
+		 * beginning of the RPC header. MUST be changed if the
 		 * call_struct is changed
 		 */
-		*(u_int32_t *)info =
-		    ntohl(*(u_int32_t *)(void *)(ct->ct_u.ct_mcallc +
-		    4 * BYTES_PER_XDR_UNIT));
+		ntohlp(info, ct->ct_u.ct_mcallc + 4 * BYTES_PER_XDR_UNIT);
 		break;
 
 	case CLSET_VERS:
-		*(u_int32_t *)(void *)(ct->ct_u.ct_mcallc +
-		    4 * BYTES_PER_XDR_UNIT) =
-		    htonl(*(u_int32_t *)info);
+		htonlp(ct->ct_u.ct_mcallc + 4 * BYTES_PER_XDR_UNIT, info, 0);
 		break;
 
 	case CLGET_PROG:
 		/*
 		 * This RELIES on the information that, in the call body,
 		 * the program number field is the fourth field from the
-		 * begining of the RPC header. MUST be changed if the
+		 * beginning of the RPC header. MUST be changed if the
 		 * call_struct is changed
 		 */
-		*(u_int32_t *)info =
-		    ntohl(*(u_int32_t *)(void *)(ct->ct_u.ct_mcallc +
-		    3 * BYTES_PER_XDR_UNIT));
+		ntohlp(info, ct->ct_u.ct_mcallc + 3 * BYTES_PER_XDR_UNIT);
 		break;
 
 	case CLSET_PROG:
-		*(u_int32_t *)(void *)(ct->ct_u.ct_mcallc +
-		    3 * BYTES_PER_XDR_UNIT) =
-		    htonl(*(u_int32_t *)info);
+		htonlp(ct->ct_u.ct_mcallc + 3 * BYTES_PER_XDR_UNIT, info, 0);
 		break;
 
 	default:

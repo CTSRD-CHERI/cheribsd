@@ -1,6 +1,8 @@
 /*	$OpenBSD: fsirand.c,v 1.9 1997/02/28 00:46:33 millert Exp $	*/
 
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1997 Todd C. Miller <Todd.Miller@courtesan.com>
  * All rights reserved.
  *
@@ -261,7 +263,7 @@ fsirand(char *device)
 				dp1 = &((struct ufs1_dinode *)inodebuf)[n];
 			else
 				dp2 = &((struct ufs2_dinode *)inodebuf)[n];
-			if (inumber >= ROOTINO) {
+			if (inumber >= UFS_ROOTINO) {
 				if (printonly)
 					(void)printf("ino %ju gen %08x\n",
 					    (uintmax_t)inumber,

@@ -5,7 +5,7 @@
 
 SUBDIR=	${_atf} \
 	${_atrun} \
-	${_casper} \
+	${_blacklistd-helper} \
 	${_cheritest_helper} \
 	${_cheri_bench_helper} \
 	${_comsat} \
@@ -13,6 +13,7 @@ SUBDIR=	${_atf} \
 	getty \
 	${_libpng_sb_helper} \
 	${_mail.local} \
+	${_makewhatis.local} \
 	${_mknetid} \
 	${_pppoed} \
 	revnetgroup \
@@ -38,12 +39,12 @@ SUBDIR=	${_atf} \
 _atrun=		atrun
 .endif
 
-.if ${MK_BOOTPD} != "no"
-SUBDIR+=	bootpd
+.if ${MK_BLACKLIST} != "no"
+_blacklistd-helper+=	blacklistd-helper
 .endif
 
-.if ${MK_CASPER} != "no"
-_casper=	casper
+.if ${MK_BOOTPD} != "no"
+SUBDIR+=	bootpd
 .endif
 
 .if ${MK_CHERI} != "no"
@@ -51,7 +52,7 @@ _cheri_bench_helper=	cheri_bench-helper
 _cheritest_helper=	cheritest-helper
 _libpng_sb_helper=	libpng_sb-helper
 _rtld-cheri-elf=	rtld-cheri-elf
-_tcpdump_helper=	tcpdump-helper
+_tcpdump_helper=	tcpdump-helper # Currently broken with the new compiler
 .endif
 
 .if ${MK_FINGER} != "no"
@@ -91,14 +92,13 @@ _rtld-elf=	rtld-elf
 SUBDIR+=	rbootd
 .endif
 
-.if ${MK_RCMDS} != "no"
-_rlogind=	rlogind
-_rshd=		rshd
-.endif
-
 .if ${MK_SENDMAIL} != "no"
 _mail.local=	mail.local
 _smrsh=		smrsh
+.endif
+
+.if ${MK_MAN_UTILS} != "no"
+_makewhatis.local=	makewhatis.local
 .endif
 
 .if ${MK_TALK} != "no"

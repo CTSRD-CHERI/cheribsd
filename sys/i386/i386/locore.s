@@ -13,7 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -120,12 +120,6 @@ vm86phystk:	.long	0		/* PA of vm86/bios stack */
 vm86paddr:	.long	0		/* address of vm86 region */
 vm86pa:		.long	0		/* phys addr of vm86 region */
 
-#ifdef PC98
-	.globl	pc98_system_parameter
-pc98_system_parameter:
-	.space	0x240
-#endif
-
 /**********************************************************************
  *
  * Some handy macros
@@ -183,18 +177,8 @@ pc98_system_parameter:
  */
 NON_GPROF_ENTRY(btext)
 
-#ifdef PC98
-	/* save SYSTEM PARAMETER for resume (NS/T or other) */
-	movl	$0xa1400,%esi
-	movl	$R(pc98_system_parameter),%edi
-	movl	$0x0240,%ecx
-	cld
-	rep
-	movsb
-#else	/* IBM-PC */
 /* Tell the bios to warmboot next time */
 	movw	$0x1234,0x472
-#endif	/* PC98 */
 
 /* Set up a real frame in case the double return in newboot is executed. */
 	pushl	%ebp
@@ -240,33 +224,6 @@ NON_GPROF_ENTRY(btext)
  */
 	movl	$R(tmpstk),%esp
 
-#ifdef PC98
-	/* pc98_machine_type & M_EPSON_PC98 */
-	testb	$0x02,R(pc98_system_parameter)+220
-	jz	3f
-	/* epson_machine_id <= 0x0b */
-	cmpb	$0x0b,R(pc98_system_parameter)+224
-	ja	3f
-
-	/* count up memory */
-	movl	$0x100000,%eax		/* next, talley remaining memory */
-	movl	$0xFFF-0x100,%ecx
-1:	movl	0(%eax),%ebx		/* save location to check */
-	movl	$0xa55a5aa5,0(%eax)	/* write test pattern */
-	cmpl	$0xa55a5aa5,0(%eax)	/* does not check yet for rollover */
-	jne	2f
-	movl	%ebx,0(%eax)		/* restore memory */
-	addl	$PAGE_SIZE,%eax
-	loop	1b
-2:	subl	$0x100000,%eax
-	shrl	$17,%eax
-	movb	%al,R(pc98_system_parameter)+1
-3:
-
-	movw	R(pc98_system_parameter+0x86),%ax
-	movw	%ax,R(cpu_id)
-#endif
-
 	call	identify_cpu
 	call	create_pagetables
 
@@ -284,22 +241,30 @@ NON_GPROF_ENTRY(btext)
 #if defined(PAE) || defined(PAE_TABLES)
 	movl	R(IdlePDPT), %eax
 	movl	%eax, %cr3
-	movl	%cr4, %eax
-	orl	$CR4_PAE, %eax
-	movl	%eax, %cr4
+	movl	%cr4, %edx
+	orl	$CR4_PAE, %edx
+	movl	%edx, %cr4
 #else
 	movl	R(IdlePTD), %eax
 	movl	%eax,%cr3		/* load ptd addr into mmu */
 #endif
-	movl	%cr0,%eax		/* get control word */
-	orl	$CR0_PE|CR0_PG,%eax	/* enable paging */
-	movl	%eax,%cr0		/* and let's page NOW! */
+	movl	%cr0,%edx		/* get control word */
+	orl	$CR0_PE|CR0_PG,%edx	/* enable paging */
+	movl	%edx,%cr0		/* and let's page NOW! */
 
 	pushl	$begin			/* jump to high virtualized address */
 	ret
 
-/* now running relocated at KERNBASE where the system is linked to run */
 begin:
+	/*
+	 * Now running relocated at KERNBASE where the system is linked to run.
+	 *
+	 * Remove the lowest part of the double mapping of low memory to get
+	 * some null pointer checks.
+	 */
+	movl	$0,PTD
+	movl	%eax,%cr3		/* invalidate TLB */
+
 	/* set up bootstrap stack */
 	movl	proc0kstack,%eax	/* location of in-kernel stack */
 
@@ -711,7 +676,7 @@ over_symalloc:
 no_kernend:
 
 	addl	$PDRMASK,%esi		/* Play conservative for now, and */
-	andl	$~PDRMASK,%esi		/*   ... wrap to next 4M. */
+	andl	$~PDRMASK,%esi		/* ... round up to PDR boundary */
 	movl	%esi,R(KERNend)		/* save end of kernel */
 	movl	%esi,R(physfree)	/* next free page is at end of kernel */
 
@@ -768,14 +733,15 @@ no_kernend:
 
 /*
  * Initialize page table pages mapping physical address zero through the
- * end of the kernel.  All of the page table entries allow read and write
- * access.  Write access to the first physical page is required by bios32
- * calls, and write access to the first 1 MB of physical memory is required
- * by ACPI for implementing suspend and resume.  We do this even
- * if we've enabled PSE above, we'll just switch the corresponding kernel
- * PDEs before we turn on paging.
+ * (physical) end of the kernel.  Many of these pages must be reserved,
+ * and we reserve them all and map them linearly for convenience.  We do
+ * this even if we've enabled PSE above; we'll just switch the corresponding
+ * kernel PDEs before we turn on paging.
  *
  * XXX: We waste some pages here in the PSE case!
+ *
+ * This and all other page table entries allow read and write access for
+ * various reasons.  Kernel mappings never have any access restrictions.
  */
 	xorl	%eax, %eax
 	movl	R(KERNend),%ecx
@@ -827,41 +793,26 @@ no_kernend:
 
 /*
  * Create an identity mapping for low physical memory, including the kernel.
- * The part of this mapping that covers the first 1 MB of physical memory
- * becomes a permanent part of the kernel's address space.  The rest of this
- * mapping is destroyed in pmap_bootstrap().  Ordinarily, the same page table
- * pages are shared by the identity mapping and the kernel's native mapping.
- * However, the permanent identity mapping cannot contain PG_G mappings.
- * Thus, if the kernel is loaded within the permanent identity mapping, that
- * page table page must be duplicated and not shared.
+ * This is only used to map the 2 instructions for jumping to 'begin' in
+ * locore (we map everything to avoid having to determine where these
+ * instructions are).  ACPI resume will transiently restore the first PDE in
+ * this mapping (and depend on this PDE's page table created here not being
+ * destroyed).  See pmap_bootstrap() for more details.
  *
- * N.B. Due to errata concerning large pages and physical address zero,
- * a PG_PS mapping is not used.
+ * Note:  There are errata concerning large pages and physical address zero,
+ * so a PG_PS mapping should not be used for PDE 0.  Our double mapping
+ * avoids this automatically by not using PG_PS for PDE #KPDI so that PAT
+ * bits can be set at the page level for i/o pages below 1 MB.
  */
 	movl	R(KPTphys), %eax
 	xorl	%ebx, %ebx
 	movl	$NKPT, %ecx
 	fillkpt(R(IdlePTD), $PG_RW)
-#if KERNLOAD < (1 << PDRSHIFT)
-	testl	$PG_G, R(pgeflag)
-	jz	1f
-	ALLOCPAGES(1)
-	movl	%esi, %edi
-	movl	R(IdlePTD), %eax
-	movl	(%eax), %esi
-	movl	%edi, (%eax)
-	movl	$PAGE_SIZE, %ecx
-	cld
-	rep
-	movsb
-1:	
-#endif
 
 /*
- * For the non-PSE case, install PDEs for PTs covering the KVA.
- * For the PSE case, do the same, but clobber the ones corresponding
- * to the kernel (from btext to KERNend) with 4M (2M for PAE) ('PS')
- * PDEs immediately after.
+ * Install PDEs for PTs covering enough kva to bootstrap.  Then for the PSE
+ * case, replace the PDEs whose coverage is strictly within the kernel
+ * (between KERNLOAD (rounded up) and KERNend) by large-page PDEs.
  */
 	movl	R(KPTphys), %eax
 	movl	$KPTDI, %ebx
@@ -871,10 +822,10 @@ no_kernend:
 	je	done_pde
 
 	movl	R(KERNend), %ecx
-	movl	$KERNLOAD, %eax
+	movl	$(KERNLOAD + PDRMASK) & ~PDRMASK, %eax
 	subl	%eax, %ecx
 	shrl	$PDRSHIFT, %ecx
-	movl	$(KPTDI+(KERNLOAD/(1 << PDRSHIFT))), %ebx
+	movl	$KPTDI + ((KERNLOAD + PDRMASK) >> PDRSHIFT), %ebx
 	shll	$PDESHIFT, %ebx
 	addl	R(IdlePTD), %ebx
 	orl	$(PG_V|PG_RW|PG_PS), %eax

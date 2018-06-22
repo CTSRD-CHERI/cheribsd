@@ -35,11 +35,11 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 
-#include <machine/cheri.h>
-#include <machine/cheric.h>
 #include <machine/cpuregs.h>
 
-#include <cheri/sandbox.h>
+#include <cheri/cheri.h>
+#include <cheri/cheric.h>
+#include <cheri/libcheri_sandbox.h>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -246,10 +246,12 @@ cheri_png_read_start(char *pngbuffer, size_t pnglen,
 	if (ibox_verbose)
 		sb_verbose = ibox_verbose;
 
-	if (sandbox_class == NULL)
+	if (sandbox_class == NULL) {
+		libcheri_init();
 		if (sandbox_class_new("/usr/libexec/readpng-cheri-helper",
 		    8*1024*1024, &sandbox_class) < 0)
 			goto error;
+	}
 	if (sandbox_object == NULL)
 		if (sandbox_object_new(sandbox_class, 4*1024*1024,
 		    &sandbox_object) < 0)
@@ -259,7 +261,7 @@ cheri_png_read_start(char *pngbuffer, size_t pnglen,
 	 * XXXBD: We don't really want to capabilities in the output
 	 * buffer, but memcpy_c will do capability writes
 	 */
-        v = sandbox_object_cinvoke(sandbox_object,
+        v = sandbox_object_invoke(sandbox_object,
 	    width, height, pnglen, 0, 0, 0, 0, 0,
             cheri_ptrperm(__DEVOLATILE(void *, is->buffer),
 	     is->width * is->height * sizeof(*is->buffer),

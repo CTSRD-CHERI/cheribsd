@@ -62,8 +62,11 @@ __FBSDID("$FreeBSD$");
 #include <machine/resource.h>
 #include <machine/intr.h>
 
+#include <arm/arm/nexusvar.h>
+
 #ifdef FDT
 #include <machine/fdt.h>
+#include <dev/ofw/ofw_bus_subr.h>
 #include "ofw_bus_if.h"
 #endif
 
@@ -85,14 +88,16 @@ static	struct resource *nexus_alloc_resource(device_t, device_t, int, int *,
     rman_res_t, rman_res_t, rman_res_t, u_int);
 static	int nexus_activate_resource(device_t, device_t, int, int,
     struct resource *);
-#ifdef ARM_INTRNG
+static bus_space_tag_t nexus_get_bus_tag(device_t, device_t);
+static bus_dma_tag_t nexus_get_dma_tag(device_t dev, device_t child);
+#ifdef INTRNG
 #ifdef SMP
 static	int nexus_bind_intr(device_t, device_t, struct resource *, int);
 #endif
 #endif
 static int nexus_config_intr(device_t dev, int irq, enum intr_trigger trig,
     enum intr_polarity pol);
-#ifdef ARM_INTRNG
+#ifdef INTRNG
 static	int nexus_describe_intr(device_t dev, device_t child,
     struct resource *irq, void *cookie, const char *descr);
 #endif
@@ -110,6 +115,13 @@ static int nexus_ofw_map_intr(device_t dev, device_t child, phandle_t iparent,
     int icells, pcell_t *intr);
 #endif
 
+/*
+ * Normally NULL (which results in defaults which are handled in
+ * busdma_machdep), platform init code can use nexus_set_dma_tag() to set this
+ * to a tag that will be inherited by all busses and devices on the platform.
+ */
+static bus_dma_tag_t nexus_dma_tag;
+
 static device_method_t nexus_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		nexus_probe),
@@ -124,7 +136,9 @@ static device_method_t nexus_methods[] = {
 	DEVMETHOD(bus_release_resource,	nexus_release_resource),
 	DEVMETHOD(bus_setup_intr,	nexus_setup_intr),
 	DEVMETHOD(bus_teardown_intr,	nexus_teardown_intr),
-#ifdef ARM_INTRNG
+	DEVMETHOD(bus_get_bus_tag,	nexus_get_bus_tag),
+	DEVMETHOD(bus_get_dma_tag,	nexus_get_dma_tag),
+#ifdef INTRNG
 	DEVMETHOD(bus_describe_intr,	nexus_describe_intr),
 #ifdef SMP
 	DEVMETHOD(bus_bind_intr,	nexus_bind_intr),
@@ -159,10 +173,11 @@ nexus_attach(device_t dev)
 {
 
 	mem_rman.rm_start = 0;
-	mem_rman.rm_end = ~0ul;
+	mem_rman.rm_end = BUS_SPACE_MAXADDR;
 	mem_rman.rm_type = RMAN_ARRAY;
 	mem_rman.rm_descr = "I/O memory addresses";
-	if (rman_init(&mem_rman) || rman_manage_region(&mem_rman, 0, ~0))
+	if (rman_init(&mem_rman) ||
+	    rman_manage_region(&mem_rman, 0, BUS_SPACE_MAXADDR))
 		panic("nexus_probe mem_rman");
 
 	/*
@@ -231,7 +246,7 @@ nexus_alloc_resource(device_t bus, device_t child, int type, int *rid,
 	}
 
 	rv = rman_reserve_resource(rm, start, end, count, flags, child);
-	if (rv == 0)
+	if (rv == NULL)
 		return (NULL);
 
 	rman_set_rid(rv, *rid);
@@ -260,14 +275,40 @@ nexus_release_resource(device_t bus, device_t child, int type, int rid,
 	return (rman_release_resource(res));
 }
 
+static bus_space_tag_t
+nexus_get_bus_tag(device_t bus __unused, device_t child __unused)
+{
+
+#ifdef FDT
+		return(fdtbus_bs_tag);
+#else
+		return((void *)1);
+#endif
+}
+
+static bus_dma_tag_t
+nexus_get_dma_tag(device_t dev, device_t child)
+{
+
+	return nexus_dma_tag;
+}
+
+void
+nexus_set_dma_tag(bus_dma_tag_t tag)
+{
+
+	nexus_dma_tag = tag;
+}
+
 static int
 nexus_config_intr(device_t dev, int irq, enum intr_trigger trig,
     enum intr_polarity pol)
 {
 	int ret = ENODEV;
 
-#ifdef ARM_INTRNG
-	ret = intr_irq_config(irq, trig, pol);
+#ifdef INTRNG
+	device_printf(dev, "bus_config_intr is obsolete and not supported!\n");
+	ret = EOPNOTSUPP;
 #else
 	if (arm_config_irq)
 		ret = (*arm_config_irq)(irq, trig, pol);
@@ -279,42 +320,43 @@ static int
 nexus_setup_intr(device_t dev, device_t child, struct resource *res, int flags,
     driver_filter_t *filt, driver_intr_t *intr, void *arg, void **cookiep)
 {
+#ifndef INTRNG
 	int irq;
+#endif
 
 	if ((rman_get_flags(res) & RF_SHAREABLE) == 0)
 		flags |= INTR_EXCL;
 
-	for (irq = rman_get_start(res); irq <= rman_get_end(res); irq++) {
-#ifdef ARM_INTRNG
-		intr_irq_add_handler(child, filt, intr, arg, irq, flags,
-		    cookiep);
+#ifdef INTRNG
+	return(intr_setup_irq(child, res, filt, intr, arg, flags, cookiep));
 #else
+	for (irq = rman_get_start(res); irq <= rman_get_end(res); irq++) {
 		arm_setup_irqhandler(device_get_nameunit(child),
 		    filt, intr, arg, irq, flags, cookiep);
 		arm_unmask_irq(irq);
-#endif
 	}
 	return (0);
+#endif
 }
 
 static int
 nexus_teardown_intr(device_t dev, device_t child, struct resource *r, void *ih)
 {
 
-#ifdef ARM_INTRNG
-	return (intr_irq_remove_handler(child, rman_get_start(r), ih));
+#ifdef INTRNG
+	return (intr_teardown_irq(child, r, ih));
 #else
 	return (arm_remove_irqhandler(rman_get_start(r), ih));
 #endif
 }
 
-#ifdef ARM_INTRNG
+#ifdef INTRNG
 static int
 nexus_describe_intr(device_t dev, device_t child, struct resource *irq,
     void *cookie, const char *descr)
 {
 
-	return (intr_irq_describe(rman_get_start(irq), cookie, descr));
+	return (intr_describe_irq(child, irq, cookie, descr));
 }
 
 #ifdef SMP
@@ -322,7 +364,7 @@ static int
 nexus_bind_intr(device_t dev, device_t child, struct resource *irq, int cpu)
 {
 
-	return (intr_irq_bind(rman_get_start(irq), cpu));
+	return (intr_bind_irq(child, irq, cpu));
 }
 #endif
 #endif
@@ -363,6 +405,15 @@ nexus_activate_resource(device_t bus, device_t child, int type, int rid,
 #endif
 		rman_set_virtual(r, (void *)vaddr);
 		rman_set_bushandle(r, vaddr);
+		return (0);
+	} else if (type == SYS_RES_IRQ) {
+#ifdef INTRNG
+		err = intr_activate_irq(child, r);
+		if (err != 0) {
+			rman_deactivate_resource(r);
+			return (err);
+		}
+#endif
 	}
 	return (0);
 }
@@ -374,17 +425,23 @@ nexus_deactivate_resource(device_t bus, device_t child, int type, int rid,
 	bus_size_t psize;
 	bus_space_handle_t vaddr;
 
-	psize = (bus_size_t)rman_get_size(r);
-	vaddr = rman_get_bushandle(r);
+	if (type == SYS_RES_MEMORY || type == SYS_RES_IOPORT) {
+		psize = (bus_size_t)rman_get_size(r);
+		vaddr = rman_get_bushandle(r);
 
-	if (vaddr != 0) {
+		if (vaddr != 0) {
 #ifdef FDT
-		bus_space_unmap(fdtbus_bs_tag, vaddr, psize);
+			bus_space_unmap(fdtbus_bs_tag, vaddr, psize);
 #else
-		pmap_unmapdev((vm_offset_t)vaddr, (vm_size_t)psize);
+			pmap_unmapdev((vm_offset_t)vaddr, (vm_size_t)psize);
 #endif
-		rman_set_virtual(r, NULL);
-		rman_set_bushandle(r, 0);
+			rman_set_virtual(r, NULL);
+			rman_set_bushandle(r, 0);
+		}
+	} else if (type == SYS_RES_IRQ) {
+#ifdef INTRNG
+		intr_deactivate_irq(child, r);
+#endif
 	}
 
 	return (rman_deactivate_resource(r));
@@ -395,7 +452,22 @@ static int
 nexus_ofw_map_intr(device_t dev, device_t child, phandle_t iparent, int icells,
     pcell_t *intr)
 {
-
+#ifndef INTRNG
 	return (intr_fdt_map_irq(iparent, intr, icells));
+#else
+	u_int irq;
+	struct intr_map_data_fdt *fdt_data;
+	size_t len;
+
+	len = sizeof(*fdt_data) + icells * sizeof(pcell_t);
+	fdt_data = (struct intr_map_data_fdt *)intr_alloc_map_data(
+	    INTR_MAP_DATA_FDT, len, M_WAITOK | M_ZERO);
+	fdt_data->iparent = iparent;
+	fdt_data->ncells = icells;
+	memcpy(fdt_data->cells, intr, icells * sizeof(pcell_t));
+	irq = intr_map_irq(NULL, iparent, (struct intr_map_data *)fdt_data);
+	return (irq);
+#endif /* INTRNG */
 }
-#endif
+#endif /* FDT */
+

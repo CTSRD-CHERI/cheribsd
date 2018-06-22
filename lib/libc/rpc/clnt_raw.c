@@ -1,6 +1,8 @@
 /*	$NetBSD: clnt_raw.c,v 1.20 2000/12/10 04:12:03 christos Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2009, Sun Microsystems, Inc.
  * All rights reserved.
  *
@@ -26,6 +28,17 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
  * POSSIBILITY OF SUCH DAMAGE.
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "sunrpc"
+ * }
+ * CHERI CHANGES END
  */
 
 #if defined(LIBC_SCCS) && !defined(lint)
@@ -168,7 +181,7 @@ call_again:
 	if ((! XDR_PUTBYTES(xdrs, clp->u.mashl_callmsg, clp->mcnt)) ||
 	    (! XDR_PUTINT32(xdrs, &proc)) ||
 	    (! AUTH_MARSHALL(h->cl_auth, xdrs)) ||
-	    (! (*xargs)(xdrs, argsp))) {
+	    (! (*xargs)(xdrs, argsp, 0))) {
 		return (RPC_CANTENCODEARGS);
 	}
 	(void)XDR_GETPOS(xdrs);  /* called just to cause overhead */
@@ -253,7 +266,7 @@ clnt_raw_freeres(CLIENT *cl, xdrproc_t xdr_res, void *res_ptr)
 	}
 	mutex_unlock(&clntraw_lock);
 	xdrs->x_op = XDR_FREE;
-	return ((*xdr_res)(xdrs, res_ptr));
+	return ((*xdr_res)(xdrs, res_ptr, 0));
 }
 
 /*ARGSUSED*/

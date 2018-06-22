@@ -80,6 +80,11 @@ __ledf2(fp_t a, fp_t b) {
     }
 }
 
+#if defined(__ELF__)
+// Alias for libgcc compatibility
+FNALIAS(__cmpdf2, __ledf2);
+#endif
+
 enum GE_RESULT {
     GE_LESS      = -1,
     GE_EQUAL     =  0,
@@ -107,8 +112,6 @@ __gedf2(fp_t a, fp_t b) {
         else return GE_GREATER;
     }
 }
-
-ARM_EABI_FNALIAS(dcmpun, unorddf2)
 
 COMPILER_RT_ABI int
 __unorddf2(fp_t a, fp_t b) {
@@ -138,4 +141,10 @@ COMPILER_RT_ABI enum GE_RESULT
 __gtdf2(fp_t a, fp_t b) {
     return __gedf2(a, b);
 }
+
+#if defined(__ARM_EABI__)
+AEABI_RTABI int __aeabi_dcmpun(fp_t a, fp_t b) {
+  return __unorddf2(a, b);
+}
+#endif
 

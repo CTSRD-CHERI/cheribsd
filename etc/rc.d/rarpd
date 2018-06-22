@@ -6,11 +6,12 @@
 # PROVIDE: rarpd
 # REQUIRE: DAEMON FILESYSTEMS
 # BEFORE:  LOGIN
-# KEYWORD: nojail
+# KEYWORD: nojailvnet
 
 . /etc/rc.subr
 
 name="rarpd"
+desc="Reverse ARP daemon"
 rcvar="rarpd_enable"
 command="/usr/sbin/${name}"
 required_files="/etc/ethers"

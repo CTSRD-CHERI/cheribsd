@@ -523,7 +523,8 @@ mac_socket_label_set(struct ucred *cred, struct socket *so,
 }
 
 int
-mac_setsockopt_label(struct ucred *cred, struct socket *so, struct mac *mac)
+mac_setsockopt_label(struct ucred *cred, struct socket *so,
+    const kmac_t *mac)
 {
 	struct label *intlabel;
 	char *buffer;
@@ -537,7 +538,8 @@ mac_setsockopt_label(struct ucred *cred, struct socket *so, struct mac *mac)
 		return (error);
 
 	buffer = malloc(mac->m_buflen, M_MACTEMP, M_WAITOK);
-	error = copyinstr(mac->m_string, buffer, mac->m_buflen, NULL);
+	error = copyinstr_c(mac->m_string,
+	    (__cheri_tocap char * __capability)buffer, mac->m_buflen, NULL);
 	if (error) {
 		free(buffer, M_MACTEMP);
 		return (error);
@@ -556,7 +558,8 @@ out:
 }
 
 int
-mac_getsockopt_label(struct ucred *cred, struct socket *so, struct mac *mac)
+mac_getsockopt_label(struct ucred *cred, struct socket *so,
+    const kmac_t *mac)
 {
 	char *buffer, *elements;
 	struct label *intlabel;
@@ -570,7 +573,8 @@ mac_getsockopt_label(struct ucred *cred, struct socket *so, struct mac *mac)
 		return (error);
 
 	elements = malloc(mac->m_buflen, M_MACTEMP, M_WAITOK);
-	error = copyinstr(mac->m_string, elements, mac->m_buflen, NULL);
+	error = copyinstr_c(mac->m_string,
+	    (__cheri_tocap char * __capability)elements, mac->m_buflen, NULL);
 	if (error) {
 		free(elements, M_MACTEMP);
 		return (error);
@@ -585,7 +589,8 @@ mac_getsockopt_label(struct ucred *cred, struct socket *so, struct mac *mac)
 	    mac->m_buflen);
 	mac_socket_label_free(intlabel);
 	if (error == 0)
-		error = copyout(buffer, mac->m_string, strlen(buffer)+1);
+		error = copyout_c((__cheri_tocap char * __capability)buffer,
+		    mac->m_string, strlen(buffer)+1);
 
 	free(buffer, M_MACTEMP);
 	free(elements, M_MACTEMP);
@@ -595,7 +600,7 @@ mac_getsockopt_label(struct ucred *cred, struct socket *so, struct mac *mac)
 
 int
 mac_getsockopt_peerlabel(struct ucred *cred, struct socket *so,
-    struct mac *mac)
+    const kmac_t *mac)
 {
 	char *elements, *buffer;
 	struct label *intlabel;
@@ -609,7 +614,8 @@ mac_getsockopt_peerlabel(struct ucred *cred, struct socket *so,
 		return (error);
 
 	elements = malloc(mac->m_buflen, M_MACTEMP, M_WAITOK);
-	error = copyinstr(mac->m_string, elements, mac->m_buflen, NULL);
+	error = copyinstr_c(mac->m_string,
+	    (__cheri_tocap char * __capability)elements, mac->m_buflen, NULL);
 	if (error) {
 		free(elements, M_MACTEMP);
 		return (error);
@@ -624,7 +630,8 @@ mac_getsockopt_peerlabel(struct ucred *cred, struct socket *so,
 	    mac->m_buflen);
 	mac_socket_label_free(intlabel);
 	if (error == 0)
-		error = copyout(buffer, mac->m_string, strlen(buffer)+1);
+		error = copyout_c((__cheri_tocap char * __capability)buffer,
+		    mac->m_string, strlen(buffer)+1);
 
 	free(buffer, M_MACTEMP);
 	free(elements, M_MACTEMP);

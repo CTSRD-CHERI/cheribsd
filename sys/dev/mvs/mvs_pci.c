@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2010 Alexander Motin <mav@FreeBSD.org>
  * All rights reserved.
  *
@@ -316,7 +318,7 @@ mvs_setup_interrupt(device_t dev)
 		device_printf(dev, "unable to setup interrupt\n");
 		bus_release_resource(dev, SYS_RES_IRQ,
 		    ctlr->irq.r_irq_rid, ctlr->irq.r_irq);
-		ctlr->irq.r_irq = 0;
+		ctlr->irq.r_irq = NULL;
 		return (ENXIO);
 	}
 	return (0);
@@ -336,7 +338,7 @@ mvs_intr(void *data)
 
 	ic = ATA_INL(ctlr->r_mem, CHIP_MIC);
 	if (ctlr->msi) {
-		/* We have to to mask MSI during processing. */
+		/* We have to mask MSI during processing. */
 		mtx_lock(&ctlr->mtx);
 		ATA_OUTL(ctlr->r_mem, CHIP_MIM, 0);
 		ctlr->msia = 1; /* Deny MIM update during processing. */
@@ -396,7 +398,7 @@ mvs_alloc_resource(device_t dev, device_t child, int type, int *rid,
 	int unit = ((struct mvs_channel *)device_get_softc(child))->unit;
 	struct resource *res = NULL;
 	int offset = HC_BASE(unit >> 2) + PORT_BASE(unit & 0x03);
-	long st;
+	rman_res_t st;
 
 	switch (type) {
 	case SYS_RES_MEMORY:

@@ -16,15 +16,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/Analysis/CaptureTracking.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/CFG.h"
-#include "llvm/Analysis/CaptureTracking.h"
+#include "llvm/Analysis/OrderedBasicBlock.h"
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicInst.h"
 
 using namespace llvm;
 
@@ -52,63 +54,6 @@ namespace {
     bool Captured;
   };
 
-  struct NumberedInstCache {
-    SmallDenseMap<const Instruction *, unsigned, 32> NumberedInsts;
-    BasicBlock::const_iterator LastInstFound;
-    unsigned LastInstPos;
-    const BasicBlock *BB;
-
-    NumberedInstCache(const BasicBlock *BasicB) : LastInstPos(0), BB(BasicB) {
-      LastInstFound = BB->end();
-    }
-
-    /// \brief Find the first instruction 'A' or 'B' in 'BB'. Number out
-    /// instruction while walking 'BB'.
-    const Instruction *find(const Instruction *A, const Instruction *B) {
-      const Instruction *Inst = nullptr;
-      assert(!(LastInstFound == BB->end() && LastInstPos != 0) &&
-             "Instruction supposed to be in NumberedInsts");
-
-      // Start the search with the instruction found in the last lookup round.
-      auto II = BB->begin();
-      auto IE = BB->end();
-      if (LastInstFound != IE)
-        II = std::next(LastInstFound);
-
-      // Number all instructions up to the point where we find 'A' or 'B'.
-      for (++LastInstPos; II != IE; ++II, ++LastInstPos) {
-        Inst = cast<Instruction>(II);
-        NumberedInsts[Inst] = LastInstPos;
-        if (Inst == A || Inst == B)
-          break;
-      }
-
-      assert(II != IE && "Instruction not found?");
-      LastInstFound = II;
-      return Inst;
-    }
-
-    /// \brief Find out whether 'A' dominates 'B', meaning whether 'A'
-    /// comes before 'B' in 'BB'. This is a simplification that considers
-    /// cached instruction positions and ignores other basic blocks, being
-    /// only relevant to compare relative instructions positions inside 'BB'.
-    bool dominates(const Instruction *A, const Instruction *B) {
-      assert(A->getParent() == B->getParent() &&
-             "Instructions must be in the same basic block!");
-
-      unsigned NA = NumberedInsts.lookup(A);
-      unsigned NB = NumberedInsts.lookup(B);
-      if (NA && NB)
-        return NA < NB;
-      if (NA)
-        return true;
-      if (NB)
-        return false;
-
-      return A == find(A, B);
-    }
-  };
-
   /// Only find pointer captures which happen before the given instruction. Uses
   /// the dominator tree to determine whether one instruction is before another.
   /// Only support the case where the Value is defined in the same basic block
@@ -116,8 +61,8 @@ namespace {
   struct CapturesBefore : public CaptureTracker {
 
     CapturesBefore(bool ReturnCaptures, const Instruction *I, DominatorTree *DT,
-                   bool IncludeI)
-      : LocalInstCache(I->getParent()), BeforeHere(I), DT(DT),
+                   bool IncludeI, OrderedBasicBlock *IC)
+      : OrderedBB(IC), BeforeHere(I), DT(DT),
         ReturnCaptures(ReturnCaptures), IncludeI(IncludeI), Captured(false) {}
 
     void tooManyUses() override { Captured = true; }
@@ -131,36 +76,33 @@ namespace {
 
       // Compute the case where both instructions are inside the same basic
       // block. Since instructions in the same BB as BeforeHere are numbered in
-      // 'LocalInstCache', avoid using 'dominates' and 'isPotentiallyReachable'
+      // 'OrderedBB', avoid using 'dominates' and 'isPotentiallyReachable'
       // which are very expensive for large basic blocks.
       if (BB == BeforeHere->getParent()) {
         // 'I' dominates 'BeforeHere' => not safe to prune.
         //
-        // The value defined by an invoke dominates an instruction only if it
-        // dominates every instruction in UseBB. A PHI is dominated only if
-        // the instruction dominates every possible use in the UseBB. Since
+        // The value defined by an invoke dominates an instruction only
+        // if it dominates every instruction in UseBB. A PHI is dominated only
+        // if the instruction dominates every possible use in the UseBB. Since
         // UseBB == BB, avoid pruning.
         if (isa<InvokeInst>(BeforeHere) || isa<PHINode>(I) || I == BeforeHere)
           return false;
-        if (!LocalInstCache.dominates(BeforeHere, I))
+        if (!OrderedBB->dominates(BeforeHere, I))
           return false;
 
         // 'BeforeHere' comes before 'I', it's safe to prune if we also
         // guarantee that 'I' never reaches 'BeforeHere' through a back-edge or
         // by its successors, i.e, prune if:
         //
-        //  (1) BB is an entry block or have no sucessors.
-        //  (2) There's no path coming back through BB sucessors.
+        //  (1) BB is an entry block or have no successors.
+        //  (2) There's no path coming back through BB successors.
         if (BB == &BB->getParent()->getEntryBlock() ||
             !BB->getTerminator()->getNumSuccessors())
           return true;
 
         SmallVector<BasicBlock*, 32> Worklist;
         Worklist.append(succ_begin(BB), succ_end(BB));
-        if (!isPotentiallyReachableFromMany(Worklist, BB, DT))
-          return true;
-
-        return false;
+        return !isPotentiallyReachableFromMany(Worklist, BB, DT);
       }
 
       // If the value is defined in the same basic block as use and BeforeHere,
@@ -196,7 +138,7 @@ namespace {
       return true;
     }
 
-    NumberedInstCache LocalInstCache;
+    OrderedBasicBlock *OrderedBB;
     const Instruction *BeforeHere;
     DominatorTree *DT;
 
@@ -238,21 +180,29 @@ bool llvm::PointerMayBeCaptured(const Value *V,
 /// returning the value (or part of it) from the function counts as capturing
 /// it or not.  The boolean StoreCaptures specified whether storing the value
 /// (or part of it) into memory anywhere automatically counts as capturing it
-/// or not.
+/// or not. A ordered basic block \p OBB can be used in order to speed up
+/// queries about relative order among instructions in the same basic block.
 bool llvm::PointerMayBeCapturedBefore(const Value *V, bool ReturnCaptures,
                                       bool StoreCaptures, const Instruction *I,
-                                      DominatorTree *DT, bool IncludeI) {
+                                      DominatorTree *DT, bool IncludeI,
+                                      OrderedBasicBlock *OBB) {
   assert(!isa<GlobalValue>(V) &&
          "It doesn't make sense to ask whether a global is captured.");
+  bool UseNewOBB = OBB == nullptr;
 
   if (!DT)
     return PointerMayBeCaptured(V, ReturnCaptures, StoreCaptures);
+  if (UseNewOBB)
+    OBB = new OrderedBasicBlock(I->getParent());
 
   // TODO: See comment in PointerMayBeCaptured regarding what could be done
   // with StoreCaptures.
 
-  CapturesBefore CB(ReturnCaptures, I, DT, IncludeI);
+  CapturesBefore CB(ReturnCaptures, I, DT, IncludeI, OBB);
   PointerMayBeCaptured(V, &CB);
+
+  if (UseNewOBB)
+    delete OBB;
   return CB.Captured;
 }
 
@@ -293,6 +243,13 @@ void llvm::PointerMayBeCaptured(const Value *V, CaptureTracker *Tracker) {
       if (CS.onlyReadsMemory() && CS.doesNotThrow() && I->getType()->isVoidTy())
         break;
 
+      // Volatile operations effectively capture the memory location that they
+      // load and store to.
+      if (auto *MI = dyn_cast<MemIntrinsic>(I))
+        if (MI->isVolatile())
+          if (Tracker->captured(U))
+            return;
+
       // Not captured if only passed via 'nocapture' arguments.  Note that
       // calling a function pointer does not in itself cause the pointer to
       // be captured.  This is a subtle point considering that (for example)
@@ -300,8 +257,9 @@ void llvm::PointerMayBeCaptured(const Value *V, CaptureTracker *Tracker) {
       // that loading a value from a pointer does not cause the pointer to be
       // captured, even though the loaded value might be the pointer itself
       // (think of self-referential objects).
-      CallSite::arg_iterator B = CS.arg_begin(), E = CS.arg_end();
-      for (CallSite::arg_iterator A = B; A != E; ++A)
+      CallSite::data_operand_iterator B =
+        CS.data_operands_begin(), E = CS.data_operands_end();
+      for (CallSite::data_operand_iterator A = B; A != E; ++A)
         if (A->get() == V && !CS.doesNotCapture(A - B))
           // The parameter is not marked 'nocapture' - captured.
           if (Tracker->captured(U))
@@ -309,18 +267,46 @@ void llvm::PointerMayBeCaptured(const Value *V, CaptureTracker *Tracker) {
       break;
     }
     case Instruction::Load:
-      // Loading from a pointer does not cause it to be captured.
+      // Volatile loads make the address observable.
+      if (cast<LoadInst>(I)->isVolatile())
+        if (Tracker->captured(U))
+          return;
       break;
     case Instruction::VAArg:
       // "va-arg" from a pointer does not cause it to be captured.
       break;
     case Instruction::Store:
-      if (V == I->getOperand(0))
         // Stored the pointer - conservatively assume it may be captured.
+        // Volatile stores make the address observable.
+      if (V == I->getOperand(0) || cast<StoreInst>(I)->isVolatile())
         if (Tracker->captured(U))
           return;
-      // Storing to the pointee does not cause the pointer to be captured.
       break;
+    case Instruction::AtomicRMW: {
+      // atomicrmw conceptually includes both a load and store from
+      // the same location.
+      // As with a store, the location being accessed is not captured,
+      // but the value being stored is.
+      // Volatile stores make the address observable.
+      auto *ARMWI = cast<AtomicRMWInst>(I);
+      if (ARMWI->getValOperand() == V || ARMWI->isVolatile())
+        if (Tracker->captured(U))
+          return;
+      break;
+    }
+    case Instruction::AtomicCmpXchg: {
+      // cmpxchg conceptually includes both a load and store from
+      // the same location.
+      // As with a store, the location being accessed is not captured,
+      // but the value being stored is.
+      // Volatile stores make the address observable.
+      auto *ACXI = cast<AtomicCmpXchgInst>(I);
+      if (ACXI->getCompareOperand() == V || ACXI->getNewValOperand() == V ||
+          ACXI->isVolatile())
+        if (Tracker->captured(U))
+          return;
+      break;
+    }
     case Instruction::BitCast:
     case Instruction::GetElementPtr:
     case Instruction::PHI:
@@ -339,7 +325,7 @@ void llvm::PointerMayBeCaptured(const Value *V, CaptureTracker *Tracker) {
             Worklist.push_back(&UU);
       }
       break;
-    case Instruction::ICmp:
+    case Instruction::ICmp: {
       // Don't count comparisons of a no-alias return value against null as
       // captures. This allows us to ignore comparisons of malloc results
       // with null, for example.
@@ -348,11 +334,19 @@ void llvm::PointerMayBeCaptured(const Value *V, CaptureTracker *Tracker) {
         if (CPN->getType()->getAddressSpace() == 0)
           if (isNoAliasCall(V->stripPointerCasts()))
             break;
+      // Comparison against value stored in global variable. Given the pointer
+      // does not escape, its value cannot be guessed and stored separately in a
+      // global variable.
+      unsigned OtherIndex = (I->getOperand(0) == V) ? 1 : 0;
+      auto *LI = dyn_cast<LoadInst>(I->getOperand(OtherIndex));
+      if (LI && isa<GlobalVariable>(LI->getPointerOperand()))
+        break;
       // Otherwise, be conservative. There are crazy ways to capture pointers
       // using comparisons.
       if (Tracker->captured(U))
         return;
       break;
+    }
     default:
       // Something else - be conservative and say it is captured.
       if (Tracker->captured(U))

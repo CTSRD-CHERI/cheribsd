@@ -64,12 +64,9 @@ struct ShadowSegmentEndpoint {
 };
 
 void FlushUnneededASanShadowMemory(uptr p, uptr size) {
-    // Since asan's mapping is compacting, the shadow chunk may be
-    // not page-aligned, so we only flush the page-aligned portion.
-    uptr page_size = GetPageSizeCached();
-    uptr shadow_beg = RoundUpTo(MemToShadow(p), page_size);
-    uptr shadow_end = RoundDownTo(MemToShadow(p + size), page_size);
-    FlushUnneededShadowMemory(shadow_beg, shadow_end - shadow_beg);
+  // Since asan's mapping is compacting, the shadow chunk may be
+  // not page-aligned, so we only flush the page-aligned portion.
+  ReleaseMemoryPagesToOS(MemToShadow(p), MemToShadow(p + size));
 }
 
 void AsanPoisonOrUnpoisonIntraObjectRedzone(uptr ptr, uptr size, bool poison) {
@@ -102,7 +99,7 @@ using namespace __asan;  // NOLINT
 // that user program (un)poisons the memory it owns. It poisons memory
 // conservatively, and unpoisons progressively to make sure asan shadow
 // mapping invariant is preserved (see detailed mapping description here:
-// http://code.google.com/p/address-sanitizer/wiki/AddressSanitizerAlgorithm).
+// https://github.com/google/sanitizers/wiki/AddressSanitizerAlgorithm).
 //
 // * if user asks to poison region [left, right), the program poisons
 // at least [left, AlignDown(right)).
@@ -117,9 +114,9 @@ void __asan_poison_memory_region(void const volatile *addr, uptr size) {
   ShadowSegmentEndpoint beg(beg_addr);
   ShadowSegmentEndpoint end(end_addr);
   if (beg.chunk == end.chunk) {
-    CHECK(beg.offset < end.offset);
+    CHECK_LT(beg.offset, end.offset);
     s8 value = beg.value;
-    CHECK(value == end.value);
+    CHECK_EQ(value, end.value);
     // We can only poison memory if the byte in end.offset is unaddressable.
     // No need to re-poison memory if it is poisoned already.
     if (value > 0 && value <= end.offset) {
@@ -131,7 +128,7 @@ void __asan_poison_memory_region(void const volatile *addr, uptr size) {
     }
     return;
   }
-  CHECK(beg.chunk < end.chunk);
+  CHECK_LT(beg.chunk, end.chunk);
   if (beg.offset > 0) {
     // Mark bytes from beg.offset as unaddressable.
     if (beg.value == 0) {
@@ -157,9 +154,9 @@ void __asan_unpoison_memory_region(void const volatile *addr, uptr size) {
   ShadowSegmentEndpoint beg(beg_addr);
   ShadowSegmentEndpoint end(end_addr);
   if (beg.chunk == end.chunk) {
-    CHECK(beg.offset < end.offset);
+    CHECK_LT(beg.offset, end.offset);
     s8 value = beg.value;
-    CHECK(value == end.value);
+    CHECK_EQ(value, end.value);
     // We unpoison memory bytes up to enbytes up to end.offset if it is not
     // unpoisoned already.
     if (value != 0) {
@@ -167,7 +164,7 @@ void __asan_unpoison_memory_region(void const volatile *addr, uptr size) {
     }
     return;
   }
-  CHECK(beg.chunk < end.chunk);
+  CHECK_LT(beg.chunk, end.chunk);
   if (beg.offset > 0) {
     *beg.chunk = 0;
     beg.chunk++;
@@ -314,6 +311,30 @@ static void PoisonAlignedStackMemory(uptr addr, uptr size, bool do_poison) {
   }
 }
 
+void __asan_set_shadow_00(uptr addr, uptr size) {
+  REAL(memset)((void *)addr, 0, size);
+}
+
+void __asan_set_shadow_f1(uptr addr, uptr size) {
+  REAL(memset)((void *)addr, 0xf1, size);
+}
+
+void __asan_set_shadow_f2(uptr addr, uptr size) {
+  REAL(memset)((void *)addr, 0xf2, size);
+}
+
+void __asan_set_shadow_f3(uptr addr, uptr size) {
+  REAL(memset)((void *)addr, 0xf3, size);
+}
+
+void __asan_set_shadow_f5(uptr addr, uptr size) {
+  REAL(memset)((void *)addr, 0xf5, size);
+}
+
+void __asan_set_shadow_f8(uptr addr, uptr size) {
+  REAL(memset)((void *)addr, 0xf8, size);
+}
+
 void __asan_poison_stack_memory(uptr addr, uptr size) {
   VReport(1, "poisoning: %p %zx\n", (void *)addr, size);
   PoisonAlignedStackMemory(addr, size, true);
@@ -343,7 +364,7 @@ void __sanitizer_annotate_contiguous_container(const void *beg_p,
                                                  &stack);
   }
   CHECK_LE(end - beg,
-           FIRST_32_SECOND_64(1UL << 30, 1UL << 34)); // Sanity check.
+           FIRST_32_SECOND_64(1UL << 30, 1ULL << 34)); // Sanity check.
 
   uptr a = RoundDownTo(Min(old_mid, new_mid), granularity);
   uptr c = RoundUpTo(Max(old_mid, new_mid), granularity);
@@ -354,7 +375,7 @@ void __sanitizer_annotate_contiguous_container(const void *beg_p,
   // Make a quick sanity check that we are indeed in this state.
   //
   // FIXME: Two of these three checks are disabled until we fix
-  // https://code.google.com/p/address-sanitizer/issues/detail?id=258.
+  // https://github.com/google/sanitizers/issues/258.
   // if (d1 != d2)
   //  CHECK_EQ(*(u8*)MemToShadow(d1), old_mid - d1);
   if (a + granularity <= d1)
@@ -375,10 +396,10 @@ void __sanitizer_annotate_contiguous_container(const void *beg_p,
   }
 }
 
-int __sanitizer_verify_contiguous_container(const void *beg_p,
-                                            const void *mid_p,
-                                            const void *end_p) {
-  if (!flags()->detect_container_overflow) return 1;
+const void *__sanitizer_contiguous_container_find_bad_address(
+    const void *beg_p, const void *mid_p, const void *end_p) {
+  if (!flags()->detect_container_overflow)
+    return nullptr;
   uptr beg = reinterpret_cast<uptr>(beg_p);
   uptr end = reinterpret_cast<uptr>(end_p);
   uptr mid = reinterpret_cast<uptr>(mid_p);
@@ -388,24 +409,31 @@ int __sanitizer_verify_contiguous_container(const void *beg_p,
   // ending with end.
   uptr kMaxRangeToCheck = 32;
   uptr r1_beg = beg;
-  uptr r1_end = Min(end + kMaxRangeToCheck, mid);
+  uptr r1_end = Min(beg + kMaxRangeToCheck, mid);
   uptr r2_beg = Max(beg, mid - kMaxRangeToCheck);
   uptr r2_end = Min(end, mid + kMaxRangeToCheck);
   uptr r3_beg = Max(end - kMaxRangeToCheck, mid);
   uptr r3_end = end;
   for (uptr i = r1_beg; i < r1_end; i++)
     if (AddressIsPoisoned(i))
-      return 0;
+      return reinterpret_cast<const void *>(i);
   for (uptr i = r2_beg; i < mid; i++)
     if (AddressIsPoisoned(i))
-      return 0;
+      return reinterpret_cast<const void *>(i);
   for (uptr i = mid; i < r2_end; i++)
     if (!AddressIsPoisoned(i))
-      return 0;
+      return reinterpret_cast<const void *>(i);
   for (uptr i = r3_beg; i < r3_end; i++)
     if (!AddressIsPoisoned(i))
-      return 0;
-  return 1;
+      return reinterpret_cast<const void *>(i);
+  return nullptr;
+}
+
+int __sanitizer_verify_contiguous_container(const void *beg_p,
+                                            const void *mid_p,
+                                            const void *end_p) {
+  return __sanitizer_contiguous_container_find_bad_address(beg_p, mid_p,
+                                                           end_p) == nullptr;
 }
 
 extern "C" SANITIZER_INTERFACE_ATTRIBUTE

@@ -49,7 +49,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/bus.h>
 #include <machine/cpu.h>
 
-#include <dev/fdt/fdt_common.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
@@ -164,7 +163,7 @@ aml8726_usb_phy_attach(device_t dev)
 			sc->force_aca = TRUE;
 	}
 
-	free(force_aca, M_OFWPROP);
+	OF_prop_free(force_aca);
 
 	err = 0;
 
@@ -187,7 +186,7 @@ aml8726_usb_phy_attach(device_t dev)
 		}
 	}
 
-	free(prop, M_OFWPROP);
+	OF_prop_free(prop);
 
 	len = OF_getencprop_alloc(node, "usb-hub-rst",
 	    3 * sizeof(pcell_t), (void **)&prop);
@@ -200,7 +199,7 @@ aml8726_usb_phy_attach(device_t dev)
 			err = 1;
 	}
 
-	free(prop, M_OFWPROP);
+	OF_prop_free(prop);
 
 	if (err) {
 		device_printf(dev, "unable to parse gpio\n");

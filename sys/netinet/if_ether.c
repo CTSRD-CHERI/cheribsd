@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1988, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -137,13 +139,34 @@ SYSCTL_INT(_net_link_ether_inet, OID_AUTO, max_log_per_second,
 	"Maximum number of remotely triggered ARP messages that can be "
 	"logged per second");
 
+/*
+ * Due to the exponential backoff algorithm used for the interval between GARP
+ * retransmissions, the maximum number of retransmissions is limited for
+ * sanity. This limit corresponds to a maximum interval between retransmissions
+ * of 2^16 seconds ~= 18 hours.
+ *
+ * Making this limit more dynamic is more complicated than worthwhile,
+ * especially since sending out GARPs spaced days apart would be of little
+ * use. A maximum dynamic limit would look something like:
+ *
+ * const int max = fls(INT_MAX / hz) - 1;
+ */
+#define MAX_GARP_RETRANSMITS 16
+static int sysctl_garp_rexmit(SYSCTL_HANDLER_ARGS);
+static int garp_rexmit_count = 0; /* GARP retransmission setting. */
+
+SYSCTL_PROC(_net_link_ether_inet, OID_AUTO, garp_rexmit_count,
+    CTLTYPE_INT|CTLFLAG_RW|CTLFLAG_MPSAFE,
+    &garp_rexmit_count, 0, sysctl_garp_rexmit, "I",
+    "Number of times to retransmit GARP packets;"
+    " 0 to disable, maximum of 16");
+
 #define	ARP_LOG(pri, ...)	do {					\
 	if (ppsratecheck(&arp_lastlog, &arp_curpps, arp_maxpps))	\
 		log((pri), "arp: " __VA_ARGS__);			\
 } while (0)
 
 
-static void	arp_init(void);
 static void	arpintr(struct mbuf *);
 static void	arptimer(void *);
 #ifdef INET
@@ -420,7 +443,8 @@ arprequest(struct ifnet *ifp, const struct in_addr *sip,
  */
 static int
 arpresolve_full(struct ifnet *ifp, int is_gw, int flags, struct mbuf *m,
-	const struct sockaddr *dst, u_char *desten, uint32_t *pflags)
+	const struct sockaddr *dst, u_char *desten, uint32_t *pflags,
+	struct llentry **plle)
 {
 	struct llentry *la = NULL, *la_tmp;
 	struct mbuf *curr = NULL;
@@ -431,6 +455,8 @@ arpresolve_full(struct ifnet *ifp, int is_gw, int flags, struct mbuf *m,
 
 	if (pflags != NULL)
 		*pflags = 0;
+	if (plle != NULL)
+		*plle = NULL;
 
 	if ((flags & LLE_CREATE) == 0) {
 		IF_AFDATA_RLOCK(ifp);
@@ -440,9 +466,12 @@ arpresolve_full(struct ifnet *ifp, int is_gw, int flags, struct mbuf *m,
 	if (la == NULL && (ifp->if_flags & (IFF_NOARP | IFF_STATICARP)) == 0) {
 		la = lltable_alloc_entry(LLTABLE(ifp), 0, dst);
 		if (la == NULL) {
+			char addrbuf[INET_ADDRSTRLEN];
+
 			log(LOG_DEBUG,
 			    "arpresolve: can't allocate llinfo for %s on %s\n",
-			    inet_ntoa(SIN(dst)->sin_addr), if_name(ifp));
+			    inet_ntoa_r(SIN(dst)->sin_addr, addrbuf),
+			    if_name(ifp));
 			m_freem(m);
 			return (EINVAL);
 		}
@@ -483,6 +512,10 @@ arpresolve_full(struct ifnet *ifp, int is_gw, int flags, struct mbuf *m,
 		}
 		if (pflags != NULL)
 			*pflags = la->la_flags & (LLE_VALID|LLE_IFADDR);
+		if (plle) {
+			LLE_ADDREF(la);
+			*plle = la;
+		}
 		LLE_WUNLOCK(la);
 		return (0);
 	}
@@ -548,12 +581,12 @@ arpresolve_full(struct ifnet *ifp, int is_gw, int flags, struct mbuf *m,
  */
 int
 arpresolve_addr(struct ifnet *ifp, int flags, const struct sockaddr *dst,
-    char *desten, uint32_t *pflags)
+    char *desten, uint32_t *pflags, struct llentry **plle)
 {
 	int error;
 
 	flags |= LLE_ADDRONLY;
-	error = arpresolve_full(ifp, 0, flags, NULL, dst, desten, pflags);
+	error = arpresolve_full(ifp, 0, flags, NULL, dst, desten, pflags, plle);
 	return (error);
 }
 
@@ -576,12 +609,15 @@ arpresolve_addr(struct ifnet *ifp, int flags, const struct sockaddr *dst,
  */
 int
 arpresolve(struct ifnet *ifp, int is_gw, struct mbuf *m,
-	const struct sockaddr *dst, u_char *desten, uint32_t *pflags)
+	const struct sockaddr *dst, u_char *desten, uint32_t *pflags,
+	struct llentry **plle)
 {
-	struct llentry *la = 0;
+	struct llentry *la = NULL;
 
 	if (pflags != NULL)
 		*pflags = 0;
+	if (plle != NULL)
+		*plle = NULL;
 
 	if (m != NULL) {
 		if (m->m_flags & M_BCAST) {
@@ -598,7 +634,7 @@ arpresolve(struct ifnet *ifp, int is_gw, struct mbuf *m,
 	}
 
 	IF_AFDATA_RLOCK(ifp);
-	la = lla_lookup(LLTABLE(ifp), LLE_UNLOCKED, dst);
+	la = lla_lookup(LLTABLE(ifp), plle ? LLE_EXCLUSIVE : LLE_UNLOCKED, dst);
 	if (la != NULL && (la->r_flags & RLLE_VALID) != 0) {
 		/* Entry found, let's copy lle info */
 		bcopy(la->r_linkdata, desten, la->r_hdrlen);
@@ -610,13 +646,20 @@ arpresolve(struct ifnet *ifp, int is_gw, struct mbuf *m,
 			la->r_skip_req = 0; /* Notify that entry was used */
 			LLE_REQ_UNLOCK(la);
 		}
+		if (plle) {
+			LLE_ADDREF(la);
+			*plle = la;
+			LLE_WUNLOCK(la);
+		}
 		IF_AFDATA_RUNLOCK(ifp);
 		return (0);
 	}
+	if (plle && la)
+		LLE_WUNLOCK(la);
 	IF_AFDATA_RUNLOCK(ifp);
 
 	return (arpresolve_full(ifp, is_gw, la == NULL ? LLE_CREATE : 0, m, dst,
-	    desten, pflags));
+	    desten, pflags, plle));
 }
 
 /*
@@ -765,6 +808,7 @@ in_arpinput(struct mbuf *m)
 	size_t linkhdrsize;
 	int lladdr_off;
 	int error;
+	char addrbuf[INET_ADDRSTRLEN];
 
 	sin.sin_len = sizeof(struct sockaddr_in);
 	sin.sin_family = AF_INET;
@@ -889,7 +933,7 @@ match:
 		goto drop;	/* it's from me, ignore it. */
 	if (!bcmp(ar_sha(ah), ifp->if_broadcastaddr, ifp->if_addrlen)) {
 		ARP_LOG(LOG_NOTICE, "link address is broadcast for IP address "
-		    "%s!\n", inet_ntoa(isaddr));
+		    "%s!\n", inet_ntoa_r(isaddr, addrbuf));
 		goto drop;
 	}
 
@@ -911,7 +955,7 @@ match:
 	    myaddr.s_addr != 0) {
 		ARP_LOG(LOG_ERR, "%*D is using my IP address %s on %s!\n",
 		   ifp->if_addrlen, (u_char *)ar_sha(ah), ":",
-		   inet_ntoa(isaddr), ifp->if_xname);
+		   inet_ntoa_r(isaddr, addrbuf), ifp->if_xname);
 		itaddr = myaddr;
 		ARPSTAT_INC(dupips);
 		goto reply;
@@ -1048,12 +1092,14 @@ reply:
 			if (nh4.nh_ifp != ifp) {
 				ARP_LOG(LOG_INFO, "proxy: ignoring request"
 				    " from %s via %s\n",
-				    inet_ntoa(isaddr), ifp->if_xname);
+				    inet_ntoa_r(isaddr, addrbuf),
+				    ifp->if_xname);
 				goto drop;
 			}
 
 #ifdef DEBUG_PROXY
-			printf("arp: proxying for %s\n", inet_ntoa(itaddr));
+			printf("arp: proxying for %s\n",
+			    inet_ntoa_r(itaddr, addrbuf));
 #endif
 		}
 	}
@@ -1063,7 +1109,7 @@ reply:
 		/* RFC 3927 link-local IPv4; always reply by broadcast. */
 #ifdef DEBUG_LINKLOCAL
 		printf("arp: sending reply for link-local addr %s\n",
-		    inet_ntoa(itaddr));
+		    inet_ntoa_r(itaddr, addrbuf));
 #endif
 		m->m_flags |= M_BCAST;
 		m->m_flags &= ~M_MCAST;
@@ -1124,6 +1170,7 @@ arp_check_update_lle(struct arphdr *ah, struct in_addr isaddr, struct ifnet *ifp
 	uint8_t linkhdr[LLE_MAX_LINKHDR];
 	size_t linkhdrsize;
 	int lladdr_off;
+	char addrbuf[INET_ADDRSTRLEN];
 
 	LLE_WLOCK_ASSERT(la);
 
@@ -1132,7 +1179,7 @@ arp_check_update_lle(struct arphdr *ah, struct in_addr isaddr, struct ifnet *ifp
 		if (log_arp_wrong_iface)
 			ARP_LOG(LOG_WARNING, "%s is on %s "
 			    "but got reply from %*D on %s\n",
-			    inet_ntoa(isaddr),
+			    inet_ntoa_r(isaddr, addrbuf),
 			    la->lle_tbl->llt_ifp->if_xname,
 			    ifp->if_addrlen, (u_char *)ar_sha(ah), ":",
 			    ifp->if_xname);
@@ -1149,15 +1196,16 @@ arp_check_update_lle(struct arphdr *ah, struct in_addr isaddr, struct ifnet *ifp
 				    "permanent entry for %s on %s\n",
 				    ifp->if_addrlen,
 				    (u_char *)ar_sha(ah), ":",
-				    inet_ntoa(isaddr), ifp->if_xname);
+				    inet_ntoa_r(isaddr, addrbuf),
+				    ifp->if_xname);
 			return;
 		}
 		if (log_arp_movements) {
 			ARP_LOG(LOG_INFO, "%s moved from %*D "
 			    "to %*D on %s\n",
-			    inet_ntoa(isaddr),
+			    inet_ntoa_r(isaddr, addrbuf),
 			    ifp->if_addrlen,
-			    (u_char *)&la->ll_addr, ":",
+			    (u_char *)la->ll_addr, ":",
 			    ifp->if_addrlen, (u_char *)ar_sha(ah), ":",
 			    ifp->if_xname);
 		}
@@ -1233,7 +1281,7 @@ arp_mark_lle_reachable(struct llentry *la)
 }
 
 /*
- * Add pernament link-layer record for given interface address.
+ * Add permanent link-layer record for given interface address.
  */
 static __noinline void
 arp_add_ifa_lle(struct ifnet *ifp, const struct sockaddr *dst)
@@ -1271,6 +1319,109 @@ arp_add_ifa_lle(struct ifnet *ifp, const struct sockaddr *dst)
 		lltable_free_entry(LLTABLE(ifp), lle_tmp);
 }
 
+/*
+ * Handle the garp_rexmit_count. Like sysctl_handle_int(), but limits the range
+ * of valid values.
+ */
+static int
+sysctl_garp_rexmit(SYSCTL_HANDLER_ARGS)
+{
+	int error;
+	int rexmit_count = *(int *)arg1;
+
+	error = sysctl_handle_int(oidp, &rexmit_count, 0, req);
+
+	/* Enforce limits on any new value that may have been set. */
+	if (!error && req->newptr) {
+		/* A new value was set. */
+		if (rexmit_count < 0) {
+			rexmit_count = 0;
+		} else if (rexmit_count > MAX_GARP_RETRANSMITS) {
+			rexmit_count = MAX_GARP_RETRANSMITS;
+		}
+		*(int *)arg1 = rexmit_count;
+	}
+
+	return (error);
+}
+
+/*
+ * Retransmit a Gratuitous ARP (GARP) and, if necessary, schedule a callout to
+ * retransmit it again. A pending callout owns a reference to the ifa.
+ */
+static void
+garp_rexmit(void *arg)
+{
+	struct in_ifaddr *ia = arg;
+
+	if (callout_pending(&ia->ia_garp_timer) ||
+	    !callout_active(&ia->ia_garp_timer)) {
+		IF_ADDR_WUNLOCK(ia->ia_ifa.ifa_ifp);
+		ifa_free(&ia->ia_ifa);
+		return;
+	}
+
+	/*
+	 * Drop lock while the ARP request is generated.
+	 */
+	IF_ADDR_WUNLOCK(ia->ia_ifa.ifa_ifp);
+
+	arprequest(ia->ia_ifa.ifa_ifp, &IA_SIN(ia)->sin_addr,
+	    &IA_SIN(ia)->sin_addr, IF_LLADDR(ia->ia_ifa.ifa_ifp));
+
+	/*
+	 * Increment the count of retransmissions. If the count has reached the
+	 * maximum value, stop sending the GARP packets. Otherwise, schedule
+	 * the callout to retransmit another GARP packet.
+	 */
+	++ia->ia_garp_count;
+	if (ia->ia_garp_count >= garp_rexmit_count) {
+		ifa_free(&ia->ia_ifa);
+	} else {
+		int rescheduled;
+		IF_ADDR_WLOCK(ia->ia_ifa.ifa_ifp);
+		rescheduled = callout_reset(&ia->ia_garp_timer,
+		    (1 << ia->ia_garp_count) * hz,
+		    garp_rexmit, ia);
+		IF_ADDR_WUNLOCK(ia->ia_ifa.ifa_ifp);
+		if (rescheduled) {
+			ifa_free(&ia->ia_ifa);
+		}
+	}
+}
+
+/*
+ * Start the GARP retransmit timer.
+ *
+ * A single GARP is always transmitted when an IPv4 address is added
+ * to an interface and that is usually sufficient. However, in some
+ * circumstances, such as when a shared address is passed between
+ * cluster nodes, this single GARP may occasionally be dropped or
+ * lost. This can lead to neighbors on the network link working with a
+ * stale ARP cache and sending packets destined for that address to
+ * the node that previously owned the address, which may not respond.
+ *
+ * To avoid this situation, GARP retransmits can be enabled by setting
+ * the net.link.ether.inet.garp_rexmit_count sysctl to a value greater
+ * than zero. The setting represents the maximum number of
+ * retransmissions. The interval between retransmissions is calculated
+ * using an exponential backoff algorithm, doubling each time, so the
+ * retransmission intervals are: {1, 2, 4, 8, 16, ...} (seconds).
+ */
+static void
+garp_timer_start(struct ifaddr *ifa)
+{
+	struct in_ifaddr *ia = (struct in_ifaddr *) ifa;
+
+	IF_ADDR_WLOCK(ia->ia_ifa.ifa_ifp);
+	ia->ia_garp_count = 0;
+	if (callout_reset(&ia->ia_garp_timer, (1 << ia->ia_garp_count) * hz,
+	    garp_rexmit, ia) == 0) {
+		ifa_ref(ifa);
+	}
+	IF_ADDR_WUNLOCK(ia->ia_ifa.ifa_ifp);
+}
+
 void
 arp_ifinit(struct ifnet *ifp, struct ifaddr *ifa)
 {
@@ -1286,6 +1437,9 @@ arp_ifinit(struct ifnet *ifp, struct ifaddr *ifa)
 	if (ntohl(dst_in->sin_addr.s_addr) == INADDR_ANY)
 		return;
 	arp_announce_ifaddr(ifp, dst_in->sin_addr, IF_LLADDR(ifp));
+	if (garp_rexmit_count > 0) {
+		garp_timer_start(ifa);
+	}
 
 	arp_add_ifa_lle(ifp, dst);
 }
@@ -1327,12 +1481,33 @@ arp_iflladdr(void *arg __unused, struct ifnet *ifp)
 }
 
 static void
-arp_init(void)
+vnet_arp_init(void)
 {
 
-	netisr_register(&arp_nh);
-	if (IS_DEFAULT_VNET(curvnet))
+	if (IS_DEFAULT_VNET(curvnet)) {
+		netisr_register(&arp_nh);
 		iflladdr_tag = EVENTHANDLER_REGISTER(iflladdr_event,
 		    arp_iflladdr, NULL, EVENTHANDLER_PRI_ANY);
+	}
+#ifdef VIMAGE
+	else
+		netisr_register_vnet(&arp_nh);
+#endif
 }
-SYSINIT(arp, SI_SUB_PROTO_DOMAIN, SI_ORDER_ANY, arp_init, 0);
+VNET_SYSINIT(vnet_arp_init, SI_SUB_PROTO_DOMAIN, SI_ORDER_SECOND,
+    vnet_arp_init, 0);
+
+#ifdef VIMAGE
+/*
+ * We have to unregister ARP along with IP otherwise we risk doing INADDR_HASH
+ * lookups after destroying the hash.  Ideally this would go on SI_ORDER_3.5.
+ */
+static void
+vnet_arp_destroy(__unused void *arg)
+{
+
+	netisr_unregister_vnet(&arp_nh);
+}
+VNET_SYSUNINIT(vnet_arp_uninit, SI_SUB_PROTO_DOMAIN, SI_ORDER_THIRD,
+    vnet_arp_destroy, NULL);
+#endif

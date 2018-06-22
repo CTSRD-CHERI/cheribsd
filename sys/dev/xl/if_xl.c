@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -75,7 +77,7 @@ __FBSDID("$FreeBSD$");
  * Columbia University, New York City
  */
 /*
- * The 3c90x series chips use a bus-master DMA interface for transfering
+ * The 3c90x series chips use a bus-master DMA interface for transferring
  * packets to and from the controller chip. Some of the "vortex" cards
  * (3c59x) also supported a bus master mode, however for those chips
  * you could only DMA packets to/from a contiguous memory buffer. For
@@ -106,8 +108,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/sockio.h>
 #include <sys/endian.h>
-#include <sys/mbuf.h>
 #include <sys/kernel.h>
+#include <sys/malloc.h>
+#include <sys/mbuf.h>
 #include <sys/module.h>
 #include <sys/socket.h>
 #include <sys/taskqueue.h>
@@ -352,7 +355,7 @@ xl_dma_map_addr(void *arg, bus_dma_segment_t *segs, int nseg, int error)
 static void
 xl_wait(struct xl_softc *sc)
 {
-	register int		i;
+	int			i;
 
 	for (i = 0; i < XL_TIMEOUT; i++) {
 		if ((CSR_READ_2(sc, XL_STATUS) & XL_STAT_CMDBUSY) == 0)
@@ -835,7 +838,7 @@ xl_setmode(struct xl_softc *sc, int media)
 static void
 xl_reset(struct xl_softc *sc)
 {
-	register int		i;
+	int			i;
 
 	XL_LOCK_ASSERT(sc);
 
@@ -3003,7 +3006,7 @@ xl_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	struct mii_data		*mii = NULL;
 
 	switch (command) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		XL_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING &&
@@ -3019,8 +3022,8 @@ xl_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->xl_if_flags = ifp->if_flags;
 		XL_UNLOCK(sc);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		/* XXX Downcall from if_addmulti() possibly with locks held. */
 		XL_LOCK(sc);
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
@@ -3028,7 +3031,7 @@ xl_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		XL_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		if (sc->xl_miibus != NULL)
 			mii = device_get_softc(sc->xl_miibus);
 		if (mii == NULL)
@@ -3038,8 +3041,8 @@ xl_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			error = ifmedia_ioctl(ifp, ifr,
 			    &mii->mii_media, command);
 		break;
-	case SIOCSIFCAP:
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+	CASE_IOC_IFREQ(SIOCSIFCAP):
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 #ifdef DEVICE_POLLING
 		if ((mask & IFCAP_POLLING) != 0 &&
 		    (ifp->if_capabilities & IFCAP_POLLING) != 0) {
@@ -3152,7 +3155,7 @@ xl_watchdog(struct xl_softc *sc)
 static void
 xl_stop(struct xl_softc *sc)
 {
-	register int		i;
+	int			i;
 	struct ifnet		*ifp = sc->xl_ifp;
 
 	XL_LOCK_ASSERT(sc);

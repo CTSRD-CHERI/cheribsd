@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2007-2009
  * 	Swinburne University of Technology, Melbourne, Australia.
  * Copyright (c) 2009-2010, The FreeBSD Foundation
@@ -150,7 +152,7 @@ __FBSDID("$FreeBSD$");
 #endif
 
 /* useful macros */
-#define CAST_PTR_INT(X) (*((int*)(X)))
+#define CAST_PTR_INT(X) (*((int * __capability)(X)))
 
 #define UPPER_SHORT(X)	(((X) & 0xFFFF0000) >> 16)
 #define LOWER_SHORT(X)	((X) & 0x0000FFFF)
@@ -1561,6 +1563,6 @@ static moduledata_t siftr_mod = {
  *          Defines the initialisation order of this kld relative to others
  *          within the same subsystem as defined by param 3
  */
-DECLARE_MODULE(siftr, siftr_mod, SI_SUB_SMP, SI_ORDER_ANY);
+DECLARE_MODULE(siftr, siftr_mod, SI_SUB_LAST, SI_ORDER_ANY);
 MODULE_DEPEND(siftr, alq, 1, 1, 1);
 MODULE_VERSION(siftr, MODVERSION);

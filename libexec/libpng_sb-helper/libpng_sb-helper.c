@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 Robert N. M. Watson
+ * Copyright (c) 2014-2017 Robert N. M. Watson
  * Copyright (c) 2014 SRI International
  * All rights reserved.
  *
@@ -32,13 +32,12 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include <machine/cheri.h>
-#include <machine/cheric.h>
-
-#include <cheri/cheri_enter.h>
-#include <cheri/cheri_fd.h>
-#include <cheri/cheri_invoke.h>
-#include <cheri/cheri_system.h>
+#include <cheri/cheri.h>
+#include <cheri/cheric.h>
+#include <cheri/libcheri_enter.h>
+#include <cheri/libcheri_fd.h>
+#include <cheri/libcheri_invoke.h>
+#include <cheri/libcheri_system.h>
 
 #include <png.h>
 #include <stdio.h>
@@ -78,7 +77,7 @@ static void
 libpng_sb_read_callback(void *psp, png_bytep data, png_size_t length)
 {
 
-	cheri_system_user_call_fn(LIBPNG_SB_USERFN_READ_CALLBACK,
+	libcheri_system_user_call_fn(LIBPNG_SB_USERFN_READ_CALLBACK,
 	    length, 0, 0, 0, 0, 0, 0,
 	    psp, data, NULL, NULL, NULL);
 }
@@ -87,7 +86,7 @@ static void
 libpng_sb_info_callback(void *psp, png_infop info_ptr)
 {
 
-	cheri_system_user_call_fn(LIBPNG_SB_USERFN_INFO_CALLBACK,
+	libcheri_system_user_call_fn(LIBPNG_SB_USERFN_INFO_CALLBACK,
 	    0, 0, 0, 0, 0, 0, 0,
 	    psp, info_ptr, NULL, NULL, NULL);
 }
@@ -97,7 +96,7 @@ libpng_sb_row_callback(void *psp, png_bytep new_row, png_uint_32 row_num,
     int pass)
 {
 
-	cheri_system_user_call_fn(LIBPNG_SB_USERFN_ROW_CALLBACK,
+	libcheri_system_user_call_fn(LIBPNG_SB_USERFN_ROW_CALLBACK,
 	    row_num, pass, 0, 0, 0, 0, 0,
 	    psp, new_row, NULL, NULL, NULL);
 }
@@ -106,7 +105,7 @@ static void
 libpng_sb_end_callback(void *psp, png_infop info_ptr)
 {
 
-	cheri_system_user_call_fn(LIBPNG_SB_USERFN_END_CALLBACK,
+	libcheri_system_user_call_fn(LIBPNG_SB_USERFN_END_CALLBACK,
 	    0, 0, 0, 0, 0, 0, 0,
 	    psp, info_ptr, NULL, NULL, NULL);
 }
@@ -187,7 +186,7 @@ invoke(struct cheri_object c __unused, register_t v0 __unused,
 		if (info_ptr == NULL)
 			return (1);
 		else {
-			*(__capability void **)c7 = info_ptr;
+			*(void * __capability *)c7 = info_ptr;
 			return (0);
 		}
 

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2006-2009 RMI Corporation
  * Copyright (c) 2002-2004 Juli Mallett <jmallett@FreeBSD.org>
  * All rights reserved.
@@ -571,17 +573,24 @@ platform_init_ap(int cpuid)
 }
 
 int
-platform_ipi_intrnum(void) 
+platform_ipi_hardintr_num(void)
 {
 
 	return (IRQ_IPI);
+}
+
+int
+platform_ipi_softintr_num(void)
+{
+
+	return (-1);
 }
 
 void
 platform_ipi_send(int cpuid)
 {
 
-	pic_send_ipi(xlr_cpuid_to_hwtid[cpuid], platform_ipi_intrnum());
+	pic_send_ipi(xlr_cpuid_to_hwtid[cpuid], platform_ipi_hardintr_num());
 }
 
 void

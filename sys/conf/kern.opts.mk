@@ -34,20 +34,23 @@ __DEFAULT_YES_OPTIONS = \
     INET \
     INET6 \
     IPFILTER \
+    IPSEC_SUPPORT \
     ISCSI \
     KERNEL_SYMBOLS \
     NETGRAPH \
     PF \
     SOURCELESS_HOST \
     SOURCELESS_UCODE \
+    TESTS \
     USB_GADGET_EXAMPLES \
     ZFS
 
 __DEFAULT_NO_OPTIONS = \
-    EISA \
-    FAST_DEPEND \
+    EXTRA_TCP_STACKS \
     NAND \
-    OFED
+    OFED \
+    RATELIMIT \
+    REPRODUCIBLE_BUILD
 
 # Some options are totally broken on some architectures. We disable
 # them. If you need to enable them on an experimental basis, you
@@ -59,26 +62,25 @@ __DEFAULT_NO_OPTIONS = \
 
 # Things that don't work based on the CPU
 .if ${MACHINE_CPUARCH} == "arm"
-BROKEN_OPTIONS+= ZFS
-. if ${MACHINE_ARCH:Marmv6*} == ""
-BROKEN_OPTIONS+= CDDL
+. if ${MACHINE_ARCH:Marmv[67]*} == ""
+BROKEN_OPTIONS+= CDDL ZFS
 . endif
 .endif
 
 .if ${MACHINE_CPUARCH} == "mips"
-BROKEN_OPTIONS+= CDDL ZFS
+BROKEN_OPTIONS+= CDDL ZFS SSP
 .endif
 
 .if ${MACHINE_CPUARCH} == "powerpc" && ${MACHINE_ARCH} == "powerpc"
 BROKEN_OPTIONS+= ZFS
 .endif
 
-# Things that don't work because the kernel doesn't have the support
-# for them.
-.if ${MACHINE} != "i386"
-BROKEN_OPTIONS+= EISA
+.if ${MACHINE_CPUARCH} == "riscv"
+BROKEN_OPTIONS+= FORMAT_EXTENSIONS
 .endif
 
+# Things that don't work because the kernel doesn't have the support
+# for them.
 .if ${MACHINE} != "i386" && ${MACHINE} != "amd64"
 BROKEN_OPTIONS+= OFED
 .endif
@@ -138,7 +140,10 @@ MK_${var}:=	no
 MK_${var}_SUPPORT:= no
 .else
 .if defined(KERNBUILDDIR)	# See if there's an opt_foo.h
+.if !defined(OPT_${var})
 OPT_${var}!= cat ${KERNBUILDDIR}/opt_${var:tl}.h; echo
+.export OPT_${var}
+.endif
 .if ${OPT_${var}} == ""		# nothing -> no
 MK_${var}_SUPPORT:= no
 .else
@@ -149,3 +154,11 @@ MK_${var}_SUPPORT:= yes
 .endif
 .endif
 .endfor
+
+# Some modules only compile successfully if option FDT is set, due to #ifdef FDT
+# wrapped around declarations.  Module makefiles can optionally compile such
+# things using .if !empty(OPT_FDT)
+.if !defined(OPT_FDT) && defined(KERNBUILDDIR)
+OPT_FDT!= sed -n '/FDT/p' ${KERNBUILDDIR}/opt_platform.h
+.export OPT_FDT
+.endif

@@ -38,7 +38,7 @@ __FBSDID("$FreeBSD$");
 
 int
 OF_decode_addr(phandle_t dev, int regno, bus_space_tag_t *tag,
-    bus_space_handle_t *handle)
+    bus_space_handle_t *handle, bus_size_t *sz)
 {
 	bus_addr_t addr;
 	bus_size_t size;
@@ -50,7 +50,7 @@ OF_decode_addr(phandle_t dev, int regno, bus_space_tag_t *tag,
 		return (res);
 
 	/*
-	 * Nothing special to do for PCI busses right now.
+	 * Nothing special to do for PCI buses right now.
 	 * This may need to be handled per-platform when it does come up.
 	 */
 #ifdef notyet
@@ -66,6 +66,10 @@ OF_decode_addr(phandle_t dev, int regno, bus_space_tag_t *tag,
 	*tag = fdtbus_bs_tag;
 	flags = 0;
 #endif
+
+	if (sz != NULL)
+		*sz = size;
+
 	return (bus_space_map(*tag, addr, size, flags, handle));
 }
 

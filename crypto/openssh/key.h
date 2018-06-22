@@ -1,4 +1,4 @@
-/* $OpenBSD: key.h,v 1.48 2015/07/03 03:43:18 djm Exp $ */
+/* $OpenBSD: key.h,v 1.50 2016/09/12 23:31:27 djm Exp $ */
 
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
@@ -74,7 +74,6 @@ int	 key_certify(Key *, Key *);
 void	 key_cert_copy(const Key *, Key *);
 int	 key_cert_check_authority(const Key *, int, int, const char *,
 	    const char **);
-char	*key_alg_list(int, int);
 
 #if defined(WITH_OPENSSL) && defined(OPENSSL_HAS_ECC)
 int	 key_ec_validate_public(const EC_GROUP *, const EC_POINT *);
@@ -84,7 +83,8 @@ int	 key_ec_validate_private(const EC_KEY *);
 Key	*key_from_blob(const u_char *, u_int);
 int	 key_to_blob(const Key *, u_char **, u_int *);
 
-int	 key_sign(const Key *, u_char **, u_int *, const u_char *, u_int);
+int	 key_sign(const Key *, u_char **, u_int *, const u_char *, u_int,
+    const char *);
 int	 key_verify(const Key *, const u_char *, u_int, const u_char *, u_int);
 
 void     key_private_serialize(const Key *, struct sshbuf *);

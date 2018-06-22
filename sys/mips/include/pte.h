@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2004-2010 Juli Mallett <jmallett@FreeBSD.org>
  * All rights reserved.
  *
@@ -38,7 +40,15 @@ typedef	uint64_t pt_entry_t;
 typedef	uint32_t pt_entry_t;
 #endif
 
+#if defined(_KERNEL) && !defined(__CHERI_PURE_CAPABILITY__)
 typedef	pt_entry_t *pd_entry_t;
+#else
+/*
+ * XXX: used in the kernel to set VM system paramaters.  Only used for
+ * the parameter macros (which use its size) in usespace.
+ */
+typedef uint64_t pd_entry_t;
+#endif
 #endif
 
 /*
@@ -155,8 +165,10 @@ typedef	pt_entry_t *pd_entry_t;
  * 		it is matched.
  */
 #define	PTE_C(attr)		((attr & 0x07) << 3)
+#define	PTE_C_MASK		(PTE_C(0x07))
 #define	PTE_C_UNCACHED		(PTE_C(MIPS_CCA_UNCACHED))
 #define	PTE_C_CACHE		(PTE_C(MIPS_CCA_CACHED))
+#define	PTE_C_WC		(PTE_C(MIPS_CCA_WC))
 #define	PTE_D			0x04
 #define	PTE_VR			0x02
 #define	PTE_G			0x01
@@ -500,6 +512,8 @@ TLBLO_PTE_TO_PA(pt_entry_t pte)
 }
 #endif /* ! _LOCORE */
 #endif /* ! PHYSADDR_64_BIT */
+
+#define	pte_cache_bits(pte)	((*(pte) >> 3) & 0x07)
 
 /* Assembly support for PTE access*/
 #ifdef LOCORE

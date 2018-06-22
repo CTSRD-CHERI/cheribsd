@@ -29,7 +29,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 
-#include <machine/cheric.h>
+#include <cheri/cheric.h>
 
 #include <errno.h>
 #include <stddef.h>
@@ -40,8 +40,7 @@
 #include "debug.h"
 #include "rtld.h"
 
-static Elf_Ehdr *get_elf_header(int, const char *);
-static int convert_prot(int);	/* Elf flags -> mmap protection */
+static Elf_Ehdr *get_elf_header(int, const char *, const struct stat *);
 static int convert_flags(int); /* Elf flags -> mmap flags */
 
 /*
@@ -88,12 +87,12 @@ map_object(int fd, const char *path, const struct stat *sb)
     Elf_Word stack_flags;
     Elf_Addr relro_page;
     size_t relro_size;
-    Elf_Addr note_start;
-    Elf_Addr note_end;
+    caddr_t note_start;
+    caddr_t note_end;
     char *note_map;
     size_t note_map_len;
 
-    hdr = get_elf_header(fd, path);
+    hdr = get_elf_header(fd, path, sb);
     if (hdr == NULL)
 	return (NULL);
 
@@ -164,10 +163,10 @@ map_object(int fd, const char *path, const struct stat *sb)
 		    _rtld_error("%s: error mapping PT_NOTE (%d)", path, errno);
 		    goto error;
 		}
-		note_start = (Elf_Addr)(note_map + phdr->p_offset -
+		note_start = (note_map + phdr->p_offset -
 		  trunc_page(phdr->p_offset));
 	    } else {
-		note_start = (Elf_Addr)(char *)hdr + phdr->p_offset;
+		note_start = (char *)hdr + phdr->p_offset;
 	    }
 	    note_end = note_start + phdr->p_filesz;
 	    break;
@@ -192,22 +191,30 @@ map_object(int fd, const char *path, const struct stat *sb)
     base_vaddr = trunc_page(segs[0]->p_vaddr);
     base_vlimit = round_page(segs[nsegs]->p_vaddr + segs[nsegs]->p_memsz);
     mapsize = base_vlimit - base_vaddr;
-    base_addr = cheri_setoffset(cheri_getdefault(), base_vaddr);
+    if (base_vaddr != 0)
+	base_addr = cheri_setoffset(cheri_getdefault(), base_vaddr);
+    else
+	base_addr = NULL;
     base_flags = MAP_PRIVATE | MAP_ANON | MAP_NOCORE;
     if (npagesizes > 1 && round_page(segs[0]->p_filesz) >= pagesizes[1])
 	base_flags |= MAP_ALIGNED_SUPER;
 
-    mapbase = mmap(base_addr, mapsize, PROT_NONE, base_flags, -1, 0);
-    if (mapbase == (caddr_t) -1) {
+    dbg("Allocating entire object: mmap(%#p, 0x%lx, 0x%x, 0x%x, -1, 0)",
+	    base_addr, mapsize, PROT_READ|PROT_WRITE|PROT_EXEC, base_flags);
+    mapbase = mmap(base_addr, mapsize, PROT_READ|PROT_WRITE|PROT_EXEC,
+	base_flags, -1, 0);
+    if (mapbase == MAP_FAILED) {
 	_rtld_error("%s: mmap of entire address space failed: %s",
 	  path, rtld_strerror(errno));
 	goto error;
     }
-    if (base_addr != NULL && mapbase != base_addr) {
-	_rtld_error("%s: mmap returned wrong address: wanted %p, got %p",
+    if (base_addr != NULL && (vaddr_t)mapbase != (vaddr_t)base_addr) {
+	_rtld_error("%s: mmap returned wrong address: wanted %#p, got %#p",
 	  path, base_addr, mapbase);
 	goto error1;
     }
+    if (mprotect(mapbase, mapsize, PROT_NONE) != 0)
+	_rtld_error("%s: mprotect of region failed", path);
 
     for (i = 0; i <= nsegs; i++) {
 	/* Overlay the segment onto the proper region. */
@@ -217,6 +224,8 @@ map_object(int fd, const char *path, const struct stat *sb)
 	data_addr = mapbase + (data_vaddr - base_vaddr);
 	data_prot = convert_prot(segs[i]->p_flags);
 	data_flags = convert_flags(segs[i]->p_flags) | MAP_FIXED;
+	dbg("Mapping %s PT_LOAD(%d) with flags 0x%x at %p", path, i,
+	    segs[i]->p_flags, data_addr, data_vlimit);
 	if (mmap(data_addr, data_vlimit - data_vaddr, data_prot,
 	  data_flags | MAP_PREFAULT_READ, fd, data_offset) == (caddr_t) -1) {
 	    _rtld_error("%s: mmap of data failed: %s", path,
@@ -326,9 +335,15 @@ error:
 }
 
 static Elf_Ehdr *
-get_elf_header(int fd, const char *path)
+get_elf_header(int fd, const char *path, const struct stat *sbp)
 {
 	Elf_Ehdr *hdr;
+
+	/* Make sure file has enough data for the ELF header */
+	if (sbp != NULL && sbp->st_size < sizeof(Elf_Ehdr)) {
+		_rtld_error("%s: invalid file format", path);
+		return (NULL);
+	}
 
 	hdr = mmap(NULL, PAGE_SIZE, PROT_READ, MAP_PRIVATE | MAP_PREFAULT_READ,
 	    fd, 0);
@@ -360,6 +375,13 @@ get_elf_header(int fd, const char *path)
 		_rtld_error("%s: unsupported machine", path);
 		goto error;
 	}
+
+	/*
+	 * XXX: No checks are performed on e_flags.  This permits loading
+	 * "plain" MIPS shared libraries with CHERI binaries or mixing
+	 * 128-bit and 256-bit.  At some point, e_flags validation should
+	 * be added.
+	 */
 
 	/*
 	 * We rely on the program header being in the first page.  This is
@@ -441,7 +463,7 @@ obj_new(void)
  * Given a set of ELF protection flags, return the corresponding protection
  * flags for MMAP.
  */
-static int
+int
 convert_prot(int elfflags)
 {
     int prot = 0;

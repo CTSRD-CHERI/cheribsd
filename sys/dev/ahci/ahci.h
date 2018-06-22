@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1998 - 2008 Søren Schmidt <sos@FreeBSD.org>
  * Copyright (c) 2009-2012 Alexander Motin <mav@FreeBSD.org>
  * All rights reserved.
@@ -444,7 +446,7 @@ struct ahci_channel {
 	int			numtslotspd[16];/* Number of tagged slots per dev */
 	int			numhslots;	/* Number of held slots */
 	int			recoverycmd;	/* Our READ LOG active */
-	int			fatalerr;	/* Fatal error happend */
+	int			fatalerr;	/* Fatal error happened */
 	int			resetting;	/* Hard-reset in progress. */
 	int			resetpolldiv;	/* Hard-reset poll divider. */
 	int			listening;	/* SUD bit is cleared. */
@@ -465,7 +467,7 @@ struct ahci_enclosure {
 	device_t		dev;            /* Device handle */
 	struct resource		*r_memc;	/* Control register */
 	struct resource		*r_memt;	/* Transmit buffer */
-	struct resource		*r_memr;	/* Recieve buffer */
+	struct resource		*r_memr;	/* Receive buffer */
 	struct cam_sim		*sim;
 	struct cam_path		*path;
 	struct mtx		mtx;		/* state lock */
@@ -474,7 +476,7 @@ struct ahci_enclosure {
 	uint8_t			status[AHCI_MAX_PORTS][4]; /* ArrayDev statuses */
 	int			quirks;
 	int			channels;
-	int			ichannels;
+	uint32_t		ichannels;
 };
 
 /* structure describing a AHCI controller */
@@ -509,7 +511,7 @@ struct ahci_controller {
 	int			quirks;
 	int			numirqs;
 	int			channels;
-	int			ichannels;
+	uint32_t		ichannels;
 	int			ccc;		/* CCC timeout */
 	int			cccv;		/* CCC vector */
 	int			direct;		/* Direct command completion */
@@ -519,6 +521,7 @@ struct ahci_controller {
 		void			*argument;
 	} interrupt[AHCI_MAX_PORTS];
 	void			(*ch_start)(struct ahci_channel *);
+	int			dma_coherent;	/* DMA is cache-coherent */
 };
 
 enum ahci_err_type {
@@ -597,6 +600,10 @@ enum ahci_err_type {
 #define AHCI_Q_1MSI		0x00020000
 #define AHCI_Q_FORCE_PI		0x00040000
 #define AHCI_Q_RESTORE_CAP	0x00080000
+#define AHCI_Q_NOMSIX		0x00100000
+#define AHCI_Q_MRVL_SR_DEL	0x00200000
+#define AHCI_Q_NOCCS		0x00400000
+#define AHCI_Q_NOAUX		0x00800000
 
 #define AHCI_Q_BIT_STRING	\
 	"\020"			\
@@ -619,7 +626,11 @@ enum ahci_err_type {
 	"\021ABAR0"		\
 	"\0221MSI"              \
 	"\023FORCE_PI"          \
-	"\024RESTORE_CAP"
+	"\024RESTORE_CAP"	\
+	"\025NOMSIX"		\
+	"\026MRVL_SR_DEL"	\
+	"\027NOCCS"		\
+	"\030NOAUX"
 
 int ahci_attach(device_t dev);
 int ahci_detach(device_t dev);
@@ -640,3 +651,6 @@ bus_dma_tag_t ahci_get_dma_tag(device_t dev, device_t child);
 int ahci_ctlr_reset(device_t dev);
 int ahci_ctlr_setup(device_t dev);
 void ahci_free_mem(device_t dev);
+
+extern devclass_t ahci_devclass;
+

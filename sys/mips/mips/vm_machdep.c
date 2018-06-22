@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986 The Regents of the University of California.
  * Copyright (c) 1989, 1990 William Jolitz
  * Copyright (c) 1994 John Dyson
@@ -16,7 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -60,9 +62,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/vmem.h>
 
 #include <machine/cache.h>
-#ifdef CPU_CHERI
-#include <machine/cheri.h>
-#endif
 #include <machine/clock.h>
 #include <machine/cpu.h>
 #include <machine/cpufunc.h>
@@ -70,6 +69,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/md_var.h>
 #include <machine/pcb.h>
 #include <machine/tls.h>
+
+#ifdef CPU_CHERI
+#include <cheri/cheri.h>
+#endif
 
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
@@ -104,10 +107,9 @@ __FBSDID("$FreeBSD$");
  * ready to run and return to user mode.
  */
 void
-cpu_fork(register struct thread *td1,register struct proc *p2,
-    struct thread *td2,int flags)
+cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2,int flags)
 {
-	register struct proc *p1;
+	struct proc *p1;
 	struct pcb *pcb2;
 
 	p1 = td1->td_proc;
@@ -126,22 +128,21 @@ cpu_fork(register struct thread *td1,register struct proc *p2,
 	 * of the td_frame, for us that's not needed any
 	 * longer (this copy does them both) 
 	 */
+#ifndef CPU_CHERI
 	bcopy(td1->td_pcb, pcb2, sizeof(*pcb2));
-
-#ifdef CPU_CHERI
-	/*
-	 * XXXRW: We're copying this memory twice -- once in the bcopy()
-	 * above, and once here using capabilities.  Once bcopy() is
-	 * capability-oblivious, we can lose this.
-	 */
-	cheri_context_copy(pcb2, td1->td_pcb);
+#else
+	cheri_bcopy(td1->td_pcb, pcb2, sizeof(*pcb2));
 	cheri_signal_copy(pcb2, td1->td_pcb);
-	cheri_stack_copy(pcb2, td1->td_pcb);
-	cheri_typecap_copy(pcb2, td1->td_pcb);
+	cheri_sealcap_copy(p2, p1);
 #endif
 
 	/* Point mdproc and then copy over td1's contents */
 	td2->td_md.md_flags = td1->td_md.md_flags & MDTD_FPUSED;
+
+	/* Inherit Qemu ISA-level tracing from parent. */
+#ifdef CPU_CPU_QEMU_MALTA
+	td2->td_md.md_flags |= td1->td_md.md_flags & MDTD_QTRACE;
+#endif
 
 	/*
 	 * Set up return-value registers as fork() libc stub expects.
@@ -178,15 +179,12 @@ cpu_fork(register struct thread *td1,register struct proc *p2,
 
 	td2->td_md.md_tls = td1->td_md.md_tls;
 	td2->td_md.md_tls_tcb_offset = td1->td_md.md_tls_tcb_offset;
-#ifdef CPU_CHERI
-	cheri_capability_copy(&td2->td_md.md_tls_cap, &td1->td_md.md_tls_cap);
-#endif
 	td2->td_md.md_saved_intr = MIPS_SR_INT_IE;
 	td2->td_md.md_spinlock_count = 1;
-#ifdef COMPAT_CHERIABI
-	p2->p_md.md_cheri_mmap_perms = p1->p_md.md_cheri_mmap_perms;
-#endif
 #ifdef CPU_CHERI
+#ifdef COMPAT_CHERIABI
+	td2->td_md.md_cheri_mmap_cap = td1->td_md.md_cheri_mmap_cap;
+#endif
 	/*
 	 * XXXRW: Ensure capability coprocessor is enabled for both kernel and
 	 * userspace in child.
@@ -235,7 +233,7 @@ cpu_fork(register struct thread *td1,register struct proc *p2,
  * This is needed to make kernel threads stay in kernel mode.
  */
 void
-cpu_set_fork_handler(struct thread *td, void (*func) __P((void *)), void *arg)
+cpu_fork_kthread_handler(struct thread *td, void (*func)(void *), void *arg)
 {
 	/*
 	 * Note that the trap frame follows the args, so the function
@@ -298,8 +296,8 @@ cpu_thread_swapin(struct thread *td)
 #ifdef KSTACK_LARGE_PAGE
 	/* Just one entry for one large kernel page. */
 	pte = pmap_pte(kernel_pmap, td->td_kstack);
-	td->td_md.md_upte[0] = *pte & ~TLBLO_SWBITS_MASK;
-	td->td_md.md_upte[1] = 1;
+	td->td_md.md_upte[0] = PTE_G;   /* Guard Page */
+	td->td_md.md_upte[1] = *pte & ~TLBLO_SWBITS_MASK;
 
 #else
 
@@ -322,17 +320,21 @@ cpu_thread_alloc(struct thread *td)
 {
 	pt_entry_t *pte;
 
+#ifdef KSTACK_LARGE_PAGE
+	KASSERT((td->td_kstack & (KSTACK_PAGE_SIZE - 1) ) == 0,
+	    ("kernel stack must be aligned to 16K boundary."));
+#else
 	KASSERT((td->td_kstack & ((KSTACK_PAGE_SIZE * 2) - 1) ) == 0,
 	    ("kernel stack must be aligned."));
+#endif
 	td->td_pcb = (struct pcb *)(td->td_kstack +
 	    td->td_kstack_pages * PAGE_SIZE) - 1;
 	td->td_frame = &td->td_pcb->pcb_regs;
-
 #ifdef KSTACK_LARGE_PAGE
 	/* Just one entry for one large kernel page. */
 	pte = pmap_pte(kernel_pmap, td->td_kstack);
-	td->td_md.md_upte[0] = *pte & ~TLBLO_SWBITS_MASK;
-	td->td_md.md_upte[1] = 1;
+	td->td_md.md_upte[0] = PTE_G;   /* Guard Page */
+	td->td_md.md_upte[1] = *pte & ~TLBLO_SWBITS_MASK;
 
 #else
 
@@ -417,14 +419,14 @@ cpu_set_syscall_retval(struct thread *td, int error)
 }
 
 /*
- * Initialize machine state (pcb and trap frame) for a new thread about to
- * upcall. Put enough state in the new thread's PCB to get it to go back
- * userret(), where we can intercept it again to set the return (upcall)
- * Address and stack, along with those from upcalls that are from other sources
- * such as those generated in thread_userret() itself.
+ * Initialize machine state, mostly pcb and trap frame for a new
+ * thread, about to return to userspace.  Put enough state in the new
+ * thread's PCB to get it to go back to the fork_return(), which
+ * finalizes the thread state and handles peculiarities of the first
+ * return to userspace for the new thread.
  */
 void
-cpu_set_upcall(struct thread *td, struct thread *td0)
+cpu_copy_thread(struct thread *td, struct thread *td0)
 {
 	struct pcb *pcb2;
 
@@ -445,17 +447,11 @@ cpu_set_upcall(struct thread *td, struct thread *td0)
 	 * and gets copied when we copy the PCB. No separate copy
 	 * is needed.
 	 */
+#ifndef CPU_CHERI
 	bcopy(td0->td_pcb, pcb2, sizeof(*pcb2));
-
-#ifdef CPU_CHERI
-	/*
-	 * XXXRW: We're copying this memory twice -- once in the bcopy()
-	 * above, and once here using capabilities.  Once bcopy() is
-	 * capability-oblivious, we can lose this.
-	 */
-	cheri_context_copy(pcb2, td0->td_pcb);
+#else
+	cheri_bcopy(td0->td_pcb, pcb2, sizeof(*pcb2));
 	cheri_signal_copy(pcb2, td0->td_pcb);
-	cheri_stack_copy(pcb2, td0->td_pcb);
 #endif
 
 	/*
@@ -497,6 +493,9 @@ cpu_set_upcall(struct thread *td, struct thread *td0)
 	/* Setup to release spin count in in fork_exit(). */
 	td->td_md.md_spinlock_count = 1;
 	td->td_md.md_saved_intr = MIPS_SR_INT_IE;
+#if defined(CPU_CHERI) && defined(COMPAT_CHERIABI)
+	td->td_md.md_cheri_mmap_cap = td0->td_md.md_cheri_mmap_cap;
+#endif
 #if 0
 	    /* Maybe we need to fix this? */
 	td->td_md.md_saved_sr = ( (MIPS_SR_COP_2_BIT | MIPS_SR_COP_0_BIT) |
@@ -506,12 +505,11 @@ cpu_set_upcall(struct thread *td, struct thread *td0)
 }
 
 /*
- * Set that machine state for performing an upcall that has to
- * be done in thread_userret() so that those upcalls generated
- * in thread_userret() itself can be done as well.
+ * Set that machine state for performing an upcall that starts
+ * the entry function with the given argument.
  */
 void
-cpu_set_upcall_kse(struct thread *td, void (*entry)(void *), void *arg,
+cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
     stack_t *stack)
 {
 	struct trapframe *tf;
@@ -557,7 +555,12 @@ cpu_set_upcall_kse(struct thread *td, void (*entry)(void *), void *arg,
 
 	 /* XXXRW: With CNMIPS moved, does this still belong here? */
 #ifdef CPU_CHERI
+	/*
+	 * For the MIPS ABI, we can derive any required CHERI state from
+	 * the completed MIPS trapframe and existing process state.
+	 */
 	tf->sr |= MIPS_SR_COP_2_BIT;
+	hybridabi_newthread_setregs(td, (uintptr_t)entry);
 #endif
 /*	tf->sr |= (ALL_INT_MASK & idle_mask) | SR_INT_ENAB; */
 	/**XXX the above may now be wrong -- mips2 implements this as panic */
@@ -591,7 +594,22 @@ int
 cpu_set_user_tls(struct thread *td, void *tls_base)
 {
 
-	td->td_md.md_tls = (char*)tls_base;
+#if defined(__mips_n64) && defined(COMPAT_FREEBSD32)
+	if (td->td_proc && SV_PROC_FLAG(td->td_proc, SV_ILP32))
+		td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET + TLS_TCB_SIZE32;
+	else
+#endif
+#if defined (COMPAT_CHERIABI)
+	/*
+	 * XXX-AR: should cheriabi_set_user_tls just delegate to this
+	 * function?
+	 */
+	if (td->td_proc && SV_PROC_FLAG(td->td_proc, SV_CHERI))
+		panic("cpu_set_user_tls(%p) should not be called from CHERIABI\n", td);
+	else
+#endif
+	td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET + TLS_TCB_SIZE;
+	td->td_md.md_tls = __USER_CAP_UNBOUND(tls_base);
 	if (td == curthread && cpuinfo.userlocal_reg == true) {
 		mips_wr_userlocal((unsigned long)tls_base +
 		    td->td_md.md_tls_tcb_offset);

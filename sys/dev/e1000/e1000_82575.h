@@ -1,4 +1,5 @@
 /******************************************************************************
+  SPDX-License-Identifier: BSD-3-Clause
 
   Copyright (c) 2001-2015, Intel Corporation 
   All rights reserved.
@@ -493,12 +494,14 @@ enum e1000_promisc_type {
 void e1000_vfta_set_vf(struct e1000_hw *, u16, bool);
 void e1000_rlpml_set_vf(struct e1000_hw *, u16);
 s32 e1000_promisc_set_vf(struct e1000_hw *, enum e1000_promisc_type type);
+void e1000_write_vfta_i350(struct e1000_hw *hw, u32 offset, u32 value);
 u16 e1000_rxpbs_adjust_82580(u32 data);
 s32 e1000_read_emi_reg(struct e1000_hw *hw, u16 addr, u16 *data);
-s32 e1000_set_eee_i350(struct e1000_hw *);
-s32 e1000_set_eee_i354(struct e1000_hw *);
+s32 e1000_set_eee_i350(struct e1000_hw *hw, bool adv1G, bool adv100M);
+s32 e1000_set_eee_i354(struct e1000_hw *hw, bool adv1G, bool adv100M);
 s32 e1000_get_eee_status_i354(struct e1000_hw *, bool *);
 s32 e1000_initialize_M88E1512_phy(struct e1000_hw *hw);
+s32 e1000_initialize_M88E1543_phy(struct e1000_hw *hw);
 
 /* I2C SDA and SCL timing parameters for standard mode */
 #define E1000_I2C_T_HD_STA	4

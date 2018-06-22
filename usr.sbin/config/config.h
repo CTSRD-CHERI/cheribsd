@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1980, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -54,6 +56,7 @@ struct file_list {
 	char	*f_clean;		/* File list to add to clean rule */
 	char	*f_warn;		/* warning message */
 	const char *f_objprefix;	/* prefix string for object name */
+	const char *f_srcprefix;	/* source prefix such as $S/ */
 };
 
 struct files_name {
@@ -152,7 +155,7 @@ struct includepath {
 SLIST_HEAD(, includepath) includepath;
 
 /*
- * Tag present in the kernelconf.tmlp template file. It's mandatory for those
+ * Tag present in the kernconf.tmpl template file. It's mandatory for those
  * two strings to be the same. Otherwise you'll get into trouble.
  */
 #define	KERNCONFTAG	"%%KERNCONFFILE%%"

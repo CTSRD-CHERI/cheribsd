@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1998 John Birrell <jb@cimlogic.com.au>.
  * All rights reserved.
  *
@@ -42,7 +44,10 @@
  * or more threads. It is used to avoid calling locking functions
  * when they are not required.
  */
+#ifndef __LIBC_ISTHREADED_DECLARED
+#define __LIBC_ISTHREADED_DECLARED
 extern int	__isthreaded;
+#endif
 
 /*
  * Elf_Auxinfo *__elf_aux_vector, the pointer to the ELF aux vector
@@ -168,6 +173,9 @@ typedef enum {
 	PJT_CLEANUP_PUSH_IMP,
 	PJT_CANCEL_ENTER,
 	PJT_CANCEL_LEAVE,
+	PJT_MUTEX_CONSISTENT,
+	PJT_MUTEXATTR_GETROBUST,
+	PJT_MUTEXATTR_SETROBUST,
 	PJT_MAX
 } pjt_index_t;
 
@@ -224,6 +232,9 @@ enum {
 	INTERPOS_kevent,
 	INTERPOS_wait6,
 	INTERPOS_ppoll,
+	INTERPOS_map_stacks_exec,
+	INTERPOS_fdatasync,
+	INTERPOS_clock_nanosleep,
 	INTERPOS_MAX
 };
 
@@ -238,6 +249,16 @@ int _yp_check(char **);
  * Initialise TLS for static programs
  */
 void _init_tls(void);
+
+/*
+ * Internal allocator for TLS
+ */
+void	*tls_malloc(__size_t size);
+void	*tls_calloc(__size_t number, __size_t size);
+void	 tls_free(void *ptr);
+void	*tls_calloc_aligned(__size_t number, __size_t size, __size_t align);
+void	*tls_malloc_aligned(__size_t size, __size_t align);
+void	 tls_free_aligned(void *ptr);
 
 /*
  * Provides pthread_once()-like functionality for both single-threaded
@@ -261,6 +282,14 @@ extern const char *__progname;
  * thread is exiting.
  */
 void _malloc_thread_cleanup(void);
+
+/*
+ * This function is used by the threading libraries to notify libc that a
+ * thread is exiting, so its thread-local dtors should be called.
+ */
+void __cxa_thread_call_dtors(void);
+int __cxa_thread_atexit_hidden(void (*dtor_func)(void *), void *obj,
+    void *dso_symbol) __hidden;
 
 /*
  * These functions are used by the threading libraries in order to protect
@@ -293,6 +322,7 @@ struct pollfd;
 struct rusage;
 struct sigaction;
 struct sockaddr;
+struct stat;
 struct timespec;
 struct timeval;
 struct timezone;
@@ -305,13 +335,18 @@ int		__sys_aio_suspend(const struct aiocb * const[], int,
 int		__sys_accept(int, struct sockaddr *, __socklen_t *);
 int		__sys_accept4(int, struct sockaddr *, __socklen_t *, int);
 int		__sys_clock_gettime(__clockid_t, struct timespec *ts);
+int		__sys_clock_nanosleep(__clockid_t, int,
+		    const struct timespec *, struct timespec *);
 int		__sys_close(int);
 int		__sys_connect(int, const struct sockaddr *, __socklen_t);
 		/* fcntl declared to match the kernel so we can call directly */
 int		__sys_fcntl(int, int, __intptr_t);
+int		__sys_fdatasync(int);
+int		__sys_fstatat(int, const char *, struct stat *, int);
 int		__sys_fsync(int);
 __pid_t		__sys_fork(void);
 int		__sys_ftruncate(int, __off_t);
+__ssize_t	__sys_getdirentries(int, char *, __size_t, __off_t *);
 int		__sys_gettimeofday(struct timeval *, struct timezone *);
 		/* ioctl declared to match the kernel so we can call directly */
 int		__sys_ioctl(int, unsigned long, void *);
@@ -326,6 +361,7 @@ int		__sys_openat(int, const char *, int, int);
 int		__sys_pselect(int, struct fd_set *, struct fd_set *,
 		    struct fd_set *, const struct timespec *,
 		    const __sigset_t *);
+int		__sys_ptrace(int, __pid_t, char *, int);
 int		__sys_poll(struct pollfd *, unsigned, int);
 int		__sys_ppoll(struct pollfd *, unsigned, const struct timespec *,
 		    const __sigset_t *);
@@ -384,8 +420,16 @@ int _elf_aux_info(int aux, void *buf, int buflen);
 struct dl_phdr_info;
 int __elf_phdr_match_addr(struct dl_phdr_info *, void *);
 void __init_elf_aux_vector(void);
+void __libc_map_stacks_exec(void);
 
 void	_pthread_cancel_enter(int);
 void	_pthread_cancel_leave(int);
+
+struct _pthread_cleanup_info;
+void	___pthread_cleanup_push_imp(void (*)(void *), void *,
+	    struct _pthread_cleanup_info *);
+void	___pthread_cleanup_pop_imp(int);
+
+void __throw_constraint_handler_s(const char * restrict msg, int error);
 
 #endif /* _LIBC_PRIVATE_H_ */

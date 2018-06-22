@@ -25,7 +25,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd December 9, 2015
+.Dd April 26, 2017
 .Dt UART 4
 .Os
 .Sh NAME
@@ -156,7 +156,7 @@ The
 .Nm
 driver can capture PPS timing information as defined in RFC 2783.
 The API, accessed via
-.Xr ioctl 8 ,
+.Xr ioctl 2 ,
 is available on the tty device.
 To use the PPS capture feature with
 .Xr ntpd 8 ,
@@ -188,7 +188,7 @@ Capture pulses on the CTS line.
 Capture pulses on the DCD line.
 .El
 .Pp
-The following values may be ORed with the capture mode to configure 
+The following values may be ORed with the capture mode to configure
 capture processing options:
 .Bl -tag -compact -offset "mmmm" -width "mmmm"
 .It 0x10
@@ -226,7 +226,7 @@ level signal at up to 12 volts.
 A connection to header pins or an edge-connector on an embedded board
 is typically a TTL signal at 3.3 or 5 volts.
 .Sh FILES
-.Bl -tag -width ".Pa /dev/ttyu?.init" -compact
+.Bl -tag -width "/dev/ttyu?.init" -compact
 .It Pa /dev/ttyu?
 for callin ports
 .It Pa /dev/ttyu?.init

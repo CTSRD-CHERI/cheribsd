@@ -1,6 +1,8 @@
 /*	$NetBSD: Locore.c,v 1.7 2000/08/20 07:04:59 tsubai Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
  * Copyright (C) 1995, 1996 TooLs GmbH.
  * All rights reserved.
@@ -198,6 +200,12 @@ OF_install(char *name, int prio)
 {
 	ofw_def_t *ofwp, **ofwpp;
 	static int curr_prio = 0;
+
+	/* Allow OF layer to be uninstalled */
+	if (name == NULL) {
+		ofw_def_impl = NULL;
+		return (FALSE);
+	}
 
 	/*
 	 * Try and locate the OFW kobj corresponding to the name.
@@ -475,6 +483,13 @@ OF_getencprop_alloc(phandle_t package, const char *name, int elsz, void **buf)
 		cell[i] = be32toh(cell[i]);
 
 	return (retval);
+}
+
+/* Free buffer allocated by OF_getencprop_alloc or OF_getprop_alloc */
+void OF_prop_free(void *buf)
+{
+
+	free(buf, M_OFWPROP);
 }
 
 /* Get the next property of a package. */

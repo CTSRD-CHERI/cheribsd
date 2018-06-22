@@ -1,6 +1,8 @@
 /*	$NetBSD: obio_space.c,v 1.6 2003/07/15 00:25:05 lukem Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2001, 2002, 2003 Wasabi Systems, Inc.
  * All rights reserved.
  *
@@ -43,6 +45,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/bus.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/devmap.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -51,7 +54,6 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/bus.h>
 #include <machine/cpufunc.h>
-#include <machine/devmap.h>
 
 void
 generic_bs_unimplemented(void)
@@ -71,8 +73,8 @@ generic_bs_map(bus_space_tag_t t, bus_addr_t bpa, bus_size_t size, int flags,
 
 	/*
 	 * We don't even examine the passed-in flags.  For ARM, the CACHEABLE
-	 * flag doesn't make sense (we create PTE_DEVICE mappings), and the
-	 * LINEAR flag is just implied because we use kva_alloc(size).
+	 * flag doesn't make sense (we create VM_MEMATTR_DEVICE mappings), and
+	 * the LINEAR flag is just implied because we use kva_alloc(size).
 	 */
 	if ((va = pmap_mapdev(bpa, size)) == NULL)
 		return (ENOMEM);

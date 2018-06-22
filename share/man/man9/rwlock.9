@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd December 13, 2014
+.Dd November 11, 2017
 .Dt RWLOCK 9
 .Os
 .Sh NAME
@@ -45,7 +45,8 @@
 .Nm rw_initialized ,
 .Nm rw_wowned ,
 .Nm rw_assert ,
-.Nm RW_SYSINIT
+.Nm RW_SYSINIT ,
+.Nm RW_SYSINIT_FLAGS
 .Nd kernel reader/writer lock
 .Sh SYNOPSIS
 .In sys/param.h
@@ -88,6 +89,7 @@
 .Fn rw_assert "const struct rwlock *rw" "int what"
 .In sys/kernel.h
 .Fn RW_SYSINIT "name" "struct rwlock *rw" "const char *desc"
+.Fn RW_SYSINIT_FLAGS "name" "struct rwlock *rw" "const char *desc" "int flags"
 .Sh DESCRIPTION
 Reader/writer locks allow shared access to protected data by multiple threads,
 or exclusive access by a single thread.
@@ -313,18 +315,19 @@ facility was written by
 This manual page was written by
 .An "Gleb Smirnoff" .
 .Sh BUGS
-If
+A kernel without
 .Dv WITNESS
-is not included in the kernel,
-then it is impossible to assert that the current thread does or does not
-hold a read lock.
-In the
-.Pf non- Dv WITNESS
-case, the
+cannot assert whether the current thread does or does not hold a read lock.
 .Dv RA_LOCKED
 and
 .Dv RA_RLOCKED
-assertions merely check that some thread holds a read lock.
+can only assert that
+.Em any
+thread holds a read lock.
+They cannot ensure that the current thread holds a read lock.
+Further,
+.Dv RA_UNLOCKED
+can only assert that the current thread does not hold a write lock.
 .Pp
 Reader/writer is a bit of an awkward name.
 An

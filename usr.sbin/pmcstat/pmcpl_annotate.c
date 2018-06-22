@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2005-2007, Joseph Koshy
  * Copyright (c) 2007 The FreeBSD Foundation
  * All rights reserved.
@@ -26,6 +28,16 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
  */
 
 /*
@@ -103,7 +115,7 @@ pmcpl_annotate_process(struct pmcstat_process *pp, struct pmcstat_pmcrecord *pmc
 		return;
 
 	fprintf(args.pa_graphfile, "%p %s 0x%jx 0x%jx\n",
-		(void *)cc[0],
+		(void *)(intptr_t)cc[0],
 		pmcstat_string_unintern(sym->ps_name),
 		(uintmax_t)(sym->ps_start +
 		image->pi_vaddr), (uintmax_t)(sym->ps_end +

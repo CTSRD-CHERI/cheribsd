@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011 Jakub Wojciech Klama <jceel@FreeBSD.org>
  * All rights reserved.
  *
@@ -47,8 +49,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/watchdog.h>
 
 #include <machine/bus.h>
-#include <machine/cpu.h>
-#include <machine/cpufunc.h>
 #include <machine/resource.h>
 #include <machine/intr.h>
 
@@ -143,12 +143,16 @@ static int
 lpc_spi_transfer(device_t dev, device_t child, struct spi_command *cmd)
 {
 	struct lpc_spi_softc *sc = device_get_softc(dev);
-	struct spibus_ivar *devi = SPIBUS_IVAR(child);
+	uint32_t cs;
 	uint8_t *in_buf, *out_buf;
 	int i;
 
+	spibus_get_cs(child, &cs);
+
+	cs &= ~SPIBUS_CS_HIGH;
+
 	/* Set CS active */
-	lpc_gpio_set_state(child, devi->cs, 0);
+	lpc_gpio_set_state(child, cs, 0);
 
 	/* Wait for FIFO to be ready */
 	while ((lpc_spi_read_4(sc, LPC_SSP_SR) & LPC_SSP_SR_TNF) == 0);
@@ -170,7 +174,7 @@ lpc_spi_transfer(device_t dev, device_t child, struct spi_command *cmd)
 	}
 
 	/* Set CS inactive */
-	lpc_gpio_set_state(child, devi->cs, 1);
+	lpc_gpio_set_state(child, cs, 1);
 
 	return (0);
 }

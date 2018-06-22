@@ -41,14 +41,15 @@
 #include <sys/sysctl.h>
 #include <sys/time.h>
 
-#include <machine/cheri.h>
-#include <machine/cheric.h>
+#include <cheri/cheri.h>
+#include <cheri/cheric.h>
+
 #include <machine/cpuregs.h>
 #include <machine/sysarch.h>
 
-#include <cheri/cheri_enter.h>
-#include <cheri/cheri_fd.h>
-#include <cheri/sandbox.h>
+#include <cheri/libcheri_enter.h>
+#include <cheri/libcheri_fd.h>
+#include <cheri/libcheri_sandbox.h>
 
 #include <cheritest-helper.h>
 #include <err.h>
@@ -70,20 +71,42 @@
 #define	PERM_RWX	(PERM_READ|PERM_WRITE|PERM_EXEC)
 
 void
+test_cheriabi_mmap_nospace(const struct cheri_test *ctp __unused)
+{
+	size_t len;
+	void *cap;
+
+	/* Remove all space from the default mmap capability. */
+	len = 0;
+	if (sysarch(CHERI_MMAP_SETBOUNDS, &len) != 0)
+		cheritest_failure_err(
+		    "sysarch(CHERI_MMAP_SETBOUNDS, 0) failed");
+	if ((cap = mmap(0, PAGE_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC,
+	    MAP_ANON, -1, 0)) != MAP_FAILED)
+		cheritest_failure_err(
+		    "mmap() returned a a pointer when it should have failed");
+
+	cheritest_success();
+}
+
+void
 test_cheriabi_mmap_perms(const struct cheri_test *ctp __unused)
 {
 	uint64_t perms, operms;
-	void *cap;
+	void *cap, *tmpcap;
 
 	if (sysarch(CHERI_MMAP_GETPERM, &perms) != 0)
 		cheritest_failure_err("sysarch(CHERI_MMAP_GETPERM) failed");
 
-	if (!(perms & CHERI_PERM_USER0))
+	/*
+	 * Make sure perms we are going to try removing are there...
+	 */
+	if (!(perms & CHERI_PERM_SW0))
 		cheritest_failure_errx(
-		    "no CHERI_PERM_USER0 in default perms (0x%lx)", perms);
-	if (!(perms & CHERI_PERM_USER1))
+		    "no CHERI_PERM_SW0 in default perms (0x%lx)", perms);
+	if (!(perms & CHERI_PERM_SW2))
 		cheritest_failure_errx(
-		    "no CHERI_PERM_USER1 in default perms (0x%lx)", perms);
+		    "no CHERI_PERM_SW2 in default perms (0x%lx)", perms);
 
 	if ((cap = mmap(0, PAGE_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC,
 	    MAP_ANON, -1, 0)) == MAP_FAILED)
@@ -97,31 +120,36 @@ test_cheriabi_mmap_perms(const struct cheri_test *ctp __unused)
 		cheritest_failure_err("munmap() failed");
 
 	operms = perms;
-	perms = ~CHERI_PERM_USER1;
+	perms = ~CHERI_PERM_SW2;
 	if (sysarch(CHERI_MMAP_ANDPERM, &perms) != 0)
 		cheritest_failure_err("sysarch(CHERI_MMAP_ANDPERM) failed");
-	if (perms != (operms & ~CHERI_PERM_USER1))
+	if (perms != (operms & ~CHERI_PERM_SW2))
 		cheritest_failure_errx("sysarch(CHERI_MMAP_ANDPERM) did not "
-		    "just remove CHERI_PERM_USER1.  Got 0x%lx but "
+		    "just remove CHERI_PERM_SW2.  Got 0x%lx but "
 		    "expected 0x%lx", perms,
-		    operms & ~CHERI_PERM_USER1);
+		    operms & ~CHERI_PERM_SW2);
+	if (sysarch(CHERI_MMAP_GETPERM, &perms) != 0)
+		cheritest_failure_err("sysarch(CHERI_MMAP_GETPERM) failed");
+	if (perms & CHERI_PERM_SW2)
+		cheritest_failure_errx("sysarch(CHERI_MMAP_ANDPERM) failed "
+		    "to remove CHERI_PERM_SW2.  Got 0x%lx.", perms);
 
 	if ((cap = mmap(0, PAGE_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC,
 	    MAP_ANON, -1, 0)) == MAP_FAILED)
 		cheritest_failure_err("mmap() failed");
 
-	if (cheri_getperm(cap) & CHERI_PERM_USER1)
+	if (cheri_getperm(cap) & CHERI_PERM_SW2)
 		cheritest_failure_errx("mmap() returned with "
-		    "CHERI_PERM_USER1 after restriction (0x%lx)",
+		    "CHERI_PERM_SW2 after restriction (0x%lx)",
 		    cheri_getperm(cap));
 
-	cap = cheri_andperm(cap, ~CHERI_PERM_USER0);
+	cap = cheri_andperm(cap, ~CHERI_PERM_SW0);
 	if ((cap = mmap(cap, PAGE_SIZE, PROT_READ,
 	    MAP_ANON|MAP_FIXED, -1, 0)) == MAP_FAILED)
 		cheritest_failure_err("mmap(MAP_FIXED) failed");
-	if (cheri_getperm(cap) & CHERI_PERM_USER0)
+	if (cheri_getperm(cap) & CHERI_PERM_SW0)
 		cheritest_failure_errx(
-		    "mmap(MAP_FIXED) returned with CHERI_PERM_USER0 in perms "
+		    "mmap(MAP_FIXED) returned with CHERI_PERM_SW0 in perms "
 		    "without it in addr (perms 0x%lx)", cheri_getperm(cap));
 
 	if (munmap(cap, PAGE_SIZE) != 0)
@@ -134,29 +162,72 @@ test_cheriabi_mmap_perms(const struct cheri_test *ctp __unused)
 		cheritest_failure_errx("mmap(PROT_NONE) returned unrequested "
 		    "permissions (0x%lx)", cheri_getperm(cap));
 
-	if ((cap = mmap(cap, PAGE_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC,
-	    MAP_ANON|MAP_FIXED, -1, 0)) == MAP_FAILED)
-		cheritest_failure_err("mmap(MAP_FIXED) failed");
-	if ((cheri_getperm(cap) & PERM_RWX) != PERM_RWX)
-		cheritest_failure_errx("mmap(PROT_READ|PROT_WRITE|PROT_EXEC) "
-		    "failed to upgrade permissions (0x%lx)",
-		    cheri_getperm(cap));
+	/* Remove VMMAP permission from cap */
+	tmpcap = cheri_andperm(cap, ~CHERI_PERM_CHERIABI_VMMAP);
+	if (munmap(tmpcap, PAGE_SIZE) == 0)
+		cheritest_failure_errx(
+		    "munmap() unmapped without CHERI_PERM_CHERIABI_VMMAP");
 
 	if (munmap(cap, PAGE_SIZE) != 0)
 		cheritest_failure_err("munmap() failed");
+
+	if ((cap = mmap(tmpcap, PAGE_SIZE, PROT_NONE, MAP_ANON|MAP_FIXED,
+	    -1, 0)) != MAP_FAILED)
+		cheritest_failure_errx(
+		    "mmap(MAP_FIXED) succeeded through a cap without"
+		    " CHERI_PERM_CHERIABI_VMMAP");
 
 	/* Disallow executable pages */
 	perms = ~PERM_EXEC;
 	if (sysarch(CHERI_MMAP_ANDPERM, &perms) != 0)
 		cheritest_failure_err("sysarch(CHERI_MMAP_ANDPERM) failed");
 	if ((cap = mmap(0, PAGE_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC,
-	    MAP_ANON, -1, 0)) == MAP_FAILED)
-		cheritest_failure_err("mmap(MAP_FIXED) failed");
-	if (cheri_getperm(cap) & PERM_EXEC)
-		cheritest_failure_errx("mmap(PROT_READ|PROT_WRITE|PROT_EXEC) "
-		    "produced execute perm after sysarch(CHERI_MMAP_ANDPERM, "
-		    "~PERM_EXEC)");
+	    MAP_ANON, -1, 0)) != MAP_FAILED)
+		cheritest_failure_err("mmap(PROT_READ|PROT_WRITE|PROT_EXEC) "
+		    "succeeded after removing PROT_EXEC from default cap");
 
+	cheritest_success();
+}
+
+void
+test_cheriabi_mmap_unrepresentable(const struct cheri_test *ctp __unused)
+{
+#ifdef CHERI_BASELEN_BITS
+	size_t len = ((size_t)PAGE_SIZE << CHERI_BASELEN_BITS) + 1;
+	void *cap;
+
+	if ((cap = mmap(0, len, PROT_READ|PROT_WRITE|PROT_EXEC,
+	    MAP_ANON, -1, 0)) != MAP_FAILED)
+		cheritest_failure_errx("mmap() returned a pointer when "
+		    "given an unrepresentable length (%zu): %#p", len, cap);
+	cheritest_success();
+#endif
+
+	cheritest_success();
+}
+
+void
+test_cheriabi_mmap_ddc(const struct cheri_test *ctp __unused)
+{
+	void *cap, *ddc;
+	size_t length;
+
+	ddc = cheri_getdefault();
+	if ((cheri_getperm(ddc) & CHERI_PERM_CHERIABI_VMMAP) ==
+	    CHERI_PERM_CHERIABI_VMMAP) {
+		if ((cap = mmap(0, PAGE_SIZE, PROT_READ|PROT_WRITE,
+		    MAP_ANON|MAP_CHERI_DDC, -1, 0)) == MAP_FAILED)
+			cheritest_failure_err("mmap(MAP_CHERI_DDC) failed");
+
+		if (cheri_getbase(cap) < cheri_getbase(ddc) ||
+		    cheri_getbase(cap) > cheri_getbase(ddc) + cheri_getlen(ddc))
+			cheritest_failure_errx(
+			    "cap (%#p) base outside ddc (%#p)", cap, ddc);
+		if (cheri_getbase(cap) + cheri_getlen(cap) >
+		    cheri_getbase(ddc) + cheri_getlen(ddc))
+			cheritest_failure_errx(
+			    "cap (%#p) extends beyond ddc (%#p)", cap, ddc);
+	}
 
 	cheritest_success();
 }

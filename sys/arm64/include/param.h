@@ -42,11 +42,16 @@
 #define	STACKALIGNBYTES	(16 - 1)
 #define	STACKALIGN(p)	((uint64_t)(p) & ~STACKALIGNBYTES)
 
+#define	__PCI_REROUTE_INTERRUPT
+
 #ifndef MACHINE
 #define	MACHINE		"arm64"
 #endif
 #ifndef MACHINE_ARCH
 #define	MACHINE_ARCH	"aarch64"
+#endif
+#ifndef MACHINE_ARCH32
+#define	MACHINE_ARCH32	"armv7"
 #endif
 
 #if defined(SMP) || defined(KLD_MODULE)
@@ -58,7 +63,7 @@
 #endif /* SMP || KLD_MODULE */
 
 #ifndef MAXMEMDOM
-#define	MAXMEMDOM	1
+#define	MAXMEMDOM	2
 #endif
 
 #define	ALIGNBYTES	_ALIGNBYTES
@@ -75,7 +80,7 @@
  * CACHE_LINE_SIZE is the compile-time maximum cache line size for an
  * architecture.  It should be used with appropriate caution.
  */
-#define	CACHE_LINE_SHIFT	6
+#define	CACHE_LINE_SHIFT	7
 #define	CACHE_LINE_SIZE		(1 << CACHE_LINE_SHIFT)
 
 #define	PAGE_SHIFT	12

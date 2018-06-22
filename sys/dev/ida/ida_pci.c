@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1999,2000 Jonathan Lemon
  * All rights reserved.
  *
@@ -294,7 +296,7 @@ ida_pci_attach(device_t dev)
 		return (ENOMEM);
 	}
 
-	error = ida_init(ida);
+	error = ida_setup(ida);
 	if (error) {
 	        ida_free(ida);
 	        return (error);

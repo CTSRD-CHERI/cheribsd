@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2002-2005, 2009, 2013 Jeffrey Roberson <jeff@FreeBSD.org>
  * Copyright (c) 2004, 2005 Bosko Milekic <bmilekic@FreeBSD.org>
  * All rights reserved.
@@ -27,6 +29,9 @@
  * $FreeBSD$
  *
  */
+
+#include <sys/_bitset.h>
+#include <sys/_task.h>
 
 /* 
  * This file includes definitions, structures, prototypes, and inlines that
@@ -108,6 +113,8 @@
 #define UMA_SLAB_SHIFT	PAGE_SHIFT	/* Number of bits PAGE_MASK */
 
 #define UMA_BOOT_PAGES		64	/* Pages allocated for startup */
+#define UMA_BOOT_PAGES_ZONES	32	/* Multiplier for pages to reserve */
+					/* if uma_zone > PAGE_SIZE */
 
 /* Max waste percentage before going to off page slab management */
 #define UMA_MAX_WASTE	10
@@ -206,8 +213,7 @@ struct uma_keg {
 	vm_offset_t	uk_kva;		/* Zone base KVA */
 	uma_zone_t	uk_slabzone;	/* Slab zone backing us, if OFFPAGE */
 
-	uint16_t	uk_slabsize;	/* Slab size for this keg */
-	uint16_t	uk_pgoff;	/* Offset to uma_slab struct */
+	uint32_t	uk_pgoff;	/* Offset to uma_slab struct */
 	uint16_t	uk_ppera;	/* pages per allocation from backend */
 	uint16_t	uk_ipers;	/* Items per slab */
 	uint32_t	uk_flags;	/* Internal flags */
@@ -248,17 +254,7 @@ struct uma_slab {
 #define	us_link	us_type._us_link
 #define	us_size	us_type._us_size
 
-/*
- * The slab structure for UMA_ZONE_REFCNT zones for whose items we
- * maintain reference counters in the slab for.
- */
-struct uma_slab_refcnt {
-	struct uma_slab		us_head;	/* slab header data */
-	uint32_t		us_refcnt[0];	/* Actually larger. */
-};
-
 typedef struct uma_slab * uma_slab_t;
-typedef struct uma_slab_refcnt * uma_slabrefcnt_t;
 typedef uma_slab_t (*uma_slaballoc)(uma_zone_t, uma_keg_t, int);
 
 struct uma_klink {
@@ -307,7 +303,7 @@ struct uma_zone {
 	const char	*uz_warning;	/* Warning to print on failure */
 	struct timeval	uz_ratecheck;	/* Warnings rate-limiting */
 
-	uma_maxaction_t	uz_maxaction;	/* Function to run when at limit */
+	struct task	uz_maxaction;	/* Task to run when at limit */
 
 	/*
 	 * This HAS to be the last item because we adjust the zone size
@@ -423,12 +419,19 @@ vsetslab(vm_offset_t va, uma_slab_t slab)
 
 /*
  * The following two functions may be defined by architecture specific code
- * if they can provide more effecient allocation functions.  This is useful
+ * if they can provide more efficient allocation functions.  This is useful
  * for using direct mapped addresses.
  */
 void *uma_small_alloc(uma_zone_t zone, vm_size_t bytes, uint8_t *pflag,
     int wait);
 void uma_small_free(void *mem, vm_size_t size, uint8_t flags);
+
+/* Set a global soft limit on UMA managed memory. */
+void uma_set_limit(unsigned long limit);
+unsigned long uma_limit(void);
+
+/* Return the amount of memory managed by UMA. */
+unsigned long uma_size(void);
 #endif /* _KERNEL */
 
 #endif /* VM_UMA_INT_H */

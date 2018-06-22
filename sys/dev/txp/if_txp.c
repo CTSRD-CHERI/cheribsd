@@ -1,6 +1,8 @@
 /*	$OpenBSD: if_txp.c,v 1.48 2001/06/27 06:34:50 kjc Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2001
  *	Jason L. Wright <jason@thought.net>, Theo de Raadt, and
  *	Aaron Campbell <aaron@monkey.org>.  All rights reserved.
@@ -371,7 +373,7 @@ txp_attach(device_t dev)
 	 * diagnose sleep image specific issues.
 	 */
 	rsp = NULL;
-	if (txp_ext_command(sc, TXP_CMD_READ_VERSION, 0, 0, 0, NULL, 0,
+	if (txp_ext_command(sc, TXP_CMD_VERSIONS_READ, 0, 0, 0, NULL, 0,
 	    &rsp, TXP_CMD_WAIT)) {
 		device_printf(dev, "can not read sleep image version\n");
 		error = ENXIO;
@@ -400,8 +402,7 @@ txp_attach(device_t dev)
 		    "Unknown Typhoon sleep image version: %u:0x%08x\n",
 		    rsp->rsp_numdesc, p2);
 	}
-	if (rsp != NULL)
-		free(rsp, M_DEVBUF);
+	free(rsp, M_DEVBUF);
 
 	sc->sc_xcvr = TXP_XCVR_AUTO;
 	txp_command(sc, TXP_CMD_XCVR_SELECT, TXP_XCVR_AUTO, 0, 0,
@@ -1709,7 +1710,7 @@ txp_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int capenable, error = 0, mask;
 
 	switch(command) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		TXP_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
@@ -1727,8 +1728,8 @@ txp_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->sc_if_flags = ifp->if_flags;
 		TXP_UNLOCK(sc);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		/*
 		 * Multicast list has changed; set the hardware
 		 * filter accordingly.
@@ -1738,10 +1739,10 @@ txp_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			txp_set_filter(sc);
 		TXP_UNLOCK(sc);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		TXP_LOCK(sc);
 		capenable = ifp->if_capenable;
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&
 		    (ifp->if_capabilities & IFCAP_TXCSUM) != 0) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;
@@ -1772,7 +1773,7 @@ txp_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		VLAN_CAPABILITIES(ifp);
 		break;
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		error = ifmedia_ioctl(ifp, ifr, &sc->sc_ifmedia, command);
 		break;
 	default:

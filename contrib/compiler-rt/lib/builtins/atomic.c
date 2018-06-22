@@ -24,6 +24,16 @@
  *
  *===----------------------------------------------------------------------===
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "hashing"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <stdint.h>
 #include <string.h>
@@ -56,13 +66,13 @@ static const long SPINLOCK_MASK = SPINLOCK_COUNT - 1;
 #include <machine/atomic.h>
 #include <sys/umtx.h>
 typedef struct _usem Lock;
-inline static void unlock(Lock *l) {
+__inline static void unlock(Lock *l) {
   __c11_atomic_store((_Atomic(uint32_t)*)&l->_count, 1, __ATOMIC_RELEASE);
   __c11_atomic_thread_fence(__ATOMIC_SEQ_CST);
   if (l->_has_waiters)
       _umtx_op(l, UMTX_OP_SEM_WAKE, 1, 0, 0);
 }
-inline static void lock(Lock *l) {
+__inline static void lock(Lock *l) {
   uint32_t old = 1;
   while (!__c11_atomic_compare_exchange_weak((_Atomic(uint32_t)*)&l->_count, &old,
         0, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) {
@@ -76,12 +86,12 @@ static Lock locks[SPINLOCK_COUNT] = { [0 ...  SPINLOCK_COUNT-1] = {0,1,0} };
 #elif defined(__APPLE__)
 #include <libkern/OSAtomic.h>
 typedef OSSpinLock Lock;
-inline static void unlock(Lock *l) {
+__inline static void unlock(Lock *l) {
   OSSpinLockUnlock(l);
 }
 /// Locks a lock.  In the current implementation, this is potentially
 /// unbounded in the contended case.
-inline static void lock(Lock *l) {  
+__inline static void lock(Lock *l) {
   OSSpinLockLock(l);
 }
 static Lock locks[SPINLOCK_COUNT]; // initialized to OS_SPINLOCK_INIT which is 0
@@ -89,12 +99,12 @@ static Lock locks[SPINLOCK_COUNT]; // initialized to OS_SPINLOCK_INIT which is 0
 #else
 typedef _Atomic(uintptr_t) Lock;
 /// Unlock a lock.  This is a release operation.
-inline static void unlock(Lock *l) {
+__inline static void unlock(Lock *l) {
   __c11_atomic_store(l, 0, __ATOMIC_RELEASE);
 }
 /// Locks a lock.  In the current implementation, this is potentially
 /// unbounded in the contended case.
-inline static void lock(Lock *l) {
+__inline static void lock(Lock *l) {
   uintptr_t old = 0;
   while (!__c11_atomic_compare_exchange_weak(l, &old, 1, __ATOMIC_ACQUIRE,
         __ATOMIC_RELAXED))
@@ -105,15 +115,20 @@ static Lock locks[SPINLOCK_COUNT];
 #endif
 
 
+#ifndef _VADDR_T_DECLARED
+typedef	__uintptr_t	vaddr_t;
+#define	_VADDR_T_DECLARED
+#endif
+
 /// Returns a lock to use for a given pointer.  
-static inline Lock *lock_for_pointer(void *ptr) {
-  intptr_t hash = (intptr_t)ptr;
+static __inline Lock *lock_for_pointer(void *ptr) {
+  vaddr_t hash = (vaddr_t)ptr;
   // Disregard the lowest 4 bits.  We want all values that may be part of the
   // same memory operation to hash to the same value and therefore use the same
   // lock.  
   hash >>= 4;
   // Use the next bits as the basis for the hash
-  intptr_t low = hash & SPINLOCK_MASK;
+  vaddr_t low = hash & SPINLOCK_MASK;
   // Now use the high(er) set of bits to perturb the hash, so that we don't
   // get collisions from atomic fields in a single object
   hash >>= 16;
@@ -229,13 +244,20 @@ void __atomic_exchange_c(int size, void *ptr, void *val, void *old, int model) {
 // Where the size is known at compile time, the compiler may emit calls to
 // specialised versions of the above functions.
 ////////////////////////////////////////////////////////////////////////////////
+#ifdef __SIZEOF_INT128__
 #define OPTIMISED_CASES\
   OPTIMISED_CASE(1, IS_LOCK_FREE_1, uint8_t)\
   OPTIMISED_CASE(2, IS_LOCK_FREE_2, uint16_t)\
   OPTIMISED_CASE(4, IS_LOCK_FREE_4, uint32_t)\
   OPTIMISED_CASE(8, IS_LOCK_FREE_8, uint64_t)\
-  /* FIXME: __uint128_t isn't available on 32 bit platforms.
-  OPTIMISED_CASE(16, IS_LOCK_FREE_16, __uint128_t)*/\
+  OPTIMISED_CASE(16, IS_LOCK_FREE_16, __uint128_t)
+#else
+#define OPTIMISED_CASES\
+  OPTIMISED_CASE(1, IS_LOCK_FREE_1, uint8_t)\
+  OPTIMISED_CASE(2, IS_LOCK_FREE_2, uint16_t)\
+  OPTIMISED_CASE(4, IS_LOCK_FREE_4, uint32_t)\
+  OPTIMISED_CASE(8, IS_LOCK_FREE_8, uint64_t)
+#endif
 
 #define OPTIMISED_CASE(n, lockfree, type)\
 type __atomic_load_##n(type *src, int model) {\

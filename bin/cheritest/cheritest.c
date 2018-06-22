@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 2012-2016 Robert N. M. Watson
- * Copyright (c) 2014 SRI International
+ * Copyright (c) 2012-2018 Robert N. M. Watson
+ * Copyright (c) 2014-2016 SRI International
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -37,24 +37,28 @@
 #endif
 #endif
 
-#include <sys/types.h>
+#include <sys/param.h>
 #include <sys/mman.h>
+#include <sys/resource.h>
 #include <sys/sysctl.h>
 #include <sys/time.h>
 #include <sys/ucontext.h>
 #include <sys/wait.h>
 
 #ifndef LIST_ONLY
-#include <machine/cheri.h>
-#include <machine/cheric.h>
+#include <cheri/cheri.h>
+#include <cheri/cheric.h>
+
 #include <machine/cherireg.h>
 #include <machine/cpuregs.h>
 #include <machine/frame.h>
 #include <machine/trap.h>
 
-#include <cheri/cheri_fd.h>
-#include <cheri/cheri_stack.h>
-#include <cheri/sandbox.h>
+#include <cheri/libcheri_fd.h>
+#include <cheri/libcheri_stack.h>
+#include <cheri/libcheri_sandbox.h>
+
+#include <machine/sysarch.h>
 #endif
 
 #include <assert.h>
@@ -65,9 +69,11 @@
 #include <fnmatch.h>
 #include <inttypes.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stringlist.h>
 #include <sysexits.h>
 #include <unistd.h>
 #include <vis.h>
@@ -80,7 +86,26 @@
 #include "cheritest_list_only.h"
 #endif
 
-#define	max(x, y)	((x) > (y) ? (x) : (y))
+#ifndef SIGPROT
+#define	SIGPROT				0
+#define	PROT_CHERI_BOUNDS		0
+#define	PROT_CHERI_TAG			0
+#define	PROT_CHERI_SEALED		0
+#define	PROT_CHERI_TYPE			0
+#define	PROT_CHERI_PERM			0
+#define	PROT_CHERI_STORETAG		0
+#define	PROT_CHERI_IMPRECISE		0
+#define	PROT_CHERI_STORELOCAL		0
+#define	PROT_CHERI_CCALL		0
+#define	PROT_CHERI_CRETURN		0
+#define	PROT_CHERI_SYSREG		0
+#define	PROT_CHERI_UNSEALED		0
+#define	PROT_CHERI_OVERFLOW		0
+#define	PROT_CHERI_UNDERFLOW		0
+#define	PROT_CHERI_CCALLREGS		0
+#define	PROT_CHERI_LOCALARG		0
+#define	PROT_CHERI_LOCALRET		0
+#endif /* SIGPROT */
 
 static const struct cheri_test cheri_tests[] = {
 	/*
@@ -89,11 +114,13 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_initregs_default",
 	  .ct_desc = "Test initial value of default capability",
 	  .ct_func = test_initregs_default },
-
+#ifdef __CHERI_PURE_CAPABILITY__
 	{ .ct_name = "test_initregs_stack",
 	  .ct_desc = "Test initial value of stack capability",
-	  .ct_func = test_initregs_stack },
-
+	  .ct_func = test_initregs_stack,
+	  .ct_xfail_reason = "CHERI_PERM_CHERIABI_VMMAP "
+	    "unnecessarily set in stack capability" },
+#endif
 	{ .ct_name = "test_initregs_idc",
 	  .ct_desc = "Test initial value of invoked data capability",
 	  .ct_func = test_initregs_idc },
@@ -115,15 +142,15 @@ static const struct cheri_test cheri_tests[] = {
 	 * Capability manipulation and use tests that sometimes generate
 	 * signals.
 	 */
-	/* XXXRW: Check this CP2 exception code number. */
 	{ .ct_name = "test_fault_cgetcause",
 	  .ct_desc = "Ensure CGetCause is unavailable in userspace",
 	  .ct_func = test_fault_cgetcause,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		    CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
 	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_SYSREG,
 	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_ACCESS_EPCC },
+	  .ct_cp2_exccode = CHERI_EXCCODE_SYSTEM_REGS },
 
 	{ .ct_name = "test_nofault_cfromptr",
 	  .ct_desc = "Exercise CFromPtr success",
@@ -132,18 +159,20 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_fault_bounds",
 	  .ct_desc = "Exercise capability bounds check failure",
 	  .ct_func = test_fault_bounds,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		    CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
 	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_BOUNDS,
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_LENGTH },
 
 	{ .ct_name = "test_fault_perm_load",
 	  .ct_desc = "Exercise capability load permission failure",
 	  .ct_func = test_fault_perm_load,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		    CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
 	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_PERM,
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_LOAD },
 
@@ -151,12 +180,23 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Exercise capability load permission success",
 	  .ct_func = test_nofault_perm_load },
 
+	{ .ct_name = "test_fault_perm_seal",
+	  .ct_desc = "Exercise capability seal permission failure",
+	  .ct_func = test_fault_perm_seal,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
+	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_PERM,
+	  .ct_mips_exccode = T_C2E,
+	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_SEAL },
+
 	{ .ct_name = "test_fault_perm_store",
 	  .ct_desc = "Exercise capability store permission failure",
 	  .ct_func = test_fault_perm_store,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		    CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
 	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_PERM,
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_STORE },
 
@@ -164,23 +204,35 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Exercise capability store permission success",
 	  .ct_func = test_nofault_perm_store },
 
+	{ .ct_name = "test_fault_perm_unseal",
+	  .ct_desc = "Exercise capability unseal permission failure",
+	  .ct_func = test_fault_perm_unseal,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
+	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_PERM,
+	  .ct_mips_exccode = T_C2E,
+	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_UNSEAL },
+
 	{ .ct_name = "test_fault_tag",
 	  .ct_desc = "Store via untagged capability",
 	  .ct_func = test_fault_tag,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		    CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
 	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_TAG,
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_TAG },
 
 	{ .ct_name = "test_fault_ccheck_user_fail",
 	  .ct_desc = "Exercise CCheckPerm failure",
 	  .ct_func = test_fault_ccheck_user_fail,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		    CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
 	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_PERM,
 	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_USER_PERM },
+	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_USER },
 
 	{ .ct_name = "test_nofault_ccheck_user_pass",
 	  .ct_desc = "Exercise CCheckPerm success",
@@ -189,47 +241,535 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_fault_read_kr1c",
 	  .ct_desc = "Ensure KR1C is unavailable in userspace",
 	  .ct_func = test_fault_read_kr1c,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		    CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
 	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_SYSREG,
 	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_ACCESS_KR1C },
+	  .ct_cp2_exccode = CHERI_EXCCODE_SYSTEM_REGS },
 
 	{ .ct_name = "test_fault_read_kr2c",
 	  .ct_desc = "Ensure KR2C is unavailable in userspace",
 	  .ct_func = test_fault_read_kr2c,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		    CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
 	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_SYSREG,
 	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_ACCESS_KR2C },
+	  .ct_cp2_exccode = CHERI_EXCCODE_SYSTEM_REGS },
 
 	{ .ct_name = "test_fault_read_kcc",
 	  .ct_desc = "Ensure KCC is unavailable in userspace",
 	  .ct_func = test_fault_read_kcc,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		    CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
 	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_SYSREG,
 	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_ACCESS_KCC },
+	  .ct_cp2_exccode = CHERI_EXCCODE_SYSTEM_REGS },
 
 	{ .ct_name = "test_fault_read_kdc",
 	  .ct_desc = "Ensure KDC is unavailable in userspace",
 	  .ct_func = test_fault_read_kdc,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		    CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
 	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_SYSREG,
 	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_ACCESS_KDC },
+	  .ct_cp2_exccode = CHERI_EXCCODE_SYSTEM_REGS },
 
 	{ .ct_name = "test_fault_read_epcc",
 	  .ct_desc = "Ensure EPCC is unavailable in userspace",
 	  .ct_func = test_fault_read_epcc,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		    CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
 	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_SYSREG,
 	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_ACCESS_EPCC },
+	  .ct_cp2_exccode = CHERI_EXCCODE_SYSTEM_REGS },
+
+	/*
+	 * Tests on the kernel-provided sealing capability (sealcap).
+	 */
+	{ .ct_name = "test_sealcap_sysarch",
+	  .ct_desc = "Retrieve sealcap using sysarch(2)",
+	  .ct_func = test_sealcap_sysarch, },
+
+	{ .ct_name = "test_sealcap_seal",
+	  .ct_desc = "Use sealcap to seal a capability",
+	  .ct_func = test_sealcap_seal, },
+
+	{ .ct_name = "test_sealcap_seal_unseal",
+	  .ct_desc = "Use sealcap to seal and unseal a capability",
+	  .ct_func = test_sealcap_seal_unseal, },
+
+	/*
+	 * Test bounds on globals in the same file they are allocated in.
+	 */
+	{ .ct_name = "test_bounds_global_static_uint8",
+	  .ct_desc = "Check bounds on global static uint8_t",
+	  .ct_func = test_bounds_global_static_uint8,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for static globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_uint8",
+	  .ct_desc = "Check bounds on global uint8_t",
+	  .ct_func = test_bounds_global_uint8,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_static_uint16",
+	  .ct_desc = "Check bounds on global static uint16_t",
+	  .ct_func = test_bounds_global_static_uint16,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for static globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_uint16",
+	  .ct_desc = "Check bounds on global uint16_t",
+	  .ct_func = test_bounds_global_uint16,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_static_uint32",
+	  .ct_desc = "Check bounds on global static uint32_t",
+	  .ct_func = test_bounds_global_static_uint32,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for static globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_uint32",
+	  .ct_desc = "Check bounds on global uint32_t",
+	  .ct_func = test_bounds_global_uint32,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for static globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_static_uint64",
+	  .ct_desc = "Check bounds on global static uint64_t",
+	  .ct_func = test_bounds_global_static_uint64,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for static globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_uint64",
+	  .ct_desc = "Check bounds on global uint64_t",
+	  .ct_func = test_bounds_global_uint64,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for static globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_static_uint8_array1",
+	  .ct_desc = "Check bounds on global static uint8_t[1]",
+	  .ct_func = test_bounds_global_static_uint8_array1,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for static globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_uint8_array1",
+	  .ct_desc = "Check bounds on global uint8_t[1]",
+	  .ct_func = test_bounds_global_uint8_array1,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_static_uint8_array3",
+	  .ct_desc = "Check bounds on global static uint8_t[3]",
+	  .ct_func = test_bounds_global_static_uint8_array3,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for static globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_uint8_array3",
+	  .ct_desc = "Check bounds on global uint8_t[3]",
+	  .ct_func = test_bounds_global_uint8_array3,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_static_uint8_array17",
+	  .ct_desc = "Check bounds on global static uint_t[17]",
+	  .ct_func = test_bounds_global_static_uint8_array17,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for static globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_uint8_array17",
+	  .ct_desc = "Check bounds on global uint_t[17]",
+	  .ct_func = test_bounds_global_uint8_array17,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_static_uint8_array65537",
+	  .ct_desc = "Check bounds on global static uint8_t[65537]",
+	  .ct_func = test_bounds_global_static_uint8_array65537,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for static globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_uint8_array65537",
+	  .ct_desc = "Check bounds on global uint8_t[65537]",
+	  .ct_func = test_bounds_global_uint8_array65537,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_static_uint8_array32",
+	  .ct_desc = "Check bounds on global static uint8_t[32]",
+	  .ct_func = test_bounds_global_static_uint8_array32,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for static globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_uint8_array32",
+	  .ct_desc = "Check bounds on global uint8_t[32]",
+	  .ct_func = test_bounds_global_uint8_array32,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_static_uint8_array64",
+	  .ct_desc = "Check bounds on global static uint8_t[64]",
+	  .ct_func = test_bounds_global_static_uint8_array64,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for static globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_uint8_array64",
+	  .ct_desc = "Check bounds on global uint8_t[64]",
+	  .ct_func = test_bounds_global_uint8_array64,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_static_uint8_array128",
+	  .ct_desc = "Check bounds on global static uint8_t[128]",
+	  .ct_func = test_bounds_global_static_uint8_array128,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for static globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_uint8_array128",
+	  .ct_desc = "Check bounds on global uint8_t[128]",
+	  .ct_func = test_bounds_global_uint8_array128,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_static_uint8_array256",
+	  .ct_desc = "Check bounds on global static uint8_t[256]",
+	  .ct_func = test_bounds_global_static_uint8_array256,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for static globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_uint8_array256",
+	  .ct_desc = "Check bounds on global uint8_t[256]",
+	  .ct_func = test_bounds_global_uint8_array256,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_static_uint8_array512",
+	  .ct_desc = "Check bounds on global static uint8_t[512]",
+	  .ct_func = test_bounds_global_static_uint8_array512,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for static globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_uint8_array512",
+	  .ct_desc = "Check bounds on global uint8_t[512]",
+	  .ct_func = test_bounds_global_uint8_array512,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_static_uint8_array1024",
+	  .ct_desc = "Check bounds on global static uint8_t[1024]",
+	  .ct_func = test_bounds_global_static_uint8_array1024,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for static globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_uint8_array1024",
+	  .ct_desc = "Check bounds on global  uint8_t[1024]",
+	  .ct_func = test_bounds_global_uint8_array1024,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_static_uint8_array2048",
+	  .ct_desc = "Check bounds on global static uint8_t[2048]",
+	  .ct_func = test_bounds_global_static_uint8_array2048,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for static globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_uint8_array2048",
+	  .ct_desc = "Check bounds on global uint8_t[2048]",
+	  .ct_func = test_bounds_global_uint8_array2048,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_static_uint8_array4096",
+	  .ct_desc = "Check bounds on global static uint8_t[4096]",
+	  .ct_func = test_bounds_global_static_uint8_array4096,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for static globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_uint8_array4096",
+	  .ct_desc = "Check bounds on global uint8_t[4096]",
+	  .ct_func = test_bounds_global_uint8_array4096,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_static_uint8_array8192",
+	  .ct_desc = "Check bounds on global uint8_t[8192]",
+	  .ct_func = test_bounds_global_static_uint8_array8192,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for static globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_uint8_array8192",
+	  .ct_desc = "Check bounds on global uint8_t[8192]",
+	  .ct_func = test_bounds_global_uint8_array8192,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_static_uint8_array16384",
+	  .ct_desc = "Check bounds on global static uint8_t[16384]",
+	  .ct_func = test_bounds_global_static_uint8_array16384,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for static globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_uint8_array16384",
+	  .ct_desc = "Check bounds on global uint8_t[16384]",
+	  .ct_func = test_bounds_global_uint8_array16384,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_static_uint8_array32768",
+	  .ct_desc = "Check bounds on global static uint8_t[32768]",
+	  .ct_func = test_bounds_global_static_uint8_array32768,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for static globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_uint8_array32768",
+	  .ct_desc = "Check bounds on global uint8_t[32768]",
+	  .ct_func = test_bounds_global_uint8_array32768,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_static_uint8_array65536",
+	  .ct_desc = "Check bounds on global static uint8_t[65536]",
+	  .ct_func = test_bounds_global_static_uint8_array65536,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for static globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_global_uint8_array65536",
+	  .ct_desc = "Check bounds on global uint8_t[65536]",
+	  .ct_func = test_bounds_global_uint8_array65536,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for globals in hybrid code",
+#endif
+	},
+
+	/*
+	 * Test bounds on globals that are allocated in a different file from
+	 * the test, in the hopes of exercising the linker.
+	 */
+	{ .ct_name = "test_bounds_extern_global_uint8",
+	  .ct_desc = "Check bounds on extern global uint8_t (C size)",
+	  .ct_func = test_bounds_extern_global_uint8,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for extern globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_extern_global_uint16",
+	  .ct_desc = "Check bounds on extern global uint16_t (dynamic size)",
+	  .ct_func = test_bounds_extern_global_uint16,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for extern globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_extern_global_uint32",
+	  .ct_desc = "Check bounds on extern global uint32_t (C size)",
+	  .ct_func = test_bounds_extern_global_uint32,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for extern globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_extern_global_uint64",
+	  .ct_desc = "Check bounds on extern global uint64_t (dynamic size)",
+	  .ct_func = test_bounds_extern_global_uint64,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for extern globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_extern_global_array1",
+	  .ct_desc = "Check bounds on extern global uint8_t[1] (dynamic size)",
+	  .ct_func = test_bounds_extern_global_array1,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for extern globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_extern_global_array7",
+	  .ct_desc = "Check bounds on extern global uint8_t[7] (C size)",
+	  .ct_func = test_bounds_extern_global_array7,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for extern globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_extern_global_array65537",
+	  .ct_desc = "Check bounds on extern global uint8_t[65537] "
+	    "(dynamic size)",
+	  .ct_func = test_bounds_extern_global_array65537,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for extern globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_extern_global_array16",
+	  .ct_desc = "Check bounds on extern global uint8_t[16] (C size)",
+	  .ct_func = test_bounds_extern_global_array16,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for extern globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_extern_global_array65536",
+	  .ct_desc = "Check bounds on extern global uint8_t[65536] (C size)",
+	  .ct_func = test_bounds_extern_global_array65536,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for extern globals in hybrid code",
+#endif
+	},
+
+	{ .ct_name = "test_bounds_extern_global_array256",
+	  .ct_desc = "Check bounds on extern global uint8_t[256] "
+	    "(dynamic size)",
+	  .ct_func = test_bounds_extern_global_array256,
+#if !defined(__CHERI_PURE_CAPABILITY__)
+	  .ct_xfail_reason =
+	    "Bounds not supported for extern globals in hybrid code",
+#endif
+	},
+
+	/*
+	 * Test bounds on heap allocation.
+	 */
+#ifdef __CHERI_PURE_CAPABILITY__
+	{ .ct_name = "test_bounds_calloc",
+	  .ct_desc = "Check bounds on variously sized heap allocations",
+	  .ct_func = test_bounds_calloc, },
+#endif
 
 	/*
 	 * Test bounds on static stack allocations.
@@ -440,12 +980,13 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "cheritest_vm_notag_tmpfile_shared",
 	  .ct_desc = "check tags are not stored for tmpfile() MAP_SHARED pages",
 	  .ct_func = cheritest_vm_notag_tmpfile_shared,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-	    CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+	    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
 	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_STORETAG,
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_TLBSTORE,
-	  .ct_check_xfail = xfail_need_writable_tmp, },
+	  .ct_check_xfail = xfail_need_writable_non_tmpfs_tmp, },
 
 	{ .ct_name = "cheritest_vm_tag_tmpfile_private",
 	  .ct_desc = "check tags are stored for tmpfile() MAP_PRIVATE pages",
@@ -470,15 +1011,17 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_func = cheritest_vm_swap,
 	  .ct_check_xfail = xfail_swap_required},
 
+#if 0
 	/*
 	 * Simple CCall/CReturn tests that sometimes generate signals.
 	 */
 	{ .ct_name = "test_fault_creturn",
 	  .ct_desc = "Exercise trusted stack underflow",
 	  .ct_func = test_fault_creturn,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		    CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
 	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_UNDERFLOW,
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_RETURN },
 
@@ -501,319 +1044,414 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_fault_ccall_code_untagged",
 	  .ct_desc = "Invoke CCall with untagged code capability",
 	  .ct_func = test_fault_ccall_code_untagged,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		  CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
 	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_TAG,
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_TAG },
 
 	{ .ct_name = "test_fault_ccall_data_untagged",
 	  .ct_desc = "Invoke CCall with an untagged data capability",
 	  .ct_func = test_fault_ccall_data_untagged,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		  CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
 	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_TAG,
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_TAG },
 
 	{ .ct_name = "test_fault_ccall_code_unsealed",
 	  .ct_desc = "Invoke CCall with an unsealed code capability",
 	  .ct_func = test_fault_ccall_code_unsealed,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		  CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
 	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_UNSEALED,
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_SEAL },
 
 	{ .ct_name = "test_fault_ccall_data_unsealed",
 	  .ct_desc = "Invoke CCall with an unsealed data capability",
 	  .ct_func = test_fault_ccall_data_unsealed,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		  CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
 	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_UNSEALED,
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_SEAL },
 
 	{ .ct_name = "test_fault_ccall_typemismatch",
 	  .ct_desc = "Invoke CCall with code/data type mismatch",
 	  .ct_func = test_fault_ccall_typemismatch,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		  CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
 	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_TYPE,
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_TYPE },
 
 	{ .ct_name = "test_fault_ccall_code_noexecute",
 	  .ct_desc = "Invoke CCall with a non-executable code capability",
 	  .ct_func = test_fault_ccall_code_noexecute,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		  CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
 	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_PERM,
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_EXECUTE },
 
 	{ .ct_name = "test_fault_ccall_data_execute",
 	  .ct_desc = "Invoke CCall with an executable data capability",
 	  .ct_func = test_fault_ccall_data_execute,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		  CT_FLAG_CP2_EXCCODE,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE,
 	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_PERM,
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_EXECUTE },
+#endif
+
+	/*
+	 * Test copyin/out(_c) via kbounce(2) syscall.
+	 */
+	{ .ct_name = "test_kbounce",
+	  .ct_desc = "Exercise copyin/out via kbounce(2) syscall",
+	  .ct_func = test_kbounce, },
 
 	/*
 	 * Test libcheri sandboxing -- and kernel sandbox unwind.
 	 */
 	{ .ct_name = "test_sandbox_abort",
 	  .ct_desc = "Exercise system call in a libcheri sandbox",
-	  .ct_func = test_sandbox_abort },
+	  .ct_func = test_sandbox_abort,
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_clock_gettime",
 	  .ct_desc = "Exercise clock_gettime() in a libcheri sandbox",
 	  .ct_func = test_sandbox_cs_clock_gettime,
-	  .ct_flags = CT_FLAG_STDOUT_IGNORE },
+	  .ct_flags = CT_FLAG_STDOUT_IGNORE | CT_FLAG_SANDBOX, },
+
+	{ .ct_name = "test_sandbox_clock_gettime_default",
+	  .ct_desc = "Unauthorized call of clock_gettime() in a sandbox",
+	  .ct_func = test_sandbox_cs_clock_gettime_default,
+	  .ct_flags = CT_FLAG_STDOUT_IGNORE | CT_FLAG_SANDBOX, },
+
+	{ .ct_name = "test_sandbox_clock_gettime_deny",
+	  .ct_desc = "Denied call of clock_gettime() in a sandbox",
+	  .ct_func = test_sandbox_cs_clock_gettime_deny,
+	  .ct_flags = CT_FLAG_STDOUT_IGNORE | CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_cp2_bound_catch",
 	  .ct_desc = "Exercise sandboxed CP2 bounds-check failure; caught",
 	  .ct_func = test_sandbox_cp2_bound_catch,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		    CT_FLAG_CP2_EXCCODE | CT_FLAG_SIGNAL_UNWIND,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE |
+		    CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
 	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_BOUNDS,
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_LENGTH },
 
 	{ .ct_name = "test_sandbox_cp2_bound_nocatch",
 	  .ct_desc = "Exercise sandboxed CP2 bounds-check failure; uncaught",
-	  .ct_func = test_sandbox_cp2_bound_nocatch },
+	  .ct_func = test_sandbox_cp2_bound_nocatch,
+	  .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+	  .ct_signum = SIGPROT },
+
+	{ .ct_name = "test_sandbox_cp2_bound_nocatch_noaltstack",
+	  .ct_desc = "Exercise sandboxed CP2 bounds-check failure; uncaught, "
+		"no alt stack",
+	  .ct_func = test_sandbox_cp2_bound_nocatch_noaltstack,
+	  .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+	  .ct_signum = SIGILL },
 
 	{ .ct_name = "test_sandbox_cp2_perm_load_catch",
 	  .ct_desc = "Exercise sandboxed CP2 load-perm-check failure; caught",
 	  .ct_func = test_sandbox_cp2_perm_load_catch,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		    CT_FLAG_CP2_EXCCODE | CT_FLAG_SIGNAL_UNWIND,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE |
+		    CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
 	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_PERM,
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_LOAD },
 
 	{ .ct_name = "test_sandbox_cp2_perm_load_nocatch",
 	  .ct_desc = "Exercise sandboxed CP2 load-perm-check failure; uncaught",
-	  .ct_func = test_sandbox_cp2_perm_load_nocatch, },
+	  .ct_func = test_sandbox_cp2_perm_load_nocatch,
+	  .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+	  .ct_signum = SIGPROT },
 
 	{ .ct_name = "test_sandbox_cp2_perm_store_catch",
 	  .ct_desc = "Exercise sandboxed CP2 store-perm-check failure; caught",
 	  .ct_func = test_sandbox_cp2_perm_store_catch,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		    CT_FLAG_CP2_EXCCODE | CT_FLAG_SIGNAL_UNWIND,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE |
+		    CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
 	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_PERM,
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_STORE },
 
 	{ .ct_name = "test_sandbox_cp2_perm_store_nocatch",
 	  .ct_desc = "Exercise sandboxed CP2 store-perm-check failure; uncaught",
-	  .ct_func = test_sandbox_cp2_perm_store_nocatch, },
+	  .ct_func = test_sandbox_cp2_perm_store_nocatch,
+	  .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+	  .ct_signum = SIGPROT },
 
 	{ .ct_name = "test_sandbox_cp2_tag_catch",
 	  .ct_desc = "Exercise sandboxed CP2 tag-check failure; caught",
 	  .ct_func = test_sandbox_cp2_tag_catch,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		    CT_FLAG_CP2_EXCCODE | CT_FLAG_SIGNAL_UNWIND,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE |
+		    CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
 	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_TAG,
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_TAG },
 
 	{ .ct_name = "test_sandbox_cp2_tag_nocatch",
 	  .ct_desc = "Exercise sandboxed CP2 tag-check failure; uncaught",
-	  .ct_func = test_sandbox_cp2_tag_nocatch, },
+	  .ct_func = test_sandbox_cp2_tag_nocatch,
+	  .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+	  .ct_signum = SIGPROT },
 
 	{ .ct_name = "test_sandbox_cp2_seal_catch",
 	  .ct_desc = "Exercise sandboxed CP2 seal failure; caught",
 	  .ct_func = test_sandbox_cp2_seal_catch,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		    CT_FLAG_CP2_EXCCODE | CT_FLAG_SIGNAL_UNWIND,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE |
+		    CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
 	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_PERM,
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_SEAL },
 
 	{ .ct_name = "test_sandbox_cp2_seal_nocatch",
 	  .ct_desc = "Exercise sandboxed CP2 seal failure; uncaught",
-	  .ct_func = test_sandbox_cp2_seal_nocatch, },
+	  .ct_func = test_sandbox_cp2_seal_nocatch,
+	  .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+	  .ct_signum = SIGPROT },
 
 	{ .ct_name = "test_sandbox_divzero_catch",
 	  .ct_desc = "Exercise sandboxed divide-by-zero exception; caught",
 	  .ct_func = test_sandbox_divzero_catch,
 	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		    CT_FLAG_SIGNAL_UNWIND,
+		    CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
 	  .ct_signum = SIGTRAP,
-	  .ct_mips_exccode = T_TRAP },
+	  .ct_mips_exccode = T_TRAP,
+	  .ct_xfail_reason =
+	    "LLVM assembler generates break rather than trap instruction", },
 
 	{ .ct_name = "test_sandbox_divzero_nocatch",
 	  .ct_desc = "Exercise sandboxed divide-by-zero exception; uncaught",
 	  .ct_func = test_sandbox_divzero_nocatch,
 	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		    CT_FLAG_SIGNAL_UNWIND,
+		    CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
 	  .ct_signum = SIGTRAP,
-	  .ct_mips_exccode = T_TRAP },
+	  .ct_mips_exccode = T_TRAP,
+	  .ct_xfail_reason =
+	    "LLVM assembler generates break rather than trap instruction", },
 
 	{ .ct_name = "test_sandbox_vm_rfault_catch",
 	  .ct_desc = "Exercise sandboxed VM read fault; caught",
 	  .ct_func = test_sandbox_vm_rfault_catch,
 	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		    CT_FLAG_SIGNAL_UNWIND,
-	  .ct_signum = SIGBUS,
+		    CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
+	  .ct_signum = SIGSEGV,
 	  .ct_mips_exccode = T_TLB_LD_MISS },
 
 	{ .ct_name = "test_sandbox_vm_rfault_nocatch",
 	  .ct_desc = "Exercise sandboxed VM read fault; uncaught",
-	  .ct_func = test_sandbox_vm_rfault_nocatch, },
+	  .ct_func = test_sandbox_vm_rfault_nocatch,
+	  .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+	  .ct_signum = SIGSEGV },
 
 	{ .ct_name = "test_sandbox_vm_wfault_catch",
 	  .ct_desc = "Exercise sandboxed VM write fault; caught",
 	  .ct_func = test_sandbox_vm_wfault_catch,
 	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		    CT_FLAG_SIGNAL_UNWIND,
-	  .ct_signum = SIGBUS,
+		    CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
+	  .ct_signum = SIGSEGV,
 	  .ct_mips_exccode = T_TLB_ST_MISS },
 
 	{ .ct_name = "test_sandbox_vm_wfault_nocatch",
 	  .ct_desc = "Exercise sandboxed VM write fault; uncaught",
-	  .ct_func = test_sandbox_vm_wfault_nocatch, },
+	  .ct_func = test_sandbox_vm_wfault_nocatch,
+	  .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+	  .ct_signum = SIGSEGV },
 
 	{ .ct_name = "test_sandbox_vm_xfault_catch",
 	  .ct_desc = "Exercise sandboxed VM exec fault; caught",
 	  .ct_func = test_sandbox_vm_xfault_catch,
 	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		    CT_FLAG_SIGNAL_UNWIND,
-	  .ct_signum = SIGBUS,
+		    CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
+	  .ct_signum = SIGSEGV,
 	  .ct_mips_exccode = T_TLB_LD_MISS },
 
 	{ .ct_name = "test_sandbox_vm_xfault_nocatch",
 	  .ct_desc = "Exercise sandboxed VM exec fault; uncaught",
-	  .ct_func = test_sandbox_vm_xfault_nocatch },
+	  .ct_func = test_sandbox_vm_xfault_nocatch,
+	  .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+	  .ct_signum = SIGSEGV },
 
 	{ .ct_name = "test_sandbox_helloworld",
 	  .ct_desc = "Print 'hello world' in a libcheri sandbox",
 	  .ct_func = test_sandbox_cs_helloworld,
-	  .ct_flags = CT_FLAG_STDOUT_STRING,
+	  .ct_flags = CT_FLAG_STDOUT_STRING | CT_FLAG_SANDBOX,
 	  .ct_stdout_string = "hello world\n" },
 
 	{ .ct_name = "test_sandbox_md5_ccall",
 	  .ct_desc = "Generate an MD5 checksum in a sandbox via direct ccall",
 	  .ct_func_arg = test_sandbox_md5_ccall,
-	  .ct_arg = 1 },
+	  .ct_arg = 1,
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_md5_ccall2",
 	  .ct_desc = "Generate an MD5 checksum in a sandbox via 2nd class",
 	  .ct_func_arg = test_sandbox_md5_ccall,
-	  .ct_arg = 2 },
+	  .ct_arg = 2,
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_2sandbox_newdestroy",
 	  .ct_desc = "Instantiate and destroy a second sandbox object",
 	  .ct_func = test_2sandbox_newdestroy,
-	  .ct_flags = CT_FLAG_SLOW },
+	  .ct_flags = CT_FLAG_SLOW |  CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_2sandbox_var_data_getset",
 	  .ct_desc = "Instantiate second object and get/set variables",
 	  .ct_func = test_2sandbox_var_data_getset,
-          .ct_flags = CT_FLAG_SLOW },
+          .ct_flags = CT_FLAG_SLOW | CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_malloc",
 	  .ct_desc = "Malloc memory in a libcheri sandbox",
-	  .ct_func = test_sandbox_malloc },
+	  .ct_func = test_sandbox_malloc,
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_ptrdiff",
 	  .ct_desc = "Verify that pointer subtraction works",
-	  .ct_func = test_sandbox_ptrdiff },
+	  .ct_func = test_sandbox_ptrdiff,
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_system_calloc",
 	  .ct_desc = "Allocate memory in base for use in the sandbox",
-	  .ct_func = test_sandbox_cs_calloc },
+	  .ct_func = test_sandbox_cs_calloc,
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_printf",
 	  .ct_desc = "printf() in a libcheri sandbox",
 	  .ct_func = test_sandbox_printf,
-	  .ct_flags = CT_FLAG_STDOUT_STRING,
+	  .ct_flags = CT_FLAG_STDOUT_STRING | CT_FLAG_SANDBOX,
 	  .ct_stdout_string = "invoke_cheri_system_printf: printf in sandbox test\n" },
 
 	{ .ct_name = "test_sandbox_cs_putchar",
 	  .ct_desc = "putchar() in a libcheri sandbox",
 	  .ct_func = test_sandbox_cs_putchar,
-	  .ct_flags = CT_FLAG_STDOUT_STRING,
+	  .ct_flags = CT_FLAG_STDOUT_STRING | CT_FLAG_SANDBOX,
 	  .ct_stdout_string = "C" },
 
 	{ .ct_name = "test_sandbox_cs_puts",
 	  .ct_desc = "puts() in a libcheri sandbox",
 	  .ct_func = test_sandbox_cs_puts,
-	  .ct_flags = CT_FLAG_STDOUT_STRING,
+	  .ct_flags = CT_FLAG_STDOUT_STRING | CT_FLAG_SANDBOX,
 	  .ct_stdout_string = "sandbox cs_puts\n" },
 
 	{ .ct_name = "test_sandbox_spin",
 	  .ct_desc = "spin in a libcheri sandbox",
 	  .ct_func = test_sandbox_spin,
-	  .ct_flags = CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SLOW,
+	  .ct_flags = CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SLOW | CT_FLAG_SANDBOX,
 	  .ct_signum = SIGALRM },
 
 	{ .ct_name = "test_sandbox_syscall",
 	  .ct_desc = "Invoke a system call in a libcheri sandbox",
-	  .ct_func = test_sandbox_syscall },
+	  .ct_func = test_sandbox_syscall,
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_varargs",
 	  .ct_desc = "Verify that varargs work in a sandbox",
-	  .ct_func = test_sandbox_varargs },
+	  .ct_func = test_sandbox_varargs,
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_va_copy",
 	  .ct_desc = "Verify that va_copy works in a sandbox",
-	  .ct_func = test_sandbox_va_copy },
+	  .ct_func = test_sandbox_va_copy,
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	/*
 	 * libcheri + cheri_fd tests.
 	 */
+	{ .ct_name = "test_sandbox_cxx_exception",
+	  .ct_desc = "Test that failed sandbox invocations become exceptions in C++",
+	  .ct_func = test_sandbox_cxx_exception,
+	  .ct_flags = CT_FLAG_SANDBOX, },
+
+	{ .ct_name = "test_sandbox_cxx_no_exception",
+	  .ct_desc = "Test that successful sandbox invocations don't exceptions in C++",
+	  .ct_func = test_sandbox_cxx_no_exception,
+	  .ct_flags = CT_FLAG_SANDBOX, },
+
 	{ .ct_name = "test_sandbox_fd_fstat",
 	  .ct_desc = "Exercise fstat() on a cheri_fd in a libcheri sandbox",
-	  .ct_func = test_sandbox_fd_fstat },
+	  .ct_func = test_sandbox_fd_fstat,
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_fd_lseek",
 	  .ct_desc = "Exercise lseek() on a cheri_fd in a libcheri sandbox",
-	  .ct_func = test_sandbox_fd_lseek },
+	  .ct_func = test_sandbox_fd_lseek,
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_fd_read",
 	  .ct_desc = "Exercise read() on a cheri_fd in a libcheri sandbox",
 	  .ct_func = test_sandbox_fd_read,
-	  .ct_flags = CT_FLAG_STDIN_STRING,
+	  .ct_flags = CT_FLAG_STDIN_STRING | CT_FLAG_SANDBOX,
 	  .ct_stdin_string = CHERITEST_FD_READ_STR },
 
 	{ .ct_name = "test_sandbox_fd_read_revoke",
 	  .ct_desc = "Exercise revoke() before read() on a cheri_fd",
 	  .ct_func = test_sandbox_fd_read_revoke,
-	  .ct_flags = CT_FLAG_STDIN_STRING,
+	  .ct_flags = CT_FLAG_STDIN_STRING | CT_FLAG_SANDBOX,
 	  .ct_stdin_string = CHERITEST_FD_READ_STR },
 
 	{ .ct_name = "test_sandbox_fd_write",
 	  .ct_desc = "Exercise write() on a cheri_fd in a libcheri sandbox",
 	  .ct_func = test_sandbox_fd_write,
-	  .ct_flags = CT_FLAG_STDOUT_STRING,
+	  .ct_flags = CT_FLAG_STDOUT_STRING | CT_FLAG_SANDBOX,
 	  .ct_stdout_string = CHERITEST_FD_WRITE_STR },
 
 	{ .ct_name = "test_sandbox_fd_write_revoke",
 	  .ct_desc = "Exercise revoke() before write() on a cheri_fd",
 	  .ct_func = test_sandbox_fd_write_revoke,
 	  /* NB: String defined but flag not set: shouldn't print. */
-	  .ct_stdout_string = "write123" },
+	  .ct_stdout_string = "write123",
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_userfn",
 	  .ct_desc = "Exercise user-defined system-class method",
-	  .ct_func = test_sandbox_userfn },
+	  .ct_func = test_sandbox_userfn,
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_getstack",
-	  .ct_desc = "Exercise CHERI_GET_STACK sysarch()",
-	  .ct_func = test_sandbox_getstack },
+	  .ct_desc = "Exercise libcheri_stack_get()",
+	  .ct_func = test_sandbox_getstack,
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_setstack_nop",
-	  .ct_desc = "Exercise CHERI_SET_STACK sysarch() for nop rewrite",
-	  .ct_func = test_sandbox_setstack_nop },
+	  .ct_desc = "Exercise libcheri_stack_set() for nop rewrite",
+	  .ct_func = test_sandbox_setstack_nop,
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_setstack",
-	  .ct_desc = "Exercise CHERI_SET_STACK sysarch() to change stack",
-	  .ct_func = test_sandbox_setstack },
+	  .ct_desc = "Exercise libcheri_stack_set() to change stack",
+	  .ct_func = test_sandbox_setstack,
+	  .ct_flags = CT_FLAG_SANDBOX, },
+
+	{ .ct_name = "test_sandbox_trustedstack_underflow",
+	  .ct_desc = "Underflow trusted stack",
+	  .ct_func = test_sandbox_trustedstack_underflow,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE | CT_FLAG_SANDBOX,
+	  .ct_signum = SIGEMT,
+	  .ct_mips_exccode = T_TRAP },
 
 	/*
 	 * Check various properties to do with global vs. local capabilities
@@ -821,54 +1459,50 @@ static const struct cheri_test cheri_tests[] = {
 	 */
 	{ .ct_name = "test_sandbox_store_global_capability_in_bss",
 	  .ct_desc = "Try to store global capability to sandbox bss",
-	  .ct_func = test_sandbox_store_global_capability_in_bss },
+	  .ct_func = test_sandbox_store_global_capability_in_bss,
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_store_local_capability_in_bss_catch",
 	  .ct_desc = "Try to store local capability to sandbox bss; caught",
 	  .ct_func = test_sandbox_store_local_capability_in_bss_catch,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		    CT_FLAG_CP2_EXCCODE | CT_FLAG_SIGNAL_UNWIND,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE |
+		    CT_FLAG_MIPS_EXCCODE | CT_FLAG_CP2_EXCCODE |
+		    CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
 	  .ct_signum = SIGPROT,
+	  .ct_si_code = PROT_CHERI_STORELOCAL,
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_STORE_LOCALCAP },
 
-	{ .ct_name = "test_sandbox_store_local_capability_in_bss",
+	{ .ct_name = "test_sandbox_store_local_capability_in_bss_nocatch",
 	  .ct_desc = "Try to store local capability to sandbox bss; uncaught",
-	  .ct_func = test_sandbox_store_local_capability_in_bss_nocatch },
+	  .ct_func = test_sandbox_store_local_capability_in_bss_nocatch,
+	  .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+	  .ct_signum = SIGPROT },
 
 	{ .ct_name = "test_sandbox_store_global_capability_in_stack",
 	  .ct_desc = "Try to store global capability to sandbox stack",
-	  .ct_func = test_sandbox_store_global_capability_in_stack },
+	  .ct_func = test_sandbox_store_global_capability_in_stack,
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_store_local_capability_in_stack",
 	  .ct_desc = "Try to store local capability to sandbox stack",
-	  .ct_func = test_sandbox_store_local_capability_in_stack },
+	  .ct_func = test_sandbox_store_local_capability_in_stack,
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_return_global_capability",
 	  .ct_desc = "Try to return global capability from sandbox",
-	  .ct_func = test_sandbox_return_global_capability },
+	  .ct_func = test_sandbox_return_global_capability,
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
-	{ .ct_name = "test_sandbox_return_local_capability_catch",
-	  .ct_desc = "Try to return a local capability from a sandbox; caught",
-	  .ct_func = test_sandbox_return_local_capability_catch,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		    CT_FLAG_CP2_EXCCODE | CT_FLAG_SIGNAL_UNWIND,
-	  .ct_signum = SIGPROT,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_SW_LOCALRET },
-
-	{ .ct_name = "test_sandbox_return_local_capability_nocatch",
-	  .ct_desc = "Try to return a local capability from a sandbox; uncaught",
-	  .ct_func = test_sandbox_return_local_capability_nocatch },
+	{ .ct_name = "test_sandbox_return_local_capability",
+	  .ct_desc = "Try to return a local capability from a sandbox",
+	  .ct_func = test_sandbox_return_local_capability,
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_pass_local_capability_arg",
 	  .ct_desc = "Try to pass a local capability to a sandbox",
 	  .ct_func = test_sandbox_pass_local_capability_arg,
-	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE |
-		    CT_FLAG_CP2_EXCCODE,
-	  .ct_signum = SIGPROT,
-	  .ct_mips_exccode = T_C2E,
-	  .ct_cp2_exccode = CHERI_EXCCODE_SW_LOCALARG },
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	/*
 	 * Tests relating to initialisation of, and permissions on, global
@@ -876,23 +1510,62 @@ static const struct cheri_test cheri_tests[] = {
 	 */
 	{ .ct_name = "test_sandbox_var_bss",
 	  .ct_desc = "Check initial value of .bss variable",
-	  .ct_func = test_sandbox_var_bss },
+	  .ct_func = test_sandbox_var_bss,
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_var_data",
 	  .ct_desc = "Check initial value of .data variable",
-	  .ct_func = test_sandbox_var_data },
+	  .ct_func = test_sandbox_var_data,
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_var_data_getset",
 	  .ct_desc = "Get and set .data variables over multiple invocations",
-	  .ct_func = test_sandbox_var_data_getset },
+	  .ct_func = test_sandbox_var_data_getset,
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	{ .ct_name = "test_sandbox_var_constructor",
 	  .ct_desc = "Check initial value of constructor-initalised variable",
-	  .ct_func = test_sandbox_var_constructor },
+	  .ct_func = test_sandbox_var_constructor,
+	  .ct_flags = CT_FLAG_SANDBOX, },
+
+#ifdef CHERITHREAD_TESTS
+	/*
+	 * Tests of pthread interactions with libcheri.
+	 */
+	{ .ct_name = "test_sandbox_pthread_abort",
+	  .ct_desc = "Test sandbox abort from a second thread",
+	  .ct_func = test_sandbox_pthread_abort,
+	  .ct_flags = CT_FLAG_SANDBOX, },
+
+	{ .ct_name = "test_sandbox_pthread_cs_helloworld",
+	  .ct_desc = "Test sandbox hello world from a second thread",
+	  .ct_func = test_sandbox_pthread_cs_helloworld,
+	  .ct_flags = CT_FLAG_STDOUT_STRING | CT_FLAG_SANDBOX,
+	  .ct_stdout_string = "hello world\n" },
+#endif
+
+	/*
+	 * Tests relating to setjmp(3) and longjmp(3).
+	 */
+	{ .ct_name = "cheritest_setjmp",
+	  .ct_desc = "Exercise setjmp without longjmp",
+	  .ct_func = cheritest_setjmp, },
+
+	{ .ct_name = "cheritest_setjmp_longjmp",
+	  .ct_desc = "Exercise setjmp with longjmp",
+	  .ct_func = cheritest_setjmp_longjmp, },
 
 	/*
 	 * Standard library string tests.
 	 */
+#ifdef KERNEL_MEMCPY_TESTS
+	{ .ct_name = "test_string_kern_memcpy_c",
+	  .ct_desc = "Test explicit capability memcpy (kernel version)",
+	  .ct_func = test_string_kern_memcpy_c },
+	{ .ct_name = "test_string_kern_memmove_c",
+	  .ct_desc = "Test explicit capability memmove (kernel version)",
+	  .ct_func = test_string_kern_memmove_c },
+#endif
 	{ .ct_name = "test_string_memcpy",
 	  .ct_desc = "Test implicit capability memcpy",
 	  .ct_func = test_string_memcpy },
@@ -907,6 +1580,21 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_func = test_string_memmove_c },
 
 	/*
+	 * Thread-Local Storage (TLS) tests.
+	 */
+	{ .ct_name = "test_tls_align_ptr",
+	  .ct_desc = "Test alignment of TLS pointers",
+	  .ct_func = test_tls_align_ptr, },
+
+	{ .ct_name = "test_tls_align_cap",
+	  .ct_desc = "Test alignment of TLS capabilities",
+	  .ct_func = test_tls_align_ptr, },
+
+	{ .ct_name = "test_tls_align_4k",
+	  .ct_desc = "Test alignment of TLS 4K array",
+	  .ct_func = test_tls_align_4k, },
+
+	/*
 	 * zlib tests.
 	 */
 	{ .ct_name = "test_deflate_zeroes",
@@ -919,15 +1607,71 @@ static const struct cheri_test cheri_tests[] = {
 
 	{ .ct_name = "test_sandbox_inflate_zeroes",
 	  .ct_desc = "Inflate a compressed buffer of zeroes -- in a sandbox",
-	  .ct_func = test_sandbox_inflate_zeroes },
+	  .ct_func = test_sandbox_inflate_zeroes,
+	  .ct_flags = CT_FLAG_SANDBOX, },
 
 	/*
 	 * CheriABI specific tests.
 	 */
 #ifdef CHERIABI_TESTS
+	{ .ct_name = "test_cheriabi_mmap_nospace",
+	  .ct_desc = "Test CheriABI mmap() with no space in default capability",
+	  .ct_func = test_cheriabi_mmap_nospace },
+
 	{ .ct_name = "test_cheriabi_mmap_perms",
 	  .ct_desc = "Test CheriABI mmap() permissions",
 	  .ct_func = test_cheriabi_mmap_perms },
+
+	{ .ct_name = "test_cheriabi_mmap_unrepresentable",
+	  .ct_desc = "Test CheriABI mmap() with unrepresentable lengths",
+	  .ct_func = test_cheriabi_mmap_unrepresentable },
+
+	{ .ct_name = "test_cheriabi_mmap_ddc",
+	  .ct_desc = "Test CheriABI MAP_CHERI_DDC flag",
+	  .ct_func = test_cheriabi_mmap_ddc },
+
+	/*
+	 * Tests for pathname handling in open(2).
+	 */
+	{ .ct_name = "test_cheriabi_open_ordinary",
+	  .ct_desc = "Smoke test for open(2)",
+	  .ct_func = test_cheriabi_open_ordinary, },
+
+	{ .ct_name = "test_cheriabi_open_offset",
+	  .ct_desc = "Path with non-zero offset",
+	  .ct_func = test_cheriabi_open_offset, },
+
+	{ .ct_name = "test_cheriabi_open_shortened",
+	  .ct_desc = "Path shorter than its capability bounds",
+	  .ct_func = test_cheriabi_open_shortened, },
+
+	{ .ct_name = "test_cheriabi_open_bad_addr",
+	  .ct_desc = "Path with nonsensical address",
+	  .ct_func = test_cheriabi_open_bad_addr, },
+
+	{ .ct_name = "test_cheriabi_open_bad_addr_2",
+	  .ct_desc = "Path with nonsensical address in kernel range",
+	  .ct_func = test_cheriabi_open_bad_addr_2, },
+
+	{ .ct_name = "test_cheriabi_open_bad_len",
+	  .ct_desc = "Path too long for the capaility bounds",
+	  .ct_func = test_cheriabi_open_bad_len, },
+
+	{ .ct_name = "test_cheriabi_open_bad_len_2",
+	  .ct_desc = "Path with offset past its bounds",
+	  .ct_func = test_cheriabi_open_bad_len_2, },
+
+	{ .ct_name = "test_cheriabi_open_bad_tag",
+	  .ct_desc = "Path with tag bit missing",
+	  .ct_func = test_cheriabi_open_bad_tag, },
+
+	{ .ct_name = "test_cheriabi_open_bad_perm",
+	  .ct_desc = "Path with CHERI_PERM_LOAD permission missing",
+	  .ct_func = test_cheriabi_open_bad_perm, },
+
+	{ .ct_name = "test_cheriabi_open_sealed",
+	  .ct_desc = "Sealed path",
+	  .ct_func = test_cheriabi_open_sealed, },
 #endif
 #ifdef CHERI_C_TESTS
 #define	DECLARE_TEST(name, desc)			\
@@ -941,6 +1685,8 @@ static const struct cheri_test cheri_tests[] = {
 };
 static const u_int cheri_tests_len = sizeof(cheri_tests) /
 	    sizeof(cheri_tests[0]);
+static StringList* cheri_failed_tests;
+static StringList* cheri_xfailed_tests;
 
 /* Shared memory page with child process. */
 struct cheritest_child_state *ccsp;
@@ -950,8 +1696,11 @@ static int expected_failures;
 static int list;
 static int run_all;
 static int fast_tests_only;
+static int qtrace;
 static int sleep_after_test;
+static int unsandboxed_tests_only;
 static int verbose;
+static int coredump_enabled;
 
 static void
 usage(void)
@@ -968,7 +1717,12 @@ usage(void)
 "\n"
 "options:\n"
 "    -f  -- Only include \"fast\" tests\n"
+#ifndef LIST_ONLY
+"    -c  -- Enable core dumps\n"
 "    -s  -- Sleep one second after each test\n"
+"    -q  -- Enable qemu tracing in test process\n"
+#endif
+"    -u  -- Only include unsandboxed tests\n"
 "    -v  -- Increase verbosity\n"
 	     );
 	exit(EX_USAGE);
@@ -983,30 +1737,33 @@ list_tests(void)
 	xo_open_container("testsuite");
 	xo_open_list("test");
 	for (i = 0; i < cheri_tests_len; i++) {
-		if (!fast_tests_only ||
-	 	    !(cheri_tests[i].ct_flags & CT_FLAG_SLOW)) {
-			xo_open_instance("test");
-			if (verbose)
-				xo_emit("{cw:name/%s}{:description/%s}",
-				    cheri_tests[i].ct_name,
-				    cheri_tests[i].ct_desc);
-			else
-				xo_emit("{:name/%s}{e:description/%s}",
-			    	    cheri_tests[i].ct_name,
-				    cheri_tests[i].ct_desc);
-			if (cheri_tests[i].ct_check_xfail)
-				xfail_reason = cheri_tests[i].ct_check_xfail(
-				    cheri_tests[i].ct_name);
-			else
-				xfail_reason = cheri_tests[i].ct_xfail_reason;
-			if (xfail_reason)
-				xo_emit("{e:expected-failure-reason/%s}",
-				    xfail_reason);
-			if (cheri_tests[i].ct_flags & CT_FLAG_SLOW)
-				xo_emit("{e:timeout/%s}", "LONG");
-			xo_emit("\n");
-			xo_close_instance("test");
-		}
+		if (fast_tests_only &&
+		    (cheri_tests[i].ct_flags & CT_FLAG_SLOW))
+			continue;
+		if (unsandboxed_tests_only &&
+		    (cheri_tests[i].ct_flags & CT_FLAG_SANDBOX))
+			continue;
+		xo_open_instance("test");
+		if (verbose)
+			xo_emit("{cw:name/%s}{:description/%s}",
+			    cheri_tests[i].ct_name,
+			    cheri_tests[i].ct_desc);
+		else
+			xo_emit("{:name/%s}{e:description/%s}",
+			    cheri_tests[i].ct_name,
+			    cheri_tests[i].ct_desc);
+		if (cheri_tests[i].ct_check_xfail)
+			xfail_reason = cheri_tests[i].ct_check_xfail(
+			    cheri_tests[i].ct_name);
+		else
+			xfail_reason = cheri_tests[i].ct_xfail_reason;
+		if (xfail_reason)
+			xo_emit("{e:expected-failure-reason/%s}",
+			    xfail_reason);
+		if (cheri_tests[i].ct_flags & CT_FLAG_SLOW)
+			xo_emit("{e:timeout/%s}", "LONG");
+		xo_emit("\n");
+		xo_close_instance("test");
 	}
 	xo_close_list("test");
 	xo_close_container("testsuite");
@@ -1017,7 +1774,7 @@ list_tests(void)
 
 #ifndef LIST_ONLY
 static void
-signal_handler(int signum, siginfo_t *info __unused, void *vuap)
+signal_handler(int signum, siginfo_t *info, void *vuap)
 {
 	struct cheri_frame *cfp;
 	ucontext_t *uap;
@@ -1042,6 +1799,7 @@ signal_handler(int signum, siginfo_t *info __unused, void *vuap)
 		_exit(EX_OSERR);
 	}
 	ccsp->ccs_signum = signum;
+	ccsp->ccs_si_code = info->si_code;
 	ccsp->ccs_mips_cause = uap->uc_mcontext.cause;
 	ccsp->ccs_cp2_cause = cfp->cf_capcause;
 
@@ -1052,10 +1810,10 @@ signal_handler(int signum, siginfo_t *info __unused, void *vuap)
 	 * CHERITEST_SANDBOX_UNWOUND, or if we are not executing in a sandbox,
 	 * terminate the test, returning signal information to the parent.
 	 */
-	ret = cheri_stack_numframes(&numframes);
+	ret = libcheri_stack_numframes(&numframes);
 	if (ret < 0) {
 		ccsp->ccs_signum = -1;
-		fprintf(stderr, "%s: cheri_stack_numframes failed\n",
+		fprintf(stderr, "%s: libcheri_stack_numframes failed\n",
 		    __func__);
 		_exit(EX_SOFTWARE);
 	}
@@ -1065,11 +1823,11 @@ signal_handler(int signum, siginfo_t *info __unused, void *vuap)
 		 * Sandboxed code is executing, even if we're not in a
 		 * sandbox.
 		 */
-		ret = cheri_stack_unwind(uap, CHERITEST_SANDBOX_UNWOUND,
-		    CHERI_STACK_UNWIND_OP_ALL, 0);
+		ret = libcheri_stack_unwind(uap, CHERITEST_SANDBOX_UNWOUND,
+		    LIBCHERI_STACK_UNWIND_OP_ALL, 0);
 		if (ret < 0) {
 			ccsp->ccs_signum = -1;
-			fprintf(stderr, "%s: cheri_stack_unwind failed\n",
+			fprintf(stderr, "%s: libcheri_stack_unwind failed\n",
 			    __func__);
 			_exit(EX_SOFTWARE);
 		}
@@ -1099,6 +1857,17 @@ signal_handler_clear(int sig)
 		cheritest_failure_err("clearing handler for sig %d", sig);
 }
 
+static inline void
+set_thread_tracing(void)
+{
+	int error, intval;
+
+	intval = 1;
+	error = sysarch(QEMU_SET_QTRACE, &intval);
+	if (error)
+		err(EX_OSERR, "QEMU_SET_QTRACE");
+}
+
 /* Maximum size of stdout data we will check if called for by a test. */
 #define	TEST_BUFFER_LEN	1024
 
@@ -1112,6 +1881,7 @@ cheritest_run_test(const struct cheri_test *ctp)
 	char visreason[sizeof(reason) * 4]; /* Space for vis(3) the string */
 	char buffer[TEST_BUFFER_LEN];
 	const char *xfail_reason;
+	char* failure_message;
 	register_t cp2_exccode, mips_exccode;
 	ssize_t len;
 
@@ -1198,6 +1968,9 @@ cheritest_run_test(const struct cheri_test *ctp)
 		close(pipefd_stdout[0]);
 		close(pipefd_stdout[1]);
 
+		if (qtrace)
+			set_thread_tracing();
+
 		/* Run the actual test. */
 		if (ctp->ct_arg != 0)
 			ctp->ct_func_arg(ctp, ctp->ct_arg);
@@ -1213,10 +1986,31 @@ cheritest_run_test(const struct cheri_test *ctp)
 
 	/*
 	 * First, check for errors from the test framework: successful process
-	 * termination, signal disposition/exception codes/etc.
-	 *
-	 * Analyse child's signal state returned via shared memory.
+	 * termination, signal disposition/exception codes/etc.  Handle the
+	 * special case in which the kernel terminates a process with prejudice
+	 * if an alternate signal stack is not present when a sandbox receives
+	 * a signal.  Analyse child's signal state returned via shared memory.
 	 */
+	if (ctp->ct_flags & CT_FLAG_SIGEXIT) {
+		if (!WIFSIGNALED(status)) {
+			snprintf(reason, sizeof(reason),
+			    "Expected child termination with signal %d",
+			    ctp->ct_signum);
+			goto fail;
+		}
+		if (WTERMSIG(status) != ctp->ct_signum) {
+			snprintf(reason, sizeof(reason),
+			    "Expected child termination with signal %d; got %d",
+			    ctp->ct_signum, WTERMSIG(status));
+			goto fail;
+		}
+
+		/*
+		 * Skip remaining checks as process has terminated as
+		 * expected.
+		 */
+		goto pass;
+	}
 	if (!WIFEXITED(status)) {
 		snprintf(reason, sizeof(reason), "Child exited abnormally");
 		goto fail;
@@ -1235,6 +2029,12 @@ cheritest_run_test(const struct cheri_test *ctp)
 	    ccsp->ccs_signum != ctp->ct_signum) {
 		snprintf(reason, sizeof(reason), "Expected signal %d, got %d",
 		    ctp->ct_signum, ccsp->ccs_signum);
+		goto fail;
+	}
+	if ((ctp->ct_flags & CT_FLAG_SI_CODE) &&
+	    ccsp->ccs_si_code != ctp->ct_si_code) {
+		snprintf(reason, sizeof(reason), "Expected si_code %d, got %d",
+		    ctp->ct_si_code, ccsp->ccs_si_code);
 		goto fail;
 	}
 	if ((ctp->ct_flags & CT_FLAG_SIGNAL_UNWIND) && !ccsp->ccs_unwound) {
@@ -1351,6 +2151,7 @@ cheritest_run_test(const struct cheri_test *ctp)
 		}
 	}
 
+pass:
 	if (xfail_reason == NULL)
 		xo_emit("{:status/%s}: {d:name/%s}\n", "PASS", ctp->ct_name);
 	else {
@@ -1371,15 +2172,18 @@ fail:
 	 * Escape non-printing characters.
 	 */
 	strnvis(visreason, sizeof(visreason), reason, VIS_TAB);
-	if (xfail_reason == NULL)
+	asprintf(&failure_message, "%s: %s", ctp->ct_name, visreason);
+	if (xfail_reason == NULL) {
 		xo_emit("{:status/%s}: {d:name/%s}: {:failure-reason/%s}\n",
 		    "FAIL", ctp->ct_name, visreason);
-	else {
+		sl_add(cheri_failed_tests, failure_message);
+	} else {
 		xo_attr("expected", "true");
 		xo_emit("{d:/%s}{:status/%s}: {d:name/%s}: "
 		    "{:failure-reason/%s} ({d:expected-failure-reason/%s})\n",
 		    "X", "FAIL", ctp->ct_name, visreason, xfail_reason);
 		tests_xfailed++;
+		sl_add(cheri_xfailed_tests, failure_message);
 	}
 	tests_failed++;
 	xo_close_instance("test");
@@ -1406,6 +2210,7 @@ cheritest_run_test_name(const char *name)
 int
 main(int argc, char *argv[])
 {
+	struct rlimit rl;
 	int opt;
 	int glob = 0;
 #ifndef LIST_ONLY
@@ -1413,14 +2218,19 @@ main(int argc, char *argv[])
 	int i;
 	u_int t;
 #endif
+	uint qemu_trace_perthread;
+	size_t len;
 
 	argc = xo_parse_args(argc, argv);
 	if (argc < 0)
 		errx(1, "xo_parse_args failed\n");
-	while ((opt = getopt(argc, argv, "afglsv")) != -1) {
+	while ((opt = getopt(argc, argv, "acfglqsuv")) != -1) {
 		switch (opt) {
 		case 'a':
 			run_all = 1;
+			break;
+		case 'c':
+			coredump_enabled = 1;
 			break;
 		case 'f':
 			fast_tests_only = 1;
@@ -1431,8 +2241,23 @@ main(int argc, char *argv[])
 		case 'l':
 			list = 1;
 			break;
+		case 'q':
+			len = sizeof(qemu_trace_perthread);
+			if (sysctlbyname("hw.qemu_trace_perthread",
+			    &qemu_trace_perthread,
+			    &len, NULL, 0) < 0)
+				err(EX_OSERR,
+				    "sysctlbyname(\"hw.qemu_trace_perthread\")");
+			if (!qemu_trace_perthread)
+				errx(EX_USAGE, "-q requires sysctl "
+				    "hw.qemu_trace_perthread=1");
+			qtrace = 1;
+			break;
 		case 's':
 			sleep_after_test = 1;
+			break;
+		case 'u':
+			unsandboxed_tests_only = 1;
 			break;
 		case 'v':
 			verbose++;
@@ -1481,7 +2306,7 @@ main(int argc, char *argv[])
 	 * XXXRW: It is unclear if this should be done by libcheri rather than
 	 * the main program?
 	 */
-	stack.ss_size = max(getpagesize(), SIGSTKSZ);
+	stack.ss_size = MAX(getpagesize(), SIGSTKSZ);
 	stack.ss_sp = mmap(NULL, stack.ss_size, PROT_READ | PROT_WRITE,
 	    MAP_ANON, -1, 0);
 	if (stack.ss_sp == MAP_FAILED)
@@ -1502,38 +2327,93 @@ main(int argc, char *argv[])
 	if (minherit(ccsp, getpagesize(), INHERIT_SHARE) < 0)
 		err(EX_OSERR, "minherit");
 
+	/*
+	 * Disable core dumps unless specifically enabled.
+	 */
+	if (!coredump_enabled) {
+		bzero(&rl, sizeof(rl));
+		if (setrlimit(RLIMIT_CORE, &rl) < 0)
+			err(EX_OSERR, "setrlimit");
+	}
+
+	/*
+	 * Initialise the libcheri sandboxing library.
+	 */
+	if (!unsandboxed_tests_only)
+		libcheri_init();
+
+	cheri_failed_tests = sl_init();
+	cheri_xfailed_tests = sl_init();
 	/* Run the actual tests. */
+#if 0
 	cheritest_ccall_setup();
-	if (cheritest_libcheri_setup() < 0)
-		err(EX_SOFTWARE, "cheritest_libcheri_setup");
+#endif
+	if (!unsandboxed_tests_only) {
+		if (cheritest_libcheri_setup() < 0)
+			err(EX_SOFTWARE, "cheritest_libcheri_setup");
+	}
 	xo_open_container("testsuite");
 	xo_open_list("test");
 	if (run_all) {
-		for (t = 0; t < cheri_tests_len; t++)
-			if (!fast_tests_only || 
-			    !(cheri_tests[t].ct_flags & CT_FLAG_SLOW)) {
+		for (t = 0; t < cheri_tests_len; t++) {
+			if (fast_tests_only &&
+			    (cheri_tests[t].ct_flags & CT_FLAG_SLOW))
+				continue;
+			if (unsandboxed_tests_only &&
+			    (cheri_tests[t].ct_flags & CT_FLAG_SANDBOX))
+				continue;
+			cheritest_run_test(&cheri_tests[t]);
+			if (sleep_after_test)
+				sleep(1);
+		}
+	} else if (glob) {
+		for (i = 0; i < argc; i++) {
+			for (t = 0; t < cheri_tests_len; t++) {
+				if (fnmatch(argv[i], cheri_tests[t].ct_name,
+				    0) != 0)
+					continue;
+				if (fast_tests_only &&
+				    (cheri_tests[t].ct_flags & CT_FLAG_SLOW))
+					continue;
+				if (unsandboxed_tests_only &&
+				    (cheri_tests[t].ct_flags & CT_FLAG_SANDBOX))
+					continue;
 				cheritest_run_test(&cheri_tests[t]);
 				if (sleep_after_test)
 					sleep(1);
 			}
-	} else if (glob) {
-		for (i = 0; i < argc; i++) {
-			for (t = 0; t < cheri_tests_len; t++)
-				if ((fnmatch(argv[i], cheri_tests[t].ct_name,
-				    0) == 0) && (!fast_tests_only ||
-				    !(cheri_tests[t].ct_flags & CT_FLAG_SLOW))) {
-					cheritest_run_test(&cheri_tests[t]);
-					if (sleep_after_test)
-						sleep(1);
-				}
 		}
 	} else {
-		for (i = 0; i < argc; i++)
+		for (i = 0; i < argc; i++) {
+			if (fast_tests_only &&
+			    (cheri_tests[i].ct_flags & CT_FLAG_SLOW))
+				continue;
+			if (unsandboxed_tests_only &&
+			    (cheri_tests[i].ct_flags & CT_FLAG_SANDBOX))
+				continue;
 			cheritest_run_test_name(argv[i]);
+		}
 	}
 	xo_close_list("test");
 	xo_close_container("testsuite");
 	xo_finish();
+
+	/* print a summary which tests failed */
+	/* XXXAR: use xo_emit? */
+	if (tests_xfailed > 0) {
+		fprintf(stderr, "Expected failures:\n");
+		for (i = 0; (size_t)i < cheri_xfailed_tests->sl_cur; i++)
+			fprintf(stderr, "  %s\n",
+			    cheri_xfailed_tests->sl_str[i]);
+		sl_free(cheri_xfailed_tests, true);
+	}
+	if (tests_failed > tests_xfailed) {
+		fprintf(stderr, "Unexpected failures:\n");
+		for (i = 0; (size_t)i < cheri_failed_tests->sl_cur; i++)
+			fprintf(stderr, "  %s\n",
+			    cheri_failed_tests->sl_str[i]);
+		sl_free(cheri_failed_tests, true);
+	}
 	if (tests_passed + tests_failed > 1) {
 		if (expected_failures == 0)
 			fprintf(stderr, "SUMMARY: passed %d failed %d\n",
@@ -1549,7 +2429,8 @@ main(int argc, char *argv[])
 			    expected_failures - tests_xfailed);
 	}
 
-	cheritest_libcheri_destroy();
+	if (!unsandboxed_tests_only)
+		cheritest_libcheri_destroy();
 	if (tests_failed > tests_xfailed)
 		exit(-1);
 	exit(EX_OK);

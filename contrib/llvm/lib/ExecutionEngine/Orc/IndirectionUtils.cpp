@@ -7,19 +7,71 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/ExecutionEngine/Orc/IndirectionUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Triple.h"
-#include "llvm/ExecutionEngine/Orc/IndirectionUtils.h"
+#include "llvm/ExecutionEngine/Orc/OrcABISupport.h"
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Transforms/Utils/Cloning.h"
-#include <set>
 #include <sstream>
 
 namespace llvm {
 namespace orc {
 
-Constant* createIRTypedAddress(FunctionType &FT, TargetAddress Addr) {
+void JITCompileCallbackManager::anchor() {}
+void IndirectStubsManager::anchor() {}
+
+std::unique_ptr<JITCompileCallbackManager>
+createLocalCompileCallbackManager(const Triple &T,
+                                  JITTargetAddress ErrorHandlerAddress) {
+  switch (T.getArch()) {
+    default: return nullptr;
+
+    case Triple::x86: {
+      typedef orc::LocalJITCompileCallbackManager<orc::OrcI386> CCMgrT;
+      return llvm::make_unique<CCMgrT>(ErrorHandlerAddress);
+    }
+
+    case Triple::x86_64: {
+      if ( T.getOS() == Triple::OSType::Win32 ) {
+        typedef orc::LocalJITCompileCallbackManager<orc::OrcX86_64_Win32> CCMgrT;
+        return llvm::make_unique<CCMgrT>(ErrorHandlerAddress);
+      } else {
+        typedef orc::LocalJITCompileCallbackManager<orc::OrcX86_64_SysV> CCMgrT;
+        return llvm::make_unique<CCMgrT>(ErrorHandlerAddress);
+      }
+    }
+  }
+}
+
+std::function<std::unique_ptr<IndirectStubsManager>()>
+createLocalIndirectStubsManagerBuilder(const Triple &T) {
+  switch (T.getArch()) {
+    default: return nullptr;
+
+    case Triple::x86:
+      return [](){
+        return llvm::make_unique<
+                       orc::LocalIndirectStubsManager<orc::OrcI386>>();
+      };
+
+    case Triple::x86_64:
+      if (T.getOS() == Triple::OSType::Win32) {
+        return [](){
+          return llvm::make_unique<
+                     orc::LocalIndirectStubsManager<orc::OrcX86_64_Win32>>();
+        };
+      } else {
+        return [](){
+          return llvm::make_unique<
+                     orc::LocalIndirectStubsManager<orc::OrcX86_64_SysV>>();
+        };
+      }
+  }
+}
+
+Constant* createIRTypedAddress(FunctionType &FT, JITTargetAddress Addr) {
   Constant *AddrIntVal =
     ConstantInt::get(Type::getInt64Ty(FT.getContext()), Addr);
   Constant *AddrPtrVal =
@@ -37,7 +89,7 @@ GlobalVariable* createImplPointer(PointerType &PT, Module &M,
   return IP;
 }
 
-void makeStub(Function &F, GlobalVariable &ImplPointer) {
+void makeStub(Function &F, Value &ImplPointer) {
   assert(F.isDeclaration() && "Can't turn a definition into a stub.");
   assert(F.getParent() && "Function isn't in a module.");
   Module &M = *F.getParent();
@@ -61,9 +113,7 @@ class GlobalRenamer {
 public:
 
   static bool needsRenaming(const Value &New) {
-    if (!New.hasName() || New.getName().startswith("\01L"))
-      return true;
-    return false;
+    return !New.hasName() || New.getName().startswith("\01L");
   }
 
   const std::string& getRename(const Value &Orig) {
@@ -94,7 +144,7 @@ static void raiseVisibilityOnValue(GlobalValue &V, GlobalRenamer &R) {
     V.setLinkage(GlobalValue::ExternalLinkage);
     V.setVisibility(GlobalValue::HiddenVisibility);
   }
-  V.setUnnamedAddr(false);
+  V.setUnnamedAddr(GlobalValue::UnnamedAddr::None);
   assert(!R.needsRenaming(V) && "Invalid global name.");
 }
 
@@ -106,13 +156,16 @@ void makeAllSymbolsExternallyAccessible(Module &M) {
 
   for (auto &GV : M.globals())
     raiseVisibilityOnValue(GV, Renamer);
+
+  for (auto &A : M.aliases())
+    raiseVisibilityOnValue(A, Renamer);
 }
 
 Function* cloneFunctionDecl(Module &Dst, const Function &F,
                             ValueToValueMapTy *VMap) {
   assert(F.getParent() != &Dst && "Can't copy decl over existing function.");
   Function *NewF =
-    Function::Create(cast<FunctionType>(F.getType()->getElementType()),
+    Function::Create(cast<FunctionType>(F.getValueType()),
                      F.getLinkage(), F.getName(), &Dst);
   NewF->copyAttributesFrom(&F);
 
@@ -121,7 +174,7 @@ Function* cloneFunctionDecl(Module &Dst, const Function &F,
     auto NewArgI = NewF->arg_begin();
     for (auto ArgI = F.arg_begin(), ArgE = F.arg_end(); ArgI != ArgE;
          ++ArgI, ++NewArgI)
-      (*VMap)[ArgI] = NewArgI;
+      (*VMap)[&*ArgI] = &*NewArgI;
   }
 
   return NewF;
@@ -150,7 +203,7 @@ GlobalVariable* cloneGlobalVariableDecl(Module &Dst, const GlobalVariable &GV,
                                         ValueToValueMapTy *VMap) {
   assert(GV.getParent() != &Dst && "Can't copy decl over existing global var.");
   GlobalVariable *NewGV = new GlobalVariable(
-      Dst, GV.getType()->getElementType(), GV.isConstant(),
+      Dst, GV.getValueType(), GV.isConstant(),
       GV.getLinkage(), nullptr, GV.getName(), nullptr,
       GV.getThreadLocalMode(), GV.getType()->getAddressSpace());
   NewGV->copyAttributesFrom(&GV);
@@ -175,6 +228,26 @@ void moveGlobalVariableInitializer(GlobalVariable &OrigGV,
 
   NewGV->setInitializer(MapValue(OrigGV.getInitializer(), VMap, RF_None,
                                  nullptr, Materializer));
+}
+
+GlobalAlias* cloneGlobalAliasDecl(Module &Dst, const GlobalAlias &OrigA,
+                                  ValueToValueMapTy &VMap) {
+  assert(OrigA.getAliasee() && "Original alias doesn't have an aliasee?");
+  auto *NewA = GlobalAlias::create(OrigA.getValueType(),
+                                   OrigA.getType()->getPointerAddressSpace(),
+                                   OrigA.getLinkage(), OrigA.getName(), &Dst);
+  NewA->copyAttributesFrom(&OrigA);
+  VMap[&OrigA] = NewA;
+  return NewA;
+}
+
+void cloneModuleFlagsMetadata(Module &Dst, const Module &Src,
+                              ValueToValueMapTy &VMap) {
+  auto *MFs = Src.getModuleFlagsMetadata();
+  if (!MFs)
+    return;
+  for (auto *MF : MFs->operands())
+    Dst.addModuleFlag(MapMetadata(MF, VMap));
 }
 
 } // End namespace orc.

@@ -1,11 +1,15 @@
 #	@(#)Makefile	8.2 (Berkeley) 2/3/94
 # $FreeBSD$
 
+PACKAGE=	clibs
 SHLIBDIR?= /lib
 WANT_DUMP=	yes
 WANT_CHERI=	variables
 
 .include <src.opts.mk>
+
+# Force building of libc_pic.a
+MK_TOOLCHAIN=	yes
 
 LIBC_SRCTOP?= ${.CURDIR}
 
@@ -25,12 +29,20 @@ LIBC_ARCH=${MACHINE_CPUARCH}
 # below.  Note: there are no IDs for syscall stubs whose sources are generated.
 # To include legacy CSRG sccsid strings, add -DLIBC_SCCS and -DSYSLIBC_SCCS
 # to CFLAGS below.  -DSYSLIBC_SCCS affects just the system call stubs.
-LIB=c
+LIB?=c
 SHLIB_MAJOR= 7
+.ifdef LIBCHERI
+SHLIB_LDSCRIPT=libc-cheri.ldscript
+.else
+.if ${MK_SSP} != "no"
 SHLIB_LDSCRIPT=libc.ldscript
+.else
+SHLIB_LDSCRIPT=libc_nossp.ldscript
+.endif
+.endif
 SHLIB_LDSCRIPT_LINKS=libxnet.so
 WARNS?=	2
-CFLAGS+=-I${LIBC_SRCTOP}/include -I${LIBC_SRCTOP}/../../include
+CFLAGS+=-I${LIBC_SRCTOP}/include -I${SRCTOP}/include
 CFLAGS+=-I${LIBC_SRCTOP}/${LIBC_ARCH}
 .if ${MK_NLS} != "no"
 CFLAGS+=-DNLS
@@ -95,19 +107,28 @@ NOASM=
 .include "${LIBC_SRCTOP}/resolv/Makefile.inc"
 .include "${LIBC_SRCTOP}/stdio/Makefile.inc"
 .include "${LIBC_SRCTOP}/stdlib/Makefile.inc"
-.if !defined(LIBCHERI) || ${MK_LIBCHERI_JEMALLOC} == "yes"
 .include "${LIBC_SRCTOP}/stdlib/jemalloc/Makefile.inc"
-.endif
 .include "${LIBC_SRCTOP}/stdtime/Makefile.inc"
 .include "${LIBC_SRCTOP}/string/Makefile.inc"
+.if !defined(NO_SYSCALLS)
 .include "${LIBC_SRCTOP}/sys/Makefile.inc"
+.else
+.PATH: ${LIBC_SRCTOP}/sys
+SRCS+=	interposing_table.c
+CFLAGS+=	-DNO_SYSCALLS
+.endif
 .include "${LIBC_SRCTOP}/secure/Makefile.inc"
 .include "${LIBC_SRCTOP}/rpc/Makefile.inc"
 .include "${LIBC_SRCTOP}/uuid/Makefile.inc"
 .include "${LIBC_SRCTOP}/xdr/Makefile.inc"
-.if (${LIBC_ARCH} == "arm" && ${MACHINE_ARCH} != "armv6hf") ||\
-     ${LIBC_ARCH} == "mips"
+.if (${LIBC_ARCH} == "arm" && \
+	(${MACHINE_ARCH:Marmv[67]*} == "" || (defined(CPUTYPE) && ${CPUTYPE:M*soft*}))) || \
+    (${LIBC_ARCH} == "mips" && ${MACHINE_ARCH:Mmips*hf} == "") || \
+    (${LIBC_ARCH} == "riscv" && ${MACHINE_ARCH:Mriscv*sf} != "")
 .include "${LIBC_SRCTOP}/softfloat/Makefile.inc"
+.endif
+.if ${LIBC_ARCH} == "i386" || ${LIBC_ARCH} == "amd64"
+.include "${LIBC_SRCTOP}/x86/sys/Makefile.inc"
 .endif
 .if ${MK_NIS} != "no"
 CFLAGS+= -DYP
@@ -164,8 +185,15 @@ libkern.${LIBC_ARCH}:: ${KMSRCS}
 	${CP} ${.ALLSRC} ${DESTDIR}/sys/libkern/${LIBC_ARCH}
 .endif
 
-.if ${MK_TESTS} != "no"
-SUBDIR+=	tests
+.if !defined(NO_SYSCALLS)
+HAS_TESTS=
+SUBDIR.${MK_TESTS}+= tests
+.endif
+
+.if defined(NO_SYSCALLS)
+MAN:=
+MLINKS:=
+NLS:=
 .endif
 
 .include <bsd.lib.mk>
@@ -187,6 +215,8 @@ CFLAGS+= -I${SRCTOP}/lib/msun/src
 GENDIRDEPS_FILTER+= N${RELDIR:H}/msun
 .endif
 .endif
+
+CFLAGS+=     ${CFLAGS.${.IMPSRC:T}}
 
 # Disable warnings in contributed sources.
 CWARNFLAGS:=	${.IMPSRC:Ngdtoa_*.c:C/^.+$/${CWARNFLAGS}/:C/^$/-w/}

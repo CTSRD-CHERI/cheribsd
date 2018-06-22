@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012-2015 Solarflare Communications Inc.
+ * Copyright (c) 2012-2016 Solarflare Communications Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -54,11 +54,11 @@ __FBSDID("$FreeBSD$");
 
 			void
 siena_mcdi_send_request(
-	__in		efx_nic_t *enp,
-	__in		void *hdrp,
-	__in		size_t hdr_len,
-	__in		void *sdup,
-	__in		size_t sdu_len)
+	__in			efx_nic_t *enp,
+	__in_bcount(hdr_len)	void *hdrp,
+	__in			size_t hdr_len,
+	__in_bcount(sdu_len)	void *sdup,
+	__in			size_t sdu_len)
 {
 	efx_mcdi_iface_t *emip = &(enp->en_mcdi.em_emip);
 	efx_dword_t dword;
@@ -174,6 +174,8 @@ siena_mcdi_init(
 	unsigned int portnum;
 	efx_rc_t rc;
 
+	_NOTE(ARGUNUSED(mtp))
+
 	EFSYS_ASSERT(enp->en_family == EFX_FAMILY_SIENA);
 
 	/* Determine the port number to use for MCDI */
@@ -212,6 +214,7 @@ fail1:
 siena_mcdi_fini(
 	__in		efx_nic_t *enp)
 {
+	_NOTE(ARGUNUSED(enp))
 }
 
 	__checkReturn	efx_rc_t
@@ -234,7 +237,6 @@ siena_mcdi_feature_supported(
 	default:
 		rc = ENOTSUP;
 		goto fail1;
-		break;
 	}
 
 	return (0);
@@ -244,5 +246,20 @@ fail1:
 
 	return (rc);
 }
+
+/* Default timeout for MCDI command processing. */
+#define	SIENA_MCDI_CMD_TIMEOUT_US	(10 * 1000 * 1000)
+
+			void
+siena_mcdi_get_timeout(
+	__in		efx_nic_t *enp,
+	__in		efx_mcdi_req_t *emrp,
+	__out		uint32_t *timeoutp)
+{
+	_NOTE(ARGUNUSED(enp, emrp))
+
+	*timeoutp = SIENA_MCDI_CMD_TIMEOUT_US;
+}
+
 
 #endif	/* EFSYS_OPT_SIENA && EFSYS_OPT_MCDI */

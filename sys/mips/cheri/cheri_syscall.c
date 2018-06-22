@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2011-2014 Robert N. M. Watson
+ * Copyright (c) 2011-2014, 2016 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -39,8 +39,10 @@
 #include <ddb/ddb.h>
 #include <sys/kdb.h>
 
+#include <cheri/cheri.h>
+#include <cheri/cheric.h>
+
 #include <machine/atomic.h>
-#include <machine/cheri.h>
 #include <machine/pcb.h>
 #include <machine/sysarch.h>
 
@@ -49,11 +51,11 @@
  * sandboxes that have been explicitly delegated CHERI_PERM_SYSCALL via their
  * code capability.  Note that CHERI_PERM_SYSCALL effectively implies ambient
  * authority, as the kernel does not [currently] interpret pointers/lengths
- * via userspace $c0.
+ * via userspace $ddc.
  */
 int
 cheri_syscall_authorize(struct thread *td, u_int code, int nargs,
-    register_t *args)
+    syscallarg_t *args)
 {
 	uintmax_t c_perms;
 
@@ -63,19 +65,17 @@ cheri_syscall_authorize(struct thread *td, u_int code, int nargs,
 	 * XXXRW: Now that we support a userspace cycle counter, we should
 	 * remove this.
 	 */
-	if (code == SYS_sysarch && args[0] == MIPS_GET_COUNT)
+	if (code == SYS_sysarch && (vaddr_t)args[0] == MIPS_GET_COUNT)
 		return (0);
 
 	/*
 	 * Check whether userspace holds the rights defined in
-	 * cheri_capability_set_user() in $PCC.  Note that object type doesn't
+	 * cheri_capability_set_user() in $pcc.  Note that object type doesn't
 	 * come into play here.
 	 *
 	 * XXXRW: Possibly ECAPMODE should be EPROT or ESANDBOX?
 	 */
-	CHERI_CLC(CHERI_CR_CTEMP0, CHERI_CR_KDC,
-	    &td->td_pcb->pcb_cheriframe.cf_pcc, 0);
-	CHERI_CGETPERM(c_perms, CHERI_CR_CTEMP0);
+	c_perms = cheri_getperm(td->td_pcb->pcb_regs.pcc);
 	if ((c_perms & CHERI_PERM_SYSCALL) == 0) {
 		atomic_add_int(&security_cheri_syscall_violations, 1);
 

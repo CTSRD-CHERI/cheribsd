@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1999 Peter Jeremy
  * All rights reserved.
  *
@@ -27,7 +29,7 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-/* This file creates publically callable functions to perform various
+/* This file creates publicly callable functions to perform various
  * simple arithmetic on memory which is atomic in the presence of
  * interrupts and multiple processors.
  */

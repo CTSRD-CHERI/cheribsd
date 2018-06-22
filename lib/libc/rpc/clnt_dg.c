@@ -1,6 +1,8 @@
 /*	$NetBSD: clnt_dg.c,v 1.4 2000/07/14 08:40:41 fvdl Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2009, Sun Microsystems, Inc.
  * All rights reserved.
  *
@@ -29,6 +31,17 @@
  */
 /*
  * Copyright (c) 1986-1991 by Sun Microsystems Inc. 
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "sunrpc"
+ * }
+ * CHERI CHANGES END
  */
 
 #if defined(LIBC_SCCS) && !defined(lint)
@@ -406,7 +419,7 @@ call_again_same_xid:
 		if ((! XDR_PUTBYTES(xdrs, cu->cu_outhdr, cu->cu_xdrpos)) ||
 		    (! XDR_PUTINT32(xdrs, &proc)) ||
 		    (! AUTH_MARSHALL(cl->cl_auth, xdrs)) ||
-		    (! (*xargs)(xdrs, argsp))) {
+		    (! (*xargs)(xdrs, argsp, 0))) {
 			cu->cu_error.re_status = RPC_CANTENCODEARGS;
 			goto out;
 		}
@@ -582,7 +595,7 @@ get_reply:
 			}
 		}		/* end successful completion */
 		/*
-		 * If unsuccesful AND error is an authentication error
+		 * If unsuccessful AND error is an authentication error
 		 * then refresh credentials and try again, else break
 		 */
 		else if (cu->cu_error.re_status == RPC_AUTHERROR)
@@ -629,7 +642,7 @@ clnt_dg_freeres(CLIENT *cl, xdrproc_t xdr_res, void *res_ptr)
 	while (dg_fd_locks[cu->cu_fd])
 		cond_wait(&dg_cv[cu->cu_fd], &clnt_fd_lock);
 	xdrs->x_op = XDR_FREE;
-	dummy = (*xdr_res)(xdrs, res_ptr);
+	dummy = (*xdr_res)(xdrs, res_ptr, 0);
 	mutex_unlock(&clnt_fd_lock);
 	thr_sigsetmask(SIG_SETMASK, &mask, NULL);
 	cond_signal(&dg_cv[cu->cu_fd]);
@@ -742,7 +755,7 @@ clnt_dg_control(CLIENT *cl, u_int request, void *info)
 		/*
 		 * This RELIES on the information that, in the call body,
 		 * the version number field is the fifth field from the
-		 * begining of the RPC header. MUST be changed if the
+		 * beginning of the RPC header. MUST be changed if the
 		 * call_struct is changed
 		 */
 		*(u_int32_t *)info =
@@ -759,7 +772,7 @@ clnt_dg_control(CLIENT *cl, u_int request, void *info)
 		/*
 		 * This RELIES on the information that, in the call body,
 		 * the program number field is the fourth field from the
-		 * begining of the RPC header. MUST be changed if the
+		 * beginning of the RPC header. MUST be changed if the
 		 * call_struct is changed
 		 */
 		*(u_int32_t *)info =

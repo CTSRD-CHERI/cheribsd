@@ -6,11 +6,12 @@
 # PROVIDE: ipsec
 # REQUIRE: FILESYSTEMS
 # BEFORE:  DAEMON mountcritremote
-# KEYWORD: nojail
+# KEYWORD: nojailvnet
 
 . /etc/rc.subr
 
 name="ipsec"
+desc="Internet Protocol Security protocol"
 rcvar="ipsec_enable"
 start_precmd="ipsec_prestart"
 start_cmd="ipsec_start"

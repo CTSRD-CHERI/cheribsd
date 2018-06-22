@@ -42,9 +42,9 @@
 .In vm/vm.h
 .In vm/vm_extern.h
 .Ft int
-.Fn vslock "void *addr" "size_t len"
+.Fn vslock "void * __capability addr" "size_t len"
 .Ft void
-.Fn vsunlock "void *addr" "size_t len"
+.Fn vsunlock "void * __capability addr" "size_t len"
 .Sh DESCRIPTION
 The
 .Fn vslock
@@ -85,4 +85,8 @@ limit on locked memory.
 .It Bq Er EFAULT
 Some portion of the indicated address range is not allocated.
 There was an error faulting/mapping a page.
+.It Bq Er EPROT
+The
+.Fa addr
+capability does not provide a reference to the requested range.
 .El

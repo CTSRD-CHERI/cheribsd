@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2005-2007, Joseph Koshy
  * Copyright (c) 2007 The FreeBSD Foundation
  * All rights reserved.
@@ -26,6 +28,16 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
  */
 
 /*
@@ -72,6 +84,9 @@ __FBSDID("$FreeBSD$");
 #include "pmcstat_log.h"
 #include "pmcstat_top.h"
 #include "pmcpl_callgraph.h"
+
+#define	min(A,B)		((A) < (B) ? (A) : (B))
+#define	max(A,B)		((A) > (B) ? (A) : (B))
 
 /* Get the sample value in percent related to nsamples. */
 #define PMCPL_CG_COUNTP(a) \
@@ -280,7 +295,7 @@ pmcstat_cgnode_print(struct pmcstat_cgnode *cg, int depth, uint32_t total)
 		    pmcstat_string_unintern(sym->ps_name));
 	else
 		(void) fprintf(args.pa_graphfile, "%p",
-		    (void *) (cg->pcg_image->pi_vaddr + cg->pcg_func));
+		    (void *)(intptr_t) (cg->pcg_image->pi_vaddr + cg->pcg_func));
 
 	if (pmcstat_previous_filename_printed !=
 	    cg->pcg_image->pi_fullpath) {
@@ -490,7 +505,7 @@ pmcstat_cgnode_topprint(struct pmcstat_cgnode *cg,
 		    pmcstat_string_unintern(sym->ps_name));
 	} else
 		snprintf(ns, sizeof(ns), "%p",
-		    (void *)cg->pcg_func);
+		    (void *)(intptr_t)cg->pcg_func);
 
 	PMCSTAT_ATTRON(v_attrs);
 	PMCSTAT_PRINTW("%5.5s", vs);
@@ -549,7 +564,7 @@ pmcstat_cgnode_topprint(struct pmcstat_cgnode *cg,
 			    pmcstat_string_unintern(sym->ps_name));
 		} else
 			ns_len = snprintf(ns, sizeof(ns), "%p",
-			    (void *)pcg->pcg_func);
+			    (void *)(intptr_t)pcg->pcg_func);
 
 		len = ns_len + vs_len + 1;
 		if (width - len < 0) {
@@ -638,8 +653,11 @@ pmcpl_cg_topdisplay(void)
  */
 
 int
-pmcpl_cg_topkeypress(int c, WINDOW *w)
+pmcpl_cg_topkeypress(int c, void *arg)
 {
+	WINDOW *w;
+
+	w = (WINDOW *)arg;
 
 	(void) c; (void) w;
 

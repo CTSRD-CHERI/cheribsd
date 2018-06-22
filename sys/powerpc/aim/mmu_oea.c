@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD AND BSD-4-Clause
+ *
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -287,6 +289,7 @@ boolean_t moea_is_referenced(mmu_t, vm_page_t);
 int moea_ts_referenced(mmu_t, vm_page_t);
 vm_offset_t moea_map(mmu_t, vm_offset_t *, vm_paddr_t, vm_paddr_t, int);
 boolean_t moea_page_exists_quick(mmu_t, pmap_t, vm_page_t);
+void moea_page_init(mmu_t, vm_page_t);
 int moea_page_wired_mappings(mmu_t, vm_page_t);
 void moea_pinit(mmu_t, pmap_t);
 void moea_pinit0(mmu_t, pmap_t);
@@ -300,7 +303,6 @@ void moea_remove_write(mmu_t, vm_page_t);
 void moea_unwire(mmu_t, pmap_t, vm_offset_t, vm_offset_t);
 void moea_zero_page(mmu_t, vm_page_t);
 void moea_zero_page_area(mmu_t, vm_page_t, int, int);
-void moea_zero_page_idle(mmu_t, vm_page_t);
 void moea_activate(mmu_t, struct thread *);
 void moea_deactivate(mmu_t, struct thread *);
 void moea_cpu_bootstrap(mmu_t, int);
@@ -335,6 +337,7 @@ static mmu_method_t moea_methods[] = {
 	MMUMETHOD(mmu_ts_referenced,	moea_ts_referenced),
 	MMUMETHOD(mmu_map,     		moea_map),
 	MMUMETHOD(mmu_page_exists_quick,moea_page_exists_quick),
+	MMUMETHOD(mmu_page_init,	moea_page_init),
 	MMUMETHOD(mmu_page_wired_mappings,moea_page_wired_mappings),
 	MMUMETHOD(mmu_pinit,		moea_pinit),
 	MMUMETHOD(mmu_pinit0,		moea_pinit0),
@@ -349,7 +352,6 @@ static mmu_method_t moea_methods[] = {
 	MMUMETHOD(mmu_unwire,		moea_unwire),
 	MMUMETHOD(mmu_zero_page,       	moea_zero_page),
 	MMUMETHOD(mmu_zero_page_area,	moea_zero_page_area),
-	MMUMETHOD(mmu_zero_page_idle,	moea_zero_page_idle),
 	MMUMETHOD(mmu_activate,		moea_activate),
 	MMUMETHOD(mmu_deactivate,      	moea_deactivate),
 	MMUMETHOD(mmu_page_set_memattr,	moea_page_set_memattr),
@@ -384,6 +386,8 @@ moea_calc_wimg(vm_paddr_t pa, vm_memattr_t ma)
 		switch (ma) {
 		case VM_MEMATTR_UNCACHEABLE:
 			return (PTE_I | PTE_G);
+		case VM_MEMATTR_CACHEABLE:
+			return (PTE_M);
 		case VM_MEMATTR_WRITE_COMBINING:
 		case VM_MEMATTR_WRITE_BACK:
 		case VM_MEMATTR_PREFETCHABLE:
@@ -919,7 +923,7 @@ moea_bootstrap(mmu_t mmup, vm_offset_t kernelstart, vm_offset_t kernelend)
 	Maxmem = powerpc_btop(phys_avail[i + 1]);
 
 	moea_cpu_bootstrap(mmup,0);
-
+	mtmsr(mfmsr() | PSL_DR | PSL_IR);
 	pmap_bootstrapped++;
 
 	/*
@@ -1077,13 +1081,6 @@ moea_zero_page_area(mmu_t mmu, vm_page_t m, int off, int size)
 	void *va = (void *)(pa + off);
 
 	bzero(va, size);
-}
-
-void
-moea_zero_page_idle(mmu_t mmu, vm_page_t m)
-{
-
-	moea_zero_page(mmu, m);
 }
 
 vm_offset_t
@@ -1601,6 +1598,15 @@ moea_page_exists_quick(mmu_t mmu, pmap_t pmap, vm_page_t m)
 	return (rv);
 }
 
+void
+moea_page_init(mmu_t mmu __unused, vm_page_t m)
+{
+
+	m->md.mdpg_attrs = 0;
+	m->md.mdpg_cache_attrs = VM_MEMATTR_DEFAULT;
+	LIST_INIT(&m->md.mdpg_pvoh);
+}
+
 /*
  * Return the number of managed mappings to the given physical page
  * that are wired.
@@ -1671,7 +1677,7 @@ moea_pinit(mmu_t mmu, pmap_t pmap)
 			}
 			i = ffs(~moea_vsid_bitmap[n]) - 1;
 			mask = 1 << i;
-			hash &= 0xfffff & ~(VSID_NBPW - 1);
+			hash &= rounddown2(0xfffff, VSID_NBPW);
 			hash |= i;
 		}
 		KASSERT(!(moea_vsid_bitmap[n] & mask),
@@ -1863,7 +1869,7 @@ moea_bootstrap_alloc(vm_size_t size, u_int align)
 	size = round_page(size);
 	for (i = 0; phys_avail[i + 1] != 0; i += 2) {
 		if (align != 0)
-			s = (phys_avail[i] + align - 1) & ~(align - 1);
+			s = roundup2(phys_avail[i], align);
 		else
 			s = phys_avail[i];
 		e = s + size;

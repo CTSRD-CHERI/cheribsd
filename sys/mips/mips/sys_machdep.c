@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
  *
@@ -56,11 +58,14 @@ int
 sysarch(struct thread *td, struct sysarch_args *uap)
 {
 	int error;
+#ifdef CPU_QEMU_MALTA
+	int intval;
+#endif
 	void *tlsbase;
 
 	switch (uap->op) {
 	case MIPS_SET_TLS:
-		td->td_md.md_tls = uap->parms;
+		td->td_md.md_tls = __USER_CAP_UNBOUND(uap->parms);
 
 		/*
 		 * If there is an user local register implementation (ULRI)
@@ -68,8 +73,10 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 		 * value in this register is adjusted like in the case of the
 		 * rdhwr trap() instruction handler.
 		 *
-		 * XXXSS For more information why this offset is required see:
-		 * 	'git show c6be4f4d2d1b71c04de5d3bbb6933ce2dbcdb317'
+		 * The user local register needs the TLS and TCB offsets
+		 * because the compiler simply generates a 'rdhwr reg, $29'
+		 * instruction to access thread local storage (i.e., variables
+		 * with the '_thread' attribute).
 		 */
 		if (cpuinfo.userlocal_reg == true) {
 			mips_wr_userlocal((unsigned long)(uap->parms +
@@ -78,7 +85,7 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 		return (0);
 
 	case MIPS_GET_TLS:
-		tlsbase = td->td_md.md_tls;
+		tlsbase = (__cheri_fromcap void *)td->td_md.md_tls;
 		error = copyout(&tlsbase, uap->parms, sizeof(tlsbase));
 		return (error);
 
@@ -86,15 +93,35 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 		td->td_retval[0] = mips_rd_count();
 		return (0);
 
+#ifdef CPU_QEMU_MALTA
+	case QEMU_GET_QTRACE:
+		intval = (td->td_md.md_flags & MDTD_QTRACE) ? 1 : 0;
+		error = copyout(&intval, uap->parms, sizeof(intval));
+		return (error);
+
+	case QEMU_SET_QTRACE:
+		error = copyin(uap->parms, &intval, sizeof(intval));
+		if (error)
+			return (error);
+		if (intval)
+			td->td_md.md_flags |= MDTD_QTRACE;
+		else
+			td->td_md.md_flags &= ~MDTD_QTRACE;
+		return (0);
+#endif
+
 #ifdef CPU_CHERI
+#if 0
 	case CHERI_GET_STACK:
 		return (cheri_sysarch_getstack(td, uap));
 
 	case CHERI_SET_STACK:
 		return (cheri_sysarch_setstack(td, uap));
+#endif
 
-	case CHERI_GET_TYPECAP:
-		return (cheri_sysarch_gettypecap(td, uap));
+	case CHERI_GET_SEALCAP:
+		return (cheri_sysarch_getsealcap(td,
+		    __USER_CAP(uap->parms, sizeof(void * __capability))));
 #endif
 
 	default:

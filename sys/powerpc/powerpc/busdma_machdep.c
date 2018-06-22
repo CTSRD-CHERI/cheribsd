@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1997, 1998 Justin T. Gibbs.
  * All rights reserved.
  *
@@ -87,7 +89,8 @@ struct bounce_page {
 	vm_offset_t	vaddr;		/* kva of bounce buffer */
 	bus_addr_t	busaddr;	/* Physical address */
 	vm_offset_t	datavaddr;	/* kva of client data */
-	bus_addr_t	dataaddr;	/* client physical address */
+	vm_page_t	datapage;	/* physical page of client data */
+	vm_offset_t	dataoffs;	/* page offset of client data */
 	bus_size_t	datacount;	/* client data count */
 	STAILQ_ENTRY(bounce_page) links;
 };
@@ -585,7 +588,8 @@ _bus_dmamap_count_phys(bus_dma_tag_t dmat, bus_dmamap_t map, vm_paddr_t buf,
 		while (buflen != 0) {
 			sgsize = MIN(buflen, dmat->maxsegsz);
 			if (run_filter(dmat, curaddr) != 0) {
-				sgsize = MIN(sgsize, PAGE_SIZE);
+				sgsize = MIN(sgsize,
+				    PAGE_SIZE - (curaddr & PAGE_MASK));
 				map->pagesneeded++;
 			}
 			curaddr += sgsize;
@@ -736,7 +740,7 @@ _bus_dmamap_load_phys(bus_dma_tag_t dmat,
 		curaddr = buf;
 		sgsize = MIN(buflen, dmat->maxsegsz);
 		if (map->pagesneeded != 0 && run_filter(dmat, curaddr)) {
-			sgsize = MIN(sgsize, PAGE_SIZE);
+			sgsize = MIN(sgsize, PAGE_SIZE - (curaddr & PAGE_MASK));
 			curaddr = add_bounce_page(dmat, map, 0, curaddr,
 			    sgsize);
 		}
@@ -779,7 +783,7 @@ _bus_dmamap_load_buffer(bus_dma_tag_t dmat,
 {
 	bus_size_t sgsize;
 	bus_addr_t curaddr;
-	vm_offset_t vaddr;
+	vm_offset_t kvaddr, vaddr;
 	int error;
 
 	if (segs == NULL)
@@ -802,20 +806,23 @@ _bus_dmamap_load_buffer(bus_dma_tag_t dmat,
 		/*
 		 * Get the physical address for this segment.
 		 */
-		if (pmap == kernel_pmap)
+		if (pmap == kernel_pmap) {
 			curaddr = pmap_kextract(vaddr);
-		else
+			kvaddr = vaddr;
+		} else {
 			curaddr = pmap_extract(pmap, vaddr);
+			kvaddr = 0;
+		}
 
 		/*
 		 * Compute the segment size, and adjust counts.
 		 */
 		max_sgsize = MIN(buflen, dmat->maxsegsz);
-		sgsize = PAGE_SIZE - ((vm_offset_t)curaddr & PAGE_MASK);
+		sgsize = PAGE_SIZE - (curaddr & PAGE_MASK);
 		if (map->pagesneeded != 0 && run_filter(dmat, curaddr)) {
 			sgsize = roundup2(sgsize, dmat->alignment);
 			sgsize = MIN(sgsize, max_sgsize);
-			curaddr = add_bounce_page(dmat, map, vaddr, curaddr,
+			curaddr = add_bounce_page(dmat, map, kvaddr, curaddr,
 			    sgsize);
 		} else {
 			sgsize = MIN(sgsize, max_sgsize);
@@ -836,7 +843,7 @@ _bus_dmamap_load_buffer(bus_dma_tag_t dmat,
 }
 
 void
-__bus_dmamap_waitok(bus_dma_tag_t dmat, bus_dmamap_t map,
+_bus_dmamap_waitok(bus_dma_tag_t dmat, bus_dmamap_t map,
 		    struct memdesc *mem, bus_dmamap_callback_t *callback,
 		    void *callback_arg)
 {
@@ -874,7 +881,7 @@ _bus_dmamap_complete(bus_dma_tag_t dmat, bus_dmamap_t map,
  * Release the mapping held by map.
  */
 void
-_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map)
+bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map)
 {
 	struct bounce_page *bpage;
 
@@ -890,11 +897,13 @@ _bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map)
 }
 
 void
-_bus_dmamap_sync(bus_dma_tag_t dmat, bus_dmamap_t map, bus_dmasync_op_t op)
+bus_dmamap_sync(bus_dma_tag_t dmat, bus_dmamap_t map, bus_dmasync_op_t op)
 {
 	struct bounce_page *bpage;
+	vm_offset_t datavaddr, tempvaddr;
 
 	if ((bpage = STAILQ_FIRST(&map->bpages)) != NULL) {
+
 		/*
 		 * Handle data bouncing.  We might also
 		 * want to add support for invalidating
@@ -905,14 +914,20 @@ _bus_dmamap_sync(bus_dma_tag_t dmat, bus_dmamap_t map, bus_dmasync_op_t op)
 
 		if (op & BUS_DMASYNC_PREWRITE) {
 			while (bpage != NULL) {
-				if (bpage->datavaddr != 0)
-					bcopy((void *)bpage->datavaddr,
-					      (void *)bpage->vaddr,
-					      bpage->datacount);
-				else
-					physcopyout(bpage->dataaddr,
-					    (void *)bpage->vaddr,
-					    bpage->datacount);
+				tempvaddr = 0;
+				datavaddr = bpage->datavaddr;
+				if (datavaddr == 0) {
+					tempvaddr = pmap_quick_enter_page(
+					    bpage->datapage);
+					datavaddr = tempvaddr |
+					    bpage->dataoffs;
+				}
+
+				bcopy((void *)datavaddr,
+				    (void *)bpage->vaddr, bpage->datacount);
+
+				if (tempvaddr != 0)
+					pmap_quick_remove_page(tempvaddr);
 				bpage = STAILQ_NEXT(bpage, links);
 			}
 			dmat->bounce_zone->total_bounced++;
@@ -920,13 +935,20 @@ _bus_dmamap_sync(bus_dma_tag_t dmat, bus_dmamap_t map, bus_dmasync_op_t op)
 
 		if (op & BUS_DMASYNC_POSTREAD) {
 			while (bpage != NULL) {
-				if (bpage->datavaddr != 0)
-					bcopy((void *)bpage->vaddr,
-					      (void *)bpage->datavaddr,
-					      bpage->datacount);
-				else
-					physcopyin((void *)bpage->vaddr,
-					    bpage->dataaddr, bpage->datacount);
+				tempvaddr = 0;
+				datavaddr = bpage->datavaddr;
+				if (datavaddr == 0) {
+					tempvaddr = pmap_quick_enter_page(
+					    bpage->datapage);
+					datavaddr = tempvaddr |
+					    bpage->dataoffs;
+				}
+
+				bcopy((void *)bpage->vaddr,
+				    (void *)datavaddr, bpage->datacount);
+
+				if (tempvaddr != 0)
+					pmap_quick_remove_page(tempvaddr);
 				bpage = STAILQ_NEXT(bpage, links);
 			}
 			dmat->bounce_zone->total_bounced++;
@@ -1125,7 +1147,8 @@ add_bounce_page(bus_dma_tag_t dmat, bus_dmamap_t map, vm_offset_t vaddr,
 		bpage->busaddr |= addr & PAGE_MASK;
 	}
 	bpage->datavaddr = vaddr;
-	bpage->dataaddr = addr;
+	bpage->datapage = PHYS_TO_VM_PAGE(addr);
+	bpage->dataoffs = addr & PAGE_MASK;
 	bpage->datacount = size;
 	STAILQ_INSERT_TAIL(&(map->bpages), bpage, links);
 	return (bpage->busaddr);
@@ -1189,7 +1212,7 @@ busdma_swi(void)
 }
 
 int
-bus_dma_tag_set_iommu(bus_dma_tag_t tag, struct device *iommu, void *cookie)
+bus_dma_tag_set_iommu(bus_dma_tag_t tag, device_t iommu, void *cookie)
 {
 	tag->iommu = iommu;
 	tag->iommu_cookie = cookie;

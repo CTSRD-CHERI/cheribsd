@@ -128,6 +128,7 @@ __FBSDID("$FreeBSD$");
 #include <ddb/ddb.h>
 
 #include <dev/ofw/openfirm.h>
+#include <dev/ofw/ofw_subr.h>
 
 int cold = 1;
 #ifdef __powerpc64__
@@ -140,6 +141,7 @@ int hw_direct_map = 1;
 extern void *ap_pcpu;
 
 struct pcpu __pcpu[MAXCPU];
+static char init_kenv[2048];
 
 static struct trapframe frame0;
 
@@ -152,7 +154,8 @@ SYSINIT(cpu, SI_SUB_CPU, SI_ORDER_FIRST, cpu_startup, NULL);
 SYSCTL_INT(_machdep, CPU_CACHELINE, cacheline_size,
 	   CTLFLAG_RD, &cacheline_size, 0, "");
 
-uintptr_t	powerpc_init(vm_offset_t, vm_offset_t, vm_offset_t, void *);
+uintptr_t	powerpc_init(vm_offset_t, vm_offset_t, vm_offset_t, void *,
+		    uint32_t);
 
 long		Maxmem = 0;
 long		realmem = 0;
@@ -197,7 +200,7 @@ cpu_startup(void *dummy)
 			    phys_avail[indx + 1] - phys_avail[indx];
 
 			#ifdef __powerpc64__
-			printf("0x%016jx - 0x%016jx, %jd bytes (%jd pages)\n",
+			printf("0x%016jx - 0x%016jx, %ju bytes (%ju pages)\n",
 			#else
 			printf("0x%09jx - 0x%09jx, %ju bytes (%ju pages)\n",
 			#endif
@@ -230,12 +233,15 @@ void aim_cpu_init(vm_offset_t toc);
 void booke_cpu_init(void);
 
 uintptr_t
-powerpc_init(vm_offset_t fdt, vm_offset_t toc, vm_offset_t ofentry, void *mdp)
+powerpc_init(vm_offset_t fdt, vm_offset_t toc, vm_offset_t ofentry, void *mdp,
+    uint32_t mdp_cookie)
 {
 	struct		pcpu *pc;
+	struct cpuref	bsp;
 	vm_offset_t	startkernel, endkernel;
 	void		*kmdp;
-        char		*env;
+	char		*env;
+        bool		ofw_bootargs = false;
 #ifdef DDB
 	vm_offset_t ksym_start;
 	vm_offset_t ksym_end;
@@ -247,9 +253,24 @@ powerpc_init(vm_offset_t fdt, vm_offset_t toc, vm_offset_t ofentry, void *mdp)
 	startkernel = __startkernel;
 	endkernel = __endkernel;
 
-	/* Check for ePAPR loader, which puts a magic value into r6 */
-	if (mdp == (void *)0x65504150)
+	/*
+	 * If the metadata pointer cookie is not set to the magic value,
+	 * the number in mdp should be treated as nonsense.
+	 */
+	if (mdp_cookie != 0xfb5d104d)
 		mdp = NULL;
+
+#ifdef AIM
+	/*
+	 * If running from an FDT, make sure we are in real mode to avoid
+	 * tromping on firmware page tables. Everything in the kernel assumes
+	 * 1:1 mappings out of firmware, so this won't break anything not
+	 * already broken. This doesn't work if there is live OF, since OF
+	 * may internally use non-1:1 mappings.
+	 */
+	if (ofentry == 0)
+		mtmsr(mfmsr() & ~(PSL_IR | PSL_DR));
+#endif
 
 	/*
 	 * Parse metadata if present and fetch parameters.  Must be done
@@ -272,13 +293,17 @@ powerpc_init(vm_offset_t fdt, vm_offset_t toc, vm_offset_t ofentry, void *mdp)
 #endif
 		}
 	} else {
+#if !defined(BOOKE)
+		/*
+		 * On BOOKE the BSS is already cleared and some variables
+		 * initialized.  Do not wipe them out.
+		 */
 		bzero(__sbss_start, __sbss_end - __sbss_start);
 		bzero(__bss_start, _end - __bss_start);
-	}
-#ifdef BOOKE
-	tlb1_init();
 #endif
-
+		init_static_kenv(init_kenv, sizeof(init_kenv));
+		ofw_bootargs = true;
+	}
 	/* Store boot environment state */
 	OF_initial_setup((void *)fdt, NULL, (int (*)(void *))ofentry);
 
@@ -292,51 +317,29 @@ powerpc_init(vm_offset_t fdt, vm_offset_t toc, vm_offset_t ofentry, void *mdp)
 	 */
 	proc_linkup0(&proc0, &thread0);
 	thread0.td_frame = &frame0;
-
-	/*
-	 * Set up per-cpu data.
-	 */
-	pc = __pcpu;
-	pcpu_init(pc, 0, sizeof(struct pcpu));
-	pc->pc_curthread = &thread0;
 #ifdef __powerpc64__
-	__asm __volatile("mr 13,%0" :: "r"(pc->pc_curthread));
+	__asm __volatile("mr 13,%0" :: "r"(&thread0));
 #else
-	__asm __volatile("mr 2,%0" :: "r"(pc->pc_curthread));
+	__asm __volatile("mr 2,%0" :: "r"(&thread0));
 #endif
-	pc->pc_cpuid = 0;
-
-	__asm __volatile("mtsprg 0, %0" :: "r"(pc));
 
 	/*
 	 * Init mutexes, which we use heavily in PMAP
 	 */
-
 	mutex_init();
 
 	/*
 	 * Install the OF client interface
 	 */
-
 	OF_bootstrap();
+
+	if (ofw_bootargs)
+		ofw_parse_bootargs();
 
 	/*
 	 * Initialize the console before printing anything.
 	 */
 	cninit();
-
-	/*
-	 * Complain if there is no metadata.
-	 */
-	if (mdp == NULL || kmdp == NULL) {
-		printf("powerpc_init: no loader metadata.\n");
-	}
-
-	/*
-	 * Init KDB
-	 */
-
-	kdb_init();
 
 #ifdef AIM
 	aim_cpu_init(toc);
@@ -352,6 +355,26 @@ powerpc_init(vm_offset_t fdt, vm_offset_t toc, vm_offset_t ofentry, void *mdp)
 	 */
 
 	platform_probe_and_attach();
+
+	/*
+	 * Set up per-cpu data for the BSP now that the platform can tell
+	 * us which that is.
+	 */
+	if (platform_smp_get_bsp(&bsp) != 0)
+		bsp.cr_cpuid = 0;
+	pc = &__pcpu[bsp.cr_cpuid];
+	pcpu_init(pc, bsp.cr_cpuid, sizeof(struct pcpu));
+	pc->pc_curthread = &thread0;
+	thread0.td_oncpu = bsp.cr_cpuid;
+	pc->pc_cpuid = bsp.cr_cpuid;
+	pc->pc_hwref = bsp.cr_hwref;
+	pc->pc_pir = mfspr(SPR_PIR);
+	__asm __volatile("mtsprg 0, %0" :: "r"(pc));
+
+	/*
+	 * Init KDB
+	 */
+	kdb_init();
 
 	/*
 	 * Bring up MMU
@@ -395,43 +418,6 @@ powerpc_init(vm_offset_t fdt, vm_offset_t toc, vm_offset_t ofentry, void *mdp)
 	    (sizeof(struct callframe) - 3*sizeof(register_t))) & ~15UL);
 }
 
-void
-bzero(void *buf, size_t len)
-{
-	caddr_t	p;
-
-	p = buf;
-
-	while (((vm_offset_t) p & (sizeof(u_long) - 1)) && len) {
-		*p++ = 0;
-		len--;
-	}
-
-	while (len >= sizeof(u_long) * 8) {
-		*(u_long*) p = 0;
-		*((u_long*) p + 1) = 0;
-		*((u_long*) p + 2) = 0;
-		*((u_long*) p + 3) = 0;
-		len -= sizeof(u_long) * 8;
-		*((u_long*) p + 4) = 0;
-		*((u_long*) p + 5) = 0;
-		*((u_long*) p + 6) = 0;
-		*((u_long*) p + 7) = 0;
-		p += sizeof(u_long) * 8;
-	}
-
-	while (len >= sizeof(u_long)) {
-		*(u_long*) p = 0;
-		len -= sizeof(u_long);
-		p += sizeof(u_long);
-	}
-
-	while (len) {
-		*p++ = 0;
-		len--;
-	}
-}
-
 /*
  * Flush the D-cache for non-DMA I/O so that the I-cache can
  * be made coherent later.
@@ -449,7 +435,7 @@ cpu_flush_dcache(void *ptr, size_t len)
 	addr = (uintptr_t)ptr;
 	off = addr & (cacheline_size - 1);
 	addr -= off;
-	len = (len + off + cacheline_size - 1) & ~(cacheline_size - 1);
+	len = roundup2(len + off, cacheline_size);
 
 	while (len > 0) {
 		__asm __volatile ("dcbf 0,%0" :: "r"(addr));
@@ -503,3 +489,71 @@ spinlock_exit(void)
 	}
 }
 
+/*
+ * Simple ddb(4) command/hack to view any SPR on the running CPU.
+ * Uses a trivial asm function to perform the mfspr, and rewrites the mfspr
+ * instruction each time.
+ * XXX: Since it uses code modification, it won't work if the kernel code pages
+ * are marked RO.
+ */
+extern register_t get_spr(int);
+
+#ifdef DDB
+DB_SHOW_COMMAND(spr, db_show_spr)
+{
+	register_t spr;
+	volatile uint32_t *p;
+	int sprno, saved_sprno;
+
+	if (!have_addr)
+		return;
+
+	saved_sprno = sprno = (intptr_t) addr;
+	sprno = ((sprno & 0x3e0) >> 5) | ((sprno & 0x1f) << 5);
+	p = (uint32_t *)(void *)&get_spr;
+	*p = (*p & ~0x001ff800) | (sprno << 11);
+	__syncicache(get_spr, cacheline_size);
+	spr = get_spr(sprno);
+
+	db_printf("SPR %d(%x): %lx\n", saved_sprno, saved_sprno,
+	    (unsigned long)spr);
+}
+#endif
+
+#undef bzero
+void
+bzero(void *buf, size_t len)
+{
+	caddr_t	p;
+
+	p = buf;
+
+	while (((vm_offset_t) p & (sizeof(u_long) - 1)) && len) {
+		*p++ = 0;
+		len--;
+	}
+
+	while (len >= sizeof(u_long) * 8) {
+		*(u_long*) p = 0;
+		*((u_long*) p + 1) = 0;
+		*((u_long*) p + 2) = 0;
+		*((u_long*) p + 3) = 0;
+		len -= sizeof(u_long) * 8;
+		*((u_long*) p + 4) = 0;
+		*((u_long*) p + 5) = 0;
+		*((u_long*) p + 6) = 0;
+		*((u_long*) p + 7) = 0;
+		p += sizeof(u_long) * 8;
+	}
+
+	while (len >= sizeof(u_long)) {
+		*(u_long*) p = 0;
+		len -= sizeof(u_long);
+		p += sizeof(u_long);
+	}
+
+	while (len) {
+		*p++ = 0;
+		len--;
+	}
+}

@@ -977,7 +977,7 @@ static limb smallfelem_is_zero(const smallfelem small)
     return result;
 }
 
-static int smallfelem_is_zero_int(const smallfelem small)
+static int smallfelem_is_zero_int(const void *small)
 {
     return (int)(smallfelem_is_zero(small) & ((limb) 1));
 }
@@ -1979,7 +1979,6 @@ static void make_points_affine(size_t num, smallfelem points[][3],
                                              sizeof(smallfelem),
                                              tmp_smallfelems,
                                              (void (*)(void *))smallfelem_one,
-                                             (int (*)(const void *))
                                              smallfelem_is_zero_int,
                                              (void (*)(void *, const void *))
                                              smallfelem_assign,
@@ -2249,8 +2248,7 @@ int ec_GFp_nistp256_precompute_mult(EC_GROUP *group, BN_CTX *ctx)
      */
     if (0 == EC_POINT_cmp(group, generator, group->generator, ctx)) {
         memcpy(pre->g_pre_comp, gmul, sizeof(pre->g_pre_comp));
-        ret = 1;
-        goto err;
+        goto done;
     }
     if ((!BN_to_felem(x_tmp, &group->generator->X)) ||
         (!BN_to_felem(y_tmp, &group->generator->Y)) ||
@@ -2337,6 +2335,7 @@ int ec_GFp_nistp256_precompute_mult(EC_GROUP *group, BN_CTX *ctx)
     }
     make_points_affine(31, &(pre->g_pre_comp[0][1]), tmp_smallfelems);
 
+ done:
     if (!EC_EX_DATA_set_data(&group->extra_data, pre, nistp256_pre_comp_dup,
                              nistp256_pre_comp_free,
                              nistp256_pre_comp_clear_free))

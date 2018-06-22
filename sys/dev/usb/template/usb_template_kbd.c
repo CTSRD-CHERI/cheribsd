@@ -1,5 +1,7 @@
 /* $FreeBSD$ */
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2010 Hans Petter Selasky. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -130,9 +132,9 @@ static const void *keyboard_iface_0_desc[] = {
 static const struct usb_temp_interface_desc keyboard_iface_0 = {
 	.ppRawDesc = keyboard_iface_0_desc,
 	.ppEndpoints = keyboard_endpoints,
-	.bInterfaceClass = 3,
-	.bInterfaceSubClass = 1,
-	.bInterfaceProtocol = 1,
+	.bInterfaceClass = UICLASS_HID,
+	.bInterfaceSubClass = UISUBCLASS_BOOT,
+	.bInterfaceProtocol = UIPROTO_BOOT_KEYBOARD,
 	.iInterface = INDEX_KEYBOARD,
 };
 

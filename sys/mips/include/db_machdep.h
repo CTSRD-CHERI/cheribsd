@@ -1,6 +1,8 @@
 /*	$OpenBSD: db_machdep.h,v 1.2 1998/09/15 10:50:12 pefo Exp $ */
 
-/*
+/*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1998 Per Fogelstrom, Opsycon AB
  *
  * Redistribution and use in source and binary forms, with or without
@@ -61,7 +63,7 @@ db_addr_t	next_instr_address(db_addr_t, boolean_t);
 #define	IS_BREAKPOINT_TRAP(type, code)	((type) == T_BREAK)
 #define	IS_WATCHPOINT_TRAP(type, code)	(0)	/* XXX mips3 watchpoint */
 
-#define	PC_REGS()	((db_addr_t)kdb_thrctx->pcb_regs.pc)
+#define	PC_REGS()	((db_addr_t)kdb_thrctx->pcb_context[PCB_REG_PC])
 #define	BKPT_SKIP					\
 	do {							\
 		if((db_get_value(kdb_frame->pc, sizeof(int), FALSE) &	\
@@ -87,12 +89,8 @@ db_addr_t	next_instr_address(db_addr_t, boolean_t);
 #define	inst_load(i)		(db_inst_type(i) == IT_LOAD)
 #define	inst_store(i)		(db_inst_type(i) == IT_STORE)
 
-#define	DB_SMALL_VALUE_MAX	0x7fffffff
-#define	DB_SMALL_VALUE_MIN	(-0x400001)
-
 int db_inst_type(int);
 db_addr_t branch_taken(int inst, db_addr_t pc);
-void stacktrace_subr(register_t pc, register_t sp, register_t ra, int (*)(const char *, ...));
 int32_t kdbpeek(int *);
 int64_t kdbpeekd(int *);
 

@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1993 Paul Kranenburg
  * All rights reserved.
  *
@@ -49,7 +51,7 @@ __FBSDID("$FreeBSD$");
 #include "extern.h"
 
 /* We don't support a.out executables on arm64 and riscv */
-#if !defined(__aarch64__) && !defined(__riscv__)
+#if !defined(__aarch64__) && !defined(__riscv)
 #include <a.out.h>
 #define	AOUT_SUPPORTED
 #endif
@@ -66,11 +68,13 @@ __FBSDID("$FreeBSD$");
 #define	LDD_SETENV(name, value, overwrite) do {		\
 	setenv("LD_" name, value, overwrite);		\
 	setenv("LD_32_" name, value, overwrite);	\
+	setenv("LD_CHERI_" name, value, overwrite);	\
 } while (0)
 
 #define	LDD_UNSETENV(name) do {		\
 	unsetenv("LD_" name);		\
 	unsetenv("LD_32_" name);	\
+	unsetenv("LD_CHERI_" name);	\
 } while (0)
 
 static int	is_executable(const char *fname, int fd, int *is_shlib,
@@ -88,7 +92,7 @@ static void	usage(void);
 static int
 execldd32(char *file, char *fmt1, char *fmt2, int aflag, int vflag)
 {
-	char *argv[8];
+	char *argv[9];
 	int i, rval, status;
 
 	LDD_UNSETENV("TRACE_LOADED_OBJECTS");

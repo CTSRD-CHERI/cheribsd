@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2002, 2005-2007, 2011 Marcel Moolenaar
  * All rights reserved.
  *
@@ -472,8 +474,7 @@ gpt_read_hdr(struct g_part_gpt_table *table, struct g_consumer *cp,
 	    hdr->hdr_lba_table <= hdr->hdr_lba_end)
 		goto fail;
 	lba = hdr->hdr_lba_table +
-	    (hdr->hdr_entries * hdr->hdr_entsz + pp->sectorsize - 1) /
-	    pp->sectorsize - 1;
+	    howmany(hdr->hdr_entries * hdr->hdr_entsz, pp->sectorsize) - 1;
 	if (lba >= last)
 		goto fail;
 	if (lba >= hdr->hdr_lba_start && lba <= hdr->hdr_lba_end)
@@ -515,7 +516,7 @@ gpt_read_tbl(struct g_part_gpt_table *table, struct g_consumer *cp,
 
 	table->state[elt] = GPT_STATE_MISSING;
 	tblsz = hdr->hdr_entries * hdr->hdr_entsz;
-	sectors = (tblsz + pp->sectorsize - 1) / pp->sectorsize;
+	sectors = howmany(tblsz, pp->sectorsize);
 	buf = g_malloc(sectors * pp->sectorsize, M_WAITOK | M_ZERO);
 	for (idx = 0; idx < sectors; idx += MAXPHYS / pp->sectorsize) {
 		size = (sectors - idx > MAXPHYS / pp->sectorsize) ?  MAXPHYS:
@@ -653,8 +654,8 @@ g_part_gpt_create(struct g_part_table *basetable, struct g_part_parms *gpp)
 
 	table = (struct g_part_gpt_table *)basetable;
 	pp = gpp->gpp_provider;
-	tblsz = (basetable->gpt_entries * sizeof(struct gpt_ent) +
-	    pp->sectorsize - 1) / pp->sectorsize;
+	tblsz = howmany(basetable->gpt_entries * sizeof(struct gpt_ent),
+	    pp->sectorsize);
 	if (pp->sectorsize < MBRSIZE ||
 	    pp->mediasize < (3 + 2 * tblsz + basetable->gpt_entries) *
 	    pp->sectorsize)
@@ -688,10 +689,11 @@ g_part_gpt_destroy(struct g_part_table *basetable, struct g_part_parms *gpp)
 	table->hdr = NULL;
 
 	/*
-	 * Wipe the first 2 sectors to clear the partitioning. Wipe the last
-	 * sector only if it has valid secondary header.
+	 * Wipe the first 2 sectors and last one to clear the partitioning.
+	 * Wipe sectors only if they have valid metadata.
 	 */
-	basetable->gpt_smhead |= 3;
+	if (table->state[GPT_ELT_PRIHDR] == GPT_STATE_OK)
+		basetable->gpt_smhead |= 3;
 	if (table->state[GPT_ELT_SECHDR] == GPT_STATE_OK &&
 	    table->lba[GPT_ELT_SECHDR] == pp->mediasize / pp->sectorsize - 1)
 		basetable->gpt_smtail |= 1;
@@ -699,11 +701,11 @@ g_part_gpt_destroy(struct g_part_table *basetable, struct g_part_parms *gpp)
 }
 
 static void
-g_part_gpt_dumpconf(struct g_part_table *table, struct g_part_entry *baseentry, 
+g_part_gpt_dumpconf(struct g_part_table *table, struct g_part_entry *baseentry,
     struct sbuf *sb, const char *indent)
 {
 	struct g_part_gpt_entry *entry;
- 
+
 	entry = (struct g_part_gpt_entry *)baseentry;
 	if (indent == NULL) {
 		/* conftxt: libdisk compatibility */
@@ -731,13 +733,19 @@ g_part_gpt_dumpconf(struct g_part_table *table, struct g_part_entry *baseentry,
 		sbuf_printf(sb, "%s<rawuuid>", indent);
 		sbuf_printf_uuid(sb, &entry->ent.ent_uuid);
 		sbuf_printf(sb, "</rawuuid>\n");
+		sbuf_printf(sb, "%s<efimedia>", indent);
+		sbuf_printf(sb, "HD(%d,GPT,", entry->base.gpe_index);
+		sbuf_printf_uuid(sb, &entry->ent.ent_uuid);
+		sbuf_printf(sb, ",%#jx,%#jx)", (intmax_t)entry->base.gpe_start,
+		    (intmax_t)(entry->base.gpe_end - entry->base.gpe_start + 1));
+		sbuf_printf(sb, "</efimedia>\n");
 	} else {
 		/* confxml: scheme information */
 	}
 }
 
 static int
-g_part_gpt_dumpto(struct g_part_table *table, struct g_part_entry *baseentry)  
+g_part_gpt_dumpto(struct g_part_table *table, struct g_part_entry *baseentry)
 {
 	struct g_part_gpt_entry *entry;
 
@@ -860,7 +868,7 @@ g_part_gpt_probe(struct g_part_table *table, struct g_consumer *cp)
 	    &error);
 	if (buf == NULL)
 		return (error);
-	res = memcmp(buf, GPT_HDR_SIG, 8); 
+	res = memcmp(buf, GPT_HDR_SIG, 8);
 	g_free(buf);
 	return ((res == 0) ? pri : ENXIO);
 }
@@ -1102,13 +1110,13 @@ g_part_gpt_setunset(struct g_part_table *basetable,
 }
 
 static const char *
-g_part_gpt_type(struct g_part_table *basetable, struct g_part_entry *baseentry, 
+g_part_gpt_type(struct g_part_table *basetable, struct g_part_entry *baseentry,
     char *buf, size_t bufsz)
 {
 	struct g_part_gpt_entry *entry;
 	struct uuid *type;
 	struct g_part_uuid_alias *uap;
- 
+
 	entry = (struct g_part_gpt_entry *)baseentry;
 	type = &entry->ent.ent_type;
 	for (uap = &gpt_uuid_alias_match[0]; uap->uuid; uap++)
@@ -1134,8 +1142,8 @@ g_part_gpt_write(struct g_part_table *basetable, struct g_consumer *cp)
 
 	pp = cp->provider;
 	table = (struct g_part_gpt_table *)basetable;
-	tblsz = (table->hdr->hdr_entries * table->hdr->hdr_entsz +
-	    pp->sectorsize - 1) / pp->sectorsize;
+	tblsz = howmany(table->hdr->hdr_entries * table->hdr->hdr_entsz,
+	    pp->sectorsize);
 
 	/* Reconstruct the MBR from the GPT if under Boot Camp. */
 	if (table->bootcamp)
@@ -1239,8 +1247,8 @@ g_gpt_set_defaults(struct g_part_table *basetable, struct g_provider *pp)
 
 	table = (struct g_part_gpt_table *)basetable;
 	last = pp->mediasize / pp->sectorsize - 1;
-	tblsz = (basetable->gpt_entries * sizeof(struct gpt_ent) +
-	    pp->sectorsize - 1) / pp->sectorsize;
+	tblsz = howmany(basetable->gpt_entries * sizeof(struct gpt_ent),
+	    pp->sectorsize);
 
 	table->lba[GPT_ELT_PRIHDR] = 1;
 	table->lba[GPT_ELT_PRITBL] = 2;

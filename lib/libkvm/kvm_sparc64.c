@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -14,7 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -134,7 +136,6 @@ _sparc64_initvtop(kvm_t *kd)
 	struct sparc64_dump_reg	*regs;
 	struct vmstate *vm;
 	size_t regsz;
-	uint64_t pa;
 	int i;
 
 	vm = (struct vmstate *)_kvm_malloc(kd, sizeof(*vm));
@@ -151,7 +152,6 @@ _sparc64_initvtop(kvm_t *kd)
 	hdr.dh_tsb_size = be64toh(hdr.dh_tsb_size);
 	hdr.dh_tsb_mask = be64toh(hdr.dh_tsb_mask);
 	hdr.dh_nregions = be32toh(hdr.dh_nregions);
-	pa = hdr.dh_tsb_pa;
 
 	regsz = hdr.dh_nregions * sizeof(*regs);
 	regs = _kvm_malloc(kd, regsz);
@@ -223,7 +223,7 @@ invalid:
 }
 
 static int
-_sparc64_native(kvm_t *kd)
+_sparc64_native(kvm_t *kd __unused)
 {
 
 #ifdef __sparc64__
@@ -233,7 +233,7 @@ _sparc64_native(kvm_t *kd)
 #endif
 }
 
-struct kvm_arch kvm_sparc64 = {
+static struct kvm_arch kvm_sparc64 = {
 	.ka_probe = _sparc64_probe,
 	.ka_initvtop = _sparc64_initvtop,
 	.ka_freevtop = _sparc64_freevtop,

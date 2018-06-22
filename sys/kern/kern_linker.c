@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1997-2000 Doug Rabson
  * All rights reserved.
  *
@@ -53,6 +55,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/vnode.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
+
+#ifdef DDB
+#include <ddb/ddb.h>
+#endif
 
 #include <net/vnet.h>
 
@@ -284,7 +290,7 @@ linker_file_sysuninit(linker_file_t lf)
 }
 
 static void
-linker_file_register_sysctls(linker_file_t lf)
+linker_file_register_sysctls(linker_file_t lf, bool enable)
 {
 	struct sysctl_oid **start, **stop, **oidp;
 
@@ -299,8 +305,34 @@ linker_file_register_sysctls(linker_file_t lf)
 
 	sx_xunlock(&kld_sx);
 	sysctl_wlock();
+	for (oidp = start; oidp < stop; oidp++) {
+		if (enable)
+			sysctl_register_oid(*oidp);
+		else
+			sysctl_register_disabled_oid(*oidp);
+	}
+	sysctl_wunlock();
+	sx_xlock(&kld_sx);
+}
+
+static void
+linker_file_enable_sysctls(linker_file_t lf)
+{
+	struct sysctl_oid **start, **stop, **oidp;
+
+	KLD_DPF(FILE,
+	    ("linker_file_enable_sysctls: enable SYSCTLs for %s\n",
+	    lf->filename));
+
+	sx_assert(&kld_sx, SA_XLOCKED);
+
+	if (linker_file_lookup_set(lf, "sysctl_set", &start, &stop, NULL) != 0)
+		return;
+
+	sx_xunlock(&kld_sx);
+	sysctl_wlock();
 	for (oidp = start; oidp < stop; oidp++)
-		sysctl_register_oid(*oidp);
+		sysctl_enable_oid(*oidp);
 	sysctl_wunlock();
 	sx_xlock(&kld_sx);
 }
@@ -426,7 +458,7 @@ linker_load_file(const char *filename, linker_file_t *result)
 				return (error);
 			}
 			modules = !TAILQ_EMPTY(&lf->modules);
-			linker_file_register_sysctls(lf);
+			linker_file_register_sysctls(lf, false);
 			linker_file_sysinit(lf);
 			lf->flags |= LINKER_FILE_LINKED;
 
@@ -439,6 +471,7 @@ linker_load_file(const char *filename, linker_file_t *result)
 				linker_file_unload(lf, LINKER_UNLOAD_FORCE);
 				return (ENOEXEC);
 			}
+			linker_file_enable_sysctls(lf);
 			EVENTHANDLER_INVOKE(kld_load, lf);
 			*result = lf;
 			return (0);
@@ -455,7 +488,8 @@ linker_load_file(const char *filename, linker_file_t *result)
 		 * printout a message before to fail.
 		 */
 		if (error == ENOSYS)
-			printf("linker_load_file: Unsupported file type\n");
+			printf("%s: %s - unsupported file type\n",
+			    __func__, filename);
 
 		/*
 		 * Format not recognized or otherwise unloadable.
@@ -687,8 +721,8 @@ linker_file_unload(linker_file_t file, int flags)
 	 */
 	if (file->flags & LINKER_FILE_LINKED) {
 		file->flags &= ~LINKER_FILE_LINKED;
-		linker_file_sysuninit(file);
 		linker_file_unregister_sysctls(file);
+		linker_file_sysuninit(file);
 	}
 	TAILQ_REMOVE(&linker_files, file, link);
 
@@ -949,7 +983,7 @@ linker_debug_search_symbol_name(caddr_t value, char *buf, u_int buflen,
  *
  * Note that we do not obey list locking protocols here.  We really don't need
  * DDB to hang because somebody's got the lock held.  We'll take the chance
- * that the files list is inconsistant instead.
+ * that the files list is inconsistent instead.
  */
 #ifdef DDB
 int
@@ -1127,6 +1161,13 @@ sys_kldunloadf(struct thread *td, struct kldunloadf_args *uap)
 int
 sys_kldfind(struct thread *td, struct kldfind_args *uap)
 {
+
+	return (kern_kldfind(td, __USER_CAP_STR(uap->file)));
+}
+
+int
+kern_kldfind(struct thread *td, const char * __capability file)
+{
 	char *pathname;
 	const char *filename;
 	linker_file_t lf;
@@ -1141,7 +1182,9 @@ sys_kldfind(struct thread *td, struct kldfind_args *uap)
 	td->td_retval[0] = -1;
 
 	pathname = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	if ((error = copyinstr(uap->file, pathname, MAXPATHLEN, NULL)) != 0)
+	if ((error = copyinstr_c(file,
+	    (__cheri_tocap char * __capability)pathname, MAXPATHLEN,
+	    NULL)) != 0)
 		goto out;
 
 	filename = linker_basename(pathname);
@@ -1197,7 +1240,7 @@ out:
 int
 sys_kldstat(struct thread *td, struct kldstat_args *uap)
 {
-	struct kld_file_stat stat;
+	struct kld_file_stat *stat;
 	int error, version;
 
 	/*
@@ -1210,10 +1253,12 @@ sys_kldstat(struct thread *td, struct kldstat_args *uap)
 	    version != sizeof(struct kld_file_stat))
 		return (EINVAL);
 
-	error = kern_kldstat(td, uap->fileid, &stat);
-	if (error != 0)
-		return (error);
-	return (copyout(&stat, uap->stat, version));
+	stat = malloc(sizeof(*stat), M_TEMP, M_WAITOK | M_ZERO);
+	error = kern_kldstat(td, uap->fileid, stat);
+	if (error == 0)
+		error = copyout(stat, uap->stat, version);
+	free(stat, M_TEMP);
+	return (error);
 }
 
 int
@@ -1238,8 +1283,8 @@ kern_kldstat(struct thread *td, int fileid, struct kld_file_stat *stat)
 
 	/* Version 1 fields: */
 	namelen = strlen(lf->filename) + 1;
-	if (namelen > MAXPATHLEN)
-		namelen = MAXPATHLEN;
+	if (namelen > sizeof(stat->name))
+		namelen = sizeof(stat->name);
 	bcopy(lf->filename, &stat->name[0], namelen);
 	stat->refs = lf->refs;
 	stat->id = lf->id;
@@ -1247,14 +1292,31 @@ kern_kldstat(struct thread *td, int fileid, struct kld_file_stat *stat)
 	stat->size = lf->size;
 	/* Version 2 fields: */
 	namelen = strlen(lf->pathname) + 1;
-	if (namelen > MAXPATHLEN)
-		namelen = MAXPATHLEN;
+	if (namelen > sizeof(stat->pathname))
+		namelen = sizeof(stat->pathname);
 	bcopy(lf->pathname, &stat->pathname[0], namelen);
 	sx_xunlock(&kld_sx);
 
 	td->td_retval[0] = 0;
 	return (0);
 }
+
+#ifdef DDB
+DB_COMMAND(kldstat, db_kldstat)
+{
+	linker_file_t lf;
+
+#define	POINTER_WIDTH	((int)(sizeof(void *) * 2 + 2))
+	db_printf("Id Refs Address%*c Size     Name\n", POINTER_WIDTH - 7, ' ');
+#undef	POINTER_WIDTH
+	TAILQ_FOREACH(lf, &linker_files, link) {
+		if (db_pager_quit)
+			return;
+		db_printf("%2d %4d %p %-8zx %s\n", lf->id, lf->refs,
+		    lf->address, lf->size, lf->filename);
+	}
+}
+#endif /* DDB */
 
 int
 sys_kldfirstmod(struct thread *td, struct kldfirstmod_args *uap)
@@ -1288,12 +1350,39 @@ sys_kldfirstmod(struct thread *td, struct kldfirstmod_args *uap)
 int
 sys_kldsym(struct thread *td, struct kldsym_args *uap)
 {
-	char *symstr = NULL;
+
+	struct kld_sym_lookup lookup;
+	char *symstr;
+	int error;
+
+	error = copyin(uap->data, &lookup, sizeof(lookup));
+	if (error != 0)
+		return (error);
+	if (lookup.version != sizeof(lookup) ||
+	    uap->cmd != KLDSYM_LOOKUP)
+		return (EINVAL);
+	symstr = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
+	error = copyinstr(lookup.symname, symstr, MAXPATHLEN, NULL);
+	if (error != 0)
+		goto done;
+	error = kern_kldsym(td, uap->fileid, uap->cmd, symstr,
+	    &lookup.symvalue, &lookup.symsize);
+	if (error != 0)
+		goto done;
+	error = copyout(&lookup, uap->data, sizeof(lookup));
+done:
+	free(symstr, M_TEMP);
+	return (error);
+}
+
+int
+kern_kldsym(struct thread *td, int fileid, int cmd, const char *symstr,
+    u_long *symvalue, size_t *symsize)
+{
 	c_linker_sym_t sym;
 	linker_symval_t symval;
 	linker_file_t lf;
-	struct kld_sym_lookup lookup;
-	int error = 0;
+	int error;
 
 #ifdef MAC
 	error = mac_kld_check_stat(td->td_ucred);
@@ -1301,34 +1390,25 @@ sys_kldsym(struct thread *td, struct kldsym_args *uap)
 		return (error);
 #endif
 
-	if ((error = copyin(uap->data, &lookup, sizeof(lookup))) != 0)
-		return (error);
-	if (lookup.version != sizeof(lookup) ||
-	    uap->cmd != KLDSYM_LOOKUP)
-		return (EINVAL);
-	symstr = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	if ((error = copyinstr(lookup.symname, symstr, MAXPATHLEN, NULL)) != 0)
-		goto out;
 	sx_xlock(&kld_sx);
-	if (uap->fileid != 0) {
-		lf = linker_find_file_by_id(uap->fileid);
+	if (fileid != 0) {
+		lf = linker_find_file_by_id(fileid);
 		if (lf == NULL)
 			error = ENOENT;
 		else if (LINKER_LOOKUP_SYMBOL(lf, symstr, &sym) == 0 &&
 		    LINKER_SYMBOL_VALUES(lf, sym, &symval) == 0) {
-			lookup.symvalue = (uintptr_t) symval.value;
-			lookup.symsize = symval.size;
-			error = copyout(&lookup, uap->data, sizeof(lookup));
+			*symvalue = (uintptr_t) symval.value;
+			*symsize = symval.size;
+			error = 0;
 		} else
 			error = ENOENT;
 	} else {
 		TAILQ_FOREACH(lf, &linker_files, link) {
 			if (LINKER_LOOKUP_SYMBOL(lf, symstr, &sym) == 0 &&
 			    LINKER_SYMBOL_VALUES(lf, sym, &symval) == 0) {
-				lookup.symvalue = (uintptr_t)symval.value;
-				lookup.symsize = symval.size;
-				error = copyout(&lookup, uap->data,
-				    sizeof(lookup));
+				*symvalue = (uintptr_t)symval.value;
+				*symsize = symval.size;
+				error = 0;
 				break;
 			}
 		}
@@ -1336,8 +1416,6 @@ sys_kldsym(struct thread *td, struct kldsym_args *uap)
 			error = ENOENT;
 	}
 	sx_xunlock(&kld_sx);
-out:
-	free(symstr, M_TEMP);
 	return (error);
 }
 
@@ -1578,7 +1656,6 @@ restart:
 			if (error)
 				panic("cannot add dependency");
 		}
-		lf->userrefs++;	/* so we can (try to) kldunload it */
 		error = linker_file_lookup_set(lf, MDT_SETNAME, &start,
 		    &stop, NULL);
 		if (!error) {
@@ -1616,10 +1693,12 @@ restart:
 			goto fail;
 		}
 		linker_file_register_modules(lf);
+		if (!TAILQ_EMPTY(&lf->modules))
+			lf->flags |= LINKER_FILE_MODULES;
 		if (linker_file_lookup_set(lf, "sysinit_set", &si_start,
 		    &si_stop, NULL) == 0)
 			sysinit_add(si_start, si_stop);
-		linker_file_register_sysctls(lf);
+		linker_file_register_sysctls(lf, true);
 		lf->flags |= LINKER_FILE_LINKED;
 		continue;
 fail:
@@ -1631,6 +1710,41 @@ fail:
 }
 
 SYSINIT(preload, SI_SUB_KLD, SI_ORDER_MIDDLE, linker_preload, 0);
+
+/*
+ * Handle preload files that failed to load any modules.
+ */
+static void
+linker_preload_finish(void *arg)
+{
+	linker_file_t lf, nlf;
+
+	sx_xlock(&kld_sx);
+	TAILQ_FOREACH_SAFE(lf, &linker_files, link, nlf) {
+		/*
+		 * If all of the modules in this file failed to load, unload
+		 * the file and return an error of ENOEXEC.  (Parity with
+		 * linker_load_file.)
+		 */
+		if ((lf->flags & LINKER_FILE_MODULES) != 0 &&
+		    TAILQ_EMPTY(&lf->modules)) {
+			linker_file_unload(lf, LINKER_UNLOAD_FORCE);
+			continue;
+		}
+
+		lf->flags &= ~LINKER_FILE_MODULES;
+		lf->userrefs++;	/* so we can (try to) kldunload it */
+	}
+	sx_xunlock(&kld_sx);
+}
+
+/*
+ * Attempt to run after all DECLARE_MODULE SYSINITs.  Unfortunately they can be
+ * scheduled at any subsystem and order, so run this as late as possible.  init
+ * becomes runnable in SI_SUB_KTHREAD_INIT, so go slightly before that.
+ */
+SYSINIT(preload_finish, SI_SUB_KTHREAD_INIT - 100, SI_ORDER_MIDDLE,
+    linker_preload_finish, 0);
 
 /*
  * Search for a not-loaded module by name.
@@ -1713,7 +1827,7 @@ linker_lookup_file(const char *path, int pathlen, const char *name,
 }
 
 #define	INT_ALIGN(base, ptr)	ptr =					\
-	(base) + (((ptr) - (base) + sizeof(int) - 1) & ~(sizeof(int) - 1))
+	(base) + roundup2((ptr) - (base), sizeof(int))
 
 /*
  * Lookup KLD which contains requested module in the "linker.hints" file. If
@@ -1763,8 +1877,6 @@ linker_hints_lookup(const char *path, int pathlen, const char *modname,
 		goto bad;
 	}
 	hints = malloc(vattr.va_size, M_TEMP, M_WAITOK);
-	if (hints == NULL)
-		goto bad;
 	error = vn_rdwr(UIO_READ, nd.ni_vp, (caddr_t)hints, vattr.va_size, 0,
 	    UIO_SYSSPACE, IO_NODELOCKED, cred, NOCRED, &reclen, td);
 	if (error)
@@ -2039,7 +2151,7 @@ linker_load_dependencies(linker_file_t lf)
 	int ver, error = 0, count;
 
 	/*
-	 * All files are dependant on /kernel.
+	 * All files are dependent on /kernel.
 	 */
 	sx_assert(&kld_sx, SA_XLOCKED);
 	if (linker_kernel_file) {

@@ -106,7 +106,8 @@ static struct scsi_nv output_format_map[] = {
 
 int
 scsiattrib(struct cam_device *device, int argc, char **argv, char *combinedopt,
-	   int retry_count, int timeout, int verbosemode, int err_recover)
+	   int task_attr, int retry_count, int timeout, int verbosemode,
+	   int err_recover)
 {
 	union ccb *ccb = NULL;
 	int attr_num = -1;
@@ -137,8 +138,7 @@ scsiattrib(struct cam_device *device, int argc, char **argv, char *combinedopt,
 		goto bailout;
 	}
 
-	bzero(&(&ccb->ccb_h)[1],
-	      sizeof(union ccb) - sizeof(struct ccb_hdr));
+	CCB_CLEAR_ALL_EXCEPT_HDR(&ccb->csio);
 
 	STAILQ_INIT(&write_attr_list);
 
@@ -318,7 +318,7 @@ scsiattrib(struct cam_device *device, int argc, char **argv, char *combinedopt,
 		scsi_read_attribute(&ccb->csio,
 				    /*retries*/ retry_count,
 				    /*cbfcnp*/ NULL,
-				    /*tag_action*/ MSG_SIMPLE_Q_TAG,
+				    /*tag_action*/ task_attr,
 				    /*service_action*/ read_service_action,
 				    /*element*/ element_address,
 				    /*elem_type*/ element_type,

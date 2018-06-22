@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2002 Poul-Henning Kamp
  * Copyright (c) 2002 Networks Associates Technology, Inc.
  * All rights reserved.
@@ -35,6 +37,8 @@
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
+
+#include "opt_compat.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -128,35 +132,44 @@ g_dev_fini(struct g_class *mp)
 }
 
 static int
-g_dev_setdumpdev(struct cdev *dev, struct thread *td)
+g_dev_setdumpdev(struct cdev *dev, struct diocskerneldump_arg *kda,
+    struct thread *td)
 {
 	struct g_kerneldump kd;
 	struct g_consumer *cp;
 	int error, len;
 
-	if (dev == NULL)
-		return (set_dumper(NULL, NULL, td));
+	if (dev == NULL || kda == NULL)
+		return (set_dumper(NULL, NULL, td, 0, 0, NULL, 0, NULL));
 
 	cp = dev->si_drv2;
 	len = sizeof(kd);
 	kd.offset = 0;
 	kd.length = OFF_MAX;
 	error = g_io_getattr("GEOM::kerneldump", cp, &len, &kd);
-	if (error == 0) {
-		error = set_dumper(&kd.di, devtoname(dev), td);
-		if (error == 0)
-			dev->si_flags |= SI_DUMPDEV;
-	}
+	if (error != 0)
+		return (error);
+
+	error = set_dumper(&kd.di, devtoname(dev), td, kda->kda_compression,
+	    kda->kda_encryption, kda->kda_key, kda->kda_encryptedkeysize,
+	    kda->kda_encryptedkey);
+	if (error == 0)
+		dev->si_flags |= SI_DUMPDEV;
+
 	return (error);
 }
 
 static int
 init_dumpdev(struct cdev *dev)
 {
+	struct diocskerneldump_arg kda;
 	struct g_consumer *cp;
 	const char *devprefix = "/dev/", *devname;
 	int error;
 	size_t len;
+
+	bzero(&kda, sizeof(kda));
+	kda.kda_enable = 1;
 
 	if (dumpdev == NULL)
 		return (0);
@@ -173,7 +186,7 @@ init_dumpdev(struct cdev *dev)
 	if (error != 0)
 		return (error);
 
-	error = g_dev_setdumpdev(dev, curthread);
+	error = g_dev_setdumpdev(dev, &kda, curthread);
 	if (error == 0) {
 		freeenv(dumpdev);
 		dumpdev = NULL;
@@ -222,55 +235,68 @@ g_dev_print(void)
 }
 
 static void
-g_dev_attrchanged(struct g_consumer *cp, const char *attr)
+g_dev_set_physpath(struct g_consumer *cp)
+{
+	struct g_dev_softc *sc;
+	char *physpath;
+	int error, physpath_len;
+
+	if (g_access(cp, 1, 0, 0) != 0)
+		return;
+
+	sc = cp->private;
+	physpath_len = MAXPATHLEN;
+	physpath = g_malloc(physpath_len, M_WAITOK|M_ZERO);
+	error = g_io_getattr("GEOM::physpath", cp, &physpath_len, physpath);
+	g_access(cp, -1, 0, 0);
+	if (error == 0 && strlen(physpath) != 0) {
+		struct cdev *dev, *old_alias_dev;
+		struct cdev **alias_devp;
+
+		dev = sc->sc_dev;
+		old_alias_dev = sc->sc_alias;
+		alias_devp = (struct cdev **)&sc->sc_alias;
+		make_dev_physpath_alias(MAKEDEV_WAITOK, alias_devp, dev,
+		    old_alias_dev, physpath);
+	} else if (sc->sc_alias) {
+		destroy_dev((struct cdev *)sc->sc_alias);
+		sc->sc_alias = NULL;
+	}
+	g_free(physpath);
+}
+
+static void
+g_dev_set_media(struct g_consumer *cp)
 {
 	struct g_dev_softc *sc;
 	struct cdev *dev;
 	char buf[SPECNAMELEN + 6];
 
 	sc = cp->private;
-	if (strcmp(attr, "GEOM::media") == 0) {
-		dev = sc->sc_dev;
+	dev = sc->sc_dev;
+	snprintf(buf, sizeof(buf), "cdev=%s", dev->si_name);
+	devctl_notify_f("DEVFS", "CDEV", "MEDIACHANGE", buf, M_WAITOK);
+	devctl_notify_f("GEOM", "DEV", "MEDIACHANGE", buf, M_WAITOK);
+	dev = sc->sc_alias;
+	if (dev != NULL) {
 		snprintf(buf, sizeof(buf), "cdev=%s", dev->si_name);
 		devctl_notify_f("DEVFS", "CDEV", "MEDIACHANGE", buf, M_WAITOK);
 		devctl_notify_f("GEOM", "DEV", "MEDIACHANGE", buf, M_WAITOK);
-		dev = sc->sc_alias;
-		if (dev != NULL) {
-			snprintf(buf, sizeof(buf), "cdev=%s", dev->si_name);
-			devctl_notify_f("DEVFS", "CDEV", "MEDIACHANGE", buf,
-			    M_WAITOK);
-			devctl_notify_f("GEOM", "DEV", "MEDIACHANGE", buf,
-			    M_WAITOK);
-		}
+	}
+}
+
+static void
+g_dev_attrchanged(struct g_consumer *cp, const char *attr)
+{
+
+	if (strcmp(attr, "GEOM::media") == 0) {
+		g_dev_set_media(cp);
 		return;
 	}
 
-	if (strcmp(attr, "GEOM::physpath") != 0)
+	if (strcmp(attr, "GEOM::physpath") == 0) {
+		g_dev_set_physpath(cp);
 		return;
-
-	if (g_access(cp, 1, 0, 0) == 0) {
-		char *physpath;
-		int error, physpath_len;
-
-		physpath_len = MAXPATHLEN;
-		physpath = g_malloc(physpath_len, M_WAITOK|M_ZERO);
-		error =
-		    g_io_getattr("GEOM::physpath", cp, &physpath_len, physpath);
-		g_access(cp, -1, 0, 0);
-		if (error == 0 && strlen(physpath) != 0) {
-			struct cdev *old_alias_dev;
-			struct cdev **alias_devp;
-
-			dev = sc->sc_dev;
-			old_alias_dev = sc->sc_alias;
-			alias_devp = (struct cdev **)&sc->sc_alias;
-			make_dev_physpath_alias(MAKEDEV_WAITOK, alias_devp,
-			    dev, old_alias_dev, physpath);
-		} else if (sc->sc_alias) {
-			destroy_dev((struct cdev *)sc->sc_alias);
-			sc->sc_alias = NULL;
-		}
-		g_free(physpath);
 	}
 }
 
@@ -292,10 +318,11 @@ static struct g_geom *
 g_dev_taste(struct g_class *mp, struct g_provider *pp, int insist __unused)
 {
 	struct g_geom *gp;
+	struct g_geom_alias *gap;
 	struct g_consumer *cp;
 	struct g_dev_softc *sc;
 	int error;
-	struct cdev *dev;
+	struct cdev *dev, *adev;
 	char buf[SPECNAMELEN + 6];
 
 	g_trace(G_T_TOPOLOGY, "dev_taste(%s,%s)", mp->name, pp->name);
@@ -334,6 +361,20 @@ g_dev_taste(struct g_class *mp, struct g_provider *pp, int insist __unused)
 	g_dev_attrchanged(cp, "GEOM::physpath");
 	snprintf(buf, sizeof(buf), "cdev=%s", gp->name);
 	devctl_notify_f("GEOM", "DEV", "CREATE", buf, M_WAITOK);
+	/*
+	 * Now add all the aliases for this drive
+	 */
+	LIST_FOREACH(gap, &pp->geom->aliases, ga_next) {
+		error = make_dev_alias_p(MAKEDEV_CHECKNAME | MAKEDEV_WAITOK, &adev, dev,
+		    "%s", gap->ga_alias);
+		if (error) {
+			printf("%s: make_dev_alias_p() failed (name=%s, error=%d)\n",
+			    __func__, gap->ga_alias, error);
+			continue;
+		}
+		snprintf(buf, sizeof(buf), "cdev=%s", gap->ga_alias);
+		devctl_notify_f("GEOM", "DEV", "CREATE", buf, M_WAITOK);
+	}
 
 	return (gp);
 }
@@ -445,7 +486,7 @@ g_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread
 {
 	struct g_consumer *cp;
 	struct g_provider *pp;
-	off_t offset, length, chunk;
+	off_t offset, length, chunk, odd;
 	int i, error;
 
 	cp = dev->si_drv2;
@@ -480,12 +521,56 @@ g_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread
 	case DIOCGFRONTSTUFF:
 		error = g_io_getattr("GEOM::frontstuff", cp, &i, data);
 		break;
-	case DIOCSKERNELDUMP:
-		if (*(u_int *)data == 0)
-			error = g_dev_setdumpdev(NULL, td);
+#ifdef COMPAT_FREEBSD11
+	case DIOCSKERNELDUMP_FREEBSD11:
+	    {
+		struct diocskerneldump_arg kda;
+
+		bzero(&kda, sizeof(kda));
+		kda.kda_encryption = KERNELDUMP_ENC_NONE;
+		kda.kda_enable = (uint8_t)*(u_int *)data;
+		if (kda.kda_enable == 0)
+			error = g_dev_setdumpdev(NULL, NULL, td);
 		else
-			error = g_dev_setdumpdev(dev, td);
+			error = g_dev_setdumpdev(dev, &kda, td);
 		break;
+	    }
+#endif
+	case DIOCSKERNELDUMP:
+	    {
+		struct diocskerneldump_arg *kda;
+		uint8_t *encryptedkey;
+
+		kda = (struct diocskerneldump_arg *)data;
+		if (kda->kda_enable == 0) {
+			error = g_dev_setdumpdev(NULL, NULL, td);
+			break;
+		}
+
+		if (kda->kda_encryption != KERNELDUMP_ENC_NONE) {
+			if (kda->kda_encryptedkeysize <= 0 ||
+			    kda->kda_encryptedkeysize >
+			    KERNELDUMP_ENCKEY_MAX_SIZE) {
+				return (EINVAL);
+			}
+			encryptedkey = malloc(kda->kda_encryptedkeysize, M_TEMP,
+			    M_WAITOK);
+			error = copyin(kda->kda_encryptedkey, encryptedkey,
+			    kda->kda_encryptedkeysize);
+		} else {
+			encryptedkey = NULL;
+		}
+		if (error == 0) {
+			kda->kda_encryptedkey = encryptedkey;
+			error = g_dev_setdumpdev(dev, kda, td);
+		}
+		if (encryptedkey != NULL) {
+			explicit_bzero(encryptedkey, kda->kda_encryptedkeysize);
+			free(encryptedkey, M_TEMP);
+		}
+		explicit_bzero(kda, sizeof(*kda));
+		break;
+	    }
 	case DIOCGFLUSH:
 		error = g_io_flush(cp);
 		break;
@@ -505,6 +590,13 @@ g_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread
 			    g_dev_del_max_sectors * cp->provider->sectorsize) {
 				chunk = g_dev_del_max_sectors *
 				    cp->provider->sectorsize;
+				if (cp->provider->stripesize > 0) {
+					odd = (offset + chunk +
+					    cp->provider->stripeoffset) %
+					    cp->provider->stripesize;
+					if (chunk > odd)
+						chunk -= odd;
+				}
 			}
 			error = g_delete_data(cp, offset, chunk);
 			length -= chunk;
@@ -549,6 +641,42 @@ g_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread
 		error = g_io_getattr(arg->name, cp, &arg->len, &arg->value);
 		break;
 	}
+	case DIOCZONECMD: {
+		struct disk_zone_args *zone_args =(struct disk_zone_args *)data;
+		struct disk_zone_rep_entry *new_entries, *old_entries;
+		struct disk_zone_report *rep;
+		size_t alloc_size;
+
+		old_entries = NULL;
+		new_entries = NULL;
+		rep = NULL;
+		alloc_size = 0;
+
+		if (zone_args->zone_cmd == DISK_ZONE_REPORT_ZONES) {
+
+			rep = &zone_args->zone_params.report;
+			alloc_size = rep->entries_allocated *
+			    sizeof(struct disk_zone_rep_entry);
+			if (alloc_size != 0)
+				new_entries = g_malloc(alloc_size,
+				    M_WAITOK| M_ZERO);
+			old_entries = rep->entries;
+			rep->entries = new_entries;
+		}
+		error = g_io_zonecmd(zone_args, cp);
+		if ((zone_args->zone_cmd == DISK_ZONE_REPORT_ZONES)
+		 && (alloc_size != 0)
+		 && (error == 0)) {
+			error = copyout(new_entries, old_entries, alloc_size);
+		}
+		if ((old_entries != NULL)
+		 && (rep != NULL))
+			rep->entries = old_entries;
+
+		if (new_entries != NULL)
+			g_free(new_entries);
+		break;
+	}
 	default:
 		if (cp->provider->geom->ioctl != NULL) {
 			error = cp->provider->geom->ioctl(cp->provider, cmd, data, fflag, td);
@@ -574,6 +702,9 @@ g_dev_done(struct bio *bp2)
 	bp->bio_error = bp2->bio_error;
 	bp->bio_completed = bp2->bio_completed;
 	bp->bio_resid = bp->bio_length - bp2->bio_completed;
+	if (bp2->bio_cmd == BIO_ZONE)
+		bcopy(&bp2->bio_zone, &bp->bio_zone, sizeof(bp->bio_zone));
+
 	if (bp2->bio_error != 0) {
 		g_trace(G_T_BIO, "g_dev_done(%p) had error %d",
 		    bp2, bp2->bio_error);
@@ -608,13 +739,15 @@ g_dev_strategy(struct bio *bp)
 	KASSERT(bp->bio_cmd == BIO_READ ||
 	        bp->bio_cmd == BIO_WRITE ||
 	        bp->bio_cmd == BIO_DELETE ||
-		bp->bio_cmd == BIO_FLUSH,
+		bp->bio_cmd == BIO_FLUSH ||
+		bp->bio_cmd == BIO_ZONE,
 		("Wrong bio_cmd bio=%p cmd=%d", bp, bp->bio_cmd));
 	dev = bp->bio_dev;
 	cp = dev->si_drv2;
 	sc = cp->private;
 	KASSERT(cp->acr || cp->acw,
 	    ("Consumer with zero access count in g_dev_strategy"));
+	biotrack(bp, __func__);
 #ifdef INVARIANTS
 	if ((bp->bio_offset % cp->provider->sectorsize) != 0 ||
 	    (bp->bio_bcount % cp->provider->sectorsize) != 0) {
@@ -630,8 +763,8 @@ g_dev_strategy(struct bio *bp)
 
 	for (;;) {
 		/*
-		 * XXX: This is not an ideal solution, but I belive it to
-		 * XXX: deadlock safe, all things considered.
+		 * XXX: This is not an ideal solution, but I believe it to
+		 * XXX: deadlock safely, all things considered.
 		 */
 		bp2 = g_clone_bio(bp);
 		if (bp2 != NULL)
@@ -686,7 +819,7 @@ g_dev_callback(void *arg)
  * - Clear any dump settings.
  * - Request asynchronous device destruction to prevent any more requests
  *   from coming in.  The provider is already marked with an error, so
- *   anything which comes in in the interrim will be returned immediately.
+ *   anything which comes in the interim will be returned immediately.
  */
 
 static void
@@ -702,7 +835,7 @@ g_dev_orphan(struct g_consumer *cp)
 
 	/* Reset any dump-area set on this device */
 	if (dev->si_flags & SI_DUMPDEV)
-		(void)set_dumper(NULL, NULL, curthread);
+		(void)set_dumper(NULL, NULL, curthread, 0, 0, NULL, 0, NULL);
 
 	/* Destroy the struct cdev *so we get no more requests */
 	destroy_dev_sched_cb(dev, g_dev_callback, cp);

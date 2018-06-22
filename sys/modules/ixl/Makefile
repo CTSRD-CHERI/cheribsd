@@ -1,20 +1,18 @@
 #$FreeBSD$
 
-.PATH:  ${.CURDIR}/../../dev/ixl
+.PATH:  ${SRCTOP}/sys/dev/ixl
 
 KMOD    = if_ixl
-SRCS    = device_if.h bus_if.h pci_if.h pci_iov_if.h opt_bdg.h
-SRCS    += opt_inet.h opt_inet6.h opt_rss.h
-SRCS    += if_ixl.c ixl_txrx.c i40e_osdep.c
+SRCS    = device_if.h bus_if.h pci_if.h
+SRCS    += opt_inet.h opt_inet6.h opt_rss.h opt_ixl.h
+SRCS    += if_ixl.c ixl_pf_main.c ixl_pf_qmgr.c ixl_txrx.c ixl_pf_i2c.c i40e_osdep.c
+SRCS	+= ixl_iw.c
+SRCS.PCI_IOV=	pci_iov_if.h ixl_pf_iov.c
 
 # Shared source
 SRCS    += i40e_common.c i40e_nvm.c i40e_adminq.c i40e_lan_hmc.c i40e_hmc.c
 
-CFLAGS	+= -DSMP -DIXL_DEBUG_SYSCTL
-
-# Add Flow Director support
-# CFLAGS += -DIXL_FDIR
 # Debug messages / sysctls
-# CFLAGS += -DIXLE_DEBUG
+# CFLAGS += -DIXL_DEBUG
 
 .include <bsd.kmod.mk>

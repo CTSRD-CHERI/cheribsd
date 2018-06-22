@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2010, Oracle America, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,6 +29,17 @@
  *   WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
  *   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "sunrpc"
+ * }
+ * CHERI CHANGES END
  */
 /*
  * xdr_sizeof.c
@@ -148,7 +161,7 @@ xdr_sizeof(xdrproc_t func, void *data)
 	x.x_private = (caddr_t) NULL;
 	x.x_base = (caddr_t) 0;
 
-	stat = func(&x, data);
+	stat = func(&x, data, 0);
 	if (x.x_private)
 		free(x.x_private);
 	return (stat == TRUE ? (unsigned) x.x_handy: 0);

@@ -1,9 +1,10 @@
 # $FreeBSD$
 
+PACKAGE=iscsi_legacy
 SRCS= iscontrol.c pdu.c fsm.c config.c login.c auth_subr.c misc.c
 PROG= iscontrol
 LIBADD=	cam md
-S= ${.CURDIR}/../../sys
+S= ${SRCTOP}/sys
 
 WARNS?=	3
 CFLAGS+=	-I$S

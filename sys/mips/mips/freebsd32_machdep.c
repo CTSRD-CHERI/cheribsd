@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2012 Juli Mallett <jmallett@FreeBSD.org>
  * All rights reserved.
  *
@@ -61,6 +63,7 @@
 #include <machine/reg.h>
 #include <machine/sigframe.h>
 #include <machine/sysarch.h>
+#include <machine/tls.h>
 
 #include <compat/freebsd32/freebsd32_signal.h>
 #include <compat/freebsd32/freebsd32_util.h>
@@ -98,10 +101,19 @@ struct sysentvec elf32_freebsd_sysvec = {
 	.sv_setregs	= freebsd32_exec_setregs,
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
-	.sv_flags	= SV_ABI_FREEBSD | SV_ILP32,
+	.sv_flags	= SV_ABI_FREEBSD | SV_ILP32 |
+#ifdef MIPS_SHAREDPAGE
+			  SV_SHP,
+#else
+			  0,
+#endif
 	.sv_set_syscall_retval = cpu_set_syscall_retval,
 	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
 	.sv_syscallnames = freebsd32_syscallnames,
+#ifdef MIPS_SHAREDPAGE
+	.sv_shared_page_base = FREEBSD32_SHAREDPAGE,
+	.sv_shared_page_len = PAGE_SIZE,
+#endif
 	.sv_schedtail	= NULL,
 	.sv_thread_detach = NULL,
 	.sv_trap	= NULL,
@@ -116,7 +128,8 @@ static Elf32_Brandinfo freebsd_brand_info = {
 	.interp_path	= "/libexec/ld-elf.so.1",
 	.sysvec		= &elf32_freebsd_sysvec,
 	.interp_newpath	= "/libexec/ld-elf32.so.1",
-	.flags		= 0
+	.brand_note	= &elf32_freebsd_brandnote,
+	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE
 };
 
 SYSINIT(elf32, SI_SUB_EXEC, SI_ORDER_FIRST,
@@ -367,7 +380,9 @@ freebsd32_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 {
 	struct proc *p;
 	struct thread *td;
+#if defined(CPU_HAVEFPU)
 	struct fpreg32 fpregs;
+#endif
 	struct reg32 regs;
 	struct sigacts *psp;
 	struct sigframe32 sf, *sfp;
@@ -395,7 +410,8 @@ freebsd32_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	sf.sf_uc.uc_mcontext.mc_pc = regs.r_regs[PC];
 	sf.sf_uc.uc_mcontext.mullo = regs.r_regs[MULLO];
 	sf.sf_uc.uc_mcontext.mulhi = regs.r_regs[MULHI];
-	sf.sf_uc.uc_mcontext.mc_tls = (int32_t)(intptr_t)td->td_md.md_tls;
+	sf.sf_uc.uc_mcontext.mc_tls =
+	    (int32_t)(intptr_t)(__cheri_fromcap void *)td->td_md.md_tls;
 	sf.sf_uc.uc_mcontext.mc_regs[0] = UCONTEXT_MAGIC;  /* magic number */
 	for (i = 1; i < 32; i++)
 		sf.sf_uc.uc_mcontext.mc_regs[i] = regs.r_regs[i];
@@ -474,10 +490,11 @@ freebsd32_sysarch(struct thread *td, struct freebsd32_sysarch_args *uap)
 
 	switch (uap->op) {
 	case MIPS_SET_TLS:
-		td->td_md.md_tls = (void *)(intptr_t)uap->parms;
+		td->td_md.md_tls = __USER_CAP_UNBOUND((void *)(intptr_t)uap->parms);
 		return (0);
 	case MIPS_GET_TLS: 
-		tlsbase = (int32_t)(intptr_t)td->td_md.md_tls;
+		tlsbase =
+		    (int32_t)(intptr_t)(__cheri_fromcap void *)td->td_md.md_tls;
 		error = copyout(&tlsbase, uap->parms, sizeof(tlsbase));
 		return (error);
 	default:

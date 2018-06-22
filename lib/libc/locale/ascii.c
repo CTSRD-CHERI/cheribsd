@@ -1,6 +1,6 @@
-/*
- * Copyright 2013 Garrett D'Amore <garrett@damore.org>
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2002-2004 Tim J. Robbins. All rights reserved.
  * Copyright (c) 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -21,7 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,8 +36,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * @(#)none.c	8.1 (Berkeley) 6/4/93
  */
 
 #include <sys/cdefs.h>
@@ -65,7 +63,7 @@ static size_t	_ascii_wcsnrtombs(char * __restrict, const wchar_t ** __restrict,
 		    size_t, size_t, mbstate_t * __restrict);
 
 int
-_ascii_init(struct xlocale_ctype *l, _RuneLocale *rl)
+_ascii_init(struct xlocale_ctype *l,_RuneLocale *rl)
 {
 
 	l->__mbrtowc = _ascii_mbrtowc;
@@ -82,6 +80,7 @@ _ascii_init(struct xlocale_ctype *l, _RuneLocale *rl)
 static int
 _ascii_mbsinit(const mbstate_t *ps __unused)
 {
+
 	/*
 	 * Encoding is not state dependent - we are always in the
 	 * initial state.
@@ -93,6 +92,7 @@ static size_t
 _ascii_mbrtowc(wchar_t * __restrict pwc, const char * __restrict s, size_t n,
     mbstate_t * __restrict ps __unused)
 {
+
 	if (s == NULL)
 		/* Reset to initial shift state (no-op) */
 		return (0);
@@ -132,18 +132,20 @@ _ascii_mbsnrtowcs(wchar_t * __restrict dst, const char ** __restrict src,
 	size_t nchr;
 
 	if (dst == NULL) {
-		s = memchr(*src, '\0', nms);
-		if (*s & 0x80) {
-			errno = EILSEQ;
-			return ((size_t)-1);
+		for (s = *src; nms > 0 && *s != '\0'; s++, nms--) {
+			if (*s & 0x80) {
+				errno = EILSEQ;
+				return ((size_t)-1);
+			}
 		}
-		return (s != NULL ? s - *src : nms);
+		return (s - *src);
 	}
 
 	s = *src;
 	nchr = 0;
 	while (len-- > 0 && nms-- > 0) {
 		if (*s & 0x80) {
+			*src = s;
 			errno = EILSEQ;
 			return ((size_t)-1);
 		}
@@ -178,6 +180,7 @@ _ascii_wcsnrtombs(char * __restrict dst, const wchar_t ** __restrict src,
 	nchr = 0;
 	while (len-- > 0 && nwc-- > 0) {
 		if (*s < 0 || *s > 127) {
+			*src = s;
 			errno = EILSEQ;
 			return ((size_t)-1);
 		}
@@ -190,3 +193,4 @@ _ascii_wcsnrtombs(char * __restrict dst, const wchar_t ** __restrict src,
 	*src = s;
 	return (nchr);
 }
+

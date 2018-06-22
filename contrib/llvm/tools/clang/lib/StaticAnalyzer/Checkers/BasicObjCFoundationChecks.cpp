@@ -132,7 +132,7 @@ namespace {
     void checkPostStmt(const ObjCArrayLiteral *AL,
                        CheckerContext &C) const;
   };
-}
+} // end anonymous namespace
 
 void NilArgChecker::warnIfNilExpr(const Expr *E,
                                   const char *Msg,
@@ -140,10 +140,9 @@ void NilArgChecker::warnIfNilExpr(const Expr *E,
   ProgramStateRef State = C.getState();
   if (State->isNull(C.getSVal(E)).isConstrainedTrue()) {
 
-    if (ExplodedNode *N = C.generateSink()) {
+    if (ExplodedNode *N = C.generateErrorNode()) {
       generateBugReport(N, Msg, E->getSourceRange(), E, C);
     }
-    
   }
 }
 
@@ -156,8 +155,8 @@ void NilArgChecker::warnIfNilArg(CheckerContext &C,
   ProgramStateRef State = C.getState();
   if (!State->isNull(msg.getArgSVal(Arg)).isConstrainedTrue())
       return;
-      
-  if (ExplodedNode *N = C.generateSink()) {
+
+  if (ExplodedNode *N = C.generateErrorNode()) {
     SmallString<128> sbuf;
     llvm::raw_svector_ostream os(sbuf);
 
@@ -193,7 +192,7 @@ void NilArgChecker::warnIfNilArg(CheckerContext &C,
         os << "' cannot be nil";
       }
     }
-    
+
     generateBugReport(N, os.str(), msg.getArgSourceRange(Arg),
                       msg.getArgExpr(Arg), C);
   }
@@ -224,7 +223,7 @@ void NilArgChecker::checkPreObjCMessage(const ObjCMethodCall &msg,
   static const unsigned InvalidArgIndex = UINT_MAX;
   unsigned Arg = InvalidArgIndex;
   bool CanBeSubscript = false;
-  
+
   if (Class == FC_NSString) {
     Selector S = msg.getSelector();
 
@@ -234,19 +233,16 @@ void NilArgChecker::checkPreObjCMessage(const ObjCMethodCall &msg,
     if (StringSelectors.empty()) {
       ASTContext &Ctx = C.getASTContext();
       Selector Sels[] = {
-        getKeywordSelector(Ctx, "caseInsensitiveCompare", nullptr),
-        getKeywordSelector(Ctx, "compare", nullptr),
-        getKeywordSelector(Ctx, "compare", "options", nullptr),
-        getKeywordSelector(Ctx, "compare", "options", "range", nullptr),
-        getKeywordSelector(Ctx, "compare", "options", "range", "locale",
-                           nullptr),
-        getKeywordSelector(Ctx, "componentsSeparatedByCharactersInSet",
-                           nullptr),
-        getKeywordSelector(Ctx, "initWithFormat",
-                           nullptr),
-        getKeywordSelector(Ctx, "localizedCaseInsensitiveCompare", nullptr),
-        getKeywordSelector(Ctx, "localizedCompare", nullptr),
-        getKeywordSelector(Ctx, "localizedStandardCompare", nullptr),
+          getKeywordSelector(Ctx, "caseInsensitiveCompare"),
+          getKeywordSelector(Ctx, "compare"),
+          getKeywordSelector(Ctx, "compare", "options"),
+          getKeywordSelector(Ctx, "compare", "options", "range"),
+          getKeywordSelector(Ctx, "compare", "options", "range", "locale"),
+          getKeywordSelector(Ctx, "componentsSeparatedByCharactersInSet"),
+          getKeywordSelector(Ctx, "initWithFormat"),
+          getKeywordSelector(Ctx, "localizedCaseInsensitiveCompare"),
+          getKeywordSelector(Ctx, "localizedCompare"),
+          getKeywordSelector(Ctx, "localizedStandardCompare"),
       };
       for (Selector KnownSel : Sels)
         StringSelectors[KnownSel] = 0;
@@ -263,16 +259,15 @@ void NilArgChecker::checkPreObjCMessage(const ObjCMethodCall &msg,
 
     if (ArrayWithObjectSel.isNull()) {
       ASTContext &Ctx = C.getASTContext();
-      ArrayWithObjectSel = getKeywordSelector(Ctx, "arrayWithObject", nullptr);
-      AddObjectSel = getKeywordSelector(Ctx, "addObject", nullptr);
+      ArrayWithObjectSel = getKeywordSelector(Ctx, "arrayWithObject");
+      AddObjectSel = getKeywordSelector(Ctx, "addObject");
       InsertObjectAtIndexSel =
-        getKeywordSelector(Ctx, "insertObject", "atIndex", nullptr);
+          getKeywordSelector(Ctx, "insertObject", "atIndex");
       ReplaceObjectAtIndexWithObjectSel =
-        getKeywordSelector(Ctx, "replaceObjectAtIndex", "withObject", nullptr);
+          getKeywordSelector(Ctx, "replaceObjectAtIndex", "withObject");
       SetObjectAtIndexedSubscriptSel =
-        getKeywordSelector(Ctx, "setObject", "atIndexedSubscript", nullptr);
-      ArrayByAddingObjectSel =
-        getKeywordSelector(Ctx, "arrayByAddingObject", nullptr);
+          getKeywordSelector(Ctx, "setObject", "atIndexedSubscript");
+      ArrayByAddingObjectSel = getKeywordSelector(Ctx, "arrayByAddingObject");
     }
 
     if (S == ArrayWithObjectSel || S == AddObjectSel ||
@@ -293,13 +288,11 @@ void NilArgChecker::checkPreObjCMessage(const ObjCMethodCall &msg,
     if (DictionaryWithObjectForKeySel.isNull()) {
       ASTContext &Ctx = C.getASTContext();
       DictionaryWithObjectForKeySel =
-        getKeywordSelector(Ctx, "dictionaryWithObject", "forKey", nullptr);
-      SetObjectForKeySel =
-        getKeywordSelector(Ctx, "setObject", "forKey", nullptr);
+          getKeywordSelector(Ctx, "dictionaryWithObject", "forKey");
+      SetObjectForKeySel = getKeywordSelector(Ctx, "setObject", "forKey");
       SetObjectForKeyedSubscriptSel =
-        getKeywordSelector(Ctx, "setObject", "forKeyedSubscript", nullptr);
-      RemoveObjectForKeySel =
-        getKeywordSelector(Ctx, "removeObjectForKey", nullptr);
+          getKeywordSelector(Ctx, "setObject", "forKeyedSubscript");
+      RemoveObjectForKeySel = getKeywordSelector(Ctx, "removeObjectForKey");
     }
 
     if (S == DictionaryWithObjectForKeySel || S == SetObjectForKeySel) {
@@ -307,8 +300,7 @@ void NilArgChecker::checkPreObjCMessage(const ObjCMethodCall &msg,
       warnIfNilArg(C, msg, /* Arg */1, Class);
     } else if (S == SetObjectForKeyedSubscriptSel) {
       CanBeSubscript = true;
-      Arg = 0;
-      warnIfNilArg(C, msg, /* Arg */1, Class, CanBeSubscript);
+      Arg = 1;
     } else if (S == RemoveObjectForKeySel) {
       Arg = 0;
     }
@@ -338,15 +330,15 @@ void NilArgChecker::checkPostStmt(const ObjCDictionaryLiteral *DL,
 }
 
 //===----------------------------------------------------------------------===//
-// Error reporting.
+// Checking for mismatched types passed to CFNumberCreate/CFNumberGetValue.
 //===----------------------------------------------------------------------===//
 
 namespace {
-class CFNumberCreateChecker : public Checker< check::PreStmt<CallExpr> > {
+class CFNumberChecker : public Checker< check::PreStmt<CallExpr> > {
   mutable std::unique_ptr<APIMisuse> BT;
-  mutable IdentifierInfo* II;
+  mutable IdentifierInfo *ICreate, *IGetValue;
 public:
-  CFNumberCreateChecker() : II(nullptr) {}
+  CFNumberChecker() : ICreate(nullptr), IGetValue(nullptr) {}
 
   void checkPreStmt(const CallExpr *CE, CheckerContext &C) const;
 
@@ -427,18 +419,20 @@ static const char* GetCFNumberTypeStr(uint64_t i) {
 }
 #endif
 
-void CFNumberCreateChecker::checkPreStmt(const CallExpr *CE,
+void CFNumberChecker::checkPreStmt(const CallExpr *CE,
                                          CheckerContext &C) const {
   ProgramStateRef state = C.getState();
   const FunctionDecl *FD = C.getCalleeDecl(CE);
   if (!FD)
     return;
-  
-  ASTContext &Ctx = C.getASTContext();
-  if (!II)
-    II = &Ctx.Idents.get("CFNumberCreate");
 
-  if (FD->getIdentifier() != II || CE->getNumArgs() != 3)
+  ASTContext &Ctx = C.getASTContext();
+  if (!ICreate) {
+    ICreate = &Ctx.Idents.get("CFNumberCreate");
+    IGetValue = &Ctx.Idents.get("CFNumberGetValue");
+  }
+  if (!(FD->getIdentifier() == ICreate || FD->getIdentifier() == IGetValue) ||
+      CE->getNumArgs() != 3)
     return;
 
   // Get the value of the "theType" argument.
@@ -452,13 +446,13 @@ void CFNumberCreateChecker::checkPreStmt(const CallExpr *CE,
     return;
 
   uint64_t NumberKind = V->getValue().getLimitedValue();
-  Optional<uint64_t> OptTargetSize = GetCFNumberSize(Ctx, NumberKind);
+  Optional<uint64_t> OptCFNumberSize = GetCFNumberSize(Ctx, NumberKind);
 
   // FIXME: In some cases we can emit an error.
-  if (!OptTargetSize)
+  if (!OptCFNumberSize)
     return;
 
-  uint64_t TargetSize = *OptTargetSize;
+  uint64_t CFNumberSize = *OptCFNumberSize;
 
   // Look at the value of the integer being passed by reference.  Essentially
   // we want to catch cases where the value passed in is not equal to the
@@ -483,38 +477,44 @@ void CFNumberCreateChecker::checkPreStmt(const CallExpr *CE,
   if (!T->isIntegralOrEnumerationType())
     return;
 
-  uint64_t SourceSize = Ctx.getTypeSize(T);
+  uint64_t PrimitiveTypeSize = Ctx.getTypeSize(T);
 
-  // CHECK: is SourceSize == TargetSize
-  if (SourceSize == TargetSize)
+  if (PrimitiveTypeSize == CFNumberSize)
     return;
 
-  // Generate an error.  Only generate a sink if 'SourceSize < TargetSize';
-  // otherwise generate a regular node.
-  //
   // FIXME: We can actually create an abstract "CFNumber" object that has
   //  the bits initialized to the provided values.
-  //
-  if (ExplodedNode *N = SourceSize < TargetSize ? C.generateSink() 
-                                                : C.addTransition()) {
+  ExplodedNode *N = C.generateNonFatalErrorNode();
+  if (N) {
     SmallString<128> sbuf;
     llvm::raw_svector_ostream os(sbuf);
-    
-    os << (SourceSize == 8 ? "An " : "A ")
-       << SourceSize << " bit integer is used to initialize a CFNumber "
-                        "object that represents "
-       << (TargetSize == 8 ? "an " : "a ")
-       << TargetSize << " bit integer. ";
-    
-    if (SourceSize < TargetSize)
-      os << (TargetSize - SourceSize)
-      << " bits of the CFNumber value will be garbage." ;
+    bool isCreate = (FD->getIdentifier() == ICreate);
+
+    if (isCreate) {
+      os << (PrimitiveTypeSize == 8 ? "An " : "A ")
+         << PrimitiveTypeSize << "-bit integer is used to initialize a "
+         << "CFNumber object that represents "
+         << (CFNumberSize == 8 ? "an " : "a ")
+         << CFNumberSize << "-bit integer; ";
+    } else {
+      os << "A CFNumber object that represents "
+         << (CFNumberSize == 8 ? "an " : "a ")
+         << CFNumberSize << "-bit integer is used to initialize "
+         << (PrimitiveTypeSize == 8 ? "an " : "a ")
+         << PrimitiveTypeSize << "-bit integer; ";
+    }
+
+    if (PrimitiveTypeSize < CFNumberSize)
+      os << (CFNumberSize - PrimitiveTypeSize)
+      << " bits of the CFNumber value will "
+      << (isCreate ? "be garbage." : "overwrite adjacent storage.");
     else
-      os << (SourceSize - TargetSize)
-      << " bits of the input integer will be lost.";
+      os << (PrimitiveTypeSize - CFNumberSize)
+      << " bits of the integer value will be "
+      << (isCreate ? "lost." : "garbage.");
 
     if (!BT)
-      BT.reset(new APIMisuse(this, "Bad use of CFNumberCreate"));
+      BT.reset(new APIMisuse(this, "Bad use of CFNumber APIs"));
 
     auto report = llvm::make_unique<BugReport>(*BT, os.str(), N);
     report->addRange(CE->getArg(2)->getSourceRange());
@@ -530,6 +530,7 @@ namespace {
 class CFRetainReleaseChecker : public Checker< check::PreStmt<CallExpr> > {
   mutable std::unique_ptr<APIMisuse> BT;
   mutable IdentifierInfo *Retain, *Release, *MakeCollectable, *Autorelease;
+
 public:
   CFRetainReleaseChecker()
       : Retain(nullptr), Release(nullptr), MakeCollectable(nullptr),
@@ -537,7 +538,6 @@ public:
   void checkPreStmt(const CallExpr *CE, CheckerContext &C) const;
 };
 } // end anonymous namespace
-
 
 void CFRetainReleaseChecker::checkPreStmt(const CallExpr *CE,
                                           CheckerContext &C) const {
@@ -549,7 +549,7 @@ void CFRetainReleaseChecker::checkPreStmt(const CallExpr *CE,
   const FunctionDecl *FD = C.getCalleeDecl(CE);
   if (!FD)
     return;
-  
+
   if (!BT) {
     ASTContext &Ctx = C.getASTContext();
     Retain = &Ctx.Idents.get("CFRetain");
@@ -589,7 +589,7 @@ void CFRetainReleaseChecker::checkPreStmt(const CallExpr *CE,
   std::tie(stateTrue, stateFalse) = state->assume(ArgIsNull);
 
   if (stateTrue && !stateFalse) {
-    ExplodedNode *N = C.generateSink(stateTrue);
+    ExplodedNode *N = C.generateErrorNode(stateTrue);
     if (!N)
       return;
 
@@ -631,11 +631,10 @@ class ClassReleaseChecker : public Checker<check::PreObjCMessage> {
 public:
   void checkPreObjCMessage(const ObjCMethodCall &msg, CheckerContext &C) const;
 };
-}
+} // end anonymous namespace
 
 void ClassReleaseChecker::checkPreObjCMessage(const ObjCMethodCall &msg,
                                               CheckerContext &C) const {
-  
   if (!BT) {
     BT.reset(new APIMisuse(
         this, "message incorrectly sent to class instead of class instance"));
@@ -646,7 +645,7 @@ void ClassReleaseChecker::checkPreObjCMessage(const ObjCMethodCall &msg,
     autoreleaseS = GetNullarySelector("autorelease", Ctx);
     drainS = GetNullarySelector("drain", Ctx);
   }
-  
+
   if (msg.isInstanceMessage())
     return;
   const ObjCInterfaceDecl *Class = msg.getReceiverInterface();
@@ -655,8 +654,8 @@ void ClassReleaseChecker::checkPreObjCMessage(const ObjCMethodCall &msg,
   Selector S = msg.getSelector();
   if (!(S == releaseS || S == retainS || S == autoreleaseS || S == drainS))
     return;
-  
-  if (ExplodedNode *N = C.addTransition()) {
+
+  if (ExplodedNode *N = C.generateNonFatalErrorNode()) {
     SmallString<200> buf;
     llvm::raw_svector_ostream os(buf);
 
@@ -665,7 +664,7 @@ void ClassReleaseChecker::checkPreObjCMessage(const ObjCMethodCall &msg,
     os << "' message should be sent to instances "
           "of class '" << Class->getName()
        << "' and not the class directly";
-  
+
     auto report = llvm::make_unique<BugReport>(*BT, os.str(), N);
     report->addRange(msg.getSourceRange());
     C.emitReport(std::move(report));
@@ -692,19 +691,19 @@ class VariadicMethodTypeChecker : public Checker<check::PreObjCMessage> {
 public:
   void checkPreObjCMessage(const ObjCMethodCall &msg, CheckerContext &C) const;
 };
-}
+} // end anonymous namespace
 
 /// isVariadicMessage - Returns whether the given message is a variadic message,
 /// where all arguments must be Objective-C types.
 bool
 VariadicMethodTypeChecker::isVariadicMessage(const ObjCMethodCall &msg) const {
   const ObjCMethodDecl *MD = msg.getDecl();
-  
+
   if (!MD || !MD->isVariadic() || isa<ObjCProtocolDecl>(MD->getDeclContext()))
     return false;
-  
+
   Selector S = msg.getSelector();
-  
+
   if (msg.isInstanceMessage()) {
     // FIXME: Ideally we'd look at the receiver interface here, but that's not
     // useful for init, because alloc returns 'id'. In theory, this could lead
@@ -751,7 +750,7 @@ void VariadicMethodTypeChecker::checkPreObjCMessage(const ObjCMethodCall &msg,
 
     ASTContext &Ctx = C.getASTContext();
     arrayWithObjectsS = GetUnarySelector("arrayWithObjects", Ctx);
-    dictionaryWithObjectsAndKeysS = 
+    dictionaryWithObjectsAndKeysS =
       GetUnarySelector("dictionaryWithObjectsAndKeys", Ctx);
     setWithObjectsS = GetUnarySelector("setWithObjects", Ctx);
     orderedSetWithObjectsS = GetUnarySelector("orderedSetWithObjects", Ctx);
@@ -789,18 +788,18 @@ void VariadicMethodTypeChecker::checkPreObjCMessage(const ObjCMethodCall &msg,
     // Ignore pointer constants.
     if (msg.getArgSVal(I).getAs<loc::ConcreteInt>())
       continue;
-    
+
     // Ignore pointer types annotated with 'NSObject' attribute.
     if (C.getASTContext().isObjCNSObjectType(ArgTy))
       continue;
-    
+
     // Ignore CF references, which can be toll-free bridged.
     if (coreFoundation::isCFObjectRef(ArgTy))
       continue;
 
     // Generate only one error node to use for all bug reports.
     if (!errorNode.hasValue())
-      errorNode = C.addTransition();
+      errorNode = C.generateNonFatalErrorNode();
 
     if (!errorNode.getValue())
       continue;
@@ -855,13 +854,13 @@ public:
                                      const CallEvent *Call,
                                      PointerEscapeKind Kind) const;
 };
-}
+} // end anonymous namespace
 
 static bool isKnownNonNilCollectionType(QualType T) {
   const ObjCObjectPointerType *PT = T->getAs<ObjCObjectPointerType>();
   if (!PT)
     return false;
-  
+
   const ObjCInterfaceDecl *ID = PT->getInterfaceDecl();
   if (!ID)
     return false;
@@ -983,7 +982,6 @@ assumeCollectionNonEmpty(CheckerContext &C, ProgramStateRef State,
   return assumeCollectionNonEmpty(C, State, CollectionS, Assumption);
 }
 
-
 /// If the fist block edge is a back edge, we are reentering the loop.
 static bool alreadyExecutedAtLeastOneLoopIteration(const ExplodedNode *N,
                                              const ObjCForCollectionStmt *FCS) {
@@ -992,9 +990,7 @@ static bool alreadyExecutedAtLeastOneLoopIteration(const ExplodedNode *N,
 
   ProgramPoint P = N->getLocation();
   if (Optional<BlockEdge> BE = P.getAs<BlockEdge>()) {
-    if (BE->getSrc()->getLoopTarget() == FCS)
-      return true;
-    return false;
+    return BE->getSrc()->getLoopTarget() == FCS;
   }
 
   // Keep looking for a block edge.
@@ -1023,9 +1019,9 @@ void ObjCLoopChecker::checkPostStmt(const ObjCForCollectionStmt *FCS,
     State = checkElementNonNil(C, State, FCS);
     State = assumeCollectionNonEmpty(C, State, FCS, /*Assumption*/true);
   }
-  
+
   if (!State)
-    C.generateSink();
+    C.generateSink(C.getState(), C.getPredecessor());
   else if (State != C.getState())
     C.addTransition(State);
 }
@@ -1038,11 +1034,8 @@ bool ObjCLoopChecker::isCollectionCountMethod(const ObjCMethodCall &M,
     CountSelectorII = &C.getASTContext().Idents.get("count");
 
   // If the method returns collection count, record the value.
-  if (S.isUnarySelector() &&
-      (S.getIdentifierInfoForSlot(0) == CountSelectorII))
-    return true;
-  
-  return false;
+  return S.isUnarySelector() &&
+         (S.getIdentifierInfoForSlot(0) == CountSelectorII);
 }
 
 void ObjCLoopChecker::checkPostObjCMessage(const ObjCMethodCall &M,
@@ -1069,7 +1062,7 @@ void ObjCLoopChecker::checkPostObjCMessage(const ObjCMethodCall &M,
   // a call to "count" and add it to the map.
   if (!isCollectionCountMethod(M, C))
     return;
-  
+
   const Expr *MsgExpr = M.getOriginExpr();
   SymbolRef CountS = C.getSVal(MsgExpr).getAsSymbol();
   if (CountS) {
@@ -1085,7 +1078,6 @@ void ObjCLoopChecker::checkPostObjCMessage(const ObjCMethodCall &M,
 
     C.addTransition(State);
   }
-  return;
 }
 
 static SymbolRef getMethodReceiverIfKnownImmutable(const CallEvent *Call) {
@@ -1208,7 +1200,7 @@ public:
 
   void checkPostObjCMessage(const ObjCMethodCall &M, CheckerContext &C) const;
 };
-}
+} // end anonymous namespace
 
 ProgramStateRef
 ObjCNonNilReturnValueChecker::assumeExprIsNonNull(const Expr *NonNullExpr,
@@ -1281,8 +1273,8 @@ void ento::registerNilArgChecker(CheckerManager &mgr) {
   mgr.registerChecker<NilArgChecker>();
 }
 
-void ento::registerCFNumberCreateChecker(CheckerManager &mgr) {
-  mgr.registerChecker<CFNumberCreateChecker>();
+void ento::registerCFNumberChecker(CheckerManager &mgr) {
+  mgr.registerChecker<CFNumberChecker>();
 }
 
 void ento::registerCFRetainReleaseChecker(CheckerManager &mgr) {

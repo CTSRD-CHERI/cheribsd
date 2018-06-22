@@ -31,12 +31,13 @@
 
 # PROVIDE: static_arp
 # REQUIRE: netif
-# KEYWORD: nojail
+# KEYWORD: nojailvnet
 
 . /etc/rc.subr
 . /etc/network.subr
 
 name="static_arp"
+desc="Static ARP Configuration"
 start_cmd="static_arp_start"
 stop_cmd="static_arp_stop"
 

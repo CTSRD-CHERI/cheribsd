@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1982, 1986, 1990 The Regents of the University of California.
  * All rights reserved.
@@ -16,7 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -82,7 +84,7 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 	int o;
 	u_int c = 0;
 	vm_paddr_t pa;
-	struct iovec *iov;
+	kiovec_t *iov;
 	int error = 0;
 	vm_offset_t addr;
 
@@ -108,8 +110,11 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 			continue;
 		}
 		if (dev2unit(dev) == CDEV_MINOR_MEM) {
-			pa = uio->uio_offset;
-			pa &= ~PAGE_MASK;
+			if (uio->uio_offset > cpu_getmaxphyaddr()) {
+				error = EFAULT;
+				break;
+			}
+			pa = trunc_page(uio->uio_offset);
 		} else {
 			/*
 			 * Extract the physical page since the mapping may
@@ -161,12 +166,13 @@ int
 memmmap(struct cdev *dev, vm_ooffset_t offset, vm_paddr_t *paddr,
     int prot __unused, vm_memattr_t *memattr __unused)
 {
-	if (dev2unit(dev) == CDEV_MINOR_MEM)
+	if (dev2unit(dev) == CDEV_MINOR_MEM) {
+		if (offset > cpu_getmaxphyaddr())
+			return (-1);
 		*paddr = offset;
-	else if (dev2unit(dev) == CDEV_MINOR_KMEM)
-        	*paddr = vtophys(offset);
-	/* else panic! */
-	return (0);
+		return (0);
+	}
+	return (-1);
 }
 
 /*

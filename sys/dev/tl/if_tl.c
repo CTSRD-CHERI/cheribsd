@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1997, 1998
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -116,7 +118,7 @@ __FBSDID("$FreeBSD$");
  * To transmit frames, the driver again sets up lists and fragment
  * descriptors, only this time the buffers contain frame data that
  * is to be DMA'ed into the chip instead of out of it. Once the chip
- * has transfered the data into its on-board SRAM, it will trigger a
+ * has transferred the data into its on-board SRAM, it will trigger a
  * TX 'end of frame' interrupt. It will also generate an 'end of channel'
  * interrupt when it reaches the end of the list.
  */
@@ -534,7 +536,7 @@ static u_int8_t tl_eeprom_putbyte(sc, byte)
 	struct tl_softc		*sc;
 	int			byte;
 {
-	register int		i, ack = 0;
+	int			i, ack = 0;
 
 	/*
 	 * Make sure we're in TX mode.
@@ -579,7 +581,7 @@ static u_int8_t tl_eeprom_getbyte(sc, addr, dest)
 	int			addr;
 	u_int8_t		*dest;
 {
-	register int		i;
+	int			i;
 	u_int8_t		byte = 0;
 	device_t		tl_dev = sc->tl_dev;
 
@@ -2124,7 +2126,7 @@ tl_ioctl(ifp, command, data)
 	int			error = 0;
 
 	switch(command) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		TL_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING &&
@@ -2148,14 +2150,14 @@ tl_ioctl(ifp, command, data)
 		TL_UNLOCK(sc);
 		error = 0;
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		TL_LOCK(sc);
 		tl_setmulti(sc);
 		TL_UNLOCK(sc);
 		error = 0;
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		if (sc->tl_bitrate)
 			error = ifmedia_ioctl(ifp, ifr, &sc->ifmedia, command);
@@ -2199,7 +2201,7 @@ static void
 tl_stop(sc)
 	struct tl_softc		*sc;
 {
-	register int		i;
+	int			i;
 	struct ifnet		*ifp;
 
 	TL_LOCK_ASSERT(sc);

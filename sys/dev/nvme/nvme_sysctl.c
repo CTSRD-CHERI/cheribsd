@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (C) 2012-2016 Intel Corporation
  * All rights reserved.
  *
@@ -27,27 +29,23 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include "opt_nvme.h"
+
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/sysctl.h>
 
 #include "nvme_private.h"
 
-SYSCTL_NODE(_kern, OID_AUTO, nvme, CTLFLAG_RD, 0, "NVM Express");
-/*
- * Intel NVMe controllers have a slow path for I/Os that span a 128KB
- * stripe boundary but ZFS limits ashift, which is derived from
- * d_stripesize, to 13 (8KB) so we limit the stripesize reported to
- * geom(8) to 4KB by default.
- *
- * This may result in a small number of additional I/Os to require
- * splitting in nvme(4), however the NVMe I/O path is very efficient
- * so these additional I/Os will cause very minimal (if any) difference
- * in performance or CPU utilisation.
- */
-int nvme_max_optimal_sectorsize = 1<<12;
-SYSCTL_INT(_kern_nvme, OID_AUTO, max_optimal_sectorsize, CTLFLAG_RWTUN,
-    &nvme_max_optimal_sectorsize, 0, "The maximum optimal sectorsize reported");
+#ifndef NVME_USE_NVD
+#define NVME_USE_NVD 1
+#endif
+
+int nvme_use_nvd = NVME_USE_NVD;
+
+SYSCTL_NODE(_hw, OID_AUTO, nvme, CTLFLAG_RD, 0, "NVMe sysctl tunables");
+SYSCTL_INT(_hw_nvme, OID_AUTO, use_nvd, CTLFLAG_RDTUN,
+    &nvme_use_nvd, 1, "1 = Create NVD devices, 0 = Create NDA devices");
 
 /*
  * CTLTYPE_S64 and sysctl_handle_64 were added in r217616.  Define these

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1999 Poul-Henning Kamp.
  * Copyright (c) 2009-2012 James Gritton
  * All rights reserved.
@@ -94,7 +96,7 @@ static const enum intparam startcommands[] = {
     IP_MOUNT_DEVFS,
     IP_MOUNT_FDESCFS,
     IP_MOUNT_PROCFS,
-    IP_EXEC_PRESTART, 
+    IP_EXEC_PRESTART,
     IP__OP,
     IP_VNET_INTERFACE,
     IP_EXEC_START,
@@ -269,7 +271,7 @@ main(int argc, char **argv)
 				    &sysval, &sysvallen, NULL, 0) == 0)
 					add_param(NULL, NULL,
 					    perm_sysctl[pi].ipnum,
-					    (sysval ? 1 : 0) ^ 
+					    (sysval ? 1 : 0) ^
 					    perm_sysctl[pi].rev
 					    ? NULL : "false");
 			}
@@ -806,8 +808,7 @@ rdtun_params(struct cfjail *j, int dofail)
 	if (jailparam_get(rtparams, nrt,
 	    bool_param(j->intparams[IP_ALLOW_DYING]) ? JAIL_DYING : 0) > 0) {
 		rtjp = rtparams + 1;
-		for (jp = j->jp, rtjp = rtparams + 1; rtjp < rtparams + nrt;
-		     jp++) {
+		for (jp = j->jp; rtjp < rtparams + nrt; jp++) {
 			if (JP_RDTUN(jp) && strcmp(jp->jp_name, "jid")) {
 				if (!((jp->jp_flags & (JP_BOOL | JP_NOBOOL)) &&
 				    jp->jp_valuelen == 0 &&

@@ -89,8 +89,8 @@ swcr_encdec(struct cryptodesc *crd, struct swcr_data *sw, caddr_t buf,
 	struct enc_xform *exf;
 	int i, j, k, blks, ind, count, ivlen;
 	struct uio *uio, uiolcl;
-	struct iovec iovlcl[4];
-	struct iovec *iov;
+	kiovec_t iovlcl[4];
+	kiovec_t *iov;
 	int iovcnt, iovalloc;
 	int error;
 
@@ -156,8 +156,7 @@ swcr_encdec(struct cryptodesc *crd, struct swcr_data *sw, caddr_t buf,
 	} else if ((flags & CRYPTO_F_IOV) != 0)
 		uio = (struct uio *)buf;
 	else {
-		iov[0].iov_base = buf;
-		iov[0].iov_len = crd->crd_skip + crd->crd_len;
+		IOVEC_INIT(&iov[0], buf, crd->crd_skip + crd->crd_len);
 		uio->uio_iov = iov;
 		uio->uio_iovcnt = 1;
 	}
@@ -253,7 +252,8 @@ swcr_encdec(struct cryptodesc *crd, struct swcr_data *sw, caddr_t buf,
 		 * we only use it in the while() loop, only if
 		 * there are indeed enough data.
 		 */
-		idat = (char *)uio->uio_iov[ind].iov_base + k;
+		/* XXX-CHERI: we should push these down further. */
+		idat = (__cheri_fromcap char *)uio->uio_iov[ind].iov_base + k;
 
 		while (uio->uio_iov[ind].iov_len >= k + blks && i > 0) {
 			if (exf->reinit) {
@@ -930,8 +930,11 @@ swcr_newsession(device_t dev, u_int32_t *sid, struct cryptoini *cri)
 			axf = &auth_hash_nist_gmac_aes_256;
 		auth4common:
 			len = cri->cri_klen / 8;
-			if (len != 16 && len != 24 && len != 32)
+			if (len != 16 && len != 24 && len != 32) {
+				swcr_freesession_locked(dev, i);
+				rw_runlock(&swcr_sessions_lock);
 				return EINVAL;
+			}
 
 			(*swd)->sw_ictx = malloc(axf->ctxsize, M_CRYPTO_DATA,
 			    M_NOWAIT);
@@ -983,7 +986,6 @@ swcr_freesession_locked(device_t dev, u_int64_t tid)
 	struct swcr_data *swd;
 	struct enc_xform *txf;
 	struct auth_hash *axf;
-	struct comp_algo *cxf;
 	u_int32_t sid = CRYPTO_SESID2LID(tid);
 
 	if (sid > swcr_sesnum || swcr_sessions == NULL ||
@@ -1058,7 +1060,7 @@ swcr_freesession_locked(device_t dev, u_int64_t tid)
 			break;
 
 		case CRYPTO_DEFLATE_COMP:
-			cxf = swd->sw_cxf;
+			/* Nothing to do */
 			break;
 		}
 

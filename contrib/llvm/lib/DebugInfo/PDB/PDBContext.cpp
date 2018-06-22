@@ -12,36 +12,24 @@
 #include "llvm/DebugInfo/PDB/IPDBLineNumber.h"
 #include "llvm/DebugInfo/PDB/IPDBSourceFile.h"
 #include "llvm/DebugInfo/PDB/PDBSymbol.h"
-#include "llvm/DebugInfo/PDB/PDBSymbolFunc.h"
 #include "llvm/DebugInfo/PDB/PDBSymbolData.h"
+#include "llvm/DebugInfo/PDB/PDBSymbolFunc.h"
 #include "llvm/DebugInfo/PDB/PDBSymbolPublicSymbol.h"
 #include "llvm/Object/COFF.h"
 
 using namespace llvm;
 using namespace llvm::object;
+using namespace llvm::pdb;
 
 PDBContext::PDBContext(const COFFObjectFile &Object,
-                       std::unique_ptr<IPDBSession> PDBSession,
-                       bool RelativeAddress)
+                       std::unique_ptr<IPDBSession> PDBSession)
     : DIContext(CK_PDB), Session(std::move(PDBSession)) {
-  if (!RelativeAddress) {
-    uint64_t ImageBase = 0;
-    if (Object.is64()) {
-      const pe32plus_header *Header = nullptr;
-      Object.getPE32PlusHeader(Header);
-      if (Header)
-        ImageBase = Header->ImageBase;
-    } else {
-      const pe32_header *Header = nullptr;
-      Object.getPE32Header(Header);
-      if (Header)
-        ImageBase = static_cast<uint64_t>(Header->ImageBase);
-    }
-    Session->setLoadAddress(ImageBase);
-  }
+  ErrorOr<uint64_t> ImageBase = Object.getImageBase();
+  if (ImageBase)
+    Session->setLoadAddress(ImageBase.get());
 }
 
-void PDBContext::dump(raw_ostream &OS, DIDumpType DumpType) {}
+void PDBContext::dump(raw_ostream &OS, DIDumpOptions DumpOpts){}
 
 DILineInfo PDBContext::getLineInfoForAddress(uint64_t Address,
                                              DILineInfoSpecifier Specifier) {
@@ -108,26 +96,24 @@ std::string PDBContext::getFunctionName(uint64_t Address,
   if (NameKind == DINameKind::None)
     return std::string();
 
+  std::unique_ptr<PDBSymbol> FuncSymbol =
+      Session->findSymbolByAddress(Address, PDB_SymType::Function);
+  auto *Func = dyn_cast_or_null<PDBSymbolFunc>(FuncSymbol.get());
+
   if (NameKind == DINameKind::LinkageName) {
     // It is not possible to get the mangled linkage name through a
     // PDBSymbolFunc.  For that we have to specifically request a
     // PDBSymbolPublicSymbol.
     auto PublicSym =
         Session->findSymbolByAddress(Address, PDB_SymType::PublicSymbol);
-    if (auto PS = dyn_cast_or_null<PDBSymbolPublicSymbol>(PublicSym.get()))
-      return PS->getName();
+    if (auto *PS = dyn_cast_or_null<PDBSymbolPublicSymbol>(PublicSym.get())) {
+      // If we also have a function symbol, prefer the use of public symbol name
+      // only if it refers to the same address. The public symbol uses the
+      // linkage name while the function does not.
+      if (!Func || Func->getVirtualAddress() == PS->getVirtualAddress())
+        return PS->getName();
+    }
   }
 
-  auto FuncSymbol =
-      Session->findSymbolByAddress(Address, PDB_SymType::Function);
-
-  // This could happen either if there was no public symbol (e.g. not
-  // external) or the user requested the short name.  In the former case,
-  // although they technically requested the linkage name, if the linkage
-  // name is not available we fallback to at least returning a non-empty
-  // string.
-  if (auto Func = dyn_cast_or_null<PDBSymbolFunc>(FuncSymbol.get()))
-      return Func->getName();
-
-  return std::string();
+  return Func ? Func->getName() : std::string();
 }

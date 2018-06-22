@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright(c) 2002-2011 Exar Corp.
  * All rights reserved.
  *
@@ -5613,7 +5615,7 @@ __hal_mrpcim_get_vpd_data(__hal_device_t *hldev)
 	}
 	vpd_data = (u8 *) vxge_os_malloc(hldev->header.pdev,
 	    VXGE_HAL_VPD_BUFFER_SIZE + 16);
-	if (vpd_data == 0)
+	if (vpd_data == NULL)
 		return;
 
 	for (i = 0; i < VXGE_HAL_VPD_BUFFER_SIZE; i += 4) {
@@ -5654,10 +5656,10 @@ __hal_mrpcim_get_vpd_data(__hal_device_t *hldev)
 			if ((vpd_data[count] == 'S') &&
 			    (vpd_data[count + 1] == 'N') &&
 			    (vpd_data[count + 2] < VXGE_HAL_VPD_LENGTH)) {
-				(void) vxge_os_memzero(
+				vxge_os_memzero(
 				    hldev->mrpcim->vpd_data.serial_num,
 				    VXGE_HAL_VPD_LENGTH);
-				(void) vxge_os_memcpy(
+				vxge_os_memcpy(
 				    hldev->mrpcim->vpd_data.serial_num,
 				    &vpd_data[count + 3],
 				    vpd_data[count + 2]);
@@ -5666,9 +5668,9 @@ __hal_mrpcim_get_vpd_data(__hal_device_t *hldev)
 		}
 
 		if (vpd_data[1] < VXGE_HAL_VPD_LENGTH) {
-			(void) vxge_os_memzero(
+			vxge_os_memzero(
 			    hldev->mrpcim->vpd_data.product_name, vpd_data[1]);
-			(void) vxge_os_memcpy(hldev->mrpcim->vpd_data.product_name,
+			vxge_os_memcpy(hldev->mrpcim->vpd_data.product_name,
 			    &vpd_data[3], vpd_data[1]);
 		}
 	}

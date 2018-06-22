@@ -90,6 +90,7 @@ enum {
 
 struct ural_softc {
 	struct ieee80211com		sc_ic;
+	struct ieee80211_ratectl_tx_stats sc_txs;
 	struct mbufq			sc_snd;
 	device_t			sc_dev;
 	struct usb_device		*sc_udev;
@@ -97,7 +98,7 @@ struct ural_softc {
 	uint32_t			asic_rev;
 	uint8_t				rf_rev;
 
-	struct usb_xfer		*sc_xfer[URAL_N_TRANSFER];
+	struct usb_xfer			*sc_xfer[URAL_N_TRANSFER];
 
 	struct ural_tx_data		tx_data[RAL_TX_LIST_COUNT];
 	ural_txdhead			tx_q;
@@ -112,6 +113,8 @@ struct ural_softc {
 	uint8_t				txpow[14];
 	u_int				sc_detached:1,
 					sc_running:1;
+
+	uint8_t				sc_bssid[IEEE80211_ADDR_LEN];
 
 	struct {
 		uint8_t			val;

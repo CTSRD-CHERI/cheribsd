@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1992 Terrence R. Lambert.
  * Copyright (c) 1982, 1987, 1990 The Regents of the University of California.
  * All rights reserved.
@@ -14,7 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -61,9 +63,11 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_extern.h>
 #include <sys/user.h>
 #include <sys/uio.h>
+#include <machine/cpuinfo.h>
 #include <machine/reg.h>
 #include <machine/md_var.h>
 #include <machine/sigframe.h>
+#include <machine/tls.h>
 #include <machine/vmparam.h>
 #include <machine/tls.h>
 #include <sys/vnode.h>
@@ -71,7 +75,7 @@ __FBSDID("$FreeBSD$");
 #include <fs/procfs/procfs.h>
 
 #ifdef CPU_CHERI
-#include <machine/cheri.h>
+#include <cheri/cheri.h>
 #endif
 
 #include <ddb/ddb.h>
@@ -95,6 +99,9 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	struct proc *p;
 	struct thread *td;
 	struct trapframe *regs;
+#ifdef CPU_CHERI
+	struct cheri_frame *cfp;
+#endif
 	struct sigacts *psp;
 	struct sigframe sf, *sfp;
 	vm_offset_t sp;
@@ -126,7 +133,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 *     consider user state to be 'sandboxed' and therefore to require
 	 *     special delivery handling which includes a domain-switch to the
 	 *     thread's context-switch domain.  (This is done by
-	 *     cheri_sendsig()).
+	 *     hybridabi_sendsig()).
 	 *
 	 * (3) If an alternative signal stack is not defined, and we are in a
 	 *     'sandboxed' state, then we have two choices: (a) if the signal
@@ -175,7 +182,8 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	sf.sf_uc.uc_mcontext.mc_pc = regs->pc;
 	sf.sf_uc.uc_mcontext.mullo = regs->mullo;
 	sf.sf_uc.uc_mcontext.mulhi = regs->mulhi;
-	sf.sf_uc.uc_mcontext.mc_tls = td->td_md.md_tls;
+	sf.sf_uc.uc_mcontext.mc_tls =
+	    (__cheri_fromcap void *)td->td_md.md_tls;
 	sf.sf_uc.uc_mcontext.mc_regs[0] = UCONTEXT_MAGIC;  /* magic number */
 	bcopy((void *)&regs->ast, (void *)&sf.sf_uc.uc_mcontext.mc_regs[1],
 	    sizeof(sf.sf_uc.uc_mcontext.mc_regs) - sizeof(register_t));
@@ -219,7 +227,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		sp = (vm_offset_t)regs->sp;
 	}
 #ifdef CPU_CHERI
-	cp2_len = sizeof(td->td_pcb->pcb_cheriframe);
+	cp2_len = sizeof(*cfp);
 	sp -= cp2_len;
 	sp &= ~(CHERICAP_SIZE - 1);
 	sf.sf_uc.uc_mcontext.mc_cp2state = sp;
@@ -243,9 +251,10 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		/* sf.sf_ahu.sf_action = (__siginfohandler_t *)catcher; */
 
 		/* fill siginfo structure */
+		siginfo_to_siginfo_native(&ksi->ksi_info, &sf.sf_si);
 		sf.sf_si.si_signo = sig;
 		sf.sf_si.si_code = ksi->ksi_code;
-		sf.sf_si.si_addr = (void*)(intptr_t)regs->badvaddr;
+		sf.sf_si.si_addr = (void *)(uintptr_t)regs->badvaddr;
 	} else {
 		/* Old FreeBSD-style arguments. */
 		regs->a1 = ksi->ksi_code;
@@ -260,14 +269,19 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 * Copy the sigframe out to the user's stack.
 	 */
 #ifdef CPU_CHERI
-	if (copyoutcap(&td->td_pcb->pcb_cheriframe,
-	    (void *)sf.sf_uc.uc_mcontext.mc_cp2state, cp2_len) != 0) {
+	cfp = malloc(sizeof(*cfp), M_TEMP, M_WAITOK);
+	cheri_trapframe_to_cheriframe(&td->td_pcb->pcb_regs, cfp);
+	if (copyoutcap_c((__cheri_tocap struct cheri_frame * __capability)cfp,
+	    __USER_CAP((void *)(uintptr_t)sf.sf_uc.uc_mcontext.mc_cp2state,
+	    cp2_len), cp2_len) != 0) {
+		free(cfp, M_TEMP);
 		PROC_LOCK(p);
 		printf("pid %d, tid %d: could not copy out cheriframe\n",
 		    td->td_proc->p_pid, td->td_tid);
 		sigexit(td, SIGILL);
 		/* NOTREACHED */
 	}
+	free(cfp, M_TEMP);
 #endif
 	if (copyout(&sf, sfp, sizeof(struct sigframe)) != 0) {
 		/*
@@ -287,16 +301,21 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 * in.  As we don't install this in the CHERI frame on the user stack,
 	 * it will be (genrally) be removed automatically on sigreturn().
 	 */
-	cheri_sendsig(td);
+	hybridabi_sendsig(td);
 #endif
 
-	regs->pc = (register_t)(intptr_t)catcher;
-	regs->t9 = (register_t)(intptr_t)catcher;
+	regs->pc = (register_t)(__cheri_addr intptr_t)catcher;
+	regs->t9 = (register_t)(__cheri_addr intptr_t)catcher;
 	regs->sp = (register_t)(intptr_t)sfp;
-	/*
-	 * Signal trampoline code is at base of user stack.
-	 */
-	regs->ra = (register_t)(intptr_t)PS_STRINGS - *(p->p_sysent->sv_szsigcode);
+	if (p->p_sysent->sv_sigcode_base != 0) {
+		/* Signal trampoline code is in the shared page */
+		regs->ra = p->p_sysent->sv_sigcode_base;
+	} else {
+		/* Signal trampoline code is at base of user stack. */
+		/* XXX: GC this code path once shared page is stable */
+		regs->ra = (register_t)(intptr_t)PS_STRINGS -
+		    *(p->p_sysent->sv_szsigcode);
+	}
 	PROC_LOCK(p);
 	mtx_lock(&psp->ps_mtx);
 }
@@ -413,9 +432,9 @@ void
 makectx(struct trapframe *tf, struct pcb *pcb)
 {
 
-	pcb->pcb_regs.ra = tf->ra;
-	pcb->pcb_regs.pc = tf->pc;
-	pcb->pcb_regs.sp = tf->sp;
+	pcb->pcb_context[PCB_REG_RA] = tf->ra;
+	pcb->pcb_context[PCB_REG_PC] = tf->pc;
+	pcb->pcb_context[PCB_REG_SP] = tf->sp;
 }
 
 int
@@ -467,12 +486,16 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int flags)
 	mcp->mc_pc = td->td_frame->pc;
 	mcp->mullo = td->td_frame->mullo;
 	mcp->mulhi = td->td_frame->mulhi;
-	mcp->mc_tls = td->td_md.md_tls;
+	mcp->mc_tls = (__cheri_fromcap void *)td->td_md.md_tls;
 
-#if 0
 #ifdef CPU_CHERI
-	/* XXXRW: TODO */
-#endif
+	/*
+	 * XXXBD: Can't do easily do anything useful with capability state
+	 * here because we get mcp as an uninitialized stack allocation from
+	 * sys_getcontext().
+	 */
+	mcp->mc_cp2state = 0;
+	mcp->mc_cp2state_len = 0;
 #endif
 
 	return (0);
@@ -482,25 +505,32 @@ int
 set_mcontext(struct thread *td, mcontext_t *mcp)
 {
 #ifdef CPU_CHERI
+	struct cheri_frame *cfp;
 	int error;
 #endif
 	struct trapframe *tp;
 
 #ifdef CPU_CHERI
 	if ((void *)mcp->mc_cp2state != NULL) {
-		if (mcp->mc_cp2state_len !=
-		    sizeof(td->td_pcb->pcb_cheriframe)) {
-			printf("%s: invalid length\n", __func__);
+		if (mcp->mc_cp2state_len != sizeof(*cfp)) {
+			printf("%s: invalid cp2 state length "
+			    "(expected %zd, got %zd)\n", __func__,
+			    sizeof(*cfp), mcp->mc_cp2state_len);
 			return (EINVAL);
 		}
-		error = copyincap((void *)mcp->mc_cp2state,
-		    &td->td_pcb->pcb_cheriframe,
-		    sizeof(td->td_pcb->pcb_cheriframe));
+		cfp = malloc(sizeof(*cfp), M_TEMP, M_WAITOK);
+		error = copyincap_c(__USER_CAP((void *)mcp->mc_cp2state,
+		    mcp->mc_cp2state_len),
+		    (__cheri_tocap struct cheri_frame * __capability)cfp,
+		    sizeof(*cfp));
 		if (error) {
+			free(cfp, M_TEMP);
 			printf("%s: invalid pointer\n", __func__);
 			return (EINVAL);
 		}
-		td->td_pcb->pcb_cheriframe.cf_capcause = 0;
+		cheri_trapframe_from_cheriframe(&td->td_pcb->pcb_regs, cfp);
+		free(cfp, M_TEMP);
+		td->td_pcb->pcb_regs.capcause = 0;
 	}
 #endif
 
@@ -508,7 +538,11 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 	bcopy((void *)&mcp->mc_regs, (void *)&td->td_frame->zero,
 	    sizeof(mcp->mc_regs));
 
-	td->td_md.md_flags = mcp->mc_fpused & MDTD_FPUSED;
+	td->td_md.md_flags = (mcp->mc_fpused & MDTD_FPUSED)
+#ifdef CPU_QEMU_MALTA
+	    | (td->td_md.md_flags & MDTD_QTRACE)
+#endif
+	    ;
 	if (mcp->mc_fpused) {
 		bcopy((void *)&mcp->mc_fpregs, (void *)&td->td_frame->f0,
 		    sizeof(mcp->mc_fpregs));
@@ -516,7 +550,7 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 	td->td_frame->pc = mcp->mc_pc;
 	td->td_frame->mullo = mcp->mullo;
 	td->td_frame->mulhi = mcp->mulhi;
-	td->td_md.md_tls = mcp->mc_tls;
+	td->td_md.md_tls = __USER_CAP_UNBOUND(mcp->mc_tls);
 	/* Dont let user to set any bits in status and cause registers. */
 
 	return (0);
@@ -528,7 +562,8 @@ fill_fpregs(struct thread *td, struct fpreg *fpregs)
 #if defined(CPU_HAVEFPU)
 	if (td == PCPU_GET(fpcurthread))
 		MipsSaveCurFPState(td);
-	memcpy(fpregs, &td->td_frame->f0, sizeof(struct fpreg)); 
+	memcpy(fpregs, &td->td_frame->f0, sizeof(struct fpreg));
+	fpregs->r_regs[FIR_NUM] = cpuinfo.fpu_id;
 #endif
 	return 0;
 }
@@ -543,75 +578,17 @@ set_fpregs(struct thread *td, struct fpreg *fpregs)
 }
 
 #ifdef CPU_CHERI
-#define CHERI_CAP_ADDTAG(dst, src) do {				\
-	register_t tag;						\
-								\
-	cheri_capability_load(CHERI_CR_CTEMP0, (struct chericap *)src);	\
-	CHERI_CGETTAG(tag, CHERI_CR_CTEMP0);			\
-	*dst = (*src & ~(1ULL << 63)) | (tag << 63);		\
-	dst++; src++;						\
-	*dst = *src;	/* cursor */				\
-	dst++; src++;						\
-	*dst = *src;	/* base */				\
-	dst++; src++;						\
-	*dst = *src;	/* length */				\
-	dst++; src++;						\
-} while(0)
-
 int
-fill_capregs(struct thread *td, void *_capregs)
+fill_capregs(struct thread *td, struct capreg *capregs)
 {
-#ifdef CPU_CHERI128
-	memcpy(_capregs, &td->td_pcb->pcb_cheriframe, sizeof(struct cheri_frame));
-#else
-	uint64_t *dst = _capregs;
-	uint64_t *src = (uint64_t *)&td->td_pcb->pcb_cheriframe;
 
-	/*
-	 * Merge the tag bit into the cap register state that is
-	 * written out in the core file.  We currently use one of
-	 * reserved bits.  We may need to do something else for
-	 * compressed capabilities given the limited reserved space.
-	 *
-	 * XXXSS This needs to match 'struct cheri_frame' in cheri.h.
-	 */
-	CHERI_CAP_ADDTAG(dst, src);	/* 0 */
-	CHERI_CAP_ADDTAG(dst, src);
-	CHERI_CAP_ADDTAG(dst, src);
-	CHERI_CAP_ADDTAG(dst, src);
-	CHERI_CAP_ADDTAG(dst, src);	/* 4 */
-	CHERI_CAP_ADDTAG(dst, src);
-	CHERI_CAP_ADDTAG(dst, src);
-	CHERI_CAP_ADDTAG(dst, src);
-	CHERI_CAP_ADDTAG(dst, src);	/* 8 */
-	CHERI_CAP_ADDTAG(dst, src);
-	CHERI_CAP_ADDTAG(dst, src);
-	CHERI_CAP_ADDTAG(dst, src);
-	CHERI_CAP_ADDTAG(dst, src);	/* 12 */
-	CHERI_CAP_ADDTAG(dst, src);
-	CHERI_CAP_ADDTAG(dst, src);
-	CHERI_CAP_ADDTAG(dst, src);
-	CHERI_CAP_ADDTAG(dst, src);	/* 16 */
-	CHERI_CAP_ADDTAG(dst, src);
-	CHERI_CAP_ADDTAG(dst, src);
-	CHERI_CAP_ADDTAG(dst, src);
-	CHERI_CAP_ADDTAG(dst, src);	/* 20 */
-	CHERI_CAP_ADDTAG(dst, src);
-	CHERI_CAP_ADDTAG(dst, src);
-	CHERI_CAP_ADDTAG(dst, src);
-	CHERI_CAP_ADDTAG(dst, src);	/* 24 */
-	CHERI_CAP_ADDTAG(dst, src);
-	CHERI_CAP_ADDTAG(dst, src);
-	CHERI_CAP_ADDTAG(dst, src);
-
-	*dst = *src; /* capcause register */
-
-#endif /* ! CPU_CHERI128 */
+	cheri_trapframe_to_cheriframe(&td->td_pcb->pcb_regs,
+	    (struct cheri_frame *)capregs);
 	return (0);
 }
 
 int
-set_capregs(struct thread *td, void *_capregs)
+set_capregs(struct thread *td, struct capreg *capregs)
 {
 	return (ENOSYS);
 }
@@ -651,15 +628,12 @@ exec_setregs(struct thread *td, struct image_params *imgp, u_long stack)
 	 * 0xffffffff80007f00 and the load is instead done from
 	 * 0xffffffff7ffffff0.
 	 *
-	 * To prevent this, we subtract 64K from the stack pointer here.
-	 *
-	 * For consistency, we should just always do this unless we're
-	 * running n64 programs.  For now, since we don't support
-	 * COMPAT_FREEBSD32 on n64 kernels, we just do it unless we're
-	 * running n64 kernels.
+	 * To prevent this, we subtract 64K from the stack pointer here
+	 * for processes with 32-bit pointers.
 	 */
-#if !defined(__mips_n64)
-	td->td_frame->sp -= 65536;
+#if defined(__mips_n32) || defined(__mips_n64)
+	if (!SV_PROC_FLAG(td->td_proc, SV_LP64))
+		td->td_frame->sp -= 65536;
 #endif
 
 	td->td_frame->pc = imgp->entry_addr & ~3;
@@ -673,8 +647,7 @@ exec_setregs(struct thread *td, struct image_params *imgp, u_long stack)
 #endif
 #if defined(CPU_CHERI)
 	td->td_frame->sr |= MIPS_SR_COP_2_BIT;
-	cheri_exec_setregs(td, imgp->entry_addr & ~3);
-	cheri_stack_init(td->td_pcb);
+	hybridabi_exec_setregs(td, imgp->entry_addr & ~3);
 #endif
 	/*
 	 * FREEBSD_DEVELOPERS_FIXME:

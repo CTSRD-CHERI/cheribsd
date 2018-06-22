@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2000-2003 Tor Egge
  * All rights reserved.
  *
@@ -58,7 +60,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 
 static int ffs_rawread_readahead(struct vnode *vp,
-				 caddr_t udata,
+				 caddr_t __capability udata,
 				 off_t offset,
 				 size_t len,
 				 struct thread *td,
@@ -185,7 +187,7 @@ ffs_rawread_sync(struct vnode *vp)
 
 static int
 ffs_rawread_readahead(struct vnode *vp,
-		      caddr_t udata,
+		      caddr_t __capability udata,
 		      off_t offset,
 		      size_t len,
 		      struct thread *td,
@@ -204,7 +206,7 @@ ffs_rawread_readahead(struct vnode *vp,
 	bsize = vp->v_mount->mnt_stat.f_iosize;
 	
 	ip = VTOI(vp);
-	dp = ip->i_devvp;
+	dp = ITODEVVP(ip);
 
 	iolen = ((vm_offset_t) udata) & PAGE_MASK;
 	bp->b_bcount = len;
@@ -216,7 +218,7 @@ ffs_rawread_readahead(struct vnode *vp,
 	bp->b_flags = 0;	/* XXX necessary ? */
 	bp->b_iocmd = BIO_READ;
 	bp->b_iodone = bdone;
-	bp->b_data = udata;
+	bp->b_data = (__cheri_fromcap void *)udata;
 	blockno = offset / bsize;
 	blockoff = (offset % bsize) / DEV_BSIZE;
 	if ((daddr_t) blockno != blockno) {
@@ -270,8 +272,7 @@ ffs_rawread_main(struct vnode *vp,
 	int error, nerror;
 	struct buf *bp, *nbp, *tbp;
 	u_int iolen;
-	int spl;
-	caddr_t udata;
+	caddr_t __capability udata;
 	long resid;
 	off_t offset;
 	struct thread *td;
@@ -330,10 +331,7 @@ ffs_rawread_main(struct vnode *vp,
 			}
 		}
 		
-		spl = splbio();
 		bwait(bp, PRIBIO, "rawrd");
-		splx(spl);
-		
 		vunmapbuf(bp);
 		
 		iolen = bp->b_bcount - bp->b_resid;
@@ -400,9 +398,7 @@ ffs_rawread_main(struct vnode *vp,
 		relpbuf(bp, &ffsrawbufcnt);
 	}
 	if (nbp != NULL) {			/* Run down readahead buffer */
-		spl = splbio();
 		bwait(nbp, PRIBIO, "rawrd");
-		splx(spl);
 		vunmapbuf(nbp);
 		pbrelvp(nbp);
 		relpbuf(nbp, &ffsrawbufcnt);
@@ -440,7 +436,7 @@ ffs_rawread(struct vnode *vp,
 
 		/* Only handle sector aligned reads */
 		ip = VTOI(vp);
-		secsize = ip->i_devvp->v_bufobj.bo_bsize;
+		secsize = ITODEVVP(ip)->v_bufobj.bo_bsize;
 		if ((uio->uio_offset & (secsize - 1)) == 0 &&
 		    (uio->uio_resid & (secsize - 1)) == 0) {
 			
@@ -460,7 +456,7 @@ ffs_rawread(struct vnode *vp,
 				}
 				
 				partialbytes = ((unsigned int) ip->i_size) %
-					ip->i_fs->fs_bsize;
+				    ITOFS(ip)->fs_bsize;
 				blockbytes = (int) filebytes - partialbytes;
 				if (blockbytes > 0) {
 					skipbytes = uio->uio_resid -

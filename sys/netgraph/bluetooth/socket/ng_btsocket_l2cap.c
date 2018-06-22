@@ -3,6 +3,8 @@
  */
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2001-2002 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
  *
@@ -614,21 +616,13 @@ ng_btsocket_l2cap_process_l2ca_con_ind(struct ng_mesg *msg,
 	
 	pcb = ng_btsocket_l2cap_pcb_by_addr(&rt->src, ip->psm);
 	if (pcb != NULL) {
-		struct socket	*so1 = NULL;
+		struct socket *so1;
 
 		mtx_lock(&pcb->pcb_mtx);
 
-		/*
-		 * First check the pending connections queue and if we have
-		 * space then create new socket and set proper source address.
-		 */
-
-		if (pcb->so->so_qlen <= pcb->so->so_qlimit) {
-			CURVNET_SET(pcb->so->so_vnet);
-			so1 = sonewconn(pcb->so, 0);
-			CURVNET_RESTORE();
-		}
-
+		CURVNET_SET(pcb->so->so_vnet);
+		so1 = sonewconn(pcb->so, 0);
+		CURVNET_RESTORE();
 		if (so1 == NULL) {
 			result = NG_L2CAP_NO_RESOURCES;
 			goto respond;
@@ -1115,7 +1109,7 @@ ng_btsocket_l2cap_process_l2ca_discon_ind(struct ng_mesg *msg,
 
 	/* Look for the socket with given channel ID */
 	pcb = ng_btsocket_l2cap_pcb_by_cid(&rt->src, ip->lcid,
-					   NG_L2CAP_L2CA_IDTYPE_BREDR);
+					   ip->idtype);
 	if (pcb == NULL) {
 		mtx_unlock(&ng_btsocket_l2cap_sockets_mtx);
 		return (0);
@@ -2076,7 +2070,7 @@ ng_btsocket_l2cap_attach(struct socket *so, int proto, struct thread *td)
 	 * This is totally FUBAR. We could get here in two cases:
 	 *
 	 * 1) When user calls socket()
-	 * 2) When we need to accept new incomming connection and call 
+	 * 2) When we need to accept new incoming connection and call 
 	 *    sonewconn()
 	 *
 	 * In the first case we must acquire ng_btsocket_l2cap_sockets_mtx.
@@ -2610,7 +2604,7 @@ ng_btsocket_l2cap_send(struct socket *so, int flags, struct mbuf *m,
 		goto drop;
 	}
 
-	/* Check packet size agains outgoing (peer's incoming) MTU) */
+	/* Check packet size against outgoing (peer's incoming) MTU) */
 	if (m->m_pkthdr.len > pcb->omtu) {
 		NG_BTSOCKET_L2CAP_ERR(
 "%s: Packet too big, len=%d, omtu=%d\n", __func__, m->m_pkthdr.len, pcb->omtu);
@@ -2690,7 +2684,7 @@ ng_btsocket_l2cap_send2(ng_btsocket_l2cap_pcb_p pcb)
 		hdr->token, pcb->state);
 
 	/*
-	 * If we got here than we have successfuly creates new L2CAP 
+	 * If we got here than we have successfully creates new L2CAP 
 	 * data packet and now we can send it to the L2CAP layer
 	 */
 

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -32,10 +34,13 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include "opt_compat.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
+#include <sys/malloc.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/resource.h>
@@ -53,7 +58,52 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_object.h>
 #include <sys/sysctl.h>
 
-struct vmmeter vm_cnt;
+struct vmmeter __exclusive_cache_line vm_cnt = {
+	.v_swtch = EARLY_COUNTER,
+	.v_trap = EARLY_COUNTER,
+	.v_syscall = EARLY_COUNTER,
+	.v_intr = EARLY_COUNTER,
+	.v_soft = EARLY_COUNTER,
+	.v_vm_faults = EARLY_COUNTER,
+	.v_io_faults = EARLY_COUNTER,
+	.v_cow_faults = EARLY_COUNTER,
+	.v_cow_optim = EARLY_COUNTER,
+	.v_zfod = EARLY_COUNTER,
+	.v_ozfod = EARLY_COUNTER,
+	.v_swapin = EARLY_COUNTER,
+	.v_swapout = EARLY_COUNTER,
+	.v_swappgsin = EARLY_COUNTER,
+	.v_swappgsout = EARLY_COUNTER,
+	.v_vnodein = EARLY_COUNTER,
+	.v_vnodeout = EARLY_COUNTER,
+	.v_vnodepgsin = EARLY_COUNTER,
+	.v_vnodepgsout = EARLY_COUNTER,
+	.v_intrans = EARLY_COUNTER,
+	.v_reactivated = EARLY_COUNTER,
+	.v_pdwakeups = EARLY_COUNTER,
+	.v_pdpages = EARLY_COUNTER,
+	.v_pdshortfalls = EARLY_COUNTER,
+	.v_dfree = EARLY_COUNTER,
+	.v_pfree = EARLY_COUNTER,
+	.v_tfree = EARLY_COUNTER,
+	.v_forks = EARLY_COUNTER,
+	.v_vforks = EARLY_COUNTER,
+	.v_rforks = EARLY_COUNTER,
+	.v_kthreads = EARLY_COUNTER,
+	.v_forkpages = EARLY_COUNTER,
+	.v_vforkpages = EARLY_COUNTER,
+	.v_rforkpages = EARLY_COUNTER,
+	.v_kthreadpages = EARLY_COUNTER,
+};
+
+static void
+vmcounter_startup(void)
+{
+	counter_u64_t *cnt = (counter_u64_t *)&vm_cnt;
+
+	COUNTER_ARRAY_ALLOC(cnt, VM_METER_NCOUNTERS, M_WAITOK);
+}
+SYSINIT(counter, SI_SUB_CPU, SI_ORDER_FOURTH + 1, vmcounter_startup, NULL);
 
 SYSCTL_UINT(_vm, VM_V_FREE_MIN, v_free_min,
 	CTLFLAG_RW, &vm_cnt.v_free_min, 0, "Minimum low-free-pages threshold");
@@ -89,64 +139,92 @@ SYSCTL_PROC(_vm, VM_LOADAVG, loadavg, CTLTYPE_STRUCT | CTLFLAG_RD |
     CTLFLAG_MPSAFE, NULL, 0, sysctl_vm_loadavg, "S,loadavg",
     "Machine loadaverage history");
 
+/*
+ * This function aims to determine if the object is mapped,
+ * specifically, if it is referenced by a vm_map_entry.  Because
+ * objects occasionally acquire transient references that do not
+ * represent a mapping, the method used here is inexact.  However, it
+ * has very low overhead and is good enough for the advisory
+ * vm.vmtotal sysctl.
+ */
+static bool
+is_object_active(vm_object_t obj)
+{
+
+	return (obj->ref_count > obj->shadow_count);
+}
+
+#if defined(COMPAT_FREEBSD11)
+struct vmtotal11 {
+	int16_t	t_rq;
+	int16_t	t_dw;
+	int16_t	t_pw;
+	int16_t	t_sl;
+	int16_t	t_sw;
+	int32_t	t_vm;
+	int32_t	t_avm;
+	int32_t	t_rm;
+	int32_t	t_arm;
+	int32_t	t_vmshr;
+	int32_t	t_avmshr;
+	int32_t	t_rmshr;
+	int32_t	t_armshr;
+	int32_t	t_free;
+};
+#endif
+
 static int
 vmtotal(SYSCTL_HANDLER_ARGS)
 {
-	struct proc *p;
 	struct vmtotal total;
-	vm_map_entry_t entry;
+#if defined(COMPAT_FREEBSD11)
+	struct vmtotal11 total11;
+#endif
 	vm_object_t object;
-	vm_map_t map;
-	int paging;
+	struct proc *p;
 	struct thread *td;
-	struct vmspace *vm;
 
-	bzero(&total, sizeof(total));
-	/*
-	 * Mark all objects as inactive.
-	 */
-	mtx_lock(&vm_object_list_mtx);
-	TAILQ_FOREACH(object, &vm_object_list, object_list) {
-		VM_OBJECT_WLOCK(object);
-		vm_object_clear_flag(object, OBJ_ACTIVE);
-		VM_OBJECT_WUNLOCK(object);
+	if (req->oldptr == NULL) {
+#if defined(COMPAT_FREEBSD11)
+		if (curproc->p_osrel < P_OSREL_VMTOTAL64)
+			return (SYSCTL_OUT(req, NULL, sizeof(total11)));
+#endif
+		return (SYSCTL_OUT(req, NULL, sizeof(total)));
 	}
-	mtx_unlock(&vm_object_list_mtx);
+	bzero(&total, sizeof(total));
+
 	/*
 	 * Calculate process statistics.
 	 */
 	sx_slock(&allproc_lock);
 	FOREACH_PROC_IN_SYSTEM(p) {
-		if (p->p_flag & P_SYSTEM)
+		if ((p->p_flag & P_SYSTEM) != 0)
 			continue;
 		PROC_LOCK(p);
-		switch (p->p_state) {
-		case PRS_NEW:
-			PROC_UNLOCK(p);
-			continue;
-			break;
-		default:
+		if (p->p_state != PRS_NEW) {
 			FOREACH_THREAD_IN_PROC(p, td) {
 				thread_lock(td);
 				switch (td->td_state) {
 				case TDS_INHIBITED:
 					if (TD_IS_SWAPPED(td))
 						total.t_sw++;
-					else if (TD_IS_SLEEPING(td) &&
-					    td->td_priority <= PZERO)
-						total.t_dw++;
-					else
-						total.t_sl++;
+					else if (TD_IS_SLEEPING(td)) {
+						if (td->td_priority <= PZERO)
+							total.t_dw++;
+						else
+							total.t_sl++;
+						if (td->td_wchan ==
+						    &vm_cnt.v_free_count)
+							total.t_pw++;
+					}
 					break;
-
 				case TDS_CAN_RUN:
 					total.t_sw++;
 					break;
 				case TDS_RUNQ:
 				case TDS_RUNNING:
 					total.t_rq++;
-					thread_unlock(td);
-					continue;
+					break;
 				default:
 					break;
 				}
@@ -154,29 +232,6 @@ vmtotal(SYSCTL_HANDLER_ARGS)
 			}
 		}
 		PROC_UNLOCK(p);
-		/*
-		 * Note active objects.
-		 */
-		paging = 0;
-		vm = vmspace_acquire_ref(p);
-		if (vm == NULL)
-			continue;
-		map = &vm->vm_map;
-		vm_map_lock_read(map);
-		for (entry = map->header.next;
-		    entry != &map->header; entry = entry->next) {
-			if ((entry->eflags & MAP_ENTRY_IS_SUB_MAP) ||
-			    (object = entry->object.vm_object) == NULL)
-				continue;
-			VM_OBJECT_WLOCK(object);
-			vm_object_set_flag(object, OBJ_ACTIVE);
-			paging |= object->paging_in_progress;
-			VM_OBJECT_WUNLOCK(object);
-		}
-		vm_map_unlock_read(map);
-		vmspace_free(vm);
-		if (paging)
-			total.t_pw++;
 	}
 	sx_sunlock(&allproc_lock);
 	/*
@@ -202,9 +257,18 @@ vmtotal(SYSCTL_HANDLER_ARGS)
 			 */
 			continue;
 		}
+		if (object->ref_count == 1 &&
+		    (object->flags & OBJ_NOSPLIT) != 0) {
+			/*
+			 * Also skip otherwise unreferenced swap
+			 * objects backing tmpfs vnodes, and POSIX or
+			 * SysV shared memory.
+			 */
+			continue;
+		}
 		total.t_vm += object->size;
 		total.t_rm += object->resident_page_count;
-		if (object->flags & OBJ_ACTIVE) {
+		if (is_object_active(object)) {
 			total.t_avm += object->size;
 			total.t_arm += object->resident_page_count;
 		}
@@ -212,45 +276,41 @@ vmtotal(SYSCTL_HANDLER_ARGS)
 			/* shared object */
 			total.t_vmshr += object->size;
 			total.t_rmshr += object->resident_page_count;
-			if (object->flags & OBJ_ACTIVE) {
+			if (is_object_active(object)) {
 				total.t_avmshr += object->size;
 				total.t_armshr += object->resident_page_count;
 			}
 		}
 	}
 	mtx_unlock(&vm_object_list_mtx);
-	total.t_free = vm_cnt.v_free_count + vm_cnt.v_cache_count;
-	return (sysctl_handle_opaque(oidp, &total, sizeof(total), req));
-}
-
-/*
- * vcnt() -	accumulate statistics from all cpus and the global cnt
- *		structure.
- *
- *	The vmmeter structure is now per-cpu as well as global.  Those
- *	statistics which can be kept on a per-cpu basis (to avoid cache
- *	stalls between cpus) can be moved to the per-cpu vmmeter.  Remaining
- *	statistics, such as v_free_reserved, are left in the global
- *	structure.
- *
- * (sysctl_oid *oidp, void *arg1, int arg2, struct sysctl_req *req)
- */
-static int
-vcnt(SYSCTL_HANDLER_ARGS)
-{
-	int count = *(int *)arg1;
-	int offset = (char *)arg1 - (char *)&vm_cnt;
-	int i;
-
-	CPU_FOREACH(i) {
-		struct pcpu *pcpu = pcpu_find(i);
-		count += *(int *)((char *)&pcpu->pc_cnt + offset);
+	total.t_free = vm_cnt.v_free_count;
+#if defined(COMPAT_FREEBSD11)
+	/* sysctl(8) allocates twice as much memory as reported by sysctl(3) */
+	if (curproc->p_osrel < P_OSREL_VMTOTAL64 && (req->oldlen ==
+	    sizeof(total11) || req->oldlen == 2 * sizeof(total11))) {
+		bzero(&total11, sizeof(total11));
+		total11.t_rq = total.t_rq;
+		total11.t_dw = total.t_dw;
+		total11.t_pw = total.t_pw;
+		total11.t_sl = total.t_sl;
+		total11.t_sw = total.t_sw;
+		total11.t_vm = total.t_vm;	/* truncate */
+		total11.t_avm = total.t_avm;	/* truncate */
+		total11.t_rm = total.t_rm;	/* truncate */
+		total11.t_arm = total.t_arm;	/* truncate */
+		total11.t_vmshr = total.t_vmshr;	/* truncate */
+		total11.t_avmshr = total.t_avmshr;	/* truncate */
+		total11.t_rmshr = total.t_rmshr;	/* truncate */
+		total11.t_armshr = total.t_armshr;	/* truncate */
+		total11.t_free = total.t_free;		/* truncate */
+		return (SYSCTL_OUT(req, &total11, sizeof(total11)));
 	}
-	return (SYSCTL_OUT(req, &count, sizeof(int)));
+#endif
+	return (SYSCTL_OUT(req, &total, sizeof(total)));
 }
 
-SYSCTL_PROC(_vm, VM_TOTAL, vmtotal, CTLTYPE_OPAQUE|CTLFLAG_RD|CTLFLAG_MPSAFE,
-    0, sizeof(struct vmtotal), vmtotal, "S,vmtotal", 
+SYSCTL_PROC(_vm, VM_TOTAL, vmtotal, CTLTYPE_OPAQUE | CTLFLAG_RD |
+    CTLFLAG_MPSAFE, NULL, 0, vmtotal, "S,vmtotal",
     "System virtual memory statistics");
 SYSCTL_NODE(_vm, OID_AUTO, stats, CTLFLAG_RW, 0, "VM meter stats");
 static SYSCTL_NODE(_vm_stats, OID_AUTO, sys, CTLFLAG_RW, 0,
@@ -259,10 +319,27 @@ static SYSCTL_NODE(_vm_stats, OID_AUTO, vm, CTLFLAG_RW, 0,
 	"VM meter vm stats");
 SYSCTL_NODE(_vm_stats, OID_AUTO, misc, CTLFLAG_RW, 0, "VM meter misc stats");
 
+static int
+sysctl_handle_vmstat(SYSCTL_HANDLER_ARGS)
+{
+	uint64_t val;
+#ifdef COMPAT_FREEBSD11
+	uint32_t val32;
+#endif
+
+	val = counter_u64_fetch(*(counter_u64_t *)arg1);
+#ifdef COMPAT_FREEBSD11
+	if (req->oldlen == sizeof(val32)) {
+		val32 = val;		/* truncate */
+		return (SYSCTL_OUT(req, &val32, sizeof(val32)));
+	}
+#endif
+	return (SYSCTL_OUT(req, &val, sizeof(val)));
+}
+
 #define	VM_STATS(parent, var, descr) \
-	SYSCTL_PROC(parent, OID_AUTO, var, \
-	    CTLTYPE_UINT | CTLFLAG_RD | CTLFLAG_MPSAFE, &vm_cnt.var, 0, vcnt, \
-	    "IU", descr)
+    SYSCTL_OID(parent, OID_AUTO, var, CTLTYPE_U64 | CTLFLAG_MPSAFE | \
+    CTLFLAG_RD, &vm_cnt.var, 0, sysctl_handle_vmstat, "QU", descr);
 #define	VM_STATS_VM(var, descr)		VM_STATS(_vm_stats_vm, var, descr)
 #define	VM_STATS_SYS(var, descr)	VM_STATS(_vm_stats_sys, var, descr)
 
@@ -286,26 +363,13 @@ VM_STATS_VM(v_vnodeout, "Vnode pager pageouts");
 VM_STATS_VM(v_vnodepgsin, "Vnode pages paged in");
 VM_STATS_VM(v_vnodepgsout, "Vnode pages paged out");
 VM_STATS_VM(v_intrans, "In transit page faults");
-VM_STATS_VM(v_reactivated, "Pages reactivated from free list");
+VM_STATS_VM(v_reactivated, "Pages reactivated by pagedaemon");
 VM_STATS_VM(v_pdwakeups, "Pagedaemon wakeups");
 VM_STATS_VM(v_pdpages, "Pages analyzed by pagedaemon");
-VM_STATS_VM(v_tcached, "Total pages cached");
+VM_STATS_VM(v_pdshortfalls, "Page reclamation shortfalls");
 VM_STATS_VM(v_dfree, "Pages freed by pagedaemon");
 VM_STATS_VM(v_pfree, "Pages freed by exiting processes");
 VM_STATS_VM(v_tfree, "Total pages freed");
-VM_STATS_VM(v_page_size, "Page size in bytes");
-VM_STATS_VM(v_page_count, "Total number of pages in system");
-VM_STATS_VM(v_free_reserved, "Pages reserved for deadlock");
-VM_STATS_VM(v_free_target, "Pages desired free");
-VM_STATS_VM(v_free_min, "Minimum low-free-pages threshold");
-VM_STATS_VM(v_free_count, "Free pages");
-VM_STATS_VM(v_wire_count, "Wired pages");
-VM_STATS_VM(v_active_count, "Active pages");
-VM_STATS_VM(v_inactive_target, "Desired inactive pages");
-VM_STATS_VM(v_inactive_count, "Inactive pages");
-VM_STATS_VM(v_cache_count, "Pages on cache queue");
-VM_STATS_VM(v_pageout_free_min, "Min pages reserved for kernel");
-VM_STATS_VM(v_interrupt_free_min, "Reserved pages for interrupt code");
 VM_STATS_VM(v_forks, "Number of fork() calls");
 VM_STATS_VM(v_vforks, "Number of vfork() calls");
 VM_STATS_VM(v_rforks, "Number of rfork() calls");
@@ -315,5 +379,30 @@ VM_STATS_VM(v_vforkpages, "VM pages affected by vfork()");
 VM_STATS_VM(v_rforkpages, "VM pages affected by rfork()");
 VM_STATS_VM(v_kthreadpages, "VM pages affected by fork() by kernel");
 
-SYSCTL_INT(_vm_stats_misc, OID_AUTO, zero_page_count, CTLFLAG_RD,
-	&vm_page_zero_count, 0, "Number of zero-ed free pages");
+#define	VM_STATS_UINT(var, descr)	\
+    SYSCTL_UINT(_vm_stats_vm, OID_AUTO, var, CTLFLAG_RD, &vm_cnt.var, 0, descr)
+VM_STATS_UINT(v_page_size, "Page size in bytes");
+VM_STATS_UINT(v_page_count, "Total number of pages in system");
+VM_STATS_UINT(v_free_reserved, "Pages reserved for deadlock");
+VM_STATS_UINT(v_free_target, "Pages desired free");
+VM_STATS_UINT(v_free_min, "Minimum low-free-pages threshold");
+VM_STATS_UINT(v_free_count, "Free pages");
+VM_STATS_UINT(v_wire_count, "Wired pages");
+VM_STATS_UINT(v_active_count, "Active pages");
+VM_STATS_UINT(v_inactive_target, "Desired inactive pages");
+VM_STATS_UINT(v_inactive_count, "Inactive pages");
+VM_STATS_UINT(v_laundry_count, "Pages eligible for laundering");
+VM_STATS_UINT(v_pageout_free_min, "Min pages reserved for kernel");
+VM_STATS_UINT(v_interrupt_free_min, "Reserved pages for interrupt code");
+VM_STATS_UINT(v_free_severe, "Severe page depletion point");
+
+#ifdef COMPAT_FREEBSD11
+/*
+ * Provide compatibility sysctls for the benefit of old utilities which exit
+ * with an error if they cannot be found.
+ */
+SYSCTL_UINT(_vm_stats_vm, OID_AUTO, v_cache_count, CTLFLAG_RD,
+    SYSCTL_NULL_UINT_PTR, 0, "Dummy for compatibility");
+SYSCTL_UINT(_vm_stats_vm, OID_AUTO, v_tcached, CTLFLAG_RD,
+    SYSCTL_NULL_UINT_PTR, 0, "Dummy for compatibility");
+#endif

@@ -1,4 +1,4 @@
-//===-- llvm/MC/MCObjectWriter.h - Object File Writer Interface -*- C++ -*-===//
+//===- llvm/MC/MCObjectWriter.h - Object File Writer Interface --*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -11,17 +11,20 @@
 #define LLVM_MC_MCOBJECTWRITER_H
 
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/Compiler.h"
-#include "llvm/Support/DataTypes.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Endian.h"
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cassert>
+#include <cstdint>
 
 namespace llvm {
+
 class MCAsmLayout;
 class MCAssembler;
 class MCFixup;
 class MCFragment;
+class MCSymbol;
 class MCSymbolRefExpr;
 class MCValue;
 
@@ -37,19 +40,22 @@ class MCValue;
 /// The object writer also contains a number of helper methods for writing
 /// binary data to the output stream.
 class MCObjectWriter {
-  MCObjectWriter(const MCObjectWriter &) = delete;
-  void operator=(const MCObjectWriter &) = delete;
+  raw_pwrite_stream *OS;
 
 protected:
-  raw_pwrite_stream &OS;
-
   unsigned IsLittleEndian : 1;
 
-protected: // Can only create subclasses.
+  // Can only create subclasses.
   MCObjectWriter(raw_pwrite_stream &OS, bool IsLittleEndian)
-      : OS(OS), IsLittleEndian(IsLittleEndian) {}
+      : OS(&OS), IsLittleEndian(IsLittleEndian) {}
+
+  unsigned getInitialOffset() {
+    return OS->tell();
+  }
 
 public:
+  MCObjectWriter(const MCObjectWriter &) = delete;
+  MCObjectWriter &operator=(const MCObjectWriter &) = delete;
   virtual ~MCObjectWriter();
 
   /// lifetime management
@@ -57,7 +63,8 @@ public:
 
   bool isLittleEndian() const { return IsLittleEndian; }
 
-  raw_ostream &getStream() { return OS; }
+  raw_pwrite_stream &getStream() { return *OS; }
+  void setStream(raw_pwrite_stream &NewOS) { OS = &NewOS; }
 
   /// \name High-Level API
   /// @{
@@ -79,7 +86,7 @@ public:
   virtual void recordRelocation(MCAssembler &Asm, const MCAsmLayout &Layout,
                                 const MCFragment *Fragment,
                                 const MCFixup &Fixup, MCValue Target,
-                                bool &IsPCRel, uint64_t &FixedValue) = 0;
+                                uint64_t &FixedValue) = 0;
 
   /// Check whether the difference (A - B) between two symbol references is
   /// fully resolved.
@@ -92,15 +99,15 @@ public:
                                           bool InSet) const;
 
   virtual bool isSymbolRefDifferenceFullyResolvedImpl(const MCAssembler &Asm,
+                                                      const MCSymbol &A,
+                                                      const MCSymbol &B,
+                                                      bool InSet) const;
+
+  virtual bool isSymbolRefDifferenceFullyResolvedImpl(const MCAssembler &Asm,
                                                       const MCSymbol &SymA,
                                                       const MCFragment &FB,
                                                       bool InSet,
                                                       bool IsPCRel) const;
-
-  /// True if this symbol (which is a variable) is weak. This is not
-  /// just STB_WEAK, but more generally whether or not we can evaluate
-  /// past it.
-  virtual bool isWeak(const MCSymbol &Sym) const;
 
   /// Write the object file.
   ///
@@ -113,30 +120,30 @@ public:
   /// \name Binary Output
   /// @{
 
-  void write8(uint8_t Value) { OS << char(Value); }
+  void write8(uint8_t Value) { *OS << char(Value); }
 
   void writeLE16(uint16_t Value) {
-    support::endian::Writer<support::little>(OS).write(Value);
+    support::endian::Writer<support::little>(*OS).write(Value);
   }
 
   void writeLE32(uint32_t Value) {
-    support::endian::Writer<support::little>(OS).write(Value);
+    support::endian::Writer<support::little>(*OS).write(Value);
   }
 
   void writeLE64(uint64_t Value) {
-    support::endian::Writer<support::little>(OS).write(Value);
+    support::endian::Writer<support::little>(*OS).write(Value);
   }
 
   void writeBE16(uint16_t Value) {
-    support::endian::Writer<support::big>(OS).write(Value);
+    support::endian::Writer<support::big>(*OS).write(Value);
   }
 
   void writeBE32(uint32_t Value) {
-    support::endian::Writer<support::big>(OS).write(Value);
+    support::endian::Writer<support::big>(*OS).write(Value);
   }
 
   void writeBE64(uint64_t Value) {
-    support::endian::Writer<support::big>(OS).write(Value);
+    support::endian::Writer<support::big>(*OS).write(Value);
   }
 
   void write16(uint16_t Value) {
@@ -164,9 +171,9 @@ public:
     const char Zeros[16] = {0};
 
     for (unsigned i = 0, e = N / 16; i != e; ++i)
-      OS << StringRef(Zeros, 16);
+      *OS << StringRef(Zeros, 16);
 
-    OS << StringRef(Zeros, N % 16);
+    *OS << StringRef(Zeros, N % 16);
   }
 
   void writeBytes(const SmallVectorImpl<char> &ByteVec,
@@ -180,7 +187,7 @@ public:
     assert(
         (ZeroFillSize == 0 || Str.size() <= ZeroFillSize) &&
         "data size greater than fill size, unexpected large write will occur");
-    OS << Str;
+    *OS << Str;
     if (ZeroFillSize)
       WriteZeros(ZeroFillSize - Str.size());
   }
@@ -188,6 +195,6 @@ public:
   /// @}
 };
 
-} // End llvm namespace
+} // end namespace llvm
 
-#endif
+#endif // LLVM_MC_MCOBJECTWRITER_H

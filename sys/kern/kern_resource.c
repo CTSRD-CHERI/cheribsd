@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -15,7 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -90,7 +92,7 @@ struct getpriority_args {
 };
 #endif
 int
-sys_getpriority(struct thread *td, register struct getpriority_args *uap)
+sys_getpriority(struct thread *td, struct getpriority_args *uap)
 {
 	struct proc *p;
 	struct pgrp *pg;
@@ -287,36 +289,45 @@ struct rtprio_thread_args {
 int
 sys_rtprio_thread(struct thread *td, struct rtprio_thread_args *uap)
 {
+
+	return (kern_rtprio_thread(td, uap->function, uap->lwpid,
+	    __USER_CAP_OBJ(uap->rtp)));
+}
+
+int
+kern_rtprio_thread(struct thread *td, int function, lwpid_t lwpid,
+    struct rtprio * __capability urtp)
+{
 	struct proc *p;
 	struct rtprio rtp;
 	struct thread *td1;
 	int cierror, error;
 
 	/* Perform copyin before acquiring locks if needed. */
-	if (uap->function == RTP_SET)
-		cierror = copyin(uap->rtp, &rtp, sizeof(struct rtprio));
+	if (function == RTP_SET)
+		cierror = copyin_c(urtp, &rtp, sizeof(struct rtprio));
 	else
 		cierror = 0;
 
-	if (uap->lwpid == 0 || uap->lwpid == td->td_tid) {
+	if (lwpid == 0 || lwpid == td->td_tid) {
 		p = td->td_proc;
 		td1 = td;
 		PROC_LOCK(p);
 	} else {
 		/* Only look up thread in current process */
-		td1 = tdfind(uap->lwpid, curproc->p_pid);
+		td1 = tdfind(lwpid, curproc->p_pid);
 		if (td1 == NULL)
 			return (ESRCH);
 		p = td1->td_proc;
 	}
 
-	switch (uap->function) {
+	switch (function) {
 	case RTP_LOOKUP:
 		if ((error = p_cansee(td, p)))
 			break;
 		pri_to_rtp(td1, &rtp);
 		PROC_UNLOCK(p);
-		return (copyout(&rtp, uap->rtp, sizeof(struct rtprio)));
+		return (copyout_c(&rtp, urtp, sizeof(struct rtprio)));
 	case RTP_SET:
 		if ((error = p_cansched(td, p)) || (error = cierror))
 			break;
@@ -367,7 +378,16 @@ struct rtprio_args {
 };
 #endif
 int
-sys_rtprio(struct thread *td, register struct rtprio_args *uap)
+sys_rtprio(struct thread *td, struct rtprio_args *uap)
+{
+
+	return (kern_rtprio(td, uap->function, uap->pid,
+	    __USER_CAP_OBJ(uap->rtp)));
+}
+
+int
+kern_rtprio(struct thread *td, int function, pid_t pid,
+    struct rtprio * __capability urtp)
 {
 	struct proc *p;
 	struct thread *tdp;
@@ -375,21 +395,21 @@ sys_rtprio(struct thread *td, register struct rtprio_args *uap)
 	int cierror, error;
 
 	/* Perform copyin before acquiring locks if needed. */
-	if (uap->function == RTP_SET)
-		cierror = copyin(uap->rtp, &rtp, sizeof(struct rtprio));
+	if (function == RTP_SET)
+		cierror = copyin_c(urtp, &rtp, sizeof(struct rtprio));
 	else
 		cierror = 0;
 
-	if (uap->pid == 0) {
+	if (pid == 0) {
 		p = td->td_proc;
 		PROC_LOCK(p);
 	} else {
-		p = pfind(uap->pid);
+		p = pfind(pid);
 		if (p == NULL)
 			return (ESRCH);
 	}
 
-	switch (uap->function) {
+	switch (function) {
 	case RTP_LOOKUP:
 		if ((error = p_cansee(td, p)))
 			break;
@@ -401,7 +421,7 @@ sys_rtprio(struct thread *td, register struct rtprio_args *uap)
 		 * Note: specifying our own pid is not the same
 		 * as leaving it zero.
 		 */
-		if (uap->pid == 0) {
+		if (pid == 0) {
 			pri_to_rtp(td, &rtp);
 		} else {
 			struct rtprio rtp2;
@@ -419,7 +439,7 @@ sys_rtprio(struct thread *td, register struct rtprio_args *uap)
 			}
 		}
 		PROC_UNLOCK(p);
-		return (copyout(&rtp, uap->rtp, sizeof(struct rtprio)));
+		return (copyout_c(&rtp, urtp, sizeof(struct rtprio)));
 	case RTP_SET:
 		if ((error = p_cansched(td, p)) || (error = cierror))
 			break;
@@ -443,7 +463,7 @@ sys_rtprio(struct thread *td, register struct rtprio_args *uap)
 		 * do all the threads on that process. If we
 		 * specify our own pid we do the latter.
 		 */
-		if (uap->pid == 0) {
+		if (pid == 0) {
 			error = rtp_to_pri(&rtp, td);
 		} else {
 			FOREACH_THREAD_IN_PROC(p, td) {
@@ -533,7 +553,7 @@ struct osetrlimit_args {
 };
 #endif
 int
-osetrlimit(struct thread *td, register struct osetrlimit_args *uap)
+osetrlimit(struct thread *td, struct osetrlimit_args *uap)
 {
 	struct orlimit olim;
 	struct rlimit lim;
@@ -554,7 +574,7 @@ struct ogetrlimit_args {
 };
 #endif
 int
-ogetrlimit(struct thread *td, register struct ogetrlimit_args *uap)
+ogetrlimit(struct thread *td, struct ogetrlimit_args *uap)
 {
 	struct orlimit olim;
 	struct rlimit rl;
@@ -587,7 +607,7 @@ struct __setrlimit_args {
 };
 #endif
 int
-sys_setrlimit(struct thread *td, register struct __setrlimit_args *uap)
+sys_setrlimit(struct thread *td, struct __setrlimit_args *uap)
 {
 	struct rlimit alim;
 	int error;
@@ -645,7 +665,7 @@ kern_proc_setrlimit(struct thread *td, struct proc *p, u_int which,
     struct rlimit *limp)
 {
 	struct plimit *newlim, *oldlim;
-	register struct rlimit *alimp;
+	struct rlimit *alimp;
 	struct rlimit oldssiz;
 	int error;
 
@@ -775,7 +795,7 @@ struct __getrlimit_args {
 #endif
 /* ARGSUSED */
 int
-sys_getrlimit(struct thread *td, register struct __getrlimit_args *uap)
+sys_getrlimit(struct thread *td, struct __getrlimit_args *uap)
 {
 	struct rlimit rlim;
 	int error;
@@ -945,7 +965,7 @@ struct getrusage_args {
 };
 #endif
 int
-sys_getrusage(register struct thread *td, register struct getrusage_args *uap)
+sys_getrusage(struct thread *td, struct getrusage_args *uap)
 {
 	struct rusage ru;
 	int error;
@@ -1253,6 +1273,18 @@ struct uidinfo *
 uifind(uid_t uid)
 {
 	struct uidinfo *new_uip, *uip;
+	struct ucred *cred;
+
+	cred = curthread->td_ucred;
+	if (cred->cr_uidinfo->ui_uid == uid) {
+		uip = cred->cr_uidinfo;
+		uihold(uip);
+		return (uip);
+	} else if (cred->cr_ruidinfo->ui_uid == uid) {
+		uip = cred->cr_ruidinfo;
+		uihold(uip);
+		return (uip);
+	}
 
 	rw_rlock(&uihashtbl_lock);
 	uip = uilookup(uid);
@@ -1431,4 +1463,11 @@ chgkqcnt(struct uidinfo *uip, int diff, rlim_t max)
 {
 
 	return (chglimit(uip, &uip->ui_kqcnt, diff, max, "kqcnt"));
+}
+
+int
+chgumtxcnt(struct uidinfo *uip, int diff, rlim_t max)
+{
+
+	return (chglimit(uip, &uip->ui_umtxcnt, diff, max, "umtxcnt"));
 }

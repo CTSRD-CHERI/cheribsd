@@ -20,10 +20,10 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
  * Copyright 2015 RackTop Systems.
+ * Copyright 2016 Nexenta Systems, Inc.
  */
 
 /*
@@ -42,6 +42,7 @@
  * using our derived config, and record the results.
  */
 
+#include <aio.h>
 #include <ctype.h>
 #include <devid.h>
 #include <dirent.h>
@@ -379,13 +380,14 @@ refresh_config(libzfs_handle_t *hdl, nvlist_t *config)
 {
 	nvlist_t *nvl;
 	zfs_cmd_t zc = { 0 };
-	int err;
+	int err, dstbuf_size;
 
 	if (zcmd_write_conf_nvlist(hdl, &zc, config) != 0)
 		return (NULL);
 
-	if (zcmd_alloc_dst_nvlist(hdl, &zc,
-	    zc.zc_nvlist_conf_size * 2) != 0) {
+	dstbuf_size = MAX(CONFIG_BUF_MINSIZE, zc.zc_nvlist_conf_size * 4);
+
+	if (zcmd_alloc_dst_nvlist(hdl, &zc, dstbuf_size) != 0) {
 		zcmd_free_nvlists(&zc);
 		return (NULL);
 	}
@@ -440,12 +442,12 @@ get_configs(libzfs_handle_t *hdl, pool_list_t *pl, boolean_t active_ok)
 	pool_entry_t *pe;
 	vdev_entry_t *ve;
 	config_entry_t *ce;
-	nvlist_t *ret = NULL, *config = NULL, *tmp, *nvtop, *nvroot;
+	nvlist_t *ret = NULL, *config = NULL, *tmp = NULL, *nvtop, *nvroot;
 	nvlist_t **spares, **l2cache;
 	uint_t i, nspares, nl2cache;
 	boolean_t config_seen;
 	uint64_t best_txg;
-	char *name, *hostname;
+	char *name, *hostname = NULL;
 	uint64_t guid;
 	uint_t children = 0;
 	nvlist_t **child = NULL;
@@ -864,6 +866,7 @@ label_offset(uint64_t size, int l)
 /*
  * Given a file descriptor, read the label information and return an nvlist
  * describing the configuration, if there is one.
+ * Return 0 on success, or -1 on failure
  */
 int
 zpool_read_label(int fd, nvlist_t **config)
@@ -876,7 +879,7 @@ zpool_read_label(int fd, nvlist_t **config)
 	*config = NULL;
 
 	if (fstat64(fd, &statbuf) == -1)
-		return (0);
+		return (-1);
 	size = P2ALIGN_TYPED(statbuf.st_size, sizeof (vdev_label_t), uint64_t);
 
 	if ((label = malloc(sizeof (vdev_label_t))) == NULL)
@@ -910,7 +913,91 @@ zpool_read_label(int fd, nvlist_t **config)
 
 	free(label);
 	*config = NULL;
-	return (0);
+	return (-1);
+}
+
+/*
+ * Given a file descriptor, read the label information and return an nvlist
+ * describing the configuration, if there is one.
+ * returns the number of valid labels found
+ * If a label is found, returns it via config.  The caller is responsible for
+ * freeing it.
+ */
+int
+zpool_read_all_labels(int fd, nvlist_t **config)
+{
+	struct stat64 statbuf;
+	struct aiocb aiocbs[VDEV_LABELS];
+	struct aiocb *aiocbps[VDEV_LABELS];
+	int l;
+	vdev_phys_t *labels;
+	uint64_t state, txg, size;
+	int nlabels = 0;
+
+	*config = NULL;
+
+	if (fstat64(fd, &statbuf) == -1)
+		return (0);
+	size = P2ALIGN_TYPED(statbuf.st_size, sizeof (vdev_label_t), uint64_t);
+
+	if ((labels = calloc(VDEV_LABELS, sizeof (vdev_phys_t))) == NULL)
+		return (0);
+
+	memset(aiocbs, 0, sizeof(aiocbs));
+	for (l = 0; l < VDEV_LABELS; l++) {
+		aiocbs[l].aio_fildes = fd;
+		aiocbs[l].aio_offset = label_offset(size, l) + VDEV_SKIP_SIZE;
+		aiocbs[l].aio_buf = &labels[l];
+		aiocbs[l].aio_nbytes = sizeof(vdev_phys_t);
+		aiocbs[l].aio_lio_opcode = LIO_READ;
+		aiocbps[l] = &aiocbs[l];
+	}
+
+	if (lio_listio(LIO_WAIT, aiocbps, VDEV_LABELS, NULL) != 0) {
+		if (errno == EAGAIN || errno == EINTR || errno == EIO) {
+			for (l = 0; l < VDEV_LABELS; l++) {
+				errno = 0;
+				int r = aio_error(&aiocbs[l]);
+				if (r != EINVAL)
+					(void)aio_return(&aiocbs[l]);
+			}
+		}
+		free(labels);
+		return (0);
+	}
+
+	for (l = 0; l < VDEV_LABELS; l++) {
+		nvlist_t *temp = NULL;
+
+		if (aio_return(&aiocbs[l]) != sizeof(vdev_phys_t))
+			continue;
+
+		if (nvlist_unpack(labels[l].vp_nvlist,
+		    sizeof (labels[l].vp_nvlist), &temp, 0) != 0)
+			continue;
+
+		if (nvlist_lookup_uint64(temp, ZPOOL_CONFIG_POOL_STATE,
+		    &state) != 0 || state > POOL_STATE_L2CACHE) {
+			nvlist_free(temp);
+			temp = NULL;
+			continue;
+		}
+
+		if (state != POOL_STATE_SPARE && state != POOL_STATE_L2CACHE &&
+		    (nvlist_lookup_uint64(temp, ZPOOL_CONFIG_POOL_TXG,
+		    &txg) != 0 || txg == 0)) {
+			nvlist_free(temp);
+			temp = NULL;
+			continue;
+		}
+		if (temp)
+			*config = temp;
+
+		nlabels++;
+	}
+
+	free(labels);
+	return (nlabels);
 }
 
 typedef struct rdsk_node {
@@ -1088,7 +1175,7 @@ zpool_open_func(void *arg)
 	}
 #endif	/* illumos */
 
-	if ((zpool_read_label(fd, &config)) != 0) {
+	if ((zpool_read_label(fd, &config)) != 0 && errno == ENOMEM) {
 		(void) close(fd);
 		(void) no_memory(rn->rn_hdl);
 		return;
@@ -1099,9 +1186,7 @@ zpool_open_func(void *arg)
 }
 
 /*
- * Given a file descriptor, clear (zero) the label information.  This function
- * is used in the appliance stack as part of the ZFS sysevent module and
- * to implement the "zpool labelclear" command.
+ * Given a file descriptor, clear (zero) the label information.
  */
 int
 zpool_clear_label(int fd)
@@ -1168,7 +1253,7 @@ zpool_find_import_impl(libzfs_handle_t *hdl, importargs_t *iarg)
 	 */
 	for (i = 0; i < dirs; i++) {
 		tpool_t *t;
-		char *rdsk;
+		char rdsk[MAXPATHLEN];
 		int dfd;
 		boolean_t config_failed = B_FALSE;
 		DIR *dirp;
@@ -1184,15 +1269,17 @@ zpool_find_import_impl(libzfs_handle_t *hdl, importargs_t *iarg)
 		*end = 0;
 		pathleft = &path[sizeof (path)] - end;
 
+#ifdef illumos
 		/*
 		 * Using raw devices instead of block devices when we're
 		 * reading the labels skips a bunch of slow operations during
 		 * close(2) processing, so we replace /dev/dsk with /dev/rdsk.
 		 */
-		if (strcmp(path, "/dev/dsk/") == 0)
-			rdsk = "/dev/";
+		if (strcmp(path, ZFS_DISK_ROOTD) == 0)
+			(void) strlcpy(rdsk, ZFS_RDISK_ROOTD, sizeof (rdsk));
 		else
-			rdsk = path;
+#endif
+			(void) strlcpy(rdsk, path, sizeof (rdsk));
 
 		if ((dfd = open64(rdsk, O_RDONLY)) < 0 ||
 		    (dirp = fdopendir(dfd)) == NULL) {
@@ -1331,8 +1418,7 @@ error:
 			venext = ve->ve_next;
 			for (ce = ve->ve_configs; ce != NULL; ce = cenext) {
 				cenext = ce->ce_next;
-				if (ce->ce_config)
-					nvlist_free(ce->ce_config);
+				nvlist_free(ce->ce_config);
 				free(ce);
 			}
 			free(ve);
@@ -1590,7 +1676,7 @@ zpool_in_use(libzfs_handle_t *hdl, int fd, pool_state_t *state, char **namestr,
 
 	*inuse = B_FALSE;
 
-	if (zpool_read_label(fd, &config) != 0) {
+	if (zpool_read_label(fd, &config) != 0 && errno == ENOMEM) {
 		(void) no_memory(hdl);
 		return (-1);
 	}

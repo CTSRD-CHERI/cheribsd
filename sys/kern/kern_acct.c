@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -18,7 +20,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -78,12 +80,14 @@ __FBSDID("$FreeBSD$");
 #include <sys/kthread.h>
 #include <sys/limits.h>
 #include <sys/lock.h>
+#include <sys/malloc.h>
 #include <sys/mount.h>
 #include <sys/mutex.h>
 #include <sys/namei.h>
 #include <sys/priv.h>
 #include <sys/proc.h>
 #include <sys/resourcevar.h>
+#include <sys/syscallsubr.h>
 #include <sys/sched.h>
 #include <sys/sx.h>
 #include <sys/sysctl.h>
@@ -94,6 +98,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/vnode.h>
 
 #include <security/mac/mac_framework.h>
+
+_Static_assert(sizeof(struct acctv3) - offsetof(struct acctv3, ac_trailer) ==
+    sizeof(struct acctv2) - offsetof(struct acctv2, ac_trailer), "trailer");
+_Static_assert(sizeof(struct acctv3) - offsetof(struct acctv3, ac_len2) ==
+    sizeof(struct acctv2) - offsetof(struct acctv2, ac_len2), "len2");
 
 /*
  * The routines implemented in this file are described in:
@@ -196,6 +205,13 @@ SYSCTL_INT(_kern, OID_AUTO, acct_suspended, CTLFLAG_RD, &acct_suspended, 0,
 int
 sys_acct(struct thread *td, struct acct_args *uap)
 {
+
+	return (kern_acct(td, __USER_CAP_STR(uap->path)));
+}
+
+int
+kern_acct(struct thread *td, const char * __capability path)
+{
 	struct nameidata nd;
 	int error, flags, i, replacing;
 
@@ -207,9 +223,9 @@ sys_acct(struct thread *td, struct acct_args *uap)
 	 * If accounting is to be started to a file, open that file for
 	 * appending and make sure it's a 'normal'.
 	 */
-	if (uap->path != NULL) {
-		NDINIT(&nd, LOOKUP, NOFOLLOW | AUDITVNODE1,
-		    UIO_USERSPACE, uap->path, td);
+	if (path != NULL) {
+		NDINIT_C(&nd, LOOKUP, NOFOLLOW | AUDITVNODE1,
+		    UIO_USERSPACE, path, td);
 		flags = FWRITE | O_APPEND;
 		error = vn_open(&nd, &flags, 0, NULL);
 		if (error)
@@ -247,7 +263,7 @@ sys_acct(struct thread *td, struct acct_args *uap)
 	 * switching from one accounting file to another due to log
 	 * rotation.
 	 */
-	replacing = (acct_vp != NULL && uap->path != NULL);
+	replacing = (acct_vp != NULL && path != NULL);
 
 	/*
 	 * If accounting was previously enabled, kill the old space-watcher,
@@ -258,7 +274,7 @@ sys_acct(struct thread *td, struct acct_args *uap)
 	acct_suspended = 0;
 	if (acct_vp != NULL)
 		error = acct_disable(td, !replacing);
-	if (uap->path == NULL) {
+	if (path == NULL) {
 		if (acct_state & ACCT_RUNNING) {
 			acct_state |= ACCT_EXITREQ;
 			wakeup(&acct_state);
@@ -338,7 +354,7 @@ acct_disable(struct thread *td, int logging)
 int
 acct_process(struct thread *td)
 {
-	struct acctv2 acct;
+	struct acctv3 acct;
 	struct timeval ut, st, tmp;
 	struct plimit *oldlim;
 	struct proc *p;
@@ -389,7 +405,7 @@ acct_process(struct thread *td)
 	acct.ac_stime = encode_timeval(st);
 
 	/* (4) The elapsed time the command ran (and its starting time) */
-	tmp = boottime;
+	getboottime(&tmp);
 	timevaladd(&tmp, &p->p_stats->p_start);
 	acct.ac_btime = tmp.tv_sec;
 	microuptime(&tmp);
@@ -420,7 +436,7 @@ acct_process(struct thread *td)
 	/* Setup ancillary structure fields. */
 	acct.ac_flagx |= ANVER;
 	acct.ac_zero = 0;
-	acct.ac_version = 2;
+	acct.ac_version = 3;
 	acct.ac_len = acct.ac_len2 = sizeof(acct);
 
 	/*
@@ -552,7 +568,7 @@ encode_long(long val)
 static void
 acctwatch(void)
 {
-	struct statfs sb;
+	struct statfs *sp;
 
 	sx_assert(&acct_sx, SX_XLOCKED);
 
@@ -580,21 +596,25 @@ acctwatch(void)
 	 * Stopping here is better than continuing, maybe it will be VBAD
 	 * next time around.
 	 */
-	if (VFS_STATFS(acct_vp->v_mount, &sb) < 0)
+	sp = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
+	if (VFS_STATFS(acct_vp->v_mount, sp) < 0) {
+		free(sp, M_STATFS);
 		return;
+	}
 	if (acct_suspended) {
-		if (sb.f_bavail > (int64_t)(acctresume * sb.f_blocks /
+		if (sp->f_bavail > (int64_t)(acctresume * sp->f_blocks /
 		    100)) {
 			acct_suspended = 0;
 			log(LOG_NOTICE, "Accounting resumed\n");
 		}
 	} else {
-		if (sb.f_bavail <= (int64_t)(acctsuspend * sb.f_blocks /
+		if (sp->f_bavail <= (int64_t)(acctsuspend * sp->f_blocks /
 		    100)) {
 			acct_suspended = 1;
 			log(LOG_NOTICE, "Accounting suspended\n");
 		}
 	}
+	free(sp, M_STATFS);
 }
 
 /*

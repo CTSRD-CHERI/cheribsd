@@ -1,6 +1,8 @@
 /*	$NetBSD: svc_raw.c,v 1.14 2000/07/06 03:10:35 christos Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2009, Sun Microsystems, Inc.
  * All rights reserved.
  *
@@ -29,6 +31,17 @@
  */
 /*
  * Copyright (c) 1986-1991 by Sun Microsystems Inc. 
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "sunrpc"
+ * }
+ * CHERI CHANGES END
  */
 
 /* #ident	"@(#)svc_raw.c	1.16	94/04/24 SMI" */
@@ -229,7 +242,7 @@ svc_raw_freeargs(SVCXPRT *xprt, xdrproc_t xdr_args, void *args_ptr)
 
 	xdrs = &srp->xdr_stream;
 	xdrs->x_op = XDR_FREE;
-	return (*xdr_args)(xdrs, args_ptr);
+	return (*xdr_args)(xdrs, args_ptr, 0);
 }
 
 /*ARGSUSED*/

@@ -1,6 +1,8 @@
 /*	$NetBSD: mdreloc.c,v 1.42 2008/04/28 20:23:04 martin Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ *
  * Copyright (c) 2000 Eduardo Horvath.
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -503,7 +505,7 @@ reloc_plt(Obj_Entry *obj)
 		assert(ELF64_R_TYPE_ID(rela->r_info) == R_SPARC_JMP_SLOT);
 		where = (Elf_Addr *)(obj->relocbase + rela->r_offset);
 		def = find_symdef(ELF_R_SYM(rela->r_info), obj, &defobj,
-		    true, NULL, lockstate);
+		    SYMLOOK_IN_PLT, NULL, lockstate);
 		value = (Elf_Addr)(defobj->relocbase + def->st_value);
 		*where = value;
 	}
@@ -581,7 +583,9 @@ reloc_jmpslot(Elf_Addr *wherep, Elf_Addr target, const Obj_Entry *obj,
 	Elf_Addr offset;
 	Elf_Word *where;
 
-	if (rela - refobj->pltrela < 32764) {
+	if (ld_bind_not) {
+		/* Skip any PLT modifications */
+	} else if (rela - refobj->pltrela < 32764) {
 		/*
 		 * At the PLT entry pointed at by `where', we now construct
 		 * a direct transfer to the now fully resolved function
@@ -784,6 +788,11 @@ reloc_jmpslot(Elf_Addr *wherep, Elf_Addr target, const Obj_Entry *obj,
 	}
 
 	return (target);
+}
+
+void
+ifunc_init(Elf_Auxinfo aux_info[__min_size(AT_COUNT)] __unused)
+{
 }
 
 /*

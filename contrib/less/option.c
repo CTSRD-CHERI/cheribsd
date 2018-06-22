@@ -1,10 +1,20 @@
 /*
- * Copyright (C) 1984-2015  Mark Nudelman
+ * Copyright (C) 1984-2017  Mark Nudelman
  *
  * You may distribute under the terms of either the GNU General Public
  * License or the Less License, as specified in the README file.
  *
  * For more information, see the README file.
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ]
+ * }
+ * CHERI CHANGES END
  */
 
 
@@ -23,8 +33,8 @@
 static struct loption *pendopt;
 public int plusoption = FALSE;
 
-static char *optstring();
-static int flip_triple();
+static char *optstring(char *s, char **p_str, char *printopt, char *validchars);
+static int flip_triple(int val, int lc);
 
 extern int screen_trashed;
 extern int less_is_more;
@@ -69,8 +79,8 @@ propt(c)
 scan_option(s)
 	char *s;
 {
-	register struct loption *o;
-	register int optc;
+	struct loption *o;
+	int optc;
 	char *optname;
 	char *printopt;
 	char *str;
@@ -305,7 +315,7 @@ toggle_option(o, lower, s, how_toggle)
 	char *s;
 	int how_toggle;
 {
-	register int num;
+	int num;
 	int no_prompt;
 	int err;
 	PARG parg;
@@ -568,8 +578,8 @@ optstring(s, p_str, printopt, validchars)
 	char *printopt;
 	char *validchars;
 {
-	register char *p;
-	register char *out;
+	char *p;
+	char *out;
 
 	if (*s == '\0')
 	{
@@ -632,9 +642,9 @@ getnum(sp, printopt, errp)
 	char *printopt;
 	int *errp;
 {
-	register char *s;
-	register int n;
-	register int neg;
+	char *s;
+	int n;
+	int neg;
 
 	s = skipsp(*sp);
 	neg = FALSE;
@@ -669,7 +679,7 @@ getfraction(sp, printopt, errp)
 	char *printopt;
 	int *errp;
 {
-	register char *s;
+	char *s;
 	long frac = 0;
 	int fraclen = 0;
 

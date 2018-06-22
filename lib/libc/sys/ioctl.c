@@ -27,6 +27,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -47,6 +57,7 @@ __weak_reference(_ioctl, ioctl);
 int
 ioctl(int fd, unsigned long com, ...)
 #else
+int _ioctl(int fd, unsigned long com, ...);
 #pragma weak _ioctl
 int
 _ioctl(int fd, unsigned long com, ...)

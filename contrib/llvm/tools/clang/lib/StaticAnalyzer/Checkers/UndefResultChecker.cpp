@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This defines UndefResultChecker, a builtin check in ExprEngine that 
+// This defines UndefResultChecker, a builtin check in ExprEngine that
 // performs checks for undefined results of non-assignment binary operators.
 //
 //===----------------------------------------------------------------------===//
@@ -25,7 +25,7 @@ using namespace clang;
 using namespace ento;
 
 namespace {
-class UndefResultChecker 
+class UndefResultChecker
   : public Checker< check::PostStmt<BinaryOperator> > {
 
   mutable std::unique_ptr<BugType> BT;
@@ -34,6 +34,30 @@ public:
   void checkPostStmt(const BinaryOperator *B, CheckerContext &C) const;
 };
 } // end anonymous namespace
+
+static bool isArrayIndexOutOfBounds(CheckerContext &C, const Expr *Ex) {
+  ProgramStateRef state = C.getState();
+  const LocationContext *LCtx = C.getLocationContext();
+
+  if (!isa<ArraySubscriptExpr>(Ex))
+    return false;
+
+  SVal Loc = state->getSVal(Ex, LCtx);
+  if (!Loc.isValid())
+    return false;
+
+  const MemRegion *MR = Loc.castAs<loc::MemRegionVal>().getRegion();
+  const ElementRegion *ER = dyn_cast<ElementRegion>(MR);
+  if (!ER)
+    return false;
+
+  DefinedOrUnknownSVal Idx = ER->getIndex().castAs<DefinedOrUnknownSVal>();
+  DefinedOrUnknownSVal NumElements = C.getStoreManager().getSizeInElements(
+      state, ER->getSuperRegion(), ER->getValueType());
+  ProgramStateRef StInBound = state->assumeInBound(Idx, NumElements, true);
+  ProgramStateRef StOutBound = state->assumeInBound(Idx, NumElements, false);
+  return StOutBound && !StInBound;
+}
 
 void UndefResultChecker::checkPostStmt(const BinaryOperator *B,
                                        CheckerContext &C) const {
@@ -50,10 +74,10 @@ void UndefResultChecker::checkPostStmt(const BinaryOperator *B,
         return;
 
     // Generate an error node.
-    ExplodedNode *N = C.generateSink();
+    ExplodedNode *N = C.generateErrorNode();
     if (!N)
       return;
-    
+
     if (!BT)
       BT.reset(
           new BuiltinBug(this, "Result of operation is garbage or undefined"));
@@ -62,7 +86,7 @@ void UndefResultChecker::checkPostStmt(const BinaryOperator *B,
     llvm::raw_svector_ostream OS(sbuf);
     const Expr *Ex = nullptr;
     bool isLeft = true;
-    
+
     if (state->getSVal(B->getLHS(), LCtx).isUndef()) {
       Ex = B->getLHS()->IgnoreParenCasts();
       isLeft = true;
@@ -71,13 +95,15 @@ void UndefResultChecker::checkPostStmt(const BinaryOperator *B,
       Ex = B->getRHS()->IgnoreParenCasts();
       isLeft = false;
     }
-    
+
     if (Ex) {
       OS << "The " << (isLeft ? "left" : "right")
          << " operand of '"
          << BinaryOperator::getOpcodeStr(B->getOpcode())
          << "' is a garbage value";
-    }          
+      if (isArrayIndexOutOfBounds(C, Ex))
+        OS << " due to array index out of bounds";
+    }
     else {
       // Neither operand was undefined, but the result is undefined.
       OS << "The result of the '"
@@ -91,7 +117,7 @@ void UndefResultChecker::checkPostStmt(const BinaryOperator *B,
     }
     else
       bugreporter::trackNullOrUndefValue(N, B, *report);
-    
+
     C.emitReport(std::move(report));
   }
 }

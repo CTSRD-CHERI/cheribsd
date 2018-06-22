@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2002 Marcel Moolenaar
  * All rights reserved.
  *
@@ -59,8 +61,7 @@ dumpsys_wbinv_all(void)
 	 * have already been stopped, and their flush/invalidate was done as
 	 * part of stopping.
 	 */
-	cpu_idcache_wbinv_all();
-	cpu_l2cache_wbinv_all();
+	dcache_wbinv_poc_all();
 #ifdef __XSCALE__
 	xscale_cache_clean_minidata();
 #endif

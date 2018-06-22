@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2003-2008, Joseph Koshy
  * Copyright (c) 2007 The FreeBSD Foundation
  * All rights reserved.
@@ -64,6 +66,8 @@ __FBSDID("$FreeBSD$");
 #include <sysexits.h>
 #include <unistd.h>
 
+#include <libpmcstat.h>
+
 #include "pmcstat.h"
 
 /*
@@ -114,34 +118,6 @@ static struct kinfo_proc *pmcstat_plist;
 struct pmcstat_args args;
 
 static void
-pmcstat_clone_event_descriptor(struct pmcstat_ev *ev, const cpuset_t *cpumask)
-{
-	int cpu;
-	struct pmcstat_ev *ev_clone;
-
-	for (cpu = 0; cpu < CPU_SETSIZE; cpu++) {
-		if (!CPU_ISSET(cpu, cpumask))
-			continue;
-
-		if ((ev_clone = malloc(sizeof(*ev_clone))) == NULL)
-			errx(EX_SOFTWARE, "ERROR: Out of memory");
-		(void) memset(ev_clone, 0, sizeof(*ev_clone));
-
-		ev_clone->ev_count = ev->ev_count;
-		ev_clone->ev_cpu   = cpu;
-		ev_clone->ev_cumulative = ev->ev_cumulative;
-		ev_clone->ev_flags = ev->ev_flags;
-		ev_clone->ev_mode  = ev->ev_mode;
-		ev_clone->ev_name  = strdup(ev->ev_name);
-		ev_clone->ev_pmcid = ev->ev_pmcid;
-		ev_clone->ev_saved = ev->ev_saved;
-		ev_clone->ev_spec  = strdup(ev->ev_spec);
-
-		STAILQ_INSERT_TAIL(&args.pa_events, ev_clone, ev_next);
-	}
-}
-
-static void
 pmcstat_get_cpumask(const char *cpuspec, cpuset_t *cpumask)
 {
 	int cpu;
@@ -164,50 +140,22 @@ pmcstat_get_cpumask(const char *cpuspec, cpuset_t *cpumask)
 }
 
 void
-pmcstat_attach_pmcs(void)
-{
-	struct pmcstat_ev *ev;
-	struct pmcstat_target *pt;
-	int count;
-
-	/* Attach all process PMCs to target processes. */
-	count = 0;
-	STAILQ_FOREACH(ev, &args.pa_events, ev_next) {
-		if (PMC_IS_SYSTEM_MODE(ev->ev_mode))
-			continue;
-		SLIST_FOREACH(pt, &args.pa_targets, pt_next)
-			if (pmc_attach(ev->ev_pmcid, pt->pt_pid) == 0)
-				count++;
-			else if (errno != ESRCH)
-				err(EX_OSERR,
-"ERROR: cannot attach pmc \"%s\" to process %d",
-				    ev->ev_name, (int)pt->pt_pid);
-	}
-
-	if (count == 0)
-		errx(EX_DATAERR, "ERROR: No processes were attached to.");
-}
-
-
-void
 pmcstat_cleanup(void)
 {
-	struct pmcstat_ev *ev, *tmp;
+	struct pmcstat_ev *ev;
 
 	/* release allocated PMCs. */
-	STAILQ_FOREACH_SAFE(ev, &args.pa_events, ev_next, tmp)
-	    if (ev->ev_pmcid != PMC_ID_INVALID) {
-		if (pmc_stop(ev->ev_pmcid) < 0)
-			err(EX_OSERR, "ERROR: cannot stop pmc 0x%x \"%s\"",
-			    ev->ev_pmcid, ev->ev_name);
-		if (pmc_release(ev->ev_pmcid) < 0)
-			err(EX_OSERR, "ERROR: cannot release pmc 0x%x \"%s\"",
-			    ev->ev_pmcid, ev->ev_name);
-		free(ev->ev_name);
-		free(ev->ev_spec);
-		STAILQ_REMOVE(&args.pa_events, ev, pmcstat_ev, ev_next);
-		free(ev);
-	    }
+	STAILQ_FOREACH(ev, &args.pa_events, ev_next)
+		if (ev->ev_pmcid != PMC_ID_INVALID) {
+			if (pmc_stop(ev->ev_pmcid) < 0)
+				err(EX_OSERR,
+				    "ERROR: cannot stop pmc 0x%x \"%s\"",
+				    ev->ev_pmcid, ev->ev_name);
+			if (pmc_release(ev->ev_pmcid) < 0)
+				err(EX_OSERR,
+				    "ERROR: cannot release pmc 0x%x \"%s\"",
+				    ev->ev_pmcid, ev->ev_name);
+		}
 
 	/* de-configure the log file if present. */
 	if (args.pa_flags & (FLAG_HAS_PIPE | FLAG_HAS_OUTPUT_LOGFILE))
@@ -218,66 +166,7 @@ pmcstat_cleanup(void)
 		args.pa_logparser = NULL;
 	}
 
-	pmcstat_shutdown_logging();
-}
-
-void
-pmcstat_create_process(void)
-{
-	char token;
-	pid_t pid;
-	struct kevent kev;
-	struct pmcstat_target *pt;
-
-	if (socketpair(AF_UNIX, SOCK_STREAM, 0, pmcstat_sockpair) < 0)
-		err(EX_OSERR, "ERROR: cannot create socket pair");
-
-	switch (pid = fork()) {
-	case -1:
-		err(EX_OSERR, "ERROR: cannot fork");
-		/*NOTREACHED*/
-
-	case 0:		/* child */
-		(void) close(pmcstat_sockpair[PARENTSOCKET]);
-
-		/* Write a token to tell our parent we've started executing. */
-		if (write(pmcstat_sockpair[CHILDSOCKET], "+", 1) != 1)
-			err(EX_OSERR, "ERROR (child): cannot write token");
-
-		/* Wait for our parent to signal us to start. */
-		if (read(pmcstat_sockpair[CHILDSOCKET], &token, 1) < 0)
-			err(EX_OSERR, "ERROR (child): cannot read token");
-		(void) close(pmcstat_sockpair[CHILDSOCKET]);
-
-		/* exec() the program requested */
-		execvp(*args.pa_argv, args.pa_argv);
-		/* and if that fails, notify the parent */
-		kill(getppid(), SIGCHLD);
-		err(EX_OSERR, "ERROR: execvp \"%s\" failed", *args.pa_argv);
-		/*NOTREACHED*/
-
-	default:	/* parent */
-		(void) close(pmcstat_sockpair[CHILDSOCKET]);
-		break;
-	}
-
-	/* Ask to be notified via a kevent when the target process exits. */
-	EV_SET(&kev, pid, EVFILT_PROC, EV_ADD|EV_ONESHOT, NOTE_EXIT, 0,
-	    NULL);
-	if (kevent(pmcstat_kq, &kev, 1, NULL, 0, NULL) < 0)
-		err(EX_OSERR, "ERROR: cannot monitor child process %d", pid);
-
-	if ((pt = malloc(sizeof(*pt))) == NULL)
-		errx(EX_SOFTWARE, "ERROR: Out of memory.");
-
-	pt->pt_pid = pid;
-	SLIST_INSERT_HEAD(&args.pa_targets, pt, pt_next);
-
-	/* Wait for the child to signal that its ready to go. */
-	if (read(pmcstat_sockpair[PARENTSOCKET], &token, 1) < 0)
-		err(EX_OSERR, "ERROR (parent): cannot read token");
-
-	return;
+	pmcstat_log_shutdown_logging();
 }
 
 void
@@ -375,7 +264,6 @@ pmcstat_start_pmcs(void)
 		exit(EX_OSERR);
 	    }
 	}
-
 }
 
 void
@@ -461,24 +349,6 @@ pmcstat_print_pmcs(void)
 	pmcstat_print_counters();
 
 	return;
-}
-
-/*
- * Do process profiling
- *
- * If a pid was specified, attach each allocated PMC to the target
- * process.  Otherwise, fork a child and attach the PMCs to the child,
- * and have the child exec() the target program.
- */
-
-void
-pmcstat_start_process(void)
-{
-	/* Signal the child to proceed. */
-	if (write(pmcstat_sockpair[PARENTSOCKET], "!", 1) != 1)
-		err(EX_OSERR, "ERROR (parent): write of token failed");
-
-	(void) close(pmcstat_sockpair[PARENTSOCKET]);
 }
 
 void
@@ -614,7 +484,9 @@ main(int argc, char **argv)
 	len = 0;
 	if (sysctlbyname("kern.bootfile", NULL, &len, NULL, 0) == -1)
 		err(EX_OSERR, "ERROR: Cannot determine path of running kernel");
-	args.pa_kernel = malloc(len + 1);
+	args.pa_kernel = malloc(len);
+	if (args.pa_kernel == NULL)
+		errx(EX_SOFTWARE, "ERROR: Out of memory.");
 	if (sysctlbyname("kern.bootfile", args.pa_kernel, &len, NULL, 0) == -1)
 		err(EX_OSERR, "ERROR: Cannot determine path of running kernel");
 
@@ -700,6 +572,8 @@ main(int argc, char **argv)
 		case 'k':	/* pathname to the kernel */
 			free(args.pa_kernel);
 			args.pa_kernel = strdup(optarg);
+			if (args.pa_kernel == NULL)
+				errx(EX_SOFTWARE, "ERROR: Out of memory");
 			args.pa_required |= FLAG_DO_ANALYSIS;
 			args.pa_flags    |= FLAG_HAS_KERNELPATH;
 			break;
@@ -766,7 +640,9 @@ main(int argc, char **argv)
 			if (option == 's' || option == 'S')
 				args.pa_flags |= FLAG_HAS_SYSTEM_PMCS;
 
-			ev->ev_spec  = strdup(optarg);
+			ev->ev_spec = strdup(optarg);
+			if (ev->ev_spec == NULL)
+				errx(EX_SOFTWARE, "ERROR: Out of memory.");
 
 			if (option == 'S' || option == 'P')
 				ev->ev_count = current_sampling_count;
@@ -796,6 +672,8 @@ main(int argc, char **argv)
 			/* extract event name */
 			c = strcspn(optarg, ", \t");
 			ev->ev_name = malloc(c + 1);
+			if (ev->ev_name == NULL)
+				errx(EX_SOFTWARE, "ERROR: Out of memory.");
 			(void) strncpy(ev->ev_name, optarg, c);
 			*(ev->ev_name + c) = '\0';
 
@@ -803,7 +681,7 @@ main(int argc, char **argv)
 
 			if (option == 's' || option == 'S') {
 				CPU_CLR(ev->ev_cpu, &cpumask);
-				pmcstat_clone_event_descriptor(ev, &cpumask);
+				pmcstat_clone_event_descriptor(ev, &cpumask, &args);
 				CPU_SET(ev->ev_cpu, &cpumask);
 			}
 
@@ -1086,6 +964,8 @@ main(int argc, char **argv)
 	if (!S_ISDIR(sb.st_mode)) {
 		tmp = args.pa_kernel;
 		args.pa_kernel = strdup(dirname(args.pa_kernel));
+		if (args.pa_kernel == NULL)
+			errx(EX_SOFTWARE, "ERROR: Out of memory");
 		free(tmp);
 		(void) snprintf(buffer, sizeof(buffer), "%s%s",
 		    args.pa_fsroot, args.pa_kernel);
@@ -1145,7 +1025,7 @@ main(int argc, char **argv)
 		if ((args.pa_flags & FLAG_DO_ANALYSIS) == 0)
 			args.pa_flags |= FLAG_DO_PRINT;
 
-		pmcstat_initialize_logging();
+		pmcstat_log_initialize_logging();
 		rfd = pmcstat_open_log(args.pa_inputpath,
 		    PMCSTAT_OPEN_FOR_READ);
 		if ((args.pa_logparser = pmclog_open(rfd)) == NULL)
@@ -1321,7 +1201,7 @@ main(int argc, char **argv)
 
 	/* attach PMCs to the target process, starting it if specified */
 	if (args.pa_flags & FLAG_HAS_COMMANDLINE)
-		pmcstat_create_process();
+		pmcstat_create_process(pmcstat_sockpair, &args, pmcstat_kq);
 
 	if (check_driver_stats && pmc_get_driver_stats(&ds_start) < 0)
 		err(EX_OSERR, "ERROR: Cannot retrieve driver statistics");
@@ -1332,7 +1212,7 @@ main(int argc, char **argv)
 			errx(EX_DATAERR,
 			    "ERROR: No matching target processes.");
 		if (args.pa_flags & FLAG_HAS_PROCESS_PMCS)
-			pmcstat_attach_pmcs();
+			pmcstat_attach_pmcs(&args);
 
 		if (pmcstat_kvm) {
 			kvm_close(pmcstat_kvm);
@@ -1345,10 +1225,10 @@ main(int argc, char **argv)
 
 	/* start the (commandline) process if needed */
 	if (args.pa_flags & FLAG_HAS_COMMANDLINE)
-		pmcstat_start_process();
+		pmcstat_start_process(pmcstat_sockpair);
 
 	/* initialize logging */
-	pmcstat_initialize_logging();
+	pmcstat_log_initialize_logging();
 
 	/* Handle SIGINT using the kqueue loop */
 	sa.sa_handler = SIG_IGN;
@@ -1412,7 +1292,7 @@ main(int argc, char **argv)
 
 		switch (kev.filter) {
 		case EVFILT_PROC:  /* target has exited */
-			runstate = pmcstat_close_log();
+			runstate = pmcstat_close_log(&args);
 			do_print = 1;
 			break;
 
@@ -1420,7 +1300,7 @@ main(int argc, char **argv)
 			if (kev.ident == (unsigned)fileno(stdin) &&
 			    (args.pa_flags & FLAG_DO_TOP)) {
 				if (pmcstat_keypress_log())
-					runstate = pmcstat_close_log();
+					runstate = pmcstat_close_log(&args);
 			} else {
 				do_read = 0;
 				runstate = pmcstat_process_log();
@@ -1443,13 +1323,13 @@ main(int argc, char **argv)
 				 * of its targets, or if logfile
 				 * writes encounter an error.
 				 */
-				runstate = pmcstat_close_log();
+				runstate = pmcstat_close_log(&args);
 				do_print = 1; /* print PMCs at exit */
 			} else if (kev.ident == SIGINT) {
 				/* Kill the child process if we started it */
 				if (args.pa_flags & FLAG_HAS_COMMANDLINE)
 					pmcstat_kill_process();
-				runstate = pmcstat_close_log();
+				runstate = pmcstat_close_log(&args);
 			} else if (kev.ident == SIGWINCH) {
 				if (ioctl(fileno(args.pa_printfile),
 					TIOCGWINSZ, &ws) < 0)
@@ -1502,8 +1382,6 @@ main(int argc, char **argv)
 		pmc_close_logfile();
 
 	pmcstat_cleanup();
-
-	free(args.pa_kernel);
 
 	/* check if the driver lost any samples or events */
 	if (check_driver_stats) {

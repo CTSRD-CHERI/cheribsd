@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2004 Nate Lawson (SDG)
  * All rights reserved.
  *
@@ -140,6 +142,8 @@ out:
 		free(buf.Pointer, M_TEMP);
 	if (error != 0)
 		fdc_release_resources(sc);
+	else
+		fdc_start_worker(dev);
 
 	return (error);
 }

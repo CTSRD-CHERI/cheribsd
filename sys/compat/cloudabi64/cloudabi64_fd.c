@@ -34,8 +34,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/uio.h>
 
-#include <compat/cloudabi64/cloudabi64_syscalldefs.h>
+#include <contrib/cloudabi/cloudabi64_types.h>
+
 #include <compat/cloudabi64/cloudabi64_proto.h>
+#include <compat/cloudabi64/cloudabi64_util.h>
 
 /* Copies in 64-bit iovec structures from userspace. */
 static int
@@ -44,16 +46,16 @@ cloudabi64_copyinuio(const cloudabi64_iovec_t *iovp, size_t iovcnt,
 {
 	cloudabi64_iovec_t iovobj;
 	struct uio *uio;
-	struct iovec *iov;
+	kiovec_t *iov;
 	size_t i;
 	int error;
 
 	/* Allocate uio and iovecs. */
 	if (iovcnt > UIO_MAXIOV)
 		return (EINVAL);
-	uio = malloc(sizeof(struct uio) + iovcnt * sizeof(struct iovec),
+	uio = malloc(sizeof(struct uio) + iovcnt * sizeof(kiovec_t),
 	    M_IOV, M_WAITOK);
-	iov = (struct iovec *)(uio + 1);
+	iov = (kiovec_t *)(uio + 1);
 
 	/* Initialize uio. */
 	uio->uio_iov = iov;
@@ -69,9 +71,8 @@ cloudabi64_copyinuio(const cloudabi64_iovec_t *iovp, size_t iovcnt,
 			free(uio, M_IOV);
 			return (error);
 		}
-		iov[i].iov_base = (void *)iovobj.iov_base;
-		iov[i].iov_len = iovobj.iov_len;
-		if (iov[i].iov_len > SSIZE_MAX - uio->uio_resid) {
+		IOVEC_INIT(&iov[i], TO_PTR(iovobj.buf), iovobj.buf_len);
+		if (iov[i].iov_len > INT64_MAX - uio->uio_resid) {
 			free(uio, M_IOV);
 			return (EINVAL);
 		}
@@ -89,7 +90,7 @@ cloudabi64_sys_fd_pread(struct thread *td,
 	struct uio *uio;
 	int error;
 
-	error = cloudabi64_copyinuio(uap->iov, uap->iovcnt, &uio);
+	error = cloudabi64_copyinuio(uap->iovs, uap->iovs_len, &uio);
 	if (error != 0)
 		return (error);
 	error = kern_preadv(td, uap->fd, uio, uap->offset);
@@ -104,8 +105,7 @@ cloudabi64_sys_fd_pwrite(struct thread *td,
 	struct uio *uio;
 	int error;
 
-	error = cloudabi64_copyinuio((const cloudabi64_iovec_t *)uap->iov,
-	    uap->iovcnt, &uio);
+	error = cloudabi64_copyinuio(TO_PTR(uap->iovs), uap->iovs_len, &uio);
 	if (error != 0)
 		return (error);
 	error = kern_pwritev(td, uap->fd, uio, uap->offset);
@@ -120,7 +120,7 @@ cloudabi64_sys_fd_read(struct thread *td,
 	struct uio *uio;
 	int error;
 
-	error = cloudabi64_copyinuio(uap->iov, uap->iovcnt, &uio);
+	error = cloudabi64_copyinuio(uap->iovs, uap->iovs_len, &uio);
 	if (error != 0)
 		return (error);
 	error = kern_readv(td, uap->fd, uio);
@@ -135,8 +135,7 @@ cloudabi64_sys_fd_write(struct thread *td,
 	struct uio *uio;
 	int error;
 
-	error = cloudabi64_copyinuio((const cloudabi64_iovec_t *)uap->iov,
-	    uap->iovcnt, &uio);
+	error = cloudabi64_copyinuio(TO_PTR(uap->iovs), uap->iovs_len, &uio);
 	if (error != 0)
 		return (error);
 	error = kern_writev(td, uap->fd, uio);

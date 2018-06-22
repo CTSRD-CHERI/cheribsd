@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
  *
@@ -41,7 +43,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -158,7 +160,6 @@ static struct in6_addrpolicy *match_addrsel_policy(struct sockaddr_in6 *);
  */
 #define REPLACE(r) do {\
 	IP6STAT_INC(ip6s_sources_rule[(r)]); \
-	rule = (r);	\
 	/* { \
 	char ip6buf[INET6_ADDRSTRLEN], ip6b[INET6_ADDRSTRLEN]; \
 	printf("in6_selectsrc: replace %s with %s by %d\n", ia_best ? ip6_sprintf(ip6buf, &ia_best->ia_addr.sin6_addr) : "none", ip6_sprintf(ip6b, &ia->ia_addr.sin6_addr), (r)); \
@@ -174,7 +175,6 @@ static struct in6_addrpolicy *match_addrsel_policy(struct sockaddr_in6 *);
 } while(0)
 #define BREAK(r) do { \
 	IP6STAT_INC(ip6s_sources_rule[(r)]); \
-	rule = (r);	\
 	goto out;		/* XXX: we can't use 'break' here */ \
 } while(0)
 
@@ -192,7 +192,7 @@ in6_selectsrc(uint32_t fibnum, struct sockaddr_in6 *dstsock,
 	struct in6_addrpolicy *dst_policy = NULL, *best_policy = NULL;
 	u_int32_t odstzone;
 	int prefer_tempaddr;
-	int error, rule;
+	int error;
 	struct ip6_moptions *mopts;
 
 	KASSERT(srcp != NULL, ("%s: srcp is NULL", __func__));
@@ -226,9 +226,6 @@ in6_selectsrc(uint32_t fibnum, struct sockaddr_in6 *dstsock,
 	 */
 	if (opts && (pi = opts->ip6po_pktinfo) &&
 	    !IN6_IS_ADDR_UNSPECIFIED(&pi->ipi6_addr)) {
-		struct sockaddr_in6 srcsock;
-		struct in6_ifaddr *ia6;
-
 		/* get the outgoing interface */
 		if ((error = in6_selectif(dstsock, opts, mopts, &ifp, oifp,
 		    fibnum))
@@ -242,33 +239,36 @@ in6_selectsrc(uint32_t fibnum, struct sockaddr_in6 *dstsock,
 		 * the interface must be specified; otherwise, ifa_ifwithaddr()
 		 * will fail matching the address.
 		 */
-		bzero(&srcsock, sizeof(srcsock));
-		srcsock.sin6_family = AF_INET6;
-		srcsock.sin6_len = sizeof(srcsock);
-		srcsock.sin6_addr = pi->ipi6_addr;
+		tmp = pi->ipi6_addr;
 		if (ifp) {
-			error = in6_setscope(&srcsock.sin6_addr, ifp, NULL);
+			error = in6_setscope(&tmp, ifp, &odstzone);
 			if (error)
 				return (error);
 		}
 		if (cred != NULL && (error = prison_local_ip6(cred,
-		    &srcsock.sin6_addr, (inp != NULL &&
-		    (inp->inp_flags & IN6P_IPV6_V6ONLY) != 0))) != 0)
+		    &tmp, (inp->inp_flags & IN6P_IPV6_V6ONLY) != 0)) != 0)
 			return (error);
 
-		ia6 = (struct in6_ifaddr *)ifa_ifwithaddr(
-		    (struct sockaddr *)&srcsock);
-		if (ia6 == NULL ||
-		    (ia6->ia6_flags & (IN6_IFF_ANYCAST | IN6_IFF_NOTREADY))) {
-			if (ia6 != NULL)
-				ifa_free(&ia6->ia_ifa);
-			return (EADDRNOTAVAIL);
-		}
-		pi->ipi6_addr = srcsock.sin6_addr; /* XXX: this overrides pi */
+		/*
+		 * If IPV6_BINDANY socket option is set, we allow to specify
+		 * non local addresses as source address in IPV6_PKTINFO
+		 * ancillary data.
+		 */
+		if ((inp->inp_flags & INP_BINDANY) == 0) {
+			ia = in6ifa_ifwithaddr(&tmp, 0 /* XXX */);
+			if (ia == NULL || (ia->ia6_flags & (IN6_IFF_ANYCAST |
+			    IN6_IFF_NOTREADY))) {
+				if (ia != NULL)
+					ifa_free(&ia->ia_ifa);
+				return (EADDRNOTAVAIL);
+			}
+			bcopy(&ia->ia_addr.sin6_addr, srcp, sizeof(*srcp));
+			ifa_free(&ia->ia_ifa);
+		} else
+			bcopy(&tmp, srcp, sizeof(*srcp));
+		pi->ipi6_addr = tmp; /* XXX: this overrides pi */
 		if (ifpp)
 			*ifpp = ifp;
-		bcopy(&ia6->ia_addr.sin6_addr, srcp, sizeof(*srcp));
-		ifa_free(&ia6->ia_ifa);
 		return (0);
 	}
 
@@ -297,7 +297,7 @@ in6_selectsrc(uint32_t fibnum, struct sockaddr_in6 *dstsock,
 	 */
 	/* get the outgoing interface */
 	if ((error = in6_selectif(dstsock, opts, mopts, &ifp, oifp,
-	    (inp != NULL) ? inp->inp_inc.inc_fibnum : RT_DEFAULT_FIB)) != 0)
+	    (inp != NULL) ? inp->inp_inc.inc_fibnum : fibnum)) != 0)
 		return (error);
 
 #ifdef DIAGNOSTIC
@@ -308,7 +308,6 @@ in6_selectsrc(uint32_t fibnum, struct sockaddr_in6 *dstsock,
 	if (error)
 		return (error);
 
-	rule = 0;
 	IN6_IFADDR_RLOCK(&in6_ifa_tracker);
 	TAILQ_FOREACH(ia, &V_in6_ifaddrhead, ia_link) {
 		int new_scope = -1, new_matchlen = -1;
@@ -563,7 +562,7 @@ in6_selectsrc_socket(struct sockaddr_in6 *dstsock, struct ip6_pktopts *opts,
 	uint32_t fibnum;
 	int error;
 
-	fibnum = (inp != NULL) ? inp->inp_inc.inc_fibnum : RT_DEFAULT_FIB;
+	fibnum = inp->inp_inc.inc_fibnum;
 	retifp = NULL;
 
 	error = in6_selectsrc(fibnum, dstsock, opts, inp, cred, &retifp, srcp);

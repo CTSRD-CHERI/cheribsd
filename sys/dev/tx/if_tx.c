@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1997 Semen Ustimenko (semenu@FreeBSD.org)
  * All rights reserved.
  *
@@ -44,6 +46,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sockio.h>
 #include <sys/mbuf.h>
 #include <sys/kernel.h>
+#include <sys/malloc.h>
 #include <sys/module.h>
 #include <sys/socket.h>
 #include <sys/queue.h>
@@ -525,8 +528,8 @@ epic_ifioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int error = 0;
 
 	switch (command) {
-	case SIOCSIFMTU:
-		if (ifp->if_mtu == ifr->ifr_mtu)
+	CASE_IOC_IFREQ(SIOCSIFMTU):
+		if (ifp->if_mtu == ifr_mtu_get(ifr))
 			break;
 
 		/* XXX Though the datasheet doesn't imply any
@@ -536,8 +539,8 @@ epic_ifioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		 * up if more data is sent).
 		 */
 		EPIC_LOCK(sc);
-		if (ifr->ifr_mtu + ifp->if_hdrlen <= EPIC_MAX_MTU) {
-			ifp->if_mtu = ifr->ifr_mtu;
+		if (ifr_mtu_get(ifr) + ifp->if_hdrlen <= EPIC_MAX_MTU) {
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			epic_stop(sc);
 			epic_init_locked(sc);
 		} else
@@ -545,7 +548,7 @@ epic_ifioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		EPIC_UNLOCK(sc);
 		break;
 
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		/*
 		 * If the interface is marked up and stopped, then start it.
 		 * If it is marked down and running, then stop it.
@@ -573,15 +576,15 @@ epic_ifioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		EPIC_UNLOCK(sc);
 		break;
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		EPIC_LOCK(sc);
 		epic_set_mc_table(sc);
 		EPIC_UNLOCK(sc);
 		error = 0;
 		break;
 
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
@@ -795,7 +798,7 @@ epic_rx_done(epic_softc_t *sc)
 		(*ifp->if_input)(ifp, m);
 		EPIC_LOCK(sc);
 
-		/* Successfuly received frame */
+		/* Successfully received frame */
 		if_inc_counter(ifp, IFCOUNTER_IPACKETS, 1);
         }
 	bus_dmamap_sync(sc->rtag, sc->rmap,
@@ -896,7 +899,7 @@ epic_intr(void *arg)
 		      INTSTAT_APE|INTSTAT_DPE|INTSTAT_TXU|INTSTAT_RXE)) {
     	    if (status & (INTSTAT_FATAL|INTSTAT_PMA|INTSTAT_PTA|
 			  INTSTAT_APE|INTSTAT_DPE)) {
-		device_printf(sc->dev, "PCI fatal errors occured: %s%s%s%s\n",
+		device_printf(sc->dev, "PCI fatal errors occurred: %s%s%s%s\n",
 		    (status & INTSTAT_PMA) ? "PMA " : "",
 		    (status & INTSTAT_PTA) ? "PTA " : "",
 		    (status & INTSTAT_APE) ? "APE " : "",

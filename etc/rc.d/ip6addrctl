@@ -6,12 +6,13 @@
 # PROVIDE: ip6addrctl
 # REQUIRE: FILESYSTEMS
 # BEFORE: netif
-# KEYWORD: nojail
+# KEYWORD: nojailvnet
 
 . /etc/rc.subr
 . /etc/network.subr
 
 name="ip6addrctl"
+desc="configure address selection policy for IPv6 and IPv4"
 rcvar="ip6addrctl_enable"
 start_cmd="ip6addrctl_start"
 stop_cmd="ip6addrctl_stop"

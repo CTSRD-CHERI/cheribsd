@@ -30,23 +30,13 @@
 // Common definitions:
 
 // Function return status
-namespace MIstatus
-{
+namespace MIstatus {
 const bool success = true;
 const bool failure = false;
 }
 
 // Use to avoid "unused parameter" compiler warnings:
-#define MIunused(x) (void) x;
-
-#ifdef _WIN32
-#define MI_NO_INITIALIZE_VTABLE __declspec(novtable)
-#define MI_FORCE_INLINE __forceinline
-#else
-#define MI_NO_INITIALIZE_VTABLE
-#define MI_FORCE_INLINE inline
-// __attribute__( ( always_inline ) )
-#endif // _WIN32
+#define MIunused(x) (void)x;
 
 // Portability issues
 #ifdef _WIN64
@@ -72,10 +62,3 @@ typedef unsigned int MIuint;
 // Fundamentals:
 typedef long long MIint64;           // 64bit signed integer.
 typedef unsigned long long MIuint64; // 64bit unsigned integer.
-
-// using namespace std; // Better to put this or std:: at translation units scope.
-
-//--------------------------------------------------------------------------------------
-// Common routines:
-
-//--------------------------------------------------------------------------------------

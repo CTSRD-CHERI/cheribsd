@@ -1,6 +1,8 @@
 /* $OpenBSD: linux_getcwd.c,v 1.2 2001/05/16 12:50:21 ho Exp $ */
 /* $NetBSD: vfs_getcwd.c,v 1.3.2.3 1999/07/11 10:24:09 sommerfeld Exp $ */
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ *
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
  * Copyright (c) 2015 The FreeBSD Foundation
  * All rights reserved.
@@ -76,8 +78,8 @@ linux_getcwd(struct thread *td, struct linux_getcwd_args *args)
 
 	path = malloc(LINUX_PATH_MAX, M_LINUX, M_WAITOK);
 
-	error = kern___getcwd(td, path, UIO_SYSSPACE, args->bufsize,
-	    LINUX_PATH_MAX);
+	error = kern___getcwd(td, (__cheri_tocap char * __capability)path,
+	    UIO_SYSSPACE, args->bufsize, LINUX_PATH_MAX);
 	if (error == 0) {
 		lenused = strlen(path) + 1;
 		error = copyout(path, args->buf, lenused);

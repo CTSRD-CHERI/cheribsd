@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -43,13 +45,13 @@ __FBSDID("$FreeBSD$");
  * Copy src to dst, truncating or null-padding to always copy n bytes.
  * Return dst.
  */
-__CAPABILITY char *
-__CAPSUFFIX(strncpy)(__CAPABILITY char * __restrict dst,
-    __CAPABILITY const char * __restrict src, size_t n)
+char * __CAP
+__CAPSUFFIX(strncpy)(char * __CAP __restrict dst,
+    const char * __CAP __restrict src, size_t n)
 {
 	if (n != 0) {
-		__CAPABILITY char *d = dst;
-		__CAPABILITY const char *s = src;
+		char * __CAP d = dst;
+		const char * __CAP s = src;
 
 		do {
 			if ((*d++ = *s++) == '\0') {

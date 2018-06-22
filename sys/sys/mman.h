@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -43,6 +45,7 @@
 #define INHERIT_SHARE	0
 #define INHERIT_COPY	1
 #define INHERIT_NONE	2
+#define INHERIT_ZERO	3
 #endif
 
 /*
@@ -52,6 +55,14 @@
 #define	PROT_READ	0x01	/* pages can be read */
 #define	PROT_WRITE	0x02	/* pages can be written */
 #define	PROT_EXEC	0x04	/* pages can be executed */
+#define	PROT_ALL	(PROT_READ|PROT_WRITE|PROT_EXEC)
+#define	EXTRACT_PROT(prot)	(prot & PROT_ALL)
+
+#define	_PROT_MAX_SHIFT	16
+#define	PROT_MAX(prot)	((prot) << _PROT_MAX_SHIFT)
+#define	EXTRACT_PROT_MAX(prot)						\
+	(((prot) >> _PROT_MAX_SHIFT) != 0 ?				\
+	 ((prot) >> _PROT_MAX_SHIFT) : EXTRACT_PROT(prot))
 
 /*
  * Flags contain sharing type and options.
@@ -89,6 +100,7 @@
 /*
  * Extended flags
  */
+#define	MAP_GUARD	 0x00002000 /* reserve but don't map address range */
 #define	MAP_EXCL	 0x00004000 /* for MAP_FIXED, fail if address is used */
 #define	MAP_NOCORE	 0x00020000 /* dont include these pages in a coredump */
 #define	MAP_PREFAULT_READ 0x00040000 /* prefault mapping for reading */
@@ -120,6 +132,7 @@
  * requested length or fails.  Passing an under-rounded length fails.
  */
 #define	MAP_CHERI_NOSETBOUNDS	0x0020		/* Don't alter addr */
+#define	MAP_CHERI_DDC		0x0040		/* map within DDC */
 #define	MAP_ALIGNED_CHERI	MAP_ALIGNED(2)	/* align for CHERI data */
 #define	MAP_ALIGNED_CHERI_SEAL	MAP_ALIGNED(3)	/* align for sealing on CHERI */
 #endif /* __BSD_VISIBLE */
@@ -180,7 +193,11 @@
 /*
  * Anonymous object constant for shm_open().
  */
+#ifndef _KERNEL
 #define	SHM_ANON		((char *)1)
+#else
+#define	SHM_ANON		((char * __capability)(intcap_t)1)
+#endif
 #endif /* __BSD_VISIBLE */
 
 /*
@@ -250,6 +267,13 @@ struct shmfd {
 int	shm_map(struct file *fp, size_t size, off_t offset, void **memp);
 int	shm_unmap(struct file *fp, void *mem, size_t size);
 
+int	shm_access(struct shmfd *shmfd, struct ucred *ucred, int flags);
+struct shmfd *shm_alloc(struct ucred *ucred, mode_t mode);
+struct shmfd *shm_hold(struct shmfd *shmfd);
+void	shm_drop(struct shmfd *shmfd);
+int	shm_dotruncate(struct shmfd *shmfd, off_t length);
+
+extern struct fileops shm_ops;
 #else /* !_KERNEL */
 
 __BEGIN_DECLS
@@ -268,7 +292,7 @@ int	mlock(const void *, size_t);
 #define	_MMAP_DECLARED
 void *	mmap(void *, size_t, int, int, int, off_t);
 #endif
-int	mprotect(const void *, size_t, int);
+int	mprotect(void *, size_t, int);
 int	msync(void *, size_t, int);
 int	munlock(const void *, size_t);
 int	munmap(void *, size_t);

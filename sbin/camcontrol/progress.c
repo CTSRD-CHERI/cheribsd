@@ -1,6 +1,8 @@
 /*	$NetBSD: progressbar.c,v 1.21 2009/04/12 10:18:52 lukem Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ *
  * Copyright (c) 1997-2009 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -56,7 +58,7 @@ static const char * const suffixes[] = {
 	"EiB",	/* 2^60 Exbibyte */
 };
 
-#define NSUFFIXES	(sizeof(suffixes) / sizeof(suffixes[0]))
+#define NSUFFIXES	nitems(suffixes)
 #define SECSPERHOUR	(60 * 60)
 #define DEFAULT_TTYWIDTH	80
 

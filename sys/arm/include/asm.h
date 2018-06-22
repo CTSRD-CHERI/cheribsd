@@ -1,6 +1,8 @@
 /*	$NetBSD: asm.h,v 1.5 2003/08/07 16:26:53 agc Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
  *
@@ -39,7 +41,6 @@
 #ifndef _MACHINE_ASM_H_
 #define _MACHINE_ASM_H_
 #include <sys/cdefs.h>
-#include <machine/acle-compat.h>
 #include <machine/sysreg.h>
 
 #define	_C_LABEL(x)	x
@@ -79,7 +80,7 @@
 
 /*
  * EENTRY()/EEND() mark "extra" entry/exit points from a function.
- * LEENTRY()/LEEND() are the the same for local symbols.
+ * LEENTRY()/LEEND() are the same for local symbols.
  * The unwind info cannot handle the concept of a nested function, or a function
  * with multiple .fnstart directives, but some of our assembler code is written
  * with multiple labels to allow entry at several points.  The EENTRY() macro
@@ -236,6 +237,15 @@
 #define DSB	dsb
 #define DMB	dmb
 #define WFI	wfi
+
+#if defined(__ARM_ARCH_7VE__) || defined(__clang__)
+#define	MSR_ELR_HYP(regnum)	msr	elr_hyp, lr
+#define	ERET	eret
+#else
+#define MSR_ELR_HYP(regnum) .word (0xe12ef300 | regnum)
+#define ERET .word 0xe160006e
+#endif
+
 #elif __ARM_ARCH == 6
 #define ISB	mcr CP15_CP15ISB
 #define DSB	mcr CP15_CP15DSB

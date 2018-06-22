@@ -17,36 +17,31 @@
 // Other libraries and framework includes
 // Project includes
 #include "lldb/Target/StopInfo.h"
-#include "lldb/Core/StructuredData.h"
+#include "lldb/Utility/StructuredData.h"
 
 namespace lldb_private {
 
-class InstrumentationRuntimeStopInfo : public StopInfo
-{
+class InstrumentationRuntimeStopInfo : public StopInfo {
 public:
-    
-    virtual ~InstrumentationRuntimeStopInfo()
-    {
-    }
-    
-    virtual lldb::StopReason
-    GetStopReason () const
-    {
-        return lldb::eStopReasonInstrumentation;
-    }
-    
-    virtual const char *
-    GetDescription ();
-    
-    static lldb::StopInfoSP
-    CreateStopReasonWithInstrumentationData (Thread &thread, std::string description, StructuredData::ObjectSP additional_data);
-    
+  ~InstrumentationRuntimeStopInfo() override {}
+
+  lldb::StopReason GetStopReason() const override {
+    return lldb::eStopReasonInstrumentation;
+  }
+
+  const char *GetDescription() override;
+
+  bool DoShouldNotify(Event *event_ptr) override { return true; }
+
+  static lldb::StopInfoSP CreateStopReasonWithInstrumentationData(
+      Thread &thread, std::string description,
+      StructuredData::ObjectSP additional_data);
+
 private:
-    
-    InstrumentationRuntimeStopInfo(Thread &thread, std::string description, StructuredData::ObjectSP additional_data);
-    
+  InstrumentationRuntimeStopInfo(Thread &thread, std::string description,
+                                 StructuredData::ObjectSP additional_data);
 };
 
 } // namespace lldb_private
 
-#endif  // liblldb_InstrumentationRuntimeStopInfo_h_
+#endif // liblldb_InstrumentationRuntimeStopInfo_h_

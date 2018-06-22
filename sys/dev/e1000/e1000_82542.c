@@ -1,4 +1,5 @@
 /******************************************************************************
+  SPDX-License-Identifier: BSD-3-Clause
 
   Copyright (c) 2001-2015, Intel Corporation 
   All rights reserved.
@@ -317,7 +318,7 @@ static s32 e1000_init_hw_82542(struct e1000_hw *hw)
 static s32 e1000_setup_link_82542(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
-	s32 ret_val = E1000_SUCCESS;
+	s32 ret_val;
 
 	DEBUGFUNC("e1000_setup_link_82542");
 
@@ -565,7 +566,7 @@ static void e1000_clear_hw_cntrs_82542(struct e1000_hw *hw)
  *
  *  Reads the device MAC address from the EEPROM and stores the value.
  **/
-static s32 e1000_read_mac_addr_82542(struct e1000_hw *hw)
+s32 e1000_read_mac_addr_82542(struct e1000_hw *hw)
 {
 	s32  ret_val = E1000_SUCCESS;
 	u16 offset, nvm_data, i;

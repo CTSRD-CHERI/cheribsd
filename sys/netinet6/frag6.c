@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
  *
@@ -135,7 +137,7 @@ frag6_init(void)
  *	fragment's Fragment header.
  *		-> should grab it from the first fragment only
  *
- * The following note also contradicts with fragment rule - noone is going to
+ * The following note also contradicts with fragment rule - no one is going to
  * send different fragment with different next header field.
  *
  * additional note (p22):
@@ -225,6 +227,7 @@ frag6_input(struct mbuf **mp, int *offp, int proto)
 		IP6STAT_INC(ip6s_reassembled);
 		in6_ifstat_inc(dstifp, ifs6_reass_ok);
 		*offp = offset;
+		m->m_flags |= M_FRAGMENTED;
 		return (ip6f->ip6f_nxt);
 	}
 
@@ -528,6 +531,11 @@ insert:
 	af6 = ip6af->ip6af_down;
 	frag6_deq(ip6af);
 	while (af6 != (struct ip6asfrag *)q6) {
+		m->m_pkthdr.csum_flags &=
+		    IP6_REASS_MBUF(af6)->m_pkthdr.csum_flags;
+		m->m_pkthdr.csum_data +=
+		    IP6_REASS_MBUF(af6)->m_pkthdr.csum_data;
+
 		af6dwn = af6->ip6af_down;
 		frag6_deq(af6);
 		while (t->m_next)
@@ -537,6 +545,10 @@ insert:
 		free(af6, M_FTABLE);
 		af6 = af6dwn;
 	}
+
+	while (m->m_pkthdr.csum_data & 0xffff0000)
+		m->m_pkthdr.csum_data = (m->m_pkthdr.csum_data & 0xffff) +
+		    (m->m_pkthdr.csum_data >> 16);
 
 	/* adjust offset to point where the original next header starts */
 	offset = ip6af->ip6af_offset - sizeof(struct ip6_frag);
@@ -816,5 +828,6 @@ ip6_deletefraghdr(struct mbuf *m, int offset, int wait)
 		m_cat(m, t);
 	}
 
+	m->m_flags |= M_FRAGMENTED;
 	return (0);
 }

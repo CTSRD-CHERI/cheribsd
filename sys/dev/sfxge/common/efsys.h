@@ -1,5 +1,7 @@
 /*-
- * Copyright (c) 2010-2015 Solarflare Communications Inc.
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
+ * Copyright (c) 2010-2016 Solarflare Communications Inc.
  * All rights reserved.
  *
  * This software was developed in part by Philip Paeps under contract for
@@ -236,11 +238,9 @@ sfxge_map_mbuf_fast(bus_dma_tag_t tag, bus_dmamap_t map,
 
 #define	EFSYS_OPT_NAMES 1
 
-#define	EFSYS_OPT_FALCON 0
-#define	EFSYS_OPT_FALCON_NIC_CFG_OVERRIDE 0
 #define	EFSYS_OPT_SIENA 1
 #define	EFSYS_OPT_HUNTINGTON 1
-#define	EFSYS_OPT_MEDFORD 0
+#define	EFSYS_OPT_MEDFORD 1
 #ifdef DEBUG
 #define	EFSYS_OPT_CHECK_REG 1
 #else
@@ -251,41 +251,23 @@ sfxge_map_mbuf_fast(bus_dma_tag_t tag, bus_dmamap_t map,
 #define	EFSYS_OPT_MCDI_LOGGING 0
 #define	EFSYS_OPT_MCDI_PROXY_AUTH 0
 
-#define	EFSYS_OPT_MAC_FALCON_GMAC 0
-#define	EFSYS_OPT_MAC_FALCON_XMAC 0
 #define	EFSYS_OPT_MAC_STATS 1
 
 #define	EFSYS_OPT_LOOPBACK 0
 
-#define	EFSYS_OPT_MON_NULL 0
-#define	EFSYS_OPT_MON_LM87 0
-#define	EFSYS_OPT_MON_MAX6647 0
 #define	EFSYS_OPT_MON_MCDI 0
 #define	EFSYS_OPT_MON_STATS 0
 
-#define	EFSYS_OPT_PHY_NULL 0
-#define	EFSYS_OPT_PHY_QT2022C2 0
-#define	EFSYS_OPT_PHY_SFX7101 0
-#define	EFSYS_OPT_PHY_TXC43128 0
-#define	EFSYS_OPT_PHY_SFT9001 0
-#define	EFSYS_OPT_PHY_QT2025C 0
 #define	EFSYS_OPT_PHY_STATS 1
-#define	EFSYS_OPT_PHY_PROPS 0
-#define	EFSYS_OPT_PHY_BIST 0
 #define	EFSYS_OPT_BIST 1
 #define	EFSYS_OPT_PHY_LED_CONTROL 1
 #define	EFSYS_OPT_PHY_FLAGS 0
 
 #define	EFSYS_OPT_VPD 1
 #define	EFSYS_OPT_NVRAM 1
-#define	EFSYS_OPT_NVRAM_FALCON_BOOTROM 0
-#define	EFSYS_OPT_NVRAM_SFT9001	0
-#define	EFSYS_OPT_NVRAM_SFX7101	0
 #define	EFSYS_OPT_BOOTCFG 0
 
-#define	EFSYS_OPT_PCIE_TUNE 0
 #define	EFSYS_OPT_DIAG 0
-#define	EFSYS_OPT_WOL 1
 #define	EFSYS_OPT_RX_SCALE 1
 #define	EFSYS_OPT_QSTATS 1
 #define	EFSYS_OPT_FILTER 1
@@ -296,6 +278,8 @@ sfxge_map_mbuf_fast(bus_dma_tag_t tag, bus_dmamap_t map,
 #define	EFSYS_OPT_DECODE_INTR_FATAL 1
 
 #define	EFSYS_OPT_LICENSING 0
+
+#define	EFSYS_OPT_ALLOW_UNCONFIGURED_NIC 0
 
 /* ID */
 
@@ -1112,6 +1096,8 @@ typedef struct efsys_lock_s {
 #define	SFXGE_EFSYS_LOCK_ASSERT_OWNED(_eslp)				\
 	mtx_assert(&(_eslp)->lock, MA_OWNED)
 
+typedef int efsys_lock_state_t;
+
 #define	EFSYS_LOCK_MAGIC	0x000010c4
 
 #define	EFSYS_LOCK(_lockp, _state)					\
@@ -1126,22 +1112,6 @@ typedef struct efsys_lock_s {
 		if ((_state) != EFSYS_LOCK_MAGIC)			\
 			KASSERT(B_FALSE, ("not locked"));		\
 		SFXGE_EFSYS_UNLOCK(_lockp);				\
-	_NOTE(CONSTANTCONDITION)					\
-	} while (B_FALSE)
-
-/* PREEMPT */
-
-#define	EFSYS_PREEMPT_DISABLE(_state)					\
-	do {								\
-		(_state) = (_state);					\
-		critical_enter();					\
-	_NOTE(CONSTANTCONDITION)					\
-	} while (B_FALSE)
-
-#define	EFSYS_PREEMPT_ENABLE(_state)					\
-	do {								\
-		(_state) = (_state);					\
-		critical_exit(_state);					\
 	_NOTE(CONSTANTCONDITION)					\
 	} while (B_FALSE)
 

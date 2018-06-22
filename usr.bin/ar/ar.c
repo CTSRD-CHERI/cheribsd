@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2007 Kai Wang
  * Copyright (c) 2007 Tim Kientzle
  * Copyright (c) 2007 Joseph Koshy
@@ -272,10 +274,10 @@ main(int argc, char **argv)
 		    "only one of -s and -S options allowed");
 
 	if (bsdar->options & (AR_A | AR_B)) {
-		if ((bsdar->posarg = *argv) == NULL)
+		if (*argv == NULL)
 			bsdar_errc(bsdar, EX_USAGE, 0,
 			    "no position operand specified");
-		if ((bsdar->posarg = basename(bsdar->posarg)) == NULL)
+		if ((bsdar->posarg = basename(*argv)) == NULL)
 			bsdar_errc(bsdar, EX_SOFTWARE, errno,
 			    "basename failed");
 		argc--;
@@ -283,7 +285,8 @@ main(int argc, char **argv)
 	}
 
 	/* Set determinstic mode for -D, and by default without -U. */
-	if (Dflag || (Uflag == 0 && (bsdar->mode == 'q' || bsdar->mode == 'r')))
+	if (Dflag || (Uflag == 0 && (bsdar->mode == 'q' || bsdar->mode == 'r' ||
+	    (bsdar->mode == '\0' && bsdar->options & AR_S))))
 		bsdar->options |= AR_D;
 
 	if (bsdar->options & AR_A)

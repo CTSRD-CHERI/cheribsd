@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011 HighPoint Technologies, Inc.
  * All rights reserved.
  *
@@ -31,7 +33,7 @@
 #include <dev/hpt27xx/os_bsd.h>
 #include <dev/hpt27xx/hptintf.h>
 
-static HIM *hpt_match(device_t dev)
+static HIM *hpt_match(device_t dev, int scan)
 {
 	PCI_ID pci_id;
 	HIM *him;
@@ -39,7 +41,7 @@ static HIM *hpt_match(device_t dev)
 
 	for (him = him_list; him; him = him->next) {
 		for (i=0; him->get_supported_device_id(i, &pci_id); i++) {
-			if (him->get_controller_count)
+			if (scan && him->get_controller_count)
 				him->get_controller_count(&pci_id,0,0);
 			if ((pci_get_vendor(dev) == pci_id.vid) &&
 				(pci_get_device(dev) == pci_id.did)){
@@ -54,7 +56,7 @@ static int hpt_probe(device_t dev)
 {
 	HIM *him;
 
-	him = hpt_match(dev);
+	him = hpt_match(dev, 0);
 	if (him != NULL) {
 		KdPrint(("hpt_probe: adapter at PCI %d:%d:%d, IRQ %d",
 			pci_get_bus(dev), pci_get_slot(dev), pci_get_function(dev), pci_get_irq(dev)
@@ -77,7 +79,7 @@ static int hpt_attach(device_t dev)
 	
 	KdPrint(("hpt_attach(%d/%d/%d)", pci_get_bus(dev), pci_get_slot(dev), pci_get_function(dev)));
 
-	him = hpt_match(dev);
+	him = hpt_match(dev, 1);
 	hba->ext_type = EXT_TYPE_HBA;
 	hba->ldm_adapter.him = him;
 	pci_enable_busmaster(dev);
@@ -297,7 +299,7 @@ static int hpt_flush_vdev(PVBUS_EXT vbus_ext, PVDEV vd)
 	hpt_lock_vbus(vbus_ext);
 
 	if (mIsArray(vd->type) && vd->u.array.transform)
-		count = MAX(vd->u.array.transform->source->cmds_per_request,
+		count = max(vd->u.array.transform->source->cmds_per_request,
 					vd->u.array.transform->target->cmds_per_request);
 	else
 		count = vd->cmds_per_request;
@@ -934,9 +936,9 @@ static void hpt_action(struct cam_sim *sim, union ccb *ccb)
 		cpi->initiator_id = osm_max_targets;
 		cpi->base_transfer_speed = 3300;
 
-		strncpy(cpi->sim_vid, "FreeBSD", SIM_IDLEN);
-		strncpy(cpi->hba_vid, "HPT   ", HBA_IDLEN);
-		strncpy(cpi->dev_name, cam_sim_name(sim), DEV_IDLEN);
+		strlcpy(cpi->sim_vid, "FreeBSD", SIM_IDLEN);
+		strlcpy(cpi->hba_vid, "HPT   ", HBA_IDLEN);
+		strlcpy(cpi->dev_name, cam_sim_name(sim), DEV_IDLEN);
 		cpi->transport = XPORT_SPI;
 		cpi->transport_version = 2;
 		cpi->protocol = PROTO_SCSI;
@@ -1260,8 +1262,8 @@ static void hpt_final_init(void *dummy)
 
 		for (hba = vbus_ext->hba_list; hba; hba = hba->next) {
 			int rid = 0;
-			if ((hba->irq_res = bus_alloc_resource(hba->pcidev,
-				SYS_RES_IRQ, &rid, 0, ~0ul, 1, RF_SHAREABLE | RF_ACTIVE)) == NULL)
+			if ((hba->irq_res = bus_alloc_resource_any(hba->pcidev,
+				SYS_RES_IRQ, &rid, RF_SHAREABLE | RF_ACTIVE)) == NULL)
 			{
 				os_printk("can't allocate interrupt");
 				return ;

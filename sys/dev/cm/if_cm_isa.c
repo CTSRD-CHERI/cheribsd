@@ -4,6 +4,8 @@
 __FBSDID("$FreeBSD$");
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ *
  * Copyright (c) 1994, 1995, 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -63,8 +65,8 @@ cm_isa_probe(dev)
 	int rid;
 
 	rid = 0;
-	sc->port_res = bus_alloc_resource(
-	    dev, SYS_RES_IOPORT, &rid, 0ul, ~0ul, CM_IO_PORTS, RF_ACTIVE);
+	sc->port_res = bus_alloc_resource_anywhere(
+	    dev, SYS_RES_IOPORT, &rid, CM_IO_PORTS, RF_ACTIVE);
 	if (sc->port_res == NULL)
 		return (ENOENT);
 
@@ -74,8 +76,8 @@ cm_isa_probe(dev)
 	}
 
 	rid = 0;
-	sc->mem_res = bus_alloc_resource(
-	    dev, SYS_RES_MEMORY, &rid, 0ul, ~0ul, CM_MEM_SIZE, RF_ACTIVE);
+	sc->mem_res = bus_alloc_resource_anywhere(
+	    dev, SYS_RES_MEMORY, &rid, CM_MEM_SIZE, RF_ACTIVE);
 	if (sc->mem_res == NULL) {
 		cm_release_resources(dev);
 		return (ENOENT);

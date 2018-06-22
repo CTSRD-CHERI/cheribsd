@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2005-2007, Joseph Koshy
  * Copyright (c) 2007 The FreeBSD Foundation
  * Copyright (c) 2009, Fabien Thomas
@@ -75,6 +77,9 @@ __FBSDID("$FreeBSD$");
 #include "pmcpl_gprof.h"
 
 typedef	uint64_t	WIDEHISTCOUNTER;
+
+#define	min(A,B)		((A) < (B) ? (A) : (B))
+#define	max(A,B)		((A) > (B) ? (A) : (B))
 
 #define	WIDEHISTCOUNTER_MAX		UINT64_MAX
 #define	HISTCOUNTER_MAX			USHRT_MAX
@@ -310,8 +315,9 @@ pmcstat_callgraph_do_gmon_arcs(void)
 void
 pmcpl_gmon_initimage(struct pmcstat_image *pi)
 {
+	const char *execpath;
 	int count, nlen;
-	char *sn;
+	char *sn, *snbuf;
 	char name[NAME_MAX];
 
 	/*
@@ -321,9 +327,11 @@ pmcpl_gmon_initimage(struct pmcstat_image *pi)
 	 * `basename(path)`+ "~" + NNN + ".gmon" till we get a free
 	 * entry.
 	 */
-	if ((sn = basename(pmcstat_string_unintern(pi->pi_execpath))) == NULL)
-		err(EX_OSERR, "ERROR: Cannot process \"%s\"",
-		    pmcstat_string_unintern(pi->pi_execpath));
+	execpath = pmcstat_string_unintern(pi->pi_execpath);
+	if ((snbuf = strdup(execpath)) == NULL)
+		err(EX_OSERR, "ERROR: Cannot copy \"%s\"", execpath);
+	if ((sn = basename(snbuf)) == NULL)
+		err(EX_OSERR, "ERROR: Cannot process \"%s\"", execpath);
 
 	nlen = strlen(sn);
 	nlen = min(nlen, (int) (sizeof(name) - sizeof(".gmon")));
@@ -355,6 +363,7 @@ pmcpl_gmon_initimage(struct pmcstat_image *pi)
 			}
 		} while (count > 0);
 	}
+	free(snbuf);
 
 	LIST_INIT(&pi->pi_gmlist);
 }
@@ -432,7 +441,7 @@ pmcpl_gmon_process(struct pmcstat_process *pp, struct pmcstat_pmcrecord *pmcr,
 	 * this executable image, try determine its parameters.
 	 */
 	if (image->pi_type == PMCSTAT_IMAGE_UNKNOWN)
-		pmcstat_image_determine_type(image);
+		pmcstat_image_determine_type(image, &args);
 
 	assert(image->pi_type != PMCSTAT_IMAGE_UNKNOWN);
 
@@ -464,8 +473,8 @@ pmcpl_gmon_process(struct pmcstat_process *pp, struct pmcstat_pmcrecord *pmcr,
 		    image, pmcid);
 		pgf->pgf_pmcid = pmcid;
 		assert(image->pi_end > image->pi_start);
-		pgf->pgf_nbuckets = (image->pi_end - image->pi_start) /
-		    FUNCTION_ALIGNMENT;	/* see <machine/profile.h> */
+		pgf->pgf_nbuckets = howmany(image->pi_end - image->pi_start,
+		    FUNCTION_ALIGNMENT);	/* see <machine/profile.h> */
 		pgf->pgf_ndatabytes = sizeof(struct gmonhdr) +
 		    pgf->pgf_nbuckets * hc_sz;
 		pgf->pgf_nsamples = 0;

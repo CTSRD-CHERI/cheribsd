@@ -47,6 +47,12 @@ public:
   /// must contain at least one entry.
   std::vector<std::string> Targets;
 
+  /// A list of filenames to be used as extra dependencies for every target.
+  std::vector<std::string> ExtraDeps;
+
+  /// In /showIncludes mode, pretend the main TU is a header with this name.
+  std::string ShowIncludesPretendHeader;
+
   /// \brief The file to write GraphViz-formatted header dependencies to.
   std::string DOTOutputFile;
 

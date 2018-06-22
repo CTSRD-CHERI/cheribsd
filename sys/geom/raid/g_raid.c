@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2010 Alexander Motin <mav@FreeBSD.org>
  * All rights reserved.
  *
@@ -953,7 +955,6 @@ g_raid_dirty(struct g_raid_volume *vol)
 void
 g_raid_tr_flush_common(struct g_raid_tr_object *tr, struct bio *bp)
 {
-	struct g_raid_softc *sc;
 	struct g_raid_volume *vol;
 	struct g_raid_subdisk *sd;
 	struct bio_queue_head queue;
@@ -961,7 +962,6 @@ g_raid_tr_flush_common(struct g_raid_tr_object *tr, struct bio *bp)
 	int i;
 
 	vol = tr->tro_volume;
-	sc = vol->v_softc;
 
 	/*
 	 * Allocate all bios before sending any request, so we can return
@@ -1011,7 +1011,7 @@ g_raid_tr_kerneldump_common(struct g_raid_tr_object *tr,
 	vol = tr->tro_volume;
 	sc = vol->v_softc;
 
-	bzero(&bp, sizeof(bp));
+	g_reset_bio(&bp);
 	bp.bio_cmd = BIO_WRITE;
 	bp.bio_done = g_raid_tr_kerneldump_common_done;
 	bp.bio_attribute = NULL;
@@ -2462,7 +2462,6 @@ g_raid_shutdown_post_sync(void *arg, int howto)
 	struct g_raid_volume *vol;
 
 	mp = arg;
-	DROP_GIANT();
 	g_topology_lock();
 	g_raid_shutdown = 1;
 	LIST_FOREACH_SAFE(gp, &mp->geom, geom, gp2) {
@@ -2477,7 +2476,6 @@ g_raid_shutdown_post_sync(void *arg, int howto)
 		g_topology_lock();
 	}
 	g_topology_unlock();
-	PICKUP_GIANT();
 }
 
 static void

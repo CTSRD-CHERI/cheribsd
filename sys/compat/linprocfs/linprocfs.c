@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2000 Dag-Erling Coïdan Smørgrav
  * Copyright (c) 1999 Pierre Beyssac
  * Copyright (c) 1993 Jan-Simon Pendry
@@ -61,6 +63,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/proc.h>
 #include <sys/ptrace.h>
 #include <sys/resourcevar.h>
+#include <sys/resource.h>
 #include <sys/sbuf.h>
 #include <sys/sem.h>
 #include <sys/smp.h>
@@ -143,12 +146,10 @@ linprocfs_domeminfo(PFS_FILL_ARGS)
 	unsigned long memtotal;		/* total memory in bytes */
 	unsigned long memused;		/* used memory in bytes */
 	unsigned long memfree;		/* free memory in bytes */
-	unsigned long memshared;	/* shared memory ??? */
 	unsigned long buffers, cached;	/* buffer / cache memory ??? */
 	unsigned long long swaptotal;	/* total swap space in bytes */
 	unsigned long long swapused;	/* used swap space in bytes */
 	unsigned long long swapfree;	/* free swap space in bytes */
-	vm_object_t object;
 	int i, j;
 
 	memtotal = physmem * PAGE_SIZE;
@@ -168,13 +169,6 @@ linprocfs_domeminfo(PFS_FILL_ARGS)
 	swaptotal = (unsigned long long)i * PAGE_SIZE;
 	swapused = (unsigned long long)j * PAGE_SIZE;
 	swapfree = swaptotal - swapused;
-	memshared = 0;
-	mtx_lock(&vm_object_list_mtx);
-	TAILQ_FOREACH(object, &vm_object_list, object_list)
-		if (object->shadow_count > 1)
-			memshared += object->resident_page_count;
-	mtx_unlock(&vm_object_list_mtx);
-	memshared *= PAGE_SIZE;
 	/*
 	 * We'd love to be able to write:
 	 *
@@ -184,24 +178,17 @@ linprocfs_domeminfo(PFS_FILL_ARGS)
 	 * like unstaticizing it just for linprocfs's sake.
 	 */
 	buffers = 0;
-	cached = vm_cnt.v_cache_count * PAGE_SIZE;
+	cached = vm_cnt.v_inactive_count * PAGE_SIZE;
 
 	sbuf_printf(sb,
-	    "	     total:    used:	free:  shared: buffers:	 cached:\n"
-	    "Mem:  %lu %lu %lu %lu %lu %lu\n"
-	    "Swap: %llu %llu %llu\n"
 	    "MemTotal: %9lu kB\n"
 	    "MemFree:  %9lu kB\n"
-	    "MemShared:%9lu kB\n"
 	    "Buffers:  %9lu kB\n"
 	    "Cached:   %9lu kB\n"
 	    "SwapTotal:%9llu kB\n"
 	    "SwapFree: %9llu kB\n",
-	    memtotal, memused, memfree, memshared, buffers, cached,
-	    swaptotal, swapused, swapfree,
-	    B2K(memtotal), B2K(memfree),
-	    B2K(memshared), B2K(buffers), B2K(cached),
-	    B2K(swaptotal), B2K(swapfree));
+	    B2K(memtotal), B2K(memfree), B2K(buffers),
+	    B2K(cached), B2K(swaptotal), B2K(swapfree));
 
 	return (0);
 }
@@ -217,8 +204,9 @@ linprocfs_docpuinfo(PFS_FILL_ARGS)
 	char model[128];
 	uint64_t freq;
 	size_t size;
-	int class, fqmhz, fqkhz;
-	int i;
+	u_int cache_size[4];
+	int fqmhz, fqkhz;
+	int i, j;
 
 	/*
 	 * We default the flags to include all non-conflicting flags,
@@ -234,32 +222,13 @@ linprocfs_docpuinfo(PFS_FILL_ARGS)
 		"3dnowext", "3dnow"
 	};
 
-	switch (cpu_class) {
-#ifdef __i386__
-	case CPUCLASS_286:
-		class = 2;
-		break;
-	case CPUCLASS_386:
-		class = 3;
-		break;
-	case CPUCLASS_486:
-		class = 4;
-		break;
-	case CPUCLASS_586:
-		class = 5;
-		break;
-	case CPUCLASS_686:
-		class = 6;
-		break;
-	default:
-		class = 0;
-		break;
-#else /* __amd64__ */
-	default:
-		class = 15;
-		break;
-#endif
-	}
+	static char *power_flags[] = {
+		"ts",           "fid",          "vid",
+		"ttp",          "tm",           "stc",
+		"100mhzsteps",  "hwpstate",     "",
+		"cpb",          "eff_freq_ro",  "proc_feedback",
+		"acc_power",
+	};
 
 	hw_model[0] = CTL_HW;
 	hw_model[1] = HW_MODEL;
@@ -267,25 +236,10 @@ linprocfs_docpuinfo(PFS_FILL_ARGS)
 	size = sizeof(model);
 	if (kernel_sysctl(td, hw_model, 2, &model, &size, 0, 0, 0, 0) != 0)
 		strcpy(model, "unknown");
-	for (i = 0; i < mp_ncpus; ++i) {
-		sbuf_printf(sb,
-		    "processor\t: %d\n"
-		    "vendor_id\t: %.20s\n"
-		    "cpu family\t: %u\n"
-		    "model\t\t: %u\n"
-		    "model name\t: %s\n"
-		    "stepping\t: %u\n\n",
-		    i, cpu_vendor, CPUID_TO_FAMILY(cpu_id),
-		    CPUID_TO_MODEL(cpu_id), model, cpu_id & CPUID_STEPPING);
-		/* XXX per-cpu vendor / class / model / id? */
-	}
-
-	sbuf_cat(sb, "flags\t\t:");
-
 #ifdef __i386__
 	switch (cpu_vendor_id) {
 	case CPU_VENDOR_AMD:
-		if (class < 6)
+		if (cpu_class < CPUCLASS_686)
 			flags[16] = "fcmov";
 		break;
 	case CPU_VENDOR_CYRIX:
@@ -293,20 +247,73 @@ linprocfs_docpuinfo(PFS_FILL_ARGS)
 		break;
 	}
 #endif
-
-	for (i = 0; i < 32; i++)
-		if (cpu_feature & (1 << i))
-			sbuf_printf(sb, " %s", flags[i]);
-	sbuf_cat(sb, "\n");
-	freq = atomic_load_acq_64(&tsc_freq);
-	if (freq != 0) {
-		fqmhz = (freq + 4999) / 1000000;
-		fqkhz = ((freq + 4999) / 10000) % 100;
+	if (cpu_exthigh >= 0x80000006)
+		do_cpuid(0x80000006, cache_size);
+	else
+		memset(cache_size, 0, sizeof(cache_size));
+	for (i = 0; i < mp_ncpus; ++i) {
+		fqmhz = 0;
+		fqkhz = 0;
+		freq = atomic_load_acq_64(&tsc_freq);
+		if (freq != 0) {
+			fqmhz = (freq + 4999) / 1000000;
+			fqkhz = ((freq + 4999) / 10000) % 100;
+		}
 		sbuf_printf(sb,
+		    "processor\t: %d\n"
+		    "vendor_id\t: %.20s\n"
+		    "cpu family\t: %u\n"
+		    "model\t\t: %u\n"
+		    "model name\t: %s\n"
+		    "stepping\t: %u\n"
 		    "cpu MHz\t\t: %d.%02d\n"
-		    "bogomips\t: %d.%02d\n",
-		    fqmhz, fqkhz, fqmhz, fqkhz);
+		    "cache size\t: %d KB\n"
+		    "physical id\t: %d\n"
+		    "siblings\t: %d\n"
+		    "core id\t\t: %d\n"
+		    "cpu cores\t: %d\n"
+		    "apicid\t\t: %d\n"
+		    "initial apicid\t: %d\n"
+		    "fpu\t\t: %s\n"
+		    "fpu_exception\t: %s\n"
+		    "cpuid level\t: %d\n"
+		    "wp\t\t: %s\n",
+		    i, cpu_vendor, CPUID_TO_FAMILY(cpu_id),
+		    CPUID_TO_MODEL(cpu_id), model, cpu_id & CPUID_STEPPING,
+		    fqmhz, fqkhz,
+		    (cache_size[2] >> 16), 0, mp_ncpus, i, mp_ncpus,
+		    i, i, /*cpu_id & CPUID_LOCAL_APIC_ID ??*/
+		    (cpu_feature & CPUID_FPU) ? "yes" : "no", "yes",
+		    CPUID_TO_FAMILY(cpu_id), "yes");
+		sbuf_cat(sb, "flags\t\t:");
+		for (j = 0; j < nitems(flags); j++)
+			if (cpu_feature & (1 << j))
+				sbuf_printf(sb, " %s", flags[j]);
+		sbuf_cat(sb, "\n");
+		sbuf_printf(sb,
+		    "bugs\t\t: %s\n"
+		    "bogomips\t: %d.%02d\n"
+		    "clflush size\t: %d\n"
+		    "cache_alignment\t: %d\n"
+		    "address sizes\t: %d bits physical, %d bits virtual\n",
+#if defined(I586_CPU) && !defined(NO_F00F_HACK)
+		    (has_f00f_bug) ? "Intel F00F" : "",
+#else
+		    "",
+#endif
+		    fqmhz, fqkhz,
+		    cpu_clflush_line_size, cpu_clflush_line_size,
+		    cpu_maxphyaddr,
+		    (cpu_maxphyaddr > 32) ? 48 : 0);
+		sbuf_cat(sb, "power management: ");
+		for (j = 0; j < nitems(power_flags); j++)
+			if (amd_pminfo & (1 << j))
+				sbuf_printf(sb, " %s", power_flags[j]);
+		sbuf_cat(sb, "\n\n");
+
+		/* XXX per-cpu vendor / class / model / id? */
 	}
+	sbuf_cat(sb, "\n");
 
 	return (0);
 }
@@ -326,7 +333,8 @@ linprocfs_domtab(PFS_FILL_ARGS)
 	char *dlep, *flep, *mntto, *mntfrom, *fstype;
 	size_t lep_len;
 	int error;
-	struct statfs *buf, *sp;
+	struct statfs * __capability buf
+	struct statfs *sp;
 	size_t count;
 
 	/* resolve symlinks etc. in the emulation tree prefix */
@@ -345,12 +353,13 @@ linprocfs_domtab(PFS_FILL_ARGS)
 	error = kern_getfsstat(td, &buf, SIZE_T_MAX, &count,
 	    UIO_SYSSPACE, MNT_WAIT);
 	if (error != 0) {
-		free(buf, M_TEMP);
+		free_c(buf, M_TEMP);
 		free(flep, M_TEMP);
 		return (error);
 	}
 
-	for (sp = buf; count > 0; sp++, count--) {
+	for (sp = (__cheri_fromcap struct statfs *)buf; count > 0;
+	    sp++, count--) {
 		/* determine device name */
 		mntfrom = sp->f_mntfromname;
 
@@ -391,7 +400,7 @@ linprocfs_domtab(PFS_FILL_ARGS)
 		sbuf_printf(sb, " 0 0\n");
 	}
 
-	free(buf, M_TEMP);
+	free_c(buf, M_TEMP);
 	free(flep, M_TEMP);
 	return (error);
 }
@@ -446,9 +455,11 @@ linprocfs_dostat(PFS_FILL_ARGS)
 	struct pcpu *pcpu;
 	long cp_time[CPUSTATES];
 	long *cp;
+	struct timeval boottime;
 	int i;
 
 	read_cpu_time(cp_time);
+	getboottime(&boottime);
 	sbuf_printf(sb, "cpu %ld %ld %ld %ld\n",
 	    T2J(cp_time[CP_USER]),
 	    T2J(cp_time[CP_NICE]),
@@ -465,17 +476,17 @@ linprocfs_dostat(PFS_FILL_ARGS)
 	}
 	sbuf_printf(sb,
 	    "disk 0 0 0 0\n"
-	    "page %u %u\n"
-	    "swap %u %u\n"
-	    "intr %u\n"
-	    "ctxt %u\n"
+	    "page %ju %ju\n"
+	    "swap %ju %ju\n"
+	    "intr %ju\n"
+	    "ctxt %ju\n"
 	    "btime %lld\n",
-	    vm_cnt.v_vnodepgsin,
-	    vm_cnt.v_vnodepgsout,
-	    vm_cnt.v_swappgsin,
-	    vm_cnt.v_swappgsout,
-	    vm_cnt.v_intr,
-	    vm_cnt.v_swtch,
+	    (uintmax_t)VM_CNT_FETCH(v_vnodepgsin),
+	    (uintmax_t)VM_CNT_FETCH(v_vnodepgsout),
+	    (uintmax_t)VM_CNT_FETCH(v_swappgsin),
+	    (uintmax_t)VM_CNT_FETCH(v_swappgsout),
+	    (uintmax_t)VM_CNT_FETCH(v_intr),
+	    (uintmax_t)VM_CNT_FETCH(v_swtch),
 	    (long long)boottime.tv_sec);
 	return (0);
 }
@@ -489,7 +500,6 @@ linprocfs_doswaps(PFS_FILL_ARGS)
 	char devname[SPECNAMELEN + 1];
 
 	sbuf_printf(sb, "Filename\t\t\t\tType\t\tSize\tUsed\tPriority\n");
-	mtx_lock(&Giant);
 	for (n = 0; ; n++) {
 		if (swap_dev_info(n, &xsw, devname, sizeof(devname)) != 0)
 			break;
@@ -503,7 +513,6 @@ linprocfs_doswaps(PFS_FILL_ARGS)
 		sbuf_printf(sb, "/dev/%-34s unknown\t\t%jd\t%jd\t-1\n",
 		    devname, total, used);
 	}
-	mtx_unlock(&Giant);
 	return (0);
 }
 
@@ -625,10 +634,12 @@ static int
 linprocfs_doprocstat(PFS_FILL_ARGS)
 {
 	struct kinfo_proc kp;
+	struct timeval boottime;
 	char state;
 	static int ratelimit = 0;
 	vm_offset_t startcode, startdata;
 
+	getboottime(&boottime);
 	sx_slock(&proctree_lock);
 	PROC_LOCK(p);
 	fill_kinfo_proc(p, &kp);
@@ -639,7 +650,7 @@ linprocfs_doprocstat(PFS_FILL_ARGS)
 	} else {
 	   startcode = 0;
 	   startdata = 0;
-	};
+	}
 	sbuf_printf(sb, "%d", p->p_pid);
 #define PS_ADD(name, fmt, arg) sbuf_printf(sb, " " fmt, arg)
 	PS_ADD("comm",		"(%s)",	p->p_comm);
@@ -1325,13 +1336,13 @@ linprocfs_dofilesystems(PFS_FILL_ARGS)
 {
 	struct vfsconf *vfsp;
 
-	mtx_lock(&Giant);
+	vfsconf_slock();
 	TAILQ_FOREACH(vfsp, &vfsconf, vfc_list) {
 		if (vfsp->vfc_flags & VFCF_SYNTHETIC)
 			sbuf_printf(sb, "nodev");
 		sbuf_printf(sb, "\t%s\n", vfsp->vfc_name);
 	}
-	mtx_unlock(&Giant);
+	vfsconf_sunlock();
 	return(0);
 }
 
@@ -1366,6 +1377,97 @@ linprocfs_dofdescfs(PFS_FILL_ARGS)
 	return (0);
 }
 
+/*
+ * Filler function for proc/pid/limits
+ */
+static const struct linux_rlimit_ident {
+	const char	*desc;
+	const char	*unit;
+	unsigned int	rlim_id;
+} linux_rlimits_ident[] = {
+	{ "Max cpu time",	"seconds",	RLIMIT_CPU },
+	{ "Max file size", 	"bytes",	RLIMIT_FSIZE },
+	{ "Max data size",	"bytes", 	RLIMIT_DATA },
+	{ "Max stack size",	"bytes", 	RLIMIT_STACK },
+	{ "Max core file size",  "bytes",	RLIMIT_CORE },
+	{ "Max resident set",	"bytes",	RLIMIT_RSS },
+	{ "Max processes",	"processes",	RLIMIT_NPROC },
+	{ "Max open files",	"files",	RLIMIT_NOFILE },
+	{ "Max locked memory",	"bytes",	RLIMIT_MEMLOCK },
+	{ "Max address space",	"bytes",	RLIMIT_AS },
+	{ "Max file locks",	"locks",	LINUX_RLIMIT_LOCKS },
+	{ "Max pending signals", "signals",	LINUX_RLIMIT_SIGPENDING },
+	{ "Max msgqueue size",	"bytes",	LINUX_RLIMIT_MSGQUEUE },
+	{ "Max nice priority", 		"",	LINUX_RLIMIT_NICE },
+	{ "Max realtime priority",	"",	LINUX_RLIMIT_RTPRIO },
+	{ "Max realtime timeout",	"us",	LINUX_RLIMIT_RTTIME },
+	{ 0, 0, 0 }
+};
+
+static int
+linprocfs_doproclimits(PFS_FILL_ARGS)
+{
+	const struct linux_rlimit_ident *li;
+	struct plimit *limp;
+	struct rlimit rl;
+	ssize_t size;
+	int res, error;
+
+	error = 0;
+
+	PROC_LOCK(p);
+	limp = lim_hold(p->p_limit);
+	PROC_UNLOCK(p);
+	size = sizeof(res);
+	sbuf_printf(sb, "%-26s%-21s%-21s%-21s\n", "Limit", "Soft Limit",
+			"Hard Limit", "Units");
+	for (li = linux_rlimits_ident; li->desc != NULL; ++li) {
+		switch (li->rlim_id)
+		{
+		case LINUX_RLIMIT_LOCKS:
+			/* FALLTHROUGH */
+		case LINUX_RLIMIT_RTTIME:
+			rl.rlim_cur = RLIM_INFINITY;
+			break;
+		case LINUX_RLIMIT_SIGPENDING:
+			error = kernel_sysctlbyname(td,
+			    "kern.sigqueue.max_pending_per_proc",
+			    &res, &size, 0, 0, 0, 0);
+			if (error != 0)
+				goto out;
+			rl.rlim_cur = res;
+			rl.rlim_max = res;
+			break;
+		case LINUX_RLIMIT_MSGQUEUE:
+			error = kernel_sysctlbyname(td,
+			    "kern.ipc.msgmnb", &res, &size, 0, 0, 0, 0);
+			if (error != 0)
+				goto out;
+			rl.rlim_cur = res;
+			rl.rlim_max = res;
+			break;
+		case LINUX_RLIMIT_NICE:
+			/* FALLTHROUGH */
+		case LINUX_RLIMIT_RTPRIO:
+			rl.rlim_cur = 0;
+			rl.rlim_max = 0;
+			break;
+		default:
+			rl = limp->pl_rlimit[li->rlim_id];
+			break;
+		}
+		if (rl.rlim_cur == RLIM_INFINITY)
+			sbuf_printf(sb, "%-26s%-21s%-21s%-10s\n",
+			    li->desc, "unlimited", "unlimited", li->unit);
+		else
+			sbuf_printf(sb, "%-26s%-21llu%-21llu%-10s\n",
+			    li->desc, (unsigned long long)rl.rlim_cur,
+			    (unsigned long long)rl.rlim_max, li->unit);
+	}
+out:
+	lim_free(limp);
+	return (error);
+}
 
 /*
  * Filler function for proc/sys/kernel/random/uuid
@@ -1492,6 +1594,8 @@ linprocfs_init(PFS_INIT_ARGS)
 	    NULL, NULL, NULL, PFS_RD);
 	pfs_create_file(dir, "mem", &procfs_doprocmem,
 	    &procfs_attr, &procfs_candebug, NULL, PFS_RDWR|PFS_RAW);
+	pfs_create_file(dir, "mounts", &linprocfs_domtab,
+	    NULL, NULL, NULL, PFS_RD);
 	pfs_create_link(dir, "root", &linprocfs_doprocroot,
 	    NULL, NULL, NULL, 0);
 	pfs_create_file(dir, "stat", &linprocfs_doprocstat,
@@ -1504,6 +1608,8 @@ linprocfs_init(PFS_INIT_ARGS)
 	    NULL, NULL, NULL, 0);
 	pfs_create_file(dir, "auxv", &linprocfs_doauxv,
 	    NULL, &procfs_candebug, NULL, PFS_RD|PFS_RAWRD);
+	pfs_create_file(dir, "limits", &linprocfs_doproclimits,
+	    NULL, NULL, NULL, PFS_RD);
 
 	/* /proc/scsi/... */
 	dir = pfs_create_dir(root, "scsi", NULL, NULL, NULL, 0);

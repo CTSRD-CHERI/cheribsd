@@ -15,7 +15,7 @@
 #define LLVM_LIB_ASMPARSER_LLPARSER_H
 
 #include "LLLexer.h"
-#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Instructions.h"
@@ -46,29 +46,32 @@ namespace llvm {
   /// or a symbolic (%var) reference.  This is just a discriminated union.
   struct ValID {
     enum {
-      t_LocalID, t_GlobalID,      // ID in UIntVal.
-      t_LocalName, t_GlobalName,  // Name in StrVal.
-      t_APSInt, t_APFloat,        // Value in APSIntVal/APFloatVal.
-      t_Null, t_Undef, t_Zero,    // No value.
-      t_EmptyArray,               // No value:  []
-      t_Constant,                 // Value in ConstantVal.
-      t_InlineAsm,                // Value in StrVal/StrVal2/UIntVal.
-      t_ConstantStruct,           // Value in ConstantStructElts.
-      t_PackedConstantStruct      // Value in ConstantStructElts.
-    } Kind;
+      t_LocalID, t_GlobalID,           // ID in UIntVal.
+      t_LocalName, t_GlobalName,       // Name in StrVal.
+      t_APSInt, t_APFloat,             // Value in APSIntVal/APFloatVal.
+      t_Null, t_Undef, t_Zero, t_None, // No value.
+      t_EmptyArray,                    // No value:  []
+      t_Constant,                      // Value in ConstantVal.
+      t_InlineAsm,                     // Value in FTy/StrVal/StrVal2/UIntVal.
+      t_ConstantStruct,                // Value in ConstantStructElts.
+      t_PackedConstantStruct           // Value in ConstantStructElts.
+    } Kind = t_LocalID;
 
     LLLexer::LocTy Loc;
     unsigned UIntVal;
+    FunctionType *FTy = nullptr;
     std::string StrVal, StrVal2;
     APSInt APSIntVal;
-    APFloat APFloatVal;
+    APFloat APFloatVal{0.0};
     Constant *ConstantVal;
-    Constant **ConstantStructElts;
+    std::unique_ptr<Constant *[]> ConstantStructElts;
 
-    ValID() : Kind(t_LocalID), APFloatVal(0.0) {}
-    ~ValID() {
-      if (Kind == t_ConstantStruct || Kind == t_PackedConstantStruct)
-        delete [] ConstantStructElts;
+    ValID() = default;
+    ValID(const ValID &RHS)
+        : Kind(RHS.Kind), Loc(RHS.Loc), UIntVal(RHS.UIntVal), FTy(RHS.FTy),
+          StrVal(RHS.StrVal), StrVal2(RHS.StrVal2), APSIntVal(RHS.APSIntVal),
+          APFloatVal(RHS.APFloatVal), ConstantVal(RHS.ConstantVal) {
+      assert(!RHS.ConstantStructElts);
     }
 
     bool operator<(const ValID &RHS) const {
@@ -143,6 +146,11 @@ namespace llvm {
           Slots(Slots), BlockAddressPFS(nullptr) {}
     bool Run();
 
+    bool parseStandaloneConstantValue(Constant *&C, const SlotMapping *Slots);
+
+    bool parseTypeAtBeginning(Type *&Ty, unsigned &Read,
+                              const SlotMapping *Slots);
+
     LLVMContext &getContext() { return Context; }
 
   private:
@@ -153,6 +161,10 @@ namespace llvm {
     bool TokError(const Twine &Msg) const {
       return Error(Lex.getLoc(), Msg);
     }
+
+    /// Restore the internal name and slot mappings using the mappings that
+    /// were created at an earlier parsing stage.
+    void restoreParsingState(const SlotMapping *Slots);
 
     /// GetGlobalVal - Get a value with the specified name or ID, creating a
     /// forward reference record if needed.  This can return null if the value
@@ -181,6 +193,10 @@ namespace llvm {
         case lltok::kw_ninf: FMF.setNoInfs();          Lex.Lex(); continue;
         case lltok::kw_nsz:  FMF.setNoSignedZeros();   Lex.Lex(); continue;
         case lltok::kw_arcp: FMF.setAllowReciprocal(); Lex.Lex(); continue;
+        case lltok::kw_contract:
+          FMF.setAllowContract(true);
+          Lex.Lex();
+          continue;
         default: return FMF;
         }
       return FMF;
@@ -210,30 +226,34 @@ namespace llvm {
       return ParseUInt64(Val);
     }
 
+    bool ParseStringAttribute(AttrBuilder &B);
+
     bool ParseTLSModel(GlobalVariable::ThreadLocalMode &TLM);
     bool ParseOptionalThreadLocal(GlobalVariable::ThreadLocalMode &TLM);
-    bool parseOptionalUnnamedAddr(bool &UnnamedAddr) {
-      return ParseOptionalToken(lltok::kw_unnamed_addr, UnnamedAddr);
-    }
+    bool ParseOptionalUnnamedAddr(GlobalVariable::UnnamedAddr &UnnamedAddr);
     bool ParseOptionalAddrSpace(unsigned &AddrSpace);
     bool ParseOptionalParamAttrs(AttrBuilder &B);
     bool ParseOptionalReturnAttrs(AttrBuilder &B);
-    bool ParseOptionalLinkage(unsigned &Linkage, bool &HasLinkage);
-    bool ParseOptionalLinkage(unsigned &Linkage) {
-      bool HasLinkage; return ParseOptionalLinkage(Linkage, HasLinkage);
-    }
-    bool ParseOptionalVisibility(unsigned &Visibility);
-    bool ParseOptionalDLLStorageClass(unsigned &DLLStorageClass);
+    bool ParseOptionalLinkage(unsigned &Linkage, bool &HasLinkage,
+                              unsigned &Visibility, unsigned &DLLStorageClass);
+    void ParseOptionalVisibility(unsigned &Visibility);
+    void ParseOptionalDLLStorageClass(unsigned &DLLStorageClass);
     bool ParseOptionalCallingConv(unsigned &CC);
     bool ParseOptionalAlignment(unsigned &Alignment);
     bool ParseOptionalDerefAttrBytes(lltok::Kind AttrKind, uint64_t &Bytes);
-    bool ParseScopeAndOrdering(bool isAtomic, SynchronizationScope &Scope,
+    bool ParseScopeAndOrdering(bool isAtomic, SyncScope::ID &SSID,
                                AtomicOrdering &Ordering);
+    bool ParseScope(SyncScope::ID &SSID);
     bool ParseOrdering(AtomicOrdering &Ordering);
     bool ParseOptionalStackAlignment(unsigned &Alignment);
     bool ParseOptionalCommaAlign(unsigned &Alignment, bool &AteExtraComma);
+    bool ParseOptionalCommaAddrSpace(unsigned &AddrSpace, LocTy &Loc,
+                                     bool &AteExtraComma);
     bool ParseOptionalCommaInAlloca(bool &IsInAlloca);
-    bool ParseIndexList(SmallVectorImpl<unsigned> &Indices,bool &AteExtraComma);
+    bool parseAllocSizeArguments(unsigned &ElemSizeArg,
+                                 Optional<unsigned> &HowManyArg);
+    bool ParseIndexList(SmallVectorImpl<unsigned> &Indices,
+                        bool &AteExtraComma);
     bool ParseIndexList(SmallVectorImpl<unsigned> &Indices) {
       bool AteExtraComma;
       if (ParseIndexList(Indices, AteExtraComma)) return true;
@@ -247,6 +267,7 @@ namespace llvm {
     bool ValidateEndOfModule();
     bool ParseTargetDefinition();
     bool ParseModuleAsm();
+    bool ParseSourceFileName();
     bool ParseDepLibs();        // FIXME: Remove in 4.0.
     bool ParseUnnamedType();
     bool ParseNamedType();
@@ -259,10 +280,13 @@ namespace llvm {
     bool ParseGlobal(const std::string &Name, LocTy Loc, unsigned Linkage,
                      bool HasLinkage, unsigned Visibility,
                      unsigned DLLStorageClass,
-                     GlobalVariable::ThreadLocalMode TLM, bool UnnamedAddr);
-    bool ParseAlias(const std::string &Name, LocTy Loc, unsigned Linkage,
-                    unsigned Visibility, unsigned DLLStorageClass,
-                    GlobalVariable::ThreadLocalMode TLM, bool UnnamedAddr);
+                     GlobalVariable::ThreadLocalMode TLM,
+                     GlobalVariable::UnnamedAddr UnnamedAddr);
+    bool parseIndirectSymbol(const std::string &Name, LocTy Loc,
+                             unsigned Linkage, unsigned Visibility,
+                             unsigned DLLStorageClass,
+                             GlobalVariable::ThreadLocalMode TLM,
+                             GlobalVariable::UnnamedAddr UnnamedAddr);
     bool parseComdat();
     bool ParseStandaloneMetadata();
     bool ParseNamedMetadata();
@@ -343,10 +367,12 @@ namespace llvm {
     bool ConvertValIDToValue(Type *Ty, ValID &ID, Value *&V,
                              PerFunctionState *PFS);
 
+    bool parseConstantValue(Type *Ty, Constant *&C);
     bool ParseValue(Type *Ty, Value *&V, PerFunctionState *PFS);
     bool ParseValue(Type *Ty, Value *&V, PerFunctionState &PFS) {
       return ParseValue(Ty, V, &PFS);
     }
+
     bool ParseValue(Type *Ty, Value *&V, LocTy &Loc,
                     PerFunctionState &PFS) {
       Loc = Lex.getLoc();
@@ -374,18 +400,26 @@ namespace llvm {
       Value *V;
       AttributeSet Attrs;
       ParamInfo(LocTy loc, Value *v, AttributeSet attrs)
-        : Loc(loc), V(v), Attrs(attrs) {}
+          : Loc(loc), V(v), Attrs(attrs) {}
     };
     bool ParseParameterList(SmallVectorImpl<ParamInfo> &ArgList,
                             PerFunctionState &PFS,
                             bool IsMustTailCall = false,
                             bool InVarArgsFunc = false);
 
+    bool
+    ParseOptionalOperandBundles(SmallVectorImpl<OperandBundleDef> &BundleList,
+                                PerFunctionState &PFS);
+
+    bool ParseExceptionArgs(SmallVectorImpl<Value *> &Args,
+                            PerFunctionState &PFS);
+
     // Constant Parsing.
     bool ParseValID(ValID &ID, PerFunctionState *PFS = nullptr);
     bool ParseGlobalValue(Type *Ty, Constant *&V);
     bool ParseGlobalTypeAndValue(Constant *&V);
-    bool ParseGlobalValueVector(SmallVectorImpl<Constant *> &Elts);
+    bool ParseGlobalValueVector(SmallVectorImpl<Constant *> &Elts,
+                                Optional<unsigned> *InRangeOp = nullptr);
     bool parseOptionalComdat(StringRef GlobalName, Comdat *&C);
     bool ParseMetadataAsValue(Value *&V, PerFunctionState &PFS);
     bool ParseValueAsMetadata(Metadata *&MD, const Twine &TypeMsg,
@@ -397,6 +431,7 @@ namespace llvm {
     bool ParseMDNodeVector(SmallVectorImpl<Metadata *> &MDs);
     bool ParseMetadataAttachment(unsigned &Kind, MDNode *&MD);
     bool ParseInstructionMetadata(Instruction &Inst);
+    bool ParseGlobalObjectMetadataAttachment(GlobalObject &GO);
     bool ParseOptionalFunctionMetadata(Function &F);
 
     template <class FieldTy>
@@ -419,7 +454,7 @@ namespace llvm {
       AttributeSet Attrs;
       std::string Name;
       ArgInfo(LocTy L, Type *ty, AttributeSet Attr, const std::string &N)
-        : Loc(L), Ty(ty), Attrs(Attr), Name(N) {}
+          : Loc(L), Ty(ty), Attrs(Attr), Name(N) {}
     };
     bool ParseArgumentList(SmallVectorImpl<ArgInfo> &ArgList, bool &isVarArg);
     bool ParseFunctionHeader(Function *&Fn, bool isDefine);
@@ -441,6 +476,11 @@ namespace llvm {
     bool ParseIndirectBr(Instruction *&Inst, PerFunctionState &PFS);
     bool ParseInvoke(Instruction *&Inst, PerFunctionState &PFS);
     bool ParseResume(Instruction *&Inst, PerFunctionState &PFS);
+    bool ParseCleanupRet(Instruction *&Inst, PerFunctionState &PFS);
+    bool ParseCatchRet(Instruction *&Inst, PerFunctionState &PFS);
+    bool ParseCatchSwitch(Instruction *&Inst, PerFunctionState &PFS);
+    bool ParseCatchPad(Instruction *&Inst, PerFunctionState &PFS);
+    bool ParseCleanupPad(Instruction *&Inst, PerFunctionState &PFS);
 
     bool ParseArithmetic(Instruction *&I, PerFunctionState &PFS, unsigned Opc,
                          unsigned OperandType);

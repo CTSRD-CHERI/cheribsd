@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -13,7 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -1144,6 +1146,7 @@ static short nfsv4err_setclientid[] = {
 	NFSERR_INVAL,
 	NFSERR_RESOURCE,
 	NFSERR_SERVERFAULT,
+	NFSERR_WRONGSEC,
 	0,
 };
 
@@ -1397,8 +1400,7 @@ nfsrv_fillattr(struct nfsrv_descript *nd, struct nfsvattr *nvap)
 		fp->fa3_rdev.specdata2 = txdr_unsigned(NFSMINOR(nvap->na_rdev));
 		fp->fa3_fsid.nfsuquad[0] = 0;
 		fp->fa3_fsid.nfsuquad[1] = txdr_unsigned(nvap->na_fsid);
-		fp->fa3_fileid.nfsuquad[0] = 0;
-		fp->fa3_fileid.nfsuquad[1] = txdr_unsigned(nvap->na_fileid);
+		txdr_hyper(nvap->na_fileid, &fp->fa3_fileid);
 		txdr_nfsv3time(&nvap->na_atime, &fp->fa3_atime);
 		txdr_nfsv3time(&nvap->na_mtime, &fp->fa3_mtime);
 		txdr_nfsv3time(&nvap->na_ctime, &fp->fa3_ctime);
@@ -1808,13 +1810,12 @@ nfsrv_putreferralattr(struct nfsrv_descript *nd, nfsattrbit_t *retbitp,
 			break;
 		case NFSATTRBIT_MOUNTEDONFILEID:
 			NFSM_BUILD(tl, u_int32_t *, NFSX_HYPER);
-			*tl++ = 0;
-			*tl = txdr_unsigned(refp->nfr_dfileno);
+			txdr_hyper(refp->nfr_dfileno, tl);
 			retnum += NFSX_HYPER;
 			break;
 		default:
 			printf("EEK! Bad V4 refattr bitpos=%d\n", bitpos);
-		};
+		}
 	    }
 	}
 	*retnump = txdr_unsigned(retnum);

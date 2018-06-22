@@ -1,9 +1,10 @@
 # $FreeBSD$
 
+PACKAGE=lib${LIB}
 LIB=		lzma
-LZMADIR=	${.CURDIR}/../../contrib/xz/src/liblzma
+LZMADIR=	${SRCTOP}/contrib/xz/src/liblzma
 
-.PATH: ${LZMADIR}/../common
+.PATH: ${LZMADIR:H}/common
 SRCS+=	tuklib_physmem.c tuklib_cpucores.c
 
 .PATH: ${LZMADIR}/api/lzma
@@ -144,7 +145,7 @@ CFLAGS+=	-DHAVE_CONFIG_H \
 		-I${LZMADIR}/lzma \
 		-I${LZMADIR}/delta \
 		-I${LZMADIR}/simple \
-		-I${LZMADIR}/../common
+		-I${LZMADIR:H}/common
 
 LIBADD+=	pthread
 

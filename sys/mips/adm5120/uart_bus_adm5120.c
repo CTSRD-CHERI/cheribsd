@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2007 Bruce M. Simpson.
  * All rights reserved.
  *
@@ -87,7 +89,7 @@ uart_adm5120_probe(device_t dev)
 	sc->sc_class = &uart_adm5120_uart_class;
 	bcopy(&sc->sc_sysdev->bas, &sc->sc_bas, sizeof(sc->sc_bas));
 
-	return (uart_bus_probe(dev, 0, 0, 0, 0));
+	return (uart_bus_probe(dev, 0, 0, 0, 0, 0));
 }
 
 DRIVER_MODULE(uart, obio, uart_adm5120_driver, uart_devclass, 0, 0);

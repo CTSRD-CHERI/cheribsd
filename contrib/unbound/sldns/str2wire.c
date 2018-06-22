@@ -204,7 +204,7 @@ rrinternal_get_owner(sldns_buffer* strbuf, uint8_t* rr, size_t* len,
 			return RET_ERR(LDNS_WIREPARSE_ERR_BUFFER_TOO_SMALL,
 				sldns_buffer_position(strbuf));
 		memmove(rr, tocopy, *dname_len);
-	} else if(strlen(token) == 0) {
+	} else if(*token == '\0') {
 		/* no ownername was given, try prev, if that fails
 		 * origin, else default to root */
 		uint8_t* tocopy;
@@ -892,10 +892,10 @@ int sldns_fp2wire_rr_buf(FILE* in, uint8_t* rr, size_t* len, size_t* dname_len,
 			parse_state?parse_state->default_ttl:0,
 			(parse_state&&parse_state->origin_len)?
 				parse_state->origin:NULL,
-			parse_state->origin_len,
+			parse_state?parse_state->origin_len:0,
 			(parse_state&&parse_state->prev_rr_len)?
 				parse_state->prev_rr:NULL,
-			parse_state->prev_rr_len);
+			parse_state?parse_state->prev_rr_len:0);
 	}
 	return LDNS_WIREPARSE_ERR_OK;
 }
@@ -1091,7 +1091,7 @@ int sldns_str2wire_apl_buf(const char* str, uint8_t* rd, size_t* len)
 	uint8_t prefix;
 	size_t i;
 
-	if(strlen(my_str) == 0) {
+	if(*my_str == '\0') {
 		/* empty APL element, no data, no string */
 		*len = 0;
 		return LDNS_WIREPARSE_ERR_OK;

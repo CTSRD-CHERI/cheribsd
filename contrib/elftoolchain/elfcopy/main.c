@@ -39,7 +39,7 @@
 
 #include "elfcopy.h"
 
-ELFTC_VCSID("$Id: main.c 3268 2015-12-07 20:30:55Z emaste $");
+ELFTC_VCSID("$Id: main.c 3520 2017-04-17 01:47:52Z kaiwang27 $");
 
 enum options
 {
@@ -209,6 +209,7 @@ static struct {
 	{"openbsd", ELFOSABI_OPENBSD},
 	{"openvms", ELFOSABI_OPENVMS},
 	{"nsk", ELFOSABI_NSK},
+	{"cloudabi", ELFOSABI_CLOUDABI},
 	{"arm", ELFOSABI_ARM},
 	{"standalone", ELFOSABI_STANDALONE},
 	{NULL, 0}
@@ -235,7 +236,7 @@ static void	strip_main(struct elfcopy *ecp, int argc, char **argv);
 static void	strip_usage(void);
 
 /*
- * An ELF object usually has a sturcture described by the
+ * An ELF object usually has a structure described by the
  * diagram below.
  *  _____________
  * |             |
@@ -284,6 +285,7 @@ create_elf(struct elfcopy *ecp)
 	size_t		 ishnum;
 
 	ecp->flags |= SYMTAB_INTACT;
+	ecp->flags &= ~SYMTAB_EXIST;
 
 	/* Create EHDR. */
 	if (gelf_getehdr(ecp->ein, &ieh) == NULL)
@@ -316,6 +318,7 @@ create_elf(struct elfcopy *ecp)
 	oeh.e_entry	      = ieh.e_entry;
 	oeh.e_version	      = ieh.e_version;
 
+	ecp->flags &= ~(EXECUTABLE | DYNAMIC | RELOCATABLE);
 	if (ieh.e_type == ET_EXEC)
 		ecp->flags |= EXECUTABLE;
 	else if (ieh.e_type == ET_DYN)
@@ -497,6 +500,10 @@ free_elf(struct elfcopy *ecp)
 		}
 	}
 
+	ecp->symtab = NULL;
+	ecp->strtab = NULL;
+	ecp->shstrtab = NULL;
+
 	if (ecp->secndx != NULL) {
 		free(ecp->secndx);
 		ecp->secndx = NULL;
@@ -640,6 +647,18 @@ create_file(struct elfcopy *ecp, const char *src, const char *dst)
 	 * ELF object before processing.
 	 */
 	if (ecp->itf != ETF_ELF) {
+		/*
+		 * If the output object is not an ELF file, choose an arbitrary
+		 * ELF format for the intermediate file. srec, ihex and binary
+		 * formats are independent of class, endianness and machine
+		 * type so these choices do not affect the output.
+		 */
+		if (ecp->otf != ETF_ELF) {
+			if (ecp->oec == ELFCLASSNONE)
+				ecp->oec = ELFCLASS64;
+			if (ecp->oed == ELFDATANONE)
+				ecp->oed = ELFDATA2LSB;
+		}
 		create_tempfile(&elftemp, &efd);
 		if ((ecp->eout = elf_begin(efd, ELF_C_WRITE, NULL)) == NULL)
 			errx(EXIT_FAILURE, "elf_begin() failed: %s",
@@ -660,6 +679,8 @@ create_file(struct elfcopy *ecp, const char *src, const char *dst)
 		if ((ifd = open(elftemp, O_RDONLY)) == -1)
 			err(EXIT_FAILURE, "open %s failed", src);
 		close(efd);
+		if (unlink(elftemp) < 0)
+			err(EXIT_FAILURE, "unlink %s failed", elftemp);
 		free(elftemp);
 	}
 
@@ -721,6 +742,15 @@ create_file(struct elfcopy *ecp, const char *src, const char *dst)
 			case ETF_SREC:
 				create_srec(ecp, ofd, ofd0,
 				    dst != NULL ? dst : src);
+				break;
+			case ETF_PE:
+			case ETF_EFI:
+#if	WITH_PE
+				create_pe(ecp, ofd, ofd0);
+#else
+				errx(EXIT_FAILURE, "PE/EFI support not enabled"
+				    " at compile time");
+#endif
 				break;
 			default:
 				errx(EXIT_FAILURE, "Internal: unsupported"
@@ -1255,8 +1285,9 @@ parse_symlist_file(struct elfcopy *ecp, const char *fn, unsigned int op)
 		err(EXIT_FAILURE, "can not open %s", fn);
 	if ((data = malloc(sb.st_size + 1)) == NULL)
 		err(EXIT_FAILURE, "malloc failed");
-	if (fread(data, 1, sb.st_size, fp) == 0 || ferror(fp))
-		err(EXIT_FAILURE, "fread failed");
+	if (sb.st_size > 0)
+		if (fread(data, sb.st_size, 1, fp) != 1)
+			err(EXIT_FAILURE, "fread failed");
 	fclose(fp);
 	data[sb.st_size] = '\0';
 
@@ -1345,6 +1376,9 @@ set_output_target(struct elfcopy *ecp, const char *target_name)
 		ecp->oed = elftc_bfd_target_byteorder(tgt);
 		ecp->oem = elftc_bfd_target_machine(tgt);
 	}
+	if (ecp->otf == ETF_EFI || ecp->otf == ETF_PE)
+		ecp->oem = elftc_bfd_target_machine(tgt);
+
 	ecp->otgt = target_name;
 }
 
@@ -1366,7 +1400,7 @@ set_osabi(struct elfcopy *ecp, const char *abi)
 
 #define	ELFCOPY_USAGE_MESSAGE	"\
 Usage: %s [options] infile [outfile]\n\
-  Transform an ELF object.\n\n\
+  Transform object files.\n\n\
   Options:\n\
   -d | -g | --strip-debug      Remove debugging information from the output.\n\
   -j SECTION | --only-section=SECTION\n\
@@ -1382,6 +1416,8 @@ Usage: %s [options] infile [outfile]\n\
   -N SYM | --strip-symbol=SYM  Do not copy symbol SYM to the output.\n\
   -O FORMAT | --output-target=FORMAT\n\
                                Specify object format for the output file.\n\
+                               FORMAT should be a target name understood by\n\
+                               elftc_bfd_find_target(3).\n\
   -R NAME | --remove-section=NAME\n\
                                Remove the named section.\n\
   -S | --strip-all             Remove all symbol and relocation information\n\
@@ -1419,7 +1455,7 @@ Usage: %s [options] infile [outfile]\n\
                                sections.\n\
   --only-keep-debug            Copy only debugging information.\n\
   --output-target=FORMAT       Use the specified format for the output.\n\
-  --pad-to=ADDRESS             Pad the output object upto the given address.\n\
+  --pad-to=ADDRESS             Pad the output object up to the given address.\n\
   --prefix-alloc-sections=STRING\n\
                                Prefix the section names of all the allocated\n\
                                sections with STRING.\n\
@@ -1471,6 +1507,7 @@ Usage: %s [options] file...\n\
   Options:\n\
   -d | -g | -S | --strip-debug    Remove debugging symbols.\n\
   -h | --help                     Print a help message.\n\
+  -o FILE | --output-file FILE    Write output to FILE.\n\
   --only-keep-debug               Keep debugging information only.\n\
   -p | --preserve-dates           Preserve access and modification times.\n\
   -s | --strip-all                Remove all symbols.\n\
@@ -1498,6 +1535,22 @@ print_version(void)
 {
 	(void) printf("%s (%s)\n", ELFTC_GETPROGNAME(), elftc_version());
 	exit(EXIT_SUCCESS);
+}
+
+/*
+ * Compare the ending of s with end.
+ */
+static int
+strrcmp(const char *s, const char *end)
+{
+	size_t endlen, slen;
+
+	slen = strlen(s);
+	endlen = strlen(end);
+
+	if (slen >= endlen)
+		s += slen - endlen;
+	return (strcmp(s, end));
 }
 
 int
@@ -1533,12 +1586,16 @@ main(int argc, char **argv)
 	if ((ecp->progname = ELFTC_GETPROGNAME()) == NULL)
 		ecp->progname = "elfcopy";
 
-	if (strcmp(ecp->progname, "strip") == 0)
+	if (strrcmp(ecp->progname, "strip") == 0)
 		strip_main(ecp, argc, argv);
-	else if (strcmp(ecp->progname, "mcs") == 0)
+	else if (strrcmp(ecp->progname, "mcs") == 0)
 		mcs_main(ecp, argc, argv);
-	else
+	else {
+		if (strrcmp(ecp->progname, "elfcopy") != 0 &&
+		    strrcmp(ecp->progname, "objcopy") != 0)
+			warnx("program mode not known, defaulting to elfcopy");
 		elfcopy_main(ecp, argc, argv);
+	}
 
 	free_sec_add(ecp);
 	free_sec_act(ecp);

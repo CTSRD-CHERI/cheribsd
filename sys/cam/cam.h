@@ -1,6 +1,8 @@
 /*-
  * Data structures and definitions for the CAM system.
  *
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1997 Justin T. Gibbs.
  * All rights reserved.
  *
@@ -32,7 +34,7 @@
 #define _CAM_CAM_H 1
 
 #ifdef _KERNEL
-#include <opt_cam.h>
+#include "opt_cam.h"
 #endif
 
 #include <sys/cdefs.h>
@@ -77,7 +79,7 @@ typedef enum {
     CAM_RL_VALUES
 } cam_rl;
 /*
- * The generation number is incremented everytime a new entry is entered into
+ * The generation number is incremented every time a new entry is entered into
  * the queue giving round robin per priority level scheduling.
  */
 typedef struct {
@@ -118,7 +120,7 @@ typedef enum {
 enum {
 	SF_RETRY_UA		= 0x01,	/* Retry UNIT ATTENTION conditions. */
 	SF_NO_PRINT		= 0x02,	/* Never print error status. */
-	SF_QUIET_IR		= 0x04,	/* Be quiet about Illegal Request reponses */
+	SF_QUIET_IR		= 0x04,	/* Be quiet about Illegal Request responses */
 	SF_PRINT_ALWAYS		= 0x08,	/* Always print error status. */
 	SF_NO_RECOVERY		= 0x10,	/* Don't do active error recovery. */
 	SF_NO_RETRY		= 0x20,	/* Don't do any retries. */
@@ -290,7 +292,7 @@ typedef enum {
 	/* SIM ready to take more commands */
 	CAM_RELEASE_SIMQ	= 0x100,
 
-	/* SIM has this command in it's queue */
+	/* SIM has this command in its queue */
 	CAM_SIM_QUEUED		= 0x200,
 
 	/* Quality of service data is valid */

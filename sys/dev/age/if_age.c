@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2008, Pyun YongHyeon <yongari@FreeBSD.org>
  * All rights reserved.
  *
@@ -323,8 +325,7 @@ age_probe(device_t dev)
 	vendor = pci_get_vendor(dev);
 	devid = pci_get_device(dev);
 	sp = age_devs;
-	for (i = 0; i < sizeof(age_devs) / sizeof(age_devs[0]);
-	    i++, sp++) {
+	for (i = 0; i < nitems(age_devs); i++, sp++) {
 		if (vendor == sp->age_vendorid &&
 		    devid == sp->age_deviceid) {
 			device_set_desc(dev, sp->age_name);
@@ -588,7 +589,7 @@ age_attach(device_t dev)
 	/* Create device sysctl node. */
 	age_sysctl_node(sc);
 
-	if ((error = age_dma_alloc(sc) != 0))
+	if ((error = age_dma_alloc(sc)) != 0)
 		goto fail;
 
 	/* Load station address. */
@@ -1825,12 +1826,12 @@ age_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ifr = (struct ifreq *)data;
 	error = 0;
 	switch (cmd) {
-	case SIOCSIFMTU:
-		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > AGE_JUMBO_MTU)
+	CASE_IOC_IFREQ(SIOCSIFMTU):
+		if (ifr_mtu_get(ifr) < ETHERMIN || ifr_mtu_get(ifr) > AGE_JUMBO_MTU)
 			error = EINVAL;
-		else if (ifp->if_mtu != ifr->ifr_mtu) {
+		else if (ifp->if_mtu != ifr_mtu_get(ifr)) {
 			AGE_LOCK(sc);
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
 				ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 				age_init_locked(sc);
@@ -1838,7 +1839,7 @@ age_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			AGE_UNLOCK(sc);
 		}
 		break;
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		AGE_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
@@ -1856,21 +1857,21 @@ age_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->age_if_flags = ifp->if_flags;
 		AGE_UNLOCK(sc);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		AGE_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			age_rxfilter(sc);
 		AGE_UNLOCK(sc);
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->age_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		AGE_LOCK(sc);
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&
 		    (ifp->if_capabilities & IFCAP_TXCSUM) != 0) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;
@@ -2162,11 +2163,6 @@ age_int_task(void *arg, int pending)
 	    sc->age_cdata.age_cmb_block_map,
 	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
 
-#if 0
-	printf("INTR: 0x%08x\n", status);
-	status &= ~INTR_DIS_DMA;
-	CSR_WRITE_4(sc, AGE_INTR_STATUS, status | INTR_DIS_INT);
-#endif
 	ifp = sc->age_ifp;
 	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
 		if ((status & INTR_CMB_RX) != 0)
@@ -2487,7 +2483,7 @@ age_rxintr(struct age_softc *sc, int rr_prod, int count)
 		 * I'm not sure whether this check is really needed.
 		 */
 		pktlen = AGE_RX_BYTES(le32toh(rxrd->len));
-		if (nsegs != (pktlen + (AGE_RX_BUF_SIZE - 1)) / AGE_RX_BUF_SIZE)
+		if (nsegs != howmany(pktlen, AGE_RX_BUF_SIZE))
 			break;
 
 		/* Received a frame. */

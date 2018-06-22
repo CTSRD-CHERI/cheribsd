@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2007-2008
  *	Swinburne University of Technology, Melbourne, Australia.
  * Copyright (c) 2009-2010 Lawrence Stewart <lstewart@freebsd.org>
@@ -316,12 +318,12 @@ SYSINIT(cc, SI_SUB_PROTO_IFATTACHDOMAIN, SI_ORDER_FIRST, cc_init, NULL);
 
 /* Declare sysctl tree and populate it. */
 SYSCTL_NODE(_net_inet_tcp, OID_AUTO, cc, CTLFLAG_RW, NULL,
-    "congestion control related settings");
+    "Congestion control related settings");
 
 SYSCTL_PROC(_net_inet_tcp_cc, OID_AUTO, algorithm,
     CTLFLAG_VNET | CTLTYPE_STRING | CTLFLAG_RW,
-    NULL, 0, cc_default_algo, "A", "default congestion control algorithm");
+    NULL, 0, cc_default_algo, "A", "Default congestion control algorithm");
 
 SYSCTL_PROC(_net_inet_tcp_cc, OID_AUTO, available, CTLTYPE_STRING|CTLFLAG_RD,
     NULL, 0, cc_list_available, "A",
-    "list available congestion control algorithms");
+    "List available congestion control algorithms");

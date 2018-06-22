@@ -1,6 +1,8 @@
 /*	$FreeBSD$	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (C) 2009 Gabor Kovesdan <gabor@FreeBSD.org>
  * Copyright (C) 2012 Oleg Moskalenko <mom040267@gmail.com>
  * All rights reserved.
@@ -25,6 +27,17 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_size"
+ *   ],
+ *   "change_comment": "aligning struct key_hint, not packing struct key_value"
+ * }
+ * CHERI CHANGES END
  */
 
 #if !defined(__COLL_H__)
@@ -82,7 +95,12 @@ struct key_hint
 		struct g_hint		gh;
 		struct M_hint		Mh;
 	}			v;
-};
+}
+#ifdef __CHERI_PURE_CAPABILITY__
+/* We need this to be padded out to maintain pointer alignment. */
+__aligned(sizeof(void *))
+#endif
+;
 
 /*
  * Key value
@@ -91,7 +109,12 @@ struct key_value
 {
 	struct bwstring		*k; /* key string */
 	struct key_hint		 hint[0]; /* key sort hint */
-};
+}
+#ifndef __CHERI_PURE_CAPABILITY__
+/* Packing is gratutious... */
+__packed
+#endif
+;
 
 /*
  * Set of keys container object.
@@ -146,6 +169,7 @@ cmpcoll_t get_sort_func(struct sort_mods *sm);
 
 struct keys_array *keys_array_alloc(void);
 size_t keys_array_size(void);
+struct key_value *get_key_from_keys_array(struct keys_array *ka, size_t ind);
 void set_key_on_keys_array(struct keys_array *ka, struct bwstring *s, size_t ind);
 void clean_keys_array(const struct bwstring *s, struct keys_array *ka);
 

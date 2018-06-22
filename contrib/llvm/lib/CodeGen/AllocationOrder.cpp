@@ -29,12 +29,13 @@ using namespace llvm;
 // Compare VirtRegMap::getRegAllocPref().
 AllocationOrder::AllocationOrder(unsigned VirtReg,
                                  const VirtRegMap &VRM,
-                                 const RegisterClassInfo &RegClassInfo)
+                                 const RegisterClassInfo &RegClassInfo,
+                                 const LiveRegMatrix *Matrix)
   : Pos(0) {
   const MachineFunction &MF = VRM.getMachineFunction();
   const TargetRegisterInfo *TRI = &VRM.getTargetRegInfo();
   Order = RegClassInfo.getOrder(MF.getRegInfo().getRegClass(VirtReg));
-  TRI->getRegAllocationHints(VirtReg, Order, Hints, MF, &VRM);
+  TRI->getRegAllocationHints(VirtReg, Order, Hints, MF, &VRM, Matrix);
   rewind();
 
   DEBUG({
@@ -47,7 +48,7 @@ AllocationOrder::AllocationOrder(unsigned VirtReg,
   });
 #ifndef NDEBUG
   for (unsigned I = 0, E = Hints.size(); I != E; ++I)
-    assert(std::find(Order.begin(), Order.end(), Hints[I]) != Order.end() &&
+    assert(is_contained(Order, Hints[I]) &&
            "Target hint is outside allocation order.");
 #endif
 }

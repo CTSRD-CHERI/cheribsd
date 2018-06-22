@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2002 Poul-Henning Kamp
  * Copyright (c) 2002 Networks Associates Technology, Inc.
  * All rights reserved.
@@ -46,6 +48,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/conf.h>
 #include <sys/disk.h>
 #include <sys/malloc.h>
+#include <sys/proc.h>
 #include <sys/sysctl.h>
 #include <sys/sbuf.h>
 
@@ -135,7 +138,7 @@ gctl_copyin(struct gctl_req *req)
 {
 	struct gctl_req_arg *ap;
 	char *p;
-	int i;
+	u_int i;
 
 	ap = geom_alloc_copyin(req, req->arg, req->narg * sizeof(*ap));
 	if (ap == NULL) {
@@ -212,7 +215,7 @@ gctl_copyout(struct gctl_req *req)
 static void
 gctl_free(struct gctl_req *req)
 {
-	int i;
+	u_int i;
 
 	sbuf_delete(req->serror);
 	if (req->arg == NULL)
@@ -270,7 +273,7 @@ int
 gctl_set_param(struct gctl_req *req, const char *param, void const *ptr,
     int len)
 {
-	int i;
+	u_int i;
 	struct gctl_req_arg *ap;
 
 	for (i = 0; i < req->narg; i++) {
@@ -311,7 +314,7 @@ gctl_set_param_err(struct gctl_req *req, const char *param, void const *ptr,
 void *
 gctl_get_param(struct gctl_req *req, const char *param, int *len)
 {
-	int i;
+	u_int i;
 	void *p;
 	struct gctl_req_arg *ap;
 
@@ -332,7 +335,7 @@ gctl_get_param(struct gctl_req *req, const char *param, int *len)
 char const *
 gctl_get_asciiparam(struct gctl_req *req, const char *param)
 {
-	int i;
+	u_int i;
 	char const *p;
 	struct gctl_req_arg *ap;
 
@@ -465,7 +468,8 @@ g_ctl_ioctl_ctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct th
 	/* It is an error if we cannot return an error text */
 	if (req->lerror < 2)
 		return (EINVAL);
-	if (!useracc(req->error, req->lerror, VM_PROT_WRITE))
+	if (!useracc(__USER_CAP(req->error, req->lerror), req->lerror,
+	    VM_PROT_WRITE))
 		return (EINVAL);
 
 	req->serror = sbuf_new_auto();

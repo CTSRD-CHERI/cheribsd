@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -13,7 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -205,17 +207,6 @@
  * for a given compiler, let the compile fail if it is told to use
  * a feature that we cannot live without.
  */
-#ifdef lint
-#define	__dead2
-#define	__pure2
-#define	__unused
-#define	__packed
-#define	__aligned(x)
-#define	__alloc_align(x)
-#define	__alloc_size(x)
-#define	__section(x)
-#define	__weak_symbol
-#else
 #define	__weak_symbol	__attribute__((__weak__))
 #if !__GNUC_PREREQ__(2, 5) && !defined(__INTEL_COMPILER)
 #define	__dead2
@@ -247,7 +238,6 @@
 #else
 #define	__alloc_align(x)
 #endif
-#endif /* lint */
 
 #if !__GNUC_PREREQ__(2, 95)
 #define	__alignof(x)	__offsetof(struct { char __a; x __b; }, __b)
@@ -257,7 +247,7 @@
  * Keywords added in C11.
  */
 
-#if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 201112L || defined(lint)
+#if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 201112L
 
 #if !__has_extension(c_alignas)
 #if (defined(__cplusplus) && __cplusplus >= 201103L) || \
@@ -275,7 +265,8 @@
 #define	_Alignof(x)		__alignof(x)
 #endif
 
-#if !__has_extension(c_atomic) && !__has_extension(cxx_atomic)
+#if !defined(__cplusplus) && !__has_extension(c_atomic) && \
+    !__has_extension(cxx_atomic)
 /*
  * No native support for _Atomic(). Place object in structure to prevent
  * most forms of direct non-atomic access.
@@ -293,7 +284,7 @@
 #if (defined(__cplusplus) && __cplusplus >= 201103L) || \
     __has_extension(cxx_static_assert)
 #define	_Static_assert(x, y)	static_assert(x, y)
-#elif __GNUC_PREREQ__(4,6)
+#elif __GNUC_PREREQ__(4,6) && !defined(__cplusplus)
 /* Nothing, gcc 4.6 and higher has _Static_assert built-in */
 #elif defined(__COUNTER__)
 #define	_Static_assert(x, y)	__Static_assert(x, __COUNTER__)
@@ -340,6 +331,21 @@
 	    __builtin_types_compatible_p(__typeof(expr), t), yes, no)
 #endif
 
+/*
+ * C99 Static array indices in function parameter declarations.  Syntax such as:
+ * void bar(int myArray[static 10]);
+ * is allowed in C99 but not in C++.  Define __min_size appropriately so
+ * headers using it can be compiled in either language.  Use like this:
+ * void bar(int myArray[__min_size(10)]);
+ */
+#if !defined(__cplusplus) && \
+    (defined(__clang__) || __GNUC_PREREQ__(4, 6)) && \
+    (!defined(__STDC_VERSION__) || (__STDC_VERSION__ >= 199901))
+#define __min_size(x)	static (x)
+#else
+#define __min_size(x)	(x)
+#endif
+
 #if __GNUC_PREREQ__(2, 96)
 #define	__malloc_like	__attribute__((__malloc__))
 #define	__pure		__attribute__((__pure__))
@@ -358,14 +364,6 @@
 #define	__noinline	__attribute__ ((__noinline__))
 #else
 #define	__noinline
-#endif
-
-#if __GNUC_PREREQ__(3, 3)
-#define	__nonnull(x)	__attribute__((__nonnull__(x)))
-#define	__nonnull_all	__attribute__((__nonnull__))
-#else
-#define	__nonnull(x)
-#define	__nonnull_all
 #endif
 
 #if __GNUC_PREREQ__(3, 4)
@@ -415,7 +413,7 @@
  * software that is unaware of C99 keywords.
  */
 #if !(__GNUC__ == 2 && __GNUC_MINOR__ == 95)
-#if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 199901 || defined(lint)
+#if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 199901
 #define	__restrict
 #else
 #define	__restrict	restrict
@@ -528,22 +526,6 @@
 	    __attribute__((__format__ (__strftime__, fmtarg, firstvararg)))
 #endif
 
-/*
- * FORTIFY_SOURCE, and perhaps other compiler-specific features, require
- * the use of non-standard inlining.  In general we should try to avoid
- * using these but GCC-compatible compilers tend to support the extensions
- * well enough to use them in limited cases.
- */ 
-#if defined(__GNUC_GNU_INLINE__) || defined(__GNUC_STDC_INLINE__)
-#if __GNUC_PREREQ__(4, 3) || __has_attribute(__artificial__)
-#define	__gnu_inline	__attribute__((__gnu_inline__, __artificial__))
-#else
-#define	__gnu_inline	__attribute__((__gnu_inline__))
-#endif /* artificial */
-#else
-#define	__gnu_inline
-#endif
-
 /* Compiler-dependent macros that rely on FreeBSD-specific extensions. */
 #if defined(__FreeBSD_cc_version) && __FreeBSD_cc_version >= 300001 && \
     defined(__GNUC__) && !defined(__INTEL_COMPILER)
@@ -569,7 +551,7 @@
 #define	__sym_compat(sym,impl,verid)	\
 	__asm__(".symver " #impl ", " #sym "@" #verid)
 #define	__sym_default(sym,impl,verid)	\
-	__asm__(".symver " #impl ", " #sym "@@" #verid)
+	__asm__(".symver " #impl ", " #sym "@@@" #verid)
 #else
 #define	__weak_reference(sym,alias)	\
 	__asm__(".weak alias");		\
@@ -581,7 +563,7 @@
 #define	__sym_compat(sym,impl,verid)	\
 	__asm__(".symver impl, sym@verid")
 #define	__sym_default(impl,sym,verid)	\
-	__asm__(".symver impl, sym@@verid")
+	__asm__(".symver impl, sym@@@verid")
 #endif	/* __STDC__ */
 #endif	/* __GNUC__ || __INTEL_COMPILER */
 
@@ -646,27 +628,61 @@
 #endif
 #endif
 
+/*
+ * XXXAR: For CHERI hybrid mode I removed the cast to the qualified type
+ * because we don't know whether the input type is a capability or a pointer
+ * and casting to the wrong one causes compiler warnings.
+ * The real solution would be an equivalent of const_cast<> for C
+ */
+
 #ifndef	__DECONST
-#if !__has_feature(capabilities)
 #define	__DECONST(type, var)	((type)(__uintptr_t)(const void *)(var))
-#else
-#define	__DECONST(type, var)	((type)(__intcap_t)(__capability const void *)(var))
-#endif
 #endif
 
 #ifndef	__DEVOLATILE
-#if !__has_feature(capabilities)
 #define	__DEVOLATILE(type, var)	((type)(__uintptr_t)(volatile void *)(var))
-#else
-#define	__DEVOLATILE(type, var)	((type)(__intcap_t)(__capability volatile void *)(var))
-#endif
 #endif
 
 #ifndef	__DEQUALIFY
-#if !__has_feature(capabilities)
 #define	__DEQUALIFY(type, var)	((type)(__uintptr_t)(const volatile void *)(var))
+#endif
+
+#if __has_feature(capabilities)
+#define	__DECONST_CAP(type, var)	((type)(__uintcap_t)(const void * __capability)(var))
+#define	__DEVOLATILE_CAP(type, var)	((type)(__uintcap_t)(volatile void * __capability)(var))
+#define	__DEQUALIFY_CAP(type, var)	((type)(__uintcap_t)(const volatile void * __capability)(var))
 #else
-#define	__DEQUALIFY(type, var)	((type)(__intcap_t)(__capability const volatile void *)(var))
+#define	__DECONST_CAP		__DECONST
+#define	__DEVOLATILE_CAP	__DEVOLATILE
+#define	__DEQUALIFY_CAP		__DEQUALIFY
+#endif
+
+#ifndef __CAP_CHECK
+#if __has_feature(capabilities)
+#define __CAP_CHECK(cap, len) ({					\
+	int ret = 1;							\
+	size_t caplen = __builtin_mips_cheri_get_cap_length(cap);	\
+	size_t capoff = __builtin_mips_cheri_cap_offset_get(cap);	\
+	if (capoff < 0 || capoff > caplen || caplen - capoff < (len))	\
+		ret = 0;						\
+	ret;								\
+})
+#else
+#define	__CAP_CHECK(cap, len)	1
+#endif
+#endif
+
+#ifndef __DECAP_CHECK
+#if __has_feature(capabilities)
+#define __DECAP_CHECK(cap, len)						\
+({									\
+	void * __capability tmpcap = (cap);				\
+	if (!__CAP_CHECK((cap), (len)))					\
+		tmpcap = NULL;						\
+	(__cheri_fromcap void *)(tmpcap);				\
+})
+#else
+#define __DECAP_CHECK(cap, len) (cap)
 #endif
 #endif
 
@@ -770,26 +786,63 @@
 #define	__XSI_VISIBLE		0
 #define	__BSD_VISIBLE		0
 #define	__ISO_C_VISIBLE		1990
+#define	__EXT1_VISIBLE		0
 #elif defined(_C99_SOURCE)	/* Localism to specify strict C99 env. */
 #define	__POSIX_VISIBLE		0
 #define	__XSI_VISIBLE		0
 #define	__BSD_VISIBLE		0
 #define	__ISO_C_VISIBLE		1999
+#define	__EXT1_VISIBLE		0
 #elif defined(_C11_SOURCE)	/* Localism to specify strict C11 env. */
 #define	__POSIX_VISIBLE		0
 #define	__XSI_VISIBLE		0
 #define	__BSD_VISIBLE		0
 #define	__ISO_C_VISIBLE		2011
+#define	__EXT1_VISIBLE		0
 #else				/* Default environment: show everything. */
 #define	__POSIX_VISIBLE		200809
 #define	__XSI_VISIBLE		700
 #define	__BSD_VISIBLE		1
 #define	__ISO_C_VISIBLE		2011
+#define	__EXT1_VISIBLE		1
 #endif
 #endif
 
-#if defined(__mips) || defined(__powerpc64__) || defined(__riscv__)
+/* User override __EXT1_VISIBLE */
+#if defined(__STDC_WANT_LIB_EXT1__)
+#undef	__EXT1_VISIBLE
+#if __STDC_WANT_LIB_EXT1__
+#define	__EXT1_VISIBLE		1
+#else
+#define	__EXT1_VISIBLE		0
+#endif
+#endif /* __STDC_WANT_LIB_EXT1__ */
+
+#if defined(__mips) || defined(__powerpc64__) || defined(__riscv)
 #define	__NO_TLS 1
+#endif
+
+/*
+ * Old versions of GCC use non-standard ARM arch symbols; acle-compat.h
+ * translates them to __ARM_ARCH and the modern feature symbols defined by ARM.
+ */
+#if defined(__arm__) && !defined(__ARM_ARCH)
+#include <machine/acle-compat.h>
+#endif
+
+/*
+ * Nullability qualifiers: currently only supported by Clang.
+ */
+#if !(defined(__clang__) && __has_feature(nullability))
+#define	_Nonnull
+#define	_Nullable
+#define	_Null_unspecified
+#define	__NULLABILITY_PRAGMA_PUSH
+#define	__NULLABILITY_PRAGMA_POP
+#else
+#define	__NULLABILITY_PRAGMA_PUSH _Pragma("clang diagnostic push")	\
+	_Pragma("clang diagnostic ignored \"-Wnullability-completeness\"")
+#define	__NULLABILITY_PRAGMA_POP _Pragma("clang diagnostic pop")
 #endif
 
 /*
@@ -800,7 +853,7 @@
  */
 
 #if __has_attribute(__argument_with_type_tag__) && \
-    __has_attribute(__type_tag_for_datatype__) && !defined(lint)
+    __has_attribute(__type_tag_for_datatype__)
 #define	__arg_type_tag(arg_kind, arg_idx, type_tag_idx) \
 	    __attribute__((__argument_with_type_tag__(arg_kind, arg_idx, type_tag_idx)))
 #define	__datatype_type_tag(kind, type) \
@@ -866,5 +919,40 @@
 /* Guard variables and structure members by lock. */
 #define	__guarded_by(x)		__lock_annotate(guarded_by(x))
 #define	__pt_guarded_by(x)	__lock_annotate(pt_guarded_by(x))
+
+/* Specify that a file requires capabilities */
+#if __has_feature(capabilities)
+#define __REQUIRE_CAPABILITIES
+#else
+#define __REQUIRE_CAPABILITIES \
+	_Pragma("GCC error \"This file requires a capability-aware compiler\"")
+#endif
+
+#if __has_feature(capabilities)
+#define	__CAPABILITY	__capability
+#ifdef _KERNEL
+#define	__kerncap	__capability
+#else
+#define	__kerncap
+#endif
+#else
+#define	__CAPABILITY
+#define	__capability
+#define	__kerncap
+#endif
+
+#if !__has_feature(cheri_casts)
+/* Support old compiler versions without CHERI casts: */
+#define __cheri_tocap
+#define __cheri_fromcap
+#define __cheri_offset
+#define __cheri_addr
+#endif
+
+/* allow __builtin_is_aligned unconditionally */
+#if !__has_builtin(__builtin_is_aligned)
+#define __builtin_is_aligned(addr, align) \
+	(((vaddr_t)addr & ((vaddr_t)(align) - 1)) == 0)
+#endif
 
 #endif /* !_SYS_CDEFS_H_ */

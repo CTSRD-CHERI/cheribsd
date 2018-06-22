@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1980, 1986, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -59,7 +61,6 @@
 #include <net/route.h>
 #include <net/route_var.h>
 #include <net/vnet.h>
-#include <net/flowtable.h>
 
 #ifdef RADIX_MPATH
 #include <net/radix_mpath.h>
@@ -201,6 +202,18 @@ rt_tables_get_rnh(int table, int fam)
 	return (*rt_tables_get_rnh_ptr(table, fam));
 }
 
+u_int
+rt_tables_get_gen(int table, int fam)
+{
+	struct rib_head *rnh;
+
+	rnh = *rt_tables_get_rnh_ptr(table, fam);
+	KASSERT(rnh != NULL, ("%s: NULL rib_head pointer table %d fam %d",
+	    __func__, table, fam));
+	return (rnh->rnh_gen);
+}
+
+
 /*
  * route initialization must occur before ip6_init2(), which happenas at
  * SI_ORDER_MIDDLE.
@@ -322,7 +335,7 @@ vnet_route_uninit(const void *unused __unused)
 	free(V_rt_tables, M_RTABLE);
 	uma_zdestroy(V_rtzone);
 }
-VNET_SYSUNINIT(vnet_route_uninit, SI_SUB_PROTO_DOMAIN, SI_ORDER_THIRD,
+VNET_SYSUNINIT(vnet_route_uninit, SI_SUB_PROTO_DOMAIN, SI_ORDER_FIRST,
     vnet_route_uninit, 0);
 #endif
 
@@ -340,7 +353,7 @@ rt_table_init(int offset)
 	rh->head.rnh_masks = &rh->rmhead;
 
 	/* Init locks */
-	rw_init(&rh->rib_lock, "rib head lock");
+	RIB_LOCK_INIT(rh);
 
 	/* Finally, set base callbacks */
 	rh->rnh_addaddr = rn_addroute;
@@ -353,12 +366,26 @@ rt_table_init(int offset)
 	return (rh);
 }
 
+static int
+rt_freeentry(struct radix_node *rn, void *arg)
+{
+	struct radix_head * const rnh = arg;
+	struct radix_node *x;
+
+	x = (struct radix_node *)rn_delete(rn + 2, NULL, rnh);
+	if (x != NULL)
+		R_Free(x);
+	return (0);
+}
+
 void
 rt_table_destroy(struct rib_head *rh)
 {
 
+	rn_walktree(&rh->rmhead.head, rt_freeentry, &rh->rmhead.head);
+
 	/* Assume table is already empty */
-	rw_destroy(&rh->rib_lock);
+	RIB_LOCK_DESTROY(rh);
 	free(rh, M_RTABLE);
 }
 
@@ -428,22 +455,26 @@ rtalloc1_fib(struct sockaddr *dst, int report, u_long ignflags,
 	/*
 	 * Look up the address in the table for that Address Family
 	 */
-	RIB_RLOCK(rh);
+	if ((ignflags & RTF_RNH_LOCKED) == 0)
+		RIB_RLOCK(rh);
+#ifdef INVARIANTS
+	else
+		RIB_LOCK_ASSERT(rh);
+#endif
 	rn = rh->rnh_matchaddr(dst, &rh->head);
 	if (rn && ((rn->rn_flags & RNF_ROOT) == 0)) {
 		newrt = RNTORT(rn);
 		RT_LOCK(newrt);
 		RT_ADDREF(newrt);
-		RIB_RUNLOCK(rh);
+		if ((ignflags & RTF_RNH_LOCKED) == 0)
+			RIB_RUNLOCK(rh);
 		return (newrt);
 
-	} else
+	} else if ((ignflags & RTF_RNH_LOCKED) == 0)
 		RIB_RUNLOCK(rh);
-	
 	/*
-	 * Either we hit the root or couldn't find any match,
-	 * Which basically means
-	 * "caint get there frm here"
+	 * Either we hit the root or could not find any match,
+	 * which basically means: "cannot get there from here".
 	 */
 miss:
 	V_rtstat.rts_unreach++;
@@ -723,7 +754,9 @@ ifa_ifwithroute(int flags, const struct sockaddr *dst, struct sockaddr *gateway,
 	if (ifa == NULL)
 		ifa = ifa_ifwithnet(gateway, 0, fibnum);
 	if (ifa == NULL) {
-		struct rtentry *rt = rtalloc1_fib(gateway, 0, 0, fibnum);
+		struct rtentry *rt;
+
+		rt = rtalloc1_fib(gateway, 0, flags, fibnum);
 		if (rt == NULL)
 			return (NULL);
 		/*
@@ -1115,6 +1148,15 @@ rt_ifdelroute(const struct rtentry *rt, void *arg)
  * to this interface...oh well...
  */
 void
+rt_flushifroutes_af(struct ifnet *ifp, int af)
+{
+	KASSERT((af >= 1 && af <= AF_MAX), ("%s: af %d not >= 1 and <= %d",
+	    __func__, af, AF_MAX));
+
+	rt_foreach_fib_walk_del(af, rt_ifdelroute, ifp);
+}
+
+void
 rt_flushifroutes(struct ifnet *ifp)
 {
 
@@ -1463,79 +1505,12 @@ rt_mpath_unlink(struct rib_head *rnh, struct rt_addrinfo *info,
 }
 #endif
 
-#ifdef FLOWTABLE
-static struct rtentry *
-rt_flowtable_check_route(struct rib_head *rnh, struct rt_addrinfo *info)
-{
-#if defined(INET6) || defined(INET)
-	struct radix_node *rn;
-#endif
-	struct rtentry *rt0;
-
-	rt0 = NULL;
-	/* "flow-table" only supports IPv6 and IPv4 at the moment. */
-	switch (dst->sa_family) {
-#ifdef INET6
-	case AF_INET6:
-#endif
-#ifdef INET
-	case AF_INET:
-#endif
-#if defined(INET6) || defined(INET)
-		rn = rnh->rnh_matchaddr(dst, &rnh->head);
-		if (rn && ((rn->rn_flags & RNF_ROOT) == 0)) {
-			struct sockaddr *mask;
-			u_char *m, *n;
-			int len;
-
-			/*
-			 * compare mask to see if the new route is
-			 * more specific than the existing one
-			 */
-			rt0 = RNTORT(rn);
-			RT_LOCK(rt0);
-			RT_ADDREF(rt0);
-			RT_UNLOCK(rt0);
-			/*
-			 * A host route is already present, so
-			 * leave the flow-table entries as is.
-			 */
-			if (rt0->rt_flags & RTF_HOST) {
-				RTFREE(rt0);
-				rt0 = NULL;
-			} else if (!(flags & RTF_HOST) && netmask) {
-				mask = rt_mask(rt0);
-				len = mask->sa_len;
-				m = (u_char *)mask;
-				n = (u_char *)netmask;
-				while (len-- > 0) {
-					if (*n != *m)
-						break;
-					n++;
-					m++;
-				}
-				if (len == 0 || (*n < *m)) {
-					RTFREE(rt0);
-					rt0 = NULL;
-				}
-			}
-		}
-#endif/* INET6 || INET */
-	}
-
-	return (rt0);
-}
-#endif
-
 int
 rtrequest1_fib(int req, struct rt_addrinfo *info, struct rtentry **ret_nrt,
 				u_int fibnum)
 {
 	int error = 0;
 	struct rtentry *rt, *rt_old;
-#ifdef FLOWTABLE
-	struct rtentry *rt0;
-#endif
 	struct radix_node *rn;
 	struct rib_head *rnh;
 	struct ifaddr *ifa;
@@ -1669,10 +1644,6 @@ rtrequest1_fib(int req, struct rt_addrinfo *info, struct rtentry **ret_nrt,
 		}
 #endif
 
-#ifdef FLOWTABLE
-		rt0 = rt_flowtable_check_route(rnh, info);
-#endif /* FLOWTABLE */
-
 		/* XXX mtu manipulation will be done in rnh_addaddr -- itojun */
 		rn = rnh->rnh_addaddr(ndst, netmask, &rnh->head, rt->rt_nodes);
 
@@ -1707,18 +1678,8 @@ rtrequest1_fib(int req, struct rt_addrinfo *info, struct rtentry **ret_nrt,
 			ifa_free(rt->rt_ifa);
 			R_Free(rt_key(rt));
 			uma_zfree(V_rtzone, rt);
-#ifdef FLOWTABLE
-			if (rt0 != NULL)
-				RTFREE(rt0);
-#endif
 			return (EEXIST);
 		} 
-#ifdef FLOWTABLE
-		else if (rt0 != NULL) {
-			flowtable_route_flush(dst->sa_family, rt0);
-			RTFREE(rt0);
-		}
-#endif
 
 		if (rt_old != NULL) {
 			rt_notifydelete(rt_old, info);
@@ -1740,6 +1701,7 @@ rtrequest1_fib(int req, struct rt_addrinfo *info, struct rtentry **ret_nrt,
 			*ret_nrt = rt;
 			RT_ADDREF(rt);
 		}
+		rnh->rnh_gen++;		/* Routing table updated */
 		RT_UNLOCK(rt);
 		break;
 	case RTM_CHANGE:
@@ -1803,8 +1765,13 @@ rtrequest1_fib_change(struct rib_head *rnh, struct rt_addrinfo *info,
 	    info->rti_info[RTAX_IFP] != NULL ||
 	    (info->rti_info[RTAX_IFA] != NULL &&
 	     !sa_equal(info->rti_info[RTAX_IFA], rt->rt_ifa->ifa_addr))) {
-
+		/*
+		 * XXX: Temporarily set RTF_RNH_LOCKED flag in the rti_flags
+		 *	to avoid rlock in the ifa_ifwithroute().
+		 */
+		info->rti_flags |= RTF_RNH_LOCKED;
 		error = rt_getifa_fib(info, fibnum);
+		info->rti_flags &= ~RTF_RNH_LOCKED;
 		if (info->rti_ifa != NULL)
 			free_ifa = 1;
 
@@ -1814,8 +1781,9 @@ rtrequest1_fib_change(struct rib_head *rnh, struct rt_addrinfo *info,
 
 	/* Check if outgoing interface has changed */
 	if (info->rti_ifa != NULL && info->rti_ifa != rt->rt_ifa &&
-	    rt->rt_ifa != NULL && rt->rt_ifa->ifa_rtrequest != NULL) {
-		rt->rt_ifa->ifa_rtrequest(RTM_DELETE, rt, info);
+	    rt->rt_ifa != NULL) {
+		if (rt->rt_ifa->ifa_rtrequest != NULL)
+			rt->rt_ifa->ifa_rtrequest(RTM_DELETE, rt, info);
 		ifa_free(rt->rt_ifa);
 	}
 	/* Update gateway address */

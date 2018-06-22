@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2013 Gleb Smirnoff <glebius@FreeBSD.org>
  * Copyright (c) 2010 Juniper Networks, Inc.
  * Copyright (c) 2009 Robert N. M. Watson
@@ -266,7 +268,7 @@ _kvm_dpcpu_init(kvm_t *kd)
 }
 
 /*
- * Check whether the dpcpu module has been initialized sucessfully or not,
+ * Check whether the dpcpu module has been initialized successfully or not,
  * initialize it if permitted.
  */
 int

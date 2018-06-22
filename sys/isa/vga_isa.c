@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1999 Kazutaka YOKOTA <yokota@zodiac.mech.utsunomiya-u.ac.jp>
  * All rights reserved.
  *
@@ -173,6 +175,7 @@ isavga_probe(device_t dev)
 				 adp.va_io_base, adp.va_io_size);
 		bus_set_resource(dev, SYS_RES_MEMORY, 0,
 				 adp.va_mem_base, adp.va_mem_size);
+		isa_set_vendorid(dev, PNP_EISAID("PNP0900"));
 #if 0
 		isa_set_port(dev, adp.va_io_base);
 		isa_set_portsize(dev, adp.va_io_size);
@@ -195,11 +198,11 @@ isavga_attach(device_t dev)
 	sc = device_get_softc(dev);
 
 	rid = 0;
-	bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
-				  0, ~0, 0, RF_ACTIVE | RF_SHAREABLE);
+	bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid,
+				  RF_ACTIVE | RF_SHAREABLE);
 	rid = 0;
-	bus_alloc_resource(dev, SYS_RES_MEMORY, &rid,
-				 0, ~0, 0, RF_ACTIVE | RF_SHAREABLE);
+	bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid,
+				 RF_ACTIVE | RF_SHAREABLE);
 
 	error = vga_attach_unit(unit, sc, device_get_flags(dev));
 	if (error)

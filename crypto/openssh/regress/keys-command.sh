@@ -3,7 +3,7 @@
 
 tid="authorized keys from command"
 
-if test -z "$SUDO" ; then
+if [ -z "$SUDO" -a ! -w /var/run ]; then
 	echo "skipped (SUDO not set)"
 	echo "need SUDO to create file in /var/run, test won't work without"
 	exit 0
@@ -35,6 +35,12 @@ fi
 exec cat "$OBJ/authorized_keys_${LOGNAME}"
 _EOF
 $SUDO chmod 0755 "$KEY_COMMAND"
+
+if ! $OBJ/check-perm -m keys-command $KEY_COMMAND ; then
+	echo "skipping: $KEY_COMMAND is unsuitable as AuthorizedKeysCommand"
+	$SUDO rm -f $KEY_COMMAND
+	exit 0
+fi
 
 if [ -x $KEY_COMMAND ]; then
 	cp $OBJ/sshd_proxy $OBJ/sshd_proxy.bak

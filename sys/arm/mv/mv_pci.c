@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2008 MARVELL INTERNATIONAL LTD.
  * Copyright (c) 2010 The FreeBSD Foundation
  * Copyright (c) 2010-2015 Semihalf
@@ -52,6 +54,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/bus.h>
 #include <sys/rman.h>
 #include <sys/endian.h>
+#include <sys/devmap.h>
 
 #include <machine/fdt.h>
 #include <machine/intr.h>
@@ -61,8 +64,8 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/fdt/fdt_common.h>
 #include <dev/ofw/ofw_bus.h>
-#include <dev/ofw/ofw_pci.h>
 #include <dev/ofw/ofw_bus_subr.h>
+#include <dev/ofw/ofw_pci.h>
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcib_private.h>
@@ -70,7 +73,6 @@ __FBSDID("$FreeBSD$");
 #include "ofw_bus_if.h"
 #include "pcib_if.h"
 
-#include <machine/devmap.h>
 #include <machine/resource.h>
 #include <machine/bus.h>
 
@@ -147,7 +149,7 @@ mv_pci_ranges_decode(phandle_t node, struct mv_pci_range *io_space,
 	/*
 	 * Initialize the ranges so that we don't have to worry about
 	 * having them all defined in the FDT. In particular, it is
-	 * perfectly fine not to want I/O space on PCI busses.
+	 * perfectly fine not to want I/O space on PCI buses.
 	 */
 	bzero(io_space, sizeof(*io_space));
 	bzero(mem_space, sizeof(*mem_space));
@@ -221,7 +223,7 @@ mv_pci_ranges(phandle_t node, struct mv_pci_range *io_space,
 }
 
 int
-mv_pci_devmap(phandle_t node, struct arm_devmap_entry *devmap, vm_offset_t io_va,
+mv_pci_devmap(phandle_t node, struct devmap_entry *devmap, vm_offset_t io_va,
     vm_offset_t mem_va)
 {
 	struct mv_pci_range io_space, mem_space;
@@ -233,15 +235,11 @@ mv_pci_devmap(phandle_t node, struct arm_devmap_entry *devmap, vm_offset_t io_va
 	devmap->pd_va = (io_va ? io_va : io_space.base_parent);
 	devmap->pd_pa = io_space.base_parent;
 	devmap->pd_size = io_space.len;
-	devmap->pd_prot = VM_PROT_READ | VM_PROT_WRITE;
-	devmap->pd_cache = PTE_DEVICE;
 	devmap++;
 
 	devmap->pd_va = (mem_va ? mem_va : mem_space.base_parent);
 	devmap->pd_pa = mem_space.base_parent;
 	devmap->pd_size = mem_space.len;
-	devmap->pd_prot = VM_PROT_READ | VM_PROT_WRITE;
-	devmap->pd_cache = PTE_DEVICE;
 	return (0);
 }
 
@@ -372,7 +370,7 @@ static device_method_t mv_pcib_methods[] = {
 	DEVMETHOD(pcib_read_config,		mv_pcib_read_config),
 	DEVMETHOD(pcib_write_config,		mv_pcib_write_config),
 	DEVMETHOD(pcib_route_interrupt,		mv_pcib_route_interrupt),
-
+	DEVMETHOD(pcib_request_feature,		pcib_request_feature_allow),
 #if defined(SOC_MV_ARMADAXP)
 	DEVMETHOD(pcib_alloc_msi,		mv_pcib_alloc_msi),
 	DEVMETHOD(pcib_release_msi,		mv_pcib_release_msi),
@@ -398,6 +396,7 @@ static driver_t mv_pcib_driver = {
 devclass_t pcib_devclass;
 
 DRIVER_MODULE(pcib, ofwbus, mv_pcib_driver, pcib_devclass, 0, 0);
+DRIVER_MODULE(pcib, pcib_ctrl, mv_pcib_driver, pcib_devclass, 0, 0);
 
 static struct mtx pcicfg_mtx;
 
@@ -423,22 +422,30 @@ mv_pcib_attach(device_t self)
 {
 	struct mv_pcib_softc *sc;
 	phandle_t node, parnode;
-	uint32_t val, unit;
-	int err;
+	uint32_t val, reg0;
+	int err, bus, devfn, port_id;
 
 	sc = device_get_softc(self);
 	sc->sc_dev = self;
-	unit = fdt_get_unit(self);
-
 
 	node = ofw_bus_get_node(self);
 	parnode = OF_parent(node);
-	if (fdt_is_compatible(node, "mrvl,pcie")) {
+
+	if (OF_getencprop(node, "marvell,pcie-port", &(port_id),
+	    sizeof(port_id)) <= 0) {
+		/* If port ID does not exist in the FDT set value to 0 */
+		if (!OF_hasprop(node, "marvell,pcie-port"))
+			port_id = 0;
+		else
+			return(ENXIO);
+	}
+
+	if (ofw_bus_node_is_compatible(node, "mrvl,pcie")) {
 		sc->sc_type = MV_TYPE_PCIE;
-		sc->sc_win_target = MV_WIN_PCIE_TARGET(unit);
-		sc->sc_mem_win_attr = MV_WIN_PCIE_MEM_ATTR(unit);
-		sc->sc_io_win_attr = MV_WIN_PCIE_IO_ATTR(unit);
-	} else if (fdt_is_compatible(node, "mrvl,pci")) {
+		sc->sc_win_target = MV_WIN_PCIE_TARGET(port_id);
+		sc->sc_mem_win_attr = MV_WIN_PCIE_MEM_ATTR(port_id);
+		sc->sc_io_win_attr = MV_WIN_PCIE_IO_ATTR(port_id);
+	} else if (ofw_bus_node_is_compatible(node, "mrvl,pci")) {
 		sc->sc_type = MV_TYPE_PCI;
 		sc->sc_win_target = MV_WIN_PCI_TARGET;
 		sc->sc_mem_win_attr = MV_WIN_PCI_MEM_ATTR;
@@ -480,7 +487,7 @@ mv_pcib_attach(device_t self)
 	/*
 	 * Enable PCIE device.
 	 */
-	mv_pcib_enable(sc, unit);
+	mv_pcib_enable(sc, port_id);
 
 	/*
 	 * Memory management.
@@ -488,6 +495,22 @@ mv_pcib_attach(device_t self)
 	err = mv_pcib_mem_init(sc);
 	if (err)
 		return (err);
+
+	/*
+	 * Preliminary bus enumeration to find first linked devices and set
+	 * appropriate bus number from which should start the actual enumeration
+	 */
+	for (bus = 0; bus < PCI_BUSMAX; bus++) {
+		for (devfn = 0; devfn < mv_pcib_maxslots(self); devfn++) {
+			reg0 = mv_pcib_read_config(self, bus, devfn, devfn & 0x7, 0x0, 4);
+			if (reg0 == (~0U))
+				continue; /* no device */
+			else {
+				sc->sc_busnr = bus; /* update bus number */
+				break;
+			}
+		}
+	}
 
 	if (sc->sc_mode == MV_MODE_ROOT) {
 		err = mv_pcib_init(sc, sc->sc_busnr,
@@ -846,9 +869,9 @@ mv_pcib_alloc_resource(device_t dev, device_t child, int type, int *rid,
 	default:
 		return (BUS_ALLOC_RESOURCE(device_get_parent(dev), dev,
 		    type, rid, start, end, count, flags));
-	};
+	}
 
-	if ((start == 0UL) && (end == ~0UL)) {
+	if (RMAN_IS_DEFAULT_RANGE(start, end)) {
 		start = sc->sc_mem_base;
 		end = sc->sc_mem_base + sc->sc_mem_size - 1;
 		count = sc->sc_mem_size;
@@ -922,7 +945,7 @@ static inline void
 pcib_write_irq_mask(struct mv_pcib_softc *sc, uint32_t mask)
 {
 
-	if (sc->sc_type != MV_TYPE_PCI)
+	if (sc->sc_type != MV_TYPE_PCIE)
 		return;
 
 	bus_space_write_4(sc->sc_bst, sc->sc_bsh, PCIE_REG_IRQ_MASK, mask);

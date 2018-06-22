@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2006 Wojciech A. Koszek <wkoszek@FreeBSD.org>
  * Copyright (c) 2012-2014 Robert N. M. Watson
  * All rights reserved.
@@ -61,6 +63,7 @@ __FBSDID("$FreeBSD$");
 #include <contrib/libfdt/fdt.h>
 #include <dev/fdt/fdt_common.h>
 #include <dev/ofw/openfirm.h>
+#include <dev/ofw/ofw_subr.h>
 #endif
 
 #include <vm/vm.h>
@@ -101,7 +104,8 @@ mips_init(void)
 	int i;
 #ifdef FDT
 	struct mem_region mr[FDT_MEM_REGIONS];
-	int mr_cnt, val;
+	uint64_t val;
+	int mr_cnt;
 	int j;
 #endif
 
@@ -183,9 +187,7 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 	char **envp = (char **)a2;
 	long memsize;
 #ifdef FDT
-	char buf[2048];		/* early stack supposedly big enough */
 	vm_offset_t dtbp = 0;
-	phandle_t chosen;
 	void *kmdp;
 	int dtb_needs_swap = 0; /* error */
 	size_t dtb_size = 0;
@@ -293,9 +295,7 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 	/*
 	 * Get bootargs from FDT if specified.
 	 */
-	chosen = OF_finddevice("/chosen");
-	if (OF_getprop(chosen, "bootargs", buf, sizeof(buf)) != -1)
-		mips_parse_bootargs(buf);
+	ofw_parse_bootargs();
 #endif
 
 	/*

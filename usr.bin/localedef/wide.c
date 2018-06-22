@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>  All rights reserved.
  * Copyright 2015 John Marino <draco@marino.st>
@@ -92,7 +92,7 @@ static struct {
 	{ "EUC-CN",	"EUC-CN",	16, towide_euccn, tomb_mbs },
 	{ "eucCN",	"EUC-CN",	16, towide_euccn, tomb_mbs },
 	/*
-	 * Becuase the 3-byte form of EUC-JP use the same leading byte,
+	 * Because the 3-byte form of EUC-JP use the same leading byte,
 	 * only 17 bits required to provide unique priorities.  (The low
 	 * bit of that first byte is set.)  By setting this value low,
 	 * we can get by with only 3 bytes in the strxfrm expansion.
@@ -598,7 +598,7 @@ to_mb(char *mb, wchar_t wc)
 	int	rv;
 
 	if ((rv = _tomb(mb, wc)) < 0) {
-		errf(widemsg);
+		warn("%s", widemsg);
 		free(widemsg);
 		widemsg = NULL;
 	}
@@ -614,7 +614,7 @@ to_mb_string(const wchar_t *wcs)
 
 	mbs = malloc((wcslen(wcs) * mb_cur_max) + 1);
 	if (mbs == NULL) {
-		errf("out of memory");
+		warn("out of memory");
 		return (NULL);
 	}
 	ptr = mbs;

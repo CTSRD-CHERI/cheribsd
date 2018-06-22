@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1996, Javier Martín Rueda (jmrueda@diatel.upm.es)
  * All rights reserved.
  *
@@ -812,7 +814,7 @@ rx_another: ;
 
 
 static int
-ex_ioctl(register struct ifnet *ifp, u_long cmd, caddr_t data)
+ex_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
 	struct ex_softc *	sc = ifp->if_softc;
 	struct ifreq *		ifr = (struct ifreq *)data;
@@ -821,13 +823,7 @@ ex_ioctl(register struct ifnet *ifp, u_long cmd, caddr_t data)
 	DODEBUG(Start_End, printf("%s: ex_ioctl: start ", ifp->if_xname););
 
 	switch(cmd) {
-		case SIOCSIFADDR:
-		case SIOCGIFADDR:
-		case SIOCSIFMTU:
-			error = ether_ioctl(ifp, cmd, data);
-			break;
-
-		case SIOCSIFFLAGS:
+		CASE_IOC_IFREQ(SIOCSIFFLAGS):
 			DODEBUG(Start_End, printf("SIOCSIFFLAGS"););
 			EX_LOCK(sc);
 			if ((ifp->if_flags & IFF_UP) == 0 &&
@@ -838,18 +834,18 @@ ex_ioctl(register struct ifnet *ifp, u_long cmd, caddr_t data)
 			}
 			EX_UNLOCK(sc);
 			break;
-		case SIOCADDMULTI:
-		case SIOCDELMULTI:
+		CASE_IOC_IFREQ(SIOCADDMULTI):
+		CASE_IOC_IFREQ(SIOCDELMULTI):
 			ex_init(sc);
 			error = 0;
 			break;
-		case SIOCSIFMEDIA:
+		CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		case SIOCGIFMEDIA:
 			error = ifmedia_ioctl(ifp, ifr, &sc->ifmedia, cmd);
 			break;
 		default:
-			DODEBUG(Start_End, printf("unknown"););
-			error = EINVAL;
+			error = ether_ioctl(ifp, cmd, data);
+			break;
 	}
 
 	DODEBUG(Start_End, printf("\n%s: ex_ioctl: finish\n", ifp->if_xname););

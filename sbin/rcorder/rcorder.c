@@ -2,7 +2,9 @@
 /*	$NetBSD: rcorder.c,v 1.7 2000/08/04 07:33:55 enami Exp $	*/
 #endif
 
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1998, 1999 Matthew R. Green
  * All rights reserved.
  * Copyright (c) 1998
@@ -701,7 +703,7 @@ keep_ok(filenode *fnode)
 static void
 do_file(filenode *fnode)
 {
-	f_reqnode *r, *r_tmp;
+	f_reqnode *r;
 	f_provnode *p, *p_tmp;
 	provnode *pnode;
 	int was_set;	
@@ -728,13 +730,8 @@ do_file(filenode *fnode)
 	 */
 	r = fnode->req_list;
 	while (r != NULL) {
-		r_tmp = r;
 		satisfy_req(r, fnode->filename);
 		r = r->next;
-#if 0
-		if (was_set == 0)
-			free(r_tmp);
-#endif
 	}
 	fnode->req_list = NULL;
 

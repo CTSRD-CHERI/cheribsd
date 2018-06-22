@@ -14,11 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $OpenBSD: krl.c,v 1.33 2015/07/03 03:43:18 djm Exp $ */
+/* $OpenBSD: krl.c,v 1.39 2017/03/10 07:18:32 dtucker Exp $ */
 
 #include "includes.h"
 
-#include <sys/param.h>	/* MIN */
 #include <sys/types.h>
 #include <openbsd-compat/sys-tree.h>
 #include <openbsd-compat/sys-queue.h>
@@ -121,7 +120,7 @@ blob_cmp(struct revoked_blob *a, struct revoked_blob *b)
 	int r;
 
 	if (a->len != b->len) {
-		if ((r = memcmp(a->blob, b->blob, MIN(a->len, b->len))) != 0)
+		if ((r = memcmp(a->blob, b->blob, MINIMUM(a->len, b->len))) != 0)
 			return r;
 		return a->len > b->len ? 1 : -1;
 	} else
@@ -458,9 +457,9 @@ choose_next_state(int current_state, u_int64_t contig, int final,
 	 * Avoid unsigned overflows.
 	 * The limits are high enough to avoid confusing the calculations.
 	 */
-	contig = MIN(contig, 1ULL<<31);
-	last_gap = MIN(last_gap, 1ULL<<31);
-	next_gap = MIN(next_gap, 1ULL<<31);
+	contig = MINIMUM(contig, 1ULL<<31);
+	last_gap = MINIMUM(last_gap, 1ULL<<31);
+	next_gap = MINIMUM(next_gap, 1ULL<<31);
 
 	/*
 	 * Calculate the cost to switch from the current state to candidates.
@@ -486,8 +485,8 @@ choose_next_state(int current_state, u_int64_t contig, int final,
 	/* Estimate base cost in bits of each section type */
 	cost_list += 64 * contig + (final ? 0 : 8+64);
 	cost_range += (2 * 64) + (final ? 0 : 8+64);
-	cost_bitmap += last_gap + contig + (final ? 0 : MIN(next_gap, 8+64));
-	cost_bitmap_restart += contig + (final ? 0 : MIN(next_gap, 8+64));
+	cost_bitmap += last_gap + contig + (final ? 0 : MINIMUM(next_gap, 8+64));
+	cost_bitmap_restart += contig + (final ? 0 : MINIMUM(next_gap, 8+64));
 
 	/* Convert to byte costs for actual comparison */
 	cost_list = (cost_list + 7) / 8;
@@ -723,7 +722,7 @@ ssh_krl_to_blob(struct ssh_krl *krl, struct sshbuf *buf,
 	if ((r = sshbuf_put(buf, KRL_MAGIC, sizeof(KRL_MAGIC) - 1)) != 0 ||
 	    (r = sshbuf_put_u32(buf, KRL_FORMAT_VERSION)) != 0 ||
 	    (r = sshbuf_put_u64(buf, krl->krl_version)) != 0 ||
-	    (r = sshbuf_put_u64(buf, krl->generated_date) != 0) ||
+	    (r = sshbuf_put_u64(buf, krl->generated_date)) != 0 ||
 	    (r = sshbuf_put_u64(buf, krl->flags)) != 0 ||
 	    (r = sshbuf_put_string(buf, NULL, 0)) != 0 ||
 	    (r = sshbuf_put_cstring(buf, krl->comment)) != 0)
@@ -772,7 +771,7 @@ ssh_krl_to_blob(struct ssh_krl *krl, struct sshbuf *buf,
 			goto out;
 
 		if ((r = sshkey_sign(sign_keys[i], &sblob, &slen,
-		    sshbuf_ptr(buf), sshbuf_len(buf), 0)) != 0)
+		    sshbuf_ptr(buf), sshbuf_len(buf), NULL, 0)) != 0)
 			goto out;
 		KRL_DBG(("%s: signature sig len %zu", __func__, slen));
 		if ((r = sshbuf_put_string(buf, sblob, slen)) != 0)
@@ -826,10 +825,8 @@ parse_revoked_certs(struct sshbuf *buf, struct ssh_krl *krl)
 		goto out;
 
 	while (sshbuf_len(buf) > 0) {
-		if (subsect != NULL) {
-			sshbuf_free(subsect);
-			subsect = NULL;
-		}
+		sshbuf_free(subsect);
+		subsect = NULL;
 		if ((r = sshbuf_get_u8(buf, &type)) != 0 ||
 		    (r = sshbuf_froms(buf, &subsect)) != 0)
 			goto out;
@@ -1017,7 +1014,7 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 		}
 		/* Check signature over entire KRL up to this point */
 		if ((r = sshkey_verify(key, blob, blen,
-		    sshbuf_ptr(buf), sshbuf_len(buf) - sig_off, 0)) != 0)
+		    sshbuf_ptr(buf), sig_off, 0)) != 0)
 			goto out;
 		/* Check if this key has already signed this KRL */
 		for (i = 0; i < nca_used; i++) {
@@ -1038,7 +1035,6 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 		ca_used = tmp_ca_used;
 		ca_used[nca_used++] = key;
 		key = NULL;
-		break;
 	}
 
 	if (sshbuf_len(copy) != 0) {
@@ -1059,10 +1055,8 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 	if ((r = sshbuf_consume(copy, sects_off)) != 0)
 		goto out;
 	while (sshbuf_len(copy) > 0) {
-		if (sect != NULL) {
-			sshbuf_free(sect);
-			sect = NULL;
-		}
+		sshbuf_free(sect);
+		sect = NULL;
 		if ((r = sshbuf_get_u8(copy, &type)) != 0 ||
 		    (r = sshbuf_froms(copy, &sect)) != 0)
 			goto out;
@@ -1095,7 +1089,7 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 			break;
 		case KRL_SECTION_SIGNATURE:
 			/* Handled above, but still need to stay in synch */
-			sshbuf_reset(sect);
+			sshbuf_free(sect);
 			sect = NULL;
 			if ((r = sshbuf_skip_string(copy)) != 0)
 				goto out;
@@ -1105,7 +1099,7 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 			r = SSH_ERR_INVALID_FORMAT;
 			goto out;
 		}
-		if (sshbuf_len(sect) > 0) {
+		if (sect != NULL && sshbuf_len(sect) > 0) {
 			error("KRL section contains unparsed data");
 			r = SSH_ERR_INVALID_FORMAT;
 			goto out;
@@ -1294,7 +1288,8 @@ ssh_krl_file_contains_key(const char *path, const struct sshkey *key)
 	debug2("%s: checking KRL %s", __func__, path);
 	r = ssh_krl_check_key(krl, key);
  out:
-	close(fd);
+	if (fd != -1)
+		close(fd);
 	sshbuf_free(krlbuf);
 	ssh_krl_free(krl);
 	if (r != 0)

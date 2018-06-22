@@ -1,4 +1,5 @@
 /**************************************************************************
+SPDX-License-Identifier: BSD-2-Clause-FreeBSD
 
 Copyright (c) 2007-2009, Chelsio Inc.
 All rights reserved.
@@ -54,7 +55,6 @@ $FreeBSD$
 #include <machine/bus.h>
 #include <machine/resource.h>
 
-#include <sys/bus_dma.h>
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
 

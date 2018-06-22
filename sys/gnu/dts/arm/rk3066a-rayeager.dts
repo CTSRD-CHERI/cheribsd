@@ -41,36 +41,48 @@
  */
 
 /dts-v1/;
+#include <dt-bindings/input/input.h>
 #include "rk3066a.dtsi"
 
 / {
 	model = "Rayeager PX2";
 	compatible = "chipspark,rayeager-px2", "rockchip,rk3066a";
 
-	memory {
+	memory@60000000 {
+		device_type = "memory";
 		reg = <0x60000000 0x40000000>;
 	};
 
 	ir: ir-receiver {
 		compatible = "gpio-ir-receiver";
-		gpios = <&gpio6 1 GPIO_ACTIVE_LOW>;
+		gpios = <&gpio6 RK_PA1 GPIO_ACTIVE_LOW>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&ir_int>;
 	};
 
 	keys: gpio-keys {
 		compatible = "gpio-keys";
-		#address-cells = <1>;
-		#size-cells = <0>;
 
-		button@0 {
-			gpio-key,wakeup = <1>;
-			gpios = <&gpio6 2 GPIO_ACTIVE_LOW>;
+		power {
+			wakeup-source;
+			gpios = <&gpio6 RK_PA2 GPIO_ACTIVE_LOW>;
 			label = "GPIO Power";
-			linux,code = <116>;
+			linux,code = <KEY_POWER>;
 			pinctrl-names = "default";
 			pinctrl-0 = <&pwr_key>;
 		};
+	};
+
+	vdd_log: vdd-log {
+		compatible = "pwm-regulator";
+		pwms = <&pwm3 0 1000>;
+		regulator-name = "vdd_log";
+		regulator-min-microvolt = <1200000>;
+		regulator-max-microvolt = <1200000>;
+		regulator-always-on;
+		voltage-table = <1000000 100>,
+				<1200000 42>;
+		status = "okay";
 	};
 
 	vsys: vsys-regulator {
@@ -103,7 +115,7 @@
 	vcc_sata: sata-regulator {
 		compatible = "regulator-fixed";
 		enable-active-high;
-		gpio = <&gpio4 22 GPIO_ACTIVE_HIGH>;
+		gpio = <&gpio4 RK_PC6 GPIO_ACTIVE_HIGH>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&sata_pwr>;
 		regulator-name = "usb_5v";
@@ -115,7 +127,7 @@
 
 	vcc_sd: sdmmc-regulator {
 		compatible = "regulator-fixed";
-		gpio = <&gpio3 7 GPIO_ACTIVE_LOW>;
+		gpio = <&gpio3 RK_PA7 GPIO_ACTIVE_LOW>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&sdmmc_pwr>;
 		regulator-name = "vcc_sd";
@@ -128,7 +140,7 @@
 	vcc_host: usb-host-regulator {
 		compatible = "regulator-fixed";
 		enable-active-high;
-		gpio = <&gpio0 6 GPIO_ACTIVE_HIGH>;
+		gpio = <&gpio0 RK_PA6 GPIO_ACTIVE_HIGH>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&host_drv>;
 		regulator-name = "host-pwr";
@@ -141,7 +153,7 @@
 	vcc_otg: usb-otg-regulator {
 		compatible = "regulator-fixed";
 		enable-active-high;
-		gpio = <&gpio0 5 GPIO_ACTIVE_HIGH>;
+		gpio = <&gpio0 RK_PA5 GPIO_ACTIVE_HIGH>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&otg_drv>;
 		regulator-name = "vcc_otg";
@@ -169,12 +181,10 @@
 };
 
 &emmc {
-	broken-cd;
 	bus-width = <8>;
 	cap-mmc-highspeed;
 	disable-wp;
 	non-removable;
-	num-slots = <1>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&emmc_clk>, <&emmc_cmd>, <&emmc_rst>;
 	vmmc-supply = <&vcc_emmc>;
@@ -190,7 +200,7 @@
 		compatible = "asahi-kasei,ak8975";
 		reg = <0x0d>;
 		interrupt-parent = <&gpio4>;
-		interrupts = <17 IRQ_TYPE_EDGE_RISING>;
+		interrupts = <RK_PC1 IRQ_TYPE_EDGE_RISING>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&comp_int>;
 	};
@@ -199,7 +209,7 @@
 		compatible = "fsl,mma8452";
 		reg = <0x1d>;
 		interrupt-parent = <&gpio4>;
-		interrupts = <16 IRQ_TYPE_EDGE_RISING>;
+		interrupts = <RK_PC0 IRQ_TYPE_EDGE_RISING>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&gsensor_int>;
 	};
@@ -212,7 +222,7 @@
 	tps: tps@2d {
 		reg = <0x2d>;
 		interrupt-parent = <&gpio6>;
-		interrupts = <4 IRQ_TYPE_EDGE_RISING>;
+		interrupts = <RK_PA4 IRQ_TYPE_EDGE_RISING>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&pmic_int>, <&pwr_hold>;
 
@@ -325,19 +335,18 @@
 &mmc0 {
 	bus-width = <4>;
 	disable-wp;
-	num-slots = <1>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&sd0_clk>, <&sd0_cmd>, <&sd0_cd>, <&sd0_bus4>;
 	vmmc-supply = <&vcc_sd>;
+	cap-mmc-highspeed;
+	cap-sd-highspeed;
 	status = "okay";
 };
 
 &mmc1 {
-	broken-cd;
 	bus-width = <4>;
 	disable-wp;
 	non-removable;
-	num-slots = <1>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&sd1_clk>, <&sd1_cmd>, <&sd1_bus4>;
 	vmmc-supply = <&vccio_wl>;
@@ -428,6 +437,10 @@
 	status = "okay";
 };
 
+&pwm3 {
+	status = "okay";
+};
+
 &saradc {
 	vref-supply = <&vcc_25>;
 	status = "okay";
@@ -456,6 +469,10 @@
 &usb_host {
 	pinctrl-names = "default";
 	pinctrl-0 = <&hub_rst>, <&sata_reset>;
+	status = "okay";
+};
+
+&usbphy {
 	status = "okay";
 };
 

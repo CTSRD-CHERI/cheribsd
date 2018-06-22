@@ -1,7 +1,9 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2010 The FreeBSD Foundation
  * All rights reserved.
- 
+
  * This software was developed by Shteryana Sotirova Shopova under
  * sponsorship from the FreeBSD Foundation.
  *
@@ -158,7 +160,7 @@ wlan_kmodules_load(void)
 		syslog(LOG_NOTICE, "SNMP wlan loaded %s module",
 		    wmod_names[WLAN_KMOD_WEP]);
 
-	return (0);	
+	return (0);
 }
 
 /* XXX: FIXME */
@@ -2387,7 +2389,7 @@ wlan_get_mac_policy(struct wlan_iface *wif)
 			wif->mac_policy = wlanMACAccessControlPolicy_open;
 			return (0);
 		}
-		
+
 	}
 
 	wif->macsupported = 1;

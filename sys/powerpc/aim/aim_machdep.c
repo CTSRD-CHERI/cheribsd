@@ -130,7 +130,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/openfirm.h>
 
 #ifdef __powerpc64__
-extern int n_slbs;
+#include "mmu_oea64.h"
 #endif
 
 #ifndef __powerpc64__
@@ -178,17 +178,6 @@ aim_cpu_init(vm_offset_t toc)
 
 	trap_offset = 0;
 	cacheline_warn = 0;
-
-	#ifdef __powerpc64__
-	/*
-	 * Switch to 64-bit mode, if the bootloader didn't, before we start 
-	 * using memory beyond what the bootloader might have set up.
-	 * Guaranteed not to cause an implicit branch since we either (a)
-	 * started with a 32-bit bootloader below 4 GB or (b) were already in
-	 * 64-bit mode, making this a no-op.
-	 */
-	mtmsrd(mfmsr() | PSL_SF);
-	#endif
 
 	/* Various very early CPU fix ups */
 	switch (mfpvr() >> 16) {
@@ -606,7 +595,7 @@ cpu_sleep()
 		while (1)
 			mtmsr(msr);
 	}
-	mttb(timebase);
+	platform_smp_timebase_sync(timebase, 0);
 	PCPU_SET(curthread, curthread);
 	PCPU_SET(curpcb, curthread->td_pcb);
 	pmap_activate(curthread);

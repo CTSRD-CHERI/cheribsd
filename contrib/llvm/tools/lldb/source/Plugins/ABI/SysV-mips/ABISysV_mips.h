@@ -14,110 +14,91 @@
 // C++ Includes
 // Other libraries and framework includes
 // Project includes
-#include "lldb/lldb-private.h"
 #include "lldb/Target/ABI.h"
+#include "lldb/lldb-private.h"
 
-class ABISysV_mips :
-    public lldb_private::ABI
-{
+class ABISysV_mips : public lldb_private::ABI {
 public:
+  ~ABISysV_mips() override = default;
 
-    ~ABISysV_mips()
-    {
-    }
+  size_t GetRedZoneSize() const override;
 
-    virtual size_t
-    GetRedZoneSize () const;
+  bool PrepareTrivialCall(lldb_private::Thread &thread, lldb::addr_t sp,
+                          lldb::addr_t functionAddress,
+                          lldb::addr_t returnAddress,
+                          llvm::ArrayRef<lldb::addr_t> args) const override;
 
-    virtual bool
-    PrepareTrivialCall (lldb_private::Thread &thread, 
-                        lldb::addr_t sp,
-                        lldb::addr_t functionAddress,
-                        lldb::addr_t returnAddress, 
-                        llvm::ArrayRef<lldb::addr_t> args) const;
+  bool GetArgumentValues(lldb_private::Thread &thread,
+                         lldb_private::ValueList &values) const override;
 
-    virtual bool
-    GetArgumentValues (lldb_private::Thread &thread,
-                       lldb_private::ValueList &values) const;
+  lldb_private::Status
+  SetReturnValueObject(lldb::StackFrameSP &frame_sp,
+                       lldb::ValueObjectSP &new_value) override;
 
-    virtual lldb_private::Error
-    SetReturnValueObject(lldb::StackFrameSP &frame_sp, lldb::ValueObjectSP &new_value);
+  lldb::ValueObjectSP
+  GetReturnValueObjectImpl(lldb_private::Thread &thread,
+                           lldb_private::CompilerType &type) const override;
 
-protected:
-    lldb::ValueObjectSP
-    GetReturnValueObjectSimple (lldb_private::Thread &thread,
-                                lldb_private::ClangASTType &ast_type) const;
-    
-public:    
-    virtual lldb::ValueObjectSP
-    GetReturnValueObjectImpl (lldb_private::Thread &thread,
-                          lldb_private::ClangASTType &type) const;
+  bool
+  CreateFunctionEntryUnwindPlan(lldb_private::UnwindPlan &unwind_plan) override;
 
-    virtual bool
-    CreateFunctionEntryUnwindPlan (lldb_private::UnwindPlan &unwind_plan);
+  bool CreateDefaultUnwindPlan(lldb_private::UnwindPlan &unwind_plan) override;
 
-    virtual bool
-    CreateDefaultUnwindPlan (lldb_private::UnwindPlan &unwind_plan);
+  bool RegisterIsVolatile(const lldb_private::RegisterInfo *reg_info) override;
 
-    virtual bool
-    RegisterIsVolatile (const lldb_private::RegisterInfo *reg_info);
+  bool IsSoftFloat(uint32_t fp_flag) const;
 
-    virtual bool
-    CallFrameAddressIsValid (lldb::addr_t cfa)
-    {
-        // Make sure the stack call frame addresses are 8 byte aligned
-        if (cfa & (8ull - 1ull))
-            return false;   // Not 8 byte aligned
-        if (cfa == 0)
-            return false;   // Zero is not a valid stack address
-        return true;
-    }
+  bool CallFrameAddressIsValid(lldb::addr_t cfa) override {
+    // Make sure the stack call frame addresses are 8 byte aligned
+    if (cfa & (8ull - 1ull))
+      return false; // Not 8 byte aligned
+    if (cfa == 0)
+      return false; // Zero is not a valid stack address
+    return true;
+  }
 
-    virtual bool
-    CodeAddressIsValid (lldb::addr_t pc)//must- check
-    {
-       if (pc & (4ull - 1ull))
-           return false;   // Not 4 byte aligned
-        
-        // Anything else if fair game..
-        return true;
-    }
+  bool CodeAddressIsValid(lldb::addr_t pc) override {
+    // Just make sure the address is a valid 32 bit address. Bit zero
+    // might be set due to MicroMIPS function calls, so don't enforce alignment.
+    return (pc <= UINT32_MAX);
+  }
 
-    virtual const lldb_private::RegisterInfo *
-    GetRegisterInfoArray (uint32_t &count);
-    //------------------------------------------------------------------
-    // Static Functions
-    //------------------------------------------------------------------
-    static void
-    Initialize();
+  const lldb_private::RegisterInfo *
+  GetRegisterInfoArray(uint32_t &count) override;
 
-    static void
-    Terminate();
+  //------------------------------------------------------------------
+  // Static Functions
+  //------------------------------------------------------------------
 
-    static lldb::ABISP
-    CreateInstance (const lldb_private::ArchSpec &arch);
+  static void Initialize();
 
-    static lldb_private::ConstString
-    GetPluginNameStatic();
-    
-    //------------------------------------------------------------------
-    // PluginInterface protocol
-    //------------------------------------------------------------------
-    virtual lldb_private::ConstString
-    GetPluginName();
+  static void Terminate();
 
-    virtual uint32_t
-    GetPluginVersion();
+  static lldb::ABISP CreateInstance(lldb::ProcessSP process_sp, const lldb_private::ArchSpec &arch);
+
+  static lldb_private::ConstString GetPluginNameStatic();
+
+  //------------------------------------------------------------------
+  // PluginInterface protocol
+  //------------------------------------------------------------------
+
+  lldb_private::ConstString GetPluginName() override;
+
+  uint32_t GetPluginVersion() override;
 
 protected:
-    void
-    CreateRegisterMapIfNeeded ();
+  void CreateRegisterMapIfNeeded();
 
-    bool
-    RegisterIsCalleeSaved (const lldb_private::RegisterInfo *reg_info);
+  lldb::ValueObjectSP
+  GetReturnValueObjectSimple(lldb_private::Thread &thread,
+                             lldb_private::CompilerType &ast_type) const;
+
+  bool RegisterIsCalleeSaved(const lldb_private::RegisterInfo *reg_info);
 
 private:
-    ABISysV_mips() : lldb_private::ABI() { } // Call CreateInstance instead.
+  ABISysV_mips(lldb::ProcessSP process_sp) : lldb_private::ABI(process_sp) {
+    // Call CreateInstance instead.
+  }
 };
 
-#endif  // liblldb_ABI_h_
+#endif // liblldb_ABISysV_mips_h_

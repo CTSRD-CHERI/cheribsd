@@ -1,4 +1,4 @@
-//===-- DynamicLoaderWindowsDYLDh ----------------------------------*- C++ -*-===//
+//===-- DynamicLoaderWindowsDYLD.h ------------------------------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,37 +7,41 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef liblldb_Plugins_Process_Windows_DynamicLoaderWindowsDYLD_H_
-#define liblldb_Plugins_Process_Windows_DynamicLoaderWindowsDYLD_H_
+#ifndef liblldb_Plugins_Process_Windows_DynamicLoaderWindowsDYLD_h_
+#define liblldb_Plugins_Process_Windows_DynamicLoaderWindowsDYLD_h_
 
-#include "lldb/lldb-forward.h"
+// C Includes
+// C++ Includes
+// Other libraries and framework includes
+// Project includes
 #include "lldb/Target/DynamicLoader.h"
+#include "lldb/lldb-forward.h"
 
-namespace lldb_private
-{
+namespace lldb_private {
 
-class DynamicLoaderWindowsDYLD : public DynamicLoader
-{
-  public:
-    DynamicLoaderWindowsDYLD(Process *process);
-    virtual ~DynamicLoaderWindowsDYLD();
+class DynamicLoaderWindowsDYLD : public DynamicLoader {
+public:
+  DynamicLoaderWindowsDYLD(Process *process);
 
-    static void Initialize();
-    static void Terminate();
-    static ConstString GetPluginNameStatic();
-    static const char *GetPluginDescriptionStatic();
+  ~DynamicLoaderWindowsDYLD() override;
 
-    static DynamicLoader *CreateInstance(Process *process, bool force);
+  static void Initialize();
+  static void Terminate();
+  static ConstString GetPluginNameStatic();
+  static const char *GetPluginDescriptionStatic();
 
-    void DidAttach () override;
-    void DidLaunch () override;
-    Error CanLoadImage () override;
-    lldb::ThreadPlanSP GetStepThroughTrampolinePlan(Thread &thread, bool stop) override;
+  static DynamicLoader *CreateInstance(Process *process, bool force);
 
-    ConstString GetPluginName() override;
-    uint32_t GetPluginVersion() override;
+  void DidAttach() override;
+  void DidLaunch() override;
+  Status CanLoadImage() override;
+  lldb::ThreadPlanSP GetStepThroughTrampolinePlan(Thread &thread,
+                                                  bool stop) override;
+
+  ConstString GetPluginName() override;
+  uint32_t GetPluginVersion() override;
 };
 
-}
+} // namespace lldb_private
 
-#endif
+#endif // liblldb_Plugins_Process_Windows_DynamicLoaderWindowsDYLD_h_

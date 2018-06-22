@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2010 Hudson River Trading LLC
  * Written by: John H. Baldwin <jhb@FreeBSD.org>
  * All rights reserved.
@@ -28,7 +30,10 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include "opt_vm.h"
+
 #include <sys/param.h>
+#include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
@@ -42,19 +47,21 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_phys.h>
 
 #include <contrib/dev/acpica/include/acpi.h>
+#include <contrib/dev/acpica/include/aclocal.h>
 #include <contrib/dev/acpica/include/actables.h>
 
 #include <machine/intr_machdep.h>
+#include <machine/md_var.h>
 #include <x86/apicvar.h>
 
 #include <dev/acpica/acpivar.h>
 
 #if MAXMEMDOM > 1
-struct cpu_info {
+static struct cpu_info {
 	int enabled:1;
 	int has_memory:1;
 	int domain;
-} cpus[MAX_APIC_ID + 1];
+} *cpus;
 
 struct mem_affinity mem_info[VM_PHYSSEG_MAX + 1];
 int num_mem;
@@ -62,7 +69,8 @@ int num_mem;
 static ACPI_TABLE_SRAT *srat;
 static vm_paddr_t srat_physaddr;
 
-static int vm_domains[VM_PHYSSEG_MAX];
+static int domain_pxm[MAXMEMDOM];
+static int ndomain;
 
 static ACPI_TABLE_SLIT *slit;
 static vm_paddr_t slit_physaddr;
@@ -145,8 +153,10 @@ parse_slit(void)
 	acpi_unmap_table(slit);
 	slit = NULL;
 
+#ifdef VM_NUMA_ALLOC
 	/* Tell the VM about it! */
 	mem_locality = vm_locality_table;
+#endif
 	return (0);
 }
 
@@ -164,7 +174,7 @@ overlaps_phys_avail(vm_paddr_t start, vm_paddr_t end)
 	int i;
 
 	for (i = 0; phys_avail[i] != 0 && phys_avail[i + 1] != 0; i += 2) {
-		if (phys_avail[i + 1] < start)
+		if (phys_avail[i + 1] <= start)
 			continue;
 		if (phys_avail[i] < end)
 			return (1);
@@ -196,8 +206,18 @@ srat_parse_entry(ACPI_SUBTABLE_HEADER *entry, void *arg)
 			    "enabled" : "disabled");
 		if (!(cpu->Flags & ACPI_SRAT_CPU_ENABLED))
 			break;
-		KASSERT(!cpus[cpu->ApicId].enabled,
-		    ("Duplicate local APIC ID %u", cpu->ApicId));
+		if (cpu->ApicId > max_apic_id) {
+			printf("SRAT: Ignoring local APIC ID %u (too high)\n",
+			    cpu->ApicId);
+			break;
+		}
+
+		if (cpus[cpu->ApicId].enabled) {
+			printf("SRAT: Duplicate local APIC ID %u\n",
+			    cpu->ApicId);
+			*(int *)arg = ENXIO;
+			break;
+		}
 		cpus[cpu->ApicId].domain = domain;
 		cpus[cpu->ApicId].enabled = 1;
 		break;
@@ -210,6 +230,12 @@ srat_parse_entry(ACPI_SUBTABLE_HEADER *entry, void *arg)
 			    "enabled" : "disabled");
 		if (!(x2apic->Flags & ACPI_SRAT_CPU_ENABLED))
 			break;
+		if (x2apic->ApicId > max_apic_id) {
+			printf("SRAT: Ignoring local APIC ID %u (too high)\n",
+			    x2apic->ApicId);
+			break;
+		}
+
 		KASSERT(!cpus[x2apic->ApicId].enabled,
 		    ("Duplicate local APIC ID %u", x2apic->ApicId));
 		cpus[x2apic->ApicId].domain = x2apic->ProximityDomain;
@@ -219,7 +245,7 @@ srat_parse_entry(ACPI_SUBTABLE_HEADER *entry, void *arg)
 		mem = (ACPI_SRAT_MEM_AFFINITY *)entry;
 		if (bootverbose)
 			printf(
-		    "SRAT: Found memory domain %d addr %jx len %jx: %s\n",
+		    "SRAT: Found memory domain %d addr 0x%jx len 0x%jx: %s\n",
 			    mem->ProximityDomain, (uintmax_t)mem->BaseAddress,
 			    (uintmax_t)mem->Length,
 			    (mem->Flags & ACPI_SRAT_MEM_ENABLED) ?
@@ -228,7 +254,7 @@ srat_parse_entry(ACPI_SUBTABLE_HEADER *entry, void *arg)
 			break;
 		if (!overlaps_phys_avail(mem->BaseAddress,
 		    mem->BaseAddress + mem->Length)) {
-			printf("SRAT: Ignoring memory at addr %jx\n",
+			printf("SRAT: Ignoring memory at addr 0x%jx\n",
 			    (uintmax_t)mem->BaseAddress);
 			break;
 		}
@@ -270,7 +296,7 @@ check_domains(void)
 
 	for (i = 0; i < num_mem; i++) {
 		found = 0;
-		for (j = 0; j <= MAX_APIC_ID; j++)
+		for (j = 0; j <= max_apic_id; j++)
 			if (cpus[j].enabled &&
 			    cpus[j].domain == mem_info[i].domain) {
 				cpus[j].has_memory = 1;
@@ -282,7 +308,7 @@ check_domains(void)
 			return (ENXIO);
 		}
 	}
-	for (i = 0; i <= MAX_APIC_ID; i++)
+	for (i = 0; i <= max_apic_id; i++)
 		if (cpus[i].enabled && !cpus[i].has_memory) {
 			printf("SRAT: No memory found for CPU %d\n", i);
 			return (ENXIO);
@@ -325,7 +351,7 @@ check_phys_avail(void)
 				address = mem_info[i].end + 1;
 		}
 	}
-	printf("SRAT: No memory region found for %jx - %jx\n",
+	printf("SRAT: No memory region found for 0x%jx - 0x%jx\n",
 	    (uintmax_t)phys_avail[j], (uintmax_t)phys_avail[j + 1]);
 	return (ENXIO);
 }
@@ -340,48 +366,47 @@ renumber_domains(void)
 	int i, j, slot;
 
 	/* Enumerate all the domains. */
-	vm_ndomains = 0;
+	ndomain = 0;
 	for (i = 0; i < num_mem; i++) {
 		/* See if this domain is already known. */
-		for (j = 0; j < vm_ndomains; j++) {
-			if (vm_domains[j] >= mem_info[i].domain)
+		for (j = 0; j < ndomain; j++) {
+			if (domain_pxm[j] >= mem_info[i].domain)
 				break;
 		}
-		if (j < vm_ndomains && vm_domains[j] == mem_info[i].domain)
+		if (j < ndomain && domain_pxm[j] == mem_info[i].domain)
 			continue;
 
-		/* Insert the new domain at slot 'j'. */
-		slot = j;
-		for (j = vm_ndomains; j > slot; j--)
-			vm_domains[j] = vm_domains[j - 1];
-		vm_domains[slot] = mem_info[i].domain;
-		vm_ndomains++;
-		if (vm_ndomains > MAXMEMDOM) {
-			vm_ndomains = 1;
+		if (ndomain >= MAXMEMDOM) {
+			ndomain = 1;
 			printf("SRAT: Too many memory domains\n");
 			return (EFBIG);
 		}
+
+		/* Insert the new domain at slot 'j'. */
+		slot = j;
+		for (j = ndomain; j > slot; j--)
+			domain_pxm[j] = domain_pxm[j - 1];
+		domain_pxm[slot] = mem_info[i].domain;
+		ndomain++;
 	}
 
-	/* Renumber each domain to its index in the sorted 'domains' list. */
-	for (i = 0; i < vm_ndomains; i++) {
+	/* Renumber each domain to its index in the sorted 'domain_pxm' list. */
+	for (i = 0; i < ndomain; i++) {
 		/*
 		 * If the domain is already the right value, no need
 		 * to renumber.
 		 */
-		if (vm_domains[i] == i)
+		if (domain_pxm[i] == i)
 			continue;
 
 		/* Walk the cpu[] and mem_info[] arrays to renumber. */
 		for (j = 0; j < num_mem; j++)
-			if (mem_info[j].domain == vm_domains[i])
+			if (mem_info[j].domain == domain_pxm[i])
 				mem_info[j].domain = i;
-		for (j = 0; j <= MAX_APIC_ID; j++)
-			if (cpus[j].enabled && cpus[j].domain == vm_domains[i])
+		for (j = 0; j <= max_apic_id; j++)
+			if (cpus[j].enabled && cpus[j].domain == domain_pxm[i])
 				cpus[j].domain = i;
 	}
-	KASSERT(vm_ndomains > 0,
-	    ("renumber_domains: invalid final vm_ndomains setup"));
 
 	return (0);
 }
@@ -392,6 +417,8 @@ renumber_domains(void)
 static int
 parse_srat(void)
 {
+	unsigned int idx, size;
+	vm_paddr_t addr;
 	int error;
 
 	if (resource_disabled("srat", 0))
@@ -400,6 +427,31 @@ parse_srat(void)
 	srat_physaddr = acpi_find_table(ACPI_SIG_SRAT);
 	if (srat_physaddr == 0)
 		return (-1);
+
+	/*
+	 * Allocate data structure:
+	 *
+	 * Find the last physical memory region and steal some memory from
+	 * it. This is done because at this point in the boot process
+	 * malloc is still not usable.
+	 */
+	for (idx = 0; phys_avail[idx + 1] != 0; idx += 2);
+	KASSERT(idx != 0, ("phys_avail is empty!"));
+	idx -= 2;
+
+	size =  sizeof(*cpus) * (max_apic_id + 1);
+	addr = trunc_page(phys_avail[idx + 1] - size);
+	KASSERT(addr >= phys_avail[idx],
+	    ("Not enough memory for SRAT table items"));
+	phys_avail[idx + 1] = addr - 1;
+
+	/*
+	 * We cannot rely on PHYS_TO_DMAP because this code is also used in
+	 * i386, so use pmap_mapbios to map the memory, this will end up using
+	 * the default memory attribute (WB), and the DMAP when available.
+	 */
+	cpus = (struct cpu_info *)pmap_mapbios(addr, size);
+	bzero(cpus, size);
 
 	/*
 	 * Make a pass over the table to populate the cpus[] and
@@ -416,8 +468,11 @@ parse_srat(void)
 		return (-1);
 	}
 
+#ifdef VM_NUMA_ALLOC
 	/* Point vm_phys at our memory affinity table. */
+	vm_ndomains = ndomain;
 	mem_affinity = mem_info;
+#endif
 
 	return (0);
 }
@@ -482,6 +537,10 @@ srat_set_cpus(void *dummy)
 			printf("SRAT: CPU %u has memory domain %d\n", i,
 			    cpu->domain);
 	}
+
+	/* Last usage of the cpus array, unmap it. */
+	pmap_unmapbios((vm_offset_t)cpus, sizeof(*cpus) * (max_apic_id + 1));
+	cpus = NULL;
 }
 SYSINIT(srat_set_cpus, SI_SUB_CPU, SI_ORDER_ANY, srat_set_cpus, NULL);
 
@@ -495,10 +554,19 @@ acpi_map_pxm_to_vm_domainid(int pxm)
 {
 	int i;
 
-	for (i = 0; i < vm_ndomains; i++) {
-		if (vm_domains[i] == pxm)
+	for (i = 0; i < ndomain; i++) {
+		if (domain_pxm[i] == pxm)
 			return (i);
 	}
+
+	return (-1);
+}
+
+#else /* MAXMEMDOM == 1 */
+
+int
+acpi_map_pxm_to_vm_domainid(int pxm)
+{
 
 	return (-1);
 }

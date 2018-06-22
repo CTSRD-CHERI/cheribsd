@@ -20,7 +20,7 @@
 
 using namespace llvm;
 
-#define DEBUG_TYPE "processimplicitdefs"
+#define DEBUG_TYPE "processimpdefs"
 
 namespace {
 /// Process IMPLICIT_DEF instructions and make sure there is one implicit_def
@@ -51,14 +51,12 @@ public:
 char ProcessImplicitDefs::ID = 0;
 char &llvm::ProcessImplicitDefsID = ProcessImplicitDefs::ID;
 
-INITIALIZE_PASS_BEGIN(ProcessImplicitDefs, "processimpdefs",
-                "Process Implicit Definitions", false, false)
-INITIALIZE_PASS_END(ProcessImplicitDefs, "processimpdefs",
+INITIALIZE_PASS(ProcessImplicitDefs, DEBUG_TYPE,
                 "Process Implicit Definitions", false, false)
 
 void ProcessImplicitDefs::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.setPreservesCFG();
-  AU.addPreserved<AliasAnalysis>();
+  AU.addPreserved<AAResultsWrapperPass>();
   MachineFunctionPass::getAnalysisUsage(AU);
 }
 
@@ -96,7 +94,7 @@ void ProcessImplicitDefs::processImplicitDef(MachineInstr *MI) {
 
   // This is a physreg implicit-def.
   // Look for the first instruction to use or define an alias.
-  MachineBasicBlock::instr_iterator UserMI = MI;
+  MachineBasicBlock::instr_iterator UserMI = MI->getIterator();
   MachineBasicBlock::instr_iterator UserE = MI->getParent()->instr_end();
   bool Found = false;
   for (++UserMI; UserMI != UserE; ++UserMI) {
@@ -151,7 +149,7 @@ bool ProcessImplicitDefs::runOnMachineFunction(MachineFunction &MF) {
     for (MachineBasicBlock::instr_iterator MBBI = MFI->instr_begin(),
          MBBE = MFI->instr_end(); MBBI != MBBE; ++MBBI)
       if (MBBI->isImplicitDef())
-        WorkList.insert(MBBI);
+        WorkList.insert(&*MBBI);
 
     if (WorkList.empty())
       continue;

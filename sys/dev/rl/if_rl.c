@@ -276,7 +276,7 @@ DRIVER_MODULE(miibus, rl, miibus_driver, miibus_devclass, 0, 0);
 static void
 rl_eeprom_putbyte(struct rl_softc *sc, int addr)
 {
-	register int		d, i;
+	int			d, i;
 
 	d = addr | sc->rl_eecmd_read;
 
@@ -303,7 +303,7 @@ rl_eeprom_putbyte(struct rl_softc *sc, int addr)
 static void
 rl_eeprom_getword(struct rl_softc *sc, int addr, uint16_t *dest)
 {
-	register int		i;
+	int			i;
 	uint16_t		word = 0;
 
 	/* Enter EEPROM access mode. */
@@ -561,7 +561,7 @@ rl_rxfilter(struct rl_softc *sc)
 static void
 rl_reset(struct rl_softc *sc)
 {
-	register int		i;
+	int			i;
 
 	RL_LOCK_ASSERT(sc);
 
@@ -598,7 +598,7 @@ rl_probe(device_t dev)
 		}
 	}
 	t = rl_devs;
-	for (i = 0; i < sizeof(rl_devs) / sizeof(rl_devs[0]); i++, t++) {
+	for (i = 0; i < nitems(rl_devs); i++, t++) {
 		if (vendor == t->rl_vid && devid == t->rl_did) {
 			device_set_desc(dev, t->rl_name);
 			return (BUS_PROBE_DEFAULT);
@@ -1817,7 +1817,7 @@ rl_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int			error = 0, mask;
 
 	switch (command) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		RL_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING &&
@@ -1831,21 +1831,21 @@ rl_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->rl_if_flags = ifp->if_flags;
 		RL_UNLOCK(sc);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		RL_LOCK(sc);
 		rl_rxfilter(sc);
 		RL_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		mii = device_get_softc(sc->rl_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;
-	case SIOCSIFCAP:
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+	CASE_IOC_IFREQ(SIOCSIFCAP):
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 #ifdef DEVICE_POLLING
-		if (ifr->ifr_reqcap & IFCAP_POLLING &&
+		if (ifr_reqcap_get(ifr) & IFCAP_POLLING &&
 		    !(ifp->if_capenable & IFCAP_POLLING)) {
 			error = ether_poll_register(rl_poll, ifp);
 			if (error)
@@ -1858,7 +1858,7 @@ rl_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			return (error);
 			
 		}
-		if (!(ifr->ifr_reqcap & IFCAP_POLLING) &&
+		if (!(ifr_reqcap_get(ifr) & IFCAP_POLLING) &&
 		    ifp->if_capenable & IFCAP_POLLING) {
 			error = ether_poll_deregister(ifp);
 			/* Enable interrupts. */
@@ -1912,7 +1912,7 @@ rl_watchdog(struct rl_softc *sc)
 static void
 rl_stop(struct rl_softc *sc)
 {
-	register int		i;
+	int			i;
 	struct ifnet		*ifp = sc->rl_ifp;
 
 	RL_LOCK_ASSERT(sc);
@@ -1938,15 +1938,13 @@ rl_stop(struct rl_softc *sc)
 	 */
 	for (i = 0; i < RL_TX_LIST_CNT; i++) {
 		if (sc->rl_cdata.rl_tx_chain[i] != NULL) {
-			if (sc->rl_cdata.rl_tx_chain[i] != NULL) {
-				bus_dmamap_sync(sc->rl_cdata.rl_tx_tag,
-				    sc->rl_cdata.rl_tx_dmamap[i],
-				    BUS_DMASYNC_POSTWRITE);
-				bus_dmamap_unload(sc->rl_cdata.rl_tx_tag,
-				    sc->rl_cdata.rl_tx_dmamap[i]);
-				m_freem(sc->rl_cdata.rl_tx_chain[i]);
-				sc->rl_cdata.rl_tx_chain[i] = NULL;
-			}
+			bus_dmamap_sync(sc->rl_cdata.rl_tx_tag,
+			    sc->rl_cdata.rl_tx_dmamap[i],
+			    BUS_DMASYNC_POSTWRITE);
+			bus_dmamap_unload(sc->rl_cdata.rl_tx_tag,
+			    sc->rl_cdata.rl_tx_dmamap[i]);
+			m_freem(sc->rl_cdata.rl_tx_chain[i]);
+			sc->rl_cdata.rl_tx_chain[i] = NULL;
 			CSR_WRITE_4(sc, RL_TXADDR0 + (i * sizeof(uint32_t)),
 			    0x0000000);
 		}

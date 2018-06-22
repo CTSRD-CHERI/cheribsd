@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1991, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -14,7 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -42,6 +44,7 @@ void def_close(void);
 void jcl(char **);
 void pos_in(void);
 void pos_out(void);
+double secs_elapsed(void);
 void summary(void);
 void siginfo_handler(int);
 void terminate(int);
@@ -54,6 +57,7 @@ extern void (*cfunc)(void);
 extern uintmax_t cpy_cnt;
 extern size_t cbsz;
 extern u_int ddflags;
+extern size_t speed;
 extern uintmax_t files_cnt;
 extern const u_char *ctab;
 extern const u_char a2e_32V[], a2e_POSIX[];

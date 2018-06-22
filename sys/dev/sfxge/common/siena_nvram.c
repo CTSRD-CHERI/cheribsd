@@ -1,5 +1,7 @@
 /*-
- * Copyright (c) 2009-2015 Solarflare Communications Inc.
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
+ * Copyright (c) 2009-2016 Solarflare Communications Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -170,7 +172,7 @@ fail1:
 	return (rc);
 }
 
-				void
+	__checkReturn		efx_rc_t
 siena_nvram_partn_unlock(
 	__in			efx_nic_t *enp,
 	__in			uint32_t partn)
@@ -186,14 +188,16 @@ siena_nvram_partn_unlock(
 		    partn == MC_CMD_NVRAM_TYPE_PHY_PORT1 ||
 		    partn == MC_CMD_NVRAM_TYPE_DISABLED_CALLISTO);
 
-	if ((rc = efx_mcdi_nvram_update_finish(enp, partn, reboot)) != 0) {
+	rc = efx_mcdi_nvram_update_finish(enp, partn, reboot, NULL);
+	if (rc != 0)
 		goto fail1;
-	}
 
-	return;
+	return (0);
 
 fail1:
 	EFSYS_PROBE1(fail1, efx_rc_t, rc);
+
+	return (rc);
 }
 
 #endif	/* EFSYS_OPT_VPD || EFSYS_OPT_NVRAM */
@@ -342,7 +346,7 @@ siena_nvram_get_dynamic_cfg(
 	    != SIENA_MC_DYNAMIC_CONFIG_MAGIC)
 		goto invalid1;
 
-	/* All future versions of the structure must be backwards compatable */
+	/* All future versions of the structure must be backwards compatible */
 	EFX_STATIC_ASSERT(SIENA_MC_DYNAMIC_CONFIG_VERSION == 0);
 
 	hdr_length = EFX_WORD_FIELD(dcfg->length, EFX_WORD_0);
@@ -523,7 +527,7 @@ siena_nvram_partn_get_version(
 			: MC_CMD_NVRAM_TYPE_DYNAMIC_CFG_PORT1;
 		/*
 		 * Ingore missing partitions on port 2, assuming they're due
-		 * to to running on a single port part.
+		 * to running on a single port part.
 		 */
 		if ((1 << dcfg_partn) &  ~enp->en_u.siena.enu_partn_mask) {
 			if (entry->port == 2)
@@ -585,12 +589,22 @@ fail1:
 	return (rc);
 }
 
-				void
+	__checkReturn		efx_rc_t
 siena_nvram_partn_rw_finish(
 	__in			efx_nic_t *enp,
 	__in			uint32_t partn)
 {
-	siena_nvram_partn_unlock(enp, partn);
+	efx_rc_t rc;
+
+	if ((rc = siena_nvram_partn_unlock(enp, partn)) != 0)
+		goto fail1;
+
+	return (0);
+
+fail1:
+	EFSYS_PROBE1(fail1, efx_rc_t, rc);
+
+	return (rc);
 }
 
 	__checkReturn		efx_rc_t

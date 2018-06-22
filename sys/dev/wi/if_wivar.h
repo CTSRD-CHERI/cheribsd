@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2002
  *	M Warner Losh <imp@freebsd.org>.  All rights reserved.
  * Copyright (c) 1997, 1998, 1999
@@ -114,6 +116,7 @@ struct wi_softc	{
 	u_int16_t		sc_portnum;
 	u_int16_t		sc_encryption;
 	u_int16_t		sc_monitor_port;
+	u_int16_t		sc_chanmask;
 
 	/* RSSI interpretation */
 	u_int16_t		sc_min_rssi;	/* clamp sc_min_rssi < RSSI */

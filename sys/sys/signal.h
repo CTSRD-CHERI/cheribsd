@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1989, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -15,7 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -44,6 +46,23 @@
 
 #include <machine/_limits.h>	/* __MINSIGSTKSZ */
 #include <machine/signal.h>	/* sig_atomic_t; trap codes; sigcontext */
+
+#if __POSIX_VISIBLE >= 200809
+
+#include <sys/_pthreadtypes.h>
+#include <sys/_timespec.h>
+
+#ifndef _SIZE_T_DECLARED
+typedef	__size_t	size_t;
+#define	_SIZE_T_DECLARED
+#endif
+
+#ifndef _UID_T_DECLARED
+typedef	__uid_t		uid_t;
+#define	_UID_T_DECLARED
+#endif
+
+#endif /* __POSIX_VISIBLE >= 200809 */
 
 /*
  * System defined signals.
@@ -118,11 +137,14 @@
 #define	SIGRTMIN	65
 #define	SIGRTMAX	126
 
-#define	SIG_DFL		((__sighandler_t *)0)
-#define	SIG_IGN		((__sighandler_t *)1)
-#define	SIG_ERR		((__sighandler_t *)-1)
-/* #define	SIG_CATCH	((__sighandler_t *)2) See signalvar.h */
-#define SIG_HOLD        ((__sighandler_t *)3)
+#if !__has_feature(capabilities)
+#define	__intcap_t __intptr_t
+#endif
+#define	SIG_DFL		((__sighandler_t * __kerncap)(__intcap_t)0)
+#define	SIG_IGN		((__sighandler_t * __kerncap)(__intcap_t)1)
+#define	SIG_ERR		((__sighandler_t * __kerncap)(__intcap_t)-1)
+/* #define	SIG_CATCH	((__sighandler_t *)(__intcap_t)2) See signalvar.h */
+#define SIG_HOLD        ((__sighandler_t * __kerncap)(__intcap_t)3)
 
 /*
  * Type of a signal handling function.
@@ -150,6 +172,7 @@ typedef	__sigset_t	sigset_t;
 #endif
 
 #if __POSIX_VISIBLE >= 199309 || __XSI_VISIBLE >= 500
+#ifndef _KERNEL
 union sigval {
 	/* Members as suggested by Annex C of POSIX 1003.1b. */
 	int	sival_int;
@@ -158,9 +181,39 @@ union sigval {
 	int     sigval_int;
 	void    *sigval_ptr;
 };
+
+#else /* _KERNEL */
+union sigval_native {
+	int	sival_int;
+	void	*sival_ptr;
+};
+#if __has_feature(capabilities)
+union sigval_c {
+	int	sival_int;
+	void * __capability sival_ptr;
+};
+typedef union sigval_c		ksigval_union;
+#else
+typedef union sigval_native	ksigval_union;
+#endif
+#endif /* _KERNEL */
+
+#if defined(_WANT_LWPINFO32) || (defined(_KERNEL) && defined(__LP64__))
+union sigval32 {
+	int	sival_int;
+	uint32_t sival_ptr;
+	/* 6.0 compatibility */
+	int	sigval_int;
+	uint32_t sigval_ptr;
+};
+#endif
 #endif
 
 #if __POSIX_VISIBLE >= 199309
+
+struct pthread_attr;
+
+#ifndef _KERNEL
 struct sigevent {
 	int	sigev_notify;		/* Notification type */
 	int	sigev_signo;		/* Signal number */
@@ -169,12 +222,50 @@ struct sigevent {
 		__lwpid_t	_threadid;
 		struct {
 			void (*_function)(union sigval);
-			void *_attribute; /* pthread_attr_t * */
+			struct pthread_attr **_attribute;
 		} _sigev_thread;
 		unsigned short _kevent_flags;
 		long __spare__[8];
 	} _sigev_un;
 };
+
+#else /* _KERNEL */
+
+struct sigevent_native {
+	int	sigev_notify;		/* Notification type */
+	int	sigev_signo;		/* Signal number */
+	ksigval_union sigev_value;	/* Signal value */
+	union {
+		__lwpid_t	_threadid;
+		struct {
+			void (*_function)(union sigval_native);
+			struct pthread_attr **_attribute;
+		} _sigev_thread;
+		unsigned short _kevent_flags;
+		long __spare__[8];
+	} _sigev_un;
+};
+
+#if __has_feature(capabilities)
+struct sigevent_c {
+	int	sigev_notify;		/* Notification type */
+	int	sigev_signo;		/* Signal number */
+	ksigval_union sigev_value;	/* Signal value */
+	union {
+		__lwpid_t	_threadid;
+		struct {
+			void (* __capability _function)(ksigval_union);
+			struct pthread_attr * __capability * __capability _attribute;
+		} _sigev_thread;
+		unsigned short _kevent_flags;
+		long __spare__[8];
+	} _sigev_un;
+};
+typedef	struct sigevent_c	ksigevent_t;
+#else
+typedef	struct sigevent_native	ksigevent_t;
+#endif
+#endif /* _KERNEL */
 
 #if __BSD_VISIBLE
 #define	sigev_notify_kqueue		sigev_signo
@@ -191,9 +282,11 @@ struct sigevent {
 #define	SIGEV_KEVENT	3		/* Generate a kevent. */
 #define	SIGEV_THREAD_ID	4		/* Send signal to a kernel thread. */
 #endif
+
 #endif /* __POSIX_VISIBLE >= 199309 */
 
 #if __POSIX_VISIBLE >= 199309 || __XSI_VISIBLE
+#ifndef _KERNEL
 typedef	struct __siginfo {
 	int	si_signo;		/* signal number */
 	int	si_errno;		/* errno association */
@@ -229,12 +322,121 @@ typedef	struct __siginfo {
 		} __spare__;
 	} _reason;
 } siginfo_t;
+#else /* _KERNEL */
+struct siginfo_native {
+	int	si_signo;		/* signal number */
+	int	si_errno;		/* errno association */
+	/*
+	 * Cause of signal, one of the SI_ macros or signal-specific
+	 * values, i.e. one of the FPE_... values for SIGFPE.  This
+	 * value is equivalent to the second argument to an old-style
+	 * FreeBSD signal handler.
+	 */
+	int	si_code;		/* signal code */
+	__pid_t	si_pid;			/* sending process */
+	__uid_t	si_uid;			/* sender's ruid */
+	int	si_status;		/* exit value */
+	void	*si_addr;		/* faulting instruction */
+	union sigval_native si_value;
+	union	{
+		struct {
+			int	_trapno;/* machine specific trap code */
+		} _fault;
+		struct {
+			int	_timerid;
+			int	_overrun;
+		} _timer;
+		struct {
+			int	_mqd;
+		} _mesgq;
+		struct {
+			long	_band;		/* band event for SIGPOLL */
+		} _poll;			/* was this ever used ? */
+		struct {
+			long	__spare1__;
+			int	__spare2__[7];
+		} __spare__;
+	} _reason;
+};
+#if __has_feature(capabilities)
+struct siginfo_c {
+	int	si_signo;		/* signal number */
+	int	si_errno;		/* errno association */
+	/*
+	 * Cause of signal, one of the SI_ macros or signal-specific
+	 * values, i.e. one of the FPE_... values for SIGFPE.  This
+	 * value is equivalent to the second argument to an old-style
+	 * FreeBSD signal handler.
+	 */
+	int	si_code;		/* signal code */
+	__pid_t	si_pid;			/* sending process */
+	__uid_t	si_uid;			/* sender's ruid */
+	int	si_status;		/* exit value */
+	void* __capability si_addr;	/* faulting instruction */
+	union sigval_c si_value;
+	union	{
+		struct {
+			int	_trapno;/* machine specific trap code */
+		} _fault;
+		struct {
+			int	_timerid;
+			int	_overrun;
+		} _timer;
+		struct {
+			int	_mqd;
+		} _mesgq;
+		struct {
+			long	_band;		/* band event for SIGPOLL */
+		} _poll;			/* was this ever used ? */
+		struct {
+			long	__spare1__;
+			int	__spare2__[7];
+		} __spare__;
+	} _reason;
+};
+typedef	struct siginfo_c	_siginfo_t;
+#else
+typedef	struct siginfo_native	_siginfo_t;
+#endif
+#endif /* _KERNEL */
 
 #define si_trapno	_reason._fault._trapno
 #define si_timerid	_reason._timer._timerid
 #define si_overrun	_reason._timer._overrun
 #define si_mqd		_reason._mesgq._mqd
 #define si_band		_reason._poll._band
+
+#if defined(_WANT_LWPINFO32) || (defined(_KERNEL) && defined(__LP64__))
+struct siginfo32 {
+	int	si_signo;		/* signal number */
+	int	si_errno;		/* errno association */
+	int	si_code;		/* signal code */
+	__pid_t	si_pid;			/* sending process */
+	__uid_t	si_uid;			/* sender's ruid */
+	int	si_status;		/* exit value */
+	uint32_t si_addr;		/* faulting instruction */
+	union sigval32 si_value;	/* signal value */
+	union	{
+		struct {
+			int	_trapno;/* machine specific trap code */
+		} _fault;
+		struct {
+			int	_timerid;
+			int	_overrun;
+		} _timer;
+		struct {
+			int	_mqd;
+		} _mesgq;
+		struct {
+			int32_t	_band;		/* band event for SIGPOLL */
+		} _poll;			/* was this ever used ? */
+		struct {
+			int32_t	__spare1__;
+			int	__spare2__[7];
+		} __spare__;
+	} _reason;
+};
+#endif
 
 /** si_code **/
 /* codes for SIGILL */
@@ -271,6 +473,7 @@ typedef	struct __siginfo {
 #define TRAP_BRKPT	1	/* Process breakpoint.			*/
 #define TRAP_TRACE	2	/* Process trace trap.			*/
 #define	TRAP_DTRACE	3	/* DTrace induced trap.			*/
+#define	TRAP_CAP	4	/* Capabilities protective trap.	*/
 
 /* codes for SIGCHLD */
 #define CLD_EXITED	1	/* Child has exited			*/
@@ -290,6 +493,24 @@ typedef	struct __siginfo {
 #define POLL_PRI	5	/* High priority input available	*/
 #define POLL_HUP	6	/* Device disconnected			*/
 
+/* codes for SIGPROT - XXXRW: under incorrect ifdef */
+#define	PROT_CHERI_BOUNDS	1	/* Capability bounds fault	*/
+#define	PROT_CHERI_TAG		2	/* Capability tag fault		*/
+#define	PROT_CHERI_SEALED	3	/* Capability sealed fault	*/
+#define	PROT_CHERI_TYPE		4	/* Type mismatch fault		*/
+#define	PROT_CHERI_PERM		5	/* Capability permission fault	*/
+#define	PROT_CHERI_STORETAG	6	/* Tag-store page fault		*/
+#define	PROT_CHERI_IMPRECISE	7	/* Imprecise bounds fault	*/
+#define	PROT_CHERI_STORELOCAL	8	/* Store-local fault		*/
+#define	PROT_CHERI_CCALL	9	/* CCall fault			*/
+#define	PROT_CHERI_CRETURN	10	/* CReturn fault		*/
+#define	PROT_CHERI_SYSREG	11	/* Capability system register fault */
+#define	PROT_CHERI_UNSEALED	61	/* CCall unsealed argument fault */
+#define	PROT_CHERI_OVERFLOW	62	/* Trusted stack oveflow fault	*/
+#define	PROT_CHERI_UNDERFLOW	63	/* Trusted stack underflow fault */
+#define	PROT_CHERI_CCALLREGS	64	/* CCall argument fault		*/
+#define	PROT_CHERI_LOCALARG	65	/* CCall local argument fault	*/
+#define	PROT_CHERI_LOCALRET	66	/* CReturn local retval fault	*/
 #endif
 
 #if __POSIX_VISIBLE || __XSI_VISIBLE
@@ -298,6 +519,7 @@ struct __siginfo;
 /*
  * Signal vector "template" used in sigaction call.
  */
+#ifndef _KERNEL
 struct sigaction {
 	union {
 		void    (*__sa_handler)(int);
@@ -306,6 +528,32 @@ struct sigaction {
 	int	sa_flags;		/* see signal options below */
 	sigset_t sa_mask;		/* signal mask to apply */
 };
+#else
+#if __has_feature(capabilities)
+struct sigaction_c {
+	union {
+		void    (* __capability __sa_handler)(int);
+		void    (* __capability __sa_sigaction)
+			    (int, struct __siginfo *, void *);
+	} __sigaction_u;		/* signal handler */
+	int	sa_flags;		/* see signal options below */
+	sigset_t sa_mask;		/* signal mask to apply */
+};
+#endif
+struct sigaction_native {
+	union {
+		void    (*__sa_handler)(int);
+		void    (*__sa_sigaction)(int, struct __siginfo *, void *);
+	} __sigaction_u;		/* signal handler */
+	int	sa_flags;		/* see signal options below */
+	sigset_t sa_mask;		/* signal mask to apply */
+};
+#if __has_feature(capabilities)
+typedef struct sigaction_c	ksigaction_t;
+#else
+typedef	struct sigaction_native	ksigaction_t;
+#endif
+#endif
 
 #define	sa_handler	__sigaction_u.__sa_handler
 #endif
@@ -350,28 +598,39 @@ struct sigaction {
 #endif
 
 #if __BSD_VISIBLE
-typedef	__sighandler_t	*sig_t;	/* type of pointer to a signal function */
+typedef	__sighandler_t	* __kerncap sig_t;	/* type of pointer to a signal function */
 typedef	void __siginfohandler_t(int, struct __siginfo *, void *);
 #endif
 
 #if __XSI_VISIBLE
-/*
- * Structure used in sigaltstack call.
- */
 #if __BSD_VISIBLE
-typedef	struct sigaltstack {
-#else
-typedef	struct {
+#define	__stack_t sigaltstack
 #endif
-	void	*ss_sp;			/* signal stack base */
-	__size_t ss_size;		/* signal stack length */
-	int	ss_flags;		/* SS_DISABLE and/or SS_ONSTACK */
-} stack_t;
+typedef	struct __stack_t stack_t;
 
 #define	SS_ONSTACK	0x0001	/* take signal on alternate stack */
 #define	SS_DISABLE	0x0004	/* disable taking signals on alternate stack */
 #define	MINSIGSTKSZ	__MINSIGSTKSZ		/* minimum stack size */
 #define	SIGSTKSZ	(MINSIGSTKSZ + 32768)	/* recommended stack size */
+#endif
+
+/*
+ * Structure used in sigaltstack call.  Its definition is always
+ * needed for __ucontext.  If __BSD_VISIBLE is defined, the structure
+ * tag is actually sigaltstack.
+ */
+struct __stack_t {
+	void * __kerncap ss_sp;		/* signal stack base */
+	__size_t ss_size;		/* signal stack length */
+	int	ss_flags;		/* SS_DISABLE and/or SS_ONSTACK */
+};
+
+#ifdef _KERNEL
+struct sigaltstack_native {
+	void	*ss_sp;			/* signal stack base */
+	__size_t ss_size;		/* signal stack length */
+	int	ss_flags;		/* SS_DISABLE and/or SS_ONSTACK */
+};
 #endif
 
 #if __BSD_VISIBLE
@@ -440,5 +699,9 @@ struct sigstack {
 __BEGIN_DECLS
 __sighandler_t *signal(int, __sighandler_t *);
 __END_DECLS
+
+#ifdef _KERNEL
+int	convert_sigevent(const struct sigevent_native *, ksigevent_t *);
+#endif
 
 #endif /* !_SYS_SIGNAL_H_ */

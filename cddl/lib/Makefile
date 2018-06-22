@@ -12,11 +12,8 @@ SUBDIR=	${_drti} \
 	${_libzfs_core} \
 	${_libzfs} \
 	${_libzpool} \
-	${_tests}
 
-.if ${MK_TESTS} != "no"
-_tests=		tests
-.endif
+SUBDIR.${MK_TESTS}+= tests
 
 .if ${MK_ZFS} != "no"
 _libzfs_core=	libzfs_core
@@ -26,7 +23,7 @@ _libzpool=	libzpool
 .endif
 .endif
 
-.if ${MACHINE_CPUARCH} != "sparc64" && ${MACHINE_CPUARCH} != "riscv"
+.if ${MACHINE_CPUARCH} != "sparc64"
 _drti=		drti
 _libdtrace=	libdtrace
 .endif
@@ -35,18 +32,9 @@ SUBDIR_DEPEND_libdtrace=	libctf
 SUBDIR_DEPEND_libzfs_core=	libnvpair
 SUBDIR_DEPEND_libzfs=	libavl libnvpair libumem libuutil libzfs_core
 SUBDIR_DEPEND_libzpool=	libavl libnvpair libumem
+SUBDIR_DEPEND_libavl=	libnvpair
+SUBDIR_DEPEND_libuutil=	libnvpair
 
 SUBDIR_PARALLEL=
-
-.if defined(LIBCHERI)
-.if ${MK_LIBCHERI_ALL} == "no"
-SUBDIR:=
-.else
-.if ${MK_LIBCHERI_BROKEN} == "no"
-# dt_options.c stores pointers in ints (should store ints in pointers)
-SUBDIR:=	${SUBDIR:Nlibdtrace}
-.endif
-.endif
-.endif
 
 .include <bsd.subdir.mk>

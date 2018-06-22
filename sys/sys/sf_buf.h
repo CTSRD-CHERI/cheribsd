@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2014 Gleb Smirnoff <glebius@FreeBSD.org>
  * Copyright (c) 2003-2004 Alan L. Cox <alc@cs.rice.edu>
  * All rights reserved.
@@ -41,6 +43,7 @@ struct sfstat {				/* sendfile statistics */
 	uint64_t	sf_busy;	/* times aborted on a busy page */
 	uint64_t	sf_allocfail;	/* times sfbuf allocation failed */
 	uint64_t	sf_allocwait;	/* times sfbuf allocation had to wait */
+	uint64_t	sf_pages_bogus;	/* times bogus page was used */
 };
 
 #ifdef _KERNEL

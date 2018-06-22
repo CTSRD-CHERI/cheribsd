@@ -9,7 +9,6 @@
  * http://www.gnu.org/copyleft/gpl.html
  */
 
-#include "skeleton.dtsi"
 #include "imx27-pinfunc.h"
 
 #include <dt-bindings/clock/imx27-clock.h>
@@ -18,6 +17,17 @@
 #include <dt-bindings/interrupt-controller/irq.h>
 
 / {
+	#address-cells = <1>;
+	#size-cells = <1>;
+	/*
+	 * The decompressor and also some bootloaders rely on a
+	 * pre-existing /chosen node to be available to insert the
+	 * command line and merge other ATAGS info.
+	 * Also for U-Boot there must be a pre-existing /memory node.
+	 */
+	chosen {};
+	memory { device_type = "memory"; reg = <0 0>; };
+
 	aliases {
 		ethernet0 = &fec;
 		gpio0 = &gpio1;
@@ -63,6 +73,7 @@
 
 		cpu: cpu@0 {
 			device_type = "cpu";
+			reg = <0>;
 			compatible = "arm,arm926ej-s";
 			operating-points = <
 				/* kHz uV */
@@ -108,7 +119,7 @@
 			};
 
 			gpt1: timer@10003000 {
-				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
+				compatible = "fsl,imx27-gpt", "fsl,imx21-gpt";
 				reg = <0x10003000 0x1000>;
 				interrupts = <26>;
 				clocks = <&clks IMX27_CLK_GPT1_IPG_GATE>,
@@ -117,7 +128,7 @@
 			};
 
 			gpt2: timer@10004000 {
-				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
+				compatible = "fsl,imx27-gpt", "fsl,imx21-gpt";
 				reg = <0x10004000 0x1000>;
 				interrupts = <25>;
 				clocks = <&clks IMX27_CLK_GPT2_IPG_GATE>,
@@ -126,7 +137,7 @@
 			};
 
 			gpt3: timer@10005000 {
-				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
+				compatible = "fsl,imx27-gpt", "fsl,imx21-gpt";
 				reg = <0x10005000 0x1000>;
 				interrupts = <24>;
 				clocks = <&clks IMX27_CLK_GPT3_IPG_GATE>,
@@ -142,6 +153,15 @@
 				clocks = <&clks IMX27_CLK_PWM_IPG_GATE>,
 					 <&clks IMX27_CLK_PER1_GATE>;
 				clock-names = "ipg", "per";
+			};
+
+			rtc: rtc@10007000 {
+				compatible = "fsl,imx21-rtc";
+				reg = <0x10007000 0x1000>;
+				interrupts = <22>;
+				clocks = <&clks IMX27_CLK_CKIL>,
+					 <&clks IMX27_CLK_RTC_IPG_GATE>;
+				clock-names = "ref", "ipg";
 			};
 
 			kpp: kpp@10008000 {
@@ -376,7 +396,7 @@
 			};
 
 			gpt4: timer@10019000 {
-				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
+				compatible = "fsl,imx27-gpt", "fsl,imx21-gpt";
 				reg = <0x10019000 0x1000>;
 				interrupts = <4>;
 				clocks = <&clks IMX27_CLK_GPT4_IPG_GATE>,
@@ -385,7 +405,7 @@
 			};
 
 			gpt5: timer@1001a000 {
-				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
+				compatible = "fsl,imx27-gpt", "fsl,imx21-gpt";
 				reg = <0x1001a000 0x1000>;
 				interrupts = <3>;
 				clocks = <&clks IMX27_CLK_GPT5_IPG_GATE>,
@@ -436,7 +456,7 @@
 			};
 
 			gpt6: timer@1001f000 {
-				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
+				compatible = "fsl,imx27-gpt", "fsl,imx21-gpt";
 				reg = <0x1001f000 0x1000>;
 				interrupts = <2>;
 				clocks = <&clks IMX27_CLK_GPT6_IPG_GATE>,
@@ -477,7 +497,10 @@
 				compatible = "fsl,imx27-usb";
 				reg = <0x10024000 0x200>;
 				interrupts = <56>;
-				clocks = <&clks IMX27_CLK_USB_IPG_GATE>;
+				clocks = <&clks IMX27_CLK_USB_IPG_GATE>,
+					<&clks IMX27_CLK_USB_AHB_GATE>,
+					<&clks IMX27_CLK_USB_DIV>;
+				clock-names = "ipg", "ahb", "per";
 				fsl,usbmisc = <&usbmisc 0>;
 				status = "disabled";
 			};
@@ -486,8 +509,12 @@
 				compatible = "fsl,imx27-usb";
 				reg = <0x10024200 0x200>;
 				interrupts = <54>;
-				clocks = <&clks IMX27_CLK_USB_IPG_GATE>;
+				clocks = <&clks IMX27_CLK_USB_IPG_GATE>,
+					<&clks IMX27_CLK_USB_AHB_GATE>,
+					<&clks IMX27_CLK_USB_DIV>;
+				clock-names = "ipg", "ahb", "per";
 				fsl,usbmisc = <&usbmisc 1>;
+				dr_mode = "host";
 				status = "disabled";
 			};
 
@@ -495,8 +522,12 @@
 				compatible = "fsl,imx27-usb";
 				reg = <0x10024400 0x200>;
 				interrupts = <55>;
-				clocks = <&clks IMX27_CLK_USB_IPG_GATE>;
+				clocks = <&clks IMX27_CLK_USB_IPG_GATE>,
+					<&clks IMX27_CLK_USB_AHB_GATE>,
+					<&clks IMX27_CLK_USB_DIV>;
+				clock-names = "ipg", "ahb", "per";
 				fsl,usbmisc = <&usbmisc 2>;
+				dr_mode = "host";
 				status = "disabled";
 			};
 
@@ -504,7 +535,6 @@
 				#index-cells = <1>;
 				compatible = "fsl,imx27-usbmisc";
 				reg = <0x10024600 0x200>;
-				clocks = <&clks IMX27_CLK_USB_AHB_GATE>;
 			};
 
 			sahara2: sahara@10025000 {
@@ -531,7 +561,7 @@
 
 			fec: ethernet@1002b000 {
 				compatible = "fsl,imx27-fec";
-				reg = <0x1002b000 0x4000>;
+				reg = <0x1002b000 0x1000>;
 				interrupts = <50>;
 				clocks = <&clks IMX27_CLK_FEC_IPG_GATE>,
 					 <&clks IMX27_CLK_FEC_AHB_GATE>;

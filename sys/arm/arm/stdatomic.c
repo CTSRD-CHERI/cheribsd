@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2013 Ed Schouten <ed@FreeBSD.org>
  * All rights reserved.
  *
@@ -31,7 +33,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/stdatomic.h>
 #include <sys/types.h>
 
-#include <machine/acle-compat.h>
 #include <machine/atomic.h>
 #include <machine/cpufunc.h>
 #include <machine/sysarch.h>

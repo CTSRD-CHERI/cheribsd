@@ -19,8 +19,18 @@
  * CDDL HEADER END
  */
 /*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
+/*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 /*
@@ -66,6 +76,7 @@ extern "C" {
 #include <fsshare.h>
 #include <pthread.h>
 #include <sched.h>
+#include <setjmp.h>
 #include <sys/debug.h>
 #include <sys/note.h>
 #include <sys/types.h>
@@ -126,8 +137,8 @@ extern void dprintf_setup(int *argc, char **argv);
 
 extern void cmn_err(int, const char *, ...);
 extern void vcmn_err(int, const char *, __va_list);
-extern void panic(const char *, ...);
-extern void vpanic(const char *, __va_list);
+extern void panic(const char *, ...)  __NORETURN;
+extern void vpanic(const char *, __va_list)  __NORETURN;
 
 #define	fm_panic	panic
 
@@ -324,6 +335,7 @@ extern gid_t *crgetgroups(cred_t *cr);
 typedef cond_t kcondvar_t;
 
 #define	CV_DEFAULT	USYNC_THREAD
+#define	CALLOUT_FLAG_ABSOLUTE	0x2
 
 extern void cv_init(kcondvar_t *cv, char *name, int type, void *arg);
 extern void cv_destroy(kcondvar_t *cv);
@@ -348,6 +360,7 @@ extern void cv_broadcast(kcondvar_t *cv);
 #define	KM_SLEEP		UMEM_NOFAIL
 #define	KM_PUSHPAGE		KM_SLEEP
 #define	KM_NOSLEEP		UMEM_DEFAULT
+#define	KM_NORMALPRI		0	/* not needed with UMEM_DEFAULT */
 #define	KMC_NODEBUG		UMC_NODEBUG
 #define	KMC_NOTOUCH		0	/* not needed for userland caches */
 #define	KM_NODEBUG		0
@@ -388,7 +401,7 @@ typedef struct taskq_ent {
 	struct taskq_ent	*tqent_prev;
 	task_func_t		*tqent_func;
 	void			*tqent_arg;
-	uintptr_t		tqent_flags;
+	vaddr_t			tqent_flags;
 } taskq_ent_t;
 
 #define	TQENT_FLAG_PREALLOC	0x1	/* taskq_dispatch_ent used */
@@ -578,8 +591,9 @@ extern void kernel_init(int);
 extern void kernel_fini(void);
 
 struct spa;
-extern void nicenum(uint64_t num, char *buf);
+extern void nicenum(uint64_t num, char *buf, size_t);
 extern void show_pool_stats(struct spa *);
+extern int set_global_var(char *arg);
 
 typedef struct callb_cpr {
 	kmutex_t	*cc_lockp;

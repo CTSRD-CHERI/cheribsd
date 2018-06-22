@@ -1,42 +1,18 @@
 # $FreeBSD$
 
-.include <bsd.own.mk>
+PROG_CXX=	bugpoint
 
-PROG_CXX=bugpoint
+SRCDIR=		tools/bugpoint
+SRCS+=		BugDriver.cpp
+SRCS+=		CrashDebugger.cpp
+SRCS+=		ExecutionDriver.cpp
+SRCS+=		ExtractFunction.cpp
+SRCS+=		FindBugs.cpp
+SRCS+=		Miscompilation.cpp
+SRCS+=		OptimizerDriver.cpp
+SRCS+=		ToolRunner.cpp
+SRCS+=		bugpoint.cpp
 
-SRCDIR=	tools/bugpoint
-SRCS=	BugDriver.cpp \
-	CrashDebugger.cpp \
-	ExecutionDriver.cpp \
-	ExtractFunction.cpp \
-	FindBugs.cpp \
-	Miscompilation.cpp \
-	OptimizerDriver.cpp \
-	ToolRunner.cpp \
-	bugpoint.cpp
+LIBADD+=	z
 
-TGHDRS=	Intrinsics
-LIBDEPS=llvmcodegen \
-	llvmtarget \
-	llvmobjcarcopts \
-	llvmirreader \
-	llvmbitwriter \
-	llvmlinker \
-	llvmipo \
-	llvmvectorize \
-	llvmscalaropts \
-	llvmprofiledata \
-	llvmobject \
-	llvmmcparser \
-	llvmbitreader \
-	llvminstcombine \
-	llvminstrumentation \
-	llvmtransformutils \
-	llvmipa \
-	llvmmc \
-	llvmanalysis \
-	llvmasmparser \
-	llvmcore \
-	llvmsupport
-
-.include "../clang.prog.mk"
+.include "../llvm.prog.mk"

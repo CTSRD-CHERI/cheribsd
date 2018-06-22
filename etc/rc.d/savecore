@@ -10,6 +10,8 @@
 . /etc/rc.subr
 
 name="savecore"
+rcvar="savecore_enable"
+desc="Save a core dump of the operating system"
 start_cmd="savecore_start"
 start_precmd="savecore_prestart"
 stop_cmd=":"
@@ -68,7 +70,7 @@ savecore_start()
 	if savecore -C "${dev}" >/dev/null; then
 		savecore ${savecore_flags} ${dumpdir} ${dumpdev}
 		if checkyesno crashinfo_enable; then
-			${crashinfo_program} -d ${dumpdir}
+			${crashinfo_program} -b -d ${dumpdir}
 		fi
 		sync
 	else

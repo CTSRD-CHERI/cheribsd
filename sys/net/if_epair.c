@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2008 The FreeBSD Foundation
  * Copyright (c) 2009-2010 Bjoern A. Zeeb <bz@FreeBSD.org>
  * All rights reserved.
@@ -52,6 +54,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
+#include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/module.h>
 #include <sys/refcount.h>
@@ -96,7 +99,8 @@ static int epair_media_change(struct ifnet *);
 static void epair_media_status(struct ifnet *, struct ifmediareq *);
 
 static int epair_clone_match(struct if_clone *, const char *);
-static int epair_clone_create(struct if_clone *, char *, size_t, caddr_t);
+static int epair_clone_create(struct if_clone *, char *, size_t,
+    void * __capability);
 static int epair_clone_destroy(struct if_clone *, struct ifnet *);
 
 static const char epairname[] = "epair";
@@ -401,8 +405,8 @@ epair_start_locked(struct ifnet *ifp)
 		return;
 
 	/*
-	 * We get patckets here from ether_output via if_handoff()
-	 * and ned to put them into the input queue of the oifp
+	 * We get packets here from ether_output via if_handoff()
+	 * and need to put them into the input queue of the oifp
 	 * and call oifp->if_input() via netisr/epair_sintr().
 	 */
 	oifp = sc->oifp;
@@ -513,7 +517,7 @@ epair_transmit_locked(struct ifnet *ifp, struct mbuf *m)
 	DPRINTF("packet %s -> %s\n", ifp->if_xname, oifp->if_xname);
 
 #ifdef ALTQ
-	/* Support ALTQ via the clasic if_start() path. */
+	/* Support ALTQ via the classic if_start() path. */
 	IF_LOCK(&ifp->if_snd);
 	if (ALTQ_IS_ENABLED(&ifp->if_snd)) {
 		ALTQ_ENQUEUE(&ifp->if_snd, m, NULL, error);
@@ -639,21 +643,21 @@ epair_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	ifr = (struct ifreq *)data;
 	switch (cmd) {
-	case SIOCSIFFLAGS:
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		error = 0;
 		break;
 
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		sc = ifp->if_softc;
 		error = ifmedia_ioctl(ifp, ifr, &sc->media, cmd);
 		break;
 
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		/* We basically allow all kinds of MTUs. */
-		ifp->if_mtu = ifr->ifr_mtu;
+		ifp->if_mtu = ifr_mtu_get(ifr);
 		error = 0;
 		break;
 
@@ -704,7 +708,8 @@ epair_clone_match(struct if_clone *ifc, const char *name)
 }
 
 static int
-epair_clone_create(struct if_clone *ifc, char *name, size_t len, caddr_t params)
+epair_clone_create(struct if_clone *ifc, char *name, size_t len,
+    void * __capability params)
 {
 	struct epair_softc *sca, *scb;
 	struct ifnet *ifp;
@@ -719,7 +724,7 @@ epair_clone_create(struct if_clone *ifc, char *name, size_t len, caddr_t params)
 	 * it cannot fail anymore. So just do attach it here.
 	 */
 	if (params) {
-		scb = (struct epair_softc *)params;
+		scb = (__cheri_fromcap struct epair_softc *)params;
 		ifp = scb->ifp;
 		/* Assign a hopefully unique, locally administered etheraddr. */
 		eaddr[0] = 0x02;
@@ -806,9 +811,9 @@ epair_clone_create(struct if_clone *ifc, char *name, size_t len, caddr_t params)
 	 * cache locality but we can at least allow parallelism.
 	 */
 	sca->cpuid =
-	    netisr_get_cpuid(sca->ifp->if_index % netisr_get_cpucount());
+	    netisr_get_cpuid(sca->ifp->if_index);
 	scb->cpuid =
-	    netisr_get_cpuid(scb->ifp->if_index % netisr_get_cpucount());
+	    netisr_get_cpuid(scb->ifp->if_index);
 
 	/* Initialise pseudo media types. */
 	ifmedia_init(&sca->media, 0, epair_media_change, epair_media_status);
@@ -830,7 +835,8 @@ epair_clone_create(struct if_clone *ifc, char *name, size_t len, caddr_t params)
 	ifp->if_start = epair_start;
 	ifp->if_ioctl = epair_ioctl;
 	ifp->if_init  = epair_init;
-	ifp->if_snd.ifq_maxlen = ifqmaxlen;
+	if_setsendqlen(ifp, ifqmaxlen);
+	if_setsendqready(ifp);
 	/* Assign a hopefully unique, locally administered etheraddr. */
 	eaddr[0] = 0x02;
 	eaddr[3] = (ifp->if_index >> 8) & 0xff;
@@ -856,10 +862,12 @@ epair_clone_create(struct if_clone *ifc, char *name, size_t len, caddr_t params)
 	ifp->if_start = epair_start;
 	ifp->if_ioctl = epair_ioctl;
 	ifp->if_init  = epair_init;
-	ifp->if_snd.ifq_maxlen = ifqmaxlen;
+	if_setsendqlen(ifp, ifqmaxlen);
+	if_setsendqready(ifp);
 	/* We need to play some tricks here for the second interface. */
 	strlcpy(name, epairname, len);
-	error = if_clone_create(name, len, (caddr_t)scb);
+	error = if_clone_create(name, len,
+	    (__cheri_tocap void * __capability)scb);
 	if (error)
 		panic("%s: if_clone_create() for our 2nd iface failed: %d",
 		    __func__, error);
@@ -958,18 +966,35 @@ vnet_epair_init(const void *unused __unused)
 
 	V_epair_cloner = if_clone_advanced(epairname, 0,
 	    epair_clone_match, epair_clone_create, epair_clone_destroy);
+#ifdef VIMAGE
+	netisr_register_vnet(&epair_nh);
+#endif
 }
-VNET_SYSINIT(vnet_epair_init, SI_SUB_PROTO_IFATTACHDOMAIN, SI_ORDER_ANY,
+VNET_SYSINIT(vnet_epair_init, SI_SUB_PSEUDO, SI_ORDER_ANY,
     vnet_epair_init, NULL);
 
 static void
 vnet_epair_uninit(const void *unused __unused)
 {
 
+#ifdef VIMAGE
+	netisr_unregister_vnet(&epair_nh);
+#endif
 	if_clone_detach(V_epair_cloner);
 }
-VNET_SYSUNINIT(vnet_epair_uninit, SI_SUB_PROTO_IFATTACHDOMAIN, SI_ORDER_ANY,
+VNET_SYSUNINIT(vnet_epair_uninit, SI_SUB_INIT_IF, SI_ORDER_ANY,
     vnet_epair_uninit, NULL);
+
+static void
+epair_uninit(const void *unused __unused)
+{
+	netisr_unregister(&epair_nh);
+	epair_dpcpu_detach();
+	if (bootverbose)
+		printf("%s unloaded.\n", epairname);
+}
+SYSUNINIT(epair_uninit, SI_SUB_INIT_IF, SI_ORDER_MIDDLE,
+    epair_uninit, NULL);
 
 static int
 epair_modevent(module_t mod, int type, void *data)
@@ -988,10 +1013,7 @@ epair_modevent(module_t mod, int type, void *data)
 			printf("%s initialized.\n", epairname);
 		break;
 	case MOD_UNLOAD:
-		netisr_unregister(&epair_nh);
-		epair_dpcpu_detach();
-		if (bootverbose)
-			printf("%s unloaded.\n", epairname);
+		/* Handled in epair_uninit() */
 		break;
 	default:
 		return (EOPNOTSUPP);
@@ -1005,5 +1027,5 @@ static moduledata_t epair_mod = {
 	0
 };
 
-DECLARE_MODULE(if_epair, epair_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
+DECLARE_MODULE(if_epair, epair_mod, SI_SUB_PSEUDO, SI_ORDER_MIDDLE);
 MODULE_VERSION(if_epair, 1);

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1989, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -15,7 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -67,7 +69,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/resourcevar.h>
 #include <sys/sbuf.h>
 #include <sys/signalvar.h>
-#include <sys/socketvar.h>
 #include <sys/kdb.h>
 #include <sys/stat.h>
 #include <sys/sx.h>
@@ -98,8 +99,8 @@ MALLOC_DEFINE(M_FILECAPS, "filecaps", "descriptor capabilities");
 
 MALLOC_DECLARE(M_FADVISE);
 
-static uma_zone_t file_zone;
-static uma_zone_t filedesc0_zone;
+static __read_mostly uma_zone_t file_zone;
+static __read_mostly uma_zone_t filedesc0_zone;
 
 static int	closefp(struct filedesc *fdp, int fd, struct file *fp,
 		    struct thread *td, int holdleaders);
@@ -169,9 +170,9 @@ struct filedesc0 {
 /*
  * Descriptor management.
  */
-volatile int openfiles;			/* actual number of open files */
+volatile int __exclusive_cache_line openfiles; /* actual number of open files */
 struct mtx sigio_lock;		/* mtx to protect pointers to sigio */
-void (*mq_fdclose)(struct thread *td, int fd, struct file *fp);
+void __read_mostly (*mq_fdclose)(struct thread *td, int fd, struct file *fp);
 
 /*
  * If low >= size, just return low. Otherwise find the first zero bit in the
@@ -318,11 +319,11 @@ pwd_ensure_dirs(void)
 	FILEDESC_XLOCK(fdp);
 	if (fdp->fd_cdir == NULL) {
 		fdp->fd_cdir = rootvnode;
-		VREF(rootvnode);
+		vrefact(rootvnode);
 	}
 	if (fdp->fd_rdir == NULL) {
 		fdp->fd_rdir = rootvnode;
-		VREF(rootvnode);
+		vrefact(rootvnode);
 	}
 	FILEDESC_XUNLOCK(fdp);
 }
@@ -405,12 +406,28 @@ struct fcntl_args {
 int
 sys_fcntl(struct thread *td, struct fcntl_args *uap)
 {
+	intcap_t tmp;
 
-	return (kern_fcntl_freebsd(td, uap->fd, uap->cmd, uap->arg));
+	switch (uap->cmd) {
+	case F_GETLK:
+	case F_OGETLK:
+	case F_OSETLK:
+	case F_OSETLKW:
+	case F_SETLK:
+	case F_SETLKW:
+	case F_SETLK_REMOTE:
+		tmp = (intcap_t)__USER_CAP_UNBOUND((void *)uap->arg);
+		break;
+
+	default:
+		tmp = (intcap_t)uap->arg;
+	}
+
+	return (kern_fcntl_freebsd(td, uap->fd, uap->cmd, tmp));
 }
 
 int
-kern_fcntl_freebsd(struct thread *td, int fd, int cmd, long arg)
+kern_fcntl_freebsd(struct thread *td, int fd, int cmd, intcap_t arg)
 {
 	struct flock fl;
 	struct __oflock ofl;
@@ -426,7 +443,7 @@ kern_fcntl_freebsd(struct thread *td, int fd, int cmd, long arg)
 		/*
 		 * Convert old flock structure to new.
 		 */
-		error = copyin((void *)(intptr_t)arg, &ofl, sizeof(ofl));
+		error = copyin_c((void * __capability)arg, &ofl, sizeof(ofl));
 		fl.l_start = ofl.l_start;
 		fl.l_len = ofl.l_len;
 		fl.l_pid = ofl.l_pid;
@@ -451,7 +468,7 @@ kern_fcntl_freebsd(struct thread *td, int fd, int cmd, long arg)
 	case F_SETLK:
 	case F_SETLKW:
 	case F_SETLK_REMOTE:
-		error = copyin((void *)(intptr_t)arg, &fl, sizeof(fl));
+		error = copyin_c((void * __capability)arg, &fl, sizeof(fl));
 		arg1 = (intptr_t)&fl;
 		break;
 	default:
@@ -469,9 +486,9 @@ kern_fcntl_freebsd(struct thread *td, int fd, int cmd, long arg)
 		ofl.l_pid = fl.l_pid;
 		ofl.l_type = fl.l_type;
 		ofl.l_whence = fl.l_whence;
-		error = copyout(&ofl, (void *)(intptr_t)arg, sizeof(ofl));
+		error = copyout_c(&ofl, (void * __capability)arg, sizeof(ofl));
 	} else if (cmd == F_GETLK) {
-		error = copyout(&fl, (void *)(intptr_t)arg, sizeof(fl));
+		error = copyout_c(&fl, (void * __capability)arg, sizeof(fl));
 	}
 	return (error);
 }
@@ -495,6 +512,8 @@ kern_fcntl(struct thread *td, int fd, int cmd, intptr_t arg)
 	p = td->td_proc;
 	fdp = p->p_fd;
 
+	AUDIT_ARG_FD(cmd);
+	AUDIT_ARG_CMD(cmd);
 	switch (cmd) {
 	case F_DUPFD:
 		tmp = arg;
@@ -517,28 +536,26 @@ kern_fcntl(struct thread *td, int fd, int cmd, intptr_t arg)
 		break;
 
 	case F_GETFD:
+		error = EBADF;
 		FILEDESC_SLOCK(fdp);
-		if (fget_locked(fdp, fd) == NULL) {
-			FILEDESC_SUNLOCK(fdp);
-			error = EBADF;
-			break;
+		fde = fdeget_locked(fdp, fd);
+		if (fde != NULL) {
+			td->td_retval[0] =
+			    (fde->fde_flags & UF_EXCLOSE) ? FD_CLOEXEC : 0;
+			error = 0;
 		}
-		fde = &fdp->fd_ofiles[fd];
-		td->td_retval[0] =
-		    (fde->fde_flags & UF_EXCLOSE) ? FD_CLOEXEC : 0;
 		FILEDESC_SUNLOCK(fdp);
 		break;
 
 	case F_SETFD:
+		error = EBADF;
 		FILEDESC_XLOCK(fdp);
-		if (fget_locked(fdp, fd) == NULL) {
-			FILEDESC_XUNLOCK(fdp);
-			error = EBADF;
-			break;
+		fde = fdeget_locked(fdp, fd);
+		if (fde != NULL) {
+			fde->fde_flags = (fde->fde_flags & ~UF_EXCLOSE) |
+			    (arg & FD_CLOEXEC ? UF_EXCLOSE : 0);
+			error = 0;
 		}
-		fde = &fdp->fd_ofiles[fd];
-		fde->fde_flags = (fde->fde_flags & ~UF_EXCLOSE) |
-		    (arg & FD_CLOEXEC ? UF_EXCLOSE : 0);
 		FILEDESC_XUNLOCK(fdp);
 		break;
 
@@ -820,6 +837,9 @@ kern_dup(struct thread *td, u_int mode, int flags, int old, int new)
 	MPASS((flags & ~(FDDUP_FLAG_CLOEXEC)) == 0);
 	MPASS(mode < FDDUP_LASTMODE);
 
+	AUDIT_ARG_FD(old);
+	/* XXXRW: if (flags & FDDUP_FIXED) AUDIT_ARG_FD2(new); */
+
 	/*
 	 * Verify we have a valid descriptor to dup from and possibly to
 	 * dup to. Unlike dup() and dup2(), fcntl()'s F_DUPFD should
@@ -833,17 +853,16 @@ kern_dup(struct thread *td, u_int mode, int flags, int old, int new)
 	if (new >= maxfd)
 		return (mode == FDDUP_FCNTL ? EINVAL : EBADF);
 
+	error = EBADF;
 	FILEDESC_XLOCK(fdp);
-	if (fget_locked(fdp, old) == NULL) {
-		FILEDESC_XUNLOCK(fdp);
-		return (EBADF);
-	}
+	if (fget_locked(fdp, old) == NULL)
+		goto unlock;
 	if ((mode == FDDUP_FIXED || mode == FDDUP_MUSTREPLACE) && old == new) {
 		td->td_retval[0] = new;
 		if (flags & FDDUP_FLAG_CLOEXEC)
 			fdp->fd_ofiles[new].fde_flags |= UF_EXCLOSE;
-		FILEDESC_XUNLOCK(fdp);
-		return (0);
+		error = 0;
+		goto unlock;
 	}
 
 	/*
@@ -854,17 +873,13 @@ kern_dup(struct thread *td, u_int mode, int flags, int old, int new)
 	switch (mode) {
 	case FDDUP_NORMAL:
 	case FDDUP_FCNTL:
-		if ((error = fdalloc(td, new, &new)) != 0) {
-			FILEDESC_XUNLOCK(fdp);
-			return (error);
-		}
+		if ((error = fdalloc(td, new, &new)) != 0)
+			goto unlock;
 		break;
 	case FDDUP_MUSTREPLACE:
 		/* Target file descriptor must exist. */
-		if (fget_locked(fdp, new) == NULL) {
-			FILEDESC_XUNLOCK(fdp);
-			return (EBADF);
-		}
+		if (fget_locked(fdp, new) == NULL)
+			goto unlock;
 		break;
 	case FDDUP_FIXED:
 		if (new >= fdp->fd_nfiles) {
@@ -882,8 +897,8 @@ kern_dup(struct thread *td, u_int mode, int flags, int old, int new)
 				error = racct_set(p, RACCT_NOFILE, new + 1);
 				PROC_UNLOCK(p);
 				if (error != 0) {
-					FILEDESC_XUNLOCK(fdp);
-					return (EMFILE);
+					error = EMFILE;
+					goto unlock;
 				}
 			}
 #endif
@@ -921,14 +936,17 @@ kern_dup(struct thread *td, u_int mode, int flags, int old, int new)
 #endif
 	td->td_retval[0] = new;
 
+	error = 0;
+
 	if (delfp != NULL) {
 		(void) closefp(fdp, new, delfp, td, 1);
-		/* closefp() drops the FILEDESC lock for us. */
+		FILEDESC_UNLOCK_ASSERT(fdp);
 	} else {
+unlock:
 		FILEDESC_XUNLOCK(fdp);
 	}
 
-	return (0);
+	return (error);
 }
 
 /*
@@ -941,6 +959,8 @@ funsetown(struct sigio **sigiop)
 {
 	struct sigio *sigio;
 
+	if (*sigiop == NULL)
+		return;
 	SIGIO_LOCK();
 	sigio = *sigiop;
 	if (sigio == NULL) {
@@ -1302,6 +1322,24 @@ ofstat(struct thread *td, struct ofstat_args *uap)
 }
 #endif /* COMPAT_43 */
 
+#if defined(COMPAT_FREEBSD11)
+int
+freebsd11_fstat(struct thread *td, struct freebsd11_fstat_args *uap)
+{
+	struct stat sb;
+	struct freebsd11_stat osb;
+	int error;
+
+	error = kern_fstat(td, uap->fd, &sb);
+	if (error != 0)
+		return (error);
+	error = freebsd11_cvtstat(&sb, &osb);
+	if (error == 0)
+		error = copyout(&osb, uap->sb, sizeof(osb));
+	return (error);
+}
+#endif	/* COMPAT_FREEBSD11 */
+
 /*
  * Return status information about a file descriptor.
  */
@@ -1315,12 +1353,19 @@ struct fstat_args {
 int
 sys_fstat(struct thread *td, struct fstat_args *uap)
 {
+
+	return (user_fstat(td, uap->fd, __USER_CAP_OBJ(uap->sb)));
+}
+
+int
+user_fstat(struct thread *td, int fd, struct stat * __capability sb)
+{
 	struct stat ub;
 	int error;
 
-	error = kern_fstat(td, uap->fd, &ub);
+	error = kern_fstat(td, fd, &ub);
 	if (error == 0)
-		error = copyout(&ub, uap->sb, sizeof(ub));
+		error = copyout_c(&ub, sb, sizeof(ub));
 	return (error);
 }
 
@@ -1341,6 +1386,14 @@ kern_fstat(struct thread *td, int fd, struct stat *sbp)
 
 	error = fo_stat(fp, sbp, td->td_ucred, td);
 	fdrop(fp, td);
+#ifdef __STAT_TIME_T_EXT
+	if (error == 0) {
+		sbp->st_atim_ext = 0;
+		sbp->st_mtim_ext = 0;
+		sbp->st_ctim_ext = 0;
+		sbp->st_btim_ext = 0;
+	}
+#endif
 #ifdef KTRACE
 	if (error == 0 && KTRPOINT(td, KTR_STRUCT))
 		ktrstat(sbp);
@@ -1348,18 +1401,19 @@ kern_fstat(struct thread *td, int fd, struct stat *sbp)
 	return (error);
 }
 
+#if defined(COMPAT_FREEBSD11)
 /*
  * Return status information about a file descriptor.
  */
 #ifndef _SYS_SYSPROTO_H_
-struct nfstat_args {
+struct freebsd11_nfstat_args {
 	int	fd;
 	struct	nstat *sb;
 };
 #endif
 /* ARGSUSED */
 int
-sys_nfstat(struct thread *td, struct nfstat_args *uap)
+freebsd11_nfstat(struct thread *td, struct freebsd11_nfstat_args *uap)
 {
 	struct nstat nub;
 	struct stat ub;
@@ -1367,11 +1421,12 @@ sys_nfstat(struct thread *td, struct nfstat_args *uap)
 
 	error = kern_fstat(td, uap->fd, &ub);
 	if (error == 0) {
-		cvtnstat(&ub, &nub);
+		freebsd11_cvtnstat(&ub, &nub);
 		error = copyout(&nub, uap->sb, sizeof(nub));
 	}
 	return (error);
 }
+#endif /* COMPAT_FREEBSD11 */
 
 /*
  * Return pathconf information about a file descriptor.
@@ -1386,27 +1441,33 @@ struct fpathconf_args {
 int
 sys_fpathconf(struct thread *td, struct fpathconf_args *uap)
 {
+
+	return (kern_fpathconf(td, uap->fd, uap->name));
+}
+
+int
+kern_fpathconf(struct thread *td, int fd, int name)
+{
 	struct file *fp;
 	struct vnode *vp;
 	cap_rights_t rights;
 	int error;
 
-	error = fget(td, uap->fd, cap_rights_init(&rights, CAP_FPATHCONF), &fp);
+	error = fget(td, fd, cap_rights_init(&rights, CAP_FPATHCONF), &fp);
 	if (error != 0)
 		return (error);
 
-	/* If asynchronous I/O is available, it works for all descriptors. */
-	if (uap->name == _PC_ASYNC_IO) {
-		td->td_retval[0] = async_io_version;
+	if (name == _PC_ASYNC_IO) {
+		td->td_retval[0] = _POSIX_ASYNCHRONOUS_IO;
 		goto out;
 	}
 	vp = fp->f_vnode;
 	if (vp != NULL) {
 		vn_lock(vp, LK_SHARED | LK_RETRY);
-		error = VOP_PATHCONF(vp, uap->name, td->td_retval);
+		error = VOP_PATHCONF(vp, name, td->td_retval);
 		VOP_UNLOCK(vp, 0);
 	} else if (fp->f_type == DTYPE_PIPE || fp->f_type == DTYPE_SOCKET) {
-		if (uap->name != _PC_PIPE_BUF) {
+		if (name != _PC_PIPE_BUF) {
 			error = EINVAL;
 		} else {
 			td->td_retval[0] = PIPE_BUF;
@@ -1531,7 +1592,7 @@ fdgrowtable_exp(struct filedesc *fdp, int nfd)
 }
 
 /*
- * Grow the file table to accomodate (at least) nfd descriptors.
+ * Grow the file table to accommodate (at least) nfd descriptors.
  */
 static void
 fdgrowtable(struct filedesc *fdp, int nfd)
@@ -1545,7 +1606,7 @@ fdgrowtable(struct filedesc *fdp, int nfd)
 
 	/*
 	 * If lastfile is -1 this struct filedesc was just allocated and we are
-	 * growing it to accomodate for the one we are going to copy from. There
+	 * growing it to accommodate for the one we are going to copy from. There
 	 * is no need to have a lock on this one as it's not visible to anyone.
 	 */
 	if (fdp->fd_lastfile != -1)
@@ -1710,7 +1771,7 @@ fdallocn(struct thread *td, int minfd, int *fds, int n)
 }
 
 /*
- * Create a new open file structure and allocate a file decriptor for the
+ * Create a new open file structure and allocate a file descriptor for the
  * process that refers to it.  We add one reference to the file for the
  * descriptor table and one reference for resultfp. This is to prevent us
  * being preempted and the entry in the descriptor table closed after we
@@ -1752,21 +1813,23 @@ falloc_noinstall(struct thread *td, struct file **resultfp)
 {
 	struct file *fp;
 	int maxuserfiles = maxfiles - (maxfiles / 20);
+	int openfiles_new;
 	static struct timeval lastfail;
 	static int curfail;
 
 	KASSERT(resultfp != NULL, ("%s: resultfp == NULL", __func__));
 
-	if ((openfiles >= maxuserfiles &&
+	openfiles_new = atomic_fetchadd_int(&openfiles, 1) + 1;
+	if ((openfiles_new >= maxuserfiles &&
 	    priv_check(td, PRIV_MAXFILES) != 0) ||
-	    openfiles >= maxfiles) {
+	    openfiles_new >= maxfiles) {
+		atomic_subtract_int(&openfiles, 1);
 		if (ppsratecheck(&lastfail, &curfail, 1)) {
-			printf("kern.maxfiles limit exceeded by uid %i, "
-			    "please see tuning(7).\n", td->td_ucred->cr_ruid);
+			printf("kern.maxfiles limit exceeded by uid %i, (%s) "
+			    "please see tuning(7).\n", td->td_ucred->cr_ruid, td->td_proc->p_comm);
 		}
 		return (ENFILE);
 	}
-	atomic_add_int(&openfiles, 1);
 	fp = uma_zalloc(file_zone, M_WAITOK | M_ZERO);
 	refcount_init(&fp->f_count, 1);
 	fp->f_cred = crhold(td->td_ucred);
@@ -1858,13 +1921,13 @@ fdinit(struct filedesc *fdp, bool prepfiles)
 	FILEDESC_SLOCK(fdp);
 	newfdp->fd_cdir = fdp->fd_cdir;
 	if (newfdp->fd_cdir)
-		VREF(newfdp->fd_cdir);
+		vrefact(newfdp->fd_cdir);
 	newfdp->fd_rdir = fdp->fd_rdir;
 	if (newfdp->fd_rdir)
-		VREF(newfdp->fd_rdir);
+		vrefact(newfdp->fd_rdir);
 	newfdp->fd_jdir = fdp->fd_jdir;
 	if (newfdp->fd_jdir)
-		VREF(newfdp->fd_jdir);
+		vrefact(newfdp->fd_jdir);
 
 	if (!prepfiles) {
 		FILEDESC_SUNLOCK(fdp);
@@ -2308,7 +2371,7 @@ fdcloseexec(struct thread *td)
 			FILEDESC_XLOCK(fdp);
 			fdfree(fdp, i);
 			(void) closefp(fdp, i, fp, td, 0);
-			/* closefp() drops the FILEDESC lock. */
+			FILEDESC_UNLOCK_ASSERT(fdp);
 		}
 	}
 }
@@ -2446,6 +2509,82 @@ finit(struct file *fp, u_int flag, short type, void *data, struct fileops *ops)
 }
 
 int
+fget_cap_locked(struct filedesc *fdp, int fd, cap_rights_t *needrightsp,
+    struct file **fpp, struct filecaps *havecapsp)
+{
+	struct filedescent *fde;
+	int error;
+
+	FILEDESC_LOCK_ASSERT(fdp);
+
+	fde = fdeget_locked(fdp, fd);
+	if (fde == NULL) {
+		error = EBADF;
+		goto out;
+	}
+
+#ifdef CAPABILITIES
+	error = cap_check(cap_rights_fde(fde), needrightsp);
+	if (error != 0)
+		goto out;
+#endif
+
+	if (havecapsp != NULL)
+		filecaps_copy(&fde->fde_caps, havecapsp, true);
+
+	*fpp = fde->fde_file;
+
+	error = 0;
+out:
+	return (error);
+}
+
+int
+fget_cap(struct thread *td, int fd, cap_rights_t *needrightsp,
+    struct file **fpp, struct filecaps *havecapsp)
+{
+	struct filedesc *fdp = td->td_proc->p_fd;
+	int error;
+#ifndef CAPABILITIES
+	error = fget_unlocked(fdp, fd, needrightsp, fpp, NULL);
+	if (error == 0 && havecapsp != NULL)
+		filecaps_fill(havecapsp);
+#else
+	struct file *fp;
+	seq_t seq;
+
+	for (;;) {
+		error = fget_unlocked(fdp, fd, needrightsp, &fp, &seq);
+		if (error != 0)
+			return (error);
+
+		if (havecapsp != NULL) {
+			if (!filecaps_copy(&fdp->fd_ofiles[fd].fde_caps,
+			    havecapsp, false)) {
+				fdrop(fp, td);
+				goto get_locked;
+			}
+		}
+
+		if (!fd_modified(fdp, fd, seq))
+			break;
+		fdrop(fp, td);
+	}
+
+	*fpp = fp;
+	return (0);
+
+get_locked:
+	FILEDESC_SLOCK(fdp);
+	error = fget_cap_locked(fdp, fd, needrightsp, fpp, havecapsp);
+	if (error == 0)
+		fhold(*fpp);
+	FILEDESC_SUNLOCK(fdp);
+#endif
+	return (error);
+}
+
+int
 fget_unlocked(struct filedesc *fdp, int fd, cap_rights_t *needrightsp,
     struct file **fpp, seq_t *seqp)
 {
@@ -2478,10 +2617,8 @@ fget_unlocked(struct filedesc *fdp, int fd, cap_rights_t *needrightsp,
 		fde = &fdt->fdt_ofiles[fd];
 		haverights = *cap_rights_fde(fde);
 		fp = fde->fde_file;
-		if (!seq_consistent(fd_seq(fdt, fd), seq)) {
-			cpu_spinwait();
+		if (!seq_consistent(fd_seq(fdt, fd), seq))
 			continue;
-		}
 #else
 		fp = fdt->fdt_ofiles[fd].fde_file;
 #endif
@@ -2492,8 +2629,8 @@ fget_unlocked(struct filedesc *fdp, int fd, cap_rights_t *needrightsp,
 		if (error != 0)
 			return (error);
 #endif
-	retry:
 		count = fp->f_count;
+	retry:
 		if (count == 0) {
 			/*
 			 * Force a reload. Other thread could reallocate the
@@ -2507,7 +2644,7 @@ fget_unlocked(struct filedesc *fdp, int fd, cap_rights_t *needrightsp,
 		 * Use an acquire barrier to force re-reading of fdt so it is
 		 * refreshed for verification.
 		 */
-		if (atomic_cmpset_acq_int(&fp->f_count, count, count + 1) == 0)
+		if (atomic_fcmpset_acq_int(&fp->f_count, &count, count + 1) == 0)
 			goto retry;
 		fdt = fdp->fd_files;
 #ifdef	CAPABILITIES
@@ -2536,7 +2673,7 @@ fget_unlocked(struct filedesc *fdp, int fd, cap_rights_t *needrightsp,
  *
  * File's rights will be checked against the capability rights mask.
  *
- * If an error occured the non-zero error is returned and *fpp is set to
+ * If an error occurred the non-zero error is returned and *fpp is set to
  * NULL.  Otherwise *fpp is held and set and zero is returned.  Caller is
  * responsible for fdrop().
  */
@@ -2691,7 +2828,7 @@ _fgetvp(struct thread *td, int fd, int flags, cap_rights_t *needrightsp,
 		error = EINVAL;
 	} else {
 		*vpp = fp->f_vnode;
-		vref(*vpp);
+		vrefact(*vpp);
 	}
 	fdrop(fp, td);
 
@@ -2710,30 +2847,31 @@ fgetvp_rights(struct thread *td, int fd, cap_rights_t *needrightsp,
     struct filecaps *havecaps, struct vnode **vpp)
 {
 	struct filedesc *fdp;
+	struct filecaps caps;
 	struct file *fp;
-#ifdef CAPABILITIES
 	int error;
-#endif
 
 	fdp = td->td_proc->p_fd;
-	fp = fget_locked(fdp, fd);
-	if (fp == NULL || fp->f_ops == &badfileops)
-		return (EBADF);
-
-#ifdef CAPABILITIES
-	error = cap_check(cap_rights(fdp, fd), needrightsp);
+	error = fget_cap_locked(fdp, fd, needrightsp, &fp, &caps);
 	if (error != 0)
 		return (error);
-#endif
+	if (fp->f_ops == &badfileops) {
+		error = EBADF;
+		goto out;
+	}
+	if (fp->f_vnode == NULL) {
+		error = EINVAL;
+		goto out;
+	}
 
-	if (fp->f_vnode == NULL)
-		return (EINVAL);
-
+	*havecaps = caps;
 	*vpp = fp->f_vnode;
-	vref(*vpp);
-	filecaps_copy(&fdp->fd_ofiles[fd].fde_caps, havecaps, true);
+	vrefact(*vpp);
 
 	return (0);
+out:
+	filecaps_free(&caps);
+	return (error);
 }
 
 int
@@ -2759,61 +2897,6 @@ fgetvp_write(struct thread *td, int fd, cap_rights_t *rightsp,
 	return (_fgetvp(td, fd, FWRITE, rightsp, vpp));
 }
 #endif
-
-/*
- * Like fget() but loads the underlying socket, or returns an error if the
- * descriptor does not represent a socket.
- *
- * We bump the ref count on the returned socket.  XXX Also obtain the SX lock
- * in the future.
- *
- * Note: fgetsock() and fputsock() are deprecated, as consumers should rely
- * on their file descriptor reference to prevent the socket from being free'd
- * during use.
- */
-int
-fgetsock(struct thread *td, int fd, cap_rights_t *rightsp, struct socket **spp,
-    u_int *fflagp)
-{
-	struct file *fp;
-	int error;
-
-	*spp = NULL;
-	if (fflagp != NULL)
-		*fflagp = 0;
-	if ((error = _fget(td, fd, &fp, 0, rightsp, NULL)) != 0)
-		return (error);
-	if (fp->f_type != DTYPE_SOCKET) {
-		error = ENOTSOCK;
-	} else {
-		*spp = fp->f_data;
-		if (fflagp)
-			*fflagp = fp->f_flag;
-		SOCK_LOCK(*spp);
-		soref(*spp);
-		SOCK_UNLOCK(*spp);
-	}
-	fdrop(fp, td);
-
-	return (error);
-}
-
-/*
- * Drop the reference count on the socket and XXX release the SX lock in the
- * future.  The last reference closes the socket.
- *
- * Note: fputsock() is deprecated, see comment for fgetsock().
- */
-void
-fputsock(struct socket *so)
-{
-
-	ACCEPT_LOCK();
-	SOCK_LOCK(so);
-	CURVNET_SET(so->so_vnet);
-	sorele(so);
-	CURVNET_RESTORE();
-}
 
 /*
  * Handle the last reference to a file being closed.
@@ -3036,10 +3119,10 @@ pwd_chroot(struct thread *td, struct vnode *vp)
 		}
 	}
 	oldvp = fdp->fd_rdir;
-	VREF(vp);
+	vrefact(vp);
 	fdp->fd_rdir = vp;
 	if (fdp->fd_jdir == NULL) {
-		VREF(vp);
+		vrefact(vp);
 		fdp->fd_jdir = vp;
 	}
 	FILEDESC_XUNLOCK(fdp);
@@ -3087,17 +3170,17 @@ mountcheckdirs(struct vnode *olddp, struct vnode *newdp)
 			continue;
 		FILEDESC_XLOCK(fdp);
 		if (fdp->fd_cdir == olddp) {
-			vref(newdp);
+			vrefact(newdp);
 			fdp->fd_cdir = newdp;
 			nrele++;
 		}
 		if (fdp->fd_rdir == olddp) {
-			vref(newdp);
+			vrefact(newdp);
 			fdp->fd_rdir = newdp;
 			nrele++;
 		}
 		if (fdp->fd_jdir == olddp) {
-			vref(newdp);
+			vrefact(newdp);
 			fdp->fd_jdir = newdp;
 			nrele++;
 		}
@@ -3106,13 +3189,13 @@ mountcheckdirs(struct vnode *olddp, struct vnode *newdp)
 	}
 	sx_sunlock(&allproc_lock);
 	if (rootvnode == olddp) {
-		vref(newdp);
+		vrefact(newdp);
 		rootvnode = newdp;
 		nrele++;
 	}
 	mtx_lock(&prison0.pr_mtx);
 	if (prison0.pr_root == olddp) {
-		vref(newdp);
+		vrefact(newdp);
 		prison0.pr_root = newdp;
 		nrele++;
 	}
@@ -3121,7 +3204,7 @@ mountcheckdirs(struct vnode *olddp, struct vnode *newdp)
 	TAILQ_FOREACH(pr, &allprison, pr_list) {
 		mtx_lock(&pr->pr_mtx);
 		if (pr->pr_root == olddp) {
-			vref(newdp);
+			vrefact(newdp);
 			pr->pr_root = newdp;
 			nrele++;
 		}
@@ -3178,7 +3261,7 @@ sysctl_kern_proc_nfds(SYSCTL_HANDLER_ARGS)
 }
 
 static SYSCTL_NODE(_kern_proc, KERN_PROC_NFDS, nfds,
-    CTLFLAG_RD|CTLFLAG_MPSAFE, sysctl_kern_proc_nfds,
+    CTLFLAG_RD|CTLFLAG_CAPRD|CTLFLAG_MPSAFE, sysctl_kern_proc_nfds,
     "Number of open file descriptors");
 
 /*
@@ -3448,17 +3531,17 @@ kern_proc_filedesc_out(struct proc *p,  struct sbuf *sb, ssize_t maxlen,
 	/* ktrace vnode */
 	tracevp = p->p_tracevp;
 	if (tracevp != NULL)
-		vref(tracevp);
+		vrefact(tracevp);
 	/* text vnode */
 	textvp = p->p_textvp;
 	if (textvp != NULL)
-		vref(textvp);
+		vrefact(textvp);
 	/* Controlling tty. */
 	cttyvp = NULL;
 	if (p->p_pgrp != NULL && p->p_pgrp->pg_session != NULL) {
 		cttyvp = p->p_pgrp->pg_session->s_ttyvp;
 		if (cttyvp != NULL)
-			vref(cttyvp);
+			vrefact(cttyvp);
 	}
 	fdp = fdhold(p);
 	PROC_UNLOCK(p);
@@ -3482,17 +3565,17 @@ kern_proc_filedesc_out(struct proc *p,  struct sbuf *sb, ssize_t maxlen,
 	FILEDESC_SLOCK(fdp);
 	/* working directory */
 	if (fdp->fd_cdir != NULL) {
-		vref(fdp->fd_cdir);
+		vrefact(fdp->fd_cdir);
 		export_vnode_to_sb(fdp->fd_cdir, KF_FD_TYPE_CWD, FREAD, efbuf);
 	}
 	/* root directory */
 	if (fdp->fd_rdir != NULL) {
-		vref(fdp->fd_rdir);
+		vrefact(fdp->fd_rdir);
 		export_vnode_to_sb(fdp->fd_rdir, KF_FD_TYPE_ROOT, FREAD, efbuf);
 	}
 	/* jail directory */
 	if (fdp->fd_jdir != NULL) {
-		vref(fdp->fd_jdir);
+		vrefact(fdp->fd_jdir);
 		export_vnode_to_sb(fdp->fd_jdir, KF_FD_TYPE_JAIL, FREAD, efbuf);
 	}
 	for (i = 0; fdp->fd_refcnt > 0 && i <= fdp->fd_lastfile; i++) {
@@ -3550,11 +3633,11 @@ sysctl_kern_proc_filedesc(SYSCTL_HANDLER_ARGS)
 	return (error != 0 ? error : error2);
 }
 
+#ifdef COMPAT_FREEBSD7
 #ifdef KINFO_OFILE_SIZE
 CTASSERT(sizeof(struct kinfo_ofile) == KINFO_OFILE_SIZE);
 #endif
 
-#ifdef COMPAT_FREEBSD7
 static void
 kinfo_to_okinfo(struct kinfo_file *kif, struct kinfo_ofile *okif)
 {
@@ -3567,13 +3650,21 @@ kinfo_to_okinfo(struct kinfo_file *kif, struct kinfo_ofile *okif)
 	    KF_FLAG_APPEND | KF_FLAG_ASYNC | KF_FLAG_FSYNC | KF_FLAG_NONBLOCK |
 	    KF_FLAG_DIRECT | KF_FLAG_HASLOCK);
 	okif->kf_offset = kif->kf_offset;
-	okif->kf_vnode_type = kif->kf_vnode_type;
-	okif->kf_sock_domain = kif->kf_sock_domain;
-	okif->kf_sock_type = kif->kf_sock_type;
-	okif->kf_sock_protocol = kif->kf_sock_protocol;
+	if (kif->kf_type == KF_TYPE_VNODE)
+		okif->kf_vnode_type = kif->kf_un.kf_file.kf_file_type;
+	else
+		okif->kf_vnode_type = KF_VTYPE_VNON;
 	strlcpy(okif->kf_path, kif->kf_path, sizeof(okif->kf_path));
-	okif->kf_sa_local = kif->kf_sa_local;
-	okif->kf_sa_peer = kif->kf_sa_peer;
+	if (kif->kf_type == KF_TYPE_SOCKET) {
+		okif->kf_sock_domain = kif->kf_un.kf_sock.kf_sock_domain0;
+		okif->kf_sock_type = kif->kf_un.kf_sock.kf_sock_type0;
+		okif->kf_sock_protocol = kif->kf_un.kf_sock.kf_sock_protocol0;
+		okif->kf_sa_local = kif->kf_un.kf_sock.kf_sa_local;
+		okif->kf_sa_peer = kif->kf_un.kf_sock.kf_sa_peer;
+	} else {
+		okif->kf_sa_local.ss_family = AF_UNSPEC;
+		okif->kf_sa_peer.ss_family = AF_UNSPEC;
+	}
 }
 
 static int
@@ -3582,7 +3673,7 @@ export_vnode_for_osysctl(struct vnode *vp, int type, struct kinfo_file *kif,
 {
 	int error;
 
-	vref(vp);
+	vrefact(vp);
 	FILEDESC_SUNLOCK(fdp);
 	export_vnode_to_kinfo(vp, type, 0, kif, KERN_FILEDESC_PACK_KINFO);
 	kinfo_to_okinfo(kif, okif);
@@ -3709,7 +3800,7 @@ kern_proc_cwd_out(struct proc *p,  struct sbuf *sb, ssize_t maxlen)
 	if (fdp->fd_cdir == NULL)
 		error = EINVAL;
 	else {
-		vref(fdp->fd_cdir);
+		vrefact(fdp->fd_cdir);
 		error = export_vnode_to_sb(fdp->fd_cdir, KF_FD_TYPE_CWD,
 		    FREAD, efbuf);
 	}
@@ -3762,23 +3853,33 @@ file_type_to_name(short type)
 	case 0:
 		return ("zero");
 	case DTYPE_VNODE:
-		return ("vnod");
+		return ("vnode");
 	case DTYPE_SOCKET:
-		return ("sock");
+		return ("socket");
 	case DTYPE_PIPE:
 		return ("pipe");
 	case DTYPE_FIFO:
 		return ("fifo");
 	case DTYPE_KQUEUE:
-		return ("kque");
+		return ("kqueue");
 	case DTYPE_CRYPTO:
-		return ("crpt");
+		return ("crypto");
 	case DTYPE_MQUEUE:
-		return ("mque");
+		return ("mqueue");
 	case DTYPE_SHM:
 		return ("shm");
 	case DTYPE_SEM:
 		return ("ksem");
+	case DTYPE_PTS:
+		return ("pts");
+	case DTYPE_DEV:
+		return ("dev");
+	case DTYPE_PROCDESC:
+		return ("proc");
+	case DTYPE_LINUXEFD:
+		return ("levent");
+	case DTYPE_LINUXTFD:
+		return ("ltimer");
 	default:
 		return ("unkn");
 	}
@@ -3813,17 +3914,21 @@ file_to_first_proc(struct file *fp)
 static void
 db_print_file(struct file *fp, int header)
 {
+#define XPTRWIDTH ((int)howmany(sizeof(void *) * NBBY, 4))
 	struct proc *p;
 
 	if (header)
-		db_printf("%8s %4s %8s %8s %4s %5s %6s %8s %5s %12s\n",
-		    "File", "Type", "Data", "Flag", "GCFl", "Count",
-		    "MCount", "Vnode", "FPID", "FCmd");
+		db_printf("%*s %6s %*s %8s %4s %5s %6s %*s %5s %s\n",
+		    XPTRWIDTH, "File", "Type", XPTRWIDTH, "Data", "Flag",
+		    "GCFl", "Count", "MCount", XPTRWIDTH, "Vnode", "FPID",
+		    "FCmd");
 	p = file_to_first_proc(fp);
-	db_printf("%8p %4s %8p %08x %04x %5d %6d %8p %5d %12s\n", fp,
-	    file_type_to_name(fp->f_type), fp->f_data, fp->f_flag,
-	    0, fp->f_count, 0, fp->f_vnode,
+	db_printf("%*p %6s %*p %08x %04x %5d %6d %*p %5d %s\n", XPTRWIDTH,
+	    fp, file_type_to_name(fp->f_type), XPTRWIDTH, fp->f_data,
+	    fp->f_flag, 0, fp->f_count, 0, XPTRWIDTH, fp->f_vnode,
 	    p != NULL ? p->p_pid : -1, p != NULL ? p->p_comm : "-");
+
+#undef XPTRWIDTH
 }
 
 DB_SHOW_COMMAND(file, db_show_file)
@@ -3959,7 +4064,7 @@ badfo_chown(struct file *fp, uid_t uid, gid_t gid, struct ucred *active_cred,
 static int
 badfo_sendfile(struct file *fp, int sockfd, struct uio *hdr_uio,
     struct uio *trl_uio, off_t offset, size_t nbytes, off_t *sent, int flags,
-    int kflags, struct thread *td)
+    struct thread *td)
 {
 
 	return (EBADF);
@@ -4045,7 +4150,7 @@ invfo_chown(struct file *fp, uid_t uid, gid_t gid, struct ucred *active_cred,
 int
 invfo_sendfile(struct file *fp, int sockfd, struct uio *hdr_uio,
     struct uio *trl_uio, off_t offset, size_t nbytes, off_t *sent, int flags,
-    int kflags, struct thread *td)
+    struct thread *td)
 {
 
 	return (EINVAL);

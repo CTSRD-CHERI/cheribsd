@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2012 Oleksandr Tymoshenko <gonzo@freebsd.org>
  * Copyright (c) 2013 Luiz Otavio O Souza <loos@freebsd.org>
  * All rights reserved.
@@ -40,12 +42,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 
 #include <machine/bus.h>
-#include <machine/cpu.h>
-#include <machine/cpufunc.h>
 #include <machine/resource.h>
 #include <machine/intr.h>
 
-#include <dev/fdt/fdt_common.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
@@ -57,6 +56,12 @@ __FBSDID("$FreeBSD$");
 #include <arm/broadcom/bcm2835/bcm2835_spivar.h>
 
 #include "spibus_if.h"
+
+static struct ofw_compat_data compat_data[] = {
+	{"broadcom,bcm2835-spi",	1},
+	{"brcm,bcm2835-spi",		1},
+	{NULL,				0}
+};
 
 static void bcm_spi_intr(void *);
 
@@ -233,7 +238,7 @@ bcm_spi_probe(device_t dev)
 	if (!ofw_bus_status_okay(dev))
 		return (ENXIO);
 
-	if (!ofw_bus_is_compatible(dev, "broadcom,bcm2835-spi"))
+	if (ofw_bus_search_compatible(dev, compat_data)->ocd_data == 0)
 		return (ENXIO);
 
 	device_set_desc(dev, "BCM2708/2835 SPI controller");
@@ -418,7 +423,8 @@ static int
 bcm_spi_transfer(device_t dev, device_t child, struct spi_command *cmd)
 {
 	struct bcm_spi_softc *sc;
-	int cs, err;
+	uint32_t cs;
+	int err;
 
 	sc = device_get_softc(dev);
 
@@ -429,7 +435,10 @@ bcm_spi_transfer(device_t dev, device_t child, struct spi_command *cmd)
 
 	/* Get the proper chip select for this child. */
 	spibus_get_cs(child, &cs);
-	if (cs < 0 || cs > 2) {
+
+	cs &= ~SPIBUS_CS_HIGH;
+
+	if (cs > 2) {
 		device_printf(dev,
 		    "Invalid chip select %d requested by %s\n", cs,
 		    device_get_nameunit(child));

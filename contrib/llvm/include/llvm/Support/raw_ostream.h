@@ -16,20 +16,26 @@
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/DataTypes.h"
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <string>
 #include <system_error>
 
 namespace llvm {
+
+class formatv_object_base;
 class format_object_base;
 class FormattedString;
 class FormattedNumber;
-template <typename T> class SmallVectorImpl;
+class FormattedBytes;
 
 namespace sys {
 namespace fs {
 enum OpenFlags : unsigned;
-}
-}
+} // end namespace fs
+} // end namespace sys
 
 /// This class implements an extremely fast bulk output stream that can *only*
 /// output to a stream.  It does not support seeking, reopening, rewinding, line
@@ -37,9 +43,6 @@ enum OpenFlags : unsigned;
 /// a chunk at a time.
 class raw_ostream {
 private:
-  void operator=(const raw_ostream &) = delete;
-  raw_ostream(const raw_ostream &) = delete;
-
   /// The buffer is handled in such a way that the buffer is
   /// uninitialized, unbuffered, or out of space when OutBufCur >=
   /// OutBufEnd. Thus a single comparison suffices to determine if we
@@ -69,7 +72,7 @@ private:
 public:
   // color order matches ANSI escape sequence, don't change
   enum Colors {
-    BLACK=0,
+    BLACK = 0,
     RED,
     GREEN,
     YELLOW,
@@ -85,6 +88,9 @@ public:
     // Start out ready to flush.
     OutBufStart = OutBufEnd = OutBufCur = nullptr;
   }
+
+  raw_ostream(const raw_ostream &) = delete;
+  void operator=(const raw_ostream &) = delete;
 
   virtual ~raw_ostream();
 
@@ -184,7 +190,7 @@ public:
     return write(Str.data(), Str.length());
   }
 
-  raw_ostream &operator<<(const llvm::SmallVectorImpl<char> &Str) {
+  raw_ostream &operator<<(const SmallVectorImpl<char> &Str) {
     return write(Str.data(), Str.size());
   }
 
@@ -193,6 +199,7 @@ public:
   raw_ostream &operator<<(unsigned long long N);
   raw_ostream &operator<<(long long N);
   raw_ostream &operator<<(const void *P);
+
   raw_ostream &operator<<(unsigned int N) {
     return this->operator<<(static_cast<unsigned long>(N));
   }
@@ -218,13 +225,18 @@ public:
 
   // Formatted output, see the leftJustify() function in Support/Format.h.
   raw_ostream &operator<<(const FormattedString &);
-  
+
   // Formatted output, see the formatHex() function in Support/Format.h.
   raw_ostream &operator<<(const FormattedNumber &);
-  
+
+  // Formatted output, see the formatv() function in Support/FormatVariadic.h.
+  raw_ostream &operator<<(const formatv_object_base &);
+
+  // Formatted output, see the format_bytes() function in Support/Format.h.
+  raw_ostream &operator<<(const FormattedBytes &);
+
   /// indent - Insert 'NumSpaces' spaces.
   raw_ostream &indent(unsigned NumSpaces);
-
 
   /// Changes the foreground color of text that will be output from this point
   /// forward.
@@ -246,7 +258,7 @@ public:
   /// outputting colored text, or before program exit.
   virtual raw_ostream &resetColor() { return *this; }
 
-  /// Reverses the forground and background colors.
+  /// Reverses the foreground and background colors.
   virtual raw_ostream &reverseColor() { return *this; }
 
   /// This function determines if this stream is connected to a "tty" or
@@ -316,7 +328,7 @@ private:
 };
 
 /// An abstract base class for streams implementations that also support a
-/// pwrite operation. This is usefull for code that can mostly stream out data,
+/// pwrite operation. This is useful for code that can mostly stream out data,
 /// but needs to patch in a header that needs to know the output size.
 class raw_pwrite_stream : public raw_ostream {
   virtual void pwrite_impl(const char *Ptr, size_t Size, uint64_t Offset) = 0;
@@ -349,10 +361,6 @@ class raw_fd_ostream : public raw_pwrite_stream {
   /// Error This flag is true if an error of any kind has been detected.
   ///
   bool Error;
-
-  /// Controls whether the stream should attempt to use atomic writes, when
-  /// possible.
-  bool UseAtomicWrites;
 
   uint64_t pos;
 
@@ -402,16 +410,6 @@ public:
   /// Flushes the stream and repositions the underlying file descriptor position
   /// to the offset specified from the beginning of the file.
   uint64_t seek(uint64_t off);
-
-  /// Set the stream to attempt to use atomic writes for individual output
-  /// routines where possible.
-  ///
-  /// Note that because raw_ostream's are typically buffered, this flag is only
-  /// sensible when used on unbuffered streams which will flush their output
-  /// immediately.
-  void SetUseAtomicWrites(bool Value) {
-    UseAtomicWrites = Value;
-  }
 
   raw_ostream &changeColor(enum Colors colors, bool bold=false,
                            bool bg=false) override;
@@ -471,6 +469,7 @@ class raw_string_ostream : public raw_ostream {
   /// Return the current position within the stream, not counting the bytes
   /// currently in the buffer.
   uint64_t current_pos() const override { return OS.size(); }
+
 public:
   explicit raw_string_ostream(std::string &O) : OS(O) {}
   ~raw_string_ostream() override;
@@ -485,6 +484,9 @@ public:
 
 /// A raw_ostream that writes to an SmallVector or SmallString.  This is a
 /// simple adaptor class. This class does not encounter output errors.
+/// raw_svector_ostream operates without a buffer, delegating all memory
+/// management to the SmallString. Thus the SmallString is always up-to-date,
+/// may be used directly and there is no need to call flush().
 class raw_svector_ostream : public raw_pwrite_stream {
   SmallVectorImpl<char> &OS;
 
@@ -493,32 +495,24 @@ class raw_svector_ostream : public raw_pwrite_stream {
 
   void pwrite_impl(const char *Ptr, size_t Size, uint64_t Offset) override;
 
-  /// Return the current position within the stream, not counting the bytes
-  /// currently in the buffer.
+  /// Return the current position within the stream.
   uint64_t current_pos() const override;
-
-protected:
-  // Like the regular constructor, but doesn't call init.
-  explicit raw_svector_ostream(SmallVectorImpl<char> &O, unsigned);
-  void init();
 
 public:
   /// Construct a new raw_svector_ostream.
   ///
   /// \param O The vector to write to; this should generally have at least 128
   /// bytes free to avoid any extraneous memory overhead.
-  explicit raw_svector_ostream(SmallVectorImpl<char> &O);
-  ~raw_svector_ostream() override;
+  explicit raw_svector_ostream(SmallVectorImpl<char> &O) : OS(O) {
+    SetUnbuffered();
+  }
 
+  ~raw_svector_ostream() override = default;
 
-  /// This is called when the SmallVector we're appending to is changed outside
-  /// of the raw_svector_ostream's control.  It is only safe to do this if the
-  /// raw_svector_ostream has previously been flushed.
-  void resync();
+  void flush() = delete;
 
-  /// Flushes the stream contents to the target vector and return a StringRef
-  /// for the vector contents.
-  StringRef str();
+  /// Return a StringRef for the vector contents.
+  StringRef str() { return StringRef(OS.data(), OS.size()); }
 };
 
 /// A raw_ostream that discards all output.
@@ -532,7 +526,7 @@ class raw_null_ostream : public raw_pwrite_stream {
   uint64_t current_pos() const override;
 
 public:
-  explicit raw_null_ostream() {}
+  explicit raw_null_ostream() = default;
   ~raw_null_ostream() override;
 };
 
@@ -541,12 +535,10 @@ class buffer_ostream : public raw_svector_ostream {
   SmallVector<char, 0> Buffer;
 
 public:
-  buffer_ostream(raw_ostream &OS) : raw_svector_ostream(Buffer, 0), OS(OS) {
-    init();
-  }
-  ~buffer_ostream() { OS << str(); }
+  buffer_ostream(raw_ostream &OS) : raw_svector_ostream(Buffer), OS(OS) {}
+  ~buffer_ostream() override { OS << str(); }
 };
 
-} // end llvm namespace
+} // end namespace llvm
 
-#endif
+#endif // LLVM_SUPPORT_RAW_OSTREAM_H
