@@ -31,11 +31,18 @@
 .set noreorder
 .set noat
 
-.text
-.global cocall
+#include <machine/asm.h>
+__FBSDID("$FreeBSD$");
+#include "SYS.h"
 
-cocall:
+LEAF(cocall)
+	PIC_PROLOGUE(cocall)
+
 	ccall	$c3, $c4, 1
 	cgetpcc $c11
-	jr	$ra
+//	bnez	v0, 1f
 	nop
+	PIC_RETURN()
+1:
+	PIC_TAILCALL(__cerror)
+END(cocall)

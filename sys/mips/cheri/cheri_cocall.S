@@ -46,8 +46,8 @@
 			 /* $a0-$a7 are preserved and passed to the callee */ \
 			 1 << 12 /* $t4 */ | \
 			 1 << 13 /* $t5 */ | \
-			 1 << 14 /* $t6 */ | \
-			 1 << 15 /* $t7 */)
+			 1 << 14 /* $t6 */)
+			 /* $t7 is used by libc stub to save $gp */
 
 #define	CLEARHI_BITS	(/* s0-s7 are loaded from the callee context */ \
 			 1 << 8  /* $t8 */ | \
@@ -82,7 +82,7 @@
  *
  * Save before calling the calee, and restore afterwards: s0-s7, gp, sp, s8
  *
- * Zero before calling the callee: at, v0, v1, t4-t7, s0-s7, t8, t9, gp, sp, s8, ra, hi, lo
+ * Zero before calling the callee: at, v0, v1, t4-t6, s0-s7, t8, t9, gp, sp, s8, ra, hi, lo
  *
  * XXX: Floating point
  */
@@ -114,6 +114,7 @@ _C_LABEL(switcher_cocall):
 	csd	sp, zero, 3*CHERICAP_SIZE+72($idc)
 	csd	s8, zero, 3*CHERICAP_SIZE+80($idc)
 	csd	ra, zero, 3*CHERICAP_SIZE+88($idc)
+	csd	$15, zero, 3*CHERICAP_SIZE+96($idc) // t7
 
 	csc	$c17, zero, 1*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
 	csc	$c18, zero, 2*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
@@ -127,8 +128,8 @@ _C_LABEL(switcher_cocall):
 	/*
 	 * Save the data transfer args.
 	 */
-	csd	a0, zero, 3*CHERICAP_SIZE+96($idc)
-	csd	a1, zero, 3*CHERICAP_SIZE+104($idc)
+	csd	a0, zero, 3*CHERICAP_SIZE+104($idc)
+	csd	a1, zero, 3*CHERICAP_SIZE+112($idc)
 
 	/*
 	 * Save the PCC, put there by cocall().
@@ -183,6 +184,7 @@ _C_LABEL(switcher_cocall):
 	cld	sp, zero, 3*CHERICAP_SIZE+72($c5)
 	cld	s8, zero, 3*CHERICAP_SIZE+80($c5)
 	cld	ra, zero, 3*CHERICAP_SIZE+88($c5)
+	cld	$15, zero, 3*CHERICAP_SIZE+96($c5) // t7
 
 	clc	$c17, zero, 1*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c5)
 	clc	$c18, zero, 2*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c5)
@@ -198,14 +200,14 @@ _C_LABEL(switcher_cocall):
 	/*
 	 * Do the data transfer.
 	 */
-	cld	t0, zero, 3*CHERICAP_SIZE+96($c5)
-	cld	t1, zero, 3*CHERICAP_SIZE+104($c5)
+	cld	t0, zero, 3*CHERICAP_SIZE+104($c5)
+	cld	t1, zero, 3*CHERICAP_SIZE+112($c5)
 
 	/*
 	 * Compare buffer sizes, put the smaller one into t1.
 	 */
-	dsub	t3, a1, t1
-	bgez	t3, 2f
+	dsub	t8, a1, t1
+	bgez	t8, 2f
 	nop
 	daddiu	t1, a1, 0
 
