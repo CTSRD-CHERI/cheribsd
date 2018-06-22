@@ -11,6 +11,7 @@
 #include <sys/signal.h>
 #include <sys/acl.h>
 #include <sys/cpuset.h>
+#include <sys/domainset.h>
 #include <sys/_ffcounter.h>
 #include <sys/_semaphore.h>
 #include <sys/ucontext.h>
@@ -1372,6 +1373,22 @@ struct cheriabi_kevent_args {
 	char nevents_l_[PADL_(int)]; int nevents; char nevents_r_[PADR_(int)];
 	char timeout_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability timeout; char timeout_r_[PADR_(const struct timespec * __capability)];
 };
+struct cheriabi_cpuset_getdomain_args {
+	char level_l_[PADL_(cpulevel_t)]; cpulevel_t level; char level_r_[PADR_(cpulevel_t)];
+	char which_l_[PADL_(cpuwhich_t)]; cpuwhich_t which; char which_r_[PADR_(cpuwhich_t)];
+	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
+	char domainsetsize_l_[PADL_(size_t)]; size_t domainsetsize; char domainsetsize_r_[PADR_(size_t)];
+	char mask_l_[PADL_(domainset_t * __capability)]; domainset_t * __capability mask; char mask_r_[PADR_(domainset_t * __capability)];
+	char policy_l_[PADL_(int * __capability)]; int * __capability policy; char policy_r_[PADR_(int * __capability)];
+};
+struct cheriabi_cpuset_setdomain_args {
+	char level_l_[PADL_(cpulevel_t)]; cpulevel_t level; char level_r_[PADR_(cpulevel_t)];
+	char which_l_[PADL_(cpuwhich_t)]; cpuwhich_t which; char which_r_[PADR_(cpuwhich_t)];
+	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
+	char domainsetsize_l_[PADL_(size_t)]; size_t domainsetsize; char domainsetsize_r_[PADR_(size_t)];
+	char mask_l_[PADL_(domainset_t * __capability)]; domainset_t * __capability mask; char mask_r_[PADR_(domainset_t * __capability)];
+	char policy_l_[PADL_(int)]; int policy; char policy_r_[PADR_(int)];
+};
 #if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
 #define PAD64_REQUIRED
 #endif
@@ -1652,6 +1669,8 @@ int	cheriabi_getfsstat(struct thread *, struct cheriabi_getfsstat_args *);
 int	cheriabi_fhstatfs(struct thread *, struct cheriabi_fhstatfs_args *);
 int	cheriabi_mknodat(struct thread *, struct cheriabi_mknodat_args *);
 int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
+int	cheriabi_cpuset_getdomain(struct thread *, struct cheriabi_cpuset_getdomain_args *);
+int	cheriabi_cpuset_setdomain(struct thread *, struct cheriabi_cpuset_setdomain_args *);
 
 #ifdef COMPAT_43
 
@@ -1983,6 +2002,8 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_fhstatfs	AUE_FHSTATFS
 #define	CHERIABI_SYS_AUE_cheriabi_mknodat	AUE_MKNODAT
 #define	CHERIABI_SYS_AUE_cheriabi_kevent	AUE_KEVENT
+#define	CHERIABI_SYS_AUE_cheriabi_cpuset_getdomain	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_cpuset_setdomain	AUE_NULL
 
 #undef PAD_
 #undef PADL_

@@ -350,4 +350,6 @@
 #define	CHERIABI_SYS_cheriabi_fhstatfs_PTRMASK	(0x0 | 0x1 | 0x2)
 #define	CHERIABI_SYS_cheriabi_mknodat_PTRMASK	(0x0 | 0x2)
 #define	CHERIABI_SYS_cheriabi_kevent_PTRMASK	(0x0 | 0x2 | 0x8 | 0x20)
+#define	CHERIABI_SYS_cheriabi_cpuset_getdomain_PTRMASK	(0x0 | 0x10 | 0x20)
+#define	CHERIABI_SYS_cheriabi_cpuset_setdomain_PTRMASK	(0x0 | 0x10)
 #endif /* !_CHERIABI_SYSARGMAP_H_ */

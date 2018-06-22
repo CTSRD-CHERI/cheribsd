@@ -1417,3 +1417,13 @@
 				    struct kevent_c *eventlist, \
 				    int nevents, \
 				    _In_opt_ const struct timespec *timeout); }
+561	AUE_NULL	STD	{ int cheriabi_cpuset_getdomain( \
+				    cpulevel_t level, \
+				    cpuwhich_t which, id_t id, \
+				    size_t domainsetsize, domainset_t *mask, \
+				    int *policy); }
+562	AUE_NULL	STD	{ int cheriabi_cpuset_setdomain( \
+				    cpulevel_t level, \
+				    cpuwhich_t which, id_t id, \
+				    size_t domainsetsize, domainset_t *mask, \
+				    int policy); }

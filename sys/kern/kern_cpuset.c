@@ -1871,12 +1871,15 @@ sys_cpuset_getdomain(struct thread *td, struct cpuset_getdomain_args *uap)
 {
 
 	return (kern_cpuset_getdomain(td, uap->level, uap->which,
-	    uap->id, uap->domainsetsize, uap->mask, uap->policy));
+	    uap->id, uap->domainsetsize,
+	    __USER_CAP(uap->mask, uap->domainsetsize),
+	    __USER_CAP_OBJ(uap->policy)));
 }
 
 int
 kern_cpuset_getdomain(struct thread *td, cpulevel_t level, cpuwhich_t which,
-    id_t id, size_t domainsetsize, domainset_t *maskp, int *policyp)
+    id_t id, size_t domainsetsize, domainset_t * __capability maskp,
+    int * __capability policyp)
 {
 	struct domainset outset;
 	struct thread *ttd;
@@ -1980,9 +1983,11 @@ kern_cpuset_getdomain(struct thread *td, cpulevel_t level, cpuwhich_t which,
 	}
 	DOMAINSET_COPY(&outset.ds_mask, mask);
 	if (error == 0)
-		error = copyout(mask, maskp, domainsetsize);
+		error = copyout_c(
+		    (__cheri_tocap domainset_t * __capability)mask, maskp,
+		    domainsetsize);
 	if (error == 0)
-		error = copyout(&outset.ds_policy, policyp,
+		error = copyout_c(&outset.ds_policy, policyp,
 		    sizeof(outset.ds_policy));
 out:
 	free(mask, M_TEMP);
@@ -2004,12 +2009,14 @@ sys_cpuset_setdomain(struct thread *td, struct cpuset_setdomain_args *uap)
 {
 
 	return (kern_cpuset_setdomain(td, uap->level, uap->which,
-	    uap->id, uap->domainsetsize, uap->mask, uap->policy));
+	    uap->id, uap->domainsetsize,
+	    __USER_CAP(uap->mask, uap->domainsetsize), uap->policy));
 }
 
 int
 kern_cpuset_setdomain(struct thread *td, cpulevel_t level, cpuwhich_t which,
-    id_t id, size_t domainsetsize, const domainset_t *maskp, int policy)
+    id_t id, size_t domainsetsize, const domainset_t * __capability maskp,
+    int policy)
 {
 	struct cpuset *nset;
 	struct cpuset *set;
@@ -2033,7 +2040,8 @@ kern_cpuset_setdomain(struct thread *td, cpulevel_t level, cpuwhich_t which,
 	}
 	memset(&domain, 0, sizeof(domain));
 	mask = malloc(domainsetsize, M_TEMP, M_WAITOK | M_ZERO);
-	error = copyin(maskp, mask, domainsetsize);
+	error = copyin_c(maskp, (__cheri_tocap domainset_t * __capability)mask,
+	    domainsetsize);
 	if (error)
 		goto out;
 	/*

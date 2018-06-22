@@ -570,4 +570,6 @@ const char *cheriabi_syscallnames[] = {
 	"cheriabi_fhstatfs",			/* 558 = cheriabi_fhstatfs */
 	"cheriabi_mknodat",			/* 559 = cheriabi_mknodat */
 	"cheriabi_kevent",			/* 560 = cheriabi_kevent */
+	"cheriabi_cpuset_getdomain",			/* 561 = cheriabi_cpuset_getdomain */
+	"cheriabi_cpuset_setdomain",			/* 562 = cheriabi_cpuset_setdomain */
 };

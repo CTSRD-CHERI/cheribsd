@@ -138,10 +138,10 @@ int	kern_cpuset_setaffinity(struct thread *td, cpulevel_t level,
 	    const cpuset_t * __capability maskp);
 int	kern_cpuset_getdomain(struct thread *td, cpulevel_t level,
 	    cpuwhich_t which, id_t id, size_t domainsetsize,
-	    domainset_t *maskp, int *policyp);
+	    domainset_t * __capability maskp, int * __capability policyp);
 int	kern_cpuset_setdomain(struct thread *td, cpulevel_t level,
 	    cpuwhich_t which, id_t id, size_t domainsetsize,
-	    const domainset_t *maskp, int policy);
+	    const domainset_t * __capability maskp, int policy);
 int	kern_cpuset_getid(struct thread *td, cpulevel_t level,
 	    cpuwhich_t which, id_t id, cpusetid_t * __capability setid);
 int	kern_cpuset_setid(struct thread *td, cpuwhich_t which,
