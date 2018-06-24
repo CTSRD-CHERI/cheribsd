@@ -61,8 +61,8 @@ __FBSDID("$FreeBSD$");
 #define assert_aligned(p, align) assert((((uintptr_t)p) & ((align) - 1)) == 0)
 #endif
 
-struct protocol *protocols;
-struct timeout *timeouts;
+static struct protocol *protocols;
+static struct timeout *timeouts;
 static struct timeout *free_timeouts;
 static int interfaces_invalidated;
 void (*bootp_packet_handler)(struct interface_info *,
