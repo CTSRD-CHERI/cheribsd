@@ -217,6 +217,10 @@ GENDIRDEPS_FILTER+= N${RELDIR:H}/msun
 .endif
 
 CFLAGS+=     ${CFLAGS.${.IMPSRC:T}}
+.if ${COMPILER_TYPE} == "clang"
+# Don't fail the build (yet) with the new clang warning -Watomic-alignment
+CFLAGS+=	-Wno-error=atomic-alignment
+.endif
 
 # Disable warnings in contributed sources.
 CWARNFLAGS:=	${.IMPSRC:Ngdtoa_*.c:C/^.+$/${CWARNFLAGS}/:C/^$/-w/}
