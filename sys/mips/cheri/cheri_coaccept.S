@@ -142,24 +142,24 @@ _C_LABEL(switcher_coaccept):
 	/*
 	 * Save the data transfer args.
 	 */
+	csc	$c5, zero, 9*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
 	csd	a0, zero, 3*CHERICAP_SIZE+104($idc)
-	csd	a1, zero, 3*CHERICAP_SIZE+112($idc)
 
 	/*
 	 * Save the PCC, put there by coaccept().
 	 */
-	csc	$c11, zero, 9*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
+	csc	$c11, zero, 10*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
 
 	/*
 	 * Load the capability to the caller's control block.
 	 */
-	clc	$c5, zero, 0($idc)
+	clc	$c25, zero, 0($idc)
 
 	/*
 	 * Is this the first invocation of coaccept, or rather a response
 	 * for a ccall()?  If the former - call copark(2).
 	 */
-	cbts	$c5, 1f
+	cbts	$c25, 1f
 	nop
 	li	v0, SYS_copark
 	syscall
@@ -169,7 +169,7 @@ _C_LABEL(switcher_coaccept):
 	/*
 	 * Zero out the sc_peer_context variables, releasing the spinlock.
 	 */
-	csd	zero, zero, 0($c5);
+	csd	zero, zero, 0($c25);
 	csd	zero, zero, 0($idc);
 
 	/*
@@ -177,37 +177,37 @@ _C_LABEL(switcher_coaccept):
 	 * This is used by kernel to look up the real thread.  Also clear
 	 * the same field on the caller side.
 	 */
-	cld	t8, zero, 1*CHERICAP_SIZE($c5);
+	cld	t8, zero, 1*CHERICAP_SIZE($c25);
 	csd	t8, zero, 1*CHERICAP_SIZE+8($idc)
-	csd	zero, zero, 1*CHERICAP_SIZE+8($c5)
+	csd	zero, zero, 1*CHERICAP_SIZE+8($c25)
 
 	/*
 	 * Restore the caller's context.
 	 */
-	cld	s0, zero, 3*CHERICAP_SIZE+0($c5)
-	cld	s1, zero, 3*CHERICAP_SIZE+8($c5)
-	cld	s2, zero, 3*CHERICAP_SIZE+16($c5)
-	cld	s3, zero, 3*CHERICAP_SIZE+24($c5)
-	cld	s4, zero, 3*CHERICAP_SIZE+32($c5)
-	cld	s5, zero, 3*CHERICAP_SIZE+40($c5)
-	cld	s6, zero, 3*CHERICAP_SIZE+48($c5)
-	cld	s7, zero, 3*CHERICAP_SIZE+56($c5)
-	cld	gp, zero, 3*CHERICAP_SIZE+64($c5)
-	cld	sp, zero, 3*CHERICAP_SIZE+72($c5)
-	cld	s8, zero, 3*CHERICAP_SIZE+80($c5)
-	cld	ra, zero, 3*CHERICAP_SIZE+88($c5)
-	cld	$15, zero, 3*CHERICAP_SIZE+96($c5) // t7
+	cld	s0, zero, 3*CHERICAP_SIZE+0($c25)
+	cld	s1, zero, 3*CHERICAP_SIZE+8($c25)
+	cld	s2, zero, 3*CHERICAP_SIZE+16($c25)
+	cld	s3, zero, 3*CHERICAP_SIZE+24($c25)
+	cld	s4, zero, 3*CHERICAP_SIZE+32($c25)
+	cld	s5, zero, 3*CHERICAP_SIZE+40($c25)
+	cld	s6, zero, 3*CHERICAP_SIZE+48($c25)
+	cld	s7, zero, 3*CHERICAP_SIZE+56($c25)
+	cld	gp, zero, 3*CHERICAP_SIZE+64($c25)
+	cld	sp, zero, 3*CHERICAP_SIZE+72($c25)
+	cld	s8, zero, 3*CHERICAP_SIZE+80($c25)
+	cld	ra, zero, 3*CHERICAP_SIZE+88($c25)
+	cld	$15, zero, 3*CHERICAP_SIZE+96($c25) // t7
 
-	clc	$c17, zero, 1*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c5)
-	clc	$c18, zero, 2*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c5)
-	clc	$c19, zero, 3*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c5)
-	clc	$c20, zero, 4*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c5)
-	clc	$c21, zero, 5*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c5)
-	clc	$c22, zero, 6*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c5)
-	clc	$c23, zero, 7*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c5)
-	clc	$c24, zero, 8*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c5)
+	clc	$c17, zero, 1*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c18, zero, 2*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c19, zero, 3*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c20, zero, 4*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c21, zero, 5*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c22, zero, 6*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c23, zero, 7*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c24, zero, 8*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
 
-	clc	$c11, zero, 9*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c5)
+	clc	$c11, zero, 10*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
 
 	/*
 	 * Do the data transfer back to the caller.  The reason
@@ -215,24 +215,22 @@ _C_LABEL(switcher_coaccept):
 	 * is doing - it transfers the data there and back, both
 	 * sides.
 	 */
-	cld	t0, zero, 3*CHERICAP_SIZE+104($c5)
-	cld	t1, zero, 3*CHERICAP_SIZE+112($c5)
+	clc	$c7, zero, 9*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	cld	t0, zero, 3*CHERICAP_SIZE+104($c25)
 
 	/*
-	 * Compare buffer sizes, put the smaller one into t1.
+	 * Compare buffer sizes, put the smaller one into t0.
 	 */
-	dsub	t8, a1, t1
+	dsub	t8, a0, t0
 	bgez	t8, 2f
 	nop
-	daddiu	t1, a1, 0
+	daddiu	t0, a0, 0
 
 2:
-	ld	t2, 0(a0)
-	sd	t2, 0(t0)
-	daddiu	a0, 8
-	daddiu	t0, 8
-	daddi	t1, -8
-	bgtz	t1, 2b
+	daddi	t0, -8
+	cld	t1, t0, 0($c5)
+	csd	t1, t0, 0($c7)
+	bgtz	t0, 2b
 	nop
 
 	clearlo		CLEARLO_BITS

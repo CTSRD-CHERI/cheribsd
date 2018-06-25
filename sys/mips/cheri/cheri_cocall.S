@@ -128,29 +128,29 @@ _C_LABEL(switcher_cocall):
 	/*
 	 * Save the data transfer args.
 	 */
+	csc	$c6, zero, 9*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
 	csd	a0, zero, 3*CHERICAP_SIZE+104($idc)
-	csd	a1, zero, 3*CHERICAP_SIZE+112($idc)
 
 	/*
 	 * Save the PCC, put there by cocall().
 	 */
-	csc	$c11, zero, 9*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
+	csc	$c11, zero, 10*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
 
 	/*
 	 * Unseal the callee's control block.
 	 */
 	clc	$c13, zero, 2*CHERICAP_SIZE($idc)	/* Load the unsealing capability */
-	cunseal	$c5, $c5, $c13				/* Unseal the calee control block */
+	cunseal	$c25, $c5, $c13				/* Unseal the calee control block */
 
 1:
 	/*
 	 * Save the capability to the caller's control block in the callee
 	 * context.  This also serves as the callee's spinlock.
 	 */
-	cllc	$c12, $c5
+	cllc	$c12, $c25
 	cbts	$c12, 10f
 	nop
-	cscc	t8, $idc, $c5
+	cscc	t8, $idc, $c25
 	beq	t8, zero, 1b
 	/* no branch delay slot needed */
 
@@ -159,65 +159,63 @@ _C_LABEL(switcher_cocall):
 	 * This is used by kernel to look up the real thread.  Also clear
 	 * the same field on the callee side.
 	 */
-	cld	t8, zero, 1*CHERICAP_SIZE($c5);
+	cld	t8, zero, 1*CHERICAP_SIZE($c25);
 	csd	t8, zero, 1*CHERICAP_SIZE+8($idc)
-	csd	zero, zero, 1*CHERICAP_SIZE+8($c5)
+	csd	zero, zero, 1*CHERICAP_SIZE+8($c25)
 
 	/*
 	 * Save the capability to the callee's control block in the caller
 	 * context.
 	 */
-	csc	$c5, zero, 0($idc);
+	csc	$c25, zero, 0($idc);
 
 	/*
 	 * Restore the callee's context.
 	 */
-	cld	s0, zero, 3*CHERICAP_SIZE+0($c5)
-	cld	s1, zero, 3*CHERICAP_SIZE+8($c5)
-	cld	s2, zero, 3*CHERICAP_SIZE+16($c5)
-	cld	s3, zero, 3*CHERICAP_SIZE+24($c5)
-	cld	s4, zero, 3*CHERICAP_SIZE+32($c5)
-	cld	s5, zero, 3*CHERICAP_SIZE+40($c5)
-	cld	s6, zero, 3*CHERICAP_SIZE+48($c5)
-	cld	s7, zero, 3*CHERICAP_SIZE+56($c5)
-	cld	gp, zero, 3*CHERICAP_SIZE+64($c5)
-	cld	sp, zero, 3*CHERICAP_SIZE+72($c5)
-	cld	s8, zero, 3*CHERICAP_SIZE+80($c5)
-	cld	ra, zero, 3*CHERICAP_SIZE+88($c5)
-	cld	$15, zero, 3*CHERICAP_SIZE+96($c5) // t7
+	cld	s0, zero, 3*CHERICAP_SIZE+0($c25)
+	cld	s1, zero, 3*CHERICAP_SIZE+8($c25)
+	cld	s2, zero, 3*CHERICAP_SIZE+16($c25)
+	cld	s3, zero, 3*CHERICAP_SIZE+24($c25)
+	cld	s4, zero, 3*CHERICAP_SIZE+32($c25)
+	cld	s5, zero, 3*CHERICAP_SIZE+40($c25)
+	cld	s6, zero, 3*CHERICAP_SIZE+48($c25)
+	cld	s7, zero, 3*CHERICAP_SIZE+56($c25)
+	cld	gp, zero, 3*CHERICAP_SIZE+64($c25)
+	cld	sp, zero, 3*CHERICAP_SIZE+72($c25)
+	cld	s8, zero, 3*CHERICAP_SIZE+80($c25)
+	cld	ra, zero, 3*CHERICAP_SIZE+88($c25)
+	cld	$15, zero, 3*CHERICAP_SIZE+96($c25) // t7
 
-	clc	$c17, zero, 1*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c5)
-	clc	$c18, zero, 2*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c5)
-	clc	$c19, zero, 3*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c5)
-	clc	$c20, zero, 4*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c5)
-	clc	$c21, zero, 5*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c5)
-	clc	$c22, zero, 6*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c5)
-	clc	$c23, zero, 7*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c5)
-	clc	$c24, zero, 8*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c5)
+	clc	$c17, zero, 1*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c18, zero, 2*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c19, zero, 3*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c20, zero, 4*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c21, zero, 5*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c22, zero, 6*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c23, zero, 7*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c24, zero, 8*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
 
-	clc	$c11, zero, 9*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c5)
+	clc	$c11, zero, 10*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
 
 	/*
 	 * Do the data transfer.
 	 */
-	cld	t0, zero, 3*CHERICAP_SIZE+104($c5)
-	cld	t1, zero, 3*CHERICAP_SIZE+112($c5)
+	clc	$c7, zero, 9*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	cld	t0, zero, 3*CHERICAP_SIZE+104($c25)
 
 	/*
-	 * Compare buffer sizes, put the smaller one into t1.
+	 * Compare buffer sizes, put the smaller one into t0.
 	 */
-	dsub	t8, a1, t1
+	dsub	t8, a0, t0
 	bgez	t8, 2f
 	nop
-	daddiu	t1, a1, 0
+	daddiu	t0, a0, 0
 
 2:
-	ld	t2, 0(a0)
-	sd	t2, 0(t0)
-	daddiu	a0, 8
-	daddiu	t0, 8
-	daddi	t1, -8
-	bgtz	t1, 2b
+	daddi	t0, -8
+	cld	t1, t0, 0($c6)
+	csd	t1, t0, 0($c7)
+	bgtz	t0, 2b
 	nop
 
 	clearlo		CLEARLO_BITS
