@@ -167,12 +167,6 @@ _C_LABEL(switcher_coaccept):
 
 1:
 	/*
-	 * Zero out the sc_peer_context variables, releasing the spinlock.
-	 */
-	csd	zero, zero, 0($c25);
-	csd	zero, zero, 0($idc);
-
-	/*
 	 * Save the capability to the caller's thread in the callee context.
 	 * This is used by kernel to look up the real thread.  Also clear
 	 * the same field on the caller side.
@@ -232,6 +226,12 @@ _C_LABEL(switcher_coaccept):
 	csd	t1, t0, 0($c7)
 	bgtz	t0, 2b
 	nop
+
+	/*
+	 * Zero out the sc_peer_context variables, releasing the spinlock.
+	 */
+	csd	zero, zero, 0($c25);
+	csd	zero, zero, 0($idc);
 
 	clearlo		CLEARLO_BITS
 	clearhi		CLEARHI_BITS
