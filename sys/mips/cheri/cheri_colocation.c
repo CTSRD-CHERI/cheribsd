@@ -225,7 +225,6 @@ colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 	return (0);
 }
 
-
 static int
 cosetup(struct thread *td)
 {
