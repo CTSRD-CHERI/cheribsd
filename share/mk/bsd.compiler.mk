@@ -173,7 +173,7 @@ ${X_}COMPILER_FREEBSD_VERSION= 0
 .else
 # .info "${.CURDIR}: Running ${${cc}} --version to compute ${X_}COMPILER_TYPE/${X_}COMPILER_VERSION. ${cc}=${${cc}}"
 .endif
-_v!=	${${cc}} --version || echo 0.0.0
+_v!=	${${cc}:N${CCACHE_BIN}} --version || echo 0.0.0
 
 .if !defined(${X_}COMPILER_TYPE)
 . if ${${cc}:T:M*gcc*}
@@ -201,7 +201,7 @@ ${X_}COMPILER_VERSION!=echo "${_v:M[1-9].[0-9]*}" | awk -F. '{print $$1 * 10000 
 .else
 # .info "${.CURDIR}: Computing ${X_}COMPILER_FREEBSD_VERSION. ${cc}=${${cc}}"
 .endif
-${X_}COMPILER_FREEBSD_VERSION!=	{ echo "__FreeBSD_cc_version" | ${${cc}} -E - 2>/dev/null || echo __FreeBSD_cc_version; } | sed -n '$$p'
+${X_}COMPILER_FREEBSD_VERSION!=	{ echo "__FreeBSD_cc_version" | ${${cc}:N${CCACHE_BIN}} -E - 2>/dev/null || echo __FreeBSD_cc_version; } | sed -n '$$p'
 # If we get a literal "__FreeBSD_cc_version" back then the compiler
 # is a non-FreeBSD build that doesn't support it or some other error
 # occurred.
