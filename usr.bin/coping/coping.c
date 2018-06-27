@@ -99,12 +99,18 @@ main(int argc, char **argv)
 		fprintf(stderr, "%s: cocalling...\n", getprogname());
 
 	buf[0] = 42;
-	error = cocall(switcher_code, switcher_data, lookedup, buf, sizeof(buf));
-	if (error != 0)
-		warn("cocall");
 
-	if (vflag)
-		printf("done, pid %d, error %d, buf[0] is %d\n", getpid(), error, buf[0]);
+	for (;;) {
+		error = cocall(switcher_code, switcher_data, lookedup, buf, sizeof(buf));
+		if (error != 0)
+			warn("cocall");
+
+		if (vflag)
+			printf("done, pid %d, error %d, buf[0] is %d\n", getpid(), error, buf[0]);
+		else
+			printf(".");
+		sleep(1);
+	}
 
 	return (0);
 }
