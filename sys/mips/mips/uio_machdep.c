@@ -56,7 +56,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/cache.h>
 
 #ifdef CPU_CHERI
-#define	CAP_ALIGNED(x)	((x) % CHERICAP_SIZE == 0)
+#define	CAP_ALIGNED(x)	((vaddr_t)(x) % CHERICAP_SIZE == 0)
 #endif
 
 /*
@@ -129,8 +129,8 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 			break;
 		case UIO_SYSSPACE:
 #ifdef CPU_CHERI
-			if (CAP_ALIGNED((uintptr_t)cp) &&
-			    CAP_ALIGNED((uintptr_t)iov->iov_base) &&
+			if (CAP_ALIGNED(cp) &&
+			    CAP_ALIGNED(iov->iov_base) &&
 			    CAP_ALIGNED(cnt)) {
 				if (uio->uio_rw == UIO_READ)
 					cheri_bcopy(cp,
