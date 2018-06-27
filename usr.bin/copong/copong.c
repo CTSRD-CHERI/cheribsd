@@ -58,6 +58,7 @@ main(int argc, char **argv)
 	void * __capability switcher_code;
 	void * __capability switcher_data;
 	void * __capability cookie;
+	uint64_t *halfcookie;
 	bool vflag = false;
 	int ch, error;
 
@@ -96,8 +97,11 @@ main(int argc, char **argv)
 		error = coaccept(switcher_code, switcher_data, &cookie, buf, sizeof(buf));
 		if (error != 0)
 			warn("coaccept");
-		if (vflag)
-			printf("pong, pid %d, error %d, cookie %p, buf[0] is %d\n", getpid(), error, (__cheri_fromcap void *)cookie, buf[0]);
+		if (vflag) {
+			halfcookie = (uint64_t *)&cookie;
+			printf("pong, pid %d, error %d, cookie %#lx%lx, buf[0] is %d\n",
+			    getpid(), error, halfcookie[0], halfcookie[1], buf[0]);
+		}
 		buf[0]++;
 	}
 

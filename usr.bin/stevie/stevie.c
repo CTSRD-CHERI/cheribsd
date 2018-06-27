@@ -156,6 +156,7 @@ service_proc(void *dummy __unused)
 	void * __capability switcher_code;
 	void * __capability switcher_data;
 	void * __capability cookie;
+	uint64_t *halfcookie;
 	char buf[8];
 	int error;
 
@@ -175,8 +176,9 @@ service_proc(void *dummy __unused)
 		error = coaccept(switcher_code, switcher_data, &cookie, buf, sizeof(buf));
 		if (error != 0)
 			fprintf(stderr, "%s: coaccept: %s\n", __func__, strerror(errno));
-		fprintf(stderr, "%s: accepted, error %d, cookie %p, we are thread %d, buf %p contains %d, looping...\n",
-		    __func__, error, (__cheri_fromcap void *)cookie, pthread_getthreadid_np(), buf, buf[0]);
+		halfcookie = (uint64_t *)&cookie;
+		fprintf(stderr, "%s: accepted, error %d, cookie %#lx%lx, we are thread %d, buf %p contains %d, looping...\n",
+		    __func__, error, halfcookie[0], halfcookie[1], pthread_getthreadid_np(), buf, buf[0]);
 		buf[0]++;
 	}
 }
