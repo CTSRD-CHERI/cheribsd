@@ -103,6 +103,7 @@ int	kern_auditctl(struct thread *td, const char * __capability path);
 int	kern_auditon(struct thread *td, int cmd, void * __capability data,
 	    u_int length);
 int	kern_bindat(struct thread *td, int dirfd, int fd, struct sockaddr *sa);
+int	kern_break(struct thread *td, uintptr_t *addr);
 int	kern_cap_getmode(struct thread *td, u_int * __capability modep);
 int	kern_cap_fcntls_get(struct thread *td, int fd,
 	    uint32_t * __capability fcntlrightsp);
