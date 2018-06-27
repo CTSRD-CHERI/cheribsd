@@ -99,11 +99,9 @@ main(int argc, char **argv)
 			warn("coaccept");
 		if (vflag) {
 			halfcookie = (uint64_t *)&cookie;
-			printf("pong, pid %d, error %d, cookie %#lx%lx, buf[0] is %d\n",
-			    getpid(), error, halfcookie[0], halfcookie[1], buf[0]);
+			printf("pong, pid %d, cookie %#lx%lx, buf[0] is %d\n",
+			    getpid(), halfcookie[0], halfcookie[1], buf[0]);
 		}
 		buf[0]++;
 	}
-
-	err(1, "we're not supposed to be here, pid %d\n", getpid());
 }

@@ -106,7 +106,7 @@ main(int argc, char **argv)
 			warn("cocall");
 
 		if (vflag)
-			printf("done, pid %d, error %d, buf[0] is %d\n", getpid(), error, buf[0]);
+			printf("done, pid %d, buf[0] is %d\n", getpid(), buf[0]);
 		else
 			printf(".");
 		sleep(1);

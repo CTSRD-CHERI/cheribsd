@@ -137,8 +137,10 @@ call(void)
 	fprintf(stderr, "%s: code %p, data %p, calling %p, buf %p, we are thread %d...\n",
 	    __func__, (__cheri_fromcap void *)switcher_code, (__cheri_fromcap void *)switcher_data, (__cheri_fromcap void *)lookedup, buf, pthread_getthreadid_np());
 	error = cocall(switcher_code, switcher_data, lookedup, buf, sizeof(buf));
-	fprintf(stderr, "%s: done, cocall returned %d, we are thread %d, buf %p contains %d\n",
-	    __func__, error, pthread_getthreadid_np(), buf, buf[0]);
+	if (error != 0)
+		fprintf(stderr, "%s: cocall: %s\n", __func__, strerror(errno));
+	fprintf(stderr, "%s: done, we are thread %d, buf %p contains %d\n",
+	    __func__, pthread_getthreadid_np(), buf, buf[0]);
 
 	buf[0]++;
 	fprintf(stderr, "%s: code %p, data %p, calling %p, buf %p, we are thread %d...\n",
@@ -146,8 +148,8 @@ call(void)
 	error = cocall(switcher_code, switcher_data, lookedup, buf, sizeof(buf));
 	if (error != 0)
 		fprintf(stderr, "%s: cocall: %s\n", __func__, strerror(errno));
-	fprintf(stderr, "%s: done, cocall returned %d, we are thread %d, buf %p contains %d\n",
-	    __func__, error, pthread_getthreadid_np(), buf, buf[0]);
+	fprintf(stderr, "%s: done, we are thread %d, buf %p contains %d\n",
+	    __func__, pthread_getthreadid_np(), buf, buf[0]);
 }
 
 static void *
@@ -177,8 +179,8 @@ service_proc(void *dummy __unused)
 		if (error != 0)
 			fprintf(stderr, "%s: coaccept: %s\n", __func__, strerror(errno));
 		halfcookie = (uint64_t *)&cookie;
-		fprintf(stderr, "%s: accepted, error %d, cookie %#lx%lx, we are thread %d, buf %p contains %d, looping...\n",
-		    __func__, error, halfcookie[0], halfcookie[1], pthread_getthreadid_np(), buf, buf[0]);
+		fprintf(stderr, "%s: accepted, cookie %#lx%lx, we are thread %d, buf %p contains %d, looping...\n",
+		    __func__, halfcookie[0], halfcookie[1], pthread_getthreadid_np(), buf, buf[0]);
 		buf[0]++;
 	}
 }
