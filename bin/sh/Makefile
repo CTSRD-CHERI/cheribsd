@@ -32,8 +32,7 @@ WFORMAT=0
 	${.CURDIR:H}/test \
 	${SRCTOP}/usr.bin/printf
 
-CLEANFILES+= mknodes mknodes.o \
-	mksyntax mksyntax.o
+CLEANFILES+= mknodes mksyntax
 CLEANFILES+= ${GENSRCS} ${GENHDRS}
 
 build-tools: mknodes mksyntax
