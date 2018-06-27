@@ -590,7 +590,7 @@ extern int optreset;			/* getopt(3) external variable */
 
 #if __has_feature(capabilities)
 int	cocall(void * __capability, void * __capability, void * __capability, void __capability *, size_t);
-int	coaccept(void * __capability, void * __capability, void __capability *, size_t);
+int	coaccept(void * __capability, void * __capability, void * __capability * __capability, void __capability *, size_t);
 int	cosetup(int, void * __capability *, void * __capability *);
 int	coregister(const char *, void * __capability *);
 int	colookup(const char *, void * __capability *);

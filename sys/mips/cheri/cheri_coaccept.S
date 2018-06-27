@@ -142,7 +142,7 @@ _C_LABEL(switcher_coaccept):
 	/*
 	 * Save the data transfer args.
 	 */
-	csc	$c5, zero, 9*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
+	csc	$c6, zero, 9*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
 	csd	a0, zero, 3*CHERICAP_SIZE+104($idc)
 
 	/*
@@ -222,7 +222,7 @@ _C_LABEL(switcher_coaccept):
 
 2:
 	daddi	t0, -8
-	cld	t1, t0, 0($c5)
+	cld	t1, t0, 0($c6)
 	csd	t1, t0, 0($c7)
 	bgtz	t0, 2b
 	nop

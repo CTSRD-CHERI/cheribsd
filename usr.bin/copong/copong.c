@@ -57,6 +57,7 @@ main(int argc, char **argv)
 {
 	void * __capability switcher_code;
 	void * __capability switcher_data;
+	void * __capability cookie;
 	bool vflag = false;
 	int ch, error;
 
@@ -92,11 +93,11 @@ main(int argc, char **argv)
 		fprintf(stderr, "%s: coaccepting...\n", getprogname());
 
 	for (;;) {
-		error = coaccept(switcher_code, switcher_data, buf, sizeof(buf));
+		error = coaccept(switcher_code, switcher_data, &cookie, buf, sizeof(buf));
 		if (error != 0)
 			warn("coaccept");
 		if (vflag)
-			printf("pong, pid %d, error %d, buf[0] is %d\n", getpid(), error, buf[0]);
+			printf("pong, pid %d, error %d, cookie %p, buf[0] is %d\n", getpid(), error, (__cheri_fromcap void *)cookie, buf[0]);
 		buf[0]++;
 	}
 

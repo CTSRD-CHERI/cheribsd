@@ -40,7 +40,7 @@
 .Sh SYNOPSIS
 .In unistd.h
 .Ft int
-.Fn coaccept "void * __capability code" "void * __capability data" "void * __capability buf" "size_t len"
+.Fn coaccept "void * __capability code" "void * __capability data" "void * __capability *cookiep" "void * __capability buf" "size_t len"
 .Sh DESCRIPTION
 The
 .Fn coaccept
@@ -63,6 +63,9 @@ and
 .Ar data
 arguments must point to a sealed capability pair obtained from
 .Xr cosetup 2 .
+The
+.Ar cookiep
+will be set to an opaque, capability-sized token that identifies the callee.
 .Sh RETURN VALUES
 .Rv -std coaccept
 .Sh ERRORS
@@ -88,6 +91,7 @@ Basic usage example:
 	char buf[MAXBSIZE];
 	void * __capability switcher_code;
 	void * __capability switcher_data;
+	void * __capability caller_cookie;
 
 	error = cosetup(COSETUP_COACCEPT, &switcher_code, &switcher_data);
 	if (error != 0)
@@ -98,7 +102,7 @@ Basic usage example:
 		err(1, "coregister");
 
 	for (;;) {
-		error = coaccept(switcher_code, switcher_data, buf, sizeof(buf));
+		error = coaccept(switcher_code, switcher_data, &caller_cookie, buf, sizeof(buf));
 		if (error != 0)
 			err(1, "coaccept");
 	}
