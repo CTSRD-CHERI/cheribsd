@@ -151,6 +151,11 @@ _C_LABEL(switcher_coaccept):
 	csc	$c11, zero, 10*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
 
 	/*
+	 * Save the pointer to the cookie.
+	 */
+	csc	$c5, zero, 11*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
+
+	/*
 	 * Load the capability to the caller's control block.
 	 */
 	clc	$c25, zero, 0($idc)

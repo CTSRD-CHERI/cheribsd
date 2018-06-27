@@ -61,7 +61,7 @@
 #define	CCLEARLO_BITS	(1 << 1  /* PCC */ | \
 			 1 << 2  /* IDC */ | \
 			 1 << 3  /* $c3, containing the sealed code capability */ | \
-			 1 << 4  /* $c4, containing the sealed code capability */ | \
+			 1 << 4  /* $c4, containing the sealed data capability */ | \
 			 /* $c5-$c10 are preserved and passed to the callee */ \
 			 /* $c11 is loaded from the callee context */ \
 			 1 << 12 /* $c12 */ | \
@@ -168,6 +168,14 @@ _C_LABEL(switcher_cocall):
 	 * context.
 	 */
 	csc	$c25, zero, 0($idc);
+
+	/*
+	 * Put the caller cookie (caller's data capability with the tag
+	 * stripped off) where the callee wants it.
+	 */
+	clc	$c24, zero, 11*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	ccleartag	$c4, $c4
+	csc	$c4, zero, 0($c24)
 
 	/*
 	 * Restore the callee's context.
