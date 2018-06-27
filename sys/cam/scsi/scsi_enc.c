@@ -1056,3 +1056,11 @@ out:
 	return (status);
 }
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:misc"
+//   ]
+// }
+// CHERI CHANGES END

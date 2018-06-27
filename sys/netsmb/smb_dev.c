@@ -413,3 +413,12 @@ smb_dev2share(int fd, int mode, struct smb_cred *scred,
 	return error;
 }
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

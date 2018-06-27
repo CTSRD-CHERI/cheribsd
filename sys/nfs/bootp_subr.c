@@ -1910,3 +1910,12 @@ out:
 }
 
 SYSINIT(bootp_rootconf, SI_SUB_ROOT_CONF, SI_ORDER_FIRST, bootpc_init, NULL);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

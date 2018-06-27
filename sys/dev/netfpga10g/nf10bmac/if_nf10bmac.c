@@ -968,3 +968,11 @@ nf10bmac_detach_dev(device_t dev)
 }
 
 /* end */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

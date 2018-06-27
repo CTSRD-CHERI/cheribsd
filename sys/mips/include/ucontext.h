@@ -199,3 +199,11 @@ typedef struct __ucontext_c {
 #define	UCR_MDHI	UCTX_REG(34)
 
 #endif	/* !_MACHINE_UCONTEXT_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

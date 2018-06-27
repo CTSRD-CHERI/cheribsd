@@ -316,3 +316,11 @@ memioctl(struct cdev *dev __unused, u_long cmd, caddr_t data, int flags,
 	return (error);
 }
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

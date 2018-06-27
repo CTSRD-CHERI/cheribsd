@@ -620,3 +620,11 @@ unsigned int		 if_nametoindex(const char *);
 __END_DECLS
 #endif
 #endif /* !_NET_IF_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

@@ -855,3 +855,12 @@ sglist_slice(struct sglist *original, struct sglist **slice, size_t offset,
 	}
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

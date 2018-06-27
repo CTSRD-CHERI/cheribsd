@@ -1088,3 +1088,11 @@ start_periodic_resettodr(void *arg __unused)
 
 SYSINIT(periodic_resettodr, SI_SUB_LAST, SI_ORDER_MIDDLE,
 	start_periodic_resettodr, NULL);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

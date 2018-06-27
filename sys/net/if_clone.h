@@ -80,3 +80,11 @@ int	if_clone_destroyif(struct if_clone *, struct ifnet *);
 
 #endif /* _KERNEL */
 #endif /* !_NET_IF_CLONE_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

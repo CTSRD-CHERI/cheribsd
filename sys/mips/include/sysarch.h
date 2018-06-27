@@ -93,3 +93,12 @@ __END_DECLS
 #endif
 
 #endif /* !_MACHINE_SYSARCH_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": "mmap cap"
+// }
+// CHERI CHANGES END

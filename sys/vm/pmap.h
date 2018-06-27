@@ -195,3 +195,12 @@ void		 pmap_zero_page_area(vm_page_t, int off, int size);
 
 #endif /* _KERNEL */
 #endif /* _PMAP_VM_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

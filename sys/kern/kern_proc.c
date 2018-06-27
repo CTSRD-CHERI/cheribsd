@@ -3661,3 +3661,11 @@ SYSCTL_PROC(_debug, OID_AUTO, stop_all_proc, CTLTYPE_INT | CTLFLAG_RW |
     sysctl_debug_stop_all_proc, "I",
     "");
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

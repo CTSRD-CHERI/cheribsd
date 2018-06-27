@@ -705,3 +705,15 @@ int	convert_sigevent(const struct sigevent_native *, ksigevent_t *);
 #endif
 
 #endif /* !_SYS_SIGNAL_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "kernel_sig_types",
+//     "pointer_as_integer",
+//     "user_capabilities"
+//   ],
+//   "change_comment": "",
+//   "hybrid_specific": false
+// }
+// CHERI CHANGES END

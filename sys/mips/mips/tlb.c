@@ -425,3 +425,11 @@ DB_SHOW_COMMAND(tlb, ddb_dump_tlb)
 	db_printf("Finished.\n");
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "platform"
+//   ]
+// }
+// CHERI CHANGES END

@@ -113,3 +113,12 @@ typedef	__uint64_t		vaddr_t;
 #endif
 
 #endif /* !_SYS__STDINT_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "pointer_integrity",
+//     "virtual_address"
+//   ]
+// }
+// CHERI CHANGES END

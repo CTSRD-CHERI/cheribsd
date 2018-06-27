@@ -3102,3 +3102,11 @@ ixlv_sysctl_qrx_tail_handler(SYSCTL_HANDLER_ARGS)
 }
 #endif
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

@@ -2543,3 +2543,11 @@ MODULE_DEPEND (isa_cx, sppp, 1, 1, 1);
 #endif
 DRIVER_MODULE (cx, isa, cx_isa_driver, cx_devclass, cx_modevent, NULL);
 MODULE_VERSION (cx, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

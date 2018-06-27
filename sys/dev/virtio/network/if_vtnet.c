@@ -3977,3 +3977,11 @@ vtnet_tunable_int(struct vtnet_softc *sc, const char *knob, int def)
 
 	return (def);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

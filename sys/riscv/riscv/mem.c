@@ -122,3 +122,11 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 	return (error);
 }
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

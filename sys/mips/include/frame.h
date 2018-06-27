@@ -224,3 +224,11 @@ struct trapframe {
 };
 
 #endif	/* !_MACHINE_FRAME_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

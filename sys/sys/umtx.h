@@ -200,3 +200,11 @@ void umtx_thread_alloc(struct thread *);
 void umtx_thread_exit(struct thread *);
 #endif /* !_KERNEL */
 #endif /* !_SYS_UMTX_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

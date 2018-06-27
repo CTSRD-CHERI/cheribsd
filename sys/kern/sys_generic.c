@@ -1936,3 +1936,13 @@ kern_posix_error(struct thread *td, int error)
 	td->td_retval[0] = error;
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

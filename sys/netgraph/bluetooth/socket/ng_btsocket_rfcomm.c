@@ -3558,3 +3558,11 @@ ng_btsocket_rfcomm_prepare_packet(struct sockbuf *sb, int length)
 	return (top);
 } /* ng_btsocket_rfcomm_prepare_packet */
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

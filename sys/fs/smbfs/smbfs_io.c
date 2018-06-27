@@ -676,3 +676,12 @@ smbfs_vinvalbuf(struct vnode *vp, struct thread *td)
 	}
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

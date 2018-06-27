@@ -3609,3 +3609,12 @@ bridge_linkcheck(struct bridge_softc *sc)
 	}
 	if_link_state_change(sc->sc_ifp, new_link);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1960,3 +1960,12 @@ t4_ddp_mod_unload(void)
 	t4_register_cpl_handler(CPL_RX_DDP_COMPLETE, NULL);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

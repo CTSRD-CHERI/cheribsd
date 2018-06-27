@@ -130,3 +130,12 @@ __END_DECLS
 #endif /* _KERNEL */
 
 #endif /* !_SYS_UIO_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "kiovec_t",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

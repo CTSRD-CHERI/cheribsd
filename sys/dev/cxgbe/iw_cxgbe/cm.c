@@ -2970,3 +2970,12 @@ void __exit c4iw_cm_term(void)
 	t4_register_an_handler(NULL);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

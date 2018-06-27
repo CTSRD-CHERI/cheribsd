@@ -3188,3 +3188,12 @@ static moduledata_t vxlan_mod = {
 
 DECLARE_MODULE(if_vxlan, vxlan_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
 MODULE_VERSION(if_vxlan, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

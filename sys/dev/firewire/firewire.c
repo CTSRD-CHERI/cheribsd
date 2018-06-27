@@ -2383,3 +2383,12 @@ fw_modevent(module_t mode, int type, void *data)
 DRIVER_MODULE(firewire, fwohci, firewire_driver, firewire_devclass,
     fw_modevent,0);
 MODULE_VERSION(firewire, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

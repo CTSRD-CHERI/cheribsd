@@ -508,3 +508,13 @@ elf32_dump_thread(struct thread *td __unused, void *dst __unused,
     size_t *off __unused)
 {
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support",
+//     "user_capabilities"
+//   ],
+//   "change_comment": "shared page"
+// }
+// CHERI CHANGES END

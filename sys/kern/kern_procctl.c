@@ -672,3 +672,11 @@ kern_procctl(struct thread *td, idtype_t idtype, id_t id, int com, void *data)
 		sx_unlock(&proctree_lock);
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

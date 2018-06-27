@@ -2276,3 +2276,11 @@ tl_shutdown(dev)
 
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

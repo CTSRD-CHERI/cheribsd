@@ -3747,3 +3747,11 @@ pmap_change_attr(vm_offset_t sva, vm_size_t size, vm_memattr_t ma)
 	mips_dcache_wbinv_range(ova, size);
 	return 0;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

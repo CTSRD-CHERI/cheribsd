@@ -534,3 +534,11 @@ usbpf_xfertap(struct usb_xfer *xfer, int type)
 
 	free(buf, M_TEMP);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

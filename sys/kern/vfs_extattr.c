@@ -804,3 +804,13 @@ kern_extattr_list_path(struct thread *td, const char * __capability path,
 	vrele(nd.ni_vp);
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

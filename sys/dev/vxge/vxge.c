@@ -4199,3 +4199,11 @@ static driver_t vxge_driver = {
 static devclass_t vxge_devclass;
 
 DRIVER_MODULE(vxge, pci, vxge_driver, vxge_devclass, 0, 0);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

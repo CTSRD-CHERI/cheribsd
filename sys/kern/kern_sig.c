@@ -3842,3 +3842,13 @@ sigacts_shared(struct sigacts *ps)
 
 	return (ps->ps_refcnt > 1);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "kernel_sig_types",
+//     "pointer_integrity",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

@@ -6796,3 +6796,11 @@ bge_get_counter(if_t ifp, ift_counter cnt)
 		return (if_get_counter_default(ifp, cnt));
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

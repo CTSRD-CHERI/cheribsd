@@ -2534,3 +2534,12 @@ __elfN(untrans_prot)(vm_prot_t prot)
 		flags |= PF_W;
 	return (flags);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support",
+//     "user_capabilities",
+//   ]
+// }
+// CHERI CHANGES END

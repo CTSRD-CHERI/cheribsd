@@ -124,3 +124,12 @@ cloudabi32_sys_sock_send(struct thread *td,
 	so.so_datalen = datalen;
 	return (copyout(&so, uap->out, sizeof(so)));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

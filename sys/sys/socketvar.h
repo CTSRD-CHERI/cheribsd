@@ -527,3 +527,11 @@ void	sbtoxsockbuf(struct sockbuf *sb, struct xsockbuf *xsb);
 #define	SBS_RCVATMARK		0x0040	/* at mark on input */
 
 #endif /* !_SYS_SOCKETVAR_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

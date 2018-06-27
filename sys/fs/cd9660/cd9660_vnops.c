@@ -917,3 +917,12 @@ struct vop_vector cd9660_fifoops = {
 	.vop_setattr =		cd9660_setattr,
 	.vop_vptofh =		cd9660_vptofh,
 };
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

@@ -369,3 +369,12 @@ static moduledata_t edsc_mod = {
 };
 
 DECLARE_MODULE(if_edsc, edsc_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

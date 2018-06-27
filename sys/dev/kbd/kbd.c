@@ -1494,3 +1494,12 @@ genkbd_keyaction(keyboard_t *kbd, int keycode, int up, int *shiftstate,
 	}
 	/* NOT REACHED */
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:misc",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

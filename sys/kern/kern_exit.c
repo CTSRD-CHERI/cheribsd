@@ -1351,3 +1351,11 @@ proc_reparent(struct proc *child, struct proc *parent)
 
 	child->p_pptr = parent;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

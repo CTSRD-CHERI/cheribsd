@@ -2497,3 +2497,11 @@ bnxt_get_wol_settings(struct bnxt_softc *softc)
 		wol_handle = bnxt_hwrm_get_wol_fltrs(softc, wol_handle);
 	} while (wol_handle && wol_handle != BNXT_NO_MORE_WOL_FILTERS);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

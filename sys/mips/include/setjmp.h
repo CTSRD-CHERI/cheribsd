@@ -82,3 +82,12 @@ typedef struct _jmp_buf { _JBTYPE _jb[_JBLEN + 1]; } jmp_buf[1];
 #endif /* _LOCORE */
 
 #endif /* _MACHINE_SETJMP_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

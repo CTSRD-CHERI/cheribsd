@@ -5430,3 +5430,11 @@ sppp_null(struct sppp *unused)
 {
 	/* do just nothing */
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

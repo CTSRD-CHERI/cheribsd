@@ -999,3 +999,12 @@ ipsec_delete_tunnel(struct ifnet *ifp, int locked)
 			key_freesp(&oldsp[i]);
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

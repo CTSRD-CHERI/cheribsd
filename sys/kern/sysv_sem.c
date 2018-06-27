@@ -2128,3 +2128,11 @@ freebsd32_semctl(struct thread *td, struct freebsd32_semctl_args *uap)
 }
 
 #endif /* COMPAT_FREEBSD32 */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

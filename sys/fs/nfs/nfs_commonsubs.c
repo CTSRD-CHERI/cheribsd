@@ -4247,3 +4247,12 @@ nfsv4_freeslot(struct nfsclsession *sep, int slot)
 	mtx_unlock(&sep->nfsess_mtx);
 }
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

@@ -884,3 +884,11 @@ sbuf_end_section(struct sbuf *s, ssize_t old_len, size_t pad, int c)
 		return (-1);
 	return (len);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

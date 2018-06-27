@@ -3823,3 +3823,12 @@ flashcard(struct ifnet *ifp, struct aironet_ioctl *l_ioctl)
 
 	return -EINVAL;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

@@ -377,3 +377,11 @@ __END_DECLS
 #endif /* !_KERNEL */
 
 #endif /* !_SYS_EVENT_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

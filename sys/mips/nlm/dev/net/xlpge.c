@@ -1541,3 +1541,11 @@ nlm_xlpge_msgring_handler(int vc, int size, int code, int src_id,
 		nlm_xlpge_submit_rx_free_desc(xlpge_sc, 1);
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

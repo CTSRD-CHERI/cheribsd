@@ -755,3 +755,11 @@ int    ether_poll_deregister(if_t ifp);
 #include <net/ifq.h>	/* XXXAO: temporary unconditional include */
 
 #endif /* !_NET_IF_VAR_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

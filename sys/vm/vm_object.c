@@ -2737,3 +2737,12 @@ DB_SHOW_COMMAND(vmopag, vm_object_print_pages)
 	}
 }
 #endif /* DDB */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

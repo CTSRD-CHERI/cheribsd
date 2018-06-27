@@ -2654,3 +2654,11 @@ vr_sysctl_stats(SYSCTL_HANDLER_ARGS)
 
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

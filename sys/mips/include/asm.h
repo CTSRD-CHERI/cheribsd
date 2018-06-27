@@ -823,3 +823,12 @@ _C_LABEL(x):
 #endif
 
 #endif /* !_MACHINE_ASM_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ]
+//   "change_comment": "jmpbuf, call frame, etc"
+// }
+// CHERI CHANGES END

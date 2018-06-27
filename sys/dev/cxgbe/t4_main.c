@@ -10288,3 +10288,12 @@ MODULE_VERSION(vcxl, 1);
 
 DRIVER_MODULE(vcc, cc, vcc_driver, vcc_devclass, 0, 0);
 MODULE_VERSION(vcc, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

@@ -399,3 +399,11 @@ static moduledata_t kgssapi_mod = {
 DECLARE_MODULE(kgssapi, kgssapi_mod, SI_SUB_VFS, SI_ORDER_ANY);
 MODULE_DEPEND(kgssapi, krpc, 1, 1, 1);
 MODULE_VERSION(kgssapi, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

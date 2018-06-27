@@ -1129,3 +1129,12 @@ pmclog_shutdown()
 		free(plb, M_PMC);
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

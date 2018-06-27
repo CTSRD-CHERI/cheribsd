@@ -2605,3 +2605,11 @@ sysctl_hw_stge_rxint_dmawait(SYSCTL_HANDLER_ARGS)
 	return (sysctl_int_range(oidp, arg1, arg2, req,
 	    STGE_RXINT_DMAWAIT_MIN, STGE_RXINT_DMAWAIT_MAX));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

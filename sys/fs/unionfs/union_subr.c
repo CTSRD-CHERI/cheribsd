@@ -1262,3 +1262,12 @@ unionfs_checklowervp(struct vnode *vp, char *fil, int lno)
 	return (unp->un_lowervp);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

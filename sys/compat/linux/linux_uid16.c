@@ -442,3 +442,11 @@ linux_setresuid16(struct thread *td, struct linux_setresuid16_args *args)
 	LIN_SDT_PROBE1(uid16, linux_setresuid16, return, error);
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

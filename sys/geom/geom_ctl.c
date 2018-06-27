@@ -515,3 +515,11 @@ g_ctl_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread
 	return (error);
 
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

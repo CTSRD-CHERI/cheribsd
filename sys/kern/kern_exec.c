@@ -1821,3 +1821,12 @@ exec_unregister(const struct execsw *execsw_arg)
 	execsw = newexecsw;
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "pointer_integrity",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

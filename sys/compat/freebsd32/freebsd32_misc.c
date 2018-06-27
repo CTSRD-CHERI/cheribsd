@@ -3566,3 +3566,16 @@ freebsd32_ppoll(struct thread *td, struct freebsd32_ppoll_args *uap)
 	return (kern_poll(td, __USER_CAP_ARRAY(uap->fds, uap->nfds), uap->nfds,
 	    tsp, ssp));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t",
+//     "kernel_sig_types",
+//     "pointer_integrity",
+//     "user_capabilities",
+//     "other"
+//   ]
+// }
+// CHERI CHANGES END

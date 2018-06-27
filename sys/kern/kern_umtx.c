@@ -5084,3 +5084,11 @@ umtx_thread_cleanup(struct thread *td)
 	if (rb_inact != 0)
 		(void)umtx_handle_rb(td, rb_inact, NULL, true);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

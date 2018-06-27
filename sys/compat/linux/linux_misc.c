@@ -2558,3 +2558,13 @@ linux_mincore(struct thread *td, struct linux_mincore_args *args)
 	return (kern_mincore(td, args->start, args->len,
 	    __USER_CAP(args->vec, args->len)));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

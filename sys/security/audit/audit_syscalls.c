@@ -975,3 +975,11 @@ sys_auditctl(struct thread *td, struct auditctl_args *uap)
 	return (ENOSYS);
 }
 #endif /* AUDIT */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

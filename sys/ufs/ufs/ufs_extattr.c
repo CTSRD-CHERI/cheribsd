@@ -1294,3 +1294,12 @@ ufs_extattr_vnode_inactive(struct vnode *vp, struct thread *td)
 }
 
 #endif /* !UFS_EXTATTR */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1116,3 +1116,12 @@ tapkqdetach(struct knote *kn)
 	knlist_remove(&tp->tap_rsel.si_note, kn, 0);
 } /* tapkqdetach */
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

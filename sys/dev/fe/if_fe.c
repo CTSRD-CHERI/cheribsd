@@ -2254,3 +2254,11 @@ fe_medstat (struct ifnet *ifp, struct ifmediareq *ifmr)
 
 	ifmr->ifm_active = sc->media.ifm_media;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

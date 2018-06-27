@@ -409,3 +409,12 @@ typedef	void * __capability	otype_t;
 #endif /* __BSD_VISIBLE */
 
 #endif /* !_SYS_TYPES_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

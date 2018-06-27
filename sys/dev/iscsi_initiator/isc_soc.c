@@ -687,3 +687,12 @@ isc_start_receiver(isc_session_t *sp)
 #endif
 	  (isc_in, sp, &sp->soc_proc, 0, 0, "isc_in %d", sp->sid);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

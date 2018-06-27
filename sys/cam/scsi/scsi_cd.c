@@ -3774,3 +3774,11 @@ scsi_read_dvd_structure(struct ccb_scsiio *csio, u_int32_t retries,
 		      sizeof(*scsi_cmd),
 		      timeout);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:misc"
+//   ]
+// }
+// CHERI CHANGES END

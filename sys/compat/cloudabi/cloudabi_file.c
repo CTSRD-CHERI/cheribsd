@@ -765,3 +765,13 @@ cloudabi_sys_file_unlink(struct thread *td,
 	cloudabi_freestr(path);
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

@@ -234,3 +234,12 @@ __END_DECLS
 #endif /* !_KERNEL */
 
 #endif	/* !_SYS_PTRACE_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "kernel_sig_types",
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

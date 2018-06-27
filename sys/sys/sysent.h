@@ -295,3 +295,12 @@ void exec_inittk(void);
 #endif /* _KERNEL */
 
 #endif /* !_SYS_SYSENT_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

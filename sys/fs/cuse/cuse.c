@@ -1891,3 +1891,12 @@ cuse_client_kqfilter(struct cdev *dev, struct knote *kn)
 		cuse_client_kqfilter_poll(dev, pcc);
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

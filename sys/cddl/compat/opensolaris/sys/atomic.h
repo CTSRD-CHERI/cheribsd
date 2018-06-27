@@ -147,3 +147,12 @@ atomic_cas_ptr(volatile void *target, void *cmp,  void *newval)
 #endif	/* !defined(COMPAT_32BIT) && defined(__LP64__) */
 
 #endif	/* !_OPENSOLARIS_SYS_ATOMIC_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": "Avoid (wrong) duplicate atomic functions"
+// }
+// CHERI CHANGES END

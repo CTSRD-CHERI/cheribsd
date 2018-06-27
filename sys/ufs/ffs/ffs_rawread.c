@@ -474,3 +474,11 @@ ffs_rawread(struct vnode *vp,
 	*workdone = 0;
 	return 0;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

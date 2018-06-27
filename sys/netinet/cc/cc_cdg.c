@@ -699,3 +699,11 @@ SYSCTL_UINT(_net_inet_tcp_cc_cdg, OID_AUTO, loss_compete_hold_backoff,
 DECLARE_CC_MODULE(cdg, &cdg_cc_algo);
 
 MODULE_DEPEND(cdg, ertt, 1, 1, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "pointer_integrity"
+//   ]
+// }
+// CHERI CHANGES END

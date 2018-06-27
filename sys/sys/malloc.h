@@ -232,3 +232,12 @@ WOULD_OVERFLOW(size_t nmemb, size_t size)
 #endif /* _KERNEL */
 
 #endif /* !_SYS_MALLOC_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

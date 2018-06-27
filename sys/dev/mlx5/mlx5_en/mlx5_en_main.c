@@ -3583,3 +3583,12 @@ MODULE_DEPEND(mlx5en, linuxkpi, 1, 1, 1);
 #endif
 MODULE_DEPEND(mlx5en, mlx5, 1, 1, 1);
 MODULE_VERSION(mlx5en, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

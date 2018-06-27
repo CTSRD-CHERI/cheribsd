@@ -665,3 +665,11 @@ acct_thread(void *dummy)
 	sx_xunlock(&acct_sx);
 	kproc_exit(0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

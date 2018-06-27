@@ -1748,3 +1748,11 @@ chipit:
 	    HME_MAC_RXCFG_ME)))
 		device_printf(sc->sc_dev, "cannot configure RX MAC\n");
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

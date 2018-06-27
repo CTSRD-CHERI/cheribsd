@@ -423,3 +423,12 @@ void	trapsignal(struct thread *td, ksiginfo_t *ksi);
 #endif /* _KERNEL */
 
 #endif /* !_SYS_SIGNALVAR_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "kernel_sig_types",
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

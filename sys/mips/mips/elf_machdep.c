@@ -598,3 +598,12 @@ elf_cpu_unload_file(linker_file_t lf __unused)
 
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": "shared page"
+// }
+// CHERI CHANGES END

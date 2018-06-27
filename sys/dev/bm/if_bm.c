@@ -1296,3 +1296,11 @@ bm_disable_interrupts(struct bm_softc *sc)
 {
 	CSR_WRITE_2(sc, BM_INTR_DISABLE, BM_INTR_NONE);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

@@ -359,3 +359,11 @@ __END_DECLS
 #endif
 
 #endif /* !_SYS_LINKER_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "pointer_size"
+//   ]
+// }
+// CHERI CHANGES END

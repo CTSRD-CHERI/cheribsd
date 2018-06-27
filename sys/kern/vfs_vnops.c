@@ -2502,3 +2502,13 @@ vn_fsid(struct vnode *vp, struct vattr *va)
 	va->va_fsid <<= sizeof(f->val[1]) * NBBY;
 	va->va_fsid += (uint32_t)f->val[0];
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

@@ -180,3 +180,11 @@ struct wtap_tx_radiotap_header {
 } __packed;
 
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

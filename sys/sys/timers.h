@@ -117,3 +117,11 @@ struct	kclock {
 int	itimer_accept(struct proc *p, int tid, ksiginfo_t *ksi);
 #endif
 #endif /* !_SYS_TIMERS_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "kernel_sig_types"
+//   ]
+// }
+// CHERI CHANGES END

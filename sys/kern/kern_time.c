@@ -1806,3 +1806,12 @@ itimers_event_hook_exit(void *arg, struct proc *p)
 		}
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "kernel_sig_types",
+//     "user_capabilities",
+//   ]
+// }
+// CHERI CHANGES END

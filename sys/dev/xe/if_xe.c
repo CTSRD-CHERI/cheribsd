@@ -2074,3 +2074,11 @@ xe_deactivate(device_t dev)
 		if_free(sc->ifp);
 	sc->ifp = NULL;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

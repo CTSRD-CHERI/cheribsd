@@ -1487,3 +1487,11 @@ qla_tx_done(void *context, int pending)
 	qla_start(ha->ifp);
 }
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

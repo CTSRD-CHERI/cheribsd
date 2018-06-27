@@ -1559,3 +1559,11 @@ static moduledata_t ipoib_mod = {
 DECLARE_MODULE(ipoib, ipoib_mod, SI_SUB_LAST, SI_ORDER_ANY);
 MODULE_DEPEND(ipoib, ibcore, 1, 1, 1);
 MODULE_DEPEND(ipoib, linuxkpi, 1, 1, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

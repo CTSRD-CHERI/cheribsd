@@ -402,3 +402,12 @@ smbfs_statfs(struct mount *mp, struct statfs *sbp)
 	smbfs_free_scred(scred);
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

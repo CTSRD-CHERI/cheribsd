@@ -3630,3 +3630,11 @@ mpssas_realloc_targets(struct mps_softc *sc, int maxtargets)
 		    __func__, ENOMEM);
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros"
+//   ]
+// }
+// CHERI CHANGES END

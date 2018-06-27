@@ -728,3 +728,11 @@ tunable_str_init(void *data)
 
 	TUNABLE_STR_FETCH(d->path, d->var, d->size);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

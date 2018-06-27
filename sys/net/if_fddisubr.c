@@ -664,3 +664,11 @@ static moduledata_t fddi_mod = {
 
 DECLARE_MODULE(fddi, fddi_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
 MODULE_VERSION(fddi, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

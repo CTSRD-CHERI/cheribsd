@@ -418,3 +418,12 @@ fo_aio_queue(struct file *fp, struct kaiocb *job)
 #endif /* _KERNEL */
 
 #endif /* !SYS_FILE_H */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

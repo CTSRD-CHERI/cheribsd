@@ -85,3 +85,11 @@ void cloudabi_vdso_init(struct sysentvec *, char *, char *);
 void cloudabi_vdso_destroy(struct sysentvec *);
 
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

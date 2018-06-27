@@ -3433,3 +3433,12 @@ MODULE_DEPEND(nfsd, nfslockd, 1, 1, 1);
 MODULE_DEPEND(nfsd, krpc, 1, 1, 1);
 MODULE_DEPEND(nfsd, nfssvc, 1, 1, 1);
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

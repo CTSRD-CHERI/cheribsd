@@ -2240,3 +2240,11 @@ dmu_objset_willuse_space(objset_t *os, int64_t space, dmu_tx_t *tx)
 		dsl_pool_dirty_space(dmu_tx_pool(tx), space, tx);
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "hashing"
+//   ]
+// }
+// CHERI CHANGES END

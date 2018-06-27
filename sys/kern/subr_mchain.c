@@ -552,3 +552,12 @@ md_get_uio(struct mdchain *mdp, struct uio *uiop, int size)
 	}
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

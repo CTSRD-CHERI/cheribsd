@@ -62,3 +62,11 @@
 #endif
 
 #endif	/* __MIPS_TLS_H__ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

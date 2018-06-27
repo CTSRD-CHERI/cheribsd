@@ -2232,3 +2232,13 @@ SYSUNINIT(linux_compat, SI_SUB_DRIVERS, SI_ORDER_SECOND, linux_compat_uninit, NU
  * LinuxKPI may not work like expected:
  */
 CTASSERT(sizeof(unsigned long) == sizeof(uintptr_t));
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

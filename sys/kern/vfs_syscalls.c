@@ -4754,3 +4754,13 @@ sys_posix_fadvise(struct thread *td, struct posix_fadvise_args *uap)
 	    uap->advice);
 	return (kern_posix_error(td, error));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

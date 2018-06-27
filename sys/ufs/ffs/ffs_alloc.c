@@ -3252,3 +3252,11 @@ out:
 	foffset_unlock_uio(fp, uio, flags | FOF_NEXTOFF);
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

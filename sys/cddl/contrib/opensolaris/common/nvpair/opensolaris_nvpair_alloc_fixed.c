@@ -116,3 +116,11 @@ const nv_alloc_ops_t nv_fixed_ops_def = {
 };
 
 const nv_alloc_ops_t *nv_fixed_ops = &nv_fixed_ops_def;
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END

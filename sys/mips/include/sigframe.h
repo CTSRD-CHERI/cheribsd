@@ -85,3 +85,11 @@ struct sigframe_c {
 #endif
 
 #endif /* !_MACHINE_SIGFRAME_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

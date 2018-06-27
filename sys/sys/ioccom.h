@@ -89,3 +89,11 @@ __END_DECLS
 #endif
 
 #endif /* !_SYS_IOCCOM_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:misc"
+//   ]
+// }
+// CHERI CHANGES END

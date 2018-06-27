@@ -185,3 +185,11 @@ int savectx(struct pcb *) __returns_twice;
 #endif
 
 #endif	/* !_MACHINE_PCB_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

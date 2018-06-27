@@ -2995,3 +2995,12 @@ oce_read_env_variables( POCE_SOFTC sc )
 
 	return;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

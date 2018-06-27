@@ -49,3 +49,12 @@ cloudabi_sys_random_get(struct thread *td,
 
 	return (read_random_uio(&uio, false));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1077,3 +1077,11 @@ vx_mbuf_empty(struct vx_softc *sc)
 	if (sc->vx_buffill_pending != 0)
 		callout_stop(&sc->vx_callout);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

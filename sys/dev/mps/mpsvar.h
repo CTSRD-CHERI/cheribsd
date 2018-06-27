@@ -828,3 +828,11 @@ SYSCTL_DECL(_hw_mps);
 
 #endif
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

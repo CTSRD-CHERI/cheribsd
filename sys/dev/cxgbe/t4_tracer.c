@@ -521,3 +521,11 @@ tracer_media_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 
 	return;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

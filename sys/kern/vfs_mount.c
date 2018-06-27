@@ -1995,3 +1995,13 @@ vfs_oexport_conv(const struct oexport_args *oexp, struct export_args *exp)
 	bcopy(oexp, exp, sizeof(*oexp));
 	exp->ex_numsecflavors = 0;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1554,3 +1554,12 @@ vnode_pager_release_writecount(vm_object_t object, vm_offset_t start,
 	if (mp != NULL)
 		vn_finished_write(mp);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

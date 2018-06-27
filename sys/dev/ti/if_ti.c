@@ -4058,3 +4058,11 @@ ti_sysctl_node(struct ti_softc *sc)
 	    device_get_unit(sc->ti_dev), "stat_ticks",
 	    &sc->ti_stat_ticks);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

@@ -3740,3 +3740,11 @@ rsu_ms_delay(struct rsu_softc *sc, int ms)
 	//usb_pause_mtx(&sc->sc_mtx, hz / 1000);
 	DELAY(ms * 1000);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

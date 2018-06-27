@@ -3002,3 +3002,11 @@ cfiscsi_done(union ctl_io *io)
 
 	refcount_release(&cs->cs_outstanding_ctl_pdus);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

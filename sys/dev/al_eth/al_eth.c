@@ -3579,3 +3579,11 @@ al_miibus_linkchg(device_t dev)
 	device_printf(adapter->dev, "ERROR: unknown MII media active 0x%08x\n",
 	    adapter->mii->mii_media_active);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

@@ -829,3 +829,11 @@ static moduledata_t arc_mod = {
 
 DECLARE_MODULE(arcnet, arc_mod, SI_SUB_INIT_IF, SI_ORDER_ANY);
 MODULE_VERSION(arcnet, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

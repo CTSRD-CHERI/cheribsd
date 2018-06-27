@@ -257,3 +257,12 @@ getcopy(kiovec_t *iov, int n)
 
 	return (tiov);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

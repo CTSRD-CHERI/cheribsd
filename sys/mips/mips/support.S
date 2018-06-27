@@ -1336,3 +1336,12 @@ LEAF(cheri_trace_log)
 	.set pop
 END(cheri_trace_log)
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities",
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

@@ -3541,3 +3541,12 @@ static driver_t xge_driver = {
 static devclass_t xge_devclass;
 DRIVER_MODULE(nxge, pci, xge_driver, xge_devclass, 0, 0);
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

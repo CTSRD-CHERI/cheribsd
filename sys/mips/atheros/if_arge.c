@@ -2737,3 +2737,11 @@ argemdio_detach(device_t dev)
 }
 
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

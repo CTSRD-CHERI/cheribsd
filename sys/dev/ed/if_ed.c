@@ -1855,3 +1855,11 @@ ed_gen_ifmedia_init(struct ed_softc *sc)
 	ifmedia_add(&sc->ifmedia, IFM_ETHER | IFM_AUTO, 0, 0);
 	ifmedia_set(&sc->ifmedia, IFM_ETHER | IFM_AUTO);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

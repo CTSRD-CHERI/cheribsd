@@ -135,3 +135,14 @@ membar_producer(void)
 {
 	/* nothing */
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support",
+//     "other"
+//   ],
+//   "change_comment": "Avoid overloading, don't redefine atomic_add_64",
+//   "hybrid_specific": false
+// }
+// CHERI CHANGES END

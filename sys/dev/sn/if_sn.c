@@ -1436,3 +1436,11 @@ sn_getmcf(struct ifnet *ifp, uint8_t *mcf)
 	if_maddr_runlock(ifp);
 	return 1;  /* use multicast filter */
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

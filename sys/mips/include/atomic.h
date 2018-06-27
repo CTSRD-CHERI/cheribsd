@@ -1065,3 +1065,11 @@ atomic_thread_fence_seq_cst(void)
 #endif
 
 #endif /* ! _MACHINE_ATOMIC_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

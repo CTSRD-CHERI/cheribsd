@@ -693,3 +693,12 @@ struct smb_tran_desc smb_tran_nbtcp_desc = {
 	smb_nbst_fatal
 };
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

@@ -74,3 +74,11 @@ typedef struct mbuf *		mbuf_t;
 #define	uio_iov_len_add(p, v)	((p)->uio_iov->iov_len += (v))
 
 #endif	/* _NFS_NFSKPIPORT_H */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros"
+//   ]
+// }
+// CHERI CHANGES END

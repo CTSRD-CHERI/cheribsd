@@ -719,3 +719,11 @@ linux_syncfs(struct thread *td, struct linux_syncfs_args *args)
 	vrele(vp);
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

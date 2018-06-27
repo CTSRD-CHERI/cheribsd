@@ -217,3 +217,12 @@
 #define	pgtok(x)		((x) * (PAGE_SIZE / 1024))
 
 #endif /* !_MIPS_INCLUDE_PARAM_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": "sysv shm"
+// }
+// CHERI CHANGES END

@@ -1123,3 +1123,11 @@ fork_return(struct thread *td, struct trapframe *frame)
 		ktrsysret(SYS_fork, 0, 0);
 #endif
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

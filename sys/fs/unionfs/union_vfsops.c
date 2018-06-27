@@ -506,3 +506,11 @@ static struct vfsops unionfs_vfsops = {
 };
 
 VFS_SET(unionfs_vfsops, unionfs, VFCF_LOOPBACK);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

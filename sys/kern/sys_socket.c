@@ -820,3 +820,12 @@ soo_aio_queue(struct file *fp, struct kaiocb *job)
 	SOCKBUF_UNLOCK(sb);
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

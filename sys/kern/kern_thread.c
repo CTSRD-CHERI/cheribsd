@@ -1262,3 +1262,11 @@ tidhash_remove(struct thread *td)
 	LIST_REMOVE(td, td_hash);
 	rw_wunlock(&tidhash_lock);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "pointer_integrity"
+//   ]
+// }
+// CHERI CHANGES END

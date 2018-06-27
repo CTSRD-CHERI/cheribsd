@@ -2987,3 +2987,11 @@ cpsw_writephy(device_t dev, int phy, int reg, int data)
 	return (0);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

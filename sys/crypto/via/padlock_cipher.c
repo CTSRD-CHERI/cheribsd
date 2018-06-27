@@ -277,3 +277,11 @@ padlock_cipher_process(struct padlock_session *ses, struct cryptodesc *enccrd,
 	}
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

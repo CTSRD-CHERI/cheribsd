@@ -514,3 +514,11 @@ int	vn_setlabel(struct vnode *vp, struct label *intlabel,
 } while (0)
 
 #endif /* !_SECURITY_MAC_MAC_INTERNAL_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

@@ -473,3 +473,12 @@ filemon_wrapper_deinstall(void)
 	EVENTHANDLER_DEREGISTER(process_exit, filemon_exit_tag);
 	EVENTHANDLER_DEREGISTER(process_fork, filemon_fork_tag);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

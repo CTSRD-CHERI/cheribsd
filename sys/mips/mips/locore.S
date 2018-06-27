@@ -244,3 +244,12 @@ VECTOR(_locore, unknown)
 	PANIC("Startup failed!")
 
 VECTOR_END(_locore)
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

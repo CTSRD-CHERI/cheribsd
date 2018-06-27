@@ -3572,3 +3572,11 @@ cxgbc_mod_event(module_t mod, int cmd, void *arg)
 
 	return (rc);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

@@ -777,3 +777,11 @@ pdq_os_databuf_alloc(
     return m;
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

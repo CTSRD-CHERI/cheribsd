@@ -1295,3 +1295,12 @@ getconfexit:
 
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:misc",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

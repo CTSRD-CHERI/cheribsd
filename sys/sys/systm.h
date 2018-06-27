@@ -627,3 +627,11 @@ void counted_warning(unsigned *counter, const char *msg);
 __NULLABILITY_PRAGMA_POP
 
 #endif /* !_SYS_SYSTM_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

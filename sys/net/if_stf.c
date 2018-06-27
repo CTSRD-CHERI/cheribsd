@@ -765,3 +765,12 @@ stf_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	return error;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

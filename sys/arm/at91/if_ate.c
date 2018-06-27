@@ -1530,3 +1530,11 @@ DRIVER_MODULE(ate, atmelarm, ate_driver, ate_devclass, NULL, NULL);
 DRIVER_MODULE(miibus, ate, miibus_driver, miibus_devclass, NULL, NULL);
 MODULE_DEPEND(ate, miibus, 1, 1, 1);
 MODULE_DEPEND(ate, ether, 1, 1, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

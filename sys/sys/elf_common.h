@@ -1351,3 +1351,11 @@ typedef struct {
 
 
 #endif /* !_SYS_ELF_COMMON_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

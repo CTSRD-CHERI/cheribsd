@@ -649,3 +649,11 @@ uether_rxflush(struct usb_ether *ue)
  */
 DECLARE_MODULE(uether, uether_mod, SI_SUB_DRIVERS, SI_ORDER_ANY);
 MODULE_VERSION(uether, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

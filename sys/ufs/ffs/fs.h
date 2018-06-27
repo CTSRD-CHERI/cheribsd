@@ -829,3 +829,12 @@ extern u_char *fragtbl[];
 #define	UFSRESUME	_IO('U', 2)
 
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "pointer_size"
+//   ],
+//   "change_comment": "embedded pointer storage in superblock"
+// }
+// CHERI CHANGES END

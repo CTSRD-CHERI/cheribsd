@@ -605,3 +605,12 @@ int	vntype_to_kinfo(int vtype);
 #endif /* !_KERNEL */
 
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

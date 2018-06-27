@@ -4200,3 +4200,11 @@ so_unlock(struct socket *so)
 
 	SOCK_UNLOCK(so);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

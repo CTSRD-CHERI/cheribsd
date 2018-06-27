@@ -735,3 +735,11 @@ ifc_simple_destroy(struct if_clone *ifc, struct ifnet *ifp)
 
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

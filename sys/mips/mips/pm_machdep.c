@@ -702,3 +702,14 @@ ptrace_clear_single_step(struct thread *td)
 	td->td_md.md_ss_addr = 0;
 	return 0;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "kernel_sig_types",
+//     "support",
+//     "user_capabilities"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

@@ -1034,3 +1034,12 @@ tunkqdetach(struct knote *kn)
 
 	knlist_remove(&tp->tun_rsel.si_note, kn, 0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

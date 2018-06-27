@@ -2387,3 +2387,12 @@ fuse_vnop_print(struct vop_print_args *ap)
 
 	return 0;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

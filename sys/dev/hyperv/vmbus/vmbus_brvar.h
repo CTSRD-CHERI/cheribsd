@@ -128,3 +128,11 @@ int		vmbus_txbr_write(struct vmbus_txbr *tbr,
 		    const kiovec_t iov[], int iovlen, boolean_t *need_sig);
 
 #endif  /* _VMBUS_BRVAR_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

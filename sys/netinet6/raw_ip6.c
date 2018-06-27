@@ -899,3 +899,11 @@ struct pr_usrreqs rip6_usrreqs = {
 	.pru_sockaddr =		in6_getsockaddr,
 	.pru_close =		rip6_close,
 };
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

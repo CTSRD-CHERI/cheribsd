@@ -559,3 +559,11 @@ static devclass_t beri_vtblk_devclass;
 
 DRIVER_MODULE(beri_vtblk, simplebus, beri_vtblk_driver,
     beri_vtblk_devclass, 0, 0);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1930,3 +1930,11 @@ uhso_if_stop(struct uhso_softc *sc)
 	usbd_transfer_stop(sc->sc_if_xfer[UHSO_IFNET_WRITE]);
 	sc->sc_ifp->if_drv_flags &= ~(IFF_DRV_RUNNING | IFF_DRV_OACTIVE);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

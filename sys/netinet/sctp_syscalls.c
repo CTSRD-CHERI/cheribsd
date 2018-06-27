@@ -712,3 +712,13 @@ out1:
 	return (EOPNOTSUPP);
 #endif /* SCTP */
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

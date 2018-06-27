@@ -2303,3 +2303,12 @@ passerror(union ccb *ccb, u_int32_t cam_flags, u_int32_t sense_flags)
 	
 	return(cam_periph_error(ccb, cam_flags, sense_flags));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:misc",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

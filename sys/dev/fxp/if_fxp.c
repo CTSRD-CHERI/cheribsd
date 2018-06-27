@@ -3260,3 +3260,11 @@ sysctl_hw_fxp_bundle_max(SYSCTL_HANDLER_ARGS)
 
 	return (sysctl_int_range(oidp, arg1, arg2, req, 1, 0xffff));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

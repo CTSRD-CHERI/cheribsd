@@ -3840,3 +3840,11 @@ sysctl_hw_sk_int_mod(SYSCTL_HANDLER_ARGS)
 {
 	return (sysctl_int_range(oidp, arg1, arg2, req, SK_IM_MIN, SK_IM_MAX));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

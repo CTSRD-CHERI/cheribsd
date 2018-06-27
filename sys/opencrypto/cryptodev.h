@@ -545,3 +545,11 @@ extern	int crypto_apply(int flags, caddr_t buf, int off, int len,
 
 #endif /* _KERNEL */
 #endif /* _CRYPTO_CRYPTO_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

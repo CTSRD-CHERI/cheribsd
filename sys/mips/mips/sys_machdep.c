@@ -129,3 +129,12 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 	}
 	return (EINVAL);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

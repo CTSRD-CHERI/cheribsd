@@ -933,3 +933,12 @@ linux_shmctl(struct thread *td, struct linux_shmctl_args *args)
 MODULE_DEPEND(linux, sysvmsg, 1, 1, 1);
 MODULE_DEPEND(linux, sysvsem, 1, 1, 1);
 MODULE_DEPEND(linux, sysvshm, 1, 1, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "pointer_integrity",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

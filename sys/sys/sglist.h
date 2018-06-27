@@ -111,3 +111,11 @@ int	sglist_split(struct sglist *original, struct sglist **head,
 	    size_t length, int mflags);
 
 #endif	/* !__SGLIST_H__ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

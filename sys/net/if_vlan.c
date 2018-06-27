@@ -2056,3 +2056,12 @@ vlan_snd_tag_alloc(struct ifnet *ifp,
 	return (ifp->if_snd_tag_alloc(ifp, params, ppmt));
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

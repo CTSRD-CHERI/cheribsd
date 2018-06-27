@@ -817,3 +817,11 @@ lance_zerobuf_gap16(struct lance_softc *sc, int boff, int len)
 	}
 }
 #endif /* Example only */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

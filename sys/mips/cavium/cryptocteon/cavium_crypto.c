@@ -2136,3 +2136,11 @@ octo_aes_cbc_sha1_decrypt(
 }
 
 /****************************************************************************/
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

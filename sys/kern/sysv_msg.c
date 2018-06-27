@@ -2052,3 +2052,11 @@ freebsd7_msgctl(struct thread *td, struct freebsd7_msgctl_args *uap)
 
 #endif	/* COMPAT_FREEBSD4 || COMPAT_FREEBSD5 || COMPAT_FREEBSD6 ||
 	   COMPAT_FREEBSD7 */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

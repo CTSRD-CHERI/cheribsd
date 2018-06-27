@@ -1261,3 +1261,11 @@ ure_init_fifo(struct ure_softc *sc)
 	ure_write_4(sc, URE_PLA_TXFIFO_CTRL, URE_MCU_TYPE_PLA,
 	    URE_TXFIFO_THR_NORMAL);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

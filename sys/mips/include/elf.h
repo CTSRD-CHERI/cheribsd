@@ -278,3 +278,11 @@ __ElfType(Auxinfo);
 #define	EF_MIPS_MACH		0x00FF0000	/* Machine */
 
 #endif /* __MIPS_ELF_H */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

@@ -579,3 +579,11 @@ procdesc_fill_kinfo(struct file *fp, struct kinfo_file *kif,
 	kif->kf_un.kf_proc.kf_pid = pdp->pd_pid;
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

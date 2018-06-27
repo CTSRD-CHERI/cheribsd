@@ -1004,3 +1004,12 @@ ctl_ha_msg_destroy(struct ctl_softc *ctl_softc)
 	mtx_destroy(&softc->ha_lock);
 	return (CTL_HA_STATUS_SUCCESS);
 };
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

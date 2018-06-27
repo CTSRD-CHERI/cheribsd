@@ -177,3 +177,11 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 		kva_free(ova, PAGE_SIZE * colors);
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

@@ -2043,3 +2043,12 @@ void nfscl_retopts(struct nfsmount *nmp, char *buffer, size_t buflen)
 	nfscl_printoptval(nmp, nmp->nm_retry, ",retrans", &buf, &blen);
 }
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

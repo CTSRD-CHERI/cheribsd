@@ -343,3 +343,12 @@ struct vnode *vm_object_vnode(vm_object_t object);
 #endif				/* _KERNEL */
 
 #endif				/* _VM_OBJECT_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

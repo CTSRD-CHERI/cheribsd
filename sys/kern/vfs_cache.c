@@ -2529,3 +2529,11 @@ out:
 	free(fbuf, M_TEMP);
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

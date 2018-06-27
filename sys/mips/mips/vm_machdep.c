@@ -744,3 +744,12 @@ DB_SHOW_COMMAND(trapframe, ddb_dump_trapframe)
 }
 
 #endif	/* DDB */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

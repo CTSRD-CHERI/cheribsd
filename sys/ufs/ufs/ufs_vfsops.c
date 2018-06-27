@@ -240,3 +240,11 @@ ufs_fhtovp(mp, ufhp, flags, vpp)
 	vnode_create_vobject(*vpp, DIP(ip, i_size), curthread);
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

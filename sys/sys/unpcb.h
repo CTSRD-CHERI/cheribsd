@@ -165,3 +165,11 @@ struct xunpgen {
 #endif /* _SYS_SOCKETVAR_H_ */
 
 #endif /* _SYS_UNPCB_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "pointer_integrity"
+//   ]
+// }
+// CHERI CHANGES END

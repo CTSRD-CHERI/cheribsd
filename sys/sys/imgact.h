@@ -121,3 +121,12 @@ void	post_execve(struct thread *td, int error, struct vmspace *oldvmspace);
 #endif
 
 #endif /* !_SYS_IMGACT_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

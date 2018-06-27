@@ -2197,3 +2197,11 @@ sbuf_new_for_sysctl(struct sbuf *s, char *buf, int length,
 	sbuf_set_drain(s, sbuf_sysctl_drain, req);
 	return (s);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

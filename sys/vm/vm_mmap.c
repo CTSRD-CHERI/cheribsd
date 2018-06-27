@@ -1810,3 +1810,13 @@ vm_mmap_to_errno(int rv)
 		return (EINVAL);
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support",
+//     "user_capabilities"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

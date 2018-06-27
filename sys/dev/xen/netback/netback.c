@@ -2515,3 +2515,11 @@ DRIVER_MODULE(xnb, xenbusb_back, xnb_driver, xnb_devclass, 0, 0);
 #ifdef XNB_DEBUG
 #include "netback_unit_tests.c"
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

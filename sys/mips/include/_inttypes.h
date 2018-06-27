@@ -226,3 +226,11 @@
 #define	SCNxPTR		__PRIptr"x"	/* uintptr_t */
 
 #endif /* !_MACHINE_INTTYPES_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

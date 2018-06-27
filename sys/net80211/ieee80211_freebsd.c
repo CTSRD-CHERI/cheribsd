@@ -1013,3 +1013,11 @@ MODULE_DEPEND(wlan, ether, 1, 1, 1);
 MODULE_DEPEND(wlan, alq, 1, 1, 1);
 #endif	/* IEEE80211_ALQ */
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

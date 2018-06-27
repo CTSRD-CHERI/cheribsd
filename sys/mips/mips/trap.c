@@ -2037,3 +2037,12 @@ emulate_unaligned_access(struct trapframe *frame, int mode)
 	}
 	return access_type;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

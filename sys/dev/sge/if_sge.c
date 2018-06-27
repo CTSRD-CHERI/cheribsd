@@ -1903,3 +1903,11 @@ sge_stop(struct sge_softc *sc)
 	sge_list_rx_free(sc);
 	sge_list_tx_free(sc);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

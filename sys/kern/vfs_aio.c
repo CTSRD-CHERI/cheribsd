@@ -3416,3 +3416,14 @@ cheriabi_lio_listio(struct thread *td, struct cheriabi_lio_listio_args *uap)
 	return (error);
 }
 #endif /* COMPAT_CHERIABI */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kernel_sig_types",
+//     "kiovec_t",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

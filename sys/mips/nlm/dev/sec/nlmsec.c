@@ -850,3 +850,11 @@ errout:
 	crypto_done(crp);
 	return (err);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

@@ -4587,3 +4587,11 @@ DB_SHOW_COMMAND(procvm, procvm)
 }
 
 #endif /* DDB */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "platform"
+//   ]
+// }
+// CHERI CHANGES END

@@ -404,3 +404,12 @@ int vm_map_wire(vm_map_t map, vm_offset_t start, vm_offset_t end,
 long vmspace_swap_count(struct vmspace *vmspace);
 #endif				/* _KERNEL */
 #endif				/* _VM_MAP_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

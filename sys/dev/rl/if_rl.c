@@ -2122,3 +2122,11 @@ rl_clrwol(struct rl_softc *sc)
 	v &= ~RL_CFG5_WOL_LANWAKE;
 	CSR_WRITE_1(sc, sc->rl_cfg5, v);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

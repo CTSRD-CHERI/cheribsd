@@ -2331,3 +2331,12 @@ dmu_fini(void)
 	zfs_dbgmsg_fini();
 	abd_fini();
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

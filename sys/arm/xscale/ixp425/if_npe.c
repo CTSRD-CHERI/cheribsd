@@ -1780,3 +1780,11 @@ DRIVER_MODULE(miibus, npe, miibus_driver, miibus_devclass, 0, 0);
 MODULE_DEPEND(npe, ixpqmgr, 1, 1, 1);
 MODULE_DEPEND(npe, miibus, 1, 1, 1);
 MODULE_DEPEND(npe, ether, 1, 1, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

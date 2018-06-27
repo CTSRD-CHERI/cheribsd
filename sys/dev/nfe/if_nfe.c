@@ -3412,3 +3412,11 @@ nfe_set_wol(struct nfe_softc *sc)
 		pmstat |= PCIM_PSTAT_PME | PCIM_PSTAT_PMEENABLE;
 	pci_write_config(sc->nfe_dev, pmc + PCIR_POWER_STATUS, pmstat, 2);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

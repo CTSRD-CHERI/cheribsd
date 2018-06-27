@@ -854,3 +854,11 @@ static driver_t lp_driver = {
 
 DRIVER_MODULE(plip, ppbus, lp_driver, lp_devclass, lp_module_handler, 0);
 MODULE_DEPEND(plip, ppbus, 1, 1, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

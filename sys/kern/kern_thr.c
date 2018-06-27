@@ -619,3 +619,11 @@ kern_thr_alloc(struct proc *p, int pages, struct thread **ntd)
 
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

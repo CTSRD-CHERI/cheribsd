@@ -102,3 +102,11 @@ uma_small_free(void *mem, vm_size_t size, u_int8_t flags)
 	vm_page_free(m);
 	atomic_subtract_int(&vm_cnt.v_wire_count, 1);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "platform"
+//   ]
+// }
+// CHERI CHANGES END

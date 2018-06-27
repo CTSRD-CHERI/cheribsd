@@ -2018,3 +2018,11 @@ static struct vop_vector devfs_specops = {
  */
 CTASSERT(O_NONBLOCK == IO_NDELAY);
 CTASSERT(O_FSYNC == IO_SYNC);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:misc"
+//   ]
+// }
+// CHERI CHANGES END

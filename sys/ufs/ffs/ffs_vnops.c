@@ -1722,3 +1722,12 @@ ffs_getpages(struct vop_getpages_args *ap)
 	return (vfs_bio_getpages(vp, ap->a_m, ap->a_count, ap->a_rbehind,
 	    ap->a_rahead, ffs_gbp_getblkno, ffs_gbp_getblksz));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

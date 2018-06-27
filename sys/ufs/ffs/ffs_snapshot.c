@@ -2701,3 +2701,12 @@ ffs_snapdata_acquire(struct vnode *devvp)
 }
 
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

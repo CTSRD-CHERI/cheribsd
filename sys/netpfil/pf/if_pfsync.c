@@ -2434,3 +2434,12 @@ static moduledata_t pfsync_mod = {
 DECLARE_MODULE(pfsync, pfsync_mod, SI_SUB_PROTO_FIREWALL, SI_ORDER_ANY);
 MODULE_VERSION(pfsync, PFSYNC_MODVER);
 MODULE_DEPEND(pfsync, pf, PF_MODVER, PF_MODVER, PF_MODVER);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

@@ -2357,3 +2357,11 @@ DB_SHOW_COMMAND(tcpcb, db_show_tcpcb)
 	db_print_tcpcb(tp, "tcpcb", 0);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

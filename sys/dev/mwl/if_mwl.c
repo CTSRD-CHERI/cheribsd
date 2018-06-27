@@ -4840,3 +4840,12 @@ mwl_announce(struct mwl_softc *sc)
 		device_printf(sc->sc_dev, "no tx drop\n");
 #endif
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

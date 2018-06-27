@@ -5599,3 +5599,11 @@ __mnt_vnode_markerfree_active(struct vnode **mvp, struct mount *mp)
 	mtx_unlock(&mp->mnt_listmtx);
 	mnt_vnode_markerfree_active(mvp, mp);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "sysctl"
+//   ]
+// }
+// CHERI CHANGES END

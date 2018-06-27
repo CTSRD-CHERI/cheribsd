@@ -125,3 +125,11 @@ void vm_thread_dispose(struct thread *td);
 int vm_thread_new(struct thread *td, int pages);
 #endif				/* _KERNEL */
 #endif				/* !_VM_EXTERN_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

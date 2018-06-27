@@ -456,3 +456,11 @@ struct ath_tx_radiotap_header {
 #define	SIOCGATHBTCOEX		_IOWR('i', 152, struct ath_diag)
 
 #endif /* _DEV_ATH_ATHIOCTL_H */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

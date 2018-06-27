@@ -914,3 +914,11 @@ struct unmap_parm_list {
 
 #endif
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

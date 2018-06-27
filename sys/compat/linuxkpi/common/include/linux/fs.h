@@ -309,3 +309,11 @@ void linux_shmem_truncate_range(vm_object_t, loff_t, loff_t);
   linux_shmem_truncate_range(__VA_ARGS__)
 
 #endif /* _LINUX_FS_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

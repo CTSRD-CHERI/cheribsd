@@ -250,3 +250,12 @@ linux_fixup_prot(struct thread *td, int *prot)
 
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": "PROT_MAX"
+// }
+// CHERI CHANGES END

@@ -753,3 +753,12 @@ kick_proc0(void)
 
 	wakeup(&proc0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

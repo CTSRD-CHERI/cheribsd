@@ -72,3 +72,11 @@ int	so_setsockopt(struct socket *so, int level, int optname,
 	    void *optval, size_t optlen);
 
 #endif /* _SYS_SOCKOPT_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

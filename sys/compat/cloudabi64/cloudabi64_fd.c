@@ -142,3 +142,12 @@ cloudabi64_sys_fd_write(struct thread *td,
 	free(uio, M_IOV);
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

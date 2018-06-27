@@ -560,3 +560,11 @@ ibcs2_shmsys(td, uap)
 MODULE_DEPEND(ibcs2, sysvmsg, 1, 1, 1);
 MODULE_DEPEND(ibcs2, sysvsem, 1, 1, 1);
 MODULE_DEPEND(ibcs2, sysvshm, 1, 1, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "pointer_integrity"
+//   ]
+// }
+// CHERI CHANGES END

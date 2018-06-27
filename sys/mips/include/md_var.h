@@ -89,3 +89,12 @@ void	dump_drop_page(vm_paddr_t);
 int	minidumpsys(struct dumperinfo *);
 
 #endif /* !_MACHINE_MD_VAR_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": "sigcode"
+// }
+// CHERI CHANGES END

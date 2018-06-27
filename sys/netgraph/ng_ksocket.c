@@ -1274,3 +1274,11 @@ ng_ksocket_parse(const struct ng_ksocket_alias *aliases,
 	return (val);
 }
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

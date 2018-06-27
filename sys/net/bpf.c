@@ -3068,3 +3068,11 @@ DB_SHOW_COMMAND(bpf_if, db_show_bpf_if)
 	bpf_show_bpf_if((struct bpf_if *)addr);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:misc"
+//   ]
+// }
+// CHERI CHANGES END

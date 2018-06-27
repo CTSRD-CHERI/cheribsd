@@ -2244,3 +2244,13 @@ g_md_fini(struct g_class *mp __unused)
 		destroy_dev(status_dev);
 	delete_unrhdr(md_uh);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:misc",
+//     "iovec-macros",
+//     "kiovec_t",
+//   ]
+// }
+// CHERI CHANGES END

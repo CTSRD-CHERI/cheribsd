@@ -1045,3 +1045,11 @@ freebsd4_sendfile(struct thread *td, struct freebsd4_sendfile_args *uap)
 	return (sendfile(td, &args, 1));
 }
 #endif /* COMPAT_FREEBSD4 */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

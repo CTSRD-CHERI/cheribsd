@@ -511,3 +511,12 @@ ksyms_modevent(module_t mod __unused, int type, void *data __unused)
 
 DEV_MODULE(ksyms, ksyms_modevent, NULL);
 MODULE_VERSION(ksyms, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

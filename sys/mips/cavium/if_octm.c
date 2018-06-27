@@ -539,3 +539,11 @@ octm_rx_intr(void *arg)
 	cvmx_write_csr(CVMX_MIXX_ISR(sc->sc_port), mixx_isr.u64);
 	cvmx_read_csr(CVMX_MIXX_ISR(sc->sc_port));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

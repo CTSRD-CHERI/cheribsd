@@ -182,3 +182,12 @@ cloudabi_sock_send(struct thread *td, cloudabi_fd_t fd, kiovec_t *data,
 	td->td_retval[0] = 0;
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

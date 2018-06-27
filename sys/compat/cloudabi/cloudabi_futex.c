@@ -1163,3 +1163,11 @@ cloudabi_sys_lock_unlock(struct thread *td,
 	futex_lock_release(fl);
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1075,3 +1075,11 @@ ex_eeprom_read(struct ex_softc *sc, int location)
 	CSR_WRITE_1(sc, CMD_REG, Bank0_Sel);
 	return(data);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

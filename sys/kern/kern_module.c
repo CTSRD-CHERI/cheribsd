@@ -533,3 +533,11 @@ freebsd32_modstat(struct thread *td, struct freebsd32_modstat_args *uap)
 	return (error);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

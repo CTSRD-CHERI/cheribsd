@@ -2171,3 +2171,11 @@ qla_stats(void *context, int pending)
 	return;
 }
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

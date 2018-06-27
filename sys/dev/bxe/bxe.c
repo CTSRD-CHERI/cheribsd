@@ -19159,3 +19159,11 @@ bxe_eioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 
     return (rval);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

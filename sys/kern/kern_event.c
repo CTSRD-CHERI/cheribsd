@@ -2679,3 +2679,12 @@ noacquire:
 	fdrop(fp, td);
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "pointer_integrity",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

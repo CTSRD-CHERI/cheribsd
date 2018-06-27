@@ -2255,3 +2255,11 @@ ae_update_stats_rx(uint16_t flags, ae_stats_t *stats)
 	if ((flags & AE_RXD_ALIGN) != 0)
 		stats->rx_align++;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

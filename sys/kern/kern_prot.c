@@ -2291,3 +2291,11 @@ change_svgid(struct ucred *newcred, gid_t svgid)
 
 	newcred->cr_svgid = svgid;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

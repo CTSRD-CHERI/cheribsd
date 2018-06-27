@@ -549,3 +549,11 @@ out:
 		stopprofclock(p);
 	PROC_UNLOCK(p);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

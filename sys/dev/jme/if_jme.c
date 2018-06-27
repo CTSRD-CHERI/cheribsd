@@ -3456,3 +3456,11 @@ sysctl_hw_jme_proc_limit(SYSCTL_HANDLER_ARGS)
 	return (sysctl_int_range(oidp, arg1, arg2, req,
 	    JME_PROC_MIN, JME_PROC_MAX));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

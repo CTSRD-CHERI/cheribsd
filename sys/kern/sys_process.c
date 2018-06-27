@@ -1544,3 +1544,13 @@ stopevent(struct proc *p, unsigned int event, unsigned int val)
 		msleep(&p->p_step, &p->p_mtx, PWAIT, "stopevent", 0);
 	} while (p->p_step);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t",
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

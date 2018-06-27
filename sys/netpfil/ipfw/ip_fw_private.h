@@ -787,3 +787,12 @@ cksum_adjust(uint16_t oldsum, uint16_t old, uint16_t new)
 
 #endif /* _KERNEL */
 #endif /* _IPFW2_PRIVATE_H */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

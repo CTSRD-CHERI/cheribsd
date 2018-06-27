@@ -90,3 +90,11 @@ linux_getcwd(struct thread *td, struct linux_getcwd_args *args)
 	free(path, M_LINUX);
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

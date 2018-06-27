@@ -434,3 +434,11 @@ error:
 DRIVER_MODULE(ic, iicbus, ic_driver, ic_devclass, 0, 0);
 MODULE_DEPEND(ic, iicbus, IICBUS_MINVER, IICBUS_PREFVER, IICBUS_MAXVER);
 MODULE_VERSION(ic, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

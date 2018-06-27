@@ -11611,3 +11611,11 @@ bce_breakpoint(struct bce_softc *sc)
 	breakpoint();
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

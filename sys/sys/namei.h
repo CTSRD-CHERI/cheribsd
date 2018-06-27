@@ -223,3 +223,11 @@ struct nchstats {
 extern struct nchstats nchstats;
 
 #endif /* !_SYS_NAMEI_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

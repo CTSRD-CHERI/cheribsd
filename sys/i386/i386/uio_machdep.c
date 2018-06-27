@@ -125,3 +125,12 @@ out:
 		td->td_pflags &= ~TDP_DEADLKTREAT;
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

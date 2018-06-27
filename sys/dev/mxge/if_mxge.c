@@ -5019,3 +5019,11 @@ mxge_shutdown(device_t dev)
   tab-width:8
   End:
 */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

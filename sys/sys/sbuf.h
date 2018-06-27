@@ -114,3 +114,11 @@ int		 sbuf_copyin(struct sbuf *, const void * __capability, size_t);
 __END_DECLS
 
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

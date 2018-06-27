@@ -804,3 +804,11 @@ void sdp_abort_rdma_read(struct socket *sk)
 
 	ssk->rx_sa = NULL;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

@@ -5966,3 +5966,12 @@ iflib_fixup_rx(struct mbuf *m)
 	return (n);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

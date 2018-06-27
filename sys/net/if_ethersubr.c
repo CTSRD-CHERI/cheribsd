@@ -1245,3 +1245,11 @@ ether_vlanencap(struct mbuf *m, uint16_t tag)
 
 DECLARE_MODULE(ether, ether_mod, SI_SUB_INIT_IF, SI_ORDER_ANY);
 MODULE_VERSION(ether, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

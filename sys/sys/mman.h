@@ -310,3 +310,13 @@ __END_DECLS
 #endif /* !_KERNEL */
 
 #endif /* !_SYS_MMAN_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support",
+//     "user_capabilities"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

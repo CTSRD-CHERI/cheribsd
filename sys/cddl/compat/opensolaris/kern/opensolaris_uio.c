@@ -90,3 +90,11 @@ uioskip(uio_t *uio, size_t n)
 	uiomove(NULL, n, uio->uio_rw, uio);
 	uio->uio_segflg = segflg;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

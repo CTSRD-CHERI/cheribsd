@@ -3810,3 +3810,11 @@ linux_ioctl_unregister_handler(struct linux_ioctl_handler *h)
 
 	return (EINVAL);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

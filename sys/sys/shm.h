@@ -177,3 +177,12 @@ __END_DECLS
 #endif /* _KERNEL || _WANT_SHM_PROTOTYPES */
 
 #endif /* !_SYS_SHM_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "pointer_integrity"
+//   ],
+//   "change_comment": "compression of large shared memory allocations",
+// }
+// CHERI CHANGES END

@@ -1058,3 +1058,11 @@ axge_csum_cfg(struct usb_ether *ue)
 		csum |= CRCR_IP | CRCR_TCP | CRCR_UDP;
 	axge_write_cmd_1(sc, AXGE_ACCESS_MAC, AXGE_CRCR, csum);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

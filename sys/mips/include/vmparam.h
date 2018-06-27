@@ -227,3 +227,12 @@
 #define	DMAP_TO_PHYS(x)	MIPS_DIRECT_TO_PHYS(x)
 
 #endif /* !_MACHINE_VMPARAM_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

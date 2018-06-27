@@ -1470,3 +1470,11 @@ chgumtxcnt(struct uidinfo *uip, int diff, rlim_t max)
 
 	return (chglimit(uip, &uip->ui_umtxcnt, diff, max, "umtxcnt"));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

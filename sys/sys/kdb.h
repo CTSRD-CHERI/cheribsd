@@ -125,3 +125,12 @@ extern const char * volatile kdb_why;
 #define	KDB_REQ_REBOOT		3	/* User requested a clean reboot */
 
 #endif /* !_SYS_KDB_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

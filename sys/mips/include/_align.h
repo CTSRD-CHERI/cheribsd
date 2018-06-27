@@ -64,3 +64,11 @@
 #endif
 
 #endif /* !_MIPS_INCLUDE__ALIGN_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END

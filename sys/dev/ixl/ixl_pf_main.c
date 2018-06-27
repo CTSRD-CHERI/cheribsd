@@ -6089,3 +6089,12 @@ ixl_sysctl_fec_auto_enable(SYSCTL_HANDLER_ARGS)
 	return ixl_set_fec_config(pf, &abilities, I40E_AQ_SET_FEC_AUTO, !!(mode));
 }
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

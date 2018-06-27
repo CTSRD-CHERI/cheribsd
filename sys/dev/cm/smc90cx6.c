@@ -924,3 +924,11 @@ cm_watchdog(void *arg)
 		return;
 	PUTREG(CMCMD, CM_TXDIS);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

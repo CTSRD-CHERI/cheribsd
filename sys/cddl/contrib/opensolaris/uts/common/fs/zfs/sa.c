@@ -759,7 +759,11 @@ sa_build_layouts(sa_handle_t *hdl, sa_bulk_attr_t *attr_desc, int attr_count,
 		if (sa->sa_attr_table[attrs[i]].sa_length == 0) {
 			sahdr->sa_lengths[len_idx++] = length;
 		}
+#if has_feature(__builtin_is_aligned)
 		VERIFY(__builtin_is_aligned(data_start, 8));
+#else
+		VERIFY((uintptr_t)data_start % 8 == 0);
+#endif
 		data_start = (void *)P2ROUNDUP(((uintptr_t)data_start +
 		    length), 8);
 		buf_space -= P2ROUNDUP(length, 8);
@@ -2012,3 +2016,11 @@ sa_handle_unlock(sa_handle_t *hdl)
 	ASSERT(hdl);
 	mutex_exit(&hdl->sa_lock);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END

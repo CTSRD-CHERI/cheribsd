@@ -3428,3 +3428,12 @@ ndis_scan_end(struct ieee80211com *ic)
 
 	ndis_scan_results(sc);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

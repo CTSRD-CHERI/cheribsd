@@ -1266,3 +1266,11 @@ sysctl_kern_mprof(SYSCTL_HANDLER_ARGS)
 SYSCTL_OID(_kern, OID_AUTO, mprof, CTLTYPE_STRING|CTLFLAG_RD,
     NULL, 0, sysctl_kern_mprof, "A", "Malloc Profiling");
 #endif /* MALLOC_PROFILE */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "pointer_integrity"
+//   ]
+// }
+// CHERI CHANGES END

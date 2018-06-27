@@ -2879,3 +2879,11 @@ static void mlx4_en_sysctl_stat(struct mlx4_en_priv *priv)
 		    CTLFLAG_RD, &rx_ring->errors, 0, "RX soft errors");
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

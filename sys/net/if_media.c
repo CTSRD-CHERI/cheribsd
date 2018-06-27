@@ -547,3 +547,12 @@ ifmedia_printword(ifmw)
 	printf("%s\n", seen_option ? ">" : "");
 }
 #endif /* IFMEDIA_DEBUG */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

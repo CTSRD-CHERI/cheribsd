@@ -339,3 +339,12 @@ ffs_susp_uninitialize(void)
 	destroy_dev(ffs_susp_dev);
 	sx_destroy(&ffs_susp_lock);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

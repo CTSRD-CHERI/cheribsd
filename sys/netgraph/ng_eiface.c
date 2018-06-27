@@ -683,3 +683,11 @@ vnet_ng_eiface_uninit(const void *unused)
 }
 VNET_SYSUNINIT(vnet_ng_eiface_uninit, SI_SUB_INIT_IF, SI_ORDER_ANY,
    vnet_ng_eiface_uninit, NULL);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1063,3 +1063,12 @@ gif_delete_tunnel(struct ifnet *ifp)
 	ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 	if_link_state_change(ifp, LINK_STATE_DOWN);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

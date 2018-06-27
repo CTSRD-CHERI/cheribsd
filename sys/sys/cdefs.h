@@ -956,3 +956,13 @@
 #endif
 
 #endif /* !_SYS_CDEFS_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "pointer_integrity",
+//     "support",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

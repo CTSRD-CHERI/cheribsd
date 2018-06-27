@@ -307,3 +307,19 @@ SYSCTL_PROC(_net_inet_tcp_cc_vegas, OID_AUTO, beta,
 
 DECLARE_CC_MODULE(vegas, &vegas_cc_algo);
 MODULE_DEPEND(vegas, ertt, 1, 1, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "pointer_integrity"
+//   ]
+// }
+// CHERI CHANGES END
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "pointer_integrity"
+//   ]
+// }
+// CHERI CHANGES END

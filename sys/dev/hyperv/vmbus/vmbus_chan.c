@@ -2194,3 +2194,12 @@ vmbus_chan_poll_disable(struct vmbus_channel *chan)
 	TASK_INIT(&poll_dis, 0, vmbus_chan_polldis_task, chan);
 	vmbus_chan_run_task(chan, &poll_dis);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

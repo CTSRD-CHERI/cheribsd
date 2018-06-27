@@ -1860,3 +1860,13 @@ dqb32_dqb64(const struct dqblk32 *dqb32, struct dqblk64 *dqb64)
 	dqb64->dqb_btime = dqb32->dqb_btime;
 	dqb64->dqb_itime = dqb32->dqb_itime;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

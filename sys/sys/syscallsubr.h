@@ -562,3 +562,11 @@ int	freebsd11_kern_getdirentries(struct thread *td, int fd, char *ubuf, u_int
 	    count, long *basep, void (*func)(struct freebsd11_dirent *));
 
 #endif /* !_SYS_SYSCALLSUBR_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

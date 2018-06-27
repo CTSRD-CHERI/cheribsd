@@ -2267,3 +2267,11 @@ MODULE_DEPEND (cp, sppp, 1, 1, 1);
 #endif
 DRIVER_MODULE (cp, pci, cp_driver, cp_devclass, cp_modevent, NULL);
 MODULE_VERSION (cp, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

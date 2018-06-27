@@ -1059,3 +1059,11 @@ typedef struct _ipfw_sopt_info {
 } ipfw_sopt_info;
 
 #endif /* _IPFW2_H */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "pointer_integrity"
+//   ]
+// }
+// CHERI CHANGES END

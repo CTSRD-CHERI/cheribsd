@@ -1671,3 +1671,11 @@ linux_fallocate(struct thread *td, struct linux_fallocate_args *args)
 	return (kern_posix_fallocate(td, args->fd, args->offset,
 	    args->len));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1947,3 +1947,11 @@ MODULE_DEPEND(smsc, ether, 1, 1, 1);
 MODULE_DEPEND(smsc, miibus, 1, 1, 1);
 MODULE_VERSION(smsc, 1);
 USB_PNP_HOST_INFO(smsc_devs);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

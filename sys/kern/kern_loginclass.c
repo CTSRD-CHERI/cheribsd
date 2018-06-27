@@ -276,3 +276,11 @@ loginclass_racct_foreach(void (*callback)(struct racct *racct,
 		(post)();
 	rw_runlock(&loginclasses_lock);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

@@ -310,4 +310,12 @@ ath_ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 		return (ENOTTY);
 	}
 }
-
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

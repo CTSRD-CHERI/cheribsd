@@ -3338,3 +3338,11 @@ sysctl_hw_age_int_mod(SYSCTL_HANDLER_ARGS)
 	return (sysctl_int_range(oidp, arg1, arg2, req, AGE_IM_TIMER_MIN,
 	    AGE_IM_TIMER_MAX));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

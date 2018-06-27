@@ -2696,3 +2696,11 @@ DEV_MODULE(fasttrap, fasttrap_modevent, NULL);
 MODULE_VERSION(fasttrap, 1);
 MODULE_DEPEND(fasttrap, dtrace, 1, 1, 1);
 MODULE_DEPEND(fasttrap, opensolaris, 1, 1, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

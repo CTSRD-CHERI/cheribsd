@@ -1194,3 +1194,12 @@ ibcs2_readlink(struct thread *td, struct ibcs2_readlink_args *uap)
 	free(path, M_TEMP);
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

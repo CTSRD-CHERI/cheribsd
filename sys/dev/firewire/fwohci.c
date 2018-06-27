@@ -2974,3 +2974,12 @@ err:
 	OWRITE(sc, OHCI_DMACTL(off), OHCI_CNTL_DMA_WAKE);
 	splx(s);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

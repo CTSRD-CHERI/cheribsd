@@ -174,3 +174,11 @@ void	 ui_racct_foreach(void (*callback)(struct racct *racct,
 
 #endif /* _KERNEL */
 #endif /* !_SYS_RESOURCEVAR_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

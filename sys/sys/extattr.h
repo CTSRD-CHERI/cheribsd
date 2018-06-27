@@ -103,3 +103,11 @@ __END_DECLS
 
 #endif /* !_KERNEL */
 #endif /* !_SYS_EXTATTR_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

@@ -798,3 +798,12 @@ void so_unlock(struct socket *so);
 
 #endif /* _KERNEL */
 #endif /* !_SYS_SOCKET_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "kiovec_t",
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END

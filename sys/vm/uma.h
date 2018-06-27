@@ -729,3 +729,11 @@ unsigned long uma_size(void);
 long uma_avail(void);
 
 #endif	/* _VM_UMA_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "pointer_integrity"
+//   ]
+// }
+// CHERI CHANGES END

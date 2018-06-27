@@ -625,3 +625,11 @@ acl_free(struct acl *aclp)
 
 	free(aclp, M_ACL);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180628,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END
