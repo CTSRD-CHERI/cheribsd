@@ -50,6 +50,8 @@ END {
 }
 
 /CHERI CHANGES START$/ {
+	if (match(FILENAME, "tools/tools/cheri-changes") != 0)
+		nextfile
 	state="entered block"
 	trim=$0
 	sub(/CHERI CHANGES START$/, "", trim)
