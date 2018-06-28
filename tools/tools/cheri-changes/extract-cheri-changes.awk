@@ -38,13 +38,19 @@ function escape_string( str ) {
 }
 
 
-BEGIN	{
+BEGIN {
 	state="before start"
 	curfile=""
+	numblocks=0
+	print "["
+}
+
+END {
+	print "]"
 }
 
 /CHERI CHANGES START$/ {
-	state="in block"
+	state="entered block"
 	trim=$0
 	sub(/CHERI CHANGES START$/, "", trim)
 	gsub(/[\\.^$(){}\[\]|*+?]/, "\\\\&", trim)
@@ -57,6 +63,12 @@ BEGIN	{
 }
 
 {
+	if (state == "entered block") {
+		state="in block"
+		if (nblocks != 0)
+			print ","
+		nblocks++
+	}
 	if (state != "in block")
 		next
 	sub(trim, "")
