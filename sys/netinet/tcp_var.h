@@ -665,7 +665,7 @@ struct xtcpcb {
 	int32_t		tt_2msl;		/* (s) */
 	int32_t		tt_delack;		/* (s) */
 	int32_t		spare32[32];
-} __aligned(8);
+} __aligned(sizeof(void* __CAPABILITY) < 8 ? 8 : sizeof(void* __CAPABILITY));
 #ifdef _KERNEL
 void	tcp_inptoxtp(const struct inpcb *, struct xtcpcb *);
 #endif
