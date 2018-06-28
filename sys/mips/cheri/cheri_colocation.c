@@ -143,7 +143,7 @@ colocation_thread_exit(struct thread *td)
 /*
  * Called from trap().
  */
-int
+void
 colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 {
 	struct switcher_context sc;
@@ -157,25 +157,22 @@ colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 		/*
 		 * We've never called cosetup(2).
 		 */
-		return (0);
+		return;
 	}
 
 	/*
 	 * Fetch switcher context for currently executing userspace thread.
 	 */
 	error = copyincap_c(__USER_CAP((const void *)td->td_md.md_switcher_context, sizeof(sc)), &sc, sizeof(sc));
-	if (error != 0) {
-		printf("%s: copyincap_c from %p failed with error %d\n",
-		    __func__, (void *)td->td_md.md_switcher_context, error);
-		return (error);
-	}
+	KASSERT(error == 0, ("%s: copyincap_c from %p failed with error %d\n",
+	    __func__, (void *)td->td_md.md_switcher_context, error));
 
 	peertd = sc.sc_borrower_td;
 	if (peertd == NULL) {
 		/*
 		 * Nothing borrowed yet.
 		 */
-		return (0);
+		return;
 	}
 
 	KASSERT(peertd != td, ("%s: peertd %p == td %p\n", __func__, peertd, td));
@@ -221,8 +218,6 @@ colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 	 */
 	KASSERT(td->td_sa.code == SYS_copark,
 	    ("%s: td_sa.code %d != %d\n", __func__, td->td_sa.code, SYS_copark));
-
-	return (0);
 }
 
 static int

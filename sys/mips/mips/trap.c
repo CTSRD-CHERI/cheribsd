@@ -902,12 +902,7 @@ dofault:
 		{
 			int error;
 
-			error = colocation_unborrow(td, &trapframe);
-			if (error != 0) {
-				(p->p_sysent->sv_set_syscall_retval)(td, error);
-				userret(td, trapframe);
-				return (trapframe->pc);
-			}
+			colocation_unborrow(td, &trapframe);
 
 			td->td_sa.trapframe = trapframe;
 			error = syscallenter(td);
