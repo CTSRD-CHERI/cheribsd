@@ -27,6 +27,7 @@
  * Copyright (c) 2014 Integros [integros.com]
  */
 
+#include <sys/cdefs.h>
 #include <sys/zfs_context.h>
 #include <sys/types.h>
 #include <sys/param.h>
