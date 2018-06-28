@@ -760,7 +760,7 @@ sa_build_layouts(sa_handle_t *hdl, sa_bulk_attr_t *attr_desc, int attr_count,
 		if (sa->sa_attr_table[attrs[i]].sa_length == 0) {
 			sahdr->sa_lengths[len_idx++] = length;
 		}
-#if has_feature(__builtin_is_aligned)
+#if __has_builtin(__builtin_is_aligned)
 		VERIFY(__builtin_is_aligned(data_start, 8));
 #else
 		VERIFY((uintptr_t)data_start % 8 == 0);
