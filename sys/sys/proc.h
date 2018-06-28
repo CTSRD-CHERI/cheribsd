@@ -1162,7 +1162,7 @@ td_softdep_cleanup(struct thread *td)
 //   "updated": 20180628,
 //   "changes": [
 //     "kernel_sig_types",
-//     "user_capabilities",
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

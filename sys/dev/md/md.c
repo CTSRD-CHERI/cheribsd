@@ -2250,7 +2250,7 @@ g_md_fini(struct g_class *mp __unused)
 //   "changes": [
 //     "ioctl:misc",
 //     "iovec-macros",
-//     "kiovec_t",
+//     "kiovec_t"
 //   ]
 // }
 // CHERI CHANGES END

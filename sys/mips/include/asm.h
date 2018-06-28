@@ -828,7 +828,7 @@ _C_LABEL(x):
 //   "updated": 20180628,
 //   "changes": [
 //     "support"
-//   ]
+//   ],
 //   "change_comment": "jmpbuf, call frame, etc"
 // }
 // CHERI CHANGES END

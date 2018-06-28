@@ -32,7 +32,7 @@ THIS SOFTWARE.
  *   "changes": [
  *     "pointer_size"
  *   ],
- *   "change_comment": "pointers may be larger than doubles",
+ *   "change_comment": "pointers may be larger than doubles"
  * }
  * CHERI CHANGES END
  */

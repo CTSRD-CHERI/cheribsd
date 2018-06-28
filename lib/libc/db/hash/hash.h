@@ -39,7 +39,7 @@
  * {
  *   "updated": 20180530,
  *   "changes": [
- *     "pointer_bit_flags",
+ *     "pointer_bit_flags"
  *   ]
  * }
  * CHERI CHANGES END

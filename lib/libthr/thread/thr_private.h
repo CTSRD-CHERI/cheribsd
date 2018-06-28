@@ -37,7 +37,7 @@
  *   "changes": [
  *     "function_abi",
  *     "unsupported"
- *   ]
+ *   ],
  *   "change_comment": "stack pointer"
  * }
  * CHERI CHANGES END

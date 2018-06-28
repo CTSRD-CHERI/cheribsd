@@ -32,8 +32,7 @@
  *   "updated": 20180530,
  *   "changes": [
  *     "support"
- *   ],
- *   "change_comment: ""
+ *   ]
  * }
  * CHERI CHANGES END
  */

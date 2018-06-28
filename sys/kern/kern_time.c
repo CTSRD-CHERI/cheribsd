@@ -1811,7 +1811,7 @@ itimers_event_hook_exit(void *arg, struct proc *p)
 //   "updated": 20180628,
 //   "changes": [
 //     "kernel_sig_types",
-//     "user_capabilities",
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

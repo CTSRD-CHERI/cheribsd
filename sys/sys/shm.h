@@ -183,6 +183,6 @@ __END_DECLS
 //   "changes": [
 //     "pointer_integrity"
 //   ],
-//   "change_comment": "compression of large shared memory allocations",
+//   "change_comment": "compression of large shared memory allocations"
 // }
 // CHERI CHANGES END

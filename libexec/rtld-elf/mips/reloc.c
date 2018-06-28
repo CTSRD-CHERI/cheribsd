@@ -36,7 +36,7 @@
  *   "changes": [
  *     "support"
  *   ],
- *   "change_comment: "CHERI relocation"
+ *   "change_comment": "CHERI relocation"
  * }
  * CHERI CHANGES END
  */

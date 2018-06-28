@@ -43,7 +43,7 @@
  *   "changes": [
  *     "support"
  *   ],
- *   "change_comment: "PRIiPTR"
+ *   "change_comment": "PRIiPTR"
  * }
  * CHERI CHANGES END
  */

@@ -41,7 +41,7 @@
  * {
  *   "updated": 20180530,
  *   "changes": [
- *     "function_abi",
+ *     "function_abi"
  *   ],
  *   "change_comment": "SunRPC"
  * }

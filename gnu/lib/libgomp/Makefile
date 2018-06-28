@@ -5,7 +5,7 @@
 #   "changes": [
 #     "pointer_size"
 #   ],
-#   "change_comment": "size and alignment of locks set by defines",
+#   "change_comment": "size and alignment of locks set by defines"
 # }
 # CHERI CHANGES END
 

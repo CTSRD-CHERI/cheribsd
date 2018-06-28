@@ -27,7 +27,7 @@
  * {
  *   "updated": 20180530,
  *   "changes": [
- *     "pointer_integrity",
+ *     "pointer_integrity"
  *   ],
  *   "hybrid_specific": true
  * }

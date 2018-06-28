@@ -40,7 +40,7 @@
  *   "changes": [
  *     "pointer_integrity"
  *   ],
- *   "change_comment": "memswap",
+ *   "change_comment": "memswap"
  * }
  * CHERI CHANGES END
  */

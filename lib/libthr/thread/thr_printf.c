@@ -32,7 +32,7 @@
  *   "changes": [
  *     "support"
  *   ],
- *   "change_comment: "printf"
+ *   "change_comment": "printf"
  * }
  * CHERI CHANGES END
  */
