@@ -42,7 +42,7 @@ __FBSDID("$FreeBSD$");
 #include <stdlib.h>
 #include <unistd.h>
 
-static char buf[1000000];
+static long long buf[1000000];
 
 static void
 usage(void)
@@ -99,7 +99,7 @@ main(int argc, char **argv)
 			warn("coaccept");
 		if (vflag) {
 			halfcookie = (uint64_t *)&cookie;
-			printf("pong, pid %d, cookie %#lx%lx, buf[0] is %d\n",
+			printf("pong, pid %d, cookie %#lx%lx, buf[0] is %lld\n",
 			    getpid(), halfcookie[0], halfcookie[1], buf[0]);
 		}
 		buf[0]++;

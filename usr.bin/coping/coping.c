@@ -43,7 +43,7 @@ __FBSDID("$FreeBSD$");
 #include <stdlib.h>
 #include <unistd.h>
 
-static char buf[1000000];
+static long long buf[1000000];
 
 static void
 usage(void)
@@ -106,7 +106,7 @@ main(int argc, char **argv)
 			warn("cocall");
 
 		if (vflag)
-			printf("done, pid %d, buf[0] is %d\n", getpid(), buf[0]);
+			printf("done, pid %d, buf[0] is %lld\n", getpid(), buf[0]);
 		else
 			printf(".");
 		sleep(1);
