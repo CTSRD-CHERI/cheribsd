@@ -427,7 +427,8 @@ DB_SHOW_COMMAND(tlb, ddb_dump_tlb)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "platform"
 //   ]

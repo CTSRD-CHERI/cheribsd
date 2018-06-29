@@ -129,7 +129,8 @@ lzjb_decompress(void *s_start, void *d_start, size_t s_len, size_t d_len, int n)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "hashing"
 //   ]

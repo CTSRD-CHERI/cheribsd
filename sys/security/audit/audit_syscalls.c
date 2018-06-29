@@ -977,7 +977,8 @@ sys_auditctl(struct thread *td, struct auditctl_args *uap)
 #endif /* AUDIT */
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
 //   ]

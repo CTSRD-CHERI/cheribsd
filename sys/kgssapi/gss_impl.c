@@ -401,7 +401,8 @@ MODULE_DEPEND(kgssapi, krpc, 1, 1, 1);
 MODULE_VERSION(kgssapi, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
 //   ]

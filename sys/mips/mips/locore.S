@@ -246,7 +246,8 @@ VECTOR(_locore, unknown)
 VECTOR_END(_locore)
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "header",
 //   "changes": [
 //     "support"
 //   ],

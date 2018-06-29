@@ -64,7 +64,8 @@
 #endif	/* __MIPS_TLS_H__ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"
 //   ]

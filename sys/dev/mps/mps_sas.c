@@ -3632,7 +3632,8 @@ mpssas_realloc_targets(struct mps_softc *sc, int maxtargets)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros"
 //   ]

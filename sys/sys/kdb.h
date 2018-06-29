@@ -127,7 +127,8 @@ extern const char * volatile kdb_why;
 #endif /* !_SYS_KDB_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "header",
 //   "changes": [
 //     "support"
 //   ],

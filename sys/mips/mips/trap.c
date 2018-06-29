@@ -2039,7 +2039,8 @@ emulate_unaligned_access(struct trapframe *frame, int mode)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "support"
 //   ],

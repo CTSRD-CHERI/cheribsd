@@ -201,7 +201,8 @@ typedef struct __ucontext_c {
 #endif	/* !_MACHINE_UCONTEXT_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "header",
 //   "changes": [
 //     "support"
 //   ]

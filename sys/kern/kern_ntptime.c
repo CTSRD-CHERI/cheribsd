@@ -1090,7 +1090,8 @@ SYSINIT(periodic_resettodr, SI_SUB_LAST, SI_ORDER_MIDDLE,
 	start_periodic_resettodr, NULL);
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
 //   ]

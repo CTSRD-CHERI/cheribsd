@@ -3950,7 +3950,8 @@ vmxnet3_barrier(struct vmxnet3_softc *sc, vmxnet3_barrier_t type)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"
 //   ]

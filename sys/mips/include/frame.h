@@ -226,7 +226,8 @@ struct trapframe {
 #endif	/* !_MACHINE_FRAME_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "header",
 //   "changes": [
 //     "support"
 //   ]

@@ -19161,7 +19161,8 @@ bxe_eioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"
 //   ]

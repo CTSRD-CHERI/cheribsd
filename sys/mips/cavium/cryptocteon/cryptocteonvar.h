@@ -94,7 +94,8 @@ octo_decrypt_t octo_aes_cbc_sha1_decrypt;
 #endif /* !_MIPS_CAVIUM_CRYPTOCTEON_CRYPTOCTEONVAR_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "header",
 //   "changes": [
 //     "kiovec_t"
 //   ]

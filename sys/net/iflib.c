@@ -5968,7 +5968,8 @@ iflib_fixup_rx(struct mbuf *m)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",
 //     "user_capabilities"

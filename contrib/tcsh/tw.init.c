@@ -1031,6 +1031,7 @@ tw_job_next(struct Strbuf *res, struct Strbuf *dir, int *flags)
 // CHERI CHANGES START
 // {
 //   "updated": 20180629,
+//   "target_type": "prog",
 //   "changes": [
 //     "pointer_provenance"
 //   ],

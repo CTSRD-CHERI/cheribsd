@@ -118,7 +118,8 @@ const nv_alloc_ops_t nv_fixed_ops_def = {
 const nv_alloc_ops_t *nv_fixed_ops = &nv_fixed_ops_def;
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "pointer_alignment"
 //   ]

@@ -99,7 +99,8 @@ typedef struct iovec_native	uiovec_t;
 #endif /* !_SYS__IOVEC_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "header",
 //   "changes": [
 //     "iovec-macros",
 //     "kiovec_t"

@@ -858,7 +858,8 @@ kick_init(const void *udata __unused)
 SYSINIT(kickinit, SI_SUB_KTHREAD_INIT, SI_ORDER_MIDDLE, kick_init, NULL);
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
 //   ]

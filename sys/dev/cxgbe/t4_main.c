@@ -10290,7 +10290,8 @@ DRIVER_MODULE(vcc, cc, vcc_driver, vcc_devclass, 0, 0);
 MODULE_VERSION(vcc, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",
 //     "user_capabilities"

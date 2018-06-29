@@ -2997,7 +2997,8 @@ oce_read_env_variables( POCE_SOFTC sc )
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",
 //     "user_capabilities"

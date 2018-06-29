@@ -1353,7 +1353,8 @@ proc_reparent(struct proc *child, struct proc *parent)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
 //   ]

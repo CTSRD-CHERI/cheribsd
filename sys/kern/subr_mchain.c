@@ -554,7 +554,8 @@ md_get_uio(struct mdchain *mdp, struct uio *uiop, int size)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "kiovec_t"

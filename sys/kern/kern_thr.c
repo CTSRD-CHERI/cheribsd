@@ -621,7 +621,8 @@ kern_thr_alloc(struct proc *p, int pages, struct thread **ntd)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
 //   ]

@@ -415,7 +415,8 @@ smb_dev2share(int fd, int mode, struct smb_cred *scred,
 
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "kiovec_t"

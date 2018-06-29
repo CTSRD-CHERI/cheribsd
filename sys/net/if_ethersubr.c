@@ -1247,7 +1247,8 @@ DECLARE_MODULE(ether, ether_mod, SI_SUB_INIT_IF, SI_ORDER_ANY);
 MODULE_VERSION(ether, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"
 //   ]

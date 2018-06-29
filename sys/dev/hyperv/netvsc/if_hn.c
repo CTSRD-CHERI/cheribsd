@@ -7535,7 +7535,8 @@ hn_sysuninit(void *arg __unused)
 SYSUNINIT(hn_sysuninit, SI_SUB_DRIVERS, SI_ORDER_SECOND, hn_sysuninit, NULL);
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"
 //   ]

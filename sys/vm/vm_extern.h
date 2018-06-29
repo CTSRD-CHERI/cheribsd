@@ -127,7 +127,8 @@ int vm_thread_new(struct thread *td, int pages);
 #endif				/* !_VM_EXTERN_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"
 //   ]

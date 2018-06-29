@@ -113,7 +113,8 @@ __END_DECLS
 #endif /* !_SYS_MAC_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"
 //   ]

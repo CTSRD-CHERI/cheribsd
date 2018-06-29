@@ -2737,7 +2737,8 @@ sysctl_hw_sf_int_mod(SYSCTL_HANDLER_ARGS)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"
 //   ]

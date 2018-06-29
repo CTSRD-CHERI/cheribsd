@@ -1496,7 +1496,8 @@ genkbd_keyaction(keyboard_t *kbd, int keycode, int up, int *shiftstate,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc",
 //     "user_capabilities"

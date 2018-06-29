@@ -381,7 +381,8 @@ get_bs(struct chip_swap *swap, uint32_t block, uint8_t writing)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "kiovec_t"

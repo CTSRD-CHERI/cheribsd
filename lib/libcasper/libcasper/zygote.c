@@ -218,6 +218,7 @@ zygote_init(void)
 // CHERI CHANGES START
 // {
 //   "updated": 20180629,
+//   "target_type": "lib",
 //   "changes": [
 //     "pointer_provenance"
 //   ],

@@ -1862,7 +1862,8 @@ dqb32_dqb64(const struct dqblk32 *dqb32, struct dqblk64 *dqb64)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "kiovec_t",

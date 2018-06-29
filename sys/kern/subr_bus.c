@@ -5655,7 +5655,8 @@ DB_SHOW_ALL_COMMAND(devices, db_show_all_devices)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "kiovec_t",
 //     "user_capabilities"

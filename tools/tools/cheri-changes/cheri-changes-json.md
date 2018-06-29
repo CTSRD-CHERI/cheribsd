@@ -10,6 +10,7 @@ comments.  The following example shows all the current annotations.
  * CHERI CHANGES START
  * {
  *   "updated": 20180626,
+ *   "target_type": "header, kernel, lib, or prog"
  *   "changes": [
  *     "function_abi",
  *     "hashing",
@@ -44,6 +45,14 @@ comments.  The following example shows all the current annotations.
 
 `updated`: Date in YYYYMMDD the comment was updated in UTC.  Intended
 for used by validation tools.
+
+`target_type`: What is this file used for
+ * `header` - System headers defining language runtime and kernel
+   interfaces.
+ * `kernel` - Files that are part of the kernel.
+ * `lib` - Integral to a library (or shared code linked to multiple
+   programs).
+ * `prog` - Linked to a program.
 
 `changes`: Zero or more tags indicating the types of changes.  Current
 values are:

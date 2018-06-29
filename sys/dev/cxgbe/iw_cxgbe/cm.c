@@ -2972,7 +2972,8 @@ void __exit c4iw_cm_term(void)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "user_capabilities"

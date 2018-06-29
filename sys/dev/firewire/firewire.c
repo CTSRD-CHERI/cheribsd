@@ -2385,7 +2385,8 @@ DRIVER_MODULE(firewire, fwohci, firewire_driver, firewire_devclass,
 MODULE_VERSION(firewire, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "kiovec_t"

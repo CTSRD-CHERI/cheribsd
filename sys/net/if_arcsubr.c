@@ -831,7 +831,8 @@ DECLARE_MODULE(arcnet, arc_mod, SI_SUB_INIT_IF, SI_ORDER_ANY);
 MODULE_VERSION(arcnet, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"
 //   ]

@@ -704,7 +704,8 @@ ptrace_clear_single_step(struct thread *td)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "kernel_sig_types",
 //     "support",

@@ -620,7 +620,8 @@ EARLY_DRIVER_MODULE(axgbephy, simplebus, axgbephy_driver, axgbephy_devclass,
     0, 0, BUS_PASS_RESOURCE + BUS_PASS_ORDER_MIDDLE);
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"
 //   ]

@@ -16,7 +16,8 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180530,
+ *   "updated": 20180629,
+ *   "target_type": "lib",
  *   "changes": [
  *     "pointer_alignment"
  *   ]

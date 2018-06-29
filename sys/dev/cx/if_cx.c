@@ -2545,7 +2545,8 @@ DRIVER_MODULE (cx, isa, cx_isa_driver, cx_devclass, cx_modevent, NULL);
 MODULE_VERSION (cx, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"
 //   ]

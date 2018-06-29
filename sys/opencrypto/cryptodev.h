@@ -547,7 +547,8 @@ extern	int crypto_apply(int flags, caddr_t buf, int off, int len,
 #endif /* _CRYPTO_CRYPTO_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "header",
 //   "changes": [
 //     "kiovec_t"
 //   ]

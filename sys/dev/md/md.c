@@ -2246,7 +2246,8 @@ g_md_fini(struct g_class *mp __unused)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc",
 //     "iovec-macros",

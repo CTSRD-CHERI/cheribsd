@@ -7443,7 +7443,8 @@ qlnx_dump_buf8(qlnx_host_t *ha, const char *msg, void *dbuf, uint32_t len)
 
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"
 //   ]

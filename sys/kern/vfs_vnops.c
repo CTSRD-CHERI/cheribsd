@@ -2504,7 +2504,8 @@ vn_fsid(struct vnode *vp, struct vattr *va)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "kiovec_t",

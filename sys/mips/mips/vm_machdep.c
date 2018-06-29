@@ -746,7 +746,8 @@ DB_SHOW_COMMAND(trapframe, ddb_dump_trapframe)
 #endif	/* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "support"
 //   ],

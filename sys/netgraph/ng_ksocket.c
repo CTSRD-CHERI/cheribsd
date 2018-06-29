@@ -1276,7 +1276,8 @@ ng_ksocket_parse(const struct ng_ksocket_alias *aliases,
 
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
 //   ]

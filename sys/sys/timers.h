@@ -119,7 +119,8 @@ int	itimer_accept(struct proc *p, int tid, ksiginfo_t *ksi);
 #endif /* !_SYS_TIMERS_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "header",
 //   "changes": [
 //     "kernel_sig_types"
 //   ]

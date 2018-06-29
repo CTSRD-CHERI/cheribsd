@@ -3458,7 +3458,8 @@ sysctl_hw_jme_proc_limit(SYSCTL_HANDLER_ARGS)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"
 //   ]

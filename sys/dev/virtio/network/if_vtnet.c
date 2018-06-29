@@ -3979,7 +3979,8 @@ vtnet_tunable_int(struct vtnet_softc *sc, const char *knob, int def)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"
 //   ]

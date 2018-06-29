@@ -134,7 +134,8 @@ int freebsd32_exec_copyin_args(struct image_args *args, char *fname,
 #endif /* !_COMPAT_FREEBSD32_FREEBSD32_UTIL_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "header",
 //   "changes": [
 //     "kiovec_t",
 //     "support",

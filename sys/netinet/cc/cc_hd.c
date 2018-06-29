@@ -256,7 +256,8 @@ DECLARE_CC_MODULE(hd, &hd_cc_algo);
 MODULE_DEPEND(hd, ertt, 1, 1, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "pointer_integrity"
 //   ]

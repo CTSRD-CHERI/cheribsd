@@ -2989,7 +2989,8 @@ cpsw_writephy(device_t dev, int phy, int reg, int data)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"
 //   ]

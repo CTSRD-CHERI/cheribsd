@@ -853,7 +853,8 @@ DECLARE_MODULE(if_firewire, firewire_mod, SI_SUB_INIT_IF, SI_ORDER_ANY);
 MODULE_VERSION(if_firewire, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"
 //   ]

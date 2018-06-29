@@ -1583,7 +1583,8 @@ zap_get_stats(objset_t *os, uint64_t zapobj, zap_stats_t *zs)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "hashing"
 //   ]

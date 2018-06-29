@@ -2499,7 +2499,8 @@ bnxt_get_wol_settings(struct bnxt_softc *softc)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"
 //   ]

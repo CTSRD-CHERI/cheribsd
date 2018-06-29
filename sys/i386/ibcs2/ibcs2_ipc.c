@@ -562,7 +562,8 @@ MODULE_DEPEND(ibcs2, sysvsem, 1, 1, 1);
 MODULE_DEPEND(ibcs2, sysvshm, 1, 1, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "pointer_integrity"
 //   ]

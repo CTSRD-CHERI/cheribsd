@@ -549,7 +549,8 @@ ifmedia_printword(ifmw)
 #endif /* IFMEDIA_DEBUG */
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",
 //     "user_capabilities"

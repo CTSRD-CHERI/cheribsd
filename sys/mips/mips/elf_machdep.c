@@ -600,7 +600,8 @@ elf_cpu_unload_file(linker_file_t lf __unused)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "support"
 //   ],

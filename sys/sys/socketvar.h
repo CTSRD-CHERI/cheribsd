@@ -529,7 +529,8 @@ void	sbtoxsockbuf(struct sockbuf *sb, struct xsockbuf *xsb);
 #endif /* !_SYS_SOCKETVAR_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"
 //   ]

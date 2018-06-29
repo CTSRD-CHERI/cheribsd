@@ -571,7 +571,8 @@ bus_dmamap_load_mem(bus_dma_tag_t dmat, bus_dmamap_t map,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "kiovec_t",

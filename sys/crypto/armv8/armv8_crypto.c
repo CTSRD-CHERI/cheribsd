@@ -565,7 +565,8 @@ DRIVER_MODULE(armv8crypto, nexus, armv8_crypto_driver, armv8_crypto_devclass,
     0, 0);
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "kiovec_t"
 //   ]

@@ -130,7 +130,8 @@ int		vmbus_txbr_write(struct vmbus_txbr *tbr,
 #endif  /* _VMBUS_BRVAR_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "header",
 //   "changes": [
 //     "kiovec_t"
 //   ]

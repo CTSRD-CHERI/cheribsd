@@ -978,7 +978,8 @@ DECLARE_MODULE(alq, alq_mod, SI_SUB_LAST, SI_ORDER_ANY);
 MODULE_VERSION(alq, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "kiovec_t"

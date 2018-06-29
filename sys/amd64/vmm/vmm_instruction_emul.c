@@ -2478,7 +2478,8 @@ vmm_decode_instruction(struct vm *vm, int cpuid, uint64_t gla,
 #endif	/* _KERNEL */
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "kiovec_t"
 //   ]

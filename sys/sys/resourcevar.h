@@ -176,7 +176,8 @@ void	 ui_racct_foreach(void (*callback)(struct racct *racct,
 #endif /* !_SYS_RESOURCEVAR_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"
 //   ]

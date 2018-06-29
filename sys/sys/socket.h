@@ -800,7 +800,8 @@ void so_unlock(struct socket *so);
 #endif /* !_SYS_SOCKET_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "header",
 //   "changes": [
 //     "kiovec_t",
 //     "pointer_alignment"

@@ -1060,7 +1060,8 @@ axge_csum_cfg(struct usb_ether *ue)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"
 //   ]

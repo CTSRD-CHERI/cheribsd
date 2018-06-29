@@ -1938,7 +1938,8 @@ tsec_set_mtu(struct tsec_softc *sc, unsigned int mtu)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"
 //   ]

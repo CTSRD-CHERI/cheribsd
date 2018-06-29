@@ -7594,7 +7594,8 @@ nfsrpc_layoutgetres(struct nfsmount *nmp, vnode_t vp, uint8_t *newfhp,
 
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
 //   ]

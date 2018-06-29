@@ -3621,7 +3621,8 @@ ieee80211_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",
 //     "user_capabilities"

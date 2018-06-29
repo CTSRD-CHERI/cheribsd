@@ -178,7 +178,8 @@ typedef __va_list		__gnuc_va_list;	/* compatibility w/GNU headers*/
 #endif /* !_MACHINE__TYPES_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "header",
 //   "changes": [
 //     "support"
 //   ]

@@ -345,7 +345,8 @@ struct vnode *vm_object_vnode(vm_object_t object);
 #endif				/* _VM_OBJECT_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "header",
 //   "changes": [
 //     "support"
 //   ],

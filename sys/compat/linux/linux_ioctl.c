@@ -3812,7 +3812,8 @@ linux_ioctl_unregister_handler(struct linux_ioctl_handler *h)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"
 //   ]

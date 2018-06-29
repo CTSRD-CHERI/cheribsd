@@ -92,7 +92,8 @@ uioskip(uio_t *uio, size_t n)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "kiovec_t"
 //   ]

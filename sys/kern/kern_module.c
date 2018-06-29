@@ -535,7 +535,8 @@ freebsd32_modstat(struct thread *td, struct freebsd32_modstat_args *uap)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
 //   ]

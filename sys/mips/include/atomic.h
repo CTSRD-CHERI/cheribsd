@@ -1067,7 +1067,8 @@ atomic_thread_fence_seq_cst(void)
 #endif /* ! _MACHINE_ATOMIC_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "header",
 //   "changes": [
 //     "support"
 //   ]

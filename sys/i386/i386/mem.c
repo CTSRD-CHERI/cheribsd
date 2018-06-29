@@ -236,7 +236,8 @@ memioctl(struct cdev *dev __unused, u_long cmd, caddr_t data, int flags,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "kiovec_t"
 //   ]

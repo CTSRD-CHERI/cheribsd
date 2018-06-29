@@ -128,7 +128,8 @@ struct mrsas_iocpacket32 {
 #endif					/* MRSAS_IOCTL_H */
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "header",
 //   "changes": [
 //     "kiovec_t"
 //   ]

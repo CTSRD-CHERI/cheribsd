@@ -1893,7 +1893,8 @@ cuse_client_kqfilter(struct cdev *dev, struct knote *kn)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "kiovec_t"

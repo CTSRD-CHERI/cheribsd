@@ -664,7 +664,8 @@ DECLARE_MODULE(if_me, me_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
 MODULE_VERSION(if_me, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",
 //     "user_capabilities"

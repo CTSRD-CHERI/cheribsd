@@ -71,7 +71,8 @@ int setup_pio(device_t dev, char *name, device_t *pio_dev);
 int setup_offset(device_t dev, uint32_t *offset);
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "header",
 //   "changes": [
 //     "kiovec_t"
 //   ]

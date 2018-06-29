@@ -2436,7 +2436,8 @@ MODULE_VERSION(pfsync, PFSYNC_MODVER);
 MODULE_DEPEND(pfsync, pf, PF_MODVER, PF_MODVER, PF_MODVER);
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",
 //     "user_capabilities"

@@ -104,7 +104,8 @@ uma_small_free(void *mem, vm_size_t size, u_int8_t flags)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "platform"
 //   ]

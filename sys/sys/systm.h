@@ -629,7 +629,8 @@ __NULLABILITY_PRAGMA_POP
 #endif /* !_SYS_SYSTM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"
 //   ]

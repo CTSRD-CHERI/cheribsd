@@ -2054,7 +2054,8 @@ freebsd7_msgctl(struct thread *td, struct freebsd7_msgctl_args *uap)
 	   COMPAT_FREEBSD7 */
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
 //   ]

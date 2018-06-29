@@ -3749,7 +3749,8 @@ pmap_change_attr(vm_offset_t sva, vm_size_t size, vm_memattr_t ma)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "support"
 //   ]

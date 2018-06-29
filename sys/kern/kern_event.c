@@ -2681,7 +2681,8 @@ noacquire:
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "pointer_integrity",
 //     "user_capabilities"

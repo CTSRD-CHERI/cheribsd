@@ -460,7 +460,8 @@ static struct vfsops null_vfsops = {
 VFS_SET(null_vfsops, nullfs, VFCF_LOOPBACK | VFCF_JAIL);
 // CHERI CHANGES START
 // {
-//   "updated": 20180628,
+//   "updated": 20180629,
+//   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
 //   ]
