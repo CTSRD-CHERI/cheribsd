@@ -154,7 +154,7 @@ struct xunpcb {
 		char	xu_dummy2[256];
 	};
 	struct xsocket	xu_socket;
-} __aligned(sizeof(void* __CAPABILITY) < 8 ? 8 : sizeof(void* __CAPABILITY));
+} __aligned(8);
 
 struct xunpgen {
 	size_t	xug_len;
