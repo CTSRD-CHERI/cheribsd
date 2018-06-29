@@ -1032,7 +1032,7 @@ tw_job_next(struct Strbuf *res, struct Strbuf *dir, int *flags)
 // {
 //   "updated": 20180629,
 //   "changes": [
-//     "pointer_provenance",
+//     "pointer_provenance"
 //   ],
 //   "change_comment": "improper update of realloc()d pointers",
 //   "is_upstream": true
