@@ -26,6 +26,8 @@
  * SUCH DAMAGE.
  */
 
+#include "opt_global.h"
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -39,7 +41,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/sx.h>
 #include <sys/sysctl.h>
 #include <sys/syslog.h>
+#ifdef CPU_CHERI
 #include <cheri/cheric.h>
+#endif
 
 #include "iconv_converter_if.h"
 
@@ -415,7 +419,7 @@ struct iconv_add32 {
 	char	ia_to[ICONV_CSNMAXLEN];
 	char	ia_from[ICONV_CSNMAXLEN];
 	int	ia_datalen;
-	uint23_t ia_data;
+	uint32_t ia_data;
 };
 #endif
 
@@ -449,7 +453,8 @@ iconv_sysctl_add(SYSCTL_HANDLER_ARGS)
 #ifdef COMPAT_FREEBSD32
 	if (req->flags & SCTL_MASK32) {
 		error = SYSCTL_IN(req, &du.din32, sizeof(du.din32));
-		ia_data = __USER_CAP(du.din32.ia_data, du.din32.ia_datalen);
+		ia_data = __USER_CAP((void*)(uintptr_t)du.din32.ia_data,
+		    du.din32.ia_datalen);
 	} else
 #endif
 	{

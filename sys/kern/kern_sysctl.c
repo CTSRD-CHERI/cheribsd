@@ -42,6 +42,7 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_capsicum.h"
 #include "opt_compat.h"
+#include "opt_global.h"
 #include "opt_ktrace.h"
 
 #include <sys/param.h>
@@ -1713,12 +1714,14 @@ sysctl_old_kernel(struct sysctl_req *req, const void *p, size_t l)
 			if (i > req->oldlen - req->oldidx)
 				i = req->oldlen - req->oldidx;
 		if (i > 0) {
+#ifdef CPU_CHERI
 			if (req->flags & SCTL_PTRIN)
 				memcpy_c((char * __capability)req->oldptr +
 				    req->oldidx,
 				    (__cheri_tocap const char * __capability)p,
 				    l);
 			else
+#endif
 				memcpy((__cheri_fromcap char *)req->oldptr +
 				    req->oldidx, p, l);
 		}
@@ -1736,10 +1739,12 @@ sysctl_new_kernel(struct sysctl_req *req, void *p, size_t l)
 		return (0);
 	if (req->newlen - req->newidx < l)
 		return (EINVAL);
+#ifdef CPU_CHERI
 	if (req->flags & SCTL_PTRIN)
 		memcpy_c((__cheri_tocap char * __capability)p,
 		    (char * __capability)req->newptr + req->newidx, l);
 	else
+#endif
 		memcpy(p, (__cheri_fromcap char *)req->newptr + req->newidx, l);
 	req->newidx += l;
 	return (0);
