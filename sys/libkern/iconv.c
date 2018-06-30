@@ -26,8 +26,6 @@
  * SUCH DAMAGE.
  */
 
-#include "opt_global.h"
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -41,9 +39,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/sx.h>
 #include <sys/sysctl.h>
 #include <sys/syslog.h>
-#ifdef CPU_CHERI
-#include <cheri/cheric.h>
-#endif
 
 #include "iconv_converter_if.h"
 
