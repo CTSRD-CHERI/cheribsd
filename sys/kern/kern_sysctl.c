@@ -1715,7 +1715,7 @@ sysctl_old_kernel(struct sysctl_req *req, const void *p, size_t l)
 				i = req->oldlen - req->oldidx;
 		if (i > 0) {
 #ifdef CPU_CHERI
-			if (req->flags & SCTL_PTRIN)
+			if (req->flags & SCTL_PTROUT)
 				memcpy_c((char * __capability)req->oldptr +
 				    req->oldidx,
 				    (__cheri_tocap const char * __capability)p,
@@ -1848,7 +1848,7 @@ sysctl_old_user(struct sysctl_req *req, const void *p, size_t l)
 		if (i > len - origidx)
 			i = len - origidx;
 		if (req->lock == REQ_WIRED) {
-			if (req->flags & SCTL_PTRIN)
+			if (req->flags & SCTL_PTROUT)
 				error = copyoutcap_nofault_c(
 				    (__cheri_tocap const void * __capability)p,
 				    (char * __capability)req->oldptr +
@@ -1859,7 +1859,7 @@ sysctl_old_user(struct sysctl_req *req, const void *p, size_t l)
 				    (char * __capability)req->oldptr + origidx,
 				    i);
 		} else
-			if (req->flags & SCTL_PTRIN)
+			if (req->flags & SCTL_PTROUT)
 				error = copyoutcap_c(
 				    (__cheri_tocap const void * __capability)p,
 				    (char * __capability)req->oldptr + origidx,
