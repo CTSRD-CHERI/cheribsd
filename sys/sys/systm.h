@@ -400,8 +400,12 @@ int	copyout_nofault(const void * _Nonnull __restrict kaddr,
 #if __has_feature(capabilities)
 int	copyout_nofault_c(const void * __capability _Nonnull __restrict kaddr,
 	    void * __capability _Nonnull __restrict udaddr, size_t len);
+int	copyoutcap_nofault_c(
+	    const void * __capability _Nonnull __restrict kaddr,
+	    void * __capability _Nonnull __restrict udaddr, size_t len);
 #else
 #define	copyout_nofault_c	copyout_nofault
+#define	copyoutcap_nofault_c	copyout_nofault
 #endif
 
 int	fubyte(volatile const void *base);

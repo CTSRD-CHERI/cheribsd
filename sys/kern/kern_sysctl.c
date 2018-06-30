@@ -1712,8 +1712,16 @@ sysctl_old_kernel(struct sysctl_req *req, const void *p, size_t l)
 		else
 			if (i > req->oldlen - req->oldidx)
 				i = req->oldlen - req->oldidx;
-		if (i > 0)
-			bcopy(p, (__cheri_fromcap char *)req->oldptr + req->oldidx, i);
+		if (i > 0) {
+			if (req->flags & SCTL_PTRIN)
+				memcpy_c((char * __capability)req->oldptr +
+				    req->oldidx,
+				    (__cheri_tocap const char * __capability)p,
+				    l);
+			else
+				memcpy((__cheri_fromcap char *)req->oldptr +
+				    req->oldidx, p, l);
+		}
 	}
 	req->oldidx += l;
 	if (req->oldptr && i != l)
@@ -1728,7 +1736,11 @@ sysctl_new_kernel(struct sysctl_req *req, void *p, size_t l)
 		return (0);
 	if (req->newlen - req->newidx < l)
 		return (EINVAL);
-	bcopy((__cheri_fromcap char *)req->newptr + req->newidx, p, l);
+	if (req->flags & SCTL_PTRIN)
+		memcpy_c((__cheri_tocap char * __capability)p,
+		    (char * __capability)req->newptr + req->newidx, l);
+	else
+		memcpy(p, (__cheri_fromcap char *)req->newptr + req->newidx, l);
 	req->newidx += l;
 	return (0);
 }
@@ -1831,14 +1843,27 @@ sysctl_old_user(struct sysctl_req *req, const void *p, size_t l)
 		if (i > len - origidx)
 			i = len - origidx;
 		if (req->lock == REQ_WIRED) {
-			error = copyout_nofault_c(
-			    (__cheri_tocap const void * __capability)p,
-			    (char * __capability)req->oldptr +
-			    origidx, i);
+			if (req->flags & SCTL_PTRIN)
+				error = copyoutcap_nofault_c(
+				    (__cheri_tocap const void * __capability)p,
+				    (char * __capability)req->oldptr +
+				    origidx, i);
+			else
+				error = copyout_nofault_c(
+				    (__cheri_tocap const void * __capability)p,
+				    (char * __capability)req->oldptr + origidx,
+				    i);
 		} else
-			error = copyout_c(
-			    (__cheri_tocap const void * __capability)p,
-			    (char * __capability)req->oldptr + origidx, i);
+			if (req->flags & SCTL_PTRIN)
+				error = copyoutcap_c(
+				    (__cheri_tocap const void * __capability)p,
+				    (char * __capability)req->oldptr + origidx,
+				    i);
+			else
+				error = copyout_c(
+				    (__cheri_tocap const void * __capability)p,
+				    (char * __capability)req->oldptr + origidx,
+				    i);
 		if (error != 0)
 			return (error);
 	}
@@ -1857,9 +1882,12 @@ sysctl_new_user(struct sysctl_req *req, void *p, size_t l)
 	if (req->newlen - req->newidx < l)
 		return (EINVAL);
 	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
-	    "sysctl_new_user()");
-	error = copyin_c((char * __capability )req->newptr + req->newidx,
-	    (__cheri_tocap void * __capability)p, l);
+	if (req->flags & SCTL_PTRIN)
+		error = copyincap_c((char * __capability)req->newptr +
+		    req->newidx, (__cheri_tocap void * __capability)p, l);
+	else
+		error = copyin_c((char * __capability)req->newptr + req->newidx,
+		    (__cheri_tocap void * __capability)p, l);
 	req->newidx += l;
 	return (error);
 }
@@ -1955,6 +1983,11 @@ sysctl_root(SYSCTL_HANDLER_ARGS)
 	error = sysctl_find_oid(arg1, arg2, &oid, &indx, req);
 	if (error)
 		goto out;
+
+	if (oid->oid_kind & CTLFLAG_PTRIN)
+		req->flags |= SCTL_PTRIN;
+	if (oid->oid_kind & CTLFLAG_PTROUT)
+		req->flags |= SCTL_PTROUT;
 
 	if ((oid->oid_kind & CTLTYPE) == CTLTYPE_NODE) {
 		/*

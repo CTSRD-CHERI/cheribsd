@@ -121,6 +121,18 @@ copyout_nofault_c(const void * __capability kaddr, void * __capability udaddr,
 	vm_fault_enable_pagefaults(save);
 	return (error);
 }
+
+int
+copyoutcap_nofault_c(const void * __capability kaddr,
+    void * __capability udaddr, size_t len)
+{
+	int error, save;
+
+	save = vm_fault_disable_pagefaults();
+	error = copyoutcap_c(kaddr, udaddr, len);
+	vm_fault_enable_pagefaults(save);
+	return (error);
+}
 #endif
 
 #define	PHYS_PAGE_COUNT(len)	(howmany(len, PAGE_SIZE) + 1)

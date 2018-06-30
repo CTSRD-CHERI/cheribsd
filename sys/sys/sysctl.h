@@ -103,6 +103,9 @@ struct ctlname {
 #define	CTLFLAG_STATS	0x00002000	/* Statistics, not a tuneable */
 #define	CTLFLAG_NOFETCH	0x00001000	/* Don't fetch tunable from getenv() */
 #define	CTLFLAG_CAPRW	(CTLFLAG_CAPRD|CTLFLAG_CAPWR)
+#define	CTLFLAG_PTRIN	0x00000800	/* Copy in pointers */
+#define	CTLFLAG_PTROUT	0x00000400	/* Copy out pointers */
+#define	CTLFLAG_PTR	(CTLFLAG_PTRIN|CTLFLAG_PTROUT)
 
 /*
  * Secure level.   Note that CTLFLAG_SECURE == CTLFLAG_SECURE1.
@@ -154,6 +157,8 @@ struct ctlname {
 #ifdef COMPAT_CHERIABI
 #define	SCTL_CHERIABI	2	/* CheriABI support */
 #endif
+#define	SCTL_PTRIN	4
+#define	SCTL_PTROUT	8
 
 /*
  * This describes the access space for a sysctl request.  This is needed
