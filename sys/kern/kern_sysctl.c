@@ -1882,6 +1882,7 @@ sysctl_new_user(struct sysctl_req *req, void *p, size_t l)
 	if (req->newlen - req->newidx < l)
 		return (EINVAL);
 	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
+	    "sysctl_new_user()");
 	if (req->flags & SCTL_PTRIN)
 		error = copyincap_c((char * __capability)req->newptr +
 		    req->newidx, (__cheri_tocap void * __capability)p, l);
