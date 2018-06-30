@@ -154,9 +154,7 @@ struct ctlname {
     (defined(__mips__) && defined(__mips_n64))
 #define	SCTL_MASK32	1	/* 32 bit emulation */
 #endif
-#ifdef COMPAT_CHERIABI
 #define	SCTL_CHERIABI	2	/* CheriABI support */
-#endif
 #define	SCTL_PTRIN	4
 #define	SCTL_PTROUT	8
 
