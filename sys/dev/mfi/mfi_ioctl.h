@@ -85,7 +85,7 @@ struct mfi_ioc_packet {
 	} mfi_frame;
 
 	struct iovec_native mfi_sgl[MAX_IOCTL_SGE];
-} __packed;
+} __packed __aligned(sizeof(void *__CAPABILITY));
 
 #ifdef COMPAT_FREEBSD32
 struct mfi_ioc_packet32 {
@@ -136,7 +136,7 @@ struct mfi_linux_ioc_packet {
 #else
 	struct iovec_native lioc_sgl[MAX_LINUX_IOCTL_SGE];
 #endif
-} __packed;
+} __packed __aligned(sizeof(void *__CAPABILITY));
 
 struct mfi_ioc_passthru {
 	struct mfi_dcmd_frame	ioc_frame;
