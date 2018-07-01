@@ -1433,7 +1433,13 @@ buildsysroot: buildworld_prologue ${BUILDSYSROOT_TGTS} buildworld_epilogue .PHON
 #
 installcheck: _installcheck_world _installcheck_kernel .PHONY
 _installcheck_world: .PHONY
+	@echo "--------------------------------------------------------------"
+	@echo ">>> Install check world"
+	@echo "--------------------------------------------------------------"
 _installcheck_kernel: .PHONY
+	@echo "--------------------------------------------------------------"
+	@echo ">>> Install check kernel"
+	@echo "--------------------------------------------------------------"
 
 #
 # Require DESTDIR to be set if installing for a different architecture or
@@ -1700,7 +1706,7 @@ restage reinstall reinstallsysroot: .MAKE .PHONY
 .endif
 	@echo
 	@echo "--------------------------------------------------------------"
-	@echo ">>> Installing everything"
+	@echo ">>> Installing everything started on `LC_ALL=C date`"
 	@echo "--------------------------------------------------------------"
 	${_+_}cd ${.CURDIR}; ${MAKE} -f Makefile.inc1 install
 .if defined(LIBCOMPAT)
