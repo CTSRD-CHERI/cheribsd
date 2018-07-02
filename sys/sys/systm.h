@@ -41,6 +41,7 @@
 #include <sys/callout.h>
 #include <sys/queue.h>
 #include <sys/stdint.h>		/* for people using printf mainly */
+#include <sys/limits.h>
 
 #include <machine/atomic.h>
 #include <machine/cpufunc.h>
