@@ -417,7 +417,7 @@ struct	ifreq {
 #endif
 };
 
-#if defined(_KERNEL) && __has_feature(capabilities)
+#if defined(_KERNEL) && ! defined(CHERI_KERNEL) && __has_feature(capabilities)
 struct ifreq_buffer_c {
 	size_t			length;		/* (size_t) */
 	void * __capability	buffer;		/* (void *) */
