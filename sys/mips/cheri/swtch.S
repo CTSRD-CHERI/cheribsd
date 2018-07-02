@@ -78,6 +78,7 @@
 
 #include <machine/cheriasm.h>
 #include <machine/cherireg.h>
+.set cheri_sysregs_accessible
 
 #include "assym.s"
 

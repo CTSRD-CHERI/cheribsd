@@ -74,6 +74,9 @@
 
 #include "assym.s"
 
+	/* Don't warn about uses of c27-c30 */
+	.set cheri_sysregs_accessible
+
 /*
  * Check that we are compiling with the expected flags
  */

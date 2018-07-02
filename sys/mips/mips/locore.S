@@ -210,27 +210,6 @@ VECTOR(_locore, unknown)
 	/*
 	 * Initialize stack and call machine startup.
 	 */
-#ifdef __CHERI_PURE_CAPABILITY__
-	PTR_LA		t0, _C_LABEL(pcpu_space)
-	csetoffset	$c11, $c11, t0
-	cincoffset	$c11, $c11, PCPU_SIZE	# Top of pcpu space is struct pcpu
-	REG_LI		t0, (PAGE_SIZE * 2) - PCPU_SIZE
-	csetbounds	$c11, $c11, t0		# Boot stack capability
-	REG_SUBIU	t0, t0, CALLFRAME_SIZ
-	cincoffset	$c11, $c11, t0		# Make room for initial callframe
-
-	PTR_LA	gp, _C_LABEL(_gp)	# where is gp in cheri???
-
-	/* Call the platform-specific startup code. */
-	PTR_LA	t0, _C_LABEL(platform_start)
-	cgetdefault	$c12
-	csetoffset	$c12, $c12, t0
-	cjalr	$c12, $c17
-	nop
-
-	PANIC("Startup failed!")
-	
-#else
 	PTR_LA		sp, _C_LABEL(pcpu_space)
 	PTR_ADDU	sp, (PAGE_SIZE * 2) - CALLFRAME_SIZ
 
@@ -243,7 +222,6 @@ VECTOR(_locore, unknown)
 	PTR_LA	t9, _C_LABEL(platform_start)
 	jalr	t9
 	nop
-#endif	
 
 	PTR_LA	sp, _C_LABEL(thread0_st)
 	PTR_L	a0, TD_PCB(sp)
