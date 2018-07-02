@@ -205,6 +205,7 @@
  * XXXRW: We should in fact also do this for the kernel version?
  */
 #define	SAVE_CREGS_TO_PCB(pcb, treg, treg2)				\
+	/* Note we save KR2C here, so later we can use it */		\
 	SAVE_U_PCB_CREG(CHERI_REG_SEC0, DDC, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C1, C1, pcb);				\
 	SAVE_U_PCB_CREG(CHERI_REG_C2, C2, pcb);				\
@@ -239,7 +240,6 @@
 	SAVE_CAPCAUSE_TO_PCB(treg, treg2, pcb)
 
 #define	RESTORE_CREGS_FROM_PCB(pcb, treg)				\
-	RESTORE_U_PCB_CREG(CHERI_REG_SEC0, DDC, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C1, C1, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C2, C2, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C3, C3, pcb);			\
@@ -269,6 +269,8 @@
 	/* EPCC is no longer a GPR so load it into KR2C first */	\
 	RESTORE_U_PCB_CREG(CHERI_REG_KR2C, PCC, pcb);			\
 	CSetEPCC	CHERI_REG_KR2C;					\
+	/* Restore DDC in KR2C after trashing the temporary KR2C */	\
+	RESTORE_U_PCB_CREG(CHERI_REG_SEC0, DDC, pcb);			\
 	RESTORE_CAPCAUSE_FROM_PCB(treg, pcb);				\
 	csetcause	treg
 

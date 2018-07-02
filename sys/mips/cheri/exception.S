@@ -128,6 +128,7 @@
 
 #include <machine/cheriasm.h>
 #include <machine/cherireg.h>
+.set cheri_sysregs_accessible	# Don't warn on access to c27-c30	
 
 #include "assym.s"
 
@@ -378,13 +379,15 @@ SlowFault:
 /*
  * The CHERI kernel holds the preempted STC in KR1C
  * and restores it outside the SAVE/RESTORE macros.
- * We save it here to keep the traframe consistent.
+ * The CHERI kernel holds the preempted DDC in KR2C
+ * and restores it outside the SAVE/RESTORE macros,
+ * see CHERI_EXCEPTION_ENTER.
+ * We save these here to keep KR1C and KR2C usable and
+ * to keep the trapframe consistent.
  */
-#define SAVE_STC			\
-	SAVE_CREG(CHERI_REG_KR1C, STC)
-
-#define	SAVE_CHERI(treg0, treg1)			\
-	SAVE_CREG(CHERI_REG_DDC, DDC);		\
+#define	SAVE_CHERI(treg0, treg1)		\
+	/* $ddc is held by KR2C */		\
+	SAVE_CREG(CHERI_REG_KR2C, DDC);		\
 	SAVE_CREG(CHERI_REG_C1, C1);		\
 	SAVE_CREG(CHERI_REG_C2, C2);		\
 	SAVE_CREG(CHERI_REG_C3, C3);		\
@@ -395,7 +398,8 @@ SlowFault:
 	SAVE_CREG(CHERI_REG_C8, C8);		\
 	SAVE_CREG(CHERI_REG_C9, C9);		\
 	SAVE_CREG(CHERI_REG_C10, C10);		\
-	SAVE_STC		     ;		\
+	/* Note KR1C is saved here, so later can be used */\
+	SAVE_CREG(CHERI_REG_KR1C, STC);		\
 	SAVE_CREG(CHERI_REG_C12, C12);		\
 	SAVE_CREG(CHERI_REG_C13, C13);		\
 	SAVE_CREG(CHERI_REG_C14, C14);		\
@@ -411,7 +415,9 @@ SlowFault:
 	SAVE_CREG(CHERI_REG_C24, C24);		\
 	SAVE_CREG(CHERI_REG_C25, C25);		\
 	SAVE_CREG(CHERI_REG_C26, IDC);		\
-	SAVE_CREG(CHERI_REG_EPCC, PCC);		\
+	/* EPCC is no longer a GPR so load it into KR1C first */\
+	CGetEPCC CHERI_REG_KR1C;		\
+	SAVE_CREG(CHERI_REG_KR1C, PCC);		\
 	cgetcause	treg0;			\
 	SAVE_CAPCAUSE(treg0, treg1, CAPCAUSE)
 
@@ -504,22 +510,26 @@ SlowFault:
 /*
  * Restore CHERI registers from the on-stack kernel trap frame.
  *
- * Notice: the capability cause register is saved, but not restored.
- * Notice: STC must be restored later in the cheri kernel, otherwise we can not
+ * STC must be restored later in the cheri kernel, otherwise we can not
  * restore the rest.
+ * DDC must be stored in KR2C since CHERI_EXCEPTION_RETURN expects,
+ * it to be there.
+ * Both STC and DDC are restored outside SAVE/RESTORE_CHERI macros.
+ *
+ * Notice: the capability cause register is saved, but not restored.
  */
 #define	RESTORE_CHERI				\
-	RESTORE_CREG(CHERI_REG_DDC, DDC);	\
-	RESTORE_CREG(CHERI_REG_C1, C1);	\
-	RESTORE_CREG(CHERI_REG_C2, C2);	\
-	RESTORE_CREG(CHERI_REG_C3, C3);	\
-	RESTORE_CREG(CHERI_REG_C4, C4);	\
-	RESTORE_CREG(CHERI_REG_C5, C5);	\
-	RESTORE_CREG(CHERI_REG_C6, C6);	\
-	RESTORE_CREG(CHERI_REG_C7, C7);	\
-	RESTORE_CREG(CHERI_REG_C8, C8);	\
-	RESTORE_CREG(CHERI_REG_C9, C9);	\
+	RESTORE_CREG(CHERI_REG_C1, C1);		\
+	RESTORE_CREG(CHERI_REG_C2, C2);		\
+	RESTORE_CREG(CHERI_REG_C3, C3);		\
+	RESTORE_CREG(CHERI_REG_C4, C4);		\
+	RESTORE_CREG(CHERI_REG_C5, C5);		\
+	RESTORE_CREG(CHERI_REG_C6, C6);		\
+	RESTORE_CREG(CHERI_REG_C7, C7);		\
+	RESTORE_CREG(CHERI_REG_C8, C8);		\
+	RESTORE_CREG(CHERI_REG_C9, C9);		\
 	RESTORE_CREG(CHERI_REG_C10, C10);	\
+	/* Restore STC in KR1C, will be fully restored later */\
 	RESTORE_CREG(CHERI_REG_KR1C, STC);	\
 	RESTORE_CREG(CHERI_REG_C12, C12);	\
 	RESTORE_CREG(CHERI_REG_C13, C13);	\
@@ -536,7 +546,11 @@ SlowFault:
 	RESTORE_CREG(CHERI_REG_C24, C24);	\
 	RESTORE_CREG(CHERI_REG_C25, C25);	\
 	RESTORE_CREG(CHERI_REG_C26, IDC);	\
-	RESTORE_CREG(CHERI_REG_EPCC, PCC)
+	/* EPCC is no longer a GPR so load it into KR1C first */\
+	RESTORE_CREG(CHERI_REG_KR2C, PCC);	\
+	CSetEPCC CHERI_REG_KR2C;		\
+	/* Restore DDC last so we can use KR2C */\
+	RESTORE_CREG(CHERI_REG_KR2C, DDC)
 
 /*
  * Restore preempted kernel state following a kernel exception.  The caller
@@ -675,6 +689,7 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	/* XXX-AM: a3 this holds the exception PC from SAVE_CPU, find it a place once ddb is ported */
 	csd	a3, zero, CALLFRAME_RA(CHERI_REG_STC) # for debugging
 
+	/* XXX-AM: this may need to be moved before loading pcpu, if we need the pcpup symbol */
 	LOAD_KERNEL_GP
 	/* Turn off fpu and enter kernel mode */
 	and	t0, a0, ~(MIPS_SR_COP_1_BIT | MIPS_SR_EXL | MIPS_SR_KSU_MASK | MIPS_SR_INT_IE)
