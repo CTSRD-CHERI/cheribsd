@@ -513,6 +513,22 @@ test_getuid(uintmax_t num, uintmax_t int_arg __unused, const char *path __unused
 }
 
 static uintmax_t
+test_memcpy(uintmax_t num, uintmax_t int_arg, const char *path __unused)
+{
+	char buf[int_arg], buf2[int_arg];
+	uintmax_t i;
+
+	benchmark_start();
+	BENCHMARK_FOREACH(i, num) {
+		memcpy(buf2, buf, int_arg);
+		memcpy(buf, buf2, int_arg);
+	}
+	benchmark_stop();
+
+	return (i);
+}
+
+static uintmax_t
 test_open_close(uintmax_t num, uintmax_t int_arg __unused, const char *path)
 {
 	uintmax_t i;
@@ -971,6 +987,13 @@ static const struct test tests[] = {
 	{ "getresuid", test_getresuid, .t_flags = 0 },
 	{ "gettimeofday", test_gettimeofday, .t_flags = 0 },
 	{ "getuid", test_getuid, .t_flags = 0 },
+	{ "memcpy_8", test_memcpy, .t_flags = 0, .t_int = 8 },
+	{ "memcpy_80", test_memcpy, .t_flags = 0, .t_int = 80 },
+	{ "memcpy_800", test_memcpy, .t_flags = 0, .t_int = 800 },
+	{ "memcpy_8000", test_memcpy, .t_flags = 0, .t_int = 8000 },
+	{ "memcpy_80000", test_memcpy, .t_flags = 0, .t_int = 80000 },
+	{ "memcpy_800000", test_memcpy, .t_flags = 0, .t_int = 800000 },
+	{ "memcpy_8000000", test_memcpy, .t_flags = 0, .t_int = 8000000 },
 	{ "open_close", test_open_close, .t_flags = FLAG_PATH },
 	{ "open_read_close_1", test_open_read_close, .t_flags = FLAG_PATH,
 	    .t_int = 1 },
