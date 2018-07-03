@@ -160,7 +160,7 @@ ${FULLKERNEL}: ${SYSTEM_DEP} vers.o
 	sh ${S}/tools/embed_cheriabitest_list.sh ${FULLKERNEL}
 .endif
 
-OBJS_DEPEND_GUESS+=	assym.inc vnode_if.h ${BEFORE_DEPEND:M*.h} \
+OBJS_DEPEND_GUESS+=	offset.inc assym.inc vnode_if.h ${BEFORE_DEPEND:M*.h} \
 			${MFILES:T:S/.m$/.h/}
 
 .for mfile in ${MFILES}
