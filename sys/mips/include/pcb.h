@@ -170,6 +170,18 @@
 #define	RESTORE_U_PCB_CONTEXT(reg, offs, base) \
 	REG_L	reg, (U_PCB_CONTEXT + (SZREG * offs)) (base)
 
+#define	SAVE_U_PCB_FPREG(reg, offs, base) \
+	FP_S	reg, (U_PCB_FPREGS + (SZFPREG * offs)) (base)
+
+#define	RESTORE_U_PCB_FPREG(reg, offs, base) \
+	FP_L	reg, (U_PCB_FPREGS + (SZFPREG * offs)) (base)
+
+#define	SAVE_U_PCB_FPSR(reg, offs, base) \
+	REG_S	reg, (U_PCB_FPREGS + (SZFPREG * offs)) (base)
+
+#define	RESTORE_U_PCB_FPSR(reg, offs, base) \
+	REG_L	reg, (U_PCB_FPREGS + (SZFPREG * offs)) (base)
+
 #ifdef CPU_CHERI
 #define	SAVE_U_PCB_CREG(creg, offs, base) \
 	csc	creg, base, (U_PCB_REGS + (SZREG * offs)) (CHERI_REG_KDC)
@@ -208,19 +220,17 @@
 	REG_LI	t0, (U_PCB_CONTEXT + (SZREG * offs));		\
 	cld	reg, t0, 0(base)
 
+/*
+ * XXX-AM: CHERI-MIPS does not support hardfloats, so I undefine
+ * these just in case someone tries to use them.
+ *
+ * #define	SAVE_U_PCB_FPREG(reg, offs, base, treg)
+ * #define	RESTORE_U_PCB_FPREG(reg, offs, base, treg)
+ * #define	SAVE_U_PCB_FPSR(reg, offs, base, treg)
+ * #define	RESTORE_U_PCB_FPSR(reg, offs, base, treg)
+ */
+
 #endif /* CHERI_KERNEL */
-
-#define	SAVE_U_PCB_FPREG(reg, offs, base) \
-	FP_S	reg, (U_PCB_FPREGS + (SZFPREG * offs)) (base)
-
-#define	RESTORE_U_PCB_FPREG(reg, offs, base) \
-	FP_L	reg, (U_PCB_FPREGS + (SZFPREG * offs)) (base)
-
-#define	SAVE_U_PCB_FPSR(reg, offs, base) \
-	REG_S	reg, (U_PCB_FPREGS + (SZFPREG * offs)) (base)
-
-#define	RESTORE_U_PCB_FPSR(reg, offs, base) \
-	REG_L	reg, (U_PCB_FPREGS + (SZFPREG * offs)) (base)
 
 #ifndef LOCORE
 #include <machine/frame.h>

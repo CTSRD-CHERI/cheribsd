@@ -476,15 +476,30 @@ sw2:
 	nop
 END(cpu_switch)
 
-#if defined(CPU_HAVEFPU)
-#error "CHERI purecap kernel does not yet support FPU regs context switching!"
-#endif /* CPU_HAVEFPU */
+/*----------------------------------------------------------------------------
+ *
+ * MipsSwitchFPState --
+ *
+ * CHERI do not support hardfloats, the purecap kernel certainly does not
+ * since we do not have a way to load/store hardware floats via capabilities
+ * unless we emulate it.
+ *
+ * Panic for now.
+ *
+ *----------------------------------------------------------------------------
+ */
+LEAF(MipsSwitchFPState)
+	PANIC("purecap kernel has no FPU support")
+	nop
+END(MipsSwitchFPState)
 
 /*----------------------------------------------------------------------------
  *
  * MipsFPID --
  *
  *	Read and return the floating point implementation register.
+ *	Always return zero in this case since the purecap kernel does not
+ *	currently support an FPU.
  *
  *	uint32_t
  *	MipsFPID(void)
@@ -500,6 +515,11 @@ END(cpu_switch)
 LEAF(MipsFPID)
 	.set push
 	.set hardfloat
+#ifdef CHERI_KERNEL
+	li	v0, 0
+	cjr	$c17
+	nop
+#else
 	mfc0	t1, MIPS_COP_0_STATUS		# Save the status register.
 	HAZARD_DELAY
 	or	t0, t1, MIPS_SR_COP_1_BIT | MIPS_SR_FR
@@ -511,6 +531,7 @@ LEAF(MipsFPID)
 	ITLBNOPFIX
 	cjr	$c17
 	nop
+#endif
 	.set pop
 END(MipsFPID)
 
