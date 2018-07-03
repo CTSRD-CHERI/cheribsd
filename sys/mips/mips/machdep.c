@@ -318,7 +318,7 @@ mips_proc0_init(void)
 	thread0.td_pcb = cheri_csetbounds((struct pcb *)(thread0.td_kstack +
 		thread0.td_kstack_pages * PAGE_SIZE) - 1,
 		sizeof(struct pcb));
-	thread0.td_kstack = cheri_csetbounds(thread0.td_kstack,
+	thread0.td_kstack = (vm_ptr_t) cheri_csetbounds((void *)thread0.td_kstack,
 		thread0.td_kstack_pages * PAGE_SIZE - sizeof(struct pcb));
 #endif /* CHERI_KERNEL */
 	thread0.td_frame = &thread0.td_pcb->pcb_regs;
