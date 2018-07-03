@@ -1005,7 +1005,8 @@ int
 shm_map(struct file *fp, size_t size, off_t offset, void **memp)
 {
 	struct shmfd *shmfd;
-	vm_offset_t kva, ofs;
+	vm_ptr_t kva;
+	vm_offset_t ofs;
 	vm_object_t obj;
 	int rv;
 
@@ -1037,13 +1038,13 @@ shm_map(struct file *fp, size_t size, off_t offset, void **memp)
 	    VMFS_OPTIMAL_SPACE, VM_PROT_READ | VM_PROT_WRITE,
 	    VM_PROT_READ | VM_PROT_WRITE, 0);
 	if (rv == KERN_SUCCESS) {
-		rv = vm_map_wire(kernel_map, kva, kva + size,
+		rv = vm_map_wire(kernel_map, ptr_to_va(kva), ptr_to_va(kva) + size,
 		    VM_MAP_WIRE_SYSTEM | VM_MAP_WIRE_NOHOLES);
 		if (rv == KERN_SUCCESS) {
 			*memp = (void *)(kva + ofs);
 			return (0);
 		}
-		vm_map_remove(kernel_map, kva, kva + size);
+		vm_map_remove(kernel_map, ptr_to_va(kva), ptr_to_va(kva) + size);
 	} else
 		vm_object_deallocate(obj);
 
