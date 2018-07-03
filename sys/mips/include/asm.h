@@ -713,13 +713,24 @@ _C_LABEL(x):
 /**
  * XXX-AM: This should become a cap-table load
  * using KDC (which will become GPC at some point)
+ * For now we force a static relocation here because this
+ * is used in places where the kernel GPC is not yet installed.
+ * once KDC is kernel GPC, CHERI_EXCEPTION_ENTER can install GPC
+ * and save the old GPC to KR2C?
  */
 #define	GET_CPU_PCPU(creg, treg)			\
-	PTR_LA	treg, _C_LABEL(pcpup);			\
+	/* PTR_LA	treg, _C_LABEL(pcpup);*/	\
+	/* we can only afford to use a single tmp register here */\
+	lui	treg, %highest(pcpup);			\
+	daddiu	treg, treg, %higher(pcpup);		\
+	dsll	treg, treg, 16;				\
+	daddiu	treg, treg, %hi(pcpup);			\
+	dsll	treg, treg, 16;				\
+	daddiu	treg, treg, %lo(pcpup);			\
 	cgetkdc		creg;				\
 	cfromptr	creg, creg, treg;		\
 	csetbounds	creg, creg, CHERICAP_SIZE;	\
-	clc	creg, zero, 0(creg)
+	clc	creg, zero, 0(creg);
 #define	GET_CPU_PCPU_NOCAP(reg)		\
 	PTR_L	reg, _C_LABEL(pcpup);
 #else /* ! CHERI_KERNEL */

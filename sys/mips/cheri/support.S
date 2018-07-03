@@ -46,6 +46,7 @@
 
 #include "assym.s"
 
+	.set	cheri_sysregs_accessible
 	.set	noreorder
 
 	.text
@@ -61,9 +62,7 @@
  * a0 - maximum length
  */
 LEAF(copystr_c)
-#ifdef CHERI_KERNEL
 XLEAF(copystr)
-#endif
 	li		v0, 0	/* Hopefully we succeed */
 	beqz		a0, cstr_return_toolong /* Return if zero-length. */
 	li		t1, 1	/* Length we will have copied in loop */
@@ -82,11 +81,7 @@ cstr_return_nul:	/* Store length read if c5 is non-NULL */
 	nop
 	csd		t1, zero, 0($c5)	/* Store bytes copied */
 cstr_return:
-#ifdef CHERI_KERNEL
 	cjr	$c17
-#else
-	jr	ra
-#endif
 	nop
 END(copystr_c)
 
@@ -325,17 +320,14 @@ NESTED(copyinstr_c, CALLFRAME_SIZ, ra)
 	cgetbase	t0, $c3 # make sure source is in userspace
 	bge	t0, zero, 1f
 	csc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
-	PTR_LA	t0, _C_LABEL(copyerr)
-	cgetpccsetoffset	$c12, t0
+	CAPTABLE_LOAD($c12, copyerr)
 	cjr	$c12
 	nop
 1:
 	GET_CPU_PCPU($c1, t0)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
-	PTR_LA	t0, copyerr
-	cgetpccsetoffset $c2, t0	# prepare the onfault jump point
-	PTR_LA	t9, _C_LABEL(copystr)
-	cgetpccsetoffset $c12, t9
+	CAPTABLE_LOAD($c2, copyerr)	# prepare the onfault jump point
+	CAPCALL_LOAD($c12, copystr)
 	cjalr	$c12, $c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
@@ -365,17 +357,14 @@ XNESTED(copyoutstr_c)
 	cgetbase	t0, $c4 # make sure destination is in userspace
 	bge	t0, zero, 1f
 	csc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
-	PTR_LA	t0, _C_LABEL(copyerr)
-	cgetpccsetoffset	$c12, t0
+	CAPTABLE_LOAD($c12, copyerr)
 	cjr	$c12
 	nop
 1:
 	GET_CPU_PCPU($c1, t0)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
-	PTR_LA	t0, copyerr
-	cgetpccsetoffset $c2, t0	# prepare the onfault jump point
-	PTR_LA	t9, _C_LABEL(copystr)
-	cgetpccsetoffset $c12, t9
+	CAPTABLE_LOAD($c2, copyerr)	# prepare the onfault jump point
+	CAPCALL_LOAD($c12, copystr)
 	cjalr	$c12, $c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
@@ -401,17 +390,14 @@ NESTED(copyin_c, CALLFRAME_SIZ, ra)
 	cgetbase t0, $c3	# make sure source is in userspace
 	bge	t0, zero, 1f
 	csc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
-	PTR_LA	t0, _C_LABEL(copyerr)
-	cgetpccsetoffset	$c12, t0
+	CAPTABLE_LOAD($c12, copyerr)
 	cjr	$c12
 	nop
 1:
 	GET_CPU_PCPU($c1, t0)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
-	PTR_LA	t0, copyerr
-	cgetpccsetoffset $c2, t0	# prepare the onfault jump point
-	PTR_LA	t9, _C_LABEL(bcopy)
-	cgetpccsetoffset $c12, t9
+	CAPTABLE_LOAD($c2, copyerr)	# prepare the onfault jump point
+	CAPCALL_LOAD($c12, bcopy)
 	cjalr	$c12, $c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
@@ -439,17 +425,14 @@ NESTED(copyincap_c, CALLFRAME_SIZ, ra)
 	cgetbase t0, $c3	# make sure source is in userspace
 	bge	t0, zero, 1f
 	csc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
-	PTR_LA	t0, _C_LABEL(copyerr)
-	cgetpccsetoffset	$c12, t0
+	CAPTABLE_LOAD($c12, copyerr)
 	cjr	$c12
 	nop
 1:
 	GET_CPU_PCPU($c1, t0)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
-	PTR_LA	t0, copyerr
-	cgetpccsetoffset $c2, t0	# prepare the onfault jump point
-	PTR_LA	t9, _C_LABEL(cheri_bcopy)
-	cgetpccsetoffset $c12, t9
+	CAPTABLE_LOAD($c2, copyerr)	# prepare the onfault jump point
+	CAPCALL_LOAD($c12, cheri_bcopy)
 	cjalr	$c12, $c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
@@ -476,17 +459,14 @@ NESTED(copyout_c, CALLFRAME_SIZ, ra)
 	cgetbase t0, $c4	# make sure source is in userspace
 	bge	t0, zero, 1f
 	csc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
-	PTR_LA	t0, _C_LABEL(copyerr)
-	cgetpccsetoffset	$c12, t0
+	CAPTABLE_LOAD($c12, copyerr)
 	cjr	$c12
 	nop
 1:
 	GET_CPU_PCPU($c1, t0)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
-	PTR_LA	t0, copyerr
-	cgetpccsetoffset $c2, t0	# prepare the onfault jump point
-	PTR_LA	t9, _C_LABEL(bcopy)
-	cgetpccsetoffset $c12, t9
+	CAPTABLE_LOAD($c2, copyerr)	# prepare the onfault jump point
+	CAPCALL_LOAD($c12, bcopy)
 	cjalr	$c12, $c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
@@ -515,17 +495,14 @@ XNESTED(copyoutcap_c)
 	cgetbase t0, $c4	# make sure source is in userspace
 	bge	t0, zero, 1f
 	csc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
-	PTR_LA	t0, _C_LABEL(copyerr)
-	cgetpccsetoffset	$c12, t0
+	CAPTABLE_LOAD($c12, copyerr)
 	cjr	$c12
 	nop
 1:
 	GET_CPU_PCPU($c1, t0)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
-	PTR_LA	t0, copyerr
-	cgetpccsetoffset $c2, t0	# prepare the onfault jump point
-	PTR_LA	t9, _C_LABEL(cheri_bcopy)
-	cgetpccsetoffset $c12, t9
+	CAPTABLE_LOAD($c2, copyerr)	# prepare the onfault jump point
+	CAPCALL_LOAD($c12, cheri_bcopy)
 	cjalr	$c12, $c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
@@ -558,14 +535,12 @@ END(copyerr)
 LEAF(fueword64_c)
 XLEAF(fueword_c)
 	cgetaddr t0, $c3	# make sure source is in userspace
+	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
 	nop
 	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
-	/* XXX-AM: this may become CAP_TABLE_LOAD */
-	PTR_LA	v0, fswberr
-	cgetpccsetoffset $c2, v0
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	cld	v0, zero, 0($c3)	# fetch word
 	CHERI_NULL($c2)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
@@ -573,22 +548,18 @@ XLEAF(fueword_c)
 	cjr	$c17
 	li	v0, 0
 1:
-	PTR_LA	t0, _C_LABEL(fswberr)
-	cgetpccsetoffset	$c12, t0
-	cjr	$c12
+	cjr	$c2	# fswberr
 	nop
-END(fuword64_c)
+END(fueword64_c)
 
 LEAF(fueword32_c)
 	cgetaddr t0, $c3	# make sure source is in userspace
+	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
 	nop
 	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
-	/* XXX-AM: this may become CAP_TABLE_LOAD */
-	PTR_LA	v0, fswberr
-	cgetpccsetoffset $c2, v0
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	clw	v0, zero, 0($c3)	# fetch word
 	CHERI_NULL($c2)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
@@ -596,90 +567,76 @@ LEAF(fueword32_c)
 	cjr	$c17
 	li	v0, 0
 1:
-	PTR_LA	t0, _C_LABEL(fswberr)
-	cgetpccsetoffset	$c12, t0
-	cjr	$c12
+	cjr	$c2
 	nop
 END(fueword32_c)
 
 LEAF(fuesword_c)
 	cgetaddr t0, $c3	# make sure source is in userspace
-	PTR_LA	v0, _C_LABEL(fswberr)
+	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
-	/* XXX-AM: this may become CAP_TABLE_LOAD */
-	cgetpccsetoffset	$c2, v0
 	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	clhu	v0, zero, 0($c3)	# fetch short
 	CHERI_NULL($c2)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
-	cshu	v0, zero, 0($c4)	# store short
+	csh	v0, zero, 0($c4)	# store short
 	cjr	$c17
 	li	v0, 0
 1:
-	cjr	$c2	# jump to fswberr
+	cjr	$c2	# fswberr
 	nop
-END(fusword_c)
+END(fuesword_c)
 
 LEAF(fubyte_c)
 	cgetaddr t0, $c3	# make sure source is in userspace
-	PTR_LA	v0, _C_LABEL(fswberr)
+	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
-	/* XXX-AM: this may become CAP_TABLE_LOAD */
-	cgetpccsetoffset	$c2, v0
 	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	clbu	v0, zero, 0($c3)	# fetch byte
 	CHERI_NULL($c2)
 	cjr	$c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 1:
-	cjr	$c2	# jump to fswberr
+	cjr	$c2	# fswberr
 	nop
 END(fubyte_c)
 
 LEAF(suword64_c)
 XLEAF(suword_c)
 	cgetaddr t0, $c3	# make sure source is in userspace
+	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
 	nop
 	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
-	/* XXX-AM: this may become CAP_TABLE_LOAD */
-	PTR_LA	v0, fswberr
-	cgetpccsetoffset $c2, v0
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	csd	a0, zero, 0($c3)	# store word
 	CHERI_NULL($c2)
 	cjr	$c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 1:
-	PTR_LA	t0, _C_LABEL(fswberr)
-	cgetpccsetoffset	$c12, t0
-	cjr	$c12
+	cjr	$c2	# fswberr
 	nop
 END(suword64_c)
 
 LEAF(suword32_c)
 	cgetaddr t0, $c3	# make sure source is in userspace
+	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
 	nop
 	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
-	/* XXX-AM: this may become CAP_TABLE_LOAD */
-	PTR_LA	v0, fswberr
-	cgetpccsetoffset $c2, v0
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	csw	a0, zero, 0($c3)	# store word
 	CHERI_NULL($c2)
 	cjr	$c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 1:
-	PTR_LA	t0, _C_LABEL(fswberr)
-	cgetpccsetoffset	$c12, t0
-	cjr	$c12
+	cjr	$c2	# fswberr
 	nop
 END(suword32_c)
 
@@ -695,13 +652,12 @@ END(suword32_c)
  */
 LEAF(casueword32_c)
 	cgetaddr t0, $c3	# make sure source is in userspace
-	PTR_LA	v0, _C_LABEL(fswberr)
+	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
-	/* XXX-AM: this may become CAP_TABLE_LOAD */
-	cgetpccsetoffset	$c2, v0
+	nop
 	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 2:
 	move	t0, a1
 	cllw	t1, $c3		# load word
@@ -720,20 +676,19 @@ LEAF(casueword32_c)
 	cjr	$c17
 	csw	t1, zero, 0($c4)	# unconditionally store old word
 1:
-	cjr	$c2	# jump to fswberr
+	cjr	$c2	# fswberr
 	nop
 END(casueword32_c)
 
 LEAF(casueword64_c)
 XLEAF(casueword_c)
 	cgetaddr t0, $c3	# make sure source is in userspace
-	PTR_LA	v0, _C_LABEL(fswberr)
+	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
-	/* XXX-AM: this may become CAP_TABLE_LOAD */
-	cgetpccsetoffset	$c2, v0
+	nop
 	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 2:
 	move	t0, a1
 	clld	t1, $c3
@@ -752,7 +707,7 @@ XLEAF(casueword_c)
 	cjr	$c17
 	csd	t1, zero, 0($c4)	# unconditionally store old word
 1:
-	cjr	$c2	# jump to fswberr
+	cjr	$c2	# fswberr
 	nop
 END(casueword64_c)
 
@@ -761,39 +716,37 @@ END(casueword64_c)
  */
 LEAF(susword_c)
 	cgetaddr t0, $c3	# make sure source is in userspace
-	PTR_LA	v0, _C_LABEL(fswberr)
+	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
-	/* XXX-AM: this may become CAP_TABLE_LOAD */
-	cgetpccsetoffset $c2, v0
+	nop
 	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	csh	a0, zero, 0($c3)	# store short
 	CHERI_NULL($c2)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 	cjr	$c17
 	move	v0, zero
 1:
-	cjr	$c2	# jump to fswberr
+	cjr	$c2	# fswberr
 	nop
 END(susword_c)
 
 LEAF(subyte_c)
 	cgetaddr t0, $c3	# make sure source is in userspace
-	PTR_LA	v0, _C_LABEL(fswberr)
+	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
-	/* XXX-AM: this may become CAP_TABLE_LOAD */
-	cgetpccsetoffset $c2, v0
+	nop
 	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	csb	a0, zero, 0($c3)	# store short
 	CHERI_NULL($c2)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 	cjr	$c17
 	move	v0, zero
 1:
-	cjr	$c2	# jump to fswberr
+	cjr	$c2	# fswberr
 	nop
 END(subyte_c)
 
@@ -810,36 +763,36 @@ END(fswberr)
  */
 LEAF(fuswintr)
 	cgetbase t0, $c3	# make sure source is in userspace
-	PTR_LA	v0, _C_LABEL(fswintrberr)
+	CAPTABLE_LOAD($c2, fswintrberr)
 	blt	t0, zero, 1f
-	cgetpccsetoffset	$c2, v0
+	nop
 	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	clhu	v0, zero, 0($c3)	# fetch short
 	CHERI_NULL($c2)
 	cjr	$c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 1:
-	cjr	$c2	# jump to fswintrberr
+	cjr	$c2	# fswintrberr
 	nop
 END(fuswintr)
 
 LEAF(suswintr)
 	cgetbase t0, $c3	# make sure source is in userspace
-	PTR_LA	v0, _C_LABEL(fswintrberr)
+	CAPTABLE_LOAD($c2, fswintrberr)
 	blt	t0, zero, 1f
-	cgetpccsetoffset $c2, v0
+	nop
 	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	csh	a0, zero, 0($c3)	# store short
 	CHERI_NULL($c2)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 	cjr	$c17
 	move	v0, zero
 1:
-	cjr	$c2	# jump to fswintrberr
+	cjr	$c2	# fswintrberr
 	nop
 END(suswintr)
 
@@ -1045,243 +998,8 @@ LEAF(ffs)
 	j	ra
 	nop
 END(ffs)
-
-<<<<<<< HEAD
-=======
-#if 0 /* XXX-AM these seems not being used */
-
-/**
- * void
- * atomic_set_16(u_int16_t *a, u_int16_t b)
- * {
- *	*a |= b;
- * }
- */
-LEAF(atomic_set_16)
-	.set	noreorder
-	srl	a0, a0, 2	# round down address to be 32-bit aligned
-	sll	a0, a0, 2
-	andi	a1, a1, 0xffff
-1:
-	ll	t0, 0(a0)
-	or	t0, t0, a1
-	sc	t0, 0(a0)
-	beq	t0, zero, 1b
-	nop
-	j	ra
-	nop
-END(atomic_set_16)
-
-/**
- * void
- * atomic_clear_16(u_int16_t *a, u_int16_t b)
- * {
- *	*a &= ~b;
- * }
- */
-LEAF(atomic_clear_16)
-	.set	noreorder
-	srl	a0, a0, 2	# round down address to be 32-bit aligned
-	sll	a0, a0, 2
-	nor	a1, zero, a1
-1:
-	ll	t0, 0(a0)
-	move	t1, t0
-	andi	t1, t1, 0xffff	# t1 has the original lower 16 bits
-	and	t1, t1, a1	# t1 has the new lower 16 bits
-	srl	t0, t0, 16	# preserve original top 16 bits
-	sll	t0, t0, 16
-	or	t0, t0, t1
-	sc	t0, 0(a0)
-	beq	t0, zero, 1b
-	nop
-	j	ra
-	nop
-END(atomic_clear_16)
-
-
-/**
- * void
- * atomic_subtract_16(uint16_t *a, uint16_t b)
- * {
- *	*a -= b;
- * }
- */
-LEAF(atomic_subtract_16)
-	.set	noreorder
-	srl	a0, a0, 2	# round down address to be 32-bit aligned
-	sll	a0, a0, 2
-1:
-	ll	t0, 0(a0)
-	move	t1, t0
-	andi	t1, t1, 0xffff	# t1 has the original lower 16 bits
-	subu	t1, t1, a1
-	andi	t1, t1, 0xffff	# t1 has the new lower 16 bits
-	srl	t0, t0, 16	# preserve original top 16 bits
-	sll	t0, t0, 16
-	or	t0, t0, t1
-	sc	t0, 0(a0)
-	beq	t0, zero, 1b
-	nop
-	j	ra
-	nop
-END(atomic_subtract_16)
-
-/**
- * void
- * atomic_add_16(uint16_t *a, uint16_t b)
- * {
- *	*a += b;
- * }
- */
-LEAF(atomic_add_16)
-	.set	noreorder
-	srl	a0, a0, 2	# round down address to be 32-bit aligned
-	sll	a0, a0, 2
-1:
-	ll	t0, 0(a0)
-	move	t1, t0
-	andi	t1, t1, 0xffff	# t1 has the original lower 16 bits
-	addu	t1, t1, a1
-	andi	t1, t1, 0xffff	# t1 has the new lower 16 bits
-	srl	t0, t0, 16	# preserve original top 16 bits
-	sll	t0, t0, 16
-	or	t0, t0, t1
-	sc	t0, 0(a0)
-	beq	t0, zero, 1b
-	nop
-	j	ra
-	nop
-END(atomic_add_16)
-
-/**
- * void
- * atomic_add_8(uint8_t *a, uint8_t b)
- * {
- *	*a += b;
- * }
- */
-LEAF(atomic_add_8)
-	.set	noreorder
-	srl	a0, a0, 2	# round down address to be 32-bit aligned
-	sll	a0, a0, 2
-1:
-	ll	t0, 0(a0)
-	move	t1, t0
-	andi	t1, t1, 0xff	# t1 has the original lower 8 bits
-	addu	t1, t1, a1
-	andi	t1, t1, 0xff	# t1 has the new lower 8 bits
-	srl	t0, t0, 8	# preserve original top 24 bits
-	sll	t0, t0, 8
-	or	t0, t0, t1
-	sc	t0, 0(a0)
-	beq	t0, zero, 1b
-	nop
-	j	ra
-	nop
-END(atomic_add_8)
-
-
-/**
- * void
- * atomic_subtract_8(uint8_t *a, uint8_t b)
- * {
- *	*a += b;
- * }
- */
-LEAF(atomic_subtract_8)
-	.set	noreorder
-	srl	a0, a0, 2	# round down address to be 32-bit aligned
-	sll	a0, a0, 2
-1:
-	ll	t0, 0(a0)
-	move	t1, t0
-	andi	t1, t1, 0xff	# t1 has the original lower 8 bits
-	subu	t1, t1, a1
-	andi	t1, t1, 0xff	# t1 has the new lower 8 bits
-	srl	t0, t0, 8	# preserve original top 24 bits
-	sll	t0, t0, 8
-	or	t0, t0, t1
-	sc	t0, 0(a0)
-	beq	t0, zero, 1b
-	nop
-	j	ra
-	nop
-END(atomic_subtract_8)
-
-/*
- *	atomic 64-bit register read/write assembly language support routines.
- */
-
-	.set	noreorder		# Noreorder is default style!
-
-#if !defined(__mips_n64) && !defined(__mips_n32)
-	/*
-	 * I don't know if these routines have the right number of
-	 * NOPs in it for all processors.  XXX
-	 *
-	 * Maybe it would be better to just leave this undefined in that case.
-	 *
-	 * XXX These routines are not safe in the case of a TLB miss on a1 or
-	 *     a0 unless the trapframe is 64-bit, which it just isn't with O32.
-	 *     If we take any exception, not just an interrupt, the upper
-	 *     32-bits will be clobbered.  Use only N32 and N64 kernels if you
-	 *     want to use 64-bit registers while interrupts are enabled or
-	 *     with memory operations.  Since this isn't even using load-linked
-	 *     and store-conditional, perhaps it should just use two registers
-	 *     instead, as is right and good with the O32 ABI.
-	 */
-LEAF(atomic_store_64)
-	mfc0	t1, MIPS_COP_0_STATUS
-	and	t2, t1, ~MIPS_SR_INT_IE
-	mtc0	t2, MIPS_COP_0_STATUS
-	nop
-	nop
-	nop
-	nop
-	ld	t0, (a1)
-	nop
-	nop
-	sd	t0, (a0)
-	nop
-	nop
-	mtc0	t1,MIPS_COP_0_STATUS
-	nop
-	nop
-	nop
-	nop
-	j	ra
-	nop
-END(atomic_store_64)
-
-LEAF(atomic_load_64)
-	mfc0	t1, MIPS_COP_0_STATUS
-	and	t2, t1, ~MIPS_SR_INT_IE
-	mtc0	t2, MIPS_COP_0_STATUS
-	nop
-	nop
-	nop
-	nop
-	ld	t0, (a0)
-	nop
-	nop
-	sd	t0, (a1)
-	nop
-	nop
-	mtc0	t1,MIPS_COP_0_STATUS
-	nop
-	nop
-	nop
-	nop
-	j	ra
-	nop
-END(atomic_load_64)
-#endif
-#endif /* XXX-AM seemingly not used */
-
-#endif /* the above should not exist in purecap */
-
->>>>>>> 76795b8f35befc22667ea1b199f2cb88a5872da2
+#endif /* XXX-AM: disabled */	
+	
 #if defined(DDB) || defined(DEBUG)
 
 LEAF(kdbpeek)
