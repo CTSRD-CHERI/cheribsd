@@ -779,14 +779,14 @@ test_semaping(uintmax_t num, uintmax_t int_arg __unused, const char *path __unus
 	uintmax_t i;
 	pid_t pid;
 	sem_t *buf;
-	int error, procfd;
+	int error, j, procfd;
 
 	buf = mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_ANON | MAP_SHARED, -1, 0);
 	if (buf == MAP_FAILED)
 		err(1, "mmap");
 
-	for (i = 0; i < 2; i++) {
-		error = sem_init(&buf[i], 1, 0);
+	for (j = 0; j < 2; j++) {
+		error = sem_init(&buf[j], 1, 0);
 		if (error != 0)
 			err(1, "sem_init");
 	}
@@ -819,8 +819,8 @@ test_semaping(uintmax_t num, uintmax_t int_arg __unused, const char *path __unus
 
 	close(procfd);
 
-	for (i = 0; i < 2; i++) {
-		error = sem_destroy(&buf[i]);
+	for (j = 0; j < 2; j++) {
+		error = sem_destroy(&buf[j]);
 		if (error != 0)
 			err(1, "sem_destroy");
 	}
