@@ -238,44 +238,44 @@ ntb_ioctl(if_t ifp, u_long command, caddr_t data)
 	int error = 0;
 
 	switch (command) {
-	case SIOCSIFFLAGS:
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		break;
 
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 	    {
-		if (ifr->ifr_mtu > sc->mtu - ETHER_HDR_LEN) {
+		if (ifr_mtu_get(ifr) > sc->mtu - ETHER_HDR_LEN) {
 			error = EINVAL;
 			break;
 		}
 
-		if_setmtu(ifp, ifr->ifr_mtu);
+		if_setmtu(ifp, ifr_mtu_get(ifr));
 		break;
 	    }
 
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->media, command);
 		break;
 
-	case SIOCSIFCAP:
-		if (ifr->ifr_reqcap & IFCAP_RXCSUM)
+	CASE_IOC_IFREQ(SIOCSIFCAP):
+		if (ifr_reqcap_get(ifr) & IFCAP_RXCSUM)
 			if_setcapenablebit(ifp, IFCAP_RXCSUM, 0);
 		else
 			if_setcapenablebit(ifp, 0, IFCAP_RXCSUM);
-		if (ifr->ifr_reqcap & IFCAP_TXCSUM) {
+		if (ifr_reqcap_get(ifr) & IFCAP_TXCSUM) {
 			if_setcapenablebit(ifp, IFCAP_TXCSUM, 0);
 			if_sethwassistbits(ifp, NTB_CSUM_FEATURES, 0);
 		} else {
 			if_setcapenablebit(ifp, 0, IFCAP_TXCSUM);
 			if_sethwassistbits(ifp, 0, NTB_CSUM_FEATURES);
 		}
-		if (ifr->ifr_reqcap & IFCAP_RXCSUM_IPV6)
+		if (ifr_reqcap_get(ifr) & IFCAP_RXCSUM_IPV6)
 			if_setcapenablebit(ifp, IFCAP_RXCSUM_IPV6, 0);
 		else
 			if_setcapenablebit(ifp, 0, IFCAP_RXCSUM_IPV6);
-		if (ifr->ifr_reqcap & IFCAP_TXCSUM_IPV6) {
+		if (ifr_reqcap_get(ifr) & IFCAP_TXCSUM_IPV6) {
 			if_setcapenablebit(ifp, IFCAP_TXCSUM_IPV6, 0);
 			if_sethwassistbits(ifp, NTB_CSUM_FEATURES6, 0);
 		} else {

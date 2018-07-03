@@ -2,6 +2,19 @@
 #ifndef JEMALLOC_INTERNAL_DEFS_H_
 #define JEMALLOC_INTERNAL_DEFS_H_
 /*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "unsupported",
+ *     "other"
+ *   ],
+ *   "change_comment": "sbrk, use C11 atomics, etc",
+ *   "hybrid_specific": false
+ * }
+ * CHERI CHANGES END
+ */
+/*
  * If JEMALLOC_PREFIX is defined via --with-jemalloc-prefix, it will cause all
  * public APIs to be prefixed.  This makes it possible, with some care, to use
  * multiple allocators simultaneously.
@@ -104,6 +117,9 @@
 /* Defined if pthread_atfork(3) is available. */
 #define JEMALLOC_HAVE_PTHREAD_ATFORK 
 
+/* Defined if pthread_setname_np(3) is available. */
+/* #undef JEMALLOC_HAVE_PTHREAD_SETNAME_NP */
+
 /*
  * Defined if clock_gettime(CLOCK_MONOTONIC_COARSE, ...) is available.
  */
@@ -112,7 +128,10 @@
 /*
  * Defined if clock_gettime(CLOCK_MONOTONIC, ...) is available.
  */
+/* XXX: CLOCK_MONOTONIC goes backwards on mips under qemu... */
+#ifndef __mips__
 #define JEMALLOC_HAVE_CLOCK_MONOTONIC 1
+#endif
 
 /*
  * Defined if mach_absolute_time() is available.
@@ -193,7 +212,11 @@
 /* #undef LG_QUANTUM */
 
 /* One page is 2^LG_PAGE bytes. */
+#ifndef __CHERI_PURE_CAPABILITY__
 #define LG_PAGE 12
+#else
+#define LG_PAGE 13
+#endif
 
 /*
  * One huge page is 2^LG_HUGEPAGE bytes.  Note that this is defined even if the
@@ -336,7 +359,7 @@
 /* #undef JEMALLOC_EXPORT */
 
 /* config.malloc_conf options string. */
-#define JEMALLOC_CONFIG_MALLOC_CONF ""
+#define JEMALLOC_CONFIG_MALLOC_CONF "abort_conf:false"
 
 /* If defined, jemalloc takes the malloc/free/etc. symbol names. */
 #define JEMALLOC_IS_MALLOC 1

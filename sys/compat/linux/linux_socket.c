@@ -659,7 +659,7 @@ linux_sendto_hdrincl(struct thread *td, struct linux_sendto_args *linux_args)
 
 	struct ip *packet;
 	struct msghdr msg;
-	struct iovec aiov[1];
+	kiovec_t aiov[1];
 	int error;
 
 	/* Check that the packet isn't too big or too small. */
@@ -685,8 +685,7 @@ linux_sendto_hdrincl(struct thread *td, struct linux_sendto_args *linux_args)
 	msg.msg_iovlen = 1;
 	msg.msg_control = NULL;
 	msg.msg_flags = 0;
-	aiov[0].iov_base = (char *)packet;
-	aiov[0].iov_len = linux_args->len;
+	IOVEC_INIT(&aiov[0], packet, linux_args->len);
 	error = linux_sendit(td, linux_args->s, &msg, linux_args->flags,
 	    NULL, UIO_SYSSPACE);
 goout:
@@ -1018,7 +1017,7 @@ int
 linux_sendto(struct thread *td, struct linux_sendto_args *args)
 {
 	struct msghdr msg;
-	struct iovec aiov;
+	kiovec_t aiov;
 
 	if (linux_check_hdrincl(td, args->s) == 0)
 		/* IP_HDRINCL set, tweak the packet before sending */
@@ -1030,8 +1029,7 @@ linux_sendto(struct thread *td, struct linux_sendto_args *args)
 	msg.msg_iovlen = 1;
 	msg.msg_control = NULL;
 	msg.msg_flags = 0;
-	aiov.iov_base = PTRIN(args->msg);
-	aiov.iov_len = args->len;
+	IOVEC_INIT(&aiov, PTRIN(args->msg), args->len);
 	return (linux_sendit(td, args->s, &msg, args->flags, NULL,
 	    UIO_USERSPACE));
 }
@@ -1040,7 +1038,7 @@ int
 linux_recvfrom(struct thread *td, struct linux_recvfrom_args *args)
 {
 	struct msghdr msg;
-	struct iovec aiov;
+	kiovec_t aiov;
 	int error, fromlen;
 
 	if (PTRIN(args->fromlen) != NULL) {
@@ -1057,8 +1055,7 @@ linux_recvfrom(struct thread *td, struct linux_recvfrom_args *args)
 	msg.msg_name = (struct sockaddr * __restrict)PTRIN(args->from);
 	msg.msg_iov = &aiov;
 	msg.msg_iovlen = 1;
-	aiov.iov_base = PTRIN(args->buf);
-	aiov.iov_len = args->len;
+	IOVEC_INIT(&aiov, PTRIN(args->buf), args->len);
 	msg.msg_control = 0;
 	msg.msg_flags = linux_to_bsd_msg_flags(args->flags);
 
@@ -1094,7 +1091,7 @@ linux_sendmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 	struct l_cmsghdr linux_cmsg;
 	struct l_cmsghdr *ptr_cmsg;
 	struct l_msghdr linux_msg;
-	struct iovec *iov;
+	kiovec_t *iov;
 	socklen_t datalen;
 	struct sockaddr *sa;
 	sa_family_t sa_family;
@@ -1268,7 +1265,7 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 	struct l_ucred linux_ucred;
 	socklen_t datalen, outlen;
 	struct l_msghdr linux_msg;
-	struct iovec *iov, *uiov;
+	kiovec_t *iov, *uiov;
 	struct mbuf *control = NULL;
 	struct mbuf **controlp;
 	struct timeval *ftmvl;

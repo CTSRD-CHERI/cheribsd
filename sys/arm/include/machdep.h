@@ -40,6 +40,7 @@ void arm_parse_fdt_bootargs(void);
 void arm_print_kenv(void);
 
 void arm_generic_initclocks(void);
+int arm_get_vfpstate(struct thread *td, void *args);
 
 /* Board-specific attributes */
 void board_set_serial(uint64_t);
@@ -48,7 +49,7 @@ void board_set_revision(uint32_t);
 int arm_predict_branch(void *, u_int, register_t, register_t *,
     u_int (*)(void*, int), u_int (*)(void*, vm_offset_t, u_int*));
 
-#ifdef MULTIDELAY
+#ifdef PLATFORM
 typedef void delay_func(int, void *);
 void arm_set_delay(delay_func *, void *);
 #endif

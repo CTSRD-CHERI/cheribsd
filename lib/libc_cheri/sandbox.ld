@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2011-2015 Robert N. M. Watson
+ * Copyright (c) 2017-2018 Alex Richardson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -62,6 +63,8 @@ PAGE_ALIGN = 0x1000;
  */
 INPUT(crt_rtld.o crt_invoke.o)
 INPUT(crtbeginC.o crtendC.o)
+/* Currently needed to process __cap_relocs in sandboxes: */
+INPUT(crt_init_globals.o)
 
 ENTRY(__rtld_vector)
 /* Not supported by LLD: STARTUP(crt_rtld.o) */
@@ -96,12 +99,19 @@ SECTIONS
 		KEEP (*(.init))
 	} = 0
 	.text ALIGN(CAP_ALIGN): {
-		*(.text)
+		KEEP(*(.text*))
 	}
 	.fini ALIGN(CAP_ALIGN): {
 		KEEP (*(.fini))
 	} = 0
-
+	/* Try to trick the linker into not adding any orphan sections before
+	 * .text:
+	 * https://sourceware.org/binutils/docs/ld/Location-Counter.html#Location-Counter
+	 */
+	. = .;
+	.rodata ALIGN(CAP_ALIGN) : {
+		*(.rodata)
+	}
 	/*
 	 * Memory to be mapped into the data segment.  For compiler-generated
 	 * content, it would be much preferable to map into the code segment
@@ -109,6 +119,9 @@ SECTIONS
 	 */
 	.MIPS.options ALIGN(PAGE_ALIGN): {
 		*(.MIPS.options)
+	}
+	.MIPS.abiflags ALIGN(PAGE_ALIGN): {
+		*(.MIPS.abiflags)
 	}
 	.ctors ALIGN(CAP_ALIGN) : {
 		KEEP (crtbeginC.o(.ctors))

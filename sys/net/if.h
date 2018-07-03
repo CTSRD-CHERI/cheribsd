@@ -396,6 +396,7 @@ struct	ifreq {
 		u_int	ifru_fib;
 		u_char	ifru_vlan_pcp;
 	} ifr_ifru;
+#ifndef _KERNEL
 #define	ifr_addr	ifr_ifru.ifru_addr	/* address */
 #define	ifr_dstaddr	ifr_ifru.ifru_dstaddr	/* other end of p-to-p link */
 #define	ifr_broadaddr	ifr_ifru.ifru_broadaddr	/* broadcast address */
@@ -413,7 +414,36 @@ struct	ifreq {
 #define	ifr_index	ifr_ifru.ifru_index	/* interface index */
 #define	ifr_fib		ifr_ifru.ifru_fib	/* interface fib */
 #define	ifr_vlan_pcp	ifr_ifru.ifru_vlan_pcp	/* VLAN priority */
+#endif
 };
+
+#if defined(_KERNEL) && __has_feature(capabilities)
+struct ifreq_buffer_c {
+	size_t			length;		/* (size_t) */
+	void * __capability	buffer;		/* (void *) */
+};
+
+struct ifreq_c {
+	char	ifr_name[IFNAMSIZ];		/* if name, e.g. "en0" */
+	union {
+		struct sockaddr	ifru_addr;
+		struct sockaddr	ifru_dstaddr;
+		struct sockaddr	ifru_broadaddr;
+		struct ifreq_buffer_c ifru_buffer;
+		short		ifru_flags[2];
+		short		ifru_index;
+		int		ifru_jid;
+		int		ifru_metric;
+		int		ifru_mtu;
+		int		ifru_phys;
+		int		ifru_media;
+		void * __capability ifru_data;
+		int		ifru_cap[2];
+		u_int		ifru_fib;
+		u_char		ifru_vlan_pcp;
+	} ifr_ifru;
+};
+#endif /* defined(_KERNEL) && __has_feature(capabilities) */
 
 #define	_SIZEOF_ADDR_IFREQ(ifr) \
 	((ifr).ifr_addr.sa_len > sizeof(struct sockaddr) ? \
@@ -443,7 +473,7 @@ struct ifmediareq {
 	int	ifm_status;		/* media status */
 	int	ifm_active;		/* active options */
 	int	ifm_count;		/* # entries in ifm_ulist array */
-	int	*ifm_ulist;		/* media words */
+	int * __kerncap ifm_ulist;		/* media words */
 };
 
 struct  ifdrv {
@@ -509,8 +539,10 @@ struct ifgroupreq {
 		char	ifgru_group[IFNAMSIZ];
 		struct	ifg_req *ifgru_groups;
 	} ifgr_ifgru;
+#ifndef _KERNEL
 #define ifgr_group	ifgr_ifgru.ifgru_group
 #define ifgr_groups	ifgr_ifgru.ifgru_groups
+#endif
 };
 
 /*
@@ -525,6 +557,42 @@ struct ifi2creq {
 	uint32_t spare1;
 	uint8_t data[8];	/* read buffer */
 }; 
+
+/*
+ * RSS hash.
+ */
+
+#define	RSS_FUNC_NONE		0		/* RSS disabled */
+#define	RSS_FUNC_PRIVATE	1		/* non-standard */
+#define	RSS_FUNC_TOEPLITZ	2
+
+#define	RSS_TYPE_IPV4		0x00000001
+#define	RSS_TYPE_TCP_IPV4	0x00000002
+#define	RSS_TYPE_IPV6		0x00000004
+#define	RSS_TYPE_IPV6_EX	0x00000008
+#define	RSS_TYPE_TCP_IPV6	0x00000010
+#define	RSS_TYPE_TCP_IPV6_EX	0x00000020
+#define	RSS_TYPE_UDP_IPV4	0x00000040
+#define	RSS_TYPE_UDP_IPV6	0x00000080
+#define	RSS_TYPE_UDP_IPV6_EX	0x00000100
+
+#define	RSS_KEYLEN		128
+
+struct ifrsskey {
+	char		ifrk_name[IFNAMSIZ];	/* if name, e.g. "en0" */
+	uint8_t		ifrk_func;		/* RSS_FUNC_ */
+	uint8_t		ifrk_spare0;
+	uint16_t	ifrk_keylen;
+	uint8_t		ifrk_key[RSS_KEYLEN];
+};
+
+struct ifrsshash {
+	char		ifrh_name[IFNAMSIZ];	/* if name, e.g. "en0" */
+	uint8_t		ifrh_func;		/* RSS_FUNC_ */
+	uint8_t		ifrh_spare0;
+	uint16_t	ifrh_spare1;
+	uint32_t	ifrh_types;		/* RSS_TYPE_ */
+};
 
 #endif /* __BSD_VISIBLE */
 

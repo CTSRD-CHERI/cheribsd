@@ -46,16 +46,16 @@ cloudabi64_copyinuio(const cloudabi64_iovec_t *iovp, size_t iovcnt,
 {
 	cloudabi64_iovec_t iovobj;
 	struct uio *uio;
-	struct iovec *iov;
+	kiovec_t *iov;
 	size_t i;
 	int error;
 
 	/* Allocate uio and iovecs. */
 	if (iovcnt > UIO_MAXIOV)
 		return (EINVAL);
-	uio = malloc(sizeof(struct uio) + iovcnt * sizeof(struct iovec),
+	uio = malloc(sizeof(struct uio) + iovcnt * sizeof(kiovec_t),
 	    M_IOV, M_WAITOK);
-	iov = (struct iovec *)(uio + 1);
+	iov = (kiovec_t *)(uio + 1);
 
 	/* Initialize uio. */
 	uio->uio_iov = iov;
@@ -71,8 +71,7 @@ cloudabi64_copyinuio(const cloudabi64_iovec_t *iovp, size_t iovcnt,
 			free(uio, M_IOV);
 			return (error);
 		}
-		iov[i].iov_base = TO_PTR(iovobj.buf);
-		iov[i].iov_len = iovobj.buf_len;
+		IOVEC_INIT(&iov[i], TO_PTR(iovobj.buf), iovobj.buf_len);
 		if (iov[i].iov_len > INT64_MAX - uio->uio_resid) {
 			free(uio, M_IOV);
 			return (EINVAL);

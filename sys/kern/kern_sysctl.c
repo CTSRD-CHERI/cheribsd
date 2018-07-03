@@ -56,6 +56,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/mutex.h>
 #include <sys/rmlock.h>
 #include <sys/sbuf.h>
+#include <sys/syscallsubr.h>
 #include <sys/sysent.h>
 #include <sys/sx.h>
 #include <sys/sysproto.h>
@@ -89,7 +90,7 @@ static MALLOC_DEFINE(M_SYSCTLTMP, "sysctltmp", "sysctl temp output buffer");
  * sysctl requests larger than a single page via an exclusive lock.
  */
 static struct rmlock sysctllock;
-static struct sx sysctlmemlock;
+static struct sx __exclusive_cache_line sysctlmemlock;
 
 #define	SYSCTL_WLOCK()		rm_wlock(&sysctllock)
 #define	SYSCTL_WUNLOCK()	rm_wunlock(&sysctllock)
@@ -311,7 +312,7 @@ sysctl_load_tunable_by_oid_locked(struct sysctl_oid *oidp)
 		if (penv == NULL)
 			return;
 		req.newlen = strlen(penv);
-		req.newptr = penv;
+		req.newptr = (__cheri_tocap char * __capability)penv;
 		break;
 	default:
 		return;
@@ -323,6 +324,91 @@ sysctl_load_tunable_by_oid_locked(struct sysctl_oid *oidp)
 	if (penv != NULL)
 		freeenv(penv);
 }
+
+static int
+sbuf_printf_drain(void *arg __unused, const char *data, int len)
+{
+
+	return (printf("%.*s", len, data));
+}
+
+/*
+ * Locate the path to a given oid.  Returns the length of the resulting path,
+ * or -1 if the oid was not found.  nodes must have room for CTL_MAXNAME
+ * elements and be NULL initialized.
+ */
+static int
+sysctl_search_oid(struct sysctl_oid **nodes, struct sysctl_oid *needle)
+{
+	int indx;
+
+	SYSCTL_ASSERT_LOCKED();
+	indx = 0;
+	while (indx < CTL_MAXNAME && indx >= 0) {
+		if (nodes[indx] == NULL && indx == 0)
+			nodes[indx] = SLIST_FIRST(&sysctl__children);
+		else if (nodes[indx] == NULL)
+			nodes[indx] = SLIST_FIRST(&nodes[indx - 1]->oid_children);
+		else
+			nodes[indx] = SLIST_NEXT(nodes[indx], oid_link);
+
+		if (nodes[indx] == needle)
+			return (indx + 1);
+
+		if (nodes[indx] == NULL) {
+			indx--;
+			continue;
+		}
+
+		if ((nodes[indx]->oid_kind & CTLTYPE) == CTLTYPE_NODE) {
+			indx++;
+			continue;
+		}
+	}
+	return (-1);
+}
+
+static void
+sysctl_warn_reuse(const char *func, struct sysctl_oid *leaf)
+{
+	struct sysctl_oid *nodes[CTL_MAXNAME];
+	char buf[128];
+	struct sbuf sb;
+	int rc, i;
+
+	(void)sbuf_new(&sb, buf, sizeof(buf), SBUF_FIXEDLEN | SBUF_INCLUDENUL);
+	sbuf_set_drain(&sb, sbuf_printf_drain, NULL);
+
+	sbuf_printf(&sb, "%s: can't re-use a leaf (", __func__);
+
+	memset(nodes, 0, sizeof(nodes));
+	rc = sysctl_search_oid(nodes, leaf);
+	if (rc > 0) {
+		for (i = 0; i < rc; i++)
+			sbuf_printf(&sb, "%s%.*s", nodes[i]->oid_name,
+			    i != (rc - 1), ".");
+	} else {
+		sbuf_printf(&sb, "%s", leaf->oid_name);
+	}
+	sbuf_printf(&sb, ")!\n");
+
+	(void)sbuf_finish(&sb);
+}
+
+#ifdef SYSCTL_DEBUG
+static int
+sysctl_reuse_test(SYSCTL_HANDLER_ARGS)
+{
+	struct rm_priotracker tracker;
+
+	SYSCTL_RLOCK(&tracker);
+	sysctl_warn_reuse(__func__, oidp);
+	SYSCTL_RUNLOCK(&tracker);
+	return (0);
+}
+SYSCTL_PROC(_sysctl, 0, reuse_test, CTLTYPE_STRING|CTLFLAG_RD|CTLFLAG_MPSAFE,
+	0, 0, sysctl_reuse_test, "-", "");
+#endif
 
 void
 sysctl_register_oid(struct sysctl_oid *oidp)
@@ -344,7 +430,7 @@ sysctl_register_oid(struct sysctl_oid *oidp)
 			p->oid_refcnt++;
 			return;
 		} else {
-			printf("can't re-use a leaf (%s)!\n", p->oid_name);
+			sysctl_warn_reuse(__func__, p);
 			return;
 		}
 	}
@@ -423,6 +509,37 @@ retry:
 		/* try to fetch value from kernel environment */
 		sysctl_load_tunable_by_oid_locked(oidp);
 	}
+}
+
+void
+sysctl_register_disabled_oid(struct sysctl_oid *oidp)
+{
+
+	/*
+	 * Mark the leaf as dormant if it's not to be immediately enabled.
+	 * We do not disable nodes as they can be shared between modules
+	 * and it is always safe to access a node.
+	 */
+	KASSERT((oidp->oid_kind & CTLFLAG_DORMANT) == 0,
+	    ("internal flag is set in oid_kind"));
+	if ((oidp->oid_kind & CTLTYPE) != CTLTYPE_NODE)
+		oidp->oid_kind |= CTLFLAG_DORMANT;
+	sysctl_register_oid(oidp);
+}
+
+void
+sysctl_enable_oid(struct sysctl_oid *oidp)
+{
+
+	SYSCTL_ASSERT_WLOCKED();
+	if ((oidp->oid_kind & CTLTYPE) == CTLTYPE_NODE) {
+		KASSERT((oidp->oid_kind & CTLFLAG_DORMANT) == 0,
+		    ("sysctl node is marked as dormant"));
+		return;
+	}
+	KASSERT((oidp->oid_kind & CTLFLAG_DORMANT) != 0,
+	    ("enabling already enabled sysctl oid"));
+	oidp->oid_kind &= ~CTLFLAG_DORMANT;
 }
 
 void
@@ -716,8 +833,8 @@ sysctl_add_oid(struct sysctl_ctx_list *clist, struct sysctl_oid_list *parent,
 			SYSCTL_WUNLOCK();
 			return (oidp);
 		} else {
+			sysctl_warn_reuse(__func__, oidp);
 			SYSCTL_WUNLOCK();
-			printf("can't re-use a leaf (%s)!\n", name);
 			return (NULL);
 		}
 	}
@@ -973,7 +1090,7 @@ sysctl_sysctl_next_ls(struct sysctl_oid_list *lsp, int *name, u_int namelen,
 		*next = oidp->oid_number;
 		*oidpp = oidp;
 
-		if (oidp->oid_kind & CTLFLAG_SKIP)
+		if ((oidp->oid_kind & (CTLFLAG_SKIP | CTLFLAG_DORMANT)) != 0)
 			continue;
 
 		if (!namelen) {
@@ -1589,7 +1706,7 @@ sysctl_old_kernel(struct sysctl_req *req, const void *p, size_t l)
 			if (i > req->oldlen - req->oldidx)
 				i = req->oldlen - req->oldidx;
 		if (i > 0)
-			bcopy(p, (char *)req->oldptr + req->oldidx, i);
+			bcopy(p, (__cheri_fromcap char *)req->oldptr + req->oldidx, i);
 	}
 	req->oldidx += l;
 	if (req->oldptr && i != l)
@@ -1604,7 +1721,7 @@ sysctl_new_kernel(struct sysctl_req *req, void *p, size_t l)
 		return (0);
 	if (req->newlen - req->newidx < l)
 		return (EINVAL);
-	bcopy((char *)req->newptr + req->newidx, p, l);
+	bcopy((__cheri_fromcap char *)req->newptr + req->newidx, p, l);
 	req->newidx += l;
 	return (0);
 }
@@ -1627,12 +1744,12 @@ kernel_sysctl(struct thread *td, int *name, u_int namelen, void *old,
 	req.validlen = req.oldlen;
 
 	if (old) {
-		req.oldptr= old;
+		req.oldptr= (__cheri_tocap void * __capability)old;
 	}
 
 	if (new != NULL) {
 		req.newlen = newlen;
-		req.newptr = new;
+		req.newptr = (__cheri_tocap void * __capability)new;
 	}
 
 	req.oldfunc = sysctl_old_kernel;
@@ -1707,10 +1824,14 @@ sysctl_old_user(struct sysctl_req *req, const void *p, size_t l)
 		if (i > len - origidx)
 			i = len - origidx;
 		if (req->lock == REQ_WIRED) {
-			error = copyout_nofault(p, (char *)req->oldptr +
+			error = copyout_nofault_c(
+			    (__cheri_tocap const void * __capability)p,
+			    (char * __capability)req->oldptr +
 			    origidx, i);
 		} else
-			error = copyout(p, (char *)req->oldptr + origidx, i);
+			error = copyout_c(
+			    (__cheri_tocap const void * __capability)p,
+			    (char * __capability)req->oldptr + origidx, i);
 		if (error != 0)
 			return (error);
 	}
@@ -1730,7 +1851,8 @@ sysctl_new_user(struct sysctl_req *req, void *p, size_t l)
 		return (EINVAL);
 	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
 	    "sysctl_new_user()");
-	error = copyin((char *)req->newptr + req->newidx, p, l);
+	error = copyin_c((char * __capability )req->newptr + req->newidx,
+	    (__cheri_tocap void * __capability)p, l);
 	req->newidx += l;
 	return (error);
 }
@@ -1794,6 +1916,8 @@ sysctl_find_oid(int *name, u_int namelen, struct sysctl_oid **noid,
 			}
 			lsp = SYSCTL_CHILDREN(oid);
 		} else if (indx == namelen) {
+			if ((oid->oid_kind & CTLFLAG_DORMANT) != 0)
+				return (ENOENT);
 			*noid = oid;
 			if (nindx != NULL)
 				*nindx = indx;
@@ -1927,29 +2051,34 @@ struct sysctl_args {
 int
 sys___sysctl(struct thread *td, struct sysctl_args *uap)
 {
-	int error, flags, i, name[CTL_MAXNAME];
+
+	return (kern_sysctl(td, __USER_CAP(uap->name, uap->namelen),
+	    uap->namelen, __USER_CAP_UNBOUND(uap->old),
+	    __USER_CAP_OBJ(uap->oldlenp), __USER_CAP(uap->new, uap->newlen),
+	    uap->newlen, 0));
+}
+
+int
+kern_sysctl(struct thread *td, int * __capability uname, u_int namelen,
+    void * __capability old, size_t * __capability oldlenp,
+    void * __capability new, size_t newlen, int flags)
+{
+	int error, i, name[CTL_MAXNAME];
 	size_t j;
 
-	flags = 0;
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI))
-		flags = SCTL_CHERIABI;
-#endif
-
-	if (uap->namelen > CTL_MAXNAME || uap->namelen < 2)
+	if (namelen > CTL_MAXNAME || namelen < 2)
 		return (EINVAL);
 
- 	error = copyin(uap->name, &name, uap->namelen * sizeof(int));
- 	if (error)
+	error = copyin_c(uname, &name[0], namelen * sizeof(int));
+	if (error)
 		return (error);
 
-	error = userland_sysctl(td, name, uap->namelen,
-		uap->old, uap->oldlenp, 0,
-		uap->new, uap->newlen, &j, flags);
+	error = userland_sysctl(td, name, namelen, old, oldlenp, 0,
+		new, newlen, &j, flags);
 	if (error && error != ENOMEM)
 		return (error);
-	if (uap->oldlenp) {
-		i = copyout(&j, uap->oldlenp, sizeof(j));
+	if (oldlenp) {
+		i = copyout_c(&j, oldlenp, sizeof(j));
 		if (i)
 			return (i);
 	}
@@ -1961,9 +2090,9 @@ sys___sysctl(struct thread *td, struct sysctl_args *uap)
  * must be in kernel space.
  */
 int
-userland_sysctl(struct thread *td, int *name, u_int namelen, void *old,
-    size_t *oldlenp, int inkernel, void *new, size_t newlen, size_t *retval,
-    int flags)
+userland_sysctl(struct thread *td, int *name, u_int namelen,
+    void * __capability old, size_t * __capability oldlenp, int inkernel,
+    void * __capability new, size_t newlen, size_t *retval, int flags)
 {
 	int error = 0, memlocked;
 	struct sysctl_req req;
@@ -1977,22 +2106,16 @@ userland_sysctl(struct thread *td, int *name, u_int namelen, void *old,
 		if (inkernel) {
 			req.oldlen = *oldlenp;
 		} else {
-			error = copyin(oldlenp, &req.oldlen, sizeof(*oldlenp));
+			error = copyin_c(oldlenp, &req.oldlen,
+			    sizeof(*oldlenp));
 			if (error)
 				return (error);
 		}
 	}
 	req.validlen = req.oldlen;
-
-	if (old) {
-		if (!useracc(old, req.oldlen, VM_PROT_WRITE))
-			return (EFAULT);
-		req.oldptr= old;
-	}
+	req.oldptr = old;
 
 	if (new != NULL) {
-		if (!useracc(new, newlen, VM_PROT_READ))
-			return (EFAULT);
 		req.newlen = newlen;
 		req.newptr = new;
 	}
@@ -2005,12 +2128,11 @@ userland_sysctl(struct thread *td, int *name, u_int namelen, void *old,
 	if (KTRPOINT(curthread, KTR_SYSCTL))
 		ktrsysctl(name, namelen);
 #endif
-
-	if (req.oldptr && req.oldlen > PAGE_SIZE) {
+	memlocked = 0;
+	if (req.oldptr != NULL && req.oldlen > 4 * PAGE_SIZE) {
 		memlocked = 1;
 		sx_xlock(&sysctlmemlock);
-	} else
-		memlocked = 0;
+	}
 	CURVNET_SET(TD_TO_VNET(td));
 
 	for (;;) {

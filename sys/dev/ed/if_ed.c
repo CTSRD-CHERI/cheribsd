@@ -1223,7 +1223,7 @@ ed_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int     error = 0;
 
 	switch (command) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		/*
 		 * If the interface is marked up and stopped, then start it.
 		 * If we're up and already running, then it may be a mediachg.
@@ -1250,8 +1250,8 @@ ed_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		ED_UNLOCK(sc);
 		break;
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		/*
 		 * Multicast list has changed; set the hardware filter
 		 * accordingly.
@@ -1263,7 +1263,7 @@ ed_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		if (sc->sc_media_ioctl == NULL) {
 			error = EINVAL;
 			break;

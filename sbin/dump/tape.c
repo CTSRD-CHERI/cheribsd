@@ -26,6 +26,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_alignment"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #ifndef lint
 #if 0
@@ -143,8 +153,13 @@ alloctape(void)
 		    malloc((unsigned)(reqsiz + writesize + pgoff + TP_BSIZE));
 		if (buf == NULL)
 			return(0);
+#if __has_builtin(__builtin_align_up)
+		slaves[i].tblock = (char (*)[TP_BSIZE])
+		    __builtin_align_up(&buf[ntrec + 1], pgoff + 1);
+#else
 		slaves[i].tblock = (char (*)[TP_BSIZE])
 		    (((intptr_t)&buf[ntrec + 1] + pgoff) &~ (intptr_t)pgoff);
+#endif
 		slaves[i].req = (struct req *)slaves[i].tblock - ntrec - 1;
 	}
 	slp = &slaves[0];

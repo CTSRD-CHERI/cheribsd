@@ -183,7 +183,8 @@ struct if_encap_req {
 struct m_snd_tag;
 
 #define	IF_SND_TAG_TYPE_RATE_LIMIT 0
-#define	IF_SND_TAG_TYPE_MAX 1
+#define	IF_SND_TAG_TYPE_UNLIMITED 1
+#define	IF_SND_TAG_TYPE_MAX 2
 
 struct if_snd_tag_alloc_header {
 	uint32_t type;		/* send tag type, see IF_SND_TAG_XXX */
@@ -198,19 +199,26 @@ struct if_snd_tag_alloc_rate_limit {
 
 struct if_snd_tag_rate_limit_params {
 	uint64_t max_rate;	/* in bytes/s */
+	uint32_t queue_level;	/* 0 (empty) .. 65535 (full) */
+#define	IF_SND_QUEUE_LEVEL_MIN 0
+#define	IF_SND_QUEUE_LEVEL_MAX 65535
+	uint32_t reserved;	/* padding */
 };
 
 union if_snd_tag_alloc_params {
 	struct if_snd_tag_alloc_header hdr;
 	struct if_snd_tag_alloc_rate_limit rate_limit;
+	struct if_snd_tag_alloc_rate_limit unlimited;
 };
 
 union if_snd_tag_modify_params {
 	struct if_snd_tag_rate_limit_params rate_limit;
+	struct if_snd_tag_rate_limit_params unlimited;
 };
 
 union if_snd_tag_query_params {
 	struct if_snd_tag_rate_limit_params rate_limit;
+	struct if_snd_tag_rate_limit_params unlimited;
 };
 
 typedef int (if_snd_tag_alloc_t)(struct ifnet *, union if_snd_tag_alloc_params *,
@@ -705,6 +713,32 @@ int drbr_enqueue_drv(if_t ifp, struct buf_ring *br, struct mbuf *m);
 /* TSO */
 void if_hw_tsomax_common(if_t ifp, struct ifnet_hw_tsomax *);
 int if_hw_tsomax_update(if_t ifp, struct ifnet_hw_tsomax *);
+
+/* Helper macro for struct ifreq ioctls */
+#if __has_feature(capabilities)
+#define	CASE_IOC_IFREQ(cmd)					\
+    case (cmd):							\
+    case _IOC_NEWTYPE((cmd), struct ifreq_c)
+#else
+#define	CASE_IOC_IFREQ(cmd)					\
+    case (cmd)
+#endif
+
+/* accessors for struct ifreq */
+char *ifr_addr_get_data(void *ifrp);
+sa_family_t ifr_addr_get_family(void *ifrp);
+unsigned char ifr_addr_get_len(void *ifrp);
+struct sockaddr *ifr_addr_get_sa(void *ifrp);
+void * __capability ifr_data_get_ptr(void *ifrp);
+u_int ifr_fib_get(void *ifrp);
+void ifr_fib_set(void *ifrp, u_int fib);
+short ifr_flags_get(void *ifrp);
+int ifr_media_get(void *ifrp);
+int ifr_mtu_get(void *ifrp);
+void ifr_mtu_set(void *ifrp, int val);
+int ifr_reqcap_get(void *ifrp);
+u_char ifr_vlan_pcp_get(void *ifrp);
+void ifr_vlan_pcp_set(void *ifrp, u_char pcp);
 
 #ifdef DEVICE_POLLING
 enum poll_cmd { POLL_ONLY, POLL_AND_CHECK_STATUS };

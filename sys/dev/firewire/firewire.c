@@ -1852,14 +1852,13 @@ fw_rcv_copy(struct fw_rcv_buf *rb)
 
 	rb->xfer->recv.spd = rb->spd;
 
-	pkt = (struct fw_pkt *)rb->vec->iov_base;
+	pkt = (__cheri_fromcap struct fw_pkt *)rb->vec->iov_base;
 	tinfo = &rb->fc->tcode[pkt->mode.hdr.tcode];
 
 	/* Copy header */
 	p = (u_char *)&rb->xfer->recv.hdr;
-	bcopy(rb->vec->iov_base, p, tinfo->hdr_len);
-	rb->vec->iov_base = (u_char *)rb->vec->iov_base + tinfo->hdr_len;
-	rb->vec->iov_len -= tinfo->hdr_len;
+	bcopy((__cheri_fromcap void *)rb->vec->iov_base, p, tinfo->hdr_len);
+	IOVEC_ADVANCE(rb->vec, tinfo->hdr_len);
 
 	/* Copy payload */
 	p = (u_char *)rb->xfer->recv.payload;
@@ -1886,7 +1885,7 @@ fw_rcv_copy(struct fw_rcv_buf *rb)
 				__func__, rb->xfer->recv.pay_len, len - res);
 			len = res;
 		}
-		bcopy(rb->vec->iov_base, p, len);
+		bcopy((__cheri_fromcap void *)rb->vec->iov_base, p, len);
 		p += len;
 		res -= len;
 		plen -= len;
@@ -1919,7 +1918,7 @@ fw_rcv(struct fw_rcv_buf *rb)
 		if ((i % 16) != 15) printf("\n");
 	}
 #endif
-	fp = (struct fw_pkt *)rb->vec[0].iov_base;
+	fp = (__cheri_fromcap struct fw_pkt *)rb->vec[0].iov_base;
 	tcode = fp->mode.common.tcode;
 	switch (tcode) {
 	case FWTCODE_WRES:

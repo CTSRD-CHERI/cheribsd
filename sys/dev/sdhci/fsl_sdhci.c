@@ -33,6 +33,8 @@ __FBSDID("$FreeBSD$");
  * This supports both eSDHC (earlier SoCs) and uSDHC (more recent SoCs).
  */
 
+#include "opt_mmccam.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/types.h>
@@ -801,9 +803,26 @@ fsl_sdhci_get_platform_clock(device_t dev)
 static int
 fsl_sdhci_detach(device_t dev)
 {
+	struct fsl_sdhci_softc *sc = device_get_softc(dev);
 
-	/* sdhci_fdt_gpio_teardown(sc->gpio); */
-	return (EBUSY);
+	if (sc->gpio != NULL)
+		sdhci_fdt_gpio_teardown(sc->gpio);
+
+	callout_drain(&sc->r1bfix_callout);
+
+	if (sc->intr_cookie != NULL)
+		bus_teardown_intr(dev, sc->irq_res, sc->intr_cookie);
+	if (sc->irq_res != NULL)
+		bus_release_resource(dev, SYS_RES_IRQ,
+		    rman_get_rid(sc->irq_res), sc->irq_res);
+
+	if (sc->mem_res != NULL) {
+		sdhci_cleanup_slot(&sc->slot);
+		bus_release_resource(dev, SYS_RES_MEMORY,
+		    rman_get_rid(sc->mem_res), sc->mem_res);
+	}
+
+	return (0);
 }
 
 static int
@@ -916,13 +935,7 @@ fsl_sdhci_attach(device_t dev)
 	return (0);
 
 fail:
-	if (sc->intr_cookie)
-		bus_teardown_intr(dev, sc->irq_res, sc->intr_cookie);
-	if (sc->irq_res)
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->irq_res);
-	if (sc->mem_res)
-		bus_release_resource(dev, SYS_RES_MEMORY, 0, sc->mem_res);
-
+	fsl_sdhci_detach(dev);
 	return (err);
 }
 
@@ -930,7 +943,7 @@ static int
 fsl_sdhci_probe(device_t dev)
 {
 
-        if (!ofw_bus_status_okay(dev))
+	if (!ofw_bus_status_okay(dev))
 		return (ENXIO);
 
 	switch (ofw_bus_search_compatible(dev, compat_data)->ocd_data) {
@@ -988,4 +1001,7 @@ static driver_t fsl_sdhci_driver = {
 DRIVER_MODULE(sdhci_fsl, simplebus, fsl_sdhci_driver, fsl_sdhci_devclass,
     NULL, NULL);
 MODULE_DEPEND(sdhci_fsl, sdhci, 1, 1, 1);
+
+#ifndef MMCCAM
 MMC_DECLARE_BRIDGE(sdhci_fsl);
+#endif

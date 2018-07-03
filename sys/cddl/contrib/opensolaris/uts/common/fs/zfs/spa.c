@@ -28,6 +28,7 @@
  * Copyright 2013 Saso Kiselkov. All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
  * Copyright 2016 Toomas Soome <tsoome@me.com>
+ * Copyright (c) 2017 Datto Inc.
  */
 
 /*
@@ -74,6 +75,7 @@
 #include <sys/zfeature.h>
 #include <sys/zvol.h>
 #include <sys/trim_map.h>
+#include <sys/abd.h>
 
 #ifdef	_KERNEL
 #include <sys/callb.h>
@@ -1937,6 +1939,7 @@ spa_load_verify_done(zio_t *zio)
 	int error = zio->io_error;
 	spa_t *spa = zio->io_spa;
 
+	abd_free(zio->io_abd);
 	if (error) {
 		if ((BP_GET_LEVEL(bp) != 0 || DMU_OT_IS_METADATA(type)) &&
 		    type != DMU_OT_INTENT_LOG)
@@ -1944,7 +1947,6 @@ spa_load_verify_done(zio_t *zio)
 		else
 			atomic_inc_64(&sle->sle_data_count);
 	}
-	zio_data_buf_free(zio->io_data, zio->io_size);
 
 	mutex_enter(&spa->spa_scrub_lock);
 	spa->spa_scrub_inflight--;
@@ -1987,12 +1989,11 @@ spa_load_verify_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 	 */
 	if (!spa_load_verify_metadata)
 		return (0);
-	if (BP_GET_BUFC_TYPE(bp) == ARC_BUFC_DATA && !spa_load_verify_data)
+	if (!BP_IS_METADATA(bp) && !spa_load_verify_data)
 		return (0);
 
 	zio_t *rio = arg;
 	size_t size = BP_GET_PSIZE(bp);
-	void *data = zio_data_buf_alloc(size);
 
 	mutex_enter(&spa->spa_scrub_lock);
 	while (spa->spa_scrub_inflight >= spa_load_verify_maxinflight)
@@ -2000,7 +2001,7 @@ spa_load_verify_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 	spa->spa_scrub_inflight++;
 	mutex_exit(&spa->spa_scrub_lock);
 
-	zio_nowait(zio_read(rio, spa, bp, data, size,
+	zio_nowait(zio_read(rio, spa, bp, abd_alloc_for_io(size, B_FALSE), size,
 	    spa_load_verify_done, rio->io_private, ZIO_PRIORITY_SCRUB,
 	    ZIO_FLAG_SPECULATIVE | ZIO_FLAG_CANFAIL |
 	    ZIO_FLAG_SCRUB | ZIO_FLAG_RAW, zb));
@@ -3095,6 +3096,8 @@ spa_load_best(spa_t *spa, spa_load_state_t state, int mosconfig,
 
 	if (config && (rewind_error || state != SPA_LOAD_RECOVER))
 		spa_config_set(spa, config);
+	else
+		nvlist_free(config);
 
 	if (state == SPA_LOAD_RECOVER) {
 		ASSERT3P(loadinfo, ==, NULL);
@@ -4269,6 +4272,16 @@ spa_import_rootpool(const char *name)
 		    == 0);
 
 		if ((spa = spa_lookup(pname)) != NULL) {
+			/*
+			 * The pool could already be imported,
+			 * e.g., after reboot -r.
+			 */
+			if (spa->spa_state == POOL_STATE_ACTIVE) {
+				mutex_exit(&spa_namespace_lock);
+				nvlist_free(config);
+				return (0);
+			}
+
 			/*
 			 * Remove the existing root pool from the namespace so
 			 * that we can replace it with the correct config
@@ -6038,6 +6051,16 @@ spa_vdev_setfru(spa_t *spa, uint64_t guid, const char *newfru)
  * SPA Scanning
  * ==========================================================================
  */
+int
+spa_scrub_pause_resume(spa_t *spa, pool_scrub_cmd_t cmd)
+{
+	ASSERT(spa_config_held(spa, SCL_ALL, RW_WRITER) == 0);
+
+	if (dsl_scan_resilvering(spa->spa_dsl_pool))
+		return (SET_ERROR(EBUSY));
+
+	return (dsl_scrub_set_pause_resume(spa->spa_dsl_pool, cmd));
+}
 
 int
 spa_scan_stop(spa_t *spa)
@@ -6223,8 +6246,6 @@ spa_async_thread_vd(void *arg)
 {
 	spa_t *spa = arg;
 	int tasks;
-
-	ASSERT(spa->spa_sync_on);
 
 	mutex_enter(&spa->spa_async_lock);
 	tasks = spa->spa_async_tasks;

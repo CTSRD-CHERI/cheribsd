@@ -8,6 +8,8 @@
     libcheri
         dtrace
         ..
+        engines
+        ..
         i18n
         ..
     ..

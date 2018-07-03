@@ -98,6 +98,7 @@
 /*
  * Extended flags
  */
+#define	MAP_GUARD	 0x00002000 /* reserve but don't map address range */
 #define	MAP_EXCL	 0x00004000 /* for MAP_FIXED, fail if address is used */
 #define	MAP_NOCORE	 0x00020000 /* dont include these pages in a coredump */
 #define	MAP_PREFAULT_READ 0x00040000 /* prefault mapping for reading */
@@ -190,7 +191,11 @@
 /*
  * Anonymous object constant for shm_open().
  */
+#ifndef _KERNEL
 #define	SHM_ANON		((char *)1)
+#else
+#define	SHM_ANON		((char * __capability)(intcap_t)1)
+#endif
 #endif /* __BSD_VISIBLE */
 
 /*

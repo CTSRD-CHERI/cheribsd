@@ -55,7 +55,8 @@
 
 /*
  * Query the root of the object-type sealing capability provenance tree.  This
- * allows us to avoid setting CHERI_PERM_SEAL on data and code capabilities.
+ * allows us to avoid setting CHERI_PERM_SEAL and CHERI_PERM_UNSEAL on data
+ * and code capabilities.
  */
 #define	CHERI_GET_SEALCAP	6	/* Get root sealing capability. */
 

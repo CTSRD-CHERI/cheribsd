@@ -108,6 +108,7 @@ static void process_peer_close(struct c4iw_ep *ep);
 static void process_conn_error(struct c4iw_ep *ep);
 static void process_close_complete(struct c4iw_ep *ep);
 static void ep_timeout(unsigned long arg);
+static void setiwsockopt(struct socket *so);
 static void init_iwarp_socket(struct socket *so, void *arg);
 static void uninit_iwarp_socket(struct socket *so);
 static void process_data(struct c4iw_ep *ep);
@@ -616,21 +617,16 @@ process_close_complete(struct c4iw_ep *ep)
 }
 
 static void
-init_iwarp_socket(struct socket *so, void *arg)
+setiwsockopt(struct socket *so)
 {
 	int rc;
 	struct sockopt sopt;
 	int on = 1;
 
-	/* Note that SOCK_LOCK(so) is same as SOCKBUF_LOCK(&so->so_rcv) */
-	SOCK_LOCK(so);
-	soupcall_set(so, SO_RCV, c4iw_so_upcall, arg);
-	so->so_state |= SS_NBIO;
-	SOCK_UNLOCK(so);
 	sopt.sopt_dir = SOPT_SET;
 	sopt.sopt_level = IPPROTO_TCP;
 	sopt.sopt_name = TCP_NODELAY;
-	sopt.sopt_val = (caddr_t)&on;
+	sopt.sopt_val = &on;
 	sopt.sopt_valsize = sizeof on;
 	sopt.sopt_td = NULL;
 	rc = sosetopt(so, &sopt);
@@ -638,6 +634,16 @@ init_iwarp_socket(struct socket *so, void *arg)
 		log(LOG_ERR, "%s: can't set TCP_NODELAY on so %p (%d)\n",
 		    __func__, so, rc);
 	}
+}
+
+static void
+init_iwarp_socket(struct socket *so, void *arg)
+{
+
+	SOCKBUF_LOCK(&so->so_rcv);
+	soupcall_set(so, SO_RCV, c4iw_so_upcall, arg);
+	so->so_state |= SS_NBIO;
+	SOCKBUF_UNLOCK(&so->so_rcv);
 }
 
 static void
@@ -735,6 +741,7 @@ process_newconn(struct iw_cm_id *parent_cm_id, struct socket *child_so)
 	free(local, M_SONAME);
 	free(remote, M_SONAME);
 
+	setiwsockopt(child_so);
 	init_iwarp_socket(child_so, &child_ep->com);
 	c4iw_get_ep(&parent_ep->com);
 	init_timer(&child_ep->timer);
@@ -882,7 +889,7 @@ static int enable_tcp_window_scaling = 1;
 SYSCTL_INT(_hw_iw_cxgbe, OID_AUTO, enable_tcp_window_scaling, CTLFLAG_RWTUN, &enable_tcp_window_scaling, 0,
 		"Enable tcp window scaling (default = 1)");
 
-int c4iw_debug = 1;
+int c4iw_debug = 0;
 SYSCTL_INT(_hw_iw_cxgbe, OID_AUTO, c4iw_debug, CTLFLAG_RWTUN, &c4iw_debug, 0,
 		"Enable debug logging (default = 0)");
 
@@ -1003,6 +1010,8 @@ void _c4iw_free_ep(struct kref *kref)
 	    __func__, epc));
 	if (test_bit(QP_REFERENCED, &ep->com.flags))
 		deref_qp(ep);
+	CTR4(KTR_IW_CXGBE, "%s: ep %p, history 0x%lx, flags 0x%lx",
+	    __func__, ep, epc->history, epc->flags);
 	kfree(ep);
 }
 
@@ -1315,7 +1324,7 @@ send_abort(struct c4iw_ep *ep)
 	sopt.sopt_dir = SOPT_SET;
 	sopt.sopt_level = SOL_SOCKET;
 	sopt.sopt_name = SO_LINGER;
-	sopt.sopt_val = (caddr_t)&l;
+	sopt.sopt_val = &l;
 	sopt.sopt_valsize = sizeof l;
 	sopt.sopt_td = NULL;
 	rc = sosetopt(so, &sopt);
@@ -1847,7 +1856,7 @@ process_mpa_request(struct c4iw_ep *ep)
 	u16 plen;
 	int flags = MSG_DONTWAIT;
 	int rc;
-	struct iovec iov;
+	kiovec_t iov;
 	struct uio uio;
 	enum c4iw_ep_state state = state_read(&ep->com);
 
@@ -1856,8 +1865,8 @@ process_mpa_request(struct c4iw_ep *ep)
 	if (state != MPA_REQ_WAIT)
 		return 0;
 
-	iov.iov_base = &ep->mpa_pkt[ep->mpa_pkt_len];
-	iov.iov_len = sizeof(ep->mpa_pkt) - ep->mpa_pkt_len;
+	IOVEC_INIT(&iov, &ep->mpa_pkt[ep->mpa_pkt_len],
+	    sizeof(ep->mpa_pkt) - ep->mpa_pkt_len);
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = 0;
@@ -2234,6 +2243,7 @@ int c4iw_connect(struct iw_cm_id *cm_id, struct iw_cm_conn_param *conn_param)
 	}
 	fib4_free_nh_ext(RT_DEFAULT_FIB, &nh4);
 
+	setiwsockopt(cm_id->so);
 	state_set(&ep->com, CONNECTING);
 	ep->tos = 0;
 	ep->com.local_addr = cm_id->local_addr;

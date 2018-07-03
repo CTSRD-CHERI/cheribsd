@@ -288,7 +288,7 @@ linker_file_sysuninit(linker_file_t lf)
 }
 
 static void
-linker_file_register_sysctls(linker_file_t lf)
+linker_file_register_sysctls(linker_file_t lf, bool enable)
 {
 	struct sysctl_oid **start, **stop, **oidp;
 
@@ -303,8 +303,34 @@ linker_file_register_sysctls(linker_file_t lf)
 
 	sx_xunlock(&kld_sx);
 	sysctl_wlock();
+	for (oidp = start; oidp < stop; oidp++) {
+		if (enable)
+			sysctl_register_oid(*oidp);
+		else
+			sysctl_register_disabled_oid(*oidp);
+	}
+	sysctl_wunlock();
+	sx_xlock(&kld_sx);
+}
+
+static void
+linker_file_enable_sysctls(linker_file_t lf)
+{
+	struct sysctl_oid **start, **stop, **oidp;
+
+	KLD_DPF(FILE,
+	    ("linker_file_enable_sysctls: enable SYSCTLs for %s\n",
+	    lf->filename));
+
+	sx_assert(&kld_sx, SA_XLOCKED);
+
+	if (linker_file_lookup_set(lf, "sysctl_set", &start, &stop, NULL) != 0)
+		return;
+
+	sx_xunlock(&kld_sx);
+	sysctl_wlock();
 	for (oidp = start; oidp < stop; oidp++)
-		sysctl_register_oid(*oidp);
+		sysctl_enable_oid(*oidp);
 	sysctl_wunlock();
 	sx_xlock(&kld_sx);
 }
@@ -430,7 +456,7 @@ linker_load_file(const char *filename, linker_file_t *result)
 				return (error);
 			}
 			modules = !TAILQ_EMPTY(&lf->modules);
-			linker_file_register_sysctls(lf);
+			linker_file_register_sysctls(lf, false);
 			linker_file_sysinit(lf);
 			lf->flags |= LINKER_FILE_LINKED;
 
@@ -443,6 +469,7 @@ linker_load_file(const char *filename, linker_file_t *result)
 				linker_file_unload(lf, LINKER_UNLOAD_FORCE);
 				return (ENOEXEC);
 			}
+			linker_file_enable_sysctls(lf);
 			EVENTHANDLER_INVOKE(kld_load, lf);
 			*result = lf;
 			return (0);
@@ -692,8 +719,8 @@ linker_file_unload(linker_file_t file, int flags)
 	 */
 	if (file->flags & LINKER_FILE_LINKED) {
 		file->flags &= ~LINKER_FILE_LINKED;
-		linker_file_sysuninit(file);
 		linker_file_unregister_sysctls(file);
+		linker_file_sysuninit(file);
 	}
 	TAILQ_REMOVE(&linker_files, file, link);
 
@@ -1132,6 +1159,13 @@ sys_kldunloadf(struct thread *td, struct kldunloadf_args *uap)
 int
 sys_kldfind(struct thread *td, struct kldfind_args *uap)
 {
+
+	return (kern_kldfind(td, __USER_CAP_STR(uap->file)));
+}
+
+int
+kern_kldfind(struct thread *td, const char * __capability file)
+{
 	char *pathname;
 	const char *filename;
 	linker_file_t lf;
@@ -1146,7 +1180,9 @@ sys_kldfind(struct thread *td, struct kldfind_args *uap)
 	td->td_retval[0] = -1;
 
 	pathname = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	if ((error = copyinstr(uap->file, pathname, MAXPATHLEN, NULL)) != 0)
+	if ((error = copyinstr_c(file,
+	    (__cheri_tocap char * __capability)pathname, MAXPATHLEN,
+	    NULL)) != 0)
 		goto out;
 
 	filename = linker_basename(pathname);
@@ -1243,8 +1279,8 @@ kern_kldstat(struct thread *td, int fileid, struct kld_file_stat *stat)
 
 	/* Version 1 fields: */
 	namelen = strlen(lf->filename) + 1;
-	if (namelen > MAXPATHLEN)
-		namelen = MAXPATHLEN;
+	if (namelen > sizeof(stat->name))
+		namelen = sizeof(stat->name);
 	bcopy(lf->filename, &stat->name[0], namelen);
 	stat->refs = lf->refs;
 	stat->id = lf->id;
@@ -1252,8 +1288,8 @@ kern_kldstat(struct thread *td, int fileid, struct kld_file_stat *stat)
 	stat->size = lf->size;
 	/* Version 2 fields: */
 	namelen = strlen(lf->pathname) + 1;
-	if (namelen > MAXPATHLEN)
-		namelen = MAXPATHLEN;
+	if (namelen > sizeof(stat->pathname))
+		namelen = sizeof(stat->pathname);
 	bcopy(lf->pathname, &stat->pathname[0], namelen);
 	sx_xunlock(&kld_sx);
 
@@ -1310,12 +1346,39 @@ sys_kldfirstmod(struct thread *td, struct kldfirstmod_args *uap)
 int
 sys_kldsym(struct thread *td, struct kldsym_args *uap)
 {
-	char *symstr = NULL;
+
+	struct kld_sym_lookup lookup;
+	char *symstr;
+	int error;
+
+	error = copyin(uap->data, &lookup, sizeof(lookup));
+	if (error != 0)
+		return (error);
+	if (lookup.version != sizeof(lookup) ||
+	    uap->cmd != KLDSYM_LOOKUP)
+		return (EINVAL);
+	symstr = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
+	error = copyinstr(lookup.symname, symstr, MAXPATHLEN, NULL);
+	if (error != 0)
+		goto done;
+	error = kern_kldsym(td, uap->fileid, uap->cmd, symstr,
+	    &lookup.symvalue, &lookup.symsize);
+	if (error != 0)
+		goto done;
+	error = copyout(&lookup, uap->data, sizeof(lookup));
+done:
+	free(symstr, M_TEMP);
+	return (error);
+}
+
+int
+kern_kldsym(struct thread *td, int fileid, int cmd, const char *symstr,
+    u_long *symvalue, size_t *symsize)
+{
 	c_linker_sym_t sym;
 	linker_symval_t symval;
 	linker_file_t lf;
-	struct kld_sym_lookup lookup;
-	int error = 0;
+	int error;
 
 #ifdef MAC
 	error = mac_kld_check_stat(td->td_ucred);
@@ -1323,34 +1386,25 @@ sys_kldsym(struct thread *td, struct kldsym_args *uap)
 		return (error);
 #endif
 
-	if ((error = copyin(uap->data, &lookup, sizeof(lookup))) != 0)
-		return (error);
-	if (lookup.version != sizeof(lookup) ||
-	    uap->cmd != KLDSYM_LOOKUP)
-		return (EINVAL);
-	symstr = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	if ((error = copyinstr(lookup.symname, symstr, MAXPATHLEN, NULL)) != 0)
-		goto out;
 	sx_xlock(&kld_sx);
-	if (uap->fileid != 0) {
-		lf = linker_find_file_by_id(uap->fileid);
+	if (fileid != 0) {
+		lf = linker_find_file_by_id(fileid);
 		if (lf == NULL)
 			error = ENOENT;
 		else if (LINKER_LOOKUP_SYMBOL(lf, symstr, &sym) == 0 &&
 		    LINKER_SYMBOL_VALUES(lf, sym, &symval) == 0) {
-			lookup.symvalue = (uintptr_t) symval.value;
-			lookup.symsize = symval.size;
-			error = copyout(&lookup, uap->data, sizeof(lookup));
+			*symvalue = (uintptr_t) symval.value;
+			*symsize = symval.size;
+			error = 0;
 		} else
 			error = ENOENT;
 	} else {
 		TAILQ_FOREACH(lf, &linker_files, link) {
 			if (LINKER_LOOKUP_SYMBOL(lf, symstr, &sym) == 0 &&
 			    LINKER_SYMBOL_VALUES(lf, sym, &symval) == 0) {
-				lookup.symvalue = (uintptr_t)symval.value;
-				lookup.symsize = symval.size;
-				error = copyout(&lookup, uap->data,
-				    sizeof(lookup));
+				*symvalue = (uintptr_t)symval.value;
+				*symsize = symval.size;
+				error = 0;
 				break;
 			}
 		}
@@ -1358,8 +1412,6 @@ sys_kldsym(struct thread *td, struct kldsym_args *uap)
 			error = ENOENT;
 	}
 	sx_xunlock(&kld_sx);
-out:
-	free(symstr, M_TEMP);
 	return (error);
 }
 
@@ -1642,7 +1694,7 @@ restart:
 		if (linker_file_lookup_set(lf, "sysinit_set", &si_start,
 		    &si_stop, NULL) == 0)
 			sysinit_add(si_start, si_stop);
-		linker_file_register_sysctls(lf);
+		linker_file_register_sysctls(lf, true);
 		lf->flags |= LINKER_FILE_LINKED;
 		continue;
 fail:

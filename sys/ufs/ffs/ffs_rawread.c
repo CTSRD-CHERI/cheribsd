@@ -58,7 +58,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 
 static int ffs_rawread_readahead(struct vnode *vp,
-				 caddr_t udata,
+				 caddr_t __capability udata,
 				 off_t offset,
 				 size_t len,
 				 struct thread *td,
@@ -185,7 +185,7 @@ ffs_rawread_sync(struct vnode *vp)
 
 static int
 ffs_rawread_readahead(struct vnode *vp,
-		      caddr_t udata,
+		      caddr_t __capability udata,
 		      off_t offset,
 		      size_t len,
 		      struct thread *td,
@@ -216,7 +216,7 @@ ffs_rawread_readahead(struct vnode *vp,
 	bp->b_flags = 0;	/* XXX necessary ? */
 	bp->b_iocmd = BIO_READ;
 	bp->b_iodone = bdone;
-	bp->b_data = udata;
+	bp->b_data = (__cheri_fromcap void *)udata;
 	blockno = offset / bsize;
 	blockoff = (offset % bsize) / DEV_BSIZE;
 	if ((daddr_t) blockno != blockno) {
@@ -270,7 +270,7 @@ ffs_rawread_main(struct vnode *vp,
 	int error, nerror;
 	struct buf *bp, *nbp, *tbp;
 	u_int iolen;
-	caddr_t udata;
+	caddr_t __capability udata;
 	long resid;
 	off_t offset;
 	struct thread *td;

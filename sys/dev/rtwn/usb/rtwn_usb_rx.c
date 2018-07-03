@@ -63,18 +63,56 @@ __FBSDID("$FreeBSD$");
 #include <dev/rtwn/usb/rtwn_usb_var.h>
 #include <dev/rtwn/usb/rtwn_usb_rx.h>
 
-#include <dev/rtwn/rtl8192c/r92c_reg.h>	/* for CAM_ALGO_NONE */
-#include <dev/rtwn/rtl8192c/r92c_rx_desc.h>
+static struct mbuf *	rtwn_rxeof(struct rtwn_softc *, struct rtwn_data *,
+			    uint8_t *, int);
 
+static int
+rtwn_rx_check_pre_alloc(struct rtwn_softc *sc,
+    struct rtwn_rx_stat_common *stat)
+{
+	uint32_t rxdw0;
+	int pktlen;
+
+	RTWN_ASSERT_LOCKED(sc);
+
+	/*
+	 * don't pass packets to the ieee80211 framework if the driver isn't
+	 * RUNNING.
+	 */
+	if (!(sc->sc_flags & RTWN_RUNNING))
+		return (-1);
+
+	rxdw0 = le32toh(stat->rxdw0);
+	if (__predict_false(rxdw0 & (RTWN_RXDW0_CRCERR | RTWN_RXDW0_ICVERR))) {
+		/*
+		 * This should not happen since we setup our Rx filter
+		 * to not receive these frames.
+		 */
+		RTWN_DPRINTF(sc, RTWN_DEBUG_RECV,
+		    "%s: RX flags error (%s)\n", __func__,
+		    rxdw0 & RTWN_RXDW0_CRCERR ? "CRC" : "ICV");
+		return (-1);
+	}
+
+	pktlen = MS(rxdw0, RTWN_RXDW0_PKTLEN);
+	if (__predict_false(pktlen < sizeof(struct ieee80211_frame_ack))) {
+		/*
+		 * Should not happen (because of Rx filter setup).
+		 */
+		RTWN_DPRINTF(sc, RTWN_DEBUG_RECV,
+		    "%s: frame is too short: %d\n", __func__, pktlen);
+		return (-1);
+	}
+
+	return (0);
+}
 
 static struct mbuf *
-rtwn_rx_copy_to_mbuf(struct rtwn_softc *sc, struct r92c_rx_stat *stat,
+rtwn_rx_copy_to_mbuf(struct rtwn_softc *sc, struct rtwn_rx_stat_common *stat,
     int totlen)
 {
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct mbuf *m;
-	uint32_t rxdw0;
-	int pktlen;
 
 	RTWN_ASSERT_LOCKED(sc);
 
@@ -85,34 +123,8 @@ rtwn_rx_copy_to_mbuf(struct rtwn_softc *sc, struct r92c_rx_stat *stat,
 	    le32toh(stat->rxdw2), le32toh(stat->rxdw3), le32toh(stat->rxdw4),
 	    le32toh(stat->tsf_low));
 
-	/*
-	 * don't pass packets to the ieee80211 framework if the driver isn't
-	 * RUNNING.
-	 */
-	if (!(sc->sc_flags & RTWN_RUNNING))
-		return (NULL);
-
-	rxdw0 = le32toh(stat->rxdw0);
-	if (__predict_false(rxdw0 & (R92C_RXDW0_CRCERR | R92C_RXDW0_ICVERR))) {
-		/*
-		 * This should not happen since we setup our Rx filter
-		 * to not receive these frames.
-		 */
-		RTWN_DPRINTF(sc, RTWN_DEBUG_RECV,
-		    "%s: RX flags error (%s)\n", __func__,
-		    rxdw0 & R92C_RXDW0_CRCERR ? "CRC" : "ICV");
+	if (rtwn_rx_check_pre_alloc(sc, stat) != 0)
 		goto fail;
-	}
-
-	pktlen = MS(rxdw0, R92C_RXDW0_PKTLEN);
-	if (__predict_false(pktlen < sizeof(struct ieee80211_frame_ack))) {
-		/*
-		 * Should not happen (because of Rx filter setup).
-		 */
-		RTWN_DPRINTF(sc, RTWN_DEBUG_RECV,
-		    "%s: frame is too short: %d\n", __func__, pktlen);
-		goto fail;
-	}
 
 	m = m_get2(totlen, M_NOWAIT, MT_DATA, M_PKTHDR);
 	if (__predict_false(m == NULL)) {
@@ -137,30 +149,124 @@ fail:
 }
 
 static struct mbuf *
-rtwn_rxeof(struct rtwn_softc *sc, uint8_t *buf, int len)
+rtwn_rxeof_fragmented(struct rtwn_usb_softc *uc, struct rtwn_data *data,
+    uint8_t *buf, int len)
+{
+	struct rtwn_softc *sc = &uc->uc_sc;
+	struct ieee80211com *ic = &sc->sc_ic;
+	struct rtwn_rx_stat_common *stat = &uc->uc_rx_stat;
+	uint32_t rxdw0;
+	int totlen, pktlen, infosz, min_len;
+	int orig_len = len;
+	int alloc_mbuf = 0;
+
+	/* Check if Rx descriptor is not truncated. */
+	if (uc->uc_rx_stat_len < sizeof(*stat)) {
+		min_len = min(sizeof(*stat) - uc->uc_rx_stat_len, len);
+		memcpy((uint8_t *)stat + uc->uc_rx_stat_len, buf, min_len);
+
+		uc->uc_rx_stat_len += min_len;
+		buf += min_len;
+		len -= min_len;
+
+		if (uc->uc_rx_stat_len < sizeof(*stat))
+			goto end;
+
+		KASSERT(data->m == NULL, ("%s: data->m != NULL!\n", __func__));
+		alloc_mbuf = 1;
+
+		/* Dump Rx descriptor. */
+		RTWN_DPRINTF(sc, RTWN_DEBUG_RECV_DESC,
+		    "%s: dw: 0 %08X, 1 %08X, 2 %08X, 3 %08X, 4 %08X, "
+		    "tsfl %08X\n", __func__, le32toh(stat->rxdw0),
+		    le32toh(stat->rxdw1), le32toh(stat->rxdw2),
+		    le32toh(stat->rxdw3), le32toh(stat->rxdw4),
+		    le32toh(stat->tsf_low));
+	}
+
+	rxdw0 = le32toh(stat->rxdw0);
+	pktlen = MS(rxdw0, RTWN_RXDW0_PKTLEN);
+	infosz = MS(rxdw0, RTWN_RXDW0_INFOSZ) * 8;
+	totlen = sizeof(*stat) + infosz + pktlen;
+	if (alloc_mbuf) {
+		if (rtwn_rx_check_pre_alloc(sc, stat) == 0) {
+			data->m = m_getm(NULL, totlen, M_NOWAIT, MT_DATA);
+			if (data->m != NULL) {
+				m_copyback(data->m, 0, uc->uc_rx_stat_len,
+				    (caddr_t)stat);
+
+				if (rtwn_check_frame(sc, data->m) != 0) {
+					m_freem(data->m);
+					data->m = NULL;
+					counter_u64_add(ic->ic_ierrors, 1);
+				}
+			} else
+				counter_u64_add(ic->ic_ierrors, 1);
+		} else
+			counter_u64_add(ic->ic_ierrors, 1);
+
+		uc->uc_rx_off = sizeof(*stat);
+	}
+
+	/* If mbuf allocation fails just discard the data. */
+	min_len = min(totlen - uc->uc_rx_off, len);
+	if (data->m != NULL)
+		m_copyback(data->m, uc->uc_rx_off, min_len, buf);
+
+	uc->uc_rx_off += min_len;
+	if (uc->uc_rx_off == totlen) {
+		/* Align next frame. */
+		min_len = rtwn_usb_align_rx(uc,
+		    orig_len - len + min_len, orig_len);
+		min_len -= (orig_len - len);
+		KASSERT(len >= min_len, ("%s: len (%d) < min_len (%d)!\n",
+		    __func__, len, min_len));
+
+		/* Clear mbuf stats. */
+		uc->uc_rx_stat_len = 0;
+		uc->uc_rx_off = 0;
+	}
+	len -= min_len;
+	buf += min_len;
+end:
+	if (uc->uc_rx_stat_len == 0)
+		return (rtwn_rxeof(sc, data, buf, len));
+	else
+		return (NULL);
+}
+
+static struct mbuf *
+rtwn_rxeof(struct rtwn_softc *sc, struct rtwn_data *data, uint8_t *buf,
+    int len)
 {
 	struct rtwn_usb_softc *uc = RTWN_USB_SOFTC(sc);
-	struct r92c_rx_stat *stat;
+	struct rtwn_rx_stat_common *stat;
 	struct mbuf *m, *m0 = NULL;
 	uint32_t rxdw0;
 	int totlen, pktlen, infosz;
 
+	/* Prepend defragmented frame (if any). */
+	if (data->m != NULL) {
+		m0 = m = data->m;
+		data->m = NULL;
+	}
+
 	/* Process packets. */
 	while (len >= sizeof(*stat)) {
-		stat = (struct r92c_rx_stat *)buf;
+		stat = (struct rtwn_rx_stat_common *)buf;
 		rxdw0 = le32toh(stat->rxdw0);
 
-		pktlen = MS(rxdw0, R92C_RXDW0_PKTLEN);
+		pktlen = MS(rxdw0, RTWN_RXDW0_PKTLEN);
 		if (__predict_false(pktlen == 0))
 			break;
 
-		infosz = MS(rxdw0, R92C_RXDW0_INFOSZ) * 8;
+		infosz = MS(rxdw0, RTWN_RXDW0_INFOSZ) * 8;
 
 		/* Make sure everything fits in xfer. */
 		totlen = sizeof(*stat) + infosz + pktlen;
 		if (totlen > len) {
-			device_printf(sc->sc_dev,
-			    "%s: totlen (%d) > len (%d)!\n",
+			RTWN_DPRINTF(sc, RTWN_DEBUG_RECV,
+			    "%s: frame is fragmented (totlen %d len %d)\n",
 			    __func__, totlen, len);
 			break;
 		}
@@ -168,9 +274,9 @@ rtwn_rxeof(struct rtwn_softc *sc, uint8_t *buf, int len)
 		if (m0 == NULL)
 			m0 = m = rtwn_rx_copy_to_mbuf(sc, stat, totlen);
 		else {
-			m->m_next = rtwn_rx_copy_to_mbuf(sc, stat, totlen);
-			if (m->m_next != NULL)
-				m = m->m_next;
+			m->m_nextpkt = rtwn_rx_copy_to_mbuf(sc, stat, totlen);
+			if (m->m_nextpkt != NULL)
+				m = m->m_nextpkt;
 		}
 
 		/* Align next frame. */
@@ -178,6 +284,9 @@ rtwn_rxeof(struct rtwn_softc *sc, uint8_t *buf, int len)
 		buf += totlen;
 		len -= totlen;
 	}
+
+	if (len > 0)
+		(void)rtwn_rxeof_fragmented(uc, data, buf, len);
 
 	return (m0);
 }
@@ -193,15 +302,19 @@ rtwn_report_intr(struct rtwn_usb_softc *uc, struct usb_xfer *xfer,
 
 	usbd_xfer_status(xfer, &len, NULL, NULL, NULL);
 
-	if (__predict_false(len < sizeof(struct r92c_rx_stat))) {
+	if (__predict_false(len < sizeof(struct rtwn_rx_stat_common) &&
+	    uc->uc_rx_stat_len == 0)) {
 		counter_u64_add(ic->ic_ierrors, 1);
 		return (NULL);
 	}
 
 	buf = data->buf;
+	if (uc->uc_rx_stat_len > 0)
+		return (rtwn_rxeof_fragmented(uc, data, data->buf, len));
+
 	switch (rtwn_classify_intr(sc, buf, len)) {
 	case RTWN_RX_DATA:
-		return (rtwn_rxeof(sc, buf, len));
+		return (rtwn_rxeof(sc, data, buf, len));
 	case RTWN_RX_TX_REPORT:
 		if (sc->sc_ratectl != RTWN_RATECTL_NET80211) {
 			/* shouldn't happen */
@@ -238,11 +351,11 @@ rtwn_report_intr(struct rtwn_usb_softc *uc, struct usb_xfer *xfer,
 static struct ieee80211_node *
 rtwn_rx_frame(struct rtwn_softc *sc, struct mbuf *m)
 {
-	struct r92c_rx_stat stat;
+	struct rtwn_rx_stat_common stat;
 
 	/* Imitate PCIe layout. */
-	m_copydata(m, 0, sizeof(struct r92c_rx_stat), (caddr_t)&stat);
-	m_adj(m, sizeof(struct r92c_rx_stat));
+	m_copydata(m, 0, sizeof(stat), (caddr_t)&stat);
+	m_adj(m, sizeof(stat));
 
 	return (rtwn_rx_common(sc, m, &stat));
 }
@@ -287,8 +400,8 @@ tr_setup:
 		 * callback and safe to unlock.
 		 */
 		while (m != NULL) {
-			next = m->m_next;
-			m->m_next = NULL;
+			next = m->m_nextpkt;
+			m->m_nextpkt = NULL;
 
 			ni = rtwn_rx_frame(sc, m);
 
@@ -312,6 +425,8 @@ tr_setup:
 			STAILQ_INSERT_TAIL(&uc->uc_rx_inactive, data, next);
 		}
 		if (error != USB_ERR_CANCELLED) {
+			/* XXX restart device if frame was fragmented? */
+
 			usbd_xfer_set_stall(xfer);
 			counter_u64_add(ic->ic_ierrors, 1);
 			goto tr_setup;

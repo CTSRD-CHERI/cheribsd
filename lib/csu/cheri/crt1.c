@@ -55,10 +55,15 @@ __FBSDID("$FreeBSD: head/lib/csu/mips/crt1_c.c 245133 2013-01-07 17:58:27Z kib $
 #include "libc_private.h"
 #include "crtbrand.c"
 #include "ignore_init.c"
+/* For -pie executables rtld will initialize the __cap_relocs */
+#ifndef POSITION_INDEPENDENT_STARTUP
+#define DONT_EXPORT_CRT_INIT_GLOBALS
+#include "crt_init_globals.c"
+#endif
 
 struct Struct_Obj_Entry;
 
-void __start(void *, void (*)(void), struct Struct_Obj_Entry *);
+static void _start(void *, void (*)(void), struct Struct_Obj_Entry *) __used;
 extern void crt_call_constructors(void);
 
 #ifdef GCRT
@@ -71,51 +76,27 @@ extern int etext;
 
 Elf_Auxinfo *__auxargs;
 
-struct capreloc
-{
-	uint64_t capability_location;
-	uint64_t object;
-	uint64_t offset;
-	uint64_t size;
-	uint64_t permissions;
-};
-static const uint64_t function_reloc_flag = 1ULL<<63;
-static const uint64_t function_pointer_permissions =
-	~0 &
-	~__CHERI_CAP_PERMISSION_PERMIT_STORE_CAPABILITY__ &
-	~__CHERI_CAP_PERMISSION_PERMIT_STORE__;
-static const uint64_t global_pointer_permissions =
-	~0 & ~__CHERI_CAP_PERMISSION_PERMIT_EXECUTE__;
-
-__attribute__((weak))
-extern struct capreloc __start___cap_relocs;
-__attribute__((weak))
-extern struct capreloc __stop___cap_relocs;
-
-static void
-crt_init_globals(void)
-{
-	void *gdc = __builtin_cheri_global_data_get();
-	void *pcc = __builtin_cheri_program_counter_get();
-
-	gdc = __builtin_cheri_perms_and(gdc, global_pointer_permissions);
-	pcc = __builtin_cheri_perms_and(pcc, function_pointer_permissions);
-	for (struct capreloc *reloc = &__start___cap_relocs ;
-	     reloc < &__stop___cap_relocs ; reloc++)
-	{
-		_Bool isFunction = (reloc->permissions & function_reloc_flag) ==
-			function_reloc_flag;
-		void **dest = __builtin_cheri_offset_set(gdc, reloc->capability_location);
-		void *base = isFunction ? pcc : gdc;
-		void *src = __builtin_cheri_offset_set(base, reloc->object);
-		if (!isFunction && (reloc->size != 0))
-		{
-			src = __builtin_cheri_bounds_set(src, reloc->size);
-		}
-		src = __builtin_cheri_offset_increment(src, reloc->offset);
-		*dest = src;
-	}
-}
+/* Define an assembly stub that sets up $cgp and jumps to _start */
+#ifndef POSITION_INDEPENDENT_STARTUP
+DEFINE_CHERI_START_FUNCTION(_start)
+#else
+/* RTLD takes care of initializing $cgp, and all the globals */
+/* FIXME: we should probably just rename _start to __start instead of jumping */
+asm(
+	".text\n\t"
+	".global __start\n\t"
+	"__start:\n\t"
+	".set noreorder\n\t"
+	".set noat\n\t"
+	".protected _start\n\t"
+	/* Setup $c12 correctly in case we are inferring $cgp from $c12 */
+	"lui $1, %pcrel_hi(_start - 8)\n\t"
+	"daddiu $1, $1, %pcrel_lo(_start - 4)\n\t"
+	"cgetpcc $c12\n\t"
+	"cincoffset $c12, $c12, $1\n\t"
+	"cjr $c12\n\t"
+	"nop\n\t");
+#endif
 
 /* The entry function, C part. This performs the bulk of program initialisation
  * before handing off to main(). It is called by __start, which is defined in
@@ -127,8 +108,8 @@ crt_init_globals(void)
  * the position independent code in __start.
  * See: http://stackoverflow.com/questions/8095531/mips-elf-and-partial-linking
  */
-void
-__start(void *auxv,
+static void
+_start(void *auxv,
 	void (*cleanup)(void),			/* from shared loader */
 	struct Struct_Obj_Entry *obj __unused)	/* from shared loader */
 {
@@ -139,7 +120,11 @@ __start(void *auxv,
 	char **env = NULL;
 	Elf_Auxinfo *auxp;
 
+	/* For -pie executables rtld will initialize the __cap_relocs */
+#ifndef POSITION_INDEPENDENT_STARTUP
+	/* Must be called before accessing any globals */
 	crt_init_globals();
+#endif
 
 	__auxargs = auxv;
 	/* Digest the auxiliary vector. */
@@ -160,7 +145,13 @@ __start(void *auxv,
 	else
 		_init_tls();
 
+#ifndef POSITION_INDEPENDENT_STARTUP
+	/*
+	 * .ctors and .dtors are no longer supported for dynamically linked
+	 * binaries. TODO: remove for statically linked ones too
+	 */
 	crt_call_constructors();
+#endif
 
 #ifdef GCRT
 	/* Set up profiling support for the program, if we're being compiled

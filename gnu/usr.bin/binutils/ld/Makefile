@@ -44,6 +44,9 @@ CFLAGS+= -DTARGET_SYSTEM_ROOT=\"/\"
 CFLAGS+= -DTOOLBINDIR=\"${TOOLS_PREFIX}/${BINDIR}/libexec\"
 CFLAGS+= -D_GNU_SOURCE
 CFLAGS+= -I${SRCDIR}/ld -I${SRCDIR}/bfd
+.if ${MK_CHERI} == yes
+CFLAGS+=	-Wno-cheri-bitwise-operations
+.endif
 .if ${MK_SHARED_TOOLCHAIN} == "no"
 NO_SHARED?= yes
 .endif

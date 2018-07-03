@@ -11,6 +11,16 @@
  * forth in the LICENSE file which can be found at the top level of
  * the sendmail distribution.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sm/gen.h>
 SM_IDSTR(id, "@(#)$Id: vfscanf.c,v 1.55 2013-11-22 20:51:44 ca Exp $")

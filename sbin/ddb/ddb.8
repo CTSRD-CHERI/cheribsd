@@ -43,6 +43,8 @@
 .Op Fl N system
 .Cm status
 .Nm
+.Cm enter
+.Nm
 .Cm script
 .Ar scriptname
 .Nm
@@ -64,6 +66,7 @@ kernel debugger from user space that are not configured at compile-time or
 easily via
 .Xr sysctl 8
 MIB entries.
+It can also be used to manually enter the debugger.
 .Pp
 To ease configuration, commands can be put in a file which is processed using
 .Nm

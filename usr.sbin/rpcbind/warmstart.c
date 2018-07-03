@@ -31,6 +31,17 @@
  *
  * Copyright (c) 1990 by Sun Microsystems, Inc.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "sunrpc"
+ * }
+ * CHERI CHANGES END
+ */
 
 /*
  * #ident	"@(#)warmstart.c	1.7	93/07/05 SMI"

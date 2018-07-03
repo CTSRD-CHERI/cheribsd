@@ -220,7 +220,7 @@ ffs_snapshot(mp, snapfile)
 	struct vattr vat;
 	struct vnode *vp, *xvp, *mvp, *devvp;
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	struct snapdata *sn;
 	struct ufsmount *ump;
 
@@ -756,8 +756,7 @@ out1:
 	 */
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
-	aiov.iov_base = (void *)snapblklist;
-	aiov.iov_len = snaplistsize * sizeof(daddr_t);
+	IOVEC_INIT(&aiov, snapblklist, snaplistsize * sizeof(daddr_t));
 	auio.uio_resid = aiov.iov_len;
 	auio.uio_offset = ip->i_size;
 	auio.uio_segflg = UIO_SYSSPACE;
@@ -888,17 +887,8 @@ cgaccount(cg, vp, nbp, passno)
 
 	ip = VTOI(vp);
 	fs = ITOFS(ip);
-	error = bread(ITODEVVP(ip), fsbtodb(fs, cgtod(fs, cg)),
-	    (int)fs->fs_cgsize, KERNCRED, &bp);
-	if (error) {
-		brelse(bp);
+	if ((error = ffs_getcg(fs, ITODEVVP(ip), cg, &bp, &cgp)) != 0)
 		return (error);
-	}
-	cgp = (struct cg *)bp->b_data;
-	if (!cg_chkmagic(cgp)) {
-		brelse(bp);
-		return (EIO);
-	}
 	UFS_LOCK(ITOUMP(ip));
 	ACTIVESET(fs, cg);
 	/*
@@ -936,7 +926,7 @@ cgaccount(cg, vp, nbp, passno)
 	error = UFS_BALLOC(vp, lblktosize(fs, (off_t)(base + loc)),
 	    fs->fs_bsize, KERNCRED, BA_METAONLY, &ibp);
 	if (error) {
-		return (error);
+		goto out;
 	}
 	indiroff = (base + loc - UFS_NDADDR) % NINDIR(fs);
 	for ( ; loc < len; loc++, indiroff++) {
@@ -948,7 +938,7 @@ cgaccount(cg, vp, nbp, passno)
 			    lblktosize(fs, (off_t)(base + loc)),
 			    fs->fs_bsize, KERNCRED, BA_METAONLY, &ibp);
 			if (error) {
-				return (error);
+				goto out;
 			}
 			indiroff = 0;
 		}
@@ -976,7 +966,21 @@ cgaccount(cg, vp, nbp, passno)
 	if (passno == 2)
 		ibp->b_flags |= B_VALIDSUSPWRT;
 	bdwrite(ibp);
-	return (0);
+out:
+	/*
+	 * We have to calculate the crc32c here rather than just setting the
+	 * BX_CYLGRP b_xflags because the allocation of the block for the
+	 * the cylinder group map will always be a full size block (fs_bsize)
+	 * even though the cylinder group may be smaller (fs_cgsize). The
+	 * crc32c must be computed only over fs_cgsize whereas the BX_CYLGRP
+	 * flag causes it to be computed over the size of the buffer.
+	 */
+	if ((fs->fs_metackhash & CK_CYLGRP) != 0) {
+		((struct cg *)nbp->b_data)->cg_ckhash = 0;
+		((struct cg *)nbp->b_data)->cg_ckhash =
+		    calculate_crc32c(~0L, nbp->b_data, fs->fs_cgsize);
+	}
+	return (error);
 }
 
 /*
@@ -1403,7 +1407,7 @@ indiracct_ufs2(snapvp, cancelvp, level, blkno, lbn, rlbn, remblks,
 	 */
 	bp = getblk(cancelvp, lbn, fs->fs_bsize, 0, 0, 0);
 	bp->b_blkno = fsbtodb(fs, blkno);
-	if ((bp->b_flags & (B_DONE | B_DELWRI)) == 0 &&
+	if ((bp->b_flags & B_CACHE) == 0 &&
 	    (error = readblock(cancelvp, bp, fragstoblks(fs, blkno)))) {
 		brelse(bp);
 		return (error);
@@ -1607,7 +1611,7 @@ ffs_snapremove(vp)
 	struct buf *ibp;
 	struct fs *fs;
 	ufs2_daddr_t numblks, blkno, dblk;
-	int error, loc, last;
+	int error, i, last, loc;
 	struct snapdata *sn;
 
 	ip = VTOI(vp);
@@ -1627,10 +1631,14 @@ ffs_snapremove(vp)
 		ip->i_nextsnap.tqe_prev = 0;
 		VI_UNLOCK(devvp);
 		lockmgr(&vp->v_lock, LK_EXCLUSIVE, NULL);
+		for (i = 0; i < sn->sn_lock.lk_recurse; i++)
+			lockmgr(&vp->v_lock, LK_EXCLUSIVE, NULL);
 		KASSERT(vp->v_vnlock == &sn->sn_lock,
 			("ffs_snapremove: lost lock mutation")); 
 		vp->v_vnlock = &vp->v_lock;
 		VI_LOCK(devvp);
+		while (sn->sn_lock.lk_recurse > 0)
+			lockmgr(&sn->sn_lock, LK_RELEASE, NULL);
 		lockmgr(&sn->sn_lock, LK_RELEASE, NULL);
 		try_free_snapdata(devvp);
 	} else
@@ -1940,7 +1948,7 @@ retry:
 	 */
 	if (error != 0 && wkhd != NULL)
 		softdep_freework(wkhd);
-	lockmgr(vp->v_vnlock, LK_RELEASE, NULL);
+	lockmgr(&sn->sn_lock, LK_RELEASE, NULL);
 	return (error);
 }
 
@@ -1960,7 +1968,7 @@ ffs_snapshot_mount(mp)
 	struct vnode *lastvp;
 	struct inode *ip;
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	void *snapblklist;
 	char *reason;
 	daddr_t snaplistsize;
@@ -2045,8 +2053,7 @@ ffs_snapshot_mount(mp)
 	 */
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
-	aiov.iov_base = (void *)&snaplistsize;
-	aiov.iov_len = sizeof(snaplistsize);
+	IOVEC_INIT(&aiov, &snaplistsize, sizeof(snaplistsize));
 	auio.uio_resid = aiov.iov_len;
 	auio.uio_offset =
 	    lblktosize(fs, howmany(fs->fs_size, fs->fs_frag));
@@ -2062,8 +2069,7 @@ ffs_snapshot_mount(mp)
 	snapblklist = malloc(snaplistsize * sizeof(daddr_t),
 	    M_UFSMNT, M_WAITOK);
 	auio.uio_iovcnt = 1;
-	aiov.iov_base = snapblklist;
-	aiov.iov_len = snaplistsize * sizeof (daddr_t);
+	IOVEC_INIT(&aiov, snapblklist, snaplistsize * sizeof (daddr_t));
 	auio.uio_resid = aiov.iov_len;
 	auio.uio_offset -= sizeof(snaplistsize);
 	if ((error = VOP_READ(vp, &auio, IO_UNIT, td->td_ucred)) != 0) {
@@ -2643,8 +2649,8 @@ try_free_snapdata(struct vnode *devvp)
 static struct snapdata *
 ffs_snapdata_acquire(struct vnode *devvp)
 {
-	struct snapdata *nsn;
-	struct snapdata *sn;
+	struct snapdata *nsn, *sn;
+	int error;
 
 	/*
 	 * Allocate a free snapdata.  This is done before acquiring the
@@ -2652,23 +2658,37 @@ ffs_snapdata_acquire(struct vnode *devvp)
 	 * held.
 	 */
 	nsn = ffs_snapdata_alloc();
-	/*
-	 * If there snapshots already exist on this filesystem grab a
-	 * reference to the shared lock.  Otherwise this is the first
-	 * snapshot on this filesystem and we need to use our
-	 * pre-allocated snapdata.
-	 */
-	VI_LOCK(devvp);
-	if (devvp->v_rdev->si_snapdata == NULL) {
-		devvp->v_rdev->si_snapdata = nsn;
-		nsn = NULL;
+
+	for (;;) {
+		VI_LOCK(devvp);
+		sn = devvp->v_rdev->si_snapdata;
+		if (sn == NULL) {
+			/*
+			 * This is the first snapshot on this
+			 * filesystem and we use our pre-allocated
+			 * snapdata.  Publish sn with the sn_lock
+			 * owned by us, to avoid the race.
+			 */
+			error = lockmgr(&nsn->sn_lock, LK_EXCLUSIVE |
+			    LK_NOWAIT, NULL);
+			if (error != 0)
+				panic("leaked sn, lockmgr error %d", error);
+			sn = devvp->v_rdev->si_snapdata = nsn;
+			VI_UNLOCK(devvp);
+			nsn = NULL;
+			break;
+		}
+
+		/*
+		 * There is a snapshots which already exists on this
+		 * filesystem, grab a reference to the common lock.
+		 */
+		error = lockmgr(&sn->sn_lock, LK_INTERLOCK |
+		    LK_EXCLUSIVE | LK_SLEEPFAIL, VI_MTX(devvp));
+		if (error == 0)
+			break;
 	}
-	sn = devvp->v_rdev->si_snapdata;
-	/*
-	 * Acquire the snapshot lock.
-	 */
-	lockmgr(&sn->sn_lock,
-	    LK_INTERLOCK | LK_EXCLUSIVE | LK_RETRY, VI_MTX(devvp));
+
 	/*
 	 * Free any unused snapdata.
 	 */

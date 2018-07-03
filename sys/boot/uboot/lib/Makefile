@@ -1,23 +1,20 @@
 # $FreeBSD$
 
-.include <src.opts.mk>
+.include <bsd.init.mk>
 
-.PATH: ${.CURDIR}/../../common
+.PATH: ${LDRSRC}
 
 LIB=		uboot
 INTERNALLIB=
 WARNS?=		2
 
-SRCS=	crc32.c console.c copy.c devicename.c elf_freebsd.c glue.c
+SRCS=	console.c copy.c devicename.c elf_freebsd.c glue.c
 SRCS+=	module.c net.c reboot.c time.c
 
 CFLAGS+=	-ffreestanding -msoft-float
 
-CFLAGS+=	-I${.CURDIR}/../../../../lib/libstand/
-
-.if !defined(LOADER_NO_DISK_SUPPORT)
-SRCS+=	disk.c
-CFLAGS+= -DLOADER_DISK_SUPPORT
+.if ${LOADER_DISK_SUPPORT:Uyes} == "yes"
+SRCS+= disk.c
 .endif
 
 .if ${MK_FDT} != "no"
@@ -27,14 +24,14 @@ LOADER_FDT_SUPPORT=	no
 .endif
 
 .if ${LOADER_FDT_SUPPORT} == "yes"
-CFLAGS+= -DLOADER_FDT_SUPPORT -I${.CURDIR}/../../fdt
+CFLAGS+= -DLOADER_FDT_SUPPORT -I${FDTSRC}
 .endif
 
 # Pick up FDT includes
-CFLAGS+=	-I${.CURDIR}/../../../../sys/contrib/libfdt/
+CFLAGS+=	-I${SYSDIR}/contrib/libfdt/
 
 # Pick up the bootstrap header for some interface items
-CFLAGS+=	-I${.CURDIR}/../../common -I${.CURDIR}/../../.. -I.
+CFLAGS+=	-I${LDRSRC} -I${SYSDIR} -I.
 
 .ifdef(BOOT_DISK_DEBUG)
 # Make the disk code more talkative
@@ -42,7 +39,7 @@ CFLAGS+= -DDISK_DEBUG
 .endif
 
 machine: .NOMETA
-	ln -sf ${.CURDIR}/../../../${MACHINE_CPUARCH}/include machine
+	ln -sf ${SYSDIR}/${MACHINE_CPUARCH}/include machine
 
 CLEANFILES+=	machine
 

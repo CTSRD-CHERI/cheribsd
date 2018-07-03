@@ -40,12 +40,35 @@
 #include <sys/kdb.h>
 
 #include <cheri/cheri.h>
+#include <cheri/cheric.h>
 
 #include <machine/atomic.h>
 #include <machine/pcb.h>
 #include <machine/sysarch.h>
 
 #ifdef DDB
+
+#define	DB_CHERI_CAP_PRINT(crn) do {					\
+	uintmax_t c_perms, c_otype, c_base, c_length, c_offset;		\
+	u_int ctag, c_sealed;						\
+									\
+	CHERI_CGETTAG(ctag, (crn));					\
+	CHERI_CGETSEALED(c_sealed, (crn));				\
+	CHERI_CGETPERM(c_perms, (crn));					\
+	CHERI_CGETTYPE(c_otype, (crn));					\
+	CHERI_CGETBASE(c_base, (crn));					\
+	CHERI_CGETLEN(c_length, (crn));					\
+	CHERI_CGETOFFSET(c_offset, (crn));				\
+	db_printf("v:%u s:%u p:%08jx b:%016jx l:%016jx o:%jx t:%jx\n",	\
+	    ctag, c_sealed, c_perms, c_base, c_length, c_offset,	\
+	    c_otype);							\
+} while (0)
+
+#define	DB_CHERI_REG_PRINT(crn, num) do {				\
+	db_printf("$c%02u: ", num);					\
+	DB_CHERI_CAP_PRINT(crn);					\
+} while (0)
+
 /*
  * Variation that prints live register state from the capability coprocessor.
  *
@@ -71,9 +94,7 @@ DB_SHOW_COMMAND(cp2, ddb_dump_cp2)
 		db_printf("RegNum: invalid (%d) ", regnum);
 	db_printf("(%s)\n", cheri_exccode_string(exccode));
 
-	/* Shift $ddc into $ctemp for printing. */
-	CHERI_CGETDEFAULT(CHERI_CR_CTEMP0);
-	DB_CHERI_REG_PRINT(CHERI_CR_CTEMP0, 0);
+	/* DDC is printed later: DB_CHERI_REG_PRINT(0, 0); */
 	DB_CHERI_REG_PRINT(1, 1);
 	DB_CHERI_REG_PRINT(2, 2);
 	DB_CHERI_REG_PRINT(3, 3);
@@ -104,7 +125,16 @@ DB_SHOW_COMMAND(cp2, ddb_dump_cp2)
 	DB_CHERI_REG_PRINT(28, 28);
 	DB_CHERI_REG_PRINT(29, 29);
 	DB_CHERI_REG_PRINT(30, 30);
-	DB_CHERI_REG_PRINT(31, 31);
+	/* TODO: will be NULL reg soon: DB_CHERI_REG_PRINT(31, 31); */
+
+	/* Shift $ddc into $ctemp for printing. */
+	db_printf("$ddc: ");
+	CHERI_CGETDEFAULT(CHERI_CR_KR1C);
+	DB_CHERI_REG_PRINT(CHERI_CR_KR1C, 0);
+	/* Same again for $epcc */
+	db_printf("$epcc: ");
+	CHERI_CGETEPCC(CHERI_CR_KR1C);
+	DB_CHERI_CAP_PRINT(CHERI_CR_KR1C);
 }
 
 static void

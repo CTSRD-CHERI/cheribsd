@@ -20,7 +20,7 @@ SRCS=	\
 	strtoaddr.c \
 	tcpdump.c \
 	version.c
-CLEANFILES+=	version.c
+CLEANFILES+=	version.c ${MAN}
 
 .include "Makefile.print"
 
@@ -40,7 +40,7 @@ CFLAGS+=-DHAVE_CASPER
 .endif
 .if ${MK_OPENSSL} != "no"
 LIBADD+=	crypto
-CFLAGS+= -I${DESTDIR}/usr/include/openssl
+CFLAGS+= -I${SYSROOT:U${DESTDIR}}/usr/include/openssl
 CFLAGS+= -DHAVE_LIBCRYPTO -DHAVE_OPENSSL_EVP_H
 .endif
 
@@ -54,3 +54,9 @@ version.c: ${TCPDUMP_DISTDIR}/VERSION
 		> version.c
 
 .include <bsd.prog.mk>
+
+.for mp in ${MAN}
+${mp}: ${mp}.in
+	sed -e 's/@MAN_MISC_INFO@/7/g' -e 's/@MAN_FILE_FORMATS@/5/g' \
+		${.ALLSRC} > ${.TARGET}
+.endfor

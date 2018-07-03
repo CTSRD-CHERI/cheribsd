@@ -30,6 +30,16 @@
  * SUCH DAMAGE.
  *
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 

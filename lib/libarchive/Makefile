@@ -15,6 +15,9 @@ SHLIB_MAJOR= 7
 
 CFLAGS+=	-DPLATFORM_CONFIG_H=\"${.CURDIR}/config_freebsd.h\"
 CFLAGS+=	-I${.OBJDIR}
+.ifdef LIBCHERI
+CFLAGS+=	-Wno-cheri-bitwise-operations
+.endif
 
 .if ${MK_OPENSSL} != "no"
 CFLAGS+=	-DWITH_OPENSSL
@@ -94,6 +97,7 @@ SRCS=	archive_acl.c					\
 	archive_read_support_filter_rpm.c		\
 	archive_read_support_filter_uu.c		\
 	archive_read_support_filter_xz.c		\
+	archive_read_support_filter_zstd.c		\
 	archive_read_support_format_7zip.c		\
 	archive_read_support_format_all.c		\
 	archive_read_support_format_ar.c		\
@@ -136,6 +140,7 @@ SRCS=	archive_acl.c					\
 	archive_write_add_filter_program.c		\
 	archive_write_add_filter_uuencode.c		\
 	archive_write_add_filter_xz.c			\
+	archive_write_add_filter_zstd.c			\
 	archive_write_set_format.c			\
 	archive_write_set_format_7zip.c			\
 	archive_write_set_format_ar.c			\
@@ -414,16 +419,8 @@ MLINKS+=	archive_write_set_options.3 archive_write_set_option.3
 MLINKS+=	libarchive.3 archive.3
 
 .if ${MACHINE_ARCH} != "mips64"
-.if ${MK_TESTS} != "no"
-SUBDIR+=	tests
-.endif
-.endif
-
-.include <bsd.compiler.mk>
-
-# work around CTSRD-CHERI/clang#120
-.if ${COMPILER_TYPE} == "clang"
-CFLAGS+=       -Wno-varargs
+HAS_TESTS=
+SUBDIR.${MK_TESTS}+= tests
 .endif
 
 .include <bsd.lib.mk>

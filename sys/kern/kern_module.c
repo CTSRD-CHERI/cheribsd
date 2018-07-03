@@ -34,8 +34,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/eventhandler.h>
 #include <sys/malloc.h>
-#include <sys/sysproto.h>
+#include <sys/syscallsubr.h>
 #include <sys/sysent.h>
+#include <sys/sysproto.h>
 #include <sys/proc.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
@@ -369,15 +370,22 @@ struct module_stat_v1 {
 int
 sys_modstat(struct thread *td, struct modstat_args *uap)
 {
+
+	return (kern_modstat(td, uap->modid, __USER_CAP_OBJ(uap->stat)));
+}
+
+int
+kern_modstat(struct thread *td, int modid,
+    struct module_stat * __capability stat)
+{
 	module_t mod;
 	modspecific_t data;
 	int error = 0;
 	int id, namelen, refs, version;
-	struct module_stat *stat;
 	char *name;
 
 	MOD_SLOCK;
-	mod = module_lookupbyid(uap->modid);
+	mod = module_lookupbyid(modid);
 	if (mod == NULL) {
 		MOD_SUNLOCK;
 		return (ENOENT);
@@ -387,12 +395,11 @@ sys_modstat(struct thread *td, struct modstat_args *uap)
 	name = mod->name;
 	data = mod->data;
 	MOD_SUNLOCK;
-	stat = uap->stat;
 
 	/*
 	 * Check the version of the user's structure.
 	 */
-	if ((error = copyin(&stat->version, &version, sizeof(version))) != 0)
+	if ((error = copyin_c(&stat->version, &version, sizeof(version))) != 0)
 		return (error);
 	if (version != sizeof(struct module_stat_v1)
 	    && version != sizeof(struct module_stat))
@@ -400,20 +407,20 @@ sys_modstat(struct thread *td, struct modstat_args *uap)
 	namelen = strlen(mod->name) + 1;
 	if (namelen > MAXMODNAME)
 		namelen = MAXMODNAME;
-	if ((error = copyout(name, &stat->name[0], namelen)) != 0)
+	if ((error = copyout_c((__cheri_tocap char * __capability)name,
+	    &stat->name, namelen)) != 0)
 		return (error);
 
-	if ((error = copyout(&refs, &stat->refs, sizeof(int))) != 0)
+	if ((error = copyout_c(&refs, &stat->refs, sizeof(int))) != 0)
 		return (error);
-	if ((error = copyout(&id, &stat->id, sizeof(int))) != 0)
+	if ((error = copyout_c(&id, &stat->id, sizeof(int))) != 0)
 		return (error);
 
 	/*
 	 * >v1 stat includes module data.
 	 */
 	if (version == sizeof(struct module_stat))
-		if ((error = copyout(&data, &stat->data, 
-		    sizeof(data))) != 0)
+		if ((error = copyout_c(&data, &stat->data, sizeof(data))) != 0)
 			return (error);
 	td->td_retval[0] = 0;
 	return (error);
@@ -422,11 +429,18 @@ sys_modstat(struct thread *td, struct modstat_args *uap)
 int
 sys_modfind(struct thread *td, struct modfind_args *uap)
 {
+
+	return (kern_modfind(td, __USER_CAP_STR(uap->name)));
+}
+
+int
+kern_modfind(struct thread *td, const char * __capability uname)
+{
 	int error = 0;
 	char name[MAXMODNAME];
 	module_t mod;
 
-	if ((error = copyinstr(uap->name, name, sizeof name, 0)) != 0)
+	if ((error = copyinstr_c(uname, &name[0], sizeof name, 0)) != 0)
 		return (error);
 
 	MOD_SLOCK;

@@ -91,7 +91,7 @@
 int		loioctl(struct ifnet *, u_long, caddr_t);
 int		looutput(struct ifnet *ifp, struct mbuf *m,
 		    const struct sockaddr *dst, struct route *ro);
-static int	lo_clone_create(struct if_clone *, int, caddr_t);
+static int	lo_clone_create(struct if_clone *, int, void * __capability);
 static void	lo_clone_destroy(struct ifnet *);
 
 VNET_DEFINE(struct ifnet *, loif);	/* Used externally */
@@ -119,7 +119,8 @@ lo_clone_destroy(struct ifnet *ifp)
 }
 
 static int
-lo_clone_create(struct if_clone *ifc, int unit, caddr_t params)
+lo_clone_create(struct if_clone *ifc, int unit,
+    void * __capability params __unused)
 {
 	struct ifnet *ifp;
 
@@ -375,7 +376,7 @@ loioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error = 0, mask;
 
 	switch (cmd) {
-	case SIOCSIFADDR:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
 		ifp->if_flags |= IFF_UP;
 		ifp->if_drv_flags |= IFF_DRV_RUNNING;
 		/*
@@ -383,13 +384,13 @@ loioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		 */
 		break;
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		if (ifr == NULL) {
 			error = EAFNOSUPPORT;		/* XXX */
 			break;
 		}
-		switch (ifr->ifr_addr.sa_family) {
+		switch (ifr_addr_get_family(ifr)) {
 
 #ifdef INET
 		case AF_INET:
@@ -406,15 +407,15 @@ loioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case SIOCSIFMTU:
-		ifp->if_mtu = ifr->ifr_mtu;
+	CASE_IOC_IFREQ(SIOCSIFMTU):
+		ifp->if_mtu = ifr_mtu_get(ifr);
 		break;
 
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		break;
 
-	case SIOCSIFCAP:
-		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
+	CASE_IOC_IFREQ(SIOCSIFCAP):
+		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
 		if ((mask & IFCAP_RXCSUM) != 0)
 			ifp->if_capenable ^= IFCAP_RXCSUM;
 		if ((mask & IFCAP_TXCSUM) != 0)

@@ -301,9 +301,11 @@ vfs_buildopts(struct uio *auio, struct vfsoptlist **options)
 		TAILQ_INSERT_TAIL(opts, opt, link);
 
 		if (auio->uio_segflg == UIO_SYSSPACE) {
-			bcopy(auio->uio_iov[i].iov_base, opt->name, namelen);
+			bcopy((__cheri_fromcap void *)auio->uio_iov[i].iov_base,
+			    opt->name, namelen);
 		} else {
-			error = copyin(auio->uio_iov[i].iov_base, opt->name,
+			error = copyin_c(auio->uio_iov[i].iov_base,
+			    (__cheri_tocap char * __capability)opt->name,
 			    namelen);
 			if (error)
 				goto bad;
@@ -317,10 +319,12 @@ vfs_buildopts(struct uio *auio, struct vfsoptlist **options)
 			opt->len = optlen;
 			opt->value = malloc(optlen, M_MOUNT, M_WAITOK);
 			if (auio->uio_segflg == UIO_SYSSPACE) {
-				bcopy(auio->uio_iov[i + 1].iov_base, opt->value,
+				bcopy((__cheri_fromcap void *)
+				    auio->uio_iov[i + 1].iov_base, opt->value,
 				    optlen);
 			} else {
-				error = copyin(auio->uio_iov[i + 1].iov_base,
+				error = copyin_c(auio->uio_iov[i + 1].iov_base,
+				    (__cheri_tocap void * __capability)
 				    opt->value, optlen);
 				if (error)
 					goto bad;
@@ -368,7 +372,7 @@ vfs_mergeopts(struct vfsoptlist *toopts, struct vfsoptlist *oldopts)
  */
 #ifndef _SYS_SYSPROTO_H_
 struct nmount_args {
-	struct iovec *iovp;
+	struct iovec_native *iovp;
 	unsigned int iovcnt;
 	int flags;
 };
@@ -529,6 +533,8 @@ vfs_mount_destroy(struct mount *mp)
 	if (mp->mnt_lockref != 0)
 		panic("vfs_mount_destroy: nonzero lock refcount");
 	MNT_IUNLOCK(mp);
+	if (mp->mnt_vnodecovered != NULL)
+		vrele(mp->mnt_vnodecovered);
 #ifdef MAC
 	mac_mount_destroy(mp);
 #endif
@@ -680,10 +686,11 @@ bail:
 	    && errmsg_len > 0 && errmsg != NULL) {
 		if (fsoptions->uio_segflg == UIO_SYSSPACE) {
 			bcopy(errmsg,
+			    (__cheri_fromcap void *)
 			    fsoptions->uio_iov[2 * errmsg_pos + 1].iov_base,
 			    fsoptions->uio_iov[2 * errmsg_pos + 1].iov_len);
 		} else {
-			copyout(errmsg,
+			copyout_c((__cheri_tocap char * __capability)errmsg,
 			    fsoptions->uio_iov[2 * errmsg_pos + 1].iov_base,
 			    fsoptions->uio_iov[2 * errmsg_pos + 1].iov_len);
 		}
@@ -819,6 +826,7 @@ vfs_domount_first(
 	error = VFS_MOUNT(mp);
 	if (error != 0) {
 		vfs_unbusy(mp);
+		mp->mnt_vnodecovered = NULL;
 		vfs_mount_destroy(mp);
 		VI_LOCK(vp);
 		vp->v_iflag &= ~VI_MOUNT;
@@ -1131,12 +1139,19 @@ struct unmount_args {
 int
 sys_unmount(struct thread *td, struct unmount_args *uap)
 {
+
+	return (kern_unmount(td, __USER_CAP_STR(uap->path), uap->flags));
+}
+
+int
+kern_unmount(struct thread *td, const char * __capability path, int flags)
+{
 	struct nameidata nd;
 	struct mount *mp;
 	char *pathbuf;
 	int error, id0, id1;
 
-	AUDIT_ARG_VALUE(uap->flags);
+	AUDIT_ARG_VALUE(flags);
 	if (jailed(td->td_ucred) || usermount == 0) {
 		error = priv_check(td, PRIV_VFS_UNMOUNT);
 		if (error)
@@ -1144,12 +1159,13 @@ sys_unmount(struct thread *td, struct unmount_args *uap)
 	}
 
 	pathbuf = malloc(MNAMELEN, M_TEMP, M_WAITOK);
-	error = copyinstr(uap->path, pathbuf, MNAMELEN, NULL);
+	error = copyinstr_c(path, (__cheri_tocap char * __capability)pathbuf,
+	    MNAMELEN, NULL);
 	if (error) {
 		free(pathbuf, M_TEMP);
 		return (error);
 	}
-	if (uap->flags & MNT_BYFSID) {
+	if (flags & MNT_BYFSID) {
 		AUDIT_ARG_TEXT(pathbuf);
 		/* Decode the filesystem ID. */
 		if (sscanf(pathbuf, "FSID:%d:%d", &id0, &id1) != 2) {
@@ -1196,7 +1212,7 @@ sys_unmount(struct thread *td, struct unmount_args *uap)
 		 * now, so in the !MNT_BYFSID case return the more likely
 		 * EINVAL for compatibility.
 		 */
-		return ((uap->flags & MNT_BYFSID) ? ENOENT : EINVAL);
+		return ((flags & MNT_BYFSID) ? ENOENT : EINVAL);
 	}
 
 	/*
@@ -1206,7 +1222,7 @@ sys_unmount(struct thread *td, struct unmount_args *uap)
 		vfs_rel(mp);
 		return (EINVAL);
 	}
-	error = dounmount(mp, uap->flags, td);
+	error = dounmount(mp, flags, td);
 	return (error);
 }
 
@@ -1259,7 +1275,7 @@ dounmount_cleanup(struct mount *mp, struct vnode *coveredvp, int mntkflags)
 int
 dounmount(struct mount *mp, int flags, struct thread *td)
 {
-	struct vnode *coveredvp, *fsrootvp;
+	struct vnode *coveredvp;
 	int error;
 	uint64_t async_flag;
 	int mnt_gen_r;
@@ -1361,22 +1377,6 @@ dounmount(struct mount *mp, int flags, struct thread *td)
 	MNT_IUNLOCK(mp);
 	cache_purgevfs(mp, false); /* remove cache entries for this file sys */
 	vfs_deallocate_syncvnode(mp);
-	/*
-	 * For forced unmounts, move process cdir/rdir refs on the fs root
-	 * vnode to the covered vnode.  For non-forced unmounts we want
-	 * such references to cause an EBUSY error.
-	 */
-	if ((flags & MNT_FORCE) &&
-	    VFS_ROOT(mp, LK_EXCLUSIVE, &fsrootvp) == 0) {
-		if (mp->mnt_vnodecovered != NULL &&
-		    (mp->mnt_flag & MNT_IGNORE) == 0)
-			mountcheckdirs(fsrootvp, mp->mnt_vnodecovered);
-		if (fsrootvp == rootvnode) {
-			vrele(rootvnode);
-			rootvnode = NULL;
-		}
-		vput(fsrootvp);
-	}
 	if ((mp->mnt_flag & MNT_RDONLY) != 0 || (flags & MNT_FORCE) != 0 ||
 	    (error = VFS_SYNC(mp, MNT_WAIT)) == 0)
 		error = VFS_UNMOUNT(mp, flags);
@@ -1388,17 +1388,6 @@ dounmount(struct mount *mp, int flags, struct thread *td)
 	 * it doesn't exist anymore.
 	 */
 	if (error && error != ENXIO) {
-		if ((flags & MNT_FORCE) &&
-		    VFS_ROOT(mp, LK_EXCLUSIVE, &fsrootvp) == 0) {
-			if (mp->mnt_vnodecovered != NULL &&
-			    (mp->mnt_flag & MNT_IGNORE) == 0)
-				mountcheckdirs(mp->mnt_vnodecovered, fsrootvp);
-			if (rootvnode == NULL) {
-				rootvnode = fsrootvp;
-				vref(rootvnode);
-			}
-			vput(fsrootvp);
-		}
 		MNT_ILOCK(mp);
 		mp->mnt_kern_flag &= ~MNTK_NOINSMNTQ;
 		if ((mp->mnt_flag & MNT_RDONLY) == 0) {
@@ -1426,9 +1415,13 @@ dounmount(struct mount *mp, int flags, struct thread *td)
 	EVENTHANDLER_INVOKE(vfs_unmounted, mp, td);
 	if (coveredvp != NULL) {
 		coveredvp->v_mountedhere = NULL;
-		vput(coveredvp);
+		VOP_UNLOCK(coveredvp, 0);
 	}
 	vfs_event_signal(NULL, VQ_UNMOUNT, 0);
+	if (rootvnode != NULL && mp == rootvnode->v_mount) {
+		vrele(rootvnode);
+		rootvnode = NULL;
+	}
 	if (mp == rootdevmp)
 		rootdevmp = NULL;
 	vfs_mount_destroy(mp);
@@ -1807,7 +1800,7 @@ struct mntaarg {
 
 /* The header for the mount arguments */
 struct mntarg {
-	struct iovec *v;
+	kiovec_t *v;
 	int len;
 	int error;
 	SLIST_HEAD(, mntaarg)	list;
@@ -1849,8 +1842,7 @@ mount_argf(struct mntarg *ma, const char *name, const char *fmt, ...)
 
 	ma->v = realloc(ma->v, sizeof *ma->v * (ma->len + 2),
 	    M_MOUNT, M_WAITOK);
-	ma->v[ma->len].iov_base = (void *)(uintptr_t)name;
-	ma->v[ma->len].iov_len = strlen(name) + 1;
+	IOVEC_INIT_STR(&ma->v[ma->len], __DECONST(void *, name));
 	ma->len++;
 
 	sb = sbuf_new_auto();
@@ -1864,8 +1856,7 @@ mount_argf(struct mntarg *ma, const char *name, const char *fmt, ...)
 	bcopy(sbuf_data(sb), maa + 1, len);
 	sbuf_delete(sb);
 
-	ma->v[ma->len].iov_base = maa + 1;
-	ma->v[ma->len].iov_len = len;
+	IOVEC_INIT(&ma->v[ma->len], maa + 1, len);
 	ma->len++;
 
 	return (ma);
@@ -1913,15 +1904,13 @@ mount_arg(struct mntarg *ma, const char *name, const void *val, int len)
 
 	ma->v = realloc(ma->v, sizeof *ma->v * (ma->len + 2),
 	    M_MOUNT, M_WAITOK);
-	ma->v[ma->len].iov_base = (void *)(uintptr_t)name;
-	ma->v[ma->len].iov_len = strlen(name) + 1;
+	IOVEC_INIT_STR(&ma->v[ma->len], __DECONST(void *, name));
 	ma->len++;
 
-	ma->v[ma->len].iov_base = (void *)(uintptr_t)val;
 	if (len < 0)
-		ma->v[ma->len].iov_len = strlen(val) + 1;
+		IOVEC_INIT_STR(&ma->v[ma->len], __DECONST(char *, val));
 	else
-		ma->v[ma->len].iov_len = len;
+		IOVEC_INIT(&ma->v[ma->len], __DECONST(char *, val), len);
 	ma->len++;
 	return (ma);
 }

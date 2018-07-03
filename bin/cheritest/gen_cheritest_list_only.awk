@@ -15,9 +15,7 @@ BEGIN {
 		exit 1
 	}
 	sub(/[,}]*$/, "", $value)
-	if ($member ~ /\.ct_func/)
-		funcs[$value]
-	else if ($member ~ /\.ct_check_xfail/)
+	if ($member ~ /\.ct_check_xfail/)
 		xfail_funcs[$value]
 	else if ($member ~ /\.ct_cp2_exccode/)
 		cp2_exccodes[$value]

@@ -70,6 +70,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/unistd.h>	
 #include <sys/sdt.h>
 #include <sys/sx.h>
+#include <sys/syscallsubr.h>
 #include <sys/sysent.h>
 #include <sys/signalvar.h>
 
@@ -119,6 +120,13 @@ sys_fork(struct thread *td, struct fork_args *uap)
 int
 sys_pdfork(struct thread *td, struct pdfork_args *uap)
 {
+
+	return (kern_pdfork(td, __USER_CAP_OBJ(uap->fdp), uap->flags));
+}
+
+int
+kern_pdfork(struct thread *td, int * __capability fdp, int flags)
+{
 	struct fork_req fr;
 	int error, fd, pid;
 
@@ -126,7 +134,7 @@ sys_pdfork(struct thread *td, struct pdfork_args *uap)
 	fr.fr_flags = RFFDG | RFPROC | RFPROCDESC;
 	fr.fr_pidp = &pid;
 	fr.fr_pd_fd = &fd;
-	fr.fr_pd_flags = uap->flags;
+	fr.fr_pd_flags = flags;
 	/*
 	 * It is necessary to return fd by reference because 0 is a valid file
 	 * descriptor number, and the child needs to be able to distinguish
@@ -136,7 +144,7 @@ sys_pdfork(struct thread *td, struct pdfork_args *uap)
 	if (error == 0) {
 		td->td_retval[0] = pid;
 		td->td_retval[1] = 0;
-		error = copyout(&fd, uap->fdp, sizeof(fd));
+		error = copyout_c(&fd, fdp, sizeof(fd));
 	}
 	return (error);
 }
@@ -208,20 +216,26 @@ sysctl_kern_randompid(SYSCTL_HANDLER_ARGS)
 	pid = randompid;
 	error = sysctl_handle_int(oidp, &pid, 0, req);
 	if (error == 0 && req->newptr != NULL) {
-		if (pid < 0 || pid > pid_max - 100)	/* out of range */
-			pid = pid_max - 100;
-		else if (pid < 2)			/* NOP */
-			pid = 0;
-		else if (pid < 100)			/* Make it reasonable */
-			pid = 100;
-		randompid = pid;
+		if (pid == 0)
+			randompid = 0;
+		else if (pid == 1)
+			/* generate a random PID modulus between 100 and 1123 */
+			randompid = 100 + arc4random() % 1024;
+		else if (pid < 0 || pid > pid_max - 100)
+			/* out of range */
+			randompid = pid_max - 100;
+		else if (pid < 100)	 
+			/* Make it reasonable */
+			randompid = 100;
+		else
+			randompid = pid;
 	}
 	sx_xunlock(&allproc_lock);
 	return (error);
 }
 
 SYSCTL_PROC(_kern, OID_AUTO, randompid, CTLTYPE_INT|CTLFLAG_RW,
-    0, 0, sysctl_kern_randompid, "I", "Random PID modulus");
+    0, 0, sysctl_kern_randompid, "I", "Random PID modulus. Special values: 0: disable, 1: choose random value");
 
 static int
 fork_findpid(int flags)

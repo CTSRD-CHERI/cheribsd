@@ -33,6 +33,8 @@ RTLD_ARCH=	${MACHINE_CPUARCH}
 CFLAGS+=	-I${.CURDIR}/${RTLD_ARCH} -I${.CURDIR}
 .if ${MACHINE_ARCH} == "powerpc64"
 LDFLAGS+=	-nostdlib -e _rtld_start
+.elif ${MACHINE_CPUARCH} == "mips"
+LDFLAGS+=	-nostdlib -e rtld_start
 .else
 LDFLAGS+=	-nostdlib -e .rtld_start
 .endif
@@ -94,9 +96,8 @@ beforeinstall:
 
 .PATH: ${.CURDIR}/${RTLD_ARCH}
 
-.if ${MK_TESTS} != "no"
-SUBDIR+=	tests
-.endif
+HAS_TESTS=
+SUBDIR.${MK_TESTS}+= tests
 
 .include <bsd.prog.mk>
 ${PROG_FULL}:	${VERSION_MAP}

@@ -98,10 +98,12 @@ static void		tapifstart(struct ifnet *);
 static int		tapifioctl(struct ifnet *, u_long, caddr_t);
 static void		tapifinit(void *);
 
-static int		tap_clone_create(struct if_clone *, int, caddr_t);
+static int		tap_clone_create(struct if_clone *, int,
+			    void * __capability);
 static void		tap_clone_destroy(struct ifnet *);
 static struct if_clone *tap_cloner;
-static int		vmnet_clone_create(struct if_clone *, int, caddr_t);
+static int		vmnet_clone_create(struct if_clone *, int,
+			    void * __capability);
 static void		vmnet_clone_destroy(struct ifnet *);
 static struct if_clone *vmnet_cloner;
 
@@ -177,7 +179,7 @@ SYSCTL_INT(_net_link_tap, OID_AUTO, debug, CTLFLAG_RW, &tapdebug, 0, "");
 DEV_MODULE(if_tap, tapmodevent, NULL);
 
 static int
-tap_clone_create(struct if_clone *ifc, int unit, caddr_t params)
+tap_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 {
 	struct cdev *dev;
 	int i;
@@ -195,7 +197,7 @@ tap_clone_create(struct if_clone *ifc, int unit, caddr_t params)
 
 /* vmnet devices are tap devices in disguise */
 static int
-vmnet_clone_create(struct if_clone *ifc, int unit, caddr_t params)
+vmnet_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 {
 	struct cdev *dev;
 	int i;
@@ -607,9 +609,9 @@ tapifioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int			 dummy, error = 0;
 
 	switch (cmd) {
-		case SIOCSIFFLAGS: /* XXX -- just like vmnet does */
-		case SIOCADDMULTI:
-		case SIOCDELMULTI:
+		CASE_IOC_IFREQ(SIOCSIFFLAGS): /* XXX -- just like vmnet does */
+		CASE_IOC_IFREQ(SIOCADDMULTI):
+		CASE_IOC_IFREQ(SIOCDELMULTI):
 			break;
 
 		case SIOCGIFMEDIA:
@@ -623,13 +625,13 @@ tapifioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ifmr->ifm_current = ifmr->ifm_active;
 			if (dummy >= 1) {
 				int media = IFM_ETHER;
-				error = copyout(&media, ifmr->ifm_ulist,
+				error = copyout_c(&media, ifmr->ifm_ulist,
 				    sizeof(int));
 			}
 			break;
 
-		case SIOCSIFMTU:
-			ifp->if_mtu = ifr->ifr_mtu;
+		CASE_IOC_IFREQ(SIOCSIFMTU):
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			break;
 
 		case SIOCGIFSTATUS:
@@ -759,7 +761,7 @@ tapioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *td
 			*(int *)data = tapdebug;
 			break;
 
-		case TAPGIFNAME: {
+		CASE_IOC_IFREQ(TAPGIFNAME): {
 			struct ifreq	*ifr = (struct ifreq *) data;
 
 			strlcpy(ifr->ifr_name, ifp->if_xname, IFNAMSIZ);
@@ -827,13 +829,13 @@ tapioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *td
 			mtx_unlock(&tp->tap_mtx);
 			break;
 
-		case SIOCGIFADDR:	/* get MAC address of the remote side */
+		CASE_IOC_IFREQ(SIOCGIFADDR):	/* get MAC address of the remote side */
 			mtx_lock(&tp->tap_mtx);
 			bcopy(tp->ether_addr, data, sizeof(tp->ether_addr));
 			mtx_unlock(&tp->tap_mtx);
 			break;
 
-		case SIOCSIFADDR:	/* set MAC address of the remote side */
+		CASE_IOC_IFREQ(SIOCSIFADDR):	/* set MAC address of the remote side */
 			mtx_lock(&tp->tap_mtx);
 			bcopy(data, tp->ether_addr, sizeof(tp->ether_addr));
 			mtx_unlock(&tp->tap_mtx);

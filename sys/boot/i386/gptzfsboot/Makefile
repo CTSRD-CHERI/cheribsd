@@ -1,10 +1,10 @@
 # $FreeBSD$
 
-.include <bsd.own.mk>
+.include "../Makefile.inc"
 
 .PATH:		${.CURDIR}/../boot2 ${.CURDIR}/../gptboot \
 		${.CURDIR}/../zfsboot ${.CURDIR}/../common \
-		${.CURDIR}/../../common ${.CURDIR}/../../../crypto/skein
+		${.CURDIR}/../../../crypto/skein ${SASRC}
 
 FILES=		gptzfsboot
 MAN=		gptzfsboot.8
@@ -19,7 +19,7 @@ REL1=	0x700
 ORG1=	0x7c00
 ORG2=	0x0
 
-CFLAGS=	-DBOOTPROG=\"gptzfsboot\" \
+CFLAGS+=-DBOOTPROG=\"gptzfsboot\" \
 	-O1 \
 	-DGPT -DZFS -DBOOT2 \
 	-DSIOPRT=${BOOT_COMCONSOLE_PORT} \
@@ -48,10 +48,10 @@ CFLAGS+=	-Wno-tentative-definition-incomplete-type
 # Do not unroll skein loops, reduce code size
 CFLAGS+=	-DSKEIN_LOOP=111
 
-.if !defined(LOADER_NO_GELI_SUPPORT)
+.if ${LOADER_GELI_SUPPORT:Uyes} == "yes"
 CFLAGS+=	-DLOADER_GELI_SUPPORT
-CFLAGS+=	-I${.CURDIR}/../../geli
-LIBGELIBOOT=	${.OBJDIR}/../../geli/libgeliboot.a
+CFLAGS+=	-I${BOOTSRC}/geli
+LIBGELIBOOT=	${BOOTOBJ}/geli/libgeliboot.a
 .PATH:		${.CURDIR}/../../../opencrypto
 OPENCRYPTO_XTS=	xform_aes_xts.o
 .endif
@@ -59,8 +59,6 @@ OPENCRYPTO_XTS=	xform_aes_xts.o
 CFLAGS.gcc+=	--param max-inline-insns-single=100
 
 LD_FLAGS=${LD_FLAGS_BIN}
-
-LIBSTAND=	${.OBJDIR}/../../libstand32/libstand.a
 
 # Pick up ../Makefile.inc early.
 .include <bsd.init.mk>
@@ -87,7 +85,7 @@ gptzfsboot.bin: gptzfsboot.out
 
 gptzfsboot.out: ${BTXCRT} zfsboot.o sio.o gpt.o drv.o cons.o util.o \
 	skein.o skein_block.o ${OPENCRYPTO_XTS}
-	${LD} ${LD_FLAGS} -Ttext ${ORG2} -o ${.TARGET} ${.ALLSRC} ${LIBGELIBOOT} ${LIBSTAND}
+	${LD} ${LD_FLAGS} -Ttext ${ORG2} -o ${.TARGET} ${.ALLSRC} ${LIBGELIBOOT} ${LIBSA32}
 
 zfsboot.o: ${.CURDIR}/../../zfs/zfsimpl.c
 

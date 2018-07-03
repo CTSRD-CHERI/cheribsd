@@ -11,6 +11,8 @@ PLAIN_TESTS_SH=	yacc_tests
 # with root, this must be run as a non-privileged user; otherwise
 # the testcases will fail unexpectedly.
 TEST_METADATA.yacc_tests+=	required_user="unprivileged"
+# Times out on CHERI purecap QEMU
+TEST_METADATA.yacc_tests+=	timeout="1800"
 
 SCRIPTS=	run_test
 SCRIPTSDIR=	${TESTSDIR}

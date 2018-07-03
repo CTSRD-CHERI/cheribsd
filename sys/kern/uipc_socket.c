@@ -135,6 +135,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/stat.h>
 #include <sys/sx.h>
 #include <sys/sysctl.h>
+#include <sys/sysent.h>
 #include <sys/taskqueue.h>
 #include <sys/uio.h>
 #include <sys/jail.h>
@@ -461,12 +462,6 @@ sodealloc(struct socket *so)
 	so->so_vnet->vnet_sockcnt--;
 #endif
 	mtx_unlock(&so_global_mtx);
-	if (so->so_rcv.sb_hiwat)
-		(void)chgsbsize(so->so_cred->cr_uidinfo,
-		    &so->so_rcv.sb_hiwat, 0, RLIM_INFINITY);
-	if (so->so_snd.sb_hiwat)
-		(void)chgsbsize(so->so_cred->cr_uidinfo,
-		    &so->so_snd.sb_hiwat, 0, RLIM_INFINITY);
 #ifdef MAC
 	mac_socket_destroy(so);
 #endif
@@ -478,6 +473,12 @@ sodealloc(struct socket *so)
 		if (so->sol_accept_filter != NULL)
 			accept_filt_setopt(so, NULL);
 	} else {
+		if (so->so_rcv.sb_hiwat)
+			(void)chgsbsize(so->so_cred->cr_uidinfo,
+			    &so->so_rcv.sb_hiwat, 0, RLIM_INFINITY);
+		if (so->so_snd.sb_hiwat)
+			(void)chgsbsize(so->so_cred->cr_uidinfo,
+			    &so->so_snd.sb_hiwat, 0, RLIM_INFINITY);
 		sx_destroy(&so->so_snd.sb_sx);
 		sx_destroy(&so->so_rcv.sb_sx);
 		SOCKBUF_LOCK_DESTROY(&so->so_snd);
@@ -857,6 +858,9 @@ solisten_proto(struct socket *so, int backlog)
 	so->sol_accept_filter = NULL;
 	so->sol_accept_filter_arg = NULL;
 	so->sol_accept_filter_str = NULL;
+
+	so->sol_upcall = NULL;
+	so->sol_upcallarg = NULL;
 
 	so->so_options |= SO_ACCEPTCONN;
 
@@ -2695,10 +2699,17 @@ sooptcopyin(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
 	if (valsize > len)
 		sopt->sopt_valsize = valsize = len;
 
-	if (sopt->sopt_td != NULL)
-		return (copyin(sopt->sopt_val, buf, valsize));
+	if (sopt->sopt_td != NULL) {
+		if (sopt->sopt_dir == SOPT_SETCAP ||
+		    sopt->sopt_dir == SOPT_GETCAP)
+			return (copyincap_c(sopt->sopt_val,
+			   (__cheri_tocap void * __capability)buf, valsize));
+		else
+			return (copyin_c(sopt->sopt_val,
+			   (__cheri_tocap void * __capability)buf, valsize));
+	}
 
-	bcopy(sopt->sopt_val, buf, valsize);
+	bcopy((__cheri_fromcap void *)sopt->sopt_val, buf, valsize);
 	return (0);
 }
 
@@ -2716,7 +2727,7 @@ so_setsockopt(struct socket *so, int level, int optname, void *optval,
 	sopt.sopt_level = level;
 	sopt.sopt_name = optname;
 	sopt.sopt_dir = SOPT_SET;
-	sopt.sopt_val = optval;
+	sopt.sopt_val = (__cheri_tocap void * __capability)optval;
 	sopt.sopt_valsize = optlen;
 	sopt.sopt_td = NULL;
 	return (sosetopt(so, &sopt));
@@ -2731,7 +2742,7 @@ sosetopt(struct socket *so, struct sockopt *sopt)
 	sbintime_t val;
 	uint32_t val32;
 #ifdef MAC
-	struct mac extmac;
+	kmac_t extmac;
 #endif
 
 	CURVNET_SET(so->so_vnet);
@@ -2834,38 +2845,7 @@ sosetopt(struct socket *so, struct sockopt *sopt)
 				goto bad;
 			}
 
-			switch (sopt->sopt_name) {
-			case SO_SNDBUF:
-			case SO_RCVBUF:
-				if (sbreserve(sopt->sopt_name == SO_SNDBUF ?
-				    &so->so_snd : &so->so_rcv, (u_long)optval,
-				    so, curthread) == 0) {
-					error = ENOBUFS;
-					goto bad;
-				}
-				(sopt->sopt_name == SO_SNDBUF ? &so->so_snd :
-				    &so->so_rcv)->sb_flags &= ~SB_AUTOSIZE;
-				break;
-
-			/*
-			 * Make sure the low-water is never greater than the
-			 * high-water.
-			 */
-			case SO_SNDLOWAT:
-				SOCKBUF_LOCK(&so->so_snd);
-				so->so_snd.sb_lowat =
-				    (optval > so->so_snd.sb_hiwat) ?
-				    so->so_snd.sb_hiwat : optval;
-				SOCKBUF_UNLOCK(&so->so_snd);
-				break;
-			case SO_RCVLOWAT:
-				SOCKBUF_LOCK(&so->so_rcv);
-				so->so_rcv.sb_lowat =
-				    (optval > so->so_rcv.sb_hiwat) ?
-				    so->so_rcv.sb_hiwat : optval;
-				SOCKBUF_UNLOCK(&so->so_rcv);
-				break;
-			}
+			error = sbsetopt(so, sopt->sopt_name, optval);
 			break;
 
 		case SO_SNDTIMEO:
@@ -2905,8 +2885,27 @@ sosetopt(struct socket *so, struct sockopt *sopt)
 
 		case SO_LABEL:
 #ifdef MAC
-			error = sooptcopyin(sopt, &extmac, sizeof extmac,
-			    sizeof extmac);
+#ifdef COMPAT_FREEBSD32
+			if (SV_CURPROC_FLAG(SV_ILP32))
+				error = EOPNOTSUPP;
+			else
+#endif
+#ifdef COMPAT_CHERIABI
+			if (SV_CURPROC_FLAG(SV_CHERI)) {
+				sopt->sopt_dir = SOPT_SETCAP;
+				error = sooptcopyin(sopt, &extmac,
+				    sizeof extmac, sizeof extmac);
+				sopt->sopt_dir = SOPT_SET;
+			} else
+#endif
+			{
+				struct mac_native tmpmac;
+				error = sooptcopyin(sopt, &tmpmac,
+				    sizeof tmpmac, sizeof tmpmac);
+				extmac.m_buflen = tmpmac.m_buflen;
+				extmac.m_string = __USER_CAP(tmpmac.m_string,
+				    tmpmac.m_buflen);
+			}
 			if (error)
 				goto bad;
 			error = mac_setsockopt_label(sopt->sopt_td->td_ucred,
@@ -2974,10 +2973,16 @@ sooptcopyout(struct sockopt *sopt, const void *buf, size_t len)
 	valsize = min(len, sopt->sopt_valsize);
 	sopt->sopt_valsize = valsize;
 	if (sopt->sopt_val != NULL) {
-		if (sopt->sopt_td != NULL)
-			error = copyout(buf, sopt->sopt_val, valsize);
-		else
-			bcopy(buf, sopt->sopt_val, valsize);
+		if (sopt->sopt_td != NULL) {
+			KASSERT(sopt->sopt_dir != SOPT_GETCAP &&
+			   sopt->sopt_dir != SOPT_SETCAP,
+			   ("exporting capabilities not supproted"));
+			error = copyout_c(
+			    (__cheri_tocap const void * __capability)buf,
+			    sopt->sopt_val, valsize);
+		} else
+			bcopy(buf, (__cheri_fromcap void *)sopt->sopt_val,
+			    valsize);
 	}
 	return (error);
 }
@@ -2989,7 +2994,7 @@ sogetopt(struct socket *so, struct sockopt *sopt)
 	struct	linger l;
 	struct	timeval tv;
 #ifdef MAC
-	struct mac extmac;
+	kmac_t extmac;
 #endif
 
 	CURVNET_SET(so->so_vnet);
@@ -3048,19 +3053,23 @@ integer:
 			goto integer;
 
 		case SO_SNDBUF:
-			optval = so->so_snd.sb_hiwat;
+			optval = SOLISTENING(so) ? so->sol_sbsnd_hiwat :
+			    so->so_snd.sb_hiwat;
 			goto integer;
 
 		case SO_RCVBUF:
-			optval = so->so_rcv.sb_hiwat;
+			optval = SOLISTENING(so) ? so->sol_sbrcv_hiwat :
+			    so->so_rcv.sb_hiwat;
 			goto integer;
 
 		case SO_SNDLOWAT:
-			optval = so->so_snd.sb_lowat;
+			optval = SOLISTENING(so) ? so->sol_sbsnd_lowat :
+			    so->so_snd.sb_lowat;
 			goto integer;
 
 		case SO_RCVLOWAT:
-			optval = so->so_rcv.sb_lowat;
+			optval = SOLISTENING(so) ? so->sol_sbrcv_lowat :
+			    so->so_rcv.sb_lowat;
 			goto integer;
 
 		case SO_SNDTIMEO:
@@ -3081,15 +3090,34 @@ integer:
 
 		case SO_LABEL:
 #ifdef MAC
-			error = sooptcopyin(sopt, &extmac, sizeof(extmac),
-			    sizeof(extmac));
+#ifdef COMPAT_FREEBSD32
+			if (SV_CURPROC_FLAG(SV_ILP32))
+				error = EOPNOTSUPP;
+			else
+#endif
+#ifdef COMPAT_CHERIABI
+			if (SV_CURPROC_FLAG(SV_CHERI)) {
+				sopt->sopt_dir = SOPT_GETCAP;
+				error = sooptcopyin(sopt, &extmac,
+				    sizeof extmac, sizeof extmac);
+				sopt->sopt_dir = SOPT_GET;
+			} else
+#endif
+			{
+				struct mac_native tmpmac;
+				error = sooptcopyin(sopt, &tmpmac,
+				    sizeof tmpmac, sizeof tmpmac);
+				extmac.m_buflen = tmpmac.m_buflen;
+				extmac.m_string = __USER_CAP(tmpmac.m_string,
+				    tmpmac.m_buflen);
+			}
 			if (error)
 				goto bad;
 			error = mac_getsockopt_label(sopt->sopt_td->td_ucred,
 			    so, &extmac);
 			if (error)
 				goto bad;
-			error = sooptcopyout(sopt, &extmac, sizeof extmac);
+			/* Don't copy out extmac, it is unchanged. */
 #else
 			error = EOPNOTSUPP;
 #endif
@@ -3097,15 +3125,34 @@ integer:
 
 		case SO_PEERLABEL:
 #ifdef MAC
-			error = sooptcopyin(sopt, &extmac, sizeof(extmac),
-			    sizeof(extmac));
+#ifdef COMPAT_FREEBSD32
+			if (SV_CURPROC_FLAG(SV_ILP32))
+				error = EOPNOTSUPP;
+			else
+#endif
+#ifdef COMPAT_CHERIABI
+			if (SV_CURPROC_FLAG(SV_CHERI)) {
+				sopt->sopt_dir = SOPT_GETCAP;
+				error = sooptcopyin(sopt, &extmac,
+				    sizeof extmac, sizeof extmac);
+				sopt->sopt_dir = SOPT_GET;
+			} else
+#endif
+			{
+				struct mac_native tmpmac;
+				error = sooptcopyin(sopt, &tmpmac,
+				    sizeof tmpmac, sizeof tmpmac);
+				extmac.m_buflen = tmpmac.m_buflen;
+				extmac.m_string = __USER_CAP(tmpmac.m_string,
+				    tmpmac.m_buflen);
+			}
 			if (error)
 				goto bad;
 			error = mac_getsockopt_peerlabel(
 			    sopt->sopt_td->td_ucred, so, &extmac);
 			if (error)
 				goto bad;
-			error = sooptcopyout(sopt, &extmac, sizeof extmac);
+			/* Don't copy out extmac, it is unchanged. */
 #else
 			error = EOPNOTSUPP;
 #endif
@@ -3206,16 +3253,18 @@ soopt_mcopyin(struct sockopt *sopt, struct mbuf *m)
 		if (sopt->sopt_td != NULL) {
 			int error;
 
-			error = copyin(sopt->sopt_val, mtod(m, char *),
+			error = copyin_c(sopt->sopt_val,
+			    (__cheri_tocap void * __capability)mtod(m, char *),
 			    m->m_len);
 			if (error != 0) {
 				m_freem(m0);
 				return(error);
 			}
 		} else
-			bcopy(sopt->sopt_val, mtod(m, char *), m->m_len);
+			bcopy((__cheri_fromcap void *)sopt->sopt_val,
+			    mtod(m, char *), m->m_len);
 		sopt->sopt_valsize -= m->m_len;
-		sopt->sopt_val = (char *)sopt->sopt_val + m->m_len;
+		sopt->sopt_val = (char * __capability)sopt->sopt_val + m->m_len;
 		m = m->m_next;
 	}
 	if (m != NULL) /* should be allocated enoughly at ip6_sooptmcopyin() */
@@ -3235,16 +3284,18 @@ soopt_mcopyout(struct sockopt *sopt, struct mbuf *m)
 		if (sopt->sopt_td != NULL) {
 			int error;
 
-			error = copyout(mtod(m, char *), sopt->sopt_val,
-			    m->m_len);
+			error = copyout_c(
+			    (__cheri_tocap void * __capability)mtod(m, char *),
+			    sopt->sopt_val, m->m_len);
 			if (error != 0) {
 				m_freem(m0);
 				return(error);
 			}
 		} else
-			bcopy(mtod(m, char *), sopt->sopt_val, m->m_len);
+			bcopy(mtod(m, char *),
+			    (__cheri_fromcap void *)sopt->sopt_val, m->m_len);
 		sopt->sopt_valsize -= m->m_len;
-		sopt->sopt_val = (char *)sopt->sopt_val + m->m_len;
+		sopt->sopt_val = (char * __capability)sopt->sopt_val + m->m_len;
 		valsize += m->m_len;
 		m = m->m_next;
 	}
@@ -3712,24 +3763,41 @@ soisconnecting(struct socket *so)
 void
 soisconnected(struct socket *so)
 {
-	struct socket *head;
-	int ret;
 
-	/*
-	 * XXXGL: this is the only place where we acquire socket locks
-	 * in reverse order: first child, then listening socket.  To
-	 * avoid possible LOR, use try semantics.
-	 */
-restart:
 	SOCK_LOCK(so);
-	if ((head = so->so_listen) != NULL &&
-	    __predict_false(SOLISTEN_TRYLOCK(head) == 0)) {
-		SOCK_UNLOCK(so);
-		goto restart;
-	}
 	so->so_state &= ~(SS_ISCONNECTING|SS_ISDISCONNECTING|SS_ISCONFIRMING);
 	so->so_state |= SS_ISCONNECTED;
-	if (head != NULL && (so->so_qstate == SQ_INCOMP)) {
+
+	if (so->so_qstate == SQ_INCOMP) {
+		struct socket *head = so->so_listen;
+		int ret;
+
+		KASSERT(head, ("%s: so %p on incomp of NULL", __func__, so));
+		/*
+		 * Promoting a socket from incomplete queue to complete, we
+		 * need to go through reverse order of locking.  We first do
+		 * trylock, and if that doesn't succeed, we go the hard way
+		 * leaving a reference and rechecking consistency after proper
+		 * locking.
+		 */
+		if (__predict_false(SOLISTEN_TRYLOCK(head) == 0)) {
+			soref(head);
+			SOCK_UNLOCK(so);
+			SOLISTEN_LOCK(head);
+			SOCK_LOCK(so);
+			if (__predict_false(head != so->so_listen)) {
+				/*
+				 * The socket went off the listen queue,
+				 * should be lost race to close(2) of sol.
+				 * The socket is about to soabort().
+				 */
+				SOCK_UNLOCK(so);
+				sorele(head);
+				return;
+			}
+			/* Not the last one, as so holds a ref. */
+			refcount_release(&head->so_count);
+		}
 again:
 		if ((so->so_options & SO_ACCEPTFILTER) == 0) {
 			TAILQ_REMOVE(&head->sol_incomp, so, so_list);
@@ -3758,8 +3826,6 @@ again:
 		}
 		return;
 	}
-	if (head != NULL)
-		SOLISTEN_UNLOCK(head);
 	SOCK_UNLOCK(so);
 	wakeup(&so->so_timeo);
 	sorwakeup(so);
@@ -3793,13 +3859,14 @@ soisdisconnected(struct socket *so)
 	so->so_state |= SS_ISDISCONNECTED;
 
 	if (!SOLISTENING(so)) {
+		SOCK_UNLOCK(so);
 		SOCKBUF_LOCK(&so->so_rcv);
 		socantrcvmore_locked(so);
 		SOCKBUF_LOCK(&so->so_snd);
 		sbdrop_locked(&so->so_snd, sbused(&so->so_snd));
 		socantsendmore_locked(so);
-	}
-	SOCK_UNLOCK(so);
+	} else
+		SOCK_UNLOCK(so);
 	wakeup(&so->so_timeo);
 }
 

@@ -31,14 +31,119 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include <sys/param.h>
-#include <sys/types.h>
-#include <sys/errno.h>
-#include <sys/socket.h>
-#include <sys/user.h>
+#include "opt_mac.h"
 
-#include <compat/cheriabi/cheriabi.h>
+#include <sys/param.h>
+#include <sys/errno.h>
+#include <sys/imgact.h>
+#include <sys/namei.h>
+#include <sys/syscallsubr.h>
+
 #include <compat/cheriabi/cheriabi_proto.h>
+#include <compat/cheriabi/cheriabi_util.h>
+
+#include <security/mac/mac_framework.h>
+
+#ifdef MAC
+int
+cheriabi___mac_get_pid(struct thread *td,
+    struct cheriabi___mac_get_pid_args *uap)
+{
+
+	return (kern_mac_get_pid(td, uap->pid, uap->mac_p));
+}
+
+int
+cheriabi___mac_get_proc(struct thread *td,
+    struct cheriabi___mac_get_proc_args *uap)
+{
+
+	return (kern_mac_get_proc(td, uap->mac_p));
+}
+
+int
+cheriabi___mac_set_proc(struct thread *td,
+    struct cheriabi___mac_set_proc_args *uap)
+{
+
+	return (kern_mac_set_proc(td, uap->mac_p));
+}
+
+int
+cheriabi___mac_get_fd(struct thread *td,
+    struct cheriabi___mac_get_fd_args *uap)
+{
+
+	return (kern_mac_get_fd(td, uap->fd, uap->mac_p));
+}
+
+int
+cheriabi___mac_get_file(struct thread *td,
+    struct cheriabi___mac_get_file_args *uap)
+{
+
+	return (kern_mac_get_path(td, uap->path_p, uap->mac_p, FOLLOW));
+}
+
+int
+cheriabi___mac_get_link(struct thread *td,
+    struct cheriabi___mac_get_link_args *uap)
+{
+
+	return (kern_mac_get_path(td, uap->path_p, uap->mac_p, NOFOLLOW));
+}
+
+int
+cheriabi___mac_set_fd(struct thread *td,
+    struct cheriabi___mac_set_fd_args *uap)
+{
+
+	return (kern_mac_set_fd(td, uap->fd, uap->mac_p));
+}
+
+int
+cheriabi___mac_set_file(struct thread *td,
+    struct cheriabi___mac_set_file_args *uap)
+{
+
+	return (kern_mac_set_path(td, uap->path_p, uap->mac_p, FOLLOW));
+}
+
+int
+cheriabi___mac_set_link(struct thread *td,
+    struct cheriabi___mac_set_link_args *uap)
+{
+
+	return (kern_mac_set_path(td, uap->path_p, uap->mac_p, NOFOLLOW));
+}
+
+int
+cheriabi_mac_syscall(struct thread *td, struct cheriabi_mac_syscall_args *uap)
+{
+
+	return (kern_mac_syscall(td, uap->policy, uap->call, uap->arg));
+}
+
+int
+cheriabi___mac_execve(struct thread *td, struct cheriabi___mac_execve_args *uap)
+{
+	struct image_args eargs;
+	struct vmspace *oldvmspace;
+	int error;
+
+	error = pre_execve(td, &oldvmspace);
+	if (error != 0)
+		return (error);
+	error = cheriabi_exec_copyin_args(&eargs, NULL, UIO_SYSSPACE,
+	    uap->argv, uap->envv);
+	if (error == 0)
+		error = kern_execve(td, &eargs, uap->mac_p);
+
+	post_execve(td, error, oldvmspace);
+	return (error);
+}
+
+#else /* !MAC */
 
 int
 cheriabi___mac_get_proc(struct thread *td, struct cheriabi___mac_get_proc_args *uap)
@@ -104,9 +209,17 @@ cheriabi___mac_set_link(struct thread *td, struct cheriabi___mac_set_link_args *
 }
 
 int
+cheriabi_mac_syscall(struct thread *td, struct cheriabi_mac_syscall_args *uap)
+{
+
+	return(ENOSYS);
+}
+
+int
 cheriabi___mac_execve(struct thread *td, struct cheriabi___mac_execve_args *uap)
 {
 
 	return(ENOSYS);
 }
 
+#endif /* !MAC */

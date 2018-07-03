@@ -89,6 +89,8 @@ static MALLOC_DEFINE(M_SEM, "sem", "SVID compatible semaphores");
 #define DPRINTF(a)
 #endif
 
+static int kern_semop(struct thread *td, int semid,
+    struct sembuf * __capability usops, size_t nsops);
 static int seminit(void);
 static int sysvsem_modload(struct module *, int, void *);
 static int semunload(void);
@@ -269,7 +271,7 @@ static struct syscall_helper_data sem32_syscalls[] = {
 static struct syscall_helper_data cheriabi_sem_syscalls[] = {
 	CHERIABI_SYSCALL_INIT_HELPER(cheriabi___semctl),
 	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(semget),
-	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(semop),
+	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_semop),
 	SYSCALL_INIT_LAST
 };
 #endif /* COMPAT_CHERIABI */
@@ -645,7 +647,8 @@ int
 sys___semctl(struct thread *td, struct __semctl_args *uap)
 {
 	struct semid_ds dsbuf;
-	union semun arg, semun;
+	usemun_t arg;
+	ksemun_t semun;
 	register_t rval;
 	int error;
 
@@ -675,7 +678,11 @@ sys___semctl(struct thread *td, struct __semctl_args *uap)
 		break;
 	case GETALL:
 	case SETALL:
-		semun.array = arg.array;
+		/*
+		 * No easy way to set a better bound.  See comment in
+		 * kern_semctl().
+		 */
+		semun.array = __USER_CAP_UNBOUND(arg.array);
 		break;
 	case SETVAL:
 		semun.val = arg.val;
@@ -706,10 +713,9 @@ cheriabi___semctl(struct thread *td, struct cheriabi___semctl_args *uap)
 	struct semid_ds dsbuf;
 	struct semid_ds_c dsbuf_c;
 	union semun_c arg;
-	union semun semun;
+	ksemun_t semun;
 	register_t rval;
-	int error, semidx;
-	int64_t reqperms;
+	int error;
 
 	switch (uap->cmd) {
 	case SEM_STAT:
@@ -718,7 +724,7 @@ cheriabi___semctl(struct thread *td, struct cheriabi___semctl_args *uap)
 	case GETALL:
 	case SETVAL:
 	case SETALL:
-		error = copyincap(uap->arg, &arg, sizeof(arg));
+		error = copyincap_c(uap->arg, &arg, sizeof(arg));
 		if (error)
 			return (error);
 		break;
@@ -730,9 +736,7 @@ cheriabi___semctl(struct thread *td, struct cheriabi___semctl_args *uap)
 		semun.buf = &dsbuf;
 		break;
 	case IPC_SET:
-		error = copyin_c(arg.buf,
-		    (__cheri_tocap struct semid_ds_c * __capability)&dsbuf_c,
-		    sizeof(dsbuf_c));
+		error = copyin_c(arg.buf, &dsbuf_c, sizeof(dsbuf_c));
 		if (error)
 			return (error);
 		memset(&dsbuf, 0, sizeof(dsbuf));
@@ -742,27 +746,7 @@ cheriabi___semctl(struct thread *td, struct cheriabi___semctl_args *uap)
 		break;
 	case GETALL:
 	case SETALL:
-		semidx = IPCID_TO_IX(uap->semid);
-		if (semidx < 0 || semidx >= seminfo.semmni)
-			return (EINVAL);
-
-		reqperms = CHERI_PERM_GLOBAL;
-		if (uap->cmd == GETALL)
-			reqperms |= CHERI_PERM_LOAD;
-		else
-			reqperms |= CHERI_PERM_STORE;
-		/*
-		 * NOTE: a time-of-check vs time-of-use bug exists here.
-		 * The semid "uniqueness" code partially mitigates this
-		 * as documented in the GETALL case of kern_semctl().
-		 *
-		 * Performing the check here vs at the copyin somewhat
-		 * widens the race, but this is less disruptive for now.
-		 */
-		error = cheriabi_cap_to_ptr((caddr_t *)&semun.array, arg.array,
-		    sema[semidx].u.sem_nsems * sizeof(*arg.array), reqperms, 0);
-		if (error)
-			return (error);
+		semun.array = arg.array;
 		break;
 	case SETVAL:
 		semun.val = arg.val;
@@ -783,9 +767,7 @@ cheriabi___semctl(struct thread *td, struct cheriabi___semctl_args *uap)
 		CP(dsbuf, dsbuf_c, sem_nsems);
 		CP(dsbuf, dsbuf_c, sem_otime);
 		CP(dsbuf, dsbuf_c, sem_ctime);
-		error = copyout_c(
-		    (__cheri_tocap struct semid_ds_c * __capability)&dsbuf_c,
-		    arg.buf, sizeof(dsbuf_c));
+		error = copyout_c( &dsbuf_c, arg.buf, sizeof(dsbuf_c));
 		break;
 	}
 
@@ -793,13 +775,21 @@ cheriabi___semctl(struct thread *td, struct cheriabi___semctl_args *uap)
 		td->td_retval[0] = rval;
 	return (error);
 }
+
+int
+cheriabi_semop(struct thread *td, struct cheriabi_semop_args *uap)
+{
+
+	return (kern_semop(td, uap->semid, uap->sops, uap->nsops));
+}
+
 #endif /* COMPAT_CHERIABI */
 
 int
-kern_semctl(struct thread *td, int semid, int semnum, int cmd,
-    union semun *arg, register_t *rval)
+kern_semctl(struct thread *td, int semid, int semnum, int cmd, ksemun_t *arg,
+    register_t *rval)
 {
-	u_short *array;
+	u_short * __capability array;
 	struct ucred *cred = td->td_ucred;
 	int i, error;
 	struct prison *rpr;
@@ -964,7 +954,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 		 */
 		count = semakptr->u.sem_nsems;
 		mtx_unlock(sema_mtxp);		    
-		array = malloc(sizeof(*array) * count, M_TEMP, M_WAITOK);
+		array = malloc_c(sizeof(*array) * count, M_TEMP, M_WAITOK);
 		mtx_lock(sema_mtxp);
 		if ((error = semvalid(semid, rpr, semakptr)) != 0)
 			goto done2;
@@ -974,7 +964,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 		for (i = 0; i < semakptr->u.sem_nsems; i++)
 			array[i] = semakptr->u.sem_base[i].semval;
 		mtx_unlock(sema_mtxp);
-		error = copyout(array, arg->array, count * sizeof(*array));
+		error = copyout_c(array, arg->array, count * sizeof(*array));
 		mtx_lock(sema_mtxp);
 		break;
 
@@ -1017,8 +1007,8 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 		 */
 		count = semakptr->u.sem_nsems;
 		mtx_unlock(sema_mtxp);		    
-		array = malloc(sizeof(*array) * count, M_TEMP, M_WAITOK);
-		error = copyin(arg->array, array, count * sizeof(*array));
+		array = malloc_c(sizeof(*array) * count, M_TEMP, M_WAITOK);
+		error = copyin_c(arg->array, array, count * sizeof(*array));
 		mtx_lock(sema_mtxp);
 		if (error)
 			break;
@@ -1051,7 +1041,7 @@ done2:
 	if (cmd == IPC_RMID)
 		mtx_unlock(&sem_mtx);
 	if (array != NULL)
-		free(array, M_TEMP);
+		free_c(array, M_TEMP);
 	return(error);
 }
 
@@ -1197,10 +1187,17 @@ struct semop_args {
 int
 sys_semop(struct thread *td, struct semop_args *uap)
 {
+
+	return (kern_semop(td, uap->semid,
+	    __USER_CAP_ARRAY(uap->sops, uap->nsops), uap->nsops));
+}
+
+static int
+kern_semop(struct thread *td, int semid, struct sembuf * __capability usops,
+    size_t nsops)
+{
 #define SMALL_SOPS	8
 	struct sembuf small_sops[SMALL_SOPS];
-	int semid = uap->semid;
-	size_t nsops = uap->nsops;
 	struct prison *rpr;
 	struct sembuf *sops;
 	struct semid_kernel *semakptr;
@@ -1251,9 +1248,12 @@ sys_semop(struct thread *td, struct semop_args *uap)
 
 		sops = malloc(nsops * sizeof(*sops), M_TEMP, M_WAITOK);
 	}
-	if ((error = copyin(uap->sops, sops, nsops * sizeof(sops[0]))) != 0) {
+	if ((error = copyin_c(usops,
+	    (__cheri_tocap struct sembuf * __capability)sops,
+	    nsops * sizeof(sops[0]))) != 0) {
 		DPRINTF(("error = %d from copyin(%p, %p, %d)\n", error,
-		    uap->sops, sops, nsops * sizeof(sops[0])));
+		    (__cheri_fromcap struct sembuf *)usops, sops,
+		    nsops * sizeof(sops[0])));
 		if (sops != small_sops)
 			free(sops, M_SEM);
 		return (error);
@@ -1267,7 +1267,7 @@ sys_semop(struct thread *td, struct semop_args *uap)
 		goto done2;
 	}
 	seq = semakptr->u.sem_perm.seq;
-	if (seq != IPCID_TO_SEQ(uap->semid)) {
+	if (seq != IPCID_TO_SEQ(semid)) {
 		error = EINVAL;
 		goto done2;
 	}
@@ -1395,7 +1395,7 @@ sys_semop(struct thread *td, struct semop_args *uap)
 		 */
 		seq = semakptr->u.sem_perm.seq;
 		if ((semakptr->u.sem_perm.mode & SEM_ALLOC) == 0 ||
-		    seq != IPCID_TO_SEQ(uap->semid)) {
+		    seq != IPCID_TO_SEQ(semid)) {
 			error = EIDRM;
 			goto done2;
 		}
@@ -1527,6 +1527,8 @@ semexit_myhook(void *arg, struct proc *p)
 	 * Go through the chain of undo vectors looking for one
 	 * associated with this process.
 	 */
+	if (LIST_EMPTY(&semu_list))
+		return;
 	SEMUNDO_LOCK();
 	LIST_FOREACH(suptr, &semu_list, un_next) {
 		if (suptr->un_proc == p)
@@ -1889,7 +1891,7 @@ freebsd7___semctl(struct thread *td, struct freebsd7___semctl_args *uap)
 	struct semid_ds_old dsold;
 	struct semid_ds dsbuf;
 	union semun_old arg;
-	union semun semun;
+	ksemun_t semun;
 	register_t rval;
 	int error;
 
@@ -1985,7 +1987,7 @@ freebsd7_freebsd32_semctl(struct thread *td,
 {
 	struct semid_ds32_old dsbuf32;
 	struct semid_ds dsbuf;
-	union semun semun;
+	ksemun_t semun;
 	union semun32 arg;
 	register_t rval;
 	int error;
@@ -2057,7 +2059,7 @@ freebsd32_semctl(struct thread *td, struct freebsd32_semctl_args *uap)
 {
 	struct semid_ds32 dsbuf32;
 	struct semid_ds dsbuf;
-	union semun semun;
+	ksemun_t semun;
 	union semun32 arg;
 	register_t rval;
 	int error;

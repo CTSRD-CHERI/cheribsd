@@ -135,7 +135,7 @@ ATF_TC_BODY(seekdir_basic, tc)
 }
 
 /* There is no sbrk on AArch64 and RISC-V */
-#if !defined(__aarch64__) && !defined(__riscv__) && !defined(__CHERI_PURE_CAPABILITY__)
+#if !defined(__aarch64__) && !defined(__riscv) && !defined(__CHERI_PURE_CAPABILITY__)
 ATF_TC(telldir_leak);
 ATF_TC_HEAD(telldir_leak, tc)
 {
@@ -185,7 +185,7 @@ ATF_TP_ADD_TCS(tp)
 {
 
 	ATF_TP_ADD_TC(tp, seekdir_basic);
-#if !defined(__aarch64__) && !defined(__riscv__) && !defined(__CHERI_PURE_CAPABILITY__)
+#if !defined(__aarch64__) && !defined(__riscv) && !defined(__CHERI_PURE_CAPABILITY__)
 	ATF_TP_ADD_TC(tp, telldir_leak);
 #endif
 

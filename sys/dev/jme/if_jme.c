@@ -1981,15 +1981,15 @@ jme_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ifr = (struct ifreq *)data;
 	error = 0;
 	switch (cmd) {
-	case SIOCSIFMTU:
-		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > JME_JUMBO_MTU ||
+	CASE_IOC_IFREQ(SIOCSIFMTU):
+		if (ifr_mtu_get(ifr) < ETHERMIN || ifr_mtu_get(ifr) > JME_JUMBO_MTU ||
 		    ((sc->jme_flags & JME_FLAG_NOJUMBO) != 0 &&
-		    ifr->ifr_mtu > JME_MAX_MTU)) {
+		    ifr_mtu_get(ifr) > JME_MAX_MTU)) {
 			error = EINVAL;
 			break;
 		}
 
-		if (ifp->if_mtu != ifr->ifr_mtu) {
+		if (ifp->if_mtu != ifr_mtu_get(ifr)) {
 			/*
 			 * No special configuration is required when interface
 			 * MTU is changed but availability of TSO/Tx checksum
@@ -1997,14 +1997,14 @@ jme_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			 * FIFO size is just 2K.
 			 */
 			JME_LOCK(sc);
-			if (ifr->ifr_mtu >= JME_TX_FIFO_SIZE) {
+			if (ifr_mtu_get(ifr) >= JME_TX_FIFO_SIZE) {
 				ifp->if_capenable &=
 				    ~(IFCAP_TXCSUM | IFCAP_TSO4);
 				ifp->if_hwassist &=
 				    ~(JME_CSUM_FEATURES | CSUM_TSO);
 				VLAN_CAPABILITIES(ifp);
 			}
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
 				ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 				jme_init_locked(sc);
@@ -2012,7 +2012,7 @@ jme_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			JME_UNLOCK(sc);
 		}
 		break;
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		JME_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
@@ -2030,21 +2030,21 @@ jme_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->jme_if_flags = ifp->if_flags;
 		JME_UNLOCK(sc);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		JME_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			jme_set_filter(sc);
 		JME_UNLOCK(sc);
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->jme_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		JME_LOCK(sc);
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&
 		    ifp->if_mtu < JME_TX_FIFO_SIZE) {
 			if ((IFCAP_TXCSUM & ifp->if_capabilities) != 0) {

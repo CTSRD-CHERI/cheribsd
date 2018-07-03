@@ -16,6 +16,10 @@ __<bsd.init.mk>__:
 .include <bsd.own.mk>
 .MAIN: all
 
+# This is used in bsd.{dep,lib,prog}.mk as ${OBJS_SRCS_FILTER:ts:}
+# Some makefiles may want T as well to avoid nested objdirs.
+OBJS_SRCS_FILTER+= R
+
 # Handle INSTALL_AS_USER here to maximize the chance that
 # it has final authority over fooOWN and fooGRP.
 .if ${MK_INSTALL_AS_USER} != "no"
@@ -50,8 +54,9 @@ $xGRP=	${_gid}
 _SKIP_BUILD=	not building at level 0
 .elif !empty(.MAKEFLAGS:M-V${_V_DO_BUILD}) || \
     ${.TARGETS:M*install*} == ${.TARGETS} || \
-    make(clean*) || make(obj) || make(analyze) || make(print-dir) || \
-    make(destroy*)
+    ${.TARGETS:Mclean*} == ${.TARGETS} || \
+    ${.TARGETS:Mdestroy*} == ${.TARGETS} || \
+    make(obj) || make(analyze) || make(print-dir)
 # Skip building, but don't show a warning.
 _SKIP_BUILD=
 .endif

@@ -75,6 +75,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/socket.h> /* sockaddrs */
 #include <sys/selinfo.h>
 #include <net/if.h>
+#include <net/if_types.h>
 #include <net/if_var.h>
 #include <machine/bus.h>        /* bus_dmamap_* in netmap_kern.h */
 
@@ -165,7 +166,7 @@ nm_os_get_mbuf(struct ifnet *ifp, int len)
  * has a KASSERT(), checking that the mbuf dtor function is not NULL.
  */
 
-static void void_mbuf_dtor(struct mbuf *m, void *arg1, void *arg2) { }
+static void void_mbuf_dtor(struct mbuf *m) { }
 
 #define SET_MBUF_DESTRUCTOR(m, fn)	do {		\
 	(m)->m_ext.ext_free = (fn != NULL) ?		\
@@ -623,7 +624,7 @@ generic_mbuf_destructor(struct mbuf *m)
 	 * txsync. */
 	netmap_generic_irq(na, r, NULL);
 #ifdef __FreeBSD__
-	void_mbuf_dtor(m, NULL, NULL);
+	void_mbuf_dtor(m);
 #endif
 }
 
@@ -1197,6 +1198,13 @@ generic_netmap_attach(struct ifnet *ifp)
 	struct netmap_generic_adapter *gna;
 	int retval;
 	u_int num_tx_desc, num_rx_desc;
+
+#ifdef __FreeBSD__
+	if (ifp->if_type == IFT_LOOP) {
+		D("if_loop is not supported by %s", __func__);
+		return EINVAL;
+	}
+#endif
 
 	num_tx_desc = num_rx_desc = netmap_generic_ringsize; /* starting point */
 

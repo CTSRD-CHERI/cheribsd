@@ -15,7 +15,5 @@ FBSD_1.0 {
 	strnlen_c;
 	strncmp_c;
 	strncpy_c;
-	strncpy_c_fromcap;
-	strncpy_c_tocap;
 	strtol_c;
 };

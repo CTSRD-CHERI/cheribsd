@@ -30,6 +30,17 @@
 /*
  * Copyright (c) 1986-1991 by Sun Microsystems Inc. 
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "sunrpc"
+ * }
+ * CHERI CHANGES END
+ */
 
 #if defined(LIBC_SCCS) && !defined(lint)
 #ident	"@(#)clnt_bcast.c	1.18	94/05/03 SMI"

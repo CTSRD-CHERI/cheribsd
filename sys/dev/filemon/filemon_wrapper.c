@@ -47,14 +47,13 @@ static void
 filemon_output(struct filemon *filemon, char *msg, size_t len)
 {
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 	int error;
 
 	if (filemon->fp == NULL)
 		return;
 
-	aiov.iov_base = msg;
-	aiov.iov_len = len;
+	IOVEC_INIT(&aiov, msg, len);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_resid = len;

@@ -4,8 +4,6 @@
 PACKAGE=runtime
 PROG=	rm
 
-CHERI_NO_SHARED=	fails: incorrect errno deleting nonexistant directory
-
 LINKS=	${BINDIR}/rm ${BINDIR}/unlink
 MLINKS=	rm.1 unlink.1
 

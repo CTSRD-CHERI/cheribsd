@@ -21,6 +21,9 @@ CFLAGS+= -I${SRCTOP}/sys/cddl/contrib/opensolaris/uts/common/fs/zfs
 CFLAGS+= -I${SRCTOP}/sys
 CFLAGS+= -I${SRCTOP}/cddl/contrib/opensolaris/head
 CFLAGS+= -I${SRCTOP}/cddl/compat/opensolaris/lib/libumem
+.if defined(LIBCHERI)
+CFLAGS+= -Wno-cheri-bitwise-operations
+.endif
 
 # This library uses macros to define fprintf behavior for several object types
 # The compiler will see the non-string literal arguments to the fprintf calls and
@@ -31,12 +34,4 @@ CFLAGS+= -I${SRCTOP}/cddl/compat/opensolaris/lib/libumem
 #    ARENDER(pctl, nvlist_array, nvl, name, val, nelem);
 #
 CFLAGS+= -Wno-format-security
-
-.include <bsd.compiler.mk>
-
-# work around CTSRD-CHERI/clang#120
-.if ${COMPILER_TYPE} == "clang"
-CFLAGS+= -Wno-varargs
-.endif
-
 .include <bsd.lib.mk>

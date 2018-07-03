@@ -219,11 +219,11 @@ futex_address_create(struct futex_address *fa, struct thread *td,
 	    ("Can only create umtx keys for the current thread"));
 	switch (scope) {
 	case CLOUDABI_SCOPE_PRIVATE:
-		return (umtx_key_get(object, TYPE_FUTEX, THREAD_SHARE,
-		    &fa->fa_key));
+		return (umtx_key_get(__USER_CAP_UNBOUND(object), TYPE_FUTEX,
+		    THREAD_SHARE, &fa->fa_key));
 	case CLOUDABI_SCOPE_SHARED:
-		return (umtx_key_get(object, TYPE_FUTEX, AUTO_SHARE,
-		    &fa->fa_key));
+		return (umtx_key_get(__USER_CAP_UNBOUND(object), TYPE_FUTEX,
+		    AUTO_SHARE, &fa->fa_key));
 	default:
 		return (EINVAL);
 	}

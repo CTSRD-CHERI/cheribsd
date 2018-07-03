@@ -1374,7 +1374,7 @@ pcn_ioctl(ifp, command, data)
 	int			error = 0;
 
 	switch(command) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		PCN_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
                         if (ifp->if_drv_flags & IFF_DRV_RUNNING &&
@@ -1407,15 +1407,15 @@ pcn_ioctl(ifp, command, data)
 		PCN_UNLOCK(sc);
 		error = 0;
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		PCN_LOCK(sc);
 		pcn_setmulti(sc);
 		PCN_UNLOCK(sc);
 		error = 0;
 		break;
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		mii = device_get_softc(sc->pcn_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;

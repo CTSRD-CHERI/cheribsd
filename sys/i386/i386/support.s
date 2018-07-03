@@ -450,20 +450,6 @@ ENTRY(fueword)
 END(fueword32)
 END(fueword)
 
-/*
- * fuswintr() and suswintr() are specialized variants of fuword16() and
- * suword16(), respectively.  They are called from the profiling code,
- * potentially at interrupt time.  If they fail, that's okay; good things
- * will happen later.  They always fail for now, until the trap code is
- * able to deal with this.
- */
-ALTENTRY(suswintr)
-ENTRY(fuswintr)
-	movl	$-1,%eax
-	ret
-END(suswintr)
-END(fuswintr)
-
 ENTRY(fuword16)
 	movl	PCPU(CURPCB),%ecx
 	movl	$fusufault,PCB_ONFAULT(%ecx)

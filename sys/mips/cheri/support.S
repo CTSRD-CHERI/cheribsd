@@ -93,8 +93,8 @@ END(copystr_c)
 /*
  * pure capability ABI-only versions of the support routines
  */
-#ifdef CHERI_KERNEL
 
+#if 0 /* XXX-AM: We now use the memcpy version in cheri_memcpy.c */
 /*
  * Implement CHERI memcpy() and bcopy() variants in assembly; C works fine in
  * the kernel most of the time, but copyincap() and copyoutcap() require that
@@ -307,6 +307,8 @@ XLEAF(cheri_bcopy)
 	cmove	$c3, $c1	/* need to return original c3 for memcpy */
 END(memcpy)
 
+#endif /* disable memcpy */
+
 /*
  * Copy a null terminated string from the user address space into
  * the kernel address space.
@@ -318,8 +320,7 @@ END(memcpy)
  * c5 - pointer length copied
  * a0 - maximum length
  */
-NESTED(copyinstr, CALLFRAME_SIZ, ra)
-XNESTED(copyinstr_c)
+NESTED(copyinstr_c, CALLFRAME_SIZ, ra)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, -CALLFRAME_SIZ
 	cgetbase	t0, $c3 # make sure source is in userspace
 	bge	t0, zero, 1f
@@ -345,7 +346,7 @@ XNESTED(copyinstr_c)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 	cjr	$c17
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, CALLFRAME_SIZ
-END(copyinstr)
+END(copyinstr_c)
 
 /*
  * Copy a null terminated string from the kernel address space into
@@ -359,6 +360,7 @@ END(copyinstr)
  * a0 - maximum length
  */
 NESTED(copyoutstr, CALLFRAME_SIZ, ra)
+XNESTED(copyoutstr_c)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, -CALLFRAME_SIZ
 	cgetbase	t0, $c4 # make sure destination is in userspace
 	bge	t0, zero, 1f
@@ -394,8 +396,7 @@ END(copyoutstr)
  * c4 - kernel destination pointer
  * a0 - length of the copy
  */
-NESTED(copyin, CALLFRAME_SIZ, ra)
-XNESTED(copyin_c)
+NESTED(copyin_c, CALLFRAME_SIZ, ra)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, -CALLFRAME_SIZ
 	cgetbase t0, $c3	# make sure source is in userspace
 	bge	t0, zero, 1f
@@ -422,7 +423,7 @@ XNESTED(copyin_c)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, CALLFRAME_SIZ
 	cjr	$c17
 	move	v0, zero
-END(copyin)
+END(copyin_c)
 
 /*
  * Copy specified amount of data from user space into the kernel, preserving
@@ -433,7 +434,7 @@ END(copyin)
  * c4 - kernel destination pointer
  * a0 - length of the copy
  */
-NESTED(copyincap, CALLFRAME_SIZ, ra)
+NESTED(copyincap_c, CALLFRAME_SIZ, ra)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, -CALLFRAME_SIZ
 	cgetbase t0, $c3	# make sure source is in userspace
 	bge	t0, zero, 1f
@@ -460,7 +461,7 @@ NESTED(copyincap, CALLFRAME_SIZ, ra)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, CALLFRAME_SIZ
 	cjr	$c17
 	move	v0, zero
-END(copyincap)
+END(copyincap_c)
 
 /*
  * Copy specified amount of data from kernel to the user space
@@ -470,8 +471,7 @@ END(copyincap)
  * c4 - user destination pointer
  * a0 - length of the copy
  */
-NESTED(copyout, CALLFRAME_SIZ, ra)
-XNESTED(copyout_c)
+NESTED(copyout_c, CALLFRAME_SIZ, ra)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, -CALLFRAME_SIZ
 	cgetbase t0, $c4	# make sure source is in userspace
 	bge	t0, zero, 1f
@@ -498,7 +498,7 @@ XNESTED(copyout_c)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, CALLFRAME_SIZ
 	cjr	$c17
 	move	v0, zero
-END(copyout)
+END(copyout_c)
 
 /*
  * Copy specified amount of data from kernel to the user space, preserving
@@ -510,6 +510,7 @@ END(copyout)
  * a0 - length of the copy
  */
 NESTED(copyoutcap, CALLFRAME_SIZ, ra)
+XNESTED(copyoutcap_c)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, -CALLFRAME_SIZ
 	cgetbase t0, $c4	# make sure source is in userspace
 	bge	t0, zero, 1f
@@ -552,69 +553,80 @@ END(copyerr)
  * user data space.
  * accepts:
  * c3 - target address
+ * c4 - destination address
  */
-LEAF(fuword64)
-XLEAF(fuword)
-	cgetbase t0, $c3	# make sure source is in userspace
+LEAF(fueword64_c)
+XLEAF(fueword_c)
+	cgetaddr t0, $c3	# make sure source is in userspace
 	blt	t0, zero, 1f
 	nop
 	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
+	/* XXX-AM: this may become CAP_TABLE_LOAD */
 	PTR_LA	v0, fswberr
 	cgetpccsetoffset $c2, v0
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 	cld	v0, zero, 0($c3)	# fetch word
 	CHERI_NULL($c2)
-	cjr	$c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csd	v0, zero, 0($c4)	# store word
+	cjr	$c17
+	li	v0, 0
 1:
 	PTR_LA	t0, _C_LABEL(fswberr)
 	cgetpccsetoffset	$c12, t0
 	cjr	$c12
 	nop
-END(fuword64)
+END(fuword64_c)
 
-LEAF(fuword32)
-	cgetbase t0, $c3	# make sure source is in userspace
+LEAF(fueword32_c)
+	cgetaddr t0, $c3	# make sure source is in userspace
 	blt	t0, zero, 1f
 	nop
 	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
+	/* XXX-AM: this may become CAP_TABLE_LOAD */
 	PTR_LA	v0, fswberr
 	cgetpccsetoffset $c2, v0
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 	clw	v0, zero, 0($c3)	# fetch word
 	CHERI_NULL($c2)
-	cjr	$c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csw	v0, zero, 0($c4)	# store word
+	cjr	$c17
+	li	v0, 0
 1:
 	PTR_LA	t0, _C_LABEL(fswberr)
 	cgetpccsetoffset	$c12, t0
 	cjr	$c12
 	nop
-END(fuword32)
+END(fueword32_c)
 
-LEAF(fusword)
-	cgetbase t0, $c3	# make sure source is in userspace
+LEAF(fuesword_c)
+	cgetaddr t0, $c3	# make sure source is in userspace
 	PTR_LA	v0, _C_LABEL(fswberr)
 	blt	t0, zero, 1f
+	/* XXX-AM: this may become CAP_TABLE_LOAD */
 	cgetpccsetoffset	$c2, v0
 	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 	clhu	v0, zero, 0($c3)	# fetch short
 	CHERI_NULL($c2)
-	cjr	$c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	cshu	v0, zero, 0($c4)	# store short
+	cjr	$c17
+	li	v0, 0
 1:
 	cjr	$c2	# jump to fswberr
 	nop
-END(fusword)
+END(fusword_c)
 
-LEAF(fubyte)
-	cgetbase t0, $c3	# make sure source is in userspace
+LEAF(fubyte_c)
+	cgetaddr t0, $c3	# make sure source is in userspace
 	PTR_LA	v0, _C_LABEL(fswberr)
 	blt	t0, zero, 1f
+	/* XXX-AM: this may become CAP_TABLE_LOAD */
 	cgetpccsetoffset	$c2, v0
 	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
@@ -626,15 +638,16 @@ LEAF(fubyte)
 1:
 	cjr	$c2	# jump to fswberr
 	nop
-END(fubyte)
+END(fubyte_c)
 
-LEAF(suword64)
-XLEAF(suword)
-	cgetbase t0, $c3	# make sure source is in userspace
+LEAF(suword64_c)
+XLEAF(suword_c)
+	cgetaddr t0, $c3	# make sure source is in userspace
 	blt	t0, zero, 1f
 	nop
 	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
+	/* XXX-AM: this may become CAP_TABLE_LOAD */
 	PTR_LA	v0, fswberr
 	cgetpccsetoffset $c2, v0
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
@@ -647,14 +660,15 @@ XLEAF(suword)
 	cgetpccsetoffset	$c12, t0
 	cjr	$c12
 	nop
-END(suword64)
+END(suword64_c)
 
-LEAF(suword32)
-	cgetbase t0, $c3	# make sure source is in userspace
+LEAF(suword32_c)
+	cgetaddr t0, $c3	# make sure source is in userspace
 	blt	t0, zero, 1f
 	nop
 	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
+	/* XXX-AM: this may become CAP_TABLE_LOAD */
 	PTR_LA	v0, fswberr
 	cgetpccsetoffset $c2, v0
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
@@ -667,85 +681,89 @@ LEAF(suword32)
 	cgetpccsetoffset	$c12, t0
 	cjr	$c12
 	nop
-END(suword32)
+END(suword32_c)
 
 /*
- * casuword(9)
- * <v0>u_long casuword(<c3>u_long *p, <a0>u_long oldval, <a1>u_long newval)
+ * casueword_c(9)
+ * <v0>u_long casueword_c(<c3>u_long *p, <a0>u_long oldval,
+ *     <c4>u_long *oldval_p, <a1>u_long newval);
  */
 /*
- * casuword32(9)
- * <v0>uint32_t casuword(<c3>uint32_t *p, <a0>uint32_t oldval,
- *			 <a1>uint32_t newval)
+ * casueword32_c(9)
+ * <v0>uint32_t casueword32_c(<c3>uint32_t *p, <a0>uint32_t oldval,
+ *     <c4>int32_t *oldval_p, <a1>uint32_t newval);
  */
-LEAF(casuword32)
-	cgetbase t0, $c3	# make sure source is in userspace
+LEAF(casueword32_c)
+	cgetaddr t0, $c3	# make sure source is in userspace
 	PTR_LA	v0, _C_LABEL(fswberr)
 	blt	t0, zero, 1f
+	/* XXX-AM: this may become CAP_TABLE_LOAD */
 	cgetpccsetoffset	$c2, v0
 	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 2:
 	move	t0, a1
-	cllw	v0, $c3
-	bne	a0, v0, 3f
+	cllw	t1, $c3		# load word
+	bne	a0, t1, 3f
 	nop
 	cscw	t0, zero, $c3	# store word
 	beqz	t0, 2b
 	nop
 	j	4f
-	nop
+	li	v0, 0
 3:
 	li	v0, -1
 4:
 	CHERI_NULL($c2)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 	cjr	$c17
-	nop
+	csw	t1, zero, 0($c4)	# unconditionally store old word
 1:
 	cjr	$c2	# jump to fswberr
 	nop
-END(casuword32)
+END(casueword32_c)
 
-LEAF(casuword64)
-XLEAF(casuword)
-	cgetbase t0, $c3	# make sure source is in userspace
+LEAF(casueword64_c)
+XLEAF(casueword_c)
+	cgetaddr t0, $c3	# make sure source is in userspace
 	PTR_LA	v0, _C_LABEL(fswberr)
 	blt	t0, zero, 1f
+	/* XXX-AM: this may become CAP_TABLE_LOAD */
 	cgetpccsetoffset	$c2, v0
 	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 2:
 	move	t0, a1
-	clld	v0, $c3
-	bne	a0, v0, 3f
+	clld	t1, $c3
+	bne	a0, t1, 3f
 	nop
 	cscd	t0, zero, $c3	# store word
 	beqz	t0, 2b
 	nop
 	j	4f
-	nop
+	li	v0, 0
 3:
 	li	v0, -1
 4:
 	CHERI_NULL($c2)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 	cjr	$c17
-	nop
+	csd	t1, zero, 0($c4)	# unconditionally store old word
 1:
 	cjr	$c2	# jump to fswberr
 	nop
-END(casuword64)
+END(casueword64_c)
 
 /*
  * Will have to flush the instruction cache if byte merging is done in hardware.
  */
-LEAF(susword)
-	cgetbase t0, $c3	# make sure source is in userspace
+LEAF(susword_c)
+	cgetaddr t0, $c3	# make sure source is in userspace
 	PTR_LA	v0, _C_LABEL(fswberr)
 	blt	t0, zero, 1f
+	/* XXX-AM: this may become CAP_TABLE_LOAD */
 	cgetpccsetoffset $c2, v0
 	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
@@ -758,12 +776,13 @@ LEAF(susword)
 1:
 	cjr	$c2	# jump to fswberr
 	nop
-END(susword)
+END(susword_c)
 
-LEAF(subyte)
-	cgetbase t0, $c3	# make sure source is in userspace
+LEAF(subyte_c)
+	cgetaddr t0, $c3	# make sure source is in userspace
 	PTR_LA	v0, _C_LABEL(fswberr)
 	blt	t0, zero, 1f
+	/* XXX-AM: this may become CAP_TABLE_LOAD */
 	cgetpccsetoffset $c2, v0
 	GET_CPU_PCPU($c1, t0)
 	clc	$c1, zero, PC_CURPCB($c1)
@@ -776,13 +795,14 @@ LEAF(subyte)
 1:
 	cjr	$c2	# jump to fswberr
 	nop
-END(subyte)
+END(subyte_c)
 
 LEAF(fswberr)
 	cjr	$c17
 	li	v0, -1
 END(fswberr)
 
+#if 0 /* patched out */
 /*
  * fuswintr and suswintr are just like fusword and susword except that if
  * the page is not in memory or would cause a trap, then we return an error.
@@ -827,6 +847,8 @@ LEAF(fswintrberr)
 	cjr	$c17
 	li	v0, -1
 END(fswintrberr)
+
+#endif /* patched out */
 
 /*
  * <c3>void *memset(<c3>void *s1, <a0>int c, <a1>int len)
@@ -928,7 +950,7 @@ smallclr:
 	nop
 END(bzero)
 
-
+#if 0 /* XXX-AM: These should not exist in purecap (not yet ported) */
 /*
  * bcmp(s1, s2, n)
  */
@@ -1024,6 +1046,242 @@ LEAF(ffs)
 	nop
 END(ffs)
 
+<<<<<<< HEAD
+=======
+#if 0 /* XXX-AM these seems not being used */
+
+/**
+ * void
+ * atomic_set_16(u_int16_t *a, u_int16_t b)
+ * {
+ *	*a |= b;
+ * }
+ */
+LEAF(atomic_set_16)
+	.set	noreorder
+	srl	a0, a0, 2	# round down address to be 32-bit aligned
+	sll	a0, a0, 2
+	andi	a1, a1, 0xffff
+1:
+	ll	t0, 0(a0)
+	or	t0, t0, a1
+	sc	t0, 0(a0)
+	beq	t0, zero, 1b
+	nop
+	j	ra
+	nop
+END(atomic_set_16)
+
+/**
+ * void
+ * atomic_clear_16(u_int16_t *a, u_int16_t b)
+ * {
+ *	*a &= ~b;
+ * }
+ */
+LEAF(atomic_clear_16)
+	.set	noreorder
+	srl	a0, a0, 2	# round down address to be 32-bit aligned
+	sll	a0, a0, 2
+	nor	a1, zero, a1
+1:
+	ll	t0, 0(a0)
+	move	t1, t0
+	andi	t1, t1, 0xffff	# t1 has the original lower 16 bits
+	and	t1, t1, a1	# t1 has the new lower 16 bits
+	srl	t0, t0, 16	# preserve original top 16 bits
+	sll	t0, t0, 16
+	or	t0, t0, t1
+	sc	t0, 0(a0)
+	beq	t0, zero, 1b
+	nop
+	j	ra
+	nop
+END(atomic_clear_16)
+
+
+/**
+ * void
+ * atomic_subtract_16(uint16_t *a, uint16_t b)
+ * {
+ *	*a -= b;
+ * }
+ */
+LEAF(atomic_subtract_16)
+	.set	noreorder
+	srl	a0, a0, 2	# round down address to be 32-bit aligned
+	sll	a0, a0, 2
+1:
+	ll	t0, 0(a0)
+	move	t1, t0
+	andi	t1, t1, 0xffff	# t1 has the original lower 16 bits
+	subu	t1, t1, a1
+	andi	t1, t1, 0xffff	# t1 has the new lower 16 bits
+	srl	t0, t0, 16	# preserve original top 16 bits
+	sll	t0, t0, 16
+	or	t0, t0, t1
+	sc	t0, 0(a0)
+	beq	t0, zero, 1b
+	nop
+	j	ra
+	nop
+END(atomic_subtract_16)
+
+/**
+ * void
+ * atomic_add_16(uint16_t *a, uint16_t b)
+ * {
+ *	*a += b;
+ * }
+ */
+LEAF(atomic_add_16)
+	.set	noreorder
+	srl	a0, a0, 2	# round down address to be 32-bit aligned
+	sll	a0, a0, 2
+1:
+	ll	t0, 0(a0)
+	move	t1, t0
+	andi	t1, t1, 0xffff	# t1 has the original lower 16 bits
+	addu	t1, t1, a1
+	andi	t1, t1, 0xffff	# t1 has the new lower 16 bits
+	srl	t0, t0, 16	# preserve original top 16 bits
+	sll	t0, t0, 16
+	or	t0, t0, t1
+	sc	t0, 0(a0)
+	beq	t0, zero, 1b
+	nop
+	j	ra
+	nop
+END(atomic_add_16)
+
+/**
+ * void
+ * atomic_add_8(uint8_t *a, uint8_t b)
+ * {
+ *	*a += b;
+ * }
+ */
+LEAF(atomic_add_8)
+	.set	noreorder
+	srl	a0, a0, 2	# round down address to be 32-bit aligned
+	sll	a0, a0, 2
+1:
+	ll	t0, 0(a0)
+	move	t1, t0
+	andi	t1, t1, 0xff	# t1 has the original lower 8 bits
+	addu	t1, t1, a1
+	andi	t1, t1, 0xff	# t1 has the new lower 8 bits
+	srl	t0, t0, 8	# preserve original top 24 bits
+	sll	t0, t0, 8
+	or	t0, t0, t1
+	sc	t0, 0(a0)
+	beq	t0, zero, 1b
+	nop
+	j	ra
+	nop
+END(atomic_add_8)
+
+
+/**
+ * void
+ * atomic_subtract_8(uint8_t *a, uint8_t b)
+ * {
+ *	*a += b;
+ * }
+ */
+LEAF(atomic_subtract_8)
+	.set	noreorder
+	srl	a0, a0, 2	# round down address to be 32-bit aligned
+	sll	a0, a0, 2
+1:
+	ll	t0, 0(a0)
+	move	t1, t0
+	andi	t1, t1, 0xff	# t1 has the original lower 8 bits
+	subu	t1, t1, a1
+	andi	t1, t1, 0xff	# t1 has the new lower 8 bits
+	srl	t0, t0, 8	# preserve original top 24 bits
+	sll	t0, t0, 8
+	or	t0, t0, t1
+	sc	t0, 0(a0)
+	beq	t0, zero, 1b
+	nop
+	j	ra
+	nop
+END(atomic_subtract_8)
+
+/*
+ *	atomic 64-bit register read/write assembly language support routines.
+ */
+
+	.set	noreorder		# Noreorder is default style!
+
+#if !defined(__mips_n64) && !defined(__mips_n32)
+	/*
+	 * I don't know if these routines have the right number of
+	 * NOPs in it for all processors.  XXX
+	 *
+	 * Maybe it would be better to just leave this undefined in that case.
+	 *
+	 * XXX These routines are not safe in the case of a TLB miss on a1 or
+	 *     a0 unless the trapframe is 64-bit, which it just isn't with O32.
+	 *     If we take any exception, not just an interrupt, the upper
+	 *     32-bits will be clobbered.  Use only N32 and N64 kernels if you
+	 *     want to use 64-bit registers while interrupts are enabled or
+	 *     with memory operations.  Since this isn't even using load-linked
+	 *     and store-conditional, perhaps it should just use two registers
+	 *     instead, as is right and good with the O32 ABI.
+	 */
+LEAF(atomic_store_64)
+	mfc0	t1, MIPS_COP_0_STATUS
+	and	t2, t1, ~MIPS_SR_INT_IE
+	mtc0	t2, MIPS_COP_0_STATUS
+	nop
+	nop
+	nop
+	nop
+	ld	t0, (a1)
+	nop
+	nop
+	sd	t0, (a0)
+	nop
+	nop
+	mtc0	t1,MIPS_COP_0_STATUS
+	nop
+	nop
+	nop
+	nop
+	j	ra
+	nop
+END(atomic_store_64)
+
+LEAF(atomic_load_64)
+	mfc0	t1, MIPS_COP_0_STATUS
+	and	t2, t1, ~MIPS_SR_INT_IE
+	mtc0	t2, MIPS_COP_0_STATUS
+	nop
+	nop
+	nop
+	nop
+	ld	t0, (a0)
+	nop
+	nop
+	sd	t0, (a1)
+	nop
+	nop
+	mtc0	t1,MIPS_COP_0_STATUS
+	nop
+	nop
+	nop
+	nop
+	j	ra
+	nop
+END(atomic_load_64)
+#endif
+#endif /* XXX-AM seemingly not used */
+
+#endif /* the above should not exist in purecap */
+
+>>>>>>> 76795b8f35befc22667ea1b199f2cb88a5872da2
 #if defined(DDB) || defined(DEBUG)
 
 LEAF(kdbpeek)
@@ -1230,5 +1488,3 @@ LEAF(cheri_trace_log)
 	.set pop
 END(cheri_trace_log)
 #endif
-
-#endif /* CHERI_KERNEL */

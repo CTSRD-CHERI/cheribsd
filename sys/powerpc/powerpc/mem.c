@@ -89,7 +89,7 @@ struct mem_range_softc mem_range_softc = {
 int
 memrw(struct cdev *dev, struct uio *uio, int flags)
 {
-	struct iovec *iov;
+	kiovec_t *iov;
 	int error = 0;
 	vm_offset_t va, eva, off, v;
 	vm_prot_t prot;

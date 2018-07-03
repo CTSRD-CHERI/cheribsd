@@ -34,6 +34,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "support"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)vfprintf.c	8.1 (Berkeley) 6/4/93";
@@ -279,14 +289,14 @@ vfprintf_l(FILE * __restrict fp, locale_t locale, const char * __restrict fmt0,
 	int ret;
 	FIX_LOCALE(locale);
 
-	FLOCKFILE(fp);
+	FLOCKFILE_CANCELSAFE(fp);
 	/* optimise fprintf(stderr) (and other unbuffered Unix files) */
 	if ((fp->_flags & (__SNBF|__SWR|__SRW)) == (__SNBF|__SWR) &&
 	    fp->_file >= 0)
 		ret = __sbprintf(fp, locale, fmt0, ap);
 	else
 		ret = __vfprintf(fp, locale, fmt0, ap);
-	FUNLOCKFILE(fp);
+	FUNLOCKFILE_CANCELSAFE();
 	return (ret);
 }
 int
@@ -304,8 +314,12 @@ vfprintf(FILE * __restrict fp, const char * __restrict fmt0, va_list ap)
 #ifndef __CHERI_PURE_CAPABILITY__
 #define	BUF	32
 #else
-/* For the CHERI sandbox ABI we need enough space to print a capability dump */
-#define BUF	84
+/* For the CHERI sandbox ABI we need enough space to print a capability dump:
+ * v:1 s:0 p:0007807d b:00000001200ff73c l:0000000000000004 o:0123456789abcdef t:-1
+ * The current maximum length 80 chars but in case we decide to print more info
+ * in the future we just use 128 since we have enough stack space here anyway.
+*/
+#define BUF	128
 #endif
 #else
 #error "BUF must be large enough to format a uintmax_t"

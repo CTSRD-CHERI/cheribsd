@@ -29,6 +29,16 @@
  *	From: @(#)systat.h	8.1 (Berkeley) 6/6/93
  * $FreeBSD$
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <curses.h>
 

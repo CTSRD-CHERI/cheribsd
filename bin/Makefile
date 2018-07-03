@@ -52,15 +52,19 @@ SUBDIR.${MK_CHERI}+=	cheriabitest-mt
 SUBDIR.${MK_CHERI}+=	cheritest
 SUBDIR.${MK_CHERI}+=	cheritest-mt
 SUBDIR.${MK_CHERI}+=	helloworld
+SUBDIR.${MK_CHERI}+=	helloworld_cxx
 
 SUBDIR.${MK_RCMDS}+=	rcp
 SUBDIR.${MK_SENDMAIL}+=	rmail
 SUBDIR.${MK_TCSH}+=	csh
 SUBDIR.${MK_TESTS}+=	tests
 
-.include <bsd.arch.inc.mk>
+.if ${MK_CHERI_SHARED} != "no"
+SUBDIR.${MK_CHERI}+=	cheri_minimal_dynamic_exe
+SUBDIR.${MK_CHERI}+=	cheri_minimal_pie_exe
+.endif
 
-SUBDIR:=	${SUBDIR:O}
+.include <bsd.arch.inc.mk>
 
 SUBDIR_PARALLEL=
 

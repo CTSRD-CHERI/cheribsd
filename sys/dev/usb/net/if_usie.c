@@ -1282,7 +1282,7 @@ usie_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	struct ifmediareq *ifmr;
 
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		if (ifp->if_flags & IFF_UP) {
 			if (!(ifp->if_drv_flags & IFF_DRV_RUNNING))
 				usie_if_init(sc);
@@ -1292,7 +1292,7 @@ usie_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		if (!(ifp->if_drv_flags & IFF_DRV_RUNNING)) {
 			device_printf(sc->sc_dev,
 			    "Connect to the network first.\n");
@@ -1328,7 +1328,7 @@ usie_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		DPRINTF("media\n");
 		break;
 
-	case SIOCSIFADDR:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
 		break;
 
 	default:

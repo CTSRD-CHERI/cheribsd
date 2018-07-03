@@ -31,6 +31,7 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/capsicum.h>
+#include <sys/nv.h>
 
 #include <assert.h>
 #include <err.h>
@@ -52,6 +53,7 @@ static int ntest = 1;
 		printf("ok %d %s:%u\n", ntest, __FILE__, __LINE__);	\
 	else								\
 		printf("not ok %d %s:%u\n", ntest, __FILE__, __LINE__);	\
+	fflush(stdout);							\
 	ntest++;							\
 } while (0)
 #define CHECKX(expr)     do {						\
@@ -61,6 +63,7 @@ static int ntest = 1;
 		printf("not ok %d %s:%u\n", ntest, __FILE__, __LINE__);	\
 		exit(1);						\
 	}								\
+	fflush(stdout);							\
 	ntest++;							\
 } while (0)
 
@@ -1524,6 +1527,7 @@ main(void)
 	cap_channel_t *capcas, *capgrp;
 
 	printf("1..199\n");
+	fflush(stdout);
 
 	capcas = cap_init();
 	CHECKX(capcas != NULL);

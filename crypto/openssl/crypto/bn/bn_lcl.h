@@ -108,6 +108,16 @@
  * Hudson (tjh@cryptsoft.com).
  *
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_integrity"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #ifndef HEADER_BN_LCL_H
 # define HEADER_BN_LCL_H

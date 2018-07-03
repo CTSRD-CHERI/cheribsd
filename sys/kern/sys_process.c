@@ -87,20 +87,6 @@ struct ptrace_vm_entry32 {
 	u_int		pve_fsid;
 	uint32_t	pve_path;
 };
-
-struct ptrace_lwpinfo32 {
-	lwpid_t	pl_lwpid;	/* LWP described. */
-	int	pl_event;	/* Event that stopped the LWP. */
-	int	pl_flags;	/* LWP flags. */
-	sigset_t	pl_sigmask;	/* LWP signal mask */
-	sigset_t	pl_siglist;	/* LWP pending signal */
-	struct siginfo32 pl_siginfo;	/* siginfo for signal */
-	char	pl_tdname[MAXCOMLEN + 1];	/* LWP name. */
-	pid_t	pl_child_pid;		/* New child pid */
-	u_int		pl_syscall_code;
-	u_int		pl_syscall_narg;
-};
-
 #endif
 
 /*
@@ -360,7 +346,7 @@ static ssize_t
 proc_iop(struct thread *td, struct proc *p, vm_offset_t va, void *buf,
     size_t len, enum uio_rw rw)
 {
-	struct iovec iov;
+	kiovec_t iov;
 	struct uio uio;
 	ssize_t slen;
 	int error;
@@ -368,8 +354,7 @@ proc_iop(struct thread *td, struct proc *p, vm_offset_t va, void *buf,
 	MPASS(len < SSIZE_MAX);
 	slen = (ssize_t)len;
 
-	iov.iov_base = (caddr_t)buf;
-	iov.iov_len = len;
+	IOVEC_INIT(&iov, buf, len);
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = va;
@@ -757,7 +742,7 @@ proc_set_traced(struct proc *p, bool stop)
 int
 kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 {
-	struct iovec iov;
+	kiovec_t iov;
 	struct uio uio;
 	struct proc *curp, *p, *pp;
 	struct thread *td2 = NULL, *td3;
@@ -1097,8 +1082,8 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 
 		switch (req) {
 		case PT_STEP:
-			CTR2(KTR_PTRACE, "PT_STEP: tid %d (pid %d)",
-			    td2->td_tid, p->p_pid);
+			CTR3(KTR_PTRACE, "PT_STEP: tid %d (pid %d), sig = %d",
+			    td2->td_tid, p->p_pid, data);
 			error = ptrace_single_step(td2);
 			if (error)
 				goto out;
@@ -1187,6 +1172,13 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 		}
 
 	sendsig:
+		/*
+		 * Clear the pending event for the thread that just
+		 * reported its event (p_xthread).  This may not be
+		 * the thread passed to PT_CONTINUE, PT_STEP, etc. if
+		 * the debugger is resuming a different thread.
+		 */
+		td2 = p->p_xthread;
 		if (proctree_locked) {
 			sx_xunlock(&proctree_lock);
 			proctree_locked = 0;
@@ -1261,16 +1253,15 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 #ifdef COMPAT_FREEBSD32
 		if (wrap32) {
 			piod32 = addr;
-			iov.iov_base = (void *)(uintptr_t)piod32->piod_addr;
-			iov.iov_len = piod32->piod_len;
+			IOVEC_INIT(&iov, (void *)(uintptr_t)piod32->piod_addr,
+			    piod32->piod_len);
 			uio.uio_offset = (off_t)(uintptr_t)piod32->piod_offs;
 			uio.uio_resid = piod32->piod_len;
 		} else
 #endif
 		{
 			piod = addr;
-			iov.iov_base = piod->piod_addr;
-			iov.iov_len = piod->piod_len;
+			IOVEC_INIT(&iov, piod->piod_addr, piod->piod_len);
 			uio.uio_offset = (off_t)(uintptr_t)piod->piod_offs;
 			uio.uio_resid = piod->piod_len;
 		}
@@ -1406,7 +1397,8 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 #endif
 			){
 				pl->pl_flags |= PL_FLAG_SI;
-				pl->pl_siginfo = td2->td_si;
+				siginfo_to_siginfo_native(&td2->td_si,
+				    &pl->pl_siginfo);
 			}
 		}
 		if ((pl->pl_flags & PL_FLAG_SI) == 0)

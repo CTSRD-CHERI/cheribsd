@@ -258,6 +258,15 @@ linux_synchronize_rcu_cb(ck_epoch_t *epoch __unused, ck_epoch_record_t *epoch_re
 			sched_prio(td, prio);
 			/* task switch */
 			mi_switch(SW_VOL | SWT_RELINQUISH, NULL);
+
+			/*
+			 * Release the thread lock while yielding to
+			 * allow other threads to acquire the lock
+			 * pointed to by TDQ_LOCKPTR(td). Else a
+			 * deadlock like situation might happen.
+			 */
+			thread_unlock(td);
+			thread_lock(td);
 		}
 	} else {
 		/*
@@ -299,8 +308,9 @@ linux_synchronize_rcu(void)
 	old_cpu = PCPU_GET(cpuid);
 	old_pinned = td->td_pinned;
 	old_prio = td->td_priority;
-	td->td_pinned = 0;
 	was_bound = sched_is_bound(td);
+	sched_unbind(td);
+	td->td_pinned = 0;
 	sched_bind(td, old_cpu);
 
 	ck_epoch_synchronize_wait(&linux_epoch,

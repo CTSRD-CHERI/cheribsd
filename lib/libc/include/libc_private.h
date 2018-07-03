@@ -337,7 +337,6 @@ int		__sys_clock_nanosleep(__clockid_t, int,
 		    const struct timespec *, struct timespec *);
 int		__sys_close(int);
 int		__sys_connect(int, const struct sockaddr *, __socklen_t);
-__ssize_t	__sys_getdirentries(int, char *, __size_t, __off_t *);
 		/* fcntl declared to match the kernel so we can call directly */
 int		__sys_fcntl(int, int, __intptr_t);
 int		__sys_fdatasync(int);
@@ -345,6 +344,7 @@ int		__sys_fstatat(int, const char *, struct stat *, int);
 int		__sys_fsync(int);
 __pid_t		__sys_fork(void);
 int		__sys_ftruncate(int, __off_t);
+__ssize_t	__sys_getdirentries(int, char *, __size_t, __off_t *);
 int		__sys_gettimeofday(struct timeval *, struct timezone *);
 		/* ioctl declared to match the kernel so we can call directly */
 int		__sys_ioctl(int, unsigned long, void *);
@@ -422,6 +422,11 @@ void __libc_map_stacks_exec(void);
 
 void	_pthread_cancel_enter(int);
 void	_pthread_cancel_leave(int);
+
+struct _pthread_cleanup_info;
+void	___pthread_cleanup_push_imp(void (*)(void *), void *,
+	    struct _pthread_cleanup_info *);
+void	___pthread_cleanup_pop_imp(int);
 
 void __throw_constraint_handler_s(const char * restrict msg, int error);
 

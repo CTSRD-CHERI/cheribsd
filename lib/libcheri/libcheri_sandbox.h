@@ -36,10 +36,6 @@
 #include <exception>
 #endif
 
-#if !__has_feature(capabilities)
-#error "This code requires a CHERI-aware compiler"
-#endif
-
 /*
  * This section defines interfaces for setting up, invoking, resetting, and
  * destroying sandbox classes and objects.
@@ -97,7 +93,7 @@ int	sandbox_object_new(struct sandbox_class *sbcp, size_t heaplen,
 int	sandbox_object_new_flags(struct sandbox_class *sbcp, size_t heaplen,
 	    uint flags, struct sandbox_object **sbopp);
 int	sandbox_object_new_system_object(__capability void *private_data,
-	    __capability void *invoke_pcc, __capability intptr_t *vtable,
+	    __capability void *invoke_pcc, __capability vm_offset_t *vtable,
 	    struct sandbox_object **sbopp);
 
 /**

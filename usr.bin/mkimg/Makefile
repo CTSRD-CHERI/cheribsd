@@ -35,9 +35,10 @@ LIBADD=	util
 
 WARNS?=	6
 
-.if ${MK_TESTS} != "no" && ${MACHINE_CPUARCH} != "mips"
+.if ${MACHINE_CPUARCH} != "mips"
 # XXX: the process of listing tests times out under qemu
-SUBDIR+= tests
+HAS_TESTS=
+SUBDIR.${MK_TESTS}+= tests
 .endif
 
 .include <bsd.prog.mk>

@@ -1,0 +1,436 @@
+# A copy of bsdbox adjust to work for the CHERI FPGA
+MAN=
+
+.include <bsd.own.mk>
+.include <src.opts.mk>
+
+MK_SSP=	no
+
+PROG=	cheribsdbox
+CHERIBSDBOX_DIR?=	/bin
+BINDIR?=${CHERIBSDBOX_DIR}
+# We want to build all these tools as statically linked MIPS binaries to save size
+WANT_CHERI=		none
+CRUNCH_BUILDOPTS+=	WANT_CHERI=none -DWITHOUT_TESTS MK_TESTS=no
+# Avoid linking against libcasper for tcpdump/traceroute/kdump:
+CRUNCH_BUILDOPTS+=	-DWITHOUT_CASPER MK_CASPER=no
+
+# Do not do hardlinks as part of the install since we want to be able to install
+# this without conflicting with the real binaries and instead do some mtree
+# magic to generate a sensible image
+CRUNCH_GENERATE_LINKS= no
+
+# Define Makefile variable RESCUE
+CRUNCH_BUILDOPTS+= -DRESCUE
+
+# Which sources have local-arch build tools?
+# Define as blank; others need to override
+CRUNCH_BUILDTOOLS=
+
+
+.if 0  # we can just add  the original scripts to the list of needed files
+# Shell scripts need #! line to be edited from /bin/sh to /rescue/sh
+SCRIPTS+= dhclient_FIXED
+SCRIPTSNAME_dhclient_FIXED= dhclient-script
+dhclient_FIXED: ../../sbin/dhclient/dhclient-script
+	sed '1s/\/bin\//\${CHERIBSDBOX_DIR}\//' ${.ALLSRC} > ${.TARGET}
+CLEANFILES+= dhclient_FIXED
+
+# XXXAR: do we really need clear?
+SCRIPTS+= clear_FIXED
+SCRIPTSNAME_clear_FIXED= clear
+clear_FIXED: ../../usr.bin/tput/clear.sh
+	sed '1s/\/bin\//\${CHERIBSDBOX_DIR}\//' ${.ALLSRC} > ${.TARGET}
+CLEANFILES+= clear_FIXED
+
+# Similarly for nextboot:
+SCRIPTS= nextboot_FIXED
+SCRIPTSNAME_nextboot_FIXED= nextboot
+nextboot_FIXED: ../../sbin/reboot/nextboot.sh
+	sed '1s/\/bin\//\${CHERIBSDBOX_DIR}\//' ${.ALLSRC} > ${.TARGET}
+CLEANFILES+= nextboot_FIXED
+.endif
+
+# Libraries:
+# We install sshd so we need a shared libcrypto and libc anyway
+# Similarly for libutil, etc we can link shared to save space
+# We need libcrypto anyway for sshd and it's massive so don't embed it here
+CRUNCH_SHLIBS+= -lcrypto -lssl
+CRUNCH_SHLIBS+=	-lc -lutil -lcrypt -lxo
+# libm is also needed by other tools so let's link dynamically
+CRUNCH_SHLIBS+=	-lm
+# libz is needed by libprivatessh so we might as well link dynamically
+CRUNCH_SHLIBS+=	-lz
+
+
+# grep/tar/xz
+CRUNCH_LIBS+=	-llzma
+CRUNCH_LIBS+=	-larchive
+# ktrace:
+CRUNCH_LIBS+=	-lsysdecode
+
+# login/su (could theoretically use static_libpam but that will probably not work)
+CRUNCH_SHLIBS+= -lpam -lbsm
+
+# needed by ifconfig
+CRUNCH_LIBS+=	-l80211
+# needed by fetch:
+CRUNCH_LIBS+= -lfetch
+# devinfo
+CRUNCH_LIBS+= -ldevinfo
+# usbconfig
+CRUNCH_LIBS+= -lusb
+
+# netstat needs libkvm (which needs libelf)
+CRUNCH_LIBS+= -lkvm -lelf -lmemstat -lnetgraph
+
+# Misc libs copied from recue/bsdbox:
+CRUNCH_LIBS+= -ledit -ll -ltermcapw
+
+###################################################################
+# Programs from stock /bin
+#
+# WARNING: Changing this list may require adjusting
+# /usr/include/paths.h as well!  You were warned!
+#
+CRUNCH_SRCDIRS+= bin
+CRUNCH_PROGS_bin+=	cat \
+		chflags \
+		chmod \
+		cp \
+		date \
+		dd \
+		df \
+		echo \
+		expr \
+		hostname \
+		kenv \
+		kill \
+		ln \
+		ls \
+		mkdir \
+		mv \
+		ps \
+		pwd \
+		realpath \
+		rm \
+		rmdir \
+		sleep \
+		stty \
+		test \
+		uuidgen
+
+CRUNCH_ALIAS_test=	[
+
+# Su doesn't work with cheribsdbox bin/sh and bin/csh because it sets argv[0]
+# and then cheribsdbox thinks it should execute _su
+CRUNCH_SUPPRESS_LINK_sh=	1
+CRUNCH_BUILDTOOLS+=	bin/sh
+CRUNCH_PROGS_bin+=	sh
+# For now don't include csh
+.if 0
+CRUNCH_ALIAS_sh=	-sh
+CRUNCH_BUILDTOOLS+=	bin/csh
+CRUNCH_ALIAS_csh=	-csh tcsh -tcsh
+.endif
+
+
+###################################################################
+# Programs from standard /sbin
+#
+# WARNING: Changing this list may require adjusting
+# /usr/include/paths.h as well!  You were warned!
+#
+# Note that mdmfs have their own private 'pathnames.h'
+# headers in addition to the standard 'paths.h' header.
+#
+CRUNCH_SRCDIRS+= sbin
+
+CRUNCH_LIBS+= -lalias -lcam -lcursesw -ldevstat -lipsec
+# Don't forget this - ifconfig, etc -adrian
+CRUNCH_LIBS+= -lgeom -lbsdxml -ljail -lkiconv -lmd -lsbuf -lufs
+
+
+CRUNCH_PROGS_sbin+= dhclient \
+		dmesg \
+		dumpfs \
+		ifconfig \
+		md5 \
+		mount \
+		mount_msdosfs \
+		mount_nfs \
+		newfs \
+		ping \
+		ping6 \
+		rcorder \
+		reboot \
+		route \
+		rtsol \
+		shutdown \
+		sysctl \
+		umount
+CRUNCH_ALIAS_md5=	sha256
+CRUNCH_ALIAS_shutdown= poweroff
+
+# TODO: add init once the image works fine:
+# CRUNCH_PROGS_sbin+= init
+
+
+# TODO: do we need these:
+# sbin/fsck
+# sbin/fsck_ufs
+# sbin/fsdb
+# sbin/kldload
+# sbin/kldstat
+# sbin/kldunload
+# sbin/mdconfig
+# sbin/mdmfs
+# sbin/mount_mfs
+
+# devd won't work with crunchgen
+# sbin/devd
+
+
+
+##################################################################
+# Programs from stock /usr/bin
+#
+CRUNCH_SRCDIRS+= usr.bin
+# grep
+CRUNCH_LIBS+=	-lbz2
+
+CRUNCH_PROGS_usr.bin+= \
+		basename \
+		bzip2 \
+		diff \
+		dirname \
+		fetch \
+		find \
+		grep \
+		head \
+		hexdump \
+		id \
+		jot \
+		kdump \
+		ktrace \
+		ldd \
+		less \
+		limits \
+		login \
+		mktemp \
+		nc \
+		netstat \
+		passwd \
+		sed \
+		seq \
+		sockstat \
+		tail \
+		tar \
+		tee \
+		tftp \
+		time \
+		top \
+		tput \
+		tr \
+		uname \
+		uudecode \
+		uuencode \
+		vmstat \
+		w \
+		which \
+		xargs
+
+CRUNCH_ALIAS_bzip2=	bunzip2
+CRUNCH_ALIAS_tar=	bsdtar
+CRUNCH_ALIAS_hexdump=	hd od
+CRUNCH_ALIAS_w=	uptime
+CRUNCH_PROGS_usr.bin+=su
+
+# FIXME: wait -> usr.bin/alias (but that is just a script so how to add
+.if 0
+LINKS=	${BINDIR}/alias ${BINDIR}/bg \
+	${BINDIR}/alias ${BINDIR}/cd \
+	${BINDIR}/alias ${BINDIR}/command \
+	${BINDIR}/alias ${BINDIR}/fc \
+	${BINDIR}/alias ${BINDIR}/fg \
+	${BINDIR}/alias ${BINDIR}/getopts \
+	${BINDIR}/alias ${BINDIR}/hash \
+	${BINDIR}/alias ${BINDIR}/jobs \
+	${BINDIR}/alias ${BINDIR}/read \
+	${BINDIR}/alias ${BINDIR}/type \
+	${BINDIR}/alias ${BINDIR}/ulimit \
+	${BINDIR}/alias ${BINDIR}/umask \
+	${BINDIR}/alias ${BINDIR}/unalias \
+	${BINDIR}/alias ${BINDIR}/wait
+.endif
+
+.if ${MK_VI} != "no"
+# let's see if vi also works
+CRUNCH_PROGS_usr.bin+= vi
+.endif
+
+CRUNCH_ALIAS_id= groups whoami
+CRUNCH_ALIAS_less= more
+
+# TODO: These are in /usr/bin but probably won't work
+# scp sftp ssh ssh-keygen
+
+##################################################################
+# Programs from stock /usr/sbin
+#
+CRUNCH_SRCDIRS+= usr.sbin
+CRUNCH_PROGS_usr.sbin+= \
+		chown \
+		devinfo \
+		diskinfo \
+		iostat \
+		ip6addrctl \
+		mtest \
+		ndp \
+		newsyslog \
+		pw \
+		pwd_mkdb \
+		syslogd \
+		tcpdump \
+		traceroute \
+		traceroute6 \
+		usbconfig \
+		watch
+
+
+# Also build mount_smb for QEMU user-mode smb shares:
+CRUNCH_PROGS_usr.sbin+=	mount_smbfs
+CRUNCH_LIBS+=	-lsmb
+
+# Build mtree as well:
+CRUNCH_PROGS_usr.sbin+=	nmtree
+CRUNCH_ALIAS_nmtree= mtree
+# TODO: Not sure what the correct way of doing this is because -lnetbsd is
+# marked as internallib so -lnetbsd will give a linker error
+# It seems like ${LIBNETBSD} works:
+CRUNCH_LIBS+=	${LIBNETBSD}
+
+# usr/sbin/de4ctl
+# usr/sbin/flashit
+# usr/sbin/vipw
+
+# TODO: ctsrd/usr.sbin/mtlctl?
+
+# TODO: do we need ctsrd/bin/wr?
+
+
+
+
+
+##################################################################
+
+CRUNCH_SRCDIRS+= libexec
+CRUNCH_PROGS_libexec+=	getty
+# from sshd: usr/libexec/sftp-server
+
+
+##### sshd, ssh, scp: #####
+# TODO: should we build a separate binary for these programs?
+
+CRUNCH_SRCDIRS+= secure/usr.sbin
+CRUNCH_PROGS_secure/usr.sbin+=	sshd
+# TODO: should we link libssh static and use ${LIBSSH}?
+CRUNCH_SHLIBS+=	-lpam -lutil
+
+# Build ssh deps static?
+CRUNCH_LIBS+=	${LIBSSH}
+.if ${MK_LDNS} != "no"
+# needed by LIBSSH
+CRUNCH_LIBS+=	${LIBLDNS}
+.endif
+
+
+CRUNCH_SRCDIRS+= secure/usr.bin
+CRUNCH_PROGS_secure/usr.bin+=	scp sftp ssh ssh-keygen
+
+CRUNCH_SRCDIRS+= secure/libexec
+CRUNCH_PROGS_secure/libexec+=	sftp-server
+
+# Disable all optional SSH features to make sshd,scp,ssh as small as possible
+DISABLE_OPTIONAL_SSH_FEATURES+=	\
+	MK_AUDIT=no \
+	MK_BLACKLIST_SUPPORT=no \
+	MK_TCP_WRAPPERS=no
+# Kerberos support uses up way too much space on our minimal images:
+# so let's build sshd without it
+DISABLE_OPTIONAL_SSH_FEATURES+=MK_KERBEROS_SUPPORT=no
+# TODO: would be nice to add CRUNCH_BUILDOPTS+=	MK_LDNS=no
+# However, libprivatessh links against ldns so we can't skip it
+
+CRUNCH_BUILDOPTS_sshd+=${DISABLE_OPTIONAL_SSH_FEATURES}
+CRUNCH_BUILDOPTS_scp+=${DISABLE_OPTIONAL_SSH_FEATURES}
+CRUNCH_BUILDOPTS_ssh+=${DISABLE_OPTIONAL_SSH_FEATURES}
+CRUNCH_BUILDOPTS_ssh-keygen+=${DISABLE_OPTIONAL_SSH_FEATURES}
+CRUNCH_BUILDOPTS_sftp-server+=${DISABLE_OPTIONAL_SSH_FEATURES}
+
+
+### END programs ####
+
+# Generate an mtree file to be used when building the FPGA images
+# I'm not sure how to add hardlinks to makefs without actually writing the
+# hardlinks. The problem is that we want to install the original programs to
+# the rootfs but replace them with links to cheribsdbox on the FPGA memory fs
+# image. It seems to me like the easiest way to do this is to just write an
+# mtree manifest with symlinks. Since crunchgen should only be checking argv[0]
+# this should also work fine
+
+FILES=cheribsdbox.mtree
+FILESDIR=/
+
+# Example entry for symlinks::
+# ./usr/bin/chfn type=link uname=root gname=wheel mode=0755 link=chpass tags=package=runtime
+INSTALLDIR_bin=/bin
+LINKPATH_bin:=${PROG}
+INSTALLDIR_sbin=/sbin
+LINKPATH_sbin:=../${PROG}
+INSTALLDIR_usr.bin=/usr/bin
+LINKPATH_usr.bin:=../../${PROG}
+INSTALLDIR_usr.sbin=/usr/sbin
+LINKPATH_usr.sbin:=../../${PROG}
+INSTALLDIR_libexec=/usr/libexec
+LINKPATH_libexec:=../../${PROG}
+INSTALLDIR_secure/usr.sbin=/usr/sbin
+LINKPATH_secure/usr.sbin:=../../${PROG}
+INSTALLDIR_secure/usr.bin=/usr/bin
+LINKPATH_secure/usr.bin:=../../${PROG}
+INSTALLDIR_secure/libexec=/usr/libexec
+LINKPATH_secure/libexec:=../../${PROG}
+
+cheribsdbox.mtree: Makefile
+	echo '#mtree 2.0' > ${.TARGET}
+.for D in ${CRUNCH_SRCDIRS}
+.if empty(INSTALLDIR_${D}) || empty(LINKPATH_${D})
+.error "empty(INSTALLDIR_${D}) || empty(LINKPATH_${D})"
+.endif
+.for P in ${CRUNCH_PROGS_${D}}
+.ifndef CRUNCH_SUPPRESS_LINK_${P}
+	#echo ".${INSTALLDIR_${D}}/${P} type=link uname=root gname=wheel mode=0755 link=${LINKPATH_${D}}" >> ${.TARGET}
+	echo ".${INSTALLDIR_${D}}/${P} type=file uname=root gname=wheel mode=0755 contents=.${BINDIR}/${PROG}" >> ${.TARGET}
+.endif
+.for A in ${CRUNCH_ALIAS_${P}}
+.ifndef CRUNCH_SUPPRESS_LINK_${A}
+	#echo ".${INSTALLDIR_${D}}/${A} type=link uname=root gname=wheel mode=0755 link=${P}" >> ${.TARGET}
+	echo ".${INSTALLDIR_${D}}/${A} type=file uname=root gname=wheel mode=0755 contents=.${BINDIR}/${PROG}" >> ${.TARGET}
+.endif
+.endfor
+.endfor
+.endfor
+	@echo "cheribsdbox manifest written"
+
+# Work around makefs stupidity:
+# Check for hardlinks. If the contents key is used, then the check
+# will only trigger if the contents file is a link even if it is used
+# by more than one file
+# -> we need to create at last one hardlink to cheribsdbox
+LINKS+=${BINDIR}/${PROG} ${BINDIR}/${PROG}.dummy-hardlink-for-makefs
+
+# the crunchgen build environment
+.include <bsd.crunchgen.mk>
+
+# and since it creates a program..
+.include <bsd.prog.mk>

@@ -54,12 +54,22 @@ __FBSDID("$FreeBSD$");
 #include <arm/allwinner/clkng/aw_ccung.h>
 #include <arm/allwinner/clkng/aw_clk.h>
 
+#ifdef __aarch64__
+#include "opt_soc.h"
+#endif
+
 #if defined(SOC_ALLWINNER_A31)
 #include <arm/allwinner/clkng/ccu_a31.h>
 #endif
 
-#if defined(SOC_ALLWINNER_H3)
+#if defined(SOC_ALLWINNER_A64)
+#include <arm/allwinner/clkng/ccu_a64.h>
+#include <arm/allwinner/clkng/ccu_sun8i_r.h>
+#endif
+
+#if defined(SOC_ALLWINNER_H3) || defined(SOC_ALLWINNER_H5)
 #include <arm/allwinner/clkng/ccu_h3.h>
+#include <arm/allwinner/clkng/ccu_sun8i_r.h>
 #endif
 
 #include "clkdev_if.h"
@@ -70,20 +80,31 @@ static struct resource_spec aw_ccung_spec[] = {
 	{ -1, 0 }
 };
 
-#if defined(SOC_ALLWINNER_H3)
-#define	H3_CCU	1
+#if defined(SOC_ALLWINNER_H3) || defined(SOC_ALLWINNER_H5)
+#define	H3_CCU		1
+#define	H3_R_CCU	2
 #endif
 
 #if defined(SOC_ALLWINNER_A31)
-#define	A31_CCU	2
+#define	A31_CCU		3
+#endif
+
+#if defined(SOC_ALLWINNER_A64)
+#define	A64_CCU		4
+#define	A64_R_CCU	5
 #endif
 
 static struct ofw_compat_data compat_data[] = {
-#if defined(SOC_ALLWINNER_H3)
+#if defined(SOC_ALLWINNER_H3) || defined(SOC_ALLWINNER_H5)
 	{ "allwinner,sun8i-h3-ccu", H3_CCU },
+	{ "allwinner,sun8i-h3-r-ccu", H3_R_CCU },
 #endif
 #if defined(SOC_ALLWINNER_A31)
 	{ "allwinner,sun6i-a31-ccu", A31_CCU },
+#endif
+#if defined(SOC_ALLWINNER_A64)
+	{ "allwinner,sun50i-a64-ccu", A64_CCU },
+	{ "allwinner,sun50i-a64-r-ccu", A64_R_CCU },
 #endif
 	{NULL, 0 }
 };
@@ -261,7 +282,7 @@ aw_ccung_init_clocks(struct aw_ccung_softc *sc)
 			    sc->clk_init[i].default_freq, 0 , 0);
 			if (error != 0) {
 				device_printf(sc->dev,
-				    "Cannot set frequency for %s to %llu\n",
+				    "Cannot set frequency for %s to %ju\n",
 				    sc->clk_init[i].name,
 				    sc->clk_init[i].default_freq);
 				continue;
@@ -301,14 +322,25 @@ aw_ccung_attach(device_t dev)
 		panic("Cannot create clkdom\n");
 
 	switch (sc->type) {
-#if defined(SOC_ALLWINNER_H3)
+#if defined(SOC_ALLWINNER_H3) || defined(SOC_ALLWINNER_H5)
 	case H3_CCU:
 		ccu_h3_register_clocks(sc);
+		break;
+	case H3_R_CCU:
+		ccu_sun8i_r_register_clocks(sc);
 		break;
 #endif
 #if defined(SOC_ALLWINNER_A31)
 	case A31_CCU:
 		ccu_a31_register_clocks(sc);
+		break;
+#endif
+#if defined(SOC_ALLWINNER_A64)
+	case A64_CCU:
+		ccu_a64_register_clocks(sc);
+		break;
+	case A64_R_CCU:
+		ccu_sun8i_r_register_clocks(sc);
 		break;
 #endif
 	}

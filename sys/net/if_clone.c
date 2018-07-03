@@ -97,10 +97,11 @@ struct if_clone {
 
 static void	if_clone_free(struct if_clone *ifc);
 static int	if_clone_createif(struct if_clone *ifc, char *name, size_t len,
-		    caddr_t params);
+		    void * __capability params);
 
 static int     ifc_simple_match(struct if_clone *, const char *);
-static int     ifc_simple_create(struct if_clone *, char *, size_t, caddr_t);
+static int     ifc_simple_create(struct if_clone *, char *, size_t,
+		    void * __capability);
 static int     ifc_simple_destroy(struct if_clone *, struct ifnet *);
 
 static struct mtx if_cloners_mtx;
@@ -172,7 +173,7 @@ vnet_if_clone_init(void)
  * Lookup and create a clone network interface.
  */
 int
-if_clone_create(char *name, size_t len, caddr_t params)
+if_clone_create(char *name, size_t len, void * __capability params)
 {
 	struct if_clone *ifc;
 
@@ -212,7 +213,8 @@ if_clone_create(char *name, size_t len, caddr_t params)
  * Create a clone network interface.
  */
 static int
-if_clone_createif(struct if_clone *ifc, char *name, size_t len, caddr_t params)
+if_clone_createif(struct if_clone *ifc, char *name, size_t len,
+   void * __capability params)
 {
 	int err;
 	struct ifnet *ifp;
@@ -595,44 +597,56 @@ ifc_name2unit(const char *name, int *unit)
 	return (0);
 }
 
-int
-ifc_alloc_unit(struct if_clone *ifc, int *unit)
+static int
+ifc_alloc_unit_specific(struct if_clone *ifc, int *unit)
 {
 	char name[IFNAMSIZ];
-	int wildcard;
 
-	wildcard = (*unit < 0);
-retry:
 	if (*unit > ifc->ifc_maxunit)
 		return (ENOSPC);
-	if (*unit < 0) {
-		*unit = alloc_unr(ifc->ifc_unrhdr);
-		if (*unit == -1)
-			return (ENOSPC);
-	} else {
-		*unit = alloc_unr_specific(ifc->ifc_unrhdr, *unit);
-		if (*unit == -1) {
-			if (wildcard) {
-				(*unit)++;
-				goto retry;
-			} else
-				return (EEXIST);
-		}
-	}
+
+	if (alloc_unr_specific(ifc->ifc_unrhdr, *unit) == -1)
+		return (EEXIST);
 
 	snprintf(name, IFNAMSIZ, "%s%d", ifc->ifc_name, *unit);
 	if (ifunit(name) != NULL) {
 		free_unr(ifc->ifc_unrhdr, *unit);
-		if (wildcard) {
-			(*unit)++;
-			goto retry;
-		} else
-			return (EEXIST);
+		return (EEXIST);
 	}
 
 	IF_CLONE_ADDREF(ifc);
 
 	return (0);
+}
+
+static int
+ifc_alloc_unit_next(struct if_clone *ifc, int *unit)
+{
+	int error;
+
+	*unit = alloc_unr(ifc->ifc_unrhdr);
+	if (*unit == -1)
+		return (ENOSPC);
+
+	free_unr(ifc->ifc_unrhdr, *unit);
+	for (;;) {
+		error = ifc_alloc_unit_specific(ifc, unit);
+		if (error != EEXIST)
+			break;
+
+		(*unit)++;
+	}
+
+	return (error);
+}
+
+int
+ifc_alloc_unit(struct if_clone *ifc, int *unit)
+{
+	if (*unit < 0)
+		return (ifc_alloc_unit_next(ifc, unit));
+	else
+		return (ifc_alloc_unit_specific(ifc, unit));
 }
 
 void
@@ -665,7 +679,8 @@ ifc_simple_match(struct if_clone *ifc, const char *name)
 }
 
 static int
-ifc_simple_create(struct if_clone *ifc, char *name, size_t len, caddr_t params)
+ifc_simple_create(struct if_clone *ifc, char *name, size_t len,
+    void * __capability params)
 {
 	char *dp;
 	int wildcard;

@@ -1,3 +1,13 @@
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "virtual_address"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 #define JEMALLOC_PROF_C_
 #include "jemalloc/internal/jemalloc_preamble.h"
 #include "jemalloc/internal/jemalloc_internal_includes.h"
@@ -1633,7 +1643,7 @@ prof_dump(tsd_t *tsd, bool propagate_err, const char *filename,
 		return true;
 	}
 
-	pre_reentrancy(tsd);
+	pre_reentrancy(tsd, NULL);
 	malloc_mutex_lock(tsd_tsdn(tsd), &prof_dump_mtx);
 
 	prof_gctx_tree_t gctxs;

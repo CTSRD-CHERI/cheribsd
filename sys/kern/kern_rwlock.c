@@ -93,14 +93,14 @@ struct lock_class lock_class_rw = {
 };
 
 #ifdef ADAPTIVE_RWLOCKS
-static int rowner_retries = 10;
-static int rowner_loops = 10000;
+static int __read_frequently rowner_retries = 10;
+static int __read_frequently rowner_loops = 10000;
 static SYSCTL_NODE(_debug, OID_AUTO, rwlock, CTLFLAG_RD, NULL,
     "rwlock debugging");
 SYSCTL_INT(_debug_rwlock, OID_AUTO, retry, CTLFLAG_RW, &rowner_retries, 0, "");
 SYSCTL_INT(_debug_rwlock, OID_AUTO, loops, CTLFLAG_RW, &rowner_loops, 0, "");
 
-static struct lock_delay_config __read_mostly rw_delay;
+static struct lock_delay_config __read_frequently rw_delay;
 
 SYSCTL_INT(_debug_rwlock, OID_AUTO, delay_base, CTLFLAG_RW, &rw_delay.base,
     0, "");
@@ -269,7 +269,8 @@ _rw_wlock_cookie(volatile uintptr_t *c, const char *file, int line)
 
 	rw = rwlock2rw(c);
 
-	KASSERT(kdb_active != 0 || !TD_IS_IDLETHREAD(curthread),
+	KASSERT(kdb_active != 0 || SCHEDULER_STOPPED() ||
+	    !TD_IS_IDLETHREAD(curthread),
 	    ("rw_wlock() by idle thread %p on rwlock %s @ %s:%d",
 	    curthread, rw->lock_object.lo_name, file, line));
 	KASSERT(rw->rw_lock != RW_DESTROYED,
@@ -305,7 +306,7 @@ __rw_try_wlock(volatile uintptr_t *c, const char *file, int line)
 
 	rw = rwlock2rw(c);
 
-	KASSERT(kdb_active != 0 || !TD_IS_IDLETHREAD(curthread),
+	KASSERT(kdb_active != 0 || !TD_IS_IDLETHREAD(td),
 	    ("rw_try_wlock() by idle thread %p on rwlock %s @ %s:%d",
 	    curthread, rw->lock_object.lo_name, file, line));
 	KASSERT(rw->rw_lock != RW_DESTROYED,
@@ -371,10 +372,8 @@ _rw_wunlock_cookie(volatile uintptr_t *c, const char *file, int line)
  * prioritizes writers before readers.
  */
 #define	RW_CAN_READ(td, _rw)						\
-	(((td)->td_rw_rlocks && ptr_get_flag(_rw, RW_LOCK_READ)) ||	\
-	 ptr_get_flag(_rw, RW_LOCK_READ | RW_LOCK_WRITE_WAITERS |	\
-		     RW_LOCK_WRITE_SPINNER)				\
-	 == RW_LOCK_READ)
+	(ptr_get_flag(_rw, RW_LOCK_READ | RW_LOCK_WRITE_WAITERS | RW_LOCK_WRITE_SPINNER) == \
+	 RW_LOCK_READ || ((td)->td_rw_rlocks && ptr_get_flag(_rw, RW_LOCK_READ)))
 
 static bool __always_inline
 __rw_rlock_try(struct rwlock *rw, struct thread *td, uintptr_t *vp,
@@ -415,7 +414,7 @@ __rw_rlock_hard(volatile uintptr_t *c, struct thread *td, uintptr_t v,
 #ifdef ADAPTIVE_RWLOCKS
 	volatile struct thread *owner;
 	int spintries = 0;
-	int i;
+	int i, n;
 #endif
 #ifdef LOCK_PROFILING
 	uint64_t waittime = 0;
@@ -489,14 +488,14 @@ __rw_rlock_hard(volatile uintptr_t *c, struct thread *td, uintptr_t v,
 			KTR_STATE1(KTR_SCHED, "thread", sched_tdname(curthread),
 			    "spinning", "lockname:\"%s\"",
 			    rw->lock_object.lo_name);
-			for (i = 0; i < rowner_loops; i++) {
+			for (i = 0; i < rowner_loops; i += n) {
+				n = RW_READERS(v);
+				lock_delay_spin(n);
 				v = RW_READ_VALUE(rw);
 				if (ptr_get_flag(v, RW_LOCK_READ) == 0 ||
 				    RW_CAN_READ(td, v))
 					break;
-				cpu_spinwait();
 			}
-			v = RW_READ_VALUE(rw);
 #ifdef KDTRACE_HOOKS
 			lda.spin_cnt += rowner_loops - i;
 #endif
@@ -617,7 +616,8 @@ __rw_rlock(volatile uintptr_t *c, const char *file, int line)
 	td = curthread;
 	rw = rwlock2rw(c);
 
-	KASSERT(kdb_active != 0 || !TD_IS_IDLETHREAD(td),
+	KASSERT(kdb_active != 0 || SCHEDULER_STOPPED_TD(td) ||
+	    !TD_IS_IDLETHREAD(td),
 	    ("rw_rlock() by idle thread %p on rwlock %s @ %s:%d",
 	    td, rw->lock_object.lo_name, file, line));
 	KASSERT(rw->rw_lock != RW_DESTROYED,
@@ -819,7 +819,6 @@ _rw_runlock_cookie(volatile uintptr_t *c, const char *file, int line)
 	TD_LOCKS_DEC(curthread);
 }
 
-
 /*
  * This function is called when we are unable to obtain a write lock on the
  * first try.  This means that at least one other thread holds either a
@@ -834,7 +833,7 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v, uintptr_t tid,
 #ifdef ADAPTIVE_RWLOCKS
 	volatile struct thread *owner;
 	int spintries = 0;
-	int i;
+	int i, n;
 #endif
 	uintptr_t x;
 #ifdef LOCK_PROFILING
@@ -849,6 +848,9 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v, uintptr_t tid,
 	u_int sleep_cnt = 0;
 	int64_t sleep_time = 0;
 	int64_t all_time = 0;
+#endif
+#if defined(KDTRACE_HOOKS) || defined(LOCK_PROFILING)
+	int doing_lockprof;
 #endif
 
 	if (SCHEDULER_STOPPED())
@@ -878,10 +880,17 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v, uintptr_t tid,
 		CTR5(KTR_LOCK, "%s: %s contested (lock=%p) at %s:%d", __func__,
 		    rw->lock_object.lo_name, (void *)rw->rw_lock, file, line);
 
-#ifdef KDTRACE_HOOKS
-	all_time -= lockstat_nsecs(&rw->lock_object);
+#ifdef LOCK_PROFILING
+	doing_lockprof = 1;
 	state = v;
+#elif defined(KDTRACE_HOOKS)
+	doing_lockprof = lockstat_enabled;
+	if (__predict_false(doing_lockprof)) {
+		all_time -= lockstat_nsecs(&rw->lock_object);
+		state = v;
+	}
 #endif
+
 	for (;;) {
 		if (v == RW_UNLOCKED) {
 			if (_rw_write_lock_fetch(rw, &v, tid))
@@ -932,14 +941,15 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v, uintptr_t tid,
 			KTR_STATE1(KTR_SCHED, "thread", sched_tdname(curthread),
 			    "spinning", "lockname:\"%s\"",
 			    rw->lock_object.lo_name);
-			for (i = 0; i < rowner_loops; i++) {
-				if (ptr_get_flag(rw->rw_lock, RW_LOCK_WRITE_SPINNER) == 0)
+			for (i = 0; i < rowner_loops; i += n) {
+				n = RW_READERS(v);
+				lock_delay_spin(n);
+				v = RW_READ_VALUE(rw);
+				if ((ptr_get_flag(v, RW_LOCK_WRITE_SPINNER)) == 0)
 					break;
-				cpu_spinwait();
 			}
 			KTR_STATE0(KTR_SCHED, "thread", sched_tdname(curthread),
 			    "running");
-			v = RW_READ_VALUE(rw);
 #ifdef KDTRACE_HOOKS
 			lda.spin_cnt += rowner_loops - i;
 #endif
@@ -1027,6 +1037,10 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v, uintptr_t tid,
 #endif
 		v = RW_READ_VALUE(rw);
 	}
+#if defined(KDTRACE_HOOKS) || defined(LOCK_PROFILING)
+	if (__predict_true(!doing_lockprof))
+		return;
+#endif
 #ifdef KDTRACE_HOOKS
 	all_time += lockstat_nsecs(&rw->lock_object);
 	if (sleep_time)

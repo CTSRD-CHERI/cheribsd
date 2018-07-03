@@ -208,13 +208,12 @@ cd9660_getattr(ap)
 	vap->va_size	= (u_quad_t) ip->i_size;
 	if (ip->i_size == 0 && (vap->va_mode & S_IFMT) == S_IFLNK) {
 		struct vop_readlink_args rdlnk;
-		struct iovec aiov;
+		kiovec_t aiov;
 		struct uio auio;
 		char *cp;
 
 		cp = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-		aiov.iov_base = cp;
-		aiov.iov_len = MAXPATHLEN;
+		IOVEC_INIT(&aiov, cp, MAXPATHLEN);
 		auio.uio_iov = &aiov;
 		auio.uio_iovcnt = 1;
 		auio.uio_offset = 0;
@@ -709,7 +708,7 @@ cd9660_readlink(ap)
 	 * Abuse a namei buffer for now.
 	 */
 	if (uio->uio_segflg == UIO_SYSSPACE)
-		symname = uio->uio_iov->iov_base;
+		symname = (__cheri_fromcap void *)uio->uio_iov->iov_base;
 	else
 		symname = uma_zalloc(namei_zone, M_WAITOK);
 
@@ -736,8 +735,7 @@ cd9660_readlink(ap)
 		return (error);
 	}
 	uio->uio_resid -= symlen;
-	uio->uio_iov->iov_base = (char *)uio->uio_iov->iov_base + symlen;
-	uio->uio_iov->iov_len -= symlen;
+	IOVEC_ADVANCE(uio->uio_iov, symlen);
 	return (0);
 }
 
@@ -783,6 +781,9 @@ cd9660_pathconf(ap)
 {
 
 	switch (ap->a_name) {
+	case _PC_FILESIZEBITS:
+		*ap->a_retval = 32;
+		return (0);
 	case _PC_LINK_MAX:
 		*ap->a_retval = 1;
 		return (0);
@@ -792,20 +793,17 @@ cd9660_pathconf(ap)
 		else
 			*ap->a_retval = 37;
 		return (0);
-	case _PC_PATH_MAX:
-		*ap->a_retval = PATH_MAX;
-		return (0);
-	case _PC_PIPE_BUF:
-		*ap->a_retval = PIPE_BUF;
-		return (0);
-	case _PC_CHOWN_RESTRICTED:
-		*ap->a_retval = 1;
-		return (0);
+	case _PC_SYMLINK_MAX:
+		if (VTOI(ap->a_vp)->i_mnt->iso_ftype == ISO_FTYPE_RRIP) {
+			*ap->a_retval = MAXPATHLEN;
+			return (0);
+		}
+		return (EINVAL);
 	case _PC_NO_TRUNC:
 		*ap->a_retval = 1;
 		return (0);
 	default:
-		return (EINVAL);
+		return (vop_stdpathconf(ap));
 	}
 	/* NOTREACHED */
 }

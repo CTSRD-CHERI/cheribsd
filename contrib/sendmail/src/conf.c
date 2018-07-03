@@ -10,6 +10,17 @@
  * the sendmail distribution.
  *
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "unsupported"
+ *   ],
+ *   "change_comment": "relies on stack ABI details"
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sendmail.h>
 

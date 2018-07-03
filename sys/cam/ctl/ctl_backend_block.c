@@ -196,7 +196,7 @@ static struct ctl_be_block_softc backend_block_softc;
 struct ctl_be_block_io {
 	union ctl_io			*io;
 	struct ctl_sg_entry		sg_segs[CTLBLK_MAX_SEGS];
-	struct iovec			xiovecs[CTLBLK_MAX_SEGS];
+	kiovec_t			xiovecs[CTLBLK_MAX_SEGS];
 	int				bio_cmd;
 	int				num_segs;
 	int				num_bios_sent;
@@ -624,7 +624,7 @@ ctl_be_block_dispatch_file(struct ctl_be_block_lun *be_lun,
 	struct ctl_be_block_filedata *file_data;
 	union ctl_io *io;
 	struct uio xuio;
-	struct iovec *xiovec;
+	kiovec_t *xiovec;
 	size_t s;
 	int error, flags, i;
 
@@ -653,10 +653,8 @@ ctl_be_block_dispatch_file(struct ctl_be_block_lun *be_lun,
 	xuio.uio_iovcnt = beio->num_segs;
 	xuio.uio_td = curthread;
 
-	for (i = 0, xiovec = xuio.uio_iov; i < xuio.uio_iovcnt; i++, xiovec++) {
-		xiovec->iov_base = beio->sg_segs[i].addr;
-		xiovec->iov_len = beio->sg_segs[i].len;
-	}
+	for (i = 0, xiovec = xuio.uio_iov; i < xuio.uio_iovcnt; i++, xiovec++)
+		IOVEC_INIT(xiovec, beio->sg_segs[i].addr, beio->sg_segs[i].len);
 
 	binuptime(&beio->ds_t0);
 	mtx_lock(&be_lun->io_lock);
@@ -857,7 +855,7 @@ ctl_be_block_dispatch_zvol(struct ctl_be_block_lun *be_lun,
 	struct cdevsw *csw;
 	struct cdev *dev;
 	struct uio xuio;
-	struct iovec *xiovec;
+	kiovec_t *xiovec;
 	int error, flags, i, ref;
 
 	DPRINTF("entered\n");
@@ -884,10 +882,8 @@ ctl_be_block_dispatch_zvol(struct ctl_be_block_lun *be_lun,
 	xuio.uio_iovcnt = beio->num_segs;
 	xuio.uio_td = curthread;
 
-	for (i = 0, xiovec = xuio.uio_iov; i < xuio.uio_iovcnt; i++, xiovec++) {
-		xiovec->iov_base = beio->sg_segs[i].addr;
-		xiovec->iov_len = beio->sg_segs[i].len;
-	}
+	for (i = 0, xiovec = xuio.uio_iov; i < xuio.uio_iovcnt; i++, xiovec++)
+		IOVEC_INIT(xiovec, beio->sg_segs[i].addr, beio->sg_segs[i].len);
 
 	binuptime(&beio->ds_t0);
 	mtx_lock(&be_lun->io_lock);
@@ -2324,7 +2320,7 @@ ctl_be_block_create(struct ctl_be_block_softc *softc, struct ctl_lun_req *req)
 	cbe_lun->be = &ctl_be_block_driver;
 
 	if ((params->flags & CTL_LUN_FLAG_SERIAL_NUM) == 0) {
-		snprintf(tmpstr, sizeof(tmpstr), "MYSERIAL%4d",
+		snprintf(tmpstr, sizeof(tmpstr), "MYSERIAL%04d",
 			 softc->num_luns);
 		strncpy((char *)cbe_lun->serial_num, tmpstr,
 			MIN(sizeof(cbe_lun->serial_num), sizeof(tmpstr)));
@@ -2338,7 +2334,7 @@ ctl_be_block_create(struct ctl_be_block_softc *softc, struct ctl_lun_req *req)
 			sizeof(params->serial_num)));
 	}
 	if ((params->flags & CTL_LUN_FLAG_DEVID) == 0) {
-		snprintf(tmpstr, sizeof(tmpstr), "MYDEVID%4d", softc->num_luns);
+		snprintf(tmpstr, sizeof(tmpstr), "MYDEVID%04d", softc->num_luns);
 		strncpy((char *)cbe_lun->device_id, tmpstr,
 			MIN(sizeof(cbe_lun->device_id), sizeof(tmpstr)));
 

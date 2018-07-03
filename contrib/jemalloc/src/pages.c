@@ -1,3 +1,17 @@
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "unsupported",
+ *     "virtual_address",
+ *     "other"
+ *   ],
+ *   "change_comment": "No MAP_FIXED, LG_PAGE hack",
+ *   "hybrid_specific": false
+ * }
+ * CHERI CHANGES END
+ */
 #define JEMALLOC_PAGES_C_
 #include "jemalloc/internal/jemalloc_preamble.h"
 
@@ -412,6 +426,9 @@ pages_boot(void) {
 
 #ifndef _WIN32
 	mmap_flags = MAP_PRIVATE | MAP_ANON;
+#endif
+#ifdef __CHERI_PURE_CAPABILITY__
+	mmap_flags |= MAP_ALIGNED(LG_PAGE);
 #endif
 
 #ifdef JEMALLOC_SYSCTL_VM_OVERCOMMIT

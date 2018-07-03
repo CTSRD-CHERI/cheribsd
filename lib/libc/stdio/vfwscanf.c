@@ -34,6 +34,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "support"
+ *   ],
+ *   "change_comment: "PRIiPTR"
+ * }
+ * CHERI CHANGES END
+ */
 
 #if 0
 #if defined(LIBC_SCCS) && !defined(lint)
@@ -429,10 +440,10 @@ vfwscanf_l(FILE * __restrict fp, locale_t locale,
 	int ret;
 	FIX_LOCALE(locale);
 
-	FLOCKFILE(fp);
+	FLOCKFILE_CANCELSAFE(fp);
 	ORIENT(fp, 1);
 	ret = __vfwscanf(fp, locale, fmt, ap);
-	FUNLOCKFILE(fp);
+	FUNLOCKFILE_CANCELSAFE();
 	return (ret);
 }
 int

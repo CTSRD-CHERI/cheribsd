@@ -688,6 +688,9 @@ typedef struct {
 #define	DT_MIPS_RLD_OBJ_UPDATE		0x70000033
 #define	DT_MIPS_RWPLT			0x70000034
 
+#define	DT_CHERI___CAPRELOCS	0x7000c000 /* start of __cap_relocs section */
+#define	DT_CHERI___CAPRELOCSSZ	0x7000c001 /* size of __cap_relocs section */
+
 #define	DT_PPC_GOT			0x70000000
 #define	DT_PPC_TLSOPT			0x70000001
 
@@ -758,6 +761,7 @@ typedef struct {
 #define	NT_CAPREGS		20	/* Capability registers. */
 #define	NT_PPC_VMX	0x100	/* PowerPC Altivec/VMX registers */
 #define	NT_X86_XSTATE	0x202	/* x86 XSAVE extended state. */
+#define	NT_ARM_VFP	0x400	/* ARM VFP registers */
 
 /* Symbol Binding - ELFNN_ST_BIND - st_info */
 #define	STB_LOCAL	0	/* Local symbol */
@@ -1060,6 +1064,8 @@ typedef struct {
 #define	R_MIPS_CALLLO16 31	/* lower 16 bit GOT entry for function */
 #define	R_MIPS_JALR	37
 #define	R_MIPS_TLS_GD	42
+#define	R_MIPS_COPY	126
+#define	R_MIPS_JUMP_SLOT	127
 
 #define	R_PPC_NONE		0	/* No relocation. */
 #define	R_PPC_ADDR32		1

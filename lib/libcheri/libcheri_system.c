@@ -55,8 +55,6 @@
  * minimalist.  Sandbox object instances are created by sandbox_object_new()
  * as required, one per loaded sandbox object.
  */
-__capability vm_offset_t	*libcheri_system_vtable;
-
 static struct cheri_object null_object;
 
 LIBCHERI_CLASS_DECL(libcheri_system);

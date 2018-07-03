@@ -209,12 +209,10 @@ uiomove_object_page(vm_object_t obj, size_t len, struct uio *uio)
 	}
 	vm_page_lock(m);
 	vm_page_hold(m);
-	if (m->queue == PQ_NONE) {
-		vm_page_deactivate(m);
-	} else {
-		/* Requeue to maintain LRU ordering. */
-		vm_page_requeue(m);
-	}
+	if (vm_page_active(m))
+		vm_page_reference(m);
+	else
+		vm_page_activate(m);
 	vm_page_unlock(m);
 	VM_OBJECT_WUNLOCK(obj);
 	error = uiomove_fromphys(&m, offset, tlen, uio);
@@ -694,8 +692,8 @@ shm_remove(char *path, Fnv32_t fnv, struct ucred *ucred)
 }
 
 int
-kern_shm_open(struct thread *td, const char *userpath, int flags, mode_t mode,
-    struct filecaps *fcaps)
+kern_shm_open(struct thread *td, const char * __capability userpath, int flags,
+    mode_t mode, struct filecaps *fcaps)
 {
 	struct filedesc *fdp;
 	struct shmfd *shmfd;
@@ -747,7 +745,8 @@ kern_shm_open(struct thread *td, const char *userpath, int flags, mode_t mode,
 		/* Construct a full pathname for jailed callers. */
 		pr_pathlen = strcmp(pr_path, "/") == 0 ? 0
 		    : strlcpy(path, pr_path, MAXPATHLEN);
-		error = copyinstr(userpath, path + pr_pathlen,
+		error = copyinstr_c(userpath,
+		    (__cheri_tocap char * __capability)path + pr_pathlen,
 		    MAXPATHLEN - pr_pathlen, NULL);
 #ifdef KTRACE
 		if (error == 0 && KTRPOINT(curthread, KTR_NAMEI))
@@ -842,11 +841,19 @@ int
 sys_shm_open(struct thread *td, struct shm_open_args *uap)
 {
 
-	return (kern_shm_open(td, uap->path, uap->flags, uap->mode, NULL));
+	return (kern_shm_open(td, __USER_CAP_STR(uap->path), uap->flags,
+	    uap->mode, NULL));
 }
 
 int
 sys_shm_unlink(struct thread *td, struct shm_unlink_args *uap)
+{
+
+	return (kern_shm_unlink(td, __USER_CAP_STR(uap->path)));
+}
+
+int
+kern_shm_unlink(struct thread *td, const char * __capability userpath)
 {
 	char *path;
 	const char *pr_path;
@@ -858,8 +865,9 @@ sys_shm_unlink(struct thread *td, struct shm_unlink_args *uap)
 	pr_path = td->td_ucred->cr_prison->pr_path;
 	pr_pathlen = strcmp(pr_path, "/") == 0 ? 0
 	    : strlcpy(path, pr_path, MAXPATHLEN);
-	error = copyinstr(uap->path, path + pr_pathlen, MAXPATHLEN - pr_pathlen,
-	    NULL);
+	error = copyinstr_c(userpath,
+	    (__cheri_tocap char * __capability)path + pr_pathlen,
+	    MAXPATHLEN - pr_pathlen, NULL);
 	if (error) {
 		free(path, M_TEMP);
 		return (error);
@@ -927,7 +935,7 @@ shm_mmap(struct file *fp, vm_map_t map, vm_offset_t *addr,
 	    flags, shmfd->shm_object, foff, FALSE, td);
 	if (error != 0)
 		vm_object_deallocate(shmfd->shm_object);
-	return (0);
+	return (error);
 }
 
 static int

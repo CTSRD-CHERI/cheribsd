@@ -91,8 +91,6 @@
 
 static int ext2_makeinode(int mode, struct vnode *, struct vnode **, struct componentname *);
 static void ext2_itimes_locked(struct vnode *);
-static int ext4_ext_read(struct vop_read_args *);
-static int ext2_ind_read(struct vop_read_args *);
 
 static vop_access_t	ext2_access;
 static int ext2_chmod(struct vnode *, int, struct ucred *, struct thread *);
@@ -630,7 +628,8 @@ ext2_mknod(struct vop_mknod_args *ap)
 		 * Want to be able to use this to make badblock
 		 * inodes, so don't truncate the dev number.
 		 */
-		ip->i_rdev = vap->va_rdev;
+		if (!(ip->i_flag & IN_E4EXTENTS))
+			ip->i_rdev = vap->va_rdev;
 	}
 	/*
 	 * Remove inode, then reload it through VFS_VGET so it is
@@ -672,6 +671,19 @@ out:
 	return (error);
 }
 
+static unsigned short
+ext2_max_nlink(struct inode *ip)
+{
+	struct m_ext2fs *fs;
+
+	fs = ip->i_e2fs;
+
+	if (EXT2_HAS_RO_COMPAT_FEATURE(fs, EXT2F_ROCOMPAT_DIR_NLINK))
+		return (EXT4_LINK_MAX);
+	else
+		return (EXT2_LINK_MAX);
+}
+
 /*
  * link vnode call
  */
@@ -689,7 +701,7 @@ ext2_link(struct vop_link_args *ap)
 		panic("ext2_link: no name");
 #endif
 	ip = VTOI(vp);
-	if ((nlink_t)ip->i_nlink >= EXT2_LINK_MAX) {
+	if ((nlink_t)ip->i_nlink >= ext2_max_nlink(ip)) {
 		error = EMLINK;
 		goto out;
 	}
@@ -708,6 +720,31 @@ ext2_link(struct vop_link_args *ap)
 	}
 out:
 	return (error);
+}
+
+static int
+ext2_inc_nlink(struct inode *ip)
+{
+
+	ip->i_nlink++;
+
+	if (ext2_htree_has_idx(ip) && ip->i_nlink > 1) {
+		if (ip->i_nlink >= ext2_max_nlink(ip) || ip->i_nlink == 2)
+			ip->i_nlink = 1;
+	} else if (ip->i_nlink > ext2_max_nlink(ip)) {
+		ip->i_nlink--;
+		return (EMLINK);
+	}
+
+	return (0);
+}
+
+static void
+ext2_dec_nlink(struct inode *ip)
+{
+
+	if (!S_ISDIR(ip->i_mode) || ip->i_nlink > 2)
+		ip->i_nlink--;
 }
 
 /*
@@ -792,7 +829,7 @@ abortit:
 		goto abortit;
 	dp = VTOI(fdvp);
 	ip = VTOI(fvp);
-	if (ip->i_nlink >= EXT2_LINK_MAX) {
+	if (ip->i_nlink >= ext2_max_nlink(ip) && !ext2_htree_has_idx(ip)) {
 		VOP_UNLOCK(fvp, 0);
 		error = EMLINK;
 		goto abortit;
@@ -835,7 +872,7 @@ abortit:
 	 *    completing our work, the link count
 	 *    may be wrong, but correctable.
 	 */
-	ip->i_nlink++;
+	ext2_inc_nlink(ip);
 	ip->i_flag |= IN_CHANGE;
 	if ((error = ext2_update(fvp, !DOINGASYNC(fvp))) != 0) {
 		VOP_UNLOCK(fvp, 0);
@@ -890,11 +927,10 @@ abortit:
 		 * parent we don't fool with the link count.
 		 */
 		if (doingdirectory && newparent) {
-			if ((nlink_t)dp->i_nlink >= EXT2_LINK_MAX) {
-				error = EMLINK;
+			error = ext2_inc_nlink(dp);
+			if (error)
 				goto bad;
-			}
-			dp->i_nlink++;
+
 			dp->i_flag |= IN_CHANGE;
 			error = ext2_update(tdvp, !DOINGASYNC(tdvp));
 			if (error)
@@ -903,7 +939,7 @@ abortit:
 		error = ext2_direnter(ip, tdvp, tcnp);
 		if (error) {
 			if (doingdirectory && newparent) {
-				dp->i_nlink--;
+				ext2_dec_nlink(dp);
 				dp->i_flag |= IN_CHANGE;
 				(void)ext2_update(tdvp, 1);
 			}
@@ -936,8 +972,7 @@ abortit:
 		 * (both directories, or both not directories).
 		 */
 		if ((xp->i_mode & IFMT) == IFDIR) {
-			if (!ext2_dirempty(xp, dp->i_number, tcnp->cn_cred) ||
-			    xp->i_nlink > 2) {
+			if (!ext2_dirempty(xp, dp->i_number, tcnp->cn_cred)) {
 				error = ENOTEMPTY;
 				goto bad;
 			}
@@ -960,7 +995,7 @@ abortit:
 		 * of the target directory.
 		 */
 		if (doingdirectory && !newparent) {
-			dp->i_nlink--;
+			ext2_dec_nlink(dp);
 			dp->i_flag |= IN_CHANGE;
 		}
 		vput(tdvp);
@@ -974,7 +1009,7 @@ abortit:
 		 * it above, as the remaining link would point to
 		 * a directory without "." or ".." entries.
 		 */
-		xp->i_nlink--;
+		ext2_dec_nlink(xp);
 		if (doingdirectory) {
 			if (--xp->i_nlink != 0)
 				panic("ext2_rename: linked directory");
@@ -1031,7 +1066,7 @@ abortit:
 		 * and ".." set to point to the new parent.
 		 */
 		if (doingdirectory && newparent) {
-			dp->i_nlink--;
+			ext2_dec_nlink(dp);
 			dp->i_flag |= IN_CHANGE;
 			error = vn_rdwr(UIO_READ, fvp, (caddr_t)&dirbuf,
 			    sizeof(struct dirtemplate), (off_t)0,
@@ -1060,7 +1095,7 @@ abortit:
 		}
 		error = ext2_dirremove(fdvp, fcnp);
 		if (!error) {
-			xp->i_nlink--;
+			ext2_dec_nlink(xp);
 			xp->i_flag |= IN_CHANGE;
 		}
 		xp->i_flag &= ~IN_RENAME;
@@ -1080,7 +1115,7 @@ out:
 	if (doingdirectory)
 		ip->i_flag &= ~IN_RENAME;
 	if (vn_lock(fvp, LK_EXCLUSIVE) == 0) {
-		ip->i_nlink--;
+		ext2_dec_nlink(ip);
 		ip->i_flag |= IN_CHANGE;
 		ip->i_flag &= ~IN_RENAME;
 		vput(fvp);
@@ -1255,7 +1290,8 @@ ext2_mkdir(struct vop_mkdir_args *ap)
 		panic("ext2_mkdir: no name");
 #endif
 	dp = VTOI(dvp);
-	if ((nlink_t)dp->i_nlink >= EXT2_LINK_MAX) {
+	if ((nlink_t)dp->i_nlink >= ext2_max_nlink(dp) &&
+	    !ext2_htree_has_idx(dp)) {
 		error = EMLINK;
 		goto out;
 	}
@@ -1306,7 +1342,7 @@ ext2_mkdir(struct vop_mkdir_args *ap)
 	 * be done before reference is created
 	 * so reparation is possible if we crash.
 	 */
-	dp->i_nlink++;
+	ext2_inc_nlink(dp);
 	dp->i_flag |= IN_CHANGE;
 	error = ext2_update(dvp, !DOINGASYNC(dvp));
 	if (error)
@@ -1333,7 +1369,7 @@ ext2_mkdir(struct vop_mkdir_args *ap)
 	    IO_NODELOCKED | IO_SYNC | IO_NOMACCHECK, cnp->cn_cred, NOCRED,
 	    NULL, NULL);
 	if (error) {
-		dp->i_nlink--;
+		ext2_dec_nlink(dp);
 		dp->i_flag |= IN_CHANGE;
 		goto bad;
 	}
@@ -1358,7 +1394,7 @@ ext2_mkdir(struct vop_mkdir_args *ap)
 	/* Directory set up, now install its entry in the parent directory. */
 	error = ext2_direnter(ip, dvp, cnp);
 	if (error) {
-		dp->i_nlink--;
+		ext2_dec_nlink(dp);
 		dp->i_flag |= IN_CHANGE;
 	}
 bad:
@@ -1400,7 +1436,7 @@ ext2_rmdir(struct vop_rmdir_args *ap)
 	 *  the current directory and thus be
 	 *  non-empty.)
 	 */
-	if (ip->i_nlink != 2 || !ext2_dirempty(ip, dp->i_number, cnp->cn_cred)) {
+	if (!ext2_dirempty(ip, dp->i_number, cnp->cn_cred)) {
 		error = ENOTEMPTY;
 		goto out;
 	}
@@ -1417,22 +1453,15 @@ ext2_rmdir(struct vop_rmdir_args *ap)
 	error = ext2_dirremove(dvp, cnp);
 	if (error)
 		goto out;
-	dp->i_nlink--;
+	ext2_dec_nlink(dp);
 	dp->i_flag |= IN_CHANGE;
 	cache_purge(dvp);
 	VOP_UNLOCK(dvp, 0);
 	/*
 	 * Truncate inode.  The only stuff left
-	 * in the directory is "." and "..".  The
-	 * "." reference is inconsequential since
-	 * we're quashing it.  The ".." reference
-	 * has already been adjusted above.  We've
-	 * removed the "." reference and the reference
-	 * in the parent directory, but there may be
-	 * other hard links so decrement by 2 and
-	 * worry about them later.
+	 * in the directory is "." and "..".
 	 */
-	ip->i_nlink -= 2;
+	ip->i_nlink = 0;
 	error = ext2_truncate(vp, (off_t)0, IO_SYNC, cnp->cn_cred,
 	    cnp->cn_thread);
 	cache_purge(ITOV(ip));
@@ -1512,7 +1541,12 @@ ext2_strategy(struct vop_strategy_args *ap)
 	if (vp->v_type == VBLK || vp->v_type == VCHR)
 		panic("ext2_strategy: spec");
 	if (bp->b_blkno == bp->b_lblkno) {
-		error = ext2_bmaparray(vp, bp->b_lblkno, &blkno, NULL, NULL);
+
+		if (VTOI(ap->a_vp)->i_flag & IN_E4EXTENTS)
+			error = ext4_bmapext(vp, bp->b_lblkno, &blkno, NULL, NULL);
+		else
+			error = ext2_bmaparray(vp, bp->b_lblkno, &blkno, NULL, NULL);
+
 		bp->b_blkno = blkno;
 		if (error) {
 			bp->b_error = error;
@@ -1592,19 +1626,10 @@ ext2_pathconf(struct vop_pathconf_args *ap)
 
 	switch (ap->a_name) {
 	case _PC_LINK_MAX:
-		*ap->a_retval = EXT2_LINK_MAX;
-		break;
-	case _PC_NAME_MAX:
-		*ap->a_retval = NAME_MAX;
-		break;
-	case _PC_PATH_MAX:
-		*ap->a_retval = PATH_MAX;
-		break;
-	case _PC_PIPE_BUF:
-		*ap->a_retval = PIPE_BUF;
-		break;
-	case _PC_CHOWN_RESTRICTED:
-		*ap->a_retval = 1;
+		if (ext2_htree_has_idx(VTOI(ap->a_vp)))
+			*ap->a_retval = INT_MAX;
+		else
+			*ap->a_retval = ext2_max_nlink(VTOI(ap->a_vp));
 		break;
 	case _PC_NO_TRUNC:
 		*ap->a_retval = 1;
@@ -1627,11 +1652,6 @@ ext2_pathconf(struct vop_pathconf_args *ap)
 
 	case _PC_MIN_HOLE_SIZE:
 		*ap->a_retval = ap->a_vp->v_mount->mnt_stat.f_iosize;
-		break;
-	case _PC_ASYNC_IO:
-		/* _PC_ASYNC_IO should have been handled by upper layers. */
-		KASSERT(0, ("_PC_ASYNC_IO should not get here"));
-		error = EINVAL;
 		break;
 	case _PC_PRIO_IO:
 		*ap->a_retval = 0;
@@ -1662,7 +1682,7 @@ ext2_pathconf(struct vop_pathconf_args *ap)
 		break;
 
 	default:
-		error = EINVAL;
+		error = vop_stdpathconf(ap);
 		break;
 	}
 	return (error);
@@ -1974,28 +1994,6 @@ ext2_read(struct vop_read_args *ap)
 {
 	struct vnode *vp;
 	struct inode *ip;
-	int error;
-
-	vp = ap->a_vp;
-	ip = VTOI(vp);
-
-	/* EXT4_EXT_LOCK(ip); */
-	if (ip->i_flag & IN_E4EXTENTS)
-		error = ext4_ext_read(ap);
-	else
-		error = ext2_ind_read(ap);
-	/* EXT4_EXT_UNLOCK(ip); */
-	return (error);
-}
-
-/*
- * Vnode op for reading.
- */
-static int
-ext2_ind_read(struct vop_read_args *ap)
-{
-	struct vnode *vp;
-	struct inode *ip;
 	struct uio *uio;
 	struct m_ext2fs *fs;
 	struct buf *bp;
@@ -2112,122 +2110,6 @@ ext2_ioctl(struct vop_ioctl_args *ap)
 	default:
 		return (ENOTTY);
 	}
-}
-
-/*
- * this function handles ext4 extents block mapping
- */
-static int
-ext4_ext_read(struct vop_read_args *ap)
-{
-	static unsigned char zeroes[EXT2_MAX_BLOCK_SIZE];
-	struct vnode *vp;
-	struct inode *ip;
-	struct uio *uio;
-	struct m_ext2fs *fs;
-	struct buf *bp;
-	struct ext4_extent nex, *ep;
-	struct ext4_extent_path path;
-	daddr_t lbn, newblk;
-	off_t bytesinfile;
-	int cache_type;
-	ssize_t orig_resid;
-	int error;
-	long size, xfersize, blkoffset;
-
-	vp = ap->a_vp;
-	ip = VTOI(vp);
-	uio = ap->a_uio;
-	memset(&path, 0, sizeof(path));
-
-	orig_resid = uio->uio_resid;
-	KASSERT(orig_resid >= 0, ("%s: uio->uio_resid < 0", __func__));
-	if (orig_resid == 0)
-		return (0);
-	KASSERT(uio->uio_offset >= 0, ("%s: uio->uio_offset < 0", __func__));
-	fs = ip->i_e2fs;
-	if (uio->uio_offset < ip->i_size && uio->uio_offset >= fs->e2fs_maxfilesize)
-		return (EOVERFLOW);
-
-	while (uio->uio_resid > 0) {
-		if ((bytesinfile = ip->i_size - uio->uio_offset) <= 0)
-			break;
-		lbn = lblkno(fs, uio->uio_offset);
-		size = blksize(fs, ip, lbn);
-		blkoffset = blkoff(fs, uio->uio_offset);
-
-		xfersize = fs->e2fs_fsize - blkoffset;
-		xfersize = MIN(xfersize, uio->uio_resid);
-		xfersize = MIN(xfersize, bytesinfile);
-
-		/* get block from ext4 extent cache */
-		cache_type = ext4_ext_in_cache(ip, lbn, &nex);
-		switch (cache_type) {
-		case EXT4_EXT_CACHE_NO:
-			ext4_ext_find_extent(fs, ip, lbn, &path);
-			if (path.ep_is_sparse)
-				ep = &path.ep_sparse_ext;
-			else
-				ep = path.ep_ext;
-			if (ep == NULL)
-				return (EIO);
-
-			ext4_ext_put_cache(ip, ep,
-			    path.ep_is_sparse ? EXT4_EXT_CACHE_GAP : EXT4_EXT_CACHE_IN);
-
-			newblk = lbn - ep->e_blk + (ep->e_start_lo |
-			    (daddr_t)ep->e_start_hi << 32);
-
-			if (path.ep_bp != NULL) {
-				brelse(path.ep_bp);
-				path.ep_bp = NULL;
-			}
-			break;
-
-		case EXT4_EXT_CACHE_GAP:
-			/* block has not been allocated yet */
-			break;
-
-		case EXT4_EXT_CACHE_IN:
-			newblk = lbn - nex.e_blk + (nex.e_start_lo |
-			    (daddr_t)nex.e_start_hi << 32);
-			break;
-
-		default:
-			panic("%s: invalid cache type", __func__);
-		}
-
-		if (cache_type == EXT4_EXT_CACHE_GAP ||
-		    (cache_type == EXT4_EXT_CACHE_NO && path.ep_is_sparse)) {
-			if (xfersize > sizeof(zeroes))
-				xfersize = sizeof(zeroes);
-			error = uiomove(zeroes, xfersize, uio);
-			if (error)
-				return (error);
-		} else {
-			error = bread(ip->i_devvp, fsbtodb(fs, newblk), size,
-			    NOCRED, &bp);
-			if (error) {
-				brelse(bp);
-				return (error);
-			}
-
-			size -= bp->b_resid;
-			if (size < xfersize) {
-				if (size == 0) {
-					bqrelse(bp);
-					break;
-				}
-				xfersize = size;
-			}
-			error = uiomove(bp->b_data + blkoffset, xfersize, uio);
-			bqrelse(bp);
-			if (error)
-				return (error);
-		}
-	}
-
-	return (0);
 }
 
 /*

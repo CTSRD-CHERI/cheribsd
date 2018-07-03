@@ -36,6 +36,16 @@
  *
  * $FreeBSD$
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "support"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 /*
  * This file defines common routines used by both printf and wprintf.
@@ -285,7 +295,12 @@ __cheri_ptr_alt(void *pointer, CHAR *cp, const char *xdigs)
 	CHAR *scp;
 
 	ujval = cheri_gettype(pointer);
-	cp = __ujtoa(ujval, cp, 16, 0, xdigs);
+	if (ujval == -1) {
+		*--cp = '1';
+		*--cp = '-';
+	} else {
+		cp = __ujtoa(ujval, cp, 16, 0, xdigs);
+	}
 	*--cp = ':';
 	*--cp = 't';
 	*--cp = ' ';

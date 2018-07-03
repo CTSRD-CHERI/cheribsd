@@ -5,6 +5,16 @@
   * 
   * Author: Wietse Venema, Eindhoven University of Technology, The Netherlands.
   */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #ifndef lint
 static char sccsid[] = "@(#) inetcf.c 1.7 97/02/12 02:13:23";

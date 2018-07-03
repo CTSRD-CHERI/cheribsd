@@ -383,20 +383,23 @@ udf_pathconf(struct vop_pathconf_args *a)
 {
 
 	switch (a->a_name) {
+	case _PC_FILESIZEBITS:
+		*a->a_retval = 64;
+		return (0);
 	case _PC_LINK_MAX:
 		*a->a_retval = 65535;
 		return (0);
 	case _PC_NAME_MAX:
 		*a->a_retval = NAME_MAX;
 		return (0);
-	case _PC_PATH_MAX:
-		*a->a_retval = PATH_MAX;
+	case _PC_SYMLINK_MAX:
+		*a->a_retval = MAXPATHLEN;
 		return (0);
 	case _PC_NO_TRUNC:
 		*a->a_retval = 1;
 		return (0);
 	default:
-		return (EINVAL);
+		return (vop_stdpathconf(a));
 	}
 }
 
@@ -892,7 +895,7 @@ udf_readlink(struct vop_readlink_args *ap)
 	struct path_component *pc, *end;
 	struct vnode *vp;
 	struct uio uio;
-	struct iovec iov[1];
+	kiovec_t iov[1];
 	struct udf_node *node;
 	void *buf;
 	char *cp;
@@ -907,8 +910,7 @@ udf_readlink(struct vop_readlink_args *ap)
 	node = VTON(vp);
 	len = le64toh(node->fentry->inf_len);
 	buf = malloc(len, M_DEVBUF, M_WAITOK);
-	iov[0].iov_len = len;
-	iov[0].iov_base = buf;
+	IOVEC_INIT(&iov[0], buf, len);
 	uio.uio_iov = iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = 0;

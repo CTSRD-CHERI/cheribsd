@@ -25,6 +25,16 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sys/cdefs.h>
 __COPYRIGHT("@(#) Copyright (c) 2008\
@@ -141,7 +151,7 @@ mutex2_threadfunc(void *arg)
 		PTHREAD_REQUIRE(pthread_mutex_unlock(&mutex));
 	}
 
-	return (void *)count;
+	return (void *)(intptr_t)count;
 }
 
 ATF_TC(mutex2);
@@ -217,7 +227,7 @@ mutex3_threadfunc(void *arg)
 		PTHREAD_REQUIRE(pthread_mutex_unlock(&static_mutex));
 	}
 
-	return (void *)count;
+	return (void *)(intptr_t)count;
 }
 
 ATF_TC(mutex3);

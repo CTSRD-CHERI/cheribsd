@@ -37,6 +37,7 @@ __FBSDID("$FreeBSD$");
 #define _WANT_MSG_PROTOTYPES
 #define _WANT_SEM_PROTOTYPES
 #define _WANT_SHM_PROTOTYPES
+#define _WANT_SEMUN
 #define _KERNEL
 #include <sys/sem.h>
 #include <sys/shm.h>

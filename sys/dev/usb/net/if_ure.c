@@ -67,6 +67,7 @@ SYSCTL_INT(_hw_usb_ure, OID_AUTO, debug, CTLFLAG_RWTUN, &ure_debug, 0,
  */
 static const STRUCT_USB_HOST_ID ure_devs[] = {
 #define	URE_DEV(v,p,i)	{ USB_VPI(USB_VENDOR_##v, USB_PRODUCT_##v##_##p, i) }
+	URE_DEV(LENOVO, RTL8153, 0),
 	URE_DEV(REALTEK, RTL8152, URE_FLAG_8152),
 	URE_DEV(REALTEK, RTL8153, 0),
 #undef URE_DEV
@@ -895,9 +896,10 @@ ure_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ifr = (struct ifreq *)data;
 	error = 0;
 	reinit = 0;
-	if (cmd == SIOCSIFCAP) {
+	switch (cmd) {
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		URE_LOCK(sc);
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if (reinit > 0 && ifp->if_drv_flags & IFF_DRV_RUNNING)
 			ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 		else
@@ -905,8 +907,11 @@ ure_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		URE_UNLOCK(sc);
 		if (reinit > 0)
 			uether_init(ue);
-	} else
+		break;
+	default:
 		error = uether_ioctl(ifp, cmd, data);
+		break;
+	}
 
 	return (error);
 }

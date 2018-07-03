@@ -36,6 +36,16 @@
  * File: am-utils/amd/srvr_nfs.c
  *
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_as_integer"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 /*
  * NFS server modeling

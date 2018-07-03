@@ -199,19 +199,19 @@ dump_record(dmu_replay_record_t *drr, void *payload, int payload_len,
 {
 	ASSERT3U(offsetof(dmu_replay_record_t, drr_u.drr_checksum.drr_checksum),
 	    ==, sizeof (dmu_replay_record_t) - sizeof (zio_cksum_t));
-	fletcher_4_incremental_native(drr,
+	(void) fletcher_4_incremental_native(drr,
 	    offsetof(dmu_replay_record_t, drr_u.drr_checksum.drr_checksum), zc);
 	if (drr->drr_type != DRR_BEGIN) {
 		ASSERT(ZIO_CHECKSUM_IS_ZERO(&drr->drr_u.
 		    drr_checksum.drr_checksum));
 		drr->drr_u.drr_checksum.drr_checksum = *zc;
 	}
-	fletcher_4_incremental_native(&drr->drr_u.drr_checksum.drr_checksum,
-	    sizeof (zio_cksum_t), zc);
+	(void) fletcher_4_incremental_native(
+	    &drr->drr_u.drr_checksum.drr_checksum, sizeof (zio_cksum_t), zc);
 	if (write(outfd, drr, sizeof (*drr)) == -1)
 		return (errno);
 	if (payload_len != 0) {
-		fletcher_4_incremental_native(payload, payload_len, zc);
+		(void) fletcher_4_incremental_native(payload, payload_len, zc);
 		if (write(outfd, payload, payload_len) == -1)
 			return (errno);
 	}
@@ -2096,9 +2096,9 @@ recv_read(libzfs_handle_t *hdl, int fd, void *buf, int ilen,
 
 	if (zc) {
 		if (byteswap)
-			fletcher_4_incremental_byteswap(buf, ilen, zc);
+			(void) fletcher_4_incremental_byteswap(buf, ilen, zc);
 		else
-			fletcher_4_incremental_native(buf, ilen, zc);
+			(void) fletcher_4_incremental_native(buf, ilen, zc);
 	}
 	return (0);
 }
@@ -3212,7 +3212,12 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 	/*
 	 * Determine the name of the origin snapshot, store in zc_string.
 	 */
-	if (drrb->drr_flags & DRR_FLAG_CLONE) {
+	if (originsnap) {
+		(void) strncpy(zc.zc_string, originsnap, sizeof (zc.zc_string));
+		if (flags->verbose)
+			(void) printf("using provided clone origin %s\n",
+			    zc.zc_string);
+	} else if (drrb->drr_flags & DRR_FLAG_CLONE) {
 		if (guid_to_name(hdl, zc.zc_value,
 		    drrb->drr_fromguid, B_FALSE, zc.zc_string) != 0) {
 			zcmd_free_nvlists(&zc);
@@ -3223,11 +3228,6 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 		}
 		if (flags->verbose)
 			(void) printf("found clone origin %s\n", zc.zc_string);
-	} else if (originsnap) {
-		(void) strncpy(zc.zc_string, originsnap, sizeof (zc.zc_string));
-		if (flags->verbose)
-			(void) printf("using provided clone origin %s\n",
-			    zc.zc_string);
 	}
 
 	boolean_t resuming = DMU_GET_FEATUREFLAGS(drrb->drr_versioninfo) &
@@ -3688,7 +3688,8 @@ zfs_receive_impl(libzfs_handle_t *hdl, const char *tosnap,
 		 * recv_read() above; do it again correctly.
 		 */
 		bzero(&zcksum, sizeof (zio_cksum_t));
-		fletcher_4_incremental_byteswap(&drr, sizeof (drr), &zcksum);
+		(void) fletcher_4_incremental_byteswap(&drr,
+		    sizeof (drr), &zcksum);
 		flags->byteswap = B_TRUE;
 
 		drr.drr_type = BSWAP_32(drr.drr_type);

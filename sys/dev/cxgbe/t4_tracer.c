@@ -133,7 +133,8 @@ t4_cloner_match(struct if_clone *ifc, const char *name)
 }
 
 static int
-t4_cloner_create(struct if_clone *ifc, char *name, size_t len, caddr_t params)
+t4_cloner_create(struct if_clone *ifc, char *name, size_t len,
+    void * __capability params __unused)
 {
 	struct match_rr mrr;
 	struct adapter *sc;
@@ -464,13 +465,13 @@ tracer_ioctl(struct ifnet *ifp, unsigned long cmd, caddr_t data)
 	struct ifreq *ifr = (struct ifreq *)data;
 
 	switch (cmd) {
-	case SIOCSIFMTU:
-	case SIOCSIFFLAGS:
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 	case SIOCGIFXMEDIA:
 		sx_xlock(&t4_trace_lock);

@@ -1,5 +1,18 @@
 #ifndef JEMALLOC_INTERNAL_INLINES_C_H
 #define JEMALLOC_INTERNAL_INLINES_C_H
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "monotonicity",
+ *     "pointer_alignment",
+ *     "virtual_address"
+ *   ],
+ *   "change_comment": "unbound_ptr()"
+ * }
+ * CHERI CHANGES END
+ */
 
 #include "jemalloc/internal/jemalloc_internal_types.h"
 #include "jemalloc/internal/sz.h"
@@ -13,9 +26,10 @@ unbound_ptr(tsdn_t *tsdn, void *ptr) {
 	ubptr = ptr;
 #else
 	rtree_ctx_t *rtree_ctx;
+	rtree_ctx_t rtree_ctx_fallback;
 	extent_t *extent;
 
-	rtree_ctx = tsd_rtree_ctx(tsdn_tsd(tsdn));
+	rtree_ctx = tsdn_rtree_ctx(tsdn, &rtree_ctx_fallback);
 	extent = rtree_extent_read(tsdn, &extents_rtree,
 	    rtree_ctx, (vaddr_t)ptr, true);
 	assert(extent != NULL);

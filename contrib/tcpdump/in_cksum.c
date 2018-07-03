@@ -34,6 +34,16 @@
  *
  *	@(#)in_cksum.c	8.1 (Berkeley) 6/10/93
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_alignment"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #ifdef HAVE_CONFIG_H
 # include "config.h"

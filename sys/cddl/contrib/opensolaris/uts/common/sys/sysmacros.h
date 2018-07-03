@@ -215,8 +215,11 @@ extern unsigned char bcd_to_byte[256];
 /*
  * Macro for checking power of 2 address alignment.
  */
+#if __has_builtin(__builtin_is_aligned)
+#define	IS_P2ALIGNED(v, a) __builtin_is_aligned(v, a)
+#else
 #define	IS_P2ALIGNED(v, a) ((((uintptr_t)(v)) & ((uintptr_t)(a) - 1)) == 0)
-
+#endif
 /*
  * Macros for counting and rounding.
  */
@@ -240,7 +243,11 @@ extern unsigned char bcd_to_byte[256];
  * eg, P2ALIGN(0x1234, 0x100) == 0x1200 (0x12*align)
  * eg, P2ALIGN(0x5600, 0x100) == 0x5600 (0x56*align)
  */
+#if __has_builtin(__builtin_align_down)
+#define	P2ALIGN(x, align)		__builtin_align_down(x, align)
+#else
 #define	P2ALIGN(x, align)		((x) & -(align))
+#endif
 
 /*
  * return x % (mod) align
@@ -262,14 +269,22 @@ extern unsigned char bcd_to_byte[256];
  * eg, P2ROUNDUP(0x1234, 0x100) == 0x1300 (0x13*align)
  * eg, P2ROUNDUP(0x5600, 0x100) == 0x5600 (0x56*align)
  */
+#if __has_builtin(__builtin_align_up)
+#define	P2ROUNDUP(x, align)		__builtin_align_up(x, align)
+#else
 #define	P2ROUNDUP(x, align)		(-(-(x) & -(align)))
+#endif
 
 /*
  * return the ending address of the block that x is in
  * eg, P2END(0x1234, 0x100) == 0x12ff (0x13*align - 1)
  * eg, P2END(0x5600, 0x100) == 0x56ff (0x57*align - 1)
  */
+#if __has_builtin(__builtin_align_up)
+#define	P2END(x, align)			(__builtin_align_up(x + 1, align) - 1)
+#else
 #define	P2END(x, align)			(-(~(x) & -(align)))
+#endif
 
 /*
  * return x rounded up to the next phase (offset) within align.

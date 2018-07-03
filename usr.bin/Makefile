@@ -119,6 +119,7 @@ SUBDIR=	alias \
 	patch \
 	pathchk \
 	perror \
+	pie \
 	pr \
 	printenv \
 	printf \
@@ -133,8 +134,10 @@ SUBDIR=	alias \
 	rpcinfo \
 	rs \
 	rup \
+	ruptime \
 	rusers \
 	rwall \
+	rwho \
 	script \
 	sdiff \
 	sed \
@@ -240,7 +243,6 @@ SUBDIR.${MK_MAIL}+=	from
 SUBDIR.${MK_MAIL}+=	mail
 SUBDIR.${MK_MAIL}+=	msgs
 SUBDIR.${MK_MAKE}+=	bmake
-SUBDIR.${MK_MAN_UTILS}+=	catman
 SUBDIR.${MK_MAN_UTILS}+=	man
 SUBDIR.${MK_NETCAT}+=	nc
 SUBDIR.${MK_NIS}+=	ypcat
@@ -252,10 +254,6 @@ SUBDIR.${MK_OPENSSL}+=	chkey
 SUBDIR.${MK_OPENSSL}+=	dc
 SUBDIR.${MK_OPENSSL}+=	newkey
 SUBDIR.${MK_QUOTAS}+=	quota
-SUBDIR.${MK_RCMDS}+=	rlogin
-SUBDIR.${MK_RCMDS}+=	rsh
-SUBDIR.${MK_RCMDS}+=	ruptime
-SUBDIR.${MK_RCMDS}+=	rwho
 SUBDIR.${MK_SENDMAIL}+=	vacation
 SUBDIR.${MK_TALK}+=	talk
 SUBDIR.${MK_TELNET}+=	telnet
@@ -308,8 +306,6 @@ SUBDIR+=	mkesdb_static
 .endif
 
 .include <bsd.arch.inc.mk>
-
-SUBDIR:=	${SUBDIR:O:u}
 
 SUBDIR_PARALLEL=
 

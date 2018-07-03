@@ -290,7 +290,7 @@ namei(struct nameidata *ndp)
 	struct filedesc *fdp;	/* pointer to file descriptor state */
 	char *cp;		/* pointer into pathname argument */
 	struct vnode *dp;	/* the directory we are searching */
-	struct iovec aiov;		/* uio for reading symbolic links */
+	kiovec_t aiov;		/* uio for reading symbolic links */
 	struct componentname *cnp;
 	struct thread *td;
 	struct proc *p;
@@ -325,24 +325,15 @@ namei(struct nameidata *ndp)
 	if ((cnp->cn_flags & HASBUF) == 0)
 		cnp->cn_pnbuf = uma_zalloc(namei_zone, M_WAITOK);
 	if (ndp->ni_segflg == UIO_SYSSPACE)
-/* XXX: work around CTSRD-CHERI/clang#157 */
-#if __has_feature(capabilities)
-		error = copystr((void *)(uintptr_t)cheri_getoffset(ndp->ni_dirp),
-#else
-		error = copystr(ndp->ni_dirp,
-#endif
-		    cnp->cn_pnbuf, MAXPATHLEN, &ndp->ni_pathlen);
+		error = copystr_c(ndp->ni_dirp,
+		    (__cheri_tocap char * __capability)cnp->cn_pnbuf,
+		    MAXPATHLEN,
+		    (__cheri_tocap size_t * __capability)&ndp->ni_pathlen);
 	else
-/* XXX: work around CTSRD-CHERI/clang#157 */
-#if __has_feature(capabilities)
 		error = copyinstr_c(ndp->ni_dirp,
-		    cheri_ptr(cnp->cn_pnbuf, MAXPATHLEN), MAXPATHLEN,
-		    cheri_ptr_to_bounded_cap(&ndp->ni_pathlen));
-#else
-		error = copyinstr_c(ndp->ni_dirp,
-		    (__cheri_tocap char * __CAPABILITY)cnp->cn_pnbuf, MAXPATHLEN,
-		    (__cheri_tocap size_t * __CAPABILITY)&ndp->ni_pathlen);
-#endif
+		    (__cheri_tocap char * __capability)cnp->cn_pnbuf,
+		    MAXPATHLEN,
+		    (__cheri_tocap size_t * __capability)&ndp->ni_pathlen);
 
 	/*
 	 * Don't allow empty pathnames.
@@ -494,8 +485,7 @@ namei(struct nameidata *ndp)
 			cp = uma_zalloc(namei_zone, M_WAITOK);
 		else
 			cp = cnp->cn_pnbuf;
-		aiov.iov_base = cp;
-		aiov.iov_len = MAXPATHLEN;
+		IOVEC_INIT(&aiov, cp, MAXPATHLEN);
 		auio.uio_iov = &aiov;
 		auio.uio_iovcnt = 1;
 		auio.uio_offset = 0;
@@ -1271,13 +1261,13 @@ NDINIT_ALL(struct nameidata *ndp, u_long op, u_long flags, enum uio_seg segflg,
 {
 
 	NDINIT_ALL_C(ndp, op, flags, segflg,
-	    (__cheri_tocap const char * __CAPABILITY)namep,
+	    (__cheri_tocap const char * __capability)namep,
 	    dirfd, startdir, rightsp, td);
 }
 
 void
 NDINIT_ALL_C(struct nameidata *ndp, u_long op, u_long flags, enum uio_seg segflg,
-    const char * __CAPABILITY namep, int dirfd, struct vnode *startdir, cap_rights_t *rightsp,
+    const char * __capability namep, int dirfd, struct vnode *startdir, cap_rights_t *rightsp,
     struct thread *td)
 {
 
@@ -1418,13 +1408,13 @@ kern_alternate_path(struct thread *td, const char *prefix, const char *path,
 		for (cp = &ptr[len] - 1; *cp != '/'; cp--);
 		*cp = '\0';
 
-		NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, buf, td);
+		NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, buf, td);
 		error = namei(&nd);
 		*cp = '/';
 		if (error != 0)
 			goto keeporig;
 	} else {
-		NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, buf, td);
+		NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, buf, td);
 
 		error = namei(&nd);
 		if (error != 0)

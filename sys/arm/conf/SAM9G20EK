@@ -4,11 +4,11 @@
 # For more information on this file, please read the handbook section on
 # Kernel Configuration Files:
 #
-#    http://www.FreeBSD.org/doc/en_US.ISO8859-1/books/handbook/kernelconfig-config.html
+#    https://www.FreeBSD.org/doc/en_US.ISO8859-1/books/handbook/kernelconfig-config.html
 #
 # The handbook is also available locally in /usr/share/doc/handbook
 # if you've installed the doc distribution, otherwise always see the
-# FreeBSD World Wide Web server (http://www.FreeBSD.org/) for the
+# FreeBSD World Wide Web server (https://www.FreeBSD.org/) for the
 # latest information.
 #
 # An exhaustive list of options and more detailed explanations of the
@@ -34,6 +34,8 @@ options 	SOCDEV_VA=0xdc000000
 #To statically compile in device wiring instead of /boot/device.hints
 hints		"SAM9G20EK.hints"
 makeoptions	MODULES_OVERRIDE=""
+
+options 	ARM_USE_V6_BUSDMA	# Use v6 to track down unaligned I/O issues
 
 options 	SCHED_4BSD		# 4BSD scheduler
 options 	INET			# InterNETworking

@@ -8,7 +8,8 @@ BINDIR=		${TESTSDIR}
 NETBSD_ATF_TESTS_C=	proc1_test
 # XXX: fails `ke.fflags & NOTE_TRACKERR` invariant
 #NETBSD_ATF_TESTS_C+=	proc2_test
-NETBSD_ATF_TESTS_C+=	proc3_test
+# CheriABI: double free panic
+#NETBSD_ATF_TESTS_C+=	proc3_test
 NETBSD_ATF_TESTS_C+=	sig_test
 NETBSD_ATF_TESTS_C+=	vnode_test
 

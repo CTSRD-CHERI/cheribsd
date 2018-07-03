@@ -22,6 +22,18 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING.  If not, write to
 the Free Software Foundation, 51 Franklin Street, Fifth Floor,
 Boston, MA 02110-1301, USA.  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_size"
+ *   ],
+ *   "change_comment": "align stack for capabilities",
+ *   "hybrid_specific": true
+ * }
+ * CHERI CHANGES END
+ */
 
 
 /* MIPS external variables defined in mips.c.  */

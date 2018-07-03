@@ -63,7 +63,7 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 
 	switch (uap->op) {
 	case MIPS_SET_TLS:
-		td->td_md.md_tls = uap->parms;
+		td->td_md.md_tls = __USER_CAP_UNBOUND(uap->parms);
 
 		/*
 		 * If there is an user local register implementation (ULRI)
@@ -83,7 +83,7 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 		return (0);
 
 	case MIPS_GET_TLS:
-		tlsbase = td->td_md.md_tls;
+		tlsbase = (__cheri_fromcap void *)td->td_md.md_tls;
 		error = copyout(&tlsbase, uap->parms, sizeof(tlsbase));
 		return (error);
 
@@ -118,7 +118,8 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 #endif
 
 	case CHERI_GET_SEALCAP:
-		return (cheri_sysarch_getsealcap(td, uap));
+		return (cheri_sysarch_getsealcap(td,
+		    __USER_CAP(uap->parms, sizeof(void * __capability))));
 #endif
 
 	default:

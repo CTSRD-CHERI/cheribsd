@@ -164,6 +164,30 @@ allwinner_cpu_reset(platform_t plat)
 	while (1);
 }
 
+/*
+ * To use early printf on Allwinner SoC, add to kernel config
+ * options SOCDEV_PA=0x01C00000
+ * options SOCDEV_VA=0x10000000
+ * options EARLY_PRINTF
+ * And remove the if 0
+*/
+#if 0
+#ifdef EARLY_PRINTF
+static void
+allwinner_early_putc(int c)
+{
+	volatile uint32_t * UART_STAT_REG = (uint32_t *)0x1002807C;
+	volatile uint32_t * UART_TX_REG   = (uint32_t *)0x10028000;
+	const uint32_t      UART_TXRDY    = (1 << 2);
+
+	while ((*UART_STAT_REG & UART_TXRDY) == 0)
+		continue;
+	*UART_TX_REG = c;
+}
+early_putc_t *early_putc = allwinner_early_putc;
+#endif /* EARLY_PRINTF */
+#endif
+
 #if defined(SOC_ALLWINNER_A10)
 static platform_method_t a10_methods[] = {
 	PLATFORMMETHOD(platform_attach,         a10_attach),
@@ -261,6 +285,21 @@ static platform_method_t a83t_methods[] = {
 FDT_PLATFORM_DEF(a83t, "a83t", 0, "allwinner,sun8i-a83t", 200);
 #endif
 
+#if defined(SOC_ALLWINNER_H2PLUS)
+static platform_method_t h2_plus_methods[] = {
+	PLATFORMMETHOD(platform_attach,         h3_attach),
+	PLATFORMMETHOD(platform_devmap_init,    allwinner_devmap_init),
+	PLATFORMMETHOD(platform_cpu_reset,	allwinner_cpu_reset),
+
+#ifdef SMP
+	PLATFORMMETHOD(platform_mp_start_ap,	aw_mp_start_ap),
+	PLATFORMMETHOD(platform_mp_setmaxid,	aw_mp_setmaxid),
+#endif
+	PLATFORMMETHOD_END,
+};
+FDT_PLATFORM_DEF(h2_plus, "h2_plus", 0, "allwinner,sun8i-h2-plus", 200);
+#endif
+
 #if defined(SOC_ALLWINNER_H3)
 static platform_method_t h3_methods[] = {
 	PLATFORMMETHOD(platform_attach,         h3_attach),
@@ -275,6 +314,8 @@ static platform_method_t h3_methods[] = {
 };
 FDT_PLATFORM_DEF(h3, "h3", 0, "allwinner,sun8i-h3", 200);
 #endif
+
+
 
 u_int
 allwinner_soc_type(void)

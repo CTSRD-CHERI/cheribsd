@@ -37,7 +37,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
-#include <sys/bus_dma.h>
 #include <sys/endian.h>
 #include <sys/mbuf.h>
 #include <sys/kernel.h>
@@ -935,15 +934,15 @@ tsec_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int mask, error = 0;
 
 	switch (command) {
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		TSEC_GLOBAL_LOCK(sc);
-		if (tsec_set_mtu(sc, ifr->ifr_mtu))
-			ifp->if_mtu = ifr->ifr_mtu;
+		if (tsec_set_mtu(sc, ifr_mtu_get(ifr)))
+			ifp->if_mtu = ifr_mtu_get(ifr);
 		else
 			error = EINVAL;
 		TSEC_GLOBAL_UNLOCK(sc);
 		break;
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		TSEC_GLOBAL_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -962,30 +961,30 @@ tsec_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->tsec_if_flags = ifp->if_flags;
 		TSEC_GLOBAL_UNLOCK(sc);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 			TSEC_GLOBAL_LOCK(sc);
 			tsec_setup_multicast(sc);
 			TSEC_GLOBAL_UNLOCK(sc);
 		}
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		error = ifmedia_ioctl(ifp, ifr, &sc->tsec_mii->mii_media,
 		    command);
 		break;
-	case SIOCSIFCAP:
-		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
+	CASE_IOC_IFREQ(SIOCSIFCAP):
+		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
 		if ((mask & IFCAP_HWCSUM) && sc->is_etsec) {
 			TSEC_GLOBAL_LOCK(sc);
 			ifp->if_capenable &= ~IFCAP_HWCSUM;
-			ifp->if_capenable |= IFCAP_HWCSUM & ifr->ifr_reqcap;
+			ifp->if_capenable |= IFCAP_HWCSUM & ifr_reqcap_get(ifr);
 			tsec_offload_setup(sc);
 			TSEC_GLOBAL_UNLOCK(sc);
 		}
 #ifdef DEVICE_POLLING
 		if (mask & IFCAP_POLLING) {
-			if (ifr->ifr_reqcap & IFCAP_POLLING) {
+			if (ifr_reqcap_get(ifr) & IFCAP_POLLING) {
 				error = ether_poll_register(tsec_poll, ifp);
 				if (error)
 					return (error);

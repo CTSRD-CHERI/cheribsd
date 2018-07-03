@@ -403,9 +403,9 @@ host_unmarshal_func(char *buffer, size_t buffer_size, void *retval, va_list ap,
 
 	orig_buf = (char *)_ALIGN(orig_buf);
 	memcpy(orig_buf, buffer + sizeof(struct hostent) + sizeof(char *) +
-	    _ALIGN(p) - (size_t)p,
+	    (vaddr_t)_ALIGN(p) - (vaddr_t)p,
 	    buffer_size - sizeof(struct hostent) - sizeof(char *) -
-	    _ALIGN(p) + (size_t)p);
+	    (vaddr_t)_ALIGN(p) + (vaddr_t)p);
 	p = (char *)_ALIGN(p);
 
 	NS_APPLY_OFFSET(ht->h_name, orig_buf, p, char *);

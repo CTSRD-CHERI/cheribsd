@@ -294,7 +294,7 @@
 #if (defined(__cplusplus) && __cplusplus >= 201103L) || \
     __has_extension(cxx_static_assert)
 #define	_Static_assert(x, y)	static_assert(x, y)
-#elif __GNUC_PREREQ__(4,6)
+#elif __GNUC_PREREQ__(4,6) && !defined(__cplusplus)
 /* Nothing, gcc 4.6 and higher has _Static_assert built-in */
 #elif defined(__COUNTER__)
 #define	_Static_assert(x, y)	__Static_assert(x, __COUNTER__)
@@ -657,10 +657,43 @@
 #define	__DEQUALIFY(type, var)	((type)(__uintptr_t)(const volatile void *)(var))
 #endif
 
-#ifdef __CHERI__
+#if __has_feature(capabilities)
 #define	__DECONST_CAP(type, var)	((type)(__uintcap_t)(const void * __capability)(var))
 #define	__DEVOLATILE_CAP(type, var)	((type)(__uintcap_t)(volatile void * __capability)(var))
 #define	__DEQUALIFY_CAP(type, var)	((type)(__uintcap_t)(const volatile void * __capability)(var))
+#else
+#define	__DECONST_CAP		__DECONST
+#define	__DEVOLATILE_CAP	__DEVOLATILE
+#define	__DEQUALIFY_CAP		__DEQUALIFY
+#endif
+
+#ifndef __CAP_CHECK
+#if __has_feature(capabilities)
+#define __CAP_CHECK(cap, len) ({					\
+	int ret = 1;							\
+	size_t caplen = __builtin_mips_cheri_get_cap_length(cap);	\
+	size_t capoff = __builtin_mips_cheri_cap_offset_get(cap);	\
+	if (capoff < 0 || capoff > caplen || caplen - capoff < (len))	\
+		ret = 0;						\
+	ret;								\
+})
+#else
+#define	__CAP_CHECK(cap, len)	1
+#endif
+#endif
+
+#ifndef __DECAP_CHECK
+#if __has_feature(capabilities)
+#define __DECAP_CHECK(cap, len)						\
+({									\
+	void * __capability tmpcap = (cap);				\
+	if (!__CAP_CHECK((cap), (len)))					\
+		tmpcap = NULL;						\
+	(__cheri_fromcap void *)(tmpcap);				\
+})
+#else
+#define __DECAP_CHECK(cap, len) (cap)
+#endif
 #endif
 
 /*-
@@ -795,7 +828,7 @@
 #endif
 #endif /* __STDC_WANT_LIB_EXT1__ */
 
-#if defined(__mips) || defined(__powerpc64__) || defined(__riscv__)
+#if defined(__mips) || defined(__powerpc64__) || defined(__riscv)
 #define	__NO_TLS 1
 #endif
 
@@ -907,8 +940,15 @@
 
 #if __has_feature(capabilities)
 #define	__CAPABILITY	__capability
+#ifdef _KERNEL
+#define	__kerncap	__capability
+#else
+#define	__kerncap
+#endif
 #else
 #define	__CAPABILITY
+#define	__capability
+#define	__kerncap
 #endif
 
 #if !__has_feature(cheri_casts)
@@ -917,6 +957,12 @@
 #define __cheri_fromcap
 #define __cheri_offset
 #define __cheri_addr
+#endif
+
+/* allow __builtin_is_aligned unconditionally */
+#if !__has_builtin(__builtin_is_aligned)
+#define __builtin_is_aligned(addr, align) \
+	(((vaddr_t)addr & ((vaddr_t)(align) - 1)) == 0)
 #endif
 
 #endif /* !_SYS_CDEFS_H_ */

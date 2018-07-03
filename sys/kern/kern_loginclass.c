@@ -58,6 +58,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/racct.h>
 #include <sys/refcount.h>
 #include <sys/rwlock.h>
+#include <sys/syscallsubr.h>
 #include <sys/sysproto.h>
 #include <sys/systm.h>
 
@@ -178,14 +179,25 @@ struct getloginclass_args {
 int
 sys_getloginclass(struct thread *td, struct getloginclass_args *uap)
 {
+
+	return (kern_getloginclass(td, __USER_CAP(uap->namebuf, uap->namelen),
+	    uap->namelen));
+}
+
+int
+kern_getloginclass(struct thread *td, char * __capability namebuf,
+    size_t namelen)
+{
 	struct loginclass *lc;
 	size_t lcnamelen;
 
 	lc = td->td_ucred->cr_loginclass;
 	lcnamelen = strlen(lc->lc_name) + 1;
-	if (lcnamelen > uap->namelen)
+	if (lcnamelen > namelen)
 		return (ERANGE);
-	return (copyout(lc->lc_name, uap->namebuf, lcnamelen));
+	return (copyout_c(
+	    (__cheri_tocap char * __capability)&lc->lc_name[0], namebuf,
+	    lcnamelen));
 }
 
 /*
@@ -200,6 +212,13 @@ struct setloginclass_args {
 int
 sys_setloginclass(struct thread *td, struct setloginclass_args *uap)
 {
+
+	return (kern_setloginclass(td, __USER_CAP_STR(uap->namebuf)));
+}
+
+int
+kern_setloginclass(struct thread *td, const char * __capability namebuf)
+{
 	struct proc *p = td->td_proc;
 	int error;
 	char lcname[MAXLOGNAME];
@@ -209,7 +228,8 @@ sys_setloginclass(struct thread *td, struct setloginclass_args *uap)
 	error = priv_check(td, PRIV_PROC_SETLOGINCLASS);
 	if (error != 0)
 		return (error);
-	error = copyinstr(uap->namebuf, lcname, sizeof(lcname), NULL);
+	error = copyinstr_c(namebuf, &lcname[0], sizeof(lcname),
+	    NULL);
 	if (error != 0)
 		return (error);
 

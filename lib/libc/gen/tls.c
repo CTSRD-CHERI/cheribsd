@@ -25,6 +25,17 @@
  *
  *	$FreeBSD$
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_size"
+ *   ],
+ *   "change_comment": "TLS alignment"
+ * }
+ * CHERI CHANGES END
+ */
 
 /*
  * Define stubs for TLS internals so that programs and libraries can
@@ -69,7 +80,7 @@ void __libc_free_tls(void *tls, size_t tcbsize, size_t tcbalign);
 #elif __has_feature(capabilities)
 #define	TLS_TCB_ALIGN	sizeof(void * __capability)
 #elif defined(__aarch64__) || defined(__arm__) || defined(__i386__) || \
-    defined(__mips__) || defined(__powerpc__) || defined(__riscv__) || \
+    defined(__mips__) || defined(__powerpc__) || defined(__riscv) || \
     defined(__sparc64__)
 #define	TLS_TCB_ALIGN	sizeof(void *)
 #else
@@ -77,7 +88,7 @@ void __libc_free_tls(void *tls, size_t tcbsize, size_t tcbalign);
 #endif
 
 #if defined(__aarch64__) || defined(__arm__) || defined(__mips__) || \
-    defined(__powerpc__) || defined(__riscv__)
+    defined(__powerpc__) || defined(__riscv)
 #define TLS_VARIANT_I
 #endif
 #if defined(__i386__) || defined(__amd64__) || defined(__sparc64__)

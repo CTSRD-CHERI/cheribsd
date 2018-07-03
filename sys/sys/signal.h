@@ -135,11 +135,14 @@ typedef	__uid_t		uid_t;
 #define	SIGRTMIN	65
 #define	SIGRTMAX	126
 
-#define	SIG_DFL		((__sighandler_t *)0)
-#define	SIG_IGN		((__sighandler_t *)1)
-#define	SIG_ERR		((__sighandler_t *)-1)
-/* #define	SIG_CATCH	((__sighandler_t *)2) See signalvar.h */
-#define SIG_HOLD        ((__sighandler_t *)3)
+#if !__has_feature(capabilities)
+#define	__intcap_t __intptr_t
+#endif
+#define	SIG_DFL		((__sighandler_t * __kerncap)(__intcap_t)0)
+#define	SIG_IGN		((__sighandler_t * __kerncap)(__intcap_t)1)
+#define	SIG_ERR		((__sighandler_t * __kerncap)(__intcap_t)-1)
+/* #define	SIG_CATCH	((__sighandler_t *)(__intcap_t)2) See signalvar.h */
+#define SIG_HOLD        ((__sighandler_t * __kerncap)(__intcap_t)3)
 
 /*
  * Type of a signal handling function.
@@ -167,6 +170,7 @@ typedef	__sigset_t	sigset_t;
 #endif
 
 #if __POSIX_VISIBLE >= 199309 || __XSI_VISIBLE >= 500
+#ifndef _KERNEL
 union sigval {
 	/* Members as suggested by Annex C of POSIX 1003.1b. */
 	int	sival_int;
@@ -175,12 +179,39 @@ union sigval {
 	int     sigval_int;
 	void    *sigval_ptr;
 };
+
+#else /* _KERNEL */
+union sigval_native {
+	int	sival_int;
+	void	*sival_ptr;
+};
+#if __has_feature(capabilities)
+union sigval_c {
+	int	sival_int;
+	void * __capability sival_ptr;
+};
+typedef union sigval_c		ksigval_union;
+#else
+typedef union sigval_native	ksigval_union;
+#endif
+#endif /* _KERNEL */
+
+#if defined(_WANT_LWPINFO32) || (defined(_KERNEL) && defined(__LP64__))
+union sigval32 {
+	int	sival_int;
+	uint32_t sival_ptr;
+	/* 6.0 compatibility */
+	int	sigval_int;
+	uint32_t sigval_ptr;
+};
+#endif
 #endif
 
 #if __POSIX_VISIBLE >= 199309
 
 struct pthread_attr;
 
+#ifndef _KERNEL
 struct sigevent {
 	int	sigev_notify;		/* Notification type */
 	int	sigev_signo;		/* Signal number */
@@ -195,6 +226,44 @@ struct sigevent {
 		long __spare__[8];
 	} _sigev_un;
 };
+
+#else /* _KERNEL */
+
+struct sigevent_native {
+	int	sigev_notify;		/* Notification type */
+	int	sigev_signo;		/* Signal number */
+	ksigval_union sigev_value;	/* Signal value */
+	union {
+		__lwpid_t	_threadid;
+		struct {
+			void (*_function)(union sigval_native);
+			struct pthread_attr **_attribute;
+		} _sigev_thread;
+		unsigned short _kevent_flags;
+		long __spare__[8];
+	} _sigev_un;
+};
+
+#if __has_feature(capabilities)
+struct sigevent_c {
+	int	sigev_notify;		/* Notification type */
+	int	sigev_signo;		/* Signal number */
+	ksigval_union sigev_value;	/* Signal value */
+	union {
+		__lwpid_t	_threadid;
+		struct {
+			void (* __capability _function)(ksigval_union);
+			struct pthread_attr * __capability * __capability _attribute;
+		} _sigev_thread;
+		unsigned short _kevent_flags;
+		long __spare__[8];
+	} _sigev_un;
+};
+typedef	struct sigevent_c	ksigevent_t;
+#else
+typedef	struct sigevent_native	ksigevent_t;
+#endif
+#endif /* _KERNEL */
 
 #if __BSD_VISIBLE
 #define	sigev_notify_kqueue		sigev_signo
@@ -215,6 +284,7 @@ struct sigevent {
 #endif /* __POSIX_VISIBLE >= 199309 */
 
 #if __POSIX_VISIBLE >= 199309 || __XSI_VISIBLE
+#ifndef _KERNEL
 typedef	struct __siginfo {
 	int	si_signo;		/* signal number */
 	int	si_errno;		/* errno association */
@@ -250,12 +320,121 @@ typedef	struct __siginfo {
 		} __spare__;
 	} _reason;
 } siginfo_t;
+#else /* _KERNEL */
+struct siginfo_native {
+	int	si_signo;		/* signal number */
+	int	si_errno;		/* errno association */
+	/*
+	 * Cause of signal, one of the SI_ macros or signal-specific
+	 * values, i.e. one of the FPE_... values for SIGFPE.  This
+	 * value is equivalent to the second argument to an old-style
+	 * FreeBSD signal handler.
+	 */
+	int	si_code;		/* signal code */
+	__pid_t	si_pid;			/* sending process */
+	__uid_t	si_uid;			/* sender's ruid */
+	int	si_status;		/* exit value */
+	void	*si_addr;		/* faulting instruction */
+	union sigval_native si_value;
+	union	{
+		struct {
+			int	_trapno;/* machine specific trap code */
+		} _fault;
+		struct {
+			int	_timerid;
+			int	_overrun;
+		} _timer;
+		struct {
+			int	_mqd;
+		} _mesgq;
+		struct {
+			long	_band;		/* band event for SIGPOLL */
+		} _poll;			/* was this ever used ? */
+		struct {
+			long	__spare1__;
+			int	__spare2__[7];
+		} __spare__;
+	} _reason;
+};
+#if __has_feature(capabilities)
+struct siginfo_c {
+	int	si_signo;		/* signal number */
+	int	si_errno;		/* errno association */
+	/*
+	 * Cause of signal, one of the SI_ macros or signal-specific
+	 * values, i.e. one of the FPE_... values for SIGFPE.  This
+	 * value is equivalent to the second argument to an old-style
+	 * FreeBSD signal handler.
+	 */
+	int	si_code;		/* signal code */
+	__pid_t	si_pid;			/* sending process */
+	__uid_t	si_uid;			/* sender's ruid */
+	int	si_status;		/* exit value */
+	void* __capability si_addr;	/* faulting instruction */
+	union sigval_c si_value;
+	union	{
+		struct {
+			int	_trapno;/* machine specific trap code */
+		} _fault;
+		struct {
+			int	_timerid;
+			int	_overrun;
+		} _timer;
+		struct {
+			int	_mqd;
+		} _mesgq;
+		struct {
+			long	_band;		/* band event for SIGPOLL */
+		} _poll;			/* was this ever used ? */
+		struct {
+			long	__spare1__;
+			int	__spare2__[7];
+		} __spare__;
+	} _reason;
+};
+typedef	struct siginfo_c	_siginfo_t;
+#else
+typedef	struct siginfo_native	_siginfo_t;
+#endif
+#endif /* _KERNEL */
 
 #define si_trapno	_reason._fault._trapno
 #define si_timerid	_reason._timer._timerid
 #define si_overrun	_reason._timer._overrun
 #define si_mqd		_reason._mesgq._mqd
 #define si_band		_reason._poll._band
+
+#if defined(_WANT_LWPINFO32) || (defined(_KERNEL) && defined(__LP64__))
+struct siginfo32 {
+	int	si_signo;		/* signal number */
+	int	si_errno;		/* errno association */
+	int	si_code;		/* signal code */
+	__pid_t	si_pid;			/* sending process */
+	__uid_t	si_uid;			/* sender's ruid */
+	int	si_status;		/* exit value */
+	uint32_t si_addr;		/* faulting instruction */
+	union sigval32 si_value;	/* signal value */
+	union	{
+		struct {
+			int	_trapno;/* machine specific trap code */
+		} _fault;
+		struct {
+			int	_timerid;
+			int	_overrun;
+		} _timer;
+		struct {
+			int	_mqd;
+		} _mesgq;
+		struct {
+			int32_t	_band;		/* band event for SIGPOLL */
+		} _poll;			/* was this ever used ? */
+		struct {
+			int32_t	__spare1__;
+			int	__spare2__[7];
+		} __spare__;
+	} _reason;
+};
+#endif
 
 /** si_code **/
 /* codes for SIGILL */
@@ -338,6 +517,7 @@ struct __siginfo;
 /*
  * Signal vector "template" used in sigaction call.
  */
+#ifndef _KERNEL
 struct sigaction {
 	union {
 		void    (*__sa_handler)(int);
@@ -346,6 +526,32 @@ struct sigaction {
 	int	sa_flags;		/* see signal options below */
 	sigset_t sa_mask;		/* signal mask to apply */
 };
+#else
+#if __has_feature(capabilities)
+struct sigaction_c {
+	union {
+		void    (* __capability __sa_handler)(int);
+		void    (* __capability __sa_sigaction)
+			    (int, struct __siginfo *, void *);
+	} __sigaction_u;		/* signal handler */
+	int	sa_flags;		/* see signal options below */
+	sigset_t sa_mask;		/* signal mask to apply */
+};
+#endif
+struct sigaction_native {
+	union {
+		void    (*__sa_handler)(int);
+		void    (*__sa_sigaction)(int, struct __siginfo *, void *);
+	} __sigaction_u;		/* signal handler */
+	int	sa_flags;		/* see signal options below */
+	sigset_t sa_mask;		/* signal mask to apply */
+};
+#if __has_feature(capabilities)
+typedef struct sigaction_c	ksigaction_t;
+#else
+typedef	struct sigaction_native	ksigaction_t;
+#endif
+#endif
 
 #define	sa_handler	__sigaction_u.__sa_handler
 #endif
@@ -390,7 +596,7 @@ struct sigaction {
 #endif
 
 #if __BSD_VISIBLE
-typedef	__sighandler_t	*sig_t;	/* type of pointer to a signal function */
+typedef	__sighandler_t	* __kerncap sig_t;	/* type of pointer to a signal function */
 typedef	void __siginfohandler_t(int, struct __siginfo *, void *);
 #endif
 
@@ -412,10 +618,18 @@ typedef	struct __stack_t stack_t;
  * tag is actually sigaltstack.
  */
 struct __stack_t {
+	void * __kerncap ss_sp;		/* signal stack base */
+	__size_t ss_size;		/* signal stack length */
+	int	ss_flags;		/* SS_DISABLE and/or SS_ONSTACK */
+};
+
+#ifdef _KERNEL
+struct sigaltstack_native {
 	void	*ss_sp;			/* signal stack base */
 	__size_t ss_size;		/* signal stack length */
 	int	ss_flags;		/* SS_DISABLE and/or SS_ONSTACK */
 };
+#endif
 
 #if __BSD_VISIBLE
 /*
@@ -483,5 +697,9 @@ struct sigstack {
 __BEGIN_DECLS
 __sighandler_t *signal(int, __sighandler_t *);
 __END_DECLS
+
+#ifdef _KERNEL
+int	convert_sigevent(const struct sigevent_native *, ksigevent_t *);
+#endif
 
 #endif /* !_SYS_SIGNAL_H_ */

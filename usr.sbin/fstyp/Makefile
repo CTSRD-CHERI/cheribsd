@@ -15,11 +15,10 @@ WARNS?=	2
 
 .include <bsd.endian.mk>
 
-.if ${MK_TESTS} != "no" && ${TARGET_ENDIANNESS} == 1234
-SUBDIR+=	tests
+.if ${TARGET_ENDIANNESS} == 1234
+HAS_TESTS=
+SUBDIR.${MK_TESTS}+= tests
 .endif
-
-CFLAGS+=-I${SRCTOP}/sys
 
 .if ${MK_ZFS} != "no"
 IGNORE_PRAGMA=  YES
@@ -35,6 +34,8 @@ CFLAGS+= -I${SRCTOP}/sys/cddl/contrib/opensolaris/uts/common
 CFLAGS+= -I${SRCTOP}/sys/cddl/contrib/opensolaris/uts/common/sys
 CFLAGS+= -I${SRCTOP}/cddl/contrib/opensolaris/head
 .endif
+
+CFLAGS+=-I${SRCTOP}/sys
 
 LIBADD=	geom md
 

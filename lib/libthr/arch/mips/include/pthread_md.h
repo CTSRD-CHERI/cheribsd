@@ -26,6 +26,19 @@
  * from: src/lib/libthr/arch/arm/include/pthread_md.h,v 1.3 2005/10/29 13:40:31 davidxu
  * $FreeBSD$
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_size",
+ *     "unsupported"
+ *   ],
+ *   "change_comment": "TLS alignment, non-capability based TLS interface",
+ *   "hybrid_specific": false
+ * }
+ * CHERI CHANGES END
+ */
 
 /*
  * Machine-dependent thread prototypes/definitions.

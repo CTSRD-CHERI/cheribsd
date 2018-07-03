@@ -29,6 +29,16 @@
   *
   * $FreeBSD$
   */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #ifndef lint
 static char sccsid[] = "@(#) options.c 1.17 96/02/11 17:01:31";
@@ -71,8 +81,8 @@ extern jmp_buf tcpd_buf;		/* tcpd_jump() support */
 static char whitespace_eq[] = "= \t\r\n";
 #define whitespace (whitespace_eq + 1)
 
-static char *get_field();		/* chew :-delimited field off string */
-static char *chop_string();		/* strip leading and trailing blanks */
+static char *get_field(char *string);		/* chew :-delimited field off string */
+static char *chop_string(char *string);		/* strip leading and trailing blanks */
 
 /* List of functions that implement the options. Add yours here. */
 

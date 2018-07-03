@@ -43,13 +43,12 @@ builtins.h: .NOMETA
 builtins.c builtins.h: mkbuiltins builtins.def
 	sh ${.CURDIR}/mkbuiltins ${.CURDIR}
 
-# XXX this is just to stop the default .c rule being used, so that the
-# intermediate object has a fixed name.
-# XXX we have a default .c rule, but no default .o rule.
-mknodes.o mksyntax.o: ${BUILD_TOOLS_META}
-	${CC} ${CFLAGS} ${LDFLAGS} ${.IMPSRC} ${LDLIBS} -o ${.TARGET}
-mknodes: mknodes.o ${BUILD_TOOLS_META}
-mksyntax: mksyntax.o ${BUILD_TOOLS_META}
+mknodes: mknodes.c ${BUILD_TOOLS_META}
+	${BUILD_TOOLS_CC} ${BUILD_TOOLS_CFLAGS} ${BUILD_TOOLS_LDFLAGS} \
+	    ${.ALLSRC:[1]} -o ${.TARGET}
+mksyntax: mksyntax.c ${BUILD_TOOLS_META}
+	${BUILD_TOOLS_CC} ${BUILD_TOOLS_CFLAGS} ${BUILD_TOOLS_LDFLAGS} \
+	    ${.ALLSRC:[1]} -o ${.TARGET}
 
 .ORDER: nodes.c nodes.h
 nodes.h: .NOMETA
@@ -64,9 +63,8 @@ syntax.c syntax.h: mksyntax
 token.h: mktokens
 	sh ${.CURDIR}/mktokens
 
-.if ${MK_TESTS} != "no"
-SUBDIR+=    tests
-.endif
+HAS_TESTS=
+SUBDIR.${MK_TESTS}+= tests
 
 WANT_DUMP=	yes
 

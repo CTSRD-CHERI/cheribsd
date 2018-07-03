@@ -291,12 +291,11 @@ nbssn_recvhdr(struct nbpcb *nbp, int *lenp,
 {
 	struct socket *so = nbp->nbp_tso;
 	struct uio auio;
-	struct iovec aio;
+	kiovec_t aio;
 	u_int32_t len;
 	int error;
 
-	aio.iov_base = (caddr_t)&len;
-	aio.iov_len = sizeof(len);
+	IOVEC_INIT_OBJ(&aio, len);
 	auio.uio_iov = &aio;
 	auio.uio_iovcnt = 1;
 	auio.uio_segflg = UIO_SYSSPACE;

@@ -11,8 +11,10 @@ SRCS+=	cheritest_bounds_globals.c					\
 	cheritest_ccall.c						\
 	cheritest_fault.c						\
 	cheritest_fd.c							\
+	cheritest_kbounce.c						\
 	cheritest_libcheri.c						\
 	cheritest_libcheri_cxx.cc					\
+	cheritest_libcheri_fault.c					\
 	cheritest_libcheri_local.c					\
 	cheritest_libcheri_trustedstack.c				\
 	cheritest_libcheri_var.c					\
@@ -39,10 +41,21 @@ SRCS+=	cheritest_cheriabi_open.c
 CFLAGS+=	-DCHERIABI_TESTS
 .endif
 
+.ifndef BOOTSTRAPPING
+.PATH: ${SRCTOP}/sys/mips/cheri
+SRCS+=	cheri_memcpy_c.S
+CFLAGS.cheri_memcpy_c.S=-D__KERN_FUNC_PREFIX -D_KERNEL -DINVARIANTS
+CFLAGS+=	-DKERNEL_MEMCPY_TESTS
+.else
+.endif
+
 .ifdef CHERI_C_TESTS
 CHERI_C_TESTS_DIR=	${SRCTOP}/contrib/cheri-c-tests
 .if exists(${CHERI_C_TESTS_DIR}/Makefile)
-.PATH: ${CHERI_C_TESTS_DIR}
+.PATH: ${CHERI_C_TESTS_DIR} \
+		${CHERI_C_TESTS_DIR}/clang-hybrid \
+		${CHERI_C_TESTS_DIR}/clang-purecap \
+		${CHERI_C_TESTS_DIR}/libc
 CFLAGS+=	-DCHERI_C_TESTS \
 		-I${CHERI_C_TESTS_DIR}
 

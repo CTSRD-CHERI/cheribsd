@@ -18,6 +18,18 @@
  *
  *******************************************************************************
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_bit_flags",
+ *     "pointer_size",
+ *     "virtual_address"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #ifndef RB_H_
 #define RB_H_

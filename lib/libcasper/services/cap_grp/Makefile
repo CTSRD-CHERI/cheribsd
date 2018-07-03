@@ -5,12 +5,15 @@ SHLIBDIR?=	/lib/casper
 .include <src.opts.mk>
 
 PACKAGE=libcasper
-LIB=	cap_grp
 
 SHLIB_MAJOR=	0
 INCSDIR?=	${INCLUDEDIR}/casper
 
+.if ${MK_CASPER} != "no"
+LIB=	cap_grp
+
 SRCS=	cap_grp.c
+.endif
 
 INCS=	cap_grp.h
 
@@ -18,8 +21,7 @@ LIBADD=	nv
 
 CFLAGS+=-I${.CURDIR}
 
-.if ${MK_TESTS} != "no"
-SUBDIR+=	tests
-.endif
+HAS_TESTS=
+SUBDIR.${MK_TESTS}+= tests
 
 .include <bsd.lib.mk>

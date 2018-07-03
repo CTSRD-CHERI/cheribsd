@@ -43,7 +43,7 @@ __FBSDID("$FreeBSD$");
  * Compare strings.
  */
 int
-__CAPSUFFIX(strcmp)(__CAP const char *s1, __CAP const char *s2)
+__CAPSUFFIX(strcmp)(const char * __CAP s1, const char * __CAP s2)
 {
 
 	while (*s1 == *s2) {
@@ -51,6 +51,6 @@ __CAPSUFFIX(strcmp)(__CAP const char *s1, __CAP const char *s2)
 		if (*s1++ == '\0')
 			return (0);
 	}
-	return (*(__CAP const unsigned char *)s1 -
-	    *(__CAP const unsigned char *)s2);
+	return (*(const unsigned char * __CAP)s1 -
+	    *(const unsigned char * __CAP)s2);
 }

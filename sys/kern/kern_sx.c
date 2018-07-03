@@ -142,13 +142,13 @@ struct lock_class lock_class_sx = {
 #endif
 
 #ifdef ADAPTIVE_SX
-static u_int asx_retries = 10;
-static u_int asx_loops = 10000;
+static __read_frequently u_int asx_retries = 10;
+static __read_frequently u_int asx_loops = 10000;
 static SYSCTL_NODE(_debug, OID_AUTO, sx, CTLFLAG_RD, NULL, "sxlock debugging");
 SYSCTL_UINT(_debug_sx, OID_AUTO, retries, CTLFLAG_RW, &asx_retries, 0, "");
 SYSCTL_UINT(_debug_sx, OID_AUTO, loops, CTLFLAG_RW, &asx_loops, 0, "");
 
-static struct lock_delay_config __read_mostly sx_delay;
+static struct lock_delay_config __read_frequently sx_delay;
 
 SYSCTL_INT(_debug_sx, OID_AUTO, delay_base, CTLFLAG_RW, &sx_delay.base,
     0, "");
@@ -295,7 +295,8 @@ _sx_xlock(struct sx *sx, int opts, const char *file, int line)
 	uintptr_t tid, x;
 	int error = 0;
 
-	KASSERT(kdb_active != 0 || !TD_IS_IDLETHREAD(curthread),
+	KASSERT(kdb_active != 0 || SCHEDULER_STOPPED() ||
+	    !TD_IS_IDLETHREAD(curthread),
 	    ("sx_xlock() by idle thread %p on sx %s @ %s:%d",
 	    curthread, sx->lock_object.lo_name, file, line));
 	KASSERT(sx->sx_lock != SX_LOCK_DESTROYED,
@@ -332,7 +333,7 @@ sx_try_xlock_(struct sx *sx, const char *file, int line)
 	if (SCHEDULER_STOPPED_TD(td))
 		return (1);
 
-	KASSERT(kdb_active != 0 || !TD_IS_IDLETHREAD(curthread),
+	KASSERT(kdb_active != 0 || !TD_IS_IDLETHREAD(td),
 	    ("sx_try_xlock() by idle thread %p on sx %s @ %s:%d",
 	    curthread, sx->lock_object.lo_name, file, line));
 	KASSERT(sx->sx_lock != SX_LOCK_DESTROYED,
@@ -501,7 +502,7 @@ _sx_xlock_hard(struct sx *sx, uintptr_t x, uintptr_t tid, int opts,
 	GIANT_DECLARE;
 #ifdef ADAPTIVE_SX
 	volatile struct thread *owner;
-	u_int i, spintries = 0;
+	u_int i, n, spintries = 0;
 #endif
 #ifdef LOCK_PROFILING
 	uint64_t waittime = 0;
@@ -599,23 +600,23 @@ _sx_xlock_hard(struct sx *sx, uintptr_t x, uintptr_t tid, int opts,
 				    "lockname:\"%s\"", sx->lock_object.lo_name);
 				GIANT_SAVE();
 				spintries++;
-				for (i = 0; i < asx_loops; i++) {
+				for (i = 0; i < asx_loops; i += n) {
 					if (LOCK_LOG_TEST(&sx->lock_object, 0))
 						CTR4(KTR_LOCK,
 				    "%s: shared spinning on %p with %u and %u",
 						    __func__, sx, spintries, i);
-					x = sx->sx_lock;
+					n = SX_SHARERS(x);
+					lock_delay_spin(n);
+					x = SX_READ_VALUE(sx);
 					if (ptr_get_flag(x, SX_LOCK_SHARED) == 0 ||
 					    SX_SHARERS(x) == 0)
 						break;
-					cpu_spinwait();
-#ifdef KDTRACE_HOOKS
-					lda.spin_cnt++;
-#endif
 				}
+#ifdef KDTRACE_HOOKS
+				lda.spin_cnt += i;
+#endif
 				KTR_STATE0(KTR_SCHED, "thread",
 				    sched_tdname(curthread), "running");
-				x = SX_READ_VALUE(sx);
 				if (i != asx_loops)
 					continue;
 			}
@@ -1034,7 +1035,8 @@ _sx_slock(struct sx *sx, int opts, const char *file, int line)
 	uintptr_t x;
 	int error;
 
-	KASSERT(kdb_active != 0 || !TD_IS_IDLETHREAD(curthread),
+	KASSERT(kdb_active != 0 || SCHEDULER_STOPPED() ||
+	    !TD_IS_IDLETHREAD(curthread),
 	    ("sx_slock() by idle thread %p on sx %s @ %s:%d",
 	    curthread, sx->lock_object.lo_name, file, line));
 	KASSERT(sx->sx_lock != SX_LOCK_DESTROYED,

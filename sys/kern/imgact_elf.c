@@ -450,8 +450,7 @@ __elfN(map_partial)(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		if (sf == NULL)
 			return (KERN_FAILURE);
 		off = offset - trunc_page(offset);
-		error = copyout((caddr_t)sf_buf_kva(sf) + off,
-		    (caddr_t)cheri_kern_ptr(start, end - start),
+		error = copyout_implicit_cap((caddr_t)sf_buf_kva(sf) + off, (caddr_t)start,
 		    end - start);
 		vm_imgact_unmap_page(sf);
 		if (error != 0)
@@ -507,8 +506,8 @@ __elfN(map_insert)(struct image_params *imgp, vm_map_t map, vm_object_t object,
 			sz = end - start;
 			if (sz > PAGE_SIZE - off)
 				sz = PAGE_SIZE - off;
-			error = copyout((caddr_t)sf_buf_kva(sf) + off,
-				(caddr_t)cheri_kern_ptr(start, sz), sz);
+			error = copyout_implicit_cap((caddr_t)sf_buf_kva(sf) + off,
+			    (caddr_t)start, sz);
 			vm_imgact_unmap_page(sf);
 			if (error != 0)
 				return (KERN_FAILURE);
@@ -625,8 +624,8 @@ __elfN(load_section)(struct image_params *imgp, vm_ooffset_t offset,
 		/* send the page fragment to user space */
 		off = trunc_page_ps(offset + filsz, pagesize) -
 		    trunc_page(offset + filsz);
-		error = copyout((caddr_t)sf_buf_kva(sf) + off,
-		    (caddr_t)cheri_kern_ptr(map_addr, copy_len), copy_len);
+		error = copyout_implicit_cap((caddr_t)sf_buf_kva(sf) + off,
+		    (caddr_t)map_addr, copy_len);
 		vm_imgact_unmap_page(sf);
 		if (error != 0)
 			return (error);
@@ -755,9 +754,6 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 		if (phdr[i].p_type == PT_LOAD && phdr[i].p_memsz != 0) {
 			/* Loadable segment */
 			prot = __elfN(trans_prot)(phdr[i].p_flags);
-			/* XXX-BD: .text currently contains relocations. */
-			if (p->p_sysent->sv_flags & SV_CHERI)
-				prot |= PROT_WRITE;
 			error = __elfN(load_section)(imgp, phdr[i].p_offset,
 			    (caddr_t)(uintptr_t)phdr[i].p_vaddr + rbase,
 			    phdr[i].p_memsz, phdr[i].p_filesz, prot, pagesize);
@@ -948,25 +944,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 			if (phdr[i].p_memsz == 0)
 				break;
 			prot = __elfN(trans_prot)(phdr[i].p_flags);
-#ifdef COMPAT_CHERIABI
-			/*
-			 * XXX-BD: we need to be able to write to .rodata
-			 * to initalize capabilities.  For now, just make
-			 * all sections writiable.  We will want to add a
-			 * a new .rocapdata or the like which starts RW
-			 * and gets mapped RO by the appropriate startup
-			 * code after initalization.
-			 */
-			/* XXXAR: use PT_GNU_RELRO once we change to lld? */
-			if ((brand_info->sysvec->sv_flags & SV_CHERI) &&
-			    !(prot & PF_W)) {
-				prot |= PF_W;
-				/*
-				 * XXX-BD: how to tell the process we did
-				 * this?
-				 */
-			}
-#endif
 			error = __elfN(load_section)(imgp, phdr[i].p_offset,
 			    (caddr_t)(uintptr_t)phdr[i].p_vaddr + et_dyn_addr,
 			    phdr[i].p_memsz, phdr[i].p_filesz, prot,
@@ -1156,9 +1133,7 @@ __elfN(set_auxargs)(Elf_Addr *pos, struct image_params *imgp)
 	AUXARGS_ENTRY(pos, AT_FLAGS, args->flags);
 	AUXARGS_ENTRY(pos, AT_ENTRY, args->entry);
 	AUXARGS_ENTRY(pos, AT_BASE, args->base);
-#ifdef AT_EHDRFLAGS
 	AUXARGS_ENTRY(pos, AT_EHDRFLAGS, args->hdr_eflags);
-#endif
 	if (imgp->execpathp != 0)
 		AUXARGS_ENTRY(pos, AT_EXECPATH, imgp->execpathp);
 	AUXARGS_ENTRY(pos, AT_OSRELDATE,
@@ -1179,6 +1154,10 @@ __elfN(set_auxargs)(Elf_Addr *pos, struct image_params *imgp)
 	AUXARGS_ENTRY(pos, AT_STACKPROT, imgp->sysent->sv_shared_page_obj
 	    != NULL && imgp->stack_prot != 0 ? imgp->stack_prot :
 	    imgp->sysent->sv_stackprot);
+	if (imgp->sysent->sv_hwcap != NULL)
+		AUXARGS_ENTRY(pos, AT_HWCAP, *imgp->sysent->sv_hwcap);
+	if (imgp->sysent->sv_hwcap2 != NULL)
+		AUXARGS_ENTRY(pos, AT_HWCAP2, *imgp->sysent->sv_hwcap2);
 	AUXARGS_ENTRY(pos, AT_NULL, 0);
 
 	free(imgp->auxargs, M_TEMP);
@@ -1940,6 +1919,7 @@ __elfN(putnote)(struct note_info *ninfo, struct sbuf *sb)
 
 #if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
 #include <compat/freebsd32/freebsd32.h>
+#include <compat/freebsd32/freebsd32_signal.h>
 
 typedef struct prstatus32 elf_prstatus_t;
 typedef struct prpsinfo32 elf_prpsinfo_t;
@@ -2116,13 +2096,17 @@ __elfN(note_ptlwpinfo)(void *arg, struct sbuf *sb, size_t *sizep)
 	struct thread *td;
 	size_t size;
 	int structsize;
+#if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
+	struct ptrace_lwpinfo32 pl;
+#else
 	struct ptrace_lwpinfo pl;
+#endif
 
 	td = (struct thread *)arg;
-	size = sizeof(structsize) + sizeof(struct ptrace_lwpinfo);
+	size = sizeof(structsize) + sizeof(pl);
 	if (sb != NULL) {
 		KASSERT(*sizep == size, ("invalid size"));
-		structsize = sizeof(struct ptrace_lwpinfo);
+		structsize = sizeof(pl);
 		sbuf_bcat(sb, &structsize, sizeof(structsize));
 		bzero(&pl, sizeof(pl));
 		pl.pl_lwpid = td->td_tid;
@@ -2132,11 +2116,15 @@ __elfN(note_ptlwpinfo)(void *arg, struct sbuf *sb, size_t *sizep)
 		if (td->td_si.si_signo != 0) {
 			pl.pl_event = PL_EVENT_SIGNAL;
 			pl.pl_flags |= PL_FLAG_SI;
-			pl.pl_siginfo = td->td_si;
+#if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
+			siginfo_to_siginfo32(&td->td_si, &pl.pl_siginfo);
+#else
+			siginfo_to_siginfo_native(&td->td_si, &pl.pl_siginfo);
+#endif
 		}
 		strcpy(pl.pl_tdname, td->td_name);
 		/* XXX TODO: supply more information in struct ptrace_lwpinfo*/
-		sbuf_bcat(sb, &pl, sizeof(struct ptrace_lwpinfo));
+		sbuf_bcat(sb, &pl, sizeof(pl));
 	}
 	*sizep = size;
 }

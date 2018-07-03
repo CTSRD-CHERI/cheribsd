@@ -250,6 +250,7 @@ struct xvnode {
 #define	VV_DELETED	0x0400	/* should be removed */
 #define	VV_MD		0x0800	/* vnode backs the md device */
 #define	VV_FORCEINSMQ	0x1000	/* force the insmntque to succeed */
+#define	VV_READLINK	0x2000	/* fdescfs linux vnode */
 
 #define	VMP_TMPMNTFREELIST	0x0001	/* Vnode is on mnt's tmp free list */
 
@@ -398,6 +399,7 @@ extern int		vttoif_tab[];
 #define	V_NORMAL	0x0004	/* vinvalbuf: invalidate only regular bufs */
 #define	V_CLEANONLY	0x0008	/* vinvalbuf: invalidate only clean bufs */
 #define	V_VMIO		0x0010	/* vinvalbuf: called during pageout */
+#define	V_ALLOWCLEAN	0x0020	/* vinvalbuf: allow clean buffers after flush */
 #define	REVOKEALL	0x0001	/* vop_revoke: revoke all aliases */
 #define	V_WAIT		0x0001	/* vn_start_write: sleep for suspend */
 #define	V_NOWAIT	0x0002	/* vn_start_write: don't sleep for suspend */

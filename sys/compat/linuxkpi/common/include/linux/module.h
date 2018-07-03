@@ -37,6 +37,7 @@
 
 #include <linux/list.h>
 #include <linux/compiler.h>
+#include <linux/kmod.h>
 #include <linux/kobject.h>
 #include <linux/sysfs.h>
 #include <linux/moduleparam.h>
@@ -100,5 +101,7 @@ _module_run(void *arg)
 #define	module_get(module)
 #define	module_put(module)
 #define	try_module_get(module)	1
+
+#define	postcore_initcall(fn)	module_init(fn)
 
 #endif	/* _LINUX_MODULE_H_ */

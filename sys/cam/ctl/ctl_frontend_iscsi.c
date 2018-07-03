@@ -1308,18 +1308,17 @@ cfiscsi_session_delete(struct cfiscsi_session *cs)
 	KASSERT(TAILQ_EMPTY(&cs->cs_waiting_for_data_out),
 	    ("destroying session with non-empty queue"));
 
+	mtx_lock(&softc->lock);
+	TAILQ_REMOVE(&softc->sessions, cs, cs_next);
+	mtx_unlock(&softc->lock);
+
 	cfiscsi_session_unregister_initiator(cs);
 	if (cs->cs_target != NULL)
 		cfiscsi_target_release(cs->cs_target);
 	icl_conn_close(cs->cs_conn);
 	icl_conn_free(cs->cs_conn);
-
-	mtx_lock(&softc->lock);
-	TAILQ_REMOVE(&softc->sessions, cs, cs_next);
-	cv_signal(&softc->sessions_cv);
-	mtx_unlock(&softc->lock);
-
 	free(cs, M_CFISCSI);
+	cv_signal(&softc->sessions_cv);
 }
 
 static int
@@ -1864,7 +1863,8 @@ cfiscsi_ioctl_listen(struct ctl_iscsi *ci)
 		return;
 	}
 
-	error = getsockaddr(&sa, (void *)cilp->addr, cilp->addrlen);
+	error = getsockaddr(&sa, __USER_CAP(cilp->addr, cilp->addrlen),
+	    cilp->addrlen);
 	if (error != 0) {
 		CFISCSI_DEBUG("getsockaddr, error %d", error);
 		snprintf(ci->error_str, sizeof(ci->error_str), "getsockaddr failed");

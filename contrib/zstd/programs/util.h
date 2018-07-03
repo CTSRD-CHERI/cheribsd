@@ -1,12 +1,10 @@
-/**
- * util.h - utility functions
- *
- * Copyright (c) 2016-present, Przemyslaw Skibinski, Yann Collet, Facebook, Inc.
+/*
+ * Copyright (c) 2016-present, Yann Collet, Facebook, Inc.
  * All rights reserved.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under both the BSD-style license (found in the
+ * LICENSE file in the root directory of this source tree) and the GPLv2 (found
+ * in the COPYING file in the root directory of this source tree).
  */
 
 #ifndef UTIL_H_MODULE
@@ -208,7 +206,7 @@ UTIL_STATIC int UTIL_getFileStat(const char* infilename, stat_t *statbuf)
 }
 
 
-UTIL_STATIC int UTIL_isRegFile(const char* infilename)
+UTIL_STATIC int UTIL_isRegularFile(const char* infilename)
 {
     stat_t statbuf;
     return UTIL_getFileStat(infilename, &statbuf); /* Only need to know whether it is a regular file */
@@ -609,7 +607,7 @@ UTIL_STATIC int UTIL_countPhysicalCores(void)
 
     /* try to determine if there's hyperthreading */
     {   FILE* const cpuinfo = fopen("/proc/cpuinfo", "r");
-        size_t const BUF_SIZE = 80;
+#define BUF_SIZE 80
         char buff[BUF_SIZE];
 
         int siblings = 0;

@@ -108,7 +108,7 @@ fuse_read_biobackend(struct vnode *vp, struct uio *uio,
     struct ucred *cred, struct fuse_filehandle *fufh);
 static int 
 fuse_write_directbackend(struct vnode *vp, struct uio *uio,
-    struct ucred *cred, struct fuse_filehandle *fufh);
+    struct ucred *cred, struct fuse_filehandle *fufh, int ioflag);
 static int 
 fuse_write_biobackend(struct vnode *vp, struct uio *uio,
     struct ucred *cred, struct fuse_filehandle *fufh, int ioflag);
@@ -156,7 +156,7 @@ fuse_io_dispatch(struct vnode *vp, struct uio *uio, int ioflag,
 		if (directio) {
 			FS_DEBUG("direct write of vnode %ju via file handle %ju\n",
 			    (uintmax_t)VTOILLU(vp), (uintmax_t)fufh->fh_id);
-			err = fuse_write_directbackend(vp, uio, cred, fufh);
+			err = fuse_write_directbackend(vp, uio, cred, fufh, ioflag);
 		} else {
 			FS_DEBUG("buffered write of vnode %ju\n", 
 			      (uintmax_t)VTOILLU(vp));
@@ -318,7 +318,7 @@ out:
 
 static int
 fuse_write_directbackend(struct vnode *vp, struct uio *uio,
-    struct ucred *cred, struct fuse_filehandle *fufh)
+    struct ucred *cred, struct fuse_filehandle *fufh, int ioflag)
 {
 	struct fuse_vnode_data *fvdat = VTOFUD(vp);
 	struct fuse_write_in *fwi;
@@ -327,8 +327,10 @@ fuse_write_directbackend(struct vnode *vp, struct uio *uio,
 	int diff;
 	int err = 0;
 
-	if (!uio->uio_resid)
+	if (uio->uio_resid == 0)
 		return (0);
+	if (ioflag & IO_APPEND)
+		uio_setoffset(uio, fvdat->filesize);
 
 	fdisp_init(&fdi, 0);
 
@@ -606,7 +608,7 @@ fuse_io_strategy(struct vnode *vp, struct buf *bp)
 	struct ucred *cred;
 	struct uio *uiop;
 	struct uio uio;
-	struct iovec io;
+	kiovec_t io;
 	int error = 0;
 
 	const int biosize = fuse_iosize(vp);
@@ -644,8 +646,8 @@ fuse_io_strategy(struct vnode *vp, struct buf *bp)
 	KASSERT(!(bp->b_flags & B_DONE),
 	    ("fuse_io_strategy: bp %p already marked done", bp));
 	if (bp->b_iocmd == BIO_READ) {
-		io.iov_len = uiop->uio_resid = bp->b_bcount;
-		io.iov_base = bp->b_data;
+		IOVEC_INIT(&io, bp->b_data, bp->b_bcount);
+		uiop->uio_resid = bp->b_bcount;
 		uiop->uio_rw = UIO_READ;
 
 		uiop->uio_offset = ((off_t)bp->b_blkno) * biosize;
@@ -698,14 +700,14 @@ fuse_io_strategy(struct vnode *vp, struct buf *bp)
 				(off_t)bp->b_blkno * biosize;
 
 		if (bp->b_dirtyend > bp->b_dirtyoff) {
-			io.iov_len = uiop->uio_resid = bp->b_dirtyend
-			    - bp->b_dirtyoff;
+			uiop->uio_resid = bp->b_dirtyend - bp->b_dirtyoff;
 			uiop->uio_offset = (off_t)bp->b_blkno * biosize
 			    + bp->b_dirtyoff;
-			io.iov_base = (char *)bp->b_data + bp->b_dirtyoff;
+			IOVEC_INIT(&io, (char *)bp->b_data + bp->b_dirtyoff,
+			    uiop->uio_resid);
 			uiop->uio_rw = UIO_WRITE;
 
-			error = fuse_write_directbackend(vp, uiop, cred, fufh);
+			error = fuse_write_directbackend(vp, uiop, cred, fufh, 0);
 
 			if (error == EINTR || error == ETIMEDOUT
 			    || (!error && (bp->b_flags & B_NEEDCOMMIT))) {

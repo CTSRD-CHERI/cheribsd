@@ -541,7 +541,7 @@ fddi_ioctl (ifp, command, data)
 	error = 0;
 
 	switch (command) {
-	case SIOCSIFADDR:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
 		ifp->if_flags |= IFF_UP;
 
 		switch (ifa->ifa_addr->sa_family) {
@@ -556,23 +556,17 @@ fddi_ioctl (ifp, command, data)
 			break;
 		}
 		break;
-	case SIOCGIFADDR: {
-			struct sockaddr *sa;
-
-			sa = (struct sockaddr *) & ifr->ifr_data;
-			bcopy(IF_LLADDR(ifp),
-			      (caddr_t) sa->sa_data, FDDI_ADDR_LEN);
-
-		}
+	CASE_IOC_IFREQ(SIOCGIFADDR):
+		bcopy(IF_LLADDR(ifp), ifr_addr_get_data(ifr), FDDI_ADDR_LEN);
 		break;
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		/*
 		 * Set the interface MTU.
 		 */
-		if (ifr->ifr_mtu > FDDIMTU) {
+		if (ifr_mtu_get(ifr) > FDDIMTU) {
 			error = EINVAL;
 		} else {
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 		}
 		break;
 	default:

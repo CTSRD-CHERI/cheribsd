@@ -479,14 +479,14 @@ oce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		rc = ifmedia_ioctl(ifp, ifr, &sc->media, command);
 		break;
 
-	case SIOCSIFMTU:
-		if (ifr->ifr_mtu > OCE_MAX_MTU)
+	CASE_IOC_IFREQ(SIOCSIFMTU):
+		if (ifr_mtu_get(ifr) > OCE_MAX_MTU)
 			rc = EINVAL;
 		else
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(ifr);
 		break;
 
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		if (ifp->if_flags & IFF_UP) {
 			if (!(ifp->if_drv_flags & IFF_DRV_RUNNING)) {
 				sc->ifp->if_drv_flags |= IFF_DRV_RUNNING;	
@@ -515,16 +515,16 @@ oce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 
 		break;
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		rc = oce_hw_update_multicast(sc);
 		if (rc)
 			device_printf(sc->dev,
 				"Update multicast address failed\n");
 		break;
 
-	case SIOCSIFCAP:
-		u = ifr->ifr_reqcap ^ ifp->if_capenable;
+	CASE_IOC_IFREQ(SIOCSIFCAP):
+		u = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 
 		if (u & IFCAP_TXCSUM) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;
@@ -581,10 +581,7 @@ oce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 
 		break;
 
-	case SIOCGPRIVATE_0:
-#ifdef CPU_CHERI
-#error Unvalidatable ifr_data use.  Unsafe with CheriABI.
-#endif
+	CASE_IOC_IFREQ(SIOCGPRIVATE_0):
 		rc = oce_handle_passthrough(ifp, data);
 		break;
 	default:
@@ -2277,21 +2274,21 @@ oce_handle_passthrough(struct ifnet *ifp, caddr_t data)
 	struct ifreq *ifr = (struct ifreq *)data;
 	int rc = ENXIO;
 	char cookie[32] = {0};
-	void *priv_data = (void *)ifr->ifr_data;
-	void *ioctl_ptr;
+	void * __capability priv_data = ifr_data_get_ptr(ifr);
+	void * __capability ioctl_ptr;
 	uint32_t req_size;
 	struct mbx_hdr req;
 	OCE_DMA_MEM dma_mem;
 	struct mbx_common_get_cntl_attr *fw_cmd;
 
-	if (copyin(priv_data, cookie, strlen(IOCTL_COOKIE)))
+	if (copyin_c(priv_data, cookie, strlen(IOCTL_COOKIE)))
 		return EFAULT;
 
 	if (memcmp(cookie, IOCTL_COOKIE, strlen(IOCTL_COOKIE)))
 		return EINVAL;
 
-	ioctl_ptr = (char *)priv_data + strlen(IOCTL_COOKIE);
-	if (copyin(ioctl_ptr, &req, sizeof(struct mbx_hdr)))
+	ioctl_ptr = (char * __capability)priv_data + strlen(IOCTL_COOKIE);
+	if (copyin_c(ioctl_ptr, &req, sizeof(struct mbx_hdr)))
 		return EFAULT;
 
 	req_size = le32toh(req.u0.req.request_length);
@@ -2303,7 +2300,7 @@ oce_handle_passthrough(struct ifnet *ifp, caddr_t data)
 	if (rc)
 		return ENOMEM;
 
-	if (copyin(ioctl_ptr, OCE_DMAPTR(&dma_mem,char), req_size)) {
+	if (copyin_c(ioctl_ptr, (__cheri_tocap void * __capability)OCE_DMAPTR(&dma_mem,char), req_size)) {
 		rc = EFAULT;
 		goto dma_free;
 	}
@@ -2314,7 +2311,7 @@ oce_handle_passthrough(struct ifnet *ifp, caddr_t data)
 		goto dma_free;
 	}
 
-	if (copyout(OCE_DMAPTR(&dma_mem,char), ioctl_ptr, req_size))
+	if (copyout_c((__cheri_tocap void * __capability)OCE_DMAPTR(&dma_mem,char), ioctl_ptr, req_size))
 		rc =  EFAULT;
 
 	/* 
@@ -2322,7 +2319,9 @@ oce_handle_passthrough(struct ifnet *ifp, caddr_t data)
 	   the driver version..so fill it 
 	 */
 	if(req.u0.rsp.opcode == OPCODE_COMMON_GET_CNTL_ATTRIBUTES) {
-		fw_cmd = (struct mbx_common_get_cntl_attr *) ioctl_ptr;
+		/* XXX-BD: this seems to be directly acces to userspace... */
+		fw_cmd = (struct mbx_common_get_cntl_attr *)
+		(__cheri_fromcap void *) ioctl_ptr;
 		strncpy(fw_cmd->params.rsp.cntl_attr_info.hba_attr.drv_ver_str,
 			COMPONENT_REVISION, strlen(COMPONENT_REVISION));	
 	}

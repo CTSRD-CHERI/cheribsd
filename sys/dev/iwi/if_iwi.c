@@ -286,6 +286,7 @@ iwi_attach(device_t dev)
 	int i, error;
 
 	sc->sc_dev = dev;
+	sc->sc_ledevent = ticks;
 
 	IWI_LOCK_INIT(sc);
 	mbufq_init(&sc->sc_snd, ifqmaxlen);
@@ -2054,12 +2055,14 @@ iwi_ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 
 	IWI_LOCK(sc);
 	switch (cmd) {
-	case SIOCGIWISTATS:
+	CASE_IOC_IFREQ(SIOCGIWISTATS):
 		/* XXX validate permissions/memory/etc? */
-		error = copyout(&sc->sc_linkqual, ifr->ifr_data,
+		error = copyout_c(
+		    (__cheri_tocap struct iwi_notif_link_quality * __capability)
+		    &sc->sc_linkqual, ifr_data_get_ptr(ifr),
 		    sizeof(struct iwi_notif_link_quality));
 		break;
-	case SIOCZIWISTATS:
+	CASE_IOC_IFREQ(SIOCZIWISTATS):
 		memset(&sc->sc_linkqual, 0,
 		    sizeof(struct iwi_notif_link_quality));
 		error = 0;

@@ -30,6 +30,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "other"
+ *   ],
+ *   "change_comment": "workaround for aligning array on stack"
+ * }
+ * CHERI CHANGES END
+ */
 
 #if 0
 #ifndef lint
@@ -2886,7 +2897,7 @@ sourceroute(struct addrinfo *ai, char *arg, unsigned char **cpp, int *lenp, int 
 		lsrp = *cpp;
 		ep = lsrp + *lenp;
 	} else {
-		*cpp = lsrp = (char *)ALIGN(buf);
+		*cpp = lsrp = (char *)ALIGN(&buf[0]);
 		ep = lsrp + 1024;
 	}
 

@@ -33,7 +33,8 @@ NETBSD_ATF_TESTS_SH+=	symlink_test
 NETBSD_ATF_TESTS_SH+=	times_test
 NETBSD_ATF_TESTS_SH+=	truncate_test
 NETBSD_ATF_TESTS_SH+=	vnd_test
-NETBSD_ATF_TESTS_SH+=	vnode_leak_test
+# kernel panic
+#NETBSD_ATF_TESTS_SH+=	vnode_leak_test
 
 ${PACKAGE}FILES+=	h_funcs.subr
 ${PACKAGE}FILESDIR=	${TESTSDIR}
@@ -41,7 +42,13 @@ ${PACKAGE}FILESDIR=	${TESTSDIR}
 PROGS+=			h_tools
 BINDIR.h_tools=		${TESTSDIR}
 
+# NOTE: dev_t is represented by 64-bits after r321920 (it was 16-bits
+# previously).
+#
+# The old hardcoded values assume the 16-bit layout for <struct stat>.st_rdev .
 ATF_TESTS_SH_SED_mknod_test=		\
+					-e '/$${st_rdev} -eq 512/s/512/8589934592/g' \
+					-e '/$${st_rdev} -eq 514/s/514/8589934594/g' \
 					-e 's,mknod pipe p,mkfifo pipe,g' \
 					-e 's,mknod dir/pipe p,mkfifo dir/pipe,g'
 

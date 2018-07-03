@@ -1310,7 +1310,7 @@ tmpfs_reclaim(struct vop_reclaim_args *v)
 	return 0;
 }
 
-static int
+int
 tmpfs_print(struct vop_print_args *v)
 {
 	struct vnode *vp = v->a_vp;
@@ -1344,26 +1344,6 @@ tmpfs_pathconf(struct vop_pathconf_args *v)
 	error = 0;
 
 	switch (name) {
-	case _PC_LINK_MAX:
-		*retval = LINK_MAX;
-		break;
-
-	case _PC_NAME_MAX:
-		*retval = NAME_MAX;
-		break;
-
-	case _PC_PATH_MAX:
-		*retval = PATH_MAX;
-		break;
-
-	case _PC_PIPE_BUF:
-		*retval = PIPE_BUF;
-		break;
-
-	case _PC_CHOWN_RESTRICTED:
-		*retval = 1;
-		break;
-
 	case _PC_NO_TRUNC:
 		*retval = 1;
 		break;
@@ -1373,11 +1353,11 @@ tmpfs_pathconf(struct vop_pathconf_args *v)
 		break;
 
 	case _PC_FILESIZEBITS:
-		*retval = 0; /* XXX Don't know which value should I return. */
+		*retval = 64;
 		break;
 
 	default:
-		error = EINVAL;
+		error = vop_stdpathconf(v);
 	}
 
 	return error;

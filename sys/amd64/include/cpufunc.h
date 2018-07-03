@@ -63,7 +63,7 @@ breakpoint(void)
 	__asm __volatile("int $3");
 }
 
-static __inline u_int
+static __inline __pure2 u_int
 bsfl(u_int mask)
 {
 	u_int	result;
@@ -72,7 +72,7 @@ bsfl(u_int mask)
 	return (result);
 }
 
-static __inline u_long
+static __inline __pure2 u_long
 bsfq(u_long mask)
 {
 	u_long	result;
@@ -81,7 +81,7 @@ bsfq(u_long mask)
 	return (result);
 }
 
-static __inline u_int
+static __inline __pure2 u_int
 bsrl(u_int mask)
 {
 	u_int	result;
@@ -90,7 +90,7 @@ bsrl(u_int mask)
 	return (result);
 }
 
-static __inline u_long
+static __inline __pure2 u_long
 bsrq(u_long mask)
 {
 	u_long	result;
@@ -155,7 +155,7 @@ enable_intr(void)
 
 #define	HAVE_INLINE_FFSL
 
-static __inline int
+static __inline __pure2 int
 ffsl(long mask)
 {
 	return (mask == 0 ? mask : (int)bsfq((u_long)mask) + 1);
@@ -163,7 +163,7 @@ ffsl(long mask)
 
 #define	HAVE_INLINE_FFSLL
 
-static __inline int
+static __inline __pure2 int
 ffsll(long long mask)
 {
 	return (ffsl((long)mask));
@@ -171,7 +171,7 @@ ffsll(long long mask)
 
 #define	HAVE_INLINE_FLS
 
-static __inline int
+static __inline __pure2 int
 fls(int mask)
 {
 	return (mask == 0 ? mask : (int)bsrl((u_int)mask) + 1);
@@ -179,7 +179,7 @@ fls(int mask)
 
 #define	HAVE_INLINE_FLSL
 
-static __inline int
+static __inline __pure2 int
 flsl(long mask)
 {
 	return (mask == 0 ? mask : (int)bsrq((u_long)mask) + 1);
@@ -187,7 +187,7 @@ flsl(long mask)
 
 #define	HAVE_INLINE_FLSLL
 
-static __inline int
+static __inline __pure2 int
 flsll(long long mask)
 {
 	return (flsl((long)mask));
@@ -651,6 +651,38 @@ load_gs(u_short sel)
 }
 #endif
 
+static __inline uint64_t
+rdfsbase(void)
+{
+	uint64_t x;
+
+	__asm __volatile("rdfsbase %0" : "=r" (x));
+	return (x);
+}
+
+static __inline void
+wrfsbase(uint64_t x)
+{
+
+	__asm __volatile("wrfsbase %0" : : "r" (x));
+}
+
+static __inline uint64_t
+rdgsbase(void)
+{
+	uint64_t x;
+
+	__asm __volatile("rdgsbase %0" : "=r" (x));
+	return (x);
+}
+
+static __inline void
+wrgsbase(uint64_t x)
+{
+
+	__asm __volatile("wrgsbase %0" : : "r" (x));
+}
+
 static __inline void
 bare_lgdt(struct region_descriptor *addr)
 {
@@ -800,6 +832,85 @@ static __inline void
 intr_restore(register_t rflags)
 {
 	write_rflags(rflags);
+}
+
+enum {
+	SGX_ECREATE	= 0x0,
+	SGX_EADD	= 0x1,
+	SGX_EINIT	= 0x2,
+	SGX_EREMOVE	= 0x3,
+	SGX_EDGBRD	= 0x4,
+	SGX_EDGBWR	= 0x5,
+	SGX_EEXTEND	= 0x6,
+	SGX_ELDU	= 0x8,
+	SGX_EBLOCK	= 0x9,
+	SGX_EPA		= 0xA,
+	SGX_EWB		= 0xB,
+	SGX_ETRACK	= 0xC,
+};
+
+enum {
+	SGX_PT_SECS = 0x00,
+	SGX_PT_TCS  = 0x01,
+	SGX_PT_REG  = 0x02,
+	SGX_PT_VA   = 0x03,
+	SGX_PT_TRIM = 0x04,
+};
+
+int sgx_encls(uint32_t eax, uint64_t rbx, uint64_t rcx, uint64_t rdx);
+
+static __inline int
+sgx_ecreate(void *pginfo, void *secs)
+{
+
+	return (sgx_encls(SGX_ECREATE, (uint64_t)pginfo,
+	    (uint64_t)secs, 0));
+}
+
+static __inline int
+sgx_eadd(void *pginfo, void *epc)
+{
+
+	return (sgx_encls(SGX_EADD, (uint64_t)pginfo,
+	    (uint64_t)epc, 0));
+}
+
+static __inline int
+sgx_einit(void *sigstruct, void *secs, void *einittoken)
+{
+
+	return (sgx_encls(SGX_EINIT, (uint64_t)sigstruct,
+	    (uint64_t)secs, (uint64_t)einittoken));
+}
+
+static __inline int
+sgx_eextend(void *secs, void *epc)
+{
+
+	return (sgx_encls(SGX_EEXTEND, (uint64_t)secs,
+	    (uint64_t)epc, 0));
+}
+
+static __inline int
+sgx_epa(void *epc)
+{
+
+	return (sgx_encls(SGX_EPA, SGX_PT_VA, (uint64_t)epc, 0));
+}
+
+static __inline int
+sgx_eldu(uint64_t rbx, uint64_t rcx,
+    uint64_t rdx)
+{
+
+	return (sgx_encls(SGX_ELDU, rbx, rcx, rdx));
+}
+
+static __inline int
+sgx_eremove(void *epc)
+{
+
+	return (sgx_encls(SGX_EREMOVE, 0, (uint64_t)epc, 0));
 }
 
 #else /* !(__GNUCLIKE_ASM && __CC_SUPPORTS___INLINE) */

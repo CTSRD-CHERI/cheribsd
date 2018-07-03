@@ -115,6 +115,7 @@ __vdso_gettimeofday(struct timeval *tv, struct timezone *tz)
 }
 
 #pragma weak __vdso_clock_gettime
+#pragma weak _elf_aux_info
 int
 __vdso_clock_gettime(clockid_t clock_id, struct timespec *ts)
 {
@@ -122,6 +123,8 @@ __vdso_clock_gettime(clockid_t clock_id, struct timespec *ts)
 	int abs, error;
 
 	if (tk == NULL) {
+		if (_elf_aux_info == NULL)
+			return (ENOSYS);
 		error = _elf_aux_info(AT_TIMEKEEP, &tk, sizeof(tk));
 		if (error != 0 || tk == NULL)
 			return (ENOSYS);

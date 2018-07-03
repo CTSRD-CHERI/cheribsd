@@ -552,7 +552,6 @@ mlx5e_update_stats_work(struct work_struct *work)
 	    priv->stats.pport.alignment_err +
 	    priv->stats.pport.check_seq_err +
 	    priv->stats.pport.crc_align_errors +
-	    priv->stats.pport.drop_events +
 	    priv->stats.pport.in_range_len_errors +
 	    priv->stats.pport.jabbers +
 	    priv->stats.pport.out_of_range_len +
@@ -561,7 +560,8 @@ mlx5e_update_stats_work(struct work_struct *work)
 	    priv->stats.pport.too_long_errors +
 	    priv->stats.pport.undersize_pkts +
 	    priv->stats.pport.unsupported_op_rx;
-	ifp->if_iqdrops = s->rx_out_of_buffer;
+	ifp->if_iqdrops = s->rx_out_of_buffer +
+	    priv->stats.pport.drop_events;
 	ifp->if_opackets = s->tx_packets;
 	ifp->if_oerrors = s->tx_error_packets;
 	ifp->if_snd.ifq_drops = s->tx_queue_dropped;
@@ -1408,7 +1408,7 @@ mlx5e_enable_cq(struct mlx5e_cq *cq, struct mlx5e_cq_param *param, int eq_ix)
 	if (err)
 		return (err);
 
-	mlx5e_cq_arm(cq);
+	mlx5e_cq_arm(cq, MLX5_GET_DOORBELL_LOCK(&cq->priv->doorbell_lock));
 
 	return (0);
 }
@@ -2467,7 +2467,6 @@ mlx5e_get_counter(struct ifnet *ifp, ift_counter cnt)
 		    priv->stats.pport.alignment_err +
 		    priv->stats.pport.check_seq_err +
 		    priv->stats.pport.crc_align_errors +
-		    priv->stats.pport.drop_events +
 		    priv->stats.pport.in_range_len_errors +
 		    priv->stats.pport.jabbers +
 		    priv->stats.pport.out_of_range_len +
@@ -2478,7 +2477,8 @@ mlx5e_get_counter(struct ifnet *ifp, ift_counter cnt)
 		    priv->stats.pport.unsupported_op_rx;
 		break;
 	case IFCOUNTER_IQDROPS:
-		retval = priv->stats.vport.rx_out_of_buffer;
+		retval = priv->stats.vport.rx_out_of_buffer +
+		    priv->stats.pport.drop_events;
 		break;
 	case IFCOUNTER_OPACKETS:
 		retval = priv->stats.vport.tx_packets;
@@ -2541,14 +2541,14 @@ mlx5e_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		return (ENXIO);
 
 	switch (command) {
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		ifr = (struct ifreq *)data;
 
 		PRIV_LOCK(priv);
 		mlx5_query_port_max_mtu(priv->mdev, &max_mtu);
 
-		if (ifr->ifr_mtu >= MLX5E_MTU_MIN &&
-		    ifr->ifr_mtu <= MIN(MLX5E_MTU_MAX, max_mtu)) {
+		if (ifr_mtu_get(ifr) >= MLX5E_MTU_MIN &&
+		    ifr_mtu_get(ifr) <= MIN(MLX5E_MTU_MAX, max_mtu)) {
 			int was_opened;
 
 			was_opened = test_bit(MLX5E_STATE_OPENED, &priv->state);
@@ -2556,7 +2556,7 @@ mlx5e_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 				mlx5e_close_locked(ifp);
 
 			/* set new MTU */
-			mlx5e_set_dev_port_mtu(ifp, ifr->ifr_mtu);
+			mlx5e_set_dev_port_mtu(ifp, ifr_mtu_get(ifr));
 
 			if (was_opened)
 				mlx5e_open_locked(ifp);
@@ -2567,7 +2567,7 @@ mlx5e_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		PRIV_UNLOCK(priv);
 		break;
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		if ((ifp->if_flags & IFF_UP) &&
 		    (ifp->if_drv_flags & IFF_DRV_RUNNING)) {
 			mlx5e_set_rx_mode(ifp);
@@ -2593,20 +2593,20 @@ mlx5e_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		PRIV_UNLOCK(priv);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		mlx5e_set_rx_mode(ifp);
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 	case SIOCGIFXMEDIA:
 		ifr = (struct ifreq *)data;
 		error = ifmedia_ioctl(ifp, ifr, &priv->media, command);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		ifr = (struct ifreq *)data;
 		PRIV_LOCK(priv);
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 
 		if (mask & IFCAP_TXCSUM) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;
@@ -2693,14 +2693,14 @@ out:
 		PRIV_UNLOCK(priv);
 		break;
 
-	case SIOCGI2C:
+	CASE_IOC_IFREQ(SIOCGI2C):
 		ifr = (struct ifreq *)data;
 
 		/*
 		 * Copy from the user-space address ifr_data to the
 		 * kernel-space address i2c
 		 */
-		error = copyin(ifr->ifr_data, &i2c, sizeof(i2c));
+		error = copyin(ifr_data_get_ptr(ifr), &i2c, sizeof(i2c));
 		if (error)
 			break;
 
@@ -2763,7 +2763,7 @@ out:
 			goto err_i2c;
 		}
 
-		error = copyout(&i2c, ifr->ifr_data, sizeof(i2c));
+		error = copyout(&i2c, ifr_data_get_ptr(ifr), sizeof(i2c));
 err_i2c:
 		PRIV_UNLOCK(priv);
 		break;

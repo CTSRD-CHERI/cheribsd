@@ -108,7 +108,11 @@ extern "C" {
 
 #if !(defined(VMS) || defined(__VMS)) /* VMS uses logical names instead */
 #if defined(HEADER_CRYPTLIB_H) && !defined(OPENSSLDIR)
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define ENGINESDIR "/usr/libcheri/engines"
+#else
 #define ENGINESDIR "/usr/lib/engines"
+#endif
 #define OPENSSLDIR "/etc/ssl"
 #endif
 #endif

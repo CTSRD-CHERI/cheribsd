@@ -97,6 +97,7 @@ __FBSDID("$FreeBSD$");
 #include <cheri/cheric.h>
 #include <sys/user.h>
 #include <compat/cheriabi/cheriabi_ipc_shm.h>
+#include <compat/cheriabi/cheriabi_proto.h>
 #include <compat/cheriabi/cheriabi_syscall.h>
 #include <compat/cheriabi/cheriabi_util.h>
 #include <compat/cheriabi/cheriabi_sysargmap.h>
@@ -121,6 +122,11 @@ static int shmget_allocate_segment(struct thread *td,
     struct shmget_args *uap, int mode);
 static int shmget_existing(struct thread *td, struct shmget_args *uap,
     int mode, int segnum);
+static int kern_shmat(struct thread *td, int shmid,
+	const void * __capability shmaddr, int shmflg);
+static int kern_shmdt(struct thread *td, const void * __capability shmaddr);
+static int user_shmctl(struct thread *td, int shmid, int cmd,
+    struct shmid_ds * __capability ubuf);
 
 #define	SHMSEG_FREE     	0x0200
 #define	SHMSEG_REMOVED  	0x0400
@@ -354,7 +360,7 @@ shm_prison_cansee(struct prison *rpr, struct shmid_kernel *shmseg)
 }
 
 static int
-kern_shmdt_locked(struct thread *td, const void *shmaddr)
+kern_shmdt_locked(struct thread *td, const void * __capability shmaddr)
 {
 	struct proc *p = td->td_proc;
 	struct shmmap_state *shmmap_s;
@@ -400,30 +406,33 @@ struct shmdt_args {
 int
 sys_shmdt(struct thread *td, struct shmdt_args *uap)
 {
+
+	return (kern_shmdt(td, __USER_CAP_UNBOUND(uap->shmaddr)));
+}
+
+static int
+kern_shmdt(struct thread *td, const void * __capability shmaddr)
+{
 	int error;
 
 	SYSVSHM_LOCK();
-	error = kern_shmdt_locked(td, uap->shmaddr);
+	error = kern_shmdt_locked(td, shmaddr);
 	SYSVSHM_UNLOCK();
 	return (error);
 }
 
 static int
-kern_shmat_locked(struct thread *td, int shmid, const void *shmaddr,
-    int shmflg)
+kern_shmat_locked(struct thread *td, int shmid,
+    const void * __capability shmaddr, int shmflg)
 {
 	struct prison *rpr;
 	struct proc *p = td->td_proc;
 	struct shmid_kernel *shmseg;
 	struct shmmap_state *shmmap_s;
-	vm_offset_t attach_va = 0, max_va = 0;
+	vm_offset_t attach_va = 0, max_va;
 	vm_prot_t prot;
 	vm_size_t size;
 	int error, findspace, i, rv;
-#ifdef COMPAT_CHERIABI
-	void * __capability shmaddr_cap;
-	vm_offset_t cap_base;
-#endif
 
 	AUDIT_ARG_SVIPC_ID(shmid);
 	AUDIT_ARG_VALUE(shmflg);
@@ -481,34 +490,35 @@ kern_shmat_locked(struct thread *td, int shmid, const void *shmaddr,
 				attach_va = (vm_offset_t)shmaddr;
 			else
 				return (EINVAL);
-		}
+		} else
 #endif
-		if ((shmflg & SHM_RND) != 0)
-			attach_va = rounddown2((vm_offset_t)shmaddr, SHMLBA);
-		else if (((vm_offset_t)shmaddr & (SHMLBA-1)) == 0)
-			attach_va = (vm_offset_t)shmaddr;
-		else
+		{
+			if ((shmflg & SHM_RND) != 0)
+				attach_va = rounddown2((vm_offset_t)shmaddr, SHMLBA);
+			else if (((vm_offset_t)shmaddr & (SHMLBA-1)) == 0)
+				attach_va = (vm_offset_t)shmaddr;
+			else
+				return (EINVAL);
+		}
+		shmaddr = (const char * __capability)shmaddr -
+		    ((vm_offset_t)shmaddr - attach_va);
+		/*
+		 * Check that shmaddr (as adjusted for SHM_RND) has
+		 * enough space for a mapping.  For CheriABI this means
+		 * that we alread control this address space.  For
+		 * hybrid code this ensures we're inside DDC (as our
+		 * capability is DDC derived).  For existing programs
+		 * this is a nop, but for in address space compartments
+		 * where ddc is reduced, it is a security feature.
+		 *
+		 * NOTE: for CheriABI this means shmaddr must have
+		 * previously allocated so a capability exists.
+		 */
+		if (!__CAP_CHECK(shmaddr, size))
 			return (EINVAL);
-#ifdef COMPAT_CHERIABI
-		if (SV_CURPROC_FLAG(SV_CHERI)) {
-			cheriabi_fetch_syscall_arg(td, &shmaddr_cap, 1,
-			    CHERIABI_SYS_shmat_PTRMASK);
-		}
-#endif
 	} else {
 #ifdef COMPAT_CHERIABI
-		if (!SV_CURPROC_FLAG(SV_CHERI)) {
-#endif
-			findspace = VMFS_OPTIMAL_SPACE;
-			/*
-			 * This is just a hint to vm_map_find() about where to
-			 * put it.
-			 */
-			attach_va = round_page(
-			    (vm_offset_t)p->p_vmspace->vm_daddr +
-			    lim_max(td, RLIMIT_DATA));
-#ifdef COMPAT_CHERIABI
-		} else {
+		if (SV_CURPROC_FLAG(SV_CHERI)) {
 			/*
 			 * Require representable alignment for large objects
 			 * and preserve the fragmentation promoting default
@@ -519,35 +529,26 @@ kern_shmat_locked(struct thread *td, int shmid, const void *shmaddr,
 			findspace = CHERI_ALIGN_SHIFT(size) < 12 ?
 			    VMFS_OPTIMAL_SPACE :
 			    VMFS_ALIGNED_SPACE(CHERI_ALIGN_SHIFT(size));
-		}
-			shmaddr_cap = td->td_md.md_cheri_mmap_cap;
+			shmaddr = td->td_md.md_cheri_mmap_cap;
+			attach_va = cheri_getbase(shmaddr);
+		} else
 #endif
-	}
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI)) {
-		size_t cap_len, cap_offset;
-		register_t	usertag;
-
-		usertag = cheri_gettag(shmaddr_cap);
-		if (!usertag)
-			return (EINVAL);
-		cap_base = cheri_getbase(shmaddr_cap);
-		cap_len = cheri_getlen(shmaddr_cap);
-		cap_offset = cheri_getoffset(shmaddr_cap);
-		if (attach_va == 0) {
-			attach_va = cap_base;
-		} else {
-			size_t shift = (vaddr_t)shmaddr - attach_va;
-			if (cap_offset > cap_len || \
-			    cap_offset < shift || \
-			    cap_len - cap_offset + shift < size)
-				return (EINVAL);
+		{
+			findspace = VMFS_OPTIMAL_SPACE;
+			/*
+			 * This is just a hint to vm_map_find() about where to
+			 * put it.
+			 */
+			attach_va = round_page(
+			    (vm_offset_t)p->p_vmspace->vm_daddr +
+			    lim_max(td, RLIMIT_DATA));
 		}
-		max_va = cap_base + cap_len;
-		/* XXX-BD: what to do about perms? */
 	}
+#ifdef CPU_CHERI
+	max_va = cheri_getbase(shmaddr) + cheri_getlen(shmaddr);
+#else
+	max_va = 0;
 #endif
-
 	vm_object_reference(shmseg->object);
 	rv = vm_map_find(&p->p_vmspace->vm_map, shmseg->object, 0, &attach_va,
 	    size, max_va, findspace,
@@ -563,27 +564,25 @@ kern_shmat_locked(struct thread *td, int shmid, const void *shmaddr,
 	shmseg->u.shm_atime = time_second;
 	shmseg->u.shm_nattch++;
 #ifdef COMPAT_CHERIABI
-	if (!SV_CURPROC_FLAG(SV_CHERI)) {
-#endif
-		td->td_retval[0] = attach_va;
-#ifdef COMPAT_CHERIABI
-	} else {
-		shmaddr_cap = cheri_setoffset(shmaddr_cap,
-		    attach_va - cap_base);
+	if (SV_CURPROC_FLAG(SV_CHERI)) {
+		shmaddr = cheri_setoffset(shmaddr,
+		    attach_va - cheri_getbase(shmaddr));
 		if (cheriabi_sysv_shm_setbounds) {
-			shmaddr_cap = cheri_csetbounds(shmaddr_cap, 
+			shmaddr = cheri_csetbounds(shmaddr, 
 			    roundup2(shmseg->u.shm_segsz,
 			    1 << CHERI_ALIGN_SHIFT(shmseg->u.shm_segsz)));
 		}
 		/* XXX: set perms */
-		td->td_retcap = shmaddr_cap;
-	}
+		td->td_retcap = __DECONST_CAP(void * __capability, shmaddr);
+	} else
 #endif
+		td->td_retval[0] = attach_va;
 	return (error);
 }
 
-int
-kern_shmat(struct thread *td, int shmid, const void *shmaddr, int shmflg)
+static int
+kern_shmat(struct thread *td, int shmid, const void * __capability shmaddr,
+    int shmflg)
 {
 	int error;
 
@@ -604,7 +603,8 @@ int
 sys_shmat(struct thread *td, struct shmat_args *uap)
 {
 
-	return (kern_shmat(td, uap->shmid, uap->shmaddr, uap->shmflg));
+	return (kern_shmat(td, uap->shmid, __USER_CAP_UNBOUND(uap->shmaddr),
+	    uap->shmflg));
 }
 
 static int
@@ -733,6 +733,48 @@ struct shmctl_args {
 int
 sys_shmctl(struct thread *td, struct shmctl_args *uap)
 {
+
+	return (user_shmctl(td, uap->shmid, uap->cmd,
+	    __USER_CAP_OBJ(uap->buf)));
+}
+
+#ifdef COMPAT_CHERIABI
+int
+cheriabi_shmat(struct thread *td, struct cheriabi_shmat_args *uap)
+{
+	void * __capability shmaddr = uap->shmaddr;
+
+	if (shmaddr != NULL &&
+	    (cheri_getperm(shmaddr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
+		return (EPROT);
+
+	return (kern_shmat(td, uap->shmid, shmaddr, uap->shmflg));
+}
+
+int
+cheriabi_shmdt(struct thread *td, struct cheriabi_shmdt_args *uap)
+{
+	void * __capability shmaddr = uap->shmaddr;
+
+	if (shmaddr != NULL &&
+	    (cheri_getperm(shmaddr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
+		return (EPROT);
+
+	return (kern_shmdt(td, shmaddr));
+}
+
+int
+cheriabi_shmctl(struct thread *td, struct cheriabi_shmctl_args *uap)
+{
+
+	return (user_shmctl(td, uap->shmid, uap->cmd, uap->buf));
+}
+#endif
+
+static int
+user_shmctl(struct thread *td, int shmid, int cmd,
+    struct shmid_ds * __capability ubuf)
+{
 	int error;
 	struct shmid_ds buf;
 	size_t bufsz;
@@ -742,24 +784,23 @@ sys_shmctl(struct thread *td, struct shmctl_args *uap)
 	 * Linux binaries.  If we see the call come through the FreeBSD ABI,
 	 * return an error back to the user since we do not to support this.
 	 */
-	if (uap->cmd == IPC_INFO || uap->cmd == SHM_INFO ||
-	    uap->cmd == SHM_STAT)
+	if (cmd == IPC_INFO || cmd == SHM_INFO || cmd == SHM_STAT)
 		return (EINVAL);
 
 	/* IPC_SET needs to copyin the buffer before calling kern_shmctl */
-	if (uap->cmd == IPC_SET) {
-		if ((error = copyin(uap->buf, &buf, sizeof(struct shmid_ds))))
+	if (cmd == IPC_SET) {
+		if ((error = copyin_c(ubuf, &buf, sizeof(struct shmid_ds))))
 			goto done;
 	}
 
-	error = kern_shmctl(td, uap->shmid, uap->cmd, (void *)&buf, &bufsz);
+	error = kern_shmctl(td, shmid, cmd, &buf, &bufsz);
 	if (error)
 		goto done;
 
 	/* Cases in which we need to copyout */
-	switch (uap->cmd) {
+	switch (cmd) {
 	case IPC_STAT:
-		error = copyout(&buf, uap->buf, bufsz);
+		error = copyout_c(&buf, ubuf, bufsz);
 		break;
 	}
 
@@ -1038,12 +1079,14 @@ static struct syscall_helper_data shm32_syscalls[] = {
 
 #ifdef COMPAT_CHERIABI
 #include <compat/cheriabi/cheriabi.h>
+#include <compat/cheriabi/cheriabi_proto.h>
+#include <compat/cheriabi/cheriabi_syscall.h>
 
 static struct syscall_helper_data cheriabi_shm_syscalls[] = {
-	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(shmat),
-	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(shmdt),
+	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_shmat),
+	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_shmdt),
 	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(shmget),
-	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(shmctl),
+	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_shmctl),
 	SYSCALL_INIT_LAST
 };
 #endif /* COMPAT_CHERIABI */

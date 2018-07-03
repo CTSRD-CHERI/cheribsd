@@ -57,7 +57,7 @@ struct ktr_header {
 	pid_t	ktr_pid;		/* process id */
 	char	ktr_comm[MAXCOMLEN + 1];/* command name */
 	struct	timeval ktr_time;	/* timestamp */
-	intptr_t	ktr_tid;	/* was ktr_buffer */
+	long	ktr_tid;		/* thread being traced */
 };
 
 /*
@@ -297,6 +297,9 @@ struct ktr_cexception {
 #define	KTRFAC_DROP	0x20000000	/* last event was dropped */
 
 #ifdef	_KERNEL
+struct uio;
+struct vnode;
+
 void	ktrnamei(char *);
 void	ktrcsw(int, int, const char *);
 void	ktrpsig(int, sig_t, sigset_t *, int);
@@ -331,7 +334,7 @@ extern u_int ktr_geniosize;
 
 #ifdef KTRACE
 #define SYSERRCAUSE(fmt, ...) \
-        if (KTRPOINT(td, KTR_SYSERRCAUSE)) \
+        if (KTRPOINT(curthread, KTR_SYSERRCAUSE)) \
                 ktrsyserrcause("%s: " fmt, __func__, ##__VA_ARGS__);
 #else
 #define SYSERRCAUSE(fmt, ...)

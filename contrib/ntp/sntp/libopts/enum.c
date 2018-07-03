@@ -1,3 +1,15 @@
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_bit_flags"
+ *   ],
+ *   "change_comment": "",
+ *   "hybrid_specific": false
+ * }
+ * CHERI CHANGES END
+ */
 
 /**
  * \file enumeration.c
@@ -50,7 +62,7 @@ static void
 set_memb_names(tOptions * opts, tOptDesc * od, char const * const * nm_list,
                unsigned int nm_ct);
 
-static uintptr_t
+static vaddr_t
 check_membership_start(tOptDesc * od, char const ** argp, bool * invert);
 
 static uintptr_t
@@ -289,12 +301,16 @@ optionEnumerationVal(tOptions * pOpts, tOptDesc * pOD,
      *  IF the program option descriptor pointer is invalid,
      *  then it is some sort of special request.
      */
-    if (pOpts == OPTPROC_EMIT_USAGE) {
+    switch ((uintptr_t)pOpts) {
+    case (uintptr_t)OPTPROC_EMIT_USAGE:
         /*
          *  print the list of enumeration names.
          */
         enum_err(pOpts, pOD, paz_names, (int)name_ct);
-    } else if (pOpts == OPTPROC_EMIT_SHELL) {
+        break;
+
+    case (uintptr_t)OPTPROC_EMIT_SHELL:
+    {
         unsigned int ix = (unsigned int)pOD->optArg.argEnum;
         /*
          *  print the name string.
@@ -303,7 +319,12 @@ optionEnumerationVal(tOptions * pOpts, tOptDesc * pOD,
             printf(INVALID_FMT, ix);
         else
             fputs(paz_names[ ix ], stdout);
-    } else if (pOpts == OPTPROC_RETURN_VALNAME) {
+
+        break;
+    }
+
+    case (uintptr_t)OPTPROC_RETURN_VALNAME:
+    {
         unsigned int ix = (unsigned int)pOD->optArg.argEnum;
         /*
          *  Replace the enumeration value with the name string.
@@ -312,7 +333,13 @@ optionEnumerationVal(tOptions * pOpts, tOptDesc * pOD,
             return (uintptr_t)INVALID_STR;
 
         pOD->optArg.argString = paz_names[ix];
-    } else if ((pOD->fOptState & OPTST_RESET) == 0) {
+        break;
+    }
+
+    default:
+        if ((pOD->fOptState & OPTST_RESET) != 0)
+            break;
+
         res = find_name(pOD->optArg.argString, pOpts, pOD, paz_names, name_ct);
 
         if (pOD->fOptState & OPTST_ALLOC_ARG) {
@@ -333,11 +360,11 @@ set_memb_shell(tOptions * pOpts, tOptDesc * pOD, char const * const * paz_names,
      *  print the name string.
      */
     unsigned int ix =  0;
-    uintptr_t  bits = (uintptr_t)pOD->optCookie;
+    vaddr_t  bits = (vaddr_t)pOD->optCookie;
     size_t     len  = 0;
 
     (void)pOpts;
-    bits &= ((uintptr_t)1 << (uintptr_t)name_ct) - (uintptr_t)1;
+    bits &= ((vaddr_t)1 << (vaddr_t)name_ct) - (vaddr_t)1;
 
     while (bits != 0) {
         if (bits & 1) {
@@ -354,8 +381,8 @@ set_memb_names(tOptions * opts, tOptDesc * od, char const * const * nm_list,
                unsigned int nm_ct)
 {
     char *     pz;
-    uintptr_t  mask = (1UL << (uintptr_t)nm_ct) - 1UL;
-    uintptr_t  bits = (uintptr_t)od->optCookie & mask;
+    vaddr_t  mask = (1UL << (vaddr_t)nm_ct) - 1UL;
+    vaddr_t  bits = (vaddr_t)od->optCookie & mask;
     unsigned int ix = 0;
     size_t     len  = 1;
 
@@ -371,7 +398,7 @@ set_memb_names(tOptions * opts, tOptDesc * od, char const * const * nm_list,
     }
 
     od->optArg.argString = pz = AGALOC(len, "enum");
-    bits = (uintptr_t)od->optCookie & mask;
+    bits = (vaddr_t)od->optCookie & mask;
     if (bits == 0) {
         *pz = NUL;
         return;
@@ -411,10 +438,10 @@ set_memb_names(tOptions * opts, tOptDesc * od, char const * const * nm_list,
  *
  * @returns either zero or the original value for the optCookie.
  */
-static uintptr_t
+static vaddr_t
 check_membership_start(tOptDesc * od, char const ** argp, bool * invert)
 {
-    uintptr_t    res = (uintptr_t)od->optCookie;
+    vaddr_t      res = (vaddr_t)od->optCookie;
     char const * arg = SPN_WHITESPACE_CHARS(od->optArg.argString);
     if ((arg == NULL) || (*arg == NUL))
         goto member_start_fail;
@@ -485,7 +512,7 @@ find_member_bit(tOptions * opts, tOptDesc * od, char const * pz, int len,
         if (shift_ct >= nm_ct)
             return 0UL;
 
-        return (uintptr_t)1U << shift_ct;
+        return (vaddr_t)1U << shift_ct;
     }
 }
 
@@ -535,15 +562,21 @@ optionSetMembers(tOptions * opts, tOptDesc * od,
      *  IF the program option descriptor pointer is invalid,
      *  then it is some sort of special request.
      */
-    if (opts == OPTPROC_EMIT_USAGE) {
+    switch ((uintptr_t)opts) {
+    case (uintptr_t)OPTPROC_EMIT_USAGE:
         enum_err(OPTPROC_EMIT_USAGE, od, nm_list, nm_ct);
         return;
-    } else if (opts == OPTPROC_EMIT_SHELL) {
+
+    case (uintptr_t)OPTPROC_EMIT_SHELL:
         set_memb_shell(opts, od, nm_list, nm_ct);
         return;
-    } else if (opts == OPTPROC_RETURN_VALNAME) {
+
+    case (uintptr_t)OPTPROC_RETURN_VALNAME:
         set_memb_names(opts, od, nm_list, nm_ct);
         return;
+
+    default:
+        break;
     }
 
     if ((od->fOptState & OPTST_RESET) != 0)
@@ -552,7 +585,7 @@ optionSetMembers(tOptions * opts, tOptDesc * od,
     {
         char const * arg;
         bool         invert;
-        uintptr_t    res = check_membership_start(od, &arg, &invert);
+        vaddr_t    res = check_membership_start(od, &arg, &invert);
         if (arg == NULL)
             goto fail_return;
 

@@ -1,9 +1,6 @@
 #	@(#)Makefile	8.1 (Berkeley) 6/6/93
 # $FreeBSD$
 
-# Can't read records produced by ktrace.
-WANT_CHERI=none
-
 .include <src.opts.mk>
 
 .PATH: ${SRCTOP}/usr.bin/ktrace
@@ -17,7 +14,7 @@ LIBADD=		sysdecode
 LIBADD+=	casper
 LIBADD+=	cap_grp
 LIBADD+=	cap_pwd
-CFLAGS+=-DHAVE_LIBCASPER
+CFLAGS+=-DWITH_CASPER
 .endif
 
 #NO_WERROR?=	YES

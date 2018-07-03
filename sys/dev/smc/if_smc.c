@@ -782,7 +782,7 @@ smc_task_rx(void *context, int pending)
 }
 
 #ifdef DEVICE_POLLING
-static void
+static int
 smc_poll(struct ifnet *ifp, enum poll_cmd cmd, int count)
 {
 	struct smc_softc	*sc;
@@ -792,12 +792,13 @@ smc_poll(struct ifnet *ifp, enum poll_cmd cmd, int count)
 	SMC_LOCK(sc);
 	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0) {
 		SMC_UNLOCK(sc);
-		return;
+		return (0);
 	}
 	SMC_UNLOCK(sc);
 
 	if (cmd == POLL_AND_CHECK_STATUS)
 		taskqueue_enqueue(sc->smc_tq, &sc->smc_intr);
+        return (0);
 }
 #endif
 
@@ -1287,7 +1288,7 @@ smc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	error = 0;
 
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		if ((ifp->if_flags & IFF_UP) == 0 &&
 		    (ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
 			SMC_LOCK(sc);
@@ -1300,8 +1301,8 @@ smc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		/* XXX
 		SMC_LOCK(sc);
 		smc_setmcast(sc);
@@ -1311,7 +1312,7 @@ smc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 
 	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		if (sc->smc_mii_mediaioctl == NULL) {
 			error = EINVAL;
 			break;

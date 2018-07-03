@@ -46,8 +46,6 @@ WANT_CHERI?=	hybrid
 # XXXAR: leave this for a while until everyone has updated clang to
 # a version that defaults to libc++
 LDFLAGS+=	-stdlib=libc++
-# exceptions currently require text relocations on MIPS
-ALLOW_SHARED_TEXTREL=yes
 .endif
 .endif
 
@@ -104,17 +102,22 @@ _CHERI_COMMON_FLAGS+=	-mllvm -cheri-exact-equals
 # Turn off deprecated warnings
 _CHERI_COMMON_FLAGS+= -Wno-deprecated-declarations
 
-.if ${WANT_CHERI} != "none"
-CFLAGS+=	${CHERI_OPTIMIZATION_FLAGS:U-O2}
-.endif
-
 .if ${WANT_CHERI} == "pure" || ${WANT_CHERI} == "sandbox"
 OBJCOPY:=	objcopy
-MIPS_ABI=	purecap
+MIPS_ABI:=	purecap
 _CHERI_COMMON_FLAGS+=	-fpic
-LIBDIR:=	/usr/libcheri
-ROOTOBJDIR=	${.OBJDIR:S,${.CURDIR},,}${SRCTOP}/worldcheri${SRCTOP}
+# Don't override libdir for tests since that causes the dlopen tests to fail
+.if !defined(LIBDIR) || ${LIBDIR:S/^${TESTSBASE}//} == ${LIBDIR}
+LIBDIR_BASE:=	/usr/libcheri
+.else
+.info "Not overriding LIBDIR for CHERI since ${.CURDIR} is a test library"
+.endif
+ROOTOBJDIR=	${.OBJDIR:S,${.CURDIR},,}${SRCTOP}/obj-libcheri${SRCTOP}
 CFLAGS+=	-ftls-model=local-exec
+.ifdef CHERI_USE_CAP_TABLE
+CFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
+.endif
+
 .ifdef NO_WERROR
 # Implicit function declarations should always be an error in purecap mode as
 # we will probably generate wrong code for calling them
@@ -128,32 +131,6 @@ LDFLAGS+=	-Wl,-melf64btsmip_cheri_fbsd
 .if defined(__BSD_PROG_MK)
 _LIB_OBJTOP=	${ROOTOBJDIR}
 .endif
-.ifdef LIBCHERI
-LDFLAGS+=	-Wl,-init=crt_init_globals
-.endif
-.if ${WANT_CHERI} == "sandbox"
-CHERI_LLD_BROKEN=	yes
-.endif
-# remove any conflicting -fuse-ld= flags
-LDFLAGS:=${LDFLAGS:N-fuse-ld=*}
-.ifdef CHERI_LLD_BROKEN
-LDFLAGS+=	-fuse-ld=bfd
-.else
-LDFLAGS+=	-fuse-ld=lld -Wl,-z,norelro
-.ifdef CHERI_LLD_INTEGRATED_CAPSIZEFIX
-LDFLAGS+=      -no-capsizefix -Wl,--process-cap-relocs -Wl,-color-diagnostics
-LD_FATAL_WARNINGS:=no
-.endif
-.if ${CFLAGS:M-fexceptions} != ""
-# any code built with -fexceptions currently needs text relocations
-# See https://reviews.llvm.org/D33670
-ALLOW_SHARED_TEXTREL=yes
-.endif
-.ifdef ALLOW_SHARED_TEXTREL
-# By default text relocations are an error instead of a warning with LLD
-LDFLAGS+=	-Wl,-z,notext
-.endif
-.endif
 .else
 STATIC_CFLAGS+= -ftls-model=local-exec # MIPS/hybrid case
 .endif
@@ -163,9 +140,22 @@ _CHERI_COMMON_FLAGS+=	-cheri=128
 .else
 _CHERI_COMMON_FLAGS+=	-cheri=256
 .endif
+
+CFLAGS+=	${CHERI_OPTIMIZATION_FLAGS:U-O2}
+# We now need LLD to link any code that uses capabilities:
+# We are expanding $LDFLAGS here so this must come after MIPS_ABI has been set!
+LDFLAGS:=${LDFLAGS:N-fuse-ld=*}
+LDFLAGS+=	-fuse-ld=lld
+LDFLAGS+=	-Wl,-preemptible-caprelocs=elf
+# Work around cheri-unknown-freebsd-ld.lld: error: section: .init_array is not contiguous with other relro sections
+# TODO: remove this once I've debugged the root cause
+LDFLAGS+=	-Wl,-z,norelro
+
 # XXX: Needed as Clang rejects -mllvm -cheri128 when using $CC to link:
 # warning: argument unused during compilation: '-cheri=128'
 _CHERI_CFLAGS+=	-Qunused-arguments
+_CHERI_CFLAGS+=	-Werror=cheri-bitwise-operations
+
 .if ${WANT_CHERI} != "variables"
 .if ${MK_CHERI_SHARED} == "no" || defined(CHERI_NO_SHARED)
 NO_SHARED=	yes

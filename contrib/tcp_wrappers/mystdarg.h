@@ -3,6 +3,16 @@
   * What follows is an attempt to unify varargs.h and stdarg.h. I'd rather
   * have this than #ifdefs all over the code.
   */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #ifdef __STDC__
 #include <stdarg.h>

@@ -17,7 +17,7 @@ INCS=	libproc.h
 
 CFLAGS+=	-I${.CURDIR}
 
-.if ${MK_CXX} == "no" || defined(LIBCHERI)
+.if ${MK_CXX} == "no"
 CFLAGS+=	-DNO_CXA_DEMANGLE
 .elif ${MK_LIBCPLUSPLUS} != "no"
 LIBADD+=		cxxrt
@@ -41,11 +41,7 @@ SHLIB_MAJOR=	4
 
 MAN=
 
-.ifndef LIBCHERI
-# requires C++
-.if ${MK_TESTS} != "no"
-SUBDIR+=	tests
-.endif
-.endif
+HAS_TESTS=
+SUBDIR.${MK_TESTS}+= tests
 
 .include <bsd.lib.mk>

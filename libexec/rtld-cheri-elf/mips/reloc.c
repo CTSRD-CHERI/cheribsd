@@ -47,6 +47,8 @@ __FBSDID("$FreeBSD$");
 #include "debug.h"
 #include "rtld.h"
 
+#include <cheri_init_globals.h>
+
 #define	GOT1_MASK	0x8000000000000000UL
 
 /*
@@ -99,7 +101,7 @@ void _rtld_relocate_nonplt_self(Elf_Dyn *, caddr_t);
 #define ELF_R_TYPE(r_info)		bswap32((r_info) >> 32)
 #endif
 
-static __inline Elf_Sxword
+static __inline __always_inline Elf_Sxword
 load_ptr(void *where, size_t len)
 {
 	Elf_Sxword val;
@@ -122,7 +124,7 @@ load_ptr(void *where, size_t len)
 	return (len == sizeof(Elf_Sxword)) ? val : (Elf_Sword)val;
 }
 
-static __inline void
+static __inline __always_inline void
 store_ptr(void *where, Elf_Sxword val, size_t len)
 {
 	if (__predict_true(((size_t)where & (len - 1)) == 0)) {
@@ -146,9 +148,21 @@ store_ptr(void *where, Elf_Sxword val, size_t len)
 void
 _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 {
+	/*
+	 * Warning: global capabilities have not been initialized yet so we
+	 * can't call any functions here (only ones with __always_inline)
+	 *
+	 * FIXME: all the debug printfs will crash
+	 * TODO: change __cap_relocs emission in lld so that we can process
+	 * __cap_relocs before this function (add a flag to say this entry does
+	 * not need any relocations)
+	 */
 	const Elf_Rel *rel = NULL, *rellim;
 	Elf_Addr relsz = 0;
 	const Elf_Sym *symtab = NULL, *sym;
+#ifdef DEBUG
+	const char* strtab = NULL;
+#endif
 	Elf_Addr *where;
 	Elf_Addr *got = NULL;
 	Elf_Word local_gotno = 0, symtabno = 0, gotsym = 0;
@@ -165,6 +179,11 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 		case DT_SYMTAB:
 			symtab = (const Elf_Sym *)(relocbase + dynp->d_un.d_ptr);
 			break;
+#ifdef DEBUG
+		case DT_STRTAB:
+			strtab = (const char *)(relocbase + dynp->d_un.d_ptr);
+			break;
+#endif
 		case DT_PLTGOT:
 			got = (Elf_Addr *)(relocbase + dynp->d_un.d_ptr);
 			break;
@@ -184,13 +203,13 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 	/* Relocate the local GOT entries */
 	got += i;
 	for (; i < local_gotno; i++) {
-		*got++ += (uintptr_t)relocbase;
+		*got++ += (vaddr_t)relocbase;
 	}
 
 	sym = symtab + gotsym;
 	/* Now do the global GOT entries */
 	for (i = gotsym; i < symtabno; i++) {
-		*got = sym->st_value + (uintptr_t)relocbase;
+		*got = sym->st_value + (vaddr_t)relocbase;
 		++sym;
 		++got;
 	}
@@ -219,9 +238,13 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 			assert(r_symndx < gotsym);
 			sym = symtab + r_symndx;
 			assert(ELF_ST_BIND(sym->st_info) == STB_LOCAL);
-			val += (uintptr_t)relocbase;
-#ifdef DEBUG_VERBOSE
-			dbg("REL32/L(%p) %p -> %p in <self>",
+			val += (vaddr_t)relocbase;
+#ifdef DEBUG_VERBOSE_SELF
+			/*
+			 * FIXME dbg() can never work since the debug var only
+			 * gets initialized later -> use rtld_printf for now
+			 */
+			rtld_printf("REL32/L(%p) %p -> %p in <self>\n",
 			    where, (void *)(uintptr_t)old,
 			    (void *)(uintptr_t)val);
 #endif
@@ -229,13 +252,82 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 			break;
 		}
 
+	/*
+	 * There should be no dynamic CHERI_SIZE/CHERI_ABSPTR/CHERI_CAPABILITY
+	 * relocations inside rtld since there are no global capabilities that
+	 * are initialized to point to something.
+	 *
+	 * The reason this code is still here is that this may change at some
+	 * point in the future.
+	 */
+#if 0
+		case R_TYPE(CHERI_SIZE):
+		case R_TYPE(CHERI_ABSPTR): {
+			/* This is needed for __auxargs, otherwise there
+			 * are no initialized globals
+			 */
+			const size_t rlen =
+			    ELF_R_NXTTYPE_64_P(r_type)
+				? sizeof(Elf_Sxword)
+				: sizeof(Elf_Sword);
+			Elf_Sxword old = load_ptr(where, rlen);
+			Elf_Sxword val = old;
+			sym = symtab + r_symndx;
+			assert(ELF_ST_BIND(sym->st_info) == STB_LOCAL ||
+			    ELF_ST_BIND(sym->st_info) == STB_WEAK);
+			if ((r_type & 0xff) == R_TYPE(CHERI_SIZE)) {
+				val += sym->st_size;
+			} else {
+				Elf_Addr symval = (Elf_Addr)relocbase + sym->st_value;
+				val += symval;
+			}
+#ifdef DEBUG_VERBOSE_SELF
+			/*
+			 * FIXME dbg() can never work since the debug var only
+			 * gets initialized later -> use rtld_printf for now
+			 */
+			rtld_printf("%s/L(%p) %p -> %p in <self>\n",
+			    (r_type & 0xff) == R_TYPE(CHERI_SIZE) ? "SIZE" : "ABS",
+			    where, (void *)(uintptr_t)old,
+			    (void *)(uintptr_t)val);
+#endif
+			store_ptr(where, val, rlen);
+			break;
+		}
+		case R_TYPE(CHERI_CAPABILITY): {
+			sym = symtab + r_symndx;
+			/* This is a hack for the undef weak __auxargs */
+			/* TODO: try to remove __auxargs dependency */
+			assert(ELF_ST_BIND(sym->st_info) == STB_WEAK);
+			assert(sym->st_shndx == SHN_UNDEF);
+			*((void**)where) = NULL;
+		}
+#endif
+
 		case R_TYPE(GPREL32):
 		case R_TYPE(NONE):
 			break;
 
 
 		default:
-			abort();
+			/*
+			 * XXXAR: the printf will fault in cap-table mode since
+			 * the __cap_relocs have not been processed yet!
+			 */
+#ifdef DEBUG
+			rtld_printf("sym = %lu, type = %lu, offset = %p, "
+			    "contents = %p, symbol = %s\n",
+			    (u_long)r_symndx, (u_long)ELF_R_TYPE(rel->r_info),
+			    (void *)(uintptr_t)rel->r_offset,
+			    (void *)(uintptr_t)load_ptr(where, sizeof(Elf_Sword)),
+			    strtab + symtab[r_symndx].st_name);
+#endif
+			rtld_printf("%s: Unsupported relocation type %ld "
+			    "in non-PLT relocations\n",
+			    __func__, (u_long) ELF_R_TYPE(rel->r_info));
+			/* Abort won't work yet since it needs global caps */
+			/* abort(); */
+			__builtin_trap();
 			break;
 		}
 	}
@@ -269,6 +361,11 @@ _mips_rtld_bind(Obj_Entry *obj, Elf_Size reloff)
 	*where = target;
 	lock_release(rtld_bind_lock, &lockstate);
 	return (Elf_Addr)target;
+}
+
+static inline const char*
+symname(Obj_Entry* obj, size_t r_symndx) {
+	return obj->strtab + obj->symtab[r_symndx].st_name;
 }
 
 int
@@ -320,7 +417,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 	    got, obj->symtabno);
 	/* Now do the global GOT entries */
 	for (i = obj->gotsym; i < obj->symtabno; i++) {
-#ifdef DEBUG_VERBOSE
+#if defined(DEBUG_VERBOSE) || defined(DEBUG_MIPS_GOT)
 		dbg(" doing got %d sym %p (%s, %lx)", i - obj->gotsym, sym,
 		    sym->st_name + obj->strtab, (u_long) *got);
 #endif
@@ -435,7 +532,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			}
 		}
 
-#ifdef DEBUG_VERBOSE
+#if defined(DEBUG_VERBOSE) || defined(DEBUG_MIPS_GOT)
 		dbg("  --> now %lx", (u_long) *got);
 #endif
 		++sym;
@@ -469,13 +566,15 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 
 			if (r_symndx >= obj->gotsym) {
 				val += got[obj->local_gotno + r_symndx - obj->gotsym];
-#ifdef DEBUG_VERBOSE
-				dbg("REL32/G(%p) %p --> %p (%s) in %s",
-				    where, (void *)(uintptr_t)old, (void *)(uintptr_t)val,
+#if defined(DEBUG_VERBOSE) || defined(DEBUG_MIPS_GOT)
+				dbg("REL32/G(%p/0x%lx) %p --> %p (%s) in %s",
+				    where, (caddr_t)where - obj->relocbase,
+				    (void *)(uintptr_t)old, (void *)(uintptr_t)val,
 				    obj->strtab + def->st_name,
 				    obj->path);
 #endif
 			} else {
+#if 0
 				/*
 				 * XXX: ABI DIFFERENCE!
 				 *
@@ -498,14 +597,28 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				    && !broken
 #endif
 				    )
-					val += (Elf_Addr)def->st_value;
+#endif
+				/* XXXAR: always adding st_value seems to be required (also glibc does it)*/
+				val += (Elf_Addr)def->st_value;
 
+				if (r_symndx != 0) {
+					_rtld_error("%s: local R_MIPS_REL32 relocation references symbol %s (%d). st_value=0x%lx, st_info=%x, st_shndx=%d",
+					    obj->path, obj->strtab + def->st_name, r_symndx, def->st_value, def->st_info, def->st_shndx);
+					return (-1);
+				}
 				val += (Elf_Addr)obj->relocbase;
-
-#ifdef DEBUG_VERBOSE
-				dbg("REL32/L(%p) %p -> %p (%s) in %s",
-				    where, (void *)(uintptr_t)old, (void *)(uintptr_t)val,
-				    obj->strtab + def->st_name, obj->path);
+#if defined(DEBUG)
+				_Bool print_local_reloc_dbg = false;
+				if (def->st_value != 0) {
+					print_local_reloc_dbg = true;
+				}
+#if defined(DEBUG_VERBOSE)
+				print_local_reloc_dbg = true;
+#endif
+				if (print_local_reloc_dbg)
+					dbg("REL32/L(%p/0x%lx) %p -> %p (%s) in %s, st_value = 0x%lx, st_info=%x, r_symndx=%d, st_shndx=%d",
+					    where, rel->r_offset, (void *)(uintptr_t)old, (void *)(uintptr_t)val,
+					    obj->strtab + def->st_name, obj->path, def->st_value, def->st_info, r_symndx, def->st_shndx);
 #endif
 			}
 			store_ptr(where, val, rlen);
@@ -532,7 +645,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 
 			store_ptr(where, val, rlen);
 			dbg("DTPMOD %s in %s %p --> %p in %s",
-			    obj->strtab + obj->symtab[r_symndx].st_name,
+			    symname(obj, r_symndx),
 			    obj->path, (void *)(uintptr_t)old, (void*)(uintptr_t)val, defobj->path);
 			break;
 		}
@@ -559,7 +672,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			store_ptr(where, val, rlen);
 
 			dbg("DTPREL %s in %s %p --> %p in %s",
-			    obj->strtab + obj->symtab[r_symndx].st_name,
+			    symname(obj, r_symndx),
 			    obj->path, (void*)(uintptr_t)old, (void *)(uintptr_t)val, defobj->path);
 			break;
 		}
@@ -588,12 +701,135 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			store_ptr(where, val, rlen);
 
 			dbg("TPREL %s in %s %p --> %p in %s",
-			    obj->strtab + obj->symtab[r_symndx].st_name,
+			    symname(obj, r_symndx),
+			    obj->path, (void*)(uintptr_t)old, (void *)(uintptr_t)val, defobj->path);
+			break;
+		}
+
+		case R_TYPE(CHERI_ABSPTR):
+		{
+			def = find_symdef(r_symndx, obj,
+			    &defobj, flags, NULL, lockstate);
+			if (def == NULL) {
+				_rtld_error("%s: Could not find symbol %s",
+				    obj->path, symname(obj, r_symndx));
+				return -1;
+			}
+			assert(ELF_ST_TYPE(def->st_info) != STT_GNU_IFUNC &&
+			    "IFUNC not implemented!");
+			Elf_Addr symval = (Elf_Addr)defobj->relocbase + def->st_value;
+			const size_t rlen =
+			    ELF_R_NXTTYPE_64_P(r_type)
+				? sizeof(Elf_Sxword)
+				: sizeof(Elf_Sword);
+			Elf_Addr old = load_ptr(where, rlen);
+			Elf_Addr val = old;
+			val += symval;
+			store_ptr(where, val, rlen);
+			dbg("ABS(%p/0x%lx) %s in %s %p --> %p in %s",
+			    where, rel->r_offset, symname(obj, r_symndx),
 			    obj->path, (void*)(uintptr_t)old, (void *)(uintptr_t)val, defobj->path);
 			break;
 		}
 
 
+		case R_TYPE(CHERI_SIZE):
+		{
+			def = find_symdef(r_symndx, obj,
+			    &defobj, flags, NULL, lockstate);
+			if (def == NULL) {
+				_rtld_error("%s: Could not find symbol %s",
+				    obj->path, symname(obj, r_symndx));
+				return -1;
+			}
+			assert(ELF_ST_TYPE(def->st_info) != STT_GNU_IFUNC &&
+			    "IFUNC not implemented!");
+			Elf_Sxword size = def->st_size;
+			const size_t rlen =
+			    ELF_R_NXTTYPE_64_P(r_type)
+				? sizeof(Elf_Sxword)
+				: sizeof(Elf_Sword);
+			Elf_Addr old = load_ptr(where, rlen);
+			Elf_Addr val = old;
+			val += size;
+			store_ptr(where, val, rlen);
+			dbg("SIZE(%p/0x%lx) %s in %s %p --> %p in %s",
+			    where, rel->r_offset, symname(obj, r_symndx),
+			    obj->path, (void*)(uintptr_t)old, (void *)(uintptr_t)val, defobj->path);
+			break;
+		}
+
+		case R_TYPE(CHERI_CAPABILITY):
+		{
+			def = find_symdef(r_symndx, obj, &defobj, flags, NULL,
+			    lockstate);
+			if (def == NULL) {
+				_rtld_error("%s: Could not find symbol %s",
+				    obj->path, symname(obj, r_symndx));
+				return -1;
+			}
+			assert(ELF_ST_TYPE(def->st_info) != STT_GNU_IFUNC &&
+			    "IFUNC not implemented!");
+
+			void* symval = NULL;
+			bool is_undef_weak = false;
+			if (def->st_shndx == SHN_UNDEF) {
+				/* Verify that we are resolving a weak symbol */
+				const Elf_Sym* src_sym = obj->symtab + r_symndx;
+#ifdef DEBUG
+				dbg("NOTE: found undefined R_CHERI_CAPABILITY "
+				    "for %s (in %s): value=%ld, size=%ld, "
+				    "type=%d, def bind=%d,sym bind=%d",
+				    symname(obj, r_symndx), obj->path,
+				    def->st_value, def->st_size,
+				    ELF_ST_TYPE(def->st_info),
+				    ELF_ST_BIND(def->st_info),
+				    ELF_ST_BIND(src_sym->st_info));
+#endif
+				assert(ELF_ST_BIND(src_sym->st_info) == STB_WEAK);
+				assert(def->st_value == 0);
+				assert(def->st_size == 0);
+				is_undef_weak = true;
+			}
+			else if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
+				/* Remove write permissions and set bounds */
+				symval = make_function_pointer(def, defobj);
+			} else {
+				/* Remove execute permissions and set bounds */
+				symval = make_data_pointer(def, defobj);
+			}
+#if 0
+			// FIXME: this warning breaks some tests that expect clean stdout/stderr
+			// FIXME: See https://github.com/CTSRD-CHERI/cheribsd/issues/257
+			// TODO: or use this approach: https://github.com/CTSRD-CHERI/cheribsd/commit/c1920496c0086d9c5214fb0f491e4d6cdff3828e?
+			if (symval != NULL && cheri_getlen(symval) <= 0) {
+				rtld_fdprintf(STDERR_FILENO, "Warning: created "
+				    "zero length capability for %s (in %s): %-#p\n",
+				    symname(obj, r_symndx), obj->path, symval);
+			}
+#endif
+			/*
+			 * The capability offset is the addend for the
+			 * relocation. Since we are using Elf_Rel this is the
+			 * first 8 bytes of the target location (which is the
+			 * virtual address for both 128 and 256-bit CHERI).
+			 */
+			uint64_t src_offset = load_ptr(where, sizeof(uint64_t));
+			symval += src_offset;
+			if (!cheri_gettag(symval) && !is_undef_weak) {
+				_rtld_error("%s: constructed invalid capability"
+				   "for %s: %#p",  obj->path,
+				    symname(obj, r_symndx), symval);
+				return -1;
+			}
+			*((void**)where) = symval;
+#if defined(DEBUG_VERBOSE)
+			dbg("CAP(%p/0x%lx) %s in %s --> %-#p in %s",
+			    where, rel->r_offset, symname(obj, r_symndx),
+			    obj->path, *((void**)where), defobj->path);
+#endif
+			break;
+		}
 
 		default:
 			dbg("sym = %lu, type = %lu, offset = %p, "
@@ -601,7 +837,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			    (u_long)r_symndx, (u_long)ELF_R_TYPE(rel->r_info),
 			    (void *)(uintptr_t)rel->r_offset,
 			    (void *)(uintptr_t)load_ptr(where, sizeof(Elf_Sword)),
-			    obj->strtab + obj->symtab[r_symndx].st_name);
+			    symname(obj, r_symndx));
 			_rtld_error("%s: Unsupported relocation type %ld "
 			    "in non-PLT relocations",
 			    obj->path, (u_long) ELF_R_TYPE(rel->r_info));
@@ -738,4 +974,97 @@ __tls_get_addr(tls_index* ti)
 	p = tls_get_addr_common(tls, ti->ti_module, ti->ti_offset + TLS_DTP_OFFSET);
 
 	return (p);
+}
+
+/* FIXME: replace this with cheri_init_globals_impl once everyone has updated clang */
+static __attribute__((always_inline))
+void _do___caprelocs(const struct capreloc *start_relocs,
+    const struct capreloc * stop_relocs, void* gdc, void* pcc, vaddr_t base_addr)
+{
+
+	gdc = __builtin_cheri_perms_and(gdc, global_pointer_permissions);
+	pcc = __builtin_cheri_perms_and(pcc, function_pointer_permissions);
+	for (const struct capreloc *reloc = start_relocs; reloc < stop_relocs; reloc++) {
+		_Bool isFunction = (reloc->permissions & function_reloc_flag) ==
+		    function_reloc_flag;
+		void **dest = __builtin_cheri_offset_set(gdc,
+		    reloc->capability_location + base_addr);
+		if (reloc->object == 0) {
+			/*
+			 * XXXAR: clang fills uninitialized capabilities with
+			 * 0xcacaca..., so we we need to explicitly write NUL
+			 * here.
+			 */
+			*dest = (void*)0;
+			continue;
+		}
+		void *base = isFunction ? pcc : gdc;
+		void *src = __builtin_cheri_offset_set(base, reloc->object);
+		if (!isFunction && (reloc->size != 0))
+		{
+			src = __builtin_cheri_bounds_set(src, reloc->size);
+		}
+		src = __builtin_cheri_offset_increment(src, reloc->offset);
+		*dest = src;
+	}
+}
+
+/*
+ * XXXAR: We can't use cheri_init_globals since that uses dla and
+ * therefore would cause text relocations. Instead use the PIC_LOAD_CODE_PTR()
+ * macro in the assembly and pass in __start_cap_relocs/__stop_cap_relocs.
+ *
+ * TODO: We could also parse the DT_CHERI___CAPRELOCS and DT_CHERI___CAPRELOCSSZ
+ * in _rtld_relocate_nonplt_self and save that to the stack instead. Might
+ * save a few instructions but not sure it's worth the effort of writing more asm.
+ */
+void
+_rtld_do___caprelocs_self(const struct capreloc *start_relocs,
+    const struct capreloc* end_relocs)
+{
+	void *ddc = __builtin_cheri_global_data_get();
+	void *pcc = __builtin_cheri_program_counter_get();
+
+	_do___caprelocs(start_relocs, end_relocs, ddc, pcc, 0);
+}
+
+void
+process___cap_relocs(Obj_Entry* obj)
+{
+	if (obj->cap_relocs_processed) {
+		dbg("__cap_relocs for %s have already been processed!", obj->path);
+		/* TODO: abort() to prevent this from happening? */
+		return;
+	}
+	struct capreloc *start_relocs = (struct capreloc *)obj->cap_relocs;
+	struct capreloc *end_relocs =
+	    (struct capreloc *)(obj->cap_relocs + obj->cap_relocs_size);
+	/*
+	 * It would be nice if we could use a DDC and PCC with smaller bounds
+	 * here. However, the target could be in a different shared library so
+	 * while we are still using __cap_relocs just derive it from RTLD.
+	 *
+	 * TODO: reject those binaries and suggest relinking with the right flag
+	 */
+	void *ddc = __builtin_cheri_global_data_get();
+	void *pcc = __builtin_cheri_program_counter_get();
+
+	dbg("Processing %lu __cap_relocs for %s\n", (end_relocs - start_relocs),
+	    obj->path);
+
+	/*
+	 * We currently emit dynamic relocations for the cap_relocs location, so
+	 * they will already have been processed when this function is called.
+	 * This means the load address will already be included in
+	 * reloc->capability_location.
+	 */
+#if 0
+	/* TODO: don't emit dynamic relocations for obj->capability_location */
+	vaddr_t base_addr = (vaddr_t)obj->relocbase;
+#endif
+	vaddr_t base_addr = 0;
+
+	_do___caprelocs(start_relocs, end_relocs, ddc, pcc, base_addr);
+
+	obj->cap_relocs_processed = true;
 }

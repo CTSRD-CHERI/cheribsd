@@ -4,7 +4,3 @@
 PROG=	look
 
 .include <bsd.prog.mk>
-
-.if defined(LIBCHERI) || (${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 060000)
-CFLAGS+=-Wno-tautological-constant-compare
-.endif

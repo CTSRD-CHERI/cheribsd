@@ -332,6 +332,7 @@ extern caddr_t cheri_kall_capability;
 #define	MIPS_CR_COP_ERR		0x30000000
 #define	MIPS_CR_EXC_CODE	0x0000007C	/* five bits */
 #define	MIPS_CR_IP		0x0000FF00
+#define	MIPS_CR_DC		(1 << 27)	/* Count register disable */
 #define	MIPS_CR_EXC_CODE_SHIFT	2
 #define	MIPS_CR_COP_ERR_SHIFT	28
 
@@ -530,6 +531,7 @@ extern caddr_t cheri_kall_capability;
  * 10	MIPS_COP_0_TLB_HI	3636 TLB entry high.
  * 11	MIPS_COP_0_COMPARE	.333 Compare (against Count).
  * 12	MIPS_COP_0_STATUS	3333 Status register.
+ * 12/1	MIPS_COP_0_INTCTL	..33 Interrupt setup (MIPS32/64 r2).
  * 13	MIPS_COP_0_CAUSE	3333 Exception cause register.
  * 14	MIPS_COP_0_EXC_PC	3636 Exception PC.
  * 15	MIPS_COP_0_PRID		3333 Processor revision identifier.
@@ -614,6 +616,7 @@ extern caddr_t cheri_kall_capability;
 /* MIPS32/64 */
 #define	MIPS_COP_0_USERLOCAL	_(4)	/* sel 2 is userlevel register */
 #define	MIPS_COP_0_HWRENA	_(7)
+#define	MIPS_COP_0_INTCTL	_(12)
 #define	MIPS_COP_0_DEBUG	_(23)
 #define	MIPS_COP_0_DEPC		_(24)
 #define	MIPS_COP_0_PERFCNT	_(25)
@@ -631,6 +634,16 @@ extern caddr_t cheri_kall_capability;
 #define MIPS_MMU_TLB			0x01		/* Standard TLB */
 #define MIPS_MMU_BAT			0x02		/* Standard BAT */
 #define MIPS_MMU_FIXED			0x03		/* Standard fixed mapping */
+
+/*
+ * IntCtl Register Fields
+ */
+#define	MIPS_INTCTL_IPTI_MASK	0xE0000000	/* bits 31..29 timer intr # */
+#define	MIPS_INTCTL_IPTI_SHIFT	29
+#define	MIPS_INTCTL_IPPCI_MASK	0x1C000000	/* bits 26..29 perf counter intr # */
+#define	MIPS_INTCTL_IPPCI_SHIFT	26
+#define	MIPS_INTCTL_VS_MASK	0x000001F0	/* bits 5..9 vector spacing */
+#define	MIPS_INTCTL_VS_SHIFT	4
 
 /*
  * Config Register Fields

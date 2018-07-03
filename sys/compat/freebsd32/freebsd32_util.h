@@ -86,23 +86,30 @@ SYSCALL32_MODULE(syscallname,                           \
     & syscallname##_syscall32, & syscallname##_sysent32,\
     NULL, NULL);
 
-#define SYSCALL32_INIT_HELPER(syscallname) {			\
+#define SYSCALL32_INIT_HELPER_F(syscallname, flags) {		\
     .new_sysent = {						\
 	.sy_narg = (sizeof(struct syscallname ## _args )	\
 	    / sizeof(syscallarg_t)),				\
 	.sy_call = (sy_call_t *)& syscallname,			\
+	.sy_flags = (flags)					\
     },								\
     .syscall_no = FREEBSD32_SYS_##syscallname			\
 }
 
-#define SYSCALL32_INIT_HELPER_COMPAT(syscallname) {		\
+#define SYSCALL32_INIT_HELPER_COMPAT_F(syscallname, flags) {	\
     .new_sysent = {						\
 	.sy_narg = (sizeof(struct syscallname ## _args )	\
 	    / sizeof(syscallarg_t)),				\
 	.sy_call = (sy_call_t *)& sys_ ## syscallname,		\
+	.sy_flags = (flags)					\
     },								\
     .syscall_no = FREEBSD32_SYS_##syscallname			\
 }
+
+#define SYSCALL32_INIT_HELPER(syscallname)			\
+    SYSCALL32_INIT_HELPER_F(syscallname, 0)
+#define SYSCALL32_INIT_HELPER_COMPAT(syscallname)		\
+    SYSCALL32_INIT_HELPER_COMPAT_F(syscallname, 0)
 
 int    syscall32_register(int *offset, struct sysent *new_sysent,
 	    struct sysent *old_sysent, int flags);
@@ -114,8 +121,8 @@ int    syscall32_helper_unregister(struct syscall_helper_data *sd);
 struct iovec32;
 struct rusage32;
 register_t *freebsd32_copyout_strings(struct image_params *imgp);
-int	freebsd32_copyiniov(struct iovec32 *iovp, u_int iovcnt,
-	    struct iovec **iov, int error);
+int	freebsd32_copyiniov(struct iovec32 * __capability iovp, u_int iovcnt,
+	    kiovec_t **iov, int error);
 void	freebsd32_rusage_out(const struct rusage *s, struct rusage32 *s32);
 
 struct image_args;

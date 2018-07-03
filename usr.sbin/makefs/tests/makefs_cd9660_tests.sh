@@ -29,7 +29,7 @@
 
 # A note on specs:
 # - A copy of the ISO-9660 spec can be found here:
-#   http://www.ecma-international.org/publications/files/ECMA-ST/Ecma-119.pdf
+#   https://www.ecma-international.org/publications/files/ECMA-ST/Ecma-119.pdf
 # - Any references to `rockridge` are referring to the `Rock Ridge` extensions
 #   of the ISO-9660 spec. A copy of the draft `IEEE-P1282` spec can be found
 #   here:
@@ -279,6 +279,10 @@ o_flag_isolevel_3_cleanup()
 }
 
 atf_test_case o_flag_preparer
+o_flag_preparer_head()
+{
+	atf_set "require.progs" "strings"
+}
 o_flag_preparer_body()
 {
 	create_test_dirs
@@ -294,6 +298,10 @@ o_flag_preparer_body()
 }
 
 atf_test_case o_flag_publisher
+o_flag_publisher_head()
+{
+	atf_set "require.progs" "strings"
+}
 o_flag_publisher_body()
 {
 	create_test_dirs

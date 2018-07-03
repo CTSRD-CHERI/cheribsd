@@ -73,7 +73,7 @@ static const struct usb_config rtwn_config_common[RTWN_N_TRANSFER] = {
 		.type = UE_BULK,
 		.endpoint = UE_ADDR_ANY,
 		.direction = UE_DIR_OUT,
-		.bufsize = RTWN_TXBUFSZ,
+		.bufsize = RTWN_USB_TXBUFSZ,
 		.flags = {
 			.ext_buffer = 1,
 			.pipe_bof = 1,
@@ -86,7 +86,7 @@ static const struct usb_config rtwn_config_common[RTWN_N_TRANSFER] = {
 		.type = UE_BULK,
 		.endpoint = UE_ADDR_ANY,
 		.direction = UE_DIR_OUT,
-		.bufsize = RTWN_TXBUFSZ,
+		.bufsize = RTWN_USB_TXBUFSZ,
 		.flags = {
 			.ext_buffer = 1,
 			.pipe_bof = 1,
@@ -99,7 +99,7 @@ static const struct usb_config rtwn_config_common[RTWN_N_TRANSFER] = {
 		.type = UE_BULK,
 		.endpoint = UE_ADDR_ANY,
 		.direction = UE_DIR_OUT,
-		.bufsize = RTWN_TXBUFSZ,
+		.bufsize = RTWN_USB_TXBUFSZ,
 		.flags = {
 			.ext_buffer = 1,
 			.pipe_bof = 1,
@@ -112,7 +112,7 @@ static const struct usb_config rtwn_config_common[RTWN_N_TRANSFER] = {
 		.type = UE_BULK,
 		.endpoint = UE_ADDR_ANY,
 		.direction = UE_DIR_OUT,
-		.bufsize = RTWN_TXBUFSZ,
+		.bufsize = RTWN_USB_TXBUFSZ,
 		.flags = {
 			.ext_buffer = 1,
 			.pipe_bof = 1,
@@ -225,7 +225,8 @@ rtwn_usb_setup_endpoints(struct rtwn_usb_softc *uc)
 		break;
 	}
 
-	rtwn_config[RTWN_BULK_RX].bufsize = sc->rx_dma_size + 1024;
+	rtwn_config[RTWN_BULK_RX].bufsize =
+	    uc->uc_rx_buf_size * RTWN_USB_RXBUFSZ_UNIT;
 	error = usbd_transfer_setup(uc->uc_udev, &iface_index,
 	    uc->uc_xfer, rtwn_config, RTWN_N_TRANSFER, uc, &sc->sc_mtx);
 	free(rtwn_config, M_TEMP);

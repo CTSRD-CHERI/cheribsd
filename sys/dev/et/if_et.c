@@ -1293,7 +1293,7 @@ et_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 /* XXX LOCKSUSED */
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		ET_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -1311,14 +1311,14 @@ et_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ET_UNLOCK(sc);
 		break;
 
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->sc_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 			ET_LOCK(sc);
 			et_setmulti(sc);
@@ -1326,7 +1326,7 @@ et_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 		ET_LOCK(sc);
 #if 0
 		if (sc->sc_flags & ET_FLAG_JUMBO)
@@ -1335,14 +1335,14 @@ et_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #endif
 			max_framelen = MCLBYTES - 1;
 
-		if (ET_FRAMELEN(ifr->ifr_mtu) > max_framelen) {
+		if (ET_FRAMELEN(ifr_mtu_get(ifr)) > max_framelen) {
 			error = EOPNOTSUPP;
 			ET_UNLOCK(sc);
 			break;
 		}
 
-		if (ifp->if_mtu != ifr->ifr_mtu) {
-			ifp->if_mtu = ifr->ifr_mtu;
+		if (ifp->if_mtu != ifr_mtu_get(ifr)) {
+			ifp->if_mtu = ifr_mtu_get(ifr);
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 				ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 				et_init_locked(sc);
@@ -1351,9 +1351,9 @@ et_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ET_UNLOCK(sc);
 		break;
 
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		ET_LOCK(sc);
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&
 		    (IFCAP_TXCSUM & ifp->if_capabilities) != 0) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;

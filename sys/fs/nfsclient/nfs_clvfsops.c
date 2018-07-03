@@ -444,7 +444,7 @@ nfs_mountroot(struct mount *mp)
 	if (error)
 		panic("nfs_mountroot: SIOCAIFADDR: %d", error);
 	if ((cp = kern_getenv("boot.netif.mtu")) != NULL) {
-		ir.ifr_mtu = strtol(cp, NULL, 10);
+		ir.ifr_ifru.ifru_mtu = strtol(cp, NULL, 10);
 		bcopy(nd->myif.ifra_name, ir.ifr_name, IFNAMSIZ);
 		freeenv(cp);
 		error = ifioctl(so, SIOCSIFMTU, (caddr_t)&ir, td);
@@ -1235,7 +1235,7 @@ nfs_mount(struct mount *mp)
 		bzero(&hst[hstlen], MNAMELEN - hstlen);
 		args.hostname = hst;
 		/* getsockaddr() call must be after above copyin() calls */
-		error = getsockaddr(&nam, (caddr_t)args.addr,
+		error = getsockaddr(&nam, __USER_CAP(args.addr, args.addrlen),
 		    args.addrlen);
 		if (error != 0)
 			goto out;
@@ -1698,6 +1698,11 @@ nfs_unmount(struct mount *mp, int mntflags)
 	 */
 	if ((mntflags & MNT_FORCE) == 0)
 		nfscl_umount(nmp, td);
+	else {
+		mtx_lock(&nmp->nm_mtx);
+		nmp->nm_privflag |= NFSMNTP_FORCEDISM;
+		mtx_unlock(&nmp->nm_mtx);
+	}
 	/* Make sure no nfsiods are assigned to this mount. */
 	mtx_lock(&ncl_iod_mutex);
 	for (i = 0; i < NFS_MAXASYNCDAEMON; i++)
@@ -1706,6 +1711,19 @@ nfs_unmount(struct mount *mp, int mntflags)
 			ncl_iodmount[i] = NULL;
 		}
 	mtx_unlock(&ncl_iod_mutex);
+
+	/*
+	 * We can now set mnt_data to NULL and wait for
+	 * nfssvc(NFSSVC_FORCEDISM) to complete.
+	 */
+	mtx_lock(&mountlist_mtx);
+	mtx_lock(&nmp->nm_mtx);
+	mp->mnt_data = NULL;
+	mtx_unlock(&mountlist_mtx);
+	while ((nmp->nm_privflag & NFSMNTP_CANCELRPCS) != 0)
+		msleep(nmp, &nmp->nm_mtx, PVFS, "nfsfdism", 0);
+	mtx_unlock(&nmp->nm_mtx);
+
 	newnfs_disconnect(&nmp->nm_sockreq);
 	crfree(nmp->nm_sockreq.nr_cred);
 	FREE(nmp->nm_nam, M_SONAME);
@@ -1775,7 +1793,7 @@ nfs_sync(struct mount *mp, int waitfor)
 	 * the umount(2) syscall doesn't get stuck in VFS_SYNC() before
 	 * calling VFS_UNMOUNT().
 	 */
-	if ((mp->mnt_kern_flag & MNTK_UNMOUNTF) != 0) {
+	if (NFSCL_FORCEDISM(mp)) {
 		MNT_IUNLOCK(mp);
 		return (EBADF);
 	}

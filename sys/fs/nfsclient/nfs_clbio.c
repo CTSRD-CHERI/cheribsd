@@ -117,7 +117,7 @@ ncl_getpages(struct vop_getpages_args *ap)
 {
 	int i, error, nextoff, size, toff, count, npages;
 	struct uio uio;
-	struct iovec iov;
+	kiovec_t iov;
 	vm_offset_t kva;
 	struct buf *bp;
 	struct vnode *vp;
@@ -188,8 +188,7 @@ ncl_getpages(struct vop_getpages_args *ap)
 	VM_CNT_ADD(v_vnodepgsin, npages);
 
 	count = npages << PAGE_SHIFT;
-	iov.iov_base = (caddr_t) kva;
-	iov.iov_len = count;
+	IOVEC_INIT(&iov, bp->b_data, count);
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = IDX_TO_OFF(pages[0]->pindex);
@@ -265,7 +264,7 @@ int
 ncl_putpages(struct vop_putpages_args *ap)
 {
 	struct uio uio;
-	struct iovec iov;
+	kiovec_t iov;
 	int i, error, npages, count;
 	off_t offset;
 	int *rtvals;
@@ -306,10 +305,6 @@ ncl_putpages(struct vop_putpages_args *ap)
 		printf("ncl_putpages: called on noncache-able vnode\n");
 		mtx_lock(&np->n_mtx);
 	}
-
-	for (i = 0; i < npages; i++)
-		rtvals[i] = VM_PAGER_ERROR;
-
 	/*
 	 * When putting pages, do not extend file past EOF.
 	 */
@@ -320,11 +315,13 @@ ncl_putpages(struct vop_putpages_args *ap)
 	}
 	mtx_unlock(&np->n_mtx);
 
+	for (i = 0; i < npages; i++)
+		rtvals[i] = VM_PAGER_ERROR;
+
 	VM_CNT_INC(v_vnodeout);
 	VM_CNT_ADD(v_vnodepgsout, count);
 
-	iov.iov_base = unmapped_buf;
-	iov.iov_len = count;
+	IOVEC_INIT(&iov, unmapped_buf, count);
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = offset;
@@ -337,8 +334,10 @@ ncl_putpages(struct vop_putpages_args *ap)
 	    cred);
 	crfree(cred);
 
-	if (error == 0 || !nfs_keep_dirty_on_error)
-		vnode_pager_undirty_pages(pages, rtvals, count - uio.uio_resid);
+	if (error == 0 || !nfs_keep_dirty_on_error) {
+		vnode_pager_undirty_pages(pages, rtvals, count - uio.uio_resid,
+		    np->n_size - offset, npages * PAGE_SIZE);
+	}
 	return (rtvals[0]);
 }
 
@@ -364,20 +363,13 @@ nfs_bioread_check_cons(struct vnode *vp, struct thread *td, struct ucred *cred)
 	int error = 0;
 	struct vattr vattr;
 	struct nfsnode *np = VTONFS(vp);
-	int old_lock;
+	bool old_lock;
 
 	/*
-	 * Grab the exclusive lock before checking whether the cache is
-	 * consistent.
-	 * XXX - We can make this cheaper later (by acquiring cheaper locks).
-	 * But for now, this suffices.
+	 * Ensure the exclusove access to the node before checking
+	 * whether the cache is consistent.
 	 */
-	old_lock = ncl_upgrade_vnlock(vp);
-	if (vp->v_iflag & VI_DOOMED) {
-		error = EBADF;
-		goto out;
-	}
-
+	old_lock = ncl_excl_start(vp);
 	mtx_lock(&np->n_mtx);
 	if (np->n_flag & NMODIFIED) {
 		mtx_unlock(&np->n_mtx);
@@ -385,9 +377,7 @@ nfs_bioread_check_cons(struct vnode *vp, struct thread *td, struct ucred *cred)
 			if (vp->v_type != VDIR)
 				panic("nfs: bioread, not dir");
 			ncl_invaldir(vp);
-			error = ncl_vinvalbuf(vp, V_SAVE, td, 1);
-			if (error == 0 && (vp->v_iflag & VI_DOOMED) != 0)
-				error = EBADF;
+			error = ncl_vinvalbuf(vp, V_SAVE | V_ALLOWCLEAN, td, 1);
 			if (error != 0)
 				goto out;
 		}
@@ -403,16 +393,14 @@ nfs_bioread_check_cons(struct vnode *vp, struct thread *td, struct ucred *cred)
 		mtx_unlock(&np->n_mtx);
 		error = VOP_GETATTR(vp, &vattr, cred);
 		if (error)
-			return (error);
+			goto out;
 		mtx_lock(&np->n_mtx);
 		if ((np->n_flag & NSIZECHANGED)
 		    || (NFS_TIMESPEC_COMPARE(&np->n_mtime, &vattr.va_mtime))) {
 			mtx_unlock(&np->n_mtx);
 			if (vp->v_type == VDIR)
 				ncl_invaldir(vp);
-			error = ncl_vinvalbuf(vp, V_SAVE, td, 1);
-			if (error == 0 && (vp->v_iflag & VI_DOOMED) != 0)
-				error = EBADF;
+			error = ncl_vinvalbuf(vp, V_SAVE | V_ALLOWCLEAN, td, 1);
 			if (error != 0)
 				goto out;
 			mtx_lock(&np->n_mtx);
@@ -422,7 +410,7 @@ nfs_bioread_check_cons(struct vnode *vp, struct thread *td, struct ucred *cred)
 		mtx_unlock(&np->n_mtx);
 	}
 out:
-	ncl_downgrade_vnlock(vp, old_lock);
+	ncl_excl_finish(vp, old_lock);
 	return (error);
 }
 
@@ -607,8 +595,6 @@ ncl_bioread(struct vnode *vp, struct uio *uio, int ioflag, struct ucred *cred)
 		    while (error == NFSERR_BAD_COOKIE) {
 			ncl_invaldir(vp);
 			error = ncl_vinvalbuf(vp, 0, td, 1);
-			if (error == 0 && (vp->v_iflag & VI_DOOMED) != 0)
-				return (EBADF);
 
 			/*
 			 * Yuck! The directory has been modified on the
@@ -749,13 +735,12 @@ nfs_directio_write(vp, uiop, cred, ioflag)
 	if (ioflag & IO_SYNC) {
 		int iomode, must_commit;
 		struct uio uio;
-		struct iovec iov;
+		kiovec_t iov;
 do_sync:
 		while (uiop->uio_resid > 0) {
 			size = MIN(uiop->uio_resid, wsize);
 			size = MIN(uiop->uio_iov->iov_len, size);
-			iov.iov_base = uiop->uio_iov->iov_base;
-			iov.iov_len = size;
+			IOVEC_INIT_C(&iov, uiop->uio_iov->iov_base, size);
 			uio.uio_iov = &iov;
 			uio.uio_iovcnt = 1;
 			uio.uio_offset = uiop->uio_offset;
@@ -776,14 +761,12 @@ do_sync:
 				uiop->uio_iovcnt--;
 				uiop->uio_iov++;
 			} else {
-				uiop->uio_iov->iov_base =
-					(char *)uiop->uio_iov->iov_base + size;
-				uiop->uio_iov->iov_len -= size;
+				IOVEC_ADVANCE(uiop->uio_iov, size);
 			}
 		}
 	} else {
 		struct uio *t_uio;
-		struct iovec *t_iov;
+		kiovec_t *t_iov;
 		struct buf *bp;
 
 		/*
@@ -805,9 +788,9 @@ do_sync:
 			size = MIN(uiop->uio_iov->iov_len, size);
 			bp = getpbuf(&ncl_pbuf_freecnt);
 			t_uio = malloc(sizeof(struct uio), M_NFSDIRECTIO, M_WAITOK);
-			t_iov = malloc(sizeof(struct iovec), M_NFSDIRECTIO, M_WAITOK);
-			t_iov->iov_base = malloc(size, M_NFSDIRECTIO, M_WAITOK);
-			t_iov->iov_len = size;
+			t_iov = malloc(sizeof(kiovec_t), M_NFSDIRECTIO, M_WAITOK);
+			IOVEC_INIT(t_iov, malloc(size, M_NFSDIRECTIO, M_WAITOK),
+			    size);
 			t_uio->uio_iov = t_iov;
 			t_uio->uio_iovcnt = 1;
 			t_uio->uio_offset = uiop->uio_offset;
@@ -819,7 +802,7 @@ do_sync:
 			    uiop->uio_segflg == UIO_SYSSPACE,
 			    ("nfs_directio_write: Bad uio_segflg"));
 			if (uiop->uio_segflg == UIO_USERSPACE) {
-				error = copyin(uiop->uio_iov->iov_base,
+				error = copyin_c(uiop->uio_iov->iov_base,
 				    t_iov->iov_base, size);
 				if (error != 0)
 					goto err_free;
@@ -828,7 +811,9 @@ do_sync:
 				 * UIO_SYSSPACE may never happen, but handle
 				 * it just in case it does.
 				 */
-				bcopy(uiop->uio_iov->iov_base, t_iov->iov_base,
+				bcopy((__cheri_fromcap void *)
+				    uiop->uio_iov->iov_base,
+				    (__cheri_fromcap void *)t_iov->iov_base,
 				    size);
 			bp->b_flags |= B_DIRECT;
 			bp->b_iocmd = BIO_WRITE;
@@ -842,7 +827,7 @@ do_sync:
 			error = ncl_asyncio(nmp, bp, NOCRED, td);
 err_free:
 			if (error) {
-				free(t_iov->iov_base, M_NFSDIRECTIO);
+				free_c(t_iov->iov_base, M_NFSDIRECTIO);
 				free(t_iov, M_NFSDIRECTIO);
 				free(t_uio, M_NFSDIRECTIO);
 				bp->b_vp = NULL;
@@ -857,9 +842,7 @@ err_free:
 				uiop->uio_iovcnt--;
 				uiop->uio_iov++;
 			} else {
-				uiop->uio_iov->iov_base =
-					(char *)uiop->uio_iov->iov_base + size;
-				uiop->uio_iov->iov_len -= size;
+				IOVEC_ADVANCE(uiop->uio_iov, size);
 			}
 		}
 	}
@@ -932,8 +915,6 @@ ncl_write(struct vop_write_args *ap)
 			KDTRACE_NFS_ATTRCACHE_FLUSH_DONE(vp);
 			error = ncl_vinvalbuf(vp, V_SAVE | ((ioflag &
 			    IO_VMIO) != 0 ? V_VMIO : 0), td, 1);
-			if (error == 0 && (vp->v_iflag & VI_DOOMED) != 0)
-				error = EBADF;
 			if (error != 0)
 				return (error);
 		} else
@@ -1015,9 +996,6 @@ ncl_write(struct vop_write_args *ap)
 				KDTRACE_NFS_ATTRCACHE_FLUSH_DONE(vp);
 				error = ncl_vinvalbuf(vp, V_SAVE | ((ioflag &
 				    IO_VMIO) != 0 ? V_VMIO : 0), td, 1);
-				if (error == 0 &&
-				    (vp->v_iflag & VI_DOOMED) != 0)
-					error = EBADF;
 				if (error != 0)
 					return (error);
 				wouldcommit = biosize;
@@ -1335,13 +1313,13 @@ ncl_vinvalbuf(struct vnode *vp, int flags, struct thread *td, int intrflg)
 	struct nfsnode *np = VTONFS(vp);
 	struct nfsmount *nmp = VFSTONFS(vp->v_mount);
 	int error = 0, slpflag, slptimeo;
-	int old_lock = 0;
+	bool old_lock;
 
 	ASSERT_VOP_LOCKED(vp, "ncl_vinvalbuf");
 
 	if ((nmp->nm_flag & NFSMNT_INT) == 0)
 		intrflg = 0;
-	if ((nmp->nm_mountp->mnt_kern_flag & MNTK_UNMOUNTF))
+	if (NFSCL_FORCEDISM(nmp->nm_mountp))
 		intrflg = 1;
 	if (intrflg) {
 		slpflag = PCATCH;
@@ -1351,16 +1329,9 @@ ncl_vinvalbuf(struct vnode *vp, int flags, struct thread *td, int intrflg)
 		slptimeo = 0;
 	}
 
-	old_lock = ncl_upgrade_vnlock(vp);
-	if (vp->v_iflag & VI_DOOMED) {
-		/*
-		 * Since vgonel() uses the generic vinvalbuf() to flush
-		 * dirty buffers and it does not call this function, it
-		 * is safe to just return OK when VI_DOOMED is set.
-		 */
-		ncl_downgrade_vnlock(vp, old_lock);
-		return (0);
-	}
+	old_lock = ncl_excl_start(vp);
+	if (old_lock)
+		flags |= V_ALLOWCLEAN;
 
 	/*
 	 * Now, flush as required.
@@ -1399,7 +1370,7 @@ ncl_vinvalbuf(struct vnode *vp, int flags, struct thread *td, int intrflg)
 		np->n_flag &= ~NMODIFIED;
 	mtx_unlock(&np->n_mtx);
 out:
-	ncl_downgrade_vnlock(vp, old_lock);
+	ncl_excl_finish(vp, old_lock);
 	return error;
 }
 
@@ -1563,13 +1534,13 @@ ncl_doio_directwrite(struct buf *bp)
 {
 	int iomode, must_commit;
 	struct uio *uiop = (struct uio *)bp->b_caller1;
-	char *iov_base = uiop->uio_iov->iov_base;
+	char * __capability iov_base = uiop->uio_iov->iov_base;
 
 	iomode = NFSWRITE_FILESYNC;
 	uiop->uio_td = NULL; /* NULL since we're in nfsiod */
 	ncl_writerpc(bp->b_vp, uiop, bp->b_wcred, &iomode, &must_commit, 0);
 	KASSERT((must_commit == 0), ("ncl_doio_directwrite: Did not commit write"));
-	free(iov_base, M_NFSDIRECTIO);
+	free_c(iov_base, M_NFSDIRECTIO);
 	free(uiop->uio_iov, M_NFSDIRECTIO);
 	free(uiop, M_NFSDIRECTIO);
 	if ((bp->b_flags & B_DIRECT) && bp->b_iocmd == BIO_WRITE) {
@@ -1609,7 +1580,7 @@ ncl_doio(struct vnode *vp, struct buf *bp, struct ucred *cr, struct thread *td,
 	struct nfsmount *nmp;
 	int error = 0, iomode, must_commit = 0;
 	struct uio uio;
-	struct iovec io;
+	kiovec_t io;
 	struct proc *p = td ? td->td_proc : NULL;
 	uint8_t	iocmd;
 
@@ -1632,8 +1603,8 @@ ncl_doio(struct vnode *vp, struct buf *bp, struct ucred *cr, struct thread *td,
 	KASSERT(!(bp->b_flags & B_DONE), ("ncl_doio: bp %p already marked done", bp));
 	iocmd = bp->b_iocmd;
 	if (iocmd == BIO_READ) {
-	    io.iov_len = uiop->uio_resid = bp->b_bcount;
-	    io.iov_base = bp->b_data;
+	    uiop->uio_resid = bp->b_bcount;
+	    IOVEC_INIT(&io, bp->b_data, bp->b_bcount);
 	    uiop->uio_rw = UIO_READ;
 
 	    switch (vp->v_type) {
@@ -1734,11 +1705,12 @@ ncl_doio(struct vnode *vp, struct buf *bp, struct ucred *cr, struct thread *td,
 	    mtx_unlock(&np->n_mtx);
 
 	    if (bp->b_dirtyend > bp->b_dirtyoff) {
-		io.iov_len = uiop->uio_resid = bp->b_dirtyend
+		uiop->uio_resid = bp->b_dirtyend
 		    - bp->b_dirtyoff;
 		uiop->uio_offset = (off_t)bp->b_blkno * DEV_BSIZE
 		    + bp->b_dirtyoff;
-		io.iov_base = (char *)bp->b_data + bp->b_dirtyoff;
+		IOVEC_INIT(&io, (char *)bp->b_data + bp->b_dirtyoff,
+		    uiop->uio_resid);
 		uiop->uio_rw = UIO_WRITE;
 		NFSINCRGLOBAL(nfsstatsv1.write_bios);
 

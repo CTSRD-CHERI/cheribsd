@@ -189,7 +189,7 @@ swap_file_write(struct chip_swap *swap, struct block_state *blk_state)
 	struct mount *mp;
 	struct vnode *vp;
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 
 	if (swap == NULL || blk_state == NULL)
 		return (-1);
@@ -206,8 +206,7 @@ swap_file_write(struct chip_swap *swap, struct block_state *blk_state)
 	bzero(&aiov, sizeof(aiov));
 	bzero(&auio, sizeof(auio));
 
-	aiov.iov_base = blk_space->blk_ptr;
-	aiov.iov_len = swap->blk_size;
+	IOVEC_INIT(&aiov, blk_space->blk_ptr, swap->blk_size);
 	td = curthread;
 	vp = swap->swap_vp;
 
@@ -235,7 +234,7 @@ swap_file_read(struct chip_swap *swap, struct block_state *blk_state)
 	struct thread *td;
 	struct vnode *vp;
 	struct uio auio;
-	struct iovec aiov;
+	kiovec_t aiov;
 
 	if (swap == NULL || blk_state == NULL)
 		return (-1);
@@ -248,8 +247,7 @@ swap_file_read(struct chip_swap *swap, struct block_state *blk_state)
 	bzero(&aiov, sizeof(aiov));
 	bzero(&auio, sizeof(auio));
 
-	aiov.iov_base = blk_space->blk_ptr;
-	aiov.iov_len = swap->blk_size;
+	IOVEC_INIT(&aiov, blk_space->blk_ptr, swap->blk_size);
 	td = curthread;
 	vp = swap->swap_vp;
 

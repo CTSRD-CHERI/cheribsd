@@ -272,15 +272,14 @@ get_next_dirent(struct vnode *vp, struct dirent **dpp, char *dirbuf,
 {
 	int error, reclen;
 	struct uio uio;
-	struct iovec iov;
+	kiovec_t iov;
 	struct dirent *dp;
 
 	KASSERT(VOP_ISLOCKED(vp), ("vp %p is not locked", vp));
 	KASSERT(vp->v_type == VDIR, ("vp %p is not a directory", vp));
 
 	if (*len == 0) {
-		iov.iov_base = dirbuf;
-		iov.iov_len = dirbuflen;
+		IOVEC_INIT(&iov, dirbuf, dirbuflen);
 
 		uio.uio_iov = &iov;
 		uio.uio_iovcnt = 1;
@@ -486,20 +485,11 @@ vop_stdpathconf(ap)
 		case _PC_LINK_MAX:
 			*ap->a_retval = LINK_MAX;
 			return (0);
-		case _PC_MAX_CANON:
-			*ap->a_retval = MAX_CANON;
-			return (0);
-		case _PC_MAX_INPUT:
-			*ap->a_retval = MAX_INPUT;
-			return (0);
 		case _PC_PIPE_BUF:
 			*ap->a_retval = PIPE_BUF;
 			return (0);
 		case _PC_CHOWN_RESTRICTED:
 			*ap->a_retval = 1;
-			return (0);
-		case _PC_VDISABLE:
-			*ap->a_retval = _POSIX_VDISABLE;
 			return (0);
 		default:
 			return (EINVAL);
@@ -938,7 +928,7 @@ vop_stdallocate(struct vop_allocate_args *ap)
 	struct statfs *sfs;
 	off_t maxfilesize = 0;
 #endif
-	struct iovec aiov;
+	kiovec_t aiov;
 	struct vattr vattr, *vap;
 	struct uio auio;
 	off_t fsize, len, cur, offset;
@@ -1015,8 +1005,7 @@ vop_stdallocate(struct vop_allocate_args *ap)
 		if (cur > len)
 			cur = len;
 		if (offset < fsize) {
-			aiov.iov_base = buf;
-			aiov.iov_len = cur;
+			IOVEC_INIT(&aiov, buf, cur);
 			auio.uio_iov = &aiov;
 			auio.uio_iovcnt = 1;
 			auio.uio_offset = offset;
@@ -1035,8 +1024,7 @@ vop_stdallocate(struct vop_allocate_args *ap)
 			bzero(buf, cur);
 		}
 
-		aiov.iov_base = buf;
-		aiov.iov_len = cur;
+		IOVEC_INIT(&aiov, buf, cur);
 		auio.uio_iov = &aiov;
 		auio.uio_iovcnt = 1;
 		auio.uio_offset = offset;

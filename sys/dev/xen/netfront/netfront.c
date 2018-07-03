@@ -74,8 +74,8 @@ __FBSDID("$FreeBSD$");
 /* Features supported by all backends.  TSO and LRO can be negotiated */
 #define XN_CSUM_FEATURES	(CSUM_TCP | CSUM_UDP)
 
-#define NET_TX_RING_SIZE __RING_SIZE((netif_tx_sring_t *)0, PAGE_SIZE)
-#define NET_RX_RING_SIZE __RING_SIZE((netif_rx_sring_t *)0, PAGE_SIZE)
+#define NET_TX_RING_SIZE __CONST_RING_SIZE(netif_tx, PAGE_SIZE)
+#define NET_RX_RING_SIZE __CONST_RING_SIZE(netif_rx, PAGE_SIZE)
 
 #define NET_RX_SLOTS_MIN (XEN_NETIF_NR_SLOTS_MIN + 1)
 
@@ -1749,7 +1749,7 @@ xn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	dev = sc->xbdev;
 
 	switch(cmd) {
-	case SIOCSIFADDR:
+	CASE_IOC_IFREQ(SIOCSIFADDR):
 #ifdef INET
 		XN_LOCK(sc);
 		if (ifa->ifa_addr->sa_family == AF_INET) {
@@ -1766,15 +1766,15 @@ xn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 #endif
 		break;
-	case SIOCSIFMTU:
-		if (ifp->if_mtu == ifr->ifr_mtu)
+	CASE_IOC_IFREQ(SIOCSIFMTU):
+		if (ifp->if_mtu == ifr_mtu_get(ifr))
 			break;
 
-		ifp->if_mtu = ifr->ifr_mtu;
+		ifp->if_mtu = ifr_mtu_get(ifr);
 		ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 		xn_ifinit(sc);
 		break;
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		XN_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			/*
@@ -1794,8 +1794,8 @@ xn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->xn_if_flags = ifp->if_flags;
 		XN_UNLOCK(sc);
 		break;
-	case SIOCSIFCAP:
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+	CASE_IOC_IFREQ(SIOCSIFCAP):
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		reinit = 0;
 
 		if (mask & IFCAP_TXCSUM) {
@@ -1855,10 +1855,10 @@ xn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		 */
 		error = tsleep(sc, 0, "xn_rst", 30*hz);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->sc_media, cmd);
 		break;

@@ -87,6 +87,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_provenance"
+ *   ],
+ *   "change_comment": "dlfunc() vs dlsym()"
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sys/cdefs.h>
 #include <sys/types.h>
@@ -267,7 +278,7 @@ _citrus_find_getops(_citrus_module_t handle, const char *modname,
 
 	snprintf(name, sizeof(name), "_citrus_%s_%s_getops",
 	    modname, ifname);
-	p = dlsym((void *)handle, name);
+	p = dlfunc((void *)handle, name);
 	return (p);
 }
 

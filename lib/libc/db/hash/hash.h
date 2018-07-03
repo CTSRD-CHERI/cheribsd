@@ -32,6 +32,16 @@
  *	@(#)hash.h	8.3 (Berkeley) 5/31/94
  * $FreeBSD$
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_bit_flags",
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 /* Operations */
 typedef enum {

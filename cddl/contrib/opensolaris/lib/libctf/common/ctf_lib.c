@@ -20,6 +20,16 @@
  * CDDL HEADER END
  */
 /*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_alignment"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
+/*
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -200,10 +210,16 @@ ctf_sect_mmap(ctf_sect_t *sp, int fd)
 void
 ctf_sect_munmap(const ctf_sect_t *sp)
 {
-	uintptr_t addr = (uintptr_t)sp->cts_data;
-	uintptr_t pageoff = addr & (uintptr_t)~_PAGEMASK;
+#if __has_builtin(__builtin_align_down)
+	void *base = __builtin_align_down(sp->cts_data, _PAGESIZE);
+	size_t pageoff = sp->cts_data - base;
+#else
+	size_t addr = (size_t)sp->cts_data;
+	size_t pageoff = addr & ~_PAGEMASK;
+	void *base = (void *)(addr - pageoff);
+#endif
 
-	(void) munmap((void *)(addr - pageoff), sp->cts_size + pageoff);
+	(void) munmap(base, sp->cts_size + pageoff);
 }
 
 /*

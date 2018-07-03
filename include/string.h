@@ -167,11 +167,6 @@ int	 strncmp_c(__capability const char *, __capability const char *,
 __capability char
 *strncpy_c(__capability char * __restrict, __capability const char * __restrict,
 	    size_t);
-char	 *strncpy_c_fromcap(char * __restrict,
-	    __capability const char * __restrict, size_t);
-__capability char
-	*strncpy_c_tocap(__capability char * __restrict,
-	    const char * __restrict, size_t);
 size_t	 strnlen_c(__capability const char *, size_t) __pure;
 #endif
 

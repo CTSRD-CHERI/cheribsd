@@ -38,12 +38,13 @@
 #ifndef _SYS_SYSTM_H_
 #define	_SYS_SYSTM_H_
 
-#include <machine/atomic.h>
-#include <machine/cpufunc.h>
 #include <sys/callout.h>
-#include <sys/cdefs.h>
 #include <sys/queue.h>
 #include <sys/stdint.h>		/* for people using printf mainly */
+
+#include <machine/atomic.h>
+#include <machine/cpufunc.h>
+#include <machine/pcb.h>
 
 __NULLABILITY_PRAGMA_PUSH
 
@@ -135,9 +136,44 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
 #define	SCHEDULER_STOPPED() SCHEDULER_STOPPED_TD(curthread)
 
 /*
+ * Macros to create userspace capabilities from virtual addresses.
+ * Addresses are assumed to be relative to the current userspace
+ * thread's address space and are created from the DDC or PCC of
+ * the current PCB.
+ */
+#if __has_feature(capabilities)
+#define	__USER_CAP_UNBOUND(ptr)						\
+    ((ptr) == NULL ? NULL :						\
+	__builtin_cheri_offset_set(curthread->td_pcb->pcb_regs.ddc,	\
+	(vaddr_t)(ptr)))
+
+#define	__USER_CODE_CAP(ptr)						\
+    ((ptr) == NULL ? NULL :						\
+	__builtin_cheri_offset_set(curthread->td_pcb->pcb_regs.pcc,	\
+	(vaddr_t)(ptr)))
+
+#else /* !has_feature(capabilities) */
+#define	__USER_CAP_UNBOUND(ptr)	(ptr)
+#define	__USER_CODE_CAP(ptr)	(ptr)
+#endif /* !has_feature(capabilities) */
+
+#define	__USER_CAP(ptr, len)	__USER_CAP_UNBOUND(ptr)
+#define	__USER_CAP_ADDR(ptr)	__USER_CAP_UNBOUND(ptr)
+#define	__USER_CAP_ARRAY(objp, cnt) \
+     __USER_CAP((objp), sizeof(*(objp)) * (cnt))
+#define	__USER_CAP_OBJ(objp)	__USER_CAP((objp), sizeof(*(objp)))
+/*
+ * NOTE: we can't place tigher bounds because we don't know what the
+ * length is until after we use it.
+ * XXX: We should probably have a __USER_CAP_PATH() with a MAXPATH limit.
+ */
+#define	__USER_CAP_STR(strp)	__USER_CAP_UNBOUND(strp)
+
+/*
  * Align variables.
  */
 #define	__read_mostly		__section(".data.read_mostly")
+#define	__read_frequently	__section(".data.read_frequently")
 #define	__exclusive_cache_line	__aligned(CACHE_LINE_SIZE) \
 				    __section(".data.exclusive_cache_line")
 /*
@@ -257,18 +293,42 @@ void	hexdump(const void *ptr, int length, const char *hdr, int flags);
 #define ovbcopy(f, t, l) bcopy((f), (t), (l))
 void	bcopy(const void * _Nonnull from, void * _Nonnull to, size_t len);
 #if __has_feature(capabilities)
+void	bcopy_c(const void * _Nonnull __capability from,
+	    void * _Nonnull __capability to, size_t len);
 void	bcopynocap_c(const void * _Nonnull __capability from,
 	    void * _Nonnull __capability to, size_t len);
+void	cheri_bcopy(const void *src, void *dst, size_t len);
+#else
+#define	bcopy_c		bcopy
+#define	bcopynocap_c	bcopy
+#define	cheri_bcopy	bcopy
 #endif
 void	bzero(void * _Nonnull buf, size_t len);
+#define bzero(buf, len) ({				\
+	if (__builtin_constant_p(len) && (len) <= 64)	\
+		__builtin_memset((buf), 0, (len));	\
+	else						\
+		bzero((buf), (len));			\
+})
 void	explicit_bzero(void * _Nonnull, size_t);
 
 void	*memcpy(void * _Nonnull to, const void * _Nonnull from, size_t len);
 #if __has_feature(capabilities)
+void	*memcpy_c(void * _Nonnull __capability to,
+	    const void * _Nonnull __capability from, size_t len);
 void	*memcpynocap_c(void * _Nonnull __capability to,
 	    const void * _Nonnull __capability from, size_t len);
+void	*cheri_memcpy(void *dst, const void *src, size_t len);
+#else
+#define	cheri_memcpy	memcpy
 #endif
 void	*memmove(void * _Nonnull dest, const void * _Nonnull src, size_t n);
+#if __has_feature(capabilities)
+void	*memmove_c(void * _Nonnull __capability dest,
+	    const void * _Nonnull __capability src, size_t n);
+void	*memmovenocap_c(void * _Nonnull __capability dest,
+	    const void * _Nonnull __capability src, size_t n);
+#endif
 
 struct copy_map {
 	size_t	len;
@@ -279,6 +339,13 @@ struct copy_map {
 int	copystr(const void * _Nonnull __restrict kfaddr,
 	    void * _Nonnull __restrict kdaddr, size_t len,
 	    size_t * __restrict lencopied);
+#if __has_feature(capabilities)
+int	copystr_c(const void * __capability _Nonnull __restrict kfaddr,
+	    void * __capability _Nonnull __restrict kdaddr, size_t len,
+	    size_t * __capability __restrict lencopied);
+#else
+#define	copystr_c	copystr
+#endif
 int	copyinstr(const void * __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len,
 	    size_t * __restrict lencopied);
@@ -287,64 +354,52 @@ int	copyinstr_c(const void * _Nonnull __restrict __CAPABILITY udaddr,
 	    void * _Nonnull __restrict __CAPABILITY kaddr, size_t len,
 	    size_t * __restrict __CAPABILITY lencopied);
 #else
-static inline
-int
-copyinstr_c(const void * __restrict udaddr,
-    void * _Nonnull __restrict kaddr, size_t len,
-    size_t * __restrict lencopied) {
-
-	return (copyinstr(udaddr, kaddr, len, lencopied));
-}
+#define	copyinstr_c	copyinstr
 #endif
 int	copyin(const void * _Nonnull __restrict udaddr,
+	    void * _Nonnull __restrict kaddr, size_t len);
+int	copyin_implicit_cap(const void * _Nonnull __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
 #if __has_feature(capabilities)
 int	copyin_c(const void * _Nonnull __restrict __capability udaddr,
 	    void * _Nonnull __restrict __capability kaddr, size_t len);
+int	copyincap_c(const void * _Nonnull __restrict __capability udaddr,
+	    void * _Nonnull __restrict __capability kaddr, size_t len);
 #else
-static inline int
-copyin_c(const void * _Nonnull __restrict uaddr,
-    void * _Nonnull __restrict kaddr, size_t len)
-{
-
-	return(copyin(uaddr, kaddr, len));
-}
-#endif
-#ifdef CPU_CHERI
-int	copyincap(const void * _Nonnull __restrict udaddr,
-	    void * _Nonnull __restrict kaddr, size_t len);
+#define	copyin_c	copyin
+#define	copyincap_c	copyin
 #endif
 int	copyin_nofault(const void * _Nonnull __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
+#if __has_feature(capabilities)
+int	copyin_nofault_c(const void * __capability _Nonnull __restrict udaddr,
+	    void * __capability _Nonnull __restrict kaddr, size_t len);
+#else
+#define	copyin_nofault_c	copyin_nofault
+#endif
 int	copyout(const void * _Nonnull __restrict kaddr,
 	    void * _Nonnull __restrict udaddr, size_t len);
-int	copyout_part(const void * _Nonnull __restrict kaddr,
-	     void * _Nonnull __restrict udaddr,
-	    struct copy_map * _Nonnull cmap, size_t cmap_ents);
+int	copyout_implicit_cap(const void * _Nonnull __restrict kaddr,
+	    void * _Nonnull __restrict udaddr, size_t len);
 
 #if __has_feature(capabilities)
 int	copyout_c(const void * _Nonnull __restrict __capability kaddr,
 	    void * _Nonnull __restrict __capability udaddr, size_t len);
-int	copyoutcap(const void * _Nonnull __restrict kaddr,
-	    void * _Nonnull __restrict udaddr, size_t len);
+int	copyoutcap_c(const void * __capability _Nonnull __restrict kaddr,
+	    void * __capability _Nonnull __restrict udaddr, size_t len);
 #else
-static inline int
-copyout_c(const void * _Nonnull __restrict kaddr,
-    void * _Nonnull __restrict udaddr, size_t len)
-{
-
-	return (copyout(kaddr, udaddr, len));
-}
-static inline int
-copyoutcap(const void * _Nonnull __restrict kaddr,
-    void * _Nonnull __restrict udaddr, size_t len)
-{
-
-	return (copyout(kaddr, udaddr, len));
-}
+#define	copyout_c	copyout
+#define	copyoutcap	copyout
+#define	copyoutcap_c	copyout
 #endif
 int	copyout_nofault(const void * _Nonnull __restrict kaddr,
 	    void * _Nonnull __restrict udaddr, size_t len);
+#if __has_feature(capabilities)
+int	copyout_nofault_c(const void * __capability _Nonnull __restrict kaddr,
+	    void * __capability _Nonnull __restrict udaddr, size_t len);
+#else
+#define	copyout_nofault_c	copyout_nofault
+#endif
 
 int	fubyte(volatile const void *base);
 long	fuword(volatile const void *base);
@@ -365,6 +420,48 @@ int	casueword32(volatile uint32_t *base, uint32_t oldval, uint32_t *oldvalp,
 	    uint32_t newval);
 int	casueword(volatile u_long *p, u_long oldval, u_long *oldvalp,
 	    u_long newval);
+
+#if __has_feature(capabilities)
+int	fubyte_c(volatile const void * __capability base);
+long	fuword_c(volatile const void * __capability base);
+int	fuword16_c(volatile const void * __capability base);
+int32_t	fuword32_c(volatile const void * __capability base);
+int64_t	fuword64_c(volatile const void * __capability base);
+int	fuecap_c(volatile const void * __capability base, intcap_t *val);
+int	fueword_c(volatile const void * __capability base, long *val);
+int	fueword32_c(volatile const void * __capability base, int32_t *val);
+int	fueword64_c(volatile const void * __capability base, int64_t *val);
+int	subyte_c(volatile void * __capability base, int byte);
+int	suword_c(volatile void * __capability base, long word);
+int	suword16_c(volatile void * __capability base, int word);
+int	suword32_c(volatile void * __capability base, int32_t word);
+int	suword64_c(volatile void * __capability base, int64_t word);
+uint32_t casuword32_c(volatile uint32_t * __capability base, uint32_t oldval,
+	    uint32_t newval);
+u_long	casuword_c(volatile u_long * __capability base, u_long oldval,
+	    u_long newval);
+int	casueword_c(volatile u_long * __capability base, u_long oldval,
+	    u_long *oldvalp, u_long newval);
+int	casueword32_c(volatile uint32_t * __capability base, uint32_t oldval,
+	    uint32_t *oldvalp, uint32_t newval);
+#else
+#define	fubyte_c	fubyte
+#define	fuword_c	fuword
+#define	fuword16_c	fuword16
+#define	fuword32_c	fuword32
+#define	fuword64_c	fuword64
+#define	fuecap_c	fuecap
+#define	fueword_c	fueword
+#define	fueword32_c	fueword32
+#define	subyte_c	subyte
+#define	suword_c	suword
+#define	suword16_c	suword16
+#define	suword32_c	suword32
+#define	suword64_c	suword64
+#define	casuword32_c	casuword32
+#define	casuword_c	casuword
+#define	casueword32_c	casueword32
+#endif
 
 void	realitexpire(void *);
 
@@ -512,6 +609,7 @@ struct unrhdr;
 struct unrhdr *new_unrhdr(int low, int high, struct mtx *mutex);
 void init_unrhdr(struct unrhdr *uh, int low, int high, struct mtx *mutex);
 void delete_unrhdr(struct unrhdr *uh);
+void clear_unrhdr(struct unrhdr *uh);
 void clean_unrhdr(struct unrhdr *uh);
 void clean_unrhdrl(struct unrhdr *uh);
 int alloc_unr(struct unrhdr *uh);

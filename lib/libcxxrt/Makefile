@@ -5,7 +5,6 @@
 PACKAGE=	clibs
 .if ${MK_CHERI} != "no"
 WANT_CHERI?=	hybrid
-ALLOW_SHARED_TEXTREL=yes
 SRCDIR=		${SRCTOP}/contrib/cheri-libcxxrt/src
 .else
 SRCDIR=		${SRCTOP}/contrib/cheri-libcxxrt/src

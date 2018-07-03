@@ -146,11 +146,13 @@ TUNABLE_INT("hw.awg.rx_batch", &awg_rx_batch);
 enum awg_type {
 	EMAC_A83T = 1,
 	EMAC_H3,
+	EMAC_A64,
 };
 
 static struct ofw_compat_data compat_data[] = {
 	{ "allwinner,sun8i-a83t-emac",		EMAC_A83T },
 	{ "allwinner,sun8i-h3-emac",		EMAC_H3 },
+	{ "allwinner,sun50i-a64-emac",		EMAC_A64 },
 	{ NULL,					0 }
 };
 
@@ -984,7 +986,7 @@ awg_ioctl(if_t ifp, u_long cmd, caddr_t data)
 	error = 0;
 
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		AWG_LOCK(sc);
 		if (if_getflags(ifp) & IFF_UP) {
 			if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
@@ -1000,23 +1002,23 @@ awg_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		sc->if_flags = if_getflags(ifp);
 		AWG_UNLOCK(sc);
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
 			AWG_LOCK(sc);
 			awg_setup_rxfilter(sc);
 			AWG_UNLOCK(sc);
 		}
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
-	case SIOCSIFCAP:
-		mask = ifr->ifr_reqcap ^ if_getcapenable(ifp);
+	CASE_IOC_IFREQ(SIOCSIFCAP):
+		mask = ifr_reqcap_get(ifr) ^ if_getcapenable(ifp);
 #ifdef DEVICE_POLLING
 		if (mask & IFCAP_POLLING) {
-			if ((ifr->ifr_reqcap & IFCAP_POLLING) != 0) {
+			if ((ifr_reqcap_get(ifr) & IFCAP_POLLING) != 0) {
 				error = ether_poll_register(awg_poll, ifp);
 				if (error != 0)
 					break;
@@ -1039,10 +1041,10 @@ awg_ioctl(if_t ifp, u_long cmd, caddr_t data)
 			if_togglecapenable(ifp, IFCAP_RXCSUM);
 		if (mask & IFCAP_TXCSUM)
 			if_togglecapenable(ifp, IFCAP_TXCSUM);
-		if ((if_getcapenable(ifp) & (IFCAP_RXCSUM|IFCAP_TXCSUM)) != 0)
-			if_sethwassistbits(ifp, CSUM_IP, 0);
+		if ((if_getcapenable(ifp) & IFCAP_TXCSUM) != 0)
+			if_sethwassistbits(ifp, CSUM_IP | CSUM_UDP | CSUM_TCP, 0);
 		else
-			if_sethwassistbits(ifp, 0, CSUM_IP);
+			if_sethwassistbits(ifp, 0, CSUM_IP | CSUM_UDP | CSUM_TCP);
 		break;
 	default:
 		error = ether_ioctl(ifp, cmd, data);

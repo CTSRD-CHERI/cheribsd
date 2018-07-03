@@ -192,7 +192,12 @@ _thr_rtld_init(void)
 	curthread = _get_curthread();
 
 	/* force to resolve _umtx_op PLT */
-	_umtx_op_err((struct umtx *)&dummy, UMTX_OP_WAKE, 1, 0, 0);
+	/*
+	 * XXXAR: this line here hangs when running Qt unit tests, let's just
+	 * use an invalid opcode to get EINVAL
+	 */
+	/* _umtx_op_err((struct umtx *)&dummy, UMTX_OP_WAKE, 1, 0, 0); */
+	_umtx_op_err((struct umtx *)&dummy, INT_MAX, 1, 0, 0);
 	
 	/* force to resolve errno() PLT */
 	__error();

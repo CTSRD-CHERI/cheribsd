@@ -36,6 +36,17 @@
  * File: am-utils/libamu/misc_rpc.c
  *
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "function_abi",
+ *   ],
+ *   "change_comment": "SunRPC"
+ * }
+ * CHERI CHANGES END
+ */
 
 /*
  * Additions to Sun RPC.

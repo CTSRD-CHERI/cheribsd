@@ -3319,9 +3319,9 @@ al_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int			error = 0;
 
 	switch (command) {
-	case SIOCSIFMTU:
+	CASE_IOC_IFREQ(SIOCSIFMTU):
 	{
-		error = al_eth_check_mtu(adapter, ifr->ifr_mtu);
+		error = al_eth_check_mtu(adapter, ifr_mtu_get(ifr));
 		if (error != 0) {
 			device_printf(adapter->dev, "ioctl wrong mtu %u\n",
 			    adapter->netdev->if_mtu);
@@ -3329,11 +3329,11 @@ al_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 
 		ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
-		adapter->netdev->if_mtu = ifr->ifr_mtu;
+		adapter->netdev->if_mtu = ifr_mtu_get(ifr);
 		al_init(adapter);
 		break;
 	}
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
 				if (((ifp->if_flags ^ adapter->if_flags) &
@@ -3357,8 +3357,8 @@ al_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		adapter->if_flags = ifp->if_flags;
 		break;
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
 			device_printf_dbg(adapter->dev,
 			    "ioctl add/del multi before\n");
@@ -3368,7 +3368,7 @@ al_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 #endif
 		}
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		if (adapter->mii != NULL)
 			error = ifmedia_ioctl(ifp, ifr,
@@ -3377,15 +3377,15 @@ al_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			error = ifmedia_ioctl(ifp, ifr,
 			    &adapter->media, command);
 		break;
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 	    {
 		int mask, reinit;
 
 		reinit = 0;
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 #ifdef DEVICE_POLLING
 		if ((mask & IFCAP_POLLING) != 0) {
-			if ((ifr->ifr_reqcap & IFCAP_POLLING) != 0) {
+			if ((ifr_reqcap_get(ifr) & IFCAP_POLLING) != 0) {
 				if (error != 0)
 					return (error);
 				ifp->if_capenable |= IFCAP_POLLING;

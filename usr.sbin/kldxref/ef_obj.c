@@ -33,6 +33,16 @@
  *
  * $FreeBSD$
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_alignment"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sys/param.h>
 #include <sys/linker.h>
@@ -502,14 +512,14 @@ ef_obj_open(const char *filename, struct elf_file *efile, int verbose)
 		switch (shdr[i].sh_type) {
 		case SHT_PROGBITS:
 		case SHT_NOBITS:
+#if __has_builtin(__builtin_align_up)
+			mapbase = __builtin_align_up(mapbase,
+			    shdr[i].sh_addralign);
+#else
 			alignmask = shdr[i].sh_addralign - 1;
 			mapbase += alignmask;
-			/*
-			 * CHERI: This is safe due to the use of
-			 * posix_memalign to allocate the space with at
-			 * least the required alignment.
-			 */
-			mapbase  = (char *)((uintptr_t)mapbase & (uintptr_t)~alignmask);
+			mapbase  = (char *)((uintptr_t)mapbase & ~alignmask);
+#endif
 			ef->progtab[pb].addr = (void *)(uintptr_t)mapbase;
 			if (shdr[i].sh_type == SHT_PROGBITS) {
 				ef->progtab[pb].name = "<<PROGBITS>>";

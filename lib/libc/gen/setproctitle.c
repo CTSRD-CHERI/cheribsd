@@ -14,6 +14,17 @@
  * 3. Absolutely no warranty of function or purpose is made by the author
  *    Peter Wemm.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "unsupported"
+ *   ],
+ *   "change_comment": "ps_string not currently supported"
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");

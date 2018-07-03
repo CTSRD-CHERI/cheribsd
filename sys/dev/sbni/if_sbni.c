@@ -1105,7 +1105,7 @@ sbni_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	error = 0;
 
 	switch (command) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		/*
 		 * If the interface is marked up and stopped, then start it.
 		 * If it is marked down and running, then stop it.
@@ -1122,8 +1122,8 @@ sbni_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		SBNI_UNLOCK(sc);
 		break;
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		/*
 		 * Multicast list has changed; set the hardware filter
 		 * accordingly.
@@ -1136,7 +1136,7 @@ sbni_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		/*
 		 * SBNI specific ioctl
 		 */
-	case SIOCGHWFLAGS:	/* get flags */
+	CASE_IOC_IFREQ(SIOCGHWFLAGS):	/* get flags */
 		SBNI_LOCK(sc);
 		bcopy((caddr_t)IF_LLADDR(sc->ifp)+3, (caddr_t) &flags, 3);
 		flags.rxl = sc->cur_rxl_index;
@@ -1144,29 +1144,27 @@ sbni_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		flags.fixed_rxl = (sc->delta_rxl == 0);
 		flags.fixed_rate = 1;
 		SBNI_UNLOCK(sc);
-		ifr->ifr_data = *(caddr_t*) &flags;
+		bcopy(&flags, &ifr->ifr_ifru, sizeof(flags));
 		break;
 
-	case SIOCGINSTATS:
-#ifdef CPU_CHERI
-#error Unvalidatable ifr_data use.  Unsafe with CheriABI.
-#endif
+	CASE_IOC_IFREQ(SIOCGINSTATS):
 		in_stats = malloc(sizeof(struct sbni_in_stats), M_DEVBUF,
 		    M_WAITOK);
 		SBNI_LOCK(sc);
 		bcopy(&sc->in_stats, in_stats, sizeof(struct sbni_in_stats));
 		SBNI_UNLOCK(sc);
-		error = copyout(ifr->ifr_data, in_stats,
+		error = copyout_c(ifr_data_get_ptr(ifr),
+		    (__cheri_tocap struct sbni_in_stats * __capability)in_stats,
 		    sizeof(struct sbni_in_stats));
 		free(in_stats, M_DEVBUF);
 		break;
 
-	case SIOCSHWFLAGS:	/* set flags */
+	CASE_IOC_IFREQ(SIOCSHWFLAGS):	/* set flags */
 		/* root only */
 		error = priv_check(td, PRIV_DRIVER);
 		if (error)
 			break;
-		flags = *(struct sbni_flags*)&ifr->ifr_data;
+		bcopy(&ifr->ifr_ifru, &flags, sizeof(flags));
 		SBNI_LOCK(sc);
 		if (flags.fixed_rxl) {
 			sc->delta_rxl = 0;
@@ -1186,7 +1184,7 @@ sbni_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		SBNI_UNLOCK(sc);
 		break;
 
-	case SIOCRINSTATS:
+	CASE_IOC_IFREQ(SIOCRINSTATS):
 		SBNI_LOCK(sc);
 		if (!(error = priv_check(td, PRIV_DRIVER)))	/* root only */
 			bzero(&sc->in_stats, sizeof(struct sbni_in_stats));

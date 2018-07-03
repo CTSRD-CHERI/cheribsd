@@ -86,11 +86,13 @@ _meta_filemon=	1
 # Skip reading .depend when not needed to speed up tree-walks and simple
 # lookups.  See _SKIP_BUILD logic in bsd.init.mk for more details.
 # Also skip generating or including .depend.* files if in meta+filemon mode
-# since it will track dependencies itself.  OBJS_DEPEND_GUESS is still used.
-.if defined(_SKIP_BUILD) || defined(_meta_filemon)
-_SKIP_READ_DEPEND=	1
-.if ${MK_DIRDEPS_BUILD} == "no" || make(analyze) || make(print-dir) || \
-    make(obj) || make(clean*) || make(destroy*)
+# since it will track dependencies itself.  OBJS_DEPEND_GUESS is still used
+# for _meta_filemon but not for _SKIP_DEPEND.
+.if !defined(NO_SKIP_DEPEND) && defined(_SKIP_BUILD)
+_SKIP_DEPEND=	1
+.endif
+.if ${MK_DIRDEPS_BUILD} == "no"
+.if defined(_SKIP_DEPEND) || defined(_meta_filemon)
 .MAKE.DEPENDFILE=	/dev/null
 .endif
 .endif
@@ -99,7 +101,7 @@ _SKIP_READ_DEPEND=	1
 CLEANFILES?=
 
 .for _S in ${SRCS:N*.[dhly]}
-OBJS_DEPEND_GUESS.${_S:R}.o+=	${_S}
+OBJS_DEPEND_GUESS.${_S:${OBJS_SRCS_FILTER:ts:}}.o+=	${_S}
 .endfor
 
 # Lexical analyzers
@@ -178,21 +180,27 @@ DEPEND_MP?=	-MP
 DEPEND_FILTER=	C,/,_,g
 DEPENDSRCS=	${SRCS:M*.[cSC]} ${SRCS:M*.cxx} ${SRCS:M*.cpp} ${SRCS:M*.cc}
 .if !empty(DEPENDSRCS)
-DEPENDOBJS+=	${DEPENDSRCS:R:S,$,.o,}
+DEPENDOBJS+=	${DEPENDSRCS:${OBJS_SRCS_FILTER:ts:}:S,$,.o,}
 .endif
 DEPENDFILES_OBJS=	${DEPENDOBJS:O:u:${DEPEND_FILTER}:C/^/${DEPENDFILE}./}
+.if defined(_SKIP_DEPEND)
+# Don't bother statting any .meta files for .depend*
+${DEPENDOBJS}:	.NOMETA
+${DEPENDFILE}:	.NOMETA
+# Unset these to avoid looping/statting on them later.
+.undef DEPENDSRCS
+.undef DEPENDOBJS
+.undef DEPENDFILES_OBJS
+.endif	# defined(_SKIP_DEPEND)
 DEPEND_CFLAGS+=	-MD ${DEPEND_MP} -MF${DEPENDFILE}.${.TARGET:${DEPEND_FILTER}}
 DEPEND_CFLAGS+=	-MT${.TARGET}
 .if !defined(_meta_filemon)
-.if defined(.PARSEDIR)
+.if !empty(DEPEND_CFLAGS)
 # Only add in DEPEND_CFLAGS for CFLAGS on files we expect from DEPENDOBJS
 # as those are the only ones we will include.
 DEPEND_CFLAGS_CONDITION= "${DEPENDOBJS:${DEPEND_FILTER}:M${.TARGET:${DEPEND_FILTER}}}" != ""
 CFLAGS+=	${${DEPEND_CFLAGS_CONDITION}:?${DEPEND_CFLAGS}:}
-.else
-CFLAGS+=	${DEPEND_CFLAGS}
 .endif
-.if !defined(_SKIP_READ_DEPEND)
 .for __depend_obj in ${DEPENDFILES_OBJS}
 .if ${MAKE_VERSION} < 20160220
 .sinclude "${.OBJDIR}/${__depend_obj}"
@@ -200,7 +208,6 @@ CFLAGS+=	${DEPEND_CFLAGS}
 .dinclude "${.OBJDIR}/${__depend_obj}"
 .endif
 .endfor
-.endif	# !defined(_SKIP_READ_DEPEND)
 .endif	# !defined(_meta_filemon)
 .endif	# defined(SRCS)
 
@@ -231,8 +238,12 @@ _meta_obj=	${.OBJDIR:C,/,_,g}_${__obj:C,/,_,g}.meta
 _meta_obj=	${__obj}.meta
 .endif
 _dep_obj=	${DEPENDFILE}.${__obj:${DEPEND_FILTER}}
-.if (defined(_meta_filemon) && !exists(${.OBJDIR}/${_meta_obj})) || \
-    (!defined(_meta_filemon) && !exists(${.OBJDIR}/${_dep_obj}))
+.if defined(_meta_filemon)
+_depfile=	${.OBJDIR}/${_meta_obj}
+.else
+_depfile=	${.OBJDIR}/${_dep_obj}
+.endif
+.if !exists(${_depfile})
 ${__obj}: ${OBJS_DEPEND_GUESS}
 ${__obj}: ${OBJS_DEPEND_GUESS.${__obj}}
 .elif defined(_meta_filemon)
@@ -243,7 +254,7 @@ ${__obj}: ${OBJS_DEPEND_GUESS.${__obj}}
 # guesses do include headers though since they may not be in SRCS.
 ${__obj}: ${OBJS_DEPEND_GUESS:N*.h}
 ${__obj}: ${OBJS_DEPEND_GUESS.${__obj}}
-.endif
+.endif	# !exists(${_depfile})
 .endfor
 
 # Always run 'make depend' to generate dependencies early and to avoid the
@@ -267,11 +278,13 @@ DPSRCS+= ${SRCS}
 # targets are kept as they be used for generating something.  The target is
 # kept to allow 'make depend' to generate files.
 ${DEPENDFILE}: ${DPSRCS}
+.if !defined(_SKIP_DEPEND)
 .if exists(${.OBJDIR}/${DEPENDFILE}) || \
     ((commands(beforedepend) || \
     (!defined(_meta_filemon) && commands(_EXTRADEPEND)) || \
     commands(afterdepend)) && !empty(.MAKE.MODE:Mmeta))
 	rm -f ${DEPENDFILE}
+.endif
 .endif
 .if !defined(_meta_filemon) && target(_EXTRADEPEND)
 _EXTRADEPEND: .USE

@@ -51,7 +51,7 @@ static void
 hybridabi_capability_set_user_ddc(void * __capability *cp)
 {
 
-	cheri_capability_set(cp, CHERI_CAP_USER_DATA_PERMS,
+	*cp = cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
 	    CHERI_CAP_USER_DATA_BASE, CHERI_CAP_USER_DATA_LENGTH,
 	    CHERI_CAP_USER_DATA_OFFSET);
 }
@@ -82,7 +82,7 @@ static void
 hybridabi_capability_set_user_pcc(void * __capability *cp)
 {
 
-	cheri_capability_set(cp, CHERI_CAP_USER_CODE_PERMS,
+	*cp = cheri_capability_build_user_code(CHERI_CAP_USER_CODE_PERMS,
 	    CHERI_CAP_USER_CODE_BASE, CHERI_CAP_USER_CODE_LENGTH,
 	    CHERI_CAP_USER_CODE_OFFSET);
 }
@@ -96,7 +96,7 @@ hybridabi_capability_set_user_entry(void * __capability *cp,
 	 * Set the jump target regigster for the pure capability calling
 	 * convention.
 	 */
-	cheri_capability_set(cp, CHERI_CAP_USER_CODE_PERMS,
+	*cp = cheri_capability_build_user_code(CHERI_CAP_USER_CODE_PERMS,
 	    CHERI_CAP_USER_CODE_BASE, CHERI_CAP_USER_CODE_LENGTH, entry_addr);
 }
 

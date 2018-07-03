@@ -218,6 +218,16 @@ _bus_dmamap_load_ccb(bus_dma_tag_t dmat, bus_dmamap_t map, union ccb *ccb,
 		sglist_cnt = 0;
 		break;
 	}
+	case XPT_NVME_IO:
+	case XPT_NVME_ADMIN: {
+		struct ccb_nvmeio *nvmeio;
+
+		nvmeio = &ccb->nvmeio;
+		data_ptr = nvmeio->data_ptr;
+		dxfer_len = nvmeio->dxfer_len;
+		sglist_cnt = nvmeio->sglist_cnt;
+		break;
+	}
 	default:
 		panic("_bus_dmamap_load_ccb: Unsupported func code %d",
 		    ccb_h->func_code);
@@ -262,7 +272,7 @@ _bus_dmamap_load_uio(bus_dma_tag_t dmat, bus_dmamap_t map, struct uio *uio,
 {
 	bus_size_t resid;
 	bus_size_t minlen;
-	struct iovec *iov;
+	kiovec_t *iov;
 	pmap_t pmap;
 	caddr_t addr;
 	int error, i;
@@ -283,8 +293,8 @@ _bus_dmamap_load_uio(bus_dma_tag_t dmat, bus_dmamap_t map, struct uio *uio,
 		 * until we have exhausted the residual count.
 		 */
 
-		addr = (caddr_t) iov[i].iov_base;
 		minlen = resid < iov[i].iov_len ? resid : iov[i].iov_len;
+		addr = __DECAP_CHECK(iov[i].iov_base, minlen);
 		if (minlen > 0) {
 			error = _bus_dmamap_load_buffer(dmat, map, addr,
 			    minlen, pmap, flags, NULL, nsegs);

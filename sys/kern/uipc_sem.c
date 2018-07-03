@@ -122,7 +122,7 @@ static struct ksem *ksem_alloc(struct ucred *ucred, mode_t mode,
 		    unsigned int value);
 static int	ksem_create(struct thread *td, const char *path,
 		    semid_t *semidp, mode_t mode, unsigned int value,
-		    int flags, int compat32);
+		    int flags);
 static void	ksem_drop(struct ksem *ks);
 static int	ksem_get(struct thread *td, semid_t id, cap_rights_t *rightsp,
     struct file **fpp);
@@ -431,8 +431,7 @@ ksem_remove(char *path, Fnv32_t fnv, struct ucred *ucred)
 }
 
 static int
-ksem_create_copyout_semid(struct thread *td, semid_t *semidp, int fd,
-    int compat32)
+ksem_create_copyout_semid(struct thread *td, semid_t *semidp, int fd)
 {
 	semid_t semid;
 #ifdef COMPAT_FREEBSD32
@@ -442,27 +441,25 @@ ksem_create_copyout_semid(struct thread *td, semid_t *semidp, int fd,
 	size_t ptrs;
 
 #ifdef COMPAT_FREEBSD32
-	if (compat32) {
+	if (SV_CURPROC_FLAG(SV_ILP32)) {
 		semid32 = fd;
 		ptr = &semid32;
 		ptrs = sizeof(semid32);
-	} else {
+	} else
 #endif
+	{
 		semid = fd;
 		ptr = &semid;
 		ptrs = sizeof(semid);
-		compat32 = 0; /* silence gcc */
-#ifdef COMPAT_FREEBSD32
 	}
-#endif
 
 	return (copyout(ptr, semidp, ptrs));
 }
 
 /* Other helper routines. */
 static int
-ksem_create(struct thread *td, const char *name, semid_t *semidp, mode_t mode,
-    unsigned int value, int flags, int compat32)
+ksem_create(struct thread *td, const char * name, semid_t * semidp,
+    mode_t mode, unsigned int value, int flags)
 {
 	struct filedesc *fdp;
 	struct ksem *ks;
@@ -494,7 +491,7 @@ ksem_create(struct thread *td, const char *name, semid_t *semidp, mode_t mode,
 	 * premature, but it is a lot easier to handle errors as opposed
 	 * to later when we've possibly created a new semaphore, etc.
 	 */
-	error = ksem_create_copyout_semid(td, semidp, fd, compat32);
+	error = ksem_create_copyout_semid(td, semidp, fd);
 	if (error) {
 		fdclose(td, fp, fd);
 		fdrop(fp, td);
@@ -595,6 +592,8 @@ ksem_get(struct thread *td, semid_t id, cap_rights_t *rightsp,
 	struct file *fp;
 	int error;
 
+	if (id < 0 || id > INT_MAX)
+		return (EINVAL);
 	error = fget(td, id, rightsp, &fp);
 	if (error)
 		return (EINVAL);
@@ -623,7 +622,7 @@ sys_ksem_init(struct thread *td, struct ksem_init_args *uap)
 {
 
 	return (ksem_create(td, NULL, uap->idp, S_IRWXU | S_IRWXG, uap->value,
-	    0, 0));
+	    0));
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -644,7 +643,7 @@ sys_ksem_open(struct thread *td, struct ksem_open_args *uap)
 	if ((uap->oflag & ~(O_CREAT | O_EXCL)) != 0)
 		return (EINVAL);
 	return (ksem_create(td, uap->name, uap->idp, uap->mode, uap->value,
-	    uap->oflag, 0));
+	    uap->oflag));
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -968,24 +967,6 @@ static struct syscall_helper_data ksem_syscalls[] = {
 #include <compat/freebsd32/freebsd32_util.h>
 
 int
-freebsd32_ksem_init(struct thread *td, struct freebsd32_ksem_init_args *uap)
-{
-
-	return (ksem_create(td, NULL, uap->idp, S_IRWXU | S_IRWXG, uap->value,
-	    0, 1));
-}
-
-int
-freebsd32_ksem_open(struct thread *td, struct freebsd32_ksem_open_args *uap)
-{
-
-	if ((uap->oflag & ~(O_CREAT | O_EXCL)) != 0)
-		return (EINVAL);
-	return (ksem_create(td, uap->name, uap->idp, uap->mode, uap->value,
-	    uap->oflag, 1));
-}
-
-int
 freebsd32_ksem_timedwait(struct thread *td,
     struct freebsd32_ksem_timedwait_args *uap)
 {
@@ -1012,8 +993,8 @@ freebsd32_ksem_timedwait(struct thread *td,
 }
 
 static struct syscall_helper_data ksem32_syscalls[] = {
-	SYSCALL32_INIT_HELPER(freebsd32_ksem_init),
-	SYSCALL32_INIT_HELPER(freebsd32_ksem_open),
+	SYSCALL32_INIT_HELPER_COMPAT(ksem_init),
+	SYSCALL32_INIT_HELPER_COMPAT(ksem_open),
 	SYSCALL32_INIT_HELPER_COMPAT(ksem_unlink),
 	SYSCALL32_INIT_HELPER_COMPAT(ksem_close),
 	SYSCALL32_INIT_HELPER_COMPAT(ksem_post),

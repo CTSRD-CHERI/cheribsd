@@ -47,14 +47,14 @@
 .set noreorder
 
 /*
- * Implement CHERI memcpy() and bcopy() variants in assembly; C works fine in
- * the kernel most of the time, but copyincap() and copyoutcap() require that
- * no callee-save registers be trampled over due to fault-based error
- * handling.
+ * Implement CHERI memcpy() and bcopy() variants in assembly.
  *
  * These routines attempt to handle only fully aligned access, and will throw
  * exceptions if that is not the case.  Likewise, they do not handle
  * overlapping copies, a typical requirement of bcopy() implementations.
+ *
+ * XXX-BD: these should probably go away in favor of capability
+ * oblivious memcpy/bcopy.
  *
  * cheri_bcopy() accepts:
  * a0 - source pointer
@@ -85,38 +85,6 @@ return:
 	nop
 END(cheri_memcpy)
 
-/*
- * Implement memcpy() and bcopy() variants that take capability
- * arguments, but DO NOT copy capabilities.  These are implemented in
- * assembly to support copyin and copyout variants.
- *
- *  XXX: These routines are inefficent and copy one byte at a time.
- *
- * memcpynocap_c() accepts:
- * c3 - destination ponter
- * c4 - source pointer
- * a0 - length
- *
- * bcopynocap_c() has inverted source/destination pointers.
- */
-LEAF(bcopynocap_c)
-	cmove	$c5, $c3
-	cmove	$c3, $c4	/* $c3 now holds $dst for memcpynocap_c */
-	cmove	$c4, $c5
-XLEAF(memcpynocap_c)
-	beqz	a0, bcnc_return	/* Return immediately if zero-length. */
-	li	t0, 1		/* Bytes that will have been copied */
-bcnc_loop:
-	clbu	t1, t0, -1($c4)
-	csb	t1, t0, -1($c3)
-	bne	a0, t0, bcnc_loop /* Are we there yet?  If not, loop. */
-	daddiu	t0, t0, 1
-bcnc_return:
-	jr	ra
-	nop
-END(bcopynocap_c)
-
-#ifndef CHERI_KERNEL
 /*
  * Copy a string from one capabilty to another up to a maximum length.
  * Return the length by reference.
@@ -152,5 +120,3 @@ cstr_return:
 	jr	ra
 	nop
 END(copystr_c)
-#endif
-	

@@ -337,7 +337,7 @@ static int	vxlan_input(struct vxlan_socket *, uint32_t, struct mbuf **,
 static void	vxlan_set_default_config(struct vxlan_softc *);
 static int	vxlan_set_user_config(struct vxlan_softc *,
 		     struct ifvxlanparam *);
-static int	vxlan_clone_create(struct if_clone *, int, caddr_t);
+static int	vxlan_clone_create(struct if_clone *, int, void * __capability);
 static void	vxlan_clone_destroy(struct ifnet *);
 
 static uint32_t vxlan_mac_hash(struct vxlan_softc *, const uint8_t *);
@@ -2206,8 +2206,8 @@ vxlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ifd = (struct ifdrv *) data;
 
 	switch (cmd) {
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		error = 0;
 		break;
 
@@ -2216,7 +2216,7 @@ vxlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = vxlan_ioctl_drvspec(sc, ifd, cmd == SIOCGDRVSPEC);
 		break;
 
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		error = vxlan_ioctl_ifflags(sc);
 		break;
 	default:
@@ -2642,7 +2642,7 @@ vxlan_set_user_config(struct vxlan_softc *sc, struct ifvxlanparam *vxlp)
 }
 
 static int
-vxlan_clone_create(struct if_clone *ifc, int unit, caddr_t params)
+vxlan_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 {
 	struct vxlan_softc *sc;
 	struct ifnet *ifp;
@@ -2654,7 +2654,7 @@ vxlan_clone_create(struct if_clone *ifc, int unit, caddr_t params)
 	vxlan_set_default_config(sc);
 
 	if (params != 0) {
-		error = copyin(params, &vxlp, sizeof(vxlp));
+		error = copyin_c(params, &vxlp, sizeof(vxlp));
 		if (error)
 			goto fail;
 

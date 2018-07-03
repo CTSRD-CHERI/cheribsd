@@ -1,5 +1,33 @@
 /*	$OpenBSD: locore.S,v 1.18 1998/09/15 10:58:53 pefo Exp $	*/
 /*-
+ * Copyright (c) 2016 Robert N. M. Watson
+ * All rights reserved.
+ *
+ * This software was developed by SRI International and the University of
+ * Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
+ * ("CTSRD"), as part of the DARPA CRASH research programme.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -58,10 +86,17 @@
 
 #include <machine/asm.h>
 #include <machine/cpu.h>
+#include <machine/exceptionasm.h>
 #include <machine/regnum.h>
 #include <machine/cpuregs.h>
 #include <machine/pte.h>
 #include <machine/pcb.h>
+
+#ifdef CPU_CHERI
+#include <machine/cheriasm.h>
+#include <machine/cherireg.h>
+.set cheri_sysregs_accessible	# Don't warn on access to c27-c30
+#endif
 
 #include "assym.s"
 
@@ -85,6 +120,28 @@ dtrace_invop_calltrap_addr:
  */
 #define	INTRCNT_COUNT	256
 
+/*
+ * General MIPS CPU state for exceptions:
+ *
+ * EPC Register will point to the instruction that caused fault, unless the
+ * faulting instruction was in a branch delay slot.  In that case, it will
+ * point to the branch before the branch delay slot instruction.
+ *
+ * The cause register will contain what caused the exception and some state
+ * about the interrupt.
+ *
+ * The status register contains information about the status of the CPU such
+ * as: Kernel/User mode bit, interrupt enable bit.
+ *
+ * The BadVaddr register contains the virtual address that cause the last
+ * exception.
+ *
+ * The Context register contains the lower 22 bits of the VPN (starting at
+ * bit 4) that cause the last exception except bit0 and bit1 are zero. The
+ * upper bits (bits 23 to 31 for MIPS32 and bits 23 to 63) are set under
+ * kernel control (i.e. point to the page table). The Context/XContext
+ * registers are not currently used by FreeBSD.
+ */
 
 /*
  *----------------------------------------------------------------------------
@@ -102,6 +159,12 @@ dtrace_invop_calltrap_addr:
 VECTOR(MipsTLBMiss, unknown)
 	.set push
 	.set noat
+
+#ifdef CPU_CHERI
+	CHERI_EXCEPTION_ENTER(k0)
+#endif
+	# Increment exception counter, if enabled.
+	INC_EXCEPTION_CNTR(TLB_MISS_CNT)
 	j	MipsDoTLBMiss
 	MFC0	k0, MIPS_COP_0_BAD_VADDR	# get the fault address
 	.set pop
@@ -110,13 +173,27 @@ VECTOR_END(MipsTLBMiss)
 /*
  *----------------------------------------------------------------------------
  *
- * MipsDoTLBMiss --
+ * MipsDoTLBMiss --  (UTLB miss)
  *
- * This is the real TLB Miss Handler code.
+ * This is the real TLB Miss Handler code.  A miss was generated when the
+ * access is to kuseg and there was not matching mapping loaded into the TLB.
  * 'segbase' points to the base of the segment table for user processes.
+ *
+ * The CPU does the following for an UTLB miss:
+ * - Sets the EPC register.
+ * - Sets the Cause register.
+ * - Sets the Status register. Shifts K/U and IE bits over one and clears
+ *   the current Kernel/User and Interrupt Enable bits. So the processor
+ *   is in kernel mode with the interupts turned off.
+ * - Sets BadVaddr register.
+ * - Sets the Context/XContext register(s).
+ * - Sets the TLB EntryHi register to contain VPN of the faulting address.
  *
  * Don't check for invalid pte's here. We load them as well and
  * let the processor trap to load the correct value after service.
+ *
+ * XXX This really needs to be changed to a linear page table and use the
+ * Context and XContext registers.  That is really what it was designed for.
  *----------------------------------------------------------------------------
  */
  	.set push
@@ -137,25 +214,92 @@ MipsDoTLBMiss:
 #ifdef __mips_n64
 	PTR_SRL		k0, PDRSHIFT - PTRSHIFT		# k0=VPN
 	andi		k0, k0, PDEPTRMASK		# k0=pde offset
-	PTR_ADDU	k1, k0, k1			# k1=pde entry address
-	PTR_L		k1, 0(k1)			# k1=pde entry
-	MFC0		k0, MIPS_COP_0_BAD_VADDR	# k0=bad address (again)
+	PTR_ADDU	k0, k0, k1			# k0=pde entry address
+	PTR_L		k1, 0(k0)			# k1=pde entry
 	beq		k1, zero, 2f			# ==0 -- no page table
-#endif
+	nop
+
+#ifdef MIPS64_NEW_PMAP
+	# Check for superpage
+	GET_SUPERPAGE_IDX(k1)				# k1=superpage index from PTE
+	beq		k1, zero, not_superpage		# ==0 -- not superpage
+	PTR_L		k1, 0(k0)			# k1=pde entry (delay slot)
+
+	# Set the referenced bit in the PDE if valid.
+	#
+	# XXX Setting the referenced bit here saves a fault later but it
+	# may not be safe to do so. Therefore, just take the fault to set
+	# the reference bit.
+#	IF_VALID_SET_REFBIT(k1, k0, 0, 1)
+
+	# The PDE is actually a superpage PTE.  Store it in the TLB lo0 reg.
+	CLEAR_PTE_SWBITS(k1)
+	PTE_MTC0	k1, MIPS_COP_0_TLB_LO0		# lo0 is loaded
+	COP0_SYNC
+
+	# Compute the PFN for the TLB lo1 register from k1(=PTE for TLB lo0).
+	GET_ODD_1M_PFN_FROM_EVEN(k1)			# k1=Odd PFN in PTE postion
+
+	# Get hard TLB flag bits.
+	PTR_L		k0, 0(k0)			# k0=pde entry (again)
+	GET_HW_TLB_FLAGS(k0)				# k0=hw TLB flag bits
+	or		k1, k1, k0			# k1=PTE=PFN | hwflg bits
+	# Load it into the TLB Lo1 register.
+	#CLEAR_PTE_SWBITS(k1)				# No SW bits to clear
+	PTE_MTC0	k1, MIPS_COP_0_TLB_LO1		# lo1 is loaded
+	COP0_SYNC
+
+	# Load the TLB PageMask for 1M pages.
+	dli		k0, TLBMASK_1M_PAGE		# PageMask for 1M Page
+	PTE_MTC0	k0, MIPS_COP_0_TLB_PG_MASK	# PageMask is loaded
+	COP0_SYNC
+
+	tlbwr						# write to tlb
+	HAZARD_DELAY
+	PTE_MTC0	zero, MIPS_COP_0_TLB_PG_MASK	# zero out PageMask reg
+	COP0_SYNC
+	eret						# return from exception
+
+not_superpage:
+#endif /* MIPS64_NEW_PMAP */
+#endif /* __mips_n64 */
+	MFC0		k0, MIPS_COP_0_BAD_VADDR	# k0=bad address (again)
 	PTR_SRL		k0, PAGE_SHIFT - PTESHIFT	#0b: k0=VPN (aka va>>10)
 	andi		k0, k0, PTE2MASK		#0c: k0=page tab offset
 	PTR_ADDU	k1, k1, k0			#0d: k1=pte address
+
 	PTE_L		k0, 0(k1)			#0e: k0=lo0 pte
-	PTE_L		k1, PTESIZE(k1)			#0f: k1=lo0 pte
+
+	# Set the referenced bit in the PDE if valid.
+	#
+	# XXX Setting the referenced bit here saves a fault later but it
+	# may not be safe to do so. Therefore, just take the fault to set
+	# the reference bit.
+#	IF_VALID_SET_REFBIT(k0, k1, 0, 2)
+
 	CLEAR_PTE_SWBITS(k0)
 	PTE_MTC0	k0, MIPS_COP_0_TLB_LO0		#12: lo0 is loaded
 	COP0_SYNC
-	CLEAR_PTE_SWBITS(k1)
-	PTE_MTC0	k1, MIPS_COP_0_TLB_LO1		#15: lo1 is loaded
+
+	PTE_L		k0, PTESIZE(k1)			# k0=lo1 pte
+
+	# Set the referenced bit in the PDE if valid.
+	#
+	# XXX Setting the referenced bit here saves a fault later but it
+	# may not be safe to do so. Therefore, just take the fault to set
+	# the reference bit.
+#	IF_VALID_SET_REFBIT(k0, k1, 0, 3)
+
+	CLEAR_PTE_SWBITS(k0)
+	PTE_MTC0	k0, MIPS_COP_0_TLB_LO1		#15: lo1 is loaded
 	COP0_SYNC
 	tlbwr						#1a: write to tlb
 	HAZARD_DELAY
+#ifdef CPU_CHERI
+	CHERI_EXCEPTION_RETURN(k0)
+#endif
 	eret						#1f: retUrn from exception
+
 1:	j		MipsTLBMissException		#20: kernel exception
 	nop						#21: branch delay slot
 2:	j		SlowFault			#22: no page table present
@@ -178,6 +322,9 @@ VECTOR(MipsException, unknown)
  * and MipsTLBInvalidException
  */
 	.set	noat
+#ifdef CPU_CHERI
+	CHERI_EXCEPTION_ENTER(k0)
+#endif
 	mfc0	k0, MIPS_COP_0_STATUS		# Get the status register
 	mfc0	k1, MIPS_COP_0_CAUSE		# Get the cause register value.
 	and	k0, k0, MIPS_SR_KSU_USER	# test for user mode
@@ -234,48 +381,117 @@ SlowFault:
  *----------------------------------------------------------------------------
  */
 
-#define	SAVE_REG(reg, offs, base) \
-	REG_S	reg, CALLFRAME_SIZ + (SZREG * offs) (base)
-
-#if defined(CPU_CNMIPS)
-#define CLEAR_STATUS \
-	mfc0    a0, MIPS_COP_0_STATUS   ;\
-	li      a2, (MIPS_SR_KX | MIPS_SR_SX | MIPS_SR_UX) ; \
-	or      a0, a0, a2	        ; \
-	li      a2, ~(MIPS_SR_INT_IE | MIPS_SR_EXL | MIPS_SR_KSU_USER)   ; \
-	and     a0, a0, a2              ; \
-        mtc0    a0, MIPS_COP_0_STATUS   ; \
-	ITLBNOPFIX
-#elif defined(CPU_RMI) || defined(CPU_NLM)
-#define CLEAR_STATUS \
-	mfc0    a0, MIPS_COP_0_STATUS   ;\
-	li      a2, (MIPS_SR_KX | MIPS_SR_UX | MIPS_SR_COP_2_BIT) ; \
-	or      a0, a0, a2	        ; \
-	li      a2, ~(MIPS_SR_INT_IE | MIPS_SR_EXL | MIPS_SR_KSU_USER)   ; \
-	and     a0, a0, a2              ; \
-        mtc0    a0, MIPS_COP_0_STATUS   ; \
-	ITLBNOPFIX
+/*
+ * The kernel exception stack contains 40 general-purpose registers, hi/lo
+ * registers, and status register.  If CHERI is present, a further 28 CHERI
+ * registers are stored there.  We also set up linkage conventions.  The
+ * on-stack frame must match the binary layout of 'struct trapframe'.
+ *
+ * If we store capability registers on the stack, we need to adjust the stack
+ * pointer to provide suitable alignment.  We therefore allocate an additional
+ * CHERICAP_SIZE/2 to allow for that adjustment.  a0 will be set suitably to
+ * include that alignment.
+ */
+#define	KERN_REG_SIZE		(NUMSAVEREGS * SZREG)
+#ifdef CPU_CHERI
+#define	KERN_CREG_SIZE		(NUMCHERISAVEREGS * CHERICAP_SIZE)
+#define	KERN_EXC_FRAME_SIZE	(CALLFRAME_SIZ + KERN_REG_SIZE +	\
+				KERN_CREG_SIZE)
 #else
-#define CLEAR_STATUS \
-	mfc0    a0, MIPS_COP_0_STATUS   ;\
-	li      a2, ~(MIPS_SR_INT_IE | MIPS_SR_EXL | MIPS_SR_KSU_USER)   ; \
-	and     a0, a0, a2              ; \
-	mtc0	a0, MIPS_COP_0_STATUS   ; \
-	ITLBNOPFIX
+#define	KERN_EXC_FRAME_SIZE	(CALLFRAME_SIZ + KERN_REG_SIZE)
+#endif
+
+#ifdef CPU_CHERI
+/*
+ * CHERI requires 16- or 32-byte alignment of the trap frame, so adjust sp
+ * (or, whatever register is passed in via 'reg') down if required.  The
+ * previous value of sp should be saved prior to calling this macro --
+ * typically, in k1.  There are no free registers, so we do this using shift
+ * instructions.
+ */
+#define	CHERI_ADJUST_SP(reg)						\
+	dsrl	reg, reg, CHERICAP_SHIFT;				\
+	dsll	reg, reg, CHERICAP_SHIFT
+#else
+#define	CHERI_ADJUST_SP(reg)
+#endif
+
+#ifdef CPU_CHERI
+/*
+ * Save CHERI registers on the stack to construct the kernel trap frame.
+ * Suitable alignment should already have been arranged by the caller.
+ */
+#define	SAVE_CREG(creg, regoffs, offs, cregbase)	\
+	csc	creg, regoffs, (CALLFRAME_SIZ + (SZREG * offs))(cregbase)
+
+#define	SAVE_CAPCAUSE(reg, treg, regoffs, offs, cregbase)		\
+	daddiu	treg, regoffs, (CALLFRAME_SIZ + (SZREG * offs));	\
+	csd	reg, treg, 0(cregbase)
+
+#define	SAVE_CHERI(treg0, treg1)				\
+	/* $ddc should no longer be accessed using $c0 */	\
+	CGetDefault CHERI_REG_KR1C;				\
+	SAVE_CREG(CHERI_REG_KR1C, sp, DDC, CHERI_REG_KDC);	\
+	SAVE_CREG(CHERI_REG_C1, sp, C1, CHERI_REG_KDC);		\
+	SAVE_CREG(CHERI_REG_C2, sp, C2, CHERI_REG_KDC);		\
+	SAVE_CREG(CHERI_REG_C3, sp, C3, CHERI_REG_KDC);		\
+	SAVE_CREG(CHERI_REG_C4, sp, C4, CHERI_REG_KDC);		\
+	SAVE_CREG(CHERI_REG_C5, sp, C5, CHERI_REG_KDC);		\
+	SAVE_CREG(CHERI_REG_C6, sp, C6, CHERI_REG_KDC);		\
+	SAVE_CREG(CHERI_REG_C7, sp, C7, CHERI_REG_KDC);		\
+	SAVE_CREG(CHERI_REG_C8, sp, C8, CHERI_REG_KDC);		\
+	SAVE_CREG(CHERI_REG_C9, sp, C9, CHERI_REG_KDC);		\
+	SAVE_CREG(CHERI_REG_C10, sp, C10, CHERI_REG_KDC);	\
+	SAVE_CREG(CHERI_REG_STC, sp, STC, CHERI_REG_KDC);	\
+	SAVE_CREG(CHERI_REG_C12, sp, C12, CHERI_REG_KDC);	\
+	SAVE_CREG(CHERI_REG_C13, sp, C13, CHERI_REG_KDC);	\
+	SAVE_CREG(CHERI_REG_C14, sp, C14, CHERI_REG_KDC);	\
+	SAVE_CREG(CHERI_REG_C15, sp, C15, CHERI_REG_KDC);	\
+	SAVE_CREG(CHERI_REG_C16, sp, C16, CHERI_REG_KDC);	\
+	SAVE_CREG(CHERI_REG_C17, sp, C17, CHERI_REG_KDC);	\
+	SAVE_CREG(CHERI_REG_C18, sp, C18, CHERI_REG_KDC);	\
+	SAVE_CREG(CHERI_REG_C19, sp, C19, CHERI_REG_KDC);	\
+	SAVE_CREG(CHERI_REG_C20, sp, C20, CHERI_REG_KDC);	\
+	SAVE_CREG(CHERI_REG_C21, sp, C21, CHERI_REG_KDC);	\
+	SAVE_CREG(CHERI_REG_C22, sp, C22, CHERI_REG_KDC);	\
+	SAVE_CREG(CHERI_REG_C23, sp, C23, CHERI_REG_KDC);	\
+	SAVE_CREG(CHERI_REG_C24, sp, C24, CHERI_REG_KDC);	\
+	SAVE_CREG(CHERI_REG_C25, sp, C25, CHERI_REG_KDC);	\
+	SAVE_CREG(CHERI_REG_C26, sp, IDC, CHERI_REG_KDC);	\
+	/* EPCC is no longer a GPR so load it into KR1C first */\
+	CGetEPCC CHERI_REG_KR1C;				\
+	SAVE_CREG(CHERI_REG_KR1C, sp, PCC, CHERI_REG_KDC);	\
+	cgetcause	treg0;					\
+	SAVE_CAPCAUSE(treg0, treg1, sp, CAPCAUSE, CHERI_REG_KDC)
+#else
+#define	SAVE_CHERI(treg0, treg1)
 #endif
 
 /*
- * Save CPU and CP0 register state.
+ * Save CPU and CP0 register state when taking an exception in kernel mode.
+ * The caller will already have set up a stack pointer with suitable space and
+ * alignment.
  *
  * This is straightforward except for saving the exception program
  * counter. The ddb backtrace code looks for the first instruction
  * matching the form "sw ra, (off)sp" to figure out the address of the
  * calling function. So we must make sure that we save the exception
  * PC by staging it through 'ra' as opposed to any other register.
+ *
+ * sp passes in the pointer to where we should place the call frame and trap
+ * frame on the stack.
+ * k1 passes in the preempted stack pointer (to be saved at SP).
+ * a0 returns a pointer to the trap frame.
+ * k0 is used as a temporary to hold the CP0 status register.
+ *
+ * sp and k1 may differ if we've had to re-align the stack for CHERI.
  */
+#define	SAVE_REG(reg, offs, base) \
+	REG_S	reg, (CALLFRAME_SIZ + (SZREG * offs)) (base)
+
 #define	SAVE_CPU \
 	SAVE_REG(AT, AST, sp)		;\
-	.set	at		        ; \
+	.set	at		        ;\
 	SAVE_REG(v0, V0, sp)		;\
 	SAVE_REG(v1, V1, sp)		;\
 	SAVE_REG(a0, A0, sp)		;\
@@ -313,22 +529,73 @@ SlowFault:
 	SAVE_REG(a0, SR, sp)		;\
 	SAVE_REG(a1, CAUSE, sp)		;\
 	SAVE_REG(a2, BADVADDR, sp)	;\
+	SAVE_CHERI(t0, t1)		;\
 	move	t0, ra			;\
 	move	ra, a3			;\
 	SAVE_REG(ra, PC, sp)		;\
 	move	ra, t0			;\
 	SAVE_REG(ra, RA, sp)		;\
-	PTR_ADDU v0, sp, KERN_EXC_FRAME_SIZE ;\
-	SAVE_REG(v0, SP, sp)		;\
+	SAVE_REG(k1, SP, sp)		/* Notice: k1 stored for sp. */	;\
 	CLEAR_STATUS			;\
-	PTR_ADDU a0, sp, CALLFRAME_SIZ	;\
+	PTR_ADDU a0, sp, CALLFRAME_SIZ	/* Make trap frame pointer. */	;\
 	ITLBNOPFIX
 
+#ifdef CPU_CHERI
+#define	RESTORE_CREG(creg, regoffs, offs, cregbase)	\
+	clc	creg, regoffs, (CALLFRAME_SIZ + (SZREG * offs))(cregbase)
+
+/*
+ * Restore CHERI registers from the on-stack kernel trap frame.
+ *
+ * Notice: the capability cause register is saved, but not restored.
+ */
+#define	RESTORE_CHERI						\
+	/* $ddc should no longer be accessed using $c0 */	\
+	RESTORE_CREG(CHERI_REG_KR1C, sp, DDC, CHERI_REG_KDC);	\
+	CSetDefault CHERI_REG_KR1C;				\
+	RESTORE_CREG(CHERI_REG_C1, sp, C1, CHERI_REG_KDC);	\
+	RESTORE_CREG(CHERI_REG_C2, sp, C2, CHERI_REG_KDC);	\
+	RESTORE_CREG(CHERI_REG_C3, sp, C3, CHERI_REG_KDC);	\
+	RESTORE_CREG(CHERI_REG_C4, sp, C4, CHERI_REG_KDC);	\
+	RESTORE_CREG(CHERI_REG_C5, sp, C5, CHERI_REG_KDC);	\
+	RESTORE_CREG(CHERI_REG_C6, sp, C6, CHERI_REG_KDC);	\
+	RESTORE_CREG(CHERI_REG_C7, sp, C7, CHERI_REG_KDC);	\
+	RESTORE_CREG(CHERI_REG_C8, sp, C8, CHERI_REG_KDC);	\
+	RESTORE_CREG(CHERI_REG_C9, sp, C9, CHERI_REG_KDC);	\
+	RESTORE_CREG(CHERI_REG_C10, sp, C10, CHERI_REG_KDC);	\
+	RESTORE_CREG(CHERI_REG_STC, sp, STC, CHERI_REG_KDC);	\
+	RESTORE_CREG(CHERI_REG_C12, sp, C12, CHERI_REG_KDC);	\
+	RESTORE_CREG(CHERI_REG_C13, sp, C13, CHERI_REG_KDC);	\
+	RESTORE_CREG(CHERI_REG_C14, sp, C14, CHERI_REG_KDC);	\
+	RESTORE_CREG(CHERI_REG_C15, sp, C15, CHERI_REG_KDC);	\
+	RESTORE_CREG(CHERI_REG_C16, sp, C16, CHERI_REG_KDC);	\
+	RESTORE_CREG(CHERI_REG_C17, sp, C17, CHERI_REG_KDC);	\
+	RESTORE_CREG(CHERI_REG_C18, sp, C18, CHERI_REG_KDC);	\
+	RESTORE_CREG(CHERI_REG_C19, sp, C19, CHERI_REG_KDC);	\
+	RESTORE_CREG(CHERI_REG_C20, sp, C20, CHERI_REG_KDC);	\
+	RESTORE_CREG(CHERI_REG_C21, sp, C21, CHERI_REG_KDC);	\
+	RESTORE_CREG(CHERI_REG_C22, sp, C22, CHERI_REG_KDC);	\
+	RESTORE_CREG(CHERI_REG_C23, sp, C23, CHERI_REG_KDC);	\
+	RESTORE_CREG(CHERI_REG_C24, sp, C24, CHERI_REG_KDC);	\
+	RESTORE_CREG(CHERI_REG_C25, sp, C25, CHERI_REG_KDC);	\
+	RESTORE_CREG(CHERI_REG_C26, sp, IDC, CHERI_REG_KDC);	\
+	/* EPCC is no longer a GPR so load it into KR1C first */\
+	RESTORE_CREG(CHERI_REG_KR1C, sp, PCC, CHERI_REG_KDC);	\
+	CSetEPCC CHERI_REG_KR1C;
+#else
+#define	RESTORE_CHERI
+#endif
+
+/*
+ * Restore preempted kernel state following a kernel exception.  The caller
+ * will restore the original sp from k1 after RESTORE_CPU has ended.
+ */
 #define	RESTORE_REG(reg, offs, base) \
-	REG_L	reg, CALLFRAME_SIZ + (SZREG * offs) (base)
+	REG_L	reg, (CALLFRAME_SIZ + (SZREG * offs)) (base)
 
 #define	RESTORE_CPU \
 	CLEAR_STATUS			;\
+	RESTORE_CHERI			;\
 	RESTORE_REG(k0, SR, sp)		;\
 	RESTORE_REG(t0, MULLO, sp)	;\
 	RESTORE_REG(t1, MULHI, sp)	;\
@@ -364,33 +631,30 @@ SlowFault:
 	RESTORE_REG(s8, S8, sp)	        ;\
 	RESTORE_REG(gp, GP, sp)		;\
 	RESTORE_REG(ra, RA, sp)		;\
-	PTR_ADDU sp, sp, KERN_EXC_FRAME_SIZE;\
+	RESTORE_REG(k1, SP, sp)		/* Notice: restored sp in k1. */ ;\
 	mtc0	k0, MIPS_COP_0_STATUS
-
-
-/*
- * The kernel exception stack contains 18 saved general registers,
- * the status register and the multiply lo and high registers.
- * In addition, we set this up for linkage conventions.
- */
-#define	KERN_REG_SIZE		(NUMSAVEREGS * SZREG)
-#define	KERN_EXC_FRAME_SIZE	(CALLFRAME_SIZ + KERN_REG_SIZE + 16)
 
 NESTED_NOPROFILE(MipsKernGenException, KERN_EXC_FRAME_SIZE, ra)
 	.set	noat
+
+	/* Save exception sp in k1 to put on the stack later. */
+	move	k1, sp
 	PTR_SUBU	sp, sp, KERN_EXC_FRAME_SIZE
+	CHERI_ADJUST_SP(sp)
 	.mask	0x80000000, (CALLFRAME_RA - KERN_EXC_FRAME_SIZE)
 /*
- *  Save CPU state, building 'frame'.
+ * Save CPU state, building 'frame'.  sp holds the location to save the trap
+ * frame, whereas k1 holds the value of sp to save in the trap frame.
  */
 	SAVE_CPU
 /*
- *  Call the exception handler. a0 points at the saved frame.
+ * Call the exception handler.  SAVE_CPU has left a0 pointing at the saved
+ * frame.
  */
 	PTR_LA	gp, _C_LABEL(_gp)
-	PTR_LA	k0, _C_LABEL(trap)
-	jalr	k0
-	REG_S	a3, CALLFRAME_RA + KERN_REG_SIZE(sp)		# for debugging
+	PTR_LA	t9, _C_LABEL(trap)
+	jalr	t9
+	REG_S	a3, (CALLFRAME_RA + KERN_REG_SIZE)(sp)		# for debugging
 
 	/*
 	 * Update interrupt and CPU mask in saved status register
@@ -405,7 +669,14 @@ NESTED_NOPROFILE(MipsKernGenException, KERN_EXC_FRAME_SIZE, ra)
 	or	a1, a1, a0
 	SAVE_REG(a1, SR, sp)
 	RESTORE_CPU			# v0 contains the return address.
+
+	/* Restore preempted sp from k1 now we are done with the stack. */
+	move	sp, k1
 	sync
+
+#ifdef CPU_CHERI
+	CHERI_EXCEPTION_RETURN(k0)
+#endif
 	eret
 	.set	at
 END(MipsKernGenException)
@@ -428,54 +699,15 @@ END(MipsKernGenException)
 NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	.set	noat
 	.mask	0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ)
-/*
- * Save all of the registers except for the kernel temporaries in u.u_pcb.
- */
 	GET_CPU_PCPU(k1)
 	PTR_L	k1, PC_CURPCB(k1)
-	SAVE_U_PCB_REG(AT, AST, k1)
-	.set	at
-	SAVE_U_PCB_REG(v0, V0, k1)
-	SAVE_U_PCB_REG(v1, V1, k1)
-	SAVE_U_PCB_REG(a0, A0, k1)
-	mflo	v0
-	SAVE_U_PCB_REG(a1, A1, k1)
-	SAVE_U_PCB_REG(a2, A2, k1)
-	SAVE_U_PCB_REG(a3, A3, k1)
-	SAVE_U_PCB_REG(t0, T0, k1)
-	mfhi	v1
-	SAVE_U_PCB_REG(t1, T1, k1)
-	SAVE_U_PCB_REG(t2, T2, k1)
-	SAVE_U_PCB_REG(t3, T3, k1)
-	SAVE_U_PCB_REG(ta0, TA0, k1)
-	mfc0	a0, MIPS_COP_0_STATUS		# First arg is the status reg.
-	SAVE_U_PCB_REG(ta1, TA1, k1)
-	SAVE_U_PCB_REG(ta2, TA2, k1)
-	SAVE_U_PCB_REG(ta3, TA3, k1)
-	SAVE_U_PCB_REG(s0, S0, k1)
-	mfc0	a1, MIPS_COP_0_CAUSE		# Second arg is the cause reg.
-	SAVE_U_PCB_REG(s1, S1, k1)
-	SAVE_U_PCB_REG(s2, S2, k1)
-	SAVE_U_PCB_REG(s3, S3, k1)
-	SAVE_U_PCB_REG(s4, S4, k1)
-	MFC0	a2, MIPS_COP_0_BAD_VADDR	# Third arg is the fault addr
-	SAVE_U_PCB_REG(s5, S5, k1)
-	SAVE_U_PCB_REG(s6, S6, k1)
-	SAVE_U_PCB_REG(s7, S7, k1)
-	SAVE_U_PCB_REG(t8, T8, k1)
-	MFC0	a3, MIPS_COP_0_EXC_PC		# Fourth arg is the pc.
-	SAVE_U_PCB_REG(t9, T9, k1)
-	SAVE_U_PCB_REG(gp, GP, k1)
-	SAVE_U_PCB_REG(sp, SP, k1)
-	SAVE_U_PCB_REG(s8, S8, k1)
-	PTR_SUBU	sp, k1, CALLFRAME_SIZ	 # switch to kernel SP
-	SAVE_U_PCB_REG(ra, RA, k1)
-	SAVE_U_PCB_REG(v0, MULLO, k1)
-	SAVE_U_PCB_REG(v1, MULHI, k1)
-	SAVE_U_PCB_REG(a0, SR, k1)
-	SAVE_U_PCB_REG(a1, CAUSE, k1)
-	SAVE_U_PCB_REG(a2, BADVADDR, k1)
-	SAVE_U_PCB_REG(a3, PC, k1)
+	SAVE_REGS_TO_PCB(k1)
+#ifdef CPU_CHERI
+	/*
+	 * Note: This saves EPCC, matching the explicit EPC save above.
+	 */
+	SAVE_CREGS_TO_PCB(k1, t0)
+#endif
 	REG_S	a3, CALLFRAME_RA(sp)	# for debugging
 	PTR_LA	gp, _C_LABEL(_gp)	# switch to kernel GP
 # Turn off fpu and enter kernel mode
@@ -487,14 +719,15 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	or      t0, t0, (MIPS_SR_KX | MIPS_SR_UX | MIPS_SR_COP_2_BIT)
 #endif	
 	mtc0	t0, MIPS_COP_0_STATUS
+
 	PTR_ADDU a0, k1, U_PCB_REGS
 	ITLBNOPFIX
 
 /*
  * Call the exception handler.
  */
-	PTR_LA	k0, _C_LABEL(trap)
-	jalr	k0
+	PTR_LA	t9, _C_LABEL(trap)
+	jalr	t9
 	nop
 
 /*
@@ -525,47 +758,20 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	or	a1, a1, a0
 	SAVE_U_PCB_REG(a1, SR, k1)
 
-	RESTORE_U_PCB_REG(t0, MULLO, k1)
-	RESTORE_U_PCB_REG(t1, MULHI, k1)
-	mtlo	t0
-	mthi	t1
-	RESTORE_U_PCB_REG(a0, PC, k1)
-	RESTORE_U_PCB_REG(v0, V0, k1)
-        MTC0	a0, MIPS_COP_0_EXC_PC	# set return address
-	RESTORE_U_PCB_REG(v1, V1, k1)
-	RESTORE_U_PCB_REG(a0, A0, k1)
-	RESTORE_U_PCB_REG(a1, A1, k1)
-	RESTORE_U_PCB_REG(a2, A2, k1)
-	RESTORE_U_PCB_REG(a3, A3, k1)
-	RESTORE_U_PCB_REG(t0, T0, k1)
-	RESTORE_U_PCB_REG(t1, T1, k1)
-	RESTORE_U_PCB_REG(t2, T2, k1)
-	RESTORE_U_PCB_REG(t3, T3, k1)
-	RESTORE_U_PCB_REG(ta0, TA0, k1)
-	RESTORE_U_PCB_REG(ta1, TA1, k1)
-	RESTORE_U_PCB_REG(ta2, TA2, k1)
-	RESTORE_U_PCB_REG(ta3, TA3, k1)
-	RESTORE_U_PCB_REG(s0, S0, k1)
-	RESTORE_U_PCB_REG(s1, S1, k1)
-	RESTORE_U_PCB_REG(s2, S2, k1)
-	RESTORE_U_PCB_REG(s3, S3, k1)
-	RESTORE_U_PCB_REG(s4, S4, k1)
-	RESTORE_U_PCB_REG(s5, S5, k1)
-	RESTORE_U_PCB_REG(s6, S6, k1)
-	RESTORE_U_PCB_REG(s7, S7, k1)
-	RESTORE_U_PCB_REG(t8, T8, k1)
-	RESTORE_U_PCB_REG(t9, T9, k1)
-	RESTORE_U_PCB_REG(gp, GP, k1)
-	RESTORE_U_PCB_REG(sp, SP, k1)
-	RESTORE_U_PCB_REG(k0, SR, k1)
-	RESTORE_U_PCB_REG(s8, S8, k1)
-	RESTORE_U_PCB_REG(ra, RA, k1)
-	.set noat
-	RESTORE_U_PCB_REG(AT, AST, k1)
+#ifdef CPU_CHERI
+	/*
+	 * Note: This restores EPCC, matching the explicit EPC restore below.
+	 */
+	RESTORE_CREGS_FROM_PCB(k1, t0)
+#endif
+	RESTORE_REGS_FROM_PCB(k1)
 
 	mtc0	k0, MIPS_COP_0_STATUS	# still exception level
 	ITLBNOPFIX
 	sync
+#ifdef CPU_CHERI
+	CHERI_EXCEPTION_RETURN(k0)
+#endif
 	eret
 	.set	at
 END(MipsUserGenException)
@@ -580,7 +786,8 @@ NESTED(mips_wait, CALLFRAME_SIZ, ra)
 	xori	t1, t0, MIPS_SR_INT_IE
 	mtc0	t1, MIPS_COP_0_STATUS
 	COP0_SYNC
-	jal	sched_runnable
+	PTR_LA	t9, sched_runnable
+	jalr	t9
 	nop
 	REG_L   ra, CALLFRAME_RA(sp)
 	mfc0	t0, MIPS_COP_0_STATUS
@@ -620,11 +827,14 @@ END(mips_wait)
 
 NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
 	.set	noat
-	PTR_SUBU	sp, sp, KERN_EXC_FRAME_SIZE
-	.mask	0x80000000, (CALLFRAME_RA - KERN_EXC_FRAME_SIZE)
 
 /*
  * Check for getting interrupts just before wait
+ *
+ * XXXCHERI: Once we use variable CHERI PCC in the kernel, this check will
+ * also need to take that into account.  In the mean time, the fact that we're
+ * in the kernel ring is sufficient to imply that PCC matches the kernel
+ * address space.
  */
 	MFC0	k0, MIPS_COP_0_EXC_PC
 	ori	k0, 0xf
@@ -635,20 +845,29 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
 	PTR_ADDU k1, 16			# skip over wait
 	MTC0	k1, MIPS_COP_0_EXC_PC
 1:
+
+	/* Save exception sp in k1 to put on the stack later. */
+	move	k1, sp
+	PTR_SUBU	sp, sp, KERN_EXC_FRAME_SIZE
+	CHERI_ADJUST_SP(sp)
+	.mask	0x80000000, (CALLFRAME_RA - KERN_EXC_FRAME_SIZE)
+
 /*
- *  Save CPU state, building 'frame'.
+ * Save CPU state, building 'frame'.  sp holds the location to save the trap
+ * frame, whereas k1 holds the value of sp to save in the trap frame.
  */
 	SAVE_CPU
 /*
- *  Call the interrupt handler. a0 points at the saved frame.
+ * Call the interrupt handler.   SAVE_CPU has left a0 pointing at the saved
+ * frame.
  */
 	PTR_LA	gp, _C_LABEL(_gp)
 #ifdef INTRNG
-	PTR_LA	k0, _C_LABEL(intr_irq_handler)
+	PTR_LA	t9, _C_LABEL(intr_irq_handler)
 #else
-	PTR_LA	k0, _C_LABEL(cpu_intr)
+	PTR_LA	t9, _C_LABEL(cpu_intr)
 #endif
-	jalr	k0
+	jalr	t9
 	REG_S	a3, CALLFRAME_RA + KERN_REG_SIZE(sp)		# for debugging
 
 	/*
@@ -663,9 +882,15 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
 	and	a1, a1, ~(MIPS_SR_INT_MASK|MIPS_SR_COP_USABILITY)
 	or	a1, a1, a0
 	SAVE_REG(a1, SR, sp)
-	REG_L	v0, CALLFRAME_RA + KERN_REG_SIZE(sp)
+	REG_L	v0, (CALLFRAME_RA + KERN_REG_SIZE)(sp)
 	RESTORE_CPU			# v0 contains the return address.
+
+	/* Restore preempted sp from k1 now we are done with the stack. */
+	move	sp, k1
 	sync
+#ifdef CPU_CHERI
+	CHERI_EXCEPTION_RETURN(k0)
+#endif
 	eret
 	.set	at
 END(MipsKernIntr)
@@ -742,6 +967,12 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 	SAVE_U_PCB_REG(a0, SR, k1)
 	SAVE_U_PCB_REG(a1, CAUSE, k1)
 	SAVE_U_PCB_REG(a3, PC, k1)	# PC in a3, note used later!
+#ifdef CPU_CHERI
+	/*
+	 * Note: This saves EPCC, matching the explicit EPC save above.
+	 */
+	SAVE_CREGS_TO_PCB(k1, t0)
+#endif
 	PTR_SUBU	sp, k1, CALLFRAME_SIZ  # switch to kernel SP
 	PTR_LA	gp, _C_LABEL(_gp)	# switch to kernel GP
 
@@ -760,11 +991,11 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
  * Call the interrupt handler.
  */
 #ifdef INTRNG
-	PTR_LA	k0, _C_LABEL(intr_irq_handler)
+	PTR_LA	t9, _C_LABEL(intr_irq_handler)
 #else
-	PTR_LA	k0, _C_LABEL(cpu_intr)
+	PTR_LA	t9, _C_LABEL(cpu_intr)
 #endif
-	jalr	k0
+	jalr	t9
 	REG_S	a3, CALLFRAME_RA(sp)	# for debugging
 
 /*
@@ -804,6 +1035,12 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 	or	a1, a1, a0
 	SAVE_U_PCB_REG(a1, SR, k1)
 
+#ifdef CPU_CHERI
+	/*
+	 * Note: This restores EPCC, matching the explicit EPC restore below.
+	 */
+	RESTORE_CREGS_FROM_PCB(k1, t0)
+#endif
 	RESTORE_U_PCB_REG(s0, S0, k1)
 	RESTORE_U_PCB_REG(s1, S1, k1)
 	RESTORE_U_PCB_REG(s2, S2, k1)
@@ -845,15 +1082,34 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 	mtc0	k0, MIPS_COP_0_STATUS	# SR with EXL set. 
 	ITLBNOPFIX
 	sync
+#ifdef CPU_CHERI
+	CHERI_EXCEPTION_RETURN(k0)
+#endif
 	eret
 	.set	at
 END(MipsUserIntr)
+
+#if defined(MIPS_EXC_CNTRS)
+/* A stub for counting TLB modification exceptions. */
+LEAF_NOPROFILE(MipsTLBModException)
+	.set push
+	.set noat
+
+	# Increment exception counter, if enabled.
+	INC_EXCEPTION_CNTR(TLB_MOD_CNT)
+	j	MipsKernGenException
+	nop
+	.set pop
+END(MipsTLBModException)
+#endif /* defined(MIPS_EXC_CNTRS) */
 
 LEAF_NOPROFILE(MipsTLBInvalidException)
 	.set push
 	.set noat
 	.set noreorder
 
+	# Increment exception counter, if enabled.
+	INC_EXCEPTION_CNTR(TLB_INVALID_CNT)
 	MFC0		k0, MIPS_COP_0_BAD_VADDR
 	PTR_LI		k1, VM_MAXUSER_ADDRESS
 	sltu		k1, k0, k1
@@ -888,13 +1144,52 @@ LEAF_NOPROFILE(MipsTLBInvalidException)
 	PTR_SRL		k0, PDRSHIFT - PTRSHIFT		# k0=pde offset (almost)
 	beq		k1, zero, MipsKernGenException	# ==0 -- no pde tab
 	andi		k0, k0, PDEPTRMASK		# k0=pde offset
-	PTR_ADDU	k1, k0, k1			# k1=pde entry address
-	PTR_L		k1, 0(k1)			# k1=pde entry
+	PTR_ADDU	k0, k0, k1			# k0=pde entry address
+	PTR_L		k1, 0(k0)			# k1=pde entry
 
 	/* Validate pde table pointer.  */
 	beqz		k1, 3f
 	nop
-#endif
+
+#ifdef MIPS64_NEW_PMAP
+	# Check for superpage
+	GET_SUPERPAGE_IDX(k1)				# k1=superpage index from PTE
+	beq		k1, zero, not_spg		# ==0 -- not superpage
+	PTR_L		k1, 0(k0)			# k1=pde entry (delay slot)
+
+	/* Validate page table entry.  */
+	andi		k1, PTE_VR
+	beqz		k1, 3f
+	nop
+
+	# The PDE is actually a superpage PTE.  Store it in the TLB lo0 reg.
+	CLEAR_PTE_SWBITS(k1)
+	PTE_MTC0	k1, MIPS_COP_0_TLB_LO0		# lo0 is loaded
+	COP0_SYNC
+
+	# Compute the PFN for the TLB lo1 register from k1(=PTE for TLB lo0).
+	GET_ODD_1M_PFN_FROM_EVEN(k1)			# k1=Odd PFN in PTE postion
+
+	# Get hard TLB flag bits.
+	PTR_L		k0, 0(k0)			# k0=pde entry (again)
+	GET_HW_TLB_FLAGS(k0)				# k0=hw TLB flag bits
+	or		k1, k1, k0			# k1=PTE=PFN | hwflg bits
+	# Load it into the TLB Lo1 register.
+	# CLEAR_PTE_SWBITS(k1)				# No SW bits to clear
+	PTE_MTC0	k1, MIPS_COP_0_TLB_LO1		# lo1 is loaded
+	COP0_SYNC
+
+	# Load the TLB PageMask for 1M pages.
+	dli		k0, TLBMASK_1M_PAGE		# PageMask for 1M Page
+	PTE_MTC0	k0, MIPS_COP_0_TLB_PG_MASK	# PageMask is loaded
+	COP0_SYNC
+
+	b		tlb_insert_entry
+	nop
+
+not_spg:
+#endif /* MIPS64_NEW_PMAP */
+#endif /* __mips_n64 */
 	MFC0		k0, MIPS_COP_0_BAD_VADDR	# k0=bad address (again)
 	PTR_SRL		k0, PAGE_SHIFT - PTESHIFT	# k0=VPN
 	andi		k0, k0, PTEMASK			# k0=page tab offset
@@ -902,7 +1197,7 @@ LEAF_NOPROFILE(MipsTLBInvalidException)
 	PTE_L		k0, 0(k1)			# k0=this PTE
 
 	/* Validate page table entry.  */
-	andi		k0, PTE_V
+	andi		k0, PTE_VR
 	beqz		k0, 3f
 	nop
 
@@ -912,12 +1207,15 @@ LEAF_NOPROFILE(MipsTLBInvalidException)
 	nop
 
 	PTE_L		k0, 0(k1)
-	PTE_L		k1, PTESIZE(k1)
+
 	CLEAR_PTE_SWBITS(k0)
 	PTE_MTC0	k0, MIPS_COP_0_TLB_LO0
 	COP0_SYNC
-	CLEAR_PTE_SWBITS(k1)
-	PTE_MTC0	k1, MIPS_COP_0_TLB_LO1
+
+	PTE_L		k0, PTESIZE(k1)
+
+	CLEAR_PTE_SWBITS(k0)
+	PTE_MTC0	k0, MIPS_COP_0_TLB_LO1
 	COP0_SYNC
 
 	b		tlb_insert_entry
@@ -925,12 +1223,15 @@ LEAF_NOPROFILE(MipsTLBInvalidException)
 
 odd_page:
 	PTE_L		k0, -PTESIZE(k1)
-	PTE_L		k1, 0(k1)
+
 	CLEAR_PTE_SWBITS(k0)
 	PTE_MTC0	k0, MIPS_COP_0_TLB_LO0
 	COP0_SYNC
-	CLEAR_PTE_SWBITS(k1)
-	PTE_MTC0	k1, MIPS_COP_0_TLB_LO1
+
+	PTE_L		k0, 0(k1)
+
+	CLEAR_PTE_SWBITS(k0)
+	PTE_MTC0	k0, MIPS_COP_0_TLB_LO1
 	COP0_SYNC
 
 tlb_insert_entry:
@@ -940,11 +1241,21 @@ tlb_insert_entry:
 	bltz		k0, tlb_insert_random
 	nop
 	tlbwi
+	PTE_MTC0	zero, MIPS_COP_0_TLB_PG_MASK
+	COP0_SYNC
+#ifdef CPU_CHERI
+	CHERI_EXCEPTION_RETURN(k0)
+#endif
 	eret
 	ssnop
 
 tlb_insert_random:
 	tlbwr
+	PTE_MTC0	zero, MIPS_COP_0_TLB_PG_MASK
+	COP0_SYNC
+#ifdef CPU_CHERI
+	CHERI_EXCEPTION_RETURN(k0)
+#endif
 	eret
 	ssnop
 
@@ -982,13 +1293,16 @@ tlb_insert_random:
 	PTR_ADDU	k0, k0, k1
 
 	/*
-	 * Stash the original value of 'sp' so we can update trapframe later.
-	 * We assume that SAVE_CPU does not trash 'k1'.
+	 * Convergence of interests: save the original 'sp' in 'k1' so that
+	 * SAVE_CPU can preserve that rather than our modified 'sp' used to
+	 * access the stack during the exception handler.  But also save it so
+	 * that we can restore it later.
 	 */
 	move	k1, sp
 
 	move	sp, k0
 	PTR_SUBU	sp, sp, KERN_EXC_FRAME_SIZE
+	CHERI_ADJUST_SP(sp)
 
 	move	k0, ra
 	move	ra, zero
@@ -996,6 +1310,11 @@ tlb_insert_random:
 	REG_S	zero, CALLFRAME_SP(sp)
 	move	ra, k0
 
+	/*
+	 * Save CPU state, building 'frame'.  sp holds the location to save
+	 * the trap frame, whereas k1 holds the value of sp to save in the
+	 * trap frame.
+	 */
 	SAVE_CPU
 
 	/*
@@ -1060,24 +1379,73 @@ LEAF_NOPROFILE(MipsTLBMissException)
 #ifdef __mips_n64
 	PTR_SRL		k0, PDRSHIFT - PTRSHIFT		# k0=VPN
 	andi		k0, k0, PDEPTRMASK		# k0=pde offset
-	PTR_ADDU	k1, k0, k1			# k1=pde entry address
-	PTR_L		k1, 0(k1)			# k1=pde entry
+	PTR_ADDU	k0, k0, k1			# k1=pde entry address
+	PTR_L		k1, 0(k0)			# k1=pde entry
+
+#ifdef MIPS64_NEW_PMAP
+	# Check for superpage
+	GET_SUPERPAGE_IDX(k1)				# k1=superpage index from PTE
+	beq		k1, zero, not_kspg		# ==0 -- not superpage
+	PTR_L		k1, 0(k0)			# k1=pde entry (delay slot)
+
+	# XXX Reference bit emulation
+
+	# The PDE is actually a superpage PTE.  Store it in the TLB lo0 reg.
+	CLEAR_PTE_SWBITS(k1)
+	PTE_MTC0	k1, MIPS_COP_0_TLB_LO0		# lo0 is loaded
+	COP0_SYNC
+
+	# Compute the PFN for the TLB lo1 register from k1(=PTE for TLB lo0).
+	GET_ODD_1M_PFN_FROM_EVEN(k1)			# k1=Odd PFN in PTE postion
+
+	# Get hard TLB flag bits.
+	PTR_L		k0, 0(k0)			# k0=pde entry (again)
+	GET_HW_TLB_FLAGS(k0)				# k0=hw TLB flag bits
+	or		k1, k1, k0			# k1=PTE=PFN | hwflg bits
+	# Load it into the TLB Lo1 register.
+	#CLEAR_PTE_SWBITS(k1)				# No SW Bits to clear
+	PTE_MTC0	k1, MIPS_COP_0_TLB_LO1		# lo1 is loaded
+	COP0_SYNC
+
+	# Load the TLB PageMask for 1M pages.
+	dli		k0, TLBMASK_1M_PAGE		# PageMask for 1M Page
+	PTE_MTC0	k0, MIPS_COP_0_TLB_PG_MASK	# PageMask is loaded
+	COP0_SYNC
+
+	tlbwr						# write to tlb
+	HAZARD_DELAY
+	PTE_MTC0	zero, MIPS_COP_0_TLB_PG_MASK	# zero out PageMask reg
+	COP0_SYNC
+	eret						# return from exception
+
+not_kspg:
+#endif /* MIPS64_NEW_PMAP */
+
 	MFC0		k0, MIPS_COP_0_BAD_VADDR	# k0=bad address (again)
   	beq		k1, zero, MipsKernGenException	# ==0 -- no page table
 #endif
 	PTR_SRL		k0, PAGE_SHIFT - PTESHIFT	# k0=VPN
 	andi		k0, k0, PTE2MASK		# k0=page tab offset
 	PTR_ADDU	k1, k1, k0			# k1=pte address
+
 	PTE_L		k0, 0(k1)			# k0=lo0 pte
-	PTE_L		k1, PTESIZE(k1)			# k1=lo1 pte
+
+	# XXX Reference bit emulation
+
 	CLEAR_PTE_SWBITS(k0)
 	PTE_MTC0	k0, MIPS_COP_0_TLB_LO0		# lo0 is loaded
 	COP0_SYNC
-	CLEAR_PTE_SWBITS(k1)
-	PTE_MTC0	k1, MIPS_COP_0_TLB_LO1		# lo1 is loaded
+
+	PTE_L		k0, PTESIZE(k1)			# k0=lo1 pte
+
+	CLEAR_PTE_SWBITS(k0)
+	PTE_MTC0	k0, MIPS_COP_0_TLB_LO1		# lo1 is loaded
 	COP0_SYNC
 	tlbwr					# write to tlb
 	HAZARD_DELAY
+#ifdef CPU_CHERI
+	CHERI_EXCEPTION_RETURN(k0)
+#endif
 	eret					# return from exception
 	.set	at
 END(MipsTLBMissException)
@@ -1101,7 +1469,10 @@ END(MipsTLBMissException)
  *
  *----------------------------------------------------------------------------
  */
+#if defined(CPU_HAVEFPU)
 NESTED(MipsFPTrap, CALLFRAME_SIZ, ra)
+	.set push
+	.set hardfloat
 	PTR_SUBU	sp, sp, CALLFRAME_SIZ
 	mfc0	t0, MIPS_COP_0_STATUS
 	HAZARD_DELAY
@@ -1132,21 +1503,21 @@ NESTED(MipsFPTrap, CALLFRAME_SIZ, ra)
  * The instruction is in the branch delay slot so the branch will have to
  * be emulated to get the resulting PC.
  */
-	PTR_S	a2, CALLFRAME_SIZ + 8(sp)
+	PTR_S	a2, (CALLFRAME_SIZ + 8)(sp)
 	GET_CPU_PCPU(a0)
 #mips64 unsafe?
 	PTR_L	a0, PC_CURPCB(a0)
 	PTR_ADDU a0, a0, U_PCB_REGS		# first arg is ptr to CPU registers
 	move	a1, a2				# second arg is instruction PC
 	move	a2, t1				# third arg is floating point CSR
-	PTR_LA	t3, _C_LABEL(MipsEmulateBranch)	# compute PC after branch
-	jalr	t3				# compute PC after branch
+	PTR_LA	t9, _C_LABEL(MipsEmulateBranch)	# compute PC after branch
+	jalr	t9				# compute PC after branch
 	move	a3, zero			# fourth arg is FALSE
 /*
  * Now load the floating-point instruction in the branch delay slot
  * to be emulated.
  */
-	PTR_L	a2, CALLFRAME_SIZ + 8(sp)	# restore EXC pc
+	PTR_L	a2, (CALLFRAME_SIZ + 8)(sp)	# restore EXC pc
 	b	2f
 	lw	a0, 4(a2)			# a0 = coproc instruction
 /*
@@ -1176,8 +1547,8 @@ NESTED(MipsFPTrap, CALLFRAME_SIZ, ra)
 	PTR_L	a0, PC_CURTHREAD(a0)		# get current thread
 	cfc1	a2, MIPS_FPU_CSR		# code = FP execptions
 	ctc1	zero, MIPS_FPU_CSR		# Clear exceptions
-	PTR_LA	t3, _C_LABEL(trapsignal)
-	jalr	t3
+	PTR_LA	t9, _C_LABEL(trapsignal)
+	jalr	t9
 	li	a1, SIGFPE
 	b	FPReturn
 	nop
@@ -1186,8 +1557,8 @@ NESTED(MipsFPTrap, CALLFRAME_SIZ, ra)
  * Finally, we can call MipsEmulateFP() where a0 is the instruction to emulate.
  */
 4:
-	PTR_LA	t3, _C_LABEL(MipsEmulateFP)
-	jalr	t3
+	PTR_LA	t9, _C_LABEL(MipsEmulateFP)
+	jalr	t9
 	nop
 
 /*
@@ -1201,7 +1572,9 @@ FPReturn:
 	ITLBNOPFIX
 	j	ra
 	PTR_ADDU sp, sp, CALLFRAME_SIZ
+	.set pop
 END(MipsFPTrap)
+#endif /* CPU_HAVEFPU */
 
 #ifndef INTRNG
 /*
@@ -1238,6 +1611,9 @@ sintrcnt:
  */
 	.text
 VECTOR(MipsCache, unknown)
+#ifdef CPU_CHERI
+	CHERI_EXCEPTION_ENTER(k0)
+#endif
 	PTR_LA	k0, _C_LABEL(MipsCacheException)
 	li	k1, MIPS_KSEG0_PHYS_MASK
 	and	k0, k1
@@ -1270,6 +1646,9 @@ NESTED_NOPROFILE(MipsCacheException, KERN_EXC_FRAME_SIZE, ra)
 	mtc0	k0, MIPS_COP_0_STATUS		# restore status
 	COP0_SYNC
 
+#ifdef CPU_CHERI
+	CHERI_EXCEPTION_RETURN(k0)
+#endif
 	eret
 
 	MSG("cache error @ EPC 0x%x CachErr 0x%x");

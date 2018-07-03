@@ -152,23 +152,6 @@ BIN1+= regdomain.xml
 # -rwxr-xr-x root:wheel, for the new cron root:wheel
 BIN2=	netstart pccard_ether rc.suspend rc.resume
 
-MTREE=	BSD.debug.dist BSD.include.dist BSD.root.dist BSD.usr.dist BSD.var.dist
-.if ${MK_CHERI} != "no"
-MTREE+=	BSD.libcheri.dist
-.endif
-.if ${MK_LIB32} != "no"
-MTREE+=	BSD.lib32.dist
-.endif
-.if ${MK_LIBSOFT} != "no"
-MTREE+=	BSD.libsoft.dist
-.endif
-.if ${MK_TESTS} != "no"
-MTREE+=	BSD.tests.dist
-.endif
-.if ${MK_SENDMAIL} != "no"
-MTREE+=	BSD.sendmail.dist
-.endif
-
 PPPCNF=	ppp.conf
 
 .if ${MK_SENDMAIL} == "no"
@@ -229,9 +212,6 @@ distribution:
 	    ${INSTALL} -o ${BINOWN} -g ${BINGRP} -m 600 \
 		snmpd.config ${DESTDIR}/etc;
 .endif
-.if ${MK_AT} == "no"
-	sed -i "" -e 's;.*/usr/libexec/atrun;#&;' ${DESTDIR}/etc/crontab
-.endif
 .if ${MK_TCSH} == "no"
 	sed -i "" -e 's;/bin/csh;/bin/sh;' ${DESTDIR}/etc/master.passwd
 .endif
@@ -257,6 +237,7 @@ distribution:
 	${_+_}cd ${.CURDIR}/defaults; ${MAKE} install
 	${_+_}cd ${.CURDIR}/devd; ${MAKE} install
 	${_+_}cd ${.CURDIR}/gss; ${MAKE} install
+	${_+_}cd ${.CURDIR}/mtree; ${MAKE} install
 	${_+_}cd ${.CURDIR}/newsyslog.conf.d; ${MAKE} install
 .if ${MK_NTP} != "no"
 	${_+_}cd ${.CURDIR}/ntp; ${MAKE} install
@@ -311,8 +292,6 @@ distribution:
 	    rm -f ${DESTDIR}/.cshrc; \
 	    ln ${DESTDIR}/root/.cshrc ${DESTDIR}/.cshrc
 .endif
-	cd ${.CURDIR}/mtree; ${INSTALL} -o ${BINOWN} -g ${BINGRP} -m 444 \
-	    ${MTREE} ${DESTDIR}/etc/mtree
 .if ${MK_MAIL} != "no"
 	cd ${.CURDIR}/mail; ${INSTALL} -o ${BINOWN} -g ${BINGRP} -m 644 \
 	    ${ETCMAIL} ${DESTDIR}/etc/mail
@@ -344,19 +323,6 @@ distribution:
 .endif
 
 MTREE_CMD?=	mtree
-
-.if ${MK_INSTALL_AS_USER} == "yes" && ${_uid} != 0
-MTREE_FILTER= sed -e 's,\([gu]\)name=,\1id=,g' \
-	-e 's,\(uid=\)[^ ]* ,\1${_uid} ,' \
-	-e 's,\(gid=\)[^ ]* ,\1${_gid} ,' \
-	-e 's,\(uid=\)[^ ]*$$,\1${_uid},' \
-	-e 's,\(gid=\)[^ ]*$$,\1${_gid},' 
-.else
-MTREE_FILTER= cat
-.if !defined(NO_FSCHG)
-MTREE_FSCHG=	-i
-.endif
-.endif
 
 MTREES=		mtree/BSD.root.dist		/		\
 		mtree/BSD.var.dist		/var		\
@@ -434,31 +400,6 @@ distrib-dirs: ${MTREES:N/*} distrib-cleanup .PHONY
 	done; true
 .endif
 	${INSTALL_SYMLINK} usr/src/sys ${DESTDIR}/sys
-.if ${MK_MAN} != "no"
-	cd ${DESTDIR}${SHAREDIR}/man; \
-	for mandir in man*; do \
-		${INSTALL_SYMLINK} ../$$mandir \
-		    ${DESTDIR}${SHAREDIR}/man/en.ISO8859-1/; \
-		${INSTALL_SYMLINK} ../$$mandir \
-		    ${DESTDIR}${SHAREDIR}/man/en.UTF-8/; \
-	done
-.if ${MK_OPENSSL} != "no"
-	cd ${DESTDIR}${SHAREDIR}/openssl/man; \
-	for mandir in man*; do \
-		${INSTALL_SYMLINK} ../$$mandir \
-		    ${DESTDIR}${SHAREDIR}/openssl/man/en.ISO8859-1/; \
-	done
-.endif
-	set - `grep "^[a-zA-Z]" ${.CURDIR}/man.alias`; \
-	while [ $$# -gt 0 ] ; do \
-		${INSTALL_SYMLINK} "$$2" "${DESTDIR}${SHAREDIR}/man/$$1"; \
-		if [ "${MK_OPENSSL}" != "no" ]; then \
-			${INSTALL_SYMLINK} "$$2" \
-			    "${DESTDIR}${SHAREDIR}/openssl/man/$$1"; \
-		fi; \
-		shift; shift; \
-	done
-.endif
 .if ${MK_NLS} != "no"
 	set - `grep "^[a-zA-Z]" ${.CURDIR}/nls.alias`; \
 	while [ $$# -gt 0 ] ; do \
@@ -478,3 +419,16 @@ etc-examples: etc-examples-install
 	    DESTDIR=${DESTDIR}${SHAREDIR}/examples
 
 .include <bsd.prog.mk>
+
+.if ${MK_INSTALL_AS_USER} == "yes" && ${_uid} != 0
+MTREE_FILTER= sed -e 's,\([gu]\)name=,\1id=,g' \
+	-e 's,\(uid=\)[^ ]* ,\1${_uid} ,' \
+	-e 's,\(gid=\)[^ ]* ,\1${_gid} ,' \
+	-e 's,\(uid=\)[^ ]*$$,\1${_uid},' \
+	-e 's,\(gid=\)[^ ]*$$,\1${_gid},'
+.else
+MTREE_FILTER= cat
+.if !defined(NO_FSCHG)
+MTREE_FSCHG=	-i
+.endif
+.endif

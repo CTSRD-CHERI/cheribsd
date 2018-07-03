@@ -78,12 +78,10 @@ __FBSDID("$FreeBSD$");
 
 struct mips_cache_ops mips_cache_ops;
 
-#if defined(MIPS_DISABLE_L1_CACHE) || defined(CPU_RMI) || defined(CPU_NLM)
 static void
 cache_noop(vm_offset_t va, vm_size_t size)
 {
 }
-#endif
 
 void
 mips_config_cache(struct mips_cpuinfo * cpuinfo)
@@ -118,14 +116,11 @@ mips_config_cache(struct mips_cpuinfo * cpuinfo)
 		mips_cache_ops.mco_icache_sync_range_index =
 		    mipsNN_icache_sync_range_index_128;
 		break;
-
-#ifdef MIPS_DISABLE_L1_CACHE
 	case 0:
 		mips_cache_ops.mco_icache_sync_all = (void (*)(void))cache_noop;
 		mips_cache_ops.mco_icache_sync_range = cache_noop;
 		mips_cache_ops.mco_icache_sync_range_index = cache_noop;
 		break;
-#endif
 	default:
 		panic("no Icache ops for %d byte lines",
 		    cpuinfo->l1.ic_linesize);
@@ -207,7 +202,6 @@ mips_config_cache(struct mips_cpuinfo * cpuinfo)
 		    mips_cache_ops.mco_intern_pdcache_wb_range =
 		    mipsNN_pdcache_wb_range_128;
 		break;
-#ifdef MIPS_DISABLE_L1_CACHE
 	case 0:
 		mips_cache_ops.mco_pdcache_wbinv_all =
 		    mips_cache_ops.mco_intern_pdcache_wbinv_all =
@@ -220,7 +214,6 @@ mips_config_cache(struct mips_cpuinfo * cpuinfo)
 		mips_cache_ops.mco_pdcache_wb_range = cache_noop;
 		mips_cache_ops.mco_intern_pdcache_wb_range = cache_noop;
 		break;
-#endif
 	default:
 		panic("no Dcache ops for %d byte lines",
 		    cpuinfo->l1.dc_linesize);

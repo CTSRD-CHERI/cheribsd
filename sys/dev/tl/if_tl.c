@@ -2124,7 +2124,7 @@ tl_ioctl(ifp, command, data)
 	int			error = 0;
 
 	switch(command) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		TL_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING &&
@@ -2148,14 +2148,14 @@ tl_ioctl(ifp, command, data)
 		TL_UNLOCK(sc);
 		error = 0;
 		break;
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		TL_LOCK(sc);
 		tl_setmulti(sc);
 		TL_UNLOCK(sc);
 		error = 0;
 		break;
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		if (sc->tl_bitrate)
 			error = ifmedia_ioctl(ifp, ifr, &sc->ifmedia, command);

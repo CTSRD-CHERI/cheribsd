@@ -40,6 +40,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/resourcevar.h>
+#include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
 
 #include <machine/cpu.h>
@@ -406,14 +407,23 @@ struct profil_args {
 int
 sys_profil(struct thread *td, struct profil_args *uap)
 {
+
+	return (kern_profil(td, __USER_CAP(uap->samples, uap->size), uap->size,
+	    uap->offset, uap->scale));
+}
+
+int
+kern_profil(struct thread *td, char * __capability samples, size_t size,
+    size_t offset, u_int scale)
+{
 	struct uprof *upp;
 	struct proc *p;
 
-	if (uap->scale > (1 << 16))
+	if (scale > (1 << 16))
 		return (EINVAL);
 
 	p = td->td_proc;
-	if (uap->scale == 0) {
+	if (scale == 0) {
 		PROC_LOCK(p);
 		stopprofclock(p);
 		PROC_UNLOCK(p);
@@ -422,10 +432,10 @@ sys_profil(struct thread *td, struct profil_args *uap)
 	PROC_LOCK(p);
 	upp = &td->td_proc->p_stats->p_prof;
 	PROC_PROFLOCK(p);
-	upp->pr_off = uap->offset;
-	upp->pr_scale = uap->scale;
-	upp->pr_base = uap->samples;
-	upp->pr_size = uap->size;
+	upp->pr_off = offset;
+	upp->pr_scale = scale;
+	upp->pr_base = samples;
+	upp->pr_size = size;
 	PROC_PROFUNLOCK(p);
 	startprofclock(p);
 	PROC_UNLOCK(p);
@@ -445,10 +455,9 @@ sys_profil(struct thread *td, struct profil_args *uap)
 /*
  * Collect user-level profiling statistics; called on a profiling tick,
  * when a process is running in user-mode.  This routine may be called
- * from an interrupt context.  We try to update the user profiling buffers
- * cheaply with fuswintr() and suswintr().  If that fails, we revert to
- * an AST that will vector us to trap() with a context in which copyin
- * and copyout will work.  Trap will then call addupc_task().
+ * from an interrupt context.  We perform the update with an AST
+ * that will vector us to trap() with a context in which copyin and
+ * copyout will work.  Trap will then call addupc_task().
  *
  * Note that we may (rarely) not get around to the AST soon enough, and
  * lose profile ticks when the next tick overwrites this one, but in this
@@ -461,7 +470,6 @@ addupc_intr(struct thread *td, uintfptr_t pc, u_int ticks)
 	struct uprof *prof;
 	caddr_t addr;
 	u_int i;
-	int v;
 
 	if (ticks == 0)
 		return;
@@ -473,16 +481,14 @@ addupc_intr(struct thread *td, uintfptr_t pc, u_int ticks)
 		return;			/* out of range; ignore */
 	}
 
-	addr = prof->pr_base + i;
+	addr = __DECAP_CHECK(prof->pr_base + i, sizeof(short));
 	PROC_PROFUNLOCK(td->td_proc);
-	if ((v = fuswintr(addr)) == -1 || suswintr(addr, v + ticks) == -1) {
-		td->td_profil_addr = pc;
-		td->td_profil_ticks = ticks;
-		td->td_pflags |= TDP_OWEUPC;
-		thread_lock(td);
-		td->td_flags |= TDF_ASTPENDING;
-		thread_unlock(td);
-	}
+	td->td_profil_addr = pc;
+	td->td_profil_ticks = ticks;
+	td->td_pflags |= TDP_OWEUPC;
+	thread_lock(td);
+	td->td_flags |= TDF_ASTPENDING;
+	thread_unlock(td);
 }
 
 /*
@@ -494,7 +500,7 @@ addupc_task(struct thread *td, uintfptr_t pc, u_int ticks)
 {
 	struct proc *p = td->td_proc; 
 	struct uprof *prof;
-	caddr_t addr;
+	char * __capability addr;
 	u_int i;
 	u_short v;
 	int stop = 0;
@@ -519,9 +525,9 @@ addupc_task(struct thread *td, uintfptr_t pc, u_int ticks)
 	addr = prof->pr_base + i;
 	PROC_PROFUNLOCK(p);
 	PROC_UNLOCK(p);
-	if (copyin(addr, &v, sizeof(v)) == 0) {
+	if (copyin_c(addr, &v, sizeof(v)) == 0) {
 		v += ticks;
-		if (copyout(&v, addr, sizeof(v)) == 0) {
+		if (copyout_c(&v, addr, sizeof(v)) == 0) {
 			PROC_LOCK(p);
 			goto out;
 		}

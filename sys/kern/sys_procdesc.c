@@ -79,8 +79,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/procdesc.h>
 #include <sys/resourcevar.h>
 #include <sys/stat.h>
-#include <sys/sysproto.h>
+#include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
+#include <sys/sysproto.h>
 #include <sys/systm.h>
 #include <sys/ucred.h>
 #include <sys/user.h>
@@ -207,15 +208,22 @@ out:
 int
 sys_pdgetpid(struct thread *td, struct pdgetpid_args *uap)
 {
+
+	return (user_pdgetpid(td, uap->fd, __USER_CAP_OBJ(uap->pidp)));
+}
+
+int
+user_pdgetpid(struct thread *td, int fd, pid_t * __capability pidp)
+{
 	cap_rights_t rights;
 	pid_t pid;
 	int error;
 
-	AUDIT_ARG_FD(uap->fd);
-	error = kern_pdgetpid(td, uap->fd,
+	AUDIT_ARG_FD(fd);
+	error = kern_pdgetpid(td, fd,
 	    cap_rights_init(&rights, CAP_PDGETPID), &pid);
 	if (error == 0)
-		error = copyout(&pid, uap->pidp, sizeof(pid));
+		error = copyout_c(&pid, pidp, sizeof(pid));
 	return (error);
 }
 

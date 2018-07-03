@@ -1168,7 +1168,7 @@ cgem_ioctl(if_t ifp, u_long cmd, caddr_t data)
 	int error = 0, mask;
 
 	switch (cmd) {
-	case SIOCSIFFLAGS:
+	CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		CGEM_LOCK(sc);
 		if ((if_getflags(ifp) & IFF_UP) != 0) {
 			if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0) {
@@ -1187,8 +1187,8 @@ cgem_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		CGEM_UNLOCK(sc);
 		break;
 
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
+	CASE_IOC_IFREQ(SIOCADDMULTI):
+	CASE_IOC_IFREQ(SIOCDELMULTI):
 		/* Set up multi-cast filters. */
 		if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0) {
 			CGEM_LOCK(sc);
@@ -1197,18 +1197,18 @@ cgem_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case SIOCSIFMEDIA:
+	CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
 
-	case SIOCSIFCAP:
+	CASE_IOC_IFREQ(SIOCSIFCAP):
 		CGEM_LOCK(sc);
-		mask = if_getcapenable(ifp) ^ ifr->ifr_reqcap;
+		mask = if_getcapenable(ifp) ^ ifr_reqcap_get(ifr);
 
 		if ((mask & IFCAP_TXCSUM) != 0) {
-			if ((ifr->ifr_reqcap & IFCAP_TXCSUM) != 0) {
+			if ((ifr_reqcap_get(ifr) & IFCAP_TXCSUM) != 0) {
 				/* Turn on TX checksumming. */
 				if_setcapenablebit(ifp, IFCAP_TXCSUM |
 						   IFCAP_TXCSUM_IPV6, 0);
@@ -1229,7 +1229,7 @@ cgem_ioctl(if_t ifp, u_long cmd, caddr_t data)
 			}
 		}
 		if ((mask & IFCAP_RXCSUM) != 0) {
-			if ((ifr->ifr_reqcap & IFCAP_RXCSUM) != 0) {
+			if ((ifr_reqcap_get(ifr) & IFCAP_RXCSUM) != 0) {
 				/* Turn on RX checksumming. */
 				if_setcapenablebit(ifp, IFCAP_RXCSUM |
 						   IFCAP_RXCSUM_IPV6, 0);

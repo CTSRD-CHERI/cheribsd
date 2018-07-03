@@ -579,7 +579,7 @@ soaio_process_job(struct socket *so, struct sockbuf *sb, struct kaiocb *job)
 	struct thread *td;
 	struct file *fp;
 	struct uio uio;
-	struct iovec iov;
+	kiovec_t iov;
 	size_t cnt, done;
 	long ru_before;
 	int error, flags;
@@ -594,8 +594,7 @@ retry:
 
 	done = job->aio_done;
 	cnt = job->uaiocb.aio_nbytes - done;
-	iov.iov_base = (void *)((uintptr_t)job->uaiocb.aio_buf + done);
-	iov.iov_len = cnt;
+	IOVEC_INIT(&iov, (void *)((uintptr_t)job->uaiocb.aio_buf + done), cnt);
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = 0;
@@ -693,6 +692,7 @@ soaio_process_sb(struct socket *so, struct sockbuf *sb)
 {
 	struct kaiocb *job;
 
+	CURVNET_SET(so->so_vnet);
 	SOCKBUF_LOCK(sb);
 	while (!TAILQ_EMPTY(&sb->sb_aiojobq) && soaio_ready(so, sb)) {
 		job = TAILQ_FIRST(&sb->sb_aiojobq);
@@ -715,6 +715,7 @@ soaio_process_sb(struct socket *so, struct sockbuf *sb)
 
 	SOCK_LOCK(so);
 	sorele(so);
+	CURVNET_RESTORE();
 }
 
 void
@@ -744,11 +745,7 @@ sowakeup_aio(struct socket *so, struct sockbuf *sb)
 	if (sb->sb_flags & SB_AIO_RUNNING)
 		return;
 	sb->sb_flags |= SB_AIO_RUNNING;
-	if (sb == &so->so_snd)
-		SOCK_LOCK(so);
 	soref(so);
-	if (sb == &so->so_snd)
-		SOCK_UNLOCK(so);
 	soaio_enqueue(&sb->sb_aiotask);
 }
 

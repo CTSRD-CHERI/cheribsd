@@ -80,4 +80,5 @@ NO_WERROR=
 .PATH: ${.CURDIR}/../libc/string
 .PATH: ${.CURDIR}/../libc/${MACHINE}/string
 
+.include "../Makefile.inc"
 .include <bsd.lib.mk>

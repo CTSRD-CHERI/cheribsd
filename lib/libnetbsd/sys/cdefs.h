@@ -29,6 +29,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "pointer_integrity"
+ *   ],
+ *   "hybrid_specific": true
+ * }
+ * CHERI CHANGES END
+ */
 
 #ifndef _LIBNETBSD_SYS_CDEFS_H_
 #define _LIBNETBSD_SYS_CDEFS_H_

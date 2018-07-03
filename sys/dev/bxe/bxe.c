@@ -167,6 +167,12 @@ static struct bxe_device_type bxe_devs[] = {
         "QLogic NetXtreme II BCM57840 4x10GbE"
     },
     {
+        QLOGIC_VENDORID,
+        CHIP_NUM_57840_4_10,
+        PCI_ANY_ID, PCI_ANY_ID,
+        "QLogic NetXtreme II BCM57840 4x10GbE"
+    },
+    {
         BRCM_VENDORID,
         CHIP_NUM_57840_2_20,
         PCI_ANY_ID, PCI_ANY_ID,
@@ -4506,34 +4512,29 @@ bxe_ioctl(if_t ifp,
 
     switch (command)
     {
-    case SIOCSIFMTU:
+    CASE_IOC_IFREQ(SIOCSIFMTU):
         BLOGD(sc, DBG_IOCTL, "Received SIOCSIFMTU ioctl (mtu=%d)\n",
-              ifr->ifr_mtu);
+              ifr_mtu_get(ifr));
 
-        if (sc->mtu == ifr->ifr_mtu) {
+        if (sc->mtu == ifr_mtu_get(ifr)) {
             /* nothing to change */
             break;
         }
 
-        if ((ifr->ifr_mtu < mtu_min) || (ifr->ifr_mtu > mtu_max)) {
+        if ((ifr_mtu_get(ifr) < mtu_min) || (ifr_mtu_get(ifr) > mtu_max)) {
             BLOGE(sc, "Unsupported MTU size %d (range is %d-%d)\n",
-                  ifr->ifr_mtu, mtu_min, mtu_max);
+                  ifr_mtu_get(ifr), mtu_min, mtu_max);
             error = EINVAL;
             break;
         }
 
         atomic_store_rel_int((volatile unsigned int *)&sc->mtu,
-                             (unsigned long)ifr->ifr_mtu);
-	/* 
-        atomic_store_rel_long((volatile unsigned long *)&if_getmtu(ifp),
-                              (unsigned long)ifr->ifr_mtu);
-	XXX - Not sure why it needs to be atomic
-	*/
-	if_setmtu(ifp, ifr->ifr_mtu);
+                             ifr_mtu_get(ifr));
+	if_setmtu(ifp, ifr_mtu_get(ifr));
         reinit = 1;
         break;
 
-    case SIOCSIFFLAGS:
+    CASE_IOC_IFREQ(SIOCSIFFLAGS):
         /* toggle the interface state up or down */
         BLOGD(sc, DBG_IOCTL, "Received SIOCSIFFLAGS ioctl\n");
 
@@ -4556,8 +4557,8 @@ bxe_ioctl(if_t ifp,
 
         break;
 
-    case SIOCADDMULTI:
-    case SIOCDELMULTI:
+    CASE_IOC_IFREQ(SIOCADDMULTI):
+    CASE_IOC_IFREQ(SIOCDELMULTI):
         /* add/delete multicast addresses */
         BLOGD(sc, DBG_IOCTL, "Received SIOCADDMULTI/SIOCDELMULTI ioctl\n");
 
@@ -4571,9 +4572,9 @@ bxe_ioctl(if_t ifp,
 
         break;
 
-    case SIOCSIFCAP:
+    CASE_IOC_IFREQ(SIOCSIFCAP):
         /* find out which capabilities have changed */
-        mask = (ifr->ifr_reqcap ^ if_getcapenable(ifp));
+        mask = (ifr_reqcap_get(ifr) ^ if_getcapenable(ifp));
 
         BLOGD(sc, DBG_IOCTL, "Received SIOCSIFCAP ioctl (mask=0x%08x)\n",
               mask);
@@ -4676,7 +4677,7 @@ bxe_ioctl(if_t ifp,
 
         break;
 
-    case SIOCSIFMEDIA:
+    CASE_IOC_IFREQ(SIOCSIFMEDIA):
     case SIOCGIFMEDIA:
         /* set/get interface media */
         BLOGD(sc, DBG_IOCTL,

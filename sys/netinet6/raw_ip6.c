@@ -629,6 +629,8 @@ rip6_ctloutput(struct socket *so, struct sockopt *sopt)
 			break;
 		}
 		break;
+	default:
+		return (EINVAL);
 	}
 
 	return (error);

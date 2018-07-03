@@ -24,6 +24,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180530,
+ *   "changes": [
+ *     "support"
+ *   ],
+ *   "change_comment: ""
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -47,6 +58,22 @@ __FBSDID("$FreeBSD$");
 #include <unistd.h>
 
 #include "core.h"
+
+#ifndef EF_MIPS_ABI
+#define	EF_MIPS_ABI		0x0000f000
+#endif
+#ifndef EF_MIPS_ABI_CHERIABI
+#define	EF_MIPS_ABI_CHERIABI	0x0000c000
+#endif
+#ifndef EF_MIPS_MACH_CHERI128
+#define	EF_MIPS_MACH_CHERI128	0x00C10000
+#endif
+#ifndef	EF_MIPS_MACH_CHERI256
+#define EF_MIPS_MACH_CHERI256	0x00C20000
+#endif
+#ifndef EF_MIPS_MACH
+#define	EF_MIPS_MACH		0x00FF0000
+#endif
 
 #define PROCSTAT_CORE_MAGIC	0x012DADB8
 struct procstat_core
@@ -128,7 +155,7 @@ typedef struct _cap256_ps_strings cap256_ps_strings_t;
 static struct psc_type_info {
 	unsigned int	n_type;
 	int		structsize;
-} psc_type_info[PSC_TYPE_MAX] = {
+} default_type_info[PSC_TYPE_MAX] = {
 	{ .n_type  = NT_PROCSTAT_PROC, .structsize = sizeof(struct kinfo_proc) },
 	{ .n_type = NT_PROCSTAT_FILES, .structsize = sizeof(struct kinfo_file) },
 	{ .n_type = NT_PROCSTAT_VMMAP, .structsize = sizeof(struct kinfo_vmentry) },
@@ -140,6 +167,36 @@ static struct psc_type_info {
 	{ .n_type = NT_PROCSTAT_PSSTRINGS, .structsize = sizeof(vm_offset_t) },
 	{ .n_type = NT_PROCSTAT_PSSTRINGS, .structsize = sizeof(vm_offset_t) },
 	{ .n_type = NT_PROCSTAT_AUXV, .structsize = sizeof(Elf_Auxinfo) },
+	{ .n_type = NT_PTLWPINFO, .structsize = sizeof(struct ptrace_lwpinfo) },
+};
+
+static struct psc_type_info cheri128_type_info[PSC_TYPE_MAX] = {
+	{ .n_type = NT_PROCSTAT_PROC, .structsize = sizeof(struct kinfo_proc) },
+	{ .n_type = NT_PROCSTAT_FILES, .structsize = sizeof(struct kinfo_file) },
+	{ .n_type = NT_PROCSTAT_VMMAP, .structsize = sizeof(struct kinfo_vmentry) },
+	{ .n_type = NT_PROCSTAT_GROUPS, .structsize = sizeof(gid_t) },
+	{ .n_type = NT_PROCSTAT_UMASK, .structsize = sizeof(u_short) },
+	{ .n_type = NT_PROCSTAT_RLIMIT, .structsize = sizeof(struct rlimit) * RLIM_NLIMITS },
+	{ .n_type = NT_PROCSTAT_OSREL, .structsize = sizeof(int) },
+	{ .n_type = NT_PROCSTAT_PSSTRINGS, .structsize = sizeof(vm_offset_t) },
+	{ .n_type = NT_PROCSTAT_PSSTRINGS, .structsize = sizeof(vm_offset_t) },
+	{ .n_type = NT_PROCSTAT_PSSTRINGS, .structsize = sizeof(vm_offset_t) },
+	{ .n_type = NT_PROCSTAT_AUXV, .structsize = sizeof(ElfCheriABI128_Auxinfo) },
+	{ .n_type = NT_PTLWPINFO, .structsize = sizeof(struct ptrace_lwpinfo) },
+};
+
+static struct psc_type_info cheri256_type_info[PSC_TYPE_MAX] = {
+	{ .n_type = NT_PROCSTAT_PROC, .structsize = sizeof(struct kinfo_proc) },
+	{ .n_type = NT_PROCSTAT_FILES, .structsize = sizeof(struct kinfo_file) },
+	{ .n_type = NT_PROCSTAT_VMMAP, .structsize = sizeof(struct kinfo_vmentry) },
+	{ .n_type = NT_PROCSTAT_GROUPS, .structsize = sizeof(gid_t) },
+	{ .n_type = NT_PROCSTAT_UMASK, .structsize = sizeof(u_short) },
+	{ .n_type = NT_PROCSTAT_RLIMIT, .structsize = sizeof(struct rlimit) * RLIM_NLIMITS },
+	{ .n_type = NT_PROCSTAT_OSREL, .structsize = sizeof(int) },
+	{ .n_type = NT_PROCSTAT_PSSTRINGS, .structsize = sizeof(vm_offset_t) },
+	{ .n_type = NT_PROCSTAT_PSSTRINGS, .structsize = sizeof(vm_offset_t) },
+	{ .n_type = NT_PROCSTAT_PSSTRINGS, .structsize = sizeof(vm_offset_t) },
+	{ .n_type = NT_PROCSTAT_AUXV, .structsize = sizeof(ElfCheriABI256_Auxinfo) },
 	{ .n_type = NT_PTLWPINFO, .structsize = sizeof(struct ptrace_lwpinfo) },
 };
 
@@ -165,6 +222,17 @@ core_is_cheri256(struct procstat_core *core)
 
 	return ((core->pc_ehdr.e_flags & (EF_MIPS_ABI | EF_MIPS_MACH)) ==
 	    (EF_MIPS_ABI_CHERIABI | EF_MIPS_MACH_CHERI256));
+}
+
+static struct psc_type_info *
+core_psc_type_info(struct procstat_core *core)
+{
+
+	if (core_is_cheri128(core))
+		return (cheri128_type_info);
+	if (core_is_cheri256(core))
+		return (cheri256_type_info);
+	return (default_type_info);
 }
 
 struct procstat_core *
@@ -254,6 +322,7 @@ void *
 procstat_core_get(struct procstat_core *core, enum psc_type type, void *buf,
     size_t *lenp)
 {
+	struct psc_type_info *psc_type_info;
 	Elf_Note nhdr;
 	off_t offset, eoffset;
 	vm_offset_t psstrings;
@@ -269,6 +338,7 @@ procstat_core_get(struct procstat_core *core, enum psc_type type, void *buf,
 		return (NULL);
 	}
 
+	psc_type_info = core_psc_type_info(core);
 	offset = core->pc_phdr.p_offset;
 	eoffset = offset + core->pc_phdr.p_filesz;
 	curlen = 0;
@@ -643,6 +713,7 @@ get_auxv(struct procstat_core *core, void *auxv, size_t *lenp)
 int
 procstat_core_note_count(struct procstat_core *core, enum psc_type type)
 {
+	struct psc_type_info *psc_type_info;
 	Elf_Note nhdr;
 	off_t offset, eoffset;
 	int cstructsize;
@@ -654,6 +725,7 @@ procstat_core_note_count(struct procstat_core *core, enum psc_type type)
 		return (0);
 	}
 
+	psc_type_info = core_psc_type_info(core);
 	offset = core->pc_phdr.p_offset;
 	eoffset = offset + core->pc_phdr.p_filesz;
 

@@ -285,6 +285,10 @@ struct freebsd32_aio_suspend_args {
 	char nent_l_[PADL_(int)]; int nent; char nent_r_[PADR_(int)];
 	char timeout_l_[PADL_(const struct timespec32 *)]; const struct timespec32 * timeout; char timeout_r_[PADR_(const struct timespec32 *)];
 };
+struct freebsd32_aio_cancel_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char aiocbp_l_[PADL_(struct aiocb32 *)]; struct aiocb32 * aiocbp; char aiocbp_r_[PADR_(struct aiocb32 *)];
+};
 struct freebsd32_aio_error_args {
 	char aiocbp_l_[PADL_(struct aiocb32 *)]; struct aiocb32 * aiocbp; char aiocbp_r_[PADR_(struct aiocb32 *)];
 };
@@ -293,12 +297,12 @@ struct freebsd32_jail_args {
 };
 struct freebsd32_sigtimedwait_args {
 	char set_l_[PADL_(const sigset_t *)]; const sigset_t * set; char set_r_[PADR_(const sigset_t *)];
-	char info_l_[PADL_(siginfo_t *)]; siginfo_t * info; char info_r_[PADR_(siginfo_t *)];
+	char info_l_[PADL_(struct siginfo32 *)]; struct siginfo32 * info; char info_r_[PADR_(struct siginfo32 *)];
 	char timeout_l_[PADL_(const struct timespec *)]; const struct timespec * timeout; char timeout_r_[PADR_(const struct timespec *)];
 };
 struct freebsd32_sigwaitinfo_args {
 	char set_l_[PADL_(const sigset_t *)]; const sigset_t * set; char set_r_[PADR_(const sigset_t *)];
-	char info_l_[PADL_(siginfo_t *)]; siginfo_t * info; char info_r_[PADR_(siginfo_t *)];
+	char info_l_[PADL_(struct siginfo32 *)]; struct siginfo32 * info; char info_r_[PADR_(struct siginfo32 *)];
 };
 struct freebsd32_aio_waitcomplete_args {
 	char aiocbp_l_[PADL_(struct aiocb32 **)]; struct aiocb32 ** aiocbp; char aiocbp_r_[PADR_(struct aiocb32 **)];
@@ -318,17 +322,6 @@ struct freebsd32_sendfile_args {
 	char hdtr_l_[PADL_(struct sf_hdtr32 *)]; struct sf_hdtr32 * hdtr; char hdtr_r_[PADR_(struct sf_hdtr32 *)];
 	char sbytes_l_[PADL_(off_t *)]; off_t * sbytes; char sbytes_r_[PADR_(off_t *)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
-};
-struct freebsd32_ksem_init_args {
-	char idp_l_[PADL_(semid_t *)]; semid_t * idp; char idp_r_[PADR_(semid_t *)];
-	char value_l_[PADL_(unsigned int)]; unsigned int value; char value_r_[PADR_(unsigned int)];
-};
-struct freebsd32_ksem_open_args {
-	char idp_l_[PADL_(semid_t *)]; semid_t * idp; char idp_r_[PADR_(semid_t *)];
-	char name_l_[PADL_(const char *)]; const char * name; char name_r_[PADR_(const char *)];
-	char oflag_l_[PADL_(int)]; int oflag; char oflag_r_[PADR_(int)];
-	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
-	char value_l_[PADL_(unsigned int)]; unsigned int value; char value_r_[PADR_(unsigned int)];
 };
 struct freebsd32_sigaction_args {
 	char sig_l_[PADL_(int)]; int sig; char sig_r_[PADR_(int)];
@@ -600,7 +593,7 @@ struct freebsd32_wait6_args {
 	char status_l_[PADL_(int *)]; int * status; char status_r_[PADR_(int *)];
 	char options_l_[PADL_(int)]; int options; char options_r_[PADR_(int)];
 	char wrusage_l_[PADL_(struct wrusage32 *)]; struct wrusage32 * wrusage; char wrusage_r_[PADR_(struct wrusage32 *)];
-	char info_l_[PADL_(siginfo_t *)]; siginfo_t * info; char info_r_[PADR_(siginfo_t *)];
+	char info_l_[PADL_(struct siginfo32 *)]; struct siginfo32 * info; char info_r_[PADR_(struct siginfo32 *)];
 };
 #else
 struct freebsd32_posix_fallocate_args {
@@ -625,7 +618,7 @@ struct freebsd32_wait6_args {
 	char status_l_[PADL_(int *)]; int * status; char status_r_[PADR_(int *)];
 	char options_l_[PADL_(int)]; int options; char options_r_[PADR_(int)];
 	char wrusage_l_[PADL_(struct wrusage32 *)]; struct wrusage32 * wrusage; char wrusage_r_[PADR_(struct wrusage32 *)];
-	char info_l_[PADL_(siginfo_t *)]; siginfo_t * info; char info_r_[PADR_(siginfo_t *)];
+	char info_l_[PADL_(struct siginfo32 *)]; struct siginfo32 * info; char info_r_[PADR_(struct siginfo32 *)];
 };
 #endif
 struct freebsd32_cap_ioctls_limit_args {
@@ -752,6 +745,7 @@ int	freebsd32_modstat(struct thread *, struct freebsd32_modstat_args *);
 int	freebsd32_kldstat(struct thread *, struct freebsd32_kldstat_args *);
 int	freebsd32_aio_return(struct thread *, struct freebsd32_aio_return_args *);
 int	freebsd32_aio_suspend(struct thread *, struct freebsd32_aio_suspend_args *);
+int	freebsd32_aio_cancel(struct thread *, struct freebsd32_aio_cancel_args *);
 int	freebsd32_aio_error(struct thread *, struct freebsd32_aio_error_args *);
 int	freebsd32_jail(struct thread *, struct freebsd32_jail_args *);
 int	freebsd32_sigtimedwait(struct thread *, struct freebsd32_sigtimedwait_args *);
@@ -759,8 +753,6 @@ int	freebsd32_sigwaitinfo(struct thread *, struct freebsd32_sigwaitinfo_args *);
 int	freebsd32_aio_waitcomplete(struct thread *, struct freebsd32_aio_waitcomplete_args *);
 int	freebsd32_nmount(struct thread *, struct freebsd32_nmount_args *);
 int	freebsd32_sendfile(struct thread *, struct freebsd32_sendfile_args *);
-int	freebsd32_ksem_init(struct thread *, struct freebsd32_ksem_init_args *);
-int	freebsd32_ksem_open(struct thread *, struct freebsd32_ksem_open_args *);
 int	freebsd32_sigaction(struct thread *, struct freebsd32_sigaction_args *);
 int	freebsd32_sigreturn(struct thread *, struct freebsd32_sigreturn_args *);
 int	freebsd32_getcontext(struct thread *, struct freebsd32_getcontext_args *);
@@ -1302,6 +1294,7 @@ int	freebsd11_freebsd32_mknodat(struct thread *, struct freebsd11_freebsd32_mkno
 #define	FREEBSD32_SYS_AUE_freebsd32_kldstat	AUE_NULL
 #define	FREEBSD32_SYS_AUE_freebsd32_aio_return	AUE_AIO_RETURN
 #define	FREEBSD32_SYS_AUE_freebsd32_aio_suspend	AUE_AIO_SUSPEND
+#define	FREEBSD32_SYS_AUE_freebsd32_aio_cancel	AUE_AIO_CANCEL
 #define	FREEBSD32_SYS_AUE_freebsd32_aio_error	AUE_AIO_ERROR
 #define	FREEBSD32_SYS_AUE_freebsd6_freebsd32_aio_read	AUE_AIO_READ
 #define	FREEBSD32_SYS_AUE_freebsd6_freebsd32_aio_write	AUE_AIO_WRITE
@@ -1316,8 +1309,6 @@ int	freebsd11_freebsd32_mknodat(struct thread *, struct freebsd11_freebsd32_mkno
 #define	FREEBSD32_SYS_AUE_freebsd11_freebsd32_kevent	AUE_KEVENT
 #define	FREEBSD32_SYS_AUE_freebsd32_nmount	AUE_NMOUNT
 #define	FREEBSD32_SYS_AUE_freebsd32_sendfile	AUE_SENDFILE
-#define	FREEBSD32_SYS_AUE_freebsd32_ksem_init	AUE_SEMINIT
-#define	FREEBSD32_SYS_AUE_freebsd32_ksem_open	AUE_SEMOPEN
 #define	FREEBSD32_SYS_AUE_freebsd32_sigaction	AUE_SIGACTION
 #define	FREEBSD32_SYS_AUE_freebsd32_sigreturn	AUE_SIGRETURN
 #define	FREEBSD32_SYS_AUE_freebsd32_getcontext	AUE_NULL

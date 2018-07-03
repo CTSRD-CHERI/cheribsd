@@ -53,7 +53,7 @@ __FBSDID("$FreeBSD$");
 #define DEFAULT_SIZE	(4096)
 #define MAX_FW_SLOTS	(7)
 
-typedef void (*print_fn_t)(void *buf, uint32_t size);
+typedef void (*print_fn_t)(const struct nvme_controller_data *cdata, void *buf, uint32_t size);
 
 struct kv_name
 {
@@ -75,57 +75,17 @@ kv_lookup(const struct kv_name *kv, size_t kv_count, uint32_t key)
 }
 
 static void
-print_bin(void *data, uint32_t length)
+print_log_hex(const struct nvme_controller_data *cdata __unused, void *data, uint32_t length)
 {
+
+	print_hex(data, length);
+}
+
+static void
+print_bin(const struct nvme_controller_data *cdata __unused, void *data, uint32_t length)
+{
+
 	write(STDOUT_FILENO, data, length);
-}
-
-/*
- * 128-bit integer augments to standard values. On i386 this
- * doesn't exist, so we use 64-bit values. The 128-bit counters
- * are crazy anyway, since for this purpose, you'd need a
- * billion IOPs for billions of seconds to overflow them.
- * So, on 32-bit i386, you'll get truncated values.
- */
-#define UINT128_DIG	39
-#ifdef __i386__
-typedef uint64_t uint128_t;
-#else
-typedef __uint128_t uint128_t;
-#endif
-
-static inline uint128_t
-to128(void *p)
-{
-	return *(uint128_t *)p;
-}
-
-static char *
-uint128_to_str(uint128_t u, char *buf, size_t buflen)
-{
-	char *end = buf + buflen - 1;
-
-	*end-- = '\0';
-	if (u == 0)
-		*end-- = '0';
-	while (u && end >= buf) {
-		*end-- = u % 10 + '0';
-		u /= 10;
-	}
-	end++;
-	if (u != 0)
-		return NULL;
-
-	return end;
-}
-
-/* "Missing" from endian.h */
-static __inline uint64_t
-le48dec(const void *pp)
-{
-	uint8_t const *p = (uint8_t const *)pp;
-
-	return (((uint64_t)le16dec(p + 4) << 32) | le32dec(p));
 }
 
 static void *
@@ -163,7 +123,7 @@ read_logpage(int fd, uint8_t log_page, int nsid, void *payload,
 }
 
 static void
-print_log_error(void *buf, uint32_t size)
+print_log_error(const struct nvme_controller_data *cdata __unused, void *buf, uint32_t size)
 {
 	int					i, nentries;
 	struct nvme_error_information_entry	*entry = buf;
@@ -210,7 +170,7 @@ print_temp(uint16_t t)
 
 
 static void
-print_log_health(void *buf, uint32_t size __unused)
+print_log_health(const struct nvme_controller_data *cdata __unused, void *buf, uint32_t size __unused)
 {
 	struct nvme_health_information_page *health = buf;
 	char cbuf[UINT128_DIG + 1];
@@ -272,16 +232,21 @@ print_log_health(void *buf, uint32_t size __unused)
 }
 
 static void
-print_log_firmware(void *buf, uint32_t size __unused)
+print_log_firmware(const struct nvme_controller_data *cdata __unused, void *buf, uint32_t size __unused)
 {
-	int				i;
+	int				i, slots;
 	const char			*status;
 	struct nvme_firmware_page	*fw = buf;
 
 	printf("Firmware Slot Log\n");
 	printf("=================\n");
 
-	for (i = 0; i < MAX_FW_SLOTS; i++) {
+	if (cdata->oacs.firmware == 0)
+		slots = 1;
+	else
+		slots = MIN(cdata->frmw.num_slots, MAX_FW_SLOTS);
+
+	for (i = 0; i < slots; i++) {
 		printf("Slot %d: ", i + 1);
 		if (fw->afi.slot == i + 1)
 			status = "  Active";
@@ -308,7 +273,7 @@ print_log_firmware(void *buf, uint32_t size __unused)
  * offset 147: it is only 1 byte, not 6.
  */
 static void
-print_intel_temp_stats(void *buf, uint32_t size __unused)
+print_intel_temp_stats(const struct nvme_controller_data *cdata __unused, void *buf, uint32_t size __unused)
 {
 	struct intel_log_temp_stats	*temp = buf;
 
@@ -335,7 +300,7 @@ print_intel_temp_stats(void *buf, uint32_t size __unused)
  * Read and write stats pages have identical encoding.
  */
 static void
-print_intel_read_write_lat_log(void *buf, uint32_t size __unused)
+print_intel_read_write_lat_log(const struct nvme_controller_data *cdata __unused, void *buf, uint32_t size __unused)
 {
 	const char *walker = buf;
 	int i;
@@ -351,28 +316,28 @@ print_intel_read_write_lat_log(void *buf, uint32_t size __unused)
 }
 
 static void
-print_intel_read_lat_log(void *buf, uint32_t size)
+print_intel_read_lat_log(const struct nvme_controller_data *cdata __unused, void *buf, uint32_t size)
 {
 
 	printf("Intel Read Latency Log\n");
 	printf("======================\n");
-	print_intel_read_write_lat_log(buf, size);
+	print_intel_read_write_lat_log(cdata, buf, size);
 }
 
 static void
-print_intel_write_lat_log(void *buf, uint32_t size)
+print_intel_write_lat_log(const struct nvme_controller_data *cdata __unused, void *buf, uint32_t size)
 {
 
 	printf("Intel Write Latency Log\n");
 	printf("=======================\n");
-	print_intel_read_write_lat_log(buf, size);
+	print_intel_read_write_lat_log(cdata, buf, size);
 }
 
 /*
  * Table 19. 5.4 SMART Attributes. Samsung also implements this and some extra data not documented.
  */
 static void
-print_intel_add_smart(void *buf, uint32_t size __unused)
+print_intel_add_smart(const struct nvme_controller_data *cdata __unused, void *buf, uint32_t size __unused)
 {
 	uint8_t *walker = buf;
 	uint8_t *end = walker + 150;
@@ -801,7 +766,7 @@ kv_indirect(void *buf, uint32_t subtype, uint8_t res, uint32_t size, struct subp
 }
 
 static void
-print_hgst_info_log(void *buf, uint32_t size __unused)
+print_hgst_info_log(const struct nvme_controller_data *cdata __unused, void *buf, uint32_t size __unused)
 {
 	uint8_t	*walker, *end, *subpage;
 	int pages;
@@ -976,7 +941,7 @@ logpage(int argc, char *argv[])
 			    "smart/health information");
 	}
 
-	print_fn = print_hex;
+	print_fn = print_log_hex;
 	size = DEFAULT_SIZE;
 	if (binflag)
 		print_fn = print_bin;
@@ -1008,7 +973,7 @@ logpage(int argc, char *argv[])
 	/* Read the log page */
 	buf = get_log_buffer(size);
 	read_logpage(fd, log_page, nsid, buf, size);
-	print_fn(buf, size);
+	print_fn(&cdata, buf, size);
 
 	close(fd);
 	exit(0);

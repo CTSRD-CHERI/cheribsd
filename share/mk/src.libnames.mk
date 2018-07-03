@@ -20,6 +20,7 @@ _PRIVATELIBS=	\
 		event \
 		heimipcc \
 		heimipcs \
+		ifconfig \
 		ldns \
 		sqlite3 \
 		ssh \
@@ -49,6 +50,7 @@ _INTERNALLIBS=	\
 		opts \
 		parse \
 		pe \
+		pmcstat \
 		readline \
 		sl \
 		sm \
@@ -103,6 +105,7 @@ _LIBRARIES=	\
 		devstat \
 		dialog \
 		dom \
+		dl \
 		dpv \
 		dtrace \
 		dwarf \
@@ -124,7 +127,6 @@ _LIBRARIES=	\
 		heimsqlite \
 		hubbub \
 		hx509 \
-		ifconfig \
 		ipsec \
 		jail \
 		jpeg \
@@ -278,7 +280,7 @@ _DP_radius=	crypto
 .endif
 _DP_rtld_db=	elf procstat
 _DP_procstat=	kvm util elf
-.if ${MK_CXX} == "yes" && !defined(LIBCHERI)
+.if ${MK_CXX} == "yes"
 .if ${MK_LIBCPLUSPLUS} != "no"
 _DP_proc=	cxxrt
 .else
@@ -358,6 +360,8 @@ _DP_ipf=	kvm
 _DP_zfs=	md pthread umem util uutil m nvpair avl bsdxml geom nvpair z \
 		zfs_core
 _DP_zfs_core=	nvpair
+_DP_uutil=	nvpair
+_DP_avl=	nvpair
 _DP_zpool=	md pthread z nvpair avl umem
 .if ${MK_OFED} != "no"
 _DP_cxgb4=	ibverbs pthread
@@ -376,13 +380,13 @@ _DP_helloworld=	cheri
 
 # Define special cases
 LDADD_supcplusplus=	-lsupc++
-LIBATF_C=	${DESTDIR}${LIBDIR}/libprivateatf-c.a
-LIBATF_CXX=	${DESTDIR}${LIBDIR}/libprivateatf-c++.a
+LIBATF_C=	${LIBDESTDIR}${LIBDIR_BASE}/libprivateatf-c.a
+LIBATF_CXX=	${LIBDESTDIR}${LIBDIR_BASE}/libprivateatf-c++.a
 LDADD_atf_c=	-lprivateatf-c
 LDADD_atf_cxx=	-lprivateatf-c++
 
 .for _l in ${_PRIVATELIBS}
-LIB${_l:tu}?=	${DESTDIR}${LIBDIR}/libprivate${_l}.a
+LIB${_l:tu}?=	${LIBDESTDIR}${LIBDIR_BASE}/libprivate${_l}.a
 .endfor
 
 .for _l in ${_LIBRARIES}
@@ -498,6 +502,9 @@ LIBBSNMPTOOLS?=	${LIBBSNMPTOOLSDIR}/libbsnmptools.a
 
 LIBAMUDIR=	${_LIB_OBJTOP}/usr.sbin/amd/libamu
 LIBAMU?=	${LIBAMUDIR}/libamu.a
+
+LIBPMCSTATDIR=	${_LIB_OBJTOP}/lib/libpmcstat
+LIBPMCSTAT?=	${LIBPMCSTATDIR}/libpmcstat.a
 
 LIBBFDDIR=	${_LIB_OBJTOP}/gnu/usr.bin/binutils/libbfd
 LIBBFD?=	${LIBBFDDIR}/libbfd.a

@@ -224,6 +224,7 @@
 #define	FREEBSD32_SYS_freebsd32_aio_read	255
 #define	FREEBSD32_SYS_freebsd32_aio_write	256
 #define	FREEBSD32_SYS_freebsd32_lio_listio	257
+#define	FREEBSD32_SYS_kbounce	258
 #define	FREEBSD32_SYS_freebsd11_freebsd32_getdents	272
 #define	FREEBSD32_SYS_lchmod	274
 #define	FREEBSD32_SYS_netbsd_lchown	275
@@ -253,7 +254,7 @@
 				/* 313 is obsolete signanosleep */
 #define	FREEBSD32_SYS_freebsd32_aio_return	314
 #define	FREEBSD32_SYS_freebsd32_aio_suspend	315
-#define	FREEBSD32_SYS_aio_cancel	316
+#define	FREEBSD32_SYS_freebsd32_aio_cancel	316
 #define	FREEBSD32_SYS_freebsd32_aio_error	317
 				/* 318 is freebsd6 freebsd32_aio_read */
 				/* 319 is freebsd6 freebsd32_aio_write */
@@ -318,8 +319,8 @@
 #define	FREEBSD32_SYS_ksem_post	401
 #define	FREEBSD32_SYS_ksem_wait	402
 #define	FREEBSD32_SYS_ksem_trywait	403
-#define	FREEBSD32_SYS_freebsd32_ksem_init	404
-#define	FREEBSD32_SYS_freebsd32_ksem_open	405
+#define	FREEBSD32_SYS_ksem_init	404
+#define	FREEBSD32_SYS_ksem_open	405
 #define	FREEBSD32_SYS_ksem_unlink	406
 #define	FREEBSD32_SYS_ksem_getvalue	407
 #define	FREEBSD32_SYS_ksem_destroy	408
