@@ -903,90 +903,76 @@ smallclr:
 	nop
 END(bzero)
 
-#if 0 /* XXX-AM: These should not exist in purecap (not yet ported) */
 /*
+ * Compare byte string
  * bcmp(s1, s2, n)
+ * c3: s1
+ * c4: s2
+ * a0: n
  */
 LEAF(bcmp)
-	blt	a2, 16, smallcmp	# is it worth any trouble?
-	xor	v0, a0, a1		# compare low two bits of addresses
+	blt	a0, 16, smallcmp	# is it worth any trouble?
+	cgetaddr	t0, $c3
+	cgetaddr	t1, $c4
+	xor	v0, t0, t1		# compare low two bits of addresses
 	and	v0, v0, 3
-	PTR_SUBU	a3, zero, a1		# compute # bytes to word align address
-	bne	v0, zero, unalignedcmp	# not possible to align addresses
+	PTR_SUBU	a3, zero, t1		# compute # bytes to word align address
+	bne	v0, zero, smallcmp	# not possible to align addresses
 	and	a3, a3, 3
 
 	beq	a3, zero, 1f
-	PTR_SUBU	a2, a2, a3		# subtract from remaining count
+	PTR_SUBU	a0, a0, a3		# subtract from remaining count
 	move	v0, v1			# init v0,v1 so unmodified bytes match
-	LWHI	v0, 0(a0)		# read 1, 2, or 3 bytes
-	LWHI	v1, 0(a1)
-	PTR_ADDU	a1, a1, a3
+	/* Compare unaligned bytes, read 1, 2, or 3 bytes */
+4:
+	clb	v0, zero, 0($c3)
+	clb	v1, zero, 0($c4)
+	cincoffset	$c3, $c3, 1
 	bne	v0, v1, nomatch
-	PTR_ADDU	a0, a0, a3
+	cincoffset	$c4, $c4, 1
+	daddi	a3, a3, -1
+	bnez	a3, 4b
 1:
-	and	a3, a2, ~3		# compute number of whole words left
-	PTR_SUBU	a2, a2, a3		#   which has to be >= (16-3) & ~3
-	PTR_ADDU	a3, a3, a0		# compute ending address
+	and	a3, a0, ~3		# compute number of whole words left
+	PTR_SUBU	a0, a0, a3		#   which has to be >= (16-3) & ~3
+	cincoffset	$c5, $c3, a3		# compute ending address
 2:
-	lw	v0, 0(a0)		# compare words
-	lw	v1, 0(a1)
-	PTR_ADDU	a0, a0, 4
+	clw	v0, zero, 0($c3)		# compare words
+	clw	v1, zero, 0($c4)
+	cincoffset	$c3, $c3, 4
 	bne	v0, v1, nomatch
-	PTR_ADDU	a1, a1, 4
-	bne	a0, a3, 2b
+	cincoffset	$c4, $c4, 4
+	cne	v0, $c3, $c5
+	bnez	v0, 2b
 	nop
-	b	smallcmp		# finish remainder
-	nop
-unalignedcmp:
-	beq	a3, zero, 2f
-	PTR_SUBU	a2, a2, a3		# subtract from remaining count
-	PTR_ADDU	a3, a3, a0		# compute ending address
-1:
-	lbu	v0, 0(a0)		# compare bytes until a1 word aligned
-	lbu	v1, 0(a1)
-	PTR_ADDU	a0, a0, 1
-	bne	v0, v1, nomatch
-	PTR_ADDU	a1, a1, 1
-	bne	a0, a3, 1b
-	nop
-2:
-	and	a3, a2, ~3		# compute number of whole words left
-	PTR_SUBU	a2, a2, a3		#   which has to be >= (16-3) & ~3
-	PTR_ADDU	a3, a3, a0		# compute ending address
-3:
-	LWHI	v0, 0(a0)		# compare words a0 unaligned, a1 aligned
-	LWLO	v0, 3(a0)
-	lw	v1, 0(a1)
-	PTR_ADDU	a0, a0, 4
-	bne	v0, v1, nomatch
-	PTR_ADDU	a1, a1, 4
-	bne	a0, a3, 3b
-	nop
+	/* Fall through, finish remainder */
 smallcmp:
-	ble	a2, zero, match
-	PTR_ADDU	a3, a2, a0		# compute ending address
+	ble	a0, zero, match
+	cincoffset $c5, $c3, a0		# compute ending address
 1:
-	lbu	v0, 0(a0)
-	lbu	v1, 0(a1)
-	PTR_ADDU	a0, a0, 1
+	clb	v0, zero, 0($c3)
+	clb	v1, zero, 0($c4)
+	cincoffset	$c3, $c3, 1
 	bne	v0, v1, nomatch
-	PTR_ADDU	a1, a1, 1
-	bne	a0, a3, 1b
+	cincoffset	$c4, $c4, 1
+	ceq	v0, $c5, $c3
+	beqz	v0, 1b
 	nop
 match:
-	j	ra
-	 move	v0, zero
+	cjr	$c17
+	move	v0, zero
 nomatch:
-	j	ra
+	cjr	$c17
 	li	v0, 1
 END(bcmp)
 
 
 /*
+ * Find first bit set
  * bit = ffs(value)
+ * a0: value
  */
 LEAF(ffs)
-	.set	noreorder
 	beq	a0, zero, 2f
 	move	v0, zero
 1:
@@ -995,10 +981,10 @@ LEAF(ffs)
 	beq	v1, zero, 1b		# no, continue
 	srl	a0, a0, 1
 2:
-	j	ra
+	cjr	$c17
 	nop
 END(ffs)
-#endif /* XXX-AM: disabled */	
+
 	
 #if defined(DDB) || defined(DEBUG)
 
