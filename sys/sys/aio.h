@@ -114,7 +114,7 @@ struct aiocb_native {
 	} _aiocb_private;
 	struct sigevent_native aio_sigevent;	/* Signal to deliver */
 };
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && !defined(CHERI_KERNEL)
 struct aiocb_c {
 	int	aio_fildes;		/* File descriptor */
 	off_t	aio_offset;		/* File offset for I/O */

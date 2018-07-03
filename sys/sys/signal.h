@@ -244,7 +244,7 @@ struct sigevent_native {
 	} _sigev_un;
 };
 
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && !defined(CHERI_KERNEL)
 struct sigevent_c {
 	int	sigev_notify;		/* Notification type */
 	int	sigev_signo;		/* Signal number */
