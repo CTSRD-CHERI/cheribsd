@@ -75,6 +75,7 @@
  *	from: @(#)locore.s	8.5 (Berkeley) 1/4/94
  *	JNPR: exception.S,v 1.5 2007/01/08 04:58:37 katta
  * $FreeBSD$
+ */
 
 /* XXX-AM add CTSRD license header? Do we keep the old header? */
 
@@ -941,43 +942,43 @@ END(MipsKernIntr)
 	SAVE_U_PCB_REG(a3, PC, pcb)
 
 #define RESTORE_UINTR_PCB_REGS(pcb)			\
-	RESTORE_U_PCB_REG(s0, S0, k1);			\
-	RESTORE_U_PCB_REG(s1, S1, k1);			\
-	RESTORE_U_PCB_REG(s2, S2, k1);			\
-	RESTORE_U_PCB_REG(s3, S3, k1);			\
-	RESTORE_U_PCB_REG(s4, S4, k1);			\
-	RESTORE_U_PCB_REG(s5, S5, k1);			\
-	RESTORE_U_PCB_REG(s6, S6, k1);			\
-	RESTORE_U_PCB_REG(s7, S7, k1);			\
-	RESTORE_U_PCB_REG(s8, S8, k1);			\
-	RESTORE_U_PCB_REG(t0, MULLO, k1);		\
-	RESTORE_U_PCB_REG(t1, MULHI, k1);		\
-	RESTORE_U_PCB_REG(t2, PC, k1);			\
+	RESTORE_U_PCB_REG(s0, S0, pcb);			\
+	RESTORE_U_PCB_REG(s1, S1, pcb);			\
+	RESTORE_U_PCB_REG(s2, S2, pcb);			\
+	RESTORE_U_PCB_REG(s3, S3, pcb);			\
+	RESTORE_U_PCB_REG(s4, S4, pcb);			\
+	RESTORE_U_PCB_REG(s5, S5, pcb);			\
+	RESTORE_U_PCB_REG(s6, S6, pcb);			\
+	RESTORE_U_PCB_REG(s7, S7, pcb);			\
+	RESTORE_U_PCB_REG(s8, S8, pcb);			\
+	RESTORE_U_PCB_REG(t0, MULLO, pcb);		\
+	RESTORE_U_PCB_REG(t1, MULHI, pcb);		\
+	RESTORE_U_PCB_REG(t2, PC, pcb);			\
 	mtlo	t0;					\
 	mthi	t1;					\
 	MTC0	t2, MIPS_COP_0_EXC_PC	# set return address;	\
-	RESTORE_U_PCB_REG(v0, V0, k1);			\
-	RESTORE_U_PCB_REG(v1, V1, k1);			\
-	RESTORE_U_PCB_REG(a0, A0, k1);			\
-	RESTORE_U_PCB_REG(a1, A1, k1);			\
-	RESTORE_U_PCB_REG(a2, A2, k1);			\
-	RESTORE_U_PCB_REG(a3, A3, k1);			\
-	RESTORE_U_PCB_REG(t0, T0, k1);			\
-	RESTORE_U_PCB_REG(t1, T1, k1);			\
-	RESTORE_U_PCB_REG(t2, T2, k1);			\
-	RESTORE_U_PCB_REG(t3, T3, k1);			\
-	RESTORE_U_PCB_REG(ta0, TA0, k1);		\
-	RESTORE_U_PCB_REG(ta1, TA1, k1);		\
-	RESTORE_U_PCB_REG(ta2, TA2, k1);		\
-	RESTORE_U_PCB_REG(ta3, TA3, k1);		\
-	RESTORE_U_PCB_REG(t8, T8, k1);			\
-	RESTORE_U_PCB_REG(t9, T9, k1);			\
-	RESTORE_U_PCB_REG(gp, GP, k1);			\
-	RESTORE_U_PCB_REG(k0, SR, k1);			\
-	RESTORE_U_PCB_REG(sp, SP, k1);			\
-	RESTORE_U_PCB_REG(ra, RA, k1);			\
+	RESTORE_U_PCB_REG(v0, V0, pcb);			\
+	RESTORE_U_PCB_REG(v1, V1, pcb);			\
+	RESTORE_U_PCB_REG(a0, A0, pcb);			\
+	RESTORE_U_PCB_REG(a1, A1, pcb);			\
+	RESTORE_U_PCB_REG(a2, A2, pcb);			\
+	RESTORE_U_PCB_REG(a3, A3, pcb);			\
+	RESTORE_U_PCB_REG(t0, T0, pcb);			\
+	RESTORE_U_PCB_REG(t1, T1, pcb);			\
+	RESTORE_U_PCB_REG(t2, T2, pcb);			\
+	RESTORE_U_PCB_REG(t3, T3, pcb);			\
+	RESTORE_U_PCB_REG(ta0, TA0, pcb);		\
+	RESTORE_U_PCB_REG(ta1, TA1, pcb);		\
+	RESTORE_U_PCB_REG(ta2, TA2, pcb);		\
+	RESTORE_U_PCB_REG(ta3, TA3, pcb);		\
+	RESTORE_U_PCB_REG(t8, T8, pcb);			\
+	RESTORE_U_PCB_REG(t9, T9, pcb);			\
+	RESTORE_U_PCB_REG(gp, GP, pcb);			\
+	RESTORE_U_PCB_REG(k0, SR, pcb);			\
+	RESTORE_U_PCB_REG(sp, SP, pcb);			\
+	RESTORE_U_PCB_REG(ra, RA, pcb);			\
 	.set	noat;					\
-	RESTORE_U_PCB_REG(AT, AST, k1)
+	RESTORE_U_PCB_REG(AT, AST, pcb)
 
 
 NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
