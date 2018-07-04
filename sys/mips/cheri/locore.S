@@ -136,8 +136,9 @@ VECTOR(_locore, unknown)
 	 * XXXRW: Do we want to rely on default initialisation of all CP2
 	 * registers here?
 	 */
-	cgetdefault	CHERI_REG_KCC	# Preserve $kcc
-	cgetdefault	CHERI_REG_KDC	# Preserve $kdc
+	cgetdefault	CHERI_REG_KCC
+	cgetdefault	CHERI_REG_KDC
+	csetkdc		CHERI_REG_KDC
 
 #if defined(CPU_BERI)
 	/*
@@ -175,6 +176,7 @@ VECTOR(_locore, unknown)
 	/*
 	 * Initialize stack and call machine startup.
 	 */
+	cmove		CHERI_REG_STC, CHERI_REG_KDC
 	PTR_LA		t0, _C_LABEL(pcpu_space)
 	csetoffset	CHERI_REG_STC, CHERI_REG_STC, t0
 	REG_LI		t0, PCPU_SIZE
