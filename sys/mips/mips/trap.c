@@ -648,9 +648,11 @@ trap(struct trapframe *trapframe)
 #endif
 		pid = mips_rd_entryhi() & TLBHI_ASID_MASK;
 #ifdef CHERI_KERNEL
-		printf("badaddr = %#jx, pc = %#jx, ra = %p, sp = %p, sr = %jx, pid = %d, ASID = %u\n",
-		    (intmax_t)trapframe->badvaddr, (intmax_t)trapframe->pc, trapframe->c17,
-		    trapframe->csp, (intmax_t)trapframe->sr, (curproc ? curproc->p_pid : -1), pid);
+		printf("capcause = %d, badaddr = %#jx, pc = %#jx, ra = %p, "
+		    "sp = %p, sr = %jx, pid = %d, ASID = %u\n", trapframe->capcause,
+		    (intmax_t)trapframe->badvaddr, (intmax_t)trapframe->pc,
+		    trapframe->c17, trapframe->csp, (intmax_t)trapframe->sr,
+		    (curproc ? curproc->p_pid : -1), pid);
 #else
 		printf("badaddr = %#jx, pc = %#jx, ra = %#jx, sp = %#jx, sr = %jx, pid = %d, ASID = %u\n",
 		    (intmax_t)trapframe->badvaddr, (intmax_t)trapframe->pc, (intmax_t)trapframe->ra,
