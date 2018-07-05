@@ -51,11 +51,6 @@ bytes pointed to by
 .Fa buf
 will be copied from buffer provided by the caller; before returning the data
 will be copied back to the caller.
-Both the
-.Fa buf
-and the
-.Fa len
-must be 8-bit aligned.
 .Pp
 The
 .Ar code
@@ -66,6 +61,11 @@ arguments must point to a sealed capability pair obtained from
 The
 .Ar cookiep
 will be set to an opaque, capability-sized token that identifies the callee.
+Both the
+.Fa buf
+and the
+.Fa len
+must be 8-byte aligned.
 .Sh RETURN VALUES
 .Rv -std coaccept
 .Sh ERRORS
@@ -88,10 +88,10 @@ points outside the process's allocated address space.
 .Sh EXAMPLES
 Basic usage example:
 .Bd -literal
-	char buf[MAXBSIZE];
 	void * __capability switcher_code;
 	void * __capability switcher_data;
 	void * __capability caller_cookie;
+	uint64_t buf[MAXBSIZE];
 
 	error = cosetup(COSETUP_COACCEPT, &switcher_code, &switcher_data);
 	if (error != 0)

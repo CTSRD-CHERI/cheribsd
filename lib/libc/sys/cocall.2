@@ -53,11 +53,6 @@ bytes pointed to by
 .Fa buf
 will be copied to the buffer provided by the callee; before returning the data
 will be copied from the callee back to the calling side.
-Both the
-.Fa buf
-and the
-.Fa len
-must be 8-bit aligned.
 .Pp
 The
 .Ar code
@@ -67,8 +62,13 @@ arguments must point to a sealed capability pair obtained from
 .Xr cosetup 2 .
 The
 .Ar target
-argument is a capability usually retrieved with
+argument is a sealed capability usually retrieved with
 .Xr colookup 2 .
+Both the
+.Fa buf
+and the
+.Fa len
+must be 8-byte aligned.
 .Sh RETURN VALUES
 .Rv -std cocall
 .Sh ERRORS
@@ -93,10 +93,10 @@ points outside the process's allocated address space.
 .Sh EXAMPLES
 Basic usage example:
 .Bd -literal
-	char buf[MAXBSIZE];
 	void * __capability switcher_code;
 	void * __capability switcher_data;
 	void * __capability lookedup;
+	uint64_t buf[MAXBSIZE];
 
 	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
 	if (error != 0)
