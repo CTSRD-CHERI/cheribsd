@@ -202,6 +202,7 @@ CRUNCH_LIBS+=	-lbz2
 CRUNCH_PROGS_usr.bin+= \
 		awk \
 		basename \
+		bmake \
 		bzip2 \
 		diff \
 		dirname \
@@ -243,6 +244,7 @@ CRUNCH_PROGS_usr.bin+= \
 		which \
 		xargs
 
+CRUNCH_ALIAS_bmake=	make
 CRUNCH_ALIAS_bzip2=	bunzip2
 CRUNCH_ALIAS_tar=	bsdtar
 CRUNCH_ALIAS_hexdump=	hd od
