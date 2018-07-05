@@ -109,8 +109,8 @@ struct addr {
 };
 
 struct sock {
-	void *socket;
-	void *pcb;
+	kvaddr_t socket;
+	kvaddr_t pcb;
 	int shown;
 	int vflag;
 	int family;
@@ -790,8 +790,8 @@ gather_unix(int proto)
 			warnx("struct xunpcb size mismatch");
 			goto out;
 		}
-		if ((xup->unp_conn == NULL && !opt_l) ||
-		    (xup->unp_conn != NULL && !opt_c))
+		if ((xup->unp_conn == 0 && !opt_l) ||
+		    (xup->unp_conn != 0 && !opt_c))
 			continue;
 		if ((sock = calloc(1, sizeof(*sock))) == NULL)
 			err(1, "malloc()");
@@ -807,8 +807,8 @@ gather_unix(int proto)
 		if (xup->xu_addr.sun_family == AF_UNIX)
 			laddr->address =
 			    *(struct sockaddr_storage *)(void *)&xup->xu_addr;
-		else if (xup->unp_conn != NULL)
-			faddr->connection = xup->unp_conn;
+		else if (xup->unp_conn != 0)
+			*(kvaddr_t*)&(faddr->address) = xup->unp_conn;
 		laddr->next = NULL;
 		faddr->next = NULL;
 		sock->laddr = laddr;
@@ -1009,7 +1009,7 @@ sctp_path_state(int state)
 static void
 displaysock(struct sock *s, int pos)
 {
-	void *p;
+	kvaddr_t p;
 	int hash, first, offset;
 	struct addr *laddr, *faddr;
 	struct sock *s_tmp;
@@ -1055,8 +1055,8 @@ displaysock(struct sock *s, int pos)
 				break;
 			}
 			/* client */
-			p = faddr->connection;
-			if (p == NULL) {
+			p = *(kvaddr_t*)&(faddr->address);
+			if (p == 0) {
 				pos += xprintf("(not connected)");
 				offset += opt_w ? 92 : 44;
 				break;
@@ -1175,13 +1175,13 @@ display(void)
 	}
 	setpassent(1);
 	for (xf = xfiles, n = 0; n < nxfiles; ++n, ++xf) {
-		if (xf->xf_data == NULL)
+		if (xf->xf_data == 0)
 			continue;
 		if (opt_j >= 0 && opt_j != getprocjid(xf->xf_pid))
 			continue;
 		hash = (int)((uintptr_t)xf->xf_data % HASHSIZE);
 		for (s = sockhash[hash]; s != NULL; s = s->next) {
-			if ((void *)s->socket != xf->xf_data)
+			if (s->socket != xf->xf_data)
 				continue;
 			if (!check_ports(s))
 				continue;
