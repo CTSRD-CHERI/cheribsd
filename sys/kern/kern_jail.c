@@ -3984,8 +3984,10 @@ prison_racct_attach(struct prison *pr)
 static void
 prison_racct_modify(struct prison *pr)
 {
+#ifdef RCTL
 	struct proc *p;
 	struct ucred *cred;
+#endif
 	struct prison_racct *oldprr;
 
 	ASSERT_RACCT_ENABLED();
