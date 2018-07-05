@@ -144,7 +144,7 @@ colocation_thread_exit(struct thread *td)
  * Called from trap().
  */
 void
-colocation_unborrow(struct thread *td, struct trapframe **trapframep, int type)
+colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 {
 	struct switcher_context sc;
 	struct thread *peertd;
@@ -178,8 +178,8 @@ colocation_unborrow(struct thread *td, struct trapframe **trapframep, int type)
 	KASSERT(peertd != td, ("%s: peertd %p == td %p\n", __func__, peertd, td));
 
 #if 0
-	printf("%s: trap type %#x, replacing current td %p, switcher_context %#lx, md_tls %p, md_tls_tcb_offset %zd, "
-	    "with td %p, switcher_context %#lx, md_tls %p, md_tls_tcb_offset %zd\n", __func__, type,
+	printf("%s: replacing current td %p, switcher_context %#lx, md_tls %p, md_tls_tcb_offset %zd, "
+	    "with td %p, switcher_context %#lx, md_tls %p, md_tls_tcb_offset %zd\n", __func__,
 	    td, td->td_md.md_switcher_context, (__cheri_fromcap void *)td->td_md.md_tls, td->td_md.md_tls_tcb_offset,
 	    peertd, peertd->td_md.md_switcher_context, (__cheri_fromcap void *)peertd->td_md.md_tls, peertd->td_md.md_tls_tcb_offset);
 #endif

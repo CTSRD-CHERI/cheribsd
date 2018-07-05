@@ -681,14 +681,6 @@ trap(struct trapframe *trapframe)
 	}
 #endif
 
-	if (usermode) {
-		/*
-		 * XXX: Why does it fail without the conditional?
-		 */
-		if ((type & (T_TLB_MOD | T_TLB_LD_MISS | T_TLB_ST_MISS)) == 0)
-			colocation_unborrow(td, &trapframe,  type);
-	}
-
 #ifdef KDTRACE_HOOKS
 	/*
 	 * A trap can occur while DTrace executes a probe. Before
@@ -909,6 +901,8 @@ dofault:
 	case T_SYSCALL + T_USER:
 		{
 			int error;
+
+			colocation_unborrow(td, &trapframe);
 
 			td->td_sa.trapframe = trapframe;
 			error = syscallenter(td);
