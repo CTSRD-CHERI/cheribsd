@@ -206,6 +206,7 @@ CRUNCH_PROGS_usr.bin+= \
 		bzip2 \
 		diff \
 		dirname \
+		du \
 		env \
 		fetch \
 		find \
