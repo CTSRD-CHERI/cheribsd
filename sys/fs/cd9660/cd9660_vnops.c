@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1994
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -915,3 +917,13 @@ struct vop_vector cd9660_fifoops = {
 	.vop_setattr =		cd9660_setattr,
 	.vop_vptofh =		cd9660_vptofh,
 };
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

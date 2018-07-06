@@ -248,3 +248,13 @@ dmu_diff(const char *tosnap_name, const char *fromsnap_name,
 
 	return (da.da_err);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

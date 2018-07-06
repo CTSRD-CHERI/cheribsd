@@ -959,7 +959,7 @@ vmxnet3_init_rxq(struct vmxnet3_softc *sc, int q)
 		rxr = &rxq->vxrxq_cmd_ring[i];
 		rxr->vxrxr_rid = i;
 		rxr->vxrxr_ndesc = sc->vmx_nrxdescs;
-		rxr->vxrxr_rxbuf = malloc(rxr->vxrxr_ndesc *
+		rxr->vxrxr_rxbuf = mallocarray(rxr->vxrxr_ndesc,
 		    sizeof(struct vmxnet3_rxbuf), M_DEVBUF, M_NOWAIT | M_ZERO);
 		if (rxr->vxrxr_rxbuf == NULL)
 			return (ENOMEM);
@@ -987,7 +987,7 @@ vmxnet3_init_txq(struct vmxnet3_softc *sc, int q)
 	txq->vxtxq_id = q;
 
 	txr->vxtxr_ndesc = sc->vmx_ntxdescs;
-	txr->vxtxr_txbuf = malloc(txr->vxtxr_ndesc *
+	txr->vxtxr_txbuf = mallocarray(txr->vxtxr_ndesc,
 	    sizeof(struct vmxnet3_txbuf), M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (txr->vxtxr_txbuf == NULL)
 		return (ENOMEM);
@@ -1023,10 +1023,10 @@ vmxnet3_alloc_rxtx_queues(struct vmxnet3_softc *sc)
 		sc->vmx_max_ntxqueues = 1;
 	}
 
-	sc->vmx_rxq = malloc(sizeof(struct vmxnet3_rxqueue) *
-	    sc->vmx_max_nrxqueues, M_DEVBUF, M_NOWAIT | M_ZERO);
-	sc->vmx_txq = malloc(sizeof(struct vmxnet3_txqueue) *
-	    sc->vmx_max_ntxqueues, M_DEVBUF, M_NOWAIT | M_ZERO);
+	sc->vmx_rxq = mallocarray(sc->vmx_max_nrxqueues,
+	    sizeof(struct vmxnet3_rxqueue), M_DEVBUF, M_NOWAIT | M_ZERO);
+	sc->vmx_txq = mallocarray(sc->vmx_max_ntxqueues,
+	    sizeof(struct vmxnet3_txqueue), M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (sc->vmx_rxq == NULL || sc->vmx_txq == NULL)
 		return (ENOMEM);
 
@@ -3485,14 +3485,15 @@ vmxnet3_media_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 
 	sc = ifp->if_softc;
 
-	ifmr->ifm_active = IFM_ETHER | IFM_AUTO;
 	ifmr->ifm_status = IFM_AVALID;
+	ifmr->ifm_active = IFM_ETHER;
 
 	VMXNET3_CORE_LOCK(sc);
-	if (vmxnet3_link_is_up(sc) != 0)
+	if (vmxnet3_link_is_up(sc) != 0) {
 		ifmr->ifm_status |= IFM_ACTIVE;
-	else
-		ifmr->ifm_status |= IFM_NONE;
+		ifmr->ifm_active |= IFM_AUTO;
+	} else
+		ifmr->ifm_active |= IFM_NONE;
 	VMXNET3_CORE_UNLOCK(sc);
 }
 
@@ -3947,3 +3948,12 @@ vmxnet3_barrier(struct vmxnet3_softc *sc, vmxnet3_barrier_t type)
 		panic("%s: bad barrier type %d", __func__, type);
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

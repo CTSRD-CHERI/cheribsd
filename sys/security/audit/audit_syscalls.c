@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1999-2009 Apple Inc.
  * Copyright (c) 2016 Robert N. M. Watson
  * All rights reserved.
@@ -973,3 +975,12 @@ sys_auditctl(struct thread *td, struct auditctl_args *uap)
 	return (ENOSYS);
 }
 #endif /* AUDIT */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

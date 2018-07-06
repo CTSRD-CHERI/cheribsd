@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2017, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2018, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -1652,7 +1652,6 @@ AcpiDmDumpTable (
             AcpiOsPrintf (UINT8_FORMAT, *Target,
                 AcpiDmTpm2Subnames[Temp8]);
             break;
-
 
 
         case ACPI_DMT_FADTPM:

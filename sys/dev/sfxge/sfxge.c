@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2010-2016 Solarflare Communications Inc.
  * All rights reserved.
  *
@@ -1200,3 +1202,13 @@ static driver_t sfxge_driver = {
 };
 
 DRIVER_MODULE(sfxge, pci, sfxge_driver, sfxge_devclass, 0, 0);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

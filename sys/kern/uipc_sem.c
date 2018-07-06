@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2002 Alfred Perlstein <alfred@FreeBSD.org>
  * Copyright (c) 2003-2005 SPARTA, Inc.
  * Copyright (c) 2005, 2016-2017 Robert N. M. Watson
@@ -1090,3 +1092,12 @@ static moduledata_t sem_mod = {
 
 DECLARE_MODULE(sem, sem_mod, SI_SUB_SYSV_SEM, SI_ORDER_FIRST);
 MODULE_VERSION(sem, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

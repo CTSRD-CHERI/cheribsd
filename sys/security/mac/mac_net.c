@@ -502,3 +502,12 @@ mac_ifnet_ioctl_set(struct ucred *cred, struct ifreq *ifr, struct ifnet *ifp)
 	mac_ifnet_label_free(intlabel);
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

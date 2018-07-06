@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011 Jakub Wojciech Klama <jceel@FreeBSD.org>
  * All rights reserved.
  *
@@ -1230,3 +1232,12 @@ DRIVER_MODULE(miibus, lpe, miibus_driver, miibus_devclass, 0, 0);
 MODULE_DEPEND(lpe, obio, 1, 1, 1);
 MODULE_DEPEND(lpe, miibus, 1, 1, 1);
 MODULE_DEPEND(lpe, ether, 1, 1, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2002 Juli Mallett.  All rights reserved.
  *
  * This software was written by Juli Mallett <jmallett@FreeBSD.org> for the
@@ -109,6 +111,8 @@ int berase(struct uufsd *, ufs2_daddr_t, ufs2_daddr_t);
 ufs2_daddr_t cgballoc(struct uufsd *);
 int cgbfree(struct uufsd *, ufs2_daddr_t, long);
 ino_t cgialloc(struct uufsd *);
+int cgget(struct uufsd *, int, struct cg *);
+int cgput(struct uufsd *, struct cg *);
 int cgread(struct uufsd *);
 int cgread1(struct uufsd *, int);
 int cgwrite(struct uufsd *);

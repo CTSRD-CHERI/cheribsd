@@ -607,9 +607,7 @@ swcr_authenc(struct cryptop *crp)
 					bzero(blk, blksz);
 				crypto_copydata(crp->crp_flags, buf,
 				    crde->crd_skip + i, len, blk);
-				if (!(crde->crd_flags & CRD_F_ENCRYPT)) {
-					exf->decrypt(swe->sw_kschedule, blk);
-				}
+				exf->decrypt(swe->sw_kschedule, blk);
 				crypto_copyback(crp->crp_flags, buf,
 				    crde->crd_skip + i, len, blk);
 			}
@@ -986,7 +984,6 @@ swcr_freesession_locked(device_t dev, u_int64_t tid)
 	struct swcr_data *swd;
 	struct enc_xform *txf;
 	struct auth_hash *axf;
-	struct comp_algo *cxf;
 	u_int32_t sid = CRYPTO_SESID2LID(tid);
 
 	if (sid > swcr_sesnum || swcr_sessions == NULL ||
@@ -1061,7 +1058,7 @@ swcr_freesession_locked(device_t dev, u_int64_t tid)
 			break;
 
 		case CRYPTO_DEFLATE_COMP:
-			cxf = swd->sw_cxf;
+			/* Nothing to do */
 			break;
 		}
 
@@ -1296,3 +1293,14 @@ extern int crypto_modevent(struct module *, int, void *);
 DRIVER_MODULE(cryptosoft, nexus, swcr_driver, swcr_devclass, crypto_modevent,0);
 MODULE_VERSION(cryptosoft, 1);
 MODULE_DEPEND(cryptosoft, crypto, 1, 1, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

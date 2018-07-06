@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -351,7 +353,7 @@ PCTRIE_DEFINE(BUF, buf, b_lblkno, buf_trie_alloc, buf_trie_free);
  *
  * Reevaluate the following cap on the number of vnodes after the physical
  * memory size exceeds 512GB.  In the limit, as the physical memory size
- * grows, the ratio of the memory size in KB to to vnodes approaches 64:1.
+ * grows, the ratio of the memory size in KB to vnodes approaches 64:1.
  */
 #ifndef	MAXVNODES_MAX
 #define	MAXVNODES_MAX	(512 * 1024 * 1024 / 64)	/* 8M */
@@ -1135,7 +1137,7 @@ static void
 vnlru_proc(void)
 {
 	struct mount *mp, *nmp;
-	unsigned long ofreevnodes, onumvnodes;
+	unsigned long onumvnodes;
 	int done, force, reclaim_nc_src, trigger, usevnodes;
 
 	EVENTHANDLER_REGISTER(shutdown_pre_sync, kproc_shutdown, vnlruproc,
@@ -1172,7 +1174,6 @@ vnlru_proc(void)
 		}
 		mtx_unlock(&vnode_free_list_mtx);
 		done = 0;
-		ofreevnodes = freevnodes;
 		onumvnodes = numvnodes;
 		/*
 		 * Calculate parameters for recycling.  These are the same
@@ -2843,14 +2844,14 @@ _vhold(struct vnode *vp, bool locked)
 	else
 		ASSERT_VI_UNLOCKED(vp, __func__);
 	CTR2(KTR_VFS, "%s: vp %p", __func__, vp);
-	if (!locked && vfs_refcount_acquire_if_not_zero(&vp->v_holdcnt)) {
-		VNASSERT((vp->v_iflag & VI_FREE) == 0, vp,
-		    ("_vhold: vnode with holdcnt is free"));
-		return;
-	}
-
-	if (!locked)
+	if (!locked) {
+		if (vfs_refcount_acquire_if_not_zero(&vp->v_holdcnt)) {
+			VNASSERT((vp->v_iflag & VI_FREE) == 0, vp,
+			    ("_vhold: vnode with holdcnt is free"));
+			return;
+		}
 		VI_LOCK(vp);
+	}
 	if ((vp->v_iflag & VI_FREE) == 0) {
 		refcount_acquire(&vp->v_holdcnt);
 		if (!locked)
@@ -2914,14 +2915,11 @@ _vdrop(struct vnode *vp, bool locked)
 	CTR2(KTR_VFS, "%s: vp %p", __func__, vp);
 	if ((int)vp->v_holdcnt <= 0)
 		panic("vdrop: holdcnt %d", vp->v_holdcnt);
-	if (vfs_refcount_release_if_not_last(&vp->v_holdcnt)) {
-		if (locked)
-			VI_UNLOCK(vp);
-		return;
-	}
-
-	if (!locked)
+	if (!locked) {
+		if (vfs_refcount_release_if_not_last(&vp->v_holdcnt))
+			return;
 		VI_LOCK(vp);
+	}
 	if (refcount_release(&vp->v_holdcnt) == 0) {
 		VI_UNLOCK(vp);
 		return;
@@ -5601,3 +5599,12 @@ __mnt_vnode_markerfree_active(struct vnode **mvp, struct mount *mp)
 	mtx_unlock(&mp->mnt_listmtx);
 	mnt_vnode_markerfree_active(mvp, mp);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "sysctl"
+//   ]
+// }
+// CHERI CHANGES END

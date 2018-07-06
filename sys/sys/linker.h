@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1997-2000 Doug Rabson
  * All rights reserved.
  *
@@ -357,3 +359,12 @@ __END_DECLS
 #endif
 
 #endif /* !_SYS_LINKER_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "pointer_size"
+//   ]
+// }
+// CHERI CHANGES END

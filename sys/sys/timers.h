@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2005 David Xu <davidxu@freebsd.org>
  * Copyright (c) 1994 by Chris Provenzano, proven@mit.edu
  * All rights reserved.
@@ -115,3 +117,12 @@ struct	kclock {
 int	itimer_accept(struct proc *p, int tid, ksiginfo_t *ksi);
 #endif
 #endif /* !_SYS_TIMERS_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "kernel_sig_types"
+//   ]
+// }
+// CHERI CHANGES END

@@ -244,7 +244,7 @@ SYSCTL_INT(_net_link_lagg, OID_AUTO, failover_rx_all, CTLFLAG_RW | CTLFLAG_VNET,
     "Accept input from any interface in a failover lagg");
 
 /* Default value for using flowid */
-static VNET_DEFINE(int, def_use_flowid) = 1;
+static VNET_DEFINE(int, def_use_flowid) = 0;
 #define	V_def_use_flowid	VNET(def_use_flowid)
 SYSCTL_INT(_net_link_lagg, OID_AUTO, default_use_flowid, CTLFLAG_RWTUN,
     &VNET_NAME(def_use_flowid), 0,
@@ -2185,3 +2185,13 @@ lagg_lacp_input(struct lagg_softc *sc, struct lagg_port *lp, struct mbuf *m)
 	return (m);
 }
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

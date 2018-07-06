@@ -142,7 +142,7 @@ NO_META_IGNORE_HOST_HEADERS=	1
 .if defined(%POSIX)
 .SUFFIXES:	.o .c .y .l .a .sh .f
 .else
-.SUFFIXES:	.out .a .ln .o .bco .llo .c .cc .cpp .cxx .C .m .F .f .e .r .y .l .S .asm .s .cl .p .h .sh
+.SUFFIXES:	.out .a .o .bco .llo .c .cc .cpp .cxx .C .m .F .f .e .r .y .l .S .asm .s .cl .p .h .sh
 .endif
 
 AR		?=	ar
@@ -247,15 +247,6 @@ LD		?=	ld
 LDFLAGS		?=
 LDFLAGS		+=	-Wl,--no-warn-mismatch
 _LDFLAGS	=	${LDFLAGS:S/-Wl,//g:N-mabi=*:N-fuse-ld=*}
-
-LINT		?=	lint
-# Lint doesn't understand clang's stddef.h so let's define __STDDEF_H to skip it
-# It also doesn't understand __builtin_va_list so let's define it to __va_list
-LINTFLAGS	?=	-cghapbxF -D__STDDEF_H=1 -D__builtin_va_list=__va_list
-LINTKERNFLAGS	?=	${LINTFLAGS}
-LINTOBJFLAGS	?=	-cghapbxu -i
-LINTOBJKERNFLAGS?=	${LINTOBJFLAGS}
-LINTLIBFLAGS	?=	-cghapbxu -C ${LIB}
 
 MAKE		?=	make
 

@@ -30,6 +30,7 @@
  * SUCH DAMAGE.
  */
 
+#include "opt_acpi.h"
 #include "opt_platform.h"
 
 #include <sys/cdefs.h>
@@ -1105,12 +1106,10 @@ static int
 gicv3_its_release_msi(device_t dev, device_t child, int count,
     struct intr_irqsrc **isrc)
 {
-	struct gicv3_its_softc *sc;
 	struct gicv3_its_irqsrc *girq;
 	struct its_dev *its_dev;
 	int i;
 
-	sc = device_get_softc(dev);
 	its_dev = its_device_find(dev, child);
 
 	KASSERT(its_dev != NULL,
@@ -1165,11 +1164,9 @@ gicv3_its_alloc_msix(device_t dev, device_t child, device_t *pic,
 static int
 gicv3_its_release_msix(device_t dev, device_t child, struct intr_irqsrc *isrc)
 {
-	struct gicv3_its_softc *sc;
 	struct gicv3_its_irqsrc *girq;
 	struct its_dev *its_dev;
 
-	sc = device_get_softc(dev);
 	its_dev = its_device_find(dev, child);
 
 	KASSERT(its_dev != NULL,
@@ -1405,9 +1402,7 @@ its_cmd_prepare(struct its_cmd *cmd, struct its_cmd_desc *desc)
 	uint64_t target;
 	uint8_t cmd_type;
 	u_int size;
-	boolean_t error;
 
-	error = FALSE;
 	cmd_type = desc->cmd_type;
 	target = ITS_TARGET_NONE;
 
@@ -1646,7 +1641,7 @@ DEFINE_CLASS_1(its, gicv3_its_fdt_driver, gicv3_its_fdt_methods,
 #undef its_baseclasses
 static devclass_t gicv3_its_fdt_devclass;
 
-EARLY_DRIVER_MODULE(its, gic, gicv3_its_fdt_driver,
+EARLY_DRIVER_MODULE(its_fdt, gic, gicv3_its_fdt_driver,
     gicv3_its_fdt_devclass, 0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
 
 static int
@@ -1688,6 +1683,65 @@ gicv3_its_fdt_attach(device_t dev)
 
 	/* Register this device to handle MSI interrupts */
 	intr_msi_register(dev, xref);
+
+	return (0);
+}
+#endif
+
+#ifdef DEV_ACPI
+static device_probe_t gicv3_its_acpi_probe;
+static device_attach_t gicv3_its_acpi_attach;
+
+static device_method_t gicv3_its_acpi_methods[] = {
+	/* Device interface */
+	DEVMETHOD(device_probe,		gicv3_its_acpi_probe),
+	DEVMETHOD(device_attach,	gicv3_its_acpi_attach),
+
+	/* End */
+	DEVMETHOD_END
+};
+
+#define its_baseclasses its_acpi_baseclasses
+DEFINE_CLASS_1(its, gicv3_its_acpi_driver, gicv3_its_acpi_methods,
+    sizeof(struct gicv3_its_softc), gicv3_its_driver);
+#undef its_baseclasses
+static devclass_t gicv3_its_acpi_devclass;
+
+EARLY_DRIVER_MODULE(its_acpi, gic, gicv3_its_acpi_driver,
+    gicv3_its_acpi_devclass, 0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
+
+static int
+gicv3_its_acpi_probe(device_t dev)
+{
+
+	if (gic_get_bus(dev) != GIC_BUS_ACPI)
+		return (EINVAL);
+
+	if (gic_get_hw_rev(dev) < 3)
+		return (EINVAL);
+
+	device_set_desc(dev, "ARM GIC Interrupt Translation Service");
+	return (BUS_PROBE_DEFAULT);
+}
+
+static int
+gicv3_its_acpi_attach(device_t dev)
+{
+	struct gicv3_its_softc *sc;
+	int err;
+
+	err = gicv3_its_attach(dev);
+	if (err != 0)
+		return (err);
+
+	sc = device_get_softc(dev);
+
+	sc->sc_pic = intr_pic_register(dev, 1);
+	intr_pic_add_handler(device_get_parent(dev), sc->sc_pic,
+	    gicv3_its_intr, sc, GIC_FIRST_LPI, LPI_NIRQS);
+
+	/* Register this device to handle MSI interrupts */
+	intr_msi_register(dev, 1);
 
 	return (0);
 }

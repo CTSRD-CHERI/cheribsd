@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2003 Hidetoshi Shimokawa
  * Copyright (c) 1998-2002 Katsushi Kobayashi and Hidetoshi Shimokawa
  * All rights reserved.
@@ -2972,3 +2974,13 @@ err:
 	OWRITE(sc, OHCI_DMACTL(off), OHCI_CNTL_DMA_WAKE);
 	splx(s);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

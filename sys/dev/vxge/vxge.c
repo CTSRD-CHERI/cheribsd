@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright(c) 2002-2011 Exar Corp.
  * All rights reserved.
  *
@@ -4197,3 +4199,12 @@ static driver_t vxge_driver = {
 static devclass_t vxge_devclass;
 
 DRIVER_MODULE(vxge, pci, vxge_driver, vxge_devclass, 0, 0);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1989, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -352,9 +354,31 @@ pfind(pid_t pid)
 {
 	struct proc *p;
 
+	p = curproc;
+	if (p->p_pid == pid) {
+		PROC_LOCK(p);
+		return (p);
+	}
 	sx_slock(&allproc_lock);
 	p = pfind_locked(pid);
 	sx_sunlock(&allproc_lock);
+	return (p);
+}
+
+/*
+ * Same as pfind but allow zombies.
+ */
+struct proc *
+pfind_any(pid_t pid)
+{
+	struct proc *p;
+
+	sx_slock(&allproc_lock);
+	p = pfind_locked(pid);
+	if (p == NULL)
+		p = zpfind_locked(pid);
+	sx_sunlock(&allproc_lock);
+
 	return (p);
 }
 
@@ -1500,16 +1524,12 @@ kern_proc_out(struct proc *p, struct sbuf *sb, int flags)
 }
 
 static int
-sysctl_out_proc(struct proc *p, struct sysctl_req *req, int flags,
-    int doingzomb)
+sysctl_out_proc(struct proc *p, struct sysctl_req *req, int flags)
 {
 	struct sbuf sb;
 	struct kinfo_proc ki;
-	struct proc *np;
 	int error, error2;
-	pid_t pid;
 
-	pid = p->p_pid;
 	sbuf_new_for_sysctl(&sb, (char *)&ki, sizeof(ki), req);
 	sbuf_clear_flags(&sb, SBUF_INCLUDENUL);
 	error = kern_proc_out(p, &sb, flags);
@@ -1519,20 +1539,6 @@ sysctl_out_proc(struct proc *p, struct sysctl_req *req, int flags,
 		return (error);
 	else if (error2 != 0)
 		return (error2);
-	if (doingzomb)
-		np = zpfind(pid);
-	else {
-		if (pid == 0)
-			return (0);
-		np = pfind(pid);
-	}
-	if (np == NULL)
-		return (ESRCH);
-	if (np != p) {
-		PROC_UNLOCK(np);
-		return (ESRCH);
-	}
-	PROC_UNLOCK(np);
 	return (0);
 }
 
@@ -1570,7 +1576,7 @@ sysctl_kern_proc(SYSCTL_HANDLER_ARGS)
 		sx_slock(&proctree_lock);
 		error = pget((pid_t)name[0], PGET_CANSEE, &p);
 		if (error == 0)
-			error = sysctl_out_proc(p, req, flags, 0);
+			error = sysctl_out_proc(p, req, flags);
 		sx_sunlock(&proctree_lock);
 		return (error);
 	}
@@ -1610,11 +1616,9 @@ sysctl_kern_proc(SYSCTL_HANDLER_ARGS)
 			/*
 			 * Skip embryonic processes.
 			 */
-			PROC_LOCK(p);
-			if (p->p_state == PRS_NEW) {
-				PROC_UNLOCK(p);
+			if (p->p_state == PRS_NEW)
 				continue;
-			}
+			PROC_LOCK(p);
 			KASSERT(p->p_ucred != NULL,
 			    ("process credential is NULL for non-NEW proc"));
 			/*
@@ -1701,7 +1705,7 @@ sysctl_kern_proc(SYSCTL_HANDLER_ARGS)
 
 			}
 
-			error = sysctl_out_proc(p, req, flags, doingzomb);
+			error = sysctl_out_proc(p, req, flags);
 			if (error) {
 				sx_sunlock(&allproc_lock);
 				sx_sunlock(&proctree_lock);
@@ -2135,14 +2139,25 @@ sysctl_kern_proc_args(SYSCTL_HANDLER_ARGS)
 	struct proc *p;
 	struct sbuf sb;
 	int flags, error = 0, error2;
+	pid_t pid;
 
 	if (namelen != 1)
 		return (EINVAL);
 
+	pid = (pid_t)name[0];
+	/*
+	 * If the query is for this process and it is single-threaded, there
+	 * is nobody to modify pargs, thus we can just read.
+	 */
+	p = curproc;
+	if (pid == p->p_pid && p->p_numthreads == 1 && req->newptr == NULL &&
+	    (pa = p->p_args) != NULL)
+		return (SYSCTL_OUT(req, pa->ar_args, pa->ar_length));
+
 	flags = PGET_CANSEE;
 	if (req->newptr != NULL)
 		flags |= PGET_ISCURRENT;
-	error = pget((pid_t)name[0], flags, &p);
+	error = pget(pid, flags, &p);
 	if (error)
 		return (error);
 
@@ -2169,7 +2184,7 @@ sysctl_kern_proc_args(SYSCTL_HANDLER_ARGS)
 	if (error != 0 || req->newptr == NULL)
 		return (error);
 
-	if (req->newlen + sizeof(struct pargs) > ps_arg_cache_limit)
+	if (req->newlen > ps_arg_cache_limit - sizeof(struct pargs))
 		return (ENOMEM);
 	newpa = pargs_alloc(req->newlen);
 	error = SYSCTL_IN(req, newpa->ar_args, req->newlen);
@@ -2374,8 +2389,10 @@ sysctl_kern_proc_ovmmap(SYSCTL_HANDLER_ARGS)
 		}
 
 		for (lobj = tobj = obj; tobj; tobj = tobj->backing_object) {
-			if (tobj != obj)
+			if (tobj != obj) {
 				VM_OBJECT_RLOCK(tobj);
+				kve->kve_offset += tobj->backing_object_offset;
+			}
 			if (lobj != obj)
 				VM_OBJECT_RUNLOCK(lobj);
 			lobj = tobj;
@@ -2383,7 +2400,7 @@ sysctl_kern_proc_ovmmap(SYSCTL_HANDLER_ARGS)
 
 		kve->kve_start = (void*)entry->start;
 		kve->kve_end = (void*)entry->end;
-		kve->kve_offset = (off_t)entry->offset;
+		kve->kve_offset += (off_t)entry->offset;
 
 		if (entry->protection & VM_PROT_READ)
 			kve->kve_protection |= KVME_PROT_READ;
@@ -2493,15 +2510,20 @@ sysctl_kern_proc_ovmmap(SYSCTL_HANDLER_ARGS)
 CTASSERT(sizeof(struct kinfo_vmentry) == KINFO_VMENTRY_SIZE);
 #endif
 
-static void
+void
 kern_proc_vmmap_resident(vm_map_t map, vm_map_entry_t entry,
-    struct kinfo_vmentry *kve)
+    int *resident_count, bool *super)
 {
 	vm_object_t obj, tobj;
 	vm_page_t m, m_adv;
 	vm_offset_t addr;
 	vm_paddr_t locked_pa;
 	vm_pindex_t pi, pi_adv, pindex;
+
+	*super = false;
+	*resident_count = 0;
+	if (vmmap_skip_res_cnt)
+		return;
 
 	locked_pa = 0;
 	obj = entry->object.vm_object;
@@ -2535,7 +2557,7 @@ kern_proc_vmmap_resident(vm_map_t map, vm_map_entry_t entry,
 		    (addr & (pagesizes[1] - 1)) == 0 &&
 		    (pmap_mincore(map->pmap, addr, &locked_pa) &
 		    MINCORE_SUPER) != 0) {
-			kve->kve_flags |= KVME_FLAG_SUPER;
+			*super = true;
 			pi_adv = atop(pagesizes[1]);
 		} else {
 			/*
@@ -2547,7 +2569,7 @@ kern_proc_vmmap_resident(vm_map_t map, vm_map_entry_t entry,
 			 */
 			pi_adv = 1;
 		}
-		kve->kve_resident += pi_adv;
+		*resident_count += pi_adv;
 next:;
 	}
 	PA_UNLOCK_COND(locked_pa);
@@ -2571,6 +2593,7 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 	vm_offset_t addr;
 	unsigned int last_timestamp;
 	int error;
+	bool super;
 
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 
@@ -2598,13 +2621,16 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 			for (tobj = obj; tobj != NULL;
 			    tobj = tobj->backing_object) {
 				VM_OBJECT_RLOCK(tobj);
+				kve->kve_offset += tobj->backing_object_offset;
 				lobj = tobj;
 			}
 			if (obj->backing_object == NULL)
 				kve->kve_private_resident =
 				    obj->resident_page_count;
-			if (!vmmap_skip_res_cnt)
-				kern_proc_vmmap_resident(map, entry, kve);
+			kern_proc_vmmap_resident(map, entry,
+			    &kve->kve_resident, &super);
+			if (super)
+				kve->kve_flags |= KVME_FLAG_SUPER;
 			for (tobj = obj; tobj != NULL;
 			    tobj = tobj->backing_object) {
 				if (tobj != obj && tobj != lobj)
@@ -3575,6 +3601,7 @@ resume_all_proc(void)
 
 	cp = curproc;
 	sx_xlock(&allproc_lock);
+again:
 	LIST_REMOVE(cp, p_list);
 	LIST_INSERT_HEAD(&allproc, cp, p_list);
 	for (;;) {
@@ -3594,6 +3621,12 @@ resume_all_proc(void)
 		} else {
 			PROC_UNLOCK(p);
 		}
+	}
+	/*  Did the loop above missed any stopped process ? */
+	LIST_FOREACH(p, &allproc, p_list) {
+		/* No need for proc lock. */
+		if ((p->p_flag & P_TOTAL_STOP) != 0)
+			goto again;
 	}
 	sx_xunlock(&allproc_lock);
 }
@@ -3629,3 +3662,12 @@ SYSCTL_PROC(_debug, OID_AUTO, stop_all_proc, CTLTYPE_INT | CTLFLAG_RW |
     sysctl_debug_stop_all_proc, "I",
     "");
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

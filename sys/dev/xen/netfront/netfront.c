@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2004-2006 Kip Macy
  * Copyright (c) 2015 Wei Liu <wei.liu2@citrix.com>
  * All rights reserved.
@@ -2337,3 +2339,12 @@ devclass_t netfront_devclass;
 
 DRIVER_MODULE(xe, xenbusb_front, netfront_driver, netfront_devclass, NULL,
     NULL);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

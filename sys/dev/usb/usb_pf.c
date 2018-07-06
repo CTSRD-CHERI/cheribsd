@@ -1,5 +1,7 @@
 /* $FreeBSD$ */
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1990, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -532,3 +534,12 @@ usbpf_xfertap(struct usb_xfer *xfer, int type)
 
 	free(buf, M_TEMP);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

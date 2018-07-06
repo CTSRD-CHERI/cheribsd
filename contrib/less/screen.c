@@ -9,7 +9,8 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180530,
+ *   "updated": 20180629,
+ *   "target_type": "prog",
  *   "changes": [
  *     "function_abi"
  *   ]
@@ -136,16 +137,21 @@ static HANDLE con_out_save = INVALID_HANDLE_VALUE; /* previous console */
 static HANDLE con_out_ours = INVALID_HANDLE_VALUE; /* our own */
 HANDLE con_out = INVALID_HANDLE_VALUE;             /* current console */
 
+extern int utf_mode;
 extern int quitting;
 static void win32_init_term();
 static void win32_deinit_term();
+
+#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
+#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 4
+#endif
 
 #define FG_COLORS       (FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY)
 #define BG_COLORS       (BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_BLUE | BACKGROUND_INTENSITY)
 #define	MAKEATTR(fg,bg)		((WORD)((fg)|((bg)<<4)))
 #define	SETCOLORS(fg,bg)	{ curr_attr = MAKEATTR(fg,bg); \
 				if (SetConsoleTextAttribute(con_out, curr_attr) == 0) \
-				error("SETCOLORS failed"); }
+				error("SETCOLORS failed", NULL_PARG); }
 #endif
 
 #if MSDOS_COMPILER
@@ -162,7 +168,9 @@ public int bl_bg_color;
 static int sy_fg_color;		/* Color of system text (before less) */
 static int sy_bg_color;
 public int sgr_mode;		/* Honor ANSI sequences rather than using above */
-
+#if MSDOS_COMPILER==WIN32C
+public int have_ul;		/* Is underline available? */
+#endif
 #else
 
 /*
@@ -211,6 +219,7 @@ public int above_mem, below_mem;	/* Memory retained above/below screen */
 public int can_goto_line;		/* Can move cursor to any line */
 public int clear_bg;		/* Clear fills with background color */
 public int missing_cap = 0;	/* Some capability is missing */
+public char *kent = NULL;	/* Keypad ENTER sequence */
 
 static int attrmode = AT_NORMAL;
 extern int binattr;
@@ -1221,7 +1230,8 @@ get_term()
 	sc_e_keypad = ltgetstr("ke", &sp);
 	if (sc_e_keypad == NULL)
 		sc_e_keypad = "";
-		
+	kent = ltgetstr("@8", &sp);
+
 	sc_init = ltgetstr("ti", &sp);
 	if (sc_init == NULL)
 		sc_init = "";
@@ -1509,6 +1519,8 @@ win32_init_term()
 
 	if (con_out_ours == INVALID_HANDLE_VALUE)
 	{
+		DWORD output_mode;
+
 		/*
 		 * Create our own screen buffer, so that we
 		 * may restore the original when done.
@@ -1519,6 +1531,12 @@ win32_init_term()
 			(LPSECURITY_ATTRIBUTES) NULL,
 			CONSOLE_TEXTMODE_BUFFER,
 			(LPVOID) NULL);
+		/*
+		 * Enable underline, if available.
+		 */
+		GetConsoleMode(con_out_ours, &output_mode);
+		have_ul = SetConsoleMode(con_out_ours,
+			    output_mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
 	}
 
 	size.X = scr.srWindow.Right - scr.srWindow.Left + 1;
@@ -1839,6 +1857,8 @@ win32_scroll_up(n)
 	public void
 lower_left()
 {
+	if (!init_done)
+		return;
 #if !MSDOS_COMPILER
 	tputs(sc_lower_left, 1, putchr);
 #else
@@ -1913,14 +1933,14 @@ check_winch()
  * Goto a specific line on the screen.
  */
 	public void
-goto_line(slinenum)
-	int slinenum;
+goto_line(sindex)
+	int sindex;
 {
 #if !MSDOS_COMPILER
-	tputs(tgoto(sc_move, 0, slinenum), 1, putchr);
+	tputs(tgoto(sc_move, 0, sindex), 1, putchr);
 #else
 	flush();
-	_settextposition(slinenum+1, 1);
+	_settextposition(sindex+1, 1);
 #endif
 }
 
@@ -2519,7 +2539,18 @@ WIN32textout(text, len)
 {
 #if MSDOS_COMPILER==WIN32C
 	DWORD written;
-	WriteConsole(con_out, text, len, &written, NULL);
+	if (utf_mode == 2)
+	{
+		/*
+		 * We've got UTF-8 text in a non-UTF-8 console.  Convert it to
+		 * wide and use WriteConsoleW.
+		 */
+		WCHAR wtext[1024];
+		len = MultiByteToWideChar(CP_UTF8, 0, text, len, wtext,
+					  sizeof(wtext)/sizeof(*wtext));
+		WriteConsoleW(con_out, wtext, len, &written, NULL);
+	} else
+		WriteConsole(con_out, text, len, &written, NULL);
 #else
 	char c = text[len];
 	text[len] = '\0';

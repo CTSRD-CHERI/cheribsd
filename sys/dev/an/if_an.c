@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -3821,3 +3823,13 @@ flashcard(struct ifnet *ifp, struct aironet_ioctl *l_ioctl)
 
 	return -EINVAL;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

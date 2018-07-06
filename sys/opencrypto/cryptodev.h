@@ -426,8 +426,12 @@ struct cryptop {
 					 * if CRYPTO_F_ASYNC flags is set
 					 */
 
-	caddr_t		crp_buf;	/* Data to be processed */
-	caddr_t		crp_opaque;	/* Opaque pointer, passed along */
+	union {
+		caddr_t		crp_buf;	/* Data to be processed */
+		struct mbuf	*crp_mbuf;
+		struct uio	*crp_uio;
+	};
+	void *		crp_opaque;	/* Opaque pointer, passed along */
 	struct cryptodesc *crp_desc;	/* Linked list of processing descriptors */
 
 	int (*crp_callback)(struct cryptop *); /* Callback function */
@@ -538,5 +542,15 @@ extern	void crypto_copydata(int flags, caddr_t buf, int off, int size,
 	    caddr_t out);
 extern	int crypto_apply(int flags, caddr_t buf, int off, int len,
 	    int (*f)(void *, void *, u_int), void *arg);
+
 #endif /* _KERNEL */
 #endif /* _CRYPTO_CRYPTO_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2002-2009 Luigi Rizzo, Universita` di Pisa
  *
  * Redistribution and use in source and binary forms, with or without
@@ -734,6 +736,8 @@ __aligned(sizeof(void *))
 
 #define	ICMP_REJECT_RST		0x100	/* fake ICMP code (send a TCP RST) */
 #define	ICMP6_UNREACH_RST	0x100	/* fake ICMPv6 code (send a TCP RST) */
+#define	ICMP_REJECT_ABORT	0x101	/* fake ICMP code (send an SCTP ABORT) */
+#define	ICMP6_UNREACH_ABORT	0x101	/* fake ICMPv6 code (send an SCTP ABORT) */
 
 /*
  * These are used for lookup tables.
@@ -1055,3 +1059,12 @@ typedef struct _ipfw_sopt_info {
 } ipfw_sopt_info;
 
 #endif /* _IPFW2_H */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "pointer_integrity"
+//   ]
+// }
+// CHERI CHANGES END

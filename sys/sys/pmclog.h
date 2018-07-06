@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2005-2007, Joseph Koshy
  * Copyright (c) 2007 The FreeBSD Foundation
  * All rights reserved.
@@ -108,7 +110,11 @@ struct pmclog_callchain {
 	uint32_t		pl_pmcid;
 	uint32_t		pl_cpuflags;
 	/* 8 byte aligned */
-	uintptr_t		pl_pc[PMC_CALLCHAIN_DEPTH_MAX];
+	/*
+	 * XXXAR: not sure whether this actually needs to be a valid cap.
+	 * If it is we need to increase the alignment of this struct
+	 */
+	/* uintptr_t */ vaddr_t	pl_pc[PMC_CALLCHAIN_DEPTH_MAX];
 } __packed;
 
 #define	PMC_CALLCHAIN_CPUFLAGS_TO_CPU(CF)	(((CF) >> 16) & 0xFFFF)

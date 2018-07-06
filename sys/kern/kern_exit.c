@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1989, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -86,7 +88,6 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_map.h>
 #include <vm/vm_page.h>
 #include <vm/uma.h>
-#include <vm/vm_domain.h>
 
 #ifdef KDTRACE_HOOKS
 #include <sys/dtrace_bsd.h>
@@ -941,10 +942,6 @@ proc_reap(struct thread *td, struct proc *p, int *status, int options)
 #ifdef MAC
 	mac_proc_destroy(p);
 #endif
-	/*
-	 * Free any domain policy that's still hiding around.
-	 */
-	vm_domain_policy_cleanup(&p->p_vm_dom_policy);
 
 	KASSERT(FIRST_THREAD_IN_PROC(p),
 	    ("proc_reap: no residual thread!"));
@@ -1354,3 +1351,12 @@ proc_reparent(struct proc *child, struct proc *parent)
 
 	child->p_pptr = parent;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

@@ -221,8 +221,6 @@ vm_offset_t virtual_avail;	/* VA of first avail page (after kernel bss) */
 vm_offset_t virtual_end;	/* VA of last avail page (end of kernel AS) */
 vm_offset_t kernel_vm_end = 0;
 
-struct msgbuf *msgbufp = NULL;
-
 /*
  * Data for the pv entry allocation mechanism.
  * Updates to pv_invl_gen are protected by the pv_list_locks[]
@@ -623,7 +621,7 @@ pmap_bootstrap_l2(vm_offset_t l1pt, vm_offset_t va, vm_offset_t l2_start)
 static vm_offset_t
 pmap_bootstrap_l3(vm_offset_t l1pt, vm_offset_t va, vm_offset_t l3_start)
 {
-	vm_offset_t l2pt, l3pt;
+	vm_offset_t l3pt;
 	vm_paddr_t pa;
 	pd_entry_t *l2;
 	u_int l2_slot;
@@ -632,7 +630,6 @@ pmap_bootstrap_l3(vm_offset_t l1pt, vm_offset_t va, vm_offset_t l3_start)
 
 	l2 = pmap_l2(kernel_pmap, va);
 	l2 = (pd_entry_t *)rounddown2((uintptr_t)l2, PAGE_SIZE);
-	l2pt = (vm_offset_t)l2;
 	l2_slot = pmap_l2_index(va);
 	l3pt = l3_start;
 
@@ -896,7 +893,7 @@ SYSCTL_ULONG(_vm_pmap_l2, OID_AUTO, promotions, CTLFLAG_RD,
 /*
  * Invalidate a single TLB entry.
  */
-PMAP_INLINE void
+static __inline void
 pmap_invalidate_page(pmap_t pmap, vm_offset_t va)
 {
 
@@ -910,12 +907,11 @@ pmap_invalidate_page(pmap_t pmap, vm_offset_t va)
 	sched_unpin();
 }
 
-PMAP_INLINE void
-pmap_invalidate_range(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
+static __inline void
+pmap_invalidate_range_nopin(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 {
 	vm_offset_t addr;
 
-	sched_pin();
 	dsb(ishst);
 	for (addr = sva; addr < eva; addr += PAGE_SIZE) {
 		__asm __volatile(
@@ -924,10 +920,18 @@ pmap_invalidate_range(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 	__asm __volatile(
 	    "dsb  ish	\n"
 	    "isb	\n");
+}
+
+static __inline void
+pmap_invalidate_range(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
+{
+
+	sched_pin();
+	pmap_invalidate_range_nopin(pmap, sva, eva);
 	sched_unpin();
 }
 
-PMAP_INLINE void
+static __inline void
 pmap_invalidate_all(pmap_t pmap)
 {
 
@@ -2670,7 +2674,7 @@ pmap_update_entry(pmap_t pmap, pd_entry_t *pte, pd_entry_t newpte,
 
 	/* Clear the old mapping */
 	pmap_load_clear(pte);
-	pmap_invalidate_range(pmap, va, va + size);
+	pmap_invalidate_range_nopin(pmap, va, va + size);
 
 	/* Create the new mapping */
 	pmap_load_store(pte, newpte);
@@ -4661,6 +4665,51 @@ pmap_activate(struct thread *td)
 	    "r"(td->td_proc->p_md.md_l0addr));
 	pmap_invalidate_all(pmap);
 	critical_exit();
+}
+
+struct pcb *
+pmap_switch(struct thread *old, struct thread *new)
+{
+	pcpu_bp_harden bp_harden;
+	struct pcb *pcb;
+
+	/* Store the new curthread */
+	PCPU_SET(curthread, new);
+
+	/* And the new pcb */
+	pcb = new->td_pcb;
+	PCPU_SET(curpcb, pcb);
+
+	/*
+	 * TODO: We may need to flush the cache here if switching
+	 * to a user process.
+	 */
+
+	if (old == NULL ||
+	    old->td_proc->p_md.md_l0addr != new->td_proc->p_md.md_l0addr) {
+		__asm __volatile(
+		    /* Switch to the new pmap */
+		    "msr	ttbr0_el1, %0	\n"
+		    "isb			\n"
+
+		    /* Invalidate the TLB */
+		    "dsb	ishst		\n"
+		    "tlbi	vmalle1is	\n"
+		    "dsb	ish		\n"
+		    "isb			\n"
+		    : : "r"(new->td_proc->p_md.md_l0addr));
+
+		/*
+		 * Stop userspace from training the branch predictor against
+		 * other processes. This will call into a CPU specific
+		 * function that clears the branch predictor state.
+		 */
+		bp_harden = PCPU_GET(bp_harden);
+		if (bp_harden != NULL)
+			bp_harden();
+	}
+
+	return (pcb);
 }
 
 void

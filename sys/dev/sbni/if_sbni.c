@@ -1276,3 +1276,12 @@ static u_int32_t crc32tab[] __aligned(8) = {
 	0x616495A3,  0x1663A535,  0x8F6AF48F,  0xF86DC419,
 	0x660951BA,  0x110E612C,  0x88073096,  0xFF000000
 };
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

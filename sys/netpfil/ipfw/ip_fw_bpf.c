@@ -207,3 +207,12 @@ ipfw_bpf_uninit(int last)
 		LOGIF_LOCK_DESTROY();
 }
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

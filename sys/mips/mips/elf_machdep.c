@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright 1996-1998 John D. Polstra.
  * All rights reserved.
  *
@@ -596,3 +598,13 @@ elf_cpu_unload_file(linker_file_t lf __unused)
 
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": "shared page"
+// }
+// CHERI CHANGES END

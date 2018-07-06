@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -1160,6 +1162,8 @@ retry_dotdot:
 			SDT_PROBE3(vfs, namecache, lookup, miss, dvp,
 			    "..", NULL);
 			mtx_unlock(dvlp);
+			if (dvlp2 != NULL)
+				mtx_unlock(dvlp2);
 			return (0);
 		}
 		if ((ncp->nc_flag & NCF_ISDOTDOT) != 0) {
@@ -2525,3 +2529,12 @@ out:
 	free(fbuf, M_TEMP);
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

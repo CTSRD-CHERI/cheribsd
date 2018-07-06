@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: (BSD-4-Clause AND MIT-CMU)
+ *
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  * Copyright (c) 1994 John S. Dyson
@@ -1616,6 +1618,7 @@ vm_fault_copy_entry(vm_map_t dst_map, vm_map_t src_map,
 	KASSERT(upgrade || dst_entry->object.vm_object == NULL,
 	    ("vm_fault_copy_entry: vm_object not NULL"));
 	if (src_object != dst_object) {
+		dst_object->domain = src_object->domain;
 		dst_entry->object.vm_object = dst_object;
 		dst_entry->offset = 0;
 		dst_object->charge = dst_entry->end - dst_entry->start;
@@ -1789,3 +1792,13 @@ vm_fault_enable_pagefaults(int save)
 
 	curthread_pflags_restore(save);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

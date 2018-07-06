@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2003-2012 Broadcom Corporation
  * All Rights Reserved
  *
@@ -305,3 +307,12 @@ nlm_get_cipher_param(struct xlp_sec_command *cmd)
 	}
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

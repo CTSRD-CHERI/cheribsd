@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1990 The Regents of the University of California.
  * All rights reserved.
  *
@@ -192,3 +194,12 @@ ASSYM(COP2_HSH_IVW0_PASS1_OFFSET, offsetof(struct octeon_cop2_state, hsh_ivw));
 ASSYM(COP2_HSH_IVW1_PASS1_OFFSET, offsetof(struct octeon_cop2_state, hsh_ivw) + 8);
 ASSYM(COP2_HSH_IVW2_PASS1_OFFSET, offsetof(struct octeon_cop2_state, hsh_ivw) + 16);
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

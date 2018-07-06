@@ -32,7 +32,8 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180530,
+ *   "updated": 20180629,
+ *   "target_type": "prog",
  *   "changes": [
  *     "pointer_size"
  *   ]
@@ -42,7 +43,9 @@
 
 #include <machine/asm.h>
 
+#if defined(__clang__) || (defined(__GNUC__) && __GNUC__ > 4)
 	.cfi_sections .debug_frame
+#endif
 
 .globl _C_LABEL(_rtld_relocate_nonplt_self)
 .globl _C_LABEL(_rtld)

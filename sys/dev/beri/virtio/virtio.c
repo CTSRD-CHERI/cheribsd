@@ -250,10 +250,20 @@ getcopy(kiovec_t *iov, int n)
 	kiovec_t *tiov;
 	int i;
 
-	tiov = malloc(n * sizeof(kiovec_t), M_DEVBUF, M_NOWAIT);
+	tiov = mallocarray(n, sizeof(kiovec_t), M_DEVBUF, M_NOWAIT);
 	for (i = 0; i < n; i++) {
 		IOVEC_INIT(&tiov[i], iov[i].iov_base, iov[i].iov_len);
 	}
 
 	return (tiov);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

@@ -6,6 +6,8 @@
  * This software is provided ``AS IS'' without any warranties of any kind.
  */
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2003-2005 McAfee, Inc.
  * Copyright (c) 2016-2017 Robert N. M. Watson
  * All rights reserved.
@@ -2126,3 +2128,12 @@ freebsd32_semctl(struct thread *td, struct freebsd32_semctl_args *uap)
 }
 
 #endif /* COMPAT_FREEBSD32 */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

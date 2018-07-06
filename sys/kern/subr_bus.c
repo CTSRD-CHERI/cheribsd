@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1997,1998,2003 Doug Rabson
  * All rights reserved.
  *
@@ -32,6 +34,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/conf.h>
+#include <sys/eventhandler.h>
 #include <sys/filio.h>
 #include <sys/lock.h>
 #include <sys/kernel.h>
@@ -144,6 +147,10 @@ struct device {
 
 static MALLOC_DEFINE(M_BUS, "bus", "Bus data structures");
 static MALLOC_DEFINE(M_BUS_SC, "bus-sc", "Bus data structures, softc");
+
+EVENTHANDLER_LIST_DEFINE(device_attach);
+EVENTHANDLER_LIST_DEFINE(device_detach);
+EVENTHANDLER_LIST_DEFINE(dev_lookup);
 
 static void devctl2_init(void);
 
@@ -1458,7 +1465,7 @@ devclass_get_devices(devclass_t dc, device_t **devlistp, int *devcountp)
 	device_t *list;
 
 	count = devclass_get_count(dc);
-	list = malloc(count * sizeof(device_t), M_TEMP, M_NOWAIT|M_ZERO);
+	list = mallocarray(count, sizeof(device_t), M_TEMP, M_NOWAIT|M_ZERO);
 	if (!list)
 		return (ENOMEM);
 
@@ -1674,7 +1681,7 @@ devclass_alloc_unit(devclass_t dc, device_t dev, int *unitp)
 
 		oldlist = dc->devices;
 		newsize = roundup((unit + 1), MINALLOCSIZE / sizeof(device_t));
-		newlist = malloc(sizeof(device_t) * newsize, M_BUS, M_NOWAIT);
+		newlist = mallocarray(newsize, sizeof(device_t), M_BUS, M_NOWAIT);
 		if (!newlist)
 			return (ENOMEM);
 		if (oldlist != NULL)
@@ -2312,7 +2319,7 @@ device_get_children(device_t dev, device_t **devlistp, int *devcountp)
 		return (0);
 	}
 
-	list = malloc(count * sizeof(device_t), M_TEMP, M_NOWAIT|M_ZERO);
+	list = mallocarray(count, sizeof(device_t), M_TEMP, M_NOWAIT|M_ZERO);
 	if (!list)
 		return (ENOMEM);
 
@@ -2955,7 +2962,7 @@ device_attach(device_t dev)
 	else
 		dev->state = DS_ATTACHED;
 	dev->flags &= ~DF_DONENOMATCH;
-	EVENTHANDLER_INVOKE(device_attach, dev);
+	EVENTHANDLER_DIRECT_INVOKE(device_attach, dev);
 	devadded(dev);
 	return (0);
 }
@@ -2989,12 +2996,14 @@ device_detach(device_t dev)
 	if (dev->state != DS_ATTACHED)
 		return (0);
 
-	EVENTHANDLER_INVOKE(device_detach, dev, EVHDEV_DETACH_BEGIN);
+	EVENTHANDLER_DIRECT_INVOKE(device_detach, dev, EVHDEV_DETACH_BEGIN);
 	if ((error = DEVICE_DETACH(dev)) != 0) {
-		EVENTHANDLER_INVOKE(device_detach, dev, EVHDEV_DETACH_FAILED);
+		EVENTHANDLER_DIRECT_INVOKE(device_detach, dev,
+		    EVHDEV_DETACH_FAILED);
 		return (error);
 	} else {
-		EVENTHANDLER_INVOKE(device_detach, dev, EVHDEV_DETACH_COMPLETE);
+		EVENTHANDLER_DIRECT_INVOKE(device_detach, dev,
+		    EVHDEV_DETACH_COMPLETE);
 	}
 	devremoved(dev);
 	if (!device_is_quiet(dev))
@@ -5349,7 +5358,7 @@ find_device(struct devreq *req, device_t *devp)
 
 	/* Finally, give device enumerators a chance. */
 	dev = NULL;
-	EVENTHANDLER_INVOKE(dev_lookup, req->dr_name, &dev);
+	EVENTHANDLER_DIRECT_INVOKE(dev_lookup, req->dr_name, &dev);
 	if (dev == NULL)
 		return (ENOENT);
 	*devp = dev;
@@ -5644,3 +5653,13 @@ DB_SHOW_ALL_COMMAND(devices, db_show_all_devices)
 	}
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "kiovec_t",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

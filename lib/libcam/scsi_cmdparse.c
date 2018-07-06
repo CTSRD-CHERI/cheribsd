@@ -1,7 +1,10 @@
 /*
  * Taken from the original FreeBSD user SCSI library.
  */
-/* Copyright (c) 1994 HD Associates
+/*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
+ * Copyright (c) 1994 HD Associates
  * (contact: dufault@hda.com)
  * All rights reserved.
  *
@@ -36,7 +39,8 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180530,
+ *   "updated": 20180629,
+ *   "target_type": "lib",
  *   "changes": [
  *     "pointer_as_integer"
  *   ]

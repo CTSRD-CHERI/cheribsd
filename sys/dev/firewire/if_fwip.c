@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2004
  *	Doug Rabson
  * Copyright (c) 2002-2003
@@ -408,8 +410,7 @@ fwip_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				return (error);
 			/* Disable interrupts */
 			fc->set_intr(fc, 0);
-			ifp->if_capenable |= IFCAP_POLLING |
-			    IFCAP_POLLING_NOCOUNT;
+			ifp->if_capenable |= IFCAP_POLLING;
 			return (error);
 		}
 		if (!(ifr_reqcap_get(ifr) & IFCAP_POLLING) &&
@@ -418,7 +419,6 @@ fwip_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			/* Enable interrupts. */
 			fc->set_intr(fc, 1);
 			ifp->if_capenable &= ~IFCAP_POLLING;
-			ifp->if_capenable &= ~IFCAP_POLLING_NOCOUNT;
 			return (error);
 		}
 	    }
@@ -932,3 +932,12 @@ static driver_t fwip_driver = {
 DRIVER_MODULE(fwip, firewire, fwip_driver, fwip_devclass, 0, 0);
 MODULE_VERSION(fwip, 1);
 MODULE_DEPEND(fwip, firewire, 1, 1, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

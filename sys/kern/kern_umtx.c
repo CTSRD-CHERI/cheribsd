@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2015, 2016 The FreeBSD Foundation
  * Copyright (c) 2004, David Xu <davidxu@freebsd.org>
  * Copyright (c) 2002, Jeffrey Roberson <jeff@freebsd.org>
@@ -5082,3 +5084,12 @@ umtx_thread_cleanup(struct thread *td)
 	if (rb_inact != 0)
 		(void)umtx_handle_rb(td, rb_inact, NULL, true);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

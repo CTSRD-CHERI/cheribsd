@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -709,7 +711,7 @@ main(int argc, char *const *argv)
 	if (options & F_NUMERIC)
 		cansandbox = true;
 	else if (capdns != NULL)
-		cansandbox = true;
+		cansandbox = CASPER_SUPPORT;
 	else
 		cansandbox = false;
 

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (C) 2002-2003 NetGroup, Politecnico di Torino (Italy)
  * Copyright (C) 2005-2017 Jung-uk Kim <jkim@FreeBSD.org>
  * All rights reserved.
@@ -184,7 +186,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 	/* Allocate the reference table for the jumps. */
 	if (fjmp) {
 #ifdef _KERNEL
-		stream.refs = malloc((nins + 1) * sizeof(u_int), M_BPFJIT,
+		stream.refs = mallocarray(nins + 1, sizeof(u_int), M_BPFJIT,
 		    M_NOWAIT | M_ZERO);
 #else
 		stream.refs = calloc(nins + 1, sizeof(u_int));

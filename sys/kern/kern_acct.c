@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -663,3 +665,12 @@ acct_thread(void *dummy)
 	sx_xunlock(&acct_sx);
 	kproc_exit(0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

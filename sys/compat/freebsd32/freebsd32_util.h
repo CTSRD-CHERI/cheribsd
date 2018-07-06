@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1998-1999 Andrew Gallatin
  * All rights reserved.
  *
@@ -130,3 +132,14 @@ int freebsd32_exec_copyin_args(struct image_args *args, char *fname,
 	    enum uio_seg segflg, u_int32_t *argv, u_int32_t *envv);
 
 #endif /* !_COMPAT_FREEBSD32_FREEBSD32_UTIL_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "kiovec_t",
+//     "support",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

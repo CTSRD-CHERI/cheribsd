@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1997,1998,2003 Doug Rabson
  * All rights reserved.
  *
@@ -962,3 +964,12 @@ static __inline void varp ## _set_ ## var(device_t dev, type t)		\
 #endif /* _KERNEL */
 
 #endif /* !_SYS_BUS_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "platform"
+//   ]
+// }
+// CHERI CHANGES END

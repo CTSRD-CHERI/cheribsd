@@ -1028,3 +1028,14 @@ tw_job_next(struct Strbuf *res, struct Strbuf *dir, int *flags)
     }
     return 0;
 } /* end tw_job_next */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "prog",
+//   "changes": [
+//     "pointer_provenance"
+//   ],
+//   "change_comment": "improper update of realloc()d pointers",
+//   "is_upstream": true
+// }
+// CHERI CHANGES END

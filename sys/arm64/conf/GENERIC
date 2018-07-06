@@ -26,7 +26,7 @@ makeoptions	WITH_CTF=1		# Run ctfconvert(1) for DTrace support
 
 options 	SCHED_ULE		# ULE scheduler
 options 	PREEMPTION		# Enable kernel thread preemption
-options 	VIMAGE			# Subsystem virtualization, e.g. VNET
+#options 	VIMAGE			# Subsystem virtualization, e.g. VNET
 options 	INET			# InterNETworking
 options 	INET6			# IPv6 communications protocols
 options 	IPSEC			# IP (v4/v6) security
@@ -52,6 +52,7 @@ options 	PSEUDOFS		# Pseudo-filesystem framework
 options 	GEOM_PART_GPT		# GUID Partition Tables.
 options 	GEOM_RAID		# Soft RAID functionality.
 options 	GEOM_LABEL		# Provides labelization
+options 	COMPAT_FREEBSD32	# Incomplete, but used by cloudabi32.ko.
 options 	COMPAT_FREEBSD11	# Compatible with FreeBSD11
 options 	SCSI_DELAY=5000		# Delay (in ms) before probing SCSI
 options 	KTRACE			# ktrace(1) support
@@ -226,6 +227,7 @@ device		md		# Memory "disks"
 device		gif		# IPv6 and IPv4 tunneling
 device		firmware	# firmware assist module
 device		psci		# Support for ARM PSCI
+options 	EFIRT		# EFI Runtime Services
 
 # EXT_RESOURCES pseudo devices
 options 	EXT_RESOURCES
@@ -233,6 +235,7 @@ device		clk
 device		phy
 device		hwreset
 device		regulator
+device		syscon
 
 # The `bpf' device enables the Berkeley Packet Filter.
 # Be aware of the administrative consequences of enabling this!

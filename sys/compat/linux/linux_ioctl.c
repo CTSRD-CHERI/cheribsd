@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1994-1995 Søren Schmidt
  * All rights reserved.
  *
@@ -3808,3 +3810,12 @@ linux_ioctl_unregister_handler(struct linux_ioctl_handler *h)
 
 	return (EINVAL);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

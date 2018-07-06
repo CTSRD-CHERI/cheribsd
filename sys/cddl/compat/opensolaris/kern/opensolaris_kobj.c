@@ -207,3 +207,13 @@ kobj_close_file(struct _buf *file)
 		vn_close(file->ptr, FREAD, curthread->td_ucred, curthread);
 	kmem_free(file, sizeof(*file));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

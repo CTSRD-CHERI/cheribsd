@@ -9,7 +9,8 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180530,
+ *   "updated": 20180629,
+ *   "target_type": "prog",
  *   "changes": [
  *     "function_abi"
  *   ]
@@ -524,7 +525,6 @@ struct wchar_range_table
 #define	CH_HELPFILE	010
 #define	CH_NODATA  	020	/* Special case for zero length files */
 
-
 #define	ch_zero()	((POSITION)0)
 
 #define	FAKE_HELPFILE	"@/\\less/\\help/\\file/\\@"
@@ -549,6 +549,6 @@ struct hilite_tree;
 #include "funcs.h"
 
 /* Functions not included in funcs.h */
-void postoa(POSITION num, char *buf);
-void linenumtoa(LINENUM num, char *buf);
-void inttoa(int num, char *buf);
+void postoa LESSPARAMS ((POSITION, char*));
+void linenumtoa LESSPARAMS ((LINENUM, char*));
+void inttoa LESSPARAMS ((int, char*));

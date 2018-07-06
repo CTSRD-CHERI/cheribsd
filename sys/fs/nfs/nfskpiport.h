@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2009 Rick Macklem, University of Guelph
  * All rights reserved.
  *
@@ -72,3 +74,12 @@ typedef struct mbuf *		mbuf_t;
 #define	uio_iov_len_add(p, v)	((p)->uio_iov->iov_len += (v))
 
 #endif	/* _NFS_NFSKPIPORT_H */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "iovec-macros"
+//   ]
+// }
+// CHERI CHANGES END

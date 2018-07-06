@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (C) 2001 Julian Elischer <julian@freebsd.org>.
  *  All rights reserved.
  *
@@ -62,7 +64,6 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
 #include <vm/uma.h>
-#include <vm/vm_domain.h>
 #include <sys/eventhandler.h>
 
 /*
@@ -76,13 +77,13 @@ __FBSDID("$FreeBSD$");
  * structures.
  */
 #ifdef __amd64__
-_Static_assert(offsetof(struct thread, td_flags) == 0xf4,
+_Static_assert(offsetof(struct thread, td_flags) == 0xfc,
     "struct thread KBI td_flags");
-_Static_assert(offsetof(struct thread, td_pflags) == 0xfc,
+_Static_assert(offsetof(struct thread, td_pflags) == 0x104,
     "struct thread KBI td_pflags");
-_Static_assert(offsetof(struct thread, td_frame) == 0x460,
+_Static_assert(offsetof(struct thread, td_frame) == 0x468,
     "struct thread KBI td_frame");
-_Static_assert(offsetof(struct thread, td_emuldata) == 0x508,
+_Static_assert(offsetof(struct thread, td_emuldata) == 0x510,
     "struct thread KBI td_emuldata");
 _Static_assert(offsetof(struct proc, p_flag) == 0xb0,
     "struct proc KBI p_flag");
@@ -96,13 +97,13 @@ _Static_assert(offsetof(struct proc, p_emuldata) == 0x4b8,
     "struct proc KBI p_emuldata");
 #endif
 #ifdef __i386__
-_Static_assert(offsetof(struct thread, td_flags) == 0x9c,
+_Static_assert(offsetof(struct thread, td_flags) == 0x98,
     "struct thread KBI td_flags");
-_Static_assert(offsetof(struct thread, td_pflags) == 0xa4,
+_Static_assert(offsetof(struct thread, td_pflags) == 0xa0,
     "struct thread KBI td_pflags");
-_Static_assert(offsetof(struct thread, td_frame) == 0x2ec,
+_Static_assert(offsetof(struct thread, td_frame) == 0x2e4,
     "struct thread KBI td_frame");
-_Static_assert(offsetof(struct thread, td_emuldata) == 0x338,
+_Static_assert(offsetof(struct thread, td_emuldata) == 0x330,
     "struct thread KBI td_emuldata");
 _Static_assert(offsetof(struct proc, p_flag) == 0x68,
     "struct proc KBI p_flag");
@@ -411,7 +412,6 @@ thread_alloc(int pages)
 		return (NULL);
 	}
 	cpu_thread_alloc(td);
-	vm_domain_policy_init(&td->td_vm_dom_policy);
 	return (td);
 }
 
@@ -441,7 +441,6 @@ thread_free(struct thread *td)
 	cpu_thread_free(td);
 	if (td->td_kstack != 0)
 		vm_thread_dispose(td);
-	vm_domain_policy_cleanup(&td->td_vm_dom_policy);
 	callout_drain(&td->td_slpcallout);
 	uma_zfree(thread_zone, td);
 }
@@ -1263,3 +1262,12 @@ tidhash_remove(struct thread *td)
 	LIST_REMOVE(td, td_hash);
 	rw_wunlock(&tidhash_lock);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "pointer_integrity"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2008 The FreeBSD Foundation
  * Copyright (c) 2009-2010 Bjoern A. Zeeb <bz@FreeBSD.org>
  * All rights reserved.
@@ -1027,3 +1029,13 @@ static moduledata_t epair_mod = {
 
 DECLARE_MODULE(if_epair, epair_mod, SI_SUB_PSEUDO, SI_ORDER_MIDDLE);
 MODULE_VERSION(if_epair, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

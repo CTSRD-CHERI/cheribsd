@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2003 Alan L. Cox <alc@cs.rice.edu>
  * All rights reserved.
  *
@@ -42,7 +44,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/vmparam.h>
 
 void *
-uma_small_alloc(uma_zone_t zone, vm_size_t bytes, u_int8_t *flags, int wait)
+uma_small_alloc(uma_zone_t zone, vm_size_t bytes, int domain, u_int8_t *flags,
+    int wait)
 {
 	vm_paddr_t pa;
 	vm_page_t m;
@@ -60,7 +63,8 @@ uma_small_alloc(uma_zone_t zone, vm_size_t bytes, u_int8_t *flags, int wait)
 #ifdef MIPS64_NEW_PMAP
 		m = vm_page_alloc(NULL, 0, pflags | VM_ALLOC_NOOBJ);
 #else /* ! MIPS64_NEW_PMAP */
-		m = vm_page_alloc_freelist(VM_FREELIST_DIRECT, pflags);
+		m = vm_page_alloc_freelist_domain(domain, VM_FREELIST_DIRECT,
+		    pflags);
 #endif /* ! MIPS64_NEW_PMAP */
 #ifndef __mips_n64
 		if (m == NULL && vm_page_reclaim_contig(pflags, 1,
@@ -98,3 +102,12 @@ uma_small_free(void *mem, vm_size_t size, u_int8_t flags)
 	vm_page_free(m);
 	atomic_subtract_int(&vm_cnt.v_wire_count, 1);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "platform"
+//   ]
+// }
+// CHERI CHANGES END

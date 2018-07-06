@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -2733,3 +2735,12 @@ sysctl_hw_sf_int_mod(SYSCTL_HANDLER_ARGS)
 
 	return (sysctl_int_range(oidp, arg1, arg2, req, SF_IM_MIN, SF_IM_MAX));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

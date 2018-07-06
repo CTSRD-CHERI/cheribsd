@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: (BSD-3-Clause AND MIT-CMU)
+ *
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -115,9 +117,7 @@ __FBSDID("$FreeBSD$");
  * space.
  */
 int
-kernacc(addr, len, rw)
-	void *addr;
-	int len, rw;
+kernacc(void *addr, int len, int rw)
 {
 	boolean_t rv;
 	vm_offset_t saddr, eaddr;
@@ -688,12 +688,8 @@ intr_prof_stack_use(struct thread *td, struct trapframe *frame)
  * to user mode to avoid stack copying and relocation problems.
  */
 int
-vm_forkproc(td, p2, td2, vm2, flags)
-	struct thread *td;
-	struct proc *p2;
-	struct thread *td2;
-	struct vmspace *vm2;
-	int flags;
+vm_forkproc(struct thread *td, struct proc *p2, struct thread *td2,
+    struct vmspace *vm2, int flags)
 {
 	vm_map_t map2;
 	vm_map_entry_t entry;
@@ -770,3 +766,13 @@ kick_proc0(void)
 
 	wakeup(&proc0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "support",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -3296,3 +3298,12 @@ xl_setwol(struct xl_softc *sc)
 	pci_write_config(sc->xl_dev,
 	    sc->xl_pmcap + PCIR_POWER_STATUS, pmstat, 2);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

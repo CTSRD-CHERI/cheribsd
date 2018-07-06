@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: ISC
+ *
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr) and
  * Niels Provos (provos@physnet.uni-hamburg.de).
@@ -316,3 +318,13 @@ static moduledata_t pflog_mod = { pflogname, pflog_modevent, 0 };
 DECLARE_MODULE(pflog, pflog_mod, SI_SUB_PROTO_FIREWALL, SI_ORDER_ANY);
 MODULE_VERSION(pflog, PFLOG_MODVER);
 MODULE_DEPEND(pflog, pf, PF_MODVER, PF_MODVER, PF_MODVER);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

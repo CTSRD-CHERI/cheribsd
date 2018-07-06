@@ -1061,3 +1061,12 @@ done:
 
 	return (AVL_NODE2DATA(node, off));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "pointer_bit_flags"
+//   ]
+// }
+// CHERI CHANGES END

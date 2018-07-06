@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2012 Chelsio Communications, Inc.
  * All rights reserved.
  * Written by: Navdeep Parhar <np@FreeBSD.org>
@@ -1958,3 +1960,13 @@ t4_ddp_mod_unload(void)
 	t4_register_cpl_handler(CPL_RX_DDP_COMPLETE, NULL);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

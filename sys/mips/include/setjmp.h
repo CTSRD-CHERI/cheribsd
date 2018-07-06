@@ -1,6 +1,8 @@
 /* From: NetBSD: setjmp.h,v 1.2 1997/04/06 08:47:41 cgd Exp */
 
 /*-
+ * SPDX-License-Identifier: MIT-CMU
+ *
  * Copyright (c) 1994, 1995 Carnegie-Mellon University.
  * All rights reserved.
  *
@@ -80,3 +82,13 @@ typedef struct _jmp_buf { _JBTYPE _jb[_JBLEN + 1]; } jmp_buf[1];
 #endif /* _LOCORE */
 
 #endif /* _MACHINE_SETJMP_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

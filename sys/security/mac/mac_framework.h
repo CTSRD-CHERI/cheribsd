@@ -468,3 +468,12 @@ void	mac_vnode_relabel(struct ucred *cred, struct vnode *vp,
 int	vop_stdsetlabel_ea(struct vop_setlabel_args *ap);
 
 #endif /* !_SECURITY_MAC_MAC_FRAMEWORK_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

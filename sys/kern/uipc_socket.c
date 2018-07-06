@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1988, 1990, 1993
  *	The Regents of the University of California.
  * Copyright (c) 2004 The FreeBSD Foundation
@@ -4198,3 +4200,12 @@ so_unlock(struct socket *so)
 
 	SOCK_UNLOCK(so);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -2456,9 +2458,14 @@ struct pathconf_args {
 int
 sys_pathconf(struct thread *td, struct pathconf_args *uap)
 {
+	long value;
+	int error;
 
-	return (kern_pathconf(td, __USER_CAP_STR(uap->path),
-	    UIO_USERSPACE, uap->name, FOLLOW));
+	error = kern_pathconf(td, __USER_CAP_STR(uap->path), UIO_USERSPACE,
+	    uap->name, FOLLOW, &value);
+	if (error == 0)
+		td->td_retval[0] = value;
+	return (error);
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -2470,14 +2477,19 @@ struct lpathconf_args {
 int
 sys_lpathconf(struct thread *td, struct lpathconf_args *uap)
 {
+	long value;
+	int error;
 
-	return (kern_pathconf(td, __USER_CAP_STR(uap->path),
-	    UIO_USERSPACE, uap->name, NOFOLLOW));
+	error = kern_pathconf(td, __USER_CAP_STR(uap->path), UIO_USERSPACE,
+	    uap->name, NOFOLLOW, &value);
+	if (error == 0)
+		td->td_retval[0] = value;
+	return (error);
 }
 
 int
 kern_pathconf(struct thread *td, const char * __capability path,
-    enum uio_seg pathseg, int name, u_long flags)
+    enum uio_seg pathseg, int name, u_long flags, long *valuep)
 {
 	struct nameidata nd;
 	int error;
@@ -2488,7 +2500,7 @@ kern_pathconf(struct thread *td, const char * __capability path,
 		return (error);
 	NDFREE(&nd, NDF_ONLY_PNBUF);
 
-	error = VOP_PATHCONF(nd.ni_vp, name, td->td_retval);
+	error = VOP_PATHCONF(nd.ni_vp, name, valuep);
 	vput(nd.ni_vp);
 	return (error);
 }
@@ -4742,3 +4754,14 @@ sys_posix_fadvise(struct thread *td, struct posix_fadvise_args *uap)
 	    uap->advice);
 	return (kern_posix_error(td, error));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

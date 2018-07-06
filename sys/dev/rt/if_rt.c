@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2015-2016, Stanislav Galabov
  * Copyright (c) 2014, Aleksandr A. Mityaev
  * Copyright (c) 2011, Aleksandr Rybalko
@@ -2946,3 +2948,12 @@ rtmdio_detach(device_t dev)
 	return(0);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

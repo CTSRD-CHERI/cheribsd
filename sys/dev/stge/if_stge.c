@@ -1,6 +1,8 @@
 /*	$NetBSD: if_stge.c,v 1.32 2005/12/11 12:22:49 christos Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ *
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -2603,3 +2605,12 @@ sysctl_hw_stge_rxint_dmawait(SYSCTL_HANDLER_ARGS)
 	return (sysctl_int_range(oidp, arg1, arg2, req,
 	    STGE_RXINT_DMAWAIT_MIN, STGE_RXINT_DMAWAIT_MAX));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

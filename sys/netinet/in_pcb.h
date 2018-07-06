@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1990, 1993
  *	The Regents of the University of California.
  * Copyright (c) 2010-2011 Juniper Networks, Inc.
@@ -768,3 +770,12 @@ void	in_pcboutput_eagain(struct inpcb *);
 #endif /* _KERNEL */
 
 #endif /* !_NETINET_IN_PCB_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "pointer_integrity"
+//   ]
+// }
+// CHERI CHANGES END

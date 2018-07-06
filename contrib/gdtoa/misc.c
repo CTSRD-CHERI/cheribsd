@@ -28,11 +28,12 @@ THIS SOFTWARE.
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180530,
+ *   "updated": 20180629,
+ *   "target_type": "lib",
  *   "changes": [
  *     "pointer_size"
  *   ],
- *   "change_comment": "pointers may be larger than doubles",
+ *   "change_comment": "pointers may be larger than doubles"
  * }
  * CHERI CHANGES END
  */

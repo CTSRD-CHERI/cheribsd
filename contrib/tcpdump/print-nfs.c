@@ -650,17 +650,15 @@ _nfsreq_print_noaddr(netdissect_options *ndo,
 		if ((dp = parsereq(ndo, rp, length)) != NULL &&
 		    (dp = parsefh(ndo, dp, v3)) != NULL) {
 			if (v3) {
-				ND_TCHECK(dp[2]);
+				ND_TCHECK(dp[4]);
 				ND_PRINT((ndo, " %u (%u) bytes @ %" PRIu64,
 						EXTRACT_32BITS(&dp[4]),
 						EXTRACT_32BITS(&dp[2]),
 						EXTRACT_64BITS(&dp[0])));
 				if (ndo->ndo_vflag) {
-					dp += 3;
-					ND_TCHECK(dp[0]);
 					ND_PRINT((ndo, " <%s>",
 						tok2str(nfsv3_writemodes,
-							NULL, EXTRACT_32BITS(dp))));
+							NULL, EXTRACT_32BITS(&dp[3]))));
 				}
 			} else {
 				ND_TCHECK(dp[3]);
@@ -831,11 +829,15 @@ nfs_printfh(netdissect_options *ndo,
 
 	if (sfsname) {
 		/* file system ID is ASCII, not numeric, for this server OS */
-		static char temp[NFSX_V3FHMAX+1];
+		char temp[NFSX_V3FHMAX+1];
+		u_int stringlen;
 
 		/* Make sure string is null-terminated */
-		strncpy(temp, sfsname, NFSX_V3FHMAX);
-		temp[sizeof(temp) - 1] = '\0';
+		stringlen = len;
+		if (stringlen > NFSX_V3FHMAX)
+			stringlen = NFSX_V3FHMAX;
+		strncpy(temp, sfsname, stringlen);
+		temp[stringlen] = '\0';
 		/* Remove trailing spaces */
 		spacep = strchr(temp, ' ');
 		if (spacep)
@@ -890,7 +892,7 @@ xid_map_enter(netdissect_options *ndo,
 	const struct ip6_hdr *ip6 = NULL;
 	struct xid_map_entry *xmep;
 
-	if (!ND_TTEST(rp->rm_call.cb_vers))
+	if (!ND_TTEST(rp->rm_call.cb_proc))
 		return (0);
 	switch (IP_V((const struct ip *)bp)) {
 	case 4:
@@ -1024,11 +1026,11 @@ parserep(netdissect_options *ndo,
 	 * skip past the ar_verf credentials.
 	 */
 	dp += (len + (2*sizeof(uint32_t) + 3)) / sizeof(uint32_t);
-	ND_TCHECK2(dp[0], 0);
 
 	/*
 	 * now we can check the ar_stat field
 	 */
+	ND_TCHECK(dp[0]);
 	astat = (enum sunrpc_accept_stat) EXTRACT_32BITS(dp);
 	if (astat != SUNRPC_SUCCESS) {
 		ND_PRINT((ndo, " %s", tok2str(sunrpc_str, "ar_stat %d", astat)));
@@ -1265,6 +1267,7 @@ static const uint32_t *
 parse_wcc_attr(netdissect_options *ndo,
                const uint32_t *dp)
 {
+	/* Our caller has already checked this */
 	ND_PRINT((ndo, " sz %" PRIu64, EXTRACT_64BITS(&dp[0])));
 	ND_PRINT((ndo, " mtime %u.%06u ctime %u.%06u",
 	       EXTRACT_32BITS(&dp[2]), EXTRACT_32BITS(&dp[3]),
@@ -1533,8 +1536,10 @@ interp_reply(netdissect_options *ndo,
 			ND_PRINT((ndo, " attr:"));
 		if (!(dp = parse_post_op_attr(ndo, dp, ndo->ndo_vflag)))
 			break;
-		if (!er)
+		if (!er) {
+			ND_TCHECK(dp[0]);
 			ND_PRINT((ndo, " c %04x", EXTRACT_32BITS(&dp[0])));
+		}
 		return;
 
 	case NFSPROC_READLINK:

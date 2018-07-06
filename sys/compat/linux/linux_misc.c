@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2002 Doug Rabson
  * Copyright (c) 1994-1995 Søren Schmidt
  * All rights reserved.
@@ -2556,3 +2558,14 @@ linux_mincore(struct thread *td, struct linux_mincore_args *args)
 	return (kern_mincore(td, args->start, args->len,
 	    __USER_CAP(args->vec, args->len)));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

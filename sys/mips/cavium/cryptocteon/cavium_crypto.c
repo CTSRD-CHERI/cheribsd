@@ -1,7 +1,9 @@
 /*
  * vim:sw=4 ts=8
  */
-/*
+/*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2009 David McCullough <david.mccullough@securecomputing.com>
  *
  * Copyright (c) 2003-2007 Cavium Networks (support@cavium.com). All rights
@@ -2134,3 +2136,12 @@ octo_aes_cbc_sha1_decrypt(
 }
 
 /****************************************************************************/
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

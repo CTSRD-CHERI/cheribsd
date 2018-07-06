@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2015 Alexander Motin <mav@FreeBSD.org>
  * All rights reserved.
  *
@@ -1002,3 +1004,13 @@ ctl_ha_msg_destroy(struct ctl_softc *ctl_softc)
 	mtx_destroy(&softc->ha_lock);
 	return (CTL_HA_STATUS_SUCCESS);
 };
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

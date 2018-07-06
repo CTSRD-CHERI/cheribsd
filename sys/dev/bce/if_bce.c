@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
  * Copyright (c) 2006-2014 QLogic Corporation
  *
  * Redistribution and use in source and binary forms, with or without
@@ -11609,3 +11611,12 @@ bce_breakpoint(struct bce_softc *sc)
 	breakpoint();
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

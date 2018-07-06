@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1990, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -719,7 +721,7 @@ bpf_check_upgrade(u_long cmd, struct bpf_d *d, struct bpf_insn *fcode, int flen)
 	 * Check if cmd looks like snaplen setting from
 	 * pcap_bpf.c:pcap_open_live().
 	 * Note we're not checking .k value here:
-	 * while pcap_open_live() definitely sets to to non-zero value,
+	 * while pcap_open_live() definitely sets to non-zero value,
 	 * we'd prefer to treat k=0 (deny ALL) case the same way: e.g.
 	 * do not consider upgrading immediately
 	 */
@@ -3066,3 +3068,12 @@ DB_SHOW_COMMAND(bpf_if, db_show_bpf_if)
 	bpf_show_bpf_if((struct bpf_if *)addr);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:misc"
+//   ]
+// }
+// CHERI CHANGES END

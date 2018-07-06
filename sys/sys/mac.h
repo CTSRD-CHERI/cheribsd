@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1999-2002 Robert N. M. Watson
  * Copyright (c) 2001-2005 Networks Associates Technology, Inc.
  * Copyright (c) 2005-2006 SPARTA, Inc.
@@ -109,3 +111,12 @@ __END_DECLS
 #endif /* !_KERNEL */
 
 #endif /* !_SYS_MAC_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

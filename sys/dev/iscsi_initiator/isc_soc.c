@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2005-2010 Daniel Braniss <danny@cs.huji.ac.il>
  * All rights reserved.
  *
@@ -685,3 +687,13 @@ isc_start_receiver(isc_session_t *sp)
 #endif
 	  (isc_in, sp, &sp->soc_proc, 0, 0, "isc_in %d", sp->sid);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

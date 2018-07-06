@@ -1,6 +1,8 @@
 /*	$NetBSD: asm.h,v 1.29 2000/12/14 21:29:51 jeffs Exp $	*/
 
 /*
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -821,3 +823,13 @@ _C_LABEL(x):
 #endif
 
 #endif /* !_MACHINE_ASM_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": "jmpbuf, call frame, etc"
+// }
+// CHERI CHANGES END

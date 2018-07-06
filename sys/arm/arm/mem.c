@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1982, 1986, 1990 The Regents of the University of California.
  * All rights reserved.
@@ -167,3 +169,12 @@ memmmap(struct cdev *dev, vm_ooffset_t offset, vm_paddr_t *paddr,
 	}
 	return (-1);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

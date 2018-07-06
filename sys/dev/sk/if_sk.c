@@ -1,6 +1,8 @@
 /*	$OpenBSD: if_sk.c,v 2.33 2003/08/12 05:23:06 nate Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1997, 1998, 1999, 2000
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -3838,3 +3840,12 @@ sysctl_hw_sk_int_mod(SYSCTL_HANDLER_ARGS)
 {
 	return (sysctl_int_range(oidp, arg1, arg2, req, SK_IM_MIN, SK_IM_MAX));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

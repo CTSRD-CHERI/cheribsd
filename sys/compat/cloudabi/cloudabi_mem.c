@@ -159,3 +159,12 @@ cloudabi_sys_mem_unmap(struct thread *td,
 
 	return (kern_munmap(td, (uintptr_t)uap->mapping, uap->mapping_len));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

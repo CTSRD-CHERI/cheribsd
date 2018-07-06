@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1995 Søren Schmidt
  * All rights reserved.
  *
@@ -1762,3 +1764,13 @@ linux_socketcall(struct thread *td, struct linux_socketcall_args *args)
 	return (ENOSYS);
 }
 #endif /* __i386__ || (__amd64__ && COMPAT_LINUX32) */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

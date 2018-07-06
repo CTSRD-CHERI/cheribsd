@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2008 Marcel Moolenaar
  * All rights reserved.
  *
@@ -72,26 +74,19 @@ void
 machdep_ap_bootstrap(void)
 {
 
-	/* Set PIR */
-	PCPU_SET(pir, mfspr(SPR_PIR));
 	PCPU_SET(awake, 1);
 	__asm __volatile("msync; isync");
 
 	while (ap_letgo == 0)
-		;
-
-	/* Initialize DEC and TB, sync with the BSP values */
-#ifdef __powerpc64__
-	/* Writing to the time base register is hypervisor-privileged */
-	if (mfmsr() & PSL_HV)
-		mttb(ap_timebase);
-#else
-	mttb(ap_timebase);
-#endif
-	decr_ap_init();
+		__asm __volatile("or 27,27,27");
+	__asm __volatile("or 6,6,6");
 
 	/* Give platform code a chance to do anything necessary */
 	platform_smp_ap_init();
+
+	/* Initialize DEC and TB, sync with the BSP values */
+	platform_smp_timebase_sync(ap_timebase, 1);
+	decr_ap_init();
 
 	/* Serialize console output and AP count increment */
 	mtx_lock_spin(&ap_boot_mtx);
@@ -144,7 +139,6 @@ cpu_mp_start(void)
 
 	error = platform_smp_get_bsp(&bsp);
 	KASSERT(error == 0, ("Don't know BSP"));
-	KASSERT(bsp.cr_cpuid == 0, ("%s: cpuid != 0", __func__));
 
 	error = platform_smp_first_cpu(&cpu);
 	while (!error) {
@@ -184,7 +178,10 @@ cpu_mp_announce(void)
 	struct pcpu *pc;
 	int i;
 
-	for (i = 0; i <= mp_maxid; i++) {
+	if (!bootverbose)
+		return;
+
+	CPU_FOREACH(i) {
 		pc = pcpu_find(i);
 		if (pc == NULL)
 			continue;
@@ -225,13 +222,13 @@ cpu_mp_unleash(void *dummy)
 				DELAY(1000);
 
 		} else {
-			PCPU_SET(pir, mfspr(SPR_PIR));
 			pc->pc_awake = 1;
 		}
 		if (pc->pc_awake) {
 			if (bootverbose)
-				printf("Adding CPU %d, pir=%x, awake=%x\n",
-				    pc->pc_cpuid, pc->pc_pir, pc->pc_awake);
+				printf("Adding CPU %d, hwref=%jx, awake=%x\n",
+				    pc->pc_cpuid, (uintmax_t)pc->pc_hwref,
+				    pc->pc_awake);
 			smp_cpus++;
 		} else
 			CPU_SET(pc->pc_cpuid, &stopped_cpus);
@@ -246,13 +243,7 @@ cpu_mp_unleash(void *dummy)
 	/* Let APs continue */
 	atomic_store_rel_int(&ap_letgo, 1);
 
-#ifdef __powerpc64__
-	/* Writing to the time base register is hypervisor-privileged */
-	if (mfmsr() & PSL_HV)
-		mttb(ap_timebase);
-#else
-	mttb(ap_timebase);
-#endif
+	platform_smp_timebase_sync(ap_timebase, 0);
 
 	while (ap_awake < smp_cpus)
 		;

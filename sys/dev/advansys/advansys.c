@@ -7,6 +7,8 @@
  *			ABP940UA, ABP950, ABP960, ABP960U, ABP960UA,
  *			ABP970, ABP970U
  *
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1996-2000 Justin Gibbs.
  * All rights reserved.
  *
@@ -1253,7 +1255,7 @@ adv_attach(adv)
 	 * a transaction and use it for mapping the queue to the
 	 * upper level SCSI transaction it represents.
 	 */
-	adv->ccb_infos = malloc(sizeof(*adv->ccb_infos) * adv->max_openings,
+	adv->ccb_infos = mallocarray(adv->max_openings, sizeof(*adv->ccb_infos),
 				M_DEVBUF, M_NOWAIT);
 
 	if (adv->ccb_infos == NULL)

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2009 Yahoo! Inc.
  * Copyright (c) 2011-2015 LSI Corp.
  * Copyright (c) 2013-2015 Avago Technologies
@@ -826,3 +828,12 @@ SYSCTL_DECL(_hw_mps);
 
 #endif
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

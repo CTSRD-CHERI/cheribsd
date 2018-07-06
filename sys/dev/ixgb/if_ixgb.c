@@ -1,4 +1,5 @@
 /*******************************************************************************
+SPDX-License-Identifier: BSD-3-Clause
 
 Copyright (c) 2001-2004, Intel Corporation
 All rights reserved.
@@ -2531,3 +2532,12 @@ ixgb_sysctl_stats(SYSCTL_HANDLER_ARGS)
 	}
 	return error;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

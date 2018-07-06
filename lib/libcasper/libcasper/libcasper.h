@@ -56,11 +56,13 @@ typedef struct nvlist nvlist_t;
 struct cap_channel;
 
 typedef struct cap_channel cap_channel_t;
+#define	CASPER_SUPPORT	(1)
 #else
 struct cap_channel {
 	int cch_fd;
 };
 typedef struct cap_channel cap_channel_t;
+#define	CASPER_SUPPORT	(0)
 #endif /* ! WITH_CASPER */
 #endif /* ! _CAP_CHANNEL_T_DECLARED */
 
@@ -120,7 +122,15 @@ cap_wrap(int sock)
 #ifdef WITH_CASPER
 int	cap_unwrap(cap_channel_t *chan);
 #else
-#define	cap_unwrap(chan)	(chan->cch_fd)
+static inline int
+cap_unwrap(cap_channel_t *chan)
+{
+	int fd;
+
+	fd = chan->cch_fd;
+	free(chan);
+	return (fd);
+}
 #endif
 
 /*

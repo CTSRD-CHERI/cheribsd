@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2000 Dag-Erling Coïdan Smørgrav
  * Copyright (c) 1999 Pierre Beyssac
  * Copyright (c) 1993 Jan-Simon Pendry
@@ -1661,3 +1663,12 @@ MODULE_DEPEND(linprocfs, linux, 1, 1, 1);
 MODULE_DEPEND(linprocfs, procfs, 1, 1, 1);
 MODULE_DEPEND(linprocfs, sysvmsg, 1, 1, 1);
 MODULE_DEPEND(linprocfs, sysvsem, 1, 1, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

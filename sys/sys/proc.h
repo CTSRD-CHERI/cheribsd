@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1986, 1989, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -60,11 +62,18 @@
 #include <sys/time.h>			/* For structs itimerval, timeval. */
 #else
 #include <sys/pcpu.h>
+#include <sys/systm.h>
 #endif
 #include <sys/ucontext.h>
 #include <sys/ucred.h>
-#include <sys/_vm_domain.h>
+#include <sys/types.h>
+#include <sys/domainset.h>
+
 #include <machine/proc.h>		/* Machine-dependent proc substruct. */
+#ifdef _KERNEL
+#include <machine/cpu.h>
+#endif
+
 
 /*
  * One structure allocated per session.
@@ -177,11 +186,14 @@ struct procdesc;
 struct racct;
 struct sbuf;
 struct sleepqueue;
+struct socket;
 struct syscall_args;
 struct td_sched;
 struct thread;
 struct trapframe;
 struct turnstile;
+struct vm_map;
+struct vm_map_entry;
 
 /*
  * XXX: Does this belong in resource.h or resourcevar.h instead?
@@ -218,12 +230,12 @@ struct thread {
 	TAILQ_ENTRY(thread) td_lockq;	/* (t) Lock queue. */
 	LIST_ENTRY(thread) td_hash;	/* (d) Hash chain. */
 	struct cpuset	*td_cpuset;	/* (t) CPU affinity mask. */
+	struct domainset_ref td_domain;	/* (a) NUMA policy */
 	struct seltd	*td_sel;	/* Select queue/channel. */
 	struct sleepqueue *td_sleepqueue; /* (k) Associated sleep queue. */
 	struct turnstile *td_turnstile;	/* (k) Associated turnstile. */
 	struct rl_q_entry *td_rlqe;	/* (k) Associated range lock entry. */
 	struct umtx_q   *td_umtxq;	/* (c?) Link for when we're blocked. */
-	struct vm_domain_policy td_vm_dom_policy;	/* (c) current numa domain policy */
 	lwpid_t		td_tid;		/* (b) Thread ID. */
 	sigqueue_t	td_sigqueue;	/* (c) Sigs arrived, not delivered. */
 #define	td_siglist	td_sigqueue.sq_signals
@@ -286,7 +298,6 @@ struct thread {
 	pid_t		td_dbg_forked;	/* (c) Child pid for debugger. */
 	u_int		td_vp_reserv;	/* (k) Count of reserved vnodes. */
 	int		td_no_sleeping;	/* (k) Sleeping disabled count. */
-	int		td_dom_rr_idx;	/* (k) RR Numa domain selection. */
 	void		*td_su;		/* (k) FFS SU private */
 	sbintime_t	td_sleeptimo;	/* (t) Sleep timeout. */
 	int		td_rtcgen;	/* (s) rtc_generation of abs. sleep */
@@ -661,7 +672,6 @@ struct proc {
 	uint64_t	p_prev_runtime;	/* (c) Resource usage accounting. */
 	struct racct	*p_racct;	/* (b) Resource accounting. */
 	int		p_throttled;	/* (c) Flag for racct pcpu throttling */
-	struct vm_domain_policy p_vm_dom_policy;	/* (c) process default VM domain, or -1 */
 	/*
 	 * An orphan is the child that has beed re-parented to the
 	 * debugger as a result of attaching to it.  Need to keep
@@ -964,6 +974,7 @@ extern struct proc *initproc, *pageproc; /* Process slots for init, pager. */
 extern struct uma_zone *proc_zone;
 
 struct	proc *pfind(pid_t);		/* Find process by id. */
+struct	proc *pfind_any(pid_t);		/* Find (zombie) process by id. */
 struct	proc *pfind_locked(pid_t pid);
 struct	pgrp *pgfind(pid_t);		/* Find process group by id. */
 struct	proc *zpfind(pid_t);		/* Find zombie process by id. */
@@ -1011,6 +1022,8 @@ void	fork_exit(void (*)(void *, struct trapframe *), void *,
 	    struct trapframe *);
 void	fork_return(struct thread *, struct trapframe *);
 int	inferior(struct proc *p);
+void	kern_proc_vmmap_resident(struct vm_map *map, struct vm_map_entry *entry,
+	    int *resident_count, bool *super);
 void	kern_yield(int);
 void 	kick_proc0(void);
 void	killjobc(void);
@@ -1146,3 +1159,13 @@ td_softdep_cleanup(struct thread *td)
 #endif	/* _KERNEL */
 
 #endif	/* !_SYS_PROC_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "kernel_sig_types",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

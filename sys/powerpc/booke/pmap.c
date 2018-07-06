@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (C) 2007-2009 Semihalf, Rafal Jaworowski <raj@semihalf.com>
  * Copyright (C) 2006 Semihalf, Marian Balakowicz <m8@semihalf.com>
  * All rights reserved.
@@ -378,6 +380,9 @@ static vm_offset_t	mmu_booke_quick_enter_page(mmu_t mmu, vm_page_t m);
 static void		mmu_booke_quick_remove_page(mmu_t mmu, vm_offset_t addr);
 static int		mmu_booke_change_attr(mmu_t mmu, vm_offset_t addr,
     vm_size_t sz, vm_memattr_t mode);
+static int		mmu_booke_map_user_ptr(mmu_t mmu, pmap_t pm,
+    volatile const void *uaddr, void **kaddr, size_t ulen, size_t *klen);
+
 
 static mmu_method_t mmu_booke_methods[] = {
 	/* pmap dispatcher interface */
@@ -430,6 +435,7 @@ static mmu_method_t mmu_booke_methods[] = {
 	MMUMETHOD(mmu_kremove,		mmu_booke_kremove),
 	MMUMETHOD(mmu_unmapdev,		mmu_booke_unmapdev),
 	MMUMETHOD(mmu_change_attr,	mmu_booke_change_attr),
+	MMUMETHOD(mmu_map_user_ptr,	mmu_booke_map_user_ptr),
 
 	/* dumpsys() support */
 	MMUMETHOD(mmu_dumpsys_map,	mmu_booke_dumpsys_map),
@@ -1289,6 +1295,10 @@ pte_remove(mmu_t mmu, pmap_t pmap, vm_offset_t va, u_int8_t flags)
 
 		/* Remove pv_entry from pv_list. */
 		pv_remove(pmap, va, m);
+	} else if (m->md.pv_tracked) {
+		pv_remove(pmap, va, m);
+		if (TAILQ_EMPTY(&m->md.pv_list))
+			m->md.pv_tracked = false;
 	}
 	mtx_lock_spin(&tlbivax_mutex);
 	tlb_miss_lock();
@@ -2089,18 +2099,24 @@ static vm_paddr_t
 mmu_booke_kextract(mmu_t mmu, vm_offset_t va)
 {
 	tlb_entry_t e;
+	vm_paddr_t p = 0;
 	int i;
 
-	/* Check TLB1 mappings */
-	for (i = 0; i < TLB1_ENTRIES; i++) {
-		tlb1_read_entry(&e, i);
-		if (!(e.mas1 & MAS1_VALID))
-			continue;
-		if (va >= e.virt && va < e.virt + e.size)
-			return (e.phys + (va - e.virt));
+	if (va >= VM_MIN_KERNEL_ADDRESS && va <= VM_MAX_KERNEL_ADDRESS)
+		p = pte_vatopa(mmu, kernel_pmap, va);
+	
+	if (p == 0) {
+		/* Check TLB1 mappings */
+		for (i = 0; i < TLB1_ENTRIES; i++) {
+			tlb1_read_entry(&e, i);
+			if (!(e.mas1 & MAS1_VALID))
+				continue;
+			if (va >= e.virt && va < e.virt + e.size)
+				return (e.phys + (va - e.virt));
+		}
 	}
 
-	return (pte_vatopa(mmu, kernel_pmap, va));
+	return (p);
 }
 
 /*
@@ -2253,6 +2269,26 @@ mmu_booke_kremove(mmu_t mmu, vm_offset_t va)
 
 	tlb_miss_unlock();
 	mtx_unlock_spin(&tlbivax_mutex);
+}
+
+/*
+ * Provide a kernel pointer corresponding to a given userland pointer.
+ * The returned pointer is valid until the next time this function is
+ * called in this thread. This is used internally in copyin/copyout.
+ */
+int
+mmu_booke_map_user_ptr(mmu_t mmu, pmap_t pm, volatile const void *uaddr,
+    void **kaddr, size_t ulen, size_t *klen)
+{
+
+	if ((uintptr_t)uaddr + ulen > VM_MAXUSER_ADDRESS + PAGE_SIZE)
+		return (EFAULT);
+
+	*kaddr = (void *)(uintptr_t)uaddr;
+	if (klen)
+		*klen = ulen;
+
+	return (0);
 }
 
 /*
@@ -3867,31 +3903,27 @@ tlb1_read_entry(tlb_entry_t *entry, unsigned int slot)
 	    tsize2size((entry->mas1 & MAS1_TSIZE_MASK) >> MAS1_TSIZE_SHIFT);
 }
 
-/*
- * Write given entry to TLB1 hardware.
- */
+struct tlbwrite_args {
+	tlb_entry_t *e;
+	unsigned int idx;
+};
+
 static void
-tlb1_write_entry(tlb_entry_t *e, unsigned int idx)
+tlb1_write_entry_int(void *arg)
 {
-	register_t msr;
+	struct tlbwrite_args *args = arg;
 	uint32_t mas0;
 
-	//debugf("tlb1_write_entry: s\n");
-
 	/* Select entry */
-	mas0 = MAS0_TLBSEL(1) | MAS0_ESEL(idx);
-	//debugf("tlb1_write_entry: mas0 = 0x%08x\n", mas0);
-
-	msr = mfmsr();
-	__asm __volatile("wrteei 0");
+	mas0 = MAS0_TLBSEL(1) | MAS0_ESEL(args->idx);
 
 	mtspr(SPR_MAS0, mas0);
 	__asm __volatile("isync");
-	mtspr(SPR_MAS1, e->mas1);
+	mtspr(SPR_MAS1, args->e->mas1);
 	__asm __volatile("isync");
-	mtspr(SPR_MAS2, e->mas2);
+	mtspr(SPR_MAS2, args->e->mas2);
 	__asm __volatile("isync");
-	mtspr(SPR_MAS3, e->mas3);
+	mtspr(SPR_MAS3, args->e->mas3);
 	__asm __volatile("isync");
 	switch ((mfpvr() >> 16) & 0xFFFF) {
 	case FSL_E500mc:
@@ -3901,7 +3933,7 @@ tlb1_write_entry(tlb_entry_t *e, unsigned int idx)
 		__asm __volatile("isync");
 		/* FALLTHROUGH */
 	case FSL_E500v2:
-		mtspr(SPR_MAS7, e->mas7);
+		mtspr(SPR_MAS7, args->e->mas7);
 		__asm __volatile("isync");
 		break;
 	default:
@@ -3909,9 +3941,42 @@ tlb1_write_entry(tlb_entry_t *e, unsigned int idx)
 	}
 
 	__asm __volatile("tlbwe; isync; msync");
-	mtmsr(msr);
 
-	//debugf("tlb1_write_entry: e\n");
+}
+
+static void
+tlb1_write_entry_sync(void *arg)
+{
+	/* Empty synchronization point for smp_rendezvous(). */
+}
+
+/*
+ * Write given entry to TLB1 hardware.
+ */
+static void
+tlb1_write_entry(tlb_entry_t *e, unsigned int idx)
+{
+	struct tlbwrite_args args;
+
+	args.e = e;
+	args.idx = idx;
+
+#ifdef SMP
+	if ((e->mas2 & _TLB_ENTRY_SHARED) && smp_started) {
+		mb();
+		smp_rendezvous(tlb1_write_entry_sync,
+		    tlb1_write_entry_int,
+		    tlb1_write_entry_sync, &args);
+	} else
+#endif
+	{
+		register_t msr;
+
+		msr = mfmsr();
+		__asm __volatile("wrteei 0");
+		tlb1_write_entry_int(&args);
+		mtmsr(msr);
+	}
 }
 
 /*
@@ -4183,10 +4248,10 @@ pmap_track_page(pmap_t pmap, vm_offset_t va)
 
 	va = trunc_page(va);
 	pa = pmap_kextract(va);
+	page = PHYS_TO_VM_PAGE(pa);
 
 	rw_wlock(&pvh_global_lock);
 	PMAP_LOCK(pmap);
-	page = PHYS_TO_VM_PAGE(pa);
 
 	TAILQ_FOREACH(pve, &page->md.pv_list, pv_link) {
 		if ((pmap == pve->pv_pmap) && (va == pve->pv_va)) {

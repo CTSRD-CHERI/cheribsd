@@ -152,6 +152,9 @@ SECTIONS
 		KEEP (*(SORT(.fini_array.*)))
 		PROVIDE_HIDDEN (__fini_array_end = .);
 	}
+	__cap_relocs : {
+		KEEP(*(__cap_relocs))
+	}
 	.bss ALIGN(CAP_ALIGN): {
 		*(.bss)
 	}

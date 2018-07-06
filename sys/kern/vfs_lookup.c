@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -506,7 +508,7 @@ namei(struct nameidata *ndp)
 			error = ENOENT;
 			break;
 		}
-		if (linklen + ndp->ni_pathlen >= MAXPATHLEN) {
+		if (linklen + ndp->ni_pathlen > MAXPATHLEN) {
 			if (ndp->ni_pathlen > 1)
 				uma_zfree(namei_zone, cp);
 			error = ENAMETOOLONG;
@@ -1451,3 +1453,14 @@ keeporig:
 		bcopy(ptr, buf, len);
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

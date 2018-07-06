@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2002-2003
  * 	Hidetoshi Shimokawa. All rights reserved.
  *
@@ -393,7 +395,6 @@ fwe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				/* Disable interrupts */
 				fc->set_intr(fc, 0);
 				ifp->if_capenable |= IFCAP_POLLING;
-				ifp->if_capenable |= IFCAP_POLLING_NOCOUNT;
 				return (error);
 			}
 			if (!(ifr_reqcap_get(ifr) & IFCAP_POLLING) &&
@@ -402,7 +403,6 @@ fwe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				/* Enable interrupts. */
 				fc->set_intr(fc, 1);
 				ifp->if_capenable &= ~IFCAP_POLLING;
-				ifp->if_capenable &= ~IFCAP_POLLING_NOCOUNT;
 				return (error);
 			}
 		    }
@@ -630,3 +630,12 @@ static driver_t fwe_driver = {
 DRIVER_MODULE(fwe, firewire, fwe_driver, fwe_devclass, 0, 0);
 MODULE_VERSION(fwe, 1);
 MODULE_DEPEND(fwe, firewire, 1, 1, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

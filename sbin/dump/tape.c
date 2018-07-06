@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1980, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -29,7 +31,8 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180530,
+ *   "updated": 20180629,
+ *   "target_type": "prog",
  *   "changes": [
  *     "pointer_alignment"
  *   ]
@@ -799,7 +802,7 @@ doslave(int cmd, int slave_number)
 		for (trecno = 0; trecno < ntrec;
 		     trecno += p->count, p += p->count) {
 			if (p->dblk) {
-				bread(p->dblk, slp->tblock[trecno],
+				blkread(p->dblk, slp->tblock[trecno],
 					p->count * TP_BSIZE);
 			} else {
 				if (p->count != 1 || atomic(read, cmd,

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2001, 2002 Ian Dowse.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -190,9 +192,11 @@ ufsdirhash_create(struct inode *ip)
 	struct dirhash *ndh;
 	struct dirhash *dh;
 	struct vnode *vp;
+	bool excl;
 
 	ndh = dh = NULL;
 	vp = ip->i_vnode;
+	excl = false;
 	for (;;) {
 		/* Racy check for i_dirhash to prefetch a dirhash structure. */
 		if (ip->i_dirhash == NULL && ndh == NULL) {
@@ -229,8 +233,11 @@ ufsdirhash_create(struct inode *ip)
 		ufsdirhash_hold(dh);
 		VI_UNLOCK(vp);
 
-		/* Acquire a shared lock on existing hashes. */
-		sx_slock(&dh->dh_lock);
+		/* Acquire a lock on existing hashes. */
+		if (excl)
+			sx_xlock(&dh->dh_lock);
+		else
+			sx_slock(&dh->dh_lock);
 
 		/* The hash could've been recycled while we were waiting. */
 		VI_LOCK(vp);
@@ -251,9 +258,10 @@ ufsdirhash_create(struct inode *ip)
 		 * so we can recreate it.  If we fail the upgrade, drop our
 		 * lock and try again.
 		 */
-		if (sx_try_upgrade(&dh->dh_lock))
+		if (excl || sx_try_upgrade(&dh->dh_lock))
 			break;
 		sx_sunlock(&dh->dh_lock);
+		excl = true;
 	}
 	/* Free the preallocated structure if it was not necessary. */
 	if (ndh) {
@@ -341,7 +349,8 @@ ufsdirhash_build(struct inode *ip)
 	struct direct *ep;
 	struct vnode *vp;
 	doff_t bmask, pos;
-	int dirblocks, i, j, memreqd, nblocks, narrays, nslots, slot;
+	int j, memreqd, slot;
+	u_int dirblocks, i, nblocks, narrays, nslots;
 
 	/* Take care of a decreased sysctl value. */
 	while (ufs_dirhashmem > ufs_dirhashmaxmem) {
@@ -407,11 +416,11 @@ ufsdirhash_build(struct inode *ip)
 	 * Use non-blocking mallocs so that we will revert to a linear
 	 * lookup on failure rather than potentially blocking forever.
 	 */
-	dh->dh_hash = malloc(narrays * sizeof(dh->dh_hash[0]),
+	dh->dh_hash = mallocarray(narrays, sizeof(dh->dh_hash[0]),
 	    M_DIRHASH, M_NOWAIT | M_ZERO);
 	if (dh->dh_hash == NULL)
 		goto fail;
-	dh->dh_blkfree = malloc(nblocks * sizeof(dh->dh_blkfree[0]),
+	dh->dh_blkfree = mallocarray(nblocks, sizeof(dh->dh_blkfree[0]),
 	    M_DIRHASH, M_NOWAIT);
 	if (dh->dh_blkfree == NULL)
 		goto fail;

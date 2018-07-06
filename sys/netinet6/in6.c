@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
  *
@@ -2502,3 +2504,12 @@ in6_sin_2_v4mapsin6_in_sock(struct sockaddr **nam)
 	free(*nam, M_SONAME);
 	*nam = (struct sockaddr *)sin6_p;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

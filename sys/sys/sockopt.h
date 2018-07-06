@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -70,3 +72,12 @@ int	so_setsockopt(struct socket *so, int level, int optname,
 	    void *optval, size_t optlen);
 
 #endif /* _SYS_SOCKOPT_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

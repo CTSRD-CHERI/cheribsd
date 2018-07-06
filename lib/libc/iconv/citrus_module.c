@@ -2,6 +2,8 @@
 /* $NetBSD: citrus_module.c,v 1.9 2009/01/11 02:46:24 christos Exp $ */
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
  * Copyright (c)1999, 2000, 2001, 2002 Citrus Project,
  * All rights reserved.
  *
@@ -90,7 +92,8 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180530,
+ *   "updated": 20180629,
+ *   "target_type": "lib",
  *   "changes": [
  *     "pointer_provenance"
  *   ],

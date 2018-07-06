@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -476,20 +478,8 @@ vop_stdpathconf(ap)
 		case _PC_ASYNC_IO:
 			*ap->a_retval = _POSIX_ASYNCHRONOUS_IO;
 			return (0);
-		case _PC_NAME_MAX:
-			*ap->a_retval = NAME_MAX;
-			return (0);
 		case _PC_PATH_MAX:
 			*ap->a_retval = PATH_MAX;
-			return (0);
-		case _PC_LINK_MAX:
-			*ap->a_retval = LINK_MAX;
-			return (0);
-		case _PC_PIPE_BUF:
-			*ap->a_retval = PIPE_BUF;
-			return (0);
-		case _PC_CHOWN_RESTRICTED:
-			*ap->a_retval = 1;
 			return (0);
 		default:
 			return (EINVAL);
@@ -1314,3 +1304,14 @@ vfs_stdsysctl(mp, op, req)
 }
 
 /* end of vfs default ops */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

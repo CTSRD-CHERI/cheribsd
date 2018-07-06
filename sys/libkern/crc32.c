@@ -787,3 +787,12 @@ calculate_crc32c(uint32_t crc32c,
 		return (multitable_crc32c(crc32c, buffer, length));
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END

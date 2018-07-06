@@ -298,7 +298,7 @@ static struct if_shared_ctx bnxt_sctx_init = {
 	.isc_magic = IFLIB_MAGIC,
 	.isc_driver = &bnxt_iflib_driver,
 	.isc_nfl = 2,				// Number of Free Lists
-	.isc_flags = IFLIB_HAS_RXCQ | IFLIB_HAS_TXCQ,
+	.isc_flags = IFLIB_HAS_RXCQ | IFLIB_HAS_TXCQ | IFLIB_NEED_ETHER_PAD,
 	.isc_q_align = PAGE_SIZE,
 	.isc_tx_maxsize = BNXT_TSO_SIZE,
 	.isc_tx_maxsegsize = BNXT_TSO_SIZE,
@@ -351,7 +351,7 @@ bnxt_tx_queues_alloc(if_ctx_t ctx, caddr_t *vaddrs,
 
 	softc = iflib_get_softc(ctx);
 
-	softc->tx_cp_rings = malloc(sizeof(struct bnxt_cp_ring) * ntxqsets,
+	softc->tx_cp_rings = mallocarray(ntxqsets, sizeof(struct bnxt_cp_ring),
 	    M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (!softc->tx_cp_rings) {
 		device_printf(iflib_get_dev(ctx),
@@ -359,7 +359,7 @@ bnxt_tx_queues_alloc(if_ctx_t ctx, caddr_t *vaddrs,
 		rc = ENOMEM;
 		goto cp_alloc_fail;
 	}
-	softc->tx_rings = malloc(sizeof(struct bnxt_ring) * ntxqsets,
+	softc->tx_rings = mallocarray(ntxqsets, sizeof(struct bnxt_ring),
 	    M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (!softc->tx_rings) {
 		device_printf(iflib_get_dev(ctx),
@@ -446,7 +446,7 @@ bnxt_rx_queues_alloc(if_ctx_t ctx, caddr_t *vaddrs,
 
 	softc = iflib_get_softc(ctx);
 
-	softc->rx_cp_rings = malloc(sizeof(struct bnxt_cp_ring) * nrxqsets,
+	softc->rx_cp_rings = mallocarray(nrxqsets, sizeof(struct bnxt_cp_ring),
 	    M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (!softc->rx_cp_rings) {
 		device_printf(iflib_get_dev(ctx),
@@ -454,7 +454,7 @@ bnxt_rx_queues_alloc(if_ctx_t ctx, caddr_t *vaddrs,
 		rc = ENOMEM;
 		goto cp_alloc_fail;
 	}
-	softc->rx_rings = malloc(sizeof(struct bnxt_ring) * nrxqsets,
+	softc->rx_rings = mallocarray(nrxqsets, sizeof(struct bnxt_ring),
 	    M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (!softc->rx_rings) {
 		device_printf(iflib_get_dev(ctx),
@@ -462,7 +462,7 @@ bnxt_rx_queues_alloc(if_ctx_t ctx, caddr_t *vaddrs,
 		rc = ENOMEM;
 		goto ring_alloc_fail;
 	}
-	softc->ag_rings = malloc(sizeof(struct bnxt_ring) * nrxqsets,
+	softc->ag_rings = mallocarray(nrxqsets, sizeof(struct bnxt_ring),
 	    M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (!softc->ag_rings) {
 		device_printf(iflib_get_dev(ctx),
@@ -470,7 +470,7 @@ bnxt_rx_queues_alloc(if_ctx_t ctx, caddr_t *vaddrs,
 		rc = ENOMEM;
 		goto ag_alloc_fail;
 	}
-	softc->grp_info = malloc(sizeof(struct bnxt_grp_info) * nrxqsets,
+	softc->grp_info = mallocarray(nrxqsets, sizeof(struct bnxt_grp_info),
 	    M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (!softc->grp_info) {
 		device_printf(iflib_get_dev(ctx),
@@ -540,9 +540,10 @@ bnxt_rx_queues_alloc(if_ctx_t ctx, caddr_t *vaddrs,
 		softc->rx_rings[i].paddr = paddrs[i * nrxqs + 1];
 
 		/* Allocate the TPA start buffer */
-		softc->rx_rings[i].tpa_start = malloc(sizeof(struct bnxt_full_tpa_start) *
-	    		(RX_TPA_START_CMPL_AGG_ID_MASK >> RX_TPA_START_CMPL_AGG_ID_SFT),
-	    		M_DEVBUF, M_NOWAIT | M_ZERO);
+		softc->rx_rings[i].tpa_start = mallocarray(
+		    RX_TPA_START_CMPL_AGG_ID_MASK >> RX_TPA_START_CMPL_AGG_ID_SFT,
+		    sizeof(struct bnxt_full_tpa_start),	M_DEVBUF,
+		    M_NOWAIT | M_ZERO);
 		if (softc->rx_rings[i].tpa_start == NULL) {
 			rc = -ENOMEM;
 			device_printf(softc->dev,
@@ -643,6 +644,23 @@ cp_alloc_fail:
 	return rc;
 }
 
+static void bnxt_free_hwrm_short_cmd_req(struct bnxt_softc *softc)
+{
+	if (softc->hwrm_short_cmd_req_addr.idi_vaddr)
+		iflib_dma_free(&softc->hwrm_short_cmd_req_addr);
+	softc->hwrm_short_cmd_req_addr.idi_vaddr = NULL;
+}
+
+static int bnxt_alloc_hwrm_short_cmd_req(struct bnxt_softc *softc)
+{
+	int rc;
+
+	rc = iflib_dma_alloc(softc->ctx, softc->hwrm_max_req_len,
+	    &softc->hwrm_short_cmd_req_addr, BUS_DMA_NOWAIT);
+
+	return rc;
+}
+
 /* Device setup and teardown */
 static int
 bnxt_attach_pre(if_ctx_t ctx)
@@ -714,19 +732,28 @@ bnxt_attach_pre(if_ctx_t ctx)
 		goto ver_fail;
 	}
 
-	/* Get NVRAM info */
-	softc->nvm_info = malloc(sizeof(struct bnxt_nvram_info),
-	    M_DEVBUF, M_NOWAIT | M_ZERO);
-	if (softc->nvm_info == NULL) {
-		rc = ENOMEM;
-		device_printf(softc->dev,
-		    "Unable to allocate space for NVRAM info\n");
-		goto nvm_alloc_fail;
+	if (softc->flags & BNXT_FLAG_SHORT_CMD) {
+		rc = bnxt_alloc_hwrm_short_cmd_req(softc);
+		if (rc)
+			goto hwrm_short_cmd_alloc_fail;
 	}
-	rc = bnxt_hwrm_nvm_get_dev_info(softc, &softc->nvm_info->mfg_id,
-	    &softc->nvm_info->device_id, &softc->nvm_info->sector_size,
-	    &softc->nvm_info->size, &softc->nvm_info->reserved_size,
-	    &softc->nvm_info->available_size);
+
+	/* Get NVRAM info */
+	if (BNXT_PF(softc)) {
+		softc->nvm_info = malloc(sizeof(struct bnxt_nvram_info),
+		    M_DEVBUF, M_NOWAIT | M_ZERO);
+		if (softc->nvm_info == NULL) {
+			rc = ENOMEM;
+			device_printf(softc->dev,
+			    "Unable to allocate space for NVRAM info\n");
+			goto nvm_alloc_fail;
+		}
+
+		rc = bnxt_hwrm_nvm_get_dev_info(softc, &softc->nvm_info->mfg_id,
+		    &softc->nvm_info->device_id, &softc->nvm_info->sector_size,
+		    &softc->nvm_info->size, &softc->nvm_info->reserved_size,
+		    &softc->nvm_info->available_size);
+	}
 
 	/* Register the driver with the FW */
 	rc = bnxt_hwrm_func_drv_rgtr(softc);
@@ -793,6 +820,7 @@ bnxt_attach_pre(if_ctx_t ctx)
 	scctx->isc_tx_tso_size_max = BNXT_TSO_SIZE;
 	scctx->isc_tx_tso_segsize_max = BNXT_TSO_SIZE;
 	scctx->isc_vectors = softc->func.max_cp_rings;
+	scctx->isc_min_frame_size = BNXT_MIN_FRAME_SIZE;
 	scctx->isc_txrx = &bnxt_txrx;
 
 	if (scctx->isc_nrxd[0] <
@@ -858,9 +886,11 @@ bnxt_attach_pre(if_ctx_t ctx)
 	rc = bnxt_init_sysctl_ctx(softc);
 	if (rc)
 		goto init_sysctl_failed;
-	rc = bnxt_create_nvram_sysctls(softc->nvm_info);
-	if (rc)
-		goto failed;
+	if (BNXT_PF(softc)) {
+		rc = bnxt_create_nvram_sysctls(softc->nvm_info);
+		if (rc)
+			goto failed;
+	}
 
 	arc4rand(softc->vnic_info.rss_hash_key, HW_HASH_KEY_SIZE, 0);
 	softc->vnic_info.rss_hash_type =
@@ -893,8 +923,11 @@ failed:
 init_sysctl_failed:
 	bnxt_hwrm_func_drv_unrgtr(softc, false);
 drv_rgtr_fail:
-	free(softc->nvm_info, M_DEVBUF);
+	if (BNXT_PF(softc))
+		free(softc->nvm_info, M_DEVBUF);
 nvm_alloc_fail:
+	bnxt_free_hwrm_short_cmd_req(softc);
+hwrm_short_cmd_alloc_fail:
 ver_fail:
 	free(softc->ver_info, M_DEVBUF);
 ver_alloc_fail:
@@ -962,10 +995,12 @@ bnxt_detach(if_ctx_t ctx)
 	for (i = 0; i < softc->nrxqsets; i++)
 		free(softc->rx_rings[i].tpa_start, M_DEVBUF);
 	free(softc->ver_info, M_DEVBUF);
-	free(softc->nvm_info, M_DEVBUF);
+	if (BNXT_PF(softc))
+		free(softc->nvm_info, M_DEVBUF);
 
 	bnxt_hwrm_func_drv_unrgtr(softc, false);
 	bnxt_free_hwrm_dma_mem(softc);
+	bnxt_free_hwrm_short_cmd_req(softc);
 	BNXT_HWRM_LOCK_DESTROY(softc);
 
 	pci_disable_busmaster(softc->dev);
@@ -2051,8 +2086,13 @@ bnxt_add_media_types(struct bnxt_softc *softc)
 		break;
 
 	case HWRM_PORT_PHY_QCFG_OUTPUT_PHY_TYPE_UNKNOWN:
-        default:
 		/* Only Autoneg is supported for TYPE_UNKNOWN */
+		device_printf(softc->dev, "Unknown phy type\n");
+		break;
+
+        default:
+		/* Only Autoneg is supported for new phy type values */
+		device_printf(softc->dev, "phy type %d not supported by driver\n", phy_type);
 		break;
 	}
 
@@ -2190,6 +2230,10 @@ bnxt_report_link(struct bnxt_softc *softc)
 	link_info->last_flow_ctrl.tx = link_info->flow_ctrl.tx;
 	link_info->last_flow_ctrl.rx = link_info->flow_ctrl.rx;
 	link_info->last_flow_ctrl.autoneg = link_info->flow_ctrl.autoneg;
+	/* update media types */
+	ifmedia_removeall(softc->media);
+	bnxt_add_media_types(softc);
+	ifmedia_set(softc->media, IFM_ETHER | IFM_AUTO);
 }
 
 static int
@@ -2453,3 +2497,12 @@ bnxt_get_wol_settings(struct bnxt_softc *softc)
 		wol_handle = bnxt_hwrm_get_wol_fltrs(softc, wol_handle);
 	} while (wol_handle && wol_handle != BNXT_NO_MORE_WOL_FILTERS);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

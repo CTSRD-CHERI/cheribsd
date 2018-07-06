@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1994-1995 Søren Schmidt
  * All rights reserved.
  *
@@ -717,3 +719,12 @@ linux_syncfs(struct thread *td, struct linux_syncfs_args *args)
 	vrele(vp);
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

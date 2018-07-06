@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1997, 1998, 1999, 2000-2003
  *	Bill Paul <wpaul@windriver.com>.  All rights reserved.
  *
@@ -1506,3 +1508,12 @@ axe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

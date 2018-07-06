@@ -1,4 +1,4 @@
-/*
+/*-
  * $FreeBSD$
  *
  * Copyright (c) 2002-2004 David Boggs. <boggs@boggs.palo-alto.ca.us>
@@ -3821,7 +3821,6 @@ setup_ifnet(struct ifnet *ifp)
 
 # if defined(DEVICE_POLLING)
   ifp->if_capabilities |= IFCAP_POLLING;
-  ifp->if_capenable    |= IFCAP_POLLING_NOCOUNT;
 # endif
 
   if_initname(ifp, device_get_name(sc->dev), device_get_unit(sc->dev));
@@ -4590,3 +4589,12 @@ MODULE_DEPEND(lmc, sppp, 1, 1, 1);
 /* This is the I/O configuration interface for BSD/OS. */
 
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

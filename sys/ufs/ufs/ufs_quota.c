@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1990, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -1858,3 +1860,14 @@ dqb32_dqb64(const struct dqblk32 *dqb32, struct dqblk64 *dqb64)
 	dqb64->dqb_btime = dqb32->dqb_btime;
 	dqb64->dqb_itime = dqb32->dqb_itime;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

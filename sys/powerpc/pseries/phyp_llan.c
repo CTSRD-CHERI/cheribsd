@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright 2013 Nathan Whitehorn
  * All rights reserved.
  *
@@ -548,3 +550,12 @@ llan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	return (err);
 }
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

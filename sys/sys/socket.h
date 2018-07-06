@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1985, 1986, 1988, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -796,3 +798,13 @@ void so_unlock(struct socket *so);
 
 #endif /* _KERNEL */
 #endif /* !_SYS_SOCKET_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "kiovec_t",
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END

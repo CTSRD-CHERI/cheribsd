@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (C) 2009-2012 Semihalf
  * All rights reserved.
  *
@@ -377,3 +379,13 @@ get_bs(struct chip_swap *swap, uint32_t block, uint8_t writing)
 
 	return (blk_space);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

@@ -78,6 +78,8 @@ __FBSDID("$FreeBSD$");
 #include <netinet/tcp_lro.h>
 #include <netinet/udp.h>
 
+#include <netinet6/ip6_var.h>
+
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
 
@@ -1102,7 +1104,7 @@ nicvf_init_snd_queue(struct nicvf *nic, struct snd_queue *sq, int q_len,
 	}
 
 	/* Allocate send buffers array */
-	sq->snd_buff = malloc(sizeof(*sq->snd_buff) * q_len, M_NICVF,
+	sq->snd_buff = mallocarray(q_len, sizeof(*sq->snd_buff), M_NICVF,
 	    (M_NOWAIT | M_ZERO));
 	if (sq->snd_buff == NULL) {
 		device_printf(nic->dev,
@@ -1712,13 +1714,12 @@ nicvf_sq_disable(struct nicvf *nic, int qidx)
 static void
 nicvf_sq_free_used_descs(struct nicvf *nic, struct snd_queue *sq, int qidx)
 {
-	uint64_t head, tail;
+	uint64_t head;
 	struct snd_buff *snd_buff;
 	struct sq_hdr_subdesc *hdr;
 
 	NICVF_TX_LOCK(sq);
 	head = nicvf_queue_reg_read(nic, NIC_QSET_SQ_0_7_HEAD, qidx) >> 4;
-	tail = nicvf_queue_reg_read(nic, NIC_QSET_SQ_0_7_TAIL, qidx) >> 4;
 	while (sq->head != head) {
 		hdr = (struct sq_hdr_subdesc *)GET_SQ_DESC(sq, sq->head);
 		if (hdr->subdesc_type != SQ_DESC_TYPE_HEADER) {
@@ -1752,7 +1753,7 @@ nicvf_sq_add_hdr_subdesc(struct snd_queue *sq, int qentry,
 	struct tcphdr *th;
 #endif
 	uint16_t etype;
-	int ehdrlen, iphlen, poff;
+	int ehdrlen, iphlen, poff, proto;
 
 	nic = sq->nic;
 
@@ -1776,13 +1777,21 @@ nicvf_sq_add_hdr_subdesc(struct snd_queue *sq, int qentry,
 		etype = ntohs(eh->evl_encap_proto);
 	}
 
+	poff = proto = -1;
 	switch (etype) {
 #ifdef INET6
 	case ETHERTYPE_IPV6:
-		/* ARM64TODO: Add support for IPv6 */
-		hdr->csum_l3 = 0;
-		sq->snd_buff[qentry].mbuf = NULL;
-		return (ENXIO);
+		if (mbuf->m_len < ehdrlen + sizeof(struct ip6_hdr)) {
+			mbuf = m_pullup(mbuf, ehdrlen +sizeof(struct ip6_hdr));
+			sq->snd_buff[qentry].mbuf = NULL;
+			if (mbuf == NULL)
+				return (ENOBUFS);
+		}
+		poff = ip6_lasthdr(mbuf, ehdrlen, IPPROTO_IPV6, &proto);
+		if (poff < 0)
+			return (ENOBUFS);
+		poff += ehdrlen;
+		break;
 #endif
 #ifdef INET
 	case ETHERTYPE_IP:
@@ -1792,75 +1801,73 @@ nicvf_sq_add_hdr_subdesc(struct snd_queue *sq, int qentry,
 			if (mbuf == NULL)
 				return (ENOBUFS);
 		}
+		if (mbuf->m_pkthdr.csum_flags & CSUM_IP)
+			hdr->csum_l3 = 1; /* Enable IP csum calculation */
 
 		ip = (struct ip *)(mbuf->m_data + ehdrlen);
 		iphlen = ip->ip_hl << 2;
 		poff = ehdrlen + iphlen;
-
-		if (mbuf->m_pkthdr.csum_flags != 0) {
-			hdr->csum_l3 = 1; /* Enable IP csum calculation */
-			switch (ip->ip_p) {
-			case IPPROTO_TCP:
-				if ((mbuf->m_pkthdr.csum_flags & CSUM_TCP) == 0)
-					break;
-
-				if (mbuf->m_len < (poff + sizeof(struct tcphdr))) {
-					mbuf = m_pullup(mbuf, poff + sizeof(struct tcphdr));
-					sq->snd_buff[qentry].mbuf = mbuf;
-					if (mbuf == NULL)
-						return (ENOBUFS);
-				}
-				hdr->csum_l4 = SEND_L4_CSUM_TCP;
-				break;
-			case IPPROTO_UDP:
-				if ((mbuf->m_pkthdr.csum_flags & CSUM_UDP) == 0)
-					break;
-
-				if (mbuf->m_len < (poff + sizeof(struct udphdr))) {
-					mbuf = m_pullup(mbuf, poff + sizeof(struct udphdr));
-					sq->snd_buff[qentry].mbuf = mbuf;
-					if (mbuf == NULL)
-						return (ENOBUFS);
-				}
-				hdr->csum_l4 = SEND_L4_CSUM_UDP;
-				break;
-			case IPPROTO_SCTP:
-				if ((mbuf->m_pkthdr.csum_flags & CSUM_SCTP) == 0)
-					break;
-
-				if (mbuf->m_len < (poff + sizeof(struct sctphdr))) {
-					mbuf = m_pullup(mbuf, poff + sizeof(struct sctphdr));
-					sq->snd_buff[qentry].mbuf = mbuf;
-					if (mbuf == NULL)
-						return (ENOBUFS);
-				}
-				hdr->csum_l4 = SEND_L4_CSUM_SCTP;
-				break;
-			default:
-				break;
-			}
-			hdr->l3_offset = ehdrlen;
-			hdr->l4_offset = ehdrlen + iphlen;
-		}
-
-		if ((mbuf->m_pkthdr.tso_segsz != 0) && nic->hw_tso) {
-			/*
-			 * Extract ip again as m_data could have been modified.
-			 */
-			ip = (struct ip *)(mbuf->m_data + ehdrlen);
-			th = (struct tcphdr *)((caddr_t)ip + iphlen);
-
-			hdr->tso = 1;
-			hdr->tso_start = ehdrlen + iphlen + (th->th_off * 4);
-			hdr->tso_max_paysize = mbuf->m_pkthdr.tso_segsz;
-			hdr->inner_l3_offset = ehdrlen - 2;
-			nic->drv_stats.tx_tso++;
-		}
+		proto = ip->ip_p;
 		break;
 #endif
-	default:
-		hdr->csum_l3 = 0;
 	}
+
+#if defined(INET6) || defined(INET)
+	if (poff > 0 && mbuf->m_pkthdr.csum_flags != 0) {
+		switch (proto) {
+		case IPPROTO_TCP:
+			if ((mbuf->m_pkthdr.csum_flags & CSUM_TCP) == 0)
+				break;
+
+			if (mbuf->m_len < (poff + sizeof(struct tcphdr))) {
+				mbuf = m_pullup(mbuf, poff + sizeof(struct tcphdr));
+				sq->snd_buff[qentry].mbuf = mbuf;
+				if (mbuf == NULL)
+					return (ENOBUFS);
+			}
+			hdr->csum_l4 = SEND_L4_CSUM_TCP;
+			break;
+		case IPPROTO_UDP:
+			if ((mbuf->m_pkthdr.csum_flags & CSUM_UDP) == 0)
+				break;
+
+			if (mbuf->m_len < (poff + sizeof(struct udphdr))) {
+				mbuf = m_pullup(mbuf, poff + sizeof(struct udphdr));
+				sq->snd_buff[qentry].mbuf = mbuf;
+				if (mbuf == NULL)
+					return (ENOBUFS);
+			}
+			hdr->csum_l4 = SEND_L4_CSUM_UDP;
+			break;
+		case IPPROTO_SCTP:
+			if ((mbuf->m_pkthdr.csum_flags & CSUM_SCTP) == 0)
+				break;
+
+			if (mbuf->m_len < (poff + sizeof(struct sctphdr))) {
+				mbuf = m_pullup(mbuf, poff + sizeof(struct sctphdr));
+				sq->snd_buff[qentry].mbuf = mbuf;
+				if (mbuf == NULL)
+					return (ENOBUFS);
+			}
+			hdr->csum_l4 = SEND_L4_CSUM_SCTP;
+			break;
+		default:
+			break;
+		}
+		hdr->l3_offset = ehdrlen;
+		hdr->l4_offset = poff;
+	}
+
+	if ((mbuf->m_pkthdr.tso_segsz != 0) && nic->hw_tso) {
+		th = (struct tcphdr *)((caddr_t)(mbuf->m_data + poff));
+
+		hdr->tso = 1;
+		hdr->tso_start = poff + (th->th_off * 4);
+		hdr->tso_max_paysize = mbuf->m_pkthdr.tso_segsz;
+		hdr->inner_l3_offset = ehdrlen - 2;
+		nic->drv_stats.tx_tso++;
+	}
+#endif
 
 	return (0);
 }

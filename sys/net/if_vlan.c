@@ -480,7 +480,7 @@ vlan_growhash(struct ifvlantrunk *trunk, int howmuch)
 		return;
 
 	/* M_NOWAIT because we're called with trunk mutex held */
-	hash2 = malloc(sizeof(struct ifvlanhead) * n2, M_VLAN, M_NOWAIT);
+	hash2 = mallocarray(n2, sizeof(struct ifvlanhead), M_VLAN, M_NOWAIT);
 	if (hash2 == NULL) {
 		printf("%s: out of memory -- hash size not changed\n",
 		    __func__);
@@ -2056,3 +2056,13 @@ vlan_snd_tag_alloc(struct ifnet *ifp,
 	return (ifp->if_snd_tag_alloc(ifp, params, ppmt));
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

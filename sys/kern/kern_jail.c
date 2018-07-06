@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1999 Poul-Henning Kamp.
  * Copyright (c) 2008 Bjoern A. Zeeb.
  * Copyright (c) 2009 James Gritton.
@@ -4116,3 +4118,14 @@ DB_SHOW_COMMAND(prison, db_show_prison_command)
 }
 
 #endif /* DDB */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

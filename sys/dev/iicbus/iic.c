@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1998, 2001 Nicolas Souchu
  * All rights reserved.
  *
@@ -498,3 +500,13 @@ iicioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags, struct thread *t
 DRIVER_MODULE(iic, iicbus, iic_driver, iic_devclass, 0, 0);
 MODULE_DEPEND(iic, iicbus, IICBUS_MINVER, IICBUS_PREFVER, IICBUS_MAXVER);
 MODULE_VERSION(iic, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

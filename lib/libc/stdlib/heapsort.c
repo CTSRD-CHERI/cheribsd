@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  * Copyright (c) 2014 David T. Chisnall
@@ -34,11 +36,12 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180530,
+ *   "updated": 20180629,
+ *   "target_type": "lib",
  *   "changes": [
  *     "pointer_integrity"
  *   ],
- *   "change_comment": "memswap",
+ *   "change_comment": "memswap"
  * }
  * CHERI CHANGES END
  */

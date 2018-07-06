@@ -425,3 +425,12 @@ mac_proc_check_wait(struct ucred *cred, struct proc *p)
 
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

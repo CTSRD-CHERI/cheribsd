@@ -360,4 +360,6 @@ MIASM =  \
 	cheriabi_getfsstat.o \
 	cheriabi_fhstatfs.o \
 	cheriabi_mknodat.o \
-	cheriabi_kevent.o
+	cheriabi_kevent.o \
+	cheriabi_cpuset_getdomain.o \
+	cheriabi_cpuset_setdomain.o

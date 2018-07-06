@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011, Bryan Venteicher <bryanv@FreeBSD.org>
  * All rights reserved.
  *
@@ -753,9 +755,9 @@ vtnet_alloc_rxtx_queues(struct vtnet_softc *sc)
 
 	npairs = sc->vtnet_max_vq_pairs;
 
-	sc->vtnet_rxqs = malloc(sizeof(struct vtnet_rxq) * npairs, M_DEVBUF,
+	sc->vtnet_rxqs = mallocarray(npairs, sizeof(struct vtnet_rxq), M_DEVBUF,
 	    M_NOWAIT | M_ZERO);
-	sc->vtnet_txqs = malloc(sizeof(struct vtnet_txq) * npairs, M_DEVBUF,
+	sc->vtnet_txqs = mallocarray(npairs, sizeof(struct vtnet_txq), M_DEVBUF,
 	    M_NOWAIT | M_ZERO);
 	if (sc->vtnet_rxqs == NULL || sc->vtnet_txqs == NULL)
 		return (ENOMEM);
@@ -885,7 +887,8 @@ vtnet_alloc_virtqueues(struct vtnet_softc *sc)
 	if (sc->vtnet_flags & VTNET_FLAG_CTRL_VQ)
 		nvqs++;
 
-	info = malloc(sizeof(struct vq_alloc_info) * nvqs, M_TEMP, M_NOWAIT);
+	info = mallocarray(nvqs, sizeof(struct vq_alloc_info), M_TEMP,
+	    M_NOWAIT);
 	if (info == NULL)
 		return (ENOMEM);
 
@@ -3974,3 +3977,12 @@ vtnet_tunable_int(struct vtnet_softc *sc, const char *knob, int def)
 
 	return (def);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

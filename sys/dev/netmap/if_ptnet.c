@@ -351,7 +351,7 @@ ptnet_attach(device_t dev)
 	sc->num_tx_rings = num_tx_rings;
 
 	/* Allocate and initialize per-queue data structures. */
-	sc->queues = malloc(sizeof(struct ptnet_queue) * sc->num_rings,
+	sc->queues = mallocarray(sc->num_rings, sizeof(struct ptnet_queue),
 			    M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (sc->queues == NULL) {
 		err = ENOMEM;
@@ -2274,3 +2274,12 @@ ptnet_poll(if_t ifp, enum poll_cmd cmd, int budget)
 	return count;
 }
 #endif /* DEVICE_POLLING */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

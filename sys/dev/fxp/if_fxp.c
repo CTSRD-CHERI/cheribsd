@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ *
  * Copyright (c) 1995, David Greenman
  * Copyright (c) 2001 Jonathan Lemon <jlemon@freebsd.org>
  * All rights reserved.
@@ -1623,7 +1625,12 @@ fxp_encap(struct fxp_softc *sc, struct mbuf **m_head)
 		cbp->tbd_number = nseg;
 	/* Configure TSO. */
 	if (m->m_pkthdr.csum_flags & CSUM_TSO) {
-		cbp->tbd[-1].tb_size = htole32(m->m_pkthdr.tso_segsz << 16);
+		/*
+		 * XXX-BD: the first line was cbp->tbd[-1].tb_size which
+		 * is clearly wrong and stomped on three members of cbp.
+		 * This also seems wrong by probably isn't worse...
+		 */
+		cbp->tbd[1].tb_size = htole32(m->m_pkthdr.tso_segsz << 16);
 		cbp->tbd[1].tb_size |= htole32(tcp_payload << 16);
 		cbp->ipcb_ip_schedule |= FXP_IPCB_LARGESEND_ENABLE |
 		    FXP_IPCB_IP_CHECKSUM_ENABLE |
@@ -3258,3 +3265,12 @@ sysctl_hw_fxp_bundle_max(SYSCTL_HANDLER_ARGS)
 
 	return (sysctl_int_range(oidp, arg1, arg2, req, 1, 0xffff));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

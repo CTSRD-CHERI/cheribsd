@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -2041,3 +2043,13 @@ void nfscl_retopts(struct nfsmount *nmp, char *buffer, size_t buflen)
 	nfscl_printoptval(nmp, nmp->nm_retry, ",retrans", &buf, &blen);
 }
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END
