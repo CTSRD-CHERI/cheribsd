@@ -818,6 +818,8 @@
             man3
             ..
             man4
+                aarch64
+                ..
                 amd64
                 ..
                 arm
