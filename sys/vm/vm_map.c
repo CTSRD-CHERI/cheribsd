@@ -4350,8 +4350,14 @@ vmspace_exec(struct proc *p, vm_offset_t minuser, vm_offset_t maxuser)
 	struct vmspace *oldvmspace = p->p_vmspace;
 	struct vmspace *newvmspace;
 
+#if 0
+	/*
+	 * XXX: For some reason makes the kernel explode when booting
+	 *      with kern.opportunistic_coexecve set to 1.
+	 */
 	KASSERT((curthread->td_pflags & TDP_EXECVMSPC) == 0,
 	    ("vmspace_exec recursed"));
+#endif
 	newvmspace = vmspace_alloc(minuser, maxuser, NULL);
 	if (newvmspace == NULL)
 		return (ENOMEM);
@@ -4378,7 +4384,7 @@ vmspace_coexec(struct proc *p, struct proc *cop, vm_offset_t minuser, vm_offset_
 	struct vmspace *newvmspace;
 
 	KASSERT((curthread->td_pflags & TDP_EXECVMSPC) == 0,
-	    ("vmspace_exec recursed"));
+	    ("vmspace_coexec recursed"));
 	newvmspace = vmspace_acquire_ref(cop);
 	PROC_VMSPACE_LOCK(p);
 	p->p_vmspace = newvmspace;
