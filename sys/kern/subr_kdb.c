@@ -54,7 +54,6 @@ __FBSDID("$FreeBSD$");
 #endif
 
 u_char __read_frequently kdb_active = 0;
-int kdb_reenter_silent = 0;
 static void *kdb_jmpbufp = NULL;
 struct kdb_dbbe *kdb_dbbe = NULL;
 static struct pcb kdb_pcb;
@@ -535,11 +534,8 @@ kdb_reenter(void)
 	if (!kdb_active || kdb_jmpbufp == NULL)
 		return;
 
-	if (!kdb_reenter_silent) {
-		kdb_reenter_silent = 0;
-		printf("KDB: reentering\n");
-		kdb_backtrace();
-	}
+	printf("KDB: reentering\n");
+	kdb_backtrace();
 	longjmp(kdb_jmpbufp, 1);
 	/* NOTREACHED */
 }
