@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -288,7 +290,6 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 	int hlen;	/* link layer header length */
 	uint32_t pflags;
 	struct llentry *lle = NULL;
-	struct rtentry *rt0 = NULL;
 	int addref = 0;
 
 	phdr = NULL;
@@ -318,7 +319,6 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 				pflags = lle->r_flags;
 			}
 		}
-		rt0 = ro->ro_rt;
 	}
 
 #ifdef MAC
@@ -1245,3 +1245,12 @@ ether_vlanencap(struct mbuf *m, uint16_t tag)
 
 DECLARE_MODULE(ether, ether_mod, SI_SUB_INIT_IF, SI_ORDER_ANY);
 MODULE_VERSION(ether, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2010, 2012 Zheng Liu <lz@freebsd.org>
  * Copyright (c) 2012, Vyacheslav Matyushin
  * All rights reserved.
@@ -898,3 +900,13 @@ finish:
 		ext2_htree_release(&info);
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

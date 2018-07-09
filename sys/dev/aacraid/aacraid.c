@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2000 Michael Smith
  * Copyright (c) 2001 Scott Long
  * Copyright (c) 2000 BSDi
@@ -1459,7 +1461,7 @@ aac_convert_sgraw2(struct aac_softc *sc, struct aac_raw_io2 *raw,
 	int i, j, pos;
 	u_int32_t addr_low;
 
-	sge = malloc(nseg_new * sizeof(struct aac_sge_ieee1212), 
+	sge = mallocarray(nseg_new, sizeof(struct aac_sge_ieee1212), 
 		M_AACRAIDBUF, M_NOWAIT|M_ZERO);
 	if (sge == NULL)
 		return nseg;

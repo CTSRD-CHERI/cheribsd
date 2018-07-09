@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2012 The FreeBSD Foundation
  * All rights reserved.
  *
@@ -1789,6 +1791,18 @@ iscsi_ioctl_session_add(struct iscsi_softc *sc, struct iscsi_session_add *isa)
 	is = malloc(sizeof(*is), M_ISCSI, M_ZERO | M_WAITOK);
 	memcpy(&is->is_conf, &isa->isa_conf, sizeof(is->is_conf));
 
+	/*
+	 * Set some default values, from RFC 3720, section 12.
+	 *
+	 * These values are updated by the handoff IOCTL, but are
+	 * needed prior to the handoff to support sending the ISER
+	 * login PDU.
+	 */
+	is->is_max_recv_data_segment_length = 8192;
+	is->is_max_send_data_segment_length = 8192;
+	is->is_max_burst_length = 262144;
+	is->is_first_burst_length = 65536;
+
 	sx_xlock(&sc->sc_lock);
 
 	/*
@@ -2569,3 +2583,12 @@ moduledata_t iscsi_data = {
 DECLARE_MODULE(iscsi, iscsi_data, SI_SUB_DRIVERS, SI_ORDER_MIDDLE);
 MODULE_DEPEND(iscsi, cam, 1, 1, 1);
 MODULE_DEPEND(iscsi, icl, 1, 1, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

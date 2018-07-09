@@ -107,6 +107,6 @@ CFLAGS.tc-mips.c=	-Wno-format-security
 NO_SHARED?=	yes
 .endif
 
-LIBADD=       bfd iberty opcodes
+LIBADD+=	bfd iberty opcodes
 
 .include <bsd.prog.mk>

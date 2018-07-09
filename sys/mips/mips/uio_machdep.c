@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2004 Alan L. Cox <alc@cs.rice.edu>
  * Copyright (c) 1982, 1986, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -54,7 +56,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/cache.h>
 
 #ifdef CPU_CHERI
-#define	CAP_ALIGNED(x)	((x) % CHERICAP_SIZE == 0)
+#define	CAP_ALIGNED(x)	((vaddr_t)(x) % CHERICAP_SIZE == 0)
 #endif
 
 /*
@@ -127,8 +129,8 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 			break;
 		case UIO_SYSSPACE:
 #ifdef CPU_CHERI
-			if (CAP_ALIGNED((uintptr_t)cp) &&
-			    CAP_ALIGNED((uintptr_t)iov->iov_base) &&
+			if (CAP_ALIGNED(cp) &&
+			    CAP_ALIGNED(iov->iov_base) &&
 			    CAP_ALIGNED(cnt)) {
 				if (uio->uio_rw == UIO_READ)
 					cheri_bcopy(cp,
@@ -166,3 +168,12 @@ out:
 		td->td_pflags &= ~TDP_DEADLKTREAT;
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "pointer_integrity"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1994 Jan-Simon Pendry
  * Copyright (c) 1994
  *	The Regents of the University of California.  All rights reserved.
@@ -1260,3 +1262,13 @@ unionfs_checklowervp(struct vnode *vp, char *fil, int lno)
 	return (unp->un_lowervp);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

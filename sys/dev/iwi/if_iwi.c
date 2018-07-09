@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2004, 2005
  *      Damien Bergamini <damien.bergamini@free.fr>. All rights reserved.
  * Copyright (c) 2005-2006 Sam Leffler, Errno Consulting
@@ -638,7 +640,7 @@ iwi_alloc_tx_ring(struct iwi_softc *sc, struct iwi_tx_ring *ring, int count,
 		goto fail;
 	}
 
-	ring->data = malloc(count * sizeof (struct iwi_tx_data), M_DEVBUF,
+	ring->data = mallocarray(count, sizeof(struct iwi_tx_data), M_DEVBUF,
 	    M_NOWAIT | M_ZERO);
 	if (ring->data == NULL) {
 		device_printf(sc->sc_dev, "could not allocate soft data\n");
@@ -746,7 +748,7 @@ iwi_alloc_rx_ring(struct iwi_softc *sc, struct iwi_rx_ring *ring, int count)
 	ring->count = count;
 	ring->cur = 0;
 
-	ring->data = malloc(count * sizeof (struct iwi_rx_data), M_DEVBUF,
+	ring->data = mallocarray(count, sizeof(struct iwi_rx_data), M_DEVBUF,
 	    M_NOWAIT | M_ZERO);
 	if (ring->data == NULL) {
 		device_printf(sc->sc_dev, "could not allocate soft data\n");
@@ -1048,12 +1050,15 @@ static int
 iwi_wme_setparams(struct iwi_softc *sc)
 {
 	struct ieee80211com *ic = &sc->sc_ic;
+	struct chanAccParams chp;
 	const struct wmeParams *wmep;
 	int ac;
 
+	ieee80211_wme_ic_getparams(ic, &chp);
+
 	for (ac = 0; ac < WME_NUM_AC; ac++) {
 		/* set WME values for current operating mode */
-		wmep = &ic->ic_wme.wme_chanParams.cap_wmeParams[ac];
+		wmep = &chp.cap_wmeParams[ac];
 		sc->wme[0].aifsn[ac] = wmep->wmep_aifsn;
 		sc->wme[0].cwmin[ac] = IWI_EXP2(wmep->wmep_logcwmin);
 		sc->wme[0].cwmax[ac] = IWI_EXP2(wmep->wmep_logcwmax);
@@ -1769,11 +1774,9 @@ iwi_tx_start(struct iwi_softc *sc, struct mbuf *m0, struct ieee80211_node *ni,
     int ac)
 {
 	struct ieee80211vap *vap = ni->ni_vap;
-	struct ieee80211com *ic = ni->ni_ic;
 	struct iwi_node *in = (struct iwi_node *)ni;
 	const struct ieee80211_frame *wh;
 	struct ieee80211_key *k;
-	const struct chanAccParams *cap;
 	struct iwi_tx_ring *txq = &sc->txq[ac];
 	struct iwi_tx_data *data;
 	struct iwi_tx_desc *desc;
@@ -1795,8 +1798,7 @@ iwi_tx_start(struct iwi_softc *sc, struct mbuf *m0, struct ieee80211_node *ni,
 		flags |= IWI_DATA_FLAG_SHPREAMBLE;
 	if (IEEE80211_QOS_HAS_SEQ(wh)) {
 		xflags |= IWI_DATA_XFLAG_QOS;
-		cap = &ic->ic_wme.wme_chanParams;
-		if (!cap->cap_wmeParams[ac].wmep_noackPolicy)
+		if (ieee80211_wme_vap_ac_is_noack(vap, ac))
 			flags &= ~IWI_DATA_FLAG_NEED_ACK;
 	}
 
@@ -3617,3 +3619,13 @@ iwi_getradiocaps(struct ieee80211com *ic,
 		    bands, 0);
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

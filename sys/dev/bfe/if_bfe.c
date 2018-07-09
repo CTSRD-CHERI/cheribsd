@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2003 Stuart Walsh<stu@ipng.org.uk>
  * and Duncan Barclay<dmlb@dmlb.org>
  *
@@ -1964,3 +1966,12 @@ sysctl_bfe_stats(SYSCTL_HANDLER_ARGS)
 
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

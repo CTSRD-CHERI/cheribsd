@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1999 Kazutaka YOKOTA <yokota@zodiac.mech.utsunomiya-u.ac.jp>
  * All rights reserved.
  *
@@ -94,17 +96,18 @@ kbd_realloc_array(void)
 {
 	keyboard_t **new_kbd;
 	keyboard_switch_t **new_kbdsw;
-	int newsize;
+	u_int newsize;
 	int s;
 
 	s = spltty();
 	newsize = rounddown(keyboards + ARRAY_DELTA, ARRAY_DELTA);
-	new_kbd = malloc(sizeof(*new_kbd)*newsize, M_DEVBUF, M_NOWAIT|M_ZERO);
+	new_kbd = mallocarray(newsize, sizeof(*new_kbd), M_DEVBUF,
+	    M_NOWAIT|M_ZERO);
 	if (new_kbd == NULL) {
 		splx(s);
 		return (ENOMEM);
 	}
-	new_kbdsw = malloc(sizeof(*new_kbdsw)*newsize, M_DEVBUF,
+	new_kbdsw = mallocarray(newsize, sizeof(*new_kbdsw), M_DEVBUF,
 			    M_NOWAIT|M_ZERO);
 	if (new_kbdsw == NULL) {
 		free(new_kbd, M_DEVBUF);
@@ -1491,3 +1494,13 @@ genkbd_keyaction(keyboard_t *kbd, int keycode, int up, int *shiftstate,
 	}
 	/* NOT REACHED */
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:misc",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

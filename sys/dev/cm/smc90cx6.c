@@ -4,6 +4,8 @@
 __FBSDID("$FreeBSD$");
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ *
  * Copyright (c) 1994, 1995, 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -922,3 +924,12 @@ cm_watchdog(void *arg)
 		return;
 	PUTREG(CMCMD, CM_TXDIS);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

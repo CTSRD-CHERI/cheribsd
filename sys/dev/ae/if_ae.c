@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2008 Stanislav Sedov <stas@FreeBSD.org>.
  * All rights reserved.
  *
@@ -2253,3 +2255,12 @@ ae_update_stats_rx(uint16_t flags, ae_stats_t *stats)
 	if ((flags & AE_RXD_ALIGN) != 0)
 		stats->rx_align++;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

@@ -331,7 +331,7 @@ _llc_print(netdissect_options *ndo, const u_char *p, u_int length, u_int caplen,
 #endif
 	if (ssap == LLCSAP_ISONS && dsap == LLCSAP_ISONS
 	    && control == LLC_UI) {
-		isoclns_print(ndo, p, length, caplen);
+		isoclns_print(ndo, p, length);
 		return (hdrlen);
 	}
 

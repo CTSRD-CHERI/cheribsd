@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1995 Terrence R. Lambert
  * All rights reserved.
  *
@@ -88,7 +90,6 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_param.h>
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
-#include <vm/vm_domain.h>
 #include <sys/copyright.h>
 
 #include <ddb/ddb.h>
@@ -139,6 +140,11 @@ SET_DECLARE(sysinit_set, struct sysinit);
 struct sysinit **sysinit, **sysinit_end;
 struct sysinit **newsysinit, **newsysinit_end;
 
+EVENTHANDLER_LIST_DECLARE(process_init);
+EVENTHANDLER_LIST_DECLARE(thread_init);
+EVENTHANDLER_LIST_DECLARE(process_ctor);
+EVENTHANDLER_LIST_DECLARE(thread_ctor);
+
 /*
  * Merge a new sysinit set into the current set, reallocating it if
  * necessary.  This can only be called after malloc is running.
@@ -156,7 +162,7 @@ sysinit_add(struct sysinit **set, struct sysinit **set_end)
 		count += newsysinit_end - newsysinit;
 	else
 		count += sysinit_end - sysinit;
-	newset = malloc(count * sizeof(*sipp), M_TEMP, M_NOWAIT);
+	newset = mallocarray(count, sizeof(*sipp), M_TEMP, M_NOWAIT);
 	if (newset == NULL)
 		panic("cannot malloc for sysinit");
 	xipp = newset;
@@ -215,6 +221,8 @@ mi_startup(void)
 	int last;
 	int verbose;
 #endif
+
+	TSENTER();
 
 	if (boothowto & RB_VERBOSE)
 		bootverbose++;
@@ -308,6 +316,8 @@ restart:
 			goto restart;
 		}
 	}
+
+	TSEXIT();	/* Here so we don't overlap with start_init. */
 
 	mtx_assert(&Giant, MA_OWNED | MA_NOTRECURSED);
 	mtx_unlock(&Giant);
@@ -423,6 +433,10 @@ proc0_init(void *dummy __unused)
 	struct proc *p;
 	struct thread *td;
 	struct ucred *newcred;
+	struct uidinfo tmpuinfo;
+	struct loginclass tmplc = {
+		.lc_name = "",
+	};
 	vm_paddr_t pageablemem;
 	int i;
 
@@ -485,10 +499,7 @@ proc0_init(void *dummy __unused)
 	td->td_flags = TDF_INMEM;
 	td->td_pflags = TDP_KTHREAD;
 	td->td_cpuset = cpuset_thread0();
-	vm_domain_policy_init(&td->td_vm_dom_policy);
-	vm_domain_policy_set(&td->td_vm_dom_policy, VM_POLICY_NONE, -1);
-	vm_domain_policy_init(&p->p_vm_dom_policy);
-	vm_domain_policy_set(&p->p_vm_dom_policy, VM_POLICY_NONE, -1);
+	td->td_domain.dr_policy = td->td_cpuset->cs_domain;
 	prison0_init();
 	p->p_peers = 0;
 	p->p_leader = p;
@@ -505,10 +516,17 @@ proc0_init(void *dummy __unused)
 	/* Create credentials. */
 	newcred = crget();
 	newcred->cr_ngroups = 1;	/* group 0 */
+	/* A hack to prevent uifind from tripping over NULL pointers. */
+	curthread->td_ucred = newcred;
+	tmpuinfo.ui_uid = 1;
+	newcred->cr_uidinfo = newcred->cr_ruidinfo = &tmpuinfo;
 	newcred->cr_uidinfo = uifind(0);
 	newcred->cr_ruidinfo = uifind(0);
-	newcred->cr_prison = &prison0;
+	newcred->cr_loginclass = &tmplc;
 	newcred->cr_loginclass = loginclass_find("default");
+	/* End hack. creds get properly set later with thread_cow_get_proc */
+	curthread->td_ucred = NULL;
+	newcred->cr_prison = &prison0;
 	proc_set_cred_init(p, newcred);
 #ifdef AUDIT
 	audit_cred_kproc0(newcred);
@@ -589,10 +607,10 @@ proc0_init(void *dummy __unused)
 	 * Call the init and ctor for the new thread and proc.  We wait
 	 * to do this until all other structures are fairly sane.
 	 */
-	EVENTHANDLER_INVOKE(process_init, p);
-	EVENTHANDLER_INVOKE(thread_init, td);
-	EVENTHANDLER_INVOKE(process_ctor, p);
-	EVENTHANDLER_INVOKE(thread_ctor, td);
+	EVENTHANDLER_DIRECT_INVOKE(process_init, p);
+	EVENTHANDLER_DIRECT_INVOKE(thread_init, td);
+	EVENTHANDLER_DIRECT_INVOKE(process_ctor, p);
+	EVENTHANDLER_DIRECT_INVOKE(thread_ctor, td);
 
 	/*
 	 * Charge root for one process.
@@ -709,6 +727,8 @@ start_init(void *dummy)
 
 	GIANT_REQUIRED;
 
+	TSENTER();	/* Here so we don't overlap with mi_startup. */
+
 	td = curthread;
 	p = td->td_proc;
 
@@ -777,9 +797,10 @@ start_init(void *dummy)
 		 * to user mode as init!
 		 */
 		error = kern_execve(td, &args, NULL);
-		if (error == 0) {
-			free(free_init_path, M_TEMP);
+		if (error == EJUSTRETURN) {
 			mtx_unlock(&Giant);
+			free(free_init_path, M_TEMP);
+			TSEXIT();
 			return;
 		}
 		if (error != ENOENT)
@@ -854,3 +875,12 @@ kick_init(const void *udata __unused)
 	thread_unlock(td);
 }
 SYSINIT(kickinit, SI_SUB_KTHREAD_INIT, SI_ORDER_MIDDLE, kick_init, NULL);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

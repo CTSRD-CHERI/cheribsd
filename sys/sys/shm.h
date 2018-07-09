@@ -2,6 +2,8 @@
 /*	$NetBSD: shm.h,v 1.15 1994/06/29 06:45:17 cgd Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1994 Adam Glass
  * All rights reserved.
  *
@@ -163,7 +165,7 @@ typedef __size_t        size_t;
 #endif
 
 __BEGIN_DECLS
-#ifdef __BSD_VISIBLE
+#if __BSD_VISIBLE
 int shmsys(int, ...);
 #endif
 void *shmat(int, const void *, int);
@@ -175,3 +177,13 @@ __END_DECLS
 #endif /* _KERNEL || _WANT_SHM_PROTOTYPES */
 
 #endif /* !_SYS_SHM_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "pointer_integrity"
+//   ],
+//   "change_comment": "compression of large shared memory allocations"
+// }
+// CHERI CHANGES END

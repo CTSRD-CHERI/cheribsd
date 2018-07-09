@@ -1038,3 +1038,12 @@ intptr_t	mac_label_get(struct label *l, int slot);
 void		mac_label_set(struct label *l, int slot, intptr_t v);
 
 #endif /* !_SECURITY_MAC_MAC_POLICY_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

@@ -242,3 +242,14 @@ crypto_mbuftoiov(struct mbuf *mbuf, kiovec_t **iovptr, int *cnt,
 	*cnt = i;
 	return 0;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

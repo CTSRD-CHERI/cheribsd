@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -1271,6 +1273,18 @@ struct uidinfo *
 uifind(uid_t uid)
 {
 	struct uidinfo *new_uip, *uip;
+	struct ucred *cred;
+
+	cred = curthread->td_ucred;
+	if (cred->cr_uidinfo->ui_uid == uid) {
+		uip = cred->cr_uidinfo;
+		uihold(uip);
+		return (uip);
+	} else if (cred->cr_ruidinfo->ui_uid == uid) {
+		uip = cred->cr_ruidinfo;
+		uihold(uip);
+		return (uip);
+	}
 
 	rw_rlock(&uihashtbl_lock);
 	uip = uilookup(uid);
@@ -1388,18 +1402,17 @@ ui_racct_foreach(void (*callback)(struct racct *racct,
 static inline int
 chglimit(struct uidinfo *uip, long *limit, int diff, rlim_t max, const char *name)
 {
+	long new;
 
 	/* Don't allow them to exceed max, but allow subtraction. */
+	new = atomic_fetchadd_long(limit, (long)diff) + diff;
 	if (diff > 0 && max != 0) {
-		if (atomic_fetchadd_long(limit, (long)diff) + diff > max) {
+		if (new < 0 || new > max) {
 			atomic_subtract_long(limit, (long)diff);
 			return (0);
 		}
-	} else {
-		atomic_add_long(limit, (long)diff);
-		if (*limit < 0)
-			printf("negative %s for uid = %d\n", name, uip->ui_uid);
-	}
+	} else if (new < 0)
+		printf("negative %s for uid = %d\n", name, uip->ui_uid);
 	return (1);
 }
 
@@ -1457,3 +1470,12 @@ chgumtxcnt(struct uidinfo *uip, int diff, rlim_t max)
 
 	return (chglimit(uip, &uip->ui_umtxcnt, diff, max, "umtxcnt"));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

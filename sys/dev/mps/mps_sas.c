@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2009 Yahoo! Inc.
  * Copyright (c) 2011-2015 LSI Corp.
  * Copyright (c) 2013-2015 Avago Technologies
@@ -3628,3 +3630,12 @@ mpssas_realloc_targets(struct mps_softc *sc, int maxtargets)
 		    __func__, ENOMEM);
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros"
+//   ]
+// }
+// CHERI CHANGES END

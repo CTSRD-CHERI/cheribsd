@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2003
  *	Bill Paul <wpaul@windriver.com>.  All rights reserved.
  *
@@ -663,8 +665,8 @@ ndis_attach(device_t dev)
 	if (sc->ndis_maxpkts == 0)
 		sc->ndis_maxpkts = 10;
 
-	sc->ndis_txarray = malloc(sizeof(ndis_packet *) *
-	    sc->ndis_maxpkts, M_DEVBUF, M_NOWAIT|M_ZERO);
+	sc->ndis_txarray = mallocarray(sc->ndis_maxpkts,
+	    sizeof(ndis_packet *), M_DEVBUF, M_NOWAIT|M_ZERO);
 
 	/* Allocate a pool of ndis_packets for TX encapsulation. */
 
@@ -3426,3 +3428,13 @@ ndis_scan_end(struct ieee80211com *ic)
 
 	ndis_scan_results(sc);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

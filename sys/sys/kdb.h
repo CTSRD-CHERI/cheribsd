@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2004 Marcel Moolenaar
  * All rights reserved.
  *
@@ -78,6 +80,7 @@ void *	kdb_jmpbuf(jmp_buf);
 void	kdb_panic(const char *);
 void	kdb_reboot(void);
 void	kdb_reenter(void);
+void	kdb_reenter_silent(void);
 struct pcb *kdb_thr_ctx(struct thread *);
 struct thread *kdb_thr_first(void);
 struct thread *kdb_thr_from_pid(pid_t);
@@ -122,3 +125,13 @@ extern const char * volatile kdb_why;
 #define	KDB_REQ_REBOOT		3	/* User requested a clean reboot */
 
 #endif /* !_SYS_KDB_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

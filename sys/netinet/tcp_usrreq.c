@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1988, 1993
  *	The Regents of the University of California.
  * Copyright (c) 2006-2007 Robert N. M. Watson
@@ -2355,3 +2357,12 @@ DB_SHOW_COMMAND(tcpcb, db_show_tcpcb)
 	db_print_tcpcb(tp, "tcpcb", 0);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

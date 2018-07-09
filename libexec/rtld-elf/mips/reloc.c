@@ -1,6 +1,8 @@
 /*	$NetBSD: mips_reloc.c,v 1.58 2010/01/14 11:57:06 skrll Exp $	*/
 
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright 1997 Michael L. Hitch <mhitch@montana.edu>
  * Portions copyright 2002 Charles M. Hannum <root@ihack.net>
  * All rights reserved.
@@ -30,11 +32,12 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180530,
+ *   "updated": 20180629,
+ *   "target_type": "prog",
  *   "changes": [
  *     "support"
  *   ],
- *   "change_comment: "CHERI relocation"
+ *   "change_comment": "CHERI relocation"
  * }
  * CHERI CHANGES END
  */

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2006 M. Warner Losh.  All rights reserved.
  * Copyright (c) 2009 Greg Ansley.  All rights reserved.
  *
@@ -1528,3 +1530,12 @@ DRIVER_MODULE(ate, atmelarm, ate_driver, ate_devclass, NULL, NULL);
 DRIVER_MODULE(miibus, ate, miibus_driver, miibus_devclass, NULL, NULL);
 MODULE_DEPEND(ate, miibus, 1, 1, 1);
 MODULE_DEPEND(ate, ether, 1, 1, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

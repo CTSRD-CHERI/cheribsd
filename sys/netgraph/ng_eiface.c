@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  *
  * Copyright (c) 1999-2001, Vitaly V Belekhov
  * All rights reserved.
@@ -681,3 +683,12 @@ vnet_ng_eiface_uninit(const void *unused)
 }
 VNET_SYSUNINIT(vnet_ng_eiface_uninit, SI_SUB_INIT_IF, SI_ORDER_ANY,
    vnet_ng_eiface_uninit, NULL);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

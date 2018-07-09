@@ -5,6 +5,8 @@
  *  University of Utah, Department of Computer Science
  */
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -82,8 +84,8 @@
 #include <fs/ext2fs/fs.h>
 #include <fs/ext2fs/inode.h>
 #include <fs/ext2fs/ext2_acl.h>
-#include <fs/ext2fs/ext2_extern.h>
 #include <fs/ext2fs/ext2fs.h>
+#include <fs/ext2fs/ext2_extern.h>
 #include <fs/ext2fs/ext2_dinode.h>
 #include <fs/ext2fs/ext2_dir.h>
 #include <fs/ext2fs/ext2_mount.h>
@@ -178,6 +180,7 @@ struct vop_vector ext2_fifoops = {
 	.vop_getattr =		ext2_getattr,
 	.vop_inactive =		ext2_inactive,
 	.vop_kqfilter =		ext2fifo_kqfilter,
+	.vop_pathconf =		ext2_pathconf,
 	.vop_print =		ext2_print,
 	.vop_read =		VOP_PANIC,
 	.vop_reclaim =		ext2_reclaim,
@@ -781,7 +784,7 @@ ext2_rename(struct vop_rename_args *ap)
 	struct componentname *tcnp = ap->a_tcnp;
 	struct componentname *fcnp = ap->a_fcnp;
 	struct inode *ip, *xp, *dp;
-	struct dirtemplate dirbuf;
+	struct dirtemplate *dirbuf;
 	int doingdirectory = 0, oldparent = 0, newparent = 0;
 	int error = 0;
 	u_char namlen;
@@ -1068,23 +1071,31 @@ abortit:
 		if (doingdirectory && newparent) {
 			ext2_dec_nlink(dp);
 			dp->i_flag |= IN_CHANGE;
-			error = vn_rdwr(UIO_READ, fvp, (caddr_t)&dirbuf,
-			    sizeof(struct dirtemplate), (off_t)0,
+			dirbuf = malloc(dp->i_e2fs->e2fs_bsize, M_TEMP, M_WAITOK | M_ZERO);
+			if (!dirbuf) {
+				error = ENOMEM;
+				goto bad;
+			}
+			error = vn_rdwr(UIO_READ, fvp, (caddr_t)dirbuf,
+			    ip->i_e2fs->e2fs_bsize, (off_t)0,
 			    UIO_SYSSPACE, IO_NODELOCKED | IO_NOMACCHECK,
 			    tcnp->cn_cred, NOCRED, NULL, NULL);
 			if (error == 0) {
 				/* Like ufs little-endian: */
-				namlen = dirbuf.dotdot_type;
+				namlen = dirbuf->dotdot_type;
 				if (namlen != 2 ||
-				    dirbuf.dotdot_name[0] != '.' ||
-				    dirbuf.dotdot_name[1] != '.') {
+				    dirbuf->dotdot_name[0] != '.' ||
+				    dirbuf->dotdot_name[1] != '.') {
 					ext2_dirbad(xp, (doff_t)12,
 					    "rename: mangled dir");
 				} else {
-					dirbuf.dotdot_ino = newparent;
+					dirbuf->dotdot_ino = newparent;
+					ext2_dir_blk_csum_set_mem(ip,
+					    (char *)dirbuf,
+					    ip->i_e2fs->e2fs_bsize);
 					(void)vn_rdwr(UIO_WRITE, fvp,
-					    (caddr_t)&dirbuf,
-					    sizeof(struct dirtemplate),
+					    (caddr_t)dirbuf,
+					    ip->i_e2fs->e2fs_bsize,
 					    (off_t)0, UIO_SYSSPACE,
 					    IO_NODELOCKED | IO_SYNC |
 					    IO_NOMACCHECK, tcnp->cn_cred,
@@ -1092,6 +1103,7 @@ abortit:
 					cache_purge(fdvp);
 				}
 			}
+			free(dirbuf, M_TEMP);
 		}
 		error = ext2_dirremove(fdvp, fcnp);
 		if (!error) {
@@ -1271,18 +1283,28 @@ out:
 
 #endif /* UFS_ACL */
 
+static void
+ext2_init_dirent_tail(struct ext2fs_direct_tail *tp)
+{
+	memset(tp, 0, sizeof(struct ext2fs_direct_tail));
+	tp->e2dt_rec_len = sizeof(struct ext2fs_direct_tail);
+	tp->e2dt_reserved_ft = EXT2_FT_DIR_CSUM;
+}
+
 /*
  * Mkdir system call
  */
 static int
 ext2_mkdir(struct vop_mkdir_args *ap)
 {
+	struct m_ext2fs *fs;
 	struct vnode *dvp = ap->a_dvp;
 	struct vattr *vap = ap->a_vap;
 	struct componentname *cnp = ap->a_cnp;
 	struct inode *ip, *dp;
 	struct vnode *tvp;
 	struct dirtemplate dirtemplate, *dtp;
+	char *buf = NULL;
 	int error, dmode;
 
 #ifdef INVARIANTS
@@ -1306,6 +1328,7 @@ ext2_mkdir(struct vop_mkdir_args *ap)
 	if (error)
 		goto out;
 	ip = VTOI(tvp);
+	fs = ip->i_e2fs;
 	ip->i_gid = dp->i_gid;
 #ifdef SUIDDIR
 	{
@@ -1364,8 +1387,21 @@ ext2_mkdir(struct vop_mkdir_args *ap)
 #undef  DIRBLKSIZ
 #define DIRBLKSIZ  VTOI(dvp)->i_e2fs->e2fs_bsize
 	dirtemplate.dotdot_reclen = DIRBLKSIZ - 12;
-	error = vn_rdwr(UIO_WRITE, tvp, (caddr_t)&dirtemplate,
-	    sizeof(dirtemplate), (off_t)0, UIO_SYSSPACE,
+	buf = malloc(DIRBLKSIZ, M_TEMP, M_WAITOK | M_ZERO);
+	if (!buf) {
+		error = ENOMEM;
+		ext2_dec_nlink(dp);
+		dp->i_flag |= IN_CHANGE;
+		goto bad;
+	}
+	if (EXT2_HAS_RO_COMPAT_FEATURE(fs, EXT2F_ROCOMPAT_METADATA_CKSUM)) {
+		dirtemplate.dotdot_reclen -= sizeof(struct ext2fs_direct_tail);
+		ext2_init_dirent_tail(EXT2_DIRENT_TAIL(buf, DIRBLKSIZ));
+	}
+	memcpy(buf, &dirtemplate, sizeof(dirtemplate));
+	ext2_dir_blk_csum_set_mem(ip, buf, DIRBLKSIZ);
+	error = vn_rdwr(UIO_WRITE, tvp, (caddr_t)buf,
+	    DIRBLKSIZ, (off_t)0, UIO_SYSSPACE,
 	    IO_NODELOCKED | IO_SYNC | IO_NOMACCHECK, cnp->cn_cred, NOCRED,
 	    NULL, NULL);
 	if (error) {
@@ -1409,6 +1445,7 @@ bad:
 	} else
 		*ap->a_vpp = tvp;
 out:
+	free(buf, M_TEMP);
 	return (error);
 #undef  DIRBLKSIZ
 #define DIRBLKSIZ  DEV_BSIZE
@@ -1630,6 +1667,18 @@ ext2_pathconf(struct vop_pathconf_args *ap)
 			*ap->a_retval = INT_MAX;
 		else
 			*ap->a_retval = ext2_max_nlink(VTOI(ap->a_vp));
+		break;
+	case _PC_NAME_MAX:
+		*ap->a_retval = NAME_MAX;
+		break;
+	case _PC_PIPE_BUF:
+		if (ap->a_vp->v_type == VDIR || ap->a_vp->v_type == VFIFO)
+			*ap->a_retval = PIPE_BUF;
+		else
+			error = EINVAL;
+		break;
+	case _PC_CHOWN_RESTRICTED:
+		*ap->a_retval = 1;
 		break;
 	case _PC_NO_TRUNC:
 		*ap->a_retval = 1;

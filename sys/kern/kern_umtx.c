@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2015, 2016 The FreeBSD Foundation
  * Copyright (c) 2004, David Xu <davidxu@freebsd.org>
  * Copyright (c) 2002, Jeffrey Roberson <jeff@freebsd.org>
@@ -1612,8 +1614,7 @@ umtx_pi_setowner(struct umtx_pi *pi, struct thread *owner)
 
 	uq_owner = owner->td_umtxq;
 	mtx_assert(&umtx_lock, MA_OWNED);
-	if (pi->pi_owner != NULL)
-		panic("pi_owner != NULL");
+	MPASS(pi->pi_owner == NULL);
 	pi->pi_owner = owner;
 	TAILQ_INSERT_TAIL(&uq_owner->uq_pi_contested, pi, pi_link);
 }
@@ -5083,3 +5084,12 @@ umtx_thread_cleanup(struct thread *td)
 	if (rb_inact != 0)
 		(void)umtx_handle_rb(td, rb_inact, NULL, true);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

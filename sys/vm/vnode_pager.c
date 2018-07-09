@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1990 University of Utah.
  * Copyright (c) 1991 The Regents of the University of California.
  * All rights reserved.
@@ -1552,3 +1554,13 @@ vnode_pager_release_writecount(vm_object_t object, vm_offset_t start,
 	if (mp != NULL)
 		vn_finished_write(mp);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

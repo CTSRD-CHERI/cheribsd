@@ -231,6 +231,13 @@ __FBSDID("$FreeBSD$");
 
 #define clamp_t(type, _x, min, max)     min_t(type, max_t(type, _x, min), max)
 
+#define BNXT_IFMEDIA_ADD(supported, fw_speed, ifm_speed) do {			\
+	if ((supported) & HWRM_PORT_PHY_QCFG_OUTPUT_SUPPORT_ ## fw_speed)	\
+		ifmedia_add(softc->media, IFM_ETHER | (ifm_speed), 0, NULL);	\
+} while(0)
+
+#define BNXT_MIN_FRAME_SIZE	52	/* Frames must be padded to this size for some A0 chips */
+
 /* NVRAM access */
 enum bnxt_nvm_directory_type {
 	BNX_DIR_TYPE_UNUSED = 0,
@@ -554,6 +561,7 @@ struct bnxt_softc {
 #define BNXT_FLAG_VF		0x0001
 #define BNXT_FLAG_NPAR		0x0002
 #define BNXT_FLAG_WOL_CAP	0x0004
+#define BNXT_FLAG_SHORT_CMD	0x0008 
 	uint32_t		flags;
 	uint32_t		total_msix;
 
@@ -565,6 +573,7 @@ struct bnxt_softc {
 	uint16_t		hwrm_cmd_seq;
 	uint32_t		hwrm_cmd_timeo;	/* milliseconds */
 	struct iflib_dma_info	hwrm_cmd_resp;
+	struct iflib_dma_info	hwrm_short_cmd_req_addr;
 	/* Interrupt info for HWRM */
 	struct if_irq		irq;
 	struct mtx		hwrm_lock;

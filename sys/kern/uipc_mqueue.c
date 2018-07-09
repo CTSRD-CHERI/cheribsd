@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2005 David Xu <davidxu@freebsd.org>
  * Copyright (c) 2016-2017 Robert N. M. Watson
  * All rights reserved.
@@ -3091,3 +3093,13 @@ static moduledata_t mqueuefs_mod = {
 };
 DECLARE_MODULE(mqueuefs, mqueuefs_mod, SI_SUB_VFS, SI_ORDER_MIDDLE);
 MODULE_VERSION(mqueuefs, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "kernel_sig_types",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

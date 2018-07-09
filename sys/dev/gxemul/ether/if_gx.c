@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2008-2012 Juli Mallett <jmallett@FreeBSD.org>
  * All rights reserved.
  *
@@ -396,3 +398,12 @@ gx_rx_intr(void *arg)
 	}
 	GXEMUL_ETHER_UNLOCK(sc);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

@@ -186,6 +186,7 @@ sed -e '
 		printf "#include <sys/signal.h>\n" > sysarg
 		printf "#include <sys/acl.h>\n" > sysarg
 		printf "#include <sys/cpuset.h>\n" > sysarg
+		printf "#include <sys/domainset.h>\n" > sysarg
 		printf "#include <sys/_ffcounter.h>\n" > sysarg
 		printf "#include <sys/_semaphore.h>\n" > sysarg
 		printf "#include <sys/ucontext.h>\n" > sysarg
@@ -249,6 +250,7 @@ sed -e '
 
 		printf "#include <sys/acl.h>\n" > sysstubs
 		printf "#include <sys/cpuset.h>\n" > sysstubs
+		printf "#include <sys/_domainset.h>\n" > sysstubs
 		printf "#include <sys/_ffcounter.h>\n" > sysstubs
 		printf "#include <sys/_semaphore.h>\n" > sysstubs
 		printf "#include <sys/socket.h>\n" > sysstubs

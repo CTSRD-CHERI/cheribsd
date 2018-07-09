@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: (Beerware AND BSD-3-Clause)
+ *
  * ----------------------------------------------------------------------------
  * "THE BEER-WARE LICENSE" (Revision 42):
  * <phk@FreeBSD.ORG> wrote this file.  As long as you retain this notice you
@@ -2242,3 +2244,14 @@ g_md_fini(struct g_class *mp __unused)
 		destroy_dev(status_dev);
 	delete_unrhdr(md_uh);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:misc",
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

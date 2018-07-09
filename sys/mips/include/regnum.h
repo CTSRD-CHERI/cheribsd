@@ -1,6 +1,8 @@
 /*	$OpenBSD: regnum.h,v 1.3 1999/01/27 04:46:06 imp Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause AND BSD-2-Clause
+ *
  * Copyright (c) 2011-2016 Robert N. M. Watson
  * Copyright (c) 2015 SRI International
  * All rights reserved.

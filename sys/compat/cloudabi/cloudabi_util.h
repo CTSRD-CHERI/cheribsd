@@ -65,13 +65,13 @@ int cloudabi_convert_timespec(const struct timespec *, cloudabi_timestamp_t *);
  */
 int cloudabi_futex_condvar_wait(struct thread *, cloudabi_condvar_t *,
     cloudabi_scope_t, cloudabi_lock_t *, cloudabi_scope_t, cloudabi_clockid_t,
-    cloudabi_timestamp_t, cloudabi_timestamp_t);
+    cloudabi_timestamp_t, cloudabi_timestamp_t, bool);
 int cloudabi_futex_lock_rdlock(struct thread *, cloudabi_lock_t *,
     cloudabi_scope_t, cloudabi_clockid_t, cloudabi_timestamp_t,
-    cloudabi_timestamp_t);
+    cloudabi_timestamp_t, bool);
 int cloudabi_futex_lock_wrlock(struct thread *, cloudabi_lock_t *,
     cloudabi_scope_t, cloudabi_clockid_t, cloudabi_timestamp_t,
-    cloudabi_timestamp_t);
+    cloudabi_timestamp_t, bool);
 
 /* Socket operations. */
 int cloudabi_sock_recv(struct thread *, cloudabi_fd_t, kiovec_t *, size_t,
@@ -85,3 +85,12 @@ void cloudabi_vdso_init(struct sysentvec *, char *, char *);
 void cloudabi_vdso_destroy(struct sysentvec *);
 
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

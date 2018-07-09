@@ -1,14 +1,14 @@
 # $FreeBSD$
 
-.include <src.opts.mk>
-
-PACKAGE=${LIB}
-
-SHLIB_MAJOR=	0
 SHLIBDIR?=	/lib
 
+.include <src.opts.mk>
+
+PACKAGE=casper
+
 .if ${MK_CASPER} != "no"
-LIB=	casper
+SHLIB=	casper
+SHLIB_MAJOR=	0
 
 SRCS=	libcasper.c
 SRCS+=	libcasper_impl.c

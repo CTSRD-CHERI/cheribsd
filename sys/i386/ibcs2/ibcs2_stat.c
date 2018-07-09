@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1995 Scott Bartram
  * Copyright (c) 1995 Steven Wallace
  * All rights reserved.
@@ -243,3 +245,12 @@ ibcs2_utssys(td, uap)
 		return ENOSYS;
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

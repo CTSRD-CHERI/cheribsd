@@ -215,3 +215,14 @@ zygote_init(void)
 	}
 	/* NOTREACHED */
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "lib",
+//   "changes": [
+//     "pointer_provenance"
+//   ],
+//   "change_comment": "pointers over IPC",
+//   "is_upstream": true
+// }
+// CHERI CHANGES END

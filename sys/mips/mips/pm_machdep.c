@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1992 Terrence R. Lambert.
  * Copyright (c) 1982, 1987, 1990 The Regents of the University of California.
  * All rights reserved.
@@ -700,3 +702,15 @@ ptrace_clear_single_step(struct thread *td)
 	td->td_md.md_ss_addr = 0;
 	return 0;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "kernel_sig_types",
+//     "support",
+//     "user_capabilities"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

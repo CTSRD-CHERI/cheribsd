@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -426,7 +428,7 @@ nfsm_loadattr(struct nfsrv_descript *nd, struct nfsvattr *nap)
 		nap->na_mode = fxdr_unsigned(u_short, fp->fa_mode);
 		nap->na_rdev = makedev(fxdr_unsigned(u_char, fp->fa3_rdev.specdata1),
 			fxdr_unsigned(u_char, fp->fa3_rdev.specdata2));
-		nap->na_nlink = fxdr_unsigned(u_short, fp->fa_nlink);
+		nap->na_nlink = fxdr_unsigned(uint32_t, fp->fa_nlink);
 		nap->na_uid = fxdr_unsigned(uid_t, fp->fa_uid);
 		nap->na_gid = fxdr_unsigned(gid_t, fp->fa_gid);
 		nap->na_size = fxdr_hyper(&fp->fa3_size);
@@ -670,3 +672,14 @@ nfscl_lockderef(struct nfsv4lock *lckp)
 	NFSUNLOCKCLSTATE();
 }
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2008-2010 Nikolay Denev <ndenev@gmail.com>
  * Copyright (c) 2007-2008 Alexander Pohoyda <alexander.pohoyda@gmx.net>
  * Copyright (c) 1997, 1998, 1999
@@ -1901,3 +1903,12 @@ sge_stop(struct sge_softc *sc)
 	sge_list_rx_free(sc);
 	sge_list_tx_free(sc);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

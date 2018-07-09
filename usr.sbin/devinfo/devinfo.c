@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2000, 2001 Michael Smith
  * Copyright (c) 2000 BSDi
  * All rights reserved.
@@ -135,6 +137,22 @@ skip:
 	return(0);
 }
 
+static void
+print_dev(struct devinfo_dev *dev)
+{
+
+	printf("%s", dev->dd_name[0] ? dev->dd_name : "unknown");
+	if (vflag && *dev->dd_pnpinfo)
+		printf(" pnpinfo %s", dev->dd_pnpinfo);
+	if (vflag && *dev->dd_location)
+		printf(" at %s", dev->dd_location);
+	if (!(dev->dd_flags & DF_ENABLED))
+		printf(" (disabled)");
+	else if (dev->dd_flags & DF_SUSPENDED)
+		printf(" (suspended)");
+}
+
+
 /*
  * Print information about a device and its children.
  */
@@ -148,15 +166,7 @@ print_device(struct devinfo_dev *dev, void *arg)
 		indent = (int)(intptr_t)arg;
 		for (i = 0; i < indent; i++)
 			printf(" ");
-		printf("%s", dev->dd_name[0] ? dev->dd_name : "unknown");
-		if (vflag && *dev->dd_pnpinfo)
-			printf(" pnpinfo %s", dev->dd_pnpinfo);
-		if (vflag && *dev->dd_location)
-			printf(" at %s", dev->dd_location);
-		if (!(dev->dd_flags & DF_ENABLED))
-			printf(" (disabled)");
-		else if (dev->dd_flags & DF_SUSPENDED)
-			printf(" (suspended)");
+		print_dev(dev);
 		printf("\n");
 		if (iflag || rflag) {
 			ia.indent = indent + 4;
@@ -205,17 +215,54 @@ print_rman(struct devinfo_rman *rman, void *arg __unused)
 	return(0);
 }
 
+static int
+print_path(struct devinfo_dev *dev, void *xname)
+{
+	const char *name = xname;
+	int rv;
+
+	if (strcmp(dev->dd_name, name) == 0) {
+		print_dev(dev);
+		if (vflag)
+			printf("\n");
+		return (1);
+	}
+
+	rv = devinfo_foreach_device_child(dev, print_path, xname);
+	if (rv == 1) {
+		printf(" ");
+		print_dev(dev);
+		if (vflag)
+			printf("\n");
+	}
+	return (rv);
+}
+
+static void __dead2
+usage(void)
+{
+	fprintf(stderr, "%s\n%s\n%s\n",
+	    "usage: devinfo [-rv]",
+	    "       devinfo -u",
+	    "       devifno -p dev [-v]");
+	exit(1);
+}
+
 int
 main(int argc, char *argv[]) 
 {
 	struct devinfo_dev	*root;
 	int			c, uflag;
+	char			*path = NULL;
 
 	uflag = 0;
-	while ((c = getopt(argc, argv, "iruv")) != -1) {
+	while ((c = getopt(argc, argv, "ip:ruv")) != -1) {
 		switch(c) {
 		case 'i':
 			iflag++;
+			break;
+		case 'p':
+			path = optarg;
 			break;
 		case 'r':
 			rflag++;
@@ -227,12 +274,12 @@ main(int argc, char *argv[])
 			vflag++;
 			break;
 		default:
-			fprintf(stderr, "%s\n%s\n",
-			    "usage: devinfo [-irv]",
-			    "       devinfo -u");
-			exit(1);
+			usage();
 		}
 	}
+
+	if (path && (rflag || uflag))
+		usage();
 
 	if (devinfo_init())
 		err(1, "devinfo_init");
@@ -240,8 +287,13 @@ main(int argc, char *argv[])
 	if ((root = devinfo_handle_to_device(DEVINFO_ROOT_DEVICE)) == NULL)
 		errx(1, "can't find root device");
 
-	/* print resource usage? */
-	if (uflag) {
+	if (path) {
+		if (devinfo_foreach_device_child(root, print_path, (void *)path) == 0)
+			errx(1, "%s: Not found", path);
+		if (!vflag)
+			printf("\n");
+	} else if (uflag) {
+		/* print resource usage? */
 		devinfo_foreach_rman(print_rman, NULL);
 	} else {
 		/* print device hierarchy */

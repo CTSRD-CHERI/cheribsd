@@ -7,6 +7,7 @@
 
 #include <sys/acl.h>
 #include <sys/cpuset.h>
+#include <sys/_domainset.h>
 #include <sys/_ffcounter.h>
 #include <sys/_semaphore.h>
 #include <sys/socket.h>
@@ -3527,5 +3528,25 @@ SYS_STUB_ARGHASPTRS(560, int, kevent,
     /* _callargs_chk */ (&ret, stub_errno, fd, changelist, nchanges, eventlist, nevents, timeout),
     /* _callargs_err */ (&errno, fd, (const struct kevent* )changelist, nchanges, (struct kevent* )eventlist, nevents, (const struct timespec * )timeout),
     /* _localcheck */ {if (!(cheri_getperm(changelist) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(eventlist) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(timeout) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
+)
+
+SYS_STUB(561, int, cpuset_getdomain,
+    /* _protoargs */ (cpulevel_t level, cpuwhich_t which, id_t id, size_t domainsetsize, domainset_t *  mask, int *  policy),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, cpulevel_t level, cpuwhich_t which, id_t id, size_t domainsetsize, domainset_t * __capability   mask, int * __capability   policy),
+    /* _protoargs_err */ (__capability int *stub_errno, cpulevel_t level, cpuwhich_t which, id_t id, size_t domainsetsize, domainset_t * __capability   mask, int * __capability   policy),
+    /* _callargs */ (level, which, id, domainsetsize, (__cheri_fromcap domainset_t * )mask, (__cheri_fromcap int * )policy),
+    /* _callargs_chk */ (&ret, stub_errno, level, which, id, domainsetsize, mask, policy),
+    /* _callargs_err */ (&errno, level, which, id, domainsetsize, (domainset_t * )mask, (int * )policy),
+    /* _localcheck */ {if (!(cheri_getperm(mask) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(policy) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
+)
+
+SYS_STUB(562, int, cpuset_setdomain,
+    /* _protoargs */ (cpulevel_t level, cpuwhich_t which, id_t id, size_t domainsetsize, domainset_t *  mask, int policy),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, cpulevel_t level, cpuwhich_t which, id_t id, size_t domainsetsize, domainset_t * __capability   mask, int policy),
+    /* _protoargs_err */ (__capability int *stub_errno, cpulevel_t level, cpuwhich_t which, id_t id, size_t domainsetsize, domainset_t * __capability   mask, int policy),
+    /* _callargs */ (level, which, id, domainsetsize, (__cheri_fromcap domainset_t * )mask, policy),
+    /* _callargs_chk */ (&ret, stub_errno, level, which, id, domainsetsize, mask, policy),
+    /* _callargs_err */ (&errno, level, which, id, domainsetsize, (domainset_t * )mask, policy),
+    /* _localcheck */ {if (!(cheri_getperm(mask) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 

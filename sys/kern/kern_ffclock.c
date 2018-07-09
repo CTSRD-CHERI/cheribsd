@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011 The University of Melbourne
  * All rights reserved.
  *
@@ -497,3 +499,12 @@ sys_ffclock_getestimate(struct thread *td, struct ffclock_getestimate_args *uap)
 }
 
 #endif /* FFCLOCK */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

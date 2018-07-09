@@ -657,6 +657,8 @@ ah_input(struct mbuf *m, struct secasvar *sav, int skip, int protoff)
 	/* Crypto operation descriptor. */
 	crp->crp_ilen = m->m_pkthdr.len; /* Total input length. */
 	crp->crp_flags = CRYPTO_F_IMBUF | CRYPTO_F_CBIFSYNC;
+	if (V_async_crypto)
+		crp->crp_flags |= CRYPTO_F_ASYNC | CRYPTO_F_ASYNC_KEEPORDER;
 	crp->crp_buf = (caddr_t) m;
 	crp->crp_callback = ah_input_cb;
 	crp->crp_sid = cryptoid;
@@ -683,9 +685,7 @@ ah_input_cb(struct cryptop *crp)
 {
 	IPSEC_DEBUG_DECLARE(char buf[IPSEC_ADDRSTRLEN]);
 	unsigned char calc[AH_ALEN_MAX];
-	const struct auth_hash *ahx;
 	struct mbuf *m;
-	struct cryptodesc *crd;
 	struct xform_data *xd;
 	struct secasvar *sav;
 	struct secasindex *saidx;
@@ -694,7 +694,6 @@ ah_input_cb(struct cryptop *crp)
 	int authsize, rplen, error, skip, protoff;
 	uint8_t nxt;
 
-	crd = crp->crp_desc;
 	m = (struct mbuf *) crp->crp_buf;
 	xd = (struct xform_data *) crp->crp_opaque;
 	sav = xd->sav;
@@ -706,8 +705,6 @@ ah_input_cb(struct cryptop *crp)
 	IPSEC_ASSERT(saidx->dst.sa.sa_family == AF_INET ||
 		saidx->dst.sa.sa_family == AF_INET6,
 		("unexpected protocol family %u", saidx->dst.sa.sa_family));
-
-	ahx = sav->tdb_authalgxform;
 
 	/* Check for crypto errors. */
 	if (crp->crp_etype) {
@@ -1033,6 +1030,8 @@ ah_output(struct mbuf *m, struct secpolicy *sp, struct secasvar *sav,
 	/* Crypto operation descriptor. */
 	crp->crp_ilen = m->m_pkthdr.len; /* Total input length. */
 	crp->crp_flags = CRYPTO_F_IMBUF | CRYPTO_F_CBIFSYNC;
+	if (V_async_crypto)
+		crp->crp_flags |= CRYPTO_F_ASYNC | CRYPTO_F_ASYNC_KEEPORDER;
 	crp->crp_buf = (caddr_t) m;
 	crp->crp_callback = ah_output_cb;
 	crp->crp_sid = cryptoid;

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2000-2001 Boris Popov
  * All rights reserved.
  *
@@ -33,7 +35,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/iconv.h>
 #include <sys/malloc.h>
 #include <sys/mount.h>
+#include <sys/proc.h>
 #include <sys/sx.h>
+#include <sys/sysctl.h>
 #include <sys/syslog.h>
 
 #include "iconv_converter_if.h"
@@ -392,6 +396,28 @@ iconv_add(const char *converter, const char *to, const char *from)
 	return iconv_register_cspair(to, from, dcp, NULL, &csp);
 }
 
+#ifdef COMPAT_CHERIABI
+struct iconv_add_c {
+	int	ia_version;
+	char	ia_converter[ICONV_CNVNMAXLEN];
+	char	ia_to[ICONV_CSNMAXLEN];
+	char	ia_from[ICONV_CSNMAXLEN];
+	int	ia_datalen;
+	const void * __capability ia_data;
+};
+#endif
+
+#ifdef COMPAT_FREEBSD32
+struct iconv_add32 {
+	int	ia_version;
+	char	ia_converter[ICONV_CNVNMAXLEN];
+	char	ia_to[ICONV_CSNMAXLEN];
+	char	ia_from[ICONV_CSNMAXLEN];
+	int	ia_datalen;
+	uint32_t ia_data;
+};
+#endif
+
 /*
  * Add new charset pair
  */
@@ -400,34 +426,62 @@ iconv_sysctl_add(SYSCTL_HANDLER_ARGS)
 {
 	struct iconv_converter_class *dcp;
 	struct iconv_cspair *csp;
-	struct iconv_add_in din;
+	union {
+		struct iconv_add_in din;
+#ifdef COMPAT_CHERIABI
+		struct iconv_add_c din_c;
+#endif
+#ifdef COMPAT_FREEBSD32
+		struct iconv_add32 din32;
+#endif
+	} du;
+	const void * __capability ia_data;
 	struct iconv_add_out dout;
 	int error;
 
-	error = SYSCTL_IN(req, &din, sizeof(din));
+#ifdef COMPAT_CHERIABI
+	if (req->flags & SCTL_CHERIABI) {
+		error = SYSCTL_IN(req, &du.din_c, sizeof(du.din_c));
+		ia_data = du.din_c.ia_data;
+	} else
+#endif
+#ifdef COMPAT_FREEBSD32
+	if (req->flags & SCTL_MASK32) {
+		error = SYSCTL_IN(req, &du.din32, sizeof(du.din32));
+		ia_data = __USER_CAP((void*)(uintptr_t)du.din32.ia_data,
+		    du.din32.ia_datalen);
+	} else
+#endif
+	{
+		error = SYSCTL_IN(req, &du.din, sizeof(du.din));
+		ia_data = __USER_CAP(du.din.ia_data, du.din.ia_datalen);
+	}
 	if (error)
 		return error;
-	if (din.ia_version != ICONV_ADD_VER)
+	if (du.din.ia_version != ICONV_ADD_VER)
 		return EINVAL;
-	if (din.ia_datalen > ICONV_CSMAXDATALEN)
+	if (du.din.ia_datalen > ICONV_CSMAXDATALEN)
 		return EINVAL;
-	if (strlen(din.ia_from) >= ICONV_CSNMAXLEN)
+	if (strlen(du.din.ia_from) >= ICONV_CSNMAXLEN)
 		return EINVAL;
-	if (strlen(din.ia_to) >= ICONV_CSNMAXLEN)
+	if (strlen(du.din.ia_to) >= ICONV_CSNMAXLEN)
 		return EINVAL;
-	if (strlen(din.ia_converter) >= ICONV_CNVNMAXLEN)
+	if (strlen(du.din.ia_converter) >= ICONV_CNVNMAXLEN)
 		return EINVAL;
-	if (iconv_lookupconv(din.ia_converter, &dcp) != 0)
+	if (iconv_lookupconv(du.din.ia_converter, &dcp) != 0)
 		return EINVAL;
 	sx_xlock(&iconv_lock);
-	error = iconv_register_cspair(din.ia_to, din.ia_from, dcp, NULL, &csp);
+	error = iconv_register_cspair(du.din.ia_to, du.din.ia_from, dcp,
+	    NULL, &csp);
 	if (error) {
 		sx_xunlock(&iconv_lock);
 		return error;
 	}
-	if (din.ia_datalen) {
-		csp->cp_data = malloc(din.ia_datalen, M_ICONVDATA, M_WAITOK);
-		error = copyin(din.ia_data, csp->cp_data, din.ia_datalen);
+	if (du.din.ia_datalen) {
+		csp->cp_data = malloc(du.din.ia_datalen, M_ICONVDATA, M_WAITOK);
+		error = copyin_c(ia_data,
+		    (__cheri_tocap void * __capability)csp->cp_data,
+		    du.din.ia_datalen);
 		if (error)
 			goto bad;
 	}
@@ -436,7 +490,8 @@ iconv_sysctl_add(SYSCTL_HANDLER_ARGS)
 	if (error)
 		goto bad;
 	sx_xunlock(&iconv_lock);
-	ICDEBUG("%s => %s, %d bytes\n",din.ia_from, din.ia_to, din.ia_datalen);
+	ICDEBUG("%s => %s, %d bytes\n", du.din.ia_from, du.din.ia_to,
+	    du.din.ia_datalen);
 	return 0;
 bad:
 	iconv_unregister_cspair(csp);
@@ -444,8 +499,9 @@ bad:
 	return error;
 }
 
-SYSCTL_PROC(_kern_iconv, OID_AUTO, add, CTLFLAG_RW | CTLTYPE_OPAQUE,
-	    NULL, 0, iconv_sysctl_add, "S,xlat", "register charset pair");
+SYSCTL_PROC(_kern_iconv, OID_AUTO, add,
+    CTLFLAG_RW | CTLTYPE_OPAQUE | CTLFLAG_PTRIN,
+    NULL, 0, iconv_sysctl_add, "S,xlat", "register charset pair");
 
 /*
  * Default stubs for converters

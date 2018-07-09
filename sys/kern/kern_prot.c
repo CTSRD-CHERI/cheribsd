@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1989, 1990, 1991, 1993
  *	The Regents of the University of California.
  * (c) UNIX System Laboratories, Inc.
@@ -2289,3 +2291,12 @@ change_svgid(struct ucred *newcred, gid_t svgid)
 
 	newcred->cr_svgid = svgid;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

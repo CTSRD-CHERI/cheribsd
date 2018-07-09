@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright 2013 Nathan Whitehorn
  * All rights reserved.
  *
@@ -334,8 +336,8 @@ vscsi_attach(device_t dev)
 
 	mtx_lock(&sc->io_lock);
 	vscsi_setup_bus(sc);
-	sc->xfer = malloc(sizeof(sc->xfer[0])*sc->max_transactions, M_VSCSI,
-	    M_NOWAIT);
+	sc->xfer = mallocarray(sc->max_transactions, sizeof(sc->xfer[0]),
+	    M_VSCSI, M_NOWAIT);
 	for (i = 0; i < sc->max_transactions; i++) {
 		xp = &sc->xfer[i];
 		xp->sc = sc;

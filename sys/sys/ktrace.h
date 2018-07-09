@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1988, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -224,9 +226,21 @@ struct ktr_faultend {
 };
 
 /*
+ * KTR_STRUCT_ARRAY - array of misc. structs
+ */
+#define	KTR_STRUCT_ARRAY 15
+struct ktr_struct_array {
+	size_t struct_size;
+	/*
+	 * Followed by null-terminated structure name and then payload
+	 * contents.
+	 */
+};
+
+/*
  * KTR_CCALL - CHERI CCall
  */
-#define KTR_CCALL	15
+#define KTR_CCALL	16
 struct ktr_ccall {
 	struct cheri_serial		ktr_pcc;
 	struct cheri_serial		ktr_idc;
@@ -237,7 +251,7 @@ struct ktr_ccall {
 /*
  * KTR_CRETURN - CHERI CReturn (return from CCall)
  */
-#define KTR_CRETURN	16
+#define KTR_CRETURN	17
 struct ktr_creturn {
 	/* XXXBD: restored PCC/IDC? */
 	struct cheri_serial		ktr_cret;
@@ -247,7 +261,7 @@ struct ktr_creturn {
 /*
  * KTR_CEXCEPTION - CHERI Capability exception
  */
-#define KTR_CEXCEPTION	17
+#define KTR_CEXCEPTION	18
 struct ktr_cexception {
 	struct cheri_serial	ktr_cap;
 	uint8_t			ktr_exccode;
@@ -257,7 +271,7 @@ struct ktr_cexception {
 /*
  * KTR_SYSERRCAUSE - String detailing cause of next syscall error
  */
-#define	KTR_SYSERRCAUSE	18
+#define	KTR_SYSERRCAUSE	19
 	/* record contains error message */
 
 /*
@@ -284,6 +298,7 @@ struct ktr_cexception {
 #define KTRFAC_CAPFAIL	(1<<KTR_CAPFAIL)
 #define KTRFAC_FAULT	(1<<KTR_FAULT)
 #define KTRFAC_FAULTEND	(1<<KTR_FAULTEND)
+#define	KTRFAC_STRUCT_ARRAY (1<<KTR_STRUCT_ARRAY)
 #define KTRFAC_CCALL	(1<<KTR_CCALL)
 #define KTRFAC_CRETURN	(1<<KTR_CRETURN)
 #define KTRFAC_CEXCEPTION	(1<<KTR_CEXCEPTION)
@@ -314,7 +329,8 @@ void	ktrprocexec(struct proc *, struct ucred **, struct vnode **);
 void	ktrprocexit(struct thread *);
 void	ktrprocfork(struct proc *, struct proc *);
 void	ktruserret(struct thread *);
-void	ktrstruct(const char *, void *, size_t);
+void	ktrstruct(const char *, const void *, size_t);
+void	ktrstructarray(const char *, enum uio_seg, const void *, int, size_t);
 void	ktrcapfail(enum ktr_cap_fail_type, const cap_rights_t *,
 	    const cap_rights_t *);
 #define ktrcaprights(s) \
@@ -352,3 +368,13 @@ __END_DECLS
 #endif
 
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

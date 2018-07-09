@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ *
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -224,3 +226,12 @@
 #define	SCNxPTR		__PRIptr"x"	/* uintptr_t */
 
 #endif /* !_MACHINE_INTTYPES_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

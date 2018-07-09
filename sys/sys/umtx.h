@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2002, Jeffrey Roberson <jeff@freebsd.org>
  * All rights reserved.
  *
@@ -122,7 +124,11 @@ struct umtx_robust_lists_params {
 
 #ifndef _KERNEL
 
+__BEGIN_DECLS
+
 int _umtx_op(void *obj, int op, u_long val, void *uaddr, void *uaddr2);
+
+__END_DECLS
 
 #else
 
@@ -194,3 +200,12 @@ void umtx_thread_alloc(struct thread *);
 void umtx_thread_exit(struct thread *);
 #endif /* !_KERNEL */
 #endif /* !_SYS_UMTX_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

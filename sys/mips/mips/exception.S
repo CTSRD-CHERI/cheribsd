@@ -1479,7 +1479,7 @@ NESTED(MipsFPTrap, CALLFRAME_SIZ, ra)
 	REG_S	ra, CALLFRAME_RA(sp)
 	.mask	0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ)
 
-#if defined(__mips_n64)
+#if defined(__mips_n32) || defined(__mips_n64)
 	or	t1, t0, MIPS_SR_COP_1_BIT | MIPS_SR_FR
 #else
 	or	t1, t0, MIPS_SR_COP_1_BIT
@@ -1654,3 +1654,13 @@ NESTED_NOPROFILE(MipsCacheException, KERN_EXC_FRAME_SIZE, ra)
 	MSG("cache error @ EPC 0x%x CachErr 0x%x");
 	.set	at
 END(MipsCacheException)
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

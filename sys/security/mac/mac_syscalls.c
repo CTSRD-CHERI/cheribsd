@@ -264,7 +264,6 @@ kern_mac_get_fd(struct thread *td, int fd, void * __capability mac_p)
 	struct pipe *pipe;
 	struct socket *so;
 	cap_rights_t rights;
-	short label_type;
 	int error;
 
 	error = copyin_mac(mac_p, &mac);
@@ -288,7 +287,6 @@ kern_mac_get_fd(struct thread *td, int fd, void * __capability mac_p)
 	if (error)
 		goto out;
 
-	label_type = fp->f_type;
 	switch (fp->f_type) {
 	case DTYPE_FIFO:
 	case DTYPE_VNODE:
@@ -715,3 +713,12 @@ sys_mac_syscall(struct thread *td, struct mac_syscall_args *uap)
 }
 
 #endif /* !MAC */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

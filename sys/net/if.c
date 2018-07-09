@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1980, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -1859,7 +1861,7 @@ ifa_maintain_loopback_route(int cmd, const char *otype, struct ifaddr *ifa,
 	bzero(&info, sizeof(info));
 	if (cmd != RTM_DELETE)
 		info.rti_ifp = V_loif;
-	info.rti_flags = ifa->ifa_flags | RTF_HOST | RTF_STATIC;
+	info.rti_flags = ifa->ifa_flags | RTF_HOST | RTF_STATIC | RTF_PINNED;
 	info.rti_info[RTAX_DST] = ia;
 	info.rti_info[RTAX_GATEWAY] = (struct sockaddr *)&null_sdl;
 	link_init_sdl(ifp, (struct sockaddr *)&null_sdl, ifp->if_type);
@@ -4958,3 +4960,13 @@ drbr_enqueue_drv(if_t ifh, struct buf_ring *br, struct mbuf *m)
 	return drbr_enqueue(ifh, br, m);
 
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

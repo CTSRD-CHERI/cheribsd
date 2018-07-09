@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -827,3 +829,13 @@ extern u_char *fragtbl[];
 #define	UFSRESUME	_IO('U', 2)
 
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "pointer_size"
+//   ],
+//   "change_comment": "embedded pointer storage in superblock"
+// }
+// CHERI CHANGES END

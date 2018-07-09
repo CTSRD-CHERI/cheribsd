@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2012 The FreeBSD Foundation
  * All rights reserved.
  *
@@ -337,3 +339,13 @@ ffs_susp_uninitialize(void)
 	destroy_dev(ffs_susp_dev);
 	sx_destroy(&ffs_susp_lock);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

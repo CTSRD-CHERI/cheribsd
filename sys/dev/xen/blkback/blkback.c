@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2009-2012 Spectra Logic Corporation
  * All rights reserved.
  *
@@ -3164,7 +3166,7 @@ xbb_alloc_requests(struct xbb_softc *xbb)
 	/*
 	 * Allocate request book keeping datastructures.
 	 */
-	xbb->requests = malloc(xbb->max_requests * sizeof(*xbb->requests),
+	xbb->requests = mallocarray(xbb->max_requests, sizeof(*xbb->requests),
 			       M_XENBLOCKBACK, M_NOWAIT|M_ZERO);
 	if (xbb->requests == NULL) {
 		xenbus_dev_fatal(xbb->dev, ENOMEM, 
@@ -3192,7 +3194,7 @@ xbb_alloc_request_lists(struct xbb_softc *xbb)
 	 * If no requests can be merged, we need 1 request list per
 	 * in flight request.
 	 */
-	xbb->request_lists = malloc(xbb->max_requests *
+	xbb->request_lists = mallocarray(xbb->max_requests,
 		sizeof(*xbb->request_lists), M_XENBLOCKBACK, M_NOWAIT|M_ZERO);
 	if (xbb->request_lists == NULL) {
 		xenbus_dev_fatal(xbb->dev, ENOMEM, 
@@ -3220,7 +3222,7 @@ xbb_alloc_request_lists(struct xbb_softc *xbb)
 		}
 #endif /* XBB_USE_BOUNCE_BUFFERS */
 
-		reqlist->gnt_handles = malloc(xbb->max_reqlist_segments *
+		reqlist->gnt_handles = mallocarray(xbb->max_reqlist_segments,
 					      sizeof(*reqlist->gnt_handles),
 					      M_XENBLOCKBACK, M_NOWAIT|M_ZERO);
 		if (reqlist->gnt_handles == NULL) {
@@ -3934,3 +3936,12 @@ static driver_t xbb_driver = {
 devclass_t xbb_devclass;
 
 DRIVER_MODULE(xbbd, xenbusb_back, xbb_driver, xbb_devclass, 0, 0);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

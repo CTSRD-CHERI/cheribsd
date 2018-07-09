@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2012 Juli Mallett <jmallett@FreeBSD.org>
  * All rights reserved.
  *
@@ -506,3 +508,14 @@ elf32_dump_thread(struct thread *td __unused, void *dst __unused,
     size_t *off __unused)
 {
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "support",
+//     "user_capabilities"
+//   ],
+//   "change_comment": "shared page"
+// }
+// CHERI CHANGES END

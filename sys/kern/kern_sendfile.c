@@ -273,6 +273,7 @@ sendfile_iodone(void *arg, vm_page_t *pg, int count, int error)
 	if (!refcount_release(&sfio->nios))
 		return;
 
+	CURVNET_SET(so->so_vnet);
 	if (sfio->error) {
 		struct mbuf *m;
 
@@ -293,15 +294,13 @@ sendfile_iodone(void *arg, vm_page_t *pg, int count, int error)
 		m = sfio->m;
 		for (int i = 0; i < sfio->npages; i++)
 			m = m_free(m);
-	} else {
-		CURVNET_SET(so->so_vnet);
+	} else
 		(void )(so->so_proto->pr_usrreqs->pru_ready)(so, sfio->m,
 		    sfio->npages);
-		CURVNET_RESTORE();
-	}
 
 	SOCK_LOCK(so);
 	sorele(so);
+	CURVNET_RESTORE();
 	free(sfio, M_TEMP);
 }
 
@@ -1046,3 +1045,12 @@ freebsd4_sendfile(struct thread *td, struct freebsd4_sendfile_args *uap)
 	return (sendfile(td, &args, 1));
 }
 #endif /* COMPAT_FREEBSD4 */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

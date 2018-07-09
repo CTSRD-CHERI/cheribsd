@@ -127,8 +127,11 @@ VECTOR(_locore, unknown)
 #else
 	li	t1, MIPS_SR_COP_1_BIT
 #endif
+#if defined(__mips_n32) || defined(__mips_n64)
+	or	t1, MIPS_SR_FR
+#endif
 #ifdef __mips_n64
-	or	t1, MIPS_SR_KX | MIPS_SR_SX | MIPS_SR_UX | MIPS_SR_FR
+	or	t1, MIPS_SR_KX | MIPS_SR_SX | MIPS_SR_UX
 #endif
 #endif
 	/*
@@ -154,9 +157,15 @@ VECTOR(_locore, unknown)
 	 *
 	 * XXXRW: Do we want to rely on default initialisation of all CP2
 	 * registers here?
+	 *
+	 * XXXAR: Recent versions of CHERI no longer mirror the special
+	 * registers to the general purpose register file so for now set up
+	 * this mirroring now and assume only DDC and PCC are ambient caps
 	 */
-	cgetdefault	CHERI_REG_KCC	# Preserve $kcc
+	cgetpcc	CHERI_REG_KCC		# Preserve $kcc
+	csetkcc	CHERI_REG_KCC
 	cgetdefault	CHERI_REG_KDC	# Preserve $kdc
+	csetkdc	CHERI_REG_KDC
 #endif
 
 #if defined(CPU_BERI)
@@ -236,3 +245,13 @@ VECTOR(_locore, unknown)
 	PANIC("Startup failed!")
 
 VECTOR_END(_locore)
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

@@ -649,3 +649,13 @@ static devclass_t vtbe_devclass;
 
 DRIVER_MODULE(vtbe, simplebus, vtbe_driver, vtbe_devclass, 0, 0);
 MODULE_DEPEND(vtbe, ether, 1, 1, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "kiovec_t",
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

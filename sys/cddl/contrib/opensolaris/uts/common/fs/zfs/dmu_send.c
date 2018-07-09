@@ -3369,3 +3369,13 @@ dmu_objset_is_receiving(objset_t *os)
 	return (os->os_dsl_dataset != NULL &&
 	    os->os_dsl_dataset->ds_owner == dmu_recv_tag);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

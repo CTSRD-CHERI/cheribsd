@@ -1,6 +1,8 @@
 /*	$OpenBSD: trap.c,v 1.19 1998/09/30 12:40:41 pefo Exp $	*/
 /* tracked to 1.23 */
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -1165,7 +1167,7 @@ dofault:
 			addr = trapframe->pc;
 			MipsSwitchFPState(PCPU_GET(fpcurthread), td->td_frame);
 			PCPU_SET(fpcurthread, td);
-#if defined(__mips_n64)
+#if defined(__mips_n32) || defined(__mips_n64)
 			td->td_frame->sr |= MIPS_SR_COP_1_BIT | MIPS_SR_FR;
 #else
 			td->td_frame->sr |= MIPS_SR_COP_1_BIT;
@@ -2043,3 +2045,13 @@ emulate_unaligned_access(struct trapframe *frame, int mode)
 	}
 	return access_type;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

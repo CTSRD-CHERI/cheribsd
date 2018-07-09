@@ -3083,6 +3083,30 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 6;
 		break;
 	}
+	/* cheriabi_cpuset_getdomain */
+	case 561: {
+		struct cheriabi_cpuset_getdomain_args *p = params;
+		iarg[0] = p->level; /* cpulevel_t */
+		iarg[1] = p->which; /* cpuwhich_t */
+		iarg[2] = p->id; /* id_t */
+		uarg[3] = p->domainsetsize; /* size_t */
+		uarg[4] = (__cheri_addr intptr_t) p->mask; /* domainset_t * __capability */
+		uarg[5] = (__cheri_addr intptr_t) p->policy; /* int * __capability */
+		*n_args = 6;
+		break;
+	}
+	/* cheriabi_cpuset_setdomain */
+	case 562: {
+		struct cheriabi_cpuset_setdomain_args *p = params;
+		iarg[0] = p->level; /* cpulevel_t */
+		iarg[1] = p->which; /* cpuwhich_t */
+		iarg[2] = p->id; /* id_t */
+		uarg[3] = p->domainsetsize; /* size_t */
+		uarg[4] = (__cheri_addr intptr_t) p->mask; /* domainset_t * __capability */
+		iarg[5] = p->policy; /* int */
+		*n_args = 6;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -8217,6 +8241,56 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* cheriabi_cpuset_getdomain */
+	case 561:
+		switch(ndx) {
+		case 0:
+			p = "cpulevel_t";
+			break;
+		case 1:
+			p = "cpuwhich_t";
+			break;
+		case 2:
+			p = "id_t";
+			break;
+		case 3:
+			p = "size_t";
+			break;
+		case 4:
+			p = "userland domainset_t * __capability";
+			break;
+		case 5:
+			p = "userland int * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_cpuset_setdomain */
+	case 562:
+		switch(ndx) {
+		case 0:
+			p = "cpulevel_t";
+			break;
+		case 1:
+			p = "cpuwhich_t";
+			break;
+		case 2:
+			p = "id_t";
+			break;
+		case 3:
+			p = "size_t";
+			break;
+		case 4:
+			p = "userland domainset_t * __capability";
+			break;
+		case 5:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -9992,6 +10066,16 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* cheriabi_kevent */
 	case 560:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_cpuset_getdomain */
+	case 561:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_cpuset_setdomain */
+	case 562:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

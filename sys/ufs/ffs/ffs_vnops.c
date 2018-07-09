@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: (BSD-2-Clause-FreeBSD AND BSD-3-Clause)
+ *
  * Copyright (c) 2002, 2003 Networks Associates Technology, Inc.
  * All rights reserved.
  *
@@ -1365,7 +1367,6 @@ vop_deleteextattr {
 */
 {
 	struct inode *ip;
-	struct fs *fs;
 	struct extattr *eap;
 	uint32_t ul;
 	int olen, error, i, easize;
@@ -1373,7 +1374,6 @@ vop_deleteextattr {
 	void *tmp;
 
 	ip = VTOI(ap->a_vp);
-	fs = ITOFS(ip);
 
 	if (ap->a_vp->v_type == VCHR || ap->a_vp->v_type == VBLK)
 		return (EOPNOTSUPP);
@@ -1722,3 +1722,13 @@ ffs_getpages(struct vop_getpages_args *ap)
 	return (vfs_bio_getpages(vp, ap->a_m, ap->a_count, ap->a_rbehind,
 	    ap->a_rahead, ffs_gbp_getblkno, ffs_gbp_getblksz));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

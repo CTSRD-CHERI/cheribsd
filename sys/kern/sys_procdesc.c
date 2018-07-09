@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2009, 2016 Robert N. M. Watson
  * All rights reserved.
  *
@@ -577,3 +579,12 @@ procdesc_fill_kinfo(struct file *fp, struct kinfo_file *kif,
 	kif->kf_un.kf_proc.kf_pid = pdp->pd_pid;
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

@@ -2,6 +2,8 @@
 /*	$KAME: if_stf.c,v 1.73 2001/12/03 11:08:30 keiichi Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
  *
@@ -763,3 +765,13 @@ stf_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	return error;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

@@ -200,10 +200,12 @@ CRUNCH_SRCDIRS+= usr.bin
 CRUNCH_LIBS+=	-lbz2
 
 CRUNCH_PROGS_usr.bin+= \
+		awk \
 		basename \
 		bzip2 \
 		diff \
 		dirname \
+		env \
 		fetch \
 		find \
 		grep \
@@ -237,6 +239,7 @@ CRUNCH_PROGS_usr.bin+= \
 		uuencode \
 		vmstat \
 		w \
+		wall \
 		which \
 		xargs
 

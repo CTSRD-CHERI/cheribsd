@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2013-2014 Kevin Lo
  * All rights reserved.
  *
@@ -1056,3 +1058,12 @@ axge_csum_cfg(struct usb_ether *ue)
 		csum |= CRCR_IP | CRCR_TCP | CRCR_UDP;
 	axge_write_cmd_1(sc, AXGE_ACCESS_MAC, AXGE_CRCR, csum);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

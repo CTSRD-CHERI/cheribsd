@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright 2008 Nathan Whitehorn. All rights reserved.
  * Copyright 2003 by Peter Grehan. All rights reserved.
  * Copyright (C) 1998, 1999, 2000 Tsubai Masanari.  All rights reserved.
@@ -1294,3 +1296,12 @@ bm_disable_interrupts(struct bm_softc *sc)
 {
 	CSR_WRITE_2(sc, BM_INTR_DISABLE, BM_INTR_NONE);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

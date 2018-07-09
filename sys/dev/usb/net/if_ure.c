@@ -70,6 +70,7 @@ static const STRUCT_USB_HOST_ID ure_devs[] = {
 	URE_DEV(LENOVO, RTL8153, 0),
 	URE_DEV(REALTEK, RTL8152, URE_FLAG_8152),
 	URE_DEV(REALTEK, RTL8153, 0),
+	URE_DEV(TPLINK, RTL8153, 0),
 #undef URE_DEV
 };
 
@@ -1260,3 +1261,12 @@ ure_init_fifo(struct ure_softc *sc)
 	ure_write_4(sc, URE_PLA_TXFIFO_CTRL, URE_MCU_TYPE_PLA,
 	    URE_TXFIFO_THR_NORMAL);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

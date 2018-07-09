@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2007 Sepherosa Ziehau.  All rights reserved.
  *
  * This code is derived from software contributed to The DragonFly Project
@@ -2745,3 +2747,12 @@ et_resume(device_t dev)
 	ET_UNLOCK(sc);
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

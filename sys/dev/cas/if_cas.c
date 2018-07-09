@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (C) 2001 Eduardo Horvath.
  * Copyright (c) 2001-2003 Thomas Moestl
  * Copyright (c) 2007-2009 Marius Strobl <marius@FreeBSD.org>
@@ -2917,3 +2919,12 @@ cas_pci_resume(device_t dev)
 	cas_resume(device_get_softc(dev));
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

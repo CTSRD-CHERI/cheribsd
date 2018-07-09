@@ -167,3 +167,12 @@ extern void *avl_walk(struct avl_tree *, void *, int);
 #endif
 
 #endif	/* _AVL_IMPL_H */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "pointer_bit_flags"
+//   ]
+// }
+// CHERI CHANGES END

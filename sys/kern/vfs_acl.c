@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1999-2006, 2016-2017 Robert N. M. Watson
  * All rights reserved.
  *
@@ -623,3 +625,12 @@ acl_free(struct acl *aclp)
 
 	free(aclp, M_ACL);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

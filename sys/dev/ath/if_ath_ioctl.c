@@ -197,7 +197,7 @@ ath_ioctl_diag(struct ath_softc *sc, struct ath_diag *ad)
 		 * pointer for us to use below in reclaiming the buffer;
 		 * may want to be more defensive.
 		 */
-		outdata = malloc(outsize, M_TEMP, M_NOWAIT);
+		outdata = malloc(outsize, M_TEMP, M_NOWAIT | M_ZERO);
 		if (outdata == NULL) {
 			error = ENOMEM;
 			goto bad;
@@ -310,4 +310,13 @@ ath_ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 		return (ENOTTY);
 	}
 }
-
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

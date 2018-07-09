@@ -36,6 +36,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/mman.h>
 #include <sys/signal.h>
+#include <sys/uio.h>
 #include <sys/ktrace.h>		/* Must come after sys/signal.h */
 #include <sys/syscallsubr.h>
 #include <sys/user.h>

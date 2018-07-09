@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -486,7 +488,7 @@ nfsm_fhtom(struct nfsrv_descript *nd, u_int8_t *fhp, int size, int set_true)
 {
 	u_int32_t *tl;
 	u_int8_t *cp;
-	int fullsiz, rem, bytesize = 0;
+	int fullsiz, bytesize = 0;
 
 	if (size == 0)
 		size = NFSX_MYFH;
@@ -503,7 +505,6 @@ nfsm_fhtom(struct nfsrv_descript *nd, u_int8_t *fhp, int size, int set_true)
 	case ND_NFSV3:
 	case ND_NFSV4:
 		fullsiz = NFSM_RNDUP(size);
-		rem = fullsiz - size;
 		if (set_true) {
 		    bytesize = 2 * NFSX_UNSIGNED + fullsiz;
 		    NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
@@ -882,7 +883,7 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 				NFSV3_FSFHOMOGENEOUS | NFSV3_FSFCANSETTIME);
 		}
 		if (pc != NULL) {
-			pc->pc_linkmax = LINK_MAX;
+			pc->pc_linkmax = NFS_LINK_MAX;
 			pc->pc_namemax = NAME_MAX;
 			pc->pc_notrunc = 0;
 			pc->pc_chownrestricted = 0;
@@ -1319,7 +1320,7 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 			NFSM_DISSECT(tl, u_int32_t *, NFSX_UNSIGNED);
 			if (compare) {
 				if (!(*retcmpp)) {
-				    if (fxdr_unsigned(int, *tl) != LINK_MAX)
+				    if (fxdr_unsigned(int, *tl) != NFS_LINK_MAX)
 					*retcmpp = NFSERR_NOTSAME;
 				}
 			} else if (pc != NULL) {
@@ -2304,7 +2305,7 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 			break;
 		case NFSATTRBIT_MAXLINK:
 			NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
-			*tl = txdr_unsigned(LINK_MAX);
+			*tl = txdr_unsigned(NFS_LINK_MAX);
 			retnum += NFSX_UNSIGNED;
 			break;
 		case NFSATTRBIT_MAXNAME:
@@ -4246,3 +4247,13 @@ nfsv4_freeslot(struct nfsclsession *sep, int slot)
 	mtx_unlock(&sep->nfsess_mtx);
 }
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

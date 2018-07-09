@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1999 Kazutaka YOKOTA <yokota@zodiac.mech.utsunomiya-u.ac.jp>
  * All rights reserved.
  *
@@ -134,8 +136,8 @@ splash_register(splash_decoder_t *decoder)
 				break;
 		}
 		if ((i >= decoders) && (decoders % DECODER_ARRAY_DELTA) == 0) {
-			p = malloc(sizeof(*p)*(decoders + DECODER_ARRAY_DELTA),
-			   	M_DEVBUF, M_NOWAIT);
+			p = mallocarray(decoders + DECODER_ARRAY_DELTA,
+			   	sizeof(*p), M_DEVBUF, M_NOWAIT);
 			if (p == NULL)
 				return ENOMEM;
 			if (decoder_set != NULL) {

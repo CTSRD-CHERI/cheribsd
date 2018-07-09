@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
  * Copyright (c) 2001-2003 Thomas Moestl <tmm@FreeBSD.org>.
  * All rights reserved.
@@ -1746,3 +1748,12 @@ chipit:
 	    HME_MAC_RXCFG_ME)))
 		device_printf(sc->sc_dev, "cannot configure RX MAC\n");
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

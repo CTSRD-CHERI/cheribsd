@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2006 IronPort Systems Inc. <ambrisko@ironport.com>
  * All rights reserved.
  *
@@ -83,8 +85,8 @@ int ipmi_attached = 0;
 static int on = 1;
 static bool wd_in_shutdown = false;
 static int wd_timer_actions = IPMI_SET_WD_ACTION_POWER_CYCLE;
-static int wd_shutdown_countdown = 420; /* sec */
-static int wd_startup_countdown = 420; /* sec */
+static int wd_shutdown_countdown = 0; /* sec */
+static int wd_startup_countdown = 0; /* sec */
 static int wd_pretimeout_countdown = 120; /* sec */
 static int cycle_wait = 10; /* sec */
 

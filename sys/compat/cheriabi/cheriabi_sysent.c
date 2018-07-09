@@ -551,7 +551,7 @@ struct sysent cheriabi_sysent[] = {
 	{ AS(cheriabi_rctl_get_limits_args), (sy_call_t *)cheriabi_rctl_get_limits, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 527 = cheriabi_rctl_get_limits */
 	{ AS(cheriabi_rctl_add_rule_args), (sy_call_t *)cheriabi_rctl_add_rule, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 528 = cheriabi_rctl_add_rule */
 	{ AS(cheriabi_rctl_remove_rule_args), (sy_call_t *)cheriabi_rctl_remove_rule, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 529 = cheriabi_rctl_remove_rule */
-	{ AS(posix_fallocate_args), (sy_call_t *)sys_posix_fallocate, AUE_POSIX_FALLOCATE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 530 = posix_fallocate */
+	{ AS(posix_fallocate_args), (sy_call_t *)sys_posix_fallocate, AUE_POSIX_FALLOCATE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 530 = posix_fallocate */
 	{ AS(posix_fadvise_args), (sy_call_t *)sys_posix_fadvise, AUE_POSIX_FADVISE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 531 = posix_fadvise */
 	{ AS(cheriabi_wait6_args), (sy_call_t *)cheriabi_wait6, AUE_WAIT6, NULL, 0, 0, 0, SY_THR_STATIC },	/* 532 = cheriabi_wait6 */
 	{ AS(cheriabi_cap_rights_limit_args), (sy_call_t *)cheriabi_cap_rights_limit, AUE_CAP_RIGHTS_LIMIT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 533 = cheriabi_cap_rights_limit */
@@ -582,4 +582,6 @@ struct sysent cheriabi_sysent[] = {
 	{ AS(cheriabi_fhstatfs_args), (sy_call_t *)cheriabi_fhstatfs, AUE_FHSTATFS, NULL, 0, 0, 0, SY_THR_STATIC },	/* 558 = cheriabi_fhstatfs */
 	{ AS(cheriabi_mknodat_args), (sy_call_t *)cheriabi_mknodat, AUE_MKNODAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 559 = cheriabi_mknodat */
 	{ AS(cheriabi_kevent_args), (sy_call_t *)cheriabi_kevent, AUE_KEVENT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 560 = cheriabi_kevent */
+	{ AS(cheriabi_cpuset_getdomain_args), (sy_call_t *)cheriabi_cpuset_getdomain, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 561 = cheriabi_cpuset_getdomain */
+	{ AS(cheriabi_cpuset_setdomain_args), (sy_call_t *)cheriabi_cpuset_setdomain, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 562 = cheriabi_cpuset_setdomain */
 };

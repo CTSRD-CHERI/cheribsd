@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -116,6 +118,18 @@ copyout_nofault_c(const void * __capability kaddr, void * __capability udaddr,
 
 	save = vm_fault_disable_pagefaults();
 	error = copyout_c(kaddr, udaddr, len);
+	vm_fault_enable_pagefaults(save);
+	return (error);
+}
+
+int
+copyoutcap_nofault_c(const void * __capability kaddr,
+    void * __capability udaddr, size_t len)
+{
+	int error, save;
+
+	save = vm_fault_disable_pagefaults();
+	error = copyoutcap_c(kaddr, udaddr, len);
 	vm_fault_enable_pagefaults(save);
 	return (error);
 }
@@ -936,3 +950,14 @@ casuword32_c(volatile uint32_t * __capability base, uint32_t oldval,
 	return (ov);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

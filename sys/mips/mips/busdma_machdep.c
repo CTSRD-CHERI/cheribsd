@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2006 Oleksandr Tymoshenko
  * All rights reserved.
  *
@@ -344,7 +346,8 @@ _busdma_alloc_dmamap(bus_dma_tag_t dmat)
 	struct sync_list *slist;
 	bus_dmamap_t map;
 
-	slist = malloc(sizeof(*slist) * dmat->nsegments, M_BUSDMA, M_NOWAIT);
+	slist = mallocarray(dmat->nsegments, sizeof(*slist), M_BUSDMA,
+	    M_NOWAIT);
 	if (slist == NULL)
 		return (NULL);
 	map = uma_zalloc_arg(dmamap_zone, dmat, M_NOWAIT);
@@ -481,6 +484,13 @@ bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 }
 
 int
+bus_dma_tag_set_domain(bus_dma_tag_t dmat, int domain)
+{
+
+	return (0);
+}
+
+int
 bus_dma_tag_destroy(bus_dma_tag_t dmat)
 {
 #ifdef KTR
@@ -527,9 +537,9 @@ bus_dmamap_create(bus_dma_tag_t dmat, int flags, bus_dmamap_t *mapp)
 	int error = 0;
 
 	if (dmat->segments == NULL) {
-		dmat->segments = (bus_dma_segment_t *)malloc(
-		    sizeof(bus_dma_segment_t) * dmat->nsegments, M_BUSDMA,
-		    M_NOWAIT);
+		dmat->segments =
+		    (bus_dma_segment_t *)mallocarray(dmat->nsegments,
+		    sizeof(bus_dma_segment_t), M_BUSDMA, M_NOWAIT);
 		if (dmat->segments == NULL) {
 			CTR3(KTR_BUSDMA, "%s: tag %p error %d",
 			    __func__, dmat, ENOMEM);
@@ -640,9 +650,9 @@ bus_dmamem_alloc(bus_dma_tag_t dmat, void** vaddrp, int flags,
 	else
 		mflags = M_WAITOK;
 	if (dmat->segments == NULL) {
-		dmat->segments = (bus_dma_segment_t *)malloc(
-		    sizeof(bus_dma_segment_t) * dmat->nsegments, M_BUSDMA,
-		    mflags);
+		dmat->segments = 
+		   (bus_dma_segment_t *)mallocarray(dmat->nsegments,
+		    sizeof(bus_dma_segment_t), M_BUSDMA, mflags);
 		if (dmat->segments == NULL) {
 			CTR4(KTR_BUSDMA, "%s: tag %p tag flags 0x%x error %d",
 			    __func__, dmat, dmat->flags, ENOMEM);

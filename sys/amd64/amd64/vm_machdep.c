@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1982, 1986 The Regents of the University of California.
  * Copyright (c) 1989, 1990 William Jolitz
  * Copyright (c) 1994 John Dyson
@@ -337,6 +339,8 @@ cpu_thread_clean(struct thread *td)
 	 * Clean TSS/iomap
 	 */
 	if (pcb->pcb_tssp != NULL) {
+		pmap_pti_remove_kva((vm_offset_t)pcb->pcb_tssp,
+		    (vm_offset_t)pcb->pcb_tssp + ctob(IOPAGES + 1));
 		kmem_free(kernel_arena, (vm_offset_t)pcb->pcb_tssp,
 		    ctob(IOPAGES + 1));
 		pcb->pcb_tssp = NULL;
@@ -508,6 +512,9 @@ cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
 		   (((uintptr_t)stack->ss_sp + stack->ss_size - 4) & ~0x0f) - 4;
 		td->td_frame->tf_rip = (uintptr_t)entry;
 
+		/* Return address sentinel value to stop stack unwinding. */
+		suword32((void *)td->td_frame->tf_rsp, 0);
+
 		/* Pass the argument to the entry point. */
 		suword32((void *)(td->td_frame->tf_rsp + sizeof(int32_t)),
 		    (uint32_t)(uintptr_t)arg);
@@ -530,6 +537,9 @@ cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
 	td->td_frame->tf_fs = _ufssel;
 	td->td_frame->tf_gs = _ugssel;
 	td->td_frame->tf_flags = TF_HASSEGS;
+
+	/* Return address sentinel value to stop stack unwinding. */
+	suword((void *)td->td_frame->tf_rsp, 0);
 
 	/* Pass the argument to the entry point. */
 	td->td_frame->tf_rdi = (register_t)arg;

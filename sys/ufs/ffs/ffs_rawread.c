@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2000-2003 Tor Egge
  * All rights reserved.
  *
@@ -472,3 +474,12 @@ ffs_rawread(struct vnode *vp,
 	*workdone = 0;
 	return 0;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2002-2007 Neterion, Inc.
  * All rights reserved.
  *
@@ -3539,3 +3541,13 @@ static driver_t xge_driver = {
 static devclass_t xge_devclass;
 DRIVER_MODULE(nxge, pci, xge_driver, xge_devclass, 0, 0);
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1498,3 +1500,12 @@ in_domifdetach(struct ifnet *ifp, void *aux)
 	lltable_free(ii->ii_llt);
 	free(ii, M_IFADDR);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

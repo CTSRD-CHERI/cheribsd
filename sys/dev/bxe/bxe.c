@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
  * Copyright (c) 2007-2014 QLogic Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -12011,7 +12013,8 @@ bxe_set_mc_list(struct bxe_softc *sc)
     }
     bzero(mta, (sizeof(unsigned char) * ETHER_ADDR_LEN * mc_count));
     
-    mc_mac = malloc(sizeof(*mc_mac) * mc_count, M_DEVBUF, (M_NOWAIT | M_ZERO));
+    mc_mac = mallocarray(mc_count, sizeof(*mc_mac), M_DEVBUF,
+        (M_NOWAIT | M_ZERO));
     mc_mac_start = mc_mac;
 
     if (!mc_mac) {
@@ -19156,3 +19159,12 @@ bxe_eioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 
     return (rval);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

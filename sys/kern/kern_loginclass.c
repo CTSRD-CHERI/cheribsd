@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011 The FreeBSD Foundation
  * All rights reserved.
  *
@@ -136,6 +138,12 @@ loginclass_find(const char *name)
 	if (name[0] == '\0' || strlen(name) >= MAXLOGNAME)
 		return (NULL);
 
+	lc = curthread->td_ucred->cr_loginclass;
+	if (strcmp(name, lc->lc_name) == 0) {
+		loginclass_hold(lc);
+		return (lc);
+	}
+
 	rw_rlock(&loginclasses_lock);
 	lc = loginclass_lookup(name);
 	rw_runlock(&loginclasses_lock);
@@ -268,3 +276,12 @@ loginclass_racct_foreach(void (*callback)(struct racct *racct,
 		(post)();
 	rw_runlock(&loginclasses_lock);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

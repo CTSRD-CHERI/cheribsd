@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -187,6 +189,7 @@ struct vop_vector newnfs_fifoops = {
 	.vop_fsync =		nfs_fsync,
 	.vop_getattr =		nfs_getattr,
 	.vop_inactive =		ncl_inactive,
+	.vop_pathconf =		nfs_pathconf,
 	.vop_print =		nfs_print,
 	.vop_read =		nfsfifo_read,
 	.vop_reclaim =		ncl_reclaim,
@@ -2663,7 +2666,7 @@ ncl_flush(struct vnode *vp, int waitfor, struct thread *td,
 #define	NFS_COMMITBVECSIZ	20
 #endif
 	struct buf *bvec_on_stack[NFS_COMMITBVECSIZ];
-	int bvecsize = 0, bveccount;
+	u_int bvecsize = 0, bveccount;
 
 	if (called_from_renewthread != 0)
 		slptimeo = hz;
@@ -3448,7 +3451,7 @@ nfs_pathconf(struct vop_pathconf_args *ap)
 		 * For NFSv2 (or NFSv3 when not one of the above 4 a_names),
 		 * just fake them.
 		 */
-		pc.pc_linkmax = LINK_MAX;
+		pc.pc_linkmax = NFS_LINK_MAX;
 		pc.pc_namemax = NFS_MAXNAMLEN;
 		pc.pc_notrunc = 1;
 		pc.pc_chownrestricted = 1;
@@ -3458,10 +3461,20 @@ nfs_pathconf(struct vop_pathconf_args *ap)
 	}
 	switch (ap->a_name) {
 	case _PC_LINK_MAX:
+#ifdef _LP64
 		*ap->a_retval = pc.pc_linkmax;
+#else
+		*ap->a_retval = MIN(LONG_MAX, pc.pc_linkmax);
+#endif
 		break;
 	case _PC_NAME_MAX:
 		*ap->a_retval = pc.pc_namemax;
+		break;
+	case _PC_PIPE_BUF:
+		if (ap->a_vp->v_type == VDIR || ap->a_vp->v_type == VFIFO)
+			*ap->a_retval = PIPE_BUF;
+		else
+			error = EINVAL;
 		break;
 	case _PC_CHOWN_RESTRICTED:
 		*ap->a_retval = pc.pc_chownrestricted;
@@ -3526,3 +3539,12 @@ nfs_pathconf(struct vop_pathconf_args *ap)
 	return (error);
 }
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

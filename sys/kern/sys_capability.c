@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2008-2011 Robert N. M. Watson
  * Copyright (c) 2010-2011 Jonathan Anderson
  * Copyright (c) 2012 FreeBSD Foundation
@@ -696,3 +698,12 @@ sys_cap_fcntls_get(struct thread *td, struct cap_fcntls_get_args *uap)
 }
 
 #endif /* CAPABILITIES */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

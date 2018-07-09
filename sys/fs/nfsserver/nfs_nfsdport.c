@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -345,7 +347,7 @@ nfsvno_namei(struct nfsrv_descript *nd, struct nameidata *ndp,
 	kiovec_t aiov;
 	struct uio auio;
 	int lockleaf = (cnp->cn_flags & LOCKLEAF) != 0, linklen;
-	int error = 0, crossmnt;
+	int error = 0;
 	char *cp;
 
 	*retdirp = NULL;
@@ -370,7 +372,6 @@ nfsvno_namei(struct nfsrv_descript *nd, struct nameidata *ndp,
 	if (NFSVNO_EXRDONLY(exp))
 		cnp->cn_flags |= RDONLY;
 	ndp->ni_segflg = UIO_SYSSPACE;
-	crossmnt = 1;
 
 	if (nd->nd_flag & ND_PUBLOOKUP) {
 		ndp->ni_loopcnt = 0;
@@ -398,7 +399,6 @@ nfsvno_namei(struct nfsrv_descript *nd, struct nameidata *ndp,
 		 * the mount point, unless nfsrv_enable_crossmntpt is set.
 		 */
 		cnp->cn_flags |= NOCROSSMOUNT;
-		crossmnt = 0;
 	}
 
 	/*
@@ -3433,3 +3433,13 @@ MODULE_DEPEND(nfsd, nfslockd, 1, 1, 1);
 MODULE_DEPEND(nfsd, krpc, 1, 1, 1);
 MODULE_DEPEND(nfsd, nfssvc, 1, 1, 1);
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

@@ -125,14 +125,15 @@
 TGTS=	all all-man buildenv buildenvvars buildkernel buildworld \
 	check check-old check-old-dirs check-old-files check-old-libs \
 	checkdpadd checkworld clean cleandepend cleandir cleanworld \
+	cleanuniverse \
 	delete-old delete-old-dirs delete-old-files delete-old-libs \
 	depend distribute distributekernel distributekernel.debug \
 	distributeworld distrib-dirs distribution doxygen \
 	everything hier hierarchy install installcheck installkernel \
 	installkernel.debug packagekernel packageworld \
 	reinstallkernel reinstallkernel.debug \
-	installworld kernel-toolchain libraries lint maninstall \
-	obj objlink rerelease showconfig tags toolchain update \
+	installworld kernel-toolchain libraries maninstall \
+	obj objlink showconfig tags toolchain update \
 	_worldtmp _legacy _bootstrap-tools _cleanobj _obj \
 	_build-tools _build-metadata _cross-tools _includes _libraries \
 	build32 distribute32 install32 buildsoft distributesoft installsoft \
@@ -195,10 +196,11 @@ PATH=	/sbin:/bin:/usr/sbin:/usr/bin
 MAKEOBJDIRPREFIX?=	/usr/obj
 _MAKEOBJDIRPREFIX!= /usr/bin/env -i PATH=${PATH} ${MAKE} MK_AUTO_OBJ=no \
     ${.MAKEFLAGS:MMAKEOBJDIRPREFIX=*} __MAKE_CONF=${__MAKE_CONF} \
+    SRCCONF=${SRCCONF} \
     -f /dev/null -V MAKEOBJDIRPREFIX dummy
 .if !empty(_MAKEOBJDIRPREFIX)
 .error MAKEOBJDIRPREFIX can only be set in environment, not as a global\
-	(in make.conf(5)) or command-line variable.
+	(in make.conf(5) or src.conf(5)) or command-line variable.
 .endif
 
 # We often need to use the tree's version of make to build it.
@@ -213,7 +215,7 @@ WANT_MAKE_VERSION= 20160604
 # 20160220 - support .dinclude for FAST_DEPEND.
 WANT_MAKE_VERSION= 20160220
 .endif
-MYMAKE=		${MAKEOBJDIRPREFIX}${.CURDIR}/make.${MACHINE}/${WANT_MAKE}
+MYMAKE=		${OBJROOT}make.${MACHINE}/${WANT_MAKE}
 .if defined(.PARSEDIR)
 HAVE_MAKE=	bmake
 .else
@@ -257,10 +259,13 @@ CHERI_FLAGS+=	-DWITH_CHERI256
 
 _MAKE=	PATH=${PATH} MAKE_CMD="${MAKE}" ${SUB_MAKE} -f Makefile.inc1 \
 	${CHERI_FLAGS} \
-	TARGET=${_TARGET} TARGET_ARCH=${_TARGET_ARCH}
+	TARGET=${_TARGET} TARGET_ARCH=${_TARGET_ARCH} ${_MAKEARGS}
 
+.if defined(MK_META_MODE) && ${MK_META_MODE} == "yes"
 # Only allow meta mode for the whitelisted targets.  See META_TGT_WHITELIST
-# above.
+# above.  If overridden as a make argument then don't bother trying to
+# disable it.
+.if empty(.MAKEOVERRIDES:MMK_META_MODE)
 .for _tgt in ${META_TGT_WHITELIST}
 .if make(${_tgt})
 _CAN_USE_META_MODE?= yes
@@ -268,17 +273,22 @@ _CAN_USE_META_MODE?= yes
 .endfor
 .if !defined(_CAN_USE_META_MODE)
 _MAKE+=	MK_META_MODE=no
+MK_META_MODE= no
 .if defined(.PARSEDIR)
 .unexport META_MODE
 .endif
-.elif defined(MK_META_MODE) && ${MK_META_MODE} == "yes"
+.endif	# !defined(_CAN_USE_META_MODE)
+.endif	# empty(.MAKEOVERRIDES:MMK_META_MODE)
+
+.if ${MK_META_MODE} == "yes"
 .if !exists(/dev/filemon) && !defined(NO_FILEMON) && !make(showconfig)
 # Require filemon be loaded to provide a working incremental build
 .error ${.newline}ERROR: The filemon module (/dev/filemon) is not loaded. \
     ${.newline}ERROR: WITH_META_MODE is enabled but requires filemon for an incremental build. \
     ${.newline}ERROR: 'kldload filemon' or pass -DNO_FILEMON to suppress this error.
 .endif	# !exists(/dev/filemon) && !defined(NO_FILEMON)
-.endif	# !defined(_CAN_USE_META_MODE)
+.endif	# ${MK_META_MODE} == yes
+.endif	# defined(MK_META_MODE) && ${MK_META_MODE} == yes
 
 # Guess target architecture from target type, and vice versa, based on
 # historic FreeBSD practice of tending to have TARGET == TARGET_ARCH
@@ -286,7 +296,7 @@ _MAKE+=	MK_META_MODE=no
 # exceptions.
 .if !defined(TARGET_ARCH) && defined(TARGET)
 # T->TA mapping is usually TARGET with arm64 the odd man out
-_TARGET_ARCH=	${TARGET:S/arm64/aarch64/}
+_TARGET_ARCH=	${TARGET:S/arm64/aarch64/:S/riscv/riscv64/}
 .elif !defined(TARGET) && defined(TARGET_ARCH) && \
     ${TARGET_ARCH} != ${MACHINE_ARCH}
 # TA->T mapping is accidentally CPUARCH with aarch64 the odd man out
@@ -313,6 +323,15 @@ ${XTGTS}: _assert_target
 # Otherwise, default to current machine type and architecture.
 _TARGET?=	${MACHINE}
 _TARGET_ARCH?=	${MACHINE_ARCH}
+
+.if make(native-xtools*)
+NXB_TARGET:=		${_TARGET}
+NXB_TARGET_ARCH:=	${_TARGET_ARCH}
+_TARGET=		${MACHINE}
+_TARGET_ARCH=		${MACHINE_ARCH}
+_MAKE+=			NXB_TARGET=${NXB_TARGET} \
+			NXB_TARGET_ARCH=${NXB_TARGET_ARCH}
+.endif
 
 .if make(print-dir)
 .SILENT:
@@ -432,10 +451,13 @@ upgrade_checks: .PHONY
 # headers, libraries and tools.  Also, allow the location of
 # the system bsdmake-like utility to be overridden.
 #
-MMAKEENV=	MAKEOBJDIRPREFIX=${MYMAKE:H} \
+MMAKEENV=	\
 		DESTDIR= \
 		INSTALL="sh ${.CURDIR}/tools/install.sh"
 MMAKE=		${MMAKEENV} ${MAKE} \
+		OBJTOP=${MYMAKE:H}/obj \
+		OBJROOT='$${OBJTOP}/' \
+		MAKEOBJDIRPREFIX= \
 		MAN= -DNO_SHARED \
 		-DNO_CPU_CFLAGS -DNO_WERROR \
 		-DNO_SUBDIR \
@@ -578,7 +600,8 @@ universe_${target}_kernels: universe_${target}_worlds .PHONY
 universe_${target}_kernels: universe_${target}_prologue .MAKE .PHONY
 .if exists(${KERNSRCDIR}/${target}/conf/NOTES)
 	@(cd ${KERNSRCDIR}/${target}/conf && env __MAKE_CONF=/dev/null \
-	    ${SUB_MAKE} LINT > ${.CURDIR}/_.${target}.makeLINT 2>&1 || \
+	    ${SUB_MAKE} LINT \
+	    > ${.CURDIR}/_.${target}.makeLINT 2>&1 || \
 	    (echo "${target} 'make LINT' failed," \
 	    "check _.${target}.makeLINT for details"| ${MAKEFAIL}))
 .endif
@@ -591,6 +614,7 @@ universe_${target}: universe_${target}_done
 universe_${target}_done:
 	@echo ">> ${target} completed on `LC_ALL=C date`"
 .endfor
+.if make(universe_kernconfs) || make(universe_kernels)
 universe_kernels: universe_kernconfs .PHONY
 .if !defined(TARGET)
 TARGET!=	uname -m
@@ -627,6 +651,7 @@ universe_kernconf_${TARGET}_${kernel}: .MAKE
 	    (echo "${TARGET} ${kernel} kernel failed," \
 	    "check _.${TARGET}.${kernel} for details"| ${MAKEFAIL}))
 .endfor
+.endif	# make(universe_kernels)
 universe: universe_epilogue
 universe_epilogue: .PHONY
 	@echo "--------------------------------------------------------------"

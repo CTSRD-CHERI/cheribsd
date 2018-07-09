@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2012 Damjan Marion <dmarion@Freebsd.org>
  * Copyright (c) 2016 Rubicon Communications, LLC (Netgate)
  * All rights reserved.
@@ -2985,3 +2987,12 @@ cpsw_writephy(device_t dev, int phy, int reg, int data)
 	return (0);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

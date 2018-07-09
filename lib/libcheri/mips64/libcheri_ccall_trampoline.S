@@ -340,14 +340,14 @@ libcheri_ccall_rtld_extract_target:
 	clc	$c26, $zero, (0*CHERICAP_SIZE)($c26) # XXXRW: Hard-coded offset
 
 libcheri_ccall_rtld_clear_regs:
-	CHERI_CLEAR_GPLO16( \
+	ClearLo	( \
 		CHERI_CLEAR_GPLO_AT | \
 		CHERI_CLEAR_GPLO_V1 | \
 		CHERI_CLEAR_GPLO_T0 | \
 		CHERI_CLEAR_GPLO_T1 | \
 		CHERI_CLEAR_GPLO_T2 | \
 		CHERI_CLEAR_GPLO_T3 )
-	CHERI_CLEAR_GPHI16( \
+	ClearHi	( \
 		CHERI_CLEAR_GPHI_S0 | \
 		CHERI_CLEAR_GPHI_S1 | \
 		CHERI_CLEAR_GPHI_S2 | \
@@ -371,13 +371,13 @@ libcheri_ccall_rtld_clear_fpregs:
 	/* XXXRW: Floating-point registers. */
 
 libcheri_ccall_rtld_clear_caps:
-	CHERI_CLEAR_CAPLO16( \
+	CClearLo	( \
 		/* CHERI_CLEAR_CAPLO_C11 | */ \
 		/* CHERI_CLEAR_CAPLO_C12 | */ \
 		CHERI_CLEAR_CAPLO_C13 | \
 		CHERI_CLEAR_CAPLO_C14 | \
 		CHERI_CLEAR_CAPLO_C15 )
-	CHERI_CLEAR_CAPHI16( \
+	CClearHi	( \
 		CHERI_CLEAR_CAPHI_C16 | \
 		CHERI_CLEAR_CAPHI_C17 | \
 		CHERI_CLEAR_CAPHI_C18 | \
@@ -410,7 +410,7 @@ libcheri_ccall_rtld_sandbox_busy:
 
 libcheri_ccall_rtld_error_return:
 libcheri_ccall_rtld_error_clear_regs:
-	CHERI_CLEAR_GPLO16( \
+	ClearLo	( \
 		CHERI_CLEAR_GPLO_AT | \
 		CHERI_CLEAR_GPLO_V0 | \
 		CHERI_CLEAR_GPLO_V1 | \
@@ -425,7 +425,7 @@ libcheri_ccall_rtld_error_clear_regs:
 		CHERI_CLEAR_GPLO_T1 | \
 		CHERI_CLEAR_GPLO_T2 | \
 		CHERI_CLEAR_GPLO_T3 )
-	CHERI_CLEAR_GPHI16( \
+	ClearHi	( \
 		CHERI_CLEAR_GPHI_S0 | \
 		CHERI_CLEAR_GPHI_S1 | \
 		CHERI_CLEAR_GPHI_S2 | \
@@ -449,7 +449,7 @@ libcheri_ccall_rtld_error_clear_fpregs:
 	/* XXXRW: Floating-point registers. */
 
 libcheri_ccall_rtld_error_clear_caps:
-	CHERI_CLEAR_CAPLO16( \
+	CClearLo	( \
 		CHERI_CLEAR_CAPLO_C0 | \
 		CHERI_CLEAR_CAPLO_C1 | \
 		CHERI_CLEAR_CAPLO_C2 | \
@@ -467,7 +467,7 @@ libcheri_ccall_rtld_error_clear_caps:
 		CHERI_CLEAR_CAPLO_C13 | \
 		CHERI_CLEAR_CAPLO_C14 | \
 		CHERI_CLEAR_CAPLO_C15 )
-	CHERI_CLEAR_CAPHI16( \
+	CClearHi	( \
 		CHERI_CLEAR_CAPHI_C16 | \
 		/* CHERI_CLEAR_CAPHI_C17 | */ \
 		CHERI_CLEAR_CAPHI_C18 | \
@@ -720,14 +720,14 @@ libcheri_ccall_invoke_extract_target:
 	clc	$c26, $zero, (0*CHERICAP_SIZE)($c26) # XXXRW: Hard-coded offset
 
 libcheri_ccall_invoke_clear_regs:
-	CHERI_CLEAR_GPLO16( \
+	ClearLo	( \
 		CHERI_CLEAR_GPLO_AT | \
 		CHERI_CLEAR_GPLO_V1 | \
 		CHERI_CLEAR_GPLO_T0 | \
 		CHERI_CLEAR_GPLO_T1 | \
 		CHERI_CLEAR_GPLO_T2 | \
 		CHERI_CLEAR_GPLO_T3 )
-	CHERI_CLEAR_GPHI16( \
+	ClearHi	( \
 		CHERI_CLEAR_GPHI_S0 | \
 		CHERI_CLEAR_GPHI_S1 | \
 		CHERI_CLEAR_GPHI_S2 | \
@@ -751,13 +751,13 @@ libcheri_ccall_invoke_clear_fpregs:
 	/* XXXRW: Floating-point registers. */
 
 libcheri_ccall_invoke_clear_caps:
-	CHERI_CLEAR_CAPLO16( \
+	CClearLo	( \
 		/* CHERI_CLEAR_CAPLO_C11 | */ \
 		/* CHERI_CLEAR_CAPLO_C12 | */ \
 		CHERI_CLEAR_CAPLO_C13 | \
 		CHERI_CLEAR_CAPLO_C14 | \
 		CHERI_CLEAR_CAPLO_C15 )
-	CHERI_CLEAR_CAPHI16( \
+	CClearHi	( \
 		CHERI_CLEAR_CAPHI_C16 | \
 		CHERI_CLEAR_CAPHI_C17 | \
 		CHERI_CLEAR_CAPHI_C18 | \
@@ -790,7 +790,7 @@ libcheri_ccall_invoke_sandbox_busy:
 
 libcheri_ccall_invoke_error_return:
 libcheri_ccall_invoke_error_clear_regs:
-	CHERI_CLEAR_GPLO16( \
+	ClearLo	( \
 		CHERI_CLEAR_GPLO_AT | \
 		CHERI_CLEAR_GPLO_V0 | \
 		CHERI_CLEAR_GPLO_V1 | \
@@ -805,7 +805,7 @@ libcheri_ccall_invoke_error_clear_regs:
 		CHERI_CLEAR_GPLO_T1 | \
 		CHERI_CLEAR_GPLO_T2 | \
 		CHERI_CLEAR_GPLO_T3 )
-	CHERI_CLEAR_GPHI16( \
+	ClearHi	( \
 		CHERI_CLEAR_GPHI_S0 | \
 		CHERI_CLEAR_GPHI_S1 | \
 		CHERI_CLEAR_GPHI_S2 | \
@@ -829,7 +829,7 @@ libcheri_ccall_invoke_error_clear_fpregs:
 	/* XXXRW: Floating-point registers. */
 
 libcheri_ccall_invoke_error_clear_caps:
-	CHERI_CLEAR_CAPLO16( \
+	CClearLo	( \
 		CHERI_CLEAR_CAPLO_C0 | \
 		CHERI_CLEAR_CAPLO_C1 | \
 		CHERI_CLEAR_CAPLO_C2 | \
@@ -847,7 +847,7 @@ libcheri_ccall_invoke_error_clear_caps:
 		CHERI_CLEAR_CAPLO_C13 | \
 		CHERI_CLEAR_CAPLO_C14 | \
 		CHERI_CLEAR_CAPLO_C15 )
-	CHERI_CLEAR_CAPHI16( \
+	CClearHi	( \
 		CHERI_CLEAR_CAPHI_C16 | \
 		/* CHERI_CLEAR_CAPHI_C17 | */ \
 		CHERI_CLEAR_CAPHI_C18 | \
@@ -955,7 +955,7 @@ libcheri_creturn_check_global:
 	nop
 
 libcheri_creturn_clear_regs:
-	CHERI_CLEAR_GPLO16( \
+	ClearLo	( \
 		CHERI_CLEAR_GPLO_AT | \
 		/* CHERI_CLEAR_GPLO_V0 | */ \
 		/* CHERI_CLEAR_GPLO_V1 | */ \
@@ -971,7 +971,7 @@ libcheri_creturn_clear_regs:
 		CHERI_CLEAR_GPLO_T1 | \
 		CHERI_CLEAR_GPLO_T2 | \
 		CHERI_CLEAR_GPLO_T3 )
-	CHERI_CLEAR_GPHI16( \
+	ClearHi	( \
 		CHERI_CLEAR_GPHI_S0 | \
 		CHERI_CLEAR_GPHI_S1 | \
 		CHERI_CLEAR_GPHI_S2 | \
@@ -995,7 +995,7 @@ libcheri_creturn_clear_fpregs:
 	/* XXXRW: Floating-point registers. */
 
 libcheri_creturn_clear_caps:
-	CHERI_CLEAR_CAPLO16( \
+	CClearLo	( \
 		CHERI_CLEAR_CAPLO_C1  | \
 		CHERI_CLEAR_CAPLO_C2  | \
 		/* CHERI_CLEAR_CAPLO_C3  | */ \
@@ -1011,7 +1011,7 @@ libcheri_creturn_clear_caps:
 		CHERI_CLEAR_CAPLO_C13 | \
 		CHERI_CLEAR_CAPLO_C14 | \
 		CHERI_CLEAR_CAPLO_C15 )
-	CHERI_CLEAR_CAPHI16( \
+	CClearHi	( \
 		CHERI_CLEAR_CAPHI_C16 | \
 		/* CHERI_CLEAR_CAPHI_C17 | */ \
 		CHERI_CLEAR_CAPHI_C18 | \
@@ -1040,7 +1040,7 @@ libcheri_creturn_stack_underflow:
 
 libcheri_creturn_error_return:
 libcheri_creturn_error_clear_regs:
-	CHERI_CLEAR_GPLO16( \
+	ClearLo	( \
 		CHERI_CLEAR_GPLO_AT | \
 		CHERI_CLEAR_GPLO_V0 | \
 		CHERI_CLEAR_GPLO_V1 | \
@@ -1056,7 +1056,7 @@ libcheri_creturn_error_clear_regs:
 		CHERI_CLEAR_GPLO_T1 | \
 		CHERI_CLEAR_GPLO_T2 | \
 		CHERI_CLEAR_GPLO_T3 )
-	CHERI_CLEAR_GPHI16( \
+	ClearHi	( \
 		CHERI_CLEAR_GPHI_S0 | \
 		CHERI_CLEAR_GPHI_S1 | \
 		CHERI_CLEAR_GPHI_S2 | \
@@ -1080,7 +1080,7 @@ libcheri_creturn_error_clear_fpregs:
 	/* XXXRW: Floating-point registers. */
 
 libcheri_creturn_error_clear_caps:
-	CHERI_CLEAR_CAPLO16( \
+	CClearLo	( \
 		CHERI_CLEAR_CAPLO_C1  | \
 		CHERI_CLEAR_CAPLO_C2  | \
 		CHERI_CLEAR_CAPLO_C3  | \
@@ -1096,7 +1096,7 @@ libcheri_creturn_error_clear_caps:
 		CHERI_CLEAR_CAPLO_C13 | \
 		CHERI_CLEAR_CAPLO_C14 | \
 		CHERI_CLEAR_CAPLO_C15 )
-	CHERI_CLEAR_CAPHI16( \
+	CClearHi	( \
 		CHERI_CLEAR_CAPHI_C16 | \
 		/* CHERI_CLEAR_CAPHI_C17 | */ \
 		CHERI_CLEAR_CAPHI_C18 | \

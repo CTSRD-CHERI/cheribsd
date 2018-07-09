@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1993, David Greenman
  * All rights reserved.
  *
@@ -97,8 +99,6 @@ struct sysentvec;
 struct thread;
 struct vmspace;
 
-#define IMGACT_CORE_COMPRESS	0x01
-
 int	exec_alloc_args(struct image_args *);
 int	exec_args_add_arg_str(struct image_args *args, char *argp,
 	    enum uio_seg segflg);
@@ -121,3 +121,13 @@ void	post_execve(struct thread *td, int error, struct vmspace *oldvmspace);
 #endif
 
 #endif /* !_SYS_IMGACT_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

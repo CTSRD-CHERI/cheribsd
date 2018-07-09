@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1998 Doug Rabson
  * All rights reserved.
  *
@@ -34,50 +36,7 @@
 #error this file needs sys/cdefs.h as a prerequisite
 #endif
 
-/* XXX-AM: defines similar to what stdatomic provides */
-#define atomic_thread_fence(order) __c11_atomic_thread_fence(order)
-#define atomic_store(object, desired)			\
-  __c11_atomic_store(object, desired, __ATOMIC_SEQ_CST)
-#define atomic_store_explicit __c11_atomic_store
-
-#define atomic_load(object) __c11_atomic_load(object, __ATOMIC_SEQ_CST)
-#define atomic_load_explicit __c11_atomic_load
-
-#define atomic_exchange(object, desired)			\
-	__c11_atomic_exchange(object, desired, __ATOMIC_SEQ_CST)
-#define atomic_exchange_explicit __c11_atomic_exchange
-
-#define atomic_compare_exchange_strong(object, expected, desired)	\
-  __c11_atomic_compare_exchange_strong(object, expected, desired,	\
-				       __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
-#define atomic_compare_exchange_strong_explicit \
-  __c11_atomic_compare_exchange_strong
-
-#define atomic_compare_exchange_weak(object, expected, desired)		\
-  __c11_atomic_compare_exchange_weak(object, expected, desired,		\
-				     __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
-#define atomic_compare_exchange_weak_explicit	\
-  __c11_atomic_compare_exchange_weak
-
-#define atomic_fetch_add(object, operand)			\
-  __c11_atomic_fetch_add(object, operand, __ATOMIC_SEQ_CST)
-#define atomic_fetch_add_explicit __c11_atomic_fetch_add
-
-#define atomic_fetch_sub(object, operand)			\
-  __c11_atomic_fetch_sub(object, operand, __ATOMIC_SEQ_CST)
-#define atomic_fetch_sub_explicit __c11_atomic_fetch_sub
-
-#define atomic_fetch_or(object, operand)			\
-  __c11_atomic_fetch_or(object, operand, __ATOMIC_SEQ_CST)
-#define atomic_fetch_or_explicit __c11_atomic_fetch_or
-
-#define atomic_fetch_xor(object, operand)			\
-  __c11_atomic_fetch_xor(object, operand, __ATOMIC_SEQ_CST)
-#define atomic_fetch_xor_explicit __c11_atomic_fetch_xor
-
-#define atomic_fetch_and(object, operand)			\
-  __c11_atomic_fetch_and(object, operand, __ATOMIC_SEQ_CST)
-#define atomic_fetch_and_explicit __c11_atomic_fetch_and
+#include <sys/atomic_common.h>
 
 /*
  * Note: All the 64-bit atomic operations are only atomic when running
@@ -110,6 +69,51 @@ mips_sync(void)
 //#define ATOMIC_NOTYET
 
 #ifdef ATOMIC_NOTYET
+
+/* XXX-AM: defines similar to what stdatomic provides */
+#define atomic_thread_fence(order) __c11_atomic_thread_fence(order)
+#define atomic_store(object, desired)			\
+	__c11_atomic_store(object, desired, __ATOMIC_SEQ_CST)
+#define atomic_store_explicit __c11_atomic_store
+
+#define atomic_load(object) __c11_atomic_load(object, __ATOMIC_SEQ_CST)
+#define atomic_load_explicit __c11_atomic_load
+
+#define atomic_exchange(object, desired)			\
+	__c11_atomic_exchange(object, desired, __ATOMIC_SEQ_CST)
+#define atomic_exchange_explicit __c11_atomic_exchange
+
+#define atomic_compare_exchange_strong(object, expected, desired)	\
+	__c11_atomic_compare_exchange_strong(object, expected, desired,	\
+					     __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
+#define atomic_compare_exchange_strong_explicit \
+	__c11_atomic_compare_exchange_strong
+
+#define atomic_compare_exchange_weak(object, expected, desired)		\
+	__c11_atomic_compare_exchange_weak(object, expected, desired,	\
+					   __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
+#define atomic_compare_exchange_weak_explicit	\
+	__c11_atomic_compare_exchange_weak
+
+#define atomic_fetch_add(object, operand)			\
+	__c11_atomic_fetch_add(object, operand, __ATOMIC_SEQ_CST)
+#define atomic_fetch_add_explicit __c11_atomic_fetch_add
+
+#define atomic_fetch_sub(object, operand)			\
+	__c11_atomic_fetch_sub(object, operand, __ATOMIC_SEQ_CST)
+#define atomic_fetch_sub_explicit __c11_atomic_fetch_sub
+
+#define atomic_fetch_or(object, operand)			\
+	__c11_atomic_fetch_or(object, operand, __ATOMIC_SEQ_CST)
+#define atomic_fetch_or_explicit __c11_atomic_fetch_or
+
+#define atomic_fetch_xor(object, operand)			\
+	__c11_atomic_fetch_xor(object, operand, __ATOMIC_SEQ_CST)
+#define atomic_fetch_xor_explicit __c11_atomic_fetch_xor
+
+#define atomic_fetch_and(object, operand)			\
+	__c11_atomic_fetch_and(object, operand, __ATOMIC_SEQ_CST)
+#define atomic_fetch_and_explicit __c11_atomic_fetch_and
 
 /*
  * Various simple arithmetic on memory which is atomic in the presence
@@ -442,6 +446,13 @@ void atomic_subtract_16(__volatile uint16_t *, uint16_t);
 #define QEMU_TLB_WORKAROUND64(register) \
 	"cld $zero, $zero, 0(" register ")\n\t"
 
+/*
+ * Avoid an error if the compiler decides to use $at as one of the registers.
+ * This only seems to happen in the CHERI purecap case so far
+ */
+#define __INLINE_ASM_PUSH_NOAT	".set push\n\t.set noat\n\t"
+#define __INLINE_ASM_POP_NOAT	".set pop"
+
 
 static __inline void
 atomic_set_32(__volatile uint32_t *p, uint32_t v)
@@ -459,12 +470,14 @@ atomic_set_32(__volatile uint32_t *p, uint32_t v)
 		: "memory");
 #else
 	__asm __volatile (
+		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
 		QEMU_TLB_WORKAROUND32("%1")
 		"cllw	%0, %1\n\t"		/* load old value */
 		"or	%0, %2, %0\n\t"		/* calculate new value */
 		"cscw	%0, %0, %1\n\t"		/* attempt to store */
 		"beqz	%0, 1b\n\t"		/* spin if failed */
+		__INLINE_ASM_POP_NOAT
 		: "=&r" (temp), "+C" (p)
 		: "r" (v)
 		: "memory");
@@ -489,12 +502,14 @@ atomic_clear_32(__volatile uint32_t *p, uint32_t v)
 		: "memory");
 #else
 	__asm __volatile (
+		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
 		QEMU_TLB_WORKAROUND32("%1")
 		"cllw	%0, %1\n\t"		/* load old value */
 		"and	%0, %2, %0\n\t"		/* calculate new value */
 		"cscw	%0, %0, %1\n\t"		/* attempt to store */
 		"beqz	%0, 1b\n\t"		/* spin if failed */
+		__INLINE_ASM_POP_NOAT
 		: "=&r" (temp), "+C" (p)
 		: "r" (v)
 		: "memory");
@@ -517,12 +532,14 @@ atomic_add_32(__volatile uint32_t *p, uint32_t v)
 		: "memory");
 #else
 	__asm __volatile (
+		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
 		QEMU_TLB_WORKAROUND32("%1")
 		"cllw	%0, %1\n\t"	/* load old value */
 		"addu	%0, %2, %0\n\t"		/* calculate new value */
 		"cscw	%0, %0, %1\n\t"		/* attempt to store */
 		"beqz	%0, 1b\n\t"		/* spin if failed */
+		__INLINE_ASM_POP_NOAT
 		: "=&r" (temp), "+C" (p)
 		: "r" (v)
 		: "memory");
@@ -545,12 +562,14 @@ atomic_subtract_32(__volatile uint32_t *p, uint32_t v)
 		: "memory");
 #else
 	__asm __volatile (
+		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
 		QEMU_TLB_WORKAROUND32("%1")
 		"cllw	%0, %1\n\t"		/* load old value */
 		"subu	%0, %2\n\t"		/* calculate new value */
 		"cscw	%0, %0, %1\n\t"		/* attempt to store */
 		"beqz	%0, 1b\n\t"		/* spin if failed */
+		__INLINE_ASM_POP_NOAT
 		: "=&r" (temp), "+C" (p)
 		: "r" (v)
 		: "memory");
@@ -573,12 +592,14 @@ atomic_readandclear_32(__volatile uint32_t *addr)
 		: "memory");
 #else
 	__asm __volatile (
+		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
 		QEMU_TLB_WORKAROUND32("%2")
 		"cllw	%0, %2\n\t"	/* load current value, asserting lock */
 		"li	%1, 0\n\t"	/* value to store */
 		"cscw	%1, %1, %2\n\t"	/* attempt to store */
 		"beqz	%1, 1b\n\t"	/* if the store failed, spin */
+		__INLINE_ASM_POP_NOAT
 		: "=&r"(result), "=&r"(temp), "+C" (addr)
 		:
 		: "memory");
@@ -603,12 +624,14 @@ atomic_readandset_32(__volatile uint32_t *addr, uint32_t value)
 		: "memory");
 #else
 	__asm __volatile (
+		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
 		QEMU_TLB_WORKAROUND32("%2")
 		"cllw	%0, %2\n\t"	/* load current value, asserting lock */
 		"or	%1, $0, %3\n\t"
 		"cscw	%1, %1, %2\n\t"	/* attempt to store */
 		"beqz	%1, 1b\n\t"	/* if the store failed, spin */
+		__INLINE_ASM_POP_NOAT
 		: "=&r"(result), "=&r"(temp), "+C" (addr)
 		: "r" (value)
 		: "memory");
@@ -635,12 +658,14 @@ atomic_set_64(__volatile uint64_t *p, uint64_t v)
 		: "memory");
 #else
 	__asm __volatile (
+		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
 		QEMU_TLB_WORKAROUND64("%1")
 		"clld	%0, %1\n\t"		/* load old value */
 		"or	%0, %2, %0\n\t"		/* calculate new value */
 		"cscd	%0, %0, %1\n\t"		/* attempt to store */
 		"beqz	%0, 1b\n\t"		/* spin if failed */
+		__INLINE_ASM_POP_NOAT
 		: "=&r" (temp), "+C" (p)
 		: "r" (v)
 		: "memory");
@@ -666,12 +691,14 @@ atomic_clear_64(__volatile uint64_t *p, uint64_t v)
 		: "memory");
 #else
 	__asm __volatile (
+		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
 		QEMU_TLB_WORKAROUND64("%1")
 		"clld	%0, %1\n\t"		/* load old value */
 		"and	%0, %2, %0\n\t"		/* calculate new value */
 		"cscd	%0, %0, %1\n\t"		/* attempt to store */
 		"beqz	%0, 1b\n\t"		/* spin if failed */
+		__INLINE_ASM_POP_NOAT
 		: "=&r" (temp), "+C" (p)
 		: "r" (v)
 		: "memory");
@@ -695,12 +722,14 @@ atomic_add_64(__volatile uint64_t *p, uint64_t v)
 		: "memory");
 #else
 	__asm __volatile (
+		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
 		QEMU_TLB_WORKAROUND64("%1")
 		"clld	%0, %1\n\t"		/* load old value */
 		"daddu	%0, %2, %0\n\t"		/* calculate new value */
 		"cscd	%0, %0, %1\n\t"		/* attempt to store */
 		"beqz	%0, 1b\n\t"		/* spin if failed */
+		__INLINE_ASM_POP_NOAT
 		: "=&r" (temp), "+C" (p)
 		: "r" (v)
 		: "memory");
@@ -724,12 +753,14 @@ atomic_subtract_64(__volatile uint64_t *p, uint64_t v)
 		: "memory");
 #else
 	__asm __volatile (
+		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
 		QEMU_TLB_WORKAROUND64("%1")
 		"clld	%0, %1\n\t"		/* load old value */
 		"dsubu	%0, %2\n\t"		/* calculate new value */
 		"cscd	%0, %0, %1\n\t"		/* attempt to store */
 		"beqz	%0, 1b\n\t"		/* spin if failed */
+		__INLINE_ASM_POP_NOAT
 		: "=&r" (temp), "+C" (p)
 		: "r" (v)
 		: "memory");
@@ -753,12 +784,14 @@ atomic_readandclear_64(__volatile uint64_t *addr)
 		: "memory");
 #else
 	__asm __volatile (
+		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
 		QEMU_TLB_WORKAROUND64("%2")
 		"clld	 %0, %2\n\t"		/* load old value */
 		"li	 %1, 0\n\t"		/* value to store */
 		"cscd	 %1, %1, %2\n\t"	/* attempt to store */
 		"beqz	 %1, 1b\n\t"		/* if the store failed, spin */
+		__INLINE_ASM_POP_NOAT
 		: "=&r"(result), "=&r"(temp), "+C" (addr)
 		:
 		: "memory");
@@ -784,12 +817,14 @@ atomic_readandset_64(__volatile uint64_t *addr, uint64_t value)
 		: "memory");
 #else
 	__asm __volatile (
+		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
 		QEMU_TLB_WORKAROUND64("%2")
 		"clld	 %0, %2\n\t"		/* load old value*/
 		"or      %1, $0, %3\n\t"
 		"cscd	 %1, %1, %2\n\t"	/* attempt to store */
 		"beqz	 %1, 1b\n\t"		/* if the store failed, spin */
+		__INLINE_ASM_POP_NOAT
 		: "=&r"(result), "=&r"(temp), "+C" (addr)
 		: "r" (value)
 		: "memory");
@@ -859,23 +894,6 @@ atomic_store_rel_##WIDTH(__volatile uint##WIDTH##_t *p, uint##WIDTH##_t v)\
 
 ATOMIC_STORE_LOAD(32)
 ATOMIC_STORE_LOAD(64)
-#if !defined(__mips_n64) && !defined(__mips_n32)
-void atomic_store_64(__volatile uint64_t *, uint64_t *);
-void atomic_load_64(__volatile uint64_t *, uint64_t *);
-#else
-static __inline void
-atomic_store_64(__volatile uint64_t *p, uint64_t *v)
-{
-	*p = *v;
-}
-
-static __inline void
-atomic_load_64(__volatile uint64_t *p, uint64_t *v)
-{
-	*v = *p;
-}
-#endif
-
 #undef ATOMIC_STORE_LOAD
 
 /*
@@ -904,6 +922,7 @@ atomic_cmpset_32(__volatile uint32_t *p, uint32_t cmpval, uint32_t newval)
 		: "memory");
 #else
 	__asm __volatile (
+		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
 		QEMU_TLB_WORKAROUND32("%1")
 		"cllw	%0, %1\n\t"		/* load old value */
@@ -915,6 +934,7 @@ atomic_cmpset_32(__volatile uint32_t *p, uint32_t cmpval, uint32_t newval)
 		"2:\n\t"
 		"li	%0, 0\n\t"
 		"3:\n"
+		__INLINE_ASM_POP_NOAT
 		: "=&r" (ret), "+C" (p)
 		: "r" (cmpval), "r" (newval)
 		: "memory");
@@ -971,6 +991,7 @@ atomic_fcmpset_32(__volatile uint32_t *p, uint32_t *cmpval, uint32_t newval)
 	uint32_t expected = *cmpval;
 
 	__asm __volatile (
+		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
 		"cllw	%[tmp], %[ptr]\n\t"		/* load old value */
 		"bne	%[tmp], %[expected], 2f\n\t"	/* compare */
@@ -981,6 +1002,7 @@ atomic_fcmpset_32(__volatile uint32_t *p, uint32_t *cmpval, uint32_t newval)
 		"csw	%[tmp], $0, 0(%[cmpval])\n\t"	/* store loaded value */
 		"li	%[ret], 0\n\t"
 		"3:\n"
+		__INLINE_ASM_POP_NOAT
 		: [ret] "=&r" (ret), [tmp] "=&r" (tmp), [ptr]"+C" (p),
 		    [cmpval]"+C" (cmpval)
 		: [newval] "r" (newval), [expected] "r" (expected)
@@ -1025,12 +1047,14 @@ atomic_fetchadd_32(__volatile uint32_t *p, uint32_t v)
 		: "r" (v));
 #else
 	__asm __volatile (
+		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
 		QEMU_TLB_WORKAROUND32("%1")
 		"cllw	%0, %1\n\t"		/* load old value */
 		"addu	%2, %3, %0\n\t"		/* calculate new value */
 		"cscw	%2, %2, %1\n\t"		/* attempt to store */
 		"beqz %2, 1b\n\t"		/* spin if failed */
+		__INLINE_ASM_POP_NOAT
 		: "=&r" (value), "+C" (p), "=&r" (temp)
 		: "r" (v));
 #endif
@@ -1065,6 +1089,7 @@ atomic_cmpset_64(__volatile uint64_t *p, uint64_t cmpval, uint64_t newval)
 		: "memory");
 #else
 	__asm __volatile (
+		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
 		QEMU_TLB_WORKAROUND64("%1")
 		"clld	%0, %1\n\t"		/* load old value */
@@ -1076,6 +1101,7 @@ atomic_cmpset_64(__volatile uint64_t *p, uint64_t cmpval, uint64_t newval)
 		"2:\n\t"
 		"li	%0, 0\n\t"
 		"3:\n"
+		__INLINE_ASM_POP_NOAT
 		: "=&r" (ret), "+C" (p)
 		: "r" (cmpval), "r" (newval)
 		: "memory");
@@ -1132,6 +1158,7 @@ atomic_fcmpset_64(__volatile uint64_t *p, uint64_t *cmpval, uint64_t newval)
 	uint64_t expected = *cmpval;
 
 	__asm __volatile (
+		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
 		"clld	%[tmp], %[ptr]\n\t"		/* load old value */
 		"bne	%[tmp], %[expected], 2f\n\t"	/* compare */
@@ -1142,6 +1169,7 @@ atomic_fcmpset_64(__volatile uint64_t *p, uint64_t *cmpval, uint64_t newval)
 		"csd	%[tmp], $0, 0(%[cmpval])\n\t"	/* store loaded value */
 		"li	%[ret], 0\n\t"
 		"3:\n"
+		__INLINE_ASM_POP_NOAT
 		: [ret] "=&r" (ret), [tmp] "=&r" (tmp), [ptr]"+C" (p),
 		    [cmpval]"+C" (cmpval)
 		: [newval] "r" (newval), [expected] "r" (expected)
@@ -1187,12 +1215,14 @@ atomic_fetchadd_64(__volatile uint64_t *p, uint64_t v)
 		: "r" (v));
 #else
 	__asm __volatile (
+		__INLINE_ASM_PUSH_NOAT
 		"1:\n\t"
 		QEMU_TLB_WORKAROUND64("%1")
 		"clld	%0, %1\n\t"		/* load old value */
 		"daddu	%2, %3, %0\n\t"		/* calculate new value */
 		"cscd	%2, %2, %1\n\t"		/* attempt to store */
 		"beqz	%2, 1b\n\t"		/* spin if failed */
+		__INLINE_ASM_POP_NOAT
 		: "=&r" (value), "+C" (p), "=&r" (temp)
 		: "r" (v));
 #endif
@@ -1640,3 +1670,12 @@ atomic_thread_fence_seq_cst(void)
 #endif /* CHERI_KERNEL */
 
 #endif /* ! _MACHINE_ATOMIC_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

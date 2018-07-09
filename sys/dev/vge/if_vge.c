@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2004
  *	Bill Paul <wpaul@windriver.com>.  All rights reserved.
  *
@@ -2929,3 +2931,12 @@ vge_clrwol(struct vge_softc *sc)
 	CSR_WRITE_1(sc, VGE_WOLSR0C, 0xFF);
 	CSR_WRITE_1(sc, VGE_WOLSR1C, 0xFF);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

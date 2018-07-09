@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2000 Doug Rabson
  * All rights reserved.
  *
@@ -50,3 +52,12 @@ struct spigen_transfer_mmapped {
 #define SPIGENIOC_SET_CLOCK_SPEED  _IOW(SPIGENIOC_BASE, 3, uint32_t)
 
 #endif /* !_SYS_SPIGENIO_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END
