@@ -1438,4 +1438,4 @@
 				    _Out_opt_ void * __capability *cap); }
 566	AUE_NULL	NOPROTO	{ int colookup(_In_z_ const char *name, \
 				    _Out_ void * __capability *cap); }
-567	AUE_NULL	NOPROTO	{ int copark(void); }
+567	AUE_NULL	UNIMPL	{ int copark(void); }

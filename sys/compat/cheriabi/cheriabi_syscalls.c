@@ -576,5 +576,5 @@ const char *cheriabi_syscallnames[] = {
 	"cosetup",			/* 564 = cosetup */
 	"coregister",			/* 565 = coregister */
 	"colookup",			/* 566 = colookup */
-	"copark",			/* 567 = copark */
+	"#567",			/* 567 = { */
 };
