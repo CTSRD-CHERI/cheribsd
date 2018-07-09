@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1997 John S. Dyson.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -287,7 +289,7 @@ int	aio_suspend(const struct aiocb * const[], int, const struct timespec *);
  */
 int	aio_mlock(struct aiocb *);
 
-#ifdef __BSD_VISIBLE
+#if __BSD_VISIBLE
 ssize_t	aio_waitcomplete(struct aiocb **, struct timespec *);
 #endif
 
@@ -297,3 +299,12 @@ __END_DECLS
 #endif /* !_KERNEL */
 
 #endif /* !_SYS_AIO_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

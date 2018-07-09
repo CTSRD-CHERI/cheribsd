@@ -6946,6 +6946,75 @@ CHERIABI_SYS_cheriabi_kevent_fill_uap(struct thread *td,
 }
 
 static inline int
+CHERIABI_SYS_cheriabi_cpuset_getdomain_fill_uap(struct thread *td,
+    struct cheriabi_cpuset_getdomain_args *uap)
+{
+	void * __capability tmpcap;
+
+	/* [0] cpulevel_t level */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_cpuset_getdomain_PTRMASK);
+	uap->level = cheri_getoffset(tmpcap);
+
+	/* [1] cpuwhich_t which */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_cpuset_getdomain_PTRMASK);
+	uap->which = cheri_getoffset(tmpcap);
+
+	/* [2] id_t id */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_cpuset_getdomain_PTRMASK);
+	uap->id = cheri_getoffset(tmpcap);
+
+	/* [3] size_t domainsetsize */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_cpuset_getdomain_PTRMASK);
+	uap->domainsetsize = cheri_getoffset(tmpcap);
+
+	/* [4] domainset_t * __capability mask */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->mask),
+	    4, CHERIABI_SYS_cheriabi_cpuset_getdomain_PTRMASK);
+
+	/* [5] int * __capability policy */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->policy),
+	    5, CHERIABI_SYS_cheriabi_cpuset_getdomain_PTRMASK);
+
+	return (0);
+}
+
+static inline int
+CHERIABI_SYS_cheriabi_cpuset_setdomain_fill_uap(struct thread *td,
+    struct cheriabi_cpuset_setdomain_args *uap)
+{
+	void * __capability tmpcap;
+
+	/* [0] cpulevel_t level */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 0, CHERIABI_SYS_cheriabi_cpuset_setdomain_PTRMASK);
+	uap->level = cheri_getoffset(tmpcap);
+
+	/* [1] cpuwhich_t which */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 1, CHERIABI_SYS_cheriabi_cpuset_setdomain_PTRMASK);
+	uap->which = cheri_getoffset(tmpcap);
+
+	/* [2] id_t id */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 2, CHERIABI_SYS_cheriabi_cpuset_setdomain_PTRMASK);
+	uap->id = cheri_getoffset(tmpcap);
+
+	/* [3] size_t domainsetsize */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 3, CHERIABI_SYS_cheriabi_cpuset_setdomain_PTRMASK);
+	uap->domainsetsize = cheri_getoffset(tmpcap);
+
+	/* [5] int policy */
+	cheriabi_fetch_syscall_arg(td, &tmpcap, 5, CHERIABI_SYS_cheriabi_cpuset_setdomain_PTRMASK);
+	uap->policy = cheri_getoffset(tmpcap);
+
+	/* [4] domainset_t * __capability mask */
+	cheriabi_fetch_syscall_arg(td,
+	    __DECONST(void * __capability *, &uap->mask),
+	    4, CHERIABI_SYS_cheriabi_cpuset_setdomain_PTRMASK);
+
+	return (0);
+}
+
+static inline int
 CHERIABI_SYS_cheriabi_coexecve_fill_uap(struct thread *td,
     struct cheriabi_coexecve_args *uap)
 {

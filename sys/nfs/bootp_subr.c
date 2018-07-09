@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1995 Gordon Ross, Adam Glass
  * Copyright (c) 1992 Regents of the University of California.
  * All rights reserved.
@@ -1908,3 +1910,13 @@ out:
 }
 
 SYSINIT(bootp_rootconf, SI_SUB_ROOT_CONF, SI_ORDER_FIRST, bootpc_init, NULL);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

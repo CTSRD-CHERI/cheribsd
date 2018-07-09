@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2008 Isilon Inc http://www.isilon.com/
  * Authors: Doug Rabson <dfr@rabson.org>
  * Developed with Red Inc: Alfred Perlstein <alfred@freebsd.org>
@@ -397,3 +399,12 @@ static moduledata_t kgssapi_mod = {
 DECLARE_MODULE(kgssapi, kgssapi_mod, SI_SUB_VFS, SI_ORDER_ANY);
 MODULE_DEPEND(kgssapi, krpc, 1, 1, 1);
 MODULE_VERSION(kgssapi, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1374,6 +1374,24 @@ cheriabi_cpuset_setaffinity(struct thread *td,
 	    uap->cpusetsize, uap->mask));
 }
 
+int
+cheriabi_cpuset_getdomain(struct thread *td,
+    struct cheriabi_cpuset_getdomain_args *uap)
+{
+
+	return (kern_cpuset_getdomain(td, uap->level, uap->which,
+	    uap->id, uap->domainsetsize, uap->mask, uap->policy));
+}
+
+int
+cheriabi_cpuset_setdomain(struct thread *td,
+    struct cheriabi_cpuset_setdomain_args *uap)
+{
+
+	return (kern_cpuset_setdomain(td, uap->level, uap->which,
+	    uap->id, uap->domainsetsize, uap->mask, uap->policy));
+}
+
 /*
  * kern_descrip.c
  */

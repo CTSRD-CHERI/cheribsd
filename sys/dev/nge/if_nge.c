@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2001 Wind River Systems
  * Copyright (c) 1997, 1998, 1999, 2000, 2001
  *	Bill Paul <wpaul@bsdi.com>.  All rights reserved.
@@ -2735,3 +2737,12 @@ sysctl_hw_nge_int_holdoff(SYSCTL_HANDLER_ARGS)
 	return (sysctl_int_range(oidp, arg1, arg2, req, NGE_INT_HOLDOFF_MIN,
 	    NGE_INT_HOLDOFF_MAX));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

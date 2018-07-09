@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1998 John D. Polstra.
  * All rights reserved.
  *
@@ -121,3 +123,13 @@ struct thrmisc32 {
 #endif /* __HAVE_REG32 */
 
 #endif /* _SYS_PROCFS_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

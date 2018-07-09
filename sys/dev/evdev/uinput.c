@@ -719,3 +719,12 @@ uinput_modevent(module_t mod __unused, int cmd, void *data)
 DEV_MODULE(uinput, uinput_modevent, NULL);
 MODULE_VERSION(uinput, 1);
 MODULE_DEPEND(uinput, evdev, 1, 1, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

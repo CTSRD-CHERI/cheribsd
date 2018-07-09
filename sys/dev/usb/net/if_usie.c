@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011 Anybots Inc
  * written by Akinori Furukoshi <moonlightakkiy@yahoo.ca>
  *  - ucom part is based on u3g.c
@@ -1613,3 +1615,12 @@ usie_driver_loaded(struct module *mod, int what, void *arg)
 	return (0);
 }
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

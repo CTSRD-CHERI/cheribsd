@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2009-2017 Alexander Motin <mav@FreeBSD.org>
  * Copyright (c) 1997-2009 by Matthew Jacob
  * All rights reserved.
@@ -4322,3 +4324,13 @@ isp_put_ecmd(ispsoftc_t *isp, isp_ecmd_t *ecmd)
 	ecmd->next = isp->isp_osinfo.ecmd_free;
 	isp->isp_osinfo.ecmd_free = ecmd;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:misc",
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

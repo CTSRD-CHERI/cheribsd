@@ -90,6 +90,7 @@ _LIBRARIES=	\
 		cap_pwd \
 		cap_random \
 		cap_sysctl \
+		cap_syslog \
 		com_err \
 		compiler_rt \
 		crypt \
@@ -222,18 +223,16 @@ _LIBRARIES+= \
 _LIBRARIES+= \
 		cxgb4 \
 		ibcm \
-		ibcommon \
 		ibmad \
-		ibsdp \
+		ibnetdisc \
 		ibumad \
 		ibverbs \
 		mlx4 \
-		mthca \
-		opensm \
-		osmcomp \
-		osmvendor \
+		mlx5 \
 		rdmacm \
-
+		osmcomp \
+		opensm \
+		osmvendor
 .endif
 
 # Each library's LIBADD needs to be duplicated here for static linkage of
@@ -268,6 +267,7 @@ _DP_cap_grp=	nv
 _DP_cap_pwd=	nv
 _DP_cap_random=	nv
 _DP_cap_sysctl=	nv
+_DP_cap_syslog=	nv
 _DP_pjdlog=	util
 _DP_png=	z
 _DP_opie=	md
@@ -364,17 +364,21 @@ _DP_zfs_core=	nvpair
 _DP_uutil=	nvpair
 _DP_avl=	nvpair
 _DP_zpool=	md pthread z nvpair avl umem
+
+# OFED support
 .if ${MK_OFED} != "no"
 _DP_cxgb4=	ibverbs pthread
 _DP_ibcm=	ibverbs
-_DP_ibmad=	ibcommon ibumad
-_DP_ibumad=	ibcommon
+_DP_ibmad=	ibumad
+_DP_ibnetdisc=	osmcomp ibmad ibumad
+_DP_ibumad=	
+_DP_ibverbs=
 _DP_mlx4=	ibverbs pthread
-_DP_mthca=	ibverbs pthread
-_DP_opensm=	pthread
-_DP_osmcomp=	pthread
-_DP_osmvendor=	ibumad opensm osmcomp pthread
+_DP_mlx5=	ibverbs pthread
 _DP_rdmacm=	ibverbs
+_DP_osmcomp=	pthread
+_DP_opensm=	pthread
+_DP_osmvendor=	ibumad pthread
 .endif
 
 _DP_helloworld=	cheri
@@ -391,7 +395,7 @@ LIB${_l:tu}?=	${LIBDESTDIR}${LIBDIR_BASE}/libprivate${_l}.a
 .endfor
 
 .for _l in ${_LIBRARIES}
-.if ${_INTERNALLIBS:M${_l}}
+.if ${_INTERNALLIBS:M${_l}} || !defined(SYSROOT)
 LDADD_${_l}_L+=		-L${LIB${_l:tu}DIR}
 .endif
 DPADD_${_l}?=	${LIB${_l:tu}}
@@ -547,6 +551,21 @@ LIBOSMCOMPDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libosmcomp
 LIBOSMVENDORDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libosmvendor
 LIBRDMACMDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/librdmacm
 LIBIBSDPDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libsdp
+
+# OFED support
+LIBCXGB4DIR=	${_LIB_OBJTOP}/contrib/ofed/libcxgb4
+LIBIBCMDIR=	${_LIB_OBJTOP}/contrib/ofed/libibcm
+LIBIBMADDIR=	${_LIB_OBJTOP}/contrib/ofed/libibmad
+LIBIBNETDISCDIR=${_LIB_OBJTOP}/contrib/ofed/libibnetdisc
+LIBIBUMADDIR=	${_LIB_OBJTOP}/contrib/ofed/libibumad
+LIBIBVERBSDIR=	${_LIB_OBJTOP}/contrib/ofed/libibverbs
+LIBMLX4DIR=	${_LIB_OBJTOP}/contrib/ofed/libmlx4
+LIBMLX5DIR=	${_LIB_OBJTOP}/contrib/ofed/libmlx5
+LIBRDMACMDIR=	${_LIB_OBJTOP}/contrib/ofed/librdmacm
+LIBOSMCOMPDIR=	${_LIB_OBJTOP}/contrib/ofed/opensm/complib
+LIBOPENSMDIR=	${_LIB_OBJTOP}/contrib/ofed/opensm/libopensm
+LIBOSMVENDORDIR=${_LIB_OBJTOP}/contrib/ofed/opensm/libvendor
+
 LIBDIALOGDIR=	${_LIB_OBJTOP}/gnu/lib/libdialog
 LIBGCOVDIR=	${_LIB_OBJTOP}/gnu/lib/libgcov
 LIBGOMPDIR=	${_LIB_OBJTOP}/gnu/lib/libgomp
@@ -583,6 +602,7 @@ LIBCAP_GRPDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_grp
 LIBCAP_PWDDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_pwd
 LIBCAP_RANDOMDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_random
 LIBCAP_SYSCTLDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_sysctl
+LIBCAP_SYSLOGDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_syslog
 LIBBSDXMLDIR=	${_LIB_OBJTOP}/lib/libexpat
 LIBKVMDIR=	${_LIB_OBJTOP}/lib/libkvm
 LIBPTHREADDIR=	${_LIB_OBJTOP}/lib/libthr

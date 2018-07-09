@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -70,7 +72,7 @@ struct socket;
  * (a) constant after allocation, no locking required.
  * (b) locked by SOCK_LOCK(so).
  * (cr) locked by SOCKBUF_LOCK(&so->so_rcv).
- * (cs) locked by SOCKBUF_LOCK(&so->so_rcv).
+ * (cs) locked by SOCKBUF_LOCK(&so->so_snd).
  * (e) locked by SOLISTEN_LOCK() of corresponding listening socket.
  * (f) not locked since integer reads/writes are atomic.
  * (g) used only as a sleep/wakeup address, no value.
@@ -525,3 +527,12 @@ void	sbtoxsockbuf(struct sockbuf *sb, struct xsockbuf *xsb);
 #define	SBS_RCVATMARK		0x0040	/* at mark on input */
 
 #endif /* !_SYS_SOCKETVAR_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

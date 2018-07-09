@@ -2,6 +2,8 @@
 /*	$FreeBSD$ */
 
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1994, 1995 Ignatios Souvatzis
  * Copyright (c) 1982, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -827,3 +829,12 @@ static moduledata_t arc_mod = {
 
 DECLARE_MODULE(arcnet, arc_mod, SI_SUB_INIT_IF, SI_ORDER_ANY);
 MODULE_VERSION(arcnet, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -101,6 +103,9 @@ struct ctlname {
 #define	CTLFLAG_STATS	0x00002000	/* Statistics, not a tuneable */
 #define	CTLFLAG_NOFETCH	0x00001000	/* Don't fetch tunable from getenv() */
 #define	CTLFLAG_CAPRW	(CTLFLAG_CAPRD|CTLFLAG_CAPWR)
+#define	CTLFLAG_PTRIN	0x00000800	/* Copy in pointers */
+#define	CTLFLAG_PTROUT	0x00000400	/* Copy out pointers */
+#define	CTLFLAG_PTR	(CTLFLAG_PTRIN|CTLFLAG_PTROUT)
 
 /*
  * Secure level.   Note that CTLFLAG_SECURE == CTLFLAG_SECURE1.
@@ -145,13 +150,13 @@ struct ctlname {
 #define	REQ_WIRED	2
 
 /* definitions for sysctl_req 'flags' member */
-#if defined(__amd64__) || defined(__powerpc64__) ||\
+#if defined(__aarch64__) || defined(__amd64__) || defined(__powerpc64__) ||\
     (defined(__mips__) && defined(__mips_n64))
 #define	SCTL_MASK32	1	/* 32 bit emulation */
 #endif
-#ifdef COMPAT_CHERIABI
 #define	SCTL_CHERIABI	2	/* CheriABI support */
-#endif
+#define	SCTL_PTRIN	4
+#define	SCTL_PTROUT	8
 
 /*
  * This describes the access space for a sysctl request.  This is needed
@@ -1072,3 +1077,12 @@ __END_DECLS
 #endif	/* _KERNEL */
 
 #endif	/* !_SYS_SYSCTL_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

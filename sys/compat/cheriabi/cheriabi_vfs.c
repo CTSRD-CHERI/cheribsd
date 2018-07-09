@@ -34,6 +34,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/fcntl.h>
 #include <sys/namei.h>
+#include <sys/proc.h>
 #include <sys/signal.h>
 #include <sys/syscallsubr.h>
 
@@ -453,17 +454,27 @@ cheriabi_fstatat(struct thread *td, struct cheriabi_fstatat_args *uap)
 int
 cheriabi_pathconf(struct thread *td, struct cheriabi_pathconf_args *uap)
 {
+	long value;
+	int error;
 
-	return (kern_pathconf(td, uap->path, UIO_USERSPACE, uap->name,
-	    FOLLOW));
+	error = kern_pathconf(td, uap->path, UIO_USERSPACE, uap->name,
+	    FOLLOW, &value);
+	if (error == 0)
+		td->td_retval[0] = value;
+	return (error);
 }
 
 int
 cheriabi_lpathconf(struct thread *td, struct cheriabi_lpathconf_args *uap)
 {
+	long value;
+	int error;
 
-	return (kern_pathconf(td, uap->path, UIO_USERSPACE, uap->name,
-	    NOFOLLOW));
+	error = kern_pathconf(td, uap->path, UIO_USERSPACE, uap->name,
+	    NOFOLLOW, &value);
+	if (error == 0)
+		td->td_retval[0] = value;
+	return (error);
 }
 
 int

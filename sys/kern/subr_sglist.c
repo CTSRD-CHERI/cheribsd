@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2008 Yahoo!, Inc.
  * All rights reserved.
  * Written by: John Baldwin <jhb@FreeBSD.org>
@@ -853,3 +855,13 @@ sglist_slice(struct sglist *original, struct sglist **slice, size_t offset,
 	}
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

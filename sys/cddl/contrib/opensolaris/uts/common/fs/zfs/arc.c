@@ -4199,8 +4199,6 @@ arc_shrink(int64_t to_free)
 	}
 }
 
-static long needfree = 0;
-
 typedef enum free_memory_reason_t {
 	FMR_UNKNOWN,
 	FMR_NEEDFREE,
@@ -4209,7 +4207,6 @@ typedef enum free_memory_reason_t {
 	FMR_PAGES_PP_MAXIMUM,
 	FMR_HEAP_ARENA,
 	FMR_ZIO_ARENA,
-	FMR_ZIO_FRAG,
 } free_memory_reason_t;
 
 int64_t last_free_memory;
@@ -4238,14 +4235,6 @@ arc_available_memory(void)
 	free_memory_reason_t r = FMR_UNKNOWN;
 
 #ifdef _KERNEL
-	if (needfree > 0) {
-		n = PAGESIZE * (-needfree);
-		if (n < lowest) {
-			lowest = n;
-			r = FMR_NEEDFREE;
-		}
-	}
-
 	/*
 	 * Cooperate with pagedaemon when it's time for it to scan
 	 * and reclaim some pages.
@@ -4312,15 +4301,11 @@ arc_available_memory(void)
 	 * heap is allocated.  (Or, in the calculation, if less than 1/4th is
 	 * free)
 	 */
-	n = (int64_t)vmem_size(heap_arena, VMEM_FREE) -
-	    (vmem_size(heap_arena, VMEM_FREE | VMEM_ALLOC) >> 2);
+	n = uma_avail() - (long)(uma_limit() / 4);
 	if (n < lowest) {
 		lowest = n;
 		r = FMR_HEAP_ARENA;
 	}
-#define	zio_arena	NULL
-#else
-#define	zio_arena	heap_arena
 #endif
 
 	/*
@@ -4338,20 +4323,6 @@ arc_available_memory(void)
 		if (n < lowest) {
 			lowest = n;
 			r = FMR_ZIO_ARENA;
-		}
-	}
-
-	/*
-	 * Above limits know nothing about real level of KVA fragmentation.
-	 * Start aggressive reclamation if too little sequential KVA left.
-	 */
-	if (lowest > 0) {
-		n = (vmem_size(heap_arena, VMEM_MAXFREE) < SPA_MAXBLOCKSIZE) ?
-		    -((int64_t)vmem_size(heap_arena, VMEM_ALLOC) >> 4) :
-		    INT64_MAX;
-		if (n < lowest) {
-			lowest = n;
-			r = FMR_ZIO_FRAG;
 		}
 	}
 
@@ -4510,9 +4481,6 @@ arc_reclaim_thread(void *dummy __unused)
 			int64_t to_free =
 			    (arc_c >> arc_shrink_shift) - free_memory;
 			if (to_free > 0) {
-#ifdef _KERNEL
-				to_free = MAX(to_free, ptob(needfree));
-#endif
 				arc_shrink(to_free);
 			}
 		} else if (free_memory < arc_c >> arc_no_grow_shift) {
@@ -4533,9 +4501,6 @@ arc_reclaim_thread(void *dummy __unused)
 		 * infinite loop.
 		 */
 		if (arc_size <= arc_c || evicted == 0) {
-#ifdef _KERNEL
-			needfree = 0;
-#endif
 			/*
 			 * We're either no longer overflowing, or we
 			 * can't evict anything more, so we should wake
@@ -6126,8 +6091,7 @@ arc_memory_throttle(uint64_t reserve, uint64_t txg)
 	static uint64_t last_txg = 0;
 
 #if defined(__i386) || !defined(UMA_MD_SMALL_ALLOC)
-	available_memory =
-	    MIN(available_memory, ptob(vmem_size(heap_arena, VMEM_FREE)));
+	available_memory = MIN(available_memory, uma_avail());
 #endif
 
 	if (freemem > (uint64_t)physmem * arc_lotsfree_percent / 100)
@@ -6310,9 +6274,7 @@ arc_lowmem(void *arg __unused, int howto __unused)
 {
 
 	mutex_enter(&arc_reclaim_lock);
-	/* XXX: Memory deficit should be passed as argument. */
-	needfree = btoc(arc_c >> arc_shrink_shift);
-	DTRACE_PROBE(arc__needfree);
+	DTRACE_PROBE1(arc__needfree, int64_t, ((int64_t)freemem - zfs_arc_free_target) * PAGESIZE);
 	cv_signal(&arc_reclaim_thread_cv);
 
 	/*
@@ -6510,8 +6472,12 @@ arc_init(void)
 	 * Metadata is stored in the kernel's heap.  Don't let us
 	 * use more than half the heap for the ARC.
 	 */
+#ifdef __FreeBSD__
+	arc_meta_limit = MIN(arc_meta_limit, uma_limit() / 2);
+#else
 	arc_meta_limit = MIN(arc_meta_limit,
 	    vmem_size(heap_arena, VMEM_ALLOC | VMEM_FREE) / 2);
+#endif
 #endif
 
 	/* Allow the tunable to override if it is reasonable */
@@ -6637,6 +6603,11 @@ arc_init(void)
 void
 arc_fini(void)
 {
+#ifdef _KERNEL
+	if (arc_event_lowmem != NULL)
+		EVENTHANDLER_DEREGISTER(vm_lowmem, arc_event_lowmem);
+#endif
+
 	mutex_enter(&arc_reclaim_lock);
 	arc_reclaim_thread_exit = B_TRUE;
 	/*
@@ -6682,11 +6653,6 @@ arc_fini(void)
 	buf_fini();
 
 	ASSERT0(arc_loaned_bytes);
-
-#ifdef _KERNEL
-	if (arc_event_lowmem != NULL)
-		EVENTHANDLER_DEREGISTER(vm_lowmem, arc_event_lowmem);
-#endif
 }
 
 /*

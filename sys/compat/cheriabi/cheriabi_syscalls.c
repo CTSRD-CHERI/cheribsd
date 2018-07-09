@@ -570,9 +570,11 @@ const char *cheriabi_syscallnames[] = {
 	"cheriabi_fhstatfs",			/* 558 = cheriabi_fhstatfs */
 	"cheriabi_mknodat",			/* 559 = cheriabi_mknodat */
 	"cheriabi_kevent",			/* 560 = cheriabi_kevent */
-	"cheriabi_coexecve",			/* 561 = cheriabi_coexecve */
-	"cosetup",			/* 562 = cosetup */
-	"coregister",			/* 563 = coregister */
-	"colookup",			/* 564 = colookup */
-	"copark",			/* 565 = copark */
+	"cheriabi_cpuset_getdomain",			/* 561 = cheriabi_cpuset_getdomain */
+	"cheriabi_cpuset_setdomain",			/* 562 = cheriabi_cpuset_setdomain */
+	"cheriabi_coexecve",			/* 563 = cheriabi_coexecve */
+	"cosetup",			/* 564 = cosetup */
+	"coregister",			/* 565 = coregister */
+	"colookup",			/* 566 = colookup */
+	"copark",			/* 567 = copark */
 };

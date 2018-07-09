@@ -35,10 +35,19 @@ LIB32WMAKEFLAGS=	\
 		OBJCOPY="${XOBJCOPY}"
 
 .elif ${TARGET_ARCH:Mmips64*} != ""
+.if ${WANT_COMPILER_TYPE} == gcc || \
+    (defined(X_COMPILER_TYPE) && ${X_COMPILER_TYPE} == gcc)
 .if empty(TARGET_CPUTYPE)
 LIB32CPUFLAGS=	-march=mips3
 .else
 LIB32CPUFLAGS=	-march=${TARGET_CPUTYPE}
+.endif
+.else
+.if ${TARGET_ARCH:Mmips64el*} != ""
+LIB32CPUFLAGS=  -target mipsel-unknown-freebsd12.0
+.else
+LIB32CPUFLAGS=  -target mips-unknown-freebsd12.0
+.endif
 .endif
 LIB32CPUFLAGS+= -mabi=32
 LIB32WMAKEENV=	MACHINE=mips MACHINE_ARCH=mips

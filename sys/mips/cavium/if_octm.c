@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2010-2011 Juli Mallett <jmallett@FreeBSD.org>
  * All rights reserved.
  *
@@ -537,3 +539,12 @@ octm_rx_intr(void *arg)
 	cvmx_write_csr(CVMX_MIXX_ISR(sc->sc_port), mixx_isr.u64);
 	cvmx_read_csr(CVMX_MIXX_ISR(sc->sc_port));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

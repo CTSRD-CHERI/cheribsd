@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1996 John S. Dyson
  * Copyright (c) 2012 Giovanni Trematerra
  * All rights reserved.
@@ -1845,3 +1847,14 @@ filt_pipenotsup(struct knote *kn, long hint)
 
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

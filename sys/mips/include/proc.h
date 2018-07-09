@@ -1,6 +1,8 @@
 /*	$OpenBSD: proc.h,v 1.2 1998/09/15 10:50:12 pefo Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -143,3 +145,13 @@ struct syscall_args {
 #endif
 
 #endif	/* !_MACHINE_PROC_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "support",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

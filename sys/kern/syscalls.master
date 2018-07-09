@@ -1002,12 +1002,8 @@
 547	AUE_FUTIMESAT	STD	{ int utimensat(int fd, \
 				    char *path, \
 				    struct timespec *times, int flag); }
-548	AUE_NULL	STD	{ int numa_getaffinity(cpuwhich_t which, \
-				    id_t id, \
-				    struct vm_domain_policy_entry *policy); }
-549	AUE_NULL	STD	{ int numa_setaffinity(cpuwhich_t which, \
-				    id_t id, const struct \
-				    vm_domain_policy_entry *policy); }
+548	AUE_NULL	UNIMPL	numa_getaffinity
+549	AUE_NULL	UNIMPL	numa_setaffinity
 550	AUE_FSYNC	STD	{ int fdatasync(int fd); }
 551	AUE_FSTAT	STD	{ int fstat(int fd, struct stat *sb); }
 552	AUE_FSTATAT	STD	{ int fstatat(int fd, char *path, \
@@ -1030,15 +1026,24 @@
 				    struct kevent_native *eventlist, \
 				    int nevents, \
 				    const struct timespec *timeout); }
-561	AUE_NULL	STD	{ int coexecve(pid_t pid, char *fname, char **argv, \
+561	AUE_NULL	STD	{ int cpuset_getdomain(cpulevel_t level, \
+				    cpuwhich_t which, id_t id, \
+				    size_t domainsetsize, domainset_t *mask, \
+				    int *policy); }
+562	AUE_NULL	STD	{ int cpuset_setdomain(cpulevel_t level, \
+				    cpuwhich_t which, id_t id, \
+				    size_t domainsetsize, domainset_t *mask, \
+				    int policy); }
+563	AUE_NULL	STD	{ int coexecve(pid_t pid, char *fname, char **argv, \
 				    char **envv); }
-562	AUE_NULL	STD	{ int cosetup(int what, void * __capability *code, \
+564	AUE_NULL	STD	{ int cosetup(int what, void * __capability *code, \
 				    void * __capability *data); }
-563	AUE_NULL	STD	{ int coregister(const char *name, \
+565	AUE_NULL	STD	{ int coregister(const char *name, \
 				    void * __capability *cap); }
-564	AUE_NULL	STD	{ int colookup(const char *name, \
+566	AUE_NULL	STD	{ int colookup(const char *name, \
 				    void * __capability *cap); }
-565	AUE_NULL	STD	{ int copark(void); }
+567	AUE_NULL	STD	{ int copark(void); }
 
 ; Please copy any additions and changes to the following compatability tables:
 ; sys/compat/freebsd32/syscalls.master
+; vim: syntax=off

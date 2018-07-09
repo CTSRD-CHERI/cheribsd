@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2012 Sandvine, Inc.
  * Copyright (c) 2012 NetApp, Inc.
  * All rights reserved.
@@ -2474,3 +2476,12 @@ vmm_decode_instruction(struct vm *vm, int cpuid, uint64_t gla,
 	return (0);
 }
 #endif	/* _KERNEL */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

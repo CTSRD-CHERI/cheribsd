@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1996, by Steve Passe
  * Copyright (c) 2003, by Peter Wemm
  * All rights reserved.
@@ -85,9 +87,8 @@ extern	struct pcpu __pcpu[];
 
 /* Temporary variables for init_secondary()  */
 char *doublefault_stack;
+char *mce_stack;
 char *nmi_stack;
-
-extern inthand_t IDTVEC(fast_syscall), IDTVEC(fast_syscall32);
 
 /*
  * Local data and functions.
@@ -132,33 +133,40 @@ cpu_mp_start(void)
 	/* Install an inter-CPU IPI for TLB invalidation */
 	if (pmap_pcid_enabled) {
 		if (invpcid_works) {
-			setidt(IPI_INVLTLB, IDTVEC(invltlb_invpcid),
-			    SDT_SYSIGT, SEL_KPL, 0);
+			setidt(IPI_INVLTLB, pti ? IDTVEC(invltlb_invpcid_pti) :
+			    IDTVEC(invltlb_invpcid), SDT_SYSIGT, SEL_KPL, 0);
 		} else {
-			setidt(IPI_INVLTLB, IDTVEC(invltlb_pcid), SDT_SYSIGT,
-			    SEL_KPL, 0);
+			setidt(IPI_INVLTLB, pti ? IDTVEC(invltlb_pcid_pti) :
+			    IDTVEC(invltlb_pcid), SDT_SYSIGT, SEL_KPL, 0);
 		}
 	} else {
-		setidt(IPI_INVLTLB, IDTVEC(invltlb), SDT_SYSIGT, SEL_KPL, 0);
+		setidt(IPI_INVLTLB, pti ? IDTVEC(invltlb_pti) : IDTVEC(invltlb),
+		    SDT_SYSIGT, SEL_KPL, 0);
 	}
-	setidt(IPI_INVLPG, IDTVEC(invlpg), SDT_SYSIGT, SEL_KPL, 0);
-	setidt(IPI_INVLRNG, IDTVEC(invlrng), SDT_SYSIGT, SEL_KPL, 0);
+	setidt(IPI_INVLPG, pti ? IDTVEC(invlpg_pti) : IDTVEC(invlpg),
+	    SDT_SYSIGT, SEL_KPL, 0);
+	setidt(IPI_INVLRNG, pti ? IDTVEC(invlrng_pti) : IDTVEC(invlrng),
+	    SDT_SYSIGT, SEL_KPL, 0);
 
 	/* Install an inter-CPU IPI for cache invalidation. */
-	setidt(IPI_INVLCACHE, IDTVEC(invlcache), SDT_SYSIGT, SEL_KPL, 0);
+	setidt(IPI_INVLCACHE, pti ? IDTVEC(invlcache_pti) : IDTVEC(invlcache),
+	    SDT_SYSIGT, SEL_KPL, 0);
 
 	/* Install an inter-CPU IPI for all-CPU rendezvous */
-	setidt(IPI_RENDEZVOUS, IDTVEC(rendezvous), SDT_SYSIGT, SEL_KPL, 0);
+	setidt(IPI_RENDEZVOUS, pti ? IDTVEC(rendezvous_pti) :
+	    IDTVEC(rendezvous), SDT_SYSIGT, SEL_KPL, 0);
 
 	/* Install generic inter-CPU IPI handler */
-	setidt(IPI_BITMAP_VECTOR, IDTVEC(ipi_intr_bitmap_handler),
-	       SDT_SYSIGT, SEL_KPL, 0);
+	setidt(IPI_BITMAP_VECTOR, pti ? IDTVEC(ipi_intr_bitmap_handler_pti) :
+	    IDTVEC(ipi_intr_bitmap_handler), SDT_SYSIGT, SEL_KPL, 0);
 
 	/* Install an inter-CPU IPI for CPU stop/restart */
-	setidt(IPI_STOP, IDTVEC(cpustop), SDT_SYSIGT, SEL_KPL, 0);
+	setidt(IPI_STOP, pti ? IDTVEC(cpustop_pti) : IDTVEC(cpustop),
+	    SDT_SYSIGT, SEL_KPL, 0);
 
 	/* Install an inter-CPU IPI for CPU suspend/resume */
-	setidt(IPI_SUSPEND, IDTVEC(cpususpend), SDT_SYSIGT, SEL_KPL, 0);
+	setidt(IPI_SUSPEND, pti ? IDTVEC(cpususpend_pti) : IDTVEC(cpususpend),
+	    SDT_SYSIGT, SEL_KPL, 0);
 
 	/* Set boot_cpu_id if needed. */
 	if (boot_cpu_id == -1) {
@@ -188,7 +196,7 @@ init_secondary(void)
 {
 	struct pcpu *pc;
 	struct nmi_pcpu *np;
-	u_int64_t msr, cr0;
+	u_int64_t cr0;
 	int cpu, gsel_tss, x;
 	struct region_descriptor ap_gdt;
 
@@ -197,7 +205,6 @@ init_secondary(void)
 
 	/* Init tss */
 	common_tss[cpu] = common_tss[0];
-	common_tss[cpu].tss_rsp0 = 0;   /* not used until after switch */
 	common_tss[cpu].tss_iobase = sizeof(struct amd64tss) +
 	    IOPERM_BITMAP_SIZE;
 	common_tss[cpu].tss_ist1 = (long)&doublefault_stack[PAGE_SIZE];
@@ -205,6 +212,10 @@ init_secondary(void)
 	/* The NMI stack runs on IST2. */
 	np = ((struct nmi_pcpu *) &nmi_stack[PAGE_SIZE]) - 1;
 	common_tss[cpu].tss_ist2 = (long) np;
+
+	/* The MC# stack runs on IST3. */
+	np = ((struct nmi_pcpu *) &mce_stack[PAGE_SIZE]) - 1;
+	common_tss[cpu].tss_ist3 = (long) np;
 
 	/* Prepare private GDT */
 	gdt_segs[GPROC0_SEL].ssd_base = (long) &common_tss[cpu];
@@ -240,8 +251,15 @@ init_secondary(void)
 	pc->pc_curpmap = kernel_pmap;
 	pc->pc_pcid_gen = 1;
 	pc->pc_pcid_next = PMAP_PCID_KERN + 1;
+	common_tss[cpu].tss_rsp0 = pti ? ((vm_offset_t)&pc->pc_pti_stack +
+	    PC_PTI_STACK_SZ * sizeof(uint64_t)) & ~0xful : 0;
 
 	/* Save the per-cpu pointer for use by the NMI handler. */
+	np = ((struct nmi_pcpu *) &nmi_stack[PAGE_SIZE]) - 1;
+	np->np_pcpu = (register_t) pc;
+
+	/* Save the per-cpu pointer for use by the MC# handler. */
+	np = ((struct nmi_pcpu *) &mce_stack[PAGE_SIZE]) - 1;
 	np->np_pcpu = (register_t) pc;
 
 	wrmsr(MSR_FSBASE, 0);		/* User value */
@@ -263,15 +281,7 @@ init_secondary(void)
 	cr0 &= ~(CR0_CD | CR0_NW | CR0_EM);
 	load_cr0(cr0);
 
-	/* Set up the fast syscall stuff */
-	msr = rdmsr(MSR_EFER) | EFER_SCE;
-	wrmsr(MSR_EFER, msr);
-	wrmsr(MSR_LSTAR, (u_int64_t)IDTVEC(fast_syscall));
-	wrmsr(MSR_CSTAR, (u_int64_t)IDTVEC(fast_syscall32));
-	msr = ((u_int64_t)GSEL(GCODE_SEL, SEL_KPL) << 32) |
-	      ((u_int64_t)GSEL(GUCODE32_SEL, SEL_UPL) << 48);
-	wrmsr(MSR_STAR, msr);
-	wrmsr(MSR_SF_MASK, PSL_NT|PSL_T|PSL_I|PSL_C|PSL_D);
+	amd64_conf_fast_syscall();
 
 	/* signal our startup to the BSP. */
 	mp_naps++;
@@ -346,6 +356,8 @@ native_start_all_aps(void)
 		    kstack_pages * PAGE_SIZE, M_WAITOK | M_ZERO);
 		doublefault_stack = (char *)kmem_malloc(kernel_arena,
 		    PAGE_SIZE, M_WAITOK | M_ZERO);
+		mce_stack = (char *)kmem_malloc(kernel_arena, PAGE_SIZE,
+		    M_WAITOK | M_ZERO);
 		nmi_stack = (char *)kmem_malloc(kernel_arena, PAGE_SIZE,
 		    M_WAITOK | M_ZERO);
 		dpcpu = (void *)kmem_malloc(kernel_arena, DPCPU_SIZE,

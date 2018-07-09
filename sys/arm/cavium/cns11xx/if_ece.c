@@ -1953,3 +1953,12 @@ DRIVER_MODULE(ece, econaarm, ece_driver, ece_devclass, 0, 0);
 DRIVER_MODULE(miibus, ece, miibus_driver, miibus_devclass, 0, 0);
 MODULE_DEPEND(ece, miibus, 1, 1, 1);
 MODULE_DEPEND(ece, ether, 1, 1, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

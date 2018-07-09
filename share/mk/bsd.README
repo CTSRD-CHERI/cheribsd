@@ -268,8 +268,6 @@ It has seven targets:
 		beforeinstall and afterinstall may also be used to cause
 		actions immediately before and after the install target
 		is executed.
-	lint:
-		run lint on the source files
 	tags:
 		create a tags file for the source files.
 
@@ -512,18 +510,17 @@ ${MOD}_oid.h	A header which programmatically describes the MIB root and
 
 The include file <bsd.subdir.mk> contains the default targets for building
 subdirectories.  It has the same seven targets as <bsd.prog.mk>: all, clean,
-cleandir, depend, install, lint, and tags.  For all of the directories
-listed in the variable SUBDIRS, the specified directory will be visited
-and the target made.  There is also a default target which allows the
-command "make subdir" where subdir is any directory listed in the variable
-SUBDIRS.
+cleandir, depend, install, and tags.  For all of the directories listed in the
+variable SUBDIRS, the specified directory will be visited and the target made.
+There is also a default target which allows the command "make subdir" where
+subdir is any directory listed in the variable SUBDIRS.
 
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
-The include file <bsd.lib.mk> has support for building libraries.  It has
-the same seven targets as <bsd.prog.mk>: all, clean, cleandir, depend,
-install, lint, and tags.  It has a limited number of suffixes, consistent
-with the current needs of the BSD tree.
+The include file <bsd.lib.mk> has support for building libraries.  It has the
+same seven targets as <bsd.prog.mk>: all, clean, cleandir, depend, install, and
+tags.  It has a limited number of suffixes, consistent with the current needs of
+the BSD tree.
 
 It sets/uses the following variables:
 
@@ -566,8 +563,6 @@ LINKOWN		Owner of links created with LINKS [${LIBOWN}].
 LINKGRP		Group of links created with LINKS [${LIBGRP}].
 
 LINKMODE	Mode of links created with LINKS [${LIBMODE}].
-
-LINTLIBDIR	Target directory for lint libraries.
 
 MAN		The manual pages to be installed. See bsd.man.mk for more
 		details.
@@ -625,8 +620,6 @@ It has seven targets:
                 targets beforeinstall and afterinstall may also be used
                 to cause actions immediately before and after the
                 install target is executed.
-	lint:
-		run lint on the source files.
 	tags:
 		create a tags file for the source files.
 

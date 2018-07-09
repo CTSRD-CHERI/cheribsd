@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  * Copyright (c) 2000
@@ -337,8 +339,8 @@ struct dumperinfo {
 	off_t	mediasize;	/* Space available in bytes. */
 	void	*blockbuf;	/* Buffer for padding shorter dump blocks */
 	off_t	dumpoff;	/* Offset of ongoing kernel dump. */
-	struct kerneldumpcrypto	*kdc; /* Kernel dump crypto. */
-	struct kerneldumpgz *kdgz; /* Kernel dump compression. */
+	struct kerneldumpcrypto	*kdcrypto; /* Kernel dump crypto. */
+	struct kerneldumpcomp *kdcomp; /* Kernel dump compression. */
 };
 
 extern int dumping;		/* system is dumping */

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2002, Jeffrey Roberson <jeff@freebsd.org>
  * Copyright (c) 2008-2009, Lawrence Stewart <lstewart@freebsd.org>
  * Copyright (c) 2009-2010, The FreeBSD Foundation
@@ -974,3 +976,13 @@ static moduledata_t alq_mod =
 
 DECLARE_MODULE(alq, alq_mod, SI_SUB_LAST, SI_ORDER_ANY);
 MODULE_VERSION(alq, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

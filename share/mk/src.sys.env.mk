@@ -2,6 +2,14 @@
 
 # early setup only see also src.sys.mk
 
+# bmake-20170301 started taking '-C' "as is" for some cases, notably absolute
+# paths.  Some later comparisons will assume .CURDIR is resolved and matches
+# what we would get with 'cd'.  So just force resolve it now if it is an
+# absolute path.
+.if ${MAKE_VERSION} >= 20170301 && !empty(.CURDIR:M/*)
+.CURDIR:= ${.CURDIR:tA}
+.endif
+
 # make sure this is defined in a consistent manner
 SRCTOP:= ${.PARSEDIR:tA:H:H}
 
@@ -21,6 +29,8 @@ SRC_ENV_CONF?= /etc/src-env.conf
 .-include "${SRC_ENV_CONF}"
 _src_env_conf_included_:	.NOTMAIN
 .endif
+
+.include <bsd.mkopt.mk>
 
 # Top-level installs should not use meta mode as it may prevent installing
 # based on cookies.
@@ -44,4 +54,7 @@ MAKESYSPATH:=	${.PARSEDIR:tA}
 .export MAKESYSPATH
 .endif
 
+.if ${RELDIR:U} == "." && ${.MAKE.LEVEL} == 0
+.sinclude "${.CURDIR}/Makefile.sys.inc"
+.endif
 .include <src.sys.obj.mk>

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1988, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -398,8 +400,12 @@ int	copyout_nofault(const void * _Nonnull __restrict kaddr,
 #if __has_feature(capabilities)
 int	copyout_nofault_c(const void * __capability _Nonnull __restrict kaddr,
 	    void * __capability _Nonnull __restrict udaddr, size_t len);
+int	copyoutcap_nofault_c(
+	    const void * __capability _Nonnull __restrict kaddr,
+	    void * __capability _Nonnull __restrict udaddr, size_t len);
 #else
 #define	copyout_nofault_c	copyout_nofault
+#define	copyoutcap_nofault_c	copyout_nofault
 #endif
 
 int	fubyte(volatile const void *base);
@@ -625,3 +631,12 @@ void counted_warning(unsigned *counter, const char *msg);
 __NULLABILITY_PRAGMA_POP
 
 #endif /* !_SYS_SYSTM_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

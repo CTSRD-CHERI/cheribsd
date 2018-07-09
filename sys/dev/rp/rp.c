@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) Comtrol Corporation <support@comtrol.com>
  * All rights reserved.
  *
@@ -730,7 +732,8 @@ rp_attachcommon(CONTROLLER_T *ctlp, int num_aiops, int num_ports)
 
 	ctlp->num_ports = num_ports;
 	ctlp->rp = rp = (struct rp_port *)
-		malloc(sizeof(struct rp_port) * num_ports, M_DEVBUF, M_NOWAIT | M_ZERO);
+		mallocarray(num_ports, sizeof(struct rp_port), M_DEVBUF,
+		    M_NOWAIT | M_ZERO);
 	if (rp == NULL) {
 		device_printf(ctlp->dev, "rp_attachcommon: Could not malloc rp_ports structures.\n");
 		retval = ENOMEM;

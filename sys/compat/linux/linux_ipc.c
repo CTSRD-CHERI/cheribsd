@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1994-1995 Søren Schmidt
  * All rights reserved.
  *
@@ -931,3 +933,13 @@ linux_shmctl(struct thread *td, struct linux_shmctl_args *args)
 MODULE_DEPEND(linux, sysvmsg, 1, 1, 1);
 MODULE_DEPEND(linux, sysvsem, 1, 1, 1);
 MODULE_DEPEND(linux, sysvshm, 1, 1, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "pointer_integrity",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2012, 2013 Bjoern A. Zeeb
  * Copyright (c) 2014 Robert N. M. Watson
  * All rights reserved.
@@ -2095,3 +2097,12 @@ atse_miibus_statchg(device_t dev)
 }
 
 /* end */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

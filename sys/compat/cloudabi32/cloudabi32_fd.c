@@ -142,3 +142,13 @@ cloudabi32_sys_fd_write(struct thread *td,
 	free(uio, M_IOV);
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

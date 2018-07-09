@@ -1,11 +1,12 @@
 # $FreeBSD$
 # CHERI CHANGES START
 # {
-#   "updated": 20180530,
+#   "updated": 20180629,
+#   "target_type": "lib",
 #   "changes": [
 #     "pointer_size"
 #   ],
-#   "change_comment": "size and alignment of locks set by defines",
+#   "change_comment": "size and alignment of locks set by defines"
 # }
 # CHERI CHANGES END
 

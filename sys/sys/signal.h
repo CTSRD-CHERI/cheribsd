@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1989, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -703,3 +705,16 @@ int	convert_sigevent(const struct sigevent_native *, ksigevent_t *);
 #endif
 
 #endif /* !_SYS_SIGNAL_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "kernel_sig_types",
+//     "pointer_as_integer",
+//     "user_capabilities"
+//   ],
+//   "change_comment": "",
+//   "hybrid_specific": false
+// }
+// CHERI CHANGES END

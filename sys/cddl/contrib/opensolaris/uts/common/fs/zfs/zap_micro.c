@@ -1581,3 +1581,12 @@ zap_get_stats(objset_t *os, uint64_t zapobj, zap_stats_t *zs)
 	zap_unlockdir(zap, FTAG);
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "hashing"
+//   ]
+// }
+// CHERI CHANGES END

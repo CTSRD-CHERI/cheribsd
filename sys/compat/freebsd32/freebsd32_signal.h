@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2006 David Xu <davidxu@freebsd.org>
  * All rights reserved.
  *
@@ -64,3 +66,12 @@ int convert_sigevent32(struct sigevent32 *sig32, ksigevent_t *sig);
 void siginfo_to_siginfo32(const _siginfo_t *src, struct siginfo32 *dst);
 
 #endif /* !_COMPAT_FREEBSD32_SIGNAL_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "kernel_sig_types"
+//   ]
+// }
+// CHERI CHANGES END

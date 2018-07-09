@@ -2,6 +2,8 @@
 /*	$OpenBSD: pcb.h,v 1.3 1998/09/15 10:50:12 pefo Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause AND BSD-2-Clause
+ *
  * Copyright (c) 2017 Robert N. M. Watson
  * All rights reserved.
  *
@@ -183,3 +185,12 @@ int savectx(struct pcb *) __returns_twice;
 #endif
 
 #endif	/* !_MACHINE_PCB_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

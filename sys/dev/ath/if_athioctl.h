@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2002-2009 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
@@ -454,3 +456,12 @@ struct ath_tx_radiotap_header {
 #define	SIOCGATHBTCOEX		_IOWR('i', 152, struct ath_diag)
 
 #endif /* _DEV_ATH_ATHIOCTL_H */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

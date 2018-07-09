@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (C) 1999-2000 by Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
  *
@@ -737,9 +739,10 @@ tapioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *td
 	switch (cmd) {
 		case TAPSIFINFO:
 			tapp = (struct tapinfo *)data;
+			if (ifp->if_type != tapp->type)
+				return (EPROTOTYPE);
 			mtx_lock(&tp->tap_mtx);
 			ifp->if_mtu = tapp->mtu;
-			ifp->if_type = tapp->type;
 			ifp->if_baudrate = tapp->baudrate;
 			mtx_unlock(&tp->tap_mtx);
 			break;
@@ -1113,3 +1116,13 @@ tapkqdetach(struct knote *kn)
 	knlist_remove(&tp->tap_rsel.si_note, kn, 0);
 } /* tapkqdetach */
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

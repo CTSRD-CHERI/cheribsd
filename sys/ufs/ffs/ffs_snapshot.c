@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright 2000 Marshall Kirk McKusick. All Rights Reserved.
  *
  * Further information about snapshots can be obtained from:
@@ -646,7 +648,7 @@ loop:
 	 * keep us out of deadlock until the full one is ready.
 	 */
 	if (xp == NULL) {
-		snapblklist = malloc(snaplistsize * sizeof(daddr_t),
+		snapblklist = mallocarray(snaplistsize, sizeof(daddr_t),
 		    M_UFSMNT, M_WAITOK);
 		blkp = &snapblklist[1];
 		*blkp++ = lblkno(fs, fs->fs_sblockloc);
@@ -727,7 +729,7 @@ out1:
 	/*
 	 * Allocate space for the full list of preallocated snapshot blocks.
 	 */
-	snapblklist = malloc(snaplistsize * sizeof(daddr_t),
+	snapblklist = mallocarray(snaplistsize, sizeof(daddr_t),
 	    M_UFSMNT, M_WAITOK);
 	ip->i_snapblklist = &snapblklist[1];
 	/*
@@ -2497,7 +2499,7 @@ readblock(vp, bp, lbn)
 	struct buf *bp;
 	ufs2_daddr_t lbn;
 {
-	struct inode *ip = VTOI(vp);
+	struct inode *ip;
 	struct bio *bip;
 	struct fs *fs;
 
@@ -2699,3 +2701,13 @@ ffs_snapdata_acquire(struct vnode *devvp)
 }
 
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

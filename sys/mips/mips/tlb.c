@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2004-2010 Juli Mallett <jmallett@FreeBSD.org>
  * All rights reserved.
  *
@@ -423,3 +425,12 @@ DB_SHOW_COMMAND(tlb, ddb_dump_tlb)
 	db_printf("Finished.\n");
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "platform"
+//   ]
+// }
+// CHERI CHANGES END

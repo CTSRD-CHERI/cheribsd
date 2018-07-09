@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1996, Javier Martín Rueda (jmrueda@diatel.upm.es)
  * All rights reserved.
  *
@@ -1073,3 +1075,12 @@ ex_eeprom_read(struct ex_softc *sc, int location)
 	CSR_WRITE_1(sc, CMD_REG, Bank0_Sel);
 	return(data);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

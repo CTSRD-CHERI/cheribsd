@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: (BSD-3-Clause AND MIT-CMU)
+ *
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -413,3 +415,13 @@ int vm_map_wire(vm_map_t map, vm_offset_t start, vm_offset_t end,
 long vmspace_swap_count(struct vmspace *vmspace);
 #endif				/* _KERNEL */
 #endif				/* _VM_MAP_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

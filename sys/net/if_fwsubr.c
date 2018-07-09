@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2004 Doug Rabson
  * Copyright (c) 1982, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -849,3 +851,12 @@ static moduledata_t firewire_mod = {
 
 DECLARE_MODULE(if_firewire, firewire_mod, SI_SUB_INIT_IF, SI_ORDER_ANY);
 MODULE_VERSION(if_firewire, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

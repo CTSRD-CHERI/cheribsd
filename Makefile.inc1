@@ -150,7 +150,7 @@ TEST_SYSTEM_COMPILER_VARS= \
 	WANT_COMPILER_FREEBSD_VERSION WANT_COMPILER_FREEBSD_VERSION_FILE \
 	CC COMPILER_TYPE COMPILER_FEATURES COMPILER_VERSION \
 	COMPILER_FREEBSD_VERSION \
-	LINKER_TYPE LINKER_VERSION
+	LINKER_TYPE LINKER_FEATURES LINKER_VERSION
 test-system-compiler: .PHONY
 .for v in ${TEST_SYSTEM_COMPILER_VARS}
 	${_+_}@printf "%-35s= %s\n" "${v}" "${${v}}"
@@ -184,6 +184,7 @@ _COMPILER_METADATA_VARS=	COMPILER_VERSION \
 				COMPILER_FEATURES \
 				COMPILER_FREEBSD_VERSION \
 				LINKER_VERSION \
+				LINKER_FEATURES \
 				LINKER_TYPE
 compiler-metadata.mk: .PHONY .META
 	@: > ${.TARGET}
@@ -276,6 +277,9 @@ SUBDIR+=secure
 .if !defined(NO_SHARE)
 SUBDIR+=share
 .endif
+.if ${MK_BOOT} != "no"
+SUBDIR+=stand
+.endif
 SUBDIR+=sys usr.bin usr.sbin
 .if ${MK_TESTS} != "no"
 SUBDIR+=	tests
@@ -285,12 +289,13 @@ SUBDIR+=contrib/ofed
 .endif
 .endif # !defined(SYSROOT_ONLY)
 
-# Local directories are last, since it is nice to at least get the base
-# system rebuilt before you do them.
+# Local directories are built in parallel with the base system directories.
+# Users may insert a .WAIT directive at the beginning or elsewhere within
+# the LOCAL_DIRS and LOCAL_LIB_DIRS lists as needed.
 SUBDIR+=.WAIT
 .if !defined(SYSROOT_ONLY)
 .for _DIR in ${LOCAL_DIRS}
-.if exists(${.CURDIR}/${_DIR}/Makefile)
+.if ${_DIR} == ".WAIT" || exists(${.CURDIR}/${_DIR}/Makefile)
 SUBDIR+=	${_DIR}
 .endif
 .endfor
@@ -302,7 +307,7 @@ _REDUNDANT_LIB_DIRS+=    ${LOCAL_LIB_DIRS:M${_DIR}*}
 .endfor
 .endif  # !defined(SYSROOT_ONLY)
 .for _DIR in ${LOCAL_LIB_DIRS}
-.if empty(_REDUNDANT_LIB_DIRS:M${_DIR}) && exists(${.CURDIR}/${_DIR}/Makefile)
+.if ${_DIR} == ".WAIT" || (empty(_REDUNDANT_LIB_DIRS:M${_DIR}) && exists(${.CURDIR}/${_DIR}/Makefile))
 SUBDIR+=	${_DIR}
 .endif
 .endfor
@@ -570,6 +575,7 @@ BSARGS= 	DESTDIR= \
 		-DNO_CPU_CFLAGS MK_WARNS=no MK_CTF=no \
 		MK_CLANG_EXTRAS=no MK_CLANG_FULL=no \
 		MK_LLDB=no MK_TESTS=no \
+		MK_LLD=${MK_LLD_BOOTSTRAP} \
 		MK_INCLUDES=yes
 
 BMAKE=		\
@@ -685,9 +691,9 @@ XCXXFLAGS+=	-isystem ${WORLDTMP}/usr/include/c++/v1 -std=c++11 \
 .elif ${WANT_COMPILER_TYPE} == clang || \
     (defined(X_COMPILER_TYPE) && ${X_COMPILER_TYPE} == clang)
 MACHINE_ABI?=	unknown
-MACHINE_TRIPLE?=${MACHINE_ARCH:C/amd64/x86_64/}-${MACHINE_ABI}-freebsd12.0
+MACHINE_TRIPLE?=${MACHINE_ARCH:S/amd64/x86_64/:C/hf$//:S/mipsn32/mips64/}-${MACHINE_ABI}-freebsd12.0
 TARGET_ABI?=	unknown
-TARGET_TRIPLE?=	${TARGET_ARCH:C/amd64/x86_64/}-${TARGET_ABI}-freebsd12.0
+TARGET_TRIPLE?=	${TARGET_ARCH:S/amd64/x86_64/:C/hf$//:S/mipsn32/mips64/}-${TARGET_ABI}-freebsd12.0
 XCFLAGS+=	-target ${TARGET_TRIPLE}
 .endif
 XCFLAGS+=	--sysroot=${WORLDTMP}
@@ -1716,7 +1722,7 @@ reinstallkernel reinstallkernel.debug: _installcheck_kernel .PHONY
 	@echo "--------------------------------------------------------------"
 	@echo ">>> Installing kernel ${INSTALLKERNEL}"
 	@echo "--------------------------------------------------------------"
-	cd ${KRNLOBJDIR}/${INSTALLKERNEL}; \
+	${_+_}cd ${KRNLOBJDIR}/${INSTALLKERNEL}; \
 	    ${CROSSENV} PATH=${TMPPATH} \
 	    ${MAKE} ${IMAKE_INSTALL} KERNEL=${INSTKERNNAME} ${.TARGET:S/kernel//}
 .endif
@@ -1725,7 +1731,7 @@ reinstallkernel reinstallkernel.debug: _installcheck_kernel .PHONY
 	@echo "--------------------------------------------------------------"
 	@echo ">>> Installing kernel ${_kernel}"
 	@echo "--------------------------------------------------------------"
-	cd ${KRNLOBJDIR}/${_kernel}; \
+	${_+_}cd ${KRNLOBJDIR}/${_kernel}; \
 	    ${CROSSENV} PATH=${TMPPATH} \
 	    ${MAKE} ${IMAKE_INSTALL} KERNEL=${INSTKERNNAME}.${_kernel} ${.TARGET:S/kernel//}
 .endfor
@@ -1741,7 +1747,7 @@ distributekernel distributekernel.debug: .PHONY
 .if defined(NO_ROOT)
 	@echo "#${MTREE_MAGIC}" > ${DESTDIR}/${DISTDIR}/kernel.premeta
 .endif
-	cd ${KRNLOBJDIR}/${INSTALLKERNEL}; \
+	${_+_}cd ${KRNLOBJDIR}/${INSTALLKERNEL}; \
 	    ${IMAKEENV} ${IMAKE_INSTALL:S/METALOG/kernel.premeta/} \
 	    ${IMAKE_MTREE} PATH=${TMPPATH} ${MAKE} KERNEL=${INSTKERNNAME} \
 	    DESTDIR=${INSTALL_DDIR}/kernel \
@@ -1756,7 +1762,7 @@ distributekernel distributekernel.debug: .PHONY
 .if defined(NO_ROOT)
 	@echo "#${MTREE_MAGIC}" > ${DESTDIR}/${DISTDIR}/kernel.${_kernel}.premeta
 .endif
-	cd ${KRNLOBJDIR}/${_kernel}; \
+	${_+_}cd ${KRNLOBJDIR}/${_kernel}; \
 	    ${IMAKEENV} ${IMAKE_INSTALL:S/METALOG/kernel.${_kernel}.premeta/} \
 	    ${IMAKE_MTREE} PATH=${TMPPATH} ${MAKE} \
 	    KERNEL=${INSTKERNNAME}.${_kernel} \
@@ -1887,8 +1893,8 @@ create-packages: .PHONY create-packages-world create-packages-kernel
 create-world-packages:	_pkgbootstrap .PHONY
 	@rm -f ${WSTAGEDIR}/*.plist 2>/dev/null || :
 	@cd ${WSTAGEDIR} ; \
-		awk -f ${SRCDIR}/release/scripts/mtree-to-plist.awk \
-		${WSTAGEDIR}/METALOG
+		env -i LC_COLLATE=C sort ${WSTAGEDIR}/METALOG | \
+		awk -f ${SRCDIR}/release/scripts/mtree-to-plist.awk
 	@for plist in ${WSTAGEDIR}/*.plist; do \
 	  plist=$${plist##*/} ; \
 	  pkgname=$${plist%.plist} ; \
@@ -1932,9 +1938,9 @@ _debug=-debug
 create-kernel-packages: create-kernel-packages-flavor${flavor:C,^""$,${_default_flavor},}
 create-kernel-packages-flavor${flavor:C,^""$,${_default_flavor},}: _pkgbootstrap .PHONY
 	@cd ${KSTAGEDIR}/${DISTDIR} ; \
+	env -i LC_COLLATE=C sort ${KSTAGEDIR}/kernel.meta | \
 	awk -f ${SRCDIR}/release/scripts/mtree-to-plist.awk \
-		-v kernel=yes -v _kernconf=${INSTALLKERNEL} \
-		${KSTAGEDIR}/kernel.meta ; \
+		-v kernel=yes -v _kernconf=${INSTALLKERNEL} ; \
 	cap_arg=`cd ${SRCDIR}/etc ; ${MAKE} -VCAP_MKDB_ENDIAN` ; \
 	pwd_arg=`cd ${SRCDIR}/etc ; ${MAKE} -VPWD_MKDB_ENDIAN` ; \
 	sed -e "s/%VERSION%/${PKG_VERSION}/" \
@@ -1967,9 +1973,9 @@ _debug=-debug
 create-kernel-packages: create-kernel-packages-extra-flavor${flavor:C,^""$,${_default_flavor},}-${_kernel}
 create-kernel-packages-extra-flavor${flavor:C,^""$,${_default_flavor},}-${_kernel}: _pkgbootstrap .PHONY
 	@cd ${KSTAGEDIR}/kernel.${_kernel} ; \
+	env -i LC_COLLATE=C sort ${KSTAGEDIR}/kernel.${_kernel}.meta | \
 	awk -f ${SRCDIR}/release/scripts/mtree-to-plist.awk \
-		-v kernel=yes -v _kernconf=${_kernel} \
-		${KSTAGEDIR}/kernel.${_kernel}.meta ; \
+		-v kernel=yes -v _kernconf=${_kernel} ; \
 	cap_arg=`cd ${SRCDIR}/etc ; ${MAKE} -VCAP_MKDB_ENDIAN` ; \
 	pwd_arg=`cd ${SRCDIR}/etc ; ${MAKE} -VPWD_MKDB_ENDIAN` ; \
 	sed -e "s/%VERSION%/${PKG_VERSION}/" \
@@ -2247,7 +2253,7 @@ bootstrap-tools: ${_bt}-${_tool}
 #
 # build-tools: Build special purpose build tools
 #
-.if !defined(NO_SHARE)
+.if !defined(NO_SHARE) && ${MK_SYSCONS} != "no"
 _share=	share/syscons/scrnmaps
 .endif
 
@@ -2262,6 +2268,9 @@ _rescue=rescue/rescue
 
 .if ${MK_TCSH} != "no"
 _tcsh=bin/csh
+.endif
+.if ${MK_FILE} != "no"
+_libmagic=lib/libmagic
 .endif
 
 # kernel-toolchain skips _cleanobj, so handle cleaning up previous
@@ -2279,7 +2288,7 @@ _bt_clean=	${CLEANDIR}
     ${_rescue} \
     ${_share} \
     usr.bin/awk \
-    lib/libmagic \
+    ${_libmagic} \
     usr.bin/mkesdb_static \
     usr.bin/mkcsmapper_static \
     usr.bin/vi/catalog \
@@ -2361,7 +2370,7 @@ _clang_libs=	lib/clang
 _gcc=		gnu/usr.bin/cc
 .endif
 .if ${MK_USB} != "no"
-_usb_tools=	usr.bin/sysinit
+_usb_tools=	stand/usb/tools
 .endif
 
 cross-tools: .MAKE .PHONY
@@ -2538,7 +2547,7 @@ NXBMAKE+=	SUBDIR_OVERRIDE='$${NXBDIRS:M*}'
 # even if the TARGET being built for wants GCC.
 NXBMAKE+=	WANT_COMPILER_TYPE='$${X_COMPILER_TYPE}'
 native-xtools: .PHONY
-	${_+_}cd ${.CURDIR}; ${NXBTMAKE} _cleanobj
+	${_+_}cd ${.CURDIR}; ${NXBTMAKE} _cleanobj MK_GCC=yes
 	# Build the bootstrap/host/cross tools that produce native binaries
 	# Pass along MK_GCC=yes to ensure GCC-needed build tools are built.
 	# We don't quite know what the NXB_TARGET wants so just build it.
@@ -2551,6 +2560,8 @@ native-xtools: .PHONY
 	# needed build tools are built.
 	${_+_}cd ${.CURDIR}; ${NXBTMAKE} _includes MK_CLANG=no MK_GCC=no
 	${_+_}cd ${.CURDIR}; ${NXBTMAKE} _libraries MK_CLANG=no MK_GCC=no
+	# Clean out improper TARGET=MACHINE files
+	${_+_}cd ${.CURDIR}/gnu/usr.bin/cc/cc_tools; ${NXBTMAKE} cleandir
 .if !defined(NO_OBJWALK)
 	${_+_}cd ${.CURDIR}; ${NXBMAKE} _obj
 .endif
@@ -2696,16 +2707,24 @@ _lib_libradius=	lib/libradius
 .endif
 
 .if ${MK_OFED} != "no"
-_ofed_lib=		contrib/ofed/usr.lib
-_prebuild_libs+=	contrib/ofed/usr.lib/libosmcomp
-_prebuild_libs+=	contrib/ofed/usr.lib/libopensm
-_prebuild_libs+=	contrib/ofed/usr.lib/libibcommon
-_prebuild_libs+=	contrib/ofed/usr.lib/libibverbs
-_prebuild_libs+=	contrib/ofed/usr.lib/libibumad
+#
+# The OFED libraries are built in four steps
+# as reflected below, due to interdependencies.
+#
+# NOTE: Depending on contrib/ofed/include is only needed for
+# the lib32 compat build.
+#
+_ofed_lib= \
+contrib/ofed/include \
+contrib/ofed/usr.lib/0 \
+contrib/ofed/usr.lib/1 \
+contrib/ofed/usr.lib/2 \
+contrib/ofed/usr.lib/3
 
-contrib/ofed/usr.lib/libopensm__L: lib/libthr__L
-contrib/ofed/usr.lib/libosmcomp__L: lib/libthr__L
-contrib/ofed/usr.lib/libibumad__L: contrib/ofed/usr.lib/libibcommon__L
+contrib/ofed/usr.lib/0__L: contrib/ofed/include__L lib/libthr__L
+contrib/ofed/usr.lib/1__L: contrib/ofed/usr.lib/0__L
+contrib/ofed/usr.lib/2__L: contrib/ofed/usr.lib/1__L
+contrib/ofed/usr.lib/3__L: contrib/ofed/usr.lib/2__L
 .endif
 
 .if ${MK_CASPER} != "no"
@@ -2721,7 +2740,7 @@ _generic_libs=	${_cddl_lib} gnu/lib ${_kerberos5_lib} lib ${_secure_lib} usr.bin
 _generic_libs+=	sbin/ipf/libipf
 .endif
 .for _DIR in ${LOCAL_LIB_DIRS}
-.if exists(${.CURDIR}/${_DIR}/Makefile) && empty(_generic_libs:M${_DIR})
+.if ${_DIR} == ".WAIT"  || (empty(_generic_libs:M${_DIR}) && exists(${.CURDIR}/${_DIR}/Makefile))
 _generic_libs+= ${_DIR}
 .endif
 .endfor
@@ -3113,7 +3132,8 @@ cleanworld cleanuniverse: .PHONY
 	-chflags -R 0 ${BW_CANONICALOBJDIR}
 	rm -rf ${BW_CANONICALOBJDIR}*
 .endif
-.if make(cleanworld) && ${MK_AUTO_OBJ} == "no"
+.if make(cleanworld) && ${MK_AUTO_OBJ} == "no" && \
+    (empty(BW_CANONICALOBJDIR) || ${.CURDIR:tA} == ${BW_CANONICALOBJDIR:tA})
 .if ${.CURDIR} == ${.OBJDIR} || ${.CURDIR}/obj == ${.OBJDIR}
 	#   To be safe in this case, fall back to a 'make cleandir'
 	${_+_}@cd ${.CURDIR}; ${MAKE} cleandir

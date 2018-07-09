@@ -5,6 +5,8 @@
  *  University of Utah, Department of Computer Science
  */
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -47,8 +49,8 @@
 #include <sys/vnode.h>
 
 #include <fs/ext2fs/inode.h>
-#include <fs/ext2fs/ext2_extern.h>
 #include <fs/ext2fs/ext2fs.h>
+#include <fs/ext2fs/ext2_extern.h>
 #include <fs/ext2fs/fs.h>
 #include <fs/ext2fs/ext2_extents.h>
 #include <fs/ext2fs/ext2_mount.h>
@@ -74,6 +76,11 @@ ext2_blkatoff(struct vnode *vp, off_t offset, char **res, struct buf **bpp)
 	bsize = blksize(fs, ip, lbn);
 
 	if ((error = bread(vp, lbn, bsize, NOCRED, &bp)) != 0) {
+		brelse(bp);
+		return (error);
+	}
+	error = ext2_dir_blk_csum_verify(ip, bp);
+	if (error != 0) {
 		brelse(bp);
 		return (error);
 	}

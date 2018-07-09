@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1999 Marcel Moolenaar
  * All rights reserved.
  *
@@ -83,3 +85,12 @@ struct sigframe_c {
 #endif
 
 #endif /* !_MACHINE_SIGFRAME_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

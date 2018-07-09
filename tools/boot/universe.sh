@@ -11,8 +11,8 @@
 #	powerpc/powerpc powerpc/powerpc64 powerpc/powerpcspe \
 #	riscv/riscv64 riscv/riscv64sf
 #
-# This script is expected to be run in sys/boot (though you could run it anywhere
-# in the tree). It does a full clean build. For sys/boot you can do all the archs in
+# This script is expected to be run in stand (though you could run it anywhere
+# in the tree). It does a full clean build. For stand you can do all the archs in
 # about a minute or two on a fast machine. It's also possible that you need a full
 # make universe for this to work completely.
 #
@@ -26,6 +26,8 @@ dobuild()
     local opt=$3
 
     echo -n "Building $ta ${opt} ... "
+    objdir=$(make buildenv TARGET_ARCH=$ta BUILDENV_SHELL="make -V .OBJDIR" | tail -1)
+    rm -rf ${objdir}
     if ! make buildenv TARGET_ARCH=$ta BUILDENV_SHELL="make clean cleandepend cleandir obj depend"  \
 	 > $lf 2>&1; then
 	echo "Fail (cleanup)"
@@ -40,7 +42,25 @@ dobuild()
 }
 
 top=$(make -V SRCTOP)
-cd $top/sys/boot
+cd $top/stand
+
+# Build without forth
+for i in \
+	amd64/amd64 \
+	i386/i386 \
+	; do
+    ta=${i##*/}
+    dobuild $ta _.boot.${ta}.no_forth.log "WITHOUT_FORTH=yes"
+done
+
+# Build without GELI
+for i in \
+	amd64/amd64 \
+	i386/i386 \
+	; do
+    ta=${i##*/}
+    dobuild $ta _.boot.${ta}.no_geli.log "WITHOUT_LOADER_GEIL=yes"
+done
 
 # Default build for a goodly selection of architectures
 for i in \
@@ -73,13 +93,4 @@ for i in \
 	; do
     ta=${i##*/}
     dobuild $ta _.boot.${ta}.firewire.log "MK_LOADER_FIREWIRE=yes"
-done
-
-# Build without GELI
-for i in \
-	amd64/amd64 \
-	i386/i386 \
-	; do
-    ta=${i##*/}
-    dobuild $ta _.boot.${ta}.no_geli.log "MK_LOADER_GELI=no"
 done

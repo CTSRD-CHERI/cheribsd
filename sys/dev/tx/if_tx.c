@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1997 Semen Ustimenko (semenu@FreeBSD.org)
  * All rights reserved.
  *
@@ -1852,3 +1854,12 @@ epic_miibus_writereg(device_t dev, int phy, int reg, int data)
 
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

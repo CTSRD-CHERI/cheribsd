@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD AND BSD-3-Clause
+ *
  * Copyright (c) 1998, 1999, 2003  Scott Mitchell
  * All rights reserved.
  *
@@ -2072,3 +2074,12 @@ xe_deactivate(device_t dev)
 		if_free(sc->ifp);
 	sc->ifp = NULL;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

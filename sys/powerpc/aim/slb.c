@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2010 Nathan Whitehorn
  * All rights reserved.
  *
@@ -478,7 +480,8 @@ slb_insert_user(pmap_t pm, struct slb *slb)
 }
 
 static void *
-slb_uma_real_alloc(uma_zone_t zone, vm_size_t bytes, u_int8_t *flags, int wait)
+slb_uma_real_alloc(uma_zone_t zone, vm_size_t bytes, int domain,
+    u_int8_t *flags, int wait)
 {
 	static vm_offset_t realmax = 0;
 	void *va;
@@ -488,13 +491,13 @@ slb_uma_real_alloc(uma_zone_t zone, vm_size_t bytes, u_int8_t *flags, int wait)
 		realmax = platform_real_maxaddr();
 
 	*flags = UMA_SLAB_PRIV;
-	m = vm_page_alloc_contig(NULL, 0,
+	m = vm_page_alloc_contig_domain(NULL, 0, domain,
 	    malloc2vm_flags(wait) | VM_ALLOC_NOOBJ | VM_ALLOC_WIRED,
 	    1, 0, realmax, PAGE_SIZE, PAGE_SIZE, VM_MEMATTR_DEFAULT);
 	if (m == NULL)
 		return (NULL);
 
-	va = (void *) VM_PAGE_TO_PHYS(m);
+	va = (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
 
 	if (!hw_direct_map)
 		pmap_kenter((vm_offset_t)va, VM_PAGE_TO_PHYS(m));

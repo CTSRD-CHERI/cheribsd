@@ -1,6 +1,8 @@
 /*	$NetBSD: xdr.c,v 1.22 2000/07/06 03:10:35 christos Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2010, Oracle America, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,7 +35,8 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180530,
+ *   "updated": 20180629,
+ *   "target_type": "lib",
  *   "changes": [
  *     "function_abi"
  *   ],

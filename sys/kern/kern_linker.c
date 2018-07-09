@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1997-2000 Doug Rabson
  * All rights reserved.
  *
@@ -1238,7 +1240,7 @@ out:
 int
 sys_kldstat(struct thread *td, struct kldstat_args *uap)
 {
-	struct kld_file_stat stat;
+	struct kld_file_stat *stat;
 	int error, version;
 
 	/*
@@ -1251,10 +1253,12 @@ sys_kldstat(struct thread *td, struct kldstat_args *uap)
 	    version != sizeof(struct kld_file_stat))
 		return (EINVAL);
 
-	error = kern_kldstat(td, uap->fileid, &stat);
-	if (error != 0)
-		return (error);
-	return (copyout(&stat, uap->stat, version));
+	stat = malloc(sizeof(*stat), M_TEMP, M_WAITOK | M_ZERO);
+	error = kern_kldstat(td, uap->fileid, stat);
+	if (error == 0)
+		error = copyout(stat, uap->stat, version);
+	free(stat, M_TEMP);
+	return (error);
 }
 
 int
@@ -2256,3 +2260,12 @@ sysctl_kern_function_list(SYSCTL_HANDLER_ARGS)
 
 SYSCTL_PROC(_kern, OID_AUTO, function_list, CTLTYPE_OPAQUE | CTLFLAG_RD,
     NULL, 0, sysctl_kern_function_list, "", "kernel function list");
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

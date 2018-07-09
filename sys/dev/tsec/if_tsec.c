@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (C) 2007-2008 Semihalf, Rafal Jaworowski
  * Copyright (C) 2006-2007 Semihalf, Piotr Kruszynski
  * All rights reserved.
@@ -1934,3 +1936,12 @@ tsec_set_mtu(struct tsec_softc *sc, unsigned int mtu)
 
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

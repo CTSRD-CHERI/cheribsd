@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1989, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -38,7 +40,6 @@
 __FBSDID("$FreeBSD$");
 
 #include "opt_compat.h"
-#include "opt_gzio.h"
 #include "opt_ktrace.h"
 
 #include <sys/param.h>
@@ -49,6 +50,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/acct.h>
 #include <sys/bus.h>
 #include <sys/capsicum.h>
+#include <sys/compressor.h>
 #include <sys/condvar.h>
 #include <sys/event.h>
 #include <sys/fcntl.h>
@@ -1859,10 +1861,8 @@ sys_kill(struct thread *td, struct kill_args *uap)
 
 	if (uap->pid > 0) {
 		/* kill single process */
-		if ((p = pfind(uap->pid)) == NULL) {
-			if ((p = zpfind(uap->pid)) == NULL)
-				return (ESRCH);
-		}
+		if ((p = pfind_any(uap->pid)) == NULL)
+			return (ESRCH);
 		AUDIT_ARG_PROCESS(p);
 		error = p_cansignal(td, p, uap->signum);
 		if (error == 0 && uap->signum)
@@ -1967,10 +1967,8 @@ kern_sigqueue(struct thread *td, pid_t pid, int signum, ksigval_union *value,
 	if (pid <= 0)
 		return (EINVAL);
 
-	if ((p = pfind(pid)) == NULL) {
-		if ((p = zpfind(pid)) == NULL)
-			return (ESRCH);
-	}
+	if ((p = pfind_any(pid)) == NULL)
+		return (ESRCH);
 	error = p_cansignal(td, p, signum);
 	if (error == 0 && signum != 0) {
 		ksiginfo_init(&ksi);
@@ -3351,17 +3349,30 @@ SYSCTL_PROC(_debug, OID_AUTO, ncores, CTLTYPE_INT|CTLFLAG_RW,
 
 #define	GZ_SUFFIX	".gz"
 
-#ifdef GZIO
-static int compress_user_cores = 1;
-SYSCTL_INT(_kern, OID_AUTO, compress_user_cores, CTLFLAG_RWTUN,
-    &compress_user_cores, 0, "Compression of user corefiles");
+int compress_user_cores = 0;
 
-int compress_user_cores_gzlevel = 6;
-SYSCTL_INT(_kern, OID_AUTO, compress_user_cores_gzlevel, CTLFLAG_RWTUN,
-    &compress_user_cores_gzlevel, 0, "Corefile gzip compression level");
-#else
-static int compress_user_cores = 0;
-#endif
+static int
+sysctl_compress_user_cores(SYSCTL_HANDLER_ARGS)
+{
+	int error, val;
+
+	val = compress_user_cores;
+	error = sysctl_handle_int(oidp, &val, 0, req);
+	if (error != 0 || req->newptr == NULL)
+		return (error);
+	if (val != 0 && !compressor_avail(val))
+		return (EINVAL);
+	compress_user_cores = val;
+	return (error);
+}
+SYSCTL_PROC(_kern, OID_AUTO, compress_user_cores, CTLTYPE_INT | CTLFLAG_RWTUN,
+    0, sizeof(int), sysctl_compress_user_cores, "I",
+    "Enable compression of user corefiles (" __XSTRING(COMPRESS_GZIP) " = gzip)");
+
+int compress_user_cores_level = 6;
+SYSCTL_INT(_kern, OID_AUTO, compress_user_cores_level, CTLFLAG_RWTUN,
+    &compress_user_cores_level, 0,
+    "Corefile compression level");
 
 /*
  * Protect the access to corefilename[] by allproc_lock.
@@ -3459,7 +3470,7 @@ corefile_open(const char *comm, uid_t uid, pid_t pid, struct thread *td,
 	}
 	sx_sunlock(&corefilename_lock);
 	free(hostname, M_TEMP);
-	if (compress)
+	if (compress == COMPRESS_GZIP)
 		sbuf_printf(&sb, GZ_SUFFIX);
 	if (sbuf_error(&sb) != 0) {
 		log(LOG_ERR, "pid %ld (%s), uid (%lu): corename is too "
@@ -3625,8 +3636,7 @@ coredump(struct thread *td)
 	PROC_UNLOCK(p);
 
 	if (p->p_sysent->sv_coredump != NULL) {
-		error = p->p_sysent->sv_coredump(td, vp, limit,
-		    compress_user_cores ? IMGACT_CORE_COMPRESS : 0);
+		error = p->p_sysent->sv_coredump(td, vp, limit, 0);
 	} else {
 		error = ENOSYS;
 	}
@@ -3831,3 +3841,14 @@ sigacts_shared(struct sigacts *ps)
 
 	return (ps->ps_refcnt > 1);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "kernel_sig_types",
+//     "pointer_integrity",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

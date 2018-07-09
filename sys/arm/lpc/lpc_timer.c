@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011 Jakub Wojciech Klama <jceel@FreeBSD.org>
  * All rights reserved.
  *
@@ -290,6 +292,7 @@ DELAY(int usec)
 				;
 		return;
 	}
+	TSENTER();
 
 	first = lpc_get_timecount(&lpc_timecounter);
 	while (val > 0) {
@@ -302,4 +305,5 @@ DELAY(int usec)
 		val -= (last - first);
 		first = last;
 	}
+	TSEXIT();
 }

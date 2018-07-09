@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1996, 1997, 1998
  *	HD Associates, Inc.  All rights reserved.
  *
@@ -317,8 +319,8 @@ int
 sys_sched_yield(struct thread *td, struct sched_yield_args *uap)
 {
 
-	sched_relinquish(curthread);
-	return 0;
+	sched_relinquish(td);
+	return (0);
 }
 
 int
@@ -414,3 +416,12 @@ p31binit(void *notused)
 }
 
 SYSINIT(p31b, SI_SUB_P1003_1B, SI_ORDER_FIRST, p31binit, NULL);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

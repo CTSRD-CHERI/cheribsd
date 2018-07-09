@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1983 Regents of the University of California.
  * All rights reserved.
  *
@@ -62,7 +64,7 @@ static int findbucket(union overhead *, int);
 /*
  * Pre-allocate mmap'ed pages
  */
-#define	NPOOLPAGES	(32*1024/pagesz)
+#define	NPOOLPAGES	(128*1024/pagesz)
 static caddr_t		pagepool_start, pagepool_end;
 static int		morepages(int n);
 

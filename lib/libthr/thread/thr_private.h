@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (C) 2005 Daniel M. Eischen <deischen@freebsd.org>
  * Copyright (c) 2005 David Xu <davidxu@freebsd.org>
  * Copyright (c) 1995-1998 John Birrell <jb@cimlogic.com.au>.
@@ -31,11 +33,12 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180530,
+ *   "updated": 20180629,
+ *   "target_type": "lib",
  *   "changes": [
  *     "function_abi",
  *     "unsupported"
- *   ]
+ *   ],
  *   "change_comment": "stack pointer"
  * }
  * CHERI CHANGES END

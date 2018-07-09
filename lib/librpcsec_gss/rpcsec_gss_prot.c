@@ -1,4 +1,6 @@
 /*
+  SPDX-License-Identifier: BSD-3-Clause
+
   rpcsec_gss_prot.c
   
   Copyright (c) 2000 The Regents of the University of Michigan.
@@ -37,7 +39,8 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180530,
+ *   "updated": 20180629,
+ *   "target_type": "lib",
  *   "changes": [
  *     "function_abi"
  *   ],

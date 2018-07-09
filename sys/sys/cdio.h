@@ -282,3 +282,12 @@ struct ioc_capability {			/*<2>*/
 #define CDIOCREADSUBCHANNEL_SYSSPACE _IOWR('c', 31, struct ioc_read_subchannel)
 
 #endif /* !_SYS_CDIO_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "ioctl:misc"
+//   ]
+// }
+// CHERI CHANGES END

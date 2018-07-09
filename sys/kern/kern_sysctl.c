@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -1211,17 +1213,21 @@ sysctl_sysctl_name2oid(SYSCTL_HANDLER_ARGS)
 	int error, oid[CTL_MAXNAME], len = 0;
 	struct sysctl_oid *op = NULL;
 	struct rm_priotracker tracker;
+	char buf[32];
 
 	if (!req->newlen) 
 		return (ENOENT);
 	if (req->newlen >= MAXPATHLEN)	/* XXX arbitrary, undocumented */
 		return (ENAMETOOLONG);
 
-	p = malloc(req->newlen+1, M_SYSCTL, M_WAITOK);
+	p = buf;
+	if (req->newlen >= sizeof(buf))
+		p = malloc(req->newlen+1, M_SYSCTL, M_WAITOK);
 
 	error = SYSCTL_IN(req, p, req->newlen);
 	if (error) {
-		free(p, M_SYSCTL);
+		if (p != buf)
+			free(p, M_SYSCTL);
 		return (error);
 	}
 
@@ -1231,7 +1237,8 @@ sysctl_sysctl_name2oid(SYSCTL_HANDLER_ARGS)
 	error = name2oid(p, oid, &len, &op);
 	SYSCTL_RUNLOCK(&tracker);
 
-	free(p, M_SYSCTL);
+	if (p != buf)
+		free(p, M_SYSCTL);
 
 	if (error)
 		return (error);
@@ -1705,8 +1712,18 @@ sysctl_old_kernel(struct sysctl_req *req, const void *p, size_t l)
 		else
 			if (i > req->oldlen - req->oldidx)
 				i = req->oldlen - req->oldidx;
-		if (i > 0)
-			bcopy(p, (__cheri_fromcap char *)req->oldptr + req->oldidx, i);
+		if (i > 0) {
+#ifdef CPU_CHERI
+			if (req->flags & SCTL_PTROUT)
+				memcpy_c((char * __capability)req->oldptr +
+				    req->oldidx,
+				    (__cheri_tocap const char * __capability)p,
+				    l);
+			else
+#endif
+				memcpy((__cheri_fromcap char *)req->oldptr +
+				    req->oldidx, p, l);
+		}
 	}
 	req->oldidx += l;
 	if (req->oldptr && i != l)
@@ -1721,7 +1738,13 @@ sysctl_new_kernel(struct sysctl_req *req, void *p, size_t l)
 		return (0);
 	if (req->newlen - req->newidx < l)
 		return (EINVAL);
-	bcopy((__cheri_fromcap char *)req->newptr + req->newidx, p, l);
+#ifdef CPU_CHERI
+	if (req->flags & SCTL_PTRIN)
+		memcpy_c((__cheri_tocap char * __capability)p,
+		    (char * __capability)req->newptr + req->newidx, l);
+	else
+#endif
+		memcpy(p, (__cheri_fromcap char *)req->newptr + req->newidx, l);
 	req->newidx += l;
 	return (0);
 }
@@ -1824,14 +1847,27 @@ sysctl_old_user(struct sysctl_req *req, const void *p, size_t l)
 		if (i > len - origidx)
 			i = len - origidx;
 		if (req->lock == REQ_WIRED) {
-			error = copyout_nofault_c(
-			    (__cheri_tocap const void * __capability)p,
-			    (char * __capability)req->oldptr +
-			    origidx, i);
+			if (req->flags & SCTL_PTROUT)
+				error = copyoutcap_nofault_c(
+				    (__cheri_tocap const void * __capability)p,
+				    (char * __capability)req->oldptr +
+				    origidx, i);
+			else
+				error = copyout_nofault_c(
+				    (__cheri_tocap const void * __capability)p,
+				    (char * __capability)req->oldptr + origidx,
+				    i);
 		} else
-			error = copyout_c(
-			    (__cheri_tocap const void * __capability)p,
-			    (char * __capability)req->oldptr + origidx, i);
+			if (req->flags & SCTL_PTROUT)
+				error = copyoutcap_c(
+				    (__cheri_tocap const void * __capability)p,
+				    (char * __capability)req->oldptr + origidx,
+				    i);
+			else
+				error = copyout_c(
+				    (__cheri_tocap const void * __capability)p,
+				    (char * __capability)req->oldptr + origidx,
+				    i);
 		if (error != 0)
 			return (error);
 	}
@@ -1851,8 +1887,12 @@ sysctl_new_user(struct sysctl_req *req, void *p, size_t l)
 		return (EINVAL);
 	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
 	    "sysctl_new_user()");
-	error = copyin_c((char * __capability )req->newptr + req->newidx,
-	    (__cheri_tocap void * __capability)p, l);
+	if (req->flags & SCTL_PTRIN)
+		error = copyincap_c((char * __capability)req->newptr +
+		    req->newidx, (__cheri_tocap void * __capability)p, l);
+	else
+		error = copyin_c((char * __capability)req->newptr + req->newidx,
+		    (__cheri_tocap void * __capability)p, l);
 	req->newidx += l;
 	return (error);
 }
@@ -1948,6 +1988,11 @@ sysctl_root(SYSCTL_HANDLER_ARGS)
 	error = sysctl_find_oid(arg1, arg2, &oid, &indx, req);
 	if (error)
 		goto out;
+
+	if (oid->oid_kind & CTLFLAG_PTRIN)
+		req->flags |= SCTL_PTRIN;
+	if (oid->oid_kind & CTLFLAG_PTROUT)
+		req->flags |= SCTL_PTROUT;
 
 	if ((oid->oid_kind & CTLTYPE) == CTLTYPE_NODE) {
 		/*
@@ -2190,3 +2235,12 @@ sbuf_new_for_sysctl(struct sbuf *s, char *buf, int length,
 	sbuf_set_drain(s, sbuf_sysctl_drain, req);
 	return (s);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

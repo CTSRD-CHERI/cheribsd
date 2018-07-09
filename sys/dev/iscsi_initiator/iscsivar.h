@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2005-2011 Daniel Braniss <danny@cs.huji.ac.il>
  * All rights reserved.
  *
@@ -597,3 +599,13 @@ i_mbufcopy(struct mbuf *mp, caddr_t dp, int len)
 	       break;
      }
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

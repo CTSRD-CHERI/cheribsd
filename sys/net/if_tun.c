@@ -676,9 +676,10 @@ tunioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag,
 			if (error)
 				return (error);
 		}
+		if (TUN2IFP(tp)->if_type != tunp->type)
+			return (EPROTOTYPE);
 		mtx_lock(&tp->tun_mtx);
 		TUN2IFP(tp)->if_mtu = tunp->mtu;
-		TUN2IFP(tp)->if_type = tunp->type;
 		TUN2IFP(tp)->if_baudrate = tunp->baudrate;
 		mtx_unlock(&tp->tun_mtx);
 		break;
@@ -1033,3 +1034,13 @@ tunkqdetach(struct knote *kn)
 
 	knlist_remove(&tp->tun_rsel.si_note, kn, 0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

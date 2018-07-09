@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1999-2001 Robert N. M. Watson
  * All rights reserved.
  *
@@ -101,3 +103,12 @@ __END_DECLS
 
 #endif /* !_KERNEL */
 #endif /* !_SYS_EXTATTR_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

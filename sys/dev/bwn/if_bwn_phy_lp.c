@@ -65,15 +65,14 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcireg.h>
-#include <dev/siba/siba_ids.h>
-#include <dev/siba/sibareg.h>
-#include <dev/siba/sibavar.h>
 
 #include <net80211/ieee80211_var.h>
 #include <net80211/ieee80211_radiotap.h>
 #include <net80211/ieee80211_regdomain.h>
 #include <net80211/ieee80211_phy.h>
 #include <net80211/ieee80211_ratectl.h>
+
+#include <dev/bwn/if_bwn_siba.h>
 
 #include <dev/bwn/if_bwnreg.h>
 #include <dev/bwn/if_bwnvar.h>
@@ -1128,7 +1127,7 @@ bwn_phy_lp_bugfix(struct bwn_mac *mac)
 	uint8_t mode;
 	int8_t txpwridx;
 
-	tabs = (uint32_t *)malloc(sizeof(uint32_t) * size, M_DEVBUF,
+	tabs = (uint32_t *)mallocarray(size, sizeof(uint32_t), M_DEVBUF,
 	    M_NOWAIT | M_ZERO);
 	if (tabs == NULL) {
 		device_printf(sc->sc_dev, "failed to allocate buffer.\n");

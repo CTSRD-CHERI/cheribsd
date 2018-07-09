@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2005 Olivier Houchard.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,6 +42,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpufunc.h>
 #include <machine/armreg.h>
 #include <machine/cpu.h>
+#include <machine/vmparam.h>	/* For KERNVIRTADDR */
 
 #if __ARM_ARCH >= 6
 #error "elf_trampline is not supported on ARMv6/v7 platforms"

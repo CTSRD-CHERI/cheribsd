@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2003-2008, Joseph Koshy
  * Copyright (c) 2007 The FreeBSD Foundation
  * All rights reserved.
@@ -1348,6 +1350,7 @@ main(int argc, char **argv)
 			}
 			/* print out counting PMCs */
 			if ((args.pa_flags & FLAG_DO_TOP) &&
+			    (args.pa_flags & FLAG_HAS_PIPE) &&
 			     pmc_flush_logfile() == 0)
 				do_read = 1;
 			do_print = 1;

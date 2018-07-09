@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1998 Michael Smith
  * All rights reserved.
  *
@@ -726,3 +728,12 @@ tunable_str_init(void *data)
 
 	TUNABLE_STR_FETCH(d->path, d->var, d->size);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

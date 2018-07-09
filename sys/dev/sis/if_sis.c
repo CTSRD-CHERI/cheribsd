@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2005 Poul-Henning Kamp <phk@FreeBSD.org>
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
@@ -2407,3 +2409,12 @@ static devclass_t sis_devclass;
 
 DRIVER_MODULE(sis, pci, sis_driver, sis_devclass, 0, 0);
 DRIVER_MODULE(miibus, sis, miibus_driver, miibus_devclass, 0, 0);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

@@ -27,7 +27,7 @@
         aout
         ..
         clang
-            5.0.0
+            6.0.0
                 include
                     sanitizer
                     ..
@@ -57,8 +57,6 @@
         gcc
         ..
         ldscripts
-        ..
-        lint
         ..
         pkgconfig
         ..

@@ -1,6 +1,8 @@
 /*	$NetBSD: lance.c,v 1.34 2005/12/24 20:27:30 perry Exp $	*/
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ *
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -815,3 +817,12 @@ lance_zerobuf_gap16(struct lance_softc *sc, int boff, int len)
 	}
 }
 #endif /* Example only */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

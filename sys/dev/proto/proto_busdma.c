@@ -485,3 +485,13 @@ proto_busdma_mmap_allowed(struct proto_busdma *busdma, vm_paddr_t physaddr)
 	}
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

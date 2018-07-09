@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2008 John Birrell <jb@freebsd.org>
  * All rights reserved.
  *
@@ -43,7 +45,7 @@ z_alloc(void *nil, u_int items, u_int size)
 {
 	void *ptr;
 
-	ptr = malloc(items * size, M_TEMP, M_NOWAIT);
+	ptr = mallocarray(items, size, M_TEMP, M_NOWAIT);
 	return ptr;
 }
 

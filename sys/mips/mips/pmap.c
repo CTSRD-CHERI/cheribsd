@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1991 Regents of the University of California.
  * All rights reserved.
  * Copyright (c) 1994 John S. Dyson
@@ -2609,9 +2611,8 @@ pmap_copy_page_internal(vm_page_t src, vm_page_t dst, int flags)
 			cheri_bcopy((caddr_t)va_src, (caddr_t)va_dst,
 			    PAGE_SIZE);
 		else
-#else
-			bcopy((caddr_t)va_src, (caddr_t)va_dst, PAGE_SIZE);
 #endif
+			bcopy((caddr_t)va_src, (caddr_t)va_dst, PAGE_SIZE);
 		mips_dcache_wbinv_range(va_dst, PAGE_SIZE);
 	} else {
 		va_src = pmap_lmem_map2(phys_src, phys_dst);
@@ -2679,9 +2680,8 @@ pmap_copy_pages_internal(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
 			if (flags & PMAP_COPY_TAGS)
 				cheri_bcopy(a_cp, b_cp, cnt);
 			else
-#else
-				bcopy(a_cp, b_cp, cnt);
 #endif
+				bcopy(a_cp, b_cp, cnt);
 			mips_dcache_wbinv_range((vm_offset_t)b_cp, cnt);
 		} else {
 			a_cp = (char *)pmap_lmem_map2(a_phys, b_phys);
@@ -2692,9 +2692,8 @@ pmap_copy_pages_internal(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
 			if (flags & PMAP_COPY_TAGS)
 				cheri_bcopy(a_cp, b_cp, cnt);
 			else
-#else
-				bcopy(a_cp, b_cp, cnt);
 #endif
+				bcopy(a_cp, b_cp, cnt);
 			mips_dcache_wbinv_range((vm_offset_t)b_cp, cnt);
 			pmap_lmem_unmap();
 		}
@@ -3748,3 +3747,12 @@ pmap_change_attr(vm_offset_t sva, vm_size_t size, vm_memattr_t ma)
 	mips_dcache_wbinv_range(ova, size);
 	return 0;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

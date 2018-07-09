@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2008-2009, Stacey Son <sson@freebsd.org>
  * All rights reserved.
  *
@@ -509,3 +511,13 @@ ksyms_modevent(module_t mod __unused, int type, void *data __unused)
 
 DEV_MODULE(ksyms, ksyms_modevent, NULL);
 MODULE_VERSION(ksyms, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

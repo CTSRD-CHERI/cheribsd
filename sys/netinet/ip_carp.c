@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2002 Michael Shalayeff.
  * Copyright (c) 2003 Ryan McBride.
  * Copyright (c) 2011 Gleb Smirnoff <glebius@FreeBSD.org>
@@ -2260,3 +2262,13 @@ static moduledata_t carp_mod = {
 };
 
 DECLARE_MODULE(carp, carp_mod, SI_SUB_PROTO_DOMAIN, SI_ORDER_ANY);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net",
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

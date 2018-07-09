@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1996 Gardner Buchanan <gbuchanan@shl.com>
  * All rights reserved.
  *
@@ -1434,3 +1436,12 @@ sn_getmcf(struct ifnet *ifp, uint8_t *mcf)
 	if_maddr_runlock(ifp);
 	return 1;  /* use multicast filter */
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

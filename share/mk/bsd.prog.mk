@@ -71,7 +71,7 @@ CFLAGS+= -ftls-model=initial-exec
 # Ports will not have MK_PIE defined and the following logic requires
 # it be defined.
 
-.if ${LDFLAGS:M-static}
+.if ${LDFLAGS:M-static} || (defined(WANT_CHERI) && ${WANT_CHERI} == "sandbox") || (defined(LIBADD) && !empty(LIBADD:Mcheri))
 NOPIE=yes
 .endif
 
@@ -349,13 +349,6 @@ realinstall: maninstall
 .endif
 
 .endif	# !target(install)
-
-.if !target(lint)
-lint: ${SRCS:M*.c}
-.if defined(PROG)
-	${LINT} ${LINTFLAGS} ${CFLAGS:M-[DIU]*} ${.ALLSRC}
-.endif
-.endif
 
 .if ${MK_MAN} != "no"
 .include <bsd.man.mk>

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1995 Bruce D. Evans.
  * All rights reserved.
  *
@@ -91,3 +93,13 @@ void	dump_drop_page(vm_paddr_t);
 int	minidumpsys(struct dumperinfo *);
 
 #endif /* !_MACHINE_MD_VAR_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": "sigcode"
+// }
+// CHERI CHANGES END

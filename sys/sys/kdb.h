@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2004 Marcel Moolenaar
  * All rights reserved.
  *
@@ -60,7 +62,6 @@ struct kdb_dbbe {
 	DATA_SET(kdb_dbbe_set, name##_dbbe)
 
 extern u_char kdb_active;		/* Non-zero while in debugger. */
-extern int kdb_reenter_silent;		/* Make kdb_reenter(9) silent. */
 extern int debugger_on_panic;		/* enter the debugger on panic. */
 extern struct kdb_dbbe *kdb_dbbe;	/* Default debugger backend or NULL. */
 extern struct trapframe *kdb_frame;	/* Frame to kdb_trap(). */
@@ -79,6 +80,7 @@ void *	kdb_jmpbuf(jmp_buf);
 void	kdb_panic(const char *);
 void	kdb_reboot(void);
 void	kdb_reenter(void);
+void	kdb_reenter_silent(void);
 struct pcb *kdb_thr_ctx(struct thread *);
 struct thread *kdb_thr_first(void);
 struct thread *kdb_thr_from_pid(pid_t);
@@ -123,3 +125,13 @@ extern const char * volatile kdb_why;
 #define	KDB_REQ_REBOOT		3	/* User requested a clean reboot */
 
 #endif /* !_SYS_KDB_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2006 IronPort Systems
  * All rights reserved.
  *
@@ -83,7 +85,7 @@ struct mfi_ioc_packet {
 	} mfi_frame;
 
 	struct iovec_native mfi_sgl[MAX_IOCTL_SGE];
-} __packed;
+} __packed __aligned(sizeof(void *__CAPABILITY));
 
 #ifdef COMPAT_FREEBSD32
 struct mfi_ioc_packet32 {
@@ -134,7 +136,7 @@ struct mfi_linux_ioc_packet {
 #else
 	struct iovec_native lioc_sgl[MAX_LINUX_IOCTL_SGE];
 #endif
-} __packed;
+} __packed __aligned(sizeof(void *__CAPABILITY));
 
 struct mfi_ioc_passthru {
 	struct mfi_dcmd_frame	ioc_frame;
@@ -189,3 +191,13 @@ struct mfi_query_disk {
 #define MFI_LINUX_SET_AEN	0x400c4d03
 #define MFI_LINUX_CMD_2		0xc1144d02
 #define MFI_LINUX_SET_AEN_2	0x400c4d04
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "kiovec_t",
+//     "pointer_integrity"
+//   ]
+// }
+// CHERI CHANGES END

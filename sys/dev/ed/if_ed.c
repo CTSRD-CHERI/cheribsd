@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1995, David Greenman
  * All rights reserved.
  *
@@ -1853,3 +1855,12 @@ ed_gen_ifmedia_init(struct ed_softc *sc)
 	ifmedia_add(&sc->ifmedia, IFM_ETHER | IFM_AUTO, 0, 0);
 	ifmedia_set(&sc->ifmedia, IFM_ETHER | IFM_AUTO);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

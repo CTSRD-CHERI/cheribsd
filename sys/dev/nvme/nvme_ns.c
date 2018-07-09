@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (C) 2012-2013 Intel Corporation
  * All rights reserved.
  *
@@ -319,7 +321,8 @@ nvme_allocate_child_bios(int num_bios)
 	struct bio **child_bios;
 	int err = 0, i;
 
-	child_bios = malloc(num_bios * sizeof(struct bio *), M_NVME, M_NOWAIT);
+	child_bios = mallocarray(num_bios, sizeof(struct bio *), M_NVME,
+	    M_NOWAIT);
 	if (child_bios == NULL)
 		return (NULL);
 

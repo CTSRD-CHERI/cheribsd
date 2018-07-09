@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 1995, 1996
  *	Matt Thomas <matt@3am-software.com>.  All rights reserved.
  * Copyright (c) 1982, 1989, 1993
@@ -662,3 +664,12 @@ static moduledata_t fddi_mod = {
 
 DECLARE_MODULE(fddi, fddi_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
 MODULE_VERSION(fddi, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

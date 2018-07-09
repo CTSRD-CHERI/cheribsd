@@ -1,6 +1,8 @@
 /*	$OpenBSD: frame.h,v 1.3 1998/09/15 10:50:12 pefo Exp $ */
 
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause AND BSD-4-Clause
+ *
  * Copyright (c) 2011-2016 Robert N. M. Watson
  * Copyright (c) 2015 SRI International
  * All rights reserved.
@@ -222,3 +224,12 @@ struct trapframe {
 };
 
 #endif	/* !_MACHINE_FRAME_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

@@ -178,3 +178,12 @@ __END_DECLS
 #endif /* !_KERNEL || _WANT_SEM_PROTOTYPES */
 
 #endif /* !_SYS_SEM_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

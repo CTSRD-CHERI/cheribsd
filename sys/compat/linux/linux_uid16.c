@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2001  The FreeBSD Project
  * All rights reserved.
  *
@@ -440,3 +442,12 @@ linux_setresuid16(struct thread *td, struct linux_setresuid16_args *args)
 	LIN_SDT_PROBE1(uid16, linux_setresuid16, return, error);
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

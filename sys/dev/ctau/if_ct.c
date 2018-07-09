@@ -2204,3 +2204,12 @@ MODULE_DEPEND (ct, sppp, 1, 1, 1);
 #endif
 DRIVER_MODULE (ct, isa, ct_isa_driver, ct_devclass, ct_modevent, NULL);
 MODULE_VERSION (ct, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

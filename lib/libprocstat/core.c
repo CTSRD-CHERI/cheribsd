@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2013 Mikolaj Golub <trociny@FreeBSD.org>
  * Copyright (c) 2017 Dell EMC
  * All rights reserved.
@@ -27,11 +29,11 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180530,
+ *   "updated": 20180629,
+ *   "target_type": "lib",
  *   "changes": [
  *     "support"
- *   ],
- *   "change_comment: ""
+ *   ]
  * }
  * CHERI CHANGES END
  */

@@ -2641,3 +2641,12 @@ DRIVER_MODULE (ce, pci, ce_driver, ce_devclass, ce_modevent, NULL);
 #endif
 #endif /* __FreeBSD_version < 500000 */
 #endif /* NPCI */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

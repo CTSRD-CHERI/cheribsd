@@ -11,6 +11,7 @@
 #include <sys/signal.h>
 #include <sys/acl.h>
 #include <sys/cpuset.h>
+#include <sys/domainset.h>
 #include <sys/_ffcounter.h>
 #include <sys/_semaphore.h>
 #include <sys/ucontext.h>
@@ -1713,16 +1714,6 @@ struct utimensat_args {
 	char times_l_[PADL_(struct timespec *)]; struct timespec * times; char times_r_[PADR_(struct timespec *)];
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 };
-struct numa_getaffinity_args {
-	char which_l_[PADL_(cpuwhich_t)]; cpuwhich_t which; char which_r_[PADR_(cpuwhich_t)];
-	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
-	char policy_l_[PADL_(struct vm_domain_policy_entry *)]; struct vm_domain_policy_entry * policy; char policy_r_[PADR_(struct vm_domain_policy_entry *)];
-};
-struct numa_setaffinity_args {
-	char which_l_[PADL_(cpuwhich_t)]; cpuwhich_t which; char which_r_[PADR_(cpuwhich_t)];
-	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
-	char policy_l_[PADL_(const struct vm_domain_policy_entry *)]; const struct vm_domain_policy_entry * policy; char policy_r_[PADR_(const struct vm_domain_policy_entry *)];
-};
 struct fdatasync_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 };
@@ -1776,6 +1767,22 @@ struct kevent_args {
 	char eventlist_l_[PADL_(struct kevent_native *)]; struct kevent_native * eventlist; char eventlist_r_[PADR_(struct kevent_native *)];
 	char nevents_l_[PADL_(int)]; int nevents; char nevents_r_[PADR_(int)];
 	char timeout_l_[PADL_(const struct timespec *)]; const struct timespec * timeout; char timeout_r_[PADR_(const struct timespec *)];
+};
+struct cpuset_getdomain_args {
+	char level_l_[PADL_(cpulevel_t)]; cpulevel_t level; char level_r_[PADR_(cpulevel_t)];
+	char which_l_[PADL_(cpuwhich_t)]; cpuwhich_t which; char which_r_[PADR_(cpuwhich_t)];
+	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
+	char domainsetsize_l_[PADL_(size_t)]; size_t domainsetsize; char domainsetsize_r_[PADR_(size_t)];
+	char mask_l_[PADL_(domainset_t *)]; domainset_t * mask; char mask_r_[PADR_(domainset_t *)];
+	char policy_l_[PADL_(int *)]; int * policy; char policy_r_[PADR_(int *)];
+};
+struct cpuset_setdomain_args {
+	char level_l_[PADL_(cpulevel_t)]; cpulevel_t level; char level_r_[PADR_(cpulevel_t)];
+	char which_l_[PADL_(cpuwhich_t)]; cpuwhich_t which; char which_r_[PADR_(cpuwhich_t)];
+	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
+	char domainsetsize_l_[PADL_(size_t)]; size_t domainsetsize; char domainsetsize_r_[PADR_(size_t)];
+	char mask_l_[PADL_(domainset_t *)]; domainset_t * mask; char mask_r_[PADR_(domainset_t *)];
+	char policy_l_[PADL_(int)]; int policy; char policy_r_[PADR_(int)];
 };
 struct coexecve_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
@@ -2167,8 +2174,6 @@ int	sys_procctl(struct thread *, struct procctl_args *);
 int	sys_ppoll(struct thread *, struct ppoll_args *);
 int	sys_futimens(struct thread *, struct futimens_args *);
 int	sys_utimensat(struct thread *, struct utimensat_args *);
-int	sys_numa_getaffinity(struct thread *, struct numa_getaffinity_args *);
-int	sys_numa_setaffinity(struct thread *, struct numa_setaffinity_args *);
 int	sys_fdatasync(struct thread *, struct fdatasync_args *);
 int	sys_fstat(struct thread *, struct fstat_args *);
 int	sys_fstatat(struct thread *, struct fstatat_args *);
@@ -2180,6 +2185,8 @@ int	sys_getfsstat(struct thread *, struct getfsstat_args *);
 int	sys_fhstatfs(struct thread *, struct fhstatfs_args *);
 int	sys_mknodat(struct thread *, struct mknodat_args *);
 int	sys_kevent(struct thread *, struct kevent_args *);
+int	sys_cpuset_getdomain(struct thread *, struct cpuset_getdomain_args *);
+int	sys_cpuset_setdomain(struct thread *, struct cpuset_setdomain_args *);
 int	sys_coexecve(struct thread *, struct coexecve_args *);
 int	sys_cosetup(struct thread *, struct cosetup_args *);
 int	sys_coregister(struct thread *, struct coregister_args *);
@@ -3065,8 +3072,6 @@ int	freebsd11_mknodat(struct thread *, struct freebsd11_mknodat_args *);
 #define	SYS_AUE_ppoll	AUE_POLL
 #define	SYS_AUE_futimens	AUE_FUTIMES
 #define	SYS_AUE_utimensat	AUE_FUTIMESAT
-#define	SYS_AUE_numa_getaffinity	AUE_NULL
-#define	SYS_AUE_numa_setaffinity	AUE_NULL
 #define	SYS_AUE_fdatasync	AUE_FSYNC
 #define	SYS_AUE_fstat	AUE_FSTAT
 #define	SYS_AUE_fstatat	AUE_FSTATAT
@@ -3078,6 +3083,8 @@ int	freebsd11_mknodat(struct thread *, struct freebsd11_mknodat_args *);
 #define	SYS_AUE_fhstatfs	AUE_FHSTATFS
 #define	SYS_AUE_mknodat	AUE_MKNODAT
 #define	SYS_AUE_kevent	AUE_KEVENT
+#define	SYS_AUE_cpuset_getdomain	AUE_NULL
+#define	SYS_AUE_cpuset_setdomain	AUE_NULL
 #define	SYS_AUE_coexecve	AUE_NULL
 #define	SYS_AUE_cosetup	AUE_NULL
 #define	SYS_AUE_coregister	AUE_NULL

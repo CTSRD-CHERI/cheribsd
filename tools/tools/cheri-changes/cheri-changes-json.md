@@ -9,11 +9,18 @@ comments.  The following example shows all the current annotations.
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180530,
+ *   "updated": 20180626,
+ *   "target_type": "header, kernel, lib, or prog"
  *   "changes": [
  *     "function_abi",
  *     "hashing",
+ *     "ioctl:misc",
+ *     "ioctl:net",
+ *     "iovec-macros",
+ *     "kernel_sig_types",
+ *     "kiovec_t",
  *     "monotonicity",
+ *     "platform",
  *     "pointer_alignment",
  *     "pointer_as_integer",
  *     "pointer_bit_flags",
@@ -21,7 +28,9 @@ comments.  The following example shows all the current annotations.
  *     "pointer_provenance",
  *     "pointer_size",
  *     "support",
+ *     "sysctl",
  *     "unsupported",
+ *     "user_capabilities",
  *     "virtual_address",
  *     "other"
  *   ],
@@ -37,6 +46,14 @@ comments.  The following example shows all the current annotations.
 `updated`: Date in YYYYMMDD the comment was updated in UTC.  Intended
 for used by validation tools.
 
+`target_type`: What is this file used for
+ * `header` - System headers defining language runtime and kernel
+   interfaces.
+ * `kernel` - Files that are part of the kernel.
+ * `lib` - Integral to a library (or shared code linked to multiple
+   programs).
+ * `prog` - Linked to a program.
+
 `changes`: Zero or more tags indicating the types of changes.  Current
 values are:
 
@@ -45,8 +62,20 @@ values are:
    non-va_args functions having different register use.
  * `hashing` - Use of pointer addresses in a hash.  In practice, a subset
    of `virtual address, but common enough to call out.
+ * `ioctl:misc` - (kernel) Changes to support ioctls with capability pointers
+   in their arguments.
+ * `ioctl:net` - (kernel) Like `ioctl:misc` but covering network interface
+   configuration.
+ * `iovec-macros` - (kernel) Use of macros to initialize and manipulate
+   `struct iovec`.  A subset of `user_capabilities`.
+ * `kernel_sig_types` - (kernel) Changes to signal related types to store
+   signal handlers as poineters  A subset of `user_capabilities`.
+ * `kiovec_t` - (kernel) Use `kiovec_t` rather than `struct iovec`.
+   A subset of `user_capabilities`.
  * `monotonicity` - Need to retrieve a capability with greater range or
    permissions from a lesser capability.
+ * `platform` - Changes related to the CHERI platform(s) that are not
+   CHERI specific.
  * `pointer_alignment` - Aligning (or checking the alignment of) the
    virtual address pointed to by a capability.
  * `pointer_as_integer` - Storing integers in pointer types or
@@ -64,8 +93,12 @@ values are:
    such as increased alignment.  Also dealing with conflation of the
    size of pointers and the size of the virtual address space.
  * `support` - Adding support for CHERI.
+ * `sysctl` - (kernel) Sysctl compatability support for CheriABI.
  * `unsupported` - Working around unsupported features such as combining
    adjacent `mmap()` allocations, fixed `mmap()` allocations, or `sbrk()`.
+ * `user_capabilities` - (kernel) Changes related to userspace pointers
+   becoming capabilities including changes to variable, struct member, etc
+   types and changes to copyin/out calls etc.
  * `virtual_address` - Need to work with the virtual address (not the
    offset) of capabilities.
  * `other` - Other unrelated changes.

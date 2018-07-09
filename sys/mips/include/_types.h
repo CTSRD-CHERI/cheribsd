@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2002 Mike Barcroft <mike@FreeBSD.org>
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -174,3 +176,12 @@ typedef __va_list		__gnuc_va_list;	/* compatibility w/GNU headers*/
 #endif
 
 #endif /* !_MACHINE__TYPES_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "header",
+//   "changes": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

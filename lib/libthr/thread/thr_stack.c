@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2001 Daniel Eischen <deischen@freebsd.org>
  * Copyright (c) 2000-2001 Jason Evans <jasone@freebsd.org>
  * All rights reserved.
@@ -27,7 +29,8 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180530,
+ *   "updated": 20180629,
+ *   "target_type": "lib",
  *   "changes": [
  *     "support",
  *     "unsupported"

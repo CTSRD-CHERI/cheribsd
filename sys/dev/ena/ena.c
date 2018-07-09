@@ -3943,3 +3943,12 @@ MODULE_DEPEND(ena, pci, 1, 1, 1);
 MODULE_DEPEND(ena, ether, 1, 1, 1);
 
 /*********************************************************************/
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

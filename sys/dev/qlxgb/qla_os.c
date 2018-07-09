@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011-2013 Qlogic Corporation
  * All rights reserved.
  *
@@ -1485,3 +1487,12 @@ qla_tx_done(void *context, int pending)
 	qla_start(ha->ifp);
 }
 
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END

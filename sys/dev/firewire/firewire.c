@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (c) 2003 Hidetoshi Shimokawa
  * Copyright (c) 1998-2002 Katsushi Kobayashi and Hidetoshi Shimokawa
  * All rights reserved.
@@ -2381,3 +2383,13 @@ fw_modevent(module_t mode, int type, void *data)
 DRIVER_MODULE(firewire, fwohci, firewire_driver, firewire_devclass,
     fw_modevent,0);
 MODULE_VERSION(firewire, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "iovec-macros",
+//     "kiovec_t"
+//   ]
+// }
+// CHERI CHANGES END

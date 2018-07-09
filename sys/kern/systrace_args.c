@@ -3170,24 +3170,6 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
-	/* numa_getaffinity */
-	case 548: {
-		struct numa_getaffinity_args *p = params;
-		iarg[0] = p->which; /* cpuwhich_t */
-		iarg[1] = p->id; /* id_t */
-		uarg[2] = (intptr_t) p->policy; /* struct vm_domain_policy_entry * */
-		*n_args = 3;
-		break;
-	}
-	/* numa_setaffinity */
-	case 549: {
-		struct numa_setaffinity_args *p = params;
-		iarg[0] = p->which; /* cpuwhich_t */
-		iarg[1] = p->id; /* id_t */
-		uarg[2] = (intptr_t) p->policy; /* const struct vm_domain_policy_entry * */
-		*n_args = 3;
-		break;
-	}
 	/* fdatasync */
 	case 550: {
 		struct fdatasync_args *p = params;
@@ -3286,8 +3268,32 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 6;
 		break;
 	}
-	/* coexecve */
+	/* cpuset_getdomain */
 	case 561: {
+		struct cpuset_getdomain_args *p = params;
+		iarg[0] = p->level; /* cpulevel_t */
+		iarg[1] = p->which; /* cpuwhich_t */
+		iarg[2] = p->id; /* id_t */
+		uarg[3] = p->domainsetsize; /* size_t */
+		uarg[4] = (intptr_t) p->mask; /* domainset_t * */
+		uarg[5] = (intptr_t) p->policy; /* int * */
+		*n_args = 6;
+		break;
+	}
+	/* cpuset_setdomain */
+	case 562: {
+		struct cpuset_setdomain_args *p = params;
+		iarg[0] = p->level; /* cpulevel_t */
+		iarg[1] = p->which; /* cpuwhich_t */
+		iarg[2] = p->id; /* id_t */
+		uarg[3] = p->domainsetsize; /* size_t */
+		uarg[4] = (intptr_t) p->mask; /* domainset_t * */
+		iarg[5] = p->policy; /* int */
+		*n_args = 6;
+		break;
+	}
+	/* coexecve */
+	case 563: {
 		struct coexecve_args *p = params;
 		iarg[0] = p->pid; /* pid_t */
 		uarg[1] = (intptr_t) p->fname; /* char * */
@@ -3297,7 +3303,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		break;
 	}
 	/* cosetup */
-	case 562: {
+	case 564: {
 		struct cosetup_args *p = params;
 		iarg[0] = p->what; /* int */
 		uarg[1] = (intptr_t) p->code; /* void *__capability * */
@@ -3306,7 +3312,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		break;
 	}
 	/* coregister */
-	case 563: {
+	case 565: {
 		struct coregister_args *p = params;
 		uarg[0] = (intptr_t) p->name; /* const char * */
 		uarg[1] = (intptr_t) p->cap; /* void *__capability * */
@@ -3314,7 +3320,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		break;
 	}
 	/* colookup */
-	case 564: {
+	case 566: {
 		struct colookup_args *p = params;
 		uarg[0] = (intptr_t) p->name; /* const char * */
 		uarg[1] = (intptr_t) p->cap; /* void *__capability * */
@@ -3322,7 +3328,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		break;
 	}
 	/* copark */
-	case 565: {
+	case 567: {
 		*n_args = 0;
 		break;
 	}
@@ -8592,38 +8598,6 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* numa_getaffinity */
-	case 548:
-		switch(ndx) {
-		case 0:
-			p = "cpuwhich_t";
-			break;
-		case 1:
-			p = "id_t";
-			break;
-		case 2:
-			p = "userland struct vm_domain_policy_entry *";
-			break;
-		default:
-			break;
-		};
-		break;
-	/* numa_setaffinity */
-	case 549:
-		switch(ndx) {
-		case 0:
-			p = "cpuwhich_t";
-			break;
-		case 1:
-			p = "id_t";
-			break;
-		case 2:
-			p = "userland const struct vm_domain_policy_entry *";
-			break;
-		default:
-			break;
-		};
-		break;
 	/* fdatasync */
 	case 550:
 		switch(ndx) {
@@ -8797,8 +8771,58 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* coexecve */
+	/* cpuset_getdomain */
 	case 561:
+		switch(ndx) {
+		case 0:
+			p = "cpulevel_t";
+			break;
+		case 1:
+			p = "cpuwhich_t";
+			break;
+		case 2:
+			p = "id_t";
+			break;
+		case 3:
+			p = "size_t";
+			break;
+		case 4:
+			p = "userland domainset_t *";
+			break;
+		case 5:
+			p = "userland int *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cpuset_setdomain */
+	case 562:
+		switch(ndx) {
+		case 0:
+			p = "cpulevel_t";
+			break;
+		case 1:
+			p = "cpuwhich_t";
+			break;
+		case 2:
+			p = "id_t";
+			break;
+		case 3:
+			p = "size_t";
+			break;
+		case 4:
+			p = "userland domainset_t *";
+			break;
+		case 5:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* coexecve */
+	case 563:
 		switch(ndx) {
 		case 0:
 			p = "pid_t";
@@ -8817,7 +8841,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		};
 		break;
 	/* cosetup */
-	case 562:
+	case 564:
 		switch(ndx) {
 		case 0:
 			p = "int";
@@ -8833,7 +8857,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		};
 		break;
 	/* coregister */
-	case 563:
+	case 565:
 		switch(ndx) {
 		case 0:
 			p = "userland const char *";
@@ -8846,7 +8870,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		};
 		break;
 	/* colookup */
-	case 564:
+	case 566:
 		switch(ndx) {
 		case 0:
 			p = "userland const char *";
@@ -8859,7 +8883,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		};
 		break;
 	/* copark */
-	case 565:
+	case 567:
 		break;
 	default:
 		break;
@@ -10687,16 +10711,6 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* numa_getaffinity */
-	case 548:
-		if (ndx == 0 || ndx == 1)
-			p = "int";
-		break;
-	/* numa_setaffinity */
-	case 549:
-		if (ndx == 0 || ndx == 1)
-			p = "int";
-		break;
 	/* fdatasync */
 	case 550:
 		if (ndx == 0 || ndx == 1)
@@ -10752,28 +10766,38 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* coexecve */
+	/* cpuset_getdomain */
 	case 561:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cosetup */
+	/* cpuset_setdomain */
 	case 562:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* coregister */
+	/* coexecve */
 	case 563:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* colookup */
+	/* cosetup */
 	case 564:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* copark */
+	/* coregister */
 	case 565:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* colookup */
+	case 566:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* copark */
+	case 567:
 	default:
 		break;
 	};

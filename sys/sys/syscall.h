@@ -466,8 +466,6 @@
 #define	SYS_ppoll	545
 #define	SYS_futimens	546
 #define	SYS_utimensat	547
-#define	SYS_numa_getaffinity	548
-#define	SYS_numa_setaffinity	549
 #define	SYS_fdatasync	550
 #define	SYS_fstat	551
 #define	SYS_fstatat	552
@@ -479,9 +477,11 @@
 #define	SYS_fhstatfs	558
 #define	SYS_mknodat	559
 #define	SYS_kevent	560
-#define	SYS_coexecve	561
-#define	SYS_cosetup	562
-#define	SYS_coregister	563
-#define	SYS_colookup	564
-#define	SYS_copark	565
-#define	SYS_MAXSYSCALL	566
+#define	SYS_cpuset_getdomain	561
+#define	SYS_cpuset_setdomain	562
+#define	SYS_coexecve	563
+#define	SYS_cosetup	564
+#define	SYS_coregister	565
+#define	SYS_colookup	566
+#define	SYS_copark	567
+#define	SYS_MAXSYSCALL	568

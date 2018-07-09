@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2012-2014 Thomas Skibo <thomasskibo@yahoo.com>
  * All rights reserved.
  *
@@ -809,7 +811,7 @@ cgem_start_locked(if_t ifp)
 		WR4(sc, CGEM_NET_CTRL, sc->net_ctl_shadow |
 		    CGEM_NET_CTRL_START_TX);
 
-		/* If there is a BPF listener, bounce a copy to to him. */
+		/* If there is a BPF listener, bounce a copy to him. */
 		ETHER_BPF_MTAP(ifp, m);
 	}
 }
@@ -1864,3 +1866,12 @@ DRIVER_MODULE(cgem, simplebus, cgem_driver, cgem_devclass, NULL, NULL);
 DRIVER_MODULE(miibus, cgem, miibus_driver, miibus_devclass, NULL, NULL);
 MODULE_DEPEND(cgem, miibus, 1, 1, 1);
 MODULE_DEPEND(cgem, ether, 1, 1, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20180629,
+//   "target_type": "kernel",
+//   "changes": [
+//     "ioctl:net"
+//   ]
+// }
+// CHERI CHANGES END
