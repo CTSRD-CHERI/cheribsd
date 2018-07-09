@@ -89,7 +89,7 @@ main(int argc, char **argv)
 	error = colookup(argv[0], &lookedup);
 	if (error != 0) {
 		if (errno == ESRCH) {
-			warnx("received ESRCH; this usually means there's nothing coregistered for \"%s\"", argv[1]);
+			warnx("received ESRCH; this usually means there's nothing coregistered for \"%s\"", argv[0]);
 			warnx("use coexec(1) to colocate; you might also find \"ps aux -o vmaddr\" useful");
 		}
 		err(1, "colookup");
