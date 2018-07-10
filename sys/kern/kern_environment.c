@@ -39,7 +39,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/queue.h>
@@ -82,7 +81,7 @@ struct mtx	kenv_lock;
 /*
  * No need to protect this with a mutex since SYSINITS are single threaded.
  */
-int	dynamic_kenv = 0;
+bool	dynamic_kenv;
 
 #define KENV_CHECK	if (!dynamic_kenv) \
 			    panic("%s: called before SI_SUB_KMEM", __func__)
@@ -112,7 +111,7 @@ kern_kenv(struct thread *td, int what, const char * __CAPABILITY namep,
 	size_t len, done, needed, buflen;
 	int error, i;
 
-	KASSERT(dynamic_kenv, ("kenv: dynamic_kenv = 0"));
+	KASSERT(dynamic_kenv, ("kenv: dynamic_kenv = false"));
 
 	error = 0;
 	if (what == KENV_DUMP) {
@@ -356,7 +355,7 @@ init_dynamic_kenv(void *data __unused)
 	kenvp[dynamic_envpos] = NULL;
 
 	mtx_init(&kenv_lock, "kernel environment", NULL, MTX_DEF);
-	dynamic_kenv = 1;
+	dynamic_kenv = true;
 }
 SYSINIT(kenv, SI_SUB_KMEM + 1, SI_ORDER_FIRST, init_dynamic_kenv, NULL);
 
@@ -510,7 +509,7 @@ kern_setenv(const char *name, const char *value)
 	char *buf, *cp, *oldenv;
 	int namelen, vallen, i;
 
-	if (dynamic_kenv == 0 && md_env_len > 0)
+	if (!dynamic_kenv && md_env_len > 0)
 		return (setenv_static(name, value));
 
 	KENV_CHECK;
