@@ -404,15 +404,14 @@ kern_execve(struct thread *td, struct image_args *args,
 		sx_sunlock(&proctree_lock);
 		error = kern_coexecve(td, args, mac_p, cop);
 		PRELE(cop);
-#ifdef notyet
-		/*
-		 * XXX: No idea why this happens; do_execve() does the same without coexec.
-		 */
+
 		KASSERT(error != 0, ("%s: kern_coexecve returned 0", __func__));
-#else
-		if (error == 0)
-			return (0);
-#endif
+
+		/*
+		 * This is the "success" case.
+		 */
+		if (error == EJUSTRETURN)
+			return (error);
 
 		switch (error) {
 		case ENOTDIR:
@@ -421,7 +420,6 @@ kern_execve(struct thread *td, struct image_args *args,
 		case ENOENT:
 		case ELOOP:
 			return (error);
-			break;
 		default:
 			break;
 		}
