@@ -169,10 +169,12 @@ SUBDIR.${MK_LDNS}+=	libldns
 # The libraries under libclang_rt can only be built by clang, and only make
 # sense to build when clang is enabled at all.  Furthermore, they can only be
 # built for certain architectures.
-.if ${MK_CLANG} != "no" && ${COMPILER_TYPE} == "clang" && \
+.if (${MK_CLANG} != "no" && ${COMPILER_TYPE} == "clang" || \
+    ${MK_CHERI} != "no") && \
     (${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
     (${MACHINE_CPUARCH} == "arm" && ${MACHINE_ARCH} != "armeb") || \
-    (${MACHINE_CPUARCH} == "i386"))
+    (${MACHINE_CPUARCH} == "i386") || \
+    ${MACHINE_ARCH:Mmips64} != "") && !defined(LIBCHERI)
 _libclang_rt=	libclang_rt
 .endif
 
