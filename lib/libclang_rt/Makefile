@@ -1,6 +1,7 @@
 # $FreeBSD$
 
-.if ${MACHINE_CPUARCH} == "i386" || ${MACHINE_CPUARCH} == "amd64"
+.if ${MACHINE_CPUARCH} == "i386" || ${MACHINE_CPUARCH} == "amd64" || \
+    ${MACHINE_ARCH:Mmips64*} != ""
 SUBDIR+=	include
 SUBDIR+=	asan
 SUBDIR+=	asan-preinit
@@ -9,7 +10,7 @@ SUBDIR+=	asan_dynamic
 SUBDIR+=	safestack
 SUBDIR+=	stats
 SUBDIR+=	stats_client
-.if ${MACHINE_CPUARCH} == "amd64"
+.if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_ARCH:Mmips64*} != ""
 SUBDIR+=	tsan
 SUBDIR+=	tsan_cxx
 .endif
