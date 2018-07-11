@@ -117,7 +117,8 @@
 #if SANITIZER_LINUX || SANITIZER_FREEBSD
 # include <utime.h>
 # include <sys/ptrace.h>
-# if defined(__mips64) || defined(__aarch64__) || defined(__arm__)
+# if SANITIZER_LINUX && (defined(__mips64) || defined(__aarch64__) || \
+     defined(__arm__))
 #  include <asm/ptrace.h>
 #  ifdef __arm__
 typedef struct user_fpregs elf_fpregset_t;
