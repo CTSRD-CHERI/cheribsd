@@ -2057,8 +2057,24 @@ trapsignal(struct thread *td, ksiginfo_t *ksi)
 {
 	struct sigacts *ps;
 	struct proc *p;
+	struct thread *peertd;
+	bool borrowing;
 	int sig;
 	int code;
+
+	/*
+	 * Check if we're borrowing a thread over a cocall; if so - figure
+	 * out which thread/process we're actually executing, and queue the
+	 * signal to them.
+	 */
+	colocation_get_peer(td, &peertd);
+	if (peertd != NULL) {
+		//printf("%s: bingo, td %p, peertd %p\n", __func__, td, peertd);
+		borrowing = true;
+		td = peertd;
+	} else {
+		borrowing = false;
+	}
 
 	p = td->td_proc;
 	sig = ksi->ksi_signo;
@@ -2069,7 +2085,8 @@ trapsignal(struct thread *td, ksiginfo_t *ksi)
 	ps = p->p_sigacts;
 	mtx_lock(&ps->ps_mtx);
 
-	if ((p->p_flag & P_TRACED) == 0 && SIGISMEMBER(ps->ps_sigcatch, sig) &&
+	if (!borrowing &&
+	    (p->p_flag & P_TRACED) == 0 && SIGISMEMBER(ps->ps_sigcatch, sig) &&
 	    !SIGISMEMBER(td->td_sigmask, sig)) {
 #ifdef KTRACE
 		if (KTRPOINT(curthread, KTR_PSIG))
