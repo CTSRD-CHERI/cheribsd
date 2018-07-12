@@ -82,27 +82,63 @@ colocation_startup(void)
 SYSINIT(colocation_startup, SI_SUB_CPU, SI_ORDER_FIRST, colocation_startup,
     NULL);
 
+static bool
+colocation_fetch_context(struct thread *td, struct switcher_context *scp)
+{
+	vaddr_t addr;
+	int error;
+
+	addr = td->td_md.md_switcher_context;
+	if (addr == 0) {
+		/*
+		 * We've never called cosetup(2).
+		 */
+		return (false);
+	}
+
+	error = copyincap_c(__USER_CAP((const void *)addr, sizeof(*scp)),
+	    &(*scp), sizeof(*scp));
+	KASSERT(error == 0, ("%s: copyincap_c from %p failed with error %d\n",
+	    __func__, (void *)td->td_md.md_switcher_context, error));
+
+	if (scp->sc_borrower_td == NULL) {
+		/*
+		 * Nothing borrowed yet.
+		 */
+		return (false);
+	}
+
+	return (true);
+}
+
+void
+colocation_get_peer(struct thread *td, struct thread **peertdp)
+{
+	struct switcher_context sc;
+	bool borrowing;
+
+	borrowing = colocation_fetch_context(td, &sc);
+	if (!borrowing)
+		*peertdp = NULL;
+
+	*peertdp = sc.sc_borrower_td;
+}
+
 void
 colocation_thread_exit(struct thread *td)
 {
 	struct switcher_context sc, *peersc;
 	vaddr_t addr;
+	bool borrowing;
 	int error;
 
+	borrowing = colocation_fetch_context(td, &sc);
+	if (!borrowing)
+		return;
+
 	addr = td->td_md.md_switcher_context;
-	if (addr == 0)
-		return;
-
-	error = copyincap_c(__USER_CAP((void *)addr, sizeof(sc)), &sc, sizeof(sc));
-	if (error != 0) {
-		printf("%s: copyincap_c from %p failed with error %d\n",
-		    __func__, (void *)addr, error);
-		return;
-	}
-
 	peersc = (__cheri_fromcap struct switcher_context *)sc.sc_peer_context;
 	//printf("%s: terminating thread %p, peer context %p\n", __func__, td, peersc);
-
 
 	/*
 	 * Set sc_peer_context to a special "null" capability, so that cocall(2)
@@ -151,21 +187,11 @@ colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 	struct trapframe peertrapframe;
 	struct syscall_args peersa;
 	register_t peertpc;
-	int error;
+	bool borrowing;
 
-	if (td->td_md.md_switcher_context == 0) {
-		/*
-		 * We've never called cosetup(2).
-		 */
+	borrowing = colocation_fetch_context(td, &sc);
+	if (!borrowing)
 		return;
-	}
-
-	/*
-	 * Fetch switcher context for currently executing userspace thread.
-	 */
-	error = copyincap_c(__USER_CAP((const void *)td->td_md.md_switcher_context, sizeof(sc)), &sc, sizeof(sc));
-	KASSERT(error == 0, ("%s: copyincap_c from %p failed with error %d\n",
-	    __func__, (void *)td->td_md.md_switcher_context, error));
 
 	peertd = sc.sc_borrower_td;
 	if (peertd == NULL) {

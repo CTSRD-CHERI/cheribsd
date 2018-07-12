@@ -171,6 +171,7 @@ struct ktr_cexception;
 struct thr_param_c;
 void	cheriabi_thr_new_md(struct thread *parent_td,
 	    struct thr_param_c *param);
+void	colocation_get_peer(struct thread *td, struct thread **peertdp);
 void	colocation_thread_exit(struct thread *td);
 void	colocation_unborrow(struct thread *td, struct trapframe **trapframep);
 void	ktrccall_mdfill(struct pcb *pcb, struct ktr_ccall *kc);
