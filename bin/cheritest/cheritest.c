@@ -1129,6 +1129,14 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Exercise copyin/out via kbounce(2) syscall",
 	  .ct_func = test_kbounce, },
 
+	{ .ct_name = "test_sig_dfl_neq_ign",
+	  .ct_desc = "Test SIG_DFL != SIG_IGN",
+	  .ct_func = test_sig_dfl_neq_ign, },
+
+	{ .ct_name = "test_sig_dfl_ign",
+	  .ct_desc = "Test proper handling of SIG_DFL and SIG_IGN",
+	  .ct_func = test_sig_dfl_ign, },
+
 	/*
 	 * Test libcheri sandboxing -- and kernel sandbox unwind.
 	 */

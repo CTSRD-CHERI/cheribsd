@@ -37,6 +37,7 @@
 #include <sys/types.h>
 #include <sys/signal.h>
 #include <sys/sysctl.h>
+#include <sys/wait.h>
 #include <sys/time.h>
 
 #include <machine/cpuregs.h>
@@ -53,6 +54,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -90,5 +92,101 @@ test_sandbox_syscall(const struct cheri_test *ctp __unused)
 	if (new <= old)
 		cheritest_failure_errx(
 		    "security.cheri.syscall_violations unchanged");
+	cheritest_success();
+}
+
+void
+test_sig_dfl_neq_ign(const struct cheri_test *ctp __unused)
+{
+	void * __capability sic = (__cheri_tocap void * __capability)SIG_IGN;
+
+	/*
+	 * This may appear redundant, but it tickles some of the optimizers
+	 * differently than the condition below, which, apparently, can get
+	 * constant-folded and DCE'd, while this does not.
+	 */
+	int eq = (SIG_IGN == SIG_DFL);
+
+	CHERI_FPRINT_PTR(stderr, sic);
+	fprintf(stderr, "IGN=%d(%p) DFL=%d(%p) EQ=%d(%d)\n",
+		(int)SIG_IGN, SIG_IGN,
+		(int)SIG_DFL, SIG_DFL, SIG_IGN == SIG_DFL, eq);
+
+	if (SIG_IGN == SIG_DFL)
+		cheritest_failure_errx("SIG_{IGN,DFL} conflated");
+	else if (eq)
+		cheritest_failure_errx("SIG_{IGN,DFL} somewhat conflated?");
+	else
+		cheritest_success();
+}
+
+static void
+test_sig_dfl_ign_handler(int x)
+{
+	(void)x;
+}
+
+void
+test_sig_dfl_ign(const struct cheri_test *ctp __unused)
+{
+	int cpid;
+	int res;
+	struct sigaction sa;
+	sigset_t ss, oss;
+
+	bzero(&sa, sizeof sa);
+
+	/* Block SIGEMT and SIGURG */
+	res = sigprocmask(0, NULL, &ss);
+	assert(res == 0);
+	res = sigaddset(&ss, SIGEMT);
+	assert(res == 0);
+	res = sigaddset(&ss, SIGURG);
+	assert(res == 0);
+	res = sigprocmask(SIG_BLOCK, &ss, &oss);
+	assert(res == 0);
+
+	/* Install IGN as behavior for SIGEMT */
+	sa.sa_handler = SIG_IGN;
+	res = sigaction(SIGEMT, &sa, NULL);
+	assert(res == 0);
+
+	/* Make SIGURG a no-op */
+	sa.sa_handler = test_sig_dfl_ign_handler;
+	res = sigaction(SIGURG, &sa, NULL);
+	assert(res == 0);
+
+	cpid = fork();
+	if (cpid != 0) {
+		int status;
+		kill(cpid, SIGEMT); /* Ignored */
+		kill(cpid, SIGURG); /* wake from suspend */
+		res = waitpid(cpid, &status, 0);
+		assert(res == cpid);
+		assert(WIFEXITED(status) == 1);
+		assert(WEXITSTATUS(status) == 42);
+	} else {
+		sigsuspend(&oss);
+		exit(42);
+	}
+
+	/* Use SIG_DFL for SIGEMT */
+	sa.sa_handler = SIG_DFL;
+	res = sigaction(SIGEMT, &sa, NULL);
+	assert(res == 0);
+
+	cpid = fork();
+	if (cpid != 0) {
+		int status;
+		kill(cpid, SIGEMT); /* Fatal */
+		res = waitpid(cpid, &status, 0);
+		assert(res == cpid);
+		assert(WIFSIGNALED(status) == 1);
+		assert(WTERMSIG(status) == SIGEMT);
+	} else {
+		sigsuspend(&oss);
+		exit(42);
+	}
+
 	cheritest_success();
 }
