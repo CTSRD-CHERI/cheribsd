@@ -441,7 +441,7 @@ static void GetTls(uptr *addr, uptr *size) {
     // dtv = segbase[0];
     // dtv[2] = base of TLS block of the main program
     void **dtv = (void**) segbase[0];
-    if ((uptr) dtv[1] >= 2) {    
+    if ((uptr) dtv[1] >= 2) {
       // Find size (p_memsz) of TLS block of the main program.
       dl_iterate_phdr(GetSizeFromHdr, size);
 
