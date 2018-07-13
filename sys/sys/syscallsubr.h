@@ -337,7 +337,7 @@ int	kern_preadv(struct thread *td, int fd, struct uio *auio, off_t offset);
 int	kern_pselect(struct thread *td, int nd, fd_set * __capability in,
 	    fd_set * __capability ou, fd_set * __capability ex,
 	    struct timeval *tvp, sigset_t *uset, int abi_nfdbits);
-int	kern_ptrace(struct thread *td, int req, pid_t pid, void *addr,
+int	kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr,
 	    int data);
 int	kern_pwrite(struct thread *td, int fd, const void *buf, size_t nbyte,
 	    off_t offset);
