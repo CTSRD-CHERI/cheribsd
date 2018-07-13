@@ -39,6 +39,7 @@
 #include <sys/sysctl.h>
 #include <sys/wait.h>
 #include <sys/time.h>
+#include <sys/ptrace.h>
 
 #include <machine/cpuregs.h>
 #include <machine/sysarch.h>
@@ -189,4 +190,39 @@ test_sig_dfl_ign(const struct cheri_test *ctp __unused)
 	}
 
 	cheritest_success();
+}
+
+void
+test_ptrace_basic(const struct cheri_test *ctp __unused)
+{
+	int cpid, res;
+
+	cpid = fork();
+	if (cpid != 0) {
+		int status;
+
+		/* Attach to process */
+		res = ptrace(PT_ATTACH, cpid, NULL, 0);
+		assert(res == 0);
+
+		/* Stop it */
+		kill(cpid, SIGURG);
+		res = waitpid(cpid, &status, WTRAPPED);
+		assert(res == cpid);
+
+		/* Kill it */
+		res = ptrace(PT_KILL, cpid, NULL, 0);
+		assert(res == 0);
+
+		/* Reap it */
+		res = waitpid(cpid, &status, 0);
+		assert (res == cpid);
+
+		cheritest_success();
+	} else {
+		sigset_t ss;
+		sigemptyset(&ss);
+		sigsuspend(&ss);
+		exit(23);
+	}
 }

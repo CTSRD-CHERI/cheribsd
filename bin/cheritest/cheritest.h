@@ -452,6 +452,7 @@ DECLARE_CHERI_TEST(test_string_memmove_c);
 DECLARE_CHERI_TEST(test_sandbox_syscall);
 DECLARE_CHERI_TEST(test_sig_dfl_neq_ign);
 DECLARE_CHERI_TEST(test_sig_dfl_ign);
+DECLARE_CHERI_TEST(test_ptrace_basic);
 
 /* cheritest_registers.c */
 DECLARE_CHERI_TEST(test_initregs_default);

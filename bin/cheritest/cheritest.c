@@ -1137,6 +1137,10 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Test proper handling of SIG_DFL and SIG_IGN",
 	  .ct_func = test_sig_dfl_ign, },
 
+	{ .ct_name = "test_ptrace_basic",
+	  .ct_desc = "Test basic handling of ptrace functionality",
+	  .ct_func = test_ptrace_basic, },
+
 	/*
 	 * Test libcheri sandboxing -- and kernel sandbox unwind.
 	 */
