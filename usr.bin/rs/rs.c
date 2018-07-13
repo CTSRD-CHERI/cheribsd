@@ -557,3 +557,12 @@ getnum(int *num, char *p, int strict)
 			break;
 	return(--t);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180713,
+//   "changes": [
+//     "pointer_provenance"
+//   ],
+//   "change_comment": "computing new pointer from old pointer post realloc"
+// }
+// CHERI CHANGES END
