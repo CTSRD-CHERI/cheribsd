@@ -193,10 +193,11 @@
 /*
  * Anonymous object constant for shm_open().
  */
-#ifndef _KERNEL
-#define	SHM_ANON		((char *)1)
+#if __has_feature(capabilities) && \
+	(defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__))
+#define	SHM_ANON		((char * __capability)(__intcap_t)1)
 #else
-#define	SHM_ANON		((char * __capability)(intcap_t)1)
+#define	SHM_ANON		((char *)(__intptr_t)1)
 #endif
 #endif /* __BSD_VISIBLE */
 

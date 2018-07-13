@@ -704,6 +704,10 @@ shm_remove(char *path, Fnv32_t fnv, struct ucred *ucred)
 	return (ENOENT);
 }
 
+#if __has_feature(capabilities)
+#define SHM_ANON_N	1
+#endif
+
 int
 kern_shm_open(struct thread *td, const char * __capability userpath, int flags,
     mode_t mode, struct filecaps *fcaps)
@@ -717,6 +721,11 @@ kern_shm_open(struct thread *td, const char * __capability userpath, int flags,
 	Fnv32_t fnv;
 	mode_t cmode;
 	int fd, error;
+
+#if __has_feature(capabilities)
+	if ((__cheri_addr uintptr_t) userpath == SHM_ANON_N)
+		userpath = SHM_ANON;
+#endif
 
 #ifdef CAPABILITY_MODE
 	/*
