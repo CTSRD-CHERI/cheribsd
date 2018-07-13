@@ -66,6 +66,10 @@
 #include <sys/_iovec.h>
 #include <sys/_task.h>
 
+#ifdef _KERNEL
+#include <opencrypto/_cryptodev.h>
+#endif
+
 /* Some initial values */
 #define CRYPTO_DRIVERS_INITIAL	4
 #define CRYPTO_SW_SESSIONS	32
@@ -409,7 +413,7 @@ struct cryptop {
 
 	struct task	crp_task;
 
-	u_int64_t	crp_sid;	/* Session ID */
+	crypto_session_t crp_sid;	/* Session ID */
 	int		crp_ilen;	/* Input data total length */
 	int		crp_olen;	/* Result total length */
 
@@ -503,8 +507,8 @@ struct cryptkop {
 
 MALLOC_DECLARE(M_CRYPTO_DATA);
 
-extern	int crypto_newsession(u_int64_t *sid, struct cryptoini *cri, int hard);
-extern	int crypto_freesession(u_int64_t sid);
+extern	int crypto_newsession(crypto_session_t *sid, struct cryptoini *cri, int hard);
+extern	int crypto_freesession(crypto_session_t sid);
 #define	CRYPTOCAP_F_HARDWARE	CRYPTO_FLAG_HARDWARE
 #define	CRYPTOCAP_F_SOFTWARE	CRYPTO_FLAG_SOFTWARE
 #define	CRYPTOCAP_F_SYNC	0x04000000	/* operates synchronously */
