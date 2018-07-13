@@ -950,7 +950,9 @@ dofault:
 				va += sizeof(int);
 
 			/* read break instruction */
-			instr = fuword32((caddr_t)va);
+			if (fueword32_c(__USER_CODE_CAP((void *)va), &instr) !=
+			    0)
+				return (0);
 #if 0
 			printf("trap: %s (%d) breakpoint %x at %x: (adr %x ins %x)\n",
 			    p->p_comm, p->p_pid, instr, trapframe->pc,
@@ -999,7 +1001,9 @@ dofault:
 			if (DELAYBRANCH(trapframe->cause))
 				va += sizeof(int);
 			/* read break instruction */
-			instr = fuword32((caddr_t)va);
+			if (fueword32_c(__USER_CODE_CAP((void *)va), &instr) !=
+			    0)
+				return (0);
 
 			if (DELAYBRANCH(trapframe->cause)) {	/* Check BD bit */
 				locr0->pc = MipsEmulateBranch(locr0, trapframe->pc, 0,
@@ -1362,26 +1366,28 @@ MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
 #define	GetBranchDest(InstPtr, inst) \
 	(InstPtr + 4 + ((short)inst.IType.imm << 2))
 
-#ifdef CPU_CHERI
-	/*
-	 * XXXRW: This needs careful review.  We extract a suitable offset
-	 * from the executing $pcc, add it to $pcc's base, and use that for a
-	 * $kdc-relative load via fuword().  Is this safe with respect to
-	 * alignment on $pcc, etc?
-	 */
-	if (instptr)
-		instptr += cheri_getbase(framePtr->pcc);
-	instPC += cheri_getbase(framePtr->pcc);
-#endif
 	if (instptr) {
-		if (instptr < MIPS_KSEG0_START)
+		if (instptr < MIPS_KSEG0_START) {
+#ifdef CPU_CHERI
+			if (fueword32_c(
+			    cheri_setoffset(framePtr->pcc, instptr),
+			    &inst.word) != 0)
+				return (0);
+#else
 			inst.word = fuword32((void *)instptr);
-		else
+#endif
+		} else
 			inst = *(InstFmt *) instptr;
 	} else {
-		if ((vm_offset_t)instPC < MIPS_KSEG0_START)
+		if ((vm_offset_t)instPC < MIPS_KSEG0_START) {
+#ifdef CPU_CHERI
+			if (fueword32_c(cheri_setoffset(framePtr->pcc, instPC),
+			    &inst.word) != 0)
+				return (0);
+#else
 			inst.word = fuword32((void *)instPC);
-		else
+#endif
+		} else
 			inst = *(InstFmt *) instPC;
 	}
 

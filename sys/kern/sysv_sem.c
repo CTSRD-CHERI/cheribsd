@@ -1195,7 +1195,7 @@ sys_semop(struct thread *td, struct semop_args *uap)
 }
 
 static int
-kern_semop(struct thread *td, int semid, struct sembuf * __capability usops,
+kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
     size_t nsops)
 {
 #define SMALL_SOPS	8
@@ -1210,20 +1210,21 @@ kern_semop(struct thread *td, int semid, struct sembuf * __capability usops,
 	size_t i, j, k;
 	int error;
 	int do_wakeup, do_undos;
+	int semid;
 	unsigned short seq;
 
 #ifdef SEM_DEBUG
 	sops = NULL;
 #endif
-	DPRINTF(("call to semop(%d, %p, %u)\n", semid, sops, nsops));
+	DPRINTF(("call to semop(%d, %p, %u)\n", usemid, sops, nsops));
 
-	AUDIT_ARG_SVIPC_ID(semid);
+	AUDIT_ARG_SVIPC_ID(usemid);
 
 	rpr = sem_find_prison(td->td_ucred);
 	if (sem == NULL)
 		return (ENOSYS);
 
-	semid = IPCID_TO_IX(semid);	/* Convert back to zero origin */
+	semid = IPCID_TO_IX(usemid);	/* Convert back to zero origin */
 
 	if (semid < 0 || semid >= seminfo.semmni)
 		return (EINVAL);
@@ -1269,7 +1270,7 @@ kern_semop(struct thread *td, int semid, struct sembuf * __capability usops,
 		goto done2;
 	}
 	seq = semakptr->u.sem_perm.seq;
-	if (seq != IPCID_TO_SEQ(semid)) {
+	if (seq != IPCID_TO_SEQ(usemid)) {
 		error = EINVAL;
 		goto done2;
 	}
@@ -1397,7 +1398,7 @@ kern_semop(struct thread *td, int semid, struct sembuf * __capability usops,
 		 */
 		seq = semakptr->u.sem_perm.seq;
 		if ((semakptr->u.sem_perm.mode & SEM_ALLOC) == 0 ||
-		    seq != IPCID_TO_SEQ(semid)) {
+		    seq != IPCID_TO_SEQ(usemid)) {
 			error = EIDRM;
 			goto done2;
 		}

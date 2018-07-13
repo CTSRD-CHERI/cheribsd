@@ -29,6 +29,8 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/errno.h>
+
 /* XXXRW: Can I drop some of these? */
 #include <machine/asm.h>
 #include <machine/cpu.h>
