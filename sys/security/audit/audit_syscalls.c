@@ -269,7 +269,7 @@ kern_auditon(struct thread *td, int cmd, void * __capability data,
 	case A_OLDSETPOLICY:
 	case A_SETPOLICY:
 		if (length == sizeof(udata.au_policy64)) {
-			if (udata.au_policy & (~AUDIT_CNT|AUDIT_AHLT|
+			if (udata.au_policy & ~(AUDIT_CNT|AUDIT_AHLT|
 			    AUDIT_ARGV|AUDIT_ARGE))
 				return (EINVAL);
 			audit_fail_stop = ((udata.au_policy64 & AUDIT_CNT) ==
