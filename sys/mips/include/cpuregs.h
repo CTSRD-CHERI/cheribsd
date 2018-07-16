@@ -742,7 +742,7 @@
 #define	MIPS_HWRENA_CC		(1<<2)	/* Hi Res cycle counter */
 #define	MIPS_HWRENA_CCRES	(1<<3)	/* Cycle counter resolution */
 /* BERI specific statcounters */
-#if defined(CPU_BERI)
+#if defined(CPU_BERI) || defined(CPU_QEMU_MALTA)
 /*
  * XXXAR: the first three don't use the selector field so waste opcode space.
  * We should probably move them further back and use the selector. This would

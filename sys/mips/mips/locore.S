@@ -167,7 +167,7 @@ VECTOR(_locore, unknown)
 	csetkdc	CHERI_REG_KDC
 #endif
 
-#if defined(CPU_BERI)
+#if defined(CPU_BERI) || defined(CPU_QEMU_MALTA)
 	/*
 	 * Enable userspace cycle-count, cycle-count resolution, and CPU
 	 * number registers available via rdhwr.
