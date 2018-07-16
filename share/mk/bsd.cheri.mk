@@ -86,7 +86,7 @@ CHERI_CXX=${CHERI_CC:H}/${CHERI_CC:T:S/clang/clang++/}
 .error CHERI_CXX is defined to ${CHERI_CXX} which does not exist
 .endif
 
-_CHERI_COMMON_FLAGS=	-g -integrated-as --target=cheri-unknown-freebsd \
+_CHERI_COMMON_FLAGS=	-integrated-as --target=cheri-unknown-freebsd \
 			-msoft-float
 _CHERI_CC=		${CHERI_CC} ${_CHERI_COMMON_FLAGS}
 _CHERI_CXX=		${CHERI_CXX} ${_CHERI_COMMON_FLAGS}
