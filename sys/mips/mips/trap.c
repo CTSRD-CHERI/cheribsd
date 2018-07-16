@@ -1862,6 +1862,8 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, re
 	 * be nice to emulate these and assume that the tag bit is unset, but for
 	 * now we'll just let them fail as they probably indicate bugs.
 	 */
+	case OP_JALX:
+	case OP_COP2: /* TODO: assert that it is a cjr/cjalr instruction */
 	case OP_SDC2: case OP_LDC2:
 		cheri_log_exception(frame, 0);
 		return (0);
