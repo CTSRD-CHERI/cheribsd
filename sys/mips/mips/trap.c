@@ -1933,7 +1933,7 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, re
 	case OP_SCD: case OP_SC: case OP_LLD: case OP_LL:
 		return (0);
 	default:
-		printf("%s: unhandled opcode in address error: %#x\n", __func__, MIPS_INST_OPCODE(inst));
+		printf("%s: unhandled opcode in address error: %#x\n", __func__, inst);
 		return (0);
 	}
 	/* Fix up the op_type for unsigned versions */
