@@ -208,7 +208,9 @@ ffs_susp_suspend(struct mount *mp)
 	if ((error = vfs_write_suspend(mp, VS_SKIP_UNMOUNT)) != 0)
 		return (error);
 
+	UFS_LOCK(ump);
 	ump->um_flags |= UM_WRITESUSPENDED;
+	UFS_UNLOCK(ump);
 
 	return (0);
 }
@@ -253,7 +255,9 @@ ffs_susp_dtor(void *data)
 
 	vfs_write_resume(mp, 0);
 	vfs_unbusy(mp);
+	UFS_LOCK(ump);
 	ump->um_flags &= ~UM_WRITESUSPENDED;
+	UFS_UNLOCK(ump);
 
 	sx_xunlock(&ffs_susp_lock);
 }
