@@ -34,6 +34,9 @@
  * SOFTWARE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
 #include "ipoib.h"
 
 static	int ipoib_resolvemulti(struct ifnet *, struct sockaddr **,
