@@ -1548,6 +1548,27 @@ log_frame_dump(struct trapframe *frame)
 
 	printf("cause: %#jx; pc: %#jx\n",
 	    (intmax_t)(uint32_t)frame->cause, (intmax_t)frame->pc);
+
+	if (cpuinfo.badinstr_reg) {
+		/* XXXAR: Can BadInstr be clobbered by another trap before here? */
+		uint32_t inst = mips_rd_badinstr();
+		printf("badinstr: %#x ", inst);
+#ifdef DDB
+		db_disasm((db_addr_t)&inst, 0);
+#else
+		printf("\n");
+#endif
+	}
+	if (DELAYBRANCH(frame->cause) && cpuinfo.badinstr_p_reg) {
+		/* XXXAR: Can BadInstrP be clobbered by another trap before here? */
+		uint32_t inst = mips_rd_badinstr_p();
+		printf("badinstrp: %#x ", inst);
+#ifdef DDB
+		db_disasm((db_addr_t)&inst, 0);
+#else
+		printf("\n");
+#endif
+	}
 }
 
 #ifdef TRAP_DEBUG
