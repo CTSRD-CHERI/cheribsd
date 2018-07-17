@@ -430,7 +430,8 @@ cpu_fetch_syscall_args(struct thread *td)
 	/* compute next PC after syscall instruction */
 	td->td_pcb->pcb_tpc = sa->trapframe->pc; /* Remember if restart */
 	if (DELAYBRANCH(sa->trapframe->cause))	 /* Check BD bit */
-		locr0->pc = MipsEmulateBranch(locr0, sa->trapframe->pc, 0, 0);
+		locr0->pc = MipsEmulateBranch(locr0, sa->trapframe->pc, 0,
+		    cpuinfo.badinstr_p_reg ? -1 : 0);
 	else
 		locr0->pc += sizeof(int);
 	sa->code = locr0->v0;
@@ -1007,7 +1008,7 @@ dofault:
 
 			if (DELAYBRANCH(trapframe->cause)) {	/* Check BD bit */
 				locr0->pc = MipsEmulateBranch(locr0, trapframe->pc, 0,
-				    0);
+				    cpuinfo.badinstr_p_reg ? -1 : 0);
 			} else {
 				locr0->pc += sizeof(int);
 			}
@@ -1020,22 +1021,13 @@ dofault:
 		{
 			InstFmt inst;
 #ifdef CPU_CHERI
-
-			/*
-			 * XXXRW: Wwe need to be prepared for the
-			 * possibility that $pcc ($epcc) is not readable or
-			 * unaligned.
-			 */
-			if (fueword32_c(trapframe->pcc, &inst.word) != 0) {
-				printf("Reserved inst trap: Failed to fetch "
-				    "bad inst from epcc: ");
-				CHERI_PRINT_PTR(trapframe->pcc);
-				/* Ensure none of the switch cases match */
-				inst.word = 0;
-			}
-#else
-			inst = *(InstFmt *)(intptr_t)trapframe->pc;
+			KASSERT(cpuinfo.badinstr_reg,
+			    ("CHERI requires BadInstr register"));
 #endif
+			if (cpuinfo.badinstr_reg)
+				inst.word = mips_rd_badinstr();
+			else /* Loading userspace memory is a bad idea! */
+				inst = *(InstFmt *)(intptr_t)trapframe->pc;
 			switch (inst.RType.op) {
 			case OP_SPECIAL3:
 				switch (inst.RType.func) {
@@ -1366,28 +1358,27 @@ MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
 #define	GetBranchDest(InstPtr, inst) \
 	(InstPtr + 4 + ((short)inst.IType.imm << 2))
 
-	if (instptr) {
-		if (instptr < MIPS_KSEG0_START) {
 #ifdef CPU_CHERI
-			if (fueword32_c(
-			    cheri_setoffset(framePtr->pcc, instptr),
-			    &inst.word) != 0)
-				return (0);
-#else
-			inst.word = fuword32((void *)instptr);
+	KASSERT(instptr == -1, ("CHERI should use BadInstrP!"));
 #endif
-		} else
+	if (instptr == -1) {
+		KASSERT(cpuinfo.badinstr_p_reg, ("Need BadInstrP register"));
+		inst.word = mips_rd_badinstr_p();
+	} else if (instptr) {
+#ifdef CPU_CHERI
+		panic("Should not end up here for CPU_CHERI");
+#endif
+		if (instptr < MIPS_KSEG0_START)
+			inst.word = fuword32((void *)instptr);
+		else
 			inst = *(InstFmt *) instptr;
 	} else {
-		if ((vm_offset_t)instPC < MIPS_KSEG0_START) {
 #ifdef CPU_CHERI
-			if (fueword32_c(cheri_setoffset(framePtr->pcc, instPC),
-			    &inst.word) != 0)
-				return (0);
-#else
-			inst.word = fuword32((void *)instPC);
+		panic("Should not end up here for CPU_CHERI");
 #endif
-		} else
+		if ((vm_offset_t)instPC < MIPS_KSEG0_START)
+			inst.word = fuword32((void *)instPC);
+		else
 			inst = *(InstFmt *) instPC;
 	}
 
@@ -1839,13 +1830,13 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, re
 	 * of the CHERI exceptions to guarantee that the load or store should have
 	 * succeeded, but a malicious program could generate an alignment trap and
 	 * then substitute a different instruction...
-	 *
-	 * XXXRW: Should just use the CP0 'faulting instruction' register
-	 * available in CHERI (but not MIPS generally).
 	 */
-	pc += cheri_getbase(frame->pcc);
+	KASSERT(cpuinfo.badinstr_reg, ("CHERI requires BadInstr register"));
 #endif
-	inst = *((u_int32_t *)(intptr_t)pc);;
+	if (cpuinfo.badinstr_reg)
+		inst = mips_rd_badinstr();
+	else
+		inst = *((u_int32_t *)(intptr_t)pc);;
 	src_regno = MIPS_INST_RT(inst);
 
 	/*
@@ -2024,7 +2015,7 @@ emulate_unaligned_access(struct trapframe *frame, int mode)
 		if (access_type) {
 			if (DELAYBRANCH(frame->cause))
 				frame->pc = MipsEmulateBranch(frame, frame->pc,
-				    0, 0);
+				    0, cpuinfo.badinstr_p_reg ? -1 : 0);
 			else
 				frame->pc += 4;
 
