@@ -179,8 +179,7 @@ SUBDIR.${MK_LDNS}+=	libldns
 # aren't building a native clang since we might be cross-compiling with clang
 .if (${COMPILER_TYPE} == "clang") && \
     (${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
-    (${MACHINE_CPUARCH} == "arm" && ${MACHINE_ARCH} != "armeb") || \
-    (${MACHINE_CPUARCH} == "i386") || \
+    ${MACHINE_CPUARCH} == "arm" ||  ${MACHINE_CPUARCH} == "i386" || \
     ${MACHINE_ARCH:Mmips64} != "") && !defined(LIBCHERI)
 _libclang_rt=	libclang_rt
 .elif !defined(LIBCHERI)
