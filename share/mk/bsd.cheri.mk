@@ -174,6 +174,11 @@ CXXFLAGS+=	-stdlib=libc++
 # Don't remove CHERI symbols from the symbol table
 STRIP_FLAGS+=	-w --keep-symbol=__cheri_callee_method.\* \
 		--keep-symbol=__cheri_method.\*
-.endif
-.endif
-.endif
+.endif # ${WANT_CHERI} != "variables"
+
+.endif # ${MK_CHERI} != "no" && defined(WANT_CHERI) && ${WANT_CHERI} != "none"
+
+# Having LLD generate the .gdb_index section massively speeds up GDB MIPS startup.
+# Without this option the MIPS GDB can sometimes take many seconds or even minutes to load the binary.
+LDFLAGS+=	-Wl,--gdb-index
+.endif # !${.TARGETS:Mbuild-tools} && !defined(BOOTSTRAPPING)
