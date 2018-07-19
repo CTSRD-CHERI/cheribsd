@@ -41,6 +41,18 @@
  * }
  * CHERI CHANGES END
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180719,
+ *   "target_type": "test",
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "Missing mode to open with O_CREAT"
+ * }
+ * CHERI CHANGES END
+ */
 #include <sys/cdefs.h>
 __RCSID("$NetBSD: t_mprotect.c,v 1.4 2016/05/28 14:34:49 christos Exp $");
 
@@ -129,7 +141,7 @@ ATF_TC_BODY(mprotect_access, tc)
 	size_t i;
 	int fd;
 
-	fd = open(path, O_RDONLY | O_CREAT);
+	fd = open(path, O_RDONLY | O_CREAT, 0600);
 	ATF_REQUIRE(fd >= 0);
 
 	/*
