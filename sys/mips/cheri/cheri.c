@@ -99,7 +99,8 @@ CTASSERT(sizeof(struct chericap) == 32);
 CTASSERT(sizeof(struct cheri_object) == 64);
 #endif
 
-static void * __capability userspace_cap;
+/* Set to -1 to prevent it from being zeroed with the rest of BSS */
+void * __capability userspace_cap = (void * __capability)(intcap_t)-1;
 static void * __capability user_sealcap;
 
 /*
@@ -130,16 +131,8 @@ cheri_cpu_startup(void)
 #endif
 
 	/*
-	 * Create a capability covering all of userspace from which to
-	 * derive new capabilities in execve(), etc.
-	 *
-	 * XXX-BD: A hardline, no-exceptions W^X implementation would split
-	 * the userspace capability here.
-	 *
-	 * XXX-BD: This is actually an ABI property and should probably
-	 * per sysent.
-	 *
-	 * XXX-BD: this should happen earlier in startup.
+	 * Documentary assertions for userspace_cap.  Default data and
+	 * code need to be identically sized or we'll need seperate caps.
 	 */
 	_Static_assert(CHERI_CAP_USER_DATA_BASE == CHERI_CAP_USER_CODE_BASE,
 	    "Code and data bases differ");
@@ -149,10 +142,6 @@ cheri_cpu_startup(void)
 	    "Data offset is non-zero");
 	_Static_assert(CHERI_CAP_USER_CODE_OFFSET == 0,
 	    "Code offset is non-zero");
-	userspace_cap = cheri_andperm(cheri_csetbounds(
-	    cheri_setoffset(cheri_getkdc(), CHERI_CAP_USER_DATA_BASE),
-	    CHERI_CAP_USER_DATA_LENGTH),
-	    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
 
 	/*
 	 * Create a capability for userspace to seal capabilities with.

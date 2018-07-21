@@ -72,6 +72,7 @@
 
 #if defined(CPU_CHERI)
 #include <machine/cheriasm.h>
+#include <machine/cherireg.h>
 .set cheri_sysregs_accessible	# Don't warn about uses of c27-c30
 #endif
 
@@ -150,6 +151,26 @@ VECTOR(_locore, unknown)
 	COP0_SYNC
 
 #if defined(CPU_CHERI)
+	/*
+	 * Create a capability covering all of userspace from which to
+	 * derive new capabilities in execve(), etc.
+	 *
+	 * XXX-BD: A hardline, no-exceptions W^X implementation would split
+	 * the userspace capability here.
+	 *
+	 * XXX-BD: This is actually an ABI property and should probably
+	 * per sysent.
+	 */
+	cgetdefault CHERI_REG_KR1C
+	REG_LI	t0, CHERI_CAP_USER_DATA_BASE
+	csetoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	REG_LI	t0, CHERI_CAP_USER_DATA_LENGTH
+	csetbounds	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	REG_LI	t0, CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS
+	candperm	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	PTR_LA	t0, _C_LABEL(userspace_cap)
+	csc	CHERI_REG_KR1C, t0, 0($ddc)
+
 	/*
 	 * On CHERI MIPS, preserve the kernel's data segment context for use
 	 * in exception handlers.
