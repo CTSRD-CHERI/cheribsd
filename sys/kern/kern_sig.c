@@ -3421,6 +3421,9 @@ corefile_open(const char *comm, uid_t uid, pid_t pid, struct thread *td,
 	char *hostname, *name;
 	int indexpos, i, error, cmode, flags, oflags;
 
+	static struct timeval lastfail;
+	static int curfail;
+
 	hostname = NULL;
 	format = corefilename;
 	name = malloc(MAXPATHLEN, M_TEMP, M_WAITOK | M_ZERO);
@@ -3517,6 +3520,11 @@ corefile_open(const char *comm, uid_t uid, pid_t pid, struct thread *td,
 	error = vn_open_cred(&nd, &flags, cmode, oflags, td->td_ucred, NULL);
 out:
 	if (error) {
+		if (ppsratecheck(&lastfail, &curfail, 1)) {
+			log(LOG_ERR, "pid %d (%s), uid (%u): Failed to open "
+			    "coredump file '%s', error=%d\n", pid, comm, uid,
+			    name, error);
+		}
 #ifdef AUDIT
 		audit_proc_coredump(td, name, error);
 #endif
