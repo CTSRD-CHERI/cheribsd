@@ -36,7 +36,7 @@ SEARCH_DIR(/usr/lib);
 SECTIONS
 {
   /* Read-only sections, merged into text segment: */
-  . = KERNLOADADDR + SIZEOF_HEADERS;
+  . = KERNLOADADDR + SIZEOF_HEADERS - 0x8000000000000000;
   .text      :
   {
     *(.trap)

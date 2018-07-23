@@ -76,17 +76,18 @@
 #define	MIPS_KSEG0_PHYS_MASK		(0x1fffffff)
 #define	MIPS_XKPHYS_LARGEST_PHYS	(0x10000000000)  /* 40 bit PA */
 #define	MIPS_XKPHYS_PHYS_MASK		(0x0ffffffffff)
+#define	CHERI_OFFSET			(0x8000000000000000)
 
 #ifndef LOCORE
 #define	MIPS_KUSEG_START		0x00000000
-#define	MIPS_KSEG0_START		((intptr_t)(int32_t)0x80000000)
-#define	MIPS_KSEG0_END			((intptr_t)(int32_t)0x9fffffff)
-#define	MIPS_KSEG1_START		((intptr_t)(int32_t)0xa0000000)
-#define	MIPS_KSEG1_END			((intptr_t)(int32_t)0xbfffffff)
-#define	MIPS_KSSEG_START		((intptr_t)(int32_t)0xc0000000)
-#define	MIPS_KSSEG_END			((intptr_t)(int32_t)0xdfffffff)
-#define	MIPS_KSEG3_START		((intptr_t)(int32_t)0xe0000000)
-#define	MIPS_KSEG3_END			((intptr_t)(int32_t)0xffffffff)
+#define	MIPS_KSEG0_START		((intptr_t)(int32_t)0x80000000 - CHERI_OFFSET)
+#define	MIPS_KSEG0_END			((intptr_t)(int32_t)0x9fffffff - CHERI_OFFSET)
+#define	MIPS_KSEG1_START		((intptr_t)(int32_t)0xa0000000 - CHERI_OFFSET)
+#define	MIPS_KSEG1_END			((intptr_t)(int32_t)0xbfffffff - CHERI_OFFSET)
+#define	MIPS_KSSEG_START		((intptr_t)(int32_t)0xc0000000 - CHERI_OFFSET)
+#define	MIPS_KSSEG_END			((intptr_t)(int32_t)0xdfffffff - CHERI_OFFSET)
+#define	MIPS_KSEG3_START		((intptr_t)(int32_t)0xe0000000 - CHERI_OFFSET)
+#define	MIPS_KSEG3_END			((intptr_t)(int32_t)0xffffffff - CHERI_OFFSET)
 #define MIPS_KSEG2_START		MIPS_KSSEG_START
 #define MIPS_KSEG2_END			MIPS_KSSEG_END
 #endif
@@ -437,15 +438,15 @@
  *
  * Common vectors:  reset and UTLB miss.
  */
-#define	MIPS_RESET_EXC_VEC	((intptr_t)(int32_t)0xBFC00000)
-#define	MIPS_UTLB_MISS_EXC_VEC	((intptr_t)(int32_t)0x80000000)
+#define	MIPS_RESET_EXC_VEC	((intptr_t)(int32_t)0xBFC00000 - CHERI_OFFSET)
+#define	MIPS_UTLB_MISS_EXC_VEC	((intptr_t)(int32_t)0x80000000 - CHERI_OFFSET)
 
 /*
  * MIPS-III exception vectors
  */
-#define	MIPS_XTLB_MISS_EXC_VEC ((intptr_t)(int32_t)0x80000080)
-#define	MIPS_CACHE_ERR_EXC_VEC ((intptr_t)(int32_t)0x80000100)
-#define	MIPS_GEN_EXC_VEC	((intptr_t)(int32_t)0x80000180)
+#define	MIPS_XTLB_MISS_EXC_VEC ((intptr_t)(int32_t)0x80000080 - CHERI_OFFSET)
+#define	MIPS_CACHE_ERR_EXC_VEC ((intptr_t)(int32_t)0x80000100 - CHERI_OFFSET)
+#define	MIPS_GEN_EXC_VEC	((intptr_t)(int32_t)0x80000180 - CHERI_OFFSET)
 
 /*
  * MIPS32/MIPS64 (and some MIPS3) dedicated interrupt vector.

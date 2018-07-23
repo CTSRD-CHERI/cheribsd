@@ -152,6 +152,49 @@ VECTOR(_locore, unknown)
 
 #if defined(CPU_CHERI)
 	/*
+	 * Grab the initial omnipotent capability
+	 */
+	cgetdefault	CHERI_REG_KR2C
+
+	/*
+	 * Adjust DDC to cover only kernel addresses.
+	 */
+	cmove		CHERI_REG_KR1C, CHERI_REG_KR2C
+	REG_LI		t0, CHERI_CAP_KERN_BASE
+	csetoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	REG_LI		t0, CHERI_CAP_KERN_LENGTH
+	csetbounds	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	REG_LI		t0, CHERI_CAP_KERN_PERMS
+	candperm	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	csetdefault	CHERI_REG_KR1C
+	/* Store a copy in KDC for exception handlers */
+	csetkdc		CHERI_REG_KR1C
+
+	/*
+	 * Create an adjusted PCC and store in KDC.
+	 */
+	cgetpcc		CHERI_REG_KR1C
+	REG_LI		t0, CHERI_CAP_KERN_BASE
+	csetoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	REG_LI		t0, CHERI_CAP_KERN_LENGTH
+	csetbounds	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	REG_LI		t0, CHERI_CAP_KERN_PERMS
+	candperm	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	/* Store a copy in KCC for exception handlers */
+	csetkcc		CHERI_REG_KR1C
+
+	/* Install the new PCC */
+	REG_LI		t0, CHERI_CAP_KERN_BASE
+	cgetpcc		CHERI_REG_C29
+	cgetoffset	t1, CHERI_REG_C29			# 1
+	PTR_SUBU	t1, t1, t0				# 2
+	PTR_ADDIU	t1, t1, (4 * 7)				# 3
+	csetoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, t1	# 4
+	cjr		CHERI_REG_KR1C				# 5
+	nop							# 6
+	# 7 (land here)
+
+	/*
 	 * Create a capability covering all of userspace from which to
 	 * derive new capabilities in execve(), etc.
 	 *
@@ -161,7 +204,7 @@ VECTOR(_locore, unknown)
 	 * XXX-BD: This is actually an ABI property and should probably
 	 * per sysent.
 	 */
-	cgetdefault CHERI_REG_KR1C
+	cmove		CHERI_REG_KR1C, CHERI_REG_KR2C
 	REG_LI	t0, CHERI_CAP_USER_DATA_BASE
 	csetoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
 	REG_LI	t0, CHERI_CAP_USER_DATA_LENGTH
@@ -174,7 +217,7 @@ VECTOR(_locore, unknown)
 	/*
 	 * Create a capability for userspace to seal capabilities with.
 	 */
-	cgetdefault CHERI_REG_KR1C
+	cmove		CHERI_REG_KR1C, CHERI_REG_KR2C
 	REG_LI	t0, CHERI_SEALCAP_USERSPACE_BASE
 	csetoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
 	REG_LI	t0, CHERI_SEALCAP_USERSPACE_LENGTH
@@ -191,10 +234,6 @@ VECTOR(_locore, unknown)
 	 * XXXRW: Do we want to rely on default initialisation of all CP2
 	 * registers here?
 	 */
-	cgetpcc	CHERI_REG_KR1C		# Preserve $kcc
-	csetkcc	CHERI_REG_KR1C
-	cgetdefault	CHERI_REG_KR1C	# Preserve $kdc
-	csetkdc	CHERI_REG_KR1C
 #endif
 
 #if defined(CPU_BERI) || defined(CPU_QEMU_MALTA)
@@ -215,7 +254,8 @@ VECTOR(_locore, unknown)
 	 */
 #ifdef YAMON
 	/* Save YAMON boot environment pointer */
-	sw	a2, _C_LABEL(fenvp)
+	PTR_LA  t0, _C_LABEL(fenvp)
+	sw	a2, 0(t0)
 #endif
 
 #if defined(CPU_CNMIPS) && defined(SMP)
@@ -257,6 +297,15 @@ VECTOR(_locore, unknown)
 	PTR_LA	gp, _C_LABEL(_gp)
 
 	/* Call the platform-specific startup code. */
+#ifdef CPU_CHERI
+	/*
+	 * Assume that a1 and a2 are pointers that require adjustment
+	 * to match kernel DDC.  This is true on BERI and MALTA.
+	 */
+	REG_LI		t0, CHERI_CAP_KERN_BASE
+	PTR_SUBU	a1, a1, t0
+	PTR_SUBU	a2, a2, t0
+#endif
 	PTR_LA	t9, _C_LABEL(platform_start)
 	jalr	t9
 	nop

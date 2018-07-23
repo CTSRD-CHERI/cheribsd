@@ -349,7 +349,7 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 	if (bootverbose) {
 		printf("cmd line: ");
 		for (i = 0; i < argc; i++)
-			printf("%s ", (char*)(intptr_t)argv[i]);
+			printf("%s ", (char*)((intptr_t)argv[i] - CHERI_OFFSET));
 		printf("\n");
 	}
 
@@ -362,8 +362,8 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 	for (i = 0; envp[i]; i += 2) {
 		const char *a, *v;
 
-		a = (char *)(intptr_t)envp[i];
-		v = (char *)(intptr_t)envp[i+1];
+		a = (char *)((intptr_t)envp[i] - CHERI_OFFSET);
+		v = (char *)((intptr_t)envp[i+1] - CHERI_OFFSET);
 
 		if (bootverbose)
 			printf("\t%s = %s\n", a, v);

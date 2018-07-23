@@ -411,10 +411,12 @@ cpu_identify(void)
 	}
 	printf(" processor v%d.%d\n", cpuinfo.cpu_rev, cpuinfo.cpu_impl);
 
+#if 0
 #ifdef CPU_QEMU_MALTA
 	if (cpuinfo.cpu_rev < 2)
 		panic("%s: QEMU-CHERI is too old to run this kernel. Update "
 		    "QEMU before rebooting or comment out this check!", __func__);
+#endif
 #endif
 
 	printf("  MMU: ");

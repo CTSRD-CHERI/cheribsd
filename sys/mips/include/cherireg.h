@@ -253,8 +253,10 @@
  */
 #define	CHERI_CAP_KERN_PERMS						\
 	(CHERI_PERMS_SWALL | CHERI_PERMS_HWALL)
-#define	CHERI_CAP_KERN_BASE		0x0
-#define	CHERI_CAP_KERN_LENGTH		0xffffffffffffffff
+#define	CHERI_CAP_KERN_BASE		0x8000000000000000
+/* Not VM_MAX_KERNEL_ADDRESS due to kernel at top of virtual memory */
+#define	CHERI_CAP_KERN_LENGTH						\
+	(VM_MAX_ADDRESS - CHERI_CAP_KERN_BASE)
 #define	CHERI_CAP_KERN_OFFSET		0x0
 
 /*
@@ -419,7 +421,7 @@
 /*
  * Location of the CHERI CCall/CReturn software-path exception vector.
  */
-#define	CHERI_CCALL_EXC_VEC	((intptr_t)(int32_t)0x80000280)
+#define	CHERI_CCALL_EXC_VEC	((intptr_t)(int32_t)0x80000280 - CHERI_OFFSET)
 
 #if CHERICAP_SIZE == 32
 #define	CHERI_ALIGN_SHIFT(l)	0ULL
