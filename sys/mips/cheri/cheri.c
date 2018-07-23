@@ -101,7 +101,7 @@ CTASSERT(sizeof(struct cheri_object) == 64);
 
 /* Set to -1 to prevent it from being zeroed with the rest of BSS */
 void * __capability userspace_cap = (void * __capability)(intcap_t)-1;
-static void * __capability user_sealcap;
+void * __capability user_sealcap = (void * __capability)(intcap_t)-1;
 
 /*
  * For now, all we do is declare what we support, as most initialisation took
@@ -142,13 +142,6 @@ cheri_cpu_startup(void)
 	    "Data offset is non-zero");
 	_Static_assert(CHERI_CAP_USER_CODE_OFFSET == 0,
 	    "Code offset is non-zero");
-
-	/*
-	 * Create a capability for userspace to seal capabilities with.
-	 */
-	cheri_capability_set(&user_sealcap, CHERI_SEALCAP_USERSPACE_PERMS,
-	    CHERI_SEALCAP_USERSPACE_BASE, CHERI_SEALCAP_USERSPACE_LENGTH,
-	    CHERI_SEALCAP_USERSPACE_OFFSET);
 
 	/*
 	 * XXX-BD: KDC may now be reduced.

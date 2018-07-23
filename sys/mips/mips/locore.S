@@ -172,6 +172,19 @@ VECTOR(_locore, unknown)
 	csc	CHERI_REG_KR1C, t0, 0($ddc)
 
 	/*
+	 * Create a capability for userspace to seal capabilities with.
+	 */
+	cgetdefault CHERI_REG_KR1C
+	REG_LI	t0, CHERI_SEALCAP_USERSPACE_BASE
+	csetoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	REG_LI	t0, CHERI_SEALCAP_USERSPACE_LENGTH
+	csetbounds	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	REG_LI	t0, CHERI_SEALCAP_USERSPACE_PERMS
+	candperm	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	PTR_LA	t0, _C_LABEL(user_sealcap)
+	csc	CHERI_REG_KR1C, t0, 0($ddc)
+
+	/*
 	 * On CHERI MIPS, preserve the kernel's data segment context for use
 	 * in exception handlers.
 	 *
