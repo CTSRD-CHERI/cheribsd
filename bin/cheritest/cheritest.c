@@ -1616,6 +1616,12 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Test alignment of TLS 4K array",
 	  .ct_func = test_tls_align_4k, },
 
+#ifdef CHERITHREAD_TESTS
+	{ .ct_name = "test_tls_threads",
+	  .ct_desc = "Test TLS across threads",
+	  .ct_func = test_tls_threads, },
+#endif
+
 	/*
 	 * zlib tests.
 	 */

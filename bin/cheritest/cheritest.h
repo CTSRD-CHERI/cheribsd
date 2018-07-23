@@ -469,6 +469,9 @@ DECLARE_CHERI_TEST(test_tls_align_4k);
 DECLARE_CHERI_TEST(test_tls_align_cap);
 DECLARE_CHERI_TEST(test_tls_align_ptr);
 
+/* cheritest_tls_threads.c */
+DECLARE_CHERI_TEST(test_tls_threads);
+
 /* cheritest_vm.c */
 DECLARE_CHERI_TEST(cheritest_vm_tag_mmap_anon);;
 DECLARE_CHERI_TEST(cheritest_vm_tag_shm_open_anon_shared);

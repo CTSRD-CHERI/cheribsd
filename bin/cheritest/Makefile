@@ -99,7 +99,9 @@ NO_WERROR=	YES
 
 .ifdef CHERITHREAD_TESTS
 LIBADD+=	pthread
-SRCS+=		cheritest_libcheri_pthreads.c
+SRCS+=		cheritest_libcheri_pthreads.c				\
+		cheritest_tls_threads.c
+
 .endif
 
 .ifdef BOOTSTRAPPING
