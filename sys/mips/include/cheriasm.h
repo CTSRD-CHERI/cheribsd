@@ -152,8 +152,9 @@
 	/* If returning to userspace, restore saved user $ddc. */	\
 	csetdefault	CHERI_REG_SEC0; 				\
 	b	66f;							\
-	/* TODO: clear c29-31 when returning to userspace? */		\
-	nop;								\
+	/* Clear c29-c31 when returning to userspace */ 		\
+	CClearHi (CHERI_CLEAR_CAPHI_C29 | CHERI_CLEAR_CAPHI_C30 |	\
+	    CHERI_CLEAR_CAPHI_C31); /* delay slot */			\
 65:									\
 	/* If returning to kernelspace, reinstall kernel code $pcc. */	\
 	/*								\
