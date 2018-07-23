@@ -397,6 +397,9 @@ cpu_identify(void)
 	case MIPS_PRID_CID_CAVIUM:
 		printf("Cavium");
 		break;
+	case MIPS_PRID_CID_QEMU_CHERI:
+		printf("QEMU-CHERI");
+		break;
 	case MIPS_PRID_CID_INGENIC:
 	case MIPS_PRID_CID_INGENIC2:
 		printf("Ingenic XBurst");
@@ -407,6 +410,12 @@ cpu_identify(void)
 		break;
 	}
 	printf(" processor v%d.%d\n", cpuinfo.cpu_rev, cpuinfo.cpu_impl);
+
+#ifdef CPU_QEMU_MALTA
+	if (cpuinfo.cpu_rev < 2)
+		panic("%s: QEMU-CHERI is too old to run this kernel. Update "
+		    "QEMU before rebooting or comment out this check!", __func__);
+#endif
 
 	printf("  MMU: ");
 	if (cpuinfo.tlb_type == MIPS_MMU_NONE) {
