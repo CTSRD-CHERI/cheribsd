@@ -501,7 +501,7 @@ sw2:
  */
 #ifdef CPU_CHERI
 	# Get TLS address
-	clc	$c3, a1, TD_MDTLS(CHERI_REG_KDC)
+	clc	$c3, a1, TD_MDTLS($ddc)
 	cgetoffset t0, $c3
 	cgetbase t1, $c3
 	PTR_ADDU t0, t0, t1

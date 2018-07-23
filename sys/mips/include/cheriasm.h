@@ -255,11 +255,11 @@
  */
 #define	SAVE_U_PCB_CHERIKFRAME_CREG(creg, offs, base)			\
 	csc		creg, base, (U_PCB_CHERIKFRAME +		\
-			    CHERICAP_SIZE * offs)(CHERI_REG_KDC)
+			    CHERICAP_SIZE * offs)($ddc)
 
 #define	RESTORE_U_PCB_CHERIKFRAME_CREG(creg, offs, base)		\
 	clc		creg, base, (U_PCB_CHERIKFRAME +		\
-			    CHERICAP_SIZE * offs)(CHERI_REG_KDC)
+			    CHERICAP_SIZE * offs)($ddc)
 
 /*
  * Macros to save (and restore) callee-save capability registers when
