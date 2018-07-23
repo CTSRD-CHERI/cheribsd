@@ -195,8 +195,8 @@ VECTOR(_locore, unknown)
 	 * registers to the general purpose register file so for now set up
 	 * this mirroring now and assume only DDC and PCC are ambient caps
 	 */
-	cgetpcc	CHERI_REG_KCC		# Preserve $kcc
-	csetkcc	CHERI_REG_KCC
+	cgetpcc	CHERI_REG_KR1C		# Preserve $kcc
+	csetkcc	CHERI_REG_KR1C
 	cgetdefault	CHERI_REG_KDC	# Preserve $kdc
 	csetkdc	CHERI_REG_KDC
 #endif
