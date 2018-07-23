@@ -72,9 +72,9 @@
 /* 5 exception-context registers -- with names where appropriate. */
 #define	CHERI_REG_KR1C	$c27	/* Kernel exception handling capability (1). */
 #define	CHERI_REG_KR2C	$c28	/* Kernel exception handling capability (2). */
-#define	CHERI_REG_KCC	$c29	/* Kernel code capability. */
-#define	CHERI_REG_KDC	$c30	/* Kernel data capability. */
-#define	CHERI_REG_EPCC	$c31	/* Exception program counter capability. */
+#define	CHERI_REG_C29	$c29	/* Former Kernel code capability. */
+#define	CHERI_REG_C30	$c30	/* Former Kernel data capability. */
+#define	CHERI_REG_C31	$c31	/* Former Exception program counter cap. */
 
 /*
  * In kernel inline assembly, employee these two caller-save registers.  This
@@ -152,9 +152,7 @@
 	/* If returning to userspace, restore saved user $ddc. */	\
 	csetdefault	CHERI_REG_SEC0; 				\
 	b	66f;							\
-	/* TODO: clear c29-31 when returning to userspace		\
-	 * CClearHi (CHERI_CLEAR_CAPHI_KCC | CHERI_CLEAR_CAPHI_KDC	\
-	 * 	CHERI_CLEAR_CAPHI_EPCC); */				\
+	/* TODO: clear c29-31 when returning to userspace? */		\
 	nop;								\
 65:									\
 	/* If returning to kernelspace, reinstall kernel code $pcc. */	\
@@ -364,9 +362,9 @@
 #define CHERI_CLEAR_CAPHI_IDC  (1 << (26 - 16))
 #define CHERI_CLEAR_CAPHI_KR1C (1 << (27 - 16))
 #define CHERI_CLEAR_CAPHI_KR2C (1 << (28 - 16))
-#define CHERI_CLEAR_CAPHI_KCC  (1 << (29 - 16))
-#define CHERI_CLEAR_CAPHI_KDC  (1 << (30 - 16))
-#define CHERI_CLEAR_CAPHI_EPCC (1 << (31 - 16))
+#define CHERI_CLEAR_CAPHI_C29  (1 << (29 - 16))
+#define CHERI_CLEAR_CAPHI_C30  (1 << (30 - 16))
+#define CHERI_CLEAR_CAPHI_C31  (1 << (31 - 16))
 
 /* Ensure that this is kept in sync with CHERI_REG_SEC0. */
 #define	CHERI_CLEAR_CAPHI_SEC0	CHERI_CLEAR_CAPHI_KR2C
