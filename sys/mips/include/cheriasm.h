@@ -127,8 +127,8 @@
 	nop;								\
 	/* Save user $ddc; install kernel $ddc. */			\
 	cgetdefault	CHERI_REG_SEC0;					\
-	cgetkdc		CHERI_REG_KDC;					\
-	csetdefault	CHERI_REG_KDC;					\
+	cgetkdc		CHERI_REG_KR1C;					\
+	csetdefault	CHERI_REG_KR1C;					\
 64:
 
 /*

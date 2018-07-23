@@ -197,8 +197,8 @@ VECTOR(_locore, unknown)
 	 */
 	cgetpcc	CHERI_REG_KR1C		# Preserve $kcc
 	csetkcc	CHERI_REG_KR1C
-	cgetdefault	CHERI_REG_KDC	# Preserve $kdc
-	csetkdc	CHERI_REG_KDC
+	cgetdefault	CHERI_REG_KR1C	# Preserve $kdc
+	csetkdc	CHERI_REG_KR1C
 #endif
 
 #if defined(CPU_BERI) || defined(CPU_QEMU_MALTA)
