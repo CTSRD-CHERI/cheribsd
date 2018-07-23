@@ -416,6 +416,12 @@ kern_reboot(int howto)
 
 	/* Now that we're going to really halt the system... */
 	EVENTHANDLER_INVOKE(shutdown_final, howto);
+#ifdef CPU_QEMU_MALTA
+	printf("%s: shutdown did not work, attempting mtc0 $zero, $23\n", __func__);
+	for (int i = 0; i < 100; i++) {
+		__asm__ volatile("li $2, 1\n\tmtc0 $2, $23");
+	}
+#endif
 
 	for(;;) ;	/* safety against shutdown_reset not working */
 	/* NOTREACHED */
