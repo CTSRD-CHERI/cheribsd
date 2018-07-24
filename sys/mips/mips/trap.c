@@ -431,7 +431,8 @@ cpu_fetch_syscall_args(struct thread *td)
 	td->td_pcb->pcb_tpc = sa->trapframe->pc; /* Remember if restart */
 	if (DELAYBRANCH(sa->trapframe->cause))	 /* Check BD bit */
 		locr0->pc = MipsEmulateBranch(locr0, sa->trapframe->pc, 0,
-		    cpuinfo.badinstr_p_reg ? -1 : 0);
+		    sa->trapframe->badinstr_p.inst ?
+		        (uintptr_t)&sa->trapframe->badinstr_p.inst : 0);
 	else
 		locr0->pc += sizeof(int);
 	sa->code = locr0->v0;
@@ -618,6 +619,17 @@ trap(struct trapframe *trapframe)
 	} else {
 		usermode = 0;
 	}
+	/*
+	 * XXXAR: It should not be possible to get another trap before here so
+	 * we can assume BadInstr/BadInstrP are still correct.
+	 * XXXAR: We use a union for BadInstr/BadInstrP instead of register_t to
+	 * avoid problems in case some CPU wrongly sign extends the register.
+	 * This was the case for QEMU until recently.
+	 */
+	trapframe->badinstr.inst = cpuinfo.badinstr_reg ? mips_rd_badinstr(): 0;
+	trapframe->badinstr_p.inst = 0;
+	if (DELAYBRANCH(trapframe->cause) && cpuinfo.badinstr_p_reg)
+		trapframe->badinstr_p.inst = mips_rd_badinstr_p();
 
 	/*
 	 * Enable hardware interrupts if they were on before the trap. If it
@@ -1008,7 +1020,8 @@ dofault:
 
 			if (DELAYBRANCH(trapframe->cause)) {	/* Check BD bit */
 				locr0->pc = MipsEmulateBranch(locr0, trapframe->pc, 0,
-				    cpuinfo.badinstr_p_reg ? -1 : 0);
+				    trapframe->badinstr_p.inst ?
+				        (uintptr_t)&trapframe->badinstr_p.inst : 0);
 			} else {
 				locr0->pc += sizeof(int);
 			}
@@ -1021,11 +1034,11 @@ dofault:
 		{
 			InstFmt inst;
 #ifdef CPU_CHERI
-			KASSERT(cpuinfo.badinstr_reg,
+			KASSERT(cpuinfo.badinstr_reg && trapframe->badinstr.inst != 0,
 			    ("CHERI requires BadInstr register"));
 #endif
-			if (cpuinfo.badinstr_reg)
-				inst.word = mips_rd_badinstr();
+			if (trapframe->badinstr.inst != 0) /* NOP can never cause RES_INST */
+				inst.word = trapframe->badinstr.inst;
 			else /* Loading userspace memory is a bad idea! */
 				inst = *(InstFmt *)(intptr_t)trapframe->pc;
 			switch (inst.RType.op) {
@@ -1359,15 +1372,10 @@ MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
 	(InstPtr + 4 + ((short)inst.IType.imm << 2))
 
 #ifdef CPU_CHERI
-	KASSERT(instptr == -1, ("CHERI should use BadInstrP!"));
+	KASSERT(instptr == (uintptr_t)&framePtr->badinstr_p.inst,
+	    ("CHERI should use BadInstrP!"));
 #endif
-	if (instptr == -1) {
-		KASSERT(cpuinfo.badinstr_p_reg, ("Need BadInstrP register"));
-		inst.word = mips_rd_badinstr_p();
-	} else if (instptr) {
-#ifdef CPU_CHERI
-		panic("Should not end up here for CPU_CHERI");
-#endif
+	if (instptr) {
 		if (instptr < MIPS_KSEG0_START)
 			inst.word = fuword32((void *)instptr);
 		else
@@ -1549,22 +1557,18 @@ log_frame_dump(struct trapframe *frame)
 	printf("cause: %#jx; pc: %#jx\n",
 	    (intmax_t)(uint32_t)frame->cause, (intmax_t)frame->pc);
 
-	if (cpuinfo.badinstr_reg) {
-		/* XXXAR: Can BadInstr be clobbered by another trap before here? */
-		uint32_t inst = mips_rd_badinstr();
-		printf("badinstr: %#x ", inst);
+	if (frame->badinstr.inst != 0) {
+		printf("BadInstr: %#x ", frame->badinstr.inst);
 #ifdef DDB
-		db_disasm((db_addr_t)&inst, 0);
+		db_disasm((db_addr_t)&frame->badinstr.inst, 0);
 #else
 		printf("\n");
 #endif
 	}
-	if (DELAYBRANCH(frame->cause) && cpuinfo.badinstr_p_reg) {
-		/* XXXAR: Can BadInstrP be clobbered by another trap before here? */
-		uint32_t inst = mips_rd_badinstr_p();
-		printf("badinstrp: %#x ", inst);
+	if (DELAYBRANCH(frame->cause) && frame->badinstr_p.inst != 0) {
+		printf("BadInstrP: %#x ", frame->badinstr_p.inst);
 #ifdef DDB
-		db_disasm((db_addr_t)&inst, 0);
+		db_disasm((db_addr_t)&frame->badinstr_p.inst, 0);
 #else
 		printf("\n");
 #endif
@@ -1852,12 +1856,12 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, re
 	 * succeeded, but a malicious program could generate an alignment trap and
 	 * then substitute a different instruction...
 	 */
-	KASSERT(cpuinfo.badinstr_reg, ("CHERI requires BadInstr register"));
+	KASSERT(frame->badinstr.inst != 0, ("CHERI requires BadInstr register"));
 #endif
-	if (cpuinfo.badinstr_reg)
-		inst = mips_rd_badinstr();
-	else
-		inst = *((u_int32_t *)(intptr_t)pc);;
+	if (frame->badinstr.inst != 0)
+		inst = frame->badinstr.inst;
+	else	/* Dereferencing a userspace pointer is stupid... */
+		inst = *((u_int32_t *)(intptr_t)pc);
 	src_regno = MIPS_INST_RT(inst);
 
 	/*
@@ -2036,7 +2040,8 @@ emulate_unaligned_access(struct trapframe *frame, int mode)
 		if (access_type) {
 			if (DELAYBRANCH(frame->cause))
 				frame->pc = MipsEmulateBranch(frame, frame->pc,
-				    0, cpuinfo.badinstr_p_reg ? -1 : 0);
+				    0, frame->badinstr_p.inst ?
+				        (uintptr_t)&frame->badinstr_p.inst : 0);
 			else
 				frame->pc += 4;
 

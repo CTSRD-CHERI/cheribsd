@@ -529,6 +529,7 @@ SlowFault:
 	SAVE_REG(a0, SR, sp)		;\
 	SAVE_REG(a1, CAUSE, sp)		;\
 	SAVE_REG(a2, BADVADDR, sp)	;\
+	/* TODO: should we clear badinstr + badinstrp here? */ \
 	SAVE_CHERI(t0, t1)		;\
 	move	t0, ra			;\
 	move	ra, a3			;\
