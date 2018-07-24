@@ -43,18 +43,20 @@
 
 #include "cheritest.h"
 
-extern int _DYNAMIC __attribute__((weak));
-
 /*
  * Tests to ensure that Thread-Local Storage (TLS) works as expected.
  */
+#ifdef CHERI_DYNAMIC_TESTS
 __thread int tls_gd __attribute__((tls_model("global-dynamic"))) = 1;
 __thread int tls_ld __attribute__((tls_model("local-dynamic"))) = 2;
+#endif
 __thread int tls_ie __attribute__((tls_model("initial-exec"))) = 3;
 __thread int tls_le __attribute__((tls_model("local-exec"))) = 4;
 
+#ifdef CHERI_DYNAMIC_TESTS
 int *thr_tls_gd;
 int *thr_tls_ld;
+#endif
 int *thr_tls_ie;
 int *thr_tls_le;
 
@@ -65,12 +67,12 @@ static int thread_done;
 static void *
 test_tls_threads_get_vars(void *arg __unused)
 {
-	if (&_DYNAMIC) {
-		thr_tls_gd = &tls_gd;
-		++tls_gd;
-		thr_tls_ld = &tls_ld;
-		++tls_ld;
-	}
+#ifdef CHERI_DYNAMIC_TESTS
+	thr_tls_gd = &tls_gd;
+	++tls_gd;
+	thr_tls_ld = &tls_ld;
+	++tls_ld;
+#endif
 	thr_tls_ie = &tls_ie;
 	++tls_ie;
 	thr_tls_le = &tls_le;
@@ -96,18 +98,22 @@ void
 test_tls_threads(const struct cheri_test *ctp __unused)
 {
 	pthread_t thread;
-	int *my_tls_gd, *my_tls_ld, *my_tls_ie, *my_tls_le;
-	int thr_tls_gd_val, thr_tls_ld_val, thr_tls_ie_val, thr_tls_le_val;
+#ifdef CHERI_DYNAMIC_TESTS
+	int *my_tls_gd, *my_tls_ld;
+	int thr_tls_gd_val, thr_tls_ld_val;
+#endif
+	int *my_tls_ie, *my_tls_le;
+	int thr_tls_ie_val, thr_tls_le_val;
 	size_t my_bottom, my_top, thr_bottom, thr_top;
 
 	if (pthread_create(&thread, NULL,
 	    test_tls_threads_get_vars, NULL) != 0)
 		cheritest_failure_err("pthread_create");
 
-	if (&_DYNAMIC) {
-		my_tls_gd = &tls_gd;
-		my_tls_ld = &tls_ld;
-	}
+#ifdef CHERI_DYNAMIC_TESTS
+	my_tls_gd = &tls_gd;
+	my_tls_ld = &tls_ld;
+#endif
 	my_tls_ie = &tls_ie;
 	my_tls_le = &tls_le;
 
@@ -118,10 +124,10 @@ test_tls_threads(const struct cheri_test *ctp __unused)
 			cheritest_failure_err("pthread_cond_wait");
 	} while (thread_done == 0);
 
-	if (&_DYNAMIC) {
-		thr_tls_gd_val = *thr_tls_gd;
-		thr_tls_ld_val = *thr_tls_ld;
-	}
+#ifdef CHERI_DYNAMIC_TESTS
+	thr_tls_gd_val = *thr_tls_gd;
+	thr_tls_ld_val = *thr_tls_ld;
+#endif
 	thr_tls_ie_val = *thr_tls_ie;
 	thr_tls_le_val = *thr_tls_le;
 
@@ -131,24 +137,28 @@ test_tls_threads(const struct cheri_test *ctp __unused)
 	if (pthread_mutex_unlock(&lock) != 0)
 		cheritest_failure_err("pthread_mutex_unlock");
 
-	if (&_DYNAMIC && *my_tls_gd != 1)
+#ifdef CHERI_DYNAMIC_TESTS
+	if (*my_tls_gd != 1)
 		cheritest_failure_errx("Bad *my_tls_gd (got: %d; expected 1)",
 		    *my_tls_gd);
-	if (&_DYNAMIC && *my_tls_ld != 2)
+	if (*my_tls_ld != 2)
 		cheritest_failure_errx("Bad *my_tls_ld (got: %d; expected 2)",
 		    *my_tls_ld);
+#endif
 	if (*my_tls_ie != 3)
 		cheritest_failure_errx("Bad *my_tls_ie (got: %d; expected 3)",
 		    *my_tls_ie);
 	if (*my_tls_le != 4)
 		cheritest_failure_errx("Bad *my_tls_le (got: %d; expected 4)",
 		    *my_tls_le);
-	if (&_DYNAMIC && thr_tls_gd_val != 2)
+#ifdef CHERI_DYNAMIC_TESTS
+	if (thr_tls_gd_val != 2)
 		cheritest_failure_errx("Bad *thr_tls_gd (got: %d; expected 2)",
 		    thr_tls_gd_val);
-	if (&_DYNAMIC && thr_tls_ld_val != 3)
+	if (thr_tls_ld_val != 3)
 		cheritest_failure_errx("Bad *thr_tls_ld (got: %d; expected 3)",
 		    thr_tls_ld_val);
+#endif
 	if (thr_tls_ie_val != 4)
 		cheritest_failure_errx("Bad *thr_tls_ie (got: %d; expected 4)",
 		    thr_tls_ie_val);
@@ -170,10 +180,10 @@ test_tls_threads(const struct cheri_test *ctp __unused)
 		    "(my "#_var": %#p ; thread's "#_var": %#p)",	\
 		    my_##_var, thr_##_var);
 
-	if (&_DYNAMIC) {
-		CHECK_DISJOINT(tls_gd);
-		CHECK_DISJOINT(tls_ld);
-	}
+#ifdef CHERI_DYNAMIC_TESTS
+	CHECK_DISJOINT(tls_gd);
+	CHECK_DISJOINT(tls_ld);
+#endif
 	CHECK_DISJOINT(tls_ie);
 	CHECK_DISJOINT(tls_le);
 #endif
