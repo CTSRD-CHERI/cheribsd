@@ -390,8 +390,7 @@ ptrace_single_step(struct thread *td)
 
 	/* compute next address after current location */
 	if(curinstr != 0) {
-		va = MipsEmulateBranch(locr0, locr0->pc, locr0->fsr,
-		    (uintptr_t)&curinstr);
+		va = MipsEmulateBranch(locr0, locr0->pc, locr0->fsr, &curinstr);
 	} else {
 		va = locr0->pc + 4;
 	}

@@ -61,7 +61,7 @@ extern vm_offset_t kernel_kseg0_end;
 uint32_t MipsFPID(void);
 void	MipsSaveCurFPState(struct thread *);
 void	fork_trampoline(void);
-uintptr_t MipsEmulateBranch(struct trapframe *, uintptr_t, int, uintptr_t);
+uintptr_t MipsEmulateBranch(struct trapframe *, uintptr_t, int, uint32_t *);
 void MipsSwitchFPState(struct thread *, struct trapframe *);
 int	is_cacheable_mem(vm_paddr_t addr);
 void	mips_wait(void);
