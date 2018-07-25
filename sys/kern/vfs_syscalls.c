@@ -306,7 +306,7 @@ user_statfs(struct thread *td, const char * __capability path,
 	int error;
 
 	sfp = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
-	error = kern_statfs(td, __USER_CAP_STR(path), UIO_USERSPACE, sfp);
+	error = kern_statfs(td, path, UIO_USERSPACE, sfp);
 	if (error == 0)
 		error = copyout_c(
 		    (__cheri_tocap struct statfs * __capability)sfp,
