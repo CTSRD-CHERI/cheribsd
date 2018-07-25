@@ -441,6 +441,12 @@ cheribsdbox.mtree: Makefile
 # -> we need to create at last one hardlink to cheribsdbox
 LINKS+=${BINDIR}/${PROG} ${BINDIR}/${PROG}.dummy-hardlink-for-makefs
 
+check_crunchgen:
+	if [ "`which crunchgen`" = "/usr/bin/crunchgen" ]; then \
+	    echo "Should not be using crunchgen from /usr/bin!"; false; \
+	fi
+all: check_crunchgen
+
 # the crunchgen build environment
 .include <bsd.crunchgen.mk>
 
