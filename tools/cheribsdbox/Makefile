@@ -128,17 +128,18 @@ CRUNCH_PROGS_bin+=	cat \
 
 CRUNCH_ALIAS_test=	[
 
-# Su doesn't work with cheribsdbox bin/sh and bin/csh because it sets argv[0]
+# Su needs latest crunchgen to work with cheribsdbox sh/csh because it sets argv[0]
 # and then cheribsdbox thinks it should execute _su
-CRUNCH_SUPPRESS_LINK_sh=	1
 CRUNCH_BUILDTOOLS+=	bin/sh
 CRUNCH_PROGS_bin+=	sh
-# For now don't include csh
-.if 0
 CRUNCH_ALIAS_sh=	-sh
+
 CRUNCH_BUILDTOOLS+=	bin/csh
+CRUNCH_PROGS_bin+=	csh
 CRUNCH_ALIAS_csh=	-csh tcsh -tcsh
-.endif
+# to exclude csh/sh:
+# CRUNCH_SUPPRESS_LINK_sh=	1
+# CRUNCH_SUPPRESS_LINK_csh=	1
 
 
 ###################################################################
