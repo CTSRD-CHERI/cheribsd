@@ -560,7 +560,7 @@ cheriabi_fchownat(struct thread *td, struct cheriabi_fchownat_args *uap)
 {
 
 	return (kern_fchownat(td, uap->fd, uap->path, UIO_USERSPACE,
-	    uap->uid, uap->gid, 0));
+	    uap->uid, uap->gid, uap->flag));
 }
 
 int
