@@ -14,6 +14,9 @@ WANT_CHERI=		none
 CRUNCH_BUILDOPTS+=	WANT_CHERI=none -DWITHOUT_TESTS MK_TESTS=no
 # Avoid linking against libcasper for tcpdump/traceroute/kdump:
 CRUNCH_BUILDOPTS+=	-DWITHOUT_CASPER MK_CASPER=no
+# Try to reduce size by avoiding locale support
+CRUNCH_BUILDOPTS+=	-DWITHOUT_LOCALES MK_LOCALES=no
+
 
 # Do not do hardlinks as part of the install since we want to be able to install
 # this without conflicting with the real binaries and instead do some mtree
@@ -82,7 +85,10 @@ CRUNCH_LIBS+= -ldevinfo
 CRUNCH_LIBS+= -lusb
 
 # netstat needs libkvm (which needs libelf)
-CRUNCH_LIBS+= -lkvm -lelf -lmemstat -lnetgraph
+CRUNCH_LIBS+= -lkvm -lelf -lmemstat
+# avoid depending on -lnetgraph
+CRUNCH_BUILDOPTS_netstat+=MK_NETGRAPH_SUPPORT=no -j1
+
 
 # Misc libs copied from recue/bsdbox:
 CRUNCH_LIBS+= -ledit -ll -ltermcapw
