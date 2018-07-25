@@ -1448,7 +1448,7 @@ nvpair_create_nvlist_array(const char *name, const nvlist_t * const *value,
 	nvlist_set_flags(nvls[nitems - 1], flags);
 
 	parent = nvpair_allocv(name, NV_TYPE_NVLIST_ARRAY,
-	    (uint64_t)(uintptr_t)nvls, 0, nitems);
+	    (uintptr_t)nvls, 0, nitems);
 	if (parent == NULL)
 		goto fail;
 
