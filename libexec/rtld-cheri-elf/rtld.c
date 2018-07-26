@@ -4711,47 +4711,108 @@ tls_get_addr_common(intptr_t **dtvp, int index, size_t offset)
     defined(__powerpc__) || defined(__riscv__)
 
 /*
+ * Return pointer to allocated TLS block
+ */
+static void *
+get_tls_block_ptr(void *tcb, size_t tcbsize)
+{
+    size_t extra_size, post_size, pre_size, tls_block_size;
+    size_t tls_init_align;
+
+    tls_init_align = MAX(obj_main->tlsalign, 1);
+
+    /* Compute fragments sizes. */
+    extra_size = tcbsize - TLS_TCB_SIZE;
+#if defined(__aarch64__) || defined(__arm__)
+    post_size =  roundup2(TLS_TCB_SIZE, tls_init_align) - TLS_TCB_SIZE;
+#else
+    post_size = 0;
+#endif
+    tls_block_size = tcbsize + post_size;
+    pre_size = roundup2(tls_block_size, tls_init_align) - tls_block_size;
+
+    return ((char *)tcb - pre_size - extra_size);
+}
+
+/*
  * Allocate Static TLS using the Variant I method.
+ *
+ * To handle all above requirements, we setup the following layout for 
+ * TLS block:
+ * (whole memory block is aligned with MAX(TLS_TCB_ALIGN, tls_init_align))
+ *
+ * +----------+--------------+--------------+-----------+------------------+
+ * | pre gap  | extended TCB |     TCB      | post gap  |    TLS segment   |
+ * | pre_size |  extra_size  | TLS_TCB_SIZE | post_size | tls_static_space |
+ * +----------+--------------+--------------+-----------+------------------+
+ *
+ * where:
+ *  extra_size is tcbsize - TLS_TCB_SIZE
+ *  post_size is used to adjust TCB to TLS aligment for first version of TLS
+ *            layout and is always 0 for second version.
+ *  pre_size  is used to adjust TCB aligment for first version and to adjust
+ *            TLS alignment for second version.
+ *
+ * NB: rtld's tls_static_space variable includes TLS_TCB_SIZE and post_size as
+ *     it is based on tls_last_offset, and TLS offsets here are really TCB
+ *     offsets.
  */
 void *
 allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign)
 {
     Obj_Entry *obj;
-    char *tcb;
-    intptr_t **tls;
-    intptr_t *dtv;
+    char *tls_block;
+    intptr_t *dtv, **tcb;
     char *addr;
     int i;
+    size_t extra_size, maxalign, post_size, pre_size, tls_block_size;
+    size_t tls_init_align;
 
     if (oldtcb != NULL && tcbsize == TLS_TCB_SIZE)
 	return (oldtcb);
 
     assert(tcbsize >= TLS_TCB_SIZE);
-    tcb = xcalloc(1, tls_static_space - TLS_TCB_SIZE + tcbsize);
-    tls = (intptr_t **)(tcb + tcbsize - TLS_TCB_SIZE);
+    maxalign = MAX(tcbalign, tls_static_max_align);
+    tls_init_align = MAX(obj_main->tlsalign, 1);
+
+    /* Compute fragmets sizes. */
+    extra_size = tcbsize - TLS_TCB_SIZE;
+#if defined(__aarch64__) || defined(__arm__)
+    post_size = roundup2(TLS_TCB_SIZE, tls_init_align) - TLS_TCB_SIZE;
+#else
+    post_size = 0;
+#endif
+    tls_block_size = tcbsize + post_size;
+    pre_size = roundup2(tls_block_size, tls_init_align) - tls_block_size;
+    tls_block_size += pre_size + tls_static_space - TLS_TCB_SIZE - post_size;
+
+    /* Allocate whole TLS block */
+    tls_block = malloc_aligned(tls_block_size, maxalign);
+    tcb = (intptr_t **)(tls_block + pre_size + extra_size);
 
     if (oldtcb != NULL) {
-	memcpy(tls, oldtcb, tls_static_space);
-	free(oldtcb);
+	memcpy(tls_block, get_tls_block_ptr(oldtcb, tcbsize),
+	    tls_block_size);
+	free_aligned(get_tls_block_ptr(oldtcb, tcbsize));
 
 	/* Adjust the DTV. */
-	dtv = tls[0];
+	dtv = tcb[0];
 	for (i = 0; i < dtv[1]; i++) {
 	    if (dtv[i+2] >= (Elf_Addr)oldtcb &&
 		dtv[i+2] < (Elf_Addr)oldtcb + tls_static_space) {
-		dtv[i+2] = dtv[i+2] - (Elf_Addr)oldtcb + (Elf_Addr)tls;
+		dtv[i+2] = (intptr_t)tcb + ((Elf_Addr)dtv[i+2] - (Elf_Addr)oldtcb);
 	    }
 	}
     } else {
 	dtv = xcalloc(tls_max_index + 2, sizeof(void *));
-	tls[0] = dtv;
+	tcb[0] = dtv;
 	dtv[0] = (intptr_t)tls_dtv_generation;
 	dtv[1] = (intptr_t)tls_max_index;
 
 	for (obj = globallist_curr(objs); obj != NULL;
 	  obj = globallist_next(obj)) {
 	    if (obj->tlsoffset > 0) {
-		addr = (char *)tls + obj->tlsoffset;
+		addr = (char *)tcb + obj->tlsoffset;
 		if (obj->tlsinitsize > 0)
 		    memcpy(addr, obj->tlsinit, obj->tlsinitsize);
 		if (obj->tlssize > obj->tlsinitsize)
@@ -4770,14 +4831,23 @@ free_tls(void *tcb, size_t tcbsize, size_t tcbalign)
 {
     char **dtv;
     char *tlsstart, *tlsend;
-    size_t dtvsize, i;
+    size_t post_size;
+    size_t dtvsize, i, tls_init_align;
 
     assert(tcbsize >= TLS_TCB_SIZE);
+    tls_init_align = MAX(obj_main->tlsalign, 1);
 
-    tlsstart = (char *)tcb + tcbsize - TLS_TCB_SIZE;
-    tlsend = tlsstart + tls_static_space;
+    /* Compute fragments sizes. */
+#if defined(__aarch64__) || defined(__arm__)
+    post_size =  roundup2(TLS_TCB_SIZE, tls_init_align) - TLS_TCB_SIZE;
+#else
+    post_size = 0;
+#endif
 
-    dtv = *(void **)tlsstart;
+    tlsstart = (char *)tcb + TLS_TCB_SIZE + post_size;
+    tlsend = (char *)tcb + tls_static_space;
+
+    dtv = *(void **)tcb;
     dtvsize = (size_t)dtv[1];
     for (i = 0; i < dtvsize; i++) {
 	if (dtv[i+2] && (dtv[i+2] < tlsstart || dtv[i+2] >= tlsend)) {
@@ -4785,7 +4855,7 @@ free_tls(void *tcb, size_t tcbsize, size_t tcbalign)
 	}
     }
     free(dtv);
-    free(tcb);
+    free_aligned(get_tls_block_ptr(tcb, tcbsize));
 }
 
 #elif defined(__i386__) || defined(__amd64__) || defined(__sparc64__)
