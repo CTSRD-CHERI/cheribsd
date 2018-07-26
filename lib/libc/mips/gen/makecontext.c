@@ -96,7 +96,7 @@ __makecontext(ucontext_t *ucp, void (*func)(void), int argc, ...)
 #else
 	/* XXX-BD: sufficent for CHERI256? */
 	sp  = (register_t *)
-	    __builtin_align_up(sp, 16);	/* Align on quad-word boundary. */
+	    __builtin_align_down(sp, 16);	/* Align on quad-word boundary. */
 #endif
 #endif
 
