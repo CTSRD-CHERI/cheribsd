@@ -152,6 +152,73 @@ VECTOR(_locore, unknown)
 
 #if defined(CPU_CHERI)
 	/*
+	 * Grab the initial omnipotent capability
+	 */
+	cgetdefault	CHERI_REG_KR2C
+
+	/*
+	 * Create a reduced DDC.
+	 *
+	 * XXX-BD: Actually changing base/length requires changes in
+	 * linkage.
+	 */
+	cmove		CHERI_REG_KR1C, CHERI_REG_KR2C
+	REG_LI		t0, CHERI_CAP_KERN_BASE
+	csetoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	REG_LI		t0, CHERI_CAP_KERN_LENGTH
+	csetbounds	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	REG_LI		t0, CHERI_PERMS_KERNEL_DATA
+	candperm	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+
+	/* Preserve a copy in KDC for exception handlers. */
+	csetkdc		CHERI_REG_KR1C
+
+	/* Install the new DDC. */
+	csetdefault	CHERI_REG_KR1C
+
+	/*
+	 * Create a reduced PCC.
+	 *
+	 * XXX-BD: Actually changing base/length requires changes in
+	 * linkage.
+	 */
+	cgetpcc		CHERI_REG_KR1C
+	REG_LI		t0, CHERI_CAP_KERN_BASE
+	csetoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	REG_LI		t0, CHERI_CAP_KERN_LENGTH
+	csetbounds	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	REG_LI		t0, CHERI_PERMS_KERNEL_CODE
+	candperm	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+
+	/* Preserve a copy in KCC for exception handlers.  */
+
+	csetkcc		CHERI_REG_KR1C
+
+	/* Install the new PCC. */
+	REG_LI		t0, CHERI_CAP_KERN_BASE
+	cgetpcc		CHERI_REG_C29
+	cgetoffset	t1, CHERI_REG_C29			# 1
+	PTR_SUBU	t1, t1, t0				# 2
+	PTR_ADDIU	t1, t1, (4 * 7)				# 3
+	csetoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, t1	# 4
+	cjr		CHERI_REG_KR1C				# 5
+	nop							# 6
+	# 7 (land here)
+
+	/*
+	 * Create the parent kernel sealing capablity.
+	 */
+	cmove		CHERI_REG_KR1C, CHERI_REG_KR2C
+	REG_LI	t0, CHERI_SEALCAP_KERNEL_BASE
+	csetoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	REG_LI	t0, CHERI_SEALCAP_KERNEL_LENGTH
+	csetbounds	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	REG_LI	t0, CHERI_SEALCAP_KERNEL_PERMS
+	candperm	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	PTR_LA	t0, _C_LABEL(kernel_sealcap)
+	csc	CHERI_REG_KR1C, t0, 0($ddc)
+
+	/*
 	 * Create a capability covering all of userspace from which to
 	 * derive new capabilities in execve(), etc.
 	 *
@@ -161,7 +228,7 @@ VECTOR(_locore, unknown)
 	 * XXX-BD: This is actually an ABI property and should probably
 	 * per sysent.
 	 */
-	cgetdefault CHERI_REG_KR1C
+	cmove		CHERI_REG_KR1C, CHERI_REG_KR2C
 	REG_LI	t0, CHERI_CAP_USER_DATA_BASE
 	csetoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
 	REG_LI	t0, CHERI_CAP_USER_DATA_LENGTH
@@ -174,7 +241,7 @@ VECTOR(_locore, unknown)
 	/*
 	 * Create a capability for userspace to seal capabilities with.
 	 */
-	cgetdefault CHERI_REG_KR1C
+	cmove		CHERI_REG_KR1C, CHERI_REG_KR2C
 	REG_LI	t0, CHERI_SEALCAP_USERSPACE_BASE
 	csetoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
 	REG_LI	t0, CHERI_SEALCAP_USERSPACE_LENGTH
@@ -185,16 +252,13 @@ VECTOR(_locore, unknown)
 	csc	CHERI_REG_KR1C, t0, 0($ddc)
 
 	/*
-	 * On CHERI MIPS, preserve the kernel's data segment context for use
-	 * in exception handlers.
+	 * Zero out our temporary registers.
 	 *
 	 * XXXRW: Do we want to rely on default initialisation of all CP2
 	 * registers here?
 	 */
-	cgetpcc	CHERI_REG_KR1C		# Preserve $kcc
-	csetkcc	CHERI_REG_KR1C
-	cgetdefault	CHERI_REG_KR1C	# Preserve $kdc
-	csetkdc	CHERI_REG_KR1C
+	cmove CHERI_REG_KR1C, $cnull
+	cmove CHERI_REG_KR2C, $cnull
 #endif
 
 #if defined(CPU_BERI) || defined(CPU_QEMU_MALTA)
