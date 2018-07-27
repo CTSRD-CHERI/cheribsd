@@ -107,9 +107,6 @@ void * __capability	cheri_capability_build_user_data(uint32_t perms,
 void * __capability	cheri_capability_build_user_rwx(uint32_t perms,
 			    vaddr_t basep, size_t length, off_t off);
 
-void	cheri_capability_set(void * __capability *capp, uint32_t uperms,
-	    vaddr_t basep, size_t length, off_t off);
-
 /*
  * CHERI context management functions.
  */
