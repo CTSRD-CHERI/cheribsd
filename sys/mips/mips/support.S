@@ -660,14 +660,12 @@ LEAF(fuecap_c)
 	PTR_LA	v0, fswberr
 	cgetbase	t0, $c3
 	blt	t0, zero, fswberr	# make sure address is in user space
-	cgetdefault	$c4
-	csetoffset	$c4, $c4, a0
 	GET_CPU_PCPU(v1)
 	PTR_L	v1, PC_CURPCB(v1)
 	PTR_S	v0, U_PCB_ONFAULT(v1)
 	clc	$c3, zero, 0($c3)	# fetch capability
 	PTR_S	zero, U_PCB_ONFAULT(v1)
-	csc	$c3, zero, 0($c4)	# store capability
+	csc	$c3, a0, 0($ddc)	# store capability
 	j	ra
 	li	v0, 0
 END(fuecap_c)
