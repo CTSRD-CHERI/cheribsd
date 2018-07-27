@@ -40,8 +40,7 @@
 
 /*
  * Programmer-friendly macros for CHERI-aware C code -- requires use of
- * CHERI-aware Clang/LLVM, and full capability context switching, so not yet
- * usable in the kernel.
+ * CHERI-aware Clang/LLVM, and full capability context switching.
  */
 #define	cheri_getlen(x)		__builtin_cheri_length_get((x))
 #define	cheri_getbase(x)	__builtin_cheri_base_get((x))
