@@ -176,6 +176,16 @@ static int nswapdev;		/* Number of swap devices */
 int swap_pager_avail;
 static struct sx swdev_syscall_lock;	/* serialize swap(on|off) */
 
+#ifdef CPU_CHERI
+/*
+ * Omnipotent capability for restoring swapped capabilities.
+ *
+ * XXXBD: These should be a way to do this without storing such a potent
+ * capability.  Splitting sealed and unsealed caps would be a start.
+ */
+void * __capability swap_restore_cap;
+#endif
+
 static vm_ooffset_t swap_total;
 SYSCTL_QUAD(_vm, OID_AUTO, swap_total, CTLFLAG_RD, &swap_total, 0,
     "Total amount of available swap storage.");
@@ -1959,14 +1969,14 @@ cheri_restore_tag(void * __capability *cp)
 	sealed = cheri_getsealed(cap);
 	type = cheri_gettype(cap);
 
-	newcap = cheri_getkdc();
+	newcap = swap_restore_cap;
 	newcap = cheri_setoffset(newcap, base);
 	newcap = cheri_csetbounds(newcap, len);
 	newcap = cheri_andperm(newcap, perm);
 	newcap = cheri_incoffset(newcap, offset);
 
 	if (sealed) {
-		sealcap = cheri_setoffset(cheri_getkdc(), type);
+		sealcap = cheri_setoffset(swap_restore_cap, type);
 		newcap = cheri_seal(newcap, sealcap);
 	}
 

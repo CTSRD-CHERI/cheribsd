@@ -252,6 +252,12 @@ VECTOR(_locore, unknown)
 	csc	CHERI_REG_KR1C, t0, 0($ddc)
 
 	/*
+	 * Store the omnipotent capability to allow swap to be restored.
+	 */
+	PTR_LA	t0, _C_LABEL(swap_restore_cap)
+	csc	CHERI_REG_KR2C, t0, 0($ddc)
+
+	/*
 	 * Zero out our temporary registers.
 	 *
 	 * XXXRW: Do we want to rely on default initialisation of all CP2
