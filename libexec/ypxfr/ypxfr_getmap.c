@@ -72,7 +72,7 @@ extern enum ypstat yp_errno;
  */
 int
 ypxfr_get_map(char *map, char *domain, char *host,
-    int (*callback)(int, char *, int, char *, int, char*))
+    int (*callback)(u_long, char *, int, char *, int, void*))
 {
 	CLIENT *clnt;
 	ypreq_nokey req;

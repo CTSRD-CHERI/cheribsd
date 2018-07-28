@@ -120,8 +120,8 @@ usage(void)
 }
 
 int
-ypxfr_foreach(int status, char *key, int keylen, char *val, int vallen,
-    char *data)
+ypxfr_foreach(u_long status, char *key, int keylen, char *val, int vallen,
+    void *data)
 {
 	DBT dbkey, dbval;
 

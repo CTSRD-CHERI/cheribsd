@@ -69,6 +69,19 @@ static const char rcsid[] =
  * the -p flag.
  */
 
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180728,
+ *   "target_type": "lib",
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "comment": "Using a function pointer without prototypes"
+ * }
+ * CHERI CHANGES END
+ */
+
  /* arcfour.h */
 typedef struct arcfour_key
 {      
@@ -143,10 +156,7 @@ static void swap_byte(unsigned char *a, unsigned char *b)
 }
 
 /* Dummy _des_crypt function that uses ARCFOUR with a 40 bit key */
-int _arcfour_crypt(buf, len, desp)
-	char *buf;
-	int len;
-	struct desparams *desp;
+int _arcfour_crypt(char *buf, int len, struct desparams *desp)
 {
 	struct arcfour_key arcfourk;
 
@@ -187,7 +197,7 @@ void load_des(warn, libpath)
 		snprintf(dlpath, sizeof(dlpath), "%s", libpath);
 
 	if ((dlhandle = dlopen(dlpath, 0444)) != NULL)
-		_my_crypt = (int (*)())dlsym(dlhandle, "_des_crypt");
+		_my_crypt = (int (*)(char *, int, struct desparams *))dlsym(dlhandle, "_des_crypt");
 
 	if (_my_crypt == NULL) {
 		if (dlhandle != NULL)

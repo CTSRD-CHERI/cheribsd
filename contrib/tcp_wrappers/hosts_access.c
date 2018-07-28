@@ -226,10 +226,8 @@ struct request_info *request;
 
 /* list_match - match a request against a list of patterns with exceptions */
 
-static int list_match(list, request, match_fn)
-char   *list;
-struct request_info *request;
-int   (*match_fn) ();
+static int list_match(char *list, struct request_info *request,
+    int (*match_fn)(char *, struct request_info *))
 {
     char   *tok;
 
