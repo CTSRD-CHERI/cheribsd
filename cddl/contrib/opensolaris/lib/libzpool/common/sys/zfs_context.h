@@ -21,11 +21,13 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20180728,
  *   "target_type": "lib",
  *   "changes": [
  *     "pointer_as_integer"
- *   ]
+ *     "function_abi"
+ *   ],
+ *   "comment": "thread_create was using a function pointer without prototypes"
  * }
  * CHERI CHANGES END
  */
@@ -247,8 +249,7 @@ extern struct proc p0;
 #define	curproc		(&p0)
 
 #define	PS_NONE		-1
-
-extern kthread_t *zk_thread_create(void (*func)(), void *arg);
+extern kthread_t *zk_thread_create(void (*func)(void*), void *arg);
 
 #define	issig(why)	(FALSE)
 #define	ISSIG(thr, why)	(FALSE)

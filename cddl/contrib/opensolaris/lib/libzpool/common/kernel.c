@@ -72,7 +72,7 @@ struct proc p0;
  */
 /*ARGSUSED*/
 kthread_t *
-zk_thread_create(void (*func)(), void *arg)
+zk_thread_create(void (*func)(void*), void *arg)
 {
 	thread_t tid;
 
