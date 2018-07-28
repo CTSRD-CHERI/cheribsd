@@ -39,10 +39,7 @@ sm_eofread __P((
 
 /* ARGSUSED0 */
 static ssize_t
-sm_eofread(fp, buf, len)
-	SM_FILE_T *fp;
-	char *buf;
-	size_t len;
+sm_eofread(SM_FILE_T *fp, char *buf, size_t len)
 {
 	return 0;
 }

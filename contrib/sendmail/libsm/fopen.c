@@ -51,8 +51,7 @@ static jmp_buf OpenTimeOut, ReopenTimeOut;
 
 /* ARGSUSED0 */
 static void
-openalrm(sig)
-	int sig;
+openalrm(int sig)
 {
 	longjmp(OpenTimeOut, 1);
 }
@@ -77,8 +76,7 @@ openalrm(sig)
 
 /* ARGSUSED0 */
 static void
-reopenalrm(sig)
-	int sig;
+reopenalrm(int sig)
 {
 	longjmp(ReopenTimeOut, 1);
 }
