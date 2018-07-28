@@ -21,11 +21,12 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20180728,
  *   "target_type": "lib",
  *   "changes": [
  *     "function_abi"
- *   ]
+ *   ],
+ *   "comment": "Added function prototypes, and also added parameters to function pointer types"
  * }
  * CHERI CHANGES END
  */
@@ -99,7 +100,8 @@ int     resident = (-1);		/* -1, 0: unknown; +1: yes */
 /* Forward declarations. */
 
 static int table_match(char *table, struct request_info *request);
-static int list_match(char *list, struct request_info *request, int (*match_fn)());
+static int list_match(char *list, struct request_info *request,
+    int (*match_fn)(char *, struct request_info *));
 static int server_match(char *tok, struct request_info *request);
 static int client_match(char *tok, struct request_info *request);
 static int host_match(char *tok, struct host_info *host);
