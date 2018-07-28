@@ -9,6 +9,8 @@ CFLAGS+=	-DNO_COMPAT7
 CFLAGS.getpwent.c=	-mxgot
 .endif
 
+CONFS=	shells
+
 SRCS+=	__getosreldate.c \
 	__pthread_mutex_init_calloc_cb_stub.c \
 	__xuname.c \
