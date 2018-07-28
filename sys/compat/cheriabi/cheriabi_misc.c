@@ -2106,6 +2106,7 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 	case PT_DETACH:
 	case PT_KILL:
 	case PT_TRACE_ME:
+	case PT_FOLLOW_FORK:
 		addr = NULL;
 		break;
 
