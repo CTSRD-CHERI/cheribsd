@@ -109,11 +109,14 @@ cheri_exccode_string(uint8_t exccode)
 
 static inline void
 cheri_copy_and_validate(void * __capability *dst, void * __capability *src,
-    register_t *capvalid, int which)
+    register_t *capvalid, int which, bool strip_tags)
 {
 
 	*capvalid |= cheri_gettag(*src) << which;
-	*dst = *src;
+	if (strip_tags)
+		*dst = cheri_cleartag(*src);
+	else
+		*dst = *src;
 }
 
 /*
@@ -121,8 +124,8 @@ cheri_copy_and_validate(void * __capability *dst, void * __capability *src,
  * cheri_frame.
  */
 void
-cheri_trapframe_to_cheriframe(struct trapframe *frame,
-    struct cheri_frame *cfp)
+_cheri_trapframe_to_cheriframe(struct trapframe *frame,
+    struct cheri_frame *cfp, bool strip_tags)
 {
 
 	/*
@@ -131,34 +134,62 @@ cheri_trapframe_to_cheriframe(struct trapframe *frame,
 	 */
 	bzero(cfp, sizeof(*cfp));
 
-	cheri_copy_and_validate(&cfp->cf_ddc, &frame->ddc, &cfp->cf_capvalid, 0);
-	cheri_copy_and_validate(&cfp->cf_c1, &frame->c1, &cfp->cf_capvalid, 1);
-	cheri_copy_and_validate(&cfp->cf_c2, &frame->c2, &cfp->cf_capvalid, 2);
-	cheri_copy_and_validate(&cfp->cf_c3, &frame->c3, &cfp->cf_capvalid, 3);
-	cheri_copy_and_validate(&cfp->cf_c4, &frame->c4, &cfp->cf_capvalid, 4);
-	cheri_copy_and_validate(&cfp->cf_c5, &frame->c5, &cfp->cf_capvalid, 5);
-	cheri_copy_and_validate(&cfp->cf_c6, &frame->c6, &cfp->cf_capvalid, 6);
-	cheri_copy_and_validate(&cfp->cf_c7, &frame->c7, &cfp->cf_capvalid, 7);
-	cheri_copy_and_validate(&cfp->cf_c8, &frame->c8, &cfp->cf_capvalid, 8);
-	cheri_copy_and_validate(&cfp->cf_c9, &frame->c9, &cfp->cf_capvalid, 9);
-	cheri_copy_and_validate(&cfp->cf_c10, &frame->c10, &cfp->cf_capvalid, 10);
-	cheri_copy_and_validate(&cfp->cf_csp, &frame->csp, &cfp->cf_capvalid, 11);
-	cheri_copy_and_validate(&cfp->cf_c12, &frame->c12, &cfp->cf_capvalid, 12);
-	cheri_copy_and_validate(&cfp->cf_c13, &frame->c13, &cfp->cf_capvalid, 13);
-	cheri_copy_and_validate(&cfp->cf_c14, &frame->c14, &cfp->cf_capvalid, 14);
-	cheri_copy_and_validate(&cfp->cf_c15, &frame->c15, &cfp->cf_capvalid, 15);
-	cheri_copy_and_validate(&cfp->cf_c16, &frame->c16, &cfp->cf_capvalid, 16);
-	cheri_copy_and_validate(&cfp->cf_c17, &frame->c17, &cfp->cf_capvalid, 17);
-	cheri_copy_and_validate(&cfp->cf_c18, &frame->c18, &cfp->cf_capvalid, 18);
-	cheri_copy_and_validate(&cfp->cf_c19, &frame->c19, &cfp->cf_capvalid, 19);
-	cheri_copy_and_validate(&cfp->cf_c20, &frame->c20, &cfp->cf_capvalid, 20);
-	cheri_copy_and_validate(&cfp->cf_c21, &frame->c21, &cfp->cf_capvalid, 21);
-	cheri_copy_and_validate(&cfp->cf_c22, &frame->c22, &cfp->cf_capvalid, 22);
-	cheri_copy_and_validate(&cfp->cf_c23, &frame->c23, &cfp->cf_capvalid, 23);
-	cheri_copy_and_validate(&cfp->cf_c24, &frame->c24, &cfp->cf_capvalid, 24);
-	cheri_copy_and_validate(&cfp->cf_c25, &frame->c25, &cfp->cf_capvalid, 25);
-	cheri_copy_and_validate(&cfp->cf_idc, &frame->idc, &cfp->cf_capvalid, 26);
-	cheri_copy_and_validate(&cfp->cf_pcc, &frame->pcc, &cfp->cf_capvalid, 27);
+	cheri_copy_and_validate(&cfp->cf_ddc, &frame->ddc, &cfp->cf_capvalid, 0,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c1, &frame->c1, &cfp->cf_capvalid, 1,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c2, &frame->c2, &cfp->cf_capvalid, 2,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c3, &frame->c3, &cfp->cf_capvalid, 3,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c4, &frame->c4, &cfp->cf_capvalid, 4,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c5, &frame->c5, &cfp->cf_capvalid, 5,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c6, &frame->c6, &cfp->cf_capvalid, 6,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c7, &frame->c7, &cfp->cf_capvalid, 7,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c8, &frame->c8, &cfp->cf_capvalid, 8,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c9, &frame->c9, &cfp->cf_capvalid, 9,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c10, &frame->c10, &cfp->cf_capvalid, 10,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_csp, &frame->csp, &cfp->cf_capvalid, 11,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c12, &frame->c12, &cfp->cf_capvalid, 12,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c13, &frame->c13, &cfp->cf_capvalid, 13,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c14, &frame->c14, &cfp->cf_capvalid, 14,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c15, &frame->c15, &cfp->cf_capvalid, 15,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c16, &frame->c16, &cfp->cf_capvalid, 16,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c17, &frame->c17, &cfp->cf_capvalid, 17,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c18, &frame->c18, &cfp->cf_capvalid, 18,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c19, &frame->c19, &cfp->cf_capvalid, 19,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c20, &frame->c20, &cfp->cf_capvalid, 20,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c21, &frame->c21, &cfp->cf_capvalid, 21,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c22, &frame->c22, &cfp->cf_capvalid, 22,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c23, &frame->c23, &cfp->cf_capvalid, 23,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c24, &frame->c24, &cfp->cf_capvalid, 24,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c25, &frame->c25, &cfp->cf_capvalid, 25,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_idc, &frame->idc, &cfp->cf_capvalid, 26,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_pcc, &frame->pcc, &cfp->cf_capvalid, 27,
+	    strip_tags);
 	cfp->cf_capcause = frame->capcause;
 }
 

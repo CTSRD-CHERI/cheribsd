@@ -581,7 +581,7 @@ int
 fill_capregs(struct thread *td, struct capreg *capregs)
 {
 
-	cheri_trapframe_to_cheriframe(&td->td_pcb->pcb_regs,
+	cheri_trapframe_to_cheriframe_strip(&td->td_pcb->pcb_regs,
 	    (struct cheri_frame *)capregs);
 	return (0);
 }
