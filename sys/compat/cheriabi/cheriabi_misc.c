@@ -2132,8 +2132,9 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 	case PT_TO_SCE:
 	case PT_TO_SCX:
 	case PT_SYSCALL:
-		if ((uintptr_t)uap->addr != (uintptr_t)1)
+		if (uap->addr != (char * __capability)(intcap_t)1)
 			return EINVAL;
+		addr = cheri_cleartag(uap->addr);
 		break;
 
 #ifdef CPU_CHERI
