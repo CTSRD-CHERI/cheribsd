@@ -127,8 +127,12 @@ int	cheri_syscall_authorize(struct thread *td, u_int code,
 int	cheri_signal_sandboxed(struct thread *td);
 void	cheri_trapframe_from_cheriframe(struct trapframe *frame,
 	    struct cheri_frame *cfp);
-void	cheri_trapframe_to_cheriframe(struct trapframe *frame,
-	    struct cheri_frame *cfp);
+void	_cheri_trapframe_to_cheriframe(struct trapframe *frame,
+	    struct cheri_frame *cfp, bool strip_tags);
+#define	cheri_trapframe_to_cheriframe(tf, cf)			\
+	_cheri_trapframe_to_cheriframe((tf), (cf), false)
+#define	cheri_trapframe_to_cheriframe_strip(tf, cf)		\
+	_cheri_trapframe_to_cheriframe((tf), (cf), true)
 void	hybridabi_sendsig(struct thread *td);
 
 /*
