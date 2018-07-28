@@ -54,7 +54,7 @@
 struct	cmd {
 	char	*c_name;		/* command name */
 	char	*c_help;		/* help message */
-	void	(*c_handler)();		/* routine to do the work */
+	void	(*c_handler)(int, char*);/* routine to do the work */
 	int	c_priv;			/* privileged command */
 };
 
