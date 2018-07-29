@@ -1793,7 +1793,7 @@ nfsrvd_readdir(struct nfsrv_descript *nd, int isdgram,
 	struct nfsvattr at;
 	int nlen, error = 0, getret = 1;
 	int siz, cnt, fullsiz, eofflag, ncookies;
-	u_int64_t off, toff, verf;
+	u_int64_t off, toff, verf __unused;
 	u_long *cookies = NULL, *cookiep;
 	struct uio io;
 	kiovec_t iv;
