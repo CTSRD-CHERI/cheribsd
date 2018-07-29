@@ -2,7 +2,7 @@
 
 .include <src.opts.mk>
 
-CONFSDIR=	/etc/rc.d
+CONFDIR=	/etc/rc.d
 CONFGROUPS=	CONFS
 
 CONFS=	DAEMON \
@@ -76,6 +76,7 @@ CONFS=	DAEMON \
 	netif \
 	netoptions \
 	netwait \
+	newsyslog \
 	nfsclient \
 	nfscbd \
 	nfsd \
@@ -113,6 +114,8 @@ CONFS=	DAEMON \
 	stf \
 	swap \
 	swaplate \
+	sysctl \
+	syslogd \
 	tmp \
 	${_ubthidhci} \
 	ugidfw \
