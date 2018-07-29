@@ -3,7 +3,7 @@
 .include <src.opts.mk>
 
 CONFSDIR=	/etc/rc.d
-CONFSGROUPS=	CONFS
+CONFGROUPS=	CONFS
 
 CONFS=	DAEMON \
 	FILESYSTEMS \
@@ -131,13 +131,13 @@ CONFS+=	ypbind \
 .endif
 
 .if ${MK_ACCT} != "no"
-CONFSGROUPS+=	ACCT
+CONFGROUPS+=	ACCT
 ACCT+=		accounting
 ACCTPACKAGE=	acct
 .endif
 
 .if ${MK_ACPI} != "no"
-CONFSGROUPS+=	ACPI
+CONFGROUPS+=	ACPI
 ACPI=		power_profile
 ACPIPACKAGE=	acpi
 .endif
@@ -147,13 +147,13 @@ CONFS+=		powerd
 .endif
 
 .if ${MK_AMD} != "no"
-CONFSGROUPS+=	AMD
+CONFGROUPS+=	AMD
 AMD+=		amd
 AMDPACKAGE=	amd
 .endif
 
 .if ${MK_APM} != "no"
-CONFSGROUPS+=	APM
+CONFGROUPS+=	APM
 APM+=		apm
 .if ${MACHINE} == "i386"
 APM+=		apmd
@@ -185,7 +185,7 @@ CONFS+=		bootparams
 .endif
 
 .if ${MK_BSNMP} != "no"
-CONFSGROUPS+=	BSNMP
+CONFGROUPS+=	BSNMP
 BSNMP+=		bsnmpd
 BSNMPPACKAGE=	bsnmp
 .endif
@@ -199,7 +199,7 @@ CONFS+=		ftpd
 .endif
 
 .if ${MK_HAST} != "no"
-CONFSGROUPS+=	HAST
+CONFGROUPS+=	HAST
 HAST=		hastd
 HASTPACKAGE=	hast
 .endif
@@ -221,7 +221,7 @@ CONFS+=		iscsid
 .endif
 
 .if ${MK_JAIL} != "no"
-CONFSGROUPS+=	JAIL
+CONFGROUPS+=	JAIL
 JAIL+=		jail
 JAILPACKAGE=	jail
 .endif
@@ -269,7 +269,7 @@ CONFS+=		keyserv
 .endif
 
 .if ${MK_OPENSSH} != "no"
-CONFSGROUPS+=	SSH
+CONFGROUPS+=	SSH
 SSH=		sshd
 SSHPACKAGE=	ssh
 .endif
@@ -283,7 +283,7 @@ CONFS+=		routed
 .endif
 
 .if ${MK_SENDMAIL} != "no"
-CONFSGROUPS+=	SMRCD
+CONFGROUPS+=	SMRCD
 SMRCD=		sendmail
 SMRCDPACKAGE=	sendmail
 .endif
@@ -293,7 +293,7 @@ CONFS+=		timed
 .endif
 
 .if ${MK_UNBOUND} != "no"
-CONFSGROUPS+=	UNBOUND
+CONFGROUPS+=	UNBOUND
 UNBOUND+=	local_unbound
 UNBOUNDPACKAGE=	unbound
 .endif
@@ -303,7 +303,7 @@ _utx=		utx
 .endif
 
 .if ${MK_VI} != "no"
-CONFSGROUPS+=	VI
+CONFGROUPS+=	VI
 VI+=		virecover
 VIPACKAGE=	vi
 .endif
@@ -314,7 +314,7 @@ CONFS+=		wpa_supplicant
 .endif
 
 .if ${MK_ZFS} != "no"
-CONFSGROUPS+=	ZFS
+CONFGROUPS+=	ZFS
 ZFS+=		zfs
 ZFS+=		zfsbe
 ZFS+=		zfsd
@@ -325,7 +325,7 @@ ETC_ZFS=	/etc/zfs
 ETC_ZFSPACKAGE=	zfs
 .endif
 
-.for fg in ${CONFSGROUPS}
+.for fg in ${CONFGROUPS}
 ${fg}MODE?=	${BINMODE}
 .endfor
 
