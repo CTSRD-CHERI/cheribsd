@@ -51,10 +51,12 @@
 #define NONSTDTIME	3
 #define HOSTDOWN 	0x7fffffff
 
+typedef void (*handler_func)(int, char**);
+
 struct	cmd {
 	char	*c_name;		/* command name */
 	char	*c_help;		/* help message */
-	void	(*c_handler)(int, char*);/* routine to do the work */
+	handler_func c_handler;		/* routine to do the work */
 	int	c_priv;			/* privileged command */
 };
 
