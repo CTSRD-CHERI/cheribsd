@@ -4737,25 +4737,12 @@ get_tls_block_ptr(void *tcb, size_t tcbsize)
 /*
  * Allocate Static TLS using the Variant I method.
  *
- * To handle all above requirements, we setup the following layout for 
- * TLS block:
- * (whole memory block is aligned with MAX(TLS_TCB_ALIGN, tls_init_align))
- *
- * +----------+--------------+--------------+-----------+------------------+
- * | pre gap  | extended TCB |     TCB      | post gap  |    TLS segment   |
- * | pre_size |  extra_size  | TLS_TCB_SIZE | post_size | tls_static_space |
- * +----------+--------------+--------------+-----------+------------------+
- *
- * where:
- *  extra_size is tcbsize - TLS_TCB_SIZE
- *  post_size is used to adjust TCB to TLS aligment for first version of TLS
- *            layout and is always 0 for second version.
- *  pre_size  is used to adjust TCB aligment for first version and to adjust
- *            TLS alignment for second version.
+ * For details on the layout, see lib/libc/gen/tls.c.
  *
  * NB: rtld's tls_static_space variable includes TLS_TCB_SIZE and post_size as
  *     it is based on tls_last_offset, and TLS offsets here are really TCB
- *     offsets.
+ *     offsets, whereas libc's tls_static_space is just the executable's static
+ *     TLS segment.
  */
 void *
 allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign)
