@@ -57,6 +57,7 @@
 #include <sys/imgact_elf.h>
 #include <sys/imgact.h>
 #include <sys/mman.h>
+#include <sys/syscall.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysproto.h>
 #include <sys/ucontext.h>
@@ -223,6 +224,7 @@ cheriabi_fetch_syscall_arg(struct thread *td, void * __capability *argp,
 
 	/* XXX: O(1) possible with more bit twiddling. */
 	intreg_offset = ptrreg_offset = -1;
+	intreg_offset += td->td_sa.argoff;
 	for (i = 0; i <= argnum; i++) {
 		if (ptrmask & (1 << i)) {
 			is_ptr_arg = 1;
@@ -284,6 +286,11 @@ cheriabi_fetch_syscall_args(struct thread *td)
 	else
 		locr0->pc += sizeof(int);
 	sa->code = locr0->v0;
+	sa->argoff = 0;
+	if (sa->code == SYS_syscall || sa->code == SYS___syscall) {
+		sa->code = locr0->a0;
+		sa->argoff = 1;
+	}
 
 	se = td->td_proc->p_sysent;
 	if (se->sv_mask)
