@@ -995,13 +995,20 @@ void _do___caprelocs(const struct capreloc *start_relocs,
     const struct capreloc * stop_relocs, void* gdc, void* pcc, vaddr_t base_addr)
 {
 
+	/*
+	 * XXX: Aux args capabilities have base 0, but mmap gives us a tight
+	 * base. Since reloc->object and (currently) reloc->capability_location
+	 * are now absolute addresses, we must subtract the absolute address of
+	 * gdc to avoid including mapbase twice.
+	 */
+	vaddr_t mapbase = __builtin_cheri_address_get(gdc);
 	gdc = __builtin_cheri_perms_and(gdc, global_pointer_permissions);
 	pcc = __builtin_cheri_perms_and(pcc, function_pointer_permissions);
 	for (const struct capreloc *reloc = start_relocs; reloc < stop_relocs; reloc++) {
 		_Bool isFunction = (reloc->permissions & function_reloc_flag) ==
 		    function_reloc_flag;
-		void **dest = __builtin_cheri_offset_set(gdc,
-		    reloc->capability_location + base_addr);
+		void **dest = __builtin_cheri_offset_increment(gdc,
+		    reloc->capability_location + base_addr - mapbase);
 		if (reloc->object == 0) {
 			/*
 			 * XXXAR: clang fills uninitialized capabilities with
@@ -1011,11 +1018,14 @@ void _do___caprelocs(const struct capreloc *start_relocs,
 			*dest = (void*)0;
 			continue;
 		}
-		void *base = isFunction ? pcc : gdc;
-		void *src = __builtin_cheri_offset_set(base, reloc->object);
-		if (!isFunction && (reloc->size != 0))
-		{
-			src = __builtin_cheri_bounds_set(src, reloc->size);
+		void *src;
+		if (isFunction) {
+			src = __builtin_cheri_offset_set(pcc, reloc->object);
+		} else {
+			src = __builtin_cheri_offset_increment(gdc,
+			    reloc->object - mapbase);
+			if (reloc->size != 0)
+				src = __builtin_cheri_bounds_set(src, reloc->size);
 		}
 		src = __builtin_cheri_offset_increment(src, reloc->offset);
 		*dest = src;
@@ -1033,12 +1043,11 @@ void _do___caprelocs(const struct capreloc *start_relocs,
  */
 void
 _rtld_do___caprelocs_self(const struct capreloc *start_relocs,
-    const struct capreloc* end_relocs)
+    const struct capreloc* end_relocs, void *relocbase)
 {
-	void *ddc = __builtin_cheri_global_data_get();
 	void *pcc = __builtin_cheri_program_counter_get();
 
-	_do___caprelocs(start_relocs, end_relocs, ddc, pcc, 0);
+	_do___caprelocs(start_relocs, end_relocs, relocbase, pcc, 0);
 }
 
 void
@@ -1059,7 +1068,7 @@ process___cap_relocs(Obj_Entry* obj)
 	 *
 	 * TODO: reject those binaries and suggest relinking with the right flag
 	 */
-	void *ddc = __builtin_cheri_global_data_get();
+	void *mapbase = obj->mapbase;
 	void *pcc = __builtin_cheri_program_counter_get();
 
 	dbg("Processing %lu __cap_relocs for %s\n", (end_relocs - start_relocs),
@@ -1077,7 +1086,7 @@ process___cap_relocs(Obj_Entry* obj)
 #endif
 	vaddr_t base_addr = 0;
 
-	_do___caprelocs(start_relocs, end_relocs, ddc, pcc, base_addr);
+	_do___caprelocs(start_relocs, end_relocs, mapbase, pcc, base_addr);
 
 	obj->cap_relocs_processed = true;
 }

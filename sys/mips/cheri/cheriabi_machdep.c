@@ -781,12 +781,10 @@ cheriabi_newthread_init(struct thread *td)
 
 	/*
 	 * We assume that the caller has initialised the trapframe to zeroes
-	 * and then set ddc, idc, and pcc appropriatly. We might want to
-	 * check this with a more thorough set of assertions in the future.
-
+	 * and then set idc, and pcc appropriatly. We might want to check
+	 * this with a more thorough set of assertions in the future.
 	 */
 	frame = &td->td_pcb->pcb_regs;
-	KASSERT(frame->ddc != NULL, ("%s: NULL $ddc", __func__));
 	KASSERT(frame->pcc != NULL, ("%s: NULL $epcc", __func__));
 
 	/*

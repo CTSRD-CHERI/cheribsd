@@ -469,7 +469,7 @@ _init_tls(void)
 			tls_init = (void*) phdr[i].p_vaddr;
 #else
 			tls_init = cheri_csetbounds(cheri_setoffset(
-			    cheri_getdefault(), phdr[i].p_vaddr),
+			    base, phdr[i].p_vaddr - cheri_getbase(base)),
 			    tls_init_size);
 #endif
 			break;
