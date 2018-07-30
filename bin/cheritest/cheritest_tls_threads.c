@@ -84,6 +84,8 @@ test_tls_threads_get_vars(void *arg __unused)
 	if (pthread_cond_broadcast(&cond) != 0)
 		cheritest_failure_err("pthread_cond_broadcast");
 
+	// We have not yet released the lock, so no need to check before
+	// waiting.
 	do {
 		if (pthread_cond_wait(&cond, &lock) != 0)
 			cheritest_failure_err("pthread_cond_wait");
@@ -119,10 +121,10 @@ test_tls_threads(const struct cheri_test *ctp __unused)
 
 	if (pthread_mutex_lock(&lock) != 0)
 		cheritest_failure_err("pthread_mutex_lock");
-	do {
+	while (thread_done == 0) {
 		if (pthread_cond_wait(&cond, &lock) != 0)
 			cheritest_failure_err("pthread_cond_wait");
-	} while (thread_done == 0);
+	}
 
 #ifdef CHERI_DYNAMIC_TESTS
 	thr_tls_gd_val = *thr_tls_gd;
