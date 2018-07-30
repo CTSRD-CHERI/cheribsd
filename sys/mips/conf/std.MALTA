@@ -68,3 +68,7 @@ device		bpf
 device		md
 device		uart
 device		random
+# For faster QEMU random
+device		virtio
+device		virtio_random
+device		virtio_pci
