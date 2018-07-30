@@ -46,11 +46,15 @@
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
+
+#ifdef CHERI_LIBCHERI_TESTS
 #include <cheri/libcheri_enter.h>
 #include <cheri/libcheri_fd.h>
 #include <cheri/libcheri_sandbox.h>
 
 #include <cheritest-helper.h>
+#endif
+
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -64,6 +68,7 @@
 
 #include "cheritest.h"
 
+#ifdef CHERI_LIBCHERI_TESTS
 void
 test_sandbox_syscall(const struct cheri_test *ctp __unused)
 {
@@ -95,6 +100,7 @@ test_sandbox_syscall(const struct cheri_test *ctp __unused)
 		    "security.cheri.syscall_violations unchanged");
 	cheritest_success();
 }
+#endif
 
 void
 test_sig_dfl_neq_ign(const struct cheri_test *ctp __unused)

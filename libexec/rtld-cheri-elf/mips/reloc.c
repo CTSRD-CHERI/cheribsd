@@ -938,6 +938,13 @@ allocate_initial_tls(Obj_Entry *objs)
 void *
 _mips_get_tls(void)
 {
+#ifdef __CHERI_CAPABILITY_TLS__
+	uintcap_t _rv;
+
+	__asm__ __volatile__ (
+	    "creadhwr\t%0, $chwr_userlocal"
+	    : "=C" (_rv));
+#else
 	uint64_t _rv;
 
 	/* XXX-BD: need capability rdhwr */
@@ -947,6 +954,8 @@ _mips_get_tls(void)
 	    "rdhwr\t%0, $29\n\t"
 	    ".set\tpop"
 	    : "=r" (_rv));
+#endif
+
 	/*
 	 * XXXSS See 'git show c6be4f4d2d1b71c04de5d3bbb6933ce2dbcdb317'
 	 *
@@ -956,7 +965,11 @@ _mips_get_tls(void)
 	 */
 	_rv = _rv - TLS_TP_OFFSET - TLS_TCB_SIZE;
 
+#ifdef __CHERI_CAPABILITY_TLS__
+	return (void *)_rv;
+#else
 	return cheri_setoffset(cheri_getdefault(), _rv);
+#endif
 }
 
 void *

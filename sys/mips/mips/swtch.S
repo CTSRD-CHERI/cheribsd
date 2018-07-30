@@ -502,13 +502,15 @@ sw2:
 #ifdef CPU_CHERI
 	# Get TLS address
 	clc	$c3, a1, TD_MDTLS($ddc)
+	PTR_L	t1, TD_MDTLS_TCB_OFFSET(a1)	# Get TLS/TCB offset
+	cincoffset $c3, $c3, t1
+	cwritehwr $c3, $chwr_userlocal
 	cgetoffset t0, $c3
 	cgetbase t1, $c3
-	PTR_ADDU t0, t0, t1
 #else
 	PTR_L	t0, TD_MDTLS(a1)		# Get TLS pointer
-#endif
 	PTR_L	t1, TD_MDTLS_TCB_OFFSET(a1)	# Get TLS/TCB offset
+#endif
 	PTR_ADDU v0, t0, t1
 	MTC0	v0, MIPS_COP_0_USERLOCAL, 2	# write it to ULR for rdhwr
 

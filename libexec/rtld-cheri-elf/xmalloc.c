@@ -77,7 +77,7 @@ malloc_aligned(size_t size, size_t align)
 		align = sizeof(void *);
 
 	mem = xmalloc(size + sizeof(void *) + align - 1);
-	res = __builtin_align_up(mem, align);
+	res = __builtin_align_up((char *)mem + sizeof(void *), align);
 	*(void **)((uintptr_t)res - sizeof(void *)) = mem;
 	return (res);
 }

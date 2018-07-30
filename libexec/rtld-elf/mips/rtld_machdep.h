@@ -64,7 +64,7 @@ typedef struct {
 #define round(size, align) \
     (((size) + (align) - 1) & ~((align) - 1))
 #define calculate_first_tls_offset(size, align) \
-    round(TLS_TCB_SIZE, align)
+    TLS_TCB_SIZE
 #define calculate_tls_offset(prev_offset, prev_size, size, align) \
     round(prev_offset + prev_size, align)
 #define calculate_tls_end(off, size)    ((off) + (size))

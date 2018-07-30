@@ -62,6 +62,10 @@ SUBDIR.${MK_TESTS}+=	tests
 .if ${MK_CHERI_SHARED} != "no"
 SUBDIR.${MK_CHERI}+=	cheri_minimal_dynamic_exe
 SUBDIR.${MK_CHERI}+=	cheri_minimal_pie_exe
+SUBDIR.${MK_CHERI}+=	cheriabitest-dynamic
+SUBDIR.${MK_CHERI}+=	cheriabitest-dynamic-mt
+SUBDIR.${MK_CHERI}+=	cheritest-dynamic
+SUBDIR.${MK_CHERI}+=	cheritest-dynamic-mt
 .endif
 
 .include <bsd.arch.inc.mk>
