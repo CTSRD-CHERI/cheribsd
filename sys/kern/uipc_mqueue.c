@@ -1752,9 +1752,8 @@ mqueue_send(struct mqueue *mq, const char * __capability msg_ptr,
 		goto bad;
 	}
 	for (;;) {
-		ts2 = *abs_timeout;
 		getnanotime(&ts);
-		timespecsub(&ts2, &ts);
+		timespecsub(abs_timeout, &ts, &ts2);
 		if (ts2.tv_sec < 0 || (ts2.tv_sec == 0 && ts2.tv_nsec <= 0)) {
 			error = ETIMEDOUT;
 			break;
@@ -1904,9 +1903,8 @@ mqueue_receive(struct mqueue *mq, char * __capability msg_ptr,
 	}
 
 	for (;;) {
-		ts2 = *abs_timeout;
 		getnanotime(&ts);
-		timespecsub(&ts2, &ts);
+		timespecsub(abs_timeout, &ts, &ts2);
 		if (ts2.tv_sec < 0 || (ts2.tv_sec == 0 && ts2.tv_nsec <= 0)) {
 			error = ETIMEDOUT;
 			return (error);
