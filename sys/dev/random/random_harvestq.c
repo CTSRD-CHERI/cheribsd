@@ -348,6 +348,18 @@ random_harvestq_init(void *unused __unused)
 	    OID_AUTO, "harvest", CTLFLAG_RW, 0,
 	    "Entropy Device Parameters");
 	harvest_context.hc_source_mask = RANDOM_HARVEST_EVERYTHING_MASK;
+	/*
+	 * XXXAR: For QEMU-CHERI using virtio-rng noticeably speeds up boot and
+	 * we can trust virtio for our purposes so enabled it by default
+	 */
+	harvest_context.hc_source_mask |= (1 << RANDOM_PURE_VIRTIO);
+#ifdef CPU_CHERI
+	/*
+	 * Turning off random harvesting for software interrupts saves ~2% from
+	 * intr on DE4 (and probably even more on QEMU
+	 */
+	harvest_context.hc_source_mask &= ~(1 << RANDOM_SWI);
+#endif
 	SYSCTL_ADD_PROC(&random_clist,
 	    SYSCTL_CHILDREN(random_sys_o),
 	    OID_AUTO, "mask", CTLTYPE_UINT | CTLFLAG_RW,
@@ -411,10 +423,10 @@ random_harvestq_prime(void *unused __unused)
 				explicit_bzero(&event, sizeof(event));
 			}
 			explicit_bzero(data, size);
-			if (bootverbose)
+			if (bootverbose || 1)
 				printf("random: read %zu bytes from preloaded cache\n", size);
 		} else
-			if (bootverbose)
+			if (bootverbose || 1)
 				printf("random: no preloaded entropy cache\n");
 	}
 }
@@ -477,6 +489,7 @@ random_harvest_queue(const void *entropy, u_int size, u_int bits, enum random_en
 		harvest_context.hc_entropy_ring.in = ring_in;
 	}
 	RANDOM_HARVEST_UNLOCK();
+
 }
 
 /*-
