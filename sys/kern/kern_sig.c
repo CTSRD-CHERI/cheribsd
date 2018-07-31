@@ -308,6 +308,27 @@ siginfo_to_siginfo_native(const _siginfo_t *si,
 }
 
 void
+siginfo_native_to_siginfo(const struct siginfo_native *si_n,
+    _siginfo_t *si)
+{
+
+#if !__has_feature(capabilities)
+	memcpy(si, si_n, sizeof(*si_n));
+#else
+	si->si_signo = si_n->si_signo;
+	si->si_errno = si_n->si_errno;
+	si->si_code = si_n->si_code;
+	si->si_pid = si_n->si_pid;
+	si->si_uid = si_n->si_uid;
+	si->si_status = si_n->si_status;
+	si->si_addr = (__cheri_tocap void * __capability)si_n->si_addr;
+	si->si_value.sival_ptr =
+	    (__cheri_tocap void * __capability)si_n->si_value.sival_ptr;
+	memcpy(&si->_reason, &si_n->_reason, sizeof(si_n->_reason));
+#endif
+}
+
+void
 sigqueue_init(sigqueue_t *list, struct proc *p)
 {
 	SIGEMPTYSET(list->sq_signals);
