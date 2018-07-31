@@ -2091,7 +2091,7 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 		struct ptrace_lwpinfo_c pl;
 	} c = { 0 };
 
-	int error = 0;
+	int error = 0, data;
 	void * __capability addr = &r;
 
 	AUDIT_ARG_PID(uap->pid);
@@ -2099,6 +2099,7 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 	AUDIT_ARG_VALUE(uap->data);
 
 	(void)c;
+	data = uap->data;
 
 	switch (uap->req) {
 	/* If we're supposed to ignore user parameters... */
@@ -2118,9 +2119,15 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 #ifdef CPU_CHERI
 	case PT_GETCAPREGS:
 #endif
-	case PT_LWPINFO:
 	case PT_GETNUMLWPS:
 	case PT_GET_SC_ARGS:
+		break;
+
+	case PT_LWPINFO:
+		if (uap->data > sizeof(c.pl))
+			error = EINVAL;
+		else
+			data = sizeof(r.pl);
 		break;
 
 	/*
@@ -2195,12 +2202,12 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 	if (error)
 		return (error);
 
-	error = kern_ptrace(td, uap->req, uap->pid, addr, uap->data);
+	error = kern_ptrace(td, uap->req, uap->pid, addr, data);
 	if (error)
 		return (error);
 
-#if 0
 	switch (uap->req) {
+#if 0
 	case PT_VM_ENTRY:
 		error = COPYOUT(&r.pve, uap->addr, sizeof r.pve);
 		break;
@@ -2225,16 +2232,31 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 		/* NB: The size in uap->data is validated in kern_ptrace(). */
 		error = copyout(&r.ptevents, uap->addr, uap->data);
 		break;
+#endif
 	case PT_LWPINFO:
-		/* NB: The size in uap->data is validated in kern_ptrace(). */
-		error = copyout(&r.pl, uap->addr, uap->data);
+		memset(&c.pl, 0, sizeof(c.pl));
+		c.pl.pl_lwpid = r.pl.pl_lwpid;
+		c.pl.pl_event = r.pl.pl_event;
+		c.pl.pl_flags = r.pl.pl_flags;
+		c.pl.pl_sigmask = r.pl.pl_sigmask;
+		c.pl.pl_siglist = r.pl.pl_siglist;
+		c.pl.pl_child_pid = r.pl.pl_child_pid;
+		c.pl.pl_syscall_code = r.pl.pl_syscall_code;
+		c.pl.pl_syscall_narg = r.pl.pl_syscall_narg;
+		memcpy(c.pl.pl_tdname, r.pl.pl_tdname, sizeof(c.pl.pl_tdname));
+		siginfo_native_to_siginfo(&r.pl.pl_siginfo, &c.pl.pl_siginfo);
+
+		error = copyout_c(&c.pl, uap->addr, uap->data);
 		break;
+#if 0
 	case PT_GET_SC_ARGS:
 		error = copyout(r.args, uap->addr, MIN(uap->data,
 		    sizeof(r.args)));
 		break;
-	}
 #endif
+	default:
+		break;
+	}
 
 	return (error);
 }
