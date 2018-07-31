@@ -212,6 +212,7 @@ random_sources_feed(void)
 #endif
 	local_read_rate = atomic_readandclear_32(&read_rate);
 	LIST_FOREACH(rrs, &source_list, rrs_entries) {
+		printf("%s: Reading %d rounds of entropy\n", __func__, p_random_alg_context->ra_poolcount*(local_read_rate + 1));
 		for (i = 0; i < p_random_alg_context->ra_poolcount*(local_read_rate + 1); i++) {
 			n = rrs->rrs_source->rs_read(entropy, sizeof(entropy));
 			KASSERT((n <= sizeof(entropy)), ("%s: rs_read returned too much data (%u > %zu)", __func__, n, sizeof(entropy)));
