@@ -2121,6 +2121,8 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 #endif
 	case PT_GETNUMLWPS:
 	case PT_GET_SC_ARGS:
+	case PT_LWP_EVENTS:
+	case PT_SUSPEND:
 		break;
 
 	case PT_LWPINFO:
