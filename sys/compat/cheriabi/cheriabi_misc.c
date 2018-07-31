@@ -2228,11 +2228,11 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 		error = COPYOUT(&r.capreg, uap->addr, sizeof r.capreg);
 		break;
 #endif
+#endif
 	case PT_GET_EVENT_MASK:
 		/* NB: The size in uap->data is validated in kern_ptrace(). */
-		error = copyout(&r.ptevents, uap->addr, uap->data);
+		error = copyout_c(&r.ptevents, uap->addr, uap->data);
 		break;
-#endif
 	case PT_LWPINFO:
 		memset(&c.pl, 0, sizeof(c.pl));
 		c.pl.pl_lwpid = r.pl.pl_lwpid;
