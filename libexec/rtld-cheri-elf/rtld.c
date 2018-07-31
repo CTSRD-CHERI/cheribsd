@@ -2060,6 +2060,8 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
     /* MIPS has a bogus DT_TEXTREL. */
     assert(!objtmp.textrel);
 #endif
+    /* This was done in _rtld_do___caprelocs_self */
+    objtmp.cap_relocs_processed = true;
     /*
      * Temporarily put the dynamic linker entry into the object list, so
      * that symbols can be found.
@@ -2085,8 +2087,6 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 	assert(objtmp.cap_relocs_size == cap_relocs_size);
     }
 #endif
-    /* This was done in _rtld_do___caprelocs_self */
-    objtmp.cap_relocs_processed = true;
 
     /* Now that non-local variables can be accesses, copy out obj_rtld. */
     memcpy(&obj_rtld, &objtmp, sizeof(obj_rtld));
