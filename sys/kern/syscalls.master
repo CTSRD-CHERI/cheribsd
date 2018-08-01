@@ -1479,7 +1479,21 @@
 		    int flags
 		);
 	}
-259-271	AUE_NULL	UNIMPL	nosys
+259	AUE_NULL	STD	{
+		int caprevoke_shadow(
+			int flags,
+			_In_ void *arena,
+			_Out_ void *shadow,
+		);
+	}
+260	AUE_NULL	STD	{
+		void *caprevoke(
+		    int flags,
+		    uint64_t start_epoch,
+		    _Out_ struct caprevoke_stats *statout,
+		);
+	}
+261-271	AUE_NULL	UNIMPL	nosys
 272	AUE_O_GETDENTS	COMPAT11 {
 		int getdents(
 		    int fd,

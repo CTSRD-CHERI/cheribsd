@@ -308,6 +308,7 @@ cheri/cheri_asserts.c			optional cpu_cheri
 cheri/cheri_sysctl.c			optional cpu_cheri
 cheri/cheri_otype.c			optional cpu_cheri
 compat/cheriabi/cheriabi_abort2.c	optional compat_cheriabi
+compat/cheriabi/cheriabi_caprevoke.c	optional compat_cheriabi
 compat/cheriabi/cheriabi_generic.c	optional compat_cheriabi
 compat/cheriabi/cheriabi_mac.c		optional compat_cheriabi
 compat/cheriabi/cheriabi_mmap.c		optional compat_cheriabi
