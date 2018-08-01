@@ -210,7 +210,9 @@ typedef struct {
 #else
 #define	BOUND_PTR(ptr, size)	\
     ((opt_cheri_setbounds && ptr != NULL) ? \
-    cheri_csetbounds((ptr), (size)) : (ptr))
+    cheri_andperm(cheri_csetbounds((ptr), (size)), \
+	CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_CHERIABI_VMMAP) : \
+    (ptr))
 #endif
 
 /* Whether encountered any invalid config options. */
