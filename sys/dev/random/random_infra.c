@@ -50,9 +50,9 @@ MALLOC_DEFINE(M_ENTROPY, "entropy", "Entropy harvesting buffers and data structu
 struct sources_head source_list = LIST_HEAD_INITIALIZER(source_list);
 
 #if defined(RANDOM_LOADABLE)
-struct random_algorithm *p_random_alg_context = NULL;
+volatile struct random_algorithm *p_random_alg_context = NULL;
 #else /* !defined(RANDOM_LOADABLE) */
-struct random_algorithm *p_random_alg_context = &random_alg_context;
+volatile struct random_algorithm *p_random_alg_context = &random_alg_context;
 #endif /* defined(RANDOM_LOADABLE) */
 
 #if defined(RANDOM_LOADABLE)

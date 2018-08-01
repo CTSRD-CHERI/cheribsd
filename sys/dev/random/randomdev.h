@@ -84,7 +84,8 @@ struct random_algorithm {
 	random_alg_eventprocessor_t	*ra_event_processor;
 };
 
-extern struct random_algorithm random_alg_context, *p_random_alg_context;
+extern struct random_algorithm random_alg_context;
+extern volatile struct random_algorithm *p_random_alg_context;
 
 #ifdef _KERNEL
 

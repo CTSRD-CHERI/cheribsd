@@ -38,6 +38,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/callout.h>
 #include <sys/random.h>
 #include <sys/malloc.h>  /* Needed to include <dev/random/randomdev.h> */
+#include <sys/lock.h>
+#include <sys/mutex.h>
 
 #include <machine/bus.h>
 #include <machine/resource.h>
@@ -125,9 +127,22 @@ vtrnd_probe(device_t dev)
 	return (BUS_PROBE_DEFAULT);
 }
 
+/* XXXAR: when we have virtio just use that to gather random data. This
+ * speeds up ssh connections a lot since and should be fine for QEMU-CHERI */
+#if defined(CPU_QEMU_MALTA)
+#define USE_VIRTIO_AS_RANDOM_ALG 1
+#define USE_VIRTIO_AS_RANDOM_SOURCE 0
+#else
+#define USE_VIRTIO_AS_RANDOM_ALG 0
+#define USE_VIRTIO_AS_RANDOM_ALG 0
+#endif
+
+
+#if USE_VIRTIO_AS_RANDOM_SOURCE != 0 || USE_VIRTIO_AS_RANDOM_ALG != 0
+
 static struct virtqueue *vq_global_hack = NULL;
 
-static u_int random_virtio_read(void *buf, u_int size) {
+static u_int random_virtio_read_impl(void *buf, u_int size) {
 	struct sglist_seg segs[1];
 	struct sglist sg;
 	struct virtqueue *vq;
@@ -159,17 +174,126 @@ static u_int random_virtio_read(void *buf, u_int size) {
 	 * done when we return from the notify.
 	 */
 	virtqueue_notify(vq);
-	virtqueue_poll(vq, NULL);
-	// printf("%s: read %u bytes of random data:\n", __func__, size);
-	return size;
+	uint32_t len;
+	virtqueue_poll(vq, &len);
+	/* printf("%s: read %u bytes of random data (len = %d):\n", __func__, size, len); */
+	return len;
 }
 
+#endif
+
+#if USE_VIRTIO_AS_RANDOM_SOURCE != 0
 static struct random_source random_virtio = {
 	.rs_ident = "VIRTIO RNG",
 	.rs_source = RANDOM_PURE_VIRTIO,
-	.rs_read = random_virtio_read,
+	.rs_read = random_virtio_read_impl,
+};
+#endif /* USE_VIRTIO_AS_RANDOM_SOURCE */
+
+#if USE_VIRTIO_AS_RANDOM_ALG != 0
+/* From other_algorith.m */
+#define	RANDOM_RESEED_INIT_LOCK(x)		mtx_init(&random_virtio_mtx, "reseed mutex", NULL, MTX_DEF)
+#define	RANDOM_RESEED_DEINIT_LOCK(x)		mtx_destroy(&random_virtio_mtx)
+#define	RANDOM_RESEED_LOCK(x)			mtx_lock(&random_virtio_mtx)
+#define	RANDOM_RESEED_UNLOCK(x)			mtx_unlock(&random_virtio_mtx)
+#define	RANDOM_RESEED_ASSERT_LOCK_OWNED(x)	mtx_assert(&random_virtio_mtx, MA_OWNED)
+/*
+ * RANDOM_VIRTIO_NPOOLS is used when reading hardware random
+ * number sources to ensure that each pool gets one read sample
+ * per loop iteration. Yarrow has 2 such pools (FAST and SLOW),
+ * and fortuna has 32 (0-31). The RNG used prior to Yarrow and
+ * ported from Linux had just 1 pool.
+ */
+#define RANDOM_VIRTIO_NPOOLS 1
+/* Use a mutex to protect your reseed variables? */
+static struct mtx random_virtio_mtx;
+
+static void
+random_virtio_init_alg(void *unused __unused)
+{
+	RANDOM_RESEED_INIT_LOCK();
+}
+
+static void
+random_virtio_deinit_alg(void *unused __unused)
+{
+	RANDOM_RESEED_DEINIT_LOCK();
+}
+
+static void
+random_virtio_pre_read(void)
+{
+
+	RANDOM_RESEED_LOCK();
+	/*
+	 * Do pre-read housekeeping work here!
+	 * You may use this as a chance to unblock the generator.
+	 */
+	RANDOM_RESEED_UNLOCK();
+}
+
+/*
+ * void random_virtio_read(uint8_t *buf, u_int count)
+ *
+ * Generate <count> bytes of output into <*buf>.
+ * You may use the fact that <count> will be a multiple of
+ * RANDOM_BLOCKSIZE for optimization purposes.
+ *
+ * This function will always be called with your generator
+ * unblocked and ready. If you are not ready to generate
+ * output here, then feel free to KASSERT() or panic().
+ */
+static void
+random_virtio_read(uint8_t *buf, u_int count)
+{
+	u_int read_bytes;
+
+	RANDOM_RESEED_LOCK();
+	/* XXXAR: how can we check how much data has been filled by QEMU? */
+	read_bytes = random_virtio_read_impl(buf, count);
+	printf("%s: read %u bytes of random data from virtio\n", __func__, read_bytes);
+	KASSERT(read_bytes == count,
+	    ("Only read %d random bytes instead of %d", read_bytes, count));
+	RANDOM_RESEED_UNLOCK();
+}
+
+/*
+ * bool random_virtio_seeded(void)
+ *
+ * Return true if your generator is ready to generate
+ * output, and false otherwise.
+ */
+static bool
+random_virtio_seeded(void)
+{
+	/*
+	 * Virtio random algorithm is always seeded (worst case the host will block).
+	 * TODO: find out if we can query how much the host is willing to give
+	 */
+	printf("%s: true\n", __func__);
+	return (true);
+}
+
+static void
+random_virtio_process_event(struct harvest_event *event)
+{
+	/* Do nothing here */
+}
+
+struct random_algorithm virtio_random_alg_context = {
+	.ra_ident = "VirtIO",
+	.ra_init_alg = random_virtio_init_alg,
+	.ra_deinit_alg = random_virtio_deinit_alg,
+	.ra_pre_read = random_virtio_pre_read,
+	.ra_read = random_virtio_read,
+	.ra_seeded = random_virtio_seeded,
+	.ra_event_processor = random_virtio_process_event,
+	.ra_poolcount = RANDOM_VIRTIO_NPOOLS,
 };
 
+volatile struct random_algorithm *old_random_alg_context;
+
+#endif /* USE_VIRTIO_AS_RANDOM_ALG */
 
 static int
 vtrnd_attach(device_t dev)
@@ -191,20 +315,26 @@ vtrnd_attach(device_t dev)
 		goto fail;
 	}
 
+#if USE_VIRTIO_AS_RANDOM_SOURCE != 0
 	vq_global_hack = sc->vtrnd_vq;
-	/* 
+	/*
 	 * XXXAR: This causes the random thread to read tons entropy 10 times
 	 * per second (but for QEMU I added a hack to only use it once).
 	 * Also running the harvest every 5 seconds is completely pointless
 	 * since it only gathers 16 bits of entropy...
 	 */
-#if defined(CPU_CHERI) || defined(CPU_QEMU_MALTA)
 	random_source_register(&random_virtio);
 	(void)&vtrnd_timer;
 	/* Let's read a bit more entropy to ensure we have enough for boot */
 	read_rate_increment(10);
+#elif USE_VIRTIO_AS_RANDOM_ALG != 0
+	vq_global_hack = sc->vtrnd_vq;
+	old_random_alg_context = p_random_alg_context;
+	random_virtio_init_alg(NULL);
+	p_random_alg_context = &virtio_random_alg_context;
+	printf("%s: Updated random alg context\n", __func__);
+	(void)&vtrnd_timer;
 #else
-	(void)&random_virtio;
 	callout_reset(&sc->vtrnd_callout, 5 * hz, vtrnd_timer, sc);
 #endif
 fail:
@@ -219,7 +349,14 @@ vtrnd_detach(device_t dev)
 {
 	struct vtrnd_softc *sc;
 
+#if USE_VIRTIO_AS_RANDOM_SOURCE != 0
 	vq_global_hack = NULL;
+	random_source_deregister(&random_virtio);
+#elif USE_VIRTIO_AS_RANDOM_ALG != 0
+	vq_global_hack = NULL;
+	random_virtio_deinit_alg(NULL);
+	p_random_alg_context = old_random_alg_context;
+#endif
 
 	sc = device_get_softc(dev);
 
@@ -293,20 +430,6 @@ vtrnd_timer(void *xsc)
 	struct vtrnd_softc *sc;
 
 	sc = xsc;
-#if 0
-#ifdef CPU_QEMU_MALTA
-	/* XXXAR: Ensure we don't block for many seconds on first boot in QEMU */
-	int i;
-	for (i = 0; i < 40 && !p_random_alg_context->ra_seeded(); i++) {
-		printf("HACK: attempting to seed RNG %s. %d iterations so far\n", i, p_random_alg_context->ra_ident);
-		vtrnd_harvest(sc);
-	}
-	if (i != 0)
-		printf("HACK: Used %d iterations of virtio-rng seed RNG %s\n", i, p_random_alg_context->ra_ident);
-	if (i == 40)
-		printf("HACK: failed to seed RNG %s after 40 iterations\n", i, p_random_alg_context->ra_ident);
-#endif
-#endif
 	vtrnd_harvest(sc);
-	callout_schedule(&sc->vtrnd_callout, 20 * 5 * hz);
+	callout_schedule(&sc->vtrnd_callout, 5 * hz);
 }
