@@ -183,7 +183,7 @@ random_kthread(void)
 		 * runnning under QEMU CHERI. Also we don't need that much so just stop after the
 		 * initial seeding has completed.
 		 */
-		printf("%s: read entropy, suspending random harvest kproc\n", __func__);
+		/* printf("%s: read entropy, suspending random harvest kproc\n", __func__); */
 		kproc_suspend(harvest_context.hc_kthread_proc, 0);
 #else
 		tsleep_sbt(&harvest_context.hc_kthread_proc, 0, "-", SBT_1S/10, 0, C_PREL(1));
@@ -249,7 +249,7 @@ void
 read_rate_increment(u_int chunk)
 {
 
-	printf("%s: %d\n", __func__, chunk);
+	/* printf("%s: %d\n", __func__, chunk); */
 	atomic_add_32(&read_rate, chunk);
 #if defined(CPU_QEMU_MALTA) || defined(CPU_CHERI) || defined(CPU_BERI)
 	if (harvest_context.hc_kthread_proc)

@@ -251,7 +251,7 @@ random_virtio_read(uint8_t *buf, u_int count)
 	RANDOM_RESEED_LOCK();
 	/* XXXAR: how can we check how much data has been filled by QEMU? */
 	read_bytes = random_virtio_read_impl(buf, count);
-	printf("%s: read %u bytes of random data from virtio\n", __func__, read_bytes);
+	/* printf("%s: read %u bytes of random data from virtio\n", __func__, read_bytes); */
 	KASSERT(read_bytes == count,
 	    ("Only read %d random bytes instead of %d", read_bytes, count));
 	RANDOM_RESEED_UNLOCK();
@@ -270,7 +270,6 @@ random_virtio_seeded(void)
 	 * Virtio random algorithm is always seeded (worst case the host will block).
 	 * TODO: find out if we can query how much the host is willing to give
 	 */
-	printf("%s: true\n", __func__);
 	return (true);
 }
 
