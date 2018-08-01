@@ -897,7 +897,7 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 * restricted (or not set at all).
 	 */
 	/* XXXAR: is there a better way to check for dynamic binaries? */
-	is_dynamic_binary = imgp->end_addr == 0 && imgp->reloc_base != 0;
+	is_dynamic_binary = imgp->reloc_base != 0;
 	data_length = is_dynamic_binary ?
 	    CHERI_CAP_USER_DATA_LENGTH - imgp->reloc_base : text_end;
 	code_length = is_dynamic_binary ?

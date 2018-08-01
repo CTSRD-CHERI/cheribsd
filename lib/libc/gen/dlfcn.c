@@ -191,13 +191,11 @@ static void
 dl_init_phdr_info(void)
 {
 	Elf_Auxinfo *auxp;
-	void *base;
 	unsigned int i;
 
 	for (auxp = __elf_aux_vector; auxp->a_type != AT_NULL; auxp++) {
 		switch (auxp->a_type) {
 		case AT_BASE:
-			base = auxp->a_un.a_ptr;
 			phdr_info.dlpi_addr = (Elf_Addr)auxp->a_un.a_ptr;
 			break;
 		case AT_EXECPATH:
@@ -219,8 +217,9 @@ dl_init_phdr_info(void)
 #ifndef __CHERI_PURE_CAPABILITY__
 			    (void*)phdr_info.dlpi_phdr[i].p_vaddr;
 #else
-			    cheri_csetbounds(cheri_setoffset(base,
-				phdr_info.dlpi_phdr[i].p_vaddr - cheri_getbase(base)),
+			    cheri_csetbounds(cheri_setoffset(phdr_info.dlpi_phdr,
+				phdr_info.dlpi_phdr[i].p_vaddr -
+				    cheri_getbase(phdr_info.dlpi_phdr)),
 				phdr_info.dlpi_phdr[i].p_filesz);
 
 #endif
