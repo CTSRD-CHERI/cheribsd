@@ -1472,7 +1472,21 @@
 		    uint32_t key
 		);
 	}
-260-271	AUE_NULL	RESERVED
+260	AUE_NULL	STD	{
+		int cheri_revoke_shadow(
+			int flags,
+			_In_ void *arena,
+			_Out_ void *shadow,
+		);
+	}
+261	AUE_NULL	STD	{
+		void *cheri_revoke(
+		    int flags,
+		    uint64_t start_epoch,
+		    _Out_ struct cheri_revoke_syscall_info *crsi,
+		);
+	}
+262-271	AUE_NULL	RESERVED
 272	AUE_O_GETDENTS	COMPAT11 {
 		int getdents(
 		    int fd,
