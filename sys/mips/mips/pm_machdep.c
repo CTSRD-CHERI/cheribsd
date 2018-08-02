@@ -349,6 +349,12 @@ sys_sigreturn(struct thread *td, struct sigreturn_args *uap)
 int
 ptrace_set_pc(struct thread *td, unsigned long addr)
 {
+
+#ifdef CPU_CHERI
+	/* XXX: Use CFromPtr to see if 'addr' fits in PCC. */
+	if (td->td_proc && SV_PROC_FLAG(td->td_proc, SV_CHERI))
+		return (EINVAL);
+#endif
 	td->td_frame->pc = (register_t) addr;
 	return 0;
 }

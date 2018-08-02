@@ -2132,18 +2132,12 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 			data = sizeof(r.pl);
 		break;
 
-	/*
-	 * XXX Several calls allow optional setting of the next address;
-	 * for the moment, we don't support that but do want to support
-	 * resuming, all the same
-	 */
+	/* Pass along an untagged virtual address for the desired PC. */
 	case PT_CONTINUE:
 	case PT_STEP:
 	case PT_TO_SCE:
 	case PT_TO_SCX:
 	case PT_SYSCALL:
-		if (uap->addr != (char * __capability)(intcap_t)1)
-			return EINVAL;
 		addr = cheri_cleartag(uap->addr);
 		break;
 
