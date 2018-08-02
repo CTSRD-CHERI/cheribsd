@@ -222,9 +222,48 @@ cheriabi_fetch_syscall_arg(struct thread *td, void * __capability *argp,
 	KASSERT(argnum >= 0, ("Negative argument number %d\n", argnum));
 	KASSERT(argnum < 8, ("Argument number %d >= 8\n", argnum));
 
+	/*
+	 * For syscall() and __syscall(), the arguments are stored in a
+	 * var args block pointed to by c13.
+	 *
+	 * XXX: Integer arguments can be stored as either 32-bit integers
+	 * or 64-bit longs.  We don't have a way to know what size an
+	 * integer argument is.  For now we assume they are 32-bit
+	 * integers since those arguments are more common with system
+	 * calls than off_t or longs.
+	 */
+	if (td->td_sa.argoff > 1) {
+		/* An earlier argument failed to copyin. */
+		*argp = (void * __capability)(uintcap_t)0;
+		return;
+	} else if (td->td_sa.argoff == 1) {
+		int error, intval, offset;
+
+		offset = 0;
+		for (i = 0; i < argnum; i++) {
+			if (ptrmask & (1 << i)) {
+				offset = roundup2(offset, sizeof(uintcap_t));
+				offset += sizeof(uintcap_t);
+			} else
+				offset += sizeof(int);
+		}
+		if (ptrmask & (1 << argnum))
+			error = copyincap_c((char * __capability)locr0->c13 +
+			    offset,
+			    (__cheri_tocap void * __capability * __capability)
+			    argp, sizeof(*argp));
+		else {
+			error = copyin_c((char * __capability)locr0->c13 +
+			    offset, &intval, sizeof(intval));
+			*argp = (void * __capability)(__intcap_t)intval;
+		}
+		if (error)
+			td->td_sa.argoff = error + 1;
+		return;
+	}
+
 	/* XXX: O(1) possible with more bit twiddling. */
 	intreg_offset = ptrreg_offset = -1;
-	intreg_offset += td->td_sa.argoff;
 	for (i = 0; i <= argnum; i++) {
 		if (ptrmask & (1 << i)) {
 			is_ptr_arg = 1;
@@ -304,6 +343,9 @@ cheriabi_fetch_syscall_args(struct thread *td)
 	sa->narg = sa->callp->sy_narg;
 
 	error = cheriabi_dispatch_fill_uap(td, sa->code, sa->args);
+
+	if (error == 0 && sa->argoff > 1)
+		error = sa->argoff - 1;
 
 	td->td_retval[0] = 0;
 	td->td_retval[1] = locr0->v1;
