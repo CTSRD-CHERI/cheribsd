@@ -1988,8 +1988,9 @@ imalloc(static_opts_t *sopts, dynamic_opts_t *dopts) {
 		sopts->slow = true;
 		ret = imalloc_body(sopts, dopts, tsd);
 	}
-	*dopts->result = BOUND_PTR(*dopts->result,
-	    dopts->num_items * dopts->item_size);
+	if (ret == 0)
+		*dopts->result = BOUND_PTR(*dopts->result,
+		    dopts->num_items * dopts->item_size);
 	return ret;
 }
 /******************************************************************************/
