@@ -40,6 +40,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>  /* Needed to include <dev/random/randomdev.h> */
 #include <sys/lock.h>
 #include <sys/mutex.h>
+#include <sys/syslog.h>
 
 #include <machine/bus.h>
 #include <machine/resource.h>
@@ -246,12 +247,22 @@ random_virtio_pre_read(void)
 static void
 random_virtio_read(uint8_t *buf, u_int count)
 {
-	u_int read_bytes;
+	u_int read_bytes = 0;
 
 	RANDOM_RESEED_LOCK();
 	/* XXXAR: how can we check how much data has been filled by QEMU? */
-	read_bytes = random_virtio_read_impl(buf, count);
+
 	/* printf("%s: read %u bytes of random data from virtio\n", __func__, read_bytes); */
+	while (read_bytes < count) {
+		u_int read_chunk = random_virtio_read_impl(buf + read_bytes, count - read_bytes);
+		read_bytes += read_chunk;
+		if (read_bytes < count) {
+			log(LOG_ERR, "%s: Did not read full amount of random data: "
+			   "read %u instead of %u\n", __func__, read_chunk, count - (read_bytes - read_chunk));
+			/* Sleep a little bit to give the host a chance to gather entropy */
+			tsleep(&vq_global_hack, 0, "VIRTIO RNG", 1);
+		}
+	}
 	KASSERT(read_bytes == count,
 	    ("Only read %d random bytes instead of %d", read_bytes, count));
 	RANDOM_RESEED_UNLOCK();
