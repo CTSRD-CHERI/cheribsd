@@ -1,9 +1,11 @@
 # $FreeBSD$
 
-.if !defined(COMPAT_32BIT)
-GEOM_CLASS_DIR?=/lib/geom
-.else
+.if defined(COMPAT_32BIT)
 GEOM_CLASS_DIR?=/usr/lib32/geom
+.elif defined(LIBCHERI)
+GEOM_CLASS_DIR?=/usr/libcheri/geom
+.else
+GEOM_CLASS_DIR?=/lib/geom
 .endif
 
 GEOM_CLASSES=	cache

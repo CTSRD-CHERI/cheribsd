@@ -1092,7 +1092,7 @@ _cheri_libs=lib/csu lib/libgcc_eh lib/libcompiler_rt lib/libc \
 	    lib/libelf lib/libkvm lib/ncurses/ncurses lib/ncurses/ncursesw \
 	    secure/lib/libssl lib/libmd lib/libutil lib/libprocstat \
 	    lib/librtld_db cddl/lib/libctf lib/libkiconv lib/libpam/libpam \
-	    lib/libcom_err lib/libcrypt
+	    lib/libcom_err lib/libcrypt lib/libufs
 
 .if ${MK_KERBEROS} != "no"
 _cheri_libs+=kerberos5/lib/libroken kerberos5/lib/libasn1 kerberos5/lib/libwind \
