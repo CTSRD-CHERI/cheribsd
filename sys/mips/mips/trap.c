@@ -1552,11 +1552,38 @@ MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
 
 	default:
 		printf("Unhandled opcode in %s: 0x%x\n", __func__, inst.word);
+#ifdef DDB
+		/*
+		 * Print some context for cases like jenkins where we don't
+		 * have an interactive console:
+		 */
+		int32_t context_instr;
+		fetch_instr_near_pc(framePtr, -8, &context_instr);
+		db_printf("Instr at %p ($pc-8): %x   ", (char*)framePtr->pc - 8, context_instr);
+		db_disasm((db_addr_t)&context_instr, 0);
+		fetch_instr_near_pc(framePtr, -4, &context_instr);
+		db_printf("Instr at %p ($pc-4): %x   ", (char*)framePtr->pc - 4, context_instr);
+		db_disasm((db_addr_t)&context_instr, 0);
+		fetch_instr_near_pc(framePtr, 0, &context_instr);
+		db_printf("Instr at %p ($pc+0): %x   ", (char*)framePtr->pc + 0, context_instr);
+		db_disasm((db_addr_t)&context_instr, 0);
+		fetch_instr_near_pc(framePtr, 4, &context_instr);
+		db_printf("Instr at %p ($pc+4): %x   ", (char*)framePtr->pc + 4, context_instr);
+		db_disasm((db_addr_t)&context_instr, 0);
+#endif
+
+
 		/* retAddr = instPC + 4;  */
-		/* Return to NULL to force a crash in the user program */
+		/* log registers in trap frame */
+		log_frame_dump(framePtr);
+#ifdef CPU_CHERI
+		if (log_cheri_registers)
+			cheri_log_exception_registers(framePtr);
+#endif
 #ifdef DDB
 		kdb_enter(KDB_WHY_CHERI, "BAD OPCODE in MipsEmulateBranch");
 #endif
+		/* Return to NULL to force a crash in the user program */
 		retAddr = 0;
 	}
 	return (retAddr);
