@@ -82,6 +82,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/kdb.h>
 #include <sys/lock.h>
 #include <sys/mman.h>
 #include <sys/proc.h>
@@ -567,6 +568,7 @@ RetryFault:;
 	fs.map_generation = fs.map->timestamp;
 
 	if (fs.entry->eflags & MAP_ENTRY_NOFAULT) {
+		kdb_backtrace();
 		panic("%s: fault on nofault entry, addr: %#lx",
 		    __func__, (u_long)vaddr);
 	}
