@@ -1554,6 +1554,9 @@ MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
 		printf("Unhandled opcode in %s: 0x%x\n", __func__, inst.word);
 		/* retAddr = instPC + 4;  */
 		/* Return to NULL to force a crash in the user program */
+#ifdef DDB
+		kdb_enter(KDB_WHY_CHERI, "BAD OPCODE in MipsEmulateBranch");
+#endif
 		retAddr = 0;
 	}
 	return (retAddr);
