@@ -1050,7 +1050,6 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 		CASE_PCIOCGETCONF:
 		case PCIOCGETBAR:
 		case PCIOCLISTVPD:
-		case PCIOCBARMMAP:
 			break;
 		default:
 			return (EPERM);
