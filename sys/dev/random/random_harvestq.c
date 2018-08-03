@@ -177,7 +177,17 @@ random_kthread(void)
 			}
 		}
 		/* XXX: FIX!! This is a *great* place to pass hardware/live entropy to random(9) */
+#if defined(CPU_QEMU_MALTA) || defined(CPU_CHERI) || defined(CPU_BERI)
+		/*
+		 * XXXAR: reading randomness from virtio 10 times per second is way too much when
+		 * runnning under QEMU CHERI. Also we don't need that much so just stop after the
+		 * initial seeding has completed.
+		 */
+		printf("%s: read entropy, suspending random harvest kproc\n", __func__);
+		kproc_suspend(harvest_context.hc_kthread_proc, 0);
+#else
 		tsleep_sbt(&harvest_context.hc_kthread_proc, 0, "-", SBT_1S/10, 0, C_PREL(1));
+#endif
 	}
 	random_kthread_control = -1;
 	wakeup(&harvest_context.hc_kthread_proc);
@@ -239,7 +249,12 @@ void
 read_rate_increment(u_int chunk)
 {
 
+	printf("%s: %d\n", __func__, chunk);
 	atomic_add_32(&read_rate, chunk);
+#if defined(CPU_QEMU_MALTA) || defined(CPU_CHERI) || defined(CPU_BERI)
+	if (harvest_context.hc_kthread_proc)
+		kproc_resume(harvest_context.hc_kthread_proc);
+#endif
 }
 
 /* ARGSUSED */
