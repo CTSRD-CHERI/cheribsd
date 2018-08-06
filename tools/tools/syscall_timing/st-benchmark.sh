@@ -12,6 +12,8 @@ run_st() {
 #	echo "${0}: binary details:"
 #	file "${ST}"
 
+	# Avoid creating the statcounters output for this one.
+	export STATCOUNTERS_OUTPUT="/dev/null"
 	TEST_LIST=`${ST} 2>&1 | sed 1d`
 
 	OUTPUT="${RESULTS}/${NAME}"
