@@ -35,6 +35,6 @@ sysctl -a | grep -E '(invariants|witness)' || true
 
 run_st "cheri"
 run_st "hybrid"
-run_st "mips"
+#run_st "mips"
 
 echo "${0}: done"
