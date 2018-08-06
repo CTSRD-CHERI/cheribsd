@@ -215,6 +215,7 @@ CRUNCH_PROGS_usr.bin+= \
 		dirname \
 		du \
 		env \
+		false \
 		fetch \
 		find \
 		grep \
@@ -235,6 +236,7 @@ CRUNCH_PROGS_usr.bin+= \
 		sed \
 		seq \
 		sockstat \
+		stat \
 		tail \
 		tar \
 		tee \
@@ -243,6 +245,7 @@ CRUNCH_PROGS_usr.bin+= \
 		top \
 		tput \
 		tr \
+		true \
 		uname \
 		uudecode \
 		uuencode \
@@ -255,6 +258,7 @@ CRUNCH_PROGS_usr.bin+= \
 CRUNCH_ALIAS_bmake=	make
 CRUNCH_ALIAS_bzip2=	bunzip2
 CRUNCH_ALIAS_tar=	bsdtar
+CRUNCH_ALIAS_stat=	realink
 CRUNCH_ALIAS_hexdump=	hd od
 CRUNCH_ALIAS_w=	uptime
 CRUNCH_PROGS_usr.bin+=su
