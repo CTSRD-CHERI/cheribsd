@@ -51,3 +51,5 @@ cp "${ST_SRC}/syscall_timing" "${ST_INSTALL}/hybrid/"
 #make clean all
 #cp "${ST_SRC}/syscall_timing" "${ST_INSTALL}/mips/"
 
+cp st-benchmark.sh "${ST_INSTALL}/"
+
