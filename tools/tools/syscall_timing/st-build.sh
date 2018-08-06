@@ -29,17 +29,17 @@ SSP_CFLAGS="" export SSP_CFLAGS
 
 CC="${CHERI_SDK}/bin/clang" export CC
 CFLAGS="${CFLAGS_COMMON} ${CFLAGS_LIBSTATCOUNTERS} --sysroot=${CHERI_SYSROOT} -B${CHERI_SDK}/bin -target cheri-unknown-freebsd -mabi=purecap" export CFLAGS
+DESTDIR="${ST_INSTALL}/cheri/" export DESTDIR
 mkdir -p "${ST_INSTALL}/cheri"
 cd "${ST_SRC}"
-make clean all
-cp "${ST_SRC}/syscall_timing" "${ST_INSTALL}/cheri/"
+make clean all install
 
 CC="${CHERI_SDK}/bin/clang" export CC
 CFLAGS="${CFLAGS_COMMON} ${CFLAGS_LIBSTATCOUNTERS} --sysroot=${CHERI_SYSROOT} -B${CHERI_SDK}/bin -target cheri-unknown-freebsd -mabi=n64" export CFLAGS
+DESTDIR="${ST_INSTALL}/hybrid/" export DESTDIR
 mkdir -p "${ST_INSTALL}/hybrid"
 cd "${ST_SRC}"
-make clean all
-cp "${ST_SRC}/syscall_timing" "${ST_INSTALL}/hybrid/"
+make clean all install
 
 #CC="${CHERI_SDK}/bin/clang" export CC
 #CFLAGS="${CFLAGS_COMMON} --sysroot=${CHERI_FREEBSD} -B${CHERI_SDK}/bin -target mips64-unknown-freebsd -mabi=n64" export CFLAGS
