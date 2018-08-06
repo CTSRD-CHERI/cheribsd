@@ -21,7 +21,7 @@ ST_INSTALL="${WORKSPACE}/syscall_timing"
 #ST_SRC="${HOME}/cheri/cheribsd/tools/tools/syscall_timing"
 #ST_INSTALL="${HOME}/syscall_timing"
 
-CFLAGS_COMMON="-pipe -O2 -cheri=256 -cheri-cap-table-abi=pcrel -msoft-float -ggdb -static -integrated-as"
+CFLAGS_COMMON="-pipe -O2 -cheri=256 -cheri-cap-table-abi=pcrel -fuse-ld=lld -msoft-float -ggdb -static -integrated-as"
 CFLAGS_LIBSTATCOUNTERS="-Wl,--whole-archive -lstatcounters -Wl,--no-whole-archive"
 
 # Don't add -fstack-protector-strong; it breaks CHERI binaries.
