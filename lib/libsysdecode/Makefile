@@ -113,6 +113,10 @@ CLEANFILES= ioctl.c tables.h
 CPP+=	-m32
 .endif
 
+.if !defined(NEED_CHERI)
+NEED_CHERI=	hybrid
+.endif
+
 .if ${MK_PF} != "no"
 CFLAGS+=-DPF
 .endif
