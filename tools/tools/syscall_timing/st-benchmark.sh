@@ -38,3 +38,5 @@ run_st "hybrid"
 #run_st "mips"
 
 echo "${0}: done"
+
+echo "DONE RUNNING BENCHMARKS"
