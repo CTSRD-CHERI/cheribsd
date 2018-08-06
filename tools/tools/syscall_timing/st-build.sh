@@ -8,7 +8,7 @@ fi
 CHERI_ROOT="${WORKSPACE}/cheri"
 CHERI_OUTPUT="${WORKSPACE}/syscall-timing"
 CHERI_SDK="${WORKSPACE}/sdk"
-CHERI_SYSROOT="${WORKSPACE}/sdk/sysroot256/"
+CHERI_SYSROOT="${WORKSPACE}/sdk/sysroot128/"
 #CHERI_FREEBSD="${CHERI_OUTPUT}/freebsd-mips"
 ST_SRC="${WORKSPACE}/tools/tools/syscall_timing"
 ST_INSTALL="${WORKSPACE}/syscall_timing"
@@ -16,12 +16,12 @@ ST_INSTALL="${WORKSPACE}/syscall_timing"
 #CHERI_ROOT="${HOME}/cheri"
 #CHERI_OUTPUT="${CHERI_ROOT}/output"
 #CHERI_SDK="${CHERI_OUTPUT}/sdk"
-#CHERI_SYSROOT="${CHERI_OUTPUT}/sdk/sysroot256"
+#CHERI_SYSROOT="${CHERI_OUTPUT}/sdk/sysroot128"
 #CHERI_FREEBSD="${CHERI_OUTPUT}/freebsd-mips"
 #ST_SRC="${HOME}/cheri/cheribsd/tools/tools/syscall_timing"
 #ST_INSTALL="${HOME}/syscall_timing"
 
-CFLAGS_COMMON="-pipe -O2 -cheri=256 -cheri-cap-table-abi=pcrel -fuse-ld=lld -msoft-float -ggdb -static -integrated-as"
+CFLAGS_COMMON="-pipe -O2 -cheri=128 -cheri-cap-table-abi=pcrel -fuse-ld=lld -msoft-float -ggdb -static -integrated-as"
 CFLAGS_LIBSTATCOUNTERS="-Wl,--whole-archive -lstatcounters -Wl,--no-whole-archive"
 
 # Don't add -fstack-protector-strong; it breaks CHERI binaries.
