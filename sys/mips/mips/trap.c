@@ -430,6 +430,16 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 	/* TODO: if KERNLAND() */
 #ifdef CPU_CHERI
 	bad_inst_ptr = (char * __kerncap)frame->pcc + offset_from_pc;
+	/*
+	 * Work around bug in the FPGA implementation: EPCC points to the
+	 * delay slot if a trap happenend in the delay slot.
+	 */
+	if (cheri_getoffset(frame->pcc) != frame->pc) {
+		KASSERT(cheri_getoffset(frame->pcc) == frame->pc + 4,
+		    ("NEW BUG FOUND? pcc (%jx) <-> pc (%jx) mismatch:",
+		    (uintmax_t)cheri_getoffset(frame->pcc), (uintmax_t)frame->pc));
+		frame->pcc = cheri_setoffset(frame->pcc, frame->pc);
+	}
 	KASSERT(cheri_getoffset(frame->pcc) == frame->pc,
 	    ("pcc (%jx) <-> pc (%jx) mismatch:",
 	    (uintmax_t)cheri_getoffset(frame->pcc), (uintmax_t)frame->pc));
@@ -459,19 +469,6 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 static intptr_t
 fetch_bad_branch_instr(struct trapframe *frame)
 {
-	/*
-	 * Work around bug in the FPGA implementation: EPCC points to the
-	 * delay slot if a trap happenend in the delay slot.
-	 */
-#if defined(CPU_CHERI)
-	if (cheri_getoffset(frame->pcc) != frame->pc) {
-		KASSERT(cheri_getoffset(frame->pcc) == frame->pc + 4,
-		    ("NEW BUG FOUND? pcc (%jx) <-> pc (%jx) mismatch:",
-		    (uintmax_t)cheri_getoffset(frame->pcc), (uintmax_t)frame->pc));
-		frame->pcc = cheri_setoffset(frame->pcc, frame->pc);
-	}
-#endif
-
 	KASSERT(DELAYBRANCH(frame->cause),
 	    ("%s called when not in delay branch", __func__));
 	/*
