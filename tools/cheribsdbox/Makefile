@@ -231,7 +231,6 @@ CRUNCH_PROGS_usr.bin+= \
 		login \
 		mktemp \
 		nc \
-		netstat \
 		passwd \
 		sed \
 		seq \
