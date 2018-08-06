@@ -8,7 +8,7 @@ fi
 CHERI_ROOT="${WORKSPACE}/cheri"
 CHERI_OUTPUT="${WORKSPACE}/syscall-timing"
 CHERI_SDK="${WORKSPACE}/sdk"
-CHERI_SYSROOT="${WORKSPACE}/"
+CHERI_SYSROOT="${WORKSPACE}/sdk/sysroot256/"
 #CHERI_FREEBSD="${CHERI_OUTPUT}/freebsd-mips"
 ST_SRC="${WORKSPACE}/tools/tools/syscall_timing"
 ST_INSTALL="${WORKSPACE}/syscall_timing"
