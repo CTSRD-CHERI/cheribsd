@@ -1,16 +1,13 @@
 #!/bin/sh -e
 
-ST_ROOT="/syscall_timing"
+ST_ROOT=`pwd`
 RESULTS="${ST_ROOT}/results"
 
 run_st() {
 	NAME="$1"
 
 	ST="${ST_ROOT}/${NAME}/syscall_timing"
-	if [ ! -x "${ST}" ]; then
-		echo "${0}: ${ST} is not executable; exiting" > /dev/stderr
-		exit 1
-	fi
+	chmod +x "${ST}"
 
 	echo "${0}: binary details:"
 	file "${ST}"
@@ -38,5 +35,7 @@ run_st "hybrid"
 #run_st "mips"
 
 echo "${0}: done"
+
+tar zcvf /tmp/syscall_timing-output.tgz "${ST_ROOT}"
 
 echo "DONE RUNNING BENCHMARKS"
