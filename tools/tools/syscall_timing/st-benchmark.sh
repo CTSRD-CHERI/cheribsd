@@ -9,8 +9,8 @@ run_st() {
 	ST="${ST_ROOT}/${NAME}/syscall_timing"
 	chmod +x "${ST}"
 
-	echo "${0}: binary details:"
-	file "${ST}"
+#	echo "${0}: binary details:"
+#	file "${ST}"
 
 	TEST_LIST=`${ST} 2>&1 | sed 1d`
 
