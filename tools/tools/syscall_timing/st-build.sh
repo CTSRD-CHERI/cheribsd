@@ -27,6 +27,9 @@ CFLAGS_LIBSTATCOUNTERS="-Wl,--whole-archive -lstatcounters -Wl,--no-whole-archiv
 # Don't add -fstack-protector-strong; it breaks CHERI binaries.
 SSP_CFLAGS="" export SSP_CFLAGS
 
+# Put binaries in the current directory.
+export NO_OBJ=yes
+
 CC="${CHERI_SDK}/bin/clang" export CC
 CFLAGS="${CFLAGS_COMMON} ${CFLAGS_LIBSTATCOUNTERS} --sysroot=${CHERI_SYSROOT} -B${CHERI_SDK}/bin -target cheri-unknown-freebsd -mabi=purecap" export CFLAGS
 mkdir -p "${ST_INSTALL}/cheri"
