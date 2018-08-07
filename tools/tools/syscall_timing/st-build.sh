@@ -24,6 +24,8 @@ ST_INSTALL="${WORKSPACE}/syscall_timing"
 CFLAGS_COMMON="-pipe -O2 -cheri=128 -cheri-cap-table-abi=pcrel -fuse-ld=lld -msoft-float -ggdb -static -integrated-as"
 CFLAGS_LIBSTATCOUNTERS="-Wl,--whole-archive -lstatcounters -Wl,--no-whole-archive"
 
+CFLAGS_COMMON="${CFLAGS_COMMON} -static"
+
 # Don't add -fstack-protector-strong; it breaks CHERI binaries.
 SSP_CFLAGS="" export SSP_CFLAGS
 
