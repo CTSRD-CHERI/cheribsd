@@ -352,7 +352,7 @@ rd_reset(rd_agent_t *rdap)
 	base = 0;
 	for (i = 0; i < count; i++) {
 		if (auxv[i].a_type == AT_BASE) {
-			base = (u_long)(uintptr_t)auxv[i].a_un.a_ptr;
+			base = (vaddr_t)auxv[i].a_un.a_ptr;
 			break;
 		}
 	}
