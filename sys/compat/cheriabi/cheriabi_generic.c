@@ -36,7 +36,9 @@ __FBSDID("$FreeBSD$");
 #include "opt_ktrace.h"
 
 #include <sys/param.h>
+#include <sys/pcpu.h>
 #include <sys/poll.h>
+#include <sys/proc.h>
 #include <sys/syscallsubr.h>
 #include <sys/systm.h>
 
@@ -143,6 +145,8 @@ cheriabi_pselect(struct thread *td, struct cheriabi_pselect_args *uap)
 	    uset, NFDBITS));
 }
 
+volatile fd_set * __capability foo, * __capability bar, * __capability baz;
+
 int
 cheriabi_select(struct thread *td, struct cheriabi_select_args *uap)
 {
@@ -156,6 +160,10 @@ cheriabi_select(struct thread *td, struct cheriabi_select_args *uap)
 		tvp = &tv;
 	} else
 		tvp = NULL;
+
+	foo = __USER_CAP_UNBOUND(cheriabi_select);
+	bar = __USER_CAP_UNBOUND(cheriabi_poll);
+	baz = __USER_CAP_UNBOUND(cheriabi_pselect);
 
 	return (kern_select(td, uap->nd, uap->in, uap->ou, uap->ex, tvp,
 	    NFDBITS));
