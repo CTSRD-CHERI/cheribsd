@@ -21,7 +21,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180806
+ *   "updated": 20180807,
  *   "target_type": "prog",
  *   "changes": [],
  *   "change_comment": "work around compiler bug"
