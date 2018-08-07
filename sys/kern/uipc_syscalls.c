@@ -942,7 +942,7 @@ kern_recvit(struct thread *td, int s, kmsghdr_t *mp, enum uio_seg fromseg,
 {
 	struct uio auio;
 	kiovec_t * __capability iov;
-	struct mbuf *m, *control = NULL;
+	struct mbuf *control, *m;
 	char * __capability ctlbuf;
 	struct file *fp;
 	struct socket *so;
@@ -989,6 +989,7 @@ kern_recvit(struct thread *td, int s, kmsghdr_t *mp, enum uio_seg fromseg,
 	if (KTRPOINT(td, KTR_GENIO))
 		ktruio = cloneuio(&auio);
 #endif
+	control = NULL;
 	len = auio.uio_resid;
 	error = soreceive(so, &fromsa, &auio, NULL,
 	    (mp->msg_control || controlp) ? &control : NULL,
@@ -1054,30 +1055,22 @@ kern_recvit(struct thread *td, int s, kmsghdr_t *mp, enum uio_seg fromseg,
 			control->m_data += sizeof (struct cmsghdr);
 		}
 #endif
-		len = mp->msg_controllen;
-		m = control;
-		mp->msg_controllen = 0;
 		ctlbuf = mp->msg_control;
-
-		while (m && len > 0) {
-			unsigned int tocopy;
-
-			if (len >= m->m_len)
-				tocopy = m->m_len;
-			else {
-				mp->msg_flags |= MSG_CTRUNC;
-				tocopy = len;
-			}
-
+		len = mp->msg_controllen;
+		mp->msg_controllen = 0;
+		for (m = control; m != NULL && len >= m->m_len; m = m->m_next) {
 			if ((error = copyout_c(mtod(m, caddr_t), ctlbuf,
-			    tocopy)) != 0)
+			    m->m_len)) != 0)
 				goto out;
 
-			ctlbuf += tocopy;
-			len -= tocopy;
-			m = m->m_next;
+			ctlbuf += m->m_len;
+			len -= m->m_len;
+			mp->msg_controllen += m->m_len;
 		}
-		mp->msg_controllen = (__cheri_addr vaddr_t)ctlbuf - (__cheri_addr vaddr_t)mp->msg_control;
+		if (m != NULL) {
+			mp->msg_flags |= MSG_CTRUNC;
+			m_dispose_extcontrolm(m);
+		}
 	}
 out:
 	fdrop(fp, td);
@@ -1089,8 +1082,11 @@ out:
 
 	if (error == 0 && controlp != NULL)
 		*controlp = control;
-	else  if (control)
+	else if (control != NULL) {
+		if (error != 0)
+			m_dispose_extcontrolm(control);
 		m_freem(control);
+	}
 
 	return (error);
 }
@@ -1652,6 +1648,54 @@ getsockaddr(struct sockaddr **namp, const struct sockaddr * __capability uaddr,
 		*namp = sa;
 	}
 	return (error);
+}
+
+/*
+ * Dispose of externalized rights from an SCM_RIGHTS message.  This function
+ * should be used in error or truncation cases to avoid leaking file descriptors
+ * into the recipient's (the current thread's) table.
+ */
+void
+m_dispose_extcontrolm(struct mbuf *m)
+{
+	struct cmsghdr *cm;
+	struct file *fp;
+	struct thread *td;
+	socklen_t clen, datalen;
+	int error, fd, *fds, nfd;
+
+	td = curthread;
+	for (; m != NULL; m = m->m_next) {
+		if (m->m_type != MT_EXTCONTROL)
+			continue;
+		cm = mtod(m, struct cmsghdr *);
+		clen = m->m_len;
+		while (clen > 0) {
+			if (clen < sizeof(*cm))
+				panic("%s: truncated mbuf %p", __func__, m);
+			datalen = CMSG_SPACE(cm->cmsg_len - CMSG_SPACE(0));
+			if (clen < datalen)
+				panic("%s: truncated mbuf %p", __func__, m);
+
+			if (cm->cmsg_level == SOL_SOCKET &&
+			    cm->cmsg_type == SCM_RIGHTS) {
+				fds = (int *)CMSG_DATA(cm);
+				nfd = (cm->cmsg_len - CMSG_SPACE(0)) /
+				    sizeof(int);
+
+				while (nfd-- > 0) {
+					fd = *fds++;
+					error = fget(td, fd, &cap_no_rights,
+					    &fp);
+					if (error == 0)
+						fdclose(td, fp, fd);
+				}
+			}
+			clen -= datalen;
+			cm = (struct cmsghdr *)((uint8_t *)cm + datalen);
+		}
+		m_chtype(m, MT_CONTROL);
+	}
 }
 // CHERI CHANGES START
 // {
