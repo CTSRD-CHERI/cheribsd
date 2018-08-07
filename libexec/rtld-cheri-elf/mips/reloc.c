@@ -601,7 +601,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				/* XXXAR: always adding st_value seems to be required (also glibc does it)*/
 				val += (Elf_Addr)def->st_value;
 
-				if (r_symndx != 0) {
+				if (__predict_false(r_symndx != 0)) {
 					_rtld_error("%s: local R_MIPS_REL32 relocation references symbol %s (%d). st_value=0x%lx, st_info=%x, st_shndx=%d",
 					    obj->path, obj->strtab + def->st_name, r_symndx, def->st_value, def->st_info, def->st_shndx);
 					return (-1);
@@ -737,7 +737,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 		{
 			def = find_symdef(r_symndx, obj,
 			    &defobj, flags, NULL, lockstate);
-			if (def == NULL) {
+			if (__predict_false(def == NULL)) {
 				_rtld_error("%s: Could not find symbol %s",
 				    obj->path, symname(obj, r_symndx));
 				return -1;
@@ -763,7 +763,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 		{
 			def = find_symdef(r_symndx, obj, &defobj, flags, NULL,
 			    lockstate);
-			if (def == NULL) {
+			if (__predict_false(def == NULL)) {
 				_rtld_error("%s: Could not find symbol %s",
 				    obj->path, symname(obj, r_symndx));
 				return -1;
@@ -775,8 +775,8 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			bool is_undef_weak = false;
 			if (def->st_shndx == SHN_UNDEF) {
 				/* Verify that we are resolving a weak symbol */
-				const Elf_Sym* src_sym = obj->symtab + r_symndx;
 #ifdef DEBUG
+				const Elf_Sym* src_sym = obj->symtab + r_symndx;
 				dbg("NOTE: found undefined R_CHERI_CAPABILITY "
 				    "for %s (in %s): value=%ld, size=%ld, "
 				    "type=%d, def bind=%d,sym bind=%d",
@@ -785,10 +785,10 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				    ELF_ST_TYPE(def->st_info),
 				    ELF_ST_BIND(def->st_info),
 				    ELF_ST_BIND(src_sym->st_info));
-#endif
 				assert(ELF_ST_BIND(src_sym->st_info) == STB_WEAK);
 				assert(def->st_value == 0);
 				assert(def->st_size == 0);
+#endif
 				is_undef_weak = true;
 			}
 			else if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
@@ -802,7 +802,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			// FIXME: this warning breaks some tests that expect clean stdout/stderr
 			// FIXME: See https://github.com/CTSRD-CHERI/cheribsd/issues/257
 			// TODO: or use this approach: https://github.com/CTSRD-CHERI/cheribsd/commit/c1920496c0086d9c5214fb0f491e4d6cdff3828e?
-			if (symval != NULL && cheri_getlen(symval) <= 0) {
+			if (__predict_false(symval != NULL && cheri_getlen(symval) <= 0)) {
 				rtld_fdprintf(STDERR_FILENO, "Warning: created "
 				    "zero length capability for %s (in %s): %-#p\n",
 				    symname(obj, r_symndx), obj->path, symval);
@@ -816,7 +816,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			 */
 			uint64_t src_offset = load_ptr(where, sizeof(uint64_t));
 			symval += src_offset;
-			if (!cheri_gettag(symval) && !is_undef_weak) {
+			if (__predict_false(!cheri_gettag(symval) && !is_undef_weak)) {
 				_rtld_error("%s: constructed invalid capability"
 				   "for %s: %#p",  obj->path,
 				    symname(obj, r_symndx), symval);
