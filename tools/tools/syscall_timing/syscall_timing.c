@@ -158,7 +158,8 @@ test_getresuid(uintmax_t num, uintmax_t int_arg, const char *path)
 	for (i = 0; i < num; i++) {
 		if (alarm_fired)
 			break;
-		(void)getresuid(&ruid, &euid, &suid);
+		if (getresuid(&ruid, &euid, &suid) == -1)
+			err(-1, "test_getresuid: getresuid");
 	}
 	benchmark_stop();
 	return (i);
@@ -174,7 +175,8 @@ test_clock_gettime(uintmax_t num, uintmax_t int_arg, const char *path)
 	for (i = 0; i < num; i++) {
 		if (alarm_fired)
 			break;
-		(void)clock_gettime(CLOCK_REALTIME, &ts);
+		if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
+			err(-1, "test_clock_gettime: clock_gettime");
 	}
 	benchmark_stop();
 	return (i);
@@ -190,7 +192,8 @@ test_gettimeofday(uintmax_t num, uintmax_t int_arg, const char *path)
 	for (i = 0; i < num; i++) {
 		if (alarm_fired)
 			break;
-		(void)gettimeofday(&tv, NULL);
+		if (gettimeofday(&tv, NULL) == -1)
+			err(-1, "test_gettimeofday: gettimeofday");
 	}
 	benchmark_stop();
 	return (i);
@@ -258,7 +261,8 @@ test_select(uintmax_t num, uintmax_t int_arg, const char *path)
 	for (i = 0; i < num; i++) {
 		if (alarm_fired)
 			break;
-		(void)select(0, &readfds, &writefds, &exceptfds, &tv);
+		if (select(0, &readfds, &writefds, &exceptfds, &tv) == -1)
+			err(-1, "test_select: select");
 	}
 	benchmark_stop();
 	return (i);
@@ -371,7 +375,8 @@ test_access(uintmax_t num, uintmax_t int_arg, const char *path)
 	for (i = 0; i < num; i++) {
 		if (alarm_fired)
 			break;
-		access(path, O_RDONLY);
+		if (access(path, O_RDONLY) == -1)
+			err(-1, "test_access: %s", path);
 		close(fd);
 	}
 	benchmark_stop();
