@@ -113,7 +113,7 @@ CLEANFILES= ioctl.c tables.h
 CPP+=	-m32
 .endif
 
-.if !defined(NEED_CHERI)
+.if ${MK_CHERI} != "no" && !defined(NEED_CHERI)
 NEED_CHERI=	hybrid
 .endif
 
