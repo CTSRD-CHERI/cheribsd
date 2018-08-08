@@ -203,6 +203,7 @@ static char *ld_preload;	/* Environment variable for libraries to
 static char *ld_elf_hints_path;	/* Environment variable for alternative hints path */
 static char *ld_tracing;	/* Called from ldd to print libs */
 static char *ld_utrace;		/* Use utrace() to log events. */
+static bool ld_skip_init_funcs = false;	/* XXXAR: debug environment variable to verify relocation processing */
 static struct obj_entry_q obj_list;	/* Queue of all loaded objects */
 static Obj_Entry *obj_main;	/* The main program shared object */
 static Obj_Entry obj_rtld;	/* The dynamic linker shared object */
@@ -522,6 +523,7 @@ _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp)
 	    unsetenv(_LD("LIBRARY_PATH")) || unsetenv(_LD("LIBRARY_PATH_FDS")) ||
 	    unsetenv(_LD("LIBMAP_DISABLE")) || unsetenv(_LD("BIND_NOT")) ||
 	    unsetenv(_LD("DEBUG")) || unsetenv(_LD("ELF_HINTS_PATH")) ||
+	    unsetenv(_LD("SKIP_INIT_FUNCS")) ||
 	    unsetenv(_LD("LOADFLTR")) || unsetenv(_LD("LIBRARY_PATH_RPATH"))) {
 		_rtld_error("environment corrupt; aborting");
 		rtld_die();
@@ -537,6 +539,7 @@ _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp)
     ld_preload = getenv(_LD("PRELOAD"));
     ld_elf_hints_path = getenv(_LD("ELF_HINTS_PATH"));
     ld_loadfltr = getenv(_LD("LOADFLTR")) != NULL;
+    ld_skip_init_funcs = getenv(_LD("SKIP_INIT_FUNCS")) != NULL;
     library_path_rpath = getenv(_LD("LIBRARY_PATH_RPATH"));
     if (library_path_rpath != NULL) {
 	    if (library_path_rpath[0] == 'y' ||
@@ -2556,7 +2559,7 @@ preinit_main(void)
     int index;
 
     preinit_addr = obj_main->preinit_array_cap;
-    if (preinit_addr == NULL)
+    if (preinit_addr == NULL || ld_skip_init_funcs)
 	return;
 
     for (index = 0; index < obj_main->preinit_array_num; index++) {
@@ -2679,7 +2682,7 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
      */
     saved_msg = errmsg_save();
     STAILQ_FOREACH(elm, list, link) {
-	if (elm->obj->init_done) /* Initialized early. */
+	if (elm->obj->init_done || ld_skip_init_funcs) /* Initialized early. */
 	    continue;
 	/*
 	 * Race: other thread might try to use this object before current
