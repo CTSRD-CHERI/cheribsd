@@ -872,7 +872,8 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	    ("text_end 0x%zx > stackbase 0x%lx", text_end, stackbase));
 
 	map_base = (text_end == stackbase) ?
-	    CHERI_CAP_USER_MMAP_BASE : text_end;
+	    CHERI_CAP_USER_MMAP_BASE :
+	    roundup2(text_end, 1ULL << CHERI_ALIGN_SHIFT(stackbase - text_end));
 	KASSERT(map_base < stackbase,
 	    ("map_base 0x%zx >= stackbase 0x%lx", map_base, stackbase));
 	map_length = stackbase - map_base;
