@@ -1145,6 +1145,7 @@ vmem_alloc(vmem_t *vm, vmem_size_t size, int flags, vmem_addr_t *addrp)
 		if (*addrp == 0)
 			return (ENOMEM);
 		CHERI_VM_ASSERT_VALID(*addrp);
+		*addrp = (vm_ptr_t)cheri_bound((void *)*addrp, size);
 		return (0);
 	}
 
@@ -1270,6 +1271,7 @@ out:
 	if (error != 0 && (flags & M_NOWAIT) == 0)
 		panic("failed to allocate waiting allocation\n");
 	CHERI_VM_ASSERT_VALID(*addrp);
+	*addrp = (vm_ptr_t)cheri_bound((void *)*addrp, size);
 
 	return (error);
 }
