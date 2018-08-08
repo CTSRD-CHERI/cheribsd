@@ -93,10 +93,14 @@ typedef int malloc_cpuid_t;
 #    define LG_QUANTUM		4
 #  endif
 #  ifdef __mips__
-#    ifndef __CHERI_PURE_CAPABILITY__
-#    define LG_QUANTUM		3
+#    if defined(__CHERI_PURE_CAPABILITY__) && _MIPS_SZCAP == 256
+#      define LG_QUANTUM	5
+#    elif defined(__CHERI_PURE_CAPABILITY__) && _MIPS_SZCAP == 128
+#      define LG_QUANTUM	4
+#    elif defined(__mips_n32) || defined(__mips_n64)
+#      define LG_QUANTUM	4
 #    else
-#      define LG_QUANTUM		5
+#      define LG_QUANTUM	3
 #    endif
 #  endif
 #  ifdef __or1k__
