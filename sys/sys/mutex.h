@@ -465,7 +465,7 @@ extern struct mtx_pool *mtxpool_sleep;
 
 #define	mtx_initialized(m)	lock_initialized(&(m)->lock_object)
 
-#define lv_mtx_owner(v)	((struct thread *)((v) & ~MTX_FLAGMASK))
+#define lv_mtx_owner(v)	((struct thread *)ptr_clear_flag(v, MTX_FLAGMASK))
 
 #define mtx_owner(m)	lv_mtx_owner(MTX_READ_VALUE(m))
 
