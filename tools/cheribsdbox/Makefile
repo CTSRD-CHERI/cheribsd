@@ -5,6 +5,7 @@ MAN=
 .include <src.opts.mk>
 
 MK_SSP=	no
+MK_PIE=	no
 
 PROG=	cheribsdbox
 CHERIBSDBOX_DIR?=	/bin
