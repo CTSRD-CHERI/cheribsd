@@ -1394,7 +1394,7 @@ ateioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	flags = ifp->if_flags;
 	drv_flags = ifp->if_drv_flags;
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		ATE_LOCK(sc);
 		if ((flags & IFF_UP) != 0) {
 			if ((drv_flags & IFF_DRV_RUNNING) != 0) {
@@ -1413,8 +1413,8 @@ ateioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ATE_UNLOCK(sc);
 		break;
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		if ((drv_flags & IFF_DRV_RUNNING) != 0) {
 			ATE_LOCK(sc);
 			enabled = ate_setmcast(sc);
@@ -1424,12 +1424,12 @@ ateioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
 		if (mask & IFCAP_VLAN_MTU) {
 			ATE_LOCK(sc);

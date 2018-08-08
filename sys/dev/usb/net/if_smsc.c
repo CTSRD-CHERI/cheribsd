@@ -1522,7 +1522,7 @@ smsc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int reinit;
 	
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		sc = uether_getsc(ue);
 		ifr = (struct ifreq *)data;
 

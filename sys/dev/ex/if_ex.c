@@ -823,7 +823,7 @@ ex_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	DODEBUG(Start_End, printf("%s: ex_ioctl: start ", ifp->if_xname););
 
 	switch(cmd) {
-		CASE_IOC_IFREQ(SIOCSIFFLAGS):
+		case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 			DODEBUG(Start_End, printf("SIOCSIFFLAGS"););
 			EX_LOCK(sc);
 			if ((ifp->if_flags & IFF_UP) == 0 &&
@@ -834,12 +834,12 @@ ex_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			}
 			EX_UNLOCK(sc);
 			break;
-		CASE_IOC_IFREQ(SIOCADDMULTI):
-		CASE_IOC_IFREQ(SIOCDELMULTI):
+		case CASE_IOC_IFREQ(SIOCADDMULTI):
+		case CASE_IOC_IFREQ(SIOCDELMULTI):
 			ex_init(sc);
 			error = 0;
 			break;
-		CASE_IOC_IFREQ(SIOCSIFMEDIA):
+		case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		case SIOCGIFMEDIA:
 			error = ifmedia_ioctl(ifp, ifr, &sc->ifmedia, cmd);
 			break;

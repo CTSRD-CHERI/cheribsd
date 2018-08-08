@@ -1636,12 +1636,12 @@ xge_ioctl(struct ifnet *ifnetp, unsigned long command, caddr_t data)
 
 	switch(command) {
 	    /* Set ifnet MTU */
-	    CASE_IOC_IFREQ(SIOCSIFMTU):
+	    case CASE_IOC_IFREQ(SIOCSIFMTU):
 	        retValue = xge_change_mtu(lldev, ifr_mtu_get(ifreqp));
 	        break;
 
 	    /* Set ifnet flags */
-	    CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	    case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 	        if(ifnetp->if_flags & IFF_UP) {
 	            /* Link status is UP */
 	            if(!(ifnetp->if_drv_flags & IFF_DRV_RUNNING)) {
@@ -1660,21 +1660,21 @@ xge_ioctl(struct ifnet *ifnetp, unsigned long command, caddr_t data)
 	        break;
 
 	    /* Add/delete multicast address */
-	    CASE_IOC_IFREQ(SIOCADDMULTI):
-	    CASE_IOC_IFREQ(SIOCDELMULTI):
+	    case CASE_IOC_IFREQ(SIOCADDMULTI):
+	    case CASE_IOC_IFREQ(SIOCDELMULTI):
 	        if(ifnetp->if_drv_flags & IFF_DRV_RUNNING) {
 	            xge_setmulti(lldev);
 	        }
 	        break;
 
 	    /* Set/Get net media */
-	    CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	    case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	    case SIOCGIFMEDIA:
 	        retValue = ifmedia_ioctl(ifnetp, ifreqp, ifmediap, command);
 	        break;
 
 	    /* Set capabilities */
-	    CASE_IOC_IFREQ(SIOCSIFCAP):
+	    case CASE_IOC_IFREQ(SIOCSIFCAP):
 	        mtx_lock(&lldev->mtx_drv);
 	        mask = ifr_reqcap_get(ifreqp) ^ ifnetp->if_capenable;
 	        if(mask & IFCAP_TXCSUM) {
@@ -1709,12 +1709,12 @@ xge_ioctl(struct ifnet *ifnetp, unsigned long command, caddr_t data)
 	        break;
 
 	    /* Custom IOCTL 0 */
-	    CASE_IOC_IFREQ(SIOCGPRIVATE_0):
+	    case CASE_IOC_IFREQ(SIOCGPRIVATE_0):
 	        retValue = xge_ioctl_stats(lldev, ifreqp);
 	        break;
 
 	    /* Custom IOCTL 1 */
-	    CASE_IOC_IFREQ(SIOCGPRIVATE_1):
+	    case CASE_IOC_IFREQ(SIOCGPRIVATE_1):
 	        retValue = xge_ioctl_registers(lldev, ifreqp);
 	        break;
 

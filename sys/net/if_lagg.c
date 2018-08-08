@@ -889,7 +889,7 @@ lagg_port_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		LAGG_SUNLOCK(sc);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		if (lp->lp_ioctl == NULL) {
 			error = EINVAL;
 			break;
@@ -905,7 +905,7 @@ lagg_port_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		VLAN_CAPABILITIES(sc->sc_ifp);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		/* Do not allow the MTU to be changed once joined */
 		error = EINVAL;
 		break;
@@ -1402,7 +1402,7 @@ lagg_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		if_rele(tpif);
 		VLAN_CAPABILITIES(ifp);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		/* Set flags on ports too */
 		LAGG_XLOCK(sc);
 		SLIST_FOREACH(lp, &sc->sc_ports, lp_entries) {
@@ -1428,8 +1428,8 @@ lagg_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		} else
 			LAGG_XUNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		LAGG_WLOCK(sc);
 		SLIST_FOREACH(lp, &sc->sc_ports, lp_entries) {
 			lagg_clrmulti(lp);
@@ -1438,12 +1438,12 @@ lagg_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		LAGG_WUNLOCK(sc);
 		error = 0;
 		break;
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->sc_media, cmd);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		LAGG_XLOCK(sc);
 		SLIST_FOREACH(lp, &sc->sc_ports, lp_entries) {
 			if (lp->lp_ioctl != NULL)
@@ -1455,7 +1455,7 @@ lagg_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = 0;
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		/* Do not allow the MTU to be directly changed */
 		error = EINVAL;
 		break;

@@ -2844,7 +2844,7 @@ fxp_ioctl(if_t ifp, u_long command, caddr_t data)
 	int flag, mask, error = 0, reinit;
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		FXP_LOCK(sc);
 		/*
 		 * If interface is marked up and not running, then start it.
@@ -2868,8 +2868,8 @@ fxp_ioctl(if_t ifp, u_long command, caddr_t data)
 		FXP_UNLOCK(sc);
 		break;
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		FXP_LOCK(sc);
 		if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0) {
 			if_setdrvflagbits(ifp, 0, IFF_DRV_RUNNING);
@@ -2878,7 +2878,7 @@ fxp_ioctl(if_t ifp, u_long command, caddr_t data)
 		FXP_UNLOCK(sc);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		if (sc->miibus != NULL) {
 			mii = device_get_softc(sc->miibus);
@@ -2889,7 +2889,7 @@ fxp_ioctl(if_t ifp, u_long command, caddr_t data)
 		}
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		reinit = 0;
 		mask = if_getcapenable(ifp) ^ ifr_reqcap_get(ifr);
 #ifdef DEVICE_POLLING

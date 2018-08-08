@@ -1751,7 +1751,7 @@ xn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	dev = sc->xbdev;
 
 	switch(cmd) {
-	CASE_IOC_IFREQ(SIOCSIFADDR):
+	case CASE_IOC_IFREQ(SIOCSIFADDR):
 #ifdef INET
 		XN_LOCK(sc);
 		if (ifa->ifa_addr->sa_family == AF_INET) {
@@ -1768,7 +1768,7 @@ xn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 #endif
 		break;
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (ifp->if_mtu == ifr_mtu_get(ifr))
 			break;
 
@@ -1776,7 +1776,7 @@ xn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 		xn_ifinit(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		XN_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			/*
@@ -1796,7 +1796,7 @@ xn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->xn_if_flags = ifp->if_flags;
 		XN_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		reinit = 0;
 
@@ -1857,10 +1857,10 @@ xn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		 */
 		error = tsleep(sc, 0, "xn_rst", 30*hz);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		break;
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->sc_media, cmd);
 		break;

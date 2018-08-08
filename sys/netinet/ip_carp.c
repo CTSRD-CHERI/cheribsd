@@ -1746,7 +1746,7 @@ carp_ioctl(struct ifreq *ifr, u_long cmd, struct thread *td)
 
 	sx_xlock(&carp_sx);
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSVH):
+	case CASE_IOC_IFREQ(SIOCSVH):
 		if ((error = priv_check(td, PRIV_NETINET_CARP)))
 			break;
 		if (carpr.carpr_vhid <= 0 || carpr.carpr_vhid > CARP_MAXVHID ||
@@ -1810,7 +1810,7 @@ carp_ioctl(struct ifreq *ifr, u_long cmd, struct thread *td)
 		}
 		break;
 
-	CASE_IOC_IFREQ(SIOCGVH):
+	case CASE_IOC_IFREQ(SIOCGVH):
 	    {
 		int priveleged;
 

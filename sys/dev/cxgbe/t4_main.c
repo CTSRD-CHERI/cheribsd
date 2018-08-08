@@ -1614,7 +1614,7 @@ cxgbe_ioctl(struct ifnet *ifp, unsigned long cmd, caddr_t data)
 	uint32_t mask;
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		mtu = ifr_mtu_get(ifr);
 		if (mtu < ETHERMIN || mtu > MAX_MTU)
 			return (EINVAL);
@@ -1631,7 +1631,7 @@ cxgbe_ioctl(struct ifnet *ifp, unsigned long cmd, caddr_t data)
 		end_synchronized_op(sc, 0);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		can_sleep = 0;
 redo_sifflags:
 		rc = begin_synchronized_op(sc, vi,
@@ -1672,8 +1672,8 @@ redo_sifflags:
 		end_synchronized_op(sc, can_sleep ? 0 : LOCK_HELD);
 		break;
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI): /* these two are called with a mutex held :-( */
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI): /* these two are called with a mutex held :-( */
 		rc = begin_synchronized_op(sc, vi, HOLD_LOCK, "t4multi");
 		if (rc)
 			return (rc);
@@ -1682,7 +1682,7 @@ redo_sifflags:
 		end_synchronized_op(sc, LOCK_HELD);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		rc = begin_synchronized_op(sc, vi, SLEEP_OK | INTR_OK, "t4cap");
 		if (rc)
 			return (rc);
@@ -1786,13 +1786,13 @@ fail:
 		end_synchronized_op(sc, 0);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 	case SIOCGIFXMEDIA:
 		ifmedia_ioctl(ifp, ifr, &pi->media, cmd);
 		break;
 
-	CASE_IOC_IFREQ(SIOCGI2C): {
+	case CASE_IOC_IFREQ(SIOCGI2C): {
 		struct ifi2creq i2c;
 
 		rc = copyin_c(ifr_data_get_ptr(ifr), &i2c, sizeof(i2c));

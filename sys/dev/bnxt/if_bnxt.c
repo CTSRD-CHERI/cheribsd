@@ -1644,7 +1644,7 @@ bnxt_priv_ioctl(if_ctx_t ctx, u_long command, caddr_t data)
 	struct bnxt_ioctl_data *iod = NULL;
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCGPRIVATE_0):
+	case CASE_IOC_IFREQ(SIOCGPRIVATE_0):
 		if ((rc = priv_check(curthread, PRIV_DRIVER)) != 0)
 			goto exit;
 

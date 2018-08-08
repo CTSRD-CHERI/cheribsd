@@ -1179,12 +1179,12 @@ sppp_ioctl(struct ifnet *ifp, IOCTL_CMD_T cmd, void *data)
 	case SIOCAIFADDR:
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFADDR):
+	case CASE_IOC_IFREQ(SIOCSIFADDR):
 		/* set the interface "up" when assigning an IP address */
 		ifp->if_flags |= IFF_UP;
 		/* FALLTHROUGH */
 
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		going_up = ifp->if_flags & IFF_UP &&
 			(ifp->if_drv_flags & IFF_DRV_RUNNING) == 0;
 		going_down = (ifp->if_flags & IFF_UP) == 0 &&
@@ -1241,7 +1241,7 @@ sppp_ioctl(struct ifnet *ifp, IOCTL_CMD_T cmd, void *data)
 #ifndef ifr_mtu
 #define ifr_mtu ifr_metric
 #endif
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (ifr_mtu_get(ifr) < 128 || ifr_mtu_get(ifr) > sp->lcp.their_mru)
 			return (EINVAL);
 		ifp->if_mtu = ifr_mtu_get(ifr);
@@ -1255,7 +1255,7 @@ sppp_ioctl(struct ifnet *ifp, IOCTL_CMD_T cmd, void *data)
 		break;
 #endif
 #ifdef SIOCGIFMTU
-	CASE_IOC_IFREQ(SIOCGIFMTU):
+	case CASE_IOC_IFREQ(SIOCGIFMTU):
 		ifr_mtu_set(ifr, ifp->if_mtu);
 		break;
 #endif
@@ -1264,12 +1264,12 @@ sppp_ioctl(struct ifnet *ifp, IOCTL_CMD_T cmd, void *data)
 		*(short*)data = ifp->if_mtu;
 		break;
 #endif
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		break;
 
-	CASE_IOC_IFREQ(SIOCGIFGENERIC):
-	CASE_IOC_IFREQ(SIOCSIFGENERIC):
+	case CASE_IOC_IFREQ(SIOCGIFGENERIC):
+	case CASE_IOC_IFREQ(SIOCSIFGENERIC):
 		rv = sppp_params(sp, cmd, data);
 		break;
 
@@ -5078,7 +5078,7 @@ sppp_params(struct sppp *sp, u_long cmd, void *data)
 	switch (subcmd) {
 	case (u_long)SPPPIOGDEFS:
 		switch (cmd) {
-		CASE_IOC_IFREQ(SIOCGIFGENERIC):
+		case CASE_IOC_IFREQ(SIOCGIFGENERIC):
 			break;
 		default:
 			rv = EINVAL;
@@ -5117,7 +5117,7 @@ sppp_params(struct sppp *sp, u_long cmd, void *data)
 
 	case (u_long)SPPPIOSDEFS:
 		switch (cmd) {
-		CASE_IOC_IFREQ(SIOCGIFGENERIC):
+		case CASE_IOC_IFREQ(SIOCGIFGENERIC):
 			break;
 		default:
 			rv = EINVAL;

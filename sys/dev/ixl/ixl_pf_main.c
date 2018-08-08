@@ -5035,7 +5035,7 @@ ixl_ioctl(struct ifnet * ifp, u_long command, caddr_t data)
 
 	switch (command) {
 
-        CASE_IOC_IFREQ(SIOCSIFADDR):
+        case CASE_IOC_IFREQ(SIOCSIFADDR):
 		IOCTL_DEBUGOUT("ioctl: SIOCSIFADDR (Set Interface Address)");
 #ifdef INET
 		if (ifa->ifa_addr->sa_family == AF_INET)
@@ -5062,7 +5062,7 @@ ixl_ioctl(struct ifnet * ifp, u_long command, caddr_t data)
 			error = ether_ioctl(ifp, command, data);
 		break;
 #endif
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		IOCTL_DEBUGOUT("ioctl: SIOCSIFMTU (Set Interface MTU)");
 		if (ifr_mtu_get(ifr) > IXL_MAX_FRAME -
 		   ETHER_HDR_LEN - ETHER_CRC_LEN - ETHER_VLAN_ENCAP_LEN) {
@@ -5078,7 +5078,7 @@ ixl_ioctl(struct ifnet * ifp, u_long command, caddr_t data)
 			IXL_PF_UNLOCK(pf);
 		}
 		break;
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		IOCTL_DEBUGOUT("ioctl: SIOCSIFFLAGS (Set Interface Flags)");
 		IXL_PF_LOCK(pf);
 		if (ifp->if_flags & IFF_UP) {
@@ -5111,7 +5111,7 @@ ixl_ioctl(struct ifnet * ifp, u_long command, caddr_t data)
 		else
 			error = EINVAL;
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
 		IOCTL_DEBUGOUT("ioctl: SIOCADDMULTI");
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 			IXL_PF_LOCK(pf);
@@ -5121,7 +5121,7 @@ ixl_ioctl(struct ifnet * ifp, u_long command, caddr_t data)
 			IXL_PF_UNLOCK(pf);
 		}
 		break;
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		IOCTL_DEBUGOUT("ioctl: SIOCDELMULTI");
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 			IXL_PF_LOCK(pf);
@@ -5131,13 +5131,13 @@ ixl_ioctl(struct ifnet * ifp, u_long command, caddr_t data)
 			IXL_PF_UNLOCK(pf);
 		}
 		break;
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 	case SIOCGIFXMEDIA:
 		IOCTL_DEBUGOUT("ioctl: SIOCxIFMEDIA (Get/Set Interface Media)");
 		error = ifmedia_ioctl(ifp, ifr, &vsi->media, command);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 	{
 		int mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		IOCTL_DEBUGOUT("ioctl: SIOCSIFCAP (Set Capabilities)");
@@ -5166,7 +5166,7 @@ ixl_ioctl(struct ifnet * ifp, u_long command, caddr_t data)
 		break;
 	}
 #if __FreeBSD_version >= 1003000
-	CASE_IOC_IFREQ(SIOCGI2C):
+	case CASE_IOC_IFREQ(SIOCGI2C):
 	{
 		struct ifi2creq i2c;
 		int i;

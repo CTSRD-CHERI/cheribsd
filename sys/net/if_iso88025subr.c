@@ -157,7 +157,7 @@ iso88025_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	error = 0;
 
         switch (command) {
-        CASE_IOC_IFREQ(SIOCSIFADDR):
+        case CASE_IOC_IFREQ(SIOCSIFADDR):
                 ifp->if_flags |= IFF_UP;
 
                 switch (ifa->ifa_addr->sa_family) {
@@ -173,12 +173,12 @@ iso88025_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
                 }
                 break;
 
-        CASE_IOC_IFREQ(SIOCGIFADDR):
+        case CASE_IOC_IFREQ(SIOCGIFADDR):
 		bcopy(IF_LLADDR(ifp), ifr_addr_get_data(ifr),
 		    ISO88025_ADDR_LEN);
                 break;
 
-        CASE_IOC_IFREQ(SIOCSIFMTU):
+        case CASE_IOC_IFREQ(SIOCSIFMTU):
                 /*
                  * Set the interface MTU.
                  */

@@ -1442,7 +1442,7 @@ lge_ioctl(ifp, command, data)
 	int			error = 0;
 
 	switch(command) {
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		LGE_LOCK(sc);
 		if (ifr_mtu_get(ifr) > LGE_JUMBO_MTU)
 			error = EINVAL;
@@ -1450,7 +1450,7 @@ lge_ioctl(ifp, command, data)
 			ifp->if_mtu = ifr_mtu_get(ifr);
 		LGE_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		LGE_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING &&
@@ -1476,15 +1476,15 @@ lge_ioctl(ifp, command, data)
 		LGE_UNLOCK(sc);
 		error = 0;
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		LGE_LOCK(sc);
 		lge_setmulti(sc);
 		LGE_UNLOCK(sc);
 		error = 0;
 		break;
 	case SIOCGIFMEDIA:
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		mii = device_get_softc(sc->lge_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;

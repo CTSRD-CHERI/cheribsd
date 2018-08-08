@@ -2903,7 +2903,7 @@ ndis_ifioctl(ifp, command, data)
 	/*NDIS_LOCK(sc);*/
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		if (ifp->if_flags & IFF_UP) {
 			if (sc->ndis_running &&
 			    ifp->if_flags & IFF_PROMISC &&
@@ -2932,16 +2932,16 @@ ndis_ifioctl(ifp, command, data)
 		sc->ndis_if_flags = ifp->if_flags;
 		error = 0;
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		ndis_setmulti(sc);
 		error = 0;
 		break;
 	case SIOCGIFMEDIA:
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		error = ifmedia_ioctl(ifp, ifr, &sc->ifmedia, command);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		ifp->if_capenable = ifr_reqcap_get(ifr);
 		if (ifp->if_capenable & IFCAP_TXCSUM)
 			ifp->if_hwassist = sc->ndis_hwassist;
@@ -2995,7 +2995,7 @@ ndis_80211ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 	case SIOCSDRVSPEC:
 		error = ndis_set_info(sc, oid.oid, oidbuf, &oid.len);
 		break;
-	CASE_IOC_IFREQ(SIOCGPRIVATE_0):
+	case CASE_IOC_IFREQ(SIOCGPRIVATE_0):
 		NDIS_LOCK(sc);
 		if (sc->ndis_evt[sc->ndis_evtcidx].ne_sts == 0) {
 			error = ENOENT;

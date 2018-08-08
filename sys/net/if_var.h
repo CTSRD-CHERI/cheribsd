@@ -719,11 +719,11 @@ int if_hw_tsomax_update(if_t ifp, struct ifnet_hw_tsomax *);
 /* Helper macro for struct ifreq ioctls */
 #if __has_feature(capabilities)
 #define	CASE_IOC_IFREQ(cmd)					\
-    case (cmd):							\
+    (cmd):							\
     case _IOC_NEWTYPE((cmd), struct ifreq_c)
 #else
 #define	CASE_IOC_IFREQ(cmd)					\
-    case (cmd)
+    (cmd)
 #endif
 
 /* accessors for struct ifreq */

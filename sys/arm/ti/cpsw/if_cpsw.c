@@ -1385,7 +1385,7 @@ cpswp_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	ifr = (struct ifreq *)data;
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		changed = ifp->if_capenable ^ ifr_reqcap_get(ifr);
 		if (changed & IFCAP_HWCSUM) {
 			if ((ifr_reqcap_get(ifr) & changed) & IFCAP_HWCSUM)
@@ -1395,7 +1395,7 @@ cpswp_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		error = 0;
 		break;
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		CPSW_PORT_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -1422,17 +1422,17 @@ cpswp_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->if_flags = ifp->if_flags;
 		CPSW_PORT_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
 		cpswp_ale_update_addresses(sc, 0);
 		break;
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		/* Ugh.  DELMULTI doesn't provide the specific address
 		   being removed, so the best we can do is remove
 		   everything and rebuild it all. */
 		cpswp_ale_update_addresses(sc, 1);
 		break;
 	case SIOCGIFMEDIA:
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		error = ifmedia_ioctl(ifp, ifr, &sc->mii->mii_media, command);
 		break;
 	default:

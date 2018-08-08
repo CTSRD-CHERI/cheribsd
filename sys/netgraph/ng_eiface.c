@@ -144,14 +144,14 @@ ng_eiface_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	switch (command) {
 
 	/* These two are mostly handled at a higher layer */
-	CASE_IOC_IFREQ(SIOCSIFADDR):
+	case CASE_IOC_IFREQ(SIOCSIFADDR):
 		error = ether_ioctl(ifp, command, data);
 		break;
-	CASE_IOC_IFREQ(SIOCGIFADDR):
+	case CASE_IOC_IFREQ(SIOCGIFADDR):
 		break;
 
 	/* Set flags */
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		/*
 		 * If the interface is marked up and stopped, then start it.
 		 * If it is marked down and running, then stop it.
@@ -169,7 +169,7 @@ ng_eiface_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	/* Set the interface MTU */
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (ifr_mtu_get(ifr) > NG_EIFACE_MTU_MAX ||
 		    ifr_mtu_get(ifr) < NG_EIFACE_MTU_MIN)
 			error = EINVAL;
@@ -178,17 +178,17 @@ ng_eiface_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	/* (Fake) media type manipulation */
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &priv->media, command);
 		break;
 
 	/* Stuff that's not supported */
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		error = 0;
 		break;
-	CASE_IOC_IFREQ(SIOCSIFPHYS):
+	case CASE_IOC_IFREQ(SIOCSIFPHYS):
 		error = EOPNOTSUPP;
 		break;
 

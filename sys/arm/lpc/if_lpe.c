@@ -629,7 +629,7 @@ lpe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int err = 0;
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		lpe_lock(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -641,8 +641,8 @@ lpe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			lpe_stop(sc);
 		lpe_unlock(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 			lpe_lock(sc);
 			lpe_set_rxfilter(sc);
@@ -650,7 +650,7 @@ lpe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 	case SIOCGIFMEDIA:
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		err = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
 	default:

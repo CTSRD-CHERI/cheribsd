@@ -194,7 +194,7 @@ enc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		break;
 	default:
 		return (EINVAL);

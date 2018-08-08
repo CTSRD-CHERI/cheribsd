@@ -1313,7 +1313,7 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		case BIOCFLUSH:
 		case BIOCGDLT:
 		CASE_IOC_BPF_DLTLIST(BIOCGDLTLIST):
-		CASE_IOC_IFREQ(BIOCGETIF):
+		case CASE_IOC_IFREQ(BIOCGETIF):
 		case BIOCGRTIMEOUT:
 #if defined(COMPAT_FREEBSD32) && defined(__amd64__)
 		case BIOCGRTIMEOUT32:
@@ -1468,7 +1468,7 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	/*
 	 * Get interface name.
 	 */
-	CASE_IOC_IFREQ(BIOCGETIF):
+	case CASE_IOC_IFREQ(BIOCGETIF):
 		BPF_LOCK();
 		if (d->bd_bif == NULL)
 			error = EINVAL;
@@ -1485,7 +1485,7 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	/*
 	 * Set interface.
 	 */
-	CASE_IOC_IFREQ(BIOCSETIF):
+	case CASE_IOC_IFREQ(BIOCSETIF):
 		{
 			int alloc_buf, size;
 
