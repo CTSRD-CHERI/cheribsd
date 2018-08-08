@@ -203,7 +203,7 @@ cheri_capability_build_user_rwx(uint32_t perms, vaddr_t basep, size_t length,
 	    cheri_setoffset(userspace_cap, basep), length), perms), off);
 
 	KASSERT(cheri_getlen(tmpcap) == length,
-	    ("Constructed capability has wrong length %zu != %zu",
+	    ("Constructed capability has wrong length 0x%zx != 0x%zx",
 	    cheri_getlen(tmpcap), length));
 
 	return (tmpcap);
