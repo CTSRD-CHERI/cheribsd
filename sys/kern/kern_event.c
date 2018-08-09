@@ -80,6 +80,9 @@ __FBSDID("$FreeBSD$");
 #include <machine/atomic.h>
 
 #include <vm/uma.h>
+#include <vm/vm_extern.h>
+
+#include <cheri/cheric.h>
 
 MALLOC_DEFINE(M_KQUEUE, "kqueue", "memory for kqueue system");
 
@@ -2788,6 +2791,44 @@ noacquire:
 	fdrop(fp, td);
 	return (error);
 }
+
+#if __has_feature(capabilities)
+
+int
+kqueue_caprevoke(struct file *fp)
+{
+	struct kqueue *kq;
+	struct knote *kn;
+	int error, ix;
+
+	error = kqueue_acquire(fp, &kq);
+	if (error != 0)
+		return (error);
+
+	KQ_LOCK(kq);
+	for (ix = 0; ix < kq->kq_knlistsize; ix++) {
+		SLIST_FOREACH(kn, &kq->kq_knlist[ix], kn_link) {
+			void * __capability ud = kn->kn_kevent.udata;
+			if (vm_test_caprevoke(ud))
+				kn->kn_kevent.udata = cheri_cleartag(ud);
+		}
+	}
+	for (ix = 0; ix <= kq->kq_knhashmask; ix++) {
+		SLIST_FOREACH(kn, &kq->kq_knhash[ix], kn_link) {
+			void * __capability ud = kn->kn_kevent.udata;
+			if (vm_test_caprevoke(ud))
+				kn->kn_kevent.udata = cheri_cleartag(ud);
+		}
+	}
+
+	kqueue_release(kq, 1);
+	KQ_UNLOCK(kq);
+
+	return 0;
+}
+
+#endif
+
 // CHERI CHANGES START
 // {
 //   "updated": 20181203,

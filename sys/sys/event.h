@@ -390,6 +390,7 @@ int 	kqfd_register(int fd, kkevent_t *kev, struct thread *p,
 	    int mflag);
 int	kqueue_add_filteropts(int filt, struct filterops *filtops);
 int	kqueue_del_filteropts(int filt);
+int	kqueue_caprevoke(struct file *fp);
 
 #else 	/* !_KERNEL */
 
