@@ -133,9 +133,9 @@ struct bpf_dltlist_c {
 };
 
 #define	_CASE_IOC_BPF_DLTLIST_C(cmd)				\
-    case _IOC_NEWTYPE((cmd), struct bpf_dltlist_c):
+    _IOC_NEWTYPE((cmd), struct bpf_dltlist_c): case
 #define	_CASE_IOC_BPF_PROGRAM_C(cmd)				\
-    case _IOC_NEWTYPE((cmd), struct bpf_program_c):
+    _IOC_NEWTYPE((cmd), struct bpf_program_c): case
 #else /* !COMPAT_CHERIABI */
 #define	_CASE_IOC_BPF_DLTLIST_C(cmd)
 #define	_CASE_IOC_BPF_PROGRAM_C(cmd)
@@ -174,9 +174,9 @@ struct bpf_dltlist32 {
 #define	BIOCGRTIMEOUT32	_IOR('B', 110, struct timeval32)
 
 #define	_CASE_IOC_BPF_DLTLIST32(cmd)				\
-    case _IOC_NEWTYPE((cmd), struct bpf_dltlist32):
+    _IOC_NEWTYPE((cmd), struct bpf_dltlist32): case
 #define	_CASE_IOC_BPF_PROGRAM32(cmd)				\
-    case _IOC_NEWTYPE((cmd), struct bpf_program32):
+    _IOC_NEWTYPE((cmd), struct bpf_program32): case
 #else /* !COMPAT_FREEBSD32 */
 #define	_CASE_IOC_BPF_DLTLIST32(cmd)
 #define	_CASE_IOC_BPF_PROGRAM32(cmd)
@@ -185,11 +185,11 @@ struct bpf_dltlist32 {
 #define	CASE_IOC_BPF_DLTLIST(cmd)				\
     _CASE_IOC_BPF_DLTLIST_C(cmd)				\
     _CASE_IOC_BPF_DLTLIST32(cmd)				\
-    case (cmd)
+    (cmd)
 #define	CASE_IOC_BPF_PROGRAM(cmd)				\
     _CASE_IOC_BPF_PROGRAM_C(cmd)				\
     _CASE_IOC_BPF_PROGRAM32(cmd)				\
-    case (cmd)
+    (cmd)
 
 /*
  * bpf_iflist is a list of BPF interface structures, each corresponding to a
@@ -1312,7 +1312,7 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		case BIOCGBLEN:
 		case BIOCFLUSH:
 		case BIOCGDLT:
-		CASE_IOC_BPF_DLTLIST(BIOCGDLTLIST):
+		case CASE_IOC_BPF_DLTLIST(BIOCGDLTLIST):
 		case CASE_IOC_IFREQ(BIOCGETIF):
 		case BIOCGRTIMEOUT:
 #if defined(COMPAT_FREEBSD32) && defined(__amd64__)
@@ -1396,9 +1396,9 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	/*
 	 * Set link layer read filter.
 	 */
-	CASE_IOC_BPF_PROGRAM(BIOCSETF):
-	CASE_IOC_BPF_PROGRAM(BIOCSETFNR):
-	CASE_IOC_BPF_PROGRAM(BIOCSETWF):
+	case CASE_IOC_BPF_PROGRAM(BIOCSETF):
+	case CASE_IOC_BPF_PROGRAM(BIOCSETFNR):
+	case CASE_IOC_BPF_PROGRAM(BIOCSETWF):
 		error = bpf_setf(d, (struct bpf_program *)addr, cmd);
 		break;
 
@@ -1444,7 +1444,7 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	/*
 	 * Get a list of supported data link types.
 	 */
-	CASE_IOC_BPF_DLTLIST(BIOCGDLTLIST):
+	case CASE_IOC_BPF_DLTLIST(BIOCGDLTLIST):
 		BPF_LOCK();
 		if (d->bd_bif == NULL)
 			error = EINVAL;
