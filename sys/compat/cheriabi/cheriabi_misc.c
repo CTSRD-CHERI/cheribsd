@@ -1043,12 +1043,19 @@ cheriabi_set_auxargs(void * __capability * __capability pos,
     struct image_params *imgp)
 {
 	Elf_Auxargs *args = (Elf_Auxargs *)imgp->auxargs;
+	unsigned long prog_base, prog_len;
+
+	prog_base = rounddown2(imgp->start_addr,
+	    1ULL << CHERI_ALIGN_SHIFT(imgp->start_addr));
+	prog_len = roundup2(imgp->end_addr - prog_base,
+	    1ULL << CHERI_ALIGN_SHIFT(imgp->end_addr - prog_base));
 
 	if (args->execfd != -1)
 		AUXARGS_ENTRY_NOCAP(pos, AT_EXECFD, args->execfd);
 	CTASSERT(CHERI_CAP_USER_CODE_BASE == 0);
-	AUXARGS_ENTRY_CAP(pos, AT_PHDR, CHERI_CAP_USER_DATA_BASE, args->phdr,
-	    CHERI_CAP_USER_DATA_LENGTH, CHERI_CAP_USER_DATA_PERMS);
+	AUXARGS_ENTRY_CAP(pos, AT_PHDR, prog_base,
+	    args->phdr - prog_base, prog_len,
+	    CHERI_CAP_USER_DATA_PERMS);
 	AUXARGS_ENTRY_NOCAP(pos, AT_PHENT, args->phent);
 	AUXARGS_ENTRY_NOCAP(pos, AT_PHNUM, args->phnum);
 	AUXARGS_ENTRY_NOCAP(pos, AT_PAGESZ, args->pagesz);
@@ -1063,8 +1070,8 @@ cheriabi_set_auxargs(void * __capability * __capability pos,
 	/*
 	 * XXX-BD: grant code and data perms to allow textrel fixups.
 	 */
-	AUXARGS_ENTRY_CAP(pos, AT_BASE, CHERI_CAP_USER_DATA_BASE, args->base,
-	    CHERI_CAP_USER_DATA_LENGTH,
+	AUXARGS_ENTRY_CAP(pos, AT_BASE, args->base, 0,
+	    CHERI_CAP_USER_DATA_LENGTH - args->base,
 	    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
 #ifdef AT_EHDRFLAGS
 	AUXARGS_ENTRY_NOCAP(pos, AT_EHDRFLAGS, args->hdr_eflags);
@@ -2132,18 +2139,12 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 			data = sizeof(r.pl);
 		break;
 
-	/*
-	 * XXX Several calls allow optional setting of the next address;
-	 * for the moment, we don't support that but do want to support
-	 * resuming, all the same
-	 */
+	/* Pass along an untagged virtual address for the desired PC. */
 	case PT_CONTINUE:
 	case PT_STEP:
 	case PT_TO_SCE:
 	case PT_TO_SCX:
 	case PT_SYSCALL:
-		if (uap->addr != (char * __capability)(intcap_t)1)
-			return EINVAL;
 		addr = cheri_cleartag(uap->addr);
 		break;
 

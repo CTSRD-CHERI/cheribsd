@@ -172,8 +172,9 @@ __morepages(int n)
 		}
 	}
 
-	if ((pagepool_start = mmap(0, n * _pagesz, PROT_READ|PROT_WRITE,
-	    MAP_ANON, fd, 0)) == MAP_FAILED) {
+	if ((pagepool_start = mmap(0, n * _pagesz,
+			PROT_READ|PROT_WRITE,
+			MAP_ANON, fd, 0)) == (caddr_t)-1) {
 		return 0;
 	}
 	pagepool_end = pagepool_start + n * _pagesz;

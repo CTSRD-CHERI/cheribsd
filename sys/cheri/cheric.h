@@ -45,6 +45,7 @@
 #define	cheri_getlen(x)		__builtin_cheri_length_get((x))
 #define	cheri_getbase(x)	__builtin_cheri_base_get((x))
 #define	cheri_getoffset(x)	__builtin_cheri_offset_get((x))
+#define	cheri_getaddress(x)	__builtin_cheri_address_get((x))
 #define	cheri_getperm(x)	__builtin_cheri_perms_get((x))
 #define	cheri_getsealed(x)	__builtin_cheri_sealed_get((x))
 #define	cheri_gettag(x)		__builtin_cheri_tag_get((x))

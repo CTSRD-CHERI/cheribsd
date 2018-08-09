@@ -430,6 +430,16 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 	/* TODO: if KERNLAND() */
 #ifdef CPU_CHERI
 	bad_inst_ptr = (char * __kerncap)frame->pcc + offset_from_pc;
+	/*
+	 * Work around bug in the FPGA implementation: EPCC points to the
+	 * delay slot if a trap happenend in the delay slot.
+	 */
+	if (cheri_getoffset(frame->pcc) != frame->pc) {
+		KASSERT(cheri_getoffset(frame->pcc) == frame->pc + 4,
+		    ("NEW BUG FOUND? pcc (%jx) <-> pc (%jx) mismatch:",
+		    (uintmax_t)cheri_getoffset(frame->pcc), (uintmax_t)frame->pc));
+		frame->pcc = cheri_setoffset(frame->pcc, frame->pc);
+	}
 	KASSERT(cheri_getoffset(frame->pcc) == frame->pc,
 	    ("pcc (%jx) <-> pc (%jx) mismatch:",
 	    (uintmax_t)cheri_getoffset(frame->pcc), (uintmax_t)frame->pc));
@@ -1135,6 +1145,7 @@ dofault:
 		if (KTRPOINT(td, KTR_CEXCEPTION))
 			ktrcexception(trapframe);
 #endif
+		fetch_bad_instr(trapframe);
 		log_c2e_exception(msg, trapframe, type);
 		i = SIGPROT;
 		ucode = cheri_capcause_to_sicode(trapframe->capcause);
@@ -1552,7 +1563,37 @@ MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
 
 	default:
 		printf("Unhandled opcode in %s: 0x%x\n", __func__, inst.word);
+#ifdef DDB
+		/*
+		 * Print some context for cases like jenkins where we don't
+		 * have an interactive console:
+		 */
+		int32_t context_instr;
+		fetch_instr_near_pc(framePtr, -8, &context_instr);
+		db_printf("Instr at %p ($pc-8): %x   ", (char*)framePtr->pc - 8, context_instr);
+		db_disasm((db_addr_t)&context_instr, 0);
+		fetch_instr_near_pc(framePtr, -4, &context_instr);
+		db_printf("Instr at %p ($pc-4): %x   ", (char*)framePtr->pc - 4, context_instr);
+		db_disasm((db_addr_t)&context_instr, 0);
+		fetch_instr_near_pc(framePtr, 0, &context_instr);
+		db_printf("Instr at %p ($pc+0): %x   ", (char*)framePtr->pc + 0, context_instr);
+		db_disasm((db_addr_t)&context_instr, 0);
+		fetch_instr_near_pc(framePtr, 4, &context_instr);
+		db_printf("Instr at %p ($pc+4): %x   ", (char*)framePtr->pc + 4, context_instr);
+		db_disasm((db_addr_t)&context_instr, 0);
+#endif
+
+
 		/* retAddr = instPC + 4;  */
+		/* log registers in trap frame */
+		log_frame_dump(framePtr);
+#ifdef CPU_CHERI
+		if (log_cheri_registers)
+			cheri_log_exception_registers(framePtr);
+#endif
+#ifdef DDB
+		kdb_enter(KDB_WHY_CHERI, "BAD OPCODE in MipsEmulateBranch");
+#endif
 		/* Return to NULL to force a crash in the user program */
 		retAddr = 0;
 	}
@@ -1607,8 +1648,11 @@ log_frame_dump(struct trapframe *frame)
 	printf("cause: %#jx; pc: %#jx\n",
 	    (intmax_t)(uint32_t)frame->cause, (intmax_t)frame->pc);
 
+#if 0
+	/* XXXAR: this can KASSERT() for bad instruction fetches. See #276 */
 	if (frame->badinstr.inst == 0)
 		fetch_bad_instr(frame);
+#endif
 	if (frame->badinstr.inst != 0) {
 		printf("BadInstr: %#x ", frame->badinstr.inst);
 #ifdef DDB
@@ -1619,9 +1663,11 @@ log_frame_dump(struct trapframe *frame)
 	}
 
 	if (DELAYBRANCH(frame->cause)) {
+#if 0
+		/* XXXAR: this can KASSERT() for bad instruction fetches. See #276 */
 		if (frame->badinstr_p.inst == 0)
 			fetch_bad_branch_instr(frame);
-
+#endif
 		if (frame->badinstr_p.inst != 0) {
 			printf("BadInstrP: %#x ", frame->badinstr_p.inst);
 #ifdef DDB

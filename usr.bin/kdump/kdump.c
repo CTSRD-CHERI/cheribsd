@@ -623,6 +623,16 @@ abidump(struct ktr_header *kth)
 	if (abiflag == 0)
 		return (flags);
 
+	if (flags & SV_CHERI) {
+		/* XXX: Can't determine capability size from sv_flags */
+#if MIPS_SZCAP == 32
+		printf("C256 ");
+#else
+		printf("C128 ");
+#endif
+		return (flags);
+	}
+
 	switch (flags & SV_ABI_MASK) {
 	case SV_ABI_LINUX:
 		abi = "L";

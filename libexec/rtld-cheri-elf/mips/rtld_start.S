@@ -57,6 +57,12 @@
  */
 LEAF(rtld_start)
 	/*
+	 * XXX: Clear DDC. Eventually the kernel should stop setting it in the
+	 * first place.
+	 */
+	cgetnull	$c5
+	csetdefault	$c5
+	/*
 	 * XXX: Assume the kernel aligned the stack correctly.
 	 */
 	dli		sp, -SFRAME_SIZE
@@ -69,7 +75,7 @@ LEAF(rtld_start)
 
 	csc		$c4, zero, SFRAME_RELOCBASE($c11) /* relocbase */
 	PIC_LOAD_CODE_PTR($c3, a0, _DYNAMIC)
-	/* XXXAR: this assumes relocbase is R/W (could derive from ddc instead of relocbase too)*/
+	/* XXXAR: this assumes relocbase is R/W */
 	csub		a0, $c3, $c4	/* get difference between relocbase and
 					 * &_DYNAMIC (needed since they don't
 					 * have the same base) */
@@ -88,7 +94,8 @@ LEAF(rtld_start)
 	 */
 	PIC_LOAD_CODE_PTR($c3, a0, __start___cap_relocs)
 	PIC_LOAD_CODE_PTR($c4, a1, __stop___cap_relocs)
-	PIC_CALL(_rtld_do___caprelocs_self) /* (&__start___cap_relocs, &__stop___cap_relocs) */
+	clc		$c5, zero, SFRAME_RELOCBASE($c11) /* relocbase */
+	PIC_CALL(_rtld_do___caprelocs_self) /* (&__start___cap_relocs, &__stop___cap_relocs, relocbase) */
 
 
 	clc		$c3, zero, SFRAME_AUXARGS($c11)

@@ -61,6 +61,7 @@ __DEFAULT_YES_OPTIONS = \
     NIS \
     NLS \
     OPENSSH \
+    PIE \
     PROFILE \
     SSP \
     SYMVER \

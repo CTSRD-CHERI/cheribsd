@@ -938,7 +938,8 @@ _worldtmp: .PHONY
 	@touch ${WORLDTMP}/${.TARGET}
 
 .for _dir in \
-    bin lib lib/casper usr legacy/bin legacy/usr
+    bin \
+    lib lib/casper lib/geom usr legacy/bin legacy/usr
 	mkdir -p ${WORLDTMP}/${_dir}
 .endfor
 	mtree -deU -f ${.CURDIR}/etc/mtree/BSD.usr.dist \
@@ -1091,7 +1092,7 @@ _cheri_libs=lib/csu lib/libgcc_eh lib/libcompiler_rt lib/libc \
 	    lib/libelf lib/libkvm lib/ncurses/ncurses lib/ncurses/ncursesw \
 	    secure/lib/libssl lib/libmd lib/libutil lib/libprocstat \
 	    lib/librtld_db cddl/lib/libctf lib/libkiconv lib/libpam/libpam \
-	    lib/libcom_err lib/libcrypt
+	    lib/libcom_err lib/libcrypt lib/libufs
 
 .if ${MK_KERBEROS} != "no"
 _cheri_libs+=kerberos5/lib/libroken kerberos5/lib/libasn1 kerberos5/lib/libwind \
@@ -2672,6 +2673,7 @@ _prebuild_libs=	${_kerberos5_lib_libasn1} \
 		${_cddl_lib_libavl} \
 		${_cddl_lib_libzfs_core} \
 		${_cddl_lib_libctf} \
+		lib/libufs \
 		lib/libutil lib/libpjdlog ${_lib_libypclnt} lib/libz lib/msun \
 		${_secure_lib_libcrypto} ${_lib_libldns} \
 		${_secure_lib_libssh} ${_secure_lib_libssl}

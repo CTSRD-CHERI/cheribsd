@@ -1,20 +1,19 @@
 #!/bin/sh -e
 
-ST_ROOT="/syscall_timing"
+ST_ROOT=`pwd`
 RESULTS="${ST_ROOT}/results"
 
 run_st() {
 	NAME="$1"
 
 	ST="${ST_ROOT}/${NAME}/syscall_timing"
-	if [ ! -x "${ST}" ]; then
-		echo "${0}: ${ST} is not executable; exiting" > /dev/stderr
-		exit 1
-	fi
+	chmod +x "${ST}"
 
-	echo "${0}: binary details:"
-	file "${ST}"
+#	echo "${0}: binary details:"
+#	file "${ST}"
 
+	# Avoid creating the statcounters output for this one.
+	export STATCOUNTERS_OUTPUT="/dev/null"
 	TEST_LIST=`${ST} 2>&1 | sed 1d`
 
 	OUTPUT="${RESULTS}/${NAME}"
@@ -35,6 +34,10 @@ sysctl -a | grep -E '(invariants|witness)' || true
 
 run_st "cheri"
 run_st "hybrid"
-run_st "mips"
+#run_st "mips"
 
 echo "${0}: done"
+
+tar zcvf /tmp/syscall_timing-output.tgz "${ST_ROOT}"
+
+echo "DONE RUNNING BENCHMARKS"

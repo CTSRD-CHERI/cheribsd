@@ -177,8 +177,10 @@ sysctl_kern_arnd(SYSCTL_HANDLER_ARGS)
 	size_t reqsize = MIN(req->oldlen, sizeof(buf));
 	len = read_random(buf, reqsize);
 	/* XXXAR: spammy debug message should be rate limited */
-	if (reqsize != len && ppsratecheck(&lastfail, &curfail, 5)) {
-		printf("%s: requested %zu bytes of random data but only got %zu\n", __func__, reqsize, len);
+	if (reqsize != len && ppsratecheck(&lastfail, &curfail, 3)) {
+		printf("%s: %s (pid %d) requested %zu bytes of random data but "
+		    "only got %zu\n", __func__, curproc->p_comm, curproc->p_pid,
+		    reqsize, len);
 	}
 	return (SYSCTL_OUT(req, buf, len));
 }

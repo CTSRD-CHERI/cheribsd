@@ -1145,26 +1145,31 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 				CTR4(KTR_PTRACE,
 		    "PT_TO_SCE: pid %d, events = %#x, PC = %#lx, sig = %d",
 				    p->p_pid, p->p_ptevents,
-				    (u_long)(uintfptr_t)addr, data);
+				    (u_long)(__cheri_addr uintfptr_t)addr,
+				    data);
 				break;
 			case PT_TO_SCX:
 				p->p_ptevents |= PTRACE_SCX;
 				CTR4(KTR_PTRACE,
 		    "PT_TO_SCX: pid %d, events = %#x, PC = %#lx, sig = %d",
 				    p->p_pid, p->p_ptevents,
-				    (u_long)(uintfptr_t)addr, data);
+				    (u_long)(__cheri_addr uintfptr_t)addr,
+				    data);
 				break;
 			case PT_SYSCALL:
 				p->p_ptevents |= PTRACE_SYSCALL;
 				CTR4(KTR_PTRACE,
 		    "PT_SYSCALL: pid %d, events = %#x, PC = %#lx, sig = %d",
 				    p->p_pid, p->p_ptevents,
-				    (u_long)(uintfptr_t)addr, data);
+				    (u_long)(__cheri_addr uintfptr_t)addr,
+				    data);
 				break;
 			case PT_CONTINUE:
 				CTR3(KTR_PTRACE,
 				    "PT_CONTINUE: pid %d, PC = %#lx, sig = %d",
-				    p->p_pid, (u_long)(uintfptr_t)addr, data);
+				    p->p_pid,
+				    (u_long)(__cheri_addr uintfptr_t)addr,
+				    data);
 				break;
 			}
 			break;
