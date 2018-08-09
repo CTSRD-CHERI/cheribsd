@@ -79,6 +79,13 @@ __FBSDID("$FreeBSD$");
 #include <machine/atomic.h>
 
 #include <vm/uma.h>
+#include <vm/vm_extern.h>
+
+#ifdef CHERI_CAPREVOKE
+#include <cheri/cheric.h>
+#include <sys/caprevoke.h>
+#include <vm/vm_caprevoke.h>
+#endif
 
 MALLOC_DEFINE(M_KQUEUE, "kqueue", "memory for kqueue system");
 
@@ -119,6 +126,7 @@ static int	kqueue_scan(struct kqueue *kq, int maxevents,
 static void 	kqueue_wakeup(struct kqueue *kq);
 static struct filterops *kqueue_fo_find(int filt);
 static void	kqueue_fo_release(int filt);
+static void	knote_caprevoke_epoch_next(struct knote *);
 
 static fo_ioctl_t	kqueue_ioctl;
 static fo_poll_t	kqueue_poll;
@@ -1578,10 +1586,14 @@ findkn:
 	 */
 	kn->kn_status |= KN_SCAN;
 	kn_enter_flux(kn);
+	if ((kev->flags & EV_KEEPUDATA) == 0) {
+		kn->kn_kevent.udata = kev->udata;
+#ifdef CHERI_CAPREVOKE
+		knote_caprevoke_epoch_next(kn);
+#endif
+	}
 	KQ_UNLOCK(kq);
 	knl = kn_list_lock(kn);
-	if ((kev->flags & EV_KEEPUDATA) == 0)
-		kn->kn_kevent.udata = kev->udata;
 	if (!fops->f_isfd && fops->f_touch != NULL) {
 		fops->f_touch(kn, kev, EVENT_REGISTER);
 	} else {
@@ -2302,6 +2314,9 @@ knlist_add(struct knlist *knl, struct knote *kn, int islocked)
 	KQ_LOCK(kn->kn_kq);
 	kn->kn_knlist = knl;
 	kn->kn_status &= ~KN_DETACHED;
+#ifdef CHERI_CAPREVOKE
+	knote_caprevoke_epoch_next(kn);
+#endif
 	KQ_UNLOCK(kn->kn_kq);
 }
 
@@ -2610,6 +2625,9 @@ knote_attach(struct knote *kn, struct kqueue *kq)
 		list = &kq->kq_knhash[KN_HASH(kn->kn_id, kq->kq_knhashmask)];
 	}
 	SLIST_INSERT_HEAD(list, kn, kn_link);
+#ifdef CHERI_CAPREVOKE
+	knote_caprevoke_epoch_next(kn);
+#endif
 	return (0);
 }
 
@@ -2738,6 +2756,134 @@ noacquire:
 	fdrop(fp, td);
 	return (error);
 }
+
+#ifdef CHERI_CAPREVOKE
+
+/*
+ * XXX
+ *
+ * This whole thing is bad.  Because we have to drop the lock to go looking
+ * into the shadow bitmap, this is currently quadratic in the number of
+ * capabilities in a kqueue: things are prone to move while we're not looking,
+ * so as soon as we drop the lock we start over.  (It's linear in the number
+ * of probes of the bitmap, which is at least the right order for the expensive
+ * part; the epoch flags prevent us from re-probing for things we've already
+ * checked and that haven't changed since we looked.)
+ *
+ * We could do marginally better if we tracked when we had called kqueue_expand
+ * (even if just by epoch), so that we knew that at least the list heads we
+ * have at hand are the right ones and we don't need to start the outermost
+ * per-kqueue iteration over every time.  We could also do a little better by
+ * moving parts of the lists from their heads to their tails while we have the
+ * lock held, though for that we probably want kn_link to be 
+ */
+
+static void
+knote_caprevoke_epoch_next(struct knote *kn)
+{
+	if (kn->kn_kq->kq_state & KQ_CAPREV_EPOCH)
+		kn->kn_status &= ~KN_CAPREV_EPOCH;
+	else
+		kn->kn_status |= KN_CAPREV_EPOCH;
+}
+
+static void
+kqueue_caprevoke_note(struct kqueue *kq, struct klist *list,
+		      struct knote *kn, uintcap_t ud)
+{
+	KQ_LOCK(kq);
+	if (ud == (uintcap_t)kn->kn_kevent.udata) {
+		kn->kn_kevent.udata = (void * __capability)cheri_revoke(ud);
+		kn->kn_status ^= KN_CAPREV_EPOCH;
+	}
+	/* 
+	 * Otherwise, the value changed out from under us; don't advance
+	 * this note's epoch clock and we'll catch it next time.
+	 */
+	KQ_UNLOCK(kq);
+}
+
+static int
+kqueue_caprevoke_list(struct kqueue *kq, const struct vm_caprevoke_cookie *crc,
+		      struct klist *list)
+{
+	struct knote *kn;
+	CAPREVOKE_STATS_FOR(crst, crc);
+
+	SLIST_FOREACH(kn, list, kn_link) {
+		/* Skip notes with matching epochs */
+		if (!(kn->kn_status & KN_CAPREV_EPOCH) ==
+		    !(kq->kq_state & KQ_CAPREV_EPOCH)) {
+			continue;
+		}
+
+		/*
+		 * XXX Move nodes with matching epochs to the end of the list
+		 * so we don't revisit them every time?
+		 */
+
+		uintcap_t ud = (uintcap_t)kn->kn_kevent.udata;
+		if (cheri_gettag(ud)) {
+			refcount_acquire(&kn->kn_refcount);
+			KQ_UNLOCK(kq);
+
+			CAPREVOKE_STATS_BUMP(crst, caps_found);
+			if (vm_caprevoke_test(crc, ud)) {
+				CAPREVOKE_STATS_BUMP(crst, caps_cleared);
+				kqueue_caprevoke_note(kq, list, kn, ud);
+			} else {
+				KQ_LOCK(kq);
+				kn->kn_status ^= KN_CAPREV_EPOCH;
+				KQ_UNLOCK(kq);
+			}
+
+			knote_free(kn);
+
+			KQ_LOCK(kq);
+			return 1;
+		} else {
+			kn->kn_status ^= KN_CAPREV_EPOCH;
+		}
+	}
+
+	return 0;
+}
+
+/*
+ * The filedesc queue for the process undergoing revocation must be held
+ * (shared).  Given that, we don't need to acquire or release here, because
+ * kqueue_close can't complete until after us.
+ */
+void
+kqueue_caprevoke(struct filedesc *fdp, const struct vm_caprevoke_cookie *crc)
+{
+	int ix;
+	struct kqueue *kq;
+
+	FILEDESC_SLOCK(fdp);
+	TAILQ_FOREACH(kq, &fdp->fd_kqlist, kq_list) {
+
+		KQ_LOCK(kq);
+again:
+		for (ix = 0; ix < kq->kq_knlistsize; ix++) {
+			if (kqueue_caprevoke_list(kq, crc, &kq->kq_knlist[ix]))
+				goto again;
+		}
+		for (ix = 0; ix <= kq->kq_knhashmask; ix++) {
+			if (kqueue_caprevoke_list(kq, crc, &kq->kq_knhash[ix]))
+				goto again;
+		}
+
+		kq->kq_state ^= KQ_CAPREV_EPOCH;
+
+		KQ_UNLOCK(kq);
+	}
+
+	FILEDESC_SUNLOCK(fdp);
+}
+
+#endif
+
 // CHERI CHANGES START
 // {
 //   "updated": 20181203,
