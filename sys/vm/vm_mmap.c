@@ -291,7 +291,7 @@ kern_mmap(struct thread *td, uintptr_t addr0, uintptr_t max_addr0,
 	    (flags & ~(MAP_SHARED | MAP_PRIVATE | MAP_FIXED | MAP_HASSEMAPHORE |
 	    MAP_STACK | MAP_NOSYNC | MAP_ANON | MAP_EXCL | MAP_NOCORE |
 	    MAP_PREFAULT_READ | MAP_GUARD |
-	    MAP_CHERI_DDC | MAP_CHERI_NOSETBOUNDS |
+	    MAP_CHERI_NOSETBOUNDS |
 #ifdef MAP_32BIT
 	    MAP_32BIT |
 #endif

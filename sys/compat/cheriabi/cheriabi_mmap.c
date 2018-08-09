@@ -158,25 +158,10 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 		}
 
 		/* User didn't provide a capability so get one. */
-		if (flags & MAP_CHERI_DDC) {
-			if ((cheri_getperm(td->td_pcb->pcb_regs.ddc) &
-			    CHERI_PERM_CHERIABI_VMMAP) == 0) {
-				SYSERRCAUSE("DDC lacks "
-				    "CHERI_PERM_CHERIABI_VMMAP");
-				return (EPROT);
-			}
-			addr_cap = td->td_pcb->pcb_regs.ddc;
-		} else {
-			/* Use the per-thread one */
-			addr_cap = td->td_md.md_cheri_mmap_cap;
-			KASSERT(cheri_gettag(addr_cap),
-			    ("td->td_md.md_cheri_mmap_cap is untagged!"));
-		}
-	} else {
-		if (flags & MAP_CHERI_DDC) {
-			SYSERRCAUSE("MAP_CHERI_DDC with non-NULL addr");
-			return (EINVAL);
-		}
+		/* Use the per-thread one */
+		addr_cap = td->td_md.md_cheri_mmap_cap;
+		KASSERT(cheri_gettag(addr_cap),
+		    ("td->td_md.md_cheri_mmap_cap is untagged!"));
 	}
 	cap_base = cheri_getbase(addr_cap);
 	cap_len = cheri_getlen(addr_cap);
@@ -422,8 +407,6 @@ cheriabi_mmap_set_retcap(struct thread *td, void * __capability *retcap,
 
 	if (flags & MAP_FIXED) {
 		addr = *addrp;
-	} else if (flags & MAP_CHERI_DDC) {
-		addr = td->td_pcb->pcb_regs.ddc;
 	} else {
 		addr = td->td_md.md_cheri_mmap_cap;
 	}
