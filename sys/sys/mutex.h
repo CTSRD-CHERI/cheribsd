@@ -42,6 +42,7 @@
 #include <sys/pcpu.h>
 #include <sys/lock_profile.h>
 #include <sys/lockstat.h>
+#include <sys/ptrbits.h>
 #include <machine/atomic.h>
 #include <machine/cpufunc.h>
 

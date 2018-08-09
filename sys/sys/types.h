@@ -304,28 +304,6 @@ typedef	_Bool	bool;
 
 #define offsetof(type, field) __offsetof(type, field)
 
-/*
- * Macros that provide correct handling of flags embedded
- * in pointer bits.
- *
- * This is mostly used by locks.
- */
-#ifndef __ptr_set_flag
-/* if there are no machine-dependant defines, use this default */
-#define __ptr_set_flag(p, f) ((uintptr_t)(p) | (uintptr_t)(f))
-#endif
-#ifndef __ptr_get_flag
-/* if there are no machine-dependant defines, use this default */
-#define __ptr_get_flag(p, f) ((uintptr_t)(p) & (uintptr_t)(f))
-#endif
-#ifndef __ptr_clear_flag
-/* if there are no machine-dependant defines, use this default */
-#define __ptr_clear_flag(p, f) ((uintptr_t)(p) & (uintptr_t)(~f))
-#endif
-#define ptr_set_flag(p, f) __ptr_set_flag(p, f)
-#define ptr_get_flag(p, f) __ptr_get_flag(p, f)
-#define ptr_clear_flag(p, f) __ptr_clear_flag(p, f)
-
 #ifdef CHERI_KERNEL
 #define ptr_to_va(p) ((__cheri_addr vm_offset_t)(void *)(p))
 #else

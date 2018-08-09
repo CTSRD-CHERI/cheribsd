@@ -38,6 +38,7 @@
 
 #ifdef _KERNEL
 #include <sys/pcpu.h>
+#include <sys/ptrbits.h>
 #include <machine/atomic.h>
 #endif
 

@@ -59,6 +59,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/vmmeter.h>
+#include <sys/ptrbits.h>
 
 #include <vm/uma.h>
 #include <vm/vm.h>
@@ -191,8 +192,7 @@ vm_radix_isleaf(struct vm_radix_node *rnode)
 static __inline vm_page_t
 vm_radix_topage(struct vm_radix_node *rnode)
 {
-
-	return ((vm_page_t)((uintptr_t)rnode & ~VM_RADIX_FLAGS));
+	return ((vm_page_t)ptr_clear_flag(rnode, VM_RADIX_FLAGS));
 }
 
 /*
