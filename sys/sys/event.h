@@ -376,6 +376,11 @@ int 	kqfd_register(int fd, struct kevent *kev, struct thread *p,
 int	kqueue_add_filteropts(int filt, struct filterops *filtops);
 int	kqueue_del_filteropts(int filt);
 
+#ifdef CHERI_CAPREVOKE
+struct vm_caprevoke_cookie;
+int	kqueue_caprevoke(struct file *fp, const struct vm_caprevoke_cookie *);
+#endif
+
 #else 	/* !_KERNEL */
 
 #include <sys/cdefs.h>

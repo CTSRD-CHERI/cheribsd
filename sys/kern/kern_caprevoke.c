@@ -24,6 +24,9 @@ __FBSDID("$FreeBSD$");
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
 
+#include <sys/file.h>
+#include <sys/filedesc.h>
+
 #include <sys/caprevoke.h>
 #include <vm/vm_caprevoke.h>
 
@@ -43,7 +46,26 @@ __FBSDID("$FreeBSD$");
 static void
 caprevoke_hoarders(struct proc *p, struct vm_caprevoke_cookie *crc)
 {
+	/* kqueue */
+	{
+		int fd;
+		struct filedesc *fdp = p->p_fd;
+		FILEDESC_SLOCK(fdp);
+		for (fd = 0; fd <= fdp->fd_lastfile; fd++) {
+			struct file * fp = fdp->fd_ofiles[fd].fde_file;
+			if ((fp != NULL) && (fp->f_type == DTYPE_KQUEUE)) {
 
+				/*
+				 * We ignore errors from this function; they
+				 * indicate either that the kq has yet to be
+				 * born or that it's dying, and in either
+				 * case, that should be fine.
+				 */
+				kqueue_caprevoke(fp, crc);
+			}
+		}
+		FILEDESC_SUNLOCK(fdp);
+	}
 }
 
 static int

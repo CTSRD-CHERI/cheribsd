@@ -79,6 +79,13 @@ __FBSDID("$FreeBSD$");
 #include <machine/atomic.h>
 
 #include <vm/uma.h>
+#include <vm/vm_extern.h>
+
+#ifdef CHERI_CAPREVOKE
+#include <cheri/cheric.h>
+#include <sys/caprevoke.h>
+#include <vm/vm_caprevoke.h>
+#endif
 
 MALLOC_DEFINE(M_KQUEUE, "kqueue", "memory for kqueue system");
 
@@ -2732,6 +2739,57 @@ noacquire:
 	fdrop(fp, td);
 	return (error);
 }
+
+#ifdef CHERI_CAPREVOKE
+
+int
+kqueue_caprevoke(struct file *fp, const struct vm_caprevoke_cookie *crc)
+{
+	struct kqueue *kq;
+	struct knote *kn;
+	int error, ix;
+	CAPREVOKE_STATS_FOR(crst, crc);
+
+	error = kqueue_acquire(fp, &kq);
+	if (error != 0)
+		return (error);
+
+	KQ_LOCK(kq);
+	for (ix = 0; ix < kq->kq_knlistsize; ix++) {
+		SLIST_FOREACH(kn, &kq->kq_knlist[ix], kn_link) {
+			uintcap_t ud = (uintcap_t)kn->kn_kevent.udata;
+			if (!cheri_gettag(ud))
+				continue;
+	                CAPREVOKE_STATS_BUMP(crst, caps_found);
+			if (vm_caprevoke_test(crc, ud)) {
+				kn->kn_kevent.udata =
+					(void * __capability)cheri_revoke(ud);
+	                        CAPREVOKE_STATS_BUMP(crst, caps_cleared);
+			}
+		}
+	}
+	for (ix = 0; ix <= kq->kq_knhashmask; ix++) {
+		SLIST_FOREACH(kn, &kq->kq_knhash[ix], kn_link) {
+			uintcap_t ud = (uintcap_t)kn->kn_kevent.udata;
+			if (!cheri_gettag(ud))
+				continue;
+	                CAPREVOKE_STATS_BUMP(crst, caps_found);
+			if (vm_caprevoke_test(crc, ud)) {
+				kn->kn_kevent.udata =
+					(void * __capability)cheri_revoke(ud);
+	                        CAPREVOKE_STATS_BUMP(crst, caps_cleared);
+			}
+		}
+	}
+
+	kqueue_release(kq, 1);
+	KQ_UNLOCK(kq);
+
+	return 0;
+}
+
+#endif
+
 // CHERI CHANGES START
 // {
 //   "updated": 20181203,
