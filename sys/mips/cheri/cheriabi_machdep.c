@@ -886,6 +886,9 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	td->td_md.md_cheri_mmap_cap = cheri_capability_build_user_rwx(
 	    CHERI_CAP_USER_MMAP_PERMS, map_base, map_length,
 	    CHERI_CAP_USER_MMAP_OFFSET);
+	KASSERT(cheri_getperm(td->td_md.md_cheri_mmap_cap) &
+	    CHERI_PERM_CHERIABI_VMMAP,
+	    ("%s: mmap() cap lacks CHERI_PERM_CHERIABI_VMMAP", __func__));
 
 	td->td_frame->pc = imgp->entry_addr;
 	td->td_frame->sr = MIPS_SR_KSU_USER | MIPS_SR_EXL | MIPS_SR_INT_IE |
