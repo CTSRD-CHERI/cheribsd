@@ -189,9 +189,10 @@
 	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL | CHERI_PERM_UNSEAL)
 
 /*
- * _DATA includes _VMMAP to support MAP_CHERI_DDC.  This should be removed
- * when all consumers are migrated.  Current consumers:
- *  - TLS mini-allocator
+ * _DATA includes _VMMAP so that we can derive the MMAP cap from it.
+ *
+ * XXX: Should it include "unallocated" user permissions so
+ * userspace can use them?
  */
 #define	CHERI_PERMS_USERSPACE_DATA					\
 				(CHERI_PERMS_USERSPACE |		\
