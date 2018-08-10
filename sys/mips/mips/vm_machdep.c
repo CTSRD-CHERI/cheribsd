@@ -175,7 +175,7 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2,int flags)
 
 	pcb2->pcb_cherikframe.ckf_c17 = fork_trampoline;
 	/* kstack is the top of the stack, we initialise it at the bottom */
-	pcb2->pcb_cherikframe.ckf_stc = rounddown2(td2->td_kstack + kstack_size,
+	pcb2->pcb_cherikframe.ckf_stc = (void *)rounddown2(td2->td_kstack + kstack_size,
 	    CHERICAP_SIZE) - CALLFRAME_SIZ;
 	/* Set up fork_trampoline arguments in the frame registers 
 	 * Note that in CHERI we do not have an RA slot, we use C17.
@@ -533,7 +533,7 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 	size_t kstack_size = td->td_kstack_pages * PAGE_SIZE - sizeof(struct pcb);
 
 	pcb2->pcb_cherikframe.ckf_c17 = fork_trampoline;
-	pcb2->pcb_cherikframe.ckf_stc = rounddown2(td->td_kstack + kstack_size,
+	pcb2->pcb_cherikframe.ckf_stc = (void *)rounddown2(td->td_kstack + kstack_size,
 	    CHERICAP_SIZE) - CALLFRAME_SIZ;
 	pcb2->pcb_cherikframe.ckf_c18 = fork_return;
 	pcb2->pcb_cherikframe.ckf_c19 = td;

@@ -267,7 +267,7 @@ static int
 run_filter(bus_dma_tag_t dmat, bus_addr_t paddr)
 {
 	int retval;
-	bus_offset_t poff = ptr_to_va(paddr);
+	bus_offset_t poff = paddr;
 
 	retval = 0;
 

@@ -827,8 +827,8 @@ realloc(void *addr, unsigned long size, struct malloc_type *mtp, int flags)
 	/* Copy over original contents */
 #ifdef CPU_CHERI
 	if (size >= CHERICAP_SIZE && alloc >= CHERICAP_SIZE &&
-	    ((uintptr_t)addr & (CHERICAP_SIZE-1)) == 0 &&
-	    ((uintptr_t)newaddr & (CHERICAP_SIZE-1)) == 0)
+	    is_aligned(addr, CHERICAP_SIZE) &&
+	    is_aligned(newaddr, CHERICAP_SIZE))
 		cheri_bcopy(addr, newaddr, min(size, alloc));
 	else
 #endif
