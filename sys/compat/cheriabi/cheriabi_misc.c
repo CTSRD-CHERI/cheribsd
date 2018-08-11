@@ -863,7 +863,7 @@ cheriabi_syscall_helper_unregister(struct syscall_helper_data *sd)
 	do {								\
 		void * __capability _tmpcap;				\
 		_tmpcap = cheri_capability_build_user_rwx((perms),	\
-		    (vaddr_t)(base), (length), (offset));		\
+		    (base), (length), (offset));		\
 		copyoutcap_c(&_tmpcap, uaddr, sizeof(_tmpcap));		\
 	} while(0)
 
@@ -972,8 +972,8 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	/*
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
-	sucap(&arginfo->ps_argvstr, vectp, 0, argc * sizeof(void * __capability),
-	    CHERI_CAP_USER_DATA_PERMS);
+	sucap(&arginfo->ps_argvstr, cheri_getaddress(vectp), 0,
+	    argc * sizeof(void * __capability), CHERI_CAP_USER_DATA_PERMS);
 	suword32_c(&arginfo->ps_nargvstr, argc);
 
 	/*
@@ -981,7 +981,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	 */
 	imgp->args->argv = (__cheri_fromcap void *)vectp;
 	for (; argc > 0; --argc) {
-		sucap(vectp++, destp, 0, strlen(stringp) + 1,
+		sucap(vectp++, cheri_getaddress(destp), 0, strlen(stringp) + 1,
 		    CHERI_CAP_USER_DATA_PERMS);
 		while (*stringp++ != 0)
 			destp++;
@@ -992,7 +992,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	/* XXX: suword clears the tag */
 	suword_c(vectp++, 0);
 
-	sucap(&arginfo->ps_envstr, vectp, 0,
+	sucap(&arginfo->ps_envstr, cheri_getaddress(vectp), 0,
 	    arginfo->ps_nenvstr * sizeof(void * __capability),
 	    CHERI_CAP_USER_DATA_PERMS);
 	suword32_c(&arginfo->ps_nenvstr, envc);
@@ -1002,7 +1002,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	 */
 	imgp->args->envv = (__cheri_fromcap void *)vectp;
 	for (; envc > 0; --envc) {
-		sucap(vectp++, destp, 0, strlen(stringp) + 1,
+		sucap(vectp++, cheri_getaddress(destp), 0, strlen(stringp) + 1,
 		    CHERI_CAP_USER_DATA_PERMS);
 		while (*stringp++ != 0)
 			destp++;
@@ -1091,11 +1091,11 @@ cheriabi_set_auxargs(void * __capability * __capability pos,
 
 	AUXARGS_ENTRY_NOCAP(pos, AT_ARGC, imgp->args->argc);
 	/* XXX-BD: Includes terminating NULL.  Should it? */
-	AUXARGS_ENTRY_CAP(pos, AT_ARGV, imgp->args->argv, 0,
+	AUXARGS_ENTRY_CAP(pos, AT_ARGV, (vaddr_t)imgp->args->argv, 0,
 	   sizeof(void * __capability) * (imgp->args->argc + 1),
 	   CHERI_CAP_USER_DATA_PERMS);
 	AUXARGS_ENTRY_NOCAP(pos, AT_ENVC, imgp->args->envc);
-	AUXARGS_ENTRY_CAP(pos, AT_ENVV, imgp->args->envv, 0,
+	AUXARGS_ENTRY_CAP(pos, AT_ENVV, (vaddr_t)imgp->args->envv, 0,
 	   sizeof(void * __capability) * (imgp->args->envc + 1),
 	   CHERI_CAP_USER_DATA_PERMS);
 

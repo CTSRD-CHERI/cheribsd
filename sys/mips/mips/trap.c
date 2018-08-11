@@ -452,7 +452,7 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 		    "faulting instruction from %p\n",  __func__, p->p_pid,
 		    (long)td->td_tid, p->p_comm,
 		    p->p_ucred ? p->p_ucred->cr_uid : -1,
-		    (void*)(vaddr_t)(bad_inst_ptr));
+		    (void*)(__cheri_addr vaddr_t)(bad_inst_ptr));
 	}
 	/* Should this be a kerncap instead instead of being indirected by $pcc? */
 	vaddr = frame->pc + offset_from_pc;

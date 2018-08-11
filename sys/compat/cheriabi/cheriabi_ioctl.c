@@ -99,7 +99,7 @@ cheriabi_ioctl(struct thread *td, struct cheriabi_ioctl_args *uap)
 	if (size > 0) {
 		if (com & IOC_VOID) {
 			/* Integer argument. */
-			arg = (intptr_t)uap->data;
+			arg = (__cheri_addr intptr_t)uap->data;
 			data = (void *)&arg;
 			size = 0;
 		} else {

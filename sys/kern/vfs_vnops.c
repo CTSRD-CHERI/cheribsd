@@ -1104,7 +1104,7 @@ vn_io_fault1(struct vnode *vp, struct uio *uio, struct vn_io_fault_args *args,
 		}
 		if (len > io_hold_cnt * PAGE_SIZE)
 			len = io_hold_cnt * PAGE_SIZE;
-		addr = (vaddr_t)uio_clone->uio_iov->iov_base;
+		addr = (__cheri_addr vaddr_t)uio_clone->uio_iov->iov_base;
 		end = round_page(addr + len);
 		if (end < addr) {
 			error = EFAULT;

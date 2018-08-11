@@ -1004,7 +1004,7 @@ kevent_copyout(void *arg, kkevent_t *kevp, int count)
 		ks_n[i].flags = kevp[i].flags;
 		ks_n[i].fflags = kevp[i].fflags;
 		ks_n[i].data = kevp[i].data;
-		ks_n[i].udata = (void *)(uintptr_t)kevp[i].udata;
+		ks_n[i].udata = (void *)(__cheri_addr vaddr_t)kevp[i].udata;
 		memcpy(&ks_n[i].ext[0], &kevp->ext[0], sizeof(kevp->ext));
 	}
 	error = copyout(ks_n, uap->eventlist, count * sizeof(*ks_n));
@@ -1069,7 +1069,7 @@ kevent11_copyout(void *arg, kkevent_t *kevp, int count)
 		kev11.flags = kevp->flags;
 		kev11.fflags = kevp->fflags;
 		kev11.data = kevp->data;
-		kev11.udata = (void *)(uintptr_t)kevp->udata;
+		kev11.udata = (void *)(__cheri_addr vaddr_t)kevp->udata;
 		error = copyout(&kev11, uap->eventlist, sizeof(kev11));
 		if (error != 0)
 			break;

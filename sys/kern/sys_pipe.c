@@ -859,7 +859,7 @@ pipe_build_write_buffer(wpipe, uio)
                 size = uio->uio_iov->iov_len;
 
 	if ((i = vm_fault_quick_hold_pages(&curproc->p_vmspace->vm_map,
-	    (vm_offset_t)uio->uio_iov->iov_base, size, VM_PROT_READ,
+	    (__cheri_addr vm_offset_t)uio->uio_iov->iov_base, size, VM_PROT_READ,
 	    wpipe->pipe_map.ms, PIPENPAGES)) < 0)
 		return (EFAULT);
 
@@ -868,7 +868,7 @@ pipe_build_write_buffer(wpipe, uio)
  */
 	wpipe->pipe_map.npages = i;
 	wpipe->pipe_map.pos =
-	    ((vm_offset_t) uio->uio_iov->iov_base) & PAGE_MASK;
+	    ((__cheri_addr vm_offset_t) uio->uio_iov->iov_base) & PAGE_MASK;
 	wpipe->pipe_map.cnt = size;
 
 /*
