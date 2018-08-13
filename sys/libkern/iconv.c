@@ -479,9 +479,7 @@ iconv_sysctl_add(SYSCTL_HANDLER_ARGS)
 	}
 	if (du.din.ia_datalen) {
 		csp->cp_data = malloc(du.din.ia_datalen, M_ICONVDATA, M_WAITOK);
-		error = copyin_c(ia_data,
-		    (__cheri_tocap void * __capability)csp->cp_data,
-		    du.din.ia_datalen);
+		error = copyin_c(ia_data, csp->cp_data, du.din.ia_datalen);
 		if (error)
 			goto bad;
 	}

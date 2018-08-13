@@ -120,8 +120,7 @@ kern_audit(struct thread *td, const void * __capability record, u_int length)
 
 	rec = malloc(length, M_AUDITDATA, M_WAITOK);
 
-	error = copyin_c(record,
-	    (__cheri_tocap void * __capability)rec, length);
+	error = copyin_c(record, rec, length);
 	if (error)
 		goto free_out;
 

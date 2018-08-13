@@ -1875,8 +1875,7 @@ bpf_setf(struct bpf_d *d, struct bpf_program *fp, u_long cmd)
 	if (size > 0) {
 		/* We're setting up new filter.  Copy and check actual data. */
 		fcode = malloc(size, M_BPF, M_WAITOK);
-		if (copyin_c(bf_insns_get_ptr(fp),
-		    (__cheri_tocap struct bpf_insn * __capability)fcode, size) != 0 ||
+		if (copyin_c(bf_insns_get_ptr(fp), fcode, size) != 0 ||
 		    !bpf_validate(fcode, flen)) {
 			free(fcode, M_BPF);
 			return (EINVAL);

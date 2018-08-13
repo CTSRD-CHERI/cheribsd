@@ -1158,7 +1158,7 @@ cheriabi_kenv(struct thread *td, struct cheriabi_kenv_args *uap)
 int
 cheriabi_kbounce(struct thread *td, struct cheriabi_kbounce_args *uap)
 {
-	void * __capability bounce;
+	void * bounce;
 	void * __capability dst = uap->dst;
 	const void * __capability src = uap->src;
 	size_t len = uap->len;
@@ -1172,17 +1172,17 @@ cheriabi_kbounce(struct thread *td, struct cheriabi_kbounce_args *uap)
 	if (src == NULL || dst == NULL)
 		return (EINVAL);
 
-	bounce = malloc_c(len, M_TEMP, M_WAITOK | M_ZERO);
+	bounce = malloc(len, M_TEMP, M_WAITOK | M_ZERO);
 	error = copyin_c(src, bounce, len);
 	if (error != 0) {
 		printf("%s: error in copyin_c %d\n", __func__, error);
 		goto error;
 	}
-	error = copyout_c(bounce, dst, len);
+	error = copyout_c((__cheri_tocap void * __capability)bounce, dst, len);
 	if (error != 0)
 		printf("%s: error in copyout_c %d\n", __func__, error);
 error:
-	free_c(bounce, M_TEMP);
+	free(bounce, M_TEMP);
 	return (error);
 }
 
@@ -1577,9 +1577,7 @@ cheriabi_setgroups(struct thread *td, struct cheriabi_setgroups_args *uap)
 		/* XXX: CTSRD-CHERI/clang#179 */
 		groups = &smallgroups[0];
 
-	error = copyin_c(uap->gidset,
-	    (__cheri_tocap gid_t * __capability)groups,
-	    gidsetsize * sizeof(gid_t));
+	error = copyin_c(uap->gidset, groups, gidsetsize * sizeof(gid_t));
 	if (error == 0)
 		error = kern_setgroups(td, gidsetsize, groups);
 

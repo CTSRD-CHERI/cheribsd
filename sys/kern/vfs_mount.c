@@ -310,8 +310,7 @@ vfs_buildopts(struct uio *auio, struct vfsoptlist **options)
 			bcopy((__cheri_fromcap void *)auio->uio_iov[i].iov_base,
 			    opt->name, namelen);
 		} else {
-			error = copyin_c(auio->uio_iov[i].iov_base,
-			    (__cheri_tocap char * __capability)opt->name,
+			error = copyin_c(auio->uio_iov[i].iov_base, opt->name,
 			    namelen);
 			if (error)
 				goto bad;
@@ -330,7 +329,6 @@ vfs_buildopts(struct uio *auio, struct vfsoptlist **options)
 				    optlen);
 			} else {
 				error = copyin_c(auio->uio_iov[i + 1].iov_base,
-				    (__cheri_tocap void * __capability)
 				    opt->value, optlen);
 				if (error)
 					goto bad;

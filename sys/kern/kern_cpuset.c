@@ -1768,8 +1768,7 @@ kern_cpuset_setaffinity(struct thread *td, cpulevel_t level, cpuwhich_t which,
 			return (ECAPMODE);
 	}
 	mask = malloc(cpusetsize, M_TEMP, M_WAITOK | M_ZERO);
-	error = copyin_c(maskp, (__cheri_tocap cpuset_t * __capability)mask,
-	    cpusetsize);
+	error = copyin_c(maskp, mask, cpusetsize);
 	if (error)
 		goto out;
 	/*
@@ -2040,8 +2039,7 @@ kern_cpuset_setdomain(struct thread *td, cpulevel_t level, cpuwhich_t which,
 	}
 	memset(&domain, 0, sizeof(domain));
 	mask = malloc(domainsetsize, M_TEMP, M_WAITOK | M_ZERO);
-	error = copyin_c(maskp, (__cheri_tocap domainset_t * __capability)mask,
-	    domainsetsize);
+	error = copyin_c(maskp, mask, domainsetsize);
 	if (error)
 		goto out;
 	/*

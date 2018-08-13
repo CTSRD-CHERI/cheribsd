@@ -791,7 +791,7 @@ int
 kern_semctl(struct thread *td, int semid, int semnum, int cmd, ksemun_t *arg,
     register_t *rval)
 {
-	u_short * __capability array;
+	u_short *array;
 	struct ucred *cred = td->td_ucred;
 	int i, error;
 	struct prison *rpr;
@@ -956,7 +956,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd, ksemun_t *arg,
 		 */
 		count = semakptr->u.sem_nsems;
 		mtx_unlock(sema_mtxp);		    
-		array = malloc_c(sizeof(*array) * count, M_TEMP, M_WAITOK);
+		array = malloc(sizeof(*array) * count, M_TEMP, M_WAITOK);
 		mtx_lock(sema_mtxp);
 		if ((error = semvalid(semid, rpr, semakptr)) != 0)
 			goto done2;
@@ -966,7 +966,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd, ksemun_t *arg,
 		for (i = 0; i < semakptr->u.sem_nsems; i++)
 			array[i] = semakptr->u.sem_base[i].semval;
 		mtx_unlock(sema_mtxp);
-		error = copyout_c(array, arg->array, count * sizeof(*array));
+		error = copyout_c((__cheri_tocap void * __capability)array, arg->array, count * sizeof(*array));
 		mtx_lock(sema_mtxp);
 		break;
 
@@ -1009,7 +1009,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd, ksemun_t *arg,
 		 */
 		count = semakptr->u.sem_nsems;
 		mtx_unlock(sema_mtxp);		    
-		array = malloc_c(sizeof(*array) * count, M_TEMP, M_WAITOK);
+		array = malloc(sizeof(*array) * count, M_TEMP, M_WAITOK);
 		error = copyin_c(arg->array, array, count * sizeof(*array));
 		mtx_lock(sema_mtxp);
 		if (error)
@@ -1042,8 +1042,7 @@ done2:
 	mtx_unlock(sema_mtxp);
 	if (cmd == IPC_RMID)
 		mtx_unlock(&sem_mtx);
-	if (array != NULL)
-		free_c(array, M_TEMP);
+	free(array, M_TEMP);
 	return(error);
 }
 
@@ -1251,9 +1250,7 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 
 		sops = malloc(nsops * sizeof(*sops), M_TEMP, M_WAITOK);
 	}
-	if ((error = copyin_c(usops,
-	    (__cheri_tocap struct sembuf * __capability)sops,
-	    nsops * sizeof(sops[0]))) != 0) {
+	if ((error = copyin_c(usops, sops, nsops * sizeof(sops[0]))) != 0) {
 		DPRINTF(("error = %d from copyin(%p, %p, %d)\n", error,
 		    (__cheri_fromcap struct sembuf *)usops, sops,
 		    nsops * sizeof(sops[0])));

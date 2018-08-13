@@ -1892,7 +1892,7 @@ sysctl_new_user(struct sysctl_req *req, void *p, size_t l)
 		    req->newidx, (__cheri_tocap void * __capability)p, l);
 	else
 		error = copyin_c((char * __capability)req->newptr + req->newidx,
-		    (__cheri_tocap void * __capability)p, l);
+		    p, l);
 	req->newidx += l;
 	return (error);
 }

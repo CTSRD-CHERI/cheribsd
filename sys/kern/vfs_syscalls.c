@@ -3010,7 +3010,7 @@ getutimes(const struct timeval * __capability usrtvp, enum uio_seg tvpseg,
 {
 	struct timeval tv[2];
 	const struct timeval * __capability tvp;
-	struct timeval * __capability tmptvp;
+	struct timeval *tmptvp;
 	int error;
 
 	if (usrtvp == NULL) {
@@ -3023,7 +3023,8 @@ getutimes(const struct timeval * __capability usrtvp, enum uio_seg tvpseg,
 			tmptvp = &tv[0];
 			if ((error = copyin_c(usrtvp, tmptvp, sizeof(tv))) != 0)
 				return (error);
-			tvp = tmptvp;
+			tvp = (__cheri_tocap struct timeval * __capability)
+			    tmptvp;
 		}
 
 		if (tvp[0].tv_usec < 0 || tvp[0].tv_usec >= 1000000 ||
@@ -3058,9 +3059,7 @@ getutimens(const struct timespec * __capability usrtsp, enum uio_seg tspseg,
 	if (tspseg == UIO_SYSSPACE) {
 		tsp[0] = usrtsp[0];
 		tsp[1] = usrtsp[1];
-	} else if ((error = copyin_c(usrtsp,
-	    (__cheri_tocap struct timespec * __capability)tsp,
-	   sizeof(*tsp) * 2)) != 0)
+	} else if ((error = copyin_c(usrtsp, tsp, sizeof(*tsp) * 2)) != 0)
 		return (error);
 	if (tsp[0].tv_nsec == UTIME_OMIT && tsp[1].tv_nsec == UTIME_OMIT)
 		*retflags |= UTIMENS_EXIT;

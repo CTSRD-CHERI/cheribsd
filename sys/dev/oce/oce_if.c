@@ -2302,7 +2302,7 @@ oce_handle_passthrough(struct ifnet *ifp, caddr_t data)
 	if (rc)
 		return ENOMEM;
 
-	if (copyin_c(ioctl_ptr, (__cheri_tocap void * __capability)OCE_DMAPTR(&dma_mem,char), req_size)) {
+	if (copyin_c(ioctl_ptr, OCE_DMAPTR(&dma_mem,char), req_size)) {
 		rc = EFAULT;
 		goto dma_free;
 	}

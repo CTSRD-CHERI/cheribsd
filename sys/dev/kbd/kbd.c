@@ -919,9 +919,7 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 			else
 #endif
 				data = __USER_CAP_UNBOUND(*(void **)arg);
-			error = copyin_c(data,
-			    (__cheri_tocap keymap_t * __capability)mapp,
-			    sizeof *mapp);
+			error = copyin_c(data, mapp, sizeof *mapp);
 			if (error != 0) {
 				splx(s);
 				free(mapp, M_TEMP);

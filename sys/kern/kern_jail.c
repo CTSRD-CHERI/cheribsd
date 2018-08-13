@@ -421,7 +421,7 @@ kern_jail(struct thread *td, const char * __capability path,
 	IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
 	opt.uio_iovcnt++;
 	if (ipseg == UIO_USERSPACE) {
-		error = copyin_c(ip4, u_ip4, ip4s * sizeof(struct in_addr));
+		error = copyin_c(ip4, (__cheri_fromcap void *)u_ip4, ip4s * sizeof(struct in_addr));
 		if (error != 0)
 			goto done;
 	} else
@@ -436,7 +436,7 @@ kern_jail(struct thread *td, const char * __capability path,
 	IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
 	opt.uio_iovcnt++;
 	if (ipseg == UIO_USERSPACE) {
-		error = copyin_c(ip6, u_ip6, ip6s * sizeof(struct in_addr));
+		error = copyin_c(ip6, (__cheri_fromcap void *)u_ip6, ip6s * sizeof(struct in_addr));
 		if (error != 0)
 			goto done;
 	} else

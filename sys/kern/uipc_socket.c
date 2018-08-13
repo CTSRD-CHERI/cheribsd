@@ -2707,8 +2707,7 @@ sooptcopyin(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
 			return (copyincap_c(sopt->sopt_val,
 			   (__cheri_tocap void * __capability)buf, valsize));
 		else
-			return (copyin_c(sopt->sopt_val,
-			   (__cheri_tocap void * __capability)buf, valsize));
+			return (copyin_c(sopt->sopt_val, buf, valsize));
 	}
 
 	bcopy((__cheri_fromcap void *)sopt->sopt_val, buf, valsize);
@@ -3255,8 +3254,7 @@ soopt_mcopyin(struct sockopt *sopt, struct mbuf *m)
 		if (sopt->sopt_td != NULL) {
 			int error;
 
-			error = copyin_c(sopt->sopt_val,
-			    (__cheri_tocap void * __capability)mtod(m, char *),
+			error = copyin_c(sopt->sopt_val, mtod(m, char *),
 			    m->m_len);
 			if (error != 0) {
 				m_freem(m0);

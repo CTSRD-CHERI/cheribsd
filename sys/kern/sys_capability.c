@@ -477,9 +477,7 @@ user_cap_ioctls_limit(struct thread *td, int fd,
 		cmds = NULL;
 	} else {
 		cmds = malloc(sizeof(cmds[0]) * ncmds, M_FILECAPS, M_WAITOK);
-		error = copyin_c(ucmds,
-		    (__cheri_tocap u_long * __capability)cmds,
-		    sizeof(cmds[0]) * ncmds);
+		error = copyin_c(ucmds, cmds, sizeof(cmds[0]) * ncmds);
 		if (error != 0) {
 			free(cmds, M_FILECAPS);
 			return (error);

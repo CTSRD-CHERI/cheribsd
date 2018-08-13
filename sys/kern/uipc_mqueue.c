@@ -1666,9 +1666,8 @@ mqueue_loadmsg(const char * __capability msg_ptr, size_t msg_size, int msg_prio)
 
 	len = sizeof(struct mqueue_msg) + msg_size;
 	msg = malloc(len, M_MQUEUEDATA, M_WAITOK);
-	error = copyin_c(msg_ptr,
-	    ((__cheri_tocap char * __capability)(char *)msg) +
-	    sizeof(struct mqueue_msg), msg_size);
+	error = copyin_c(msg_ptr, (char *)msg + sizeof(struct mqueue_msg),
+	    msg_size);
 	if (error) {
 		free(msg, M_MQUEUEDATA);
 		msg = NULL;

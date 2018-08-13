@@ -1376,9 +1376,7 @@ aiocb_copyin_old_sigevent(void * __capability ujob, struct aiocb *kjob)
 	int error;
 
 	bzero(kjob, sizeof(struct aiocb));
-	error = copyin_c(ujob,
-	    (__cheri_tocap kaiocb_t * __capability)kjob,
-	    sizeof(struct oaiocb));
+	error = copyin_c(ujob, kjob, sizeof(struct oaiocb));
 	if (error)
 		return (error);
 	ojob = (struct oaiocb *)kjob;

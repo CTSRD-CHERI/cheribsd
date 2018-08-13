@@ -1934,8 +1934,7 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		error = 0;
 		break;
 	case SIOCGAIRONET:
-		error = copyin_c(ifr_data_get_ptr(ifr),
-		    (__cheri_tocap struct an_req * __capability)&sc->areq,
+		error = copyin_c(ifr_data_get_ptr(ifr), &sc->areq,
 		    sizeof(sc->areq));
 		if (error != 0)
 			break;
@@ -1973,8 +1972,7 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		if ((error = priv_check(td, PRIV_DRIVER)))
 			goto out;
 		AN_LOCK(sc);
-		error = copyin_c(ifr_data_get_ptr(ifr),
-		    (__cheri_tocap struct an_req * __capability)&sc->areq,
+		error = copyin_c(ifr_data_get_ptr(ifr), &sc->areq,
 		    sizeof(sc->areq));
 		if (error != 0)
 			break;
@@ -1984,8 +1982,7 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	case CASE_IOC_IFREQ(SIOCGPRIVATE_0):	/* used by Cisco client utility */
 		if ((error = priv_check(td, PRIV_DRIVER)))
 			goto out;
-		error = copyin_c(ifr_data_get_ptr(ifr),
-		    (__cheri_tocap struct aironet_ioctl * __capability)&l_ioctl,
+		error = copyin_c(ifr_data_get_ptr(ifr), &l_ioctl,
 		    sizeof(l_ioctl));
 		if (error)
 			goto out;
@@ -2013,8 +2010,7 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	case CASE_IOC_IFREQ(SIOCGPRIVATE_1):	/* used by Cisco client utility */
 		if ((error = priv_check(td, PRIV_DRIVER)))
 			goto out;
-		error = copyin_c(ifr_data_get_ptr(ifr),
-		    (__cheri_tocap struct aironet_ioctl * __capability)&l_ioctl,
+		error = copyin_c(ifr_data_get_ptr(ifr), &l_ioctl,
 		    sizeof(l_ioctl));
 		if (error)
 			goto out;

@@ -1606,8 +1606,7 @@ sockargs(struct mbuf **mp, char * __capability buf, socklen_t buflen, int type)
 	}
 	m = m_get2(buflen, M_WAITOK, type, 0);
 	m->m_len = buflen;
-	error = copyin_c(buf,
-	    (__cheri_tocap void * __capability) mtod(m, void *), buflen);
+	error = copyin_c(buf, mtod(m, void *), buflen);
 	if (error != 0)
 		(void) m_free(m);
 	else {
@@ -1637,8 +1636,7 @@ getsockaddr(struct sockaddr **namp, const struct sockaddr * __capability uaddr,
 	if (len < offsetof(struct sockaddr, sa_data[0]))
 		return (EINVAL);
 	sa = malloc(len, M_SONAME, M_WAITOK);
-	error = copyin_c(uaddr,
-	    (__cheri_tocap struct sockaddr * __capability)sa, len);
+	error = copyin_c(uaddr, sa, len);
 	if (error != 0) {
 		free(sa, M_SONAME);
 	} else {

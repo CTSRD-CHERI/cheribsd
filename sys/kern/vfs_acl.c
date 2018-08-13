@@ -147,9 +147,7 @@ acl_copyin(const void * __capability user_acl, struct acl *kernel_acl,
 		break;
 
 	default:
-		error = copyin_c(user_acl,
-		    (__cheri_tocap struct acl * __capability)kernel_acl,
-		    sizeof(*kernel_acl));
+		error = copyin_c(user_acl, kernel_acl, sizeof(*kernel_acl));
 		if (kernel_acl->acl_maxcnt != ACL_MAX_ENTRIES)
 			return (EINVAL);
 	}
