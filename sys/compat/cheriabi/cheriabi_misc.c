@@ -354,9 +354,7 @@ cheriabi_kevent_copyout(void *arg, kkevent_t *kevp, int count)
 	KASSERT(count <= KQ_NEVENTS, ("count (%d) > KQ_NEVENTS", count));
 	uap = (struct cheriabi_kevent_args *)arg;
 
-	error = copyoutcap_c(
-	    (__cheri_tocap struct kevent_c * __capability)kevp,
-	    uap->eventlist, count * sizeof(*kevp));
+	error = copyoutcap_c(kevp, uap->eventlist, count * sizeof(*kevp));
 	if (error == 0)
 		uap->eventlist += count;
 	return (error);
@@ -692,7 +690,7 @@ cheriabi_getcontext(struct thread *td, struct cheriabi_getcontext_args *uap)
 	PROC_LOCK(td->td_proc);
 	uc.uc_sigmask = td->td_sigmask;
 	PROC_UNLOCK(td->td_proc);
-	return (copyoutcap_c( &uc, uap->ucp, UCC_COPY_SIZE));
+	return (copyoutcap_c(&uc, uap->ucp, UCC_COPY_SIZE));
 }
 
 int
@@ -727,7 +725,7 @@ cheriabi_swapcontext(struct thread *td, struct cheriabi_swapcontext_args *uap)
 	PROC_LOCK(td->td_proc);
 	uc.uc_sigmask = td->td_sigmask;
 	PROC_UNLOCK(td->td_proc);
-	if ((ret = copyoutcap_c( &uc, uap->oucp, UCC_COPY_SIZE)) != 0)
+	if ((ret = copyoutcap_c(&uc, uap->oucp, UCC_COPY_SIZE)) != 0)
 		return (ret);
 	if ((ret = copyincap_c(uap->ucp, &uc, UCC_COPY_SIZE)) != 0)
 		return (ret);

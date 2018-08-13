@@ -1848,8 +1848,7 @@ sysctl_old_user(struct sysctl_req *req, const void *p, size_t l)
 			i = len - origidx;
 		if (req->lock == REQ_WIRED) {
 			if (req->flags & SCTL_PTROUT)
-				error = copyoutcap_nofault_c(
-				    (__cheri_tocap const void * __capability)p,
+				error = copyoutcap_nofault_c(p,
 				    (char * __capability)req->oldptr +
 				    origidx, i);
 			else
@@ -1858,8 +1857,7 @@ sysctl_old_user(struct sysctl_req *req, const void *p, size_t l)
 				    i);
 		} else
 			if (req->flags & SCTL_PTROUT)
-				error = copyoutcap_c(
-				    (__cheri_tocap const void * __capability)p,
+				error = copyoutcap_c(p,
 				    (char * __capability)req->oldptr + origidx,
 				    i);
 			else

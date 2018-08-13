@@ -1110,9 +1110,8 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 		return (cheriabi_set_user_tls(td, uap->parms));
 
 	case MIPS_GET_TLS:
-		error = copyoutcap_c(
-		    (__cheri_tocap void * __capability)&td->td_md.md_tls,
-		    uap->parms, sizeof(void * __capability));
+		error = copyoutcap_c(&td->td_md.md_tls, uap->parms,
+		    sizeof(void * __capability));
 		return (error);
 
 	case MIPS_GET_COUNT:

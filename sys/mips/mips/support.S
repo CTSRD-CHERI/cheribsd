@@ -380,6 +380,11 @@ NESTED(copyoutcap_c, CALLFRAME_SIZ, ra)
 	PTR_SUBU	sp, sp, CALLFRAME_SIZ
 	.mask	0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ)
 	PTR_LA	v0, copyerr
+	cmove	$c4, $c3
+	cgetdefault	$c3
+	csetoffset	$c3, $c3, a0
+	csetbounds	$c3, $c3, a1
+	move	a0, a1
 	cgetbase	t0, $c4
 	blt	t0, zero, _C_LABEL(copyerr) # make sure `to` is in user space
 	REG_S	ra, CALLFRAME_RA(sp)

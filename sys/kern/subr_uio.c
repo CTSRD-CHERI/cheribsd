@@ -122,8 +122,7 @@ copyout_nofault_c(const void *kaddr, void * __capability udaddr,
 }
 
 int
-copyoutcap_nofault_c(const void * __capability kaddr,
-    void * __capability udaddr, size_t len)
+copyoutcap_nofault_c(const void *kaddr, void * __capability udaddr, size_t len)
 {
 	int error, save;
 

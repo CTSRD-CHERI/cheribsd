@@ -127,9 +127,7 @@ cheriabi_ioctl(struct thread *td, struct cheriabi_ioctl_args *uap)
 	error = kern_ioctl(td, uap->fd, com, data);
 
 	if (error == 0 && (com & IOC_OUT)) {
-		error = copyoutcap_c(
-		    (__cheri_tocap void * __capability)data,
-		    uap->data, (u_int)size);
+		error = copyoutcap_c(data, uap->data, (u_int)size);
 	}
 
 out:

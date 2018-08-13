@@ -3240,7 +3240,7 @@ aiocb_c_store_aiocb(kaiocb_t ** __capability ujobp, struct kaiocb *kjob)
 	else
 		cheri_memcpy(&ujob, &kjob->ujobptr, sizeof(__intcap_t));
 
-	return (copyoutcap_c( &ujob, ujobp, sizeof(intcap_t)));
+	return (copyoutcap_c(&ujob, ujobp, sizeof(intcap_t)));
 }
 
 static size_t
