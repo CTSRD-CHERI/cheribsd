@@ -2704,8 +2704,7 @@ sooptcopyin(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
 	if (sopt->sopt_td != NULL) {
 		if (sopt->sopt_dir == SOPT_SETCAP ||
 		    sopt->sopt_dir == SOPT_GETCAP)
-			return (copyincap_c(sopt->sopt_val,
-			   (__cheri_tocap void * __capability)buf, valsize));
+			return (copyincap_c(sopt->sopt_val, buf, valsize));
 		else
 			return (copyin_c(sopt->sopt_val, buf, valsize));
 	}

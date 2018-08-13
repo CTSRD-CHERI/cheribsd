@@ -374,9 +374,7 @@ cheriabi_kevent_copyin(void *arg, kkevent_t *kevp, int count)
 	KASSERT(count <= KQ_NEVENTS, ("count (%d) > KQ_NEVENTS", count));
 	uap = (struct cheriabi_kevent_args *)arg;
 
-	error = copyincap_c(uap->changelist,
-	    (__cheri_tocap struct kevent_c * __capability)kevp,
-	    count * sizeof(*kevp));
+	error = copyincap_c(uap->changelist, kevp, count * sizeof(*kevp));
 	if (error == 0)
 		uap->changelist += count;
 	return (error);
@@ -408,7 +406,7 @@ static int
 cheriabi_copyinuio(struct iovec_c * __capability iovp, u_int iovcnt,
     struct uio **uiop)
 {
-	kiovec_t * __capability iov;
+	kiovec_t *iov;
 	struct uio *uio;
 	size_t iovlen;
 	int error, i;
@@ -418,13 +416,13 @@ cheriabi_copyinuio(struct iovec_c * __capability iovp, u_int iovcnt,
 		return (EINVAL);
 	iovlen = iovcnt * sizeof(kiovec_t);
 	uio = malloc(iovlen + sizeof(*uio), M_IOV, M_WAITOK);
-	iov = (__cheri_tocap kiovec_t * __capability)(kiovec_t *)(uio + 1);
+	iov = (kiovec_t *)(uio + 1);
 	error = copyincap_c(iovp, iov, iovlen);
 	if (error) {
 		free(uio, M_IOV);
 		return (error);
 	}
-	uio->uio_iov = (__cheri_fromcap kiovec_t *)iov;
+	uio->uio_iov = iov;
 	uio->uio_iovcnt = iovcnt;
 	uio->uio_segflg = UIO_USERSPACE;
 	uio->uio_offset = -1;
@@ -508,8 +506,7 @@ cheriabi_copyiniov(struct iovec_c * __capability iovp_c, u_int iovcnt,
 		return (error);
 	iovlen = iovcnt * sizeof(kiovec_t);
 	iov = malloc(iovlen, M_IOV, M_WAITOK);
-	error = copyincap_c(iovp_c,
-	    (__cheri_tocap kiovec_t * __capability)iov, iovlen);
+	error = copyincap_c(iovp_c, iov, iovlen);
 	if (error) {
 		free(iov, M_IOV);
 		return (error);
@@ -2174,9 +2171,7 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 		break;
 
 	case PT_VM_ENTRY:
-		error = copyincap_c(uap->addr,
-				(__cheri_tocap char * __capability)(char *)&r.pve,
-				sizeof r.pve);
+		error = copyincap_c(uap->addr, (char *)&r.pve, sizeof r.pve);
 		if (error)
 			break;
 

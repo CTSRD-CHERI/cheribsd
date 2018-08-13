@@ -367,7 +367,7 @@ int	copyin_implicit_cap(const void * _Nonnull __restrict udaddr,
 int	copyin_c(const void * _Nonnull __restrict __capability udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
 int	copyincap_c(const void * _Nonnull __restrict __capability udaddr,
-	    void * _Nonnull __restrict __capability kaddr, size_t len);
+	    void * _Nonnull __restrict kaddr, size_t len);
 #else
 #define	copyin_c	copyin
 #define	copyincap_c	copyin

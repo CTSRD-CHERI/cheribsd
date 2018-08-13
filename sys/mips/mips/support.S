@@ -274,9 +274,9 @@ END(copyin_c)
  * Copy specified amount of data from user space into the kernel via
  * capabilities
  *	copyincap_c(from, to, len)
- *		void * __capability from;	(user source address)
- *		void * __capability to;		(kernel destination address)
- *		unsigned len;
+ *		void * __capability from;	c3 (user source capability)
+ *		void * to;			a0 (kernel destination address)
+ *		unsigned len;			a1
  */
 NESTED(copyincap_c, CALLFRAME_SIZ, ra)
 	PTR_SUBU	sp, sp, CALLFRAME_SIZ
@@ -284,6 +284,10 @@ NESTED(copyincap_c, CALLFRAME_SIZ, ra)
 	PTR_LA	v0, copyerr
 	cgetbase	t0, $c3
 	blt	t0, zero, _C_LABEL(copyerr) # make sure `from` is in user space
+	cgetdefault	$c4
+	csetoffset	$c4, $c4, a0
+	csetbounds	$c4, $c4, a1
+	move	a0, a1
 	REG_S	ra, CALLFRAME_RA(sp)
 	GET_CPU_PCPU(v1)
 	PTR_L	v1, PC_CURPCB(v1)

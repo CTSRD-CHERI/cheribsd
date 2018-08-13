@@ -525,9 +525,7 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 		}
 		cfp = malloc(sizeof(*cfp), M_TEMP, M_WAITOK);
 		error = copyincap_c(__USER_CAP((void *)mcp->mc_cp2state,
-		    mcp->mc_cp2state_len),
-		    (__cheri_tocap struct cheri_frame * __capability)cfp,
-		    sizeof(*cfp));
+		    mcp->mc_cp2state_len), cfp, sizeof(*cfp));
 		if (error) {
 			free(cfp, M_TEMP);
 			printf("%s: invalid pointer\n", __func__);

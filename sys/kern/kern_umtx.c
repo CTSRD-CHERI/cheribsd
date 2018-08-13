@@ -4215,8 +4215,7 @@ __umtx_op_nwake_private_c(struct thread *td, struct cheriabi__umtx_op_args *uap)
 	for (count = uap->val, pos = 0; count > 0; count -= tocopy,
 	    pos += tocopy) {
 		tocopy = MIN(count, BATCH_SIZE_C);
-		error = copyincap_c(upp + pos,
-		    (__cheri_tocap char * __capability * __capability)uaddrs,
+		error = copyincap_c(upp + pos, uaddrs,
 		    tocopy * sizeof(char * __capability));
 		if (error != 0)
 			break;
@@ -4446,9 +4445,7 @@ __umtx_op_robust_lists_c(struct thread *td, struct cheriabi__umtx_op_args *uap)
 	if (uap->val > sizeof(rb))
 		return (EINVAL);
 	bzero(&rb, sizeof(rb));
-	error = copyincap_c(uap->uaddr1,
-	    (__cheri_tocap struct umtx_robust_lists_params_c *
-	    __capability)&rb, uap->val);
+	error = copyincap_c(uap->uaddr1, &rb, uap->val);
 	if (error != 0)
 		return (error);
 	return (umtx_robust_lists(td, &rb));
@@ -4989,8 +4986,7 @@ umtx_handle_rb(struct thread *td, uintcap_t rbp, uintcap_t *rb_list, bool inact)
 	KASSERT(td->td_proc == curproc, ("need current vmspace"));
 #ifdef COMPAT_CHERIABI
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
-		error = copyincap_c((void * __capability)rbp,
-		    (__cheri_tocap struct umutex_c * __capability)&mu.m_c,
+		error = copyincap_c((void * __capability)rbp, &mu.m_c,
 		    sizeof(mu.m_c));
 	} else
 #endif

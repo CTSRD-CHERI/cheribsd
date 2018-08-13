@@ -249,9 +249,7 @@ cheriabi_fetch_syscall_arg(struct thread *td, void * __capability *argp,
 		}
 		if (ptrmask & (1 << argnum))
 			error = copyincap_c((char * __capability)locr0->c13 +
-			    offset,
-			    (__cheri_tocap void * __capability * __capability)
-			    argp, sizeof(*argp));
+			    offset, argp, sizeof(*argp));
 		else {
 			error = copyin_c((char * __capability)locr0->c13 +
 			    offset, &intval, sizeof(intval));

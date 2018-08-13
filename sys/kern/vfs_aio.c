@@ -3166,8 +3166,7 @@ static int
 aiocb_c_copyin(void * __capability ujob, kaiocb_t *kjob)
 {
 
-	return (copyincap_c(ujob, (__cheri_tocap kaiocb_t * __capability)kjob,
-	    sizeof(*kjob)));
+	return (copyincap_c(ujob, kjob, sizeof(*kjob)));
 }
 
 static long
@@ -3290,9 +3289,8 @@ cheriabi_aio_suspend(struct thread *td, struct cheriabi_aio_suspend_args *uap)
 		tsp = NULL;
 
 	ujoblist = malloc(uap->nent * sizeof(ujoblist[0]), M_AIOS, M_WAITOK);
-	error = copyincap_c(uap->aiocbp,
-	    (__cheri_tocap struct aiocb_c * __capability * __capability)
-	    ujoblist, uap->nent * sizeof(*ujoblist));
+	error = copyincap_c(uap->aiocbp, ujoblist,
+	    uap->nent * sizeof(*ujoblist));
 	if (error == 0)
 		error = kern_aio_suspend(td, uap->nent,
 		    (kaiocb_t * __capability *)ujoblist, tsp);
@@ -3400,9 +3398,7 @@ cheriabi_lio_listio(struct thread *td, struct cheriabi_lio_listio_args *uap)
 	} else
 		sigp = NULL;
 	acb_list = malloc(sizeof(kaiocb_t *) * nent, M_LIO, M_WAITOK);
-	error = copyincap_c(uap->acb_list,
-	    (__cheri_tocap kaiocb_t * __capability * __capability)acb_list,
-	    nent * sizeof(*acb_list));
+	error = copyincap_c(uap->acb_list, acb_list, nent * sizeof(*acb_list));
 	if (error) {
 		free(acb_list, M_LIO);
 		return (error);
