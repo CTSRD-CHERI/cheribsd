@@ -4409,9 +4409,7 @@ __umtx_op_sem2_wait_c(struct thread *td, struct cheriabi__umtx_op_args *uap)
 	if (error == EINTR && uap->uaddr2 != NULL &&
 	    (timeout._flags & UMTX_ABSTIME) == 0 &&
 	    uasize >= sizeof(struct _umtx_time) + sizeof(struct timespec)) {
-		error = copyout_c(
-		    (__cheri_tocap struct timespec * __capability)
-		    &timeout._timeout,
+		error = copyout_c(&timeout._timeout,
 		    (struct _umtx_time * __capability)uap->uaddr2 + 1,
 		    sizeof(struct timespec));
 		if (error == 0) {

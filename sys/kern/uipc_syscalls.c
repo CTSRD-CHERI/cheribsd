@@ -295,9 +295,7 @@ user_accept(struct thread *td, int s, struct sockaddr * __capability uname,
 			((struct osockaddr *)name)->sa_family =
 			    name->sa_family;
 #endif
-		error = copyout_c(
-		   (__cheri_tocap struct sockaddr * __capability)name,
-		   uname, namelen);
+		error = copyout_c(name, uname, namelen);
 	}
 	if (error == 0)
 		error = copyout_c(&namelen, anamelen, sizeof(namelen));
@@ -1007,9 +1005,8 @@ kern_recvit(struct thread *td, int s, kmsghdr_t *mp, enum uio_seg fromseg,
 				    fromsa->sa_family;
 #endif
 			if (fromseg == UIO_USERSPACE) {
-				error = copyout_c(
-				    (__cheri_tocap const void * __capability)
-				    fromsa, mp->msg_name, (unsigned)len);
+				error = copyout_c(fromsa, mp->msg_name,
+				    (unsigned)len);
 				if (error != 0)
 					goto out;
 			} else
@@ -1055,9 +1052,8 @@ kern_recvit(struct thread *td, int s, kmsghdr_t *mp, enum uio_seg fromseg,
 				tocopy = len;
 			}
 
-			if ((error = copyout_c(
-			    (__cheri_tocap void * __capability)mtod(m, caddr_t),
-			    ctlbuf, tocopy)) != 0)
+			if ((error = copyout_c(mtod(m, caddr_t), ctlbuf,
+			    tocopy)) != 0)
 				goto out;
 
 			ctlbuf += tocopy;
@@ -1092,9 +1088,8 @@ recvit(struct thread *td, int s, kmsghdr_t *mp,
 	if (error != 0)
 		return (error);
 	if (namelenp != NULL) {
-		error = copyout_c(
-		    (__cheri_tocap socklen_t * __capability)&mp->msg_namelen,
-		    namelenp, sizeof (socklen_t));
+		error = copyout_c(&mp->msg_namelen, namelenp,
+		    sizeof (socklen_t));
 #ifdef COMPAT_OLDSOCK
 		if (mp->msg_flags & MSG_COMPAT)
 			error = 0;	/* old recvfrom didn't check */
@@ -1426,9 +1421,7 @@ user_getsockname(struct thread *td, int fdes,
 		if (compat)
 			((struct osockaddr *)sa)->sa_family = sa->sa_family;
 #endif
-		error = copyout_c(
-		    (__cheri_tocap struct sockaddr * __capability)sa, asa,
-		    len);
+		error = copyout_c(sa, asa, len);
 	}
 	free(sa, M_SONAME);
 	if (error == 0)
@@ -1516,8 +1509,7 @@ user_getpeername(struct thread *td, int fdes,
 		if (compat)
 			((struct osockaddr *)sa)->sa_family = sa->sa_family;
 #endif
-		error = copyout_c(
-		    (__cheri_tocap struct sockaddr * __capability)sa, asa, len);
+		error = copyout_c(sa, asa, len);
 	}
 	free(sa, M_SONAME);
 	if (error == 0)

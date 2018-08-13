@@ -5108,9 +5108,8 @@ sppp_params(struct sppp *sp, u_long cmd, void *data)
 		 * setting it.
 		 */
 		spr->defs.lcp.timeout = sp->lcp.timeout * 1000 / hz;
-		rv = copyout_c(
-		    (__cheri_tocap struct spppreq * __capability)spr,
-		    ifr_data_get_ptr(ifr), sizeof(struct spppreq));
+		rv = copyout_c(spr, ifr_data_get_ptr(ifr),
+		    sizeof(struct spppreq));
 		break;
 
 	case (u_long)SPPPIOSDEFS:

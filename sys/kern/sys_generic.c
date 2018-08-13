@@ -1159,7 +1159,7 @@ done:
 #undef swizzle_fdset
 
 #define	putbits(name, x) \
-	if (name && (error2 = copyout_c((__cheri_tocap void * __capability)obits[x], name, ncpubytes))) \
+	if (name && (error2 = copyout_c(obits[x], name, ncpubytes))) \
 		error = error2;
 	if (error == 0) {
 		int error2;
@@ -1538,7 +1538,6 @@ pollout(struct thread *td, struct pollfd *fds,
 	u_int n = 0;
 
 	for (i = 0; i < nfd; i++) {
-		/* XXX-BD: CTSRD-CHERI/clang#180 */
 		error = copyout_c(&fds->revents, &ufds->revents,
 		    sizeof(ufds->revents));
 		if (error)

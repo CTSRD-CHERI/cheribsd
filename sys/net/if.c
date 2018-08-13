@@ -2959,9 +2959,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 			if (ifr_buffer_get_length(td, ifr) < descrlen)
 				ifr_buffer_set_buffer(td, ifr, NULL);
 			else
-				error = copyout_c(
-				    (__cheri_tocap char * __capability)
-				    ifp->if_description,
+				error = copyout_c(ifp->if_description,
 				    ifr_buffer_get_buffer(td, ifr), descrlen);
 			ifr_buffer_set_length(td, ifr, descrlen);
 		}

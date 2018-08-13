@@ -1501,8 +1501,7 @@ kern_cpuset(struct thread *td, cpusetid_t * __capability setid)
 	cpuset_rel(root);
 	if (error)
 		return (error);
-	error = copyout_c((__cheri_tocap cpusetid_t * __capability)&set->cs_id,
-	    setid, sizeof(set->cs_id));
+	error = copyout_c(&set->cs_id, setid, sizeof(set->cs_id));
 	if (error == 0)
 		error = cpuset_setproc(-1, set, NULL, NULL);
 	cpuset_rel(set);
@@ -1721,8 +1720,7 @@ kern_cpuset_getaffinity(struct thread *td, cpulevel_t level, cpuwhich_t which,
 	if (p)
 		PROC_UNLOCK(p);
 	if (error == 0)
-		error = copyout_c((__cheri_tocap cpuset_t * __capability)mask,
-		    maskp, size);
+		error = copyout_c(mask, maskp, size);
 out:
 	free(mask, M_TEMP);
 	return (error);
@@ -1982,9 +1980,7 @@ kern_cpuset_getdomain(struct thread *td, cpulevel_t level, cpuwhich_t which,
 	}
 	DOMAINSET_COPY(&outset.ds_mask, mask);
 	if (error == 0)
-		error = copyout_c(
-		    (__cheri_tocap domainset_t * __capability)mask, maskp,
-		    domainsetsize);
+		error = copyout_c(mask, maskp, domainsetsize);
 	if (error == 0)
 		error = copyout_c(&outset.ds_policy, policyp,
 		    sizeof(outset.ds_policy));

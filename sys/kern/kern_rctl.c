@@ -1574,8 +1574,7 @@ rctl_write_outbuf(struct sbuf *outputsbuf, char * __capability outbufp,
 		sbuf_delete(outputsbuf);
 		return (ERANGE);
 	}
-	error = copyout_c(
-	    (__cheri_tocap char * __capability)sbuf_data(outputsbuf), outbufp,
+	error = copyout_c(sbuf_data(outputsbuf), outbufp,
 	    sbuf_len(outputsbuf) + 1);
 	sbuf_delete(outputsbuf);
 	return (error);

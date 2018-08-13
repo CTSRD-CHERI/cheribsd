@@ -247,9 +247,8 @@ nfsm_mbufuio(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 				NFSBCOPY(mbufcp,
 				    (__cheri_fromcap char *)uiocp, xfer);
 			else
-				copyout_c(
-				    (__cheri_tocap char * __capability)mbufcp,
-				    CAST_USER_ADDR_T(uiocp), xfer);
+				copyout_c(mbufcp, CAST_USER_ADDR_T(uiocp),
+				    xfer);
 			left -= xfer;
 			len -= xfer;
 			mbufcp += xfer;

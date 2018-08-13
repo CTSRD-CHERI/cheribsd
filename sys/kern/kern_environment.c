@@ -136,8 +136,7 @@ kern_kenv(struct thread *td, int what, const char * __CAPABILITY namep,
 		}
 		mtx_unlock(&kenv_lock);
 		if (buffer != NULL) {
-			error = copyout_c((__cheri_tocap char * __CAPABILITY)buffer,
-			    val, done);
+			error = copyout_c(buffer, val, done);
 			free(buffer, M_TEMP);
 		}
 		td->td_retval[0] = ((done == needed) ? 0 : needed);
@@ -180,8 +179,7 @@ kern_kenv(struct thread *td, int what, const char * __CAPABILITY namep,
 		len = strlen(value) + 1;
 		if (len > vallen)
 			len = vallen;
-		error = copyout_c((__cheri_tocap char * __CAPABILITY)value, val,
-		    len);
+		error = copyout_c(value, val, len);
 		freeenv(value);
 		if (error)
 			goto done;

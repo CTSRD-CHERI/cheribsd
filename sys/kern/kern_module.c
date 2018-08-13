@@ -409,8 +409,7 @@ kern_modstat(struct thread *td, int modid,
 	namelen = strlen(mod->name) + 1;
 	if (namelen > MAXMODNAME)
 		namelen = MAXMODNAME;
-	if ((error = copyout_c((__cheri_tocap char * __capability)name,
-	    &stat->name, namelen)) != 0)
+	if ((error = copyout_c(name, &stat->name, namelen)) != 0)
 		return (error);
 
 	if ((error = copyout_c(&refs, &stat->refs, sizeof(int))) != 0)

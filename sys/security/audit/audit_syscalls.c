@@ -624,9 +624,8 @@ kern_getauid(struct thread *td, uid_t * __capability auid)
 	error = priv_check(td, PRIV_AUDIT_GETAUDIT);
 	if (error)
 		return (error);
-	return (copyout_c(
-	    (__cheri_tocap uid_t * __capability)&td->td_ucred->cr_audit.ai_auid,
-	    auid, sizeof(td->td_ucred->cr_audit.ai_auid)));
+	return (copyout_c(&td->td_ucred->cr_audit.ai_auid, auid,
+	    sizeof(td->td_ucred->cr_audit.ai_auid)));
 }
 
 /* ARGSUSED */
@@ -780,8 +779,7 @@ kern_getaudit_addr(struct thread *td,
 	error = priv_check(td, PRIV_AUDIT_GETAUDIT);
 	if (error)
 		return (error);
-	return (copyout_c((__cheri_tocap struct auditinfo_addr * __capability)
-	    &td->td_ucred->cr_audit, auditinfo_addr,
+	return (copyout_c(&td->td_ucred->cr_audit, auditinfo_addr,
 	    sizeof(*auditinfo_addr)));
 }
 

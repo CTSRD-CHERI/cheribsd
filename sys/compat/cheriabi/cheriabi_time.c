@@ -300,9 +300,7 @@ cheriabi_ktimer_settime(struct thread *td,
 	ovalp = uap->ovalue != NULL ? &oval : NULL;
 	error = kern_ktimer_settime(td, uap->timerid, uap->flags, &val, ovalp);
 	if (error == 0 && uap->ovalue != NULL)
-		error = copyout_c(
-		    (__cheri_tocap struct itimerspec * __capability)ovalp,
-		    uap->ovalue, sizeof(*ovalp));
+		error = copyout_c(ovalp, uap->ovalue, sizeof(*ovalp));
 	return (error);
 }
 

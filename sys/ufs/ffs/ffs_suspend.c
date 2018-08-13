@@ -154,9 +154,7 @@ ffs_susp_rdwr(struct cdev *dev, struct uio *uio, int ioflag)
 				if (error != 0)
 					goto out;
 			} else {
-				error = copyout_c(
-				    (__cheri_tocap char * __capability)
-				    bp->b_data, base, len);
+				error = copyout_c(bp->b_data, base, len);
 				brelse(bp);
 				if (error != 0)
 					goto out;

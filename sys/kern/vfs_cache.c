@@ -2154,8 +2154,7 @@ kern___getcwd(struct thread *td, char * __capability buf, enum uio_seg bufseg,
 			bcopy_c((__cheri_tocap char * __capability)bp,
 			    buf, strlen(bp) + 1);
 		else
-			error = copyout_c((__cheri_tocap char * __capability)bp,
-			    buf, strlen(bp) + 1);
+			error = copyout_c(bp, buf, strlen(bp) + 1);
 #ifdef KTRACE
 	if (KTRPOINT(curthread, KTR_NAMEI))
 		ktrnamei(bp);

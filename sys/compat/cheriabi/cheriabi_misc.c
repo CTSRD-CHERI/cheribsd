@@ -629,9 +629,7 @@ cheriabi_updateiov(const struct uio * uiop, struct iovec_c * __capability iovp)
 	int i, error;
 
 	for (i = 0; i < uiop->uio_iovcnt; i++) {
-		error = copyout_c(
-		    (__cheri_tocap size_t * __capability)
-		    &uiop->uio_iov[i].iov_len, &iovp[i].iov_len,
+		error = copyout_c( &uiop->uio_iov[i].iov_len, &iovp[i].iov_len,
 		    sizeof(uiop->uio_iov[i].iov_len));
 		if (error != 0)
 			return (error);
@@ -919,8 +917,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 		destp -= szsigcode;
 		destp = __builtin_align_down(destp,
 		    sizeof(void * __capability));
-		copyout_c((__cheri_tocap void * __capability)
-		    imgp->proc->p_sysent->sv_sigcode, destp, szsigcode);
+		copyout_c(imgp->proc->p_sysent->sv_sigcode, destp, szsigcode);
 	}
 
 	/*
@@ -929,8 +926,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	if (execpath_len != 0) {
 		destp -= execpath_len;
 		imgp->execpathp = (__cheri_addr unsigned long)destp;
-		copyout_c((__cheri_tocap char * __capability)imgp->execpath,
-		    destp, execpath_len);
+		copyout_c(imgp->execpath, destp, execpath_len);
 	}
 
 	/*
@@ -978,8 +974,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	/*
 	 * Copy out strings - arguments and environment.
 	 */
-	copyout_c((__cheri_tocap char * __capability)stringp, destp,
-	    ARG_MAX - imgp->args->stringspace);
+	copyout_c(stringp, destp, ARG_MAX - imgp->args->stringspace);
 
 	/*
 	 * Fill in "ps_strings" struct for ps, w, etc.
@@ -1175,7 +1170,7 @@ cheriabi_kbounce(struct thread *td, struct cheriabi_kbounce_args *uap)
 		printf("%s: error in copyin_c %d\n", __func__, error);
 		goto error;
 	}
-	error = copyout_c((__cheri_tocap void * __capability)bounce, dst, len);
+	error = copyout_c(bounce, dst, len);
 	if (error != 0)
 		printf("%s: error in copyout_c %d\n", __func__, error);
 error:
@@ -1523,8 +1518,7 @@ cheriabi_uuidgen(struct thread *td, struct cheriabi_uuidgen_args *uap)
 	count = uap->count;
 	store = malloc(count * sizeof(struct uuid), M_TEMP, M_WAITOK);
 	kern_uuidgen(store, count);
-	error = copyout_c((__cheri_tocap struct uuid * __capability)store,
-	    uap->store, count * sizeof(struct uuid));
+	error = copyout_c(store, uap->store, count * sizeof(struct uuid));
 	free(store, M_TEMP);
 	return (error);
 }

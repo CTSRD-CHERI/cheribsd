@@ -2773,9 +2773,7 @@ again:
 		n++;
 	}
 	BPF_UNLOCK();
-	error = copyout_c(
-	    (__cheri_tocap u_int * __capability)lst, bfl_list_get_ptr(bfl),
-	    sizeof(u_int) * n);
+	error = copyout_c(lst, bfl_list_get_ptr(bfl), sizeof(u_int) * n);
 	free(lst, M_TEMP);
 	BPF_LOCK();
 	bfl->bfl_len = n;

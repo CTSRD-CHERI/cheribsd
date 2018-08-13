@@ -852,9 +852,7 @@ devfs_ioctl(struct vop_ioctl_args *ap)
 		if (i > fgn->len)
 			error = EINVAL;
 		else
-			error = copyout_c(
-			    (__cheri_tocap const char * __capability)p,
-			    fiodgname_buf_get_ptr(fgn), i);
+			error = copyout_c(p, fiodgname_buf_get_ptr(fgn), i);
 		break;
 	default:
 		error = dsw->d_ioctl(dev, com, ap->a_data, ap->a_fflag, td);

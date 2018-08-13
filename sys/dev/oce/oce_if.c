@@ -2313,7 +2313,7 @@ oce_handle_passthrough(struct ifnet *ifp, caddr_t data)
 		goto dma_free;
 	}
 
-	if (copyout_c((__cheri_tocap void * __capability)OCE_DMAPTR(&dma_mem,char), ioctl_ptr, req_size))
+	if (copyout_c(OCE_DMAPTR(&dma_mem,char), ioctl_ptr, req_size))
 		rc =  EFAULT;
 
 	/* 

@@ -1829,16 +1829,15 @@ kern_mdquery_locked(struct md_req *mdr)
 	mdr->md_sectorsize = sc->sectorsize;
 	error = 0;
 	if (mdr->md_label != NULL) {
-		error = copyout_c(
-		    (__cheri_tocap char * __capability)sc->label,
-		    mdr->md_label, strlen(sc->label) + 1);
+		error = copyout_c(sc->label, mdr->md_label,
+		    strlen(sc->label) + 1);
 		if (error != 0)
 			return (error);
 	}
 	if (sc->type == MD_VNODE ||
 	    (sc->type == MD_PRELOAD && mdr->md_file != NULL))
-		error = copyout_c((__cheri_tocap char * __capability)sc->file,
-		    mdr->md_file, strlen(sc->file) + 1);
+		error = copyout_c(sc->file, mdr->md_file,
+		    strlen(sc->file) + 1);
 	return (error);
 }
 

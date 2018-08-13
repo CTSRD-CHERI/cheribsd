@@ -308,9 +308,7 @@ user_statfs(struct thread *td, const char * __capability path,
 	sfp = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
 	error = kern_statfs(td, path, UIO_USERSPACE, sfp);
 	if (error == 0)
-		error = copyout_c(
-		    (__cheri_tocap struct statfs * __capability)sfp,
-		    buf, sizeof(struct statfs));
+		error = copyout_c(sfp, buf, sizeof(struct statfs));
 	free(sfp, M_STATFS);
 	return (error);
 }
@@ -360,9 +358,7 @@ user_fstatfs(struct thread *td, int fd, struct statfs * __capability buf)
 	sfp = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
 	error = kern_fstatfs(td, fd, sfp);
 	if (error == 0)
-		error = copyout_c(
-		    (__cheri_tocap struct statfs * __capability)sfp,
-		    buf, sizeof(struct statfs));
+		error = copyout_c(sfp, buf, sizeof(struct statfs));
 	free(sfp, M_STATFS);
 	return (error);
 }
@@ -540,9 +536,7 @@ restart:
 				    sizeof(*sp));
 				free(sptmp, M_STATFS);
 			} else /* if (bufseg == UIO_USERSPACE) */ {
-				error = copyout_c((__cheri_tocap
-				    struct statfs * __capability)sp, sfsp,
-				    sizeof(*sp));
+				error = copyout_c(sp, sfsp, sizeof(*sp));
 				free(sptmp, M_STATFS);
 				if (error != 0) {
 					vfs_unbusy(mp);
@@ -4472,9 +4466,7 @@ user_fhstatfs(struct thread *td, const struct fhandle * __capability u_fhp,
 	sfp = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
 	error = kern_fhstatfs(td, fh, sfp);
 	if (error == 0)
-		error = copyout_c(
-		    (__cheri_tocap struct statfs * __capability)sfp,
-		    buf, sizeof(*sfp));
+		error = copyout_c(sfp, buf, sizeof(*sfp));
 	free(sfp, M_STATFS);
 	return (error);
 }

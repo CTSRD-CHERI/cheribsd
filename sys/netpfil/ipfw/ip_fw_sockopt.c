@@ -3536,8 +3536,7 @@ ipfw_flush_sopt_data(struct sockopt_data *sd)
 	sopt = sd->sopt;
 
 	if (sopt->sopt_dir == SOPT_GET) {
-		error = copyout_c((__cheri_tocap void * __capability)sd->kbuf,
-		    sopt->sopt_val, sz);
+		error = copyout_c(sd->kbuf, sopt->sopt_val, sz);
 		if (error != 0)
 			return (error);
 	}

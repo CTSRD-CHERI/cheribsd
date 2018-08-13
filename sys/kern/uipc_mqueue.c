@@ -1687,13 +1687,10 @@ mqueue_savemsg(struct mqueue_msg *msg, char * __capability msg_ptr,
 {
 	int error;
 
-	error = copyout_c(
-	    ((__cheri_tocap char * __capability)(char *)msg) + sizeof(*msg),
-	    msg_ptr, msg->msg_size);
+	error = copyout_c((char *)msg + sizeof(*msg), msg_ptr, msg->msg_size);
 	if (error == 0 && msg_prio != NULL)
-		error = copyout_c(
-		    (__cheri_tocap unsigned int * __capability)&msg->msg_prio,
-		    msg_prio, sizeof(unsigned int));
+		error = copyout_c(&msg->msg_prio, msg_prio,
+		    sizeof(unsigned int));
 	return (error);
 }
 

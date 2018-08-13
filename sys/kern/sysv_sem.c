@@ -769,7 +769,7 @@ cheriabi___semctl(struct thread *td, struct cheriabi___semctl_args *uap)
 		CP(dsbuf, dsbuf_c, sem_nsems);
 		CP(dsbuf, dsbuf_c, sem_otime);
 		CP(dsbuf, dsbuf_c, sem_ctime);
-		error = copyout_c( &dsbuf_c, arg.buf, sizeof(dsbuf_c));
+		error = copyout_c(&dsbuf_c, arg.buf, sizeof(dsbuf_c));
 		break;
 	}
 
@@ -966,7 +966,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd, ksemun_t *arg,
 		for (i = 0; i < semakptr->u.sem_nsems; i++)
 			array[i] = semakptr->u.sem_base[i].semval;
 		mtx_unlock(sema_mtxp);
-		error = copyout_c((__cheri_tocap void * __capability)array, arg->array, count * sizeof(*array));
+		error = copyout_c(array, arg->array, count * sizeof(*array));
 		mtx_lock(sema_mtxp);
 		break;
 

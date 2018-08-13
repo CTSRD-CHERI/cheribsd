@@ -110,7 +110,7 @@ copyout_nofault(const void *kaddr, void *udaddr, size_t len)
 
 #if __has_feature(capabilities)
 int
-copyout_nofault_c(const void * __capability kaddr, void * __capability udaddr,
+copyout_nofault_c(const void *kaddr, void * __capability udaddr,
     size_t len)
 {
 	int error, save;
@@ -290,9 +290,7 @@ uiomove_faultflag(void *cp, int n, struct uio *uio, int nofault)
 		case UIO_USERSPACE:
 			maybe_yield();
 			if (uio->uio_rw == UIO_READ)
-				error = copyout_c(
-				    (__cheri_tocap void * __capability)cp,
-				    iov->iov_base, cnt);
+				error = copyout_c(cp, iov->iov_base, cnt);
 			else
 				error = copyin_c(iov->iov_base, cp, cnt);
 			if (error)
@@ -639,8 +637,7 @@ copyout(const void *kaddr, void *uaddr, size_t len)
 	if (!allow_implicit_capability_use())
 		return (EPROT);
 
-	return (copyout_c((__cheri_tocap void * __capability)kaddr,
-	    io_user_cap(uaddr, len), len));
+	return (copyout_c(kaddr, io_user_cap(uaddr, len), len));
 }
 
 int
@@ -758,7 +755,7 @@ int
 copyout_implicit_cap(const void *kaddr, void *uaddr, size_t len)
 {
 
-	return (copyout_c((__cheri_tocap void * __capability)kaddr,
+	return (copyout_c(kaddr,
 	    cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
 	    (vaddr_t)uaddr, len, 0), len));
 }

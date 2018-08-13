@@ -2977,9 +2977,7 @@ sooptcopyout(struct sockopt *sopt, const void *buf, size_t len)
 			KASSERT(sopt->sopt_dir != SOPT_GETCAP &&
 			   sopt->sopt_dir != SOPT_SETCAP,
 			   ("exporting capabilities not supproted"));
-			error = copyout_c(
-			    (__cheri_tocap const void * __capability)buf,
-			    sopt->sopt_val, valsize);
+			error = copyout_c(buf, sopt->sopt_val, valsize);
 		} else
 			bcopy(buf, (__cheri_fromcap void *)sopt->sopt_val,
 			    valsize);
@@ -3283,9 +3281,8 @@ soopt_mcopyout(struct sockopt *sopt, struct mbuf *m)
 		if (sopt->sopt_td != NULL) {
 			int error;
 
-			error = copyout_c(
-			    (__cheri_tocap void * __capability)mtod(m, char *),
-			    sopt->sopt_val, m->m_len);
+			error = copyout_c(mtod(m, char *), sopt->sopt_val,
+			    m->m_len);
 			if (error != 0) {
 				m_freem(m0);
 				return(error);

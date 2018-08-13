@@ -170,7 +170,7 @@ acl_copyout(const struct acl *kernel_acl, void * __capability user_acl,
 		if (error != 0)
 			break;
 
-		error = copyout_c( &old, user_acl, sizeof(old));
+		error = copyout_c(&old, user_acl, sizeof(old));
 		break;
 
 	default:
@@ -181,9 +181,7 @@ acl_copyout(const struct acl *kernel_acl, void * __capability user_acl,
 		if (am != ACL_MAX_ENTRIES)
 			return (EINVAL);
 
-		error = copyout_c(
-		    (__cheri_tocap const struct acl * __capability)kernel_acl,
-		    user_acl, sizeof(*kernel_acl));
+		error = copyout_c(kernel_acl, user_acl, sizeof(*kernel_acl));
 	}
 
 	return (error);

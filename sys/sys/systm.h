@@ -386,7 +386,7 @@ int	copyout_implicit_cap(const void * _Nonnull __restrict kaddr,
 	    void * _Nonnull __restrict udaddr, size_t len);
 
 #if __has_feature(capabilities)
-int	copyout_c(const void * _Nonnull __restrict __capability kaddr,
+int	copyout_c(const void * _Nonnull __restrict kaddr,
 	    void * _Nonnull __restrict __capability udaddr, size_t len);
 int	copyoutcap_c(const void * __capability _Nonnull __restrict kaddr,
 	    void * __capability _Nonnull __restrict udaddr, size_t len);
@@ -398,7 +398,7 @@ int	copyoutcap_c(const void * __capability _Nonnull __restrict kaddr,
 int	copyout_nofault(const void * _Nonnull __restrict kaddr,
 	    void * _Nonnull __restrict udaddr, size_t len);
 #if __has_feature(capabilities)
-int	copyout_nofault_c(const void * __capability _Nonnull __restrict kaddr,
+int	copyout_nofault_c(const void * _Nonnull __restrict kaddr,
 	    void * __capability _Nonnull __restrict udaddr, size_t len);
 int	copyoutcap_nofault_c(
 	    const void * __capability _Nonnull __restrict kaddr,

@@ -203,9 +203,7 @@ kern_getloginclass(struct thread *td, char * __capability namebuf,
 	lcnamelen = strlen(lc->lc_name) + 1;
 	if (lcnamelen > namelen)
 		return (ERANGE);
-	return (copyout_c(
-	    (__cheri_tocap char * __capability)&lc->lc_name[0], namebuf,
-	    lcnamelen));
+	return (copyout_c(&lc->lc_name[0], namebuf, lcnamelen));
 }
 
 /*

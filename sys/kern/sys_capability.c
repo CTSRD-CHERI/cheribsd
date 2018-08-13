@@ -537,8 +537,7 @@ kern_cap_ioctls_get(struct thread *td, int fd, u_long * __capability dstcmds,
 	 */
 	if (count != -1) {
 		if (cmdsp != NULL) {
-			error = copyout_c(
-			    (__cheri_tocap u_long * __capability)cmdsp, dstcmds,
+			error = copyout_c(cmdsp, dstcmds,
 			    sizeof(cmdsp[0]) * ncmds);
 			if (error != 0)
 				goto out;

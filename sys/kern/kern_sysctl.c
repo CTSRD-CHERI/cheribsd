@@ -1853,8 +1853,7 @@ sysctl_old_user(struct sysctl_req *req, const void *p, size_t l)
 				    (char * __capability)req->oldptr +
 				    origidx, i);
 			else
-				error = copyout_nofault_c(
-				    (__cheri_tocap const void * __capability)p,
+				error = copyout_nofault_c(p,
 				    (char * __capability)req->oldptr + origidx,
 				    i);
 		} else
@@ -1864,8 +1863,7 @@ sysctl_old_user(struct sysctl_req *req, const void *p, size_t l)
 				    (char * __capability)req->oldptr + origidx,
 				    i);
 			else
-				error = copyout_c(
-				    (__cheri_tocap const void * __capability)p,
+				error = copyout_c(p,
 				    (char * __capability)req->oldptr + origidx,
 				    i);
 		if (error != 0)

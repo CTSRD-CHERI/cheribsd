@@ -881,9 +881,7 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 			else
 #endif
 				data = __USER_CAP_UNBOUND(*(void **)arg);
-		error = copyout_c(
-		    (__cheri_tocap keymap_t * __capability)kbd->kb_keymap,
-		    data, sizeof(keymap_t));
+		error = copyout_c(kbd->kb_keymap, data, sizeof(keymap_t));
 		splx(s);
 		return (error);
 	case OGIO_KEYMAP:	/* get keyboard translation table (compat) */

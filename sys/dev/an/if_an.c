@@ -1964,9 +1964,8 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			break;
 		}
 		AN_UNLOCK(sc);
-		error = copyout_c(
-		    (__cheri_tocap struct an_req * __capability)&sc->areq,
-		    ifr_data_get_ptr(ifr), sizeof(sc->areq));
+		error = copyout_c(&sc->areq, ifr_data_get_ptr(ifr),
+		    sizeof(sc->areq));
 		break;
 	case SIOCSAIRONET:
 		if ((error = priv_check(td, PRIV_DRIVER)))
@@ -2001,9 +2000,7 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		AN_UNLOCK(sc);
 		if (!error) {
 			/* copy out the updated command info */
-			error = copyout_c(
-			    (__cheri_tocap struct aironet_ioctl * __capability)
-			    &l_ioctl, ifr_data_get_ptr(ifr),
+			error = copyout_c(&l_ioctl, ifr_data_get_ptr(ifr),
 			    sizeof(l_ioctl));
 		}
 		break;

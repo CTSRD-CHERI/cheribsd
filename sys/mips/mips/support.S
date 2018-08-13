@@ -338,14 +338,19 @@ END(copyout)
  * Copy specified amount of data from kernel to the user space via capabilities
  * NOTE: does not copy capabilities
  *	copyout_c(from, to, len)
- *		void * __capability from;	(kernel source capability)
- *		void * __capability to;		(user destination capability)
- *		unsigned len;
+ *		void *from;			a0 (kernel source address)
+ *		void * __capability to;		c3 (user destination capability)
+ *		unsigned len;			a1
  */
 NESTED(copyout_c, CALLFRAME_SIZ, ra)
 	PTR_SUBU	sp, sp, CALLFRAME_SIZ
 	.mask	0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ)
 	PTR_LA	v0, copyerr
+	cmove	$c4, $c3
+	cgetdefault	$c3
+	csetoffset	$c3, $c3, a0
+	csetbounds	$c3, $c3, a1
+	move	a0, a1
 	cgetbase	t0, $c4
 	blt	t0, zero, _C_LABEL(copyerr) # make sure `to` is in user space
 	REG_S	ra, CALLFRAME_RA(sp)
