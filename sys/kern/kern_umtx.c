@@ -5053,7 +5053,7 @@ umtx_thread_cleanup(struct thread *td)
 {
 	struct umtx_q *uq;
 	struct umtx_pi *pi;
-	uintcap_t rb_inact;
+	uintcap_t rb_inact = 0;
 
 	/*
 	 * Disown pi mutexes.
