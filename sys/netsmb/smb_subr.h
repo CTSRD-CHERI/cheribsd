@@ -103,8 +103,8 @@ void smb_makescred(struct smb_cred *scred, struct thread *td, struct ucred *cred
 int  smb_td_intr(struct thread *);
 char *smb_strdup(const char *s);
 void *smb_memdup(const void *umem, int len);
-char *smb_strdupin(char *s, size_t maxlen);
-void *smb_memdupin(void *umem, size_t len);
+char *smb_strdupin(char * __capability s, size_t maxlen);
+void *smb_memdupin(void * __capability umem, size_t len);
 void smb_strtouni(u_int16_t *dst, const char *src);
 void smb_strfree(char *s);
 void smb_memfree(void *s);
