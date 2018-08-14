@@ -76,6 +76,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/uma.h>
 #include <sys/aio.h>
 
+#include <cheri/cheric.h>
 #ifdef COMPAT_CHERIABI
 #include <compat/cheriabi/cheriabi_util.h>
 #endif
@@ -2722,6 +2723,61 @@ filt_lio(struct knote *kn, long hint)
 
 	return (lj->lioj_flags & LIOJ_KEVENT_POSTED);
 }
+
+#ifdef COMPAT_CHERIABI
+
+void
+aio_caprevoke(struct proc * p)
+{
+	struct kaioinfo *ki;
+	struct kaiocb *job, *jobn;
+
+	ki = p->p_aioinfo;
+	if (ki == NULL)
+		return;
+
+	AIO_LOCK(ki);
+
+restart:
+	/* Visit all pending jobs. */
+	TAILQ_FOREACH_SAFE(job, &ki->kaio_jobqueue, plist, jobn) {
+		void * __capability uc =
+			job->uaiocb.aio_sigevent.sigev_value.sival_ptr_c;
+
+		/* Zorch user pointers being revoked.
+		 *
+		 * The analog in userland (i.e. job->ujob's
+		 * aio_sigevent.sigev_value.sival_ptr) we assume will be
+		 * scrubbed by userland.
+		 */
+		if (vm_test_caprevoke(uc)) {
+			job->uaiocb.aio_sigevent.sigev_value.sival_ptr_c =
+				cheri_cleartag(uc);
+		}
+
+		/* Cancel and finish jobs whose userland metadata
+		 * structure is being revoked, so that all writes take
+		 * place before we return to userland.  Same if the
+		 * buffer itself is in the region being revoked or
+		 * the mysterious "kernelinfo" capability.
+		 */
+		if (   vm_test_caprevoke(job->ujob)
+		    || vm_test_caprevoke(__DEQUALIFY_CAP(void * __capability,
+					 job->uaiocb.aio_buf))
+		    || vm_test_caprevoke(job->uaiocb._aiocb_private.kernelinfo)
+		   ) {
+			aio_cancel_job(p, ki, job);
+			ki->kaio_flags |= KAIO_WAKEUP;
+			msleep(&p->p_aioinfo, AIO_MTX(ki), PRIBIO,
+				"aioprn", hz);
+			goto restart;
+		}
+	}
+
+	AIO_UNLOCK(ki);
+}
+
+#endif
 
 #ifdef COMPAT_FREEBSD32
 #include <sys/mount.h>

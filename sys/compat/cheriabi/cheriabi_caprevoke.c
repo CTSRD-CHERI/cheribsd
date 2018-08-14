@@ -25,6 +25,7 @@ __FBSDID("$FreeBSD$");
 #include <compat/cheriabi/cheriabi_proto.h>
 #include <compat/cheriabi/cheriabi_syscall.h>
 
+#include <sys/aio.h>
 #include <sys/file.h>
 #include <sys/filedesc.h>
 #include <sys/caprevoke.h>
@@ -65,6 +66,9 @@ caprevoke_hoarders(struct proc *p)
 		}
 		FILEDESC_SUNLOCK(fdp);
 	}
+
+	/* aio */
+	aio_caprevoke(p);
 }
 
 static int
