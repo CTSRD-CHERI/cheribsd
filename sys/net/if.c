@@ -2675,7 +2675,7 @@ ifr_buffer_get_buffer(struct thread *td, void *data)
 	else
 #endif
 		return (__USER_CAP(ifrup->ifr.ifr_ifru.ifru_buffer.buffer,
-		    ifrup->ifr32.ifr_ifru.ifru_buffer.length));
+		    ifrup->ifr.ifr_ifru.ifru_buffer.length));
 }
 
 static void
@@ -3357,7 +3357,7 @@ ifmr_init(struct ifmediareq *ifmr, caddr_t data)
 		ifmr->ifm_count = ifmr64->ifm_count;
 		ifmr->ifm_ulist =
 		    __USER_CAP(ifmr64->ifm_ulist,
-			ifrm64->ifm_count * sizeof(int));
+			ifmr64->ifm_count * sizeof(int));
 	} else
 #endif
 #ifdef COMPAT_FREEBSD32

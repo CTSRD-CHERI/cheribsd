@@ -1824,10 +1824,10 @@ bf_insns_get_ptr(void *fpp)
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		return (__USER_CAP(
 		    (struct bpf_insn *)(uintptr_t)fpup->fp32.bf_insns,
-		    fpup->fp32.bf_len * sizeof(bpf_insn)));
+		    fpup->fp32.bf_len * sizeof(struct bpf_insn)));
 #endif
 	return (__USER_CAP(fpup->fp.bf_insns,
-	    fpup->fp.bf_len * sizeof(bpf_insn)));
+	    fpup->fp.bf_len * sizeof(struct bpf_insn)));
 }
 
 /*
