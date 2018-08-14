@@ -48,6 +48,7 @@
 #include <machine/atomic.h>
 #include <machine/cpufunc.h>
 #include <machine/pcb.h>
+#include <machine/vmparam.h>
 
 __NULLABILITY_PRAGMA_PUSH
 
@@ -145,15 +146,22 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
  * the current PCB.
  */
 #if __has_feature(capabilities)
-#define	__USER_CAP_UNBOUND(ptr)						\
+/*
+ * Derive out-of-bounds and small values from NULL.  This allows common
+ * sentinel values to work.
+ */
+#define ___USER_CFROMPTR(ptr, cap)					\
     ((ptr) == NULL ? NULL :						\
-	__builtin_cheri_offset_set(curthread->td_pcb->pcb_regs.ddc,	\
-	(vaddr_t)(ptr)))
+     ((vm_offset_t)(ptr) < 4096 ||					\
+      (vm_offset_t)(ptr) > VM_MAXUSER_ADDRESS) ?			\
+	__builtin_cheri_offset_set(NULL, (vaddr_t)(ptr)) :		\
+	__builtin_cheri_offset_set((cap), (vaddr_t)(ptr)))
+
+#define	__USER_CAP_UNBOUND(ptr)						\
+    ___USER_CFROMPTR((ptr), curthread->td_pcb->pcb_regs.ddc)
 
 #define	__USER_CODE_CAP(ptr)						\
-    ((ptr) == NULL ? NULL :						\
-	__builtin_cheri_offset_set(curthread->td_pcb->pcb_regs.pcc,	\
-	(vaddr_t)(ptr)))
+     ___USER_CFROMPTR((ptr), curthread->td_pcb->pcb_regs.pcc)
 
 #else /* !has_feature(capabilities) */
 #define	__USER_CAP_UNBOUND(ptr)	(ptr)
