@@ -74,6 +74,12 @@ __FBSDID("$FreeBSD$");
 #include <vm/uma.h>
 #include <sys/aio.h>
 
+#ifdef CHERI_CAPREVOKE
+#include <cheri/cheric.h>
+#include <sys/caprevoke.h>
+#include <vm/vm_caprevoke.h>
+#endif
+
 /*
  * Counter for allocating reference ids to new jobs.  Wrapped to 1 on
  * overflow. (XXX will be removed soon.)
@@ -2664,6 +2670,65 @@ filt_lio(struct knote *kn, long hint)
 
 	return (lj->lioj_flags & LIOJ_KEVENT_POSTED);
 }
+
+#ifdef CHERI_CAPREVOKE
+
+void
+aio_caprevoke(struct proc *p, const struct vm_caprevoke_cookie *crc)
+{
+	struct kaioinfo *ki;
+	struct kaiocb *job, *jobn;
+
+	/*
+	 * XXX Does not yet count caps into stats
+	 */
+
+	ki = p->p_aioinfo;
+	if (ki == NULL)
+		return;
+
+	AIO_LOCK(ki);
+
+restart:
+	/* Visit all pending jobs. */
+	TAILQ_FOREACH_SAFE(job, &ki->kaio_jobqueue, plist, jobn) {
+		uintcap_t uc = (uintcap_t)
+			job->uaiocb.aio_sigevent.sigev_value.sival_ptr;
+
+		/* Zorch user pointers being revoked.
+		 *
+		 * The analog in userland (i.e. job->ujob's
+		 * aio_sigevent.sigev_value.sival_ptr) we assume will be
+		 * scrubbed by userland.
+		 */
+		if (vm_caprevoke_test(crc, uc)) {
+			job->uaiocb.aio_sigevent.sigev_value.sival_ptr =
+				(void * __capability)cheri_revoke(uc);
+		}
+
+		/* Cancel and finish jobs whose userland metadata
+		 * structure is being revoked, so that all writes take
+		 * place before we return to userland.  Same if the
+		 * buffer itself is in the region being revoked or
+		 * the mysterious "kernelinfo" capability.
+		 */
+		if (   vm_caprevoke_test(crc, (uintcap_t)job->ujob)
+		    || vm_caprevoke_test(crc, (uintcap_t)job->uaiocb.aio_buf)
+		    || vm_caprevoke_test(crc, (uintcap_t)
+					 job->uaiocb._aiocb_private.kernelinfo)
+		   ) {
+			aio_cancel_job(p, ki, job);
+			ki->kaio_flags |= KAIO_WAKEUP;
+			msleep(&p->p_aioinfo, AIO_MTX(ki), PRIBIO,
+				"aioprn", hz);
+			goto restart;
+		}
+	}
+
+	AIO_UNLOCK(ki);
+}
+
+#endif
 
 #ifdef COMPAT_FREEBSD32
 #include <sys/mount.h>

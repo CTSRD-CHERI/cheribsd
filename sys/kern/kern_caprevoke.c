@@ -24,6 +24,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
 
+#include <sys/aio.h>
 #include <sys/file.h>
 #include <sys/filedesc.h>
 
@@ -66,6 +67,9 @@ caprevoke_hoarders(struct proc *p, struct vm_caprevoke_cookie *crc)
 		}
 		FILEDESC_SUNLOCK(fdp);
 	}
+
+	/* aio */
+	aio_caprevoke(p, crc);
 }
 
 static int
