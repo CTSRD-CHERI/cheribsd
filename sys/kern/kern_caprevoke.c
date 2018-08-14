@@ -24,6 +24,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
 
+#include <sys/aio.h>
 #include <sys/event.h>
 
 #include <sys/caprevoke.h>
@@ -52,6 +53,9 @@ __FBSDID("$FreeBSD$");
 static void
 caprevoke_hoarders(struct proc *p, struct vm_caprevoke_cookie *crc)
 {
+	/* aio */
+	aio_caprevoke(p, crc);
+
 	/* kqueue: run last, because other systems might post here */
 	kqueue_caprevoke(p->p_fd, crc);
 }
