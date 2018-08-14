@@ -151,8 +151,8 @@ END(copystr)
  *	copyinstr(fromaddr, toaddr, maxlength, &lencopied)
  *		caddr_t fromaddr;
  *		caddr_t toaddr;
- *		u_int maxlength;
- *		u_int *lencopied;
+ *		size_t maxlength;
+ *		size_t *lencopied;
  */
 NESTED(copyinstr, CALLFRAME_SIZ, ra)
 	PTR_SUBU	sp, sp, CALLFRAME_SIZ
