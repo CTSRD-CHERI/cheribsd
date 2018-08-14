@@ -235,6 +235,10 @@ void	aio_schedule(struct kaiocb *job, aio_handle_fn_t *func);
 bool	aio_set_cancel_function(struct kaiocb *job, aio_cancel_fn_t *func);
 void	aio_switch_vmspace(struct kaiocb *job);
 
+#if __has_feature(capabilities)
+void	aio_caprevoke(struct proc *);
+#endif
+
 #else /* !_KERNEL */
 
 struct timespec;
