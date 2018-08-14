@@ -159,7 +159,7 @@ kern_gssd_syscall(struct thread *td, const char * __capability upath)
 	if (error)
 		return (error);
 
-	error = copyinstr_c(upath, &path[0], sizeof(path), NULL);
+	error = copyinstr_c(upath, path, sizeof(path), NULL);
 	if (error)
 		return (error);
 	if (strlen(path) + 1 > sizeof(sun.sun_path))

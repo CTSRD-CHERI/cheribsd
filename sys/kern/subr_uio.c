@@ -614,9 +614,7 @@ copyinstr(const void *uaddr, void *kaddr, size_t len, size_t *done)
 	if (!allow_implicit_capability_use())
 		return (EPROT);
 
-	return (copyinstr_c(io_user_cap(uaddr, len),
-	   (__cheri_tocap void * __capability)kaddr, len,
-	   (__cheri_tocap size_t * __capability)done));
+	return (copyinstr_c(io_user_cap(uaddr, len), kaddr, len, done));
 }
 
 int

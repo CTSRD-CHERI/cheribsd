@@ -179,16 +179,27 @@ END(copyinstr)
  * the user address space.
  *
  *	copyinstr_c(from, to, maxlength, &lencopied)
- *		char * __capability fromaddr;
- *		char * __capability toaddr;
- *		u_int maxlength;
- *		u_int * __capability lencopied;
+ *		char * __capability fromaddr;		c3
+ *		char *toaddr;				a0
+ *		size_t maxlength;			a1
+ *		size_t *lencopied;			a2
  */
 #ifdef CPU_CHERI
 NESTED(copyinstr_c, CALLFRAME_SIZ, ra)
 	PTR_SUBU	sp, sp, CALLFRAME_SIZ
 	.mask		0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ)
 	PTR_LA		v0, copyerr
+
+	cfromptr	$c4, $ddc, a0
+	cbez	$c4, 1f
+	move	a0, a1
+	csetbounds	$c4, $c4, a1
+1:
+	cfromptr	$c5, $ddc, a2
+	cbez	$c5, 2f
+	li	a1, 8
+	csetbounds	$c5, $c5, a1
+2:
 	cgetbase	t0, $c3
 	blt	t0, zero, _C_LABEL(copyerr) # make sure `from` is in user space
 	REG_S		ra, CALLFRAME_RA(sp)

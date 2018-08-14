@@ -1543,8 +1543,7 @@ rctl_read_inbuf(char **inputstr, const char * __capability inbufp,
 		return (E2BIG);
 
 	str = malloc(inbuflen + 1, M_RCTL, M_WAITOK);
-	error = copyinstr_c(inbufp,
-	    (__cheri_tocap char * __capability)str, inbuflen, NULL);
+	error = copyinstr_c(inbufp, str, inbuflen, NULL);
 	if (error != 0) {
 		free(str, M_RCTL);
 		return (error);

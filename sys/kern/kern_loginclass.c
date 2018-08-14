@@ -234,7 +234,7 @@ kern_setloginclass(struct thread *td, const char * __capability namebuf)
 	error = priv_check(td, PRIV_PROC_SETLOGINCLASS);
 	if (error != 0)
 		return (error);
-	error = copyinstr_c(namebuf, &lcname[0], sizeof(lcname),
+	error = copyinstr_c(namebuf, lcname, sizeof(lcname),
 	    NULL);
 	if (error != 0)
 		return (error);

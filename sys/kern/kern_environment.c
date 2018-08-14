@@ -159,8 +159,7 @@ kern_kenv(struct thread *td, int what, const char * __CAPABILITY namep,
 
 	name = malloc(KENV_MNAMELEN + 1, M_TEMP, M_WAITOK);
 
-	error = copyinstr_c(namep, (__cheri_tocap char * __CAPABILITY)name,
-	    KENV_MNAMELEN + 1, NULL);
+	error = copyinstr_c(namep, name, KENV_MNAMELEN + 1, NULL);
 	if (error)
 		goto done;
 
@@ -194,8 +193,7 @@ kern_kenv(struct thread *td, int what, const char * __CAPABILITY namep,
 		if (len > KENV_MVALLEN + 1)
 			len = KENV_MVALLEN + 1;
 		value = malloc(len, M_TEMP, M_WAITOK);
-		error = copyinstr_c(val, (__cheri_tocap char * __CAPABILITY)value,
-		    len, NULL);
+		error = copyinstr_c(val, value, len, NULL);
 		if (error) {
 			free(value, M_TEMP);
 			goto done;

@@ -441,7 +441,7 @@ kern_modfind(struct thread *td, const char * __capability uname)
 	char name[MAXMODNAME];
 	module_t mod;
 
-	if ((error = copyinstr_c(uname, &name[0], sizeof name, 0)) != 0)
+	if ((error = copyinstr_c(uname, name, sizeof name, 0)) != 0)
 		return (error);
 
 	MOD_SLOCK;

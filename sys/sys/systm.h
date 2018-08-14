@@ -342,20 +342,13 @@ struct copy_map {
 int	copystr(const void * _Nonnull __restrict kfaddr,
 	    void * _Nonnull __restrict kdaddr, size_t len,
 	    size_t * __restrict lencopied);
-#if __has_feature(capabilities)
-int	copystr_c(const void * __capability _Nonnull __restrict kfaddr,
-	    void * __capability _Nonnull __restrict kdaddr, size_t len,
-	    size_t * __capability __restrict lencopied);
-#else
-#define	copystr_c	copystr
-#endif
 int	copyinstr(const void * __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len,
 	    size_t * __restrict lencopied);
 #if __has_feature(capabilities)
-int	copyinstr_c(const void * _Nonnull __restrict __CAPABILITY udaddr,
-	    void * _Nonnull __restrict __CAPABILITY kaddr, size_t len,
-	    size_t * __restrict __CAPABILITY lencopied);
+int	copyinstr_c(const void * _Nonnull __restrict __capability udaddr,
+	    void * _Nonnull __restrict kaddr, size_t len,
+	    size_t * __restrict lencopied);
 #else
 #define	copyinstr_c	copyinstr
 #endif

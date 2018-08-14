@@ -1674,8 +1674,7 @@ kern_symlinkat(struct thread *td, const char * __capability path1, int fd,
 		syspath = (__cheri_fromcap const char *)path1;
 	} else {
 		tmppath = uma_zalloc(namei_zone, M_WAITOK);
-		if ((error = copyinstr_c(path1,
-		    (__cheri_tocap char * __capability)tmppath, MAXPATHLEN,
+		if ((error = copyinstr_c(path1, tmppath, MAXPATHLEN,
 		    NULL)) != 0)
 			goto out;
 		syspath = tmppath;

@@ -2169,7 +2169,7 @@ kern_setlogin(struct thread *td, const char * __capability namebuf)
 	error = priv_check(td, PRIV_PROC_SETLOGIN);
 	if (error)
 		return (error);
-	error = copyinstr_c(namebuf, &logintmp[0], sizeof(logintmp), NULL);
+	error = copyinstr_c(namebuf, logintmp, sizeof(logintmp), NULL);
 	if (error != 0) {
 		if (error == ENAMETOOLONG)
 			error = EINVAL;

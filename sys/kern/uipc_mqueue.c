@@ -2052,7 +2052,7 @@ kern_kmq_open(struct thread *td, const char * __capability upath, int flags,
 			return (EINVAL);
 	}
 
-	error = copyinstr_c(upath, &path[0], MQFS_NAMELEN + 1, NULL);
+	error = copyinstr_c(upath, path, MQFS_NAMELEN + 1, NULL);
         if (error)
 		return (error);
 
@@ -2173,7 +2173,7 @@ kern_kmq_unlink(struct thread *td, const char * __capability upath)
 	struct mqfs_node *pn;
 	int error, len;
 
-	error = copyinstr_c(upath, &path[0], MQFS_NAMELEN + 1, NULL);
+	error = copyinstr_c(upath, path, MQFS_NAMELEN + 1, NULL);
         if (error)
 		return (error);
 

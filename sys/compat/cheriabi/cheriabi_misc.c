@@ -234,9 +234,8 @@ cheriabi_exec_copyin_args(struct image_args *args,
 			error = copystr((__cheri_fromcap const char *)fname,
 			    args->fname, PATH_MAX, &length);
 		} else {
-			error = copyinstr_c(fname,
-			    (__cheri_tocap char * __capability)args->fname,
-			    PATH_MAX, &length);
+			error = copyinstr_c(fname, args->fname, PATH_MAX,
+			    &length);
 		}
 		if (error != 0)
 			goto err_exit;
@@ -257,9 +256,8 @@ cheriabi_exec_copyin_args(struct image_args *args,
 			goto err_exit;
 		if (argcap == NULL)
 			break;
-		error = copyinstr_c(argcap,
-		    (__cheri_tocap char * __capability)args->endp,
-		    args->stringspace, &length);
+		error = copyinstr_c(argcap, args->endp, args->stringspace,
+		    &length);
 		if (error != 0) {
 			if (error == ENAMETOOLONG)
 				error = E2BIG;
@@ -283,8 +281,7 @@ cheriabi_exec_copyin_args(struct image_args *args,
 				goto err_exit;
 			if (argcap == NULL)
 				break;
-			error = copyinstr_c(argcap,
-			    (__cheri_tocap char * __capability)args->endp,
+			error = copyinstr_c(argcap, args->endp,
 			    args->stringspace, &length);
 			if (error != 0) {
 				if (error == ENAMETOOLONG)
@@ -1405,7 +1402,7 @@ cheriabi_kldload(struct thread *td, struct cheriabi_kldload_args *uap)
 	td->td_retval[0] = -1;
 
 	pathname = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	error = copyinstr_c(uap->file, &pathname[0], MAXPATHLEN, NULL);
+	error = copyinstr_c(uap->file, pathname, MAXPATHLEN, NULL);
 	if (error != 0)
 		goto error;
 	error = kern_kldload(td, pathname, &fileid);
@@ -1463,8 +1460,7 @@ cheriabi_kldsym(struct thread *td, struct cheriabi_kldsym_args *uap)
 	    uap->cmd != KLDSYM_LOOKUP)
 		return (EINVAL);
 	symstr = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	error = copyinstr_c(lookup.symname,
-	    (__cheri_tocap char * __capability)symstr, MAXPATHLEN, NULL);
+	error = copyinstr_c(lookup.symname, symstr, MAXPATHLEN, NULL);
 	if (error != 0)
 		goto done;
 	error = kern_kldsym(td, uap->fileid, uap->cmd, symstr,

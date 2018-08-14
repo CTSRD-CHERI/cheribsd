@@ -318,14 +318,14 @@ kern_jail(struct thread *td, const char * __capability path,
 #endif
 			    )];
 	struct uio opt;
-	char * __capability u_path;
-	char * __capability u_hostname;
-	char * __capability u_name;
+	char * u_path;
+	char * u_hostname;
+	char * u_name;
 #ifdef INET
-	struct in_addr * __capability u_ip4;
+	struct in_addr * u_ip4;
 #endif
 #ifdef INET6
-	struct in6_addr * __capability u_ip6;
+	struct in6_addr * u_ip6;
 #endif
 	char *optstr;
 	size_t tmplen;
@@ -373,17 +373,17 @@ kern_jail(struct thread *td, const char * __capability path,
 	if (ip6s > 0)
 		return (EINVAL);
 #endif
-	u_path = malloc_c(tmplen, M_TEMP, M_WAITOK);
+	u_path = malloc(tmplen, M_TEMP, M_WAITOK);
 	u_hostname = u_path + MAXPATHLEN;
 	u_name = u_hostname + MAXHOSTNAMELEN;
 #ifdef INET
-	u_ip4 = (struct in_addr * __capability)(u_name + MAXHOSTNAMELEN);
+	u_ip4 = (struct in_addr *)(u_name + MAXHOSTNAMELEN);
 #endif
 #ifdef INET6
 #ifdef INET
-	u_ip6 = (struct in6_addr * __capability)(u_ip4 + ip4s);
+	u_ip6 = (struct in6_addr *)(u_ip4 + ip4s);
 #else
-	u_ip6 = (struct in6_addr * __capability)(u_name + MAXHOSTNAMELEN);
+	u_ip6 = (struct in6_addr *)(u_name + MAXHOSTNAMELEN);
 #endif
 #endif
 
@@ -393,7 +393,7 @@ kern_jail(struct thread *td, const char * __capability path,
 	error = copyinstr_c(path, u_path, MAXPATHLEN, NULL);
 	if (error)
 		goto done;
-	IOVEC_INIT_C(&optiov[opt.uio_iovcnt], u_path, tmplen);
+	IOVEC_INIT(&optiov[opt.uio_iovcnt], u_path, tmplen);
 	opt.uio_iovcnt++;
 
 	optstr = "host.hostname";
@@ -402,7 +402,7 @@ kern_jail(struct thread *td, const char * __capability path,
 	error = copyinstr_c(hostname, u_hostname, MAXHOSTNAMELEN, NULL);
 	if (error)
 		goto done;
-	IOVEC_INIT_C(&optiov[opt.uio_iovcnt], u_hostname, tmplen);
+	IOVEC_INIT(&optiov[opt.uio_iovcnt], u_hostname, tmplen);
 	opt.uio_iovcnt++;
 
 	if (jailname != NULL) {
@@ -412,7 +412,7 @@ kern_jail(struct thread *td, const char * __capability path,
 		error = copyinstr_c(jailname, u_name, MAXHOSTNAMELEN, NULL);
 		if (error)
 			goto done;
-		IOVEC_INIT_C(&optiov[opt.uio_iovcnt], u_name, tmplen);
+		IOVEC_INIT(&optiov[opt.uio_iovcnt], u_name, tmplen);
 		opt.uio_iovcnt++;
 	}
 
@@ -421,12 +421,12 @@ kern_jail(struct thread *td, const char * __capability path,
 	IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
 	opt.uio_iovcnt++;
 	if (ipseg == UIO_USERSPACE) {
-		error = copyin_c(ip4, (__cheri_fromcap void *)u_ip4, ip4s * sizeof(struct in_addr));
+		error = copyin_c(ip4, u_ip4, ip4s * sizeof(struct in_addr));
 		if (error != 0)
 			goto done;
 	} else
-		u_ip4 = ip4;
-	IOVEC_INIT_C(&optiov[opt.uio_iovcnt], u_ip4,
+		u_ip4 = (__cheri_fromcap struct in_addr *)ip4;
+	IOVEC_INIT(&optiov[opt.uio_iovcnt], u_ip4,
 	    ip4s * sizeof(struct in_addr));
 	opt.uio_iovcnt++;
 #endif
@@ -436,12 +436,12 @@ kern_jail(struct thread *td, const char * __capability path,
 	IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
 	opt.uio_iovcnt++;
 	if (ipseg == UIO_USERSPACE) {
-		error = copyin_c(ip6, (__cheri_fromcap void *)u_ip6, ip6s * sizeof(struct in_addr));
+		error = copyin_c(ip6, u_ip6, ip6s * sizeof(struct in6_addr));
 		if (error != 0)
 			goto done;
 	} else
-		u_ip6 = ip6;
-	IOVEC_INIT_C(&optiov[opt.uio_iovcnt], u_ip6,
+		u_ip6 = (__cheri_fromcap struct in6_addr *)ip6;
+	IOVEC_INIT(&optiov[opt.uio_iovcnt], u_ip6,
 	    ip6s * sizeof(struct in6_addr));
 	opt.uio_iovcnt++;
 #endif
@@ -450,7 +450,7 @@ kern_jail(struct thread *td, const char * __capability path,
 		("kern_jail: too many iovecs (%d)", opt.uio_iovcnt));
 	error = kern_jail_set(td, &opt, JAIL_CREATE | JAIL_ATTACH);
 done:
-	free_c(u_path, M_TEMP);
+	free(u_path, M_TEMP);
 	return (error);
 }
 

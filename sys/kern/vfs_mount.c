@@ -1163,8 +1163,7 @@ kern_unmount(struct thread *td, const char * __capability path, int flags)
 	}
 
 	pathbuf = malloc(MNAMELEN, M_TEMP, M_WAITOK);
-	error = copyinstr_c(path, (__cheri_tocap char * __capability)pathbuf,
-	    MNAMELEN, NULL);
+	error = copyinstr_c(path, pathbuf, MNAMELEN, NULL);
 	if (error) {
 		free(pathbuf, M_TEMP);
 		return (error);
