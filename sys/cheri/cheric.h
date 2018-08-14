@@ -79,14 +79,24 @@
 
 #define	cheri_csetbounds(x, y)	__builtin_cheri_bounds_set((x), (y))
 
-/* Capability alignment helpers.
- * Assume x is a capability and y is a power of two
- * XXX-AM: These are temporary, until we have a working generic __builtin_align_up/down
+/*
+ * Test whether a capability is a subset of another.
+ * This mimics the semantics of the experimental ctestsubset instruction.
  */
-#define rounddown2_cap(x, y) cheri_setoffset(				\
-	x, rounddown2(cheri_getbase(x) + cheri_getoffset(x), y) - cheri_getbase(x))
-#define roundup2_cap(x, y) cheri_setoffset(				\
-	x, roundup2(cheri_getbase(x) + cheri_getoffset(x), y) - cheri_getbase(x))
+static __inline bool
+cheri_is_subset(const void *parent, const void *ptr)
+{
+	if (cheri_gettag(parent) != cheri_gettag(ptr))
+		return false;
+	if (cheri_getbase(ptr) < cheri_getbase(parent))
+		return false;
+	if (cheri_getbase(ptr) + cheri_getlen(ptr) >
+	    cheri_getbase(parent) + cheri_getlen(ptr))
+		return false;
+	if ((cheri_getperm(ptr) & cheri_getperm(parent)) != cheri_getperm(ptr))
+		return false;
+	return true;
+}
 
 /*
  * Two variations on cheri_ptr() based on whether we are looking for a code or
