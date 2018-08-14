@@ -29,6 +29,8 @@
 #
 
 #include <machine/cherireg.h>
+#define _CHERI_INTERNAL
+#include <machine/cheriasm.h>
 #include "abicall.s"
 
 #.set mips64
@@ -148,8 +150,8 @@ creturn_target:
 	dli	$t0, 0x1000
 	clc	$c1, $t0, 32 + 4*CHERICAP_SIZE($c26)
 	clc	$c2, $t0, 32 + 5*CHERICAP_SIZE($c26)
-	ccall	$c1, $c2, 1
-	nop
+	CCALL($c1, $c2)
+
 	.end __invoke_vector
 
 	.global abort

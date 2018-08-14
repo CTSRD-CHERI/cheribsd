@@ -370,4 +370,17 @@
 /* Ensure that this is kept in sync with CHERI_REG_SEC0. */
 #define	CHERI_CLEAR_CAPHI_SEC0	CHERI_CLEAR_CAPHI_KR2C
 
+/*
+ * The CCall (selector 1) branch delay slot has been removed but in order to
+ * run on older hardware we use this macro ensure it is followed by a nop
+ *
+ * TODO: remove this once we drop support for older bitfiles
+ */
+#define CCALL(cb, cd)						\
+	.set push;						\
+	.set noreorder;						\
+	ccall cb, cd, 1;					\
+	nop; /* Fill branch delay slot for old harware*/	\
+	.set pop;
+
 #endif /* _MIPS_INCLUDE_CHERIASM_H_ */

@@ -29,6 +29,8 @@
 #
 
 #include <machine/cherireg.h>
+#define _CHERI_INTERNAL
+#include <machine/cheriasm.h>
 
 #.set mips64
 .set noreorder
@@ -157,8 +159,7 @@ libcheri_invoke_save_caps:
 	# Invoke object capability.  CCall/CReturn will save and restore $csp.
 	#
 libcheri_invoke_ccall:
-	ccall	$c1, $c2, 1
-	nop
+	CCALL($c1, $c2)
 libcheri_invoke_ccall_linkaddr:
 
 	#
