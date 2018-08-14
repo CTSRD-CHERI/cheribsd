@@ -1848,24 +1848,20 @@ sysctl_old_user(struct sysctl_req *req, const void *p, size_t l)
 			i = len - origidx;
 		if (req->lock == REQ_WIRED) {
 			if (req->flags & SCTL_PTROUT)
-				error = copyoutcap_nofault_c(
-				    (__cheri_tocap const void * __capability)p,
+				error = copyoutcap_nofault_c(p,
 				    (char * __capability)req->oldptr +
 				    origidx, i);
 			else
-				error = copyout_nofault_c(
-				    (__cheri_tocap const void * __capability)p,
+				error = copyout_nofault_c(p,
 				    (char * __capability)req->oldptr + origidx,
 				    i);
 		} else
 			if (req->flags & SCTL_PTROUT)
-				error = copyoutcap_c(
-				    (__cheri_tocap const void * __capability)p,
+				error = copyoutcap_c(p,
 				    (char * __capability)req->oldptr + origidx,
 				    i);
 			else
-				error = copyout_c(
-				    (__cheri_tocap const void * __capability)p,
+				error = copyout_c(p,
 				    (char * __capability)req->oldptr + origidx,
 				    i);
 		if (error != 0)
@@ -1889,10 +1885,10 @@ sysctl_new_user(struct sysctl_req *req, void *p, size_t l)
 	    "sysctl_new_user()");
 	if (req->flags & SCTL_PTRIN)
 		error = copyincap_c((char * __capability)req->newptr +
-		    req->newidx, (__cheri_tocap void * __capability)p, l);
+		    req->newidx, p, l);
 	else
 		error = copyin_c((char * __capability)req->newptr + req->newidx,
-		    (__cheri_tocap void * __capability)p, l);
+		    p, l);
 	req->newidx += l;
 	return (error);
 }

@@ -310,8 +310,7 @@ vfs_buildopts(struct uio *auio, struct vfsoptlist **options)
 			bcopy((__cheri_fromcap void *)auio->uio_iov[i].iov_base,
 			    opt->name, namelen);
 		} else {
-			error = copyin_c(auio->uio_iov[i].iov_base,
-			    (__cheri_tocap char * __capability)opt->name,
+			error = copyin_c(auio->uio_iov[i].iov_base, opt->name,
 			    namelen);
 			if (error)
 				goto bad;
@@ -330,7 +329,6 @@ vfs_buildopts(struct uio *auio, struct vfsoptlist **options)
 				    optlen);
 			} else {
 				error = copyin_c(auio->uio_iov[i + 1].iov_base,
-				    (__cheri_tocap void * __capability)
 				    opt->value, optlen);
 				if (error)
 					goto bad;
@@ -696,7 +694,7 @@ bail:
 			    fsoptions->uio_iov[2 * errmsg_pos + 1].iov_base,
 			    fsoptions->uio_iov[2 * errmsg_pos + 1].iov_len);
 		} else {
-			copyout_c((__cheri_tocap char * __capability)errmsg,
+			copyout_c(errmsg,
 			    fsoptions->uio_iov[2 * errmsg_pos + 1].iov_base,
 			    fsoptions->uio_iov[2 * errmsg_pos + 1].iov_len);
 		}
@@ -1165,8 +1163,7 @@ kern_unmount(struct thread *td, const char * __capability path, int flags)
 	}
 
 	pathbuf = malloc(MNAMELEN, M_TEMP, M_WAITOK);
-	error = copyinstr_c(path, (__cheri_tocap char * __capability)pathbuf,
-	    MNAMELEN, NULL);
+	error = copyinstr_c(path, pathbuf, MNAMELEN, NULL);
 	if (error) {
 		free(pathbuf, M_TEMP);
 		return (error);

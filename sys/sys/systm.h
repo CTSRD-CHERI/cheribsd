@@ -342,20 +342,13 @@ struct copy_map {
 int	copystr(const void * _Nonnull __restrict kfaddr,
 	    void * _Nonnull __restrict kdaddr, size_t len,
 	    size_t * __restrict lencopied);
-#if __has_feature(capabilities)
-int	copystr_c(const void * __capability _Nonnull __restrict kfaddr,
-	    void * __capability _Nonnull __restrict kdaddr, size_t len,
-	    size_t * __capability __restrict lencopied);
-#else
-#define	copystr_c	copystr
-#endif
 int	copyinstr(const void * __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len,
 	    size_t * __restrict lencopied);
 #if __has_feature(capabilities)
-int	copyinstr_c(const void * _Nonnull __restrict __CAPABILITY udaddr,
-	    void * _Nonnull __restrict __CAPABILITY kaddr, size_t len,
-	    size_t * __restrict __CAPABILITY lencopied);
+int	copyinstr_c(const void * _Nonnull __restrict __capability udaddr,
+	    void * _Nonnull __restrict kaddr, size_t len,
+	    size_t * __restrict lencopied);
 #else
 #define	copyinstr_c	copyinstr
 #endif
@@ -365,9 +358,9 @@ int	copyin_implicit_cap(const void * _Nonnull __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
 #if __has_feature(capabilities)
 int	copyin_c(const void * _Nonnull __restrict __capability udaddr,
-	    void * _Nonnull __restrict __capability kaddr, size_t len);
+	    void * _Nonnull __restrict kaddr, size_t len);
 int	copyincap_c(const void * _Nonnull __restrict __capability udaddr,
-	    void * _Nonnull __restrict __capability kaddr, size_t len);
+	    void * _Nonnull __restrict kaddr, size_t len);
 #else
 #define	copyin_c	copyin
 #define	copyincap_c	copyin
@@ -376,7 +369,7 @@ int	copyin_nofault(const void * _Nonnull __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
 #if __has_feature(capabilities)
 int	copyin_nofault_c(const void * __capability _Nonnull __restrict udaddr,
-	    void * __capability _Nonnull __restrict kaddr, size_t len);
+	    void * _Nonnull __restrict kaddr, size_t len);
 #else
 #define	copyin_nofault_c	copyin_nofault
 #endif
@@ -386,9 +379,9 @@ int	copyout_implicit_cap(const void * _Nonnull __restrict kaddr,
 	    void * _Nonnull __restrict udaddr, size_t len);
 
 #if __has_feature(capabilities)
-int	copyout_c(const void * _Nonnull __restrict __capability kaddr,
+int	copyout_c(const void * _Nonnull __restrict kaddr,
 	    void * _Nonnull __restrict __capability udaddr, size_t len);
-int	copyoutcap_c(const void * __capability _Nonnull __restrict kaddr,
+int	copyoutcap_c(const void * _Nonnull __restrict kaddr,
 	    void * __capability _Nonnull __restrict udaddr, size_t len);
 #else
 #define	copyout_c	copyout
@@ -398,10 +391,10 @@ int	copyoutcap_c(const void * __capability _Nonnull __restrict kaddr,
 int	copyout_nofault(const void * _Nonnull __restrict kaddr,
 	    void * _Nonnull __restrict udaddr, size_t len);
 #if __has_feature(capabilities)
-int	copyout_nofault_c(const void * __capability _Nonnull __restrict kaddr,
+int	copyout_nofault_c(const void * _Nonnull __restrict kaddr,
 	    void * __capability _Nonnull __restrict udaddr, size_t len);
 int	copyoutcap_nofault_c(
-	    const void * __capability _Nonnull __restrict kaddr,
+	    const void * _Nonnull __restrict kaddr,
 	    void * __capability _Nonnull __restrict udaddr, size_t len);
 #else
 #define	copyout_nofault_c	copyout_nofault

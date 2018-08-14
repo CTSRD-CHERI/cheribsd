@@ -1934,8 +1934,7 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		error = 0;
 		break;
 	case SIOCGAIRONET:
-		error = copyin_c(ifr_data_get_ptr(ifr),
-		    (__cheri_tocap struct an_req * __capability)&sc->areq,
+		error = copyin_c(ifr_data_get_ptr(ifr), &sc->areq,
 		    sizeof(sc->areq));
 		if (error != 0)
 			break;
@@ -1965,16 +1964,14 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			break;
 		}
 		AN_UNLOCK(sc);
-		error = copyout_c(
-		    (__cheri_tocap struct an_req * __capability)&sc->areq,
-		    ifr_data_get_ptr(ifr), sizeof(sc->areq));
+		error = copyout_c(&sc->areq, ifr_data_get_ptr(ifr),
+		    sizeof(sc->areq));
 		break;
 	case SIOCSAIRONET:
 		if ((error = priv_check(td, PRIV_DRIVER)))
 			goto out;
 		AN_LOCK(sc);
-		error = copyin_c(ifr_data_get_ptr(ifr),
-		    (__cheri_tocap struct an_req * __capability)&sc->areq,
+		error = copyin_c(ifr_data_get_ptr(ifr), &sc->areq,
 		    sizeof(sc->areq));
 		if (error != 0)
 			break;
@@ -1984,8 +1981,7 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	case CASE_IOC_IFREQ(SIOCGPRIVATE_0):	/* used by Cisco client utility */
 		if ((error = priv_check(td, PRIV_DRIVER)))
 			goto out;
-		error = copyin_c(ifr_data_get_ptr(ifr),
-		    (__cheri_tocap struct aironet_ioctl * __capability)&l_ioctl,
+		error = copyin_c(ifr_data_get_ptr(ifr), &l_ioctl,
 		    sizeof(l_ioctl));
 		if (error)
 			goto out;
@@ -2004,17 +2000,14 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		AN_UNLOCK(sc);
 		if (!error) {
 			/* copy out the updated command info */
-			error = copyout_c(
-			    (__cheri_tocap struct aironet_ioctl * __capability)
-			    &l_ioctl, ifr_data_get_ptr(ifr),
+			error = copyout_c(&l_ioctl, ifr_data_get_ptr(ifr),
 			    sizeof(l_ioctl));
 		}
 		break;
 	case CASE_IOC_IFREQ(SIOCGPRIVATE_1):	/* used by Cisco client utility */
 		if ((error = priv_check(td, PRIV_DRIVER)))
 			goto out;
-		error = copyin_c(ifr_data_get_ptr(ifr),
-		    (__cheri_tocap struct aironet_ioctl * __capability)&l_ioctl,
+		error = copyin_c(ifr_data_get_ptr(ifr), &l_ioctl,
 		    sizeof(l_ioctl));
 		if (error)
 			goto out;

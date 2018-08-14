@@ -805,7 +805,8 @@ do_sync:
 			    ("nfs_directio_write: Bad uio_segflg"));
 			if (uiop->uio_segflg == UIO_USERSPACE) {
 				error = copyin_c(uiop->uio_iov->iov_base,
-				    t_iov->iov_base, size);
+				    (__cheri_fromcap void *)t_iov->iov_base,
+				    size);
 				if (error != 0)
 					goto err_free;
 			} else

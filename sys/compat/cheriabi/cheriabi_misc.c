@@ -234,9 +234,8 @@ cheriabi_exec_copyin_args(struct image_args *args,
 			error = copystr((__cheri_fromcap const char *)fname,
 			    args->fname, PATH_MAX, &length);
 		} else {
-			error = copyinstr_c(fname,
-			    (__cheri_tocap char * __capability)args->fname,
-			    PATH_MAX, &length);
+			error = copyinstr_c(fname, args->fname, PATH_MAX,
+			    &length);
 		}
 		if (error != 0)
 			goto err_exit;
@@ -257,9 +256,8 @@ cheriabi_exec_copyin_args(struct image_args *args,
 			goto err_exit;
 		if (argcap == NULL)
 			break;
-		error = copyinstr_c(argcap,
-		    (__cheri_tocap char * __capability)args->endp,
-		    args->stringspace, &length);
+		error = copyinstr_c(argcap, args->endp, args->stringspace,
+		    &length);
 		if (error != 0) {
 			if (error == ENAMETOOLONG)
 				error = E2BIG;
@@ -283,8 +281,7 @@ cheriabi_exec_copyin_args(struct image_args *args,
 				goto err_exit;
 			if (argcap == NULL)
 				break;
-			error = copyinstr_c(argcap,
-			    (__cheri_tocap char * __capability)args->endp,
+			error = copyinstr_c(argcap, args->endp,
 			    args->stringspace, &length);
 			if (error != 0) {
 				if (error == ENAMETOOLONG)
@@ -354,9 +351,7 @@ cheriabi_kevent_copyout(void *arg, kkevent_t *kevp, int count)
 	KASSERT(count <= KQ_NEVENTS, ("count (%d) > KQ_NEVENTS", count));
 	uap = (struct cheriabi_kevent_args *)arg;
 
-	error = copyoutcap_c(
-	    (__cheri_tocap struct kevent_c * __capability)kevp,
-	    uap->eventlist, count * sizeof(*kevp));
+	error = copyoutcap_c(kevp, uap->eventlist, count * sizeof(*kevp));
 	if (error == 0)
 		uap->eventlist += count;
 	return (error);
@@ -374,9 +369,7 @@ cheriabi_kevent_copyin(void *arg, kkevent_t *kevp, int count)
 	KASSERT(count <= KQ_NEVENTS, ("count (%d) > KQ_NEVENTS", count));
 	uap = (struct cheriabi_kevent_args *)arg;
 
-	error = copyincap_c(uap->changelist,
-	    (__cheri_tocap struct kevent_c * __capability)kevp,
-	    count * sizeof(*kevp));
+	error = copyincap_c(uap->changelist, kevp, count * sizeof(*kevp));
 	if (error == 0)
 		uap->changelist += count;
 	return (error);
@@ -408,7 +401,7 @@ static int
 cheriabi_copyinuio(struct iovec_c * __capability iovp, u_int iovcnt,
     struct uio **uiop)
 {
-	kiovec_t * __capability iov;
+	kiovec_t *iov;
 	struct uio *uio;
 	size_t iovlen;
 	int error, i;
@@ -418,13 +411,13 @@ cheriabi_copyinuio(struct iovec_c * __capability iovp, u_int iovcnt,
 		return (EINVAL);
 	iovlen = iovcnt * sizeof(kiovec_t);
 	uio = malloc(iovlen + sizeof(*uio), M_IOV, M_WAITOK);
-	iov = (__cheri_tocap kiovec_t * __capability)(kiovec_t *)(uio + 1);
+	iov = (kiovec_t *)(uio + 1);
 	error = copyincap_c(iovp, iov, iovlen);
 	if (error) {
 		free(uio, M_IOV);
 		return (error);
 	}
-	uio->uio_iov = (__cheri_fromcap kiovec_t *)iov;
+	uio->uio_iov = iov;
 	uio->uio_iovcnt = iovcnt;
 	uio->uio_segflg = UIO_USERSPACE;
 	uio->uio_offset = -1;
@@ -508,8 +501,7 @@ cheriabi_copyiniov(struct iovec_c * __capability iovp_c, u_int iovcnt,
 		return (error);
 	iovlen = iovcnt * sizeof(kiovec_t);
 	iov = malloc(iovlen, M_IOV, M_WAITOK);
-	error = copyincap_c(iovp_c,
-	    (__cheri_tocap kiovec_t * __capability)iov, iovlen);
+	error = copyincap_c(iovp_c, iov, iovlen);
 	if (error) {
 		free(iov, M_IOV);
 		return (error);
@@ -632,9 +624,7 @@ cheriabi_updateiov(const struct uio * uiop, struct iovec_c * __capability iovp)
 	int i, error;
 
 	for (i = 0; i < uiop->uio_iovcnt; i++) {
-		error = copyout_c(
-		    (__cheri_tocap size_t * __capability)
-		    &uiop->uio_iov[i].iov_len, &iovp[i].iov_len,
+		error = copyout_c( &uiop->uio_iov[i].iov_len, &iovp[i].iov_len,
 		    sizeof(uiop->uio_iov[i].iov_len));
 		if (error != 0)
 			return (error);
@@ -697,7 +687,7 @@ cheriabi_getcontext(struct thread *td, struct cheriabi_getcontext_args *uap)
 	PROC_LOCK(td->td_proc);
 	uc.uc_sigmask = td->td_sigmask;
 	PROC_UNLOCK(td->td_proc);
-	return (copyoutcap_c( &uc, uap->ucp, UCC_COPY_SIZE));
+	return (copyoutcap_c(&uc, uap->ucp, UCC_COPY_SIZE));
 }
 
 int
@@ -732,7 +722,7 @@ cheriabi_swapcontext(struct thread *td, struct cheriabi_swapcontext_args *uap)
 	PROC_LOCK(td->td_proc);
 	uc.uc_sigmask = td->td_sigmask;
 	PROC_UNLOCK(td->td_proc);
-	if ((ret = copyoutcap_c( &uc, uap->oucp, UCC_COPY_SIZE)) != 0)
+	if ((ret = copyoutcap_c(&uc, uap->oucp, UCC_COPY_SIZE)) != 0)
 		return (ret);
 	if ((ret = copyincap_c(uap->ucp, &uc, UCC_COPY_SIZE)) != 0)
 		return (ret);
@@ -922,8 +912,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 		destp -= szsigcode;
 		destp = __builtin_align_down(destp,
 		    sizeof(void * __capability));
-		copyout_c((__cheri_tocap void * __capability)
-		    imgp->proc->p_sysent->sv_sigcode, destp, szsigcode);
+		copyout_c(imgp->proc->p_sysent->sv_sigcode, destp, szsigcode);
 	}
 
 	/*
@@ -932,8 +921,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	if (execpath_len != 0) {
 		destp -= execpath_len;
 		imgp->execpathp = (__cheri_addr unsigned long)destp;
-		copyout_c((__cheri_tocap char * __capability)imgp->execpath,
-		    destp, execpath_len);
+		copyout_c(imgp->execpath, destp, execpath_len);
 	}
 
 	/*
@@ -981,8 +969,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	/*
 	 * Copy out strings - arguments and environment.
 	 */
-	copyout_c((__cheri_tocap char * __capability)stringp, destp,
-	    ARG_MAX - imgp->args->stringspace);
+	copyout_c(stringp, destp, ARG_MAX - imgp->args->stringspace);
 
 	/*
 	 * Fill in "ps_strings" struct for ps, w, etc.
@@ -1158,7 +1145,7 @@ cheriabi_kenv(struct thread *td, struct cheriabi_kenv_args *uap)
 int
 cheriabi_kbounce(struct thread *td, struct cheriabi_kbounce_args *uap)
 {
-	void * __capability bounce;
+	void * bounce;
 	void * __capability dst = uap->dst;
 	const void * __capability src = uap->src;
 	size_t len = uap->len;
@@ -1172,7 +1159,7 @@ cheriabi_kbounce(struct thread *td, struct cheriabi_kbounce_args *uap)
 	if (src == NULL || dst == NULL)
 		return (EINVAL);
 
-	bounce = malloc_c(len, M_TEMP, M_WAITOK | M_ZERO);
+	bounce = malloc(len, M_TEMP, M_WAITOK | M_ZERO);
 	error = copyin_c(src, bounce, len);
 	if (error != 0) {
 		printf("%s: error in copyin_c %d\n", __func__, error);
@@ -1182,7 +1169,7 @@ cheriabi_kbounce(struct thread *td, struct cheriabi_kbounce_args *uap)
 	if (error != 0)
 		printf("%s: error in copyout_c %d\n", __func__, error);
 error:
-	free_c(bounce, M_TEMP);
+	free(bounce, M_TEMP);
 	return (error);
 }
 
@@ -1415,7 +1402,7 @@ cheriabi_kldload(struct thread *td, struct cheriabi_kldload_args *uap)
 	td->td_retval[0] = -1;
 
 	pathname = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	error = copyinstr_c(uap->file, &pathname[0], MAXPATHLEN, NULL);
+	error = copyinstr_c(uap->file, pathname, MAXPATHLEN, NULL);
 	if (error != 0)
 		goto error;
 	error = kern_kldload(td, pathname, &fileid);
@@ -1473,8 +1460,7 @@ cheriabi_kldsym(struct thread *td, struct cheriabi_kldsym_args *uap)
 	    uap->cmd != KLDSYM_LOOKUP)
 		return (EINVAL);
 	symstr = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	error = copyinstr_c(lookup.symname,
-	    (__cheri_tocap char * __capability)symstr, MAXPATHLEN, NULL);
+	error = copyinstr_c(lookup.symname, symstr, MAXPATHLEN, NULL);
 	if (error != 0)
 		goto done;
 	error = kern_kldsym(td, uap->fileid, uap->cmd, symstr,
@@ -1526,8 +1512,7 @@ cheriabi_uuidgen(struct thread *td, struct cheriabi_uuidgen_args *uap)
 	count = uap->count;
 	store = malloc(count * sizeof(struct uuid), M_TEMP, M_WAITOK);
 	kern_uuidgen(store, count);
-	error = copyout_c((__cheri_tocap struct uuid * __capability)store,
-	    uap->store, count * sizeof(struct uuid));
+	error = copyout_c(store, uap->store, count * sizeof(struct uuid));
 	free(store, M_TEMP);
 	return (error);
 }
@@ -1577,9 +1562,7 @@ cheriabi_setgroups(struct thread *td, struct cheriabi_setgroups_args *uap)
 		/* XXX: CTSRD-CHERI/clang#179 */
 		groups = &smallgroups[0];
 
-	error = copyin_c(uap->gidset,
-	    (__cheri_tocap gid_t * __capability)groups,
-	    gidsetsize * sizeof(gid_t));
+	error = copyin_c(uap->gidset, groups, gidsetsize * sizeof(gid_t));
 	if (error == 0)
 		error = kern_setgroups(td, gidsetsize, groups);
 
@@ -2176,9 +2159,7 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 		break;
 
 	case PT_VM_ENTRY:
-		error = copyincap_c(uap->addr,
-				(__cheri_tocap char * __capability)(char *)&r.pve,
-				sizeof r.pve);
+		error = copyincap_c(uap->addr, (char *)&r.pve, sizeof r.pve);
 		if (error)
 			break;
 

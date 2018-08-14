@@ -582,7 +582,7 @@ kern_thr_set_name(struct thread *td, lwpid_t id,
 	error = 0;
 	name[0] = '\0';
 	if (uname != NULL) {
-		error = copyinstr_c(uname, &name[0], sizeof(name),
+		error = copyinstr_c(uname, name, sizeof(name),
 		    NULL);
 		if (error == ENAMETOOLONG) {
 			error = copyin_c(uname, &name[0], sizeof(name) - 1);

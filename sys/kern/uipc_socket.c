@@ -2704,11 +2704,9 @@ sooptcopyin(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
 	if (sopt->sopt_td != NULL) {
 		if (sopt->sopt_dir == SOPT_SETCAP ||
 		    sopt->sopt_dir == SOPT_GETCAP)
-			return (copyincap_c(sopt->sopt_val,
-			   (__cheri_tocap void * __capability)buf, valsize));
+			return (copyincap_c(sopt->sopt_val, buf, valsize));
 		else
-			return (copyin_c(sopt->sopt_val,
-			   (__cheri_tocap void * __capability)buf, valsize));
+			return (copyin_c(sopt->sopt_val, buf, valsize));
 	}
 
 	bcopy((__cheri_fromcap void *)sopt->sopt_val, buf, valsize);
@@ -2979,9 +2977,7 @@ sooptcopyout(struct sockopt *sopt, const void *buf, size_t len)
 			KASSERT(sopt->sopt_dir != SOPT_GETCAP &&
 			   sopt->sopt_dir != SOPT_SETCAP,
 			   ("exporting capabilities not supproted"));
-			error = copyout_c(
-			    (__cheri_tocap const void * __capability)buf,
-			    sopt->sopt_val, valsize);
+			error = copyout_c(buf, sopt->sopt_val, valsize);
 		} else
 			bcopy(buf, (__cheri_fromcap void *)sopt->sopt_val,
 			    valsize);
@@ -3255,8 +3251,7 @@ soopt_mcopyin(struct sockopt *sopt, struct mbuf *m)
 		if (sopt->sopt_td != NULL) {
 			int error;
 
-			error = copyin_c(sopt->sopt_val,
-			    (__cheri_tocap void * __capability)mtod(m, char *),
+			error = copyin_c(sopt->sopt_val, mtod(m, char *),
 			    m->m_len);
 			if (error != 0) {
 				m_freem(m0);
@@ -3286,9 +3281,8 @@ soopt_mcopyout(struct sockopt *sopt, struct mbuf *m)
 		if (sopt->sopt_td != NULL) {
 			int error;
 
-			error = copyout_c(
-			    (__cheri_tocap void * __capability)mtod(m, char *),
-			    sopt->sopt_val, m->m_len);
+			error = copyout_c(mtod(m, char *), sopt->sopt_val,
+			    m->m_len);
 			if (error != 0) {
 				m_freem(m0);
 				return(error);

@@ -1182,9 +1182,7 @@ kern_kldfind(struct thread *td, const char * __capability file)
 	td->td_retval[0] = -1;
 
 	pathname = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	if ((error = copyinstr_c(file,
-	    (__cheri_tocap char * __capability)pathname, MAXPATHLEN,
-	    NULL)) != 0)
+	if ((error = copyinstr_c(file, pathname, MAXPATHLEN, NULL)) != 0)
 		goto out;
 
 	filename = linker_basename(pathname);

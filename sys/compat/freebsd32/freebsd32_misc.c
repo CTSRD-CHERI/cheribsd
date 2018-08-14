@@ -986,9 +986,7 @@ freebsd32_copyiniov(struct iovec32 * __capability iovp32, u_int iovcnt,
 	iovlen = iovcnt * sizeof(kiovec_t);
 	iov = malloc(iovlen, M_IOV, M_WAITOK);
 	for (i = 0; i < iovcnt; i++) {
-		error = copyin_c(&iovp32[i],
-		    (__capability struct iovec32 * __capability)&iov32,
-		    sizeof(struct iovec32));
+		error = copyin_c(&iovp32[i], &iov32, sizeof(struct iovec32));
 		if (error) {
 			free(iov, M_IOV);
 			return (error);

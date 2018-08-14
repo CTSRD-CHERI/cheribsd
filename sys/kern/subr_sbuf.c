@@ -537,9 +537,7 @@ sbuf_copyin(struct sbuf *s, const void * __capability uaddr, size_t len)
 		if (SBUF_FREESPACE(s) < len)
 			len = SBUF_FREESPACE(s);
 	}
-	switch (copyinstr_c(uaddr,
-	    (__cheri_tocap char * __capability)s->s_buf + s->s_len, len + 1,
-	    &done)) {
+	switch (copyinstr_c(uaddr, s->s_buf + s->s_len, len + 1, &done)) {
 	case ENAMETOOLONG:
 		s->s_error = ENOMEM;
 		/* fall through */

@@ -1159,25 +1159,25 @@ kern_utrace(struct thread *td, const void * __capability addr, size_t len)
 {
 #ifdef KTRACE
 	struct ktr_request *req;
-	void * __capability cp;
+	void *cp;
 	int error;
 
 	if (!KTRPOINT(td, KTR_USER))
 		return (0);
 	if (len > KTR_USER_MAXLEN)
 		return (EINVAL);
-	cp = malloc_c(len, M_KTRACE, M_WAITOK);
+	cp = malloc(len, M_KTRACE, M_WAITOK);
 	error = copyin_c(addr, cp, len);
 	if (error) {
-		free_c(cp, M_KTRACE);
+		free(cp, M_KTRACE);
 		return (error);
 	}
 	req = ktr_getrequest(KTR_USER);
 	if (req == NULL) {
-		free_c(cp, M_KTRACE);
+		free(cp, M_KTRACE);
 		return (ENOMEM);
 	}
-	req->ktr_buffer = (__cheri_fromcap void *)cp;
+	req->ktr_buffer = cp;
 	req->ktr_header.ktr_len = len;
 	ktr_submitrequest(td, req);
 	return (0);

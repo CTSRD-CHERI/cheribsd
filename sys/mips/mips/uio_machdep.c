@@ -115,12 +115,9 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 		case UIO_USERSPACE:
 			maybe_yield();
 			if (uio->uio_rw == UIO_READ)
-				error = copyout_c(
-				    (__cheri_tocap void * __capability)cp,
-				    iov->iov_base, cnt);
+				error = copyout_c(cp, iov->iov_base, cnt);
 			else
-				error = copyin_c(iov->iov_base,
-				    (__cheri_tocap void * __capability)cp, cnt);
+				error = copyin_c(iov->iov_base, cp, cnt);
 			if (error) {
 				if (sf != NULL)
 					sf_buf_free(sf);

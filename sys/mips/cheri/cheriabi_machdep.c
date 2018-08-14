@@ -249,9 +249,7 @@ cheriabi_fetch_syscall_arg(struct thread *td, void * __capability *argp,
 		}
 		if (ptrmask & (1 << argnum))
 			error = copyincap_c((char * __capability)locr0->c13 +
-			    offset,
-			    (__cheri_tocap void * __capability * __capability)
-			    argp, sizeof(*argp));
+			    offset, argp, sizeof(*argp));
 		else {
 			error = copyin_c((char * __capability)locr0->c13 +
 			    offset, &intval, sizeof(intval));
@@ -1112,9 +1110,8 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 		return (cheriabi_set_user_tls(td, uap->parms));
 
 	case MIPS_GET_TLS:
-		error = copyoutcap_c(
-		    (__cheri_tocap void * __capability)&td->td_md.md_tls,
-		    uap->parms, sizeof(void * __capability));
+		error = copyoutcap_c(&td->td_md.md_tls, uap->parms,
+		    sizeof(void * __capability));
 		return (error);
 
 	case MIPS_GET_COUNT:

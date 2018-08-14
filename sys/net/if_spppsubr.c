@@ -5068,9 +5068,7 @@ sppp_params(struct sppp *sp, u_long cmd, void *data)
 		goto quit;
 	}
 
-	if (copyin_c(ifr_data_get_ptr(ifr),
-	    (__cheri_tocap struct spppreq * __capability)spr,
-	    sizeof(struct spppreq)) != 0) {
+	if (copyin_c(ifr_data_get_ptr(ifr), spr, sizeof(struct spppreq)) != 0) {
 		rv = EFAULT;
 		goto quit;
 	}
@@ -5110,9 +5108,8 @@ sppp_params(struct sppp *sp, u_long cmd, void *data)
 		 * setting it.
 		 */
 		spr->defs.lcp.timeout = sp->lcp.timeout * 1000 / hz;
-		rv = copyout_c(
-		    (__cheri_tocap struct spppreq * __capability)spr,
-		    ifr_data_get_ptr(ifr), sizeof(struct spppreq));
+		rv = copyout_c(spr, ifr_data_get_ptr(ifr),
+		    sizeof(struct spppreq));
 		break;
 
 	case (u_long)SPPPIOSDEFS:

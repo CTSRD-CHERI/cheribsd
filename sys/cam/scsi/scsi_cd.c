@@ -1771,9 +1771,8 @@ cdioctl(struct disk *dp, u_long cmd, void *addr, int flag, struct thread *td)
 			}
 
 			cam_periph_unlock(periph);
-			error = copyout_c(
-			    (__cheri_tocap struct cd_toc_entry * __capability)
-			    data->entries, te_data_get_ptr(te), len);
+			error = copyout_c(data->entries, te_data_get_ptr(te),
+			    len);
 			free(data, M_SCSICD);
 			free(lead, M_SCSICD);
 		}
