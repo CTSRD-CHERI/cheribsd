@@ -50,8 +50,7 @@ MLINKS= csh.1 tcsh.1
 
 LIBADD=	termcapw crypt
 
-LINKS=	${BINDIR}/csh ${BINDIR}/tcsh \
-	/root/.cshrc /.cshrc
+LINKS=	${BINDIR}/csh ${BINDIR}/tcsh
 
 CLEANFILES= ${GENHDRS} gethost csh.1
 
@@ -171,7 +170,7 @@ beforeinstall:
 	rm -f ${DESTDIR}/.cshrc
 
 afterinstallconfig:
-	sed -i "" -e 's;/bin/csh;/bin/sh;' ${DESTDIR}/etc/master.passwd
+	sed -i "" -e 's;/bin/sh;/bin/csh;' ${DESTDIR}/etc/master.passwd
 	pwd_mkdb -i -p -d ${DESTDIR}/etc ${DESTDIR}/etc/master.passwd
 
 .include <bsd.prog.mk>
