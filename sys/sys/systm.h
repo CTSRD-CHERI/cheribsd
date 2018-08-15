@@ -48,7 +48,13 @@
 #include <machine/atomic.h>
 #include <machine/cpufunc.h>
 #include <machine/pcb.h>
+#if __has_feature(capabilities)
 #include <machine/vmparam.h>
+#endif
+
+#if __has_feature(capabilities)
+#include <cheri/cheri.h>
+#endif
 
 __NULLABILITY_PRAGMA_PUSH
 
@@ -163,12 +169,20 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
 #define	__USER_CODE_CAP(ptr)						\
      ___USER_CFROMPTR((ptr), curthread->td_pcb->pcb_regs.pcc)
 
+#define	__USER_CAP(ptr, len)						\
+({									\
+	void * __capability unbound = __USER_CAP_UNBOUND(ptr);		\
+	(security_cheri_bound_legacy_capabilities &&			\
+	    __builtin_cheri_tag_get(unbound) ?				\
+	    __builtin_cheri_bounds_set(unbound, (len)) : unbound);	\
+})
+
 #else /* !has_feature(capabilities) */
 #define	__USER_CAP_UNBOUND(ptr)	(ptr)
 #define	__USER_CODE_CAP(ptr)	(ptr)
+#define	__USER_CAP(ptr, len)	(ptr)
 #endif /* !has_feature(capabilities) */
 
-#define	__USER_CAP(ptr, len)	__USER_CAP_UNBOUND(ptr)
 #define	__USER_CAP_ADDR(ptr)	__USER_CAP_UNBOUND(ptr)
 #define	__USER_CAP_ARRAY(objp, cnt) \
      __USER_CAP((objp), sizeof(*(objp)) * (cnt))
