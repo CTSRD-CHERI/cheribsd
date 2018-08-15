@@ -2093,7 +2093,7 @@ int
 sys___sysctl(struct thread *td, struct sysctl_args *uap)
 {
 
-	return (kern_sysctl(td, __USER_CAP(uap->name, uap->namelen),
+	return (kern_sysctl(td, __USER_CAP_ARRAY(uap->name, uap->namelen),
 	    uap->namelen, __USER_CAP_UNBOUND(uap->old),
 	    __USER_CAP_OBJ(uap->oldlenp), __USER_CAP(uap->new, uap->newlen),
 	    uap->newlen, 0));
