@@ -346,9 +346,10 @@ struct fs {
 	u_int	*fs_active;		/* (u) used by snapshots to track fs */
 #else
 	u_int64_t cheri_align_pad;	/* Pad to 32-byte alignment */
-	int32_t	*fs_maxcluster;		/* Used by libufs */
+	u_int8_t *fs_contigdirs;	/* (u) # of contig. allocated dirs */
 	struct	csum *fs_csp;		/* Used by fsck */
-	char	fs_ocsp[128 - (2*sizeof(void *)) - 8];
+	int32_t	*fs_maxcluster;		/* Used by libufs */
+	char	fs_ocsp[128 - (3*sizeof(void *)) - 8];
 #endif
 	int32_t	 fs_old_cpc;		/* cyl per cycle in postbl */
 	int32_t	 fs_maxbsize;		/* maximum blocking factor permitted */
@@ -832,7 +833,7 @@ extern u_char *fragtbl[];
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20180816,
 //   "target_type": "header",
 //   "changes": [
 //     "pointer_size"
