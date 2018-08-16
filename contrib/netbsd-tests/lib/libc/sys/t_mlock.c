@@ -31,9 +31,10 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20180816,
  *   "target_type": "test",
  *   "changes": [
+ *     "pointer_alignment",
  *     "unsupported"
  *   ],
  *   "change_comment": "sbrk()"
@@ -404,7 +405,11 @@ ATF_TC_BODY(mlock_unaligned, tc)
 	buf = malloc(page);
 	ATF_REQUIRE(buf != NULL);
 
+#if __has_builtin(__builtin_is_aligned)
+	if (!__builtin_is_aligned(buf, page))
+#else
 	if ((uintptr_t)buf & ((uintptr_t)page - 1))
+#endif
 		addr = buf;
 	else
 		addr = (void *)(((uintptr_t)buf) + page/3);
