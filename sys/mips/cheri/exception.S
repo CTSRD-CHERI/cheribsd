@@ -622,9 +622,11 @@ NESTED_NOPROFILE(MipsKernGenException, KERN_EXC_FRAME_SIZE, ra)
 	 */
 	LOAD_KERNEL_GP
 	CAPCALL_LOAD($c12, trap)
+	/* XXX-AM: a3 this holds the exception PC from SAVE_CPU,
+	 * find it a place once ddb is ported
+	 */
 	cjalr	$c12, $c17
-	/* XXX-AM: a3 this holds the exception PC from SAVE_CPU, find it a place once ddb is ported */
-	csd	a3, zero, (CALLFRAME_RA + KERN_REG_SIZE)(CHERI_REG_STC) # for debugging
+	csd	a3, zero, CALLFRAME_RA(CHERI_REG_STC)	# for debugging
 
 	/*
 	 * Update interrupt and CPU mask in saved status register
@@ -840,9 +842,9 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
 #else
 	CAPCALL_LOAD($c12, cpu_intr)
 #endif
-	cjalr	$c12, $c17
 	/* XXX-AM: we should rely on EPCC instead of COP0_EXC_PC in a3 */
-	csd	a3, zero, CALLFRAME_RA + KERN_REG_SIZE(CHERI_REG_STC) # for debugging
+	cjalr	$c12, $c17
+	csd	a3, zero, CALLFRAME_RA(CHERI_REG_STC)	# for debugging
 
 	/*
 	 * Update interrupt and CPU mask in saved status register
@@ -858,7 +860,7 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
 	SAVE_REG(a1, SR)
 
 	/* XXX-AM: we should load a capability here */
-	cld	v0, zero, (CALLFRAME_RA + KERN_REG_SIZE)(CHERI_REG_STC)
+	cld	v0, zero, CALLFRAME_RA(CHERI_REG_STC)
 	RESTORE_CPU			# v0 contains the return address.
 
 	/* Restore preempted stc from kr1c now we are done with the stack. */
