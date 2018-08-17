@@ -56,14 +56,29 @@
 		KASSERT(cheri_getlen((void *)ptr) >= sizeof(void *),	\
 			("Cheri can not store a pointer here %p, "	\
 			 "not enugh_space(%d) %s %s:%d", ptr,		\
-			 cheri_getlen((void *)ptr), __func__, __FILE__,	\
-			 __LINE__));					\
+			 (u_long)cheri_getlen((void *)ptr),		\
+			 __func__, __FILE__, __LINE__));		\
+	} while (0)
+
+/*
+ * Check whether the bounds on a pointer have been set correctly
+ * by an allocator
+ */
+#define CHERI_VM_ASSERT_BOUNDS(ptr, expect) do {			\
+		CHERI_VM_ASSERT_VALID(ptr);				\
+		KASSERT(cheri_getlen((void *)ptr) == expect,		\
+			("Invalid bounds on pointer in %s %s:%d "	\
+			 "expected %lx, found %lx",			\
+			 __func__, __FILE__, __LINE__,			\
+			 (u_long)expect,				\
+			 (u_long)cheri_getlen((void *)ptr)));		\
 	} while (0)
 
 
 #else /* ! CHERI_KERNEL */
-#define CHERI_VM_ASSERT_VALID(ptr) do{		\
-	} while (0)
+#define CHERI_VM_ASSERT_VALID(ptr)
+#define CHERI_VM_ASSERT_FIT_PTR(ptr)
+#define CHERI_VM_ASSERT_BOUNDS(ptr, expect)
 #endif /* ! CHERI_KERNEL*/
 
 #endif /* _VM_CHERI_H_ */
