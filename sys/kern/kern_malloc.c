@@ -719,7 +719,7 @@ free(void *addr, struct malloc_type *mtp)
 	slab = vtoslab((vm_offset_t)addr & (~UMA_SLAB_MASK));
 	if (slab == NULL)
 		panic("free: address %p(%p) has not been allocated.\n",
-		    addr, (void *)((u_long)addr & (~UMA_SLAB_MASK)));
+		    addr, (void *)rounddown2(addr, UMA_SLAB_SIZE));
 
 	if (!(slab->us_flags & UMA_SLAB_MALLOC)) {
 		size = slab->us_keg->uk_size;
@@ -752,7 +752,7 @@ free_domain(void *addr, struct malloc_type *mtp)
 	slab = vtoslab((vm_offset_t)addr & (~UMA_SLAB_MASK));
 	if (slab == NULL)
 		panic("free_domain: address %p(%p) has not been allocated.\n",
-		    addr, (void *)((u_long)addr & (~UMA_SLAB_MASK)));
+		    addr, (void *)rounddown2(addr, UMA_SLAB_SIZE));
 
 	if (!(slab->us_flags & UMA_SLAB_MALLOC)) {
 		size = slab->us_keg->uk_size;

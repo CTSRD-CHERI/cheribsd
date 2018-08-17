@@ -172,7 +172,17 @@
 #define	VM_INITIAL_PAGEIN	16
 #endif
 
+/*
+ * Support uma small alloc if we are not in the cheri-256
+ * purecap kernel. The cheri-256 purecap kernel need larger
+ * slab sizes and require changes to small alloc.
+ */
+#if !defined(CHERI_KERNEL) || defined(CPU_CHERI128)
 #define	UMA_MD_SMALL_ALLOC
+#else
+/* Cheri 256 purecap kernel needs larger slabs */
+#define UMA_SUPERPAGE_SLAB
+#endif
 
 /*
  * max number of non-contig chunks of physical RAM you can have

@@ -47,6 +47,7 @@ struct cdevsw;
 
 /* These operate on kernel virtual addresses only. */
 vm_ptr_t kva_alloc(vm_size_t);
+vm_ptr_t kva_alloc_aligned(vm_size_t, vm_offset_t);
 void kva_free(vm_offset_t, vm_size_t);
 
 /* These operate on pageable virtual addresses. */
@@ -66,6 +67,8 @@ vm_ptr_t kmem_alloc_contig_domain(int domain, vm_size_t size, int flags,
     vm_memattr_t memattr);
 vm_ptr_t kmem_malloc(struct vmem *, vm_size_t size, int flags);
 vm_ptr_t kmem_malloc_domain(int domain, vm_size_t size, int flags);
+vm_ptr_t kmem_malloc_domain_aligned(int domain, vm_size_t size,
+    vm_offset_t align, int flags);
 void kmem_free(struct vmem *, vm_offset_t, vm_size_t);
 
 /* This provides memory for previously allocated address space. */

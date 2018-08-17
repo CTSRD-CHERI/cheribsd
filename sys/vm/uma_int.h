@@ -130,9 +130,15 @@
 #ifndef VM_UMA_INT_H
 #define VM_UMA_INT_H
 
+#if defined(CHERI_KERNEL) && !defined(CPU_CHERI128)
+#define UMA_SLAB_SIZE	(2*PAGE_SIZE)		/* How big are our slabs? */
+#define UMA_SLAB_MASK	(2*PAGE_SIZE - 1)	/* Mask to get back to the page */
+#define UMA_SLAB_SHIFT	(PAGE_SHIFT + 1)	/* Number of bits PAGE_MASK */
+#else /* ! CHERI_KERNEL or CPU_CHERI128 */
 #define UMA_SLAB_SIZE	PAGE_SIZE	/* How big are our slabs? */
 #define UMA_SLAB_MASK	(PAGE_SIZE - 1)	/* Mask to get back to the page */
 #define UMA_SLAB_SHIFT	PAGE_SHIFT	/* Number of bits PAGE_MASK */
+#endif /* ! CHERI_KERNEL or CPU_CHERI128 */
 
 #define UMA_BOOT_PAGES		64	/* Pages allocated for startup */
 #define UMA_BOOT_PAGES_ZONES	32	/* Multiplier for pages to reserve */
@@ -241,7 +247,7 @@ struct uma_keg {
 	uma_free	uk_freef;	/* Free routine */
 
 	u_long		uk_offset;	/* Next free offset from base KVA */
-	vm_offset_t	uk_kva;		/* Zone base KVA */
+	vm_ptr_t	uk_kva;		/* Zone base KVA */
 	uma_zone_t	uk_slabzone;	/* Slab zone backing us, if OFFPAGE */
 
 	uint32_t	uk_pgoff;	/* Offset to uma_slab struct */
@@ -261,7 +267,7 @@ typedef struct uma_keg	* uma_keg_t;
 /*
  * Free bits per-slab.
  */
-#define	SLAB_SETSIZE	(PAGE_SIZE / UMA_SMALLEST_UNIT)
+#define	SLAB_SETSIZE	(UMA_SLAB_SIZE / UMA_SMALLEST_UNIT)
 BITSET_DEFINE(slabbits, SLAB_SETSIZE);
 
 /*

@@ -142,6 +142,20 @@ kva_alloc(vm_size_t size)
 	return (addr);
 }
 
+vm_ptr_t
+kva_alloc_aligned(vm_size_t size, vm_offset_t align)
+{
+	vmem_addr_t addr;
+
+	size = round_page(size);
+	if (vmem_xalloc(kernel_arena, size, align, 0, 0,
+			VMEM_ADDR_MIN, VMEM_ADDR_MAX,
+			M_BESTFIT | M_NOWAIT, &addr))
+		return (0);
+	CHERI_VM_ASSERT_VALID(addr);
+	return (addr);
+}
+
 /*
  *	kva_free:
  *
@@ -387,6 +401,28 @@ kmem_malloc_domain(int domain, vm_size_t size, int flags)
 	vmem = vm_dom[domain].vmd_kernel_arena;
 	size = round_page(size);
 	if (vmem_alloc(vmem, size, flags | M_BESTFIT, &addr))
+		return (0);
+
+	rv = kmem_back_domain(domain, kernel_object, addr, size, flags);
+	if (rv != KERN_SUCCESS) {
+		vmem_free(vmem, addr, size);
+		return (0);
+	}
+	CHERI_VM_ASSERT_VALID(addr);
+	return (addr);
+}
+
+vm_ptr_t
+kmem_malloc_domain_aligned(int domain, vm_size_t size, vm_offset_t align, int flags)
+{
+	vmem_t *vmem;
+	vm_ptr_t addr;
+	int rv;
+
+	vmem = vm_dom[domain].vmd_kernel_arena;
+	size = round_page(size);
+	if (vmem_xalloc(vmem, size, align, 0, 0, VMEM_ADDR_MIN, VMEM_ADDR_MAX,
+			flags | M_BESTFIT, &addr))
 		return (0);
 
 	rv = kmem_back_domain(domain, kernel_object, addr, size, flags);
