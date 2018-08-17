@@ -55,7 +55,11 @@ __FBSDID("$FreeBSD$");
 #include <poll.h>
 
 /* Assert that pointer p is aligned to at least align bytes */
+#if __has_builtin(__builtin_is_aligned)
+#define assert_aligned(p, align) assert(__builtin_is_aligned((p), (align)))
+#else
 #define assert_aligned(p, align) assert((((uintptr_t)p) & ((align) - 1)) == 0)
+#endif
 
 struct protocol *protocols;
 struct timeout *timeouts;
@@ -561,3 +565,11 @@ interface_set_mtu_priv(char *ifname, u_int16_t mtu)
 			strerror(errno));
 	close(sock);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180817,
+//   "changes": [
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END
