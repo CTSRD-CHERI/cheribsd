@@ -511,6 +511,7 @@ LIBBSNMPTOOLS?=	${LIBBSNMPTOOLSDIR}/libbsnmptools.a
 LIBAMUDIR=	${_LIB_OBJTOP}/usr.sbin/amd/libamu
 LIBAMU?=	${LIBAMUDIR}/libamu.a
 
+LIBBEDIR=	${_LIB_OBJTOP}/lib/libbe
 LIBBE?=		${LIBBEDIR}/libbe.a
 
 LIBPMCSTATDIR=	${_LIB_OBJTOP}/lib/libpmcstat
@@ -538,7 +539,6 @@ LIBOPCODES?=	${LIBOPCODESDIR}/libopcodes.a
 # not using a --sysroot or for meta mode bootstrapping when there is no
 # Makefile.depend.  These are sorted by directory.
 LIBAVLDIR=	${_LIB_OBJTOP}/cddl/lib/libavl
-LIBBEDIR=	${_LIB_OBJTOP}/cddl/lib/libbe
 LIBCTFDIR=	${_LIB_OBJTOP}/cddl/lib/libctf
 LIBDTRACEDIR=	${_LIB_OBJTOP}/cddl/lib/libdtrace
 LIBNVPAIRDIR=	${_LIB_OBJTOP}/cddl/lib/libnvpair
