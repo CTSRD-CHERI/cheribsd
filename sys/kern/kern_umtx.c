@@ -2306,8 +2306,7 @@ do_unlock_pp(struct thread *td, struct umutex * __capability m, uint32_t flags,
 	if ((owner & ~UMUTEX_CONTESTED) != id)
 		return (EPERM);
 
-	error = copyin_c(&m->m_ceilings[1],
-	    (__cheri_tocap uint32_t * __capability)&rceiling, sizeof(uint32_t));
+	error = copyin_c(&m->m_ceilings[1], &rceiling, sizeof(uint32_t));
 	if (error != 0)
 		return (error);
 
@@ -3352,9 +3351,7 @@ umtx_copyin_timeout(const void * __capability addr, struct timespec *tsp)
 {
 	int error;
 
-	error = copyin_c(addr,
-	    (__cheri_tocap struct timespec * __capability)tsp,
-	    sizeof(struct timespec));
+	error = copyin_c(addr, tsp, sizeof(struct timespec));
 	if (error == 0) {
 		if (tsp->tv_sec < 0 ||
 		    tsp->tv_nsec >= 1000000000 ||
@@ -3373,13 +3370,9 @@ umtx_copyin_umtx_time(const void * __capability addr, size_t size,
 	if (size <= sizeof(struct timespec)) {
 		tp->_clockid = CLOCK_REALTIME;
 		tp->_flags = 0;
-		error = copyin_c(addr,
-		    (__cheri_tocap struct timespec * __capability)&tp->_timeout,
-		    sizeof(struct timespec));
+		error = copyin_c(addr, &tp->_timeout, sizeof(struct timespec));
 	} else 
-		error = copyin_c(addr,
-		    (__cheri_tocap struct _umtx_time * __capability)tp,
-		    sizeof(struct _umtx_time));
+		error = copyin_c(addr, tp, sizeof(struct _umtx_time));
 	if (error != 0)
 		return (error);
 	if (tp->_timeout.tv_sec < 0 ||
@@ -4222,8 +4215,7 @@ __umtx_op_nwake_private_c(struct thread *td, struct cheriabi__umtx_op_args *uap)
 	for (count = uap->val, pos = 0; count > 0; count -= tocopy,
 	    pos += tocopy) {
 		tocopy = MIN(count, BATCH_SIZE_C);
-		error = copyincap_c(upp + pos,
-		    (__cheri_tocap char * __capability * __capability)uaddrs,
+		error = copyincap_c(upp + pos, uaddrs,
 		    tocopy * sizeof(char * __capability));
 		if (error != 0)
 			break;
@@ -4417,9 +4409,7 @@ __umtx_op_sem2_wait_c(struct thread *td, struct cheriabi__umtx_op_args *uap)
 	if (error == EINTR && uap->uaddr2 != NULL &&
 	    (timeout._flags & UMTX_ABSTIME) == 0 &&
 	    uasize >= sizeof(struct _umtx_time) + sizeof(struct timespec)) {
-		error = copyout_c(
-		    (__cheri_tocap struct timespec * __capability)
-		    &timeout._timeout,
+		error = copyout_c(&timeout._timeout,
 		    (struct _umtx_time * __capability)uap->uaddr2 + 1,
 		    sizeof(struct timespec));
 		if (error == 0) {
@@ -4453,9 +4443,7 @@ __umtx_op_robust_lists_c(struct thread *td, struct cheriabi__umtx_op_args *uap)
 	if (uap->val > sizeof(rb))
 		return (EINVAL);
 	bzero(&rb, sizeof(rb));
-	error = copyincap_c(uap->uaddr1,
-	    (__cheri_tocap struct umtx_robust_lists_params_c *
-	    __capability)&rb, uap->val);
+	error = copyincap_c(uap->uaddr1, &rb, uap->val);
 	if (error != 0)
 		return (error);
 	return (umtx_robust_lists(td, &rb));
@@ -4996,14 +4984,11 @@ umtx_handle_rb(struct thread *td, uintcap_t rbp, uintcap_t *rb_list, bool inact)
 	KASSERT(td->td_proc == curproc, ("need current vmspace"));
 #ifdef COMPAT_CHERIABI
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
-		error = copyincap_c((void * __capability)rbp,
-		    (__cheri_tocap struct umutex_c * __capability)&mu.m_c,
+		error = copyincap_c((void * __capability)rbp, &mu.m_c,
 		    sizeof(mu.m_c));
 	} else
 #endif
-		error = copyin_c((void * __capability)rbp,
-		    (__cheri_tocap struct umutex * __capability)&mu.m,
-		    sizeof(mu.m));
+		error = copyin_c((void * __capability)rbp, &mu.m, sizeof(mu.m));
 	if (error != 0)
 		return (error);
 	if (rb_list != NULL)
@@ -5053,7 +5038,7 @@ umtx_thread_cleanup(struct thread *td)
 {
 	struct umtx_q *uq;
 	struct umtx_pi *pi;
-	uintcap_t rb_inact;
+	uintcap_t rb_inact = 0;
 
 	/*
 	 * Disown pi mutexes.

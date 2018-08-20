@@ -462,7 +462,7 @@ contigfree(void *addr, unsigned long size, struct malloc_type *type)
 
 #ifdef MALLOC_DEBUG
 static int
-malloc_dbg(caddr_t *vap, unsigned long *sizep, struct malloc_type *mtp,
+malloc_dbg(caddr_t *vap, size_t *sizep, struct malloc_type *mtp,
     int flags)
 {
 #ifdef INVARIANTS
@@ -527,7 +527,7 @@ malloc_dbg(caddr_t *vap, unsigned long *sizep, struct malloc_type *mtp,
  *	the allocation fails.
  */
 void *
-malloc(unsigned long size, struct malloc_type *mtp, int flags)
+malloc(size_t size, struct malloc_type *mtp, int flags)
 {
 	int indx;
 	struct malloc_type_internal *mtip;
@@ -576,7 +576,7 @@ malloc(unsigned long size, struct malloc_type *mtp, int flags)
 }
 
 void *
-malloc_domain(unsigned long size, struct malloc_type *mtp, int domain,
+malloc_domain(size_t size, struct malloc_type *mtp, int domain,
     int flags)
 {
 	int indx;
@@ -772,7 +772,7 @@ free_domain(void *addr, struct malloc_type *mtp)
  *	realloc: change the size of a memory block
  */
 void *
-realloc(void *addr, unsigned long size, struct malloc_type *mtp, int flags)
+realloc(void *addr, size_t size, struct malloc_type *mtp, int flags)
 {
 	uma_slab_t slab;
 	unsigned long alloc;
@@ -841,7 +841,7 @@ realloc(void *addr, unsigned long size, struct malloc_type *mtp, int flags)
  *	reallocf: same as realloc() but free memory on failure.
  */
 void *
-reallocf(void *addr, unsigned long size, struct malloc_type *mtp, int flags)
+reallocf(void *addr, size_t size, struct malloc_type *mtp, int flags)
 {
 	void *mem;
 
@@ -952,8 +952,6 @@ mallocinit(void *dummy)
 	mtx_init(&malloc_mtx, "malloc", NULL, MTX_DEF);
 
 	kmeminit();
-
-	uma_startup2();
 
 	if (kmem_zmax < PAGE_SIZE || kmem_zmax > KMEM_ZMAX)
 		kmem_zmax = KMEM_ZMAX;

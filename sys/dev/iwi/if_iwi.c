@@ -640,7 +640,7 @@ iwi_alloc_tx_ring(struct iwi_softc *sc, struct iwi_tx_ring *ring, int count,
 		goto fail;
 	}
 
-	ring->data = mallocarray(count, sizeof(struct iwi_tx_data), M_DEVBUF,
+	ring->data = malloc(count * sizeof (struct iwi_tx_data), M_DEVBUF,
 	    M_NOWAIT | M_ZERO);
 	if (ring->data == NULL) {
 		device_printf(sc->sc_dev, "could not allocate soft data\n");
@@ -748,7 +748,7 @@ iwi_alloc_rx_ring(struct iwi_softc *sc, struct iwi_rx_ring *ring, int count)
 	ring->count = count;
 	ring->cur = 0;
 
-	ring->data = mallocarray(count, sizeof(struct iwi_rx_data), M_DEVBUF,
+	ring->data = malloc(count * sizeof (struct iwi_rx_data), M_DEVBUF,
 	    M_NOWAIT | M_ZERO);
 	if (ring->data == NULL) {
 		device_printf(sc->sc_dev, "could not allocate soft data\n");
@@ -2057,14 +2057,12 @@ iwi_ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 
 	IWI_LOCK(sc);
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCGIWISTATS):
+	case CASE_IOC_IFREQ(SIOCGIWISTATS):
 		/* XXX validate permissions/memory/etc? */
-		error = copyout_c(
-		    (__cheri_tocap struct iwi_notif_link_quality * __capability)
-		    &sc->sc_linkqual, ifr_data_get_ptr(ifr),
+		error = copyout_c(&sc->sc_linkqual, ifr_data_get_ptr(ifr),
 		    sizeof(struct iwi_notif_link_quality));
 		break;
-	CASE_IOC_IFREQ(SIOCZIWISTATS):
+	case CASE_IOC_IFREQ(SIOCZIWISTATS):
 		memset(&sc->sc_linkqual, 0,
 		    sizeof(struct iwi_notif_link_quality));
 		error = 0;

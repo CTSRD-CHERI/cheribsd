@@ -40,12 +40,12 @@
 
 /*
  * Programmer-friendly macros for CHERI-aware C code -- requires use of
- * CHERI-aware Clang/LLVM, and full capability context switching, so not yet
- * usable in the kernel.
+ * CHERI-aware Clang/LLVM, and full capability context switching.
  */
 #define	cheri_getlen(x)		__builtin_cheri_length_get((x))
 #define	cheri_getbase(x)	__builtin_cheri_base_get((x))
 #define	cheri_getoffset(x)	__builtin_cheri_offset_get((x))
+#define	cheri_getaddress(x)	__builtin_cheri_address_get((x))
 #define	cheri_getperm(x)	__builtin_cheri_perms_get((x))
 #define	cheri_getsealed(x)	__builtin_cheri_sealed_get((x))
 #define	cheri_gettag(x)		__builtin_cheri_tag_get((x))
@@ -222,14 +222,20 @@ cheri_bytes_remaining(const void * __capability cap)
 #define cheri_cap_to_typed_ptr(cap, type)				\
 	(type *)cheri_cap_to_ptr(cap, sizeof(type))
 
-
 #define CHERI_PRINT_PTR(ptr)						\
 	printf("%s: " #ptr " v:%lu b:%016jx l:%016zx o:%jx\n", __func__, \
 	   cheri_gettag((const void * __capability)(ptr)),	        \
 	   cheri_getbase((const void * __capability)(ptr)),		\
 	   cheri_getlen((const void * __capability)(ptr)),		\
 	   cheri_getoffset((const void * __capability)(ptr)))
-#endif /* ! __has_feature(capabilities) */
+
+#define CHERI_FPRINT_PTR(f, ptr)					\
+	fprintf(f, "%s: " #ptr " v:%lu b:%016jx l:%016zx o:%jx\n", __func__, \
+	   cheri_gettag((const void * __capability)(ptr)),	        \
+	   cheri_getbase((const void * __capability)(ptr)),		\
+	   cheri_getlen((const void * __capability)(ptr)),		\
+	   cheri_getoffset((const void * __capability)(ptr)))
+#endif
 
 /* Allow use of some cheri_ptr macros in the purecap kernel
  * without extra ifdefs.

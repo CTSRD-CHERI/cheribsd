@@ -1514,7 +1514,7 @@ wb_ioctl(ifp, command, data)
 	int			error = 0;
 
 	switch(command) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		WB_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			wb_init_locked(sc);
@@ -1525,15 +1525,15 @@ wb_ioctl(ifp, command, data)
 		WB_UNLOCK(sc);
 		error = 0;
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		WB_LOCK(sc);
 		wb_setmulti(sc);
 		WB_UNLOCK(sc);
 		error = 0;
 		break;
 	case SIOCGIFMEDIA:
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		mii = device_get_softc(sc->wb_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;

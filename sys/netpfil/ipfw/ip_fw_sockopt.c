@@ -355,7 +355,7 @@ get_map(struct ip_fw_chain *chain, int extra, int locked)
 
 	for (;;) {
 		struct ip_fw **map;
-		int i, mflags;
+		u_int i, mflags;
 
 		mflags = M_ZERO | ((locked != 0) ? M_NOWAIT : M_WAITOK);
 
@@ -1062,7 +1062,7 @@ delete_range(struct ip_fw_chain *chain, ipfw_range_tlv *rt, int *ndel)
 	map = swap_map(chain, map, chain->n_rules - n);
 	/* 6. Remove all dynamic states originated by deleted rules */
 	if (ndyn > 0)
-		ipfw_expire_dyn_rules(chain, rt);
+		ipfw_expire_dyn_states(chain, rt);
 	/* 7. now remove the rules deleted from the old map */
 	for (i = start; i < end; i++) {
 		rule = map[i];
@@ -3536,8 +3536,7 @@ ipfw_flush_sopt_data(struct sockopt_data *sd)
 	sopt = sd->sopt;
 
 	if (sopt->sopt_dir == SOPT_GET) {
-		error = copyout_c((__cheri_tocap void * __capability)sd->kbuf,
-		    sopt->sopt_val, sz);
+		error = copyout_c(sd->kbuf, sopt->sopt_val, sz);
 		if (error != 0)
 			return (error);
 	}

@@ -418,13 +418,13 @@ pdq_ifioctl(
     int error = 0;
 
     switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS): {
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS): {
 	    pdq_ifinit(sc);
 	    break;
 	}
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI): {
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI): {
 	    PDQ_LOCK(sc);
 	    if (PDQ_IFNET(sc)->if_drv_flags & IFF_DRV_RUNNING) {
 		    pdq_run(sc->sc_pdq);
@@ -435,7 +435,7 @@ pdq_ifioctl(
 	}
 
 #if defined(IFM_FDDI) && defined(SIOCSIFMEDIA)
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA: {
 	    struct ifreq *ifr = (struct ifreq *)data;
 	    error = ifmedia_ioctl(ifp, ifr, &sc->sc_ifmedia, cmd);

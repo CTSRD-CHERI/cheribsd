@@ -1139,7 +1139,7 @@ snioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int             error = 0;
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		SN_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) == 0 &&
 		    ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -1151,8 +1151,8 @@ snioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		SN_UNLOCK(sc);
 		break;
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		/* update multicast filter list. */
 		SN_LOCK(sc);
 		sn_setmcast(sc);

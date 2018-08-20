@@ -151,8 +151,8 @@ END(copystr)
  *	copyinstr(fromaddr, toaddr, maxlength, &lencopied)
  *		caddr_t fromaddr;
  *		caddr_t toaddr;
- *		u_int maxlength;
- *		u_int *lencopied;
+ *		size_t maxlength;
+ *		size_t *lencopied;
  */
 NESTED(copyinstr, CALLFRAME_SIZ, ra)
 	PTR_SUBU	sp, sp, CALLFRAME_SIZ
@@ -179,16 +179,27 @@ END(copyinstr)
  * the user address space.
  *
  *	copyinstr_c(from, to, maxlength, &lencopied)
- *		char * __capability fromaddr;
- *		char * __capability toaddr;
- *		u_int maxlength;
- *		u_int * __capability lencopied;
+ *		char * __capability fromaddr;		c3
+ *		char *toaddr;				a0
+ *		size_t maxlength;			a1
+ *		size_t *lencopied;			a2
  */
 #ifdef CPU_CHERI
 NESTED(copyinstr_c, CALLFRAME_SIZ, ra)
 	PTR_SUBU	sp, sp, CALLFRAME_SIZ
 	.mask		0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ)
 	PTR_LA		v0, copyerr
+
+	cfromptr	$c4, $ddc, a0
+	cbez	$c4, 1f
+	move	a0, a1
+	csetbounds	$c4, $c4, a1
+1:
+	cfromptr	$c5, $ddc, a2
+	cbez	$c5, 2f
+	li	a1, 8
+	csetbounds	$c5, $c5, a1
+2:
 	cgetbase	t0, $c3
 	blt	t0, zero, _C_LABEL(copyerr) # make sure `from` is in user space
 	REG_S		ra, CALLFRAME_RA(sp)
@@ -241,9 +252,9 @@ END(copyin)
  * capabilities
  * NOTE: Does not copy capabilities
  *	copyin_c(from, to, len)
- *		void * __capability from;	(user source address)
- *		void * __capability to;		(kernel destination address)
- *		unsigned len;
+ *		void * __capability from;	c3 (user source capability)
+ *		void * to;			a0 (kernel destination address)
+ *		unsigned len;			a1
  */
 NESTED(copyin_c, CALLFRAME_SIZ, ra)
 	PTR_SUBU	sp, sp, CALLFRAME_SIZ
@@ -251,6 +262,10 @@ NESTED(copyin_c, CALLFRAME_SIZ, ra)
 	PTR_LA	v0, copyerr
 	cgetbase	t0, $c3
 	blt	t0, zero, _C_LABEL(copyerr) # make sure `from` is in user space
+	cgetdefault	$c4
+	csetoffset	$c4, $c4, a0
+	csetbounds	$c4, $c4, a1
+	move	a0, a1
 	REG_S	ra, CALLFRAME_RA(sp)
 	GET_CPU_PCPU(v1)
 	PTR_L	v1, PC_CURPCB(v1)
@@ -270,9 +285,9 @@ END(copyin_c)
  * Copy specified amount of data from user space into the kernel via
  * capabilities
  *	copyincap_c(from, to, len)
- *		void * __capability from;	(user source address)
- *		void * __capability to;		(kernel destination address)
- *		unsigned len;
+ *		void * __capability from;	c3 (user source capability)
+ *		void * to;			a0 (kernel destination address)
+ *		unsigned len;			a1
  */
 NESTED(copyincap_c, CALLFRAME_SIZ, ra)
 	PTR_SUBU	sp, sp, CALLFRAME_SIZ
@@ -280,6 +295,10 @@ NESTED(copyincap_c, CALLFRAME_SIZ, ra)
 	PTR_LA	v0, copyerr
 	cgetbase	t0, $c3
 	blt	t0, zero, _C_LABEL(copyerr) # make sure `from` is in user space
+	cgetdefault	$c4
+	csetoffset	$c4, $c4, a0
+	csetbounds	$c4, $c4, a1
+	move	a0, a1
 	REG_S	ra, CALLFRAME_RA(sp)
 	GET_CPU_PCPU(v1)
 	PTR_L	v1, PC_CURPCB(v1)
@@ -330,14 +349,19 @@ END(copyout)
  * Copy specified amount of data from kernel to the user space via capabilities
  * NOTE: does not copy capabilities
  *	copyout_c(from, to, len)
- *		void * __capability from;	(kernel source capability)
- *		void * __capability to;		(user destination capability)
- *		unsigned len;
+ *		void *from;			a0 (kernel source address)
+ *		void * __capability to;		c3 (user destination capability)
+ *		unsigned len;			a1
  */
 NESTED(copyout_c, CALLFRAME_SIZ, ra)
 	PTR_SUBU	sp, sp, CALLFRAME_SIZ
 	.mask	0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ)
 	PTR_LA	v0, copyerr
+	cmove	$c4, $c3
+	cgetdefault	$c3
+	csetoffset	$c3, $c3, a0
+	csetbounds	$c3, $c3, a1
+	move	a0, a1
 	cgetbase	t0, $c4
 	blt	t0, zero, _C_LABEL(copyerr) # make sure `to` is in user space
 	REG_S	ra, CALLFRAME_RA(sp)
@@ -367,6 +391,11 @@ NESTED(copyoutcap_c, CALLFRAME_SIZ, ra)
 	PTR_SUBU	sp, sp, CALLFRAME_SIZ
 	.mask	0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ)
 	PTR_LA	v0, copyerr
+	cmove	$c4, $c3
+	cgetdefault	$c3
+	csetoffset	$c3, $c3, a0
+	csetbounds	$c3, $c3, a1
+	move	a0, a1
 	cgetbase	t0, $c4
 	blt	t0, zero, _C_LABEL(copyerr) # make sure `to` is in user space
 	REG_S	ra, CALLFRAME_RA(sp)
@@ -660,14 +689,12 @@ LEAF(fuecap_c)
 	PTR_LA	v0, fswberr
 	cgetbase	t0, $c3
 	blt	t0, zero, fswberr	# make sure address is in user space
-	cgetdefault	$c4
-	csetoffset	$c4, $c4, a0
 	GET_CPU_PCPU(v1)
 	PTR_L	v1, PC_CURPCB(v1)
 	PTR_S	v0, U_PCB_ONFAULT(v1)
 	clc	$c3, zero, 0($c3)	# fetch capability
 	PTR_S	zero, U_PCB_ONFAULT(v1)
-	csc	$c3, zero, 0($c4)	# store capability
+	csc	$c3, a0, 0($ddc)	# store capability
 	j	ra
 	li	v0, 0
 END(fuecap_c)

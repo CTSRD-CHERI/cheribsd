@@ -1491,7 +1491,7 @@ mge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	error = 0;
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		MGE_GLOBAL_LOCK(sc);
 
 		if (ifp->if_flags & IFF_UP) {
@@ -1512,15 +1512,15 @@ mge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->mge_if_flags = ifp->if_flags;
 		MGE_GLOBAL_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 			MGE_GLOBAL_LOCK(sc);
 			mge_setup_multicast(sc);
 			MGE_GLOBAL_UNLOCK(sc);
 		}
 		break;
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
 		if (mask & IFCAP_HWCSUM) {
 			ifp->if_capenable &= ~IFCAP_HWCSUM;
@@ -1552,14 +1552,14 @@ mge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 #endif
 		break;
 	case SIOCGIFMEDIA: /* fall through */
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		/*
 		 * Setting up media type via ioctls is *not* supported for MAC
 		 * which is connected to switch. Use etherswitchcfg.
 		 */
 		if (!sc->phy_attached) {
 			switch (command) {
-			CASE_IOC_IFREQ(SIOCSIFMEDIA):
+			case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 				return (0);
 			}
 			error = ifmedia_ioctl(ifp, ifr, &sc->mge_ifmedia,

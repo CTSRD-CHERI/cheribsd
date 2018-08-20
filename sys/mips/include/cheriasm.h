@@ -74,9 +74,9 @@
 /* 5 exception-context registers -- with names where appropriate. */
 #define	CHERI_REG_KR1C	$c27	/* Kernel exception handling capability (1). */
 #define	CHERI_REG_KR2C	$c28	/* Kernel exception handling capability (2). */
-#define	CHERI_REG_KCC	$c29	/* Kernel code capability. */
-#define	CHERI_REG_KDC	$c30	/* Kernel data capability. */
-#define	CHERI_REG_EPCC	$c31	/* Exception program counter capability. */
+#define	CHERI_REG_C29	$c29	/* Former Kernel code capability. */
+#define	CHERI_REG_C30	$c30	/* Former Kernel data capability. */
+#define	CHERI_REG_C31	$c31	/* Former Exception program counter cap. */
 
 /*
  * In kernel inline assembly, employee these two caller-save registers.  This
@@ -134,8 +134,8 @@
 	nop;								\
 	/* Save user $ddc; install kernel $ddc. */			\
 	cgetdefault	CHERI_REG_SEC0;					\
-	cgetkdc		CHERI_REG_KDC;					\
-	csetdefault	CHERI_REG_KDC;					\
+	cgetkdc		CHERI_REG_KR1C;					\
+	csetdefault	CHERI_REG_KR1C;					\
 64:
 
 /*
@@ -159,10 +159,9 @@
 	/* If returning to userspace, restore saved user $ddc. */	\
 	csetdefault	CHERI_REG_SEC0; 				\
 	b	66f;							\
-	/* TODO: clear c29-31 when returning to userspace		\
-	 * CClearHi (CHERI_CLEAR_CAPHI_KCC | CHERI_CLEAR_CAPHI_KDC	\
-	 * 	CHERI_CLEAR_CAPHI_EPCC); */				\
-	nop;								\
+	/* Clear c29-c31 when returning to userspace (needs recent bitfile-> nop for now) */ 		\
+	/* CClearHi (CHERI_CLEAR_CAPHI_C29 | CHERI_CLEAR_CAPHI_C30 |	\
+	    CHERI_CLEAR_CAPHI_C31);*/ nop; /* delay slot */			\
 65:									\
 	/* If returning to kernelspace, reinstall kernel code $pcc. */	\
 	/*								\
@@ -287,11 +286,11 @@
 #ifndef CHERI_KERNEL
 #define	SAVE_U_PCB_CHERIKFRAME_CREG(creg, offs, base)			\
 	csc		creg, base, (U_PCB_CHERIKFRAME +		\
-			    CHERICAP_SIZE * offs)(CHERI_REG_KDC)
+			    CHERICAP_SIZE * offs)($ddc)
 
 #define	RESTORE_U_PCB_CHERIKFRAME_CREG(creg, offs, base)		\
 	clc		creg, base, (U_PCB_CHERIKFRAME +		\
-			    CHERICAP_SIZE * offs)(CHERI_REG_KDC)
+			    CHERICAP_SIZE * offs)($ddc)
 
 #define SAVE_CHERIKFRAME_GPC
 #define RESTORE_CHERIKFRAME_GPC
@@ -419,9 +418,9 @@
 #define CHERI_CLEAR_CAPHI_IDC  (1 << (26 - 16))
 #define CHERI_CLEAR_CAPHI_KR1C (1 << (27 - 16))
 #define CHERI_CLEAR_CAPHI_KR2C (1 << (28 - 16))
-#define CHERI_CLEAR_CAPHI_KCC  (1 << (29 - 16))
-#define CHERI_CLEAR_CAPHI_KDC  (1 << (30 - 16))
-#define CHERI_CLEAR_CAPHI_EPCC (1 << (31 - 16))
+#define CHERI_CLEAR_CAPHI_C29  (1 << (29 - 16))
+#define CHERI_CLEAR_CAPHI_C30  (1 << (30 - 16))
+#define CHERI_CLEAR_CAPHI_C31  (1 << (31 - 16))
 
 /* Ensure that this is kept in sync with CHERI_REG_SEC0. */
 #define	CHERI_CLEAR_CAPHI_SEC0	CHERI_CLEAR_CAPHI_KR2C
@@ -433,5 +432,18 @@
 	clcbi dst, %captab20(sym)(CHERI_REG_GPC)
 #define CAPCALL_LOAD(dst, sym)				\
 	clcbi dst, %capcall20(sym)(CHERI_REG_GPC)
+
+/*
+ * The CCall (selector 1) branch delay slot has been removed but in order to
+ * run on older hardware we use this macro ensure it is followed by a nop
+ *
+ * TODO: remove this once we drop support for older bitfiles
+ */
+#define CCALL(cb, cd)						\
+	.set push;						\
+	.set noreorder;						\
+	ccall cb, cd, 1;					\
+	nop; /* Fill branch delay slot for old harware*/	\
+	.set pop;
 
 #endif /* _MIPS_INCLUDE_CHERIASM_H_ */

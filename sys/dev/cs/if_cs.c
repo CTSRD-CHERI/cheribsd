@@ -1051,7 +1051,7 @@ cs_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 #endif
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		/*
 		 * Switch interface state between "running" and
 		 * "stopped", reflecting the UP flag.
@@ -1076,8 +1076,8 @@ cs_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		CS_UNLOCK(sc);
 		break;
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 	    /*
 	     * Multicast list has changed; set the hardware filter
 	     * accordingly.
@@ -1090,7 +1090,7 @@ cs_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	    error = 0;
 	    break;
 
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->media, command);
 		break;

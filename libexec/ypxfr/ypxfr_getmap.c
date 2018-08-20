@@ -44,8 +44,19 @@ __FBSDID("$FreeBSD$");
 #include "ypxfr_extern.h"
 
 extern bool_t xdr_ypresp_all_seq(XDR *, unsigned long *);
-
-extern int (*ypresp_allfn)();
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180728,
+ *   "target_type": "lib",
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "comment": "Fixed using a function pointer without prototypes"
+ * }
+ * CHERI CHANGES END
+ */
+extern int (*ypresp_allfn)(u_long, char *, int, char *, int, void *);
 extern void *ypresp_data;
 extern DB *specdbp;
 extern enum ypstat yp_errno;
@@ -61,7 +72,7 @@ extern enum ypstat yp_errno;
  */
 int
 ypxfr_get_map(char *map, char *domain, char *host,
-    int (*callback)(int, char *, int, char *, int, char*))
+    int (*callback)(u_long, char *, int, char *, int, void*))
 {
 	CLIENT *clnt;
 	ypreq_nokey req;

@@ -65,8 +65,12 @@ EFI_GUID imgid = LOADED_IMAGE_PROTOCOL;
 EFI_GUID mps = MPS_TABLE_GUID;
 EFI_GUID netid = EFI_SIMPLE_NETWORK_PROTOCOL;
 EFI_GUID smbios = SMBIOS_TABLE_GUID;
+EFI_GUID smbios3 = SMBIOS3_TABLE_GUID;
 EFI_GUID dxe = DXE_SERVICES_TABLE_GUID;
 EFI_GUID hoblist = HOB_LIST_TABLE_GUID;
+EFI_GUID lzmadecomp = LZMA_DECOMPRESSION_GUID;
+EFI_GUID mpcore = ARM_MP_CORE_INFO_TABLE_GUID;
+EFI_GUID esrt = ESRT_TABLE_GUID;
 EFI_GUID memtype = MEMORY_TYPE_INFORMATION_TABLE_GUID;
 EFI_GUID debugimg = DEBUG_IMAGE_INFO_TABLE_GUID;
 EFI_GUID fdtdtb = FDT_TABLE_GUID;
@@ -452,11 +456,15 @@ main(int argc, CHAR16 *argv[])
 	}
 
 	/*
-	 * March through the device switch probing for things.
+	 * Scan the BLOCK IO MEDIA handles then
+	 * march through the device switch probing for things.
 	 */
-	for (i = 0; devsw[i] != NULL; i++)
-		if (devsw[i]->dv_init != NULL)
-			(devsw[i]->dv_init)();
+	if ((i = efipart_inithandles()) == 0) {
+		for (i = 0; devsw[i] != NULL; i++)
+			if (devsw[i]->dv_init != NULL)
+				(devsw[i]->dv_init)();
+	} else
+		printf("efipart_inithandles failed %d, expect failures", i);
 
 	printf("Command line arguments:");
 	for (i = 0; i < argc; i++)
@@ -655,10 +663,18 @@ command_configuration(int argc, char *argv[])
 		else if (!memcmp(guid, &smbios, sizeof(EFI_GUID)))
 			printf("SMBIOS Table %p",
 			    ST->ConfigurationTable[i].VendorTable);
+		else if (!memcmp(guid, &smbios3, sizeof(EFI_GUID)))
+			printf("SMBIOS3 Table");
 		else if (!memcmp(guid, &dxe, sizeof(EFI_GUID)))
 			printf("DXE Table");
 		else if (!memcmp(guid, &hoblist, sizeof(EFI_GUID)))
 			printf("HOB List Table");
+		else if (!memcmp(guid, &lzmadecomp, sizeof(EFI_GUID)))
+			printf("LZMA Compression");
+		else if (!memcmp(guid, &mpcore, sizeof(EFI_GUID)))
+			printf("ARM MpCore Information Table");
+		else if (!memcmp(guid, &esrt, sizeof(EFI_GUID)))
+			printf("ESRT Table");
 		else if (!memcmp(guid, &memtype, sizeof(EFI_GUID)))
 			printf("Memory Type Information Table");
 		else if (!memcmp(guid, &debugimg, sizeof(EFI_GUID)))

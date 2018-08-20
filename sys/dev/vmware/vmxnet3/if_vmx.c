@@ -959,7 +959,7 @@ vmxnet3_init_rxq(struct vmxnet3_softc *sc, int q)
 		rxr = &rxq->vxrxq_cmd_ring[i];
 		rxr->vxrxr_rid = i;
 		rxr->vxrxr_ndesc = sc->vmx_nrxdescs;
-		rxr->vxrxr_rxbuf = mallocarray(rxr->vxrxr_ndesc,
+		rxr->vxrxr_rxbuf = malloc(rxr->vxrxr_ndesc *
 		    sizeof(struct vmxnet3_rxbuf), M_DEVBUF, M_NOWAIT | M_ZERO);
 		if (rxr->vxrxr_rxbuf == NULL)
 			return (ENOMEM);
@@ -987,7 +987,7 @@ vmxnet3_init_txq(struct vmxnet3_softc *sc, int q)
 	txq->vxtxq_id = q;
 
 	txr->vxtxr_ndesc = sc->vmx_ntxdescs;
-	txr->vxtxr_txbuf = mallocarray(txr->vxtxr_ndesc,
+	txr->vxtxr_txbuf = malloc(txr->vxtxr_ndesc *
 	    sizeof(struct vmxnet3_txbuf), M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (txr->vxtxr_txbuf == NULL)
 		return (ENOMEM);
@@ -1023,10 +1023,10 @@ vmxnet3_alloc_rxtx_queues(struct vmxnet3_softc *sc)
 		sc->vmx_max_ntxqueues = 1;
 	}
 
-	sc->vmx_rxq = mallocarray(sc->vmx_max_nrxqueues,
-	    sizeof(struct vmxnet3_rxqueue), M_DEVBUF, M_NOWAIT | M_ZERO);
-	sc->vmx_txq = mallocarray(sc->vmx_max_ntxqueues,
-	    sizeof(struct vmxnet3_txqueue), M_DEVBUF, M_NOWAIT | M_ZERO);
+	sc->vmx_rxq = malloc(sizeof(struct vmxnet3_rxqueue) *
+	    sc->vmx_max_nrxqueues, M_DEVBUF, M_NOWAIT | M_ZERO);
+	sc->vmx_txq = malloc(sizeof(struct vmxnet3_txqueue) *
+	    sc->vmx_max_ntxqueues, M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (sc->vmx_rxq == NULL || sc->vmx_txq == NULL)
 		return (ENOMEM);
 
@@ -3233,7 +3233,7 @@ vmxnet3_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	error = 0;
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (ifp->if_mtu != ifr_mtu_get(ifr)) {
 			VMXNET3_CORE_LOCK(sc);
 			error = vmxnet3_change_mtu(sc, ifr_mtu_get(ifr));
@@ -3241,7 +3241,7 @@ vmxnet3_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		VMXNET3_CORE_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING)) {
@@ -3259,20 +3259,20 @@ vmxnet3_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		VMXNET3_CORE_UNLOCK(sc);
 		break;
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		VMXNET3_CORE_LOCK(sc);
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 			vmxnet3_set_rxfilter(sc);
 		VMXNET3_CORE_UNLOCK(sc);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->vmx_media, cmd);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		VMXNET3_CORE_LOCK(sc);
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 

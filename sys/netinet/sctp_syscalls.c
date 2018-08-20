@@ -664,7 +664,7 @@ kern_sctp_generic_recvmsg(struct thread *td, int sd, void * __capability uiov,
 			error = 0;
 	} else {
 		if (usinfo)
-			error = copyout_c( &sinfo, usinfo, sizeof(sinfo));
+			error = copyout_c(&sinfo, usinfo, sizeof(sinfo));
 	}
 #ifdef KTRACE
 	if (ktruio != NULL) {
@@ -682,9 +682,7 @@ kern_sctp_generic_recvmsg(struct thread *td, int sd, void * __capability uiov,
 			len = 0;
 		else {
 			len = MIN(len, fromsa->sa_len);
-			error = copyout_c(
-			    (__cheri_tocap struct sockaddr * __capability)
-			    fromsa, from, (size_t)len);
+			error = copyout_c(fromsa, from, (size_t)len);
 			if (error != 0)
 				goto out;
 		}

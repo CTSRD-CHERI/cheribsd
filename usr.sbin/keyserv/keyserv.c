@@ -83,9 +83,8 @@ static int debugging = 1;
 static int debugging = 0;
 #endif
 
-static void keyprogram();
+static void keyprogram(struct svc_req *rqstp, SVCXPRT *transp);
 static des_block masterkey;
-char *getenv();
 static char ROOTKEY[] = "/etc/.rootkey";
 
 /*
@@ -97,10 +96,23 @@ static char ROOTKEY[] = "/etc/.rootkey";
  * implementations of these functions, and to call those in key_call().
  */
 
-extern cryptkeyres *(*__key_encryptsession_pk_LOCAL)();
-extern cryptkeyres *(*__key_decryptsession_pk_LOCAL)();
-extern des_block *(*__key_gendes_LOCAL)();
-extern int (*__des_crypt_LOCAL)();
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180728,
+ *   "target_type": "lib",
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "comment": "Using a function pointer without prototypes"
+ * }
+ * CHERI CHANGES END
+ */
+
+extern cryptkeyres *(*__key_encryptsession_pk_LOCAL)(uid_t, cryptkeyarg2 *);
+extern cryptkeyres *(*__key_decryptsession_pk_LOCAL)(uid_t, cryptkeyarg2 *);
+extern des_block *(*__key_gendes_LOCAL)(void *, struct svc_req *);
+extern int (*__des_crypt_LOCAL)(char *, int, struct desparams *);
 
 cryptkeyres *key_encrypt_pk_2_svc_prog( uid_t, cryptkeyarg2 * );
 cryptkeyres *key_decrypt_pk_2_svc_prog( uid_t, cryptkeyarg2 * );
@@ -624,9 +636,7 @@ key_getcred_1_svc_prog(uid, name)
  * RPC boilerplate
  */
 static void
-keyprogram(rqstp, transp)
-	struct svc_req *rqstp;
-	SVCXPRT *transp;
+keyprogram(struct svc_req *rqstp, SVCXPRT *transp)
 {
 	union {
 		keybuf key_set_1_arg;

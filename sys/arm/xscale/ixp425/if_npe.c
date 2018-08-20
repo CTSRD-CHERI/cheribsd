@@ -515,8 +515,7 @@ npe_dma_setup(struct npe_softc *sc, struct npedma *dma,
 		return error;
 	}
 	/* XXX M_TEMP */
-	dma->buf = mallocarray(nbuf, sizeof(struct npebuf), M_TEMP,
-	    M_NOWAIT | M_ZERO);
+	dma->buf = malloc(nbuf * sizeof(struct npebuf), M_TEMP, M_NOWAIT | M_ZERO);
 	if (dma->buf == NULL) {
 		device_printf(sc->sc_dev,
 		     "unable to allocate memory for %s s/w buffers\n",
@@ -1485,7 +1484,7 @@ npeioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #endif
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		NPE_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) == 0 &&
 		    ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -1498,8 +1497,8 @@ npeioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		NPE_UNLOCK(sc);
 		break;
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		/* update multicast filter list. */
 		NPE_LOCK(sc);
 		npe_setmcast(sc);
@@ -1507,14 +1506,14 @@ npeioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = 0;
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
   	case SIOCGIFMEDIA:
  		mii = device_get_softc(sc->sc_mii);
  		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
   		break;
 
 #ifdef DEVICE_POLLING
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
 		if (mask & IFCAP_POLLING) {
 			if (ifr_reqcap_get(ifr) & IFCAP_POLLING) {

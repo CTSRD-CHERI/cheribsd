@@ -44,7 +44,8 @@ __FBSDID("$FreeBSD$");
 
 static struct mtx cheri_otype_lock;
 static struct unrhdr *cheri_otypes;
-static void * __capability kernel_sealcap;
+/* Initialized in _start() */
+void * __capability kernel_sealcap;
 
 static void
 cheri_otype_init(void *dummy __unused)
@@ -53,9 +54,6 @@ cheri_otype_init(void *dummy __unused)
 	mtx_init(&cheri_otype_lock, "CHERI object type lock", NULL, MTX_DEF);
 	cheri_otypes = new_unrhdr(CHERI_OTYPE_KERN_MIN,
 	    CHERI_OTYPE_KERN_MAX, &cheri_otype_lock);
-	cheri_capability_set(&kernel_sealcap, CHERI_SEALCAP_KERNEL_PERMS,
-	    CHERI_SEALCAP_KERNEL_BASE, CHERI_SEALCAP_KERNEL_LENGTH,
-	    CHERI_SEALCAP_KERNEL_BASE);
 }
 SYSINIT(cheri_otype_init, SI_SUB_LOCK, SI_ORDER_FIRST, cheri_otype_init, NULL);
 

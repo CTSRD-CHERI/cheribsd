@@ -354,6 +354,10 @@
         ..
         libproc
         ..
+        libregex
+            data
+            ..
+        ..
         librt
         ..
         libsbuf
@@ -445,6 +449,8 @@
                 mirror
                 ..
                 nop
+                ..
+                part
                 ..
                 raid3
                 ..

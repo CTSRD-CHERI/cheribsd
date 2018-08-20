@@ -5,6 +5,7 @@ MAN=
 .include <src.opts.mk>
 
 MK_SSP=	no
+MK_PIE=	no
 
 PROG=	cheribsdbox
 CHERIBSDBOX_DIR?=	/bin
@@ -14,6 +15,9 @@ WANT_CHERI=		none
 CRUNCH_BUILDOPTS+=	WANT_CHERI=none -DWITHOUT_TESTS MK_TESTS=no
 # Avoid linking against libcasper for tcpdump/traceroute/kdump:
 CRUNCH_BUILDOPTS+=	-DWITHOUT_CASPER MK_CASPER=no
+# Try to reduce size by avoiding locale support
+CRUNCH_BUILDOPTS+=	-DWITHOUT_LOCALES MK_LOCALES=no
+
 
 # Do not do hardlinks as part of the install since we want to be able to install
 # this without conflicting with the real binaries and instead do some mtree
@@ -82,7 +86,10 @@ CRUNCH_LIBS+= -ldevinfo
 CRUNCH_LIBS+= -lusb
 
 # netstat needs libkvm (which needs libelf)
-CRUNCH_LIBS+= -lkvm -lelf -lmemstat -lnetgraph
+CRUNCH_LIBS+= -lkvm -lelf -lmemstat
+# avoid depending on -lnetgraph
+CRUNCH_BUILDOPTS_netstat+=MK_NETGRAPH_SUPPORT=no -j1
+
 
 # Misc libs copied from recue/bsdbox:
 CRUNCH_LIBS+= -ledit -ll -ltermcapw
@@ -122,17 +129,18 @@ CRUNCH_PROGS_bin+=	cat \
 
 CRUNCH_ALIAS_test=	[
 
-# Su doesn't work with cheribsdbox bin/sh and bin/csh because it sets argv[0]
+# Su needs latest crunchgen to work with cheribsdbox sh/csh because it sets argv[0]
 # and then cheribsdbox thinks it should execute _su
-CRUNCH_SUPPRESS_LINK_sh=	1
 CRUNCH_BUILDTOOLS+=	bin/sh
 CRUNCH_PROGS_bin+=	sh
-# For now don't include csh
-.if 0
 CRUNCH_ALIAS_sh=	-sh
+
 CRUNCH_BUILDTOOLS+=	bin/csh
+CRUNCH_PROGS_bin+=	csh
 CRUNCH_ALIAS_csh=	-csh tcsh -tcsh
-.endif
+# to exclude csh/sh:
+# CRUNCH_SUPPRESS_LINK_sh=	1
+# CRUNCH_SUPPRESS_LINK_csh=	1
 
 
 ###################################################################
@@ -202,10 +210,13 @@ CRUNCH_LIBS+=	-lbz2
 CRUNCH_PROGS_usr.bin+= \
 		awk \
 		basename \
+		bmake \
 		bzip2 \
 		diff \
 		dirname \
+		du \
 		env \
+		false \
 		fetch \
 		find \
 		grep \
@@ -221,11 +232,11 @@ CRUNCH_PROGS_usr.bin+= \
 		login \
 		mktemp \
 		nc \
-		netstat \
 		passwd \
 		sed \
 		seq \
 		sockstat \
+		stat \
 		tail \
 		tar \
 		tee \
@@ -234,6 +245,7 @@ CRUNCH_PROGS_usr.bin+= \
 		top \
 		tput \
 		tr \
+		true \
 		uname \
 		uudecode \
 		uuencode \
@@ -243,8 +255,10 @@ CRUNCH_PROGS_usr.bin+= \
 		which \
 		xargs
 
+CRUNCH_ALIAS_bmake=	make
 CRUNCH_ALIAS_bzip2=	bunzip2
 CRUNCH_ALIAS_tar=	bsdtar
+CRUNCH_ALIAS_stat=	realink
 CRUNCH_ALIAS_hexdump=	hd od
 CRUNCH_ALIAS_w=	uptime
 CRUNCH_PROGS_usr.bin+=su
@@ -431,6 +445,12 @@ cheribsdbox.mtree: Makefile
 # by more than one file
 # -> we need to create at last one hardlink to cheribsdbox
 LINKS+=${BINDIR}/${PROG} ${BINDIR}/${PROG}.dummy-hardlink-for-makefs
+
+check_crunchgen:
+	if [ "`which crunchgen`" = "/usr/bin/crunchgen" ]; then \
+	    echo "Should not be using crunchgen from /usr/bin!"; false; \
+	fi
+all: check_crunchgen
 
 # the crunchgen build environment
 .include <bsd.crunchgen.mk>

@@ -717,6 +717,8 @@ extern caddr_t cheri_kall_capability;
  * (See "MIPS Architecture for Programmers Volume III", MD00091, Table 9.41)
  */
 #define	MIPS_CONFIG3_M		0x80000000	/* Flag: Config4 is present */
+#define	MIPS_CONFIG3_BI		0x04000000	/* Flag: BadInstr is present */
+#define	MIPS_CONFIG3_BP		0x08000000	/* Flag: BadInstrP is present */
 #define	MIPS_CONFIG3_ULR	0x00002000	/* UserLocal reg implemented */
 
 #define MIPS_CONFIG4_MMUSIZEEXT		0x000000FF	/* bits 7.. 0 MMU Size Extension */
@@ -804,7 +806,7 @@ extern caddr_t cheri_kall_capability;
 #define	MIPS_HWRENA_CC		(1<<2)	/* Hi Res cycle counter */
 #define	MIPS_HWRENA_CCRES	(1<<3)	/* Cycle counter resolution */
 /* BERI specific statcounters */
-#if defined(CPU_BERI)
+#if defined(CPU_BERI) || defined(CPU_QEMU_MALTA)
 /*
  * XXXAR: the first three don't use the selector field so waste opcode space.
  * We should probably move them further back and use the selector. This would

@@ -1666,9 +1666,8 @@ mqueue_loadmsg(const char * __capability msg_ptr, size_t msg_size, int msg_prio)
 
 	len = sizeof(struct mqueue_msg) + msg_size;
 	msg = malloc(len, M_MQUEUEDATA, M_WAITOK);
-	error = copyin_c(msg_ptr,
-	    ((__cheri_tocap char * __capability)(char *)msg) +
-	    sizeof(struct mqueue_msg), msg_size);
+	error = copyin_c(msg_ptr, (char *)msg + sizeof(struct mqueue_msg),
+	    msg_size);
 	if (error) {
 		free(msg, M_MQUEUEDATA);
 		msg = NULL;
@@ -1688,13 +1687,10 @@ mqueue_savemsg(struct mqueue_msg *msg, char * __capability msg_ptr,
 {
 	int error;
 
-	error = copyout_c(
-	    ((__cheri_tocap char * __capability)(char *)msg) + sizeof(*msg),
-	    msg_ptr, msg->msg_size);
+	error = copyout_c((char *)msg + sizeof(*msg), msg_ptr, msg->msg_size);
 	if (error == 0 && msg_prio != NULL)
-		error = copyout_c(
-		    (__cheri_tocap unsigned int * __capability)&msg->msg_prio,
-		    msg_prio, sizeof(unsigned int));
+		error = copyout_c(&msg->msg_prio, msg_prio,
+		    sizeof(unsigned int));
 	return (error);
 }
 
@@ -2056,7 +2052,7 @@ kern_kmq_open(struct thread *td, const char * __capability upath, int flags,
 			return (EINVAL);
 	}
 
-	error = copyinstr_c(upath, &path[0], MQFS_NAMELEN + 1, NULL);
+	error = copyinstr_c(upath, path, MQFS_NAMELEN + 1, NULL);
         if (error)
 		return (error);
 
@@ -2177,7 +2173,7 @@ kern_kmq_unlink(struct thread *td, const char * __capability upath)
 	struct mqfs_node *pn;
 	int error, len;
 
-	error = copyinstr_c(upath, &path[0], MQFS_NAMELEN + 1, NULL);
+	error = copyinstr_c(upath, path, MQFS_NAMELEN + 1, NULL);
         if (error)
 		return (error);
 

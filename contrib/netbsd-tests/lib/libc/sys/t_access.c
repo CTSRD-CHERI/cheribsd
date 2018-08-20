@@ -28,6 +28,18 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180719,
+ *   "target_type": "test",
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "Missing mode to open with O_CREAT"
+ * }
+ * CHERI CHANGES END
+ */
 #include <sys/cdefs.h>
 __RCSID("$NetBSD: t_access.c,v 1.2 2017/01/10 22:36:29 christos Exp $");
 
@@ -62,7 +74,7 @@ ATF_TC_BODY(access_access, tc)
 	size_t i;
 	int fd;
 
-	fd = open(path, O_RDONLY | O_CREAT);
+	fd = open(path, O_RDONLY | O_CREAT, 0600);
 
 	if (fd < 0)
 		return;

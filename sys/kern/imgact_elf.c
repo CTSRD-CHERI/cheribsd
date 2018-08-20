@@ -378,12 +378,9 @@ __elfN(get_brandinfo)(struct image_params *imgp, const char *interp,
 			    /* ELF image p_filesz includes terminating zero */
 			    strlen(bi->interp_path) + 1 == interp_name_len &&
 			    strncmp(interp, bi->interp_path, interp_name_len)
-			    == 0) {
-				/* Give brand a chance to veto. */
-				if (bi->header_supported == NULL ||
-				    bi->header_supported(imgp))
-					return (bi);
-			}
+			    == 0 && (bi->header_supported == NULL ||
+			    bi->header_supported(imgp)))
+				return (bi);
 		}
 	}
 
@@ -394,7 +391,9 @@ __elfN(get_brandinfo)(struct image_params *imgp, const char *interp,
 		    (interp != NULL && (bi->flags & BI_BRAND_ONLY_STATIC) != 0))
 			continue;
 		if (hdr->e_machine == bi->machine &&
-		    __elfN(fallback_brand) == bi->brand)
+		    __elfN(fallback_brand) == bi->brand &&
+		    (bi->header_supported == NULL ||
+		    bi->header_supported(imgp)))
 			return (bi);
 	}
 	return (NULL);
@@ -697,6 +696,7 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 	imgp->image_header = NULL;
 	imgp->object = NULL;
 	imgp->execlabel = NULL;
+	imgp->start_addr = ~0UL;
 	imgp->end_addr = 0;
 
 	NDINIT(nd, LOOKUP, LOCKLEAF | FOLLOW, UIO_SYSSPACE, file, curthread);
@@ -939,7 +939,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		goto ret;
 
 	for (i = 0; i < hdr->e_phnum; i++) {
-		unsigned long end_addr;
+		unsigned long start_addr, end_addr;
 		switch (phdr[i].p_type) {
 		case PT_LOAD:	/* Loadable segment */
 			if (phdr[i].p_memsz == 0)
@@ -952,8 +952,10 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 			if (error != 0)
 				goto ret;
 
-			end_addr = phdr[i].p_vaddr + et_dyn_addr +
-			    phdr[i].p_memsz;
+			start_addr = phdr[i].p_vaddr + et_dyn_addr;
+			end_addr = start_addr + phdr[i].p_memsz;
+			if (imgp->start_addr > start_addr)
+				imgp->start_addr = start_addr;
 			if (imgp->end_addr < end_addr)
 				imgp->end_addr = end_addr;
 
@@ -1079,11 +1081,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 			    &imgp->entry_addr, sv->sv_pagesize);
 		}
 		vn_lock(imgp->vp, LK_EXCLUSIVE | LK_RETRY);
-		/*
-		 * XXX-CHERI: disable restricting DDC and PCC in dynamic
-		 * programs while we refine the model.
-		 */
-		imgp->end_addr = 0;
 		if (error != 0) {
 			uprintf("ELF interpreter %s not found, error %d\n",
 			    interp, error);

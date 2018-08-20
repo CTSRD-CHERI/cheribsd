@@ -136,13 +136,10 @@ static struct rwlock_padalign __exclusive_cache_line uma_rwlock;
 
 /*
  * Pointer and counter to pool of pages, that is preallocated at
- * startup to bootstrap UMA.  Early zones continue to use the pool
- * until it is depleted, so allocations may happen after boot, thus
- * we need a mutex to protect it.
+ * startup to bootstrap UMA.
  */
 static char *bootmem;
 static int boot_pages;
-static struct mtx uma_boot_pages_mtx;
 
 static struct sx uma_drain_lock;
 
@@ -151,9 +148,8 @@ static unsigned long uma_kmem_limit = LONG_MAX;
 static volatile unsigned long uma_kmem_total;
 
 /* Is the VM done starting up? */
-static int booted = 0;
-#define	UMA_STARTUP	1
-#define	UMA_STARTUP2	2
+static enum { BOOT_COLD = 0, BOOT_STRAPPED, BOOT_PAGEALLOC, BOOT_BUCKETS,
+    BOOT_RUNNING } booted = BOOT_COLD;
 
 /*
  * This is the handle used to schedule events that need to happen
@@ -227,6 +223,11 @@ enum zfreeskip { SKIP_NONE = 0, SKIP_DTOR, SKIP_FINI };
 #define	UMA_ANYDOMAIN	-1	/* Special value for domain search. */
 
 /* Prototypes.. */
+
+int	uma_startup_count(int);
+void	uma_startup(void *, int);
+void	uma_startup1(void);
+void	uma_startup2(void);
 
 static void *noobj_alloc(uma_zone_t, vm_size_t, int, uint8_t *, int);
 static void *page_alloc(uma_zone_t, vm_size_t, int, uint8_t *, int);
@@ -1148,48 +1149,62 @@ startup_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 	int pages;
 
 	keg = zone_first_keg(zone);
-	pages = howmany(bytes, PAGE_SIZE);
-	KASSERT(pages > 0, ("startup_alloc can't reserve 0 pages\n"));
+
+	/*
+	 * If we are in BOOT_BUCKETS or higher, than switch to real
+	 * allocator.  Zones with page sized slabs switch at BOOT_PAGEALLOC.
+	 */
+	switch (booted) {
+		case BOOT_COLD:
+		case BOOT_STRAPPED:
+			break;
+		case BOOT_PAGEALLOC:
+			if (keg->uk_ppera > 1)
+				break;
+		case BOOT_BUCKETS:
+		case BOOT_RUNNING:
+#ifdef UMA_MD_SMALL_ALLOC
+			/* keg->uk_allocf = (keg->uk_ppera >
+			   (1 << (UMA_SLAB_SHIFT - PAGE_SHIFT))) ? */
+			/*	page_alloc : uma_small_alloc; */
+			keg->uk_allocf = (keg->uk_ppera > 1) ?
+				page_alloc : uma_small_alloc;
+
+#else
+			keg->uk_allocf = page_alloc;
+#endif
+			return keg->uk_allocf(zone, bytes, domain, pflag, wait);
+	}
 
 	/*
 	 * Check our small startup cache to see if it has pages remaining.
 	 */
-	mtx_lock(&uma_boot_pages_mtx);
-	if (pages <= boot_pages) {
+	pages = howmany(bytes, PAGE_SIZE);
+	KASSERT(pages > 0, ("%s can't reserve 0 pages", __func__));
+	if (pages > boot_pages)
+		panic("UMA zone \"%s\": Increase vm.boot_pages", zone->uz_name);
+#ifdef DIAGNOSTIC
+	printf("%s from \"%s\", %d boot pages left\n", __func__, zone->uz_name,
+	    boot_pages);
+#endif
 #ifdef UMA_SUPERPAGE_SLAB
-		/* Align bootmem to slab size */
-		mem = roundup2(bootmem, UMA_SLAB_SIZE);
-		boot_pages -= ((caddr_t)mem - bootmem) / PAGE_SIZE;
+	/* Align bootmem to slab size */
+	mem = roundup2(bootmem, UMA_SLAB_SIZE);
+	boot_pages -= ((caddr_t)mem - bootmem) / PAGE_SIZE;
 #else
-		mem = bootmem;
+	mem = bootmem;
 #endif
-		boot_pages -= pages;
-		bootmem += pages * PAGE_SIZE;
-		mtx_unlock(&uma_boot_pages_mtx);
-		*pflag = UMA_SLAB_BOOT;
-		/*
-		 * XXX-AM: we should set bounds on the allocated slab.
-		 * This however breaks attempts to get back the slab pointer
-		 * from the item in zone_release and uma_dbg_getslab.
-		 */
-		/* return (cheri_bound(mem, bytes)); */
-		return (mem);
-	}
-	mtx_unlock(&uma_boot_pages_mtx);
-	if (booted < UMA_STARTUP2)
-		panic("UMA: Increase vm.boot_pages");
+	boot_pages -= pages;
+	bootmem += pages * PAGE_SIZE;
+	*pflag = UMA_SLAB_BOOT;
+
 	/*
-	 * Now that we've booted reset these users to their real allocator.
+	 * XXX-AM: we should set bounds on the allocated slab.
+	 * This however breaks attempts to get back the slab pointer
+	 * from the item in zone_release and uma_dbg_getslab.
 	 */
-#ifdef UMA_MD_SMALL_ALLOC
-	/* keg->uk_allocf = (keg->uk_ppera >
-	   (1 << (UMA_SLAB_SHIFT - PAGE_SHIFT))) ? */
-	/*	page_alloc : uma_small_alloc; */
-	keg->uk_allocf = (keg->uk_ppera > 1) ? page_alloc : uma_small_alloc;
-#else
-	keg->uk_allocf = page_alloc;
-#endif
-	return keg->uk_allocf(zone, bytes, domain, pflag, wait);
+	/* return (cheri_bound(mem, bytes)); */
+	return (mem);
 }
 
 /*
@@ -1215,9 +1230,9 @@ page_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 	 * We use page_alloc for multi-item slabs, so make sure
 	 * that we align the allocation.
 	 */
-	uma_keg_t keg;
+	/* uma_keg_t keg; */
 
-	keg = zone_first_keg(zone);
+	/* keg = zone_first_keg(zone); */
 	/* if (keg->uk_ipers > 1) */
 	p = (void *) kmem_malloc_domain_aligned(domain, bytes,
 	    UMA_SLAB_SIZE, wait);
@@ -1580,7 +1595,7 @@ keg_ctor(void *mem, int size, void *udata, int flags)
 	 * If we haven't booted yet we need allocations to go through the
 	 * startup cache until the vm is ready.
 	 */
-	if (booted < UMA_STARTUP2)
+	if (booted < BOOT_PAGEALLOC)
 		keg->uk_allocf = startup_alloc;
 #ifdef UMA_MD_SMALL_ALLOC
 	else if (keg->uk_ppera == 1)
@@ -1879,24 +1894,79 @@ zone_foreach(void (*zfunc)(uma_zone_t))
 	rw_runlock(&uma_rwlock);
 }
 
-/* Public functions */
-/* See uma.h */
+/*
+ * Count how many pages do we need to bootstrap.  VM supplies
+ * its need in early zones in the argument, we add up our zones,
+ * which consist of: UMA Slabs, UMA Hash and 9 Bucket zones. The
+ * zone of zones and zone of kegs are accounted separately.
+ */
+#define	UMA_BOOT_ZONES	11
+/* Zone of zones and zone of kegs have arbitrary alignment. */
+#define	UMA_BOOT_ALIGN	32
+static int zsize, ksize;
+int
+uma_startup_count(int vm_zones)
+{
+	int zones, pages;
+
+	ksize = sizeof(struct uma_keg) +
+	    (sizeof(struct uma_domain) * vm_ndomains);
+	zsize = sizeof(struct uma_zone) +
+	    (sizeof(struct uma_cache) * (mp_maxid + 1)) +
+	    (sizeof(struct uma_zone_domain) * vm_ndomains);
+
+	/*
+	 * Memory for the zone of kegs and its keg,
+	 * and for zone of zones.
+	 */
+	pages = howmany(roundup(zsize, CACHE_LINE_SIZE) * 2 +
+	    roundup(ksize, CACHE_LINE_SIZE), PAGE_SIZE);
+
+#ifdef	UMA_MD_SMALL_ALLOC
+	zones = UMA_BOOT_ZONES;
+#else
+	zones = UMA_BOOT_ZONES + vm_zones;
+	vm_zones = 0;
+#endif
+
+	/* Memory for the rest of startup zones, UMA and VM, ... */
+	if (zsize > UMA_SLAB_SIZE)
+		pages += (zones + vm_zones) *
+		    howmany(roundup2(zsize, UMA_BOOT_ALIGN), UMA_SLAB_SIZE);
+	else
+		pages += howmany(zones,
+		    UMA_SLAB_SPACE / roundup2(zsize, UMA_BOOT_ALIGN));
+
+	/* ... and their kegs. Note that zone of zones allocates a keg! */
+	pages += howmany(zones + 1,
+	    UMA_SLAB_SPACE / roundup2(ksize, UMA_BOOT_ALIGN));
+
+	/*
+	 * Most of startup zones are not going to be offpages, that's
+	 * why we use UMA_SLAB_SPACE instead of UMA_SLAB_SIZE in all
+	 * calculations.  Some large bucket zones will be offpage, and
+	 * thus will allocate hashes.  We take conservative approach
+	 * and assume that all zones may allocate hash.  This may give
+	 * us some positive inaccuracy, usually an extra single page.
+	 */
+	pages += howmany(zones, UMA_SLAB_SPACE /
+	    (sizeof(struct slabhead *) * UMA_HASH_SIZE_INIT));
+
+	return (pages);
+}
+
 void
 uma_startup(void *mem, int npages)
 {
 	struct uma_zctor_args args;
 	uma_keg_t masterkeg;
 	uintptr_t m;
-	int zsize;
-	int ksize;
+
+#ifdef DIAGNOSTIC
+	printf("Entering %s with %d boot pages configured\n", __func__, npages);
+#endif
 
 	rw_init(&uma_rwlock, "UMA lock");
-
-	ksize = sizeof(struct uma_keg) +
-	    (sizeof(struct uma_domain) * vm_ndomains);
-	zsize = sizeof(struct uma_zone) +
-	    (sizeof(struct uma_cache) * mp_ncpus) +
-	    (sizeof(struct uma_zone_domain) * vm_ndomains);
 
 	/* Use bootpages memory for the zone of zones and zone of kegs. */
 	m = (uintptr_t)mem;
@@ -1919,24 +1989,21 @@ uma_startup(void *mem, int npages)
 	args.uminit = zero_init;
 	args.fini = NULL;
 	args.keg = masterkeg;
-	args.align = 32 - 1;
+	args.align = UMA_BOOT_ALIGN - 1;
 	args.flags = UMA_ZFLAG_INTERNAL;
 	zone_ctor(kegs, zsize, &args, M_WAITOK);
 
-	mtx_init(&uma_boot_pages_mtx, "UMA boot pages", NULL, MTX_DEF);
 	bootmem = mem;
 	boot_pages = npages;
 
 	args.name = "UMA Zones";
-	args.size = sizeof(struct uma_zone) +
-	    (sizeof(struct uma_cache) * (mp_maxid + 1)) +
-	    (sizeof(struct uma_zone_domain) * vm_ndomains);
+	args.size = zsize;
 	args.ctor = zone_ctor;
 	args.dtor = zone_dtor;
 	args.uminit = zero_init;
 	args.fini = NULL;
 	args.keg = NULL;
-	args.align = 32 - 1;
+	args.align = UMA_BOOT_ALIGN - 1;
 	args.flags = UMA_ZFLAG_INTERNAL;
 	zone_ctor(zones, zsize, &args, M_WAITOK);
 
@@ -1953,27 +2020,40 @@ uma_startup(void *mem, int npages)
 
 	bucket_init();
 
-	booted = UMA_STARTUP;
+	booted = BOOT_STRAPPED;
 }
 
-/* see uma.h */
+void
+uma_startup1(void)
+{
+
+#ifdef DIAGNOSTIC
+	printf("Entering %s with %d boot pages left\n", __func__, boot_pages);
+#endif
+	booted = BOOT_PAGEALLOC;
+}
+
 void
 uma_startup2(void)
 {
-	booted = UMA_STARTUP2;
-	bucket_enable();
+
+#ifdef DIAGNOSTIC
+	printf("Entering %s with %d boot pages left\n", __func__, boot_pages);
+#endif
+	booted = BOOT_BUCKETS;
 	sx_init(&uma_drain_lock, "umadrain");
+	bucket_enable();
 }
 
 /*
  * Initialize our callout handle
  *
  */
-
 static void
 uma_startup3(void)
 {
 
+	booted = BOOT_RUNNING;
 	callout_init(&uma_callout, 1);
 	callout_reset(&uma_callout, UMA_TIMEOUT * hz, uma_timeout, NULL);
 }
@@ -1993,6 +2073,7 @@ uma_kcreate(uma_zone_t zone, size_t size, uma_init uminit, uma_fini fini,
 	return (zone_alloc_item(kegs, &args, UMA_ANYDOMAIN, M_WAITOK));
 }
 
+/* Public functions */
 /* See uma.h */
 void
 uma_set_align(int align)
@@ -2041,7 +2122,7 @@ uma_zcreate(const char *name, size_t size, uma_ctor ctor, uma_dtor dtor,
 	args.flags = flags;
 	args.keg = NULL;
 
-	if (booted < UMA_STARTUP2) {
+	if (booted < BOOT_BUCKETS) {
 		locked = false;
 	} else {
 		sx_slock(&uma_drain_lock);
@@ -2075,7 +2156,7 @@ uma_zsecond_create(char *name, uma_ctor ctor, uma_dtor dtor,
 	args.flags = keg->uk_flags | UMA_ZONE_SECONDARY;
 	args.keg = keg;
 
-	if (booted < UMA_STARTUP2) {
+	if (booted < BOOT_BUCKETS) {
 		locked = false;
 	} else {
 		sx_slock(&uma_drain_lock);
@@ -3508,7 +3589,7 @@ uma_zone_exhausted(uma_zone_t zone)
 	ZONE_LOCK(zone);
 	full = (zone->uz_flags & UMA_ZFLAG_FULL);
 	ZONE_UNLOCK(zone);
-	return (full);	
+	return (full);
 }
 
 int

@@ -251,7 +251,7 @@ char *argv[];
     int displays = 0;		/* indicates unspecified */
     int sel_ret = 0;
     time_t curr_time;
-    char *(*get_userid)() = username;
+    char *(*get_userid)(int) = username;
     char *uname_field = "USERNAME";
     char *header_text;
     char *env_top;
@@ -698,7 +698,7 @@ restart:
 
     while ((displays == -1) || (displays-- > 0))
     {
-	int (*compare)();
+	int (*compare)(const void *, const void *);
 
 	    
 	/* get the current stats */

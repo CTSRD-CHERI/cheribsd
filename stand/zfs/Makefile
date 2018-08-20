@@ -3,7 +3,6 @@
 .include <bsd.init.mk>
 
 LIB=		zfsboot
-INTERNALLIB=
 
 .PATH:		${ZFSSRC}
 SRCS+=		zfs.c skein.c skein_block.c
@@ -18,5 +17,4 @@ CFLAGS+=	-I${SYSDIR}/crypto/skein
 
 CFLAGS+=	-Wformat -Wall
 
-.include <bsd.stand.mk>
 .include <bsd.lib.mk>

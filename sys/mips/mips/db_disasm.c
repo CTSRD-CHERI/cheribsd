@@ -405,6 +405,10 @@ md_printins(int ins, int mdbdot)
 		break;
 
 #ifdef CPU_CHERI
+	case OP_JALX:
+		db_printf("clcbi\t%s, %d(%s)", c2_reg[i.IType.rt],
+			(short)i.IType.imm * 16, c2_reg[i.IType.rs]);
+		break;
 	case OP_COP2: {
 		int ops = -1;
 		const char *opcode = NULL;

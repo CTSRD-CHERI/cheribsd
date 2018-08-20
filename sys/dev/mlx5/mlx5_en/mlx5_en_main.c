@@ -2650,7 +2650,7 @@ mlx5e_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		return (ENXIO);
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		ifr = (struct ifreq *)data;
 
 		PRIV_LOCK(priv);
@@ -2676,7 +2676,7 @@ mlx5e_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		PRIV_UNLOCK(priv);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		if ((ifp->if_flags & IFF_UP) &&
 		    (ifp->if_drv_flags & IFF_DRV_RUNNING)) {
 			mlx5e_set_rx_mode(ifp);
@@ -2702,17 +2702,17 @@ mlx5e_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		PRIV_UNLOCK(priv);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		mlx5e_set_rx_mode(ifp);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 	case SIOCGIFXMEDIA:
 		ifr = (struct ifreq *)data;
 		error = ifmedia_ioctl(ifp, ifr, &priv->media, command);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		ifr = (struct ifreq *)data;
 		PRIV_LOCK(priv);
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
@@ -2812,7 +2812,7 @@ out:
 		PRIV_UNLOCK(priv);
 		break;
 
-	CASE_IOC_IFREQ(SIOCGI2C):
+	case CASE_IOC_IFREQ(SIOCGI2C):
 		ifr = (struct ifreq *)data;
 
 		/*

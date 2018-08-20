@@ -611,9 +611,9 @@ tapifioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int			 dummy, error = 0;
 
 	switch (cmd) {
-		CASE_IOC_IFREQ(SIOCSIFFLAGS): /* XXX -- just like vmnet does */
-		CASE_IOC_IFREQ(SIOCADDMULTI):
-		CASE_IOC_IFREQ(SIOCDELMULTI):
+		case CASE_IOC_IFREQ(SIOCSIFFLAGS): /* XXX -- just like vmnet does */
+		case CASE_IOC_IFREQ(SIOCADDMULTI):
+		case CASE_IOC_IFREQ(SIOCDELMULTI):
 			break;
 
 		case SIOCGIFMEDIA:
@@ -632,7 +632,7 @@ tapifioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			}
 			break;
 
-		CASE_IOC_IFREQ(SIOCSIFMTU):
+		case CASE_IOC_IFREQ(SIOCSIFMTU):
 			ifp->if_mtu = ifr_mtu_get(ifr);
 			break;
 
@@ -764,7 +764,7 @@ tapioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *td
 			*(int *)data = tapdebug;
 			break;
 
-		CASE_IOC_IFREQ(TAPGIFNAME): {
+		case CASE_IOC_IFREQ(TAPGIFNAME): {
 			struct ifreq	*ifr = (struct ifreq *) data;
 
 			strlcpy(ifr->ifr_name, ifp->if_xname, IFNAMSIZ);
@@ -832,13 +832,13 @@ tapioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *td
 			mtx_unlock(&tp->tap_mtx);
 			break;
 
-		CASE_IOC_IFREQ(SIOCGIFADDR):	/* get MAC address of the remote side */
+		case CASE_IOC_IFREQ(SIOCGIFADDR):	/* get MAC address of the remote side */
 			mtx_lock(&tp->tap_mtx);
 			bcopy(tp->ether_addr, data, sizeof(tp->ether_addr));
 			mtx_unlock(&tp->tap_mtx);
 			break;
 
-		CASE_IOC_IFREQ(SIOCSIFADDR):	/* set MAC address of the remote side */
+		case CASE_IOC_IFREQ(SIOCSIFADDR):	/* set MAC address of the remote side */
 			mtx_lock(&tp->tap_mtx);
 			bcopy(data, tp->ether_addr, sizeof(tp->ether_addr));
 			mtx_unlock(&tp->tap_mtx);

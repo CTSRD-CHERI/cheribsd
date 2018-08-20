@@ -321,8 +321,7 @@ kern_getgroups(struct thread *td, u_int gidsetsize, gid_t * __capability gidset)
 	if (gidsetsize < ngrp)
 		return (EINVAL);
 
-	error = copyout_c((__cheri_tocap gid_t * __capability)cred->cr_groups,
-	    gidset, ngrp * sizeof(gid_t));
+	error = copyout_c(cred->cr_groups, gidset, ngrp * sizeof(gid_t));
 out:
 	td->td_retval[0] = ngrp;
 	return (error);
@@ -1188,17 +1187,12 @@ kern_getresuid(struct thread *td, uid_t * __capability ruid,
 
 	cred = td->td_ucred;
 	if (ruid)
-		error1 = copyout_c(
-		    (__cheri_tocap uid_t * __capability)&cred->cr_ruid,
-		    ruid, sizeof(cred->cr_ruid));
+		error1 = copyout_c(&cred->cr_ruid, ruid, sizeof(cred->cr_ruid));
 	if (euid)
-		error2 = copyout_c(
-		    (__cheri_tocap uid_t * __capability)&cred->cr_uid,
-		    euid, sizeof(cred->cr_uid));
+		error2 = copyout_c(&cred->cr_uid, euid, sizeof(cred->cr_uid));
 	if (suid)
-		error3 = copyout_c(
-		    (__cheri_tocap uid_t * __capability)&cred->cr_svuid,
-		    suid, sizeof(cred->cr_svuid));
+		error3 = copyout_c(&cred->cr_svuid, suid,
+		    sizeof(cred->cr_svuid));
 	return (error1 ? error1 : error2 ? error2 : error3);
 }
 
@@ -1227,17 +1221,13 @@ kern_getresgid(struct thread *td, gid_t * __capability rgid,
 
 	cred = td->td_ucred;
 	if (rgid)
-		error1 = copyout_c(
-		    (__cheri_tocap gid_t * __capability)&cred->cr_rgid,
-		    rgid, sizeof(cred->cr_rgid));
+		error1 = copyout_c(&cred->cr_rgid, rgid, sizeof(cred->cr_rgid));
 	if (egid)
-		error2 = copyout_c(
-		    (__cheri_tocap gid_t * __capability)&cred->cr_groups[0],
-		    egid, sizeof(cred->cr_groups[0]));
+		error2 = copyout_c( &cred->cr_groups[0], egid,
+		    sizeof(cred->cr_groups[0]));
 	if (sgid)
-		error3 = copyout_c(
-		    (__cheri_tocap gid_t * __capability)&cred->cr_svgid,
-		    sgid, sizeof(cred->cr_svgid));
+		error3 = copyout_c(&cred->cr_svgid, sgid,
+		    sizeof(cred->cr_svgid));
 	return (error1 ? error1 : error2 ? error2 : error3);
 }
 
@@ -2179,7 +2169,7 @@ kern_setlogin(struct thread *td, const char * __capability namebuf)
 	error = priv_check(td, PRIV_PROC_SETLOGIN);
 	if (error)
 		return (error);
-	error = copyinstr_c(namebuf, &logintmp[0], sizeof(logintmp), NULL);
+	error = copyinstr_c(namebuf, logintmp, sizeof(logintmp), NULL);
 	if (error != 0) {
 		if (error == ENAMETOOLONG)
 			error = EINVAL;

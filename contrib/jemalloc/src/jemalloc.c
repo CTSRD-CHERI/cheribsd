@@ -210,7 +210,9 @@ typedef struct {
 #else
 #define	BOUND_PTR(ptr, size)	\
     ((opt_cheri_setbounds && ptr != NULL) ? \
-    cheri_csetbounds((ptr), (size)) : (ptr))
+    cheri_andperm(cheri_csetbounds((ptr), (size)), \
+	CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_CHERIABI_VMMAP) : \
+    (ptr))
 #endif
 
 /* Whether encountered any invalid config options. */
@@ -1986,8 +1988,9 @@ imalloc(static_opts_t *sopts, dynamic_opts_t *dopts) {
 		sopts->slow = true;
 		ret = imalloc_body(sopts, dopts, tsd);
 	}
-	*dopts->result = BOUND_PTR(*dopts->result,
-	    dopts->num_items * dopts->item_size);
+	if (ret == 0)
+		*dopts->result = BOUND_PTR(*dopts->result,
+		    dopts->num_items * dopts->item_size);
 	return ret;
 }
 /******************************************************************************/

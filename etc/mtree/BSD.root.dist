@@ -14,11 +14,13 @@
         ..
         firmware
         ..
+        lua
+        ..
         kernel
         ..
         modules
         ..
-        overlays
+        overlays              tags=package=runtime
         ..
         zfs
         ..

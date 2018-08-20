@@ -382,6 +382,8 @@ static int		mmu_booke_change_attr(mmu_t mmu, vm_offset_t addr,
     vm_size_t sz, vm_memattr_t mode);
 static int		mmu_booke_map_user_ptr(mmu_t mmu, pmap_t pm,
     volatile const void *uaddr, void **kaddr, size_t ulen, size_t *klen);
+static int		mmu_booke_decode_kernel_ptr(mmu_t mmu, vm_offset_t addr,
+    int *is_user, vm_offset_t *decoded_addr);
 
 
 static mmu_method_t mmu_booke_methods[] = {
@@ -436,6 +438,7 @@ static mmu_method_t mmu_booke_methods[] = {
 	MMUMETHOD(mmu_unmapdev,		mmu_booke_unmapdev),
 	MMUMETHOD(mmu_change_attr,	mmu_booke_change_attr),
 	MMUMETHOD(mmu_map_user_ptr,	mmu_booke_map_user_ptr),
+	MMUMETHOD(mmu_decode_kernel_ptr, mmu_booke_decode_kernel_ptr),
 
 	/* dumpsys() support */
 	MMUMETHOD(mmu_dumpsys_map,	mmu_booke_dumpsys_map),
@@ -678,7 +681,7 @@ pdir_free(mmu_t mmu, pmap_t pmap, unsigned int pp2d_idx)
 		pa = pte_vatopa(mmu, kernel_pmap, va);
 		m = PHYS_TO_VM_PAGE(pa);
 		vm_page_free_zero(m);
-		atomic_subtract_int(&vm_cnt.v_wire_count, 1);
+		vm_wire_sub(1);
 		pmap_kremove(va);
 	}
 
@@ -783,7 +786,7 @@ ptbl_alloc(mmu_t mmu, pmap_t pmap, pte_t ** pdir, unsigned int pdir_idx,
 				ptbl_free_pmap_ptbl(pmap, ptbl);
 				for (j = 0; j < i; j++)
 					vm_page_free(mtbl[j]);
-				atomic_subtract_int(&vm_cnt.v_wire_count, i);
+				vm_wire_sub(i);
 				return (NULL);
 			}
 			VM_WAIT;
@@ -825,7 +828,7 @@ ptbl_free(mmu_t mmu, pmap_t pmap, pte_t ** pdir, unsigned int pdir_idx)
 		pa = pte_vatopa(mmu, kernel_pmap, va);
 		m = PHYS_TO_VM_PAGE(pa);
 		vm_page_free_zero(m);
-		atomic_subtract_int(&vm_cnt.v_wire_count, 1);
+		vm_wire_sub(1);
 		pmap_kremove(va);
 	}
 
@@ -1027,7 +1030,7 @@ ptbl_alloc(mmu_t mmu, pmap_t pmap, unsigned int pdir_idx, boolean_t nosleep)
 				ptbl_free_pmap_ptbl(pmap, ptbl);
 				for (j = 0; j < i; j++)
 					vm_page_free(mtbl[j]);
-				atomic_subtract_int(&vm_cnt.v_wire_count, i);
+				vm_wire_sub(i);
 				return (NULL);
 			}
 			VM_WAIT;
@@ -1088,7 +1091,7 @@ ptbl_free(mmu_t mmu, pmap_t pmap, unsigned int pdir_idx)
 		pa = pte_vatopa(mmu, kernel_pmap, va);
 		m = PHYS_TO_VM_PAGE(pa);
 		vm_page_free_zero(m);
-		atomic_subtract_int(&vm_cnt.v_wire_count, 1);
+		vm_wire_sub(1);
 		mmu_booke_kremove(mmu, va);
 	}
 
@@ -1187,7 +1190,7 @@ pv_alloc(void)
 
 	pv_entry_count++;
 	if (pv_entry_count > pv_entry_high_water)
-		pagedaemon_wakeup();
+		pagedaemon_wakeup(0); /* XXX powerpc NUMA */
 	pv = uma_zalloc(pvzone, M_NOWAIT);
 
 	return (pv);
@@ -2288,6 +2291,25 @@ mmu_booke_map_user_ptr(mmu_t mmu, pmap_t pm, volatile const void *uaddr,
 	if (klen)
 		*klen = ulen;
 
+	return (0);
+}
+
+/*
+ * Figure out where a given kernel pointer (usually in a fault) points
+ * to from the VM's perspective, potentially remapping into userland's
+ * address space.
+ */
+static int
+mmu_booke_decode_kernel_ptr(mmu_t mmu, vm_offset_t addr, int *is_user,
+    vm_offset_t *decoded_addr)
+{
+
+	if (addr < VM_MAXUSER_ADDRESS)
+		*is_user = 1;
+	else
+		*is_user = 0;
+
+	*decoded_addr = addr;
 	return (0);
 }
 

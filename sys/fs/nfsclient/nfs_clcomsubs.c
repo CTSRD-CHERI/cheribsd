@@ -314,7 +314,6 @@ nfsm_uiombuf(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 				NFSMTOD(mp, caddr_t) + mbuf_len(mp), xfer);
 			else
 			    copyin_c(CAST_USER_ADDR_T(uiocp),
-				(__cheri_tocap char * __capability)
 				NFSMTOD(mp, caddr_t) + mbuf_len(mp), xfer);
 			mbuf_setlen(mp, mbuf_len(mp) + xfer);
 			left -= xfer;
@@ -391,8 +390,7 @@ nfsm_uiombuflist(struct uio *uiop, int siz, struct mbuf **mbp, char **cpp)
 				    NFSMTOD(mp, caddr_t) + mbuf_len(mp), xfer);
 			else
 				copyin_c(uiocp,
-				    (__cheri_tocap char * __capability)NFSMTOD(mp, caddr_t) +
-				    mbuf_len(mp), xfer);
+				    NFSMTOD(mp, caddr_t) + mbuf_len(mp), xfer);
 			mbuf_setlen(mp, mbuf_len(mp) + xfer);
 			left -= xfer;
 			uiocp += xfer;
@@ -494,7 +492,7 @@ nfscl_getcookie(struct nfsnode *np, off_t off, int add)
 	dp = LIST_FIRST(&np->n_cookies);
 	if (!dp) {
 		if (add) {
-			MALLOC(dp, struct nfsdmap *, sizeof (struct nfsdmap),
+			dp = malloc(sizeof (struct nfsdmap),
 				M_NFSDIROFF, M_WAITOK);
 			dp->ndm_eocookie = 0;
 			LIST_INSERT_HEAD(&np->n_cookies, dp, ndm_list);
@@ -509,7 +507,7 @@ nfscl_getcookie(struct nfsnode *np, off_t off, int add)
 				return (NULL);
 			dp = LIST_NEXT(dp, ndm_list);
 		} else if (add) {
-			MALLOC(dp2, struct nfsdmap *, sizeof (struct nfsdmap),
+			dp2 = malloc(sizeof (struct nfsdmap),
 				M_NFSDIROFF, M_WAITOK);
 			dp2->ndm_eocookie = 0;
 			LIST_INSERT_AFTER(dp, dp2, ndm_list);

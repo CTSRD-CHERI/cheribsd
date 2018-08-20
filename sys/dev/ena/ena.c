@@ -2367,7 +2367,7 @@ ena_ioctl(if_t ifp, u_long command, caddr_t data)
 	 */
 	rc = 0;
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		sx_xlock(&adapter->ioctl_sx);
 		ena_down(adapter);
 
@@ -2377,7 +2377,7 @@ ena_ioctl(if_t ifp, u_long command, caddr_t data)
 		sx_unlock(&adapter->ioctl_sx);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0) {
 				if ((ifp->if_flags & (IFF_PROMISC |
@@ -2399,16 +2399,16 @@ ena_ioctl(if_t ifp, u_long command, caddr_t data)
 		}
 		break;
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		rc = ifmedia_ioctl(ifp, ifr, &adapter->media, command);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		{
 			int reinit = 0;
 

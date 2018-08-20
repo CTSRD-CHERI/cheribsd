@@ -198,6 +198,7 @@ static char *ld_preload;	/* Environment variable for libraries to
 static char *ld_elf_hints_path;	/* Environment variable for alternative hints path */
 static char *ld_tracing;	/* Called from ldd to print libs */
 static char *ld_utrace;		/* Use utrace() to log events. */
+static bool ld_skip_init_funcs = false;	/* XXXAR: debug environment variable to verify relocation processing */
 static struct obj_entry_q obj_list;	/* Queue of all loaded objects */
 static Obj_Entry *obj_main;	/* The main program shared object */
 static Obj_Entry obj_rtld;	/* The dynamic linker shared object */
@@ -520,6 +521,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	    unsetenv(_LD("LIBRARY_PATH")) || unsetenv(_LD("LIBRARY_PATH_FDS")) ||
 	    unsetenv(_LD("LIBMAP_DISABLE")) || unsetenv(_LD("BIND_NOT")) ||
 	    unsetenv(_LD("DEBUG")) || unsetenv(_LD("ELF_HINTS_PATH")) ||
+	    unsetenv(_LD("SKIP_INIT_FUNCS")) ||
 	    unsetenv(_LD("LOADFLTR")) || unsetenv(_LD("LIBRARY_PATH_RPATH"))) {
 		_rtld_error("environment corrupt; aborting");
 		rtld_die();
@@ -536,6 +538,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     ld_elf_hints_path = getenv(_LD("ELF_HINTS_PATH"));
     ld_loadfltr = getenv(_LD("LOADFLTR")) != NULL;
     library_path_rpath = getenv(_LD("LIBRARY_PATH_RPATH"));
+    ld_skip_init_funcs = getenv(_LD("SKIP_INIT_FUNCS")) != NULL;
     if (library_path_rpath != NULL) {
 	    if (library_path_rpath[0] == 'y' ||
 		library_path_rpath[0] == 'Y' ||
@@ -754,6 +757,12 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	obj_main->preinit_array = obj_main->init_array =
 	    obj_main->fini_array = (Elf_Addr)NULL;
     }
+
+    /*
+     * Execute MD initializers required before we call the objects'
+     * init functions.
+     */
+    pre_init();
 
     wlock_acquire(rtld_bind_lock, &lockstate);
     if (obj_main->crt_no_init)
@@ -2527,7 +2536,7 @@ preinit_main(void)
     int index;
 
     preinit_addr = (Elf_Addr *)obj_main->preinit_array;
-    if (preinit_addr == NULL)
+    if (preinit_addr == NULL || ld_skip_init_funcs)
 	return;
 
     for (index = 0; index < obj_main->preinit_array_num; index++) {
@@ -2649,7 +2658,7 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
      */
     saved_msg = errmsg_save();
     STAILQ_FOREACH(elm, list, link) {
-	if (elm->obj->init_done) /* Initialized early. */
+	if (elm->obj->init_done || ld_skip_init_funcs) /* Initialized early. */
 	    continue;
 	/*
 	 * Race: other thread might try to use this object before current
@@ -4710,47 +4719,95 @@ tls_get_addr_common(Elf_Addr **dtvp, int index, size_t offset)
     defined(__powerpc__) || defined(__riscv)
 
 /*
+ * Return pointer to allocated TLS block
+ */
+static void *
+get_tls_block_ptr(void *tcb, size_t tcbsize)
+{
+    size_t extra_size, post_size, pre_size, tls_block_size;
+    size_t tls_init_align;
+
+    tls_init_align = MAX(obj_main->tlsalign, 1);
+
+    /* Compute fragments sizes. */
+    extra_size = tcbsize - TLS_TCB_SIZE;
+#if defined(__aarch64__) || defined(__arm__)
+    post_size =  roundup2(TLS_TCB_SIZE, tls_init_align) - TLS_TCB_SIZE;
+#else
+    post_size = 0;
+#endif
+    tls_block_size = tcbsize + post_size;
+    pre_size = roundup2(tls_block_size, tls_init_align) - tls_block_size;
+
+    return ((char *)tcb - pre_size - extra_size);
+}
+
+/*
  * Allocate Static TLS using the Variant I method.
+ *
+ * For details on the layout, see lib/libc/gen/tls.c.
+ *
+ * NB: rtld's tls_static_space variable includes TLS_TCB_SIZE and post_size as
+ *     it is based on tls_last_offset, and TLS offsets here are really TCB
+ *     offsets, whereas libc's tls_static_space is just the executable's static
+ *     TLS segment.
  */
 void *
 allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign)
 {
     Obj_Entry *obj;
-    char *tcb;
-    Elf_Addr **tls;
-    Elf_Addr *dtv;
+    char *tls_block;
+    Elf_Addr *dtv, **tcb;
     Elf_Addr addr;
     int i;
+    size_t extra_size, maxalign, post_size, pre_size, tls_block_size;
+    size_t tls_init_align;
 
     if (oldtcb != NULL && tcbsize == TLS_TCB_SIZE)
 	return (oldtcb);
 
     assert(tcbsize >= TLS_TCB_SIZE);
-    tcb = xcalloc(1, tls_static_space - TLS_TCB_SIZE + tcbsize);
-    tls = (Elf_Addr **)(tcb + tcbsize - TLS_TCB_SIZE);
+    maxalign = MAX(tcbalign, tls_static_max_align);
+    tls_init_align = MAX(obj_main->tlsalign, 1);
+
+    /* Compute fragmets sizes. */
+    extra_size = tcbsize - TLS_TCB_SIZE;
+#if defined(__aarch64__) || defined(__arm__)
+    post_size = roundup2(TLS_TCB_SIZE, tls_init_align) - TLS_TCB_SIZE;
+#else
+    post_size = 0;
+#endif
+    tls_block_size = tcbsize + post_size;
+    pre_size = roundup2(tls_block_size, tls_init_align) - tls_block_size;
+    tls_block_size += pre_size + tls_static_space - TLS_TCB_SIZE - post_size;
+
+    /* Allocate whole TLS block */
+    tls_block = malloc_aligned(tls_block_size, maxalign);
+    tcb = (Elf_Addr **)(tls_block + pre_size + extra_size);
 
     if (oldtcb != NULL) {
-	memcpy(tls, oldtcb, tls_static_space);
-	free(oldtcb);
+	memcpy(tls_block, get_tls_block_ptr(oldtcb, tcbsize),
+	    tls_static_space);
+	free_aligned(get_tls_block_ptr(oldtcb, tcbsize));
 
 	/* Adjust the DTV. */
-	dtv = tls[0];
+	dtv = tcb[0];
 	for (i = 0; i < dtv[1]; i++) {
 	    if (dtv[i+2] >= (Elf_Addr)oldtcb &&
 		dtv[i+2] < (Elf_Addr)oldtcb + tls_static_space) {
-		dtv[i+2] = dtv[i+2] - (Elf_Addr)oldtcb + (Elf_Addr)tls;
+		dtv[i+2] = dtv[i+2] - (Elf_Addr)oldtcb + (Elf_Addr)tcb;
 	    }
 	}
     } else {
 	dtv = xcalloc(tls_max_index + 2, sizeof(Elf_Addr));
-	tls[0] = dtv;
+	tcb[0] = dtv;
 	dtv[0] = tls_dtv_generation;
 	dtv[1] = tls_max_index;
 
 	for (obj = globallist_curr(objs); obj != NULL;
 	  obj = globallist_next(obj)) {
 	    if (obj->tlsoffset > 0) {
-		addr = (Elf_Addr)tls + obj->tlsoffset;
+		addr = (Elf_Addr)tcb + obj->tlsoffset;
 		if (obj->tlsinitsize > 0)
 		    memcpy((void*) addr, obj->tlsinit, obj->tlsinitsize);
 		if (obj->tlssize > obj->tlsinitsize)
@@ -4769,14 +4826,23 @@ free_tls(void *tcb, size_t tcbsize, size_t tcbalign)
 {
     Elf_Addr *dtv;
     Elf_Addr tlsstart, tlsend;
-    int dtvsize, i;
+    size_t post_size;
+    size_t dtvsize, i, tls_init_align;
 
     assert(tcbsize >= TLS_TCB_SIZE);
+    tls_init_align = MAX(obj_main->tlsalign, 1);
 
-    tlsstart = (Elf_Addr)tcb + tcbsize - TLS_TCB_SIZE;
-    tlsend = tlsstart + tls_static_space;
+    /* Compute fragments sizes. */
+#if defined(__aarch64__) || defined(__arm__)
+    post_size =  roundup2(TLS_TCB_SIZE, tls_init_align) - TLS_TCB_SIZE;
+#else
+    post_size = 0;
+#endif
 
-    dtv = *(Elf_Addr **)tlsstart;
+    tlsstart = (Elf_Addr)tcb + TLS_TCB_SIZE + post_size;
+    tlsend = (Elf_Addr)tcb + tls_static_space;
+
+    dtv = *(Elf_Addr **)tcb;
     dtvsize = dtv[1];
     for (i = 0; i < dtvsize; i++) {
 	if (dtv[i+2] && (dtv[i+2] < tlsstart || dtv[i+2] >= tlsend)) {
@@ -4784,7 +4850,7 @@ free_tls(void *tcb, size_t tcbsize, size_t tcbalign)
 	}
     }
     free(dtv);
-    free(tcb);
+    free_aligned(get_tls_block_ptr(tcb, tcbsize));
 }
 
 #endif

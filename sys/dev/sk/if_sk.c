@@ -1101,7 +1101,7 @@ sk_ioctl(ifp, command, data)
 
 	error = 0;
 	switch(command) {
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (ifr_mtu_get(ifr) < ETHERMIN ||
 		    ifr_mtu_get(ifr) > SK_JUMBO_MTU)
 			error = EINVAL;
@@ -1120,7 +1120,7 @@ sk_ioctl(ifp, command, data)
 			}
 		}
 		break;
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		SK_IF_LOCK(sc_if);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -1136,19 +1136,19 @@ sk_ioctl(ifp, command, data)
 		sc_if->sk_if_flags = ifp->if_flags;
 		SK_IF_UNLOCK(sc_if);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		SK_IF_LOCK(sc_if);
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 			sk_rxfilter(sc_if);
 		SK_IF_UNLOCK(sc_if);
 		break;
 	case SIOCGIFMEDIA:
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		mii = device_get_softc(sc_if->sk_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		SK_IF_LOCK(sc_if);
 		if (sc_if->sk_softc->sk_type == SK_GENESIS) {
 			SK_IF_UNLOCK(sc_if);

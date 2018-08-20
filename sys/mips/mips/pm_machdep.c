@@ -63,6 +63,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_extern.h>
 #include <sys/user.h>
 #include <sys/uio.h>
+#include <machine/abi.h>
 #include <machine/cpuinfo.h>
 #include <machine/reg.h>
 #include <machine/md_var.h>
@@ -234,12 +235,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	sf.sf_uc.uc_mcontext.mc_cp2state_len = cp2_len;
 #endif
 	sp -= sizeof(struct sigframe);
-#ifdef CPU_CHERI
-	/* For CHERI, keep the stack pointer capability aligned. */
-	sp &= ~(CHERICAP_SIZE - 1);
-#else
-	sp &= ~(sizeof(__int64_t) - 1);
-#endif
+	sp &= ~(STACK_ALIGN - 1);
 	sfp = (struct sigframe *)sp;
 
 	/* Build the argument list for the signal handler. */
@@ -271,7 +267,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 #ifdef CPU_CHERI
 	cfp = malloc(sizeof(*cfp), M_TEMP, M_WAITOK);
 	cheri_trapframe_to_cheriframe(&td->td_pcb->pcb_regs, cfp);
-	if (copyoutcap_c((__cheri_tocap struct cheri_frame * __capability)cfp,
+	if (copyoutcap_c(cfp,
 	    __USER_CAP((void *)(uintptr_t)sf.sf_uc.uc_mcontext.mc_cp2state,
 	    cp2_len), cp2_len) != 0) {
 		free(cfp, M_TEMP);
@@ -349,6 +345,12 @@ sys_sigreturn(struct thread *td, struct sigreturn_args *uap)
 int
 ptrace_set_pc(struct thread *td, unsigned long addr)
 {
+
+#ifdef CPU_CHERI
+	/* XXX: Use CFromPtr to see if 'addr' fits in PCC. */
+	if (td->td_proc && SV_PROC_FLAG(td->td_proc, SV_CHERI))
+		return (EINVAL);
+#endif
 	td->td_frame->pc = (register_t) addr;
 	return 0;
 }
@@ -390,8 +392,7 @@ ptrace_single_step(struct thread *td)
 
 	/* compute next address after current location */
 	if(curinstr != 0) {
-		va = MipsEmulateBranch(locr0, locr0->pc, locr0->fsr,
-		    (uintptr_t)&curinstr);
+		va = MipsEmulateBranch(locr0, locr0->pc, locr0->fsr, &curinstr);
 	} else {
 		va = locr0->pc + 4;
 	}
@@ -520,9 +521,7 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 		}
 		cfp = malloc(sizeof(*cfp), M_TEMP, M_WAITOK);
 		error = copyincap_c(__USER_CAP((void *)mcp->mc_cp2state,
-		    mcp->mc_cp2state_len),
-		    (__cheri_tocap struct cheri_frame * __capability)cfp,
-		    sizeof(*cfp));
+		    mcp->mc_cp2state_len), cfp, sizeof(*cfp));
 		if (error) {
 			free(cfp, M_TEMP);
 			printf("%s: invalid pointer\n", __func__);
@@ -582,7 +581,7 @@ int
 fill_capregs(struct thread *td, struct capreg *capregs)
 {
 
-	cheri_trapframe_to_cheriframe(&td->td_pcb->pcb_regs,
+	cheri_trapframe_to_cheriframe_strip(&td->td_pcb->pcb_regs,
 	    (struct cheri_frame *)capregs);
 	return (0);
 }
@@ -607,12 +606,7 @@ exec_setregs(struct thread *td, struct image_params *imgp, u_long stack)
 
 	bzero((caddr_t)td->td_frame, sizeof(struct trapframe));
 
-	/*
-	 * The stack pointer has to be aligned to accommodate the largest
-	 * datatype at minimum.  This probably means it should be 16-byte
-	 * aligned, but for now we're 8-byte aligning it.
-	 */
-	td->td_frame->sp = ((register_t) stack) & ~(sizeof(__int64_t) - 1);
+	td->td_frame->sp = ((register_t)stack) & ~(STACK_ALIGN - 1);
 
 	/*
 	 * If we're running o32 or n32 programs but have 64-bit registers,

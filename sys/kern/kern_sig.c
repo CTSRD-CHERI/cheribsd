@@ -308,6 +308,27 @@ siginfo_to_siginfo_native(const _siginfo_t *si,
 }
 
 void
+siginfo_native_to_siginfo(const struct siginfo_native *si_n,
+    _siginfo_t *si)
+{
+
+#if !__has_feature(capabilities)
+	memcpy(si, si_n, sizeof(*si_n));
+#else
+	si->si_signo = si_n->si_signo;
+	si->si_errno = si_n->si_errno;
+	si->si_code = si_n->si_code;
+	si->si_pid = si_n->si_pid;
+	si->si_uid = si_n->si_uid;
+	si->si_status = si_n->si_status;
+	si->si_addr = (__cheri_tocap void * __capability)si_n->si_addr;
+	si->si_value.sival_ptr =
+	    (__cheri_tocap void * __capability)si_n->si_value.sival_ptr;
+	memcpy(&si->_reason, &si_n->_reason, sizeof(si_n->_reason));
+#endif
+}
+
+void
 sigqueue_init(sigqueue_t *list, struct proc *p)
 {
 	SIGEMPTYSET(list->sq_signals);
@@ -3348,7 +3369,8 @@ sysctl_debug_num_cores_check (SYSCTL_HANDLER_ARGS)
 SYSCTL_PROC(_debug, OID_AUTO, ncores, CTLTYPE_INT|CTLFLAG_RW,
 	    0, sizeof(int), sysctl_debug_num_cores_check, "I", "");
 
-#define	GZ_SUFFIX	".gz"
+#define	GZIP_SUFFIX	".gz"
+#define	ZSTD_SUFFIX	".zst"
 
 int compress_user_cores = 0;
 
@@ -3368,7 +3390,9 @@ sysctl_compress_user_cores(SYSCTL_HANDLER_ARGS)
 }
 SYSCTL_PROC(_kern, OID_AUTO, compress_user_cores, CTLTYPE_INT | CTLFLAG_RWTUN,
     0, sizeof(int), sysctl_compress_user_cores, "I",
-    "Enable compression of user corefiles (" __XSTRING(COMPRESS_GZIP) " = gzip)");
+    "Enable compression of user corefiles ("
+    __XSTRING(COMPRESS_GZIP) " = gzip, "
+    __XSTRING(COMPRESS_ZSTD) " = zstd)");
 
 int compress_user_cores_level = 6;
 SYSCTL_INT(_kern, OID_AUTO, compress_user_cores_level, CTLFLAG_RWTUN,
@@ -3421,6 +3445,9 @@ corefile_open(const char *comm, uid_t uid, pid_t pid, struct thread *td,
 	char *hostname, *name;
 	int indexpos, i, error, cmode, flags, oflags;
 
+	static struct timeval lastfail;
+	static int curfail;
+
 	hostname = NULL;
 	format = corefilename;
 	name = malloc(MAXPATHLEN, M_TEMP, M_WAITOK | M_ZERO);
@@ -3472,7 +3499,9 @@ corefile_open(const char *comm, uid_t uid, pid_t pid, struct thread *td,
 	sx_sunlock(&corefilename_lock);
 	free(hostname, M_TEMP);
 	if (compress == COMPRESS_GZIP)
-		sbuf_printf(&sb, GZ_SUFFIX);
+		sbuf_printf(&sb, GZIP_SUFFIX);
+	else if (compress == COMPRESS_ZSTD)
+		sbuf_printf(&sb, ZSTD_SUFFIX);
 	if (sbuf_error(&sb) != 0) {
 		log(LOG_ERR, "pid %ld (%s), uid (%lu): corename is too "
 		    "long\n", (long)pid, comm, (u_long)uid);
@@ -3517,6 +3546,11 @@ corefile_open(const char *comm, uid_t uid, pid_t pid, struct thread *td,
 	error = vn_open_cred(&nd, &flags, cmode, oflags, td->td_ucred, NULL);
 out:
 	if (error) {
+		if (ppsratecheck(&lastfail, &curfail, 1)) {
+			log(LOG_ERR, "pid %d (%s), uid (%u): Failed to open "
+			    "coredump file '%s', error=%d\n", pid, comm, uid,
+			    name, error);
+		}
 #ifdef AUDIT
 		audit_proc_coredump(td, name, error);
 #endif

@@ -59,6 +59,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 #include <sys/taskqueue.h>
 #include <sys/vmem.h>
+#include <sys/vmmeter.h>
 
 #include "opt_vm.h"
 
@@ -73,6 +74,11 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_page.h>
 #include <vm/vm_pageout.h>
 #include <vm/cheri.h>
+#include <vm/vm_phys.h>
+#include <vm/vm_pagequeue.h>
+#include <vm/uma_int.h>
+
+int	vmem_startup_count(void);
 
 #define	VMEM_OPTORDER		5
 #define	VMEM_OPTVALUE		(1 << VMEM_OPTORDER)
@@ -649,7 +655,7 @@ vmem_bt_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 		 * possible due to M_USE_RESERVE page allocation.
 		 */
 		if (wait & M_WAITOK)
-			VM_WAIT;
+			vm_wait_domain(domain);
 		return (NULL);
 	}
 	mtx_unlock(&vmem_bt_lock);
@@ -660,6 +666,17 @@ vmem_bt_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 		pause("btalloc", 1);
 
 	return (NULL);
+}
+
+/*
+ * How many pages do we need to startup_alloc.
+ */
+int
+vmem_startup_count(void)
+{
+
+	return (howmany(BT_MAXALLOC,
+	    UMA_SLAB_SPACE / sizeof(struct vmem_btag)));
 }
 #endif
 
@@ -700,7 +717,7 @@ vmem_rehash(vmem_t *vm, vmem_size_t newhashsize)
 
 	MPASS(newhashsize > 0);
 
-	newhashlist = mallocarray(newhashsize, sizeof(struct vmem_hashlist),
+	newhashlist = malloc(sizeof(struct vmem_hashlist) * newhashsize,
 	    M_VMEM, M_NOWAIT);
 	if (newhashlist == NULL)
 		return ENOMEM;

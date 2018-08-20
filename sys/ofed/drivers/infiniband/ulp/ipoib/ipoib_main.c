@@ -290,7 +290,7 @@ ipoib_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		return (ENXIO);
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		if (ifp->if_flags & IFF_UP) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
 				error = -ipoib_open(priv);
@@ -298,12 +298,12 @@ ipoib_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 				ipoib_stop(priv);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 			queue_work(ipoib_workqueue, &priv->restart_task);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFADDR):
+	case CASE_IOC_IFREQ(SIOCSIFADDR):
 		ifp->if_flags |= IFF_UP;
 
 		switch (ifa->ifa_addr->sa_family) {
@@ -319,11 +319,11 @@ ipoib_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		break;
 
-	CASE_IOC_IFREQ(SIOCGIFADDR):
+	case CASE_IOC_IFREQ(SIOCGIFADDR):
 		bcopy(IF_LLADDR(ifp), ifr_addr_get_data(ifr), INFINIBAND_ALEN);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		/*
 		 * Set the interface MTU.
 		 */

@@ -208,7 +208,7 @@ static int
 reap_getpids(struct thread *td, struct proc *p, struct procctl_reaper_pids_c *rp)
 {
 	struct proc *reap, *p2;
-	struct procctl_reaper_pidinfo * __capability pi;
+	struct procctl_reaper_pidinfo *pi;
 	u_int i, n;
 	int error;
 
@@ -222,7 +222,7 @@ reap_getpids(struct thread *td, struct proc *p, struct procctl_reaper_pids_c *rp
 	sx_unlock(&proctree_lock);
 	if (rp->rp_count < n)
 		n = rp->rp_count;
-	pi = malloc_c(n * sizeof(*pi), M_TEMP, M_WAITOK | M_ZERO);
+	pi = malloc(n * sizeof(*pi), M_TEMP, M_WAITOK | M_ZERO);
 	sx_slock(&proctree_lock);
 	LIST_FOREACH(p2, &reap->p_reaplist, p_reapsibling) {
 		if (i == n)
@@ -238,7 +238,7 @@ reap_getpids(struct thread *td, struct proc *p, struct procctl_reaper_pids_c *rp
 	}
 	sx_sunlock(&proctree_lock);
 	error = copyout_c(pi, rp->rp_pids, i * sizeof(*pi));
-	free_c(pi, M_TEMP);
+	free(pi, M_TEMP);
 	sx_slock(&proctree_lock);
 	PROC_LOCK(p);
 	return (error);
@@ -479,9 +479,11 @@ user_procctl(struct thread *td, idtype_t idtype, id_t id, int com,
 		break;
 	case PROC_REAP_GETPIDS:
 		/* XXX: fix for cheriabi and freebsd32 */
-#ifdef COMPAT_CHERI
+#ifdef COMPAT_CHERIABI
 		if (SV_CURPROC_FLAG(SV_CHERI)) {
-			copyincap_c(udata, &x.rp, sizeof(x.rp));
+			error = copyincap_c(udata, &x.rp, sizeof(x.rp));
+			if (error != 0)
+				return (error);
 		} else
 #endif
 #ifdef COMPAT_FREEBSD32

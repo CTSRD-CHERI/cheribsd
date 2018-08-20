@@ -1874,7 +1874,7 @@ cxgb_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 	uint32_t mask;
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		ADAPTER_LOCK(sc);
 		error = IS_DOOMED(p) ? ENXIO : (IS_BUSY(sc) ? EBUSY : 0);
 		if (error) {
@@ -1894,7 +1894,7 @@ fail:
 		}
 		ADAPTER_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		ADAPTER_LOCK(sc);
 		if (IS_DOOMED(p)) {
 			error = ENXIO;
@@ -1924,8 +1924,8 @@ fail:
 
 		ADAPTER_LOCK_ASSERT_NOTOWNED(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		ADAPTER_LOCK(sc);
 		error = IS_DOOMED(p) ? ENXIO : (IS_BUSY(sc) ? EBUSY : 0);
 		if (error)
@@ -1939,7 +1939,7 @@ fail:
 		ADAPTER_UNLOCK(sc);
 
 		break;
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		ADAPTER_LOCK(sc);
 		error = IS_DOOMED(p) ? ENXIO : (IS_BUSY(sc) ? EBUSY : 0);
 		if (error)
@@ -2038,7 +2038,7 @@ fail:
 #endif
 		ADAPTER_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &p->media, command);
 		break;
@@ -2958,8 +2958,14 @@ cxgb_extension_ioctl(struct cdev *dev, unsigned long cmd, caddr_t data,
 	case CHELSIO_GET_EEPROM: {
 		int i;
 		struct ch_eeprom *e = (struct ch_eeprom *)data;
-		uint8_t *buf = malloc(EEPROMSIZE, M_DEVBUF, M_NOWAIT);
+		uint8_t *buf;
 
+		if (e->offset & 3 || e->offset >= EEPROMSIZE ||
+		    e->len > EEPROMSIZE || e->offset + e->len > EEPROMSIZE) {
+			return (EINVAL);
+		}
+
+		buf = malloc(EEPROMSIZE, M_DEVBUF, M_NOWAIT);
 		if (buf == NULL) {
 			return (ENOMEM);
 		}

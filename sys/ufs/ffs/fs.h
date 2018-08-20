@@ -346,16 +346,18 @@ struct fs {
 	u_int	*fs_active;		/* (u) used by snapshots to track fs */
 #else
 	u_int64_t cheri_align_pad;	/* Pad to 32-byte alignment */
-	int32_t	*fs_maxcluster;		/* Used by libufs */
+	u_int8_t *fs_contigdirs;	/* (u) # of contig. allocated dirs */
 	struct	csum *fs_csp;		/* Used by fsck */
-	char	fs_ocsp[128 - (2*sizeof(void *)) - 8];
+	int32_t	*fs_maxcluster;		/* Used by libufs */
+	char	fs_ocsp[128 - (3*sizeof(void *)) - 8];
 #endif
 	int32_t	 fs_old_cpc;		/* cyl per cycle in postbl */
 	int32_t	 fs_maxbsize;		/* maximum blocking factor permitted */
 	int64_t	 fs_unrefs;		/* number of unreferenced inodes */
 	int64_t  fs_providersize;	/* size of underlying GEOM provider */
 	int64_t	 fs_metaspace;		/* size of area reserved for metadata */
-	int64_t	 fs_sparecon64[14];	/* old rotation block list head */
+	int64_t	 fs_sparecon64[13];	/* old rotation block list head */
+	int64_t	 fs_sblockactualloc;	/* byte offset of this superblock */
 	int64_t	 fs_sblockloc;		/* byte offset of standard superblock */
 	struct	csum_total fs_cstotal;	/* (u) cylinder summary information */
 	ufs_time_t fs_time;		/* last time written */
@@ -443,18 +445,31 @@ CTASSERT(sizeof(struct fs) == 1376);
  * labels into extended attributes on the file system rather than maintain
  * a single mount label for all objects.
  */
-#define	FS_UNCLEAN	0x0001	/* filesystem not clean at mount */
-#define	FS_DOSOFTDEP	0x0002	/* filesystem using soft dependencies */
-#define	FS_NEEDSFSCK	0x0004	/* filesystem needs sync fsck before mount */
-#define	FS_SUJ       	0x0008	/* Filesystem using softupdate journal */
-#define	FS_ACLS		0x0010	/* file system has POSIX.1e ACLs enabled */
-#define	FS_MULTILABEL	0x0020	/* file system is MAC multi-label */
-#define	FS_GJOURNAL	0x0040	/* gjournaled file system */
-#define	FS_FLAGS_UPDATED 0x0080	/* flags have been moved to new location */
-#define	FS_NFS4ACLS	0x0100	/* file system has NFSv4 ACLs enabled */
-#define	FS_INDEXDIRS	0x0200	/* kernel supports indexed directories */
-#define	FS_TRIM		0x0400	/* issue BIO_DELETE for deleted blocks */
-#define	FS_SUPPORTED	0xFFFF	/* supported flags, others cleared at mount */
+#define	FS_UNCLEAN	0x00000001 /* filesystem not clean at mount */
+#define	FS_DOSOFTDEP	0x00000002 /* filesystem using soft dependencies */
+#define	FS_NEEDSFSCK	0x00000004 /* filesystem needs sync fsck before mount */
+#define	FS_SUJ       	0x00000008 /* Filesystem using softupdate journal */
+#define	FS_ACLS		0x00000010 /* file system has POSIX.1e ACLs enabled */
+#define	FS_MULTILABEL	0x00000020 /* file system is MAC multi-label */
+#define	FS_GJOURNAL	0x00000040 /* gjournaled file system */
+#define	FS_FLAGS_UPDATED 0x0000080 /* flags have been moved to new location */
+#define	FS_NFS4ACLS	0x00000100 /* file system has NFSv4 ACLs enabled */
+#define	FS_METACKHASH	0x00000200 /* kernel supports metadata check hashes */
+#define	FS_TRIM		0x00000400 /* issue BIO_DELETE for deleted blocks */
+#define	FS_SUPPORTED	0x00FFFFFF /* supported flags, others cleared at mount*/
+/*
+ * Things that we may someday support, but currently do not.
+ * These flags are all cleared so we know if we ran on a kernel
+ * that does not support them.
+ */
+#define	FS_INDEXDIRS	0x01000000 /* kernel supports indexed directories */
+#define	FS_VARBLKSIZE	0x02000000 /* kernel supports variable block sizes */
+#define	FS_COOLOPT1	0x04000000 /* kernel supports cool option 1 */
+#define	FS_COOLOPT2	0x08000000 /* kernel supports cool option 2 */
+#define	FS_COOLOPT3	0x10000000 /* kernel supports cool option 3 */
+#define	FS_COOLOPT4	0x20000000 /* kernel supports cool option 4 */
+#define	FS_COOLOPT5	0x40000000 /* kernel supports cool option 5 */
+#define	FS_COOLOPT6	0x80000000 /* kernel supports cool option 6 */
 
 /*
  * The fs_metackhash field indicates the types of metadata check-hash
@@ -831,7 +846,7 @@ extern u_char *fragtbl[];
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20180816,
 //   "target_type": "header",
 //   "changes": [
 //     "pointer_size"

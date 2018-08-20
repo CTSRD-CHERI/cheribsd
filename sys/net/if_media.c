@@ -236,7 +236,7 @@ ifmedia_ioctl(ifp, ifr, ifm, cmd)
 	/*
 	 * Set the current media.
 	 */
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	{
 		struct ifmedia_entry *oldentry;
 		int oldmedia;
@@ -321,9 +321,7 @@ ifmedia_ioctl(ifp, ifr, ifm, cmd)
 		i = 0;
 		LIST_FOREACH(ep, &ifm->ifm_list, ifm_list)
 			if (i++ < ifmr->ifm_count) {
-				error = copyout_c(
-				    (__cheri_tocap int * __capability)
-				    &ep->ifm_media,
+				error = copyout_c(&ep->ifm_media,
 				    ifmr->ifm_ulist + i - 1, sizeof(int));
 				if (error)
 					break;

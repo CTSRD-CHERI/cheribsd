@@ -558,10 +558,11 @@ _proc_name2map(struct proc_handle *p, const char *name)
 	}
 	/* If we didn't find a match, try matching prefixes of the basename. */
 	for (i = 0; i < p->nmappings; i++) {
-		strlcpy(path, p->mappings[i].map.pr_mapname, sizeof(path));
+		mapping = &p->mappings[i];
+		strlcpy(path, mapping->map.pr_mapname, sizeof(path));
 		base = basename(path);
 		if (strncmp(base, name, len) == 0)
-			return (&p->mappings[i]);
+			return (mapping);
 	}
 	if (strcmp(name, "a.out") == 0)
 		return (_proc_addr2map(p,
@@ -609,7 +610,6 @@ proc_name2sym(struct proc_handle *p, const char *object, const char *symbol,
 {
 	struct file_info *file;
 	struct map_info *mapping;
-	uintptr_t off;
 	int error;
 
 	if ((mapping = _proc_name2map(p, object)) == NULL) {
@@ -623,15 +623,12 @@ proc_name2sym(struct proc_handle *p, const char *object, const char *symbol,
 	}
 
 	file = mapping->file;
-	off = file->ehdr.e_type == ET_DYN ? mapping->map.pr_vaddr : 0;
 
 	error = lookup_symbol_by_name(file->elf, &file->dynsymtab, symbol,
 	    symcopy, si);
 	if (error == ENOENT)
 		error = lookup_symbol_by_name(file->elf, &file->symtab, symbol,
 		    symcopy, si);
-	if (error == 0)
-		symcopy->st_value += off;
 	return (error);
 }
 

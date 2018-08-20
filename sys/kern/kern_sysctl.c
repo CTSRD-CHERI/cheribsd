@@ -192,7 +192,7 @@ sysctl_load_tunable_by_oid_locked(struct sysctl_oid *oidp)
 	struct sysctl_req req;
 	struct sysctl_oid *curr;
 	char *penv = NULL;
-	char path[64];
+	char path[96];
 	ssize_t rem = sizeof(path);
 	ssize_t len;
 	uint8_t val_8;
@@ -1848,24 +1848,20 @@ sysctl_old_user(struct sysctl_req *req, const void *p, size_t l)
 			i = len - origidx;
 		if (req->lock == REQ_WIRED) {
 			if (req->flags & SCTL_PTROUT)
-				error = copyoutcap_nofault_c(
-				    (__cheri_tocap const void * __capability)p,
+				error = copyoutcap_nofault_c(p,
 				    (char * __capability)req->oldptr +
 				    origidx, i);
 			else
-				error = copyout_nofault_c(
-				    (__cheri_tocap const void * __capability)p,
+				error = copyout_nofault_c(p,
 				    (char * __capability)req->oldptr + origidx,
 				    i);
 		} else
 			if (req->flags & SCTL_PTROUT)
-				error = copyoutcap_c(
-				    (__cheri_tocap const void * __capability)p,
+				error = copyoutcap_c(p,
 				    (char * __capability)req->oldptr + origidx,
 				    i);
 			else
-				error = copyout_c(
-				    (__cheri_tocap const void * __capability)p,
+				error = copyout_c(p,
 				    (char * __capability)req->oldptr + origidx,
 				    i);
 		if (error != 0)
@@ -1889,10 +1885,10 @@ sysctl_new_user(struct sysctl_req *req, void *p, size_t l)
 	    "sysctl_new_user()");
 	if (req->flags & SCTL_PTRIN)
 		error = copyincap_c((char * __capability)req->newptr +
-		    req->newidx, (__cheri_tocap void * __capability)p, l);
+		    req->newidx, p, l);
 	else
 		error = copyin_c((char * __capability)req->newptr + req->newidx,
-		    (__cheri_tocap void * __capability)p, l);
+		    p, l);
 	req->newidx += l;
 	return (error);
 }
@@ -2097,7 +2093,7 @@ int
 sys___sysctl(struct thread *td, struct sysctl_args *uap)
 {
 
-	return (kern_sysctl(td, __USER_CAP(uap->name, uap->namelen),
+	return (kern_sysctl(td, __USER_CAP_ARRAY(uap->name, uap->namelen),
 	    uap->namelen, __USER_CAP_UNBOUND(uap->old),
 	    __USER_CAP_OBJ(uap->oldlenp), __USER_CAP(uap->new, uap->newlen),
 	    uap->newlen, 0));

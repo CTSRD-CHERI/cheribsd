@@ -328,7 +328,6 @@ dev/acpica/acpi_hpet.c		optional acpi
 dev/acpica/acpi_timer.c		optional acpi
 dev/acpi_support/acpi_wmi_if.m	standard
 dev/wbwd/wbwd.c			optional wbwd
-dev/wpi/if_wpi.c		optional wpi
 dev/isci/isci.c							optional isci
 dev/isci/isci_controller.c					optional isci
 dev/isci/isci_domain.c						optional isci
@@ -495,6 +494,7 @@ i386/i386/perfmon.c		optional perfmon
 i386/i386/pmap.c		standard
 i386/i386/prof_machdep.c	optional profiling-routine
 i386/i386/ptrace_machdep.c	standard
+i386/i386/sigtramp.s		standard
 i386/i386/support.s		standard
 i386/i386/swtch.s		standard
 i386/i386/sys_machdep.c		standard

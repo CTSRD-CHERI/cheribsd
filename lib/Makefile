@@ -27,6 +27,7 @@ SUBDIR_BOOTSTRAP= \
 
 SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	.WAIT \
+	geom \
 	libalias \
 	libarchive \
 	libauditd \
@@ -76,6 +77,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libpng \
 	${_libproc} \
 	libprocstat \
+	libregex \
 	librpcsvc \
 	librss \
 	librt \
@@ -104,6 +106,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 # Inter-library dependencies.  When the makefile for a library contains LDADD
 # libraries, those libraries should be listed as build order dependencies here.
 
+SUBDIR_DEPEND_geom=	libufs
 SUBDIR_DEPEND_libarchive= libz libbz2 libexpat liblzma libmd
 SUBDIR_DEPEND_libauditdm= libbsm
 SUBDIR_DEPEND_libbsnmp= ${_libnetgraph}
@@ -169,11 +172,16 @@ SUBDIR.${MK_LDNS}+=	libldns
 # The libraries under libclang_rt can only be built by clang, and only make
 # sense to build when clang is enabled at all.  Furthermore, they can only be
 # built for certain architectures.
-.if ${MK_CLANG} != "no" && ${COMPILER_TYPE} == "clang" && \
+# XXXAR: This is not actually true, it makes sense to build them even if we
+# aren't building a native clang since we might be cross-compiling with clang
+.if (${COMPILER_TYPE} == "clang") && \
     (${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
     (${MACHINE_CPUARCH} == "arm" && ${MACHINE_ARCH} != "armeb") || \
-    (${MACHINE_CPUARCH} == "i386"))
+    (${MACHINE_CPUARCH} == "i386") || \
+    ${MACHINE_ARCH:Mmips64} != "") && !defined(LIBCHERI)
 _libclang_rt=	libclang_rt
+.elif !defined(LIBCHERI)
+.error "NOT BUILDING libclang_rt"
 .endif
 
 .if ${MK_LIBCPLUSPLUS} != "no"

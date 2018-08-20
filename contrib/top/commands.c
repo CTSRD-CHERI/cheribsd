@@ -42,7 +42,7 @@ extern char *copyright;
 /* imported from screen.c */
 extern int overstrike;
 
-int err_compar();
+int err_compar(const void *p1, const void *p2);
 char *err_string();
 static int str_adderr(char *str, int len, int err);
 static int str_addarg(char *str, int len, char *arg, int first);
@@ -334,12 +334,11 @@ int  first;
  */
 
 int
-err_compar(p1, p2)
-
-register struct errs *p1, *p2;
-
+err_compar(const void* _p1, const void* _p2)
 {
-    register int result;
+	const struct errs *p1 = _p1;
+	const struct errs *p2 = _p2;
+	register int result;
 
     if ((result = p1->errnum - p2->errnum) == 0)
     {

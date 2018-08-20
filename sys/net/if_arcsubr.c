@@ -665,7 +665,7 @@ arc_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int error = 0;
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFADDR):
+	case CASE_IOC_IFREQ(SIOCSIFADDR):
 		ifp->if_flags |= IFF_UP;
 		switch (ifa->ifa_addr->sa_family) {
 #ifdef INET
@@ -680,12 +680,12 @@ arc_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		break;
 
-	CASE_IOC_IFREQ(SIOCGIFADDR):
+	case CASE_IOC_IFREQ(SIOCGIFADDR):
 		ifr_addr_get_data(ifr)[0] = ARC_LLADDR(ifp);
 		break;
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		if (ifr == NULL)
 			error = EAFNOSUPPORT;
 		else {
@@ -701,7 +701,7 @@ arc_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		/*
 		 * Set the interface MTU.
 		 * mtu can't be larger than ARCMTU for RFC1051

@@ -601,7 +601,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				/* XXXAR: always adding st_value seems to be required (also glibc does it)*/
 				val += (Elf_Addr)def->st_value;
 
-				if (r_symndx != 0) {
+				if (__predict_false(r_symndx != 0)) {
 					_rtld_error("%s: local R_MIPS_REL32 relocation references symbol %s (%d). st_value=0x%lx, st_info=%x, st_shndx=%d",
 					    obj->path, obj->strtab + def->st_name, r_symndx, def->st_value, def->st_info, def->st_shndx);
 					return (-1);
@@ -737,7 +737,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 		{
 			def = find_symdef(r_symndx, obj,
 			    &defobj, flags, NULL, lockstate);
-			if (def == NULL) {
+			if (__predict_false(def == NULL)) {
 				_rtld_error("%s: Could not find symbol %s",
 				    obj->path, symname(obj, r_symndx));
 				return -1;
@@ -763,7 +763,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 		{
 			def = find_symdef(r_symndx, obj, &defobj, flags, NULL,
 			    lockstate);
-			if (def == NULL) {
+			if (__predict_false(def == NULL)) {
 				_rtld_error("%s: Could not find symbol %s",
 				    obj->path, symname(obj, r_symndx));
 				return -1;
@@ -775,8 +775,8 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			bool is_undef_weak = false;
 			if (def->st_shndx == SHN_UNDEF) {
 				/* Verify that we are resolving a weak symbol */
-				const Elf_Sym* src_sym = obj->symtab + r_symndx;
 #ifdef DEBUG
+				const Elf_Sym* src_sym = obj->symtab + r_symndx;
 				dbg("NOTE: found undefined R_CHERI_CAPABILITY "
 				    "for %s (in %s): value=%ld, size=%ld, "
 				    "type=%d, def bind=%d,sym bind=%d",
@@ -785,10 +785,10 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				    ELF_ST_TYPE(def->st_info),
 				    ELF_ST_BIND(def->st_info),
 				    ELF_ST_BIND(src_sym->st_info));
-#endif
 				assert(ELF_ST_BIND(src_sym->st_info) == STB_WEAK);
 				assert(def->st_value == 0);
 				assert(def->st_size == 0);
+#endif
 				is_undef_weak = true;
 			}
 			else if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
@@ -802,7 +802,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			// FIXME: this warning breaks some tests that expect clean stdout/stderr
 			// FIXME: See https://github.com/CTSRD-CHERI/cheribsd/issues/257
 			// TODO: or use this approach: https://github.com/CTSRD-CHERI/cheribsd/commit/c1920496c0086d9c5214fb0f491e4d6cdff3828e?
-			if (symval != NULL && cheri_getlen(symval) <= 0) {
+			if (__predict_false(symval != NULL && cheri_getlen(symval) <= 0)) {
 				rtld_fdprintf(STDERR_FILENO, "Warning: created "
 				    "zero length capability for %s (in %s): %-#p\n",
 				    symname(obj, r_symndx), obj->path, symval);
@@ -816,7 +816,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			 */
 			uint64_t src_offset = load_ptr(where, sizeof(uint64_t));
 			symval += src_offset;
-			if (!cheri_gettag(symval) && !is_undef_weak) {
+			if (__predict_false(!cheri_gettag(symval) && !is_undef_weak)) {
 				_rtld_error("%s: constructed invalid capability"
 				   "for %s: %#p",  obj->path,
 				    symname(obj, r_symndx), symval);
@@ -938,6 +938,13 @@ allocate_initial_tls(Obj_Entry *objs)
 void *
 _mips_get_tls(void)
 {
+#ifdef __CHERI_CAPABILITY_TLS__
+	uintcap_t _rv;
+
+	__asm__ __volatile__ (
+	    "creadhwr\t%0, $chwr_userlocal"
+	    : "=C" (_rv));
+#else
 	uint64_t _rv;
 
 	/* XXX-BD: need capability rdhwr */
@@ -947,6 +954,8 @@ _mips_get_tls(void)
 	    "rdhwr\t%0, $29\n\t"
 	    ".set\tpop"
 	    : "=r" (_rv));
+#endif
+
 	/*
 	 * XXXSS See 'git show c6be4f4d2d1b71c04de5d3bbb6933ce2dbcdb317'
 	 *
@@ -956,7 +965,11 @@ _mips_get_tls(void)
 	 */
 	_rv = _rv - TLS_TP_OFFSET - TLS_TCB_SIZE;
 
+#ifdef __CHERI_CAPABILITY_TLS__
+	return (void *)_rv;
+#else
 	return cheri_setoffset(cheri_getdefault(), _rv);
+#endif
 }
 
 void *
@@ -982,13 +995,20 @@ void _do___caprelocs(const struct capreloc *start_relocs,
     const struct capreloc * stop_relocs, void* gdc, void* pcc, vaddr_t base_addr)
 {
 
+	/*
+	 * XXX: Aux args capabilities have base 0, but mmap gives us a tight
+	 * base. Since reloc->object and (currently) reloc->capability_location
+	 * are now absolute addresses, we must subtract the absolute address of
+	 * gdc to avoid including mapbase twice.
+	 */
+	vaddr_t mapbase = __builtin_cheri_address_get(gdc);
 	gdc = __builtin_cheri_perms_and(gdc, global_pointer_permissions);
 	pcc = __builtin_cheri_perms_and(pcc, function_pointer_permissions);
 	for (const struct capreloc *reloc = start_relocs; reloc < stop_relocs; reloc++) {
 		_Bool isFunction = (reloc->permissions & function_reloc_flag) ==
 		    function_reloc_flag;
-		void **dest = __builtin_cheri_offset_set(gdc,
-		    reloc->capability_location + base_addr);
+		void **dest = __builtin_cheri_offset_increment(gdc,
+		    reloc->capability_location + base_addr - mapbase);
 		if (reloc->object == 0) {
 			/*
 			 * XXXAR: clang fills uninitialized capabilities with
@@ -998,11 +1018,14 @@ void _do___caprelocs(const struct capreloc *start_relocs,
 			*dest = (void*)0;
 			continue;
 		}
-		void *base = isFunction ? pcc : gdc;
-		void *src = __builtin_cheri_offset_set(base, reloc->object);
-		if (!isFunction && (reloc->size != 0))
-		{
-			src = __builtin_cheri_bounds_set(src, reloc->size);
+		void *src;
+		if (isFunction) {
+			src = __builtin_cheri_offset_set(pcc, reloc->object);
+		} else {
+			src = __builtin_cheri_offset_increment(gdc,
+			    reloc->object - mapbase);
+			if (reloc->size != 0)
+				src = __builtin_cheri_bounds_set(src, reloc->size);
 		}
 		src = __builtin_cheri_offset_increment(src, reloc->offset);
 		*dest = src;
@@ -1020,12 +1043,11 @@ void _do___caprelocs(const struct capreloc *start_relocs,
  */
 void
 _rtld_do___caprelocs_self(const struct capreloc *start_relocs,
-    const struct capreloc* end_relocs)
+    const struct capreloc* end_relocs, void *relocbase)
 {
-	void *ddc = __builtin_cheri_global_data_get();
 	void *pcc = __builtin_cheri_program_counter_get();
 
-	_do___caprelocs(start_relocs, end_relocs, ddc, pcc, 0);
+	_do___caprelocs(start_relocs, end_relocs, relocbase, pcc, 0);
 }
 
 void
@@ -1046,7 +1068,7 @@ process___cap_relocs(Obj_Entry* obj)
 	 *
 	 * TODO: reject those binaries and suggest relinking with the right flag
 	 */
-	void *ddc = __builtin_cheri_global_data_get();
+	void *mapbase = obj->mapbase;
 	void *pcc = __builtin_cheri_program_counter_get();
 
 	dbg("Processing %lu __cap_relocs for %s\n", (end_relocs - start_relocs),
@@ -1064,7 +1086,7 @@ process___cap_relocs(Obj_Entry* obj)
 #endif
 	vaddr_t base_addr = 0;
 
-	_do___caprelocs(start_relocs, end_relocs, ddc, pcc, base_addr);
+	_do___caprelocs(start_relocs, end_relocs, mapbase, pcc, base_addr);
 
 	obj->cap_relocs_processed = true;
 }

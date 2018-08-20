@@ -1403,17 +1403,19 @@ proc_compare(void *arg1, void *arg2)
 
 #ifdef ORDER
 /* "cpu" compare routines */
-int compare_size(), compare_res(), compare_time(), compare_prio(),
-    compare_threads();
+int compare_size(void*, void*), compare_res(void*, void*),
+    compare_time(void*, void*), compare_prio(void*, void*),
+    compare_threads(void*, void*);
 
 /*
  * "io" compare routines.  Context switches aren't i/o, but are displayed
  * on the "io" display.
  */
-int compare_iototal(), compare_ioread(), compare_iowrite(), compare_iofault(),
-    compare_vcsw(), compare_ivcsw();
+int compare_iototal(void*, void*), compare_ioread(void*, void*),
+    compare_iowrite(void*, void*), compare_iofault(void*, void*),
+    compare_vcsw(void*, void*), compare_ivcsw(void*, void*);
 
-int (*compares[])() = {
+int (*compares[])(void*, void*) = {
 	compare_cpu,
 	compare_size,
 	compare_res,
@@ -1426,8 +1428,8 @@ int (*compares[])() = {
 	compare_iofault,
 	compare_vcsw,
 	compare_ivcsw,
-	compare_jid,
-	compare_swap,
+	(int(*)(void*,void*))compare_jid,
+	(int(*)(void*,void*))compare_swap,
 	NULL
 };
 

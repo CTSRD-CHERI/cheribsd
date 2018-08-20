@@ -4514,7 +4514,7 @@ bxe_ioctl(if_t ifp,
 
     switch (command)
     {
-    CASE_IOC_IFREQ(SIOCSIFMTU):
+    case CASE_IOC_IFREQ(SIOCSIFMTU):
         BLOGD(sc, DBG_IOCTL, "Received SIOCSIFMTU ioctl (mtu=%d)\n",
               ifr_mtu_get(ifr));
 
@@ -4536,7 +4536,7 @@ bxe_ioctl(if_t ifp,
         reinit = 1;
         break;
 
-    CASE_IOC_IFREQ(SIOCSIFFLAGS):
+    case CASE_IOC_IFREQ(SIOCSIFFLAGS):
         /* toggle the interface state up or down */
         BLOGD(sc, DBG_IOCTL, "Received SIOCSIFFLAGS ioctl\n");
 
@@ -4559,8 +4559,8 @@ bxe_ioctl(if_t ifp,
 
         break;
 
-    CASE_IOC_IFREQ(SIOCADDMULTI):
-    CASE_IOC_IFREQ(SIOCDELMULTI):
+    case CASE_IOC_IFREQ(SIOCADDMULTI):
+    case CASE_IOC_IFREQ(SIOCDELMULTI):
         /* add/delete multicast addresses */
         BLOGD(sc, DBG_IOCTL, "Received SIOCADDMULTI/SIOCDELMULTI ioctl\n");
 
@@ -4574,7 +4574,7 @@ bxe_ioctl(if_t ifp,
 
         break;
 
-    CASE_IOC_IFREQ(SIOCSIFCAP):
+    case CASE_IOC_IFREQ(SIOCSIFCAP):
         /* find out which capabilities have changed */
         mask = (ifr_reqcap_get(ifr) ^ if_getcapenable(ifp));
 
@@ -4679,7 +4679,7 @@ bxe_ioctl(if_t ifp,
 
         break;
 
-    CASE_IOC_IFREQ(SIOCSIFMEDIA):
+    case CASE_IOC_IFREQ(SIOCSIFMEDIA):
     case SIOCGIFMEDIA:
         /* set/get interface media */
         BLOGD(sc, DBG_IOCTL,

@@ -1560,15 +1560,15 @@ iflib_txsd_alloc(iflib_txq_t txq)
 		goto fail;
 	}
 	if (!(txq->ift_sds.ifsd_flags =
-	    (uint8_t *) mallocarray(scctx->isc_ntxd[txq->ift_br_offset],
-	    sizeof(uint8_t), M_IFLIB, M_NOWAIT | M_ZERO))) {
+	    (uint8_t *) malloc(sizeof(uint8_t) *
+	    scctx->isc_ntxd[txq->ift_br_offset], M_IFLIB, M_NOWAIT | M_ZERO))) {
 		device_printf(dev, "Unable to allocate tx_buffer memory\n");
 		err = ENOMEM;
 		goto fail;
 	}
 	if (!(txq->ift_sds.ifsd_m =
-	    (struct mbuf **) mallocarray(scctx->isc_ntxd[txq->ift_br_offset],
-	    sizeof(struct mbuf *), M_IFLIB, M_NOWAIT | M_ZERO))) {
+	    (struct mbuf **) malloc(sizeof(struct mbuf *) *
+	    scctx->isc_ntxd[txq->ift_br_offset], M_IFLIB, M_NOWAIT | M_ZERO))) {
 		device_printf(dev, "Unable to allocate tx_buffer memory\n");
 		err = ENOMEM;
 		goto fail;
@@ -1580,8 +1580,7 @@ iflib_txsd_alloc(iflib_txq_t txq)
 		return (0);
 
 	if (!(txq->ift_sds.ifsd_map =
-	    (bus_dmamap_t *) mallocarray(scctx->isc_ntxd[txq->ift_br_offset],
-	    sizeof(bus_dmamap_t), M_IFLIB, M_NOWAIT | M_ZERO))) {
+	    (bus_dmamap_t *) malloc(sizeof(bus_dmamap_t) * scctx->isc_ntxd[txq->ift_br_offset], M_IFLIB, M_NOWAIT | M_ZERO))) {
 		device_printf(dev, "Unable to allocate tx_buffer map memory\n");
 		err = ENOMEM;
 		goto fail;
@@ -1737,22 +1736,22 @@ iflib_rxsd_alloc(iflib_rxq_t rxq)
 			goto fail;
 		}
 		if (!(fl->ifl_sds.ifsd_flags =
-		      (uint8_t *) mallocarray(scctx->isc_nrxd[rxq->ifr_fl_offset],
-		          sizeof(uint8_t), M_IFLIB, M_NOWAIT | M_ZERO))) {
+		      (uint8_t *) malloc(sizeof(uint8_t) *
+					 scctx->isc_nrxd[rxq->ifr_fl_offset], M_IFLIB, M_NOWAIT | M_ZERO))) {
 			device_printf(dev, "Unable to allocate tx_buffer memory\n");
 			err = ENOMEM;
 			goto fail;
 		}
 		if (!(fl->ifl_sds.ifsd_m =
-		      (struct mbuf **) mallocarray(scctx->isc_nrxd[rxq->ifr_fl_offset],
-		          sizeof(struct mbuf *), M_IFLIB, M_NOWAIT | M_ZERO))) {
+		      (struct mbuf **) malloc(sizeof(struct mbuf *) *
+					      scctx->isc_nrxd[rxq->ifr_fl_offset], M_IFLIB, M_NOWAIT | M_ZERO))) {
 			device_printf(dev, "Unable to allocate tx_buffer memory\n");
 			err = ENOMEM;
 			goto fail;
 		}
 		if (!(fl->ifl_sds.ifsd_cl =
-		      (caddr_t *) mallocarray(scctx->isc_nrxd[rxq->ifr_fl_offset],
-		          sizeof(caddr_t), M_IFLIB, M_NOWAIT | M_ZERO))) {
+		      (caddr_t *) malloc(sizeof(caddr_t) *
+					      scctx->isc_nrxd[rxq->ifr_fl_offset], M_IFLIB, M_NOWAIT | M_ZERO))) {
 			device_printf(dev, "Unable to allocate tx_buffer memory\n");
 			err = ENOMEM;
 			goto fail;
@@ -1764,8 +1763,7 @@ iflib_rxsd_alloc(iflib_rxq_t rxq)
 			continue;
 
 		if (!(fl->ifl_sds.ifsd_map =
-		      (bus_dmamap_t *) mallocarray(scctx->isc_nrxd[rxq->ifr_fl_offset],
-		          sizeof(bus_dmamap_t), M_IFLIB, M_NOWAIT | M_ZERO))) {
+		      (bus_dmamap_t *) malloc(sizeof(bus_dmamap_t) * scctx->isc_nrxd[rxq->ifr_fl_offset], M_IFLIB, M_NOWAIT | M_ZERO))) {
 			device_printf(dev, "Unable to allocate tx_buffer map memory\n");
 			err = ENOMEM;
 			goto fail;
@@ -3908,7 +3906,7 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 	int		err = 0, reinit = 0, bits;
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFADDR):
+	case CASE_IOC_IFREQ(SIOCSIFADDR):
 #ifdef INET
 		if (ifa->ifa_addr->sa_family == AF_INET)
 			avoid_reset = TRUE;
@@ -3932,7 +3930,7 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 		} else
 			err = ether_ioctl(ifp, command, data);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		CTX_LOCK(ctx);
 		if (ifr_mtu_get(ifr) == if_getmtu(ifp)) {
 			CTX_UNLOCK(ctx);
@@ -3953,7 +3951,7 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 		if_setdrvflags(ifp, bits);
 		CTX_UNLOCK(ctx);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		CTX_LOCK(ctx);
 		if (if_getflags(ifp) & IFF_UP) {
 			if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
@@ -3969,8 +3967,8 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 		ctx->ifc_if_flags = if_getflags(ifp);
 		CTX_UNLOCK(ctx);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
 			CTX_LOCK(ctx);
 			IFDI_INTR_DISABLE(ctx);
@@ -3979,7 +3977,7 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 			CTX_UNLOCK(ctx);
 		}
 		break;
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		CTX_LOCK(ctx);
 		IFDI_MEDIA_SET(ctx);
 		CTX_UNLOCK(ctx);
@@ -3988,7 +3986,7 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 	case SIOCGIFXMEDIA:
 		err = ifmedia_ioctl(ifp, ifr, &ctx->ifc_media, command);
 		break;
-	CASE_IOC_IFREQ(SIOCGI2C):
+	case CASE_IOC_IFREQ(SIOCGI2C):
 	{
 		struct ifi2creq i2c;
 
@@ -4009,7 +4007,7 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 			    sizeof(i2c));
 		break;
 	}
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 	{
 		int mask, setmask;
 
@@ -4042,7 +4040,7 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 		}
 		break;
 	    }
-	CASE_IOC_IFREQ(SIOCGPRIVATE_0):
+	case CASE_IOC_IFREQ(SIOCGPRIVATE_0):
 	case SIOCSDRVSPEC:
 	case SIOCGDRVSPEC:
 		CTX_LOCK(ctx);
@@ -4758,8 +4756,8 @@ iflib_queues_alloc(if_ctx_t ctx)
 
 /* Allocate the TX ring struct memory */
 	if (!(txq =
-	    (iflib_txq_t) mallocarray(ntxqsets, sizeof(struct iflib_txq),
-	        M_IFLIB, M_NOWAIT | M_ZERO))) {
+	    (iflib_txq_t) malloc(sizeof(struct iflib_txq) *
+	    ntxqsets, M_IFLIB, M_NOWAIT | M_ZERO))) {
 		device_printf(dev, "Unable to allocate TX ring memory\n");
 		err = ENOMEM;
 		goto fail;
@@ -4767,8 +4765,8 @@ iflib_queues_alloc(if_ctx_t ctx)
 
 	/* Now allocate the RX */
 	if (!(rxq =
-	    (iflib_rxq_t) mallocarray(nrxqsets, sizeof(struct iflib_rxq),
-	        M_IFLIB, M_NOWAIT | M_ZERO))) {
+	    (iflib_rxq_t) malloc(sizeof(struct iflib_rxq) *
+	    nrxqsets, M_IFLIB, M_NOWAIT | M_ZERO))) {
 		device_printf(dev, "Unable to allocate RX ring memory\n");
 		err = ENOMEM;
 		goto rx_fail;
@@ -4862,8 +4860,7 @@ iflib_queues_alloc(if_ctx_t ctx)
 		}
 		rxq->ifr_nfl = nfree_lists;
 		if (!(fl =
-			  (iflib_fl_t) mallocarray(nfree_lists, sizeof(struct iflib_fl),
-			      M_IFLIB, M_NOWAIT | M_ZERO))) {
+			  (iflib_fl_t) malloc(sizeof(struct iflib_fl) * nfree_lists, M_IFLIB, M_NOWAIT | M_ZERO))) {
 			device_printf(dev, "Unable to allocate free list memory\n");
 			err = ENOMEM;
 			goto err_tx_desc;

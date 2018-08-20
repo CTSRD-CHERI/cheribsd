@@ -986,9 +986,7 @@ freebsd32_copyiniov(struct iovec32 * __capability iovp32, u_int iovcnt,
 	iovlen = iovcnt * sizeof(kiovec_t);
 	iov = malloc(iovlen, M_IOV, M_WAITOK);
 	for (i = 0; i < iovcnt; i++) {
-		error = copyin_c(&iovp32[i],
-		    (__capability struct iovec32 * __capability)&iov32,
-		    sizeof(struct iovec32));
+		error = copyin_c(&iovp32[i], &iov32, sizeof(struct iovec32));
 		if (error) {
 			free(iov, M_IOV);
 			return (error);
@@ -1769,26 +1767,6 @@ freebsd11_freebsd32_getdents(struct thread *td,
 	return (freebsd11_freebsd32_getdirentries(td, &ap));
 }
 #endif /* COMPAT_FREEBSD11 */
-
-int
-freebsd32_getdirentries(struct thread *td,
-    struct freebsd32_getdirentries_args *uap)
-{
-	long base;
-	int32_t base32;
-	int error;
-
-	error = kern_getdirentries(td, uap->fd,
-	    __USER_CAP(uap->buf, uap->count), uap->count, &base,
-	    NULL, UIO_USERSPACE);
-	if (error)
-		return (error);
-	if (uap->basep != NULL) {
-		base32 = base;
-		error = copyout(&base32, uap->basep, sizeof(int32_t));
-	}
-	return (error);
-}
 
 #ifdef COMPAT_FREEBSD6
 /* versions with the 'int pad' argument */

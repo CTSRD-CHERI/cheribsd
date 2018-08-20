@@ -92,6 +92,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_page.h>
 #include <vm/vm_pageout.h>
 #include <vm/vm_phys.h>
+#include <vm/vm_pagequeue.h>
 #include <vm/vm_radix.h>
 #include <vm/vm_extern.h>
 #include <vm/uma.h>
@@ -212,7 +213,7 @@ retry:
 				if (!vm_page_reclaim_contig_domain(domain,
 				    pflags, 1, low, high, PAGE_SIZE, 0) &&
 				    (flags & M_WAITOK) != 0)
-					VM_WAIT;
+					vm_wait_domain(domain);
 				VM_OBJECT_WLOCK(object);
 				tries++;
 				goto retry;
@@ -221,9 +222,9 @@ retry:
 			vmem_free(vmem, addr, size);
 			return (0);
 		}
-		KASSERT(vm_phys_domidx(m) == domain,
+		KASSERT(vm_phys_domain(m) == domain,
 		    ("kmem_alloc_attr_domain: Domain mismatch %d != %d",
-		    vm_phys_domidx(m), domain));
+		    vm_phys_domain(m), domain));
 		if ((flags & M_ZERO) && (m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
 		m->valid = VM_PAGE_BITS_ALL;
@@ -298,7 +299,7 @@ retry:
 			if (!vm_page_reclaim_contig_domain(domain, pflags,
 			    npages, low, high, alignment, boundary) &&
 			    (flags & M_WAITOK) != 0)
-				VM_WAIT;
+				vm_wait_domain(domain);
 			VM_OBJECT_WLOCK(object);
 			tries++;
 			goto retry;
@@ -306,9 +307,9 @@ retry:
 		vmem_free(vmem, addr, size);
 		return (0);
 	}
-	KASSERT(vm_phys_domidx(m) == domain,
+	KASSERT(vm_phys_domain(m) == domain,
 	    ("kmem_alloc_contig_domain: Domain mismatch %d != %d",
-	    vm_phys_domidx(m), domain));
+	    vm_phys_domain(m), domain));
 	end_m = m + npages;
 	tmp = ptr_to_va(addr);
 	for (; m < end_m; m++) {
@@ -501,9 +502,9 @@ retry:
 			kmem_unback(object, addr, i);
 			return (KERN_NO_SPACE);
 		}
-		KASSERT(vm_phys_domidx(m) == domain,
+		KASSERT(vm_phys_domain(m) == domain,
 		    ("kmem_back_domain: Domain mismatch %d != %d",
-		    vm_phys_domidx(m), domain));
+		    vm_phys_domain(m), domain));
 		if (flags & M_ZERO && (m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
 		KASSERT((m->oflags & VPO_UNMANAGED) != 0,
@@ -563,7 +564,7 @@ _kmem_unback(vm_object_t object, vm_offset_t addr, vm_size_t size)
 	end = offset + size;
 	VM_OBJECT_WLOCK(object);
 	m = vm_page_lookup(object, atop(offset)); 
-	domain = vm_phys_domidx(m);
+	domain = vm_phys_domain(m);
 	for (; offset < end; offset += PAGE_SIZE, m = next) {
 		next = vm_page_next(m);
 		vm_page_unwire(m, PQ_NONE);

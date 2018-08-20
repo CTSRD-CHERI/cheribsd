@@ -306,11 +306,9 @@ user_statfs(struct thread *td, const char * __capability path,
 	int error;
 
 	sfp = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
-	error = kern_statfs(td, __USER_CAP_STR(path), UIO_USERSPACE, sfp);
+	error = kern_statfs(td, path, UIO_USERSPACE, sfp);
 	if (error == 0)
-		error = copyout_c(
-		    (__cheri_tocap struct statfs * __capability)sfp,
-		    buf, sizeof(struct statfs));
+		error = copyout_c(sfp, buf, sizeof(struct statfs));
 	free(sfp, M_STATFS);
 	return (error);
 }
@@ -360,9 +358,7 @@ user_fstatfs(struct thread *td, int fd, struct statfs * __capability buf)
 	sfp = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
 	error = kern_fstatfs(td, fd, sfp);
 	if (error == 0)
-		error = copyout_c(
-		    (__cheri_tocap struct statfs * __capability)sfp,
-		    buf, sizeof(struct statfs));
+		error = copyout_c(sfp, buf, sizeof(struct statfs));
 	free(sfp, M_STATFS);
 	return (error);
 }
@@ -540,9 +536,7 @@ restart:
 				    sizeof(*sp));
 				free(sptmp, M_STATFS);
 			} else /* if (bufseg == UIO_USERSPACE) */ {
-				error = copyout_c((__cheri_tocap
-				    struct statfs * __capability)sp, sfsp,
-				    sizeof(*sp));
+				error = copyout_c(sp, sfsp, sizeof(*sp));
 				free(sptmp, M_STATFS);
 				if (error != 0) {
 					vfs_unbusy(mp);
@@ -1680,8 +1674,7 @@ kern_symlinkat(struct thread *td, const char * __capability path1, int fd,
 		syspath = (__cheri_fromcap const char *)path1;
 	} else {
 		tmppath = uma_zalloc(namei_zone, M_WAITOK);
-		if ((error = copyinstr_c(path1,
-		    (__cheri_tocap char * __capability)tmppath, MAXPATHLEN,
+		if ((error = copyinstr_c(path1, tmppath, MAXPATHLEN,
 		    NULL)) != 0)
 			goto out;
 		syspath = tmppath;
@@ -3010,7 +3003,7 @@ getutimes(const struct timeval * __capability usrtvp, enum uio_seg tvpseg,
 {
 	struct timeval tv[2];
 	const struct timeval * __capability tvp;
-	struct timeval * __capability tmptvp;
+	struct timeval *tmptvp;
 	int error;
 
 	if (usrtvp == NULL) {
@@ -3023,7 +3016,8 @@ getutimes(const struct timeval * __capability usrtvp, enum uio_seg tvpseg,
 			tmptvp = &tv[0];
 			if ((error = copyin_c(usrtvp, tmptvp, sizeof(tv))) != 0)
 				return (error);
-			tvp = tmptvp;
+			tvp = (__cheri_tocap struct timeval * __capability)
+			    tmptvp;
 		}
 
 		if (tvp[0].tv_usec < 0 || tvp[0].tv_usec >= 1000000 ||
@@ -3058,9 +3052,7 @@ getutimens(const struct timespec * __capability usrtsp, enum uio_seg tspseg,
 	if (tspseg == UIO_SYSSPACE) {
 		tsp[0] = usrtsp[0];
 		tsp[1] = usrtsp[1];
-	} else if ((error = copyin_c(usrtsp,
-	    (__cheri_tocap struct timespec * __capability)tsp,
-	   sizeof(*tsp) * 2)) != 0)
+	} else if ((error = copyin_c(usrtsp, tsp, sizeof(*tsp) * 2)) != 0)
 		return (error);
 	if (tsp[0].tv_nsec == UTIME_OMIT && tsp[1].tv_nsec == UTIME_OMIT)
 		*retflags |= UTIMENS_EXIT;
@@ -4473,9 +4465,7 @@ user_fhstatfs(struct thread *td, const struct fhandle * __capability u_fhp,
 	sfp = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
 	error = kern_fhstatfs(td, fh, sfp);
 	if (error == 0)
-		error = copyout_c(
-		    (__cheri_tocap struct statfs * __capability)sfp,
-		    buf, sizeof(*sfp));
+		error = copyout_c(sfp, buf, sizeof(*sfp));
 	free(sfp, M_STATFS);
 	return (error);
 }

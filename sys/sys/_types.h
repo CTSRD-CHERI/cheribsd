@@ -118,9 +118,25 @@ typedef	__uint32_t	__fixpt_t;	/* fixed point number */
 typedef union {
 	char		__mbstate8[128];
 	__int64_t	_mbstateL;	/* for alignment */
+	__intptr_t	_mbstateP;	/* for alignment */
 } __mbstate_t;
 
 typedef __uintmax_t     __rman_res_t;
+
+/*
+ * Types for varargs. These are all provided by builtin types these
+ * days, so centralize their definition.
+ */
+#ifdef __GNUCLIKE_BUILTIN_VARARGS
+typedef	__builtin_va_list	__va_list;	/* internally known to gcc */
+#else
+#error "No support for your compiler for stdargs"
+#endif
+#if defined(__GNUC_VA_LIST_COMPATIBILITY) && !defined(__GNUC_VA_LIST) \
+    && !defined(__NO_GNUC_VA_LIST)
+#define __GNUC_VA_LIST
+typedef __va_list		__gnuc_va_list;	/* compatibility w/GNU headers*/
+#endif
 
 /*
  * When the following macro is defined, the system uses 64-bit inode numbers.

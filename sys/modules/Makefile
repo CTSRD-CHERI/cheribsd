@@ -60,6 +60,8 @@ SUBDIR=	\
 	${_autofs} \
 	${_auxio} \
 	${_bce} \
+	${_bcm283x_clkman} \
+	${_bcm283x_pwm} \
 	bfe \
 	bge \
 	bhnd \
@@ -71,7 +73,6 @@ SUBDIR=	\
 	bridgestp \
 	bwi \
 	bwn \
-	bwn_pci \
 	${_bytgpio} \
 	cam \
 	${_cardbus} \
@@ -264,6 +265,7 @@ SUBDIR=	\
 	msdosfs_iconv \
 	${_mse} \
 	msk \
+	${_mthca} \
 	mvs \
 	mwl \
 	${_mwlfw} \
@@ -349,7 +351,6 @@ SUBDIR=	\
 	sge \
 	${_sgx} \
 	${_sgx_linux} \
-	siba_bwn \
 	siftr \
 	siis \
 	sis \
@@ -684,6 +685,7 @@ _mlx4en=	mlx4en
 _mlx5en=	mlx5en
 .endif
 .if ${MK_OFED} != "no" || defined(ALL_MODULES)
+_mthca=		mthca
 _mlx4ib=	mlx4ib
 _mlx5ib=	mlx5ib
 .endif
@@ -813,6 +815,11 @@ _cloudabi32=	cloudabi32
 _cloudabi64=	cloudabi64
 .endif
 
+.endif
+
+.if ${MACHINE_ARCH:Marmv[67]*} != "" || ${MACHINE_CPUARCH} == "aarch64"
+_bcm283x_clkman=  bcm283x_clkman
+_bcm283x_pwm=  bcm283x_pwm
 .endif
 
 .if ${MACHINE_ARCH:Marmv[67]*} != ""

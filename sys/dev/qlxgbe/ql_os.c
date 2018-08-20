@@ -1010,7 +1010,7 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ha = (qla_host_t *)ifp->if_softc;
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFADDR):
+	case CASE_IOC_IFREQ(SIOCSIFADDR):
 		QL_DPRINT4(ha, (ha->pci_dev, "%s: SIOCSIFADDR (0x%lx)\n",
 			__func__, cmd));
 
@@ -1040,7 +1040,7 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		QL_DPRINT4(ha, (ha->pci_dev, "%s: SIOCSIFMTU (0x%lx)\n",
 			__func__, cmd));
 
@@ -1072,7 +1072,7 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		QL_DPRINT4(ha, (ha->pci_dev, "%s: SIOCSIFFLAGS (0x%lx)\n",
 			__func__, cmd));
 
@@ -1106,7 +1106,7 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		QLA_UNLOCK(ha, __func__);
 		break;
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
 		QL_DPRINT4(ha, (ha->pci_dev,
 			"%s: %s (0x%lx)\n", __func__, "SIOCADDMULTI", cmd));
 
@@ -1114,7 +1114,7 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ret = EINVAL;
 		break;
 
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		QL_DPRINT4(ha, (ha->pci_dev,
 			"%s: %s (0x%lx)\n", __func__, "SIOCDELMULTI", cmd));
 
@@ -1122,7 +1122,7 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ret = EINVAL;
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		QL_DPRINT4(ha, (ha->pci_dev,
 			"%s: SIOCSIFMEDIA/SIOCGIFMEDIA (0x%lx)\n",
@@ -1130,7 +1130,7 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ret = ifmedia_ioctl(ifp, ifr, &ha->media, cmd);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 	{
 		int mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 

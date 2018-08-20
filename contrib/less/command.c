@@ -823,7 +823,7 @@ getcc_end_command()
  * (characters previously given to ungetcc or ungetsc).
  */
 	static LWCHAR
-getccu()
+getccu(void)
 {
 	LWCHAR c;
 	if (ungot == NULL)

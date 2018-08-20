@@ -1421,12 +1421,9 @@ mdcreate_vnode(struct md_s *sc, struct md_req *mdr, struct thread *td)
 
 	fname = mdr->md_file;
 	if (mdr->md_file_seg == UIO_USERSPACE)
-		error = copyinstr_c(fname,
-		    (__cheri_tocap char * __capability)sc->file,
-		    sizeof(sc->file), NULL);
+		error = copyinstr_c(fname, sc->file, sizeof(sc->file), NULL);
 	else if (mdr->md_file_seg == UIO_SYSSPACE)
-		error = copystr_c(fname,
-		    (__cheri_tocap char * __capability)sc->file,
+		error = copystr((__cheri_fromcap char *)fname, sc->file,
 		    sizeof(sc->file), NULL);
 	else
 		error = EDOOFUS;
@@ -1687,8 +1684,7 @@ kern_mdattach_locked(struct thread *td, struct md_req *mdr)
 	if (sc == NULL)
 		return (error);
 	if (mdr->md_label != NULL)
-		error = copyinstr_c(mdr->md_label,
-		    (__cheri_tocap char * __capability)sc->label,
+		error = copyinstr_c(mdr->md_label, sc->label,
 		    sizeof(sc->label), NULL);
 	if (error != 0)
 		goto err_after_new;
@@ -1829,16 +1825,15 @@ kern_mdquery_locked(struct md_req *mdr)
 	mdr->md_sectorsize = sc->sectorsize;
 	error = 0;
 	if (mdr->md_label != NULL) {
-		error = copyout_c(
-		    (__cheri_tocap char * __capability)sc->label,
-		    mdr->md_label, strlen(sc->label) + 1);
+		error = copyout_c(sc->label, mdr->md_label,
+		    strlen(sc->label) + 1);
 		if (error != 0)
 			return (error);
 	}
 	if (sc->type == MD_VNODE ||
 	    (sc->type == MD_PRELOAD && mdr->md_file != NULL))
-		error = copyout_c((__cheri_tocap char * __capability)sc->file,
-		    mdr->md_file, strlen(sc->file) + 1);
+		error = copyout_c(sc->file, mdr->md_file,
+		    strlen(sc->file) + 1);
 	return (error);
 }
 

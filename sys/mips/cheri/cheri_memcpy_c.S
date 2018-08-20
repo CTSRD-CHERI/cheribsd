@@ -267,6 +267,13 @@ XLEAF(FUNC_PREFIX(bcopy_c))
 
 .L.b_dword_copy:
 	/*
+	 * Check if we have enough data to use the dword copy.
+	 */
+	li		a2, SZREG	// a2: size of double-word
+	slt		t9, a0, a2	// Check if we have data for a dword
+	bnez		t9, .L.b_copy_head
+
+	/*
 	 * Two pointers at the end of the un-copied regions with double
 	 * word alignment.  If they have the same alignment mod
 	 * capability size, we copy down to capability alignment.

@@ -529,7 +529,7 @@ xe_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	error = 0;
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		DEVPRINTF(2, (scp->dev, "ioctl: SIOCSIFFLAGS: 0x%04x\n",
 			ifp->if_flags));
 		/*
@@ -553,8 +553,8 @@ xe_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		XE_UNLOCK(scp);
 		error = 0;
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		DEVPRINTF(2, (scp->dev, "ioctl: SIOC{ADD,DEL}MULTI\n"));
 		/*
 		 * Multicast list has (maybe) changed; set the
@@ -565,7 +565,7 @@ xe_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		XE_UNLOCK(scp);
 		error = 0;
 		break;
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		DEVPRINTF(3, (scp->dev, "ioctl: bounce to ifmedia_ioctl\n"));
 		/*

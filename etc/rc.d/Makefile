@@ -30,6 +30,7 @@ FILES=	DAEMON \
 	defaultroute \
 	devd \
 	devfs \
+	devmatch \
 	dhclient \
 	dmesg \
 	dumpon \

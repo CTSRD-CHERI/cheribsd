@@ -10,6 +10,9 @@
 #ifndef _SYS_SEM_H_
 #define _SYS_SEM_H_
 
+#ifdef _WANT_SYSVSEM_INTERNALS
+#define	_WANT_SYSVIPC_INTERNALS
+#endif
 #include <sys/ipc.h>
 
 #ifndef _PID_T_DECLARED
@@ -127,23 +130,21 @@ typedef union semun_native	usemun_t;
 #define SEM_A		IPC_W	/* alter permission */
 #define SEM_R		IPC_R	/* read permission */
 
-#ifdef _KERNEL
-
+#if defined(_KERNEL) || defined(_WANT_SYSVSEM_INTERNALS)
 /*
  * semaphore info struct
  */
 struct seminfo {
-	int	semmni,		/* # of semaphore identifiers */
-		semmns,		/* # of semaphores in system */
-		semmnu,		/* # of undo structures in system */
-		semmsl,		/* max # of semaphores per id */
-		semopm,		/* max # of operations per semop call */
-		semume,		/* max # of undo entries per process */
-		semusz,		/* size in bytes of undo structure */
-		semvmx,		/* semaphore maximum value */
-		semaem;		/* adjust on exit max value */
+	int	semmni;		/* # of semaphore identifiers */
+	int	semmns;		/* # of semaphores in system */
+	int	semmnu;		/* # of undo structures in system */
+	int	semmsl;		/* max # of semaphores per id */
+	int	semopm;		/* max # of operations per semop call */
+	int	semume;		/* max # of undo entries per process */
+	int	semusz;		/* size in bytes of undo structure */
+	int	semvmx;		/* semaphore maximum value */
+	int	semaem;		/* adjust on exit max value */
 };
-extern struct seminfo	seminfo;
 
 /*
  * Kernel wrapper for the user-level structure
@@ -157,15 +158,17 @@ struct semid_kernel {
 /* internal "mode" bits */
 #define	SEM_ALLOC	01000	/* semaphore is allocated */
 #define	SEM_DEST	02000	/* semaphore will be destroyed on last detach */
+#endif
 
+#ifdef _KERNEL
+extern struct seminfo	seminfo;
 /*
  * Process sem_undo vectors at proc exit.
  */
 void	semexit(struct proc *p);
 
-#endif /* _KERNEL */
+#else /* !_KERNEL */
 
-#if !defined(_KERNEL) || defined(_WANT_SEM_PROTOTYPES)
 __BEGIN_DECLS
 #if __BSD_VISIBLE
 int semsys(int, ...);
@@ -175,7 +178,7 @@ int semget(key_t, int, int);
 int semop(int, struct sembuf *, size_t);
 __END_DECLS
 
-#endif /* !_KERNEL || _WANT_SEM_PROTOTYPES */
+#endif /* !_KERNEL */
 
 #endif /* !_SYS_SEM_H_ */
 // CHERI CHANGES START

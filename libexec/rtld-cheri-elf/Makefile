@@ -11,7 +11,8 @@ MK_CHERI_SHARED_PROG:=yes
 .PATH: ${.CURDIR}/../../lib/libmalloc_simple
 
 # TODO: disable this once we believe RTLD works reliably
-DEBUG=-DDEBUG
+# Disable DEBUG to get a fair performance comparison to rtld-elf
+# DEBUG=-DDEBUG
 
 PROG?=		ld-cheri-elf.so.1
 SRCS=		rtld_start.S \

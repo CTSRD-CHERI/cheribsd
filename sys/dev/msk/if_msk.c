@@ -1065,7 +1065,7 @@ msk_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	error = 0;
 
 	switch(command) {
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		MSK_IF_LOCK(sc_if);
 		if (ifr_mtu_get(ifr) > MSK_JUMBO_MTU ||
 		    ifr_mtu_get(ifr) < ETHERMIN)
@@ -1094,7 +1094,7 @@ msk_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		MSK_IF_UNLOCK(sc_if);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		MSK_IF_LOCK(sc_if);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
@@ -1108,19 +1108,19 @@ msk_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc_if->msk_if_flags = ifp->if_flags;
 		MSK_IF_UNLOCK(sc_if);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		MSK_IF_LOCK(sc_if);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			msk_rxfilter(sc_if);
 		MSK_IF_UNLOCK(sc_if);
 		break;
 	case SIOCGIFMEDIA:
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		mii = device_get_softc(sc_if->msk_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		reinit = 0;
 		MSK_IF_LOCK(sc_if);
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;

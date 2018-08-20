@@ -480,7 +480,7 @@ vlan_growhash(struct ifvlantrunk *trunk, int howmuch)
 		return;
 
 	/* M_NOWAIT because we're called with trunk mutex held */
-	hash2 = mallocarray(n2, sizeof(struct ifvlanhead), M_VLAN, M_NOWAIT);
+	hash2 = malloc(sizeof(struct ifvlanhead) * n2, M_VLAN, M_NOWAIT);
 	if (hash2 == NULL) {
 		printf("%s: out of memory -- hash size not changed\n",
 		    __func__);
@@ -1853,14 +1853,14 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ifv = ifp->if_softc;
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFADDR):
+	case CASE_IOC_IFREQ(SIOCSIFADDR):
 		ifp->if_flags |= IFF_UP;
 #ifdef INET
 		if (ifa->ifa_addr->sa_family == AF_INET)
 			arp_ifinit(ifp, ifa);
 #endif
 		break;
-	CASE_IOC_IFREQ(SIOCGIFADDR):
+	case CASE_IOC_IFREQ(SIOCGIFADDR):
 		bcopy(IF_LLADDR(ifp), ifr_addr_get_data(ifr), ifp->if_addrlen);
 		break;
 	case SIOCGIFMEDIA:
@@ -1877,7 +1877,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				ifmr = (struct ifmediareq *)data;
 				if (ifmr->ifm_count >= 1 && ifmr->ifm_ulist) {
 					ifmr->ifm_count = 1;
-					error = copyout_c((__cheri_tocap int * __capability)&ifmr->ifm_current,
+					error = copyout_c(&ifmr->ifm_current,
 						ifmr->ifm_ulist,
 						sizeof(int));
 				}
@@ -1888,11 +1888,11 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		VLAN_SUNLOCK();
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		error = EINVAL;
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		/*
 		 * Set the interface MTU.
 		 */
@@ -1913,7 +1913,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		VLAN_SUNLOCK();
 		break;
 
-	CASE_IOC_IFREQ(SIOCSETVLAN):
+	case CASE_IOC_IFREQ(SIOCSETVLAN):
 	case O_SIOCSETVLAN:
 #ifdef VIMAGE
 		/*
@@ -1944,7 +1944,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		if_rele(p);
 		break;
 
-	CASE_IOC_IFREQ(SIOCGETVLAN):
+	case CASE_IOC_IFREQ(SIOCGETVLAN):
 	case O_SIOCGETVLAN:
 #ifdef VIMAGE
 		if (ifp->if_vnet != ifp->if_home_vnet) {
@@ -1963,7 +1963,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = copyout_c(&vlr, ifr_data_get_ptr(ifr), sizeof(vlr));
 		break;
 		
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		/*
 		 * We should propagate selected flags to the parent,
 		 * e.g., promiscuous mode.
@@ -1974,8 +1974,8 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		VLAN_XUNLOCK();
 		break;
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		/*
 		 * If we don't have a parent, just remember the membership for
 		 * when we do.
@@ -1993,7 +1993,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		VLAN_RUNLOCK();
 		break;
 
-	CASE_IOC_IFREQ(SIOCGVLANPCP):
+	case CASE_IOC_IFREQ(SIOCGVLANPCP):
 #ifdef VIMAGE
 		if (ifp->if_vnet != ifp->if_home_vnet) {
 			error = EPERM;
@@ -2003,7 +2003,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ifr_vlan_pcp_set(ifr, ifv->ifv_pcp);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSVLANPCP):
+	case CASE_IOC_IFREQ(SIOCSVLANPCP):
 #ifdef VIMAGE
 		if (ifp->if_vnet != ifp->if_home_vnet) {
 			error = EPERM;
@@ -2021,7 +2021,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		vlan_tag_recalculate(ifv);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		VLAN_SLOCK();
 		ifv->ifv_capenable = ifr_reqcap_get(ifr);
 		trunk = TRUNK(ifv);

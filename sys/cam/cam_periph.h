@@ -159,7 +159,7 @@ cam_status cam_periph_alloc(periph_ctor_t *periph_ctor,
 			    ac_callback_t *, ac_code, void *arg);
 struct cam_periph *cam_periph_find(struct cam_path *path, char *name);
 int		cam_periph_list(struct cam_path *, struct sbuf *);
-cam_status	cam_periph_acquire(struct cam_periph *periph);
+int		cam_periph_acquire(struct cam_periph *periph);
 void		cam_periph_doacquire(struct cam_periph *periph);
 void		cam_periph_release(struct cam_periph *periph);
 void		cam_periph_release_locked(struct cam_periph *periph);
@@ -259,6 +259,9 @@ cam_periph_acquire_next(struct cam_periph *pperiph)
 	for ((periph) = cam_periph_acquire_first(driver);		\
 	    (periph) != NULL;						\
 	    (periph) = cam_periph_acquire_next(periph))
+
+#define CAM_PERIPH_PRINT(p, msg, args...)				\
+    printf("%s%d:" msg, (periph)->periph_name, (periph)->unit_number, ##args)
 
 #endif /* _KERNEL */
 #endif /* _CAM_CAM_PERIPH_H */

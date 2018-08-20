@@ -37,7 +37,19 @@ __FBSDID("$FreeBSD$");
 #include <stdlib.h>
 #include <string.h>
 
-extern int (*ypresp_allfn)();
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180728,
+ *   "target_type": "lib",
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "comment": "Fixed using a function pointer without prototypes"
+ * }
+ * CHERI CHANGES END
+ */
+extern int (*ypresp_allfn)(u_long, char *, int, char *, int, void *);
 extern void *ypresp_data;
 
 /*

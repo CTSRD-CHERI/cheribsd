@@ -112,6 +112,38 @@ request_irq(unsigned int irq, irq_handler_t handler, unsigned long flags,
 }
 
 static inline int
+enable_irq(unsigned int irq)
+{
+	struct irq_ent *irqe;
+	struct device *dev;
+
+	dev = linux_pci_find_irq_dev(irq);
+	if (dev == NULL)
+		return -EINVAL;
+	irqe = linux_irq_ent(dev, irq);
+	if (irqe == NULL)
+		return -EINVAL;
+	return -bus_setup_intr(dev->bsddev, irqe->res, INTR_TYPE_NET | INTR_MPSAFE,
+	    NULL, linux_irq_handler, irqe, &irqe->tag);
+}
+
+static inline void
+disable_irq(unsigned int irq)
+{
+	struct irq_ent *irqe;
+	struct device *dev;
+
+	dev = linux_pci_find_irq_dev(irq);
+	if (dev == NULL)
+		return;
+	irqe = linux_irq_ent(dev, irq);
+	if (irqe == NULL)
+		return;
+	bus_teardown_intr(dev->bsddev, irqe->res, irqe->tag);
+	irqe->tag = NULL;
+}
+
+static inline int
 bind_irq_to_cpu(unsigned int irq, int cpu_id)
 {
 	struct irq_ent *irqe;
@@ -168,5 +200,7 @@ extern void tasklet_schedule(struct tasklet_struct *);
 extern void tasklet_kill(struct tasklet_struct *);
 extern void tasklet_init(struct tasklet_struct *, tasklet_func_t *,
     unsigned long data);
+extern void tasklet_enable(struct tasklet_struct *);
+extern void tasklet_disable(struct tasklet_struct *);
 
 #endif	/* _LINUX_INTERRUPT_H_ */

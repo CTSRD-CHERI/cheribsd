@@ -350,7 +350,7 @@ int
 cheriabi_mkfifoat(struct thread *td, struct cheriabi_mkfifoat_args *uap)
 {
 
-	return (kern_mkfifoat(td, AT_FDCWD, uap->path, UIO_USERSPACE,
+	return (kern_mkfifoat(td, uap->fd, uap->path, UIO_USERSPACE,
 	    uap->mode));
 }
 
@@ -559,8 +559,8 @@ int
 cheriabi_fchownat(struct thread *td, struct cheriabi_fchownat_args *uap)
 {
 
-	return (kern_fchownat(td, AT_FDCWD, uap->path, UIO_USERSPACE,
-	    uap->uid, uap->gid, 0));
+	return (kern_fchownat(td, uap->fd, uap->path, UIO_USERSPACE,
+	    uap->uid, uap->gid, uap->flag));
 }
 
 int

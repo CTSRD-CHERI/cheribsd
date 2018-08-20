@@ -121,8 +121,7 @@ __libcheri_ ## class ## _entry:						\
 	cgetdefault	$c2;						\
 	clc	$c1, $t0, 0($c2);					\
 	clc	$c2, $t0, CHERICAP_SIZE($c2);				\
-	ccall	$c1, $c2, 1;						\
-	nop;								\
+	CCALL($c1, $c2);						\
 									\
 $__libcheri_ ## class ## _entry_end:					\
 	.end __libcheri_## class ## _entry;				\
@@ -182,8 +181,7 @@ __libcheri_ ## class ## _entry:						\
 	cgetdefault	$c2;						\
 	clc	$c1, $t0, 0($c2);					\
 	clc	$c2, $t0, CHERICAP_SIZE($c2);				\
-	ccall	$c1, $c2, 1;						\
-	nop;								\
+	CCALL($c1, $c2);						\
 									\
 $__libcheri_ ## class ## _entry_end:					\
 	.end __libcheri_## class ## _entry;				\

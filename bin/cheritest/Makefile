@@ -8,16 +8,8 @@ SRCS+=	cheritest_bounds_globals.c					\
 	cheritest_bounds_globals_x.c					\
 	cheritest_bounds_heap.c						\
 	cheritest_bounds_stack.c					\
-	cheritest_ccall.c						\
 	cheritest_fault.c						\
-	cheritest_fd.c							\
 	cheritest_kbounce.c						\
-	cheritest_libcheri.c						\
-	cheritest_libcheri_cxx.cc					\
-	cheritest_libcheri_fault.c					\
-	cheritest_libcheri_local.c					\
-	cheritest_libcheri_trustedstack.c				\
-	cheritest_libcheri_var.c					\
 	cheritest_longjmp.c						\
 	cheritest_registers.c						\
 	cheritest_sandbox.S						\
@@ -82,24 +74,58 @@ MAN=
 NEED_CHERI=	hybrid
 .elif ${PROG} == cheritest-mt
 NEED_CHERI=	hybrid
+.elif ${PROG} == cheritest-dynamic
+NEED_CHERI=	hybrid
+.elif ${PROG} == cheritest-dynamic-mt
+NEED_CHERI=	hybrid
 .elif ${PROG} == cheriabitest
 WANT_CHERI=	pure
 .elif ${PROG} == cheriabitest-mt
 WANT_CHERI=	pure
+.elif ${PROG} == cheriabitest-dynamic
+WANT_CHERI=	pure
+.elif ${PROG} == cheriabitest-dynamic-mt
+WANT_CHERI=	pure
+.else
+.error Unknown cheritest variant ${PROG}
 .endif
 WANT_DUMP=	yes
-LIBADD= 	cheri z
+LIBADD= 	z
 .endif
 
 LIBADD+=	xo util
 
+.ifdef CHERI_DYNAMIC_TESTS
+CFLAGS+=	-DCHERI_DYNAMIC_TESTS
+MK_CHERI_SHARED_PROG=	yes
+.else
 NO_SHARED?=	YES
+# XXX-JC: Enable unconditionally once we have a dynamic libcheri
+CFLAGS+=	-DCHERI_LIBCHERI_TESTS
+.ifndef BOOTSTRAPPING
+LIBADD+=	cheri
+SRCS+=		cheritest_ccall.c					\
+		cheritest_fd.c						\
+		cheritest_libcheri.c					\
+		cheritest_libcheri_cxx.cc				\
+		cheritest_libcheri_fault.c				\
+		cheritest_libcheri_local.c				\
+		cheritest_libcheri_trustedstack.c			\
+		cheritest_libcheri_var.c
+.endif
+.endif
 
 NO_WERROR=	YES
 
 .ifdef CHERITHREAD_TESTS
 LIBADD+=	pthread
+.ifndef BOOTSTRAPPING
+SRCS+=		cheritest_tls_threads.c
+# XXX-JC: Enable unconditionally once we have a dynamic libcheri
+.ifndef CHERI_DYNAMIC_TESTS
 SRCS+=		cheritest_libcheri_pthreads.c
+.endif
+.endif
 .endif
 
 .ifdef BOOTSTRAPPING

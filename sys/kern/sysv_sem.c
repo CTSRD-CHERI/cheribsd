@@ -293,7 +293,7 @@ seminit(void)
 
 	sem = malloc(sizeof(struct sem) * seminfo.semmns, M_SEM, M_WAITOK);
 	sema = malloc(sizeof(struct semid_kernel) * seminfo.semmni, M_SEM,
-	    M_WAITOK|M_ZERO);
+	    M_WAITOK | M_ZERO);
 	sema_mtx = malloc(sizeof(struct mtx) * seminfo.semmni, M_SEM,
 	    M_WAITOK | M_ZERO);
 	semu = malloc(seminfo.semmnu * seminfo.semusz, M_SEM, M_WAITOK);
@@ -769,7 +769,7 @@ cheriabi___semctl(struct thread *td, struct cheriabi___semctl_args *uap)
 		CP(dsbuf, dsbuf_c, sem_nsems);
 		CP(dsbuf, dsbuf_c, sem_otime);
 		CP(dsbuf, dsbuf_c, sem_ctime);
-		error = copyout_c( &dsbuf_c, arg.buf, sizeof(dsbuf_c));
+		error = copyout_c(&dsbuf_c, arg.buf, sizeof(dsbuf_c));
 		break;
 	}
 
@@ -791,7 +791,7 @@ int
 kern_semctl(struct thread *td, int semid, int semnum, int cmd, ksemun_t *arg,
     register_t *rval)
 {
-	u_short * __capability array;
+	u_short *array;
 	struct ucred *cred = td->td_ucred;
 	int i, error;
 	struct prison *rpr;
@@ -956,7 +956,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd, ksemun_t *arg,
 		 */
 		count = semakptr->u.sem_nsems;
 		mtx_unlock(sema_mtxp);		    
-		array = malloc_c(sizeof(*array) * count, M_TEMP, M_WAITOK);
+		array = malloc(sizeof(*array) * count, M_TEMP, M_WAITOK);
 		mtx_lock(sema_mtxp);
 		if ((error = semvalid(semid, rpr, semakptr)) != 0)
 			goto done2;
@@ -1009,7 +1009,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd, ksemun_t *arg,
 		 */
 		count = semakptr->u.sem_nsems;
 		mtx_unlock(sema_mtxp);		    
-		array = malloc_c(sizeof(*array) * count, M_TEMP, M_WAITOK);
+		array = malloc(sizeof(*array) * count, M_TEMP, M_WAITOK);
 		error = copyin_c(arg->array, array, count * sizeof(*array));
 		mtx_lock(sema_mtxp);
 		if (error)
@@ -1042,8 +1042,7 @@ done2:
 	mtx_unlock(sema_mtxp);
 	if (cmd == IPC_RMID)
 		mtx_unlock(&sem_mtx);
-	if (array != NULL)
-		free_c(array, M_TEMP);
+	free(array, M_TEMP);
 	return(error);
 }
 
@@ -1195,7 +1194,7 @@ sys_semop(struct thread *td, struct semop_args *uap)
 }
 
 static int
-kern_semop(struct thread *td, int semid, struct sembuf * __capability usops,
+kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
     size_t nsops)
 {
 #define SMALL_SOPS	8
@@ -1210,20 +1209,21 @@ kern_semop(struct thread *td, int semid, struct sembuf * __capability usops,
 	size_t i, j, k;
 	int error;
 	int do_wakeup, do_undos;
+	int semid;
 	unsigned short seq;
 
 #ifdef SEM_DEBUG
 	sops = NULL;
 #endif
-	DPRINTF(("call to semop(%d, %p, %u)\n", semid, sops, nsops));
+	DPRINTF(("call to semop(%d, %p, %u)\n", usemid, sops, nsops));
 
-	AUDIT_ARG_SVIPC_ID(semid);
+	AUDIT_ARG_SVIPC_ID(usemid);
 
 	rpr = sem_find_prison(td->td_ucred);
 	if (sem == NULL)
 		return (ENOSYS);
 
-	semid = IPCID_TO_IX(semid);	/* Convert back to zero origin */
+	semid = IPCID_TO_IX(usemid);	/* Convert back to zero origin */
 
 	if (semid < 0 || semid >= seminfo.semmni)
 		return (EINVAL);
@@ -1250,9 +1250,7 @@ kern_semop(struct thread *td, int semid, struct sembuf * __capability usops,
 
 		sops = malloc(nsops * sizeof(*sops), M_TEMP, M_WAITOK);
 	}
-	if ((error = copyin_c(usops,
-	    (__cheri_tocap struct sembuf * __capability)sops,
-	    nsops * sizeof(sops[0]))) != 0) {
+	if ((error = copyin_c(usops, sops, nsops * sizeof(sops[0]))) != 0) {
 		DPRINTF(("error = %d from copyin(%p, %p, %d)\n", error,
 		    (__cheri_fromcap struct sembuf *)usops, sops,
 		    nsops * sizeof(sops[0])));
@@ -1269,7 +1267,7 @@ kern_semop(struct thread *td, int semid, struct sembuf * __capability usops,
 		goto done2;
 	}
 	seq = semakptr->u.sem_perm.seq;
-	if (seq != IPCID_TO_SEQ(semid)) {
+	if (seq != IPCID_TO_SEQ(usemid)) {
 		error = EINVAL;
 		goto done2;
 	}
@@ -1397,7 +1395,7 @@ kern_semop(struct thread *td, int semid, struct sembuf * __capability usops,
 		 */
 		seq = semakptr->u.sem_perm.seq;
 		if ((semakptr->u.sem_perm.mode & SEM_ALLOC) == 0 ||
-		    seq != IPCID_TO_SEQ(semid)) {
+		    seq != IPCID_TO_SEQ(usemid)) {
 			error = EIDRM;
 			goto done2;
 		}
@@ -1629,7 +1627,8 @@ sysctl_sema(SYSCTL_HANDLER_ARGS)
 #ifdef COMPAT_FREEBSD32
 		if (SV_CURPROC_FLAG(SV_ILP32)) {
 			bzero(&tsemak32, sizeof(tsemak32));
-			freebsd32_ipcperm_out(&tsemak.u.sem_perm, &tsemak32.u.sem_perm);
+			freebsd32_ipcperm_out(&tsemak.u.sem_perm,
+			    &tsemak32.u.sem_perm);
 			/* Don't copy u.sem_base */
 			CP(tsemak, tsemak32, u.sem_nsems);
 			CP(tsemak, tsemak32, u.sem_otime);

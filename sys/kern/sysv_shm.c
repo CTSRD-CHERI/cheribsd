@@ -1028,7 +1028,7 @@ shmrealloc(void)
 		return;
 
 	newsegs = malloc(shminfo.shmmni * sizeof(*newsegs), M_SHM,
-	    M_WAITOK|M_ZERO);
+	    M_WAITOK | M_ZERO);
 	for (i = 0; i < shmalloced; i++)
 		bcopy(&shmsegs[i], &newsegs[i], sizeof(newsegs[0]));
 	for (; i < shminfo.shmmni; i++) {

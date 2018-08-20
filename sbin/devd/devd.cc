@@ -161,7 +161,7 @@ static const char *configfile = CF;
 static void devdlog(int priority, const char* message, ...)
 	__printflike(2, 3);
 static void event_loop(void);
-static void usage(void);
+static void usage(void) __dead2;
 
 template <class T> void
 delete_and_clear(vector<T *> &v)
@@ -1021,7 +1021,7 @@ event_loop(void)
 			tv.tv_usec = 0;
 			FD_ZERO(&fds);
 			FD_SET(fd, &fds);
-			rv = select(fd + 1, &fds, &fds, &fds, &tv);
+			rv = select(fd + 1, &fds, NULL, NULL, &tv);
 			// No events -> we've processed all pending events
 			if (rv == 0) {
 				devdlog(LOG_DEBUG, "Calling daemon\n");

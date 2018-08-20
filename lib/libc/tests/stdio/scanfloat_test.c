@@ -203,6 +203,10 @@ ATF_TC_BODY(infinities_and_nans, tc)
 ATF_TC_WITHOUT_HEAD(rounding_tests);
 ATF_TC_BODY(rounding_tests, tc)
 {
+#ifndef _FLOAT_IEEE754
+	atf_tc_skip("Test not applicable on this architecture.");
+#else
+
 	long double ld = 0.0;
 	double d = 0.0;
 
@@ -277,11 +281,15 @@ ATF_TC_BODY(rounding_tests, tc)
 	/* Extra digits in a denormal shouldn't break anything. */
 	sscanf("0x1.2345678p-1050", "%le", &d);
 	ATF_CHECK(d == 0x1.234568p-1050);
+#endif /* _FLOAT_IEEE754 */
 }
 
 ATF_TC_WITHOUT_HEAD(strtod);
 ATF_TC_BODY(strtod, tc)
 {
+#ifndef _FLOAT_IEEE754
+	atf_tc_skip("Test not applicable on this architecture.");
+#else
 	char *endp;
 
 	ATF_REQUIRE(setlocale(LC_NUMERIC, "C"));
@@ -302,6 +310,7 @@ ATF_TC_BODY(strtod, tc)
 	fesetround(FE_TONEAREST);
 	ATF_CHECK(strtof("3.5e38", &endp) == INFINITY);
 	ATF_CHECK(strtod("2e308", &endp) == INFINITY);
+#endif /* _FLOAT_IEEE754 */
 }
 
 ATF_TP_ADD_TCS(tp)

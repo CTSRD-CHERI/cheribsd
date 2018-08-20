@@ -548,17 +548,17 @@ tunifioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ifs->ascii[0] = '\0';
 		mtx_unlock(&tp->tun_mtx);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFADDR):
+	case CASE_IOC_IFREQ(SIOCSIFADDR):
 		tuninit(ifp);
 		TUNDEBUG(ifp, "address set\n");
 		break;
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		ifp->if_mtu = ifr_mtu_get(ifr);
 		TUNDEBUG(ifp, "mtu set\n");
 		break;
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		break;
 	default:
 		error = EINVAL;

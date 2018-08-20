@@ -58,6 +58,7 @@
 #ifndef _MACHINE_ASM_H_
 #define	_MACHINE_ASM_H_
 
+#include <machine/abi.h>
 #include <machine/regdef.h>
 #include <machine/endian.h>
 #include <machine/cdefs.h>
@@ -289,12 +290,6 @@ _C_LABEL(x):
 	.asciiz str;			\
 	.align	3
 
-#if defined(__mips_o32)
-#define	SZREG	4
-#else
-#define	SZREG	8
-#endif
-
 #if defined(__mips_o32) || defined(__mips_o64)
 #define	ALSK	7		/* stack alignment */
 #define	ALMASK	-7		/* stack alignment */
@@ -308,74 +303,6 @@ _C_LABEL(x):
 #define	FP_L	ldc1
 #define	FP_S	sdc1
 #endif
-
-#ifndef __CHERI_PURE_CAPABILITY__
-/*
- *  standard callframe {
- *	register_t cf_pad[N];		o32/64 (N=0), n32 (N=1) n64 (N=1)
- *  	register_t cf_args[4];		arg0 - arg3 (only on o32 and o64)
- *  	register_t cf_gp;		global pointer (only on n32 and n64)
- *  	register_t cf_sp;		frame pointer
- *  	register_t cf_ra;		return address
- *  };
- */
-#if defined(__mips_o32) || defined(__mips_o64)
-#define	CALLFRAME_SIZ	(SZREG * (4 + 2))
-#define	CALLFRAME_S0	0
-#elif defined(__mips_n32) || defined(__mips_n64)
-#define	CALLFRAME_SIZ	(SZREG * 4)
-#define	CALLFRAME_S0	(CALLFRAME_SIZ - 4 * SZREG)
-#endif
-#ifndef _KERNEL
-#define	CALLFRAME_GP	(CALLFRAME_SIZ - 3 * SZREG)
-#endif
-#define	CALLFRAME_SP	(CALLFRAME_SIZ - 2 * SZREG)
-#define	CALLFRAME_RA	(CALLFRAME_SIZ - 1 * SZREG)
-#else /* defined(__CHERI_PURE_CAPABILITY__) */
-/*
- *  cheriabi callframe {
- *	intcap_t	cf_cgp;		global pointer
- *	intcap_t	cf_csp;		frame pointer
- *	intcap_t	cf_cra;		return address
- *	int32_t		cf_s0;		misc.
- *  };
- *
- *  cheriabi callframe {
- *	intcap_t	cf_s0;  misc
- *	intcap_t	cf_cra; return address
- *	intcap_t	cf_csp; frame pointer
- *	int64_t		cf_pad[N]; N=1 cheri128, N=3 cheri256
- *	int64_t		cf_cgp;  global pointer (Not yet a capability)
- *  };
- *
- * XXX-BD: This is unstable and will certainly change.
- */
-/* #define	CALLFRAME_SIZ	(2*(_MIPS_SZCAP / 8)) */
-/* #define	CALLFRAME_CRA	(0*(_MIPS_SZCAP / 8)) */
-/* #define	CALLFRAME_S0	(1*(_MIPS_SZCAP / 8)) */
-/* #define CALLFRAME_SP	0 */
-/* #define CALLFRAME_RA    CALLFRAME_CRA */
-
-/*
- * XXX-AM: The purecap kernel is PIC, so we have GP. Ideally it should go
- * away once we have proper non-pic purecap support.
- */
-#define	CALLFRAME_SIZ	(4*(_MIPS_SZCAP / 8))
-
-#define	CALLFRAME_S0	(0*(_MIPS_SZCAP / 8))
-#define	CALLFRAME_CRA	(1*(_MIPS_SZCAP / 8))
-#define CALLFRAME_CSP	(2*(_MIPS_SZCAP / 8))
-#define CALLFRAME_CGP   (3*(_MIPS_SZCAP / 8))
-
-/* XXX-AM: these should never be used in purecap */
-#define CALLFRAME_RA    CALLFRAME_CRA
-#define CALLFRAME_SP    CALLFRAME_CSP
-#ifdef CPU_CHERI128
-#define CALLFRAME_GP    CALLFRAME_CGP + 8
-#else /* CPU_CHERI256 */
-#define CALLFRAME_GP    CALLFRAME_CGP + 24
-#endif
-#endif /* defined(__CHERI_PURE_CAPABILITY__) */
 
 /*
  *   Endian-independent assembly-code aliases for unaligned memory accesses.

@@ -217,8 +217,9 @@ cheri_init_capabilities()
 
 #endif /* CHERI_KERNEL */
 
-static void * __capability userspace_cap;
-static void * __capability user_sealcap;
+/* Set to -1 to prevent it from being zeroed with the rest of BSS */
+void * __capability userspace_cap = (void * __capability)(intcap_t)-1;
+void * __capability user_sealcap = (void * __capability)(intcap_t)-1;
 
 /*
  * For now, all we do is declare what we support, as most initialisation took
@@ -248,16 +249,8 @@ cheri_cpu_startup(void)
 #endif
 
 	/*
-	 * Create a capability covering all of userspace from which to
-	 * derive new capabilities in execve(), etc.
-	 *
-	 * XXX-BD: A hardline, no-exceptions W^X implementation would split
-	 * the userspace capability here.
-	 *
-	 * XXX-BD: This is actually an ABI property and should probably
-	 * per sysent.
-	 *
-	 * XXX-BD: this should happen earlier in startup.
+	 * Documentary assertions for userspace_cap.  Default data and
+	 * code need to be identically sized or we'll need seperate caps.
 	 */
 	_Static_assert(CHERI_CAP_USER_DATA_BASE == CHERI_CAP_USER_CODE_BASE,
 	    "Code and data bases differ");
@@ -267,17 +260,6 @@ cheri_cpu_startup(void)
 	    "Data offset is non-zero");
 	_Static_assert(CHERI_CAP_USER_CODE_OFFSET == 0,
 	    "Code offset is non-zero");
-	userspace_cap = cheri_andperm(cheri_csetbounds(
-	    cheri_setoffset(cheri_getkdc(), CHERI_CAP_USER_DATA_BASE),
-	    CHERI_CAP_USER_DATA_LENGTH),
-	    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
-
-	/*
-	 * Create a capability for userspace to seal capabilities with.
-	 */
-	cheri_capability_set(&user_sealcap, CHERI_SEALCAP_USERSPACE_PERMS,
-	    CHERI_SEALCAP_USERSPACE_BASE, CHERI_SEALCAP_USERSPACE_LENGTH,
-	    CHERI_SEALCAP_USERSPACE_OFFSET);
 
 	/*
 	 * XXX-BD: KDC may now be reduced.
@@ -339,80 +321,11 @@ cheri_capability_build_user_rwx(uint32_t perms, vaddr_t basep, size_t length,
 	    cheri_setoffset(userspace_cap, basep), length), perms), off);
 
 	KASSERT(cheri_getlen(tmpcap) == length,
-	    ("Constructed capability has wrong length %zu != %zu",
+	    ("Constructed capability has wrong length 0x%zx != 0x%zx",
 	    cheri_getlen(tmpcap), length));
 
 	return (tmpcap);
 }
-
-/*
- * Build a new capabilty derived from $kdc with the contents of the passed
- * flattened representation.  Only unsealed capabilities are supported;
- * capabilities must be separately sealed if required.
- *
- * XXXRW: It's not yet clear how important ordering is here -- try to do the
- * privilege downgrade in a way that will work when doing an "in place"
- * downgrade, with permissions last.
- *
- * XXXRW: In the new world order of CSetBounds, it's not clear that taking
- * explicit base/length/offset arguments is quite the right thing.
- */
-void
-cheri_capability_set(void * __capability *cp, uint32_t perms, vaddr_t basep,
-    size_t length, off_t off)
-{
-	/* 'basep' is relative to $kdc. */
-	*cp = cheri_setoffset(cheri_andperm(cheri_csetbounds(
-	    cheri_incoffset(cheri_getkdc(), basep), length), perms),
-	    off);
-
-	/*
-	 * NB: With imprecise bounds, we want to assert that the results will
-	 * be 'as requested' -- i.e., that the kernel always request bounds
-	 * that can be represented precisly.
-	 */
-#ifdef INVARIANTS
-	KASSERT(cheri_gettag(*cp) != 0, ("%s: capability untagged", __func__));
-	KASSERT(cheri_getperm(*cp) == (register_t)perms,
-	    ("%s: permissions 0x%lx rather than 0x%x", __func__,
-	    (unsigned long)cheri_getperm(*cp), perms));
-	KASSERT(cheri_getbase(*cp) == (register_t)basep,
-	    ("%s: base %p rather than %lx", __func__,
-	     (void *)cheri_getbase(*cp), basep));
-	KASSERT(cheri_getlen(*cp) == (register_t)length,
-	    ("%s: length 0x%lx rather than %p", __func__,
-	    (unsigned long)cheri_getlen(*cp), (void *)length));
-	KASSERT(cheri_getoffset(*cp) == (register_t)off,
-	    ("%s: offset %p rather than %p", __func__,
-	    (void *)cheri_getoffset(*cp), (void *)off));
-#endif
-}
-
-#ifdef __CHERI_PURE_CAPABILITY__
-/**
- * This is used in the purecap kernel to temporarily generate
- * pointers when no better provenance options are available.
- */
-__inline void *
-cheri_kern_ptr(vaddr_t addr, size_t len)
-{
-	return cheri_csetbounds(cheri_incoffset(cheri_getkdc(), addr), len);
-}
-#endif
-
-/*
- * Functions to store a common set of capability values to in-memory
- * capabilities used in various aspects of user contexts.
- */
-#ifdef _UNUSED
-static void
-cheri_capability_set_kern(void * __capability *cp)
-{
-
-	cheri_capability_set(cp, CHERI_CAP_KERN_PERMS, CHERI_CAP_KERN_BASE,
-	    CHERI_CAP_KERN_LENGTH, CHERI_CAP_KERN_OFFSET);
-}
-#endif
 
 void
 cheri_capability_set_user_sigcode(void * __capability *cp,

@@ -125,7 +125,7 @@ struct ifmediareq64 {
 #define	SIOCGIFXMEDIA64	_IOC_NEWTYPE(SIOCGIFXMEDIA, struct ifmediareq64)
 
 #define	_CASE_IOC_IFGROUPREQ_C(cmd)				\
-    case _IOC_NEWTYPE((cmd), struct ifgroupreq_c):
+    _IOC_NEWTYPE((cmd), struct ifgroupreq_c): case
 #else
 #define _CASE_IOC_IFGROUPREQ_C(cmd)
 #endif
@@ -188,7 +188,7 @@ struct ifmediareq32 {
 #define	SIOCGIFXMEDIA32	_IOC_NEWTYPE(SIOCGIFXMEDIA, struct ifmediareq32)
 
 #define	_CASE_IOC_IFGROUPREQ_32(cmd)				\
-    case _IOC_NEWTYPE((cmd), struct ifgroupreq32):
+    _IOC_NEWTYPE((cmd), struct ifgroupreq32): case
 #else
 #define _CASE_IOC_IFGROUPREQ_32(cmd)
 #endif /* COMPAT_FREEBSD32 */
@@ -196,7 +196,7 @@ struct ifmediareq32 {
 #define CASE_IOC_IFGROUPREQ(cmd)	\
     _CASE_IOC_IFGROUPREQ_32(cmd)	\
     _CASE_IOC_IFGROUPREQ_C(cmd)		\
-    case (cmd)
+    (cmd)
 
 union ifreq_union {
 	struct ifreq	ifr;
@@ -2675,7 +2675,7 @@ ifr_buffer_get_buffer(struct thread *td, void *data)
 	else
 #endif
 		return (__USER_CAP(ifrup->ifr.ifr_ifru.ifru_buffer.buffer,
-		    ifrup->ifr32.ifr_ifru.ifru_buffer.length));
+		    ifrup->ifr.ifr_ifru.ifru_buffer.length));
 }
 
 static void
@@ -2914,41 +2914,41 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 
 	ifr = (struct ifreq *)data;
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCGIFINDEX):
+	case CASE_IOC_IFREQ(SIOCGIFINDEX):
 		ifr_index_set(ifr, ifp->if_index);
 		break;
 
-	CASE_IOC_IFREQ(SIOCGIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCGIFFLAGS):
 		temp_flags = ifp->if_flags | ifp->if_drv_flags;
 		ifr_flags_set(ifr, temp_flags & 0xffff);
 		ifr_flagshigh_set(ifr, temp_flags >> 16);
 		break;
 
-	CASE_IOC_IFREQ(SIOCGIFCAP):
+	case CASE_IOC_IFREQ(SIOCGIFCAP):
 		ifr_reqcap_set(ifr, ifp->if_capabilities);
 		ifr_curcap_set(ifr, ifp->if_capenable);
 		break;
 
 #ifdef MAC
-	CASE_IOC_IFREQ(SIOCGIFMAC):
+	case CASE_IOC_IFREQ(SIOCGIFMAC):
 		error = mac_ifnet_ioctl_get(td->td_ucred, ifr, ifp);
 		break;
 #endif
 
-	CASE_IOC_IFREQ(SIOCGIFMETRIC):
+	case CASE_IOC_IFREQ(SIOCGIFMETRIC):
 		ifr_metric_set(ifr, ifp->if_metric);
 		break;
 
-	CASE_IOC_IFREQ(SIOCGIFMTU):
+	case CASE_IOC_IFREQ(SIOCGIFMTU):
 		ifr_mtu_set(ifr, ifp->if_mtu);
 		break;
 
-	CASE_IOC_IFREQ(SIOCGIFPHYS):
+	case CASE_IOC_IFREQ(SIOCGIFPHYS):
 		/* XXXGL: did this ever worked? */
 		ifr_phys_set(ifr, 0);
 		break;
 
-	CASE_IOC_IFREQ(SIOCGIFDESCR):
+	case CASE_IOC_IFREQ(SIOCGIFDESCR):
 		error = 0;
 		sx_slock(&ifdescr_sx);
 		if (ifp->if_description == NULL)
@@ -2959,16 +2959,14 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 			if (ifr_buffer_get_length(td, ifr) < descrlen)
 				ifr_buffer_set_buffer(td, ifr, NULL);
 			else
-				error = copyout_c(
-				    (__cheri_tocap char * __capability)
-				    ifp->if_description,
+				error = copyout_c(ifp->if_description,
 				    ifr_buffer_get_buffer(td, ifr), descrlen);
 			ifr_buffer_set_length(td, ifr, descrlen);
 		}
 		sx_sunlock(&ifdescr_sx);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFDESCR):
+	case CASE_IOC_IFREQ(SIOCSIFDESCR):
 		error = priv_check(td, PRIV_NET_SETIFDESCR);
 		if (error)
 			return (error);
@@ -2987,8 +2985,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 			descrbuf = malloc(ifr_buffer_get_length(td, ifr),
 			    M_IFDESCR, M_WAITOK | M_ZERO);
 			error = copyin_c(ifr_buffer_get_buffer(td, ifr),
-			    (__cheri_tocap char * __capability)descrbuf,
-			    ifr_buffer_get_length(td, ifr) - 1);
+			    descrbuf, ifr_buffer_get_length(td, ifr) - 1);
 			if (error) {
 				free(descrbuf, M_IFDESCR);
 				break;
@@ -3004,11 +3001,11 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		free(odescrbuf, M_IFDESCR);
 		break;
 
-	CASE_IOC_IFREQ(SIOCGIFFIB):
+	case CASE_IOC_IFREQ(SIOCGIFFIB):
 		ifr_fib_set(ifr, ifp->if_fib);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFFIB):
+	case CASE_IOC_IFREQ(SIOCSIFFIB):
 		error = priv_check(td, PRIV_NET_SETIFFIB);
 		if (error)
 			return (error);
@@ -3018,7 +3015,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		ifp->if_fib = ifr_fib_get(ifr);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		error = priv_check(td, PRIV_NET_SETIFFLAGS);
 		if (error)
 			return (error);
@@ -3057,7 +3054,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		getmicrotime(&ifp->if_lastchange);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		error = priv_check(td, PRIV_NET_SETIFCAP);
 		if (error)
 			return (error);
@@ -3071,12 +3068,12 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 
 #ifdef MAC
-	CASE_IOC_IFREQ(SIOCSIFMAC):
+	case CASE_IOC_IFREQ(SIOCSIFMAC):
 		error = mac_ifnet_ioctl_set(td->td_ucred, ifr, ifp);
 		break;
 #endif
 
-	CASE_IOC_IFREQ(SIOCSIFNAME):
+	case CASE_IOC_IFREQ(SIOCSIFNAME):
 		error = priv_check(td, PRIV_NET_SETIFNAME);
 		if (error)
 			return (error);
@@ -3140,7 +3137,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 
 #ifdef VIMAGE
-	CASE_IOC_IFREQ(SIOCSIFVNET):
+	case CASE_IOC_IFREQ(SIOCSIFVNET):
 		error = priv_check(td, PRIV_NET_SETIFVNET);
 		if (error)
 			return (error);
@@ -3148,7 +3145,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 #endif
 
-	CASE_IOC_IFREQ(SIOCSIFMETRIC):
+	case CASE_IOC_IFREQ(SIOCSIFMETRIC):
 		error = priv_check(td, PRIV_NET_SETIFMETRIC);
 		if (error)
 			return (error);
@@ -3156,7 +3153,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		getmicrotime(&ifp->if_lastchange);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFPHYS):
+	case CASE_IOC_IFREQ(SIOCSIFPHYS):
 		error = priv_check(td, PRIV_NET_SETIFPHYS);
 		if (error)
 			return (error);
@@ -3167,7 +3164,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 			getmicrotime(&ifp->if_lastchange);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 	{
 		u_long oldmtu = ifp->if_mtu;
 
@@ -3196,7 +3193,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 	}
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
 	{
 		struct ifmultiaddr *ifma;
 
@@ -3231,7 +3228,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 	}
 
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		error = priv_check(td, PRIV_NET_DELMULTI);
 		if (error)
 			return (error);
@@ -3250,12 +3247,12 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 
 	case SIOCSIFPHYADDR:
-	CASE_IOC_IFREQ(SIOCDIFPHYADDR):
+	case CASE_IOC_IFREQ(SIOCDIFPHYADDR):
 #ifdef INET6
 	case SIOCSIFPHYADDR_IN6:
 #endif
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
-	CASE_IOC_IFREQ(SIOCSIFGENERIC):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFGENERIC):
 		error = priv_check(td, PRIV_NET_HWIOCTL);
 		if (error)
 			return (error);
@@ -3267,11 +3264,11 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 
 	case SIOCGIFSTATUS:
-	CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
-	CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
+	case CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
+	case CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
 	case SIOCGIFMEDIA:
 	case SIOCGIFXMEDIA:
-	CASE_IOC_IFREQ(SIOCGIFGENERIC):
+	case CASE_IOC_IFREQ(SIOCGIFGENERIC):
 	case SIOCGIFRSSKEY:
 	case SIOCGIFRSSHASH:
 		if (ifp->if_ioctl == NULL)
@@ -3279,7 +3276,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		error = (*ifp->if_ioctl)(ifp, cmd, data);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFLLADDR):
+	case CASE_IOC_IFREQ(SIOCSIFLLADDR):
 		error = priv_check(td, PRIV_NET_SETLLADDR);
 		if (error)
 			return (error);
@@ -3287,11 +3284,11 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		    ifr_addr_get_len(ifr));
 		break;
 
-	CASE_IOC_IFREQ(SIOCGHWADDR):
+	case CASE_IOC_IFREQ(SIOCGHWADDR):
 		error = if_gethwaddr(ifp, ifr);
 		break;
 
-	CASE_IOC_IFGROUPREQ(SIOCAIFGROUP):
+	case CASE_IOC_IFGROUPREQ(SIOCAIFGROUP):
 	{
 		struct ifgroupreq *ifgr = (struct ifgroupreq *)ifr;
 
@@ -3303,12 +3300,12 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 	}
 
-	CASE_IOC_IFGROUPREQ(SIOCGIFGROUP):
+	case CASE_IOC_IFGROUPREQ(SIOCGIFGROUP):
 		if ((error = if_getgroup((struct ifgroupreq *)ifr, ifp)))
 			return (error);
 		break;
 
-	CASE_IOC_IFGROUPREQ(SIOCDIFGROUP):
+	case CASE_IOC_IFGROUPREQ(SIOCDIFGROUP):
 	{
 		struct ifgroupreq *ifgr = (struct ifgroupreq *)ifr;
 
@@ -3360,7 +3357,7 @@ ifmr_init(struct ifmediareq *ifmr, caddr_t data)
 		ifmr->ifm_count = ifmr64->ifm_count;
 		ifmr->ifm_ulist =
 		    __USER_CAP(ifmr64->ifm_ulist,
-			ifrm64->ifm_count * sizeof(int));
+			ifmr64->ifm_count * sizeof(int));
 	} else
 #endif
 #ifdef COMPAT_FREEBSD32
@@ -3491,28 +3488,28 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	ifr = (struct ifreq *)data;
 	switch (cmd) {
 #ifdef VIMAGE
-	CASE_IOC_IFREQ(SIOCSIFRVNET):
+	case CASE_IOC_IFREQ(SIOCSIFRVNET):
 		error = priv_check(td, PRIV_NET_SETIFVNET);
 		if (error == 0)
 			error = if_vmove_reclaim(td, ifr->ifr_name,
 			    ifr_jid_get(ifr));
 		goto out_noref;
 #endif
-	CASE_IOC_IFREQ(SIOCIFCREATE):
+	case CASE_IOC_IFREQ(SIOCIFCREATE):
 		error = priv_check(td, PRIV_NET_IFCREATE);
 		if (error == 0)
 			error = if_clone_create(ifr->ifr_name,
 			    sizeof(ifr->ifr_name), NULL);
 		goto out_noref;
 
-	CASE_IOC_IFREQ(SIOCIFCREATE2):
+	case CASE_IOC_IFREQ(SIOCIFCREATE2):
 		error = priv_check(td, PRIV_NET_IFCREATE);
 		if (error == 0)
 			error = if_clone_create(ifr->ifr_name,
 			    sizeof(ifr->ifr_name), ifr_data_get_ptr(ifr));
 		goto out_noref;
 
-	CASE_IOC_IFREQ(SIOCIFDESTROY):
+	case CASE_IOC_IFREQ(SIOCIFDESTROY):
 		error = priv_check(td, PRIV_NET_IFDESTROY);
 		if (error == 0)
 			error = if_clone_destroy(ifr->ifr_name);
@@ -3521,12 +3518,12 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case SIOCIFGCLONERS:
 		error = if_clone_list((struct if_clonereq *)data);
 		goto out_noref;
-	CASE_IOC_IFGROUPREQ(SIOCGIFGMEMB):
+	case CASE_IOC_IFGROUPREQ(SIOCGIFGMEMB):
 		error = if_getgroupmembers((struct ifgroupreq *)data);
 		goto out_noref;
 #if defined(INET) || defined(INET6)
-	CASE_IOC_IFREQ(SIOCSVH):
-	CASE_IOC_IFREQ(SIOCGVH):
+	case CASE_IOC_IFREQ(SIOCSVH):
+	case CASE_IOC_IFREQ(SIOCGVH):
 		if (carp_ioctl_p == NULL)
 			error = EPROTONOSUPPORT;
 		else
@@ -3564,10 +3561,10 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	    ifp, td));
 	if (error == EOPNOTSUPP && ifp != NULL && ifp->if_ioctl != NULL)
 		switch (cmd) {
-		CASE_IOC_IFREQ(SIOCSIFADDR):
-		CASE_IOC_IFREQ(SIOCSIFBRDADDR):
-		CASE_IOC_IFREQ(SIOCSIFDSTADDR):
-		CASE_IOC_IFREQ(SIOCSIFNETMASK):
+		case CASE_IOC_IFREQ(SIOCSIFADDR):
+		case CASE_IOC_IFREQ(SIOCSIFBRDADDR):
+		case CASE_IOC_IFREQ(SIOCSIFDSTADDR):
+		case CASE_IOC_IFREQ(SIOCSIFNETMASK):
 			break;
 		default:
 			error = (*ifp->if_ioctl)(ifp, cmd, data);

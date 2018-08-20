@@ -1761,7 +1761,7 @@ sge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	ifr = (struct ifreq *)data;
 
 	switch(command) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		SGE_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
@@ -1775,7 +1775,7 @@ sge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->sge_if_flags = ifp->if_flags;
 		SGE_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		SGE_LOCK(sc);
 		reinit = 0;
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
@@ -1823,15 +1823,15 @@ sge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		SGE_UNLOCK(sc);
 		VLAN_CAPABILITIES(ifp);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		SGE_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			sge_rxfilter(sc);
 		SGE_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		mii = device_get_softc(sc->sge_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;

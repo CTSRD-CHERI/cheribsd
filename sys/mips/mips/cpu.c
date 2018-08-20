@@ -204,7 +204,8 @@ mips_get_identity(struct mips_cpuinfo *cpuinfo)
 		cpuinfo->userlocal_reg = false;
 		remove_userlocal_code((uint32_t *)cpu_switch);
 	}
-
+	cpuinfo->badinstr_reg = (cfg3 & MIPS_CONFIG3_BI) != 0;
+	cpuinfo->badinstr_p_reg = (cfg3 & MIPS_CONFIG3_BP) != 0;
 
 #if defined(CPU_NLM)
 	/* Account for Extended TLB entries in XLP */
@@ -396,6 +397,9 @@ cpu_identify(void)
 	case MIPS_PRID_CID_CAVIUM:
 		printf("Cavium");
 		break;
+	case MIPS_PRID_CID_QEMU_CHERI:
+		printf("QEMU-CHERI");
+		break;
 	case MIPS_PRID_CID_INGENIC:
 	case MIPS_PRID_CID_INGENIC2:
 		printf("Ingenic XBurst");
@@ -406,6 +410,12 @@ cpu_identify(void)
 		break;
 	}
 	printf(" processor v%d.%d\n", cpuinfo.cpu_rev, cpuinfo.cpu_impl);
+
+#ifdef CPU_QEMU_MALTA
+	if (cpuinfo.cpu_rev < 2)
+		panic("%s: QEMU-CHERI is too old to run this kernel. Update "
+		    "QEMU before rebooting or comment out this check!", __func__);
+#endif
 
 	printf("  MMU: ");
 	if (cpuinfo.tlb_type == MIPS_MMU_NONE) {
@@ -521,7 +531,7 @@ cpu_identify(void)
 
 	/* Print Config3 if it contains any useful info */
 	if (cfg3 & ~(0x80000000))
-		printf("  Config3=0x%b\n", cfg3, "\20\16ULRI\2SmartMIPS\1TraceLogic");
+		printf("  Config3=0x%b\n", cfg3, "\20\034BP\033BI\016ULRI\2SmartMIPS\1TraceLogic");
 
 #if defined(CPU_MIPS1004K) || defined (CPU_MIPS74K) || defined (CPU_MIPS24K)
 	cfg7 = mips_rd_config7();

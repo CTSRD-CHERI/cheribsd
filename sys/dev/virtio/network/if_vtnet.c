@@ -755,9 +755,9 @@ vtnet_alloc_rxtx_queues(struct vtnet_softc *sc)
 
 	npairs = sc->vtnet_max_vq_pairs;
 
-	sc->vtnet_rxqs = mallocarray(npairs, sizeof(struct vtnet_rxq), M_DEVBUF,
+	sc->vtnet_rxqs = malloc(sizeof(struct vtnet_rxq) * npairs, M_DEVBUF,
 	    M_NOWAIT | M_ZERO);
-	sc->vtnet_txqs = mallocarray(npairs, sizeof(struct vtnet_txq), M_DEVBUF,
+	sc->vtnet_txqs = malloc(sizeof(struct vtnet_txq) * npairs, M_DEVBUF,
 	    M_NOWAIT | M_ZERO);
 	if (sc->vtnet_rxqs == NULL || sc->vtnet_txqs == NULL)
 		return (ENOMEM);
@@ -887,8 +887,7 @@ vtnet_alloc_virtqueues(struct vtnet_softc *sc)
 	if (sc->vtnet_flags & VTNET_FLAG_CTRL_VQ)
 		nvqs++;
 
-	info = mallocarray(nvqs, sizeof(struct vq_alloc_info), M_TEMP,
-	    M_NOWAIT);
+	info = malloc(sizeof(struct vq_alloc_info) * nvqs, M_TEMP, M_NOWAIT);
 	if (info == NULL)
 		return (ENOMEM);
 
@@ -1081,7 +1080,7 @@ vtnet_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	error = 0;
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (ifp->if_mtu != ifr_mtu_get(ifr)) {
 			VTNET_CORE_LOCK(sc);
 			error = vtnet_change_mtu(sc, ifr_mtu_get(ifr));
@@ -1089,7 +1088,7 @@ vtnet_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		VTNET_CORE_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) == 0) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING)
@@ -1114,8 +1113,8 @@ vtnet_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		VTNET_CORE_UNLOCK(sc);
 		break;
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		if ((sc->vtnet_flags & VTNET_FLAG_CTRL_RX) == 0)
 			break;
 		VTNET_CORE_LOCK(sc);
@@ -1124,12 +1123,12 @@ vtnet_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		VTNET_CORE_UNLOCK(sc);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->vtnet_media, cmd);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		VTNET_CORE_LOCK(sc);
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 

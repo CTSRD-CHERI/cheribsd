@@ -688,7 +688,7 @@ z_alloc(void *nil, u_int items, u_int size)
 {
 	void *ptr;
 
-	ptr = mallocarray(items, size, M_TEMP, M_NOWAIT);
+	ptr = malloc(items * size, M_TEMP, M_NOWAIT);
 	return ptr;
 }
 
@@ -4162,11 +4162,11 @@ mxge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 
 	err = 0;
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		err = mxge_change_mtu(sc, ifr_mtu_get(ifr));
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		mtx_lock(&sc->driver_mtx);
 		if (sc->dying) {
 			mtx_unlock(&sc->driver_mtx);
@@ -4190,14 +4190,14 @@ mxge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		mtx_unlock(&sc->driver_mtx);
 		break;
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		mtx_lock(&sc->driver_mtx);
 		mxge_set_multicast_list(sc);
 		mtx_unlock(&sc->driver_mtx);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		mtx_lock(&sc->driver_mtx);
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if (mask & IFCAP_TXCSUM) {
@@ -4386,8 +4386,8 @@ mxge_alloc_slices(mxge_softc_t *sc)
 	sc->rx_ring_size = cmd.data0;
 	max_intr_slots = 2 * (sc->rx_ring_size / sizeof (mcp_dma_addr_t));
 	
-	sc->ss = mallocarray(sc->num_slices, sizeof(*sc->ss), M_DEVBUF,
-	    M_NOWAIT | M_ZERO);
+	bytes = sizeof (*sc->ss) * sc->num_slices;
+	sc->ss = malloc(bytes, M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (sc->ss == NULL)
 		return (ENOMEM);
 	for (i = 0; i < sc->num_slices; i++) {
@@ -4531,6 +4531,7 @@ abort_with_fw:
 static int
 mxge_add_msix_irqs(mxge_softc_t *sc)
 {
+	size_t bytes;
 	int count, err, i, rid;
 
 	rid = PCIR_BAR(2);
@@ -4558,8 +4559,8 @@ mxge_add_msix_irqs(mxge_softc_t *sc)
 		err = ENOSPC;
 		goto abort_with_msix;
 	}
-	sc->msix_irq_res = mallocarray(sc->num_slices,
-	    sizeof(*sc->msix_irq_res), M_DEVBUF, M_NOWAIT|M_ZERO);
+	bytes = sizeof (*sc->msix_irq_res) * sc->num_slices;
+	sc->msix_irq_res = malloc(bytes, M_DEVBUF, M_NOWAIT|M_ZERO);
 	if (sc->msix_irq_res == NULL) {
 		err = ENOMEM;
 		goto abort_with_msix;
@@ -4578,8 +4579,8 @@ mxge_add_msix_irqs(mxge_softc_t *sc)
 		}
 	}
 
-	sc->msix_ih =  mallocarray(sc->num_slices, sizeof(*sc->msix_ih),
-	    M_DEVBUF, M_NOWAIT|M_ZERO);
+	bytes = sizeof (*sc->msix_ih) * sc->num_slices;
+	sc->msix_ih =  malloc(bytes, M_DEVBUF, M_NOWAIT|M_ZERO);
 
 	for (i = 0; i < sc->num_slices; i++) {
 		err = bus_setup_intr(sc->dev, sc->msix_irq_res[i],

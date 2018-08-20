@@ -57,6 +57,7 @@
 #include <sys/imgact_elf.h>
 #include <sys/imgact.h>
 #include <sys/mman.h>
+#include <sys/syscall.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysproto.h>
 #include <sys/ucontext.h>
@@ -224,6 +225,44 @@ cheriabi_fetch_syscall_arg(struct thread *td, void * __capability *argp,
 	KASSERT(argnum >= 0, ("Negative argument number %d\n", argnum));
 	KASSERT(argnum < 8, ("Argument number %d >= 8\n", argnum));
 
+	/*
+	 * For syscall() and __syscall(), the arguments are stored in a
+	 * var args block pointed to by c13.
+	 *
+	 * XXX: Integer arguments can be stored as either 32-bit integers
+	 * or 64-bit longs.  We don't have a way to know what size an
+	 * integer argument is.  For now we assume they are 32-bit
+	 * integers since those arguments are more common with system
+	 * calls than off_t or longs.
+	 */
+	if (td->td_sa.argoff > 1) {
+		/* An earlier argument failed to copyin. */
+		*argp = (void * __capability)(uintcap_t)0;
+		return;
+	} else if (td->td_sa.argoff == 1) {
+		int error, intval, offset;
+
+		offset = 0;
+		for (i = 0; i < argnum; i++) {
+			if (ptrmask & (1 << i)) {
+				offset = roundup2(offset, sizeof(uintcap_t));
+				offset += sizeof(uintcap_t);
+			} else
+				offset += sizeof(int);
+		}
+		if (ptrmask & (1 << argnum))
+			error = copyincap_c((char * __capability)locr0->c13 +
+			    offset, argp, sizeof(*argp));
+		else {
+			error = copyin_c((char * __capability)locr0->c13 +
+			    offset, &intval, sizeof(intval));
+			*argp = (void * __capability)(__intcap_t)intval;
+		}
+		if (error)
+			td->td_sa.argoff = error + 1;
+		return;
+	}
+
 	/* XXX: O(1) possible with more bit twiddling. */
 	intreg_offset = ptrreg_offset = -1;
 	for (i = 0; i <= argnum; i++) {
@@ -287,6 +326,11 @@ cheriabi_fetch_syscall_args(struct thread *td)
 	else
 		locr0->pc += sizeof(int);
 	sa->code = locr0->v0;
+	sa->argoff = 0;
+	if (sa->code == SYS_syscall || sa->code == SYS___syscall) {
+		sa->code = locr0->a0;
+		sa->argoff = 1;
+	}
 
 	se = td->td_proc->p_sysent;
 	if (se->sv_mask)
@@ -300,6 +344,9 @@ cheriabi_fetch_syscall_args(struct thread *td)
 	sa->narg = sa->callp->sy_narg;
 
 	error = cheriabi_dispatch_fill_uap(td, sa->code, sa->args);
+
+	if (error == 0 && sa->argoff > 1)
+		error = sa->argoff - 1;
 
 	td->td_retval[0] = 0;
 	td->td_retval[1] = locr0->v1;
@@ -735,12 +782,10 @@ cheriabi_newthread_init(struct thread *td)
 
 	/*
 	 * We assume that the caller has initialised the trapframe to zeroes
-	 * and then set ddc, idc, and pcc appropriatly. We might want to
-	 * check this with a more thorough set of assertions in the future.
-
+	 * and then set idc, and pcc appropriatly. We might want to check
+	 * this with a more thorough set of assertions in the future.
 	 */
 	frame = &td->td_pcb->pcb_regs;
-	KASSERT(frame->ddc != NULL, ("%s: NULL $ddc", __func__));
 	KASSERT(frame->pcc != NULL, ("%s: NULL $epcc", __func__));
 
 	/*
@@ -828,7 +873,8 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	    ("text_end 0x%zx > stackbase 0x%lx", text_end, stackbase));
 
 	map_base = (text_end == stackbase) ?
-	    CHERI_CAP_USER_MMAP_BASE : text_end;
+	    CHERI_CAP_USER_MMAP_BASE :
+	    roundup2(text_end, 1ULL << CHERI_ALIGN_SHIFT(stackbase - text_end));
 	KASSERT(map_base < stackbase,
 	    ("map_base 0x%zx >= stackbase 0x%lx", map_base, stackbase));
 	map_length = stackbase - map_base;
@@ -841,6 +887,9 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	td->td_md.md_cheri_mmap_cap = cheri_capability_build_user_rwx(
 	    CHERI_CAP_USER_MMAP_PERMS, map_base, map_length,
 	    CHERI_CAP_USER_MMAP_OFFSET);
+	KASSERT(cheri_getperm(td->td_md.md_cheri_mmap_cap) &
+	    CHERI_PERM_CHERIABI_VMMAP,
+	    ("%s: mmap() cap lacks CHERI_PERM_CHERIABI_VMMAP", __func__));
 
 	td->td_frame->pc = imgp->entry_addr;
 	td->td_frame->sr = MIPS_SR_KSU_USER | MIPS_SR_EXL | MIPS_SR_INT_IE |
@@ -853,7 +902,7 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 * restricted (or not set at all).
 	 */
 	/* XXXAR: is there a better way to check for dynamic binaries? */
-	is_dynamic_binary = imgp->end_addr == 0 && imgp->reloc_base != 0;
+	is_dynamic_binary = imgp->reloc_base != 0;
 	data_length = is_dynamic_binary ?
 	    CHERI_CAP_USER_DATA_LENGTH - imgp->reloc_base : text_end;
 	code_length = is_dynamic_binary ?
@@ -1020,7 +1069,13 @@ cheriabi_set_user_tls(struct thread *td, void * __capability tls_base)
 	td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET + TLS_TCB_SIZE_C;
 	/* XXX-AR: add a TLS alignment check here */
 	td->td_md.md_tls = tls_base;
-	/* XXX: should support a crdhwr version */
+	/* XXX-JC: only use cwritehwr */
+	if (curthread == td) {
+		__asm __volatile ("cwritehwr %0, $chwr_userlocal"
+				  :
+				  : "C" ((char * __capability)td->td_md.md_tls +
+				      td->td_md.md_tls_tcb_offset));
+	}
 	if (curthread == td && cpuinfo.userlocal_reg == true) {
 		/*
 		 * If there is an user local register implementation
@@ -1058,9 +1113,8 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 		return (cheriabi_set_user_tls(td, uap->parms));
 
 	case MIPS_GET_TLS:
-		error = copyoutcap_c(
-		    (__cheri_tocap void * __capability)&td->td_md.md_tls,
-		    uap->parms, sizeof(void * __capability));
+		error = copyoutcap_c(&td->td_md.md_tls, uap->parms,
+		    sizeof(void * __capability));
 		return (error);
 
 	case MIPS_GET_COUNT:

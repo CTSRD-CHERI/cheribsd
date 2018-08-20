@@ -88,6 +88,7 @@ __FBSDID("$FreeBSD$");
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
+#include <vm/vm_extern.h>
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
 #include <sys/copyright.h>
@@ -162,7 +163,7 @@ sysinit_add(struct sysinit **set, struct sysinit **set_end)
 		count += newsysinit_end - newsysinit;
 	else
 		count += sysinit_end - sysinit;
-	newset = mallocarray(count, sizeof(*sipp), M_TEMP, M_NOWAIT);
+	newset = malloc(count * sizeof(*sipp), M_TEMP, M_NOWAIT);
 	if (newset == NULL)
 		panic("cannot malloc for sysinit");
 	xipp = newset;
@@ -558,7 +559,7 @@ proc0_init(void *dummy __unused)
 	p->p_limit->pl_rlimit[RLIMIT_STACK].rlim_cur = dflssiz;
 	p->p_limit->pl_rlimit[RLIMIT_STACK].rlim_max = maxssiz;
 	/* Cast to avoid overflow on i386/PAE. */
-	pageablemem = ptoa((vm_paddr_t)vm_cnt.v_free_count);
+	pageablemem = ptoa((vm_paddr_t)vm_free_count());
 	p->p_limit->pl_rlimit[RLIMIT_RSS].rlim_cur =
 	    p->p_limit->pl_rlimit[RLIMIT_RSS].rlim_max = pageablemem;
 	p->p_limit->pl_rlimit[RLIMIT_MEMLOCK].rlim_cur = pageablemem / 3;

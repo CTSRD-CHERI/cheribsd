@@ -467,13 +467,13 @@ tracer_ioctl(struct ifnet *ifp, unsigned long cmd, caddr_t data)
 	struct ifreq *ifr = (struct ifreq *)data;
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFMTU):
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		break;
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 	case SIOCGIFXMEDIA:
 		sx_xlock(&t4_trace_lock);

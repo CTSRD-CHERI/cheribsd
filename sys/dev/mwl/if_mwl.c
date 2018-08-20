@@ -4735,7 +4735,7 @@ mwl_ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 	int error = 0;
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCGMVSTATS):
+	case CASE_IOC_IFREQ(SIOCGMVSTATS):
 		mwl_hal_gethwstats(sc->sc_mh, &sc->sc_stats.hw_stats);
 #if 0
 		/* NB: embed these numbers to get a consistent view */
@@ -4750,9 +4750,7 @@ mwl_ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 		 * statistics.  The alternative is to copy the data
 		 * to a local structure.
 		 */
-		return (copyout_c(
-		    (__cheri_tocap struct mwl_stats * __capability)
-		    &sc->sc_stats, ifr_data_get_ptr(ifr),
+		return (copyout_c(&sc->sc_stats, ifr_data_get_ptr(ifr),
 		    sizeof (sc->sc_stats)));
 #ifdef MWL_DIAGAPI
 	case SIOCGMVDIAG:

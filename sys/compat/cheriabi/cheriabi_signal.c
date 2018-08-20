@@ -93,9 +93,7 @@ cheriabi_sigprocmask(struct thread *td, struct cheriabi_sigprocmask_args *uap)
 		osetp = NULL;
 	error = kern_sigprocmask(td, uap->how, setp, osetp, 0);
 	if (osetp && error == 0)
-		error = copyout_c(
-		    (__cheri_tocap sigset_t * __capability)osetp, uap->oset,
-		    sizeof(oset));
+		error = copyout_c(osetp, uap->oset, sizeof(oset));
 	return (error);
 }
 

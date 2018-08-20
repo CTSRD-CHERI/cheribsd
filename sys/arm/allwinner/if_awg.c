@@ -1094,7 +1094,7 @@ awg_ioctl(if_t ifp, u_long cmd, caddr_t data)
 	error = 0;
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		AWG_LOCK(sc);
 		if (if_getflags(ifp) & IFF_UP) {
 			if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
@@ -1110,19 +1110,19 @@ awg_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		sc->if_flags = if_getflags(ifp);
 		AWG_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
 			AWG_LOCK(sc);
 			awg_setup_rxfilter(sc);
 			AWG_UNLOCK(sc);
 		}
 		break;
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		mask = ifr_reqcap_get(ifr) ^ if_getcapenable(ifp);
 #ifdef DEVICE_POLLING
 		if (mask & IFCAP_POLLING) {
@@ -1834,9 +1834,11 @@ awg_attach(device_t dev)
 	awg_get_eaddr(dev, eaddr);
 
 	/* Soft reset EMAC core */
-	error = awg_reset(dev);
-	if (error != 0)
-		return (error);
+	if (!awg_has_internal_phy(dev)) {
+		error = awg_reset(dev);
+		if (error != 0)
+			return (error);
+	}
 
 	/* Setup DMA descriptors */
 	error = awg_setup_dma(dev);

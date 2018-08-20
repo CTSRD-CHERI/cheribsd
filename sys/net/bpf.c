@@ -63,6 +63,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysent.h>
 #include <sys/ttycom.h>
 #include <sys/uio.h>
+#include <sys/sysent.h>
 
 #include <sys/event.h>
 #include <sys/file.h>
@@ -133,9 +134,9 @@ struct bpf_dltlist_c {
 };
 
 #define	_CASE_IOC_BPF_DLTLIST_C(cmd)				\
-    case _IOC_NEWTYPE((cmd), struct bpf_dltlist_c):
+    _IOC_NEWTYPE((cmd), struct bpf_dltlist_c): case
 #define	_CASE_IOC_BPF_PROGRAM_C(cmd)				\
-    case _IOC_NEWTYPE((cmd), struct bpf_program_c):
+    _IOC_NEWTYPE((cmd), struct bpf_program_c): case
 #else /* !COMPAT_CHERIABI */
 #define	_CASE_IOC_BPF_DLTLIST_C(cmd)
 #define	_CASE_IOC_BPF_PROGRAM_C(cmd)
@@ -174,9 +175,9 @@ struct bpf_dltlist32 {
 #define	BIOCGRTIMEOUT32	_IOR('B', 110, struct timeval32)
 
 #define	_CASE_IOC_BPF_DLTLIST32(cmd)				\
-    case _IOC_NEWTYPE((cmd), struct bpf_dltlist32):
+    _IOC_NEWTYPE((cmd), struct bpf_dltlist32): case
 #define	_CASE_IOC_BPF_PROGRAM32(cmd)				\
-    case _IOC_NEWTYPE((cmd), struct bpf_program32):
+    _IOC_NEWTYPE((cmd), struct bpf_program32): case
 #else /* !COMPAT_FREEBSD32 */
 #define	_CASE_IOC_BPF_DLTLIST32(cmd)
 #define	_CASE_IOC_BPF_PROGRAM32(cmd)
@@ -185,11 +186,11 @@ struct bpf_dltlist32 {
 #define	CASE_IOC_BPF_DLTLIST(cmd)				\
     _CASE_IOC_BPF_DLTLIST_C(cmd)				\
     _CASE_IOC_BPF_DLTLIST32(cmd)				\
-    case (cmd)
+    (cmd)
 #define	CASE_IOC_BPF_PROGRAM(cmd)				\
     _CASE_IOC_BPF_PROGRAM_C(cmd)				\
     _CASE_IOC_BPF_PROGRAM32(cmd)				\
-    case (cmd)
+    (cmd)
 
 /*
  * bpf_iflist is a list of BPF interface structures, each corresponding to a
@@ -1312,8 +1313,8 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		case BIOCGBLEN:
 		case BIOCFLUSH:
 		case BIOCGDLT:
-		CASE_IOC_BPF_DLTLIST(BIOCGDLTLIST):
-		CASE_IOC_IFREQ(BIOCGETIF):
+		case CASE_IOC_BPF_DLTLIST(BIOCGDLTLIST):
+		case CASE_IOC_IFREQ(BIOCGETIF):
 		case BIOCGRTIMEOUT:
 #if defined(COMPAT_FREEBSD32) && defined(__amd64__)
 		case BIOCGRTIMEOUT32:
@@ -1343,7 +1344,7 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	 * If we're called from a 32-bit process, mark the stream as 32-bit
 	 * so that it will get 32-bit packet headers.
 	 */
-	if (SV_CURPROC_FLAG(SV_ILP32)) {
+	if (SV_PROC_FLAG(td->td_proc, SV_ILP32)) {
 		BPFD_LOCK(d);
 		d->bd_compat32 = 1;
 		BPFD_UNLOCK(d);
@@ -1396,9 +1397,9 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	/*
 	 * Set link layer read filter.
 	 */
-	CASE_IOC_BPF_PROGRAM(BIOCSETF):
-	CASE_IOC_BPF_PROGRAM(BIOCSETFNR):
-	CASE_IOC_BPF_PROGRAM(BIOCSETWF):
+	case CASE_IOC_BPF_PROGRAM(BIOCSETF):
+	case CASE_IOC_BPF_PROGRAM(BIOCSETFNR):
+	case CASE_IOC_BPF_PROGRAM(BIOCSETWF):
 		error = bpf_setf(d, (struct bpf_program *)addr, cmd);
 		break;
 
@@ -1444,7 +1445,7 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	/*
 	 * Get a list of supported data link types.
 	 */
-	CASE_IOC_BPF_DLTLIST(BIOCGDLTLIST):
+	case CASE_IOC_BPF_DLTLIST(BIOCGDLTLIST):
 		BPF_LOCK();
 		if (d->bd_bif == NULL)
 			error = EINVAL;
@@ -1468,7 +1469,7 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	/*
 	 * Get interface name.
 	 */
-	CASE_IOC_IFREQ(BIOCGETIF):
+	case CASE_IOC_IFREQ(BIOCGETIF):
 		BPF_LOCK();
 		if (d->bd_bif == NULL)
 			error = EINVAL;
@@ -1485,7 +1486,7 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	/*
 	 * Set interface.
 	 */
-	CASE_IOC_IFREQ(BIOCSETIF):
+	case CASE_IOC_IFREQ(BIOCSETIF):
 		{
 			int alloc_buf, size;
 
@@ -1824,10 +1825,10 @@ bf_insns_get_ptr(void *fpp)
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		return (__USER_CAP(
 		    (struct bpf_insn *)(uintptr_t)fpup->fp32.bf_insns,
-		    fpup->fp32.bf_len * sizeof(bpf_insn)));
+		    fpup->fp32.bf_len * sizeof(struct bpf_insn)));
 #endif
 	return (__USER_CAP(fpup->fp.bf_insns,
-	    fpup->fp.bf_len * sizeof(bpf_insn)));
+	    fpup->fp.bf_len * sizeof(struct bpf_insn)));
 }
 
 /*
@@ -1875,8 +1876,7 @@ bpf_setf(struct bpf_d *d, struct bpf_program *fp, u_long cmd)
 	if (size > 0) {
 		/* We're setting up new filter.  Copy and check actual data. */
 		fcode = malloc(size, M_BPF, M_WAITOK);
-		if (copyin_c(bf_insns_get_ptr(fp),
-		    (__cheri_tocap struct bpf_insn * __capability)fcode, size) != 0 ||
+		if (copyin_c(bf_insns_get_ptr(fp), fcode, size) != 0 ||
 		    !bpf_validate(fcode, flen)) {
 			free(fcode, M_BPF);
 			return (EINVAL);
@@ -2774,9 +2774,7 @@ again:
 		n++;
 	}
 	BPF_UNLOCK();
-	error = copyout_c(
-	    (__cheri_tocap u_int * __capability)lst, bfl_list_get_ptr(bfl),
-	    sizeof(u_int) * n);
+	error = copyout_c(lst, bfl_list_get_ptr(bfl), sizeof(u_int) * n);
 	free(lst, M_TEMP);
 	BPF_LOCK();
 	bfl->bfl_len = n;

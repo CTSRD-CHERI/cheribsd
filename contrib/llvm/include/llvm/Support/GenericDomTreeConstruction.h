@@ -628,7 +628,7 @@ struct SemiNCAInfo {
         DecreasingLevel>
         Bucket;  // Queue of tree nodes sorted by level in descending order.
     SmallDenseSet<TreeNodePtr, 8> Affected;
-    SmallDenseSet<TreeNodePtr, 8> Visited;
+    SmallDenseMap<TreeNodePtr, unsigned, 8> Visited;
     SmallVector<TreeNodePtr, 8> AffectedQueue;
     SmallVector<TreeNodePtr, 8> VisitedNotAffectedQueue;
   };
@@ -698,24 +698,20 @@ struct SemiNCAInfo {
       return;
 
     // Recalculate the set of roots.
-    DT.Roots = FindRoots(DT, BUI);
-    for (const NodePtr R : DT.Roots) {
-      const TreeNodePtr TN = DT.getNode(R);
-      // A CFG node was selected as a tree root, but the corresponding tree node
-      // is not connected to the virtual root. This is because the incremental
-      // algorithm does not really know or use the set of roots and can make a
-      // different (implicit) decision about which nodes within an infinite loop
-      // becomes a root.
-      if (DT.isVirtualRoot(TN->getIDom())) {
-        DEBUG(dbgs() << "Root " << BlockNamePrinter(R)
-                     << " is not virtual root's child\n"
-                     << "The entire tree needs to be rebuilt\n");
-        // It should be possible to rotate the subtree instead of recalculating
-        // the whole tree, but this situation happens extremely rarely in
-        // practice.
-        CalculateFromScratch(DT, BUI);
-        return;
-      }
+    auto Roots = FindRoots(DT, BUI);
+    if (DT.Roots.size() != Roots.size() ||
+        !std::is_permutation(DT.Roots.begin(), DT.Roots.end(), Roots.begin())) {
+      // The roots chosen in the CFG have changed. This is because the
+      // incremental algorithm does not really know or use the set of roots and
+      // can make a different (implicit) decision about which node within an
+      // infinite loop becomes a root.
+
+      DEBUG(dbgs() << "Roots are different in updated trees\n"
+                   << "The entire tree needs to be rebuilt\n");
+      // It may be possible to update the tree without recalculating it, but
+      // we do not know yet how to do it, and it happens rarely in practise.
+      CalculateFromScratch(DT, BUI);
+      return;
     }
   }
 
@@ -753,14 +749,16 @@ struct SemiNCAInfo {
 
     while (!II.Bucket.empty()) {
       const TreeNodePtr CurrentNode = II.Bucket.top().second;
+      const unsigned  CurrentLevel = CurrentNode->getLevel();
       II.Bucket.pop();
       DEBUG(dbgs() << "\tAdding to Visited and AffectedQueue: "
                    << BlockNamePrinter(CurrentNode) << "\n");
-      II.Visited.insert(CurrentNode);
+
+      II.Visited.insert({CurrentNode, CurrentLevel});
       II.AffectedQueue.push_back(CurrentNode);
 
       // Discover and collect affected successors of the current node.
-      VisitInsertion(DT, BUI, CurrentNode, CurrentNode->getLevel(), NCD, II);
+      VisitInsertion(DT, BUI, CurrentNode, CurrentLevel, NCD, II);
     }
 
     // Finish by updating immediate dominators and levels.
@@ -772,13 +770,17 @@ struct SemiNCAInfo {
                              const TreeNodePtr TN, const unsigned RootLevel,
                              const TreeNodePtr NCD, InsertionInfo &II) {
     const unsigned NCDLevel = NCD->getLevel();
-    DEBUG(dbgs() << "Visiting " << BlockNamePrinter(TN) << "\n");
+    DEBUG(dbgs() << "Visiting " << BlockNamePrinter(TN) << ",  RootLevel "
+                 << RootLevel << "\n");
 
     SmallVector<TreeNodePtr, 8> Stack = {TN};
     assert(TN->getBlock() && II.Visited.count(TN) && "Preconditions!");
 
+    SmallPtrSet<TreeNodePtr, 8> Processed;
+
     do {
       TreeNodePtr Next = Stack.pop_back_val();
+      DEBUG(dbgs() << " Next: " << BlockNamePrinter(Next) << "\n");
 
       for (const NodePtr Succ :
            ChildrenGetter<IsPostDom>::Get(Next->getBlock(), BUI)) {
@@ -786,19 +788,31 @@ struct SemiNCAInfo {
         assert(SuccTN && "Unreachable successor found at reachable insertion");
         const unsigned SuccLevel = SuccTN->getLevel();
 
-        DEBUG(dbgs() << "\tSuccessor " << BlockNamePrinter(Succ)
-                     << ", level = " << SuccLevel << "\n");
+        DEBUG(dbgs() << "\tSuccessor " << BlockNamePrinter(Succ) << ", level = "
+                     << SuccLevel << "\n");
+
+        // Do not process the same node multiple times.
+        if (Processed.count(Next) > 0)
+          continue;
 
         // Succ dominated by subtree From -- not affected.
         // (Based on the lemma 2.5 from the second paper.)
         if (SuccLevel > RootLevel) {
           DEBUG(dbgs() << "\t\tDominated by subtree From\n");
-          if (II.Visited.count(SuccTN) != 0)
-            continue;
+          if (II.Visited.count(SuccTN) != 0) {
+            DEBUG(dbgs() << "\t\t\talready visited at level "
+                         << II.Visited[SuccTN] << "\n\t\t\tcurrent level "
+                         << RootLevel << ")\n");
+
+            // A node can be necessary to visit again if we see it again at
+            // a lower level than before.
+            if (II.Visited[SuccTN] >= RootLevel)
+              continue;
+          }
 
           DEBUG(dbgs() << "\t\tMarking visited not affected "
                        << BlockNamePrinter(Succ) << "\n");
-          II.Visited.insert(SuccTN);
+          II.Visited.insert({SuccTN, RootLevel});
           II.VisitedNotAffectedQueue.push_back(SuccTN);
           Stack.push_back(SuccTN);
         } else if ((SuccLevel > NCDLevel + 1) &&
@@ -809,6 +823,8 @@ struct SemiNCAInfo {
           II.Bucket.push({SuccLevel, SuccTN});
         }
       }
+
+      Processed.insert(Next);
     } while (!Stack.empty());
   }
 
@@ -920,21 +936,21 @@ struct SemiNCAInfo {
     const NodePtr NCDBlock = DT.findNearestCommonDominator(From, To);
     const TreeNodePtr NCD = DT.getNode(NCDBlock);
 
-    // To dominates From -- nothing to do.
-    if (ToTN == NCD) return;
+    // If To dominates From -- nothing to do.
+    if (ToTN != NCD) {
+      DT.DFSInfoValid = false;
 
-    DT.DFSInfoValid = false;
+      const TreeNodePtr ToIDom = ToTN->getIDom();
+      DEBUG(dbgs() << "\tNCD " << BlockNamePrinter(NCD) << ", ToIDom "
+                   << BlockNamePrinter(ToIDom) << "\n");
 
-    const TreeNodePtr ToIDom = ToTN->getIDom();
-    DEBUG(dbgs() << "\tNCD " << BlockNamePrinter(NCD) << ", ToIDom "
-                 << BlockNamePrinter(ToIDom) << "\n");
-
-    // To remains reachable after deletion.
-    // (Based on the caption under Figure 4. from the second paper.)
-    if (FromTN != ToIDom || HasProperSupport(DT, BUI, ToTN))
-      DeleteReachable(DT, BUI, FromTN, ToTN);
-    else
-      DeleteUnreachable(DT, BUI, ToTN);
+      // To remains reachable after deletion.
+      // (Based on the caption under Figure 4. from the second paper.)
+      if (FromTN != ToIDom || HasProperSupport(DT, BUI, ToTN))
+        DeleteReachable(DT, BUI, FromTN, ToTN);
+      else
+        DeleteUnreachable(DT, BUI, ToTN);
+    }
 
     if (IsPostDom) UpdateRootsAfterUpdate(DT, BUI);
   }

@@ -1020,7 +1020,7 @@ exec_map_first_page(imgp)
 			if ((ma[i] = vm_page_next(ma[i - 1])) != NULL) {
 				if (ma[i]->valid)
 					break;
-				if (vm_page_tryxbusy(ma[i]))
+				if (!vm_page_tryxbusy(ma[i]))
 					break;
 			} else {
 				ma[i] = vm_page_alloc(object, i,
@@ -1774,7 +1774,7 @@ int
 exec_register(const struct execsw *execsw_arg)
 {
 	const struct execsw **es, **xs, **newexecsw;
-	int count = 2;	/* New slot and trailing NULL */
+	u_int count = 2;	/* New slot and trailing NULL */
 
 	if (execsw)
 		for (es = execsw; *es; es++)

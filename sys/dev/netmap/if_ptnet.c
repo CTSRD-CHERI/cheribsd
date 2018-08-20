@@ -351,7 +351,7 @@ ptnet_attach(device_t dev)
 	sc->num_tx_rings = num_tx_rings;
 
 	/* Allocate and initialize per-queue data structures. */
-	sc->queues = mallocarray(sc->num_rings, sizeof(struct ptnet_queue),
+	sc->queues = malloc(sizeof(struct ptnet_queue) * sc->num_rings,
 			    M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (sc->queues == NULL) {
 		err = ENOMEM;
@@ -741,7 +741,7 @@ ptnet_ioctl(if_t ifp, u_long cmd, caddr_t data)
 	int mask, err = 0;
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		device_printf(dev, "SIOCSIFFLAGS %x\n", ifp->if_flags);
 		PTNET_CORE_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
@@ -756,7 +756,7 @@ ptnet_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		PTNET_CORE_UNLOCK(sc);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		device_printf(dev, "SIOCSIFCAP %x %x\n",
 			      ifr_reqcap_get(ifr), ifp->if_capenable);
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
@@ -800,7 +800,7 @@ ptnet_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		ifp->if_capenable = ifr_reqcap_get(ifr);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		/* We support any reasonable MTU. */
 		if (ifr_mtu_get(ifr) < ETHERMIN ||
 				ifr_mtu_get(ifr) > PTNET_MAX_PKT_SIZE) {
@@ -812,7 +812,7 @@ ptnet_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		err = ifmedia_ioctl(ifp, ifr, &sc->media, cmd);
 		break;

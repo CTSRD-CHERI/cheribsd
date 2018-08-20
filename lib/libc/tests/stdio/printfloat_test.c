@@ -262,7 +262,9 @@ ATF_TC_BODY(padding_and_decimal_point_placement, tc)
 ATF_TC_WITHOUT_HEAD(decimal_rounding);
 ATF_TC_BODY(decimal_rounding, tc)
 {
-
+#ifndef _FLOAT_IEEE754
+	atf_tc_skip("Test not applicable on this architecture.");
+#else
 	ATF_REQUIRE(setlocale(LC_NUMERIC, "C"));
 
 	fesetround(FE_DOWNWARD);
@@ -288,6 +290,7 @@ ATF_TC_BODY(decimal_rounding, tc)
 	testfmt("-4.438", "%.3f", -4.4375);
 	testfmt("4.438", "%.3Lf", 4.4375L);
 	testfmt("-4.438", "%.3Lf", -4.4375L);
+#endif /* _FLOAT_IEEE754 */
 }
 
 ATF_TC_WITHOUT_HEAD(hexadecimal_floating_point);
