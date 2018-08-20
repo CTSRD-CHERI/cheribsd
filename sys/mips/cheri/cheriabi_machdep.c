@@ -225,19 +225,14 @@ cheriabi_fetch_syscall_arg(struct thread *td, void * __capability *argp,
 	/*
 	 * For syscall() and __syscall(), the arguments are stored in a
 	 * var args block pointed to by c13.
-	 *
-	 * XXX: Integer arguments can be stored as either 32-bit integers
-	 * or 64-bit longs.  We don't have a way to know what size an
-	 * integer argument is.  For now we assume they are 32-bit
-	 * integers since those arguments are more common with system
-	 * calls than off_t or longs.
 	 */
 	if (td->td_sa.argoff > 1) {
 		/* An earlier argument failed to copyin. */
 		*argp = (void * __capability)(uintcap_t)0;
 		return;
 	} else if (td->td_sa.argoff == 1) {
-		int error, intval, offset;
+		uint64_t intval;
+		int error, offset;
 
 		offset = 0;
 		for (i = 0; i < argnum; i++) {
@@ -245,7 +240,7 @@ cheriabi_fetch_syscall_arg(struct thread *td, void * __capability *argp,
 				offset = roundup2(offset, sizeof(uintcap_t));
 				offset += sizeof(uintcap_t);
 			} else
-				offset += sizeof(int);
+				offset += sizeof(uint64_t);
 		}
 		if (ptrmask & (1 << argnum))
 			error = copyincap_c((char * __capability)locr0->c13 +
