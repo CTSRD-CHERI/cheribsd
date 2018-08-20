@@ -593,8 +593,7 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		/* fill siginfo structure */
 		sf.sf_si.si_signo = sig;
 		sf.sf_si.si_code = ksi->ksi_code;
-		sf.sf_si.si_value.sival_int =
-		    ksi->ksi_info.si_value.sival_int;
+		sf.sf_si.si_value.sival_ptr = ksi->ksi_info.si_value.sival_ptr_c;
 		/*
 		 * Write out badvaddr, but don't create a valid capability
 		 * since that might allow privilege amplification.
