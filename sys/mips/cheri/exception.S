@@ -88,7 +88,7 @@
 #error "purecap kernel exception handlers compiled for non-CHERI target!"
 #endif
 #ifndef CHERI_KERNEL
-#error "purecap kernel exception handlers compiled for non-purecap kernel!"	
+#error "purecap kernel exception handlers compiled for non-purecap kernel!"
 #endif
 
 /*
@@ -129,7 +129,7 @@
 
 #include <machine/cheriasm.h>
 #include <machine/cherireg.h>
-.set cheri_sysregs_accessible	# Don't warn on access to c27-c30	
+.set cheri_sysregs_accessible	# Don't warn on access to c27-c30
 
 #include "assym.s"
 
@@ -158,7 +158,8 @@ dtrace_invop_calltrap_addr:
  */
 #define LOAD_KERNEL_GP	\
 	PTR_LA gp, _C_LABEL(_captable) ;\
-	csetoffset CHERI_REG_GPC, CHERI_REG_KDC, gp ;\
+	cgetkdc	CHERI_REG_GPC ;\
+	csetoffset CHERI_REG_GPC, CHERI_REG_GPC, gp ;\
 	PTR_LA t0, _C_LABEL(_ecaptable)		    ;\
 	PTR_SUBU t0, t0, gp			    ;\
 	csetbounds CHERI_REG_GPC, CHERI_REG_GPC, t0 ;\
@@ -1088,10 +1089,7 @@ LEAF_NOPROFILE(MipsTLBModException)
 END(MipsTLBModException)
 #endif /* defined(MIPS_EXC_CNTRS) */
 
-/*
- * XXX-AM: Some of the code is redundant with the non-purecap version
- * but splitting it is more readable than adding ifdefs for every load/store.
- */
+
 LEAF_NOPROFILE(MipsTLBInvalidException)
 	.set push
 	.set noat
@@ -1212,7 +1210,8 @@ tlb_insert_random:
 
 3:
 	/*
-	 * Branch to the comprehensive exception processing.
+	 * If we come from user mode, branch to the comprehensive
+	 * exception processing.
 	 */
 	mfc0	k1, MIPS_COP_0_STATUS
 	andi	k1, k1, MIPS_SR_KSU_USER
@@ -1225,7 +1224,7 @@ tlb_insert_random:
 	GET_CPU_PCPU(CHERI_REG_KR1C, k1)
 	clc	CHERI_REG_KR1C, zero, PC_CURTHREAD(CHERI_REG_KR1C)
 	clc	CHERI_REG_KR1C, zero, TD_KSTACK(CHERI_REG_KR1C)
-	cltu	k0, CHERI_REG_KR1C, CHERI_REG_STC /* XXX-AM Who installed the kernel stack? */
+	cltu	k0, CHERI_REG_KR1C, CHERI_REG_STC
 	bnez	k0, _C_LABEL(MipsKernGenException)
 	nop
 
@@ -1263,19 +1262,12 @@ tlb_insert_random:
 	 * access the stack during the exception handler.  But also save it so
 	 * that we can restore it later.
 	 *
-	 * XXX-AM: here we can not use KR2C (SEC0) because it holds the original
-	 * ddc saved by CHERI_EXCEPTION_ENTER in MipsException. So we cheat
-	 * by temporarily resetting the saved ddc in c0 and reload it later
-	 * when we have swapped kr1c and stc.
-	 * We also need a spare register to save $c17 to store it to the callframe.
-	 *
-	 * Another option is not to care about things saved in kr1c/kr2c since
-	 * we are going to panic anyway. This have an unknown effect on debuggability.
+	 * KR2C contains the saved ddc, we trash it here because we are going to
+	 * panic anyway.
 	 */
-	csetdefault CHERI_REG_SEC0
-	cmove	CHERI_REG_KR1C, CHERI_REG_STC
+	cmove	CHERI_REG_KR2C, CHERI_REG_STC
 	cmove	CHERI_REG_STC, CHERI_REG_KR1C
-	cmove	CHERI_REG_KR1C, CHERI_REG_KR2C
+
 	PTR_SUBU	k0, zero, KERN_EXC_FRAME_SIZE
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, k0
 	/* Assume the stack is capability aligned */
@@ -1286,8 +1278,6 @@ tlb_insert_random:
 	csc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
 	csc	$c17, zero, CALLFRAME_SP(CHERI_REG_STC)
 	cmove	$c17, CHERI_REG_KR2C
-	cgetdefault CHERI_REG_SEC0
-	csetdefault CHERI_REG_KDC /* XXX-AM: end of hack */
 
 	/*
 	 * Save CPU state, building 'frame'. stc holds the location to save

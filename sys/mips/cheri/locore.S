@@ -136,9 +136,9 @@ VECTOR(_locore, unknown)
 	 * XXXRW: Do we want to rely on default initialisation of all CP2
 	 * registers here?
 	 */
-	cgetdefault	CHERI_REG_KCC
-	cgetdefault	CHERI_REG_KDC
-	csetkdc		CHERI_REG_KDC
+	cgetdefault	$c1
+	csetkcc		$c1
+	csetkdc		$c1
 
 #if defined(CPU_BERI)
 	/*
@@ -176,7 +176,7 @@ VECTOR(_locore, unknown)
 	/*
 	 * Initialize stack and call machine startup.
 	 */
-	cmove		CHERI_REG_STC, CHERI_REG_KDC
+	cgetkdc		CHERI_REG_STC
 	PTR_LA		t0, _C_LABEL(pcpu_space)
 	csetoffset	CHERI_REG_STC, CHERI_REG_STC, t0
 	REG_LI		t0, PCPU_SIZE
@@ -195,7 +195,8 @@ VECTOR(_locore, unknown)
 	/* set up global pointer */
 	// PTR_LA	gp, _C_LABEL(_gp)
 	PTR_LA	gp, _C_LABEL(_captable)
-	csetoffset CHERI_REG_GPC, CHERI_REG_KDC, gp
+	cgetkdc		CHERI_REG_GPC
+	csetoffset CHERI_REG_GPC, CHERI_REG_GPC, gp
 	PTR_LA	t0, _C_LABEL(_ecaptable)
 	PTR_SUBU t0, t0, gp
 	csetbounds CHERI_REG_GPC, CHERI_REG_GPC, t0
@@ -234,7 +235,8 @@ restrict_pcc:
 	 */
 	// generate pointer to the __cap_relocs section start
 	PTR_LA	t0, _C_LABEL(__start___cap_relocs)
-	csetoffset	$c3, CHERI_REG_KDC, t0
+	cgetkdc		$c3
+	csetoffset	$c3, $c3, t0
 	PTR_LA	t1, _C_LABEL(__stop___cap_relocs)
 	PTR_SUBU	t0, t1, t0
 	csetbounds	$c3, $c3, t0
@@ -246,12 +248,12 @@ restrict_pcc:
 	nop
 
 	/* Call the platform-specific startup code. */
-	cfromptr	$c3, CHERI_REG_KDC, a1
+	cfromddc	$c3, a1
 	dsll		t0, a0, 3
 	csetbounds	$c3, $c3, t0
 	/* do not bound envp because we do not have
 	 * reliable length information */
-	cfromptr	$c4, CHERI_REG_KDC, a2
+	cfromddc	$c4, a2
 	move	a1, a3
 	PTR_LA	t0, _C_LABEL(platform_start)
 	cgetpccsetoffset $c12, t0
@@ -261,10 +263,10 @@ restrict_pcc:
 	/*
 	 * thread0 set thread0 kstack to the bottom of the stack
 	 * page, realign thread0 kstack and start using it.
-	*/
-	cgetdefault	CHERI_REG_KDC
+	 */
+	cgetdefault	$c3
 	PTR_LA	sp, _C_LABEL(thread0_st)
-	clc	CHERI_REG_STC, sp, TD_KSTACK(CHERI_REG_KDC)
+	clc	CHERI_REG_STC, sp, TD_KSTACK($c3)
 	cgetlen	a0, CHERI_REG_STC
 	REG_LI	t0, ~7
 	and	a0, a0, t0
@@ -274,7 +276,7 @@ restrict_pcc:
 	PTR_LA	t0, _C_LABEL(mi_startup)
 	cgetpccsetoffset $c12, t0
 	cjalr	$c12, $c17
-	nop
+	cmove	$c3, $cnull
 
 	PANIC("Startup failed!")
 
