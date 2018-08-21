@@ -315,22 +315,11 @@ slab_find_slow(uma_keg_t keg, void *item)
 	for (i = 0; i < vm_ndomains; i++) {
 		dom = &keg->uk_domain[i];
 		LIST_FOREACH(slab, &dom->ud_part_slab, us_link) {
-			/*
-			 * XXX-AM: the is-subset check should be used
-			 * when bounds are correctly enforced. For now check that
-			 * the address falls between slab->us_data and keg->uk_size
-			 */
-			/* if (cheri_is_subset(slab->us_data, item)) */
-			if (ptr_to_va(item) >= ptr_to_va(slab->us_data) &&
-			    ptr_to_va(item) <= ptr_to_va(slab->us_data) +
-			    keg->uk_ipers * keg->uk_rsize)
+			if (cheri_is_subset(slab->us_data, item))
 				return (slab);
 		}
 		LIST_FOREACH(slab, &dom->ud_full_slab, us_link) {
-			/* if (cheri_is_subset(slab->us_data, item)) */
-			if (ptr_to_va(item) >= ptr_to_va(slab->us_data) &&
-			    ptr_to_va(item) <= ptr_to_va(slab->us_data) +
-			    keg->uk_ipers * keg->uk_rsize)
+			if (cheri_is_subset(slab->us_data, item))
 				return (slab);
 		}
 	}
@@ -1065,12 +1054,7 @@ keg_alloc_slab(uma_keg_t keg, uma_zone_t zone, int domain, int wait)
 		slab = NULL;
 		goto out;
 	}
-	/*
-	 * XXX-AM: we should set bounds on the allocated slab.
-	 * This however breaks attempts to get back the slab pointer
-	 * from the item in zone_release and uma_dbg_getslab.
-	 */
-	/* CHERI_VM_ASSERT_BOUNDS(mem, size); */
+	CHERI_VM_ASSERT_BOUNDS(mem, size);
 	uma_total_inc(size);
 
 	/*
@@ -1079,24 +1063,16 @@ keg_alloc_slab(uma_keg_t keg, uma_zone_t zone, int domain, int wait)
 	 * structure pointer.
 	 */
 	if (!(keg->uk_flags & UMA_ZONE_OFFPAGE))
-		/* slab = (uma_slab_t)cheri_bound(mem + keg->uk_pgoff, */
-		/*	sizeof(struct uma_slab)); */
-		slab = (uma_slab_t)(mem + keg->uk_pgoff);
+		slab = (uma_slab_t)cheri_bound(mem + keg->uk_pgoff,
+		    sizeof(struct uma_slab));
 
 	if (keg->uk_flags & UMA_ZONE_VTOSLAB)
 		for (i = 0; i < keg->uk_ppera; i++)
 			vsetslab(ptr_to_va(mem) + (i * PAGE_SIZE), slab);
 
 	slab->us_keg = keg;
-	/*
-	 * XXX-AM: Would be nice to properly have bounds for slab items and
-	 * slab control block to be separate, so that operations on
-	 * the items can never touch the slab control block.
-	 * However uma_dbg_getslab recovers the slab from an item so it breaks.
-	 *
-	 * slab->us_data = cheri_bound(mem, keg->uk_pgoff);
-	 */
-	slab->us_data = mem;
+	slab->us_data = cheri_bound(mem, (keg->uk_flags & UMA_ZONE_OFFPAGE) ?
+	    size : keg->uk_pgoff);
 	slab->us_freecount = keg->uk_ipers;
 	slab->us_flags = flags;
 	slab->us_domain = domain;
@@ -1198,13 +1174,7 @@ startup_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 	bootmem += pages * PAGE_SIZE;
 	*pflag = UMA_SLAB_BOOT;
 
-	/*
-	 * XXX-AM: we should set bounds on the allocated slab.
-	 * This however breaks attempts to get back the slab pointer
-	 * from the item in zone_release and uma_dbg_getslab.
-	 */
-	/* return (cheri_bound(mem, bytes)); */
-	return (mem);
+	return (cheri_bound(mem, bytes));
 }
 
 /*
@@ -1303,13 +1273,7 @@ noobj_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *flags,
 	}
 
 	CHERI_VM_ASSERT_VALID(retkva);
-	/*
-	 * XXX-AM: we should set bounds on the allocated slab.
-	 * This however breaks attempts to get back the slab pointer
-	 * from the item in zone_release and uma_dbg_getslab.
-	 */
-	/* return (cheri_bound((void *)retkva, bytes)); */
-	return (void *)(retkva);
+	return (cheri_bound((void *)retkva, bytes));
 }
 
 /*
@@ -2926,12 +2890,7 @@ zone_alloc_item(uma_zone_t zone, void *udata, int domain, int flags)
 			goto fail;
 		}
 	}
-	/*
-	 * XXX-AM: we should set bounds on the allocated slab.
-	 * This however breaks attempts to get back the slab pointer
-	 * from the item in zone_release and uma_dbg_getslab.
-	 */
-	/* item = cheri_bound(item, zone->uz_size);	 */
+	item = cheri_bound(item, zone->uz_size);
 #ifdef INVARIANTS
 	uma_dbg_alloc(zone, NULL, item);
 #endif
@@ -4008,14 +3967,9 @@ uma_dbg_alloc(uma_zone_t zone, uma_slab_t slab, void *item)
 	keg = slab->us_keg;
 #ifdef CHERI_KERNEL
 	/* Check first that item is a subset of slab->us_data */
-	/* XXX-AM: Disable this until we set proper bounds on
-	 * items and us_data.
-	 */
-	/* if (cheri_getbase(item) < cheri_getbase(slab->us_data) || */
-	/*     (cheri_getbase(item) + cheri_getlen(item) > */
-	/*      cheri_getbase(slab->us_data) + cheri_getlen(slab->us_data))) */
-	/*	panic("Item capability %p is not a subset of the" */
-	/*	      "slab capability %p.", item, slab->us_data); */
+	if (!cheri_is_subset(slab->us_data, item))
+		panic("Item capability %p is not a subset of the"
+		    "slab capability %p.", item, slab->us_data);
 #endif
 	freei = (ptr_to_va(item) - ptr_to_va(slab->us_data)) / keg->uk_rsize;
 
@@ -4049,14 +4003,9 @@ uma_dbg_free(uma_zone_t zone, uma_slab_t slab, void *item)
 	keg = slab->us_keg;
 #ifdef CHERI_KERNEL
 	/* Check first that item is a subset of slab->us_data */
-	/* XXX-AM: Disable this until we set proper bounds on
-	 * items and us_data.
-	 */
-	/* if (cheri_getbase(item) < cheri_getbase(slab->us_data) || */
-	/*     (cheri_getbase(item) + cheri_getlen(item) > */
-	/*      cheri_getbase(slab->us_data) + cheri_getlen(slab->us_data))) */
-	/*	panic("Item capability %p is not a subset of the" */
-	/*	      " slab capability %p.", item, slab->us_data); */
+	if (!cheri_is_subset(slab->us_data, item))
+		panic("Item capability %p is not a subset of the"
+		    " slab capability %p.", item, slab->us_data);
 #endif
 	freei = (ptr_to_va(item) - ptr_to_va(slab->us_data)) / keg->uk_rsize;
 
