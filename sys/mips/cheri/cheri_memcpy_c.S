@@ -288,7 +288,7 @@ XLEAF(FUNC_PREFIX(bcopy_c))
 	li		t9, CHERICAP_SIZE	// enough bytes to copy for a cap aligned copy?
 	daddu		t9, t9, t2
 	slt		t9, a0, t9
-	bnez		t9, .L.f_cannot_be_word_aligned
+	bnez		t9, .L.b_cannot_be_cap_aligned
 .L.b_can_be_cap_aligned:
 	andi		t8, t0, (CHERICAP_SIZE - 1)	// just to capability
 	beqz		t8, .L.b_cap_copy	// already aligned (common)
