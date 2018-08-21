@@ -1191,9 +1191,9 @@ startup_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 	/* Align bootmem to slab size */
 	mem = roundup2(bootmem, UMA_SLAB_SIZE);
 	boot_pages -= ((caddr_t)mem - bootmem) / PAGE_SIZE;
-#else
-	mem = bootmem;
+	bootmem = mem;
 #endif
+	mem = bootmem;
 	boot_pages -= pages;
 	bootmem += pages * PAGE_SIZE;
 	*pflag = UMA_SLAB_BOOT;
@@ -1932,14 +1932,17 @@ uma_startup_count(int vm_zones)
 	/* Memory for the rest of startup zones, UMA and VM, ... */
 	if (zsize > UMA_SLAB_SIZE)
 		pages += (zones + vm_zones) *
-		    howmany(roundup2(zsize, UMA_BOOT_ALIGN), UMA_SLAB_SIZE);
+		    howmany(roundup2(zsize, UMA_BOOT_ALIGN), UMA_SLAB_SIZE) *
+		    howmany(UMA_SLAB_SIZE, PAGE_SIZE);
 	else
 		pages += howmany(zones,
-		    UMA_SLAB_SPACE / roundup2(zsize, UMA_BOOT_ALIGN));
+		    UMA_SLAB_SPACE / roundup2(zsize, UMA_BOOT_ALIGN)) *
+		    howmany(UMA_SLAB_SIZE, PAGE_SIZE);
 
 	/* ... and their kegs. Note that zone of zones allocates a keg! */
 	pages += howmany(zones + 1,
-	    UMA_SLAB_SPACE / roundup2(ksize, UMA_BOOT_ALIGN));
+	    UMA_SLAB_SPACE / roundup2(ksize, UMA_BOOT_ALIGN)) *
+	    howmany(UMA_SLAB_SIZE, PAGE_SIZE);
 
 	/*
 	 * Most of startup zones are not going to be offpages, that's
@@ -1950,7 +1953,8 @@ uma_startup_count(int vm_zones)
 	 * us some positive inaccuracy, usually an extra single page.
 	 */
 	pages += howmany(zones, UMA_SLAB_SPACE /
-	    (sizeof(struct slabhead *) * UMA_HASH_SIZE_INIT));
+	    (sizeof(struct slabhead *) * UMA_HASH_SIZE_INIT)) *
+	    howmany(UMA_SLAB_SIZE, PAGE_SIZE);
 
 	return (pages);
 }
@@ -3616,7 +3620,7 @@ uma_large_malloc_domain(vm_size_t size, int domain, int wait)
 		slab->us_data = (void *)addr;
 		slab->us_flags = UMA_SLAB_KERNEL | UMA_SLAB_MALLOC;
 		slab->us_size = size;
-		slab->us_domain = vm_phys_domidx(PHYS_TO_VM_PAGE(
+		slab->us_domain = vm_phys_domain(PHYS_TO_VM_PAGE(
 		    pmap_kextract(ptr_to_va(addr))));
 		uma_total_inc(size);
 	} else {

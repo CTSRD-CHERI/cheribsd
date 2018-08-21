@@ -31,6 +31,7 @@ nooptions	FFS
 nooptions	GEOM_RAID
 
 # debugging
+options		DIAGNOSTIC
 options		VERBOSE_SYSINIT
 options		BUS_DEBUG
 options		CAMDEBUG

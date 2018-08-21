@@ -517,13 +517,14 @@ vm_page_startup(vm_ptr_t vaddr)
 	boot_pages += vmem_startup_count();
 	/* vm_map_startup() calls uma_prealloc(). */
 	boot_pages += howmany(MAX_KMAP,
-	    UMA_SLAB_SPACE / sizeof(struct vm_map));
+	    UMA_SLAB_SPACE / sizeof(struct vm_map)) *
+	    howmany(UMA_SLAB_SIZE, PAGE_SIZE);
 
 	/*
 	 * Before going fully functional kmem_init() does allocation
 	 * from "KMAP ENTRY" and vmem_create() does allocation from "vmem".
 	 */
-	boot_pages += 2;
+	boot_pages += 2 * howmany(UMA_SLAB_SIZE, PAGE_SIZE);
 #endif
 	/*
 	 * CTFLAG_RDTUN doesn't work during the early boot process, so we must
