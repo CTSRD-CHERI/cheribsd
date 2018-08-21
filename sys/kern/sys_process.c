@@ -1133,9 +1133,9 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		case PT_TO_SCE:
 		case PT_TO_SCX:
 		case PT_SYSCALL:
-			if ((__cheri_addr uintptr_t)addr != 1) {
+			if ((__cheri_addr vaddr_t)addr != 1) {
 				error = ptrace_set_pc(td2,
-				    (u_long)(__cheri_addr uintfptr_t)addr);
+				    (u_long)(__cheri_addr vaddr_t)addr);
 				if (error)
 					goto out;
 			}
@@ -1145,7 +1145,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 				CTR4(KTR_PTRACE,
 		    "PT_TO_SCE: pid %d, events = %#x, PC = %#lx, sig = %d",
 				    p->p_pid, p->p_ptevents,
-				    (u_long)(__cheri_addr uintfptr_t)addr,
+				    (u_long)(__cheri_addr vaddr_t)addr,
 				    data);
 				break;
 			case PT_TO_SCX:
@@ -1153,7 +1153,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 				CTR4(KTR_PTRACE,
 		    "PT_TO_SCX: pid %d, events = %#x, PC = %#lx, sig = %d",
 				    p->p_pid, p->p_ptevents,
-				    (u_long)(__cheri_addr uintfptr_t)addr,
+				    (u_long)(__cheri_addr vaddr_t)addr,
 				    data);
 				break;
 			case PT_SYSCALL:
@@ -1161,14 +1161,14 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 				CTR4(KTR_PTRACE,
 		    "PT_SYSCALL: pid %d, events = %#x, PC = %#lx, sig = %d",
 				    p->p_pid, p->p_ptevents,
-				    (u_long)(__cheri_addr uintfptr_t)addr,
+				    (u_long)(__cheri_addr vaddr_t)addr,
 				    data);
 				break;
 			case PT_CONTINUE:
 				CTR3(KTR_PTRACE,
 				    "PT_CONTINUE: pid %d, PC = %#lx, sig = %d",
 				    p->p_pid,
-				    (u_long)(__cheri_addr uintfptr_t)addr,
+				    (u_long)(__cheri_addr vaddr_t)addr,
 				    data);
 				break;
 			}
