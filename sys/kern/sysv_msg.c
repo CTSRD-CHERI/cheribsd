@@ -1890,8 +1890,8 @@ cheriabi_msgctl(struct thread *td, struct cheriabi_msgctl_args *uap)
 		if (error)
 			return (error);
 		CP(msqbuf_c, msqbuf, msg_perm);
-		msqbuf.msg_first = NULL;	/* Ignored */
-		msqbuf.msg_last = NULL;		/* Ignored */
+		msqbuf.__msg_first = NULL;	/* Ignored */
+		msqbuf.__msg_last = NULL;	/* Ignored */
 		CP(msqbuf_c, msqbuf, msg_cbytes);
 		CP(msqbuf_c, msqbuf, msg_qnum);
 		CP(msqbuf_c, msqbuf, msg_qbytes);
