@@ -91,7 +91,7 @@ cheri_is_subset(const void *parent, const void *ptr)
 	if (cheri_getbase(ptr) < cheri_getbase(parent))
 		return false;
 	if (cheri_getbase(ptr) + cheri_getlen(ptr) >
-	    cheri_getbase(parent) + cheri_getlen(ptr))
+	    cheri_getbase(parent) + cheri_getlen(parent))
 		return false;
 	if ((cheri_getperm(ptr) & cheri_getperm(parent)) != cheri_getperm(ptr))
 		return false;
