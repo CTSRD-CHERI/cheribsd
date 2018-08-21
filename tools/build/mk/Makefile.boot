@@ -11,6 +11,7 @@ BUILD_TOOLS_LDFLAGS=${LDFLAGS}
 # we do not want to capture dependencies referring to the above
 UPDATE_DEPENDFILE= no
 
+.if !make(obj)
 # When building host tools we should never pull in headers from the source sys
 # directory to avoid any ABI issues that might cause the built binary to crash.
 # The only exceptions to this are sys/cddl/compat for dtrace bootstrap tools and
@@ -26,4 +27,5 @@ UPDATE_DEPENDFILE= no
 .error Do not include $${SRCTOP}/include when building bootstrap tools. \
     Copy the header to $${WORLDTMP}/legacy in tools/build/Makefile instead. \
     Error was caused by Makefile in ${.CURDIR}
+.endif
 .endif
