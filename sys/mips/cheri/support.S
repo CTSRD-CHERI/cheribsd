@@ -817,9 +817,6 @@ XLEAF(memset_c)
 	sll	t2, t1, 16		# shift that left 16
 	or	t1, t2, t1		# or together
 
-	/*
-	 * XXX-AM: can we ignore the base?
-	 */
 	cgetbase	t2, $c3
 	cgetoffset	t3, $c3
 	PTR_ADDU	t3, t2, t3
@@ -847,7 +844,7 @@ XLEAF(memset_c)
 
 memsetsmallclr:
 	ble	a1, zero, 2f
-	cincoffset	$c2, $c3, a1	# compute ending address
+	cincoffset	$c2, $c1, a1	# compute ending address
 1:
 	cincoffset	$c1, $c1, 1	# clear bytes
 	ceq	t0, $c1, $c2
