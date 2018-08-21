@@ -140,11 +140,11 @@ typedef	__uid_t		uid_t;
 #if !__has_feature(capabilities)
 #define	__intcap_t __intptr_t
 #endif
-#define	SIG_DFL		((__sighandler_t * __kerncap)(__intcap_t)0)
-#define	SIG_IGN		((__sighandler_t * __kerncap)(__intcap_t)1)
-#define	SIG_ERR		((__sighandler_t * __kerncap)(__intcap_t)-1)
-/* #define	SIG_CATCH	((__sighandler_t *)(__intcap_t)2) See signalvar.h */
-#define SIG_HOLD        ((__sighandler_t * __kerncap)(__intcap_t)3)
+#define	SIG_DFL		((__sighandler_t * __kerncap)(__intptr_t)0)
+#define	SIG_IGN		((__sighandler_t * __kerncap)(__intptr_t)1)
+#define	SIG_ERR		((__sighandler_t * __kerncap)(__intptr_t)-1)
+/* #define	SIG_CATCH	((__sighandler_t *)(__intptr_t)2) See signalvar.h */
+#define SIG_HOLD        ((__sighandler_t * __kerncap)(__intptr_t)3)
 
 /*
  * Type of a signal handling function.
