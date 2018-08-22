@@ -427,6 +427,12 @@ void uma_large_free(uma_slab_t slab);
 #define	ZONE_UNLOCK(z)	mtx_unlock((z)->uz_lockptr)
 #define	ZONE_LOCK_FINI(z)	mtx_destroy(&(z)->uz_lock)
 
+#ifdef CHERI_KERNEL
+extern vm_offset_t uma_bootmem_start;
+extern vm_offset_t uma_bootmem_end;
+extern uma_slab_t *uma_boot_vtoslab;
+#endif
+
 /*
  * Find a slab within a hash table.  This is used for OFFPAGE zones to lookup
  * the slab structure.
@@ -458,6 +464,18 @@ vtoslab(vm_offset_t va)
 {
 	vm_page_t p;
 
+#ifdef CHERI_KERNEL
+	int page_index;
+
+	if (va >= uma_bootmem_start && va < uma_bootmem_end) {
+		/*
+		 * Boot memory does not have vm_pages associated so
+		 * we use a custom vtoslab map for boot pages.
+		 */
+		page_index = (trunc_page(va) - uma_bootmem_start) / PAGE_SIZE;
+		return (uma_boot_vtoslab[page_index]);
+	}
+#endif
 	p = PHYS_TO_VM_PAGE(pmap_kextract(va));
 	return ((uma_slab_t)p->plinks.s.pv);
 }
@@ -467,6 +485,19 @@ vsetslab(vm_offset_t va, uma_slab_t slab)
 {
 	vm_page_t p;
 
+#ifdef CHERI_KERNEL
+	int page_index;
+
+	if (va >= uma_bootmem_start && va < uma_bootmem_end) {
+		/*
+		 * Boot memory does not have vm_pages associated so
+		 * we use a custom vtoslab map for boot pages.
+		 */
+		page_index = (trunc_page(va) - uma_bootmem_start) / PAGE_SIZE;
+		uma_boot_vtoslab[page_index] = slab;
+		return;
+	}
+#endif
 	p = PHYS_TO_VM_PAGE(pmap_kextract(va));
 	p->plinks.s.pv = slab;
 }

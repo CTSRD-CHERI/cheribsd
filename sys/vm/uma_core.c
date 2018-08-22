@@ -140,6 +140,18 @@ static struct rwlock_padalign __exclusive_cache_line uma_rwlock;
  */
 static char *bootmem;
 static int boot_pages;
+#ifdef CHERI_KERNEL
+/*
+ * Boundaries of the UMA boot memory pool.
+ */
+vm_offset_t uma_bootmem_start;
+vm_offset_t uma_bootmem_end;
+/*
+ * Map slab to pages in the boot memory pool.
+ * These do not have any vm_page to store the slab pointer in.
+ */
+uma_slab_t *uma_boot_vtoslab;
+#endif
 
 static struct sx uma_drain_lock;
 
@@ -290,42 +302,6 @@ SYSCTL_PROC(_vm, OID_AUTO, zone_stats, CTLFLAG_RD|CTLTYPE_STRUCT,
 static int zone_warnings = 1;
 SYSCTL_INT(_vm, OID_AUTO, zone_warnings, CTLFLAG_RWTUN, &zone_warnings, 0,
     "Warn when UMA zones becomes full");
-
-#ifdef CHERI_KERNEL
-/*
- * Find a slab in the keg slab lists.
- * This is slow and should be used as a last-resort if all else can
- * not be used.
- * The keg must be locked.
- *
- * Arguments:
- *
- * Returns:
- *	A pointer to a slab if successful, else NULL.
- */
-static uma_slab_t
-slab_find_slow(uma_keg_t keg, void *item)
-{
-	uma_slab_t slab;
-	uma_domain_t dom;
-	int i;
-
-	mtx_assert(&(keg)->uk_lock, MA_OWNED);
-
-	for (i = 0; i < vm_ndomains; i++) {
-		dom = &keg->uk_domain[i];
-		LIST_FOREACH(slab, &dom->ud_part_slab, us_link) {
-			if (cheri_is_subset(slab->us_data, item))
-				return (slab);
-		}
-		LIST_FOREACH(slab, &dom->ud_full_slab, us_link) {
-			if (cheri_is_subset(slab->us_data, item))
-				return (slab);
-		}
-	}
-	return (NULL);
-}
-#endif
 
 /* Adjust bytes under management by UMA. */
 static inline void
@@ -1521,6 +1497,11 @@ keg_ctor(void *mem, int size, void *udata, int flags)
 	keg->uk_flags = arg->flags;
 	keg->uk_slabzone = NULL;
 
+#ifdef CHERI_KERNEL
+	if ((keg->uk_flags & UMA_ZONE_HASH) == 0)
+		keg->uk_flags |= UMA_ZONE_VTOSLAB;
+#endif
+
 	/*
 	 * The master zone is passed to us at keg-creation time.
 	 */
@@ -1938,6 +1919,13 @@ uma_startup(void *mem, int npages)
 
 	/* Use bootpages memory for the zone of zones and zone of kegs. */
 	m = (uintptr_t)mem;
+#ifdef CHERI_KERNEL
+	uma_bootmem_start = ptr_to_va(mem);
+	uma_bootmem_end = uma_bootmem_start + (npages * PAGE_SIZE);
+	uma_boot_vtoslab = (uma_slab_t *)m;
+	m += sizeof(uma_slab_t) * npages;
+	bzero(uma_boot_vtoslab, sizeof(uma_slab_t) * npages);
+#endif
 	zones = (uma_zone_t)m;
 	m += roundup(zsize, CACHE_LINE_SIZE);
 	kegs = (uma_zone_t)m;
@@ -3155,7 +3143,7 @@ zone_release(uma_zone_t zone, void **bucket, int cnt)
 				slab = hash_sfind(&keg->uk_hash, mem);
 			} else {
 #ifdef CHERI_KERNEL
-				slab = slab_find_slow(keg, item);
+				slab = vtoslab(ptr_to_va(item));
 #else
 				mem += keg->uk_pgoff;
 				slab = (uma_slab_t)mem;
@@ -3936,7 +3924,7 @@ uma_dbg_getslab(uma_zone_t zone, void *item)
 		}
 		else {
 #ifdef CHERI_KERNEL
-			slab = slab_find_slow(keg, item);
+			slab = vtoslab(ptr_to_va(item));
 #else
 			slab = (uma_slab_t)(mem + keg->uk_pgoff);
 #endif
