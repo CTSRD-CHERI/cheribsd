@@ -455,6 +455,7 @@ DECLARE_CHERI_TEST(test_sandbox_syscall);
 DECLARE_CHERI_TEST(test_sig_dfl_neq_ign);
 DECLARE_CHERI_TEST(test_sig_dfl_ign);
 DECLARE_CHERI_TEST(test_ptrace_basic);
+DECLARE_CHERI_TEST(test_aio_sival);
 
 /* cheritest_registers.c */
 DECLARE_CHERI_TEST(test_initregs_default);
