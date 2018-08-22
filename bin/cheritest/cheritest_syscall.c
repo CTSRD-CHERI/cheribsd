@@ -35,7 +35,9 @@
 #endif
 
 #include <sys/types.h>
+#include <sys/aio.h>
 #include <sys/signal.h>
+#include <sys/socket.h>
 #include <sys/sysctl.h>
 #include <sys/wait.h>
 #include <sys/time.h>
@@ -230,5 +232,81 @@ test_ptrace_basic(const struct cheri_test *ctp __unused)
 		sigemptyset(&ss);
 		sigsuspend(&ss);
 		exit(23);
+	}
+}
+
+static int test_aio_sival_signal = 0;
+static siginfo_t test_aio_sival_info = { 0 };
+
+static void
+test_aio_sival_handler(int sig, siginfo_t *si, void *uc __unused)
+{
+	test_aio_sival_signal = sig;
+	test_aio_sival_info = *si;
+}
+
+void
+test_aio_sival(const struct cheri_test *cpt __unused)
+{
+	char buf[128];
+	int pfd[2];
+	int res;
+	sigset_t sigset, osigset;
+	struct aiocb aiocb;
+	struct sigaction sa;
+
+	sa.sa_flags = SA_SIGINFO;
+	sa.sa_sigaction = &test_aio_sival_handler;
+	res = sigaction(SIGUSR1, &sa, NULL);
+	CHERITEST_VERIFY2(res == 0, "Could not install AIO handler; errno=%d", errno);
+
+	res = sigaction(SIGALRM, &sa, NULL);
+	CHERITEST_VERIFY2(res == 0, "Could not install ALRM handler; errno=%d", errno);
+
+	res = socketpair(AF_UNIX, SOCK_STREAM, 0, pfd);
+	CHERITEST_VERIFY2(res == 0, "Could not create socketpair; errno=%d", errno);
+
+	aiocb.aio_fildes = pfd[0];
+	aiocb.aio_buf = buf;
+	aiocb.aio_nbytes = sizeof(buf);
+	aiocb.aio_lio_opcode = LIO_READ;
+
+	aiocb.aio_sigevent.sigev_notify = SIGEV_SIGNAL;
+	aiocb.aio_sigevent.sigev_signo = SIGUSR1;
+	aiocb.aio_sigevent.sigev_value.sival_ptr = test_aio_sival_handler;
+
+	res = aio_read(&aiocb);
+	CHERITEST_VERIFY2(res == 0, "Could not register aio; errno=%d", errno);
+
+	CHERITEST_VERIFY(sigemptyset(&sigset) == 0);
+	CHERITEST_VERIFY(sigaddset(&sigset, SIGUSR1) == 0);
+	CHERITEST_VERIFY(sigaddset(&sigset, SIGALRM) == 0);
+	CHERITEST_VERIFY(sigprocmask(SIG_BLOCK, &sigset, &osigset) == 0);
+	close(pfd[1]);
+	alarm(2);
+	CHERITEST_VERIFY(sigsuspend(&osigset) == -1 && errno == EINTR);
+	close(pfd[0]);
+
+	switch (test_aio_sival_signal) {
+	case SIGALRM:
+		cheritest_failure_errx("Test timeout!");
+		break;
+	case 0:
+		cheritest_failure_errx("No signal received?");
+		break;
+	default:
+		cheritest_failure_errx("Bad signal %d",
+					test_aio_sival_signal);
+		break;
+	case SIGUSR1:
+		CHERITEST_VERIFY2(test_aio_sival_info.si_code == SI_ASYNCIO,
+			"Signal not asyncio?  code=%d",
+			test_aio_sival_info.si_code);
+		CHERITEST_VERIFY2(test_aio_sival_info.si_value.sival_ptr ==
+				  test_aio_sival_handler,
+			"Bad si_value; expected=%p got=%p",
+			test_aio_sival_handler,
+			test_aio_sival_info.si_value.sival_ptr);
+		cheritest_success();
 	}
 }
