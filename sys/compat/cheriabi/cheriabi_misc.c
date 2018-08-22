@@ -127,7 +127,6 @@ __FBSDID("$FreeBSD$");
 #include <compat/cheriabi/cheriabi_signal.h>
 #include <compat/cheriabi/cheriabi_proto.h>
 #include <compat/cheriabi/cheriabi_syscall.h>
-#include <compat/cheriabi/cheriabi_sysargmap.h>
 
 #include <sys/cheriabi.h>
 

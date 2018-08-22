@@ -103,7 +103,6 @@ __FBSDID("$FreeBSD$");
 #include <compat/cheriabi/cheriabi_proto.h>
 #include <compat/cheriabi/cheriabi_syscall.h>
 #include <compat/cheriabi/cheriabi_util.h>
-#include <compat/cheriabi/cheriabi_sysargmap.h>
 #endif
 
 #include <security/audit/audit.h>
