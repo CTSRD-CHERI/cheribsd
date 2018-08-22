@@ -43,7 +43,7 @@
 #include <machine/cherireg.h>
 #endif
 
-#include "assym.s"
+#include "assym.inc"
 
 .set noat
 .set noreorder
