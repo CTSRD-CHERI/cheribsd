@@ -79,7 +79,7 @@ __FBSDID("$FreeBSD$");
 static MALLOC_DEFINE(M_NEWRENO, "newreno data",
 	"newreno beta values");
 
-#define	CAST_PTR_INT(X) (*((int*)(X)))
+#define	CAST_PTR_INT(X) (*((int * __capability)(X)))
 
 static int newreno_cb_init(struct cc_var *ccv);
 static void	newreno_ack_received(struct cc_var *ccv, uint16_t type);
@@ -374,3 +374,12 @@ SYSCTL_PROC(_net_inet_tcp_cc_newreno, OID_AUTO, beta_ecn,
 	"New Reno beta ecn, specified as number between 1 and 100");
 
 DECLARE_CC_MODULE(newreno, &newreno_cc_algo);
+
+// CHERI CHANGES START
+// {
+//   "updated": 20180822,
+//   "changes": [
+//     "pointer_integrity"
+//   ]
+// }
+// CHERI CHANGES END
