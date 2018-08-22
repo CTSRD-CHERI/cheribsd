@@ -1164,6 +1164,10 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Test basic handling of ptrace functionality",
 	  .ct_func = test_ptrace_basic, },
 
+	{ .ct_name = "test_aio_sival",
+	  .ct_desc = "Test pointer passing through AIO signals",
+	  .ct_func = test_aio_sival, },
+
 #ifdef CHERI_LIBCHERI_TESTS
 	/*
 	 * Test libcheri sandboxing -- and kernel sandbox unwind.
