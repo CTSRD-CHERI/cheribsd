@@ -78,7 +78,7 @@
 #include <compat/cheriabi/cheriabi.h>
 #include <compat/cheriabi/cheriabi_proto.h>
 #include <compat/cheriabi/cheriabi_syscall.h>
-#include <compat/cheriabi/cheriabi_sysargmap2.h>
+#include <compat/cheriabi/cheriabi_sysargmap.h>
 #include <compat/cheriabi/cheriabi_util.h>
 
 #include <ddb/ddb.h>
