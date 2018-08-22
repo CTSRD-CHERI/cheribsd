@@ -112,8 +112,6 @@ SUBDIR=	\
 	de \
 	${_dpms} \
 	${_dpt} \
-	${_drm} \
-	${_drm2} \
 	dummynet \
 	${_ed} \
 	${_efirt} \
@@ -594,8 +592,6 @@ _cpuctl=	cpuctl
 _cpufreq=	cpufreq
 _cs=		cs
 _dpms=		dpms
-_drm=		drm
-_drm2=		drm2
 _ed=		ed
 _em=		em
 _ena=		ena
@@ -792,7 +788,6 @@ _cardbus=	cardbus
 _cbb=		cbb
 _cfi=		cfi
 _cpufreq=	cpufreq
-_drm=		drm
 _exca=		exca
 _ffec=		ffec
 _nvd=		nvd
@@ -802,7 +797,6 @@ _wi=		wi
 .endif
 
 .if ${MACHINE_ARCH} == "powerpc64"
-_drm2=		drm2
 _ipmi=		ipmi
 .endif
 .if ${MACHINE_ARCH} == "powerpc64" || ${MACHINE_ARCH} == "powerpc"
