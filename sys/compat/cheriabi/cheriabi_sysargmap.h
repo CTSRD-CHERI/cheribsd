@@ -5,8 +5,8 @@
  * $FreeBSD$
  */
 
-#ifndef _CHERIABI_SYSARGMAP2_H_
-#define	_CHERIABI_SYSARGMAP2_H_
+#ifndef _CHERIABI_SYSARGMAP_H_
+#define	_CHERIABI_SYSARGMAP_H_
 
 int cheriabi_sysargmask[] = {
  [CHERIABI_SYS_cheriabi_syscall] = (0x0),
@@ -355,4 +355,4 @@ int cheriabi_sysargmask[] = {
  [CHERIABI_SYS_cheriabi_cpuset_setdomain] = (0x0 | 0x10),
 };
 
-#endif /* !_CHERIABI_SYSARGMAP2_H_ */
+#endif /* !_CHERIABI_SYSARGMAP_H_ */
