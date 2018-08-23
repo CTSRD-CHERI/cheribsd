@@ -44,7 +44,7 @@
 #include <machine/cherireg.h>
 #include <machine/cheriasm.h>
 
-#include "assym.s"
+#include "assym.inc"
 
 	.set	cheri_sysregs_accessible
 	.set	noreorder

@@ -72,7 +72,7 @@
 #include <machine/cheriasm.h>
 #include <machine/cherireg.h>
 
-#include "assym.s"
+#include "assym.inc"
 
 	/* Don't warn about uses of c27-c30 */
 	.set cheri_sysregs_accessible

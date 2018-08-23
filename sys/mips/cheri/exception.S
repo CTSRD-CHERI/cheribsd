@@ -131,7 +131,7 @@
 #include <machine/cherireg.h>
 .set cheri_sysregs_accessible	# Don't warn on access to c27-c30
 
-#include "assym.s"
+#include "assym.inc"
 
 	.option pic0
 	.set	noreorder		# Noreorder is default style!

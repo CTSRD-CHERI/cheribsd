@@ -80,7 +80,7 @@
 #include <machine/cherireg.h>
 .set cheri_sysregs_accessible
 
-#include "assym.s"
+#include "assym.inc"
 
 	.option pic0
 	.set	noreorder			# Noreorder is default style!
