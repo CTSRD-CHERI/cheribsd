@@ -435,7 +435,7 @@ sx_try_upgrade_int(struct sx *sx LOCK_FILE_LINE_ARG_DEF)
 			break;
 		waiters = ptr_get_flag(x, SX_LOCK_EXCLUSIVE_WAITERS);
 		if (atomic_fcmpset_acq_ptr(&sx->sx_lock, &x,
-		   ?ptr_set_flag(curthread, waiters)) {
+		    ptr_set_flag(curthread, waiters))) {
 			success = 1;
 			break;
 		}
