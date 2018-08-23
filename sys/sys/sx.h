@@ -41,6 +41,7 @@
 #include <sys/pcpu.h>
 #include <sys/lock_profile.h>
 #include <sys/lockstat.h>
+#include <sys/ptrbits.h>
 #include <machine/atomic.h>
 #endif
 
@@ -75,7 +76,7 @@
 	(SX_LOCK_SHARED | SX_LOCK_SHARED_WAITERS |			\
 	SX_LOCK_EXCLUSIVE_WAITERS | SX_LOCK_RECURSED)
 
-#define	SX_OWNER(x)		((x) & ~SX_LOCK_FLAGMASK)
+#define	SX_OWNER(x)		(ptr_clear_flag(x, SX_LOCK_FLAGMASK))
 #define	SX_SHARERS_SHIFT	4
 #define	SX_SHARERS(x)							\
 	(ptr_get_flag(x, ~SX_LOCK_FLAGMASK) >> SX_SHARERS_SHIFT)
@@ -248,7 +249,7 @@ __sx_xunlock(struct sx *sx, struct thread *td, const char *file, int line)
 	(struct thread *)SX_OWNER((sx)->sx_lock))
 
 #define	sx_xlocked(sx)							\
-	(((sx)->sx_lock & ~(SX_LOCK_FLAGMASK & ~SX_LOCK_SHARED)) ==	\
+	(ptr_clear_flag((sx)->sx_lock, (SX_LOCK_FLAGMASK & ~SX_LOCK_SHARED)) == \
 	    (uintptr_t)curthread)
 
 #define	sx_unlock_(sx, file, line) do {					\
