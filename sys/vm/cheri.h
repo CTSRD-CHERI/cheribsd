@@ -55,7 +55,7 @@
 		CHERI_VM_ASSERT_VALID(ptr);				\
 		KASSERT(cheri_getlen((void *)ptr) >= sizeof(void *),	\
 			("Cheri can not store a pointer here %p, "	\
-			 "not enugh_space(%d) %s %s:%d", ptr,		\
+			 "not enugh_space(%lu) %s %s:%d", ptr,		\
 			 (u_long)cheri_getlen((void *)ptr),		\
 			 __func__, __FILE__, __LINE__));		\
 	} while (0)
